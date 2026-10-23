@@ -138,7 +138,10 @@ export function trainSanity(filterRel, netRel, noisyRel) {
  * control is that record: held where it held there, reported as cited, never re-derived. Passing `shuffled` as well
  * is refused -- one control, one source.
  */
-export function verdict({ sets, shuffled, determinism, seedsDistinct, c0 = null, c6 = null, c1Train = null, c2Prior = null, test = "sign", alpha = 0.05, inFamily = "H1", c1Min = C1_MIN_WINS }) {
+export function verdict({ sets, shuffled, determinism, seedsDistinct, c0 = null, c6 = null, c1Train = null, c2Prior = null, test = "sign", alpha = 0.05, inFamily = "H1", c1Min = C1_MIN_WINS, c1Of = "both" }) {
+    // round 61 (section 139): c1Of, which arms C1 asks -- "both" (the candidate and its comparator), or "candidate" alone, for a
+    // comparator that does not start from the noisy frame (a held frame: section 138)
+    if (c1Of !== "both" && c1Of !== "candidate") throw new Error(`denoiseStats: c1Of is "both" or "candidate", got ${c1Of}`);
     // round 58 (section 131): c1Min, C1's wins over the noisy input a set needs -- 11 of 12 unless a round with another set size says
     if (c2Prior && shuffled) throw new Error("denoiseStats: C2 from a shuffled-target network AND from a prior round -- one source");
     if (c2Prior && !(typeof c2Prior.round === "number" && typeof c2Prior.ok === "boolean" && Number.isFinite(c2Prior.meanD)))
@@ -170,7 +173,7 @@ export function verdict({ sets, shuffled, determinism, seedsDistinct, c0 = null,
     for (const name of names) {
         const S = sets[name], net = seedMean(S.net), n = net.length;
         const netWins = net.filter((v, i) => v < S.noisy[i]).length, filterWins = S.filter.filter((v, i) => v < S.noisy[i]).length;
-        const c1 = netWins >= c1Min && filterWins >= c1Min;
+        const c1 = netWins >= c1Min && (c1Of === "candidate" || filterWins >= c1Min);
         const nearFloor = net.filter((v, i) => v <= C3_FLOOR_FACTOR * S.floor[i]).length;
         const d = effects(S.filter, net), k = d.filter((v) => v > 0).length, pSign = signTestUpper(k, n);
         // section 28 tests the mean of d by sign flips; every earlier round, the count k by the sign test
@@ -179,7 +182,7 @@ export function verdict({ sets, shuffled, determinism, seedsDistinct, c0 = null,
                     ...(test === "signflip" ? { test, pSign, pSignFlip: pFlip } : {}),
                     // with C1 decided on the training images, a test set's wins over the noisy input are reported, never tested
                     c1: c1Train ? { netWins, filterWins, tested: false } : { netWins, filterWins, ok: c1 }, c3: { nearFloor, resolvable: nearFloor <= n / 2 } };
-        if (!c1 && !c1Train) reasons.push(`C1 on ${name}: the network beat the noisy input on ${netWins} and the filter on ${filterWins} of ${n}; both need ${c1Min}`);
+        if (!c1 && !c1Train) reasons.push(`C1 on ${name}: the network beat the noisy input on ${netWins} and the filter on ${filterWins} of ${n}; ${c1Of === "candidate" ? "the candidate needs" : "both need"} ${c1Min}`);
     }
     if (!c1Train) controls.C1 = names.every((nm) => H[nm].c1.ok);
     const c1ok = c1Train ? c1Train.ok : controls.C1;

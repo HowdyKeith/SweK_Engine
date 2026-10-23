@@ -209,6 +209,19 @@ console.log("\n8. ROUND 58 (pre-registration section 131): ONE SET OF SIX, C1 AT
         `5 of 6: ${v5.run}, H1 ${v5.hypotheses.H1.status} at ${v5.hypotheses.H1.threshold} (p ${v5.hypotheses.H1.p}); default: ${v11.run}`);
 }
 
+// round 61 (section 139), by the byte-safe runner: DS4 verdict asking the comparator whatever c1Of says -- 1 RED (this section's row)
+console.log("\n9. ROUND 61 (pre-registration section 139): C1 ASKED OF THE CANDIDATE ALONE");
+{
+    // twelve images: the candidate beats the noisy input on all twelve, its comparator (a held frame) on only nine
+    const S = { noisy: Array(12).fill(1), filter: [...Array(9).fill(0.5), 2, 2, 2], net: [Array(12).fill(0.25)], floor: Array(12).fill(1e-3) };
+    const prior = { round: 11, meanD: -1.8564223228700172, ok: true }, base = { sets: { H1: S }, shuffled: null, c2Prior: prior, determinism: true, seedsDistinct: true, test: "signflip" };
+    const vc = verdict({ ...base, c1Of: "candidate" }), vb = verdict(base);
+    let bad = null; try { verdict({ ...base, c1Of: "comparator" }); } catch (e) { bad = e.message; }
+    ok("!! verdict()'s c1Of: asked of the candidate alone, a comparator that loses to the noisy input on 3 of 12 does not fire C1; asked of both (the default) it does; any other value is refused by name",
+        vc.run === "reported" && vc.controls.C1 === true && vb.run === "not reported" && vb.reasons.some((r) => /on 12 and the filter on 9 of 12; both need 11/.test(r)) &&
+        /c1Of is "both" or "candidate", got comparator/.test(bad || ""), `candidate: ${vc.run}; both: ${vb.run}`);
+}
+
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"}` +
     "\nnot closed here: that the measured errors handed to verdict() are the right ones. That is the harness's, next round.");
 process.exit(fails ? 1 : 0);

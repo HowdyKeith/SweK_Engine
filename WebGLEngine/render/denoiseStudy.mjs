@@ -21,14 +21,14 @@
 // Without it everything is computed, as before; with it the result is the same, bit for bit
 // (render/denoiseCache-selfcheck.mjs). A scene rendered under --harvest is never served to a run without it.
 "use strict";
-import { SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, SPLITS_R8, SPLITS_R9, SPLITS_R10, SPLITS_R11, SPLITS_MESH, SPLITS_FSR1, SPLITS_HALFRES, SPLITS_EMITTER, SPLITS_TEMPORALUP, SPLITS_R47, SPLITS_MESH_C, SPLITS_PAGE, SPLITS_FRAMEGEN, SPLITS_FRAMEGEN_LF, familyOf, makeScene, IMAGE, SPP_IN, SPP_REF, renderImages, renderSeeds, inputChannels, remodulate } from "./denoiseScenes.mjs";
+import { SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, SPLITS_R8, SPLITS_R9, SPLITS_R10, SPLITS_R11, SPLITS_MESH, SPLITS_FSR1, SPLITS_HALFRES, SPLITS_EMITTER, SPLITS_TEMPORALUP, SPLITS_R47, SPLITS_MESH_C, SPLITS_PAGE, SPLITS_FRAMEGEN, SPLITS_FRAMEGEN_LF, SPLITS_FRAMEGEN_DISPLAY, familyOf, makeScene, IMAGE, SPP_IN, SPP_REF, renderImages, renderSeeds, inputChannels, remodulate } from "./denoiseScenes.mjs";
 import { renderSequence, temporalChannels, sequenceSeeds } from "./denoiseTemporal.mjs";
 import { withMask, emitterCoverage, emitterRadiance, MASK_STRIDE, MASK_CHANNEL, COVERAGE_GRID } from "./denoiseMask.mjs";
 import { jointBilateral, tuneFilter } from "./denoiseFilter.mjs";
 import { trainDenoiser, denoise, TRAIN, TRAIN_LONG, INIT } from "./denoiseNet.mjs";
 import { relMSE, verdict, trainFit, historyFit, trainSanity, effects } from "./denoiseStats.mjs";
 import { cached, cachedMany, hashArrays } from "./denoiseCache.mjs";
-import { upscale, renderUpscaleImages, renderSeedsUpscale, emitterAwareUpscale, fillEmitters, compositeEmitters, nearEmitterShare, RCAS_SHARPNESS, RCAS_DENOISE, GAMMA } from "./denoiseUpscale.mjs";
+import { upscale, renderUpscaleImages, renderSeedsUpscale, emitterAwareUpscale, fillEmitters, compositeEmitters, nearEmitterShare, RCAS_SHARPNESS, RCAS_DENOISE, GAMMA, toPerceptual } from "./denoiseUpscale.mjs";
 import { trainParallel } from "./denoisePool.mjs";
 import { renderFrameGenImages, frameGenSeeds, frameGenFrames, FRAMEGEN_FILL } from "./denoiseFrameGen.mjs";
 import { renderTemporalUpscaleImages, temporalUpscaleSeeds, accumulateUpscaled, shiftResample, sequenceGeometry, halfShift, JITTER } from "./denoiseTemporalUpscale.mjs";
@@ -419,18 +419,22 @@ export const frameGenSets = (t) => ({ H1: { noisy: t.noisy, filter: t.X, net: [t
 export const RESULTS_FRAMEGEN_LF = "render/denoise-results-framegen-lf.json";
 export const ROUND_FRAMEGEN_LF = Object.freeze({ splits: SPLITS_FRAMEGEN_LF, image: 256, test: "signflip", c2Prior: ROUND_MESH.c2Prior, arrangement: "lightFree", results: RESULTS_FRAMEGEN_LF });
 export const frameGenSetsLightFree = (t) => ({ H1: { noisy: t.noisyMid, filter: t.Xl, net: [t.Gl], floor: t.floor }, H2: { noisy: t.noisyMid, filter: t.Rl, net: [t.Gl], floor: t.floor } });
-/** Round 26's transfer, Reinhard then gamma 2.2 -- the display space a secondary grades every arm in too. */
-const toDisplay = (y) => Float64Array.from(y, (v) => Math.pow(Math.max(0, v) / (1 + Math.max(0, v)), 1 / 2.2));
+/** Section 139, ROUND 61: the light-free arrangement graded in display space, C1 asked of the candidate alone, on new seeds. */
+export const RESULTS_FRAMEGEN_DISPLAY = "render/denoise-results-framegen-display.json";
+export const ROUND_FRAMEGEN_DISPLAY = Object.freeze({ splits: SPLITS_FRAMEGEN_DISPLAY, image: 256, test: "signflip", c2Prior: ROUND_MESH.c2Prior, arrangement: "lightFreeDisplay", c1Of: "candidate", results: RESULTS_FRAMEGEN_DISPLAY });
+/** Round 26's transfer, Reinhard then gamma 2.2 -- the display space a secondary grades every arm in too, and round 61 grades in. */
+export const toDisplay = (y) => Float64Array.from(y, toPerceptual);
 export function runFrameGenStudy({ splits = ROUND_FRAMEGEN.splits, net, test = ROUND_FRAMEGEN.test, c2Prior = ROUND_FRAMEGEN.c2Prior, arrangement = "shown",
                                    harvest = false, image = IMAGE, sppIn = SPP_IN, sppRef = SPP_REF, cache = null, log = () => {} } = {}) {
     if (!net) throw new Error("denoiseStudy: runFrameGenStudy needs the shipped network, decoded by its caller");
-    if (arrangement !== "shown" && arrangement !== "lightFree") throw new Error(`denoiseStudy: runFrameGenStudy's arrangement is "shown" (section 133) or "lightFree" (section 136), not ${arrangement}`);
-    const lf = arrangement === "lightFree";
+    if (!["shown", "lightFree", "lightFreeDisplay"].includes(arrangement)) throw new Error(`denoiseStudy: runFrameGenStudy's arrangement is "shown" (section 133), "lightFree" (section 136) or "lightFreeDisplay" (section 139), not ${arrangement}`);
+    // round 61: "lightFreeDisplay" is round 60's arms graded in display space, and its linear grading kept as the secondary
+    const lf = arrangement !== "shown", disp = arrangement === "lightFreeDisplay";
     const t0 = Date.now(), timings = {}, split = splits.T1;
     const lap = (k) => { timings[k] = Date.now() - t0; log(`${k} at ${(timings[k] / 1000).toFixed(1)} s`); };
     const config = { image, half: image / 2, sppIn, sppRef, harvest, test, c2Prior, fill: FRAMEGEN_FILL, t: 0.5, field: "the scene's own: eye 7's first hits projected into camera 6, per pixel",
                      trained: "nothing -- the shipped network", split: { family: split.family, n: split.seeds.length, first: split.seeds[0] },
-                     arrangement, hypotheses: lf
+                     arrangement, grading: disp ? "display: round 26's transfer, Reinhard then gamma 2.2, before relMSE" : "linear radiance", ...(disp ? { c1Of: "candidate" } : {}), hypotheses: lf
                          ? { H1: "G' (generated between L6 and L7, lit at the midpoint) against X' (their cross-fade, lit the same)", H2: "G' against R' (L6 held, lit the same)" }
                          : { H1: "G (generated between O6 and O7) against X (their cross-fade)", H2: "G against R (O6 repeated)" } };
     const keys = lf ? ["Gl", "Xl", "Rl", "noisyMid", "GlNoFill", "G", "X", "R", "O7", "noisy", "Bmid1"] : ["G", "X", "R", "O7", "noisy", "Bmid1", "GNoFill"], tables = Object.fromEntries(keys.map((k) => [k, []]));
@@ -445,9 +449,11 @@ export function runFrameGenStudy({ splits = ROUND_FRAMEGEN.splits, net, test = R
         const seq = cached(cache, `framegen-${fam}-${seed}-${image}-${sppIn}-${sppRef}-${harvest ? "harvest" : "gate"}`,
             () => renderFrameGenImages(fam, seed, { harvest, w: image, h: image, sppIn, sppRef }));
         const F = frameGenFrames(seq, net);
-        for (const k of keys) tables[k].push(relMSE(F[k], seq.ref));
-        tables.floor.push(relMSE(seq.ref2, seq.ref));
-        if (display) { const r = toDisplay(seq.ref); for (const k of Object.keys(display)) display[k].push(relMSE(toDisplay(F[k]), r)); }
+        const rD = disp ? toDisplay(seq.ref) : null;
+        for (const k of keys) tables[k].push(disp ? relMSE(toDisplay(F[k]), rD) : relMSE(F[k], seq.ref));
+        tables.floor.push(disp ? relMSE(toDisplay(seq.ref2), rD) : relMSE(seq.ref2, seq.ref));
+        // the other space's grading, reported: display beside a linear run, linear beside a display one
+        if (display) { const r = disp ? seq.ref : toDisplay(seq.ref); for (const k of Object.keys(display)) display[k].push(disp ? relMSE(F[k], r) : relMSE(toDisplay(F[k]), r)); }
         field.push(F.field);
         // C4: the candidate re-made from the same sequence, bit for bit -- the chain twice, the field, the splat, the fill
         const cand = lf ? "Gl" : "G";
@@ -456,10 +462,12 @@ export function runFrameGenStudy({ splits = ROUND_FRAMEGEN.splits, net, test = R
     });
     const allSeeds = split.seeds.flatMap((s) => { const r = frameGenSeeds(s); return [...r.half, r.mid, r.ref, r.ref2]; });
     const seedsDistinct = new Set(allSeeds).size === allSeeds.length;
-    const V = verdict({ sets: (lf ? frameGenSetsLightFree : frameGenSets)(tables), shuffled: null, c2Prior, determinism, seedsDistinct, test });
+    const V = verdict({ sets: (lf ? frameGenSetsLightFree : frameGenSets)(tables), shuffled: null, c2Prior, determinism, seedsDistinct, test, ...(disp ? { c1Of: "candidate" } : {}) });
     const secondary = lf
         ? { midTraced: effects(tables.Bmid1, tables.Gl), fill: effects(tables.GlNoFill, tables.Gl), overShown: effects(tables.G, tables.Gl), shown: { H1: effects(tables.X, tables.G), H2: effects(tables.R, tables.G) },
-            display: { H1: effects(display.Xl, display.Gl), H2: effects(display.Rl, display.Gl), shownH1: effects(display.X, display.G) }, displayTables: display, field }
+            // the other space's grading, named by its space: display beside a linear run (round 60), linear beside a display one (round 61)
+            [disp ? "linear" : "display"]: { H1: effects(display.Xl, display.Gl), H2: effects(display.Rl, display.Gl), shownH1: effects(display.X, display.G) },
+            [disp ? "linearTables" : "displayTables"]: display, field }
         : { midTraced: effects(tables.Bmid1, tables.G), fill: effects(tables.GNoFill, tables.G), newerShown: effects(tables.O7, tables.G), field };
     return { verdict: V, tables, secondary, timings, determinism, seedsDistinct, seedCount: allSeeds.length, config };
 }

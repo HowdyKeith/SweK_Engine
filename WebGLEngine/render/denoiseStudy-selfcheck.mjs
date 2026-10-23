@@ -118,6 +118,11 @@
 //   R89 (section 138) the held frame's eleventh image typed below its noisy frame  2 RED -- the re-derivation row (C1 then holds), the figures
 //   R90 the second image's G' typed off its tie with G                           1 RED -- the figures row
 //   R91 the display grading's first effect typed negative                        1 RED -- the figures row
+//   DS1 (section 139) the display round's tables graded in linear radiance          1 RED -- the miniature's display-space row
+//   DS2 the display round's verdict asking C1 of both arms                       1 RED -- the same row (its reasons name both arms)
+//   DS3 toDisplay without its gamma                                              1 RED -- the transfer row
+//   DS5 --harvest-framegen-display without its arrangement                       1 RED -- the command row
+//   DS6 SPLITS_FRAMEGEN_DISPLAY left out of the dataset refusal                   1 RED -- the refusal row
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -681,7 +686,7 @@ console.log("\n14e. ROUND 60: THE GENERATOR BETWEEN LIGHT-FREE FRAMES, LIT AT TH
     let threw = null; try { runFrameGenStudy({ splits: ROUND_FRAMEGEN_LF.splits, arrangement: "lightFree", net, image: 4, sppIn: 1, sppRef: 1 }); } catch (e) { threw = e.message; }
     let bad = null; try { runFrameGenStudy({ arrangement: "lit", net }); } catch (e) { bad = e.message; }
     ok("!! on the REAL split without harvest it is refused at its first scene, and an arrangement it does not know is refused by name",
-        /seed 55000 is a dataset seed/.test(threw || "") && /arrangement is "shown" \(section 133\) or "lightFree" \(section 136\)/.test(bad || ""), threw);
+        /seed 55000 is a dataset seed/.test(threw || "") && /arrangement is "shown" \(section 133\), "lightFree" \(section 136\) or "lightFreeDisplay" \(section 139\)/.test(bad || ""), threw);
     const mini = Object.freeze({ T1: Object.freeze({ family: "R+C", families: Object.freeze(["R", "C"]), seeds: Object.freeze([990912, 990913]) }) });
     const out = runFrameGenStudy({ splits: mini, arrangement: "lightFree", net, image: 16, sppIn: 4, sppRef: 8 }), V = out.verdict;
     ok("!! end to end on the miniature: the light-free arms and round 59's measured on both images, both hypotheses over G', the display-space grading and the field reported, C4 on G', C5, C2 cited",
@@ -689,7 +694,7 @@ console.log("\n14e. ROUND 60: THE GENERATOR BETWEEN LIGHT-FREE FRAMES, LIT AT TH
         out.determinism === true && out.seedsDistinct === true && out.config.arrangement === "lightFree" && /G' \(generated between L6 and L7/.test(out.config.hypotheses.H1) &&
         out.secondary.display.H1.length === 2 && out.secondary.displayTables.Gl.length === 2 && out.secondary.overShown.length === 2 && V.controls.C2.citedFrom === 11, `run ${V.run}`);
     const cli = fs.readFileSync(path.join(ENG, "tools/denoiseStudy.mjs"), "utf8");
-    const b0 = cli.indexOf('} else if (args.includes("--harvest-framegen-lf")) {'), branch = b0 >= 0 ? cli.slice(b0, cli.indexOf("} else if (round) {", b0)) : "";
+    const b0 = cli.indexOf('} else if (args.includes("--harvest-framegen-lf")) {'), branch = b0 >= 0 ? cli.slice(b0, cli.indexOf('} else if (args.includes("--harvest-framegen-display")) {', b0)) : "";
     const code = branch.replace(/\/\/.*$/gm, "");
     ok("!! --harvest-framegen-lf runs runFrameGenStudy on ROUND_FRAMEGEN_LF's split, size and light-free arrangement under harvest, writes its own file and never an existing one, records its commit, and logs no verdict",
         branch.length > 400 && /runFrameGenStudy\(\{ splits: ROUND_FRAMEGEN_LF\.splits, image: ROUND_FRAMEGEN_LF\.image, arrangement: ROUND_FRAMEGEN_LF\.arrangement,/.test(code) && /harvest: true/.test(code) &&
@@ -712,6 +717,39 @@ console.log("\n14e. ROUND 60: THE GENERATOR BETWEEN LIGHT-FREE FRAMES, LIT AT TH
             S2.display.H1.filter((d) => d > 0).length === 8 && S2.display.H2.filter((d) => d > 0).length === 11 && S2.midTraced.filter((d) => d < 0).length === 10 &&
             S2.fill.every((d) => d > 0), `overShown ${S2.overShown.filter((d) => d > 0).length}/12 (ties at ${ties.join(", ")}); display ${S2.display.H1.filter((d) => d > 0).length} / ${S2.display.H2.filter((d) => d > 0).length}`);
     } else ok("!! section 138 reads render/denoise-results-framegen-lf.json, and it is not there", false);
+}
+
+console.log("\n14f. ROUND 61: THE LIGHT-FREE GENERATOR GRADED IN DISPLAY SPACE, C1 OF THE CANDIDATE ALONE (pre-registration section 139)");
+{
+    const { runFrameGenStudy, ROUND_FRAMEGEN_LF, ROUND_FRAMEGEN_DISPLAY, RESULTS_FRAMEGEN_DISPLAY, toDisplay, SHIPPED_NET } = await imp("render/denoiseStudy.mjs");
+    const D = await imp("render/denoiseScenes.mjs"), { decodeNet } = await imp("render/denoiseDevice.mjs"), { toPerceptual, GAMMA } = await imp("render/denoiseUpscale.mjs");
+    const FG = await imp("render/denoiseFrameGen.mjs");
+    const net = decodeNet(JSON.parse(fs.readFileSync(path.join(ENG, SHIPPED_NET), "utf8")).net);
+    const earlier = new Set([D.SPLITS_TEMPORALUP, D.SPLITS_FRAMEGEN, D.SPLITS_FRAMEGEN_LF, D.SPLITS_PAGE, D.SPLITS_MESH_C, D.SPLITS_R47].flatMap((S) => Object.values(S).flatMap((x) => x.seeds)));
+    ok("!! ROUND_FRAMEGEN_DISPLAY: the display-graded arrangement on its own split (57000, 58000), new seeds, C1 of the candidate, round 60's size, test and cited C2 -- its own results file",
+        ROUND_FRAMEGEN_DISPLAY.splits === D.SPLITS_FRAMEGEN_DISPLAY && ROUND_FRAMEGEN_DISPLAY.arrangement === "lightFreeDisplay" && ROUND_FRAMEGEN_DISPLAY.c1Of === "candidate" &&
+        D.SPLITS_FRAMEGEN_DISPLAY.T1.seeds[0] === 57000 && D.SPLITS_FRAMEGEN_DISPLAY.T1.seeds[6] === 58000 && D.SPLITS_FRAMEGEN_DISPLAY.T1.seeds.every((s2) => !earlier.has(s2)) &&
+        ROUND_FRAMEGEN_DISPLAY.image === ROUND_FRAMEGEN_LF.image && ROUND_FRAMEGEN_DISPLAY.test === ROUND_FRAMEGEN_LF.test && RESULTS_FRAMEGEN_DISPLAY === "render/denoise-results-framegen-display.json");
+    const xs = [-1, 0, 1e-6, 0.18, 1, 30];
+    ok("  toDisplay is round 26's transfer, render/denoiseUpscale.mjs's toPerceptual -- Reinhard then gamma 2.2, a negative at 0",
+        Array.from(toDisplay(xs)).every((v, i) => Object.is(v, toPerceptual(xs[i])) && Math.abs(v - Math.pow(Math.max(xs[i], 0) / (1 + Math.max(xs[i], 0)), 1 / 2.2)) < 1e-15) && GAMMA === 2.2);
+    let threw = null; try { runFrameGenStudy({ splits: ROUND_FRAMEGEN_DISPLAY.splits, arrangement: "lightFreeDisplay", net, image: 4, sppIn: 1, sppRef: 1 }); } catch (e) { threw = e.message; }
+    ok("!! on the REAL split without harvest it is refused at its first scene", /seed 57000 is a dataset seed/.test(threw || ""), threw);
+    // the miniature: its tables are display-space relMSE of the arms against the truth, recomputed here from the same sequence
+    const mini = Object.freeze({ T1: Object.freeze({ family: "R+C", families: Object.freeze(["R", "C"]), seeds: Object.freeze([990914, 990915]) }) });
+    const out = runFrameGenStudy({ splits: mini, arrangement: "lightFreeDisplay", net, image: 16, sppIn: 4, sppRef: 8 }), V = out.verdict;
+    const seq = FG.renderFrameGenImages("R", 990914, { w: 16, h: 16, sppIn: 4, sppRef: 8 }), F = FG.frameGenFrames(seq, net), rD = toDisplay(seq.ref);
+    ok("!! end to end on the miniature: every table is the arm's relMSE IN DISPLAY SPACE, recomputed here from the same sequence bit for bit; the linear grading reported beside it; C1 asked of the candidate alone",
+        ["Gl", "Xl", "Rl", "noisyMid"].every((k) => Object.is(out.tables[k][0], relMSE(toDisplay(F[k]), rD))) && Object.is(out.tables.floor[0], relMSE(toDisplay(seq.ref2), rD)) &&
+        Object.is(out.secondary.linearTables.Gl[0], relMSE(F.Gl, seq.ref)) && out.config.c1Of === "candidate" && /^display/.test(out.config.grading) &&
+        V.reasons.every((r) => !/both need/.test(r)), `run ${V.run}; ${V.reasons.join(" | ")}`);
+    const cli = fs.readFileSync(path.join(ENG, "tools/denoiseStudy.mjs"), "utf8");
+    const b0 = cli.indexOf('} else if (args.includes("--harvest-framegen-display")) {'), branch = b0 >= 0 ? cli.slice(b0, cli.indexOf("} else if (round) {", b0)) : "";
+    const code = branch.replace(/\/\/.*$/gm, "");
+    ok("!! --harvest-framegen-display runs runFrameGenStudy on ROUND_FRAMEGEN_DISPLAY's split, size and arrangement under harvest, writes its own file and never an existing one, records its commit, and logs no verdict",
+        branch.length > 400 && /runFrameGenStudy\(\{ splits: ROUND_FRAMEGEN_DISPLAY\.splits, image: ROUND_FRAMEGEN_DISPLAY\.image, arrangement: ROUND_FRAMEGEN_DISPLAY\.arrangement,/.test(code) &&
+        /harvest: true/.test(code) && /path\.join\(ENG, ROUND_FRAMEGEN_DISPLAY\.results\)/.test(code) && /existsSync\(file\)/.test(code) && /out\.commit = /.test(code) && !/ROUND_FRAMEGEN_LF\./.test(code) && !/verdict|status|supported/.test(code));
+    ok("  its results are not yet written: section 140 reads them once the harvest's file is committed", !fs.existsSync(path.join(ENG, RESULTS_FRAMEGEN_DISPLAY)));
 }
 
 console.log("\n15. THE UPSCALE ROUND: HALF SIZE + FSR1 AGAINST THE FRAMES IT COULD BE INSTEAD (pre-registration section 81)");

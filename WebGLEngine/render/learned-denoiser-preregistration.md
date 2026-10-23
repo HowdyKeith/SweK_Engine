@@ -9367,3 +9367,69 @@ holding the older frame, though the test that would have said so was not reporte
 edges the cross-fade, which is where fsr-three.html measured it. A round that pre-registers the display-space grading,
 with C1 asked of the candidate alone, is the honest next question. It is Keith's call, not this section's, because it
 would be chosen after seeing this round's display figures, and a new round on new seeds is the only fair way to ask it.
+
+## 139. ROUND 61 -- THE LIGHT-FREE GENERATOR GRADED AS A DISPLAY SHOWS IT, C1 ASKED OF THE CANDIDATE ALONE: FIXED BEFORE ITS CODE AND ITS TEST SCENES
+
+Committed with the code that implements it. No scene of this round's test set has been rendered.
+
+**Why this round, and what it is not.** Keith asked for it after section 138. Section 138 said two things:
+- in display space, round 60's G' beat the cross-fade on 8 of 12 and the held frame on 11 of 12;
+- its C1 had been asked of a control that does not start from the noisy frame.
+
+**This round was chosen after seeing those display figures.** So it asks its question on NEW scenes, and round 60's figures
+are only the reason it is asked, never its evidence.
+
+> **Graded as a display shows it, is FSR3's generator, between light-free chain frames lit at the generated time, closer
+> to a frame traced there than the cross-fade and the held frame made the same way?**
+
+**Everything is section 136's except two things:** the network, the chain, the sequence, the midpoint eye, the field, the
+generator, FRAMEGEN_FILL, the light-free arrangement and its three arms (G', X', R'), and the truth.
+
+1. **The grading space.** Every arm, the noisy frame, the truth and the second truth go through round 26's transfer
+   (section 81) before relMSE: per channel, t = (x / (1 + x))^(1 / 2.2), Reinhard then gamma 2.2. This is the space
+   fsr-three.html's frames were in. relMSE and its 0.01 offset are unchanged; C3's floor is the second truth's, in the
+   same space.
+2. **C1 asks the candidate alone.** G' must beat the noisy frame (lit at the midpoint, in display space) on at least 11 of
+   12. The controls are not asked. A held frame does not start from the noisy frame, so whether it beats it says nothing
+   about the run (section 138).
+
+`verdict()` gains `c1Of`: "both" unless a round says "candidate".
+
+**Hypotheses**, section 6's statistic and section 28's test, Holm over the two at 0.05:
+- **H1: G' beats X'**;
+- **H2: G' beats R'**.
+
+**The split** (`SPLITS_FRAMEGEN_DISPLAY`): 6 of R (**57000-57005**) and 6 of C (**58000-58005**), new seeds.
+
+**Controls:** C1 as above; C2-C5 as section 133's.
+
+**Secondary, reported, never tested:**
+- the same arms graded in linear radiance, as rounds 59 and 60 graded them;
+- Bmid1 in display space;
+- G' without its fill;
+- the field's check.
+
+**What each outcome buys.**
+- **H1 and H2 supported:** FSR3's arrangement, lit at the generated time, runs on the path tracer's display output. The
+  device round (the generator's TSL pass and the composite after the chain on denoise.html) and a rig timing round follow.
+- **H2 only:** generating beats holding the older frame, but not the cross-fade. The page could offer the generated frame
+  over a held one, and the device round is owed only if Keith asks for that.
+- **Neither, not reported or not resolvable:** FSR3 on the path tracer closes as a measured negative in all three
+  arrangements.
+
+**Predictions, fixed now, deciding nothing, made knowing round 60's display figures.**
+- **P1:** C1 holds. G' beat round 60's noisy frame on 11 of 12 in linear radiance.
+- **P2: H2 is supported.** Round 60's display H2 was 11 of 12 at a mean d of 0.469.
+- **P3: H1 is NOT supported.** Round 60's display H1 was 8 of 12 at a mean d of only 0.106. That is a lean, and 12 new
+  scenes need not keep it at p < 0.025 or 0.05.
+- All three are reported either way.
+
+**The code, gated before the harvest.**
+- `runFrameGenStudy({ arrangement: "lightFreeDisplay" })` grades in display space through `toDisplay`, which is
+  `render/denoiseUpscale.mjs`'s `toPerceptual`, round 26's own. It reports the linear grading beside.
+- `verdict()`'s `c1Of` is gated in `render/denoiseStats-selfcheck.mjs` section 9.
+- `render/denoiseStudy-selfcheck.mjs` section 14f recomputes the miniature's display tables bit for bit.
+- Sabotages DS1-DS6 each turned red.
+
+**The command:** `node tools/denoiseStudy.mjs --harvest-framegen-display --cache <dir>` -> `render/denoise-results-framegen-display.json`.
+It refuses if the file exists. About 90 minutes here. Committed byte for byte before it is read; section 140 reads it.
