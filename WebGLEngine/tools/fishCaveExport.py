@@ -706,9 +706,13 @@ def count_degrees(mat, table, version, args, wanted, state, folder):
         pages += 1
         write_partial(folder, state, args, version)
         say("page %d: rows %d to %d of about %s (%.1f%%), %d cells counted, %.0f s" % (pages, state["offset"] - n, state["offset"], fmt(state["total"]), 100.0 * state["offset"] / state["total"] if state.get("total") else 0.0, len(counts), time.time() - t0))
-        if n < args.chunk_rows:
+        # the end of the table is known from its row count, not from a short page: a server that caps the rows it returns (500,000, say) sends short pages all the way through
+        if n == 0 or (state.get("total") and state["offset"] >= state["total"]) or (not state.get("total") and n < args.chunk_rows):
             state["done"] = True
             break
+        if n < args.chunk_rows and not state.get("capSaid"):
+            state["capSaid"] = True
+            say("the server returned %d rows for a page of %d: it caps a query; the pass goes on from the row it reached" % (n, args.chunk_rows))
     return state
 
 
