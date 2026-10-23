@@ -31,6 +31,8 @@
 //   retargeted, two exchanged, the dataset line, a type, an instance name) are red in the re-bake row (the last three only here); of nine edits of vendor/zebrafish/fish1-ten-core.json, an edge dropped or reversed, a
 //   neuron relabelled, a licence that names CC-BY, a selection record with another k and the CAVE host as the server are red here, and a changed weight, a miscounted drop and the edge-count field are 0 red here and
 //   red in brain/pilotSubFish-selfcheck.mjs, which holds the totals (308 synapses, 153 edges, 26 reciprocal, the labels). Neither gate alone is all of it; the two together leave none.
+//   ROW 9 WAS RUN ONCE WITH FISH_TEN_DIR set to the downloaded package (the four files whose sha256 the PROVENANCE file quotes): it re-derived the vendored circuit, 34 neurons and 153 edges and the selection record's counts, and passed. It is not in
+//   the 55-mutant run above (the package is not in the tree, so a plain run says NOT CHECKED for it).
 //   ONE HAZARD FOUND BY DOING IT: a mutant of --out wrote into the REAL vendor/zebrafish/fish1-ten-core.json through the scratch tree's symlinked vendor/ folder and the gate failed the next run; the file was restored from
 //   git and the mutant now writes to a folder that does not exist. The rerun after that is the log above; the real tree was checked unchanged (git status) after it.
 "use strict";
