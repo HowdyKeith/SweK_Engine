@@ -9199,3 +9199,41 @@ light sources are the problem, and the arc already has the answer for that shape
 
 A round that generates between light-free frames, and composites `emitterRadiance` from the geometry at the generated
 time, is the next question. It is `denoise-fsr3-framegen`'s next step, pre-registered on its own and not this round.
+
+## 135. THE RIG RUNS AT THE HEAD: THE 1080's OWED DENOISER RUNS, AND FSR 1-3 ON BOTH GPUs -- FIXED BEFORE THEY RUN
+
+**Why.** Keith asked for FSR 1-3 completed at its best before FSR4. Three things are owed a GPU:
+- the GTX 1080's native crash (`denoise-1080-native-crash`), never reproduced since section 102;
+- the 1080's verdict on round 33's question (`denoise-temporalup-device`), which it has lacked since its run b died;
+- one run of every FSR and frame-generation gate on a real GPU at the current head. The rig runs since v4778 have all
+  been `--only denoise`.
+
+**The runs, at the branch head, nothing pulled or committed between them:**
+- **On the GTX 1080:** two `realGpuRun --only denoise` runs, a and b, each with `SWEK_TIMING_TRACE` naming a trace file of
+  its own. Then one full `realGpuRun`, every gate.
+- **On the Intel gen-9:** one full `realGpuRun`.
+
+**R1, the crash.** If a 1080 run dies, its trace's last line names the step it died in. The JSON keeps its exit code and
+its stderr's end. If neither run dies, "not reproduced" is recorded again with the head's commit.
+
+**H135, round 33's question on the 1080 at today's defaults.** Today's defaults are the listed tile fill, the bounded
+coverage, the fused rest and the tiled accumulation, with the shipped network. The question: is the half-size chain with
+its history (`temporal`) cheaper than today's page (`full`) at 1920 x 1080?
+- It holds when both runs count and the ratio full / temporal, read off each run's section 103 line, is above 1.0 in both.
+- A run counts when every gate of `--only denoise` is green with exit 0, at the commit the runs were taken at, and both
+  networks' 1080p rows are on the device's clock.
+- If H135 holds, round 33's 1080 verdict is given at the head, and `denoise-temporalup-device`'s rig half is done.
+
+**The FSR census, per GPU.** Every gate's kind is read from its source, as `realGpuRun` sorts them:
+- **exact** gates must hold. A red exact row is a bug on that GPU, and a finding.
+- **quality** rows should hold. A miss of a few hundredths of a dB is the margin; a large one is a finding.
+- **timing** gates are the point of the run. Their figures are reported, and the cost-model rows say "NOT ASSERTED" on
+  hardware, by v4778's decision.
+
+**Predictions, fixed now, deciding nothing.**
+- **P1:** neither 1080 run dies, as in section 102.
+- **P2: H135 holds.** Section 98's run a gave 1.405 x at round 33's defaults, and every default since has been faster on
+  the device's clock.
+- **P3:** every exact gate holds on both GPUs, and any red falls in quality or timing.
+
+**The reports are committed byte for byte before they are read.** Section 137 reads them. Section 136 is round 60's.

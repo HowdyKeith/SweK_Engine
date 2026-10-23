@@ -772,6 +772,29 @@ Send the two reports back; they are committed byte for byte before they are read
 The Intel's two runs came back with K0p red natively and r57p at 0.95-1.04 x r18u at 1080p. The entry is closed as a
 measured negative (section 130), and no 1080 run is owed.
 
+### Section 135: the 1080's owed runs, and FSR 1-3 on both GPUs at the head
+
+On the GTX 1080, from `C:\SweK_r33`, nothing pulled or committed between the runs:
+
+```
+git fetch origin ccr-6c3eeb7c-pxz6kx
+git checkout ccr-6c3eeb7c-pxz6kx
+git pull origin ccr-6c3eeb7c-pxz6kx
+git log -1 --oneline
+cd WebGLEngine
+set SWEK_WEBGPU=
+set SWEK_TIMING_TRACE=%CD%\trace135-a.txt
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-s135-a-gtx1080.json
+set SWEK_TIMING_TRACE=%CD%\trace135-b.txt
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-s135-b-gtx1080.json
+set SWEK_TIMING_TRACE=
+node tools/ship/realGpuRun.mjs --out fsr-rig-s135-gtx1080.json
+```
+
+On the Intel, the same four git lines and `cd WebGLEngine`, then `node tools/ship/realGpuRun.mjs --out fsr-rig-s135-intel-gen9.json`.
+
+Send back the three 1080 JSON files, `trace135-a.txt` and `trace135-b.txt`, and the Intel's JSON file.
+
 ## Send back
 
 The JSON file. It holds the platform, the browser flags, every adapter seen, each gate's verdict, time, failing rows and
