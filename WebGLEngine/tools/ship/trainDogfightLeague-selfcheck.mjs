@@ -35,6 +35,14 @@
 //   NINE OF THE EIGHTY DID NOT GO RED BY NAME THE FIRST TIME AND THE GATE WAS FIXED FOR EACH: L14 and L15 (`--smoke --write` and a typo accepted) TIMED OUT, because the two rows that drive the command with them had no stub for the search, so the mutant started a REAL one (400 iterations x four runs) -- every refusal row now carries a stub and can start nothing; L51 and L52 (the search not started from, and not pruned toward, the shipped fighter) timed out under load and are red when given time (1 and 1);
 //   L25 (a collision is not a lost fight) went 0 red: the only lost fights in the gate were crashes -- one row builds a view with a crash, a touchdown, a loss, a collision, two airborne and a shot-down, and another sends a classic audit fight that ended in a collision; L54 (the search trains on the HELD-OUT duels) went 0 red because --smoke makes the training and held-out slots ONE set -- a row now gives a search two duels to train on and two others to be held out and holds its train score to the first pair;
 //   L65 (--dump writes nothing) and L76 (a blob for the GPU brain naming the fruit fly's policy) CRASHED the gate on an unread file and an exporter that refused, instead of going red -- both are caught now; L75 (the workers not told the brain) went 0 red because the default brain is the fruit fly's: a row runs `--workers 2 --brain gpu` and holds its dump to the one-process GPU dump (1,796 weights to a search).
+//
+// SECTION 10 (THE THREE SMALL DOORS: brainOf, loadFile, cacheKey), SABOTAGED -- 23 mutants of tools/ship/trainDogfightLeague.mjs, every one red by name (L05, L15 and L16 needed work first):
+//   L01 the default brain is the GPU Brain 2 | L02 an unknown brain is the fruit fly 1 | L03 the unknown-brain message does not name it 1 | L04 the unknown-brain message does not list the known 1 |
+//   L05 brainOf with no options throws 1 | L06 loadFile reads the brain directory whatever dir says 1 | L07 loadFile hashes the file name 6 | L08 loadFile returns the weights as plain numbers 1 |
+//   L09 loadFile accepts a refused file 2 | L10 loadFile refusal does not name the file 2 | L11 loadFile swallows a parse error 1 | L12 cacheKey forgets the search number 1 | L13 cacheKey forgets the brain 2 |
+//   L14 cacheKey forgets the seed 2 | L15 cacheKey forgets the iterations 2 | L16 cacheKey forgets sigma 2 | L17 cacheKey forgets maxK 2 | L18 cacheKey forgets smoke 1 | L19 cacheKey forgets the start hash 2 |
+//   L20 cacheKey forgets the other hash 2 | L21 cacheKey includes the cache directory 1 | L22 cacheKey includes the worker count 1 | L23 cacheKey is an object, not a string 3
+// L05 (brainOf reading `opts.brain` with no options) went 0 red as a CRASH: the row called brainOf() bare and the TypeError killed the gate before any row could be red by name; the row calls it through a wrapper now (1 red). L15 and L16 (cacheKey without its iterations / without sigma) came back PATTERN COUNT 2 and 3 because their old strings occur elsewhere in the library; they were redone anchored on the whole of cacheKey's opening (2 red each). The child-process rows import the command file, which the harness copies as a real file for the mutant to reach it (SAB_COPY=tools/ship/trainLeagueDogfight.mjs). The section holds the library's small exports that a census (tools/ship/definitionGates-selfcheck.mjs) found unnamed: brainOf, loadFile, cacheKey.
 "use strict";
 import fs from "node:fs";
 import os from "node:os";
@@ -303,8 +311,9 @@ sec("9. THE FILE");
 
 sec("10. THE THREE SMALL DOORS: brainOf, loadFile, cacheKey");
 {
+    const pick = (o) => { try { return L.brainOf(o); } catch (e) { return "threw: " + e.message; } };   // a brainOf that throws on no options is a red row, not a crashed gate
     ok("!! brainOf PICKS THE BRAIN AN OPTION NAMES AND DEFAULTS TO THE FRUIT FLY: no options, null, {} and { brain: \"fly\" } are the fruit fly, { brain: \"gpu\" } is the GPU Brain (the very frozen objects of BRAINS), and an unknown name throws naming it and the known ones",
-        L.brainOf() === L.BRAINS.fly && L.brainOf(null) === L.BRAINS.fly && L.brainOf({}) === L.BRAINS.fly && L.brainOf({ brain: "fly" }) === L.BRAINS.fly && L.brainOf({ brain: "gpu" }) === L.BRAINS.gpu
+        pick() === L.BRAINS.fly && pick(null) === L.BRAINS.fly && pick({}) === L.BRAINS.fly && pick({ brain: "fly" }) === L.BRAINS.fly && pick({ brain: "gpu" }) === L.BRAINS.gpu
         && /unknown brain "mouse" \(known: fly, gpu\)/.test(throws(() => L.brainOf({ brain: "mouse" })) || ""));
     const asked = [], real = (f) => { asked.push(f); return fs.readFileSync(f, "utf8"); };
     const lf = L.loadFile("pilotFlightPolicy", PF, "pilotDogfightWeightsDefault.json", { read: real }), lg = L.loadFile("pilotFlightMlp", MF, "pilotDogfightMlpWeightsDefault.json");
