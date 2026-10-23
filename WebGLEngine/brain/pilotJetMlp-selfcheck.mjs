@@ -17,6 +17,10 @@
 //   JM11 the hand weights written for the trainer's gains by default 4
 //   JM09 IS AN EQUIVALENT MUTANT, SAID: copying the first layer's rows for 17 features and not 18 leaves feature 17 (the yaw rate) out, and no hand weight reads feature 17 -- the column is zero in every row the copy touches. JM06 (the pilot ignoring its gains) WENT 0 RED THE FIRST TIME: every row used the default gains; the cruise-gains row now asks for the cruise autopilot's controls to 2e-6 from weights and features made from AUTOPILOT_JET, and holds the same weights read through the fighting gains' features NOT to be the autopilot.
 //   THE FIRST RUN FOUND THE TRAINER-GAINS ROW RED: handWeights(AUTOPILOT_FLIGHT) wrote an identity on the limiter's neuron even when there was no limiter, which the trainer's MLP does not -- the second-layer identity is now written only when the gains have a limiter.
+//
+// SECTION 6 (THE SEARCH'S MOVES: mutate and perturb, exported so brain/dogfightTrain.mjs can search this layout), SABOTAGED -- 6 mutants of brain/pilotJetMlp.mjs, every one red by name:
+//   P01 mutate is perturb 2 | P02 perturb is mutate 2 | P03 mutate moves nothing 3 | P04 mutate writes into its argument 3 | P05 mutate ignores maxK 2 | P06 perturb is not seeded by the rng 1
+// The league trainer (tools/ship/trainDogfightLeague.mjs --aircraft jet) found this module had no mutate: the first jet search died with `policy.mutate is not a function`. The moves are the trainer MLP's own, re-exported, and the pinned export list above carries them.
 "use strict";
 import * as M from "./pilotJetMlp.mjs";
 import * as PM from "./pilotFlightMlp.mjs";

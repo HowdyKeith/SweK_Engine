@@ -8,7 +8,12 @@
 //   5  SLOTS      the maps the league library reads (SETS_FLY, SETS_GPU, SETS_SMOKE): the same eight slots, the GPU Brain's audit / classic audit / safety are its own and the other five are shared, the smoke map points every slot at throwaway fights
 //   6  FRONT DOOR the report names the module and the sizes
 //
-// SABOTAGE LOG: the mutants were run against brain/jetLeagueSets.mjs with this gate (every one red BY NAME is the standard; any that went 0 red is said below).
+// SABOTAGE LOG -- 22 mutants of brain/jetLeagueSets.mjs, EVERY ONE RED BY NAME (red count after each), none left at 0:
+//   J01 train range one short 3 | J02 held-out starts in the training block 2 | J03 pool at the trainers' pool seeds 3 | J04 the two audits are one block 2 | J05 classic pool at 50 of each kind 3 |
+//   J06 safety overlaps the classic audit 2 | J07 next free block inside the used ones 2 | J08 the scenarios are the trainers' 2 | J09 the league slots hold turning fights 1 | J10 the classic sets hold two kinds 3 |
+//   J11 the GPU audit is the fruit fly's 2 | J12 the GPU safety is the fruit fly's 2 | J13 the reserve is the trainers' bench 1 | J14 the smoke map reads the real pool 1 | J15 the smoke map reads the real audit 1 |
+//   J16 the throwaway duels are 9100..9102 1 | J17 the seed table is not frozen 1 | J18 an entry of the seed table is not frozen 1 | J19 the report names no module 1 | J20 the report drops the next free block 1 |
+//   J21 a set is not frozen 1 | J22 the held-out set is in the training block exactly 4
 "use strict";
 import * as S from "./jetLeagueSets.mjs";
 import * as JF from "./jetFight.mjs";
