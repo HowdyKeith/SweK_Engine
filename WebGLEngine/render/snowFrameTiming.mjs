@@ -14,7 +14,9 @@
 "use strict";
 import { createSnowGpu } from "./snowGpu.mjs";
 
-export const WARMUP_FRAMES = 2, TIMED_FRAMES = 30, DEFAULT_SIZES = Object.freeze([Object.freeze([320, 180]), Object.freeze([1280, 720])]);
+// v4896 -- WARMUP 2 -> 10: the first rig run (Intel gen-9, D3D12) read 72 ms for the first fifteen frames at 1280x720 and 61 ms for the last fifteen, and 13.8 ms falling to 9.6 over the first eight at 320x180 --
+// the GPU's clock still ramping, so two frames of warm-up timed the ramp. The summary now carries the two halves' medians so a ramp that is still going is a number on the line.
+export const WARMUP_FRAMES = 10, TIMED_FRAMES = 30, DEFAULT_SIZES = Object.freeze([Object.freeze([320, 180]), Object.freeze([1280, 720])]);
 /** snow-gpu.html's walker: a circle of radius 8 m at 2.4 m/s, the camera 3 m behind and 4 m to the side, 2.6 m up, looking at 0.4 m. */
 export const RADIUS = 8, SPEED = 2.4;
 
@@ -30,23 +32,25 @@ export function summarise(ms) {
     for (const v of ms) if (!Number.isFinite(v) || v <= 0) throw new Error("summarise: " + v + " is not a positive finite time");
     const s = [...ms].sort((a, b) => a - b), n = s.length, at = (q) => s[Math.min(n - 1, Math.max(0, Math.ceil(q * n) - 1))];
     const median = n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1] + s[n / 2]) / 2;
-    return { n, min: s[0], max: s[n - 1], mean: s.reduce((a, b) => a + b, 0) / n, median, p95: at(0.95), fps: 1000 / median };
+    const med = (l) => { const t = [...l].sort((x, y) => x - y), m = t.length; return m % 2 ? t[(m - 1) / 2] : (t[m / 2 - 1] + t[m / 2]) / 2; };
+    const h = n >> 1, halves = h >= 2 ? [med(ms.slice(0, h)), med(ms.slice(n - h))] : null;   // chronological: the first and the last h frames, the middle one left out when n is odd
+    return { n, min: s[0], max: s[n - 1], mean: s.reduce((a, b) => a + b, 0) / n, median, p95: at(0.95), fps: 1000 / median, halves };
 }
 
 const f1 = (v) => (v >= 100 ? v.toFixed(0) : v >= 10 ? v.toFixed(1) : v.toFixed(2));
 /**
  * The line a real-hardware report keeps (tools/ship/realGpuRun.mjs keeps `----` lines and the gate prints this one under that prefix). One line a size:
- *   reading snowFrame: native 320x180 latency median 3.21 ms (311 fps), p95 4.10, min 2.9, max 5.0 over 30 frames; throughput 2.80 ms/frame; encode+submit median 0.90 ms; adapter NAME
+ *   reading snowFrame: native 320x180 latency median 3.21 ms (311 fps), p95 4.10, min 2.9, max 5.0 over 30 frames; throughput 2.80 ms/frame; encode+submit median 0.90 ms; first/last half median 3.4/3.0 ms; adapter NAME
  */
 export function timingLine(r, adapter) {
     const s = summarise(r.perFrame), e = summarise(r.encode);
     return `reading snowFrame: native ${r.width}x${r.height} latency median ${f1(s.median)} ms (${s.fps.toFixed(s.fps >= 100 ? 0 : 1)} fps), p95 ${f1(s.p95)}, min ${f1(s.min)}, max ${f1(s.max)} over ${s.n} frames; ` +
-           `throughput ${f1(r.batchedMs / r.batchedFrames)} ms/frame; encode+submit median ${f1(e.median)} ms; adapter ${adapter}`;
+           `throughput ${f1(r.batchedMs / r.batchedFrames)} ms/frame; encode+submit median ${f1(e.median)} ms; first/last half median ${s.halves ? f1(s.halves[0]) + "/" + f1(s.halves[1]) + " ms" : "n/a"}; adapter ${adapter}`;
 }
 /** The line's fields back out, for the gate's round trip and for anything that reads a report. */
 export function parseTimingLine(line) {
-    const m = /reading snowFrame: native (\d+)x(\d+) latency median ([\d.]+) ms \(([\d.]+) fps\), p95 ([\d.]+), min ([\d.]+), max ([\d.]+) over (\d+) frames; throughput ([\d.]+) ms\/frame; encode\+submit median ([\d.]+) ms; adapter (.*)$/.exec(line);
-    return m ? { width: +m[1], height: +m[2], median: +m[3], fps: +m[4], p95: +m[5], min: +m[6], max: +m[7], frames: +m[8], throughput: +m[9], encode: +m[10], adapter: m[11] } : null;
+    const m = /reading snowFrame: native (\d+)x(\d+) latency median ([\d.]+) ms \(([\d.]+) fps\), p95 ([\d.]+), min ([\d.]+), max ([\d.]+) over (\d+) frames; throughput ([\d.]+) ms\/frame; encode\+submit median ([\d.]+) ms; first\/last half median (?:([\d.]+)\/([\d.]+) ms|n\/a); adapter (.*)$/.exec(line);
+    return m ? { width: +m[1], height: +m[2], median: +m[3], fps: +m[4], p95: +m[5], min: +m[6], max: +m[7], frames: +m[8], throughput: +m[9], encode: +m[10], halves: m[11] ? [+m[11], +m[12]] : null, adapter: m[13] } : null;
 }
 
 /**

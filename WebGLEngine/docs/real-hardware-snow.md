@@ -42,3 +42,14 @@ node tools\ship\takeSnowFrameTiming.mjs --out snow-frame-timing.json
 It runs 2 warm-up frames and 30 timed frames at 320x180 and again at 1280x720, and prints one `reading snowFrame:` line a size: the LATENCY median/p95/min/max (encode plus the wait on the queue), the batched THROUGHPUT in ms a frame, and the encode-and-submit time alone, with the adapter's name. Send back `snow-frame-timing.json`. The first line it prints names the adapter; if it says `SOFTWARE`, the times are a CPU's and the run did not reach the GPU.
 
 `render\snowFrameTiming-selfcheck.mjs` runs the same loop for three frames at 160x90 and is in the native sweep (`realGpuRun.mjs --native --only render/`), so the rig's native report carries its reading line too. What the timing is not: a GPU timestamp (node-webgpu offers none here), the present pass (no canvas), or a frame with footprints (the orbit stamps none). On the sandbox's software adapter a 160x90 frame costs about 170 ms.
+
+## The first native frame timing (2026-10-23, ed626c4a, an Intel gen-9 on D3D12, driver 31.0.101.2137, 2 warm-up and 30 timed frames per size)
+
+| size | latency median | p95 | min / max | throughput (batched) | encode + submit | GPU errors |
+|---|---|---|---|---|---|---|
+| 320x180 | **10.3 ms (97 fps)** | 13.8 ms | 9.5 / 24.7 ms | 7.7 ms a frame (129 fps) | ~2 ms | none |
+| 1280x720 | **65.9 ms (15 fps)** | 77.8 ms | 60.2 / 112.6 ms | 58.5 ms a frame (17 fps) | ~1.3 ms | none |
+
+What it says. The frame is GPU-bound (encoding is 1-2 ms of 10 to 66). The cost is not proportional to pixels: 16 times the pixels cost 6.4 times the time, which fits **about 6.6 ms a frame that does not depend on the picture size** (three 2048x2048 shadow passes, the deform step, the clipmap's vertex stage, the sky) **plus about 64 ms per megapixel**; at 1080p that predicts ~140 ms (7 fps) on this integrated GPU, at 960x540 ~40 ms (25 fps). Batching the submissions gains 11 to 25% over one frame at a time. The first 15 frames at 1280x720 ran at ~72 ms and the last 15 at ~61 ms, and 320x180 fell from 13.8 to 9.6 ms over its first eight: the GPU's clock was still ramping, so two warm-up frames timed the ramp. Warm-up is now ten frames and the line carries the first-half and last-half medians, so a ramp that is still going shows as a number. One hitch (24.7 ms against ~10) and one at 112.6 ms are single frames, not a trend.
+
+The gate's own 160x90 run on the rig read 8.07 ms (latency) and 5.16 ms (throughput), which fits the same 6.6 ms floor plus a small picture. The same gate registers its adapter now; its first rig report had said `NO ADAPTER WAS SEEN` over a D3D12 reading.

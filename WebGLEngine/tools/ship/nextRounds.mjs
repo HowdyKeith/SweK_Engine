@@ -2178,8 +2178,8 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "snow-native-frame-timing",
-        blocker: "HARDWARE",
-        what: "BUILT, NEEDS ONE RIG RUN. render/snowFrameTiming.mjs times the snow frame graph on a native node-webgpu device (latency and batched throughput, encode time apart, 2 warm-up and 30 timed frames per size); tools/ship/takeSnowFrameTiming.mjs is its command (320x180 and 1280x720, JSON out); render/snowFrameTiming-selfcheck.mjs runs it on Dawn here (about 170 ms a frame at 160x90 on the software adapter) and is in the native sweep. OPEN: run the command on the Windows rig and file the D3D12 figures in docs/real-hardware-snow.md. NOT TIMED: the present pass, footprints, GPU timestamps.",
+        blocker: "CLOSED",
+        what: "CLOSED at v4896 (unshipped), after one rig run on 2026-10-23 (Intel gen-9, D3D12, driver 31.0.101.2137, ed626c4a): the snow frame graph costs 10.3 ms at 320x180 (97 fps; p95 13.8) and 65.9 ms at 1280x720 (15 fps; p95 77.8), no GPU errors, encoding 1-2 ms so GPU-bound; about 6.6 ms of it is independent of the picture size and about 64 ms per megapixel, so 1080p is ~140 ms on this integrated GPU. The GPU clock was still ramping over the first frames, so warm-up went 2 -> 10 and the line carries first-half and last-half medians. The native gate also stopped reading as `NO ADAPTER WAS SEEN` (it now registers its adapter). NOT MEASURED: the present pass, footprints, GPU timestamps, and a discrete GPU (the GTX 1080 box has not run it). The figures are in docs/real-hardware-snow.md.",
         how: "A command beside render/snowGpu.mjs that builds the frame as snowGpuLive's page does, submits N frames and waits on queue.onSubmittedWorkDone between batches (the wall clock around a GPU frame is the only timer node-webgpu offers without timestamp queries), and a gate that drives the same loop on Dawn/SwiftShader for a few frames so the loop is proven here. Then one realGpuRun --native on the rig.",
         why: "The 2026-10-23 rig run measured the kernels (all pass) but not the frame; the only frame rate in the report is a CPU rasteriser's.",
     },

@@ -11,6 +11,7 @@
 //   S2 timeFrames leaves the warm-up out (no warm-up run)                      -> 2 RED: the fake-clock call-count row and the live frame-count row (7 frames expected, 6 run)
 //   S3 the latency list is the encode-only time                                -> 2 RED: the fake-clock row (latency must be encode PLUS the wait) and the live row (encode must sit below latency)
 //   S4 orbitAt's camera offset 3 -> 2                                          -> 1 RED: the orbitAt(0) numeric row. The page-twin row reads the PAGE's text, so it guards the page moving, not this file; the two together hold the pair
+//   S6 the second half taken from the first frames (both halves read the head of the list) -> 2 RED: the halves row and the line's round trip
 //   S5 timingLine drops the adapter name                                       -> 3 RED: the line row, the round trip and the live row (a reading that does not say what ran is the 0.4 fps lie again)
 "use strict";
 import fs from "node:fs";
@@ -18,7 +19,7 @@ import path from "node:path";
 import { createRequire } from "node:module";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { resolveWebgpu, configureVulkanIcd, headlessGpuSkipReason, exitCleanly } from "../tools/ship/headlessGpu.mjs";
+import { resolveWebgpu, configureVulkanIcd, headlessGpuSkipReason, noteNativeAdapter, exitCleanly } from "../tools/ship/headlessGpu.mjs";
 import { summarise, timingLine, parseTimingLine, orbitAt, timeFrames, RADIUS, SPEED, WARMUP_FRAMES, TIMED_FRAMES, DEFAULT_SIZES } from "./snowFrameTiming.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -36,9 +37,11 @@ console.log("1. THE ORDER STATISTICS, EXACT");
     const s = summarise([5, 1, 3, 2, 4]), e = summarise([1, 2, 3, 4]);
     ok("an odd list: min, max, mean, median and p95 are the values they name", s.n === 5 && s.min === 1 && s.max === 5 && s.mean === 3 && s.median === 3 && s.p95 === 5 && Math.abs(s.fps - 1000 / 3) < 1e-9, JSON.stringify(s));
     ok("an even list takes the MEAN of the two middle values (2.5, not 2 or 3)", e.median === 2.5 && Math.abs(e.fps - 400) < 1e-9, "median " + e.median);
+    const ramp = summarise([10, 10, 10, 10, 5, 5, 5, 5]), odd = summarise([9, 9, 1, 5, 5]), few = summarise([4, 6, 8]);
+    ok("the two halves are the medians of the FIRST and the LAST n/2 frames in time order (a ramp 10 -> 5 reads 10 / 5; the middle frame of an odd list is left out; under four frames there is no split)", ramp.halves[0] === 10 && ramp.halves[1] === 5 && odd.halves[0] === 9 && odd.halves[1] === 5 && few.halves === null, JSON.stringify([ramp.halves, odd.halves, few.halves]));
     ok("p95 of twenty is the nineteenth value, not the maximum", summarise(Array.from({ length: 20 }, (_, i) => i + 1)).p95 === 19);
     ok("an empty list, a NaN, a zero, a negative and a string are each refused", [[], [NaN], [0], [-1], ["3"], [1, Infinity]].every((l) => throws(() => summarise(l))), "a timing that is not a positive finite number is a broken clock, not a fast frame");
-    ok("the defaults are the ones the report promises: 2 warm-up frames, 30 timed, 320x180 and 1280x720", WARMUP_FRAMES === 2 && TIMED_FRAMES === 30 && DEFAULT_SIZES.length === 2 && DEFAULT_SIZES[0].join("x") === "320x180" && DEFAULT_SIZES[1].join("x") === "1280x720");
+    ok("the defaults are the ones the report promises: 10 warm-up frames, 30 timed, 320x180 and 1280x720", WARMUP_FRAMES === 10 && TIMED_FRAMES === 30 && DEFAULT_SIZES.length === 2 && DEFAULT_SIZES[0].join("x") === "320x180" && DEFAULT_SIZES[1].join("x") === "1280x720");
 }
 
 console.log("\n2. THE READING LINE, AND BACK");
@@ -47,7 +50,7 @@ console.log("\n2. THE READING LINE, AND BACK");
     const line = timingLine(r, "intel gen-9 D3D12 driver 31.0.101.2137"), p = parseTimingLine(line);
     ok("the line starts `reading snowFrame:` (the shape realGpuRun's `----` lines carry) and names the adapter", line.startsWith("reading snowFrame: native 320x180 latency median") && line.endsWith("adapter intel gen-9 D3D12 driver 31.0.101.2137"), line);
     ok("and it parses back to the numbers it was built from: size, median, p95, min, max, frames, throughput, encode, adapter", p && p.width === 320 && p.height === 180 && p.frames === 6 && p.adapter === "intel gen-9 D3D12 driver 31.0.101.2137" &&
-        Math.abs(p.median - 3.15) < 0.01 && Math.abs(p.max - 5) < 0.01 && Math.abs(p.min - 2.9) < 0.01 && Math.abs(p.throughput - 2.8) < 0.01 && Math.abs(p.encode - 0.9) < 0.01, JSON.stringify(p));
+        Math.abs(p.median - 3.15) < 0.01 && p.halves && Math.abs(p.halves[0] - 3.1) < 0.01 && Math.abs(p.halves[1] - 3.2) < 0.01 && Math.abs(p.max - 5) < 0.01 && Math.abs(p.min - 2.9) < 0.01 && Math.abs(p.throughput - 2.8) < 0.01 && Math.abs(p.encode - 0.9) < 0.01, JSON.stringify(p));
     ok("a line that is not ours does not parse (null, not a half-filled object)", parseTimingLine("reading aerial: worst 9e-4") === null && parseTimingLine("") === null);
 }
 
@@ -95,6 +98,7 @@ if (skip) {
     Object.assign(globalThis, mod.globals || {});
     const gpu = mod.create([]);   // reachable for the whole run (headlessGpu.mjs's v4691 note: a collected instance under a live device crashes the process)
     const adapter = await gpu.requestAdapter();
+    if (adapter) noteNativeAdapter(adapter, { gate: fileURLToPath(import.meta.url) });   // so realGpuRun's report SEES the adapter this gate ran on (its first rig run read `NO ADAPTER WAS SEEN` over a D3D12 reading)
     const info = adapter ? adapter.info || {} : {}, name = [info.vendor, info.architecture, info.description].filter(Boolean).join(" ");
     ok("a native adapter answered, and has a name to put on the reading", !!adapter && name.length > 0, name);
     if (adapter) {
