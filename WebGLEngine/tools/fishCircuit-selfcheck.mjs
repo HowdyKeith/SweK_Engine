@@ -27,6 +27,10 @@
 //   THREE REPORT NO ROW OF THEIR OWN, AND ARE SAID: F06 (bby and bbz read from each other's column) is an EQUIVALENT MUTANT -- the volume is 8 x bbx x 8 x bby x 30 x bbz, a product, and a product does not care which
 //   of two factors came from which column; F28 (no `alive` check before a peeled neighbour's weight is lowered) is EQUIVALENT -- the weight of a neuron that is already gone is never read again; F52 (the command runs on
 //   import) kills the gate before it prints a row (exit 1, the command's own refusal on stderr), which is the loudest red there is and cannot be named by a row of a gate that never started.
+//   AND THE BAKED FILE AND THE VENDORED JSON, run against this gate too: all twelve edits of brain/zebrafishTopology.mjs (a neuron id, two exchanged, a neuron dropped, an edge flipped, dropped, duplicated, a self-loop,
+//   retargeted, two exchanged, the dataset line, a type, an instance name) are red in the re-bake row (the last three only here); of nine edits of vendor/zebrafish/fish1-ten-core.json, an edge dropped or reversed, a
+//   neuron relabelled, a licence that names CC-BY, a selection record with another k and the CAVE host as the server are red here, and a changed weight, a miscounted drop and the edge-count field are 0 red here and
+//   red in brain/pilotSubFish-selfcheck.mjs, which holds the totals (308 synapses, 153 edges, 26 reciprocal, the labels). Neither gate alone is all of it; the two together leave none.
 //   ONE HAZARD FOUND BY DOING IT: a mutant of --out wrote into the REAL vendor/zebrafish/fish1-ten-core.json through the scratch tree's symlinked vendor/ folder and the gate failed the next run; the file was restored from
 //   git and the mutant now writes to a folder that does not exist. The rerun after that is the log above; the real tree was checked unchanged (git status) after it.
 "use strict";
