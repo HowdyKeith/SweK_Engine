@@ -45,6 +45,11 @@
 //   pool 2; T127 SAFETY_AUDIT2 goto is SAFETY_AUDIT's 2; T128 sets not frozen 1; T129 scenario start not frozen 1; T130 scenario failure not frozen 1; T131 scenario wind not frozen 1; T132 unknown kind accepted 1; T133 KINDS not
 //   frozen 1; T134 start ignores the scenario 16; T135 hover heading target ignored 11; T136 goto target is a hover (the point is the start) 10; T137 evaluate score not a mean 9; T138 a non-finite speed is read as zero 2; T139 a
 //   non-finite speed is read as the cap, not past it 0 [EQUIVALENT]; T140 a non-finite sink is read as zero in a landing only 1.
+// THE SECOND RECIPE (guarded(), GUARD_KINDS and the five V2 sets, section 4b and the V2 rows of sections 4 and 5), 20 MORE MUTANTS, each applied the same way: G01 the guard includes motor 2; G02 it leaves goto out 4; G03 it compares strictly 1; G04 the slack
+//   added and not taken 5; G05 a kind the hand result lacks is still required 1; G07 a refusal is -1e9 and not -Infinity 5; G08 one guarded kind is enough 5; G09 GUARD_KINDS not frozen 1; G10 the guard returns the hand pilot's score 4;
+//   V01 AUDIT_V2 motor one seed short 3; V02 AUDIT_V2 hover moved a seed 2; V03 AUDIT2_V2 motor moved a seed 1; V04 BASELINE_V2 goto moved 2; V05 SAFETY_AUDIT_V2 motor one short 3; V06 SAFETY_AUDIT2_V2 hover moved 2; V07 AUDIT2_V2 hover is
+//   AUDIT_V2's 3; V08 BASELINE_V2 recovery is the first baseline's 3; V09 AUDIT_V2 is the first audit 3; V10 SAFETY_AUDIT2_V2 is the first one 3.
+//   ONE EQUIVALENT MUTANT, SAID: G06 (a result's missing guarded kind is not checked for presence) is 0 red because `undefined >= x` is false in JavaScript: the comparison that follows refuses a missing kind just as the presence check did.
 "use strict";
 import * as DT from "./droneTask.mjs";
 import * as AD from "./autopilotDrone.mjs";
@@ -250,9 +255,9 @@ console.log("\n3. THE SCORE");
 
 console.log("\n4. THE SETS");
 {
-    const key = (c) => c.kind + ":" + c.seed, S = { TRAIN: DT.TRAIN_SET, HELD_OUT: DT.HELD_OUT_SET, AUDIT: DT.AUDIT_SET, AUDIT2: DT.AUDIT2_SET, BASELINE: DT.BASELINE_SET, SAFETY_POOL: DT.SAFETY_POOL_SET, SAFETY_AUDIT: DT.SAFETY_AUDIT_SET, SAFETY_AUDIT2: DT.SAFETY_AUDIT2_SET };
-    const names = Object.keys(S), sizes = { TRAIN: [6, 12, 12, 4], HELD_OUT: [6, 6, 12, 4], AUDIT: [8, 8, 20, 6], AUDIT2: [8, 8, 20, 6], BASELINE: [4, 4, 8, 4], SAFETY_POOL: [10, 10, 30, 10], SAFETY_AUDIT: [10, 10, 30, 10], SAFETY_AUDIT2: [10, 10, 30, 10] };
-    ok("!! THE SETS HOLD THE SIZES THE HEADER SAYS, PER KIND (hover, recovery, motor, goto): TRAIN 6/12/12/4 and HELD_OUT 6/6/12/4, the two AUDITs 8/8/20/6, BASELINE 4/4/8/4, the three SAFETY sets 10/10/30/10",
+    const key = (c) => c.kind + ":" + c.seed, S = { TRAIN: DT.TRAIN_SET, HELD_OUT: DT.HELD_OUT_SET, AUDIT: DT.AUDIT_SET, AUDIT2: DT.AUDIT2_SET, BASELINE: DT.BASELINE_SET, SAFETY_POOL: DT.SAFETY_POOL_SET, SAFETY_AUDIT: DT.SAFETY_AUDIT_SET, SAFETY_AUDIT2: DT.SAFETY_AUDIT2_SET, AUDIT_V2: DT.AUDIT_SET_V2, AUDIT2_V2: DT.AUDIT2_SET_V2, BASELINE_V2: DT.BASELINE_SET_V2, SAFETY_AUDIT_V2: DT.SAFETY_AUDIT_SET_V2, SAFETY_AUDIT2_V2: DT.SAFETY_AUDIT2_SET_V2 };
+    const names = Object.keys(S), sizes = { TRAIN: [6, 12, 12, 4], HELD_OUT: [6, 6, 12, 4], AUDIT: [8, 8, 20, 6], AUDIT2: [8, 8, 20, 6], BASELINE: [4, 4, 8, 4], SAFETY_POOL: [10, 10, 30, 10], SAFETY_AUDIT: [10, 10, 30, 10], SAFETY_AUDIT2: [10, 10, 30, 10], AUDIT_V2: [8, 8, 20, 6], AUDIT2_V2: [8, 8, 20, 6], BASELINE_V2: [4, 4, 8, 4], SAFETY_AUDIT_V2: [10, 10, 30, 10], SAFETY_AUDIT2_V2: [10, 10, 30, 10] };
+    ok("!! THE SETS HOLD THE SIZES THE HEADER SAYS, PER KIND (hover, recovery, motor, goto): TRAIN 6/12/12/4 and HELD_OUT 6/6/12/4, the two AUDITs 8/8/20/6, BASELINE 4/4/8/4, the three SAFETY sets 10/10/30/10, and the FIVE V2 SETS of the second recipe (AUDIT_V2, AUDIT2_V2, BASELINE_V2, SAFETY_AUDIT_V2, SAFETY_AUDIT2_V2) the sizes of their first-recipe counterparts",
         names.every((n) => DT.KINDS.every((k, i) => S[n].filter((c) => c.kind === k).length === sizes[n][i])), names.map((n) => `${n} ${S[n].length}`).join(", "));
     ok("!! NO (kind, seed) PAIR IS IN TWO SETS, AND NONE IS REPEATED WITHIN ONE (a pilot trained on TRAIN is chosen on HELD_OUT and graded once on an AUDIT: a pair in two of them is a pilot graded on what it was taught)",
         (() => { const seen = new Map(); for (const n of names) for (const c of S[n]) { const k = key(c); if (seen.has(k)) return false; seen.set(k, n); } return seen.size === names.reduce((a, n) => a + S[n].length, 0); })(), `${names.reduce((a, n) => a + S[n].length, 0)} distinct pairs`);
@@ -267,6 +272,25 @@ console.log("\n4. THE SETS");
         && ev.crashed === runs.filter((r) => (r.kind === "motor" ? !r.settled : r.status !== "airborne")).length && ev.runs.length === small.length && DT.KINDS.every((k) => runs.some((r) => r.kind === k)) && !("hover" in DT.evaluate(hand, small.filter((c) => c.kind === "goto")).byKind));
 }
 
+console.log("\n4b. THE SECOND RECIPE'S SETS, AND THE GUARDED OBJECTIVE");
+{
+    const seeds = (set, k) => set.filter((c) => c.kind === k).map((c) => c.seed), rng = (a, b) => Array.from({ length: b - a + 1 }, (_, i) => a + i).join();
+    const pin = (set, h, r, m, g) => seeds(set, "hover").join() === rng(...h) && seeds(set, "recovery").join() === rng(...r) && seeds(set, "motor").join() === rng(...m) && seeds(set, "goto").join() === rng(...g);
+    ok("!! THE FIVE V2 SETS HOLD THE SEEDS THE HEADER SAYS (fresh, never flown by a champion): AUDIT_V2 hover and recovery 41-48, motor 65-84, go-to 41-46; AUDIT2_V2 51-58, 85-104, 51-56; BASELINE_V2 601-604, motor 601-608; SAFETY_AUDIT_V2 4001-4010, motor 4001-4030; SAFETY_AUDIT2_V2 5001-5010, motor 5001-5030",
+        pin(DT.AUDIT_SET_V2, [41, 48], [41, 48], [65, 84], [41, 46]) && pin(DT.AUDIT2_SET_V2, [51, 58], [51, 58], [85, 104], [51, 56]) && pin(DT.BASELINE_SET_V2, [601, 604], [601, 604], [601, 608], [601, 604]) && pin(DT.SAFETY_AUDIT_SET_V2, [4001, 4010], [4001, 4010], [4001, 4030], [4001, 4010]) && pin(DT.SAFETY_AUDIT2_SET_V2, [5001, 5010], [5001, 5010], [5001, 5030], [5001, 5010]));
+    const H = { score: -3, byKind: { hover: -0.5, recovery: -0.4, motor: -6.7, goto: -1.8 } }, R = (o = {}, score = -2) => ({ score, byKind: { ...H.byKind, ...o } });
+    const g = DT.guarded(H, 0.01);
+    ok("!! guarded(hand, slack) is a FUNCTION of a result, and GUARD_KINDS are hover, recovery and goto -- NOT motor (the corner where a pilot is allowed to trade), frozen", typeof g === "function" && Object.isFrozen(DT.GUARD_KINDS) && DT.GUARD_KINDS.join() === "hover,recovery,goto");
+    ok("!! a result that keeps every guarded kind within the slack of the hand pilot's is worth its plain score (and so is the hand pilot's own result): -2 for one that is level, one better and one 0.009 worse; -3 for the hand pilot against itself", g(R()) === -2 && g(R({ hover: -0.49, recovery: -0.3, goto: -1.0 })) === -2 && g(R({ hover: -0.509 })) === -2 && g(H) === -3);
+    ok("!! A RESULT THAT LETS ANY GUARDED KIND FALL MORE THAN THE SLACK BELOW THE HAND PILOT'S IS WORTH -Infinity, whatever its score: hover 0.011 worse, recovery 0.011 worse, go-to 0.011 worse, each ALONE (the score stays a very good -0.1)", g(R({ hover: -0.511 }, -0.1)) === -Infinity && g(R({ recovery: -0.411 }, -0.1)) === -Infinity && g(R({ goto: -1.811 }, -0.1)) === -Infinity);
+    ok("!! the edge is the slack itself: a kind exactly the slack below (0.01) passes and one a hair under it does not; slack 0 refuses any kind below the hand pilot's and passes one equal to it; a bigger slack lets more through", g(R({ hover: -0.51 })) === -2 && g(R({ hover: -0.5100001 })) === -Infinity && DT.guarded(H, 0)(R({ hover: -0.5 })) === -2 && DT.guarded(H, 0)(R({ hover: -0.5000001 })) === -Infinity && DT.guarded(H, 0.05)(R({ hover: -0.54 })) === -2);
+    ok("!! THE MOTOR KIND IS NOT GUARDED: a result whose motor-out mean is a full unit worse than the hand pilot's is worth its plain score (the cost of trading there is the score's, not the guard's)", g(R({ motor: -7.7 })) === -2 && g(R({ motor: -20 })) === -2);
+    ok("!! a result that does not hold a guarded kind the hand pilot's result holds is worth -Infinity (a kind that vanished is not a kind kept), and a kind the HAND PILOT's result lacks is not guarded (a set without go-to flights guards hover and recovery only)", g({ score: -2, byKind: { hover: -0.5, recovery: -0.4, motor: -6.7 } }) === -Infinity && DT.guarded({ score: -3, byKind: { hover: -0.5, recovery: -0.4, motor: -6.7 } }, 0.01)({ score: -2, byKind: { hover: -0.5, recovery: -0.4, motor: -6.7 } }) === -2);
+    ok("!! a NaN guarded mean is a refusal, not a pass (every comparison with NaN is false): -Infinity", g(R({ hover: NaN })) === -Infinity && g(R({ goto: NaN })) === -Infinity);
+    const real = DT.evaluate(hand, DT.TRAIN_SET.filter((c, i) => i % 3 === 0));
+    ok("!! on a real evaluation the hand pilot passes its own guard (its plain score comes back) and a pilot whose hover is 0.5 worse everywhere does not", DT.guarded(real, 0.01)(real) === real.score && DT.guarded(real, 0.01)({ ...real, byKind: { ...real.byKind, hover: real.byKind.hover - 0.5 } }) === -Infinity);
+}
+
 console.log("\n5. THE BASELINE, FROZEN");
 {
     const FROZEN = {
@@ -278,8 +302,13 @@ console.log("\n5. THE BASELINE, FROZEN");
         SAFETY_POOL: { score: -3.822847, crashed: 30, byKind: { hover: -0.502927, recovery: -0.49233, motor: -6.774467, goto: -1.618423 } },
         SAFETY_AUDIT: { score: -4.015044, crashed: 30, byKind: { hover: -0.55319, recovery: -0.578463, motor: -6.940888, goto: -2.135947 } },
         SAFETY_AUDIT2: { score: -3.880909, crashed: 30, byKind: { hover: -0.471657, recovery: -0.496164, motor: -6.797178, goto: -1.9261 } },
+        AUDIT_V2: { score: -3.798569, crashed: 20, byKind: { hover: -0.546052, recovery: -0.342134, motor: -6.978972, goto: -2.142499 } },
+        AUDIT2_V2: { score: -3.743704, crashed: 20, byKind: { hover: -0.59974, recovery: -0.552413, motor: -6.850244, goto: -1.835576 } },
+        BASELINE_V2: { score: -3.272481, crashed: 8, byKind: { hover: -0.522513, recovery: -0.502028, motor: -6.63902, goto: -2.059823 } },
+        SAFETY_AUDIT_V2: { score: -3.920278, crashed: 30, byKind: { hover: -0.542874, recovery: -0.453649, motor: -6.87494, goto: -1.900325 } },
+        SAFETY_AUDIT2_V2: { score: -3.916592, crashed: 30, byKind: { hover: -0.572841, recovery: -0.507326, motor: -6.861345, goto: -1.83535 } },
     };
-    const S = { TRAIN: DT.TRAIN_SET, HELD_OUT: DT.HELD_OUT_SET, AUDIT: DT.AUDIT_SET, AUDIT2: DT.AUDIT2_SET, BASELINE: DT.BASELINE_SET, SAFETY_POOL: DT.SAFETY_POOL_SET, SAFETY_AUDIT: DT.SAFETY_AUDIT_SET, SAFETY_AUDIT2: DT.SAFETY_AUDIT2_SET }, got = {};
+    const S = { TRAIN: DT.TRAIN_SET, HELD_OUT: DT.HELD_OUT_SET, AUDIT: DT.AUDIT_SET, AUDIT2: DT.AUDIT2_SET, BASELINE: DT.BASELINE_SET, SAFETY_POOL: DT.SAFETY_POOL_SET, SAFETY_AUDIT: DT.SAFETY_AUDIT_SET, SAFETY_AUDIT2: DT.SAFETY_AUDIT2_SET, AUDIT_V2: DT.AUDIT_SET_V2, AUDIT2_V2: DT.AUDIT2_SET_V2, BASELINE_V2: DT.BASELINE_SET_V2, SAFETY_AUDIT_V2: DT.SAFETY_AUDIT_SET_V2, SAFETY_AUDIT2_V2: DT.SAFETY_AUDIT2_SET_V2 }, got = {};
     for (const n of Object.keys(S)) {
         const r = DT.evaluate(hand, S[n]); got[n] = r;
         const fz = FROZEN[n];
@@ -287,7 +316,7 @@ console.log("\n5. THE BASELINE, FROZEN");
             near(r.score, fz.score, 5e-6) && DT.KINDS.every((k) => near(r.byKind[k], fz.byKind[k], 5e-6)) && r.crashed === fz.crashed, DT.describeEval(r));
     }
     const ended = (n) => got[n].runs.filter((x) => (x.kind === "motor" ? !x.settled : x.status !== "airborne"));
-    ok("!! THE HAND PILOT'S TAILS ARE PINNED BY KIND: on every one of the eight sets it ends no hover, recovery or goto flight early (the 232 of them are flown to the end) and it LANDS NO MOTOR FLIGHT -- every one of the 162 ends crashed, at 13.6 to 41.9 m/s: the dead man's curve, and the only place a learned pilot can be worse or better",
+    ok("!! THE HAND PILOT'S TAILS ARE PINNED BY KIND: on every one of the thirteen sets it ends no hover, recovery or goto flight early (the 348 of them are flown to the end) and it LANDS NO MOTOR FLIGHT -- every one of the 270 ends crashed, at 13.6 to 41.9 m/s: the dead man's curve, and the only place a learned pilot can be worse or better",
         Object.keys(S).every((n) => ended(n).length === got[n].runs.filter((x) => x.kind === "motor").length && ended(n).every((x) => x.kind === "motor" && x.touchdown === "crashed" && x.speed > 13)
             && got[n].runs.filter((x) => x.kind !== "motor").every((x) => x.status === "airborne" && x.ticks === FLOWN)), `not standing: ${Object.keys(S).map((n) => `${n} ${ended(n).length}`).join(", ")}`);
     ok("!! THE MOTOR KIND IS WHERE THE HAND PILOT LOSES, SAID IN THE TASK'S OWN NUMBERS: on every set the motor kind is the worst of the four kinds by more than 4.5 (its mean is between -7 and -6.5 -- the crashes are charged 6.3 to 7), and the recovery kind is not worse than the hover's by more than 0.2",

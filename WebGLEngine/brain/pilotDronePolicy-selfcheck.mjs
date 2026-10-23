@@ -36,6 +36,8 @@
 //   sideways part 1; D20 speed to the right, sign of the forward part 1; D21 bank feature scale 1 1; D22 pitch feature scale 1 1; D23 heading error not over pi 1; D24 motor-out flag inverted 2; D25 no bias feature 2; D26 point
 //   ahead scale 10 1; D27 point to the right reads the point ahead 1; D28 yaw rate feature sign 1; D29 thrust clamped to [-1, 1] 3; D30 the recurrent step drops the identity 11; D31 two recurrent steps 4; D32 first-layer bias
 //   read one off 2; D33 negative channel read back at 0.9 8; D34 negative channel carries the same sign 9.
+// THE `objective` OPTION OF train() AND prune() (the second recipe's guarded search; the rows after "A BLOCK THAT FAILS IS HALVED"), 5 MUTANTS, each applied the same way: O1 train ignores the objective 2; O2 train judges its start by the plain
+//   score 1; O3 train inverts the objective 2; O4 prune ignores the objective 1; O5 an objective of exactly zero treated as none -- 0 RED until a row asked for an objective of zero (a falsy value must not fall back to the plain score), then 1.
 "use strict";
 import * as PP from "./pilotDronePolicy.mjs";
 import * as AD from "./autopilotDrone.mjs";
@@ -244,6 +246,18 @@ console.log("\n7. THE TRAINING FUNCTIONS");
     const half = Float32Array.from(hw); for (let k = 0; k < 300; k++) half[600 + k] += 0.05 + 0.001 * k; half[1100] += 1;
     const hcalls = { n: 0 }, hr = PP.prune(half, { score: (x) => { hcalls.n++; return 5 * (x[1100] - hw[1100]); } });
     ok("!! A BLOCK THAT FAILS IS HALVED, AND BOTH HALVES ARE TRIED: 300 weights that do not matter and one at the far end of the vector that does (a score of 5 x its deviation) -- the whole block fails, the first half (all harmless) goes back in ONE evaluation and the second is narrowed down to the one that matters in about two evaluations a level: under 30 evaluations in all, not 300, and the weights that matter stays", hr.kept === 1 && hr.moved === 301 && Math.abs(hr.weights[1100] - (hw[1100] + 1)) < 1e-6 && hr.weights.every((v, i) => i === 1100 || v === hw[i]) && hcalls.n <= 30, `${hcalls.n} evaluations`);
+    // ---- the `objective` option (the second recipe's guarded search): null is the plain score, bit for bit; otherwise it is what a child is judged by
+    const guardSet = [DT.scenario(2, "hover"), DT.scenario(2, "goto"), DT.scenario(2, "motor")], handG = PP.evaluate(hw, guardSet), gd = DT.guarded(handG, 0);
+    const pl = PP.train({ seed: 1, iters: 24, sigma: 0.6, trainSet: guardSet }), nul = PP.train({ seed: 1, iters: 24, sigma: 0.6, trainSet: guardSet, objective: null }), gu = PP.train({ seed: 1, iters: 24, sigma: 0.6, trainSet: guardSet, objective: gd });
+    const pe = PP.evaluate(pl.weights, guardSet), ge = PP.evaluate(gu.weights, guardSet);
+    ok("!! `objective: null` IS THE PLAIN SCORE, BIT FOR BIT: a search with no objective and one with objective null return the same weights, the same train score and the same history", nul.weights.every((v, i) => v === pl.weights[i]) && nul.trainScore === pl.trainScore && JSON.stringify(nul.history) === JSON.stringify(pl.history));
+    ok("!! A GUARDED SEARCH IS JUDGED BY THE GUARD: on this set at this seed the PLAIN search ends with a guarded kind worse than the hand pilot's (hover), the search with objective guarded(hand, 0) does not -- its weights keep hover and go-to at or above the hand pilot's, its reported train score is the guarded objective of its own weights (the plain score, since the guard holds), and it is a different search from the plain one", [pe.byKind.hover < handG.byKind.hover || pe.byKind.goto < handG.byKind.goto].every(Boolean) && ge.byKind.hover >= handG.byKind.hover - 1e-12 && ge.byKind.goto >= handG.byKind.goto - 1e-12 && gu.trainScore === gd(ge) && gu.trainScore === ge.score && gu.weights.some((v, i) => v !== pl.weights[i]), `plain hover ${pe.byKind.hover.toFixed(4)} goto ${pe.byKind.goto.toFixed(4)}; guarded hover ${ge.byKind.hover.toFixed(4)} goto ${ge.byKind.goto.toFixed(4)}; hand ${handG.byKind.hover.toFixed(4)} / ${handG.byKind.goto.toFixed(4)}`);
+    const dbl = PP.train({ seed: 4, iters: 6, sigma: 0.3, trainSet: one, objective: (r) => 2 * r.score });
+    ok("!! the objective is what the history and the train score are made of: a search judged by twice the score reports twice the score (its history opens at twice the hand score), and still returns weights whose own score is half of it", near(dbl.history[0].score, 2 * t0, 1e-12) && near(dbl.trainScore, 2 * PP.evaluate(dbl.weights, one).score, 1e-12));
+    const zero = PP.train({ seed: 4, iters: 4, sigma: 0.3, trainSet: one, objective: () => 0 });
+    ok("an objective that is exactly ZERO is an objective and not 'none' (a falsy value must not fall back to the plain score): every child is worth 0, so the search reports 0 from its first history entry to its last", zero.trainScore === 0 && zero.history[0].score === 0 && zero.history.every((h) => h.score === 0));
+    const pdr = PP.prune(dirty, { trainSet: one, objective: (r) => 5 * r.score });
+    ok("!! prune() JUDGES BY THE OBJECTIVE TOO: the dirty vector pruned under an objective of five times the score comes back as the hand weights, and reports five times the hand score", pdr.kept === 0 && near(pdr.trainScore, 5 * PP.evaluate(hw, one).score, 1e-12) && pdr.weights.every((v, i) => v === hw[i]));
 }
 
 
