@@ -425,12 +425,16 @@ export const pageKernelsFor = (key, table = PAGE_KERNELS_BY_ADAPTER) => (key && 
 export const NATIVE_KERNELS_BY_ADAPTER = Object.freeze({ "win32/intel/gen-9": "r18u", "win32/nvidia/pascal": "r18t" });
 /**
  * Round 50 (section 120): THE NETWORK A DEVICE RUNS, by adapter key, beside the kernel tables. NETWORKS names the arc's two exported
- * networks; each table names a network for a key, and a key it does not name runs the shipped one. Both tables are EMPTY in this
- * round: section 119's verdict fills the Intel gen-9's two entries with "w16" by H49's rule, or leaves them empty.
+ * networks; each table names a network for a key, and a key it does not name runs the shipped one. Both were empty in round 50;
+ * round 53 filled the Intel gen-9's two entries with "w16" by section 123's reading of H49.
  */
 export const NETWORKS = Object.freeze({ shipped: "render/denoise-net-r11.json", w16: "render/denoise-net-r47-w16.json" });
-export const PAGE_NETWORKS_BY_ADAPTER = Object.freeze({});
-export const NATIVE_NETWORKS_BY_ADAPTER = Object.freeze({});
+// Round 53 (section 124): section 123's verdict -- H49 held natively on the Intel gen-9, the w16 network 2.836 and 2.656 x the shipped
+// network on r18u at 1920 x 1080 -- fills the Intel's two entries; every other key runs the shipped network, the GTX 1080's among them
+export const PAGE_NETWORKS_BY_ADAPTER = Object.freeze({ "Windows/intel/gen-9": "w16" });
+export const NATIVE_NETWORKS_BY_ADAPTER = Object.freeze({ "win32/intel/gen-9": "w16" });
+/** Which pre-registration's verdict put each network entry in its table. */
+export const NETWORKS_DECIDED_BY = Object.freeze({ "Windows/intel/gen-9": "section 123", "win32/intel/gen-9": "section 123" });
 const networkName = (name) => { if (!Object.hasOwn(NETWORKS, name)) throw new Error(`denoiseDevice: no network "${name}" -- the networks are ${Object.keys(NETWORKS).join(", ")}`); return name; };
 /** The network denoise.html runs for an adapter's key (pageAdapterKey): its table's name, else "shipped". */
 export const pageNetworkFor = (key, table = PAGE_NETWORKS_BY_ADAPTER) => networkName(key && Object.hasOwn(table, key) ? table[key] : "shipped");

@@ -628,7 +628,7 @@ else {
 console.log("\n3. THE PAGE: denoise.html's \"Time the network\", in Chromium (on the rig, the browser's GPU)");
 {
     const r = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 600000, script: `async () => {
-        const f = document.createElement("iframe"); f.style.width = "1200px"; f.style.height = "900px"; f.src = "/denoise.html"; document.body.appendChild(f);
+        const f = document.createElement("iframe"); f.style.width = "1200px"; f.style.height = "900px"; f.src = "/denoise.html?net=shipped"; document.body.appendChild(f);
         await new Promise((r) => f.onload = r);
         const d = f.contentDocument, $ = (id) => d.getElementById(id), wait = (ms) => new Promise((r) => setTimeout(r, ms));
         for (let i = 0; i < 100 && !$("time"); i++) await wait(50);
@@ -652,8 +652,10 @@ console.log("\n3. THE PAGE: denoise.html's \"Time the network\", in Chromium (on
             ok("  round 18: the page's report carries its adapter's key -- platform, vendor and architecture -- or says it has none", "pageKey" in L &&
                 (L.pageKey === null || /^[^/]+\/[^/]+\/[^/]*$/.test(L.pageKey)), String(L.pageKey));
             ok("  the page and the harness agree on what the device is", r.software === null || L.adapter.software === r.software, `harness says ${r.software ? "software" : "hardware"}`);
-            ok("  round 50: the page's ladder ran the shipped network, by name and by size, with no ?net= asked",
-                L.network === "shipped" && L.params === 33329, `${L.network}, ${L.params} parameters`);
+            // round 53 (section 124): the Intel's page entry names w16, so this ladder asks for the shipped network by name -- every page line
+            // on every GPU keeps the meaning it has had since section 37
+            ok("  rounds 50 and 53: the page's first ladder ran the shipped network, asked for by name (?net=shipped), by name and by size",
+                L.network === "shipped (asked by ?net=)" && L.params === 33329, `${L.network}, ${L.params} parameters`);
         }
         // ROUND 50 (section 120): the page's ladder again, on the w16 network (?net=w16), on the sets the page tables use -- set against
         // the shipped network's page ladder above, on the same set at every size both measured; reported, deciding nothing

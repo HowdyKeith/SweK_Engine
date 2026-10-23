@@ -237,7 +237,7 @@ import { spawnSync } from "node:child_process";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const imp = (p) => import(pathToFileURL(path.join(ENG, p)).href);
-const { PAGE_NETWORKS_BY_ADAPTER, NATIVE_NETWORKS_BY_ADAPTER, NETWORKS, pageNetworkFor, nativeNetworkFor, networkFile } = await imp("render/denoiseDevice.mjs");
+const { PAGE_NETWORKS_BY_ADAPTER, NATIVE_NETWORKS_BY_ADAPTER, NETWORKS, NETWORKS_DECIDED_BY, pageNetworkFor, nativeNetworkFor, networkFile } = await imp("render/denoiseDevice.mjs");
 const { APPLY_TOL, kernelApplyWgsl, packApplyUniforms, kernelApplyCpu, kernelFor, deviceLayers, denoiseTwin, createDeviceDenoiser, encodeNet, decodeNet,
         KERNEL_SETS, DEFAULT_KERNELS, PAGE_KERNELS, applyFor, kernelApplyFastWgsl, kernelHeadApplyWgsl, judgeHeadApply,
         R18_KERNELS, FXC_UNBUILT_SETS, isD3D12Native, nativeSetsFor, PAGE_KERNELS_BY_ADAPTER, pageAdapterKey, pageKernelsFor, passBytes, TIMED_SETS,
@@ -757,7 +757,7 @@ console.log("1. THE KERNEL'S TWIN, ON THE CPU");
             const fx49 = [H49(R49.map((e, i) => (i ? { ...e, r: 1.4 } : e))), H49(R49.map((e, i) => (i ? { ...e, c2: false } : e))), H49(R49.map((e, i) => (i ? { ...e, c1: false } : e)))];
             ok("!! *** section 123, by section 119's rule: H49 HOLDS -- every gate green at 7b871372, the w16 network's native K0 green on r18u, both 1080p passes on the device's clock, the w16 network 2.84 and 2.66 x as fast as the shipped one on r18u at 1920 x 1080 -- so the Intel gen-9's two network entries name it, as denoise-w16-intel-entries ***",
                 H49(R49) === "holds" && fx49[0] === "fails" && fx49[1] === "no verdict" && fx49[2] === "no verdict" &&
-                Object.keys(NATIVE_NETWORKS_BY_ADAPTER).length === 0 && Object.keys(PAGE_NETWORKS_BY_ADAPTER).length === 0,
+                NATIVE_NETWORKS_BY_ADAPTER["win32/intel/gen-9"] === "w16" && PAGE_NETWORKS_BY_ADAPTER["Windows/intel/gen-9"] === "w16" && NETWORKS_DECIDED_BY["win32/intel/gen-9"] === "section 123",
                 `native ${R49.map((e) => e.r).join(" / ")} x; page (reported, section 120) ${R49.map((e) => e.page).join(" / ")} x; fixtures: ${fx49.join(" | ")}`);
             ok("  ...and section 119's prediction is read as made: 2.5-3.5 x MET in both runs (2.84 / 2.66); the page, reported, 2.74 / 2.69",
                 R49.every((e) => e.r >= 2.5 && e.r <= 3.5 && e.page !== null), R49.map((e) => `${e.r} native, ${e.page} page`).join("; "));
@@ -1207,10 +1207,13 @@ else try {
 // either table does not name runs the shipped network, a fixture table's entry is honoured, and an unknown name is refused
 {
     const refuse = (f) => { try { f(); return false; } catch (e) { return /no network "nope" -- the networks are shipped, w16/.test(e.message); } };
-    ok("!! round 50: NETWORKS names the shipped and w16 files; PAGE_ and NATIVE_NETWORKS_BY_ADAPTER are empty and frozen, so every key runs the shipped network; a fixture table's entry is honoured and an unknown name refused",
+    ok("!! rounds 50 and 53: NETWORKS names the shipped and w16 files; each network table names the Intel gen-9's key alone, with w16, by section 123; every other key -- the 1080's among them -- runs the shipped network; a fixture table's entry is honoured and an unknown name refused",
         JSON.stringify(NETWORKS) === JSON.stringify({ shipped: "render/denoise-net-r11.json", w16: "render/denoise-net-r47-w16.json" }) &&
-        Object.keys(PAGE_NETWORKS_BY_ADAPTER).length === 0 && Object.keys(NATIVE_NETWORKS_BY_ADAPTER).length === 0 && Object.isFrozen(PAGE_NETWORKS_BY_ADAPTER) && Object.isFrozen(NATIVE_NETWORKS_BY_ADAPTER) &&
-        ["Windows/intel/gen-9", "Windows/nvidia/pascal", null].every((k) => pageNetworkFor(k) === "shipped") && ["win32/intel/gen-9", "win32/nvidia/pascal", null].every((k) => nativeNetworkFor(k) === "shipped") &&
+        JSON.stringify(PAGE_NETWORKS_BY_ADAPTER) === '{"Windows/intel/gen-9":"w16"}' && JSON.stringify(NATIVE_NETWORKS_BY_ADAPTER) === '{"win32/intel/gen-9":"w16"}' &&
+        Object.isFrozen(PAGE_NETWORKS_BY_ADAPTER) && Object.isFrozen(NATIVE_NETWORKS_BY_ADAPTER) &&
+        NETWORKS_DECIDED_BY["Windows/intel/gen-9"] === "section 123" && NETWORKS_DECIDED_BY["win32/intel/gen-9"] === "section 123" &&
+        pageNetworkFor("Windows/intel/gen-9") === "w16" && nativeNetworkFor("win32/intel/gen-9") === "w16" &&
+        ["Windows/nvidia/pascal", "Linux/google/swiftshader", null].every((k) => pageNetworkFor(k) === "shipped") && ["win32/nvidia/pascal", "linux/google/swiftshader", null].every((k) => nativeNetworkFor(k) === "shipped") &&
         pageNetworkFor("Windows/intel/gen-9", { "Windows/intel/gen-9": "w16" }) === "w16" && nativeNetworkFor("win32/intel/gen-9", { "win32/intel/gen-9": "w16" }) === "w16" &&
         networkFile("w16") === NETWORKS.w16 && refuse(() => networkFile("nope")) && refuse(() => pageNetworkFor("k", { k: "nope" })) &&
         Object.values(NETWORKS).every((f) => fs.existsSync(path.join(ENG, f))),
@@ -1252,8 +1255,11 @@ console.log("\n4. THE PAGE, IN CHROMIUM: denoise.html ON ITS OWN DEVICE");
             /35000 belongs to the arc's dataset and is refused/.test(R.refused?.status || "") && /only those/.test(R.scope || "") && /not<\/b>|not trained on/.test(R.scope || ""),
             (R.refused?.status || "").slice(0, 100));
         // round 50 (section 120): with no ?net= and an empty network table, the page runs the shipped network and says so
-        ok("  round 50: ...and with no ?net= the page runs the shipped network and names it -- PAGE_NETWORKS_BY_ADAPTER is empty, so no adapter's key changes it",
-            /network shipped(?! \()/.test(run.cap || "") && Object.keys(PAGE_NETWORKS_BY_ADAPTER).length === 0 && pageNetworkFor(R.key) === "shipped", (run.cap || "").slice(0, 160));
+        // round 53 (section 124): the network the page's own key names -- here SwiftShader's, so the shipped one; on the rig's Intel, w16,
+        // with the image row above holding it to THAT network's f64 image (the page checks against the network it loaded)
+        const wantNet = pageNetworkFor(R.key), tabled = !!R.key && Object.hasOwn(PAGE_NETWORKS_BY_ADAPTER, R.key);
+        ok(`  rounds 50 and 53: ...and with no ?net= the page runs the network its key names -- ${wantNet}${tabled ? `, the table's for ${R.key}` : `, no entry for ${R.key || "(no key)"}`} -- and says so`,
+            new RegExp(`network ${wantNet}${tabled ? ` \\(the table's for ${R.key.replace(/[/]/g, "\\/")}\\)` : "(?! \\()"}`).test(run.cap || ""), (run.cap || "").slice(0, 160));
     }
     // ROUND 50: ?net=w16 runs the w16 network on the page's device, held to that network's f64 image as the page holds the shipped one;
     // ?net=nope is refused by name before anything runs
@@ -1340,10 +1346,12 @@ if (W.refused || skip) console.log("  SKIP  the native caller needs a device her
 else {
     const r = spawnSync(process.execPath, [path.join(ENG, "tools", "denoiseDevice.mjs"), "--which"], { cwd: ENG, encoding: "utf8", timeout: 240000 });
     const said = String(r.stdout || ""), m = said.match(/--which: key (\S+); kernels (\S+) -- (.*)/), ran = said.match(/--which: (\S+) built and ran one 64 x 64 pass in ([\d.]+) ms; worst relative difference from the f64 network on the CPU ([\d.e+-]+)/);
-    const want = HERE_PICK || { key: null, kernels: null };
+    const want = HERE_PICK || { key: null, kernels: null }, netLine = said.match(/--which: network (\S+) -- (.*)/);
     console.log(`  ----  native caller here: ${m ? `key ${m[1]}, kernels ${m[2]} (${m[3]})` : "no pick line"}; ${ran ? `ran in ${ran[2]} ms, worst ${ran[3]}` : "no run line"}`);
     ok("!! round 20 (section 68): the native caller picks what nativePick gives this adapter and this run's compiler, builds it, and runs one pass within 1e-4 of the f64 network",
-        r.status === 0 && !!m && !!ran && m[1] === (want.key || "(none)") && m[2] === want.kernels && ran[1] === want.kernels && +ran[3] <= 1e-4,
+        r.status === 0 && !!m && !!ran && m[1] === (want.key || "(none)") && m[2] === want.kernels && ran[1] === want.kernels && +ran[3] <= 1e-4 &&
+        // round 53 (section 124): and the network its key's NATIVE_NETWORKS_BY_ADAPTER entry names, on a line of its own
+        !!netLine && netLine[1] === nativeNetworkFor(want.key),
         `exit ${r.status}; the gate's own pick ${want.key} ${want.kernels}` + (r.status ? "; " + String(r.stderr || said).trim().split("\n").slice(-2).join(" | ") : ""));
 }
 

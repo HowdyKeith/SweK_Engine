@@ -2320,10 +2320,10 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "denoise-w16-intel-entries",
-        blocker: "OPEN",
-        what: "Section 119's rule, carried out: NATIVE_NETWORKS_BY_ADAPTER and PAGE_NETWORKS_BY_ADAPTER name w16 for win32/intel/gen-9 and Windows/intel/gen-9, and the native caller reads its network by nativeNetworkFor as the page reads pageNetworkFor.",
-        how: "A round of tables, in section 67's shape: the two entries, the native caller (tools/denoiseDevice.mjs --which and its pick) loading by key, rows holding every other key to the shipped network. No rig run owed: the timing is section 123's.",
-        why: "Section 123: H49 held natively (2.836 / 2.656 x); the page, reported, 2.743 / 2.688 x.",
+        blocker: "CLOSED",
+        what: "DONE as round 53 (pre-registration section 124), shipping with the next version: NATIVE_NETWORKS_BY_ADAPTER names w16 for win32/intel/gen-9 and PAGE_NETWORKS_BY_ADAPTER for Windows/intel/gen-9, decided by section 123 (NETWORKS_DECIDED_BY); every other key, the GTX 1080's among them, runs the shipped network. The native caller (tools/denoiseDevice.mjs --which) loads its key's network and says so on a line of its own.",
+        how: "Every gate drive that measures the shipped network names it (?net=shipped): the timing gate's first page ladder and the chain gate's page drives, so every page line on the Intel keeps its meaning. The page's own row checks the network its key names; on the rig's Intel that is w16, its image held to that network's f64 image. Sabotaged W1-W5. No rig run owed: the timing is section 123's.",
+        why: "Section 123: H49 held natively, 2.836 / 2.656 x, on Keith's decision that w16 runs on the Intel only.",
     },
     {
         id: "denoise-f16-storage",

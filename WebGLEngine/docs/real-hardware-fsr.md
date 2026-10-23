@@ -742,6 +742,12 @@ node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r49-b.json
 - **Round 50 (section 120) rides the same two runs** if they are made at a commit carrying it. The timing gate's page
   ladder then times the w16 network too, adding `page: w16 against the shipped network` lines tagged section 120.
 
+### Round 53: the Intel runs the w16 network (pre-registration section 124)
+
+No run is owed. On the Intel in Chrome, denoise.html now loads the w16 network and says so, and `tools/denoiseDevice.mjs
+--which` names it natively. Every gate that compares against the shipped network asks for it by name (`?net=shipped`), so
+the rig's lines keep their meanings. Any later Intel run of the device gate checks that the page runs w16 there.
+
 ## Send back
 
 The JSON file. It holds the platform, the browser flags, every adapter seen, each gate's verdict, time, failing rows and

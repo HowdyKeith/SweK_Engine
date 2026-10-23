@@ -8368,3 +8368,60 @@ ladder's cap and about 0.5 s of the GPU's timeout. On this GPU the w16 network t
 - H48's tiled time read off the plain accumulation's figure: 2 red;
 - H49 at 3.0 x, not 1.5: 1 red;
 - H49 read at section 121's commit: 1 red.
+
+## 124. ROUND 53 -- THE INTEL GEN-9's NETWORK ENTRIES NAME THE w16 NETWORK: FIXED BEFORE ITS CODE
+
+**Why now.** Section 123, by section 119's rule: H49 held natively, at 2.836 and 2.656 x. So the Intel gen-9's two network
+entries name the w16 network. This is that round (`denoise-w16-intel-entries`), in the shape of section 67's table rounds. It
+measures nothing new, so it has no prediction to miss and no rig run to wait for. It is fixed here before its code.
+
+**What changes, in `render/denoiseDevice.mjs`:**
+- `NATIVE_NETWORKS_BY_ADAPTER` is `{ "win32/intel/gen-9": "w16" }`, and `PAGE_NETWORKS_BY_ADAPTER` is
+  `{ "Windows/intel/gen-9": "w16" }`. Every other key still runs the shipped network, the 1080's among them.
+- `NETWORKS_DECIDED_BY` names section 123 for both entries, as `NATIVE_KERNELS_DECIDED_BY` does for the kernel tables.
+- **The native caller** (`tools/denoiseDevice.mjs --which` and the device gate's native-caller row) reads its network by
+  `nativeNetworkFor`, as the page reads `pageNetworkFor`, and says which network it ran.
+
+**What changes on the page:** nothing in its code. It already loads by `pageNetworkFor`. On the Intel in Chrome it will now
+load the w16 network and say so: "network w16 (the table's for Windows/intel/gen-9)".
+
+**What must not change: the lines the rig's reports carry.** With the Intel's page entry filled, a page ladder there with no
+`?net=` would time the w16 network. That would change, with no row red, what every page line on the Intel has meant since
+section 37. So every gate drive that measures the shipped network names it:
+- the timing gate's first page ladder runs `denoise.html?net=shipped`, the second `?net=w16`, as section 120 has them
+  compared;
+- the chain gate's page drives (section 93's rig size and the pilot) run `?net=shipped`, so section 93's network figures
+  stay the shipped network's.
+
+**The rows:**
+1. **The tables.** Each names exactly the Intel's key, with `w16`, decided by section 123. Every other key, the 1080's
+   among them, runs the shipped network. Section 123's H49 row now holds the entries to its verdict, not to empty tables.
+2. **The native caller** picks the network its key's entry names, prints it, and runs it.
+3. **The page with no `?net=`** runs `pageNetworkFor` of its own key. Here that is SwiftShader's, so the shipped network, and
+   the row says which key it read. On the rig's Intel the same row reads w16, and the page's image is held to that
+   network's f64 image. The rig checks it on that GPU as it goes.
+4. **Every gate drive that measures the shipped network asks for it by name,** and the timing gate's page ladders are
+   checked by parameter count: the shipped network's 33,329, then the w16's 9,793.
+
+**Sabotages, by the byte-safe runner (W1-W5):**
+- the native entry given to the 1080;
+- the page entry dropped;
+- the native caller ignoring its network table;
+- the timing gate's first page ladder without `?net=shipped`;
+- the chain gate's page drive without `?net=shipped`.
+
+Each must turn at least one row red.
+
+**The rule.** The round holds when rows 1-4 pass on SwiftShader and every gate stays as green as it was. The next rig run of
+the device gate checks row 3 on the Intel.
+
+**Recorded after the code (round 53).** Rows 1-4 passed on SwiftShader on the first run, and the device, timing and chain
+gates stayed green. The byte-safe runner turned every sabotage red and restored each file byte for byte:
+- W1, the native entry given to the 1080: 2 red;
+- W2, the page entry dropped: 2 red;
+- W3, the native caller ignoring its network table: 1 red;
+- W4, the timing gate's first page ladder without `?net=shipped`: 1 red;
+- W5, the chain gate's page drive without `?net=shipped`: 1 red.
+
+The round holds by its rule. `denoise-w16-intel-entries` is closed. Row 3 on the Intel waits on the next rig run of the
+device gate.

@@ -61,6 +61,12 @@ node tools/ship/versionPreflight.mjs --next    # the next free version and sweep
      - Its error is 1.117 x the shipped network's on R and 1.297 x on C.
      - Next is **`denoise-w16-device`**. Keith decided: w16 on the Intel only. Round 49 (section 119) exports it, holds it
        and times it natively, and is owed two Intel runs of its own.
+   - **Sections 121-124:** the Intel runs at d77592b2 died in r41h's 1080p pass, past Windows' GPU timeout. r41h's cap is back,
+     and `denoise-f16-intel` is closed (Keith).
+   - The runs at 7b871372 held H46 (fused EASU, 0.794 / 0.799), H48 (tiled accumulation, 0.523 / 0.544) and H49 (w16 2.84 /
+     2.66 x natively).
+   - **Round 53 filled the Intel's network entries with w16.**
+   - Next: `denoise-easu-fused-default` and `denoise-accum-tile-default`, both rounds in round 43's shape.
    - Round 48 (section 117) is the accumulation's clamp read from a tile, on the same Intel runs as rounds 45 and 46.
    Round 36 (section 103) made the list fill the default, with round 31's ring fill kept as its reference.
    **`denoise-1080-native-crash`:** round 35 did not reproduce it in five runs (section 102). The traces stay armed.

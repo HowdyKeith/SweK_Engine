@@ -47,7 +47,7 @@ import { renderSplit, RESULTS_R11, RESULTS_R47 } from "../render/denoiseStudy.mj
 import { SPLITS_R11 } from "../render/denoiseScenes.mjs";
 import { denoise } from "../render/denoiseNet.mjs";
 import { relMSE } from "../render/denoiseStats.mjs";
-import { APPLY_TOL, kernelApplyCpu, judgeHeadApply, deviceLayers, createDeviceDenoiser, createNativeDenoiser, encodeNet, decodeNet, nativeSetsFor, twinsOf } from "../render/denoiseDevice.mjs";
+import { APPLY_TOL, kernelApplyCpu, judgeHeadApply, deviceLayers, createDeviceDenoiser, createNativeDenoiser, encodeNet, decodeNet, nativeSetsFor, twinsOf, nativeAdapterKey, nativeNetworkFor, networkFile, NATIVE_NETWORKS_BY_ADAPTER, NETWORKS_DECIDED_BY } from "../render/denoiseDevice.mjs";
 import * as GPU from "./ship/headlessGpu.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -113,7 +113,11 @@ if (args.includes("--export-r11")) {
     const info = adapter.info || {}, dev = await adapter.requestDevice();
     console.log(`[denoiseDevice] --which: adapter ${[info.vendor, info.architecture, info.description].filter(Boolean).join(" / ") || "(unnamed)"}; ` +
                 `node-webgpu ${(pkg && pkg.version) || "(version unread)"} from ${W.from}; compiler ${compiler || `none on ${process.platform}`}`);
-    const net = decodeNet(JSON.parse(fs.readFileSync(path.join(ENG, NET_FILE), "utf8")).net), N = 64, C = 10;
+    // round 53 (section 124): the network this adapter's key names in NATIVE_NETWORKS_BY_ADAPTER, else the shipped one -- said on a
+    // line of its own, so the pick line keeps the shape the rig's earlier --which logs were parsed by
+    const nKey = nativeAdapterKey(info, process.platform), netName = nativeNetworkFor(nKey);
+    console.log(`[denoiseDevice] --which: network ${netName} -- ${Object.hasOwn(NATIVE_NETWORKS_BY_ADAPTER, nKey || "") ? `the table's for ${nKey} (${NETWORKS_DECIDED_BY[nKey]})` : `no entry for ${nKey || "(no key)"}, the shipped network`}`);
+    const net = decodeNet(JSON.parse(fs.readFileSync(path.join(ENG, networkFile(netName)), "utf8")).net), N = 64, C = 10;
     // a fixed synthetic input: nine channels of smooth values and an emitter mask of zeros, so the pass is the same on every box
     const x = new Float32Array(N * N * C);
     for (let i = 0; i < N * N; i++) for (let c = 0; c < C - 1; c++) x[i * C + c] = 0.5 + 0.4 * Math.sin(0.37 * i + 1.3 * c);
