@@ -16,7 +16,7 @@ import path from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import * as PS from "./pcssShadow.mjs";
-import { runWgslComputeNative, headlessGpuSkipReason, exitCleanly } from "../tools/ship/headlessGpu.mjs";
+import { reading, runWgslComputeNative, headlessGpuSkipReason, exitCleanly } from "../tools/ship/headlessGpu.mjs";
 
 const require_ = createRequire(import.meta.url);
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -102,6 +102,7 @@ console.log("\n4. THE KERNEL");
         else {
             let worst = 0, differ = 0, part = 0; for (let i = 0; i < N; i++) { const d = Math.abs(g.values[i] - twin[i]); worst = Math.max(worst, d); if (d > 1e-6) differ++; if (twin[i] > 0 && twin[i] < 1) part++; }
             ok("!! the PCSS kernel equals the twin over 300 random queries on a random map (" + part + " of them partly lit): at most one tap of twelve may differ where f32 and f64 fall either side of a depth comparison; worst " + worst.toExponential(2) + ", " + differ + " queries differ", worst <= 1 / 12 + 1e-6 && differ <= 6 && part > 20 && !g.wroteNothing, "adapter " + ((g.adapter && g.adapter.description) || "?"));
+            reading("pcssShadow: PCSS kernel vs twin, 300 queries (one tap of twelve may differ)", worst, 1 / 12 + 1e-6, N, ((g.adapter && g.adapter.description) || "?"));
         }
     }
 }

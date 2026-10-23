@@ -16,7 +16,7 @@ import path from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import * as DR from "./deformRead.mjs";
-import { runWgslComputeNative, headlessGpuSkipReason, exitCleanly } from "../tools/ship/headlessGpu.mjs";
+import { reading, runWgslComputeNative, headlessGpuSkipReason, exitCleanly } from "../tools/ship/headlessGpu.mjs";
 
 const require_ = createRequire(import.meta.url);
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -81,6 +81,7 @@ console.log("\n4. THE KERNEL");
         else {
             let worst = 0, nz = 0; for (let i = 0; i < N; i++) { worst = Math.max(worst, Math.abs(g.values[i] - twin[i])); if (twin[i] !== 0) nz++; }
             ok("!! the compute kernel equals the twin over 200 random queries on a random field (worst difference under 1e-5; " + nz + " of 200 nonzero, the rest outside the falloff)", worst < 1e-5 && nz > 100 && !g.wroteNothing, "worst " + worst.toExponential(2) + ", adapter " + ((g.adapter && g.adapter.description) || "?"));
+            reading("deformRead: compute kernel vs twin, 200 queries", worst, 1e-5, N, ((g.adapter && g.adapter.description) || "?"));
         }
     }
 }

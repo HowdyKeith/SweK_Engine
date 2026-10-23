@@ -91,9 +91,9 @@ const SELF = "observedGates-selfcheck.mjs";
     ok("!! *** GATES REST THEIR ONLY RUNTIME EVIDENCE ON A FILE REWRITTEN EVERY RUN ***",
         // v4880 -- 215 at v4485 and 55 now: the durable register (gate-timings.json) and budgetEvidence's named list absorbed most of them in the meantime, which is the
         // defect shrinking, not the premise failing. What the row still claims is that the dependence is real and not small, so it holds the count to the figure read at v4880
-        // within ten, and names both numbers. v4886 -- RE-READ 55 -> 68 at the merge of the tooling chain: its five gates and the rotation's returnees are in the sweep file and not yet in the durable register. v4895 -- RE-READ 68 -> 96: the rotation and the verdict sweeps since v4886 put more gates into the sweep file than the durable register has absorbed (the row defends that the dependence exists, not its size).
-        sweepOnly.length > 20 && Math.abs(sweepOnly.length - 96) <= 10,
-        `${sweepOnly.length} of them, against 96 read at v4895 (68 at v4886) (55 at v4880) and ${M.evidenceOnlyFromScratch} measured at v4485. Any one, killed ` +
+        // within ten, and names both numbers. v4886 -- RE-READ 55 -> 68 at the merge of the tooling chain: its five gates and the rotation's returnees are in the sweep file and not yet in the durable register. v4896 -- RE-READ 96 -> 107: the ten gates this round added are in the sweep file and not yet in the durable register, plus one rotation returnee. v4895 -- RE-READ 68 -> 96: the rotation and the verdict sweeps since v4886 put more gates into the sweep file than the durable register has absorbed (the row defends that the dependence exists, not its size).
+        sweepOnly.length > 20 && Math.abs(sweepOnly.length - 107) <= 10,
+        `${sweepOnly.length} of them, against 107 read at v4896 (96 at v4895) (68 at v4886) (55 at v4880) and ${M.evidenceOnlyFromScratch} measured at v4485. Any one, killed ` +
         "at the cap on a busy box, erased the wall's green -- and the sweep file's own note says it is not a " +
         "claim about the tree");
 

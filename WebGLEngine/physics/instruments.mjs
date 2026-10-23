@@ -119,7 +119,7 @@ export const INSTRUMENTS = [
       gate: "render/snowShading-selfcheck.mjs" },
     { id: "cascades", page: "snow-deform.html", name: "Cascaded shadow maps (fit and lookup)", area: "render",
       measures: "Three orthographic light volumes (splits 26 / 95 / 330 m) fitted to a bounding sphere of each camera slice with a relatively quantised radius, the centre snapped to the map's texel lattice, and the depth range solved from the terrain's height extent and the sun's elevation (clamped to 2 degrees), plus the lookup's selection, 12% cross-fade and far fade. Every slice corner is inside its own volume over 32 camera and sun cases; the radius does not change with yaw; a world point keeps its fractional texel under camera translation (drift 2e-13); the terrain's extremes stay in the depth range from 30 to 2 degrees.",
-      key: "At a 2 degree sun cascade 2's depth range is 21 km (cot elevation), so its depth precision, not its width, is what a low sun costs. The WGSL lookup is drawn by snow-gpu's gate.",
+      key: "At a 2 degree sun cascade 2's depth range is 21 km (cot elevation), so its depth precision, not its width, is what a low sun costs. The WGSL lookup is drawn by snow-gpu's gate (render/snowGpuLookA-selfcheck.mjs holds the three shadow maps and the cascades agreeing).",
       gate: "render/cascades-selfcheck.mjs" },
     // v4895 -- the snowflow lift on the GPU: snow-gpu.html is the real WebGPU frame the CPU page stands in for.
     { id: "snow-gpu", page: "snow-gpu.html", name: "Snow on the GPU (clipmap vertex stage, snow material, three shadow cascades, TAA render graph, GPU sky and haze)", area: "render",

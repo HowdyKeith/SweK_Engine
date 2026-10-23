@@ -1,0 +1,2093 @@
+{
+ "note": "BAKED by tools/ship/takeTvPackages.mjs from three MIT repositories; the library is tv/tvPackages.mjs, graded by tools/ship/tvPackages-selfcheck.mjs. These are other people's measurements of other people's TVs: a package here is evidence about a TV, never a licence to disable it.",
+ "sources": [
+  {
+   "name": "tv-detox",
+   "repo": "ansub/tv-detox",
+   "licence": "MIT",
+   "commit": "199be582efef07e8d8db526173a71b19aeb6f449",
+   "files": [
+    "candidates.sh",
+    "install.sh"
+   ]
+  },
+  {
+   "name": "tv-vibehack",
+   "repo": "gathin23/tv-vibehack",
+   "licence": "MIT",
+   "commit": "22dc48fe21b1618f9b2fae448d991271d1d7277e",
+   "files": [
+    "tools/disable.sh",
+    "examples/*/debloat.txt"
+   ]
+  },
+  {
+   "name": "free-my-tv",
+   "repo": "simbasjungles/free-my-tv",
+   "licence": "MIT",
+   "commit": "ddb03c5d33f5e83609b874e556eecef03713ac1b",
+   "files": [
+    "app/src/io/freemytv/HomeMode.java"
+   ]
+  }
+ ],
+ "detox": {
+  "never": [
+   "com.google.android.gms",
+   "com.google.android.gsf",
+   "com.android.vending",
+   "com.android.tv.settings",
+   "com.android.settings",
+   "com.android.systemui",
+   "com.android.providers.settings",
+   "com.android.settings.intelligence",
+   "com.android.shell",
+   "com.android.packageinstaller",
+   "com.google.android.packageinstaller",
+   "com.google.android.permissioncontroller",
+   "com.android.bluetooth",
+   "com.android.externalstorage",
+   "com.android.providers.media",
+   "com.android.providers.media.module",
+   "com.android.providers.downloads",
+   "com.android.keychain",
+   "com.android.inputdevices",
+   "com.android.location.fused",
+   "com.android.se",
+   "com.android.providers.tv",
+   "com.android.providers.contacts",
+   "com.android.providers.calendar",
+   "com.android.networkstack.inprocess",
+   "com.android.networkstack.permissionconfig",
+   "com.android.certinstaller",
+   "com.android.companiondevicemanager",
+   "com.android.dynsystem",
+   "com.android.statementservice",
+   "com.android.vpndialogs",
+   "com.android.wallpaperbackup",
+   "com.android.backupconfirm",
+   "com.android.sharedstoragebackup",
+   "com.android.localtransport",
+   "com.android.proxyhandler",
+   "com.android.pacprocessor",
+   "com.android.captiveportallogin",
+   "com.dolby.android.audio.service",
+   "com.google.android.inputmethod.latin",
+   "com.android.inputmethod.latin",
+   "com.google.android.leanback.ime",
+   "com.tcl.inputmethod.international",
+   "com.android.providers.userdictionary",
+   "com.google.android.tungsten.setupwraith",
+   "com.google.android.onetimeinitializer",
+   "com.google.android.partnersetup",
+   "com.android.provision",
+   "com.android.tv.provision",
+   "com.android.managedprovisioning",
+   "com.tcl.suspension",
+   "com.tcl.tvinput",
+   "com.tcl.providers.config",
+   "com.tcl.useragreement",
+   "com.tcl.settings",
+   "com.tcl.tcl_bt_rcu_service",
+   "com.google.android.apps.tv.launcherx"
+  ],
+  "keep": [
+   "com.google.android.apps.mediashell",
+   "com.google.android.katniss",
+   "com.google.android.tv.assistant",
+   "com.google.android.marvin.talkback",
+   "com.google.android.tv.remote.service",
+   "com.google.android.tts",
+   "com.google.android.syncadapters.contacts",
+   "com.google.android.syncadapters.calendar",
+   "com.ansub.tvhome",
+   "com.google.android.webview",
+   "com.tcl.android.webview",
+   "com.tcl.tv",
+   "com.tcl.micmanager",
+   "com.android.dreams.basic",
+   "com.google.android.apps.tv.dreamx"
+  ],
+  "safe": [
+   "com.google.android.tvrecommendations",
+   "com.google.android.backdrop",
+   "com.google.android.videos",
+   "com.google.android.youtube.tvmusic",
+   "com.google.android.play.games",
+   "com.google.android.feedback",
+   "com.android.printspooler",
+   "com.android.htmlviewer",
+   "com.android.soundpicker",
+   "com.tcl.waterfall.overseas",
+   "com.tcl.esticker",
+   "com.tcl.partnercustomizer",
+   "com.tcl.messagebox",
+   "com.tcl.smartalexa",
+   "com.tcl.copydatatotv",
+   "com.tcl.audioplayer",
+   "com.tcl.imageplayer",
+   "com.tcl.keyhelp",
+   "com.tcl.usercenter",
+   "com.tcl.dashboard",
+   "com.tcl.ttvs",
+   "com.tcl.micmanager",
+   "com.tcl.factory.view"
+  ],
+  "names": {
+   "com.google.android.gms": "Google Play services",
+   "com.google.android.gsf": "Google services framework",
+   "com.android.vending": "Google Play Store",
+   "com.android.tv.settings": "TV Settings",
+   "com.android.settings": "Settings",
+   "com.android.systemui": "System UI",
+   "com.android.bluetooth": "Bluetooth",
+   "com.google.android.apps.mediashell": "Google Cast, casting from your phone",
+   "com.google.android.katniss": "Google TV search and voice",
+   "com.google.android.tv.assistant": "Google Assistant",
+   "com.google.android.marvin.talkback": "TalkBack screen reader",
+   "com.google.android.tv.remote.service": "Phone remote control",
+   "com.google.android.inputmethod.latin": "Gboard keyboard",
+   "com.android.inputmethod.latin": "Android keyboard",
+   "com.google.android.tts": "Text to speech",
+   "com.google.android.tvrecommendations": "Google TV sponsored row",
+   "com.google.android.backdrop": "Google TV backdrop ads",
+   "com.google.android.videos": "Google TV, Play Movies",
+   "com.google.android.youtube.tvmusic": "YouTube Music",
+   "com.google.android.play.games": "Play Games",
+   "com.google.android.youtube.tv": "YouTube",
+   "com.google.android.feedback": "Google feedback",
+   "com.google.android.onetimeinitializer": "One-time setup helper",
+   "com.google.android.partnersetup": "Partner app setup",
+   "com.google.android.syncadapters.contacts": "Contacts sync",
+   "com.google.android.syncadapters.calendar": "Calendar sync",
+   "com.android.printspooler": "Printing",
+   "com.android.dreams.basic": "Basic screensaver",
+   "com.google.android.apps.tv.dreamx": "Google TV screensaver",
+   "com.android.htmlviewer": "HTML file viewer",
+   "com.netflix.ninja": "Netflix",
+   "com.amazon.amazonvideo.livingroom": "Prime Video",
+   "com.tcl.waterfall.overseas": "TCL content and ads feed",
+   "com.tcl.esticker": "TCL e-sticker",
+   "com.tcl.partnercustomizer": "TCL launcher customizer",
+   "com.tcl.suspension": "TCL input picker",
+   "com.tcl.messagebox": "TCL message box",
+   "com.tcl.smartalexa": "TCL Alexa",
+   "com.tcl.copydatatotv": "TCL phone migration",
+   "com.tcl.audioplayer": "TCL audio player",
+   "com.tcl.imageplayer": "TCL picture player",
+   "com.tcl.videoplayer": "TCL video player",
+   "com.tcl.keyhelp": "TCL key help",
+   "com.tcl.useragreement": "TCL user agreement",
+   "com.tcl.usercenter": "TCL user centre",
+   "com.tcl.dashboard": "TCL dashboard",
+   "com.tcl.ttvs": "TCL analytics and Alexa hooks",
+   "com.tcl.providers.config": "TCL settings store",
+   "com.tcl.settings": "TCL settings",
+   "com.tcl.tvinput": "TV input framework",
+   "com.tcl.tv": "Live TV",
+   "com.tcl.tcl_bt_rcu_service": "Bluetooth remote",
+   "com.google.android.tvlauncher": "Google TV home screen",
+   "com.google.android.apps.tv.launcherx": "Google TV home screen",
+   "com.google.android.leanbacklauncher": "Android TV home screen",
+   "com.google.android.tungsten.setupwraith": "Google TV setup",
+   "com.dolby.android.audio.service": "Dolby audio",
+   "com.ansub.tvhome": "TV Detox home screen",
+   "com.tcl.inputmethod.international": "TV keyboard",
+   "com.google.android.webview": "Web pages inside apps",
+   "com.tcl.android.webview": "Web pages inside apps",
+   "com.google.android.apps.nbu.smartconnect.tv": "Google TV phone pairing",
+   "com.android.providers.userdictionary": "Keyboard dictionary"
+  },
+  "launchers": [
+   "com.google.android.tvlauncher",
+   "com.google.android.apps.tv.launcherx",
+   "com.google.android.leanbacklauncher",
+   "com.mitv.tvhome",
+   "com.amazon.tv.launcher"
+  ]
+ },
+ "vibehack": {
+  "coreRe": "^(android|com\\.android\\.systemui|com\\.android\\.shell|com\\.android\\.phone|com\\.android\\.settings|com\\.android\\.tv\\.settings|com\\.(google\\.)?android\\.(permissioncontroller|packageinstaller|ext\\.services|ext\\.shared|modulemetadata)|com\\.google\\.android\\.overlay\\.modules.*|com\\.android\\.providers\\..*)$",
+  "coreOk": "^com\\.android\\.providers\\.(calendar|contacts|userdictionary|blockednumber)$",
+  "devices": 227,
+  "freq": {
+   "com.google.android.feedback": [
+    167,
+    1
+   ],
+   "com.google.android.play.games": [
+    134,
+    5
+   ],
+   "com.google.android.videos": [
+    98,
+    6
+   ],
+   "com.google.android.katniss": [
+    78,
+    24
+   ],
+   "com.google.android.tungsten.setupwraith": [
+    85,
+    11
+   ],
+   "com.google.android.youtube.tvmusic": [
+    83,
+    13
+   ],
+   "com.google.android.tvrecommendations": [
+    89,
+    4
+   ],
+   "com.google.android.apps.mediashell": [
+    31,
+    40
+   ],
+   "com.google.android.partnersetup": [
+    69,
+    2
+   ],
+   "com.google.android.syncadapters.calendar": [
+    59,
+    1
+   ],
+   "com.android.printspooler": [
+    58,
+    0
+   ],
+   "com.amazon.amazonvideo.livingroom": [
+    43,
+    12
+   ],
+   "com.google.android.backdrop": [
+    46,
+    8
+   ],
+   "com.tcl.esticker": [
+    49,
+    1
+   ],
+   "com.google.android.marvin.talkback": [
+    43,
+    4
+   ],
+   "com.google.android.tvlauncher": [
+    20,
+    27
+   ],
+   "com.android.tv.feedbackconsent": [
+    44,
+    0
+   ],
+   "com.tcl.messagebox": [
+    40,
+    4
+   ],
+   "com.google.android.apps.tv.launcherx": [
+    26,
+    17
+   ],
+   "com.tcl.partnercustomizer": [
+    37,
+    6
+   ],
+   "com.google.android.apps.tv.dreamx": [
+    32,
+    10
+   ],
+   "com.tcl.usercenter": [
+    37,
+    3
+   ],
+   "com.tcl.guard": [
+    35,
+    2
+   ],
+   "com.tcl.waterfall.overseas": [
+    36,
+    1
+   ],
+   "com.google.android.onetimeinitializer": [
+    35,
+    1
+   ],
+   "com.google.android.tv.bugreportsender": [
+    36,
+    0
+   ],
+   "com.google.android.tv.remote.service": [
+    14,
+    22
+   ],
+   "com.tcl.ui_mediaCenter": [
+    30,
+    5
+   ],
+   "com.tcl.tv.tclhome_passive": [
+    33,
+    0
+   ],
+   "android.autoinstalls.config.google.gtvpai": [
+    31,
+    1
+   ],
+   "com.tcl.smartalexa": [
+    25,
+    7
+   ],
+   "fusion.android.tv.demo": [
+    32,
+    0
+   ],
+   "com.android.adservices.api": [
+    31,
+    0
+   ],
+   "com.netflix.ninja": [
+    20,
+    10
+   ],
+   "com.xm.webcontent": [
+    29,
+    0
+   ],
+   "com.miui.tv.analytics": [
+    28,
+    0
+   ],
+   "com.tcl.bi": [
+    25,
+    1
+   ],
+   "com.tcl.channelplus": [
+    24,
+    2
+   ],
+   "com.tcl.logkit": [
+    25,
+    1
+   ],
+   "com.tcl.ttvs": [
+    16,
+    10
+   ],
+   "com.android.ondevicepersonalization.services": [
+    25,
+    0
+   ],
+   "com.google.android.leanbacklauncher.recommendations": [
+    25,
+    0
+   ],
+   "com.tcl.ocean.instructions": [
+    24,
+    1
+   ],
+   "com.android.federatedcompute.services": [
+    24,
+    0
+   ],
+   "com.google.android.youtube.tv": [
+    13,
+    10
+   ],
+   "com.tcl.browser": [
+    20,
+    3
+   ],
+   "com.tcl.dashboard": [
+    20,
+    3
+   ],
+   "com.tcl.miracast": [
+    14,
+    9
+   ],
+   "com.xiaomi.statistic": [
+    23,
+    0
+   ],
+   "com.google.android.tv.assistant": [
+    20,
+    2
+   ],
+   "com.qterics.da.product": [
+    22,
+    0
+   ],
+   "com.sony.dtv.da.service": [
+    22,
+    0
+   ],
+   "com.sony.dtv.sonyselect": [
+    22,
+    0
+   ],
+   "com.tcl.useragreement": [
+    19,
+    3
+   ],
+   "com.tcl.versionUpdateApp": [
+    10,
+    11
+   ],
+   "tv.samba.ssm": [
+    21,
+    0
+   ],
+   "com.sony.dtv.multiscreendemo": [
+    20,
+    0
+   ],
+   "com.tcl.repairguide": [
+    20,
+    0
+   ],
+   "com.tcl.t_solo": [
+    17,
+    3
+   ],
+   "android.autoinstalls.config.tcl.device": [
+    19,
+    0
+   ],
+   "com.mitv.tvhome.atv": [
+    19,
+    0
+   ],
+   "com.mstar.android.tv.disclaimercustomization": [
+    19,
+    0
+   ],
+   "com.sony.dtv.demosupport": [
+    19,
+    0
+   ],
+   "com.sony.dtv.smarthelp": [
+    18,
+    1
+   ],
+   "com.tcl.gamebar": [
+    14,
+    5
+   ],
+   "com.xiaomi.mitv.tvmanager": [
+    19,
+    0
+   ],
+   "com.google.android.apps.nbu.smartconnect.tv": [
+    15,
+    3
+   ],
+   "com.tcl.UpdatePeripheral": [
+    15,
+    3
+   ],
+   "com.tcl.assistant": [
+    17,
+    1
+   ],
+   "com.xiaomi.mimusic2": [
+    18,
+    0
+   ],
+   "com.google.android.speech.pumpkin": [
+    13,
+    4
+   ],
+   "com.sony.dtv.customersupport": [
+    17,
+    0
+   ],
+   "com.tcl.exhibit": [
+    17,
+    0
+   ],
+   "tv.wuaki.apptv": [
+    11,
+    6
+   ],
+   "com.google.android.tts": [
+    15,
+    1
+   ],
+   "com.mitv.gallery": [
+    16,
+    0
+   ],
+   "com.tcl.copydatatotv": [
+    11,
+    5
+   ],
+   "com.disney.disneyplus": [
+    12,
+    3
+   ],
+   "com.mitv.tvhome.michannel": [
+    15,
+    0
+   ],
+   "com.tcl.gallery": [
+    12,
+    3
+   ],
+   "com.tcl.inputmethod.international": [
+    0,
+    15
+   ],
+   "com.tcl.keyhelp": [
+    8,
+    7
+   ],
+   "com.tcl.tv": [
+    0,
+    15
+   ],
+   "android.autoinstalls.config.sony.bravia": [
+    14,
+    0
+   ],
+   "com.Smartdevice.emanual": [
+    14,
+    0
+   ],
+   "com.mitv.tvhome.mitvplus": [
+    13,
+    1
+   ],
+   "com.sony.dtv.demosystemsupport": [
+    14,
+    0
+   ],
+   "com.sony.dtv.promos": [
+    14,
+    0
+   ],
+   "com.tcl.airplay2": [
+    6,
+    8
+   ],
+   "com.tcl.android.webview": [
+    12,
+    2
+   ],
+   "com.tcl.interactive": [
+    12,
+    2
+   ],
+   "com.tcl.suspension": [
+    2,
+    12
+   ],
+   "com.xiaomi.mitv.updateservice": [
+    11,
+    3
+   ],
+   "com.mediatek.AirplayAPK": [
+    6,
+    7
+   ],
+   "com.sony.dtv.sonybugreportsys": [
+    13,
+    0
+   ],
+   "com.sonyericsson.idd.agent": [
+    13,
+    0
+   ],
+   "com.tcl.autopair": [
+    0,
+    13
+   ],
+   "com.tcl.hearaid": [
+    12,
+    1
+   ],
+   "com.tcl.overseasappshow": [
+    13,
+    0
+   ],
+   "au.com.stan.and": [
+    4,
+    8
+   ],
+   "com.amazon.bueller.photos": [
+    12,
+    0
+   ],
+   "com.amazon.dp.logger": [
+    12,
+    0
+   ],
+   "com.amazon.tmm.tutorial": [
+    12,
+    0
+   ],
+   "com.android.health.connect.backuprestore": [
+    12,
+    0
+   ],
+   "com.google.android.music": [
+    11,
+    1
+   ],
+   "com.smartdevice.leanbacklauncher.customizer": [
+    12,
+    0
+   ],
+   "com.sony.dtv.b2b.vendorprotocol": [
+    11,
+    1
+   ],
+   "com.tcl.MultiScreenInteraction_TV": [
+    10,
+    2
+   ],
+   "com.tcl.hotelmenu": [
+    12,
+    0
+   ],
+   "com.tcl.xian.StartandroidService": [
+    6,
+    6
+   ],
+   "tv.samba.ssm.ui": [
+    12,
+    0
+   ],
+   "com.amazon.bueller.music": [
+    11,
+    0
+   ],
+   "com.amazon.gamehub": [
+    11,
+    0
+   ],
+   "com.amazon.perfcollection": [
+    11,
+    0
+   ],
+   "com.amazon.shoptv.client": [
+    11,
+    0
+   ],
+   "com.amazon.storm.lightning.tutorial": [
+    11,
+    0
+   ],
+   "com.amazon.wirelessmetrics.service": [
+    11,
+    0
+   ],
+   "com.android.healthconnect.controller": [
+    11,
+    0
+   ],
+   "com.android.providers.calendar": [
+    11,
+    0
+   ],
+   "com.mediatek.airplaydaemon": [
+    5,
+    6
+   ],
+   "com.netflix.tokenmanager": [
+    5,
+    6
+   ],
+   "com.sony.huey.dlna.module": [
+    8,
+    3
+   ],
+   "com.sony.huey.dlna.renderersettings": [
+    8,
+    3
+   ],
+   "com.sonyericsson.dlna": [
+    8,
+    3
+   ],
+   "com.tcl.magiconnectfree": [
+    9,
+    2
+   ],
+   "com.tcl.micmanager": [
+    10,
+    1
+   ],
+   "com.tcl.notereminder": [
+    9,
+    2
+   ],
+   "com.tcl.settings": [
+    0,
+    11
+   ],
+   "com.amazon.minitv.android.app": [
+    9,
+    1
+   ],
+   "com.amazon.perfc": [
+    10,
+    0
+   ],
+   "com.amazon.tv.acr": [
+    10,
+    0
+   ],
+   "com.mediatek.android.leanbacklauncher.partnercustomizer": [
+    9,
+    1
+   ],
+   "com.smartdevice.recommendation": [
+    10,
+    0
+   ],
+   "com.sony.dtv.bivlinfo": [
+    10,
+    0
+   ],
+   "com.sony.dtv.discovery": [
+    10,
+    0
+   ],
+   "com.sony.dtv.gestureapp": [
+    10,
+    0
+   ],
+   "com.sony.dtv.imanual": [
+    10,
+    0
+   ],
+   "com.tcl.tcl_bt_rcu_service": [
+    0,
+    10
+   ],
+   "com.amazon.hybridadidservice": [
+    9,
+    0
+   ],
+   "com.amazon.sneakpeek": [
+    9,
+    0
+   ],
+   "com.amazon.tahoe": [
+    9,
+    0
+   ],
+   "com.android.wallpaperbackup": [
+    9,
+    0
+   ],
+   "com.homwee.help": [
+    9,
+    0
+   ],
+   "com.homwee.store": [
+    9,
+    0
+   ],
+   "com.mitv.milinkservice": [
+    5,
+    4
+   ],
+   "com.mitv.videoplayer": [
+    8,
+    1
+   ],
+   "com.sony.dtv.osat.music": [
+    7,
+    2
+   ],
+   "com.sony.dtv.sonytab": [
+    9,
+    0
+   ],
+   "com.spotify.tv.android": [
+    9,
+    0
+   ],
+   "com.tcl.appmarket2": [
+    8,
+    1
+   ],
+   "com.xiaomi.gamecenter.sdk.service.mibox": [
+    9,
+    0
+   ],
+   "com.xiaomi.mitv.smartshare": [
+    7,
+    2
+   ],
+   "com.xiaomi.wfdsinkhelperservice": [
+    7,
+    2
+   ],
+   "org.droidtv.candeebug": [
+    9,
+    0
+   ],
+   "org.droidtv.gel": [
+    9,
+    0
+   ],
+   "tv.pluto.android": [
+    9,
+    0
+   ],
+   "android.autoinstalls.config.xiaomi.amelie": [
+    8,
+    0
+   ],
+   "com.amazon.client.metrics.api": [
+    8,
+    0
+   ],
+   "com.amazon.kso.blackbird": [
+    8,
+    0
+   ],
+   "com.amazon.naatyam": [
+    8,
+    0
+   ],
+   "com.android.dynsystem": [
+    8,
+    0
+   ],
+   "com.android.gallery3d": [
+    8,
+    0
+   ],
+   "com.mediatek.wwtv.mediaplayer": [
+    3,
+    5
+   ],
+   "com.mitv.shoplugin": [
+    8,
+    0
+   ],
+   "com.sony.dtv.usercontext": [
+    8,
+    0
+   ],
+   "com.tcl.audioplayer": [
+    8,
+    0
+   ],
+   "com.tcl.imageplayer": [
+    8,
+    0
+   ],
+   "com.tcl.keycustomfunctionservice": [
+    0,
+    8
+   ],
+   "com.tcl.system.server": [
+    0,
+    8
+   ],
+   "com.tcl.tvweishi": [
+    8,
+    0
+   ],
+   "com.ted.android.tv": [
+    8,
+    0
+   ],
+   "com.vewd.core.service": [
+    8,
+    0
+   ],
+   "com.xiaomi.floatingframe": [
+    8,
+    0
+   ],
+   "tv.anoki.acr.anokiacroptin": [
+    8,
+    0
+   ],
+   "com.amazon.alexa.externalmediaplayer.fireos": [
+    7,
+    0
+   ],
+   "com.amazon.alexamediaplayer.runtime.ftv": [
+    7,
+    0
+   ],
+   "com.amazon.device.crashmanager": [
+    1,
+    6
+   ],
+   "com.amazon.hedwig": [
+    7,
+    0
+   ],
+   "com.amazon.livedeviceservice": [
+    7,
+    0
+   ],
+   "com.amazon.privacypassservice": [
+    7,
+    0
+   ],
+   "com.amazon.shoptv.firetv.client": [
+    7,
+    0
+   ],
+   "com.amazon.systemnotices": [
+    7,
+    0
+   ],
+   "com.amazon.tv.alexaalerts": [
+    7,
+    0
+   ],
+   "com.amazon.tv.alexanotifications": [
+    7,
+    0
+   ],
+   "com.amazon.tv.democontent.provider": [
+    7,
+    0
+   ],
+   "com.amazon.tv.easyupgrade": [
+    7,
+    0
+   ],
+   "com.amazon.tv.releasenotes": [
+    7,
+    0
+   ],
+   "com.amazon.uxnotification": [
+    7,
+    0
+   ],
+   "com.amazon.wifilocker": [
+    7,
+    0
+   ],
+   "com.android.dreams.basic": [
+    7,
+    0
+   ],
+   "com.android.sharedstoragebackup": [
+    7,
+    0
+   ],
+   "com.mitv.cloudcontrol": [
+    7,
+    0
+   ],
+   "com.mitv.tvhome.oemtab": [
+    7,
+    0
+   ],
+   "com.realtek.leanbacklauncher.partnercustomizer": [
+    6,
+    1
+   ],
+   "com.smartdevice.aftersale": [
+    7,
+    0
+   ],
+   "com.sony.dtv.demomode": [
+    7,
+    0
+   ],
+   "com.sony.dtv.tvlaunchercustomizer": [
+    7,
+    0
+   ],
+   "com.tcl.tvinput": [
+    0,
+    7
+   ],
+   "com.wbd.stream": [
+    7,
+    0
+   ],
+   "com.xiaomi.mitv.handbook": [
+    7,
+    0
+   ],
+   "com.xiaomi.screenrecorder": [
+    7,
+    0
+   ],
+   "com.xiaomi.tvqs": [
+    7,
+    0
+   ],
+   "org.droidtv.demome": [
+    6,
+    1
+   ],
+   "org.droidtv.nettv.market": [
+    7,
+    0
+   ],
+   "org.droidtv.nettvrecommender": [
+    7,
+    0
+   ],
+   "org.droidtv.usagelogger": [
+    6,
+    1
+   ],
+   "com.amazon.ceviche": [
+    6,
+    0
+   ],
+   "com.amazon.cloud9": [
+    6,
+    0
+   ],
+   "com.amazon.device.logmanager": [
+    1,
+    5
+   ],
+   "com.amazon.diode": [
+    1,
+    5
+   ],
+   "com.amazon.ftvads.deeplinking": [
+    1,
+    5
+   ],
+   "com.amazon.media.recommendations": [
+    6,
+    0
+   ],
+   "com.amazon.neo.minerva": [
+    6,
+    0
+   ],
+   "com.amazon.neo.minerva.logcat": [
+    6,
+    0
+   ],
+   "com.amazon.ods.kindleconnect": [
+    6,
+    0
+   ],
+   "com.amazon.tv.developer.dataservice": [
+    6,
+    0
+   ],
+   "com.amazon.tv.fw.metrics": [
+    6,
+    0
+   ],
+   "com.amazon.tv.website_launcher": [
+    6,
+    0
+   ],
+   "com.android.backupconfirm": [
+    6,
+    0
+   ],
+   "com.android.cts.ctsshim": [
+    6,
+    0
+   ],
+   "com.android.cts.priv.ctsshim": [
+    6,
+    0
+   ],
+   "com.cltv.fast": [
+    6,
+    0
+   ],
+   "com.duokan.videodaily": [
+    6,
+    0
+   ],
+   "com.fireos.usagestats.proxy": [
+    1,
+    5
+   ],
+   "com.google.android.leanbacklauncher": [
+    4,
+    2
+   ],
+   "com.google.android.leanbacklauncher.partnercustomizer": [
+    6,
+    0
+   ],
+   "com.hbo.hbonow": [
+    6,
+    0
+   ],
+   "com.homwee.mmp.screenshare": [
+    4,
+    2
+   ],
+   "com.mediatek.network": [
+    3,
+    3
+   ],
+   "com.mediatek.tvinput": [
+    0,
+    6
+   ],
+   "com.mitv.tvhome": [
+    0,
+    6
+   ],
+   "com.miui.analytics": [
+    6,
+    0
+   ],
+   "com.nousguide.android.rbtv": [
+    6,
+    0
+   ],
+   "com.smartdevice.dailymanage": [
+    6,
+    0
+   ],
+   "com.smartdevice.dtv.icast": [
+    4,
+    2
+   ],
+   "com.smartdevice.myapp": [
+    5,
+    1
+   ],
+   "com.sony.dtv.b2b.hotelmode": [
+    6,
+    0
+   ],
+   "com.sony.dtv.networkapp.wifidirect": [
+    4,
+    2
+   ],
+   "com.tcl.videoplayer": [
+    6,
+    0
+   ],
+   "com.xiaomi.mitv.calendar": [
+    6,
+    0
+   ],
+   "com.xiaomi.mitv.mediaexplorer": [
+    4,
+    2
+   ],
+   "com.xiaomi.mitv.shop": [
+    6,
+    0
+   ],
+   "com.xiaomi.mitv.tvpush.tvpushservice": [
+    6,
+    0
+   ],
+   "com.xiaomi.smarthome.tv": [
+    6,
+    0
+   ],
+   "com.xiaomi.tv.gallery": [
+    6,
+    0
+   ],
+   "com.xiaomo.tv.milegal": [
+    6,
+    0
+   ],
+   "org.droidtv.amazonalexa": [
+    6,
+    0
+   ],
+   "com.amazon.audiohome": [
+    5,
+    0
+   ],
+   "com.amazon.device.metrics": [
+    1,
+    4
+   ],
+   "com.amazon.providers.contentsupport": [
+    5,
+    0
+   ],
+   "com.android.camera2": [
+    4,
+    1
+   ],
+   "com.android.hotspot2.osulogin": [
+    5,
+    0
+   ],
+   "com.android.htmlviewer": [
+    5,
+    0
+   ],
+   "com.android.smspush": [
+    5,
+    0
+   ],
+   "com.apple.atve.androidtv.appletv": [
+    4,
+    1
+   ],
+   "com.apps.wifihotspot": [
+    5,
+    0
+   ],
+   "com.google.android.inputmethod.japanese": [
+    5,
+    0
+   ],
+   "com.google.android.syncadapters.contacts": [
+    5,
+    0
+   ],
+   "com.hisense.service.message": [
+    5,
+    0
+   ],
+   "com.iqiyi.i18n.tv": [
+    5,
+    0
+   ],
+   "com.mediatek.tv.service": [
+    0,
+    5
+   ],
+   "com.mitv.dream": [
+    5,
+    0
+   ],
+   "com.mitv.toolhouse": [
+    5,
+    0
+   ],
+   "com.phorus.playfi.softap": [
+    5,
+    0
+   ],
+   "com.smartdevice.epopplayer": [
+    5,
+    0
+   ],
+   "com.smartdevice.recordactivation": [
+    5,
+    0
+   ],
+   "com.sony.dtv.distancealert": [
+    5,
+    0
+   ],
+   "com.sony.dtv.sensingcamera.fwupdate": [
+    5,
+    0
+   ],
+   "com.sony.dtv.sensingcamera.settings": [
+    5,
+    0
+   ],
+   "com.sony.dtv.smartmediaapp": [
+    3,
+    2
+   ],
+   "com.tcl.bootadservice": [
+    5,
+    0
+   ],
+   "com.tcl.c2dm.client": [
+    4,
+    1
+   ],
+   "com.tcl.cyberui": [
+    4,
+    1
+   ],
+   "com.tcl.ffeducation": [
+    5,
+    0
+   ],
+   "com.tcl.providers.config": [
+    0,
+    5
+   ],
+   "com.tcl.systemserver": [
+    0,
+    5
+   ],
+   "com.tcl.tv.plus": [
+    5,
+    0
+   ],
+   "com.tcl.walleve": [
+    3,
+    2
+   ],
+   "com.vewd.core.integration.dia": [
+    4,
+    1
+   ],
+   "com.xiaomi.mitv.karaoke.service": [
+    5,
+    0
+   ],
+   "com.xiaomi.mitv.smartpanel": [
+    4,
+    1
+   ],
+   "com.xiaomi.mitv.upgrade": [
+    4,
+    1
+   ],
+   "com.xiaomi.tweather": [
+    5,
+    0
+   ],
+   "mitv.service": [
+    1,
+    4
+   ],
+   "org.chromium.webview_shell": [
+    4,
+    1
+   ],
+   "org.droidtv.android.fitness": [
+    5,
+    0
+   ],
+   "org.droidtv.recommendation": [
+    5,
+    0
+   ],
+   "screnmirroring.com": [
+    3,
+    2
+   ],
+   "tv.anoki.acr.controller": [
+    5,
+    0
+   ],
+   "tv.twitch.android.app": [
+    5,
+    0
+   ],
+   "android.autoinstalls.config.homwee": [
+    4,
+    0
+   ],
+   "android.autoinstalls.config.sdmc": [
+    4,
+    0
+   ],
+   "android.autoinstalls.config.sei": [
+    4,
+    0
+   ],
+   "android.autoinstalls.config.xioami.mibox3": [
+    4,
+    0
+   ],
+   "com.amazon.cast.sink": [
+    3,
+    1
+   ],
+   "com.amazon.device.telemetry.emitter": [
+    4,
+    0
+   ],
+   "com.amazon.firehomestarter": [
+    0,
+    4
+   ],
+   "com.amazon.franktvinput": [
+    4,
+    0
+   ],
+   "com.amazon.minerva.client.api": [
+    1,
+    3
+   ],
+   "com.amazon.tv.csapp": [
+    1,
+    3
+   ],
+   "com.amazon.tv.ffsprovisioneeclient": [
+    4,
+    0
+   ],
+   "com.amazon.tv.ftvambient": [
+    3,
+    1
+   ],
+   "com.amazon.tv.livetv": [
+    4,
+    0
+   ],
+   "com.amazon.tv.localgallery": [
+    4,
+    0
+   ],
+   "com.amazon.tv.mattercohost": [
+    4,
+    0
+   ],
+   "com.android.providers.contacts": [
+    4,
+    0
+   ],
+   "com.android.tv.settings": [
+    0,
+    4
+   ],
+   "com.boosteroidtv.streaming": [
+    4,
+    0
+   ],
+   "com.cbs.ott": [
+    4,
+    0
+   ],
+   "com.google.android.tv": [
+    3,
+    1
+   ],
+   "com.google.android.tvtutorials": [
+    4,
+    0
+   ],
+   "com.google.android.youtube.tvunplugged": [
+    4,
+    0
+   ],
+   "com.graymatrix.did": [
+    3,
+    1
+   ],
+   "com.hisense.odinbrowser": [
+    4,
+    0
+   ],
+   "com.hisense.storemode": [
+    4,
+    0
+   ],
+   "com.homwee.aipont": [
+    4,
+    0
+   ],
+   "com.homwee.multiscreenshare": [
+    4,
+    0
+   ],
+   "com.mediatek.androidbox": [
+    4,
+    0
+   ],
+   "com.mediatek.backgrounddetection": [
+    3,
+    1
+   ],
+   "com.mediatek.support.webview": [
+    3,
+    1
+   ],
+   "com.mi.bluetooth": [
+    0,
+    4
+   ],
+   "com.mitv.overseaservice": [
+    1,
+    3
+   ],
+   "com.mitv.screensaver": [
+    4,
+    0
+   ],
+   "com.phorus.playfi.tv": [
+    1,
+    3
+   ],
+   "com.sohu.inputmethod.sogou.tv": [
+    1,
+    3
+   ],
+   "com.sony.dtv.assistantadapter": [
+    4,
+    0
+   ],
+   "com.sony.dtv.b2b.importexport": [
+    4,
+    0
+   ],
+   "com.sony.dtv.b2b.noderuntime.normal": [
+    4,
+    0
+   ],
+   "com.sony.dtv.b2b.noderuntime.privilege": [
+    4,
+    0
+   ],
+   "com.sony.dtv.b2b.noderuntimeextension.bpk": [
+    4,
+    0
+   ],
+   "com.sony.dtv.b2b.prosettings": [
+    4,
+    0
+   ],
+   "com.sony.dtv.b2b.rs232csupport": [
+    4,
+    0
+   ],
+   "com.sony.dtv.helpguidecontents": [
+    4,
+    0
+   ],
+   "com.sony.dtv.seeds.iot": [
+    4,
+    0
+   ],
+   "com.sony.dtv.voicesearch": [
+    3,
+    1
+   ],
+   "com.sonypicturescore": [
+    4,
+    0
+   ],
+   "com.tcl.appreciate.art": [
+    4,
+    0
+   ],
+   "com.tcl.eva": [
+    3,
+    1
+   ],
+   "com.tcl.ffkaraoke": [
+    4,
+    0
+   ],
+   "com.tcl.initsetup": [
+    1,
+    3
+   ],
+   "com.tcl.playskill": [
+    4,
+    0
+   ],
+   "com.tcl.rc.ota": [
+    0,
+    4
+   ],
+   "com.tcl.smartlink.core": [
+    4,
+    0
+   ],
+   "com.tcl.tv.tclhome_master": [
+    3,
+    1
+   ],
+   "com.tcl.wholenetsearch": [
+    4,
+    0
+   ],
+   "com.tianci.ad": [
+    4,
+    0
+   ],
+   "com.tianci.localmedia": [
+    1,
+    3
+   ],
+   "com.tubitv.ott": [
+    3,
+    1
+   ],
+   "com.tvos": [
+    0,
+    4
+   ],
+   "com.uei.quicksetsdk.sony": [
+    4,
+    0
+   ],
+   "com.utsmta.app": [
+    4,
+    0
+   ],
+   "com.xiaomi.android.tvsetup.partnercustomizer": [
+    1,
+    3
+   ],
+   "com.xiaomi.mi_connect_service": [
+    3,
+    1
+   ],
+   "com.xiaomi.mitv.healthdiagnosis": [
+    4,
+    0
+   ],
+   "com.xiaomi.tvqs.overseas.y24": [
+    3,
+    1
+   ],
+   "org.droidtv.eum": [
+    0,
+    4
+   ],
+   "org.droidtv.nettvapp4546": [
+    4,
+    0
+   ],
+   "org.droidtv.nettvapp5326": [
+    4,
+    0
+   ],
+   "org.droidtv.nettvapp5512": [
+    4,
+    0
+   ],
+   "restore.sh": [
+    0,
+    4
+   ],
+   "tv.mopa.ginga": [
+    3,
+    1
+   ],
+   "android.autoinstalls.config.scbc.device": [
+    3,
+    0
+   ],
+   "android.autoinstalls.config.skyworth": [
+    3,
+    0
+   ],
+   "android.autoinstalls.config.soc.amlogic": [
+    3,
+    0
+   ],
+   "android.autoinstalls.config.xioami.dangal": [
+    3,
+    0
+   ],
+   "au.net.abc.iview": [
+    3,
+    0
+   ],
+   "com.airoha.ble.ota": [
+    3,
+    0
+   ],
+   "com.amazon.aca": [
+    3,
+    0
+   ],
+   "com.amazon.aiondec": [
+    3,
+    0
+   ],
+   "com.amazon.smarthomemapviewapp": [
+    3,
+    0
+   ],
+   "com.amazon.tv.earlyaccess": [
+    3,
+    0
+   ],
+   "com.amazon.tv.oobe": [
+    1,
+    2
+   ],
+   "com.amazon.vizzini": [
+    2,
+    1
+   ],
+   "com.amazon.wha.mediabrowserservice": [
+    3,
+    0
+   ],
+   "com.amazon.whad": [
+    3,
+    0
+   ],
+   "com.amazon.whasettings": [
+    3,
+    0
+   ],
+   "com.android.bips": [
+    3,
+    0
+   ],
+   "com.android.cameraextensions": [
+    3,
+    0
+   ],
+   "com.android.se": [
+    3,
+    0
+   ],
+   "com.apps.channels": [
+    3,
+    0
+   ],
+   "com.apps.clear": [
+    3,
+    0
+   ],
+   "com.apps.function.gdpr": [
+    3,
+    0
+   ],
+   "com.apps.networkspeed": [
+    3,
+    0
+   ],
+   "com.apps.usbmediaplayer": [
+    3,
+    0
+   ],
+   "com.cbs.ca": [
+    3,
+    0
+   ],
+   "com.coocaa.app_browser": [
+    3,
+    0
+   ],
+   "com.coocaa.demonow.lightining": [
+    3,
+    0
+   ],
+   "com.coocaa.guide": [
+    3,
+    0
+   ],
+   "com.coocaa.messageprovider": [
+    3,
+    0
+   ],
+   "com.coocaa.screensaver": [
+    2,
+    1
+   ],
+   "com.coocaa.sky.ccapi": [
+    1,
+    2
+   ],
+   "com.crunchyroll.crunchyroid": [
+    3,
+    0
+   ],
+   "com.google.android.adservices.api": [
+    3,
+    0
+   ],
+   "com.google.android.apps.tachyon": [
+    3,
+    0
+   ],
+   "com.google.android.ext.adservices.api": [
+    3,
+    0
+   ],
+   "com.google.android.federatedcompute": [
+    3,
+    0
+   ],
+   "com.google.android.ondevicepersonalization.services": [
+    3,
+    0
+   ],
+   "com.google.android.tv.remotecontrol.logging": [
+    3,
+    0
+   ],
+   "com.google.android.youtube.tvkids": [
+    3,
+    0
+   ],
+   "com.hisense.evservice": [
+    3,
+    0
+   ],
+   "com.hisense.tv.b2b": [
+    3,
+    0
+   ],
+   "com.homwee.upgrade": [
+    3,
+    0
+   ],
+   "com.internet.tvbrowser": [
+    3,
+    0
+   ],
+   "com.jamdeo.tv.mediacenter": [
+    2,
+    1
+   ],
+   "com.jio.media.stb.ondemand": [
+    3,
+    0
+   ],
+   "com.mediatek.hotkey.dispatcher": [
+    0,
+    3
+   ],
+   "com.mediatek.testpq": [
+    3,
+    0
+   ],
+   "com.mercadolibre.android.mplay_tv": [
+    2,
+    1
+   ],
+   "com.mirakulo.astrotv.service": [
+    2,
+    1
+   ],
+   "com.mitv.alarmcenter": [
+    3,
+    0
+   ],
+   "com.mitv.livetv": [
+    0,
+    3
+   ],
+   "com.nes.dvb.playtest": [
+    3,
+    0
+   ],
+   "com.oem.qa": [
+    3,
+    0
+   ],
+   "com.oemservice": [
+    3,
+    0
+   ],
+   "com.opera.sdk.example": [
+    2,
+    1
+   ],
+   "com.pandora.android.atv": [
+    3,
+    0
+   ],
+   "com.qjy.browser": [
+    3,
+    0
+   ],
+   "com.realtek.netflix.setting": [
+    0,
+    3
+   ],
+   "com.sdt.producttest": [
+    3,
+    0
+   ],
+   "com.smartdevice.acr.recommendation": [
+    3,
+    0
+   ],
+   "com.smartdevice.common.demonow": [
+    3,
+    0
+   ],
+   "com.smartdevice.dailyshortcut": [
+    1,
+    2
+   ],
+   "com.sony.dtv.b2b.adminpassword": [
+    3,
+    0
+   ],
+   "com.sony.dtv.b2b.deviceadminsettings": [
+    3,
+    0
+   ],
+   "com.sony.dtv.seeds.auth": [
+    3,
+    0
+   ],
+   "com.tcl.atomic.servicecenter": [
+    3,
+    0
+   ],
+   "com.tcl.common.terminalmanagerplus": [
+    1,
+    2
+   ],
+   "com.tcl.common.weather": [
+    3,
+    0
+   ],
+   "com.tcl.framework.custom": [
+    0,
+    3
+   ],
+   "com.tcl.profilemanager": [
+    3,
+    0
+   ],
+   "com.tcl.showmode": [
+    0,
+    3
+   ],
+   "com.tcl.sourcemananger": [
+    0,
+    3
+   ],
+   "com.tcl.weixin": [
+    2,
+    1
+   ],
+   "com.tianci.appstore": [
+    3,
+    0
+   ],
+   "com.tianci.autoinstaller": [
+    3,
+    0
+   ],
+   "com.tianci.push": [
+    3,
+    0
+   ],
+   "com.tianci.user": [
+    2,
+    1
+   ],
+   "com.tiktok.tv": [
+    3,
+    0
+   ],
+   "com.tubitv": [
+    3,
+    0
+   ],
+   "com.vestel.vestelreporter": [
+    3,
+    0
+   ],
+   "com.vt.alexa": [
+    3,
+    0
+   ],
+   "com.vt.hishow": [
+    3,
+    0
+   ],
+   "com.vt.storemode": [
+    3,
+    0
+   ],
+   "com.vt.tv.evservice": [
+    3,
+    0
+   ],
+   "com.xgimi.bugreportsender": [
+    3,
+    0
+   ],
+   "com.xgimi.doubanfm": [
+    3,
+    0
+   ],
+   "com.xiaomi.mico.mqtt.service.application.tv": [
+    3,
+    0
+   ],
+   "com.xiaomi.mitv.csi": [
+    3,
+    0
+   ],
+   "com.xiaomi.mitv.health": [
+    3,
+    0
+   ],
+   "com.xiaomi.mitv.manualhelp": [
+    3,
+    0
+   ],
+   "com.xiaomi.tvqs.overseas": [
+    2,
+    1
+   ],
+   "com.xiaomi.voicecontrol": [
+    3,
+    0
+   ],
+   "com.xiaomi.wakeupservice": [
+    3,
+    0
+   ],
+   "com.zeasn.whalelive": [
+    3,
+    0
+   ],
+   "net.vidaatv.hisense.android.tv": [
+    3,
+    0
+   ],
+   "org.droidtv.nettvapp1814": [
+    3,
+    0
+   ],
+   "org.droidtv.nettvapp20004410": [
+    3,
+    0
+   ],
+   "org.droidtv.tv.frameworklogger": [
+    3,
+    0
+   ],
+   "org.liskovsoft.androidtv.rukeyboard": [
+    1,
+    2
+   ],
+   "org.videolan.vlc": [
+    3,
+    0
+   ],
+   "tunein.player": [
+    3,
+    0
+   ]
+  }
+ },
+ "freemytv": {
+  "debloat": [
+   "com.google.android.play.games",
+   "com.google.android.youtube.tvmusic",
+   "com.tcl.magiconnectfree",
+   "com.tcl.miracast",
+   "com.tcl.waterfall.overseas",
+   "com.tcl.channelplus",
+   "com.tcl.messagebox",
+   "com.tcl.usercenter",
+   "com.tcl.exhibit",
+   "com.tcl.esticker",
+   "com.tcl.hotelmenu",
+   "com.tcl.repairguide",
+   "com.tcl.ocean.instructions",
+   "com.tcl.logkit",
+   "tv.anoki.acr.anokiacroptin",
+   "fusion.android.tv.demo",
+   "com.expressluck.tvhelpmanual",
+   "com.homwee.aipont",
+   "com.homwee.help",
+   "com.miui.tv.analytics",
+   "com.xiaomi.statistic",
+   "com.mitv.tvhome.mitvplus",
+   "com.xm.webcontent",
+   "com.smartdevice.epopplayer",
+   "com.coocaa.demonow.lightining",
+   "com.smartdevice.recommendation",
+   "tv.anoki.acr.controller",
+   "com.mediatek.tv.retaildemo",
+   "com.electronic.manual"
+  ]
+ }
+}

@@ -20,7 +20,7 @@ import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import * as SS from "./snowShading.mjs";
 import { bakeSky, sunFrom, latLongToDir } from "./skyBake.mjs";
-import { runWgslComputeNative, headlessGpuSkipReason, exitCleanly } from "../tools/ship/headlessGpu.mjs";
+import { reading, runWgslComputeNative, headlessGpuSkipReason, exitCleanly } from "../tools/ship/headlessGpu.mjs";
 
 const require_ = createRequire(import.meta.url);
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -128,6 +128,7 @@ else {
         for (let i = 0; i < N; i++) { const k = i % KINDS; for (let c = 0; c < 4; c++) worst[k] = Math.max(worst[k], Math.abs(g.values[i * 4 + c] - tw[i][c]) / Math.max(1, Math.abs(tw[i][c]))); }
         const names = ["GGX terms", "wrapDiffuse", "snowSubsurface", "snowGlints", "shIrradiance", "RNM", "fresnelRough"];
         ok("!! every function as WGSL equals its twin over " + N + " queries: " + names.map((n, k) => n + " " + worst[k].toExponential(1)).join(", "), worst.every((e, k) => e < (k === 3 ? 0.05 : 2e-3)) && !g.wroteNothing, "adapter " + ((g.adapter && g.adapter.description) || "?"));
+        names.forEach((nm, k) => reading("snowShading: " + nm + " as WGSL vs twin", worst[k], k === 3 ? 0.05 : 2e-3, N, ((g.adapter && g.adapter.description) || "?")));
     }
 }
 console.log(`\nsnowShading-selfcheck: ${fails === 0 ? "all passed" : fails + " FAILED"}`);

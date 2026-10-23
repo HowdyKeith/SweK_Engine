@@ -403,6 +403,23 @@ export const MEASURED = Object.freeze({
  * tolerance. The browser harness fills with the same number; the two must agree or a liveness failure would
  * read as a divergence.
  */
+/**
+ * v4896 -- A READING FOR THE REAL-HARDWARE REPORT, NOT A VERDICT.
+ *
+ * tools/ship/realGpuRun.mjs keeps each gate's FAIL rows and its "----" measured lines, and drops the PASS rows -- so a kernel that agrees with its twin
+ * to 1e-7 on one adapter and 9e-4 on another (limit 1e-3) reads as the same green tick twice, and the 9e-4 is the one worth knowing about. This prints
+ * the worst difference, its limit and the MARGIN between them as a measured line, with the adapter's name on it, so a D3D12 run of the snow stack
+ * (and any other adapter's) lands in the report as numbers a person can compare. The TAA resolve's frame size was read as 1/(1/24) = 23.999998 on D3D12 and
+ * cut to 23; that run had one number, "1.00e+6", and nothing before it to compare with. These lines are what comes before.
+ * It judges nothing: the gate's own ok() row still decides pass or fail.
+ */
+export function readingLine(name, worst, limit, n, adapter) {
+    const f = (v) => (typeof v === "number" && Number.isFinite(v) ? v.toExponential(2) : String(v));
+    const margin = typeof worst === "number" && typeof limit === "number" && worst > 0 && Number.isFinite(worst) ? `, margin ${(limit / worst).toFixed(1)}x` : "";
+    return `  ----  reading ${name}: worst ${f(worst)} against a limit of ${f(limit)}${margin}${n != null ? ` over ${n} values` : ""}, adapter ${adapter || "?"}`;
+}
+export function reading(name, worst, limit, n, adapter) { const l = readingLine(name, worst, limit, n, adapter); console.log(l); return l; }
+
 export const LIVENESS_SENTINEL = -999999;
 
 export function storageWords(data) {

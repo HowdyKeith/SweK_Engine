@@ -887,10 +887,6 @@ export const UNRESOLVED = {
     // skipped run from the record, and the two false entries were removed rather than replaced with a guess.
     // A LOWER BOUND IS NOT A MEASUREMENT and neither is a skip; an absent entry and a skip time are different
     // claims, and only one of them is true. They move to MEASURED when a box with a rasteriser runs them.
-    // v4895 -- the snow frame on the GPU. It FINISHES, alone, in about 38 s (37.3 s and 38.0 s on two serial passes) because section 3 drives snow-gpu.html in
-    // headless Chromium's software WebGPU adapter through dozens of frames and a nine-second live loop; the quick sweep's 20 s cap kills it, so no sweep records a completion.
-    "render/snowGpu-selfcheck.mjs":
-        "finishes alone in ~38 s (measured twice, serially) on software WebGPU, so the sweep's 20 s cap kills it before it can say so; its sections 1-2 (maths and source text) run in 0.5 s",
     "render/holoPicture-selfcheck.mjs":
         "skips without a rasteriser, so this box has never run it to completion. Its former 55ms entry was the SKIP time, removed at v3941",
     "render/holoAgree-selfcheck.mjs":

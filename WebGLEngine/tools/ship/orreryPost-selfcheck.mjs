@@ -302,7 +302,12 @@ console.log("\n5. LOAD THE REAL PAGE AND CLICK THE BUTTON");
             const before = await state();
             const imgOff = await shot();
             await pg.click("#fxbtn");
-            await pg.waitForTimeout(900);
+            // v4896 -- WAIT FOR THE STATE, NOT FOR 900 ms. The rig's clone-verify read the label at "attaching..." with the overlay still hidden: the attach is an import plus a
+            // device request, and on a busy Windows box that took longer than the fixed wait, so the row failed on the box's speed and not on the page. The button leaves "attaching"
+            // exactly when the attach has finished or been refused (orrery.html toggleFx), so that is what is awaited, with a 60 s ceiling so a page that NEVER leaves it is still red by name.
+            // SABOTAGES: the page's attach slowed by 3 s with the old fixed wait -> both rows red as the rig saw them; the page's attach never resolving -> the wait times out and r2.err names it, both rows red.
+            await pg.waitForFunction(() => !/attaching/.test(document.getElementById("fxbtn").textContent), null, { timeout: 60000 });
+            await pg.waitForTimeout(150);
             const after = await state();
             const imgOn = await shot();
             await pg.click("#fxbtn");

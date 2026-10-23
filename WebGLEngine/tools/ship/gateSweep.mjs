@@ -16142,6 +16142,13 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
         widened: Object.freeze([]),
         verdict: "the snow and sea lift: the clipmap, deform read, PCSS, TAA, sky bake, snow shading (glints, sastrugi, SSS), three cascades and aerial perspective each against a JS twin and against Dawn, snowGpu end to end on SwiftShader, the vendored originals pinned by hash, and the shared three.js sea (patch, frame, depth tint, live tune, sub-aquarium); all 21 run alone and serially at v4895, all green",
     }),
+    since607: Object.freeze({
+        at: "v4896", swept: 10, green: 10, red: 0,
+        added: Object.freeze(["render/snowGpuField-selfcheck.mjs", "render/snowGpuLive-selfcheck.mjs", "render/snowGpuLookA-selfcheck.mjs", "render/snowGpuLookB-selfcheck.mjs", "render/snowGpuTaa-selfcheck.mjs", "tools/ship/snowReadings-selfcheck.mjs", "tools/ship/swekTvLauncher-selfcheck.mjs", "tools/ship/truncationGuard-selfcheck.mjs", "tools/ship/tvDebloat-selfcheck.mjs", "tools/ship/tvPackages-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "the snowGpu browser half split into five gates under the 20 s cap beside the trimmed core, the D3D12 readings and the truncation guard (found by mutating the real snowGpu.mjs, which the first detector missed), the TV package knowledge, the dry-run planner that executes nothing, and SweK Home's launcher (a pure Shelf.java driven by javac); each run alone and green, and each sabotaged to go red by name",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

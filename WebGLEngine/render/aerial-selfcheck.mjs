@@ -18,7 +18,7 @@ import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import * as A from "./aerial.mjs";
 import * as SB from "./skyBake.mjs";
-import { runWgslComputeNative, headlessGpuSkipReason, exitCleanly } from "../tools/ship/headlessGpu.mjs";
+import { reading, runWgslComputeNative, headlessGpuSkipReason, exitCleanly } from "../tools/ship/headlessGpu.mjs";
 
 const require_ = createRequire(import.meta.url);
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -94,6 +94,7 @@ console.log("\n4. THE KERNEL");
         else {
             let worst = 0, mid = 0; for (let i = 0; i < N; i++) for (let c = 0; c < 3; c++) { worst = Math.max(worst, Math.abs(g.values[i * 3 + c] - tw[i][c]) / Math.max(Math.abs(tw[i][c]), 0.05)); }
             ok("!! applyAerial as a compute kernel over the sky chain equals the twin over 200 queries (worst relative difference " + (worst * 100).toFixed(3) + "%)", worst < 5e-3 && !g.wroteNothing, "adapter " + ((g.adapter && g.adapter.description) || "?"));
+            reading("aerial: applyAerial kernel vs twin (relative)", worst, 5e-3, N * 3, ((g.adapter && g.adapter.description) || "?"));
         }
     }
 }

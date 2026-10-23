@@ -17,7 +17,7 @@ import path from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import * as T from "./taaResolve.mjs";
-import { runWgslComputeNative, headlessGpuSkipReason, exitCleanly } from "../tools/ship/headlessGpu.mjs";
+import { reading, runWgslComputeNative, headlessGpuSkipReason, exitCleanly } from "../tools/ship/headlessGpu.mjs";
 
 const require_ = createRequire(import.meta.url);
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -128,6 +128,7 @@ console.log("\n4. THE KERNEL");
         else {
             let worst = 0, n = 0; for (let i = 0; i < twin.length; i++) { if (i % 4 === 3) continue; worst = Math.max(worst, Math.abs(g.values[i] - twin[i])); n++; }
             ok("!! the resolve kernel equals the twin over a 24 x 16 frame with a moving camera and a jittered ray (worst difference under 1e-3 of 1)", worst < 1e-3 && !g.wroteNothing, "worst " + worst.toExponential(2) + " over " + n + " values, adapter " + ((g.adapter && g.adapter.description) || "?"));
+            reading("taaResolve: resolve kernel vs twin, 24x16 frame", worst, 1e-3, n, ((g.adapter && g.adapter.description) || "?"));
         }
     }
 }

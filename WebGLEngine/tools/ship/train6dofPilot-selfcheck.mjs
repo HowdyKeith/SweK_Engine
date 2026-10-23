@@ -69,9 +69,10 @@ ok("the audit is the champion's score on the AUDIT seeds, read once after the ch
 ok("every run is PRUNED: at least one run ends with fewer weights differing from the hand pilot than its search moved, none with more, and the log says so", a.runs.every((r) => Number.isInteger(r.kept) && Number.isInteger(r.moved) && r.kept <= r.moved) && a.runs.some((r) => r.moved > 0 && r.kept < r.moved) && lines.some((l) => /pruned \d+ moved weights to \d+/.test(l)), a.runs.map((r) => `${r.moved}->${r.kept}`).join(", "));
 ok("the log says what it did: the hand pilot's three scores, one line a run, the champion 'picked on held-out', and a verdict line", lines.length === 2 + recipe.runs + 1 && /hand pilot/.test(lines[0]) && lines.some((l) => /picked on held-out/.test(l)) && /QUALIFIES|DOES NOT QUALIFY/.test(lines[lines.length - 1]), `${lines.length} lines`);
 
-// a recipe chosen BECAUSE the run that scores best on the train seeds is not the run that scores best on the held-out ones (3003 trains to 7.45 and holds out at 6.89; 3002 trains to 7.38 and holds out at 7.75):
-// the champion must be the second, or "picked on held-out" is a sentence and not a rule
-const sp = T.run({ runs: 3, iters: 12, seed: 3002, sigma: 0.3, maxK: 4 }), trainBest = [...sp.runs].sort((x, y) => y.train - x.train)[0];
+// a recipe chosen BECAUSE the run that scores best on the train seeds is not the run that scores best on the held-out ones (restated at damage 6, v4896: seed 3017's
+// runs 3018, 3019 and 3017 train to 18.58, 18.58 and 18.76 and hold out at 18.60, 18.60 and 17.79 -- the old seed 3002 now trains three identical runs, so it no longer splits them):
+// the champion must be a held-out-best run, or "picked on held-out" is a sentence and not a rule
+const sp = T.run({ runs: 3, iters: 12, seed: 3017, sigma: 0.3, maxK: 4 }), trainBest = [...sp.runs].sort((x, y) => y.train - x.train)[0];
 ok("*** WHEN THE TRAIN-BEST RUN AND THE HELD-OUT-BEST RUN ARE DIFFERENT RUNS, THE CHAMPION IS THE HELD-OUT-BEST ONE ***", trainBest.seed !== sp.champion.seed && sp.champion.heldOut.score === Math.max(...sp.runs.map((r) => r.heldOut.score)) && trainBest.heldOut.score < sp.champion.heldOut.score, `train-best seed ${trainBest.seed} (train ${trainBest.train.toFixed(2)}, held-out ${trainBest.heldOut.score.toFixed(2)}); champion seed ${sp.champion.seed} (held-out ${sp.champion.heldOut.score.toFixed(2)})`);
 
 sec("4. the file it writes");

@@ -177,25 +177,25 @@ function M_files() {
     // v4487 -- STATED AS A SHAPE, NOT A PAIR OF LITERALS. This row read "31 of 32" until a round added one
     // file to the tree, and the honest edit turned out to be a number rather than a rethink. What the claim
     // actually is: the shipped thresholds miss exactly one row, whatever the key holds.
-    ok("*** the shipped thresholds agree with all but the rows RESIDUALS names (four since v4895), and the claim is never a clean sweep ***",
-        truth.size - disagree.length === M.v4895.agreement && M.v4895.agreement === M.v4895.rows - E.RESIDUALS.length &&
-        M.v4895.rows === E.HAND_VERIFIED.length,
+    ok("*** the shipped thresholds agree with all but the rows RESIDUALS names (five since v4896: the four of v4895 and the truncation guard's gate), and the claim is never a clean sweep ***",
+        truth.size - disagree.length === M.v4896.agreement && M.v4896.agreement === M.v4896.rows - E.RESIDUALS.length &&
+        M.v4896.rows === E.HAND_VERIFIED.length,
         `${truth.size - disagree.length}/${truth.size}`);
     ok("...and the disagreements are exactly the rows RESIDUALS names, each in the direction it says, not some other row",
         disagree.length === E.RESIDUALS.length && E.RESIDUALS.every((r) => disagree.includes(r.file) &&
             truth.get(r.file) === r.truth && got.get(r.file) === r.reported),
         E.RESIDUALS.map((r) => `${r.file}: ${r.truth} read as ${r.reported}`).join("; "));
-    ok("...so the reported totals are the hand count moved by the residuals: the emitter read as a quoter and the quoters read as emitters, which do not cancel since v4895",
-        c.emitters.length === M.v4895.reportedEmitters && c.quoters.length === M.v4895.reportedQuoters &&
-        M.v4895.reportedEmitters === M.v4895.handVerifiedEmitters + E.RESIDUALS.filter((r) => r.reported === "emitter").length - E.RESIDUALS.filter((r) => r.truth === "emitter").length &&
-        M.v4895.reportedQuoters === M.v4895.handVerifiedQuoters - E.RESIDUALS.filter((r) => r.reported === "emitter").length + E.RESIDUALS.filter((r) => r.truth === "emitter").length,
-        `reported ${c.emitters.length}/${c.quoters.length}, hand ${M.v4895.handVerifiedEmitters}/${M.v4895.handVerifiedQuoters}`);
+    ok("...so the reported totals are the hand count moved by the residuals: the emitter read as a quoter and the quoters read as emitters, which do not cancel since v4896",
+        c.emitters.length === M.v4896.reportedEmitters && c.quoters.length === M.v4896.reportedQuoters &&
+        M.v4896.reportedEmitters === M.v4896.handVerifiedEmitters + E.RESIDUALS.filter((r) => r.reported === "emitter").length - E.RESIDUALS.filter((r) => r.truth === "emitter").length &&
+        M.v4896.reportedQuoters === M.v4896.handVerifiedQuoters - E.RESIDUALS.filter((r) => r.reported === "emitter").length + E.RESIDUALS.filter((r) => r.truth === "emitter").length,
+        `reported ${c.emitters.length}/${c.quoters.length}, hand ${M.v4896.handVerifiedEmitters}/${M.v4896.handVerifiedQuoters}`);
     ok("the tree has not shrunk under the scan", c.scanned >= M.scanned, `${c.scanned} >= ${M.scanned}`);
 
     // The finding itself, stated as a number the next round can check.
     const emitters = E.HAND_VERIFIED.filter((h) => h.kind === "emitter");
     ok("*** TWENTY-THREE files carry runnable shader text that the preamble census calls none (fourteen at v4486, seven more read by hand at v4880, two at v4895) ***",
-        emitters.length === M.v4895.handVerifiedEmitters && M.v4895.handVerifiedEmitters === 23,
+        emitters.length === M.v4896.handVerifiedEmitters && M.v4896.handVerifiedEmitters === 23,
         `against ${M.preambleCensus.glslBearing} GLSL-bearing and ${M.preambleCensus.wgslBearing} WGSL-bearing`);
     ok("...and every one of them carries a REASON it is invisible, from the four the module names",
         emitters.every((h) => Object.values(E.REASONS).includes(h.why)) &&

@@ -314,6 +314,8 @@ export const HAND_VERIFIED = Object.freeze([
     Object.freeze({ file: "tools/ship/seaPatch.mjs", kind: "emitter", why: REASONS.ASSEMBLED }),
     Object.freeze({ file: "tools/ship/seaPatch-selfcheck.mjs", kind: "quoter", why: null }),
     Object.freeze({ file: "ui/seaDepthTint-selfcheck.mjs", kind: "quoter", why: null }),
+    // v4896 -- ONE FILE THE D3D12 ROUND ADDED, read by hand: the truncation guard's gate holds the v4895 bug's WGSL as fixtures (a dims() that returns a reciprocal, and the repair); it is a quoter
+    Object.freeze({ file: "tools/ship/truncationGuard-selfcheck.mjs", kind: "quoter", why: null }),
 ]);
 
 /** The rows the shipped thresholds get wrong, named rather than excluded. See the header. One at v4486; two since v4880. */
@@ -342,6 +344,12 @@ export const RESIDUALS = Object.freeze([Object.freeze({
         file: "render/skyBake-selfcheck.mjs", truth: "quoter", reported: "emitter",
         reason: "it quotes the Nishita march's statements to compare them with upstream's lib/atmosphere.wgsl and runs the bake kernel text through Dawn; it defines no shader",
         precedent: "tools/ship/swiftShaders-selfcheck.mjs, above",
+    }),
+    // v4896 -- ONE MORE, the same species
+    Object.freeze({
+        file: "tools/ship/truncationGuard-selfcheck.mjs", truth: "quoter", reported: "emitter",
+        reason: "it holds eight small WGSL functions as fixtures for a detector (the v4895 dims() bug and its repair) and never hands one to a device; the fixtures are dense enough to look like a shader",
+        precedent: "tools/ship/swiftShaders-selfcheck.mjs, above: the quote IS the shader to a density window",
     }),
 ]);
 
@@ -410,6 +418,7 @@ export const MEASURED_AT_V4486 = Object.freeze({
     v4880: Object.freeze({ rows: 46, agreement: 44, handVerifiedEmitters: 21, handVerifiedQuoters: 25, reportedEmitters: 21, reportedQuoters: 25 }),
     // v4895 -- six files read by hand (two emitters, four quoters); the thresholds now miss four of the 52 rows (two more quoters read as emitters).
     v4895: Object.freeze({ rows: 52, agreement: 48, handVerifiedEmitters: 23, handVerifiedQuoters: 29, reportedEmitters: 25, reportedQuoters: 27 }),
+    v4896: Object.freeze({ rows: 53, agreement: 48, handVerifiedEmitters: 23, handVerifiedQuoters: 30, reportedEmitters: 26, reportedQuoters: 27 }),
     // Against backendParity's own figures, unchanged and deliberately not widened.
     preambleCensus: Object.freeze({ glslBearing: 170, wgslBearing: 132, both: 27 }),   // v4880: were 150 / 72 / 16 at v4486; restated with backendParity; v4891: wgslBearing 115 -> 116 with it (render/denoiseUpscaleGPU.mjs)
     // Of the fourteen, how many are invisible for a reason a wider PATTERN could fix: the two whose only
@@ -417,5 +426,5 @@ export const MEASURED_AT_V4486 = Object.freeze({
     fixableByPattern: 2,
     // Which rejection actually rejects, over every tell in the tree. See the header: escapeOnly is 0 today and
     // the gate reports it rather than pinning it, because the day it stops being 0 is the day it starts working.
-    rejections: Object.freeze({ escapeOnly: 2, callOnly: 20, both: 23, neither: 81 }),   // v4895: were 2 / 20 / 20 / 73 at v4880 (0 / 16 / 16 / 58 before); the new snow/aerial/skyBake sources add 3 + 8 tells
+    rejections: Object.freeze({ escapeOnly: 2, callOnly: 22, both: 23, neither: 109 }),   // v4895: were 2 / 20 / 20 / 73 at v4880 (0 / 16 / 16 / 58 before); the new snow/aerial/skyBake sources add 3 + 8 tells
 });
