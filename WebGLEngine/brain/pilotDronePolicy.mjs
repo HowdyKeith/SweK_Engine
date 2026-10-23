@@ -123,11 +123,12 @@ export function mutate(w, sigma, rng, maxK = 4) {
     return o;
 }
 /** (1+1)-ES from the hand weights (the hand pilot) on TRAIN_SET. A child that scores exactly its parent replaces it, counted apart. Deterministic for a seed. */
-export function train({ seed = 7, iters = 600, sigma = 0.3, maxK = 4, start = null, trainSet = DT.TRAIN_SET, onIter = null } = {}) {
+export function train({ seed = 7, iters = 600, sigma = 0.3, maxK = 4, start = null, trainSet = DT.TRAIN_SET, onIter = null, objective = null } = {}) {   // `objective` (an evaluate() result -> number, e.g. DT.guarded) replaces the plain score as what a child is judged by; null is the score
     const rng = mulberry(seed); let best = start ? Float32Array.from(start) : handWeights();
-    let bestScore = evaluate(best, trainSet).score, improved = 0, neutral = 0; const history = [{ i: 0, score: bestScore }];
+    const judge = (x) => { const r = evaluate(x, trainSet); return objective ? objective(r) : r.score; };
+    let bestScore = judge(best), improved = 0, neutral = 0; const history = [{ i: 0, score: bestScore }];
     for (let i = 1; i <= iters; i++) {
-        const cand = mutate(best, sigma, rng, maxK), score = evaluate(cand, trainSet).score;
+        const cand = mutate(best, sigma, rng, maxK), score = judge(cand);
         if (score > bestScore + 1e-9) { best = cand; bestScore = score; improved++; } else if (score >= bestScore - 1e-9) { best = cand; neutral++; }
         if (i % 50 === 0 || i === iters) history.push({ i, score: bestScore });
         if (onIter) onIter(i, { score: bestScore, improved, neutral });
@@ -135,8 +136,8 @@ export function train({ seed = 7, iters = 600, sigma = 0.3, maxK = 4, start = nu
     return { weights: best, trainScore: bestScore, history, iters, improved, neutral };
 }
 /** Put every weight that differs from `toward` (default: the hand weights) back whenever the TRAIN score does not fall, passes repeated to a fixed point. */
-export function prune(w, { toward = null, trainSet = DT.TRAIN_SET, score = null } = {}) {   // `score` (weights -> number) is for the gate, which drives the logic with a score whose interactions it controls; null is the weights flown over trainSet
-    const base0 = toward ? Float32Array.from(toward) : handWeights(), out = Float32Array.from(w), ev = score || ((x) => evaluate(x, trainSet).score);
+export function prune(w, { toward = null, trainSet = DT.TRAIN_SET, score = null, objective = null } = {}) {   // `score` (weights -> number) is for the gate, which drives the logic with a score whose interactions it controls; null is the weights flown over trainSet
+    const base0 = toward ? Float32Array.from(toward) : handWeights(), out = Float32Array.from(w), ev = score || ((x) => { const r = evaluate(x, trainSet); return objective ? objective(r) : r.score; });
     const differs = () => { const idx = []; for (let i = 0; i < out.length; i++) if (Math.abs(out[i] - base0[i]) > 1e-6) idx.push(i); return idx; };
     const moved = differs().length; let best = ev(out), passes = 0, reverted;
     // GROUP TESTING FIRST. Most of what a search moves is drift (a child that scores exactly its parent replaces it), and a flight over the set costs seconds: putting 1,500 weights back one at a time is 1,500 flights. So try

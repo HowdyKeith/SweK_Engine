@@ -28,14 +28,16 @@ import { weightsHash } from "../../brain/drivePolicy.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_OUT = path.resolve(HERE, "..", "..", "brain", "pilotDroneWeightsDefault.json");
+/** The second recipe's files (a guarded objective on fresh audits: `--guard G --sets v2`): beside the first recipe's, never over them. */
+export const DEFAULT_OUT_V2 = path.resolve(HERE, "..", "..", "brain", "pilotDroneWeightsV2.json");
 export const RECIPE = Object.freeze({ runs: 4, iters: 600, seed: 8000, sigma: 0.3, maxK: 4 });
 /**
  * THE TWO BRAINS THIS TOOL TRAINS, by the same recipe, the same task and the same rules: "fly" is the fruit fly's Giant Fiber Circuit (brain/pilotDronePolicy.mjs, 1,167 weights) and "gpu" is the GPU Brain's MLP (brain/pilotDroneMlp.mjs, 20 -> 32 -> 32 -> 4, 1,860 weights):
  * each starts from the hand pilot's laws written through its own network, and each is graded on audits of its own.
  */
 export const BRAINS = Object.freeze({
-    fly: Object.freeze({ id: "fly", policy: PP, policyId: "pilotDronePolicy", out: DEFAULT_OUT, seed: 8000, name: "the fruit fly's Giant Fiber Circuit", citation: "male-cns Giant Fiber Circuit (Janelia FlyEM, vendor/male-cns/PROVENANCE.md), wired as the hand quadrotor pilot (brain/pilotDronePolicy.mjs)" }),
-    gpu: Object.freeze({ id: "gpu", policy: MR, policyId: "pilotDroneMlp", out: path.resolve(HERE, "..", "..", "brain", "pilotDroneMlpWeightsDefault.json"), seed: 9000, name: "the GPU Brain's MLP", citation: "SweK GPU Brain: brain/mlp.js's BatchedMLP, 20 -> 32 -> 32 -> 4, wired as the hand quadrotor pilot (brain/pilotDroneMlp.mjs)" }),
+    fly: Object.freeze({ id: "fly", policy: PP, policyId: "pilotDronePolicy", out: DEFAULT_OUT, outV2: DEFAULT_OUT_V2, seed: 8000, seedV2: 8100, name: "the fruit fly's Giant Fiber Circuit", citation: "male-cns Giant Fiber Circuit (Janelia FlyEM, vendor/male-cns/PROVENANCE.md), wired as the hand quadrotor pilot (brain/pilotDronePolicy.mjs)" }),
+    gpu: Object.freeze({ id: "gpu", policy: MR, policyId: "pilotDroneMlp", out: path.resolve(HERE, "..", "..", "brain", "pilotDroneMlpWeightsDefault.json"), outV2: path.resolve(HERE, "..", "..", "brain", "pilotDroneMlpWeightsV2.json"), seed: 9000, seedV2: 9100, name: "the GPU Brain's MLP", citation: "SweK GPU Brain: brain/mlp.js's BatchedMLP, 20 -> 32 -> 32 -> 4, wired as the hand quadrotor pilot (brain/pilotDroneMlp.mjs)" }),
 });
 export const brainOf = (opts) => { const b = BRAINS[(opts && opts.brain) || "fly"]; if (!b) throw new Error(`unknown brain ${JSON.stringify(opts.brain)} (known: ${Object.keys(BRAINS).join(", ")})`); return b; };
 /** How far below the hand pilot's score a KIND of audit scenario may be, and how far below its score on the reserve the champion may be: a chosen floor, not a test statistic. */
@@ -44,12 +46,15 @@ export const KIND_SLACK = 0.02, RESERVE_SLACK = 0.01;
 export const SETS = Object.freeze({ train: DT.TRAIN_SET, heldOut: DT.HELD_OUT_SET, pool: DT.SAFETY_POOL_SET, audit: DT.AUDIT_SET, reserve: DT.BASELINE_SET, safetyAudit: DT.SAFETY_AUDIT_SET });
 /** The GPU brain's: the same training, held-out, pool and reserve; an audit and a safety audit of its own. */
 export const SETS_GPU = Object.freeze({ ...SETS, audit: DT.AUDIT2_SET, safetyAudit: DT.SAFETY_AUDIT2_SET });
-export const setsOf = (opts) => (brainOf(opts).id === "gpu" ? SETS_GPU : SETS);
+/** The second recipe's sets: the same training, held-out and pool; FRESH audits, reserve and safety audits (the first ones were read by the first champions). */
+export const SETS_V2 = Object.freeze({ ...SETS, audit: DT.AUDIT_SET_V2, reserve: DT.BASELINE_SET_V2, safetyAudit: DT.SAFETY_AUDIT_SET_V2 });
+export const SETS_GPU_V2 = Object.freeze({ ...SETS_V2, audit: DT.AUDIT2_SET_V2, safetyAudit: DT.SAFETY_AUDIT2_SET_V2 });
+export const setsOf = (opts) => { const gpu = brainOf(opts).id === "gpu"; return opts && opts.sets === "v2" ? (gpu ? SETS_GPU_V2 : SETS_V2) : (gpu ? SETS_GPU : SETS); };
 const cmp = DT.describeEval;
 
 /** Parse `--name value` / `--flag` argv, REFUSING an option it does not know (a typo must not silently train the default recipe). `--one K` is the child's mode (see trainPilotDrone.mjs). */
 export function parseArgs(argv) {
-    const known = { runs: Number, iters: Number, seed: Number, sigma: Number, maxK: Number, workers: Number, one: Number, slice: Number, out: String, dump: String, brain: String, write: Boolean, quiet: Boolean };
+    const known = { runs: Number, iters: Number, seed: Number, sigma: Number, maxK: Number, workers: Number, one: Number, slice: Number, out: String, dump: String, brain: String, guard: Number, sets: String, write: Boolean, quiet: Boolean };
     const given = {};   // what the command line set, in ONE pass: the brain's own defaults (its seed, its file) go underneath it afterwards, so an explicit option beats them on whichever side of --brain it is written
     for (let i = 0; i < argv.length; i++) {
         const a = argv[i]; if (!a.startsWith("--")) throw new Error(`unexpected argument ${JSON.stringify(a)}`);
@@ -59,8 +64,10 @@ export function parseArgs(argv) {
     }
     const want = "brain" in given ? given.brain : "fly";
     if (!BRAINS[want]) throw new Error(`--brain must be one of ${Object.keys(BRAINS).join(", ")}, got ${JSON.stringify(want)}`);
-    const b = BRAINS[want];
-    return { ...RECIPE, seed: b.seed, workers: 1, one: null, slice: 1, out: b.out, dump: null, write: false, quiet: false, ...given, brain: b.id };
+    const b = BRAINS[want], ver = "sets" in given ? given.sets : "v1";
+    if (ver !== "v1" && ver !== "v2") throw new Error(`--sets must be v1 or v2, got ${JSON.stringify(ver)}`);
+    if ("guard" in given && !(given.guard >= 0)) throw new Error(`--guard needs a slack of 0 or more, got ${given.guard}`);
+    return { ...RECIPE, seed: ver === "v2" ? b.seedV2 : b.seed, workers: 1, one: null, slice: 1, out: ver === "v2" ? b.outV2 : b.out, dump: null, write: false, quiet: false, guard: null, ...given, sets: ver, brain: b.id };
 }
 
 // ---- the tails -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -97,7 +104,9 @@ export function qualifies(champ, hand) {
 export function searchOne(opts, k) {
     // `--slice N` trains on every Nth training scenario: a SMALL recipe for trying the machinery (the gate's children use it); `opts.trainSet` is the same for a caller with its own set; neither given is TRAIN_SET. A sliced recipe is never written (command()).
     const trainSet = opts.trainSet || (opts.slice > 1 ? DT.TRAIN_SET.filter((_, i) => i % opts.slice === 0) : undefined);
-    const P = brainOf(opts).policy, seed = opts.seed + k, found = P.train({ seed, iters: opts.iters, sigma: opts.sigma, maxK: opts.maxK, trainSet }), out = P.prune(found.weights, { trainSet });
+    // `--guard G`: the search's objective is the training score, worth -Infinity once the mean on hover, recovery or go-to falls more than G below the hand pilot's (brain/droneTask.mjs guarded): the first retrain bought its motor-out gain with those kinds, on the training scenarios too
+    const P = brainOf(opts).policy, seed = opts.seed + k, objective = opts.guard != null ? DT.guarded(P.evaluate(P.handWeights(), trainSet || DT.TRAIN_SET), opts.guard) : null;
+    const found = P.train({ seed, iters: opts.iters, sigma: opts.sigma, maxK: opts.maxK, trainSet, objective }), out = P.prune(found.weights, { trainSet, objective });
     return { k, seed, weights: out.weights, trainScore: out.trainScore, improved: found.improved, neutral: found.neutral, moved: out.moved, kept: out.kept };
 }
 
@@ -140,7 +149,7 @@ export function run(opts, log = () => {}, sets = setsOf(opts)) {
 /** Every run's pruned weights and scores and the verdict, as one JSON-able object: what `--dump` writes so a result that did not qualify can still be looked at (it is NOT a shipped file, and nothing reads it back). */
 export function dumpOf(result, opts) {
     const sc = (r) => ({ score: r.score, crashed: r.crashed, byKind: r.byKind });
-    return { recipe: { brain: brainOf(opts).id, runs: opts.runs, iters: opts.iters, seed: opts.seed, sigma: opts.sigma, maxK: opts.maxK, slice: opts.slice || 1 }, champion: result.champion ? result.champion.seed : null, verdict: result.verdict,
+    return { recipe: { brain: brainOf(opts).id, runs: opts.runs, iters: opts.iters, seed: opts.seed, sigma: opts.sigma, maxK: opts.maxK, slice: opts.slice || 1, guard: opts.guard == null ? null : opts.guard, sets: opts.sets || "v1" }, champion: result.champion ? result.champion.seed : null, verdict: result.verdict,
         hand: { heldOut: sc(result.hand.heldOut), pool: result.hand.pool, audit: result.hand.audit ? sc(result.hand.audit) : null, reserve: result.hand.reserve ? sc(result.hand.reserve) : null, safety: result.hand.safety || null },
         runs: result.runs.map((r) => ({ k: r.k, seed: r.seed, trainScore: r.trainScore, heldOut: sc(r.heldOut), pool: r.pool, eligible: r.eligible, kept: r.kept, moved: r.moved, weights: Array.from(r.weights) })) };
 }
@@ -155,9 +164,9 @@ export const LIMITS = "KNOWN LIMITS OF THE TASK THIS WAS MADE ON, SAID PLAINLY: 
 /** The file written when the champion qualifies: the portable swek-brain-v1 blob, with the recipe and the numbers it was graded on in `by`. */
 export function blobOf(result, opts) {
     const B = brainOf(opts), sets = setsOf(opts), c = result.champion, h = result.hand, desc = PB.describePolicy(B.policyId, B.policy);
-    const by = `sparse-mutation (1+1)-ES from the hand weights (the hand pilot's laws), seed ${c.seed} of ${opts.runs} runs (${opts.seed}..${opts.seed + opts.runs - 1}), sigma ${opts.sigma}, 1-${opts.maxK} weights per child, ${opts.iters} children per run, on the ${sets.train.length} training scenarios of brain/droneTask.mjs (hover in a gusty wind, recovery from an upset, go-to, a motor failing); ` +
+    const by = `sparse-mutation (1+1)-ES from the hand weights (the hand pilot's laws), seed ${c.seed} of ${opts.runs} runs (${opts.seed}..${opts.seed + opts.runs - 1}), sigma ${opts.sigma}, 1-${opts.maxK} weights per child, ${opts.iters} children per run, on the ${sets.train.length} training scenarios of brain/droneTask.mjs (hover in a gusty wind, recovery from an upset, go-to, a motor failing)${opts.guard != null ? `, THE SEARCH GUARDED: a child whose hover, recovery or go-to training mean fell more than ${opts.guard} below the hand pilot's was refused` : ""}; ` +
         `then pruned: ${c.kept} of the ${B.policy.WEIGHT_COUNT} weights differ from the hand pilot; champion picked on the ${sets.heldOut.length} held-out scenarios among the searches that end no flight early on the ${sets.pool.length} starts of the safety pool that the hand pilot completes; ` +
-        `audit ${cmp(c.audit)} over the ${sets.audit.length} audit scenarios (the hand pilot ${h.audit.score.toFixed(4)}; ${c.vs.better} scenarios better, ${c.vs.worse} worse), reserve ${c.reserve.score.toFixed(4)} (the hand pilot ${h.reserve.score.toFixed(4)}), ` +
+        `${opts.sets === "v2" ? "on FRESH second-recipe audit, reserve and safety-audit seeds; " : ""}audit ${cmp(c.audit)} over the ${sets.audit.length} audit scenarios (the hand pilot ${h.audit.score.toFixed(4)}; ${c.vs.better} scenarios better, ${c.vs.worse} worse), reserve ${c.reserve.score.toFixed(4)} (the hand pilot ${h.reserve.score.toFixed(4)}), ` +
         `safety audit of ${c.safety.n} starts: ${c.safety.crashed.length} ended early (the hand pilot ${h.safety.crashed.length}), none that the hand pilot completes. ` + LIMITS;
     return PB.exportBrain(desc, c.weights, { score: Number(c.heldOut.score.toFixed(4)), by, citation: B.citation });
 }

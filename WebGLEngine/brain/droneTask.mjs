@@ -117,6 +117,7 @@ export function fly(pilot, sc, { model = AD.defaultModel() } = {}) {
 const mk = (spec) => Object.freeze(spec.flatMap(([kind, seeds]) => seeds.map((s) => scenario(s, kind))));
 const range = (a, b) => Array.from({ length: b - a + 1 }, (_, i) => a + i);
 // TRAIN's recovery kind has twelve seeds (1..6 and 61..66): the helicopter's first GPU champion scored better than the hand pilot on the six recovery scenarios it trained on and worse on the ones it had not seen, and the second rule's training set answered with twice the scenarios.
+// THE SECOND AUDITS (v2): the first ones were read by the first drone champions and are spent (AUDIT_SET / AUDIT2_SET / BASELINE_SET / SAFETY_AUDIT_SET / SAFETY_AUDIT2_SET stay where they are: the shipped GPU file is graded on its own). A retrain under a changed recipe reads these, once each, by its own champion.
 export const TRAIN_SET = mk([["hover", range(1, 6)], ["recovery", [...range(1, 6), ...range(61, 66)]], ["motor", range(1, 12)], ["goto", range(1, 4)]]);
 export const HELD_OUT_SET = mk([["hover", range(11, 16)], ["recovery", range(11, 16)], ["motor", range(13, 24)], ["goto", range(11, 14)]]);
 export const AUDIT_SET = mk([["hover", range(21, 28)], ["recovery", range(21, 28)], ["motor", range(25, 44)], ["goto", range(21, 26)]]);       // the fruit fly's audit: read once, by its champion
@@ -126,6 +127,19 @@ export const BASELINE_SET = mk([["hover", range(501, 504)], ["recovery", range(5
 export const SAFETY_POOL_SET = mk([["hover", range(1001, 1010)], ["recovery", range(1001, 1010)], ["motor", range(1001, 1030)], ["goto", range(1001, 1010)]]);
 export const SAFETY_AUDIT_SET = mk([["hover", range(2001, 2010)], ["recovery", range(2001, 2010)], ["motor", range(2001, 2030)], ["goto", range(2001, 2010)]]);
 export const SAFETY_AUDIT2_SET = mk([["hover", range(3001, 3010)], ["recovery", range(3001, 3010)], ["motor", range(3001, 3030)], ["goto", range(3001, 3010)]]);
+export const AUDIT_SET_V2 = mk([["hover", range(41, 48)], ["recovery", range(41, 48)], ["motor", range(65, 84)], ["goto", range(41, 46)]]);              // the second recipe's fruit-fly audit
+export const AUDIT2_SET_V2 = mk([["hover", range(51, 58)], ["recovery", range(51, 58)], ["motor", range(85, 104)], ["goto", range(51, 56)]]);          // ... and the GPU network's
+export const BASELINE_SET_V2 = mk([["hover", range(601, 604)], ["recovery", range(601, 604)], ["motor", range(601, 608)], ["goto", range(601, 604)]]);   // ... the reserve
+export const SAFETY_AUDIT_SET_V2 = mk([["hover", range(4001, 4010)], ["recovery", range(4001, 4010)], ["motor", range(4001, 4030)], ["goto", range(4001, 4010)]]);
+export const SAFETY_AUDIT2_SET_V2 = mk([["hover", range(5001, 5010)], ["recovery", range(5001, 5010)], ["motor", range(5001, 5030)], ["goto", range(5001, 5010)]]);
+
+// ---- THE GUARD: what a search may not buy its gain with -------------------------------------------------------------------------------------------------------------------------------------------------------------
+// The first fruit-fly retrain took the motor-out audit from -6.70 to -5.70 and lost hover, recovery and go-to by 0.05 to 0.14 -- ON THE TRAINING SCENARIOS TOO (recovery -0.717 against the hand pilot's -0.494): 12 of the 34 training scenarios are motor-out flights, so a mean of them pays for a motor-out gain with the others. The guard is the qualification rule's own clause
+// moved into the search: a child whose mean on a guarded kind falls more than `slack` below the hand pilot's mean on it is worth -Infinity, whatever it scores elsewhere. It is an objective, not a rule: the verdict is made on the unseen sets by the rules as they were.
+export const GUARD_KINDS = Object.freeze(["hover", "recovery", "goto"]);
+/** An objective for a search: `r.score` of an evaluate() result while no guarded kind of it falls more than `slack` below the same kind in `handResult` (the hand pilot on the same scenarios), and -Infinity once one does. */
+export const guarded = (handResult, slack) => (r) => (GUARD_KINDS.every((k) => !(k in handResult.byKind) || (k in r.byKind && r.byKind[k] >= handResult.byKind[k] - slack)) ? r.score : -Infinity);
+
 
 /** `pilot` over a set: { score (the mean), runs, crashed (flights that ended early, or motor flights that did not end standing), byKind: { hover, recovery, motor, goto } (mean score each) }. */
 export function evaluate(pilot, set, opts = {}) {
