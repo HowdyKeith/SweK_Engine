@@ -2380,10 +2380,10 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "denoise-f16-storage",
-        blocker: "OPEN",
-        what: "Activations stored in half precision between layers, arithmetic in f32 -- half the memory traffic. ROUND 57 (pre-registration section 129) built it as the set r57p: r18u's kernels, the activations between two written-out layers packed f16 (pack2x16float / unpack2x16float, core WGSL, no feature), K0p green natively and in the browser on SwiftShader with every cell the f32 twin's rounded to nearest even. Owed: the rig's two runs, on either GPU or both.",
-        how: "H57: r57p at least 1.05 x r18u at 1920 x 1080 on the Intel, both paths, both runs; H57b: at least 1.05 x r18t on the 1080. realGpuRun --only denoise at the commit carrying section 129; the timing gate prints 'native: r57p against r18u at ...' and '... against r18t ...' lines, section 129 their tag.",
-        why: "Measured in the scratch study at 1.1e-3 from f64. The backlog's arithmetic expected little (neither GPU looks bandwidth-bound) and section 122 found f16 arithmetic at half speed on the Intel; Keith asked for the storage half measured.",
+        blocker: "CLOSED",
+        what: "CLOSED AS A MEASURED NEGATIVE by Keith's judgement (section 130), not by H57's rule, which gave no verdict. Round 57 (section 129) built r57p -- r18u's kernels with the activations between written-out layers stored as packed f16, f32 arithmetic, no feature. On the Intel at 1ae24f06 (render/denoise-rig-r57-{a,b}-intel-gen9.json): K0p red natively in both runs, green in the browser; r57p 0.948 / 1.021 x r18u natively and 1.027 / 1.037 x on the page at 1920 x 1080, so short of H57's 1.05 even had the key held.",
+        how: "Rounds 57 (section 129) and the verdict (section 130), re-derived from the two reports by render/denoiseDevice-selfcheck.mjs. About a quarter of the storing layers' cells took the other nearest f16 natively -- the Intel's pack2x16float very likely truncates -- and what turned the row red was cut off in the report; the native K0p row now prints its reading on a line of its own. The set, its twin and its rows stay in the tree; no table entry names it. No 1080 run owed.",
+        why: "*** THE PREDICTION WAS NO GAIN, AND THERE WAS NONE. *** The backlog's arithmetic said neither GPU is bandwidth-bound; halving the activations' traffic bought 0.95-1.04 x at 1080p on the Intel.",
     },
     {
         id: "denoise-smaller-network",

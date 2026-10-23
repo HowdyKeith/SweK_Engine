@@ -8816,3 +8816,162 @@ head" became F4 and F7, because that edit throws before any row can judge it.
 
 **Owed:** `realGpuRun --only denoise`, twice, on either GPU or both (Keith's choice), at the commit carrying this section.
 Committed byte for byte before it is read, and section 130 reads it.
+
+## 130. ROUND 57 -- THE VERDICT ON THE INTEL: H57 HAS NO VERDICT. K0p WAS RED NATIVELY, AND THE FIGURES FALL SHORT OF 1.05 ANYWAY
+
+**What arrived.** Two `realGpuRun --only denoise` reports from the Intel gen-9, runs a and b:
+- `render/denoise-rig-r57-a-intel-gen9.json` (sha-256 `fe9b2352...`);
+- `render/denoise-rig-r57-b-intel-gen9.json` (sha-256 `91a2a675...`).
+
+Both ran at 1ae24f06, the commit carrying section 129. Both were committed byte for byte (5b2651ae) before they were read.
+No 1080 run was made, so H57b has no reading.
+
+**The conditions, by section 129's rule.**
+- **C3 holds.** Both sets' 1920 x 1080 rows were measured on both paths in both runs, on the device's clock.
+- **C1 and C2 fail.** In both runs the device gate was red on one row, K0p natively. The other three gates were green, and
+  so was every other row of the device gate, K0p in the browser among them.
+- **So H57 has no verdict.** That is the rule's word, and this section does not soften it.
+
+**What K0p's red shows, and what it does not.**
+- The two runs gave the same counts to the cell. On the first three storing layers, 3,038, 3,400 and 2,592 cells of
+  12,768 a layer were the OTHER f16 value bracketing the f32 cell, not the one nearest to it. The key allows such a cell,
+  and counts it. Section 129 predicted none.
+- A count near a quarter of the cells is not ties. On this box, rounding every stored value toward zero instead of to
+  nearest gives 9,145 such cells over the same three layers of the CPU twin. The rig gave 9,030. So the Intel's native
+  `pack2x16float` very likely truncates. That is a reading, not a measurement of the converter.
+- **What turned the row red is not in the report.** `realGpuRun` keeps a failing row's first 400 characters, and the row's
+  line was cut inside the fourth layer's counts, before the head's figure and the image's. Truncation alone does not
+  break the image bound on the CPU: 7.80e-4 against 1e-3. So the cut-off clause is most likely the fourth layer: cells
+  unexplained where an f16 input is read. **That cause is not established**, and this section does not name one.
+- In the browser, on the same GPU in Chrome, K0p was green in both runs. The browser's conversion therefore matched the
+  rule there; how it rounds is not recorded, since a passing row prints no counts.
+
+**The figures, reported because C3 holds.**
+
+| r57p against r18u at 1920 x 1080 | run a | run b |
+|---|---|---|
+| native | 0.948 x | 1.021 x |
+| page | 1.027 x | 1.037 x |
+
+- None reaches H57's 1.05. Even had K0p held, H57 would have failed by its own number.
+- Across the ladder, r57p ran 0.98-1.16 x r18u, both paths, both runs. Against r18t (not the Intel's entry) it ran
+  1.36-1.81 x, as r18u does.
+
+**The predictions.**
+- **P1 FAILED.** K0p was red natively, and the other-nearest count was not zero.
+- **P2 is held by its figures and missed by its range once.** I predicted H57 would fail with r57p at 0.95-1.10 x r18u.
+  It did not reach 1.05; three of the four 1080p ratios fall in the range, and run a's native 0.948 falls just below it.
+- **P3 has no reading.** No 1080 run was made.
+
+**What it changes.** Nothing in the tables: the Intel's entries stay r18u.
+
+**The gate is changed so the next red names its clause.** The native K0p row now also prints, on a line of its own:
+- each layer's counts;
+- the head's figure;
+- the image's figure against the f64 network.
+
+A truncated failing row then still has its reading in the report.
+
+**The rows re-deriving this section** (render/denoiseDevice-selfcheck.mjs) were sabotaged red:
+- V1, the rig reports' commit read as another: 1 red. As first written V1 went 0 red. With the device gate red, C1 was
+  false whatever the commit, so the row now holds the commit on its own.
+- V2, H57's rule without C1 and C2: 1 red.
+- V3, H57's bound at 0.94: 2 red.
+
+**Closed by Keith's judgement.** `denoise-f16-storage` closes as a measured negative on the Intel, as section 122 closed
+`denoise-f16-intel`. That is his call, not H57's rule, which gave no verdict. No 1080 run is owed: on the 1080, r18u runs at
+about 0.66 x r18t (section 67's reading), so r57p would need about 1.6 x r18u there for H57b to hold, and on the Intel it
+ran within 5% of r18u. The set, its twin, its rows and its ladder lines stay in the tree, as r41h's did, and no table entry
+names it.
+
+## 131. ROUND 58 -- THE SHIPPED PAIR ON path-tracer.html's OWN SIX SCENES (`denoise-pathtracer-page-scenes`): FIXED BEFORE ANY OF ITS TEST IMAGES EXIST
+
+Committed before the code that implements it, which follows in its own commit. No test image of this round has been rendered.
+
+**Why this round.** Section 127 split these scenes off `denoise-mesh-other-materials`, because they are not a family to
+sample. They are the path tracer page's validation scenes, each built to show one thing:
+- furnace: a grey sphere in a white sky, which must look flat;
+- gradient: the same sphere under a sky brightest overhead;
+- pair: two spheres, one shadowing the other;
+- enclosed: the furnace lit by an emitting shell instead of the sky, which must look identical to the furnace;
+- rough: a GGX microfacet sphere in the white furnace, visibly dark;
+- roughcomp: the same sphere with energy compensation, which must vanish.
+
+> **On the path tracer page's own scenes, does the network the device ships beat the filter it ships?**
+
+**Nothing is trained or tuned.** The network, the filter, the input, the references and the statistic are section 79's,
+except where stated below.
+
+**The scenes: family P.** `render/denoiseScenes.mjs`'s family P draws path-tracer.html's scenes exactly as the page
+defines them:
+- its `SCENES` object, with RHO 0.18 and roughcomp's table built as the page builds it (`buildTable(0.8, { K: 24, N: 140,
+  M: 140 })`);
+- its camera: eye (0, 0, 4), looking at the origin, 40 degrees;
+- its default depth: 6 bounces, the page's slider default.
+
+The scene is chosen by the seed: seed s draws scene (s mod 6), in the page's order above. The image is 64 x 64, the arc's
+size, not the page's 128. The gate holds every scene's literal to path-tracer.html's text, so if the page changes, this
+family no longer matches it and the gate says so.
+
+**What is unusual, said before any test image exists.**
+- **Six images, one test.** H1 is decided over 6 images, one per scene. The smallest one-sided sign-flip p over 6 is
+  1/64 = 0.0156, so H1 can be supported only with nearly every image won. There is one hypothesis, so there is no Holm
+  step: its threshold is 0.05.
+- **Two of the six are one picture.** The pilot gave furnace and enclosed the same reference to the bit, as the page
+  intends. In the test each is rendered on its own render seeds, so their inputs differ but their pictures do not. They
+  stay in as two images, because the page shows both. That leaves five independent pictures, and this section says so
+  now.
+- **Scalar albedos and a rough sphere with no F0** go through `guideBuffers` as they stand: a scalar albedo as three equal
+  channels, a microfacet hit with no F0 as 1.
+- **Enclosed's camera sits inside its emitter.** The emitter mask runs as on any scene, and nothing is special-cased.
+
+**Splits** (`SPLITS_PAGE`): T1 -> **H1**, 6 of P, seeds **52000-52005** (each scene once, in order). No earlier split
+touched them. C5 holds over the 18 render seeds.
+
+**H1** is supported iff the mean d over the 6 images is > 0 and the exact one-sided sign-flip p is < 0.05.
+
+**Controls**, section 79's, scaled to 6:
+- **C1:** both methods beat the noisy input on at least 5 of 6 images, or the run is not reported.
+- **C2:** cited from round 11.
+- **C3:** not resolvable if the network is within 2 x of its floor on more than 3 of 6.
+- **C4:** the forward pass twice, bit for bit.
+- **C5:** distinct render seeds.
+
+**What each outcome buys.**
+- **Supported:** the page's scope note may say the shipped network also beats the filter on the path tracer page's own
+  six scenes. No more than that: those are six fixed scenes.
+- **Not supported:** the note's "the path tracer's own scenes included" stays a statement of what was never shown, now
+  with a measured negative under it.
+- **Not reported or not resolvable:** nothing moves.
+
+**Predictions, fixed now, deciding nothing.**
+- **P1:** C1 holds.
+- **P2:** H1 is NOT supported. The network was trained on scenes lit by small visible emitters with an emitter mask that
+  marks them. These are sky-lit, flat-shaded validation scenes, and the furnace pair's error is already small at 4
+  samples (pilot: 3.8e-3), where the filter's smoothing is hard to beat.
+- **P3:** the network's largest wins, if any, are on rough and roughcomp, the pilot's noisiest (relMSE 0.118 and 0.075).
+- All three are reported either way.
+
+**What was seen first.**
+- Everything in sections 1-130.
+- **The pilot, with NO network or filter:** the six scenes at 64 x 64, 8 bounces, with input and reference render seeds
+  990801 and 990802, outside every split.
+
+| scene | mean radiance (256 spp) | noisy relMSE vs 256 spp | time |
+|---|---|---|---|
+| furnace | 0.676 | 3.77e-3 | 0.6 s |
+| gradient | 0.421 | 4.87e-2 | 0.7 s |
+| pair | 0.429 | 4.13e-2 | 0.8 s |
+| enclosed | 0.676 | 3.77e-3 | 0.9 s |
+| rough | 0.807 | 1.18e-1 | 0.8 s |
+| roughcomp | 1.001 | 7.47e-2 | 0.9 s |
+
+  - Every image was finite.
+  - The guide channels carried 0.18, 0.60, 0.35 and 0.70 as albedos, and 1 for the sky and the microfacet spheres.
+  - The pilot ran at 8 bounces, the tracer's default. The round runs at 6, the page's.
+- Nothing of the test set has been rendered.
+
+**The command:** `node tools/denoiseStudy.mjs --harvest-page --cache <dir>` -> `render/denoise-results-page.json`.
+- It refuses if the file exists.
+- It runs here, in minutes.
+- The file is committed byte for byte before it is read, and section 132 reads it.

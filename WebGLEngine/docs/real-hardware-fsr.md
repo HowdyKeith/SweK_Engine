@@ -759,7 +759,7 @@ rest as a reference (29 rows). The rig's section 103 line says `rest fused`, and
 No run is owed. The page's history now runs the tiled accumulation (`accumT`), and shows the plain one as a reference (31
 rows). The rig's section 103 line says `accumulation tiled`, and a new section 126 line carries both.
 
-### Round 57: activations stored in f16, owed on either GPU or both (pre-registration section 129)
+### Round 57: activations stored in f16 (pre-registration sections 129-130) -- run on the Intel, closed
 
 The set r57p is r18u's kernels with the activations between layers stored as packed f16. Its arithmetic stays f32, and it
 needs no feature. Two `realGpuRun --only denoise` runs, a and b, on whichever GPU you run, at the branch head:
@@ -768,6 +768,9 @@ needs no feature. Two `realGpuRun --only denoise` runs, a and b, on whichever GP
   1920 x 1080 ratio against r18u, and H57b the 1080's against r18t.
 
 Send the two reports back; they are committed byte for byte before they are read.
+
+The Intel's two runs came back with K0p red natively and r57p at 0.95-1.04 x r18u at 1080p. The entry is closed as a
+measured negative (section 130), and no 1080 run is owed.
 
 ## Send back
 

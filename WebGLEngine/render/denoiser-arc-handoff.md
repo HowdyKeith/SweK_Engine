@@ -70,8 +70,8 @@ node tools/ship/versionPreflight.mjs --next    # the next free version and sweep
    - **Round 55 (section 126) made the tiled accumulation the history's; the plain pass is the reference.**
    - **Round 56 (sections 127-128): neither held.** The engine's meshes in family C's materials: VC mean d -0.145,
      MC 0.182 (p 0.036 against Holm's 0.025). The scope note stands; `denoise-mesh-other-materials` is closed.
-   - **Round 57 (section 129): r57p, activations stored as packed f16, f32 arithmetic.** K0p is green on SwiftShader; the
-     rig's runs are owed, on either GPU or both.
+   - **Rounds 57 (sections 129-130): r57p, activations stored as packed f16.** On the Intel, K0p went red natively and
+     r57p ran 0.95-1.04 x r18u at 1080p. `denoise-f16-storage` is closed as a measured negative (Keith).
    - Every default that the Intel's runs at 7b871372 decided is now carried out. The denoiser entries still open are
      `denoise-subgroup-reduction`, `denoise-f16-storage`, `denoise-temporalup-device`, `denoise-1080-native-crash` and
      `denoise-mesh-other-materials`.

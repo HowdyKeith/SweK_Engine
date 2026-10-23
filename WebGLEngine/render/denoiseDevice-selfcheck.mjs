@@ -201,6 +201,12 @@
 //   F5  r57p not standing aside under FXC                                 2 RED (the FXC row; the runnable-sets row)
 //   F6  F16S_IMAGE_TOL widened tenfold                                    1 RED (the static row holds the bound at 1e-3)
 //   F7  r57p left out of the timed sets                                   1 RED (the static row)
+// and section 130's verdict, by the same runner:
+//   V1  the rig reports' commit check accepting any commit                0 RED as first written: with the device gate red, C1 was false
+//                                                                         whatever the commit. The commit is held on its own now; the
+//                                                                         commit read as another, 1 RED
+//   V2  H57's rule without C1 and C2                                      1 RED (the verdict row: it reads "fails")
+//   V3  H57's bound at 0.94                                               2 RED (the verdict row's fixtures; the figures row)
 //   before it does
 // v4868 -- ROUND 27 (section 83), against the r27w set, twinsOf and FXC_UNTRIED_SETS. Each restored byte-identical (md5):
 //   Y1  kernelFor never picks the Winograd kernel for r27w                  -> 6 RED: the whole-twin row, the layers row, K0w natively,
@@ -782,6 +788,38 @@ console.log("1. THE KERNEL'S TWIN, ON THE CPU");
             ok("  ...and section 119's prediction is read as made: 2.5-3.5 x MET in both runs (2.84 / 2.66); the page, reported, 2.74 / 2.69",
                 R49.every((e) => e.r >= 2.5 && e.r <= 3.5 && e.page !== null), R49.map((e) => `${e.r} native, ${e.page} page`).join("; "));
         }
+        // ROUND 57'S VERDICT ON THE INTEL (section 130): section 129's rule read off the two Intel reports at 1ae24f06 (render/denoise-rig-r57-
+        // {a,b}-intel-gen9.json, committed before they were read). C1 every gate green; C2 K0p green natively and in the browser; C3 both sets'
+        // 1920 x 1080 rows measured on both paths; H57 r57p >= 1.05 x r18u there, both paths, both runs
+        {
+            const rig = (f) => JSON.parse(fs.readFileSync(path.join(ENG, "render", f), "utf8"));
+            const read57 = (rep) => {
+                const dev = rigGate(rep, "denoiseDevice"), T = rigLines(rigGate(rep, "denoiseTiming")), fails = (dev && dev.fails) || [];
+                const commit = String(rep.commit || "").slice(0, 8), c1 = commit === "1ae24f06" && (rep.gates || []).length === 4 && rep.gates.every((g) => g.ok === true && g.exit && g.exit.status === 0);
+                const k0pNative = !fails.some((l) => /K0p natively/.test(l)), k0pPage = !fails.some((l) => /K0p in the browser/.test(l)) && !!dev;
+                const c3 = ["native", "page"].every((p) => ["r18u", "r57p"].every((s) => T.some((l) => l.startsWith(`${p} ${s}: 1920 x 1080: `) && /; on the device's clock [\d.]+ ms/.test(l))));
+                const at = (p) => { const m = T.map((l) => l.match(new RegExp(`^${p}: r57p against r18u at 1920 x 1080: ([\\d.]+) x as fast, on the device's clock -- section 129$`))).find(Boolean); return m ? +m[1] : null; };
+                const other = (fails.find((l) => /K0p natively/.test(l)) || "").match(/(\d+)o\b/g);
+                return { commit, c1, c2: k0pNative && k0pPage, k0pNative, k0pPage, c3, native: at("native"), page: at("page"), other: other ? other.map((o) => +o.slice(0, -1)) : [],
+                         onlyRed: fails.length === 1 && rep.gates.filter((g) => !g.ok).map((g) => g.gate).join() === "render/denoiseDevice-selfcheck.mjs",
+                         adapter: (dev && dev.adapters || []).join() };
+            };
+            const H57 = (rs) => (rs.every((e) => e.c1 && e.c2 && e.c3 && e.native !== null && e.page !== null) ? (rs.every((e) => e.native >= 1.05 && e.page >= 1.05) ? "holds" : "fails") : "no verdict");
+            const R57 = ["a", "b"].map((k) => read57(rig(`denoise-rig-r57-${k}-intel-gen9.json`)));
+            const green = (rs) => rs.map((e) => ({ ...e, c1: true, c2: true })), fast = (rs) => rs.map((e) => ({ ...e, native: 1.06, page: 1.06 }));
+            const fx57 = [H57(green(R57)), H57(fast(green(R57))), H57(fast(R57))];
+            ok("!! *** section 130, by section 129's rule: H57 HAS NO VERDICT ON THE INTEL -- at 1ae24f06 the device gate was red in both runs on K0p natively alone (K0p in the browser green), so C1 and C2 fail; C3 holds ***",
+                // V1 went 0 red before this: with the device gate red C1 is false whatever the commit, so the commit is held on its own
+                H57(R57) === "no verdict" && R57.every((e) => e.commit === "1ae24f06" && !e.c1 && !e.k0pNative && e.k0pPage && e.c3 && e.onlyRed) && fx57.join() === "fails,holds,no verdict",
+                `${R57.map((e, i) => `run ${"ab"[i]}: native K0p ${e.k0pNative ? "green" : "red"}, browser ${e.k0pPage ? "green" : "red"}, 1080p ${e.c3 ? "measured" : "not"}`).join("; ")}; fixtures, green: ${fx57[0]}, green and fast: ${fx57[1]}, fast but red: ${fx57[2]}`);
+            ok("  ...and its figures, reported because C3 holds: r57p 0.948 / 1.021 x r18u natively and 1.027 / 1.037 x on the page at 1920 x 1080 -- none reaches 1.05, so with K0p green it would have failed",
+                JSON.stringify(R57.map((e) => [e.native, e.page])) === "[[0.948,1.027],[1.021,1.037]]" && H57(green(R57)) === "fails", R57.map((e) => `${e.native} / ${e.page}`).join("; "));
+            // section 129's predictions, read as made: P1 FAILED (red natively, and the other-nearest count far from zero, the same in both runs);
+            // P2's range 0.95-1.10 met by three of the four 1080p ratios, run a's native just below it; P3 no reading (no 1080 run)
+            ok("  ...and section 129's predictions as made: P1 FAILED -- the other nearest counted on the first three layers, 3038 / 3400 / 2592, the same in both runs; P2's 0.95-1.10 met by three of four, run a's native 0.948 below it; P3 not read",
+                R57.every((e) => e.other.slice(0, 3).join() === "3038,3400,2592") && R57.flatMap((e) => [e.native, e.page]).filter((r) => r >= 0.95 && r <= 1.10).length === 3 && R57[0].native < 0.95,
+                R57.map((e) => e.other.join("/")).join("; "));
+        }
         // v4852+ -- SECTION 68'S OUTCOME (round 20): the rig's six --which lines per GPU, held to the table fixed before they ran, and
         // each re-derived from nativePick on the adapter and compiler the line itself names -- so the rig's reasons are this code's
         {
@@ -1173,6 +1211,9 @@ else try {
         const r57 = await jobP(net, x, HH, WW, 10), J57 = judge(net, x, HH, WW, r57.acts, "r57p"), L57 = deviceLayers(net, "r57p");
         const j57 = judgeHeadApply(x, r57.acts[3], L57[4], r57.y, HH, WW), w64 = worstRel(r57.y, ref, 1e-12), others = J57.reduce((a, j) => a + (j.other || 0), 0);
         k0row("native", "r57p", J57, j57.worst);
+        // round 57 (section 130): the row's reading on a line of its own, so a report that cuts a failing row's line short still has it
+        console.log(`  ----  native K0p for r57p, the reading: ${J57.slice(0, 4).map((j, i) => `layer ${i} ${j.plain} plain, ${j.fused} fused, ${j.other || 0} other nearest, ${j.unexplained} unexplained`).join("; ")}; ` +
+            `head and kernel ${j57.worst.toExponential(2)} (APPLY_TOL ${APPLY_TOL}); against f64 ${w64.toExponential(2)} (F16S_IMAGE_TOL ${F16S_IMAGE_TOL})`);
         KP.push(ok(`!! *** K0p natively (section 129): the r57p set -- its storing layers every cell the f32 twin's rounded to f16 (or the other nearest, counted${soft ? ", and none here: a software adapter" : ""}), its last written-out layer K0's, given the device's own input; k_head_apply's image within APPLY_TOL; the image within F16S_IMAGE_TOL of the f64 network ***`,
             J57.slice(0, 4).every((j) => j.unexplained === 0) && J57.map((j) => j.kernel).join() === "fast_unroll_p,fast_unroll_p,fast_unroll_p,fast_unroll_p,head_apply" && r57.acts[4] === null &&
             (!soft || others === 0) && j57.worst <= APPLY_TOL && w64 <= F16S_IMAGE_TOL,
