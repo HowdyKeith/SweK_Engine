@@ -175,6 +175,13 @@
 //   X4  half summing rest                                              1 RED (section 4's default sum row)
 //   X5  restF timing the composite after the fused pass                1 RED (round 54's step row, by the kernels it dispatched)
 //   X6  the page without the reference's chain row                     1 RED (the page's 29 rows)
+//   and round 55's default accumulation (section 126), by the same runner:
+//   Q1  accumulate()'s default back to the plain pass                  1 RED (rounds 48 and 55's row, by the kernels each call ran)
+//   Q2  { tile: false } running the tiled kernel                       1 RED (the same row)
+//   Q3  temporal summing accum                                         2 RED (section 4's default sum row; round 55's reference row)
+//   Q4  temporalUntiled summing accumT                                 1 RED (round 55's reference row)
+//   Q5  the page without the reference's chain row                     1 RED (the page's 31 rows)
+//   Q6  the section 103 line without the accumulation                  1 RED (the lines row)
 "use strict";
 import fs from "node:fs";
 import crypto from "node:crypto";
@@ -611,7 +618,7 @@ console.log("\n4. THE CALLER: denoise.html's \"Time the half-size chain\", at it
                     (K.chain.listCheck ? `; the list fill ${K.chain.listCheck.listed} listed, ${K.chain.listCheck.rings} of ${K.chain.maxRings} rings, ${K.chain.listCheck.left} left` : "; the list fill not checked") +
                     (K.fullUnbound && K.halfList && K.temporalList ? `; the half-size chain with the list fill ${K.halfList.ms.toFixed(3)} ms, ratio ${(K.fullUnbound.ms / K.halfList.ms).toFixed(3)} x; with its history ${K.temporalList.ms.toFixed(3)} ms, ratio ${(K.fullUnbound.ms / K.temporalList.ms).toFixed(3)} x` : "; no ratio: a part was not measured"),
                 // round 36 (section 103): which fill the default chain runs, and its chain
-                `section 103: the default fill ${K.fill || "ring (a report from before round 36)"}, coverage ${K.coverage || "round 31's (a report from before round 44)"}, rest ${K.rest || "three passes (a report from before round 54)"}` +
+                `section 103: the default fill ${K.fill || "ring (a report from before round 36)"}, coverage ${K.coverage || "round 31's (a report from before round 44)"}, rest ${K.rest || "three passes (a report from before round 54)"}, accumulation ${K.accumulation || "plain (a report from before round 55)"}` +
                     (K.full && K.half ? `; the half-size chain ${K.half.ms.toFixed(3)} ms, ratio ${(K.full.ms / K.half.ms).toFixed(3)} x` : "; no ratio: a part was not measured") +
                     (K.full && K.temporal ? `; with its history ${K.temporal.ms.toFixed(3)} ms, ratio ${(K.full.ms / K.temporal.ms).toFixed(3)} x` : ""),
                 // round 37 (section 104): the tile fill beside the list fill, in a line of its own
@@ -634,10 +641,13 @@ console.log("\n4. THE CALLER: denoise.html's \"Time the half-size chain\", at it
                 "section 117: the accumulation tiled -- " + ["accum", "accumT"].map((k) => `${k} ${fine(ks[k]) ? ks[k].ms.toFixed(3) + " ms (" + ks[k].clock + ")" : "not measured"}`).join("; "),
                 // round 54 (section 125): the fused rest the chain runs by default, beside the three passes it stands in for, and the chains with each
                 "section 125: the fused rest -- " + ["rest", "restF"].map((k) => `${k} ${fine(ks[k]) ? ks[k].ms.toFixed(3) + " ms (" + ks[k].clock + ")" : "not measured"}`).join("; ") +
-                    (K.full && K.half && K.halfTwoPass && K.temporal && K.temporalTwoPass ? `; the half-size chain fused ${K.half.ms.toFixed(3)} ms, in three passes ${K.halfTwoPass.ms.toFixed(3)} ms; with its history fused ${K.temporal.ms.toFixed(3)} ms, in three passes ${K.temporalTwoPass.ms.toFixed(3)} ms` : "; no sum: a part was not measured")];
+                    (K.full && K.half && K.halfTwoPass && K.temporal && K.temporalTwoPass ? `; the half-size chain fused ${K.half.ms.toFixed(3)} ms, in three passes ${K.halfTwoPass.ms.toFixed(3)} ms; with its history fused ${K.temporal.ms.toFixed(3)} ms, in three passes ${K.temporalTwoPass.ms.toFixed(3)} ms` : "; no sum: a part was not measured"),
+                // round 55 (section 126): the tiled accumulation the history runs by default, beside the plain one, and the chain with each
+                "section 126: the accumulation by default -- " + ["accum", "accumT"].map((k) => `${k} ${fine(ks[k]) ? ks[k].ms.toFixed(3) + " ms (" + ks[k].clock + ")" : "not measured"}`).join("; ") +
+                    (K.temporal && K.temporalUntiled ? `; the half-size chain with its history tiled ${K.temporal.ms.toFixed(3)} ms, untiled ${K.temporalUntiled.ms.toFixed(3)} ms` : "; no sum: a part was not measured")];
         };
         ok("!! the page timed every step of the chain and both networks at its pilot size -- each a positive time on a named clock, the table shown, no page error",
-            pg.ok && !!st && keys.every((k) => fine(st[k])) && fine(J.networkFull) && fine(J.networkHalf) && !!J.full && !!J.half && !!J.temporal && !!J.halfRing && !!J.temporalRing && !!J.halfTile && !!J.temporalTile && !!J.halfList && !!J.temporalList && !J.halfLTile && !J.temporalLTile && !!J.fullUnbound && !!J.halfUnbound && !!J.temporalUnbound && !J.fullBound && !J.halfBound && !J.temporalBound && J.fill === "listedTile" && J.coverage === "bound" && J.rest === "fused" && !!J.halfTwoPass && !!J.temporalTwoPass && J.network === "shipped (asked by ?net=)" && J.params === 33329 && pg.result.shown && pg.result.rows === 29 && !pg.pageErrors.length,
+            pg.ok && !!st && keys.every((k) => fine(st[k])) && fine(J.networkFull) && fine(J.networkHalf) && !!J.full && !!J.half && !!J.temporal && !!J.halfRing && !!J.temporalRing && !!J.halfTile && !!J.temporalTile && !!J.halfList && !!J.temporalList && !J.halfLTile && !J.temporalLTile && !!J.fullUnbound && !!J.halfUnbound && !!J.temporalUnbound && !J.fullBound && !J.halfBound && !J.temporalBound && J.fill === "listedTile" && J.coverage === "bound" && J.rest === "fused" && !!J.halfTwoPass && !!J.temporalTwoPass && J.accumulation === "tiled" && !!J.temporalUntiled && J.network === "shipped (asked by ?net=)" && J.params === 33329 && pg.result.shown && pg.result.rows === 31 && !pg.pageErrors.length,
             pg.ok ? (pg.result?.status || "").slice(0, 200) : pg.reason);
         if (st) {
             // the network times are the ladder's rows, w x h then W x H (T4 went 0 RED before this held which was which); today's page
@@ -666,7 +676,7 @@ console.log("\n4. THE CALLER: denoise.html's \"Time the half-size chain\", at it
             ok("  rounds 43 and 44: the rig's lines keep their meaning -- section 93's page round 31's mask (fullUnbound) and its and 97's chain the ring fill's, section 99's \"with the list fill\" the list fill's (halfList), section 103's the default's, which is the listed tile fill on the bounded coverage",
                 n(/the half-size chain ([0-9.]+) ms/, l93) === at3(J.halfRing) && n(/with its history ([0-9.]+) ms/, l97) === at3(J.temporalRing) &&
                 n(/with the list fill ([0-9.]+) ms/, l99) === at3(J.halfList) && n(/with its history ([0-9.]+) ms/, l99) === at3(J.temporalList) &&
-                /^section 103: the default fill listedTile, coverage bound, rest fused; the half-size chain ([0-9.]+) ms/.test(l103) && n(/^section 93: .*today's page \(network and mask\) ([0-9.]+) ms/, l93) === at3(J.fullUnbound) && n(/the half-size chain ([0-9.]+) ms/, l103) === at3(J.half) && n(/with its history ([0-9.]+) ms/, l103) === at3(J.temporal),
+                /^section 103: the default fill listedTile, coverage bound, rest fused, accumulation tiled; the half-size chain ([0-9.]+) ms/.test(l103) && n(/^section 93: .*today's page \(network and mask\) ([0-9.]+) ms/, l93) === at3(J.fullUnbound) && n(/the half-size chain ([0-9.]+) ms/, l103) === at3(J.half) && n(/with its history ([0-9.]+) ms/, l103) === at3(J.temporal),
                 l103);
             // round 37 (section 104): the chain with the tile fill is the same sum with fillTile in the fill's place, by the wall
             // clock as the list fill is, its check filling every pixel in view in ceil(96 / 8) passes; the rig's line carries both
@@ -691,10 +701,11 @@ console.log("\n4. THE CALLER: denoise.html's \"Time the half-size chain\", at it
             // round 39 (section 107): the page and the chain with the bounded coverage, their sums; its check bit for bit at both sizes
             // and its traced counts the CPU twin's within 2 %; the rig's line carries the sums
             const bc = J.chain.boundCheck, l107 = rigLines(J)[7], twinN = (ww, hh) => coverageMayHit(makeScene(...J.scene), ww, hh).reduce((a, b) => a + b, 0);
+            const histT = ["hits", "shift", "accumT", "final"];   // round 55: the history's default accumulation is the tiled one
             const hb = med(halfRow) + ["covHalfB", "covFullB", "fillLTile", "restF"].reduce((a, k) => a + st[k].ms, 0), tH = twinN(J.chain.w, J.chain.h), tF = twinN(J.chain.W, J.chain.H);
-            ok("  rounds 39, 44 and 54: today's page and the chain, their defaults (full, half, temporal), are their sums with covHalfB and covFullB (and the chain's with restF), each one pass on the coverage's clock; its check is round 31's bit for bit at both sizes, tracing the twin's count within 2 %; the rig's section 107 line carries the sums",
+            ok("  rounds 39, 44, 54 and 55: today's page and the chain, their defaults (full, half, temporal), are their sums with covHalfB and covFullB (the chain's with restF, its history's with accumT), each one pass on the coverage's clock; its check is round 31's bit for bit at both sizes, tracing the twin's count within 2 %; the rig's section 107 line carries the sums",
                 !!J.half && Math.abs(J.half.ms - hb) < 1e-9 && Math.abs(J.full.ms - (med(fullRow) + st.covFullB.ms)) < 1e-9 &&
-                Math.abs(J.temporal.ms - (hb + hist.reduce((a, k) => a + st[k].ms, 0))) < 1e-9 && st.covHalfB.clock === st.covHalf.clock && st.covFullB.clock === st.covFull.clock &&
+                Math.abs(J.temporal.ms - (hb + histT.reduce((a, k) => a + st[k].ms, 0))) < 1e-9 && st.covHalfB.clock === st.covHalf.clock && st.covFullB.clock === st.covFull.clock &&
                 !!bc && bc.sameHalf && bc.sameFull && Math.abs(bc.half - tH) <= Math.max(1, 0.02 * tH) && Math.abs(bc.full - tF) <= Math.max(1, 0.02 * tF) && bc.full < bc.ofFull / 4 &&
                 n(/today's page with it ([0-9.]+) ms/, l107) === at3(J.full) && n(/the half-size chain with it ([0-9.]+) ms/, l107) === at3(J.half) && n(/with its history ([0-9.]+) ms/, l107) === at3(J.temporal),
                 `${l107.slice(0, 260)}; twin ${tH} / ${tF}`);
@@ -728,6 +739,14 @@ console.log("\n4. THE CALLER: denoise.html's \"Time the half-size chain\", at it
                 n(/the half-size chain fused ([0-9.]+) ms/, l125) === at3(J.half) && n(/, in three passes ([0-9.]+) ms; with/, l125) === at3(J.halfTwoPass) &&
                 n(/with its history fused ([0-9.]+) ms/, l125) === at3(J.temporal) && n(/with its history fused [0-9.]+ ms, in three passes ([0-9.]+) ms/, l125) === at3(J.temporalTwoPass),
                 `${l125}; restF dispatched ${(st.restF.kernels || []).join("+")}`);
+            // round 55 (section 126): the chain with its history on the plain accumulation (temporalUntiled), the reference -- the
+            // default's sum with accum in accumT's place; the rig's section 126 line carrying each figure
+            const l126 = rigLines(J)[12];
+            ok("  round 55: the chain with its history on the plain accumulation (temporalUntiled) is the default's sum with accum in accumT's place, and the rig's section 126 line carries accum, accumT and both chains",
+                !!J.temporalUntiled && Math.abs(J.temporalUntiled.ms - (J.temporal.ms - st.accumT.ms + st.accum.ms)) < 1e-9 && Math.abs(J.temporalUntiled.ms - (hb + hist.reduce((a, k) => a + st[k].ms, 0))) < 1e-9 &&
+                /^section 126: /.test(l126 || "") && n(/accum ([0-9.]+) ms/, l126) === at3(st.accum) && n(/accumT ([0-9.]+) ms/, l126) === at3(st.accumT) &&
+                n(/with its history tiled ([0-9.]+) ms/, l126) === at3(J.temporal) && n(/untiled ([0-9.]+) ms/, l126) === at3(J.temporalUntiled),
+                l126);
         }
         // ON A GPU, THE RIG'S SIZE (pre-registration section 93): 960 x 540 -> 1920 x 1080, every step a measured line the rig's
         // report keeps. Not on a software adapter: SwiftShader's 1080p would be minutes of a CPU's time that decides nothing.
@@ -738,7 +757,7 @@ console.log("\n4. THE CALLER: denoise.html's \"Time the half-size chain\", at it
             let K = null; try { K = JSON.parse(rg.result?.json || "null"); } catch {}
             const ks = K && K.chain && K.chain.steps;
             ok("!! section 93: at 1920 x 1080 the page timed both networks and every step of the chain, the fill reaching every pixel in its 96 rings -- and round 34's list fill the same, every listed pixel reached",
-                rg.ok && !!ks && keys.every((k) => fine(ks[k])) && fine(K.networkFull) && fine(K.networkHalf) && !!K.full && !!K.half && !!K.temporal && !!K.halfRing && !!K.temporalRing && !!K.halfTile && !!K.temporalTile && !!K.halfList && !!K.temporalList && K.fill === "listedTile" && K.coverage === "bound" && K.rest === "fused" && K.network === "shipped (asked by ?net=)" && !!K.fullUnbound && !!K.halfUnbound && K.chain.rings > 0 && K.chain.rings < 96 && !rg.pageErrors.length &&
+                rg.ok && !!ks && keys.every((k) => fine(ks[k])) && fine(K.networkFull) && fine(K.networkHalf) && !!K.full && !!K.half && !!K.temporal && !!K.halfRing && !!K.temporalRing && !!K.halfTile && !!K.temporalTile && !!K.halfList && !!K.temporalList && K.fill === "listedTile" && K.coverage === "bound" && K.rest === "fused" && K.accumulation === "tiled" && K.network === "shipped (asked by ?net=)" && !!K.fullUnbound && !!K.halfUnbound && K.chain.rings > 0 && K.chain.rings < 96 && !rg.pageErrors.length &&
                 !!K.chain.listCheck && K.chain.listCheck.listed === K.chain.inView && K.chain.listCheck.rings === K.chain.rings && K.chain.listCheck.left === 0 &&
                 !!K.chain.tileCheck && K.chain.tileCheck.rings === K.chain.rings && K.chain.tileCheck.left === 0 && K.chain.tileCheck.passes === 12 &&
                 !!K.chain.ltileCheck && K.chain.ltileCheck.rings === K.chain.rings && K.chain.ltileCheck.left === 0 && K.chain.ltileCheck.passes === 12 && K.chain.ltileCheck.tiles > 0 && K.chain.ltileCheck.tiles < K.chain.ltileCheck.of &&
@@ -839,11 +858,13 @@ console.log("\n6. ROUND 33: ROUND 32'S ACCUMULATION ON THE DEVICE, AGAINST rende
         // round 48 (section 117): the accumulation with its clamp read from a workgroup tile, against the kernel's own, bit for bit --
         // clamped and not on this fixture, and at 61 x 45 with the device's own hits, where the right and bottom tiles are partial
         const diff = (x, y) => { let d = 0; for (const k of ["A", "n", "y"]) for (let i = 0; i < x[k].length; i++) if (!Object.is(x[k][i], y[k][i])) d++; return d; };
-        const tl = await g.accumulate(P.S, P.eyes, fr, P.N, P.N, { geo, full, tile: true }), tlNo = await g.accumulate(P.S, P.eyes, fr, P.N, P.N, { geo, clamp: false, tile: true });
+        // round 55 (section 126): the tiled pass is the default, so the calls above run it and the plain pass is asked for by name
+        const pl = await g.accumulate(P.S, P.eyes, fr, P.N, P.N, { geo, full, tile: false }), plNo = await g.accumulate(P.S, P.eyes, fr, P.N, P.N, { geo, clamp: false, tile: false });
+        const tl = await g.accumulate(P.S, P.eyes, fr, P.N, P.N, { geo, full, tile: true });
         const W2 = 61, H2 = 45, fr2 = fr.map((f, k) => ({ y: Float64Array.from({ length: W2 * H2 * 3 }, (_, i) => 0.2 + 0.5 * ((i * 7 + k * 13) % 97) / 97), shift: f.shift }));
-        const odd = await g.accumulate(P.S, P.eyes, fr2, W2, H2, {}), oddT = await g.accumulate(P.S, P.eyes, fr2, W2, H2, { tile: true });
-        const tile48 = { clamped: diff(withCpuGeo, tl), unclamped: diff(noClamp, tlNo), odd: diff(odd, oddT), oddN: odd.A.length, clampBites: diff(withCpuGeo, noClamp),
-                         kernels: [withCpuGeo, tl, tlNo, odd, oddT].map((r) => r.kernel) };
+        const odd = await g.accumulate(P.S, P.eyes, fr2, W2, H2, { tile: false }), oddT = await g.accumulate(P.S, P.eyes, fr2, W2, H2, {});
+        const tile48 = { clamped: diff(pl, withCpuGeo), unclamped: diff(plNo, noClamp), asked: diff(withCpuGeo, tl), odd: diff(odd, oddT), oddN: odd.A.length, clampBites: diff(withCpuGeo, noClamp),
+                         kernels: [pl, withCpuGeo, noClamp, ownGeo, tl, odd, oddT].map((r) => r.kernel) };
         return { hits, withCpuGeo: pk(withCpuGeo), noClamp: pk(noClamp), ownGeo: pk(ownGeo), tile48, errs };
     }` });
     if (q.skipped) console.log("  SKIP  " + q.reason);
@@ -864,10 +885,10 @@ console.log("\n6. ROUND 33: ROUND 32'S ACCUMULATION ON THE DEVICE, AGAINST rende
         const cmp = (d, r) => { let nDiff = 0, worst = 0, nWorst = 0; for (let p = 0; p < N * N; p++) { nWorst = Math.max(nWorst, Math.abs(d.n[p] - r.n[p])); if (Math.abs(d.n[p] - r.n[p]) > 1e-4) nDiff++; for (let c = 0; c < 3; c++) worst = Math.max(worst, Math.abs(d.A[p * 3 + c] - r.A[p * 3 + c]) / (Math.abs(r.A[p * 3 + c]) + 1e-3)); } return { nDiff, worst, nWorst }; };
         const c1 = cmp(Q.withCpuGeo, ref), c0 = cmp(Q.noClamp, refNo), cOwn = cmp(Q.ownGeo, ref);
         const T48 = Q.tile48;
-        ok("!! round 48: the accumulation with its clamp read from a workgroup tile is the accumulation's own, bit for bit -- light, history length and composite -- clamped and not, and at 61 x 45 with partial tiles",
-            !!T48 && T48.clamped === 0 && T48.unclamped === 0 && T48.odd === 0 && T48.oddN === 61 * 45 * 3 && T48.clampBites > 0 && !Q.errs.length &&
-                T48.kernels.join() === "accum,accumT,accumT,accum,accumT",
-            T48 ? `${T48.clamped} / ${T48.unclamped} / ${T48.odd} values differ; the clamp moves ${T48.clampBites} values, so it is exercised; kernels ${T48.kernels.join(", ")}` : "no result");
+        ok("!! rounds 48 and 55: accumulate() asked nothing is the tiled accumulation, and it is { tile: false }'s plain pass bit for bit -- light, history length and composite -- clamped and not, asked for by name, and at 61 x 45 with partial tiles",
+            !!T48 && T48.clamped === 0 && T48.unclamped === 0 && T48.asked === 0 && T48.odd === 0 && T48.oddN === 61 * 45 * 3 && T48.clampBites > 0 && !Q.errs.length &&
+                T48.kernels.join() === "accum,accumT,accumT,accumT,accumT,accum,accumT",
+            T48 ? `${T48.clamped} / ${T48.unclamped} / ${T48.asked} / ${T48.odd} values differ; the clamp moves ${T48.clampBites} values, so it is exercised; kernels ${T48.kernels.join(", ")}` : "no result");
         ok("!! round 33: given the CPU's first hits, the device's accumulation is accumulateUpscaled's -- the history length within 1e-4 at every pixel, the light within 1e-5, clamped and not",
             c1.nDiff === 0 && c1.worst <= 1e-5 && c0.nDiff === 0 && c0.worst <= 1e-5 && Q.noClamp.A.some((v, i) => Math.abs(v - Q.withCpuGeo.A[i]) > 1e-4),
             `clamped: ${c1.nDiff} n differ by over 1e-4 (worst ${c1.nWorst.toExponential(1)}), light worst ${c1.worst.toExponential(1)}; unclamped: ${c0.nDiff}, ${c0.worst.toExponential(1)}`);

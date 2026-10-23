@@ -67,7 +67,10 @@ node tools/ship/versionPreflight.mjs --next    # the next free version and sweep
      2.66 x natively).
    - **Round 53 filled the Intel's network entries with w16.**
    - **Round 54 (section 125) made the fused EASU and composite the chain's rest; the three passes are the reference.**
-   - Next: `denoise-accum-tile-default`, a round in round 43's shape.
+   - **Round 55 (section 126) made the tiled accumulation the history's; the plain pass is the reference.**
+   - Every default that the Intel's runs at 7b871372 decided is now carried out. The denoiser entries still open are
+     `denoise-subgroup-reduction`, `denoise-f16-storage`, `denoise-temporalup-device`, `denoise-1080-native-crash` and
+     `denoise-mesh-other-materials`.
    - Round 48 (section 117) is the accumulation's clamp read from a tile, on the same Intel runs as rounds 45 and 46.
    Round 36 (section 103) made the list fill the default, with round 31's ring fill kept as its reference.
    **`denoise-1080-native-crash`:** round 35 did not reproduce it in five runs (section 102). The traces stay armed.

@@ -1082,10 +1082,10 @@ export class DenoiseUpscaleGPU {
      * render/denoiseTemporalUpscale.mjs's accumulateUpscaled on the device, and the composite after it. `frames[f]` is { y (W x H
      * rgb), shift [dx, dy] }, `eyes[f]` the frame's eye in scene S; `geo` (optional) the CPU's first hits of every frame, else the
      * device traces them. With `full` ({ cov, E } at W x H) the result is composited as section 95's Bt is. `tile` (round 48) runs
-     * ACCUM_TILE_WGSL. Returns { A, n, y, kernel }, kernel naming the accumulation it dispatched.
+     * ACCUM_TILE_WGSL -- since round 55 by default; `{ tile: false }` runs ACCUM_WGSL, the reference. Returns { A, n, y, kernel }, kernel naming the accumulation it dispatched.
      */
-    async accumulate(S, eyes, frames, W, H, { clamp = true, geo = null, full = null, tile = false } = {}) {
-        const acc = tile ? this.p.accumT : this.p.accum;   // round 48: the clamp read from a workgroup tile
+    async accumulate(S, eyes, frames, W, H, { clamp = true, geo = null, full = null, tile = true } = {}) {
+        const acc = tile ? this.p.accumT : this.p.accum;   // round 48: the clamp read from a workgroup tile; round 55: by default
         const dev = this.device, n = W * H, F = frames.length;
         if (eyes.length !== F || (geo && geo.length !== F)) throw new Error(`denoiseUpscaleGPU.accumulate: ${F} frames against ${eyes.length} eyes and ${geo ? geo.length : 0} first-hit buffers`);
         const bS = dev.buffer({ data: packSpheres(S.scene), usage: ["storage"] }), mk = (k) => dev.buffer({ data: new Float32Array(k), usage: ["storage"] });
@@ -1136,7 +1136,8 @@ export class DenoiseUpscaleGPU {
      *   covHalfB, covFullB         round 39: the coverage bounded, at w x h and W x H, one pass each
      *   restToT, restEasu, restComp  round 42: rest's three passes, one each; restToTFree the transfer without its atomic (a diagnostic)
      *   restEasuQ, restEasuComp  round 46: EASU in 2 x 2 quads alone, and fused with the composite (EASU_QUAD_WGSL, EASU_COMP_WGSL)
-     *   accumT             round 48: the accumulation with its clamp read from a workgroup tile (ACCUM_TILE_WGSL), one pass
+     *   accumT             round 48: the accumulation with its clamp read from a workgroup tile (ACCUM_TILE_WGSL), one pass;
+     *                      the history's by default since round 55
      *   restF              round 54: the chain's rest by default -- the transfer and the fused EASU and composite, one frame
      * A step is on the device's clock where the device grants timestamps and the step has 30 passes or fewer, else the wall
      * clock (performance.now() around the frame and the queue's onSubmittedWorkDone). Each row says which. Returns medians.
@@ -1253,7 +1254,7 @@ export class DenoiseUpscaleGPU {
  * Round 31, WHAT THE PAGE TIMES (denoise.html's "Time the half-size chain"): the shipped network at w x h and at W x H on the
  * page's own kernel set (render/denoiseDevice.mjs's timingLadder, the ladder the page already runs), and the chain's steps on
  * scene S (DenoiseUpscaleGPU's time). `device` is a gfx/device.js webgpu device; `newAdapter` makes the ladder's adapters.
- * Returns { ladder, chain, networkHalf, networkFull, fill, coverage, rest, full, half, temporal, fullUnbound, halfUnbound, temporalUnbound, halfList, ... }, each sum on the clocks
+ * Returns { ladder, chain, networkHalf, networkFull, fill, coverage, rest, accumulation, full, half, temporal, fullUnbound, halfUnbound, temporalUnbound, halfList, ... }, each sum on the clocks
  * its parts were read on, named:
  *   full   today's page at W x H: the network at W x H, and the emitter coverage at W x H, which is the mask it reads
  *   half   the chain: the network at w x h, the coverage at w x h (its mask, and the fill's), the coverage at W x H (the
@@ -1273,6 +1274,10 @@ export class DenoiseUpscaleGPU {
  *          the key is from before round 54, and its half and temporal took the three passes (rest)
  *   halfTwoPass, temporalTwoPass  round 54: half and temporal with the three-pass rest, the defaults of rounds 44-53 and the
  *          reference. Every other reference sum keeps the three passes
+ *   accumulation  round 55: "tiled" -- temporal takes the accumulation with its clamp read from a workgroup tile (accumT). A
+ *          report without the key is from before round 55, and its temporal took the plain accumulation (accum)
+ *   temporalUntiled  round 55: temporal with the plain accumulation, the default of round 54 and the reference. Every other
+ *          history sum keeps the plain accumulation
  * The ladder's cap is 5000 ms a pass, not its default 1500: the Intel gen-9's page pass at 1920 x 1080 is 1.2-1.4 s (rounds 27
  * and 28), close enough to 1500 that a prediction from the smaller size could skip the very row being compared.
  */
@@ -1284,9 +1289,11 @@ export async function timeHalfChain({ device, net, newAdapter, kernels, S, w, h,
     const st = chain.steps, sum = (parts) => (parts.every((x) => x && x.ms != null)
         ? { ms: parts.reduce((a, x) => a + x.ms, 0), clocks: [...new Set(parts.map((x) => x.clock))] } : null);
     return { ladder, chain, kernels, networkHalf, networkFull,
-             fill: "listedTile", coverage: "bound", rest: "fused", full: sum([networkFull, st.covFullB]), half: sum([networkHalf, st.covHalfB, st.covFullB, st.fillLTile, st.restF]),
+             fill: "listedTile", coverage: "bound", rest: "fused", accumulation: "tiled", full: sum([networkFull, st.covFullB]), half: sum([networkHalf, st.covHalfB, st.covFullB, st.fillLTile, st.restF]),
              // round 33: the chain with round 32's history -- its four passes a frame added to the half-size chain
-             temporal: sum([networkHalf, st.covHalfB, st.covFullB, st.fillLTile, st.restF, st.hits, st.shift, st.accum, st.final]),
+             temporal: sum([networkHalf, st.covHalfB, st.covFullB, st.fillLTile, st.restF, st.hits, st.shift, st.accumT, st.final]),
+             // round 55: the same with the plain accumulation, the default of round 54 and the reference
+             temporalUntiled: sum([networkHalf, st.covHalfB, st.covFullB, st.fillLTile, st.restF, st.hits, st.shift, st.accum, st.final]),
              // round 54: the same two with the three-pass rest, the defaults of rounds 44-53 and the reference
              halfTwoPass: sum([networkHalf, st.covHalfB, st.covFullB, st.fillLTile, st.rest]),
              temporalTwoPass: sum([networkHalf, st.covHalfB, st.covFullB, st.fillLTile, st.rest, st.hits, st.shift, st.accum, st.final]),

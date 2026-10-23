@@ -8492,3 +8492,64 @@ Every sabotage went red, and the runner restored each file byte for byte:
 X3 needed a change to the gate before it could judge cleanly. As first written, the ratio-3 chain sat bare in the device
 script, so X3's throw would have failed the whole drive and no single row would have judged it. The chain now sits in a
 try, and its error lands in the ratio-3 row. The round holds by its rule, and `denoise-easu-fused-default` is closed.
+
+## 126. ROUND 55 -- THE HISTORY's ACCUMULATION TILES BY DEFAULT (`denoise-accum-tile-default`): FIXED BEFORE ITS CODE
+
+Section 123 found H48 holding on the Intel: the accumulation with its clamp read from a workgroup tile costs 0.523 and 0.544
+of the plain pass. Section 117's rule said that, on a hold, the tiled pass becomes the history's. This round makes it so, in
+the shape of rounds 43, 44 and 54.
+
+**What changes:**
+- `accumulate()` asked nothing runs `ACCUM_TILE_WGSL` (`tile` defaults to true). `{ tile: false }` runs `ACCUM_WGSL`: the
+  reference. The result already names its kernel (round 48), so the default is held to having dispatched `accumT`.
+- `timeHalfChain` reports `accumulation: "tiled"`. Its `temporal` takes `accumT` in `accum`'s place.
+  - `temporalUntiled` keeps `accum`: the default of round 54, and the reference.
+  - Every other history sum (temporalRing, temporalTile, temporalList, temporalUnbound, temporalTwoPass) keeps `accum`, so
+    each keeps the meaning a committed report gave it.
+- The page's history row shows `accumT` in `accum`'s place. The plain accumulation and its chain with history become a
+  reference: two rows more, 31 in all.
+- The rig's section 103 line names the accumulation. A new section 126 line carries `accum`, `accumT` and the two chains with
+  history.
+
+**Rows (the chain gate):**
+1. `accumulate()` asked nothing, clamped and not, on round 33's fixture is `{ tile: false }`'s bit for bit (light, history
+   length, composite), and so is the same call at 61 x 45. The kernels run are, in order: the plain reference, then the
+   defaults (clamped, unclamped, with the device's own hits), `{ tile: true }`, the plain 61 x 45, and the default 61 x 45.
+   That reads `accum, accumT, accumT, accumT, accumT, accum, accumT`.
+2. Round 33's rows against accumulateUpscaled now judge the default, so the CPU's tolerances hold for the tiled pass.
+3. `temporal` is its sum with `accumT`, and `temporalUntiled` the same with `accum`.
+4. The page shows its 31 rows. The section 103 line names `accumulation tiled`, and the section 126 line carries each figure
+   it names.
+
+**Sabotages, by the byte-safe runner (Q1-Q6):**
+- Q1: accumulate()'s default back to the plain pass;
+- Q2: `{ tile: false }` running the tiled kernel;
+- Q3: `temporal` summing `accum`;
+- Q4: `temporalUntiled` summing `accumT`;
+- Q5: the page without the reference's chain row;
+- Q6: the section 103 line without the accumulation.
+
+Each must turn at least one row red.
+
+**The prediction.** None of timing. The kernel and its step are round 48's, and section 123 measured them. No rig run is owed.
+
+**The rule.** The round holds when rows 1-4 pass, every gate stays as green as it was, and each sabotage goes red.
+
+**Recorded after the code (round 55).** Rows 1-4 passed on SwiftShader on the first run, and the chain gate stayed ALL GREEN.
+The default accumulation matched `{ tile: false }` bit for bit: clamped, unclamped, asked for by name, and at 61 x 45. The clamp
+moved 17,362 values, so it was exercised. The kernels ran in the order the rows fixed.
+
+The pilot's figures, reported and not asserted: `accum` 1.950 ms, `accumT` 8.160 ms, both on the device's clock; the chain
+with its history 195.271 ms tiled against 189.060 ms untiled. On SwiftShader the tiled pass is the slower one, by about four
+times. That is a CPU emulating workgroup memory, and it decides nothing: section 123 measured the Intel at 0.523 and 0.544.
+A GPU on which the tile does not pay would show it in the section 126 line.
+
+Every sabotage went red, and the runner restored each file byte for byte:
+- Q1, accumulate()'s default back to the plain pass: 1 red;
+- Q2, `{ tile: false }` running the tiled kernel: 1 red;
+- Q3, `temporal` summing `accum`: 2 red;
+- Q4, `temporalUntiled` summing `accumT`: 1 red;
+- Q5, the page without the reference's chain row: 1 red;
+- Q6, the section 103 line without the accumulation: 1 red.
+
+The round holds by its rule, and `denoise-accum-tile-default` is closed.

@@ -753,6 +753,11 @@ the rig's lines keep their meanings. Any later Intel run of the device gate chec
 No run is owed. The page's half-size chain now runs the transfer and the fused EASU and composite, and shows the three-pass
 rest as a reference (29 rows). The rig's section 103 line says `rest fused`, and a new section 125 line carries both rests.
 
+### Round 55: the history's accumulation tiles (pre-registration section 126)
+
+No run is owed. The page's history now runs the tiled accumulation (`accumT`), and shows the plain one as a reference (31
+rows). The rig's section 103 line says `accumulation tiled`, and a new section 126 line carries both.
+
 ## Send back
 
 The JSON file. It holds the platform, the browser flags, every adapter seen, each gate's verdict, time, failing rows and

@@ -2313,9 +2313,9 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "denoise-accum-tile-default",
-        blocker: "OPEN",
-        what: "Section 117's rule, carried out: the history's accumulation runs as ACCUM_TILE_WGSL, the plain accumulation kept as the reference.",
-        how: "A round in the shape of rounds 43 and 44: accumulate() and the history's steps tile by default, held bit for bit to the plain pass clamped and not. No rig run owed: the kernel is round 48's.",
+        blocker: "CLOSED",
+        what: "DONE as round 55 (pre-registration section 126), shipping with the next version: accumulate() asked nothing runs ACCUM_TILE_WGSL; { tile: false } runs ACCUM_WGSL, the reference, held to it bit for bit clamped and not and at 61 x 45, each call held to the kernel it names.",
+        how: "timeHalfChain reports accumulation: \"tiled\"; its temporal takes accumT, temporalUntiled keeps accum, and every other history sum keeps accum. The page shows 31 rows; the rig's section 103 line names the accumulation and a section 126 line carries both. Sabotaged Q1-Q6. No rig run owed: the kernel and its step are round 48's.",
         why: "Section 123: H48 held on the Intel (0.523 / 0.544).",
     },
     {
