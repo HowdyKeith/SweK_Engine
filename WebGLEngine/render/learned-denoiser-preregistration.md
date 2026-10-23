@@ -8221,3 +8221,63 @@ owed of its own. The Intel runs owed to section 119 serve it if they are made at
 - On the page, the w16 network's image was within 8.9e-7 of its f64 image.
 - The page's ladder under `?net=w16` timed it on r15, r18t and r18u, by name and by its 9,793 parameters.
 - S1-S5 each turned rows red and were restored byte-identical: S1 2, S2 1, S3 2, S4 2, S5 2.
+
+## 121. ROUNDS 45-50 ON THE INTEL -- NOT REPORTED: THE TIMING GATE DIED IN BOTH RUNS, AND A BUG OF MINE HID THE NATIVE LADDER'S ROWS SINCE ROUND 45
+
+**What arrived.** Two `realGpuRun --only denoise` runs on the Intel gen-9 at d77592b2, which carries sections 114, 115, 117,
+119 and 120. They were committed as received at 2a538594: `render/denoise-rig-r49-{a,b}-intel-gen9.json`. **Both were
+shown in the session as they were uploaded, before that commit**, so the method's order (commit, then read) was not kept for
+either.
+
+**C1 fails in both runs. No rule in sections 114-120 gives a verdict on these runs.**
+- **What failed:** the timing gate exited 1 in both runs: `FAIL !! the native ladder ran AbortError`, then a TypeError at
+  render/denoiseTiming-selfcheck.mjs:583, reading `rows` of null.
+- **What held:** the compile, device and chain gates were green with exit 0 in both.
+- **The consequence:** every rule here asks for every gate green with exit 0, so none is read: H41 (section 114), H46
+  (115), H48 (117) and H49 (119). Section 120's rows are SwiftShader's and owe no rig reading.
+
+**Two faults, kept apart.**
+- **The TypeError is mine: a bracing bug from round 45.**
+  - Round 45 put its mini-ladder block between the native ladder's `if (err) ok(...)` and the `else { ... }` that holds the
+    ladder's trace row, its paired rows, its report and its clock rows. Round 49 put another block in the same place.
+  - That bound the `else` to the new block's condition. On the rig, where the ladder errored, the condition was false: the
+    `else` ran with no ladder (`r` null) and threw.
+  - **On SwiftShader, where the ladder did not error, the condition was true and the `else` never ran.** From round 45's
+    commit (e171b422) to this section, the native ladder's own rows were skipped here, 38 of them, with every gate green.
+    Rows that do not run cannot go red. The sabotage rounds since then (M, P, R and S) never touched those rows, so none
+    could have seen it.
+  - **Fixed here:** the `else` is back on its own `if`, with the later blocks after it. A flag set inside the `else` alone now
+    backs a row that goes red whenever the ladder ran and its report did not. T1, a block put back between the `if` and its
+    `else` as the two rounds put theirs, turns that row red. On SwiftShader the timing gate now passes 111 rows against
+    73, the 38 restored rows among them.
+- **The AbortError is the native ladder's own, and not yet explained.**
+  - Both runs died about 180-190 s in, near the end of a ladder that took 193 s in section 111's runs.
+  - **The leading suspect is round 45's cap.** With r41h allowed up to 4000 ms a pass, its 1920 x 1080 pass (predicted
+    2192-2485 ms) runs for the first time. A single GPU submission over about 2 s meets Windows' GPU timeout (TDR), which
+    resets the device. A reset device would reject the ladder's next call, which is what an AbortError from node-webgpu
+    looks like.
+  - **This is a suspicion, not a finding.** The trace file each run names (`swek-denoise-timing-trace-38456.txt` and
+    `-47172.txt` under `%TEMP%`) holds the last step before the death, and settles it.
+
+**Reported, deciding nothing (the chain gate was green, and its lines are whole).**
+
+| | run a | run b |
+|---|---|---|
+| H46: restEasuComp / (restEasu + restComp) | 44.14 / 55.52 = **0.795** | 31.46 / 40.09 = **0.785** |
+| ...the quads alone, restEasuQ / restEasu | 35.69 / 31.67 = 1.127 | 25.83 / 24.76 = 1.043 |
+| H48: accumT / accum | 34.23 / 59.41 = **0.576** | 22.00 / 43.91 = **0.501** |
+
+- **The fused pass sits just inside H46's 0.8 in both runs.** The quads alone are slower than EASU: the gain is the fusion's,
+  not the quads'.
+- **The tiled accumulation is well inside H48's 0.8.** That is outside section 117's predicted 0.60-0.85, on the fast side.
+- **Section 119's C2 held:** `native K0 for round 49's w16 network on win32/intel/gen-9 ... r15 green; r18t green; r18u
+  green`, in both runs.
+- None of these is a verdict. The rules ask for a run whose every gate is green.
+
+**What is owed.**
+- **The two trace files from these runs**, to name the step the ladder died in.
+- **Then, if the trace shows r41h's 1920 x 1080 pass:** the cap that made H41 measurable also makes it unrunnable on this
+  GPU, since one submission cannot run that long. Whether to put r41h's cap back under the timeout (H41 then has no verdict
+  for good, and `denoise-f16-intel` is closed on section 111's figures), or to time that pass another way, is Keith's call.
+  Nothing is changed here until the trace has been read.
+- **Then two more Intel runs**, at a commit carrying this section's fix and whatever the trace calls for.
