@@ -89,3 +89,8 @@ A GROUND ALERT, as Keith asked (what real jets give a pilot): the same probe tri
   * how the networks would receive it is a design question for that round: the fruit fly's eighteen features have no slot named for it (the jet's layout is already spent on the schedule and the limiter), and the alert could instead be a protection layer around ANY pilot (what the F-16's automatic ground collision avoidance is) that
     needs no change to the network at all. Neither was built.
 Parked together with stall, afterburner and the other characteristics the jet model leaves out, for after the named work is done.
+
+### The list for the flight-characteristics round, as Keith gave it (after the named work is done; none of it is started)
+
+ground alert (what real jets give the pilot) -- stall -- afterburners -- landing and take-offs ("if possible") -- "the other characteristics" the jet model leaves out. What the jet model already has of each (the trainer's flight model has a stall, the
+jet's engine has a spool lag and Mach drag) is for that round to check from the code, not from this list.
