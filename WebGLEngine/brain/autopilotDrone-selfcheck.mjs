@@ -33,6 +33,11 @@
 //   adds the rate term 10; A55 roll law adds the rate term 8; A56 yaw law sign 9; A57 thrust law sign 13; A58 thrust clamped to [-1, 1] 1; A59 pitch clamped to 0.5 1; A60 a non-finite pitch not guarded 2; A61 hover thrust 10
 //   percent high 5; A62 vertical authority from three motors 1; A63 yaw authority from two motors 1; A64 pitch authority uses the roll inertia 1; A65 attitude gain linear in wn 10; A66 attitude damping without the 2 4; A67
 //   wrapAngle is the identity 2; A68 bank error not wrapped 1; A69 motor-out yaw rate error not zeroed 1; A70 gains option ignored 2.
+//
+// SECTION 11 (THE DEFAULT TARGET AND THE FRONT DOOR), SABOTAGED -- 7 mutants of brain/autopilotDrone.mjs, six red by name and ONE EQUIVALENT, said plainly:
+//   D01 the default target is not frozen 1 | D02 the default target asks for a height 2 | D03 decide has no default target 2 | D04 the report names no module 1 | D05 the report prints the thrust to three places 1 |
+//   D06 the report swaps roll and pitch authority 0 | D07 the report prints NaN 1
+// D06 (the report prints the pitch authority where the roll authority goes) is EQUIVALENT FOR THE DEFAULT AIRFRAME: its roll and pitch inertia are equal (reported as 110.9 / 110.9 rad/s^2 a unit), so no row can see the swap; reportLines() takes no airframe, so a row with unequal inertias cannot reach it either. The unequal-inertia authority itself is held in section 10 by trimOf on a model built for the purpose.
 "use strict";
 import * as Q from "../physics/mechanics/multirotorModel6dof.mjs";
 import * as AP from "./autopilotDrone.mjs";
@@ -188,6 +193,17 @@ sec("10. THE CONSTANTS AND THE GEOMETRY, PINNED (every row here is one the first
     ok("!! AN OPTION OVERRIDES A GAIN IN THE GUIDANCE TOO, NOT ONLY IN THE LAWS: asked for { maxTilt: 0.3 } the tilt the pilot may ask for at 10 m is 0.3 and not 0.45, and { kPos: 0.3 } halves the speed asked for a point 10 m away (3.0, not 6.0)", near(AP.guidance(lvl(10), { altitude: 10 }, [0, 0, 0], { maxTilt: 0.3 }).tiltMax, 0.3, 1e-12) && near(AP.guidance(lvl(10), { altitude: 10 }).tiltMax, 0.45, 1e-12) && near(Math.hypot(...AP.guidance(lvl(50), { pos: [10, 0], altitude: 50 }, [0, 0, 0], { kPos: 0.3 }).vCmd), 3.0, 1e-9));
     const m2 = Q.createMultirotorModel({ ...Q.QUAD, inertia: [0.015, 0.03, 0.028] }), T2 = AP.trimOf(m2);
     ok("!! EACH AXIS' AUTHORITY USES ITS OWN INERTIA (the default airframe has equal roll and pitch inertia, so nothing could tell): an airframe with the pitch inertia doubled has half the pitch authority of its roll authority, the same roll authority as the default, and the yaw authority unchanged", near(T2.alphaPitch, T2.alphaRoll / 2, 1e-9) && near(T2.alphaRoll, T.alphaRoll, 1e-9) && near(T2.alphaYaw, T.alphaYaw, 1e-9));
+}
+
+sec("11. THE DEFAULT TARGET AND THE FRONT DOOR");
+{
+    const s0 = Q.createState(m, { pos: [0, 0, 50] }), none = AP.decide(s0), dflt = AP.decide(s0, AP.TARGET_DEFAULT), empty = AP.decide(s0, {});
+    ok("!! TARGET_DEFAULT IS THE EMPTY TARGET, FROZEN, AND IT MEANS 'HOLD WHERE YOU ARE': decide() with no target, with TARGET_DEFAULT and with {} are the same decision to the last bit, and at a hover at 50 m it is the hover thrust (0.41686) with a level stick and no yaw",
+       Object.isFrozen(AP.TARGET_DEFAULT) && Object.keys(AP.TARGET_DEFAULT).length === 0 && JSON.stringify(none) === JSON.stringify(dflt) && JSON.stringify(none) === JSON.stringify(empty)
+       && near(none.controls.thrust, T.thrust, 1e-12) && none.controls.pitch === 0 && none.controls.roll === 0 && none.controls.yaw === 0, JSON.stringify(none.controls));
+    const L = AP.reportLines();
+    ok("the front door prints three lines, the first names the module, the second carries this gate's own hover thrust (4 places) and the pilot's roll/pitch authority from trimOf (1 place), and no line says NaN or undefined",
+       L.length === 3 && /autopilotDrone/.test(L[0]) && L[1].includes("hover thrust " + T.thrust.toFixed(4)) && L[1].includes(T.alphaRoll.toFixed(1) + " / " + T.alphaPitch.toFixed(1)) && !L.some((l) => /NaN|undefined/.test(l)), L[1]);
 }
 
 console.log(fails ? `\nautopilotDrone-selfcheck: ${fails} FAILED` : "\nautopilotDrone-selfcheck: all checks pass");

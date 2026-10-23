@@ -22,6 +22,12 @@
 //   R33 an unloadable roster exits 0 2 | R34 the cycles missing from the record 1 | R35 the stability rows missing from the record 1 | R36 the command returns nothing 3 | R37 the hand pilot given a hash 1 | R38 --only passed on as a string 3 | R39 the pair progress line rounded wrong 1 | R40 the pairs missing from the record 1.
 //   FIVE WENT 0 RED THE FIRST TIME AND WHAT THE GATE WAS MISSING IS NOW IN IT. R27, R28, R40: the stand-in roster was already in rating order, so a record that listed the ratings in roster order read the same (the roster is now worst first); R34, R35: the record row's last clause was `A && B && C || D` and the `||` made it true
 //   whenever the stability list was empty -- and with six scenarios it always was, the stability sizes starting at ten (the record test now flies twelve and asks for the row); R30: the smoke record's seeds were never read.
+//
+// SECTION 7 (THE BRAIN DIRECTORY AND THE TWO SETS), SABOTAGED -- 13 mutants of tools/ship/tournamentDogfight.mjs, every one red by name (T01..T03 went 0 RED the first time):
+//   T01 BRAIN_DIR one level up 3 | T02 BRAIN_DIR is the weights directory of another name 3 | T03 the loader ignores BRAIN_DIR as its default 2 | T04 the tournament set starts at 4001 2 | T05 the tournament set ends at 4118 2 |
+//   T06 the smoke set ends at 9102 2 | T07 the tournament is flown on the bench set 3 | T08 the smoke set is the league audit 3 | T09 the tournament set is the league audit 4 | T10 the sets table is not frozen 1 |
+//   T11 the smoke entry is not frozen 1 | T12 the tournament entry is named wrong 3 | T13 a third set in the table 1
+// T01..T03 (BRAIN_DIR one level up, another directory name, the loader's default pointing at the repository root) went 0 red as a CRASH: section 2's `TD.loadRoster()` on the real directory threw on the first missing file and the gate died before section 7 ran. That call is wrapped now and is a red row naming the error (the real directory loads: 3, 3 and 2 red, section 7's own row among them). The child-process rows import the command file, which the sabotage harness has to copy as a real file for the mutant to reach it (SAB_COPY=tools/ship/runDogfightTournament.mjs); the first run of T01..T13 copied the MODULE over its own mutant and read 0 red for that reason too.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -84,8 +90,8 @@ sec("2. LOADING");
     ok("an optional file that is there but refused is an ERROR and not a skip (a league file that does not load is not 'no league pilot')", /flyLeague: pilotDogfightWeightsLeague\.json refused: this brain is for/.test(throws(() => TD.loadRoster(memdir({ ...files, "pilotDogfightWeightsLeague.json": gpuD }))) || ""));
     const some = TD.loadRoster({ ...memdir(files), only: ["gpuDogfight", "autopilot", "flyFlight"] });
     ok("!! --only TAKES IDS IN ROSTER ORDER, NOT THE ORDER GIVEN, loads only those, and does not complain about the league files it was not asked for; an unknown id is refused by name with the ids that exist", some.pilots.map((p) => p.id).join() === "autopilot,flyFlight,gpuDogfight" && some.skipped.length === 0 && /unknown pilot "nobody" \(known: autopilot, flyFlight, flyDogfight, gpuFlight, gpuDogfight, flyLeague, gpuLeague\)/.test(throws(() => TD.loadRoster({ ...memdir(files), only: ["autopilot", "nobody"] })) || ""));
-    const disk = TD.loadRoster();
-    ok("the real directory loads: the five shipped pilots first (their hashes as above) and any league file that is there after them", disk.pilots.slice(0, 5).map((p) => p.id).join() === "autopilot,flyFlight,flyDogfight,gpuFlight,gpuDogfight" && disk.pilots.slice(0, 5).slice(1).map((p) => p.hash).join() === "88b2761f,dc5ee8ed,1ba1b116,6c2cb228" && disk.pilots.length + disk.skipped.length === 7, `${disk.pilots.length} loaded, skipped: ${disk.skipped.join(", ") || "none"}`);
+    let disk; try { disk = TD.loadRoster(); } catch (e) { disk = { pilots: [], skipped: [], error: e.message }; }   // a default directory that has no weights is a red row naming it, not a crashed gate
+    ok("the real directory loads: the five shipped pilots first (their hashes as above) and any league file that is there after them", disk.pilots.slice(0, 5).map((p) => p.id).join() === "autopilot,flyFlight,flyDogfight,gpuFlight,gpuDogfight" && disk.pilots.slice(0, 5).slice(1).map((p) => p.hash).join() === "88b2761f,dc5ee8ed,1ba1b116,6c2cb228" && disk.pilots.length + disk.skipped.length === 7, `${disk.pilots.length} loaded, skipped: ${disk.skipped.join(", ") || "none"}${disk.error ? ", ERROR: " + disk.error : ""}`);
 }
 
 sec("3. THE ARGUMENTS");
@@ -143,6 +149,22 @@ sec("6. THE ENTRY POINT");
     ok("!! RUN FOR REAL ON TWO PILOTS AND THE FOUR THROWAWAY DUELS: exit 0, the report on stdout (the counts, the edges, the ratings, the stability and seat lines) and nothing on stderr", good.status === 0 && /WINS-DRAWS-LOSSES/.test(good.stdout) && /RATINGS/.test(good.stdout) && /SEAT \(PD autopilot/.test(good.stdout) && /fruit fly trained to FIGHT/.test(good.stdout) && good.stderr === "" && !/NaN|undefined/.test(good.stdout), `${good.stdout.split("\n").length} lines`);
     const badRun = run(["--only", "autopilot,nobody"]);
     ok("!! A BAD ID IS EXIT 2 WITH THE REASON AND THE KNOWN IDS ON STDERR, and nothing on stdout", badRun.status === 2 && /^runDogfightTournament: unknown pilot "nobody" \(known: autopilot, flyFlight/.test(badRun.stderr) && badRun.stdout === "");
+}
+
+sec("7. THE BRAIN DIRECTORY AND THE TWO SETS");
+{
+    const keys = (set) => new Set(set.map((x) => x.kind + ":" + x.seed));
+    const spent = ["LEAGUE_TRAIN_SET", "LEAGUE_HELD_OUT_SET", "LEAGUE_POOL_SET", "LEAGUE_AUDIT_SET", "DOGFIGHT_SET", "DOGFIGHT_BENCH_SET", "POOL_FIGHT_SET", "AUDIT5_FIGHT_SET", "SAFETY_AUDIT5_FIGHT_SET"].filter((n) => D[n]);
+    const seen = (set) => spent.some((n) => { const a = keys(D[n]); return set.some((x) => a.has(x.kind + ":" + x.seed)); });
+    ok("!! BRAIN_DIR IS THE REPOSITORY'S brain/ DIRECTORY, AND THE LOADER'S DEFAULT: it is this tree's brain/ (the path this gate builds on its own), every shipped (not optional) roster file is in it, and loadRoster() with no directory loads the same pilots, in the same order, with the same weights hashes, as loadRoster({ dir: BRAIN_DIR })",
+        TD.BRAIN_DIR === BRAIN && TD.ROSTER.filter((r) => r.file && !r.optional).every((r) => fs.existsSync(path.join(TD.BRAIN_DIR, r.file)))
+        && (() => { const a = TD.loadRoster(), b = TD.loadRoster({ dir: TD.BRAIN_DIR }); return a.pilots.length === b.pilots.length && a.pilots.every((p, i) => p.id === b.pilots[i].id && p.hash === b.pilots[i].hash); })(), TD.BRAIN_DIR);
+    ok("!! SETS HOLDS THE TWO FIGHTS THE COMMAND CAN FLY, AND NOTHING ELSE: `tournament` is dogfightTask's TOURNAMENT_SET (the same array, 120 duels, seeds 4000..4119 in order) and `smoke` is LEAGUE_SMOKE_SET (four duels, seeds 9100..9103), each entry says the name, the first and the last seed it is, and the whole table is frozen",
+        Object.isFrozen(TD.SETS) && Object.isFrozen(TD.SETS.tournament) && Object.isFrozen(TD.SETS.smoke) && Object.keys(TD.SETS).join() === "tournament,smoke"
+        && TD.SETS.tournament.set === D.TOURNAMENT_SET && TD.SETS.tournament.set.length === 120 && TD.SETS.tournament.name === "TOURNAMENT_SET" && TD.SETS.tournament.set.every((x, i) => x.seed === 4000 + i && x.kind === "duel") && TD.SETS.tournament.lo === 4000 && TD.SETS.tournament.hi === 4119
+        && TD.SETS.smoke.set === D.LEAGUE_SMOKE_SET && TD.SETS.smoke.set.map((x) => x.seed).join() === "9100,9101,9102,9103" && TD.SETS.smoke.name === "LEAGUE_SMOKE_SET" && TD.SETS.smoke.lo === 9100 && TD.SETS.smoke.hi === 9103);
+    ok("!! NEITHER SET IS A FIGHT ANY PILOT WAS TRAINED OR AUDITED ON: no (kind, seed) of the tournament set or of the smoke set is in the league's training, held-out, pool or audit sets, the classic sets, or the safety set (" + spent.length + " sets checked), so a rating is never earned on a fight a pilot has seen",
+        spent.length >= 8 && !seen(TD.SETS.tournament.set) && !seen(TD.SETS.smoke.set), spent.join(" "));
 }
 
 console.log(fails ? `\ntournamentDogfight-selfcheck: ${fails} FAILED` : "\ntournamentDogfight-selfcheck: all checks pass");

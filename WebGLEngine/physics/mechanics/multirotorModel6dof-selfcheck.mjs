@@ -46,6 +46,13 @@
 //   M99 legs act on flat ground by the general path with the wrong sign 5; M100 no substeps near the ground (band 0) 3; M101 one substep 4; M102 a crash mid-tick does not stop the substeps 1; M103 the clearance ignores
 //   the terrain 1; M104 the clock runs on the whole tick in every substep 2; M105 the energy runs on the whole tick in every substep 1; M106 the motors' lag runs on the whole tick in every substep 1; M107 the body steps
 //   the whole tick in every substep 4; M108 the clearance counts only the first leg 2.
+//
+// SECTION 13 (THE ATTITUDE CONVENTION, THE DEFAULT AIRFRAME, THE FRONT DOOR), SABOTAGED -- 18 mutants of physics/mechanics/multirotorModel6dof.mjs, every one red by name (M17 went 0 RED the first time):
+//   M01 heading turns the wrong way 4 | M02 pitch is nose down 7 | M03 bank is left side down 4 | M04 pitch before heading 3 | M05 bank before pitch 1 | M06 heading default is not zero 1 | M07 bank default is not zero 1 |
+//   M08 a quaternion that is not unit 6 | M09 the default airframe is a copy 1 | M10 the airframe is not frozen 1 | M11 the rotor is not frozen 1 | M12 the inertia is not frozen 1 | M13 the model ignores a spec it is given 1 |
+//   M14 the report does not name the module 1 | M15 the report hover line prints the thrust fraction wrong 1 | M16 the report flies 4 seconds, not 5 1 | M17 the report drops its third line 1 |
+//   M18 the report reads the height from the wrong axis 1
+// M17 went 0 red because the mutant was not one: it replaced the third report line with the same text behind an empty string, and a mutant that changes nothing is not a sabotage. It was redone as `].slice(0, 2)` (the third line dropped) and M18 added (the height read from the wrong axis): 1 red each.
 "use strict";
 import * as Q from "./multirotorModel6dof.mjs";
 import { rotateByQuat } from "./rigidBody6dof.mjs";
@@ -291,6 +298,22 @@ sec("12. WHAT IS NOT IN IT, SAID PLAINLY");
     ok("A CONSTANT MASS: the state's mass and the weight in the model are the same after ten seconds of burning the battery (no fuel loss modelled)", ten.mass === 1.6 && m.weight === 1.6 * G && ten.energy < 8e4);
     const spun = Q.forcesAndMoments(m, { ...Q.createState(m, { pos: [0, 0, 100] }), w: [0, 2, 0] }, hoverCtl), T0 = R.kT * OM * OM, dampY = -T0 * 0.8 * 2 / (OM * 0.1) * 4 * DD * DD;
     ok("NO GYROSCOPIC COUPLING OF THE ROTORS: turning the body about its pitch axis at 2 rad/s with the motors at the hover excites no torque about the roll or yaw axes (a spinning rotor's gyroscope would), and the only torque about the pitch axis is the DAMPING the axial inflow gives (the front motors move down through the air and gain thrust): -T 0.8 w Sum(x^2) / (omega R) = " + dampY.toFixed(5) + " N m, worked out here", Math.abs(spun.acc.torque[0]) < 1e-9 && Math.abs(spun.acc.torque[2]) < 1e-9 && near(spun.acc.torque[1], dampY, 1e-9) && spun.acc.torque[1] < 0, `${spun.acc.torque.map((v) => v.toExponential(2))}`);
+}
+
+sec("13. THE ATTITUDE CONVENTION, THE DEFAULT AIRFRAME, THE FRONT DOOR");
+{
+    const v = (q, a) => rotateByQuat(q, a), cl = (a, b, tol = 1e-5) => a.every((x, i) => Math.abs(x - b[i]) <= tol);
+    const q0 = Q.attitudeQuat(), qa = Q.attitudeQuat(0.3, 0.2, 0.1), c30 = Math.cos(30 * D2R), s30 = Math.sin(30 * D2R);
+    ok("!! attitudeQuat(heading, pitch, bank) is the aeroplane's convention: no argument is the identity, the result is a unit quaternion, a heading of +90 degrees (a right turn) takes the nose from +x to -y, a pitch of +30 degrees (nose up) takes it to (cos 30, 0, sin 30), and a bank of +30 degrees (right side down) takes the left side (+y) up to (0, cos 30, sin 30) and the roof (+z) toward the right (0, -sin 30, cos 30)",
+       q0.join() === "1,0,0,0" && near(qa.reduce((t, x) => t + x * x, 0), 1, 1e-12) && cl(v(Q.attitudeQuat(Math.PI / 2), [1, 0, 0]), [0, -1, 0]) && cl(v(Q.attitudeQuat(0, 30 * D2R), [1, 0, 0]), [c30, 0, s30])
+       && cl(v(Q.attitudeQuat(0, 0, 30 * D2R), [0, 1, 0]), [0, c30, s30]) && cl(v(Q.attitudeQuat(0, 0, 30 * D2R), [0, 0, 1]), [0, -s30, c30]));
+    ok("!! the heading is applied first, then the pitch about the heading's own left axis, then the bank about the nose (the product order): a heading of 90 and a pitch of 30 together put the nose at (0, -cos 30, sin 30), and the order is not commutative (pitch then heading is a different quaternion)",
+       cl(v(Q.attitudeQuat(Math.PI / 2, 30 * D2R), [1, 0, 0]), [0, -c30, s30]) && !cl(Q.attitudeQuat(0.5, 0.4, 0), Q.attitudeQuat(0.4, 0.5, 0), 1e-3));
+    ok("!! QUAD is the model's default airframe and it is frozen: createMultirotorModel() with no argument is built from it (the same object as the model's spec), the rotor and the inertia inside it are frozen too, and a model built from another spec keeps that spec",
+       Object.isFrozen(Q.QUAD) && Object.isFrozen(Q.QUAD.rotor) && Object.isFrozen(Q.QUAD.inertia) && m.spec === Q.QUAD && Q.QUAD.mass === 1.6 && Q.createMultirotorModel({ ...Q.QUAD, mass: 2 }).mass === 2 && Q.createMultirotorModel({ ...Q.QUAD, mass: 2 }).spec !== Q.QUAD);
+    const L = Q.reportLines(), five = run(Q.createState(m, { pos: [0, 0, 50] }), hoverCtl, 120 * 5).s;
+    ok("the front door prints three lines, the first names the module, the hover line carries this gate's own hover command (41.7%), and the 5-second line carries this gate's own five seconds at the hover command (the height to the millimetre, which is 0.17 m BELOW the 50 m it started at: the battery sags and a constant command sinks) -- no line says NaN or undefined",
+       L.length === 3 && /multirotorModel6dof/.test(L[0]) && L[1].includes((trim.command * 100).toFixed(1) + "%") && L[2].includes("height " + five.pos[2].toFixed(3) + " m") && five.pos[2] < 50 && five.pos[2] > 49.5 && !L.some((l) => /NaN|undefined/.test(l)), L[2]);
 }
 
 console.log(fails ? `\nmultirotorModel6dof-selfcheck: ${fails} FAILED` : "\nmultirotorModel6dof-selfcheck: all checks pass");

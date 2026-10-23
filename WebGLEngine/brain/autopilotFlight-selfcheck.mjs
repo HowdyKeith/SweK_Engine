@@ -31,6 +31,15 @@
 //   the other way; the 3.0-rad-bank row exists because of it. A24 (a six-speed table) crashed the gate (the row read table[11]) before it went red by name; the row now reads it safely.
 //   THE FIRST RUN OF THE AUTOPILOT PULLED AN AIRCRAFT STARTING 170 DEGREES BANKED INTO THE GROUND (18 m): the pitch law added 1.1 of back-stick for its bank compensation, which inverted is a pull toward the earth. `upright` is that fix,
 //   and A17 is the sabotage that puts it back.
+//
+// SECTION 9 (THE JET'S FRONT DOOR), SABOTAGED -- 22 mutants of brain/autopilotFlight.mjs, every one red by name (S08 and S12 went 0 RED the first time):
+//   S01 the fighting bank limit is 1.0 1 | S02 the fighting gains also change the climb gain back 1 | S03 the fighting gains are not frozen 1 | S04 the fighting gains also change the speed gain 1 |
+//   S05 the jet target airspeed is 150 1 | S06 the jet target is not frozen 1 | S07 the jet model is built every call 1 | S08 the jet model is the trainer 2 | S09 trim speeds of a model are always the trainer's 1 |
+//   S10 trimAt steps instead of interpolating in speed 6 | S11 trimAt holds no top height 1 | S12 trimAt below the table returns the top row 1 | S13 the gain schedule is not applied 1 |
+//   S14 the gain schedule is linear, not squared 1 | S15 the gain schedule tops out at 4 1 | S16 the gain schedule bottoms at 0.25 1 | S17 the gain schedule applies to a gain set with no reference 5 |
+//   S18 the cruise pilot flies the fighting gains 1 | S19 the fighting pilot flies the cruise gains 1 | S20 pilotFor drops the gains 1 | S21 pilotFor drops the model 1 | S22 the jet pilot flies the trainer model 1
+// S08 went 0 red AS A CRASH: the jet model built from the trainer's spec made the front door's jet line read a trim-altitude list that does not exist, and the whole gate died with a TypeError in section 8 before section 9 ran, so nothing was red BY NAME. The reportLines() call is wrapped now and it is a red row (2 red). S12 (trimAt below the first speed of the table returning the TOP row) went 0 red because the row only read the interior of the table: the row reads both ends now (1 red).
+// The flights the jet's pilots fly are brain/autopilotJet-selfcheck.mjs's; this section only names and holds the surface autopilotFlight.mjs exports for them (AUTOPILOT_JET, AUTOPILOT_JET_FIGHT, TARGET_JET, jetModel, trimSpeedsOf, trimAt, gainSchedule, jetPilot, jetFightPilot, pilotFor) -- a census (tools/ship/definitionGates-selfcheck.mjs) wanted this gate to name them.
 "use strict";
 import * as F from "../physics/mechanics/flightModel6dof.mjs";
 import { rotateByQuat } from "../physics/mechanics/rigidBody6dof.mjs";
@@ -188,8 +197,34 @@ console.log("\n8. NaN, DETERMINISM, THE FRONT DOOR");
     ok("the pilot is deterministic, and pilot() is decide().controls", JSON.stringify(a) === JSON.stringify(b) && JSON.stringify(AF.pilot(TRIM_AT(41), { altitude: 320, heading: 0.9, airspeed: 43 })) === JSON.stringify(a.controls));
     const full = AF.decide(TRIM_AT(45, { bank: 2.9, pitch: 1.2 }), { altitude: 5000, heading: 3, airspeed: 90 }).controls;
     ok("every control stays inside its range under absurd demands (a 4,700 m climb, 90 m/s, inverted)", inRange(full));
-    const L = AF.reportLines();
+    let L; try { L = AF.reportLines(); } catch (e) { L = ["THREW: " + e.message]; }   // a front door that throws is a red row, not a crashed gate (the jet lines read the jet's trim grid)
     ok("the front door names the module, prints the trim table and one decision, and no line says NaN or undefined", L.some((l) => /autopilotFlight/.test(l)) && L.some((l) => /trim table: 12 speeds/.test(l)) && L.some((l) => /asked to climb 40 m/.test(l)) && L.every((l) => !/NaN|undefined/.test(l)));
+}
+
+console.log("\n9. THE JET'S FRONT DOOR (the flights are brain/autopilotJet-selfcheck.mjs's; this is the surface autopilotFlight.mjs exports for them)");
+{
+    const jet = AF.jetModel(), J = AF.AUTOPILOT_JET, JF = AF.AUTOPILOT_JET_FIGHT;
+    const differ = Object.keys({ ...J, ...JF }).filter((k) => J[k] !== JF[k]).sort().join(",");
+    ok("!! AUTOPILOT_JET_FIGHT is AUTOPILOT_JET with four gains changed and nothing else (kAltVs 0.25, maxBank 1.1, tauHeading 2.5, vsMax 25), both frozen; TARGET_JET is 1,000 m, heading 0, 140 m/s, frozen",
+       Object.isFrozen(J) && Object.isFrozen(JF) && Object.isFrozen(AF.TARGET_JET) && differ === "kAltVs,maxBank,tauHeading,vsMax" && JF.kAltVs === 0.25 && JF.maxBank === 1.1 && JF.tauHeading === 2.5 && JF.vsMax === 25
+       && AF.TARGET_JET.altitude === 1000 && AF.TARGET_JET.heading === 0 && AF.TARGET_JET.airspeed === 140, differ);
+    ok("!! jetModel() is built once and is the jet's: the same object twice, with the jet's thirteen trim speeds (trimSpeedsOf) where the trainer's model has its twelve from 30 to 52 m/s",
+       AF.jetModel() === jet && jet.spec === F.JET_TRAINER && AF.trimSpeedsOf(jet) === F.JET_TRAINER.trimSpeeds && AF.trimSpeedsOf(jet).length === 13 && AF.trimSpeedsOf(model) === AF.TRIM_SPEEDS && AF.TRIM_SPEEDS.length === 12);
+    const tab = AF.trimTable(jet, 3000), v0 = tab[7], v1 = tab[8], hLo = F.JET_TRAINER.trimAltitudes[0], hHi = F.JET_TRAINER.trimAltitudes[F.JET_TRAINER.trimAltitudes.length - 1];
+    const mid = (v0.v + v1.v) / 2, atMid = AF.trimAt(jet, mid, 3000, "pitch"), want = (v0.pitch + v1.pitch) / 2;
+    ok("!! trimAt reads the table: AT a grid speed and a grid height it is the table's own number (to 1e-12), between two speeds it is the straight line (to 1e-9), a speed below the table's first or above its last is that row's number, and a height outside the grid is held at the grid's end",
+       F.JET_TRAINER.trimAltitudes.includes(3000) && near(AF.trimAt(jet, v0.v, 3000, "throttle"), v0.throttle, 1e-12) && near(atMid, want, 1e-9)
+       && AF.trimAt(jet, 140, hHi + 5000, "throttle") === AF.trimAt(jet, 140, hHi, "throttle") && AF.trimAt(jet, 140, hLo - 500, "pitch") === AF.trimAt(jet, 140, hLo, "pitch")
+       && AF.trimAt(jet, tab[0].v - 30, 3000, "pitch") === tab[0].pitch && AF.trimAt(jet, tab[tab.length - 1].v + 60, 3000, "throttle") === tab[tab.length - 1].throttle, `${atMid.toFixed(5)} against ${want.toFixed(5)}`);
+    const sch = (eas, g) => AF.gainSchedule({ eas }, g);
+    ok("!! gainSchedule is (vRef / EAS)^2 held between 0.3 and 3 -- 1 at the reference, 3 at 70 m/s (4 clamped), 0.3 at 280 m/s (0.25 clamped), 1.5625 at 112 m/s (to 1e-12) -- and 1 for a gain set with no reference speed (the trainer's)",
+       sch(140, J) === 1 && sch(70, J) === 3 && sch(280, J) === 0.3 && near(sch(112, J), 1.5625, 1e-12) && sch(70, AF.AUTOPILOT_FLIGHT) === 1 && sch(5, J) === 3 && sch(1000, J) === 0.3);
+    const s0 = F.createState({ pos: [0, 0, 2000], speed: 150, heading: 0.3, pitch: 0.04, bank: 0.5, mass: jet.mass, inertia: jet.inertia }), T = { altitude: 2100, heading: 1.0, airspeed: 160 };
+    const cj = AF.jetPilot(s0, T), cf = AF.jetFightPilot(s0, T), dj = AF.decide(s0, T, [0, 0, 0], { ...J, model: jet }).controls, df = AF.decide(s0, T, [0, 0, 0], { ...JF, model: jet }).controls;
+    const same = (a, b) => ["pitch", "roll", "yaw", "throttle"].every((k) => a[k] === b[k]);
+    ok("!! jetPilot is decide() with the cruise gains on the jet's model and jetFightPilot the fighting gains on it (bit for bit), pilotFor(model, gains) is that same function for any model and any gains, and the two jet pilots are not the same pilot",
+       same(cj, dj) && same(cf, df) && same(AF.pilotFor(jet, J)(s0, T), dj) && same(AF.pilotFor(jet, JF)(s0, T, [0, 0, 0]), df) && !same(cj, cf)
+       && same(AF.pilotFor(model)(TRIM_AT(45), LEVEL), AF.pilot(TRIM_AT(45), LEVEL)));
 }
 
 console.log(fails ? `\nautopilotFlight-selfcheck: ${fails} FAILED` : "\nautopilotFlight-selfcheck: all checks pass");
