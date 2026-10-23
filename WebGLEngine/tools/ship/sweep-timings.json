@@ -2025,9 +2025,9 @@
   "tools/ship/voxtralBrowser-selfcheck.mjs": 3286,
   "tools/ship/walkGround-selfcheck.mjs": 2014,
   "tools/ship/walkerParity-selfcheck.mjs": 3353,
-  "tools/ship/wasmDoors-selfcheck.mjs": 2933,
+  "tools/ship/wasmDoors-selfcheck.mjs": 1355,
   "tools/ship/wasmSupport-selfcheck.mjs": 3658,
-  "tools/ship/wasmTeardown-selfcheck.mjs": 3435,
+  "tools/ship/wasmTeardown-selfcheck.mjs": 2868,
   "tools/ship/wasmTerrainStatus-selfcheck.mjs": 126,
   "tools/ship/water2d-selfcheck.mjs": 3494,
   "tools/ship/webcodecsFramesToMp4-selfcheck.mjs": 969,
@@ -6245,9 +6245,9 @@
   "tools/ship/voxtralBrowser-selfcheck.mjs": "2026-10-20T17:22:34.460Z",
   "tools/ship/walkGround-selfcheck.mjs": "2026-10-23T13:04:04.817Z",
   "tools/ship/walkerParity-selfcheck.mjs": "2026-10-21T13:39:28.080Z",
-  "tools/ship/wasmDoors-selfcheck.mjs": "2026-10-23T13:04:04.817Z",
+  "tools/ship/wasmDoors-selfcheck.mjs": "2026-10-23T15:56:52.121Z",
   "tools/ship/wasmSupport-selfcheck.mjs": "2026-10-20T23:24:24.165Z",
-  "tools/ship/wasmTeardown-selfcheck.mjs": "2026-10-20T23:24:24.165Z",
+  "tools/ship/wasmTeardown-selfcheck.mjs": "2026-10-23T15:56:55.149Z",
   "tools/ship/wasmTerrainStatus-selfcheck.mjs": "2026-10-23T13:04:04.817Z",
   "tools/ship/water2d-selfcheck.mjs": "2026-10-20T16:40:35.872Z",
   "tools/ship/webcodecsFramesToMp4-selfcheck.mjs": "2026-10-23T13:04:04.817Z",
@@ -8329,9 +8329,9 @@
   "tools/ship/voxtralBrowser-selfcheck.mjs": 20000,
   "tools/ship/walkGround-selfcheck.mjs": 20000,
   "tools/ship/walkerParity-selfcheck.mjs": 20000,
-  "tools/ship/wasmDoors-selfcheck.mjs": 20000,
+  "tools/ship/wasmDoors-selfcheck.mjs": 60000,
   "tools/ship/wasmSupport-selfcheck.mjs": 20000,
-  "tools/ship/wasmTeardown-selfcheck.mjs": 20000,
+  "tools/ship/wasmTeardown-selfcheck.mjs": 60000,
   "tools/ship/wasmTerrainStatus-selfcheck.mjs": 20000,
   "tools/ship/water2d-selfcheck.mjs": 20000,
   "tools/ship/webcodecsFramesToMp4-selfcheck.mjs": 20000,
@@ -10824,7 +10824,6 @@
   "tools/ship/clothSoak-selfcheck.mjs": 2,
   "tools/ship/deviceBridge-selfcheck.mjs": 2,
   "tools/ship/wasmSupport-selfcheck.mjs": 2,
-  "tools/ship/wasmTeardown-selfcheck.mjs": 2,
   "brain/flightTask-selfcheck.mjs": 3,
   "tools/roundhouse/kineticsBind-selfcheck.mjs": 2,
   "tools/ship/rebar-selfcheck.mjs": 2,
@@ -12648,9 +12647,9 @@
   "tools/ship/voxtralBrowser-selfcheck.mjs": 3286,
   "tools/ship/walkGround-selfcheck.mjs": 868,
   "tools/ship/walkerParity-selfcheck.mjs": 3353,
-  "tools/ship/wasmDoors-selfcheck.mjs": 2933,
+  "tools/ship/wasmDoors-selfcheck.mjs": 1355,
   "tools/ship/wasmSupport-selfcheck.mjs": 3658,
-  "tools/ship/wasmTeardown-selfcheck.mjs": 3435,
+  "tools/ship/wasmTeardown-selfcheck.mjs": 2868,
   "tools/ship/wasmTerrainStatus-selfcheck.mjs": 47,
   "tools/ship/water2d-selfcheck.mjs": 3494,
   "tools/ship/webcodecsFramesToMp4-selfcheck.mjs": 418,
@@ -14649,9 +14648,9 @@
   "tools/ship/voxtralBrowser-selfcheck.mjs": "2026-10-20T17:22:34.460Z",
   "tools/ship/walkGround-selfcheck.mjs": "2026-10-21T12:35:38.412Z",
   "tools/ship/walkerParity-selfcheck.mjs": "2026-10-21T13:39:28.080Z",
-  "tools/ship/wasmDoors-selfcheck.mjs": "2026-10-23T13:03:48.890Z",
+  "tools/ship/wasmDoors-selfcheck.mjs": "2026-10-23T15:56:52.121Z",
   "tools/ship/wasmSupport-selfcheck.mjs": "2026-10-20T23:24:08.790Z",
-  "tools/ship/wasmTeardown-selfcheck.mjs": "2026-10-20T23:24:08.790Z",
+  "tools/ship/wasmTeardown-selfcheck.mjs": "2026-10-23T15:56:55.149Z",
   "tools/ship/wasmTerrainStatus-selfcheck.mjs": "2026-10-23T12:49:03.366Z",
   "tools/ship/water2d-selfcheck.mjs": "2026-10-20T16:40:35.872Z",
   "tools/ship/webcodecsFramesToMp4-selfcheck.mjs": "2026-10-23T12:25:06.479Z",
@@ -23746,9 +23745,9 @@
    3353
   ],
   "tools/ship/wasmDoors-selfcheck.mjs": [
-   2716,
    2786,
-   2933
+   2933,
+   1355
   ],
   "tools/ship/wasmSupport-selfcheck.mjs": [
    2656,
@@ -23756,9 +23755,9 @@
    3658
   ],
   "tools/ship/wasmTeardown-selfcheck.mjs": [
-   2983,
    3013,
-   3435
+   3435,
+   2868
   ],
   "tools/ship/wasmTerrainStatus-selfcheck.mjs": [
    50,

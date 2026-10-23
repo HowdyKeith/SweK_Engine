@@ -475,6 +475,9 @@ export const REACH_AT_V4548 = Object.freeze({
     // wasmTeardown.mjs (one pass instead of a grep per door), not a re-timing. The ratchet still refuses growth beyond this.
     // v4894 -- READ OFF reach() after merging v4893: checked 122, overBudget 43, unguarded 17, unchecked 60. The ceiling below stays at 62 on purpose: wasmDoors-selfcheck is still at the 3 s line
     // (the v4890 note), so the count can read 62 again on a loaded sweep, and a ceiling lowered to the quiet reading would turn that into a red nobody caused.
+    // v4896 -- THE CENSUS WAS MADE CHEAP, AND THE CEILING STAYS AT 62 ON PURPOSE. wasmDoors-selfcheck now runs ~1.3 s (was 2.6-3.4 s at the 3 s line): noComments stopped looking back (main.js 632 -> 32 ms,
+    // byte-identical over all 5,584 scripts) and doorReach reads ONE git grep instead of one per level (1,097 -> 290 ms, the same 59 gates). So that gate no longer flips this count. The reading is 61 now; the
+    // ceiling is not lowered to it because other guardians still sit near the line and decide the class by how loaded the box was (wasmTeardown-selfcheck 2.9 s, reportDoors-selfcheck), as the live line below says.
     checked: 122, overBudget: 43, unguarded: 17, unchecked: 62,
     // v4550 -- the UNMEASURED class was split out of over-budget after this gate went red twice inside full
     // sweeps and passed 68 times under load; the trigger was a concurrent REWRITE of sweep-timings.json, not
