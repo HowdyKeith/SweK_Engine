@@ -237,6 +237,7 @@ import { spawnSync } from "node:child_process";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const imp = (p) => import(pathToFileURL(path.join(ENG, p)).href);
+const { PAGE_NETWORKS_BY_ADAPTER, NATIVE_NETWORKS_BY_ADAPTER, NETWORKS, pageNetworkFor, nativeNetworkFor, networkFile } = await imp("render/denoiseDevice.mjs");
 const { APPLY_TOL, kernelApplyWgsl, packApplyUniforms, kernelApplyCpu, kernelFor, deviceLayers, denoiseTwin, createDeviceDenoiser, encodeNet, decodeNet,
         KERNEL_SETS, DEFAULT_KERNELS, PAGE_KERNELS, applyFor, kernelApplyFastWgsl, kernelHeadApplyWgsl, judgeHeadApply,
         R18_KERNELS, FXC_UNBUILT_SETS, isD3D12Native, nativeSetsFor, PAGE_KERNELS_BY_ADAPTER, pageAdapterKey, pageKernelsFor, passBytes, TIMED_SETS,
@@ -1178,6 +1179,20 @@ else try {
     console.log(`  ....  adapter: ${r.adapter}; one ${HH} x ${WW} pass ${r.ms.toFixed(0)} ms (SwiftShader's, a JIT's cost and not a GPU's)`);
 } catch (e) { ok("!! the device section ran to its end", false, String(e && e.message || e).slice(0, 200)); }
 
+// ROUND 50 (section 120): the network table -- NETWORKS names exactly the two exported files, both tables are empty and frozen, a key
+// either table does not name runs the shipped network, a fixture table's entry is honoured, and an unknown name is refused
+{
+    const refuse = (f) => { try { f(); return false; } catch (e) { return /no network "nope" -- the networks are shipped, w16/.test(e.message); } };
+    ok("!! round 50: NETWORKS names the shipped and w16 files; PAGE_ and NATIVE_NETWORKS_BY_ADAPTER are empty and frozen, so every key runs the shipped network; a fixture table's entry is honoured and an unknown name refused",
+        JSON.stringify(NETWORKS) === JSON.stringify({ shipped: "render/denoise-net-r11.json", w16: "render/denoise-net-r47-w16.json" }) &&
+        Object.keys(PAGE_NETWORKS_BY_ADAPTER).length === 0 && Object.keys(NATIVE_NETWORKS_BY_ADAPTER).length === 0 && Object.isFrozen(PAGE_NETWORKS_BY_ADAPTER) && Object.isFrozen(NATIVE_NETWORKS_BY_ADAPTER) &&
+        ["Windows/intel/gen-9", "Windows/nvidia/pascal", null].every((k) => pageNetworkFor(k) === "shipped") && ["win32/intel/gen-9", "win32/nvidia/pascal", null].every((k) => nativeNetworkFor(k) === "shipped") &&
+        pageNetworkFor("Windows/intel/gen-9", { "Windows/intel/gen-9": "w16" }) === "w16" && nativeNetworkFor("win32/intel/gen-9", { "win32/intel/gen-9": "w16" }) === "w16" &&
+        networkFile("w16") === NETWORKS.w16 && refuse(() => networkFile("nope")) && refuse(() => pageNetworkFor("k", { k: "nope" })) &&
+        Object.values(NETWORKS).every((f) => fs.existsSync(path.join(ENG, f))),
+        JSON.stringify(NETWORKS));
+}
+
 console.log("\n4. THE PAGE, IN CHROMIUM: denoise.html ON ITS OWN DEVICE");
 {
     // the page itself, in an iframe at the engine's origin: family C, a seed outside every split, a 64-sample reference;
@@ -1212,6 +1227,34 @@ console.log("\n4. THE PAGE, IN CHROMIUM: denoise.html ON ITS OWN DEVICE");
         ok("  ...and it refuses a round 11 test seed before rendering it, and says above everything that it covers R and C only",
             /35000 belongs to the arc's dataset and is refused/.test(R.refused?.status || "") && /only those/.test(R.scope || "") && /not<\/b>|not trained on/.test(R.scope || ""),
             (R.refused?.status || "").slice(0, 100));
+        // round 50 (section 120): with no ?net= and an empty network table, the page runs the shipped network and says so
+        ok("  round 50: ...and with no ?net= the page runs the shipped network and names it -- PAGE_NETWORKS_BY_ADAPTER is empty, so no adapter's key changes it",
+            /network shipped(?! \()/.test(run.cap || "") && Object.keys(PAGE_NETWORKS_BY_ADAPTER).length === 0 && pageNetworkFor(R.key) === "shipped", (run.cap || "").slice(0, 160));
+    }
+    // ROUND 50: ?net=w16 runs the w16 network on the page's device, held to that network's f64 image as the page holds the shipped one;
+    // ?net=nope is refused by name before anything runs
+    const r50 = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 180000, args: { seed: 991235 }, script: `async (a) => {
+        const out = {};
+        for (const q of ["?net=w16", "?net=nope"]) {
+            const f = document.createElement("iframe"); f.style.width = "1200px"; f.style.height = "900px"; f.src = "/denoise.html" + q; document.body.appendChild(f);
+            await new Promise((r) => f.onload = r);
+            const d = f.contentDocument, $ = (id) => d.getElementById(id), wait = (ms) => new Promise((r) => setTimeout(r, ms));
+            for (let i = 0; i < 100 && !$("go"); i++) await wait(50);
+            $("family").value = "R"; $("seed").value = String(a.seed); $("refspp").value = "64"; $("status").textContent = "idle"; $("go").click();
+            const t = Date.now();
+            while (Date.now() - t < 100000) { const s = $("status").textContent; if (/rendered in|failed|refused/.test(s)) break; await wait(100); }
+            out[q] = { status: $("status").textContent, cap: $("netCap").textContent };
+            f.remove();
+        }
+        return out;
+    }` });
+    if (r50.skipped) console.log("  SKIP  " + r50.reason);
+    else {
+        const W = (r50.result || {})["?net=w16"] || {}, N = (r50.result || {})["?net=nope"] || {}, m = /worst relative difference ([0-9.e+-]+)/.exec(W.status || ""), wd = m ? Number(m[1]) : NaN;
+        ok("!! round 50: denoise.html?net=w16 runs the w16 network on its device, names it as asked, and its image is that network's f64 image within f32 rounding; ?net=nope is refused by name",
+            r50.ok && /on the device/.test(W.cap || "") && /network w16 \(asked by \?net=\)/.test(W.cap || "") && wd < 1e-5 &&
+            /failed: denoiseDevice: no network "nope" -- the networks are shipped, w16/.test(N.status || ""),
+            `${(W.cap || "").slice(0, 120)}; worst ${wd}; nope: ${(N.status || "").slice(0, 100)}`);
     }
 }
 

@@ -8163,3 +8163,61 @@ Each must turn at least one row red.
 the rows were widened before the sabotages ran, so that R2 and R4 could be seen:
 - the device row asks for r18u wherever the compiler builds it;
 - the ladder row asks that its network is the w16 shape and includes r18u wherever the shipped ladder ran it.
+
+## 120. ROUND 50 -- A NETWORK TABLE BESIDE THE KERNEL TABLES, EMPTY UNTIL H49 FILLS IT: FIXED BEFORE ITS CODE
+
+**Why now.** Keith's choice (section 119): the w16 network on the Intel gen-9 only. If H49 holds, the Intel's entries run it.
+That needs what the arc has for kernels and not for networks: a table by adapter key that the page and the native caller each
+read. This round builds that table empty. **No entry moves here.** Section 119's verdict fills the Intel's two entries by
+H49's rule, or leaves them empty. The round measures nothing new, and it is fixed here before its code.
+
+**What changes, in `render/denoiseDevice.mjs`:**
+- **`NETWORKS`** names the arc's two exported networks by name: `shipped` is `render/denoise-net-r11.json`, and `w16` is
+  `render/denoise-net-r47-w16.json`.
+- **`PAGE_NETWORKS_BY_ADAPTER = {}` and `NATIVE_NETWORKS_BY_ADAPTER = {}`**, keyed as the kernel tables are, by
+  `pageAdapterKey` and `nativeAdapterKey`. Both are empty this round.
+- **`pageNetworkFor(key, table)` and `nativeNetworkFor(key, table)`** return the table's name for the key, else `shipped`.
+  An unknown name is refused by name.
+
+**What changes on the page (`denoise.html`):**
+- **The page reads its adapter key before it loads a network**, and loads the file `pageNetworkFor` names. With the table
+  empty, that is always the shipped network's file, as today.
+- **The page says which network it runs**, beside the kernel set it already names.
+- **A query parameter, `?net=w16`,** loads the named network whatever the table says. It is for the gates and the rig, so
+  the page's own timing ladder can time the w16 network before any entry names it. An unknown name is refused on the page,
+  by name.
+
+**What changes in the gates.**
+- The timing gate drives the page's ladder a second time with `?net=w16`, on the sets the page tables use. Its
+  `page: w16 against the shipped network on <set> at W x H` lines are tagged section 120 and reported beside section 119's
+  native ones.
+- On the Intel, the rig's runs at a commit carrying this section give H49's page path too. H49's rule stays native, as
+  section 119 fixed it, so the page figures are reported and decide nothing until the verdict reads them beside the native
+  ones.
+
+**The rows:**
+1. `NETWORKS` names exactly the two files. Both tables are empty and frozen. Each function returns `shipped` for every key,
+   names a fixture table's entry when it is in it, and refuses an unknown name.
+2. The page with no parameter loads the shipped network and says so. With `?net=w16` it loads the w16 file and says so,
+   and its denoise image is the w16 network's: section 119's device key on the page. With `?net=nope` it refuses by name.
+3. The page's ladder under `?net=w16` times the w16 network. The pass's buffers are the w16 network's size, so the ladder
+   cannot secretly time the shipped one.
+4. Nothing else moves: every kernel table, every set, the chain, `fx/fsr`.
+
+**Sabotages, by the byte-safe runner (S1-S5):**
+- a table shipped with the Intel's entry filled;
+- `pageNetworkFor` ignoring its table;
+- the page loading the shipped file whatever it is asked;
+- `?net=` accepting an unknown name;
+- the page ladder timing the shipped network under `?net=w16`.
+
+Each must turn at least one row red.
+
+**The rule.** The round holds when rows 1-4 pass on SwiftShader and every gate stays as green as it was. No rig run is
+owed of its own. The Intel runs owed to section 119 serve it if they are made at a commit carrying both sections.
+
+**Before commit.**
+- Every row passed on its first run here.
+- On the page, the w16 network's image was within 8.9e-7 of its f64 image.
+- The page's ladder under `?net=w16` timed it on r15, r18t and r18u, by name and by its 9,793 parameters.
+- S1-S5 each turned rows red and were restored byte-identical: S1 2, S2 1, S3 2, S4 2, S5 2.

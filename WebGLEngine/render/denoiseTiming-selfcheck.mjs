@@ -642,6 +642,32 @@ console.log("\n3. THE PAGE: denoise.html's \"Time the network\", in Chromium (on
             ok("  round 18: the page's report carries its adapter's key -- platform, vendor and architecture -- or says it has none", "pageKey" in L &&
                 (L.pageKey === null || /^[^/]+\/[^/]+\/[^/]*$/.test(L.pageKey)), String(L.pageKey));
             ok("  the page and the harness agree on what the device is", r.software === null || L.adapter.software === r.software, `harness says ${r.software ? "software" : "hardware"}`);
+            ok("  round 50: the page's ladder ran the shipped network, by name and by size, with no ?net= asked",
+                L.network === "shipped" && L.params === 33329, `${L.network}, ${L.params} parameters`);
+        }
+        // ROUND 50 (section 120): the page's ladder again, on the w16 network (?net=w16), on the sets the page tables use -- set against
+        // the shipped network's page ladder above, on the same set at every size both measured; reported, deciding nothing
+        if (L) {
+            const sets16 = ["r15", "r18t", "r18u"].filter((s2) => L.sets.includes(s2));
+            const r2 = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 600000, args: { q: `?net=w16&sets=${sets16.join(",")}` }, script: `async (a) => {
+                const f = document.createElement("iframe"); f.style.width = "1200px"; f.style.height = "900px"; f.src = "/denoise.html" + a.q; document.body.appendChild(f);
+                await new Promise((r) => f.onload = r);
+                const d = f.contentDocument, $ = (id) => d.getElementById(id), wait = (ms) => new Promise((r) => setTimeout(r, ms));
+                for (let i = 0; i < 100 && !$("time"); i++) await wait(50);
+                $("time").click();
+                const t = Date.now();
+                while (Date.now() - t < 590000 && ($("time").disabled || !$("timeJson").textContent) && !/failed|no WebGPU/.test($("timeStatus").textContent)) await wait(100);
+                return { status: $("timeStatus").textContent, json: $("timeJson").textContent };
+            }` });
+            let L2 = null; try { L2 = JSON.parse(r2.result?.json || "null"); } catch {}
+            if (r2.skipped) console.log("  SKIP  " + r2.reason);
+            else {
+                const vs = L2 ? sets16.flatMap((s2) => (L2.rows[s2] || []).map((b) => [s2, b, (L.rows[s2] || []).find((a2) => a2.W === b.W && a2.H === b.H)]).filter(([, b, a2]) => a2 && !a2.skipped && !b.skipped)) : [];
+                for (const [s2, b, a2] of vs) say(vsSetLine("page", "w16", `the shipped network on ${s2}`, b, a2, "section 120"));
+                ok("!! round 50: the page's ladder under ?net=w16 timed the w16 network -- by name and by its 9,793 parameters -- on exactly the sets asked, each set against the shipped network's page ladder",
+                    r2.ok && !!L2 && /^w16 \(asked by \?net=\)$/.test(L2.network) && L2.params === 9793 && L2.sets.join() === sets16.join() && vs.length >= sets16.length && !r2.pageErrors.length,
+                    L2 ? `${L2.network}, ${L2.params} parameters, sets ${L2.sets.join(", ")}; ${vs.length} sizes compared` : (r2.reason || (r2.result || {}).status || "no result"));
+            }
         }
     }
 }

@@ -734,6 +734,8 @@ node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r49-b.json
   Expect the timing gate to take about a minute longer.
 - **Section 119 predicts** 2.5-3.5 x at 1920 x 1080 on r18u, so H49 holds.
 - On the 1080, one run is optional.
+- **Round 50 (section 120) rides the same two runs** if they are made at a commit carrying it. The timing gate's page
+  ladder then times the w16 network too, adding `page: w16 against the shipped network` lines tagged section 120.
 
 ## Send back
 

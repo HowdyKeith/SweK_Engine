@@ -420,6 +420,21 @@ export const pageKernelsFor = (key, table = PAGE_KERNELS_BY_ADAPTER) => (key && 
  * Every FXC run, and every adapter the table does not name, gets DEFAULT_KERNELS from nativeKernelsFor.
  */
 export const NATIVE_KERNELS_BY_ADAPTER = Object.freeze({ "win32/intel/gen-9": "r18u", "win32/nvidia/pascal": "r18t" });
+/**
+ * Round 50 (section 120): THE NETWORK A DEVICE RUNS, by adapter key, beside the kernel tables. NETWORKS names the arc's two exported
+ * networks; each table names a network for a key, and a key it does not name runs the shipped one. Both tables are EMPTY in this
+ * round: section 119's verdict fills the Intel gen-9's two entries with "w16" by H49's rule, or leaves them empty.
+ */
+export const NETWORKS = Object.freeze({ shipped: "render/denoise-net-r11.json", w16: "render/denoise-net-r47-w16.json" });
+export const PAGE_NETWORKS_BY_ADAPTER = Object.freeze({});
+export const NATIVE_NETWORKS_BY_ADAPTER = Object.freeze({});
+const networkName = (name) => { if (!Object.hasOwn(NETWORKS, name)) throw new Error(`denoiseDevice: no network "${name}" -- the networks are ${Object.keys(NETWORKS).join(", ")}`); return name; };
+/** The network denoise.html runs for an adapter's key (pageAdapterKey): its table's name, else "shipped". */
+export const pageNetworkFor = (key, table = PAGE_NETWORKS_BY_ADAPTER) => networkName(key && Object.hasOwn(table, key) ? table[key] : "shipped");
+/** The network a native run takes for its adapter's key (nativeAdapterKey): its table's name, else "shipped". */
+export const nativeNetworkFor = (key, table = NATIVE_NETWORKS_BY_ADAPTER) => networkName(key && Object.hasOwn(table, key) ? table[key] : "shipped");
+/** A network's file, by name, refusing an unknown one -- what the page fetches for `?net=`. */
+export const networkFile = (name) => NETWORKS[networkName(name)];
 /** Which pre-registration's verdict put each entry in the table -- the reason nativePick prints names it. */
 export const NATIVE_KERNELS_DECIDED_BY = Object.freeze({ "win32/intel/gen-9": "section 67", "win32/nvidia/pascal": "section 78" });
 /** A native adapter's key: "<platform>/<vendor>/<architecture>", the platform Node's (process.platform), so "win32/nvidia/pascal". */

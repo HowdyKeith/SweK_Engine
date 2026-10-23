@@ -121,7 +121,7 @@ import { emitterCoverage, withMask } from "/render/denoiseMask.mjs";
 import { jointBilateral } from "/render/denoiseFilter.mjs";
 import { relMSE } from "/render/denoiseStats.mjs";
 import { denoise } from "/render/denoiseNet.mjs";
-import { decodeNet, createDeviceDenoiser, timingLadder, TIMED_SETS, PAGE_KERNELS_BY_ADAPTER, pageAdapterKey, pageKernelsFor } from "/render/denoiseDevice.mjs";
+import { decodeNet, createDeviceDenoiser, timingLadder, TIMED_SETS, PAGE_KERNELS_BY_ADAPTER, pageAdapterKey, pageKernelsFor, PAGE_NETWORKS_BY_ADAPTER, pageNetworkFor, networkFile } from "/render/denoiseDevice.mjs";
 import { VARIANTS, jobFor, measure } from "/render/denoiseCompile.mjs";
 import { describeWebGPU, showOriginBanner } from "/ui/webgpuProbe.mjs";
 import { requestDevice } from "/gfx/device.js";
@@ -149,13 +149,18 @@ const randomSeed = () => { let s; do { s = 990000 + Math.floor(Math.random() * 9
 $("seed").value = randomSeed();
 $("reseed").onclick = () => { $("seed").value = randomSeed(); };
 
-let shipped = null, net = null, device = null, denoiser = null, deviceNote = "";
-// the shipped network, once; a response that is not ok says so instead of being parsed as one
+let shipped = null, net = null, netName = null, device = null, denoiser = null, deviceNote = "";
+// the network, once (round 50, section 120): ?net=<name> names it -- for the gates and the rig -- else PAGE_NETWORKS_BY_ADAPTER by this
+// adapter's key, else the shipped one. An unknown name is refused by name; a response that is not ok says so instead of being parsed
 async function loadNet() {
     if (shipped) return;
-    const res = await fetch("/render/denoise-net-r11.json");
+    const asked = new URLSearchParams(location.search).get("net");
+    let name = asked;
+    if (!name) { const a = navigator.gpu ? await navigator.gpu.requestAdapter() : null; name = pageNetworkFor(pageAdapterKey(a && a.info, navigator.userAgentData)); }
+    const file = networkFile(name);
+    const res = await fetch("/" + file);
     if (!res.ok) throw new Error(`the network did not load: ${res.status} ${res.statusText}`);
-    shipped = await res.json(); net = decodeNet(shipped.net);
+    shipped = await res.json(); net = decodeNet(shipped.net); netName = name + (asked ? " (asked by ?net=)" : "");
 }
 async function setup() {
     if (!shipped) { status("loading the network..."); await loadNet(); }
@@ -170,8 +175,9 @@ async function setup() {
         const info = adapter.info || {}, key = pageAdapterKey(info, navigator.userAgentData), kernels = pageKernelsFor(key);
         denoiser = await createDeviceDenoiser(device, net, { H: N, W: N, C: 10, kernels });
         deviceNote = "on the device" + ([info.vendor, info.architecture].filter(Boolean).length ? " (" + [info.vendor, info.architecture].filter(Boolean).join(" / ") + ")" : "") +
-                     `, kernels ${kernels}` + (key && Object.hasOwn(PAGE_KERNELS_BY_ADAPTER, key) ? ` (section 61's for ${key})` : "");
-    } catch (e) { denoiser = null; deviceNote = "on the CPU -- " + e.message; }
+                     `, kernels ${kernels}` + (key && Object.hasOwn(PAGE_KERNELS_BY_ADAPTER, key) ? ` (section 61's for ${key})` : "") +
+                     `, network ${netName}` + (key && Object.hasOwn(PAGE_NETWORKS_BY_ADAPTER, key) ? ` (the table's for ${key})` : "");
+    } catch (e) { denoiser = null; deviceNote = `on the CPU, network ${netName} -- ` + e.message; }
 }
 
 $("go").onclick = async () => {
@@ -216,7 +222,10 @@ $("time").onclick = async () => {
         // the sets take turns (round 18: r12, r15 and its two candidates; v4868, round 27: and r27w), so the ladder gets 300 s rather than the default 120;
         // the report carries the adapter's key, which section 61's rule fills PAGE_KERNELS_BY_ADAPTER by
         const a0 = await navigator.gpu.requestAdapter(), pageKey = pageAdapterKey(a0 && a0.info, navigator.userAgentData);
-        const r = await timingLadder(net, () => navigator.gpu.requestAdapter(), { sets: TIMED_SETS, totalMs: 300000 });
+        // round 50: ?sets=a,b,... narrows the ladder to those of TIMED_SETS, for the gates' second ladder on another network
+        const askedSets = (new URLSearchParams(location.search).get("sets") || "").split(",").filter(Boolean), sets = askedSets.length ? TIMED_SETS.filter((x) => askedSets.includes(x)) : TIMED_SETS;
+        if (askedSets.length && sets.length !== askedSets.length) throw new Error(`?sets= names ${askedSets.join(", ")}; the page times ${TIMED_SETS.join(", ")}`);
+        const r = await timingLadder(net, () => navigator.gpu.requestAdapter(), { sets, totalMs: 300000 });
         const tb = $("timeTable").querySelector("tbody"), td = (t, left) => `<td style="padding:2px 10px;text-align:${left ? "left" : "right"}">${t}</td>`;
         const A = r.sets[0], rest = r.sets.slice(1), last = r.sets[r.sets.length - 1];
         const ms = (x) => (x.skipped ? `<span style="color:#7e9a92">skipped: ${x.reason}</span>` : (x.gpu ? x.gpu.median : x.wall.median).toFixed(2));
@@ -231,8 +240,9 @@ $("time").onclick = async () => {
         }).join("");
         $("timeTable").style.display = "";
         $("timeStatus").textContent = `${r.adapter.name}${r.adapter.software ? " -- A SOFTWARE ADAPTER: these are a CPU's times, not a GPU's" : ""}` +
-            `; timing left the image unchanged: ${r.sets.map((s) => s + " " + r.invisible[s]).join(", ")}; this adapter's key: ${pageKey || "none (no platform reported)"}`;
-        $("timeJson").textContent = JSON.stringify({ ...r, pageKey });
+            `; timing left the image unchanged: ${r.sets.map((s) => s + " " + r.invisible[s]).join(", ")}; this adapter's key: ${pageKey || "none (no platform reported)"}; network ${netName}`;
+        // round 50: the network the ladder timed, by name and by its parameter count, so a gate can see which one ran
+        $("timeJson").textContent = JSON.stringify({ ...r, pageKey, network: netName, params: net.layers.reduce((a, L) => a + L.W.length + L.b.length, 0) });
     } catch (e) { $("timeStatus").textContent = "failed: " + e.message; }
     finally { $("time").disabled = false; }
 };
