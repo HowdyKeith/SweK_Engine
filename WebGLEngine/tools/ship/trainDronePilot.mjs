@@ -105,7 +105,7 @@ export function searchOne(opts, k) {
     // `--slice N` trains on every Nth training scenario: a SMALL recipe for trying the machinery (the gate's children use it); `opts.trainSet` is the same for a caller with its own set; neither given is TRAIN_SET. A sliced recipe is never written (command()).
     const trainSet = opts.trainSet || (opts.slice > 1 ? DT.TRAIN_SET.filter((_, i) => i % opts.slice === 0) : undefined);
     // `--guard G`: the search's objective is the training score, worth -Infinity once the mean on hover, recovery or go-to falls more than G below the hand pilot's (brain/droneTask.mjs guarded): the first retrain bought its motor-out gain with those kinds, on the training scenarios too
-    const P = brainOf(opts).policy, seed = opts.seed + k, objective = opts.guard != null ? DT.guarded(P.evaluate(P.handWeights(), trainSet || DT.TRAIN_SET), opts.guard) : null;
+    const P = opts.searchPolicy || brainOf(opts).policy, seed = opts.seed + k, objective = opts.guard != null ? DT.guarded(P.evaluate(P.handWeights(), trainSet || DT.TRAIN_SET), opts.guard) : null;
     const found = P.train({ seed, iters: opts.iters, sigma: opts.sigma, maxK: opts.maxK, trainSet, objective }), out = P.prune(found.weights, { trainSet, objective });
     return { k, seed, weights: out.weights, trainScore: out.trainScore, improved: found.improved, neutral: found.neutral, moved: out.moved, kept: out.kept };
 }
