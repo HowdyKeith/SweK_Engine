@@ -206,7 +206,7 @@ export const CENSUS_AT_V4479 = Object.freeze({
     negated: 2,         // "rather than in its own round": says the opposite
     satisfied: 8,       // v4884: 5 -> 8 at the merge. marked SETTLED adjacent to the claim -- 2 before this round, 5 after
     antidote: 5,        // an ANTIDOTE block: a deferral that IS watched, which is the state to want more of
-    undecided: 215,     // v4895: 214 -> 215, one more undecided phrase in this round's notes (the 6DOF page's balance comment or a module header naming what is not done), re-derived. v4884: 118 -> 213, RE-DERIVED at the merge of long-silence-elements-check into a tree 400 versions on; the class names above are v4479's reading and these three moved with the tree, as the header says they are supposed to
+    undecided: 214,     // v4896: 215 -> 214, the sixdof-retrain-at-damage-6 entry closed (an open "may want re-weighting" became a stated NOT CHECKED), re-derived from the gate's own reading. v4895: 214 -> 215, one more undecided phrase in this round's notes (the 6DOF page's balance comment or a module header naming what is not done), re-derived. v4884: 118 -> 213, RE-DERIVED at the merge of long-silence-elements-check into a tree 400 versions on; the class names above are v4479's reading and these three moved with the tree, as the header says they are supposed to
     undecidedFiles: 174,
     // *** WHAT THE ROUND FOUND BY HAND, WHICH IS WHY THE UNDECIDED NUMBER MATTERS. *** Two files were opened
     // and THREE stale notes came out, two of them in one paragraph. Each was settled within four rounds of
