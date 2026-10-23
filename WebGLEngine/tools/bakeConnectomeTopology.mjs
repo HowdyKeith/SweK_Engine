@@ -51,6 +51,8 @@ function argVal(flag) {
 function bake() {
     const inArg = argVal("--in"), outArg = argVal("--out"), circuitName = argVal("--circuit-name") || "circuit";
     const includeTypesArg = argVal("--include-types");
+    // --source-label "<text>": the header's "Source:" line and the pointer to the provenance file, for a circuit that is NOT from the fly's male-cns (the default text names Janelia FlyEM's male-cns and Neuprint, and is byte-for-byte what it always was)
+    const sourceLabel = argVal("--source-label"), provenance = argVal("--provenance");
     if (!inArg || !outArg) {
         console.error("bakeConnectomeTopology: --in <vendored json> and --out <brain/*Topology.mjs> are required");
         process.exit(1);
@@ -95,10 +97,10 @@ function bake() {
     const body = `// WebGLEngine/${path.relative(ROOT, OUT_PATH).replace(/\\/g, "/")}
 //
 // BAKED by tools/bakeConnectomeTopology.mjs from ${path.relative(ROOT, IN_PATH).replace(/\\/g, "/")} -- do not hand-edit.
-// Source: Janelia FlyEM's male-cns connectome (dataset ${JSON.stringify(data.dataset)}), ${circuitName}.
-// Full citation and fetch method: vendor/male-cns/PROVENANCE.md.
+// Source: ${sourceLabel ? `${sourceLabel} (dataset ${JSON.stringify(data.dataset)}), ${circuitName}.` : `Janelia FlyEM's male-cns connectome (dataset ${JSON.stringify(data.dataset)}), ${circuitName}.`}
+// Full citation and fetch method: ${provenance || "vendor/male-cns/PROVENANCE.md"}.
 //
-// NEURON_ORDER[i] is the real Neuprint bodyId of hidden unit i in this circuit's masked-recurrent core -- a
+// NEURON_ORDER[i] is the real ${sourceLabel ? "neuron id (the source's own)" : "Neuprint bodyId"} of hidden unit i in this circuit's masked-recurrent core -- a
 // hidden unit's identity is a real, citable neuron, not an anonymous slot. EDGES are [toIdx, fromIdx] pairs
 // (target index first, source index second) into NEURON_ORDER: a consuming policy's recurrent weight vector
 // has exactly one trainable entry per edge here, in this order, and every other (row, col) of the expanded
