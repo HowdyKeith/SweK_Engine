@@ -15,7 +15,27 @@
 //   6  THE ZERO WEIGHTS fall (thrust 0), noise is deterministic for a seed and scales with sigma, and a noisy pilot flies worse than the hand pilot
 //   7  THE TRAINING FUNCTIONS: a sparse mutation moves one to maxK weights and is deterministic for a seed; a search never ends lower than it started on its own set and is deterministic; prune puts every weight that does not matter back to the hand pilot's, a block at a time
 //
-// SABOTAGE LOG: (filled in below once run)
+// SABOTAGE LOG (each applied to brain/pilotDronePolicy.mjs in a scratch copy, the gate run on the copy, the copy discarded; the number is how many rows went red): 84 mutants, 82 red and TWO EQUIVALENT, said plainly. 50 are the
+//   helicopter policy gate's mutants written again for this module's text (the P, F, G and other series: the hand weights' coefficients, the features, the forward
+// pass, the recurrent core, the training functions and prune's group testing), 34 were written for this module (the D series: the quadrotor's own feature indices and scales, the failed-corner features, the two attitude
+//   authorities, the clamps).
+// FOUR THINGS WERE FOUND: F16 and F17 (the features, and the pilot, dropping the options handed to them) WENT 0 RED -- the gate never called a pilot with options, the same finding as the MLP gate's M13 -- and the
+//   options-reach-the-features row was written for them; D09 and D10 are the two equivalent mutants (the pitch and roll authorities taken from each other's axis: the default airframe, which handWeights() reads, has equal roll and
+//   pitch inertia, so nothing can tell them apart; the same mutant in the hand pilot, which takes a model, is held there by an airframe with the pitch inertia doubled).
+//   P07 readout pair not negated 8; P08 input pair's second channel not negated 9; F01 pitch error scale /0.2 5; F06 height scale /25 1; F08 speed along the nose uses the wrong sign 1; F09 speed to the right sign 3; F10 bank
+//   scale /1 1; F11 pitch scale /1 1; F12 heading error over 2 pi 1; F15 NaN features not zeroed 1; F16 features ignore the options 1; F17 pilot ignores the options 1; F18 heading error not wrapped by the pilot's feature (sign)
+//   1; F19 climb error scale /10 4; N01 collective clamped to [-1, 1] 3; N02 pitch clamp removed 2; N03 two recurrent steps 4; N04 recurrent identity removed in the edge pass 11; N05 synapses read source-first 4; N06 non-finite
+//   output not guarded 1; N07 readout bias read one off 3; N08 no relu after a recurrent step 1; N09 the last synapse dropped 1; N10 the twin's memo never invalidated 1; N11 the twin's recurrent matrix transposed 2; N12 a NaN
+//   input feature not zeroed 1; N13 the twin's recurrent identity removed 1; N14 the input bias read one off 2; O01 noise doubled 1; O02 the zero weights shared 9; O03 mutation ignores maxK 1; O04 mutation moves one more 1; O05
+//   search accepts worse children 1; O06 search never counts an improvement 1; O07 prune keeps a revert that costs 2; O08 prune does not repeat 1; O09 prune never reverts 2; O10 search ignores its start 1; O11 evaluate defaults
+//   to the held-out set 1; O12 train defaults to the held-out set 1; O13 search history not opened at the start score 3; O14 train ignores its seed 1; G01 group phase accepts every block 2; G02 group phase never accepts a block
+//   3; G03 group phase drops the second half 2; G04 group phase drops the first half 1; G05 a failed block is not restored 2; G06 group phase is skipped 3; G07 group phase does not update the best score 1; G08 group phase
+//   restores the wrong values 2; D01 thrust climb coefficient 1x kVs 5; D02 thrust feed-forward weight 0.9 5; D03 pitch error coefficient doubled 5; D04 pitch rate sign 5; D05 bank error coefficient halved 5; D06 roll rate sign
+//   5; D07 yaw coefficient doubled 6; D08 gain overrides ignored 1; D09 pitch authority taken from the roll axis 0 [EQUIVALENT]; D10 roll authority taken from the pitch axis 0 [EQUIVALENT]; D11 pitch rate scale 0.25 4; D12 pitch
+//   rate clamp 5 3; D13 bank error clamp 4 3; D14 yaw-rate error sign 5; D15 climb scale 10 4; D16 height scale 25 1; D17 failedLeft reads failedFront 1; D18 failedFront reads failedLeft 1; D19 speed along the nose, sign of the
+//   sideways part 1; D20 speed to the right, sign of the forward part 1; D21 bank feature scale 1 1; D22 pitch feature scale 1 1; D23 heading error not over pi 1; D24 motor-out flag inverted 2; D25 no bias feature 2; D26 point
+//   ahead scale 10 1; D27 point to the right reads the point ahead 1; D28 yaw rate feature sign 1; D29 thrust clamped to [-1, 1] 3; D30 the recurrent step drops the identity 11; D31 two recurrent steps 4; D32 first-layer bias
+//   read one off 2; D33 negative channel read back at 0.9 8; D34 negative channel carries the same sign 9.
 "use strict";
 import * as PP from "./pilotDronePolicy.mjs";
 import * as AD from "./autopilotDrone.mjs";
