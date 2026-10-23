@@ -115,7 +115,19 @@ console.log("\n5. THE BRAIN FILE AND THE FRONT DOOR");
     ok("!! A BRAIN FILE FOR THE TRAINER'S MLP, AND ONE FOR THE JET'S FRUIT FLY, ARE REFUSED BY THIS IMPORTER BY NAME, and this brain's file is refused by the trainer's MLP's importer (the same 1,796 weights mean different things in the two: a jet's file in a trainer's pilot flies it into the ground)", !a.ok && /pilotFlightMlp/.test(a.reason) && !b.ok && /pilotJetPolicy/.test(b.reason) && !c.ok && /pilotJetMlp/.test(c.reason), `${a.reason} | ${b.reason}`);
     const L = M.reportLines();
     ok("the front door names the module, the layer sizes and the 1,796 weights, says that 43 are not zero, and no line says NaN or undefined", L.length === 2 && /pilotJetMlp/.test(L[0]) && /18 -> 32 -> 32 -> 4/.test(L[0]) && /1796 weights/.test(L[0]) && /43 of 1796 non-zero/.test(L[1]) && !L.some((l) => /NaN|undefined/.test(l)), L[1]);
-    ok("the export list is pinned", Object.keys(M).sort().join(",") === "FEATURES,FEATURE_NAMES,HIDDEN,JET_GAINS,LAYER_SIZES,OUTPUTS,OUTPUT_NAMES,WEIGHT_COUNT,WIDTH,controlsOf,features,featuresFrom,forward,handWeights,layersOf,pilotFor,raw,reportLines,zeroWeights", Object.keys(M).sort().join(","));
+    ok("the export list is pinned", Object.keys(M).sort().join(",") === "FEATURES,FEATURE_NAMES,HIDDEN,JET_GAINS,LAYER_SIZES,OUTPUTS,OUTPUT_NAMES,WEIGHT_COUNT,WIDTH,controlsOf,features,featuresFrom,forward,handWeights,layersOf,mutate,perturb,pilotFor,raw,reportLines,zeroWeights", Object.keys(M).sort().join(","));
+}
+
+console.log("\n6. THE SEARCH'S MOVES (brain/dogfightTrain.mjs asks a policy for them)");
+{
+    const mul = (a) => () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+    const hw = M.handWeights(), diff = (a, b) => { let n = 0; for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) n++; return n; };
+    ok("!! mutate and perturb are the trainer MLP's own moves (the same functions), and a policy that has them can be searched by dogfightTrain.trainWith", M.mutate === PM.mutate && M.perturb === PM.perturb && typeof M.mutate === "function" && typeof M.perturb === "function");
+    const ms = [1, 2, 3, 4, 5, 6].map((k) => M.mutate(hw, 0.3, mul(k), 4));
+    ok("!! mutate moves between one and maxK (4) weights and leaves the rest and the weight count alone, from the hand weights: a sparse move, the search's unit",
+        ms.every((m) => m.length === 1796 && diff(m, hw) >= 1 && diff(m, hw) <= 4) && ms.some((m) => diff(m, hw) > 1), ms.map((m) => diff(m, hw)).join(","));
+    ok("mutate is deterministic for a seed and different for another, and it does not write into the weights it is given", M.mutate(hw, 0.3, mul(7), 4).every((v, i, a) => v === M.mutate(hw, 0.3, mul(7), 4)[i]) && diff(M.mutate(hw, 0.3, mul(7), 4), M.mutate(hw, 0.3, mul(8), 4)) > 0 && diff(hw, M.handWeights()) === 0);
+    ok("perturb moves every weight of a zero vector a little (sigma 0.3: standard deviation between 0.2 and 0.4) and is deterministic for a seed", (() => { const p = M.perturb(M.zeroWeights(), 0.3, mul(3)), q = M.perturb(M.zeroWeights(), 0.3, mul(3)); let s2 = 0; for (const v of p) s2 += v * v; const sd = Math.sqrt(s2 / p.length); return diff(p, q) === 0 && sd > 0.2 && sd < 0.4 && p.filter((v) => v !== 0).length > 1700; })());
 }
 
 console.log(fails ? `\npilotJetMlp-selfcheck: ${fails} FAILED` : "\npilotJetMlp-selfcheck: all checks pass");

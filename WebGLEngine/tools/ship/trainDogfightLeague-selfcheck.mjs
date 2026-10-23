@@ -57,6 +57,11 @@ import * as AF from "../../brain/autopilotFlight.mjs";
 import * as PF from "../../brain/pilotFlightPolicy.mjs";
 import * as MF from "../../brain/pilotFlightMlp.mjs";
 import * as PB from "../../brain/peerBrain.mjs";
+import * as PJ from "../../brain/pilotJetPolicy.mjs";
+import * as PJM from "../../brain/pilotJetMlp.mjs";
+import * as JF from "../../brain/jetFight.mjs";
+import * as JLS from "../../brain/jetLeagueSets.mjs";
+import * as F from "../../physics/mechanics/flightModel6dof.mjs";
 import { weightsHash } from "../../brain/drivePolicy.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -64,6 +69,7 @@ let fails = 0;
 function ok(name, cond, detail) { console.log(`  ${cond ? "PASS" : "FAIL"}  ${name}${detail ? "   " + detail : ""}`); if (!cond) fails++; }
 const sec = (t) => console.log("\n" + t);
 const throws = (fn) => { try { fn(); return null; } catch (e) { return e.message; } };
+const near = (a, b, tol) => Math.abs(a - b) <= tol;
 const same = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
 const KINDS = D.KINDS;
 
@@ -331,6 +337,56 @@ sec("10. THE THREE SMALL DOORS: brainOf, loadFile, cacheKey");
     ok("!! cacheKey IS A FUNCTION OF EXACTLY THE RECIPE: it is one JSON string, the same for the same inputs, it moves with each of the nine things a search's weights are a function of (the search number, the brain, the seed, the iterations, sigma, maxK, smoke, the shipped fighter's hash and the other brain's hash), and it does not move with the cache directory, the worker count, the run count or --write",
         typeof k0 === "string" && JSON.parse(k0).brain === "fly" && k0 === key({ ...o }) && moved.every(([, v]) => v !== k0) && new Set([k0, ...moved.map(([, v]) => v)]).size === 10
         && key({ ...o, cache: "/c", workers: 3, runs: 9, write: true, quiet: true }) === k0, moved.filter(([, v]) => v === k0).map(([n]) => n).join() || "all nine move it");
+}
+
+sec("11. THE JETS (--aircraft jet): the same league, flown at jet scale, started from the hand weights");
+{
+    const jflyO = L.parseArgs(["--aircraft", "jet"]), jgpuO = L.parseArgs(["--aircraft", "jet", "--brain", "gpu"]), jsmoke = L.parseArgs(["--aircraft", "jet", "--smoke"]);
+    ok("!! TWO FROZEN JET BRAINS, BESIDE THE TRAINERS' AND NEVER IN THEIR TABLE: the fruit fly's and the GPU Brain's jet layouts (pilotJetPolicy / pilotJetMlp), `air` \"jet\", started from the hand weights (there is no shipped jet fighter), each with the other brain's jet layout as its `other` and no file to load, a search seed (12000 and 13000) and an output (brain/pilotJetWeightsLeague.json, brain/pilotJetMlpWeightsLeague.json) of its own; the trainers' brains say `air` \"trainer\" and BRAINS still holds exactly fly and gpu",
+        Object.isFrozen(L.BRAINS_JET) && Object.keys(L.BRAINS_JET).join() === "fly,gpu" && Object.keys(L.BRAINS).join() === "fly,gpu" && L.BRAINS.fly.air === "trainer" && L.BRAINS.gpu.air === "trainer"
+        && L.BRAINS_JET.fly.air === "jet" && L.BRAINS_JET.fly.policy === PJ && L.BRAINS_JET.fly.policyId === "pilotJetPolicy" && L.BRAINS_JET.fly.other.policy === PJM && L.BRAINS_JET.fly.other.file === null && L.BRAINS_JET.fly.seed === 12000
+        && L.BRAINS_JET.gpu.air === "jet" && L.BRAINS_JET.gpu.policy === PJM && L.BRAINS_JET.gpu.policyId === "pilotJetMlp" && L.BRAINS_JET.gpu.other.policy === PJ && L.BRAINS_JET.gpu.other.file === null && L.BRAINS_JET.gpu.seed === 13000
+        && Object.values(L.BRAINS_JET).every((b) => Object.isFrozen(b) && Object.isFrozen(b.other) && /^the jet autopilot's hand weights$/.test(b.start) && path.basename(path.dirname(b.out)) === "brain" && /^pilotJet(Mlp)?WeightsLeague\.json$/.test(path.basename(b.out)))
+        && new Set([L.BRAINS.fly.out, L.BRAINS.gpu.out, L.BRAINS_JET.fly.out, L.BRAINS_JET.gpu.out]).size === 4 && new Set([L.BRAINS.fly.seed, L.BRAINS.gpu.seed, L.BRAINS_JET.fly.seed, L.BRAINS_JET.gpu.seed]).size === 4);
+    ok("!! --aircraft CHOOSES THE TABLE, THE TRAINERS' BY DEFAULT: no --aircraft is `trainer` and the fruit fly's trainer brain with its seed 10000 and file; `--aircraft jet` is the jet brain (seed 12000, its own output; --brain gpu: 13000), explicit options still beat the defaults, a typo (`--aircraft plane`) is refused naming it, and --brain names the table's own brains in its refusal",
+        L.parseArgs([]).aircraft === "trainer" && L.parseArgs([]).seed === 10000 && jflyO.aircraft === "jet" && jflyO.brain === "fly" && jflyO.seed === 12000 && jflyO.out === L.BRAINS_JET.fly.out && jgpuO.seed === 13000 && jgpuO.out === L.BRAINS_JET.gpu.out && L.parseArgs(["--aircraft", "jet", "--seed", "5"]).seed === 5
+        && /^--aircraft must be trainer or jet, got "plane"$/.test(throws(() => L.parseArgs(["--aircraft", "plane"])) || "") && /^--brain must be one of fly, gpu, got "mouse"$/.test(throws(() => L.parseArgs(["--aircraft", "jet", "--brain", "mouse"])) || "")
+        && L.brainOf({ aircraft: "jet", brain: "gpu" }) === L.BRAINS_JET.gpu && L.brainOf({ aircraft: "trainer", brain: "gpu" }) === L.BRAINS.gpu && L.brainOf({ aircraft: "jet" }) === L.BRAINS_JET.fly && /\(known: fly, gpu\)/.test(throws(() => L.brainOf({ aircraft: "jet", brain: "mouse" })) || ""));
+    const S = (o) => L.setsOf(o);
+    ok("!! THE JET SLOTS ARE THE JETS' SETS (brain/jetLeagueSets.mjs) AND NEVER THE TRAINERS': the fruit fly's jet audits are the first block and the GPU Brain's the second, the training, held-out, pool and classic pool are shared, the reserve is the jets' bench set, --smoke points every slot at the throwaway fights at jet scale, and the trainers' slots are unmoved",
+        S(jflyO) === JLS.SETS_FLY && S(jgpuO) === JLS.SETS_GPU && S(jsmoke) === JLS.SETS_SMOKE && S(jflyO).reserve === JF.JET_BENCH_SET && S(jflyO).train === JLS.JET_LEAGUE_TRAIN_SET && S(jgpuO).audit === JLS.JET_LEAGUE_AUDIT2_SET && S(jflyO).audit === JLS.JET_LEAGUE_AUDIT_SET
+        && S(jgpuO).classicAudit === JLS.JET_AUDIT2_FIGHT_SET && S(jgpuO).safety === JLS.JET_SAFETY2_FIGHT_SET && S(jflyO).pool === S(jgpuO).pool && S(L.parseArgs([])) === L.SETS && S(L.parseArgs(["--brain", "gpu"])) === L.SETS_GPU && S(L.parseArgs(["--smoke"])) === L.SETS_SMOKE);
+    const jctx = L.contextOf(jflyO), gctx = L.contextOf(jgpuO), hwF = PJ.handWeights(), hwG = PJM.handWeights();
+    ok("!! A JET LEAGUE STARTS FROM THE HAND WEIGHTS: the start is the network's handWeights() to the bit (1,099 for the fruit fly, 1,796 for the GPU Brain), the hashes are theirs and each other's, `other` is the OTHER brain's hand twin, the autopilot member is the jet FIGHTING pilot, the sim options are the jets' (JET_OPTS), and the trainers' league carries no sim options",
+        same(Array.from(jctx.startW), Array.from(hwF)) && jctx.startW.length === 1099 && gctx.startW.length === 1796 && same(Array.from(gctx.startW), Array.from(hwG)) && jctx.hashes.start === weightsHash(hwF) && jctx.hashes.other === weightsHash(hwG) && gctx.hashes.start === weightsHash(hwG) && gctx.hashes.other === weightsHash(hwF)
+        && jctx.members.autopilot === AF.jetFightPilot && jctx.sim === JF.JET_OPTS && gctx.sim === JF.JET_OPTS && Object.keys(L.contextOf(L.parseArgs(["--smoke"]), memDir()).sim).length === 0 && jctx.brain === L.BRAINS_JET.fly);
+    const st = F.createState({ pos: [0, 0, 2000], speed: 150, heading: 0.3, pitch: 0.04, bank: 0.3, mass: JF.JET_OPTS.model.mass, inertia: JF.JET_OPTS.model.inertia }), tg = { altitude: 2100, heading: 1.0, airspeed: 160 };
+    const cA = jctx.members.autopilot(st, tg), cS = jctx.members.self(st, tg), cO = jctx.members.other(st, tg), gS = gctx.members.self(st, tg);
+    ok("!! AT THE START THE THREE MEMBERS ARE ONE PILOT TO FLOAT32: the jet autopilot, the fruit fly's hand twin (self) and the GPU Brain's (other) give the same four controls on a banked, climbing jet to 1e-4 -- which is why a first search can only find a way to beat the hand rule",
+        ["pitch", "roll", "yaw", "throttle"].every((k) => Math.abs(cA[k] - cS[k]) < 1e-4 && Math.abs(cA[k] - cO[k]) < 1e-4 && Math.abs(cA[k] - gS[k]) < 1e-4), JSON.stringify(cA));
+    const o0 = L.parseArgs(["--smoke"]), c0 = { brain: L.BRAINS.fly, hashes: { start: "aaaa1111", other: "bbbb2222" } }, k0 = L.cacheKey(o0, c0, 0), kj = L.cacheKey(L.parseArgs(["--aircraft", "jet", "--smoke"]), { ...c0, brain: L.BRAINS_JET.fly }, 0);
+    ok("!! cacheKey SEPARATES THE JETS FROM THE TRAINERS WITHOUT MOVING THE TRAINERS': a jet brain's key carries aircraft \"jet\" and is not the trainer fly's for the same recipe and hashes, while the trainers' key has no aircraft field (the searches already cached keep their keys)",
+        JSON.parse(kj).aircraft === "jet" && kj !== k0 && !("aircraft" in JSON.parse(k0)) && k0 === L.cacheKey(o0, c0, 0) && kj === L.cacheKey(L.parseArgs(["--aircraft", "jet", "--smoke"]), { ...c0, brain: L.BRAINS_JET.fly }, 0));
+    const jetSc = JLS.JET_LEAGUE_SMOKE_SET, withSim = L.leagueEval(AF.jetFightPilot, jctx.members, jetSc, JF.JET_OPTS), without = L.leagueEval(AF.jetFightPilot, jctx.members, jetSc);
+    ok("!! THE SIM OPTIONS REACH THE FIGHT: the jet autopilot against the jet members on the throwaway jet duels scores 0.0269 with the jets' physics, guns and guide (JET_OPTS) and something else on the trainer's (a jet flown with the trainer's wing is not the same fight), and scorer(policy, members, set, sim)(w) is leagueEval's score with that sim",
+        near(withSim.score, 0.0269, 5e-4) && Math.abs(withSim.score - without.score) > 1e-3 && L.scorer(PJ, jctx.members, jetSc, JF.JET_OPTS)(hwF) === L.leagueEval(PJ.pilotFor(hwF), jctx.members, jetSc, JF.JET_OPTS).score, `${withSim.score.toFixed(4)} against ${without.score.toFixed(4)}`);
+    const jc = { brain: L.BRAINS_JET.fly, hashes: { start: "aaaa1111", other: "bbbb2222" } };
+    const sc2 = (s) => ({ score: s, by: Object.fromEntries(L.MEMBERS.map((m) => [m, { mean: s, lost: [], perScenario: [s], summary: sum() }])) });
+    const jchamp = { seed: 12002, weights: Float32Array.from({ length: 1099 }, (_, i) => (i === 3 ? 0.5 : 0)), kept: 3, moved: 7, heldOut: sc2(0.55), pool: sc2(0.3), audit: { ...sc2(0.5), by: { ...sc2(0.5).by, self: { ...sc2(0.5).by.self, summary: { ...sum(), winsX: 60, draws: 20, winsY: 20, edge: 0.1, se: 0.02, z: 5 } } } }, classic: { audit: ev(120, 0.5), reserve: ev(120, 0.2), safety: clean }, vsAudit: { autopilot: { n: 1, diff: 0.01, se: 0.02 }, other: { n: 1, diff: -0.01, se: 0.02 } } };
+    const jres = { champion: jchamp, shipped: { heldOut: sc2(0.3), pool: sc2(0.3), audit: sc2(0.4), classic: { audit: ev(120, 0.45), reserve: ev(120, 0.19), safety: clean } }, verdict: { ok: true, reasons: [] } };
+    const jblob = L.blobOf(jres, jflyO, jc), jback = PB.importBrain(PB.describePolicy("pilotJetPolicy", PJ), jblob), tback = PB.importBrain(PB.describePolicy("pilotFlightPolicy", PF), jblob);
+    ok("!! THE JET FILE IS A swek-brain-v1 FILE FOR THE JET LAYOUT AND NOT THE TRAINER'S: the jet fruit fly's importer takes it with the champion's weights, the trainer fruit fly's refuses it by name (the feature names differ), and `by` begins with the sentence that says there is no shipped jet fighter, that 'the shipped fighter' is the hand weights, and their hash (aaaa1111)",
+        jback.ok && jback.weights[3] === 0.5 && !tback.ok && /pilotJetPolicy/.test(tback.reason || "") && jblob.policy === "pilotJetPolicy" && /^THE JETS \(brain\/jetFight\.mjs, guns only, jet scale\): there is no shipped jet fighter, so 'the shipped fighter' below is this network's HAND WEIGHTS \(pilotJetPolicy\.handWeights\(\)[^)]*hash aaaa1111\)/.test(jblob.by) && L.dumpOf({ ...jres, runs: [] }, jflyO).recipe.aircraft === "jet" && L.dumpOf({ ...jres, runs: [] }, L.parseArgs([])).recipe.aircraft === "trainer", tback.reason);
+    const tmp2 = fs.mkdtempSync(path.join(os.tmpdir(), "leaguejet-")), cmd = path.join(ENG, "tools", "ship", "trainLeagueDogfight.mjs"), runJ = (args) => spawnSync(process.execPath, [cmd, ...args], { cwd: ENG, encoding: "utf8", timeout: 600000 });
+    const j1 = path.join(tmp2, "one.json"), j2 = path.join(tmp2, "two.json"), r1 = runJ(["--aircraft", "jet", "--smoke", "--runs", "2", "--iters", "2", "--dump", j1, "--quiet"]), r2 = runJ(["--aircraft", "jet", "--smoke", "--runs", "2", "--iters", "2", "--workers", "2", "--dump", j2, "--quiet"]);
+    const d1 = fs.existsSync(j1) ? JSON.parse(fs.readFileSync(j1, "utf8")) : null, d2 = fs.existsSync(j2) ? JSON.parse(fs.readFileSync(j2, "utf8")) : null, tr = runJ(["--smoke", "--runs", "2", "--iters", "2", "--dump", path.join(tmp2, "tr.json"), "--quiet"]);
+    const dt = fs.existsSync(path.join(tmp2, "tr.json")) ? JSON.parse(fs.readFileSync(path.join(tmp2, "tr.json"), "utf8")) : null;
+    ok("!! `--aircraft jet --workers 2` RUNS EACH JET SEARCH IN ITS OWN PROCESS AND GETS THE IN-PROCESS ANSWER TO THE BIT, AND THE WORKERS ARE TOLD THE AIRCRAFT: the dump of the two-process run is the dump of the one-process run (weights, seeds 12000 and 12001, train and held-out numbers), its recipe says aircraft jet, and it is NOT the trainer's dump of the same options (a child that was not told --aircraft would run the trainer's fight and the dumps could not match)",
+        r1.status === 0 && r2.status === 0 && tr.status === 0 && d1 && d2 && dt && JSON.stringify(d1) === JSON.stringify(d2) && d1.recipe.aircraft === "jet" && d1.runs.map((r) => r.seed).join() === "12000,12001" && JSON.stringify(d1.runs.map((r) => r.heldOut)) !== JSON.stringify(dt.runs.map((r) => r.heldOut)), `${r1.status} ${r2.status} ${tr.status}`);
+    const badAir = runJ(["--aircraft", "plane"]), jetSmoke = runJ(["--aircraft", "jet", "--smoke", "--runs", "1", "--iters", "1"]);
+    ok("the real command refuses a bad aircraft with exit 2 and the reason on stderr and nothing on stdout, and the real jet --smoke run prints the league line of the jet brain (the fruit fly's Giant Fiber Circuit flying the jet, starting from the hand weights with their hash) and exits 0",
+        badAir.status === 2 && /--aircraft must be trainer or jet/.test(badAir.stderr) && badAir.stdout === "" && jetSmoke.status === 0 && /^league for the fruit fly's Giant Fiber Circuit flying the jet: starts from the jet autopilot's hand weights \([0-9a-f]{8}\)/m.test(jetSmoke.stdout), jetSmoke.stdout.split("\n")[0]);
+    fs.rmSync(tmp2, { recursive: true, force: true });
 }
 
 console.log(fails ? `\ntrainDogfightLeague-selfcheck: ${fails} FAILED` : "\ntrainDogfightLeague-selfcheck: all checks pass");

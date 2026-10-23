@@ -14,6 +14,8 @@ import * as PJ from "./pilotJetPolicy.mjs";
 export const FEATURES = PM.FEATURES, OUTPUTS = PM.OUTPUTS, WIDTH = PM.WIDTH, HIDDEN = PM.HIDDEN, LAYER_SIZES = PM.LAYER_SIZES, WEIGHT_COUNT = PM.WEIGHT_COUNT;
 export const FEATURE_NAMES = PJ.FEATURE_NAMES, OUTPUT_NAMES = PJ.OUTPUT_NAMES, JET_GAINS = PJ.JET_GAINS;
 export const zeroWeights = PM.zeroWeights, raw = PM.raw, controlsOf = PM.controlsOf, forward = PM.forward, layersOf = PM.layersOf;
+/** The search's moves, the trainer's MLP's own: brain/dogfightTrain.mjs asks a policy for them (perturb: every weight; mutate: one to maxK weights, the sparse move). */
+export const perturb = PM.perturb, mutate = PM.mutate;
 export const features = PJ.features, featuresFrom = PJ.featuresFrom;
 /** A pilot (state, target, wind) -> controls from weights: the autopilot's own contract, for the jet. */
 export function pilotFor(w, gains = JET_GAINS) { return (state, target, wind = [0, 0, 0]) => forward(w, features(state, target, wind, gains)); }

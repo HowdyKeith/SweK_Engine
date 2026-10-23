@@ -952,8 +952,9 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4891 -- two new gates (render/denoiseUpscaleGPU-selfcheck.mjs and render/denoiseTemporalUpscale-selfcheck.mjs, the denoiser arc), each spelling ok(label, cond, note): gates 2070 -> 2072, usesOk 2049 -> 2051, definesOk 2041 -> 2043, nameFirst 1939 -> 1941; the reading rows held.
     // v4895 -- 20 net new gates from the snow/sea round (21 added, triArrangement-selfcheck removed with the snapped arrangement): gates 2074 -> 2094, usesOk 2053 -> 2073, definesOk 2045 -> 2065, nameFirst 1943 -> 1963 (read off the code).
     // v4896 -- ten new gates (the five snowGpu split gates, snowReadings, truncationGuard, tvPackages, tvDebloat, swekTvLauncher), each spelling ok(name, cond, detail): gates 2094 -> 2104, usesOk 2073 -> 2083, definesOk 2065 -> 2075, nameFirst 1963 -> 1973 (read off the code). THE RECORD CAUGHT ONE OF MY OWN: tools/ship/headlessGpu-selfcheck.mjs, whose ok() takes the condition first, got the v4896 reading() row written label-first -- a string in the condition slot, true always, so the row passed whatever reading() did; the arguments are swapped and the row now tests (suspects stays 0).
-    gates: 2104, usesOk: 2083, definesOk: 2075, importsOk: 0,
-    distinctDefinitions: 45, nameFirst: 1973, condFirst: 99, unknownSignature: 11,
+    // The unnumbered line (the version is chosen at ship time) -- nineteen new gates, each spelling ok(name, cond, detail): gates 2104 -> 2123, usesOk 2083 -> 2102, definesOk 2075 -> 2094, nameFirst 1973 -> 1992 (read off the code); nothing else moved. They are brain/{autopilotDrone,autopilotJet,dogfightTournament,droneTask,jetFight,pilotDroneMlp,pilotDronePolicy,pilotJetMlp,pilotJetPolicy,pilotSubFish}-selfcheck.mjs, physics/mechanics/{atmosphereISA,multirotorModel6dof}-selfcheck.mjs, tools/{fishCaveExport,fishCircuit}-selfcheck.mjs and tools/ship/{tournamentDogfight,tournamentDogfightShipped,trainDogfightLeague,trainDronePilot,trainSubPilot}-selfcheck.mjs.
+    gates: 2123, usesOk: 2102, definesOk: 2094, importsOk: 0,
+    distinctDefinitions: 45, nameFirst: 1992, condFirst: 99, unknownSignature: 11,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

@@ -231,6 +231,7 @@ console.log("\n*** THE raw-separator SITES, RE-DERIVED -- AND THE RULE THAT DID 
                       .map((f) => toPosix(path.relative(ENG, f)));
     // v4824 -- plus the sites the record has ADDED since, each named with its gate: the count must match AND every named one must be a hit,
     // so a later site cannot be absorbed into the total without being written down. SABOTAGED, restored: the v4824 entry removed (RED: 9 vs 8).
+    // The unnumbered line's three entries (trainDronePilot, trainSubPilot, trainDogfightLeague) were each removed in turn, restored after each: RED every time (14 sites today against 8 + 5 recorded).
     const added = SEP.addedCorrect || [];
     ok("!! *** the surviving path.join comparison sites are the 8 this record calls CORRECT, plus the ones it has added since by name ***",
        hits.length === SEP.correct + added.length && added.every((a) => hits.includes(a.gate)),
