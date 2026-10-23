@@ -96,6 +96,28 @@ console.log("1. A FIGHT OF TWO IS THE SAME FIGHT");
     ok("!! an aircraft that is flown into the ground, and one that is not flown at all, are the same in both (A's ending is the ground's: crashed or touchdown), and A is charged its full hit points", diffs.length === 0 && (ends.has("crashed") || ends.has("touchdown")), `${diffs.slice(0, 2).join("; ")} ${[...ends]}`);
 }
 
+console.log("\n1b. THE GUIDE: A CRAFT'S PURSUIT, TRIGGER AND THE COLLISION RANGE ARE THE FIGHT'S, NOT THE TRAINER'S");
+{
+    const W = (o) => Object.freeze({ ...D.GUIDE, ...o }), G2 = W({ alphaTrim: true, leadTime: 2, standoff: 260, speedGain: 0.05, maxRange: 520, collisionRange: 7, fireTolerance: 1.3, minAltitude: 150 });
+    let diffs = [], n = 0, fired = 0;
+    for (const kind of D.KINDS) for (let seed = 1; seed <= 6; seed++) {
+        const sc = D.scenario(seed, kind), d = D.duel(AF.pilot, sc, { guide: G2 }); let r;
+        try { r = A.resultOf(A.runArena(A.arenaFromScenario(sc, AF.pilot, { guide: G2 })), D.A_ID); } catch (e) { diffs.push(`${kind}${seed} THREW ${e.message}`); continue; }
+        n++; fired += d.fired;
+        for (const k of FIELDS) if (!Object.is(d[k], r[k])) diffs.push(`${kind}${seed}.${k}: ${d[k]} vs ${r[k]}`);
+    }
+    ok("!! WITH A GUIDE THAT IS NOT THE TRAINER'S (an angle-of-attack trim, two seconds of lead, a 260 m standoff, a 0.05 speed gain, a 520 m trigger range at 1.3 radii, a 150 m floor, a 7 m collision) THE ARENA IS STILL THE SAME FIGHT AS duel(): 24 fights through both, every number identical to the bit", diffs.length === 0 && n === 24 && fired > 100, `${diffs.slice(0, 3).join("; ")} (${fired} rounds fired)`);
+    const cs = (extra = {}) => [{ id: 1, team: 1, pilot: AF.pilot, behaviour: "hunt", fires: true, state: { pos: [0, 0, 300], speed: 45, heading: 0, pitch: 0.03 }, ...extra }, { id: 2, team: 2, pilot: AF.pilot, behaviour: "script", script: () => ({ heading: 0, altitude: 300, airspeed: 45 }), fires: false, state: { pos: [250, 0, 300], speed: 45, heading: 0, pitch: 0.03 } }];
+    const plain = A.createArena({ crafts: cs() }), arenaG = A.createArena({ crafts: cs(), guide: G2 }), craftG = A.createArena({ crafts: cs({ guide: G2 }) });
+    ok("!! A CRAFT CARRIES A GUIDE (the trainer's, the very object, by default; the arena's when the arena is given one; its own when it names one) and the arena's collision range is the arena's guide's (6 by default)", plain.crafts[0].guide === D.GUIDE && plain.crafts[1].guide === D.GUIDE && plain.collisionRange === 6 && arenaG.crafts[0].guide === G2 && arenaG.crafts[1].guide === G2 && arenaG.collisionRange === 7 && craftG.crafts[0].guide === G2 && craftG.crafts[1].guide === D.GUIDE && craftG.collisionRange === 6);
+    const mute = A.runArena(A.createArena({ crafts: cs({ guide: W({ maxRange: 0 }) }), seconds: 10 })), loud = A.runArena(A.createArena({ crafts: cs(), seconds: 10 }));
+    ok("!! A CRAFT'S GUIDE IS ITS OWN: a hunter whose guide has a trigger range of 0 fires nothing in ten seconds behind a straight target and the same hunter with the default fires; the target (not firing either way) is untouched", mute.crafts[0].gun.fired === 0 && loud.crafts[0].gun.fired > 20 && mute.crafts[1].taken === 0 && loud.crafts[1].taken > 0, `${mute.crafts[0].gun.fired} rounds against ${loud.crafts[0].gun.fired}`);
+    const scr = (id, team, x) => ({ id, team, pilot: AF.pilot, behaviour: "script", script: () => ({ heading: 0, altitude: 300, airspeed: 45 }), fires: false, state: { pos: [x, 0, 300], speed: 45, heading: 0 } });
+    const close = A.createArena({ crafts: [scr(1, 1, 0), scr(2, 2, 500)], guide: W({ collisionRange: 1000 }) }); A.stepArena(close);
+    const far = A.createArena({ crafts: [scr(1, 1, 0), scr(2, 2, 500)] }); A.stepArena(far);
+    ok("!! THE ARENA'S COLLISION RANGE IS THE GUIDE'S: two craft 500 m apart are both 'collided' at the first tick with a collision range of 1,000 m and both flying with the default", close.crafts.every((c) => c.status === "collided") && close.done === true && far.crafts.every((c) => c.status === "airborne"));
+}
+
 // a small world for the arena's own arithmetic: straight and level at 45 m/s, scripted
 const straight = (h = 0, alt = 300) => () => ({ heading: h, altitude: alt, airspeed: 45 });
 const cruise = (id, team, x, y, h = 0, extra = {}) => ({ id, team, name: "c" + id, pilot: AF.pilot, behaviour: "script", script: straight(h), fires: false, state: { pos: [x, y, 300], speed: 45, heading: h }, ...extra });

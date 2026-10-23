@@ -40,6 +40,13 @@ export const BREAK_RANGE = 140, BREAK_CLOSING = 15, BREAK_TURN = 0.9, BREAK_CLIM
 export const KEEP_OUT_RANGE = 30, KEEP_OUT_CLOSING = 1;   // *** FOUND BY THE FIRST TRAINING RUN. *** Inside 30 m and still closing (over 1 m/s) the guidance breaks off WHATEVER the closing speed: see pursuit()
 export const COLLISION_RANGE = 6;       // two aircraft this close have hit each other (the airframe is 10.6 m across): both are lost
 export const A_ID = 1, B_ID = 2;
+/**
+ * THE GUIDANCE'S NUMBERS AS ONE OBJECT, so that an airframe three times as fast can have its own (brain/jetFight.mjs) and the trainer's stay exactly what they are: pursuit() and fireControl() read their ranges, speeds and tolerances from `K` (default GUIDE, whose values are the constants above) and duel() takes it as `guide`.
+ * Two options the trainer's guidance does not use and a jet's does, both off here: `alphaTrim` points the GUN and not the flight path at the lead point (the flight path is aimed lower by range x (angle of attack + the gun's boresight), which the trainer's 45 m/s gets right
+ * to within a hit radius by its boresight alone and a jet at 3x the speed and 3x the range does not), and `leadTime` adds to the heading asked for the line of sight's turn rate times that many seconds (a pilot that holds a heading with a proportional law runs a steady heading error of turn rate x its time constant behind a turning target).
+ */
+export const GUIDE = Object.freeze({ minAltitude: MIN_ALTITUDE, maxRange: MAX_RANGE, fireTolerance: FIRE_TOLERANCE, speedLimits: SPEED_LIMITS, standoff: STANDOFF, speedGain: 0.04, breakRange: BREAK_RANGE, breakClosing: BREAK_CLOSING, breakTurn: BREAK_TURN, breakClimb: BREAK_CLIMB,
+    keepOutRange: KEEP_OUT_RANGE, keepOutClosing: KEEP_OUT_CLOSING, collisionRange: COLLISION_RANGE, alphaTrim: false, leadTime: 0 });
 
 const mulberry = (a) => () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
@@ -80,7 +87,7 @@ export function scenario(seed, kind = "tail") {
  * bearing to it, the altitude is its altitude (never below MIN_ALTITUDE), and the airspeed closes on the opponent when it is far and holds the opponent's speed when it is at STANDOFF. With no solution (the opponent is
  * outrunning the round) it is pure pursuit. Returns { target: { heading, altitude, airspeed }, range, sol }.
  */
-export function pursuit(me, foe, spec = G.GUN) {
+export function pursuit(me, foe, spec = G.GUN, K = GUIDE) {
     const m = G.muzzleOf(me, spec), sol = G.aimSolution(m, foe.pos, foe.vel, spec);
     const pt = sol ? sol.point : foe.pos, range = norm(sub(foe.pos, me.pos));
     const vFoe = Math.hypot(foe.vel[0], foe.vel[1], foe.vel[2]);
@@ -90,23 +97,26 @@ export function pursuit(me, foe, spec = G.GUN) {
     // KEEP OUT (the first training run's finding): the break above is for a FAST closure (over 15 m/s inside 140 m). A pilot trained on this task learned to ignore the airspeed the guidance asks for (speed is not in the score, and a faster aircraft turns
     // tighter), carried 50 m/s through a request for 38 and crept up a turning opponent's tail at 4 m/s -- under the break's 15 -- until it clipped it at 6 m, in three of the fifty turning fights of a safety audit; the PD autopilot, which follows the
     // speed it is asked for, never closes and never did. The guidance has to keep any pilot out of the opponent, so inside KEEP_OUT_RANGE and still closing at all it breaks off as well. Shooting from 30 m or more is unchanged.
-    if ((range < BREAK_RANGE && closing > BREAK_CLOSING) || (range < KEEP_OUT_RANGE && closing > KEEP_OUT_CLOSING)) {
+    if ((range < K.breakRange && closing > K.breakClosing) || (range < K.keepOutRange && closing > K.keepOutClosing)) {
         const a = F.attitude(me), f = fwdOf(a.heading), side = f[0] * los[1] - f[1] * los[0];   // (forward x line of sight).z: positive when the opponent is on the left
-        return { target: { heading: a.heading + (side > 0 ? BREAK_TURN : -BREAK_TURN), altitude: Math.max(MIN_ALTITUDE, me.pos[2] + (foe.pos[2] > me.pos[2] ? -BREAK_CLIMB : BREAK_CLIMB)), airspeed: clamp(vFoe, SPEED_LIMITS[0], SPEED_LIMITS[1]) }, range, sol, breaking: true };
+        return { target: { heading: a.heading + (side > 0 ? K.breakTurn : -K.breakTurn), altitude: Math.max(K.minAltitude, me.pos[2] + (foe.pos[2] > me.pos[2] ? -K.breakClimb : K.breakClimb)), airspeed: clamp(vFoe, K.speedLimits[0], K.speedLimits[1]) }, range, sol, breaking: true };
     }
-    return { target: { heading: headingTo(pt[0] - me.pos[0], pt[1] - me.pos[1]), altitude: Math.max(MIN_ALTITUDE, pt[2]), airspeed: clamp(vFoe + 0.04 * (range - STANDOFF), SPEED_LIMITS[0], SPEED_LIMITS[1]) }, range, sol };
+    let heading = headingTo(pt[0] - me.pos[0], pt[1] - me.pos[1]), aimZ = pt[2];
+    if (K.leadTime) { const rel = sub(foe.vel, me.vel), lx = pt[0] - me.pos[0], ly = pt[1] - me.pos[1]; heading -= K.leadTime * (lx * rel[1] - ly * rel[0]) / Math.max(1, lx * lx + ly * ly); }   // the azimuth's rate (counter-clockwise) is the heading's with the sign reversed
+    if (K.alphaTrim) aimZ -= range * (F.attitude(me).alpha + spec.boresight);
+    return { target: { heading, altitude: Math.max(K.minAltitude, aimZ), airspeed: clamp(vFoe + K.speedGain * (range - K.standoff), K.speedLimits[0], K.speedLimits[1]) }, range, sol };
 }
 
 /**
  * THE TRIGGER: pull it when a round fired along the gun WOULD hit -- the gun axis is within FIRE_TOLERANCE hit radii of the lead solution at the opponent's range -- the opponent is inside MAX_RANGE and the gun has rounds.
  * `foeRadius` is how far off the line the round may miss the opponent's centre and still be taken to hit: the gun's own hit sphere by default (a fighter), the aircraft's size for a bigger target (the bomber's). Returns { fire, miss (m, the predicted distance between the round and the opponent at its time of flight), range }. A prediction on STRAIGHT lines: an opponent that turns while the round flies is missed.
  */
-export function fireControl(me, foe, gun, spec = G.GUN, foeRadius = spec.hitRadius) {
+export function fireControl(me, foe, gun, spec = G.GUN, foeRadius = spec.hitRadius, K = GUIDE) {
     if (gun.ammo <= 0) return { fire: false, miss: Infinity, range: Infinity };
     const m = G.muzzleOf(me, spec), sol = G.aimSolution(m, foe.pos, foe.vel, spec), range = norm(sub(foe.pos, me.pos));
-    if (!sol || range > MAX_RANGE) return { fire: false, miss: Infinity, range };
+    if (!sol || range > K.maxRange) return { fire: false, miss: Infinity, range };
     const c = clamp(dot(m.dir, sol.dir), -1, 1), miss = Math.sin(Math.acos(c)) * sol.t * spec.muzzleSpeed;
-    return { fire: miss <= FIRE_TOLERANCE * foeRadius, miss, range };
+    return { fire: miss <= K.fireTolerance * foeRadius, miss, range };
 }
 
 /** The opponent's guidance target for a scripted kind at time t: straight holds what it started with; turn advances the heading at `rate`. (A hunting opponent uses pursuit().) */
@@ -129,16 +139,16 @@ export function sideScore(side, spec, seconds, killedFoe) {
  * Fly one fight. `pilotA` is the pilot under test, (state, target, wind) -> controls. Returns { score (A's), scoreB (B's: the same formula from B's seat, for a fight between two pilots under test), dealt, taken (hits), fired (rounds A fired), firedB (rounds B fired), hitRate, firstHit (s or null), killedB (s or null), killedA (s or null: when B destroyed A), statusA, statusB (airborne |
  * destroyed | collided | touchdown | crashed | lost), ticks, closest (m), minAltitude, maxAlpha (A's, radians), minV (A's slowest airspeed), fingerprint, seed, kind }. Deterministic.
  */
-export function duel(pilotA, sc, { seconds = SECONDS, dt = DT, model = AF.defaultModel(), spec = G.GUN, specB = spec, pilotB = AF.pilot } = {}) {
+export function duel(pilotA, sc, { seconds = SECONDS, dt = DT, model = AF.defaultModel(), spec = G.GUN, specB = spec, pilotB = AF.pilot, guide = GUIDE } = {}) {
     const mk = (o) => F.createState({ ...o, mass: model.mass, inertia: model.inertia });
     const A = { id: A_ID, state: mk(sc.a), gun: G.createGun(spec), hits: 0, taken: 0, status: "airborne" }, Bs = { id: B_ID, state: mk(sc.b), gun: G.createGun(specB), hits: 0, taken: 0, status: "airborne" };
     let rounds = [], firstHit = null, killedB = null, killedA = null, closest = Infinity, minAlt = Infinity, maxAlpha = 0, minV = Infinity, h = 0x811c9dc5, ticks = 0;
     const total = Math.round(seconds / dt), still = [0, 0, 0];
     for (let i = 0; i < total; i++) {
         const t = i * dt;
-        const gA = pursuit(A.state, Bs.state, spec), gB = sc.opponent.kind === "hunt" ? pursuit(Bs.state, A.state, spec) : { target: scriptedTarget(sc, t) };
+        const gA = pursuit(A.state, Bs.state, spec, guide), gB = sc.opponent.kind === "hunt" ? pursuit(Bs.state, A.state, spec, guide) : { target: scriptedTarget(sc, t) };
         const cA = pilotA(A.state, gA.target, still), cB = pilotB(Bs.state, gB.target, still);
-        const fA = fireControl(A.state, Bs.state, A.gun, spec).fire, fB = sc.opponent.fires && fireControl(Bs.state, A.state, Bs.gun, spec).fire;
+        const fA = fireControl(A.state, Bs.state, A.gun, spec, spec.hitRadius, guide).fire, fB = sc.opponent.fires && fireControl(Bs.state, A.state, Bs.gun, spec, spec.hitRadius, guide).fire;
         const sa = G.fire(A.gun, A.state, fA, dt, A_ID), sb = G.fire(Bs.gun, Bs.state, !!fB, dt, B_ID);
         A.gun = sa.gun; Bs.gun = sb.gun;
         const ra = F.stepFlight(model, A.state, cA, dt, still), rb = F.stepFlight(model, Bs.state, cB, dt, still);
@@ -155,7 +165,7 @@ export function duel(pilotA, sc, { seconds = SECONDS, dt = DT, model = AF.defaul
         { const att = F.attitude(A.state); if (att.alpha > maxAlpha) maxAlpha = att.alpha; if (att.airspeed < minV) minV = att.airspeed; }
         if (i % 30 === 0) for (const c of [A.state.pos[0], A.state.pos[1], A.state.pos[2], Bs.state.pos[0], Bs.state.pos[1], Bs.state.pos[2], A.hits, Bs.hits]) h = foldHash(h, Math.round(c * 1000) & 0xffffffff);
         if (ra.status !== "airborne") A.status = ra.status; if (rb.status !== "airborne") Bs.status = rb.status;
-        if (range < COLLISION_RANGE) { A.status = "collided"; Bs.status = "collided"; }
+        if (range < guide.collisionRange) { A.status = "collided"; Bs.status = "collided"; }
         if (A.taken >= spec.hp) { A.status = "destroyed"; killedA = ticks * dt; }
         if (Bs.taken >= spec.hp) { Bs.status = "destroyed"; killedB = ticks * dt; }
         if (A.status !== "airborne" || Bs.status !== "airborne") break;

@@ -43,6 +43,12 @@ export const TARGET_DEFAULT = Object.freeze({ altitude: 300, heading: 0, airspee
  *   alphaLimit 0.13, alphaLead 0.5, kAlpha 12   the stick is taken off by 12 per radian by which the angle of attack plus half a second of pitch rate exceeds 0.13 rad (7.4 degrees), which keeps the worst upset recovery measured (a 40-degree dive at 100 m/s and 3,000 m) under 13.5 degrees
  */
 export const AUTOPILOT_JET = Object.freeze({ maxBank: 0.9, bankLow: 0.5, kBankInv: 0.3, vRef: 140, vsMax: 15, vsLow: 65, kAltVs: 0.12, kVsPitch: 0.12, scheduleClimb: true, tauHeading: 5, kSpd: 0.05, kClimbThr: 0.02, alphaLimit: 0.13, kAlpha: 12, alphaLead: 0.5 });
+/**
+ * THE JET'S FIGHTING GAINS: AUTOPILOT_JET with four numbers set for a pilot that is asked to put the nose on an aircraft and not to hold a heading. A bank limit of 1.1 rad (63 degrees; the angle-of-attack limiter and not the bank is what keeps the wing from stalling, and the bank limit still falls with the speed), a heading time constant of 2.5 s (half), and a
+ * climb command twice as stiff (0.25 per second of error, 25 m/s at most). MEASURED against AUTOPILOT_JET at 140 m/s and 2,000 m (brain/autopilotJet-selfcheck.mjs): a 300 m climb is captured in 15 s and not 26, a 170-degree turn is made at 6 degrees a second and not 4.3, nothing overshoots, the angle of attack peaks at 4.8 degrees and 4.2 in the turn (4.1 and 3.1 before), and the upsets are flown
+ * as before. What it costs: the sideslip in a hard turn is 1.4 degrees and not 1.2, and a steeper bank asks more of the wing at the slow end (4.5 degrees of angle of attack at 110 m/s and 2.6 degrees of sideslip).
+ */
+export const AUTOPILOT_JET_FIGHT = Object.freeze({ ...AUTOPILOT_JET, maxBank: 1.1, tauHeading: 2.5, kAltVs: 0.25, vsMax: 25 });
 export const TARGET_JET = Object.freeze({ altitude: 1000, heading: 0, airspeed: 140 });
 
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
@@ -105,10 +111,13 @@ export function guidance(state, target = TARGET_DEFAULT, wind = [0, 0, 0], opts 
     };
 }
 
+/** GAIN SCHEDULE (a jet's only; the trainer's gains name no vRef, and have none: 1): the back-stick a banked wing needs for the same lift falls as the dynamic pressure rises, so the bank compensation and the climb pull are scheduled on (vRef / the equivalent airspeed)^2, held between 0.3 and 3. Exported so that the networks' jet layout (brain/pilotJetPolicy.mjs) reads the very number the laws do. */
+export const gainSchedule = (gd, g) => (g.vRef ? clamp((g.vRef / Math.max(20, gd.eas)) ** 2, 0.3, 3) : 1);
+
 /** The four controls from a guidance record, by the laws in the header. NaN-safe: a non-finite number is read as 0 by `fin`, so a flight that goes non-finite gets neutral controls and not a NaN back. */
 export function lawsFrom(gd, opts = {}) {
     const g = { ...AUTOPILOT_FLIGHT, ...opts }, r = gd.rates;
-    const sc = g.vRef ? clamp((g.vRef / Math.max(20, gd.eas)) ** 2, 0.3, 3) : 1;   // GAIN SCHEDULE (a jet's only; the trainer's gains name no vRef): the back-stick a banked wing needs for the same lift falls as the dynamic pressure rises, so it is scheduled on (vRef / the equivalent airspeed)^2
+    const sc = gainSchedule(gd, g);
     const lim = g.alphaLimit ? g.kAlpha * Math.max(0, gd.att.alpha + (g.alphaLead || 0) * r.pitch - g.alphaLimit) : 0;   // AN ALPHA LIMITER (a jet's only): a pilot that asks for a 15 m/s climb pulls the stick to the stop, which on a fast wing is a stall -- past alphaLimit radians the stick is taken off by kAlpha per radian
     const pitch = gd.upright * (gd.stickTrim + g.kBankInv * sc * gd.invCos + g.kVsPitch * (g.scheduleClimb ? sc : 1) * gd.climbErr / 5 - lim) - g.kQ * r.pitch;
     const roll = g.kBank * gd.bankErr - g.kP * r.roll;
@@ -128,6 +137,8 @@ export const pilot = (state, target, wind) => decide(state, target, wind).contro
 export const pilotFor = (model, gains = {}) => (state, target, wind) => decide(state, target, wind, { ...gains, model }).controls;
 /** THE JET'S PILOT: pilotFor the jet trainer with AUTOPILOT_JET. */
 export const jetPilot = (state, target, wind) => decide(state, target, wind, { ...AUTOPILOT_JET, model: jetModel() }).controls;
+/** THE JET'S FIGHTING PILOT: pilotFor the jet trainer with AUTOPILOT_JET_FIGHT. */
+export const jetFightPilot = (state, target, wind) => decide(state, target, wind, { ...AUTOPILOT_JET_FIGHT, model: jetModel() }).controls;
 
 // ---- the front door ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 export function reportLines() {
