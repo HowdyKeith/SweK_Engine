@@ -1,6 +1,6 @@
 // WebGLEngine/brain/droneTask-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node brain/droneTask-selfcheck.mjs      (~30 s: it flies the eight sets, 324 flights)
+// Run: node brain/droneTask-selfcheck.mjs      (~30 s: it flies the eight sets, 346 flights)
 //
 // THE SIBLING GATE OF brain/droneTask.mjs: the job every quadrotor pilot -- the hand pilot, the fruit fly's network, the GPU network -- is given and graded on. A score is only worth training on if it means what it says, so each row is a thing the score is SUPPOSED
 // to do, asked of it with a pilot whose answer is known (brain/rotorTask-selfcheck.mjs is the helicopter's, and the discipline is the same):
@@ -15,7 +15,36 @@
 //   5  THE BASELINE, FROZEN   the hand pilot's score on each of the eight sets and each kind, the not-standing counts, the tails by name (it ends no hover, recovery or goto early and it lands NO motor flight), and the fingerprint of a flight of each kind
 //   6  DETERMINISM a second evaluation is bit-identical; fly() does not mutate its scenario; versus() and describeEval() say what they say; a pilot that returns NaN does not break the task
 //
-// SABOTAGE LOG: (filled in below once run)
+// SABOTAGE LOG (each applied to brain/droneTask.mjs in a scratch copy, the gate run on the copy, the copy discarded; the number is how many rows went red): 140 mutants (T01-T137 the constants, the scenarios, the winds, the
+//   scoring, the motor flight and the sets, T138-T140 the NaN-safe costs), 137 of them red and THREE EQUIVALENT, said plainly.
+// SIX THINGS WERE FOUND BY THE FIRST PASSES, AND EACH GOT A ROW: (1) T48 (hover with no wind) CRASHED THE GATE with a TypeError that the harness counted 0 red: an uncaught exception is now a failed row by name (as in the trainer
+//   gate), the wind reads are guarded, and one row says which kinds blow a wind; T48 goes 5 red. (2) T63 (the motor flight's pilot handed options): the options and the still-air wind of a motor flight are held. (3) T67 (ground
+//   speed as the forward component only): both landings drifted along x, so a diagonal drift is held. (4) T72 and T73 (the 'lost' status) WERE UNGUARDED AND TESTING THEM FOUND A DEFECT: a motor flight started from a non-finite
+//   state scored NaN, which would poison any mean or comparison it entered; crashCost and landingCost now read a non-finite number as past the cap (a lost flight costs 7), with rows for the lost path and for the costs on their
+//   own; T138 and T140 hold the repair. (5) T115 (describeEval listing every kind) went 0 red because every set the gate described held all four kinds; a go-to-only set is described now. (6) The first pass of the final run was
+//   made against the gate without that last row; T115 was re-run alone against the gate as it now stands (1 red).
+// THE THREE EQUIVALENT MUTANTS: T104 (the number of scoring ticks by ceil and not floor: 2,400 ticks divide by 6 exactly), T106 (the heading read with the wind argument zero: Q.attitude takes the heading from the quaternion, the
+//   wind enters only the airspeed) and T139 (a non-finite number read as 1e9 and not Infinity: both are past the cap and min() caps them to the same value).
+//   T01 tick step 1/60 15; T02 seconds 30 10; T03 scoring every third tick 9; T04 worst tick 6 4; T05 kinds reordered 14; T06 motor ceiling 30 s 1; T07 settle 3 s 1; T08 sink limit 5 3; T09 landing gs scale 4 3; T10 landing gs
+//   cap 4 3; T11 crash scale 20 12; T12 never lands 6 2; T13 sink weight 0.5 4; T14 gs weight 0.5 4; T15 gs term dropped 3; T16 sink term dropped 3; T17 gs cap removed 3; T18 sink cap removed 3; T19 crash base 2 15; T20 crash
+//   slope 5 14; T21 crash negative speed read 3; T22 crash cap removed 13; T23 kind not mixed into the seed 11; T24 seed multiplier 7918 11; T25 gust mean z 0.9 10; T26 gust amp z 1.2 10; T27 motor altitude 150 10; T28 motor
+//   speed 12 10; T29 only motors 0 to 2 7; T30 failure up to 3.5 s 10; T31 motor target is one metre up 10; T32 goto distance 120 11; T33 goto height 80 11; T34 goto start 60 m 10; T35 goto wind 6 10; T36 goto gust amp 2 10; T37
+//   goto speed 3 10; T38 hover distance 30 10; T39 recovery distance 25 10; T40 target height 12 11; T41 recovery bank 1.5 11; T42 recovery bank 2.6 10; T43 recovery pitch 1.2 10; T44 recovery fall 12 11; T45 recovery yaw spin 4
+//   11; T46 hover start 60 m 2; T47 hover speed 3 10; T48 hover has no wind 5; T49 recovery has a wind 12; T50 hover wind 7 10; T51 hover gust amp 3 10; T52 recovery start 70 m 2; T53 second gust sine too big 10; T54 wind mean
+//   ignored 13; T55 still air is not still 10; T56 gust amplitude doubled 10; T57 failure >= becomes > 1; T58 failure a tenth late 12; T59 wrong motor fails 12; T60 more motors fail 12; T61 failed motor half alive 16; T62 motor
+//   fingerprint every 41 1; T63 motor pilot handed options 1; T64 motor model blown by wind 15; T65 ground speed includes the vertical 2; T66 ground speed read as zero 2; T67 ground speed is the forward component 1; T68 speed
+//   excludes the vertical 14; T69 settle twice as long 1; T70 stop one tick early 1; T71 first contact only a crash 5; T72 lost does not end the flight 1; T73 lost still counts as standing 1; T74 always standing 13; T75
+//   landed-then-crashed charged as landed 1; T76 crash charged by sink 12; T77 landing charged sink only 2; T78 landing charged ground speed only 2; T79 no touchdown costs nothing 1; T80 flight status is the touchdown status 1;
+//   T81 settled ignores standing 13; T82 motor ticks one short 5; T83 pilot blind to the wind 1; T84 model blind to the wind 11; T85 pilot handed no options 1; T86 landing does not end a hover 2; T87 ticks one extra at the end 2;
+//   T88 scoring on the second tick 8; T89 position divisor 10 9; T90 position cap 4 10; T91 height divisor 10 10; T92 height cap 4 9; T93 height error one-sided 11; T94 height error signed 11; T95 heading cap removed 1; T96
+//   heading not wrapped 1; T97 missing heading is an error 1; T98 position error is east only 8; T99 unflown ticks charged one short 3; T100 one unflown tick forgiven 12; T101 no floor on the scored count 1; T102 score over the
+//   ticks not the scoring ticks 12; T103 scored never counted 18; T104 scoring ceil 0 [EQUIVALENT]; T105 fingerprint every 21 1; T106 heading read in still air 0 [EQUIVALENT]; T107 evaluate mean over n+1 9; T108 evaluate crashed
+//   swapped 9; T109 evaluate counts a landed hover only 9; T110 byKind wrong group 10; T111 byKind keeps empty kinds 1; T112 versus swaps better and worse 1; T113 versus eps 0 1; T114 describeEval precision 1; T115 describeEval
+//   lists every kind 1; T116 TRAIN recovery has only the first six 3; T117 TRAIN recovery extra seeds are HELD_OUT 3; T118 TRAIN recovery extra seeds elsewhere 2; T119 HELD_OUT motor runs into TRAIN 1; T120 AUDIT motor runs into
+//   HELD_OUT 1; T121 AUDIT2 motor runs into AUDIT 1; T122 AUDIT hover one short 2; T123 AUDIT2 hover is the AUDIT's 2; T124 BASELINE hover is TRAIN's 2; T125 SAFETY_POOL motor one short 2; T126 SAFETY_AUDIT hover runs into the
+//   pool 2; T127 SAFETY_AUDIT2 goto is SAFETY_AUDIT's 2; T128 sets not frozen 1; T129 scenario start not frozen 1; T130 scenario failure not frozen 1; T131 scenario wind not frozen 1; T132 unknown kind accepted 1; T133 KINDS not
+//   frozen 1; T134 start ignores the scenario 16; T135 hover heading target ignored 11; T136 goto target is a hover (the point is the start) 10; T137 evaluate score not a mean 9; T138 a non-finite speed is read as zero 2; T139 a
+//   non-finite speed is read as the cap, not past it 0 [EQUIVALENT]; T140 a non-finite sink is read as zero in a landing only 1.
 "use strict";
 import * as DT from "./droneTask.mjs";
 import * as AD from "./autopilotDrone.mjs";
