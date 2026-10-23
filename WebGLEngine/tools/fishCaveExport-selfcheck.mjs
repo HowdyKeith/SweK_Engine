@@ -610,7 +610,8 @@ sec("11. the big-neuron finder (giants): a fixture with a mirror pair, a fragmen
     const RA = ["--retry-wait", "0.001", "--retry-max-wait", "0.005", "--min-chunk-rows", "10"];   // waits of a thousandth of a second: the gate does not sleep
     const pg = (r) => r.log.filter((c) => c.call === "query_table" && c.table === "synapses");
     const flaky = (list, extra = {}) => { const f = JSON.parse(JSON.stringify(GFIX)); f.flaky = list; Object.assign(f, extra); writeFixture(f); };
-    const partOf = (d) => JSON.parse(fs.readFileSync(path.join(d, "giants_counts.partial.json"), "utf8"));
+    const partOf = (d) => { const f = path.join(d, "giants_counts.partial.json"); return fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, "utf8")) : { offset: null, rows: null, somaTable: null, version: null };   // a missing file reads as null offsets, so the row that wanted it fails instead of the gate throwing and hiding every row after it
+    };
     const manOf = (d) => JSON.parse(rd(d, "MANIFEST.json"));
     const sameAsA = (d) => rd(d, "giants_top.csv") === rd(A, "giants_top.csv") && rd(d, "giants_pairs.csv") === rd(A, "giants_pairs.csv") && rd(d, "giants_counts.json") === rd(A, "giants_counts.json");
     const mkdir = (n) => { const d = outDir(n); fs.mkdirSync(d, { recursive: true }); return d; };
@@ -640,10 +641,10 @@ sec("11. the big-neuron finder (giants): a fixture with a mirror pair, a fragmen
 
     flaky([{ call: "query_table", table: "synapses", from: 3, status: 500 }]);
     const F5 = outDir("g_gaveup"), rf5 = run(gArgs(F5, [...RA, "--retries", "2"]), { env: E }); watch(rf5, F5);
-    ok("!! WHEN THE TRIES RUN OUT IT STOPS, SAYS WHERE, AND KEEPS WHAT IT HAS: the server never answers the third page again; after 3 tries (2 retries, waiting 0.001 s and then 0.003 s) the run exits 3 with STOPPED, the page, the HTTP 500 and its first line, 'Stopped at row 160 of about N (P%)', the path of the saved counts and 'Run the SAME command again'; the folder holds the partial counts file (offset 160, 160 rows) and NOTHING else -- no half-finished answer",
+    ok("!! WHEN THE TRIES RUN OUT IT STOPS, SAYS WHERE, AND KEEPS WHAT IT HAS: the server never answers the third page again; after 3 tries (2 retries, waiting 0.001 s and then 0.003 s) the run exits 3 with STOPPED, the page, the HTTP 500 and its first line, 'Stopped at row 160 of about N (P%)', the path of the saved counts and 'Run the SAME command again'; the folder holds the partial counts file (offset 160, 160 rows, naming version 77 and the soma table 'somas' it counted for) and NOTHING else -- no half-finished answer",
         rf5.status === 3 && pg(rf5).map((c) => c.offset).join() === "0,80,160,160,160" && /STOPPED: page 3 \(rows from 160\) got no good answer from the server after 3 tries \(HTTP 500: 500 Server Error/.test(rf5.stderr) && /Stopped at row 160 of about \d+ \(\d+\.\d%\)/.test(rf5.stderr)
         && /giants_counts\.partial\.json/.test(rf5.stderr) && /Run the SAME command again/.test(rf5.stderr) && (rf5.stdout.match(/waiting 0\.001 s/g) || []).length === 1 && (rf5.stdout.match(/waiting 0\.003 s/g) || []).length === 1 && !/waiting 0\.009/.test(rf5.stdout)
-        && fs.readdirSync(F5).join() === "giants_counts.partial.json" && partOf(F5).offset === 160 && partOf(F5).rows === 160, rf5.stderr.slice(0, 300));
+        && fs.readdirSync(F5).join() === "giants_counts.partial.json" && partOf(F5).offset === 160 && partOf(F5).rows === 160 && partOf(F5).somaTable === "somas" && partOf(F5).version === 77, rf5.stderr.slice(0, 300));
     const RW = ["--retry-wait", "0.001", "--retry-max-wait", "0.002", "--retries", "3"], FB = outDir("g_waits");
     flaky([{ call: "query_table", table: "synapses", from: 2, status: 500 }]);
     const rfb = run(gArgs(FB, RW), { env: E });
@@ -697,9 +698,10 @@ sec("11. the big-neuron finder (giants): a fixture with a mirror pair, a fragmen
         rsa.status === 0 && pg(rsa).map((c) => c.offset).join() === "80,160,240" && sameAsA(SA) && rsb.status === 0 && pg(rsb).map((c) => c.offset).join() === "80,160,240" && sameAsA(SB), (rsa.stderr + rsb.stderr).slice(0, 200));
     const CC = mkdir("cwd_c");
     run([...GA, "--out", "fish1_giants_a", "--pages", "1"], { env: E, cwd: CC }); run([...GA, "--out", "fish1_giants_b", "--pages", "2"], { env: E, cwd: CC });
-    const shaA = sha(path.join(CC, "fish1_giants_a", "giants_counts.partial.json")), rcc = run([...GA], { env: E, cwd: CC }); watchIn(rcc, CC);
-    ok("!! OF SEVERAL UNFINISHED PASSES THE FURTHEST WINS: folders a (row 80) and b (row 160) both hold the same command's counts; the next run without --out carries on in b (offsets 160, 240), finishes there, and leaves a exactly as it was",
-        rcc.status === 0 && pg(rcc).map((c) => c.offset).join() === "160,240" && /found an unfinished pass in \.[\\/]fish1_giants_b: row 160/.test(rcc.stdout) && sameAsA(path.join(CC, "fish1_giants_b")) && sha(path.join(CC, "fish1_giants_a", "giants_counts.partial.json")) === shaA && folders(CC).length === 2, rcc.stderr.slice(0, 200));
+    const decoy = path.join(CC, "not_ours"); fs.mkdirSync(decoy); const dec = JSON.parse(fs.readFileSync(path.join(CC, "fish1_giants_b", "giants_counts.partial.json"), "utf8")); dec.offset = 240; dec.rows = 240; fs.writeFileSync(path.join(decoy, "giants_counts.partial.json"), JSON.stringify(dec));   // a valid partial, further on than b, in a folder that is not a giants folder
+    const shaA = sha(path.join(CC, "fish1_giants_a", "giants_counts.partial.json")), shaD = sha(path.join(decoy, "giants_counts.partial.json")), rcc = run([...GA], { env: E, cwd: CC }); watchIn(rcc, CC);
+    ok("!! OF SEVERAL UNFINISHED PASSES THE FURTHEST WINS: folders a (row 80) and b (row 160) both hold the same command's counts; the next run without --out carries on in b (offsets 160, 240), finishes there, and leaves a exactly as it was; a folder NOT named fish1_giants_* that holds a valid partial file further on (offset 240) is not looked at -- it is not ours",
+        rcc.status === 0 && pg(rcc).map((c) => c.offset).join() === "160,240" && /found an unfinished pass in \.[\\/]fish1_giants_b: row 160/.test(rcc.stdout) && sameAsA(path.join(CC, "fish1_giants_b")) && sha(path.join(CC, "fish1_giants_a", "giants_counts.partial.json")) === shaA && folders(CC).length === 2 && sha(path.join(decoy, "giants_counts.partial.json")) === shaD, rcc.stderr.slice(0, 200));
 
     const rfin = run(gArgs(A, RA), { env: E });
     ok("!! A FINISHED RUN IS NEVER OVERWRITTEN, AND THE REFUSAL COMES BEFORE THE NETWORK: the same command into the folder of the finished first run exits 2 'is not empty', the stand-in is not called at all (an empty log), and the folder's answer is unchanged",
