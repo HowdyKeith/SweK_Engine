@@ -3,7 +3,7 @@
 // Run: node tools/fishCircuit-selfcheck.mjs      (~3 s)
 //
 // THE SIBLING GATE OF tools/fishCircuit.mjs, AND OF WHAT IT MADE: the rule that picks a circuit out of the Fish1 paper's open synapse table, held to known answers on graphs small enough to work out by hand, and the vendored circuit and the topology baked
-// from it held to the claims vendor/zebrafish/PROVENANCE.md makes. The raw package (3.5 MB of CSV) is not in the tree, so the derivation from it is NOT re-run here; row 8 says so, and re-runs it whenever FISH_TEN_DIR names the unzipped folder.
+// from it held to the claims vendor/zebrafish/PROVENANCE.md makes. The raw package (3.5 MB of CSV) is not in the tree, so the derivation from it is NOT re-run here; row 9 says so, and re-runs it whenever FISH_TEN_DIR names the unzipped folder.
 //
 //   1  parseCsv        plain rows, blank lines and CRLF handled, a quoted field refused by name
 //   2  synapseRows     columns read BY NAME (a reordered header works), the volume is 8 bbx x 8 bby x 30 bbz in nm^3 exactly, a row with a missing or non-numeric field is dropped and counted, a header without a column is refused
@@ -13,9 +13,22 @@
 //   6  circuitOf       neurons ascending with their labels and instance names, edges inside the core only, sorted, weights kept, counts equal
 //   7  THE VENDORED FILE AND THE TOPOLOGY   the file has the fly circuit file's shape; its licence line claims no licence the data policy does not state, the citation names the paper; the PROVENANCE file quotes the checksums; brain/zebrafishTopology.mjs is
 //                      RE-BAKED from the file here (the baker run into a scratch directory) and equals the checked-in one bit for bit; the baker's --source-label changes the header and nothing else, and its default header is unchanged
-//   8  THE DERIVATION  when FISH_TEN_DIR is set: the vendored file is re-derived from the raw package and equals it (but for the time it was fetched)
+//   8  THE COMMAND     run on a synthetic package of known answers in a scratch folder: a dry run writes nothing, --write makes the folder and the circuit, the selection record's counts are the data's, --k and --min-volume are honoured, --dir is required
+//   9  THE DERIVATION  when FISH_TEN_DIR is set: the vendored file is re-derived from the raw package and equals it (but for the time it was fetched)
 //
-// SABOTAGE LOG: (filled in below once run)
+// SABOTAGE LOG (55 mutants of tools/fishCircuit.mjs, each run alone against this gate in a scratch tree with the baker copied in, each one red BY NAME except the three below):
+//   parseCsv F01-F04 (CRLF, blank lines, quoted field, header), synapseRows F05-F13 (columns by position, the voxel size 8 x 8 x 8, z scaled by the y size, dropped rows uncounted, an empty field read as zero, a non-numeric
+//   field read as NaN, a header with a missing or only the last column missing), buildGraph F14-F20 (post sides as neurons, a partner outside the set, a self-loop, a non-strict threshold, an unweighted edge, the threshold
+//   argument ignored, the default one nm^3 higher), DEFAULTS F21 (core size 35: red once a row ties the constant to the vendored file, it was 0 red before), peelCore F22-F27 (one direction only, a tie to the larger id,
+//   the heaviest peeled, weights never updated, the core in text order -- 0 red until a row sorted 9 and 100, one neuron too few), labels F29-F34 (DMV input over DMV, no TEN- prefix, the class prefix kept, a zero id
+//   kept in either list, DMV over the TEN class), circuitOf F35-F41 (edges unsorted, edges touching the core kept, weights lost, instance name, counts exchanged, the meta dropped, its k ignored), the command F42-F55 (a
+//   dry run writes, the folder not made, --k / --min-volume / --out ignored, --dir not required or its refusal exiting 0, the dropped count, k and the counts in the selection record, a licence line that claims
+//   more than the data policy -- 0 red until the command-side row checked it -- the command run on import or never).
+//   THREE REPORT NO ROW OF THEIR OWN, AND ARE SAID: F06 (bby and bbz read from each other's column) is an EQUIVALENT MUTANT -- the volume is 8 x bbx x 8 x bby x 30 x bbz, a product, and a product does not care which
+//   of two factors came from which column; F28 (no `alive` check before a peeled neighbour's weight is lowered) is EQUIVALENT -- the weight of a neuron that is already gone is never read again; F52 (the command runs on
+//   import) kills the gate before it prints a row (exit 1, the command's own refusal on stderr), which is the loudest red there is and cannot be named by a row of a gate that never started.
+//   ONE HAZARD FOUND BY DOING IT: a mutant of --out wrote into the REAL vendor/zebrafish/fish1-ten-core.json through the scratch tree's symlinked vendor/ folder and the gate failed the next run; the file was restored from
+//   git and the mutant now writes to a folder that does not exist. The rerun after that is the log above; the real tree was checked unchanged (git status) after it.
 "use strict";
 import fs from "node:fs";
 import os from "node:os";
@@ -78,7 +91,7 @@ sec("4. peelCore");
     ok("!! PEELING UPDATES THE WEIGHTS AS IT GOES (a single sort by the first weights gives a different core): the star centre weighs 8 to the triangle's 6 at the start and would be kept, but once its leaves are gone it weighs 0 and goes too -- the core of 3 is the triangle, 1,2,3, and not 1,2,4 (and of 4 it is the triangle and leaf 8, because the centre, tied with the last leaf at 2, goes on the smaller id); the path's core of 3 is 1,2,3 and of 2 is 2,3", FC.peelCore(S, 3).join() === "1,2,3" && FC.peelCore(S, 4).join() === "1,2,3,8" && FC.peelCore(P, 3).join() === "1,2,3" && FC.peelCore(P, 2).join() === "2,3", FC.peelCore(S, 3).join());
     const tie = new Map([["5>6", 3], ["1>2", 3]]);   // four neurons weighing 3 each: the tie is all of them
     ok("!! A TIE IS BROKEN BY THE SMALLER ID, so the answer is a function of the data and not of the file's row order: 1 goes first (leaving 2, which now weighs 0), then 2, then 5 -- peeling to 3 leaves 2,5,6, to 2 leaves 5,6, and the same edges in the other order give the same", FC.peelCore(tie, 3).join() === "2,5,6" && FC.peelCore(tie, 2).join() === "5,6" && FC.peelCore(new Map([["1>2", 3], ["5>6", 3]]), 3).join() === "2,5,6");
-    ok("a core at least as large as the graph is the whole graph (sorted, ascending), a core of 0 is empty, and the answer is the same twice", FC.peelCore(P, 5).join() === "1,2,3,4,5" && FC.peelCore(P, 99).join() === "1,2,3,4,5" && FC.peelCore(P, 0).length === 0 && FC.peelCore(E, 7).join() === FC.peelCore(E, 7).join());
+    ok("a core at least as large as the graph is the whole graph (sorted, ascending, NUMERICALLY: 9 before 100), a core of 0 is empty, and the answer is the same twice", FC.peelCore(P, 5).join() === "1,2,3,4,5" && FC.peelCore(new Map([["100>9", 1]]), 5).join() === "9,100" && FC.peelCore(P, 99).join() === "1,2,3,4,5" && FC.peelCore(P, 0).length === 0 && FC.peelCore(E, 7).join() === FC.peelCore(E, 7).join());
     ok("a reciprocal pair counts BOTH ways in a neuron's weight (a>b of 3 and b>a of 4 weigh 7 each) and a neuron with no edge never takes part", (() => { const R = new Map([["1>2", 3], ["2>1", 4], ["2>3", 1]]); return FC.peelCore(R, 2).join() === "1,2" && !FC.peelCore(R, 9).includes(99); })());
 }
 
@@ -101,6 +114,7 @@ sec("7. THE VENDORED FILE AND THE TOPOLOGY");
 {
     const dir = path.join(ENG, "vendor", "zebrafish"), J = JSON.parse(fs.readFileSync(path.join(dir, "fish1-ten-core.json"), "utf8")), fly = JSON.parse(fs.readFileSync(path.join(ENG, "vendor", "male-cns", "giant-fiber-circuit.json"), "utf8"));
     const prov = fs.readFileSync(path.join(dir, "PROVENANCE.md"), "utf8");
+    ok("!! THE DEFAULT RULE IS THE ONE THE FILE WAS MADE WITH: the core size is 34 and the file has 34 neurons and records k 34; the threshold is the notebook's 5,000,000 nm^3 and the file records that too", FC.DEFAULTS.k === 34 && J.neuronCount === 34 && J.neurons.length === 34 && J.selection.k === FC.DEFAULTS.k && J.selection.minVolume === FC.DEFAULTS.minVolume && FC.DEFAULTS.minVolume === 5000000 && J.selection.rule === "peelCore");
     ok("!! the file has the fly circuit file's shape, so the baker reads it unchanged: the keys dataset, server, fetchedAt, license, citation, typePattern, neuronCount, edgeCount, neurons, edges (and the selection record), each neuron { bodyId, type, instance }, each edge [from, to, weight]", ["dataset", "server", "fetchedAt", "license", "citation", "typePattern", "neuronCount", "edgeCount", "neurons", "edges"].every((k) => k in J && k in fly) && "selection" in J && J.neurons.every((n) => Number.isInteger(n.bodyId) && typeof n.type === "string" && typeof n.instance === "string") && J.edges.every((e) => e.length === 3));
     ok("!! IT CLAIMS NO LICENCE THE DATA POLICY DOES NOT STATE, AND CITES THE PAPER: the licence line says open access under the data policy and that no licence text is stated (not CC-BY, not MIT); the citation names Petkova, Januszewski, 2025 and bioRxiv; the server is the open bucket's, not the CAVE server", /open access/.test(J.license) && /no licence text is stated/.test(J.license) && !/CC-BY|MIT|Apache/.test(J.license) && /Petkova/.test(J.citation) && /Januszewski/.test(J.citation) && /2025/.test(J.citation) && /bioRxiv/.test(J.citation) && /storage\.googleapis\.com\/fish1-release\/paper_data\//.test(J.server) && !/brain-wire-test/.test(J.server));
     const hexes = prov.match(/\b[0-9a-f]{64}\b/g) || [];
@@ -120,7 +134,28 @@ sec("7. THE VENDORED FILE AND THE TOPOLOGY");
     fs.rmSync(tmp, { recursive: true, force: true });
 }
 
-sec("8. THE DERIVATION FROM THE RAW PACKAGE");
+sec("8. THE COMMAND, on a package small enough to work out by hand");
+{
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "fishcmd_")), pkg = path.join(tmp, "pkg"), out = path.join(tmp, "out", "nested", "core.json"), run = (...a) => spawnSync(process.execPath, [path.join(ENG, "tools", "fishCircuit.mjs"), ...a], { encoding: "utf8", timeout: 60000 });
+    fs.mkdirSync(pkg);
+    const big = (pre, post, n) => Array.from({ length: n }, () => `${pre},14,14,14,${post}`), small = (pre, post, n) => Array.from({ length: n }, () => `${pre},10,10,10,${post}`);   // 14^3 voxels = 5,268,480 nm^3 (over the default 5,000,000); 10^3 = 1,920,000 (under)
+    const rowsOf = [...big(1, 2, 3), ...big(2, 1, 2), ...big(2, 3, 1), ...big(3, 2, 1), ...big(3, 4, 1), ...big(1, 9, 4), ...small(3, 4, 5), ...small(4, 3, 5), "4,x,1,1,3"];
+    fs.writeFileSync(path.join(pkg, "synapse_sizes.csv"), ["pre_neuron_id,bbx,bby,bbz,post_id", ...rowsOf].join("\n") + "\n");
+    fs.writeFileSync(path.join(pkg, "TEN_cats.csv"), "classI,classII,classIII,classIV\n1,2,,\n"); fs.writeFileSync(path.join(pkg, "DMVIDs.csv"), "3\n"); fs.writeFileSync(path.join(pkg, "DMV_InputsIDs.csv"), "4\n");
+    const bare = run("--dir", pkg, "--out", out, "--k", "3"), none = run();
+    ok("!! A DRY RUN WRITES NOTHING and says so (the default is to look, not to write), and the command REFUSES to run without --dir, naming it, with a non-zero exit", bare.status === 0 && !fs.existsSync(out) && /dry run/.test(bare.stdout) && none.status === 1 && /--dir/.test(none.stderr), (bare.stdout + none.stderr).replace(/\n/g, " | ").slice(0, 200));
+    const w = run("--dir", pkg, "--out", out, "--k", "3", "--write"), J = w.status === 0 && fs.existsSync(out) ? JSON.parse(fs.readFileSync(out, "utf8")) : null;
+    ok("!! --write MAKES THE OUTPUT FOLDER AND WRITES THE CIRCUIT worked out by hand: the neurons 1,2,3 (neuron 4 weighs 1 over the threshold and goes first), labelled TEN-I, TEN-II, DMV; the edges 1>2 (3), 2>1 (2), 2>3 (1), 3>2 (1) -- the 1>9 rows have a partner nobody follows, the small 3>4 and 4>3 rows are under the threshold, the bad row is dropped and counted",
+        !!J && JSON.stringify(J.neurons.map((n) => [n.bodyId, n.type, n.instance])) === JSON.stringify([[1, "TEN-I", "fish1:1"], [2, "TEN-II", "fish1:2"], [3, "DMV", "fish1:3"]]) && JSON.stringify(J.edges) === JSON.stringify([[1, 2, 3], [2, 1, 2], [2, 3, 1], [3, 2, 1]]) && J.neuronCount === 3 && J.edgeCount === 4, J ? JSON.stringify(J.edges) : w.stderr.slice(0, 160));
+    ok("!! THE SELECTION RECORD NAMES WHAT WAS DONE and the counts are the data's: rule peelCore, k 3, minVolume 5,000,000, 4 neurons in the set, 5 pairs over the threshold, 22 rows read and 1 dropped; the licence line (open access, no licence text stated, no licence named) and the citation are carried; the stdout line says the core's size and its labels",
+        !!J && J.selection.rule === "peelCore" && J.selection.k === 3 && J.selection.minVolume === 5000000 && J.selection.neuronsInSet === 4 && J.selection.pairsInSet === 5 && J.selection.rowsRead === 22 && rowsOf.length === 23 && J.selection.rowsDropped === 1 && /open access/.test(J.license) && /no licence text is stated/.test(J.license) && !/CC-BY|MIT|Apache/.test(J.license) && /Petkova/.test(J.citation) && /core 3 neurons, 4 edges, 7 synapses/.test(w.stdout) && /"TEN-I":1/.test(w.stdout), w.stdout.replace(/\n/g, " | ").slice(0, 200));
+    const k2 = run("--dir", pkg, "--out", path.join(tmp, "k2.json"), "--k", "2", "--write"), lowv = run("--dir", pkg, "--out", path.join(tmp, "lowv.json"), "--k", "4", "--min-volume", "1000000", "--write");
+    const K2 = JSON.parse(fs.readFileSync(path.join(tmp, "k2.json"), "utf8")), LV = JSON.parse(fs.readFileSync(path.join(tmp, "lowv.json"), "utf8"));
+    ok("!! --k AND --min-volume ARE HONOURED: k 2 leaves neurons 1,2 and record k 2; a minVolume of 1,000,000 lets the small 3>4 and 4>3 rows count (6 pairs, 3>4 with 6 synapses and 4>3 with 5) and the record says so", k2.status === 0 && K2.neurons.map((n) => n.bodyId).join() === "1,2" && K2.selection.k === 2 && lowv.status === 0 && LV.selection.minVolume === 1000000 && LV.selection.pairsInSet === 6 && JSON.stringify(LV.edges.filter((e) => e[0] >= 3 && e[1] >= 3 && e[0] !== e[1])) === JSON.stringify([[3, 4, 6], [4, 3, 5]]), `pairs ${LV.selection.pairsInSet}`);
+    fs.rmSync(tmp, { recursive: true, force: true });
+}
+
+sec("9. THE DERIVATION FROM THE RAW PACKAGE");
 {
     const dir = process.env.FISH_TEN_DIR;
     if (!dir || !fs.existsSync(path.join(dir, "synapse_sizes.csv"))) console.log("  ----  NOT CHECKED HERE: the raw package (TEN_analysis.zip, 3.5 MB) is not in the tree. Set FISH_TEN_DIR to the unzipped folder to re-derive vendor/zebrafish/fish1-ten-core.json from it; the pure functions above are what that derivation is made of");
