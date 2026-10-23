@@ -603,8 +603,11 @@ def cmd_export(args):
     synapse_cols = None
     truncated = []
 
+    def stopped_note():
+        return "Nothing but mauthner_candidates.json is in %s yet; run the same command again with a different --out (or none), or delete that folder." % out.path
+
     def run(label, **q):
-        df = mat.synapse_query(**kw_synapse_query(version, args.max_rows, **q))
+        df = call_with_retries(args, label, lambda: mat.synapse_query(**kw_synapse_query(version, args.max_rows, **q)), None, stopped_note)
         rows = rows_of(df)
         if len(rows) >= args.max_rows:
             truncated.append(label)
@@ -1031,10 +1034,16 @@ def cmd_giants_once(args):
                 out.warnings.append("TRUNCATED: %s returned the --max-rows limit of %d; raise --max-rows" % (label, args.max_rows))
                 say("WARNING: " + out.warnings[-1])
         pre_c, post_c = pre_post_columns(columns_of(q_in) or columns_of(q_out))
+    syn_res, why = [], None
     try:
         syn_res = list(mat.get_table_metadata(syn_table, **kw_table_metadata(version)).get("voxel_resolution") or [])
-    except Exception:
-        syn_res = []
+        if not syn_res:
+            why = "the table's metadata names no voxel size"
+    except Exception as e:
+        why = "%s: %s" % (type(e).__name__, brief(e))
+    if why:   # not swallowed: without the voxel size the extent columns cannot be given in micrometres, and a blank column is not an answer
+        out.warnings.append("The voxel size of the synapse table %s could not be read (%s): the extent columns of giants_top.csv are blank; the soma positions and the counts are not affected." % (syn_table, why))
+        say("WARNING: " + out.warnings[-1])
     cands = []
     for rank, root in enumerate(top, 1):
         c = cells[root]

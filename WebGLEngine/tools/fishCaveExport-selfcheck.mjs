@@ -99,6 +99,12 @@
 // gate THROW on the missing progress file, which hides every row after it: a missing file now reads as nulls, so the row that wanted it fails and the rest run. ALSO FOUND BY WRITING THE ROWS: the third failure of a page printed 'page 3' and the next
 // round 'page 1' -- a round counts its pages from where it starts, said in the keep-trying row; and two places where the script did the same thing twice (the builtin connection errors matched by name AND by type; the shrink bounded by a min() AND by a
 // guard) were each cut to one, because removing either copy would have changed nothing and a mutant of it could only have read 0 red.
+//
+// THE THIRD REAL RUN (2026-10-23: the whole synapse table read, 29,474,316 rows, 100%, resumed by itself, no warnings) GAVE TWO THINGS TO FIX. Every extent column of giants_top.csv was BLANK and nothing said why: the synapse table's voxel size was read
+// inside a bare `except Exception: syn_res = []`; it is now a warning on the console and in the manifest, naming the table and the reason (the error's first line, or 'names no voxel size'). And `export`, the command run next, had no retry for its synapse
+// queries; they are retried like the pass, and a stop says that only mauthner_candidates.json is in the folder, so the next run needs a different --out (the same command into the same folder IS refused, and a row holds that). SABOTAGED, 6 mutants,
+// every one red by name: W01 export's synapse query is not retried 2 | W02 export's stop gives no advice about the folder 1 | W03 a failed voxel-size read is swallowed again 1 | W04 an empty voxel size is not noticed 1 | W05 the warning gives no reason 1
+// | W06 the stop's advice is replaced by 'run again' 1. THE BLANK EXTENTS' CAUSE IS NOT KNOWN: the real call may have failed or the metadata may have named no voxel size; the next real run will say which, in its warnings.
 // NOT CHECKED: that the real server's 500 is the kind a pause cures (it may be a time limit on a deep OFFSET, in which case smaller pages help less than hoped and the answer is a different query); the real requests / urllib3 exception classes
 // (the stand-in builds classes of the same NAMES, which is all the script reads); a Ctrl+C on Windows (the gate raises it with _thread.interrupt_main, which is the same KeyboardInterrupt the console delivers, not the console event itself);
 // and any of section 12 against the real server.
@@ -249,9 +255,9 @@ class _Mat:
         if _fix.get("count_none") and table_name in _fix["count_none"]: return None   # a table whose size the server does not give
         return _np(_fix["tables"][table_name]["count"])
     def get_table_metadata(self, table_name, datastack_name=None, version=None, log_warning=True):
-        _write({"call": "get_table_metadata", "table": table_name, "version": version}); t = _fix["tables"][table_name]
+        _write({"call": "get_table_metadata", "table": table_name, "version": version}); _maybe_fail("get_table_metadata", table_name); t = _fix["tables"][table_name]
         md = {"schema": t["schema"], "description": "stand-in table " + table_name, "voxel_resolution": t.get("voxel_resolution", [8, 8, 30])}
-        if _fix.get("no_voxel"): del md["voxel_resolution"]
+        if _fix.get("no_voxel") or table_name in _fix.get("no_voxel_for", []): del md["voxel_resolution"]
         return md
     def query_table(self, table, limit=None, split_positions=False, materialization_version=None, metadata=True, filter_in_dict=None, select_columns=None, offset=None, random_sample=None, **kw):
         _write({"call": "query_table", "table": table, "limit": limit, "split_positions": split_positions, "version": materialization_version, "metadata": metadata, "filter_in_dict": filter_in_dict, "select_columns": select_columns, "offset": offset, "random_sample": random_sample})
@@ -811,6 +817,32 @@ sec("11. the big-neuron finder (giants): a fixture with a mirror pair, a fragmen
     const rke = run(gArgs(OLD, ["--keep-trying", "2", "--cooldown", "0.001"]), { env: E });
     ok("!! ONLY THE SERVER GIVING UP IS TRIED AGAIN: with --keep-trying 2, Ctrl+C exits 130 after ONE attempt (page 3 asked once, no 'waiting' line), a mistake in the request exits 1 after one attempt, and a refusal (the other snapshot's counts) exits 2 -- none of them loops",
         rkc.status === 130 && pg(rkc).map((c) => c.offset).join() === "0,80,160" && !/--keep-trying: waiting/.test(rkc.stdout) && (rkc.stderr.match(/STOPPED by you/g) || []).length === 1 && rkd.status === 1 && pg(rkd).map((c) => c.offset).join() === "0,80" && !/--keep-trying: waiting/.test(rkd.stdout) && rke.status === 2 && !/--keep-trying: waiting/.test(rke.stdout), (rkc.stderr + rkd.stderr + rke.stderr).slice(0, 200));
+    // the voxel size of the synapse table, and export's queries
+    flaky([{ call: "get_table_metadata", table: "synapses", from: 1, to: 1, status: 500 }]);
+    const VM = outDir("g_voxel_fail"), rvm = run(gArgs(VM, RA), { env: E }); watch(rvm, VM);
+    writeFixture(Object.assign(JSON.parse(JSON.stringify(GFIX)), { no_voxel_for: ["synapses"] }));
+    const VN = outDir("g_voxel_none"), rvn = run(gArgs(VN, RA), { env: E }); watch(rvn, VN);
+    writeFixture(GFIX);
+    const blankExt = (d) => csvRows(d, "giants_top.csv").every((r) => r.extent_x_um === "" && r.extent_y_um === "" && r.extent_z_um === ""), ranking = (d) => csvRows(d, "giants_top.csv").map((r) => r.root_id + ":" + r.in_degree + ":" + r.out_degree).join();
+    ok("!! A SYNAPSE TABLE WHOSE VOXEL SIZE CANNOT BE READ IS SAID, NOT SWALLOWED (the real run's extent columns were all blank and nothing said why): when the metadata call fails (a 500) or names no voxel size, the run still finishes with the clean run's ranking and counts, the extent columns are blank, and the console and the manifest each carry a warning naming the table and the reason (the error's first line, or 'names no voxel size'); the clean run has extents and no warning",
+        rvm.status === 0 && rvn.status === 0 && blankExt(VM) && blankExt(VN) && ranking(VM) === ranking(A) && ranking(VN) === ranking(A) && !blankExt(A) && manOf(A).warnings.length === 0
+        && manOf(VM).warnings.some((w) => /The voxel size of the synapse table synapses could not be read \(_HttpError: 500 Server Error/.test(w)) && manOf(VN).warnings.some((w) => /could not be read \(the table's metadata names no voxel size\)/.test(w)) && /WARNING: The voxel size of the synapse table synapses could not be read/.test(rvm.stdout + rvn.stdout), (rvm.stderr + rvn.stderr).slice(0, 200));
+
+    const EA = ["export", "--datastack", "fish1_test", "--root-ids", "1001,1002", "--hops", "1"], eflaky = (list) => { const f = JSON.parse(JSON.stringify(FIXTURE)); f.flaky = list; writeFixture(f); };
+    writeFixture(FIXTURE);
+    const EC = outDir("e_clean"), rec = run([...EA, "--out", EC], { env: E }); watch(rec, EC);
+    eflaky([{ call: "synapse_query", from: 1, to: 1, status: 503 }]);
+    const EF = outDir("e_flaky"), ref = run([...EA, ...RA, "--out", EF], { env: E }); watch(ref, EF);
+    eflaky([{ call: "synapse_query", from: 1, status: 503 }]);
+    const ED = outDir("e_dead"), red = run([...EA, ...RA, "--retries", "1", "--out", ED], { env: E }); watch(red, ED);
+    const edFiles = fs.readdirSync(ED).join();
+    writeFixture(FIXTURE);
+    const red2 = run([...EA, ...RA, "--out", ED], { env: E });
+    const same = ["synapses_out.csv", "synapses_in.csv", "edges.csv", "partners.csv", "cells_summary.json"];
+    ok("!! export'S SYNAPSE QUERIES ARE RETRIED TOO (the second real giants run's server failed in the middle of a long job, and export had no way to go on): the first query (the synapses OUT of the cells) fails once with a 503; the run says so and asks again (the stand-in saw 3 synapse queries, the clean run 2), exits 0, and " + same.join(", ") + " are byte for byte the clean run's",
+        rec.status === 0 && ref.status === 0 && rec.log.filter((c) => c.call === "synapse_query").length === 2 && ref.log.filter((c) => c.call === "synapse_query").length === 3 && /synapses out of the cells: the server answered HTTP 503/.test(ref.stdout) && same.every((f) => rd(EF, f) === rd(EC, f)), (rec.stderr + ref.stderr).slice(0, 200));
+    ok("!! WHEN export'S SERVER NEVER ANSWERS IT STOPS AND TELLS THE TRUTH ABOUT THE FOLDER: after 2 tries the run exits 3 with STOPPED, the query, the HTTP 503, and 'run the same command again with a different --out' because the folder holds only mauthner_candidates.json -- and the same command into that same folder IS refused ('is not empty'), so the instruction is the right one",
+        red.status === 3 && /STOPPED: synapses out of the cells got no good answer from the server after 2 tries \(HTTP 503/.test(red.stderr) && /different --out/.test(red.stderr) && edFiles === "mauthner_candidates.json" && red2.status === 2 && /is not empty/.test(red2.stderr), red.stderr.slice(0, 300));
     writeFixture(GFIX);
     const rv = [["--retries", "-1"], ["--min-chunk-rows", "0"], ["--retry-wait", "-1"], ["--keep-trying", "-1"], ["--cooldown", "-1"]].map((x) => run(gArgs(outDir("g_badopt" + x[0]), x), { env: E }));
     ok("the new options are checked before the network is touched: --retries -1, --min-chunk-rows 0, --retry-wait -1, --keep-trying -1 and --cooldown -1 each exit 2 naming the options, with an empty stand-in log", rv.every((r) => r.status === 2 && /cannot be negative, and --min-chunk-rows must be at least 1/.test(r.stderr) && r.log.length === 0));
