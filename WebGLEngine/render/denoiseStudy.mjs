@@ -21,7 +21,7 @@
 // Without it everything is computed, as before; with it the result is the same, bit for bit
 // (render/denoiseCache-selfcheck.mjs). A scene rendered under --harvest is never served to a run without it.
 "use strict";
-import { SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, SPLITS_R8, SPLITS_R9, SPLITS_R10, SPLITS_R11, SPLITS_MESH, SPLITS_FSR1, SPLITS_HALFRES, SPLITS_EMITTER, SPLITS_TEMPORALUP, SPLITS_R47, SPLITS_MESH_C, SPLITS_PAGE, familyOf, makeScene, IMAGE, SPP_IN, SPP_REF, renderImages, renderSeeds, inputChannels, remodulate } from "./denoiseScenes.mjs";
+import { SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, SPLITS_R8, SPLITS_R9, SPLITS_R10, SPLITS_R11, SPLITS_MESH, SPLITS_FSR1, SPLITS_HALFRES, SPLITS_EMITTER, SPLITS_TEMPORALUP, SPLITS_R47, SPLITS_MESH_C, SPLITS_PAGE, SPLITS_FRAMEGEN, familyOf, makeScene, IMAGE, SPP_IN, SPP_REF, renderImages, renderSeeds, inputChannels, remodulate } from "./denoiseScenes.mjs";
 import { renderSequence, temporalChannels, sequenceSeeds } from "./denoiseTemporal.mjs";
 import { withMask, emitterCoverage, emitterRadiance, MASK_STRIDE, MASK_CHANNEL, COVERAGE_GRID } from "./denoiseMask.mjs";
 import { jointBilateral, tuneFilter } from "./denoiseFilter.mjs";
@@ -30,6 +30,7 @@ import { relMSE, verdict, trainFit, historyFit, trainSanity, effects } from "./d
 import { cached, cachedMany, hashArrays } from "./denoiseCache.mjs";
 import { upscale, renderUpscaleImages, renderSeedsUpscale, emitterAwareUpscale, fillEmitters, compositeEmitters, nearEmitterShare, RCAS_SHARPNESS, RCAS_DENOISE, GAMMA } from "./denoiseUpscale.mjs";
 import { trainParallel } from "./denoisePool.mjs";
+import { renderFrameGenImages, frameGenSeeds, frameGenFrames, FRAMEGEN_FILL } from "./denoiseFrameGen.mjs";
 import { renderTemporalUpscaleImages, temporalUpscaleSeeds, accumulateUpscaled, shiftResample, sequenceGeometry, halfShift, JITTER } from "./denoiseTemporalUpscale.mjs";
 
 export const SEEDS = Object.freeze([1, 2, 3]);
@@ -394,6 +395,51 @@ export function runTemporalUpscaleStudy({ splits = ROUND_TEMPORALUP.splits, net,
     const seedsDistinct = new Set(allSeeds).size === allSeeds.length;
     const V = verdict({ sets: temporalUpSets(tables), shuffled: null, c2Prior, determinism, seedsDistinct, test });
     const secondary = { clamp: effects(tables.BtNoClamp, tables.Bt), historyAtFull: effects(tables.D1, tables.Dt), dAwareVsBt: effects(tables.DtAware, tables.Bt), history };
+    return { verdict: V, tables, secondary, timings, determinism, seedsDistinct, seedCount: allSeeds.length, config };
+}
+
+/**
+ * Section 133, ROUND 59, FSR3's FRAME GENERATION between two of round 32's chain frames (render/denoiseFrameGen.mjs). Per image,
+ * against a frame traced at the midpoint of the orbit's last step:
+ *   G  the CANDIDATE -- interpolateFrameCPU at t = 0.5 between O6 and O7 along the scene's own motion, FRAMEGEN_FILL
+ *   X  the cross-fade, 0.5 O6 + 0.5 O7         R  O6, the older frame repeated
+ * H1: G beats X. H2: G beats R. Each hypothesis's noisy frame is the newer frame's half-size input through the chain's fill,
+ * bilinear upscale, shift and composite. Reported, never tested: Bmid1 (the chain on the midpoint frame alone), G without its
+ * fill, the holes, the field's check on the geometry.
+ */
+export const RESULTS_FRAMEGEN = "render/denoise-results-framegen.json";
+export const ROUND_FRAMEGEN = Object.freeze({ splits: SPLITS_FRAMEGEN, image: 256, test: "signflip", c2Prior: ROUND_MESH.c2Prior, results: RESULTS_FRAMEGEN });
+/** Section 133's two hypotheses over a round 59 table, by name, so the run and the verdict's re-derivation read one definition. */
+export const frameGenSets = (t) => ({ H1: { noisy: t.noisy, filter: t.X, net: [t.G], floor: t.floor }, H2: { noisy: t.noisy, filter: t.R, net: [t.G], floor: t.floor } });
+export function runFrameGenStudy({ splits = ROUND_FRAMEGEN.splits, net, test = ROUND_FRAMEGEN.test, c2Prior = ROUND_FRAMEGEN.c2Prior,
+                                   harvest = false, image = IMAGE, sppIn = SPP_IN, sppRef = SPP_REF, cache = null, log = () => {} } = {}) {
+    if (!net) throw new Error("denoiseStudy: runFrameGenStudy needs the shipped network, decoded by its caller");
+    const t0 = Date.now(), timings = {}, split = splits.T1;
+    const lap = (k) => { timings[k] = Date.now() - t0; log(`${k} at ${(timings[k] / 1000).toFixed(1)} s`); };
+    const config = { image, half: image / 2, sppIn, sppRef, harvest, test, c2Prior, fill: FRAMEGEN_FILL, t: 0.5, field: "the scene's own: eye 7's first hits projected into camera 6, per pixel",
+                     trained: "nothing -- the shipped network", split: { family: split.family, n: split.seeds.length, first: split.seeds[0] },
+                     hypotheses: { H1: "G (generated between O6 and O7) against X (their cross-fade)", H2: "G against R (O6 repeated)" } };
+    const keys = ["G", "X", "R", "O7", "noisy", "Bmid1", "GNoFill"], tables = Object.fromEntries(keys.map((k) => [k, []]));
+    tables.floor = [];
+    const field = [];
+    let determinism = true;
+    // ONE IMAGE AT A TIME, as round 32: a sequence is nine frames and four full-size images
+    split.seeds.forEach((seed, i) => {
+        const fam = familyOf(split, i);
+        const seq = cached(cache, `framegen-${fam}-${seed}-${image}-${sppIn}-${sppRef}-${harvest ? "harvest" : "gate"}`,
+            () => renderFrameGenImages(fam, seed, { harvest, w: image, h: image, sppIn, sppRef }));
+        const F = frameGenFrames(seq, net);
+        for (const k of keys) tables[k].push(relMSE(F[k], seq.ref));
+        tables.floor.push(relMSE(seq.ref2, seq.ref));
+        field.push(F.field);
+        // C4: the candidate re-made from the same sequence, bit for bit -- the chain twice, the field, the splat, the fill
+        if (i === 0) determinism = frameGenFrames(seq, net).G.every((v, j) => Object.is(v, F.G[j]));
+        lap(`image ${i + 1} of ${split.seeds.length} (${fam} ${seed})`);
+    });
+    const allSeeds = split.seeds.flatMap((s) => { const r = frameGenSeeds(s); return [...r.half, r.mid, r.ref, r.ref2]; });
+    const seedsDistinct = new Set(allSeeds).size === allSeeds.length;
+    const V = verdict({ sets: frameGenSets(tables), shuffled: null, c2Prior, determinism, seedsDistinct, test });
+    const secondary = { midTraced: effects(tables.Bmid1, tables.G), fill: effects(tables.GNoFill, tables.G), newerShown: effects(tables.O7, tables.G), field };
     return { verdict: V, tables, secondary, timings, determinism, seedsDistinct, seedCount: allSeeds.length, config };
 }
 

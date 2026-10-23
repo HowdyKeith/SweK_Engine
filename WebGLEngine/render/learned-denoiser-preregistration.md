@@ -9032,3 +9032,115 @@ it still says nothing of any other material, light or sky.
   and pair.
 
 **What it does not change.** No kernel, table, weight or filter changes, only the page's note.
+
+## 133. ROUND 59 -- FSR3's FRAME GENERATION BETWEEN THE CHAIN's FRAMES (`denoise-fsr3-framegen`): FIXED BEFORE ITS CODE AND ITS TEST SCENES
+
+Committed with the code that implements it. No scene of this round's test set has been rendered.
+
+**Why this round.** Keith asked for FSR 1, 2 and 3 completed before FSR4 starts. For three.js scenes, FSR3's frame
+generation has run v4736-v4812. On the path tracer's output it has not run. Round 32 (section 96) showed round 30's
+half-size chain, accumulated over eight jittered frames, beats both of its arms. This round puts FSR3's generator between
+two of that chain's frames:
+
+> **Is a frame generated halfway between two of the chain's frames, along the scene's own motion, closer to a frame really
+> traced there than the two cheaper frames that could be shown instead?**
+
+**Nothing is trained or tuned.** The network is round 11's seed 1 (section 79's sha-256). The chain is round 32's
+(section 95) exactly, at round 32's size, 256 x 256 (each frame traced at 128 x 128): each frame half size at 4 samples, denoised, filled, EASU to full size, shifted to its unjittered
+grid, accumulated with the clamp, the light sources composited once. The generator is the one FSR3 runs on
+fsr-three.html, as its defaults stand: `render/frameInterp.mjs`'s `interpolateFrameCPU`, the CPU reference the TSL
+generator is held to. In detail:
+- a per-pixel field (block 1), indexed by the newer frame;
+- nearest-surface depth;
+- `fill: { radius: 4, reach: 16, side: "blend" }` (prefer "farther"), `fsrFrameGenTsl.mjs`'s `makeFrameGen` default;
+- t = 0.5.
+
+**The sequence, per scene.** It is round 32's camera path: the orbit of FRAMES = 8 frames, arriving at the scene's eye,
+each frame jittered by JITTER.
+- **O6 and O7** are the chain's outputs after frames 6 and 7, accumulated through them, each composited with the light
+  sources at its own eye, on its own unjittered grid. So O7 is round 32's Bt.
+- **The midpoint eye** is halfway along the orbit's last step: the same ring and height, at the mean of frames 6's and
+  7's angles.
+- **The truth** is a full-size reference at 1024 samples from the midpoint eye, unjittered, with a second one for C3.
+
+**The motion field: the scene's own.** It is what an engine hands FSR3, with no optical flow. For each pixel of O7's grid,
+the first hit from eye 7 is projected into camera 6, by `reproject`'s own inversion of `pixelRay`. The pixel's vector is
+its position in frame 7 less its position in frame 6. A sky pixel's direction is projected the same way, as a point at
+infinity. Depth is the distance along camera 7's forward axis, with sky at 1e9.
+
+**The arms, each against the truth:**
+- **G**, the candidate: `interpolateFrameCPU({ prev: O6, cur: O7, flow, depthBlock: depth, block: 1, indexedBy: "cur",
+  t: 0.5, fill })`.
+- **X**: the cross-fade, `crossFadeCPU`, 0.5 O6 + 0.5 O7.
+- **R**: repeating the older frame, O6.
+
+**Hypotheses**, with section 6's statistic and section 28's test, Holm over the two at 0.05:
+- **H1: G beats X**, `d = ln relMSE(X) - ln relMSE(G)`;
+- **H2: G beats R**, `d = ln relMSE(R) - ln relMSE(G)`.
+
+**The split** (`SPLITS_FRAMEGEN`): T1, 6 of R (**53000-53005**) and 6 of C (**54000-54005**), each as its own family. That
+is round 32's split shape, on seeds no earlier split touched.
+
+**Controls.**
+- **C1, per hypothesis:** both of its arms beat the noisy frame on at least 11 of 12. The noisy frame is the newer frame's
+  half-size input, bilinear to full size, shifted and composited (round 32's noisyHalf, at frame 7).
+- **C2:** cited from round 11.
+- **C3:** G within 2 x of the floor on more than half the images makes that hypothesis not resolvable.
+- **C4:** G re-made from the same sequence, bit for bit.
+- **C5:** distinct render seeds.
+
+**Secondary, reported, never tested:**
+- **Bmid1:** the chain on the midpoint frame alone, traced there (half size, 4 samples, denoised, filled, EASU,
+  composited), with no history. It is the cost of not generating.
+- G without the fill (its holes left black).
+- The holes, and how many pixels the fill reached.
+- The field's own check, on the geometry: each pixel's first hit from eye 7 against the hit from eye 6 at the pixel its
+  vector points to, against the same pixel unmoved, as mean point distances. It was first written on the images, as O6
+  moved along the field against O7. That reads the composited light sources, up to 30 x their surroundings, and a
+  one-pixel rounding at a light's edge outweighed every other pixel: moved read WORSE than unmoved on the pilot while
+  the geometry said the field was right.
+
+**What each outcome buys.**
+- **H1 and H2 supported:** FSR3's arrangement runs on the path tracer's output as it runs on fsr-three.html's. A device
+  round, the generator's TSL pass after the chain on denoise.html, is next, then a rig timing round.
+- **H2 only:** the generated frame beats showing the old one but not the cross-fade. That is fsrFrameGen-selfcheck's own
+  finding on smooth content, now on path-traced frames, and the device round is not owed.
+- **Neither, not reported or not resolvable:** recorded as found.
+
+**Predictions, fixed now, deciding nothing.**
+- **P1:** C1 holds.
+- **P2: H2 is supported.** Repeating O6 is half a step behind the truth, everywhere.
+- **P3: H1 is supported, by less than H2.** The orbit's steps are 1.5-4 degrees, a few pixels at 256 x 256. The
+  cross-fade doubles every edge by that much, and the generator moves the edge instead. fsr-three.html's margin over the
+  cross-fade was +0.15 to +1.00 dB.
+- **P4:** Bmid1, the midpoint traced alone, loses to G on most images. One frame's 4 samples without history is round 32's
+  B1, which Bt beat on 12 of 12.
+- All four are reported either way.
+
+**What was seen first.**
+- Everything in sections 1-132.
+- **The pilot, on R 990901 and C 990902 outside every split, at 64 x 64 with 64-sample references, NO arm graded against
+  them:**
+  - every arm was finite;
+  - the splat left 206 and 150 holes, and the fill reached all of them;
+  - the field moved pixels 2.7 and 2.3 px on average, on orbit steps of 3.6 and 2.4 degrees;
+  - moved along it, a pixel's surface point lay 0.048 and 0.019 from the newer frame's, against 0.129 and 0.065 unmoved;
+  - an image took 2-3 s to render and 1-1.5 s to make its frames.
+- Nothing of the test set has been rendered.
+
+**The code, gated before the harvest.**
+- `render/denoiseFrameGen.mjs` is gated by its own `render/denoiseFrameGen-selfcheck.mjs`:
+  - the midpoint;
+  - `projectTo` inverting `pixelRay`;
+  - the field on the geometry;
+  - G as `interpolateFrameCPU`'s own frame;
+  - X as the cross-fade;
+  - FRAMEGEN_FILL as `makeFrameGen`'s default, read off its text;
+  - the seeds and the split.
+- `render/denoiseStudy-selfcheck.mjs` section 14d covers the round and its command.
+- Sabotages FG1-FG7, R84 and R85 each turned red.
+
+**The command:** `node tools/denoiseStudy.mjs --harvest-framegen --cache <dir>` -> `render/denoise-results-framegen.json`.
+- It refuses if the file exists.
+- It runs here, about as long as round 32's harvest (35 minutes).
+- The file is committed byte for byte before it is read, and section 134 reads it.

@@ -2485,11 +2485,10 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "denoise-fsr3-framegen",
-        blocker: "UPSTREAM",
-        what: "FSR3's frame generation between denoised, upscaled frames -- fx/fsr/fsr3Tsl.mjs's arrangement, on the path tracer's output.",
-        how: "Needs FSR2's motion field first; fsrFrameGen-selfcheck's own finding (a generated frame loses to a cross-fade on smooth content) applies and would be re-measured on path-traced frames.",
-        why: "Doubles presented frames without a second trace or denoise.",
-        upstream: "denoise-fsr2-temporal.",
+        blocker: "OPEN",
+        what: "FSR3's frame generation between denoised, upscaled frames -- fx/fsr/fsr3Tsl.mjs's arrangement, on the path tracer's output. ROUND 59 (pre-registration section 133) is its study: interpolateFrameCPU, with fsr-three.html's defaults, between two of round 32's chain frames along the scene's own motion, against a frame traced at the midpoint; H1 against the cross-fade, H2 against repeating the older frame. Its harvest is committed before it is read, and section 134 is its verdict.",
+        how: "render/denoiseFrameGen.mjs and its gate; node tools/denoiseStudy.mjs --harvest-framegen -> render/denoise-results-framegen.json. If both hold, a device round (the generator's TSL pass after the chain on denoise.html) and a rig timing round follow.",
+        why: "Doubles presented frames without a second trace or denoise. Keith asked for FSR 1-3 completed before FSR4 starts; this is FSR3's piece left on the path tracer's side.",
     },
     {
         id: "fsr4-learned-upscaler",

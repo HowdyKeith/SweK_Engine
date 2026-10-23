@@ -108,6 +108,8 @@
 //   R81 (section 132) the file's H1 typed as not supported                       1 RED -- the re-derivation row
 //   R82 the page's note without the furnace                                      1 RED -- the scope row
 //   R83 the furnace's network error typed below its input                        3 RED -- the re-derivation row, the reading row, the predictions row
+//   R84 (section 133) frameGenSets' H1 against the repeated frame                  1 RED -- the frameGenSets row
+//   R85 --harvest-framegen at the default image size                             1 RED -- the command row
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -566,7 +568,7 @@ console.log("\n14c. ROUND 58: path-tracer.html'S OWN SIX SCENES, THE SHIPPED PAI
         `run ${V.run}; ${JSON.stringify(out.config.splits)}${V.reasons.length ? "; " + V.reasons.join(" | ") : ""}`);
     // the command: section 79's branch on ROUND_PAGE, with its C1, writing its own file and never an existing one, logging no verdict
     const cli = fs.readFileSync(path.join(ENG, "tools/denoiseStudy.mjs"), "utf8");
-    const b0 = cli.indexOf('} else if (args.includes("--harvest-page")) {'), branch = b0 >= 0 ? cli.slice(b0, cli.indexOf("} else if (round) {", b0)) : "";
+    const b0 = cli.indexOf('} else if (args.includes("--harvest-page")) {'), branch = b0 >= 0 ? cli.slice(b0, cli.indexOf('} else if (args.includes("--harvest-framegen")) {', b0)) : "";
     const code = branch.replace(/\/\/.*$/gm, "");
     ok("!! --harvest-page decodes the shipped file with decodeNet, runs runShippedStudy on ROUND_PAGE's split with its C1 under harvest, writes ROUND_PAGE.results and never an existing one, and logs no verdict",
         branch.length > 400 && /decodeNet\(shipped\.net\)/.test(code) && /filter: shipped\.filter/.test(code) && /runShippedStudy\(\{ splits: ROUND_PAGE\.splits, c1Min: ROUND_PAGE\.c1Min,/.test(code) && /harvest: true/.test(code) &&
@@ -598,6 +600,40 @@ console.log("\n14c. ROUND 58: path-tracer.html'S OWN SIX SCENES, THE SHIPPED PAI
         ok("!! ...and the page's scope note widens exactly as section 131 allowed: the path tracer page's six scenes, section 132 cited, the furnace named, no other material, light or sky",
             /path tracer page's own six\s+scenes/.test(scope) && /section 132/.test(scope) && /furnace/.test(scope) && /any other material, light or sky/.test(scope));
     } else ok("!! section 132 reads render/denoise-results-page.json, and it is not there", false);
+}
+
+console.log("\n14d. ROUND 59: FSR3's FRAME GENERATION BETWEEN TWO OF ROUND 32's CHAIN FRAMES (pre-registration section 133)");
+{
+    const { runFrameGenStudy, ROUND_FRAMEGEN, RESULTS_FRAMEGEN, frameGenSets, ROUND_TEMPORALUP, SHIPPED_NET } = await imp("render/denoiseStudy.mjs");
+    const D = await imp("render/denoiseScenes.mjs"), { decodeNet } = await imp("render/denoiseDevice.mjs");
+    const net = decodeNet(JSON.parse(fs.readFileSync(path.join(ENG, SHIPPED_NET), "utf8")).net);
+    const earlier = new Set([D.SPLITS, D.SPLITS_R2, D.SPLITS_R3, D.SPLITS_R4, D.SPLITS_R5, D.SPLITS_R6, D.SPLITS_R7, D.SPLITS_R8, D.SPLITS_R9, D.SPLITS_R10, D.SPLITS_R11, D.SPLITS_MESH, D.SPLITS_FSR1,
+        D.SPLITS_HALFRES, D.SPLITS_EMITTER, D.SPLITS_TEMPORALUP, D.SPLITS_R47, D.SPLITS_MESH_C, D.SPLITS_PAGE].flatMap((S) => Object.values(S).flatMap((x) => x.seeds)));
+    ok("!! ROUND_FRAMEGEN: its split on seeds no earlier split used, round 32's image size, the sign-flip test, C2 cited from round 11 -- its own results file",
+        ROUND_FRAMEGEN.splits === D.SPLITS_FRAMEGEN && D.SPLITS_FRAMEGEN.T1.seeds.every((s2) => !earlier.has(s2)) && ROUND_FRAMEGEN.image === ROUND_TEMPORALUP.image && ROUND_FRAMEGEN.image === 256 &&
+        ROUND_FRAMEGEN.test === "signflip" && ROUND_FRAMEGEN.c2Prior === ROUND_TEMPORALUP.c2Prior && RESULTS_FRAMEGEN === "render/denoise-results-framegen.json" && ROUND_FRAMEGEN.results === RESULTS_FRAMEGEN);
+    // the two hypotheses' sets by name: G the candidate's column in both, X and R the comparators, the newer frame's noisy input
+    const t = { G: [1], X: [2], R: [3], noisy: [4], floor: [5] }, hs = frameGenSets(t);
+    ok("  frameGenSets: H1 G against the cross-fade X, H2 G against the repeated R, both over the newer frame's noisy input and the floor",
+        hs.H1.net[0] === t.G && hs.H1.filter === t.X && hs.H2.net[0] === t.G && hs.H2.filter === t.R && hs.H1.noisy === t.noisy && hs.H2.noisy === t.noisy && hs.H1.floor === t.floor);
+    let threw = null; try { runFrameGenStudy({ net, image: 4, sppIn: 1, sppRef: 1 }); } catch (e) { threw = e.message; }
+    ok("!! on the REAL split without harvest it is refused at its first scene", /seed 53000 is a dataset seed/.test(threw || ""), threw);
+    // the miniature: an R and a C scene outside every split at 16 x 16 -- the PLUMBING, no number read for its value
+    const mini = Object.freeze({ T1: Object.freeze({ family: "R+C", families: Object.freeze(["R", "C"]), seeds: Object.freeze([990910, 990911]) }) });
+    const out = runFrameGenStudy({ splits: mini, net, image: 16, sppIn: 4, sppRef: 8 }), V = out.verdict;
+    ok("!! end to end on the miniature: both hypotheses, every arm measured on both images, C4 from the frames re-made, C5 over 22 render seeds, C2 cited, the field's check reported, and not reported by C1 alone (two images)",
+        Object.keys(V.hypotheses).join() === "H1,H2" && ["G", "X", "R", "O7", "noisy", "Bmid1", "GNoFill", "floor"].every((k) => out.tables[k].length === 2 && out.tables[k].every(Number.isFinite)) &&
+        out.determinism === true && out.seedsDistinct === true && out.seedCount === 22 && V.controls.C2.citedFrom === 11 && out.secondary.field.length === 2 &&
+        // at 16 x 16 the field moves pixels under half a pixel on one of the two, and the check rounds to whole pixels: no farther, there
+        out.secondary.field.every((f) => f.pointWarped <= f.pointStill && f.holes === 0) && out.config.fill.reach === 16 &&
+        V.run === "not reported" && V.reasons.length === 2 && V.reasons.every((r) => /^C1 on H[12]: .* of 2; both need 11$/.test(r)), `run ${V.run}, by C1 alone on two images`);
+    const cli = fs.readFileSync(path.join(ENG, "tools/denoiseStudy.mjs"), "utf8");
+    const b0 = cli.indexOf('} else if (args.includes("--harvest-framegen")) {'), branch = b0 >= 0 ? cli.slice(b0, cli.indexOf("} else if (round) {", b0)) : "";
+    const code = branch.replace(/\/\/.*$/gm, "");
+    ok("!! --harvest-framegen decodes the shipped file with decodeNet, runs runFrameGenStudy on ROUND_FRAMEGEN at its size under harvest, writes ROUND_FRAMEGEN.results and never an existing one, records its commit, and logs no verdict",
+        branch.length > 400 && /decodeNet\(shipped\.net\)/.test(code) && /runFrameGenStudy\(\{ splits: ROUND_FRAMEGEN\.splits, image: ROUND_FRAMEGEN\.image,/.test(code) && /harvest: true/.test(code) &&
+        /path\.join\(ENG, ROUND_FRAMEGEN\.results\)/.test(code) && /existsSync\(file\)/.test(code) && /sha256/.test(code) && /out\.commit = /.test(code) && !/ROUND_TEMPORALUP/.test(code) && !/verdict|status|supported/.test(code));
+    ok("  its results are not yet written: section 134 reads them once the harvest's file is committed", !fs.existsSync(path.join(ENG, RESULTS_FRAMEGEN)));
 }
 
 console.log("\n15. THE UPSCALE ROUND: HALF SIZE + FSR1 AGAINST THE FRAMES IT COULD BE INSTEAD (pre-registration section 81)");
