@@ -123,6 +123,27 @@ export function conv2dCpuF16(x, H, W, layer) { return forward(x, H, W, layer, f1
 /** Its fused mirror: each f16 multiply-add rounded once, as a compiler that contracts it to an fma would. */
 export function conv2dCpuF16Fma(x, H, W, layer) { return forward(x, H, W, layer, f16round, true, false); }
 
+// ---- HALF-PRECISION STORAGE (the denoiser arc, round 57: pre-registration section 129) -----------------------------------
+/** The value of a binary16's 16 bits: the inverse of f16bits over every finite value, the infinities and NaN. */
+export function f16fromBits(b) {
+    const s = b & 0x8000 ? -1 : 1, e = (b >> 10) & 31, m = b & 1023;
+    if (e === 31) return m ? NaN : s * Infinity;
+    return e === 0 ? s * m * 2 ** -24 : s * (1 + m / 1024) * 2 ** (e - 15);
+}
+/** A buffer of packed f16 pairs (as the device stores them, two channels a u32, the lower channel in the low half) as values. */
+export function unpackF16(u32) { const h = new Uint16Array(u32.buffer, u32.byteOffset, u32.length * 2); return Float32Array.from(h, f16fromBits); }
+/** The f16-storing twin: conv2dCpu's f32 cells, each then rounded to the nearest f16, ties to even -- what pack2x16float stores. */
+export function conv2dCpuStoreF16(x, H, W, layer) { return Float32Array.from(conv2dCpu(x, H, W, layer), f16round); }
+/** Its fused mirror: conv2dCpuFma's cells, each rounded to f16. */
+export function conv2dCpuStoreF16Fma(x, H, W, layer) { return Float32Array.from(conv2dCpuFma(x, H, W, layer), f16round); }
+/** The two f16 values bracketing x (equal when x is one): a conversion to f16 may take either, as WGSL allows. */
+export function f16Bracket(x) {
+    const r = f16round(x);
+    if (r === x || !Number.isFinite(r)) return [r, r];
+    const b = f16bits(r), up = (r > x) === (r > 0) ? b - 1 : b + 1, o = f16fromBits(r === 0 ? (x > 0 ? 1 : 0x8001) : up);
+    return r < o ? [r, o] : [o, r];
+}
+
 /**
  * The f64 backward pass. `dY` is the loss's gradient with respect to this layer's OUTPUT (after the activation).
  * Returns { dX, dW, db } -- with respect to the input, the weights and the bias. The relu's gradient is taken as 0
@@ -384,18 +405,25 @@ export const FAST_ARITH = Object.freeze(["f32", "f16", "f16emu"]);
  * block holds whole blocks of CB channels (the last padded with zero weights), block-major -- in half the bytes when the weights
  * are packed f16, which needs f32 reads, the block written out, and an even number of vec4s wherever the z group lands.
  */
-export function fastAltShape({ Cin, Cout, k }, { reads = "f32", unroll = false, arith = "f32" } = {}) {
+export function fastAltShape({ Cin, Cout, k }, { reads = "f32", unroll = false, arith = "f32", io = null } = {}) {
     const F = fastShape({ Cin, Cout, k }), blocks = Math.ceil(Cin / CB), perBlock = k * k * CB * F.C4, half = arith !== "f32";
     const bytes = unroll ? 16 + 16 * F.C4 + 16 * blocks * (half ? perBlock / 2 : perBlock) : F.bytes;
     const packs = !half || (unroll && reads === "f32" && perBlock % 2 === 0 && (F.groups === 1 || F.g4 % 2 === 0));
-    return { ...F, reads, unroll, arith, blocks, perBlock, bytes, fits: F.fits && FAST_READS.includes(reads) && FAST_ARITH.includes(arith) && packs && bytes <= UNIFORM_MAX };
+    // round 57: f16 storage (io.x, io.y "f16": packed pairs in u32 words) with f32 arithmetic and f32 reads only; a packed input
+    // needs whole pairs (Cin even), a packed output whole vec4s (Cout a multiple of 4)
+    const ioOk = !io || ((io.x === "f32" || io.x === "f16") && (io.y === "f32" || io.y === "f16") && arith === "f32" && reads === "f32" &&
+        (io.x !== "f16" || Cin % 2 === 0) && (io.y !== "f16" || Cout % 4 === 0));
+    return { ...F, reads, unroll, arith, io, blocks, perBlock, bytes, fits: F.fits && FAST_READS.includes(reads) && FAST_ARITH.includes(arith) && packs && ioOk && bytes <= UNIFORM_MAX };
 }
 /** The fast kernel written another way (entry k_conv_fast_alt): { reads: "f32" | "vec4", unroll: false | true, arith: FAST_ARITH }. */
-export function conv2dFastAltWgsl({ Cin, Cout, k, act = "none" }, { reads = "f32", unroll = false, arith = "f32" } = {}) {
-    const S = fastAltShape({ Cin, Cout, k }, { reads, unroll, arith });
+export function conv2dFastAltWgsl({ Cin, Cout, k, act = "none" }, { reads = "f32", unroll = false, arith = "f32", io = null } = {}) {
+    const S = fastAltShape({ Cin, Cout, k }, { reads, unroll, arith, io });
     if (!S.fits) throw new Error(`conv2d: the fast kernel's other ways hold reads ${FAST_READS.join(" or ")}, arith ${FAST_ARITH.join(" or ")} (the f16 ways with f32 reads, written out) and a layer whose weights fit one ${UNIFORM_MAX}-byte uniform binding -- got reads ${reads}, arith ${arith}, ${S.bytes} bytes for ${Cin} -> ${Cout}, k ${k}${unroll ? " written out" : ""}`);
     // round 41: the types and the four places f16 differs -- the tile's value, the weight read, the accumulators' start, the store
     const h = arith === "f16", T16 = h ? "f16" : "f32", V16 = `vec4<${T16}>`;
+    // round 57: the input and the output stored as packed f16 pairs -- a channel's value is its word's half, by its parity
+    const xH = !!io && io.x === "f16", yH = !!io && io.y === "f16";
+    const xAt = (idx) => (xH ? `unpack2x16float(X[(${idx}) >> 1u])[(${idx}) & 1u]` : `X[${idx}]`);
     const R = (k - 1) / 2, HW = TILE + k - 1, G = S.g4, js = Array.from({ length: G }, (_, j) => j), lanes = ["x", "y", "z", "w"];
     const v4 = reads === "vec4", Q = CB / 4, partial = Cin % CB !== 0, full = Math.floor(Cin / CB), tail = Cin - full * CB;
     // the tile load: f32 as the fast kernel's (pixel t, channel cj at t nb + cj); vec4 as Q vec4s a pixel, lanes past nb zero
@@ -412,7 +440,7 @@ export function conv2dFastAltWgsl({ Cin, Cout, k, act = "none" }, { reads = "f32
         : `for (var i = lid.y * ${TILE}u + lid.x; i < ${HW * HW}u * ${nb}; i = i + ${TILE * TILE}u) {
             let cj = i % ${nb}; let t = i / ${nb}; let sx = ox + i32(t % ${HW}u); let sy = oy + i32(t / ${HW}u);
             var v = ${h ? "0.0h" : "0.0"};
-            if (sx >= 0 && sx < i32(F.W) && sy >= 0 && sy < i32(F.H)) { v = ${h ? "f16(" : ""}X[(u32(sy) * F.W + u32(sx)) * ${Cin}u + ${c0} + cj]${h ? ")" : ""}; }
+            if (sx >= 0 && sx < i32(F.W) && sy >= 0 && sy < i32(F.H)) { v = ${h ? "f16(" : ""}${xAt(`(u32(sy) * F.W + u32(sx)) * ${Cin}u + ${c0} + cj`)}${h ? ")" : ""}; }
             T[i] = v;
         }`;
     // one channel's adds into every accumulator, from x, in the order j -- each lane a cell of its own
@@ -488,9 +516,9 @@ ${block(`${full * CB}u`, tail, true)}
     const wDecl = arith !== "f32" ? `array<array<vec4<u32>, ${S.perBlock / 2}>, ${S.blocks}>` : unroll ? `array<array<vec4<f32>, ${S.perBlock}>, ${S.blocks}>` : `array<vec4<f32>, ${k * k * Cin * S.C4}>`;
     return `${h ? "enable f16;" : ""}
 struct FP { H: u32, W: u32, pad0: u32, pad1: u32, b: array<vec4<f32>, ${S.C4}>, w: ${wDecl} };
-@group(0) @binding(0) var<storage, read_write> Y: array<f32>;   // H x W x ${Cout}
+@group(0) @binding(0) var<storage, read_write> Y: array<${yH ? "u32" : "f32"}>;   // H x W x ${Cout}${yH ? ", packed f16 pairs" : ""}
 @group(0) @binding(1) var<uniform> F: FP;                        // packFastAltUniforms
-@group(0) @binding(2) var<storage, read>       X: array<f32>;   // H x W x ${Cin}
+@group(0) @binding(2) var<storage, read>       X: array<${xH ? "u32" : "f32"}>;   // H x W x ${Cin}${xH ? ", packed f16 pairs" : ""}
 var<workgroup> T: array<${v4 ? "vec4<f32>" : T16}, ${HW * HW * (v4 ? Q : CB)}>;
 @compute @workgroup_size(${TILE}, ${TILE}, 1)
 fn k_conv_fast_alt(@builtin(global_invocation_id) gid: vec3<u32>, @builtin(local_invocation_id) lid: vec3<u32>,
@@ -502,8 +530,10 @@ fn k_conv_fast_alt(@builtin(global_invocation_id) gid: vec3<u32>, @builtin(local
 ${body}
     if (!inside) { return; }
     let o = (py * F.W + px) * ${Cout}u; let c = g * ${G * 4}u;
-    ${js.map((j) => (act === "relu" ? `a${j} = max(a${j}, ${V16}(${h ? "0.0h" : "0.0"}));\n    ` : "") +
-        lanes.map((l, n) => `if (c + ${4 * j + n}u < ${Cout}u) { Y[o + c + ${4 * j + n}u] = ${h ? `f32(a${j}.${l})` : `a${j}.${l}`}; }`).join(" ")).join("\n    ")}
+    ${js.map((j) => (act === "relu" ? `a${j} = max(a${j}, ${V16}(${h ? "0.0h" : "0.0"}));\n    ` : "") + (yH
+        // round 57: a vec4 of four channels is two words -- channels 4j, 4j + 1 in the first, 4j + 2, 4j + 3 in the second
+        ? `if (c + ${4 * j}u < ${Cout}u) { Y[(o + c + ${4 * j}u) >> 1u] = pack2x16float(a${j}.xy); Y[((o + c + ${4 * j}u) >> 1u) + 1u] = pack2x16float(a${j}.zw); }`
+        : lanes.map((l, n) => `if (c + ${4 * j + n}u < ${Cout}u) { Y[o + c + ${4 * j + n}u] = ${h ? `f32(a${j}.${l})` : `a${j}.${l}`}; }`).join(" "))).join("\n    ")}
 }
 `;
 }

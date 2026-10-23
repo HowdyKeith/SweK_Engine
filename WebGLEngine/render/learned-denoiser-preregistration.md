@@ -8664,3 +8664,155 @@ C3 and the guide channels would need their own design for them, so they go to an
 **The command:** `node tools/denoiseStudy.mjs --harvest-mesh-c --cache <dir>` -> `render/denoise-results-mesh-c.json`.
 - It refuses if the file exists.
 - It runs here. The file is committed byte for byte before it is read, and section 128 reads it.
+
+## 129. ROUND 57 -- ACTIVATIONS STORED IN HALF PRECISION, ARITHMETIC IN f32 (`denoise-f16-storage`): FIXED BEFORE ITS CODE
+
+**Why this round.** Keith asked for it, with the timing on either GPU or both. The backlog's own arithmetic expects little:
+- the hidden layers move about 1 GB a 1024 x 1024 pass on the Intel, about 1.8 GB/s against about 34;
+- they move about 2 GB a 1080p frame on the 1080, about 33 GB/s against its 320.
+
+So neither looks bandwidth-bound. Section 122 found f16 ARITHMETIC (r41h) at about half r18u's speed on the Intel. This
+round stores in f16 and computes in f32, so it asks whether halving the activations' traffic pays where halving the
+arithmetic's precision did not.
+
+**The set, r57p.** It is r18u's kernels exactly, with every hidden activation that passes between two written-out layers
+stored as packed f16.
+- Each `u32` word holds two channels:
+  - `pack2x16float` on the store;
+  - `unpack2x16float` on the tile's load;
+  - the arithmetic, the weights and the bias stay r18u's f32.
+- Layer 0 reads the f32 input, as r18u's does.
+- Layers 1-3 read packed f16.
+- Layers 0-2 write packed f16.
+- Layer 3 writes f32, because r15's fused head (`k_head_apply`) reads it, and the head is unchanged.
+- **No feature is needed.** `pack2x16float` and `unpack2x16float` are core WGSL on f32 values, so r57p runs on SwiftShader
+  here and on both GPUs, natively and in Chrome. It stands aside under FXC by name with the other untried sets: FXC has not
+  been tried on it.
+
+**The exactness key, K0p.** It is K0 with one change: a layer that stores f16 is held to the f32 twin's value rounded to f16.
+- **The twin:** `conv2dCpu` (or its fused mirror) over the device's own input, which for layers 1-3 is already f16 values,
+  then each cell rounded to the nearest f16, ties to even. A layer that stores f32 is K0's, unchanged.
+- **The tolerance:** WGSL lets a conversion to f16 take either of the two nearest values. So a stored cell is explained when
+  it is the twin's rounding or the other f16 value bracketing the twin's f32 value. The gate counts the second kind.
+  - Measured before this was written, on SwiftShader: `pack2x16float` gave round-to-nearest-even on 1,048,576 values of
+    1,048,576, the halfway cases and f16's subnormals among them. So on SwiftShader the count must be zero.
+  - On a GPU it is reported, not required.
+- The head's image is within `APPLY_TOL` of the twin's head, as K0 asks.
+- **The image's bound against the f64 network** is fixed from this box's run before any rig run, as section 109 fixed r41h's
+  (`F16S_IMAGE_TOL`). It is the measured worst on the device gate's fixture times 5.7, round 41's margin, and the gate prints
+  the measured worst.
+
+**Hypotheses** (timing gate; the rig's two runs; the ladder's sizes; native and page paths):
+- **H57:** on the Intel gen-9, r57p is at least 1.05 x as fast as r18u at 1920 x 1080. That must hold on both paths in both
+  runs.
+- **H57b:** on the GTX 1080, r57p is at least 1.05 x as fast as r18t, the 1080's entry, at 1920 x 1080. That too must hold
+  on both paths in both runs. Against r18u, the kernel it is built on, it is reported.
+
+**Conditions**, as section 109's:
+- C1: every gate green;
+- C2: K0p green natively and in the browser on that GPU;
+- C3: the 1920 x 1080 row measured, not skipped, on both paths.
+
+A GPU whose runs miss a condition has no verdict.
+
+**What each outcome buys.**
+- **H57 holds:** the Intel's two entries become r57p.
+- **H57b holds:** the 1080's two entries become r57p.
+- **A hypothesis fails:** that GPU's entries stay as they are, and r57p is a measured negative there.
+- No rig run is asked of a GPU Keith does not run. Either GPU alone decides its own entries.
+
+**Predictions, fixed now, deciding nothing.**
+- **P1:** K0p holds natively and in the browser on both GPUs. The "other nearest" count is zero on both, because both
+  vendors' converters round to nearest even.
+- **P2:** H57 fails. r57p runs at 0.95-1.10 x r18u on the Intel, because the arithmetic above says it is not bandwidth-bound,
+  and the unpack and pack are extra instructions in a compute-bound loop.
+- **P3:** H57b fails. r57p runs below r18t on the 1080, as r18u does (0.657 x, section 67's reading).
+- All three are reported either way.
+
+**Sabotages planned (a byte-safe runner, each to go red before the commit):**
+- a store packing the wrong half;
+- the load reading channel c's word without its half select;
+- layer 3 storing f16 for the head;
+- the twin not rounding;
+- r57p not standing aside under FXC;
+- the bound widened tenfold.
+
+## 128. ROUND 56 -- THE VERDICT: NEITHER HOLDS. THE SHIPPED NETWORK DOES NOT BEAT THE SHIPPED FILTER ON THE ENGINE's GEOMETRY IN FAMILY C's MATERIALS AND LIGHT
+
+**What arrived.** `render/denoise-results-mesh-c.json` (sha-256 `4729a0ce...`).
+- It was written by `tools/denoiseStudy.mjs --harvest-mesh-c` at debf6207, section 127's commit, and committed byte for
+  byte (af3e0eb8) before it was read.
+- The shipped file it ran is the one section 127 named (`f1a84d47...`).
+- A container restart killed the first run partway. It was restarted at the same commit, from its cache (keyed by the
+  commit and the tree's diff), and resumed.
+- It took 1,512 s to render, and 15 s to measure.
+  - **The time is not a clean figure.** The device and timing gates of round 57 ran beside the second half of the run, so
+    this box was shared. Time is secondary and reported; it decides nothing.
+
+**The run is reported. Every control held.**
+- **C1:** on VC the network beat the noisy input on 11 of 12 and the filter on 12 of 12. On MC both beat it on 12 of 12.
+  VC's 11 is the least C1 allows.
+- **C2:** cited from round 11, mean d -1.856, held.
+- **C3:** no image of either set within 2 x of its floor, so both sets are resolvable.
+- **C4:** the forward pass twice over T1, bit for bit.
+- **C5:** 72 distinct render seeds.
+
+| | H1: 12 of VC, voxel structures | H2: 12 of MC, lathed and extruded solids |
+|---|---|---|
+| mean d | **-0.145** | **0.182** |
+| images the network won | 5 of 12 | 9 of 12 |
+| sign-flip p (Holm threshold) | 0.684 (0.05) | 0.0364 (0.025) |
+| sign test p, reported | 0.806 | 0.073 |
+| **status** | **not supported** | **not supported** |
+
+**So the page's scope note stays as section 80 left it, as section 127 fixed.** The crossing is a recorded negative: on
+the engine's own geometry in family C's materials, light and sky, the shipped network did not beat the shipped filter.
+The note already says nothing of any other material, light or sky, and it says no more now.
+
+**H2 fails on Holm, not on its sign.**
+- Its p of 0.036 would have passed alone at 0.05.
+- Holm takes the smaller p first, H2's, against 0.025, and 0.036 is above it. So H2 is not supported, and H1 cannot be.
+- That is the test section 127 fixed, and it is read as fixed.
+- On MC the network won 9 of 12, its losses small (the largest -0.204) and one win large (1.098). What MC shows is a
+  lean, not a result.
+
+**H1 turns on one image.**
+- **VC's second scene, seed 50001.** The network's error is 0.867, about five times the noisy input's 0.161 and twenty
+  times the filter's 0.042: d -3.02. It is the only image of either set on which the network did worse than the input it
+  was given.
+- **The other eleven** sum to a d of +1.29, but 6 of them are losses, so without that scene H1 still would not hold by
+  count (5 of 11 won).
+- Nothing measured why it fails there. The scene is reported, and no cause is proposed.
+
+**The predictions.**
+- **P1 held:** C1 held on both sets.
+- **P2 and P3 FAILED:** neither hypothesis is supported. I expected the crossing to keep the sign of both the network's
+  win on C's spheres and its win on R's meshes. On VC it did not, and on MC it did not pass its test.
+- **P4 is half wrong.** Both means are below C's 0.765, as predicted. But MC's (0.182) is above VC's (-0.145), not below
+  it. Section 80 had M below V, and in C's materials the order turned.
+
+**What it does not change.** No kernel, table, weight or filter changes, and nor does the page's note. A round that trains
+on mesh scenes in C's materials would be a later question, pre-registered on its own, and no backlog entry asks for it.
+
+**Recorded after the code (round 57), before any rig run.**
+- **K0p held on SwiftShader, natively and in the browser.** On the device gate's fixture every cell of the four storage
+  layers matched the f16-rounded twin (12,768 of 12,768 a layer), with no other-nearest cell and none unexplained. The
+  head's image is within `APPLY_TOL`. The small network matched every cell too.
+- **The bound:** the image's worst against the f64 network is 1.78e-4. That times 5.7 is 1.01e-3, so `F16S_IMAGE_TOL` is
+  held at 1e-3. The shipped network's image on the same input is 5.91e-4: within the bound, with less margin. That is
+  reported here so a rig run near it is not a surprise.
+- **SwiftShader's timing figures, reported and not asserted:** r57p at 1.027 x r18u natively and 0.994 x on the page at
+  64 x 64. They are a CPU's figures.
+
+Every sabotage went red, each file restored byte for byte. The plan named six; seven ran. "Layer 3 storing f16 for the
+head" became F4 and F7, because that edit throws before any row can judge it.
+- F1, the store packing a vec4's halves crossed: 3 red;
+- F2, the load without its half select: 3 red;
+- F3, the storing twin not rounding: 3 red;
+- F4, a packed layer read back as f32: 3 red;
+- F5, r57p not standing aside under FXC: 2 red;
+- F6, the bound widened tenfold: 1 red;
+- F7, r57p left out of the timed sets: 1 red.
+
+**Owed:** `realGpuRun --only denoise`, twice, on either GPU or both (Keith's choice), at the commit carrying this section.
+Committed byte for byte before it is read, and section 130 reads it.

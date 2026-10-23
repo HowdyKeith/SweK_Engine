@@ -64,7 +64,7 @@
 import { conv2dWgsl, conv2dTiledWgsl, conv2dSubWgsl, packSubUniforms, subShape, subWorkgroups, conv2dFastWgsl, conv2dHeadWgsl, packProbeUniforms, packFastUniforms, packHeadUniforms, fastShape, headShape,
          conv2dTileWgsl, packTileUniforms, tileShape, tileWorkgroups, conv2dFastAltWgsl, packFastAltUniforms, fastAltShape,
          planarToChannelsLast, conv2dCpu, conv2dCpuFma, TILE, K_MAX, COUT_MAX,
-         conv2dWinoWgsl, packWinoUniforms, winoShape, winoWorkgroups, conv2dCpuWino, conv2dCpuWinoFma, conv2dCpuF16, conv2dCpuF16Fma } from "../brain/conv2d.mjs";
+         conv2dWinoWgsl, packWinoUniforms, winoShape, winoWorkgroups, conv2dCpuWino, conv2dCpuWinoFma, conv2dCpuF16, conv2dCpuF16Fma, conv2dCpuStoreF16, conv2dCpuStoreF16Fma, unpackF16 } from "../brain/conv2d.mjs";
 import { KERNEL_RADIUS, KERNEL_TAPS, headOf } from "./denoiseNet.mjs";
 import { ALBEDO_FLOOR, strideOf } from "./denoiseScenes.mjs";
 import { maskChannelOf } from "./denoiseMask.mjs";
@@ -314,7 +314,7 @@ export function kernelApplyCpu(x, logits, H, W) {
 }
 
 /** The kernel sets a pass can run on: round 12's, round 13's fast kernel (section 39), round 14's (section 43), round 15's (section 46), round 18's two (section 61), round 27's Winograd set (section 83). */
-export const KERNEL_SETS = Object.freeze(["r12", "r13", "r14", "r15", "r18t", "r18u", "r27w", "r40s", "r41h"]);
+export const KERNEL_SETS = Object.freeze(["r12", "r13", "r14", "r15", "r18t", "r18u", "r27w", "r40s", "r41h", "r57p"]);
 /**
  * Round 18 (section 61): the kernel each round-18 set runs its hidden layers on, and that kernel's configuration --
  * brain/conv2d.mjs's pixel-tiled kernel (tileShape's cfg) or its fast kernel written another way (fastAltShape's opts).
@@ -341,6 +341,12 @@ export const SUBGROUP_SETS = Object.freeze(["r40s"]);
  * (fast_unroll_h: brain/conv2d.mjs's arith "f16"), r15's fused head in f32. For the Intel gen-9, which runs f16 at twice its f32 rate.
  */
 export const R41_KERNELS = Object.freeze({ r41h: Object.freeze({ kernel: "fast_unroll_h", cfg: Object.freeze({ reads: "f32", unroll: true, arith: "f16" }) }) });
+/**
+ * Round 57 (section 129): the half-precision STORAGE set -- r18u's written-out kernel (fast_unroll_p) with every activation that
+ * passes between two such layers stored as packed f16 pairs (pack2x16float / unpack2x16float), the arithmetic, weights and bias
+ * f32. Layer 0 reads the f32 input; the layer before r15's fused head writes f32 for it. No feature: both builtins are core WGSL.
+ */
+export const R57_KERNELS = Object.freeze({ r57p: Object.freeze({ kernel: "fast_unroll_p", cfg: Object.freeze({ reads: "f32", unroll: true }) }) });
 /** Round 41: the sets that need the adapter's `shader-f16` feature. */
 export const F16_SETS = Object.freeze(["r41h"]);
 /** Round 41: the feature each such set needs -- r40s subgroups, r41h shader-f16. */
@@ -363,14 +369,16 @@ export function capSkip(set, last, px, { capMs = 1500, capBySet = SET_CAP_MS } =
 }
 /** Round 41: the image's bound against the f64 network for r41h (section 109) -- 5.7 x the CPU twin's largest on the device gate's fixture. */
 export const F16_IMAGE_TOL = 1e-2;
+/** Round 57: the image's bound against the f64 network for r57p (section 129): 1.78e-4 measured on the device gate's fixture, x 5.7, held at 1e-3. */
+export const F16S_IMAGE_TOL = 1e-3;
 /**
  * Round 27: the sets no gate builds natively on a D3D12 adapter whose compiler is FXC because nobody has tried -- FXC_UNBUILT_SETS
  * is the sets FXC was SEEN to fail. Since section 70 the pin's compiler is DXC, and an FXC that never finishes a pipeline stops a
  * gate for its whole budget (section 56), so an untried kernel stands aside under FXC on the safe side.
  */
 // round 40 (section 108): r40s too -- its subgroup kernel is wave operations, shader model 6, which FXC does not compile at all
-// round 41 (section 109): and r41h -- FXC has no 16-bit types
-export const FXC_UNTRIED_SETS = Object.freeze(["r27w", "r40s", "r41h"]);
+// round 41 (section 109): and r41h -- FXC has no 16-bit types; round 57 (section 129): and r57p -- untried there
+export const FXC_UNTRIED_SETS = Object.freeze(["r27w", "r40s", "r41h", "r57p"]);
 /**
  * The sets no gate builds natively on a D3D12 adapter whose compiler is FXC: node-webgpu 0.6.0's FXC stopped on r18t's kernel
  * and crashed on r18u's (section 60). Round 18 called them browser-only; 0.6.2's DXC built both natively (section 65).
@@ -391,7 +399,7 @@ export const nativeSetsFor = (adapter, sets, { compiler = null } = {}) =>
  * round 18's two (section 61) and round 27's (section 83) -- on the page always, natively where nativeSetsFor allows (since section 66, a DXC run on D3D12 too). Section 54 added round 16's two
  * candidates and section 57 withdrew them; r13 and r14 are decided (sections 49 and 50) and left out.
  */
-export const TIMED_SETS = Object.freeze(["r12", "r15", "r18t", "r18u", "r27w", "r40s", "r41h"]);
+export const TIMED_SETS = Object.freeze(["r12", "r15", "r18t", "r18u", "r27w", "r40s", "r41h", "r57p"]);
 /** The set a pass runs unless told otherwise: r15, by section 46's default rule on both GPUs (section 50) -- 9.25 x against r14's 6.33. */
 export const DEFAULT_KERNELS = "r15";
 /** The set denoise.html runs on an adapter PAGE_KERNELS_BY_ADAPTER does not name: r15, by section 46's page rule on both GPUs (section 50) -- 9.25 x against r13's 6.49 and r14's 6.33. */
@@ -482,10 +490,11 @@ export async function createNativeDenoiser(adapter, dev, net, { H, W, C, compile
 export const kernelFor = (L, set = DEFAULT_KERNELS, last = false) => {
     if (!KERNEL_SETS.includes(set)) throw new Error(`denoiseDevice: no kernel set "${set}" -- the sets are ${KERNEL_SETS.join(", ")}`);
     if (set === "r14" && last && headShape(L).fits) return "head";
-    if ((set === "r15" || set in R18_KERNELS || set in R27_KERNELS || set in R40_KERNELS || set in R41_KERNELS) && last && L.Cout === KERNEL_TAPS && headShape(L).fits) return "head_apply";
+    if ((set === "r15" || set in R18_KERNELS || set in R27_KERNELS || set in R40_KERNELS || set in R41_KERNELS || set in R57_KERNELS) && last && L.Cout === KERNEL_TAPS && headShape(L).fits) return "head_apply";
     if (set === "r27w" && winoShape(L, R27_KERNELS.r27w.cfg).fits) return "wino";
     if (set === "r40s" && subShape(L, R40_KERNELS.r40s.cfg).fits) return "sub";
     if (set === "r41h" && fastAltShape(L, R41_KERNELS.r41h.cfg).fits) return "fast_unroll_h";
+    if (set === "r57p" && fastAltShape(L, R57_KERNELS.r57p.cfg).fits) return "fast_unroll_p";
     if (set === "r18t" && tileShape(L, R18_KERNELS.r18t.cfg).fits) return "tile_inline";
     if (set === "r18u" && fastAltShape(L, R18_KERNELS.r18u.cfg).fits) return "fast_unroll";
     return set !== "r12" && fastShape(L).fits ? "fast" : L.k <= K_MAX && L.Cout <= COUT_MAX ? "tiled" : "direct";
@@ -499,8 +508,18 @@ export const applyFor = (layers) => { const k = layers[layers.length - 1].kernel
 /** A network's layers as the device takes them: f32 weights and biases, each layer's kernel in `set` named. */
 export function deviceLayers(net, set = DEFAULT_KERNELS) {
     if (headOf(net) !== "kernel") throw new Error("denoiseDevice: only the kernel-predicting network runs on the device");
-    return net.layers.map((L, i) => ({ Cin: L.Cin, Cout: L.Cout, k: L.k, act: L.act ?? "none", W: Float32Array.from(L.W), b: Float32Array.from(L.b),
-                                       kernel: kernelFor(L, set, i === net.layers.length - 1) }));
+    const out = net.layers.map((L, i) => ({ Cin: L.Cin, Cout: L.Cout, k: L.k, act: L.act ?? "none", W: Float32Array.from(L.W), b: Float32Array.from(L.b),
+                                            kernel: kernelFor(L, set, i === net.layers.length - 1) }));
+    // round 57: a storage layer's io -- f16 in when the layer before it stored f16, f16 out when the layer after it reads f16,
+    // which is when that layer is a storage layer too and the pair fits packed (an odd channel count stays f32)
+    const P = "fast_unroll_p", cfg = R57_KERNELS.r57p.cfg;
+    out.forEach((L, i) => { if (L.kernel === P) L.io = { x: "f32", y: "f32" }; });
+    for (let i = 0; i + 1 < out.length; i++) {
+        const L = out[i], N = out[i + 1];
+        if (L.kernel === P && N.kernel === P && fastAltShape(L, { ...cfg, io: { ...L.io, y: "f16" } }).fits && fastAltShape(N, { ...cfg, io: { ...N.io, x: "f16" } }).fits) { L.io.y = "f16"; N.io.x = "f16"; }
+    }
+    for (const L of out) if (L.io) Object.freeze(L.io);
+    return out;
 }
 
 /**
@@ -510,7 +529,9 @@ export function deviceLayers(net, set = DEFAULT_KERNELS) {
  */
 export const twinsOf = (L) => (L.kernel === "wino" ? { twin: conv2dCpuWino, mirror: conv2dCpuWinoFma }
     // round 41 (section 109): a half-precision layer is held to the half-precision twin and its fused mirror
-    : L.kernel === "fast_unroll_h" ? { twin: conv2dCpuF16, mirror: conv2dCpuF16Fma } : { twin: conv2dCpu, mirror: conv2dCpuFma });
+    : L.kernel === "fast_unroll_h" ? { twin: conv2dCpuF16, mirror: conv2dCpuF16Fma }
+    // round 57 (section 129): a layer storing f16 is held to the f32 twin's cells rounded to f16, ties to even
+    : L.io && L.io.y === "f16" ? { twin: conv2dCpuStoreF16, mirror: conv2dCpuStoreF16Fma } : { twin: conv2dCpu, mirror: conv2dCpuFma });
 /** The whole pass's twin in `set`, layer by layer through each layer's twin (twinsOf), then kernelApplyCpu: { y, acts } -- the device's order exactly. */
 export function denoiseTwin(net, x, H, W, set = DEFAULT_KERNELS) {
     const layers = deviceLayers(net, set), acts = [];
@@ -550,6 +571,7 @@ export async function createDeviceDenoiser(dev, net, { H, W, C, kernels = DEFAUL
     if (used.has("fast_unroll_h") && !(dev.features && dev.features.has("shader-f16")))
         throw new Error(`denoiseDevice: the ${kernels} set's half-precision kernel needs a device with the "shader-f16" feature -- this one has none (section 109)`);
     for (const [i, L] of layers.entries()) if (L.kernel === "fast_unroll_h") await build("fast_unroll_h" + i, conv2dFastAltWgsl(L, R41_KERNELS.r41h.cfg), "k_conv_fast_alt");
+    for (const [i, L] of layers.entries()) if (L.kernel === "fast_unroll_p") await build("fast_unroll_p" + i, conv2dFastAltWgsl(L, { ...R57_KERNELS.r57p.cfg, io: L.io }), "k_conv_fast_alt");
     // its dispatch is by the adapter's smallest subgroup size: given, else the device's adapter's, else WebGPU's least, 4
     const sgMin = subgroupMinSize || (dev.adapterInfo && dev.adapterInfo.subgroupMinSize) || 4;
     for (const [i, L] of layers.entries()) if (L.kernel === "head") await build("head" + i, conv2dHeadWgsl(L), "k_head");
@@ -567,7 +589,8 @@ export async function createDeviceDenoiser(dev, net, { H, W, C, kernels = DEFAUL
     const S = BU.STORAGE | BU.COPY_DST | BU.COPY_SRC;
     const xBuf = buffer(H * W * C * 4, S);
     // a fused last layer (k_head_apply) writes the image, so its logits get no buffer -- the one round 15 removes
-    const outs = layers.map((L) => (L.kernel === "head_apply" ? null : buffer(H * W * L.Cout * 4, S)));
+    // round 57: a layer storing packed f16 pairs takes half the bytes
+    const outs = layers.map((L) => (L.kernel === "head_apply" ? null : buffer(H * W * L.Cout * (L.io && L.io.y === "f16" ? 2 : 4), S)));
     const yBuf = buffer(H * W * 3 * 4, S);
     const groups = [Math.ceil(W / TILE), Math.ceil(H / TILE)];
     const applyUni = buffer(32, BU.UNIFORM | BU.COPY_DST, packApplyUniforms({ H, W, C }));
@@ -611,6 +634,13 @@ export async function createDeviceDenoiser(dev, net, { H, W, C, kernels = DEFAUL
         if (L.kernel === "fast_unroll_h") {
             // round 41's r41h: r18u's thread, bindings and dispatch, its weights f16-rounded and packed two vec4s to a word
             const cfg = R41_KERNELS.r41h.cfg, p = pipe["fast_unroll_h" + i], uni = packFastAltUniforms({ H, W, layer: L }, cfg);
+            return { p, wg: [...groups, fastAltShape(L, cfg).groups], bind: dev.createBindGroup({ layout: p.getBindGroupLayout(0), entries: [
+                { binding: 0, resource: { buffer: outs[i] } }, { binding: 1, resource: { buffer: buffer(uni.byteLength, BU.UNIFORM | BU.COPY_DST, uni) } },
+                { binding: 2, resource: { buffer: i ? outs[i - 1] : xBuf } }] }) };
+        }
+        if (L.kernel === "fast_unroll_p") {
+            // round 57's r57p: r18u's thread, bindings, dispatch and uniform block; its input and output as its io names them
+            const cfg = { ...R57_KERNELS.r57p.cfg, io: L.io }, p = pipe["fast_unroll_p" + i], uni = packFastAltUniforms({ H, W, layer: L }, cfg);
             return { p, wg: [...groups, fastAltShape(L, cfg).groups], bind: dev.createBindGroup({ layout: p.getBindGroupLayout(0), entries: [
                 { binding: 0, resource: { buffer: outs[i] } }, { binding: 1, resource: { buffer: buffer(uni.byteLength, BU.UNIFORM | BU.COPY_DST, uni) } },
                 { binding: 2, resource: { buffer: i ? outs[i - 1] : xBuf } }] }) };
@@ -661,7 +691,10 @@ export async function createDeviceDenoiser(dev, net, { H, W, C, kernels = DEFAUL
             const ms = (globalThis.performance ?? Date).now() - t0;
             // every layer read back channels last, as the twin computes it: a planar layer (the head kernel's) is transposed,
             // and a fused one (k_head_apply's) has no output but the image -- null, judged through it (judgeHeadApply)
-            const acts = keep ? await Promise.all(layers.map(async (L, i) => { if (!outs[i]) return null; const v = await readBack(outs[i], H * W * L.Cout);
+            // round 57: and a packed f16 layer read back as its values, channels last as stored
+            const acts = keep ? await Promise.all(layers.map(async (L, i) => { if (!outs[i]) return null;
+                if (L.io && L.io.y === "f16") return unpackF16(new Uint32Array((await readBack(outs[i], H * W * L.Cout / 2)).buffer));
+                const v = await readBack(outs[i], H * W * L.Cout);
                 return L.kernel === "head" ? planarToChannelsLast(v, H * W, L.Cout) : v; })) : null;
             return { y, acts, ms };
         },

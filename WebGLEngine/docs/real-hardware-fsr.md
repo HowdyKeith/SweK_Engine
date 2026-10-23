@@ -758,6 +758,16 @@ rest as a reference (29 rows). The rig's section 103 line says `rest fused`, and
 No run is owed. The page's history now runs the tiled accumulation (`accumT`), and shows the plain one as a reference (31
 rows). The rig's section 103 line says `accumulation tiled`, and a new section 126 line carries both.
 
+### Round 57: activations stored in f16, owed on either GPU or both (pre-registration section 129)
+
+The set r57p is r18u's kernels with the activations between layers stored as packed f16. Its arithmetic stays f32, and it
+needs no feature. Two `realGpuRun --only denoise` runs, a and b, on whichever GPU you run, at the branch head:
+- K0p must be green natively and in the browser.
+- The timing gate prints `native: r57p against r18u at ...` and `against r18t` lines, on both paths. H57 reads the Intel's
+  1920 x 1080 ratio against r18u, and H57b the 1080's against r18t.
+
+Send the two reports back; they are committed byte for byte before they are read.
+
 ## Send back
 
 The JSON file. It holds the platform, the browser flags, every adapter seen, each gate's verdict, time, failing rows and

@@ -2328,9 +2328,9 @@ export const NEXT_ROUNDS = [
     {
         id: "denoise-f16-storage",
         blocker: "OPEN",
-        what: "Activations stored in half precision between layers, arithmetic in f32 -- half the memory traffic.",
-        how: "Measured in the scratch study at 1.1e-3 from f64 and a d shift of 1.5e-4. Expected gain is small by arithmetic: the hidden layers move ~2 GB a 1080p frame on the 1080 (~33 GB/s against its 320) and ~1 GB a 1024 x 1024 pass on the Intel (~1.8 GB/s against ~34), so neither looks bandwidth-bound.",
-        why: "Logged so the estimate is checked before anybody spends a round on it; last in line of the precision levers. Half-precision storage in WGSL needs shader-f16 too, which only gen-9 exposes (the first features reading, after v4873), so this is a gen-9 lever as well.",
+        what: "Activations stored in half precision between layers, arithmetic in f32 -- half the memory traffic. ROUND 57 (pre-registration section 129) built it as the set r57p: r18u's kernels, the activations between two written-out layers packed f16 (pack2x16float / unpack2x16float, core WGSL, no feature), K0p green natively and in the browser on SwiftShader with every cell the f32 twin's rounded to nearest even. Owed: the rig's two runs, on either GPU or both.",
+        how: "H57: r57p at least 1.05 x r18u at 1920 x 1080 on the Intel, both paths, both runs; H57b: at least 1.05 x r18t on the 1080. realGpuRun --only denoise at the commit carrying section 129; the timing gate prints 'native: r57p against r18u at ...' and '... against r18t ...' lines, section 129 their tag.",
+        why: "Measured in the scratch study at 1.1e-3 from f64. The backlog's arithmetic expected little (neither GPU looks bandwidth-bound) and section 122 found f16 arithmetic at half speed on the Intel; Keith asked for the storage half measured.",
     },
     {
         id: "denoise-smaller-network",
@@ -2448,10 +2448,10 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "denoise-mesh-other-materials",
-        blocker: "OPEN",
-        what: "Section 80 widened the scope to the engine's voxel structures and lathed and extruded solids in family R's materials, light and sky -- and only that. Test the same shapes in C's materials and light. ROUND 56 (pre-registration section 127) is that round: families VC and MC, C's scene with each resting sphere replaced by round 25's meshes, the shipped pair, nothing trained -- its harvest committed before it is read, and section 128 its verdict.",
-        how: "A round in section 79's shape: H1 on 12 of VC (50000), H2 on 12 of MC (51000), section 6's statistic with section 28's test, Holm over the two; node tools/denoiseStudy.mjs --harvest-mesh-c -> render/denoise-results-mesh-c.json.",
-        why: "Ten rounds found the network failing where materials and light changed; section 80 changed only shape. The two have not been crossed. The path tracer page's own scenes, which this entry once named beside C, went to denoise-pathtracer-page-scenes (section 127 says why).",
+        blocker: "CLOSED",
+        what: "CLOSED AS A MEASURED NEGATIVE: round 56 (pre-registration sections 127 and 128). On the engine's own geometry in family C's materials, light and sky -- families VC and MC, the shipped pair, nothing trained -- neither hypothesis held: VC mean d -0.145 (5 of 12, p 0.684), MC mean d 0.182 (9 of 12, p 0.036 against Holm's 0.025). The page's scope note stays as section 80 left it.",
+        how: "render/denoise-results-mesh-c.json, written by --harvest-mesh-c at debf6207 and committed byte for byte before it was read (af3e0eb8); render/denoiseStudy-selfcheck.mjs section 14b re-derives the verdict from its tables. One image, VC's seed 50001, is the only one of 24 on which the network did worse than its own input (d -3.02); nothing measured why.",
+        why: "Ten rounds found the network failing where materials and light changed; section 80 changed only shape. Crossed, the win on R's meshes did not carry. The path tracer page's own scenes went to denoise-pathtracer-page-scenes.",
     },
     {
         id: "denoise-pathtracer-page-scenes",

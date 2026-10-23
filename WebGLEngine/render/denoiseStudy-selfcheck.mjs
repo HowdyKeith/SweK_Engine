@@ -98,6 +98,9 @@
 //   R72 P2's bound widened to +3.1 (so the miss would read as a hit)              1 RED -- the predictions row
 //   R73 (section 127) ROUND_MESH_C on the R-material mesh splits                  1 RED -- the ROUND_MESH_C row
 //   R74 --harvest-mesh-c running section 79's splits                             1 RED -- the command row
+//   R75 (section 128) the file's H2 typed as supported                           1 RED -- the re-derivation row
+//   R76 the page's scope note claiming C's materials on the meshes               1 RED -- the scope row
+//   R77 VC's second image's network error typed as 0.03                          2 RED -- the re-derivation row and the one-image row
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -502,7 +505,35 @@ console.log("\n14b. ROUND 56: THE SAME SHAPES IN FAMILY C'S MATERIALS AND LIGHT,
     ok("!! --harvest-mesh-c decodes the shipped file with decodeNet, runs runShippedStudy on ROUND_MESH_C's splits under harvest, writes ROUND_MESH_C.results and never an existing one, and logs no verdict",
         branch.length > 400 && /decodeNet\(shipped\.net\)/.test(code) && /filter: shipped\.filter/.test(code) && /runShippedStudy\(\{ splits: ROUND_MESH_C\.splits,/.test(code) && /harvest: true/.test(code) &&
         /path\.join\(ENG, ROUND_MESH_C\.results\)/.test(code) && /existsSync\(file\)/.test(code) && /sha256/.test(code) && !/ROUND_MESH\./.test(code) && !/verdict|status|supported/.test(code));
-    ok("  its results are not yet written: section 128 reads them once the harvest's file is committed", !fs.existsSync(path.join(ENG, RESULTS_MESH_C)));
+    // section 128: the committed results, read back by code -- the verdict re-derived from the file's own tables under ROUND_MESH_C's
+    // rule, so "neither holds" is the rule's output, not a sentence somebody typed; then the predictions, read as made
+    const cfile = path.join(ENG, RESULTS_MESH_C);
+    if (fs.existsSync(cfile)) {
+        const res = JSON.parse(fs.readFileSync(cfile, "utf8"));
+        const again = verdict({ sets: { H1: res.tables.T1, H2: res.tables.T2 }, shuffled: null, c2Prior: ROUND_MESH_C.c2Prior,
+                                determinism: res.determinism, seedsDistinct: res.seedsDistinct, test: ROUND_MESH_C.test });
+        const st = (v) => Object.fromEntries(Object.entries(v.hypotheses).map(([h, x]) => [h, [x.status, x.k, Number(x.meanD.toFixed(12)), x.threshold]]));
+        const H1 = again.hypotheses.H1, H2 = again.hypotheses.H2;
+        ok("!! *** section 128: verdict() over the committed results' own tables gives the file's verdict -- reported, H1 and H2 NOT SUPPORTED, H2 at p 0.036 against Holm's 0.025 ***",
+            again.run === "reported" && res.verdict.run === "reported" && JSON.stringify(st(again)) === JSON.stringify(st(res.verdict)) &&
+            H1.status === "not supported" && H2.status === "not supported" && H2.threshold === 0.025 && H2.p > 0.025 && H2.p < 0.05 && H1.meanD < 0 && H2.meanD > 0 &&
+            again.controls.C1 === true && again.controls.C4 === true && again.controls.C5 === true && again.controls.C2.citedFrom === 11 &&
+            res.config.splits.T1.family === "VC" && res.config.splits.T2.family === "MC" && res.config.trained === "nothing -- the shipped network and filter" &&
+            res.shipped && res.shipped.file === SHIPPED_NET && /^f1a84d47/.test(res.shipped.sha256),
+            `H1 ${H1.status} (mean d ${H1.meanD.toFixed(3)}, ${H1.k}/12, p ${H1.p.toFixed(4)}), H2 ${H2.status} (mean d ${H2.meanD.toFixed(3)}, ${H2.k}/12, p ${H2.p.toFixed(4)} against ${H2.threshold})`);
+        // the one image section 128 names: the only one of 24 on which the network did worse than its own input
+        const T = res.tables.T1, worse = [...["T1", "T2"].flatMap((n) => res.tables[n].net[0].map((v, i) => (v > res.tables[n].noisy[i] ? `${n}:${i}` : null)))].filter(Boolean);
+        ok("  ...and section 128's one image: VC's second scene (seed 50001) is the only image of 24 on which the network did worse than its input, its d about -3",
+            worse.join() === "T1:1" && Math.abs(Math.log(T.filter[1]) - Math.log(T.net[0][1]) + 3.024) < 0.01, `${worse.join(", ")}; d ${(Math.log(T.filter[1]) - Math.log(T.net[0][1])).toFixed(3)}`);
+        // section 127's predictions, read as made: P1 held; P2 and P3 failed; P4 half -- both below C's 0.765, but MC NOT below VC
+        const r11 = JSON.parse(fs.readFileSync(path.join(ENG, RESULTS_R11), "utf8")), cD = r11.verdict.hypotheses.H2.meanD;
+        const P = { P1: again.controls.C1 === true, P2: H1.status === "supported", P3: H2.status === "supported", P4a: H1.meanD < cD && H2.meanD < cD, P4b: H2.meanD < H1.meanD };
+        ok("  section 127's predictions, read as made: P1 held, P2 and P3 failed, and P4 is half wrong -- both means below round 11's C (0.765), but MC's above VC's",
+            P.P1 && !P.P2 && !P.P3 && P.P4a && !P.P4b && Math.abs(cD - 0.7646) < 1e-4, JSON.stringify(P));
+        const page = fs.readFileSync(path.join(ENG, "denoise.html"), "utf8"), scope = (page.match(/<p class="scope" id="scope">([\s\S]*?)<\/p>/) || [, ""])[1];
+        ok("!! ...and the page's scope note stays as section 80 left it: section 80 cited, no other material, light or sky claimed, nothing of round 56's families",
+            /section 80/.test(scope) && /any other\s+material, light or sky/.test(scope) && !/section 128|VC|MC|C's materials/.test(scope));
+    } else ok("!! section 128 reads render/denoise-results-mesh-c.json, and it is not there", false);
 }
 
 console.log("\n15. THE UPSCALE ROUND: HALF SIZE + FSR1 AGAINST THE FRAMES IT COULD BE INSTEAD (pre-registration section 81)");
