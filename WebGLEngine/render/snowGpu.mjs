@@ -34,6 +34,7 @@ import { FINE_NOISE_WGSL, FINE_TERRAIN_WGSL, DETAIL_BAKE_KERNEL_WGSL, DETAIL_MIP
 import { SHADING_WGSL, projectSH } from "./snowShading.mjs";
 import { CASCADE_SHADOW_WGSL, fitCascades, CASCADE_COUNT, SPLITS } from "./cascades.mjs";
 import { TAA_WGSL, buildHalton } from "./taaResolve.mjs";
+import { ablateWgsl } from "./snowAblate.mjs";
 
 export const SKY_W = 64, SKY_H = 32, SHADOW_RES = 2048, FRAME_FLOATS = 188, POST_FAR = 9000;
 export const HDR_FORMAT = "rgba16float", DEPTH_FORMAT = "r32float";
@@ -595,7 +596,7 @@ export function skyAmbient(sunDir, intensity, groundBounce) {
  * Build the whole frame graph on `device`. Options: { canvas (a canvas with a webgpu context, optional), format (the canvas format), width, height, deformRes, deformSize, gridN, levels, baseSpacing, shadowRes }.
  * Returns the driver: frame(dt, focus, cam, opts), stamp(...), setSun(elev, azim), readField(), readSky(), dumpTerrain(verts), shot(), errors, stats, and the resources the gate reads.
  */
-export async function createSnowGpu(device, { canvas = null, format = "bgra8unorm", width = 320, height = 180, deformRes = 128, deformSize = 20, gridN = 32, levels = 5, baseSpacing = 0.2, shadowRes = SHADOW_RES, passTimers = false } = {}) {
+export async function createSnowGpu(device, { canvas = null, format = "bgra8unorm", width = 320, height = 180, deformRes = 128, deformSize = 20, gridN = 32, levels = 5, baseSpacing = 0.2, shadowRes = SHADOW_RES, passTimers = false, ablate = [] } = {}) {   // `ablate`: terms of the beauty shader compiled OUT, for measuring (render/snowAblate.mjs); the picture is wrong on purpose
     const GU = U().GPUBufferUsage, TU = U().GPUTextureUsage, SS = U().GPUShaderStage, MM = U().GPUMapMode;
     const errors = []; device.addEventListener("uncapturederror", (e) => errors.push(String(e.error && e.error.message || e)));
     const mkBuf = (size, usage, label) => device.createBuffer({ size: Math.max(16, Math.ceil(size / 4) * 4), usage, label });
@@ -637,7 +638,7 @@ export async function createSnowGpu(device, { canvas = null, format = "bgra8unor
     ] });
     const bglShadow = bgl0(false), bglMain = bgl0(true);
     const bglDump = device.createBindGroupLayout({ entries: [{ binding: 0, visibility: SS.COMPUTE, buffer: { type: "read-only-storage" } }, { binding: 1, visibility: SS.COMPUTE, buffer: { type: "storage" } }] });
-    const vModule = device.createShaderModule({ code: TERRAIN_VERTEX_WGSL, label: "terrain vertex" }), bModule = device.createShaderModule({ code: BEAUTY_WGSL, label: "beauty" });
+    const vModule = device.createShaderModule({ code: TERRAIN_VERTEX_WGSL, label: "terrain vertex" }), bModule = device.createShaderModule({ code: ablate.length ? ablateWgsl(BEAUTY_WGSL, ablate) : BEAUTY_WGSL, label: "beauty" });
     const vbufLayout = { arrayStride: 12, attributes: [{ shaderLocation: 0, format: "float32x3", offset: 0 }] };
     const shadowPipe = [0, 1, 2].map((c) => device.createRenderPipeline({ layout: device.createPipelineLayout({ bindGroupLayouts: [bglShadow] }), vertex: { module: vModule, entryPoint: "vsShadow", constants: { CASCADE: c }, buffers: [vbufLayout] }, primitive: { topology: "triangle-list", cullMode: "none" }, depthStencil: { format: "depth32float", depthWriteEnabled: true, depthCompare: "less" } }));
     const targets = [{ format: HDR_FORMAT }, { format: DEPTH_FORMAT }];

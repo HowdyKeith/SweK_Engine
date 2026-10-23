@@ -58,8 +58,8 @@ export function parseTimingLine(line) {
  * Warm up, then time `frames` frames one at a time (latency) and `frames` more submitted back to back (throughput), on `device`, at width x height. `now` and `idle` are injectable so the rules are
  * driven on fixtures; live they are performance.now and device.queue.onSubmittedWorkDone. Returns the raw lists and the GPU errors the device raised (an uncaptured error is a failed frame, not a slow one).
  */
-export async function timeFrames(device, { width = 320, height = 180, warmup = WARMUP_FRAMES, warmupMs = WARMUP_MS, frames = TIMED_FRAMES, shadowRes, passTimers = false, now = () => performance.now(), idle = () => device.queue.onSubmittedWorkDone(), create = createSnowGpu } = {}) {
-    const g = await create(device, { canvas: null, width, height, ...(shadowRes ? { shadowRes } : {}), ...(passTimers ? { passTimers: true } : {}) });
+export async function timeFrames(device, { width = 320, height = 180, warmup = WARMUP_FRAMES, warmupMs = WARMUP_MS, frames = TIMED_FRAMES, shadowRes, passTimers = false, ablate = [], now = () => performance.now(), idle = () => device.queue.onSubmittedWorkDone(), create = createSnowGpu } = {}) {
+    const g = await create(device, { canvas: null, width, height, ...(shadowRes ? { shadowRes } : {}), ...(passTimers ? { passTimers: true } : {}), ...(ablate.length ? { ablate } : {}) });
     let i = 0;
     const w0 = now();
     for (let k = 0; k < warmup || now() - w0 < warmupMs; k++, i++) { const o = orbitAt(i); await g.frame(1 / 60, o.focus, o.cam); await idle(); }
@@ -114,4 +114,36 @@ export function bracketLine(r0, r1, adapter) {
 export function parseBracketLine(line) {
     const m = /reading snowBracket: native (\d+)x(\d+) shadowRes (\d+) median ([\d.]+) ms at the start and ([\d.]+) ms at the end \(drift ([+-]\d+)%\); adapter (.*)$/.exec(line);
     return m ? { width: +m[1], height: +m[2], shadowRes: +m[3], start: +m[4], end: +m[5], drift: +m[6], adapter: m[7] } : null;
+}
+
+/**
+ * THE ABLATION ROWS from a run of beauty-pass medians in the order  base, t1, base, t2, base, ... base  (every term sits BETWEEN two baselines). A term's cost is the mean of its two neighbouring baselines minus the
+ * pass with the term removed, so a laptop GPU's drift over the run (the Intel's beauty pass read 50, 72 and 67 ms in one sweep) cancels to first order and what is left is printed as the two baselines it was taken between.
+ */
+export function ablationRows(seq) {
+    if (!Array.isArray(seq) || seq.length < 3 || seq.length % 2 === 0) throw new Error("ablationRows: wants base, term, base, ... base (an odd number of runs, at least 3)");
+    const rows = [];
+    for (let i = 1; i < seq.length; i += 2) {
+        const a = seq[i - 1], t = seq[i], b = seq[i + 1];
+        if (a.name !== "base" || b.name !== "base" || t.name === "base") throw new Error("ablationRows: run " + i + " must be a term between two baselines");
+        for (const v of [a.beauty, t.beauty, b.beauty]) if (!Number.isFinite(v) || v <= 0) throw new Error("ablationRows: " + t.name + " has a beauty time that is not a positive number");
+        const base = (a.beauty + b.beauty) / 2;
+        rows.push({ term: t.name, base, without: t.beauty, saves: base - t.beauty, pct: 100 * (base - t.beauty) / base, before: a.beauty, after: b.beauty, drift: 100 * (b.beauty - a.beauty) / a.beauty });
+    }
+    return rows;
+}
+/** One line a term:  reading snowAblate: native 1280x720 shadowRes 2048 beauty pass 50.2 ms; without shadow 48.0 ms (saves 2.20 ms, 4.4% of the pass; baselines 50.1 and 50.3); adapter NAME */
+export function ablationLine(w, h, shadowRes, row, adapter) {
+    return `reading snowAblate: native ${w}x${h} shadowRes ${shadowRes || 2048} beauty pass ${f1(row.base)} ms; without ${row.term} ${f1(row.without)} ms (saves ${row.saves.toFixed(2)} ms, ${row.pct.toFixed(1)}% of the pass; baselines ${f1(row.before)} and ${f1(row.after)}); adapter ${adapter}`;
+}
+export function parseAblationLine(line) {
+    const m = /reading snowAblate: native (\d+)x(\d+) shadowRes (\d+) beauty pass ([\d.]+) ms; without (\w+) ([\d.]+) ms \(saves (-?[\d.]+) ms, (-?[\d.]+)% of the pass; baselines ([\d.]+) and ([\d.]+)\); adapter (.*)$/.exec(line);
+    return m ? { width: +m[1], height: +m[2], shadowRes: +m[3], base: +m[4], term: m[5], without: +m[6], saves: +m[7], pct: +m[8], before: +m[9], after: +m[10], adapter: m[11] } : null;
+}
+/** Run the whole ablation on `device`: base, each term, base, ... base, each a pass-timed run at width x height; returns the sequence of beauty-pass medians for ablationRows. */
+export async function runAblation(device, { width, height, terms, warmup = WARMUP_FRAMES, frames = TIMED_FRAMES, shadowRes, run = timeFrames } = {}) {
+    const seq = [], one = async (name, ablate) => { const r = await run(device, { width, height, warmup, frames, shadowRes, passTimers: true, ablate }); const b = r.passes && r.passes.beauty; if (!b || !b.length) throw new Error("runAblation: no beauty-pass time (this adapter has no timestamp-query?)"); seq.push({ name, beauty: summarise(b.map((v) => Math.max(v, 1e-6))).median }); };
+    await one("base", []);
+    for (const t of terms) { await one(t, [t]); await one("base", []); }
+    return seq;
 }
