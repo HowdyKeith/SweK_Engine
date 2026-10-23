@@ -49,6 +49,7 @@ import * as AF from "../../brain/autopilotFlight.mjs";
 import * as PF from "../../brain/pilotFlightPolicy.mjs";
 import * as MF from "../../brain/pilotFlightMlp.mjs";
 import * as PB from "../../brain/peerBrain.mjs";
+import { weightsHash } from "../../brain/drivePolicy.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 let fails = 0;
@@ -298,6 +299,29 @@ sec("9. THE FILE");
         [/LEAGUE-TRAINED ON DOGFIGHTS/, /the shipped fighter this was started from \(aaaa1111\)/, /other brain's shipped fighter \(bbbb2222\)/, /seed 10002 of 4 runs \(10000\.\.10003\)/, /sigma 0.3, 1-4 weights per child, 400 iterations over the 12 league train duels/, /3 of the 1099 weights differ from it/, /audit of 100 duels from both seats/, /77 fights won, 92 level, 31 lost, edge 0\.1234 \+- 0\.0321 \(3\.84 paired standard errors\)/, /own score against the autopilot \+0\.0123 and against the other brain's fighter -0\.0045/, /2 against autopilot, 2 against self, 2 against other \(the shipped fighter 4 against autopilot, 4 against self, 4 against other\)/, /classic audit 0\.5000 \(the shipped fighter 0\.4500\), reserve 0\.2000 \(0\.1900\)/, /classic safety audit 0 lost to the ground or a collision \(1\)/, /GRADED AGAINST A FIXED LEAGUE OF THREE, NOT AGAINST A PILOT THAT HAS SEEN IT\.$/].every((re) => re.test(blob.by)), blob.by.length + " characters");
     const gchamp = { ...champ, weights: Float32Array.from({ length: 1796 }, (_, i) => (i === 5 ? -0.25 : 0)) }, gblob = (() => { try { return L.blobOf({ ...result, champion: gchamp }, L.parseArgs(["--brain", "gpu"]), fakeCtx); } catch (e) { return { policy: "THREW " + e.message, weights: [] }; } })();
     ok("!! THE GPU BRAIN'S BLOB NAMES THE GPU BRAIN'S POLICY AND ITS 1,796 WEIGHTS: the GPU Brain's importer takes it, the fruit fly's refuses it by name, the seeds in `by` are 11000..11003; and a champion of the wrong length cannot be written at all (the exporter refuses it)", gblob.policy === "pilotFlightMlp" && gblob.weightCount === 1796 && PB.importBrain(PB.describePolicy("pilotFlightMlp", MF), gblob).ok && PB.importBrain(PB.describePolicy("pilotFlightMlp", MF), gblob).weights[5] === -0.25 && /this brain is for "pilotFlightMlp", not "pilotFlightPolicy"/.test(PB.importBrain(PB.describePolicy("pilotFlightPolicy", PF), gblob).reason) && /seed 10002 of 4 runs \(11000\.\.11003\)/.test(gblob.by) && /sigma 0.3, 1-4 weights per child, 400 iterations/.test(gblob.by) && /weights\.length \(1099\) must equal policy\.WEIGHT_COUNT \(1796\)/.test(throws(() => L.blobOf(result, L.parseArgs(["--brain", "gpu"]), fakeCtx)) || ""));
+}
+
+sec("10. THE THREE SMALL DOORS: brainOf, loadFile, cacheKey");
+{
+    ok("!! brainOf PICKS THE BRAIN AN OPTION NAMES AND DEFAULTS TO THE FRUIT FLY: no options, null, {} and { brain: \"fly\" } are the fruit fly, { brain: \"gpu\" } is the GPU Brain (the very frozen objects of BRAINS), and an unknown name throws naming it and the known ones",
+        L.brainOf() === L.BRAINS.fly && L.brainOf(null) === L.BRAINS.fly && L.brainOf({}) === L.BRAINS.fly && L.brainOf({ brain: "fly" }) === L.BRAINS.fly && L.brainOf({ brain: "gpu" }) === L.BRAINS.gpu
+        && /unknown brain "mouse" \(known: fly, gpu\)/.test(throws(() => L.brainOf({ brain: "mouse" })) || ""));
+    const asked = [], real = (f) => { asked.push(f); return fs.readFileSync(f, "utf8"); };
+    const lf = L.loadFile("pilotFlightPolicy", PF, "pilotDogfightWeightsDefault.json", { read: real }), lg = L.loadFile("pilotFlightMlp", MF, "pilotDogfightMlpWeightsDefault.json");
+    ok("!! loadFile LOADS A SHIPPED FIGHTER THROUGH THE PAGE'S IMPORTER: the fruit fly's file is 1,099 float32 weights with the hash dc5ee8ed (the one the header and the league record name), the GPU Brain's 1,796 with 6c2cb228, it reads <dir>/<file> (the brain/ directory unless told another) through the reader it is given, and the hash is the weights' own (weightsHash)",
+        lf.weights instanceof Float32Array && lf.weights.length === 1099 && lf.hash === "dc5ee8ed" && lg.weights.length === 1796 && lg.hash === "6c2cb228" && lf.hash === weightsHash(lf.weights)
+        && asked.length === 1 && asked[0] === path.join(ENG, "brain", "pilotDogfightWeightsDefault.json")
+        && (() => { const seen = []; L.loadFile("pilotFlightPolicy", PF, "pilotDogfightWeightsDefault.json", { dir: "/elsewhere", read: (f) => { seen.push(f); return fs.readFileSync(path.join(ENG, "brain", "pilotDogfightWeightsDefault.json"), "utf8"); } }); return seen.join() === path.join("/elsewhere", "pilotDogfightWeightsDefault.json"); })(), lf.hash + " " + lg.hash);
+    const wrong = throws(() => L.loadFile("pilotFlightPolicy", PF, "pilotDogfightMlpWeightsDefault.json")), bad = throws(() => L.loadFile("pilotFlightPolicy", PF, "x.json", { read: () => "{not json" }));
+    ok("!! loadFile REFUSES BY NAME: the GPU Brain's file read as the fruit fly's says `<file> refused: this brain is for \"pilotFlightMlp\", not \"pilotFlightPolicy\"`, and a file that is not JSON throws instead of returning weights",
+        wrong === 'pilotDogfightMlpWeightsDefault.json refused: this brain is for "pilotFlightMlp", not "pilotFlightPolicy"' && bad !== null && /JSON/.test(bad), wrong);
+    const o = L.parseArgs(["--iters", "9", "--seed", "5", "--sigma", "0.2", "--maxK", "2"]), ctx0 = { brain: L.BRAINS.fly, hashes: { start: "aaaa1111", other: "bbbb2222" } };
+    const key = (opts, ctx = ctx0, k = 0) => L.cacheKey(opts, ctx, k), k0 = key(o);
+    const moved = [["k", key(o, ctx0, 1)], ["brain", key(o, { ...ctx0, brain: L.BRAINS.gpu })], ["seed", key({ ...o, seed: 6 })], ["iters", key({ ...o, iters: 10 })], ["sigma", key({ ...o, sigma: 0.25 })], ["maxK", key({ ...o, maxK: 3 })], ["smoke", key({ ...o, smoke: true })],
+        ["start", key(o, { ...ctx0, hashes: { ...ctx0.hashes, start: "cccc3333" } })], ["other", key(o, { ...ctx0, hashes: { ...ctx0.hashes, other: "dddd4444" } })]];
+    ok("!! cacheKey IS A FUNCTION OF EXACTLY THE RECIPE: it is one JSON string, the same for the same inputs, it moves with each of the nine things a search's weights are a function of (the search number, the brain, the seed, the iterations, sigma, maxK, smoke, the shipped fighter's hash and the other brain's hash), and it does not move with the cache directory, the worker count, the run count or --write",
+        typeof k0 === "string" && JSON.parse(k0).brain === "fly" && k0 === key({ ...o }) && moved.every(([, v]) => v !== k0) && new Set([k0, ...moved.map(([, v]) => v)]).size === 10
+        && key({ ...o, cache: "/c", workers: 3, runs: 9, write: true, quiet: true }) === k0, moved.filter(([, v]) => v === k0).map(([n]) => n).join() || "all nine move it");
 }
 
 console.log(fails ? `\ntrainDogfightLeague-selfcheck: ${fails} FAILED` : "\ntrainDogfightLeague-selfcheck: all checks pass");
