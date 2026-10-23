@@ -30,3 +30,15 @@ Send back the two JSON files. Nothing in them is secret: adapter names, limits, 
 **Browser: five of six snow gates pass; `snowGpuLive` failed, and it was the gate and not the frame loop.** The headless shell on this box reached the SOFTWARE adapter (`google`), so the report says `NO ADAPTER WAS SEEN`, and the loop ran at 0.4 fps (4 frames in nine seconds) where the gate demanded more than 20. It now waits for 12 frames and 4 footprints and reports the rate as a reading. THE FRAME RATE ON A REAL GPU IS STILL UNMEASURED: a headless browser on this rig does not get the GPU for WebGPU, so the only route to it is a native frame loop (see nextRounds `snow-native-frame-timing`).
 
 The top-line verdict of the native report says `SOFTWARE ADAPTER (google swiftshader)` because one gate in the `render/` set (`denoiseCompile`) deliberately runs on SwiftShader; the snow gates in that report name `D3D12` in their own reading lines, and `denoiseDevice` and `denoiseTiming` ran on the Intel adapter natively.
+
+## The frame rate on the GPU: the native frame loop (added after that run)
+
+The browser route cannot reach the Windows rig's GPU, but node-webgpu can, so the snow frame graph is also timed natively. From `WebGLEngine\` on the rig (the clone that holds `render\snowFrameTiming.mjs`):
+
+```bat
+node tools\ship\takeSnowFrameTiming.mjs --out snow-frame-timing.json
+```
+
+It runs 2 warm-up frames and 30 timed frames at 320x180 and again at 1280x720, and prints one `reading snowFrame:` line a size: the LATENCY median/p95/min/max (encode plus the wait on the queue), the batched THROUGHPUT in ms a frame, and the encode-and-submit time alone, with the adapter's name. Send back `snow-frame-timing.json`. The first line it prints names the adapter; if it says `SOFTWARE`, the times are a CPU's and the run did not reach the GPU.
+
+`render\snowFrameTiming-selfcheck.mjs` runs the same loop for three frames at 160x90 and is in the native sweep (`realGpuRun.mjs --native --only render/`), so the rig's native report carries its reading line too. What the timing is not: a GPU timestamp (node-webgpu offers none here), the present pass (no canvas), or a frame with footprints (the orbit stamps none). On the sandbox's software adapter a 160x90 frame costs about 170 ms.

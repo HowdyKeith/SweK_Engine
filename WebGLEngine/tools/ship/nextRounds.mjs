@@ -2179,7 +2179,7 @@ export const NEXT_ROUNDS = [
     {
         id: "snow-native-frame-timing",
         blocker: "HARDWARE",
-        what: "Time the snow frame graph on a real GPU: run the frame (deform, sky bake, three shadow passes, clipmap, TAA) for N frames natively through node-webgpu on D3D12 and print the per-frame time as a reading line, because the browser route cannot reach the GPU on the Windows rig (the headless shell lands on the software adapter, 0.4 fps).",
+        what: "BUILT, NEEDS ONE RIG RUN. render/snowFrameTiming.mjs times the snow frame graph on a native node-webgpu device (latency and batched throughput, encode time apart, 2 warm-up and 30 timed frames per size); tools/ship/takeSnowFrameTiming.mjs is its command (320x180 and 1280x720, JSON out); render/snowFrameTiming-selfcheck.mjs runs it on Dawn here (about 170 ms a frame at 160x90 on the software adapter) and is in the native sweep. OPEN: run the command on the Windows rig and file the D3D12 figures in docs/real-hardware-snow.md. NOT TIMED: the present pass, footprints, GPU timestamps.",
         how: "A command beside render/snowGpu.mjs that builds the frame as snowGpuLive's page does, submits N frames and waits on queue.onSubmittedWorkDone between batches (the wall clock around a GPU frame is the only timer node-webgpu offers without timestamp queries), and a gate that drives the same loop on Dawn/SwiftShader for a few frames so the loop is proven here. Then one realGpuRun --native on the rig.",
         why: "The 2026-10-23 rig run measured the kernels (all pass) but not the frame; the only frame rate in the report is a CPU rasteriser's.",
     },
