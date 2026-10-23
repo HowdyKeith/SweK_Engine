@@ -66,3 +66,24 @@ node tools\ship\takeSnowFrameTiming.mjs --sizes 1280x720,960x540,640x360 --out s
 The first prints, for each size at shadow maps of 2048, 1024 and 512, a `reading snowPasses:` line: the GPU milliseconds of deform, the three shadow cascades, the beauty pass and TAA (median over the frames each ran in), their sum, and the share of the wall-clock frame that sum is. The gap is queue time the timestamps do not see. The second times the same frame at three render sizes. On the sandbox's software adapter at 160x90 the beauty pass is ~100 of ~163 ms and the shadows ~38; the Intel gen-9's split is what the rig run will say, and it decides the defaults below.
 
 The knobs. **Render scale:** `snow-gpu.html` has a slider (25 to 100%) and `?scale=0.75` in the address; the frame renders at that fraction of the canvas and the present pass reads it bilinearly (`render/presentScale-selfcheck.mjs` holds the filter to a CPU twin within one 8-bit level at five ratios, and the real page at `?scale=0.5` in `snowGpuLive-selfcheck`). **Shadow size:** `?shadow=1024` (512, 1024, 1536, 2048, 4096) in the address, or `--shadow-res` / `--shadow-sweep` on the command. NOTHING IS CHANGED BY DEFAULT: scale 100%, shadow 2048, the frame as before (the six older snow gates pass unchanged). Which default to ship, and whether the far cascades need the whole clipmap's vertex stage at all, waits for the rig's per-pass numbers.
+
+## The per-pass answer, on both GPUs (2026-10-23, 30 frames after warm-up, shadow maps 2048)
+
+| GPU pass (median GPU ms) | GTX 1080, 320x180 | GTX 1080, 1280x720 | Intel gen-9, 320x180 | Intel gen-9, 1280x720 |
+|---|---|---|---|---|
+| beauty (the fragment pass) | 0.91 | **8.59** | 4.45 | **50.17** |
+| TAA | 0.03 | 0.30 | 0.50 | **7.89** |
+| the three shadow cascades together | 0.10 | **0.10** | 0.65 | **0.71** |
+| deform | 0.013 | 0.013 | 0.15 | 0.16 |
+| sum of the passes / the wall-clock frame | 1.05 / 1.99 ms (53%) | 9.01 / 10.29 ms (88%) | 5.76 / 7.86 ms (73%) | 58.9 / 63.5 ms (93%) |
+| encode + submit (CPU) | 0.8 ms | 1.0 ms | 1.1 ms | 1.1 ms |
+
+**The shadow hypothesis was wrong, and the data says so on both GPUs.** I had read the Intel's 6.6 ms size-independent floor as the three 2048 shadow cascades, each drawing the whole clipmap. They cost 0.10 ms on the 1080 and 0.65 to 0.71 ms on the Intel: **about 1% of the frame at 720p**. Shrinking the maps does nothing worth having: the cascades total 0.103 / 0.106 / 0.106 ms at 2048 / 1024 / 512 on the 1080, and 0.65 / 0.50 / 0.54 ms (320x180) and 0.71 / 0.69 / 0.58 ms (720p) on the Intel, while the beauty pass moved by tens of ms with the laptop's power state. NO SHADOW CHANGE IS WORTH MAKING, so none was made: three cascades at 2048 stay.
+
+**What the frame is: the beauty pass.** 95% of the summed GPU time on the 1080 and 85% on the Intel at 720p. It scales with pixels: on the 1080 about 0.4 ms + 8.9 ms per megapixel (frame about 2 ms + 8.8 ms per megapixel, from 640x360 / 960x540 / 1280x720 at 4.2 / 6.7 / 10.3 ms), on the Intel about 1.4 ms + 53 ms per megapixel. The 1080 predicts ~20 ms at 1080p (49 fps) and ~35 ms at 1440p; the Intel ~60 ms at 720p (16 fps), ~25 fps at 960x540. So **render scale is the lever**: the fixed share is mostly CPU and queue latency (about 1 to 2 ms on the 1080, which batched submission cuts to 1.2 ms a frame).
+
+**TAA is the second cost, and only on the Intel**: 7.9 ms at 720p (12% of its frame), 26 times the 1080's 0.30 ms where the beauty pass is only 6 times slower. A hand-written Catmull-Rom history resolve is a candidate to cheapen (the CPU twin and its gate hold any rewrite to the same picture).
+
+**Reading laptop numbers.** The Intel's beauty pass read 50.2 ms in the first configuration of a run, 71.5 and 66.9 in the next two (heat and power), and frame times crept 20 to 30% over each two-minute run; the 1080's clock was still ramping after ten warm-up frames (11.45 ms in the first half of 720p, 10.60 in the second). So: warm-up is now at least a second of frames as well as ten, and `--bracket` times the first configuration again at the end and prints the drift (`reading snowBracket:`). Compare configurations only through that figure. The per-pass shadow numbers are unaffected: they are an order of magnitude below the drift.
+
+**The auto render scale** (snow-gpu.html `?scale=auto`, or the box): after a cool-down it takes the mean of 20 frames, and if that is over 28 ms (under ~36 fps) it lowers the scale by x0.85 (floor 0.4); it never raises it, because a vsync-capped frame looks the same at any scale. Driven on the measured costs: the 1080 stays at 100% at 1280x720; the Intel settles at 61% (~27 ms, 37 fps) after about 260 frames. It is OFF by default: a looks change for every visitor is a decision for a person, and the Intel is the box to try it on.

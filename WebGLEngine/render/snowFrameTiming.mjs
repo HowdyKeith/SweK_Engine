@@ -15,8 +15,9 @@
 import { createSnowGpu } from "./snowGpu.mjs";
 
 // v4896 -- WARMUP 2 -> 10: the first rig run (Intel gen-9, D3D12) read 72 ms for the first fifteen frames at 1280x720 and 61 ms for the last fifteen, and 13.8 ms falling to 9.6 over the first eight at 320x180 --
-// the GPU's clock still ramping, so two frames of warm-up timed the ramp. The summary now carries the two halves' medians so a ramp that is still going is a number on the line.
-export const WARMUP_FRAMES = 10, TIMED_FRAMES = 30, DEFAULT_SIZES = Object.freeze([Object.freeze([320, 180]), Object.freeze([1280, 720])]);
+// the GPU's clock still ramping, so two frames of warm-up timed the ramp. v4896, the GTX 1080 run: ten frames were not enough either (720p read 11.45 ms in the first half and 10.60 in the second), so warm-up is now
+// also TIME: at least WARMUP_MS of frames, whichever is longer. The summary now carries the two halves' medians so a ramp that is still going is a number on the line.
+export const WARMUP_MS = 1000, WARMUP_FRAMES = 10, TIMED_FRAMES = 30, DEFAULT_SIZES = Object.freeze([Object.freeze([320, 180]), Object.freeze([1280, 720])]);
 /** snow-gpu.html's walker: a circle of radius 8 m at 2.4 m/s, the camera 3 m behind and 4 m to the side, 2.6 m up, looking at 0.4 m. */
 export const RADIUS = 8, SPEED = 2.4;
 
@@ -57,10 +58,11 @@ export function parseTimingLine(line) {
  * Warm up, then time `frames` frames one at a time (latency) and `frames` more submitted back to back (throughput), on `device`, at width x height. `now` and `idle` are injectable so the rules are
  * driven on fixtures; live they are performance.now and device.queue.onSubmittedWorkDone. Returns the raw lists and the GPU errors the device raised (an uncaptured error is a failed frame, not a slow one).
  */
-export async function timeFrames(device, { width = 320, height = 180, warmup = WARMUP_FRAMES, frames = TIMED_FRAMES, shadowRes, passTimers = false, now = () => performance.now(), idle = () => device.queue.onSubmittedWorkDone(), create = createSnowGpu } = {}) {
+export async function timeFrames(device, { width = 320, height = 180, warmup = WARMUP_FRAMES, warmupMs = WARMUP_MS, frames = TIMED_FRAMES, shadowRes, passTimers = false, now = () => performance.now(), idle = () => device.queue.onSubmittedWorkDone(), create = createSnowGpu } = {}) {
     const g = await create(device, { canvas: null, width, height, ...(shadowRes ? { shadowRes } : {}), ...(passTimers ? { passTimers: true } : {}) });
     let i = 0;
-    for (let k = 0; k < warmup; k++, i++) { const o = orbitAt(i); await g.frame(1 / 60, o.focus, o.cam); await idle(); }
+    const w0 = now();
+    for (let k = 0; k < warmup || now() - w0 < warmupMs; k++, i++) { const o = orbitAt(i); await g.frame(1 / 60, o.focus, o.cam); await idle(); }
     const perFrame = [], encode = [], passes = {};
     for (let k = 0; k < frames; k++, i++) {
         const o = orbitAt(i), t0 = now(); await g.frame(1 / 60, o.focus, o.cam); const t1 = now(); await idle(); const t2 = now();
@@ -98,4 +100,18 @@ export function parsePassLine(line) {
     if (!m) return null;
     const passes = {}; for (const part of m[5].split(", ")) { const [n, v] = part.split(" "); passes[n] = +v; }
     return { width: +m[1], height: +m[2], shadowRes: +m[3], frames: +m[4], passes, sum: +m[6], share: m[7] ? +m[7] : null, adapter: m[8] };
+}
+
+/**
+ * The BRACKET: the first configuration timed again after all the others, so the drift in between is a printed number and not a suspicion. The Intel gen-9 laptop read 50 ms for the beauty pass in the first run of a sweep
+ * and 72 and 67 ms in the next two (power and heat), and the GTX 1080 took more than ten frames to settle; a comparison between configurations measured minutes apart is only as good as this figure says.
+ *   reading snowBracket: native 320x180 shadowRes 2048 median 7.86 ms at the start and 9.20 ms at the end (drift +17%); adapter NAME
+ */
+export function bracketLine(r0, r1, adapter) {
+    const a = summarise(r0.perFrame).median, b = summarise(r1.perFrame).median, d = Math.round(100 * (b - a) / a);
+    return `reading snowBracket: native ${r0.width}x${r0.height} shadowRes ${r0.shadowRes || 2048} median ${f1(a)} ms at the start and ${f1(b)} ms at the end (drift ${d >= 0 ? "+" : ""}${d}%); adapter ${adapter}`;
+}
+export function parseBracketLine(line) {
+    const m = /reading snowBracket: native (\d+)x(\d+) shadowRes (\d+) median ([\d.]+) ms at the start and ([\d.]+) ms at the end \(drift ([+-]\d+)%\); adapter (.*)$/.exec(line);
+    return m ? { width: +m[1], height: +m[2], shadowRes: +m[3], start: +m[4], end: +m[5], drift: +m[6], adapter: m[7] } : null;
 }

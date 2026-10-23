@@ -1,8 +1,9 @@
 // WebGLEngine/tools/ship/takeSnowFrameTiming.mjs -- UNNUMBERED (the version is chosen at ship time).
 //
 // Run: node tools/ship/takeSnowFrameTiming.mjs [--sizes 320x180,1280x720] [--frames 30] [--warmup 2] [--out snow-frame-timing.json]
-//                                          [--passes] [--shadow-res 1024] [--shadow-sweep]     --passes adds a per-pass GPU-millisecond line a size (timestamp queries); --shadow-res times with another shadow map size;
-//                                          --shadow-sweep times every size at shadow maps of 2048, 1024 and 512 in one run (the comparison the shadow cost needs)
+//                                          [--passes] [--shadow-res 1024] [--shadow-sweep] [--bracket]     --passes adds a per-pass GPU-millisecond line a size (timestamp queries); --shadow-res times with another shadow map size;
+//                                          --shadow-sweep times every size at shadow maps of 2048, 1024 and 512 in one run (the comparison the shadow cost needs);
+//                                          --bracket times the first configuration AGAIN at the end and prints the drift between the two (thermal and power state move a laptop GPU by tens of percent over a run)
 //
 // THE COMMAND FOR render/snowFrameTiming.mjs: the snow frame graph timed on a NATIVE device (D3D12 on Windows, the Vulkan software adapter on this sandbox), one reading line a size. NO EXPORTS ON PURPOSE
 // (the library is held by this file and graded by render/snowFrameTiming-selfcheck.mjs). It is the answer to the browser route on the Windows rig landing on the software adapter: this one reaches the GPU.
@@ -13,9 +14,9 @@ import path from "node:path";
 import { createRequire } from "node:module";
 import { parseOrExit } from "./cliArgs.mjs";
 import { resolveWebgpu, configureVulkanIcd, headlessGpuSkipReason, exitCleanly, FINE_CLOCK_FLAG } from "./headlessGpu.mjs";
-import { timeFrames, timingLine, passLine, summarise, DEFAULT_SIZES, TIMED_FRAMES, WARMUP_FRAMES } from "../../render/snowFrameTiming.mjs";
+import { timeFrames, timingLine, passLine, bracketLine, summarise, DEFAULT_SIZES, TIMED_FRAMES, WARMUP_FRAMES } from "../../render/snowFrameTiming.mjs";
 
-const cli = parseOrExit("takeSnowFrameTiming", { values: { "--sizes": "string", "--frames": "number", "--warmup": "number", "--out": "path", "--shadow-res": "number" }, flags: ["--passes", "--shadow-sweep"] });
+const cli = parseOrExit("takeSnowFrameTiming", { values: { "--sizes": "string", "--frames": "number", "--warmup": "number", "--out": "path", "--shadow-res": "number" }, flags: ["--passes", "--shadow-sweep", "--bracket"] });
 const shadowRes = cli.values["--shadow-res"] ?? 0, wantPasses = cli.flags.has("--passes"), shadowList = cli.flags.has("--shadow-sweep") ? [2048, 1024, 512] : [shadowRes], frames = cli.values["--frames"] ?? TIMED_FRAMES, warmup = cli.values["--warmup"] ?? WARMUP_FRAMES;
 const sizes = cli.values["--sizes"] ? cli.values["--sizes"].split(",").map((s) => s.trim().split("x").map(Number)) : DEFAULT_SIZES.map((s) => [...s]);
 if (sizes.some((s) => s.length !== 2 || !s.every((v) => Number.isInteger(v) && v >= 16 && v <= 4096))) { console.error("[takeSnowFrameTiming] --sizes wants WIDTHxHEIGHT pairs, 16..4096 each, e.g. 320x180,1280x720"); exitCleanly(2); }
@@ -37,11 +38,12 @@ const hasTs = adapter.features && adapter.features.has("timestamp-query");
 if (wantPasses && !hasTs) console.log("[takeSnowFrameTiming] this adapter has no timestamp-query: --passes will print nothing");
 const device = await adapter.requestDevice({ requiredFeatures: hasTs ? ["timestamp-query"] : [] });
 const out = { generatedFrom: "tools/ship/takeSnowFrameTiming.mjs", at: new Date().toISOString(), platform: process.platform + " " + process.arch, adapter: name, frames, warmup, runs: [] };
-let bad = 0;
+let bad = 0, first = null;
 for (const sr of shadowList) for (const [w, h] of sizes) {
     const r = await timeFrames(device, { width: w, height: h, warmup, frames, shadowRes: sr });
     await new Promise((res) => setTimeout(res, 50));   // an uncaptured error arrives after the queue is idle
     if (r.errors.length) bad++;
+    if (!first) first = { r, w, h, sr };
     console.log("  ----  " + timingLine(r, name));
     if (r.errors.length) console.log("  FAIL  GPU errors at " + w + "x" + h + ": " + r.errors.slice(0, 3).join(" | ").slice(0, 300));
     let passRun = null;
@@ -50,6 +52,11 @@ for (const sr of shadowList) for (const [w, h] of sizes) {
         console.log("  ----  " + passLine(passRun, name, summarise(r.perFrame).median));
     }
     out.runs.push({ width: w, height: h, shadowRes: sr || 2048, passes: passRun ? Object.fromEntries(Object.entries(passRun.passes).map(([n, l]) => [n, summarise(l.map((v) => Math.max(v, 1e-6)))])) : null, perFrame: r.perFrame, encode: r.encode, batchedMs: r.batchedMs, batchedFrames: r.batchedFrames, errors: r.errors, summary: summarise(r.perFrame) });
+}
+if (cli.flags.has("--bracket") && first) {
+    const again = await timeFrames(device, { width: first.w, height: first.h, warmup, frames, shadowRes: first.sr });
+    console.log("  ----  " + bracketLine({ ...first.r, shadowRes: first.sr }, again, name));
+    out.bracket = { width: first.w, height: first.h, shadowRes: first.sr || 2048, start: summarise(first.r.perFrame).median, end: summarise(again.perFrame).median };
 }
 if (cli.values["--out"]) { fs.writeFileSync(path.resolve(cli.values["--out"]), JSON.stringify(out, null, 1)); console.log("[takeSnowFrameTiming] wrote " + cli.values["--out"]); }
 exitCleanly(bad ? 1 : 0);

@@ -2185,10 +2185,31 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "snow-shadow-and-scale-defaults-from-the-rig",
-        blocker: "HARDWARE",
-        what: "Choose the snow frame's shadow size and render scale defaults from the Windows rig's PER-PASS GPU times. BUILT at v4896: per-pass timestamp queries in createSnowGpu (passTimers), `takeSnowFrameTiming.mjs --passes --shadow-sweep`, a render-scale present pass (bilinear, ratio 1 bit-exact, held to a CPU twin at five ratios) with a slider and ?scale / ?shadow on snow-gpu.html. NOTHING IS CHANGED BY DEFAULT. OPEN: run the two commands in docs/real-hardware-snow.md on the Intel gen-9 and the GTX 1080 and read where the 6.6 ms size-independent floor sits.",
+        blocker: "CLOSED",
+        what: "CLOSED at v4896 (unshipped), BY THE MEASUREMENT: the rig's per-pass GPU times on BOTH GPUs (GTX 1080 and Intel gen-9, 2026-10-23, docs/real-hardware-snow.md) put the three shadow cascades at ~1% of the frame at 720p (0.10 ms and 0.71 ms) and the shadow map size at nothing worth having (0.10 / 0.11 / 0.11 ms on the 1080 at 2048 / 1024 / 512; the Intel moved by less than the laptop's own drift). The far-cascade and coarse-clipmap ideas filed here are NOT worth building and were not; the frame is the beauty fragment pass (85 to 95% of the GPU time, ~9 ms per megapixel on the 1080 and ~53 on the Intel) and cost follows pixels, so the lever is RENDER SCALE: built (slider, ?scale=, a bilinear present held to a CPU twin) plus an opt-in AUTO scale (render/autoScale.mjs: lowers by x0.85 when 20 frames average over 28 ms, floor 0.4, never raises; the Intel settles at ~61% at 1280x720, the 1080 stays at 100%). DEFAULTS ARE UNCHANGED: scale 100%, auto off, shadows 2048 x3. OPEN as new entries: snow-auto-scale-default and snow-beauty-pass-cost, snow-taa-cost-on-igpu.",
         how: "If the three shadow cascades are most of the floor, the candidates in order of risk are: a smaller shadow map for the far cascades (the near one keeps 2048); fewer cascades (CASCADE_COUNT is a constant the WGSL and the fit read); and drawing a COARSER clipmap in the far cascades' passes, because each shadow pass currently draws the whole clipmap and so pays the vertex stage (the dunes, the deformation read, the fine relief) three times. If the beauty pass is most of it, the render scale is the lever and the default is a number to pick per adapter class. Each change to a default is a looks change: shadowing and acne are held by snowGpu-selfcheck, LookA and LookB.",
         why: "The first rig run said the frame is GPU-bound and gave a size-independent floor, but not which pass owns it; a default chosen without that is a guess.",
+    },
+    {
+        id: "snow-auto-scale-default",
+        blocker: "OPEN",
+        what: "Decide whether snow-gpu.html's auto render scale (render/autoScale.mjs, ?scale=auto) is ON by default. It is off: a looks change for every visitor is a person's call. The rule only lowers (x0.85 when 20 frames average over 28 ms, floor 0.4) and the 1080 never triggers it at 1280x720; the Intel gen-9 settles at ~61% (27 ms). Try it on the Intel box with ?scale=auto and say whether the softness at ~60% reads as acceptable against 16 fps at 100%.",
+        how: "If yes: flip the page's autoOn default, keep ?scale=1 as the way to force full size, and add a row to snowGpuScale-selfcheck that the default page starts with the box ticked. If the picture is too soft, the other levers are the TAA and the beauty pass below.",
+        why: "The rig's two GPUs differ by 6x at 720p (10 ms against 62); one default cannot serve both, and the rule is the thing that lets one page do so.",
+    },
+    {
+        id: "snow-beauty-pass-cost",
+        blocker: "OPEN",
+        what: "The beauty fragment pass is 85 to 95% of the snow frame's GPU time on both rig GPUs (8.6 ms of 9.0 on the 1080, 50 ms of 59 on the Intel, both at 1280x720) and follows pixels (~9 and ~53 ms per megapixel). Find which terms of the per-pixel work cost most: the PCSS blocker search and filter taps, the three-cascade selection and cross-fade, the filtered sastrugi and ripple and grain, the glints, the subsurface term, the aerial lobe.",
+        how: "Per-pass timers can only split by PASS, so ablate by TERM: the page's state already switches glints, sastrugi, SSS and haze off (state.glint, sastrugi, sss, aerial) and the debug view; run takeSnowFrameTiming --passes with each term zeroed (a small --ablate option, or snow-gpu.html query parameters) and read the beauty pass each time, interleaved with a --bracket so the laptop's drift is not mistaken for a term. A term worth more than 10% of the pass is a candidate for a cheaper form held to the same picture by the CPU twins.",
+        why: "Render scale buys speed by spending sharpness; cheaper pixels buy it for free. The measurement now says where the pixels' time is not (the shadows) but not yet where it is.",
+    },
+    {
+        id: "snow-taa-cost-on-igpu",
+        blocker: "OPEN",
+        what: "The TAA resolve is 7.9 ms of the Intel gen-9's 59 ms frame at 1280x720 (12%), 26 times the GTX 1080's 0.30 ms, where the beauty pass is only 6 times slower. A hand-written Catmull-Rom history resolve with a 3x3 clamp and depth reprojection reads many texels a pixel with textureLoad; an integrated GPU's texture and memory path is where that hurts.",
+        how: "In render/taaResolve.mjs's kernel: replace the manual bicubic history with hardware bilinear taps (a 5-tap Catmull-Rom from 4 bilinear fetches is the standard form), share the 3x3 neighbourhood through workgroup memory, and re-time with takeSnowFrameTiming --passes on the Intel. render/taaResolve-selfcheck.mjs holds the kernel to its CPU twin, so a cheaper form must keep the same picture within the gate's limits; the rig's reading lines (taaResolve margin 226.7x) show the room.",
+        why: "It is the second-largest cost on the slow GPU and a self-contained kernel with a twin, which makes it the cheapest speed-up to verify.",
     },
     {
         id: "tv-home-first-run-on-a-rig",

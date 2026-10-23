@@ -16,6 +16,8 @@
 //   S7b the passes sorted alphabetically instead of in frame order                    -> 1 RED: the order row
 //   S7c the share computed over twice the frame                                       -> 1 RED: the median-sum-share row
 //   S7d a pass's median taken as its mean                                             -> 1 RED: the median-sum-share row
+//   S8 warm-up ignores the time (frame count only)                                 -> 1 RED: the warm-up row
+//   S9 the bracket's drift taken the wrong way round (start over end)             -> 1 RED: the bracket row
 //   S5 timingLine drops the adapter name                                       -> 3 RED: the line row, the round trip and the live row (a reading that does not say what ran is the 0.4 fps lie again)
 "use strict";
 import fs from "node:fs";
@@ -24,7 +26,7 @@ import { createRequire } from "node:module";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { resolveWebgpu, configureVulkanIcd, headlessGpuSkipReason, noteNativeAdapter, exitCleanly } from "../tools/ship/headlessGpu.mjs";
-import { summarise, timingLine, parseTimingLine, passLine, parsePassLine, PASS_ORDER, orbitAt, timeFrames, RADIUS, SPEED, WARMUP_FRAMES, TIMED_FRAMES, DEFAULT_SIZES } from "./snowFrameTiming.mjs";
+import { summarise, timingLine, parseTimingLine, passLine, parsePassLine, bracketLine, parseBracketLine, PASS_ORDER, orbitAt, timeFrames, RADIUS, SPEED, WARMUP_FRAMES, WARMUP_MS, TIMED_FRAMES, DEFAULT_SIZES } from "./snowFrameTiming.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const require_ = createRequire(import.meta.url);
@@ -90,10 +92,17 @@ console.log("\n4. THE LOOP, DRIVEN ON A FAKE CLOCK");
 {
     let clock = 0, frameCalls = 0, idleCalls = 0, created = null;
     const fakeCreate = async (dev, opts) => { created = opts; return { errors: ["e0"], stats: { frames: 0, triangles: 77 }, frame: async () => { frameCalls++; clock += 2; } }; };
-    const r = await timeFrames({ queue: {} }, { width: 64, height: 32, warmup: 3, frames: 5, now: () => clock, idle: async () => { idleCalls++; clock += 3; }, create: fakeCreate });
+    const r = await timeFrames({ queue: {} }, { width: 64, height: 32, warmup: 3, warmupMs: 0, frames: 5, now: () => clock, idle: async () => { idleCalls++; clock += 3; }, create: fakeCreate });
     ok("the frame function runs warm-up + timed + batched times (3 + 5 + 5), and the queue is waited on once a warm-up frame, once a timed frame and once for the batch (3 + 5 + 1)", frameCalls === 13 && idleCalls === 9, `${frameCalls} frames, ${idleCalls} waits`);
     ok("each latency is the encode time PLUS the wait on the queue (2 + 3 = 5), each encode time alone is 2", r.perFrame.length === 5 && r.perFrame.every((v) => v === 5) && r.encode.every((v) => v === 2), JSON.stringify(r.perFrame));
     ok("the batched figure is five encodes and ONE wait (5 x 2 + 3 = 13), not five waits", r.batchedMs === 13 && r.batchedFrames === 5, "batched " + r.batchedMs);
+    {   // warm-up is TIME as well as frames: each frame here costs 2 + 3 = 5 ms on the fake clock, so a 100 ms warm-up is 20 frames even though 2 were asked for
+        let c2 = 0, fc = 0;
+        const r2 = await timeFrames({ queue: {} }, { width: 64, height: 32, warmup: 2, warmupMs: 100, frames: 3, now: () => c2, idle: async () => { c2 += 3; }, create: async () => ({ errors: [], stats: { frames: 0, triangles: 1 }, frame: async () => { fc++; c2 += 2; } }) });
+        ok("!! warm-up runs for the frame count OR the time, whichever is longer: 2 frames asked for, 100 ms at 5 ms a frame = 20 warm-up frames before the 3 timed and 3 batched (26 frames in all); WARMUP_MS is " + WARMUP_MS, fc === 26 && r2.perFrame.length === 3 && WARMUP_MS === 1000, fc + " frames");
+        const b = bracketLine({ width: 320, height: 180, shadowRes: 2048, perFrame: [8, 8, 8] }, { perFrame: [9.2, 9.2, 9.2] }, "adapter x"), pb = parseBracketLine(b);
+        ok("the bracket line gives the first configuration's median at the start and at the end and the drift between them (8 -> 9.2 ms is +15%), and parses back", pb && pb.start === 8 && pb.end === 9.2 && pb.drift === 15 && pb.width === 320 && pb.shadowRes === 2048 && pb.adapter === "adapter x" && parseBracketLine("reading snowFrame: x") === null, b);
+    }
     ok("the size is passed to the renderer with no canvas (a native device has none to present to), and the device's errors and triangle count come back", created && created.canvas === null && created.width === 64 && created.height === 32 && r.errors.length === 1 && r.triangles === 77);
 }
 
@@ -122,7 +131,7 @@ if (skip) {
     if (adapter) {
         const hasTs = adapter.features && adapter.features.has("timestamp-query");
         const device = await adapter.requestDevice({ requiredFeatures: hasTs ? ["timestamp-query"] : [] });
-        const r = await timeFrames(device, { width: 160, height: 90, warmup: 1, frames: 3, passTimers: hasTs });
+        const r = await timeFrames(device, { width: 160, height: 90, warmup: 1, warmupMs: 0, frames: 3, passTimers: hasTs });
         await new Promise((res) => setTimeout(res, 50));
         const s = summarise(r.perFrame);
         ok("!! the whole frame graph ran on the native device with no GPU error: deform, sky bake, three shadow passes, the clipmap and TAA, 1 warm-up + 3 timed frames (and 3 batched when the adapter has no timestamp queries)", r.errors.length === 0 && r.framesRun === (hasTs ? 4 : 7) && r.triangles > 1000, `${r.framesRun} frames, ${r.triangles} triangles, errors: ${r.errors.join(" | ").slice(0, 200) || "none"}`);

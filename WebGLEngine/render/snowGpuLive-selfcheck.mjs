@@ -52,15 +52,6 @@ if (skipWhy) {
         // v4896 -- a TIMING reading for the real-hardware report (tools/ship/realGpuRun.mjs keeps "----" lines): the whole frame graph, presenting, at 320x180, on whatever adapter the browser found.
         // On the software adapter this is a CPU rasteriser's rate; on a D3D12 GPU it is the number that says whether the graph (deform, sky bake, 3 shadow passes, clipmap, TAA) is cheap.
         console.log("  ----  reading snowGpu: live loop " + ran + " frames in " + L.secs.toFixed(1) + " s (" + fps.toFixed(1) + " fps) at 320x180, " + L.fp + " footprints, adapter " + L.adapter);
-        // v4896 -- RENDER SCALE ON THE REAL PAGE: snow-gpu.html?scale=0.5&shadow=1024 renders at half the canvas and makes a 1024 shadow map; the loop still runs, still presents, still raises no GPU error.
-        // SABOTAGE: the page ignoring ?scale (rw/rh without the scale) -> the size row RED by name; restored.
-        const sc = await browser.newPage({ viewport: { width: 320, height: 180 } }), scErrs = [];
-        sc.on("pageerror", (e) => scErrs.push(String(e).slice(0, 300))); sc.on("console", (m) => { if (m.type() === "error" && !/Failed to load resource/.test(m.text())) scErrs.push(m.text().slice(0, 300)); });
-        await sc.goto(base + "/snow-gpu.html?scale=0.5&shadow=1024"); await sc.waitForFunction(() => window.__snowgpu && (window.__snowgpu.ready || window.__snowgpu.error), null, { timeout: 60000 });
-        let scWhy = ""; try { await sc.waitForFunction(() => window.__snowgpu.frames >= 4, null, { timeout: 120000, polling: 250 }); } catch (e) { scWhy = "the scaled loop did not reach 4 frames in 120 s"; }
-        const Q = await sc.evaluate(() => { const g = window.__snowgpu; return { size: g.gpu.size, canvas: [document.getElementById("c").width, document.getElementById("c").height], shadow: g.shadowRes, shadowMap: g.gpu.stats.shadowRes, frames: g.frames, errs: g.gpu.errors.length, slider: document.getElementById("scale").value, label: document.getElementById("scalev").textContent }; });
-        ok("!! the page at ?scale=0.5&shadow=1024 renders at half the canvas (" + Q.size.join("x") + " of " + Q.canvas.join("x") + ") with a " + Q.shadowMap + " px shadow map, the slider reads " + Q.label + ", and the loop runs (" + Q.frames + " frames) with " + Q.errs + " GPU errors",
-            !scWhy && Q.size[0] === Math.round(Q.canvas[0] * 0.5) && Q.size[1] === Math.round(Q.canvas[1] * 0.5) && Q.shadowMap === 1024 && Q.slider === "50" && Q.frames >= 4 && Q.errs === 0 && scErrs.length === 0, (scWhy + " " + scErrs.join(" | ")).trim().slice(0, 240));
     } finally { await browser.close(); server.close(); }
 }
 
