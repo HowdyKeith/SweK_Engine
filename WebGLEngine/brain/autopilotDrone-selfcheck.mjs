@@ -14,8 +14,25 @@
 //   7  LANDING             a descent on the profile ends landed, slowly, level, standing
 //   8  A MOTOR QUITTING    the pilot gives up the yaw, asks for no translation, multiplies the thrust by 4/3 and comes down gently; AND THE MEASURED OUTCOME: from the starts the gate pins, the hand pilot crashes, at speeds of 14 to 41 m/s (a spinning quadrotor tumbles whatever its pilot asks): the corner the learned pilots are tried on
 //   9  PURITY              the pilot is a function of the state, the target, the wind and the options: the same inputs twice give the same bits, nothing is mutated, a non-finite state is read as zero
+//  10  THE CONSTANTS AND THE GEOMETRY   the landing profile, the ground flags, the nose's frame from the quaternion, the tilt compensation, the motor-health threshold and failed-corner signs, the speed law (the braking root), the tilt schedule, per-axis inertia, the bank wrap, a failed machine's spin, options in the guidance
 //
-// SABOTAGE LOG: (filled in below once run)
+// SABOTAGE LOG (each applied to brain/autopilotDrone.mjs in a scratch copy, the gate run on the copy, the copy discarded; the number is how many rows went red): 70 mutants (every gain constant moved, the frame and the tilt law,
+//   the speed, altitude, landing and motor-out laws, the mixer authority and the clamps), none left at 0.
+// THE FIRST PASS FOUND TWENTY HOLES, ALL IN THE CONSTANTS AND THE GEOMETRY, AND SECTION 10 WAS WRITTEN FOR THEM: the landing profile (rate, floor, cap: A16-A18, A46), the ground flags (the height, the intent, the climb rate: A19,
+//   A41, A42), the nose's frame (A26: every flight in this gate is at heading 0 or flies a symmetric manoeuvre, where a flipped forward vector changes nothing), the tilt compensation (A27, A50, A51), the motor-health threshold
+//   and the signs of the failed-corner flags (A30-A32), the braking law (A34: with the default gains the root never binds, so the row sets a brake of 0.5), the tilt schedule (A40), the airframe's per-axis inertia (A64: the
+//   default airframe's roll and pitch inertia are equal, so the row uses an airframe with the pitch inertia doubled), the bank error's wrap (A68), a failed machine's spin (A69) and the options reaching the guidance (A70). The
+//   first pass is a measurement of the gate as it stood; the table below is the final pass over the 70, against the gate as it now stands.
+//   A01 natural frequency 12 3; A02 damping 0.5 5; A03 velocity gain 1.0 3; A04 tilt limit 0.6 4; A05 low-height tilt limit 0.3 2; A06 position gain 1.0 3; A07 speed cap 12 3; A08 braking 4 1; A09 altitude gain 2.0 2; A10 climb
+//   limit 6 2; A11 descent limit 5 2; A12 climb-rate gain 0.3 4; A13 heading gain 2.0 2; A14 turn-rate limit 3 2; A15 yaw gain 2.0 2; A16 landing rate 0.8 1; A17 landing minimum 0.6 1; A18 landing maximum 4 1; A19 ground epsilon
+//   0.5 2; A20 motor-out rate 1.0 1; A21 motor-out minimum 1.5 1; A22 motor-out maximum 6 1; A23 motor-out tilt 0.4 1; A24 floor 0.1 1; A25 right vector flipped 6; A26 forward vector flipped 1; A27 cosine floor 0.5 1; A28 height
+//   ignores the legs 7; A29 motor out needs three lost 5; A30 a damaged motor counts as working 1; A31 failed front sign 1; A32 failed left sign 1; A33 position gain doubled in the speed law 4; A34 braking law without the factor
+//   2 1; A35 position dead band 0.5 6; A36 a failed machine keeps translating 1; A37 height floor ignored 1; A38 velocity error sign 7; A39 motor-out tilt limit is the normal one 1; A40 tilt schedule over 4 m 1; A41 on the ground
+//   only when landing 1; A42 on the ground at any climb rate 1; A43 pitch command sign 7; A44 bank command sign 5; A45 altitude law sign 7; A46 landing rate law doubled 1; A47 motor-out descent sign 1; A48 heading error not
+//   wrapped 1; A49 a failed machine turns to its heading 1; A50 thrust tilt compensation off 1; A51 thrust tilt compensation capped at 0.5 1; A52 thrust not scaled to the working motors 1; A53 climb error sign 11; A54 pitch law
+//   adds the rate term 10; A55 roll law adds the rate term 8; A56 yaw law sign 9; A57 thrust law sign 13; A58 thrust clamped to [-1, 1] 1; A59 pitch clamped to 0.5 1; A60 a non-finite pitch not guarded 2; A61 hover thrust 10
+//   percent high 5; A62 vertical authority from three motors 1; A63 yaw authority from two motors 1; A64 pitch authority uses the roll inertia 1; A65 attitude gain linear in wn 10; A66 attitude damping without the 2 4; A67
+//   wrapAngle is the identity 2; A68 bank error not wrapped 1; A69 motor-out yaw rate error not zeroed 1; A70 gains option ignored 2.
 "use strict";
 import * as Q from "../physics/mechanics/multirotorModel6dof.mjs";
 import * as AP from "./autopilotDrone.mjs";
