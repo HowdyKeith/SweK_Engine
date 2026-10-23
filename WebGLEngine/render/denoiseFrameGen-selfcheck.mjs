@@ -17,6 +17,13 @@
 //   FG5 the cross-fade at t 0.3                                         1 RED (the X-is-the-cross-fade row)
 //   FG6 O6 accumulated through frame 7                                  1 RED (the R-differs-from-O7 row)
 //   FG7 SPLITS_FRAMEGEN left out of the dataset refusal                 2 RED (the split row here; the study gate's refusal row)
+//   and round 60's light-free arrangement (section 136):
+//   LF1 G' generated between the lit frames                             1 RED (the G'-X'-R' row)
+//   LF2 the arms lit with frame 7's light sources                       2 RED (the G'-X'-R' row; the noisy frame's row)
+//   LF3 the cross-fade arm left unlit                                   1 RED (the G'-X'-R' row)
+//   LF4 the light-free noisy frame lit at frame 7                       1 RED (the noisy frame's row -- added before the runner, as the
+//       arms' row did not see the noisy frame)
+//   LF7 SPLITS_FRAMEGEN_LF left out of the dataset refusal              1 RED (the study gate's refusal row)
 // The field row was first written at a third of the unmoved distance; the R scene at 48 x 48 read 0.45 (the check rounds to
 // whole pixels), so it holds half -- which FG1's reversed field still fails.
 "use strict";
@@ -105,6 +112,35 @@ console.log("\n3. THE FRAMES: THE CHAIN TWICE, THE GENERATOR AS FSR3 RUNS IT, AN
     const again = FG.frameGenFrames(seq, net);
     ok("  C4's basis: the frames re-made from the same sequence are the same, bit for bit", keys.every((k) => Array.from(again[k]).every((v, i) => Object.is(v, F[k][i]))));
     ok("  R is O6 and differs from O7 -- the two frames are the orbit's step apart", F.R.some((v, i) => v !== F.O7[i]));
+}
+
+console.log("\n5. ROUND 60 (section 136): THE SAME GENERATOR BETWEEN LIGHT-FREE FRAMES, LIT AT THE MIDPOINT");
+{
+    const { compositeEmitters } = await imp("render/denoiseUpscale.mjs"), { crossFadeCPU } = await imp("render/frameInterp.mjs");
+    const net = decodeNet(JSON.parse(fs.readFileSync(path.join(ENG, "render", "denoise-net-r11.json"), "utf8")).net);
+    const seq = FG.renderFrameGenImages("R", 990904, { w: 16, h: 16, sppIn: 4, sppRef: 8 }), F = FG.frameGenFrames(seq, net), N = 256;
+    const bits = (a, b) => a.length === b.length && Array.from(a).every((v, i) => Object.is(v, b[i]));
+    const rgba = (a) => { const o = new Float32Array(N * 4); for (let p = 0; p < N; p++) { for (let c = 0; c < 3; c++) o[p * 4 + c] = a[p * 3 + c]; o[p * 4 + 3] = 1; } return o; };
+    const rgb = (a) => { const o = new Float64Array(N * 3); for (let p = 0; p < N; p++) for (let c = 0; c < 3; c++) o[p * 3 + c] = a[p * 4 + c]; return o; };
+    // L6 and L7 are the frames round 59 composited: lit with their own eyes' light sources they ARE O6 and O7, bit for bit
+    ok("!! L6 and L7 are the chain's accumulations before the composite: lit with frames 6's and 7's own light sources they are O6 and O7, bit for bit",
+        bits(compositeEmitters(F.L6, seq.E.prev), F.R) && bits(compositeEmitters(F.L7, seq.E.cur), F.O7));
+    const S = makeScene("R", 990904), m = FG.motionField(S, seq.path.eyes[FG.PREV_FRAME], seq.path.eyes[FG.CUR_FRAME], 16, 16);
+    const g = interpolateFrameCPU({ prev: rgba(F.L6), cur: rgba(F.L7), w: 16, h: 16, flow: m.flow, bw: 16, bh: 16, block: 1, depthBlock: m.depth, indexedBy: "cur", t: 0.5, fill: FG.FRAMEGEN_FILL });
+    const mid = (y) => compositeEmitters(y, seq.E.mid);
+    ok("!! G' is interpolateFrameCPU's frame between L6 and L7 lit with the midpoint's light sources, X' their cross-fade lit the same, R' L6 lit the same -- bit for bit",
+        bits(F.Gl, mid(rgb(g.frame))) && bits(F.Xl, mid(rgb(crossFadeCPU({ prev: rgba(F.L6), cur: rgba(F.L7), w: 16, h: 16, t: 0.5 })))) && bits(F.Rl, mid(F.L6)) &&
+        ["Gl", "Xl", "Rl", "noisyMid", "GlNoFill"].every((k) => F[k].length === N * 3 && Array.from(F[k]).every(Number.isFinite)));
+    // the noisy frame is the newer frame's half-size input through the chain's fill, bilinear upscale and shift, lit at the midpoint
+    const { upscale, fillEmitters } = await imp("render/denoiseUpscale.mjs"), { shiftResample, halfShift } = await imp("render/denoiseTemporalUpscale.mjs");
+    const last = seq.frames[FG.CUR_FRAME], nl = shiftResample(upscale(fillEmitters(last.half.input, last.half.cov, 8, 8), 8, 8, 16, 16, "bilinear"), 16, 16, ...halfShift(last.jitter));
+    ok("!! the light-free arrangement's noisy frame is the newer frame's half-size input through the chain's fill, bilinear upscale and shift, lit at the midpoint as the arms are -- bit for bit",
+        bits(F.noisyMid, mid(nl)) && bits(F.noisy, compositeEmitters(nl, seq.E.cur)));
+    // the light sources at the midpoint are where the geometry puts them there: E_mid is emitterRadiance from the midpoint eye
+    const { emitterRadiance } = await imp("render/denoiseMask.mjs"), Em = emitterRadiance({ ...S, eye: seq.mid }, 16, 16);
+    ok("  E_mid is emitterRadiance from the midpoint eye, and differs from frame 7's -- the light sources moved half a step",
+        bits(Em.E, seq.E.mid.E) && bits(Em.cov, seq.E.mid.cov) && !bits(seq.E.mid.cov, seq.E.cur.cov) || (bits(Em.E, seq.E.mid.E) && seq.E.cur.cov.every((v) => v === 0)),
+        `${seq.E.mid.cov.filter((v) => v > 0).length} pixels lit at the midpoint, ${seq.E.cur.cov.filter((v) => v > 0).length} at frame 7`);
 }
 
 console.log("\n4. THE SEEDS AND THE SPLIT");

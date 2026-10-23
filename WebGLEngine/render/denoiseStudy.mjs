@@ -21,7 +21,7 @@
 // Without it everything is computed, as before; with it the result is the same, bit for bit
 // (render/denoiseCache-selfcheck.mjs). A scene rendered under --harvest is never served to a run without it.
 "use strict";
-import { SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, SPLITS_R8, SPLITS_R9, SPLITS_R10, SPLITS_R11, SPLITS_MESH, SPLITS_FSR1, SPLITS_HALFRES, SPLITS_EMITTER, SPLITS_TEMPORALUP, SPLITS_R47, SPLITS_MESH_C, SPLITS_PAGE, SPLITS_FRAMEGEN, familyOf, makeScene, IMAGE, SPP_IN, SPP_REF, renderImages, renderSeeds, inputChannels, remodulate } from "./denoiseScenes.mjs";
+import { SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, SPLITS_R8, SPLITS_R9, SPLITS_R10, SPLITS_R11, SPLITS_MESH, SPLITS_FSR1, SPLITS_HALFRES, SPLITS_EMITTER, SPLITS_TEMPORALUP, SPLITS_R47, SPLITS_MESH_C, SPLITS_PAGE, SPLITS_FRAMEGEN, SPLITS_FRAMEGEN_LF, familyOf, makeScene, IMAGE, SPP_IN, SPP_REF, renderImages, renderSeeds, inputChannels, remodulate } from "./denoiseScenes.mjs";
 import { renderSequence, temporalChannels, sequenceSeeds } from "./denoiseTemporal.mjs";
 import { withMask, emitterCoverage, emitterRadiance, MASK_STRIDE, MASK_CHANNEL, COVERAGE_GRID } from "./denoiseMask.mjs";
 import { jointBilateral, tuneFilter } from "./denoiseFilter.mjs";
@@ -411,15 +411,31 @@ export const RESULTS_FRAMEGEN = "render/denoise-results-framegen.json";
 export const ROUND_FRAMEGEN = Object.freeze({ splits: SPLITS_FRAMEGEN, image: 256, test: "signflip", c2Prior: ROUND_MESH.c2Prior, results: RESULTS_FRAMEGEN });
 /** Section 133's two hypotheses over a round 59 table, by name, so the run and the verdict's re-derivation read one definition. */
 export const frameGenSets = (t) => ({ H1: { noisy: t.noisy, filter: t.X, net: [t.G], floor: t.floor }, H2: { noisy: t.noisy, filter: t.R, net: [t.G], floor: t.floor } });
-export function runFrameGenStudy({ splits = ROUND_FRAMEGEN.splits, net, test = ROUND_FRAMEGEN.test, c2Prior = ROUND_FRAMEGEN.c2Prior,
+/**
+ * Section 136, ROUND 60: the same generator between LIGHT-FREE frames (the chain's accumulations before the composite), every arm
+ * then composited with the light sources at the midpoint (emitterRadiance from the midpoint eye) -- G' against the cross-fade X'
+ * and the held frame R' made the same way, over the newer frame's noisy input composited the same way.
+ */
+export const RESULTS_FRAMEGEN_LF = "render/denoise-results-framegen-lf.json";
+export const ROUND_FRAMEGEN_LF = Object.freeze({ splits: SPLITS_FRAMEGEN_LF, image: 256, test: "signflip", c2Prior: ROUND_MESH.c2Prior, arrangement: "lightFree", results: RESULTS_FRAMEGEN_LF });
+export const frameGenSetsLightFree = (t) => ({ H1: { noisy: t.noisyMid, filter: t.Xl, net: [t.Gl], floor: t.floor }, H2: { noisy: t.noisyMid, filter: t.Rl, net: [t.Gl], floor: t.floor } });
+/** Round 26's transfer, Reinhard then gamma 2.2 -- the display space a secondary grades every arm in too. */
+const toDisplay = (y) => Float64Array.from(y, (v) => Math.pow(Math.max(0, v) / (1 + Math.max(0, v)), 1 / 2.2));
+export function runFrameGenStudy({ splits = ROUND_FRAMEGEN.splits, net, test = ROUND_FRAMEGEN.test, c2Prior = ROUND_FRAMEGEN.c2Prior, arrangement = "shown",
                                    harvest = false, image = IMAGE, sppIn = SPP_IN, sppRef = SPP_REF, cache = null, log = () => {} } = {}) {
     if (!net) throw new Error("denoiseStudy: runFrameGenStudy needs the shipped network, decoded by its caller");
+    if (arrangement !== "shown" && arrangement !== "lightFree") throw new Error(`denoiseStudy: runFrameGenStudy's arrangement is "shown" (section 133) or "lightFree" (section 136), not ${arrangement}`);
+    const lf = arrangement === "lightFree";
     const t0 = Date.now(), timings = {}, split = splits.T1;
     const lap = (k) => { timings[k] = Date.now() - t0; log(`${k} at ${(timings[k] / 1000).toFixed(1)} s`); };
     const config = { image, half: image / 2, sppIn, sppRef, harvest, test, c2Prior, fill: FRAMEGEN_FILL, t: 0.5, field: "the scene's own: eye 7's first hits projected into camera 6, per pixel",
                      trained: "nothing -- the shipped network", split: { family: split.family, n: split.seeds.length, first: split.seeds[0] },
-                     hypotheses: { H1: "G (generated between O6 and O7) against X (their cross-fade)", H2: "G against R (O6 repeated)" } };
-    const keys = ["G", "X", "R", "O7", "noisy", "Bmid1", "GNoFill"], tables = Object.fromEntries(keys.map((k) => [k, []]));
+                     arrangement, hypotheses: lf
+                         ? { H1: "G' (generated between L6 and L7, lit at the midpoint) against X' (their cross-fade, lit the same)", H2: "G' against R' (L6 held, lit the same)" }
+                         : { H1: "G (generated between O6 and O7) against X (their cross-fade)", H2: "G against R (O6 repeated)" } };
+    const keys = lf ? ["Gl", "Xl", "Rl", "noisyMid", "GlNoFill", "G", "X", "R", "O7", "noisy", "Bmid1"] : ["G", "X", "R", "O7", "noisy", "Bmid1", "GNoFill"], tables = Object.fromEntries(keys.map((k) => [k, []]));
+    // round 60: and every arm graded in display space too, reported
+    const display = lf ? Object.fromEntries(["Gl", "Xl", "Rl", "G", "X", "R"].map((k) => [k, []])) : null;
     tables.floor = [];
     const field = [];
     let determinism = true;
@@ -431,15 +447,20 @@ export function runFrameGenStudy({ splits = ROUND_FRAMEGEN.splits, net, test = R
         const F = frameGenFrames(seq, net);
         for (const k of keys) tables[k].push(relMSE(F[k], seq.ref));
         tables.floor.push(relMSE(seq.ref2, seq.ref));
+        if (display) { const r = toDisplay(seq.ref); for (const k of Object.keys(display)) display[k].push(relMSE(toDisplay(F[k]), r)); }
         field.push(F.field);
         // C4: the candidate re-made from the same sequence, bit for bit -- the chain twice, the field, the splat, the fill
-        if (i === 0) determinism = frameGenFrames(seq, net).G.every((v, j) => Object.is(v, F.G[j]));
+        const cand = lf ? "Gl" : "G";
+        if (i === 0) determinism = frameGenFrames(seq, net)[cand].every((v, j) => Object.is(v, F[cand][j]));
         lap(`image ${i + 1} of ${split.seeds.length} (${fam} ${seed})`);
     });
     const allSeeds = split.seeds.flatMap((s) => { const r = frameGenSeeds(s); return [...r.half, r.mid, r.ref, r.ref2]; });
     const seedsDistinct = new Set(allSeeds).size === allSeeds.length;
-    const V = verdict({ sets: frameGenSets(tables), shuffled: null, c2Prior, determinism, seedsDistinct, test });
-    const secondary = { midTraced: effects(tables.Bmid1, tables.G), fill: effects(tables.GNoFill, tables.G), newerShown: effects(tables.O7, tables.G), field };
+    const V = verdict({ sets: (lf ? frameGenSetsLightFree : frameGenSets)(tables), shuffled: null, c2Prior, determinism, seedsDistinct, test });
+    const secondary = lf
+        ? { midTraced: effects(tables.Bmid1, tables.Gl), fill: effects(tables.GlNoFill, tables.Gl), overShown: effects(tables.G, tables.Gl), shown: { H1: effects(tables.X, tables.G), H2: effects(tables.R, tables.G) },
+            display: { H1: effects(display.Xl, display.Gl), H2: effects(display.Rl, display.Gl), shownH1: effects(display.X, display.G) }, displayTables: display, field }
+        : { midTraced: effects(tables.Bmid1, tables.G), fill: effects(tables.GNoFill, tables.G), newerShown: effects(tables.O7, tables.G), field };
     return { verdict: V, tables, secondary, timings, determinism, seedsDistinct, seedCount: allSeeds.length, config };
 }
 

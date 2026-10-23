@@ -109,13 +109,17 @@ export function frameGenFrames(seq, net) {
     const geo = seq.path.eyes.map((eye) => firstHits(S, eye, W, H));
     const up = (img, cov, kind) => upscale(fillEmitters(img, cov, w, h), w, h, W, H, kind);
     const halfY = seq.frames.map((f) => ({ y: up(den(f.half), f.half.cov, "easu"), shift: halfShift(f.jitter) }));
-    const O6 = compositeEmitters(accumulateUpscaled(halfY.slice(0, PREV_FRAME + 1), geo.slice(0, PREV_FRAME + 1), W, H).A, seq.E.prev);
-    const O7 = compositeEmitters(accumulateUpscaled(halfY, geo, W, H).A, seq.E.cur);
+    // round 60 (section 136): L6 and L7, the accumulations BEFORE the composite -- light-free, round 30's fill took the light sources out
+    const L6 = accumulateUpscaled(halfY.slice(0, PREV_FRAME + 1), geo.slice(0, PREV_FRAME + 1), W, H).A, L7 = accumulateUpscaled(halfY, geo, W, H).A;
+    const O6 = compositeEmitters(L6, seq.E.prev), O7 = compositeEmitters(L7, seq.E.cur);
     const m = motionField(S, seq.path.eyes[PREV_FRAME], seq.path.eyes[CUR_FRAME], W, H);
-    const gen = (fill) => interpolateFrameCPU({ prev: rgba(O6, N), cur: rgba(O7, N), w: W, h: H, flow: m.flow, bw: W, bh: H, block: 1, depthBlock: m.depth, indexedBy: "cur", t: 0.5, fill });
+    const gen = (fill, a = O6, b = O7) => interpolateFrameCPU({ prev: rgba(a, N), cur: rgba(b, N), w: W, h: H, flow: m.flow, bw: W, bh: H, block: 1, depthBlock: m.depth, indexedBy: "cur", t: 0.5, fill });
     const g = gen(FRAMEGEN_FILL), g0 = gen(null);
+    // round 60: the same generator between the light-free frames, and every arm composited with the light sources at the midpoint
+    const gl = gen(FRAMEGEN_FILL, L6, L7), gl0 = gen(null, L6, L7), mid = (y) => compositeEmitters(y, seq.E.mid);
     const last = seq.frames[CUR_FRAME];
-    const noisy = compositeEmitters(shiftResample(up(last.half.input, last.half.cov, "bilinear"), W, H, ...halfShift(last.jitter)), seq.E.cur);
+    const noisyLight = shiftResample(up(last.half.input, last.half.cov, "bilinear"), W, H, ...halfShift(last.jitter));
+    const noisy = compositeEmitters(noisyLight, seq.E.cur);
     // the field's own check, ON THE GEOMETRY: each pixel's first hit from eye 7 against the hit from eye 6 at the pixel its vector
     // points to, and at the same pixel unmoved -- the mean distance between the two points. Not on the images: the composited light
     // sources are up to 30 x their surroundings, so a one-pixel rounding at a light's edge outweighs every other pixel (measured)
@@ -130,5 +134,8 @@ export function frameGenFrames(seq, net) {
     }
     return { G: rgb(g.frame, N), X: rgb(crossFadeCPU({ prev: rgba(O6, N), cur: rgba(O7, N), w: W, h: H, t: 0.5 }), N), R: O6, O7, noisy,
              Bmid1: compositeEmitters(up(den(seq.midHalf), seq.midHalf.cov, "easu"), seq.E.mid), GNoFill: rgb(g0.frame, N),
+             // round 60: the light-free arrangement -- G', X', R' and its noisy frame, each composited with E_mid
+             Gl: mid(rgb(gl.frame, N)), Xl: mid(rgb(crossFadeCPU({ prev: rgba(L6, N), cur: rgba(L7, N), w: W, h: H, t: 0.5 }), N)), Rl: mid(L6), noisyMid: mid(noisyLight),
+             GlNoFill: mid(rgb(gl0.frame, N)), L6, L7,
              field: { holes: g.holes, holesNoFill: g0.holes, filled: g.filled, sky: m.sky, pointWarped: nw ? warped / nw : null, pointStill: ns ? still / ns : null, moved: Array.from(m.flow).filter((v, i) => i % 2 === 0 && Number.isFinite(v)).reduce((a, v, i, arr) => a + Math.abs(v) / arr.length, 0) } };
 }

@@ -156,6 +156,10 @@ export const SPLITS_PAGE = Object.freeze({ T1: Object.freeze({ family: "P", seed
 export const SPLITS_FRAMEGEN = Object.freeze({
     T1: Object.freeze({ family: "R+C", families: Object.freeze([...rep("R", 6), ...rep("C", 6)]), seeds: Object.freeze([...range(53000, 6), ...range(54000, 6)]) }),
 });
+/** Round 60's split (pre-registration section 136): the light-free generator, round 59's shape on new seeds. */
+export const SPLITS_FRAMEGEN_LF = Object.freeze({
+    T1: Object.freeze({ family: "R+C", families: Object.freeze([...rep("R", 6), ...rep("C", 6)]), seeds: Object.freeze([...range(55000, 6), ...range(56000, 6)]) }),
+});
 export const SPLITS_MESH_C = Object.freeze({
     T1: Object.freeze({ family: "VC", seeds: range(50000, 12) }),
     T2: Object.freeze({ family: "MC", seeds: range(51000, 12) }),
@@ -193,7 +197,7 @@ export const SPLITS_TEMPORALUP = Object.freeze({
 export const SPLITS_R47 = Object.freeze({ train: SPLITS_R11.train, val: SPLITS_R11.val, T1: Object.freeze({ family: "R", seeds: range(48000, 12) }), T2: Object.freeze({ family: "C", seeds: range(49000, 12) }) });
 /** The family of a split's i-th scene: its own entry in `families` when the split mixes them, else the split's. */
 export const familyOf = (split, i) => (split.families ? split.families[i] : split.family);
-const RESERVED = new Set([SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, SPLITS_R8, SPLITS_R9, SPLITS_R10, SPLITS_R11, SPLITS_MESH, SPLITS_FSR1, SPLITS_HALFRES, SPLITS_EMITTER, SPLITS_TEMPORALUP, SPLITS_R47, SPLITS_MESH_C, SPLITS_PAGE, SPLITS_FRAMEGEN].flatMap((S) => Object.values(S).flatMap((s) => s.seeds)));
+const RESERVED = new Set([SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, SPLITS_R8, SPLITS_R9, SPLITS_R10, SPLITS_R11, SPLITS_MESH, SPLITS_FSR1, SPLITS_HALFRES, SPLITS_EMITTER, SPLITS_TEMPORALUP, SPLITS_R47, SPLITS_MESH_C, SPLITS_PAGE, SPLITS_FRAMEGEN, SPLITS_FRAMEGEN_LF].flatMap((S) => Object.values(S).flatMap((s) => s.seeds)));
 export const isDatasetSeed = (seed) => RESERVED.has(seed);
 
 /** The render seeds of a scene: the input, the reference and the second reference -- distinct for every scene seed. */

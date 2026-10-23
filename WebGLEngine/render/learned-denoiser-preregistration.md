@@ -9237,3 +9237,84 @@ its history (`temporal`) cheaper than today's page (`full`) at 1920 x 1080?
 - **P3:** every exact gate holds on both GPUs, and any red falls in quality or timing.
 
 **The reports are committed byte for byte before they are read.** Section 137 reads them. Section 136 is round 60's.
+
+## 136. ROUND 60 -- FSR3's GENERATOR BETWEEN LIGHT-FREE FRAMES, THE LIGHT SOURCES PUT BACK AT THE GENERATED TIME: FIXED BEFORE ITS CODE AND ITS TEST SCENES
+
+Committed with the code that implements it. No scene of this round's test set has been rendered.
+
+**Why this round.** Section 134 found FSR3's generator carrying the light sources across their silhouettes. At a light's
+edge the gather's taps land on the light as it stood in the other frame, and in linear radiance one such tap costs
+~1,800 in relMSE. The arc has met this shape twice and answered it the same way both times:
+- round 30 took the light sources out before the upscale and put them back from the geometry (section 91);
+- v4755 composited FSR3's UI at the generated time instead of warping it (`fx/fsr/fsrFrameGenUi-selfcheck.mjs`).
+
+This round does that for the generator.
+
+> **Generated between the chain's frames with the light sources taken out, and the light sources put back where the
+> geometry puts them at the generated time, is the frame closer to a frame traced there than the cheaper frames made the
+> same way?**
+
+**Everything is section 133's except the arrangement:**
+- the network and the chain (256 x 256, each frame traced at 128 x 128);
+- the sequence and the midpoint eye;
+- the scene's own motion field;
+- the generator with FRAMEGEN_FILL at t = 0.5;
+- the truth, a 1024-sample frame from the midpoint eye, with a second one for C3.
+
+**The arrangement.**
+- **L6 and L7** are the chain's accumulations through frames 6 and 7, BEFORE the composite. Their light-source pixels are
+  already filled from their neighbours before EASU (round 30's fill), so they hold no light source.
+- **E_mid** is `emitterRadiance` from the midpoint eye at full size: the light sources' coverage and emission, from the
+  geometry alone. Nothing is traced for it, and it is exact.
+- **The three arms, each composited with E_mid the same way:**
+  - **G'**, the candidate: `compositeEmitters(interpolateFrameCPU(L6, L7, ...), E_mid)`;
+  - **X'**: `compositeEmitters(0.5 L6 + 0.5 L7, E_mid)`, the cross-fade;
+  - **R'**: `compositeEmitters(L6, E_mid)`, the older frame held.
+
+  So the arms differ ONLY in how the light-free frame between is made: warped, averaged, or held.
+
+**Hypotheses**, section 6's statistic and section 28's test, Holm over the two at 0.05:
+- **H1: G' beats X'**;
+- **H2: G' beats R'**.
+
+**The split** (`SPLITS_FRAMEGEN_LF`): 6 of R (**55000-55005**) and 6 of C (**56000-56005**), new seeds.
+
+**Controls:** section 133's, with one change. The noisy frame is the newer frame's half-size input through the chain's
+fill, bilinear upscale and shift, composited with E_mid, so it is treated as the arms are. C2-C5 are as before.
+
+**Secondary, reported, never tested:**
+- round 59's three arms on these images (G, X, R as shown, each frame's own lights);
+- Bmid1;
+- G' without its fill;
+- the field's check;
+- every arm graded in display space too (round 26's transfer), since fsr-three.html's frames were display frames.
+
+**What each outcome buys.**
+- **H1 and H2 supported:** FSR3's arrangement, with the light sources composited at the generated time, runs on the path
+  tracer's output. The device round (the generator's TSL pass and the composite after the chain on denoise.html) and a
+  rig timing round follow.
+- **H2 only:** the generated frame beats holding the old one but not the cross-fade, on these motions. The device round
+  is not owed.
+- **Neither, not reported or not resolvable:** recorded as found. FSR3 on the path tracer is then a measured negative in
+  both arrangements.
+
+**Predictions, fixed now, deciding nothing.**
+- **P1:** C1 holds.
+- **P2: H2 is supported.** Holding L6 is half a step behind everywhere, and the orbit moves pixels 5-20 px here.
+- **P3: H1 is supported.** With the lights out, the generator's disocclusion errors are bounded by the scene's own
+  radiance. The cross-fade doubles every edge by half the motion, 2.5-10 px.
+- **P4:** G' beats round 59's G on every image. The light-source error section 134 measured is gone by construction.
+- All four are reported either way.
+
+**The code, gated before the harvest.**
+- `frameGenFrames` returns the light-free arms beside round 59's, from the same L6 and L7. Round 59's O6 and O7 are those
+  lit with their own eyes' light sources, bit for bit.
+- `runFrameGenStudy({ arrangement: "lightFree" })` grades them, and grades every arm in display space as well.
+- `render/denoiseFrameGen-selfcheck.mjs` section 5 holds G', X', R' and the noisy frame to their definitions, bit for bit.
+- `render/denoiseStudy-selfcheck.mjs` section 14e covers the round and its command.
+- Sabotages LF1-LF7 each turned red.
+- Round 59's own gate rows and re-derivation are unchanged and green.
+
+**The command:** `node tools/denoiseStudy.mjs --harvest-framegen-lf --cache <dir>` -> `render/denoise-results-framegen-lf.json`.
+It refuses if the file exists. It runs here for about 100 minutes, as round 59's did. The file is committed byte for byte
+before it is read, and section 138 reads it. Section 137 is kept for the rig reports section 135 asked for.
