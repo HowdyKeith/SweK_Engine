@@ -717,6 +717,11 @@ Nothing extra to run: the same two Intel runs carry it, if they are made at a co
 gate holds the tiled accumulation bit for bit against the accumulation, and adds a `section 117:` line. Section 117 predicts
 0.60-0.85 x the accumulation on the Intel, which would hold H48, narrowly.
 
+### Rounds 51-52: the runs at d77592b2, and r41h's cap put back (sections 121-122)
+
+The two Intel runs at d77592b2 died in the timing gate, inside r41h's 1920 x 1080 pass: past Windows' GPU timeout once round
+45 lifted its cap. The cap is back at 1500 ms and r41h is closed. The runs below must be at a commit carrying section 122.
+
 ### Round 49: the w16 network on the Intel, timed natively (pre-registration section 119)
 
 **On the Intel gen-9, two more runs**, at a commit carrying section 119 (`git log -1 --oneline` shows it). These are not the

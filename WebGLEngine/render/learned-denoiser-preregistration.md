@@ -8281,3 +8281,42 @@ either.
   for good, and `denoise-f16-intel` is closed on section 111's figures), or to time that pass another way, is Keith's call.
   Nothing is changed here until the trace has been read.
 - **Then two more Intel runs**, at a commit carrying this section's fix and whatever the trace calls for.
+
+## 122. ROUND 52 -- r41h's CAP PUT BACK UNDER THE GPU's TIMEOUT, AND `denoise-f16-intel` CLOSED AS A MEASURED NEGATIVE
+
+**What the traces showed.** The two runs' timing traces are committed as received at 50945d36:
+`render/denoise-rig-r49-a-trace-38456.txt` and `render/denoise-rig-r49-b-trace-47172.txt`, each named by the run whose
+report names it. Both stop inside r41h's 1920 x 1080 timing:
+- run a after r41h's round 1 began at 175.3 s, the device destroyed at 179.6 s;
+- run b in its round 0 at 187.5 s, the device destroyed at 189.7 s.
+
+In both, r18u's 1920 x 1080 round 0 completed first, at about 1.1 s a pass. So the device survived the shipped network's
+1080p pass and died inside r41h's, at about 2.4 s a pass. That is the window in which Windows resets a GPU whose one
+submission runs too long (TDR, near 2 s). Run a surviving one of r41h's rounds is what a limit that close to the pass's
+length allows. **Section 121's suspicion is confirmed as far as the traces can confirm it:** the death is r41h's 1080p pass,
+which round 45's 4000 ms cap admitted.
+
+**Keith's decision:** put the cap back, and close `denoise-f16-intel`.
+- **`SET_CAP_MS` is empty again.** Every set takes the ladder's 1500 ms cap. The table and `capSkip` stay, held on round 45's
+  table as a fixture. A new row holds every entry to at most the ladder's cap, so no set can be given a pass that long
+  again.
+- **H41 can never meet its C3 on this GPU.** A 1920 x 1080 pass of r41h needs one submission longer than the GPU allows. So
+  H41 has no verdict for good.
+- **`denoise-f16-intel` closes as a measured negative, by Keith's judgement and not by H41's rule.**
+  - What was measured: r41h at 0.49-0.61 x r18u at every size from 64 x 64 to 1024 x 1024, on both paths, in both of
+    section 111's runs.
+  - K0h held natively and in Chrome, so the f16 kernel was exact on its first hardware.
+  - No table entry ever named it.
+
+**What stays owed, unchanged by this section: two Intel runs** at a commit carrying it. Those runs read:
+- H46 (section 115) and H48 (section 117), from the chain gate's lines;
+- H49 (section 119), natively;
+- section 120's page lines, reported.
+
+Section 121's figures are not those runs. Nothing here changes how any of those rules reads.
+
+**Sabotages, by the byte-safe runner (U1-U2):**
+- the table given r41h's 4000 ms again;
+- the cap lookup ignoring the table it is handed.
+
+Each must turn at least one row red. Both did, 1 row each, restored byte-identical. The timing gate is green here.

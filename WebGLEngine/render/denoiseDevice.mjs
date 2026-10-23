@@ -352,7 +352,10 @@ export const featureSetsFor = (adapter, sets) => sets.filter((s) => !Object.hasO
  * (predicted 2192-2485 ms on the Intel gen-9, section 111) the 1500 ms cap skipped, so section 109's C3 could not be met. Every
  * other set takes capMs, as before.
  */
-export const SET_CAP_MS = Object.freeze({ r41h: 4000 });
+// Round 52 (section 122): EMPTY AGAIN. Section 121's traces put the Intel's two deaths inside r41h's 1920 x 1080 pass (about 2.4 s):
+// Windows resets a GPU whose one submission runs near 2 s, so a cap above the ladder's own lets a pass kill the device. The table and
+// capSkip stay, so a set could be given a LOWER cap; none is given a higher one (the timing gate holds every entry to at most CAP)
+export const SET_CAP_MS = Object.freeze({});
 /** The ladder's skip, as a pure function: why `set` does not run at px pixels, given its last measured pass ({ ms, px }), or null. */
 export function capSkip(set, last, px, { capMs = 1500, capBySet = SET_CAP_MS } = {}) {
     const cap = Object.hasOwn(capBySet, set) ? capBySet[set] : capMs, predicted = last ? last.ms * px / last.px : 0;

@@ -139,7 +139,7 @@ const FXC_CHILD = process.argv.includes("--fxc-ladder"), RESULT = process.argv.i
 // cap given to r18u as well, 2 red
 // round 45: the cap a set's skips are judged by -- its own (SET_CAP_MS) where it has one, the ladder's CAP otherwise; and the cap
 // row's test, apart, so a fixture can hold both (on SwiftShader no set has a cap of its own, so a live ladder cannot)
-const capOfSet = (set) => (set && Object.hasOwn(SET_CAP_MS, set) ? SET_CAP_MS[set] : CAP);
+const capOfSet = (set, caps = SET_CAP_MS) => (set && Object.hasOwn(caps, set) ? caps[set] : CAP);
 const capRowHolds = (rows, cap) => { let last = null, capped = true;
     for (const x of rows) { if (!x.skipped) { last = x; continue; } if (/cap/.test(x.reason)) capped &&= !!last && last.elapsed.median * (x.H * x.W) / (last.H * last.W) > cap && x.reason.endsWith(`over the ${cap} ms cap`); }
     return capped; };
@@ -385,21 +385,24 @@ console.log("1. THE LADDER'S ARITHMETIC");
         largestBuffer(net, 1080, 1920) === 1920 * 1080 * 81 * 4 && largestBuffer(net, 64, 64) === 64 * 64 * 81 * 4);
     // ROUND 45 (section 114): r41h's own cap, so its 1920 x 1080 pass runs where section 111's predicted 2192-2485 ms; every
     // other set keeps the ladder's. capSkip is the ladder's own skip (timingLadder calls it), so these rows are its arithmetic
-    ok("  round 45: SET_CAP_MS gives r41h alone a cap of its own, 4000 ms, and names only sets the device knows",
-        JSON.stringify(SET_CAP_MS) === JSON.stringify({ r41h: 4000 }) && Object.keys(SET_CAP_MS).every((k) => KERNEL_SETS.includes(k)) && Object.isFrozen(SET_CAP_MS),
+    // ROUND 52 (section 122): section 121's traces -- the Intel reset inside r41h's ~2.4 s 1080p pass -- put the table back to empty;
+    // the mechanism stays, held below on a fixture table, and no entry may ever lift a set's cap above the ladder's
+    ok("!! round 52: SET_CAP_MS is empty and frozen -- no set's cap is above the ladder's 1500 ms, since a pass near 2 s meets Windows' GPU timeout (section 121) -- and r41h takes the ladder's cap",
+        JSON.stringify(SET_CAP_MS) === "{}" && Object.isFrozen(SET_CAP_MS) && Object.values(SET_CAP_MS).every((v) => v <= CAP) && capOfSet("r41h") === CAP,
         JSON.stringify(SET_CAP_MS));
     {
         // the cap row's own judgement, on section 111's r41h: a 1080p pass predicted at 2373 ms is skipped rightly by the ladder's 1500
         // ms cap and wrongly by r41h's own 4000 -- so the row must judge r41h by 4000, and r18u by 1500 (M3 went 0 red before this)
         const fx = (reason) => [{ W: 1024, H: 1024, skipped: false, elapsed: { median: 1200 } }, { W: 1920, H: 1080, skipped: true, reason }];
         const old = fx(`predicted 2373 ms a pass, over the ${CAP} ms cap`);
-        ok("  round 45: the cap row judges each set by its own cap -- r41h by 4000 ms, so section 111's skip at a predicted 2373 ms is wrong for it and right for r18u at 1500",
-            capOfSet("r41h") === 4000 && capOfSet("r18u") === CAP && capOfSet(null) === CAP &&
-            capRowHolds(old, capOfSet("r18u")) === true && capRowHolds(old, capOfSet("r41h")) === false && capRowHolds(fx("predicted 4351 ms a pass, over the 4000 ms cap").map((x, i) => (i ? x : { ...x, elapsed: { median: 2200 } })), capOfSet("r41h")) === true,
-            `r41h ${capOfSet("r41h")} ms, r18u ${capOfSet("r18u")} ms`);
+        const F = Object.freeze({ r41h: 4000 });   // round 45's table, now a fixture (section 122)
+        ok("  round 45: the cap row judges each set by its own cap -- on round 45's table, r41h by 4000 ms, so section 111's skip at a predicted 2373 ms is wrong for it and right for r18u at 1500",
+            capOfSet("r41h", F) === 4000 && capOfSet("r18u", F) === CAP && capOfSet(null, F) === CAP &&
+            capRowHolds(old, capOfSet("r18u", F)) === true && capRowHolds(old, capOfSet("r41h", F)) === false && capRowHolds(fx("predicted 4351 ms a pass, over the 4000 ms cap").map((x, i) => (i ? x : { ...x, elapsed: { median: 2200 } })), capOfSet("r41h", F)) === true,
+            `r41h ${capOfSet("r41h", F)} ms, r18u ${capOfSet("r18u", F)} ms`);
         const last = { ms: 1200, px: 1024 * 1024 }, at1080 = 1920 * 1080;   // 1200 ms at 1024 x 1024 predicts about 2373 at 1080p, section 111's r41h
-        const r41 = capSkip("r41h", last, at1080, { capMs: CAP }), r18 = capSkip("r18u", last, at1080, { capMs: CAP });
-        const over = capSkip("r41h", { ms: 2200, px: 1024 * 1024 }, at1080, { capMs: CAP }), none = capSkip("r41h", null, at1080, { capMs: CAP });
+        const r41 = capSkip("r41h", last, at1080, { capMs: CAP, capBySet: F }), r18 = capSkip("r18u", last, at1080, { capMs: CAP, capBySet: F });
+        const over = capSkip("r41h", { ms: 2200, px: 1024 * 1024 }, at1080, { capMs: CAP, capBySet: F }), none = capSkip("r41h", null, at1080, { capMs: CAP, capBySet: F });
         const flat = capSkip("r41h", last, at1080, { capMs: CAP, capBySet: {} });
         ok("  round 45: a prediction between the two caps runs r41h and skips another set, a prediction past r41h's own cap skips it by that cap, and without the table it falls back to the ladder's",
             r41 === null && r18 === `predicted 2373 ms a pass, over the ${CAP} ms cap` && over === "predicted 4351 ms a pass, over the 4000 ms cap" && none === null && flat === r18,
