@@ -168,6 +168,13 @@
 //                                                                         accumulate returns the kernel it dispatched and the row asks
 //                                                                         for it; redone, 1 RED
 //   P5  the accumT step timing the plain kernel                        1 RED (the step row: accumT records its kernel, as rest's do)
+//   and round 54's default rest (section 125), by the same runner:
+//   X1  chain()'s default back to the three passes                     1 RED (round 54's default row: it says "easu")
+//   X2  the result's rest always saying "fused"                        2 RED (the default row: the reference says "fused"; the ratio-3 row)
+//   X3  the fallback dropped, a ratio of 3 asked nothing refused       1 RED (the ratio-3 row)
+//   X4  half summing rest                                              1 RED (section 4's default sum row)
+//   X5  restF timing the composite after the fused pass                1 RED (round 54's step row, by the kernels it dispatched)
+//   X6  the page without the reference's chain row                     1 RED (the page's 29 rows)
 "use strict";
 import fs from "node:fs";
 import crypto from "node:crypto";
@@ -401,8 +408,15 @@ const r = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 900000, args: { 
             { cov: Float64Array.from(P.full[i].cov), E: Float64Array.from(P.full[i].E) }, P.RINGS, { tile: true });
         const clt = await g.chain(Float64Array.from(P.chainIn[i]), Float64Array.from(P.covHalf[i]), P.Hh, P.Hh, P.W, P.W,
             { cov: Float64Array.from(P.full[i].cov), E: Float64Array.from(P.full[i].E) }, P.RINGS, { tile: "listed" });
-        chains.push({ ...c, y: A(c.y), list: { ...cl, y: A(cl.y) }, dflt: { ...cd, y: A(cd.y) }, tile: { ...ct, y: A(ct.y) }, lt: { ...clt, y: A(clt.y) } });
+        // round 54: and the three-pass rest asked for by name, the reference the fused default is held to
+        const c2 = await g.chain(Float64Array.from(P.chainIn[i]), Float64Array.from(P.covHalf[i]), P.Hh, P.Hh, P.W, P.W,
+            { cov: Float64Array.from(P.full[i].cov), E: Float64Array.from(P.full[i].E) }, P.RINGS, { rest: "easu" });
+        chains.push({ ...c, y: A(c.y), list: { ...cl, y: A(cl.y) }, dflt: { ...cd, y: A(cd.y) }, tile: { ...ct, y: A(ct.y) }, lt: { ...clt, y: A(clt.y) }, two: { ...c2, y: A(c2.y) } });
     }
+    // round 54 (section 125): a ratio of 3, where the fused pass does not run -- asked nothing, the three passes; asked fused, refused
+    const odd3 = () => [new Float64Array(13 * 9 * 3).fill(0.25), new Float64Array(13 * 9), 13, 9, 39, 27, { cov: new Float64Array(39 * 27), E: new Float64Array(39 * 27 * 3) }, 4];
+    let chainOdd = null; try { const oc = await g.chain(...odd3()); chainOdd = { rest: oc.rest, n: oc.y.length, finite: Array.from(oc.y).every(Number.isFinite) }; } catch (e) { chainOdd = { error: String(e.message).slice(0, 160) }; }
+    let chainOddRefused = null; try { await g.chain(...odd3(), { rest: "fused" }); } catch (e) { chainOddRefused = String(e.message).slice(0, 160); }
     let wrongBackend = null;
     try { new DenoiseUpscaleGPU(await requestDevice(document.createElement("canvas"), { backend: "webgl2", offscreen: true })); } catch (e) { wrongBackend = String(e.message).slice(0, 160); }
     const ad = await navigator.gpu.requestAdapter(), info = ad.info || {};
@@ -418,7 +432,7 @@ const r = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 900000, args: { 
                      lenOk: e.up.length === q.up.length && e.y.length === f.y.length && f.up === null });
     }
     let restRefused = null; try { await g.rest(new Float64Array(13 * 9 * 3), 13, 9, 39, 27, { cov: new Float64Array(39 * 27), E: new Float64Array(39 * 27 * 3) }, "fused"); } catch (e) { restRefused = String(e.message).slice(0, 160); }
-    return { cov, covB, behind, fills, lists, t13, chains, rests, restRefused, errs, backend: dev.backend, wrongBackend, adapter: [info.vendor, info.architecture, info.description].filter(Boolean).join(" / ") };
+    return { cov, covB, behind, fills, lists, t13, chains, chainOdd, chainOddRefused, rests, restRefused, errs, backend: dev.backend, wrongBackend, adapter: [info.vendor, info.architecture, info.description].filter(Boolean).join(" / ") };
 }` });
 
 if (r.skipped) console.log("  SKIP  " + r.reason);
@@ -515,6 +529,14 @@ else {
         R.chains.length === 4 && R.chains.every((c, i) => c.dflt.tilesListed === c.lt.tilesListed && c.dflt.tilesListed === tilesOf0(CPU[i].half.cov, Hh, Hh) && c.dflt.listed === 0 && c.dflt.left === 0 &&
             same(c.dflt, c.lt) && bits(c.dflt.y, c.lt.y)),
         R.chains.map((c, i) => `R ${SCENES[i].seed}: ${c.dflt.tilesListed} tiles, ${c.dflt.rings} rings`).join("; "));
+    // ROUND 54 (section 125), THE DEFAULT REST: chain() asked nothing runs the transfer and round 46's fused EASU and composite, and
+    // says so -- bit for bit the three passes asked by name, which say so too; at a ratio the fused pass refuses, the three passes
+    ok("!! round 54: chain() asked nothing is the fused rest -- it says \"fused\" -- and is { rest: \"easu\" }'s chain bit for bit, which says \"easu\", every emitter pixel reached, on all four scenes",
+        R.chains.length === 4 && R.chains.every((c) => c.dflt.rest === "fused" && c.two.rest === "easu" && bits(c.dflt.y, c.two.y) && same(c.dflt, c.two) && c.dflt.left === 0 && c.dflt.tMax === c.two.tMax),
+        R.chains.map((c, i) => `R ${SCENES[i].seed}: ${c.dflt.rest} against ${c.two.rest}, tMax ${c.dflt.tMax.toFixed(3)}`).join("; "));
+    ok("!! ...and at 13 x 9 -> 39 x 27, a ratio of 3, chain() asked nothing runs the three passes and says so, while { rest: \"fused\" } there is refused by name",
+        !!R.chainOdd && R.chainOdd.rest === "easu" && R.chainOdd.n === 39 * 27 * 3 && R.chainOdd.finite && /chain: the quad EASU runs at exactly 2 x only -- 13 x 9 -> 39 x 27 is not/.test(R.chainOddRefused || ""),
+        `${JSON.stringify(R.chainOdd)}; ${R.chainOddRefused}`);
     // ROUND 37 (section 104), THE TILE FILL: eight rings a pass in workgroup tiles. Against fillEmittersBounded at round 31's
     // tolerance, and against the list fill bit for bit -- the same sums in the same order -- with its passes read back, as two
     // fills that agree float for float cannot otherwise tell which ran (round 34's Y7)
@@ -569,7 +591,7 @@ console.log("\n4. THE CALLER: denoise.html's \"Time the half-size chain\", at it
     if (pg.skipped) console.log("  SKIP  " + pg.reason);
     else {
         let J = null; try { J = JSON.parse(pg.result?.json || "null"); } catch {}
-        const st = J && J.chain && J.chain.steps, keys = ["covHalf", "covFull", "fill", "rest", "whole", "hits", "shift", "accum", "final", "fillList", "wholeList", "fillTile", "wholeTile", "fillLTile", "wholeLTile", "covHalfB", "covFullB", "restToT", "restEasu", "restComp", "restToTFree", "restEasuQ", "restEasuComp", "accumT"];
+        const st = J && J.chain && J.chain.steps, keys = ["covHalf", "covFull", "fill", "rest", "whole", "hits", "shift", "accum", "final", "fillList", "wholeList", "fillTile", "wholeTile", "fillLTile", "wholeLTile", "covHalfB", "covFullB", "restToT", "restEasu", "restComp", "restToTFree", "restEasuQ", "restEasuComp", "accumT", "restF"];
         const fine = (x) => !!x && Number.isFinite(x.ms) && x.ms > 0 && (x.clock === "device" || x.clock === "wall");
         // THE RIG'S LINES, from a report: sections 94, 98, 100 and 102 read them out of committed reports, so each keeps its meaning
         // (section 103) -- 93's and 97's chain is round 31's ring fill (halfRing, temporalRing), 99's "with the list fill" the list
@@ -589,7 +611,7 @@ console.log("\n4. THE CALLER: denoise.html's \"Time the half-size chain\", at it
                     (K.chain.listCheck ? `; the list fill ${K.chain.listCheck.listed} listed, ${K.chain.listCheck.rings} of ${K.chain.maxRings} rings, ${K.chain.listCheck.left} left` : "; the list fill not checked") +
                     (K.fullUnbound && K.halfList && K.temporalList ? `; the half-size chain with the list fill ${K.halfList.ms.toFixed(3)} ms, ratio ${(K.fullUnbound.ms / K.halfList.ms).toFixed(3)} x; with its history ${K.temporalList.ms.toFixed(3)} ms, ratio ${(K.fullUnbound.ms / K.temporalList.ms).toFixed(3)} x` : "; no ratio: a part was not measured"),
                 // round 36 (section 103): which fill the default chain runs, and its chain
-                `section 103: the default fill ${K.fill || "ring (a report from before round 36)"}, coverage ${K.coverage || "round 31's (a report from before round 44)"}` +
+                `section 103: the default fill ${K.fill || "ring (a report from before round 36)"}, coverage ${K.coverage || "round 31's (a report from before round 44)"}, rest ${K.rest || "three passes (a report from before round 54)"}` +
                     (K.full && K.half ? `; the half-size chain ${K.half.ms.toFixed(3)} ms, ratio ${(K.full.ms / K.half.ms).toFixed(3)} x` : "; no ratio: a part was not measured") +
                     (K.full && K.temporal ? `; with its history ${K.temporal.ms.toFixed(3)} ms, ratio ${(K.full.ms / K.temporal.ms).toFixed(3)} x` : ""),
                 // round 37 (section 104): the tile fill beside the list fill, in a line of its own
@@ -609,10 +631,13 @@ console.log("\n4. THE CALLER: denoise.html's \"Time the half-size chain\", at it
                 // round 46 (section 115): EASU in quads, and fused with the composite, beside the two passes they stand in for
                 "section 115: EASU in quads -- " + ["restEasu", "restComp", "restEasuQ", "restEasuComp"].map((k) => `${k} ${fine(ks[k]) ? ks[k].ms.toFixed(3) + " ms (" + ks[k].clock + ")" : "not measured"}`).join("; "),
                 // round 48 (section 117): the accumulation with its clamp read from a workgroup tile, beside the accumulation
-                "section 117: the accumulation tiled -- " + ["accum", "accumT"].map((k) => `${k} ${fine(ks[k]) ? ks[k].ms.toFixed(3) + " ms (" + ks[k].clock + ")" : "not measured"}`).join("; ")];
+                "section 117: the accumulation tiled -- " + ["accum", "accumT"].map((k) => `${k} ${fine(ks[k]) ? ks[k].ms.toFixed(3) + " ms (" + ks[k].clock + ")" : "not measured"}`).join("; "),
+                // round 54 (section 125): the fused rest the chain runs by default, beside the three passes it stands in for, and the chains with each
+                "section 125: the fused rest -- " + ["rest", "restF"].map((k) => `${k} ${fine(ks[k]) ? ks[k].ms.toFixed(3) + " ms (" + ks[k].clock + ")" : "not measured"}`).join("; ") +
+                    (K.full && K.half && K.halfTwoPass && K.temporal && K.temporalTwoPass ? `; the half-size chain fused ${K.half.ms.toFixed(3)} ms, in three passes ${K.halfTwoPass.ms.toFixed(3)} ms; with its history fused ${K.temporal.ms.toFixed(3)} ms, in three passes ${K.temporalTwoPass.ms.toFixed(3)} ms` : "; no sum: a part was not measured")];
         };
         ok("!! the page timed every step of the chain and both networks at its pilot size -- each a positive time on a named clock, the table shown, no page error",
-            pg.ok && !!st && keys.every((k) => fine(st[k])) && fine(J.networkFull) && fine(J.networkHalf) && !!J.full && !!J.half && !!J.temporal && !!J.halfRing && !!J.temporalRing && !!J.halfTile && !!J.temporalTile && !!J.halfList && !!J.temporalList && !J.halfLTile && !J.temporalLTile && !!J.fullUnbound && !!J.halfUnbound && !!J.temporalUnbound && !J.fullBound && !J.halfBound && !J.temporalBound && J.fill === "listedTile" && J.coverage === "bound" && J.network === "shipped (asked by ?net=)" && J.params === 33329 && pg.result.shown && pg.result.rows === 26 && !pg.pageErrors.length,
+            pg.ok && !!st && keys.every((k) => fine(st[k])) && fine(J.networkFull) && fine(J.networkHalf) && !!J.full && !!J.half && !!J.temporal && !!J.halfRing && !!J.temporalRing && !!J.halfTile && !!J.temporalTile && !!J.halfList && !!J.temporalList && !J.halfLTile && !J.temporalLTile && !!J.fullUnbound && !!J.halfUnbound && !!J.temporalUnbound && !J.fullBound && !J.halfBound && !J.temporalBound && J.fill === "listedTile" && J.coverage === "bound" && J.rest === "fused" && !!J.halfTwoPass && !!J.temporalTwoPass && J.network === "shipped (asked by ?net=)" && J.params === 33329 && pg.result.shown && pg.result.rows === 29 && !pg.pageErrors.length,
             pg.ok ? (pg.result?.status || "").slice(0, 200) : pg.reason);
         if (st) {
             // the network times are the ladder's rows, w x h then W x H (T4 went 0 RED before this held which was which); today's page
@@ -641,7 +666,7 @@ console.log("\n4. THE CALLER: denoise.html's \"Time the half-size chain\", at it
             ok("  rounds 43 and 44: the rig's lines keep their meaning -- section 93's page round 31's mask (fullUnbound) and its and 97's chain the ring fill's, section 99's \"with the list fill\" the list fill's (halfList), section 103's the default's, which is the listed tile fill on the bounded coverage",
                 n(/the half-size chain ([0-9.]+) ms/, l93) === at3(J.halfRing) && n(/with its history ([0-9.]+) ms/, l97) === at3(J.temporalRing) &&
                 n(/with the list fill ([0-9.]+) ms/, l99) === at3(J.halfList) && n(/with its history ([0-9.]+) ms/, l99) === at3(J.temporalList) &&
-                /^section 103: the default fill listedTile, coverage bound; the half-size chain ([0-9.]+) ms/.test(l103) && n(/^section 93: .*today's page \(network and mask\) ([0-9.]+) ms/, l93) === at3(J.fullUnbound) && n(/the half-size chain ([0-9.]+) ms/, l103) === at3(J.half) && n(/with its history ([0-9.]+) ms/, l103) === at3(J.temporal),
+                /^section 103: the default fill listedTile, coverage bound, rest fused; the half-size chain ([0-9.]+) ms/.test(l103) && n(/^section 93: .*today's page \(network and mask\) ([0-9.]+) ms/, l93) === at3(J.fullUnbound) && n(/the half-size chain ([0-9.]+) ms/, l103) === at3(J.half) && n(/with its history ([0-9.]+) ms/, l103) === at3(J.temporal),
                 l103);
             // round 37 (section 104): the chain with the tile fill is the same sum with fillTile in the fill's place, by the wall
             // clock as the list fill is, its check filling every pixel in view in ceil(96 / 8) passes; the rig's line carries both
@@ -666,8 +691,8 @@ console.log("\n4. THE CALLER: denoise.html's \"Time the half-size chain\", at it
             // round 39 (section 107): the page and the chain with the bounded coverage, their sums; its check bit for bit at both sizes
             // and its traced counts the CPU twin's within 2 %; the rig's line carries the sums
             const bc = J.chain.boundCheck, l107 = rigLines(J)[7], twinN = (ww, hh) => coverageMayHit(makeScene(...J.scene), ww, hh).reduce((a, b) => a + b, 0);
-            const hb = med(halfRow) + ["covHalfB", "covFullB", "fillLTile", "rest"].reduce((a, k) => a + st[k].ms, 0), tH = twinN(J.chain.w, J.chain.h), tF = twinN(J.chain.W, J.chain.H);
-            ok("  rounds 39 and 44: today's page and the chain, their defaults (full, half, temporal), are their sums with covHalfB and covFullB, each one pass on the coverage's clock; its check is round 31's bit for bit at both sizes, tracing the twin's count within 2 %; the rig's section 107 line carries the sums",
+            const hb = med(halfRow) + ["covHalfB", "covFullB", "fillLTile", "restF"].reduce((a, k) => a + st[k].ms, 0), tH = twinN(J.chain.w, J.chain.h), tF = twinN(J.chain.W, J.chain.H);
+            ok("  rounds 39, 44 and 54: today's page and the chain, their defaults (full, half, temporal), are their sums with covHalfB and covFullB (and the chain's with restF), each one pass on the coverage's clock; its check is round 31's bit for bit at both sizes, tracing the twin's count within 2 %; the rig's section 107 line carries the sums",
                 !!J.half && Math.abs(J.half.ms - hb) < 1e-9 && Math.abs(J.full.ms - (med(fullRow) + st.covFullB.ms)) < 1e-9 &&
                 Math.abs(J.temporal.ms - (hb + hist.reduce((a, k) => a + st[k].ms, 0))) < 1e-9 && st.covHalfB.clock === st.covHalf.clock && st.covFullB.clock === st.covFull.clock &&
                 !!bc && bc.sameHalf && bc.sameFull && Math.abs(bc.half - tH) <= Math.max(1, 0.02 * tH) && Math.abs(bc.full - tF) <= Math.max(1, 0.02 * tF) && bc.full < bc.ofFull / 4 &&
@@ -693,6 +718,16 @@ console.log("\n4. THE CALLER: denoise.html's \"Time the half-size chain\", at it
             ok("  round 48: the tiled accumulation is one pass on the accumulation's own clock, and the rig's section 117 line carries it beside accum",
                 fine(st.accumT) && st.accumT.clock === st.accum.clock && st.accumT.runs.length === st.accum.runs.length && JSON.stringify(st.accumT.kernels) === '["accumT"]' && !st.accum.kernels && /^section 117: /.test(l117 || "") &&
                 n(/accum ([0-9.]+) ms/, l117) === at3(st.accum) && n(/accumT ([0-9.]+) ms/, l117) === at3(st.accumT), l117);
+            // round 54 (section 125): the fused rest, one frame on rest's own clock dispatching the transfer and the fused pass; the
+            // three-pass chains its reference, the same sums with rest; the rig's section 125 line carrying each figure
+            const l125 = rigLines(J)[11], two = med(halfRow) + ["covHalfB", "covFullB", "fillLTile", "rest"].reduce((a, k) => a + st[k].ms, 0);
+            ok("  round 54: restF is one frame on rest's own clock dispatching toT and easuC; the three-pass chains (halfTwoPass, temporalTwoPass) are the defaults' sums with rest in restF's place; the rig's section 125 line carries each figure",
+                fine(st.restF) && st.restF.clock === st.rest.clock && st.restF.runs.length === st.rest.runs.length && JSON.stringify(st.restF.kernels) === '["toT","easuC"]' &&
+                !!J.halfTwoPass && Math.abs(J.halfTwoPass.ms - two) < 1e-9 && !!J.temporalTwoPass && Math.abs(J.temporalTwoPass.ms - (two + hist.reduce((a, k) => a + st[k].ms, 0))) < 1e-9 &&
+                /^section 125: /.test(l125 || "") && n(/rest ([0-9.]+) ms/, l125) === at3(st.rest) && n(/restF ([0-9.]+) ms/, l125) === at3(st.restF) &&
+                n(/the half-size chain fused ([0-9.]+) ms/, l125) === at3(J.half) && n(/, in three passes ([0-9.]+) ms; with/, l125) === at3(J.halfTwoPass) &&
+                n(/with its history fused ([0-9.]+) ms/, l125) === at3(J.temporal) && n(/with its history fused [0-9.]+ ms, in three passes ([0-9.]+) ms/, l125) === at3(J.temporalTwoPass),
+                `${l125}; restF dispatched ${(st.restF.kernels || []).join("+")}`);
         }
         // ON A GPU, THE RIG'S SIZE (pre-registration section 93): 960 x 540 -> 1920 x 1080, every step a measured line the rig's
         // report keeps. Not on a software adapter: SwiftShader's 1080p would be minutes of a CPU's time that decides nothing.
@@ -703,7 +738,7 @@ console.log("\n4. THE CALLER: denoise.html's \"Time the half-size chain\", at it
             let K = null; try { K = JSON.parse(rg.result?.json || "null"); } catch {}
             const ks = K && K.chain && K.chain.steps;
             ok("!! section 93: at 1920 x 1080 the page timed both networks and every step of the chain, the fill reaching every pixel in its 96 rings -- and round 34's list fill the same, every listed pixel reached",
-                rg.ok && !!ks && keys.every((k) => fine(ks[k])) && fine(K.networkFull) && fine(K.networkHalf) && !!K.full && !!K.half && !!K.temporal && !!K.halfRing && !!K.temporalRing && !!K.halfTile && !!K.temporalTile && !!K.halfList && !!K.temporalList && K.fill === "listedTile" && K.coverage === "bound" && K.network === "shipped (asked by ?net=)" && !!K.fullUnbound && !!K.halfUnbound && K.chain.rings > 0 && K.chain.rings < 96 && !rg.pageErrors.length &&
+                rg.ok && !!ks && keys.every((k) => fine(ks[k])) && fine(K.networkFull) && fine(K.networkHalf) && !!K.full && !!K.half && !!K.temporal && !!K.halfRing && !!K.temporalRing && !!K.halfTile && !!K.temporalTile && !!K.halfList && !!K.temporalList && K.fill === "listedTile" && K.coverage === "bound" && K.rest === "fused" && K.network === "shipped (asked by ?net=)" && !!K.fullUnbound && !!K.halfUnbound && K.chain.rings > 0 && K.chain.rings < 96 && !rg.pageErrors.length &&
                 !!K.chain.listCheck && K.chain.listCheck.listed === K.chain.inView && K.chain.listCheck.rings === K.chain.rings && K.chain.listCheck.left === 0 &&
                 !!K.chain.tileCheck && K.chain.tileCheck.rings === K.chain.rings && K.chain.tileCheck.left === 0 && K.chain.tileCheck.passes === 12 &&
                 !!K.chain.ltileCheck && K.chain.ltileCheck.rings === K.chain.rings && K.chain.ltileCheck.left === 0 && K.chain.ltileCheck.passes === 12 && K.chain.ltileCheck.tiles > 0 && K.chain.ltileCheck.tiles < K.chain.ltileCheck.of &&

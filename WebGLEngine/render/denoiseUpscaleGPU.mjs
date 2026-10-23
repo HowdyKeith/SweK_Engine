@@ -950,6 +950,15 @@ export class DenoiseUpscaleGPU {
     _fillOpsFor(o) { return o.tile === "listed" ? this._fillLTileOps : o.tile ? this._fillTileOps : o.list ? this._fillListOps : this._fillOps; }
     // round 43: with nothing asked, the listed tile fill; a caller that names its fill (list or tile) gets the one it names
     _fillChoice({ list, tile } = {}) { return tile !== undefined ? { list: list ?? true, tile } : list !== undefined ? { list, tile: false } : { list: true, tile: "listed" }; }
+    // round 54: with nothing asked, the fused rest where it runs (exactly 2 x), else the three passes; a rest asked for is the one
+    // run, and the fused one asked for at another ratio is refused by name
+    _restChoice(rest, w, h, W, H) {
+        if (rest === undefined) return easuQuadRefusal(w, h, W, H) ? "easu" : "fused";
+        if (rest !== "easu" && rest !== "fused") throw new Error(`denoiseUpscaleGPU.chain: rest is easu or fused -- got ${rest}`);
+        const no = rest === "fused" ? easuQuadRefusal(w, h, W, H) : null;
+        if (no) throw new Error(`denoiseUpscaleGPU.chain: ${no}`);
+        return rest;
+    }
     _fillBufs(img3, cov, w, h, maxRings) {
         const dev = this.device, n = w * h;
         return { a: dev.buffer({ data: rgba(img3, n), usage: ["storage"] }), b: dev.buffer({ data: new Float32Array(n * 4), usage: ["storage"] }),
@@ -1031,10 +1040,12 @@ export class DenoiseUpscaleGPU {
      * through the transfer, EASU to W x H, the clamp and inverse, and the composite with `full` ({ cov, E } at W x H).
      * Returns { y (W*H*3), rings, left, perRing, listed, tMax }. Round 43: the fill is round 38's listed tile fill unless asked
      * `{ list: true }`, round 34's list fill; `{ list: false }` round 31's ring fill; `{ tile: true }` round 37's tile fill.
+     * Round 54: the rest after the fill is the transfer and round 46's fused EASU and composite (EASU_COMP_WGSL) unless asked
+     * `{ rest: "easu" }`, the three passes; at a ratio other than 2 x, asked nothing, the three passes. The result's `rest` names it.
      */
     async chain(img3, covHalf, w, h, W, H, full, maxRings, opts = {}) {
         if (full.cov.length !== W * H || full.E.length !== W * H * 3) throw new Error(`denoiseUpscaleGPU.chain: the full-size guide is not ${W} x ${H}`);
-        const dev = this.device, bufs = this._fillBufs(img3, covHalf, w, h, maxRings);
+        const rest = this._restChoice(opts.rest, w, h, W, H), dev = this.device, bufs = this._fillBufs(img3, covHalf, w, h, maxRings);
         const tMax = dev.buffer({ data: new Uint32Array(1), usage: ["storage"] }), uT = dev.buffer({ data: u4(w, h), usage: "uniform" });
         const up = dev.buffer({ data: new Float32Array(W * H * 4), usage: ["storage"] }), uE = dev.buffer({ data: u4(w, h, W, H), usage: "uniform" });
         const fc = dev.buffer({ data: Float32Array.from(full.cov), usage: ["storage"] }), fE = dev.buffer({ data: Float32Array.from(full.E), usage: ["storage"] });
@@ -1042,15 +1053,18 @@ export class DenoiseUpscaleGPU {
         dev.frame(({ pass }) => {
             const filled = this._fillOpsFor(this._fillChoice(opts)).call(this, pass, bufs, w, h, maxRings);
             this.p.toT.bind("img", filled).bind("tMax", tMax).bind("u", uT); pass.dispatch(this.p.toT, groups(w, h));
-            this.p.easu.bind("src", filled).bind("dst", up).bind("u", uE); pass.dispatch(this.p.easu, groups(W, H));
-            this.p.comp.bind("up", up).bind("cov", fc).bind("emis", fE).bind("tMax", tMax).bind("dst", dst).bind("u", uC); pass.dispatch(this.p.comp, groups(W, H));
+            if (rest === "fused") { this.p.easuC.bind("src", filled).bind("dst", dst).bind("u", uE).bind("cov", fc).bind("emis", fE).bind("tMax", tMax); pass.dispatch(this.p.easuC, groups(w + 1, h + 1)); }
+            else {
+                this.p.easu.bind("src", filled).bind("dst", up).bind("u", uE); pass.dispatch(this.p.easu, groups(W, H));
+                this.p.comp.bind("up", up).bind("cov", fc).bind("emis", fE).bind("tMax", tMax).bind("dst", dst).bind("u", uC); pass.dispatch(this.p.comp, groups(W, H));
+            }
             pass.clear([0, 0, 0, 1]);
         }, { offscreen: true });
         const y = Float64Array.from(new Float32Array(await dev.read(dst))), c = await this._fillCounts(bufs);
         const tm = new Float32Array(new Uint32Array(await dev.read(tMax)).buffer)[0];
         this._free(bufs);
         for (const b of [tMax, uT, up, uE, fc, fE, dst, uC]) b.destroy();
-        return { y, ...c, tMax: tm };
+        return { y, ...c, tMax: tm, rest };
     }
 
     /** render/denoiseTemporal.mjs's firstHits on the device, from `eye`: { pos, nrm, obj } at W x H, as the CPU returns them. */
@@ -1123,6 +1137,7 @@ export class DenoiseUpscaleGPU {
      *   restToT, restEasu, restComp  round 42: rest's three passes, one each; restToTFree the transfer without its atomic (a diagnostic)
      *   restEasuQ, restEasuComp  round 46: EASU in 2 x 2 quads alone, and fused with the composite (EASU_QUAD_WGSL, EASU_COMP_WGSL)
      *   accumT             round 48: the accumulation with its clamp read from a workgroup tile (ACCUM_TILE_WGSL), one pass
+     *   restF              round 54: the chain's rest by default -- the transfer and the fused EASU and composite, one frame
      * A step is on the device's clock where the device grants timestamps and the step has 30 passes or fewer, else the wall
      * clock (performance.now() around the frame and the queue's onSubmittedWorkDone). Each row says which. Returns medians.
      */
@@ -1165,7 +1180,7 @@ export class DenoiseUpscaleGPU {
             accumT: (pass) => { this.p.accumT.bind("prevGeo", geoB).bind("curGeo", geoB).bind("prevHist", hA).bind("cur", curB).bind("outHist", hB).bind("u", uAc); pass.dispatch(this.p.accumT, groups(W, H)); },
             final: (pass) => { this.p.final.bind("hist", hB).bind("cov", cF).bind("emis", eF).bind("dst", outB).bind("u", uC); pass.dispatch(this.p.final, groups(W, H)); },
         };
-        const step = { covHalf: [], covFull: [], fill: [], rest: [], whole: [], hits: [], shift: [], accum: [], final: [], fillList: [], wholeList: [], fillTile: [], wholeTile: [], fillLTile: [], wholeLTile: [], covHalfB: [], covFullB: [], restToT: [], restEasu: [], restComp: [], restToTFree: [], restEasuQ: [], restEasuComp: [], accumT: [] }, clock = {};
+        const step = { covHalf: [], covFull: [], fill: [], rest: [], whole: [], hits: [], shift: [], accum: [], final: [], fillList: [], wholeList: [], fillTile: [], wholeTile: [], fillLTile: [], wholeLTile: [], covHalfB: [], covFullB: [], restToT: [], restEasu: [], restComp: [], restToTFree: [], restEasuQ: [], restEasuComp: [], accumT: [], restF: [] }, clock = {};
         // round 42 (section 110): the rest steps record which of this runner's pipelines they dispatched, so a split step is held to its
         // one kernel -- through a thin wrapper on those steps alone, so no other step's timing changes
         const nameOf = (pipe) => Object.keys(this.p).find((n) => this.p[n] === pipe) || "?", dispatched = {};
@@ -1196,6 +1211,11 @@ export class DenoiseUpscaleGPU {
             // round 46 (section 115): EASU in quads alone, and fused with the composite -- (w + 1) x (h + 1) quads each
             await run("restEasuQ", (pass) => { this.p.easuQ.bind("src", filled).bind("dst", up).bind("u", uE); pass.dispatch(this.p.easuQ, groups(w + 1, h + 1)); }, 1);
             await run("restEasuComp", (pass) => { this.p.easuC.bind("src", filled).bind("dst", dst).bind("u", uE).bind("cov", cF).bind("emis", eF).bind("tMax", tMax); pass.dispatch(this.p.easuC, groups(w + 1, h + 1)); }, 1);
+            // round 54 (section 125): the chain's rest by default -- the transfer, then the fused pass, in one frame
+            await run("restF", (pass) => {
+                this.p.toT.bind("img", filled).bind("tMax", tMax).bind("u", uT); pass.dispatch(this.p.toT, groups(w, h));
+                this.p.easuC.bind("src", filled).bind("dst", dst).bind("u", uE).bind("cov", cF).bind("emis", eF).bind("tMax", tMax); pass.dispatch(this.p.easuC, groups(w + 1, h + 1));
+            }, 2);
             reset(); await run("whole", (pass) => { covOps(pass, cH, eH, uH, w, h); covOps(pass, cF, eF, uF, W, H); restOps(pass, this._fillOps(pass, bufs, w, h, maxRings)); }, 31);
             for (const k of ["hits", "shift", "accum", "final", "accumT"]) await run(k, histOps[k], 1);
             // round 34: the list fill alone, and the chain's steps in one frame with it -- by the wall clock, as the fill is
@@ -1233,7 +1253,7 @@ export class DenoiseUpscaleGPU {
  * Round 31, WHAT THE PAGE TIMES (denoise.html's "Time the half-size chain"): the shipped network at w x h and at W x H on the
  * page's own kernel set (render/denoiseDevice.mjs's timingLadder, the ladder the page already runs), and the chain's steps on
  * scene S (DenoiseUpscaleGPU's time). `device` is a gfx/device.js webgpu device; `newAdapter` makes the ladder's adapters.
- * Returns { ladder, chain, networkHalf, networkFull, fill, coverage, full, half, temporal, fullUnbound, halfUnbound, temporalUnbound, halfList, ... }, each sum on the clocks
+ * Returns { ladder, chain, networkHalf, networkFull, fill, coverage, rest, full, half, temporal, fullUnbound, halfUnbound, temporalUnbound, halfList, ... }, each sum on the clocks
  * its parts were read on, named:
  *   full   today's page at W x H: the network at W x H, and the emitter coverage at W x H, which is the mask it reads
  *   half   the chain: the network at w x h, the coverage at w x h (its mask, and the fill's), the coverage at W x H (the
@@ -1249,6 +1269,10 @@ export class DenoiseUpscaleGPU {
  *          rounds 39-43 those were fullBound, halfBound and temporalBound, and full, half and temporal had round 31's
  *   fullUnbound, halfUnbound, temporalUnbound  round 44: full, half and temporal with round 31's coverage (covHalf, covFull),
  *          the reference. Every other reference sum (halfRing, halfTile, halfList and their temporals) keeps round 31's coverage
+ *   rest   round 54: "fused" -- half and temporal take the transfer and the fused EASU and composite (restF). A report without
+ *          the key is from before round 54, and its half and temporal took the three passes (rest)
+ *   halfTwoPass, temporalTwoPass  round 54: half and temporal with the three-pass rest, the defaults of rounds 44-53 and the
+ *          reference. Every other reference sum keeps the three passes
  * The ladder's cap is 5000 ms a pass, not its default 1500: the Intel gen-9's page pass at 1920 x 1080 is 1.2-1.4 s (rounds 27
  * and 28), close enough to 1500 that a prediction from the smaller size could skip the very row being compared.
  */
@@ -1260,9 +1284,12 @@ export async function timeHalfChain({ device, net, newAdapter, kernels, S, w, h,
     const st = chain.steps, sum = (parts) => (parts.every((x) => x && x.ms != null)
         ? { ms: parts.reduce((a, x) => a + x.ms, 0), clocks: [...new Set(parts.map((x) => x.clock))] } : null);
     return { ladder, chain, kernels, networkHalf, networkFull,
-             fill: "listedTile", coverage: "bound", full: sum([networkFull, st.covFullB]), half: sum([networkHalf, st.covHalfB, st.covFullB, st.fillLTile, st.rest]),
+             fill: "listedTile", coverage: "bound", rest: "fused", full: sum([networkFull, st.covFullB]), half: sum([networkHalf, st.covHalfB, st.covFullB, st.fillLTile, st.restF]),
              // round 33: the chain with round 32's history -- its four passes a frame added to the half-size chain
-             temporal: sum([networkHalf, st.covHalfB, st.covFullB, st.fillLTile, st.rest, st.hits, st.shift, st.accum, st.final]),
+             temporal: sum([networkHalf, st.covHalfB, st.covFullB, st.fillLTile, st.restF, st.hits, st.shift, st.accum, st.final]),
+             // round 54: the same two with the three-pass rest, the defaults of rounds 44-53 and the reference
+             halfTwoPass: sum([networkHalf, st.covHalfB, st.covFullB, st.fillLTile, st.rest]),
+             temporalTwoPass: sum([networkHalf, st.covHalfB, st.covFullB, st.fillLTile, st.rest, st.hits, st.shift, st.accum, st.final]),
              // round 44: the same three with round 31's coverage, the reference -- the defaults of rounds 43 and before
              fullUnbound: sum([networkFull, st.covFull]), halfUnbound: sum([networkHalf, st.covHalf, st.covFull, st.fillLTile, st.rest]),
              temporalUnbound: sum([networkHalf, st.covHalf, st.covFull, st.fillLTile, st.rest, st.hits, st.shift, st.accum, st.final]),

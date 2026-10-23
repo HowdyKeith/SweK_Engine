@@ -290,8 +290,8 @@ $("chain").onclick = async () => {
         const f = (x) => (x ? `${x.ms.toFixed(2)} (${x.clock || x.clocks.join(" + ")})` : "not measured");
         const st = r.chain.steps, rows = [[`the network at ${W} x ${H}`, f(r.networkFull)], [`the network at ${w} x ${h}`, f(r.networkHalf)],
             [`coverage at ${w} x ${h}, bounded (${r.chain.boundCheck ? r.chain.boundCheck.half : "?"} pixels traced)`, f(st.covHalfB)], [`coverage at ${W} x ${H}, bounded (${r.chain.boundCheck ? r.chain.boundCheck.full : "?"} pixels traced)`, f(st.covFullB)], [`the fill in tiles over the lights' tiles, ${CHAIN_RINGS} rings (${r.chain.rings} filled anything; ${r.chain.ltileCheck ? `${r.chain.ltileCheck.tiles} of ${r.chain.ltileCheck.of}` : "?"} tiles)`, f(st.fillLTile)],
-            ["the transfer, EASU and the composite", f(st.rest)], [`today's page in all: the network and its mask at ${W} x ${H}`, f(r.full)],
-            ["the half-size chain in all", f(r.half)], ["the chain's steps in one frame (no network)", f(st.wholeLTile)],
+            ["the transfer, then EASU and the composite in one pass", f(st.restF)], [`today's page in all: the network and its mask at ${W} x ${H}`, f(r.full)],
+            ["the half-size chain in all", f(r.half)], ["the chain's steps in one frame, the rest in three passes (no network)", f(st.wholeLTile)],
             ["round 32's history: first hits, shift, accumulation, composite", ["hits", "shift", "accum", "final"].map((k) => f(st[k])).join(" / ")],
             ["the half-size chain with its history, in all", f(r.temporal)],
             // round 36: round 31's ring fill over the whole frame, the reference the default fill is held to
@@ -305,7 +305,10 @@ $("chain").onclick = async () => {
             ["...the half-size chain with it, in all", f(r.halfList)], ["...and with its history, in all", f(r.temporalList)],
             // round 44: round 31's coverage, every pixel traced -- the default until round 44, a reference since; the fill references above keep it
             [`the reference: round 31's coverage, at ${w} x ${h} / ${W} x ${H}, every pixel traced`, `${f(st.covHalf)} / ${f(st.covFull)}`],
-            ["today's page with that mask, in all", f(r.fullUnbound)], ["...the half-size chain with it, in all", f(r.halfUnbound)], ["...and with its history, in all", f(r.temporalUnbound)]];
+            ["today's page with that mask, in all", f(r.fullUnbound)], ["...the half-size chain with it, in all", f(r.halfUnbound)], ["...and with its history, in all", f(r.temporalUnbound)],
+            // round 54: the transfer, EASU and the composite in three passes -- the default until round 54, a reference since
+            ["the reference: the transfer, EASU and the composite, three passes", f(st.rest)], ["...the half-size chain with them, in all", f(r.halfTwoPass)],
+            ["...and with its history, in all", f(r.temporalTwoPass)]];
         $("chainTable").querySelector("thead").innerHTML = `<tr style="color:#8fc"><th style="padding:2px 10px;text-align:left">step</th><th style="padding:2px 10px;text-align:right">ms</th></tr>`;
         $("chainTable").querySelector("tbody").innerHTML = rows.map(([k, v]) => `<tr><td style="padding:2px 10px">${k}</td><td style="padding:2px 10px;text-align:right">${v}</td></tr>`).join("");
         $("chainTable").style.display = "";

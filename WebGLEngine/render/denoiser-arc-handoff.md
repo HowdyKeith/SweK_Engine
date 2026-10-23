@@ -66,7 +66,8 @@ node tools/ship/versionPreflight.mjs --next    # the next free version and sweep
    - The runs at 7b871372 held H46 (fused EASU, 0.794 / 0.799), H48 (tiled accumulation, 0.523 / 0.544) and H49 (w16 2.84 /
      2.66 x natively).
    - **Round 53 filled the Intel's network entries with w16.**
-   - Next: `denoise-easu-fused-default` and `denoise-accum-tile-default`, both rounds in round 43's shape.
+   - **Round 54 (section 125) made the fused EASU and composite the chain's rest; the three passes are the reference.**
+   - Next: `denoise-accum-tile-default`, a round in round 43's shape.
    - Round 48 (section 117) is the accumulation's clamp read from a tile, on the same Intel runs as rounds 45 and 46.
    Round 36 (section 103) made the list fill the default, with round 31's ring fill kept as its reference.
    **`denoise-1080-native-crash`:** round 35 did not reproduce it in five runs (section 102). The traces stay armed.

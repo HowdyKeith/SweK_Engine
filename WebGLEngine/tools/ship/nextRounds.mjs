@@ -2306,9 +2306,9 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "denoise-easu-fused-default",
-        blocker: "OPEN",
-        what: "Section 115's rule, carried out: the chain's EASU and composite run as EASU_COMP_WGSL, one pass, the two passes kept as the reference.",
-        how: "A round in the shape of rounds 43 and 44: chain() runs the fused pass by default, its rest step times it, the two-pass rest kept with reference rows, held bit for bit on every scene. No rig run owed: the kernel and its step are round 46's.",
+        blocker: "CLOSED",
+        what: "DONE as round 54 (pre-registration section 125), shipping with the next version: chain() asked nothing runs the transfer and EASU_COMP_WGSL, two passes for three; { rest: \"easu\" } runs the three, the reference; at a ratio other than 2 x it runs the three, and { rest: \"fused\" } there is refused by name. The result names the rest it ran.",
+        how: "time() gained restF (the transfer and the fused pass, one frame, its kernels recorded); timeHalfChain's half and temporal take it, halfTwoPass and temporalTwoPass keep rest, and every other reference sum keeps rest. The page shows 29 rows; the rig's section 103 line names the rest and a section 125 line carries both. Sabotaged X1-X6. No rig run owed: the kernel and its step are round 46's.",
         why: "Section 123: H46 held on the Intel (0.794 / 0.799).",
     },
     {

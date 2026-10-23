@@ -748,6 +748,11 @@ No run is owed. On the Intel in Chrome, denoise.html now loads the w16 network a
 --which` names it natively. Every gate that compares against the shipped network asks for it by name (`?net=shipped`), so
 the rig's lines keep their meanings. Any later Intel run of the device gate checks that the page runs w16 there.
 
+### Round 54: the chain's rest runs fused (pre-registration section 125)
+
+No run is owed. The page's half-size chain now runs the transfer and the fused EASU and composite, and shows the three-pass
+rest as a reference (29 rows). The rig's section 103 line says `rest fused`, and a new section 125 line carries both rests.
+
 ## Send back
 
 The JSON file. It holds the platform, the browser flags, every adapter seen, each gate's verdict, time, failing rows and

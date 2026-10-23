@@ -8425,3 +8425,70 @@ gates stayed green. The byte-safe runner turned every sabotage red and restored 
 
 The round holds by its rule. `denoise-w16-intel-entries` is closed. Row 3 on the Intel waits on the next rig run of the
 device gate.
+
+## 125. ROUND 54 -- THE CHAIN's REST RUNS FUSED BY DEFAULT (`denoise-easu-fused-default`): FIXED BEFORE ITS CODE
+
+Section 123 found H46 holding on the Intel: the quad EASU fused with the composite costs 0.794 and 0.799 of the two passes it
+stands in for. Section 115's rule said that, on a hold, the fused pass becomes the chain's. This round makes it so, in the
+shape of rounds 43 and 44: the new default, the old path kept as a named reference, and both held bit for bit.
+
+**What changes:**
+- `chain()` asked nothing about its rest runs the transfer and then `EASU_COMP_WGSL`, two passes in place of three.
+  - `{ rest: "easu" }` runs the three passes as before: the reference.
+  - At any ratio other than exactly 2 x, asked nothing, it runs the three passes. The fused pass refuses those ratios
+    (round 46), so the fallback stands in for the refusal.
+  - `{ rest: "fused" }` at such a ratio is refused by name.
+  - The result names the rest that ran (`rest: "fused"` or `"easu"`), because two rests that agree bit for bit cannot
+    otherwise say which ran (round 48's P4).
+- `time()` gains one step, `restF`: the transfer and the fused pass in one frame, on rest's own clock, its kernels recorded
+  (`toT`, `easuC`).
+- `timeHalfChain` reports `rest: "fused"`. Its `half` and `temporal` take `restF` in `rest`'s place.
+  - `halfTwoPass` and `temporalTwoPass` keep `rest`: they are the defaults of rounds 44-53, and the reference.
+  - Every other reference sum (halfRing, halfTile, halfList, halfUnbound and their temporals) keeps `rest`, so each keeps
+    the meaning a committed report gave it.
+- The page shows the fused rest in the default's place and the three-pass rest with its two chains as a reference. That is
+  three rows more, 29 in all.
+- The rig's section 103 line names the rest as well as the fill and the coverage. A new section 125 line carries `rest`,
+  `restF` and the three-pass chains.
+
+**Rows (the chain gate):**
+1. `chain()` asked nothing, on all four scenes, is `{ rest: "easu" }`'s chain bit for bit, says `rest: "fused"`, and every
+   emitter pixel is reached. `{ rest: "easu" }` says `"easu"`.
+2. On a 13 x 9 -> 39 x 27 frame, `chain()` asked nothing runs the three passes and says so. `{ rest: "fused" }` there is
+   refused by name.
+3. `restF` is one frame on rest's own clock, dispatching `toT` and `easuC`. `half` and `temporal` are their sums with `restF`,
+   and `halfTwoPass` and `temporalTwoPass` the same sums with `rest`.
+4. The page shows its 29 rows. The section 103 line names `rest fused`, and the section 125 line carries each figure it names.
+
+**Sabotages, by the byte-safe runner (X1-X6):**
+- X1: chain()'s default back to the three passes;
+- X2: the result's `rest` always saying "fused";
+- X3: the fallback dropped, so a ratio of 3 asked nothing is refused;
+- X4: `half` summing `rest`;
+- X5: `restF` timing the composite after the fused pass;
+- X6: the page without the reference's chain row.
+
+Each must turn at least one row red.
+
+**The prediction.** None of timing. The kernel and its step are round 46's, and section 123 measured them. No rig run is owed.
+On SwiftShader `half` falls by about `rest - restF`. That is reported, not asserted: a CPU's figures decide nothing.
+
+**The rule.** The round holds when rows 1-4 pass, every gate stays as green as it was, and each sabotage goes red.
+
+**Recorded after the code (round 54).** Rows 1-4 passed on SwiftShader on the first run, and the chain gate stayed ALL GREEN.
+On all four scenes the default chain said "fused" and matched the three-pass chain bit for bit, tMax and all. At 13 x 9 ->
+39 x 27 it ran the three passes, and `{ rest: "fused" }` there was refused by name. The pilot's figures, reported and not
+asserted: `rest` 1.632 ms, `restF` 1.388 ms, both on the device's clock; the half-size chain fused 183.279 ms against
+183.523 ms in three passes.
+
+Every sabotage went red, and the runner restored each file byte for byte:
+- X1, chain()'s default back to the three passes: 1 red;
+- X2, the result's `rest` always "fused": 2 red;
+- X3, the fallback dropped: 1 red;
+- X4, `half` summing `rest`: 1 red;
+- X5, `restF` timing the composite after the fused pass: 1 red;
+- X6, the page without the reference's chain row: 1 red.
+
+X3 needed a change to the gate before it could judge cleanly. As first written, the ratio-3 chain sat bare in the device
+script, so X3's throw would have failed the whole drive and no single row would have judged it. The chain now sits in a
+try, and its error lands in the ratio-3 row. The round holds by its rule, and `denoise-easu-fused-default` is closed.
