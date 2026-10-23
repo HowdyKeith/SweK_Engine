@@ -53,7 +53,9 @@ const of = (k) => gates.filter((g) => kinds[g] === k);
 ok(`sorted by the doc's rule -- a clock read is timing, a dB grade quality, the rest exact: timing ${of("timing").length} (${of("timing").map((g) => path.basename(g, "-selfcheck.mjs")).join(", ")}), quality ${of("quality").length}, exact ${of("exact").length}`,
    kinds["fx/fsr/fsr3LiveClock-selfcheck.mjs"] === "timing" && kinds["fx/fsr/fsrFlowCost-selfcheck.mjs"] === "timing" && kinds["fx/fsr/fsrFrameGen-selfcheck.mjs"] === "quality" &&
    kinds["render/opticalFlowTsl-selfcheck.mjs"] === "exact" && kinds["render/temporalTslZoo-selfcheck.mjs"] === "exact" &&
-   kinds["render/denoiseTiming-selfcheck.mjs"] === "timing" && kinds["render/denoiseDevice-selfcheck.mjs"] === "exact" && kinds["render/denoiseCompile-selfcheck.mjs"] === "timing");
+   // the denoiser's round 40 (section 108) gave the device gate a small ladder of its own -- r40s standing aside on an adapter
+   // without subgroups -- so by the rule it reads a clock, and is timing; its rows are exactness rows, and the doc says both
+   kinds["render/denoiseTiming-selfcheck.mjs"] === "timing" && kinds["render/denoiseDevice-selfcheck.mjs"] === "timing" && kinds["render/denoiseCompile-selfcheck.mjs"] === "timing");
 ok("  ...and the rule on text: a clock is timing even beside dB, dB is quality, neither is exact",
    categorize("const t = performance.now(); // 3 dB") === "timing" && categorize("Math.log10(1 / mse)") === "quality" && categorize("same vector at every block") === "exact");
 const rows = parseRows("\n1. X\n  PASS  a\n  FAIL  *** b wrong ***   detail\n  ----  belt8: 12.3 dB\n\nFAIL -- 1 check(s)\n");

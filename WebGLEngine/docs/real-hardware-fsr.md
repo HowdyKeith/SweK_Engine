@@ -61,8 +61,9 @@ git checkout claude/denoiser-device
 
 The run's second line, `on <commit> <date> <subject>`, should then show this branch's latest commit.
 
-- **`render/denoiseDevice-selfcheck.mjs`** (exact) holds round 11's network on the device to its CPU twin, cell for
-  cell, and drives `denoise.html` in the browser. On a GPU its rows should hold. A conv cell the GPU fused is allowed (the
+- **`render/denoiseDevice-selfcheck.mjs`** holds round 11's network on the device to its CPU twin, cell for cell, and
+  drives `denoise.html` in the browser. The run sorts it as timing since round 40, which gave it a small ladder of its own.
+  Its rows are exactness rows. On a GPU its rows should hold. A conv cell the GPU fused is allowed (the
   twin's fused mirror); an unexplained one is a finding.
 - **`render/denoiseTiming-selfcheck.mjs`** (timing) is what the run is for. It times one pass of the network and its kernel
   on a ladder of sizes, 64 x 64 up to a 1920 x 1080 frame, two ways:
