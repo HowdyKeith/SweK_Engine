@@ -559,8 +559,19 @@ export const PRESENT_WGSL = /* wgsl */ `
 @vertex fn vs(@builtin(vertex_index) i: u32) -> @builtin(position) vec4f {
     return vec4f(array<vec2f, 3>(vec2f(-1.0, -1.0), vec2f(3.0, -1.0), vec2f(-1.0, 3.0))[i], 0.0, 1.0);
 }
+// v4896 -- RENDER SCALE: exposure.yz is the render size over the output size (1, 1 when they are equal), and the output pixel at p reads the render target BILINEARLY at p * ratio. At ratio 1 the sample position is
+// exactly the texel's centre, so the filter weights are 0 and 1 and the result is the single textureLoad it replaces, bit for bit. The four taps are clamped to the target, so the last output row and column read its edge.
 @fragment fn fs(@builtin(position) p: vec4f) -> @location(0) vec4f {
-    let c = textureLoad(src, vec2i(p.xy), 0).rgb * exposure.x;
+    let dims = vec2i(textureDimensions(src));
+    let q = p.xy * exposure.yz - vec2f(0.5);
+    let i0 = vec2i(floor(q));
+    let f = q - floor(q);
+    let hi = dims - vec2i(1);
+    let a = textureLoad(src, clamp(i0, vec2i(0), hi), 0).rgb;
+    let b = textureLoad(src, clamp(i0 + vec2i(1, 0), vec2i(0), hi), 0).rgb;
+    let d = textureLoad(src, clamp(i0 + vec2i(0, 1), vec2i(0), hi), 0).rgb;
+    let e = textureLoad(src, clamp(i0 + vec2i(1, 1), vec2i(0), hi), 0).rgb;
+    let c = mix(mix(a, b, f.x), mix(d, e, f.x), f.y) * exposure.x;
     let t = c / (1.0 + c);
     return vec4f(pow(max(t, vec3f(0.0)), vec3f(1.0 / 2.2)), 1.0);
 }
@@ -584,10 +595,15 @@ export function skyAmbient(sunDir, intensity, groundBounce) {
  * Build the whole frame graph on `device`. Options: { canvas (a canvas with a webgpu context, optional), format (the canvas format), width, height, deformRes, deformSize, gridN, levels, baseSpacing, shadowRes }.
  * Returns the driver: frame(dt, focus, cam, opts), stamp(...), setSun(elev, azim), readField(), readSky(), dumpTerrain(verts), shot(), errors, stats, and the resources the gate reads.
  */
-export async function createSnowGpu(device, { canvas = null, format = "bgra8unorm", width = 320, height = 180, deformRes = 128, deformSize = 20, gridN = 32, levels = 5, baseSpacing = 0.2, shadowRes = SHADOW_RES } = {}) {
+export async function createSnowGpu(device, { canvas = null, format = "bgra8unorm", width = 320, height = 180, deformRes = 128, deformSize = 20, gridN = 32, levels = 5, baseSpacing = 0.2, shadowRes = SHADOW_RES, passTimers = false } = {}) {
     const GU = U().GPUBufferUsage, TU = U().GPUTextureUsage, SS = U().GPUShaderStage, MM = U().GPUMapMode;
     const errors = []; device.addEventListener("uncapturederror", (e) => errors.push(String(e.error && e.error.message || e)));
     const mkBuf = (size, usage, label) => device.createBuffer({ size: Math.max(16, Math.ceil(size / 4) * 4), usage, label });
+    // v4896 -- OPT-IN PER-PASS GPU TIMERS (passTimers: true, on a device made with the "timestamp-query" feature): every pass writes a begin and an end timestamp into one query set, the frame resolves them and
+    // stats.passMs holds the last frame's milliseconds per pass. It awaits a buffer map each frame, so a frame with timers on is a measurement frame, never a throughput one. Off by default: no query set, no
+    // descriptor field, nothing different from the frame before this existed.
+    const timers = passTimers && device.features && device.features.has("timestamp-query")
+        ? { qs: device.createQuerySet({ type: "timestamp", count: 32 }), res: mkBuf(32 * 8, GU.QUERY_RESOLVE | GU.COPY_SRC, "pass timers"), rd: mkBuf(32 * 8, GU.COPY_DST | GU.MAP_READ, "pass timers read") } : null;
     const ctx = canvas ? canvas.getContext("webgpu") : null; if (ctx) ctx.configure({ device, format, alphaMode: "opaque", usage: TU.RENDER_ATTACHMENT | TU.COPY_SRC });
     const field = new DeformField({ res: deformRes, size: deformSize, windDirectionDeg: 40 });
     const clip = buildClipmap({ gridN, levels });
@@ -596,7 +612,7 @@ export async function createSnowGpu(device, { canvas = null, format = "bgra8unor
     const brushBuf = mkBuf(MAX_BRUSHES * 3 * 16, GU.STORAGE | GU.COPY_DST, "brushes"), deformU = mkBuf(48, GU.UNIFORM | GU.COPY_DST, "deform params");
     const skyBuf = mkBuf(mipFloats(SKY_W, SKY_H) * 4, GU.STORAGE | GU.COPY_SRC | GU.COPY_DST, "sky lut chain"), skyU = mkBuf(48, GU.UNIFORM | GU.COPY_DST, "sky params");
     const mipU = Array.from({ length: SKY_LEVELS - 1 }, (_, i) => { const b = mkBuf(16, GU.UNIFORM | GU.COPY_DST, "mip params " + (i + 1)); device.queue.writeBuffer(b, 0, new Float32Array([SKY_W, SKY_H, i + 1, 0])); return b; });
-    const frameBuf = mkBuf(FRAME_FLOATS * 4, GU.UNIFORM | GU.COPY_DST, "frame"), taaU = mkBuf(176, GU.UNIFORM | GU.COPY_DST, "taa"), expoU = mkBuf(16, GU.UNIFORM | GU.COPY_DST, "exposure");
+    const frameBuf = mkBuf(FRAME_FLOATS * 4, GU.UNIFORM | GU.COPY_DST, "frame"), taaU = mkBuf(176, GU.UNIFORM | GU.COPY_DST, "taa"), expoU = mkBuf(16, GU.UNIFORM | GU.COPY_DST, "exposure"), expoShotU = mkBuf(16, GU.UNIFORM | GU.COPY_DST, "exposure (shot)");
     const vbuf = mkBuf(clip.positions.byteLength, GU.VERTEX | GU.COPY_DST, "clip vertices"), ibuf = mkBuf(clip.indices.byteLength, GU.INDEX | GU.COPY_DST, "clip indices");
     device.queue.writeBuffer(vbuf, 0, clip.positions); device.queue.writeBuffer(ibuf, 0, clip.indices);
     // ---- textures
@@ -666,6 +682,7 @@ export async function createSnowGpu(device, { canvas = null, format = "bgra8unor
 
     async function frame(dt, focus, cam, opts = {}) {
         const o = { present: true, shot: false, ...opts };
+        const OW = o.outW || W, OH = o.outH || H;   // a SHOT is the render size unless outW/outH ask for the present pass to upsample it (render scale, tested without a canvas)
         // 1 the field: bookkeeping on the CPU, the pass on the GPU
         const P = field.advance(dt, focus);
         device.queue.writeBuffer(deformU, 0, new Float32Array(packParams(P)));
@@ -685,44 +702,48 @@ export async function createSnowGpu(device, { canvas = null, format = "bgra8unor
         // 3 the TAA block
         const prev = state.prevVP || vpClean;
         taaF.set(prev, 0); taaF.set(invView(b), 16); taaF.set([tanX, tanY, 1 / W, 1 / H, j[0], j[1], state.historyValid, state.taa && state.resolve ? 1 : 0, state.feedback, 0, 0, 0], 32);
-        device.queue.writeBuffer(taaU, 0, taaF); device.queue.writeBuffer(expoU, 0, new Float32Array([state.exposure, 0, 0, 0]));
+        device.queue.writeBuffer(taaU, 0, taaF); // the present pass reads the render target at (render size / output size): 1 when the page draws at full size, less when it renders at a scale and the canvas is bigger; a shot is always the render size itself
+        device.queue.writeBuffer(expoU, 0, new Float32Array([state.exposure, canvas ? W / canvas.width : 1, canvas ? H / canvas.height : 1, 0])); device.queue.writeBuffer(expoShotU, 0, new Float32Array([state.exposure, W / OW, H / OH, 0]));
         const enc = device.createCommandEncoder();
+        const slots = [], tw = (name) => { if (!timers || slots.length >= 16) return undefined; slots.push(name); const k = slots.length - 1; return { querySet: timers.qs, beginningOfPassWriteIndex: 2 * k, endOfPassWriteIndex: 2 * k + 1 }; };
         // field step (writes the other buffer), then the sky if the sun moved
-        { const cp = enc.beginComputePass(); cp.setPipeline(deformPipe); cp.setBindGroup(0, deformBG[cur]); cp.dispatchWorkgroups(deformRes / 8, deformRes / 8); cp.end(); }
+        { const cp = enc.beginComputePass({ timestampWrites: tw("deform") }); cp.setPipeline(deformPipe); cp.setBindGroup(0, deformBG[cur]); cp.dispatchWorkgroups(deformRes / 8, deformRes / 8); cp.end(); }
         cur = 1 - cur; field.endFrame();
         if (skyDirty) {
             device.queue.writeBuffer(skyU, 0, new Float32Array([sun[0], sun[1], sun[2], SUN_I, GB[0], GB[1], GB[2], SKY_W, SKY_H, 0, 0, 0]));
-            const cp = enc.beginComputePass(); cp.setPipeline(bakePipe); cp.setBindGroup(0, bakeBG); cp.dispatchWorkgroups(SKY_W / 8, SKY_H / 8); cp.end();
-            for (let l = 1; l < SKY_LEVELS; l++) { const m = enc.beginComputePass(); m.setPipeline(mipPipe); m.setBindGroup(0, mipBG[l - 1]); m.dispatchWorkgroups(Math.ceil(Math.max(1, SKY_W >> l) / 8), Math.ceil(Math.max(1, SKY_H >> l) / 8)); m.end(); }
+            const cp = enc.beginComputePass({ timestampWrites: tw("skyBake") }); cp.setPipeline(bakePipe); cp.setBindGroup(0, bakeBG); cp.dispatchWorkgroups(SKY_W / 8, SKY_H / 8); cp.end();
+            for (let l = 1; l < SKY_LEVELS; l++) { const m = enc.beginComputePass({ timestampWrites: tw("skyMip" + l) }); m.setPipeline(mipPipe); m.setBindGroup(0, mipBG[l - 1]); m.dispatchWorkgroups(Math.ceil(Math.max(1, SKY_W >> l) / 8), Math.ceil(Math.max(1, SKY_H >> l) / 8)); m.end(); }
             skyDirty = false; bakes++;
         }
         // shadow passes, one per cascade: the same vertex function as the beauty pass
-        for (let c = 0; c < CASCADE_COUNT; c++) { const p = enc.beginRenderPass({ colorAttachments: [], depthStencilAttachment: { view: shadowTex[c].createView(), depthClearValue: 1, depthLoadOp: "clear", depthStoreOp: "store" } });
+        for (let c = 0; c < CASCADE_COUNT; c++) { const p = enc.beginRenderPass({ colorAttachments: [], depthStencilAttachment: { view: shadowTex[c].createView(), depthClearValue: 1, depthLoadOp: "clear", depthStoreOp: "store" }, timestampWrites: tw("shadow" + c) });
           p.setPipeline(shadowPipe[c]); p.setBindGroup(0, shadowBG[cur]); p.setVertexBuffer(0, vbuf); p.setIndexBuffer(ibuf, "uint32"); p.drawIndexed(clip.indices.length); p.end(); }
         // beauty pass: the sky dome, then ONE indexed draw of the whole clipmap
         { const p = enc.beginRenderPass({ colorAttachments: [{ view: hdr.createView(), clearValue: [0, 0, 0, 1], loadOp: "clear", storeOp: "store" }, { view: depthCol.createView(), clearValue: [POST_FAR, 0, 0, 0], loadOp: "clear", storeOp: "store" }],
-            depthStencilAttachment: { view: sceneDepth.createView(), depthClearValue: 1, depthLoadOp: "clear", depthStoreOp: "discard" } });
+            depthStencilAttachment: { view: sceneDepth.createView(), depthClearValue: 1, depthLoadOp: "clear", depthStoreOp: "discard" }, timestampWrites: tw("beauty") });
           p.setBindGroup(0, mainBG[cur]); p.setPipeline(skyPipe); p.draw(3); p.setPipeline(terrainPipe); p.setVertexBuffer(0, vbuf); p.setIndexBuffer(ibuf, "uint32"); p.drawIndexed(clip.indices.length); p.end(); }
         // TAA: current + history -> the other history
         const hi = state.histIdx, ho = 1 - hi;
         { const bg = device.createBindGroup({ layout: taaPipe.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: taaU } }, { binding: 1, resource: hdr.createView() }, { binding: 2, resource: hist[hi].createView() }, { binding: 3, resource: depthCol.createView() }, { binding: 4, resource: hist[ho].createView() }] });
-          const cp = enc.beginComputePass(); cp.setPipeline(taaPipe); cp.setBindGroup(0, bg); cp.dispatchWorkgroups(Math.ceil(W / 8), Math.ceil(H / 8)); cp.end(); }
+          const cp = enc.beginComputePass({ timestampWrites: tw("taa") }); cp.setPipeline(taaPipe); cp.setBindGroup(0, bg); cp.dispatchWorkgroups(Math.ceil(W / 8), Math.ceil(H / 8)); cp.end(); }
         // present
         let shotBuf = null, bpr = 0;
-        const draw = (pipe, view) => { const bg = device.createBindGroup({ layout: pipe.getBindGroupLayout(0), entries: [{ binding: 0, resource: hist[ho].createView() }, { binding: 1, resource: { buffer: expoU } }] });
-            const p = enc.beginRenderPass({ colorAttachments: [{ view, clearValue: [0, 0, 0, 1], loadOp: "clear", storeOp: "store" }] }); p.setPipeline(pipe); p.setBindGroup(0, bg); p.draw(3); p.end(); };
+        const draw = (pipe, view, eu = expoU) => { const bg = device.createBindGroup({ layout: pipe.getBindGroupLayout(0), entries: [{ binding: 0, resource: hist[ho].createView() }, { binding: 1, resource: { buffer: eu } }] });
+            const p = enc.beginRenderPass({ colorAttachments: [{ view, clearValue: [0, 0, 0, 1], loadOp: "clear", storeOp: "store" }], timestampWrites: tw("present") }); p.setPipeline(pipe); p.setBindGroup(0, bg); p.draw(3); p.end(); };
         if (o.present && ctx) draw(presentCanvas, ctx.getCurrentTexture().createView());
         let shotTex = null;
-        if (o.shot) { shotTex = tex([W, H], "rgba8unorm", TU.RENDER_ATTACHMENT | TU.COPY_SRC, "shot"); draw(presentShot, shotTex.createView()); bpr = Math.ceil(W * 4 / 256) * 256; shotBuf = mkBuf(bpr * H, GU.COPY_DST | GU.MAP_READ, "shot read"); enc.copyTextureToBuffer({ texture: shotTex }, { buffer: shotBuf, bytesPerRow: bpr }, [W, H]); }
+        if (o.shot) { shotTex = tex([OW, OH], "rgba8unorm", TU.RENDER_ATTACHMENT | TU.COPY_SRC, "shot"); draw(presentShot, shotTex.createView(), expoShotU); bpr = Math.ceil(OW * 4 / 256) * 256; shotBuf = mkBuf(bpr * OH, GU.COPY_DST | GU.MAP_READ, "shot read"); enc.copyTextureToBuffer({ texture: shotTex }, { buffer: shotBuf, bytesPerRow: bpr }, [OW, OH]); }
+        if (slots.length) { enc.resolveQuerySet(timers.qs, 0, slots.length * 2, timers.res, 0); enc.copyBufferToBuffer(timers.res, 0, timers.rd, 0, slots.length * 16); }
         device.queue.submit([enc.finish()]);
+        if (slots.length) { await timers.rd.mapAsync(MM.READ); const t = new BigUint64Array(timers.rd.getMappedRange().slice(0)); timers.rd.unmap(); stats.passMs = {}; slots.forEach((n, k) => { stats.passMs[n] = Number(t[2 * k + 1] - t[2 * k]) / 1e6; }); }
         state.prevVP = vpClean; state.histIdx = ho; state.historyValid = 1; state.frame++;
         stats.frames = state.frame; stats.bakes = bakes;
         if (!shotBuf) return null;
-        await shotBuf.mapAsync(MM.READ); const raw = new Uint8Array(shotBuf.getMappedRange()), out = new Uint8Array(W * H * 4);
-        for (let y = 0; y < H; y++) out.set(raw.subarray(y * bpr, y * bpr + W * 4), y * W * 4);
-        shotBuf.unmap(); shotBuf.destroy(); shotTex.destroy(); return { pixels: out, width: W, height: H };
+        await shotBuf.mapAsync(MM.READ); const raw = new Uint8Array(shotBuf.getMappedRange()), out = new Uint8Array(OW * OH * 4);
+        for (let y = 0; y < OH; y++) out.set(raw.subarray(y * bpr, y * bpr + OW * 4), y * OW * 4);
+        shotBuf.unmap(); shotBuf.destroy(); shotTex.destroy(); return { pixels: out, width: OW, height: OH };
     }
-    const stats = { frames: 0, bakes: 0, vertices: clip.vertices, triangles: clip.triangles, terrainDrawCalls: 1, cascades: CASCADE_COUNT, indices: clip.indices.length, shadowRes };
+    const stats = { passTimers: !!timers, passMs: null, frames: 0, bakes: 0, vertices: clip.vertices, triangles: clip.triangles, terrainDrawCalls: 1, cascades: CASCADE_COUNT, indices: clip.indices.length, shadowRes };
     async function readBuf(buf, bytes) { const r = mkBuf(bytes, GU.COPY_DST | GU.MAP_READ), e = device.createCommandEncoder(); e.copyBufferToBuffer(buf, 0, r, 0, bytes); device.queue.submit([e.finish()]); await r.mapAsync(MM.READ); const out = new Float32Array(r.getMappedRange().slice(0)); r.unmap(); r.destroy(); return out; }
     return {
         device, field, clip, stats, errors, state, baseSpacing, gridN, levels, deformRes,
@@ -735,6 +756,6 @@ export async function createSnowGpu(device, { canvas = null, format = "bgra8unor
             const e = device.createCommandEncoder(), cp = e.beginComputePass(); cp.setPipeline(dumpPipe); cp.setBindGroup(0, shadowBG[cur]); cp.setBindGroup(1, bg); cp.dispatchWorkgroups(Math.ceil(n / 64)); cp.end(); device.queue.submit([e.finish()]);
             const out = await readBuf(outB, n * 32); inB.destroy(); outB.destroy(); return out;
         },
-        shot: (dt, focus, cam) => frame(dt, focus, cam, { present: false, shot: true }),
+        shot: (dt, focus, cam, size = {}) => frame(dt, focus, cam, { present: false, shot: true, ...(size.outW ? { outW: size.outW, outH: size.outH } : {}) }),
     };
 }

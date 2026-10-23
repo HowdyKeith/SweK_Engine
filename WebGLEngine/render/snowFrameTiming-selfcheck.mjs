@@ -12,6 +12,10 @@
 //   S3 the latency list is the encode-only time                                -> 2 RED: the fake-clock row (latency must be encode PLUS the wait) and the live row (encode must sit below latency)
 //   S4 orbitAt's camera offset 3 -> 2                                          -> 1 RED: the orbitAt(0) numeric row. The page-twin row reads the PAGE's text, so it guards the page moving, not this file; the two together hold the pair
 //   S6 the second half taken from the first frames (both halves read the head of the list) -> 2 RED: the halves row and the line's round trip
+//   S7a the sky bake kept in the steady frame (the half-the-frames filter removed)  -> 3 RED: the order row, the left-out row, the median row
+//   S7b the passes sorted alphabetically instead of in frame order                    -> 1 RED: the order row
+//   S7c the share computed over twice the frame                                       -> 1 RED: the median-sum-share row
+//   S7d a pass's median taken as its mean                                             -> 1 RED: the median-sum-share row
 //   S5 timingLine drops the adapter name                                       -> 3 RED: the line row, the round trip and the live row (a reading that does not say what ran is the 0.4 fps lie again)
 "use strict";
 import fs from "node:fs";
@@ -20,7 +24,7 @@ import { createRequire } from "node:module";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { resolveWebgpu, configureVulkanIcd, headlessGpuSkipReason, noteNativeAdapter, exitCleanly } from "../tools/ship/headlessGpu.mjs";
-import { summarise, timingLine, parseTimingLine, orbitAt, timeFrames, RADIUS, SPEED, WARMUP_FRAMES, TIMED_FRAMES, DEFAULT_SIZES } from "./snowFrameTiming.mjs";
+import { summarise, timingLine, parseTimingLine, passLine, parsePassLine, PASS_ORDER, orbitAt, timeFrames, RADIUS, SPEED, WARMUP_FRAMES, TIMED_FRAMES, DEFAULT_SIZES } from "./snowFrameTiming.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const require_ = createRequire(import.meta.url);
@@ -48,10 +52,24 @@ console.log("\n2. THE READING LINE, AND BACK");
 {
     const r = { width: 320, height: 180, perFrame: [3.1, 2.9, 3.3, 3.0, 5.0, 3.2], encode: [0.8, 0.9, 1.0, 0.9, 0.8, 0.9], batchedMs: 16.8, batchedFrames: 6 };
     const line = timingLine(r, "intel gen-9 D3D12 driver 31.0.101.2137"), p = parseTimingLine(line);
-    ok("the line starts `reading snowFrame:` (the shape realGpuRun's `----` lines carry) and names the adapter", line.startsWith("reading snowFrame: native 320x180 latency median") && line.endsWith("adapter intel gen-9 D3D12 driver 31.0.101.2137"), line);
-    ok("and it parses back to the numbers it was built from: size, median, p95, min, max, frames, throughput, encode, adapter", p && p.width === 320 && p.height === 180 && p.frames === 6 && p.adapter === "intel gen-9 D3D12 driver 31.0.101.2137" &&
+    ok("the line starts `reading snowFrame:` (the shape realGpuRun's `----` lines carry) and names the adapter", line.startsWith("reading snowFrame: native 320x180 shadowRes 2048 latency median") && line.endsWith("adapter intel gen-9 D3D12 driver 31.0.101.2137"), line);
+    ok("and it parses back to the numbers it was built from: size, median, p95, min, max, frames, throughput, encode, adapter", p && p.width === 320 && p.height === 180 && p.shadowRes === 2048 && p.frames === 6 && p.adapter === "intel gen-9 D3D12 driver 31.0.101.2137" &&
         Math.abs(p.median - 3.15) < 0.01 && p.halves && Math.abs(p.halves[0] - 3.1) < 0.01 && Math.abs(p.halves[1] - 3.2) < 0.01 && Math.abs(p.max - 5) < 0.01 && Math.abs(p.min - 2.9) < 0.01 && Math.abs(p.throughput - 2.8) < 0.01 && Math.abs(p.encode - 0.9) < 0.01, JSON.stringify(p));
     ok("a line that is not ours does not parse (null, not a half-filled object)", parseTimingLine("reading aerial: worst 9e-4") === null && parseTimingLine("") === null);
+}
+
+console.log("\n2b. THE PER-PASS LINE, AND THE PASS-TIMED LINE");
+{
+    const r = { width: 320, height: 180, shadowRes: 1024, perFrame: [10, 10, 10, 10], batchedMs: null, batchedFrames: 4, encode: [1, 1, 1, 1],
+        passes: { beauty: [3.1, 3.3, 3.2, 3.0], shadow1: [0.9, 1.1, 1.0, 1.0], deform: [0.05, 0.05, 0.06, 0.05], shadow0: [1.2, 1.2, 1.3, 1.1], taa: [0.4, 0.4, 0.5, 0.4], skyBake: [4.0], shadow2: [0.8, 0.8, 0.8, 0.9] } };
+    const line = passLine(r, "intel gen-9 D3D12", 10), p = parsePassLine(line);
+    ok("the pass line lists the passes in the order the frame runs them (deform, shadow0, shadow1, shadow2, beauty, taa), not the order they arrived in", p && Object.keys(p.passes).join() === "deform,shadow0,shadow1,shadow2,beauty,taa", line.slice(0, 170));
+    ok("a pass that ran in under half the frames (the sky bake, which runs only when the sun moves) is left out of the steady frame", p && !("skyBake" in p.passes));
+    ok("each pass is the MEDIAN of its frames, the sum is the sum of those medians, and the share is that sum over the frame's latency", p && Math.abs(p.passes.beauty - 3.15) < 0.01 && Math.abs(p.passes.shadow0 - 1.2) < 0.01 && Math.abs(p.sum - (0.05 + 1.2 + 1.0 + 0.8 + 3.15 + 0.4)) < 0.02 && p.share === 66, JSON.stringify(p && { beauty: p.passes.beauty, sum: p.sum, share: p.share }));
+    ok("the size, shadow size, frame count and adapter are on it and parse back; a line that is not ours does not parse", p && p.width === 320 && p.height === 180 && p.shadowRes === 1024 && p.frames === 4 && p.adapter === "intel gen-9 D3D12" && parsePassLine("reading snowFrame: native 1x1") === null);
+    const tl = timingLine(r, "x"), tp = parseTimingLine(tl);
+    ok("a pass-timed run has no throughput (every frame waits on a buffer map), and its frame line says so rather than printing a number it did not measure", /throughput n\/a \(pass-timed\)/.test(tl) && tp && tp.throughput === null && tp.width === 320, tl.slice(0, 160));
+    ok("PASS_ORDER is the order snowGpu.mjs's frame writes its passes in (the source names them in that order)", (() => { const src = fs.readFileSync(path.join(ENG, "render", "snowGpu.mjs"), "utf8"); const at = ["tw(\"deform\")", "tw(\"skyBake\")", "tw(\"skyMip\" + l)", "tw(\"shadow\" + c)", "tw(\"beauty\")", "tw(\"taa\")", "tw(\"present\")"].map((x) => src.indexOf(x)); return at.every((v, k) => v > 0 && (k === 0 || v > at[k - 1])) && PASS_ORDER[0] === "deform" && PASS_ORDER[PASS_ORDER.length - 1] === "present"; })());
 }
 
 console.log("\n3. THE ORBIT IS THE PAGE'S");
@@ -102,15 +120,23 @@ if (skip) {
     const info = adapter ? adapter.info || {} : {}, name = [info.vendor, info.architecture, info.description].filter(Boolean).join(" ");
     ok("a native adapter answered, and has a name to put on the reading", !!adapter && name.length > 0, name);
     if (adapter) {
-        const device = await adapter.requestDevice();
-        const r = await timeFrames(device, { width: 160, height: 90, warmup: 1, frames: 3 });
+        const hasTs = adapter.features && adapter.features.has("timestamp-query");
+        const device = await adapter.requestDevice({ requiredFeatures: hasTs ? ["timestamp-query"] : [] });
+        const r = await timeFrames(device, { width: 160, height: 90, warmup: 1, frames: 3, passTimers: hasTs });
         await new Promise((res) => setTimeout(res, 50));
         const s = summarise(r.perFrame);
-        ok("!! the whole frame graph ran on the native device with no GPU error: deform, sky bake, three shadow passes, the clipmap and TAA, 1 + 3 + 3 frames", r.errors.length === 0 && r.framesRun === 7 && r.triangles > 1000, `${r.framesRun} frames, ${r.triangles} triangles, errors: ${r.errors.join(" | ").slice(0, 200) || "none"}`);
-        ok("every timed frame is a positive finite time, the encode time is below the latency it is part of, and the batch figure is a time too", r.perFrame.length === 3 && r.encode.every((v, k) => v > 0 && v < r.perFrame[k]) && r.batchedMs > 0, `median ${s.median.toFixed(1)} ms`);
+        ok("!! the whole frame graph ran on the native device with no GPU error: deform, sky bake, three shadow passes, the clipmap and TAA, 1 warm-up + 3 timed frames (and 3 batched when the adapter has no timestamp queries)", r.errors.length === 0 && r.framesRun === (hasTs ? 4 : 7) && r.triangles > 1000, `${r.framesRun} frames, ${r.triangles} triangles, errors: ${r.errors.join(" | ").slice(0, 200) || "none"}`);
+        ok("every timed frame is a positive finite time, the encode time is below the latency it is part of, and the batch figure is a time too (or, on a pass-timed run, absent on purpose)", r.perFrame.length === 3 && r.encode.every((v, k) => v > 0 && v < r.perFrame[k]) && (hasTs ? r.batchedMs === null : r.batchedMs > 0), `median ${s.median.toFixed(1)} ms`);
         const line = timingLine(r, name), p = parseTimingLine(line);
         ok("the reading line parses and carries this adapter's name", p && p.adapter === name && p.width === 160 && p.height === 90 && p.frames === 3, line.slice(0, 120));
         report(line);
+        if (hasTs) {
+            const names = Object.keys(r.passes), need = ["deform", "shadow0", "shadow1", "shadow2", "beauty", "taa"];
+            ok("!! the per-pass GPU timers answered: every pass of the steady frame (deform, three shadow cascades, beauty, TAA) has a positive time in each of the 3 timed frames", need.every((n) => r.passes[n] && r.passes[n].length === 3 && r.passes[n].every((v) => v > 0)), names.join(","));
+            const pl = passLine(r, name, s.median), pp = parsePassLine(pl);
+            ok("the pass line parses, names this adapter, and its sum is a real fraction of the frame (0 to 200%: timestamps and wall clock are different clocks, and a software rasteriser overlaps passes)", pp && pp.adapter === name && pp.sum > 0 && pp.share > 0 && pp.share < 200, pl.slice(0, 200));
+            report(pl);
+        } else report("this adapter has no timestamp-query: the per-pass line is SKIPPED here (the rig's adapter is the one that carries it)");
         report("(a 160x90 reading from this gate, 3 timed frames: the rig's figures come from the command at 320x180 and 1280x720 over 30. On the software adapter every number here is a CPU's.)");
         report("gate wall time " + ((performance.now() - t0) / 1000).toFixed(1) + " s");
     }

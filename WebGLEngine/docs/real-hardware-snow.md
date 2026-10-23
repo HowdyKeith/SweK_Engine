@@ -53,3 +53,16 @@ It runs 2 warm-up frames and 30 timed frames at 320x180 and again at 1280x720, a
 What it says. The frame is GPU-bound (encoding is 1-2 ms of 10 to 66). The cost is not proportional to pixels: 16 times the pixels cost 6.4 times the time, which fits **about 6.6 ms a frame that does not depend on the picture size** (three 2048x2048 shadow passes, the deform step, the clipmap's vertex stage, the sky) **plus about 64 ms per megapixel**; at 1080p that predicts ~140 ms (7 fps) on this integrated GPU, at 960x540 ~40 ms (25 fps). Batching the submissions gains 11 to 25% over one frame at a time. The first 15 frames at 1280x720 ran at ~72 ms and the last 15 at ~61 ms, and 320x180 fell from 13.8 to 9.6 ms over its first eight: the GPU's clock was still ramping, so two warm-up frames timed the ramp. Warm-up is now ten frames and the line carries the first-half and last-half medians, so a ramp that is still going shows as a number. One hitch (24.7 ms against ~10) and one at 112.6 ms are single frames, not a trend.
 
 The gate's own 160x90 run on the rig read 8.07 ms (latency) and 5.16 ms (throughput), which fits the same 6.6 ms floor plus a small picture. The same gate registers its adapter now; its first rig report had said `NO ADAPTER WAS SEEN` over a D3D12 reading.
+
+## Where the frame's time goes, and the two knobs (added after the first frame timing)
+
+The 2026-10-23 run said the frame is GPU-bound, about 6.6 ms of it independent of the picture and about 64 ms per megapixel. To see WHICH passes those are, the command now reads the GPU's own per-pass timestamps, and the shadow map size is a command option and a page parameter. From `WebGLEngine\` on the rig, in a clone that holds `render\presentScale-selfcheck.mjs`:
+
+```bat
+node tools\ship\takeSnowFrameTiming.mjs --passes --shadow-sweep --sizes 320x180,1280x720 --out snow-passes.json
+node tools\ship\takeSnowFrameTiming.mjs --sizes 1280x720,960x540,640x360 --out snow-scale.json
+```
+
+The first prints, for each size at shadow maps of 2048, 1024 and 512, a `reading snowPasses:` line: the GPU milliseconds of deform, the three shadow cascades, the beauty pass and TAA (median over the frames each ran in), their sum, and the share of the wall-clock frame that sum is. The gap is queue time the timestamps do not see. The second times the same frame at three render sizes. On the sandbox's software adapter at 160x90 the beauty pass is ~100 of ~163 ms and the shadows ~38; the Intel gen-9's split is what the rig run will say, and it decides the defaults below.
+
+The knobs. **Render scale:** `snow-gpu.html` has a slider (25 to 100%) and `?scale=0.75` in the address; the frame renders at that fraction of the canvas and the present pass reads it bilinearly (`render/presentScale-selfcheck.mjs` holds the filter to a CPU twin within one 8-bit level at five ratios, and the real page at `?scale=0.5` in `snowGpuLive-selfcheck`). **Shadow size:** `?shadow=1024` (512, 1024, 1536, 2048, 4096) in the address, or `--shadow-res` / `--shadow-sweep` on the command. NOTHING IS CHANGED BY DEFAULT: scale 100%, shadow 2048, the frame as before (the six older snow gates pass unchanged). Which default to ship, and whether the far cascades need the whole clipmap's vertex stage at all, waits for the rig's per-pass numbers.

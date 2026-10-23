@@ -2184,6 +2184,13 @@ export const NEXT_ROUNDS = [
         why: "The 2026-10-23 rig run measured the kernels (all pass) but not the frame; the only frame rate in the report is a CPU rasteriser's.",
     },
     {
+        id: "snow-shadow-and-scale-defaults-from-the-rig",
+        blocker: "HARDWARE",
+        what: "Choose the snow frame's shadow size and render scale defaults from the Windows rig's PER-PASS GPU times. BUILT at v4896: per-pass timestamp queries in createSnowGpu (passTimers), `takeSnowFrameTiming.mjs --passes --shadow-sweep`, a render-scale present pass (bilinear, ratio 1 bit-exact, held to a CPU twin at five ratios) with a slider and ?scale / ?shadow on snow-gpu.html. NOTHING IS CHANGED BY DEFAULT. OPEN: run the two commands in docs/real-hardware-snow.md on the Intel gen-9 and the GTX 1080 and read where the 6.6 ms size-independent floor sits.",
+        how: "If the three shadow cascades are most of the floor, the candidates in order of risk are: a smaller shadow map for the far cascades (the near one keeps 2048); fewer cascades (CASCADE_COUNT is a constant the WGSL and the fit read); and drawing a COARSER clipmap in the far cascades' passes, because each shadow pass currently draws the whole clipmap and so pays the vertex stage (the dunes, the deformation read, the fine relief) three times. If the beauty pass is most of it, the render scale is the lever and the default is a number to pick per adapter class. Each change to a default is a looks change: shadowing and acne are held by snowGpu-selfcheck, LookA and LookB.",
+        why: "The first rig run said the frame is GPU-bound and gave a size-independent floor, but not which pass owns it; a default chosen without that is a guess.",
+    },
+    {
         id: "tv-home-first-run-on-a-rig",
         blocker: "OPEN",
         what: "SweK Home (android/swek-webview LauncherActivity) has never run on a TV or an emulator: build the APK on the rig, install it, check that Android offers it as a home screen, that the D-pad walks the shelf, that the three SweK tiles open their pages through MainActivity, that long-press pins, and that Back does nothing.",

@@ -40,35 +40,62 @@ export function summarise(ms) {
 const f1 = (v) => (v >= 100 ? v.toFixed(0) : v >= 10 ? v.toFixed(1) : v.toFixed(2));
 /**
  * The line a real-hardware report keeps (tools/ship/realGpuRun.mjs keeps `----` lines and the gate prints this one under that prefix). One line a size:
- *   reading snowFrame: native 320x180 latency median 3.21 ms (311 fps), p95 4.10, min 2.9, max 5.0 over 30 frames; throughput 2.80 ms/frame; encode+submit median 0.90 ms; first/last half median 3.4/3.0 ms; adapter NAME
+ *   reading snowFrame: native 320x180 shadowRes 2048 latency median 3.21 ms (311 fps), p95 4.10, min 2.9, max 5.0 over 30 frames; throughput 2.80 ms/frame; encode+submit median 0.90 ms; first/last half median 3.4/3.0 ms; adapter NAME
  */
 export function timingLine(r, adapter) {
     const s = summarise(r.perFrame), e = summarise(r.encode);
-    return `reading snowFrame: native ${r.width}x${r.height} latency median ${f1(s.median)} ms (${s.fps.toFixed(s.fps >= 100 ? 0 : 1)} fps), p95 ${f1(s.p95)}, min ${f1(s.min)}, max ${f1(s.max)} over ${s.n} frames; ` +
-           `throughput ${f1(r.batchedMs / r.batchedFrames)} ms/frame; encode+submit median ${f1(e.median)} ms; first/last half median ${s.halves ? f1(s.halves[0]) + "/" + f1(s.halves[1]) + " ms" : "n/a"}; adapter ${adapter}`;
+    return `reading snowFrame: native ${r.width}x${r.height} shadowRes ${r.shadowRes || 2048} latency median ${f1(s.median)} ms (${s.fps.toFixed(s.fps >= 100 ? 0 : 1)} fps), p95 ${f1(s.p95)}, min ${f1(s.min)}, max ${f1(s.max)} over ${s.n} frames; ` +
+           `throughput ${r.batchedMs == null ? "n/a (pass-timed)" : f1(r.batchedMs / r.batchedFrames) + " ms/frame"}; encode+submit median ${f1(e.median)} ms; first/last half median ${s.halves ? f1(s.halves[0]) + "/" + f1(s.halves[1]) + " ms" : "n/a"}; adapter ${adapter}`;
 }
 /** The line's fields back out, for the gate's round trip and for anything that reads a report. */
 export function parseTimingLine(line) {
-    const m = /reading snowFrame: native (\d+)x(\d+) latency median ([\d.]+) ms \(([\d.]+) fps\), p95 ([\d.]+), min ([\d.]+), max ([\d.]+) over (\d+) frames; throughput ([\d.]+) ms\/frame; encode\+submit median ([\d.]+) ms; first\/last half median (?:([\d.]+)\/([\d.]+) ms|n\/a); adapter (.*)$/.exec(line);
-    return m ? { width: +m[1], height: +m[2], median: +m[3], fps: +m[4], p95: +m[5], min: +m[6], max: +m[7], frames: +m[8], throughput: +m[9], encode: +m[10], halves: m[11] ? [+m[11], +m[12]] : null, adapter: m[13] } : null;
+    const m = /reading snowFrame: native (\d+)x(\d+) shadowRes (\d+) latency median ([\d.]+) ms \(([\d.]+) fps\), p95 ([\d.]+), min ([\d.]+), max ([\d.]+) over (\d+) frames; throughput (?:([\d.]+) ms\/frame|n\/a \(pass-timed\)); encode\+submit median ([\d.]+) ms; first\/last half median (?:([\d.]+)\/([\d.]+) ms|n\/a); adapter (.*)$/.exec(line);
+    return m ? { width: +m[1], height: +m[2], shadowRes: +m[3], median: +m[4], fps: +m[5], p95: +m[6], min: +m[7], max: +m[8], frames: +m[9], throughput: m[10] ? +m[10] : null, encode: +m[11], halves: m[12] ? [+m[12], +m[13]] : null, adapter: m[14] } : null;
 }
 
 /**
  * Warm up, then time `frames` frames one at a time (latency) and `frames` more submitted back to back (throughput), on `device`, at width x height. `now` and `idle` are injectable so the rules are
  * driven on fixtures; live they are performance.now and device.queue.onSubmittedWorkDone. Returns the raw lists and the GPU errors the device raised (an uncaptured error is a failed frame, not a slow one).
  */
-export async function timeFrames(device, { width = 320, height = 180, warmup = WARMUP_FRAMES, frames = TIMED_FRAMES, now = () => performance.now(), idle = () => device.queue.onSubmittedWorkDone(), create = createSnowGpu } = {}) {
-    const g = await create(device, { canvas: null, width, height });
+export async function timeFrames(device, { width = 320, height = 180, warmup = WARMUP_FRAMES, frames = TIMED_FRAMES, shadowRes, passTimers = false, now = () => performance.now(), idle = () => device.queue.onSubmittedWorkDone(), create = createSnowGpu } = {}) {
+    const g = await create(device, { canvas: null, width, height, ...(shadowRes ? { shadowRes } : {}), ...(passTimers ? { passTimers: true } : {}) });
     let i = 0;
     for (let k = 0; k < warmup; k++, i++) { const o = orbitAt(i); await g.frame(1 / 60, o.focus, o.cam); await idle(); }
-    const perFrame = [], encode = [];
+    const perFrame = [], encode = [], passes = {};
     for (let k = 0; k < frames; k++, i++) {
         const o = orbitAt(i), t0 = now(); await g.frame(1 / 60, o.focus, o.cam); const t1 = now(); await idle(); const t2 = now();
         encode.push(t1 - t0); perFrame.push(t2 - t0);
+        if (g.stats.passMs) for (const [n, v] of Object.entries(g.stats.passMs)) (passes[n] || (passes[n] = [])).push(v);
     }
-    const b0 = now();
-    for (let k = 0; k < frames; k++, i++) { const o = orbitAt(i); await g.frame(1 / 60, o.focus, o.cam); }
-    await idle();
-    const batchedMs = now() - b0;
-    return { width, height, perFrame, encode, batchedMs, batchedFrames: frames, errors: [...g.errors], framesRun: g.stats.frames, triangles: g.stats.triangles };
+    // the batched figure is a THROUGHPUT, and a timed frame waits on a buffer map every frame, so with pass timers on there is no batch: batchedMs is null and the frame is a measurement frame
+    let batchedMs = null;
+    if (!passTimers) {
+        const b0 = now();
+        for (let k = 0; k < frames; k++, i++) { const o = orbitAt(i); await g.frame(1 / 60, o.focus, o.cam); }
+        await idle();
+        batchedMs = now() - b0;
+    }
+    return { width, height, shadowRes: shadowRes || null, perFrame, encode, passes, passTimers: !!g.stats.passTimers, batchedMs, batchedFrames: frames, errors: [...g.errors], framesRun: g.stats.frames, triangles: g.stats.triangles };
+}
+
+/** The order the frame runs its passes in, for printing; a name not listed (a future pass) sorts after these, alphabetically. */
+export const PASS_ORDER = Object.freeze(["deform", "skyBake", "skyMip1", "skyMip2", "skyMip3", "skyMip4", "shadow0", "shadow1", "shadow2", "beauty", "taa", "present"]);
+/**
+ * GPU milliseconds per pass, from the per-pass timers: the MEDIAN of each pass over the frames it ran in (the sky bake runs only when the sun moves, so it is absent from a steady orbit), the sum of those medians,
+ * and what share of the frame's wall-clock latency the sum is -- the rest is what the GPU timestamps do not see (queue gaps between passes, the buffer map, the CPU). One line a size:
+ *   reading snowPasses: native 320x180 shadowRes 2048 GPU ms per pass (median over 30 frames): deform 0.05, shadow0 1.20, shadow1 0.90, shadow2 0.80, beauty 3.10, taa 0.40; sum 6.45 ms of a 10.3 ms frame (63%); adapter NAME
+ */
+export function passLine(r, adapter, frameMedianMs) {
+    const names = Object.keys(r.passes).filter((n) => r.passes[n].length * 2 >= r.perFrame.length)   // a pass that ran in under half the frames (the sky bake) is not part of the steady frame
+        .sort((a, b) => { const ia = PASS_ORDER.indexOf(a), ib = PASS_ORDER.indexOf(b); return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || (a < b ? -1 : 1); });
+    const meds = names.map((n) => summarise(r.passes[n].map((v) => Math.max(v, 1e-6))).median), sum = meds.reduce((a, b) => a + b, 0);
+    const share = frameMedianMs > 0 ? ` of a ${f1(frameMedianMs)} ms frame (${Math.round(100 * sum / frameMedianMs)}%)` : "";
+    return `reading snowPasses: native ${r.width}x${r.height} shadowRes ${r.shadowRes || 2048} GPU ms per pass (median over ${r.perFrame.length} frames): ` + names.map((n, k) => `${n} ${meds[k].toFixed(2)}`).join(", ") + `; sum ${sum.toFixed(2)} ms${share}; adapter ${adapter}`;
+}
+/** The pass line back out: { width, height, shadowRes, frames, passes: {name: ms}, sum, adapter }, or null for a line that is not ours. */
+export function parsePassLine(line) {
+    const m = /reading snowPasses: native (\d+)x(\d+) shadowRes (\d+) GPU ms per pass \(median over (\d+) frames\): (.*); sum ([\d.]+) ms(?: of a [\d.]+ ms frame \((\d+)%\))?; adapter (.*)$/.exec(line);
+    if (!m) return null;
+    const passes = {}; for (const part of m[5].split(", ")) { const [n, v] = part.split(" "); passes[n] = +v; }
+    return { width: +m[1], height: +m[2], shadowRes: +m[3], frames: +m[4], passes, sum: +m[6], share: m[7] ? +m[7] : null, adapter: m[8] };
 }
