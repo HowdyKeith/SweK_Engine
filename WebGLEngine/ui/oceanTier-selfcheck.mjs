@@ -32,7 +32,7 @@ console.log("\n1. WHAT AN ADAPTER'S NAME IS WORTH");
 {
     const cases = [
         [{ vendor: "intel", architecture: "gen-9", description: "Intel(R) UHD Graphics 620" }, "integrated", "the rig's laptop, the 228-260 ms reading"],
-        [{ vendor: "nvidia", architecture: "pascal", description: "NVIDIA GeForce GTX 1080 Ti" }, "discrete", "the rig's 1080 Ti"],
+        [{ vendor: "nvidia", architecture: "pascal", description: "NVIDIA GeForce GTX 1080" }, "discrete", "the rig's 1080"],
         [{ vendor: "google", architecture: "swiftshader", description: "SwiftShader" }, "fallback", "the container's software adapter"],
         [{ vendor: "intel", description: "Intel(R) Arc(TM) A380 Graphics" }, "discrete", "Arc is Intel and is not integrated"],
         [{ vendor: "apple", architecture: "metal-3", description: "Apple M2" }, "integrated", ""],
@@ -49,13 +49,13 @@ console.log("\n1. WHAT AN ADAPTER'S NAME IS WORTH");
     const wrong = cases.filter(([i, want]) => T.classifyAdapter(i).kind !== want);
     ok("!! *** the adapters the rig and the container reported, and the common families, sort as they should ***", wrong.length === 0,
         wrong.length ? "WRONG: " + wrong.map(([i, w]) => (i && i.description) + " -> " + T.classifyAdapter(i).kind + " (wanted " + w + ")").join("; ") : cases.length + " cases");
-    ok("  and an unnamed adapter still has a label to print", T.classifyAdapter(null).label === "unnamed adapter" && /1080 Ti/.test(T.classifyAdapter(cases[1][0]).label), T.classifyAdapter(cases[1][0]).label);
+    ok("  and an unnamed adapter still has a label to print", T.classifyAdapter(null).label === "unnamed adapter" && /1080/.test(T.classifyAdapter(cases[1][0]).label), T.classifyAdapter(cases[1][0]).label);
 }
 
 console.log("\n2. THE DECISION, ONE ROW PER BRANCH");
 {
     const UHD = { vendor: "intel", architecture: "gen-9", description: "Intel(R) UHD Graphics 620" };
-    const GTX = { vendor: "nvidia", architecture: "pascal", description: "NVIDIA GeForce GTX 1080 Ti" };
+    const GTX = { vendor: "nvidia", architecture: "pascal", description: "NVIDIA GeForce GTX 1080" };
     const SW = { vendor: "google", architecture: "swiftshader", description: "SwiftShader" };
     const c = (o) => T.chooseTier(o);
     ok("!! *** off never gives the sea -- not with a fast GPU, a fast probe, or WebGPU ***", c({ preference: "off", webgpu: true, adapter: GTX, probeMs: 1 }).tier === "default", c({ preference: "off", webgpu: true, adapter: GTX, probeMs: 1 }).reason);
@@ -73,7 +73,7 @@ console.log("\n2. THE DECISION, ONE ROW PER BRANCH");
     ok("!! *** on gives the sea on a slow GPU, as asked, and SAYS how slow ***", slowOn.tier === "sea" && /228\.0 ms/.test(slowOn.reason) && /4 fps/.test(slowOn.reason), slowOn.reason);
     ok("  on with no measurement is the sea, without inventing a speed", c({ preference: "on", webgpu: true, adapter: UHD }).tier === "sea" && !/fps/.test(c({ preference: "on", webgpu: true, adapter: UHD }).reason), c({ preference: "on", webgpu: true, adapter: UHD }).reason);
     ok("  an unrecognised preference is auto, not an error", c({ preference: "turbo", webgpu: true, adapter: GTX, probeMs: 5 }).preference === "auto" && c({}).preference === "auto" && c({}).tier === "default", "turbo -> auto");
-    ok("  every decision carries a reason, and the reason names the adapter when one matters", ["off", "auto", "on"].every((p) => c({ preference: p, webgpu: true, adapter: GTX, probeMs: 8 }).reason.length > 10) && /1080 Ti/.test(c({ preference: "auto", webgpu: true, adapter: GTX, probeMs: 8 }).reason), "");
+    ok("  every decision carries a reason, and the reason names the adapter when one matters", ["off", "auto", "on"].every((p) => c({ preference: p, webgpu: true, adapter: GTX, probeMs: 8 }).reason.length > 10) && /1080/.test(c({ preference: "auto", webgpu: true, adapter: GTX, probeMs: 8 }).reason), "");
 }
 
 console.log("\n3. THE PROBE HARNESS, ON A FAKE CLOCK");
@@ -115,7 +115,7 @@ console.log("\n5. WHAT THE MODULE DOES NOT TOUCH");
     ok("!! *** it imports nothing -- in particular not the vendored sea, which stays byte-identical because nothing here can reach it ***", imports.length === 0 && !/web-ocean/.test(src), "imports: " + (imports.join(", ") || "(none)"));
     const bad = ["Date.now", "Math.random", "new Date", "document", "navigator", "window", "localStorage", "sessionStorage", "process."].filter((t) => src.includes(t));
     ok("  it reads no global: the clock, the storage and the adapter all arrive as arguments", bad.length === 0, bad.length ? "found: " + bad.join(", ") : "performance.now only as a default parameter");
-    const report = T.reportLines(T.chooseTier({ preference: "auto", webgpu: true, adapter: { description: "NVIDIA GeForce GTX 1080 Ti" } }));
+    const report = T.reportLines(T.chooseTier({ preference: "auto", webgpu: true, adapter: { description: "NVIDIA GeForce GTX 1080" } }));
     ok("  its report says the sea has not been timed when that is the reason", report.some((l) => /not been timed/.test(l)) && report[0].startsWith("tier: default"), report.join(" | "));
 }
 

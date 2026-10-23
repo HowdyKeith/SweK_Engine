@@ -167,6 +167,11 @@ export const ROWS = Object.freeze([
         note: "a gate that compiles its own binding fixtures to test the unused-binding report" }),
     Object.freeze({ file: "tools/ship/mpmDevice-selfcheck.mjs", langs: Object.freeze(["wgsl"]), source: SOURCE.OWN_GATE, evidence: EVIDENCE.ELSEWHERE, distinct: null,
         note: "a gate that assembles and runs its own kernel over mpm's helper functions" }),
+    // v4895 -- TWO MORE HAND-READ EMITTERS (render/shaderEmitters.mjs HAND_VERIFIED), each owned by a gate that runs it: the cascade lookup's WGSL fragment, and the sea patch layer's WGSL patches.
+    Object.freeze({ file: "render/cascades.mjs", langs: Object.freeze(["wgsl"]), source: SOURCE.EXPORT, evidence: EVIDENCE.ELSEWHERE, distinct: null,
+        note: "render/cascades-selfcheck.mjs owns the receipt: it assembles the lookup into a kernel and runs it in Dawn against the CPU twin" }),
+    Object.freeze({ file: "tools/ship/seaPatch.mjs", langs: Object.freeze(["wgsl"]), source: SOURCE.EXPORT, evidence: EVIDENCE.ELSEWHERE, distinct: null,
+        note: "text patches applied to the vendored sea's WGSL; tools/ship/seaPatch-selfcheck.mjs holds the patched text to its recorded hash, and the sea compiles it on a device only on the rig" }),
 ]);
 
 /**
@@ -204,12 +209,12 @@ export const SWIRL_THREE_WAY = Object.freeze({
 /** What the census reports over the tree at v4487. */
 export const MEASURED_AT_V4487 = Object.freeze({
     at: "v4487",
-    rows: 21,              // 14 at v4487; 21 at v4880 (seven hand-read emitters added to the key)
+    rows: 23,              // 14 at v4487; 21 at v4880 (seven hand-read emitters added to the key); 23 at v4895 (cascades, seaPatch)
     compiledHere: 9,       // ROWS this gate hands to a driver itself
     programsCompiled: 11,  // ...which is 11 PROGRAMS, because dither and vorton each ship a pair
     glslPrograms: 9, wgslPrograms: 2,
     gradedHere: 2,         // ...of which these two rows are compared by VALUE and not merely accepted
-    receiptElsewhere: 11,  // 4 at v4487, +7 at v4880. stereographic, glslFloatPack, tslIsing, wgslLayout
+    receiptElsewhere: 13,  // 4 at v4487, +7 at v4880, +2 at v4895. stereographic, glslFloatPack, tslIsing, wgslLayout
     notAShader: 1,         // shaderPairs-selfcheck's detector fixture
     compileFailures: 0,
     // The one compile error of the round was a probe calling holoFoil with its arguments in the wrong order.

@@ -279,9 +279,9 @@ export const PARITY_BASELINE = Object.freeze({
     // census diff against 3677d747, the commit before it -- the only file that moved -- and missed for four commits,
     // because this gate was not in that round's battery. Keith's rig run read it first: measured 162, recorded 161.
     // v4877 -- +1 to glslBearing, glslFramework and glslOnly: render/spaceBackdrop.js (the rotorcraft/space-battle branch) writes its GLSL for three.js's ShaderMaterial, which prepends the version header itself, and ships no WGSL half.
-    glslBearing: 169,   // v4884: +1, render/zoomBlurExact.mjs (the long-silence branch's pairwise-sum zoom blur, GLSL and WGSL); v4883: +1, ocean-default.html writes its GLSL (raw WebGL2, its own #version header) and ships no WGSL half: a page for the water every GPU can draw, WebGL2 only on purpose
+    glslBearing: 170,   // v4895: +1 (a three.js ShaderMaterial pass of the sea/sub-aquarium line: glslFramework 19 -> 20, glslOnly 142 -> 143, re-measured, not individually traced); v4884: +1, render/zoomBlurExact.mjs (the long-silence branch's pairwise-sum zoom blur, GLSL and WGSL); v4883: +1, ocean-default.html writes its GLSL (raw WebGL2, its own #version header) and ships no WGSL half: a page for the water every GPU can draw, WebGL2 only on purpose
     glslDirective: 150,  // v4880: +4 with the orrery-seeded merge; raw WebGL2 -- the file writes its own version header
-    glslFramework: 19,   // three.js prepends it: badTvPass, aquarellePass, grassField, solidTexture, atmosphere, ...
+    glslFramework: 20,   // three.js prepends it: badTvPass, aquarellePass, grassField, solidTexture, atmosphere, ...
     // v4392 -- 57 -> 58, and the file is a GATE rather than a shipping module. tools/ship/shipyard-selfcheck.mjs
     // section 8 embeds a WGSL compute shader to run the four float32 encodings on a real device, so it bears WGSL
     // and ships none. THAT IS THE POPULATION THIS CENSUS EXISTS TO SEE and it is counted rather than exempted:
@@ -355,10 +355,10 @@ export const PARITY_BASELINE = Object.freeze({
     // the denoiser arc, rounds 31-34 (v4891): +1, render/denoiseUpscaleGPU.mjs -- the half-size chain's coverage, fill, transfer,
     // composite and history kernels, a SHIPPING compute module with no GLSL half by construction; its twins are the CPU chain in
     // render/denoiseUpscale.mjs and render/denoiseTemporalUpscale.mjs. conv2d's shape. The same file is why wgslOnly moves too.
-    wgslBearing: 116,
+    wgslBearing: 132,   // v4895: +16 for the snowflow lift and the sea patch (render/aerial, cascades, clipmapTerrain, pcssShadow, skyBake, snowFine, snowGpu, snowShading, taaResolve, toroidalDeform, world/ocean/seaOceanWgsl.mjs and the gates that embed a kernel), all WGSL-only; re-measured
     both: 27,            // v4778: +1, fly-connectome.html (above); before that +2 for fae26dbf's specularProbeLit pair
-    glslOnly: 142,       // v4778 rig run 4: +1, tools/ship/realGpuRun.mjs (above); v4877: +1, render/spaceBackdrop.js
-    wgslOnly: 89,        // the denoiser arc, round 1: +1, brain/conv2d.mjs; round 12: +1, render/denoiseDevice.mjs; v4854: +1, tools/ship/threeTextureBarrier-selfcheck.mjs; v4891: +1, render/denoiseUpscaleGPU.mjs (see wgslBearing)
+    glslOnly: 143,       // v4778 rig run 4: +1, tools/ship/realGpuRun.mjs (above); v4877: +1, render/spaceBackdrop.js
+    wgslOnly: 105,        // the denoiser arc, round 1: +1, brain/conv2d.mjs; round 12: +1, render/denoiseDevice.mjs; v4854: +1, tools/ship/threeTextureBarrier-selfcheck.mjs; v4891: +1, render/denoiseUpscaleGPU.mjs (see wgslBearing)
     // Of `both`, the ones that are shader modules rather than pages. This is the number that matters for reach:
     // a page carrying both languages carries its own two shaders, and lends nothing to anybody else.
     bothShaderModules: Object.freeze(["fx/nebula/nebulaShaders.js", "fx/wormhole/wormholeNebula.js", "render/blackbodyWgsl.mjs", "render/fleetMask.mjs", "render/fleets.mjs", "render/gpuDriven.mjs", "render/gpuTerrain.mjs", "render/fleetTsl.mjs", "render/lyapunovWgsl.mjs", "render/tslSource.mjs", "render/stereographic.mjs", "render/texelProbe.mjs", "render/litSphere.mjs", "render/tslWide.mjs", "render/zoomBlur.mjs", "render/zoomBlurExact.mjs", "render/asciiShape.mjs", "render/water2d.mjs", "render/probeLit.mjs", "physics/render/specularProbeLit.mjs", "physics/render/specularProbeLit-selfcheck.mjs",

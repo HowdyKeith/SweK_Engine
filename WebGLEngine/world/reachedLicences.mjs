@@ -1337,6 +1337,26 @@ export const REACHED_SOURCES = Object.freeze([
              "bits are counted. The part credited to a third party is the part this tree did NOT take, so the " +
              "two are disjoint, and the function taken is the author\'s own.",
     },
+    // =========================================================================================================
+    // v4895 -- THE SNOW MATERIAL, THE CASCADES AND THE FINE SURFACE, VENDORED AND LIFTED.
+    // Noniv/snowflow_demo (MIT, Maksymilian Dendura) is vendored byte for byte under vendor/snowflow (23 files, one commit, every
+    // sha256 pinned by tools/ship/snowflowVendor-selfcheck.mjs, the notice in world/vendoredLicences.mjs). It is listed HERE because
+    // the register is what answers "whose ideas are in the code": the render/ modules below are our own adaptations whose function
+    // bodies are upstream's, said in each header.
+    // =========================================================================================================
+    {
+        repo: "Noniv/snowflow_demo", sourceUrl: "https://github.com/Noniv/snowflow_demo",
+        grantorHoldsRights: true, licenceExists: true, publisher: "Maksymilian Dendura", year: 2026,
+        spdx: "MIT", licence: null,
+        licenceNote: "MIT, (c) 2026 Maksymilian Dendura. LICENSE vendored at vendor/snowflow/LICENSE, sha256 b108a76735ab7cc0eab686fc3e85ca668bdb8866977093846d01bac5b6440453, at commit 545039733b74eec742862f161990142c7ca7c7ec.",
+        redistributable: true, posture: POSTURE.VENDORABLE,
+        taken: "The surface-deformation pass, the nested-ring clipmap, the Nishita sky bake and aerial perspective, PCSS, the cascade fit and lookup, " +
+             "the TAA resolve, and the snow material's lighting and fine surface -- function bodies kept, the Babylon wiring rewritten as storage-buffer and " +
+             "texture WGSL with a CPU twin each. Vendored bytes: vendor/snowflow (23 files). Not taken: the character, cloth, spells, water and the far-mountain raymarch.",
+        takenPaths: ["render/toroidalDeform.mjs", "render/deformRead.mjs", "render/clipmapTerrain.mjs", "render/skyBake.mjs", "render/aerial.mjs", "render/pcssShadow.mjs", "render/taaResolve.mjs", "render/cascades.mjs", "render/snowFine.mjs", "render/snowShading.mjs", "render/snowGpu.mjs"],
+        citedPaths: ["tools/ship/snowflowVendor-selfcheck.mjs", "physics/instruments.mjs"],
+        why: "The licence is permissive and the bytes are pinned; what the register adds is the plain statement of what was taken and what was measured against upstream's own comments (render/*-selfcheck.mjs print the findings).",
+    },
 ]);
 
 /** Everything wrong with one entry. Empty means it can be trusted as a record. */

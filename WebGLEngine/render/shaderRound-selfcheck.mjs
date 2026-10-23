@@ -37,6 +37,10 @@ export const KEPT = Object.freeze({
     "physics/mpm/gpuKernel.mjs :: atomicAdd(&acc[slot], i32(round(clamp(x, -CLIP, CLIP))));":
         "fixed-point quantisation of a CONTINUOUS product: a tie is measure-zero, the mirror (quantise) says so in its own " +
         "header, and ties-to-even is the UNBIASED rule for a sum of many -- the right one for an accumulator",
+    "render/toroidalDeform.mjs :: return base + size * round((centre - base) / size);":
+        "upstream's own body (snowflow's deformSim, vendor/snowflow): the nearest whole window to the centre, over a continuous distance -- a tie is measure-zero, and ties-to-even is what the kernel was graded to (the twin's roundHalfEven)",
+    "render/toroidalDeform.mjs :: p -= size * round(p / size);":
+        "upstream's own body (the same wrap, on a point): a continuous quotient, a tie is measure-zero, ties-to-even matches the twin's roundHalfEven",
     "ui/barycentricWireframe.js :: const posKey = (x, y, z) => round(x) + \",\" + round(y) + \",\" + round(z);":
         "JavaScript, not shader: a local helper that keys vertex positions, in a file that also carries GLSL",
 });

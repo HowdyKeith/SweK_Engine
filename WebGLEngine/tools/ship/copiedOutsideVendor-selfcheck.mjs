@@ -167,10 +167,12 @@ console.log("\n3. *** A POINTER IS NOT AN INCLUSION: what the copies carried bef
     // round ran the over-budget gates its edits could reach and found it red on main with nothing of its own in it. The count moved because the vendor tree grew.
     // v4880 -- twenty-nine: vendor/web-ocean/LICENSE (noniv/web-ocean, MIT, Copyright (c) 2026 Maksymilian Dendura) arrived with the ocean spike, under vendor/ where a vendored copy's notice belongs, with its PROVENANCE.txt
     // and a world/vendoredLicences.mjs entry. The count moved because the vendor tree grew; nothing outside vendor/ gained one.
-    ok("the tree held " + preexisting.length + " MIT permission notices (15 before v4263, plus vendor/three-webgpu at v4319, vendor/three-webgpu-r185 at v4805 and vendor/web-ocean at v4880), quoters and in-file copies aside",
-        preexisting.length === 29, preexisting.join(" ").slice(0, 120) + "...");
-    ok("*** and 28 of those 29 are under vendor/ -- the 29th is a packaged dependency, not engine code ***",
-        underVendor.length === 28 && preexisting.filter((f) => !f.startsWith("vendor/")).join("") ===
+    // v4895 -- thirty: the snowflow LICENSE (Noniv/snowflow_demo, MIT, Copyright (c) 2026 Maksymilian Dendura) arrived with the snowflow lift, under vendor/ where a vendored copy's notice belongs, with its
+    // PROVENANCE.txt and a world/vendoredLicences.mjs entry. The count moved because the vendor tree grew; nothing outside vendor/ gained one.
+    ok("the tree held " + preexisting.length + " MIT permission notices (15 before v4263, plus vendor/three-webgpu at v4319, vendor/three-webgpu-r185 at v4805, vendor/web-ocean at v4880 and vendor/snowflow at v4895), quoters and in-file copies aside",
+        preexisting.length === 30, preexisting.join(" ").slice(0, 120) + "...");
+    ok("*** and 29 of those 30 are under vendor/ -- the 30th is a packaged dependency, not engine code ***",
+        underVendor.length === 29 && preexisting.filter((f) => !f.startsWith("vendor/")).join("") ===
         "tools/strict-libm-pkg/LICENSE",
         underVendor.length + " under vendor/, plus " + preexisting.filter((f) => !f.startsWith("vendor/")).join(" "));
     ok("  so NO engine-source copy outside vendor/ carried one",

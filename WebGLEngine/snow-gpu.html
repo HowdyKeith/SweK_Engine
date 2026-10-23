@@ -1,0 +1,93 @@
+<!doctype html>
+<!-- snow-gpu.html -- UNNUMBERED (the version is chosen at ship time).
+
+     THE SNOWFLOW LIFT ON THE GPU. snow-deform.html puts the lifted pieces on the screen through the CPU; this page is the real path, one WebGPU frame (render/snowGpu.mjs):
+       the toroidal field stepped by a compute kernel in storage buffers  ->  the Nishita sky baked to a storage buffer when the sun moves  ->  a sun shadow pass that runs the SAME vertex function as the
+       beauty pass  ->  the sky dome and ONE indexed draw of the whole clipmap (the vertex stage places each vertex from the camera, lifts it by the dunes and the band-limited deformation read, and
+       finds its normal; the fragment lights it with a PCSS shadow and fades it into the sky by aerial perspective)  ->  a depth-reprojected TAA resolve of the jittered HDR frame  ->  a tone-mapped present.
+     WHAT THIS PAGE IS NOT, SAID PLAINLY:
+       - NOT THE DEMO IT IS LIFTED FROM. No glints, sastrugi or SSS; ONE shadow cascade; the haze mixes toward the exact sky sample (no near-sky blur, no forward lobe); no character.
+       - NOT SEEN ON A REAL GPU. render/snowGpu-selfcheck.mjs runs it on a software WebGPU adapter and holds each stage to its CPU twin; speed and looks on your GPU are a rig reading.
+       - NEEDS WEBGPU. Without it the page says so and snow-deform.html is the CPU version of the same scene.
+     Nothing is ever put in this page as markup: every status line goes in with textContent. The page loads nothing from outside the engine's own origin. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="Snow GPU">
+<meta name="demo:desc" content="The snowflow lift on WebGPU: a compute-stepped deformation field, a one-draw nested-ring clipmap placed and lifted in the vertex stage, a PCSS sun shadow, a baked Nishita sky and a TAA resolve. Needs WebGPU; snow-deform.html is the CPU version.">
+<meta name="demo:category" content="graphics">
+<title>SweK &middot; Snow GPU</title>
+<style>
+  :root { --bg:#050a12; --panel:#0b131fcc; --line:#1c2c44; --fg:#dbe7ff; --dim:#7c93b8; --cyan:#59d1ff; }
+  * { box-sizing:border-box; }
+  html, body { height:100%; margin:0; background:var(--bg); color:var(--fg); font:12px ui-monospace, Menlo, monospace; overflow:hidden; }
+  canvas#c { position:fixed; inset:0; width:100%; height:100%; display:block; cursor:crosshair; }
+  #hud { position:fixed; left:10px; top:10px; background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:8px 10px; max-width:440px; line-height:1.5; }
+  #hud h1 { font-size:13px; letter-spacing:.12em; text-transform:uppercase; color:var(--cyan); margin:0 0 4px; }
+  #hud label { display:block; margin-top:4px; color:var(--dim); } #hud input[type=range] { width:180px; vertical-align:middle; }
+  #hud a { color:var(--cyan); } pre { margin:4px 0 0; white-space:pre-wrap; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud">
+  <h1>Snow GPU</h1>
+  <div>WebGPU path of the snowflow lift. <a href="/snow-deform.html">CPU version</a> &middot; <a href="/server.html">server page</a></div>
+  <label>sun elevation <input id="sun" type="range" min="3" max="60" value="13" step="1"> <span id="sunv">13&deg;</span></label>
+  <label><input id="walk" type="checkbox" checked> walker</label>
+  <label><input id="taa" type="checkbox" checked> TAA</label>
+  <label>view <select id="dbg"><option value="0">beauty</option><option value="1">shadow visibility</option><option value="2">normals</option><option value="3">cascades</option><option value="4">albedo</option><option value="5">fine normal</option></select></label>
+  <label>glints <input id="glint" type="range" min="0" max="2" value="0.55" step="0.01"> sastrugi <input id="sas" type="range" min="0" max="2" value="1" step="0.01"></label>
+  <label>subsurface <input id="sss" type="range" min="0" max="3" value="1" step="0.01"> haze <input id="haze" type="range" min="0" max="0.03" value="0.0072" step="0.0001"></label>
+  <pre id="stats">starting&hellip;</pre>
+  <div style="color:var(--dim);margin-top:4px">Lifted from Noniv/snowflow_demo (MIT, Maksymilian Dendura): vendor/snowflow.</div>
+</div>
+<script type="module">
+  import { createSnowGpu } from "/render/snowGpu.mjs";
+  const $ = (id) => document.getElementById(id);
+  const S = { ready: false, error: "", frames: 0 };
+  window.__snowgpu = S;
+  const manual = new URLSearchParams(location.search).has("manual");
+  const dunes = null;
+  try {
+    if (!navigator.gpu) throw new Error("there is no WebGPU here -- the page may be on an insecure origin (use https or localhost) or the browser lacks it; snow-deform.html is the CPU version of this scene");
+    const adapter = await navigator.gpu.requestAdapter();
+    if (!adapter) throw new Error("no WebGPU adapter was returned");
+    const device = await adapter.requestDevice();
+    const canvas = $("c"), dpr = Math.min(1, window.devicePixelRatio || 1);
+    const w = Math.max(64, Math.round(innerWidth * dpr)), h = Math.max(64, Math.round(innerHeight * dpr));
+    canvas.width = w; canvas.height = h;
+    const gpu = await createSnowGpu(device, { canvas, format: navigator.gpu.getPreferredCanvasFormat(), width: w, height: h });
+    S.gpu = gpu; S.device = device; S.adapter = adapter.info ? (adapter.info.description || adapter.info.vendor || "") : "";
+    const walker = { a: 0, x: 8, z: 0, heading: 0, lastStep: -1, foot: 1, dist: 0 }, RADIUS = 8, SPEED = 2.4;
+    S.walker = walker; S.footprints = 0;
+    const camFor = () => ({ pos: [walker.x - Math.cos(walker.a) * 3 - Math.cos(walker.a + 0.5) * 4, 2.6, walker.z - Math.sin(walker.a) * 3 - Math.sin(walker.a + 0.5) * 4], target: [walker.x, 0.4, walker.z], fovY: 60 });
+    S.camFor = camFor;
+    function walk(dt) {
+      walker.a += SPEED / RADIUS * dt; walker.x = Math.cos(walker.a) * RADIUS; walker.z = Math.sin(walker.a) * RADIUS; walker.heading = -walker.a - Math.PI / 2; walker.dist += SPEED * dt;
+      const step = Math.floor(walker.dist / 0.7);
+      if (step !== walker.lastStep) { walker.lastStep = step; walker.foot = -walker.foot; const nx = Math.cos(walker.heading + Math.PI / 2) * 0.15 * walker.foot, nz = Math.sin(walker.heading + Math.PI / 2) * 0.15 * walker.foot; if (gpu.stamp(walker.x + nx, walker.z + nz, 0.2, 0.09, 0.05, 0.6, 0, walker.heading, 1.7, 1)) S.footprints++; }
+    }
+    S.walk = walk;
+    $("sun").addEventListener("input", (e) => { $("sunv").textContent = e.target.value + "°"; gpu.setSun(Number(e.target.value)); });
+    $("taa").addEventListener("change", (e) => { gpu.state.taa = e.target.checked; gpu.state.historyValid = 0; });
+    $("dbg").addEventListener("change", (e) => { gpu.state.debug = Number(e.target.value); });
+    for (const [id, k] of [["glint", "glint"], ["sas", "sastrugi"], ["sss", "sss"], ["haze", "aerial"]]) $(id).addEventListener("input", (e) => { gpu.state[k] = Number(e.target.value); });
+    let clock = performance.now() / 1000, t0 = clock, fpsN = 0;
+    async function loop() {
+      const now = performance.now() / 1000, dt = Math.min(0.1, now - clock); clock = now;
+      if ($("walk").checked) walk(dt);
+      await gpu.frame(dt, { x: walker.x, z: walker.z }, camFor());
+      S.frames = gpu.stats.frames; fpsN++;
+      if (S.frames % 15 === 0) { const el = now - t0; $("stats").textContent = "frames " + S.frames + "  footprints " + S.footprints + "  ~" + (fpsN / Math.max(0.001, el)).toFixed(1) + " fps\nclipmap " + gpu.stats.vertices + " vertices, " + gpu.stats.triangles + " triangles, " + gpu.stats.terrainDrawCalls + " terrain draw call\nshadow map " + gpu.stats.shadowRes + "^2   sky bakes " + gpu.stats.bakes + "   TAA " + (gpu.state.taa ? "on" : "off") + "\nGPU errors " + gpu.errors.length + "   adapter " + (S.adapter || "?"); t0 = now; fpsN = 0; }
+      requestAnimationFrame(loop);
+    }
+    S.ready = true;
+    if (!manual) requestAnimationFrame(loop);
+    else $("stats").textContent = "manual mode: frames are driven from outside";
+  } catch (e) { S.error = String((e && e.message) || e); $("stats").textContent = "could not start: " + S.error; }
+</script>
+<script type="module" src="/ui/originNotice.js"></script>
+</body>
+</html>

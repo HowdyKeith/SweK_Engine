@@ -9732,10 +9732,8 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
     // BVH-CSG round 9, at its merge onto main's v4831 -- ONE new gate file: physics/mesh/triArrangement-selfcheck.mjs, the per-triangle
     // arrangement the mesh boolean now tries first. The round is a branch round and wears no version, so `at` names the merge it closed at.
     since568: Object.freeze({
-        at: "v4831+bvh-csg-round-9", swept: 1, green: 1, red: 0,
-        added: Object.freeze([
-            "physics/mesh/triArrangement-selfcheck.mjs",
-        ]),
+        at: "v4831+bvh-csg-round-9", swept: 0, green: 0, red: 0,   // round 27: its one gate, physics/mesh/triArrangement-selfcheck.mjs, was removed with the snapped arrangement (bvh-csg-retire-snapped-fallback, step 2)
+        added: Object.freeze([]),
         widened: Object.freeze([]),
         redOnArrival: Object.freeze([]),
         verdict: "*** SEGMENT-BOUNDED CUTTING: ONE TRIANGLE OF A CUT ALONG THE SEGMENTS WHERE B ACTUALLY CROSSES IT, NOT ALONG B's PLANES. *** " +
@@ -16126,6 +16124,30 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
                      "specifier on Windows, so it threw before its first line and the rows never saw a mutation. Imported by file:// URL now, with the child's " +
                      "stderr quoted when it never mutates; green on the rig's win32 box run alone at 7fbce89e, the journal restoring where the handler did not." }),
         ]),
+    }),
+    since605: Object.freeze({
+        at: "v4894", swept: 2, green: 2, red: 0,
+        added: Object.freeze(["ui/oceanReadings-selfcheck.mjs", "tools/ship/oceanReadingsPage-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "the ocean readings (slice 5): the record's arithmetic against an independent recomputation (medians, spread, a least-squares line by normal equations), the 100 ms step clamp read out of the " +
+                 "vendored bundle's text, grouping by label AND size (the rig's native frame was three heights), the card named by Keith kept apart from what the browser reported, the comparison between " +
+                 "adapters at shared sizes only; thirteen sabotages, thirteen red. And its page: one table per adapter whose cells are the module's numbers, bars on one scale with the budget line at 33.3 ms " +
+                 "on that scale, the caveats printed with the fit; sabotages of the page, all red",
+    }),
+    since606: Object.freeze({
+        at: "v4895", swept: 21, green: 21, red: 0,
+        added: Object.freeze(["render/aerial-selfcheck.mjs", "render/cascades-selfcheck.mjs", "render/clipmapTerrain-selfcheck.mjs", "render/deformRead-selfcheck.mjs", "render/pcssShadow-selfcheck.mjs", "render/seaThree-selfcheck.mjs", "render/skyBake-selfcheck.mjs", "render/snowFine-selfcheck.mjs", "render/snowGpu-selfcheck.mjs", "render/snowShading-selfcheck.mjs", "render/subAquarium3d-selfcheck.mjs", "render/taaResolve-selfcheck.mjs", "render/toroidalDeform-selfcheck.mjs", "tools/ship/oceanSrcRebuild-selfcheck.mjs", "tools/ship/seaPatch-selfcheck.mjs", "tools/ship/snowDeformPage-selfcheck.mjs", "tools/ship/snowflowVendor-selfcheck.mjs", "tools/ship/zoomBlurWiring-selfcheck.mjs", "ui/oceanLiveTune-selfcheck.mjs", "ui/seaDepthTint-selfcheck.mjs", "ui/seaFrame-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "the snow and sea lift: the clipmap, deform read, PCSS, TAA, sky bake, snow shading (glints, sastrugi, SSS), three cascades and aerial perspective each against a JS twin and against Dawn, snowGpu end to end on SwiftShader, the vendored originals pinned by hash, and the shared three.js sea (patch, frame, depth tint, live tune, sub-aquarium); all 21 run alone and serially at v4895, all green",
+    }),
+    since607: Object.freeze({
+        at: "v4896", swept: 10, green: 10, red: 0,
+        added: Object.freeze(["render/snowGpuField-selfcheck.mjs", "render/snowGpuLive-selfcheck.mjs", "render/snowGpuLookA-selfcheck.mjs", "render/snowGpuLookB-selfcheck.mjs", "render/snowGpuTaa-selfcheck.mjs", "tools/ship/snowReadings-selfcheck.mjs", "tools/ship/swekTvLauncher-selfcheck.mjs", "tools/ship/truncationGuard-selfcheck.mjs", "tools/ship/tvDebloat-selfcheck.mjs", "tools/ship/tvPackages-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "the snowGpu browser half split into five gates under the 20 s cap beside the trimmed core, the D3D12 readings and the truncation guard (found by mutating the real snowGpu.mjs, which the first detector missed), the TV package knowledge, the dry-run planner that executes nothing, and SweK Home's launcher (a pure Shelf.java driven by javac); each run alone and green, and each sabotaged to go red by name",
     }),
 });
 

@@ -538,7 +538,7 @@
 //     and near-miss vertices besides). The other mesh's plane crosses "the same" line at distinct points, the seam has a gap, and a region floods through it: a session switching engines every 25 shots lost 6.2 units
 //     of the wall by shot 100. The exact path now runs only where both operands are conforming near the seam
 //     (nonConformingNear, below), and otherwise declines to the snapped path, whose snap closes such gaps
-//     (stats.exactDeclined; result.exact says which ran). Seed 3, 10 bvh / 10 bsp / 10 bvh shots: the default within
+//     (stats.exactDeclined; result.exact says which ran -- RETIRED at round 26: the exact run goes on and stats.nonConforming reports it). Seed 3, 10 bvh / 10 bsp / 10 bvh shots: the default within
 //     3.9e-12 of the snapped chain (8 of the last 10 declined); unchecked (opts.exactConforming:false) 6.9e-3 off.
 // MEASURED on the final code, the page's 12 x 100-shot soak, default against snapped: fallbacks 0 / 6; shots ending open at
 // the exact-bits key 0 / 42 (seed 8 open from shot 84, 10 edges at the end; seed 11 26 shots, up to 43); the same solid to
@@ -598,7 +598,6 @@ const canonPairs = (p) => p.sort((x, y) => x[0] - y[0] || x[1] - y[1]);
 const freshTree = (bvh, tris) => (bvh && bvh.derived ? new MeshBVH(tris) : bvh);
 import { groupCandidatesByTriA, accumulateFragments } from "./triFragmentAccumulate.mjs";
 import { pointInMesh } from "./meshPointClassify.mjs";
-import { arrangeTriangle, SNAP_EPS } from "./triArrangement.mjs";
 import { exactPair, arrangeTriangleExact, exactInside, EXACT_NEAR, degenerateTri } from "./exactArrangement.mjs";
 import { explicitPoint, centroidPoint, same as samePoint } from "./implicitPoints.mjs";
 import { triTriIntersect, triTriIntersectExact } from "./triTriIntersect.mjs";
@@ -727,6 +726,10 @@ export function classifyMeshAgainstOther(trisSelf, bvhSelf, trisOther, bvhOther,
     if (cutting !== "arrangement" && cutting !== "plane") {
         throw new Error('meshBoolean: unrecognized cutting "' + cutting + '" (expected "arrangement" or "plane")');
     }
+    // round 27: contacts:false was round 11's pipeline, the SNAPPED arrangement without contact handling; that arrangement is gone
+    if (cutting === "arrangement" && !contacts) {
+        throw new Error('meshBoolean: contacts:false with cutting "arrangement" was the snapped arrangement, removed at round 27; use cutting:"plane" or leave contacts on');
+    }
     let classifications = 0, arrangedTris = 0, arrangementFaces = 0, untouchedTris = 0, fallbackTris = 0;
     let onFaces = 0, nearSided = 0, nearPseudo = 0, nearEdge = 0, outsideBoxShortcuts = 0;
     const fallbackReasons = {};
@@ -756,80 +759,11 @@ export function classifyMeshAgainstOther(trisSelf, bvhSelf, trisOther, bvhOther,
         return { inside: cls.inside, ambiguous: cls.agreement < agreementThreshold, on: 0 };
     };
 
-    // Round 12: EDGE CONFORMITY. Every triangle is arranged first; then a triangle missing a point that the triangle
-    // across one of its sides put on their shared edge is arranged again with that point (the neighbour's exact
-    // coordinates) on its side. Two triangles sharing an edge then split it at the same points: no T-junction where
-    // B's surface reaches an A-edge -- a B edge crossing A's face exactly on the diagonal two A-triangles share gives
-    // one a segment ending there and the other only a point contact (flush-box fuzz: 3 unmatched edges on 23 of 450
-    // runs before; round 11 identical).
-    // round 16: the pair results meshBooleanCore's seamConsensus already found, by this side's (t, other) order
-    // round 16f: exactPair's results, computed once for both sides by meshBooleanCore
+    // round 16f: the exact arrangement needs no conformity pass -- a point on a side splits it whatever pair it came from
+    // (round 27: it is the only arrangement; the snapped one and its edge-conformity pass were removed)
     const exactPairOf = (t) => (opts.exactPairs ? (o) => opts.exactPairs.get(opts.pairSide ? o * 4294967296 + t : t * 4294967296 + o) : null);
-    const pairOf = (t) => (opts.pairResults ? (o) => opts.pairResults.get(opts.pairSide ? o * 4294967296 + t : t * 4294967296 + o) : null);
     const arrs = new Array(triCount);
     let rearranged = 0, injected = 0, conformScanned = 0;
-    // round 16f: the exact arrangement needs no conformity pass -- a point on a side splits it whatever pair it came from
-    if (cutting === "arrangement" && contacts && !opts.exactArrangement) {
-        for (let t = 0; t < triCount; t++) {
-            const cands = byTri.get(t);
-            if (cands && cands.length) arrs[t] = arrangeTriangle(trisSelf, t, trisOther, cands, { canon: opts.seamCanon, pairOf: pairOf(t), exact: !!opts.exactSeam, joinTwin: opts.joinTwin, flatEars: opts.flatEars, contacts });
-        }
-        const vk = (o) => trisSelf[o] + "," + trisSelf[o + 1] + "," + trisSelf[o + 2];
-        const edgeKey = (t, k) => { const a = vk(t * 9 + k * 3), b = vk(t * 9 + ((k + 1) % 3) * 3); return a < b ? a + "|" + b : b + "|" + a; };
-        const byEdge = new Map();
-        for (let t = 0; t < triCount; t++) {
-            const arr = arrs[t];
-            if (!arr || arr.status !== "ok") continue;
-            for (let k = 0; k < 3; k++) if (arr.sideVerts[k].length) {
-                const key = edgeKey(t, k);
-                if (!byEdge.has(key)) byEdge.set(key, []);
-                byEdge.get(key).push({ t, pts: arr.sideVerts[k] });
-            }
-        }
-        // a neighbour's point counts as present when one of this triangle's own side vertices is within 8 x snap of it:
-        // injecting a second vertex a few 1e-9 from an existing one only makes a sliver (measured on the twelve-blast
-        // chain: 1e-6-census non-manifold edges 0 -> 2 and a fallback at shot 12). Only a MISSING split is injected.
-        const SNAP2 = 64e-18;
-        // Round 15: only a triangle that SHARES AN EDGE with one that put points on its sides can be given any, and two
-        // triangles sharing an edge share two vertices, so their boxes touch: the BVH finds every such triangle
-        // (trianglesInBox is closed). Scanning all of them built two string keys per edge of every triangle in the mesh
-        // on every shot -- 18 of the 33 ms a pin-prick blast spent classifying the page's 13,448-triangle wall.
-        // opts.conformAll scans them all (the control; the gate holds the two bit for bit).
-        let receivers;
-        if (opts.conformAll) receivers = Array.from({ length: triCount }, (_, t) => t);
-        else {
-            const found = new Set();
-            for (let u = 0; u < triCount; u++) {
-                const arr = arrs[u];
-                if (!arr || arr.status !== "ok" || !arr.sideVerts.some((l) => l.length)) continue;
-                const o = u * 9, lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
-                for (let c = 0; c < 9; c++) { const v = trisSelf[o + c], a = c % 3; if (v < lo[a]) lo[a] = v; if (v > hi[a]) hi[a] = v; }
-                for (const t of bvhSelf.trianglesInBox(lo, hi)) found.add(t);
-            }
-            receivers = [...found];   // in any order: each reads only its own first arrangement and byEdge
-        }
-        conformScanned += receivers.length;
-        for (const t of receivers) {
-            if (arrs[t] && arrs[t].status === "fallback") continue;
-            const need = [];
-            for (let k = 0; k < 3; k++) {
-                const list = byEdge.get(edgeKey(t, k));
-                if (!list) continue;
-                const own = arrs[t] && arrs[t].status === "ok" ? arrs[t].sideVerts[k] : [];
-                for (const { t: u, pts } of list) {
-                    if (u === t) continue;
-                    for (const p of pts) {
-                        const have = own.some((q) => (q[0] - p[0]) ** 2 + (q[1] - p[1]) ** 2 + (q[2] - p[2]) ** 2 <= SNAP2) ||
-                                     need.some(({ p: q, side }) => side === k && (q[0] - p[0]) ** 2 + (q[1] - p[1]) ** 2 + (q[2] - p[2]) ** 2 <= SNAP2);
-                        if (!have) need.push({ p, side: k });   // the side it belongs on: a sliver cannot tell by distance
-                    }
-                }
-            }
-            if (!need.length) continue;
-            arrs[t] = arrangeTriangle(trisSelf, t, trisOther, byTri.get(t) || [], { canon: opts.seamCanon, pairOf: pairOf(t), exact: !!opts.exactSeam, joinTwin: opts.joinTwin, flatEars: opts.flatEars, contacts, sidePoints: need });
-            rearranged++; injected += need.length;
-        }
-    }
 
     for (let t = 0; t < triCount; t++) {
         const cands = byTri.get(t);
@@ -853,15 +787,13 @@ export function classifyMeshAgainstOther(trisSelf, bvhSelf, trisOther, bvhOther,
             continue;
         }
         if (cutting === "arrangement") {
-            const arr = arrs[t] || (opts.exactArrangement && contacts
-                ? arrangeTriangleExact(trisSelf, t, trisOther, cands, { pairOf: exactPairOf(t), delaunay: opts.delaunay, crossings: opts.crossings })
-                : arrangeTriangle(trisSelf, t, trisOther, cands, { canon: opts.seamCanon, pairOf: pairOf(t), exact: !!opts.exactSeam, joinTwin: opts.joinTwin, flatEars: opts.flatEars, contacts }));
+            const arr = arrangeTriangleExact(trisSelf, t, trisOther, cands, { pairOf: exactPairOf(t), delaunay: opts.delaunay, crossings: opts.crossings });
             if (arr.status === "untouched") {
                 untouchedTris++;
                 const tri = readTri(trisSelf, t);
                 const c = centroid(tri);
                 // round 16f: untouched EXACTLY can still lie a rounding from the other surface (a flush face rotated 0.7)
-                const cls = classify(c, cands, 0, opts.exactArrangement ? () => centroidPoint(...tri.map(explicitPoint)) : null);
+                const cls = classify(c, cands, 0, () => centroidPoint(...tri.map(explicitPoint)));
                 fragments.push({ tri, inside: cls.inside, ambiguous: cls.ambiguous, on: 0, src: t });
                 continue;
             }
@@ -928,13 +860,6 @@ const VALID_OPS = new Set(["union", "subtract", "intersect"]);
 export const MESH_BOOLEAN_MAX_FRAGMENTS = 65536;
 /** Round 9: segment-bounded cutting (triArrangement.mjs) by default; "plane" is round 8's path. See the header. */
 export const MESH_BOOLEAN_DEFAULT_CUTTING = "arrangement";
-/**
- * Round 16g: the exact arrangement (round 16f, exactArrangement.mjs) is meshBoolean()'s default -- see this file's ROUND 16g
- * paragraph for the soak that decided it. opts.exactArrangement:false is the snapped path (triArrangement.mjs with
- * vertexRound, seamConsensus and the conformity pass), kept and gated. classifyMeshAgainstOther(), called directly, is
- * snapped unless asked: meshBoolean() resolves the option once and passes it down.
- */
-export const MESH_BOOLEAN_EXACT_DEFAULT = true;
 function bKeepAndFlip(op, inside, on = 0) {
     if (on) return null;
     if (op === "union") return inside ? null : { flip: false };
@@ -1010,8 +935,6 @@ export function assembleBoolean(classifiedA, classifiedB, op) {
  *     while the volume came back 0.74% off.
  */
 export function meshBoolean(trisA, bvhA, trisB, bvhB, op, opts = {}) {
-    // round 16g: the arrangement is exact unless asked otherwise -- resolved here, so every step below sees one answer
-    opts = { ...opts, exactArrangement: opts.exactArrangement ?? MESH_BOOLEAN_EXACT_DEFAULT };
     // ROUND 11: every tolerance downstream is an absolute length, tuned where the extent is 1..16. Outside that band
     // the operands are brought into it by an EXACT power of two and the result is sent back by the inverse -- see
     // MESH_BOOLEAN_SCALE_BAND and scaleExponent() below. Inside it (every fixture before round 11) k is 0 and
@@ -1119,190 +1042,7 @@ function pick(tris, keep) {
     return out;
 }
 
-/**
- * BVH-CSG ROUND 16: SEAM CONSENSUS. Every arrangement merges the points it is given that lie within snap of each other,
- * each for itself -- so a seam segment shorter than snap became one point in triangle a's arrangement and stayed two in
- * the triangles across from it (round 14's 11 of 20 gaps; 100 of the weld's moves on the page's 99 chains). Here every
- * candidate pair's segment is found once (triTriIntersect, else triContact's contactPair, exactly as triArrangement
- * finds them), and the ends of each segment no longer than snap are made ONE point for everybody: a cluster's
- * representative is an input vertex if it holds one (never two -- such clusters are kept apart), else its
- * lexicographically smallest point. Returns { canon, results }: canon(p) -> p's representative (p itself if it is in no
- * cluster), or null when nothing was joined; and every pair's result, keyed a x 2^32 + b, which both meshes' arrangements
- * read instead of computing the pair again (triTriIntersect(a, b) and (b, a) give the same points -- triArrangement's gate).
- */
-export function seamConsensus(trisA, bvhA, trisB, bvhB, snap = SNAP_EPS, exact = false, folds = true) {
-    const pairs = pairOverlap(bvhA, bvhB, MESH_BOOLEAN_NEAR);
-    const rd = (buf, t) => [[buf[t * 9], buf[t * 9 + 1], buf[t * 9 + 2]], [buf[t * 9 + 3], buf[t * 9 + 4], buf[t * 9 + 5]], [buf[t * 9 + 6], buf[t * 9 + 7], buf[t * 9 + 8]]];
-    const results = new Map();          // only pairs that touch: an arrangement reads a missing pair as "none"
-    const short = [];                   // the segments no longer than snap, with which of their ends are input vertices
-    const all = [];
-    for (const [a, b] of pairs) {       // (pairOverlap gives each pair once: a triangle is in one leaf)
-        const pk = a * 4294967296 + b;
-        const r = (exact ? triTriIntersectExact : triTriIntersect)(trisA, a, trisB, b);
-        if (r.status === "none") continue;
-        let p0, p1;
-        if (r.status === "intersect") { p0 = r.p0; p1 = r.p1; results.set(pk, { r }); }
-        else { const c = contactPair(rd(trisA, a), rd(trisB, b)); results.set(pk, { r, c }); if (c.kind !== "segment") continue; p0 = c.p0; p1 = c.p1; }
-        const T = [...rd(trisA, a), ...rd(trisB, b)], isC = (p) => T.some((v) => v[0] === p[0] && v[1] === p[1] && v[2] === p[2]);
-        if (folds) all.push({ p0, p1, c0: isC(p0), c1: isC(p1) });
-        if (Math.hypot(p1[0] - p0[0], p1[1] - p0[1], p1[2] - p0[2]) > snap) continue;
-        short.push({ p0, p1, c0: isC(p0), c1: isC(p1) });
-    }
-    // BVH-CSG round 19b: a FOLD -- a segment b-c no longer than FOLD_SNAPS x snap that shares its end b with a segment
-    // a-b and doubles back along it (c within snap of a-b's interior) -- has its two ends made one point, as a segment
-    // shorter than snap does. Measured on the page (soak seed 8, shot 80): two pairs' segments meet at b, where one
-    // mesh's edge crosses the other's plane 4e-10 from the other mesh's edge, and the next pair runs 1.5e-8 straight
-    // back; the triangle across splits a-b at c (within snap of it) while the triangles beyond keep a-b whole, and the
-    // wall opened 3 edges that no weld closed (c is 1.5e-8 from b, past the finishing weld's 8e-9).
-    let nFolds = 0;
-    if (folds) {
-        const key = (p) => p[0] + "," + p[1] + "," + p[2], at = new Map();
-        for (const g of all) for (const e of [g.p0, g.p1]) { const k = key(e); if (!at.has(k)) at.set(k, []); at.get(k).push(g); }
-        for (const g of all) {
-            const L = Math.hypot(g.p1[0] - g.p0[0], g.p1[1] - g.p0[1], g.p1[2] - g.p0[2]);
-            if (!(L > snap && L <= FOLD_SNAPS * snap)) continue;
-            for (const [b, c, cb, cc] of [[g.p0, g.p1, g.c0, g.c1], [g.p1, g.p0, g.c1, g.c0]]) {
-                const hit = (at.get(key(b)) || []).some((h) => {
-                    if (h === g) return false;
-                    const a = key(h.p0) === key(b) ? h.p1 : h.p0, ab = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], L2 = ab[0] * ab[0] + ab[1] * ab[1] + ab[2] * ab[2];
-                    if (!(L2 > 0)) return false;
-                    const t = ((c[0] - a[0]) * ab[0] + (c[1] - a[1]) * ab[1] + (c[2] - a[2]) * ab[2]) / L2;
-                    const f = [c[0] - a[0] - t * ab[0], c[1] - a[1] - t * ab[1], c[2] - a[2] - t * ab[2]];
-                    return t > 0 && t < 1 && Math.hypot(f[0], f[1], f[2]) <= snap;
-                });
-                if (hit) { short.push({ p0: b, p1: c, c0: cb, c1: cc }); nFolds++; break; }
-            }
-        }
-    }
-    const j = joinSeamEnds(short);
-    seamConsensus.last = { ...j.stats, folds: nFolds };
-    return { canon: j.canon, results, pairs };
-}
-
-/** Round 19b: the longest seam FOLD seamConsensus joins, in snaps (2 x JOIN; 16, 32 and 64 measured alike on the page). */
-export const FOLD_SNAPS = 16;
-/**
- * The clustering behind seamConsensus, on its own so it can be held to its rules by hand: the two ends of every short
- * segment {p0, p1, c0, c1} (c: that end is an input vertex) become one point. A cluster's representative is its input
- * vertex if it has one -- an input vertex never moves -- and two input vertices are never joined; otherwise the
- * cluster's lexicographically smallest point. Returns { canon (or null when nothing was joined), stats }.
- */
-export function joinSeamEnds(short) {
-    const key = (p) => p[0] + "," + p[1] + "," + p[2];
-    const id = new Map(), P = [], corner = [], par = [], hasCorner = [];
-    const node = (p, isCorner) => { const k = key(p); let i = id.get(k); if (i === undefined) { i = P.length; id.set(k, i); P.push(p); corner.push(false); par.push(i); } if (isCorner) corner[i] = true; return i; };
-    const find = (i) => { while (par[i] !== i) { par[i] = par[par[i]]; i = par[i]; } return i; };
-    let joined = 0, refused = 0;
-    for (const { p0, p1, c0, c1 } of short) {
-        const x = find(node(p0, c0)), y = find(node(p1, c1));
-        if (x === y) continue;
-        const cx = hasCorner[x] ?? corner[x], cy = hasCorner[y] ?? corner[y];
-        if (cx && cy) { refused++; continue; }                    // two input vertices: never one point
-        par[Math.max(x, y)] = Math.min(x, y); hasCorner[Math.min(x, y)] = cx || cy; joined++;
-    }
-    if (!joined) return { canon: null, stats: { points: P.length, joined: 0, refused, moved: 0 } };
-    const lex = (u, v) => u[0] - v[0] || u[1] - v[1] || u[2] - v[2];
-    const rep = new Map();
-    P.forEach((p, i) => { const r = find(i), c = rep.get(r); if (c === undefined || (corner[i] && !corner[c]) || (corner[i] === corner[c] && lex(p, P[c]) < 0)) rep.set(r, i); });
-    const out = new Map();
-    P.forEach((p, i) => { const r = P[rep.get(find(i))]; if (r !== p) out.set(key(p), r); });
-    return { canon: out.size ? (p) => out.get(key(p)) || p : null, stats: { points: P.length, joined, refused, moved: out.size } };
-}
-
-/**
- * BVH-CSG ROUND 16c: VERTEX ROUNDING, the input-vertex part of global snap rounding. A vertex of B within `radius` of a
- * vertex of A is given A's coordinates exactly, so two surfaces a rounding apart share their vertices and a twin
- * triangle becomes the SAME triangle -- coplanar, decided once by the ON rule -- instead of a pair whose 1e-9 decisions
- * each arrangement takes for itself. A never moves (the wall's vertices are where earlier shots put them). The pairing
- * is one to one: b and a must each be the other's nearest within the radius, so no two vertices of B land on one point.
- * A vertex whose move would collapse or turn over any triangle using it is not moved (refused). Vertices are matched
- * by their bits, so every triangle using a vertex moves it alike and B stays closed. Returns { tris } -- a new buffer,
- * or null when nothing moved -- and stats { candidates, moved, refused, maxMove }.
- */
-export function vertexRound(trisA, bvhA, trisB, radius = VERTEX_ROUND) {
-    const nB = trisB.length / 9;
-    const stats = { candidates: 0, moved: 0, refused: 0, maxMove: 0 };
-    if (!nB || !(radius > 0) || !bvhA.count) return { tris: null, stats };
-    // B's unique vertices, by bits, with the triangles using them
-    const key = (x, y, z) => x + "," + y + "," + z;
-    const vid = new Map(), BV = [], uses = [];
-    const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
-    for (let t = 0; t < nB; t++) for (let v = 0; v < 3; v++) {
-        const o = t * 9 + v * 3, x = trisB[o], y = trisB[o + 1], z = trisB[o + 2], k = key(x, y, z);
-        let i = vid.get(k);
-        if (i === undefined) { i = BV.length; vid.set(k, i); BV.push([x, y, z]); uses.push([]); }
-        uses[i].push(t * 3 + v);
-        if (x < lo[0]) lo[0] = x; if (x > hi[0]) hi[0] = x;
-        if (y < lo[1]) lo[1] = y; if (y > hi[1]) hi[1] = y;
-        if (z < lo[2]) lo[2] = z; if (z > hi[2]) hi[2] = z;
-    }
-    // A's vertices near B's box, on a grid of cell `radius` (found through A's BVH: only the part of A near B)
-    const cell = (x) => Math.floor(x / radius), gk = (i, j, k) => i + "," + j + "," + k;
-    const grid = new Map(), AV = [], aid = new Map();
-    for (const t of bvhA.trianglesInBox(lo.map((x) => x - radius), hi.map((x) => x + radius))) for (let v = 0; v < 3; v++) {
-        const o = t * 9 + v * 3, x = trisA[o], y = trisA[o + 1], z = trisA[o + 2], k = key(x, y, z);
-        if (aid.has(k)) continue;
-        aid.set(k, AV.length); AV.push([x, y, z]);
-        const g = gk(cell(x), cell(y), cell(z));
-        if (!grid.has(g)) grid.set(g, []);
-        grid.get(g).push(AV.length - 1);
-    }
-    const nearest = (p, pts, index) => {
-        let best = -1, bd = radius * radius;
-        const i = cell(p[0]), j = cell(p[1]), k = cell(p[2]);
-        for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) for (let c = -1; c <= 1; c++) {
-            for (const q of index.get(gk(i + a, j + b, k + c)) || []) {
-                const P = pts[q], d = (P[0] - p[0]) ** 2 + (P[1] - p[1]) ** 2 + (P[2] - p[2]) ** 2;
-                // nearest; a tie goes to the lexicographically smaller point, so the choice does not depend on order
-                if (d < bd || (d === bd && (best < 0 || (P[0] - pts[best][0] || P[1] - pts[best][1] || P[2] - pts[best][2]) < 0))) { bd = d; best = q; }
-            }
-        }
-        return best;
-    };
-    const target = new Int32Array(BV.length).fill(-1);
-    let gridB = null;
-    for (let i = 0; i < BV.length; i++) {
-        const a = nearest(BV[i], AV, grid);
-        if (a < 0) continue;
-        stats.candidates++;
-        if (!gridB) {   // built once, the first time any B vertex has a partner
-            gridB = new Map();
-            BV.forEach((p, q) => { const g = gk(cell(p[0]), cell(p[1]), cell(p[2])); if (!gridB.has(g)) gridB.set(g, []); gridB.get(g).push(q); });
-        }
-        if (nearest(AV[a], BV, gridB) !== i) { stats.refused++; continue; }   // not mutual: another B vertex is nearer a
-        const P = AV[a], Q = BV[i];
-        if (P[0] === Q[0] && P[1] === Q[1] && P[2] === Q[2]) continue;      // already the same point
-        target[i] = a;
-    }
-    // a move that collapses or turns over a triangle using the vertex is refused (the triangle as it would be with
-    // every accepted move applied -- checked until nothing more is refused)
-    const pos = (i) => (target[i] >= 0 ? AV[target[i]] : BV[i]);
-    const vOf = (t, v) => { const o = t * 9 + v * 3; return vid.get(key(trisB[o], trisB[o + 1], trisB[o + 2])); };
-    for (let changed = true; changed;) {
-        changed = false;
-        for (let i = 0; i < BV.length; i++) {
-            if (target[i] < 0) continue;
-            for (const u of uses[i]) {
-                const t = (u / 3) | 0, ids = [vOf(t, 0), vOf(t, 1), vOf(t, 2)];
-                const p = ids.map(pos), q = ids.map((j) => BV[j]);
-                const n1 = cross3(sub3(p[1], p[0]), sub3(p[2], p[0])), n0 = cross3(sub3(q[1], q[0]), sub3(q[2], q[0]));
-                if (!(n1[0] * n0[0] + n1[1] * n0[1] + n1[2] * n0[2] > 0)) { target[i] = -1; stats.refused++; changed = true; break; }
-            }
-        }
-    }
-    let any = false;
-    const out = Float64Array.from(trisB);
-    for (let i = 0; i < BV.length; i++) {
-        if (target[i] < 0) continue;
-        const P = AV[target[i]], Q = BV[i];
-        stats.moved++; any = true; stats.maxMove = Math.max(stats.maxMove, Math.hypot(P[0] - Q[0], P[1] - Q[1], P[2] - Q[2]));
-        for (const u of uses[i]) out.set(P, u * 3);
-    }
-    vertexRound.last = stats;
-    return { tris: any ? out : null, stats };
-}
-/** Round 16c: vertexRound's radius -- JOIN x snap, the largest move the arrangement itself makes (triArrangement.mjs). */
-export const VERTEX_ROUND = 8 * SNAP_EPS;
+// ROUND 27: seamConsensus, joinSeamEnds, FOLD_SNAPS, vertexRound and VERTEX_ROUND are gone with the snapped arrangement (nextRounds: bvh-csg-retire-snapped-fallback, step 2).
 function sub3(a, b) { return [a[0] - b[0], a[1] - b[1], a[2] - b[2]]; }
 function cross3(a, b) { return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]; }
 function dot3(a, b) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; }
@@ -1731,15 +1471,14 @@ function meshBooleanCore(trisA, bvhA, trisB, bvhB, op, opts) {
                      stats: { a: emptyStats(trisA, eA), b: emptyStats(trisB, eB) }, emptyOperand: eA ? (eB ? "both" : "a") : "b" };
         }
     }
-    // round 16c: B's vertices within VERTEX_ROUND of A's take A's coordinates (vertexRound, above)
-    let rounded = null;
-    let exactArr = !!opts.exactArrangement && opts.contacts !== false && (opts.cutting ?? MESH_BOOLEAN_DEFAULT_CUTTING) === "arrangement";
+    // round 27: the exact arrangement is THE arrangement; it runs wherever cutting is "arrangement" (the default)
+    let exactArr = opts.contacts !== false && (opts.cutting ?? MESH_BOOLEAN_DEFAULT_CUTTING) === "arrangement";
     // round 16g: the exact arrangement's PRECONDITION -- where the operands meet, every edge has its twin on the same two
     // doubles. A seam then closes by identity; with a T-junction (a meshCSG BSP wall: a long edge against two short ones
     // whose middle vertex lies up to 1.03e-9 off it, measured at 16h) the plane of the other mesh crosses "the same" line at
     // distinct points, the chain has a gap, and the region floods through it -- a blob triangle classified whole (page session,
     // engines switched every 25 shots: 6.2 units of the wall lost by shot 100). Where the precondition fails the operation
-    // takes the snapped path, whose 1e-9 snap closes such gaps (stats.exactDeclined); opts.exactConforming:false skips the
+    // runs on (round 26: it no longer takes the snapped path; stats.nonConforming reports it); opts.exactConforming:false skips the
     // check (the gate's control).
     let pairsX = null, declined = null;
     if (exactArr) {
@@ -1764,15 +1503,12 @@ function meshBooleanCore(trisA, bvhA, trisB, bvhB, op, opts) {
                     return r;
                 }
             }
-            if (a || b) { exactArr = false; declined = { a, b }; opts = { ...opts, exactArrangement: false }; }
+            // round 26: no decline. Round 25 measured the exact arrangement forced onto what conforming leaves as never worse than the
+            // snapped path (volume, open edges); the remainder is REPORTED (stats.nonConforming) and the exact run goes on
+            if (a || b) declined = { a, b };
         }
     }
     if (!exactArr) { bvhA = freshTree(bvhA, trisA); bvhB = freshTree(bvhB, trisB); }   // round 23: see canonPairs
-    if (opts.contacts !== false && opts.vertexRound !== false && !exactArr) {
-        rounded = vertexRound(trisA, bvhA, trisB, opts.vertexRoundRadius ?? VERTEX_ROUND);
-        if (rounded.tris) { trisB = rounded.tris; bvhB = new MeshBVH(trisB); }
-    }
-    // round 16: one set of seam points for both meshes' arrangements (seamConsensus, below)
     let optsA = opts, optsB = opts;
     if (exactArr) {
         // round 16f: every pair decided once, exactly, for both meshes' arrangements (exactArrangement.mjs)
@@ -1780,10 +1516,6 @@ function meshBooleanCore(trisA, bvhA, trisB, bvhB, op, opts) {
         for (const [a, b] of pairs) res.set(a * 4294967296 + b, exactPair(readTri(trisA, a), readTri(trisB, b)));
         optsA = { ...opts, exactPairs: res, pairSide: 0, pairs };
         optsB = { ...opts, exactPairs: res, pairSide: 1, pairs: pairs.map(([a, b]) => [b, a]) };
-    } else if (opts.contacts !== false && (opts.cutting ?? MESH_BOOLEAN_DEFAULT_CUTTING) === "arrangement" && opts.seamConsensus !== false) {
-        const sc = seamConsensus(trisA, bvhA, trisB, bvhB, SNAP_EPS, !!opts.exactSeam, opts.seamFolds !== false);
-        optsA = { ...opts, seamCanon: sc.canon, pairResults: sc.results, pairSide: 0, pairs: sc.pairs };
-        optsB = { ...opts, seamCanon: sc.canon, pairResults: sc.results, pairSide: 1, pairs: sc.pairs.map(([a, b]) => [b, a]) };
     }
     const classifiedA = classifyMeshAgainstOther(trisA, bvhA, trisB, bvhB, optsA);
     const classifiedB = classifyMeshAgainstOther(trisB, bvhB, trisA, bvhA, optsB);
@@ -1799,8 +1531,7 @@ function meshBooleanCore(trisA, bvhA, trisB, bvhB, op, opts) {
         const e = embedRounded(buf, from, trisA, bvhA, trisB, bvhB, ambiguousTriIndices);
         outTris = e.tris; outFrom = e.from; outAmb = e.amb; classifiedA.stats.embed = e.stats;
     }
-    if (rounded) classifiedB.stats.vertexRound = rounded.stats;
-    if (declined) { classifiedA.stats.exactDeclined = declined.a; classifiedB.stats.exactDeclined = declined.b; }
+    if (declined) { classifiedA.stats.nonConforming = declined.a; classifiedB.stats.nonConforming = declined.b; }
     return { tris: outTris, triCount: outTris.length / 9, ambiguousTriIndices: outAmb, capped, from: Int32Array.from(outFrom), exact: exactArr,
              stats: { a: classifiedA.stats, b: classifiedB.stats } };
 }

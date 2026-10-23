@@ -1,7 +1,7 @@
 {
  "version": 1,
  "generated": "derived by tools/ship/buildPageIndex.mjs -- DO NOT HAND-EDIT, the group comes from tools/ship/pageSections.mjs",
- "count": 488,
+ "count": 492,
  "pages": [
   {
    "f": "AudioLab.html",
@@ -2076,6 +2076,13 @@
    "p": 0
   },
   {
+   "f": "ocean-readings.html",
+   "t": "SweK &middot; Ocean readings",
+   "d": "What the vendored web-ocean sea costs, from the rig's own HUD lines: GPU time per resolution on an Intel UHD 620 and an NVIDIA Pascal, the multiple of the 30 fps budget, and a computed pixel-cost line with its residuals, all derived from the stored readings.",
+   "g": "",
+   "p": 0
+  },
+  {
    "f": "ocean-sea.html",
    "t": "SweK &middot; Ocean (opt-in GPU sea)",
    "d": "The opt-in water mode: the vendored web-ocean WebGPU sea behind a tier switch, kept only if it holds the frame budget on this GPU (it is timed from its own HUD), with a computed table of where it does not match the physics surface.",
@@ -2643,6 +2650,13 @@
    "p": 0
   },
   {
+   "f": "sea-host.html",
+   "t": "SweK &middot; Sea host",
+   "d": "The patched vendored web-ocean sea, hosted for a parent page: live tuning, an external camera and a 64-point GPU height probe through window.seaApi. Needs WebGPU.",
+   "g": "",
+   "p": 0
+  },
+  {
    "f": "server.html",
    "t": "Server Mode",
    "d": "",
@@ -2808,6 +2822,20 @@
    "t": "Slug Ticker",
    "d": "A 3-D ticker of Slug outline glyphs as Box3D rigid bodies: one box per glyph dropped onto a conveyor, tumbling and wrapping, each drawn through gfx/device.js with its own body matrix on either backend. The plumbing is gated by tools/ship/slugTicker-selfcheck.mjs. The napalm mode (?mode=napalm) draws the bodies through the Doom Fire fill and drops a trail of fire puddles on the floor behind each, fading by age, gated by tools/ship/slugNapalm-selfcheck.mjs. The shatter button bursts the centre glyph into nine box3d shards each carrying its sub-rectangle of the glyph, gated by tools/ship/slugShatter-selfcheck.mjs.",
    "g": "slugtext",
+   "p": 0
+  },
+  {
+   "f": "snow-deform.html",
+   "t": "SweK &middot; Snow deform",
+   "d": "A walker leaves a trail in a nested-ring clipmap terrain: a persistent toroidal deformation field, read with a band-limiting filter at every vertex, under a Nishita sky baked once and re-baked when the sun moves. Lifted from Noniv/snowflow_demo (MIT).",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "snow-gpu.html",
+   "t": "SweK &middot; Snow GPU",
+   "d": "The snowflow lift on WebGPU: a compute-stepped deformation field, a one-draw nested-ring clipmap placed and lifted in the vertex stage, a PCSS sun shadow, a baked Nishita sky and a TAA resolve. Needs WebGPU; snow-deform.html is the CPU version.",
+   "g": "",
    "p": 0
   },
   {

@@ -678,3 +678,19 @@ export const COMMIT_BELT_DRIFT_V4880 = Object.freeze({
     }),
     bodiesNow: 24,
 });
+
+// v4895 -- ONE ARRIVAL AND ONE EXTENSION. vendor/snowflow (Noniv/snowflow_demo, MIT) arrived with the snow GPU lift (four commits, newest first); vendor/web-ocean gained the modular sources and
+// the patch layer's commits (two more, on top of the spike's 085367af). v4880's record is a claim about v4880 and is not rewritten: this one spreads it. Hashes are read from
+// `git log --format=%h --abbrev=8 -- WebGLEngine/vendor/<body>`.
+export const COMMIT_BELT_DRIFT_V4895 = Object.freeze({
+    ...COMMIT_BELT_DRIFT_V4880,
+    at: "v4895",
+    arrivedSince4475: Object.freeze({
+        ...COMMIT_BELT_DRIFT_V4880.arrivedSince4475,
+        "web-ocean": Object.freeze({ now: Object.freeze(["f0b0135c", "d36177b2", "085367af"]),
+            why: "the level-1 ocean spike vendored noniv/web-ocean's published bundle byte for byte (ocean.html, LICENSE, PROVENANCE.txt); v4895 then vendored its modular sources (byte-identical, the bundle rebuilt from them) and added the patch layer beside, not inside, them" }),
+        "snowflow": Object.freeze({ now: Object.freeze(["a7ddc280", "0c905954", "91e1c11b", "171f3111"]),
+            why: "Noniv/snowflow_demo (MIT), pinned byte for byte: the toroidal deformation files first, then the shadow, TAA and sky pieces the adaptations in render/ read; nothing in the engine loads these, the gates read them for their rules" }),
+    }),
+    bodiesNow: 25,
+});

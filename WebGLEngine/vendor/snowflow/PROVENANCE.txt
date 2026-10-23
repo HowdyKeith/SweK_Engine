@@ -1,0 +1,36 @@
+snowflow_demo (Noniv/snowflow_demo)
+MIT (Copyright (c) 2026 Maksymilian Dendura -- see LICENSE beside this file)
+https://github.com/Noniv/snowflow_demo
+commit 545039733b74eec742862f161990142c7ca7c7ec (the head of main when these files were taken, 2026-10-21)
+vendored v4895 (unnumbered until shipped): SIXTEEN FILES, byte for byte (the first five at the head of the lift, the other eleven when the read side, the clipmap, the sky, PCSS and TAA were lifted; listed below), each fetched from raw.githubusercontent.com at that commit and compared with the copy the v4895 survey had read:
+  LICENSE                                   (the permission notice; it travels with every portion, as the licence requires)
+  src/shaders/deformSim.fragment.wgsl       242 lines   the toroidal deformation pass: scroll, relax (diffusion, wind infill, slump, decay), splat, clamp
+  src/shaders/lib/noise.wgsl                            snowNoise: the hashes and the gradient noise the pass's brush edge uses
+  src/shaders/lib/deform.wgsl               74 lines    how the terrain material reads the buffer (not adapted yet)
+  src/terrain/deformation.js                295 lines   the driver: ping-pong targets, brush queue, the banked-time rule
+  src/shaders/lib/clipmap.wgsl              107 lines   the nested-ring placement and CDLOD morph
+  src/terrain/clipmapMesh.js                135 lines   the static mesh: indices, the hole shrink
+  src/shaders/lib/atmosphere.wgsl           404 lines   the Nishita sky and the aerial perspective
+  src/shaders/skyBake.fragment.wgsl         21 lines    the bake into an equirectangular LUT
+  src/shaders/lib/shading.wgsl              360 lines   pcssShadow (and the shading helpers; only PCSS is lifted)
+  src/shaders/lib/shadowLookup.wgsl         147 lines   cascade selection (read for context; not lifted)
+  src/shaders/post/taa.fragment.wgsl        175 lines   the temporal resolve
+  src/shaders/lib/postCommon.wgsl           68 lines    the tonemap weighting the resolve uses
+  src/post/postChain.js                                 the Halton(2,3) jitter builder (the render-graph wiring is Babylon's and not lifted)
+  src/terrain/heightfield.js                247 lines   the height bake (read for context; not lifted)
+  src/render/shadows.js                     361 lines   the cascade fitting (read for context; not lifted)
+tools/ship/snowflowVendor-selfcheck.mjs pins every file's sha256 and states what each is.
+WHAT IT IS: the surface-deformation half of a WebGPU snow demo built on Babylon.js. Its shaders are Babylon-flavoured WGSL (#include<...>, loose `uniform name: type;` declarations,
+FragmentInputs/FragmentOutputs), so they do NOT run as they are; render/toroidalDeform.mjs is SweK's own adaptation, a compute kernel over plain storage buffers whose function bodies are
+these files' bodies, with a CPU twin that grades it. NOTHING NOT LISTED ABOVE WAS TAKEN: the rest of the repository (the character, cloth, spells, water and sky passes, the Babylon wiring,
+README and package files) is not here, and nothing here depends on Babylon.js or Vite.
+NOT VERIFIED BY RUNNING UPSTREAM: the sandbox did not run the demo; its README's frame-time figure is its own claim. What IS run is our adaptation, against our own CPU twin.
+
+APPENDIX (v4895): seven more files, fetched from the same commit 545039733b74eec742862f161990142c7ca7c7ec, for the snow shading / cascade / aerial lift
+  src/shaders/snow.fragment.wgsl            597 lines   the shading: GGX, wrap diffuse, sub-surface, glints, SH ambient, the composition
+  src/shaders/snow.vertex.wgsl              121 lines   the vertex stage (read for the sastrugi displacement)
+  src/shaders/lib/terrain.wgsl              247 lines   terrainFine, terrainFineFiltered, windLocal, windMat
+  src/shaders/lib/ridge.wgsl                268 lines   ridged and damped noise with derivatives
+  src/core/settings.js                      269 lines   the defaults the shading reads
+  src/shaders/detailBake.fragment.wgsl       94 lines   the baked detail normal
+  src/shaders/auxBake.fragment.wgsl          61 lines   the baked macro height / curvature

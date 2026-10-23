@@ -285,8 +285,8 @@ console.log("\n7. *** THE COMMIT BELT, RE-MEASURED RATHER THAN TRUSTED ***");
            ". ORDER and COUNT are still compared exactly; only the LENGTH of each identity is tolerated.");
     }
 
-    const moved = F.COMMIT_BELT_DRIFT_V4880.movedSince4475;   // v4880: the newest record
-    const arrived = F.COMMIT_BELT_DRIFT_V4880.arrivedSince4475;
+    const moved = F.COMMIT_BELT_DRIFT_V4895.movedSince4475;   // v4895: the newest record
+    const arrived = F.COMMIT_BELT_DRIFT_V4895.arrivedSince4475;
     const expectedFor = (n) => (moved[n] ? moved[n].now : arrived[n] ? arrived[n].now : (R.perBody[n] || []));
 
     // *** v4665 -- AND THE THIRD TIME THIS ROW HAS COMPARED A RENDERING RATHER THAN AN IDENTITY. *** v4472
@@ -368,7 +368,7 @@ console.log("\n7. *** THE COMMIT BELT, RE-MEASURED RATHER THAN TRUSTED ***");
     // *** THE TWO FAILURE MODES ARE DIFFERENT FACTS AND WERE REPORTED AS ONE. *** "git renders hashes one
     // character longer now" needs nothing; "this body has new commits" needs a recorded reason. The old row
     // said the same sentence for both and buried one real change under fourteen that had not happened.
-    const D = F.COMMIT_BELT_DRIFT_V4880;   // v4880: the newest record; v4778's is graded below as history
+    const D = F.COMMIT_BELT_DRIFT_V4895;   // v4895: the newest record; v4778's is graded below as history
     // v4776 -- THE v4621 RECORD IS KEPT, SO IT IS GRADED. COMMIT_BELT_DRIFT_V4776 is built by spreading it and
     // extending ONE body; a later edit that changed any other body in the new record, or rewrote the old one, would
     // turn "recorded beside it" into "recorded over it". recordReach counts a record no gate names as unguarded,
@@ -423,6 +423,16 @@ console.log("\n7. *** THE COMMIT BELT, RE-MEASURED RATHER THAN TRUSTED ***");
            added.join(",") === "web-ocean" && O.at === "v4819" && N.at === "v4880" && N.bodiesNow === O.bodiesNow + 1 &&
            N.movedSince4475 === O.movedSince4475 && Object.keys(O.arrivedSince4475).every((k) => N.arrivedSince4475[k] === O.arrivedSince4475[k]),
            `bodiesNow ${O.bodiesNow} -> ${N.bodiesNow}; adds ${added.join(", ")}`);
+    }
+    {
+        const O = F.COMMIT_BELT_DRIFT_V4880, N = F.COMMIT_BELT_DRIFT_V4895;
+        const added = Object.keys(N.arrivedSince4475).filter((k) => !(k in O.arrivedSince4475));
+        const changed = Object.keys(O.arrivedSince4475).filter((k) => N.arrivedSince4475[k] !== O.arrivedSince4475[k]);
+        ok("!! the v4895 belt record is v4880's with ONE arrival added (snowflow) and ONE extended (web-ocean); every other entry is v4880's own object",
+           added.join(",") === "snowflow" && changed.join(",") === "web-ocean" && O.at === "v4880" && N.at === "v4895" && N.bodiesNow === O.bodiesNow + 1 &&
+           N.movedSince4475 === O.movedSince4475 &&
+           N.arrivedSince4475["web-ocean"].now.slice(-O.arrivedSince4475["web-ocean"].now.length).every((h, i) => h === O.arrivedSince4475["web-ocean"].now[i]),
+           `bodiesNow ${O.bodiesNow} -> ${N.bodiesNow}; adds ${added.join(", ")}; extends ${changed.join(", ")}`);
     }
     // *** v4665 -- agreesWithin, NOT sameList, AND A FOURTH CLASS BESIDE IT. ***
     // On a shallow clone the live list stops at the graft, so a body that has not changed since v4475 still

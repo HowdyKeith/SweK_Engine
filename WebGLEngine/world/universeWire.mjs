@@ -262,15 +262,22 @@ export const KEY_DRIFT_V4460 = Object.freeze({
             cause: "vendor/web-ocean, the WebGPU sea the ocean spike frames, is a new BODY with its own orbit, stock and prices -- v4504's field, for one body. " +
                    "Only ocean-spike.html and its gate depend on it",
             control: "on today's tree, dropping web-ocean alone gives bcb7d3bc, the key of the move above" }),
+        // v4895 -- ONE NEW BODY, BROUGHT BY THE SNOW GPU LIFT: vendor/snowflow (Noniv/snowflow_demo, MIT), 23 pinned originals, is a new directory under vendor/, so orrery.json
+        // gained a body with its own orbit, stock and prices -- v4504's field, for one body. The control below is measured on this tree by dropping it.
+        Object.freeze({ version: "v4895", commit: "171f3111", hash: "fa9b80eb", file: "orrery.json",
+            field: "bodies", bodiesTouched: 1,
+            cause: "vendor/snowflow, the snow pieces the GPU lift read and adapted, is a new BODY with its own orbit, stock and prices -- v4504's field, for one body. " +
+                   "Nothing in the engine loads it; the adaptations in render/ and their gates read it",
+            control: "on today's tree, dropping snowflow alone gives f0fde581, the key of the move above" }),
     ]),
-    current: "f0fde581",
+    current: "fa9b80eb",
     // *** MEASURED AND NEGATIVE, AND IT CORRECTS MY OWN FIRST WRITING OF THE ENTRY ABOVE. *** The re-bake's
     // diff moved TWO fields on 16 bodies each, `arrived` and `sha`, and I wrote "arrived + sha" into this
     // record straight off that diff -- the exact mistake bytesDoNotReachTheEconomy exists to record, made
     // again in the same file four moves later. `sha` reaches NOTHING: each of the 18 bodies' sha set to
     // forty zeros in turn, one at a time, and the hash never moved. A DIFF NAMES WHAT CHANGED, NOT WHAT
     // COUNTED, and the only way to tell them apart is to run it.
-    shaDoesNotReachTheEconomy: Object.freeze({ bodiesTried: 24, movedTheHash: 0,
+    shaDoesNotReachTheEconomy: Object.freeze({ bodiesTried: 25, movedTheHash: 0,
         note: "against `arrived`, the same probe on the same 22 bodies: 22 of 22 moved the hash. 18 at " +
               "v4534; xatlas made it 19 at v4560; draco-encoder made it 20 at v4535; male-cns and mikktspace " +
               "made it 22 at v4778; three-webgpu-r185 made it 23 at v4819; web-ocean made it 24 at v4880, and the probe is re-run rather than the count adjusted" }),
@@ -287,7 +294,7 @@ export const KEY_DRIFT_V4460 = Object.freeze({
     }),
     // MEASURED AND NEGATIVE, kept because it is what corrected this record: `bytes` (and so `radius`) do not
     // reach the economy. 964 bytes added to each of the 15 bodies in turn, one at a time: the hash never moved.
-    bytesDoNotReachTheEconomy: Object.freeze({ bodiesTried: 23, movedTheHash: 0,
+    bytesDoNotReachTheEconomy: Object.freeze({ bodiesTried: 25, movedTheHash: 0,
         note: "radiusFor(bytes) sets a body's drawn size and nothing the economy integrates. 15 at v4460; " +
               "every arrival since (kenney-city/-racing, morphicons, xatlas, draco-encoder, and at v4778 " +
               "male-cns and mikktspace, and at v4819 three-webgpu-r185) also defines `bytes`, so re-run against today's 23 bodies rather " +

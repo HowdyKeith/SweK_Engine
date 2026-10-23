@@ -17,7 +17,7 @@
 // WHAT AN ADAPTER'S NAME IS WORTH. classifyAdapter() sorts the strings a browser reports (vendor, architecture,
 // device, description) into discrete / integrated / fallback / unknown. It is a HINT for the reason line and for
 // the 'on' guard against software rendering -- it never turns the sea on by itself. A discrete name with no probe
-// is still the default water, with needsProbe = true: the 1080 Ti and the UHD 620 are both "WebGPU" to a page.
+// is still the default water, with needsProbe = true: the 1080 and the UHD 620 are both "WebGPU" to a page.
 //
 // WHAT THIS FILE DOES NOT DO: load the sea (slice 4) or supply the probe's workload (only the sea can say what the
 // sea costs). measureFrames() is the harness the probe runs through, with the clock and the frame injected, so a

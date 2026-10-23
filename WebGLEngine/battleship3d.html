@@ -142,6 +142,10 @@ try { if (THREE.ColorManagement) THREE.ColorManagement.enabled = false; } catch 
 // v4205 -- real shell ballistics. This page is already a module, so the physics is a plain import rather
 // than a window shim. See fireCannon() for what it replaced.
 import * as BALLISTICS from "/physics/ballistics.mjs";
+// v4895 -- the water is the physics sea (physics/ocean/oceanSurface.mjs) drawn by render/seaThree.mjs: the same surface a hull floats on, on every GPU. The old page-local wave sum is gone.
+import { createSeaMesh, CALM_OPTIONS } from "/render/seaThree.mjs";
+import { createSurface, defaultComponents } from "/physics/ocean/oceanSurface.mjs";
+import { applyDepthTint } from "/ui/seaDepthTint.mjs";
 /* ============================================================
    ABYSS — a 3D remake of Battleship.
    Pure Three.js (r128). No external controls (custom orbit cam).
@@ -157,7 +161,8 @@ const COL = {
 };
 
 let renderer, scene, camera, raycaster, pointer = new THREE.Vector2();
-let water, waterPos, waterBase, seabed;
+let water, sea, seabed;
+const floaters = [];            // ships that ride the sea's surface (heave only)
 const fish = [];
 const animators = [];           // {update(dt)=>boolean done}
 const pegs = [];                // hit/miss markers, cleared on new game
@@ -245,15 +250,8 @@ function init(){
 
 // ============================================================ ocean + seabed
 function buildOcean(){
-  const g = new THREE.PlaneGeometry(CFG.SEA, CFG.SEA, 48, 48);
-  g.rotateX(-Math.PI/2);
-  waterPos = g.attributes.position;
-  waterBase = Float32Array.from(waterPos.array);
-  const m = new THREE.MeshPhongMaterial({
-    color:COL.water, transparent:true, opacity:0.64, shininess:90,
-    specular:0x8ffcff, side:THREE.DoubleSide, depthWrite:false,
-  });
-  water = new THREE.Mesh(g, m); water.renderOrder = 2; scene.add(water);
+  sea = createSeaMesh(THREE, createSurface({ components: defaultComponents(1, CALM_OPTIONS) }), { half:CFG.SEA/2, n:48, color:COL.water, foamColor:COL.miss, opacity:0.64 });
+  water = sea.mesh; scene.add(water);
 }
 function buildSeabed(){
   const g = new THREE.PlaneGeometry(CFG.SEA, CFG.SEA, 1, 1); g.rotateX(-Math.PI/2);
@@ -266,6 +264,7 @@ function buildSeaLife(n){
     const hue = 0.5 + Math.random()*0.12;
     const m = new THREE.MeshStandardMaterial({ color:new THREE.Color().setHSL(hue,0.6,0.55),
       emissive:new THREE.Color().setHSL(hue,0.7,0.12), roughness:0.6 });
+    applyDepthTint(THREE, m, { level:0, density:0.12, color:COL.water });   // v4895: below the surface, toward the water colour (ui/seaDepthTint.mjs)
     const f = new THREE.Mesh(bodyG, m);
     const tail = new THREE.Mesh(new THREE.ConeGeometry(0.34,0.7,4),
       new THREE.MeshStandardMaterial({ color:m.color, roughness:0.6 }));
@@ -278,12 +277,8 @@ function buildSeaLife(n){
   }
 }
 function updateOcean(t){
-  const a = waterPos.array, b = waterBase;
-  for(let i=0;i<a.length;i+=3){
-    const x=b[i], z=b[i+2];
-    a[i+1] = Math.sin(x*0.12 + t*1.1)*0.45 + Math.cos(z*0.15 + t*0.9)*0.4 + Math.sin((x+z)*0.07 + t*0.6)*0.3;
-  }
-  waterPos.needsUpdate = true; water.geometry.computeVertexNormals();
+  sea.update(t);
+  for(const sh of floaters){ const g=sh.group; if(sh.sunk||!g||!g.parent) continue; g.position.y = 0.30 + sea.heightAt(g.position.x, g.position.z, t); }   // a hull rides the surface it is drawn on
 }
 function updateFish(t,dt){
   for(const f of fish){
@@ -404,6 +399,7 @@ function makeShipMesh(board, ship){
   ship.center = center.clone(); grp.userData.ship = ship;
   if(ship.side==="enemy") grp.visible = true, grp.traverse(o=>{ if(o.material){ o.material.transparent=true; o.material.opacity=0.0; } if(o.isMesh) o.castShadow=false; });   // v1989 — castShadow OFF while hidden: opacity-0 hulls still cast shadows onto the seabed, visible through the water — the whole enemy layout leaked
   scene.add(grp);
+  floaters.push(ship);
 }
 
 function placeFleet(side){

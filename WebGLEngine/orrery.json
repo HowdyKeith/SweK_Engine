@@ -1487,6 +1487,110 @@
    ]
   },
   {
+   "name": "snowflow",
+   "arrived": "2026-10-21",
+   "sha": "171f3111e8f89d077853d5c1fa6e0cc93653b128",
+   "bytes": 222760,
+   "files": [
+    {
+     "path": "LICENSE",
+     "bytes": 1076
+    },
+    {
+     "path": "PROVENANCE.txt",
+     "bytes": 4130
+    },
+    {
+     "path": "src/core/settings.js",
+     "bytes": 10944
+    },
+    {
+     "path": "src/post/postChain.js",
+     "bytes": 21374
+    },
+    {
+     "path": "src/render/shadows.js",
+     "bytes": 15889
+    },
+    {
+     "path": "src/shaders/auxBake.fragment.wgsl",
+     "bytes": 2880
+    },
+    {
+     "path": "src/shaders/deformSim.fragment.wgsl",
+     "bytes": 11225
+    },
+    {
+     "path": "src/shaders/detailBake.fragment.wgsl",
+     "bytes": 3494
+    },
+    {
+     "path": "src/shaders/lib/atmosphere.wgsl",
+     "bytes": 19400
+    },
+    {
+     "path": "src/shaders/lib/clipmap.wgsl",
+     "bytes": 4252
+    },
+    {
+     "path": "src/shaders/lib/deform.wgsl",
+     "bytes": 3745
+    },
+    {
+     "path": "src/shaders/lib/noise.wgsl",
+     "bytes": 7445
+    },
+    {
+     "path": "src/shaders/lib/postCommon.wgsl",
+     "bytes": 2999
+    },
+    {
+     "path": "src/shaders/lib/ridge.wgsl",
+     "bytes": 11572
+    },
+    {
+     "path": "src/shaders/lib/shading.wgsl",
+     "bytes": 15179
+    },
+    {
+     "path": "src/shaders/lib/shadowLookup.wgsl",
+     "bytes": 7842
+    },
+    {
+     "path": "src/shaders/lib/terrain.wgsl",
+     "bytes": 11119
+    },
+    {
+     "path": "src/shaders/post/taa.fragment.wgsl",
+     "bytes": 8135
+    },
+    {
+     "path": "src/shaders/skyBake.fragment.wgsl",
+     "bytes": 669
+    },
+    {
+     "path": "src/shaders/snow.fragment.wgsl",
+     "bytes": 28614
+    },
+    {
+     "path": "src/shaders/snow.vertex.wgsl",
+     "bytes": 4763
+    },
+    {
+     "path": "src/terrain/clipmapMesh.js",
+     "bytes": 5129
+    },
+    {
+     "path": "src/terrain/deformation.js",
+     "bytes": 11578
+    },
+    {
+     "path": "src/terrain/heightfield.js",
+     "bytes": 9307
+    }
+   ]
+  },
+  {
    "name": "taichi-js",
    "arrived": "2026-08-23",
    "sha": "e6d46a775e89e71ac5d41f5318b925b2a05c4649",
@@ -1866,8 +1970,40 @@
    "name": "web-ocean",
    "arrived": "2026-10-20",
    "sha": "085367af2f3c9aa42eccf43cee6ad0e14f98b14c",
-   "bytes": 104800,
+   "bytes": 215357,
    "files": [
+    {
+     "path": "build.mjs",
+     "bytes": 4037
+    },
+    {
+     "path": "index.html",
+     "bytes": 1594
+    },
+    {
+     "path": "js/main.js",
+     "bytes": 40833
+    },
+    {
+     "path": "js/wgsl/common.js",
+     "bytes": 6014
+    },
+    {
+     "path": "js/wgsl/ocean.js",
+     "bytes": 13789
+    },
+    {
+     "path": "js/wgsl/post.js",
+     "bytes": 5453
+    },
+    {
+     "path": "js/wgsl/sim.js",
+     "bytes": 16300
+    },
+    {
+     "path": "js/wgsl/sky.js",
+     "bytes": 19157
+    },
     {
      "path": "LICENSE",
      "bytes": 1076
@@ -1878,7 +2014,7 @@
     },
     {
      "path": "PROVENANCE.txt",
-     "bytes": 1441
+     "bytes": 4821
     }
    ]
   },

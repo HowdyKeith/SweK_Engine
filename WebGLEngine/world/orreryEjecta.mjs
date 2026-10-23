@@ -203,8 +203,36 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
         "ocean-spike.html",
         "tools/ship/oceanSpikePage-selfcheck.mjs",
         // v4890 -- the opt-in sea (slice 4): the module that builds the sea's URL and reads its declared defaults, and its gate, which pins the bundle's hash and reads its qs.get calls.
+        "ui/oceanReadings-selfcheck.mjs",
         "ui/oceanSea-selfcheck.mjs",
         "ui/oceanSea.mjs",
+        // v4895 -- the sea patch layer and its generated modules, the live-tune and frame gates, and the ocean source rebuild; the orphan ratchet names the vendored original as data.
+        "tools/ship/oceanSeaPage-selfcheck.mjs",
+        "tools/ship/oceanSrcRebuild-selfcheck.mjs",
+        "tools/ship/orphanSets.mjs",
+        "tools/ship/seaPatch-selfcheck.mjs",
+        "tools/ship/seaPatch.mjs",
+        "ui/oceanLiveTune-selfcheck.mjs",
+        "ui/seaFrame-selfcheck.mjs",
+        "world/ocean/seaMain.mjs",
+        "world/ocean/seaOceanWgsl.mjs",
+    ]),
+    // v4895 -- vendor/snowflow (Noniv/snowflow_demo, MIT) arrived with the snow GPU lift: 23 pinned originals, read by the adaptations in render/ and their gates and loaded by none.
+    "snowflow": Object.freeze([
+        "render/aerial-selfcheck.mjs",
+        "render/cascades-selfcheck.mjs",
+        "render/clipmapTerrain-selfcheck.mjs",
+        "render/deformRead-selfcheck.mjs",
+        "render/pcssShadow-selfcheck.mjs",
+        "render/skyBake-selfcheck.mjs",
+        "render/snowFine-selfcheck.mjs",
+        "render/snowGpu-selfcheck.mjs",
+        "render/snowShading-selfcheck.mjs",
+        "render/taaResolve-selfcheck.mjs",
+        "render/toroidalDeform-selfcheck.mjs",
+        "tools/ship/orphanSets.mjs",
+        "tools/ship/snowflowVendor-selfcheck.mjs",
+        "tools/ship/wgslCorpus.mjs",
     ]),
     "box3d": Object.freeze([
         "ai-bridge/doctorBridge.js",
@@ -428,9 +456,7 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
         "mpm3d.html",
         "physics/box3dMeshOverlay.js",
         "physics/fire/fireMesh.js",
-        // BVH-CSG round 9 -- triangulates each face of its per-triangle arrangement with three's ShapeUtils (Earcut),
-        // imported from vendor/three/three.core.js: ejecting three breaks meshBoolean's default path. 80 -> 81.
-        "physics/mesh/triArrangement.mjs",
+        // (physics/mesh/triArrangement.mjs, round 9's importer of three's Earcut, was removed at round 27 with the snapped arrangement: 81 -> 80)
         "pipboy-models.html",
         "render/svgExtrude.js",
         "render/tools/meshopt-selfcheck.mjs",
@@ -471,6 +497,14 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
         "wear-field.html",
         // v4886 -- orphanSets.mjs NAMES vendor paths of this body as recorded orphans (strings, not imports); the census reads a name as a dependant.
         "tools/ship/orphanSets.mjs",
+        // v4895 -- the shared three.js sea surface, the sub-aquarium 3D view, the snow deform page and the gates that read them.
+        "render/seaThree-selfcheck.mjs",
+        "render/skyBake-selfcheck.mjs",
+        "render/subAquarium3d-selfcheck.mjs",
+        "snow-deform.html",
+        "sub-aquarium.html",
+        "ui/seaDepthTint-selfcheck.mjs",
+        "ui/seaFrame-selfcheck.mjs",
     ]),
     "three-webgpu": Object.freeze([
         // backlog #31/#49/#51 -- the AI-presence orb (krispuckett/murmur-web ported into tslSource.mjs) is a

@@ -227,7 +227,7 @@ export const MEASURED_AT_V4424 = Object.freeze({
     // *** RE-DERIVED AT THE main MERGE. *** Both lines re-took this against a tree the other could not see,
     // and the readings overlap on everything predating the split, so they are run over the merged tree rather
     // than added. Both prior readings are kept in the chain above; a discarded one is evidence about the method.
-    literalColourFiles: 88,   // RE-DERIVED AT THE main MERGE: both lines re-took this at 87 for DIFFERENT arrivals -- fx/fsr/fsr.js here (a false positive of the crude predicate, EASU's tap accumulator) and world/buildingTopple.mjs on main. Two arrivals, one shared baseline of 86, so the merged reading is 88 and not 87
+    literalColourFiles: 89,   // v4895: 88 -> 89 for world/ocean/seaMain.mjs (the generated, patched sea: the vendored web-ocean sea names its sky and water colours as literals; not additive). BEFORE THAT, RE-DERIVED AT THE main MERGE: both lines re-took this at 87 for DIFFERENT arrivals -- fx/fsr/fsr.js here (a false positive of the crude predicate, EASU's tap accumulator) and world/buildingTopple.mjs on main. Two arrivals, one shared baseline of 86, so the merged reading is 88 and not 87
     overlapDrawAndLiteral: 0,
     hotUnregistered: 24,   // v4505: ascii-shape.html arrived (see HOT_UNREGISTERED)   // v4500: slug-fire.html arrived; v4501: slug-morph.html's melt mode; v4502: slug-ticker.html's napalm mode (see HOT_UNREGISTERED)
     // The three Keith named, and what the old detector saw of them.

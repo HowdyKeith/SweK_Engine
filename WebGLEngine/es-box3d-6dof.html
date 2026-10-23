@@ -75,8 +75,8 @@ import { weightsHash } from "/brain/drivePolicy.mjs";
 const HALF = [1.6, 0.7, 0.7];              // ship OBB half-extents; nose (local +X) is the long axis
 const ENGINE_MOUNT = [-1.4, 0, 0];          // on-axis at the tail -- thrust alone induces no torque
 const SHIP_MASS = 8;
-const HP_MAX = 100, SHOT_DAMAGE = 18;   // ram damage (v4848): brain/shipCollision6dof.mjs's RAM_DAMAGE_PER_IMPULSE and RAM_DAMAGE_CAP
-const FLEET_SIZE = 3, SPAWN_X = 42, SPAWN_SPREAD = 18;
+const HP_MAX = 100, SHOT_DAMAGE = 6, BATTLE_TIMEOUT_TICKS = 900;   // v4895: a battle still undecided after 30 simulated s goes to the fleet with more hp left (a draw if equal)   // ram damage (v4848): brain/shipCollision6dof.mjs's RAM_DAMAGE_PER_IMPULSE and RAM_DAMAGE_CAP
+const FLEET_SIZE = 3, SPAWN_X = 42, SPAWN_SPREAD = 18, SPAWN_STAGGER = 8;
 const FACE_B = [0, 0, 1, 0];                // 180deg about Y -- forward (+X) becomes -X, facing team A
 // AUTOPILOT's own defaults (thrustForce 40, standoff 40) are tuned for the isolated convergence cases in
 // autopilot6dof-selfcheck.mjs, not for a symmetric multi-ship dogfight -- measured head-on here (a fully
@@ -89,7 +89,12 @@ const FACE_B = [0, 0, 1, 0];                // 180deg about Y -- forward (+X) be
 // lower closing speed to actually shoot at each other with: the SAME scenario re-run at THRUST=16,
 // STANDOFF=50 flew a real 60s dogfight -- 377 shots, 19 hits, zero ship-ship collisions, two kills, no
 // instant joust -- before this page shipped.
-const PAGE_AUTOPILOT = { thrustForce: 16, standoff: 50 };
+// v4896 -- THE RE-TUNE IS ADOPTED, WITH THE PILOT RETRAINED FOR IT. v4895 measured SHOT_DAMAGE 6 and standoff 85 headless (300 battles, window.__sixdof.runBattles, staggered first shot): A 146 / B 149 / draws 5 /
+// undecided 6 and a median battle of 18.8 s (against 3.8 s at damage 18, standoff 50, where 32 of 300 were draws and 60 ran out the clock) -- and did not adopt it, because brain/pilot6dofPolicy.mjs trains and judges the
+// shipped pilot in a duel that mirrors THIS page's damage and standoff (its gate reads them from this file's source). The pilot has now been RETRAINED in that duel (tools/ship/trainPilot6dof.mjs, the default recipe, 5 runs x
+// 1500 iterations): the hand pilot is a pure mutual kill there (every duel a draw, 17 hits each), and the champion (seed 2000, picked on held-out) wins 5 of 8 held-out and 20 of 20 audit duels without a loss.
+// thrustForce 24 and standoff 30 were worse (58-69% undecided); standoff 100 and 120 left 15% draws.
+const PAGE_AUTOPILOT = { thrustForce: 16, standoff: 85 };
 
 function makeRng(seed) { let s = (seed >>> 0) || 1; return () => { s = (s * 1103515245 + 12345) & 0x7fffffff; return s / 0x7fffffff; }; }
 
@@ -152,7 +157,7 @@ const shotPoints = new THREE.Points(shotGeo, new THREE.PointsMaterial({ color: 0
 scene.add(shotPoints);
 
 // ---- combat state ----
-let A = [], B = [], shots = [], tick = 0, wins = { A: 0, B: 0 };
+let A = [], B = [], shots = [], tick = 0, wins = { A: 0, B: 0, draws: 0, timeouts: 0 };   // v4895: a battle that ends with BOTH fleets dead was counted for neither side; it is a draw and is counted as one
 function spawnFleet(team, baseX, faceQ, rng) {
   const list = [];
   for (let i = 0; i < FLEET_SIZE; i++) {
@@ -160,10 +165,14 @@ function spawnFleet(team, baseX, faceQ, rng) {
     // an INDEPENDENT rng per fleet (see newBattle()) -- a shared rng drawn sequentially for both fleets gave
     // each ship's y/z jitter the same draw as its opposite-team counterpart, so a symmetric spawn produced a
     // perfectly mirrored, guaranteed head-on joust every single battle (see PAGE_AUTOPILOT's own note).
-    const pos = [baseX, (i - (FLEET_SIZE - 1) / 2) * 8 + (rng() - 0.5) * 4, (rng() - 0.5) * SPAWN_SPREAD];
+    // v4895 -- and each ship's start along x is staggered too (up to SPAWN_STAGGER towards its own side), so the pairs do not meet at one instant
+    const pos = [baseX + Math.sign(baseX) * rng() * SPAWN_STAGGER, (i - (FLEET_SIZE - 1) / 2) * 8 + (rng() - 0.5) * 4, (rng() - 0.5) * SPAWN_SPREAD];
     const body = RB.createBody({ mass: SHIP_MASS, I, pos, q: faceQ, vel: [0, 0, 0], w: [0, 0, 0] });
     const mesh = makeHull(team); scene.add(mesh);
-    list.push({ id: team + "#" + i, team, body, hp: HP_MAX, cool: 0, dead: false, mesh });
+    // v4895 -- STAGGERED: each ship's FIRST shot waits armDelay (0..one cooldown, from the fleet's own independent rng) after it first has a firing solution, so a ship and its assigned foe do not land
+    // their sixth hits on the same tick -- the mirrored duel that ended every battle with both fleets dead (nextRounds: sixdof-page-every-battle-a-draw). A phase on the cooldown alone did nothing:
+    // the cooldown is long expired by the time the pilots have a solution.
+    list.push({ id: team + "#" + i, team, body, hp: HP_MAX, cool: 0, armDelay: rng() * RBW.WEAPON.cooldownMs, armed: false, dead: false, mesh });
   }
   return list;
 }
@@ -173,9 +182,10 @@ function spawnFleet(team, baseX, faceQ, rng) {
 // and the page is built to run indefinitely).
 function disposeHull(mesh) { for (const child of mesh.children) if (child.geometry) child.geometry.dispose(); }
 function clearFleet(list) { for (const s of list) { scene.remove(s.mesh); disposeHull(s.mesh); } }
+let battleSeq = 0, seedOverride = null;
 function newBattle() {
   clearFleet(A); clearFleet(B); shots = []; tick = 0;
-  const seed = Date.now() & 0x7fffffff;
+  const seed = (seedOverride ?? (Date.now() ^ Math.imul(++battleSeq, 2654435761))) & 0x7fffffff;   // the sequence keeps battles begun in one millisecond apart (the gate's headless runs)
   A = spawnFleet("A", -SPAWN_X, [1, 0, 0, 0], makeRng(seed));
   B = spawnFleet("B", SPAWN_X, FACE_B, makeRng(seed ^ 0x5bd1e995));
 }
@@ -196,6 +206,7 @@ function stepFleet(mine, foes, assignment, dt, nowMs, pilot) {   // v4829 -- `pi
     RB.applyForceAtPoint(acc, [d.thrust, 0, 0], ENGINE_MOUNT);
     acc.torque = d.torqueBody;
     ship.body = RB.step(ship.body, acc, dt);
+    if (d.firing && !ship.armed) { ship.armed = true; ship.cool = Math.max(ship.cool, nowMs + ship.armDelay); }
     if (d.firing && nowMs >= ship.cool) {
       ship.cool = nowMs + RBW.WEAPON.cooldownMs;
       shots.push(RBW.fireProjectile(ship.body, { ownerId: ship.id, team: ship.team }));
@@ -262,21 +273,30 @@ function syncScene() {
   shotGeo.attributes.position.needsUpdate = true;
 }
 
-function frame() {
+function simStep() {
   const dt = 1 / 30, nowMs = tick * dt * 1000;
   const liveA = A.some((s) => !s.dead), liveB = B.some((s) => !s.dead);
-  if (!liveA || !liveB) { if (liveA) wins.A++; else if (liveB) wins.B++; newBattle(); }
+  const timedOut = liveA && liveB && tick >= BATTLE_TIMEOUT_TICKS;
+  if (!liveA || !liveB || timedOut) {
+    if (timedOut) { wins.timeouts++; const ha = A.reduce((a, x) => a + Math.max(0, x.hp), 0), hb = B.reduce((a, x) => a + Math.max(0, x.hp), 0); if (ha > hb) wins.A++; else if (hb > ha) wins.B++; else wins.draws++; }
+    else if (liveA) wins.A++; else if (liveB) wins.B++; else wins.draws++;
+    newBattle();
+  }
   else {
     stepFleet(A, B, FA.assignTargets(A, B), dt, nowMs, pilotAi("A"));
     stepFleet(B, A, FA.assignTargets(B, A), dt, nowMs, pilotAi("B"));
     resolveCollisions(A.concat(B));
     stepWeapons(A.concat(B), dt);
     tick++;
+    for (const sh of A.concat(B)) if (!sh.dead && sh.hp <= 0) sh.dead = true;   // v4895: here, not only in syncScene(), so a headless run (runBattles) sees the deaths a drawn frame would
   }
+}
+function frame() {
+  simStep();
   syncScene(); controls.update();
   renderer.render(scene, camera);
   document.getElementById("stat").textContent =
-    `A ${A.filter((s) => !s.dead).length}/${FLEET_SIZE}  vs  B ${B.filter((s) => !s.dead).length}/${FLEET_SIZE}  ·  battles A:${wins.A} B:${wins.B}  ·  shots ${shots.length}  ·  tick ${tick}`;
+    `A ${A.filter((s) => !s.dead).length}/${FLEET_SIZE}  vs  B ${B.filter((s) => !s.dead).length}/${FLEET_SIZE}  ·  battles A:${wins.A} B:${wins.B} draws:${wins.draws}  (timed out ${wins.timeouts})  ·  shots ${shots.length}  ·  tick ${tick}`;
   requestAnimationFrame(frame);
 }
 // ---- v4829 -- LOAD PILOTS: brain/pilotRoster.mjs behind two selects ------------------------------------------------------------------------------------------------------------
@@ -317,7 +337,7 @@ function renderRoster() {
     sel.onchange = () => { specs = { ...specs, [t]: sel.value }; saveSpecs(); };
   }
 }
-function startFight() { wins.A = 0; wins.B = 0; newBattle(); pilotAi("A"); pilotAi("B"); return true; }
+function startFight() { wins.A = 0; wins.B = 0; wins.draws = 0; wins.timeouts = 0; newBattle(); pilotAi("A"); pilotAi("B"); return true; }
 document.getElementById("rosterBtn").onclick = () => { const p = document.getElementById("rosterPanel"); p.style.display = p.style.display === "none" ? "block" : "none"; renderRoster(); };
 document.getElementById("startFight").onclick = () => { startFight(); };
 document.getElementById("rosterReset").onclick = () => { specs = PR.defaultSpecs(); saveSpecs(); renderRoster(); };
@@ -383,7 +403,19 @@ window.__sixdof = {
       shots: shots.length,
     };
   },
-  newBattle,
+  newBattle, autopilot: PAGE_AUTOPILOT,   // the page's autopilot overrides, mutable, for the balance measurement
+  // v4895 -- run battles with no drawing, for the balance measurement in tools/ship/rigidBody6dofPage-selfcheck.mjs: n battles from seed0, each at most maxTicks; returns who won each and how long it lasted
+  runBattles(n, seed0 = 1, maxTicks = 3000) {
+    const out = [];
+    for (let b = 0; b < n; b++) {
+      seedOverride = seed0 + b; newBattle(); seedOverride = null;
+      let guard = 0; while (A.some((x) => !x.dead) && B.some((x) => !x.dead) && tick < BATTLE_TIMEOUT_TICKS && guard++ < maxTicks) simStep();
+      const la = A.some((x) => !x.dead), lb = B.some((x) => !x.dead), hA = A.reduce((a, x) => a + Math.max(0, x.hp), 0), hB = B.reduce((a, x) => a + Math.max(0, x.hp), 0), to = la && lb, w = to ? (hA > hB ? "A" : hB > hA ? "B" : "draw") : la ? "A" : lb ? "B" : "draw";
+      out.push({ w, timeout: to, ships: to ? A.concat(B).filter((x) => !x.dead).map((x) => ({ id: x.id, hp: x.hp, p: x.body.pos.map((v) => +v.toFixed(0)), speed: +Math.hypot(...x.body.vel).toFixed(1) })) : null, ticks: tick, hpA: A.reduce((a, x) => a + Math.max(0, x.hp), 0), hpB: B.reduce((a, x) => a + Math.max(0, x.hp), 0) });
+      simStep();   // counts the finished battle in wins, as the page does
+    }
+    return out;
+  },
   // v4829 -- the roster, for brain/pilot6dofPolicy-selfcheck.mjs's page rows
   roster: { get specs() { return specs; }, setSpecs(x) { specs = PR.sanitizeSpecs(x); saveSpecs(); renderRoster(); }, startFight, get lineup() { return lineup; }, pilotAi,
     // v4832 -- the shipped and the imported pilot, for the gate's page rows

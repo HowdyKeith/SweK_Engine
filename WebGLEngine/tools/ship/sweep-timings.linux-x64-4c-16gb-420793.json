@@ -1,7 +1,7 @@
 {
  "host": "linux-x64-4c-16gb-420793",
  "note": "THIS BOX'S OWN gate runtimes, written by tools/ship/boxTimings.mjs. The shared sweep-timings.json is host-claimed and a foreign box cannot write it (v4647, and that refusal is right); this is how a box records what IT measured without overwriting another machine's numbers. `kinds` says which quantity each ms is, as in the shared record: `alone` is an uncontended serial reading, `capped` is a FLOOR and not a runtime. Read for COVERAGE -- has this gate ever been timed -- and NOT for the ship-time budget, which still reads the shared file. See task #87. `serialRing` holds the last three alone readings; recordReach's margin row reads it on a box that does not own the shared record, because that row asks what a gate costs HERE and nothing here can refresh another box's ring.",
- "captured": "2026-10-19T14:00:31.682Z",
+ "captured": "2026-10-22T15:09:45.532Z",
  "timings": {
   "tools/ship/cloneProvision-selfcheck.mjs": 7171,
   "tools/ship/exitBusy-selfcheck.mjs": 15284,
@@ -85,7 +85,13 @@
   "render/spaceBackdrop-selfcheck.mjs": 1181,
   "tools/ship/gunsPageLinks-selfcheck.mjs": 54,
   "tools/ship/spaceBackdropPage-selfcheck.mjs": 8088,
-  "tools/ship/trainRotorPilot-selfcheck.mjs": 123289
+  "tools/ship/trainRotorPilot-selfcheck.mjs": 123289,
+  "render/snowGpu-selfcheck.mjs": 16597,
+  "render/snowGpuField-selfcheck.mjs": 13512,
+  "render/snowGpuTaa-selfcheck.mjs": 16258,
+  "render/snowGpuLookA-selfcheck.mjs": 16805,
+  "render/snowGpuLookB-selfcheck.mjs": 15811,
+  "render/snowGpuLive-selfcheck.mjs": 9744
  },
  "at": {
   "tools/ship/cloneProvision-selfcheck.mjs": "2026-09-25T03:35:16.858Z",
@@ -170,7 +176,13 @@
   "render/spaceBackdrop-selfcheck.mjs": "2026-10-19T14:00:31.682Z",
   "tools/ship/gunsPageLinks-selfcheck.mjs": "2026-10-19T14:00:31.682Z",
   "tools/ship/spaceBackdropPage-selfcheck.mjs": "2026-10-19T14:00:31.682Z",
-  "tools/ship/trainRotorPilot-selfcheck.mjs": "2026-10-19T14:00:31.682Z"
+  "tools/ship/trainRotorPilot-selfcheck.mjs": "2026-10-19T14:00:31.682Z",
+  "render/snowGpu-selfcheck.mjs": "2026-10-22T15:09:45.532Z",
+  "render/snowGpuField-selfcheck.mjs": "2026-10-22T15:09:45.532Z",
+  "render/snowGpuTaa-selfcheck.mjs": "2026-10-22T15:09:45.532Z",
+  "render/snowGpuLookA-selfcheck.mjs": "2026-10-22T15:09:45.532Z",
+  "render/snowGpuLookB-selfcheck.mjs": "2026-10-22T15:09:45.532Z",
+  "render/snowGpuLive-selfcheck.mjs": "2026-10-22T15:09:45.532Z"
  },
  "kinds": {
   "tools/ship/cloneProvision-selfcheck.mjs": "alone",
@@ -255,7 +267,13 @@
   "render/spaceBackdrop-selfcheck.mjs": "alone",
   "tools/ship/gunsPageLinks-selfcheck.mjs": "alone",
   "tools/ship/spaceBackdropPage-selfcheck.mjs": "alone",
-  "tools/ship/trainRotorPilot-selfcheck.mjs": "alone"
+  "tools/ship/trainRotorPilot-selfcheck.mjs": "alone",
+  "render/snowGpu-selfcheck.mjs": "alone",
+  "render/snowGpuField-selfcheck.mjs": "alone",
+  "render/snowGpuTaa-selfcheck.mjs": "alone",
+  "render/snowGpuLookA-selfcheck.mjs": "alone",
+  "render/snowGpuLookB-selfcheck.mjs": "alone",
+  "render/snowGpuLive-selfcheck.mjs": "alone"
  },
  "codes": {
   "tools/ship/cloneProvision-selfcheck.mjs": 0,
@@ -340,7 +358,13 @@
   "render/spaceBackdrop-selfcheck.mjs": 0,
   "tools/ship/gunsPageLinks-selfcheck.mjs": 0,
   "tools/ship/spaceBackdropPage-selfcheck.mjs": 0,
-  "tools/ship/trainRotorPilot-selfcheck.mjs": 0
+  "tools/ship/trainRotorPilot-selfcheck.mjs": 0,
+  "render/snowGpu-selfcheck.mjs": 0,
+  "render/snowGpuField-selfcheck.mjs": 0,
+  "render/snowGpuTaa-selfcheck.mjs": 0,
+  "render/snowGpuLookA-selfcheck.mjs": 0,
+  "render/snowGpuLookB-selfcheck.mjs": 0,
+  "render/snowGpuLive-selfcheck.mjs": 0
  },
  "serialRing": {
   "tools/ship/frozenRecords-selfcheck.mjs": [
@@ -734,6 +758,36 @@
    129037,
    136021,
    123289
+  ],
+  "render/snowGpu-selfcheck.mjs": [
+   16458,
+   15809,
+   16597
+  ],
+  "render/snowGpuField-selfcheck.mjs": [
+   14409,
+   13754,
+   13512
+  ],
+  "render/snowGpuTaa-selfcheck.mjs": [
+   17298,
+   16961,
+   16258
+  ],
+  "render/snowGpuLookA-selfcheck.mjs": [
+   16824,
+   16113,
+   16805
+  ],
+  "render/snowGpuLookB-selfcheck.mjs": [
+   14923,
+   14095,
+   15811
+  ],
+  "render/snowGpuLive-selfcheck.mjs": [
+   9689,
+   9700,
+   9744
   ]
  }
 }

@@ -500,6 +500,14 @@ sec("9. THE TEXTURE READ-BACK ARITHMETIC");
     ok(HG.halfToDouble(HG.doubleToHalf(0.5)) === 0.5 && HG.halfToDouble(HG.doubleToHalf(-0.5)) === -0.5,
         "  and it is EXACT for a value the format represents, sign included -- so the bound above is the format's and not the decoder's slack",
         "0.5 and -0.5 round trip bit for bit");
+    {   // the carry: a value within half a ULP below a power of two rounds UP into the next binade (it was masked to the binade below: 0.4999924 -> 0.25)
+        const cases = [[0.4999924, 0.5], [0.99999, 1], [1023.9, 1024], [65519, 65504], [65520, Infinity], [-0.4999924, -0.5], [6.1025e-5, 6.103515625e-5]];
+        const got = cases.map(([v]) => HG.halfToDouble(HG.doubleToHalf(v)));
+        let worst = 0; for (let i = 0; i < 20000; i++) { const v = Math.pow(2, (i % 26) - 12) * (1 - 1 / 4096 * (i % 7) * 0.1), b = HG.halfToDouble(HG.doubleToHalf(v)); worst = Math.max(worst, Math.abs(b - v) / v); }
+        ok(cases.every(([, w], i) => got[i] === w) && worst < Math.pow(2, -11) + 1e-12,
+            "*** doubleToHalf CARRIES a rounded-up mantissa into the exponent: 0.4999924 is 0.5, 0.99999 is 1, 65520 is infinity, the top of the denormals reaches the smallest normal; and 20,000 values just under a power of two are all within the format's own 2^-11 ***",
+            cases.map(([v], i) => v + "->" + got[i]).join(", ") + "; worst " + worst.toExponential(2));
+    }
     // The three branches an exponent field can take. A decoder that dropped the denormal case would pass
     // every row above, because the sweep never reaches 2^-14.
     ok(HG.halfToDouble(1) === Math.pow(2, -14) * (1 / 1024) &&
@@ -514,6 +522,15 @@ sec("9. THE TEXTURE READ-BACK ARITHMETIC");
     ok(HG.ICD_LEAF === path.join("chrome-linux", "vk_swiftshader_icd.json"),
         "  and ICD_LEAF is the path under it that findVulkanIcds joins, named here beside the root it is joined to",
         HG.ICD_LEAF);
+}
+
+// v4896 -- readingLine and reading: the measured line a kernel-versus-twin gate prints for the real-hardware report. The full grading (format, margin, NaN, the parser carrying it)
+// is tools/ship/snowReadings-selfcheck.mjs; the two are named here, beside the module that owns them, with the one property a rig run leans on.
+{
+    const line = HG.readingLine("probe: kernel vs twin", 1.5e-7, 1e-3, 64, "Some Adapter");
+    const printed = []; const log = console.log; console.log = (l) => printed.push(l); const returned = HG.reading("probe: kernel vs twin", 1.5e-7, 1e-3, 64, "Some Adapter"); console.log = log;
+    ok(/^  ----  reading probe: kernel vs twin: worst 1\.50e-7 against a limit of 1\.00e-3, margin 6666\.7x over 64 values, adapter Some Adapter$/.test(line) && printed.length === 1 && printed[0] === line && returned === line,
+        "readingLine builds a '----' measured line (the only kind realGpuRun keeps besides FAIL rows), and reading() prints exactly that line and returns it", line);
 }
 
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");

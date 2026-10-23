@@ -1,0 +1,132 @@
+<!doctype html>
+<!-- snow-deform.html -- UNNUMBERED (the version is chosen at ship time).
+
+     THE SNOWFLOW LIFT, DRAWN: A WALKER LEAVING A TRAIL IN A CLIPMAP TERRAIN UNDER A BAKED SKY. Slice 7 of snowflow-lift in tools/ship/todo.mjs.
+     Four lifted pieces meet here, each graded on its own in render/*-selfcheck.mjs and none of them re-proved by this page:
+       render/toroidalDeform.mjs  the field the walker writes (a brush per footfall) and the banked-time rule that lets the trail heal slowly;
+       render/deformRead.mjs      how the terrain READS it (band-limited 3x3 filter, falloff before the seam) at every vertex, with the vertex's own post-morph spacing;
+       render/clipmapTerrain.mjs  the nested rings placed from the camera, one static index buffer (placed on the CPU here, because the page has no vertex stage of its own);
+       render/skyBake.mjs         the Nishita sky baked once into a texture and re-baked only when the sun slider moves.
+     WHAT THIS PAGE IS NOT, SAID PLAINLY:
+       - NOT THE DEMO IT IS LIFTED FROM. No snow shading (glints, sastrugi, SSS), no cascaded PCSS shadows, no TAA, no character: the PCSS and TAA kernels are graded in their own files and are not wired here.
+       - NOT FAST. The terrain is positioned and shaded on the CPU each frame (five rings of 32 quads); a GPU vertex stage would do this for nothing. The count of vertices is printed.
+       - NOT SEEN ON A REAL GPU. The gate runs it in headless Chromium's software WebGL.
+     Nothing is ever put in this page as markup: every status line goes in with textContent. The page loads nothing from outside the engine's own origin. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="Snow deform">
+<meta name="demo:desc" content="A walker leaves a trail in a nested-ring clipmap terrain: a persistent toroidal deformation field, read with a band-limiting filter at every vertex, under a Nishita sky baked once and re-baked when the sun moves. Lifted from Noniv/snowflow_demo (MIT).">
+<meta name="demo:category" content="graphics">
+<title>SweK &middot; Snow deform</title>
+<style>
+  :root { --bg:#050a12; --panel:#0b131fcc; --line:#1c2c44; --fg:#dbe7ff; --dim:#7c93b8; --cyan:#59d1ff; }
+  * { box-sizing:border-box; }
+  html, body { height:100%; margin:0; background:var(--bg); color:var(--fg); font:12px ui-monospace, Menlo, monospace; overflow:hidden; }
+  canvas#c { position:fixed; inset:0; width:100%; height:100%; display:block; cursor:crosshair; }
+  #hud { position:fixed; left:10px; top:10px; background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:8px 10px; max-width:420px; line-height:1.5; }
+  #hud h1 { font-size:13px; letter-spacing:.12em; text-transform:uppercase; color:var(--cyan); margin:0 0 4px; }
+  #hud label { display:block; margin-top:4px; color:var(--dim); } #hud input[type=range] { width:180px; vertical-align:middle; }
+  #hud a { color:var(--cyan); } pre { margin:4px 0 0; white-space:pre-wrap; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud">
+  <h1>Snow deform</h1>
+  <div>A walker leaves a trail; click the snow to stamp. <a href="/server.html">server page</a></div>
+  <label>sun elevation <input id="sun" type="range" min="2" max="60" value="13" step="1"> <span id="sunv">13&deg;</span></label>
+  <label><input id="walk" type="checkbox" checked> walker</label>
+  <pre id="stats">starting&hellip;</pre>
+  <div style="color:var(--dim);margin-top:4px">Lifted from Noniv/snowflow_demo (MIT, Maksymilian Dendura): vendor/snowflow.</div>
+</div>
+<script type="module">
+  import { DeformField } from "/render/toroidalDeform.mjs";
+  import { noise2 } from "/render/toroidalDeform.mjs";
+  import { deformHeight } from "/render/deformRead.mjs";
+  import { buildClipmap, placeAll, outerExtent } from "/render/clipmapTerrain.mjs";
+  import { bakeSkyThree, lutToRGBA8, sunFrom } from "/render/skyBake.mjs";
+  const $ = (id) => document.getElementById(id);
+  const state = { frames: 0, footprints: 0, stamps: 0, bakes: 0, sunElev: 13, vertices: 0, triangles: 0, deformMax: 0, error: "" };
+  window.__snow = state;
+  try {
+    const THREE = await import("/vendor/three/three.module.js");
+    const canvas = $("c"), renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    renderer.setPixelRatio(1);
+    const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(60, 1, 0.05, 400);
+    const resize = () => { const w = Math.max(2, innerWidth), h = Math.max(2, innerHeight); renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); };
+    addEventListener("resize", resize); resize();
+
+    // ---- the sky: baked ONCE, again only when the sun moves
+    const GB = [0.55, 0.62, 0.74], SKY_W = 64, SKY_H = 32;
+    const skyCanvas = document.createElement("canvas"); skyCanvas.width = SKY_W; skyCanvas.height = SKY_H;
+    const skyTex = new THREE.CanvasTexture(skyCanvas); skyTex.mapping = THREE.EquirectangularReflectionMapping; skyTex.minFilter = skyTex.magFilter = THREE.LinearFilter; skyTex.generateMipmaps = false;
+    scene.background = skyTex;
+    const sunLight = new THREE.DirectionalLight(0xfff0dd, 2.2), ambient = new THREE.AmbientLight(0x9db8e0, 0.9); scene.add(sunLight, ambient);
+    function bake(elev) {
+        const sun = sunFrom(elev, 60), lut = bakeSkyThree(SKY_W, SKY_H, sun, 20, GB), px = lutToRGBA8(lut, 0.55);
+        const g = skyCanvas.getContext("2d"), img = g.createImageData(SKY_W, SKY_H); img.data.set(px); g.putImageData(img, 0, 0); skyTex.needsUpdate = true;
+        sunLight.position.set(sun[0] * 100, sun[1] * 100, sun[2] * 100);
+        let r = 0, gg = 0, b = 0; for (let i = 0; i < lut.length; i += 4) { r += lut[i]; gg += lut[i + 1]; b += lut[i + 2]; } const n = lut.length / 4; ambient.color.setRGB(Math.min(1, r / n * 0.9), Math.min(1, gg / n * 0.9), Math.min(1, b / n * 0.9));
+        state.bakes++; state.sunElev = elev; state.sunDir = sun;
+        state.skyAverage = [r / n, gg / n, b / n];
+    }
+    bake(13);
+    let pending = null; $("sun").addEventListener("input", (e) => { $("sunv").textContent = e.target.value + "°"; clearTimeout(pending); pending = setTimeout(() => bake(Number(e.target.value)), 150); });
+
+    // ---- the field the walker writes, and the terrain that reads it
+    const field = new DeformField({ res: 128, size: 20, depthScale: 1, bermScale: 1, windDirectionDeg: 40 });
+    const clip = buildClipmap({ gridN: 32, levels: 5 }), BASE = 0.2, half = clip.gridN / 2;
+    state.vertices = clip.vertices; state.triangles = clip.triangles;
+    const dunes = (x, z) => 1.1 * noise2(x * 0.045 + 3, z * 0.045 - 5) + 0.35 * noise2(x * 0.14, z * 0.14 + 9) + 0.06 * noise2(x * 0.9, z * 0.9);
+    const geom = new THREE.BufferGeometry(), pos = new Float32Array(clip.vertices * 3), col = new Float32Array(clip.vertices * 3), idx = clip.indices.slice();
+    for (let t = 0; t < idx.length; t += 3) { const b = idx[t + 1]; idx[t + 1] = idx[t + 2]; idx[t + 2] = b; }   // the clipmap's winding faces down in a right-handed scene (render/clipmapTerrain-selfcheck.mjs): flip it
+    geom.setAttribute("position", new THREE.BufferAttribute(pos, 3)); geom.setAttribute("color", new THREE.BufferAttribute(col, 3)); geom.setIndex(new THREE.BufferAttribute(idx, 1));
+    const terrain = new THREE.Mesh(geom, new THREE.MeshLambertMaterial({ vertexColors: true })); terrain.frustumCulled = false; scene.add(terrain);
+    const placed = new Float32Array(clip.vertices * 4);
+    function updateTerrain(cam) {
+        placeAll(clip, [cam.x, cam.z], placed, BASE);
+        let deformMax = 0;
+        for (let v = 0; v < clip.vertices; v++) {
+            const x = placed[v * 4], z = placed[v * 4 + 1], spacing = placed[v * 4 + 2];
+            const base = dunes(x, z), d = deformHeight(field.state, field.res, x, z, field.center, field.size, 1, spacing);
+            pos[v * 3] = x; pos[v * 3 + 1] = base + d; pos[v * 3 + 2] = z; if (Math.abs(d) > deformMax) deformMax = Math.abs(d);
+            const shade = 0.92 + Math.max(-0.25, Math.min(0.1, d * 1.5)); col[v * 3] = shade; col[v * 3 + 1] = shade * 0.99; col[v * 3 + 2] = Math.min(1, shade * 1.03);
+        }
+        state.deformMax = deformMax; geom.attributes.position.needsUpdate = true; geom.attributes.color.needsUpdate = true; geom.computeVertexNormals();
+    }
+
+    // ---- the caller: a walker whose feet are brushes; and a click that stamps one
+    const walker = { a: 0, x: 8, z: 0, heading: 0, lastStep: -1, foot: 1, dist: 0 }, RADIUS = 8, SPEED = 2.4;
+    let clock = performance.now() / 1000;
+    window.__snow.stamp = (x, z, r = 0.6) => { const ok = field.brush(x, z, r, 0.2, 0.12, 0.8, 0.3, 0, 1, 1); if (ok) state.stamps++; return ok; };
+    window.__snow.heightAt = (x, z) => dunes(x, z) + deformHeight(field.state, field.res, x, z, field.center, field.size, 1, 0.2);
+    window.__snow.baseAt = dunes;
+    // the baked sky read back at a direction, in three's equirect convention: u = atan2(z, x) / 2pi + 0.5, v (up) = asin(y) / pi + 0.5, canvas row 0 = top
+    window.__snow.skyAt = (d) => { const l = Math.hypot(d[0], d[1], d[2]), u = Math.atan2(d[2], d[0]) / (2 * Math.PI) + 0.5, v = Math.asin(d[1] / l) / Math.PI + 0.5, x = Math.min(SKY_W - 1, Math.floor(u * SKY_W)), y = Math.min(SKY_H - 1, Math.floor((1 - v) * SKY_H)); const p = skyCanvas.getContext("2d").getImageData(x, y, 1, 1).data; return [p[0], p[1], p[2]]; };
+    window.__snow.walker = walker;
+    canvas.addEventListener("click", (e) => { const ray = new THREE.Raycaster(), m = new THREE.Vector2(e.clientX / innerWidth * 2 - 1, -(e.clientY / innerHeight) * 2 + 1); ray.setFromCamera(m, camera); const hit = new THREE.Vector3(); if (ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), hit)) window.__snow.stamp(hit.x, hit.z); });
+
+    function frame() {
+        const now = performance.now() / 1000, dt = Math.min(0.1, now - clock); clock = now;
+        if ($("walk").checked) {
+            walker.a += SPEED / RADIUS * dt; walker.x = Math.cos(walker.a) * RADIUS; walker.z = Math.sin(walker.a) * RADIUS; walker.heading = -walker.a - Math.PI / 2; walker.dist += SPEED * dt;
+            const step = Math.floor(walker.dist / 0.7);
+            if (step !== walker.lastStep) { walker.lastStep = step; walker.foot = -walker.foot; const nx = Math.cos(walker.heading + Math.PI / 2) * 0.15 * walker.foot, nz = Math.sin(walker.heading + Math.PI / 2) * 0.15 * walker.foot; if (field.brush(walker.x + nx, walker.z + nz, 0.2, 0.09, 0.05, 0.6, 0, walker.heading, 1.7, 1)) state.footprints++; }
+        }
+        field.update(dt, { x: walker.x, z: walker.z });
+        const cam = { x: walker.x - Math.cos(walker.a + 0.5) * 4 + Math.cos(walker.a) * -3, y: 0, z: walker.z - Math.sin(walker.a + 0.5) * 4 + Math.sin(walker.a) * -3 };
+        cam.y = dunes(cam.x, cam.z) + 2.2;
+        camera.position.set(cam.x, cam.y, cam.z); camera.lookAt(walker.x, dunes(walker.x, walker.z) + 0.3, walker.z);
+        updateTerrain(cam);
+        renderer.render(scene, camera);
+        state.frames++;
+        if (state.frames % 10 === 0) $("stats").textContent = "frames " + state.frames + "   footprints " + state.footprints + "   stamps " + state.stamps + "\nclipmap " + clip.vertices + " vertices, " + clip.triangles + " triangles, out to " + outerExtent(clip.gridN, BASE, clip.levels).toFixed(0) + " m\ndeepest trail " + (state.deformMax * 100).toFixed(1) + " cm   sky bakes " + state.bakes + " (sun " + state.sunElev + "°)";
+        requestAnimationFrame(frame);
+    }
+    state.ready = true; requestAnimationFrame(frame);
+  } catch (e) { state.error = String((e && e.message) || e); $("stats").textContent = "could not start: " + state.error; }
+</script>
+</body>
+</html>

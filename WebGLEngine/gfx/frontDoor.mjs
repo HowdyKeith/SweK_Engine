@@ -346,6 +346,9 @@ export const REACH_ARRIVALS_SINCE_V4407 = Object.freeze([
     // over the sweep's line, so no ship-time step had run it since v4831 brought the module in.
     Object.freeze({ module: "ui/publishCommands.mjs",
         why: "a9acb8c3 (v4831, publish hygiene): the printed commands that publish, one definition; ui/githubPanel.js imports it" }),
+    // v4895 -- found by afterVerdict again: the zoom-blur wiring round (zoomBlur-wiring) made the engine's bloom pass import the zoom-blur module.
+    Object.freeze({ module: "render/zoomBlur.mjs",
+        why: "v4895 (zoom-blur wiring): render/bloomPass.js imports it, so the engine's own bloom path now reaches the zoom-blur pass the engine used to carry only as a gate-read module" }),
 ]);
 export const REACH_LOST_SINCE_V4407 = Object.freeze([]);
 

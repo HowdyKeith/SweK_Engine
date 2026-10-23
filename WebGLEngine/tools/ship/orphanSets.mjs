@@ -663,6 +663,14 @@ export const RECORDED = Object.freeze({
         "world/populationPolicy.mjs",
         "world/terrainGenerator.js",
         "world/traderGraphGithub.mjs",
+        // v4895 -- VENDORED ORIGINALS KEPT UNLOADED ON PURPOSE: pinned byte-for-byte (vendor/snowflow, vendor/web-ocean) and READ by their gates for their rules and numbers; the engine runs the
+        // adaptations in render/ and world/ocean/, never these. Not orphans to wire or delete -- deleting them loses the provenance the pins prove -- so they are recorded, with this reason.
+        "vendor/snowflow/src/post/postChain.js",
+        "vendor/snowflow/src/render/shadows.js",
+        "vendor/snowflow/src/terrain/clipmapMesh.js",
+        "vendor/snowflow/src/terrain/deformation.js",
+        "vendor/snowflow/src/terrain/heightfield.js",
+        "vendor/web-ocean/js/main.js",
     ]),
     // referenceKind-selfcheck: the subset of proseRescued whose rescuers include tools/ship/gateSweep.mjs --
     // the sweep closing the ship ritual REQUIRES every gate-adding round to write.
@@ -731,6 +739,9 @@ export const RECORDED = Object.freeze({
         "tools/ship/todo.mjs",
         "tools/ship/vacuity.mjs",
         "tools/ship/verify.mjs",
+        // v4895 -- VENDORED ORIGINALS KEPT UNLOADED ON PURPOSE: pinned byte-for-byte (vendor/snowflow, vendor/web-ocean) and READ by their gates for their rules and numbers; the engine runs the
+        // adaptations in render/ and world/ocean/, never these. Not orphans to wire or delete -- deleting them loses the provenance the pins prove -- so they are recorded, with this reason.
+        "vendor/web-ocean/js/main.js",
     ]),
 });
 

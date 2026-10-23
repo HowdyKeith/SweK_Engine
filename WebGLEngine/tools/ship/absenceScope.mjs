@@ -317,8 +317,7 @@ export const INSCOPE_ARRIVALS_SINCE_V4435 = Object.freeze([
         why: "its gate (70ae8730), which builds the BVHs its fixtures are cut with" }),
     Object.freeze({ file: "physics/mesh/meshBooleanBlast-selfcheck.mjs", at: "v4778",
         why: "BVH-CSG round 7 (0ee1dda9): the head-to-head against meshCSG, building a MeshBVH per operand" }),
-    Object.freeze({ file: "physics/mesh/triArrangement-selfcheck.mjs", at: "v4878",
-        why: "BVH-CSG round 9 (the branch merged at v4878): the gate of the per-triangle arrangement, building a MeshBVH per operand and feeding the pair walk's candidates to the segment-bounded cutter" }),
+    // (physics/mesh/triArrangement-selfcheck.mjs, named here at v4878, was removed at round 27 with the snapped arrangement)
     Object.freeze({ file: "physics/mesh/blastEngine.mjs", at: "v4879",
         why: "BVH-CSG round 16 onward (the blast engine): fragments a solid against a BVH of its own walls, a USER of meshBVH's build and its pair walk" }),
     Object.freeze({ file: "physics/mesh/blastEngine-selfcheck.mjs", at: "v4879",

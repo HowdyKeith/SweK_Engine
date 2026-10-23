@@ -58,6 +58,8 @@ public class MainActivity extends Activity {
     private static final String PREFS = "swek";
     private static final String KEY_URL = "serverUrl";
     private static final String DEFAULT_URL = "http://192.168.50.57:8787/";
+    /** v4896 -- a page on the SAME server for the launcher's tiles to open. Read through Shelf.safePath, which refuses anything that is not a plain relative path. */
+    static final String EXTRA_PATH = "com.swek.webview.PATH";
 
     private WebView web;
     private boolean isTv;                 // set once in onCreate; decides whether the D-pad layer is installed
@@ -185,7 +187,16 @@ public class MainActivity extends Activity {
 
         String url = serverUrl();
         if (url == null || url.isEmpty()) promptForUrl(false);
-        else web.loadUrl(url);
+        else web.loadUrl(Shelf.joinUrl(url, Shelf.safePath(getIntent().getStringExtra(EXTRA_PATH))));
+    }
+
+    /** singleTask: a second tile pressed while this is already open arrives here, not in onCreate. */
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        String url = serverUrl();
+        if (web != null && url != null && !url.isEmpty()) web.loadUrl(Shelf.joinUrl(url, Shelf.safePath(intent.getStringExtra(EXTRA_PATH))));
     }
 
     /** Same host as the configured server, or a private-LAN address. Anything else is somebody else's site. */

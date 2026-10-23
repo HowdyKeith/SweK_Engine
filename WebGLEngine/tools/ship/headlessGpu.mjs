@@ -403,6 +403,23 @@ export const MEASURED = Object.freeze({
  * tolerance. The browser harness fills with the same number; the two must agree or a liveness failure would
  * read as a divergence.
  */
+/**
+ * v4896 -- A READING FOR THE REAL-HARDWARE REPORT, NOT A VERDICT.
+ *
+ * tools/ship/realGpuRun.mjs keeps each gate's FAIL rows and its "----" measured lines, and drops the PASS rows -- so a kernel that agrees with its twin
+ * to 1e-7 on one adapter and 9e-4 on another (limit 1e-3) reads as the same green tick twice, and the 9e-4 is the one worth knowing about. This prints
+ * the worst difference, its limit and the MARGIN between them as a measured line, with the adapter's name on it, so a D3D12 run of the snow stack
+ * (and any other adapter's) lands in the report as numbers a person can compare. The TAA resolve's frame size was read as 1/(1/24) = 23.999998 on D3D12 and
+ * cut to 23; that run had one number, "1.00e+6", and nothing before it to compare with. These lines are what comes before.
+ * It judges nothing: the gate's own ok() row still decides pass or fail.
+ */
+export function readingLine(name, worst, limit, n, adapter) {
+    const f = (v) => (typeof v === "number" && Number.isFinite(v) ? v.toExponential(2) : String(v));
+    const margin = typeof worst === "number" && typeof limit === "number" && worst > 0 && Number.isFinite(worst) ? `, margin ${(limit / worst).toFixed(1)}x` : "";
+    return `  ----  reading ${name}: worst ${f(worst)} against a limit of ${f(limit)}${margin}${n != null ? ` over ${n} values` : ""}, adapter ${adapter || "?"}`;
+}
+export function reading(name, worst, limit, n, adapter) { const l = readingLine(name, worst, limit, n, adapter); console.log(l); return l; }
+
 export const LIVENESS_SENTINEL = -999999;
 
 export function storageWords(data) {
@@ -595,7 +612,10 @@ export function doubleToHalf(v) {
     const e = Math.floor(Math.log2(v));
     if (e < -14) return s | Math.round(v / Math.pow(2, -24));
     if (e > 15) return s | 0x7c00;
-    return s | ((e + 15) << 10) | (Math.round((v / Math.pow(2, e) - 1) * 1024) & 0x3ff);
+    const m = Math.round((v / Math.pow(2, e) - 1) * 1024);
+    // a mantissa that rounds up to 1024 carries into the exponent (0.4999924 is 0.5, not 0.25); at the top it reaches 0x7c00, which is infinity, as the format does
+    if (m === 1024) return e + 1 > 15 ? s | 0x7c00 : s | ((e + 16) << 10);
+    return s | ((e + 15) << 10) | m;
 }
 
 export const BYTES_PER_TEXEL = Object.freeze({ rgba16float: 8, rgba8unorm: 4 });
