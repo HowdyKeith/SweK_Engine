@@ -183,7 +183,7 @@ export async function command(argv, io = {}) {
     let result;
     if (opts.workers > 1 && opts.runs > 1) {
         // each search in its own process (a search touches nothing the others do: its own seed, the hand weights read-only); finish() runs here once, on the weights they send back
-        const passthrough = ["--brain", opts.brain, "--iters", opts.iters, "--seed", opts.seed, "--sigma", opts.sigma, "--maxK", opts.maxK, "--runs", opts.runs, "--slice", opts.slice].map(String);
+        const passthrough = ["--brain", opts.brain, "--iters", opts.iters, "--seed", opts.seed, "--sigma", opts.sigma, "--maxK", opts.maxK, "--runs", opts.runs, "--slice", opts.slice, ...(opts.guard != null ? ["--guard", opts.guard] : [])].map(String);   // the guard goes to the children: a search that was told to be guarded and was not would be the first recipe, under the second recipe's name
         const runOne = (k) => new Promise((resolve, reject) => {
             const t0 = Date.now(), child = spawn(process.execPath, [io.selfPath, ...passthrough, "--one", String(k)], { stdio: ["ignore", "pipe", "inherit"] });
             let buf = ""; child.stdout.on("data", (d) => { buf += d; });
