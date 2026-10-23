@@ -116,13 +116,23 @@ function scriptedTarget(sc, t) {
 }
 
 /**
- * Fly one fight. `pilotA` is the pilot under test, (state, target, wind) -> controls. Returns { score, dealt, taken (hits), fired (rounds A fired), firedB (rounds B fired), hitRate, firstHit (s or null), killedB (s or null), statusA, statusB (airborne |
+ * ONE SIDE'S SCORE OF A FIGHT, from its own numbers (the formula in the header, once, for both seats): `side` is { hits (damage it landed), taken (damage it took), status }; `killedFoe` is when it destroyed the other (s) or null. An aircraft that is not airborne at the end (the ground, a collision, a kill) has
+ * TAKEN ITS FULL hit points; both totals are capped at the hit points; the quick-kill bonus is paid only to a side that is still in the air.
+ */
+export function sideScore(side, spec, seconds, killedFoe) {
+    const lost = side.status !== "airborne" ? Math.max(side.taken, spec.hp) : side.taken;
+    const dealt = Math.min(side.hits, spec.hp), taken = Math.min(lost, spec.hp);
+    return (dealt - taken) / spec.hp * spec.damage + (killedFoe !== null && side.status === "airborne" ? KILL_BONUS * Math.max(0, seconds - killedFoe) / seconds : 0);
+}
+
+/**
+ * Fly one fight. `pilotA` is the pilot under test, (state, target, wind) -> controls. Returns { score (A's), scoreB (B's: the same formula from B's seat, for a fight between two pilots under test), dealt, taken (hits), fired (rounds A fired), firedB (rounds B fired), hitRate, firstHit (s or null), killedB (s or null), killedA (s or null: when B destroyed A), statusA, statusB (airborne |
  * destroyed | collided | touchdown | crashed | lost), ticks, closest (m), minAltitude, maxAlpha (A's, radians), minV (A's slowest airspeed), fingerprint, seed, kind }. Deterministic.
  */
 export function duel(pilotA, sc, { seconds = SECONDS, dt = DT, model = AF.defaultModel(), spec = G.GUN, specB = spec, pilotB = AF.pilot } = {}) {
     const mk = (o) => F.createState({ ...o, mass: model.mass, inertia: model.inertia });
     const A = { id: A_ID, state: mk(sc.a), gun: G.createGun(spec), hits: 0, taken: 0, status: "airborne" }, Bs = { id: B_ID, state: mk(sc.b), gun: G.createGun(specB), hits: 0, taken: 0, status: "airborne" };
-    let rounds = [], firstHit = null, killedB = null, closest = Infinity, minAlt = Infinity, maxAlpha = 0, minV = Infinity, h = 0x811c9dc5, ticks = 0;
+    let rounds = [], firstHit = null, killedB = null, killedA = null, closest = Infinity, minAlt = Infinity, maxAlpha = 0, minV = Infinity, h = 0x811c9dc5, ticks = 0;
     const total = Math.round(seconds / dt), still = [0, 0, 0];
     for (let i = 0; i < total; i++) {
         const t = i * dt;
@@ -146,14 +156,12 @@ export function duel(pilotA, sc, { seconds = SECONDS, dt = DT, model = AF.defaul
         if (i % 30 === 0) for (const c of [A.state.pos[0], A.state.pos[1], A.state.pos[2], Bs.state.pos[0], Bs.state.pos[1], Bs.state.pos[2], A.hits, Bs.hits]) h = foldHash(h, Math.round(c * 1000) & 0xffffffff);
         if (ra.status !== "airborne") A.status = ra.status; if (rb.status !== "airborne") Bs.status = rb.status;
         if (range < COLLISION_RANGE) { A.status = "collided"; Bs.status = "collided"; }
-        if (A.taken >= spec.hp) A.status = "destroyed";
+        if (A.taken >= spec.hp) { A.status = "destroyed"; killedA = ticks * dt; }
         if (Bs.taken >= spec.hp) { Bs.status = "destroyed"; killedB = ticks * dt; }
         if (A.status !== "airborne" || Bs.status !== "airborne") break;
     }
-    const aLost = A.status !== "airborne" ? Math.max(A.taken, spec.hp) : A.taken;   // the ground (or a kill) takes the full hit points
-    const dealt = Math.min(A.hits, spec.hp), taken = Math.min(aLost, spec.hp);
-    const score = (dealt - taken) / spec.hp * spec.damage + (killedB !== null && A.status === "airborne" ? KILL_BONUS * Math.max(0, seconds - killedB) / seconds : 0);
-    return { score, dealt: A.hits, taken: A.taken, fired: A.gun.fired, firedB: Bs.gun.fired, hitRate: A.gun.fired ? A.hits / A.gun.fired : 0, firstHit, killedB, statusA: A.status, statusB: Bs.status, ticks, closest, minAltitude: minAlt, maxAlpha, minV: Number.isFinite(minV) ? minV : 0, fingerprint: (h >>> 0).toString(16).padStart(8, "0"), seed: sc.seed, kind: sc.kind };
+    const score = sideScore(A, spec, seconds, killedB), scoreB = sideScore(Bs, spec, seconds, killedA);   // B's is the same formula from B's seat: in a fight that is a head-to-head and not a test of A, it is what B's pilot is graded on
+    return { score, scoreB, dealt: A.hits, taken: A.taken, fired: A.gun.fired, firedB: Bs.gun.fired, hitRate: A.gun.fired ? A.hits / A.gun.fired : 0, firstHit, killedB, killedA, statusA: A.status, statusB: Bs.status, ticks, closest, minAltitude: minAlt, maxAlpha, minV: Number.isFinite(minV) ? minV : 0, fingerprint: (h >>> 0).toString(16).padStart(8, "0"), seed: sc.seed, kind: sc.kind };
 }
 
 const mk = (spec) => Object.freeze(spec.flatMap(([kind, seeds]) => seeds.map((s) => scenario(s, kind))));
@@ -183,6 +191,22 @@ export const SAFETY_AUDIT3_FIGHT_SET = mk(KINDS.map((k) => [k, range(3200, 3249)
 // for and crept up the opponent's tail at 4 m/s until it clipped it at 6 m; see pursuit()). The guidance was fixed, every pilot is retrained under it, and the fruit fly is judged on AUDIT4_FIGHT_SET and SAFETY_AUDIT4_FIGHT_SET, which nothing has flown.
 export const AUDIT4_FIGHT_SET = mk(KINDS.map((k) => [k, range(2300, 2329)]));
 export const SAFETY_AUDIT4_FIGHT_SET = mk(KINDS.map((k) => [k, range(3300, 3349)]));
+// *** THE FIFTH AND SIXTH AUDIT PAIRS, AND THE HEAD-TO-HEAD SETS (brain/dogfightTournament.mjs, tools/ship/trainDogfightLeague.mjs). *** The league trainer's champions are judged on audits nothing has flown: AUDIT5/SAFETY5 for the fruit fly, AUDIT6/SAFETY6 for the GPU Brain (an
+// audit is read once, by one champion) -- the classic four-kind fights against the autopilot, the regression guard (a pilot that learned to beat the shipped ones must not have forgotten how to chase a straight target); and the league's own fights, which are DUELS and nothing else, because
+// the duel is the only scenario in which the opponent hunts and shoots, and so the only one a pilot can be put against another pilot in: LEAGUE_TRAIN_SET and LEAGUE_HELD_OUT_SET (the searches' training and the champion pick), LEAGUE_POOL_SET (the tails), LEAGUE_AUDIT_SET and
+// LEAGUE_AUDIT2_SET (read once, for the fruit fly's and the GPU Brain's champions). TOURNAMENT_SET is the round robin's: 120 duels that no pilot has trained on, flown by every pairing from both seats, and re-readable (a measurement, not an audit).
+export const AUDIT5_FIGHT_SET = mk(KINDS.map((k) => [k, range(2400, 2429)]));
+export const SAFETY_AUDIT5_FIGHT_SET = mk(KINDS.map((k) => [k, range(3400, 3449)]));
+export const AUDIT6_FIGHT_SET = mk(KINDS.map((k) => [k, range(2500, 2529)]));
+export const SAFETY_AUDIT6_FIGHT_SET = mk(KINDS.map((k) => [k, range(3500, 3549)]));
+export const TOURNAMENT_SET = mk([["duel", range(4000, 4119)]]);
+export const LEAGUE_TRAIN_SET = mk([["duel", range(4200, 4211)]]);
+export const LEAGUE_HELD_OUT_SET = mk([["duel", range(4300, 4331)]]);
+export const LEAGUE_AUDIT_SET = mk([["duel", range(4400, 4499)]]);
+export const LEAGUE_AUDIT2_SET = mk([["duel", range(4500, 4599)]]);
+export const LEAGUE_POOL_SET = mk([["duel", range(4600, 4699)]]);
+/** Four duels for running the league command to see that it runs: every slot of its sets under `--smoke`, and nothing else. */
+export const LEAGUE_SMOKE_SET = mk([["duel", range(9100, 9103)]]);
 /** Eight fights for running the command to see that it runs: every slot of the trainer's sets, under `--smoke`, and nothing else; a smoke champion is never written. */
 export const SMOKE_FIGHT_SET = mk(KINDS.map((k) => [k, range(9000, 9001)]));
 
