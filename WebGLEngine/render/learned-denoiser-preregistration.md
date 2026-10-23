@@ -9318,3 +9318,52 @@ fill, bilinear upscale and shift, composited with E_mid, so it is treated as the
 **The command:** `node tools/denoiseStudy.mjs --harvest-framegen-lf --cache <dir>` -> `render/denoise-results-framegen-lf.json`.
 It refuses if the file exists. It runs here for about 100 minutes, as round 59's did. The file is committed byte for byte
 before it is read, and section 138 reads it. Section 137 is kept for the rig reports section 135 asked for.
+
+## 138. ROUND 60 -- NOT REPORTED: C1 FIRED ON H2'S CONTROL. LIT AT THE GENERATED TIME THE GENERATOR LEAVES ITS LIGHT-SOURCE ERROR BEHIND, AND STILL LOSES TO THE CROSS-FADE IN LINEAR RADIANCE
+
+**What arrived.** `render/denoise-results-framegen-lf.json` (sha-256 `8961b8cb...`).
+- It was written by `--harvest-framegen-lf` at 3917dac6, the commit carrying section 136's code. It was committed byte
+  for byte (4557bc30) before it was read.
+- It took 5,158 s. Nothing else ran beside it.
+
+**The run is NOT REPORTED.** C1 fired on H2 alone, and on its CONTROL: the held frame R' beat the noisy frame on 10 of 12,
+where both arms need 11. The candidate G' beat the noisy frame on 11 of 12, and so passed its own C1 on both hypotheses.
+C2-C5 held.
+
+| | H1: G' against the cross-fade X' | H2: G' against the held frame R' |
+|---|---|---|
+| mean d (reported, decides nothing) | -0.221 | +0.431 |
+| images G' won | 5 of 12 | 9 of 12 |
+| sign-flip p (Holm threshold) | 0.890 (0.05) | 0.011 (0.025) |
+
+- **H2 would have been supported**, had its control beaten the noisy frame once more. The rule is the rule, and section
+  136 named this outcome "not reported": nothing moves.
+- **That C1 can fire on a control arm here is a fault in my design, not in the run.** C1 was written for a denoiser and a
+  filter, two methods that both start from the noisy frame. The held frame starts from the older frame, not the noisy
+  one, so it has no reason to beat it. Section 136 carried section 133's C1 over without asking that, and it is said here
+  so that a later round does not.
+
+**What the light-free arrangement did, reported.**
+- **It removed round 59's failure.** G' beat round 59's G on 10 of 12, by a mean d of 6.29. The other two (R 55001 and
+  R 55002) are exact ties: no light source is in view there, so the two arrangements make the same frame. Section 134's
+  light-source error is gone by construction, as predicted.
+- **Against the cross-fade it still loses in linear radiance**, 5 of 12. Its largest losses are C 56004 (-1.48), C 56000
+  (-0.87) and R 55001 (-0.85). The cross-fade blurs an edge that moves, and the generator moves the edge, but where it is
+  wrong it is wrong by a whole surface.
+- **In display space** (round 26's transfer, reported, never tested), G' beats the cross-fade on 8 of 12 by a mean d of
+  0.106, and the held frame on 11 of 12 by 0.469. Round 59's shown arrangement there beat the cross-fade on 1 of 12.
+- **The midpoint traced alone (Bmid1) beat G' on 10 of 12**, by a mean d of 0.83.
+- **The fill helped on 12 of 12**, by a mean d of 1.36.
+
+**The predictions.**
+- **P1 FAILED:** C1 fired, on H2's control.
+- **P2 and P3** have no reading. Descriptively, P2's sign held and P3's did not.
+- **P4 FAILED as written:** "G' beats G on every image." It beat G on 10 and tied on 2. The ties are the two scenes with
+  no light source in view, where nothing could differ, and P4 should have said "where a light source is in view".
+
+**What it says.** On the path tracer's output in linear radiance, with the light sources put where the geometry puts them,
+FSR3's generator does not beat a cross-fade between two of the chain's frames on orbits of 1.5-4 degrees a frame. It beats
+holding the older frame, though the test that would have said so was not reported. Graded as a display shows it, it
+edges the cross-fade, which is where fsr-three.html measured it. A round that pre-registers the display-space grading,
+with C1 asked of the candidate alone, is the honest next question. It is Keith's call, not this section's, because it
+would be chosen after seeing this round's display figures, and a new round on new seeds is the only fair way to ask it.

@@ -115,6 +115,9 @@
 //   R88 the round re-derived with the cross-fade as both comparators              3 RED -- frameGenSets' row, the re-derivation, the figures
 //   LF5 (section 136) frameGenSetsLightFree's H2 against the cross-fade            1 RED -- the frameGenSetsLightFree row
 //   LF6 --harvest-framegen-lf without its arrangement                            1 RED -- the command row
+//   R89 (section 138) the held frame's eleventh image typed below its noisy frame  2 RED -- the re-derivation row (C1 then holds), the figures
+//   R90 the second image's G' typed off its tie with G                           1 RED -- the figures row
+//   R91 the display grading's first effect typed negative                        1 RED -- the figures row
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -691,7 +694,24 @@ console.log("\n14e. ROUND 60: THE GENERATOR BETWEEN LIGHT-FREE FRAMES, LIT AT TH
     ok("!! --harvest-framegen-lf runs runFrameGenStudy on ROUND_FRAMEGEN_LF's split, size and light-free arrangement under harvest, writes its own file and never an existing one, records its commit, and logs no verdict",
         branch.length > 400 && /runFrameGenStudy\(\{ splits: ROUND_FRAMEGEN_LF\.splits, image: ROUND_FRAMEGEN_LF\.image, arrangement: ROUND_FRAMEGEN_LF\.arrangement,/.test(code) && /harvest: true/.test(code) &&
         /path\.join\(ENG, ROUND_FRAMEGEN_LF\.results\)/.test(code) && /existsSync\(file\)/.test(code) && /out\.commit = /.test(code) && !/ROUND_FRAMEGEN\./.test(code) && !/verdict|status|supported/.test(code));
-    ok("  its results are not yet written: section 138 reads them once the harvest's file is committed", !fs.existsSync(path.join(ENG, RESULTS_FRAMEGEN_LF)));
+    // section 138: the committed results read back by code -- NOT REPORTED, C1 firing on H2's CONTROL alone: the held frame beat the
+    // noisy frame on 10 of 12; the candidate passed its own C1 on both; and the figures section 138 reports
+    const lfile = path.join(ENG, RESULTS_FRAMEGEN_LF);
+    if (fs.existsSync(lfile)) {
+        const res = JSON.parse(fs.readFileSync(lfile, "utf8")), T = res.tables;
+        const again = verdict({ sets: frameGenSetsLightFree(T), shuffled: null, c2Prior: ROUND_FRAMEGEN_LF.c2Prior, determinism: res.determinism, seedsDistinct: res.seedsDistinct, test: ROUND_FRAMEGEN_LF.test });
+        const H1 = again.hypotheses.H1, H2 = again.hypotheses.H2, mean = (a) => a.reduce((x, v) => x + v, 0) / a.length;
+        ok("!! *** section 138: verdict() over the committed results' own tables gives the file's verdict -- NOT REPORTED, C1 firing on H2's control alone: R' beat the noisy frame on 10 of 12; G' passed on both ***",
+            again.run === "not reported" && res.verdict.run === "not reported" && again.reasons.length === 1 && /^C1 on H2: .* on 11 and the filter on 10 of 12/.test(again.reasons[0]) &&
+            H1.c1.ok === true && H1.c1.netWins === 11 && H2.c1.netWins === 11 && H2.c1.filterWins === 10 && res.commit === "3917dac6" && res.config.arrangement === "lightFree",
+            again.reasons.join(" | "));
+        const S2 = res.secondary, ties = S2.overShown.map((d, i) => (d === 0 ? i : -1)).filter((i) => i >= 0);
+        ok("  ...and section 138's figures: H1 5 of 12 (mean d -0.221), H2 9 of 12 at p 0.011 against 0.025; G' over round 59's G on 10, tied on the two scenes with no light in view; display space 8 and 11 of 12; the midpoint traced beat G' on 10",
+            H1.k === 5 && Math.abs(H1.meanD + 0.221) < 1e-3 && H2.k === 9 && Math.abs(H2.p - 0.01123046875) < 1e-12 && H2.threshold === 0.025 &&
+            S2.overShown.filter((d) => d > 0).length === 10 && ties.join() === "1,2" && ties.every((i) => T.G[i] === T.Gl[i]) &&
+            S2.display.H1.filter((d) => d > 0).length === 8 && S2.display.H2.filter((d) => d > 0).length === 11 && S2.midTraced.filter((d) => d < 0).length === 10 &&
+            S2.fill.every((d) => d > 0), `overShown ${S2.overShown.filter((d) => d > 0).length}/12 (ties at ${ties.join(", ")}); display ${S2.display.H1.filter((d) => d > 0).length} / ${S2.display.H2.filter((d) => d > 0).length}`);
+    } else ok("!! section 138 reads render/denoise-results-framegen-lf.json, and it is not there", false);
 }
 
 console.log("\n15. THE UPSCALE ROUND: HALF SIZE + FSR1 AGAINST THE FRAMES IT COULD BE INSTEAD (pre-registration section 81)");
