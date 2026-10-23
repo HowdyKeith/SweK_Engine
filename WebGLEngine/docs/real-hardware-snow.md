@@ -87,3 +87,23 @@ The knobs. **Render scale:** `snow-gpu.html` has a slider (25 to 100%) and `?sca
 **Reading laptop numbers.** The Intel's beauty pass read 50.2 ms in the first configuration of a run, 71.5 and 66.9 in the next two (heat and power), and frame times crept 20 to 30% over each two-minute run; the 1080's clock was still ramping after ten warm-up frames (11.45 ms in the first half of 720p, 10.60 in the second). So: warm-up is now at least a second of frames as well as ten, and `--bracket` times the first configuration again at the end and prints the drift (`reading snowBracket:`). Compare configurations only through that figure. The per-pass shadow numbers are unaffected: they are an order of magnitude below the drift.
 
 **The auto render scale** (snow-gpu.html `?scale=auto`, or the box): after a cool-down it takes the mean of 20 frames, and if that is over 28 ms (under ~36 fps) it lowers the scale by x0.85 (floor 0.4); it never raises it, because a vsync-capped frame looks the same at any scale. Driven on the measured costs: the 1080 stays at 100% at 1280x720; the Intel settles at 61% (~27 ms, 37 fps) after about 260 frames. It is OFF by default: a looks change for every visitor is a decision for a person, and the Intel is the box to try it on.
+
+## Which terms of the beauty pass cost what (Intel gen-9, D3D12, 2026-10-23; `takeSnowFrameTiming --ablate`)
+
+Each term was compiled out of the beauty shader and the pass timed again, baseline / term / baseline all through the run so the laptop's drift cancels (the baselines read 63 to 72 ms at 1280x720 and 17 to 20 ms at 640x360; the frame itself ran 30% slower by the end). Beauty pass 65 ms at 1280x720, 18 ms at 640x360:
+
+| term compiled out | 1280x720: saves | share | 640x360: saves | share |
+|---|---|---|---|---|
+| **fine** (filtered sastrugi, ripple, grain in the normal) | **29.2 ms** | **46%** | 7.2 ms | 38% |
+| **deform** (the footprint read: five taps of a wrapped bilinear, 20 buffer loads) | **20.1 ms** | **32%** | 3.0 ms | 16% |
+| detail (three detail-normal layers, RNM-blended) | 15.0 ms | 24% | 1.3 ms | 7% |
+| aerial (the haze) | 13.5 ms | 21% | 1.9 ms | 10% |
+| shadow (cascade select + PCSS taps, IN the beauty pass; the shadow PASSES are 0.7 ms) | 10.1 ms | 14% | 3.4 ms | 20% |
+| glints | 4.2 ms | 6% | 0.5 ms | 3% |
+| skyrefl (the mip-chain reflection) | 3.1 ms | 5% | 2.0 ms | 11% |
+| sh, sss, spec | **-12.5, -12.9, -23.3 ms** | | 0.6, 0.5, -1.3 ms | 3, 3, -7% |
+| **all ten at once** | **55.7 ms** | **85%** | 15.5 ms | 83% |
+
+What to take from it. (1) **The floor with every term out is 9.6 ms at 720p and 3.3 ms at 360p** (the vertex stage, the dunes, the sky dome, rasterisation): the terms are where the time is. (2) **fine and deform are 78% of the pass between them**, and both are per-pixel noise or buffer reads that are SMOOTH in the picture: the case for cheaper forms of the same picture. (3) **sh, sss and spec cost nothing measurable, and removing them made the 720p pass SLOWER by 12 to 23 ms** (at 360p they are within noise): the compiler changed what it did with the rest (register allocation, SIMD width) once code was removed. That is a measurement caveat and not a finding that they are expensive; it also means a term's saving is not additive: the savings above sum to 95 ms against a 65 ms pass, because removing a normal-perturbing term simplifies the lighting downstream of it. (4) The software adapter's split is NOT the GPU's: on SwiftShader at 160x90 the shadow term tops the list at 19% and fine is 6%. A CPU rasteriser pays for different things; only the rig's numbers count.
+
+Why the two big ones are expensive. **fine**: `terrainFineFiltered` runs a 3-octave ridged noise with derivatives (12 `hash22` corner evaluations), a ripple and a grain `noised` (8 more), a `windLocal` (2 `noise2`, 8) and a scour `noise2` (4): about 32 hash evaluations a pixel, for every pixel nearer than ~220 m (the sastrugi layer is fully on until a pixel is 0.35 m wide). `windLocal` and `scour` vary over 50 to 100 m. **deform**: `textureSampleLevelWrap` is a manual bilinear over a storage buffer, four `stateAt` loads with wrap arithmetic, and the fragment calls it five times (centre and four neighbours) wherever a footprint's falloff is non-zero, which is the whole 20 m window around the walker.
