@@ -79,6 +79,7 @@ export const JET_TRAINER = Object.freeze({
     }),
     wingIncidence: 0.035, stall: STALL, parasiteArea: 0.12, thrustMax: 16900, thrustPoint: Object.freeze([-2, 0, 0]),
     engine: Object.freeze({ kind: "jet", idle: 0.04, spoolTime: 1.5, densityExp: 0.8, machDecay: 0.35 }),   // INVENTED: idle thrust 4% of full, a 1.5 s first-order spool, thrust ~ density^0.8, losing 35% of itself per Mach number
+    trimSpeeds: Object.freeze(Array.from({ length: 13 }, (_, i) => 70 + 10 * i)), trimAltitudes: Object.freeze([0, 1500, 3000, 4500, 6000, 8000]),   // where a pilot's trim table is built (brain/autopilotFlight.mjs): 70..190 m/s at six heights
     atmosphere: "isa", machCrit: 0.78, waveCoeff: 20,   // INVENTED: the drag-divergence Mach number, and Lock's fourth-power law for the rise past it: CdA += wing area x 20 (M - Mcrit)^4
     wheels: Object.freeze([[3.2, 0, -1.6], [-0.4, 1.7, -1.6], [-0.4, -1.7, -1.6]]),
     hull: Object.freeze([[0, 4.7, 0], [0, -4.7, 0], [-6.5, 0, 0.4], [4.0, 0, 0.2]]),
