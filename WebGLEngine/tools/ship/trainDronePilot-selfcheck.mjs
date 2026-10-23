@@ -9,8 +9,7 @@
 // that fails in its row), finish() driven with a STAND-IN POLICY whose flights the gate controls (so that "the better search is the dangerous one" is a fact of the setup and not a hope about a real search), the searches in child processes giving the bits the in-process ones give,
 // the command with its side effects injected (it writes nothing without --write and nothing when the champion does not qualify), and the blob it writes. brain/pilotDronePolicy-selfcheck.mjs and brain/pilotDroneMlp-selfcheck.mjs hold mutate/train/prune.
 //
-// NOT IN THIS GATE: the shipped files (brain/pilotDroneWeightsDefault.json, brain/pilotDroneMlpWeightsDefault.json): the helicopter's gate has a section 9 that recomputes every number in a shipped file's `by`; this one gets it when a file is shipped, and not before -- a file
-// is written only when a champion qualifies, and whether one does is the experiment.
+// SECTION 9 is the shipped GPU-brain pilot (brain/pilotDroneMlpWeightsDefault.json): it recomputes every number in the file's `by`. THERE IS NO FRUIT-FLY FILE (brain/pilotDroneWeightsDefault.json): its champion did not qualify and nothing was written; if one is shipped later it gets the same section.
 //
 // SABOTAGE LOG (each applied to tools/ship/trainDronePilot.mjs in a scratch copy, together with a COPY of the command file tools/ship/trainPilotDrone.mjs so that the gate's child processes run the mutated library and not the real
 //   one, the gate run on the tree, the tree discarded; the number is how many rows went red): 40 mutants, none left at 0. They are the helicopter's trainer mutants written again for this module's text.
@@ -26,6 +25,16 @@
 //   a brain's own seed ignored 1; AC blob score is the audit's 1; AD hand safety read from the pool 3; AF an unknown brain accepted 1; AG tails counts nothing 7; AH reserve crash clause dropped 2; AI audit crash clause dropped 2;
 //   AJ the champion's vs read against the wrong set 1; AK the --workers children not in run order 1; AL --dump not written 1; AM the blob's citation is the other brain's 1; AN the blob's policy is the fruit fly's 1; AO blobOf
 //   leaves the known limits out of `by` 1.
+// SECTION 9, THE SHIPPED GPU-BRAIN FILE (brain/pilotDroneMlpWeightsDefault.json, written after the 40 mutants above were run, so its rows have their own): 17 mutants of the FILE and not the module, each applied to a copy of the
+//   file in a scratch tree, the gate run on the tree, the tree discarded; none left at 0. A weight moved, a number in `by` edited, the limits paragraph renamed, the motor-out-not-solved sentence removed, the policy renamed, the
+//   hand weights shipped as the trained pilot -- each a failed row by name.
+//   FM01 an output weight moved by 0.5 6; FM02 an input weight moved by 0.5 7; FM03 the audit number in `by` edited 3; FM04 the limits paragraph renamed 3; FM05 the count of differing weights edited 3; FM06 the file's score
+//   edited 3; FM07 the policy named for the fruit fly's network 3; FM08 the weight count wrong 3; FM09 the recipe in `by` edited 3; FM10 the hand weights shipped as the trained pilot 7; FM11 the safety audit count in `by` edited
+//   3; FM12 the citation edited 3; FM13 the motor-out-not-solved sentence removed 3; FM14 the not-standing count in `by` edited 4; FM15 the reserve number in `by` edited 3; FM16 the better-than count in `by` edited 3; FM17 the
+//   champion's seed outside its runs 3.
+// THE LIMITS SENTENCE ("THE MOTOR-OUT CORNER IS NOT SOLVED") WAS ADDED TO THE LIBRARY'S LIMITS AND TO THE FILE'S `by` AFTER THE VERDICT, and only that: the weights and every number in the file are the verdict's (the gate
+//   recomputes them on every run); it was added because the file's gain is entirely a slower crash (all twenty motor-out audit flights still end crashed, at a mean of 23.1 m/s against the hand pilot's 32.0) and the file would
+//   otherwise not have said so.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
