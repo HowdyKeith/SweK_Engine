@@ -142,6 +142,15 @@ export const SPLITS_MESH = Object.freeze({
     T2: Object.freeze({ family: "M", seeds: range(37000, 12) }),
 });
 /**
+ * Round 56's splits (pre-registration section 127): the same shapes in family C's materials and light, nothing trained --
+ * H1 on 12 scenes of family VC (C's scene, voxel structures, 50000), H2 on 12 of MC (C's scene, lathed and extruded
+ * solids, 51000), on ranges no earlier split touched.
+ */
+export const SPLITS_MESH_C = Object.freeze({
+    T1: Object.freeze({ family: "VC", seeds: range(50000, 12) }),
+    T2: Object.freeze({ family: "MC", seeds: range(51000, 12) }),
+});
+/**
  * Section 81's split, the upscale round: ONE test set, read by both hypotheses -- 6 new scenes of R (40000) and 6 of C
  * (41000), the families the shipped network was trained on, so what changes is the RESOLUTION and nothing about the
  * scenes. No training: the network and the filter are the shipped ones.
@@ -174,7 +183,7 @@ export const SPLITS_TEMPORALUP = Object.freeze({
 export const SPLITS_R47 = Object.freeze({ train: SPLITS_R11.train, val: SPLITS_R11.val, T1: Object.freeze({ family: "R", seeds: range(48000, 12) }), T2: Object.freeze({ family: "C", seeds: range(49000, 12) }) });
 /** The family of a split's i-th scene: its own entry in `families` when the split mixes them, else the split's. */
 export const familyOf = (split, i) => (split.families ? split.families[i] : split.family);
-const RESERVED = new Set([SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, SPLITS_R8, SPLITS_R9, SPLITS_R10, SPLITS_R11, SPLITS_MESH, SPLITS_FSR1, SPLITS_HALFRES, SPLITS_EMITTER, SPLITS_TEMPORALUP, SPLITS_R47].flatMap((S) => Object.values(S).flatMap((s) => s.seeds)));
+const RESERVED = new Set([SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, SPLITS_R8, SPLITS_R9, SPLITS_R10, SPLITS_R11, SPLITS_MESH, SPLITS_FSR1, SPLITS_HALFRES, SPLITS_EMITTER, SPLITS_TEMPORALUP, SPLITS_R47, SPLITS_MESH_C].flatMap((S) => Object.values(S).flatMap((s) => s.seeds)));
 export const isDatasetSeed = (seed) => RESERVED.has(seed);
 
 /** The render seeds of a scene: the input, the reference and the second reference -- distinct for every scene seed. */
@@ -188,8 +197,8 @@ export function renderSeeds(seed) { return { input: seed * 8 + 1, ref: seed * 8 
 export function makeScene(family, seed) {
     if (family === "C") return makeSceneC(seed);
     if (family === "R") return makeSceneR(seed);
-    if (family === "V" || family === "M") return makeSceneMesh(family, seed);
-    if (family !== "A" && family !== "B") throw new Error("denoiseScenes: family is A, B, C, R, V or M, got " + family);
+    if (family === "V" || family === "M" || family === "VC" || family === "MC") return makeSceneMesh(family, seed);
+    if (family !== "A" && family !== "B") throw new Error("denoiseScenes: family is A, B, C, R, V, M, VC or MC, got " + family);
     const r = rng(((seed >>> 0) * 2654435761 + (family === "A" ? 17 : 29)) >>> 0);
     const U = (a, b) => a + (b - a) * r();
     const scene = [{ centre: [0, -100, 0], radius: 100, albedo: [U(0.3, 0.7), U(0.3, 0.7), U(0.3, 0.7)] }];
@@ -312,7 +321,13 @@ function makeSceneR(seed) {
  * Every mesh is wound OUTWARD (its signed volume positive) -- the tracer takes a hit's normal as it comes, and a sphere's
  * always faces out. The emitters stay spheres: next-event estimation samples a sphere's solid angle.
  */
-const MESH_SALT = Object.freeze({ V: 43, M: 47 });
+/*
+ * Families VC and MC (round 56, pre-registration section 127): the same shapes in FAMILY C's scene -- its Oren-Nayar
+ * ground, its two coloured emitters, its near-black sky, its camera, and every resting sphere's place, size and material
+ * (rough-diffuse, or a dielectric reflector) -- each sphere replaced as V and M replace R's. A dielectric's albedo, like a
+ * conductor's, is never read and set to 0.
+ */
+const MESH_SALT = Object.freeze({ V: 43, M: 47, VC: 53, MC: 59 });
 /** Signed volume of a flat triangle buffer (9 floats a triangle): positive when the mesh is wound outward. */
 export function signedVolume(tris) {
     let v = 0;
@@ -369,13 +384,13 @@ function solidMesh(U, r, x, rad, z) {
     return outward(m.positions, m.indices, (a, b, c) => [x + a, c + h / 2, z + b]);
 }
 function makeSceneMesh(family, seed) {
-    const S = makeSceneR(seed);
+    const C = family.length === 2, S = C ? makeSceneC(seed) : makeSceneR(seed), shape = family[0];   // round 56: VC and MC on C
     const r = rng(((seed >>> 0) * 2654435761 + MESH_SALT[family]) >>> 0);
     const U = (a, b) => a + (b - a) * r();
     const scene = S.scene.map((o, i) => {
         if (i === 0 || o.emit) return o;                       // the ground and the emitters, as R drew them
         const [x, , z] = o.centre, rad = o.radius;
-        const tris = family === "V" ? voxelMesh(U, r, x, rad, z) : solidMesh(U, r, x, rad, z);
+        const tris = shape === "V" ? voxelMesh(U, r, x, rad, z) : solidMesh(U, r, x, rad, z);
         const { centre, radius, ...material } = o;             // the sphere's material, nothing else
         // A CONDUCTOR'S albedo IS NEVER READ -- its branch returns before the Lambertian alb() and its light
         // sampling skips the Lambertian loop -- but the tracer refuses a mesh entry without the field, so it gets

@@ -21,7 +21,7 @@
 // Without it everything is computed, as before; with it the result is the same, bit for bit
 // (render/denoiseCache-selfcheck.mjs). A scene rendered under --harvest is never served to a run without it.
 "use strict";
-import { SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, SPLITS_R8, SPLITS_R9, SPLITS_R10, SPLITS_R11, SPLITS_MESH, SPLITS_FSR1, SPLITS_HALFRES, SPLITS_EMITTER, SPLITS_TEMPORALUP, SPLITS_R47, familyOf, makeScene, IMAGE, SPP_IN, SPP_REF, renderImages, renderSeeds, inputChannels, remodulate } from "./denoiseScenes.mjs";
+import { SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, SPLITS_R8, SPLITS_R9, SPLITS_R10, SPLITS_R11, SPLITS_MESH, SPLITS_FSR1, SPLITS_HALFRES, SPLITS_EMITTER, SPLITS_TEMPORALUP, SPLITS_R47, SPLITS_MESH_C, familyOf, makeScene, IMAGE, SPP_IN, SPP_REF, renderImages, renderSeeds, inputChannels, remodulate } from "./denoiseScenes.mjs";
 import { renderSequence, temporalChannels, sequenceSeeds } from "./denoiseTemporal.mjs";
 import { withMask, emitterCoverage, emitterRadiance, MASK_STRIDE, MASK_CHANNEL, COVERAGE_GRID } from "./denoiseMask.mjs";
 import { jointBilateral, tuneFilter } from "./denoiseFilter.mjs";
@@ -148,6 +148,12 @@ export const RESULTS_MESH = "render/denoise-results-mesh.json";
 export const SHIPPED_NET = "render/denoise-net-r11.json";
 export const ROUND_MESH = Object.freeze({ splits: SPLITS_MESH, emitterMask: true, test: "signflip",
                                           c2Prior: Object.freeze({ round: 11, meanD: -1.8564223228700172, ok: true }), results: RESULTS_MESH });
+/**
+ * Round 56 (pre-registration section 127): section 79's round on the same shapes in family C's materials and light --
+ * families VC and MC, the shipped pair, nothing trained, C2 cited from round 11 as section 79 cites it.
+ */
+export const RESULTS_MESH_C = "render/denoise-results-mesh-c.json";
+export const ROUND_MESH_C = Object.freeze({ splits: SPLITS_MESH_C, emitterMask: true, test: "signflip", c2Prior: ROUND_MESH.c2Prior, results: RESULTS_MESH_C });
 /**
  * The shipped pair on a test set, end to end: render T1 and T2 (each with its second reference, for C3), measure noisy,
  * filter, network and floor per image exactly as runStudy's `measure` does, and hand them to verdict(). C4 here is the

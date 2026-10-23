@@ -8553,3 +8553,114 @@ Every sabotage went red, and the runner restored each file byte for byte:
 - Q6, the section 103 line without the accumulation: 1 red.
 
 The round holds by its rule, and `denoise-accum-tile-default` is closed.
+
+## 127. ROUND 56 -- THE ENGINE's OWN GEOMETRY IN FAMILY C's MATERIALS AND LIGHT (`denoise-mesh-other-materials`): FIXED BEFORE ANY OF ITS TEST SCENES EXIST
+
+Committed with the code that implements it. No scene of this round's two test sets has been rendered.
+
+**Why this round.** Section 80 widened the page's scope to the engine's voxel structures and its lathed and extruded solids,
+in family R's materials, light and sky, and only those. Ten rounds found the network failing where materials and light
+changed, and section 80 changed only the shape. The two have not been crossed. This round crosses them, and asks nothing else.
+
+> **Does the network the device ships beat the filter it ships, on the engine's own geometry in family C's materials and light?**
+
+**Nothing is trained or tuned.** This is section 79's design, and every part of it below is section 79's unless it says so:
+- the network is round 11's seed 1, from `render/denoise-net-r11.json` (sha-256 `f1a84d47...`), decoded as the page decodes it;
+- the filter is the setting that file names;
+- the input is 64 x 64 at 4 samples, with the nine channels and the emitter mask;
+- the references are 1024 samples, each with a second one for C3;
+- one network, not three seeds' mean.
+
+**The two families, both new, both built from C.** `render/denoiseScenes.mjs`'s families VC and MC take family C's scene for
+their own seed, exactly as C draws it:
+- the Oren-Nayar ground;
+- the two coloured emitters;
+- the near-black sky;
+- the camera;
+- every resting sphere's place, size and material, whether rough-diffuse (`sigma`) or a dielectric reflector
+  (`roughness`, `ior`).
+
+Each resting sphere is then replaced by a closed triangle mesh, built exactly as round 25 built it, inside the sphere's
+footprint and with the sphere's material:
+- VC's meshes are V's voxel structures;
+- MC's are M's lathed and extruded solids.
+
+The shapes draw from a stream of their own, so C's draws are C's whatever VC and MC do.
+- **So two things differ from the families the network was trained on, and each was varied alone before.** Shape was
+  varied in section 79 (V and M, in R's materials). C's materials and light were trained on, in round 11. They have never
+  met.
+- Every mesh is wound outward, and the emitters stay spheres.
+- A dielectric's albedo, like a conductor's, is never read, and the tracer refuses a mesh entry without one, so it is set
+  to 0. The gate renders one dielectric mesh at 0 and at 1 and holds the two images equal.
+- C's own draws are untouched. Its fingerprint over 40 scenes is still the one recorded before R existed.
+
+**Splits** (`SPLITS_MESH_C`), test sets only:
+
+| Set | Family | Seeds |
+|---|---|---|
+| T1 -> **H1** | 12 of VC | **50000-50011** |
+| T2 -> **H2** | 12 of MC | **51000-51011** |
+
+No earlier split touched these seeds. C5 holds over the round's 72 render seeds.
+
+**The statistic is section 6's, with section 28's test, exactly as section 79 ran it.**
+- Per image, `d_i = ln relMSE(filter_i) - ln relMSE(net_i)`. Positive means the network won.
+- Each hypothesis is supported iff its mean d over 12 images is > 0 and its exact one-sided sign-flip p is below its Holm
+  threshold. Holm-Bonferroni runs over {H1, H2} at family alpha 0.05.
+
+**Controls:** C1-C5 as in section 79.
+- **C1:** both methods beat the noisy input on at least 11 of 12 images of each set, or the run is not reported.
+- **C2:** cited from round 11 (mean d -1.856, held).
+- **C3:** a set is not resolvable if the network is within 2 x of its floor on more than half its images.
+- **C4:** the forward pass twice over T1, bit for bit.
+- **C5:** the 72 render seeds are distinct.
+
+**What each outcome buys.**
+- **H1 and H2 supported:** the page's scope note may say the shipped network also beats the shipped filter on these shapes
+  in family C's materials, light and sky as well as R's. It may say nothing about any other material, light or sky.
+- **One only:** the note may name that family alone.
+- **Neither:** the note stays as section 80 left it, and the crossing is a recorded negative.
+- **Not reported or not resolvable:** nothing moves.
+
+**Not in this round: path-tracer.html's own scenes.** The backlog entry named them beside C's materials. They are
+diagnostic scenes, not a family of scenes to sample:
+- six fixed scenes with no seed;
+- scalar albedos;
+- sky light and no emitter in four of them;
+- a furnace built to render flat, whose 4-sample input may already sit at its reference's floor.
+
+C3 and the guide channels would need their own design for them, so they go to an entry of their own,
+`denoise-pathtracer-page-scenes`, rather than into this round's test.
+
+**Predictions, fixed now, deciding nothing.**
+- **P1:** C1 holds on both sets.
+- **P2 and P3:** H1 and H2 are both supported. The network beat the filter on C's spheres (round 11's H2, mean d 0.765) and
+  on R's meshes (section 80), and I expect the crossing to keep the sign of both.
+- **P4:** each set's mean d is below C's 0.765, and MC's is below VC's. Section 80 had M (0.304) below V (0.647).
+- All four are reported either way.
+
+**Secondary, reported, never tested:** per-image d, each set's noisy error and floor, and time.
+
+**What was seen first.**
+- Everything in sections 1-126.
+- **The pilot, on seeds 90200-90207, outside every split, with NO network or filter:** brightness, the noisy input against a
+  256-sample reference, and time.
+
+| family | mean radiance, median [range] | noisy relMSE vs 256 spp, median [range] | 256 spp, median | triangles, median |
+|---|---|---|---|---|
+| C | 0.160 [0.015-0.384] | 0.0119 [0.0027-0.1035] | 2.1 s | 0 |
+| VC | 0.159 [0.006-0.368] | 0.0206 [0.0012-0.2073] | 7.1 s | 446 |
+| MC | 0.163 [0.022-0.393] | 0.0134 [0.0014-0.0874] | 5.5 s | 692 |
+
+  - VC and MC sit where C does, so relMSE's 0.01 offset treats them as it treats C.
+  - C is about 2.5 x darker than R (section 79's pilot: 0.393), as round 11 found. So the offset weighs more here than it
+    did in section 79, and that holds alike for the filter and the network.
+- `render/denoiseScenes-selfcheck.mjs` section 17 holds the families on 60 scenes outside every split. VC and MC are C's
+  scene, each mesh carries its sphere's material, a dielectric mesh's albedo is never read, and C's fingerprint is
+  unchanged. `render/denoiseStudy-selfcheck.mjs` section 14b runs the shipped pair end to end on four 16 x 16 scenes of
+  VC and MC outside every split. It prints no error and no effect, and none was read.
+- Nothing of either test set has been rendered.
+
+**The command:** `node tools/denoiseStudy.mjs --harvest-mesh-c --cache <dir>` -> `render/denoise-results-mesh-c.json`.
+- It refuses if the file exists.
+- It runs here. The file is committed byte for byte before it is read, and section 128 reads it.

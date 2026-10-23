@@ -2449,9 +2449,16 @@ export const NEXT_ROUNDS = [
     {
         id: "denoise-mesh-other-materials",
         blocker: "OPEN",
-        what: "Section 80 widened the scope to the engine's voxel structures and lathed and extruded solids in family R's materials, light and sky -- and only that. Test the same shapes in C's materials and light, and the path tracer page's own scenes.",
-        how: "A round in section 79's shape: families built from C (and from path-tracer.html's scenes), the shipped pair, nothing trained.",
-        why: "Ten rounds found the network failing where materials and light changed; section 80 changed only shape. The two have not been crossed.",
+        what: "Section 80 widened the scope to the engine's voxel structures and lathed and extruded solids in family R's materials, light and sky -- and only that. Test the same shapes in C's materials and light. ROUND 56 (pre-registration section 127) is that round: families VC and MC, C's scene with each resting sphere replaced by round 25's meshes, the shipped pair, nothing trained -- its harvest committed before it is read, and section 128 its verdict.",
+        how: "A round in section 79's shape: H1 on 12 of VC (50000), H2 on 12 of MC (51000), section 6's statistic with section 28's test, Holm over the two; node tools/denoiseStudy.mjs --harvest-mesh-c -> render/denoise-results-mesh-c.json.",
+        why: "Ten rounds found the network failing where materials and light changed; section 80 changed only shape. The two have not been crossed. The path tracer page's own scenes, which this entry once named beside C, went to denoise-pathtracer-page-scenes (section 127 says why).",
+    },
+    {
+        id: "denoise-pathtracer-page-scenes",
+        blocker: "OPEN",
+        what: "The shipped pair on path-tracer.html's own six scenes (furnace, gradient, pair, enclosed, rough, rough with compensation), which denoise-mesh-other-materials once named beside C's materials.",
+        how: "Not a family to sample: six fixed scenes with no seed, scalar albedos, sky light and no emitter in four, and a furnace built to render flat. A round needs its own design for C3 (a 4-sample furnace may sit at its reference's floor), for the guide channels (scalar albedos, a rough sphere with no F0), and for a test of six images, whose smallest one-sided sign-flip p is 1/64.",
+        why: "Section 127 split it off: folded into the mesh round, those scenes would have decided a question that round did not pre-register.",
     },
     {
         id: "denoise-trained-on-mesh",

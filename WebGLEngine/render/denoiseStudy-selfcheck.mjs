@@ -96,6 +96,8 @@
 //   R70 the rule ignoring H2                                                     1 RED -- the rule row
 //   R71 temporalUpSets' H2 comparator swapped to B1                               3 RED -- the round's config row, the verdict row, the predictions
 //   R72 P2's bound widened to +3.1 (so the miss would read as a hit)              1 RED -- the predictions row
+//   R73 (section 127) ROUND_MESH_C on the R-material mesh splits                  1 RED -- the ROUND_MESH_C row
+//   R74 --harvest-mesh-c running section 79's splits                             1 RED -- the command row
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -447,7 +449,7 @@ console.log("\n14. THE MESH ROUND: THE SHIPPED PAIR, NOTHING TRAINED (pre-regist
     ok("  the filter it ran is the one the shipped file names", JSON.stringify(out.filter) === JSON.stringify(shipped.filter) && JSON.stringify(out.config.filter) === JSON.stringify(shipped.filter));
     // the command: decodes the shipped file, writes the mesh round's file and refuses an existing one, logs no part of the verdict
     const cli = fs.readFileSync(path.join(ENG, "tools/denoiseStudy.mjs"), "utf8");
-    const b0 = cli.indexOf('} else if (args.includes("--harvest-mesh")) {'), branch = b0 >= 0 ? cli.slice(b0, cli.indexOf("} else if (round) {", b0)) : "";
+    const b0 = cli.indexOf('} else if (args.includes("--harvest-mesh")) {'), branch = b0 >= 0 ? cli.slice(b0, cli.indexOf('} else if (args.includes("--harvest-mesh-c")) {', b0)) : "";
     const code = branch.replace(/\/\/.*$/gm, "");
     // section 80: the committed results, read back by code -- the verdict re-derived from the file's own tables under
     // ROUND_MESH's rule, so the section's "both supported" is the rule's output, not a sentence somebody typed
@@ -471,6 +473,36 @@ console.log("\n14. THE MESH ROUND: THE SHIPPED PAIR, NOTHING TRAINED (pre-regist
     ok("!! --harvest-mesh decodes the shipped file with decodeNet, runs runShippedStudy under harvest, writes ROUND_MESH.results and never an existing one, and logs no verdict",
         branch.length > 400 && /decodeNet\(shipped\.net\)/.test(code) && /filter: shipped\.filter/.test(code) && /runShippedStudy\(/.test(code) && /harvest: true/.test(code) &&
         /path\.join\(ENG, ROUND_MESH\.results\)/.test(code) && /existsSync\(file\)/.test(code) && /sha256/.test(code) && !/verdict|status|supported/.test(code));
+}
+
+console.log("\n14b. ROUND 56: THE SAME SHAPES IN FAMILY C'S MATERIALS AND LIGHT, THE SHIPPED PAIR, NOTHING TRAINED (pre-registration section 127)");
+{
+    const { runShippedStudy, ROUND_MESH, ROUND_MESH_C, RESULTS_MESH_C, SHIPPED_NET } = await imp("render/denoiseStudy.mjs");
+    const { SPLITS_MESH_C } = await imp("render/denoiseScenes.mjs");
+    const { decodeNet } = await imp("render/denoiseDevice.mjs");
+    const shipped = JSON.parse(fs.readFileSync(path.join(ENG, SHIPPED_NET), "utf8")), net = decodeNet(shipped.net);
+    ok("!! ROUND_MESH_C: the VC and MC splits, the emitter mask, the sign-flip test, and C2 cited from round 11 as section 79 cites it -- its own results file",
+        ROUND_MESH_C.splits === SPLITS_MESH_C && ROUND_MESH_C.emitterMask === true && ROUND_MESH_C.test === "signflip" && ROUND_MESH_C.c2Prior === ROUND_MESH.c2Prior &&
+        ROUND_MESH_C.results === RESULTS_MESH_C && RESULTS_MESH_C === "render/denoise-results-mesh-c.json");
+    let threw = null; try { runShippedStudy({ splits: SPLITS_MESH_C, net, filter: shipped.filter, image: 4, sppIn: 1, sppRef: 1 }); } catch (e) { threw = e.message; }
+    ok("!! on the REAL splits without harvest it is refused at its first scene", /seed 50000 is a dataset seed/.test(threw || ""), threw);
+    // the miniature: VC and MC scenes seeded outside every split, 16 x 16 -- the PLUMBING, no number read for its value
+    const mini = Object.freeze({ T1: Object.freeze({ family: "VC", seeds: Object.freeze([950100, 950101]) }), T2: Object.freeze({ family: "MC", seeds: Object.freeze([960100, 960101]) }) });
+    const out = runShippedStudy({ splits: mini, net, filter: shipped.filter, image: 16, sppIn: 4, sppRef: 16 });
+    const V = out.verdict, T = out.tables;
+    const shapeOk = ["T1", "T2"].every((n) => ["noisy", "filter", "floor"].every((k) => T[n][k].length === 2 && T[n][k].every(Number.isFinite)) && T[n].net.length === 1 && T[n].net[0].length === 2);
+    ok("!! end to end on the miniature: two test sets of VC and MC, one network column, C4, C5, and C2 cited from round 11",
+        shapeOk && out.determinism === true && out.seedsDistinct === true && out.seedCount === 12 && V.controls.C2.citedFrom === 11 && V.controls.C4 === true && V.controls.C5 === true &&
+        Object.keys(V.hypotheses).join() === "H1,H2" && V.hypotheses.H1.test === "signflip" && out.config.splits.T1.family === "VC" && out.config.splits.T2.family === "MC",
+        `run ${V.run}; ${JSON.stringify(out.config.splits)}`);
+    // the command: section 79's branch on ROUND_MESH_C, writing its own file and never an existing one, logging no verdict
+    const cli = fs.readFileSync(path.join(ENG, "tools/denoiseStudy.mjs"), "utf8");
+    const b0 = cli.indexOf('} else if (args.includes("--harvest-mesh-c")) {'), branch = b0 >= 0 ? cli.slice(b0, cli.indexOf("} else if (round) {", b0)) : "";
+    const code = branch.replace(/\/\/.*$/gm, "");
+    ok("!! --harvest-mesh-c decodes the shipped file with decodeNet, runs runShippedStudy on ROUND_MESH_C's splits under harvest, writes ROUND_MESH_C.results and never an existing one, and logs no verdict",
+        branch.length > 400 && /decodeNet\(shipped\.net\)/.test(code) && /filter: shipped\.filter/.test(code) && /runShippedStudy\(\{ splits: ROUND_MESH_C\.splits,/.test(code) && /harvest: true/.test(code) &&
+        /path\.join\(ENG, ROUND_MESH_C\.results\)/.test(code) && /existsSync\(file\)/.test(code) && /sha256/.test(code) && !/ROUND_MESH\./.test(code) && !/verdict|status|supported/.test(code));
+    ok("  its results are not yet written: section 128 reads them once the harvest's file is committed", !fs.existsSync(path.join(ENG, RESULTS_MESH_C)));
 }
 
 console.log("\n15. THE UPSCALE ROUND: HALF SIZE + FSR1 AGAINST THE FRAMES IT COULD BE INSTEAD (pre-registration section 81)");

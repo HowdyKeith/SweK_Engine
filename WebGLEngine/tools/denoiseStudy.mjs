@@ -10,6 +10,8 @@
 //                                                     upscale and composited at full size -> render/denoise-results-emitter.json
 //       node tools/denoiseStudy.mjs --harvest-mesh  the SHIPPED network and filter on the engine's own geometry, nothing trained (section 79)
 //                                                  -> render/denoise-results-mesh.json
+//       node tools/denoiseStudy.mjs --harvest-mesh-c  the same, the shapes in family C's materials and light (section 127)
+//                                                  -> render/denoise-results-mesh-c.json
 //       node tools/denoiseStudy.mjs --harvest-r47  round 11 with the network 16 channels wide, the 32-channel one beside it (section 116) -> render/denoise-results-r47.json
 //       node tools/denoiseStudy.mjs --harvest-r11  one large network trained on families R and C together (section 32) -> render/denoise-results-r11.json
 //       node tools/denoiseStudy.mjs --secondary-r11  round 11 again, for section 32's secondary the first run skipped (section 33)
@@ -47,7 +49,7 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { execFileSync } from "node:child_process";
 import { openCache, hashArrays } from "../render/denoiseCache.mjs";
-import { runStudy, MINI, HARVESTS, studyOptions, runShippedStudy, ROUND_MESH, SHIPPED_NET, runUpscaleStudy, ROUND_FSR1, ROUND_HALFRES, runEmitterAwareStudy, ROUND_EMITTER, runTemporalUpscaleStudy, ROUND_TEMPORALUP } from "../render/denoiseStudy.mjs";
+import { runStudy, MINI, HARVESTS, studyOptions, runShippedStudy, ROUND_MESH, ROUND_MESH_C, SHIPPED_NET, runUpscaleStudy, ROUND_FSR1, ROUND_HALFRES, runEmitterAwareStudy, ROUND_EMITTER, runTemporalUpscaleStudy, ROUND_TEMPORALUP } from "../render/denoiseStudy.mjs";
 import { decodeNet } from "../render/denoiseDevice.mjs";
 import crypto from "node:crypto";
 
@@ -148,6 +150,23 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
         if (cache) out.cache = { hits: cache.hits, misses: cache.misses };
         fs.writeFileSync(file, JSON.stringify(out, (k, v) => (v instanceof Float64Array ? Array.from(v) : v), 1) + "\n");
         console.log(`[denoiseStudy] wrote ${ROUND_MESH.results}`);
+    } else if (args.includes("--harvest-mesh-c")) {
+        // section 127: section 79's round in family C's materials and light, nothing trained -- the shipped pair, decoded here exactly as denoise.html decodes it (decodeNet over
+        // the file's `net`, the filter the file names), and the file's own sha-256 written beside the results
+        const file = path.join(ENG, ROUND_MESH_C.results);
+        if (fs.existsSync(file)) { console.log(`[denoiseStudy] ${ROUND_MESH_C.results} exists -- a harvest's results are never overwritten`); process.exit(2); }
+        const bytes = fs.readFileSync(path.join(ENG, SHIPPED_NET)), shipped = JSON.parse(bytes.toString("utf8"));
+        const at = args.indexOf("--cache"), dir = at >= 0 ? args[at + 1] : null;
+        if (at >= 0 && !dir) { console.log("[denoiseStudy] --cache needs a directory"); process.exit(2); }
+        const git = (...a) => execFileSync("git", a, { cwd: ENG, encoding: "utf8", maxBuffer: 1 << 28 });
+        const cache = dir ? openCache(path.resolve(dir), { results: ROUND_MESH_C.results, commit: git("rev-parse", "HEAD").trim(),
+                                                         diff: hashArrays([git("diff", "HEAD", "--", "render", "brain", "physics", "mesh", "tools/denoiseStudy.mjs")]) }) : null;
+        if (cache) console.log(`[denoiseStudy] cache ${cache.dir}`);
+        const out = runShippedStudy({ splits: ROUND_MESH_C.splits, net: decodeNet(shipped.net), filter: shipped.filter, harvest: true, cache, log: (m) => console.log("[denoiseStudy] " + m) });
+        out.shipped = { file: SHIPPED_NET, sha256: crypto.createHash("sha256").update(bytes).digest("hex"), source: shipped.source };
+        if (cache) out.cache = { hits: cache.hits, misses: cache.misses };
+        fs.writeFileSync(file, JSON.stringify(out, (k, v) => (v instanceof Float64Array ? Array.from(v) : v), 1) + "\n");
+        console.log(`[denoiseStudy] wrote ${ROUND_MESH_C.results}`);
     } else if (round) {
         const file = path.join(ENG, round.results);
         if (fs.existsSync(file)) { console.log(`[denoiseStudy] ${round.results} exists -- a harvest's results are never overwritten`); process.exit(2); }
@@ -167,7 +186,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
         // section 33: the verdict is in the file, which is committed before it is read -- the log says only that it was written
         console.log(`[denoiseStudy] wrote ${round.results}`);
     } else {
-        console.log("usage: node tools/denoiseStudy.mjs --mini | --harvest-temporalup | --harvest-emitter | --harvest-halfres | --harvest-fsr1 | --harvest-mesh | --harvest-r47 | --secondary-r11 | --harvest-r11 | --harvest-r10 | --harvest-r9 | --harvest-r8 | --harvest-r7 | --harvest-r6 | --harvest-r5 | --harvest-r4 | --harvest-r3 | --harvest-r2 | --harvest-r1 [--cache <dir>] [--workers <n>]   (a harvest renders the pre-registered dataset; see render/learned-denoiser-preregistration.md)");
+        console.log("usage: node tools/denoiseStudy.mjs --mini | --harvest-temporalup | --harvest-emitter | --harvest-halfres | --harvest-fsr1 | --harvest-mesh | --harvest-mesh-c | --harvest-r47 | --secondary-r11 | --harvest-r11 | --harvest-r10 | --harvest-r9 | --harvest-r8 | --harvest-r7 | --harvest-r6 | --harvest-r5 | --harvest-r4 | --harvest-r3 | --harvest-r2 | --harvest-r1 [--cache <dir>] [--workers <n>]   (a harvest renders the pre-registered dataset; see render/learned-denoiser-preregistration.md)");
         process.exit(2);
     }
 }
