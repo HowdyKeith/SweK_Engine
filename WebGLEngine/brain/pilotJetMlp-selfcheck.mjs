@@ -11,7 +11,12 @@
 //   4  THE FLIGHT         the 24 jet fights flown with the hand-weights network in seat A are the hand pilot's fights, hit for hit; the trainer's gains write the trainer's MLP's weights
 //   5  THE BRAIN FILE     the policy descriptor, the round trip, a file for another policy refused by name (the trainer's MLP, the jet's fruit fly) and the front door
 //
-// SABOTAGE LOG -- (filled in below once run)
+// SABOTAGE LOG -- ELEVEN, each applied to brain/pilotJetMlp.mjs in a scratch tree, the gate run, the tree discarded; every one red by name except JM09 (the number is how many rows went red):
+//   JM01 the limiter neuron not passed through the second layer 5 | JM02 the limiter's row not copied 6 | JM03 the readout copied for the pitch only 6 | JM04 the readout read from one weight off 7 | JM05 the identity weight 2 4 |
+//   JM06 the pilot ignores its gains 1 | JM07 the jet's gains are a copy 1 | JM08 the zero weights are a copy 1 | JM09 the first layer copied for 17 features 0 | JM10 the report says undefined 1 |
+//   JM11 the hand weights written for the trainer's gains by default 4
+//   JM09 IS AN EQUIVALENT MUTANT, SAID: copying the first layer's rows for 17 features and not 18 leaves feature 17 (the yaw rate) out, and no hand weight reads feature 17 -- the column is zero in every row the copy touches. JM06 (the pilot ignoring its gains) WENT 0 RED THE FIRST TIME: every row used the default gains; the cruise-gains row now asks for the cruise autopilot's controls to 2e-6 from weights and features made from AUTOPILOT_JET, and holds the same weights read through the fighting gains' features NOT to be the autopilot.
+//   THE FIRST RUN FOUND THE TRAINER-GAINS ROW RED: handWeights(AUTOPILOT_FLIGHT) wrote an identity on the limiter's neuron even when there was no limiter, which the trainer's MLP does not -- the second-layer identity is now written only when the gains have a limiter.
 "use strict";
 import * as M from "./pilotJetMlp.mjs";
 import * as PM from "./pilotFlightMlp.mjs";
@@ -55,6 +60,15 @@ console.log("\n2. THE HAND WEIGHTS ARE THE AUTOPILOT");
         for (const k of KEYS) { worst = Math.max(worst, Math.abs(a[k] - b[k])); worstFly = Math.max(worstFly, Math.abs(c[k] - b[k])); }
     }
     ok("!! OVER 1,500 RANDOM JET STATES (any attitude, 70 to 190 m/s, 300 to 8,000 m, spinning, a wind of up to 15 m/s, any target) THE MLP'S FOUR CONTROLS ARE THE AUTOPILOT'S TO 2e-6 (float32 weights) AND THE FRUIT FLY'S HAND WEIGHTS' TO 1e-6: the two brains start from the same laws", worst < 2e-6 && worstFly < 1e-6, `autopilot ${worst.toExponential(2)}, fruit fly ${worstFly.toExponential(2)}`);
+    {
+        const GC = AF.AUTOPILOT_JET, cruise = M.pilotFor(M.handWeights(GC), GC), asFight = M.pilotFor(M.handWeights(GC)), rnd2 = mulberry(77); let worstC = 0, differ = 0;
+        for (let i = 0; i < 200; i++) {
+            const alt = 500 + rnd2() * 6000, st = jetState({ pos: [0, 0, alt], speed: 80 + rnd2() * 100, heading: rnd2() * 6 - 3, pitch: rnd2() - 0.5, bank: rnd2() * 6 - 3, gamma: rnd2() * 0.6 - 0.3 }), tg = { altitude: alt + rnd2() * 600 - 300, heading: rnd2() * 6 - 3, airspeed: 90 + rnd2() * 80 };
+            const a = AF.decide(st, tg, [0, 0, 0], { ...GC, model: jet }).controls, b = cruise(st, tg), c = asFight(st, tg);
+            for (const k of KEYS) { worstC = Math.max(worstC, Math.abs(a[k] - b[k])); if (Math.abs(b[k] - c[k]) > 1e-3) differ++; }
+        }
+        ok("!! THE PILOT TAKES ITS GAINS: the weights and the features made from the CRUISE gains (AUTOPILOT_JET) are the cruise autopilot's to 2e-6 over 200 random states, and the same weights read through the fighting gains' features (the default) are NOT (they differ by over 1e-3 in many controls)", worstC < 2e-6 && differ > 40, `cruise ${worstC.toExponential(2)}, ${differ} controls differ`);
+    }
     const T0 = { altitude: 2000, heading: 0, airspeed: 120 }, lim = (alpha, q) => { const s = jetState({ pos: [0, 0, 2000], speed: 120, pitch: alpha, bank: 0 }); s.w = [0, -q, 0]; return s; };
     const noL = M.pilotFor(M.handWeights({ ...G, alphaLimit: 0 }));
     ok("!! THE LIMITER NEURON IS THE LIMITER, THROUGH BOTH LAYERS: at an angle of attack of 0.25 rad the MLP's pitch is -1 (the autopilot's) and the same MLP without the limiter neuron's is not; at 0.05 the two MLPs give the same pitch to the bit; and with a pitch rate of 0.4 rad/s at 0.08 rad it is -1 again (the lead)", hand(lim(0.25, 0), T0).pitch === -1 && noL(lim(0.25, 0), T0).pitch > -0.5 && hand(lim(0.05, 0), T0).pitch === noL(lim(0.05, 0), T0).pitch && hand(lim(0.08, 0.4), T0).pitch === -1 && noL(lim(0.08, 0.4), T0).pitch > -0.5);

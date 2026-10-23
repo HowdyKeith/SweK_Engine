@@ -381,7 +381,7 @@ window.__dogfight = {
   clickWindow(i) { wins[i].el.dispatchEvent(new MouseEvent("click", { bubbles: true })); renderFrame(0); return wins[i].view; },
   setView(i, v) { wins[i].view = v; setLabel(wins[i]); renderFrame(0); }, pixels: pixelStats, ink: overlayInk, inkColor,
   mainCamera: () => ({ pos: camera.position.toArray(), look: camLook.toArray() }),
-  meshScale: (i) => meshes[i].scale.x, brainNames: (i) => brainRowsOf(arena.crafts[i], i).map((r) => r.names.slice(0, 18)), fog: () => [scene.fog.near, scene.fog.far],
+  stateOf: (i) => arena.crafts[i].state, targetOf: (i) => arena.crafts[i].last && arena.crafts[i].last.target, brainValues: (i) => brainRowsOf(arena.crafts[i], i)[0].values, meshScale: (i) => meshes[i].scale.x, brainNames: (i) => brainRowsOf(arena.crafts[i], i).map((r) => r.names.slice(0, 18)), fog: () => [scene.fog.near, scene.fog.far],
   settleCamera() { renderFrame(0, true); },
   mainView() { const v = new THREE.Vector3(); return arena.crafts.map((c) => { v.set(...c.state.pos).project(camera); return [v.x, v.y, v.z]; }); },
   get paused() { return paused; },

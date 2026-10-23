@@ -41,6 +41,11 @@
 //   the controls' own finite-guard: the row now holds the RECORD finite and the controls equal to those of the same target given as 0); A49 (the turn rate from the equivalent airspeed, 0 red because the heading rate in a coordinated turn follows the bank and not the rudder: the rate asked of the rudder is checked at 5,000 m directly) and A70 (the jet's default target, pinned in full).
 //   A08 IS AN EQUIVALENT MUTANT, SAID PLAINLY: moving up a table at the grid height (>= for >) changes u from 1 to 0 and the table from the lower to the upper, and the two give the same number to the last bit at every grid point -- the interpolation is continuous there.
 //   A43 CANNOT FINISH THE GATE (it makes every tick rebuild the trim tables, and a thirty-second flight takes hours), so it was run for 120 s and killed: two rows had already gone red by name (the trainer's table is one object, the jet's table at a height is one object).
+//
+//   AND NINE ON THE FIGHTING GAINS AND THE FIGHTING PILOT (section 11), each applied to brain/autopilotFlight.mjs, every one red by name (the number is how many rows went red):
+//   H01 the fighting bank limit 1.0 2 | H02 the fighting heading time constant 3 s 2 | H03 the fighting climb stiffness 0.3 1 | H04 the fighting climb limit 20 3 | H05 a fifth fighting number (the alpha limit) 1 |
+//   H06 the fighting gains not frozen 1 | H07 the fighting pilot flies the cruise gains 4 | H08 the fighting pilot flies the trainer's airframe model 4 | H09 the fighting pilot drops the gains 4
+//   (The gain schedule was moved out of lawsFrom into an exported gainSchedule(record, gains) after the seventy-three above were run, for the networks' feature layout to read; A27-A31 apply unchanged to the moved line (A31's old pattern `const sc = g.vRef ? clamp(` now reads `(g.vRef ? clamp(`) and a row holds the exported function at 1, 3, 0.49 and 0.3 and the trainer's gains at 1.)
 "use strict";
 import * as F from "../physics/mechanics/flightModel6dof.mjs";
 import { atmosphere } from "../physics/mechanics/atmosphereISA.mjs";

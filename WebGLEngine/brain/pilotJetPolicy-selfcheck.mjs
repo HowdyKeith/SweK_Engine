@@ -11,7 +11,15 @@
 //   4  THE FLIGHT           the 24 jet fights fly the same fights as the hand pilot (every hit, round, status and tick; a score difference of exactly 0); the cruise gains written the same way fly the cruise pilot's altitude step; the trainer's gains write the trainer's weights
 //   5  THE FRONT DOOR
 //
-// SABOTAGE LOG -- (filled in below once run)
+// SABOTAGE LOG -- TWENTY-SEVEN, each applied to brain/pilotJetPolicy.mjs in a scratch tree, the gate run, the tree discarded; every one red by name (the number is how many rows went red):
+//   JP01 the bank compensation not scheduled 5 | JP02 the climb pull always scheduled 1 | JP03 the climb pull never scheduled 5 | JP04 the speed error clamped at 60 m/s 1 | JP05 the climb rate clamped at 60 m/s 3 |
+//   JP06 the angle of attack not weighted by upright 3 | JP07 the angle of attack scale 0.1 5 | JP08 the pitch rate not weighted by upright 3 | JP09 the pitch rate scale 0.25 4 | JP10 the upright feature is 1 3 |
+//   JP11 the pitch rate has the wrong sign 6 | JP12 no schedule 5 | JP13 the features ignore the gains' flags 5 | JP14 the limiter reads the angle of attack at half scale 5 | JP15 the limiter without the lead's gain 4 |
+//   JP16 the limiter without kAlpha in the limit 6 | JP17 the limiter adds stick 5 | JP18 a limiter written for every gain set 2 | JP19 the limiter on the throttle's second neuron 8 | JP20 the pilot ignores its gains 1 |
+//   JP21 the features read the trainer's airframe 5 | JP22 a feature name not changed 1 | JP23 the jet's gains are the cruise gains 3 | JP24 forward is a wrapper 1 | JP25 the report says undefined 1 |
+//   JP26 the climb clamp upper bound only 3 | JP27 the speed-error scale 20 5
+//   WHAT THE FIRST RUNS FOUND, in the rows and in the module: (1) THE TRAINER'S CLAMPS ARE WRONG FOR A JET: the first random-state row (1,500 states) found 0.52 of throttle wrong in a climb of 86 m/s -- the trainer's climb-rate feature is clamped at 60 m/s of climb and its speed-error feature at 60 m/s of error, far outside what a 45 m/s aircraft does and inside what a jet does -- so features 10 and 11 carry wider clamps (24 and 40) and the steep-climb row exists because of it
+//   (JP04, JP05 and JP26 are its mutants); (2) the pitch rate of the state is MINUS the body y rate, which the limiter row had backwards on its first run; (3) the cruise-gains flight ends 5e-2 m from the hand pilot's after 40 s (float32 weights, integrated), not 1e-3; (4) the climb-pull row first asked a state with no climb error for a scheduled climb error (a factor of 3 on zero); (5) a NaN is read as 0 but an infinity is CLAMPED to the feature's bound (12 for the pitch rate), as the trainer's features do.
 "use strict";
 import * as PJ from "./pilotJetPolicy.mjs";
 import * as PF from "./pilotFlightPolicy.mjs";

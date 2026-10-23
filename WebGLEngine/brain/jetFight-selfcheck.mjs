@@ -14,7 +14,19 @@
 //   6  THE ARENA IS THE SAME FIGHT   24 fights through dogfightArena (with the jet's model, gun and guide) and through duel(): every number identical to the bit; and the fingerprints of four fights are pinned
 //   7  THE FRONT DOOR
 //
-// SABOTAGE LOG -- (filled in below once run)
+// SABOTAGE LOG -- FORTY-FIVE, each applied to brain/jetFight.mjs in a scratch tree, the gate run, the tree discarded; every one red by name (the number is how many rows went red):
+//   F01 the muzzle speed 300 12 | F02 ten rounds a second 11 | F03 200 rounds 1 | F04 the trainer's muzzle 6 | F05 the trainer's boresight 13 | F06 a round that lives 2 s 1 | F07 the trainer's hit sphere 11 |
+//   F08 two damage a hit 11 | F09 ten hit points 11 | F10 the trainer's altitude floor 1 | F11 a trigger range of 800 10 | F12 the trainer's speeds 12 | F13 the trainer's standoff 9 | F14 the trainer's break range 9 |
+//   F15 the trainer's break closing speed 1 | F16 the trainer's break climb 11 | F17 the trainer's keep-out range 1 | F18 the trainer's keep-out closing speed 1 | F19 the trainer's collision range 2 | F20 no angle-of-attack trim 12 |
+//   F21 no lead 11 | F22 a lead of 3.2 s 11 | F23 the gun not frozen 1 | F24 the guide not frozen 1 | F25 the options carry no guide 11 | F26 the options seat the trainer's pilot in B 9 |
+//   F27 the options fly the trainer's airframe 12 | F28 lengths x 3 12 | F29 speeds x 3 10 | F30 the turn rate unscaled 11 | F31 the fight at 2,500 m 13 | F32 y not scaled 14 | F33 the height difference not scaled 10 |
+//   F34 the speed not scaled 12 | F35 the turn rate not scaled 10 | F36 the seed lost 3 | F37 the fight set is the training set 11 | F38 the bench set one short 2 | F39 duel() ignores the caller's options 1 |
+//   F40 evaluate() ignores the caller's options 4 | F41 evaluate() defaults to the bench 2 | F42 the report says undefined 1 | F43 the scenario's position not frozen 1 | F44 the scenario not frozen 1 |
+//   F45 an opponent that does not turn also loses its trigger 11
+//   WHAT THE FIRST RUNS FOUND, in the rows and not in the module: (1) THE BORESIGHT HEADER WAS WRONG BEFORE IT WAS COMMITTED: it first said the jet's nose is 4 degrees (0.07 rad) above its path and the gun is tilted down to match -- the flight model's trim gives 0.018 rad at 140 m/s, 0.0055 at 160 and -0.001 at 175, so the boresight is -0.012 and the row that computes the angle of attack from
+//   the flight model (not from the header) is there because of it; (2) the lead that hits a turning target was first 3.2 s with that wrong boresight (a window 0.3 s wide that happened to be there) and is 2.5 s, the pilot's own heading time constant, with the right one -- the row ties the two; (3) the closest-approach bounds of the straight fights (600 m) and the turning ones (327..606 m) were written from the prototype's numbers and corrected from the run; (4) the seat-swapped duels
+//   (the fighting pilot against the cruise pilot) lose one of six, not none.
+//   F41 (evaluate() defaulting to the bench) CRASHED the gate at its last row (the report line indexes a kind the bench does not hold) instead of going red by name: the report row now catches the throw, and a row asks evaluate() with no set for the 24 fights.
 "use strict";
 import * as J from "./jetFight.mjs";
 import * as D from "./dogfightTask.mjs";
@@ -128,7 +140,9 @@ sec("6. THE ARENA IS THE SAME FIGHT; THE FINGERPRINTS");
 
 sec("7. THE FRONT DOOR");
 {
-    const L = J.reportLines();
+    const def = J.evaluate(AF.jetFightPilot);
+    ok("evaluate() with no set is the 24 fights of JET_FIGHT_SET (not the bench's 120), and with a set of its own it flies that one", def.results.length === 24 && near(def.score, fightSet.score, 1e-12) && J.evaluate(AF.jetFightPilot, J.JET_FIGHT_SET.slice(0, 3)).results.length === 3);
+    let L; try { L = J.reportLines(); } catch (e) { L = ["THREW " + e.message, ""]; }
     ok("!! the export list is pinned, and the report names the module, the 24 fights and the pilot's score, with no NaN or undefined", Object.keys(J).sort().join(",") === "ALTITUDE,GUIDE_JET,JET_BENCH_SET,JET_FIGHT_SET,JET_GUN,JET_OPTS,SCALE,SPEED_SCALE,TURN_SCALE,duel,evaluate,reportLines,scenario" && L.length === 2 && /jetFight/.test(L[0]) && /24 fights/.test(L[1]) && /0\.897/.test(L[1]) && !L.some((l) => /NaN|undefined/.test(l)), L[1]);
 }
 
