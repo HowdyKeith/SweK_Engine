@@ -73,6 +73,7 @@ import * as PJ from "../../brain/pilotJetPolicy.mjs";
 import * as PJM from "../../brain/pilotJetMlp.mjs";
 import * as JF from "../../brain/jetFight.mjs";
 import * as JLS from "../../brain/jetLeagueSets.mjs";
+import * as DT from "../../brain/dogfightTrain.mjs";
 import * as F from "../../physics/mechanics/flightModel6dof.mjs";
 import { weightsHash } from "../../brain/drivePolicy.mjs";
 
@@ -433,6 +434,16 @@ sec("12. THE SECOND RECIPE (--train wide): the objective on one batch of fresh d
     const one = spy("x", [smk[0], smk[1]]), degenerate = L.searchOne(wSmoke, 0, { ...jc, sets: { ...jc.sets, train: one, trainBatches: [one], trainPrune: one } }), fixedSame = L.searchOne({ ...wSmoke, train: "fixed" }, 0, { ...jc, sets: { ...jc.sets, train: one, trainBatches: [one], trainPrune: one } });
     ok("!! ONE BATCH THAT IS THE TRAINING SET, WITH A PRUNE SET THAT IS THE TRAINING SET, IS THE FIRST RECIPE, TO THE BIT: the same weights, improved and neutral counts, moved and kept, and train score as --train fixed",
         same(Array.from(degenerate.weights), Array.from(fixedSame.weights)) && degenerate.improved === fixedSame.improved && degenerate.neutral === fixedSame.neutral && degenerate.moved === fixedSame.moved && degenerate.kept === fixedSame.kept && degenerate.trainScore === fixedSame.trainScore, `${degenerate.improved} improved, ${degenerate.neutral} neutral, ${degenerate.moved} moved`);
+    // the jets' start IS policy.handWeights(), so a search that forgot to pass its start would look the same: these two rows hand it a start that is not, and a second search number
+    const nudged = Float32Array.from(jc.startW); nudged[3] += 0.25;
+    const w0 = L.searchOne({ ...wSmoke, iters: 0 }, 0, { ...jc, startW: nudged });
+    ok("!! A WIDE SEARCH STARTS FROM THE CONTEXT'S START WEIGHTS, NOT FROM THE POLICY'S OWN HAND WEIGHTS: handed a start nudged by 0.25 in one place and no iterations, nothing is moved from it (moved 0, kept 0) and the weights returned are the nudged start to the bit",
+        w0.moved === 0 && w0.kept === 0 && same(Array.from(w0.weights), Array.from(nudged)), `moved ${w0.moved}, kept ${w0.kept}`);
+    const k1 = L.searchOne(wSmoke, 1, { ...jc, sets }), sc1 = sets.trainBatches.map((set) => L.scorer(PJ, jc.members, set, jc.sim));
+    const by1 = DT.trainBatchedWith(PJ, sc1, { seed: wSmoke.seed + 1, iters: wSmoke.iters, sigma: wSmoke.sigma, maxK: wSmoke.maxK, start: jc.startW }), by0 = DT.trainBatchedWith(PJ, sc1, { seed: wSmoke.seed, iters: wSmoke.iters, sigma: wSmoke.sigma, maxK: wSmoke.maxK, start: jc.startW });
+    const pr1 = DT.pruneWith(PJ, L.scorer(PJ, jc.members, sets.trainPrune, jc.sim), by1.weights, { toward: jc.startW });
+    ok("!! SEARCH NUMBER k RUNS ON SEED opts.seed + k: search 1 returns seed 12001 and its pruned weights are, to the bit, those of the batched trainer run by hand with seed 12001 (and its improved / neutral counts), and they are not what seed 12000 would have found (the two hand-run trainers disagree somewhere)",
+        k1.seed === wSmoke.seed + 1 && same(Array.from(k1.weights), Array.from(pr1.weights)) && k1.improved === by1.improved && k1.neutral === by1.neutral && !same(Array.from(by0.weights), Array.from(by1.weights)), `${k1.improved} improved, ${k1.neutral} neutral`);
     const sm = parse(["--smoke"]), c0 = { brain: L.BRAINS.fly, hashes: { start: "aaaa1111", other: "bbbb2222" } }, cj = { ...c0, brain: L.BRAINS_JET.fly };
     const kw = L.cacheKey(wSmoke, cj, 0), kf = L.cacheKey({ ...wSmoke, train: "fixed" }, cj, 0);
     ok("!! THE CACHE CANNOT MIX THE RECIPES, AND THE OLD KEYS DO NOT MOVE: a wide search's key carries train \"wide\" and is not the fixed search's for the same everything else, the fixed key has no `train` field at all (the finished searches already cached keep their keys, trainers' and jets' alike), and the cache FILE of a wide search has its own name (league-fly-smoke-wide-0.json) so it never overwrites the fixed one's",

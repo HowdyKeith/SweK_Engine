@@ -29,6 +29,12 @@
 #                    --max-partners N        (default 40)
 #                    --max-rows N            (default 5000000: the most rows any one synapse query may return; a query that hits it is flagged TRUNCATED in the manifest)
 #                    --version N             (a materialization version; default the most recent one. ROOT IDS CHANGE WITH PROOFREADING: every query uses this one version, and the manifest records it)
+#                    --signs                 (VERSION 5: also fetch the excitatory / inhibitory tag of every synapse exported, from the stack's label table (default <synapse table>_label, keyed by target_id = the synapse's id): writes synapse_signs.csv,
+#                                             adds excitatory / inhibitory / unlabelled columns to edges.csv and a signs entry to cells_summary.json. The synapse table's own size column is empty on fish1_full; its sign is only here)
+#                    --boxes                 (VERSION 5: also fetch the bounding box of every synapse into and out of the cells from the stack's size table (the one table with 'size' in its name; --size-table names it): writes synapse_boxes.csv with
+#                                             the box in nm and its volume, and says how many boxes carry the id of an exported synapse (the join is not assumed, it is counted))
+#                    --label-table T, --size-table T   (name the tables when the stack's naming is not the default)
+#                    The two extras are best effort: when one fails the export goes on without it and says so in the console, the manifest's warnings and the README. Ctrl+C still stops.
 #
 #   giants           python3 tools/fishCaveExport.py giants --datastack <name>     # the big-neuron finder: one pass over the whole synapse table counting the synapses each cell with a soma receives, then the top cells and their mirror pairs
 #                    A PASS OVER ~30 MILLION ROWS TAKES ABOUT AN HOUR AND THE SERVER IS NOT ALWAYS UP FOR IT. Three things make that survivable:
@@ -60,7 +66,7 @@ import time
 from collections import Counter
 
 TOOL = "fishCaveExport"
-VERSION = "4"
+VERSION = "5"
 DEFAULT_SERVER = "https://global.brain-wire-test.org"
 DEFAULT_MATCH = r"mauthner|\bm[- ]?cell\b"
 DEFAULT_SCAN_MAX_ROWS = 300000
@@ -77,6 +83,7 @@ DEFAULT_RETRY_WAIT = 5.0         # seconds before the first retry; each later wa
 DEFAULT_RETRY_MAX_WAIT = 300.0
 DEFAULT_MIN_CHUNK_ROWS = 50000   # the smallest page a pass shrinks to after the server keeps failing on it
 PRE_ROOT, POST_ROOT = "pre_pt_root_id", "post_pt_root_id"
+SIGN_CHUNK = 2000   # synapse ids asked of the label table at once
 
 
 class Refusal(Exception):
@@ -542,11 +549,91 @@ def lookup_labels(client, tables, synapse_table, members, args, version):
     return labels, report
 
 
+def best_effort(out, what, fn):
+    """An optional extra of the export (--signs, --boxes): when it fails the export goes on without it and says so, in the console and in the manifest's warnings; Ctrl+C (Stopped with code 130) still stops everything."""
+    try:
+        return fn()
+    except Stopped as e:
+        if e.code == 130:
+            raise
+        out.warnings.append("%s was skipped: %s" % (what, e))
+    except Refusal as e:
+        out.warnings.append("%s was skipped: %s" % (what, e))
+    except Exception as e:
+        out.warnings.append("%s was skipped: %s: %s" % (what, type(e).__name__, brief(e)))
+    say("WARNING: " + out.warnings[-1])
+    return None
+
+
+def find_side_table(stack_tables, synapse_table, explicit, kind):
+    """The label table or the box-size table of the synapse table: the one --label-table / --size-table names, else by the stack's own naming ('<synapse table>_label'; the one table with 'size' in its name). Returns (name, None) or (None, why not)."""
+    if explicit:
+        return (explicit, None) if explicit in stack_tables else (None, "%s is not a table of this stack" % explicit)
+    if kind == "label":
+        want = (synapse_table or "") + "_label"
+        return (want, None) if want in stack_tables else (None, "no table called %s (pass --label-table)" % want)
+    sized = [t for t in stack_tables if "size" in t.lower() and t != synapse_table]
+    return (sized[0], None) if len(sized) == 1 else (None, "%d tables have 'size' in their name (pass --size-table)" % len(sized))
+
+
+def fetch_signs(mat, args, version, table, synapse_ids, stopped_note):
+    """The tag of every synapse in `synapse_ids` (1 inhibitory, 2 excitatory), from the label table, which is keyed by `target_id` = the synapse's own id; asked in chunks. Returns (the label rows, {synapse id: tag}, report). THE JOIN IS COUNTED: the report says
+    how many of the synapses asked for came back with a tag, so a table whose target_id is not the synapse id shows up as zero and not as a silent mismatch."""
+    ids = sorted(set(synapse_ids))
+    rows = []
+    step = args.sign_chunk
+    n_chunks = (len(ids) + step - 1) // step
+    for i in range(0, len(ids), step):
+        chunk = ids[i:i + step]
+        label = "synapse signs, chunk %d of %d" % (i // step + 1, n_chunks)
+        df = call_with_retries(args, label, lambda: mat.query_table(table, **kw_query_table_in(version, args.max_rows, "target_id", chunk)), None, stopped_note)
+        rows.extend(rows_of(df))
+    tag_of = {}
+    for r in rows:
+        sid, tag = as_int(r.get("target_id")), plain_int(r.get("tag"))
+        if sid is not None and tag is not None:
+            tag_of[sid] = tag
+    counts = Counter(tag_of.values())
+    report = {"table": table, "asked": len(ids), "chunks": n_chunks, "rowsReturned": len(rows), "tagged": len(tag_of), "inhibitory": counts.get(1, 0), "excitatory": counts.get(2, 0), "otherTags": sum(v for k, v in counts.items() if k not in (1, 2))}
+    return rows, tag_of, report
+
+
+def fetch_boxes(mat, args, version, table, cell_ids, synapse_ids, resolution, stopped_note):
+    """The bounding box of every synapse into (pt2_root_id) and out of (pt_root_id) the cells, from the size table; with the table's voxel size the box in nm and its volume are added. THE JOIN IS COUNTED: the report says how many boxes carry the id of a synapse that
+    was exported. Returns (the box rows with the added columns, {synapse id: volume nm^3}, report)."""
+    rows, seen = [], set()
+    for col in ("pt2_root_id", "pt_root_id"):
+        df = call_with_retries(args, "synapse boxes by %s" % col, lambda: mat.query_table(table, **kw_query_table_in(version, args.max_rows, col, cell_ids)), None, stopped_note)
+        for r in rows_of(df):
+            key = as_int(r.get("id"))
+            if key is not None and key in seen:
+                continue
+            seen.add(key)
+            rows.append(r)
+    have = bool(resolution) and len(resolution) == 3
+    vol_of, joined = {}, 0
+    for r in rows:
+        try:
+            size = [(float(r["pt2_position_" + a]) - float(r["pt_position_" + a])) * float(resolution[k]) for k, a in enumerate("xyz")] if have else None
+        except (KeyError, TypeError, ValueError):
+            size = None
+        for k, a in enumerate("xyz"):
+            r["box_nm_" + a] = round(size[k], 1) if size else ""
+        r["box_volume_nm3"] = round(abs(size[0] * size[1] * size[2]), 1) if size else ""
+        sid = as_int(r.get("id"))
+        if sid in synapse_ids:
+            joined += 1
+            if size:
+                vol_of[sid] = r["box_volume_nm3"]
+    report = {"table": table, "rows": len(rows), "joinedById": joined, "voxelNm": list(resolution) if have else None}
+    return rows, vol_of, report
+
+
 def position_columns(root_col):
     return [root_col.replace("root_id", "position_" + a) for a in "xyz"]
 
 
-def cell_summary(cid, rows_out, rows_in, pre_c, post_c, labels, resolution):
+def cell_summary(cid, rows_out, rows_in, pre_c, post_c, labels, resolution, tag_of=None):
     """What one cell looks like in the rows that were exported: how many synapses leave it and arrive on it, from how many partners, where they sit (the box and centre of the synapse positions, in voxels and, when the table's voxel size is known, in micrometres),
     and every row of a label table that names it. A cell with no synapse at all is said to be."""
     outs = [r for r in rows_out if as_int(r.get(pre_c)) == cid]
@@ -568,10 +655,35 @@ def cell_summary(cid, rows_out, rows_in, pre_c, post_c, labels, resolution):
         if resolution and len(resolution) == 3:
             box["voxelNm"] = list(resolution)
             box["extentMicrometres"] = [round((hi[k] - lo[k]) * float(resolution[k]) / 1000.0, 2) for k in range(3)]
-    return {"rootId": cid, "synapsesOut": len(outs), "synapsesIn": len(ins),
-            "partnersOut": len({as_int(r.get(post_c)) for r in outs} - {None}), "partnersIn": len({as_int(r.get(pre_c)) for r in ins} - {None}),
-            "noSynapses": not outs and not ins, "synapseBox": box,
-            "labelRows": [{"table": e["table"], "row": e.get("row", e["text"])} for e in labels.get(cid, [])]}
+    summary = {"rootId": cid, "synapsesOut": len(outs), "synapsesIn": len(ins),
+               "partnersOut": len({as_int(r.get(post_c)) for r in outs} - {None}), "partnersIn": len({as_int(r.get(pre_c)) for r in ins} - {None}),
+               "noSynapses": not outs and not ins, "synapseBox": box,
+               "labelRows": [{"table": e["table"], "row": e.get("row", e["text"])} for e in labels.get(cid, [])]}
+    if tag_of is not None:
+        for key, rows in (("In", ins), ("Out", outs)):
+            tags = Counter(tag_of.get(as_int(r.get("id"))) for r in rows)
+            summary["signs" + key] = {"excitatory": tags.get(2, 0), "inhibitory": tags.get(1, 0), "untagged": sum(v for k, v in tags.items() if k not in (1, 2))}
+    return summary
+
+
+def columns_of_rows(rows):
+    """The columns of a list of row dicts, in the order they first appear (the label and size tables are written with every column the server returned)."""
+    cols = []
+    for r in rows:
+        for c in r:
+            if c not in cols:
+                cols.append(c)
+    return cols
+
+
+def extras_readme(extras):
+    """A README sentence for each extra that was fetched ('' when none)."""
+    text = ""
+    if "signs" in extras:
+        text += "synapse_signs.csv: the label table's row for each synapse (tag 1 inhibitory, 2 excitatory; target_id is the synapse id); edges.csv has excitatory / inhibitory / unlabelled counts per pair. "
+    if "boxes" in extras:
+        text += "synapse_boxes.csv: the size table's bounding box of each synapse into and out of the cells, in voxels and (box_nm_*, box_volume_nm3) in nm. "
+    return text + ("\n" if text else "")
 
 
 def cmd_export(args):
@@ -580,6 +692,8 @@ def cmd_export(args):
         raise Refusal("export needs --datastack <name> (run `discover` first to see the names)")
     if args.hops not in (1, 2):
         raise Refusal("--hops must be 1 or 2")
+    if args.sign_chunk < 1:
+        raise Refusal("--sign-chunk must be at least 1")
     out = Folder(args.out or "fish1_mauthner_export_" + now_utc().strftime("%Y%m%dT%H%M%SZ"))
     client = make_client(args, args.datastack)
     mat = client.materialize
@@ -649,6 +763,52 @@ def cmd_export(args):
         say("circuit: %d synapses among %d neurons" % (len(circuit_rows), len(members)))
     else:
         members = sorted(set(ids) | set(top))
+    tag_of, vol_of, extras = None, {}, {}
+
+    def extras_note():
+        return "The rest of the export is complete and was written; for this extra run the same command again with a new --out."
+
+    if args.signs or args.boxes:
+        stack_tables = tables if not args.tables else list(mat.get_tables(**kw_get_tables(version)))
+        syn_table = info.get("synapse_table")
+        synapse_ids = {as_int(r.get("id")) for r in rows_out + rows_in + circuit_rows} - {None}
+        if args.signs:
+            def do_signs():
+                table, why = find_side_table(stack_tables, syn_table, args.label_table, "label")
+                if table is None:
+                    raise Refusal(why)
+                label_rows, tags, report = fetch_signs(mat, args, version, table, synapse_ids, extras_note)
+                if synapse_ids and not tags:
+                    raise Refusal("the label table %s returned no tag for any of the %d synapses asked for: its target_id is not the synapse's id in this stack, so the signs are not usable" % (table, len(synapse_ids)))
+                out.csv("synapse_signs.csv", columns_of_rows(label_rows), label_rows)
+                say("signs: %d of %d synapses tagged (%d inhibitory, %d excitatory)" % (report["tagged"], report["asked"], report["inhibitory"], report["excitatory"]))
+                return tags, report
+            got = best_effort(out, "the synapse signs", do_signs)
+            if got:
+                tag_of, extras["signs"] = got
+        if args.boxes:
+            def do_boxes():
+                table, why = find_side_table(stack_tables, syn_table, args.size_table, "size")
+                if table is None:
+                    raise Refusal(why)
+                try:
+                    res = list(mat.get_table_metadata(table, **kw_table_metadata(version)).get("voxel_resolution") or [])
+                except Exception:
+                    res = []
+                box_rows, vols, report = fetch_boxes(mat, args, version, table, ids, synapse_ids, res, extras_note)
+                cols = columns_of_rows(box_rows)
+                out.csv("synapse_boxes.csv", cols, box_rows)
+                if box_rows and not report["joinedById"]:
+                    out.warnings.append("none of the %d boxes of %s carries the id of an exported synapse: the size table's id is not the synapse's id in this stack, so edges.csv has no box volume" % (len(box_rows), table))
+                    say("WARNING: " + out.warnings[-1])
+                if box_rows and not report["voxelNm"]:
+                    out.warnings.append("the size table %s names no voxel size, so the boxes are in voxels only (box_nm_* and box_volume_nm3 are blank)" % table)
+                    say("WARNING: " + out.warnings[-1])
+                say("boxes: %d rows, %d carry the id of an exported synapse" % (report["rows"], report["joinedById"]))
+                return vols, report
+            got = best_effort(out, "the synapse boxes", do_boxes)
+            if got:
+                vol_of, extras["boxes"] = got
     size_c = "size" if "size" in synapse_cols else None
     agg = {}
     seen = set()
@@ -661,17 +821,23 @@ def cmd_export(args):
             continue
         if sid is not None:
             seen.add((sid, key))
-        a = agg.setdefault(key, [0, 0])
+        a = agg.setdefault(key, [0, 0, 0, 0, 0, 0])
         a[0] += 1
         try:
             a[1] += int(r.get(size_c)) if size_c else 0
         except (TypeError, ValueError):
             pass
+        tag = tag_of.get(as_int(sid)) if tag_of is not None else None
+        a[2 if tag == 2 else 3 if tag == 1 else 4] += 1
+        v = vol_of.get(as_int(sid))
+        if v not in (None, ""):
+            a[5] += v
     size_real = bool(size_c) and any(as_int(r.get(size_c)) for r in circuit_rows)
     if size_c and not size_real:
         out.warnings.append("the synapse table's %s column is 0 in every row exported, so edges.csv leaves total_size blank (the sizes of this stack are in a separate table: synapses_axon_to_dendrite_size)" % size_c)
         say("WARNING: " + out.warnings[-1])
-    out.csv("edges.csv", ["pre_root_id", "post_root_id", "synapses", "total_size"], [{"pre_root_id": k[0], "post_root_id": k[1], "synapses": v[0], "total_size": v[1] if size_real else ""} for k, v in sorted(agg.items())])
+    edge_cols = ["pre_root_id", "post_root_id", "synapses", "total_size"] + (["excitatory", "inhibitory", "unlabelled"] if tag_of is not None else []) + (["box_volume_nm3"] if "boxes" in extras and vol_of else [])
+    out.csv("edges.csv", edge_cols, [{"pre_root_id": k[0], "post_root_id": k[1], "synapses": v[0], "total_size": v[1] if size_real else "", "excitatory": v[2], "inhibitory": v[3], "unlabelled": v[4], "box_volume_nm3": round(v[5], 1) if v[5] else ""} for k, v in sorted(agg.items())])
     label_report = None
     if not labels:
         labels, label_report = lookup_labels(client, tables, info.get("synapse_table"), members, args, version)
@@ -685,7 +851,7 @@ def cmd_export(args):
     except Exception:
         resolution = []
     summary = {"datastack": args.datastack, "materializationVersion": version, "synapseTable": info.get("synapse_table"), "synapseVoxelNm": resolution or None,
-               "cells": [cell_summary(c, rows_out, rows_in, pre_c, post_c, labels, resolution) for c in ids], "labelLookup": label_report}
+               "cells": [cell_summary(c, rows_out, rows_in, pre_c, post_c, labels, resolution, tag_of) for c in ids], "labelLookup": label_report, "extras": extras or None}
     out.json("cells_summary.json", summary)
     for cs in summary["cells"]:
         tabs = sorted({e["table"] for e in cs["labelRows"]})
@@ -695,10 +861,10 @@ def cmd_export(args):
     out.text("README.txt", "Fish1 Mauthner export (tools/fishCaveExport.py export) of datastack %s at materialization version %s (%s).\n"
              "mauthner_candidates.json: how the cells were found. synapses_out.csv / synapses_in.csv: every synapse of the cells, every column the server returned. partners.csv: the strongest partners. "
              "synapses_circuit.csv (hops 2): the synapses among the cells and their top partners. edges.csv: one row per pre->post pair. labels.csv: the rows of the label tables (somas and the like) that name the neurons in the circuit. cells_summary.json: for each cell its synapse counts, partners, the box its synapses sit in and every label row that names it. "
-             "MANIFEST.json: sha256 of every file, the options and the caveclient version. NO TOKEN IS IN ANY OF THESE FILES.\nCite: %s\n" % (args.datastack, version, stamp, CITATION))
+             "%sMANIFEST.json: sha256 of every file, the options and the caveclient version. NO TOKEN IS IN ANY OF THESE FILES.\nCite: %s\n" % (args.datastack, version, stamp, extras_readme(extras), CITATION))
     import caveclient
     out.manifest({"command": "export", "datastack": args.datastack, "server": server, "materializationVersion": version, "timestamp": stamp, "caveclient": getattr(caveclient, "__version__", None),
-                  "options": {"match": args.match, "rootIds": args.root_ids, "tables": args.tables, "scanMaxRows": args.scan_max_rows, "hops": args.hops, "maxPartners": args.max_partners, "maxRows": args.max_rows},
+                  "options": {"match": args.match, "rootIds": args.root_ids, "tables": args.tables, "scanMaxRows": args.scan_max_rows, "hops": args.hops, "maxPartners": args.max_partners, "maxRows": args.max_rows, "signs": bool(args.signs), "boxes": bool(args.boxes), "labelTable": args.label_table, "sizeTable": args.size_table}, "extras": extras or None,
                   "cells": ids, "circuitNeurons": members, "truncated": truncated}, token_from_env())
     say("\nWrote %s/ (%d files). Upload the folder. If a WARNING above says TRUNCATED, say so." % (out.path, len(out.files) + 1))
     return 0
@@ -1123,6 +1289,11 @@ def build_parser():
     p.add_argument("--max-partners", dest="max_partners", type=int, default=DEFAULT_MAX_PARTNERS)
     p.add_argument("--max-rows", dest="max_rows", type=int, default=DEFAULT_MAX_ROWS)
     p.add_argument("--version", type=int)
+    p.add_argument("--sign-chunk", dest="sign_chunk", type=int, default=SIGN_CHUNK)
+    p.add_argument("--signs", action="store_true")
+    p.add_argument("--boxes", action="store_true")
+    p.add_argument("--label-table", dest="label_table")
+    p.add_argument("--size-table", dest="size_table")
     p.add_argument("--soma-table", dest="soma_table", default="somas")
     p.add_argument("--synapse-table", dest="synapse_table")
     p.add_argument("--soma-voxel-nm", dest="soma_voxel_nm")

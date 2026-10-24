@@ -849,6 +849,107 @@ sec("11. the big-neuron finder (giants): a fixture with a mirror pair, a fragmen
     writeFixture(FIXTURE);
 }
 
+
+sec("13. the signs and the boxes (VERSION 5: --signs, --boxes): the label table and the size table of the synapse table");
+{
+    // the fixture gets the two tables the real stack has (with the real stack's row counts, so the label lookup skips them as it did on fish1_full): a label table keyed by target_id = the synapse id, and a size table with its own pt_root_id / pt2_root_id
+    const F13 = JSON.parse(JSON.stringify(FIXTURE));
+    const tagOf = { 100000: 2, 100001: 2, 100002: 1, 100003: 3, 100007: 1, 100008: 1, 100009: 2, 100010: 1, 100011: 2, 100012: 1, 100013: 1, 100023: 2, 555555: 2 };
+    F13.tables.synapses_label = { count: 29474316, schema: "reference_tag", rows: Object.entries(tagOf).map(([t, tag], i) => ({ id: 900 + i, tag, target_id: Number(t) })) };
+    const box = (id, pre, post, a, b) => ({ id, pt_root_id: pre, pt2_root_id: post, pt_position_x: a[0], pt_position_y: a[1], pt_position_z: a[2], pt2_position_x: b[0], pt2_position_y: b[1], pt2_position_z: b[2], tag: 1, tag2: 2 });
+    F13.tables.synapse_box_sizes = { count: 29474316, schema: "bound_2tag", rows: [box(100007, 2004, 1001, [100, 200, 10], [110, 205, 12]), box(100008, 2004, 1001, [100, 200, 10], [120, 210, 11]), box(100009, 2004, 1001, [0, 0, 0], [5, 5, 5]), box(100010, 2004, 1001, [0, 0, 0], [10, 10, 2]),
+        box(100000, 1001, 2001, [1, 1, 1], [4, 4, 4]), box(100023, 1001, 1002, [0, 0, 0], [2, 2, 2]), box(777777, 2009, 1002, [0, 0, 0], [1, 1, 1])] };
+    const with13 = (f = {}) => { writeFixture(Object.assign(JSON.parse(JSON.stringify(F13)), f)); };
+    const X13 = ["export", "--datastack", "fish1_test", "--root-ids", "1001,1002"], FAST = ["--retry-wait", "0.01", "--retry-max-wait", "0.02"];
+    const man13 = (d) => JSON.parse(rd(d, "MANIFEST.json")), sum13 = (d) => JSON.parse(rd(d, "cells_summary.json")), qs = (r, t) => r.log.filter((c) => c.call === "query_table" && c.table === t);
+    const edge = (d, a, b) => csvRows(d, "edges.csv").find((r) => r.pre_root_id === String(a) && r.post_root_id === String(b));
+    const IDS19 = [...Array.from({ length: 18 }, (_, i) => 100000 + i), 100023];
+
+    with13();
+    const N0 = outDir("x13_plain"), r0 = run([...X13, "--out", N0], { env: E }); watch(r0, N0);
+    ok("!! WITHOUT THE NEW FLAGS NOTHING CHANGES (the old exports stay the old exports): no query touches the label table or the size table, edges.csv has its four columns, the folder has neither synapse_signs.csv nor synapse_boxes.csv, cells_summary.json has no signs and the manifest says signs false, boxes false",
+        r0.status === 0 && qs(r0, "synapses_label").length === 0 && qs(r0, "synapse_box_sizes").length === 0 && Object.keys(csvRows(N0, "edges.csv")[0]).join() === "pre_root_id,post_root_id,synapses,total_size" && !fs.existsSync(path.join(N0, "synapse_signs.csv")) && !fs.existsSync(path.join(N0, "synapse_boxes.csv"))
+        && sum13(N0).cells.every((c) => !("signsIn" in c) && !("signsOut" in c)) && man13(N0).options.signs === false && man13(N0).options.boxes === false && man13(N0).extras === null, r0.stderr.slice(0, 200));
+
+    const SG = outDir("x13_signs"), rs = run([...X13, "--signs", "--out", SG], { env: E }); watch(rs, SG);
+    const sq = qs(rs, "synapses_label");
+    ok("!! --signs ASKS THE LABEL TABLE FOR EXACTLY THE SYNAPSES EXPORTED AND NOTHING MORE: one query on synapses_label (the synapse table's name and _label), filtered on target_id, by the nineteen synapse ids of the export sorted (100000..100017 and 100023: the cells' own synapses and the synapses among the cells and their partners; not the autapse, not the unproofread partner, not the synapses of a cell that touches neither), at the version of the export, with the row limit",
+        rs.status === 0 && sq.length === 1 && Object.keys(sq[0].filter_in_dict).join() === "target_id" && sq[0].filter_in_dict.target_id.join() === IDS19.join() && sq[0].version === 42 && sq[0].limit === 5000000, rs.stderr.slice(0, 200));
+    const sgRows = csvRows(SG, "synapse_signs.csv"), es = (a, b) => { const r = edge(SG, a, b); return r ? `${r.excitatory}/${r.inhibitory}/${r.unlabelled}` : "none"; };
+    ok("!! synapse_signs.csv IS THE LABEL TABLE'S ROWS FOR THOSE SYNAPSES, every column the server returned: twelve rows (the thirteenth row of the table, for a synapse that is not in the export, is not there), their target ids sorted, with id, tag and target_id",
+        sgRows.length === 12 && Object.keys(sgRows[0]).join() === "id,tag,target_id" && !sgRows.some((r) => r.target_id === "555555") && sgRows.map((r) => Number(r.target_id)).sort((a, b) => a - b).join() === Object.keys(tagOf).filter((k) => k !== "555555").map(Number).sort((a, b) => a - b).join());
+    ok("!! edges.csv CARRIES THE SIGNS, counted by hand from the fixture (excitatory / inhibitory / unlabelled): 1001>2001 2/1/0, 2004>1001 1/3/0, 2001>1001 1/0/0, 2004>1002 0/2/0, 1001>1002 1/0/0, a pair with no tag at all is all unlabelled (2005>1002 0/0/1, 1002>2001 0/0/2), and a tag that is neither 1 nor 2 counts as unlabelled (1001>2002 0/0/1); the four old columns and their values are unchanged",
+        Object.keys(csvRows(SG, "edges.csv")[0]).join() === "pre_root_id,post_root_id,synapses,total_size,excitatory,inhibitory,unlabelled" && es(1001, 2001) === "2/1/0" && es(2004, 1001) === "1/3/0" && es(2001, 1001) === "1/0/0" && es(2004, 1002) === "0/2/0" && es(1001, 1002) === "1/0/0" && es(2005, 1002) === "0/0/1" && es(1002, 2001) === "0/0/2" && es(1001, 2002) === "0/0/1"
+        && csvRows(SG, "edges.csv").length === 11 && csvRows(SG, "edges.csv").every((r) => csvRows(N0, "edges.csv").some((o) => o.pre_root_id === r.pre_root_id && o.post_root_id === r.post_root_id && o.synapses === r.synapses && o.total_size === r.total_size)));
+    const sa = sum13(SG), c1 = sa.cells.find((c) => c.rootId === 1001), c2 = sa.cells.find((c) => c.rootId === 1002), sg = (o) => `${o.excitatory}/${o.inhibitory}/${o.untagged}`;
+    ok("!! cells_summary.json SAYS HOW MANY OF EACH CELL'S SYNAPSES ARE EXCITATORY, INHIBITORY OR UNTAGGED, in and out, by hand: cell 1001 in 2/3/0 (from 2004 x4: three inhibitory, one excitatory; from 2001: excitatory), out 3/1/1 (to 2001: two excitatory, one inhibitory; to 1002: excitatory; to 2002: tag 3, untagged); cell 1002 in 1/2/1, out 0/0/3; and the report names the table and counts the join: 19 asked, 12 tagged, 6 inhibitory, 5 excitatory, 1 other tag",
+        sg(c1.signsIn) === "2/3/0" && sg(c1.signsOut) === "3/1/1" && sg(c2.signsIn) === "1/2/1" && sg(c2.signsOut) === "0/0/3" && sa.extras.signs.table === "synapses_label" && sa.extras.signs.asked === 19 && sa.extras.signs.tagged === 12 && sa.extras.signs.inhibitory === 6 && sa.extras.signs.excitatory === 5 && sa.extras.signs.otherTags === 1
+        && man13(SG).options.signs === true && JSON.stringify(man13(SG).extras.signs) === JSON.stringify(sa.extras.signs) && /signs: 12 of 19 synapses tagged \(6 inhibitory, 5 excitatory\)/.test(rs.stdout) && /synapse_signs\.csv/.test(rd(SG, "README.txt")) && !/synapse_boxes/.test(rd(SG, "README.txt")));
+    const CK = outDir("x13_chunks"), rc = run([...X13, "--signs", "--sign-chunk", "7", "--out", CK], { env: E }); watch(rc, CK);
+    const cq = qs(rc, "synapses_label"), cids = cq.flatMap((c) => c.filter_in_dict.target_id);
+    ok("!! THE IDS GO IN CHUNKS, ALL OF THEM AND EACH ONCE: --sign-chunk 7 asks three times with 7, 7 and 5 ids (the sorted nineteen, cut in order), the union is the nineteen, and the folder's edges.csv, synapse_signs.csv and summary signs are exactly what one query gave (the real chunk is 2,000)",
+        rc.status === 0 && cq.map((c) => c.filter_in_dict.target_id.length).join() === "7,7,5" && cids.join() === IDS19.join() && rd(CK, "edges.csv") === rd(SG, "edges.csv") && rd(CK, "synapse_signs.csv") === rd(SG, "synapse_signs.csv") && JSON.stringify(sum13(CK).cells) === JSON.stringify(sa.cells) && /chunk 3 of 3|signs: 12 of 19/.test(rc.stdout + rc.stderr));
+    const rz0 = run([...X13, "--signs", "--sign-chunk", "0", "--out", outDir("x13_chunk0")], { env: E });
+    ok("--sign-chunk 0 is refused before the network is touched (exit 2, the option named, no call to the server)", rz0.status === 2 && /--sign-chunk must be at least 1/.test(rz0.stderr) && rz0.log.length === 0);
+
+    // the extras are best effort
+    with13({ flaky: [{ call: "query_table", table: "synapses_label", kind: "other" }] });
+    const FM = outDir("x13_failhard"), rfm = run([...X13, "--signs", "--out", FM], { env: E }); watch(rfm, FM);
+    with13({ flaky: [{ call: "query_table", table: "synapses_label", kind: "http", status: 500 }] });
+    const FT = outDir("x13_failsoft"), rft = run([...X13, "--signs", "--retries", "1", ...FAST, "--out", FT], { env: E }); watch(rft, FT);
+    with13({ flaky: [{ call: "query_table", table: "synapses_label", kind: "interrupt" }] });
+    const FI = outDir("x13_failctrlc"), rfi = run([...X13, "--signs", "--out", FI], { env: E }); watch(rfi, FI);
+    const sameMain = (d) => ["synapses_out.csv", "synapses_in.csv", "partners.csv", "synapses_circuit.csv"].every((f) => rd(d, f) === rd(N0, f));
+    ok("!! A SIGN LOOKUP THAT FAILS DOES NOT COST THE EXPORT: when the label table answers an error a retry cannot fix, and when it answers 500 until the tries run out, the export still finishes (exit 0) with its synapses, partners and circuit identical to the plain run's, no synapse_signs.csv, edges.csv with its four columns, no signs in the summary, and a warning in the console AND the manifest that names what was skipped and why",
+        rfm.status === 0 && rft.status === 0 && sameMain(FM) && sameMain(FT) && !fs.existsSync(path.join(FM, "synapse_signs.csv")) && !fs.existsSync(path.join(FT, "synapse_signs.csv")) && Object.keys(csvRows(FM, "edges.csv")[0]).join() === "pre_root_id,post_root_id,synapses,total_size" && Object.keys(csvRows(FT, "edges.csv")[0]).join() === "pre_root_id,post_root_id,synapses,total_size"
+        && man13(FM).warnings.some((w) => /the synapse signs was skipped: ValueError: a mistake the server will make again/.test(w)) && man13(FT).warnings.some((w) => /the synapse signs was skipped: STOPPED: synapse signs, chunk 1 of 1 got no good answer from the server after 2 tries \(HTTP 500/.test(w)) && /WARNING: the synapse signs was skipped/.test(rfm.stdout) && /WARNING: the synapse signs was skipped/.test(rft.stdout) && sum13(FM).cells.every((c) => !("signsIn" in c)), (rfm.stderr + rft.stderr).slice(0, 200));
+    ok("!! BUT CTRL+C IS STILL A STOP: an interrupt during the sign lookup ends the run with exit 130 and 'STOPPED by you', and no MANIFEST.json is written (the folder is not presented as finished)",
+        rfi.status === 130 && /STOPPED by you \(Ctrl\+C\) during synapse signs, chunk 1 of 1/.test(rfi.stderr) && !fs.existsSync(path.join(FI, "MANIFEST.json")), rfi.stderr.slice(0, 200));
+
+    // the tables are found by the stack's naming, or by name
+    writeFixture(FIXTURE);
+    const NT = outDir("x13_notable"), rnt = run([...X13, "--signs", "--out", NT], { env: E }); watch(rnt, NT);
+    with13();
+    const BT = outDir("x13_badname"), rbt = run([...X13, "--signs", "--boxes", "--label-table", "nope", "--size-table", "nada", "--out", BT], { env: E }); watch(rbt, BT);
+    ok("!! A STACK WITHOUT THE TABLES, OR A NAME THAT IS NOT ONE, IS SAID: no table called synapses_label (pass --label-table); nope is not a table of this stack; nada is not a table of this stack -- each a warning that names the table, the export otherwise complete (exit 0) and no query made to a table that is not there",
+        rnt.status === 0 && man13(NT).warnings.some((w) => /the synapse signs was skipped: no table called synapses_label \(pass --label-table\)/.test(w)) && rbt.status === 0 && man13(BT).warnings.some((w) => /the synapse signs was skipped: nope is not a table of this stack/.test(w)) && man13(BT).warnings.some((w) => /the synapse boxes was skipped: nada is not a table of this stack/.test(w))
+        && rbt.log.filter((c) => c.call === "query_table" && ["nope", "nada"].includes(c.table)).length === 0 && sameMain(NT) && sameMain(BT));
+    const lab2 = JSON.parse(JSON.stringify(F13)); lab2.tables.synapses_label.rows.forEach((r) => { r.target_id += 5000000; });
+    writeFixture(lab2);
+    const NJ = outDir("x13_nojoin"), rnj = run([...X13, "--signs", "--out", NJ], { env: E }); watch(rnj, NJ);
+    ok("!! A LABEL TABLE WHOSE target_id IS NOT THE SYNAPSE'S ID IS SAID, NOT USED: when no synapse asked for comes back with a tag, the warning says the table returned no tag for any of the 19 synapses and that target_id is not the synapse's id here; there is no synapse_signs.csv and edges.csv has no sign columns (zeros would read as 'all unlabelled', which is a lie about the data)",
+        rnj.status === 0 && man13(NJ).warnings.some((w) => /the synapse signs was skipped: the label table synapses_label returned no tag for any of the 19 synapses asked for: its target_id is not the synapse's id/.test(w)) && !fs.existsSync(path.join(NJ, "synapse_signs.csv")) && Object.keys(csvRows(NJ, "edges.csv")[0]).length === 4);
+
+    // the boxes
+    with13();
+    const BX = outDir("x13_boxes"), rbx = run([...X13, "--boxes", "--out", BX], { env: E }); watch(rbx, BX);
+    const bq = qs(rbx, "synapse_box_sizes"), bxr = csvRows(BX, "synapse_boxes.csv"), bro = (id) => bxr.find((r) => r.id === String(id)), vol = (a, b) => { const r = edge(BX, a, b); return r ? r.box_volume_nm3 : "none"; };
+    ok("!! --boxes ASKS THE SIZE TABLE TWICE, BY THE POSTSYNAPTIC ROOT ID AND THEN BY THE PRESYNAPTIC, for the cells given: pt2_root_id in [1001, 1002], then pt_root_id in [1001, 1002], at the export's version; the box of the synapse from cell 1001 to cell 1002 is in both answers and is written ONCE (7 rows: four boxes into 1001, the one out of 1001, the one between the cells, the one into 1002 that matches no exported synapse)",
+        rbx.status === 0 && bq.length === 2 && Object.keys(bq[0].filter_in_dict).join() === "pt2_root_id" && bq[0].filter_in_dict.pt2_root_id.join() === "1001,1002" && Object.keys(bq[1].filter_in_dict).join() === "pt_root_id" && bq[1].filter_in_dict.pt_root_id.join() === "1001,1002" && bq.every((c) => c.version === 42) && bxr.length === 7 && bxr.filter((r) => r.id === "100023").length === 1, rbx.stderr.slice(0, 200));
+    ok("!! THE BOXES CARRY THEIR SIZE IN nm AND THEIR VOLUME, by hand at the table's 8 x 8 x 30 nm voxels: 100007 is 10 x 5 x 2 voxels = 80 x 40 x 60 nm = 192,000 nm^3; 100008 20 x 10 x 1 = 384,000; 100009 5 x 5 x 5 = 240,000; 100010 10 x 10 x 2 = 384,000; 100000 3 x 3 x 3 = 51,840; 100023 2 x 2 x 2 = 15,360; every column the server returned is there as well",
+        ["id", "pt_root_id", "pt2_root_id", "pt_position_x", "pt2_position_z", "tag", "tag2", "box_nm_x", "box_nm_y", "box_nm_z", "box_volume_nm3"].every((c) => c in bxr[0]) && bro(100007).box_nm_x === "80.0" && bro(100007).box_nm_y === "40.0" && bro(100007).box_nm_z === "60.0" && Number(bro(100007).box_volume_nm3) === 192000 && Number(bro(100008).box_volume_nm3) === 384000 && Number(bro(100009).box_volume_nm3) === 240000
+        && Number(bro(100010).box_volume_nm3) === 384000 && Number(bro(100000).box_volume_nm3) === 51840 && Number(bro(100023).box_volume_nm3) === 15360);
+    ok("!! THE JOIN IS COUNTED, AND EDGES TAKE THEIR VOLUME FROM IT: six of the seven boxes carry the id of an exported synapse (the seventh, 777777, does not), the report says so, and edges.csv gains a box_volume_nm3 column summed per pair -- 2004>1001 1,200,000 (four boxes), 1001>2001 51,840, 1001>1002 15,360, every other pair blank; the four old columns are unchanged and there are no sign columns (--signs was not asked)",
+        rbx.status === 0 && sum13(BX).extras.boxes.rows === 7 && sum13(BX).extras.boxes.joinedById === 6 && JSON.stringify(sum13(BX).extras.boxes.voxelNm) === "[8,8,30]" && Object.keys(csvRows(BX, "edges.csv")[0]).join() === "pre_root_id,post_root_id,synapses,total_size,box_volume_nm3" && Number(vol(2004, 1001)) === 1200000 && Number(vol(1001, 2001)) === 51840 && Number(vol(1001, 1002)) === 15360
+        && vol(1002, 2001) === "" && vol(2001, 1001) === "" && /boxes: 7 rows, 6 carry the id of an exported synapse/.test(rbx.stdout) && /synapse_boxes\.csv/.test(rd(BX, "README.txt")) && !/synapse_signs/.test(rd(BX, "README.txt")) && man13(BX).options.boxes === true);
+    with13({ no_voxel_for: ["synapse_box_sizes"] });
+    const NV = outDir("x13_novoxel"), rnv = run([...X13, "--boxes", "--out", NV], { env: E }); watch(rnv, NV);
+    with13({ tables: Object.assign({}, F13.tables, { synapse_box_sizes: Object.assign({}, F13.tables.synapse_box_sizes, { rows: F13.tables.synapse_box_sizes.rows.map((r) => ({ ...r, id: r.id + 7000000 })) }) }) });
+    const NI = outDir("x13_boxnojoin"), rni = run([...X13, "--boxes", "--out", NI], { env: E }); watch(rni, NI);
+    ok("!! A SIZE TABLE WITHOUT A VOXEL SIZE, OR WHOSE ids ARE NOT THE SYNAPSES', IS SAID: with no voxel size the boxes are written in voxels only (box_nm_* and box_volume_nm3 blank) with a warning that names the table and edges.csv gets no volume column; when no box carries the id of an exported synapse the warning says the size table's id is not the synapse's id here and edges.csv has no volume column -- the boxes are still written, to look at",
+        rnv.status === 0 && bxr.length === 7 && csvRows(NV, "synapse_boxes.csv").length === 7 && csvRows(NV, "synapse_boxes.csv").every((r) => r.box_nm_x === "" && r.box_volume_nm3 === "") && man13(NV).warnings.some((w) => /the size table synapse_box_sizes names no voxel size/.test(w)) && !("box_volume_nm3" in csvRows(NV, "edges.csv")[0])
+        && rni.status === 0 && sum13(NI).extras.boxes.joinedById === 0 && man13(NI).warnings.some((w) => /none of the 7 boxes of synapse_box_sizes carries the id of an exported synapse/.test(w)) && csvRows(NI, "synapse_boxes.csv").length === 7 && !("box_volume_nm3" in csvRows(NI, "edges.csv")[0]));
+
+    // both, with the tables listed by --tables
+    with13();
+    const BO = outDir("x13_both"), rbo = run([...X13, "--signs", "--boxes", "--tables", "soma", "--out", BO], { env: E }); watch(rbo, BO);
+    ok("!! BOTH EXTRAS TOGETHER, WITH --tables NARROWING THE LABEL LOOKUP: the tables of the stack are asked for ONCE to find the label and size tables (the --tables list is for the label rows, not for the stack; a run without --tables reuses its own list and asks once too), edges.csv gets the sign columns and then the volume column in that order, the sign and box queries are the same as when run alone, and the manifest carries both reports",
+        rbo.status === 0 && rbo.log.filter((c) => c.call === "get_tables").length === 1 && rs.log.filter((c) => c.call === "get_tables").length === 1 && Object.keys(csvRows(BO, "edges.csv")[0]).join() === "pre_root_id,post_root_id,synapses,total_size,excitatory,inhibitory,unlabelled,box_volume_nm3" && qs(rbo, "synapses_label").length === 1 && qs(rbo, "synapse_box_sizes").length === 2 && es(1001, 2001) === "2/1/0"
+        && Object.keys(man13(BO).extras).sort().join() === "boxes,signs" && edge(BO, 2004, 1001).excitatory === "1" && Number(edge(BO, 2004, 1001).box_volume_nm3) === 1200000 && /synapse_signs\.csv/.test(rd(BO, "README.txt")) && /synapse_boxes\.csv/.test(rd(BO, "README.txt")), rbo.stderr.slice(0, 200));
+    ok("!! THE TOKEN IS IN NONE OF THE NEW FILES: the folders of this section, files and consoles, carry no trace of the token (the stand-in's secret)", ![SG, CK, BX, BO, NV, NI, FM, FT, FI, NT, BT, NJ].some((d) => fs.existsSync(d) && allText(d).includes(TOKEN)) && !(rs.stdout + rs.stderr + rbx.stdout + rbo.stdout).includes(TOKEN));
+    writeFixture(FIXTURE);
+}
+
 try { fs.rmSync(work, { recursive: true, force: true }); } catch (e) { /* the temp folder is only scratch */ }
 finished = true;
 console.log(fails ? `\nfishCaveExport-selfcheck: ${fails} FAILED` : "\nfishCaveExport-selfcheck: all checks pass");
