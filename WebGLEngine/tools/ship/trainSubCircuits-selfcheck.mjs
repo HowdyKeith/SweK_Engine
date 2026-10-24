@@ -9,7 +9,25 @@
 // THE HAND-WORKED VERDICT (records below; a score is a mean dive score, higher is better): an ER family of four with audit scores -0.40 -0.41 -0.39 -0.40 has mean -0.40, deviations 0 -0.01 +0.01 0, sample variance 0.0002/3,
 //   sd 0.008165; a fish at -0.37 is 0.03 above the mean and needs max(0.02, 2 x 0.008165 = 0.01633) = 0.02: it WINS; at -0.385 it is 0.015 above: it does not.
 //
-// SABOTAGED -- (the log is written below when the sabotage has run)
+// SABOTAGED -- 92 mutants of tools/ship/trainSubCircuits.mjs, each applied in a scratch tree and run alone against this gate, every one red by a row that names it:
+//   specs and seeds F01 an empty spec | F02 fish twice | F03 an unknown family | F04 a backwards range | F05 an index past 19 | F06 a circuit twice | F07 fish with an index | F08 a range one short | F09 the families overlap in the order |
+//   F10 search seeds four apart | F11 search seeds in the audit range | F12 the spent audit range | F13-F17 each family's control seed base | F18 the fish is a control | F19 a control's index ignored | F20 stage A without the degree controls |
+//   F21 stage B without them | F22 floor 0.01 | F23 spread factor 1 | F24 two controls make a family | F25 SIGN in the verdict families | F26 audits on the spent range | F27 and F28 smoke sets one dive too many / too few
+//   the circuit run F29 every search the first seed | F30 the children not the recipe's | F31 the step not the recipe's | F32 prune on the held-out set | F33 the old audits | F34 the autopilot's audit flown on the safety audit |
+//   F35 its reserve flown on the audit | F36 the champion's audit is the safety audit | F38 weights kept without a champion | F39 the dive count not kept | F40 and F41 the effective score always / never the autopilot's
+//   the verdict F42 sd divides by n | F43 the mean is a sum | F44 tied ranks take the smallest | F45 two pairs make a correlation | F46 a constant list has one | F47 the floor dropped | F48 the spread dropped | F49 the margin the wrong way |
+//   F50 the strongest family is the weakest | F51 a pass needs one audit | F52 a pass needs one family | F53 one lost audit fails | F54 three needed | F55 a family needs one control | F56 the fish is the first record |
+//   F57 reach correlated with the fish and the shuffles | F58 with one fixed audit | F59 WINS in lower case | F60 no verdict line | F61 SIGN not marked | F62 the no-champion count inverted
+//   the command F63 report is not a command | F64 an unknown option | F65 an option as a value | F66 a non-number | F67 --one needs a list | F68 --out optional | F69 zero workers | F70 fractional iters | F71 sigma 0 | F72 specs unchecked |
+//   F73 --one with several | F74 the default audit range | F76 another audit range mixes | F77 another number of children mixes | F78 another recipe not refused | F79 a bad line numbered from zero | F80 a resumed run trains again |
+//   F81 a record with no end of line | F82 smoke records read unasked | F83 an empty file reported | F84 a bad argument exits 1 | F85 a circuit file error exits 2 | F86 no report after a run | F87 --quiet keeps the progress |
+//   F88-F91 and F94 a child not told the runs / children / step / smoke / maxK | F92 the one result unmarked | F95 the dive count zero
+// WHAT THE SABOTAGE FOUND, FIXED: five 0-red mutants the first time. F34 and F35 (the autopilot's audits flown on the wrong set) sat in a fallback that only ran when there was NO champion, which no smoke run has: the fallback was cut and the
+// autopilot's three audits are flown for every circuit (about 12 s). F37 (the eligible count) could not be told in a run where every search is eligible: the field was cut from the record (the searches carry their own flag). F75 (the smoke clause
+// of the resume check) was EQUIVALENT -- a smoke record has no audit base and a full one has, so the audit-base clause already refuses the mix: the clause was cut. F90 (a child not told the step) because the children ran at the default
+// sigma: the gate now runs everything at sigma 0.25 and maxK 3. F41 first went red only as "section ran to the end": the row catches the throw. F93 (children one at a time) is EQUIVALENT in output (it changes the clock only) and was dropped;
+// the patterns of F20, F21 and F56 matched twice and were made unique.
+// NOT TRIED: the strict inequality of beats() (equivalent: 0.02 is not a number a double holds, so no input sits on the boundary).
 //
 "use strict";
 import fs from "node:fs";
