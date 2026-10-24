@@ -96,7 +96,7 @@ export function parseArgs(argv) {
     if (train !== "fixed" && train !== "wide") throw new Error(`--train must be fixed or wide, got ${JSON.stringify(train)}`);
     if (train === "wide" && air !== "jet") throw new Error("--train wide has its training sets for the jets only (--aircraft jet)");
     const guard = "guard" in given ? given.guard : 0;
-    if (!Number.isFinite(guard) || guard < 0) throw new Error(`--guard must be a number, 0 or more, got ${String(given.guard)}`);
+    if (guard < 0) throw new Error(`--guard must be 0 or more, got ${guard}`);   // a value that is not a finite number never gets here: the option reader above refuses it
     if (guard > 0 && train !== "wide") throw new Error("--guard has its objective for --train wide only");
     const table = air === "jet" ? BRAINS_JET : BRAINS;
     if (!table[want]) throw new Error(`--brain must be one of ${Object.keys(table).join(", ")}, got ${JSON.stringify(want)}`);
