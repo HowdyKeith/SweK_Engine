@@ -16,9 +16,13 @@
 //   safety               50 of each kind                 15900..15949     the tails, fruit fly (200 fights)
 //   safety2              50 of each kind                 16000..16049     the tails, GPU Brain
 //   reserve              60 duels + 60 turning           100..159         jetFight.JET_BENCH_SET (already the jets' bench: read before, never trained on)
+//   train, WIDE (batches) 96 duels in 8 batches of 12    16100..16195   the second recipe's objective (`--train wide`): each iteration of the search judges parent and child on ONE batch, a different batch each time
+//   train, WIDE (prune)  24 duels                        16200..16223   the second recipe's prune: the one fixed set it is pruned on
 //   smoke                4 duels / 8 fights              9100..9103 / 9000..9001   throwaway, so that running the command to see that it runs reads no audit
 //
-// THE AUDITS ARE EACH READ ONCE, FOR ONE CHAMPION (the rule of every league in this tree): a set that has graded a champion is SPENT, whatever the verdict was, and a retrain needs fresh seeds -- the next free block is 16100 and up.
+// THE WIDE TRAINING SETS (16100..16223) EXIST BECAUSE THE FIRST RECIPE'S TWELVE TRAINING DUELS WERE TOO FEW: eight searches over them lost 0 of their own 72 training fights and 4.5 to 12 percent of the pool's (brain/DOGFIGHT_LEAGUE_WIP.md). They are fresh, they are NOT audits, and nothing but
+// the second recipe's objective and prune reads them; the eligibility pool, the held-out set and the audits are the same sets as before.
+// THE AUDITS ARE EACH READ ONCE, FOR ONE CHAMPION (the rule of every league in this tree): a set that has graded a champion is SPENT, whatever the verdict was, and a retrain needs fresh seeds -- the next free block is 16300 and up.
 // Pure: no DOM, no clock, no random, no file access.
 "use strict";
 import * as JF from "./jetFight.mjs";
@@ -34,14 +38,20 @@ export const SEEDS = Object.freeze({
     audit: Object.freeze([15400, 15499]), audit2: Object.freeze([15500, 15599]),
     classicPool: Object.freeze([15000, 15099]), classicAudit: Object.freeze([15700, 15729]), classicAudit2: Object.freeze([15800, 15829]),
     safety: Object.freeze([15900, 15949]), safety2: Object.freeze([16000, 16049]),
+    trainBatches: Object.freeze([16100, 16195]), trainPrune: Object.freeze([16200, 16223]),
 });
-export const NEXT_FREE_SEED = 16100;
+export const NEXT_FREE_SEED = 16300;
+/** The wide training objective: this many duels in a batch, and the batches (each a frozen list of duels, consecutive blocks of the seed range in order). */
+export const WIDE_BATCH_DUELS = 12;
 
 export const JET_LEAGUE_TRAIN_SET = mk([["duel", range(...SEEDS.train)]]);
 export const JET_LEAGUE_HELD_OUT_SET = mk([["duel", range(...SEEDS.heldOut)]]);
 export const JET_LEAGUE_POOL_SET = mk([["duel", range(...SEEDS.pool)]]);
 export const JET_LEAGUE_AUDIT_SET = mk([["duel", range(...SEEDS.audit)]]);
 export const JET_LEAGUE_AUDIT2_SET = mk([["duel", range(...SEEDS.audit2)]]);
+export const JET_LEAGUE_TRAIN_WIDE_SET = mk([["duel", range(...SEEDS.trainBatches)]]);
+export const JET_LEAGUE_TRAIN_BATCHES = Object.freeze(Array.from({ length: JET_LEAGUE_TRAIN_WIDE_SET.length / WIDE_BATCH_DUELS }, (_, b) => Object.freeze(JET_LEAGUE_TRAIN_WIDE_SET.slice(b * WIDE_BATCH_DUELS, (b + 1) * WIDE_BATCH_DUELS))));
+export const JET_LEAGUE_TRAIN_PRUNE_SET = mk([["duel", range(...SEEDS.trainPrune)]]);
 export const JET_POOL_FIGHT_SET = mk(kinds(...SEEDS.classicPool));
 export const JET_AUDIT_FIGHT_SET = mk(kinds(...SEEDS.classicAudit));
 export const JET_AUDIT2_FIGHT_SET = mk(kinds(...SEEDS.classicAudit2));
@@ -51,14 +61,17 @@ export const JET_LEAGUE_SMOKE_SET = mk([["duel", range(9100, 9103)]]);
 export const JET_SMOKE_FIGHT_SET = mk(kinds(9000, 9001));
 
 /** The slots of the league library for each brain, in the library's own names (trainDogfightLeague.SETS). */
-export const SETS_FLY = Object.freeze({ train: JET_LEAGUE_TRAIN_SET, heldOut: JET_LEAGUE_HELD_OUT_SET, pool: JET_LEAGUE_POOL_SET, audit: JET_LEAGUE_AUDIT_SET, classicPool: JET_POOL_FIGHT_SET, classicAudit: JET_AUDIT_FIGHT_SET, safety: JET_SAFETY_FIGHT_SET, reserve: JF.JET_BENCH_SET });
+export const SETS_FLY = Object.freeze({ train: JET_LEAGUE_TRAIN_SET, heldOut: JET_LEAGUE_HELD_OUT_SET, pool: JET_LEAGUE_POOL_SET, audit: JET_LEAGUE_AUDIT_SET, classicPool: JET_POOL_FIGHT_SET, classicAudit: JET_AUDIT_FIGHT_SET, safety: JET_SAFETY_FIGHT_SET, reserve: JF.JET_BENCH_SET,
+    trainBatches: JET_LEAGUE_TRAIN_BATCHES, trainPrune: JET_LEAGUE_TRAIN_PRUNE_SET });
 export const SETS_GPU = Object.freeze({ ...SETS_FLY, audit: JET_LEAGUE_AUDIT2_SET, classicAudit: JET_AUDIT2_FIGHT_SET, safety: JET_SAFETY2_FIGHT_SET });
-export const SETS_SMOKE = Object.freeze({ train: JET_LEAGUE_SMOKE_SET, heldOut: JET_LEAGUE_SMOKE_SET, pool: JET_LEAGUE_SMOKE_SET, audit: JET_LEAGUE_SMOKE_SET, classicPool: JET_SMOKE_FIGHT_SET, classicAudit: JET_SMOKE_FIGHT_SET, safety: JET_SMOKE_FIGHT_SET, reserve: JET_SMOKE_FIGHT_SET });
+export const SETS_SMOKE = Object.freeze({ train: JET_LEAGUE_SMOKE_SET, heldOut: JET_LEAGUE_SMOKE_SET, pool: JET_LEAGUE_SMOKE_SET, audit: JET_LEAGUE_SMOKE_SET, classicPool: JET_SMOKE_FIGHT_SET, classicAudit: JET_SMOKE_FIGHT_SET, safety: JET_SMOKE_FIGHT_SET, reserve: JET_SMOKE_FIGHT_SET,
+    trainBatches: Object.freeze([Object.freeze(JET_LEAGUE_SMOKE_SET.slice(0, 2)), Object.freeze(JET_LEAGUE_SMOKE_SET.slice(2, 4))]), trainPrune: JET_LEAGUE_SMOKE_SET });
 
 export function reportLines() {
     const n = (s) => s.length;
     return [`[jetLeagueSets] the fights the jet networks are trained, picked and graded on: jet-scale scenarios on seeds 15000 and up (the next free block is ${NEXT_FREE_SEED})`,
-        `  train ${n(JET_LEAGUE_TRAIN_SET)} duels, held-out ${n(JET_LEAGUE_HELD_OUT_SET)}, pool ${n(JET_LEAGUE_POOL_SET)}, audits ${n(JET_LEAGUE_AUDIT_SET)} + ${n(JET_LEAGUE_AUDIT2_SET)} duels; classic pool ${n(JET_POOL_FIGHT_SET)} fights, classic audits ${n(JET_AUDIT_FIGHT_SET)} + ${n(JET_AUDIT2_FIGHT_SET)}, safety ${n(JET_SAFETY_FIGHT_SET)} + ${n(JET_SAFETY2_FIGHT_SET)}, reserve ${n(JF.JET_BENCH_SET)}`];
+        `  train ${n(JET_LEAGUE_TRAIN_SET)} duels, held-out ${n(JET_LEAGUE_HELD_OUT_SET)}, pool ${n(JET_LEAGUE_POOL_SET)}, audits ${n(JET_LEAGUE_AUDIT_SET)} + ${n(JET_LEAGUE_AUDIT2_SET)} duels; classic pool ${n(JET_POOL_FIGHT_SET)} fights, classic audits ${n(JET_AUDIT_FIGHT_SET)} + ${n(JET_AUDIT2_FIGHT_SET)}, safety ${n(JET_SAFETY_FIGHT_SET)} + ${n(JET_SAFETY2_FIGHT_SET)}, reserve ${n(JF.JET_BENCH_SET)}`,
+        `  wide training (--train wide): ${JET_LEAGUE_TRAIN_BATCHES.length} batches of ${WIDE_BATCH_DUELS} duels (${n(JET_LEAGUE_TRAIN_WIDE_SET)}), prune ${n(JET_LEAGUE_TRAIN_PRUNE_SET)} duels`];
 }
 if (typeof process !== "undefined" && Array.isArray(process.argv)) {   // see physics/mechanics/aircraftAssembly.mjs for why this is guarded and the import is dynamic
     const { pathToFileURL } = await import("node:url");
