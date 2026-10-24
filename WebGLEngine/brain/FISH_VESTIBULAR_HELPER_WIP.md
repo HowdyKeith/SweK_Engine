@@ -4,7 +4,11 @@ Branch `claude/fish-vestibular-helper`, made from `main` at v4896 as `brain/HAND
 it never pushes to `main` or to that branch, opens no pull request unless Keith asks in so many words, writes its own note (this one), and leaves
 the files that chat owns alone (`brain/SUBMARINE_WIP.md`, `brain/DOGFIGHT_LEAGUE_WIP.md`, `tools/ship/gateSweep.mjs`, `tools/ship/assertionShape.mjs`,
 everything under `tools/fish*`, `brain/pilotSub*`, `tools/ship/trainSub*`) and the census records (that chat registers new gates when it merges them).
-The fish rungs (`brain/pilotSub*` and the rung 3 recipe) are on that branch and not on `main`, so nothing here builds on them yet.
+The fish work is on that branch and not on `main`: `tools/fishCircuit.mjs`, `tools/fishHmi.mjs`, `tools/fishCaveExport.py`, `brain/pilotSubFish.mjs`,
+`brain/pilotSubCircuit.mjs`, the fish weights file and `vendor/zebrafish/` (checked 2026-10-24 against `main` at v4896; an older `brain/SUBMARINE_WIP.md` and the
+non-fish `brain/pilotSub*` files are on `main`). Nothing here builds on the fish files yet. That branch was still moving when this was written (newest commit
+2026-10-24 22:01 UTC, on the fly central-complex rung 4a); `vendor/zebrafish/` there holds only the two circuits already recorded (`fish1-ten-core.json`,
+`fish1-hmi-spn.json`) and no vestibular data, and the only files there naming the vestibular leads are its two notes.
 
 ## State, 2026-10-24: BLOCKED ON DATA, and what was uploaded is not the data
 
