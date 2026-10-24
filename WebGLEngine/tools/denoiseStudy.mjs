@@ -59,7 +59,7 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { execFileSync } from "node:child_process";
 import { openCache, hashArrays } from "../render/denoiseCache.mjs";
-import { runStudy, MINI, HARVESTS, studyOptions, runShippedStudy, ROUND_MESH, ROUND_MESH_C, ROUND_PAGE, SHIPPED_NET, runUpscaleStudy, ROUND_FSR1, ROUND_HALFRES, runEmitterAwareStudy, ROUND_EMITTER, runTemporalUpscaleStudy, ROUND_TEMPORALUP, runFrameGenStudy, ROUND_FRAMEGEN, ROUND_FRAMEGEN_LF, ROUND_FRAMEGEN_DISPLAY } from "../render/denoiseStudy.mjs";
+import { runStudy, MINI, HARVESTS, studyOptions, runShippedStudy, ROUND_MESH, ROUND_MESH_C, ROUND_PAGE, SHIPPED_NET, runUpscaleStudy, ROUND_FSR1, ROUND_HALFRES, runEmitterAwareStudy, ROUND_EMITTER, runTemporalUpscaleStudy, ROUND_TEMPORALUP, runFrameGenStudy, ROUND_FRAMEGEN, ROUND_FRAMEGEN_LF, ROUND_FRAMEGEN_DISPLAY, ROUND_FRAMEGEN_LARGE } from "../render/denoiseStudy.mjs";
 import { decodeNet } from "../render/denoiseDevice.mjs";
 import crypto from "node:crypto";
 

@@ -131,6 +131,7 @@
 //   L4 --harvest-framegen-large without its c1Min                                1 RED -- the command row
 //   L5 SPLITS_FRAMEGEN_LARGE left out of the dataset refusal                      2 RED -- the round row, the refusal row
 //   L6 the families 6 R and 18 C                                                 1 RED -- the round row
+//   L7 ROUND_FRAMEGEN_LARGE left off the command's import line (the first harvest's death) 1 RED -- the import row
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -809,6 +810,13 @@ console.log("\n14g. ROUND 62: ROUND 61's ARRANGEMENT ON A TEST SET TWICE ITS SIZ
         branch.length > 400 && /runFrameGenStudy\(\{ splits: ROUND_FRAMEGEN_LARGE\.splits, image: ROUND_FRAMEGEN_LARGE\.image, arrangement: ROUND_FRAMEGEN_LARGE\.arrangement,/.test(code) &&
         /c1Min: ROUND_FRAMEGEN_LARGE\.c1Min/.test(code) && /harvest: true/.test(code) && /path\.join\(ENG, ROUND_FRAMEGEN_LARGE\.results\)/.test(code) && /existsSync\(file\)/.test(code) &&
         /out\.commit = /.test(code) && !/ROUND_FRAMEGEN_DISPLAY\./.test(code) && !/verdict|status|supported/.test(code));
+    // section 142: the first harvest died at once -- ROUND_FRAMEGEN_LARGE named in its branch and never imported, which the row above,
+    // reading the branch's text, could not see. So: every ROUND_* the command names is one its import line brings in, and the
+    // module it comes from exports it
+    const imported = new Set(((cli.match(/^import \{([^}]*)\} from "\.\.\/render\/denoiseStudy\.mjs";$/m) || [])[1] || "").split(",").map((x) => x.trim()));
+    const named = [...new Set(cli.replace(/\/\/.*$/gm, "").match(/\bROUND_[A-Z0-9_]+\b/g) || [])], study = await imp("render/denoiseStudy.mjs");
+    ok("!! every ROUND_* tools/denoiseStudy.mjs names is on its import line from render/denoiseStudy.mjs, and exported there -- ROUND_FRAMEGEN_LARGE among them",
+        named.includes("ROUND_FRAMEGEN_LARGE") && named.every((k) => imported.has(k) && k in study), named.filter((k) => !imported.has(k) || !(k in study)).join(", ") || `${named.length} names`);
     ok("  its results are not yet written: section 145 reads them once the harvest's file is committed", !fs.existsSync(path.join(ENG, RESULTS_FRAMEGEN_LARGE)));
 }
 
