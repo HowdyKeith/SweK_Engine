@@ -21,7 +21,7 @@
 // Without it everything is computed, as before; with it the result is the same, bit for bit
 // (render/denoiseCache-selfcheck.mjs). A scene rendered under --harvest is never served to a run without it.
 "use strict";
-import { SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, SPLITS_R8, SPLITS_R9, SPLITS_R10, SPLITS_R11, SPLITS_MESH, SPLITS_FSR1, SPLITS_HALFRES, SPLITS_EMITTER, SPLITS_TEMPORALUP, SPLITS_R47, SPLITS_MESH_C, SPLITS_PAGE, SPLITS_FRAMEGEN, SPLITS_FRAMEGEN_LF, SPLITS_FRAMEGEN_DISPLAY, familyOf, makeScene, IMAGE, SPP_IN, SPP_REF, renderImages, renderSeeds, inputChannels, remodulate } from "./denoiseScenes.mjs";
+import { SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, SPLITS_R8, SPLITS_R9, SPLITS_R10, SPLITS_R11, SPLITS_MESH, SPLITS_FSR1, SPLITS_HALFRES, SPLITS_EMITTER, SPLITS_TEMPORALUP, SPLITS_R47, SPLITS_MESH_C, SPLITS_PAGE, SPLITS_FRAMEGEN, SPLITS_FRAMEGEN_LF, SPLITS_FRAMEGEN_DISPLAY, SPLITS_FRAMEGEN_LARGE, familyOf, makeScene, IMAGE, SPP_IN, SPP_REF, renderImages, renderSeeds, inputChannels, remodulate } from "./denoiseScenes.mjs";
 import { renderSequence, temporalChannels, sequenceSeeds } from "./denoiseTemporal.mjs";
 import { withMask, emitterCoverage, emitterRadiance, MASK_STRIDE, MASK_CHANNEL, COVERAGE_GRID } from "./denoiseMask.mjs";
 import { jointBilateral, tuneFilter } from "./denoiseFilter.mjs";
@@ -422,9 +422,16 @@ export const frameGenSetsLightFree = (t) => ({ H1: { noisy: t.noisyMid, filter: 
 /** Section 139, ROUND 61: the light-free arrangement graded in display space, C1 asked of the candidate alone, on new seeds. */
 export const RESULTS_FRAMEGEN_DISPLAY = "render/denoise-results-framegen-display.json";
 export const ROUND_FRAMEGEN_DISPLAY = Object.freeze({ splits: SPLITS_FRAMEGEN_DISPLAY, image: 256, test: "signflip", c2Prior: ROUND_MESH.c2Prior, arrangement: "lightFreeDisplay", c1Of: "candidate", results: RESULTS_FRAMEGEN_DISPLAY });
+/**
+ * Section 142, ROUND 62: round 61's arrangement, grading and C1-of-the-candidate on a test set twice its size, fixed before it
+ * exists -- 12 R and 12 C, new seeds. C1 at 22 of 24, round 61's 11 of 12 in proportion; 24 is the largest set section 28's
+ * exact sign-flip test enumerates (signFlipUpper).
+ */
+export const RESULTS_FRAMEGEN_LARGE = "render/denoise-results-framegen-large.json";
+export const ROUND_FRAMEGEN_LARGE = Object.freeze({ splits: SPLITS_FRAMEGEN_LARGE, image: 256, test: "signflip", c2Prior: ROUND_MESH.c2Prior, arrangement: "lightFreeDisplay", c1Of: "candidate", c1Min: 22, results: RESULTS_FRAMEGEN_LARGE });
 /** Round 26's transfer, Reinhard then gamma 2.2 -- the display space a secondary grades every arm in too, and round 61 grades in. */
 export const toDisplay = (y) => Float64Array.from(y, toPerceptual);
-export function runFrameGenStudy({ splits = ROUND_FRAMEGEN.splits, net, test = ROUND_FRAMEGEN.test, c2Prior = ROUND_FRAMEGEN.c2Prior, arrangement = "shown",
+export function runFrameGenStudy({ splits = ROUND_FRAMEGEN.splits, net, test = ROUND_FRAMEGEN.test, c2Prior = ROUND_FRAMEGEN.c2Prior, arrangement = "shown", c1Min = null,
                                    harvest = false, image = IMAGE, sppIn = SPP_IN, sppRef = SPP_REF, cache = null, log = () => {} } = {}) {
     if (!net) throw new Error("denoiseStudy: runFrameGenStudy needs the shipped network, decoded by its caller");
     if (!["shown", "lightFree", "lightFreeDisplay"].includes(arrangement)) throw new Error(`denoiseStudy: runFrameGenStudy's arrangement is "shown" (section 133), "lightFree" (section 136) or "lightFreeDisplay" (section 139), not ${arrangement}`);
@@ -434,7 +441,7 @@ export function runFrameGenStudy({ splits = ROUND_FRAMEGEN.splits, net, test = R
     const lap = (k) => { timings[k] = Date.now() - t0; log(`${k} at ${(timings[k] / 1000).toFixed(1)} s`); };
     const config = { image, half: image / 2, sppIn, sppRef, harvest, test, c2Prior, fill: FRAMEGEN_FILL, t: 0.5, field: "the scene's own: eye 7's first hits projected into camera 6, per pixel",
                      trained: "nothing -- the shipped network", split: { family: split.family, n: split.seeds.length, first: split.seeds[0] },
-                     arrangement, grading: disp ? "display: round 26's transfer, Reinhard then gamma 2.2, before relMSE" : "linear radiance", ...(disp ? { c1Of: "candidate" } : {}), hypotheses: lf
+                     arrangement, grading: disp ? "display: round 26's transfer, Reinhard then gamma 2.2, before relMSE" : "linear radiance", ...(disp ? { c1Of: "candidate" } : {}), ...(c1Min !== null ? { c1Min } : {}), hypotheses: lf
                          ? { H1: "G' (generated between L6 and L7, lit at the midpoint) against X' (their cross-fade, lit the same)", H2: "G' against R' (L6 held, lit the same)" }
                          : { H1: "G (generated between O6 and O7) against X (their cross-fade)", H2: "G against R (O6 repeated)" } };
     const keys = lf ? ["Gl", "Xl", "Rl", "noisyMid", "GlNoFill", "G", "X", "R", "O7", "noisy", "Bmid1"] : ["G", "X", "R", "O7", "noisy", "Bmid1", "GNoFill"], tables = Object.fromEntries(keys.map((k) => [k, []]));
@@ -462,7 +469,7 @@ export function runFrameGenStudy({ splits = ROUND_FRAMEGEN.splits, net, test = R
     });
     const allSeeds = split.seeds.flatMap((s) => { const r = frameGenSeeds(s); return [...r.half, r.mid, r.ref, r.ref2]; });
     const seedsDistinct = new Set(allSeeds).size === allSeeds.length;
-    const V = verdict({ sets: (lf ? frameGenSetsLightFree : frameGenSets)(tables), shuffled: null, c2Prior, determinism, seedsDistinct, test, ...(disp ? { c1Of: "candidate" } : {}) });
+    const V = verdict({ sets: (lf ? frameGenSetsLightFree : frameGenSets)(tables), shuffled: null, c2Prior, determinism, seedsDistinct, test, ...(disp ? { c1Of: "candidate" } : {}), ...(c1Min !== null ? { c1Min } : {}) });
     const secondary = lf
         ? { midTraced: effects(tables.Bmid1, tables.Gl), fill: effects(tables.GlNoFill, tables.Gl), overShown: effects(tables.G, tables.Gl), shown: { H1: effects(tables.X, tables.G), H2: effects(tables.R, tables.G) },
             // the other space's grading, named by its space: display beside a linear run (round 60), linear beside a display one (round 61)

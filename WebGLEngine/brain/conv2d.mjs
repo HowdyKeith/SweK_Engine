@@ -136,6 +136,18 @@ export function unpackF16(u32) { const h = new Uint16Array(u32.buffer, u32.byteO
 export function conv2dCpuStoreF16(x, H, W, layer) { return Float32Array.from(conv2dCpu(x, H, W, layer), f16round); }
 /** Its fused mirror: conv2dCpuFma's cells, each rounded to f16. */
 export function conv2dCpuStoreF16Fma(x, H, W, layer) { return Float32Array.from(conv2dCpuFma(x, H, W, layer), f16round); }
+/**
+ * x converted to binary16 TOWARD ZERO, as Direct3D's f32 -> f16 conversion was measured to (section 141): the bracketing value
+ * nearer zero, the largest finite 65504 for anything above it. f16round's quantum, so exact in f64.
+ */
+export function f16roundTZ(x) {
+    if (!Number.isFinite(x) || x === 0) return x;
+    const s = x < 0 ? -1 : 1, a = Math.abs(x);
+    let e = Math.floor(Math.log2(a));
+    if (2 ** e > a) e--; else if (2 ** (e + 1) <= a) e++;
+    const q = 2 ** (Math.max(e, -14) - 10), v = Math.floor(a / q) * q;
+    return s * Math.min(v, 65504);
+}
 /** The two f16 values bracketing x (equal when x is one): a conversion to f16 may take either, as WGSL allows. */
 export function f16Bracket(x) {
     const r = f16round(x);

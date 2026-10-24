@@ -41,11 +41,12 @@ const gates = gateList(ENG);
 const fsr = fs.readdirSync(path.join(ENG, "fx/fsr")).filter((f) => f.endsWith("-selfcheck.mjs")).length;
 const tsl = fs.readdirSync(path.join(ENG, "render")).filter((f) => /Tsl.*-selfcheck\.mjs$/.test(f)).length;
 // round 31 adds the denoiser's fourth, the half-size chain's (render/denoiseUpscaleGPU-selfcheck.mjs), which times the chain at 1080p on a GPU
+// round 63 (section 143) adds the denoiser's fifth, render/denoiseFrameGenCost-selfcheck.mjs: a generated frame's field and generator at 1080p
 // v4896 adds the snow stack's six browser gates (render/snowGpu*-selfcheck.mjs), whose live loop (snowGpuLive) prints the frame rate as a "reading" line for the report
-ok(`every fx/fsr gate (${fsr}), every render/*Tsl* gate (${tsl}), the translucent layer's, the denoiser's four and the snow stack's six: ${gates.length} gates`,
-   gates.length === fsr + tsl + 5 + 6 && ["snowGpu", "snowGpuField", "snowGpuTaa", "snowGpuLookA", "snowGpuLookB", "snowGpuLive"].every((n) => gates.includes(`render/${n}-selfcheck.mjs`)) && gates.includes("render/translucentLayer-selfcheck.mjs") && gates.includes("render/temporalTslCompute-selfcheck.mjs") &&
+ok(`every fx/fsr gate (${fsr}), every render/*Tsl* gate (${tsl}), the translucent layer's, the denoiser's five and the snow stack's six: ${gates.length} gates`,
+   gates.length === fsr + tsl + 6 + 6 && ["snowGpu", "snowGpuField", "snowGpuTaa", "snowGpuLookA", "snowGpuLookB", "snowGpuLive"].every((n) => gates.includes(`render/${n}-selfcheck.mjs`)) && gates.includes("render/translucentLayer-selfcheck.mjs") && gates.includes("render/temporalTslCompute-selfcheck.mjs") &&
    gates.includes("render/denoiseDevice-selfcheck.mjs") && gates.includes("render/denoiseTiming-selfcheck.mjs") && gates.includes("render/denoiseCompile-selfcheck.mjs") &&
-   gates.includes("render/denoiseUpscaleGPU-selfcheck.mjs"));
+   gates.includes("render/denoiseUpscaleGPU-selfcheck.mjs") && gates.includes("render/denoiseFrameGenCost-selfcheck.mjs"));
 ok(`  ...and each may run ${GATE_TIMEOUT_MS / 60000} minutes -- the rig's Intel took 498 s over one denoiser gate when the cap was 600 s (section 42)`,
    GATE_TIMEOUT_MS >= 3 * 498000);
 const kinds = Object.fromEntries(gates.map((g) => [g, categorize(fs.readFileSync(path.join(ENG, g), "utf8"))]));

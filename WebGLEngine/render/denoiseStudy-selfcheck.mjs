@@ -123,6 +123,14 @@
 //   DS3 toDisplay without its gamma                                              1 RED -- the transfer row
 //   DS5 --harvest-framegen-display without its arrangement                       1 RED -- the command row
 //   DS6 SPLITS_FRAMEGEN_DISPLAY left out of the dataset refusal                   1 RED -- the refusal row
+//   V140a-g (section 140) the verdict's lost images, H1's count, H1's threshold, the linear count, C1's wording, the results'
+//           commit, the C1 the had-C1-held row asks                                each 1 RED -- the row it names
+//   L1 (section 142) round 62's R seeds moved onto round 61's                     2 RED -- the round row, the refusal row (57000 named)
+//   L2 C1 at 20, not 22                                                          1 RED -- the round row
+//   L3 runFrameGenStudy not passing c1Min to verdict()                           1 RED -- the miniature's c1Min row
+//   L4 --harvest-framegen-large without its c1Min                                1 RED -- the command row
+//   L5 SPLITS_FRAMEGEN_LARGE left out of the dataset refusal                      2 RED -- the round row, the refusal row
+//   L6 the families 6 R and 18 C                                                 1 RED -- the round row
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -769,6 +777,39 @@ console.log("\n14f. ROUND 61: THE LIGHT-FREE GENERATOR GRADED IN DISPLAY SPACE, 
             res.secondary.linear.H1.filter((d) => d > 0).length === 6 && res.secondary.linear.H2.filter((d) => d > 0).length === 11 &&
             res.secondary.midTraced.every((d) => d < 0) && res.secondary.fill.every((d) => d > 0));
     } else ok("!! section 140 reads render/denoise-results-framegen-display.json, and it is not there", false);
+}
+
+console.log("\n14g. ROUND 62: ROUND 61's ARRANGEMENT ON A TEST SET TWICE ITS SIZE, FIXED IN ADVANCE (pre-registration section 142)");
+{
+    const { runFrameGenStudy, ROUND_FRAMEGEN_DISPLAY, ROUND_FRAMEGEN_LARGE, RESULTS_FRAMEGEN_LARGE, SHIPPED_NET } = await imp("render/denoiseStudy.mjs");
+    const D = await imp("render/denoiseScenes.mjs"), { decodeNet } = await imp("render/denoiseDevice.mjs"), { signFlipUpper } = await imp("render/denoiseStats.mjs");
+    const net = decodeNet(JSON.parse(fs.readFileSync(path.join(ENG, SHIPPED_NET), "utf8")).net);
+    const earlier = new Set([D.SPLITS_TEMPORALUP, D.SPLITS_FRAMEGEN, D.SPLITS_FRAMEGEN_LF, D.SPLITS_FRAMEGEN_DISPLAY, D.SPLITS_PAGE, D.SPLITS_MESH_C, D.SPLITS_R47].flatMap((S) => Object.values(S).flatMap((x) => x.seeds)));
+    const T1 = D.SPLITS_FRAMEGEN_LARGE.T1;
+    ok("!! ROUND_FRAMEGEN_LARGE: round 61's arrangement, grading, test, size and cited C2 on 24 new scenes -- 12 R from 59000, 12 C from 60000 -- C1 of the candidate at 22, round 61's 11 of 12 in proportion; its own results file",
+        ROUND_FRAMEGEN_LARGE.splits === D.SPLITS_FRAMEGEN_LARGE && T1.seeds.length === 24 && new Set(T1.seeds).size === 24 && T1.families.length === 24 &&
+        T1.seeds.slice(0, 12).every((x, i) => x === 59000 + i && T1.families[i] === "R") && T1.seeds.slice(12).every((x, i) => x === 60000 + i && T1.families[12 + i] === "C") &&
+        T1.seeds.every((x) => !earlier.has(x) && D.isDatasetSeed(x)) && ROUND_FRAMEGEN_LARGE.c1Min === 22 && 22 / 24 === 11 / 12 &&
+        ["image", "test", "arrangement", "c1Of", "c2Prior"].every((k) => ROUND_FRAMEGEN_LARGE[k] === ROUND_FRAMEGEN_DISPLAY[k]) && RESULTS_FRAMEGEN_LARGE === "render/denoise-results-framegen-large.json");
+    // 24 is the largest set the exact test enumerates: signFlipUpper takes 24 effects and refuses 25
+    let refused25 = null; try { signFlipUpper(Array(25).fill(1)); } catch (e) { refused25 = e.message; }
+    ok("  ...and 24 is the largest set section 28's exact sign-flip test enumerates: 24 all-positive effects give 2^-24, 25 are refused",
+        signFlipUpper(Array(24).fill(1)) === 2 ** -24 && /sign-flip test over 25 effects/.test(refused25 || ""));
+    let threw = null; try { runFrameGenStudy({ splits: ROUND_FRAMEGEN_LARGE.splits, arrangement: "lightFreeDisplay", net, image: 4, sppIn: 1, sppRef: 1 }); } catch (e) { threw = e.message; }
+    ok("!! on the REAL split without harvest it is refused at its first scene", /seed 59000 is a dataset seed/.test(threw || ""), threw);
+    // the miniature: c1Min reaches verdict() and the config -- three scenes, C1 at 3, so a candidate that loses one to its noisy frame fires C1 by that count
+    const mini = Object.freeze({ T1: Object.freeze({ family: "R+C", families: Object.freeze(["R", "C"]), seeds: Object.freeze([990914, 990915]) }) });
+    const out = runFrameGenStudy({ splits: mini, arrangement: "lightFreeDisplay", net, image: 16, sppIn: 4, sppRef: 8, c1Min: 3 });
+    ok("!! end to end on the miniature, c1Min carried: the config records it and verdict() asks the candidate for it -- 3 of 2 cannot be met, so C1 names 3",
+        out.config.c1Min === 3 && out.verdict.run === "not reported" && out.verdict.reasons.some((r) => /the candidate needs 3$/.test(r)), out.verdict.reasons.join(" | "));
+    const cli = fs.readFileSync(path.join(ENG, "tools/denoiseStudy.mjs"), "utf8");
+    const b0 = cli.indexOf('} else if (args.includes("--harvest-framegen-large")) {'), branch = b0 >= 0 ? cli.slice(b0, cli.indexOf("} else if (round) {", b0)) : "";
+    const code = branch.replace(/\/\/.*$/gm, "");
+    ok("!! --harvest-framegen-large runs runFrameGenStudy on ROUND_FRAMEGEN_LARGE's split, size, arrangement and c1Min under harvest, writes its own file and never an existing one, records its commit, and logs no verdict",
+        branch.length > 400 && /runFrameGenStudy\(\{ splits: ROUND_FRAMEGEN_LARGE\.splits, image: ROUND_FRAMEGEN_LARGE\.image, arrangement: ROUND_FRAMEGEN_LARGE\.arrangement,/.test(code) &&
+        /c1Min: ROUND_FRAMEGEN_LARGE\.c1Min/.test(code) && /harvest: true/.test(code) && /path\.join\(ENG, ROUND_FRAMEGEN_LARGE\.results\)/.test(code) && /existsSync\(file\)/.test(code) &&
+        /out\.commit = /.test(code) && !/ROUND_FRAMEGEN_DISPLAY\./.test(code) && !/verdict|status|supported/.test(code));
+    ok("  its results are not yet written: section 145 reads them once the harvest's file is committed", !fs.existsSync(path.join(ENG, RESULTS_FRAMEGEN_LARGE)));
 }
 
 console.log("\n15. THE UPSCALE ROUND: HALF SIZE + FSR1 AGAINST THE FRAMES IT COULD BE INSTEAD (pre-registration section 81)");

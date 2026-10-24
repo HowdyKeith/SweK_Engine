@@ -200,6 +200,14 @@
 //   F4  a packed layer read back as f32, not unpacked                     3 RED (K0p natively, its small network, in the browser)
 //   F5  r57p not standing aside under FXC                                 2 RED (the FXC row; the runnable-sets row)
 //   F6  F16S_IMAGE_TOL widened tenfold                                    1 RED (the static row holds the bound at 1e-3)
+// SECTION 141, each restored byte-identical (sha-256):
+//   K141a f16StoreRule reading rtz whenever a cell took the other nearest    1 RED (the rule's fixtures: mixed read rtz)
+//   K141b F16S_IMAGE_TOL_RTZ 7.5e-2                                         1 RED (the derivation row)
+//   K141c f16sImageTol giving the truncating bound to "mixed" too            1 RED (the derivation row)
+//   K141d f16roundTZ rounding to nearest                                    3 RED (the derivation, the fixtures, the simulated device)
+//   K141e the judge counting cells rounded to nearest as truncated           1 RED (the simulated device reads mixed)
+//   K141f k0pImage taking the truncating bound whatever the rule             1 RED (the simulated device: the nearest rule's refusal)
+//   K141g f16StoreRule reading rtz with no other nearest                     3 RED (the fixtures, the simulated device, K0p natively here)
 //   F7  r57p left out of the timed sets                                   1 RED (the static row)
 // and section 130's verdict, by the same runner:
 //   V1  the rig reports' commit check accepting any commit                0 RED as first written: with the device gate red, C1 was false
@@ -256,13 +264,13 @@ const { APPLY_TOL, kernelApplyWgsl, packApplyUniforms, kernelApplyCpu, kernelFor
         KERNEL_SETS, DEFAULT_KERNELS, PAGE_KERNELS, applyFor, kernelApplyFastWgsl, kernelHeadApplyWgsl, judgeHeadApply,
         R18_KERNELS, FXC_UNBUILT_SETS, isD3D12Native, nativeSetsFor, PAGE_KERNELS_BY_ADAPTER, pageAdapterKey, pageKernelsFor, passBytes, TIMED_SETS,
         isDxcCompiler, NATIVE_KERNELS_BY_ADAPTER, NATIVE_KERNELS_DECIDED_BY, nativeAdapterKey, nativeKernelsFor, nativePick, createNativeDenoiser,
-        R27_KERNELS, FXC_UNTRIED_SETS, twinsOf, R40_KERNELS, SUBGROUP_SETS, featureSetsFor, timingLadder, R41_KERNELS, F16_SETS, SET_FEATURES, F16_IMAGE_TOL, R57_KERNELS, F16S_IMAGE_TOL } = await imp("render/denoiseDevice.mjs");
+        R27_KERNELS, FXC_UNTRIED_SETS, twinsOf, R40_KERNELS, SUBGROUP_SETS, featureSetsFor, timingLadder, R41_KERNELS, F16_SETS, SET_FEATURES, F16_IMAGE_TOL, R57_KERNELS, F16S_IMAGE_TOL, F16S_IMAGE_TOL_RTZ, f16StoreRule, f16sImageTol } = await imp("render/denoiseDevice.mjs");
 // v4862 -- the native table as sections 67 and 68 measured it, before section 78 gave the 1080 r18t. Rows about what the rig ran THEN
 // (section 68's --which runs, round 19's verdict) are held to it; rows about what a native run picks NOW, to the shipped table.
 const NATIVE_KERNELS_AT_V4852 = Object.freeze({ "win32/intel/gen-9": "r18u" });
 const CMP = await imp("render/denoiseCompile.mjs");
 const { makeDenoiser, denoise, KERNEL_TAPS, shapeFor, paramCount } = await imp("render/denoiseNet.mjs");
-const { conv2dCpu, conv2dCpuFma, COUT_MAX, tileShape, fastAltShape, conv2dTileWgsl, conv2dFastAltWgsl, conv2dCpuWino, conv2dCpuWinoFma, winoShape, conv2dWinoWgsl, conv2dCpuF16, conv2dCpuF16Fma, conv2dCpuStoreF16, conv2dCpuStoreF16Fma, f16Bracket } = await imp("brain/conv2d.mjs");
+const { conv2dCpu, conv2dCpuFma, COUT_MAX, tileShape, fastAltShape, conv2dTileWgsl, conv2dFastAltWgsl, conv2dCpuWino, conv2dCpuWinoFma, winoShape, conv2dWinoWgsl, conv2dCpuF16, conv2dCpuF16Fma, conv2dCpuStoreF16, conv2dCpuStoreF16Fma, f16Bracket, f16roundTZ, f16round } = await imp("brain/conv2d.mjs");
 const { seededRandom } = await imp("brain/convNet.mjs");
 const { ALBEDO_FLOOR } = await imp("render/denoiseScenes.mjs");
 const H = await imp("tools/ship/headlessGpu.mjs");
@@ -488,6 +496,23 @@ console.log("1. THE KERNEL'S TWIN, ON THE CPU");
             twinsOf(Lp[0]).twin === conv2dCpuStoreF16 && twinsOf(Lp[0]).mirror === conv2dCpuStoreF16Fma && twinsOf(Lp[3]).twin === conv2dCpu && twinsOf(Lp[3]).mirror === conv2dCpuFma &&
             featureSetsFor({ features: new Set() }, ["r57p"]).join() === "r57p" && TIMED_SETS.includes("r57p") && F16S_IMAGE_TOL === 1e-3 && wp <= F16S_IMAGE_TOL && wp > 1e-5,
             `${Lp.map((l) => l.kernel).join()}; io ${io(Lp)}; small network io ${io(Lps)}; its twin against the f64 network ${wp.toExponential(2)} (bound ${F16S_IMAGE_TOL})`);
+        // section 141: the TRUNCATING twin -- every storing layer's f32 cells converted toward zero, as both rig GPUs were measured to
+        // through Direct3D (section 137) -- and F16S_IMAGE_TOL_RTZ derived from it as F16S_IMAGE_TOL was from the nearest twin: x 5.7
+        const storeTwin = (rnd) => { let a = Float32Array.from(xh); for (const L of Lp) a = L.io && L.io.y === "f16" ? Float32Array.from(conv2dCpu(a, HH, WW, L), rnd) : twinsOf(L).twin(a, HH, WW, L); return kernelApplyCpu(xh, a, HH, WW); };
+        const wtz = worstRel(storeTwin(f16roundTZ), y64, 1e-12), wrn = worstRel(storeTwin(f16round), y64, 1e-12);
+        ok(`!! section 141: the truncating twin's image is ${wtz.toExponential(2)} from the f64 network -- over F16S_IMAGE_TOL, as both rig GPUs read 1.32e-3 -- and F16S_IMAGE_TOL_RTZ is it x 5.7, held at 7.5e-3; the nearest twin, built the same way, is r57p's own twin`,
+            F16S_IMAGE_TOL_RTZ === 7.5e-3 && wtz > F16S_IMAGE_TOL && Math.abs(wtz - 1.32e-3) < 0.01e-3 && Math.abs(wtz * 5.7 - F16S_IMAGE_TOL_RTZ) < 0.03e-3 && Object.is(wrn, wp) &&
+            f16sImageTol("rtz") === F16S_IMAGE_TOL_RTZ && f16sImageTol("rn") === F16S_IMAGE_TOL && f16sImageTol("mixed") === F16S_IMAGE_TOL,
+            `truncating ${wtz.toExponential(3)}, x 5.7 = ${(wtz * 5.7).toExponential(3)}; nearest ${wrn.toExponential(3)}`);
+        // f16roundTZ on values whose answers are known, and f16StoreRule on judged layers whose rule is known
+        const tzOk = f16roundTZ(1 + 2 ** -11) === 1 && f16roundTZ(1 + 3 * 2 ** -11) === 1 + 2 ** -10 && f16roundTZ(-(1 + 3 * 2 ** -11)) === -(1 + 2 ** -10) &&
+            f16roundTZ(70000) === 65504 && f16roundTZ(-70000) === -65504 && f16roundTZ(3 * 2 ** -25) === 2 ** -24 && f16roundTZ(2 ** -26) === 0 && f16roundTZ(0.5) === 0.5 &&
+            f16round(1 + 3 * 2 ** -11) === 1 + 2 ** -9;
+        const lay = (other, tz, stored) => ({ kernel: "fast_unroll_p", plain: stored - other, fused: 0, other, unexplained: 0, stored, tz });
+        const ruleFx = [f16StoreRule([lay(0, 9000, 12768), lay(0, 9000, 12768)]), f16StoreRule([lay(3038, 12768, 12768), lay(0, 12768, 12768)]),
+            f16StoreRule([lay(3038, 12767, 12768)]), f16StoreRule([{ kernel: "head_apply", image: true }])];
+        ok("  ...and f16roundTZ takes the bracketing f16 nearer zero (65504 above it, 0 under the least subnormal), and f16StoreRule reads rn with no other nearest, rtz when every stored cell is truncated, mixed when one is not",
+            tzOk && ruleFx.join() === "rn,rtz,mixed,rn", ruleFx.join());
         // v4849 -- round 19 (section 66): which sets a native gate builds, by the run's compiler as well as its adapter. Round 18's
         // row here ("r18t and r18u are browser-only on D3D12") held the adapter alone. On 0.6.2 the rig's descriptions are "D3D12
         // driver version ..." under either compiler, so the compiler comes from the package (headlessGpu's nativeCompiler: "DXC" or
@@ -1026,12 +1051,31 @@ else try {
         const input = i ? acts[i - 1] : Float32Array.from(x), T = twinsOf(L), tw = T.twin(input, h, w, L), fm = T.mirror(input, h, w, L);
         // round 57: a layer storing f16 may take the OTHER f16 value bracketing the f32 cell, as WGSL allows a conversion -- counted apart
         const store = L.io && L.io.y === "f16", raw = store ? conv2dCpu(input, h, w, L) : null, rawF = store ? conv2dCpuFma(input, h, w, L) : null;
-        let plain = 0, fused = 0, other = 0, unexplained = 0;
+        let plain = 0, fused = 0, other = 0, unexplained = 0, tz = 0;
         for (let j = 0; j < tw.length; j++) { const v = acts[i][j]; if (v === tw[j]) plain++; else if (v === fm[j]) fused++;
-            else if (store && (f16Bracket(raw[j]).includes(v) || f16Bracket(rawF[j]).includes(v))) other++; else unexplained++; }
-        return { kernel: L.kernel, plain, fused, other, unexplained };
+            else if (store && (f16Bracket(raw[j]).includes(v) || f16Bracket(rawF[j]).includes(v))) other++; else unexplained++;
+            // section 141: the cell as a truncating conversion stores it, counted apart -- f16StoreRule reads the device's rule from these
+            if (store && (v === f16roundTZ(raw[j]) || v === f16roundTZ(rawF[j]))) tz++; }
+        return { kernel: L.kernel, plain, fused, other, unexplained, ...(store ? { stored: tw.length, tz } : {}) };
     });
     const net = makeDenoiser(3, "he", "kernel", 10, "large"), x = synth(HH, WW, 10, 7);
+    // section 141: K0p's image row, one function for the rig's row and the simulated one -- the bound of the rule the cells say
+    const k0pImage = (J, w) => w <= f16sImageTol(f16StoreRule(J));
+    // section 141: K0p's judge on a device it knows -- the truncating twin's own layers handed to judge as the device's, and the
+    // nearest twin's -- so the rule the rig's row reads, and the bound it takes, are this code's before any GPU runs it
+    {
+        const L = deviceLayers(net, "r57p"), y64 = denoise(net, x, HH, WW).y;
+        const fake = (rnd) => { const acts = []; let a = Float32Array.from(x);
+            for (const l of L) { a = l.io && l.io.y === "f16" ? Float32Array.from(conv2dCpu(a, HH, WW, l), rnd) : twinsOf(l).twin(a, HH, WW, l); acts.push(l.kernel === "head_apply" ? null : a); }
+            return { acts, y: kernelApplyCpu(x, a, HH, WW) }; };
+        const T = fake(f16roundTZ), Nr = fake(f16round), JT = judge(net, x, HH, WW, T.acts, "r57p"), JN = judge(net, x, HH, WW, Nr.acts, "r57p");
+        const rT = f16StoreRule(JT.slice(0, 4)), rN = f16StoreRule(JN.slice(0, 4)), wT = worstRel(T.y, y64, 1e-12), wN = worstRel(Nr.y, y64, 1e-12);
+        ok("!! section 141: a truncating device, simulated by the truncating twin's own layers, judges every cell explained, store rule rtz, its image within F16S_IMAGE_TOL_RTZ and outside F16S_IMAGE_TOL; the nearest twin's judges rn, within F16S_IMAGE_TOL",
+            JT.slice(0, 4).every((j) => j.unexplained === 0) && rT === "rtz" && JT.slice(0, 3).every((j) => j.other > 0) && k0pImage(JT.slice(0, 4), wT) && wT > F16S_IMAGE_TOL &&
+            JN.slice(0, 4).every((j) => j.unexplained === 0 && j.other === 0) && rN === "rn" && k0pImage(JN.slice(0, 4), wN) &&
+            !k0pImage(JN.slice(0, 4), wT) && !k0pImage(JT.slice(0, 4), 2 * F16S_IMAGE_TOL_RTZ),
+            `truncating: other ${JT.slice(0, 4).map((j) => j.other).join("/")}, truncated ${JT.slice(0, 4).map((j) => j.tz).join("/")} of ${JT[0].stored}, rule ${rT}, image ${wT.toExponential(2)}; nearest: rule ${rN}, image ${wN.toExponential(2)}`);
+    }
     // v4845 -- passBytes is what round 15 REPORTS a pass allocating; held here to what createDeviceDenoiser actually asks the device
     // for: every STORAGE buffer it creates, summed, for an unfused set (r12) and the fused one (r15, whose head keeps its logits).
     // MEASURED, the first time this row ran: r12 allocated 487,628 B against passBytes' 354,312 and r15 exactly its 225,036. The
@@ -1252,13 +1296,16 @@ else try {
         const soft = !!(NATIVE && NATIVE.info && /swiftshader|llvmpipe|software/i.test([NATIVE.info.vendor, NATIVE.info.architecture, NATIVE.info.description].join(" ")));
         const r57 = await jobP(net, x, HH, WW, 10), J57 = judge(net, x, HH, WW, r57.acts, "r57p"), L57 = deviceLayers(net, "r57p");
         const j57 = judgeHeadApply(x, r57.acts[3], L57[4], r57.y, HH, WW), w64 = worstRel(r57.y, ref, 1e-12), others = J57.reduce((a, j) => a + (j.other || 0), 0);
+        // section 141: the device's store rule, read from its own cells, and the image's bound for that rule
+        const rule57 = f16StoreRule(J57.slice(0, 4)), tol57 = f16sImageTol(rule57);
         k0row("native", "r57p", J57, j57.worst);
         // round 57 (section 130): the row's reading on a line of its own, so a report that cuts a failing row's line short still has it
         console.log(`  ----  native K0p for r57p, the reading: ${J57.slice(0, 4).map((j, i) => `layer ${i} ${j.plain} plain, ${j.fused} fused, ${j.other || 0} other nearest, ${j.unexplained} unexplained`).join("; ")}; ` +
-            `head and kernel ${j57.worst.toExponential(2)} (APPLY_TOL ${APPLY_TOL}); against f64 ${w64.toExponential(2)} (F16S_IMAGE_TOL ${F16S_IMAGE_TOL})`);
-        KP.push(ok(`!! *** K0p natively (section 129): the r57p set -- its storing layers every cell the f32 twin's rounded to f16 (or the other nearest, counted${soft ? ", and none here: a software adapter" : ""}), its last written-out layer K0's, given the device's own input; k_head_apply's image within APPLY_TOL; the image within F16S_IMAGE_TOL of the f64 network ***`,
+            `head and kernel ${j57.worst.toExponential(2)} (APPLY_TOL ${APPLY_TOL}); against f64 ${w64.toExponential(2)} (F16S_IMAGE_TOL ${F16S_IMAGE_TOL}); ` +
+            `store rule ${rule57}, ${J57.slice(0, 4).map((j) => j.tz ?? "-").join(" / ")} cells truncated, so the bound ${tol57} (section 141)`);
+        KP.push(ok(`!! *** K0p natively (section 129): the r57p set -- its storing layers every cell the f32 twin's rounded to f16 (or the other nearest, counted${soft ? ", and none here: a software adapter" : ""}), its last written-out layer K0's, given the device's own input; k_head_apply's image within APPLY_TOL; the image within its store rule's bound of the f64 network (section 141) ***`,
             J57.slice(0, 4).every((j) => j.unexplained === 0) && J57.map((j) => j.kernel).join() === "fast_unroll_p,fast_unroll_p,fast_unroll_p,fast_unroll_p,head_apply" && r57.acts[4] === null &&
-            (!soft || others === 0) && j57.worst <= APPLY_TOL && w64 <= F16S_IMAGE_TOL,
+            (!soft || (others === 0 && rule57 === "rn")) && j57.worst <= APPLY_TOL && k0pImage(J57.slice(0, 4), w64),
             J57.slice(0, 4).map((j) => `${j.kernel} ${j.plain}+${j.fused}f${j.other ? "+" + j.other + "o" : ""}${j.unexplained ? "+" + j.unexplained + "?" : ""}`).join(", ") + `; head and kernel ${j57.worst.toExponential(2)}; against f64 ${w64.toExponential(2)}`));
         const rp = await jobP(net9, x9, 13, 11, 9), Lp9 = deviceLayers(net9, "r57p"), Jp = judge(net9, x9, 13, 11, rp.acts, "r57p");
         const jp = judgeHeadApply(x9, rp.acts[Lp9.length - 2], Lp9[Lp9.length - 1], rp.y, 13, 11);

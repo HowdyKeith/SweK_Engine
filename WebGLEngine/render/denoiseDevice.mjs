@@ -372,6 +372,26 @@ export const F16_IMAGE_TOL = 1e-2;
 /** Round 57: the image's bound against the f64 network for r57p (section 129): 1.78e-4 measured on the device gate's fixture, x 5.7, held at 1e-3. */
 export const F16S_IMAGE_TOL = 1e-3;
 /**
+ * Section 141: the same bound for a device whose f32 -> f16 conversion truncates (both rig GPUs through Direct3D, section 137),
+ * derived as F16S_IMAGE_TOL was: the truncating twin's own 1.32e-3 against the f64 network on the device gate's fixture,
+ * x 5.7, held at 7.5e-3. Which bound a device takes is read from its own stored cells (f16StoreRule), never assumed.
+ */
+export const F16S_IMAGE_TOL_RTZ = 7.5e-3;
+/**
+ * Section 141: a device's f16 store rule, read from its storing layers' cells as the gate judges them ({ other, tz, stored }):
+ * "rn" when no cell took the other nearest; "rtz" when some did and every stored cell is the f32 cell (or its fused mirror's)
+ * truncated toward zero; otherwise "mixed", which keeps the round-to-nearest bound.
+ */
+export function f16StoreRule(J) {
+    const S = J.filter((j) => j.stored);
+    if (!S.length) return "rn";
+    const other = S.reduce((a, j) => a + j.other, 0);
+    if (other === 0) return "rn";
+    return S.every((j) => j.tz === j.stored) ? "rtz" : "mixed";
+}
+/** Section 141: the image's bound for a store rule -- F16S_IMAGE_TOL_RTZ for a truncating device, F16S_IMAGE_TOL otherwise. */
+export const f16sImageTol = (rule) => (rule === "rtz" ? F16S_IMAGE_TOL_RTZ : F16S_IMAGE_TOL);
+/**
  * Round 27: the sets no gate builds natively on a D3D12 adapter whose compiler is FXC because nobody has tried -- FXC_UNBUILT_SETS
  * is the sets FXC was SEEN to fail. Since section 70 the pin's compiler is DXC, and an FXC that never finishes a pipeline stops a
  * gate for its whole budget (section 56), so an untried kernel stands aside under FXC on the safe side.

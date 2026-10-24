@@ -9529,3 +9529,139 @@ That would be choosing the test by its outcome. The record stands as three not-r
 lean one way. Whether FSR3 on the path tracer closes on that, or gets a round of a different kind, is Keith's call.
 A different kind would be a larger test set fixed in advance, or a device timing round that asks whether a generated
 frame is worth its cost at all.
+
+## 141. K0p's IMAGE BOUND FOLLOWS THE DEVICE'S OWN STORE RULE, AND THE 1080's ROUND-33 RUNS AGAIN: FIXED BEFORE THEY RUN
+
+**Why.** Section 137 found K0p red natively on both rig GPUs, on its image bound alone, with identical cell counts on the two
+vendors. Keith asked for the bound fixed and the runs given again.
+
+**What was found, before any change.**
+- The CPU twin that converts each stored cell **toward zero** (`f16roundTZ`, brain/conv2d.mjs) lands 1.318e-3 from the
+  f64 network on the device gate's fixture. Both GPUs read 1.32e-3.
+- Its layers handed to the gate's own judge read 3038, 3400, 2592 and 0 cells at the other nearest. The rig read the same.
+- So the rig's devices are the truncating twin, cell for cell on the counts. That can be said of these counts and this fixture;
+  it is not shown for every cell value a device can see.
+
+**The change, derived, not read off the run.**
+- `F16S_IMAGE_TOL` was the nearest twin's figure × 5.7, held at 1e-3 (section 129).
+- `F16S_IMAGE_TOL_RTZ` is the truncating twin's 1.318e-3 × 5.7 = 7.51e-3, held at **7.5e-3**.
+- Which bound a device takes is read from its own cells by `f16StoreRule`:
+  - **rn** when no cell took the other nearest;
+  - **rtz** when every stored cell is the f32 cell (or its fused mirror's) truncated toward zero;
+  - **mixed** otherwise, which keeps the round-to-nearest bound.
+- A software adapter must still read rn with no other nearest, as before. The cell key (no cell unexplained) and
+  k_head_apply's bound are unchanged.
+- The gate holds the derivation, the rule on fixtures, and a simulated truncating device (rtz, 1.32e-3, within its bound;
+  the same image under the nearest rule refused).
+- **This is a change made after a run showed it was needed.** It does not reach back: sections 130 and 137 stand as written,
+  read off the reports they read.
+
+**The runs, all at one commit, nothing pulled or committed between them.**
+- **On the GTX 1080:** two `realGpuRun --only denoise` runs, a and b, each with its own trace.
+- **On the Intel gen-9:** two `realGpuRun --only denoise` runs, a and b.
+- These are also round 63's runs (section 143): `--only denoise` carries its gate, so one session on each GPU answers both.
+  The cost is that a red in round 63's gate stops a 1080 run counting for H141 too.
+
+**H141, round 33's question on the 1080 again, by section 135's rule unchanged:**
+- full / temporal, read off each 1080 run's section 103 line, is above 1.0 in both;
+- a run counts when every `--only denoise` gate is green with exit 0, at the runs' commit, with both networks' 1080p rows
+  on the device's clock.
+- If H141 holds, `denoise-temporalup-device`'s rig half is done.
+
+**R141, the bound on the device.** K0p natively is green on all four runs, and each run's reading names store rule rtz.
+
+**Predictions, fixed now, deciding nothing.**
+- **P1:** all four runs read store rule rtz, and the cell counts 3038 / 3400 / 2592 / 0 again.
+- **P2:** H141 holds, near section 137's 1.99 x.
+- **P3:** neither 1080 run dies.
+
+**The reports are committed byte for byte before they are read.** Section 144 reads them; sections 142 and 143 are the two
+FSR3 rounds Keith asked for.
+
+## 142. ROUND 62 -- ROUND 61's ARRANGEMENT ON A TEST SET TWICE ITS SIZE: FIXED BEFORE ITS SCENES EXIST
+
+**Why.** Section 140 left FSR3 on the path tracer with three not-reported rounds and declined to relax C1 after seeing where
+round 61 fell. Keith asked for two rounds of a different kind. This is the first: the same test asked of more scenes, every
+rule fixed before any of them is rendered. Section 143 is the second, a device timing round.
+
+**What does not change from round 61 (section 139).**
+- The arrangement: light-free frames L6 and L7. Every arm is lit with emitterRadiance at the generated time.
+- The arms: the generator G', the cross-fade X', the held frame R', the noisy midpoint frame, and the midpoint traced alone.
+- The grading is in display space (round 26's transfer) before relMSE, with linear radiance reported beside it.
+- The sign-flip test (section 28), with Holm over H1 and H2. C2 is cited from round 54, and C3 is within 2 x of the floor.
+- C1 is asked of the candidate alone.
+- The frames are 256 x 256, at 4 spp in and 32 spp for the truth.
+- The shipped network (r11 seed 1) and the fill: nothing is trained.
+
+**What changes.**
+- **The test set: 24 scenes**, 12 of R (seeds 59000-59011) and 12 of C (seeds 60000-60011). None of them has been rendered
+  by any round. Section 28's exact sign-flip test enumerates every sign assignment, and 24 is the most it takes; that is why
+  24, not more.
+- **C1 at 22 of 24**, round 61's 11 of 12 in proportion. It is not relaxed. At this C1, round 61's own 10 of 12 would still
+  have fired (20 of 24).
+
+**The hypotheses, as round 61's.**
+- **H1:** G' beats the cross-fade X'.
+- **H2:** G' beats the held frame R'.
+
+**What is reported beside the verdict, deciding nothing.**
+- The figures per family, R and C. Round 61 lost its two C1 images on C.
+- Linear radiance's H1 and H2.
+- The midpoint traced alone against G'.
+- The fill.
+- G' against round 59's arrangement.
+
+**Predictions, fixed now, deciding nothing.**
+- **P1:** C1 holds. This is the uncertain one: round 61 met 10 of 12, and this needs 22 of 24.
+- **P2:** H2 is supported. Round 61 read 11 of 12, p 0.00049.
+- **P3:** H1 is supported. Round 61 read 7 of 12, p 0.038, with a mean d of +0.287; twice the scenes at that effect would
+  give a smaller p.
+- **P4:** if C1 fires, it fires on C, as in round 61.
+
+**The run.** `node tools/denoiseStudy.mjs --harvest-framegen-large`, on this box, detached. It writes
+`render/denoise-results-framegen-large.json`, which is committed byte for byte before it is read, at about 10,000 s.
+Section 145 is its verdict; section 144 reads section 141's rig runs.
+
+## 143. ROUND 63 -- IS A GENERATED FRAME CHEAP ENOUGH TO BE WORTH IT ON THE DEVICE? FIXED BEFORE ITS CODE
+
+**Why.** Rounds 59-62 ask whether a generated frame looks better than what it replaces. This one asks the other half: what it
+costs on a real GPU against tracing the frame. A generated frame that costs as much as a traced one presents nothing extra.
+Keith asked for both rounds.
+
+**What is timed, at 1920 x 1080, on each rig GPU.**
+- **T, a traced frame:** the half-size chain with its history, as section 103's line reports it ("with its history").
+- **G, a generated frame,** in the light-free arrangement of rounds 60-62, is four parts summed:
+  1. **the generator:** fx/fsr/fsrFrameGenTsl.mjs's makeFrameGen, as fsr-three.html runs it, with round 59's fill. It is fed
+     a real scene's field at 1920 x 1080: eye 7's first hits projected into camera 6, as render/denoiseFrameGen.mjs's
+     motionField computes it, on a scene seeded outside every split. It runs in the browser on three.js, on the wall clock
+     after the queue drains, median of its passes.
+  2. **the field on the device:** a new pass, render/denoiseFrameGenGPU.mjs's MOTION_WGSL. It turns the history's first
+     hits at eye 7 (the chain's `hits` pass, already paid for in T) into the generator's motion and depth. It is held to
+     motionField on the CPU, then timed.
+  3. **the light at the generated time:** the bounded coverage at full size (`covFullB`, section 107's line).
+  4. **the composite:** `restComp`, section 110's line.
+
+**H63: G ≤ 0.25 × T on both GPUs, in both of each GPU's runs.**
+- At 0.25, generating every other frame presents frames at 2T / (T + G) ≥ 1.6 x the traced rate for the same work.
+- A run counts when every `--only denoise` gate is green with exit 0, all runs on one commit. All five figures must be in
+  the run's own report.
+- The four parts of G come from three clocks: the generator's wall clock, the device clock for MOTION_WGSL where the
+  adapter has timestamps, and the device clocks of `covFullB` and `restComp`. A wall clock counts against G, never for it.
+
+**What is reported beside it, deciding nothing.**
+- Each part of G on its own.
+- The generator's share of G.
+- The field's holes at 1920 x 1080.
+- G against the chain without its history.
+
+**What this round does not ask.** Whether the generated frame is good enough to show: that is rounds 60-62's question.
+Nor what an FSR3 frame costs with an optical flow; round 59's arrangement takes the scene's own field.
+
+**Predictions, fixed now, deciding nothing.**
+- **P1:** H63 holds on both GPUs.
+- **P2:** G / T is 0.08-0.20 on the 1080 and 0.10-0.30 on the Intel. The 1080 read `covFullB` 1.23 ms and `restComp`
+  0.34 ms against T at 37.5 ms (section 137); the generator is the unknown.
+- **P3:** the generator is most of G on both GPUs.
+
+**The runs: two `realGpuRun --only denoise` runs on each GPU, section 141's.** They are committed byte for byte before
+they are read. Section 146 reads them; section 144 is section 141's rig runs, section 145 round 62's verdict.

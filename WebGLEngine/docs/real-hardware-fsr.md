@@ -795,6 +795,38 @@ On the Intel, the same four git lines and `cd WebGLEngine`, then `node tools/shi
 
 Send back the three 1080 JSON files, `trace135-a.txt` and `trace135-b.txt`, and the Intel's JSON file.
 
+### Sections 141 and 143: K0p's bound by the device's store rule, the 1080's round-33 runs again, and what a generated frame costs
+
+The same two runs on each GPU answer both sections. Nothing is pulled or committed between them, and both machines must
+show the same commit on `git log -1 --oneline`.
+
+On the GTX 1080, from `C:\SweK_r33`:
+
+```
+git fetch origin ccr-6c3eeb7c-pxz6kx
+git checkout ccr-6c3eeb7c-pxz6kx
+git pull origin ccr-6c3eeb7c-pxz6kx
+git log -1 --oneline
+cd WebGLEngine
+set SWEK_WEBGPU=
+set SWEK_TIMING_TRACE=%CD%\trace141-a.txt
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-s141-a-gtx1080.json
+set SWEK_TIMING_TRACE=%CD%\trace141-b.txt
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-s141-b-gtx1080.json
+set SWEK_TIMING_TRACE=
+```
+
+On the Intel, the same four git lines, then:
+
+```
+cd WebGLEngine
+set SWEK_WEBGPU=
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-s141-a-intel-gen9.json
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-s141-b-intel-gen9.json
+```
+
+Send back the four JSON files, `trace141-a.txt` and `trace141-b.txt`.
+
 ## Send back
 
 The JSON file. It holds the platform, the browser flags, every adapter seen, each gate's verdict, time, failing rows and

@@ -953,8 +953,10 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4895 -- 20 net new gates from the snow/sea round (21 added, triArrangement-selfcheck removed with the snapped arrangement): gates 2074 -> 2094, usesOk 2053 -> 2073, definesOk 2045 -> 2065, nameFirst 1943 -> 1963 (read off the code).
     // v4896 -- ten new gates (the five snowGpu split gates, snowReadings, truncationGuard, tvPackages, tvDebloat, swekTvLauncher), each spelling ok(name, cond, detail): gates 2094 -> 2104, usesOk 2073 -> 2083, definesOk 2065 -> 2075, nameFirst 1963 -> 1973 (read off the code). THE RECORD CAUGHT ONE OF MY OWN: tools/ship/headlessGpu-selfcheck.mjs, whose ok() takes the condition first, got the v4896 reading() row written label-first -- a string in the condition slot, true always, so the row passed whatever reading() did; the arguments are swapped and the row now tests (suspects stays 0).
     // denoiser round 59 -- one new gate (render/denoiseFrameGen-selfcheck.mjs), spelling ok(n, c, d): gates 2104 -> 2105, usesOk 2083 -> 2084, definesOk 2075 -> 2076, nameFirst 1973 -> 1974 (read off the code).
-    gates: 2105, usesOk: 2084, definesOk: 2076, importsOk: 0,
-    distinctDefinitions: 45, nameFirst: 1974, condFirst: 99, unknownSignature: 11,
+    // denoiser round 63 -- one new gate (render/denoiseFrameGenCost-selfcheck.mjs), defining ok(label, cond, detail) with a return:
+    // gates 2105 -> 2106, usesOk 2084 -> 2085, definesOk 2076 -> 2077, distinctDefinitions 45 -> 46, nameFirst 1974 -> 1975 (read off the code).
+    gates: 2106, usesOk: 2085, definesOk: 2077, importsOk: 0,
+    distinctDefinitions: 46, nameFirst: 1975, condFirst: 99, unknownSignature: 11,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

@@ -45,7 +45,8 @@ export function gateList(root = ENG) {
     // (what a pass costs, 64 x 64 up to a 1080p frame -- render/learned-denoiser-preregistration.md section 37); round 14
     // adds its compile gate (each kernel's build and pass time under each native compiler and in the browser, section 43)
     return [...pick("fx/fsr", /-selfcheck\.mjs$/), ...pick("render", /Tsl.*-selfcheck\.mjs$/), ...pick("render", /^translucentLayer-selfcheck\.mjs$/),
-            ...pick("render", /^denoise(Device|Timing|Compile|UpscaleGPU)-selfcheck\.mjs$/),
+            // round 63 (section 143): and what a generated frame's own parts cost -- the field and the generator at 1920 x 1080
+            ...pick("render", /^denoise(Device|Timing|Compile|UpscaleGPU|FrameGenCost)-selfcheck\.mjs$/),
             // v4896 -- the snow stack's six browser gates (one file until the split that put each under the sweep's 20 s cap): the frame graph on the real adapter held to its CPU twins,
             // and snowGpuLive's "reading" line for the frame rate
             ...pick("render", /^snowGpu(?:Field|Taa|LookA|LookB|Live)?-selfcheck\.mjs$/)].sort();

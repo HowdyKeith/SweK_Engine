@@ -86,6 +86,11 @@ node tools/ship/versionPreflight.mjs --next    # the next free version and sweep
      gate was red in both 1080 runs on K0p natively (1.998 / 1.984 x read, would have held). K0p's reading is identical on
      both vendors, so Direct3D's f16 conversion truncates; the cell key holds and the image bound fails. Every exact FSR
      gate is green on both GPUs; `fsr2-half-stall-rig` is the one FSR quality red.
+   - **Section 141: K0p's bound follows the device's store rule.** The truncating CPU twin reads 1.318e-3 and the rig's
+     cell counts exactly; a truncating device is held to 7.5e-3 (that twin x 5.7). The 1080's two runs and one Intel run
+     are asked again; section 144 reads them.
+   - **Rounds 62 and 63 (sections 142, 143), Keith's two FSR3 rounds.** Round 62: round 61's test on 24 new scenes, C1 at
+     22 of 24 (section 145). Round 63: a generated frame's device cost against a traced one, H63 G <= 0.25 T (section 146).
    - Every default that the Intel's runs at 7b871372 decided is now carried out. The denoiser entries still open, after
      rounds 56-58, are `denoise-subgroup-reduction`, `denoise-temporalup-device` and `denoise-1080-native-crash` (all three
      owed the GTX 1080), and `denoise-fsr3-framegen`, whose upstream is closed.

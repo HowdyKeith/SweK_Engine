@@ -1,6 +1,6 @@
 {
  "gate": "tools/ship/realGpuRun-selfcheck.mjs",
- "at": "2026-10-23",
+ "at": "2026-10-24",
  "tables": [
   {
    "title": "which renderer each flag set gets on this box",
