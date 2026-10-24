@@ -957,8 +957,9 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // And one more gate on the same line, tools/fishInputSide-selfcheck.mjs (the input side of the fish cells), spelling ok(name, cond, detail): gates 2124 -> 2125, usesOk 2103 -> 2104, definesOk 2095 -> 2096, nameFirst 1993 -> 1994 (read off the code, the four rows of the gate named them all).
     // And one more, tools/fishHmi-selfcheck.mjs (the hindbrain-circuit extraction), spelling ok(name, cond, detail): gates 2125 -> 2126, usesOk 2104 -> 2105, definesOk 2096 -> 2097, nameFirst 1994 -> 1995 (read off the code: the gate defines ok(n, c, d) once and every row names first).
     // And two more, brain/pilotSubCircuit-selfcheck.mjs (the circuit-only submarine pilot and its controls) and tools/ship/trainSubCircuits-selfcheck.mjs (the family trainer and the pre-registered verdict), each defining ok(n, c, d) once and naming first: gates 2126 -> 2128, usesOk 2105 -> 2107, definesOk 2097 -> 2099, nameFirst 1995 -> 1997 (read off the code).
-    gates: 2128, usesOk: 2107, definesOk: 2099, importsOk: 0,
-    distinctDefinitions: 45, nameFirst: 1997, condFirst: 99, unknownSignature: 11,
+    // And one more, tools/subDropout-selfcheck.mjs (the compass dropout), defining ok(n, c, d) once and naming first: gates 2128 -> 2129, usesOk 2107 -> 2108, definesOk 2099 -> 2100, nameFirst 1997 -> 1998 (read off the code).
+    gates: 2129, usesOk: 2108, definesOk: 2100, importsOk: 0,
+    distinctDefinitions: 45, nameFirst: 1998, condFirst: 99, unknownSignature: 11,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([
