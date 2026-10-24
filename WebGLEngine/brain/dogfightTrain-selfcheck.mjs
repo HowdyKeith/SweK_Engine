@@ -9,12 +9,23 @@
 //                               what PF.prune() and MF.prune() give from the same moved weights (weights, kept, moved, passes, score) -- for both networks
 //   2  THE ES ITSELF            on a synthetic score with a known answer: the best score never falls, a strict gain is `improved` and a tie is `neutral` and MOVES, a sigma of 0 changes nothing (every child is a tie), every
 //                               accepted step moves at most maxK weights, the history is [0, every 50, the end], `start` is honoured and not edited, onIter is called once per iteration
+//   5  THE BATCHED SEARCH      (added for the jets' second league run) trainBatchedWith(): with ONE batch it is trainWith() bit for bit (weights, improved, neutral, score) on a synthetic score and on the flight task's, for both networks; iteration i judges parent and
+//                               child on batch (i - 1) % batches and on that one only; the parent's score on a batch is asked for once per parent -- the number of score calls is worked out here from the accept/reject sequence alone, and the result equals a
+//                               NAIVE search written here that re-scores the parent every time; a scripted 6-iteration case with a gain, three ties (one at each edge of the 1e-9 tolerance), a loss and a gain just over the tolerance gives the counts worked
+//                               out by hand; trainScore is the mean over ALL the batches of the final weights; a sigma of 0 is all ties; `start` is honoured and not edited; deterministic; onIter says the batch; a non-list of functions is refused
 //   3  THE PRUNE                reverts what does not carry the score: a vector moved on weights the score ignores comes back to the hand weights entirely; one moved on a weight the score needs keeps exactly that weight; the result is a FIXED
 //                               POINT (reverting any weight that is left lowers the score), it never ends lower than it began, `toward` is honoured, and the hand weights prune to themselves with nothing moved and nothing kept
 //
 // SABOTAGE LOG -- FIFTEEN, each applied to brain/dogfightTrain.mjs in a scratch worktree, the gate run, the worktree restored; every one red by name (the number is how many rows went red):
 //   1 a tie counted as an improvement 3 | 2 a tie does not move 2 | 3 a child worse by up to 1 accepted 2 | 4 the history every 25 iterations 1 | 5 onIter never called 1 | 6 start ignored 1 | 7 every seed searches as seed 7 4 | 8 the prune reverts everything 5 |
 //   9 the prune makes one pass 2 | 10 the prune ignores `toward` 1 | 11 the prune edits the vector it is handed 4 | 12 an improvement not kept 3 | 13 maxK ignored 2 | 14 sigma ignored 1 | 15 the prune's best score not updated 1.
+// SABOTAGE LOG OF THE BATCHED SEARCH (section 5) -- TWENTY-FIVE mutants of trainBatchedWith(), each applied to brain/dogfightTrain.mjs in a scratch tree, the gate run, the tree discarded; every one red by name (the number is how many rows went red):
+//   B01 every iteration on batch 0 3 | B02 the batch changes every second iteration 2 | B03 the batch drawn at random 6 | B04 the parent scored on batch 0 4 | B05 the child scored on the next batch 4 | B06 the memory not cleared on an improvement 2
+//   B07 not cleared on a tie that moves 1 | B08 an improved child's score not remembered 1 | B09 a tied child's score not remembered 1 | B10 the parent re-scored every iteration 2 | B11 a tie does not move 3 | B12 a child worse by up to 1 kept 5
+//   B13 a tie counts as an improvement 4 | B14 the improvement tolerance 1e-8 1 | B15 trainScore the last batch's 3 | B16 trainScore the sum 3 | B17 start ignored 1 | B18 every seed searches as seed 7 5 | B19 maxK ignored 5 | B20 sigma ignored 1
+//   B21 a bad batch list not refused 1 | B22 onIter does not say the batch 2 | B23 one iteration too few 4 | B24 the final scores are of the starting weights 5 | B25 a list of non-functions passes the check 1.
+//   B09 WENT 0 RED THE FIRST TIME: the 60-iteration case on a smooth synthetic score never produces a tie, so the path where a tied child's score is remembered was not run, and only a call count could see it. The scripted six-iteration case (which has three ties)
+//   now pins the number of score calls to the one worked out by hand (13), and B09 reads 1.
 //   THE FIRST DRAFT'S SYNTHETIC SCORE COULD NOT BE CLIMBED: it asked for two weights out of 1,796, a sparse search that moves one to four weights an iteration never touched them in 120 iterations, every child was a tie, and the row that wants an improvement went
 //   red on the unsabotaged code -- the score now asks every seventh weight to move, so about one mutation in seven is a gain.
 "use strict";
@@ -84,10 +95,58 @@ sec("3. THE PRUNE");
     ok("the vector it is handed is not edited (a copy is pruned)", same(frozenIn, before));
 }
 
+sec("5. THE BATCHED SEARCH");
+{
+    const P = MF, H = P.handWeights();
+    const mulberry = (a) => () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+    const targetOf = (b) => Float32Array.from(H, (v, i) => v + (i % 7 === b ? 0.5 : 0));   // batch b wants every seventh weight (offset b) 0.5 higher: three batches that agree on nothing, so a move judged on one is a loss on another
+    const scoreB = (b) => (w) => { const t = targetOf(b); let s = 0; for (let i = 0; i < w.length; i++) s -= Math.abs(w[i] - t[i]); return s; };
+    // 1. one batch is trainWith
+    for (const [name, Q] of Object.entries(policies)) {
+        const sc = (w) => T.evaluate(Q.pilotFor(w), SMALL).score;
+        const a = DT.trainBatchedWith(Q, [sc], { seed: 5, iters: 14, sigma: 0.3, maxK: 4 }), b = DT.trainWith(Q, sc, { seed: 5, iters: 14, sigma: 0.3, maxK: 4 });
+        ok(`!! ONE BATCH IS trainWith(), bit for bit (${name}, on the flight task): the same weights, improved and neutral counts and train score, and batchScores is that one score`, same(a.weights, b.weights) && a.improved === b.improved && a.neutral === b.neutral && a.trainScore === b.trainScore && a.batchScores.length === 1 && a.batchScores[0] === b.trainScore, `${a.improved} improved, ${a.neutral} neutral`);
+    }
+    const one = DT.trainBatchedWith(P, [scoreB(0)], { seed: 11, iters: 120, sigma: 0.3, maxK: 2 }), ref = DT.trainWith(P, scoreB(0), { seed: 11, iters: 120, sigma: 0.3, maxK: 2 });
+    ok("one batch is trainWith() on the synthetic score too, over 120 iterations, and the search did find gains (so the equality is not two searches that both did nothing)", same(one.weights, ref.weights) && one.improved === ref.improved && one.neutral === ref.neutral && one.improved > 0);
+    // 2 + 3. the batches, the pairing and the parent's memory
+    const scores3 = [0, 1, 2].map(scoreB), log = [], iterEnds = [], seen = [];
+    const wrapped = scores3.map((f, b) => (w) => { log.push(b); return f(w); });
+    const run = DT.trainBatchedWith(P, wrapped, { seed: 21, iters: 60, sigma: 0.3, maxK: 2, onIter: (i, st) => { iterEnds.push([i, log.length, st.batch, st.improved, st.neutral]); seen.push(st.batch); } });
+    const perIter = iterEnds.map((e, i) => log.slice(i === 0 ? 0 : iterEnds[i - 1][1], e[1]));
+    ok("!! ITERATION i IS JUDGED ON BATCH (i - 1) % 3 AND ON THAT ONE ONLY, PARENT AND CHILD ALIKE: onIter reports batches 0,1,2,0,1,2,..., and every score call inside iteration i (one or two of them) is to that batch", seen.every((b, i) => b === i % 3) && perIter.every((c, i) => (c.length === 1 || c.length === 2) && c.every((b) => b === i % 3)), `${seen.slice(0, 7).join()}...`);
+    // the calls the memory should have saved: re-derived from the accept/reject sequence alone
+    let known = new Set(), expectCalls = 0, prev = [0, 0];
+    for (const e of iterEnds) { const b = e[2], accepted = e[3] + e[4] > prev[0] + prev[1]; expectCalls += 1 + (known.has(b) ? 0 : 1); if (accepted) known = new Set([b]); else known.add(b); prev = [e[3], e[4]]; }
+    expectCalls += 3;   // the final scores of the three batches
+    ok("!! THE PARENT'S SCORE ON A BATCH IS ASKED FOR ONCE PER PARENT: the number of score calls equals the one worked out here from the accept/reject sequence (a child is always scored; the parent only on a batch it has not been scored on since it last changed; an accepted child's score on its batch is the new parent's)", log.length === expectCalls && log.length < 2 * 60 + 3, `${log.length} calls, ${expectCalls} expected, ${2 * 60 + 3} if nothing were remembered`);
+    // the naive search, written from the spec: re-score the parent every time
+    const naive = (() => { const rng = mulberry(21); let best = Float32Array.from(H), imp = 0, neu = 0; for (let i = 1; i <= 60; i++) { const b = (i - 1) % 3, cand = P.mutate(best, 0.3, rng, 2), sp = scores3[b](best), sc = scores3[b](cand); if (sc > sp + 1e-9) { best = cand; imp++; } else if (sc >= sp - 1e-9) { best = cand; neu++; } } return { best, imp, neu }; })();
+    ok("!! THE MEMORY CHANGES NOTHING: the search equals a naive one written here from the description (the parent re-scored on its batch every iteration): the same weights, improved and neutral counts", same(run.weights, naive.best) && run.improved === naive.imp && run.neutral === naive.neu && run.improved > 0 && run.neutral >= 0, `${run.improved} improved, ${run.neutral} neutral`);
+    ok("trainScore IS THE MEAN OVER ALL THE BATCHES OF THE FINAL WEIGHTS, and batchScores each of them (not the last batch's, not their sum)", run.batchScores.length === 3 && run.batchScores.every((x, b) => x === scores3[b](run.weights)) && Math.abs(run.trainScore - (run.batchScores[0] + run.batchScores[1] + run.batchScores[2]) / 3) < 1e-12 && run.iters === 60);
+    // 4. a scripted case, every outcome worked out by hand: the child is the parent plus 1 on weight 0
+    const stub = { handWeights: () => Float32Array.of(0, 0), mutate: (w) => { const c = Float32Array.from(w); c[0] += 1; return c; } };
+    const tab0 = { 0: 0, 1: 1, 2: 0, 3: -1, 4: -1 + 1e-10, 5: 0 }, tab1 = { 0: 0, 1: 0, 2: 0, 3: -5e-10, 4: 0.3, 5: 0.3 + 2e-9 };
+    let scriptedCalls = 0;
+    const sa = DT.trainBatchedWith(stub, [(w) => { scriptedCalls++; return tab0[w[0]]; }, (w) => { scriptedCalls++; return tab1[w[0]]; }], { iters: 6 });
+    ok("!! THE ACCEPTANCE RULE, BY HAND: six iterations alternating two batches -- (1) a gain of 1 on batch 0, kept; (2) a tie on batch 1, kept (a tie moves); (3) a loss of 1 on batch 0, REJECTED (the parent stays); (4) a loss of 5e-10 on batch 1, inside the 1e-9 tolerance, kept as a tie; (5) a gain of 1e-10 on batch 0, a tie, kept; (6) a gain of 2e-9 on batch 1, over the tolerance, an improvement -- so 2 improved, 3 neutral, the final weight 5 and the final scores [0, 0.3 + 2e-9]; and 13 score calls in all, worked out by hand: 2 + 2 + 2 + 1 (the parent's score on batch 1 was remembered from the tie in (2)) + 2 + 2 for the iterations and 2 for the final scores",
+        sa.improved === 2 && sa.neutral === 3 && sa.weights[0] === 5 && scriptedCalls === 13 && sa.batchScores[0] === tab0[5] && sa.batchScores[1] === tab1[5] && Math.abs(sa.trainScore - (tab0[5] + tab1[5]) / 2) < 1e-15, `${sa.improved} improved, ${sa.neutral} neutral, weight ${sa.weights[0]}`);
+    // 5. the rest
+    const flat = DT.trainBatchedWith(P, scores3, { seed: 11, iters: 30, sigma: 0 });
+    ok("!! A SIGMA OF 0 CHANGES NOTHING: every child is a tie, so every iteration is a neutral move, nothing is an improvement, and the weights are still the hand weights, with the mean of the batches' scores of them", flat.improved === 0 && flat.neutral === 30 && same(flat.weights, H) && Math.abs(flat.trainScore - (scores3[0](H) + scores3[1](H) + scores3[2](H)) / 3) < 1e-12);
+    const st = Float32Array.from(H); st[7] = 0.5; const copy = Float32Array.from(st), s5 = DT.trainBatchedWith(P, scores3, { seed: 2, iters: 5, maxK: 2, start: st }), s0 = DT.trainBatchedWith(P, scores3, { seed: 2, iters: 0, start: st });
+    ok("!! `start` IS HONOURED AND NOT EDITED: with no iterations the search returns the vector it was given and scores it; with five it is at most 5 x 2 weights from that vector; the vector handed in is the same after", same(st, copy) && same(s0.weights, copy) && s0.improved === 0 && s0.neutral === 0 && diffCount(s5.weights, copy) <= 10 && s0.batchScores[0] === scores3[0](copy));
+    const m1 = DT.trainBatchedWith(P, scores3, { seed: 3, iters: 1, sigma: 0.3, maxK: 1 }), m4 = DT.trainBatchedWith(P, scores3, { seed: 3, iters: 1, sigma: 0.3, maxK: 4 });
+    ok("a child moves between 1 and maxK weights: with maxK 1 an iteration moves at most 1 and with maxK 4 at most 4", diffCount(m1.weights, H) <= 1 && diffCount(m4.weights, H) <= 4);
+    ok("deterministic, and a function of the seed: the same seed gives the same search twice, another seed another", same(DT.trainBatchedWith(P, scores3, { seed: 9, iters: 25 }).weights, DT.trainBatchedWith(P, scores3, { seed: 9, iters: 25 }).weights) && !same(DT.trainBatchedWith(P, scores3, { seed: 9, iters: 25 }).weights, DT.trainBatchedWith(P, scores3, { seed: 10, iters: 25 }).weights));
+    const refused = (f) => { try { f(); return false; } catch (e) { return /scores must be a non-empty array of functions/.test(e.message); } };
+    ok("!! A BATCH LIST THAT IS NOT A LIST OF FUNCTIONS IS REFUSED, by name: an empty list, a function instead of a list, and a list with a number in it each throw before any search", refused(() => DT.trainBatchedWith(P, [], { iters: 1 })) && refused(() => DT.trainBatchedWith(P, scores3[0], { iters: 1 })) && refused(() => DT.trainBatchedWith(P, [scores3[0], 3], { iters: 1 })));
+}
+
 sec("4. THE FRONT DOOR");
 {
     const rl = DT.reportLines();
-    ok("the module's report says what it is, and no line says NaN or undefined", rl.length === 1 && /dogfightTrain/.test(rl[0]) && !/NaN|undefined/.test(rl[0]));
+    ok("the module's report says what it is (including the batched search), and no line says NaN or undefined", rl.length === 1 && /dogfightTrain/.test(rl[0]) && /batched/.test(rl[0]) && !/NaN|undefined/.test(rl[0]));
 }
 
 console.log(fails ? `\ndogfightTrain-selfcheck: ${fails} FAILED` : "\ndogfightTrain-selfcheck: all checks pass");
