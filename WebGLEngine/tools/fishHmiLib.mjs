@@ -8,7 +8,7 @@
 // VGluT2, unlabeled, unclear, n/a) and `network_level` (a list: input_one, network_seed, output_one, output_two, ...). The package's own src/zfish/graph/build.py makes the graph this file makes: for each row and each tuple of `inputs` / `outputs`
 // with at least four fields, an edge partner->cell / cell->partner, counted once per tuple (a synapse that is listed in BOTH cells' rows is counted twice, as their code counts it); a partner of '-' is an unidentified contact and is not an edge.
 //
-// THE CIRCUIT (circuitOf), one rule with two knobs: the TARGETS are the spinal projection neurons (classifier starts with "spn"); LAYER 1 is every cell with a neurotransmitter label (Gad1B = inhibitory, VGluT2 = excitatory) that has an identified
+// THE CIRCUIT (circuitOf), one rule with two knobs: the TARGETS are the spinal projection neurons (the classifier contains "spn", as the package's is_spn_cell reads it; the proximal ones, classifier ending _prox, are kept and labelled SPN_prox -- the package's own figure leaves them out); LAYER 1 is every cell with a neurotransmitter label (Gad1B = inhibitory, VGluT2 = excitatory) that has an identified
 // edge onto a target; LAYER k+1 is every labelled cell with an identified edge onto layer k; stop at `depth` (default 2). The neurons are the targets and the layers; the edges are every identified pair among them whose PRESYNAPTIC cell has a sign
 // (a pair from a cell without a label has no sign and is left out and COUNTED). Sign: +1 VGluT2, -1 Gad1B; weight: the tuple count. Neurons are in ascending soma id. Cells are annotated with their class, transmitter, SPN group (turning / forward /
 // other) and, when soma positions are given, their side of the midline.
@@ -21,7 +21,13 @@ export const SOMA_VOXEL_NM = Object.freeze([8, 8, 30]);
 export const DEFAULTS = Object.freeze({ depth: 2, midlineUm: 259.208 });
 
 // ---- the xlsx file: a zip of XML, read with nothing but zlib -------------------------------------------------------------------------------------------------------------------------------------------
-/** The files of a zip archive as a Map name -> Buffer (stored and deflated entries; no zip64, no encryption: refused by name). */
+/** The CRC-32 of a buffer (the zip format's checksum) as an unsigned integer. */
+export function crc32(buf) {
+    let crc = 0xffffffff;
+    for (const b of buf) { let c = (crc ^ b) & 0xff; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; crc = (crc >>> 8) ^ c; }
+    return (crc ^ 0xffffffff) >>> 0;
+}
+/** The files of a zip archive as a Map name -> Buffer (stored and deflated entries, each checked against the directory's size and CRC-32; no zip64, no encryption: refused by name). */
 export function unzip(buf) {
     let e = buf.length - 22;
     while (e >= 0 && buf.readUInt32LE(e) !== 0x06054b50) e--;
@@ -32,7 +38,7 @@ export function unzip(buf) {
     let p = cdOffset;
     for (let i = 0; i < count; i++) {
         if (buf.readUInt32LE(p) !== 0x02014b50) throw new Error(`fishHmi.unzip: entry ${i + 1} of ${count} has no central-directory signature`);
-        const flags = buf.readUInt16LE(p + 8), method = buf.readUInt16LE(p + 10), csize = buf.readUInt32LE(p + 20), usize = buf.readUInt32LE(p + 24);
+        const flags = buf.readUInt16LE(p + 8), method = buf.readUInt16LE(p + 10), crc = buf.readUInt32LE(p + 16), csize = buf.readUInt32LE(p + 20), usize = buf.readUInt32LE(p + 24);
         const nameLen = buf.readUInt16LE(p + 28), extraLen = buf.readUInt16LE(p + 30), commentLen = buf.readUInt16LE(p + 32), local = buf.readUInt32LE(p + 42), name = buf.toString("utf8", p + 46, p + 46 + nameLen);
         p += 46 + nameLen + extraLen + commentLen;
         if (flags & 1) throw new Error(`fishHmi.unzip: ${name} is encrypted`);
@@ -44,6 +50,7 @@ export function unzip(buf) {
         else if (method === 8) data = zlib.inflateRawSync(raw);
         else throw new Error(`fishHmi.unzip: ${name} uses compression method ${method}`);
         if (data.length !== usize) throw new Error(`fishHmi.unzip: ${name} is ${data.length} bytes after unpacking, the directory says ${usize}`);
+        if (crc32(data) !== crc) throw new Error(`fishHmi.unzip: ${name} fails its CRC-32 checksum (a damaged download?)`);
         files.set(name, data);
     }
     return files;
@@ -51,18 +58,18 @@ export function unzip(buf) {
 
 const ENTITIES = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'" };
 const unescapeXml = (s) => s.replace(/&(#x[0-9a-fA-F]+|#\d+|amp|lt|gt|quot|apos);/g, (m, g) => (g[0] === "#" ? String.fromCodePoint(g[1] === "x" ? parseInt(g.slice(2), 16) : parseInt(g.slice(1), 10)) : ENTITIES[g]));
-const textOf = (xml) => { let out = ""; const re = /<t(?:\s[^>]*)?>([\s\S]*?)<\/t>|<t\s*\/>/g; let m; while ((m = re.exec(xml))) out += m[1] === undefined ? "" : unescapeXml(m[1]); return out; };
+const textOf = (xml) => { const bare = xml.replace(/<rPh\b[\s\S]*?<\/rPh>/g, ""), re = /<t(?:\s[^>]*?)?(?:\/>|>([\s\S]*?)<\/t>)/g; let out = "", m; while ((m = re.exec(bare))) out += m[1] === undefined ? "" : unescapeXml(m[1]); return out; };
 const colIndex = (ref) => { let n = 0; for (const ch of /^[A-Z]+/.exec(ref)[0]) n = n * 26 + (ch.charCodeAt(0) - 64); return n - 1; };
 
-/** The first sheet of an xlsx file as { header: [names], rows: [{ name: text }] } (numbers come back as their text; an empty cell is left out of its row). */
+/** The first sheet of an xlsx file as { header: [names], rows: [{ name: text }] } (numbers come back as their text; an empty cell is left out of its row; a row with no value in a named column is not a record and is left out). */
 export function readXlsx(buf) {
     const files = unzip(buf), sheet = files.get("xl/worksheets/sheet1.xml");
     if (!sheet) throw new Error("fishHmi.readXlsx: no xl/worksheets/sheet1.xml in the file");
     const shared = files.has("xl/sharedStrings.xml") ? [...files.get("xl/sharedStrings.xml").toString("utf8").matchAll(/<si(?:\s[^>]*)?>([\s\S]*?)<\/si>|<si\s*\/>/g)].map((m) => (m[1] === undefined ? "" : textOf(m[1]))) : [];
     const grid = [];
-    for (const rm of sheet.toString("utf8").matchAll(/<row(?:\s[^>]*)?>([\s\S]*?)<\/row>/g)) {
+    for (const rm of sheet.toString("utf8").matchAll(/<row(?:\s[^>]*?)?(?:\/>|>([\s\S]*?)<\/row>)/g)) {
         const cells = [];
-        for (const cm of rm[1].matchAll(/<c\s([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)) {
+        for (const cm of (rm[1] || "").matchAll(/<c\s([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)) {
             const attrs = cm[1], body = cm[2] || "", ref = /\br="([A-Z]+\d+)"/.exec(attrs), type = /\bt="([^"]*)"/.exec(attrs);
             if (!ref) continue;
             let value;
@@ -75,7 +82,7 @@ export function readXlsx(buf) {
     }
     if (!grid.length) throw new Error("fishHmi.readXlsx: the sheet has no rows");
     const header = Array.from(grid[0], (h) => (h === undefined ? "" : h));
-    return { header, rows: grid.slice(1).map((cells) => { const o = {}; header.forEach((h, i) => { if (h !== "" && cells[i] !== undefined) o[h] = cells[i]; }); return o; }) };
+    return { header, rows: grid.slice(1).map((cells) => { const o = {}; header.forEach((h, i) => { if (h !== "" && cells[i] !== undefined) o[h] = cells[i]; }); return o; }).filter((o) => Object.keys(o).length) };
 }
 
 // ---- the package's labels (src/zfish/labels.py) -------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -100,10 +107,10 @@ export function ntLabel(value) {
     if (t === "unlabeled" || t === "unlabelled") return "Unlabeled";
     return "Unknown";
 }
-/** The SPN group of a raw classifier: "turning", "forward", "other" for a spinal projection neuron, null for any other cell. */
+/** The SPN group of a raw classifier: "turning", "forward", "other" for a spinal projection neuron (the package's is_spn_cell: the classifier contains 'spn', any case), null for any other cell. */
 export function spnGroup(raw) {
     const t = String(raw).trim().toLowerCase();
-    if (!t.startsWith("spn")) return null;
+    if (!t.includes("spn")) return null;
     return t.includes("turn") ? "turning" : t.includes("forw") ? "forward" : "other";
 }
 
@@ -193,7 +200,7 @@ const signOf = (nt) => (nt === "Exc" ? 1 : nt === "Inh" ? -1 : 0);
 export function circuitOf(cells, edges, { depth = DEFAULTS.depth, somas = null, midlineUm = DEFAULTS.midlineUm } = {}) {
     if (!(Number.isInteger(depth) && depth >= 1)) throw new Error(`fishHmi.circuitOf: depth must be a whole number of 1 or more, got ${depth}`);
     const targets = [...cells.values()].filter((c) => c.spn !== null).map((c) => c.id);
-    if (!targets.length) throw new Error("fishHmi.circuitOf: no spinal projection neuron (a classifier starting with 'spn') in the dataframe");
+    if (!targets.length) throw new Error("fishHmi.circuitOf: no spinal projection neuron (a classifier containing 'spn') in the dataframe");
     const layer = new Map(targets.map((t) => [t, 0])), signedPre = new Map();
     for (const e of edges.values()) { if (signOf(cells.get(e.pre).nt) !== 0 && e.pre !== e.post) { if (!signedPre.has(e.post)) signedPre.set(e.post, []); signedPre.get(e.post).push(e.pre); } }
     let frontier = targets;

@@ -18,23 +18,26 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 function main(argv) {
     const known = new Set(["--xlsx", "--somas", "--depth", "--midline-um", "--out", "--write"]);
     for (let i = 0; i < argv.length; i++) if (argv[i].startsWith("--") && !known.has(argv[i])) { console.error(`fishHmi: unknown option ${argv[i]}`); return 2; }
-    const arg = (f, d = null) => { const i = argv.indexOf(f); return i === -1 ? d : argv[i + 1]; };
-    const xlsx = arg("--xlsx");
-    if (!xlsx) { console.error("fishHmi: --xlsx <em_zfish1_dataframe.xlsx> is required"); return 2; }
-    const depth = Number(arg("--depth", DEFAULTS.depth)), midlineUm = Number(arg("--midline-um", DEFAULTS.midlineUm));
-    if (!Number.isInteger(depth) || depth < 1) { console.error(`fishHmi: --depth must be a whole number of 1 or more, got ${arg("--depth")}`); return 2; }
-    if (!Number.isFinite(midlineUm)) { console.error(`fishHmi: --midline-um must be a number, got ${arg("--midline-um")}`); return 2; }
-    const out = path.resolve(ROOT, arg("--out", "vendor/zebrafish/fish1-hmi-spn.json"));
+    const arg = (f, d = null) => { const i = argv.indexOf(f); if (i === -1) return d; if (argv[i + 1] === undefined || argv[i + 1].startsWith("--")) throw new Error(`${f} needs a value`); return argv[i + 1]; };
+    let xlsx, depth, midlineUm, out, somasFile;
+    try {
+        xlsx = arg("--xlsx"); somasFile = arg("--somas");
+        depth = Number(arg("--depth", DEFAULTS.depth)); midlineUm = Number(arg("--midline-um", DEFAULTS.midlineUm));
+        out = path.resolve(ROOT, arg("--out", "vendor/zebrafish/fish1-hmi-spn.json"));
+        if (!xlsx) throw new Error("--xlsx <em_zfish1_dataframe.xlsx> is required");
+        if (!Number.isInteger(depth) || depth < 1) throw new Error(`--depth must be a whole number of 1 or more, got ${arg("--depth")}`);
+        if (!Number.isFinite(midlineUm)) throw new Error(`--midline-um must be a number, got ${arg("--midline-um")}`);
+    } catch (e) { console.error("fishHmi: " + e.message); return 2; }
     try {
         const bytes = fs.readFileSync(xlsx), sheet = readXlsx(bytes), missing = REQUIRED_COLUMNS.filter((c) => !sheet.header.includes(c));
         if (missing.length) throw new Error(`the sheet has no column ${missing.map((c) => JSON.stringify(c)).join(", ")} (it has ${sheet.header.join(", ")})`);
         const { cells, dropped } = cellsOf(sheet.rows), { edges, stats } = edgesOf(sheet.rows, cells);
         let somas = null, somaNote = "no soma positions: no sides";
-        if (arg("--somas")) {
-            const t = parseTable(fs.readFileSync(arg("--somas"), "utf8"));
+        if (somasFile) {
+            const t = parseTable(fs.readFileSync(somasFile, "utf8"));
             if (!t.length || !("id" in t[0]) || !("_x" in t[0]) || !("_y" in t[0]) || !("_z" in t[0])) throw new Error("the soma file has no id, _x, _y, _z columns");
             somas = new Map(t.map((r) => [String(r.id), [Number(r._x), Number(r._y), Number(r._z)]]));
-            somaNote = `${somas.size} soma positions from ${path.basename(arg("--somas"))}`;
+            somaNote = `${somas.size} soma positions from ${path.basename(somasFile)}`;
         }
         const c = circuitOf(cells, edges, { depth, somas, midlineUm }), s = c.selection;
         console.log(`[fishHmi] ${sheet.rows.length} rows, ${cells.size} cells (${dropped} rows without a usable Cell ID); ${stats.tuples} synapse tuples: ${stats.identified} identified, ${stats.unidentified} to an unidentified partner, ${stats.malformed} malformed, ${stats.parseFailRows} unreadable lists; ${edges.size} distinct pairs`);
@@ -48,7 +51,7 @@ function main(argv) {
             typePattern: `the spinal projection neurons and the labelled cells that feed them, to depth ${depth} (sign from the neurotransmitter: VGluT2 +1, Gad1B -1)`, build: stats, selection: s,
         };
         const json = { meta, neurons: c.neurons, edges: c.edges };
-        if (process.argv.includes("--write")) { fs.mkdirSync(path.dirname(out), { recursive: true }); fs.writeFileSync(out, JSON.stringify(json) + "\n"); console.log("[fishHmi] wrote " + path.relative(ROOT, out)); }
+        if (argv.includes("--write")) { fs.mkdirSync(path.dirname(out), { recursive: true }); fs.writeFileSync(out, JSON.stringify(json) + "\n"); console.log("[fishHmi] wrote " + path.relative(ROOT, out)); }
         else console.log("[fishHmi] dry run (pass --write to write " + path.relative(ROOT, out) + ")");
         return 0;
     } catch (e) { console.error("fishHmi: " + e.message); return 1; }
