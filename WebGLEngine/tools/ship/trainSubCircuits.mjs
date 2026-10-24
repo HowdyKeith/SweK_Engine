@@ -82,11 +82,11 @@ export function runCircuit(spec, circuit, opts = {}, log = () => {}) {
     }
     const result = finish({ ...recipe, policy: P, seed: base, circuit: name }, runs, (m) => log(`  ${name}: ${m}`), sets);
     const handW = P.handWeights(), ev = (w, set) => P.evaluate(w, set);
-    const auto = { audit: sc(result.auto.audit || ev(handW, sets.audit)), safetyAudit: sc(result.auto.safetyAudit || ev(handW, sets.safetyAudit)), reserve: sc(result.auto.reserve || ev(handW, sets.reserve)) };
+    const auto = { audit: sc(ev(handW, sets.audit)), safetyAudit: sc(ev(handW, sets.safetyAudit)), reserve: sc(ev(handW, sets.reserve)) };   // flown here for every circuit: finish() reads them only when there is a champion
     const c = result.champion;
     return {
         spec: name, family: spec.family, index: spec.index, smoke: !!opts.smoke, recipe: { ...recipe, auditBase: opts.smoke ? null : (opts.auditBase || AUDIT_BASE) }, seedBase: base,
-        reach: P.reach, weightCount: P.WEIGHT_COUNT, champion: c ? c.seed : null, eligible: result.runs.filter((r) => r.eligible).length,
+        reach: P.reach, weightCount: P.WEIGHT_COUNT, champion: c ? c.seed : null,
         qualifies: !!(c && result.verdict.ok), reasons: c ? result.verdict.reasons : result.verdict.reasons,
         scores: { autopilot: auto, champion: c ? { heldOut: sc(c.heldOut), audit: sc(c.audit), safetyAudit: sc(c.safetyAudit), reserve: sc(c.reserve) } : null },
         searches: result.runs.map((r) => ({ k: r.k, seed: r.seed, trainScore: r.trainScore, heldOut: r.heldOut.score, eligible: r.eligible, improved: r.improved, neutral: r.neutral, moved: r.moved, kept: r.kept })),
@@ -181,7 +181,7 @@ export function parseArgs(argv) {
     if (o.one && parseSpecs(o.one).length !== 1) throw new Error("--one takes a single spec");
     return o;
 }
-const sameRecipe = (rec, o) => rec.smoke === o.smoke && rec.recipe.runs === o.recipe.runs && rec.recipe.iters === o.recipe.iters && rec.recipe.sigma === o.recipe.sigma && rec.recipe.maxK === o.recipe.maxK && rec.recipe.auditBase === (o.smoke ? null : o.auditBase);
+const sameRecipe = (rec, o) => rec.recipe.runs === o.recipe.runs && rec.recipe.iters === o.recipe.iters && rec.recipe.sigma === o.recipe.sigma && rec.recipe.maxK === o.recipe.maxK && rec.recipe.auditBase === (o.smoke ? null : o.auditBase);
 /** The records of a results file (one JSON object a line); a line that is not JSON is an error naming its number. */
 export function readRecords(text) {
     return text.split("\n").filter((l) => l.trim()).map((l, i) => { try { return JSON.parse(l); } catch (e) { throw new Error(`results file line ${i + 1} is not JSON`); } });
