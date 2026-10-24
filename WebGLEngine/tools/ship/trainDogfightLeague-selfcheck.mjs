@@ -424,7 +424,7 @@ sec("11. THE JETS (--aircraft jet): the same league, flown at jet scale, started
 
 sec("12. THE SECOND RECIPE (--train wide): the objective on one batch of fresh duels at a time, the prune on a set of its own");
 {
-    const parse = (a) => { try { return L.parseArgs(a); } catch (e) { const t = a.indexOf("--train"); return L.parseArgs(t < 0 ? a : a.filter((_, j) => j !== t && j !== t + 1)); } };   // a parser that refuses --train must turn rows red by name, not kill the gate before any row is read
+    const parse = (a) => { try { return L.parseArgs(a); } catch (e) { const drop = new Set(); a.forEach((x, j) => { if (x === "--train" || x === "--guard") { drop.add(j); drop.add(j + 1); } }); return L.parseArgs(a.filter((_, j) => !drop.has(j))); } };   // a parser that refuses --train or --guard must turn rows red by name, not kill the gate before any row is read
     const wO = parse(["--aircraft", "jet", "--train", "wide"]), fO = parse(["--aircraft", "jet"]), wSmoke = parse(["--aircraft", "jet", "--train", "wide", "--smoke", "--iters", "6", "--runs", "1"]);
     ok("!! --train CHOOSES THE RECIPE, FIXED BY DEFAULT, AND WIDE IS FOR THE JETS ONLY: no --train is `fixed` for the jets and the trainers alike; `--train wide --aircraft jet` is `wide` with the jet brain's own seed and output unmoved; wide on the trainers is refused by name (they have no wide sets), and so is a value that is neither",
         parse([]).train === "fixed" && fO.train === "fixed" && wO.train === "wide" && wO.seed === 12000 && wO.out === L.BRAINS_JET.fly.out && wO.aircraft === "jet" && parse(["--train", "fixed"]).train === "fixed"
@@ -518,6 +518,8 @@ sec("12. THE SECOND RECIPE (--train wide): the objective on one batch of fresh d
     const gObj = L.objectiveFor(gOpts, gc), pObj = L.objectiveFor(g0Opts, gc);
     ok("!! objectiveFor GIVES THE GUARDED SCORE WITH THE LAMBDA OF THE OPTIONS AND THE PLAIN SCORE WITHOUT ONE: with --guard 10 the seed-3 mutant scores the plain score minus 1.25 on the prune set, with no --guard the plain score",
         near(gObj(prune)(wBad), sc(wBad) - 1.25, 1e-12) && pObj(prune)(wBad) === sc(wBad) && near(L.objectiveFor({ ...gOpts, guard: 4 }, gc)(prune)(wBad), sc(wBad) - 0.5, 1e-12));
+    ok("!! objectiveFor HANDS THE CONTEXT'S START WEIGHTS TO THE GUARD (the jets' start IS the hand weights, so this row hands it another): with the seed-3 mutant as the context's start (3 lost), the hand weights score exactly their plain score (no excess) and the seed-2 mutant (24 lost) pays 10 x (24 - 3) / 24",
+        (() => { const o = L.objectiveFor(gOpts, { ...gc, startW: wBad })(prune); return o(start) === sc(start) && near(o(wAll), sc(wAll) - (10 * 21) / 24, 1e-12); })());
     // plumbing: the shipped fighter's count is worked out ONCE per set -- the batches and the prune set (3 on the smoke sets, 9 on the real ones) are that many evaluations of the start weights, told apart from every other evaluation because the start weights are handed over as the very same object
     const callsOf = (opts) => { let n = 0, ev = 0; const spy = { ...PJ, pilotFor: (w) => { ev++; if (w === start) n++; return PJ.pilotFor(w); } }; const r = L.searchOne(opts, 0, { ...gc, brain: { ...gc.brain, policy: spy } }); return { n, ev, r }; };
     const cg = callsOf(gOpts), c0 = callsOf(g0Opts);
