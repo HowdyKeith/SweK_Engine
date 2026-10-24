@@ -9893,3 +9893,36 @@ because the tree had no trained network on a device. It has one now: the denoise
 
 **What this section is.** The design, fixed before anything is written. The code, its gate rows, the training harvest and the
 test harvest come in that order, each committed before the next runs, as rounds 1-12 did for the denoiser.
+
+## 149. ROUND 64, THE INTEL's HALF -- H64 HOLDS THERE, BY A HAIR; THE 1080's RUNS ARE OWED
+
+**What arrived.** Four `--only denoise` reports, all on the Intel gen-9 and all at df12b982, committed byte for byte
+(1f59df80) before they were read.
+- `render/denoise-rig-s147-a-intel-gen9.json` and `-b-` are the names section 147's commands give, so they are the
+  pre-registered pair.
+- `-a-intel-gen91.json` and `-b-intel-gen91.json` are a second pair. Their timestamps put them 35 minutes earlier.
+- Every gate is green with exit 0 in all four. No 1080 report came back.
+
+| run | compute generator | field | covFullB | restComp | G₆₄ | T | G₆₄ / T | three.js generator, same run |
+|---|---|---|---|---|---|---|---|---|
+| a | 57.612 | 10.446 | 23.381 | 16.130 | 107.569 | 433.718 | **0.248** | 180.6 |
+| b | 49.881 | 10.719 | 21.953 | 15.487 | 98.040 | 446.970 | **0.219** | 161.9 |
+| a (other pair) | 63.139 | 11.636 | 21.595 | 15.208 | 111.578 | 447.224 | 0.249 | 182.4 |
+| b (other pair) | 62.138 | 11.009 | 21.202 | 15.051 | 109.400 | 447.809 | 0.244 | 195.4 |
+
+All figures are ms, every part of G₆₄ on the device's clock.
+
+**On the Intel, H64's condition holds in both pre-registered runs (0.248, 0.219), and in the other pair too.**
+- **The margin is small:** run a is 0.002 under the threshold.
+- **H64 has no verdict yet:** it needs the 1080's two runs.
+
+**What it says so far.**
+- **The compute generator is 2.9-3.2 x faster than three.js's on the same machine and run:** 50-63 ms against 162-195.
+- **The fill and the gather are most of it** (39-56 ms of 50-63). The clear, the splat and the winner come to 10 ms.
+- **P3 held on the Intel:** G₆₄ / T is within 0.25 there.
+- **P2 has no reading:** it was the 1080's.
+- **15,886 holes stay holes after the fill** at 1920 x 1080 (0.77 %): no landed vector within 16 px. interpolateFrameCPU
+  leaves them too; the parity rows hold the two to each other. The generated frame is black there before the light
+  composite. Rounds 59-62 graded the same rule at 256 x 256, where none was left.
+
+**The 1080's two runs are owed**, at the same commit, by section 147's commands. Section 149 is completed when they are read.

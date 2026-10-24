@@ -93,6 +93,19 @@ ok("  the fixture: family R's seed 990914, outside every split, its last orbit s
     ok("  ...and what that presents: 2T / (T + G) = 1.27-1.31 x the traced rate, against the 1.6 x H63 asked",
         R.every((x) => { const g = 2 * x.T / (x.T + x.G); return g > 1.26 && g < 1.32; }), R.map((x) => (2 * x.T / (x.T + x.G)).toFixed(3)).join(", "));
 }
+{
+    // SECTION 149, THE INTEL's HALF: readH64 over the four committed Intel reports (the pre-registered a and b, and an earlier
+    // pair); G64 / T within 0.25 in all four, so the Intel's condition holds -- H64's verdict waits on the 1080's runs
+    const R = ["a-intel-gen9", "b-intel-gen9", "a-intel-gen91", "b-intel-gen91"].map((k) => { const rep = JSON.parse(fs.readFileSync(path.join(ENG, `render/denoise-rig-s147-${k}.json`), "utf8"));
+        return { ...FGG.readH64(rep), intel: /intel gen-9/.test(rep.verdict) }; });
+    const r3 = (x) => Math.round(x * 1000) / 1000;
+    ok("!! *** section 149: ON THE INTEL H64's CONDITION HOLDS -- both pre-registered runs count at df12b982, G64 / T 0.248 and 0.219 (the earlier pair 0.249 and 0.244), every part on the device's clock; the verdict waits on the 1080 ***",
+        FGG.h63(R.slice(0, 2)) === "holds" && FGG.h63(R) === "holds" && R.every((x) => x.intel && x.counts && x.commit === "df12b982" && Object.values(x.clocks).every((c) => c === "device")) &&
+        JSON.stringify(R.map((x) => r3(x.ratio))) === "[0.248,0.219,0.249,0.244]",
+        R.map((x) => `G ${x.G.toFixed(3)} / T ${x.T} = ${x.ratio.toFixed(4)}`).join("; "));
+    ok("  ...and the compute generator 2.9-3.2 x faster than three.js's in the same run: 57.6 / 180.6, 49.9 / 161.9, 63.1 / 182.4, 62.1 / 195.4 ms",
+        JSON.stringify(R.map((x) => [x.parts.generator, x.threeJs])) === "[[57.612,180.6],[49.881,161.9],[63.139,182.4],[62.138,195.4]]" && R.every((x) => x.threeJs / x.parts.generator > 2.85 && x.threeJs / x.parts.generator < 3.3), R.map((x) => (x.threeJs / x.parts.generator).toFixed(3)).join(", "));
+}
 console.log("\n2. ON THE DEVICE: the field against the CPU's, then the field and the generator at 1920 x 1080, timed");
 const skip = webgpuSkipReason();
 if (skip) { console.log(`  SKIP  ${skip}`); console.log("  ----  *** NOT A PASS. *** Nothing here is static."); fails++; }
@@ -282,6 +295,8 @@ else {
 // half-even round), G4 (the reach removed) and G9 (a hole's frame 0.5, not 0) WENT 0 RED on the scene's field: it has no landing
 // on an exact half pixel, no hole past the radius and none left. *** The synthetic field's row was added for them; each is now
 // 1 red there.
+// SECTION 149, each restored byte-identical: V149a run a's compute generator typed 58.612 in its report -> 2 red (G / T 0.250
+// fails the threshold, and the speed row); V149b the Intel's first ratio typed 0.247 -> 1 red; V149c run b's clock typed wall -> 1 red.
 // SECTION 146: V146a H63_RATIO 0.6 -> 2 red (the rule's fixtures, the verdict row); V146b run a's generator typed 9.900 in its
 // committed report -> 2 red (the verdict, the presented rate); V146c the verdict's first ratio typed 0.575 -> 1 red.
 console.log(fails ? `FAIL -- ${fails} check(s) (${Date.now() - t0} ms)` : `ALL GREEN (${Date.now() - t0} ms)`);
