@@ -1,0 +1,1815 @@
+{
+ "generatedFrom": "tools/ship/realGpuRun.mjs",
+ "at": "2026-10-23T23:45:08.463Z",
+ "platform": "win32 10.0.22631 x64",
+ "node": "v24.15.0",
+ "commit": "0a4e6cbf 2026-10-23 Denoiser arc, round 61: the light-free generator graded in display space, C1 of the candidate alone ",
+ "only": null,
+ "native": false,
+ "launchArgs": [
+  "--enable-unsafe-webgpu",
+  "--use-angle=d3d11"
+ ],
+ "gates": [
+  {
+   "gate": "fx/fsr/fsr-selfcheck.mjs",
+   "category": "quality",
+   "ok": true,
+   "ms": 3939,
+   "exit": {
+    "status": 0,
+    "signal": null
+   },
+   "stderrTail": [],
+   "adapters": [
+    "nvidia pascal"
+   ],
+   "software": false,
+   "fails": [],
+   "measured": [
+    "the same picture through both: EASU and bilinear differ on 796 of 4096 pixels -- an upscaler that agreed with bilinear everywhere would be bilinear"
+   ],
+   "skips": []
+  },
+  {
+   "gate": "fx/fsr/fsr3Hold-selfcheck.mjs",
+   "category": "quality",
+   "ok": true,
+   "ms": 4833,
+   "exit": {
+    "status": 0,
+    "signal": null
+   },
+   "stderrTail": [],
+   "adapters": [
+    "nvidia pascal"
+   ],
+   "software": false,
+   "fails": [],
+   "measured": [
+    "timed    rgrgrhhrhggrgrgrgr  judder 11.55 ms, 21.44 dB a refresh, worst 19.16; generated 5:0.50 6:0.50 8:0.34 8:0.54 9:0.01 10:0.13 11:0.22",
+    "timed2   gggggrhrhggggggggg  judder 8.80 ms, 21.98 dB a refresh, worst 20.02; generated 4:0.88 5:0.38 5:0.87 6:0.38 6:0.88 8:0.29 8:0.49 8:0.75 8:0.95 9:0.51 10:0.01 10:0.60 11:0.10 11:0.67"
+   ],
+   "skips": []
+  },
+  {
+   "gate": "fx/fsr/fsr3Late-selfcheck.mjs",
+   "category": "quality",
+   "ok": true,
+   "ms": 4909,
+   "exit": {
+    "status": 0,
+    "signal": null
+   },
+   "stderrTail": [],
+   "adapters": [
+    "nvidia pascal"
+   ],
+   "software": false,
+   "fails": [],
+   "measured": [
+    "none     rhrhrhhhhrhrhrhrhrhrhrhr  judder 20.19 ms, 20.58 dB a refresh, worst 15.94; generated none",
+    "midpoint grgrgrhhhgrgrgrgrgrgrgrg  judder 17.15 ms, 21.00 dB a refresh, worst 16.81; generated 4:0.50 5:0.50 6:0.50 7:0.50 8:0.50 9:0.50 10:0.50 11:0.50 12:0.50 13:0.50 14:0.50",
+    "timed    rgrgrgrhhrhggrgrgrgrgrgr  judder 10.70 ms, 21.70 dB a refresh, worst 18.84; generated 4:0.50 5:0.50 6:0.50 8:0.34 8:0.54 9:0.01 10:0.13 11:0.22 12:0.29 13:0.34"
+   ],
+   "skips": []
+  },
+  {
+   "gate": "fx/fsr/fsr3LiveClock-selfcheck.mjs",
+   "category": "timing",
+   "ok": true,
+   "ms": 5706,
+   "exit": {
+    "status": 0,
+    "signal": null
+   },
+   "stderrTail": [],
+   "adapters": [
+    "nvidia pascal"
+   ],
+   "software": false,
+   "fails": [],
+   "measured": [
+    "none  70 timestamps kept, the refresh 16.70 ms by their median; a real frame ready 5.30 ms after it began (median of 35); over the last 2000.00 ms: judder 146.11 ms, 35.14 new images/s, latency 12.81 ms",
+    "timed 70 timestamps kept, the refresh 16.70 ms by their median; a real frame ready 5.50 ms after it began (median of 35); over the last 1465.70 ms: judder 34.68 ms, 49.63 new images/s, latency 25.94 ms"
+   ],
+   "skips": []
+  },
+  {
+   "gate": "fx/fsr/fsr3Pacing-selfcheck.mjs",
+   "category": "quality",
+   "ok": true,
+   "ms": 5104,
+   "exit": {
+    "status": 0,
+    "signal": null
+   },
+   "stderrTail": [],
+   "adapters": [
+    "nvidia pascal"
+   ],
+   "software": false,
+   "fails": [],
+   "measured": [
+    "none     rhhrhhrhhrhh: each refresh against the scene at its time, mean 20.72 dB (worst 17.92); judder 13.22 ms of scene time; generated at t in {}",
+    "midpoint ghrghrghrghr: each refresh against the scene at its time, mean 21.96 dB (worst 20.48); judder 6.76 ms of scene time; generated at t in {0.5}",
+    "timed    rggrggrggrgg: each refresh against the scene at its time, mean 22.57 dB (worst 21.68); judder 0.00 ms of scene time; generated at t in {0.3333, 0.6667}"
+   ],
+   "skips": []
+  },
+  {
+   "gate": "fx/fsr/fsr3Tsl-selfcheck.mjs",
+   "category": "quality",
+   "ok": true,
+   "ms": 7372,
+   "exit": {
+    "status": 0,
+    "signal": null
+   },
+   "stderrTail": [],
+   "adapters": [
+    "nvidia pascal"
+   ],
+   "software": false,
+   "fails": [],
+   "measured": [
+    "[webgpu] the knot at 4x the page's spin: generated from upscaled frames 25.04 (dilated field 25.00), repeat 24.33, cross-fade 25.02, generated from native frames 25.92; the last real frame, upscaled 24.62 and native 25.61",
+    "[webgpu] the knot at 12x: generated from upscaled frames 23.24, repeat 21.13, cross-fade 22.77, generated from native frames 24.89; the last real frame, upscaled 23.21 and native 25.77",
+    "[webgpu] a camera panning: generated from upscaled frames 23.92 (dilated field 24.01), repeat 18.07, cross-fade 21.18, generated from native frames 26.63; the last real frame, upscaled 24.11 and native 25.20"
+   ],
+   "skips": []
+  },
+  {
+   "gate": "fx/fsr/fsrFlicker-selfcheck.mjs",
+   "category": "quality",
+   "ok": true,
+   "ms": 4776,
+   "exit": {
+    "status": 0,
+    "signal": null
+   },
+   "stderrTail": [],
+   "adapters": [
+    "nvidia pascal"
+   ],
+   "software": false,
+   "fails": [],
+   "measured": [
+    "[webgpu] spin repeat shown 0.55, scene 0.11: excess +0.44 (x 1/255); real frames 25.48 dB, held 24.08",
+    "[webgpu] spin native shown 0.23, scene 0.11: excess +0.11 (x 1/255); real frames 25.48 dB, generated 25.83",
+    "[webgpu] spin msaa   shown 0.16, scene 0.11: excess +0.05 (x 1/255); real frames 26.84 dB, generated 26.62",
+    "[webgpu] spin rcas   shown 0.30, scene 0.11: excess +0.19 (x 1/255); real frames 25.48 dB, generated 25.55",
+    "[webgpu] spin fsr3   shown 0.15, scene 0.11: excess +0.03 (x 1/255); real frames 24.36 dB, generated 24.72",
+    "[webgpu] pan  repeat shown 2.91, scene 2.43: excess +0.48 (x 1/255); real frames 25.19 dB, held 15.86",
+    "[webgpu] pan  native shown 3.73, scene 2.43: excess +1.30 (x 1/255); real frames 25.19 dB, generated 26.77",
+    "[webgpu] pan  msaa   shown 3.58, scene 2.43: excess +1.15 (x 1/255); real frames 26.37 dB, generated 27.76",
+    "[webgpu] pan  rcas   shown 3.79, scene 2.43: excess +1.36 (x 1/255); real frames 25.19 dB, generated 26.61",
+    "[webgpu] pan  fsr3   shown 0.81, scene 2.43: excess -1.62 (x 1/255); real frames 23.86 dB, generated 23.61"
+   ],
+   "skips": []
+  },
+  {
+   "gate": "fx/fsr/fsrFlowCost-selfcheck.mjs",
+   "category": "timing",
+   "ok": true,
+   "ms": 4802,
+   "exit": {
+    "status": 0,
+    "signal": null
+   },
+   "stderrTail": [],
+   "adapters": [
+    "nvidia pascal"
+   ],
+   "software": false,
+   "fails": [],
+   "measured": [
+    "default  5.9 ms, 33.5M reads -- 100% of the default's time, 100% of its reads; reach by the sum 28 px",
+    "refine2  4.4 ms, 18.8M reads -- 75% of the default's time, 56% of its reads; reach by the sum 22 px",
+    "refine1  4.8 ms, 14.6M reads -- 81% of the default's time, 44% of its reads; reach by the sum 19 px",
+    "radius2  4.3 ms, 11.4M reads -- 73% of the default's time, 34% of its reads; reach by the sum 14 px",
+    "levels2  5.4 ms, 22.5M reads -- 92% of the default's time, 67% of its reads; reach by the sum 12 px",
+    "level    5.8 ms, 15.6M reads -- 98% of the default's time, 47% of its reads; reach by the sum 28 px",
+    "levelR2  4.4 ms, 6.4M reads -- 75% of the default's time, 19% of its reads; reach by the sum 22 px",
+    "NOT ASSERTED on a hardware adapter (nvidia pascal), by decision -- does not hold here: the flow's time on the device follows its read count: every setting within 19% of 0.06 ms per million reads plus 4.0 ms fixed (68% of the default's time) -- shares of time / reads: refine2 75% / 56%, refine1 81% / 44%, radius2 73% / 34%, levels2 92% / 67%, level 98% / 47%, levelR2 75% / 19%",
+    "this device's proportions, reported and not asserted of the method: the flow 6 ms, generating a frame from the vectors alone 2 ms, rendering the scene 2.8 ms -- a CPU rasteriser pays for the splat's 65536 instanced quads what a GPU does not"
+   ],
+   "skips": []
+  },
+  {
+   "gate": "fx/fsr/fsrFlowGrid-selfcheck.mjs",
+   "category": "quality",
+   "ok": true,
+   "ms": 5133,
+   "exit": {
+    "status": 0,
+    "signal": null
+   },
+   "stderrTail": [],
+   "adapters": [
+    "nvidia pascal"
+   ],
+   "software": false,
+   "fails": [],
+   "measured": [
+    "scroll       block grid 34.09 dB, level grid 34.41 (+0.32), refining within 2 on it 34.39 (+0.30)",
+    "panScroll    block grid 36.96 dB, level grid 37.26 (+0.30), refining within 2 on it 37.28 (+0.32)",
+    "dollyScroll  block grid 35.97 dB, level grid 35.97 (+0.00), refining within 2 on it 35.98 (+0.01)",
+    "dollyFast    block grid 33.10 dB, level grid 33.10 (-0.00), refining within 2 on it 33.11 (+0.01)",
+    "scroll       the wall's clear interior (4224 px): block grid 45.05 dB, level grid 53.67 (+8.62), refining within 2 53.35",
+    "panScroll    the wall's clear interior (4037 px): block grid 44.53 dB, level grid 64.17 (+19.64), refining within 2 66.09",
+    "dollyScroll  the wall's clear interior (3404 px): block grid 57.68 dB, level grid 57.68 (+0.00), refining within 2 57.68"
+   ],
+   "skips": []
+  },
+  {
+   "gate": "fx/fsr/fsrFlowRetry-selfcheck.mjs",
+   "category": "quality",
+   "ok": true,
+   "ms": 6150,
+   "exit": {
+    "status": 0,
+    "signal": null
+   },
+   "stderrTail": [],
+   "adapters": [
+    "nvidia pascal"
+   ],
+   "software": false,
+   "fails": [],
+   "measured": [
+    "16 px: the square's 576 pixels -- vectors 20.75 dB, the flow 20.69, retrying 32.74; where it was, is and will be 22.08, 21.93, 26.10; the frame 34.09, 33.91, 37.72; its blocks right 0/9 and 9/9",
+    "12 px: the square's 576 pixels -- vectors 20.15 dB, the flow 20.33, retrying 22.88; where it was, is and will be 21.74, 21.85, 23.57; the frame 33.81, 33.91, 35.56; its blocks right 0/4 and 4/4",
+    "16 px bright: the square's 576 pixels -- vectors 16.63 dB, the flow 35.55, retrying 35.55; where it was, is and will be 17.72, 23.94, 23.97; the frame 29.75, 35.15, 35.09; its blocks right 9/9 and 9/9",
+    "the block it changed, (2, 6), 5 of its 64 pixels in the interior: (6.0, -2.0) at 0.50 without the retry and (11.5, -3.1) at 0.75 with it; the wall beside it (-2.9, -0.0) at 0.98",
+    "the knot in front of a wall scrolling 3 px a frame: the frame 34.41 dB with the flow, 34.25 retrying; the wall's clear interior (4224 px) 53.67 and 42.76; the retry changed 1 of 256 blocks"
+   ],
+   "skips": []
+  },
+  {
+   "gate": "fx/fsr/fsrFlowSeed-selfcheck.mjs",
+   "category": "quality",
+   "ok": true,
+   "ms": 4631,
+   "exit": {
+    "status": 0,
+    "signal": null
+   },
+   "stderrTail": [],
+   "adapters": [
+    "nvidia pascal"
+   ],
+   "software": false,
+   "fails": [],
+   "measured": [
+    "scroll27     vectors up to 26.7 px: the vectors 25.86 dB, the flow 26.69, seeded 26.96 (+0.27)",
+    "scroll40     vectors up to 39.8 px: the vectors 22.49 dB, the flow 19.77, seeded 23.36 (+3.59)",
+    "reflection44 vectors up to 44.2 px: the vectors 25.35 dB, the flow 30.30, seeded 31.97 (+1.66)",
+    "slow         vectors up to 2.0 px: the vectors 36.77 dB, the flow 37.26, seeded 37.26 (+0.00)"
+   ],
+   "skips": []
+  },
+  {
+   "gate": "fx/fsr/fsrFlowStill-selfcheck.mjs",
+   "category": "quality",
+   "ok": true,
+   "ms": 4196,
+   "exit": {
+    "status": 0,
+    "signal": null
+   },
+   "stderrTail": [],
+   "adapters": [
+    "nvidia pascal"
+   ],
+   "software": false,
+   "fails": [],
+   "measured": [
+    "belt8: the highlight's 219 pixels -- vectors 20.02 dB, the flow 29.44, standing still guessed 29.44; the frame 35.41, 41.85, 41.85",
+    "belt16: the highlight's 199 pixels -- vectors 9.14 dB, the flow 11.91, standing still guessed 11.91; the frame 25.72, 28.07, 28.07"
+   ],
+   "skips": []
+  },
+  {
+   "gate": "fx/fsr/fsrFrameGen-selfcheck.mjs",
+   "category": "quality",
+   "ok": true,
+   "ms": 7804,
+   "exit": {
+    "status": 0,
+    "signal": null
+   },
+   "stderrTail": [],
+   "adapters": [
+    "nvidia pascal"
+   ],
+   "software": false,
+   "fails": [],
+   "measured": [],
+   "skips": []
+  },
+  {
+   "gate": "fx/fsr/fsrFrameGenArc-selfcheck.mjs",
+   "category": "quality",
+   "ok": true,
+   "ms": 3925,
+   "exit": {
+    "status": 0,
+    "signal": null
+   },
+   "stderrTail": [],
+   "adapters": [
+    "nvidia pascal"
+   ],
+   "software": false,
+   "fails": [],
+   "measured": [
+    "the knot's half-way point off its chord's midpoint, mean (worst), pixels: 4x 0.005 (0.02), 6x 0.012 (0.04), 12x 0.048 (0.17), 30x 0.285 (1.00), 60x 1.084 (3.34)",
+    "knot at  4x: the toward field 0.008 px off half the chord on average; arc -0.02 dB against the supersampled midpoint (36.02 -> 35.99), -0.01 against a single-sample one",
+    "knot at 12x: the toward field 0.077 px off half the chord on average; arc +0.08 dB against the supersampled midpoint (29.66 -> 29.74), +0.12 against a single-sample one",
+    "knot at 30x: the toward field 0.513 px off half the chord on average; arc +0.19 dB against the supersampled midpoint (24.42 -> 24.61), +0.18 against a single-sample one",
+    "knot at 60x: the toward field 2.182 px off half the chord on average; arc +0.51 dB against the supersampled midpoint (20.59 -> 21.10), +0.49 against a single-sample one"
+   ],
+   "skips": []
+  },
+  {
+   "gate": "fx/fsr/fsrFrameGenBackdrop-selfcheck.mjs",
+   "category": "timing",
+   "ok": true,
+   "ms": 16604,
+   "exit": {
+    "status": 0,
+    "signal": null
+   },
+   "stderrTail": [],
+   "adapters": [
+    "nvidia pascal"
+   ],
+   "software": false,
+   "fails": [],
+   "measured": [
+    "[webgpu] dB on the lens's pixels against the supersampled midpoint (over the frame):",
+    "backdrop:still         3598 px  drawn 23.84 (29.75)  flow 31.32 (34.68)  skipped 34.52 (36.42)  over 41.34 (39.84)",
+    "backdrop:moving        3600 px  drawn 23.54 (29.78)  flow 30.28 (34.64)  skipped 34.80 (38.63)  over 39.49 (45.47)",
+    "backdrop:occluded      2999 px  drawn 21.33 (26.28)  flow 26.73 (27.89)  skipped 27.94 (28.28)  over 29.51 (28.59)",
+    "transmission:still     3290 px  drawn 23.40 (29.62)  flow 34.59 (37.75)  skipped 39.11 (39.19)  over 40.51 (39.71)",
+    "transmission:moving    3313 px  drawn 23.21 (29.70)  flow 32.71 (38.70)  skipped 40.14 (45.36)  over 41.49 (47.58)",
+    "transmission:occluded  2729 px  drawn 21.75 (26.55)  flow 30.66 (28.32)  skipped 29.93 (28.74)  over 34.37 (29.10)",
+    "[webgl2] dB on the lens's pixels against the supersampled midpoint (over the frame):",
+    "backdrop:still         3598 px  drawn 23.84 (29.75)  flow 31.32 (34.68)  skipped 34.52 (36.42)  over 41.34 (39.84)",
+    "backdrop:moving        3600 px  drawn 23.54 (29.78)  flow 30.28 (34.64)  skipped 34.80 (38.63)  over 39.49 (45.47)",
+    "backdrop:occluded      2999 px  drawn 21.33 (26.28)  flow 26.73 (27.89)  skipped 27.94 (28.28)  over 29.51 (28.59)",
+    "transmission:still     3290 px  drawn 23.40 (29.62)  flow 34.59 (37.75)  skipped 39.11 (39.19)  over 40.51 (39.71)",
+    "transmission:moving    3313 px  drawn 23.21 (29.70)  flow 32.71 (38.70)  skipped 40.14 (45.36)  over 41.49 (47.58)",
+    "transmission:occluded  2729 px  drawn 21.75 (26.55)  flow 30.66 (28.32)  skipped 29.93 (28.74)  over 34.37 (29.10)"
+   ],
+   "skips": []
+  },
+  {
+   "gate": "fx/fsr/fsrFrameGenFlow-selfcheck.mjs",
+   "category": "quality",
+   "ok": true,
+   "ms": 5078,
+   "exit": {
+    "status": 0,
+    "signal": null
+   },
+   "stderrTail": [],
+   "adapters": [
+    "nvidia pascal"
+   ],
+   "software": false,
+   "fails": [],
+   "measured": [
+    "[webgpu] scroll    whole frame: vectors 33.40, default +1.01, low +0.87, block -0.27 (cross-fade 32.20, repeat 26.71); wall's interior (4224 px): vectors 41.09, default +12.58, moved +14.13; moved whole frame +0.55; the default took 4179 of the wall's 4224 pixels and 149 of the knot's 6291",
+    "[webgpu] still     whole frame: vectors 33.90, default +0.80, low +1.21, block +1.35 (cross-fade 32.58, repeat 27.87); wall's interior (4224 px): vectors 64.07, default +0.00, moved +0.00; moved whole frame +0.17; the default took 0 of the wall's 4224 pixels and 165 of the knot's 6291",
+    "[webgpu] pan       whole frame: vectors 38.12, default +0.00, low -1.18, block -0.94 (cross-fade 30.54, repeat 25.67); wall's interior (4037 px): vectors 62.35, default +0.00, moved +0.00; moved whole frame +0.00; the default took 0 of the wall's 4037 pixels and 6 of the knot's 6415",
+    "[webgpu] panScroll whole frame: vectors 36.77, default +0.82, low -0.42, block -0.47 (cross-fade 29.77, repeat 24.47); wall's interior (4037 px): vectors 40.59, default +17.31, moved +17.31; moved whole frame +0.82; the default took 3670 of the wall's 4037 pixels and 16 of the knot's 6415"
+   ],
+   "skips": []
+  },
+  {
+   "gate": "fx/fsr/fsrFrameGenLayerCost-selfcheck.mjs",
+   "category": "timing",
+   "ok": true,
+   "ms": 3738,
+   "exit": {
+    "status": 0,
+    "signal": null
+   },
+   "stderrTail": [],
+   "adapters": [
+    "nvidia pascal"
+   ],
+   "software": false,
+   "fails": [],
+   "measured": [
+    "10560 triangles: a real frame 3.1 ms, the layer with the geometry pass 3.4 ms, with the generator's depth 3.4 ms",
+    "1056000 triangles: a real frame 5.0 ms, the layer with the geometry pass 5.3 ms, with the generator's depth 3.8 ms",
+    "NOT ASSERTED on a hardware adapter (nvidia pascal), by decision -- does not hold here: the layer's geometry pass grows with the scene as a real frame does -- 3.4 to 5.3 ms, a real frame 3.1 to 5.0 -- and with the generator's depth it does not: 3.4 to 3.8 ms"
+   ],
+   "skips": []
+  },
+  {
+   "gate": "fx/fsr/fsrFrameGenParticles-selfcheck.mjs",
+   "category": "quality",
+   "ok": true,
+   "ms": 3788,
+   "exit": {
+    "status": 0,
+    "signal": null
+   },
+   "stderrTail": [],
+   "adapters": [
+    "nvidia pascal"
+   ],
+   "software": false,
+   "fails": [],
+   "measured": [
+    "instanced over the frame / the particles' 1718 pixels: vectors 24.29 / 14.77 dB, flow 26.31 / 16.95, drawn at t 27.61 / 18.60; largest vector on them 5.05 px",
+    "baked     over the frame / the particles' 1718 pixels: vectors 21.84 / 12.24 dB, flow 23.91 / 14.68, drawn at t 27.61 / 18.60; largest vector on them 0.00 px"
+   ],
+   "skips": []
+  },
+  {
+   "gate": "fx/fsr/fsrFrameGenReach-selfcheck.mjs",
+   "category": "timing",
+   "ok": true,
+   "ms": 6529,
+   "exit": {
+    "status": 0,
+    "signal": null
+   },
+   "stderrTail": [],
+   "adapters": [
+    "nvidia pascal"
+   ],
+   "software": false,
+   "fails": [],
+   "measured": [
+    "v4758's wall, 40 wide, scrolling 8.4 px under a 1.2 px pan: the vectors 36.88 dB with the radius alone (0 pixels black), 36.88 reaching 16 (0); the flow 28.33 (77), 35.58 (0)",
+    "the wall scrolling 2.9 px under a 12 px pan: the vectors 22.87 dB with the radius alone (277 pixels black), 27.81 reaching 16 (0); the flow 23.03 (332), 31.35 (0)",
+    "the 40-wide wall under the 12 px pan: the vectors 22.25 dB with the radius alone (277 pixels black), 27.79 reaching 16 (0); the flow 20.83 (487), 30.96 (0)",
+    "a 24 px pan, nothing scrolling: the vectors 15.20 dB with the radius alone (1721 pixels black), 20.68 reaching 16 (164); the flow 15.66 (1293), 19.17 (0)",
+    "the audit, on v4758's wall: the flow took 6355 of its pixels; 5181 of them within a pixel of the wall's TRUE motion -- the application's vector times 7.857, the pan and the scroll together -- and 255 within a pixel of the application's own; the chosen vector 7.47 px from the application's on average",
+    "the radius alone: no holes 1.1 ms, a tenth 1.2, all 0.7; reaching 16: 1.1 and 1.6 -- the median of five, SwiftShader's milliseconds",
+    "NOT ASSERTED on a hardware adapter (nvidia pascal), by decision -- does not hold here: [webgpu] only a hole searches: a frame with none costs 1.1 ms against 0.7 with every pixel one -- and reaching 16 costs nothing where the radius finds something, 1.6 ms against 1.2 for a tenth of the pixels"
+   ],
+   "skips": []
+  },
+  {
+   "gate": "fx/fsr/fsrFrameGenScene-selfcheck.mjs",
+   "category": "quality",
+   "ok": true,
+   "ms": 6899,
+   "exit": {
+    "status": 0,
+    "signal": null
+   },
+   "stderrTail": [],
+   "adapters": [
+    "nvidia pascal"
+   ],
+   "software": false,
+   "fails": [],
+   "measured": [
+    "[webgpu] shadowPlain    whole frame: vectors 29.74, moved +0.85, default +1.41 (cross-fade 28.55, repeat 26.45); what changed (697 px): vectors 20.57, moved +3.04, default +6.76",
+    "[webgpu] shadowTextured whole frame: vectors 32.61, moved +0.16, default +1.30 (cross-fade 31.39, repeat 29.20); what changed (697 px): vectors 23.37, moved +0.46, default +5.64",
+    "[webgpu] reflection     whole frame: vectors 31.41, moved +1.30, default +6.22 (cross-fade 28.80, repeat 24.85); what changed (1836 px): vectors 21.93, moved +1.31, default +6.32",
+    "[webgpu] ui             whole frame: vectors 31.69, moved +1.24, default +1.24, composite +4.78, compositeFlow +4.78 (cross-fade 35.36, repeat 30.09); the HUD (563 px): vectors 19.60, moved +1.05, default +1.05"
+   ],
+   "skips": []
+  },
+  {
+   "gate": "fx/fsr/fsrFrameGenTranslucent-selfcheck.mjs",
+   "category": "quality",
+   "ok": true,
+   "ms": 4383,
+   "exit": {
+    "status": 0,
+    "signal": null
+   },
+   "stderrTail": [],
+   "adapters": [
+    "nvidia pascal"
+   ],
+   "software": false,
+   "fails": [],
+   "measured": [
+    "the background moves 8.45 px a frame; dB on the translucent things' pixels (over the frame):",
+    "glass     3600 px  drawn 41.04 (37.61)  flow 37.92 (37.99)  skipped 31.49 (35.05)  layered 85.11 (52.51)",
+    "glassFine 3600 px  drawn 26.21 (31.14)  flow 30.52 (33.57)  skipped 31.48 (33.97)  layered 61.87 (40.56)",
+    "etched    3600 px  drawn 24.07 (28.43)  flow 23.20 (27.99)  skipped 13.38 (19.72)  layered 28.05 (33.64)",
+    "sparks     532 px  drawn 22.47 (30.98)  flow 21.26 (32.87)  skipped 14.48 (28.30)  layered 51.83 (40.54)",
+    "window    3600 px  drawn 24.36 (28.73)  flow 23.61 (28.20)  skipped 14.97 (21.18)  layered 27.53 (34.07)",
+    "occluded  3000 px  drawn 23.64 (27.32)  flow 29.75 (28.36)  skipped 29.15 (28.19)  layered 34.38 (29.08)",
+    "the moving pane over a still wall against the midpoint frame: 2082 of 10800 values differ, worst 5.960e-8 (1.0 f32 ulps at 1.0)"
+   ],
+   "skips": []
+  },
+  {
+   "gate": "fx/fsr/fsrFrameGenUi-selfcheck.mjs",
+   "category": "quality",
+   "ok": true,
+   "ms": 4022,
+   "exit": {
+    "status": 0,
+    "signal": null
+   },
+   "stderrTail": [],
+   "adapters": [
+    "nvidia pascal"
+   ],
+   "software": false,
+   "fails": [],
+   "measured": [
+    "baked  whole frame 31.70 dB, the translucent panels' 3286 pixels 38.00, the marker's 77 11.53",
+    "newer  whole frame 31.75 dB, the translucent panels' 3286 pixels 42.65, the marker's 77 10.05",
+    "older  whole frame 31.71 dB, the translucent panels' 3286 pixels 42.65, the marker's 77 9.99",
+    "atT    whole frame 36.90 dB, the translucent panels' 3286 pixels 42.65, the marker's 77 76.79"
+   ],
+   "skips": []
+  },
+  {
+   "gate": "fx/fsr/fsrFrameGenWorld-selfcheck.mjs",
+   "category": "quality",
+   "ok": true,
+   "ms": 5698,
+   "exit": {
+    "status": 0,
+    "signal": null
+   },
+   "stderrTail": [],
+   "adapters": [
+    "nvidia pascal"
+   ],
+   "software": false,
+   "fails": [],
+   "measured": [
+    "reflectionStill    screen 37.63, world 37.63 (+0.00 dB); still in the world: 15437 of 16384 pixels",
+    "reflectionPan      screen 32.54, world 38.20 (+5.66 dB); still in the world: 15434 of 16384 pixels",
+    "shadowTexturedPan  screen 36.63, world 38.98 (+2.34 dB); still in the world: 15570 of 16384 pixels",
+    "shadowPlainPan     screen 34.49, world 35.04 (+0.56 dB); still in the world: 15570 of 16384 pixels",
+    "floorPan           screen 39.03, world 39.39 (+0.36 dB); still in the world: 15149 of 16384 pixels"
+   ],
+   "skips": []
+  },
+  {
+   "gate": "fx/fsr/fsrGPU-selfcheck.mjs",
+   "category": "timing",
+   "ok": true,
+   "ms": 5245,
+   "exit": {
+    "status": 0,
+    "signal": null
+   },
+   "stderrTail": [],
+   "adapters": [
+    "nvidia pascal"
+   ],
+   "software": false,
+   "fails": [],
+   "measured": [
+    "SPEED at 64x64 -> 128x128, mean of 20 after a warm-up: fsr1 chained 4.61 ms, the same two passes separately 8.36 ms, easu alone 3.99 ms, fsr1CPU 47.86 ms (mean of 5, this process)",
+    "the chain saves 3.74 ms against the two-call form (45%), which is one 128x128 readback and one upload of 256 KB not taken"
+   ],
+   "skips": []
+  },
+  {
+   "gate": "fx/fsr/fsrTemporalHalf-selfcheck.mjs",
+   "category": "quality",
+   "ok": true,
+   "ms": 23834,
+   "exit": {
+    "status": 0,
+    "signal": null
+   },
+   "stderrTail": [],
+   "adapters": [
+    "nvidia pascal"
+   ],
+   "software": false,
+   "fails": [],
+   "measured": [
+    "[webgpu] the rtz mirror against itself nudged one f32 ulp: 50915 of 294912 values move, worst 36.00 half ulps (9.77e-4)",
+    "[webgl2] the rtz mirror against itself nudged one f32 ulp: 51242 of 294912 values move, worst 36.00 half ulps (9.77e-4)"
+   ],
+   "skips": []
+  },
+  {
+   "gate": "fx/fsr/fsrTemporalHalfQuality-selfcheck.mjs",
+   "category": "quality",
+   "ok": false,
+   "ms": 17439,
+   "exit": {
+    "status": 1,
+    "signal": null
+   },
+   "stderrTail": [],
+   "adapters": [
+    "nvidia pascal"
+   ],
+   "software": false,
+   "fails": [
+    "FAIL    [webgpu] ...and 12260 of 12288 history values sit within fsrTemporalHalf-selfcheck.mjs's stall bound of float's for rtz (ulp / alpha + 1 = 11 ulps), worst 36.7 ulps   28 outside -- a lock or a mask that went one way at half and the other at float can move a pixel further than the stall does",
+    "FAIL    [webgpu] ...and 12270 of 12288 history values sit within fsrTemporalHalf-selfcheck.mjs's stall bound of float's for rtz (ulp / alpha + 1 = 11 ulps), worst 26.0 ulps   18 outside -- a lock or a mask that went one way at half and the other at float can move a pixel further than the stall does",
+    "FAIL    [webgl2] ...and 12260 of 12288 history values sit within fsrTemporalHalf-selfcheck.mjs's stall bound of float's for rtz (ulp / alpha + 1 = 11 ulps), worst 36.7 ulps   28 outside -- a lock or a mask that went one way at half and the other at float can move a pixel further than the stall does",
+    "FAIL    [webgl2] ...and 12270 of 12288 history values sit within fsrTemporalHalf-selfcheck.mjs's stall bound of float's for rtz (ulp / alpha + 1 = 11 ulps), worst 26.0 ulps   18 outside -- a lock or a mask that went one way at half and the other at float can move a pixel further than the stall does"
+   ],
+   "measured": [
+    "[webgpu] still: of the 28 outside, 0 touch a half subnormal and 2 sit ABOVE float (a truncating write cannot put them there by itself); worst: (39,41).r float 0.0157509 half 0.0163116 = 36.7 ulp above, contrast 0.027, factor diff 2.15e-3 | (26,44).g float 0.0457640 half 0.0448914 = 28.6 ulp below, contrast 0.039, factor diff 2.49e-3 | (27,44).g float 0.0520253 half 0.0513306 = 22.8 ulp below, cont",
+    "[webgpu] still: 28 values outside 11 ulps; 0 on a pixel whose factor differed by > 0.25 at some frame, 0 within 2 px of one; 0 of 4096 pixels' factors differed so; the largest factor difference on an outside pixel 2.65e-3, anywhere 5.54e-3",
+    "[webgpu] moving: of the 18 outside, 0 touch a half subnormal and 0 sit ABOVE float (a truncating write cannot put them there by itself); worst: (6,43).r float 0.186035 half 0.182861 = 26.0 ulp below, contrast 0.378, factor diff 5.47e-3 | (40,36).r float 0.114848 half 0.113586 = 20.7 ulp below, contrast 0.068, factor diff 1.48e-3 | (6,43).g float 0.161818 half 0.159790 = 16.6 ulp below, contrast 0.",
+    "[webgpu] moving: 18 values outside 11 ulps; 0 on a pixel whose factor differed by > 0.25 at some frame, 0 within 2 px of one; 0 of 4096 pixels' factors differed so; the largest factor difference on an outside pixel 5.47e-3, anywhere 1.34e-2",
+    "[webgl2] still: of the 28 outside, 0 touch a half subnormal and 2 sit ABOVE float (a truncating write cannot put them there by itself); worst: (39,22).r float 0.0157509 half 0.0163116 = 36.7 ulp above, contrast 0.027, factor diff 2.15e-3 | (26,19).g float 0.0457641 half 0.0448914 = 28.6 ulp below, contrast 0.039, factor diff 2.49e-3 | (27,19).g float 0.0520253 half 0.0513306 = 22.8 ulp below, cont",
+    "[webgl2] still: 28 values outside 11 ulps; 0 on a pixel whose factor differed by > 0.25 at some frame, 0 within 2 px of one; 0 of 4096 pixels' factors differed so; the largest factor difference on an outside pixel 2.65e-3, anywhere 5.54e-3",
+    "[webgl2] moving: of the 18 outside, 0 touch a half subnormal and 0 sit ABOVE float (a truncating write cannot put them there by itself); worst: (6,20).r float 0.186035 half 0.182861 = 26.0 ulp below, contrast 0.378, factor diff 5.47e-3 | (40,27).r float 0.114848 half 0.113586 = 20.7 ulp below, contrast 0.068, factor diff 1.48e-3 | (6,20).g float 0.161818 half 0.159790 = 16.6 ulp below, contrast 0.",
+    "[webgl2] moving: 18 values outside 11 ulps; 0 on a pixel whose factor differed by > 0.25 at some frame, 0 within 2 px of one; 0 of 4096 pixels' factors differed so; the largest factor difference on an outside pixel 5.47e-3, anywhere 1.34e-2"
+   ],
+   "skips": []
+  },
+  {
+   "gate": "fx/fsr/fsrTemporalLockGhost-selfcheck.mjs",
+   "category": "quality",
+   "ok": true,
+   "ms": 12074,
+   "exit": {
+    "status": 0,
+    "signal": null
+   },
+   "stderrTail": [],
+   "adapters": [
+    "nvidia pascal"
+   ],
+   "software": false,
+   "fails": [],
+   "measured": [],
+   "skips": []
+  },
+  {
+   "gate": "fx/fsr/fsrTemporalLocks-selfcheck.mjs",
+   "category": "quality",
+   "ok": true,
+   "ms": 8955,
+   "exit": {
+    "status": 0,
+    "signal": null
+   },
+   "stderrTail": [],
+   "adapters": [
+    "nvidia pascal"
+   ],
+   "software": false,
+   "fails": [],
+   "measured": [],
+   "skips": []
+  },
+  {
+   "gate": "fx/fsr/fsrTemporalQuality-selfcheck.mjs",
+   "category": "quality",
+   "ok": true,
+   "ms": 21771,
+   "exit": {
+    "status": 0,
+    "signal": null
+   },
+   "stderrTail": [],
+   "adapters": [
+    "nvidia pascal"
+   ],
+   "software": false,
+   "fails": [],
+   "measured": [],
+   "skips": []
+  },
+  {
+   "gate": "fx/fsr/fsrTemporalTsl-selfcheck.mjs",
+   "category": "exact",
+   "ok": true,
+   "ms": 21140,
+   "exit": {
+    "status": 0,
+    "signal": null
+   },
+   "stderrTail": [],
+   "adapters": [
+    "nvidia pascal"
+   ],
+   "software": false,
+   "fails": [],
+   "measured": [],
+   "skips": []
+  },
+  {
+   "gate": "fx/fsr/fsrTsl-selfcheck.mjs",
+   "category": "exact",
+   "ok": true,
+   "ms": 5850,
+   "exit": {
+    "status": 0,
+    "signal": null
+   },
+   "stderrTail": [],
+   "adapters": [
+    "nvidia pascal"
+   ],
+   "software": false,
+   "fails": [],
+   "measured": [],
+   "skips": []
+  },
+  {
+   "gate": "render/denoiseCompile-selfcheck.mjs",
+   "category": "timing",
+   "ok": true,
+   "ms": 39226,
+   "exit": {
+    "status": 0,
+    "signal": null
+   },
+   "stderrTail": [],
+   "adapters": [
+    "nvidia pascal"
+   ],
+   "software": false,
+   "fails": [],
+   "measured": [
+    "node-webgpu 0.6.2 from C:\\Users\\howdy\\AppData\\Roaming\\npm\\node_modules\\webgpu\\index.js; native compilers: D3D12; DXC ships beside dawn.node -- runs as shipped, use_dxc and use_dxc off, from the package alone; modes: as shipped, use_dxc, use_dxc off",
+    "native / as shipped in all: 11 of 11 built; dumps: 11 DXC (DXIL); compiler, from the package: DXC; dumps at C:\\Users\\howdy\\AppData\\Local\\Temp\\swek-denoise-dump-0.6.2-as_shipped-*.txt",
+    "section 66, native / as shipped under DXC: at 64 x 64, r15's hidden kernel (r13-fast-3x3) over r18t's (r18t-tile-inline-3x3): 0.748 x (0.103 ms against 0.138 ms); r18u's (r18u-fast-unroll-3x3): 0.727 x (0.103 ms against 0.142 ms); r27w's (r27w-wino-3x3): 0.532 x (0.103 ms against 0.195 ms) -- deciding nothing",
+    "native / use_dxc in all: 11 of 11 built; dumps: 11 DXC (DXIL); compiler, from the package: DXC; dumps at C:\\Users\\howdy\\AppData\\Local\\Temp\\swek-denoise-dump-0.6.2-use_dxc-*.txt",
+    "section 66, native / use_dxc under DXC: at 64 x 64, r15's hidden kernel (r13-fast-3x3) over r18t's (r18t-tile-inline-3x3): 0.712 x (0.101 ms against 0.142 ms); r18u's (r18u-fast-unroll-3x3): 0.712 x (0.101 ms against 0.142 ms); r27w's (r27w-wino-3x3): 0.521 x (0.101 ms against 0.195 ms) -- deciding nothing",
+    "native / use_dxc off in all: 1 of 1 built; dumps: 1 FXC (DXBC); compiler, from the package: FXC; dumps at C:\\Users\\howdy\\AppData\\Local\\Temp\\swek-denoise-dump-0.6.2-use_dxc_off-*.txt",
+    "native / as shipped: r12-tiled-3x3: build 63 ms, pass 1.391 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 612 lines, 0 loops, 0 indexable-temp lines, 4 barriers",
+    "native / as shipped: r13-fast-3x3: build 116 ms, pass 0.103 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 1339 lines, 0 loops, 0 indexable-temp lines, 4 barriers",
+    "native / as shipped: r12-direct-head: build 44 ms, pass 0.432 ms (device clock, 30 passes), 331776 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 358 lines, 0 loops, 0 indexable-temp lines, 0 barriers",
+    "native / as shipped: r13-fast-head: build 108 ms, pass 0.056 ms (device clock, 30 passes), 331776 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 1173 lines, 0 loops, 0 indexable-temp lines, 4 barriers",
+    "native / as shipped: r14-head: build 23 ms, pass 0.114 ms (device clock, 30 passes), 331776 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 249 lines, 0 loops, 0 indexable-temp lines, 0 barriers",
+    "native / as shipped: r12-apply: build 66 ms, pass 0.091 ms (device clock, 30 passes), worst 4.56e-7 (APPLY_TOL 0.00001); dump: DXC (DXIL), 576 lines, 0 loops, 0 indexable-temp lines, 0 barriers",
+    "native / as shipped: r14-apply-fast: build 69 ms, pass 0.089 ms (device clock, 30 passes), worst 4.56e-7 (APPLY_TOL 0.00001); dump: DXC (DXIL), 566 lines, 0 loops, 0 indexable-temp lines, 3 barriers",
+    "native / as shipped: r15-head-apply: build 1497 ms, pass 0.051 ms (device clock, 30 passes), worst 6.26e-7 against the twin's logits, which are the fused mirror's here (APPLY_TOL 0.00001); dump: DXC (DXIL), 8910 lines, 0 loops, 0 indexable-temp lines, 3 barriers",
+    "native / as shipped: r18t-tile-inline-3x3: build 192 ms, pass 0.138 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 2029 lines, 0 loops, 0 indexable-temp lines, 4 barriers",
+    "native / as shipped: r18u-fast-unroll-3x3: build 945 ms, pass 0.142 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 12506 lines, 0 loops, 0 indexable-temp lines, 4 barriers",
+    "native / as shipped: r27w-wino-3x3: build 109 ms, pass 0.195 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 1269 lines, 0 loops, 0 indexable-temp lines, 4 barriers",
+    "native / use_dxc: r12-tiled-3x3: build 62 ms, pass 1.390 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 612 lines, 0 loops, 0 indexable-temp lines, 4 barriers",
+    "native / use_dxc: r13-fast-3x3: build 130 ms, pass 0.101 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 1339 lines, 0 loops, 0 indexable-temp lines, 4 barriers",
+    "native / use_dxc: r12-direct-head: build 38 ms, pass 0.421 ms (device clock, 30 passes), 331776 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 358 lines, 0 loops, 0 indexable-temp lines, 0 barriers",
+    "native / use_dxc: r13-fast-head: build 114 ms, pass 0.056 ms (device clock, 30 passes), 331776 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 1173 lines, 0 loops, 0 indexable-temp lines, 4 barriers",
+    "native / use_dxc: r14-head: build 27 ms, pass 0.128 ms (device clock, 30 passes), 331776 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 249 lines, 0 loops, 0 indexable-temp lines, 0 barriers",
+    "native / use_dxc: r12-apply: build 60 ms, pass 0.091 ms (device clock, 30 passes), worst 4.56e-7 (APPLY_TOL 0.00001); dump: DXC (DXIL), 576 lines, 0 loops, 0 indexable-temp lines, 0 barriers",
+    "native / use_dxc: r14-apply-fast: build 58 ms, pass 0.089 ms (device clock, 30 passes), worst 4.56e-7 (APPLY_TOL 0.00001); dump: DXC (DXIL), 566 lines, 0 loops, 0 indexable-temp lines, 3 barriers",
+    "native / use_dxc: r15-head-apply: build 1483 ms, pass 0.051 ms (device clock, 30 passes), worst 6.26e-7 against the twin's logits, which are the fused mirror's here (APPLY_TOL 0.00001); dump: DXC (DXIL), 8910 lines, 0 loops, 0 indexable-temp lines, 3 barriers",
+    "native / use_dxc: r18t-tile-inline-3x3: build 171 ms, pass 0.142 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 2029 lines, 0 loops, 0 indexable-temp lines, 4 barriers",
+    "native / use_dxc: r18u-fast-unroll-3x3: build 1026 ms, pass 0.142 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 12506 lines, 0 loops, 0 indexable-temp lines, 4 barriers",
+    "native / use_dxc: r27w-wino-3x3: build 93 ms, pass 0.195 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 1269 lines, 0 loops, 0 indexable-temp lines, 4 barriers",
+    "native / use_dxc off: r12-tiled-3x3: build 453 ms, pass 1.090 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained; dump: FXC (DXBC), 363 lines, 9 loops, 37 indexable-temp lines, 3 barriers",
+    "browser / Chrome's: r12-tiled-3x3: build 55 ms, pass 1.390 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained",
+    "browser / Chrome's: r13-fast-3x3: build 135 ms, pass 0.101 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained",
+    "browser / Chrome's: r12-direct-head: build 38 ms, pass 0.421 ms (device clock, 30 passes), 331776 plain, 0 fused, 0 unexplained",
+    "browser / Chrome's: r13-fast-head: build 97 ms, pass 0.056 ms (device clock, 30 passes), 331776 plain, 0 fused, 0 unexplained",
+    "browser / Chrome's: r14-head: build 17 ms, pass 0.114 ms (device clock, 30 passes), 331776 plain, 0 fused, 0 unexplained",
+    "browser / Chrome's: r12-apply: build 49 ms, pass 0.125 ms (device clock, 30 passes), worst 4.56e-7 (APPLY_TOL 0.00001)",
+    "browser / Chrome's: r14-apply-fast: build 60 ms, pass 0.124 ms (device clock, 30 passes), worst 4.56e-7 (APPLY_TOL 0.00001)",
+    "browser / Chrome's: r15-head-apply: build 1583 ms, pass 0.071 ms (device clock, 30 passes), worst 6.26e-7 against the twin's logits, which are the fused mirror's here (APPLY_TOL 0.00001)"
+   ],
+   "skips": [
+    "SKIP  section 87: native / use_dxc off is FXC -- the denoiser's FXC paths are retired; r12-tiled-3x3 alone is built, as FXC's control, and the other 7 stand aside, not counted as unbuilt (SWEK_DENOISE_FXC=all builds them)",
+    "SKIP  section 66: native / use_dxc off: the DXC-only hidden kernels (r18t-tile-inline-3x3, r18u-fast-unroll-3x3, r27w-wino-3x3) stand aside, not counted as unbuilt -- the compiler is FXC, not DXC"
+   ]
+  },
+  {
+   "gate": "render/denoiseDevice-selfcheck.mjs",
+   "category": "timing",
+   "ok": false,
+   "ms": 101984,
+   "exit": {
+    "status": 1,
+    "signal": null
+   },
+   "stderrTail": [],
+   "adapters": [
+    "nvidia pascal D3D12 driver version 32.0.15.8180 (native)",
+    "nvidia pascal"
+   ],
+   "software": false,
+   "fails": [
+    "FAIL  !! *** K0p natively (section 129): the r57p set -- its storing layers every cell the f32 twin's rounded to f16 (or the other nearest, counted), its last written-out layer K0's, given the device's own input; k_head_apply's image within APPLY_TOL; the image within F16S_IMAGE_TOL of the f64 network ***   fast_unroll_p 9730+0f+3038o, fast_unroll_p 9364+4f+3400o, fast_unroll_p 10174+2f+2592o, fas"
+   ],
+   "measured": [
+    "section 66 on win32/intel/gen-9: r18t K1 9.02 x at 256 x 256, 0.951 x r15 under DXC at 1024 x 1024, 0.881 x r15 under FXC at 1024 x 1024, fails condition 3; r18u K1 14.01 x at 256 x 256, 1.59 x r15 under DXC at 1024 x 1024, 1.474 x r15 under FXC at 1024 x 1024, qualifies -> r18u",
+    "section 66 on win32/nvidia/pascal: r18t K1 24.99 x at 1920 x 1080, 1.076 x r15 under DXC at 1920 x 1080, 0.996 x r15 under FXC at 1920 x 1080, fails condition 4; r18u K1 15.17 x at 1920 x 1080, 0.653 x r15 under DXC at 1920 x 1080, 0.605 x r15 under FXC at 1920 x 1080, fails condition 3 -> no entry",
+    "section 75 on win32/intel/gen-9: run a r18u (r18t K1 9.04 x at 256 x 256, 1.024 x r15 under DXC at 1024 x 1024, 0.967 x r15 under FXC at 1024 x 1024, fails condition 3; r18u K1 14.57 x at 256 x 256, 1.514 x r15 under DXC at 1024 x 1024, 1.431 x r15 under FXC at 1024 x 1024, qualifies) | run b none (r18t K1 9.11 x at 256 x 256, 1.021 x r15 under DXC at 1024 x 1024, 1.011 x r15 under FXC at 1024 x 1",
+    "section 75 on win32/nvidia/pascal: run a r18t (r18t K1 24.76 x at 1024 x 1024, 1.086 x r15 under DXC at 1920 x 1080, 1.016 x r15 under FXC at 1920 x 1080, qualifies; r18u K1 14.77 x at 1024 x 1024, 0.659 x r15 under DXC at 1920 x 1080, 0.617 x r15 under FXC at 1920 x 1080, fails condition 3) | run b none (r18t K1 17.33 x at 1920 x 1080, 1.091 x r15 under DXC at 1920 x 1080, 1.027 x r15 under FXC a",
+    "section 77 on win32/intel/gen-9: run a r18u, run b r18u; r18t K1 9.56 x at 256 x 256, 0.951 x r15 under DXC at 1024 x 1024, 1.012 x r15 under FXC at 1024 x 1024, fails condition 3; r18u K1 13.93 x at 256 x 256, 1.526 x r15 under DXC at 1024 x 1024, 1.623 x r15 under FXC at 1024 x 1024, qualifies",
+    "section 77 on win32/nvidia/pascal: run a r18t, run b r18t; r18t K1 25.58 x at 1024 x 1024, 1.08 x r15 under DXC at 1920 x 1080, 1.032 x r15 under FXC at 1920 x 1080, qualifies; r18u K1 15.08 x at 1024 x 1024, 0.655 x r15 under DXC at 1920 x 1080, 0.626 x r15 under FXC at 1920 x 1080, fails condition 3",
+    "section 83 on win32/intel/gen-9: run a native: K1 5.12 x at 256 x 256, 0.348 x r18u at 512 x 512, fails condition 3 | run b native: K1 4.82 x at 256 x 256, 0.326 x r18u at 512 x 512, fails condition 3",
+    "section 83 on Windows/intel/gen-9: run a page: K1 4.59 x at 256 x 256, 0.338 x r18u at 512 x 512, fails condition 3 | run b page: K1 4.06 x at 256 x 256, 0.369 x r18u at 512 x 512, fails condition 3",
+    "section 83 on win32/nvidia/pascal: run a native: K1 7.8 x at 1024 x 1024, 0.297 x r18t at 1920 x 1080, fails condition 3 | run b native: K1 7.85 x at 1024 x 1024, 0.296 x r18t at 1920 x 1080, fails condition 3",
+    "section 83 on Windows/nvidia/pascal: run a page: K1 7.68 x at 1024 x 1024, 0.301 x r18t at 1920 x 1080, fails condition 3 | run b page: K1 7.71 x at 1024 x 1024, 0.297 x r18t at 1920 x 1080, fails condition 3",
+    "section 111 on the 1080, native: r40s against r18t, run a 0.273 x, run b 0.263 x; on the Intel, native: r41h against r18u, run a no 1920 x 1080 ratio (predicted 2485 ms a pass, over the 1500 ms cap; at 1024 x 1024 0.514 x), run b no 1920 x 1080 ratio (predicted 2356 ms a pass, over the 1500 ms cap; at 1024 x 1024 0.49 x)",
+    "section 111 on the 1080, page: r40s against r18t, run a 0.269 x, run b 0.266 x; on the Intel, page: r41h against r18u, run a no 1920 x 1080 ratio (predicted 2318 ms a pass, over the 1500 ms cap; at 1024 x 1024 0.522 x), run b no 1920 x 1080 ratio (predicted 2192 ms a pass, over the 1500 ms cap; at 1024 x 1024 0.516 x)",
+    "section 68: the packages the rig had installed (the pin is 0.6.0): intel 0.6.1, nvidia 0.6.0",
+    "section 87, reported and not deciding: compile gate 50 s on the Intel (bound 200) and 35 s on the 1080 (bound 120); timing gate 193 s (bound 351) and 154 s (bound 230)",
+    "native adapter: nvidia / pascal / D3D12 driver version 32.0.15.8180 (hardware); compiler, from the package: DXC",
+    "native K0p for r57p, the reading: layer 0 9730 plain, 0 fused, 3038 other nearest, 0 unexplained; layer 1 9364 plain, 4 fused, 3400 other nearest, 0 unexplained; layer 2 10174 plain, 2 fused, 2592 other nearest, 0 unexplained; layer 3 12768 plain, 0 fused, 0 other nearest, 0 unexplained; head and kernel 3.55e-7 (APPLY_TOL 0.00001); against f64 1.32e-3 (F16S_IMAGE_TOL 0.001)",
+    "native K0p for round 57's set: r57p RED (1 of 2 native rows)",
+    "native K0h for round 41's set on win32/nvidia/pascal, compiler DXC, from node-webgpu 0.6.2: r41h not built natively (no shader-f16 feature)",
+    "native K0 for round 49's w16 network on win32/nvidia/pascal, compiler DXC, from node-webgpu 0.6.2: r15 green; r18t green; r18u green",
+    "native K0 for round 18's sets on win32/nvidia/pascal, compiler DXC, from node-webgpu 0.6.2: r18t green (3 of 3 native rows); r18u green (3 of 3 native rows)",
+    "native K0w for round 27's set on win32/nvidia/pascal, compiler DXC, from node-webgpu 0.6.2: r27w green (2 of 2 native rows)",
+    "native K0s for round 40's set on win32/nvidia/pascal, compiler DXC, from node-webgpu 0.6.2: r40s green (4 of 4 native rows)",
+    "native caller here: key win32/nvidia/pascal, kernels r18t (section 78's for win32/nvidia/pascal, under DXC); ran in 9.095 ms, worst 1.01e-6"
+   ],
+   "skips": [
+    "SKIP  K0h natively for r41h: the adapter has no shader-f16 feature (section 109)",
+    "SKIP  K0h in the browser for r41h: the adapter has no shader-f16 feature (section 109)"
+   ]
+  },
+  {
+   "gate": "render/denoiseTiming-selfcheck.mjs",
+   "category": "timing",
+   "ok": true,
+   "ms": 296873,
+   "exit": {
+    "status": 0,
+    "signal": null
+   },
+   "stderrTail": [],
+   "adapters": [
+    "nvidia pascal D3D12 driver version 32.0.15.8180 (native)",
+    "nvidia pascal"
+   ],
+   "software": false,
+   "fails": [],
+   "measured": [
+    "native: the trace is C:\\Users\\howdy\\AppData\\Local\\Temp\\swek-denoise-timing-trace-20272.txt",
+    "native adapter: nvidia / pascal / D3D12 driver version 32.0.15.8180 (hardware); compiler, from the package: DXC",
+    "native: this adapter's key for section 66's table: win32/nvidia/pascal",
+    "native: node-webgpu 0.6.2; compiler, read off the package with this device's flags: DXC; sets timed: r12, r15, r18t, r18u, r27w, r40s, r41h, r57p",
+    "native: adapter nvidia / pascal / D3D12 driver version 32.0.15.8180 (hardware)",
+    "native r12: 64 x 64: 7.196 ms a pass (10th-90th 5.222-22.629, 30 passes); on the device's clock 5.069 ms; 0.569 Mpx/s; conv 56.4 GFLOP/s; 3 MiB of buffers; layer 0 0.462, layer 1 1.317, layer 2 1.317, layer 3 1.318, layer 4 0.394, kernel 0.084",
+    "native r12: 128 x 128: 9.191 ms a pass (10th-90th 8.997-9.389, 30 passes); on the device's clock 8.759 ms; 1.783 Mpx/s; conv 132.9 GFLOP/s; 14 MiB of buffers; layer 0 0.563, layer 1 1.529, layer 2 1.528, layer 3 1.530, layer 4 3.015, kernel 0.537",
+    "native r12: 256 x 256: 59.189 ms a pass (10th-90th 58.746-61.305, 27 passes); on the device's clock 58.812 ms; 1.107 Mpx/s; conv 76.7 GFLOP/s; 56 MiB of buffers; layer 0 1.799, layer 1 5.081, layer 2 5.017, layer 3 5.018, layer 4 39.669, kernel 2.161",
+    "native r12: 512 x 512: 231.043 ms a pass (10th-90th 229.649-432.307, 8 passes); on the device's clock 230.679 ms; 1.135 Mpx/s; conv 78.4 GFLOP/s; 222 MiB of buffers; layer 0 6.849, layer 1 19.623, layer 2 19.634, layer 3 19.517, layer 4 155.799, kernel 8.815",
+    "native r12: 1024 x 1024: 943.546 ms a pass (10th-90th 941.797-966.409, 3 passes); on the device's clock 943.075 ms; 1.111 Mpx/s; conv 76.7 GFLOP/s; 888 MiB of buffers; layer 0 26.919, layer 1 75.662, layer 2 75.813, layer 3 76.854, layer 4 650.912, kernel 35.646",
+    "native r12: 1920 x 1080 skipped -- predicted 1866 ms a pass, over the 1500 ms cap",
+    "native r15: 64 x 64: 0.668 ms a pass (10th-90th 0.629-1.372, 30 passes); on the device's clock 0.447 ms; 6.134 Mpx/s; conv (hidden layers) 692.3 GFLOP/s; 2 MiB of buffers; layer 0 0.042, layer 1 0.108, layer 2 0.105, layer 3 0.106, layer 4 and kernel 0.086",
+    "native r15: 128 x 128: 1.011 ms a pass (10th-90th 0.985-1.288, 30 passes); on the device's clock 0.783 ms; 16.214 Mpx/s; conv (hidden layers) 1732.7 GFLOP/s; 9 MiB of buffers; layer 0 0.063, layer 1 0.171, layer 2 0.172, layer 3 0.171, layer 4 and kernel 0.207",
+    "native r15: 256 x 256: 2.798 ms a pass (10th-90th 2.748-3.118, 30 passes); on the device's clock 2.514 ms; 23.426 Mpx/s; conv (hidden layers) 2057.7 GFLOP/s; 35 MiB of buffers; layer 0 0.200, layer 1 0.582, layer 2 0.583, layer 3 0.581, layer 4 and kernel 0.566",
+    "native r15: 512 x 512: 9.810 ms a pass (10th-90th 9.673-10.043, 30 passes); on the device's clock 9.350 ms; 26.723 Mpx/s; conv (hidden layers) 2188.8 GFLOP/s; 141 MiB of buffers; layer 0 0.732, layer 1 2.190, layer 2 2.196, layer 3 2.193, layer 4 and kernel 2.034",
+    "native r15: 1024 x 1024: 39.336 ms a pass (10th-90th 38.659-48.705, 30 passes); on the device's clock 38.854 ms; 26.657 Mpx/s; conv (hidden layers) 2138.4 GFLOP/s; 564 MiB of buffers; layer 0 2.946, layer 1 9.068, layer 2 8.951, layer 3 8.974, layer 4 and kernel 8.854",
+    "native r15: 1920 x 1080: 80.146 ms a pass (10th-90th 79.607-142.840, 19 passes); on the device's clock 79.763 ms; 25.873 Mpx/s; conv (hidden layers) 2117.4 GFLOP/s; 1115 MiB of buffers; layer 0 5.880, layer 1 17.970, layer 2 17.973, layer 3 17.969, layer 4 and kernel 20.019",
+    "native r18t: 64 x 64: 0.764 ms a pass (10th-90th 0.727-0.909, 30 passes); on the device's clock 0.559 ms; 5.361 Mpx/s; conv (hidden layers) 527.5 GFLOP/s; 2 MiB of buffers; layer 0 0.053, layer 1 0.140, layer 2 0.140, layer 3 0.140, layer 4 and kernel 0.085",
+    "native r18t: 128 x 128: 1.051 ms a pass (10th-90th 1.020-1.135, 30 passes); on the device's clock 0.818 ms; 15.593 Mpx/s; conv (hidden layers) 1630.9 GFLOP/s; 9 MiB of buffers; layer 0 0.070, layer 1 0.182, layer 2 0.181, layer 3 0.180, layer 4 and kernel 0.206",
+    "native r18t: 256 x 256: 2.678 ms a pass (10th-90th 2.617-2.815, 30 passes); on the device's clock 2.385 ms; 24.471 Mpx/s; conv (hidden layers) 2186.7 GFLOP/s; 35 MiB of buffers; layer 0 0.188, layer 1 0.547, layer 2 0.547, layer 3 0.548, layer 4 and kernel 0.543",
+    "native r18t: 512 x 512: 9.274 ms a pass (10th-90th 9.202-9.559, 30 passes); on the device's clock 8.874 ms; 28.268 Mpx/s; conv (hidden layers) 2362.2 GFLOP/s; 141 MiB of buffers; layer 0 0.670, layer 1 2.036, layer 2 2.037, layer 3 2.034, layer 4 and kernel 2.100",
+    "native r18t: 1024 x 1024: 36.449 ms a pass (10th-90th 36.078-40.379, 30 passes); on the device's clock 35.971 ms; 28.768 Mpx/s; conv (hidden layers) 2392.2 GFLOP/s; 564 MiB of buffers; layer 0 2.612, layer 1 8.088, layer 2 7.990, layer 3 8.073, layer 4 and kernel 9.136",
+    "native r18t: 1920 x 1080: 74.558 ms a pass (10th-90th 73.435-74.950, 20 passes); on the device's clock 74.194 ms; 27.812 Mpx/s; conv (hidden layers) 2353.7 GFLOP/s; 1115 MiB of buffers; layer 0 5.236, layer 1 16.202, layer 2 16.187, layer 3 16.164, layer 4 and kernel 20.212",
+    "native r18u: 64 x 64: 0.782 ms a pass (10th-90th 0.717-0.936, 30 passes); on the device's clock 0.542 ms; 5.239 Mpx/s; conv (hidden layers) 550.1 GFLOP/s; 2 MiB of buffers; layer 0 0.070, layer 1 0.129, layer 2 0.128, layer 3 0.128, layer 4 and kernel 0.086",
+    "native r18u: 128 x 128: 1.282 ms a pass (10th-90th 1.254-1.391, 30 passes); on the device's clock 1.051 ms; 12.784 Mpx/s; conv (hidden layers) 1174.2 GFLOP/s; 9 MiB of buffers; layer 0 0.078, layer 1 0.257, layer 2 0.258, layer 3 0.259, layer 4 and kernel 0.199",
+    "native r18u: 256 x 256: 4.067 ms a pass (10th-90th 4.022-4.270, 30 passes); on the device's clock 3.750 ms; 16.113 Mpx/s; conv (hidden layers) 1251.6 GFLOP/s; 35 MiB of buffers; layer 0 0.315, layer 1 0.958, layer 2 0.965, layer 3 0.958, layer 4 and kernel 0.543",
+    "native r18u: 512 x 512: 15.355 ms a pass (10th-90th 15.164-15.591, 30 passes); on the device's clock 15.004 ms; 17.073 Mpx/s; conv (hidden layers) 1255.7 GFLOP/s; 141 MiB of buffers; layer 0 1.071, layer 1 3.894, layer 2 3.890, layer 3 3.891, layer 4 and kernel 2.062",
+    "native r18u: 1024 x 1024: 61.108 ms a pass (10th-90th 60.967-81.293, 24 passes); on the device's clock 60.732 ms; 17.159 Mpx/s; conv (hidden layers) 1235.8 GFLOP/s; 564 MiB of buffers; layer 0 4.320, layer 1 15.818, layer 2 15.831, layer 3 15.835, layer 4 and kernel 8.803",
+    "native r18u: 1920 x 1080: 123.095 ms a pass (10th-90th 122.928-123.505, 14 passes); on the device's clock 122.612 ms; 16.846 Mpx/s; conv (hidden layers) 1234.7 GFLOP/s; 1115 MiB of buffers; layer 0 8.719, layer 1 31.270, layer 2 31.276, layer 3 31.274, layer 4 and kernel 20.033",
+    "native r27w: 64 x 64: 0.947 ms a pass (10th-90th 0.855-1.066, 30 passes); on the device's clock 0.712 ms; 4.324 Mpx/s; conv (hidden layers) 405.7 GFLOP/s; 2 MiB of buffers; layer 0 0.068, layer 1 0.180, layer 2 0.186, layer 3 0.182, layer 4 and kernel 0.086",
+    "native r27w: 128 x 128: 2.189 ms a pass (10th-90th 2.145-2.358, 30 passes); on the device's clock 1.934 ms; 7.485 Mpx/s; conv (hidden layers) 571.3 GFLOP/s; 9 MiB of buffers; layer 0 0.166, layer 1 0.529, layer 2 0.525, layer 3 0.530, layer 4 and kernel 0.183",
+    "native r27w: 256 x 256: 7.964 ms a pass (10th-90th 7.731-8.158, 30 passes); on the device's clock 7.587 ms; 8.229 Mpx/s; conv (hidden layers) 568.5 GFLOP/s; 35 MiB of buffers; layer 0 0.690, layer 1 2.117, layer 2 2.116, layer 3 2.116, layer 4 and kernel 0.525",
+    "native r27w: 512 x 512: 30.032 ms a pass (10th-90th 29.760-30.636, 30 passes); on the device's clock 29.651 ms; 8.729 Mpx/s; conv (hidden layers) 586.4 GFLOP/s; 141 MiB of buffers; layer 0 2.645, layer 1 8.226, layer 2 8.225, layer 3 8.199, layer 4 and kernel 2.154",
+    "native r27w: 1024 x 1024: 121.787 ms a pass (10th-90th 121.146-133.306, 15 passes); on the device's clock 121.162 ms; 8.610 Mpx/s; conv (hidden layers) 570.0 GFLOP/s; 564 MiB of buffers; layer 0 10.970, layer 1 33.800, layer 2 33.774, layer 3 33.770, layer 4 and kernel 9.006",
+    "native r27w: 1920 x 1080: 247.983 ms a pass (10th-90th 247.711-320.406, 7 passes); on the device's clock 247.502 ms; 8.362 Mpx/s; conv (hidden layers) 556.1 GFLOP/s; 1115 MiB of buffers; layer 0 22.104, layer 1 68.576, layer 2 68.468, layer 3 68.511, layer 4 and kernel 19.880",
+    "native r40s: 64 x 64: 1.228 ms a pass (10th-90th 1.076-1.341, 30 passes); on the device's clock 0.997 ms; 3.336 Mpx/s; conv (hidden layers) 275.6 GFLOP/s; 2 MiB of buffers; layer 0 0.045, layer 1 0.295, layer 2 0.284, layer 3 0.284, layer 4 and kernel 0.090",
+    "native r40s: 128 x 128: 3.177 ms a pass (10th-90th 3.083-3.329, 30 passes); on the device's clock 2.873 ms; 5.158 Mpx/s; conv (hidden layers) 373.1 GFLOP/s; 9 MiB of buffers; layer 0 0.062, layer 1 0.888, layer 2 0.867, layer 3 0.863, layer 4 and kernel 0.188",
+    "native r40s: 256 x 256: 9.124 ms a pass (10th-90th 8.936-9.292, 30 passes); on the device's clock 8.771 ms; 7.183 Mpx/s; conv (hidden layers) 495.8 GFLOP/s; 35 MiB of buffers; layer 0 0.200, layer 1 2.625, layer 2 2.628, layer 3 2.618, layer 4 and kernel 0.546",
+    "native r40s: 512 x 512: 33.434 ms a pass (10th-90th 33.317-34.272, 30 passes); on the device's clock 33.014 ms; 7.841 Mpx/s; conv (hidden layers) 515.5 GFLOP/s; 141 MiB of buffers; layer 0 0.732, layer 1 10.114, layer 2 10.109, layer 3 10.092, layer 4 and kernel 2.133",
+    "native r40s: 1024 x 1024: 133.386 ms a pass (10th-90th 133.236-136.020, 12 passes); on the device's clock 133.018 ms; 7.861 Mpx/s; conv (hidden layers) 515.3 GFLOP/s; 564 MiB of buffers; layer 0 2.871, layer 1 40.511, layer 2 40.290, layer 3 40.580, layer 4 and kernel 8.622",
+    "native r40s: 1920 x 1080: 275.867 ms a pass (10th-90th 275.803-305.054, 6 passes); on the device's clock 275.454 ms; 7.517 Mpx/s; conv (hidden layers) 495.5 GFLOP/s; 1115 MiB of buffers; layer 0 5.651, layer 1 84.404, layer 2 82.586, layer 3 82.873, layer 4 and kernel 19.920",
+    "native r41h: 64 x 64 skipped -- the adapter has no shader-f16 feature, which this set's kernel needs (section 109)",
+    "native r41h: 128 x 128 skipped -- the adapter has no shader-f16 feature, which this set's kernel needs (section 109)",
+    "native r41h: 256 x 256 skipped -- the adapter has no shader-f16 feature, which this set's kernel needs (section 109)",
+    "native r41h: 512 x 512 skipped -- the adapter has no shader-f16 feature, which this set's kernel needs (section 109)",
+    "native r41h: 1024 x 1024 skipped -- the adapter has no shader-f16 feature, which this set's kernel needs (section 109)",
+    "native r41h: 1920 x 1080 skipped -- the adapter has no shader-f16 feature, which this set's kernel needs (section 109)",
+    "native r57p: 64 x 64: 0.730 ms a pass (10th-90th 0.651-0.791, 30 passes); on the device's clock 0.527 ms; 5.609 Mpx/s; conv (hidden layers) 526.3 GFLOP/s; 2 MiB of buffers; layer 0 0.052, layer 1 0.140, layer 2 0.140, layer 3 0.142, layer 4 and kernel 0.051",
+    "native r57p: 128 x 128: 1.046 ms a pass (10th-90th 1.015-1.183, 30 passes); on the device's clock 0.810 ms; 15.665 Mpx/s; conv (hidden layers) 1645.2 GFLOP/s; 9 MiB of buffers; layer 0 0.072, layer 1 0.186, layer 2 0.161, layer 3 0.188, layer 4 and kernel 0.202",
+    "native r57p: 256 x 256: 2.788 ms a pass (10th-90th 2.752-3.020, 30 passes); on the device's clock 2.523 ms; 23.506 Mpx/s; conv (hidden layers) 2022.7 GFLOP/s; 35 MiB of buffers; layer 0 0.275, layer 1 0.570, layer 2 0.546, layer 3 0.587, layer 4 and kernel 0.543",
+    "native r57p: 512 x 512: 9.916 ms a pass (10th-90th 9.665-10.745, 30 passes); on the device's clock 9.555 ms; 26.436 Mpx/s; conv (hidden layers) 2207.1 GFLOP/s; 141 MiB of buffers; layer 0 0.957, layer 1 2.092, layer 2 2.067, layer 3 2.135, layer 4 and kernel 2.115",
+    "native r57p: 1024 x 1024: 38.047 ms a pass (10th-90th 37.871-38.460, 30 passes); on the device's clock 37.661 ms; 27.560 Mpx/s; conv (hidden layers) 2216.8 GFLOP/s; 564 MiB of buffers; layer 0 3.812, layer 1 8.347, layer 2 8.141, layer 3 8.580, layer 4 and kernel 8.870",
+    "native r57p: 1920 x 1080: 78.021 ms a pass (10th-90th 77.738-114.565, 19 passes); on the device's clock 77.663 ms; 26.577 Mpx/s; conv (hidden layers) 2214.6 GFLOP/s; 1115 MiB of buffers; layer 0 7.451, layer 1 16.357, layer 2 16.397, layer 3 16.964, layer 4 and kernel 20.289",
+    "native: r15 against r12 at 64 x 64: 11.34 x as fast, on the device's clock",
+    "native: r15 against r12 at 128 x 128: 11.18 x as fast, on the device's clock",
+    "native: r15 against r12 at 256 x 256: 23.39 x as fast, on the device's clock",
+    "native: r15 against r12 at 512 x 512: 24.67 x as fast, on the device's clock",
+    "native: r15 against r12 at 1024 x 1024: 24.27 x as fast, on the device's clock",
+    "native: r18t against r12 at 64 x 64: 9.07 x as fast, on the device's clock",
+    "native: r18t against r12 at 128 x 128: 10.71 x as fast, on the device's clock",
+    "native: r18t against r12 at 256 x 256: 24.66 x as fast, on the device's clock",
+    "native: r18t against r12 at 512 x 512: 26.00 x as fast, on the device's clock",
+    "native: r18t against r12 at 1024 x 1024: 26.22 x as fast, on the device's clock",
+    "native: r18u against r12 at 64 x 64: 9.36 x as fast, on the device's clock",
+    "native: r18u against r12 at 128 x 128: 8.34 x as fast, on the device's clock",
+    "native: r18u against r12 at 256 x 256: 15.68 x as fast, on the device's clock",
+    "native: r18u against r12 at 512 x 512: 15.37 x as fast, on the device's clock",
+    "native: r18u against r12 at 1024 x 1024: 15.53 x as fast, on the device's clock",
+    "native: r27w against r12 at 64 x 64: 7.12 x as fast, on the device's clock",
+    "native: r27w against r12 at 128 x 128: 4.53 x as fast, on the device's clock",
+    "native: r27w against r12 at 256 x 256: 7.75 x as fast, on the device's clock",
+    "native: r27w against r12 at 512 x 512: 7.78 x as fast, on the device's clock",
+    "native: r27w against r12 at 1024 x 1024: 7.78 x as fast, on the device's clock",
+    "native: r40s against r12 at 64 x 64: 5.08 x as fast, on the device's clock",
+    "native: r40s against r12 at 128 x 128: 3.05 x as fast, on the device's clock",
+    "native: r40s against r12 at 256 x 256: 6.71 x as fast, on the device's clock",
+    "native: r40s against r12 at 512 x 512: 6.99 x as fast, on the device's clock",
+    "native: r40s against r12 at 1024 x 1024: 7.09 x as fast, on the device's clock",
+    "native: r57p against r12 at 64 x 64: 9.61 x as fast, on the device's clock",
+    "native: r57p against r12 at 128 x 128: 10.81 x as fast, on the device's clock",
+    "native: r57p against r12 at 256 x 256: 23.31 x as fast, on the device's clock",
+    "native: r57p against r12 at 512 x 512: 24.14 x as fast, on the device's clock",
+    "native: r57p against r12 at 1024 x 1024: 25.04 x as fast, on the device's clock",
+    "native: r18t against r15 at 64 x 64: 0.800 x as fast, on the device's clock -- section 66",
+    "native: r18t against r15 at 128 x 128: 0.958 x as fast, on the device's clock -- section 66",
+    "native: r18t against r15 at 256 x 256: 1.054 x as fast, on the device's clock -- section 66",
+    "native: r18t against r15 at 512 x 512: 1.054 x as fast, on the device's clock -- section 66",
+    "native: r18t against r15 at 1024 x 1024: 1.080 x as fast, on the device's clock -- section 66",
+    "native: r18t against r15 at 1920 x 1080: 1.075 x as fast, on the device's clock -- section 66",
+    "native: r18u against r15 at 64 x 64: 0.826 x as fast, on the device's clock -- section 66",
+    "native: r18u against r15 at 128 x 128: 0.746 x as fast, on the device's clock -- section 66",
+    "native: r18u against r15 at 256 x 256: 0.670 x as fast, on the device's clock -- section 66",
+    "native: r18u against r15 at 512 x 512: 0.623 x as fast, on the device's clock -- section 66",
+    "native: r18u against r15 at 1024 x 1024: 0.640 x as fast, on the device's clock -- section 66",
+    "native: r18u against r15 at 1920 x 1080: 0.651 x as fast, on the device's clock -- section 66",
+    "native: r27w against r15 at 64 x 64: 0.628 x as fast, on the device's clock -- section 83",
+    "native: r27w against r15 at 128 x 128: 0.405 x as fast, on the device's clock -- section 83",
+    "native: r27w against r15 at 256 x 256: 0.331 x as fast, on the device's clock -- section 83",
+    "native: r27w against r15 at 512 x 512: 0.315 x as fast, on the device's clock -- section 83",
+    "native: r27w against r15 at 1024 x 1024: 0.321 x as fast, on the device's clock -- section 83",
+    "native: r27w against r15 at 1920 x 1080: 0.322 x as fast, on the device's clock -- section 83",
+    "native: r27w against r18t at 64 x 64: 0.786 x as fast, on the device's clock -- section 83",
+    "native: r27w against r18t at 128 x 128: 0.423 x as fast, on the device's clock -- section 83",
+    "native: r27w against r18t at 256 x 256: 0.314 x as fast, on the device's clock -- section 83",
+    "native: r27w against r18t at 512 x 512: 0.299 x as fast, on the device's clock -- section 83",
+    "native: r27w against r18t at 1024 x 1024: 0.297 x as fast, on the device's clock -- section 83",
+    "native: r27w against r18t at 1920 x 1080: 0.300 x as fast, on the device's clock -- section 83",
+    "native: r27w against r18u at 64 x 64: 0.761 x as fast, on the device's clock -- section 83",
+    "native: r27w against r18u at 128 x 128: 0.543 x as fast, on the device's clock -- section 83",
+    "native: r27w against r18u at 256 x 256: 0.494 x as fast, on the device's clock -- section 83",
+    "native: r27w against r18u at 512 x 512: 0.506 x as fast, on the device's clock -- section 83",
+    "native: r27w against r18u at 1024 x 1024: 0.501 x as fast, on the device's clock -- section 83",
+    "native: r27w against r18u at 1920 x 1080: 0.495 x as fast, on the device's clock -- section 83",
+    "native: r40s against r15 at 64 x 64: 0.448 x as fast, on the device's clock -- section 108",
+    "native: r40s against r15 at 128 x 128: 0.273 x as fast, on the device's clock -- section 108",
+    "native: r40s against r15 at 256 x 256: 0.287 x as fast, on the device's clock -- section 108",
+    "native: r40s against r15 at 512 x 512: 0.283 x as fast, on the device's clock -- section 108",
+    "native: r40s against r15 at 1024 x 1024: 0.292 x as fast, on the device's clock -- section 108",
+    "native: r40s against r15 at 1920 x 1080: 0.290 x as fast, on the device's clock -- section 108",
+    "native: r40s against r18t at 64 x 64: 0.561 x as fast, on the device's clock -- section 108",
+    "native: r40s against r18t at 128 x 128: 0.285 x as fast, on the device's clock -- section 108",
+    "native: r40s against r18t at 256 x 256: 0.272 x as fast, on the device's clock -- section 108",
+    "native: r40s against r18t at 512 x 512: 0.269 x as fast, on the device's clock -- section 108",
+    "native: r40s against r18t at 1024 x 1024: 0.270 x as fast, on the device's clock -- section 108",
+    "native: r40s against r18t at 1920 x 1080: 0.269 x as fast, on the device's clock -- section 108",
+    "native: r40s against r18u at 64 x 64: 0.543 x as fast, on the device's clock -- section 108",
+    "native: r40s against r18u at 128 x 128: 0.366 x as fast, on the device's clock -- section 108",
+    "native: r40s against r18u at 256 x 256: 0.428 x as fast, on the device's clock -- section 108",
+    "native: r40s against r18u at 512 x 512: 0.454 x as fast, on the device's clock -- section 108",
+    "native: r40s against r18u at 1024 x 1024: 0.457 x as fast, on the device's clock -- section 108",
+    "native: r40s against r18u at 1920 x 1080: 0.445 x as fast, on the device's clock -- section 108",
+    "native: r41h stands aside -- the adapter has no shader-f16 feature, which this set's kernel needs (section 109)",
+    "native: r57p against r18t at 64 x 64: 1.060 x as fast, on the device's clock -- section 129",
+    "native: r57p against r18t at 128 x 128: 1.010 x as fast, on the device's clock -- section 129",
+    "native: r57p against r18t at 256 x 256: 0.945 x as fast, on the device's clock -- section 129",
+    "native: r57p against r18t at 512 x 512: 0.929 x as fast, on the device's clock -- section 129",
+    "native: r57p against r18t at 1024 x 1024: 0.955 x as fast, on the device's clock -- section 129",
+    "native: r57p against r18t at 1920 x 1080: 0.955 x as fast, on the device's clock -- section 129",
+    "native: r57p against r18u at 64 x 64: 1.027 x as fast, on the device's clock -- section 129",
+    "native: r57p against r18u at 128 x 128: 1.297 x as fast, on the device's clock -- section 129",
+    "native: r57p against r18u at 256 x 256: 1.486 x as fast, on the device's clock -- section 129",
+    "native: r57p against r18u at 512 x 512: 1.570 x as fast, on the device's clock -- section 129",
+    "native: r57p against r18u at 1024 x 1024: 1.613 x as fast, on the device's clock -- section 129",
+    "native: r57p against r18u at 1920 x 1080: 1.579 x as fast, on the device's clock -- section 129",
+    "native w16 r15: 64 x 64: 1.120 ms a pass (10th-90th 1.091-1.193, 30 passes); on the device's clock 0.676 ms",
+    "native w16 r15: 128 x 128: 0.603 ms a pass (10th-90th 0.587-0.664, 30 passes); on the device's clock 0.391 ms",
+    "native w16 r15: 256 x 256: 1.401 ms a pass (10th-90th 1.375-1.702, 30 passes); on the device's clock 1.179 ms",
+    "native w16 r15: 512 x 512: 4.049 ms a pass (10th-90th 3.998-4.239, 30 passes); on the device's clock 3.734 ms",
+    "native w16 r15: 1024 x 1024: 15.179 ms a pass (10th-90th 15.084-15.344, 30 passes); on the device's clock 14.792 ms",
+    "native w16 r15: 1920 x 1080: 30.686 ms a pass (10th-90th 30.226-30.949, 30 passes); on the device's clock 30.294 ms",
+    "native w16 r18t: 64 x 64: 1.255 ms a pass (10th-90th 1.220-1.532, 30 passes); on the device's clock 0.808 ms",
+    "native w16 r18t: 128 x 128: 0.587 ms a pass (10th-90th 0.575-0.631, 30 passes); on the device's clock 0.387 ms",
+    "native w16 r18t: 256 x 256: 1.264 ms a pass (10th-90th 1.225-1.351, 30 passes); on the device's clock 1.033 ms",
+    "native w16 r18t: 512 x 512: 3.603 ms a pass (10th-90th 3.473-3.834, 30 passes); on the device's clock 3.226 ms",
+    "native w16 r18t: 1024 x 1024: 12.652 ms a pass (10th-90th 12.422-12.739, 30 passes); on the device's clock 12.311 ms",
+    "native w16 r18t: 1920 x 1080: 25.510 ms a pass (10th-90th 25.122-25.907, 30 passes); on the device's clock 25.163 ms",
+    "native w16 r18u: 64 x 64: 1.045 ms a pass (10th-90th 0.366-1.086, 30 passes); on the device's clock 0.624 ms",
+    "native w16 r18u: 128 x 128: 0.547 ms a pass (10th-90th 0.532-0.736, 30 passes); on the device's clock 0.340 ms",
+    "native w16 r18u: 256 x 256: 1.260 ms a pass (10th-90th 1.243-1.322, 30 passes); on the device's clock 1.043 ms",
+    "native w16 r18u: 512 x 512: 3.623 ms a pass (10th-90th 3.510-3.957, 30 passes); on the device's clock 3.284 ms",
+    "native w16 r18u: 1024 x 1024: 12.916 ms a pass (10th-90th 12.691-13.246, 30 passes); on the device's clock 12.547 ms",
+    "native w16 r18u: 1920 x 1080: 26.559 ms a pass (10th-90th 26.328-27.022, 30 passes); on the device's clock 26.207 ms",
+    "native: w16 against the shipped network on r15 at 64 x 64: 0.662 x as fast, on the device's clock -- section 119",
+    "native: w16 against the shipped network on r15 at 128 x 128: 2.003 x as fast, on the device's clock -- section 119",
+    "native: w16 against the shipped network on r15 at 256 x 256: 2.133 x as fast, on the device's clock -- section 119",
+    "native: w16 against the shipped network on r15 at 512 x 512: 2.504 x as fast, on the device's clock -- section 119",
+    "native: w16 against the shipped network on r15 at 1024 x 1024: 2.627 x as fast, on the device's clock -- section 119",
+    "native: w16 against the shipped network on r15 at 1920 x 1080: 2.633 x as fast, on the device's clock -- section 119",
+    "native: w16 against the shipped network on r18t at 64 x 64: 0.692 x as fast, on the device's clock -- section 119",
+    "native: w16 against the shipped network on r18t at 128 x 128: 2.115 x as fast, on the device's clock -- section 119",
+    "native: w16 against the shipped network on r18t at 256 x 256: 2.308 x as fast, on the device's clock -- section 119",
+    "native: w16 against the shipped network on r18t at 512 x 512: 2.751 x as fast, on the device's clock -- section 119",
+    "native: w16 against the shipped network on r18t at 1024 x 1024: 2.922 x as fast, on the device's clock -- section 119",
+    "native: w16 against the shipped network on r18t at 1920 x 1080: 2.949 x as fast, on the device's clock -- section 119",
+    "native: w16 against the shipped network on r18u at 64 x 64: 0.868 x as fast, on the device's clock -- section 119",
+    "native: w16 against the shipped network on r18u at 128 x 128: 3.090 x as fast, on the device's clock -- section 119",
+    "native: w16 against the shipped network on r18u at 256 x 256: 3.594 x as fast, on the device's clock -- section 119",
+    "native: w16 against the shipped network on r18u at 512 x 512: 4.569 x as fast, on the device's clock -- section 119",
+    "native: w16 against the shipped network on r18u at 1024 x 1024: 4.840 x as fast, on the device's clock -- section 119",
+    "native: w16 against the shipped network on r18u at 1920 x 1080: 4.679 x as fast, on the device's clock -- section 119",
+    "page: adapter nvidia / pascal (hardware)",
+    "page r12: 64 x 64: 7.600 ms a pass (10th-90th 7.100-8.700, 30 passes); on the device's clock 6.376 ms; 0.539 Mpx/s; conv 43.3 GFLOP/s; 3 MiB of buffers; layer 0 0.600, layer 1 1.708, layer 2 1.711, layer 3 1.709, layer 4 0.544, kernel 0.108",
+    "page r12: 128 x 128: 10.500 ms a pass (10th-90th 10.100-11.700, 30 passes); on the device's clock 8.921 ms; 1.560 Mpx/s; conv 131.5 GFLOP/s; 14 MiB of buffers; layer 0 0.568, layer 1 1.544, layer 2 1.544, layer 3 1.543, layer 4 3.052, kernel 0.536",
+    "page r12: 256 x 256: 42.300 ms a pass (10th-90th 40.300-43.100, 30 passes); on the device's clock 41.034 ms; 1.549 Mpx/s; conv 111.4 GFLOP/s; 56 MiB of buffers; layer 0 1.811, layer 1 4.946, layer 2 5.054, layer 3 4.949, layer 4 22.211, kernel 1.981",
+    "page r12: 512 x 512: 231.400 ms a pass (10th-90th 230.200-232.700, 9 passes); on the device's clock 230.486 ms; 1.133 Mpx/s; conv 78.2 GFLOP/s; 222 MiB of buffers; layer 0 7.198, layer 1 19.710, layer 2 19.607, layer 3 19.581, layer 4 156.022, kernel 8.537",
+    "page r12: 1024 x 1024: 943.600 ms a pass (10th-90th 942.300-946.700, 3 passes); on the device's clock 942.630 ms; 1.111 Mpx/s; conv 76.7 GFLOP/s; 888 MiB of buffers; layer 0 27.315, layer 1 76.253, layer 2 76.571, layer 3 76.543, layer 4 648.779, kernel 36.171",
+    "page r12: 1920 x 1080 skipped -- predicted 1867 ms a pass, over the 1500 ms cap",
+    "page r15: 64 x 64: 2.600 ms a pass (10th-90th 2.500-3.000, 30 passes); on the device's clock 0.566 ms; 1.575 Mpx/s; conv (hidden layers) 537.9 GFLOP/s; 2 MiB of buffers; layer 0 0.053, layer 1 0.137, layer 2 0.138, layer 3 0.136, layer 4 and kernel 0.102",
+    "page r15: 128 x 128: 2.700 ms a pass (10th-90th 2.600-3.100, 30 passes); on the device's clock 0.793 ms; 6.068 Mpx/s; conv (hidden layers) 1700.0 GFLOP/s; 9 MiB of buffers; layer 0 0.064, layer 1 0.175, layer 2 0.174, layer 3 0.175, layer 4 and kernel 0.209",
+    "page r15: 256 x 256: 4.200 ms a pass (10th-90th 4.100-4.500, 30 passes); on the device's clock 2.574 ms; 15.604 Mpx/s; conv (hidden layers) 2038.4 GFLOP/s; 35 MiB of buffers; layer 0 0.201, layer 1 0.587, layer 2 0.589, layer 3 0.587, layer 4 and kernel 0.604",
+    "page r15: 512 x 512: 10.200 ms a pass (10th-90th 10.100-11.500, 30 passes); on the device's clock 9.542 ms; 25.700 Mpx/s; conv (hidden layers) 2175.1 GFLOP/s; 141 MiB of buffers; layer 0 0.736, layer 1 2.207, layer 2 2.207, layer 3 2.209, layer 4 and kernel 2.003",
+    "page r15: 1024 x 1024: 40.200 ms a pass (10th-90th 39.600-40.600, 30 passes); on the device's clock 38.853 ms; 26.084 Mpx/s; conv (hidden layers) 2152.6 GFLOP/s; 564 MiB of buffers; layer 0 2.935, layer 1 8.902, layer 2 8.936, layer 3 8.969, layer 4 and kernel 9.078",
+    "page r15: 1920 x 1080: 82.000 ms a pass (10th-90th 80.600-83.000, 27 passes); on the device's clock 80.560 ms; 25.288 Mpx/s; conv (hidden layers) 2095.4 GFLOP/s; 1115 MiB of buffers; layer 0 5.963, layer 1 18.116, layer 2 18.221, layer 3 18.122, layer 4 and kernel 20.034",
+    "page r18t: 64 x 64: 2.700 ms a pass (10th-90th 2.600-2.800, 30 passes); on the device's clock 0.714 ms; 1.517 Mpx/s; conv (hidden layers) 409.2 GFLOP/s; 2 MiB of buffers; layer 0 0.068, layer 1 0.181, layer 2 0.180, layer 3 0.181, layer 4 and kernel 0.102",
+    "page r18t: 128 x 128: 2.700 ms a pass (10th-90th 2.600-3.100, 30 passes); on the device's clock 0.829 ms; 6.068 Mpx/s; conv (hidden layers) 1610.3 GFLOP/s; 9 MiB of buffers; layer 0 0.071, layer 1 0.183, layer 2 0.183, layer 3 0.183, layer 4 and kernel 0.210",
+    "page r18t: 256 x 256: 4.200 ms a pass (10th-90th 4.000-4.300, 30 passes); on the device's clock 2.392 ms; 15.604 Mpx/s; conv (hidden layers) 2185.4 GFLOP/s; 35 MiB of buffers; layer 0 0.189, layer 1 0.547, layer 2 0.546, layer 3 0.549, layer 4 and kernel 0.540",
+    "page r18t: 512 x 512: 10.200 ms a pass (10th-90th 10.100-11.000, 30 passes); on the device's clock 9.184 ms; 25.700 Mpx/s; conv (hidden layers) 2339.9 GFLOP/s; 141 MiB of buffers; layer 0 0.674, layer 1 2.053, layer 2 2.057, layer 3 2.056, layer 4 and kernel 2.140",
+    "page r18t: 1024 x 1024: 37.100 ms a pass (10th-90th 36.400-37.400, 30 passes); on the device's clock 35.822 ms; 28.264 Mpx/s; conv (hidden layers) 2377.8 GFLOP/s; 564 MiB of buffers; layer 0 2.634, layer 1 8.118, layer 2 8.164, layer 3 8.009, layer 4 and kernel 8.841",
+    "page r18t: 1920 x 1080: 75.600 ms a pass (10th-90th 75.000-76.600, 27 passes); on the device's clock 74.474 ms; 27.429 Mpx/s; conv (hidden layers) 2333.9 GFLOP/s; 1115 MiB of buffers; layer 0 5.278, layer 1 16.318, layer 2 16.327, layer 3 16.324, layer 4 and kernel 20.249",
+    "page r18u: 64 x 64: 2.700 ms a pass (10th-90th 2.600-3.000, 30 passes); on the device's clock 0.691 ms; 1.517 Mpx/s; conv (hidden layers) 424.7 GFLOP/s; 2 MiB of buffers; layer 0 0.084, layer 1 0.169, layer 2 0.168, layer 3 0.168, layer 4 and kernel 0.102",
+    "page r18u: 128 x 128: 2.700 ms a pass (10th-90th 2.500-2.800, 30 passes); on the device's clock 1.060 ms; 6.068 Mpx/s; conv (hidden layers) 1164.7 GFLOP/s; 9 MiB of buffers; layer 0 0.079, layer 1 0.259, layer 2 0.260, layer 3 0.261, layer 4 and kernel 0.203",
+    "page r18u: 256 x 256: 5.600 ms a pass (10th-90th 4.500-5.700, 30 passes); on the device's clock 3.745 ms; 11.703 Mpx/s; conv (hidden layers) 1248.1 GFLOP/s; 35 MiB of buffers; layer 0 0.315, layer 1 0.968, layer 2 0.957, layer 3 0.966, layer 4 and kernel 0.536",
+    "page r18u: 512 x 512: 16.100 ms a pass (10th-90th 15.600-16.700, 30 passes); on the device's clock 15.009 ms; 16.282 Mpx/s; conv (hidden layers) 1252.1 GFLOP/s; 141 MiB of buffers; layer 0 1.072, layer 1 3.901, layer 2 3.903, layer 3 3.906, layer 4 and kernel 2.045",
+    "page r18u: 1024 x 1024: 62.900 ms a pass (10th-90th 62.400-63.300, 30 passes); on the device's clock 61.259 ms; 16.671 Mpx/s; conv (hidden layers) 1232.9 GFLOP/s; 564 MiB of buffers; layer 0 4.330, layer 1 15.861, layer 2 15.871, layer 3 15.867, layer 4 and kernel 9.206",
+    "page r18u: 1920 x 1080: 124.500 ms a pass (10th-90th 123.900-125.500, 18 passes); on the device's clock 122.955 ms; 16.655 Mpx/s; conv (hidden layers) 1228.3 GFLOP/s; 1115 MiB of buffers; layer 0 8.780, layer 1 31.441, layer 2 31.427, layer 3 31.423, layer 4 and kernel 19.798",
+    "page r27w: 64 x 64: 2.700 ms a pass (10th-90th 2.600-2.800, 30 passes); on the device's clock 0.887 ms; 1.517 Mpx/s; conv (hidden layers) 321.3 GFLOP/s; 2 MiB of buffers; layer 0 0.085, layer 1 0.229, layer 2 0.231, layer 3 0.232, layer 4 and kernel 0.102",
+    "page r27w: 128 x 128: 2.700 ms a pass (10th-90th 2.600-3.200, 30 passes); on the device's clock 1.958 ms; 6.068 Mpx/s; conv (hidden layers) 563.4 GFLOP/s; 9 MiB of buffers; layer 0 0.166, layer 1 0.536, layer 2 0.530, layer 3 0.544, layer 4 and kernel 0.185",
+    "page r27w: 256 x 256: 8.700 ms a pass (10th-90th 8.600-9.100, 30 passes); on the device's clock 7.602 ms; 7.533 Mpx/s; conv (hidden layers) 567.5 GFLOP/s; 35 MiB of buffers; layer 0 0.694, layer 1 2.131, layer 2 2.098, layer 3 2.128, layer 4 and kernel 0.528",
+    "page r27w: 512 x 512: 31.100 ms a pass (10th-90th 30.600-31.600, 30 passes); on the device's clock 29.850 ms; 8.429 Mpx/s; conv (hidden layers) 575.3 GFLOP/s; 141 MiB of buffers; layer 0 2.668, layer 1 8.431, layer 2 8.314, layer 3 8.409, layer 4 and kernel 2.020",
+    "page r27w: 1024 x 1024: 125.000 ms a pass (10th-90th 124.400-125.900, 18 passes); on the device's clock 123.520 ms; 8.389 Mpx/s; conv (hidden layers) 560.0 GFLOP/s; 564 MiB of buffers; layer 0 11.213, layer 1 34.360, layer 2 34.391, layer 3 34.356, layer 4 and kernel 9.218",
+    "page r27w: 1920 x 1080: 250.300 ms a pass (10th-90th 250.100-251.600, 9 passes); on the device's clock 249.416 ms; 8.284 Mpx/s; conv (hidden layers) 552.3 GFLOP/s; 1115 MiB of buffers; layer 0 22.345, layer 1 68.959, layer 2 68.959, layer 3 68.990, layer 4 and kernel 20.079",
+    "page r40s: 64 x 64: 2.700 ms a pass (10th-90th 2.600-2.800, 30 passes); on the device's clock 1.193 ms; 1.517 Mpx/s; conv (hidden layers) 229.3 GFLOP/s; 2 MiB of buffers; layer 0 0.053, layer 1 0.352, layer 2 0.342, layer 3 0.343, layer 4 and kernel 0.102",
+    "page r40s: 128 x 128: 4.200 ms a pass (10th-90th 4.000-4.300, 30 passes); on the device's clock 2.855 ms; 3.901 Mpx/s; conv (hidden layers) 374.4 GFLOP/s; 9 MiB of buffers; layer 0 0.063, layer 1 0.888, layer 2 0.857, layer 3 0.863, layer 4 and kernel 0.185",
+    "page r40s: 256 x 256: 10.100 ms a pass (10th-90th 9.700-10.500, 30 passes); on the device's clock 8.845 ms; 6.489 Mpx/s; conv (hidden layers) 492.5 GFLOP/s; 35 MiB of buffers; layer 0 0.201, layer 1 2.641, layer 2 2.642, layer 3 2.641, layer 4 and kernel 0.534",
+    "page r40s: 512 x 512: 34.200 ms a pass (10th-90th 34.000-34.600, 30 passes); on the device's clock 32.987 ms; 7.665 Mpx/s; conv (hidden layers) 517.3 GFLOP/s; 141 MiB of buffers; layer 0 0.737, layer 1 9.947, layer 2 10.122, layer 3 10.136, layer 4 and kernel 2.044",
+    "page r40s: 1024 x 1024: 134.900 ms a pass (10th-90th 134.000-135.800, 15 passes); on the device's clock 133.378 ms; 7.773 Mpx/s; conv (hidden layers) 514.0 GFLOP/s; 564 MiB of buffers; layer 0 2.871, layer 1 40.691, layer 2 40.366, layer 3 40.618, layer 4 and kernel 8.826",
+    "page r40s: 1920 x 1080: 277.200 ms a pass (10th-90th 276.000-277.500, 9 passes); on the device's clock 275.389 ms; 7.481 Mpx/s; conv (hidden layers) 495.1 GFLOP/s; 1115 MiB of buffers; layer 0 5.709, layer 1 83.286, layer 2 83.858, layer 3 82.888, layer 4 and kernel 19.484",
+    "page r41h: 64 x 64 skipped -- the adapter has no shader-f16 feature, which this set's kernel needs (section 109)",
+    "page r41h: 128 x 128 skipped -- the adapter has no shader-f16 feature, which this set's kernel needs (section 109)",
+    "page r41h: 256 x 256 skipped -- the adapter has no shader-f16 feature, which this set's kernel needs (section 109)",
+    "page r41h: 512 x 512 skipped -- the adapter has no shader-f16 feature, which this set's kernel needs (section 109)",
+    "page r41h: 1024 x 1024 skipped -- the adapter has no shader-f16 feature, which this set's kernel needs (section 109)",
+    "page r41h: 1920 x 1080 skipped -- the adapter has no shader-f16 feature, which this set's kernel needs (section 109)",
+    "page r57p: 64 x 64: 2.700 ms a pass (10th-90th 2.500-3.100, 30 passes); on the device's clock 0.647 ms; 1.517 Mpx/s; conv (hidden layers) 441.8 GFLOP/s; 2 MiB of buffers; layer 0 0.052, layer 1 0.168, layer 2 0.168, layer 3 0.178, layer 4 and kernel 0.082",
+    "page r57p: 128 x 128: 2.700 ms a pass (10th-90th 2.600-3.000, 30 passes); on the device's clock 0.816 ms; 6.068 Mpx/s; conv (hidden layers) 1629.2 GFLOP/s; 9 MiB of buffers; layer 0 0.073, layer 1 0.187, layer 2 0.162, layer 3 0.191, layer 4 and kernel 0.204",
+    "page r57p: 256 x 256: 4.200 ms a pass (10th-90th 4.100-4.500, 30 passes); on the device's clock 2.543 ms; 15.604 Mpx/s; conv (hidden layers) 2008.4 GFLOP/s; 35 MiB of buffers; layer 0 0.277, layer 1 0.575, layer 2 0.549, layer 3 0.591, layer 4 and kernel 0.549",
+    "page r57p: 512 x 512: 10.200 ms a pass (10th-90th 10.100-11.500, 30 passes); on the device's clock 9.468 ms; 25.700 Mpx/s; conv (hidden layers) 2199.0 GFLOP/s; 141 MiB of buffers; layer 0 0.961, layer 1 2.096, layer 2 2.077, layer 3 2.145, layer 4 and kernel 2.025",
+    "page r57p: 1024 x 1024: 39.400 ms a pass (10th-90th 38.600-40.100, 30 passes); on the device's clock 37.910 ms; 26.614 Mpx/s; conv (hidden layers) 2221.6 GFLOP/s; 564 MiB of buffers; layer 0 3.853, layer 1 8.227, layer 2 8.233, layer 3 8.505, layer 4 and kernel 9.030",
+    "page r57p: 1920 x 1080: 78.900 ms a pass (10th-90th 78.100-79.100, 27 passes); on the device's clock 77.245 ms; 26.281 Mpx/s; conv (hidden layers) 2188.9 GFLOP/s; 1115 MiB of buffers; layer 0 7.689, layer 1 16.545, layer 2 16.514, layer 3 17.092, layer 4 and kernel 19.406",
+    "page: r15 against r12 at 64 x 64: 11.26 x as fast, on the device's clock",
+    "page: r15 against r12 at 128 x 128: 11.26 x as fast, on the device's clock",
+    "page: r15 against r12 at 256 x 256: 15.94 x as fast, on the device's clock",
+    "page: r15 against r12 at 512 x 512: 24.15 x as fast, on the device's clock",
+    "page: r15 against r12 at 1024 x 1024: 24.26 x as fast, on the device's clock",
+    "page: r18t against r12 at 64 x 64: 8.94 x as fast, on the device's clock",
+    "page: r18t against r12 at 128 x 128: 10.76 x as fast, on the device's clock",
+    "page: r18t against r12 at 256 x 256: 17.16 x as fast, on the device's clock",
+    "page: r18t against r12 at 512 x 512: 25.10 x as fast, on the device's clock",
+    "page: r18t against r12 at 1024 x 1024: 26.31 x as fast, on the device's clock",
+    "page: r18u against r12 at 64 x 64: 9.23 x as fast, on the device's clock",
+    "page: r18u against r12 at 128 x 128: 8.42 x as fast, on the device's clock",
+    "page: r18u against r12 at 256 x 256: 10.96 x as fast, on the device's clock",
+    "page: r18u against r12 at 512 x 512: 15.36 x as fast, on the device's clock",
+    "page: r18u against r12 at 1024 x 1024: 15.39 x as fast, on the device's clock",
+    "page: r27w against r12 at 64 x 64: 7.19 x as fast, on the device's clock",
+    "page: r27w against r12 at 128 x 128: 4.56 x as fast, on the device's clock",
+    "page: r27w against r12 at 256 x 256: 5.40 x as fast, on the device's clock",
+    "page: r27w against r12 at 512 x 512: 7.72 x as fast, on the device's clock",
+    "page: r27w against r12 at 1024 x 1024: 7.63 x as fast, on the device's clock",
+    "page: r40s against r12 at 64 x 64: 5.35 x as fast, on the device's clock",
+    "page: r40s against r12 at 128 x 128: 3.12 x as fast, on the device's clock",
+    "page: r40s against r12 at 256 x 256: 4.64 x as fast, on the device's clock",
+    "page: r40s against r12 at 512 x 512: 6.99 x as fast, on the device's clock",
+    "page: r40s against r12 at 1024 x 1024: 7.07 x as fast, on the device's clock",
+    "page: r57p against r12 at 64 x 64: 9.85 x as fast, on the device's clock",
+    "page: r57p against r12 at 128 x 128: 10.93 x as fast, on the device's clock",
+    "page: r57p against r12 at 256 x 256: 16.13 x as fast, on the device's clock",
+    "page: r57p against r12 at 512 x 512: 24.34 x as fast, on the device's clock",
+    "page: r57p against r12 at 1024 x 1024: 24.87 x as fast, on the device's clock",
+    "page: r18t against r15 at 64 x 64: 0.794 x as fast, on the device's clock -- section 61",
+    "page: r18t against r15 at 128 x 128: 0.956 x as fast, on the device's clock -- section 61",
+    "page: r18t against r15 at 256 x 256: 1.076 x as fast, on the device's clock -- section 61",
+    "page: r18t against r15 at 512 x 512: 1.039 x as fast, on the device's clock -- section 61",
+    "page: r18t against r15 at 1024 x 1024: 1.085 x as fast, on the device's clock -- section 61",
+    "page: r18t against r15 at 1920 x 1080: 1.082 x as fast, on the device's clock -- section 61",
+    "page: r18u against r15 at 64 x 64: 0.819 x as fast, on the device's clock -- section 61",
+    "page: r18u against r15 at 128 x 128: 0.748 x as fast, on the device's clock -- section 61",
+    "page: r18u against r15 at 256 x 256: 0.687 x as fast, on the device's clock -- section 61",
+    "page: r18u against r15 at 512 x 512: 0.636 x as fast, on the device's clock -- section 61",
+    "page: r18u against r15 at 1024 x 1024: 0.634 x as fast, on the device's clock -- section 61",
+    "page: r18u against r15 at 1920 x 1080: 0.655 x as fast, on the device's clock -- section 61",
+    "page: r27w against r15 at 64 x 64: 0.639 x as fast, on the device's clock -- section 83",
+    "page: r27w against r15 at 128 x 128: 0.405 x as fast, on the device's clock -- section 83",
+    "page: r27w against r15 at 256 x 256: 0.339 x as fast, on the device's clock -- section 83",
+    "page: r27w against r15 at 512 x 512: 0.320 x as fast, on the device's clock -- section 83",
+    "page: r27w against r15 at 1024 x 1024: 0.315 x as fast, on the device's clock -- section 83",
+    "page: r27w against r15 at 1920 x 1080: 0.323 x as fast, on the device's clock -- section 83",
+    "page: r27w against r18t at 64 x 64: 0.805 x as fast, on the device's clock -- section 83",
+    "page: r27w against r18t at 128 x 128: 0.424 x as fast, on the device's clock -- section 83",
+    "page: r27w against r18t at 256 x 256: 0.315 x as fast, on the device's clock -- section 83",
+    "page: r27w against r18t at 512 x 512: 0.308 x as fast, on the device's clock -- section 83",
+    "page: r27w against r18t at 1024 x 1024: 0.290 x as fast, on the device's clock -- section 83",
+    "page: r27w against r18t at 1920 x 1080: 0.299 x as fast, on the device's clock -- section 83",
+    "page: r27w against r18u at 64 x 64: 0.780 x as fast, on the device's clock -- section 83",
+    "page: r27w against r18u at 128 x 128: 0.541 x as fast, on the device's clock -- section 83",
+    "page: r27w against r18u at 256 x 256: 0.493 x as fast, on the device's clock -- section 83",
+    "page: r27w against r18u at 512 x 512: 0.503 x as fast, on the device's clock -- section 83",
+    "page: r27w against r18u at 1024 x 1024: 0.496 x as fast, on the device's clock -- section 83",
+    "page: r27w against r18u at 1920 x 1080: 0.493 x as fast, on the device's clock -- section 83",
+    "page: r40s against r15 at 64 x 64: 0.475 x as fast, on the device's clock -- section 108",
+    "page: r40s against r15 at 128 x 128: 0.278 x as fast, on the device's clock -- section 108",
+    "page: r40s against r15 at 256 x 256: 0.291 x as fast, on the device's clock -- section 108",
+    "page: r40s against r15 at 512 x 512: 0.289 x as fast, on the device's clock -- section 108",
+    "page: r40s against r15 at 1024 x 1024: 0.291 x as fast, on the device's clock -- section 108",
+    "page: r40s against r15 at 1920 x 1080: 0.293 x as fast, on the device's clock -- section 108",
+    "page: r40s against r18t at 64 x 64: 0.598 x as fast, on the device's clock -- section 108",
+    "page: r40s against r18t at 128 x 128: 0.290 x as fast, on the device's clock -- section 108",
+    "page: r40s against r18t at 256 x 256: 0.270 x as fast, on the device's clock -- section 108",
+    "page: r40s against r18t at 512 x 512: 0.278 x as fast, on the device's clock -- section 108",
+    "page: r40s against r18t at 1024 x 1024: 0.269 x as fast, on the device's clock -- section 108",
+    "page: r40s against r18t at 1920 x 1080: 0.270 x as fast, on the device's clock -- section 108",
+    "page: r40s against r18u at 64 x 64: 0.579 x as fast, on the device's clock -- section 108",
+    "page: r40s against r18u at 128 x 128: 0.371 x as fast, on the device's clock -- section 108",
+    "page: r40s against r18u at 256 x 256: 0.423 x as fast, on the device's clock -- section 108",
+    "page: r40s against r18u at 512 x 512: 0.455 x as fast, on the device's clock -- section 108",
+    "page: r40s against r18u at 1024 x 1024: 0.459 x as fast, on the device's clock -- section 108",
+    "page: r40s against r18u at 1920 x 1080: 0.446 x as fast, on the device's clock -- section 108",
+    "page: r41h stands aside -- the adapter has no shader-f16 feature, which this set's kernel needs (section 109)",
+    "page: r57p against r18t at 64 x 64: 1.103 x as fast, on the device's clock -- section 129",
+    "page: r57p against r18t at 128 x 128: 1.016 x as fast, on the device's clock -- section 129",
+    "page: r57p against r18t at 256 x 256: 0.940 x as fast, on the device's clock -- section 129",
+    "page: r57p against r18t at 512 x 512: 0.970 x as fast, on the device's clock -- section 129",
+    "page: r57p against r18t at 1024 x 1024: 0.945 x as fast, on the device's clock -- section 129",
+    "page: r57p against r18t at 1920 x 1080: 0.964 x as fast, on the device's clock -- section 129",
+    "page: r57p against r18u at 64 x 64: 1.068 x as fast, on the device's clock -- section 129",
+    "page: r57p against r18u at 128 x 128: 1.299 x as fast, on the device's clock -- section 129",
+    "page: r57p against r18u at 256 x 256: 1.472 x as fast, on the device's clock -- section 129",
+    "page: r57p against r18u at 512 x 512: 1.585 x as fast, on the device's clock -- section 129",
+    "page: r57p against r18u at 1024 x 1024: 1.616 x as fast, on the device's clock -- section 129",
+    "page: r57p against r18u at 1920 x 1080: 1.592 x as fast, on the device's clock -- section 129",
+    "page: this adapter's key for section 61's table: Windows/nvidia/pascal",
+    "page: w16 against the shipped network on r15 at 64 x 64: 3.124 x as fast, on the device's clock -- section 120",
+    "page: w16 against the shipped network on r15 at 128 x 128: 2.021 x as fast, on the device's clock -- section 120",
+    "page: w16 against the shipped network on r15 at 256 x 256: 1.902 x as fast, on the device's clock -- section 120",
+    "page: w16 against the shipped network on r15 at 512 x 512: 2.403 x as fast, on the device's clock -- section 120",
+    "page: w16 against the shipped network on r15 at 1024 x 1024: 2.610 x as fast, on the device's clock -- section 120",
+    "page: w16 against the shipped network on r15 at 1920 x 1080: 2.653 x as fast, on the device's clock -- section 120",
+    "page: w16 against the shipped network on r18t at 64 x 64: 3.350 x as fast, on the device's clock -- section 120",
+    "page: w16 against the shipped network on r18t at 128 x 128: 2.142 x as fast, on the device's clock -- section 120",
+    "page: w16 against the shipped network on r18t at 256 x 256: 2.012 x as fast, on the device's clock -- section 120",
+    "page: w16 against the shipped network on r18t at 512 x 512: 2.763 x as fast, on the device's clock -- section 120",
+    "page: w16 against the shipped network on r18t at 1024 x 1024: 2.891 x as fast, on the device's clock -- section 120",
+    "page: w16 against the shipped network on r18t at 1920 x 1080: 2.968 x as fast, on the device's clock -- section 120",
+    "page: w16 against the shipped network on r18u at 64 x 64: 3.994 x as fast, on the device's clock -- section 120",
+    "page: w16 against the shipped network on r18u at 128 x 128: 3.108 x as fast, on the device's clock -- section 120",
+    "page: w16 against the shipped network on r18u at 256 x 256: 2.766 x as fast, on the device's clock -- section 120",
+    "page: w16 against the shipped network on r18u at 512 x 512: 4.124 x as fast, on the device's clock -- section 120",
+    "page: w16 against the shipped network on r18u at 1024 x 1024: 4.848 x as fast, on the device's clock -- section 120",
+    "page: w16 against the shipped network on r18u at 1920 x 1080: 4.734 x as fast, on the device's clock -- section 120"
+   ],
+   "skips": [
+    "SKIP  native r41h: the adapter has no shader-f16 feature, which this set's kernel needs (section 109)",
+    "SKIP  native FXC ladder: retired by section 87 (v4871) -- the denoiser's FXC paths fed condition 4 alone, which section 75 dropped; SWEK_DENOISE_FXC=all runs it",
+    "SKIP  page r41h: the adapter has no shader-f16 feature, which this set's kernel needs (section 109)"
+   ]
+  },
+  {
+   "gate": "render/denoiseUpscaleGPU-selfcheck.mjs",
+   "category": "exact",
+   "ok": true,
+   "ms": 33628,
+   "exit": {
+    "status": 0,
+    "signal": null
+   },
+   "stderrTail": [],
+   "adapters": [
+    "nvidia pascal"
+   ],
+   "software": false,
+   "fails": [],
+   "measured": [
+    "adapter: nvidia / pascal; backend webgpu",
+    "section 93: nvidia / pascal, kernels r18t; the network at 1920 x 1080 72.928 ms (device), at 960 x 540 17.411 ms (device); today's page (network and mask) 89.982 ms (device); the half-size chain 65.335 ms (device + wall); ratio 1.377 x",
+    "section 93: the chain's steps -- covHalf 4.254 ms (device); covFull 17.054 ms (device); fill 25.600 ms (wall); rest 1.016 ms (device); whole 47.700 ms (wall); 87 of 96 rings filled",
+    "section 97: the history's passes -- hits 0.363 ms (device); shift 0.286 ms (device); accum 0.894 ms (device); final 0.344 ms (device); the half-size chain with its history 67.222 ms (device + wall); ratio 1.339 x",
+    "section 99: the fills -- fill 25.600 ms (wall); fillList 25.200 ms (wall); whole 47.700 ms (wall); wholeList 48.100 ms (wall); the list fill 25765 listed, 87 of 96 rings, 0 left; the half-size chain with the list fill 64.935 ms, ratio 1.386 x; with its history 66.822 ms, ratio 1.347 x",
+    "section 103: the default fill listedTile, coverage bound, rest fused, accumulation tiled; the half-size chain 35.673 ms, ratio 2.079 x; with its history 37.475 ms, ratio 1.979 x",
+    "section 104: the tile fill -- fillList 25.200 ms (wall); fillTile 16.600 ms (wall); wholeList 48.100 ms (wall); wholeTile 38.700 ms (wall); the tile fill 12 passes, 87 of 96 rings, 0 left; the half-size chain with the tile fill 56.335 ms, ratio 1.597 x; with its history 58.222 ms, ratio 1.546 x",
+    "section 106: the listed tile fill -- fillList 25.200 ms (wall); fillLTile 16.200 ms (wall); wholeList 48.100 ms (wall); wholeLTile 38.600 ms (wall); the listed tile fill 123 of 2040 tiles, 12 passes, 87 of 96 rings, 0 left; the half-size chain with the listed tile fill 55.935 ms, ratio 1.609 x; with its history 57.822 ms, ratio 1.556 x",
+    "section 107: the bounded coverage -- covHalf 4.254 ms (device); covHalfB 0.347 ms (device); covFull 17.054 ms (device); covFullB 1.226 ms (device); traced 27023 of 518400 and 106709 of 2073600; bit for bit at both sizes; today's page with it 74.154 ms; the half-size chain with it 35.673 ms, ratio 2.079 x; with its history 37.475 ms, ratio 1.979 x",
+    "section 110: rest's passes -- rest 1.016 ms (device); restToT 0.083 ms (device); restEasu 0.592 ms (device); restComp 0.341 ms (device); restToTFree 0.068 ms (device)",
+    "section 115: EASU in quads -- restEasu 0.592 ms (device); restComp 0.341 ms (device); restEasuQ 0.281 ms (device); restEasuComp 0.408 ms (device)",
+    "section 117: the accumulation tiled -- accum 0.894 ms (device); accumT 0.809 ms (device)",
+    "section 125: the fused rest -- rest 1.016 ms (device); restF 0.489 ms (device); the half-size chain fused 35.673 ms, in three passes 36.200 ms; with its history fused 37.475 ms, in three passes 38.087 ms",
+    "section 126: the accumulation by default -- accum 0.894 ms (device); accumT 0.809 ms (device); the half-size chain with its history tiled 37.475 ms, untiled 37.560 ms",
+    "section 94, intel-gen9: the network at 960 x 540 307.6 / 347.1 ms; the chain's own steps (both coverages, the fill, the rest) 727.7 / 820.5 ms -- reported, deciding nothing",
+    "section 94, gtx1080: the network at 960 x 540 18.4 / 18.4 ms; the chain's own steps (both coverages, the fill, the rest) 45.7 / 42.2 ms -- reported, deciding nothing",
+    "section 98, intel-gen9: the history's four passes 86.13 / 83.07 ms, the accumulation 44.78 / 43.61 of it; the chain without them 1.452 / 1.427 x -- reported, deciding nothing",
+    "section 98, gtx1080: the history's four passes 1.92 / 1.88 ms, the accumulation 0.90 / 0.89 of it; the chain without them 1.447 / 1.528 x -- reported, deciding nothing",
+    "section 100, gtx1080: the timing gate died in 3 of 5 realGpuRun runs (b at 17.7 s, b2 at 6.5 s, extra-b at 40.4 s), each with no FAIL line, and once more run alone -- reported, deciding nothing",
+    "section 102, gtx1080: r27w at 1920 x 1080 -- native 15100.641 / 249.7 ms a pass, page 251.9 / 10247.4 ms (about 250 ms is its usual reading) -- reported, deciding nothing",
+    "section 105: the half-size chain against today's page with the tile fill -- 1080 1.601 / 1.571 x, with the list fill 1.454 / 1.417 x; Intel 1.935 / 1.978 x, with the list fill 2.066 / 2.113 x -- reported, deciding nothing",
+    "section 111: the half-size chain against today's page with the bounded coverage -- 1080 1.454 / 1.641 x, Intel 3.015 / 3.496 x (each against today's page with the bounded mask too) -- reported, deciding nothing"
+   ],
+   "skips": []
+  },
+  {
+   "gate": "render/flowReconcileTsl-selfcheck.mjs",
+   "category": "exact",
+   "ok": true,
+   "ms": 23715,
+   "exit": {
+    "status": 0,
+    "signal": null
+   },
+   "stderrTail": [],
+   "adapters": [
+    "nvidia pascal"
+   ],
+   "software": false,
+   "fails": [],
+   "measured": [
+    "[webgpu] kept / beaten / flow alone, by case: geometry 36/4/0; shader 0/40/0; both 0/40/0; flat 40/0/0; marginZero 35/5/0; marginWide 37/3/0; nearer 0/40/0; farther 0/40/0; jittered 36/4/0; invalid 35/4/1",
+    "[webgl2] kept / beaten / flow alone, by case: geometry 36/4/0; shader 0/40/0; both 0/40/0; flat 40/0/0; marginZero 35/5/0; marginWide 37/3/0; nearer 0/40/0; farther 0/40/0; jittered 36/4/0; invalid 35/4/1",
+    "[webgpu] kept / beaten / flow alone, by case: geometry 2160/0/0; shader 597/1563/0; shaderStill 508/1652/0; geometryAll 2156/4/0; shaderLow 493/1667/0; bothLow 615/1545/0; jitteredLow 1891/269/0; flat 2160/0/0; invalid 2029/4/127; bothScreen 574/1586/0; bothWorld 458/1702/0; bothHalf 550/1610/0",
+    "[webgl2] kept / beaten / flow alone, by case: geometry 2160/0/0; shader 597/1563/0; shaderStill 508/1652/0; geometryAll 2156/4/0; shaderLow 493/1667/0; bothLow 615/1545/0; jitteredLow 1891/269/0; flat 2160/0/0; invalid 2029/4/127; bothScreen 574/1586/0; bothWorld 458/1702/0; bothHalf 550/1610/0"
+   ],
+   "skips": []
+  },
+  {
+   "gate": "render/frameInterpTsl-selfcheck.mjs",
+   "category": "exact",
+   "ok": true,
+   "ms": 16945,
+   "exit": {
+    "status": 0,
+    "signal": null
+   },
+   "stderrTail": [],
+   "adapters": [
+    "nvidia pascal"
+   ],
+   "software": false,
+   "fails": [],
+   "measured": [
+    "[webgpu] flat             CPU  190 holes; mask differs 0, vector 0, depth 0; worst |frame| 1.19e-7",
+    "[webgpu] checker          CPU  190 holes; mask differs 0, vector 0, depth 0; worst |frame| 1.19e-7",
+    "[webgpu] signed           CPU  190 holes; mask differs 0, vector 0, depth 0; worst |frame| 1.19e-7",
+    "[webgpu] prevIndexed      CPU  190 holes; mask differs 0, vector 0, depth 0; worst |frame| 1.19e-7",
+    "[webgpu] t0               CPU  314 holes; mask differs 0, vector 0, depth 0; worst |frame| 0.00e+0",
+    "[webgpu] t1               CPU    0 holes; mask differs 0, vector 0, depth 0; worst |frame| 0.00e+0",
+    "[webgpu] contested        CPU  318 holes; mask differs 0, vector 0, depth 0; worst |frame| 1.19e-7",
+    "[webgpu] contestedFlat    CPU  318 holes; mask differs 0, vector 0, depth 0; worst |frame| 1.19e-7",
+    "[webgpu] contestedQuarter CPU  410 holes; mask differs 0, vector 0, depth 0; worst |frame| 2.38e-7",
+    "[webgpu] fartherWins      CPU  318 holes; mask differs 0, vector 0, depth 0; worst |frame| 1.19e-7",
+    "[webgpu] declined         CPU  358 holes; mask differs 0, vector 0, depth 0; worst |frame| 1.19e-7",
+    "[webgpu] zeroMotion       CPU    0 holes; mask differs 0, vector 0, depth 0; worst |frame| 0.00e+0",
+    "[webgpu] tieHalf          CPU  127 holes; mask differs 0, vector 0, depth 0; worst |frame| 5.96e-8",
+    "[webgpu] ragged           CPU  119 holes; mask differs 0, vector 0, depth 0; worst |frame| 2.68e-7",
+    "[webgpu] perPixel         CPU  350 holes; mask differs 0, vector 0, depth 0; worst |frame| 1.19e-7",
+    "[webgpu] arcChord      CPU  190 holes; mask differs 0, cur offset 0, prev offset 0; worst |frame| 1.19e-7",
+    "[webgpu] arcCurve      CPU  457 holes; mask differs 0, cur offset 0, prev offset 0; worst |frame| 1.79e-7",
+    "[webgpu] arcContested  CPU  544 holes; mask differs 0, cur offset 0, prev offset 0; worst |frame| 1.49e-7",
+    "[webgpu] arcPerPixel   CPU  382 holes; mask differs 0, cur offset 0, prev offset 0; worst |frame| 1.19e-7",
+    "[webgpu] arcDeclined   CPU  626 holes; mask differs 0, cur offset 0, prev offset 0; worst |frame| 1.79e-7",
+    "[webgpu] arcFilled     CPU    0 holes, 544 filled; mask differs 0, cur offset 0, prev offset 0; worst |frame| 1.49e-7",
+    "[webgl2] flat             CPU  190 holes; mask differs 0, vector 0, depth 0; worst |frame| 1.19e-7",
+    "[webgl2] checker          CPU  190 holes; mask differs 0, vector 0, depth 0; worst |frame| 1.19e-7",
+    "[webgl2] signed           CPU  190 holes; mask differs 0, vector 0, depth 0; worst |frame| 1.19e-7",
+    "[webgl2] prevIndexed      CPU  190 holes; mask differs 0, vector 0, depth 0; worst |frame| 1.19e-7",
+    "[webgl2] t0               CPU  314 holes; mask differs 0, vector 0, depth 0; worst |frame| 0.00e+0",
+    "[webgl2] t1               CPU    0 holes; mask differs 0, vector 0, depth 0; worst |frame| 0.00e+0",
+    "[webgl2] contested        CPU  318 holes; mask differs 0, vector 0, depth 0; worst |frame| 1.19e-7",
+    "[webgl2] contestedFlat    CPU  318 holes; mask differs 0, vector 0, depth 0; worst |frame| 1.19e-7",
+    "[webgl2] contestedQuarter CPU  410 holes; mask differs 0, vector 0, depth 0; worst |frame| 2.38e-7",
+    "[webgl2] fartherWins      CPU  318 holes; mask differs 0, vector 0, depth 0; worst |frame| 1.19e-7",
+    "[webgl2] declined         CPU  358 holes; mask differs 0, vector 0, depth 0; worst |frame| 1.19e-7",
+    "[webgl2] zeroMotion       CPU    0 holes; mask differs 0, vector 0, depth 0; worst |frame| 0.00e+0",
+    "[webgl2] tieHalf          CPU  127 holes; mask differs 0, vector 0, depth 0; worst |frame| 5.96e-8",
+    "[webgl2] ragged           CPU  119 holes; mask differs 0, vector 0, depth 0; worst |frame| 2.98e-7",
+    "[webgl2] perPixel         CPU  350 holes; mask differs 0, vector 0, depth 0; worst |frame| 1.19e-7",
+    "[webgl2] arcChord      CPU  190 holes; mask differs 0, cur offset 0, prev offset 0; worst |frame| 1.19e-7",
+    "[webgl2] arcCurve      CPU  457 holes; mask differs 0, cur offset 0, prev offset 0; worst |frame| 1.79e-7",
+    "[webgl2] arcContested  CPU  544 holes; mask differs 0, cur offset 0, prev offset 0; worst |frame| 1.49e-7",
+    "[webgl2] arcPerPixel   CPU  382 holes; mask differs 0, cur offset 0, prev offset 0; worst |frame| 1.19e-7",
+    "[webgl2] arcDeclined   CPU  626 holes; mask differs 0, cur offset 0, prev offset 0; worst |frame| 1.79e-7",
+    "[webgl2] arcFilled     CPU    0 holes, 544 filled; mask differs 0, cur offset 0, prev offset 0; worst |frame| 1.49e-7"
+   ],
+   "skips": []
+  },
+  {
+   "gate": "render/holeFillTsl-selfcheck.mjs",
+   "category": "exact",
+   "ok": true,
+   "ms": 20055,
+   "exit": {
+    "status": 0,
+    "signal": null
+   },
+   "stderrTail": [],
+   "adapters": [
+    "nvidia pascal"
+   ],
+   "software": false,
+   "fails": [],
+   "measured": [
+    "[webgpu] derived     filled  192/192, abstained 0/0; side differs 0, hole 0, vector 0, depth 0",
+    "[webgpu] depth       filled  192/192, abstained 0/0; side differs 0, hole 0, vector 0, depth 0",
+    "[webgpu] blend       filled  192/192, abstained 0/0; side differs 0, hole 0, vector 0, depth 0",
+    "[webgpu] prevSide    filled  192/192, abstained 0/0; side differs 0, hole 0, vector 0, depth 0",
+    "[webgpu] curSide     filled  192/192, abstained 0/0; side differs 0, hole 0, vector 0, depth 0",
+    "[webgpu] nearer      filled  192/192, abstained 0/0; side differs 0, hole 0, vector 0, depth 0",
+    "[webgpu] radius2     filled  192/192, abstained 96/96; side differs 0, hole 0, vector 0, depth 0",
+    "[webgpu] reversed    filled  192/192, abstained 192/192; side differs 0, hole 0, vector 0, depth 0",
+    "[webgpu] unreachable filled  288/288, abstained 144/144; side differs 0, hole 0, vector 0, depth 0",
+    "[webgpu] depthTie    filled  192/192, abstained 96/96; side differs 0, hole 0, vector 0, depth 0",
+    "[webgpu] reachStrip  filled  672/672, abstained 288/288; side differs 0, hole 0, vector 0, depth 0",
+    "[webgpu] reachDepth  filled  672/672, abstained 288/288; side differs 0, hole 0, vector 0, depth 0",
+    "[webgpu] reachFar    filled 1536/1536, abstained 768/768; side differs 0, hole 0, vector 0, depth 0",
+    "[webgpu] wrapped     filled    1/1, abstained 0/0; side differs 0, hole 0, vector 0, depth 0",
+    "[webgl2] derived     filled  192/192, abstained 0/0; side differs 0, hole 0, vector 0, depth 0",
+    "[webgl2] depth       filled  192/192, abstained 0/0; side differs 0, hole 0, vector 0, depth 0",
+    "[webgl2] blend       filled  192/192, abstained 0/0; side differs 0, hole 0, vector 0, depth 0",
+    "[webgl2] prevSide    filled  192/192, abstained 0/0; side differs 0, hole 0, vector 0, depth 0",
+    "[webgl2] curSide     filled  192/192, abstained 0/0; side differs 0, hole 0, vector 0, depth 0",
+    "[webgl2] nearer      filled  192/192, abstained 0/0; side differs 0, hole 0, vector 0, depth 0",
+    "[webgl2] radius2     filled  192/192, abstained 96/96; side differs 0, hole 0, vector 0, depth 0",
+    "[webgl2] reversed    filled  192/192, abstained 192/192; side differs 0, hole 0, vector 0, depth 0",
+    "[webgl2] unreachable filled  288/288, abstained 144/144; side differs 0, hole 0, vector 0, depth 0",
+    "[webgl2] depthTie    filled  192/192, abstained 96/96; side differs 0, hole 0, vector 0, depth 0",
+    "[webgl2] reachStrip  filled  672/672, abstained 288/288; side differs 0, hole 0, vector 0, depth 0",
+    "[webgl2] reachDepth  filled  672/672, abstained 288/288; side differs 0, hole 0, vector 0, depth 0",
+    "[webgl2] reachFar    filled 1536/1536, abstained 768/768; side differs 0, hole 0, vector 0, depth 0",
+    "[webgl2] wrapped     filled    1/1, abstained 0/0; side differs 0, hole 0, vector 0, depth 0"
+   ],
+   "skips": []
+  },
+  {
+   "gate": "render/opticalFlowTsl-selfcheck.mjs",
+   "category": "exact",
+   "ok": true,
+   "ms": 78784,
+   "exit": {
+    "status": 0,
+    "signal": null
+   },
+   "stderrTail": [],
+   "adapters": [
+    "nvidia pascal"
+   ],
+   "software": false,
+   "fails": [],
+   "measured": [
+    "[webgpu] metamer (3, 0): 56 of 64 vectors differ, every one a tie in exact arithmetic -- not graded",
+    "[webgpu] 1928 blocks over 31 cases; worst |flow| 1.53e-5, worst |confidence| 1.18e-6",
+    "[webgl2] metamer (3, 0): 0 of 64 vectors differ, every one a tie in exact arithmetic -- not graded",
+    "[webgl2] 1928 blocks over 31 cases; worst |flow| 1.53e-5, worst |confidence| 1.18e-6"
+   ],
+   "skips": []
+  },
+  {
+   "gate": "render/reactiveTsl-selfcheck.mjs",
+   "category": "exact",
+   "ok": true,
+   "ms": 4913,
+   "exit": {
+    "status": 0,
+    "signal": null
+   },
+   "stderrTail": [],
+   "adapters": [
+    "nvidia pascal"
+   ],
+   "software": false,
+   "fails": [],
+   "measured": [],
+   "skips": []
+  },
+  {
+   "gate": "render/snowGpu-selfcheck.mjs",
+   "category": "exact",
+   "ok": true,
+   "ms": 14423,
+   "exit": {
+    "status": 0,
+    "signal": null
+   },
+   "stderrTail": [],
+   "adapters": [],
+   "software": null,
+   "fails": [],
+   "measured": [
+    "THE EDGE: at a 2 degree sun flat ground is shadowed over 19.5% -- acne. The receiver-plane gradient is clamped to a slope of 6 as upstream clamps it, and a sun that low asks for more; snow-gpu.html's sun slider starts at 3 degrees for that reason."
+   ],
+   "skips": []
+  },
+  {
+   "gate": "render/snowGpuField-selfcheck.mjs",
+   "category": "exact",
+   "ok": true,
+   "ms": 13262,
+   "exit": {
+    "status": 0,
+    "signal": null
+   },
+   "stderrTail": [],
+   "adapters": [],
+   "software": null,
+   "fails": [],
+   "measured": [],
+   "skips": []
+  },
+  {
+   "gate": "render/snowGpuLive-selfcheck.mjs",
+   "category": "timing",
+   "ok": false,
+   "ms": 11063,
+   "exit": {
+    "status": 1,
+    "signal": null
+   },
+   "stderrTail": [],
+   "adapters": [],
+   "software": null,
+   "fails": [
+    "FAIL  !! the live loop (requestAnimationFrame, presenting to the canvas) ran: 7 frames in nine seconds, 3 footprints, 0 GPU errors"
+   ],
+   "measured": [
+    "reading snowGpu: live loop 7 frames in 9 s (0.8 fps) at 320x180, 3 footprints, adapter google"
+   ],
+   "skips": []
+  },
+  {
+   "gate": "render/snowGpuLookA-selfcheck.mjs",
+   "category": "exact",
+   "ok": true,
+   "ms": 15964,
+   "exit": {
+    "status": 0,
+    "signal": null
+   },
+   "stderrTail": [],
+   "adapters": [],
+   "software": null,
+   "fails": [],
+   "measured": [],
+   "skips": []
+  },
+  {
+   "gate": "render/snowGpuLookB-selfcheck.mjs",
+   "category": "exact",
+   "ok": true,
+   "ms": 14562,
+   "exit": {
+    "status": 0,
+    "signal": null
+   },
+   "stderrTail": [],
+   "adapters": [],
+   "software": null,
+   "fails": [],
+   "measured": [],
+   "skips": []
+  },
+  {
+   "gate": "render/snowGpuTaa-selfcheck.mjs",
+   "category": "exact",
+   "ok": true,
+   "ms": 15211,
+   "exit": {
+    "status": 0,
+    "signal": null
+   },
+   "stderrTail": [],
+   "adapters": [],
+   "software": null,
+   "fails": [],
+   "measured": [],
+   "skips": []
+  },
+  {
+   "gate": "render/temporalClipTsl-selfcheck.mjs",
+   "category": "exact",
+   "ok": true,
+   "ms": 9872,
+   "exit": {
+    "status": 0,
+    "signal": null
+   },
+   "stderrTail": [],
+   "adapters": [
+    "nvidia pascal"
+   ],
+   "software": false,
+   "fails": [],
+   "measured": [],
+   "skips": []
+  },
+  {
+   "gate": "render/temporalLockSumsTsl-selfcheck.mjs",
+   "category": "quality",
+   "ok": true,
+   "ms": 21403,
+   "exit": {
+    "status": 0,
+    "signal": null
+   },
+   "stderrTail": [],
+   "adapters": [
+    "nvidia pascal"
+   ],
+   "software": false,
+   "fails": [],
+   "measured": [
+    "and what it is worth there: 19.947 dB against the supersampled last frame, 19.949 without it -- neutral, as measured over six cases when the default was made"
+   ],
+   "skips": []
+  },
+  {
+   "gate": "render/temporalLockTsl-selfcheck.mjs",
+   "category": "exact",
+   "ok": true,
+   "ms": 19506,
+   "exit": {
+    "status": 0,
+    "signal": null
+   },
+   "stderrTail": [],
+   "adapters": [
+    "nvidia pascal"
+   ],
+   "software": false,
+   "fails": [],
+   "measured": [],
+   "skips": []
+  },
+  {
+   "gate": "render/temporalTsl-selfcheck.mjs",
+   "category": "quality",
+   "ok": true,
+   "ms": 22133,
+   "exit": {
+    "status": 0,
+    "signal": null
+   },
+   "stderrTail": [],
+   "adapters": [
+    "nvidia pascal"
+   ],
+   "software": false,
+   "fails": [],
+   "measured": [],
+   "skips": []
+  },
+  {
+   "gate": "render/temporalTslCompute-selfcheck.mjs",
+   "category": "exact",
+   "ok": true,
+   "ms": 6604,
+   "exit": {
+    "status": 0,
+    "signal": null
+   },
+   "stderrTail": [],
+   "adapters": [
+    "nvidia pascal"
+   ],
+   "software": false,
+   "fails": [],
+   "measured": [],
+   "skips": []
+  },
+  {
+   "gate": "render/temporalTslCoverage-selfcheck.mjs",
+   "category": "exact",
+   "ok": true,
+   "ms": 3936,
+   "exit": {
+    "status": 0,
+    "signal": null
+   },
+   "stderrTail": [],
+   "adapters": [
+    "nvidia pascal"
+   ],
+   "software": false,
+   "fails": [],
+   "measured": [],
+   "skips": []
+  },
+  {
+   "gate": "render/temporalTslMany-selfcheck.mjs",
+   "category": "timing",
+   "ok": true,
+   "ms": 3982,
+   "exit": {
+    "status": 0,
+    "signal": null
+   },
+   "stderrTail": [],
+   "adapters": [
+    "nvidia pascal"
+   ],
+   "software": false,
+   "fails": [],
+   "measured": [],
+   "skips": []
+  },
+  {
+   "gate": "render/temporalTslMeshes-selfcheck.mjs",
+   "category": "exact",
+   "ok": true,
+   "ms": 16603,
+   "exit": {
+    "status": 0,
+    "signal": null
+   },
+   "stderrTail": [],
+   "adapters": [
+    "nvidia pascal"
+   ],
+   "software": false,
+   "fails": [],
+   "measured": [],
+   "skips": []
+  },
+  {
+   "gate": "render/temporalTslNodes-selfcheck.mjs",
+   "category": "exact",
+   "ok": true,
+   "ms": 4983,
+   "exit": {
+    "status": 0,
+    "signal": null
+   },
+   "stderrTail": [],
+   "adapters": [
+    "nvidia pascal"
+   ],
+   "software": false,
+   "fails": [],
+   "measured": [],
+   "skips": []
+  },
+  {
+   "gate": "render/temporalTslZoo-selfcheck.mjs",
+   "category": "exact",
+   "ok": true,
+   "ms": 6114,
+   "exit": {
+    "status": 0,
+    "signal": null
+   },
+   "stderrTail": [],
+   "adapters": [
+    "nvidia pascal"
+   ],
+   "software": false,
+   "fails": [],
+   "measured": [],
+   "skips": []
+  },
+  {
+   "gate": "render/translucentLayer-selfcheck.mjs",
+   "category": "quality",
+   "ok": true,
+   "ms": 3663,
+   "exit": {
+    "status": 0,
+    "signal": null
+   },
+   "stderrTail": [],
+   "adapters": [
+    "nvidia pascal"
+   ],
+   "software": false,
+   "fails": [],
+   "measured": [],
+   "skips": []
+  }
+ ],
+ "adapters": [
+  {
+   "name": "nvidia pascal",
+   "software": false,
+   "launchArgs": [
+    "--enable-unsafe-webgpu",
+    "--use-angle=d3d11"
+   ],
+   "native": false,
+   "caps": {
+    "features": [
+     "atomic-vec2u-min-max",
+     "bgra8unorm-storage",
+     "chromium-experimental-multi-draw-indirect",
+     "chromium-experimental-sampling-resource-table",
+     "chromium-experimental-timestamp-query-inside-passes",
+     "clip-distances",
+     "core-features-and-limits",
+     "depth-clip-control",
+     "depth32float-stencil8",
+     "dual-source-blending",
+     "float32-blendable",
+     "float32-filterable",
+     "indirect-first-instance",
+     "primitive-index",
+     "rg11b10ufloat-renderable",
+     "subgroup-size-control",
+     "subgroups",
+     "texture-component-swizzle",
+     "texture-compression-bc",
+     "texture-compression-bc-sliced-3d",
+     "texture-compression-unaligned",
+     "texture-formats-tier1",
+     "texture-formats-tier2",
+     "timestamp-query"
+    ],
+    "limits": {
+     "maxComputeWorkgroupStorageSize": 32768,
+     "maxComputeInvocationsPerWorkgroup": 1024,
+     "maxComputeWorkgroupSizeX": 1024,
+     "maxStorageBufferBindingSize": 2147483644,
+     "maxUniformBufferBindingSize": 65536,
+     "maxBufferSize": 2147483648,
+     "maxStorageBuffersPerShaderStage": 16
+    },
+    "subgroups": {
+     "min": 32,
+     "max": 32
+    }
+   }
+  },
+  {
+   "name": "nvidia pascal D3D12 driver version 32.0.15.8180",
+   "software": false,
+   "launchArgs": [
+    "node-webgpu (native)"
+   ],
+   "native": true,
+   "caps": {
+    "features": [
+     "atomic-vec2u-min-max",
+     "bgra8unorm-storage",
+     "clip-distances",
+     "core-features-and-limits",
+     "depth-clip-control",
+     "depth32float-stencil8",
+     "dual-source-blending",
+     "float32-blendable",
+     "float32-filterable",
+     "indirect-first-instance",
+     "primitive-index",
+     "rg11b10ufloat-renderable",
+     "subgroup-size-control",
+     "subgroups",
+     "texture-component-swizzle",
+     "texture-compression-bc",
+     "texture-compression-bc-sliced-3d",
+     "texture-compression-unaligned",
+     "texture-formats-tier1",
+     "texture-formats-tier2",
+     "timestamp-query"
+    ],
+    "limits": {
+     "maxComputeWorkgroupStorageSize": 32768,
+     "maxComputeInvocationsPerWorkgroup": 1024,
+     "maxComputeWorkgroupSizeX": 1024,
+     "maxStorageBufferBindingSize": 2147483648,
+     "maxUniformBufferBindingSize": 65536,
+     "maxBufferSize": 2147483648,
+     "maxStorageBuffersPerShaderStage": 16
+    },
+    "subgroups": {
+     "min": 32,
+     "max": 32
+    }
+   }
+  }
+ ],
+ "verdict": "a real-hardware run on nvidia pascal; nvidia pascal D3D12 driver version 32.0.15.8180 (native)",
+ "summary": "exact 20/20, quality 25/26, timing 9/11",
+ "nodeWebgpu": {
+  "version": "0.6.2",
+  "from": "C:\\Users\\howdy\\AppData\\Roaming\\npm\\node_modules\\webgpu\\index.js",
+  "dir": "C:\\Users\\howdy\\AppData\\Roaming\\npm\\node_modules\\webgpu",
+  "dxcBeside": true,
+  "compiler": "DXC",
+  "chosenBy": "the resolver's list"
+ }
+}
