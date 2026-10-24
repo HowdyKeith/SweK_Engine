@@ -94,3 +94,25 @@ Parked together with stall, afterburner and the other characteristics the jet mo
 
 ground alert (what real jets give the pilot) -- stall -- afterburners -- landing and take-offs ("if possible") -- "the other characteristics" the jet model leaves out. What the jet model already has of each (the trainer's flight model has a stall, the
 jet's engine has a spool lag and Mach drag) is for that round to check from the code, not from this list.
+
+## Second try (search seeds 12100..12103, as written down above): NO CHAMPION again, nothing written, the audit sets still NOT read
+
+Run alone on four cores the four searches took 1,912 to 2,928 s. Same shipped fighter as before (held-out 0.0133; 4 of 200 pool fights lost against each opponent, limit 8; classic pool 0.8417).
+
+| run | seed | train | held-out | league pool, lost vs autopilot / self / other | classic pool | also |
+|---|---|---|---|---|---|---|
+| 1 | 12100 | 0.2585 | 0.0849 | 25 / 24 / 24 | 0.8655 | 7 classic-pool fights lost that the autopilot does not lose |
+| 2 | 12101 | 0.3147 | 0.3145 | 17 / 17 / 17 | 0.5742 | classic pool 0.28 below the shipped fighter's; 6 fights lost |
+| 3 | 12102 | 0.4183 | 0.2302 | 16 / 16 / 16 | 0.9115 | 5 classic-pool fights lost |
+| 4 | 12103 | 0.3846 | 0.2149 | 9 / 9 / 9 | 0.8522 | 3 classic-pool fights lost (one over the league limit of 8, and the classic rule allows none) |
+
+A champion, had there been one, would have been the best held-out of the eligible among eight searches. There is none.
+
+### What the probes say (throwaway scripts, NOT committed, NOT gated: unchecked until a gated tool reproduces them; flown on the league pool and the training duels with the three league members, both seats)
+* **Every pool loss of all four retry searches is a COLLISION; none is to the ground** (hand twin: 0 ground, 4 collisions of 200 against the autopilot; seeds 12100/12101/12102/12103: 25/17/16/9 collisions, 0 ground). The first batch's seed 12003 was the same (22 collisions, 0 ground); its seed 12002 alone had ground losses (26). A ground alert would not have changed this failure.
+* **The training set shows the search no failure at all, and the pool shows plenty**: lost fights on the 72 training fights, 0 for the hand twin and for every one of the four searches; on the 600 pool fights, 12 (2.0%) for the hand twin and 73 (12.2%), 51 (8.5%), 48 (8.0%) and 27 (4.5%) for seeds 12100..12103.
+* **The searched pilots fly the training duels differently from the pool duels**: median closest approach to the opponent on the training duels 54, 115, 77 and 161 m (hand twin 12 m); on the pool 14, 56, 55 and 29 m (hand twin 13 m). Read as: the weights found something that works in twelve geometries and does not transfer.
+* **A near-miss penalty (closest approach under X metres) is REJECTED as a remedy**: the hand twin itself passes within 15 m in 100% of the training fights and 79% of the pool's, so such a penalty would punish the baseline it is meant to protect.
+
+### Recipe change (decided in writing here, BEFORE anything is built or run; the rules -- eligibility(), qualifies(), the pool, the held-out set, the audits -- do not change)
+The training objective needs to see the scenarios the pool contains. Candidate: a much larger set of training duels on FRESH seeds (the next free block is 16100 and up; jetLeagueSets.mjs), drawn a minibatch at a time (the parent and the child scored on the same twelve duels per iteration, the minibatch changing every iteration), so that 400 iterations meet ~100 different scenarios at about twice the cost of now instead of eight times; the prune step on a fixed fresh subset. The retrain would use new search seeds and be counted again in the note. Not decided: the minibatch size and the pool of duels (the two numbers the first run would have to guess); the GPU Brain's verdict (running) is read first, since the same change would serve it.
