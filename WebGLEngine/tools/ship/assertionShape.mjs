@@ -959,8 +959,9 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // And two more, brain/pilotSubCircuit-selfcheck.mjs (the circuit-only submarine pilot and its controls) and tools/ship/trainSubCircuits-selfcheck.mjs (the family trainer and the pre-registered verdict), each defining ok(n, c, d) once and naming first: gates 2126 -> 2128, usesOk 2105 -> 2107, definesOk 2097 -> 2099, nameFirst 1995 -> 1997 (read off the code).
     // And one more, tools/subDropout-selfcheck.mjs (the compass dropout), defining ok(n, c, d) once and naming first: gates 2128 -> 2129, usesOk 2107 -> 2108, definesOk 2099 -> 2100, nameFirst 1997 -> 1998 (read off the code).
     // And one more, tools/flyCx-selfcheck.mjs (the fly heading loop from the hemibrain export), defining ok(n, c, d) once and naming first: gates 2129 -> 2130, usesOk 2108 -> 2109, definesOk 2100 -> 2101, nameFirst 1998 -> 1999 (read off the code).
-    gates: 2130, usesOk: 2109, definesOk: 2101, importsOk: 0,
-    distinctDefinitions: 45, nameFirst: 1999, condFirst: 99, unknownSignature: 11,
+    // And two more, brain/pilotSubCircuitState-selfcheck.mjs (the stateful reservoir pilot) and tools/ship/trainSubState-selfcheck.mjs (the rung 4a study library and its command), each defining ok(n, c, d) once and naming first: gates 2130 -> 2132, usesOk 2109 -> 2111, definesOk 2101 -> 2103, nameFirst 1999 -> 2001 (read off the code: the gate reported exactly these four drifting).
+    gates: 2132, usesOk: 2111, definesOk: 2103, importsOk: 0,
+    distinctDefinitions: 45, nameFirst: 2001, condFirst: 99, unknownSignature: 11,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([
