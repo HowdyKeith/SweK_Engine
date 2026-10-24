@@ -9319,6 +9319,53 @@ fill, bilinear upscale and shift, composited with E_mid, so it is treated as the
 It refuses if the file exists. It runs here for about 100 minutes, as round 59's did. The file is committed byte for byte
 before it is read, and section 138 reads it. Section 137 is kept for the rig reports section 135 asked for.
 
+## 137. SECTION 135's RIG RUNS, READ: NO CRASH, H135 WITHOUT A VERDICT, EVERY EXACT GATE GREEN ON BOTH GPUs
+
+**What arrived.** Six files, all at 0a4e6cbf. Five were committed byte for byte (8e7176ef) before they were read. Two
+exceptions: each run's trace was shown to me by its upload before it was committed, so both were seen first.
+- `render/denoise-rig-s135-a-gtx1080.json` and `-b-`: the two `--only denoise` runs on the 1080.
+- `render/fsr-rig-s135-gtx1080.json` and `render/fsr-rig-s135-intel-gen9.json`: the full runs, 57 gates each.
+- `render/denoise-rig-s135-a-trace-gtx1080.txt` and `-b-`: the runs' traces. Run b's came back after the rest.
+
+**R1, the crash: not reproduced again.** No gate in any of the four reports died on a signal or without an exit
+status. Both runs' traces walk the native ladder and the w16 ladder to their ends and end "the gate ends, 0 fail(s)".
+Neither 1080 run died, nor did the full one. **P1 held.**
+
+**H135: NO VERDICT, by section 135's own rule.**
+- A run counts only when every `--only denoise` gate is green with exit 0. In both 1080 runs the device gate was red,
+  on one row, K0p natively. So neither run counts.
+- The figures, reported and deciding nothing: full / temporal read **1.998 x and 1.984 x**, the chain without its
+  history 2.099 x and 2.085 x. The full 1080 run read 1.979 x, the Intel 2.923 x. Had the runs counted, H135 would have held.
+- **This is my miss in writing section 135.** Round 57 had already shown K0p red natively on the Intel (section 130),
+  and I wrote a counting rule that a red K0p row breaks, without asking whether the 1080 would show the same.
+  **P2 has no reading.**
+
+**K0p on the 1080: the same reading as the Intel's, cell for cell.**
+- Its first three layers read 3038, 3400 and 2592 cells at the other nearest f16, and the fourth reads 0. No cell is
+  unexplained, on either GPU.
+- The image against the f64 network is 1.32e-3, against F16S_IMAGE_TOL's 1e-3.
+- So the cell key holds on both vendors, and what fails is the image bound. That bound was set for a conversion that
+  rounds to nearest.
+- Two vendors giving identical counts says this is Direct3D's conversion, not the Intel's. The FSR gates' own probe
+  reads "rtz" (toward zero) on both GPUs. Section 130 put it on the Intel; it belongs to the backend.
+- `denoise-f16-storage` stays closed (Keith's call). The K0p row will stay red on every Direct3D rig run until its image
+  bound follows the probed rule. That needs a derived bound, not 1.32e-3 read off this run. It is Keith's call whether
+  to do that.
+
+**The FSR census.** Both GPUs read "exact 20/20, quality 25/26, timing 9/11", the same rows red on each.
+- **Exact: every gate held on both GPUs. P3 held.**
+- **Quality:** the one red gate is `fsrTemporalHalfQuality`, on its four stall rows.
+  - Of 12288 history values, 28 and 18 (1080) and 28 and 17 (Intel) sit outside the truncating stall bound, which
+    allows 12.
+  - These are the same 28 and 18 that v4778's rig run 13 read on the 1080, now matched on the Intel. They sit on no
+    mask flip and touch no half subnormal.
+  - The PSNR rows held on both GPUs. The miss is about two and a half times the allowance: a finding, not a margin.
+  - It belongs to FSR2's half history, not to this arc. It is logged as `fsr2-half-stall-rig`.
+- **Timing:** the device gate (K0p, above) and `snowGpuLive`.
+  - snowGpuLive's live loop ran 7 and 3 frames in nine seconds, on adapter "google", a software adapter. Its browser
+    did not land on the GPU, as with rig run 13's three gates before PARITY_ARGS.
+  - That is the snow stack's launch, and is reported to Keith for `snow-d3d12-readings-from-the-rig`. It is not a GPU's figure.
+
 ## 138. ROUND 60 -- NOT REPORTED: C1 FIRED ON H2'S CONTROL. LIT AT THE GENERATED TIME THE GENERATOR LEAVES ITS LIGHT-SOURCE ERROR BEHIND, AND STILL LOSES TO THE CROSS-FADE IN LINEAR RADIANCE
 
 **What arrived.** `render/denoise-results-framegen-lf.json` (sha-256 `8961b8cb...`).

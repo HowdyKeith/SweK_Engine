@@ -820,6 +820,48 @@ console.log("1. THE KERNEL'S TWIN, ON THE CPU");
                 R57.every((e) => e.other.slice(0, 3).join() === "3038,3400,2592") && R57.flatMap((e) => [e.native, e.page]).filter((r) => r >= 0.95 && r <= 1.10).length === 3 && R57[0].native < 0.95,
                 R57.map((e) => e.other.join("/")).join("; "));
         }
+        // SECTION 137: section 135's rig runs read back (render/denoise-rig-s135-{a,b}-gtx1080.json, render/fsr-rig-s135-{gtx1080,intel-gen9}.json,
+        // render/denoise-rig-s135-a-trace-gtx1080.txt, committed at 8e7176ef before they were read). R1 the crash; H135 full / temporal > 1.0 on both
+        // 1080 runs, which count only when every --only denoise gate is green with exit 0; the FSR census, exact gates holding on both GPUs
+        {
+            const rig = (f) => JSON.parse(fs.readFileSync(path.join(ENG, "render", f), "utf8"));
+            const D = ["a", "b"].map((k) => rig(`denoise-rig-s135-${k}-gtx1080.json`)), F = ["gtx1080", "intel-gen9"].map((k) => rig(`fsr-rig-s135-${k}.json`));
+            const hist = (rep) => { const m = rigLines(rigGate(rep, "denoiseUpscaleGPU")).map((l) => l.match(/^section 103: .*; the half-size chain ([\d.]+) ms, ratio ([\d.]+) x; with its history ([\d.]+) ms, ratio ([\d.]+) x$/)).find(Boolean);
+                return m ? { chain: +m[2], temporal: +m[4] } : null; };
+            const counts = (rep) => String(rep.commit || "").slice(0, 8) === "0a4e6cbf" && rep.only === "denoise" && rep.gates.length === 4 && rep.gates.every((g) => g.ok === true && g.exit && g.exit.status === 0);
+            const H135 = (rs, ratios) => (rs.every(Boolean) ? (ratios.every((r) => r !== null && r > 1.0) ? "holds" : "fails") : "no verdict");
+            const died = (rep) => rep.gates.filter((g) => !g.exit || g.exit.signal || g.exit.status === null).length;
+            const traces = ["a", "b"].map((k) => fs.readFileSync(path.join(ENG, "render", `denoise-rig-s135-${k}-trace-gtx1080.txt`), "utf8").trimEnd().split("\n"));
+            const traceOk = (t) => /the gate ends, 0 fail\(s\)$/.test(t[t.length - 1]) && /native w16 ladder done$/.test(t[t.length - 2]) && t.some((l) => /native ladder done$/.test(l));
+            ok("!! *** section 137, R1: NOT REPRODUCED AGAIN -- no gate in either 1080 denoise run, nor in either full run, died on a signal or without an exit status, all four at 0a4e6cbf; both runs' traces walk both ladders to the end and end 'the gate ends, 0 fail(s)' ***",
+                [...D, ...F].every((r) => died(r) === 0 && String(r.commit).slice(0, 8) === "0a4e6cbf") && traces.every(traceOk),
+                `${[...D, ...F].map((r) => `${r.gates.length} gates, ${died(r)} died`).join("; ")}; traces ${traces.map((t) => t.length).join(" and ")} lines`);
+            const R = D.map((r) => ({ counts: counts(r), h: hist(r), red: r.gates.filter((g) => !g.ok).map((g) => g.gate).join(), fails: (rigGate(r, "denoiseDevice") || {}).fails || [] }));
+            const fx = [H135([true, true], R.map((e) => e.h && e.h.temporal)), H135([true, true], [R[0].h.temporal, 0.99])];
+            ok("!! *** section 137, by section 135's rule: H135 HAS NO VERDICT -- neither 1080 run counts, the device gate red in both on K0p natively alone; full / temporal read 1.998 and 1.984 x, which would have held ***",
+                H135(R.map((e) => e.counts), R.map((e) => e.h && e.h.temporal)) === "no verdict" && R.every((e) => !e.counts && e.red === "render/denoiseDevice-selfcheck.mjs" && e.fails.length === 1 && /K0p natively/.test(e.fails[0])) &&
+                JSON.stringify(R.map((e) => [e.h.chain, e.h.temporal])) === "[[2.099,1.998],[2.085,1.984]]" && fx.join() === "holds,fails",
+                `${R.map((e, i) => `run ${"ab"[i]}: ${e.counts ? "counts" : "does not count"}, chain ${e.h && e.h.chain} x, with its history ${e.h && e.h.temporal} x`).join("; ")}; fixtures, counted: ${fx[0]}, one under 1.0: ${fx[1]}`);
+            // the K0p reading, the same cell for cell on both vendors as round 57's Intel: no cell unexplained, the other nearest on the first three
+            // layers, and the image against f64 over F16S_IMAGE_TOL -- the red is the image bound alone
+            const k0 = (rep) => { const l = rigLines(rigGate(rep, "denoiseDevice")).find((x) => x.startsWith("native K0p for r57p, the reading: ")) || "";
+                return { other: [...l.matchAll(/(\d+) other nearest/g)].map((m) => +m[1]).join(), unexplained: [...l.matchAll(/(\d+) unexplained/g)].every((m) => m[1] === "0") && /unexplained/.test(l), w64: +((l.match(/against f64 ([\d.e+-]+) /) || [])[1]) }; };
+            const K = [...D, ...F].map(k0);
+            ok("  ...and the K0p reading the same on the 1080 as on the Intel: other nearest 3038 / 3400 / 2592 / 0, no cell unexplained, the image 1.32e-3 against F16S_IMAGE_TOL 1e-3 -- the cell key holds and the image bound is what fails",
+                K.every((k) => k.other === "3038,3400,2592,0" && k.unexplained && k.w64 === 1.32e-3) && F16S_IMAGE_TOL === 1e-3, K.map((k) => `${k.other} ${k.w64}`).join("; "));
+            // the FSR census: realGpuRun's own summary, and which rows are red
+            const sum = (rep) => rep.summary, red = (rep, cat) => rep.gates.filter((g) => g.category === cat && !g.ok).map((g) => g.gate.split("/").pop().replace("-selfcheck.mjs", "")).join();
+            const stall = (rep) => (rep.gates.find((g) => g.gate === "fx/fsr/fsrTemporalHalfQuality-selfcheck.mjs") || {}).fails || [];
+            const outside = (rep) => stall(rep).map((l) => +((l.match(/ (\d+) outside -- /) || [])[1])).join();
+            const snow = (rep) => rigLines(rep.gates.find((g) => /snowGpuLive/.test(g.gate))).find((l) => l.startsWith("reading snowGpu: live loop")) || "";
+            ok("!! *** section 137, the FSR census: every exact gate held on both GPUs (20 of 20); quality red only on fsrTemporalHalfQuality's four stall rows; timing red on the device gate (K0p) and snowGpuLive ***",
+                F.every((r) => sum(r) === "exact 20/20, quality 25/26, timing 9/11" && red(r, "exact") === "" && red(r, "quality") === "fsrTemporalHalfQuality" && red(r, "timing") === "denoiseDevice,snowGpuLive" && stall(r).length === 4),
+                F.map((r) => `${sum(r)}; red ${red(r, "quality")} | ${red(r, "timing")}`).join("; "));
+            ok("  ...and the stall rows the same on both vendors, 28 and 18 (1080) and 28 and 17 (Intel) of 12288 outside the truncating bound against 12 allowed, as rig run 13 read on the 1080; snowGpuLive's live loop on adapter 'google', a software one",
+                outside(F[0]) === "28,18,28,18" && outside(F[1]) === "28,17,28,17" && F.every((r) => / adapter google$/.test(snow(r))), `${F.map(outside).join(" | ")}; ${F.map(snow).join(" | ")}`);
+            ok("  ...and section 135's predictions as made: P1 held (neither run died); P2 has no reading -- the ratio was above 1.0 in both, the runs did not count; P3 held (no exact gate red)",
+                [...D, ...F].every((r) => died(r) === 0) && R.every((e) => e.h.temporal > 1.0 && !e.counts) && F.every((r) => red(r, "exact") === ""));
+        }
         // v4852+ -- SECTION 68'S OUTCOME (round 20): the rig's six --which lines per GPU, held to the table fixed before they ran, and
         // each re-derived from nativePick on the adapter and compiler the line itself names -- so the rig's reasons are this code's
         {
