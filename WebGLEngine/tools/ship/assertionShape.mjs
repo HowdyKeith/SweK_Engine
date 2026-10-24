@@ -954,8 +954,9 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4896 -- ten new gates (the five snowGpu split gates, snowReadings, truncationGuard, tvPackages, tvDebloat, swekTvLauncher), each spelling ok(name, cond, detail): gates 2094 -> 2104, usesOk 2073 -> 2083, definesOk 2065 -> 2075, nameFirst 1963 -> 1973 (read off the code). THE RECORD CAUGHT ONE OF MY OWN: tools/ship/headlessGpu-selfcheck.mjs, whose ok() takes the condition first, got the v4896 reading() row written label-first -- a string in the condition slot, true always, so the row passed whatever reading() did; the arguments are swapped and the row now tests (suspects stays 0).
     // The unnumbered line (the version is chosen at ship time) -- twenty new gates, each spelling ok(name, cond, detail): gates 2104 -> 2124, usesOk 2083 -> 2103, definesOk 2075 -> 2095, nameFirst 1973 -> 1993 (read off the code); nothing else moved. They are brain/{autopilotDrone,autopilotJet,dogfightTournament,droneTask,jetFight,jetLeagueSets,pilotDroneMlp,pilotDronePolicy,pilotJetMlp,pilotJetPolicy,pilotSubFish}-selfcheck.mjs, physics/mechanics/{atmosphereISA,multirotorModel6dof}-selfcheck.mjs, tools/{fishCaveExport,fishCircuit}-selfcheck.mjs and tools/ship/{tournamentDogfight,tournamentDogfightShipped,trainDogfightLeague,trainDronePilot,trainSubPilot}-selfcheck.mjs.
     // SABOTAGED, restored: each of the four numbers moved by one in turn (gates 2123, usesOk 2102, definesOk 2095, nameFirst 1991 at the nineteen-gate reading) -> RED every time, naming the row (DRIFTED: gates 2122 -> 2123, and the same for the other three).
-    gates: 2124, usesOk: 2103, definesOk: 2095, importsOk: 0,
-    distinctDefinitions: 45, nameFirst: 1993, condFirst: 99, unknownSignature: 11,
+    // And one more gate on the same line, tools/fishInputSide-selfcheck.mjs (the input side of the fish cells), spelling ok(name, cond, detail): gates 2124 -> 2125, usesOk 2103 -> 2104, definesOk 2095 -> 2096, nameFirst 1993 -> 1994 (read off the code, the four rows of the gate named them all).
+    gates: 2125, usesOk: 2104, definesOk: 2096, importsOk: 0,
+    distinctDefinitions: 45, nameFirst: 1994, condFirst: 99, unknownSignature: 11,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([
