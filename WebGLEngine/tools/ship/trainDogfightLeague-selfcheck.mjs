@@ -496,6 +496,7 @@ sec("12. THE SECOND RECIPE (--train wide): the objective on one batch of fresh d
     fs.rmSync(tmp3, { recursive: true, force: true });
 
     // ---- 13. THE THIRD RECIPE (--guard LAMBDA) ------------------------------------------------------------------------------------------------------------------------------------------------------------
+    {   // its own scope: section 12's block already holds names like rb and sc
     sec("13. THE THIRD RECIPE (--guard LAMBDA): a price on the fights lost to the ground or a collision ABOVE the shipped fighter's own count");
     const mulb = (a) => () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
     const gOpts = parse(["--aircraft", "jet", "--train", "wide", "--smoke", "--guard", "10", "--iters", "0", "--runs", "1"]), g0Opts = parse(["--aircraft", "jet", "--train", "wide", "--smoke", "--iters", "0", "--runs", "1"]);
@@ -537,6 +538,7 @@ sec("12. THE SECOND RECIPE (--train wide): the objective on one batch of fresh d
     const bgd = L.blobOf(res, { ...wO, guard: 10 }, jcc).by;
     ok("!! A FILE AND A DUMP SAY THE GUARD WAS ON: the dump records guard 10 (0 when there was none), a guarded champion's `by` says the score was charged 10 times the share of fights lost to the ground or a collision above the shipped fighter's own count, and an unguarded wide champion's `by` (bw) says nothing of the kind",
         dg.recipe.guard === 10 && d0.recipe.guard === 0 && /the score charged 10 times the share of fights lost to the ground or a collision above the shipped fighter's own count on the same duels/.test(bgd) && !/charged/.test(bw) && /each judged on one of 8 batches of 12 fresh duels/.test(bgd));
+    }
 }
 
 console.log(fails ? `\ntrainDogfightLeague-selfcheck: ${fails} FAILED` : "\ntrainDogfightLeague-selfcheck: all checks pass");
