@@ -12,6 +12,8 @@
 //   * EACH SEARCH IS PRUNED TOWARD THE SHIPPED FIGHTER, not toward the autopilot: every weight that differs from it is put back unless the score needs it, so what is shipped is the shipped fighter's small, named delta.
 //   * ELIGIBILITY (the pool, nothing trains on it): a search may be champion only if on LEAGUE_POOL_SET (100 duels, both seats, three opponents: 600 fights) it loses no more fights to the ground or a collision, against each opponent, than the shipped fighter does plus two standard errors of a count (allowance());
 //     and on POOL_FIGHT_SET (the classic four kinds, 400 fights against the autopilot) it loses no fight to the ground or a collision that the shipped fighter does not, goes past the full-stall angle in no more than the allowance, and scores no more than POOL_SLACK below it.
+//   * `--train wide` (the jets only; the second recipe): the objective is judged on EIGHT BATCHES of twelve fresh duels (brain/jetLeagueSets.mjs, seeds 16100..16195), parent and child on the same batch and a different batch each iteration (brain/dogfightTrain.trainBatchedWith), and the prune is on 24 more fresh
+//     duels (16200..16223). The first recipe's twelve training duels showed the search no failure at all (eight searches lost 0 of their own 72 training fights and 4.5 to 12 percent of the pool's: brain/DOGFIGHT_LEAGUE_WIP.md). Everything after the search -- eligibility, the champion, the audits, qualifies() -- is the same.
 //   * CHAMPION: the eligible search with the best league score on LEAGUE_HELD_OUT_SET (32 duels, 192 fights). None eligible, no champion, nothing written, and the audit is NOT read.
 //   * VERDICT. qualifies(), fixed in this file BEFORE any audit was read, graded ONCE on the league audit (100 duels, 600 fights, fresh seeds: LEAGUE_AUDIT_SET for the fruit fly, LEAGUE_AUDIT2_SET for the GPU Brain) and the classic audit and safety audit (AUDIT5/SAFETY5, AUDIT6/SAFETY6):
 //        - the champion beats the shipped fighter head-to-head: its edge over it is at least MIN_EDGE (0.05) and at least Z_MIN (2) paired standard errors, and it wins more fights than it loses; its held-out league score beats the shipped fighter's;
@@ -79,7 +81,7 @@ export const setsOf = (opts) => (brainOf(opts).air === "jet" ? (opts && opts.smo
 
 /** Parse `--name value` / `--flag` argv in ONE pass, REFUSING an option it does not know; the brain's defaults (its seed, its file) go under what was given. `--one K` is the child's mode. */
 export function parseArgs(argv) {
-    const known = { runs: Number, iters: Number, seed: Number, sigma: Number, maxK: Number, workers: Number, one: Number, out: String, dump: String, cache: String, brain: String, aircraft: String, write: Boolean, quiet: Boolean, smoke: Boolean };
+    const known = { runs: Number, iters: Number, seed: Number, sigma: Number, maxK: Number, workers: Number, one: Number, out: String, dump: String, cache: String, brain: String, aircraft: String, train: String, write: Boolean, quiet: Boolean, smoke: Boolean };
     const given = {};
     for (let i = 0; i < argv.length; i++) {
         const a = argv[i]; if (!a.startsWith("--")) throw new Error(`unexpected argument ${JSON.stringify(a)}`);
@@ -89,11 +91,14 @@ export function parseArgs(argv) {
     }
     const want = "brain" in given ? given.brain : "fly", air = "aircraft" in given ? given.aircraft : "trainer";
     if (air !== "trainer" && air !== "jet") throw new Error(`--aircraft must be trainer or jet, got ${JSON.stringify(air)}`);
+    const train = "train" in given ? given.train : "fixed";
+    if (train !== "fixed" && train !== "wide") throw new Error(`--train must be fixed or wide, got ${JSON.stringify(train)}`);
+    if (train === "wide" && air !== "jet") throw new Error("--train wide has its training sets for the jets only (--aircraft jet)");
     const table = air === "jet" ? BRAINS_JET : BRAINS;
     if (!table[want]) throw new Error(`--brain must be one of ${Object.keys(table).join(", ")}, got ${JSON.stringify(want)}`);
     const b = table[want];
     if (given.smoke && given.write) throw new Error("--smoke and --write do not go together: a champion found on throwaway fights is never written");
-    return { ...RECIPE, seed: b.seed, workers: 1, one: null, out: b.out, dump: null, cache: null, write: false, quiet: false, smoke: false, ...given, brain: b.id, aircraft: air };
+    return { ...RECIPE, seed: b.seed, workers: 1, one: null, out: b.out, dump: null, cache: null, write: false, quiet: false, smoke: false, ...given, brain: b.id, aircraft: air, train };
 }
 
 // ---- the league ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -176,7 +181,14 @@ export function contextOf(opts, io = {}) {
 
 /** One independent search (run number k of the recipe), from the shipped fighter and pruned back toward it. Deterministic for (opts, k). Returns { k, seed, weights, trainScore, improved, neutral, moved, kept }. */
 export function searchOne(opts, k, ctx = contextOf(opts)) {
-    const P = ctx.brain.policy, seed = opts.seed + k, score = scorer(P, ctx.members, ctx.sets.train, ctx.sim);
+    const P = ctx.brain.policy, seed = opts.seed + k;
+    if (opts.train === "wide") {   // the second recipe: the objective on one batch of fresh duels at a time, the prune on a fixed fresh set of its own
+        const scores = ctx.sets.trainBatches.map((set) => scorer(P, ctx.members, set, ctx.sim));
+        const found = DT.trainBatchedWith(P, scores, { seed, iters: opts.iters, sigma: opts.sigma, maxK: opts.maxK, start: ctx.startW });
+        const pruned = DT.pruneWith(P, scorer(P, ctx.members, ctx.sets.trainPrune, ctx.sim), found.weights, { toward: ctx.startW });
+        return { k, seed, weights: pruned.weights, trainScore: pruned.trainScore, improved: found.improved, neutral: found.neutral, moved: pruned.moved, kept: pruned.kept };
+    }
+    const score = scorer(P, ctx.members, ctx.sets.train, ctx.sim);
     const found = DT.trainWith(P, score, { seed, iters: opts.iters, sigma: opts.sigma, maxK: opts.maxK, start: ctx.startW }), out = DT.pruneWith(P, score, found.weights, { toward: ctx.startW });
     return { k, seed, weights: out.weights, trainScore: out.trainScore, improved: found.improved, neutral: found.neutral, moved: out.moved, kept: out.kept };
 }
@@ -224,7 +236,7 @@ export function run(opts, log = () => {}, ctx = contextOf(opts)) {
 /** Every run's pruned weights and scores and the verdict, as one JSON-able object (`--dump`): a result that did not qualify can still be looked at; NOT a shipped file, and nothing reads it back. */
 export function dumpOf(result, opts) {
     const sc = (v) => ({ score: v.score, by: Object.fromEntries(MEMBERS.map((m) => [m, { mean: v.by[m].mean, lost: v.by[m].lost.length }])) });
-    return { recipe: { brain: brainOf(opts).id, aircraft: brainOf(opts).air, runs: opts.runs, iters: opts.iters, seed: opts.seed, sigma: opts.sigma, maxK: opts.maxK }, champion: result.champion ? result.champion.seed : null, verdict: result.verdict,
+    return { recipe: { brain: brainOf(opts).id, aircraft: brainOf(opts).air, runs: opts.runs, iters: opts.iters, seed: opts.seed, sigma: opts.sigma, maxK: opts.maxK, train: opts.train || "fixed" }, champion: result.champion ? result.champion.seed : null, verdict: result.verdict,
         shipped: { heldOut: sc(result.shipped.heldOut), pool: sc(result.shipped.pool), audit: result.shipped.audit ? sc(result.shipped.audit) : null },
         runs: result.runs.map((r) => ({ k: r.k, seed: r.seed, trainScore: r.trainScore, heldOut: sc(r.heldOut), pool: sc(r.pool), eligible: r.eligible, ineligible: r.ineligible, kept: r.kept, moved: r.moved, weights: Array.from(r.weights) })) };
 }
@@ -234,8 +246,8 @@ export function blobOf(result, opts, ctx = contextOf(opts)) {
     const B = brainOf(opts), sets = setsOf(opts), c = result.champion, desc = PB.describePolicy(B.policyId, B.policy), vs = c.audit.by.self.summary, sh = result.shipped;
     const lost = (v) => MEMBERS.map((m) => `${v.by[m].lost.length} against ${m}`).join(", ");
     const jetNote = B.air === "jet" ? `THE JETS (brain/jetFight.mjs, guns only, jet scale): there is no shipped jet fighter, so 'the shipped fighter' below is this network's HAND WEIGHTS (${B.policyId}.handWeights(): the jet fighting autopilot's laws in the weights, hash ${ctx.hashes.start}), which every search started from. ` : "";
-    const by = jetNote + `LEAGUE-TRAINED ON DOGFIGHTS (brain/dogfightTask.mjs duels flown from both seats against a league of the PD autopilot, the shipped fighter this was started from (${ctx.hashes.start}) and the other brain's shipped fighter (${ctx.hashes.other})): sparse-mutation (1+1)-ES from the shipped fighter, seed ${c.seed} of ${opts.runs} runs (${opts.seed}..${opts.seed + opts.runs - 1}), sigma ${opts.sigma}, 1-${opts.maxK} weights per child, ${opts.iters} iterations over the ${sets.train.length} league train duels, ` +
-        `then pruned toward the shipped fighter: ${c.kept} of the ${B.policy.WEIGHT_COUNT} weights differ from it; champion picked on the ${sets.heldOut.length} held-out duels among the searches no more dangerous than the shipped fighter on the ${sets.pool.length}-duel league pool and the ${sets.classicPool.length}-fight classic pool; ` +
+    const by = jetNote + `LEAGUE-TRAINED ON DOGFIGHTS (brain/dogfightTask.mjs duels flown from both seats against a league of the PD autopilot, the shipped fighter this was started from (${ctx.hashes.start}) and the other brain's shipped fighter (${ctx.hashes.other})): sparse-mutation (1+1)-ES from the shipped fighter, seed ${c.seed} of ${opts.runs} runs (${opts.seed}..${opts.seed + opts.runs - 1}), sigma ${opts.sigma}, 1-${opts.maxK} weights per child, ${opts.iters} iterations ${opts.train === "wide" ? `each judged on one of ${sets.trainBatches.length} batches of ${sets.trainBatches[0].length} fresh duels (parent and child on the same batch, a different batch each iteration)` : `over the ${sets.train.length} league train duels`}, ` +
+        `then pruned toward the shipped fighter${opts.train === "wide" ? ` on ${sets.trainPrune.length} further fresh duels` : ""}: ${c.kept} of the ${B.policy.WEIGHT_COUNT} weights differ from it; champion picked on the ${sets.heldOut.length} held-out duels among the searches no more dangerous than the shipped fighter on the ${sets.pool.length}-duel league pool and the ${sets.classicPool.length}-fight classic pool; ` +
         `audit of ${sets.audit.length} duels from both seats: against the shipped fighter ${vs.winsX} fights won, ${vs.draws} level, ${vs.winsY} lost, edge ${vs.edge.toFixed(4)} +- ${vs.se.toFixed(4)} (${vs.z.toFixed(2)} paired standard errors); own score against the autopilot ${c.vsAudit.autopilot.diff >= 0 ? "+" : ""}${c.vsAudit.autopilot.diff.toFixed(4)} and against the other brain's fighter ${c.vsAudit.other.diff >= 0 ? "+" : ""}${c.vsAudit.other.diff.toFixed(4)} from the shipped fighter's; ` +
         `fights lost to the ground or a collision: ${lost(c.audit)} (the shipped fighter ${lost(sh.audit)}); classic audit ${c.classic.audit.score.toFixed(4)} (the shipped fighter ${sh.classic.audit.score.toFixed(4)}), reserve ${c.classic.reserve.score.toFixed(4)} (${sh.classic.reserve.score.toFixed(4)}), classic safety audit ${c.classic.safety.lost.length} lost to the ground or a collision (${sh.classic.safety.lost.length}). ` +
         `GRADED AGAINST A FIXED LEAGUE OF THREE, NOT AGAINST A PILOT THAT HAS SEEN IT.`;
@@ -244,8 +256,8 @@ export function blobOf(result, opts, ctx = contextOf(opts)) {
 
 // ---- the cache of finished searches (a search is tens of minutes; a restart must not lose them) -------------------------------------------------------------------------------------------------------------
 /** The key a cached search must match: everything its weights are a function of. */
-export const cacheKey = (opts, ctx, k) => JSON.stringify({ brain: ctx.brain.id, k, seed: opts.seed, iters: opts.iters, sigma: opts.sigma, maxK: opts.maxK, smoke: !!opts.smoke, start: ctx.hashes.start, other: ctx.hashes.other, ...(ctx.brain.air === "jet" ? { aircraft: "jet" } : {}) });
-export const cachePath = (opts, k) => path.join(opts.cache, `league-${brainOf(opts).id}${opts.smoke ? "-smoke" : ""}-${k}.json`);
+export const cacheKey = (opts, ctx, k) => JSON.stringify({ brain: ctx.brain.id, k, seed: opts.seed, iters: opts.iters, sigma: opts.sigma, maxK: opts.maxK, smoke: !!opts.smoke, start: ctx.hashes.start, other: ctx.hashes.other, ...(ctx.brain.air === "jet" ? { aircraft: "jet" } : {}), ...(opts.train === "wide" ? { train: "wide" } : {}) });
+export const cachePath = (opts, k) => path.join(opts.cache, `league-${brainOf(opts).id}${opts.smoke ? "-smoke" : ""}${opts.train === "wide" ? "-wide" : ""}-${k}.json`);
 export function cacheRead(opts, ctx, k, { read = (f) => fs.readFileSync(f, "utf8"), exists = (f) => fs.existsSync(f) } = {}) {
     if (!opts.cache) return null;
     const f = cachePath(opts, k); if (!exists(f)) return null;
@@ -265,11 +277,11 @@ export async function command(argv, io = {}) {
     let opts, ctx; try { opts = parseArgs(argv); ctx = io.ctx || contextOf(opts); } catch (e) { err("trainLeagueDogfight: " + e.message); return 2; }
     const log = opts.quiet ? () => {} : out;
     if (opts.one != null) { const r = searchOne(opts, opts.one, ctx); out("SEARCH " + JSON.stringify({ ...r, weights: Array.from(r.weights) })); return 0; }
-    log(`league for ${ctx.brain.name}: starts from ${ctx.brain.start} (${ctx.hashes.start}); opponents: autopilot, self, ${ctx.brain.other.id} (${ctx.hashes.other}); ${opts.runs} runs x ${opts.iters} iterations${opts.smoke ? " (SMOKE: throwaway fights, no audit read)" : ""}`);
+    log(`league for ${ctx.brain.name}: starts from ${ctx.brain.start} (${ctx.hashes.start}); opponents: autopilot, self, ${ctx.brain.other.id} (${ctx.hashes.other}); ${opts.runs} runs x ${opts.iters} iterations${opts.train === "wide" ? ` (WIDE training: each iteration judged on one of ${ctx.sets.trainBatches.length} batches of ${ctx.sets.trainBatches[0].length} fresh duels, pruned on ${ctx.sets.trainPrune.length} more)` : ""}${opts.smoke ? " (SMOKE: throwaway fights, no audit read)" : ""}`);
     const doSearch = io.run ? null : (k) => { const hit = cacheRead(opts, ctx, k); if (hit) { log(`  search ${k + 1}/${opts.runs} (seed ${hit.seed}) read from the cache: pruned ${hit.moved} moved weights to ${hit.kept}`); return hit; } const t0 = Date.now(), r = searchOne(opts, k, ctx); cacheWrite(opts, ctx, k, r); log(`  search ${k + 1}/${opts.runs} (seed ${r.seed}) done in ${((Date.now() - t0) / 1000).toFixed(0)} s: pruned ${r.moved} moved weights to ${r.kept}`); return r; };
     let result;
     if (opts.workers > 1 && opts.runs > 1) {
-        const passthrough = ["--brain", opts.brain, "--aircraft", opts.aircraft, "--iters", opts.iters, "--seed", opts.seed, "--sigma", opts.sigma, "--maxK", opts.maxK, "--runs", opts.runs, ...(opts.smoke ? ["--smoke"] : [])].map(String);
+        const passthrough = ["--brain", opts.brain, "--aircraft", opts.aircraft, "--iters", opts.iters, "--seed", opts.seed, "--sigma", opts.sigma, "--maxK", opts.maxK, "--runs", opts.runs, ...(opts.train === "wide" ? ["--train", "wide"] : []), ...(opts.smoke ? ["--smoke"] : [])].map(String);
         const runOne = (k) => new Promise((resolve, reject) => {
             const hit = cacheRead(opts, ctx, k); if (hit) { log(`  search ${k + 1}/${opts.runs} (seed ${hit.seed}) read from the cache: pruned ${hit.moved} moved weights to ${hit.kept}`); return resolve(hit); }
             const t0 = Date.now(), child = spawn(process.execPath, [io.selfPath, ...passthrough, "--one", String(k)], { stdio: ["ignore", "pipe", "inherit"] });
