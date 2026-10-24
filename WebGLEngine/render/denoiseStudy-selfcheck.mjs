@@ -132,6 +132,8 @@
 //   L5 SPLITS_FRAMEGEN_LARGE left out of the dataset refusal                      2 RED -- the round row, the refusal row
 //   L6 the families 6 R and 18 C                                                 1 RED -- the round row
 //   L7 ROUND_FRAMEGEN_LARGE left off the command's import line (the first harvest's death) 1 RED -- the import row
+//   V145a-f (section 145) the lost image, H1's count, H1's threshold, linear H1's count, the results' commit, C1 at 24
+//           each 1 RED -- the row it names
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -817,7 +819,24 @@ console.log("\n14g. ROUND 62: ROUND 61's ARRANGEMENT ON A TEST SET TWICE ITS SIZ
     const named = [...new Set(cli.replace(/\/\/.*$/gm, "").match(/\bROUND_[A-Z0-9_]+\b/g) || [])], study = await imp("render/denoiseStudy.mjs");
     ok("!! every ROUND_* tools/denoiseStudy.mjs names is on its import line from render/denoiseStudy.mjs, and exported there -- ROUND_FRAMEGEN_LARGE among them",
         named.includes("ROUND_FRAMEGEN_LARGE") && named.every((k) => imported.has(k) && k in study), named.filter((k) => !imported.has(k) || !(k in study)).join(", ") || `${named.length} names`);
-    ok("  its results are not yet written: section 145 reads them once the harvest's file is committed", !fs.existsSync(path.join(ENG, RESULTS_FRAMEGEN_LARGE)));
+    // section 145: the committed results read back by code -- REPORTED, both supported under Holm, C1 at 23 of 24
+    const lfile = path.join(ENG, RESULTS_FRAMEGEN_LARGE);
+    if (fs.existsSync(lfile)) {
+        const res = JSON.parse(fs.readFileSync(lfile, "utf8")), T = res.tables, { frameGenSetsLightFree, verdict: V0 } = { ...(await imp("render/denoiseStudy.mjs")), ...(await imp("render/denoiseStats.mjs")) };
+        const again = V0({ sets: frameGenSetsLightFree(T), shuffled: null, c2Prior: ROUND_FRAMEGEN_LARGE.c2Prior, determinism: res.determinism, seedsDistinct: res.seedsDistinct, test: ROUND_FRAMEGEN_LARGE.test, c1Of: "candidate", c1Min: ROUND_FRAMEGEN_LARGE.c1Min });
+        const H1 = again.hypotheses.H1, H2 = again.hypotheses.H2, lost = T.Gl.map((v, i) => (v > T.noisyMid[i] ? i : -1)).filter((i) => i >= 0);
+        ok("!! *** section 145: verdict() over the committed results' own tables gives the file's verdict -- REPORTED, H1 and H2 both SUPPORTED, C1 at 23 of 24 (the one lost C 60008) ***",
+            again.run === "reported" && res.verdict.run === "reported" && H1.status === "supported" && H2.status === "supported" && res.verdict.hypotheses.H1.status === "supported" &&
+            lost.join() === "20" && res.commit === "3d215c83" && res.config.c1Min === 22 && res.config.c1Of === "candidate" && T.Gl.length === 24,
+            `H1 ${H1.k}/24 p ${H1.p}, H2 ${H2.k}/24 p ${H2.p}`);
+        ok("  ...and its figures: H1 17 of 24, mean d +0.178, p 0.0479 under Holm's 0.05; H2 19 of 24, mean d +0.570, p 7.1e-5 under 0.025",
+            H1.k === 17 && Math.abs(H1.meanD - 0.178) < 5e-4 && Math.abs(H1.p - 0.04789501428604126) < 1e-12 && H1.threshold === 0.05 &&
+            H2.k === 19 && Math.abs(H2.meanD - 0.570) < 5e-4 && Math.abs(H2.p - 0.00007081031799316406) < 1e-15 && H2.threshold === 0.025);
+        const pos = (a) => a.filter((d) => d > 0).length;
+        ok("  ...and beside it, as section 145 reports: linear radiance's H1 12 of 24 (no win), H2 19 of 24; the midpoint traced alone beat G' on 16 of 24; the fill helped on all 24",
+            pos(res.secondary.linear.H1) === 12 && res.secondary.linear.H1.reduce((a, d) => a + d, 0) < 0 && pos(res.secondary.linear.H2) === 19 &&
+            res.secondary.midTraced.filter((d) => d < 0).length === 16 && pos(res.secondary.fill) === 24);
+    } else ok("!! section 145 reads render/denoise-results-framegen-large.json, and it is not there", false);
 }
 
 console.log("\n15. THE UPSCALE ROUND: HALF SIZE + FSR1 AGAINST THE FRAMES IT COULD BE INSTEAD (pre-registration section 81)");

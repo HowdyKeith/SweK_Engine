@@ -9665,3 +9665,52 @@ Nor what an FSR3 frame costs with an optical flow; round 59's arrangement takes 
 
 **The runs: two `realGpuRun --only denoise` runs on each GPU, section 141's.** They are committed byte for byte before
 they are read. Section 146 reads them; section 144 is section 141's rig runs, section 145 round 62's verdict.
+
+## 145. ROUND 62 -- REPORTED: BOTH HYPOTHESES SUPPORTED. ON 24 SCENES THE LIGHT-FREE GENERATOR BEATS THE CROSS-FADE AND THE HELD FRAME, AS A DISPLAY SHOWS THEM
+
+**What arrived.** `render/denoise-results-framegen-large.json` (sha-256 `13c12303...`).
+- It was written by `--harvest-framegen-large` at 3d215c83, the commit carrying section 142's code, in 6,678 s.
+- It was committed byte for byte (51f7605c) before it was read.
+- A first start at b2c9e744 died at once on a missing import, before any scene was rendered. That was fixed at 3d215c83,
+  with a gate row.
+
+**The run is REPORTED.**
+- **C1 held:** G' beat the noisy frame in display space on 23 of 24, where 22 were needed. The one it lost is C 60008.
+- C2 is cited from round 54. C3: no image is near its floor. C4 (determinism) and C5 (distinct seeds) held.
+
+| | H1: G' against the cross-fade X' | H2: G' against the held frame R' |
+|---|---|---|
+| mean d | +0.178 | +0.570 |
+| images G' won | 17 of 24 (R 9 of 12, C 8 of 12) | 19 of 24 (R 10 of 12, C 9 of 12) |
+| sign-flip p (Holm threshold) | 0.0479 (0.05) | 0.00007 (0.025) |
+| status | **supported** | **supported** |
+
+**The predictions, read as made.**
+- **P1 held:** C1 held, 23 of 24.
+- **P2 held:** H2 is supported.
+- **P3 held:** H1 is supported, by a narrow margin: p 0.0479 against 0.05. Its mean d, +0.178, is smaller than round 61's +0.287.
+- **P4 has no reading:** C1 did not fire. The one loss was on C, as P4 expected of a firing.
+
+**What it says, and what it does not.**
+- **On these scenes, graded as a display shows them, FSR3's generator between light-free frames, lit at the generated time,
+  is the better frame to put between two traced ones.** It beats both a cross-fade and holding the older frame.
+- **H1 is narrow, and only in display space.** Graded in linear radiance, G' beats the cross-fade on 12 of 24 (mean d
+  -0.168), which is no win. H2 holds in both spaces (linear 19 of 24, mean d +0.425). The pre-registered grading is display
+  space (section 139's reason: a display shows Reinhard and gamma, not radiance), and the verdict is in it. The linear figure
+  is reported so that nobody reads H1 as more than it is.
+- **This is the third round to ask H1 of this arrangement.**
+  - Round 60 was not reported (C1 on its control); its display-space H1 read 8 of 12, described.
+  - Round 61 was not reported (C1 on the candidate).
+  - Round 62 is the first to pass its controls.
+  - No round's C1 was relaxed, and round 62's test set was fixed before any of its scenes existed. Even so, a reader
+    weighing the arc as a whole should know the question was asked three times.
+- **A frame traced at the midpoint is still better.** The midpoint's own half-size frame, traced alone, beat G' on 16 of 24
+  (mean d -0.290, the traced frame's way). A generated frame is the cheaper substitute, not the equal.
+  Round 63 asks how much cheaper.
+- The fill helped on 24 of 24 (mean d +2.82). G' beat round 59's arrangement on 13 of 24 (mean d +0.759).
+
+**What changes.**
+- `denoise-fsr3-framegen` keeps its quality answer: on the path tracer, the light-free generator is supported over both
+  controls in display space.
+- The entry stays open on round 63 (section 143), which asks whether it is cheap enough on the device to be worth it.
+- No default moves: nothing ships a generated frame on the path tracer's page until round 63 has read.

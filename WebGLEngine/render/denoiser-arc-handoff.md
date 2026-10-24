@@ -91,6 +91,9 @@ node tools/ship/versionPreflight.mjs --next    # the next free version and sweep
      are asked again; section 144 reads them.
    - **Rounds 62 and 63 (sections 142, 143), Keith's two FSR3 rounds.** Round 62: round 61's test on 24 new scenes, C1 at
      22 of 24 (section 145). Round 63: a generated frame's device cost against a traced one, H63 G <= 0.25 T (section 146).
+   - **Round 62 (section 145): REPORTED, both supported.** C1 23 of 24; against the cross-fade 17 of 24, p 0.0479 (narrow,
+     display space only -- linear 12 of 24); against the held frame 19 of 24, p 7.1e-5. The traced midpoint still wins 16
+     of 24. Nothing ships until round 63's rig runs read.
    - Every default that the Intel's runs at 7b871372 decided is now carried out. The denoiser entries still open, after
      rounds 56-58, are `denoise-subgroup-reduction`, `denoise-temporalup-device` and `denoise-1080-native-crash` (all three
      owed the GTX 1080), and `denoise-fsr3-framegen`, whose upstream is closed.
