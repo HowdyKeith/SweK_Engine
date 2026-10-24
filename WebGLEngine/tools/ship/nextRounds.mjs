@@ -2515,7 +2515,7 @@ export const NEXT_ROUNDS = [
         id: "fsr4-learned-upscaler",
         blocker: "OPEN",
         what: "An FSR4-style learned upscaler: a trained network replacing the hand-written upscale chain.",
-        how: "ROUND 65 (sections 148, 153, 154): U trained (candidate seed 3, validation 4.198e-3) and tested on 24 new scenes -- NOT REPORTED, C1 (18 of 24) and C3 (23 of 24 within 2 x of the floor): the 32-sample truth's own noise (5.50e-3) is above every arm's error (U 4.90e-3, EASU 4.99e-3, bilinear 5.31e-3), so the test could not resolve them. Descriptively U lost to EASU on 17 of 24 (mean d -0.053). C2 held (the shuffled U lost to EASU on all 24). A next round would take new test seeds and a 512-sample truth, the same U or one retrained on 512-sample targets -- Keith's call.",
+        how: "ROUND 65 (sections 148, 153, 154): U trained (candidate seed 3, validation 4.198e-3) and tested on 24 new scenes -- NOT REPORTED, C1 (18 of 24) and C3 (23 of 24 within 2 x of the floor): the 32-sample truth's own noise (5.50e-3) is above every arm's error (U 4.90e-3, EASU 4.99e-3, bilinear 5.31e-3), so the test could not resolve them. Descriptively U lost to EASU on 17 of 24 (mean d -0.053). C2 held (the shuffled U lost to EASU on all 24). ROUND 67 (section 155), Keith's choice: U retrained on 512-sample targets (the same 220 scenes), tested on 24 new scenes (67000, 68000) against a 2048-sample truth -- the pilot put C's 512-sample floor at 0.52 of EASU's error, so the test's truth is 2048. --harvest-upscale-train --round 67, then --harvest-upscale-test --round 67; section 156 the verdict.",
         why: "Logged because Keith asked about FSR 1-4 together; it would be its own arc, larger than any round here.",
     },
     {

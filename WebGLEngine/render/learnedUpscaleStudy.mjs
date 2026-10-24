@@ -5,7 +5,7 @@
 // the same way on targets shuffled across the training images. runUpscaleTest: the 24 test scenes, the chain with U, with EASU
 // and with bilinear in the upscale's place, graded in display space; H1 U against EASU, H2 U against bilinear.
 "use strict";
-import { SPLITS_UPSCALE_LEARNED, familyOf } from "./denoiseScenes.mjs";
+import { SPLITS_UPSCALE_LEARNED, SPLITS_UPSCALE_LEARNED_67, familyOf } from "./denoiseScenes.mjs";
 import { upscaleExample, upscaleChain, trainUpscaler, UP_TRAIN, UP_SHAPE } from "./learnedUpscale.mjs";
 import { relMSE, verdict, effects } from "./denoiseStats.mjs";
 import { toPerceptual } from "./denoiseUpscale.mjs";
@@ -18,6 +18,11 @@ export const RESULTS_UPSCALE_TEST = "render/denoise-results-upscale-learned.json
 export const SHUFFLE_SEED = 65;
 export const ROUND_UPSCALE_LEARNED = Object.freeze({ splits: SPLITS_UPSCALE_LEARNED, image: 256, sppIn: 4, sppRef: 32, test: "signflip", c1Of: "candidate", c1Min: 22,
     seeds: UPSCALE_SEEDS, train: UP_TRAIN, results: RESULTS_UPSCALE_TEST, net: RESULTS_UPSCALE_TRAIN });
+/** Section 155, ROUND 67: the same round with 512-sample training targets and a 2048-sample test truth, on new test scenes. */
+export const ROUND_UPSCALE_LEARNED_67 = Object.freeze({ ...ROUND_UPSCALE_LEARNED, splits: SPLITS_UPSCALE_LEARNED_67, sppRef: 512, sppRefTest: 2048,
+    results: "render/denoise-results-upscale-learned-r67.json", net: "render/upscale-net-r67.json" });
+/** The round a harvest runs, by number: 65 (section 148) unless --round 67 (section 155). */
+export const upscaleRound = (n) => (n === 67 ? ROUND_UPSCALE_LEARNED_67 : n === 65 || n == null ? ROUND_UPSCALE_LEARNED : (() => { throw new Error(`learnedUpscaleStudy: no round ${n} -- 65 or 67`); })());
 const toD = (y) => Float64Array.from(y, toPerceptual);
 /** An example's display-space relMSE of a frame against its reference -- round 65's grading. */
 export const gradeDisplay = (y, ex) => relMSE(toD(y), toD(ex.ref));

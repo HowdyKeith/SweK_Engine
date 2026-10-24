@@ -9,6 +9,8 @@
 // LS7 the C seeds shifted onto 61101 -> 1 red.
 // SECTION 154: V154a the training file's candidate typed 1 -> 2 red; V154b C1's count typed 19 -> 1 red; V154c the test's commit
 // typed b9f2cdac -> 2 red; V154d the floor typed 5.401e-3 -> 1 red. Each restored byte-identical.
+// SECTION 155: R67a the targets at 32 samples, R67b the test truth at 512, R67d the test handed the training's samples, R67e round 65's
+// test seeds -> 1 red each; R67c the training command without its samples -> 2 red. Each restored byte-identical.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -80,10 +82,10 @@ console.log("\n4. THE COMMANDS");
 {
     const cli = fs.readFileSync(path.join(ENG, "tools/denoiseStudy.mjs"), "utf8"), br = (flag) => { const b0 = cli.indexOf(`} else if (args.includes("${flag}")) {`); return b0 >= 0 ? cli.slice(b0, cli.indexOf("} else if (", b0 + 10)).replace(/\/\/.*$/gm, "") : ""; };
     const a = br("--harvest-upscale-train"), b = br("--harvest-upscale-test");
-    ok("!! --harvest-upscale-train runs runUpscaleTraining under harvest, writes render/upscale-net-r65.json and never an existing one, with every seed's net, C2's, the shipped sha-256 and the commit",
-        /runUpscaleTraining\(\{ net: decodeNet\(shipped\.net\), harvest: true/.test(a) && /RESULTS_UPSCALE_TRAIN/.test(a) && /existsSync\(file\)/.test(a) && /c2: \{/.test(a) && /sha256/.test(a) && /commit: git/.test(a) && !/verdict/.test(a));
+    ok("!! --harvest-upscale-train runs runUpscaleTraining under harvest, writes its round's file (render/upscale-net-r65.json, or r67's) and never an existing one, with every seed's net, C2's, the shipped sha-256 and the commit",
+        /runUpscaleTraining\(\{ splits: RD\.splits, sppRef: RD\.sppRef, net: decodeNet\(shipped\.net\), harvest: true/.test(a) && /path\.join\(ENG, RD\.net\)/.test(a) && /existsSync\(file\)/.test(a) && /c2: \{/.test(a) && /sha256/.test(a) && /commit: git/.test(a) && !/verdict/.test(a));
     ok("!! --harvest-upscale-test reads the committed training file's candidate and C2's U, runs runUpscaleTest under harvest, writes its own file and never an existing one, and records both commits",
-        /tr\.runs\.find\(\(x\) => x\.seed === tr\.candidate\)/.test(b) && /Uc2: decodeNet\(tr\.c2\.net\)/.test(b) && /harvest: true/.test(b) && /RESULTS_UPSCALE_TEST/.test(b) && /existsSync\(file\)/.test(b) && /out\.commit = /.test(b) && /commit: tr\.commit/.test(b));
+        /tr\.runs\.find\(\(x\) => x\.seed === tr\.candidate\)/.test(b) && /Uc2: decodeNet\(tr\.c2\.net\)/.test(b) && /harvest: true/.test(b) && /path\.join\(ENG, RD\.results\)/.test(b) && /existsSync\(file\)/.test(b) && /out\.commit = /.test(b) && /commit: tr\.commit/.test(b));
     // section 148's order -- this code, then the training harvest, then the test harvest: the test names the training file and the
     // commit it was written at, and was itself run at a later commit
     const trf = JSON.parse(fs.readFileSync(path.join(ENG, LS.RESULTS_UPSCALE_TRAIN), "utf8")), tef = JSON.parse(fs.readFileSync(path.join(ENG, LS.RESULTS_UPSCALE_TEST), "utf8"));
@@ -107,6 +109,24 @@ console.log("\n5. SECTION 154: THE COMMITTED HARVESTS, READ BACK");
     const mean = (a) => a.reduce((q, v) => q + v, 0) / a.length;
     ok("  ...and the reason C3 gives: the 32-sample truth's own floor (5.50e-3) above every arm's error -- U 4.90e-3, EASU 4.99e-3, bilinear 5.31e-3",
         Math.abs(mean(T.floor) - 5.501e-3) < 5e-6 && [T.U, T.easu, T.bilinear].every((a) => mean(a) < mean(T.floor)) && Math.abs(mean(T.U) - 4.901e-3) < 5e-6, `floor ${mean(T.floor).toExponential(4)}`);
+}
+
+console.log("\n6. ROUND 67 (section 155): THE SAME ROUND, 512-SAMPLE TARGETS, A 2048-SAMPLE TEST TRUTH, NEW TEST SCENES");
+{
+    const R = LS.ROUND_UPSCALE_LEARNED_67, S = D.SPLITS_UPSCALE_LEARNED_67, old = new Set(D.SPLITS_UPSCALE_LEARNED.T1.seeds);
+    ok("!! ROUND_UPSCALE_LEARNED_67: round 65's training and validation scenes, targets at 512 samples, a test truth of 2048, 24 new test scenes (67000-67011 R, 68000-68011 C), its own two files -- the rest round 65's",
+        S.train === D.SPLITS_UPSCALE_LEARNED.train && S.val === D.SPLITS_UPSCALE_LEARNED.val && R.splits === S && R.sppRef === 512 && R.sppRefTest === 2048 &&
+        S.T1.seeds.slice(0, 12).every((x, i) => x === 67000 + i && S.T1.families[i] === "R") && S.T1.seeds.slice(12).every((x, i) => x === 68000 + i && S.T1.families[12 + i] === "C") &&
+        S.T1.seeds.every((x) => D.isDatasetSeed(x) && !old.has(x)) && R.net === "render/upscale-net-r67.json" && R.results === "render/denoise-results-upscale-learned-r67.json" &&
+        ["image", "sppIn", "test", "c1Of", "c1Min", "seeds", "train"].every((k) => R[k] === LS.ROUND_UPSCALE_LEARNED[k]));
+    let bad = null; try { LS.upscaleRound(66); } catch (e) { bad = e.message; }
+    ok("  upscaleRound: 67 is round 67's, 65 and no number round 65's, any other refused", LS.upscaleRound(67) === R && LS.upscaleRound(65) === LS.ROUND_UPSCALE_LEARNED && LS.upscaleRound(null) === LS.ROUND_UPSCALE_LEARNED && /no round 66/.test(bad || ""));
+    const cli = fs.readFileSync(path.join(ENG, "tools/denoiseStudy.mjs"), "utf8"), br = (flag) => { const b0 = cli.indexOf(`} else if (args.includes("${flag}")) {`); return b0 >= 0 ? cli.slice(b0, cli.indexOf("} else if (", b0 + 10)).replace(/\/\/.*$/gm, "") : ""; };
+    const a = br("--harvest-upscale-train"), b = br("--harvest-upscale-test");
+    ok("!! both commands take --round, write the round's own files, and hand the round's splits and samples on -- training its 512-sample targets, the test its 2048-sample truth",
+        /LS\.upscaleRound\(/.test(a) && /path\.join\(ENG, RD\.net\)/.test(a) && /splits: RD\.splits, sppRef: RD\.sppRef,/.test(a) &&
+        /LS\.upscaleRound\(/.test(b) && /path\.join\(ENG, RD\.results\)/.test(b) && /readFileSync\(path\.join\(ENG, RD\.net\)/.test(b) && /splits: RD\.splits, sppRef: RD\.sppRefTest \?\? RD\.sppRef,/.test(b));
+    ok("  round 67's files are not yet written: section 156 reads them", !fs.existsSync(path.join(ENG, R.net)) && !fs.existsSync(path.join(ENG, R.results)));
 }
 
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)`);

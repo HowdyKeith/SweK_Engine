@@ -10171,3 +10171,43 @@ EASU beat bilinear on 22 of 24.
 - The same U, so the training's choice stands; or U retrained on 512-sample targets as well.
 
 `fsr4-learned-upscaler` stays open on that decision.
+
+## 155. FSR4 ROUND 67 -- U RETRAINED ON 512-SAMPLE TARGETS, TESTED AGAINST A 2048-SAMPLE TRUTH: FIXED BEFORE ITS CODE AND ITS SCENES
+
+**Why.** Section 154's round could not resolve its arms: the 32-sample truth's own noise was above all of them. Keith chose
+the second of its two options: U retrained on quieter targets, and tested again on new scenes against a quieter truth.
+
+**The floor, measured before this section, on two non-dataset scenes at 256 x 256.** The table is display-space relMSE
+against one reference.
+
+| scene | spp | second reference (the floor) | EASU's chain | bilinear's | the noisy floor |
+|---|---|---|---|---|---|
+| R 990940 | 512 | 1.95e-4 | 8.74e-4 | 9.19e-4 | 3.62e-3 |
+| C 990941 | 512 | 3.18e-3 | 6.12e-3 | 5.81e-3 | 9.63e-3 |
+
+- On R, 512 samples puts the floor at 0.22 of EASU's error, so it resolves.
+- On C, 512 leaves it at 0.52: within C3's 2 x, not resolvable. C's light reaches through glossy paths whose samples are rare.
+- So the **test's truth is 2048 samples**, 4 x quieter again: C's floor near 8e-4 against arms near 6e-3.
+- The **training targets are 512.** A noisy target is unbiased, so it slows learning and does not mislead it. At 512, 220
+  training scenes cost about 4.4 hours; at 2048 they would cost about 18.
+
+**What changes from round 65 (sections 148, 153).**
+- **Training and validation targets: 512 samples,** on the same 200 + 20 scenes (61000-61199, 62000-62019). Those were
+  never test scenes, and re-rendering them at 512 changes the targets alone.
+- **U is retrained on seeds 1-3,** the candidate again the lowest validation loss, and C2's shuffled U on the candidate's
+  seed. The results go to render/upscale-net-r67.json.
+- **The test: 24 new scenes,** 12 R (67000-67011) and 12 C (68000-68011). The two references are each 2048 samples.
+  The results go to render/denoise-results-upscale-learned-r67.json.
+
+**What does not change.** U's shape and input, its loss (display space through the composite), the schedule, the
+hypotheses (H1 against EASU, H2 against bilinear), the test, Holm, C1-C5, C1 at 22 of 24, and the grading.
+
+**Predictions, fixed now, deciding nothing.**
+- **P1:** C3 holds this time (no more than 12 of 24 within 2 x of the floor).
+- **P2:** H2 is supported.
+- **P3:** H1 is not supported. Section 154's descriptive figures had U losing to EASU on 17 of 24, and quieter targets alone
+  are not likely to turn that.
+- **P4:** C1 holds.
+
+**The runs.** `node tools/denoiseStudy.mjs --harvest-upscale-train --round 67`, then `--harvest-upscale-test --round 67`.
+Each is committed byte for byte before the next runs. Section 156 is the verdict.
