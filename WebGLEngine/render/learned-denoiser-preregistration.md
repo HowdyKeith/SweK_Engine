@@ -9971,3 +9971,82 @@ All figures are ms, every part of G₆₄ on the device's clock.
 - `denoise-framegen-compute` is done.
 - **Nothing ships by this round alone.** Putting a generated frame on path-tracer.html's page is a page change with its own
   questions: a pacing loop, and the holes past the reach. It is logged as `denoise-framegen-page`, and is Keith's call.
+
+## 151. ROUND 66 -- WHAT A HOLE SHOULD SHOW, AND A FRAME PACER: FIXED BEFORE THEIR CODE AND ROUND 66's SCENES
+
+**Why.** Section 150 left two things between the compute generator and path-tracer.html (`denoise-framegen-page`). Keith
+asked for both:
+- 0.77 % of a 1920 x 1080 generated frame has no vector within the reach and is black before the light composite;
+- nothing yet presents a generated frame between two traced ones at an even rhythm.
+
+### Part A: the holes, as a quality round
+
+**The problem's size, measured before this section.** At 256 x 256 the generator's fill (radius 4, reach 16) leaves no hole
+on rounds 59-62's scenes. Its reach is 16 pixels at any size, so the same disocclusion leaves holes at 1080p that it closes
+at 256.
+- Scaled by 256 / 1920, the fill is **radius 1, reach 2.** On round 63's scene (R 990914) that leaves 0.97 % holes at 256,
+  against 0.77 % with the full fill at 1920 x 1080.
+- On three more non-dataset scenes it leaves 0.81 %, 5.65 % and 0.60 %.
+- So round 66 grades at 256 x 256 with the scaled fill: 1080p's hole geometry at a size a harvest can trace.
+
+**The arms.** The light-free arrangement of rounds 60-62, the scaled generator, and four ways to fill what it leaves. Each
+is composited with the light sources at the midpoint, as G' is.
+- **Gh, the control:** holes left black, as today.
+- **GhX, the first candidate:** holes from the cross-fade of L6 and L7, the frame that is safe where nothing is known.
+- **GhC, the second candidate:** holes from L7, the newer frame. A disocclusion under an orbiting camera uncovers content
+  the newer frame shows.
+- **GhP**, holes from L6: reported only.
+
+**The test.**
+- **H1:** GhX beats Gh. **H2:** GhC beats GhX.
+- Graded in display space, the sign-flip test, Holm over {H1, H2}.
+- **C1**, asked of each hypothesis's candidate: it beats the noisy midpoint frame on 22 of 24.
+- C2 is cited from round 54. C3: none near its floor. C4: the candidate re-made bit for bit. C5: the seeds distinct.
+
+**The scenes.** 24 new ones: 12 R (65000-65011) and 12 C (66000-66011), 256 x 256, 4 spp in and 32 for the truth, all reserved.
+
+**Reported beside it.**
+- The holes' share per image.
+- relMSE on the hole pixels alone, per arm.
+- GhX against round 62's full-fill G' on the same scenes. That says what the scaled fill itself costs, which is not the
+  question here.
+
+**What each outcome does.**
+- H2 supported: the generator fills holes from the newer frame.
+- H1 alone: it fills them from the cross-fade.
+- Neither: they stay black, and the backlog says so.
+- The CPU reference and render/denoiseFrameGenGPU.mjs's gather take the rule together. The gather's parity rows hold them
+  to each other, as before.
+
+**Predictions, fixed now, deciding nothing.**
+- **P1:** H1 is supported on 24 of 24. Black is the worst answer a hole can have.
+- **P2:** H2 is supported, by a mean d under 0.05. The holes are 1 % of a frame.
+- **P3:** C1 holds for GhX.
+
+### Part B: the frame pacer -- the tree's own, driven by the path tracer's costs
+
+**A correction before any code ran.** This part first described a new pacer. **The tree already has one:**
+render/framePacer.mjs (v4743-v4756), FSR3's, with fx/fsr's gates behind it. It has:
+- a display that refreshes at a fixed rate or when told (VRR);
+- FSR3's "midpoint" policy, which holds the traced frame half an interval after the generated one, and is the rule written
+  here first;
+- a generation cost;
+- judder, new images a second, and latency (`scheduleCPU`, `scheduleVrrCPU`, `pacingMetrics`).
+
+Writing it here, I overwrote that file. It was restored from git before anything ran, and nothing of mine replaces it. Part B
+is therefore no new code.
+
+**What Part B does instead.** It drives the existing pacer with section 150's measured costs. The traced frame is T: 38.0 ms
+on the 1080 and 447 ms on the Intel. Generation is G₆₄: 4.34 ms and 98-112 ms. Both use policy "midpoint" against "none".
+- **On a 60 Hz display** (`scheduleCPU`, refresh 16.667 ms, pairs "two", which makeFsr3({ hold: 2 }) keeps), and **on a
+  variable-refresh display** from 30 to 144 Hz (`scheduleVrrCPU`).
+- Over 120 traced frames at a steady T, and with T jittered ±20 % from a fixed seed.
+
+**Its rows, in render/denoiseFrameGenCost-selfcheck.mjs (they read the tree's pacer and assert only what follows from it):**
+- On the 1080's costs, "midpoint" shows at least 1.6 x the new images a second "none" does, on both displays.
+- Its latency is within T / 2 + G + one refresh of the traced frame's.
+- Every present follows the readiness of what it shows: a schedule property the pacer's own gate holds, read here as well.
+- The Intel's figures, and the judder of each, are reported and decide nothing.
+
+**Not this round.** Wiring the pacer and the generator into path-tracer.html's own loop. That is the page change
+`denoise-framegen-page` names; it follows these two pieces.

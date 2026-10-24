@@ -104,7 +104,14 @@ const rgb = (img4, n) => { const o = new Float64Array(n * 3); for (let p = 0; p 
  * chain's fill, bilinear upscale, shift and composite (round 32's noisyHalf at frame 7); Bmid1 the chain on the midpoint frame
  * alone; GNoFill the generator with its holes left black. `field` is the warp's own check and the holes' count.
  */
-export function frameGenFrames(seq, net) {
+/**
+ * Round 66 (section 151): the fill scaled by 256 / 1920 -- radius 1, reach 2 -- so a 256 x 256 frame leaves the holes 1080p's
+ * full fill leaves (0.97 % against 0.77 % on round 63's scene). With `{ holes: true }` frameGenFrames adds the scaled generator
+ * between L6 and L7 and its holes filled four ways: Gh (black, today's), GhX (the cross-fade), GhC (L7), GhP (L6), each
+ * composited at the midpoint as G' is; and `holeMask`, 1 where the scaled generator left a hole.
+ */
+export const HOLE_FILL = Object.freeze({ radius: 1, reach: 2, side: "blend", prefer: "farther" });
+export function frameGenFrames(seq, net, { holes = false } = {}) {
     const W = seq.w, H = seq.h, w = W / 2, h = H / 2, N = W * H, S = makeScene(seq.family, seq.seed), den = (fr) => denoise(net, fr.x, fr.h, fr.w).y;
     const geo = seq.path.eyes.map((eye) => firstHits(S, eye, W, H));
     const up = (img, cov, kind) => upscale(fillEmitters(img, cov, w, h), w, h, W, H, kind);
@@ -132,7 +139,14 @@ export function frameGenFrames(seq, net) {
         if (X >= 0 && Y >= 0 && X < W && Y < H && g6.obj[q] === g7.obj[p]) { warped += dist(q, p); nw++; }
         if (g6.obj[p] === g7.obj[p]) { still += dist(p, p); ns++; }
     }
-    return { G: rgb(g.frame, N), X: rgb(crossFadeCPU({ prev: rgba(O6, N), cur: rgba(O7, N), w: W, h: H, t: 0.5 }), N), R: O6, O7, noisy,
+    let holeArms = {};
+    if (holes) {
+        const gh = gen(HOLE_FILL, L6, L7), G0 = rgb(gh.frame, N), xf = rgb(crossFadeCPU({ prev: rgba(L6, N), cur: rgba(L7, N), w: W, h: H, t: 0.5 }), N);
+        const holeMask = Uint8Array.from(gh.hole);
+        const fb = (src) => { const o = Float64Array.from(G0); for (let p = 0; p < N; p++) if (holeMask[p]) for (let c = 0; c < 3; c++) o[p * 3 + c] = src[p * 3 + c]; return o; };
+        holeArms = { Gh: mid(G0), GhX: mid(fb(xf)), GhC: mid(fb(L7)), GhP: mid(fb(L6)), holeMask, holesScaled: gh.holes };
+    }
+    return { ...holeArms, G: rgb(g.frame, N), X: rgb(crossFadeCPU({ prev: rgba(O6, N), cur: rgba(O7, N), w: W, h: H, t: 0.5 }), N), R: O6, O7, noisy,
              Bmid1: compositeEmitters(up(den(seq.midHalf), seq.midHalf.cov, "easu"), seq.E.mid), GNoFill: rgb(g0.frame, N),
              // round 60: the light-free arrangement -- G', X', R' and its noisy frame, each composited with E_mid
              Gl: mid(rgb(gl.frame, N)), Xl: mid(rgb(crossFadeCPU({ prev: rgba(L6, N), cur: rgba(L7, N), w: W, h: H, t: 0.5 }), N)), Rl: mid(L6), noisyMid: mid(noisyLight),

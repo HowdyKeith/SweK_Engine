@@ -143,6 +143,30 @@ console.log("\n5. ROUND 60 (section 136): THE SAME GENERATOR BETWEEN LIGHT-FREE 
         `${seq.E.mid.cov.filter((v) => v > 0).length} pixels lit at the midpoint, ${seq.E.cur.cov.filter((v) => v > 0).length} at frame 7`);
 }
 
+// section 151's sabotages: H1s GhX filled from L6 -> 1 red (the fallback row); H2s HOLE_FILL radius 2 / reach 3 -> 2 red here and 1 in the
+// study gate. Each restored byte-identical.
+console.log("\n6. ROUND 66 (section 151): THE FILL SCALED TO 1080p's HOLES, AND WHAT A HOLE SHOWS");
+{
+    const { compositeEmitters } = await imp("render/denoiseUpscale.mjs"), { crossFadeCPU } = await imp("render/frameInterp.mjs");
+    const net = decodeNet(JSON.parse(fs.readFileSync(path.join(ENG, "render", "denoise-net-r11.json"), "utf8")).net);
+    // 48 x 48: the smallest size at which this scene leaves holes under the scaled fill (26; none at 32)
+    const D = 48, N = D * D, seq = FG.renderFrameGenImages("R", 990916, { w: D, h: D, sppIn: 4, sppRef: 8 }), F = FG.frameGenFrames(seq, net, { holes: true });
+    const bits = (a, b) => a.length === b.length && Array.from(a).every((v, i) => Object.is(v, b[i]));
+    const rgba = (a) => { const o = new Float32Array(N * 4); for (let p = 0; p < N; p++) { for (let c = 0; c < 3; c++) o[p * 4 + c] = a[p * 3 + c]; o[p * 4 + 3] = 1; } return o; };
+    const rgb = (a) => { const o = new Float64Array(N * 3); for (let p = 0; p < N; p++) for (let c = 0; c < 3; c++) o[p * 3 + c] = a[p * 4 + c]; return o; };
+    const S = makeScene("R", 990916), m = FG.motionField(S, seq.path.eyes[FG.PREV_FRAME], seq.path.eyes[FG.CUR_FRAME], D, D), mid = (y) => compositeEmitters(y, seq.E.mid);
+    const g = interpolateFrameCPU({ prev: rgba(F.L6), cur: rgba(F.L7), w: D, h: D, flow: m.flow, bw: D, bh: D, block: 1, depthBlock: m.depth, indexedBy: "cur", t: 0.5, fill: FG.HOLE_FILL });
+    ok("!! HOLE_FILL is the fill scaled by 256 / 1920 -- radius 1, reach 2, blended, the farther -- and Gh is interpolateFrameCPU's frame with it between L6 and L7, lit at the midpoint, its holes black; holeMask its holes",
+        FG.HOLE_FILL.radius === 1 && FG.HOLE_FILL.reach === 2 && FG.HOLE_FILL.side === "blend" && FG.HOLE_FILL.prefer === "farther" && Object.isFrozen(FG.HOLE_FILL) &&
+        bits(F.Gh, mid(rgb(g.frame))) && bits(F.holeMask, g.hole) && F.holesScaled === g.holes && g.holes > 0, `${g.holes} of ${N} holes`);
+    // each fallback is Gh outside the holes and its source inside them, lit the same (the composite is per pixel)
+    const xf = mid(rgb(crossFadeCPU({ prev: rgba(F.L6), cur: rgba(F.L7), w: D, h: D, t: 0.5 }))), l7 = mid(F.L7), l6 = mid(F.L6);
+    const per = (A, src) => { let bad = 0; for (let p = 0; p < N; p++) for (let c = 0; c < 3; c++) if (!Object.is(A[p * 3 + c], F.holeMask[p] ? src[p * 3 + c] : F.Gh[p * 3 + c])) bad++; return bad; };
+    ok("!! GhX, GhC and GhP are Gh outside its holes and, inside them, the cross-fade of L6 and L7, L7, and L6 -- each lit at the midpoint, bit for bit",
+        per(F.GhX, xf) === 0 && per(F.GhC, l7) === 0 && per(F.GhP, l6) === 0 && !bits(F.GhX, F.Gh) && !bits(F.GhC, F.GhX), `${per(F.GhX, xf)}, ${per(F.GhC, l7)}, ${per(F.GhP, l6)} differences`);
+    ok("  ...and without { holes: true } none of the round's arms is made -- rounds 59-62's frames are as they were", !("Gh" in FG.frameGenFrames(seq, net)));
+}
+
 console.log("\n4. THE SEEDS AND THE SPLIT");
 {
     const r = FG.frameGenSeeds(53000), all = SPLITS_FRAMEGEN.T1.seeds.flatMap((s) => { const q = FG.frameGenSeeds(s); return [...q.half, q.mid, q.ref, q.ref2]; });

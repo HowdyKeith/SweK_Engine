@@ -2508,7 +2508,7 @@ export const NEXT_ROUNDS = [
         id: "denoise-framegen-page",
         blocker: "OPEN",
         what: "FSR3's generated frame on path-tracer.html's page: the half-size chain with its history traces every other frame, render/denoiseFrameGenGPU.mjs's compute generator makes the one between, lit at its own time.",
-        how: "Not designed. Its own questions: a pacing loop that presents the generated frame between two traced ones; the 0.77 % of a 1080p frame no fill reaches (black before the light composite); and the page's controls. Keith's call whether to build it.",
+        how: "Round 66 (section 151) takes its two pieces. The holes: the fill scaled to 1080p's holes at 256 x 256, and black against the cross-fade (H1) and the newer frame (H2) -- --harvest-framegen-holes, section 152 its verdict. The pacing: the tree's own render/framePacer.mjs (FSR3's midpoint policy, v4743-v4756) driven with section 150's costs -- on the 1080 it shows 1.99-2.00 x the new images a second of no generation, at 60 Hz and on a 30-144 Hz display, for 13-14 ms more latency. Wiring the two into path-tracer.html's loop follows.",
         why: "Both halves are now supported on the path tracer: quality (section 145, display space, narrowly against the cross-fade) and cost (section 150, 1.6-1.8 x the frames). The traced midpoint is still better (16 of 24), so generation is the cheaper substitute.",
     },
     {

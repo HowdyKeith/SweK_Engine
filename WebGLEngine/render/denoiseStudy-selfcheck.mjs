@@ -133,6 +133,8 @@
 //   L6 the families 6 R and 18 C                                                 1 RED -- the round row
 //   L7 ROUND_FRAMEGEN_LARGE left off the command's import line (the first harvest's death) 1 RED -- the import row
 //   V145a-f (section 145) the lost image, H1's count, H1's threshold, linear H1's count, the results' commit, C1 at 24
+//   H2s-H7s (section 151) HOLE_FILL radius 2 / reach 3 (with the frame-gen gate's two), H2 against Gh, SPLITS_FRAMEGEN_HOLES left out
+//           of the refusal, the command without c1Min, the hole pixels graded in linear radiance -- each red, the rows they name
 //           each 1 RED -- the row it names
 "use strict";
 import fs from "node:fs";
@@ -697,7 +699,7 @@ console.log("\n14e. ROUND 60: THE GENERATOR BETWEEN LIGHT-FREE FRAMES, LIT AT TH
     let threw = null; try { runFrameGenStudy({ splits: ROUND_FRAMEGEN_LF.splits, arrangement: "lightFree", net, image: 4, sppIn: 1, sppRef: 1 }); } catch (e) { threw = e.message; }
     let bad = null; try { runFrameGenStudy({ arrangement: "lit", net }); } catch (e) { bad = e.message; }
     ok("!! on the REAL split without harvest it is refused at its first scene, and an arrangement it does not know is refused by name",
-        /seed 55000 is a dataset seed/.test(threw || "") && /arrangement is "shown" \(section 133\), "lightFree" \(section 136\) or "lightFreeDisplay" \(section 139\)/.test(bad || ""), threw);
+        /seed 55000 is a dataset seed/.test(threw || "") && /arrangement is "shown" \(section 133\), "lightFree" \(section 136\), "lightFreeDisplay" \(section 139\) or "holes" \(section 151\)/.test(bad || ""), threw);
     const mini = Object.freeze({ T1: Object.freeze({ family: "R+C", families: Object.freeze(["R", "C"]), seeds: Object.freeze([990912, 990913]) }) });
     const out = runFrameGenStudy({ splits: mini, arrangement: "lightFree", net, image: 16, sppIn: 4, sppRef: 8 }), V = out.verdict;
     ok("!! end to end on the miniature: the light-free arms and round 59's measured on both images, both hypotheses over G', the display-space grading and the field reported, C4 on G', C5, C2 cited",
@@ -837,6 +839,44 @@ console.log("\n14g. ROUND 62: ROUND 61's ARRANGEMENT ON A TEST SET TWICE ITS SIZ
             pos(res.secondary.linear.H1) === 12 && res.secondary.linear.H1.reduce((a, d) => a + d, 0) < 0 && pos(res.secondary.linear.H2) === 19 &&
             res.secondary.midTraced.filter((d) => d < 0).length === 16 && pos(res.secondary.fill) === 24);
     } else ok("!! section 145 reads render/denoise-results-framegen-large.json, and it is not there", false);
+}
+
+console.log("\n14h. ROUND 66: WHAT A HOLE SHOULD SHOW, THE FILL SCALED TO 1080p's HOLES (pre-registration section 151)");
+{
+    const { runFrameGenStudy, ROUND_FRAMEGEN_LARGE, ROUND_FRAMEGEN_HOLES, RESULTS_FRAMEGEN_HOLES, frameGenSetsHoles, relMSEMasked, toDisplay, SHIPPED_NET } = await imp("render/denoiseStudy.mjs");
+    const D = await imp("render/denoiseScenes.mjs"), { decodeNet } = await imp("render/denoiseDevice.mjs"), FG = await imp("render/denoiseFrameGen.mjs");
+    const net = decodeNet(JSON.parse(fs.readFileSync(path.join(ENG, SHIPPED_NET), "utf8")).net);
+    const earlier = new Set([D.SPLITS_TEMPORALUP, D.SPLITS_FRAMEGEN, D.SPLITS_FRAMEGEN_LF, D.SPLITS_FRAMEGEN_DISPLAY, D.SPLITS_FRAMEGEN_LARGE, D.SPLITS_PAGE, D.SPLITS_MESH_C, D.SPLITS_R47].flatMap((S) => Object.values(S).flatMap((x) => x.seeds)));
+    const T1 = D.SPLITS_FRAMEGEN_HOLES.T1;
+    ok("!! ROUND_FRAMEGEN_HOLES: 24 new scenes -- 12 R from 65000, 12 C from 66000 -- the \"holes\" arrangement, display space, C1 of each candidate at 22, round 62's size, test and cited C2; its own results file",
+        ROUND_FRAMEGEN_HOLES.splits === D.SPLITS_FRAMEGEN_HOLES && T1.seeds.length === 24 && new Set(T1.seeds).size === 24 &&
+        T1.seeds.slice(0, 12).every((x, i) => x === 65000 + i && T1.families[i] === "R") && T1.seeds.slice(12).every((x, i) => x === 66000 + i && T1.families[12 + i] === "C") &&
+        T1.seeds.every((x) => !earlier.has(x) && D.isDatasetSeed(x)) && ROUND_FRAMEGEN_HOLES.arrangement === "holes" && ROUND_FRAMEGEN_HOLES.c1Of === "candidate" && ROUND_FRAMEGEN_HOLES.c1Min === 22 &&
+        ["image", "test", "c2Prior"].every((k) => ROUND_FRAMEGEN_HOLES[k] === ROUND_FRAMEGEN_LARGE[k]) && RESULTS_FRAMEGEN_HOLES === "render/denoise-results-framegen-holes.json");
+    const fx = { noisyMid: [9], Gh: [3], GhX: [2], GhC: [1], floor: [0.1] }, sets = frameGenSetsHoles(fx);
+    ok("  frameGenSetsHoles: H1 is GhX (the candidate) against Gh, H2 GhC against GhX, each against the noisy midpoint frame",
+        sets.H1.net[0] === fx.GhX && sets.H1.filter === fx.Gh && sets.H2.net[0] === fx.GhC && sets.H2.filter === fx.GhX && sets.H1.noisy === fx.noisyMid && sets.H2.noisy === fx.noisyMid);
+    ok("  relMSEMasked is relMSE over the masked pixels' three channels, null when none is masked",
+        relMSEMasked([1, 1, 1, 2, 2, 2], [1, 1, 1, 1, 1, 1], [0, 1]) === relMSE([2, 2, 2], [1, 1, 1]) && relMSEMasked([1, 1, 1], [1, 1, 1], [0]) === null);
+    let threw = null; try { runFrameGenStudy({ splits: ROUND_FRAMEGEN_HOLES.splits, arrangement: "holes", net, image: 4, sppIn: 1, sppRef: 1 }); } catch (e) { threw = e.message; }
+    ok("!! on the REAL split without harvest it is refused at its first scene", /seed 65000 is a dataset seed/.test(threw || ""), threw);
+    // the miniature, at 48 x 48 where the scaled fill leaves holes on R 990916 (26)
+    const mini = Object.freeze({ T1: Object.freeze({ family: "R+C", families: Object.freeze(["R", "R"]), seeds: Object.freeze([990916, 990914]) }) });
+    const out = runFrameGenStudy({ splits: mini, arrangement: "holes", net, image: 48, sppIn: 4, sppRef: 8, c1Min: 2 });
+    const seq = FG.renderFrameGenImages("R", 990916, { w: 48, h: 48, sppIn: 4, sppRef: 8 }), F = FG.frameGenFrames(seq, net, { holes: true }), rD = toDisplay(seq.ref);
+    ok("!! end to end on the miniature: every table is the arm's relMSE in display space, recomputed here bit for bit; the hole pixels' own relMSE per arm; the hole share; the scaled fill recorded",
+        ["Gh", "GhX", "GhC", "GhP", "noisyMid", "Gl"].every((k) => Object.is(out.tables[k][0], relMSE(toDisplay(F[k]), rD))) &&
+        Object.is(out.secondary.holePixels[0].GhX, relMSEMasked(toDisplay(F.GhX), rD, F.holeMask)) && out.secondary.holeShare[0] === F.holesScaled / (48 * 48) && F.holesScaled > 0 &&
+        JSON.stringify(out.config.holeFill) === JSON.stringify(FG.HOLE_FILL) && out.config.c1Of === "candidate" && out.determinism === true,
+        `holes ${F.holesScaled}; run ${out.verdict.run}`);
+    const cli = fs.readFileSync(path.join(ENG, "tools/denoiseStudy.mjs"), "utf8");
+    const b0 = cli.indexOf('} else if (args.includes("--harvest-framegen-holes")) {'), branch = b0 >= 0 ? cli.slice(b0, cli.indexOf("} else if (round) {", b0)) : "";
+    const code = branch.replace(/\/\/.*$/gm, "");
+    ok("!! --harvest-framegen-holes runs runFrameGenStudy on ROUND_FRAMEGEN_HOLES's split, size, arrangement and c1Min under harvest, writes its own file and never an existing one, records its commit, and logs no verdict",
+        branch.length > 400 && /runFrameGenStudy\(\{ splits: ROUND_FRAMEGEN_HOLES\.splits, image: ROUND_FRAMEGEN_HOLES\.image, arrangement: ROUND_FRAMEGEN_HOLES\.arrangement,/.test(code) &&
+        /c1Min: ROUND_FRAMEGEN_HOLES\.c1Min/.test(code) && /harvest: true/.test(code) && /path\.join\(ENG, ROUND_FRAMEGEN_HOLES\.results\)/.test(code) && /existsSync\(file\)/.test(code) &&
+        /out\.commit = /.test(code) && !/ROUND_FRAMEGEN_LARGE\./.test(code) && !/verdict|status|supported/.test(code));
+    ok("  its results are not yet written: section 152 reads them once the harvest's file is committed", !fs.existsSync(path.join(ENG, RESULTS_FRAMEGEN_HOLES)));
 }
 
 console.log("\n15. THE UPSCALE ROUND: HALF SIZE + FSR1 AGAINST THE FRAMES IT COULD BE INSTEAD (pre-registration section 81)");

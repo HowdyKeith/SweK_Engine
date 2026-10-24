@@ -119,6 +119,30 @@ ok("  the fixture: family R's seed 990914, outside every split, its last orbit s
         N.every((x) => x.parts.generator >= 2.37 && x.parts.generator <= 2.43 && x.threeJs / x.parts.generator > 7.3 && x.threeJs / x.parts.generator < 8.0 && rate(x) > 1.79 && rate(x) < 1.81) &&
         I.every((x) => rate(x) > 1.59 && rate(x) < 1.65), [...N, ...I].map((x) => `${(x.threeJs / x.parts.generator).toFixed(2)} x, ${rate(x).toFixed(3)}`).join("; "));
 }
+{
+    // SECTION 151, PART B: the tree's own pacer (render/framePacer.mjs, FSR3's, v4743-v4756) driven by section 150's measured costs --
+    // "midpoint" against "none", on a 60 Hz display and on a 30-144 Hz variable one, 120 traced frames steady and jittered +-20 %
+    const FP = await imp("render/framePacer.mjs"), { seededRandom } = await imp("brain/convNet.mjs");
+    const costs = { "gtx1080": { T: 38.0, G: 4.34 }, "intel-gen9": { T: 447, G: 105 } }, ref60 = 1000 / 60, rows = {};
+    for (const [gpu, { T, G }] of Object.entries(costs)) for (const jit of [false, true]) {
+        const r = seededRandom(151), durations = Array.from({ length: 120 }, () => (jit ? T * (0.8 + 0.4 * r.u()) : T));
+        const win = { from: 10 * T, to: 110 * T };
+        const fixed = (policy) => FP.pacingMetrics(FP.scheduleCPU({ durations, refresh: ref60, policy, genCost: G, pairs: "two" }), win);
+        const vrr = (policy) => { const sc = FP.scheduleVrrCPU({ durations, min: 1000 / 144, max: 1000 / 30, policy, genCost: G }); return { m: FP.pacingMetrics(sc, { ...win, images: "new" }), sc }; };
+        const v0 = vrr("none"), v1 = vrr("midpoint");
+        // every present follows the readiness of what it shows: a real frame after its own ready, a generated one after its pair's newer frame plus G
+        const ordered = v1.sc.shown.filter((x) => x.kind !== "hold").every((x) => x.time + 1e-9 >= v1.sc.frames[x.k].ready + (x.kind === "gen" ? G : 0));
+        rows[gpu + (jit ? " jittered" : "")] = { T, G, f0: fixed("none"), f1: fixed("midpoint"), v0: v0.m, v1: v1.m, ordered };
+    }
+    for (const [k, x] of Object.entries(rows)) say(`section 151: pacing on the ${k} costs (T ${x.T}, G ${x.G}): 60 Hz -- none ${x.f0.newPerSecond.toFixed(1)} new images/s, judder ${x.f0.judder.toFixed(2)} ms, latency ${x.f0.meanLatency.toFixed(1)}; midpoint ${x.f1.newPerSecond.toFixed(1)}/s, judder ${x.f1.judder.toFixed(2)}, latency ${x.f1.meanLatency.toFixed(1)} | VRR 30-144 -- none ${x.v0.newPerSecond.toFixed(1)}/s, midpoint ${x.v1.newPerSecond.toFixed(1)}/s, judder ${x.v1.judder.toFixed(2)}, latency ${x.v1.meanLatency.toFixed(1)}`);
+    const N = ["gtx1080", "gtx1080 jittered"].map((k) => rows[k]);
+    ok("!! section 151: on the 1080's costs the tree's pacer, FSR3's midpoint policy, shows at least 1.6 x the new images a second of no generation, on a 60 Hz display and on a variable one, steady and jittered",
+        N.every((x) => x.f1.newPerSecond >= 1.6 * x.f0.newPerSecond && x.v1.newPerSecond >= 1.6 * x.v0.newPerSecond),
+        N.map((x) => `${(x.f1.newPerSecond / x.f0.newPerSecond).toFixed(2)} x at 60 Hz, ${(x.v1.newPerSecond / x.v0.newPerSecond).toFixed(2)} x VRR`).join("; "));
+    ok("  ...and its latency within T / 2 + G + one refresh of no generation's, and every present after what it shows is ready -- on both GPUs' costs",
+        Object.values(rows).every((x) => x.f1.meanLatency <= x.f0.meanLatency + x.T / 2 + x.G + ref60 && x.v1.meanLatency <= x.v0.meanLatency + x.T / 2 + x.G + 1000 / 30 && x.ordered),
+        Object.entries(rows).map(([k, x]) => `${k} +${(x.f1.meanLatency - x.f0.meanLatency).toFixed(1)} ms`).join("; "));
+}
 console.log("\n2. ON THE DEVICE: the field against the CPU's, then the field and the generator at 1920 x 1080, timed");
 const skip = webgpuSkipReason();
 if (skip) { console.log(`  SKIP  ${skip}`); console.log("  ----  *** NOT A PASS. *** Nothing here is static."); fails++; }
@@ -308,6 +332,7 @@ else {
 // half-even round), G4 (the reach removed) and G9 (a hole's frame 0.5, not 0) WENT 0 RED on the scene's field: it has no landing
 // on an exact half pixel, no hole past the radius and none left. *** The synthetic field's row was added for them; each is now
 // 1 red there.
+// SECTION 151, PART B: P1s the midpoint arm run as "none" -> 1 red; P2s the latency bound without T / 2 and the refresh -> 1 red.
 // SECTION 150, each restored byte-identical: V150a the 1080's run a generator typed 9.429 in its report -> 2 red (its ratio
 // 0.29, and P2's row); V150b the presented rate's upper bound 1.793 -> 1 red; V150c the 1080's first ratio typed 0.112 -> 1 red.
 // SECTION 149, each restored byte-identical: V149a run a's compute generator typed 58.612 in its report -> 2 red (G / T 0.250

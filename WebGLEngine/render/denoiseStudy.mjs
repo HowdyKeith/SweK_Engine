@@ -21,7 +21,7 @@
 // Without it everything is computed, as before; with it the result is the same, bit for bit
 // (render/denoiseCache-selfcheck.mjs). A scene rendered under --harvest is never served to a run without it.
 "use strict";
-import { SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, SPLITS_R8, SPLITS_R9, SPLITS_R10, SPLITS_R11, SPLITS_MESH, SPLITS_FSR1, SPLITS_HALFRES, SPLITS_EMITTER, SPLITS_TEMPORALUP, SPLITS_R47, SPLITS_MESH_C, SPLITS_PAGE, SPLITS_FRAMEGEN, SPLITS_FRAMEGEN_LF, SPLITS_FRAMEGEN_DISPLAY, SPLITS_FRAMEGEN_LARGE, familyOf, makeScene, IMAGE, SPP_IN, SPP_REF, renderImages, renderSeeds, inputChannels, remodulate } from "./denoiseScenes.mjs";
+import { SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, SPLITS_R8, SPLITS_R9, SPLITS_R10, SPLITS_R11, SPLITS_MESH, SPLITS_FSR1, SPLITS_HALFRES, SPLITS_EMITTER, SPLITS_TEMPORALUP, SPLITS_R47, SPLITS_MESH_C, SPLITS_PAGE, SPLITS_FRAMEGEN, SPLITS_FRAMEGEN_LF, SPLITS_FRAMEGEN_DISPLAY, SPLITS_FRAMEGEN_LARGE, SPLITS_FRAMEGEN_HOLES, familyOf, makeScene, IMAGE, SPP_IN, SPP_REF, renderImages, renderSeeds, inputChannels, remodulate } from "./denoiseScenes.mjs";
 import { renderSequence, temporalChannels, sequenceSeeds } from "./denoiseTemporal.mjs";
 import { withMask, emitterCoverage, emitterRadiance, MASK_STRIDE, MASK_CHANNEL, COVERAGE_GRID } from "./denoiseMask.mjs";
 import { jointBilateral, tuneFilter } from "./denoiseFilter.mjs";
@@ -30,7 +30,7 @@ import { relMSE, verdict, trainFit, historyFit, trainSanity, effects } from "./d
 import { cached, cachedMany, hashArrays } from "./denoiseCache.mjs";
 import { upscale, renderUpscaleImages, renderSeedsUpscale, emitterAwareUpscale, fillEmitters, compositeEmitters, nearEmitterShare, RCAS_SHARPNESS, RCAS_DENOISE, GAMMA, toPerceptual } from "./denoiseUpscale.mjs";
 import { trainParallel } from "./denoisePool.mjs";
-import { renderFrameGenImages, frameGenSeeds, frameGenFrames, FRAMEGEN_FILL } from "./denoiseFrameGen.mjs";
+import { renderFrameGenImages, frameGenSeeds, frameGenFrames, FRAMEGEN_FILL, HOLE_FILL } from "./denoiseFrameGen.mjs";
 import { renderTemporalUpscaleImages, temporalUpscaleSeeds, accumulateUpscaled, shiftResample, sequenceGeometry, halfShift, JITTER } from "./denoiseTemporalUpscale.mjs";
 
 export const SEEDS = Object.freeze([1, 2, 3]);
@@ -429,48 +429,68 @@ export const ROUND_FRAMEGEN_DISPLAY = Object.freeze({ splits: SPLITS_FRAMEGEN_DI
  */
 export const RESULTS_FRAMEGEN_LARGE = "render/denoise-results-framegen-large.json";
 export const ROUND_FRAMEGEN_LARGE = Object.freeze({ splits: SPLITS_FRAMEGEN_LARGE, image: 256, test: "signflip", c2Prior: ROUND_MESH.c2Prior, arrangement: "lightFreeDisplay", c1Of: "candidate", c1Min: 22, results: RESULTS_FRAMEGEN_LARGE });
+/**
+ * Section 151, ROUND 66: what a hole should show. The light-free generator with its fill scaled to 1080p's holes (HOLE_FILL),
+ * its holes black (Gh), from the cross-fade (GhX), from L7 (GhC); H1 GhX against Gh, H2 GhC against GhX, display space, C1 of
+ * each candidate at 22 of 24, on new seeds.
+ */
+export const RESULTS_FRAMEGEN_HOLES = "render/denoise-results-framegen-holes.json";
+export const ROUND_FRAMEGEN_HOLES = Object.freeze({ splits: SPLITS_FRAMEGEN_HOLES, image: 256, test: "signflip", c2Prior: ROUND_MESH.c2Prior, arrangement: "holes", c1Of: "candidate", c1Min: 22, results: RESULTS_FRAMEGEN_HOLES });
+export const frameGenSetsHoles = (t) => ({ H1: { noisy: t.noisyMid, filter: t.Gh, net: [t.GhX], floor: t.floor }, H2: { noisy: t.noisyMid, filter: t.GhX, net: [t.GhC], floor: t.floor } });
+/** relMSE (denoiseStats.mjs's) over the pixels a mask names -- section 151's hole pixels -- or null when it names none. */
+export function relMSEMasked(a, ref, mask) {
+    const n = mask.reduce((x, m) => x + (m ? 3 : 0), 0), A = new Float64Array(n), B = new Float64Array(n);
+    let k = 0;
+    for (let p = 0; p < mask.length; p++) if (mask[p]) for (let c = 0; c < 3; c++) { A[k] = a[p * 3 + c]; B[k] = ref[p * 3 + c]; k++; }
+    return k ? relMSE(A, B) : null;
+}
 /** Round 26's transfer, Reinhard then gamma 2.2 -- the display space a secondary grades every arm in too, and round 61 grades in. */
 export const toDisplay = (y) => Float64Array.from(y, toPerceptual);
 export function runFrameGenStudy({ splits = ROUND_FRAMEGEN.splits, net, test = ROUND_FRAMEGEN.test, c2Prior = ROUND_FRAMEGEN.c2Prior, arrangement = "shown", c1Min = null,
                                    harvest = false, image = IMAGE, sppIn = SPP_IN, sppRef = SPP_REF, cache = null, log = () => {} } = {}) {
     if (!net) throw new Error("denoiseStudy: runFrameGenStudy needs the shipped network, decoded by its caller");
-    if (!["shown", "lightFree", "lightFreeDisplay"].includes(arrangement)) throw new Error(`denoiseStudy: runFrameGenStudy's arrangement is "shown" (section 133), "lightFree" (section 136) or "lightFreeDisplay" (section 139), not ${arrangement}`);
+    if (!["shown", "lightFree", "lightFreeDisplay", "holes"].includes(arrangement)) throw new Error(`denoiseStudy: runFrameGenStudy's arrangement is "shown" (section 133), "lightFree" (section 136), "lightFreeDisplay" (section 139) or "holes" (section 151), not ${arrangement}`);
     // round 61: "lightFreeDisplay" is round 60's arms graded in display space, and its linear grading kept as the secondary
-    const lf = arrangement !== "shown", disp = arrangement === "lightFreeDisplay";
+    // round 66: "holes" is the display-graded light-free arrangement with the scaled fill's holes filled three ways
+    const hl = arrangement === "holes", lf = arrangement !== "shown", disp = arrangement === "lightFreeDisplay" || hl;
     const t0 = Date.now(), timings = {}, split = splits.T1;
     const lap = (k) => { timings[k] = Date.now() - t0; log(`${k} at ${(timings[k] / 1000).toFixed(1)} s`); };
     const config = { image, half: image / 2, sppIn, sppRef, harvest, test, c2Prior, fill: FRAMEGEN_FILL, t: 0.5, field: "the scene's own: eye 7's first hits projected into camera 6, per pixel",
                      trained: "nothing -- the shipped network", split: { family: split.family, n: split.seeds.length, first: split.seeds[0] },
-                     arrangement, grading: disp ? "display: round 26's transfer, Reinhard then gamma 2.2, before relMSE" : "linear radiance", ...(disp ? { c1Of: "candidate" } : {}), ...(c1Min !== null ? { c1Min } : {}), hypotheses: lf
+                     arrangement, ...(hl ? { holeFill: HOLE_FILL } : {}), grading: disp ? "display: round 26's transfer, Reinhard then gamma 2.2, before relMSE" : "linear radiance", ...(disp ? { c1Of: "candidate" } : {}), ...(c1Min !== null ? { c1Min } : {}), hypotheses: lf
                          ? { H1: "G' (generated between L6 and L7, lit at the midpoint) against X' (their cross-fade, lit the same)", H2: "G' against R' (L6 held, lit the same)" }
                          : { H1: "G (generated between O6 and O7) against X (their cross-fade)", H2: "G against R (O6 repeated)" } };
-    const keys = lf ? ["Gl", "Xl", "Rl", "noisyMid", "GlNoFill", "G", "X", "R", "O7", "noisy", "Bmid1"] : ["G", "X", "R", "O7", "noisy", "Bmid1", "GNoFill"], tables = Object.fromEntries(keys.map((k) => [k, []]));
+    const keys = hl ? ["Gh", "GhX", "GhC", "GhP", "noisyMid", "Gl"] : lf ? ["Gl", "Xl", "Rl", "noisyMid", "GlNoFill", "G", "X", "R", "O7", "noisy", "Bmid1"] : ["G", "X", "R", "O7", "noisy", "Bmid1", "GNoFill"], tables = Object.fromEntries(keys.map((k) => [k, []]));
     // round 60: and every arm graded in display space too, reported
-    const display = lf ? Object.fromEntries(["Gl", "Xl", "Rl", "G", "X", "R"].map((k) => [k, []])) : null;
+    const display = lf && !hl ? Object.fromEntries(["Gl", "Xl", "Rl", "G", "X", "R"].map((k) => [k, []])) : null;
     tables.floor = [];
-    const field = [];
+    const field = [], holePix = [];
     let determinism = true;
     // ONE IMAGE AT A TIME, as round 32: a sequence is nine frames and four full-size images
     split.seeds.forEach((seed, i) => {
         const fam = familyOf(split, i);
         const seq = cached(cache, `framegen-${fam}-${seed}-${image}-${sppIn}-${sppRef}-${harvest ? "harvest" : "gate"}`,
             () => renderFrameGenImages(fam, seed, { harvest, w: image, h: image, sppIn, sppRef }));
-        const F = frameGenFrames(seq, net);
+        const F = frameGenFrames(seq, net, { holes: hl });
         const rD = disp ? toDisplay(seq.ref) : null;
         for (const k of keys) tables[k].push(disp ? relMSE(toDisplay(F[k]), rD) : relMSE(F[k], seq.ref));
         tables.floor.push(disp ? relMSE(toDisplay(seq.ref2), rD) : relMSE(seq.ref2, seq.ref));
         // the other space's grading, reported: display beside a linear run, linear beside a display one
         if (display) { const r = disp ? seq.ref : toDisplay(seq.ref); for (const k of Object.keys(display)) display[k].push(disp ? relMSE(F[k], r) : relMSE(toDisplay(F[k]), r)); }
-        field.push(F.field);
+        field.push(hl ? { ...F.field, holesScaled: F.holesScaled } : F.field);
+        // round 66: relMSE on the scaled fill's hole pixels alone, per arm, in the grading's space
+        if (hl) { const rD2 = toDisplay(seq.ref); holePix.push(Object.fromEntries(["Gh", "GhX", "GhC", "GhP"].map((k) => [k, relMSEMasked(toDisplay(F[k]), rD2, F.holeMask)]))); }
         // C4: the candidate re-made from the same sequence, bit for bit -- the chain twice, the field, the splat, the fill
-        const cand = lf ? "Gl" : "G";
-        if (i === 0) determinism = frameGenFrames(seq, net)[cand].every((v, j) => Object.is(v, F[cand][j]));
+        const cand = hl ? ["GhX", "GhC"] : [lf ? "Gl" : "G"];
+        if (i === 0) { const again = frameGenFrames(seq, net, { holes: hl }); determinism = cand.every((c) => again[c].every((v, j) => Object.is(v, F[c][j]))); }
         lap(`image ${i + 1} of ${split.seeds.length} (${fam} ${seed})`);
     });
     const allSeeds = split.seeds.flatMap((s) => { const r = frameGenSeeds(s); return [...r.half, r.mid, r.ref, r.ref2]; });
     const seedsDistinct = new Set(allSeeds).size === allSeeds.length;
-    const V = verdict({ sets: (lf ? frameGenSetsLightFree : frameGenSets)(tables), shuffled: null, c2Prior, determinism, seedsDistinct, test, ...(disp ? { c1Of: "candidate" } : {}), ...(c1Min !== null ? { c1Min } : {}) });
-    const secondary = lf
+    const V = verdict({ sets: (hl ? frameGenSetsHoles : lf ? frameGenSetsLightFree : frameGenSets)(tables), shuffled: null, c2Prior, determinism, seedsDistinct, test, ...(disp ? { c1Of: "candidate" } : {}), ...(c1Min !== null ? { c1Min } : {}) });
+    const secondary = hl
+        ? { holeShare: field.map((f) => f.holesScaled / (image * image)), holePixels: holePix, prevFill: effects(tables.GhX, tables.GhP), vsFullFill: effects(tables.GhX, tables.Gl), field }
+        : lf
         ? { midTraced: effects(tables.Bmid1, tables.Gl), fill: effects(tables.GlNoFill, tables.Gl), overShown: effects(tables.G, tables.Gl), shown: { H1: effects(tables.X, tables.G), H2: effects(tables.R, tables.G) },
             // the other space's grading, named by its space: display beside a linear run (round 60), linear beside a display one (round 61)
             [disp ? "linear" : "display"]: { H1: effects(display.Xl, display.Gl), H2: effects(display.Rl, display.Gl), shownH1: effects(display.X, display.G) },
