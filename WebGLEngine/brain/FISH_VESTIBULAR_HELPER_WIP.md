@@ -122,4 +122,39 @@ A pitch-hold dive with TWO disturbance kinds, so the pathways have something to 
 
 **Still open (new).** The hazard model, the hand-written reflex, the lateral sign row and the feature check are code in `tools/` and a gate, none of them built; the gate belongs to the chat that owns the census records. NOT CHECKED (addendum): that the sub has a lateral feature; that any ladder rung of 4b-E is dodgeable; the equivalence sign against the sub's own axes; the 14 features and the weight arithmetic against code; the mirror construction against the fish chat's pilot; that the 130201zf142 project is the volume the Liu skeletons were traced in (the project list does not say).
 
+## ADDENDUM 2, 2026-10-24, BEFORE ANY MEASUREMENT: the interface check, and the ladders
+Written and pushed before `tools/subVestibularTasks.mjs` exists or anything has been flown. Numbers below were reasoned from `physics/mechanics/subModel6dof.mjs` (the vessel: 6,000 kg, virtual 7,800; inertia 1,100 roll and 32,500 pitch and yaw; planes and rudder about 3.6 kN m at full deflection at 2.5 m/s) and nothing else.
+
+**The interface check.** The 14 features are defined in `brain/pilotSubPolicy.mjs`, which is on `main` (Addendum 1 had them as the fish chat's, unread; they are read now): bias, thrTrim, pitchErr, pitchRate, headingErr, yawRate, beta, speedErr, depthErr, climb, pitch, bank, speed, alpha. **Lateral channels among them:** beta (sideslip, relative to the water, so a sway-velocity step shows in it), bank, yawRate, headingErr. **There is no roll-rate feature.** So:
+* 4b-E is **not void**: the cue reaches the pilot through beta and bank.
+* The registration said 4b-T's phasic inputs are "the pitch- and roll-RATE features". Roll rate is not one of the 14, but the vessel reports it as it reports the pitch rate (`rates(state).roll`, positive right side down). **4b-T's inputs are therefore computed from the vessel's sensed quantities, not from the 14 features:** nose-down pitch tonic = -pitch attitude (the model's pitch is positive nose-up); right-roll tonic = bank (positive right side down, which is the workbooks' angle 0, rightward tilt); nose-down pitch phasic = -`rates.pitch`; right-roll phasic = `rates.roll`. Unit-RMS scaling over the training dives, as registered. The sign rows are held later by a gate: a nose-down body gives positive input to rostral-tuned afferents (sin of the angle above 0), a right-side-down body to ipsilateral-tuned ones (cos above 0).
+
+**What this addendum changes (all note's choice, reversible before training).**
+1. **One push, two coherent signals.** The hazard's pulse is a sway-velocity step applied to the hull as a force over 3 ticks (0.1 s), acting 0.1 m BELOW the centre of gravity. A right-hand hazard then pushes the hull left AND rolls it right-side-down: the same side as the otolith equivalence of Addendum 1 says (leftward acceleration is a right-ear-down tilt). That is where the registered "roll-rate kick" comes from; it is not a second free parameter. The offset 0.1 m is chosen, not fitted.
+2. **Reflexes for the reachable rule are a declared set of four,** not one: yaw away from or toward the hazard's side, with thrust +1 or -1, held 3 s from the first tick on which the sideslip exceeds 0.08 rad, the autopilot flying pitch and ballast throughout and everything after the 3 s. Side is read from the sign of the sideslip (a leftward push is a right-hand hazard). The rule's reflex is **the best of the four on the 40 training dives**; this certifies the hazard can be dodged, it does not say which reflex a circuit must learn.
+3. **4b-E's 40 training dives** are the 10 nominal seeds of `TRAIN_SET` (1-10) x side (left, right) x 2 launch times drawn from the dive's seed in [15 s, 35 s]. 4b-P's 40 are `TRAIN_SET` itself (nominal 1-10, recovery 1-10 and 101-110, current 1-10), each with its disturbance drawn from its seed.
+4. **A rung is measured by flying the autopilot with and without the disturbance on the same 40 dives; all rungs are measured and printed (they use the autopilot and the hand reflexes only, no circuit), then the rule below picks the first that qualifies.**
+
+**Mechanism.** The disturbances are forces and torques added to the vessel's accumulator inside a copy of `stepSub`'s tick, in a runner that scores exactly as `brain/subTask.mjs` `fly()` does; the tool's own self-test is that, with no disturbance, it reproduces `fly()`'s score and fingerprint on 12 scenarios. Neither `subTask.mjs` nor the vessel is edited.
+
+**Ladder, 4b-P.** Three kicks and one trim window per dive; a kick is an instant change of the pitch rate; the trim is a constant pitching torque for 20 s from a seeded start in [5 s, 35 s]; kicks at three seeded times in [5 s, 55 s], at least 5 s apart; every sign seeded. Torque in kN m, kick in rad/s:
+
+| rung | 0 | 1 | 2 | 3 | 4 |
+|---|---|---|---|---|---|
+| trim torque | 0.5 | 1 | 2 | 4 | 8 |
+| kick | 0.05 | 0.1 | 0.2 | 0.3 | 0.4 |
+
+(Reasoned scale: the pitch stiffness of the autopilot's planes and the hull's righting is about 57 kN m per rad, so a 1 kN m trim is about 1 degree.) **Rule:** the task is the lowest rung whose disturbance costs the autopilot alone at least 0.05 of mean dive score on the 40 dives. If no rung does, **4b-P is VOID**. Reported, not a rule: the cost of the trim alone and of the kicks alone at the chosen rung.
+
+**Ladder, 4b-E.** One launch per dive at a seeded time, a side seeded; hazard speed 3 m/s on a straight line in the horizontal plane at the depth of the aim point, aimed once at launch at the hull's position after the flight time T had it held its velocity (3-D); the pulse is a sway-velocity step of 0.4 m/s away from the hazard's side (item 1 above); hit = the hull's centre closer than the reach R to the hazard's centre at any tick from launch until twice the flight time; a hit is charged as an early end (the worst tick, 7.5, for every tick unflown):
+
+| rung | 0 | 1 | 2 | 3 | 4 |
+|---|---|---|---|---|---|
+| flight time T (s) | 8 | 6 | 5 | 4 | 3 |
+| reach R (m) | 3 | 4 | 5 | 6 | 7 |
+
+(Reasoned scale: full rudder at 2.5 m/s turns the hull about 0.2 rad/s, enough to move it laterally by 4 to 5 m in 6 s; so the upper rungs may be undodgeable.) **Rule:** the task is the lowest rung that clears BOTH (1) the hazard costs the autopilot alone at least 0.05 of mean dive score and (2) the best of the four reflexes wins back at least half of that cost. If no rung does, **4b-E is VOID**. Reported, not a rule: the autopilot's hit rate, each reflex's hit rate, and whether the pulse's own push dodges the hazard.
+
+**Not decided here, left to the result:** whether the task found is a task worth a training run; that is Keith's call on the numbers, not this note's.
+
 NOT CHECKED: the four cited papers beyond the sentences quoted above; that the matrices agree with the skeletons and JSON files in the Source Data zip (listed, not opened); whether 5.5 dpf wiring is the right thing to model a pitch-hold task on; the Fish1 data terms (unread); the Mauthner identification.
