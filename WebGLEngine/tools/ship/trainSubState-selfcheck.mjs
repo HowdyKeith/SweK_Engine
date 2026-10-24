@@ -47,9 +47,10 @@ const LAYER = family("layer", [[-0.39, -0.49, -0.44], [-0.40, -0.50, -0.45], [-0
 
 sec("1. specs, seeds and circuits");
 await guarded("section 1", async () => {
+    const val = (f) => { try { return f(); } catch (e) { return "THREW " + String(e.message || e).slice(0, 80); } };
     const sp = L.parseSpecs("cx,er:0-2,nostate:5,layer:3");
     ok("parseSpecs reads cx, a range and single indices, in order: cx, er 0 1 2, nostate 5, layer 3", J(sp.map(L.specName)) === '["cx","er:0","er:1","er:2","nostate:5","layer:3"]' && sp[0].family === "cx");
-    ok("parseSpecs trims a spec's spaces (' cx , er:0-1 ' reads as cx, er:0, er:1) and accepts the last index, 19", J(L.parseSpecs(" cx , er:0-1 ").map(L.specName)) === '["cx","er:0","er:1"]' && J(throws(() => L.parseSpecs("er:19"))) === "null" && J(L.parseSpecs("nostate:19").map(L.specName)) === '["nostate:19"]');
+    ok("parseSpecs trims a spec's spaces (' cx , er:0-1 ' reads as cx, er:0, er:1) and accepts the last index, 19", J(val(() => L.parseSpecs(" cx , er:0-1 ").map(L.specName))) === '["cx","er:0","er:1"]' && J(throws(() => L.parseSpecs("er:19"))) === "null" && J(val(() => L.parseSpecs("nostate:19").map(L.specName))) === '["nostate:19"]');
     ok("STAGE A is 28 circuits (cx, 6 each of ER, TYPE-BLOCK and DEGREE, 3 each of SIGN, COUNT and NO STATE) and STAGE B the other six of each of ER, TYPE-BLOCK and DEGREE: 18", L.parseSpecs(L.STAGE_A).length === 28 && L.parseSpecs(L.STAGE_B).length === 18 && L.parseSpecs(L.STAGE_A).filter((s) => s.family === "nostate").length === 3);
     const bad = (t) => throws(() => L.parseSpecs(t));
     const rows = [["an empty spec", "cx,,er:0", /an empty spec/], ["an unknown family", "wire:0", /unknown family "wire"/], ["the other rung's subject", "fish", /cannot read "fish"/], ["text it cannot read", "er0", /cannot read "er0"/], ["a backwards range", "er:5-2", /runs backwards/], ["an index past 19", "er:20", /past index 19/],
@@ -60,7 +61,6 @@ await guarded("section 1", async () => {
         fams("sign", 0) === 31610 && fams("count", 0) === 31810 && fams("nostate", 0) === 32010 && fams("nostate", 19) === 32200 && new Set(L.parseSpecs("cx,er:0-19,layer:0-19,degree:0-19,sign:0-19,count:0-19,nostate:0-19").map(L.seedBaseOf)).size === 121);
     const circuit = L.loadCircuit();
     ok("the vendored heading loop is read as { neurons, edges, io } (148 cells, 7,080 edges, 88 input and 64 output cells)", circuit.neurons.length === 148 && circuit.edges.length === 7080 && circuit.io.inputs.length === 88 && circuit.io.outputs.length === 64 && L.CIRCUIT_FILE.endsWith("vendor/hemibrain/hemibrain-cx-heading-loop.json"));
-    const val = (f) => { try { return f(); } catch (e) { return "THREW " + String(e.message || e).slice(0, 80); } };
     ok("NO STATE is the circuit itself, asked for without a control (a throw here would be a control it has none of)", val(() => L.circuitFor({ family: "nostate", index: 2 }, circuit)) === circuit);
     ok("cx and NO STATE are the circuit itself; the K-th control of a family is the family's function at its fixed seed (er 1000 + K, layer 2000 + K, degree 3000 + K, sign 4000 + K, count 5000 + K), the same however it is asked for, and keeps `io`",
         L.circuitFor({ family: "cx", index: 0 }, circuit) === circuit && L.circuitFor({ family: "nostate", index: 2 }, circuit) === circuit && J(L.circuitFor({ family: "er", index: 3 }, circuit)) === J(C.erControl(circuit, 1003)) && J(L.circuitFor({ family: "layer", index: 0 }, circuit)) === J(C.layerControl(circuit, 2000)) &&
