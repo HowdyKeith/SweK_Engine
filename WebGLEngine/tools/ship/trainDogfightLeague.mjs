@@ -96,7 +96,7 @@ export function parseArgs(argv) {
     if (train !== "fixed" && train !== "wide") throw new Error(`--train must be fixed or wide, got ${JSON.stringify(train)}`);
     if (train === "wide" && air !== "jet") throw new Error("--train wide has its training sets for the jets only (--aircraft jet)");
     const guard = "guard" in given ? given.guard : 0;
-    if (!Number.isFinite(guard) || guard < 0) throw new Error(`--guard must be a number, 0 or more, got ${JSON.stringify(given.guard)}`);
+    if (!Number.isFinite(guard) || guard < 0) throw new Error(`--guard must be a number, 0 or more, got ${String(given.guard)}`);
     if (guard > 0 && train !== "wide") throw new Error("--guard has its objective for --train wide only");
     const table = air === "jet" ? BRAINS_JET : BRAINS;
     if (!table[want]) throw new Error(`--brain must be one of ${Object.keys(table).join(", ")}, got ${JSON.stringify(want)}`);
@@ -190,11 +190,14 @@ export function contextOf(opts, io = {}) {
     return { brain, ...league, sets: setsOf(opts), sim: brain.air === "jet" ? JF.JET_OPTS : {} };
 }
 
+/** The objective a wide search scores a set of duels by: the league score, or with `--guard` the guarded one (guardedScorer, its shipped-fighter count worked out once per set). */
+export const objectiveFor = (opts, ctx) => (set) => (opts.guard > 0 ? guardedScorer(ctx.brain.policy, ctx.members, set, ctx.sim, { lambda: opts.guard, startW: ctx.startW }) : scorer(ctx.brain.policy, ctx.members, set, ctx.sim));
+
 /** One independent search (run number k of the recipe), from the shipped fighter and pruned back toward it. Deterministic for (opts, k). Returns { k, seed, weights, trainScore, improved, neutral, moved, kept }. */
 export function searchOne(opts, k, ctx = contextOf(opts)) {
     const P = ctx.brain.policy, seed = opts.seed + k;
     if (opts.train === "wide") {   // the second recipe: the objective on one batch of fresh duels at a time, the prune on a fixed fresh set of its own
-        const objective = (set) => (opts.guard > 0 ? guardedScorer(P, ctx.members, set, ctx.sim, { lambda: opts.guard, startW: ctx.startW }) : scorer(P, ctx.members, set, ctx.sim));
+        const objective = objectiveFor(opts, ctx);
         const scores = ctx.sets.trainBatches.map(objective);
         const found = DT.trainBatchedWith(P, scores, { seed, iters: opts.iters, sigma: opts.sigma, maxK: opts.maxK, start: ctx.startW });
         const pruned = DT.pruneWith(P, objective(ctx.sets.trainPrune), found.weights, { toward: ctx.startW });
