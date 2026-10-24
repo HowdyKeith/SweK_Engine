@@ -106,6 +106,19 @@ ok("  the fixture: family R's seed 990914, outside every split, its last orbit s
     ok("  ...and the compute generator 2.9-3.2 x faster than three.js's in the same run: 57.6 / 180.6, 49.9 / 161.9, 63.1 / 182.4, 62.1 / 195.4 ms",
         JSON.stringify(R.map((x) => [x.parts.generator, x.threeJs])) === "[[57.612,180.6],[49.881,161.9],[63.139,182.4],[62.138,195.4]]" && R.every((x) => x.threeJs / x.parts.generator > 2.85 && x.threeJs / x.parts.generator < 3.3), R.map((x) => (x.threeJs / x.parts.generator).toFixed(3)).join(", "));
 }
+{
+    // SECTION 150: the 1080's four reports, and H64 over both GPUs' pre-registered pairs -- HOLDS
+    const read = (k) => { const rep = JSON.parse(fs.readFileSync(path.join(ENG, `render/denoise-rig-s147-${k}.json`), "utf8")); return { ...FGG.readH64(rep), pascal: /nvidia pascal/.test(rep.verdict) }; };
+    const N = ["a-gtx1080", "b-gtx1080", "a-gtx10801", "b-gtx10801"].map(read), I = ["a-intel-gen9", "b-intel-gen9"].map(read);
+    const r3 = (x) => Math.round(x * 1000) / 1000, rate = (x) => 2 * x.T / (x.T + x.G);
+    ok("!! *** section 150: H64 HOLDS ON BOTH GPUs -- the 1080's pre-registered pair counts at df12b982, G64 / T 0.113 and 0.115 (the earlier pair 0.116, 0.115); the Intel's 0.248 and 0.219 ***",
+        FGG.h63(N.slice(0, 2)) === "holds" && FGG.h63(I) === "holds" && FGG.h63([...N.slice(0, 2), ...I]) === "holds" && N.every((x) => x.pascal && x.counts && x.commit === "df12b982" && Object.values(x.clocks).every((c) => c === "device")) &&
+        JSON.stringify(N.map((x) => r3(x.ratio))) === "[0.113,0.115,0.116,0.115]",
+        N.map((x) => `G ${x.G.toFixed(3)} / T ${x.T} = ${x.ratio.toFixed(4)}`).join("; "));
+    ok("  ...and P2: the four passes 2.38-2.43 ms on the 1080, under 3; the compute generator 7.3-7.7 x faster than three.js's; presented 1.80 x the traced rate there, 1.60-1.64 x on the Intel",
+        N.every((x) => x.parts.generator >= 2.37 && x.parts.generator <= 2.43 && x.threeJs / x.parts.generator > 7.3 && x.threeJs / x.parts.generator < 8.0 && rate(x) > 1.79 && rate(x) < 1.81) &&
+        I.every((x) => rate(x) > 1.59 && rate(x) < 1.65), [...N, ...I].map((x) => `${(x.threeJs / x.parts.generator).toFixed(2)} x, ${rate(x).toFixed(3)}`).join("; "));
+}
 console.log("\n2. ON THE DEVICE: the field against the CPU's, then the field and the generator at 1920 x 1080, timed");
 const skip = webgpuSkipReason();
 if (skip) { console.log(`  SKIP  ${skip}`); console.log("  ----  *** NOT A PASS. *** Nothing here is static."); fails++; }
@@ -295,6 +308,8 @@ else {
 // half-even round), G4 (the reach removed) and G9 (a hole's frame 0.5, not 0) WENT 0 RED on the scene's field: it has no landing
 // on an exact half pixel, no hole past the radius and none left. *** The synthetic field's row was added for them; each is now
 // 1 red there.
+// SECTION 150, each restored byte-identical: V150a the 1080's run a generator typed 9.429 in its report -> 2 red (its ratio
+// 0.29, and P2's row); V150b the presented rate's upper bound 1.793 -> 1 red; V150c the 1080's first ratio typed 0.112 -> 1 red.
 // SECTION 149, each restored byte-identical: V149a run a's compute generator typed 58.612 in its report -> 2 red (G / T 0.250
 // fails the threshold, and the speed row); V149b the Intel's first ratio typed 0.247 -> 1 red; V149c run b's clock typed wall -> 1 red.
 // SECTION 146: V146a H63_RATIO 0.6 -> 2 red (the rule's fixtures, the verdict row); V146b run a's generator typed 9.900 in its

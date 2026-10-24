@@ -9926,3 +9926,48 @@ All figures are ms, every part of G₆₄ on the device's clock.
   composite. Rounds 59-62 graded the same rule at 256 x 256, where none was left.
 
 **The 1080's two runs are owed**, at the same commit, by section 147's commands. Section 149 is completed when they are read.
+
+## 150. ROUND 64 -- H64 HOLDS ON BOTH GPUs: WITH THE GENERATOR AS COMPUTE PASSES, A GENERATED FRAME COSTS 0.11 OF A TRACED ONE ON THE 1080 AND 0.22-0.25 ON THE INTEL
+
+Section 149's second half. Section 148 is FSR4's design and keeps its number.
+
+**What arrived.** Four `--only denoise` reports, all on the GTX 1080 and all at df12b982, committed byte for byte (93bfb8eb)
+before they were read.
+- `-a-gtx1080` and `-b-gtx1080` are section 147's names, so they are the pre-registered pair.
+- `-a-gtx10801` and `-b-gtx10801` are an earlier pair. Every gate is green with exit 0 in all four.
+
+| run | compute generator | field | covFullB | restComp | G₆₄ | T | G₆₄ / T | three.js generator, same run |
+|---|---|---|---|---|---|---|---|---|
+| a | 2.429 | 0.353 | 1.226 | 0.332 | 4.340 | 38.474 | **0.113** | 18.8 |
+| b | 2.378 | 0.353 | 1.231 | 0.357 | 4.319 | 37.453 | **0.115** | 18.2 |
+| a (earlier pair) | 2.424 | 0.353 | 1.228 | 0.356 | 4.361 | 37.712 | 0.116 | 17.8 |
+| b (earlier pair) | 2.394 | 0.354 | 1.230 | 0.360 | 4.338 | 37.715 | 0.115 | 17.9 |
+
+All figures are ms, every part of G₆₄ on the device's clock.
+
+**H64 HOLDS.** Both GPUs' pre-registered pairs count. G₆₄ / T is 0.113 and 0.115 on the 1080 and 0.248 and 0.219 on the Intel
+(section 149), each at or under 0.25. Every other pair agrees.
+
+**The predictions, read as made.**
+- **P1 held:** H64 holds on the 1080.
+- **P2 held:** the four passes take 2.38-2.43 ms there, under 3. The fill is half of it, the gather a quarter.
+- **P3 held:** the Intel is within 0.25, by 0.002 in its run a.
+
+**What it says.**
+- **The compute generator is 7.3-7.7 x faster than three.js's on the 1080, and 2.9-3.2 x on the Intel,** for the same
+  algorithm, held to the same CPU reference.
+- **Generating every other frame presents 2T / (T + G₆₄):**
+  - **1.80 x the traced rate on the 1080**, against 1.27-1.31 x with three.js's generator (section 146);
+  - 1.60-1.64 x on the Intel.
+- **With section 145, both halves of FSR3 on the path tracer are now supported.**
+  - Quality: in display space the generator beats the cross-fade (narrowly) and the held frame, on 24 scenes.
+  - Cost: it presents 1.6-1.8 x the frames.
+- **What section 145 also said still stands:** the traced midpoint is better than the generated one on 16 of 24. Generation
+  is the cheaper substitute.
+- **15,886 pixels (0.77 %) stay holes at 1920 x 1080,** and are black before the light composite. That is the algorithm's
+  rule, the CPU's too, and rounds 59-62 never met it at 256 x 256.
+
+**What changes.**
+- `denoise-framegen-compute` is done.
+- **Nothing ships by this round alone.** Putting a generated frame on path-tracer.html's page is a page change with its own
+  questions: a pacing loop, and the holes past the reach. It is logged as `denoise-framegen-page`, and is Keith's call.

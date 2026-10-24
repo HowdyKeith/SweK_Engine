@@ -2499,10 +2499,17 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "denoise-framegen-compute",
-        blocker: "OPEN",
-        what: "ROUND 64 (section 147), Keith's call after section 146: FSR3's generator as compute passes on the device (render/denoiseFrameGenGPU.mjs: depth splat, winner, fill, gather), in the three.js generator's place, timed against a traced frame. H64: G <= 0.25 T on both GPUs.",
+        blocker: "CLOSED",
+        what: "DONE (sections 147, 149, 150): H64 HELD ON BOTH GPUs -- a generated frame costs 0.113 / 0.115 of a traced one on the 1080 (the compute generator 2.4 ms against three.js's 18-19) and 0.248 / 0.219 on the Intel, presenting 1.80 x and 1.60-1.64 x the traced rate. ROUND 64 (section 147), Keith's call after section 146: FSR3's generator as compute passes on the device (render/denoiseFrameGenGPU.mjs: depth splat, winner, fill, gather), in the three.js generator's place, timed against a traced frame. H64: G <= 0.25 T on both GPUs.",
         how: "Held to interpolateFrameCPU by render/denoiseFrameGenCost-selfcheck.mjs on the scene's field and a synthetic one (mask and vectors bit for bit, the frame within 1e-5); SwiftShader read 47 ms at 480 x 270 against the three.js generator's 2,914. Two --only denoise runs on each GPU at the round's commit; section 149 reads them by readH64. SECTION 149, THE INTEL's HALF: four green runs at df12b982, G64 / T 0.248 and 0.219 in the pre-registered pair (0.249, 0.244 in an earlier one) -- the condition holds there, by 0.002 in run a; the compute generator 2.9-3.2 x faster than three.js's. The 1080's two runs are owed for the verdict.",
         why: "Section 146: the three.js generator was 18-20 ms of a generated frame's 20-22 on the 1080, presenting 1.27-1.31 x the traced rate. The quality half is supported (section 145).",
+    },
+    {
+        id: "denoise-framegen-page",
+        blocker: "OPEN",
+        what: "FSR3's generated frame on path-tracer.html's page: the half-size chain with its history traces every other frame, render/denoiseFrameGenGPU.mjs's compute generator makes the one between, lit at its own time.",
+        how: "Not designed. Its own questions: a pacing loop that presents the generated frame between two traced ones; the 0.77 % of a 1080p frame no fill reaches (black before the light composite); and the page's controls. Keith's call whether to build it.",
+        why: "Both halves are now supported on the path tracer: quality (section 145, display space, narrowly against the cross-fade) and cost (section 150, 1.6-1.8 x the frames). The traced midpoint is still better (16 of 24), so generation is the cheaper substitute.",
     },
     {
         id: "fsr4-learned-upscaler",
