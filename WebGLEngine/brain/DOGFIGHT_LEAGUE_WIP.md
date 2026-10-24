@@ -140,3 +140,34 @@ What is written down as the outcomes, before they are known:
   * no eligible search in the four: the recipe is reported as not enough, with the per-search table as above and the pool losses broken into collisions and ground contacts. This note does NOT authorise a third recipe, more seeds, a looser rule or a changed pool; those would be Keith's call, written down before they run.
   * what is compared whatever happens, so the result is a measurement and not only a yes or no: the pool loss rate of each search against the first recipe's (fruit fly 4.5 to 12.2 percent of 600 pool fights, GPU Brain 1.0 to 7.7 percent of the 600, from the table above: 6, 9, 33 and 46 lost), and the train-versus-pool gap in score. If the wide objective closes the gap and the pool losses fall, the sets were the problem; if it closes the gap and the losses do not fall, the objective is the problem.
 Cost: an iteration scores the child on 12 duels as before, plus the parent when it has no remembered score on that batch, so up to twice the first recipe's time (the first recipe took 1,900 to 3,300 s per search on four cores). NOT measured yet.
+
+## Recipe v2 on the fruit fly (search seeds 12200..12203, as written down above): NO CHAMPION, nothing written, the audit sets still NOT read
+
+Run on four cores (`--train wide --workers 4`, 400 iterations, sigma 0.3, 1 to 4 weights per child): the searches took 9,315 s (12201), 11,631 s (12202), 14,245 s (12203) and 15,032 s (12200) -- 2.6 to 4.2 hours each, against 32 to 49 minutes for the first recipe (the whole run 4 h 15 min). Same shipped fighter (held-out 0.0133; 4 of 200 pool fights lost against each opponent, limit 8; classic pool 0.8417).
+
+| run | seed | score on its prune set | held-out | league pool score | pool lost vs autopilot / self / other (limit 8 each) | classic pool | weights kept of 1,099 (moved) |
+|---|---|---|---|---|---|---|---|
+| 1 | 12200 | 0.3548 | 0.1331 | 0.2046 | 7 / 7 / 7 (inside the limit) | **1 fight lost that the autopilot does not lose (duel:15001)** | 168 (341) |
+| 2 | 12201 | 0.3409 | 0.2659 | 0.2167 | 14 / 12 / 12 | 2 lost; 5 past the full-stall angle where the autopilot has none; score 0.676 | 307 (327) |
+| 3 | 12202 | 0.4102 | 0.2735 | 0.3114 | 10 / 10 / 10 | 3 lost; score 0.617 | 111 (340) |
+| 4 | 12203 | 0.3615 | 0.2059 | 0.2269 | 11 / 11 / 11 | 5 lost; score 0.0347 | 324 (356) |
+
+A champion, had there been one, would have been the best held-out of the eligible among four searches. There is none. Seed 12200 is, like the GPU Brain's seeds 13002 and 13003, one classic-pool fight short; the rule is not loosened.
+
+### Against the two earlier fruit fly tries (all from the dumps; the same pool)
+| | pool fights lost, per search (of 600) | score on what it was trained on minus the pool score |
+|---|---|---|
+| first try, 12000..12003 (12 training duels) | 5.5, 8.2, 11.0, 18.8 percent | 0.11 to 0.20 |
+| second try, 12100..12103 (the same recipe) | 4.5, 8.0, 8.5, 12.2 percent | 0.07 to 0.18 |
+| recipe v2, 12200..12203 | 3.5, 5.0, 5.5, 6.3 percent | 0.10 to 0.15 |
+(The hand-flown twin loses 2.0 percent of the pool.) The score column is not the same quantity in the two recipes: v2's is the score on its 24 prune duels, the first recipe's on its 12 training duels.
+
+### What a throwaway probe says (NOT committed, NOT gated: scratchpad `wide_probe.mjs`; the same 3 members, both seats)
+* **Every pool loss of all four v2 searches is a COLLISION again; none is to the ground** (21, 38, 30 and 33 collisions in 600). Seed 12203 is the only one with ground losses anywhere (6, on its own 96 training duels).
+* **The objective now sees failures.** On the 96 fresh training duels (576 fights) the hand twin loses 18 (3.1 percent) and the searches 15, 17, 15 and 39 (2.6, 3.0, 2.6 and 6.8 percent); the first recipe's twelve duels showed its searches 0 of 72. On the 24 prune duels: 0, 1, 0 and 3 lost.
+* **The gap between what it was trained on and the pool is smaller and not closed.** Collision rate on the pool minus on the 96 training duels: +0.9, +3.3, +2.4 and -1.3 points (the first recipe: +4.5 to +12.2). Three of the four still lose more on the pool than on what they were judged on, and all four lose more than the hand twin on the pool (2.0 percent).
+* **One search stays far away from the opponent.** Median closest approach on the pool: hand twin 13 m, seeds 12200 21 m, 12201 31 m, 12203 16 m, and **12202 167 m** (on the prune duels 175 m, on the 96 duels 171 m). It has the best pool score of the four and, with it, almost no engagement: it flies a way of not being near the opponent at all. NOT checked: what it does instead, and whether its pool score comes from fights the opponent loses to the ground; a pilot that never closes cannot beat the shipped fighter head-to-head, which `qualifies()` demands, so it could not have been champion in any case.
+
+### Reading (written against the two readings pre-registered above)
+The pre-registered reading was: if the wide objective closes the gap and the pool losses fall, the sets were the problem; if it closes the gap and the losses do not fall, the objective is the problem. What was measured is in between: the pool losses FELL (mean 10.9 and 8.3 percent of the pool in the two earlier tries to 5.1 percent) and the objective sees failures now, but the gap did not close for three of four, and no search reached the hand twin's 2.0 percent. So the 12-duel training set was PART of the problem, not all of it. The prune kept 111 to 324 weights instead of 42 to 110: on 24 duels the search needs more of what it moved, so the delta from the hand weights is no longer small.
+Said plainly: **two recipes and twelve fruit fly searches have not produced a jet fighter that is no more dangerous than the hand-flown twin and fights better than it.** This note does NOT authorise a third recipe, the GPU Brain's v2 run (seeds 13200..13203, written down above, not started), more seeds, a looser rule or a different pool. Options that would be Keith's to choose and write down first, none started: (a) the GPU Brain's v2 run as pre-registered (about 4 hours of four cores); (b) a collision term in the search's own score (the near-miss penalty was rejected from the data, a loss-weighted one has not been tried); (c) stop: the jets' hand weights are the shipped jet pilots and nothing here beats them.
