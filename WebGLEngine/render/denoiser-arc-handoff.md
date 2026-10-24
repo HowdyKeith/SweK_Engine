@@ -97,6 +97,9 @@ node tools/ship/versionPreflight.mjs --next    # the next free version and sweep
    - **Sections 144 and 146: the 1080's runs at 3d215c83.** K0p green under store rule rtz; H141 holds (1.973 / 1.992 x), so
      round 33 has its verdict on both GPUs. H63 FAILS: a generated frame costs 0.53-0.57 of a traced one on the 1080, the
      generator 18-20 ms of it. `denoise-fsr3-framegen` closes; nothing ships. The Intel's two runs did not come back.
+   - **Round 64 (section 147): the generator as compute passes**, exact against interpolateFrameCPU on two fields;
+     two `--only denoise` runs a GPU owed (section 149). **FSR4 round 65 (section 148):** a learned 2x upscaler in EASU's
+     place, designed; its code, training and test come next.
    - Every default that the Intel's runs at 7b871372 decided is now carried out. The denoiser entries still open, after
      rounds 56-58, are `denoise-subgroup-reduction`, `denoise-temporalup-device` and `denoise-1080-native-crash` (all three
      owed the GTX 1080), and `denoise-fsr3-framegen`, whose upstream is closed.

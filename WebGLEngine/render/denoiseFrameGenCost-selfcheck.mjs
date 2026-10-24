@@ -58,6 +58,19 @@ ok("  the fixture: family R's seed 990914, outside every split, its last orbit s
         FGG.h63([a, a]) === "holds" && b.ratio > 0.25 && FGG.h63([a, b]) === "fails" && FGG.h63([a, c]) === "no verdict" && FGG.h63([a, d]) === "no verdict" && FGG.H63_RATIO === 0.25,
         `G ${a.G.toFixed(3)} / T ${a.T} = ${a.ratio.toFixed(4)}`);
 }
+{
+    // section 147's rule, readH64, on the same fixtures: the compute generator's line in the three.js generator's place, which is kept beside it
+    const up = ["section 103: the default fill listedTile, coverage bound, rest fused, accumulation tiled; the half-size chain 35.669 ms, ratio 2.099 x; with its history 37.483 ms, ratio 1.998 x",
+                "section 107: the bounded coverage -- covHalf 4.269 ms (device); covHalfB 0.354 ms (device); covFull 17.117 ms (device); covFullB 1.231 ms (device); traced 27023 of 518400",
+                "section 110: rest's passes -- rest 1.016 ms (device); restToT 0.083 ms (device); restEasu 0.592 ms (device); restComp 0.341 ms (device); restToTFree 0.068 ms (device)"];
+    const cost = ["section 143: the generator at 1920 x 1080 19.900 ms (wall, median of 7)", "section 143: the field on the device at 1920 x 1080 0.353 ms (device)",
+                  "section 147: the compute generator at 1920 x 1080 2.000 ms (device); clear 0.1, splat 0.5, winner 0.5, fill 0.5, gather 0.4; 0 holes left"];
+    const rep = (c) => ({ commit: "abcdef12 x", gates: [{ gate: "render/denoiseUpscaleGPU-selfcheck.mjs", ok: true, exit: { status: 0 }, measured: up }, { gate: "render/denoiseFrameGenCost-selfcheck.mjs", ok: true, exit: { status: 0 }, measured: c }] });
+    const x = FGG.readH64(rep(cost)), y = FGG.readH64(rep(cost.slice(0, 2))), G = 2 + 0.353 + 1.231 + 0.341;
+    ok("!! readH64, section 147's rule, on fixtures: the compute generator's 2.000 ms (device) in the generator's place, the three.js generator's 19.9 kept beside it; without its line no G",
+        Math.abs(x.G - G) < 1e-12 && Math.abs(x.ratio - G / 37.483) < 1e-12 && x.parts.generator === 2 && x.threeJs === 19.9 && x.clocks.generator === "device" && y.ratio === null && FGG.h63([x, x]) === "holds",
+        `G ${x.G.toFixed(3)} / T ${x.T} = ${x.ratio.toFixed(4)}`);
+}
 
 {
     // and on a real report: section 137's full 1080 run, which has the chain's lines and no generator -- T, covFullB and restComp
@@ -84,7 +97,16 @@ console.log("\n2. ON THE DEVICE: the field against the CPU's, then the field and
 const skip = webgpuSkipReason();
 if (skip) { console.log(`  SKIP  ${skip}`); console.log("  ----  *** NOT A PASS. *** Nothing here is static."); fails++; }
 else {
-    const payload = { sph: Array.from(packSpheres(S.scene)), w, h, W, H, GEO_STRIDE, MS: FGG.MOT_STRIDE,
+    // section 147: the small fixture's two frames for the compute generator's parity row -- smooth, varied, different per frame
+    const pat = (k) => Array.from({ length: w * h * 4 }, (_, i) => { const p = i >> 2, c = i & 3, x = p % w, y = (p / w) | 0;
+        return c === 3 ? 1 : 0.5 + 0.4 * Math.sin(0.37 * x * (c + 1) + 0.23 * y + k) * Math.cos(0.11 * y * (c + 2) - k); });
+    // section 147: and a synthetic field built for the cases the scene's does not reach (sabotages G1, G4, G9 went 0 red on it alone):
+    // integer flows, so a landing sits exactly on a half pixel and the rounding rule decides it; depths in five values and sky, so
+    // ties are common; and a 44 x 40 block with no vector, whose rim the reach fills and whose middle no fill reaches
+    const synth = new Float32Array(w * h * FGG.MOT_STRIDE);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const p = (y * w + x) * FGG.MOT_STRIDE, none = x >= 10 && x <= 53 && y >= 4 && y <= 43;
+        synth[p] = (x % 3) - 1; synth[p + 1] = y % 2 ? 1 : -1; synth[p + 2] = (x + y) % 11 === 0 ? SKY_DEPTH : 1 + ((x * 7 + y * 3) % 5); synth[p + 3] = none ? 0 : 1; }
+    const payload = { sph: Array.from(packSpheres(S.scene)), w, h, W, H, GEO_STRIDE, MS: FGG.MOT_STRIDE, prevS: pat(0), curS: pat(0.7), synth: Array.from(synth),
                       geoCpu: Array.from(packGeometry(hits, w * h)), uSmall: Array.from(FGG.motionUniform(S, e6, e7, w, h)), uBig: Array.from(FGG.motionUniform(S, e6, e7, W, H)), uSoft: Array.from(FGG.motionUniform(S, e6, e7, Ws, Hs)), Ws, Hs };
     const r = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 900000, args: { payload }, script: `async (a) => {
         const P = a.payload, { requestDevice } = await import("/gfx/device.js"), UG = await import("/render/denoiseUpscaleGPU.mjs"), FGG = await import("/render/denoiseFrameGenGPU.mjs");
@@ -118,6 +140,42 @@ else {
             if (stamps) xs.push((await res).gpuMs.compute); else { await dev.gpu.queue.onSubmittedWorkDone(); xs.push(performance.now() - q0); }
         }
         const kept = xs.slice(1).sort((p, q) => p - q), motionMs = kept[Math.floor(kept.length / 2)];
+        // section 147: the generator as compute passes -- on the small fixture for the parity row, and at the round's size, timed
+        const K = Object.fromEntries(["CLEAR", "SPLAT", "WIN", "FILL", "GATHER"].map((k) => [k, dev.compute({ wgsl: FGG["GEN_" + k + "_WGSL"] })]));
+        const kErr = Object.entries(K).filter(([, k]) => k.error).map(([n, k]) => n + ": " + String(k.error).slice(0, 200));
+        if (kErr.length) return { compileError: kErr.join("; ") };
+        const genSetup = (ww, hh, mot, prevArr, curArr) => {
+            const n2 = ww * hh, S2 = FGG.genGroups(ww, hh), uG = dev.buffer({ data: FGG.genUniform(ww, hh), usage: "uniform" });
+            const zk = dev.buffer({ data: new Uint32Array(n2), usage: ["storage"] }), wn = dev.buffer({ data: new Uint32Array(n2), usage: ["storage"] });
+            const vc = dev.buffer({ data: new Float32Array(n2 * 4), usage: ["storage"] }), ds = dev.buffer({ data: new Float32Array(n2 * 4), usage: ["storage"] });
+            const pv = dev.buffer({ data: prevArr, usage: ["storage"] }), cu = dev.buffer({ data: curArr, usage: ["storage"] });
+            const ops = {
+                clear: (pass) => { K.CLEAR.bind("u", uG).bind("zkey", zk).bind("win", wn); pass.dispatch(K.CLEAR, S2.line); },
+                splat: (pass) => { K.SPLAT.bind("u", uG).bind("mot", mot).bind("zkey", zk); pass.dispatch(K.SPLAT, S2.line); },
+                win: (pass) => { K.WIN.bind("u", uG).bind("mot", mot).bind("zkey", zk).bind("win", wn); pass.dispatch(K.WIN, S2.line); },
+                fill: (pass) => { K.FILL.bind("u", uG).bind("mot", mot).bind("zkey", zk).bind("win", wn).bind("vec", vc); pass.dispatch(K.FILL, S2.tile); },
+                gather: (pass) => { K.GATHER.bind("u", uG).bind("vec", vc).bind("prev", pv).bind("cur", cu).bind("dst", ds); pass.dispatch(K.GATHER, S2.tile); } };
+            return { ops, vc, ds, zk, wn };
+        };
+        const all = (o) => (pass) => { for (const k of ["clear", "splat", "win", "fill", "gather"]) o.ops[k](pass); };
+        const gs = genSetup(P.w, P.h, devicePath.mot, new Float32Array(P.prevS), new Float32Array(P.curS));
+        dev.frame(({ pass }) => { all(gs)(pass); pass.clear([0, 0, 0, 1]); }, { offscreen: true });
+        const genSmall = { vec: Array.from(new Float32Array(await dev.read(gs.vc))), dst: Array.from(new Float32Array(await dev.read(gs.ds))) };
+        const synMot = dev.buffer({ data: new Float32Array(P.synth), usage: ["storage"] }), gy = genSetup(P.w, P.h, synMot, new Float32Array(P.prevS), new Float32Array(P.curS));
+        dev.frame(({ pass }) => { all(gy)(pass); pass.clear([0, 0, 0, 1]); }, { offscreen: true });
+        const genSynth = { vec: Array.from(new Float32Array(await dev.read(gy.vc))), dst: Array.from(new Float32Array(await dev.read(gy.ds))) };
+        // at the round's size: the device's own shading of its first hits, as the three.js generator is fed below
+        const shadeB = (k) => { const n3 = P.W * P.H, c = new Float32Array(n3 * 4), g2 = big.g; for (let p = 0; p < n3; p++) { const o = p * P.GEO_STRIDE, hit = g2[o + 6] >= 0;
+            for (let ch = 0; ch < 3; ch++) c[p * 4 + ch] = hit ? 0.5 + 0.5 * g2[o + 3 + ch] * k : 0.2 + 0.1 * ch; c[p * 4 + 3] = 1; } return c; };
+        const gb = genSetup(P.W, P.H, big.mot, shadeB(0.9), shadeB(1.0));
+        const timeOps = async (fn) => { const zs = [];
+            for (let i = 0; i < 8; i++) { await dev.gpu.queue.onSubmittedWorkDone(); const q0 = performance.now();
+                const res = dev.frame(({ pass }) => { fn(pass); pass.clear([0, 0, 0, 1]); }, { offscreen: true, ...(stamps ? { timing: true } : {}) });
+                if (stamps) zs.push((await res).gpuMs.compute); else { await dev.gpu.queue.onSubmittedWorkDone(); zs.push(performance.now() - q0); } }
+            const kz = zs.slice(1).sort((p, q) => p - q); return kz[Math.floor(kz.length / 2)]; };
+        const genPass = {}; for (const k of ["clear", "splat", "win", "fill", "gather"]) genPass[k] = await timeOps(gb.ops[k]);
+        const genAll = await timeOps(all(gb));
+        const bigVec = new Float32Array(await dev.read(gb.vc)); let genHoles = 0; for (let p = 0; p < P.W * P.H; p++) if (bigVec[p * 4 + 2] !== 0) genHoles++;
         // the field's holes before the fill, as interpolateFrameCPU's splat counts them at t = 0.5, block 1, indexed by the newer frame
         const n = P.W * P.H, landed = new Uint8Array(n), f = big.out;
         let invalid = 0;
@@ -145,7 +203,7 @@ else {
         // a strip of the generated frame read back, so a generator that wrote nothing is seen
         const strip = await renderer.readRenderTargetPixelsAsync(out, 0, P.H >> 1, 64, 1);
         gen.dispose(); out.dispose(); for (const t of [prev, cur, motion, dTex]) t.dispose();
-        return { kernelOnly: Array.from(kernelOnly.out), devicePath: Array.from(devicePath.out), deviceObj: Array.from({ length: P.w * P.h }, (_, p) => devicePath.g[p * P.GEO_STRIDE + 6]),
+        return { genSmall, genSynth, genPass, genAll, genHoles, devFlowSmall: Array.from(devicePath.out), kernelOnly: Array.from(kernelOnly.out), devicePath: Array.from(devicePath.out), deviceObj: Array.from({ length: P.w * P.h }, (_, p) => devicePath.g[p * P.GEO_STRIDE + 6]),
                  motionMs, motionClock: stamps ? "device" : "wall", genMs, invalid, holes, texInvalid: TX.invalid, strip: Array.from(strip), errs, rerr, fill: gen.fill,
                  adapter: [info.vendor, info.architecture, info.description].filter(Boolean).join(" / "), soft, W: P.W, H: P.H };
     }` });
@@ -179,6 +237,34 @@ else {
         say(`section 143: the generator at ${R.W} x ${R.H} ${R.genMs.toFixed(3)} ms (wall, median of 7)`);
         say(`section 143: the field on the device at ${R.W} x ${R.H} ${R.motionMs.toFixed(3)} ms (${R.motionClock})`);
         say(`section 143: the field's holes at ${R.W} x ${R.H}: ${R.holes} of ${R.W * R.H} before the fill, ${R.invalid} pixels with no vector`);
+        // section 147: the compute generator against interpolateFrameCPU, fed the device's own field and the same two frames
+        {
+            const { interpolateFrameCPU } = await imp("render/frameInterp.mjs"), { FRAMEGEN_FILL } = await imp("render/denoiseFrameGen.mjs"), MS = FGG.MOT_STRIDE, F = R.devFlowSmall;
+            const judgeGen = (F, G) => {
+            const flow = new Float32Array(n * 2), dep = new Float32Array(n);
+            for (let p = 0; p < n; p++) { const v = F[p * MS + 3] !== 0; flow[p * 2] = v ? F[p * MS] : NaN; flow[p * 2 + 1] = v ? F[p * MS + 1] : NaN; dep[p] = F[p * MS + 2]; }
+            const C = interpolateFrameCPU({ prev: Float32Array.from(payload.prevS), cur: Float32Array.from(payload.curS), w, h, flow, bw: w, bh: h, block: 1, depthBlock: dep, indexedBy: "cur", t: FGG.GEN_T,
+                fill: { radius: FRAMEGEN_FILL.radius, reach: FRAMEGEN_FILL.reach, side: FRAMEGEN_FILL.side, prefer: FRAMEGEN_FILL.prefer } });
+            const V = G.vec, D = G.dst;
+            let maskDiff = 0, vecDiff = 0, fw = 0, agree = 0;
+            for (let p = 0; p < n; p++) { const devHole = V[p * 4 + 2] !== 0;
+                if (devHole !== !!C.hole[p]) { maskDiff++; continue; } agree++;
+                if (devHole) { for (let c = 0; c < 4; c++) fw = Math.max(fw, Math.abs(D[p * 4 + c])); continue; }
+                if (!Object.is(Math.fround(C.vec[p * 2]), V[p * 4]) || !Object.is(Math.fround(C.vec[p * 2 + 1]), V[p * 4 + 1])) vecDiff++;
+                for (let c = 0; c < 4; c++) fw = Math.max(fw, Math.abs(D[p * 4 + c] - C.frame[p * 4 + c]) / Math.max(1e-6, Math.abs(C.frame[p * 4 + c]))); }
+            return { C, maskDiff, vecDiff, fw, agree }; };
+            const { C, maskDiff, vecDiff, fw, agree } = judgeGen(R.devFlowSmall, R.genSmall), Y = judgeGen(payload.synth, R.genSynth);
+            ok("!! section 147: the compute generator is interpolateFrameCPU at fsr-three.html's settings, fed the device's field -- the hole mask the same at all but 1 in 10,000 pixels, every vector bit for bit where it is, the frame within 1e-5 relative",
+                maskDiff <= Math.floor(n / 10000) && vecDiff === 0 && fw <= 1e-5 && C.filled > 0 && C.holes < n && agree > 0,
+                `${maskDiff} mask, ${vecDiff} vector differences; frame ${fw.toExponential(2)}; the CPU filled ${C.filled} holes, ${C.holes} left`);
+            // the synthetic field: exact, mask and vectors, since its flows are integers and nothing rounds in f32 that does not in f64
+            ok("!! ...and on the synthetic field -- half-pixel landings, depth ties, holes the reach fills and holes it leaves -- the mask and every vector bit for bit, the frame within 1e-5, the holes left 0",
+                Y.maskDiff === 0 && Y.vecDiff === 0 && Y.fw <= 1e-5 && Y.C.holes > 0 && Y.C.filled > 0 && Y.agree === n,
+                `${Y.maskDiff} mask, ${Y.vecDiff} vector differences; frame ${Y.fw.toExponential(2)}; the CPU filled ${Y.C.filled}, left ${Y.C.holes}`);
+            const gp = R.genPass;
+            say(`section 147: the compute generator at ${R.W} x ${R.H} ${R.genAll.toFixed(3)} ms (${R.motionClock}); clear ${gp.clear.toFixed(3)}, splat ${gp.splat.toFixed(3)}, winner ${gp.win.toFixed(3)}, fill ${gp.fill.toFixed(3)}, gather ${gp.gather.toFixed(3)}; ${R.genHoles} holes left`);
+            ok("  ...and its line is printed, with each pass timed", [R.genAll, gp.clear, gp.splat, gp.win, gp.fill, gp.gather].every((v) => Number.isFinite(v) && v >= 0) && R.genAll > 0);
+        }
         ok(`  ...and its three lines are printed, at ${R.soft ? "480 x 270 on this software adapter, which readH63 does not read" : "1920 x 1080 on hardware, which readH63 reads"}`,
             Number.isFinite(R.genMs) && R.genMs > 0 && Number.isFinite(R.motionMs) && R.motionMs > 0 && R.holes > 0 && R.holes < R.W * R.H && (R.soft ? R.W === Ws && R.H === Hs : R.W === W && R.H === H));
     }
@@ -190,6 +276,12 @@ else {
 // fixtures); M5 H63_RATIO 0.3 -> 1 red; M6 a red gate counted -> 1 red; M7 generatorTextures not negating the flow -> 1 red;
 // M8 the generator built with a fill of radius 2 -> 1 red (the fill row); M9 readH63's T taken from the chain without its history
 // -> 2 red (the fixtures and section 137's report).
+// SECTION 147, each restored byte-identical: G2 the winner by atomicMax (the last writer) -> 1 red; G3 the fill preferring the
+// nearer neighbour -> 1 red; G6 prev sampled forward -> 1 red; G7 the landing on the wrong side -> 1 red; G8 readH64 reading the
+// three.js generator's line -> the gate crashed (a red by exit code, not by a row). *** G1 (Math.round's half-up made WGSL's
+// half-even round), G4 (the reach removed) and G9 (a hole's frame 0.5, not 0) WENT 0 RED on the scene's field: it has no landing
+// on an exact half pixel, no hole past the radius and none left. *** The synthetic field's row was added for them; each is now
+// 1 red there.
 // SECTION 146: V146a H63_RATIO 0.6 -> 2 red (the rule's fixtures, the verdict row); V146b run a's generator typed 9.900 in its
 // committed report -> 2 red (the verdict, the presented rate); V146c the verdict's first ratio typed 0.575 -> 1 red.
 console.log(fails ? `FAIL -- ${fails} check(s) (${Date.now() - t0} ms)` : `ALL GREEN (${Date.now() - t0} ms)`);

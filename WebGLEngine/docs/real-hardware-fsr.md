@@ -827,6 +827,33 @@ node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-s141-b-intel-gen
 
 Send back the four JSON files, `trace141-a.txt` and `trace141-b.txt`.
 
+### Section 147: FSR3's generator as compute passes, timed
+
+The same commands as sections 141 and 143, on a newer commit, with new file names. On the GTX 1080, from `C:\SweK_r33`:
+
+```
+git fetch origin ccr-6c3eeb7c-pxz6kx
+git checkout ccr-6c3eeb7c-pxz6kx
+git pull origin ccr-6c3eeb7c-pxz6kx
+git log -1 --oneline
+cd WebGLEngine
+set SWEK_WEBGPU=
+set SWEK_TIMING_TRACE=
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-s147-a-gtx1080.json
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-s147-b-gtx1080.json
+```
+
+On the Intel, the same four git lines, then:
+
+```
+cd WebGLEngine
+set SWEK_WEBGPU=
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-s147-a-intel-gen9.json
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-s147-b-intel-gen9.json
+```
+
+Both machines should show the same commit. Send back the four JSON files.
+
 ## Send back
 
 The JSON file. It holds the platform, the browser flags, every adapter seen, each gate's verdict, time, failing rows and

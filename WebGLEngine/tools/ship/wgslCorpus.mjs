@@ -1240,6 +1240,11 @@ export const EXCLUDED = Object.freeze([
                     why: "a texture kernel (rgba16float history, r32float depth, storage output); equals the CPU resolve to 0.05% in render/snowGpuTaa-selfcheck.mjs" }),
     Object.freeze({ id: "snowGpu.PRESENT_WGSL", kind: "render stage, graded as a frame",
                     why: "the tone-map and gamma present triangle; drawn to the canvas by render/snowGpuLive-selfcheck.mjs and to a readable target by render/snowGpu-selfcheck.mjs" }),
+    // round 64 (section 147) -- the generator as compute passes (render/denoiseFrameGenGPU.mjs): five dispatches whose answer is the
+    // chain, held to render/frameInterp.mjs's interpolateFrameCPU by render/denoiseFrameGenCost-selfcheck.mjs on two fields
+    ...["GEN_CLEAR_WGSL", "GEN_SPLAT_WGSL", "GEN_WIN_WGSL", "GEN_FILL_WGSL", "GEN_GATHER_WGSL"].map((k) => Object.freeze({ id: `denoiseFrameGenGPU.${k}`,
+        kind: "ordered multi-dispatch chain, graded against a CPU twin",
+        why: "one of the generator's five passes -- clear, the depth splat, the winner, the fill, the gather -- each reading the last's buffers (atomic keys, winners, the filled field); one dispatch grades nothing. render/denoiseFrameGenCost-selfcheck.mjs holds the chain to interpolateFrameCPU: the mask and every vector bit for bit, the frame within 1e-5" })),
 ]);
 
 /**

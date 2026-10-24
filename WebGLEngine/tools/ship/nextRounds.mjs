@@ -2498,12 +2498,18 @@ export const NEXT_ROUNDS = [
         why: "Keith asked for FSR 1-3 complete before FSR4; this is the one FSR quality row red on both rig GPUs.",
     },
     {
+        id: "denoise-framegen-compute",
+        blocker: "OPEN",
+        what: "ROUND 64 (section 147), Keith's call after section 146: FSR3's generator as compute passes on the device (render/denoiseFrameGenGPU.mjs: depth splat, winner, fill, gather), in the three.js generator's place, timed against a traced frame. H64: G <= 0.25 T on both GPUs.",
+        how: "Held to interpolateFrameCPU by render/denoiseFrameGenCost-selfcheck.mjs on the scene's field and a synthetic one (mask and vectors bit for bit, the frame within 1e-5); SwiftShader read 47 ms at 480 x 270 against the three.js generator's 2,914. Two --only denoise runs on each GPU at the round's commit; section 149 reads them by readH64.",
+        why: "Section 146: the three.js generator was 18-20 ms of a generated frame's 20-22 on the 1080, presenting 1.27-1.31 x the traced rate. The quality half is supported (section 145).",
+    },
+    {
         id: "fsr4-learned-upscaler",
-        blocker: "UPSTREAM",
+        blocker: "OPEN",
         what: "An FSR4-style learned upscaler: a trained network replacing the hand-written upscale chain.",
-        how: "render/learned-preregistration.md (v4689) declined it as out of reach. The tree now ships a trained network on the device (the denoiser) through the same conv kernels, which is the half of the machinery that did not exist then.",
+        how: "ROUND 65 (section 148): the design, fixed before its code -- U, a kernel-predicting 2x upscaler guided by full-size albedo, normals and depth, in EASU's place in round 30's chain; trained on R and C (61000-61199, validation 62000-62019), tested on 24 new scenes (63000, 64000) against EASU (H1) and bilinear (H2), display space, Holm. Next: render/learnedUpscale.mjs and its gate rows, then the training harvest, then the test harvest, each committed before the next runs.",
         why: "Logged because Keith asked about FSR 1-4 together; it would be its own arc, larger than any round here.",
-        upstream: "denoise-halfres-at-scale and denoise-fsr2-temporal: a measured want first -- the hand-written upscalers on these frames, and where they fall short.",
     },
     {
         id: "denoise-mesh-other-materials",

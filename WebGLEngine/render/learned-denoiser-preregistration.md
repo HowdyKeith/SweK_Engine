@@ -9782,3 +9782,114 @@ read 0.574 and 0.531. No Intel run can change that, and none came back.
   against the cross-fade). The cost question failed (here).
 - A cheaper generator, the same algorithm as compute passes on the device, would be a new entry and its own round.
   It is not proposed here; Keith decides whether it is worth one.
+
+## 147. ROUND 64 -- THE SAME GENERATOR AS COMPUTE PASSES ON THE DEVICE: IS IT CHEAP ENOUGH NOW? FIXED BEFORE ITS CODE
+
+**Why.** Section 146 found a generated frame costs 0.53-0.57 of a traced one on the 1080. Nearly all of that, 18-20 ms of
+20-22, is the generator: three.js's chain of full-screen render passes, on the wall clock. Keith asked for a cheaper
+generator. This round writes the same algorithm as compute passes, held to the same CPU reference, and asks section 143's
+question again.
+
+**The generator, as compute (render/denoiseFrameGenGPU.mjs).** It is render/frameInterp.mjs's interpolateFrameCPU with
+fsr-three.html's settings, the ones rounds 59-62 graded: block 1, indexed by the newer frame, t = 0.5, and the fill of
+radius 4, reach 16, side blend, the farther neighbour. Four passes:
+1. **the depth splat:** each pixel's vector lands where its content is at t; atomicMin keeps the nearest depth there.
+2. **the winner:** among the pixels that landed with that depth, atomicMin keeps the first in scan order. This is the CPU's
+   tie rule exactly: strictly nearer, and the first writer stays.
+3. **the fill:** each hole takes the farthest landed vector within 4 px, else within 16, reading only the splat's own mask,
+   as fillHolesCPU's one pass does.
+4. **the gather:** each pixel samples the older frame back along its vector and the newer forward, bilinear with clamped
+   edges, and blends them at t.
+
+It is held to interpolateFrameCPU on round 63's fixture, fed the device's own field:
+- the landed mask the same at all but 1 in 10,000 pixels (a landing at a half-pixel rounds in f32 or f64);
+- where the masks agree, every vector bit for bit;
+- the frame within 1e-5 relative.
+
+**What is timed, on each rig GPU, at 1920 x 1080.**
+- **G₆₄** is the four passes on the device's clock where it has timestamps, plus round 63's field, `covFullB` and `restComp`.
+- **T** is section 103's chain with its history, as round 63 read it.
+- They are read by readH64, which is readH63 with the generator's line replaced by the compute generator's.
+
+**H64: G₆₄ ≤ 0.25 × T on both GPUs, in both of each GPU's runs.**
+- That is H63's threshold, unchanged: at least 1.6 x the traced rate presented.
+- A run counts as in section 143: every `--only denoise` gate green with exit 0, at one commit.
+- If only one GPU's runs come back, H64 gets no verdict on the other, and none overall unless the GPU that came back fails.
+
+**What is reported beside it, deciding nothing.**
+- Each pass's ms.
+- The three.js generator's ms in the same run, so the two are compared on one machine at one commit.
+- The holes, as round 63 read them.
+
+**Predictions, fixed now, deciding nothing.**
+- **P1:** H64 holds on the 1080.
+- **P2:** the four passes take under 3 ms on the 1080. They are four full-screen compute passes, against the chain's
+  four-pass history at 1.9 ms (section 98), and the fill reads 81 taps a hole on 4.6 % of the frame.
+- **P3:** the Intel's G₆₄ / T is within 0.25 as well. Its chain is 10x the 1080's, and passes like these scale with it.
+
+**The runs.** Two `realGpuRun --only denoise` on each GPU, at round 64's commit. They are committed byte for byte before they
+are read. Section 149 reads them; section 148 is FSR4's first pre-registration.
+
+## 148. FSR4, ROUND 65 -- A LEARNED UPSCALER IN EASU's PLACE: THE DESIGN, FIXED BEFORE ITS CODE, ITS TRAINING AND ITS SCENES
+
+**Why.** Keith asked for FSR4 once FSR 1-3 were done at their best. They now are:
+- FSR1/EASU is the half-size chain's upscale (rounds 26-31), on the device and timed;
+- FSR2's temporal history is round 32's, on the device (round 33), its verdict on both GPUs (section 144);
+- FSR3's frame generation is measured both ways (sections 145, 146, and round 64 running).
+
+FSR4's step is that the upscale itself is learned. render/learned-preregistration.md (v4689) declined a learned upscaler
+because the tree had no trained network on a device. It has one now: the denoiser, through the same conv kernels.
+
+> **On the path tracer's half-size chain, does a small trained network that upscales 2x, guided by full-size albedo, normals
+> and depth, bring the frame closer to the reference than EASU does at the same input?**
+
+**What is learned, and what is not.**
+- **The network, U** (render/learnedUpscale.mjs), predicts each full-size pixel as a normalised kernel over the 4 x 4
+  half-size texels nearest it: KERNEL_TAPS-style, softmax weights, so it cannot add energy that is not in the input.
+- U's input per full-size pixel:
+  - the half-size denoised frame, bilinearly upsampled;
+  - the full-size albedo, normals and depth (guideBuffers at full size, which the coverage pass already traces);
+  - the pixel's sub-texel phase.
+- Three 3 x 3 conv layers of 16 channels, then the 16-logit kernel head. That is about the shipped denoiser's size, so it
+  runs on the same device kernels.
+- **The light sources stay out of it,** as round 30 took them out of EASU: fill, upscale, composite at full size.
+- **Nothing else changes:** the shipped denoiser at half size, the fill, the composite, all of render/denoiseUpscale.mjs's chain.
+
+**Training, fixed now.**
+- Families R and C. Training seeds 61000-61199 (100 R, 100 C) and validation 62000-62019, all new and reserved.
+- Each image is the chain's half-size denoised, filled frame of a 256 x 256 scene (128 x 128 at 4 spp). Its target is the
+  full-size reference at 32 spp, light-free.
+- Loss: relMSE in display space (round 26's transfer), the grading rounds 61-62 used.
+- Adam, the denoiser's TRAIN schedule, 3 seeds. The seed with the best validation loss is the candidate, chosen before any
+  test scene exists.
+- **C2's network:** the same training with targets shuffled across images, as round 11's C2.
+
+**The test.**
+- **24 new scenes:** 12 R (63000-63011) and 12 C (64000-64011), 256 x 256, the chain's single frame (round 30's B, no history).
+- **H1:** the chain with U in EASU's place beats the chain with EASU.
+- **H2:** it beats bilinear in EASU's place, the floor any upscaler must clear.
+- The sign-flip test (24 is its limit), Holm over {H1, H2}, graded in display space.
+- **C1:** U's chain beats the half-size noisy input upscaled bilinearly on 22 of 24.
+- **C2:** the shuffled-target U does not beat EASU (mean d ≤ 0).
+- **C3:** no image near its floor. **C4:** the candidate re-made bit for bit on the first image. **C5:** all seeds distinct.
+- Reported beside it:
+  - each family's figures;
+  - linear radiance;
+  - U against the full-size page (today's denoiser at full size, the cost T avoids);
+  - the train/validation curves.
+
+**What each outcome does.**
+- **H1 supported:** U goes to the device as a kernel set beside EASU, and a device round times it against EASU's 0.6 ms on
+  the 1080. A learned upscale that costs a full network pass may not be worth it; that is its own question, as round 63 was
+  frame generation's.
+- **H2 alone:** U learned to upscale but not as well as EASU's hand-written edges, and the backlog records it.
+- **Neither:** a measured negative, and FSR4 stops at its first round unless Keith asks for a different design.
+
+**Predictions, fixed now, deciding nothing.**
+- **P1:** H2 is supported. Anything trained beats bilinear.
+- **P2:** H1 is supported, by a mean d under 0.3. EASU is strong on these scenes' sphere edges, and the guides give U the
+  same edges EASU infers.
+- **P3:** C1 holds.
+
+**What this section is.** The design, fixed before anything is written. The code, its gate rows, the training harvest and the
+test harvest come in that order, each committed before the next runs, as rounds 1-12 did for the denoiser.
