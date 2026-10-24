@@ -9433,3 +9433,52 @@ generator, FRAMEGEN_FILL, the light-free arrangement and its three arms (G', X',
 
 **The command:** `node tools/denoiseStudy.mjs --harvest-framegen-display --cache <dir>` -> `render/denoise-results-framegen-display.json`.
 It refuses if the file exists. About 90 minutes here. Committed byte for byte before it is read; section 140 reads it.
+
+## 140. ROUND 61 -- NOT REPORTED: C1 FIRED ON THE CANDIDATE, 10 OF 12. HAD IT HELD, BOTH HYPOTHESES WOULD HAVE BEEN SUPPORTED
+
+**What arrived.** `render/denoise-results-framegen-display.json` (sha-256 `f3060ab9...`).
+- It was written by `--harvest-framegen-display` at 0a4e6cbf, the commit carrying section 139's code. It was committed
+  byte for byte (93f5c81c) before it was read.
+- It took 4,957 s. Nothing else ran beside it; Keith's rig reports arrived during it and were left unread until it had
+  written.
+
+**The run is NOT REPORTED.** C1, asked of the candidate alone, fired: G' beat the noisy frame in display space on 10 of
+12, where it needs 11. C2-C5 held, and no image was near its floor.
+- The two images it lost are C 58002 and C 58003, both dark C scenes, by 2.25e-3 against 1.94e-3 and 3.35e-3 against
+  3.11e-3.
+- On both, the cross-fade beat the noisy frame too, and the midpoint traced alone beat everything.
+
+| | H1: G' against the cross-fade X' | H2: G' against the held frame R' |
+|---|---|---|
+| mean d (reported, decides nothing) | +0.287 | +0.606 |
+| images G' won | 7 of 12 | 11 of 12 |
+| sign-flip p (Holm threshold) | 0.038 (0.05) | 0.00049 (0.025) |
+
+- **Had C1 held, both would have been supported.** H2's p is far under its threshold. H1's then takes the second threshold,
+  0.05, and 0.038 is under it.
+- C1 did not hold, and nothing moves.
+
+**The predictions.**
+- **P1 FAILED:** C1 fired, by one image.
+- **P2 and P3** have no reading. Descriptively, P2's sign held, and P3, that H1 would NOT be supported, would have been wrong.
+
+**Reported beside it.**
+- Graded in linear radiance, the same arms gave H1 6 of 12 (mean d -0.116) and H2 11 of 12. Round 60's linear figures
+  were 5 of 12 and 9 of 12.
+- The midpoint traced alone beat G' on 12 of 12, by a mean d of 0.45.
+- The fill helped on 12 of 12, by 2.92.
+
+**What three rounds of FSR3 on the path tracer have found, and where this stops.** Sections 133, 136 and 139 were each
+pre-registered before their scenes existed, and each came back not reported, for a different reason:
+- round 59's generator carried the light sources across their silhouettes;
+- round 60's control could not meet a C1 written for another kind of comparison;
+- round 61's candidate missed C1 by one dark scene.
+
+Across rounds 60 and 61, descriptively, the arrangement with the light sources lit at the generated time beats holding the
+older frame on 20 of 24 scenes. Graded as a display shows it, it edges the cross-fade.
+
+**No round has passed its own controls, and I do not propose a fourth that relaxes C1 after seeing where this one fell.**
+That would be choosing the test by its outcome. The record stands as three not-reported rounds whose descriptive figures
+lean one way. Whether FSR3 on the path tracer closes on that, or gets a round of a different kind, is Keith's call.
+A different kind would be a larger test set fixed in advance, or a device timing round that asks whether a generated
+frame is worth its cost at all.

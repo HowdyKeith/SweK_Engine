@@ -79,6 +79,9 @@ node tools/ship/versionPreflight.mjs --next    # the next free version and sweep
      generated time.
    - **Round 60 (sections 136, 138): between light-free frames, lit at the generated time -- not reported (C1 on a control).**
      The light-source error is gone; against the cross-fade 5 of 12 in linear radiance, 8 of 12 in display space.
+   - **Round 61 (sections 139-140): graded in display space, C1 on the candidate alone -- not reported (C1, 10 of 12).**
+     Had C1 held, H1 (7 of 12, p 0.038) and H2 (11 of 12) would both have been supported. No fourth round relaxes C1;
+     whether `denoise-fsr3-framegen` closes on three not-reported rounds is Keith's call.
    - Every default that the Intel's runs at 7b871372 decided is now carried out. The denoiser entries still open, after
      rounds 56-58, are `denoise-subgroup-reduction`, `denoise-temporalup-device` and `denoise-1080-native-crash` (all three
      owed the GTX 1080), and `denoise-fsr3-framegen`, whose upstream is closed.

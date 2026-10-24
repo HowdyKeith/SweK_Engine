@@ -749,7 +749,26 @@ console.log("\n14f. ROUND 61: THE LIGHT-FREE GENERATOR GRADED IN DISPLAY SPACE, 
     ok("!! --harvest-framegen-display runs runFrameGenStudy on ROUND_FRAMEGEN_DISPLAY's split, size and arrangement under harvest, writes its own file and never an existing one, records its commit, and logs no verdict",
         branch.length > 400 && /runFrameGenStudy\(\{ splits: ROUND_FRAMEGEN_DISPLAY\.splits, image: ROUND_FRAMEGEN_DISPLAY\.image, arrangement: ROUND_FRAMEGEN_DISPLAY\.arrangement,/.test(code) &&
         /harvest: true/.test(code) && /path\.join\(ENG, ROUND_FRAMEGEN_DISPLAY\.results\)/.test(code) && /existsSync\(file\)/.test(code) && /out\.commit = /.test(code) && !/ROUND_FRAMEGEN_LF\./.test(code) && !/verdict|status|supported/.test(code));
-    ok("  its results are not yet written: section 140 reads them once the harvest's file is committed", !fs.existsSync(path.join(ENG, RESULTS_FRAMEGEN_DISPLAY)));
+    // section 140: the committed results read back by code -- NOT REPORTED, C1 firing on the candidate at 10 of 12, on both hypotheses
+    // (one candidate); and had it held, both would have been supported under Holm, which section 140 says and decides nothing
+    const dfile = path.join(ENG, RESULTS_FRAMEGEN_DISPLAY);
+    if (fs.existsSync(dfile)) {
+        const res = JSON.parse(fs.readFileSync(dfile, "utf8")), T = res.tables, { frameGenSetsLightFree } = await imp("render/denoiseStudy.mjs");
+        const again = verdict({ sets: frameGenSetsLightFree(T), shuffled: null, c2Prior: ROUND_FRAMEGEN_DISPLAY.c2Prior, determinism: res.determinism, seedsDistinct: res.seedsDistinct, test: ROUND_FRAMEGEN_DISPLAY.test, c1Of: "candidate" });
+        const H1 = again.hypotheses.H1, H2 = again.hypotheses.H2, lost = T.Gl.map((v, i) => (v > T.noisyMid[i] ? i : -1)).filter((i) => i >= 0);
+        ok("!! *** section 140: verdict() over the committed results' own tables gives the file's verdict -- NOT REPORTED, C1 firing on the candidate at 10 of 12, the two it lost C 58002 and C 58003 ***",
+            again.run === "not reported" && res.verdict.run === "not reported" && again.reasons.length === 2 && again.reasons.every((r) => /on 10 and .* of 12; the candidate needs 11$/.test(r)) &&
+            lost.join() === "8,9" && res.commit === "0a4e6cbf" && res.config.arrangement === "lightFreeDisplay" && res.config.c1Of === "candidate", again.reasons.join(" | "));
+        // with C1 out of the question, what Holm would have said -- reported, as section 140 reports it, never a verdict
+        const noC1 = verdict({ sets: frameGenSetsLightFree(T), shuffled: null, c2Prior: ROUND_FRAMEGEN_DISPLAY.c2Prior, determinism: res.determinism, seedsDistinct: res.seedsDistinct, test: ROUND_FRAMEGEN_DISPLAY.test, c1Of: "candidate", c1Min: 10 });
+        ok("  ...and section 140's 'had C1 held': H2 11 of 12 at p 0.00049 under 0.025, H1 7 of 12 at p 0.038 under its second threshold 0.05 -- both supported at a C1 of 10, which nobody pre-registered",
+            H1.k === 7 && H2.k === 11 && Math.abs(H1.p - 0.0380859375) < 1e-12 && Math.abs(H2.p - 0.00048828125) < 1e-12 &&
+            noC1.run === "reported" && noC1.hypotheses.H1.status === "supported" && noC1.hypotheses.H2.status === "supported" && noC1.hypotheses.H1.threshold === 0.05,
+            `H1 ${H1.k}/12 p ${H1.p}, H2 ${H2.k}/12 p ${H2.p}`);
+        ok("  ...and beside it: linear radiance H1 6 of 12, H2 11 of 12; the midpoint traced alone beat G' on 12 of 12; the fill helped on 12",
+            res.secondary.linear.H1.filter((d) => d > 0).length === 6 && res.secondary.linear.H2.filter((d) => d > 0).length === 11 &&
+            res.secondary.midTraced.every((d) => d < 0) && res.secondary.fill.every((d) => d > 0));
+    } else ok("!! section 140 reads render/denoise-results-framegen-display.json, and it is not there", false);
 }
 
 console.log("\n15. THE UPSCALE ROUND: HALF SIZE + FSR1 AGAINST THE FRAMES IT COULD BE INSTEAD (pre-registration section 81)");
