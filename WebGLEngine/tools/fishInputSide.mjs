@@ -8,6 +8,13 @@ import fs from "node:fs";
 import path from "node:path";
 import { parseTable, inputSide, DOMAINS, ALL } from "./fishInputSideLib.mjs";
 
+/** The root ids of mauthner_candidates.json, read as TEXT: the export writes them as plain 18-digit numbers, which JSON.parse rounds (864691128610327387 comes back as 864691128610327400) -- the first run on a real export died of it. */
+function candidateIds(text) {
+    const m = /"ids"\s*:\s*\[([^\]]*)\]/.exec(text), ids = m ? m[1].match(/\d+/g) : null;
+    if (!ids || !ids.length) throw new Error("mauthner_candidates.json names no ids (pass --cells ID1,ID2)");
+    return ids;
+}
+
 function main(argv) {
     const arg = (f, d = null) => { const i = argv.indexOf(f); return i === -1 ? d : argv[i + 1]; };
     const known = new Set(["--dir", "--cells", "--midline", "--seed", "--trim", "--json"]);
@@ -16,7 +23,7 @@ function main(argv) {
     if (!dir) { console.error("fishInputSide: --dir <an export folder> is required"); return 2; }
     const read = (n, must = true) => { const f = path.join(dir, n); if (!fs.existsSync(f)) { if (must) throw new Error(`${n} is not in ${dir}`); return null; } return fs.readFileSync(f, "utf8"); };
     try {
-        const cells = arg("--cells") ? arg("--cells").split(",").map((x) => x.trim()).filter(Boolean) : JSON.parse(read("mauthner_candidates.json")).ids.map(String);
+        const cells = arg("--cells") ? arg("--cells").split(",").map((x) => x.trim()).filter(Boolean) : candidateIds(read("mauthner_candidates.json"));
         const signsText = read("synapse_signs.csv", false);
         const midline = arg("--midline") !== null ? Number(arg("--midline")) : null;
         if (midline !== null && !Number.isFinite(midline)) throw new Error("--midline must be a number (micrometres, left-right axis)");

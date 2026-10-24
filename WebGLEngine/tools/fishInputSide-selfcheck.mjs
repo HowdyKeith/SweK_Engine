@@ -218,7 +218,7 @@ sec("8. the command");
 {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "fishinput-"));
     fs.writeFileSync(path.join(dir, "synapses_in.csv"), synapsesCsv); fs.writeFileSync(path.join(dir, "labels.csv"), labelsCsv); fs.writeFileSync(path.join(dir, "synapse_signs.csv"), signsCsv);
-    fs.writeFileSync(path.join(dir, "mauthner_candidates.json"), JSON.stringify({ ids: [CELL_A, CELL_B] }));
+    fs.writeFileSync(path.join(dir, "mauthner_candidates.json"), `{\n "ids": [\n  ${CELL_A},\n  ${CELL_B}\n ],\n "match": null\n}\n`);   // the export writes the ids as plain numbers, 18 digits, which JSON.parse rounds
     const cmd = path.join(ENG, "tools", "fishInputSide.mjs"), run = (args) => spawnSync(process.execPath, [cmd, ...args], { encoding: "utf8", cwd: ENG }), jf = path.join(dir, "report.json");
     const r = run(["--dir", dir, "--json", jf]), report = fs.existsSync(jf) ? fs.readFileSync(jf, "utf8") : "";
     ok("!! THE COMMAND PRINTS THE FACTS AND NO ROOT ID: exit 0, the two cells in the order of mauthner_candidates.json, 500 and 330 input synapses, the far line for cell A (6 synapses), 36 shared partners, the signs, and neither the printed output nor the --json file contains either root id or any partner id",
@@ -234,6 +234,9 @@ sec("8. the command");
     const bad = [run([]), run(["--dir"]), run(["--dir", dir, "--nope"]), run(["--dir", path.join(dir, "missing")]), run(["--dir", dir, "--midline", "x"]), run(["--dir", dir, "--cells", "864691128999999999", "--midline", "260"])];
     ok("the command refuses by name, each with a message on stderr and nothing on stdout: no --dir (2), --dir without a value (2), an unknown option (2), a folder without the files (1: names synapses_in.csv), a midline that is not a number (1), a cell with no soma row (1)",
         bad[0].status === 2 && /--dir <an export folder> is required/.test(bad[0].stderr) && bad[1].status === 2 && bad[2].status === 2 && /unknown option --nope/.test(bad[2].stderr) && bad[3].status === 1 && /synapses_in\.csv|mauthner_candidates\.json/.test(bad[3].stderr) && bad[4].status === 1 && /--midline must be a number/.test(bad[4].stderr) && bad[5].status === 1 && /has no soma row/.test(bad[5].stderr) && bad.every((b) => b.stdout === ""), bad.map((b) => b.status).join());
+    fs.writeFileSync(path.join(dir, "mauthner_candidates.json"), '{"ids": [], "match": null}'); const e1 = run(["--dir", dir]);
+    fs.writeFileSync(path.join(dir, "mauthner_candidates.json"), '{"match": null}'); const e2 = run(["--dir", dir]);
+    ok("a candidates file with no ids, or none of the key, is refused by name with a way out (--cells), exit 1 and nothing on stdout", e1.status === 1 && /names no ids \(pass --cells ID1,ID2\)/.test(e1.stderr) && e1.stdout === "" && e2.status === 1 && /names no ids/.test(e2.stderr) && e2.stdout === "");
     fs.rmSync(dir, { recursive: true, force: true });
 }
 
