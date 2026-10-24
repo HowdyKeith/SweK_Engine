@@ -165,6 +165,13 @@ console.log("\n6. ROUND 66 (section 151): THE FILL SCALED TO 1080p's HOLES, AND 
     ok("!! GhX, GhC and GhP are Gh outside its holes and, inside them, the cross-fade of L6 and L7, L7, and L6 -- each lit at the midpoint, bit for bit",
         per(F.GhX, xf) === 0 && per(F.GhC, l7) === 0 && per(F.GhP, l6) === 0 && !bits(F.GhX, F.Gh) && !bits(F.GhC, F.GhX), `${per(F.GhX, xf)}, ${per(F.GhC, l7)}, ${per(F.GhP, l6)} differences`);
     ok("  ...and without { holes: true } none of the round's arms is made -- rounds 59-62's frames are as they were", !("Gh" in FG.frameGenFrames(seq, net)));
+    // section 152's rule in interpolateFrameCPU: holes "crossfade" is the default frame outside the holes and the two frames' mean in them
+    const args = { prev: rgba(F.L6), cur: rgba(F.L7), w: D, h: D, flow: m.flow, bw: D, bh: D, block: 1, depthBlock: m.depth, indexedBy: "cur", t: 0.5, fill: FG.HOLE_FILL };
+    const z = interpolateFrameCPU(args), x = interpolateFrameCPU({ ...args, holes: "crossfade" }), xf4 = crossFadeCPU({ prev: args.prev, cur: args.cur, w: D, h: D, t: 0.5 });
+    let bad = 0; for (let p = 0; p < N; p++) for (let c = 0; c < 4; c++) if (!Object.is(x.frame[p * 4 + c], z.hole[p] ? xf4[p * 4 + c] : z.frame[p * 4 + c])) bad++;
+    let refused = null; try { interpolateFrameCPU({ ...args, holes: "black" }); } catch (e) { refused = e.message; }
+    ok("!! section 152's rule: interpolateFrameCPU's holes \"crossfade\" is its default frame outside the holes and the cross-fade inside them, bit for bit; the default leaves them zero; another value is refused",
+        bad === 0 && z.holes > 0 && Array.from(z.hole).every((hv, p) => !hv || [0, 1, 2, 3].every((c) => z.frame[p * 4 + c] === 0)) && /holes must be "zero" or "crossfade"/.test(refused || ""), `${bad} differences, ${z.holes} holes`);
 }
 
 console.log("\n4. THE SEEDS AND THE SPLIT");

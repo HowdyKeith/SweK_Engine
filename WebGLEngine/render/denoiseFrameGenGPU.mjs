@@ -118,7 +118,8 @@ export function h63(runs) {
 //   GEN_WIN_WGSL     among those that landed at that depth, atomicMin keeps the lowest pixel index -- the CPU's scan order, so
 //                    its tie rule (strictly nearer; the first writer stays) exactly
 //   GEN_FILL_WGSL    each pixel's vector: the winner's, or for a hole the farthest landed within the radius, else the reach
-//   GEN_GATHER_WGSL  each pixel samples prev back and cur forward along its vector, bilinear, clamped; blended at t; 0 in a hole
+//   GEN_GATHER_WGSL  each pixel samples prev back and cur forward along its vector, bilinear, clamped; blended at t; in a hole the fill
+//                    left, the cross-fade of the two at the pixel (section 152)
 // Depths are keyed by their f32 bits, which order as u32 for the non-negative depths motionField gives (SKY_DEPTH on sky).
 export const GEN_RADIUS = 4, GEN_REACH = 16, GEN_T = 0.5;
 const GEN_HEAD = /* wgsl */`
@@ -222,7 +223,8 @@ fn main(@builtin(global_invocation_id) g:vec3<u32>) {
     if (g.x >= u.w || g.y >= u.h) { return; }
     let j = g.y * u.w + g.x;
     let v = vec[j];
-    if (v.z != 0.0) { dst[j] = vec4<f32>(0.0); return; }
+    // section 152: a hole the fill left shows the cross-fade, interpolateFrameCPU's holes: "crossfade"
+    if (v.z != 0.0) { dst[j] = prev[j] * (1.0 - u.t) + cur[j] * u.t; return; }
     let x = f32(g.x); let y = f32(g.y);
     let a = fetch_prev(x - u.t * v.x, y - u.t * v.y);
     let b = fetch_cur(x + (1.0 - u.t) * v.x, y + (1.0 - u.t) * v.y);

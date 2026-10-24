@@ -646,7 +646,7 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // v4881 -- the CPU sea (physics/ocean/oceanSurface.mjs and its gate): files 4853 -> 4855, ES modules 4546 -> 4548, closures 4383 -> 4385, performance.now 260 -> 261 (the gate names it in its list of things the module must not read); the other rows held.
     // v4880 (later) -- tools/ship/register-audit-v4490.mjs, the auditCap snapshot: files 4852 -> 4853, ES modules 4545 -> 4546, WebAssembly 27 -> 28 (read off the gate).
     // v4880 -- the orrery-seeded merge (24 files): files 4828 -> 4852, ES modules 4521 -> 4545, closures 4362 -> 4383, async/await 1829 -> 1837, typed arrays 1367 -> 1371, Promises 451 -> 452, WebGL 200 -> 202, WebGPU 64 -> 65; the other rows held. Read off the gate, not typed.
-    files: 4950,                              // denoiser round 63 -- 4948 -> 4950: render/denoiseFrameGenGPU.mjs and its gate. denoiser round 59 -- 4946 -> 4948: render/denoiseFrameGen.mjs and its gate. v4895 -- RE-DERIVED over the snow/sea round (+39 files; threads 26 and wasm 28 did not move). v4776 -- RE-DERIVED over the merged tree: 4316 on this line, 4453 on the exported-functions-mesh line, 4494 merged (they share files). ten rows moved, three held (fetch/XHR, threads, WebAssembly).
+    files: 4954,                              // FSR4 round 65 -- 4950 -> 4954: render/learnedUpscale.mjs, render/learnedUpscaleStudy.mjs and their gates. denoiser round 63 -- 4948 -> 4950: render/denoiseFrameGenGPU.mjs and its gate. denoiser round 59 -- 4946 -> 4948: render/denoiseFrameGen.mjs and its gate. v4895 -- RE-DERIVED over the snow/sea round (+39 files; threads 26 and wasm 28 did not move). v4776 -- RE-DERIVED over the merged tree: 4316 on this line, 4453 on the exported-functions-mesh line, 4494 merged (they share files). ten rows moved, three held (fetch/XHR, threads, WebAssembly).
     // (v4691 note, carried)                               // v4691 -- RE-DERIVED: tools/ship/textureInProbe.mjs arrived, one ES module with a closure and top-level await -- four rows moved (files, ES modules, closures, async/await) and eight held.
                                // v4639: 4260 -> 4261 for tools/ship/fsrPage-selfcheck.mjs, named by the pre-flight before the verify rather than after
                           // ROUNDS, THREE RE-TAKES, each caught by the ship gate rather than by me.
@@ -1284,7 +1284,8 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // denoiser round 59 -- files 4946 -> 4948, ES modules 4637 -> 4639, closures 4471 -> 4473, async/await 1885 -> 1886, typed arrays 1407 -> 1409: render/denoiseFrameGen.mjs and its gate.
     // denoiser round 63 -- files 4948 -> 4950, ES modules 4639 -> 4641, closures 4473 -> 4475, async/await 1886 -> 1887, typed arrays 1409 -> 1411,
     // performance.now 267 -> 268, WebGPU 71 -> 72: render/denoiseFrameGenGPU.mjs and render/denoiseFrameGenCost-selfcheck.mjs.
-    esModules: 4641, closures: 4475, asyncAwait: 1887, typedArrays: 1411, promises: 471,
+    // FSR4 round 65 -- files 4950 -> 4954, ES modules 4641 -> 4645, closures 4475 -> 4479, async/await 1887 -> 1890, typed arrays 1411 -> 1415.
+    esModules: 4645, closures: 4479, asyncAwait: 1890, typedArrays: 1415, promises: 471,
     fetchXhr: 258, performanceNow: 268, raf: 131, webgl: 205, webgpu: 72, threads: 26, wasm: 28,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was

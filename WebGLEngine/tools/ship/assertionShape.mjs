@@ -955,8 +955,10 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // denoiser round 59 -- one new gate (render/denoiseFrameGen-selfcheck.mjs), spelling ok(n, c, d): gates 2104 -> 2105, usesOk 2083 -> 2084, definesOk 2075 -> 2076, nameFirst 1973 -> 1974 (read off the code).
     // denoiser round 63 -- one new gate (render/denoiseFrameGenCost-selfcheck.mjs), defining ok(label, cond, detail) with a return:
     // gates 2105 -> 2106, usesOk 2084 -> 2085, definesOk 2076 -> 2077, distinctDefinitions 45 -> 46, nameFirst 1974 -> 1975 (read off the code).
-    gates: 2106, usesOk: 2085, definesOk: 2077, importsOk: 0,
-    distinctDefinitions: 46, nameFirst: 1975, condFirst: 99, unknownSignature: 11,
+    // FSR4 round 65 -- two new gates (render/learnedUpscale-selfcheck.mjs, render/learnedUpscaleStudy-selfcheck.mjs), spelling ok(n, c, d):
+    // gates 2106 -> 2108, usesOk 2085 -> 2087, definesOk 2077 -> 2079, nameFirst 1975 -> 1977 (read off the code).
+    gates: 2108, usesOk: 2087, definesOk: 2079, importsOk: 0,
+    distinctDefinitions: 46, nameFirst: 1977, condFirst: 99, unknownSignature: 11,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

@@ -2508,14 +2508,14 @@ export const NEXT_ROUNDS = [
         id: "denoise-framegen-page",
         blocker: "OPEN",
         what: "FSR3's generated frame on path-tracer.html's page: the half-size chain with its history traces every other frame, render/denoiseFrameGenGPU.mjs's compute generator makes the one between, lit at its own time.",
-        how: "Round 66 (section 151) takes its two pieces. The holes: the fill scaled to 1080p's holes at 256 x 256, and black against the cross-fade (H1) and the newer frame (H2) -- --harvest-framegen-holes, section 152 its verdict. The pacing: the tree's own render/framePacer.mjs (FSR3's midpoint policy, v4743-v4756) driven with section 150's costs -- on the 1080 it shows 1.99-2.00 x the new images a second of no generation, at 60 Hz and on a 30-144 Hz display, for 13-14 ms more latency. Wiring the two into path-tracer.html's loop follows.",
+        how: "Round 66 (sections 151-152) took its two pieces. The holes: REPORTED -- the cross-fade beat black on 24 of 24 (mean d +1.97) and the newer frame did not beat the cross-fade (7 of 24), so interpolateFrameCPU's holes \"crossfade\" and the compute gather fill what the fill leaves from the cross-fade. The pacing: the tree's own render/framePacer.mjs (FSR3's midpoint policy) shows 1.99-2.00 x the new images a second of no generation on the 1080's costs, at 60 Hz and 30-144 Hz. What is left is the wiring into path-tracer.html's loop.",
         why: "Both halves are now supported on the path tracer: quality (section 145, display space, narrowly against the cross-fade) and cost (section 150, 1.6-1.8 x the frames). The traced midpoint is still better (16 of 24), so generation is the cheaper substitute.",
     },
     {
         id: "fsr4-learned-upscaler",
         blocker: "OPEN",
         what: "An FSR4-style learned upscaler: a trained network replacing the hand-written upscale chain.",
-        how: "ROUND 65 (section 148): the design, fixed before its code -- U, a kernel-predicting 2x upscaler guided by full-size albedo, normals and depth, in EASU's place in round 30's chain; trained on R and C (61000-61199, validation 62000-62019), tested on 24 new scenes (63000, 64000) against EASU (H1) and bilinear (H2), display space, Holm. Next: render/learnedUpscale.mjs and its gate rows, then the training harvest, then the test harvest, each committed before the next runs.",
+        how: "ROUND 65 (sections 148, 153): U, a kernel-predicting 2x upscaler guided by full-size albedo, normals and depth, in EASU's place in round 30's chain. Its code and gates exist (render/learnedUpscale.mjs, render/learnedUpscaleStudy.mjs); --harvest-upscale-train renders 220 scenes and trains three seeds and C2's shuffled U -> render/upscale-net-r65.json; then --harvest-upscale-test on 24 new scenes (63000, 64000), H1 against EASU, H2 against bilinear, display space, Holm.",
         why: "Logged because Keith asked about FSR 1-4 together; it would be its own arc, larger than any round here.",
     },
     {

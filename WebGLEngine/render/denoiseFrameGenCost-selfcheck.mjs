@@ -293,13 +293,14 @@ else {
             const judgeGen = (F, G) => {
             const flow = new Float32Array(n * 2), dep = new Float32Array(n);
             for (let p = 0; p < n; p++) { const v = F[p * MS + 3] !== 0; flow[p * 2] = v ? F[p * MS] : NaN; flow[p * 2 + 1] = v ? F[p * MS + 1] : NaN; dep[p] = F[p * MS + 2]; }
+            // section 152: the holes the fill leaves show the cross-fade, on both sides
             const C = interpolateFrameCPU({ prev: Float32Array.from(payload.prevS), cur: Float32Array.from(payload.curS), w, h, flow, bw: w, bh: h, block: 1, depthBlock: dep, indexedBy: "cur", t: FGG.GEN_T,
-                fill: { radius: FRAMEGEN_FILL.radius, reach: FRAMEGEN_FILL.reach, side: FRAMEGEN_FILL.side, prefer: FRAMEGEN_FILL.prefer } });
+                fill: { radius: FRAMEGEN_FILL.radius, reach: FRAMEGEN_FILL.reach, side: FRAMEGEN_FILL.side, prefer: FRAMEGEN_FILL.prefer }, holes: "crossfade" });
             const V = G.vec, D = G.dst;
             let maskDiff = 0, vecDiff = 0, fw = 0, agree = 0;
             for (let p = 0; p < n; p++) { const devHole = V[p * 4 + 2] !== 0;
                 if (devHole !== !!C.hole[p]) { maskDiff++; continue; } agree++;
-                if (devHole) { for (let c = 0; c < 4; c++) fw = Math.max(fw, Math.abs(D[p * 4 + c])); continue; }
+                if (devHole) { for (let c = 0; c < 4; c++) fw = Math.max(fw, Math.abs(D[p * 4 + c] - C.frame[p * 4 + c]) / Math.max(1e-6, Math.abs(C.frame[p * 4 + c]))); continue; }
                 if (!Object.is(Math.fround(C.vec[p * 2]), V[p * 4]) || !Object.is(Math.fround(C.vec[p * 2 + 1]), V[p * 4 + 1])) vecDiff++;
                 for (let c = 0; c < 4; c++) fw = Math.max(fw, Math.abs(D[p * 4 + c] - C.frame[p * 4 + c]) / Math.max(1e-6, Math.abs(C.frame[p * 4 + c]))); }
             return { C, maskDiff, vecDiff, fw, agree }; };
@@ -308,7 +309,7 @@ else {
                 maskDiff <= Math.floor(n / 10000) && vecDiff === 0 && fw <= 1e-5 && C.filled > 0 && C.holes < n && agree > 0,
                 `${maskDiff} mask, ${vecDiff} vector differences; frame ${fw.toExponential(2)}; the CPU filled ${C.filled} holes, ${C.holes} left`);
             // the synthetic field: exact, mask and vectors, since its flows are integers and nothing rounds in f32 that does not in f64
-            ok("!! ...and on the synthetic field -- half-pixel landings, depth ties, holes the reach fills and holes it leaves -- the mask and every vector bit for bit, the frame within 1e-5, the holes left 0",
+            ok("!! ...and on the synthetic field -- half-pixel landings, depth ties, holes the reach fills and holes it leaves -- the mask and every vector bit for bit, the frame within 1e-5, the holes left the cross-fade (section 152)",
                 Y.maskDiff === 0 && Y.vecDiff === 0 && Y.fw <= 1e-5 && Y.C.holes > 0 && Y.C.filled > 0 && Y.agree === n,
                 `${Y.maskDiff} mask, ${Y.vecDiff} vector differences; frame ${Y.fw.toExponential(2)}; the CPU filled ${Y.C.filled}, left ${Y.C.holes}`);
             const gp = R.genPass;

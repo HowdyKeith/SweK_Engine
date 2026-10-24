@@ -135,6 +135,9 @@
 //   V145a-f (section 145) the lost image, H1's count, H1's threshold, linear H1's count, the results' commit, C1 at 24
 //   H2s-H7s (section 151) HOLE_FILL radius 2 / reach 3 (with the frame-gen gate's two), H2 against Gh, SPLITS_FRAMEGEN_HOLES left out
 //           of the refusal, the command without c1Min, the hole pixels graded in linear radiance -- each red, the rows they name
+//   V152a-c (section 152) H1's count typed 23, the results' commit, the hole pixels' order -- each 1 red; X1 interpolateFrameCPU's
+//           cross-fade the older frame alone, X3 its default the cross-fade -- each 2 red in the frame-gen gate (and X2, the gather's
+//           hole the older frame alone, 1 red in the cost gate)
 //           each 1 RED -- the row it names
 "use strict";
 import fs from "node:fs";
@@ -876,7 +879,21 @@ console.log("\n14h. ROUND 66: WHAT A HOLE SHOULD SHOW, THE FILL SCALED TO 1080p'
         branch.length > 400 && /runFrameGenStudy\(\{ splits: ROUND_FRAMEGEN_HOLES\.splits, image: ROUND_FRAMEGEN_HOLES\.image, arrangement: ROUND_FRAMEGEN_HOLES\.arrangement,/.test(code) &&
         /c1Min: ROUND_FRAMEGEN_HOLES\.c1Min/.test(code) && /harvest: true/.test(code) && /path\.join\(ENG, ROUND_FRAMEGEN_HOLES\.results\)/.test(code) && /existsSync\(file\)/.test(code) &&
         /out\.commit = /.test(code) && !/ROUND_FRAMEGEN_LARGE\./.test(code) && !/verdict|status|supported/.test(code));
-    ok("  its results are not yet written: section 152 reads them once the harvest's file is committed", !fs.existsSync(path.join(ENG, RESULTS_FRAMEGEN_HOLES)));
+    // section 152: the committed results read back by code -- REPORTED, H1 supported on 24 of 24, H2 not supported
+    const hfile = path.join(ENG, RESULTS_FRAMEGEN_HOLES);
+    if (fs.existsSync(hfile)) {
+        const res = JSON.parse(fs.readFileSync(hfile, "utf8")), T = res.tables;
+        const again = verdict({ sets: frameGenSetsHoles(T), shuffled: null, c2Prior: ROUND_FRAMEGEN_HOLES.c2Prior, determinism: res.determinism, seedsDistinct: res.seedsDistinct, test: ROUND_FRAMEGEN_HOLES.test, c1Of: "candidate", c1Min: ROUND_FRAMEGEN_HOLES.c1Min });
+        const H1 = again.hypotheses.H1, H2 = again.hypotheses.H2;
+        ok("!! *** section 152: verdict() over the committed results' own tables gives the file's verdict -- REPORTED, H1 (the cross-fade against black) SUPPORTED on 24 of 24, H2 (the newer frame against the cross-fade) NOT, 7 of 24 ***",
+            again.run === "reported" && res.verdict.run === "reported" && H1.status === "supported" && H1.k === 24 && H2.status === "not supported" && H2.k === 7 && res.commit === "d3863c27" &&
+            Math.abs(H1.meanD - 1.968) < 5e-4 && Math.abs(H2.meanD + 0.011) < 5e-4 && H1.c1.netWins === 24 && H2.c1.netWins === 24 && T.Gh.length === 24,
+            `H1 ${H1.k}/24 ${H1.meanD.toFixed(4)} p ${H1.p}; H2 ${H2.k}/24 ${H2.meanD.toFixed(4)} p ${H2.p.toFixed(3)}`);
+        const m = (k) => res.secondary.holePixels.reduce((a, x) => a + x[k], 0) / 24;
+        ok("  ...and beside it: the hole share 1.45 % on the mean; on the hole pixels the cross-fade best (4.97e-4, the older frame 8.06e-4, the newer 1.32e-3, black 0.859); the scaled fill with the cross-fade better than the full fill on all 24",
+            Math.abs(res.secondary.holeShare.reduce((a, v) => a + v, 0) / 24 - 0.0145) < 5e-5 && m("GhX") < m("GhP") && m("GhP") < m("GhC") && m("GhC") < m("Gh") && Math.abs(m("GhX") - 4.966e-4) < 5e-7 &&
+            res.secondary.vsFullFill.every((d) => d < 0));
+    } else ok("!! section 152 reads render/denoise-results-framegen-holes.json, and it is not there", false);
 }
 
 console.log("\n15. THE UPSCALE ROUND: HALF SIZE + FSR1 AGAINST THE FRAMES IT COULD BE INSTEAD (pre-registration section 81)");

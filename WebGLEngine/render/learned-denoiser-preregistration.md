@@ -10050,3 +10050,76 @@ on the 1080 and 447 ms on the Intel. Generation is G₆₄: 4.34 ms and 98-112 m
 
 **Not this round.** Wiring the pacer and the generator into path-tracer.html's own loop. That is the page change
 `denoise-framegen-page` names; it follows these two pieces.
+
+## 152. ROUND 66 -- REPORTED: A HOLE SHOULD SHOW THE CROSS-FADE. BLACK LOSES ON EVERY SCENE; THE NEWER FRAME DOES NOT BEAT THE CROSS-FADE
+
+**What arrived.** `render/denoise-results-framegen-holes.json`.
+- It was written by `--harvest-framegen-holes` at d3863c27, the commit carrying section 151's code, in 7,064 s.
+- It was committed byte for byte (d8c7bf1a) before it was read.
+
+**The run is REPORTED.**
+- C1 held for both candidates: GhX and GhC each beat the noisy midpoint frame on 24 of 24.
+- C2 is cited, C3 found none near its floor, and C4 (both candidates re-made bit for bit) and C5 held.
+
+| | H1: GhX (cross-fade) against Gh (black) | H2: GhC (newer frame) against GhX |
+|---|---|---|
+| mean d | **+1.968** (R +2.78, C +1.15) | -0.011 |
+| images the candidate won | **24 of 24** | 7 of 24 (R 4, C 3) |
+| sign-flip p (Holm threshold) | 6.0e-8 (0.025) | 0.887 (0.05) |
+| status | **supported** | **not supported** |
+
+**The predictions, read as made.**
+- **P1 held:** H1 is supported on 24 of 24.
+- **P2 FAILED:** H2 is not supported. Its mean d is the cross-fade's way, though under P2's 0.05 in size.
+- **P3 held:** C1 holds for GhX.
+
+**Reported beside it.**
+- **The scaled fill's holes:** 1.45 % of a frame on the mean, 0.48-2.99 % per scene.
+- **relMSE on the hole pixels alone, the mean over scenes:**
+
+  | Gh, black | GhX, the cross-fade | GhP, the older frame | GhC, the newer frame |
+  |---|---|---|---|
+  | 0.859 | 4.97e-4 | 8.06e-4 | 1.32e-3 |
+
+  The cross-fade is the best of the three on the holes themselves. A hole's content is in neither frame for certain, and the
+  mean of the two is the safer guess.
+- **The older frame against the cross-fade:** the cross-fade is better on 17 of 24, by a mean d of 0.0004.
+- **GhX against round 62's full fill G' on the same scenes:** GhX is better on all 24, by a mean d of 0.078. At 256 x 256 the
+  scaled fill with the cross-fade in its holes beats the full fill's 4-to-16-pixel reach. Nothing was pre-registered on it,
+  so it decides nothing; it suggests the reach's long searches at 256 take vectors from too far away.
+
+**What changes, by section 151's rule.**
+- **The generator fills what it leaves from the cross-fade.**
+- interpolateFrameCPU gains `holes: "crossfade"` (default "zero", so fx/fsr's FSR3 gates and rounds 59-64 are unchanged).
+- render/denoiseFrameGenGPU.mjs's gather writes the cross-fade in a hole.
+- The cost gate's parity rows hold the two to each other on both fields, as before.
+- On the path tracer's page this closes the 0.77 % of a 1080p frame left black.
+
+## 153. FSR4 ROUND 65's CODE: FOUR DETAILS SECTION 148 LEFT OPEN, FIXED BEFORE THE TRAINING HARVEST RUNS
+
+Section 152 is round 66's verdict, written when its harvest has read. The code section 148 called for now exists:
+- render/learnedUpscale.mjs: U, its input, its apply, its loss, its training;
+- render/learnedUpscaleStudy.mjs: the two harvests;
+- `--harvest-upscale-train` and `--harvest-upscale-test`;
+- their gates: render/learnedUpscale-selfcheck.mjs and render/learnedUpscaleStudy-selfcheck.mjs, on synthetic and non-dataset
+  scenes only, every row sabotaged.
+
+Writing it fixed four things section 148 had left open. None is a result; no scene of the round has been rendered.
+
+1. **"Light-free" is the composite's.** The loss grades O = E + (1 - cov) U, the chain's own composite, against the full
+   reference, in display space. U is then asked only for the light the light sources do not cover, which is what section 148
+   meant by a light-free target. It needs no light-free reference, and the test grades the same composite.
+2. **The depth guide is d / (1 + d) along the camera's forward axis,** 0 on sky. The **phase** is ±0.25 on each axis: where
+   the pixel's centre falls in its half-size texel.
+3. **An untrained U is the 4 x 4 box.** The head's weights start at zero, as the denoiser's zero-last.
+   - Its parameter count is 6,656 (not "about the shipped denoiser's"; that one has 6,387).
+   - A crop's taps are read from a two-texel window round it, so a crop is graded exactly as the whole frame would be at
+     those pixels. A gate row holds this bit for bit.
+4. **C2's shuffle** permutes the training references across images with no image keeping its own (seed 65). Each input
+   keeps its own scene's light sources. Its U is trained on the candidate's seed.
+
+**The order from here, each step committed before the next runs:**
+1. this code;
+2. `--harvest-upscale-train`, writing render/upscale-net-r65.json;
+3. `--harvest-upscale-test`, writing render/denoise-results-upscale-learned.json;
+4. the verdict.
