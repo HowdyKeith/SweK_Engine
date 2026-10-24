@@ -146,6 +146,11 @@ export const NOT_A_LICENCE_BODY = Object.freeze([
     { path: "vendor/male-cns", why: "the grant is one line of PROVENANCE.md recording what the Neuprint server " +
         "declares for male-cns:v1.0 -- 'CC-BY-4.0' as a NAME, not CC-BY's text -- and the same file says the " +
         "declaration was not re-confirmed against Janelia's own terms. Nothing here for identify() to read." },
+    // UNNUMBERED (the fish vestibular helper branch) -- read off the file here rather than typed from memory.
+    { path: "vendor/zebrafish-vestibular", why: "the grant is the article's own licence paragraph, quoted word for word in PROVENANCE.md: " +
+        "it NAMES the Creative Commons Attribution 4.0 International License and links it, and does not carry the licence's legal code, " +
+        "which is what identify() reads for. The same file says that the paragraph speaks of 'images or other third party material' and that its " +
+        "covering the supplementary files is a reading. Nothing here for identify() to match." },
     { path: "vendor/mikktspace", why: "the grant is the zlib text in the header comment of mikktspace.h and " +
         "mikktspace.c, verbatim; the upstream repository carries no LICENSE file. identify() knows the MIT, " +
         "0BSD, OFL and Apache bodies and has no zlib clause set, so it correctly returns null here." },
