@@ -12,7 +12,28 @@
 //   Readout rows (pitch -0.04 0.01 7 | yaw 0.1 -0.02 0 | thrust 0 0.05 0 | ballast 1 0 0), b2 (0 0 0 -0.5): residuals 0.005, 0.05, 0.625, 2.5; the autopilot's laws on these features: 0.45, 0, 0.2, 0 -> 0.455, 0.05, 0.825, 1 (clamped).
 //   With cell 1 (inhibitory) also driven (W1 cell1 <- 10 x f1) the cells read [2, 2, 2, 3, 6, 0, 0, 0]: the inhibition shuts the outputs.
 //
-// SABOTAGED -- (the log is written below when the sabotage has run)
+// SABOTAGED -- 92 mutants of brain/pilotSubCircuit.mjs, each applied in a scratch tree and run alone against this gate, every one red by a row that names it EXCEPT TWO THAT HANG (M27, M28: the layer control's draw loop never finds a free pair, so
+// the gate never ends -- TIMEOUT at 150 s, red as a gate that never ends and not by a row name, the same convention as pilotSubFish-selfcheck's P04 and P22):
+//   topologyOf M01 one cell is a circuit | M02 a fractional layer | M03 a negative layer | M04 only layer 0 | M05 no output cells | M06 every cell above layer 0 is an input | M07 layer 1 is an output too | M08 a target past the last cell |
+//   M09 a self-loop | M10 a repeated pair | M11 a count of zero | M12 a wrong-signed edge | M13 a sign-0 edge from an unlabeled cell | M14 Exc and Inh swapped (red as the fixture no longer being a valid circuit)
+//   reachOf M15 a step short | M16 a step too many | M17 the last input's pairs only | M18 every input reaches | M19 no output counted as reached | M20 any cell counts as an output
+//   controls M21 a self-loop drawn | M22 a repeat drawn | M23 every redrawn edge excitatory | M24 redrawn edges lose their counts | M25 ER sources from every cell | M26 ER ignores its seed | M27 LAYER source from the target's layer (HANGS) |
+//   M28 LAYER target from the source's layer (HANGS) | M29 LAYER sources from unlabeled cells | M30 LAYER ignores its seed | M31 DEGREE swaps nothing | M32 DEGREE allows a self-loop | M33 DEGREE allows a repeat | M34 DEGREE forgets which pairs exist |
+//   M35 DEGREE makes no attempts | M36 DEGREE ignores its seed | M37 SIGN does not permute | M38 SIGN keeps the old edge signs | M39 SIGN permutes the unlabeled cell in | M40 SIGN ignores its seed | M41 COUNT does not permute |
+//   M42 COUNT makes every count 1 | M43 COUNT flips the signs | M44 COUNT ignores its seed
+//   the start M45 the seed of the input weights | M46 the input scale | M47 no bias | M48 recurrent start ignores the counts | M49 not scaled by the mean | M50 the readout does not start at zero
+//   the autopilot's laws M51-M58 (one term each: the pitch error read from the pitch rate, the pitch-rate term from the error, the heading term without pi, the yaw-rate term and the sideslip term without their scales, the speed term's sign,
+//   the depth term and the climb term without their scales)
+//   the pass M59 no bias at the input step | M60 sensors on the first cells | M61 no relu at the input step | M62 a step short | M63 no carry | M64 Dale's law off | M65 the source's sign ignored | M66 an edge runs backwards | M67 no relu in the steps |
+//   M68 readout from the first cells | M69 no readout bias | M70 the residual replaces the autopilot | M71 the residual dropped | M72 pitch clamps to 2 | M73 ballast clamps to 2 | M74 yaw does not clamp | M75 a non-finite output not read as 0 |
+//   M76 a non-finite feature in the sensors | M77 a non-finite feature in the law
+//   the recipe M78 mutate may change nothing | M79 mutate changes at most one | M80 perturb leaves one weight | M81 a search accepts a worse child | M82 a neutral child never replaces | M83 a search ignores its seed | M84 a search ignores a given start |
+//   M85 prune keeps everything | M86 prune reverts everything | M87 prune passes once | M88 prune ignores `toward` | M89-M92 the report and the weight count
+// WHAT THE SABOTAGE FOUND, FIXED IN THE GATE: seven 0-red mutants the first time. M60 (the sensors on the first cells) because the fixture's input cells ARE the first cells -- a chain 4>3>2>1>0 whose only input cell is cell 4 now carries it, and
+// worked by hand it shows the carry ACCUMULATES (cell 3 reads 1, 2, 3); M61 (no relu at the input step) because no input cell was ever driven negative -- a second small circuit now drives one; M75-M77 (non-finite values) because the
+// relu zeroes a NaN before it can be seen -- the rows now put a bias on the cell and a feature the law uses, and clamp all four outputs both ways; M84 (a search ignores a given start): no row gave one; M86 (prune reverts everything) because a
+// prune that kept nothing passed a fixed-point row over an empty list -- the row now needs something kept. M14 and M01 first went red only as "section ran to the end"; the first row now names the fixture.
+// NOT TRIED: the BFS `seen` test in reachOf (equivalent: a node expanded again at a later step reaches only nodes a shorter walk already reached, so the set within `steps` is the same).
 //
 "use strict";
 import fs from "node:fs";
