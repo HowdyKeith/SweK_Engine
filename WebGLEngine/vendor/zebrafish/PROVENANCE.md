@@ -13,7 +13,7 @@ The page states no licence text and none is claimed here.
 `https://storage.googleapis.com/fish1-release/paper_data/TEN_analysis.zip` -- 3,487,626 bytes, sha256
 `fa18e512cdf4eaceb195ae0ee4b9812ec0c85b3a0a20969a085ac38b2da4fe92`, object generation 1777086199106112 (last modified
 2026-04-25). It is one of the two analysis packages the release keeps in its open bucket (`paper_data/`); the other,
-`HMI_analysis.zip`, was read and not used. Files used from it:
+`HMI_analysis.zip`, was read later and is used for the second circuit below. Files used from it:
 
 | file | bytes | sha256 |
 |---|---|---|
@@ -42,3 +42,32 @@ label in the package. It is the densest core of what the paper analysed, not a c
 It is the fish counterpart of the tree's use of the fly's Giant Fiber Circuit: a real connectome's wiring as the sparsity pattern
 of a recurrent core. **The Mauthner (escape) circuit, the fish's true counterpart of the giant fiber, is in the CAVE tables and
 is not here.**
+
+## The second circuit: `fish1-hmi-spn.json` (the hindbrain motion integrator's route to the spinal projection neurons)
+
+**Fetched** (read-only, no token): `https://storage.googleapis.com/fish1-release/paper_data/HMI_analysis.zip` -- 1,467,376 bytes, sha256
+`5507d2d32e0a111faf8a07ab69edb33f8325f4a1bbc3c74ddd5fb33f6383feca`, object generation 1778524806228774 (last modified 2026-05-11). HMI is the
+paper's case study of a hindbrain integrator with recurrent excitation and contralateral inhibition whose outputs are spinal projection neurons
+(SPNs) for turning and for forward swimming. Files used from it (the source files are NOT committed; the zip is fetched the same way as the TEN one):
+
+| file | bytes | sha256 |
+|---|---|---|
+| `data/em_zfish1_dataframe.xlsx` | 86,872 | `ecfd38c4d9acb9b161cde2da031f137e3e713e0b504994c7324d394c787cf588` |
+| `data/cave_somas_in_big_box.csv` | 4,200,331 | `94b5c46eed84bd04f46381d52f13f7d7d91e32d4e8af16193ea475291af84638` |
+
+The dataframe has 999 cells, one row each, with `Cell ID` (the SOMA id of the CAVE somas table, not a root id), a class, a neurotransmitter label
+(Gad1B, VGluT2, unlabeled, unclear), a network level, and two Python-literal lists, `inputs` and `outputs`, of the synapses a person traced (partner
+cell or '-', x, y, z, size): 3,013 tuples, 1,755 to an identified cell, 1,254 to an unidentified one, 4 malformed; 1,401 distinct cell pairs.
+
+**Made by** `tools/fishHmi.mjs` (gated by `tools/fishHmi-selfcheck.mjs`; the xlsx is read with nothing but `zlib`): the targets are the SPNs (a classifier
+containing `spn`, as the package's own `is_spn_cell` reads it; the 22 proximal ones, `_prox`, are kept and labelled `SPN_prox` -- the package's own figure
+leaves them out); layer 1 is every cell with a transmitter label (VGluT2 +1, Gad1B -1) that has an identified synapse onto a target; layer 2 is every labelled
+cell with one onto layer 1. Edges are the identified cell pairs among those 99 neurons whose presynaptic cell has a label, the weight the number of tuples
+(a synapse listed in both cells' rows is counted twice, as the package counts it). Sides come from the soma y position against the midline at 259.208 um
+(the median of the volume's 179,930 somas), 8 nm voxels. Result: **99 neurons** (50 SPNs: 31 turning and 19 forward groups; layers 18 and 31), **148 edges**
+(127 excitatory, 21 inhibitory), **189 synapses**; 23 cell pairs (28 synapses) onto these neurons from a cell with no transmitter label are left out and
+counted. Sides: 12 neurons unknown, 75 left, 12 right -- **46 of the 50 SPNs are on the left** (27 turning and 19 forward), 1 turning on the right, 3 unknown.
+
+**What it is, said plainly**: real, human-traced wiring of a hindbrain circuit that the paper links to turning and forward swimming. It is a curated and
+partial tracing (the tuples are what a person marked, 1,254 of 3,013 end on a cell nobody identified), so its weights are tuple counts and not synapse
+sizes, and the closure is one rule with one knob. No claim is made that it can steer a body: that is what `brain/SUBMARINE_WIP.md` tests.

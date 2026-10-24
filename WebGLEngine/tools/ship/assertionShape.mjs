@@ -955,8 +955,9 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // The unnumbered line (the version is chosen at ship time) -- twenty new gates, each spelling ok(name, cond, detail): gates 2104 -> 2124, usesOk 2083 -> 2103, definesOk 2075 -> 2095, nameFirst 1973 -> 1993 (read off the code); nothing else moved. They are brain/{autopilotDrone,autopilotJet,dogfightTournament,droneTask,jetFight,jetLeagueSets,pilotDroneMlp,pilotDronePolicy,pilotJetMlp,pilotJetPolicy,pilotSubFish}-selfcheck.mjs, physics/mechanics/{atmosphereISA,multirotorModel6dof}-selfcheck.mjs, tools/{fishCaveExport,fishCircuit}-selfcheck.mjs and tools/ship/{tournamentDogfight,tournamentDogfightShipped,trainDogfightLeague,trainDronePilot,trainSubPilot}-selfcheck.mjs.
     // SABOTAGED, restored: each of the four numbers moved by one in turn (gates 2123, usesOk 2102, definesOk 2095, nameFirst 1991 at the nineteen-gate reading) -> RED every time, naming the row (DRIFTED: gates 2122 -> 2123, and the same for the other three).
     // And one more gate on the same line, tools/fishInputSide-selfcheck.mjs (the input side of the fish cells), spelling ok(name, cond, detail): gates 2124 -> 2125, usesOk 2103 -> 2104, definesOk 2095 -> 2096, nameFirst 1993 -> 1994 (read off the code, the four rows of the gate named them all).
-    gates: 2125, usesOk: 2104, definesOk: 2096, importsOk: 0,
-    distinctDefinitions: 45, nameFirst: 1994, condFirst: 99, unknownSignature: 11,
+    // And one more, tools/fishHmi-selfcheck.mjs (the hindbrain-circuit extraction), spelling ok(name, cond, detail): gates 2125 -> 2126, usesOk 2104 -> 2105, definesOk 2096 -> 2097, nameFirst 1994 -> 1995 (read off the code: the gate defines ok(n, c, d) once and every row names first).
+    gates: 2126, usesOk: 2105, definesOk: 2097, importsOk: 0,
+    distinctDefinitions: 45, nameFirst: 1995, condFirst: 99, unknownSignature: 11,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

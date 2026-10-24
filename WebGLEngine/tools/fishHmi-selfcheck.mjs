@@ -15,7 +15,38 @@
 //   depth 3: 8 neurons, 8 edges (+ H), 12 synapses | depth 4: 9 neurons, 9 edges (+ I), 13 synapses | depth 9: the same as 4.
 //   Sides (midline 260 um, y in soma voxels of 8 nm): 101 at y 40000 = 320 um R | 102 at 20000 = 160 L | 103 at 32500 = 260 (on the midline: none) | 201 at 32499 = 259.992 L | 202 at 32501 = 260.008 R | 104, 203 have no position.
 //
-// SABOTAGED -- (the log is written below when the sabotage has run)
+// SABOTAGED -- 131 mutants of tools/fishHmiLib.mjs (run with SAB_COPY=tools/fishHmi.mjs so the command's child process imports the mutant) and 51 of tools/fishHmi.mjs, every one red by a row that names it (a throw inside a section is a named red of that
+// section, "section N ran to the end", and none of these went red ONLY that way):
+//   zip and checksum: L01 wrong CRC polynomial | L02 CRC not inverted | L03 CRC starts at zero | L04 end record only at the very end | L05 no end record not refused | L06 zip64 count accepted | L07 zip64 offset accepted |
+//   L08 central signature unchecked | L09 encrypted entry read | L10 a folder is a file | L11 local signature unchecked | L12 data starts after the CENTRAL extra field | L13 stored entry inflated | L14 any method inflated |
+//   L15 unpacked size unchecked | L16 CRC unchecked | L17 compressed bytes cut at the unpacked size
+//   xlsx: L18 columns base 25 | L19 first column is the second | L20 no sheet1 not refused | L21 shared strings always read | L22 an empty <si/> skipped | L23 inline string unread | L24 shared index off by one | L25 index past the table not refused |
+//   L26 a styled empty cell reads as text | L27 a <v> value not unescaped | L28 header hole undefined | L29 a value under no header kept | L30 an empty row is a record | L33 a self-closing cell swallows the next | L34 text not unescaped |
+//   L35 only the last run | L36 phonetic run is text | L37 <t/> swallows the text after it | L38 <t> with an attribute is not text | L39-L43 &amp; &lt; &gt; &quot; &apos; | L44 hex entity read as decimal | L45 decimal read as hex |
+//   L46 numeric entities not decoded | L47 &amp; decoded first (twice-decoded text)
+//   labels: L48 proximal taken after turning | L49 anything containing _prox | L50 forward not told from other | L51 turning needs the whole word | L52 forward needs the whole word | L53 SPN only if it STARTS with spn |
+//   L54 L-2 misnamed | L55 1.0 | L56 2.0 | L57 'Class 2' | L58 'contralateral axon' | L59 7.0 | L60 4.0 | L61 '5 or 6' | L62 6.0 | L63 class not trimmed | L64 F and R swapped | L65 transmitter not lower-cased |
+//   L66 glutamatergic | L67 gaba | L68 inhibitory | L69 unlabelled | L70 Exc and Inh swapped | L71 group: containing spn is not an SPN | L72 turning and forward swapped in the group
+//   python literals: L73 tuples unread | L74 a tuple closes with a bracket | L75 a missing comma accepted | L76 unterminated list unnamed | L77 backslash escape unread | L78 double quotes unread | L79 plus sign | L80 leading-dot number |
+//   L81 exponent | L82 None as 0 | L83 True/False swapped | L84 text after the literal accepted
+//   cells and graph: L85 a decimal Cell ID is an id | L86 Cell ID not trimmed | L87 levels keep their type | L88 an unreadable level list stops the build | L89 missing status reads as '?' | L90 a row without a cell makes edges |
+//   L91 'n/a' lists parsed | L92 unreadable list not counted | L93 a scalar list walked | L94 a three-field tuple is a synapse | L95 a non-tuple not refused | L96 nan not unidentified | L97 None not unidentified |
+//   L98 a decimal partner is a cell | L99 text partner not trimmed | L100 a partner outside the dataframe is an edge | L101 inputs and outputs swapped | L102 a self-loop is an edge | L103 a pair counted once
+//   circuit: L104 decimal depth | L105 no SPN not refused | L106 a cell with no label feeds the layers | L107 closure one layer short | L108 a chosen cell re-layered | L109 ids sort as text | L110 edges by source only |
+//   L111 edges by target only | L112 left-out pairs not counted | L113 left-out synapses not summed | L114 an unsigned cell inside the set keeps its edges | L115 pairs onto unchosen cells counted as left out |
+//   L116 sign from the target | L117 an inhibitory cell excitatory | L118 weight 1 | L119 side from x | L120 side from z | L121 y in 30 nm | L122 wrong unit | L123 midline cell has a side | L124 sides swapped |
+//   L125 no position is left | L126 midline not a parameter | L127 default depth 3 | L128 default midline 259 | L129 voxel 40 nm | L130 a required column dropped | L131 defaults mutable | L132 byLayer off by one | L133 byGroup of a non-SPN is its class
+//   the command (tools/fishHmi.mjs): C01 unknown option accepted | C02 --midline-um | C03 --somas | C04 --write | C05 --depth not options | C06 an option takes another option as its value | C07 no value at the end | C08 --xlsx optional |
+//   C09 decimal depth | C10 midline not a number | C11 missing column read | C12 every run writes | C13 folder not made | C14 no final newline | C15 sha256 of the name | C16-C18 --depth / --somas / --midline-um not passed on |
+//   C19-C23 a soma file with no rows / no id / no _x / no _y / no _z read | C24 malformed and unreadable swapped | C25 excitatory and inhibitory swapped | C26 left-out pairs not said | C27 refusal to stdout | C28 read failure exits 2 |
+//   C29 written path not said | C30 licence claimed | C31 ids called root ids | C32 signs the wrong way in the note | C33 build counts not in the meta | C34 key order | C35 http | C36 citation lost | C37 soma file named by its path |
+//   C38 soma note | C39 dry run not said | C40 --somas unread | C41 default depth 3 | C42 default midline 260 | C43 dropped rows not counted | C44 pairs counted by cell | C45 dataset unnamed |
+//   C46 soma hash of the name | C47 soma count off by one | C48 soma file path in the meta | C49 soma meta never written | C50 midline not recorded | C51 soma meta written without a soma file
+// WHAT THE SABOTAGE FOUND, FIXED IN THE GATE OR THE LIBRARY: two 0-red mutants the first time. (1) A self-closing <row/> regex: the library had been changed to read it, and the mutant that put the old regex back changed NOTHING -- an empty
+// row swallows the next row, whose cells carry their own addresses, so the same cells come out. EQUIVALENT: the change was cut, the comment says why, and the gate keeps an empty row of both forms in the fixture (L30). (2) <t xml:space="preserve"/>:
+// the fixture put it alone in a string, where swallowing finds no closing tag; it now sits before <t>after</t>. Two rows (L12 the central extra field, L21 the missing shared-strings file) first went red only as "section ran to the end"; the
+// rows now catch the throw and name themselves. The first real file showed the row-regex change was not needed and the CRC check did not break it (999 rows read, 3,013 tuples).
+// NOT TRIED: removing the Number() around the soma coordinates in tools/fishHmi.mjs (equivalent: the library multiplies, and a string coerces).
 //
 "use strict";
 import fs from "node:fs";
