@@ -103,6 +103,9 @@ node tools/ship/versionPreflight.mjs --next    # the next free version and sweep
    - **Sections 149-150: H64 HOLDS on both GPUs.** With the compute generator a generated frame costs 0.11 of a traced one on
      the 1080 (2.4 ms against three.js's 18-19) and 0.22-0.25 on the Intel: 1.80 x and 1.60-1.64 x the frames. Putting it on
      the page is `denoise-framegen-page`, Keith's call.
+   - **Round 66 (section 152): holes show the cross-fade** (24 of 24 over black; the newer frame not better). **FSR4 round 65
+     (section 154): NOT REPORTED** -- C1 and C3; the 32-sample truth was noisier than every arm. U lost to EASU on 17 of 24,
+     described. A cleaner-truth round is Keith's call.
    - Every default that the Intel's runs at 7b871372 decided is now carried out. The denoiser entries still open, after
      rounds 56-58, are `denoise-subgroup-reduction`, `denoise-temporalup-device` and `denoise-1080-native-crash` (all three
      owed the GTX 1080), and `denoise-fsr3-framegen`, whose upstream is closed.

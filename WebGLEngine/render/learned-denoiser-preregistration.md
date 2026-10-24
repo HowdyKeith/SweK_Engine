@@ -10123,3 +10123,51 @@ Writing it fixed four things section 148 had left open. None is a result; no sce
 2. `--harvest-upscale-train`, writing render/upscale-net-r65.json;
 3. `--harvest-upscale-test`, writing render/denoise-results-upscale-learned.json;
 4. the verdict.
+
+## 154. FSR4 ROUND 65 -- NOT REPORTED: C1 AND C3. THE 32-SAMPLE TRUTH IS NOISIER THAN EVERY ARM, SO THE TEST COULD NOT RESOLVE THEM
+
+**What arrived.**
+- render/upscale-net-r65.json: the training harvest at 64756e00, committed at b9f2cdab. Its validation losses were 4.351e-3,
+  4.488e-3 and 4.198e-3, so the candidate is seed 3. Its log was seen before its commit; no test scene had been rendered.
+- render/denoise-results-upscale-learned.json: the test harvest at b9f2cdab, committed byte for byte (07fceeaa) before it
+  was read.
+
+**The run is NOT REPORTED, on two controls.**
+- **C1 fired:** U's chain beat the noisy floor on 18 of 24, where 22 were needed.
+- **C3 fired:** 23 of 24 images sit within 2 x of their floor, so neither hypothesis is resolvable.
+  - The floor is relMSE between the two 32-sample references, in display space. Its mean is 5.50e-3.
+  - The arms' means are U 4.90e-3, EASU 4.99e-3, bilinear 5.31e-3 and the noisy floor 6.15e-3.
+  - Every arm is closer to one reference than the second reference is. The truth's own noise is the largest error in the
+    table, and it hides differences of the size the round asked about.
+- C2 held: the shuffled-target U lost to EASU on all 24, by a mean d of 1.11. So U learned from its targets, not from
+  their noise.
+- C4 and C5 held.
+
+**Reported, deciding nothing.**
+
+| | U against EASU | U against bilinear |
+|---|---|---|
+| images U won | 7 of 24 (R 2, C 5) | 14 of 24 (R 2, C 12) |
+| mean d (display) | -0.053 (R -0.114, C +0.008) | +0.018 (R -0.065, C +0.100) |
+| mean d (linear) | -0.111 | -0.064 |
+
+EASU beat bilinear on 22 of 24.
+
+**The predictions, read as made.**
+- **P3 FAILED:** C1 did not hold.
+- **P1 and P2 have no reading.** Descriptively, P1 (U beats bilinear) is half true: on C 12 of 12, on R 2 of 12. P2 (U beats
+  EASU) is not seen at all.
+
+**What it says.** Nothing is decided, and two things are owed.
+- **This is my design's fault, and C3 caught it.**
+  - Section 148 kept the 32-sample truth of rounds 59-62. Those rounds graded frames generated from noisy inputs, whose
+    errors sat well above it.
+  - Here every arm is the shipped denoiser's half-size output upscaled, and they all sit at or under the truth's own noise.
+    I did not check the floor against the arms before fixing the design.
+- U was also trained on 32-sample targets. Noisy targets are unbiased, but they slow what it can learn.
+
+**What a next round would be, for Keith to decide.** It would not be a re-read of these 24.
+- New test seeds, and a truth of 512 samples: about 16 x quieter, so the floor falls well under the arms.
+- The same U, so the training's choice stands; or U retrained on 512-sample targets as well.
+
+`fsr4-learned-upscaler` stays open on that decision.

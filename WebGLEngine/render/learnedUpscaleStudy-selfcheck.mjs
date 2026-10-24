@@ -7,6 +7,8 @@
 // targets -> 1 red; LS3 the shuffle allowed fixed points -> 1 red; LS4 H1 against bilinear -> *** 0 RED at first ***, then 1 with
 // the effects row added for it; LS5 the training command without harvest -> 1 red; LS6 EASU graded in linear radiance -> 1 red;
 // LS7 the C seeds shifted onto 61101 -> 1 red.
+// SECTION 154: V154a the training file's candidate typed 1 -> 2 red; V154b C1's count typed 19 -> 1 red; V154c the test's commit
+// typed b9f2cdac -> 2 red; V154d the floor typed 5.401e-3 -> 1 red. Each restored byte-identical.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -82,7 +84,29 @@ console.log("\n4. THE COMMANDS");
         /runUpscaleTraining\(\{ net: decodeNet\(shipped\.net\), harvest: true/.test(a) && /RESULTS_UPSCALE_TRAIN/.test(a) && /existsSync\(file\)/.test(a) && /c2: \{/.test(a) && /sha256/.test(a) && /commit: git/.test(a) && !/verdict/.test(a));
     ok("!! --harvest-upscale-test reads the committed training file's candidate and C2's U, runs runUpscaleTest under harvest, writes its own file and never an existing one, and records both commits",
         /tr\.runs\.find\(\(x\) => x\.seed === tr\.candidate\)/.test(b) && /Uc2: decodeNet\(tr\.c2\.net\)/.test(b) && /harvest: true/.test(b) && /RESULTS_UPSCALE_TEST/.test(b) && /existsSync\(file\)/.test(b) && /out\.commit = /.test(b) && /commit: tr\.commit/.test(b));
-    ok("  neither file is written yet: section 148's order -- this code, then the training harvest, then the test harvest", !fs.existsSync(path.join(ENG, LS.RESULTS_UPSCALE_TRAIN)) && !fs.existsSync(path.join(ENG, LS.RESULTS_UPSCALE_TEST)));
+    // section 148's order -- this code, then the training harvest, then the test harvest: the test names the training file and the
+    // commit it was written at, and was itself run at a later commit
+    const trf = JSON.parse(fs.readFileSync(path.join(ENG, LS.RESULTS_UPSCALE_TRAIN), "utf8")), tef = JSON.parse(fs.readFileSync(path.join(ENG, LS.RESULTS_UPSCALE_TEST), "utf8"));
+    ok("  ...and in section 148's order: the test read the training file written at 64756e00, and ran at b9f2cdab, the commit that carried it",
+        tef.trained.file === LS.RESULTS_UPSCALE_TRAIN && tef.trained.commit === trf.commit && trf.commit === "64756e00" && tef.commit === "b9f2cdab" && tef.trained.candidate === trf.candidate);
+}
+
+console.log("\n5. SECTION 154: THE COMMITTED HARVESTS, READ BACK");
+{
+    const tr = JSON.parse(fs.readFileSync(path.join(ENG, LS.RESULTS_UPSCALE_TRAIN), "utf8")), res = JSON.parse(fs.readFileSync(path.join(ENG, LS.RESULTS_UPSCALE_TEST), "utf8"));
+    ok("!! the training file's candidate is the seed with the lowest validation loss -- seed 3 (4.198e-3 against 4.351e-3 and 4.488e-3), at 64756e00",
+        tr.candidate === 3 && tr.commit === "64756e00" && tr.runs.find((r) => r.seed === 3).valMean === Math.min(...tr.runs.map((r) => r.valMean)) && tr.runs.length === 3 && tr.c2.seed === 3,
+        tr.runs.map((r) => `${r.seed}: ${r.valMean.toExponential(4)}`).join(", "));
+    const { verdict } = await imp("render/denoiseStats.mjs"), T = res.tables;
+    const sets = { H1: { noisy: T.noisy, filter: T.easu, net: [T.U], floor: T.floor }, H2: { noisy: T.noisy, filter: T.bilinear, net: [T.U], floor: T.floor } };
+    const again = verdict({ sets, shuffled: null, c2Prior: res.verdict.controls.C2.citedFrom === 65 ? { round: 65, meanD: res.verdict.controls.C2.meanD, ok: res.verdict.controls.C2.ok } : null,
+        determinism: res.determinism, seedsDistinct: true, test: "signflip", c1Of: "candidate", c1Min: 22 });
+    ok("!! *** section 154: verdict() over the committed tables gives the file's verdict -- NOT REPORTED, C1 at 18 of 24 and C3 at 23 of 24 near the floor; C2 held ***",
+        again.run === "not reported" && res.verdict.run === "not reported" && again.hypotheses.H1.c1.netWins === 18 && again.hypotheses.H1.c3.nearFloor === 23 && !again.hypotheses.H1.c3.resolvable &&
+        res.verdict.controls.C2.ok === true && res.commit === "b9f2cdab" && res.trained.candidate === 3, again.reasons.join(" | "));
+    const mean = (a) => a.reduce((q, v) => q + v, 0) / a.length;
+    ok("  ...and the reason C3 gives: the 32-sample truth's own floor (5.50e-3) above every arm's error -- U 4.90e-3, EASU 4.99e-3, bilinear 5.31e-3",
+        Math.abs(mean(T.floor) - 5.501e-3) < 5e-6 && [T.U, T.easu, T.bilinear].every((a) => mean(a) < mean(T.floor)) && Math.abs(mean(T.U) - 4.901e-3) < 5e-6, `floor ${mean(T.floor).toExponential(4)}`);
 }
 
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)`);
