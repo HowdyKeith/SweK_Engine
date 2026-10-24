@@ -11,7 +11,7 @@
 // Read off the fixture by hand: A's signs by group perisomatic 90 excitatory / 210 inhibitory / 3 untagged (m1), lateral 118 excitatory (l5..l40 and s1: 108 + 10) / 12 inhibitory / 1 untagged (m1), z arm 36 excitatory / 4 inhibitory / 20 untagged, far 0/0/6;
 // B's: 322 excitatory, 8 inhibitory.
 //
-// SABOTAGED -- 47 mutants of tools/fishInputSideLib.mjs (run with SAB_COPY=tools/fishInputSide.mjs so the command's child process imports the mutant) and 14 of tools/fishInputSide.mjs, every one red by name:
+// SABOTAGED -- 47 mutants of tools/fishInputSideLib.mjs (run with SAB_COPY=tools/fishInputSide.mjs so the command's child process imports the mutant) and 17 of tools/fishInputSide.mjs, every one red by name:
 //   L01 a doubled quote closes the field 3 | L02 a carriage return is not a line end 1 | L03 blank lines become rows 1 | L04 the last line without an end is dropped 1 | L05 a short row is not padded 1 |
 //   L06 the soma is read in synapse voxels 5 | L07 any table's row is a soma 4 | L08 any cell's soma row will do 8 | L09 inputs are the synapses a cell sends 5 | L10 the synapses are read in soma voxels 4 |
 //   L11 a dropped row is not counted 2 | L12 a missing position reads as zero 3 | L13 the sides are swapped 4 | L14 the midline is a side 1 | L15 lateral is not made to face away from the midline 6 |
@@ -22,14 +22,16 @@
 //   L35 every shared partner is in the same group 3 | L36 a sign pair needs only one sign 1 | L37 a tag with no synapse id is kept 1 | L38 a tag that is not a number is kept 1 | L39 the midline is not the middle 2 |
 //   L40 one cell needs no midline 2 | L41 one cell has a shared table 2 | L42 the dropped count is lost 1 | L43 a cell with no input is not refused by name 1 | L44 the trim does not reach domainsOf 2 |
 //   L45 the seed does not reach domainsOf 1 | L46 no ids is not refused 1 | L47 signs are always reported present 2
-//   the command:
+//   the command (re-run on 2026-10-24 after the first real file broke it: 17 mutants):
 //   C01 an unknown option is accepted 1 | C02 --trim is not an option 1 | C03 a midline that is not a number is used 1 | C04 the default cells are in reverse order 1 | C05 the root id is printed 2 |
-//   C06 the json carries the root id 1 | C07 --json writes nothing 1 | C08 the signs file is not read 1 | C09 the far line is not printed 1 | C10 every run exits 0 1 | C11 the hint for the missing signs is gone 1 |
-//   C12 the shared line is printed for one cell 1 | C13 --midline is not read 2 | C14 --cells is not read 2
+//   C06 the json carries the root id 1 | C07 --json writes nothing 1 | C08 the signs file is not read 1 | C09 the far line is not printed 1 | C10 every run exits 0 2 | C11 the hint for the missing signs is gone 1 |
+//   C12 the shared line is printed for one cell 1 | C13 --midline is not read 2 | C14 --cells is not read 2 | C15 the ids are read with JSON.parse (rounded) 4 | C16 the way out is not named 1 |
+//   C17 a candidates file with no ids is accepted 1
 // Two went 0 red the first time and were fixed in the gate. L42 (the dropped-row count lost between inputsOf and the result): nothing fed inputSide a row without a position; a row does now (cell B's result must say dropped 1). L45 (the seed not reaching the fit): on well-separated groups the
 // seed changes nothing anyone can see, so the fit's own settings (seed, restarts, trim) are now part of every result as `fit` and the row reads them back (seed 9, 3 restarts, 150 um); the same row catches the trim not reaching the fit. Found while reading the ranges: L18 (the HIGHEST summed squared distance wins) was red only through the new
 // restarts row, because the planted groups are so well apart that every restart finds them -- the row uses the cell's offsets with the far synapses left in, where a restart that starts on a far point is stuck (the worst single restart is more than twice the best).
 // Two things in the fixture were changed so a mutant could not hide: the other table's soma-looking row comes BEFORE the cell's own (L07), and one partner has exactly ten synapses (the STRONG_PARTNER line, L32).
+// THE FIRST REAL FILE FOUND A BUG THE GATE HAD MISSED (2026-10-24): the command read the ids of mauthner_candidates.json with JSON.parse, and the export writes them as plain 18-digit numbers, which JSON.parse rounds (864691128610327387 came back as ...400: 'no soma row'). The fixture had written its ids as strings. The fixture writes them as the export does now, the command reads them as text (C15, 4 red), and a file with no ids is refused by name (C16, C17). A dead check, `|| !ids.length` (match() returns null, never an empty array, so the mutant that removed it read 0 red), was cut instead of defended.
 // NOT CHECKED: that the three-group reading is what the real cells are -- the fixture plants three groups and the tool finds them; the first real export's two cells gave three groups each in the same arrangement, which is a measurement and not a test. The tool says where synapses sit and who they come from; it does not say what the groups ARE.
 //
 "use strict";

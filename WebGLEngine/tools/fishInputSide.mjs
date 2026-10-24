@@ -11,7 +11,7 @@ import { parseTable, inputSide, DOMAINS, ALL } from "./fishInputSideLib.mjs";
 /** The root ids of mauthner_candidates.json, read as TEXT: the export writes them as plain 18-digit numbers, which JSON.parse rounds (864691128610327387 comes back as 864691128610327400) -- the first run on a real export died of it. */
 function candidateIds(text) {
     const m = /"ids"\s*:\s*\[([^\]]*)\]/.exec(text), ids = m ? m[1].match(/\d+/g) : null;
-    if (!ids || !ids.length) throw new Error("mauthner_candidates.json names no ids (pass --cells ID1,ID2)");
+    if (!ids) throw new Error("mauthner_candidates.json names no ids (pass --cells ID1,ID2)");
     return ids;
 }
 
