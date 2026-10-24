@@ -67,9 +67,9 @@ export function readXlsx(buf) {
     if (!sheet) throw new Error("fishHmi.readXlsx: no xl/worksheets/sheet1.xml in the file");
     const shared = files.has("xl/sharedStrings.xml") ? [...files.get("xl/sharedStrings.xml").toString("utf8").matchAll(/<si(?:\s[^>]*)?>([\s\S]*?)<\/si>|<si\s*\/>/g)].map((m) => (m[1] === undefined ? "" : textOf(m[1]))) : [];
     const grid = [];
-    for (const rm of sheet.toString("utf8").matchAll(/<row(?:\s[^>]*?)?(?:\/>|>([\s\S]*?)<\/row>)/g)) {
+    for (const rm of sheet.toString("utf8").matchAll(/<row(?:\s[^>]*)?>([\s\S]*?)<\/row>/g)) {   // a self-closing <row/> matches too and takes the cells of the row after it: the same cells, each with its own address, so nothing is lost
         const cells = [];
-        for (const cm of (rm[1] || "").matchAll(/<c\s([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)) {
+        for (const cm of rm[1].matchAll(/<c\s([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)) {
             const attrs = cm[1], body = cm[2] || "", ref = /\br="([A-Z]+\d+)"/.exec(attrs), type = /\bt="([^"]*)"/.exec(attrs);
             if (!ref) continue;
             let value;

@@ -32,12 +32,13 @@ function main(argv) {
         const bytes = fs.readFileSync(xlsx), sheet = readXlsx(bytes), missing = REQUIRED_COLUMNS.filter((c) => !sheet.header.includes(c));
         if (missing.length) throw new Error(`the sheet has no column ${missing.map((c) => JSON.stringify(c)).join(", ")} (it has ${sheet.header.join(", ")})`);
         const { cells, dropped } = cellsOf(sheet.rows), { edges, stats } = edgesOf(sheet.rows, cells);
-        let somas = null, somaNote = "no soma positions: no sides";
+        let somas = null, somaNote = "no soma positions: no sides", somaMeta = null;
         if (somasFile) {
-            const t = parseTable(fs.readFileSync(somasFile, "utf8"));
+            const somaBytes = fs.readFileSync(somasFile), t = parseTable(somaBytes.toString("utf8"));
             if (!t.length || !("id" in t[0]) || !("_x" in t[0]) || !("_y" in t[0]) || !("_z" in t[0])) throw new Error("the soma file has no id, _x, _y, _z columns");
-            somas = new Map(t.map((r) => [String(r.id), [Number(r._x), Number(r._y), Number(r._z)]]));
+            somas = new Map(t.map((r) => [r.id, [Number(r._x), Number(r._y), Number(r._z)]]));
             somaNote = `${somas.size} soma positions from ${path.basename(somasFile)}`;
+            somaMeta = { file: path.basename(somasFile), sha256: crypto.createHash("sha256").update(somaBytes).digest("hex"), count: somas.size };
         }
         const c = circuitOf(cells, edges, { depth, somas, midlineUm }), s = c.selection;
         console.log(`[fishHmi] ${sheet.rows.length} rows, ${cells.size} cells (${dropped} rows without a usable Cell ID); ${stats.tuples} synapse tuples: ${stats.identified} identified, ${stats.unidentified} to an unidentified partner, ${stats.malformed} malformed, ${stats.parseFailRows} unreadable lists; ${edges.size} distinct pairs`);
@@ -48,7 +49,7 @@ function main(argv) {
             license: "open access under the Fish1 data policy (https://fish1-release.storage.googleapis.com/data_policy.html); no licence text is stated there, only that work using the data must cite the resource paper; none is claimed here",
             citation: "Petkova, M. D., Januszewski, M., et al. (2025). A connectomic resource for neural cataloguing and circuit dissection of the larval zebrafish brain. bioRxiv. (Fish1 release, Janelia Research Campus / Google Research / Harvard.)",
             ids: "SOMA ids of the CAVE somas table (the dataframe's Cell ID), not root ids",
-            typePattern: `the spinal projection neurons and the labelled cells that feed them, to depth ${depth} (sign from the neurotransmitter: VGluT2 +1, Gad1B -1)`, build: stats, selection: s,
+            typePattern: `the spinal projection neurons and the labelled cells that feed them, to depth ${depth} (sign from the neurotransmitter: VGluT2 +1, Gad1B -1)`, build: stats, selection: s, somas: somaMeta, midlineUm,
         };
         const json = { meta, neurons: c.neurons, edges: c.edges };
         if (argv.includes("--write")) { fs.mkdirSync(path.dirname(out), { recursive: true }); fs.writeFileSync(out, JSON.stringify(json) + "\n"); console.log("[fishHmi] wrote " + path.relative(ROOT, out)); }
