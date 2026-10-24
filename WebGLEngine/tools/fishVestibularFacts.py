@@ -145,6 +145,25 @@ def main():
     sd = read_xlsx(zipfile.ZipFile(SOURCE).read("Source Data for figures.xlsx"))["Fig 3d, 4a,b,c"]
     ct = {r["B"]: float(r["C"]) for r in sd if r.get("B") and re.match(r"(Mauthner|vestibular_commiss|SuperiorVN|tangential|VS)", r["B"])
           and re.fullmatch(r"-?[\d.]+(E-?\d+)?", r.get("C", ""))}
+    # ---- the three arms of rung 4b after the split of 2026-10-24 (whole = all 47 cells, B = balance pathway, E = escape pathway): what each one is made of, and what it would train.
+    # Trainable weights by the registration's own arithmetic: T (tuning-derived input) = edges + a bias per input and central cell + a readout of 4 controls x central cells + 4 control biases;
+    # D (dense input) adds FEATURES x inputs. FEATURES = 14 is the fish chat's count (its note; its code was not read) and is the one number here that is not in the tables.
+    FEATURES = 14
+    print("\nthe three arms (input cells = afferents with at least one synapse onto an arm cell; phasic = myelinated):")
+    for label, keep in (("whole", None), ("B", "B"), ("E", "E")):
+        cols = {k: v for k, v in t_cols.items() if keep is None or pathway(cls(v)) == keep}
+        e = [(r["A"], k, num(r.get(k))) for r in rows for k in cols if (num(r.get(k)) or 0) > 0]
+        aff = sorted({a for a, _, _ in e})
+        n_aff, n_cen = len(aff), len({k for _, k, _ in e})
+        by_cls = collections.Counter(cls(cols[k]) for _, k, _ in e)
+        lt_arm = [a for a in aff if a in theta]
+        print("   %-5s %2d inputs (%2d phasic, %2d tonic), %2d central cells, %3d edges, %3d synapses; trainable T %4d, D %4d; edges by target class %s"
+              % (label, n_aff, sum(1 for a in aff if myelinated(a)), sum(1 for a in aff if not myelinated(a)), n_cen, len(e), sum(w for _, _, w in e),
+                 len(e) + n_aff + n_cen + 4 * n_cen + 4, FEATURES * n_aff + len(e) + n_aff + n_cen + 4 * n_cen + 4, dict(by_cls)))
+        print("         tuning of the inputs: ipsilateral-leaning %d, contralateral %d; rostral-leaning %d, caudal %d (of %d with an angle)"
+              % (sum(1 for a in lt_arm if math.cos(theta[a]) > 0), sum(1 for a in lt_arm if math.cos(theta[a]) < 0),
+                 sum(1 for a in lt_arm if math.sin(theta[a]) > 0), sum(1 for a in lt_arm if math.sin(theta[a]) < 0), len(lt_arm)))
+
     print("\ncentral neurons with a tuning angle in the Source Data: %d of %d" % (len(ct), len(t_cols)))
     groups = collections.defaultdict(list)
     for n, a in ct.items():
