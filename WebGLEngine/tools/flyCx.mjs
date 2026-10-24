@@ -24,7 +24,7 @@ function* connectionRows(text) {
     let row = 1;
     while (at + 1 < text.length) {
         let end = text.indexOf("\n", at + 1); if (end < 0) end = text.length;
-        const line = text.slice(at + 1, end).replace(/\r$/, ""); at = end; row++;
+        const line = text.slice(at + 1, end) /* a Windows line end leaves a \r on the weight, which Number() reads past */; at = end; row++;
         if (!line) continue;
         const f = line.split(",");
         if (f.length !== 3) throw new Error(`line ${row} of the connections file has ${f.length} fields, not 3`);

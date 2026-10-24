@@ -9,7 +9,21 @@
 //   8 pairs between chosen cells (the self-loop not among them), 2 below the floor (5>20 : 2 and 4>6 : 1: 3 synapses), 1 self-loop. At a floor of 4: 4 edges and 4 pairs (9 synapses) below it; at 1: all 8 pairs are edges.
 //   Input cells (E-PG and P-EN): indices 0 1 4 5 6; output cells (E-PG and P-EG): 3 4 5 6.
 //
-// SABOTAGED -- (the log is written below when the sabotage has run)
+// SABOTAGED -- 41 mutants of tools/flyCxLib.mjs (run with SAB_COPY=tools/flyCx.mjs so the command's child process imports the mutant) and 31 of tools/flyCx.mjs, every one red by a row that names it:
+//   the cells E01 Delta7 excitatory | E02 P-EG inhibitory | E03 the tangential subtype for the compass cells | E04 the side read anywhere in the name | E05 a one-digit side number | E06 a lower-case side | E07 a type with spaces not its type |
+//   E08 any word is a body id | E09 a skipped row not counted | E10 cells sorted as text | E11 a body id twice accepted | E12 every cell in layer 0 | E13 the instance not kept
+//   the edges E14 a pair at the floor dropped | E15 a pair one below the floor kept | E16 a self-loop an edge | E17 a repeated pair accepted | E18 a bad weight accepted | E19 the sign the target's | E20 the signs swapped | E21 sorted by target first |
+//   E22 the edges backwards | E23 the rows not counted | E24 the pairs between chosen cells not counted | E25 the below-floor synapses counted as pairs | E26 a fractional floor | E27 a floor of zero | E28 a pair with one end chosen looked at
+//   input and output E29 Delta7 cells as inputs | E30 P-EN_b not an input | E31 P-EG not an output
+//   the circuit E32 no missing-type refusal | E33 no empty-table refusal | E34 the default floor 4 | E35 the class pair backwards | E36 the synapses counted as edges | E37 the rule renamed | E38 the defaults mutable | E39 a cell type mutable |
+//   E40 the sides miscounted | E41 the floor not recorded
+//   the command K01 an unknown option | K02 --min-weight | K03 --dir | K04 --write not options | K05 an option takes an option as its value | K06 no value at the end | K07 the files optional | K08 a fractional floor | K09 a zero floor |
+//   K10 any header | K11 a row of the wrong width | K12 a file with no rows | K13 missing columns | K15 the last row dropped without a line end | K16 and K17 the two hashes swapped | K18 the licence note | K19 the sign note lost | K20 the citation lost |
+//   K21 the folder not made | K22 no final newline | K23 every run writes | K24 a read failure exits 2 | K25 a refusal to stdout | K26 the floor not passed on | K27 the dry run not said | K28 the written path not said | K29 no io in the file |
+//   K30 the floor not in the meta | K31 http | K32 --dir not joined to the file names
+// ONE WENT 0 RED: K14 (the command no longer strips a carriage return from each row). EQUIVALENT: a Windows line end leaves "\r" on the weight, and Number("3\r") is 3, so the strip changed nothing; it was CUT (the gate keeps its Windows-line-ends row, which
+// is a behaviour worth holding). The cut itself broke the command once, in a way the gate caught at once: the comment that said why was put on the line of the statement that moves to the next row, and swallowed it.
+// NOT TRIED: nothing the gate can see is left out.
 //
 "use strict";
 import fs from "node:fs";
