@@ -9714,3 +9714,71 @@ they are read. Section 146 reads them; section 144 is section 141's rig runs, se
   controls in display space.
 - The entry stays open on round 63 (section 143), which asks whether it is cheap enough on the device to be worth it.
 - No default moves: nothing ships a generated frame on the path tracer's page until round 63 has read.
+
+## 144. SECTION 141's RIG RUNS, READ: K0p GREEN UNDER ITS STORE RULE, AND H141 HOLDS -- ROUND 33's 1080 VERDICT IS GIVEN
+
+**What arrived.** Eight files, all at 3d215c83, committed byte for byte (0bffdc17) before the JSON was read. The upload
+displayed the four traces before that commit.
+- `render/denoise-rig-s141-a-gtx1080.json` and `-b-`: the two pre-registered 1080 runs.
+- `-a-gtx10802.json` and `-b-gtx10802.json`: a second pair, also on the 1080 (adapter "nvidia pascal"), run after.
+- The four traces.
+- **No Intel run came back.** Section 141 asked for two Intel runs.
+
+**R1, the crash: not reproduced.** No gate in any of the four reports died; every exit is status 0. Every trace walks both
+ladders and ends "the gate ends, 0 fail(s)". **P3 held.**
+
+**R141: K0p natively is green in all four 1080 runs.**
+- Each reading names store rule rtz, with 12768 cells truncated on each storing layer.
+- The counts are 3038 / 3400 / 2592 / 0 again. The image is 1.32e-3 against the truncating bound of 7.5e-3.
+- **P1 held on the 1080**; it has no reading on the Intel.
+
+**H141 HOLDS.** Both pre-registered 1080 runs count: every `--only denoise` gate is green with exit 0, at one commit, with
+both networks' 1080p rows on the device's clock.
+- full / temporal read **1.973 x and 1.992 x**, both above 1.0.
+- The second pair read 1.961 x and 1.961 x, which agrees.
+- **P2 held:** near section 137's 1.99 x.
+
+**What this closes.** The half-size chain with its history is cheaper than today's page at 1920 x 1080 on the GTX 1080, as
+it was on the Intel (section 98). `denoise-temporalup-device`'s rig half is done: round 33 has its verdict on both GPUs.
+`denoise-1080-native-crash` has not been seen since section 101: twelve 1080 runs since, five in section 102, three in
+section 137 and four here, and none died.
+
+## 146. ROUND 63 -- H63 FAILS ON THE 1080: A GENERATED FRAME COSTS ABOUT 0.55 OF A TRACED ONE, NOT 0.25
+
+**The runs.** These are section 144's four 1080 reports. The two pre-registered ones count, and so do the second pair.
+
+| run | generator | field | covFullB | restComp | G | T | G / T |
+|---|---|---|---|---|---|---|---|
+| a | 19.900 | 0.353 | 1.221 | 0.341 | 21.815 | 37.982 | **0.574** |
+| b | 18.300 | 0.353 | 1.217 | 0.356 | 20.226 | 38.088 | **0.531** |
+| a (second pair) | 18.300 | 0.352 | 1.226 | 0.341 | 20.219 | 37.436 | 0.540 |
+| b (second pair) | 18.700 | 0.355 | 1.218 | 0.356 | 20.629 | 37.234 | 0.554 |
+
+All figures are ms. The generator is on the wall clock; the other three parts are on the device's clock.
+
+**H63 FAILS.** It asked G ≤ 0.25 T on both GPUs, in both of each GPU's runs. The 1080's two pre-registered runs count and
+read 0.574 and 0.531. No Intel run can change that, and none came back.
+
+**The predictions, read as made.**
+- **P1 FAILED.**
+- **P2 FAILED:** 0.53-0.57 on the 1080, against 0.08-0.20.
+- **P3 held:** the generator is 90-91 % of G.
+
+**What it says.**
+- **On the 1080 a generated frame costs about half a traced one.** Generating every other frame presents 2T / (T + G)
+  ≈ **1.27-1.31 x** the traced rate for the same work, not the 1.6 x H63 asked.
+- That is still more frames than tracing alone. It is not the near-doubling FSR3 is used for. And by section 145 the
+  generated frame is the worse of the two frames it sits between: the traced midpoint beats it on 16 of 24.
+- **The cost is the generator's: 18-20 ms of 20-22.** The field the device computes is 0.35 ms, and the light at the
+  generated time with its composite is 1.6 ms.
+- The generator is three.js's: fx/fsr/fsrFrameGenTsl.mjs, a chain of full-screen render passes timed on the wall clock.
+  The arc's own passes are compute kernels on the device's clock.
+- Whether 18 ms is the generator's cost or the way it is driven is not measured here. The field's holes at 1920 x 1080
+  were 95,516 of 2,073,600 (4.6 %), which is not a large fill.
+
+**What changes.**
+- Nothing ships a generated frame on the path tracer's page.
+- `denoise-fsr3-framegen` closes with both halves measured. The quality question is supported (section 145, narrowly
+  against the cross-fade). The cost question failed (here).
+- A cheaper generator, the same algorithm as compute passes on the device, would be a new entry and its own round.
+  It is not proposed here; Keith decides whether it is worth one.

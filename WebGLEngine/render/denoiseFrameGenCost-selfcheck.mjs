@@ -67,6 +67,19 @@ ok("  the fixture: family R's seed 990914, outside every split, its last orbit s
         x.T === 37.475 && x.parts.covFullB === 1.226 && x.parts.restComp === 0.341 && x.clocks.covFullB === "device" && x.clocks.restComp === "device" && x.parts.generator === null && x.ratio === null && !x.counts,
         JSON.stringify(x.parts));
 }
+{
+    // SECTION 146: H63 over the 1080's committed reports (section 144's): both pre-registered runs count and read G / T 0.574 and
+    // 0.531, so H63 fails -- it needed G <= 0.25 T on both GPUs, and no Intel run can rescue it
+    const R = ["a-gtx1080", "b-gtx1080", "a-gtx10802", "b-gtx10802"].map((k) => FGG.readH63(JSON.parse(fs.readFileSync(path.join(ENG, `render/denoise-rig-s141-${k}.json`), "utf8"))));
+    const r3 = (x) => Math.round(x * 1000) / 1000;
+    ok("!! *** section 146: H63 FAILS ON THE 1080 -- both pre-registered runs count, G / T 0.574 and 0.531 (the second pair 0.540, 0.554), against 0.25; the generator 90-91 % of G ***",
+        FGG.h63(R.slice(0, 2)) === "fails" && FGG.h63(R) === "fails" && R.every((x) => x.counts && x.commit === "3d215c83" && x.clocks.field === "device") &&
+        JSON.stringify(R.map((x) => r3(x.ratio))) === "[0.574,0.531,0.54,0.554]" && JSON.stringify(R.map((x) => x.parts.generator)) === "[19.9,18.3,18.3,18.7]" &&
+        R.every((x) => x.parts.generator / x.G > 0.9 && x.parts.generator / x.G < 0.92),
+        R.map((x) => `G ${x.G.toFixed(3)} / T ${x.T} = ${x.ratio.toFixed(3)}`).join("; "));
+    ok("  ...and what that presents: 2T / (T + G) = 1.27-1.31 x the traced rate, against the 1.6 x H63 asked",
+        R.every((x) => { const g = 2 * x.T / (x.T + x.G); return g > 1.26 && g < 1.32; }), R.map((x) => (2 * x.T / (x.T + x.G)).toFixed(3)).join(", "));
+}
 console.log("\n2. ON THE DEVICE: the field against the CPU's, then the field and the generator at 1920 x 1080, timed");
 const skip = webgpuSkipReason();
 if (skip) { console.log(`  SKIP  ${skip}`); console.log("  ----  *** NOT A PASS. *** Nothing here is static."); fails++; }
@@ -177,5 +190,7 @@ else {
 // fixtures); M5 H63_RATIO 0.3 -> 1 red; M6 a red gate counted -> 1 red; M7 generatorTextures not negating the flow -> 1 red;
 // M8 the generator built with a fill of radius 2 -> 1 red (the fill row); M9 readH63's T taken from the chain without its history
 // -> 2 red (the fixtures and section 137's report).
+// SECTION 146: V146a H63_RATIO 0.6 -> 2 red (the rule's fixtures, the verdict row); V146b run a's generator typed 9.900 in its
+// committed report -> 2 red (the verdict, the presented rate); V146c the verdict's first ratio typed 0.575 -> 1 red.
 console.log(fails ? `FAIL -- ${fails} check(s) (${Date.now() - t0} ms)` : `ALL GREEN (${Date.now() - t0} ms)`);
 process.exit(fails ? 1 : 0);

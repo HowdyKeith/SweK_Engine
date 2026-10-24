@@ -94,6 +94,9 @@ node tools/ship/versionPreflight.mjs --next    # the next free version and sweep
    - **Round 62 (section 145): REPORTED, both supported.** C1 23 of 24; against the cross-fade 17 of 24, p 0.0479 (narrow,
      display space only -- linear 12 of 24); against the held frame 19 of 24, p 7.1e-5. The traced midpoint still wins 16
      of 24. Nothing ships until round 63's rig runs read.
+   - **Sections 144 and 146: the 1080's runs at 3d215c83.** K0p green under store rule rtz; H141 holds (1.973 / 1.992 x), so
+     round 33 has its verdict on both GPUs. H63 FAILS: a generated frame costs 0.53-0.57 of a traced one on the 1080, the
+     generator 18-20 ms of it. `denoise-fsr3-framegen` closes; nothing ships. The Intel's two runs did not come back.
    - Every default that the Intel's runs at 7b871372 decided is now carried out. The denoiser entries still open, after
      rounds 56-58, are `denoise-subgroup-reduction`, `denoise-temporalup-device` and `denoise-1080-native-crash` (all three
      owed the GTX 1080), and `denoise-fsr3-framegen`, whose upstream is closed.

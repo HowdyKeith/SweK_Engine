@@ -208,6 +208,9 @@
 //   K141e the judge counting cells rounded to nearest as truncated           1 RED (the simulated device reads mixed)
 //   K141f k0pImage taking the truncating bound whatever the rule             1 RED (the simulated device: the nearest rule's refusal)
 //   K141g f16StoreRule reading rtz with no other nearest                     3 RED (the fixtures, the simulated device, K0p natively here)
+// SECTION 144, each restored byte-identical: V144a the first run's ratio typed 1.974 -> 1 red (H141's row); V144b the runs'
+//   commit typed 3d215c84 -> 1 red (H141's row: none counts); V144c the store rule read as rn -> 1 red (R141's row); V144d the
+//   second pair's trace ending "1 fail(s)" -> 1 red (R1's row)
 //   F7  r57p left out of the timed sets                                   1 RED (the static row)
 // and section 130's verdict, by the same runner:
 //   V1  the rig reports' commit check accepting any commit                0 RED as first written: with the device gate red, C1 was false
@@ -887,6 +890,30 @@ console.log("1. THE KERNEL'S TWIN, ON THE CPU");
             ok("  ...and section 135's predictions as made: P1 held (neither run died); P2 has no reading -- the ratio was above 1.0 in both, the runs did not count; P3 held (no exact gate red)",
                 [...D, ...F].every((r) => died(r) === 0) && R.every((e) => e.h.temporal > 1.0 && !e.counts) && F.every((r) => red(r, "exact") === ""));
         }
+        // SECTION 144: section 141's rig runs read back (render/denoise-rig-s141-{a,b}-gtx1080.json, the pre-registered pair, and
+        // -{a,b}-gtx10802.json, a second pair on the same 1080; committed at 0bffdc17 before they were read). R141 K0p green with store
+        // rule rtz; H141 full / temporal > 1.0 in both pre-registered runs, which count when every gate is green with exit 0
+        {
+            const rig = (f) => JSON.parse(fs.readFileSync(path.join(ENG, "render", f), "utf8"));
+            const R = ["a-gtx1080", "b-gtx1080", "a-gtx10802", "b-gtx10802"].map((k) => rig(`denoise-rig-s141-${k}.json`));
+            const hist = (rep) => { const m = rigLines(rigGate(rep, "denoiseUpscaleGPU")).map((l) => l.match(/^section 103: .*; with its history [\d.]+ ms, ratio ([\d.]+) x$/)).find(Boolean); return m ? +m[1] : null; };
+            const counts = (rep) => String(rep.commit || "").slice(0, 8) === "3d215c83" && rep.only === "denoise" && rep.gates.length === 5 && rep.gates.every((g) => g.ok === true && g.exit && g.exit.status === 0 && !g.exit.signal);
+            const k0 = (rep) => rigLines(rigGate(rep, "denoiseDevice")).find((l) => l.startsWith("native K0p for r57p, the reading: ")) || "";
+            const H141 = (rs) => (rs.every((r) => counts(r)) ? (rs.every((r) => hist(r) > 1.0) ? "holds" : "fails") : "no verdict");
+            const traces = ["a", "b", "a2", "b21"].map((k) => fs.readFileSync(path.join(ENG, "render", `denoise-rig-s141-${k}-trace.txt`), "utf8").trimEnd().split("\n"));
+            ok("!! *** section 144, by section 135's rule: H141 HOLDS -- both pre-registered 1080 runs count (five gates green, exit 0, at 3d215c83), full / temporal 1.973 and 1.992 x; the second pair 1.961 and 1.961 ***",
+                H141(R.slice(0, 2)) === "holds" && R.every(counts) && JSON.stringify(R.map(hist)) === "[1.973,1.992,1.961,1.961]" && R.every((r) => /nvidia pascal/.test(r.verdict)) &&
+                H141([R[0], { ...R[1], gates: R[1].gates.map((g, i) => (i ? g : { ...g, ok: false })) }]) === "no verdict",
+                R.map((r, i) => `${["a", "b", "a2", "b2"][i]} ${counts(r) ? "counts" : "does not"} ${hist(r)} x`).join("; "));
+            // realGpuRun keeps 400 characters of a measured line, and the reading line runs out at the rule's first count -- so the row
+            // reads the rule and that count, and the bound follows from the rule (f16sImageTol); later runs print the rule on its own line
+            ok("  ...and R141: K0p natively green in all four, each reading store rule rtz (its first layer's 12768 cells truncated, where the report's 400 characters end), the counts 3038 / 3400 / 2592 / 0, the image 1.32e-3 inside f16sImageTol(rtz)",
+                f16sImageTol("rtz") === 7.5e-3 && R.every((r) => !(rigGate(r, "denoiseDevice").fails || []).length && /; store rule rtz, 12768 ?$/.test(k0(r)) &&
+                    [...k0(r).matchAll(/(\d+) other nearest/g)].map((m) => m[1]).join() === "3038,3400,2592,0" && /against f64 1\.32e-3 /.test(k0(r))), k0(R[0]).slice(-120));
+            ok("  ...and R1: no gate died in any of the four, and every trace walks both ladders to 'the gate ends, 0 fail(s)'",
+                R.every((r) => r.gates.every((g) => g.exit && g.exit.status === 0 && g.exit.signal === null)) &&
+                traces.every((t) => /the gate ends, 0 fail\(s\)$/.test(t[t.length - 1]) && /native w16 ladder done$/.test(t[t.length - 2]) && t.some((l) => /native ladder done$/.test(l))));
+        }
         // v4852+ -- SECTION 68'S OUTCOME (round 20): the rig's six --which lines per GPU, held to the table fixed before they ran, and
         // each re-derived from nativePick on the adapter and compiler the line itself names -- so the rig's reasons are this code's
         {
@@ -1303,6 +1330,8 @@ else try {
         console.log(`  ----  native K0p for r57p, the reading: ${J57.slice(0, 4).map((j, i) => `layer ${i} ${j.plain} plain, ${j.fused} fused, ${j.other || 0} other nearest, ${j.unexplained} unexplained`).join("; ")}; ` +
             `head and kernel ${j57.worst.toExponential(2)} (APPLY_TOL ${APPLY_TOL}); against f64 ${w64.toExponential(2)} (F16S_IMAGE_TOL ${F16S_IMAGE_TOL}); ` +
             `store rule ${rule57}, ${J57.slice(0, 4).map((j) => j.tz ?? "-").join(" / ")} cells truncated, so the bound ${tol57} (section 141)`);
+        // section 144: the reading line outruns realGpuRun's 400 characters at the rule's first count, so the rule and its bound again, short
+        console.log(`  ----  native K0p for r57p: store rule ${rule57}, the image ${w64.toExponential(2)} against the bound ${tol57} (section 141)`);
         KP.push(ok(`!! *** K0p natively (section 129): the r57p set -- its storing layers every cell the f32 twin's rounded to f16 (or the other nearest, counted${soft ? ", and none here: a software adapter" : ""}), its last written-out layer K0's, given the device's own input; k_head_apply's image within APPLY_TOL; the image within its store rule's bound of the f64 network (section 141) ***`,
             J57.slice(0, 4).every((j) => j.unexplained === 0) && J57.map((j) => j.kernel).join() === "fast_unroll_p,fast_unroll_p,fast_unroll_p,fast_unroll_p,head_apply" && r57.acts[4] === null &&
             (!soft || (others === 0 && rule57 === "rn")) && j57.worst <= APPLY_TOL && k0pImage(J57.slice(0, 4), w64),
