@@ -236,6 +236,9 @@ sec("7. NOT CHECKED");
 console.log("  NOT CHECKED  a full-recipe run (4 searches x 400 children on the real dives): this gate runs the plumbing on a few throwaway dives and the logic on hand-built records; the real run is the experiment");
 console.log("  NOT CHECKED  that the verdict rule is the right rule: it is the one brain/SUBMARINE_WIP.md fixed in writing before any pilot was trained; the gate holds that the code is that rule");
 
+// v4898 -- the two constants that fix which circuit an index and a seed mean, named and exercised (definitionGates counts an export no gate names): MAX_INDEX is the last index of a family (19) and SEARCH_BASE the seed the searches start from.
+ok("MAX_INDEX (19) is the last index parseSpecs takes and one past it is refused; SEARCH_BASE (21000) starts the searches: the first search seed of a spec is SEARCH_BASE + 10 x its ordinal (fish 0, er:0 1, er:2 3)",
+    L.MAX_INDEX === 19 && L.SEARCH_BASE === 21000 && L.parseSpecs("er:" + L.MAX_INDEX).length === 1 && !!throws(() => L.parseSpecs("er:" + (L.MAX_INDEX + 1))) && L.ordinalOf(L.parseSpecs("fish")[0]) === 0 && L.ordinalOf(L.parseSpecs("er:0")[0]) === 1 && L.seedBaseOf(L.parseSpecs("er:2")[0]) === L.SEARCH_BASE + 30);
 finished = true;
 console.log(fails ? `\ntrainSubCircuits-selfcheck: ${fails} FAILED` : "\ntrainSubCircuits-selfcheck: all checks pass");
 process.exit(fails ? 1 : 0);

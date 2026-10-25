@@ -2242,7 +2242,31 @@
   "render/snowFrameTiming-selfcheck.mjs": 8723,
   "render/snowGpuScale-selfcheck.mjs": 12449,
   "render/snowHoist-selfcheck.mjs": 13847,
-  "tools/ship/flightCamera-selfcheck.mjs": 1906
+  "tools/ship/flightCamera-selfcheck.mjs": 1906,
+  "brain/autopilotDrone-selfcheck.mjs": 901,
+  "brain/autopilotJet-selfcheck.mjs": 2896,
+  "brain/dogfightTournament-selfcheck.mjs": 9749,
+  "brain/droneTask-selfcheck.mjs": 16091,
+  "brain/jetFight-selfcheck.mjs": 23466,
+  "brain/jetLeagueSets-selfcheck.mjs": 126,
+  "brain/pilotDroneMlp-selfcheck.mjs": 18439,
+  "brain/pilotDronePolicy-selfcheck.mjs": 24958,
+  "brain/pilotJetMlp-selfcheck.mjs": 3627,
+  "brain/pilotJetPolicy-selfcheck.mjs": 3536,
+  "brain/pilotSubCircuit-selfcheck.mjs": 6798,
+  "brain/pilotSubCircuitState-selfcheck.mjs": 8900,
+  "brain/pilotSubFish-selfcheck.mjs": 4824,
+  "net/bridgeBase-selfcheck.mjs": 46,
+  "physics/mechanics/atmosphereISA-selfcheck.mjs": 39,
+  "physics/mechanics/multirotorModel6dof-selfcheck.mjs": 694,
+  "tools/fishCaveExport-selfcheck.mjs": 75344,
+  "tools/fishCircuit-selfcheck.mjs": 512,
+  "tools/fishHmi-selfcheck.mjs": 1710,
+  "tools/fishInputSide-selfcheck.mjs": 787,
+  "tools/flyCx-selfcheck.mjs": 908,
+  "tools/ship/channelPage-selfcheck.mjs": 1954,
+  "tools/ship/flightMap-selfcheck.mjs": 2132,
+  "tools/ship/tournamentDogfight-selfcheck.mjs": 4338
  },
  "codes": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 0,
@@ -4361,7 +4385,31 @@
   "render/snowFrameTiming-selfcheck.mjs": 0,
   "render/snowGpuScale-selfcheck.mjs": 0,
   "render/snowHoist-selfcheck.mjs": 0,
-  "tools/ship/flightCamera-selfcheck.mjs": 0
+  "tools/ship/flightCamera-selfcheck.mjs": 0,
+  "brain/autopilotDrone-selfcheck.mjs": 0,
+  "brain/autopilotJet-selfcheck.mjs": 0,
+  "brain/dogfightTournament-selfcheck.mjs": 0,
+  "brain/droneTask-selfcheck.mjs": 0,
+  "brain/jetFight-selfcheck.mjs": 0,
+  "brain/jetLeagueSets-selfcheck.mjs": 0,
+  "brain/pilotDroneMlp-selfcheck.mjs": 0,
+  "brain/pilotDronePolicy-selfcheck.mjs": 0,
+  "brain/pilotJetMlp-selfcheck.mjs": 0,
+  "brain/pilotJetPolicy-selfcheck.mjs": 0,
+  "brain/pilotSubCircuit-selfcheck.mjs": 0,
+  "brain/pilotSubCircuitState-selfcheck.mjs": 0,
+  "brain/pilotSubFish-selfcheck.mjs": 0,
+  "net/bridgeBase-selfcheck.mjs": 0,
+  "physics/mechanics/atmosphereISA-selfcheck.mjs": 0,
+  "physics/mechanics/multirotorModel6dof-selfcheck.mjs": 0,
+  "tools/fishCaveExport-selfcheck.mjs": 0,
+  "tools/fishCircuit-selfcheck.mjs": 1,
+  "tools/fishHmi-selfcheck.mjs": 0,
+  "tools/fishInputSide-selfcheck.mjs": 0,
+  "tools/flyCx-selfcheck.mjs": 0,
+  "tools/ship/channelPage-selfcheck.mjs": 0,
+  "tools/ship/flightMap-selfcheck.mjs": 0,
+  "tools/ship/tournamentDogfight-selfcheck.mjs": 0
  },
  "at": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-10-25T14:34:32.781Z",
@@ -6480,7 +6528,31 @@
   "render/snowFrameTiming-selfcheck.mjs": "2026-10-25T14:03:45.738Z",
   "render/snowGpuScale-selfcheck.mjs": "2026-10-25T14:03:58.378Z",
   "render/snowHoist-selfcheck.mjs": "2026-10-25T14:04:12.401Z",
-  "tools/ship/flightCamera-selfcheck.mjs": "2026-10-25T14:34:32.781Z"
+  "tools/ship/flightCamera-selfcheck.mjs": "2026-10-25T14:34:32.781Z",
+  "brain/autopilotDrone-selfcheck.mjs": "2026-10-25T17:00:22.171Z",
+  "brain/autopilotJet-selfcheck.mjs": "2026-10-25T17:00:25.247Z",
+  "brain/dogfightTournament-selfcheck.mjs": "2026-10-25T17:00:35.216Z",
+  "brain/droneTask-selfcheck.mjs": "2026-10-25T17:00:51.544Z",
+  "brain/jetFight-selfcheck.mjs": "2026-10-25T17:01:15.206Z",
+  "brain/jetLeagueSets-selfcheck.mjs": "2026-10-25T17:01:15.529Z",
+  "brain/pilotDroneMlp-selfcheck.mjs": "2026-10-25T17:01:34.190Z",
+  "brain/pilotDronePolicy-selfcheck.mjs": "2026-10-25T17:01:59.353Z",
+  "brain/pilotJetMlp-selfcheck.mjs": "2026-10-25T17:02:03.195Z",
+  "brain/pilotJetPolicy-selfcheck.mjs": "2026-10-25T17:02:06.911Z",
+  "brain/pilotSubCircuit-selfcheck.mjs": "2026-10-25T17:02:13.885Z",
+  "brain/pilotSubCircuitState-selfcheck.mjs": "2026-10-25T17:02:23.009Z",
+  "brain/pilotSubFish-selfcheck.mjs": "2026-10-25T17:02:28.047Z",
+  "net/bridgeBase-selfcheck.mjs": "2026-10-25T17:02:28.349Z",
+  "physics/mechanics/atmosphereISA-selfcheck.mjs": "2026-10-25T17:02:28.587Z",
+  "physics/mechanics/multirotorModel6dof-selfcheck.mjs": "2026-10-25T17:02:29.459Z",
+  "tools/fishCaveExport-selfcheck.mjs": "2026-10-25T17:03:45.023Z",
+  "tools/fishCircuit-selfcheck.mjs": "2026-10-25T17:03:45.759Z",
+  "tools/fishHmi-selfcheck.mjs": "2026-10-25T17:03:47.723Z",
+  "tools/fishInputSide-selfcheck.mjs": "2026-10-25T17:03:48.676Z",
+  "tools/flyCx-selfcheck.mjs": "2026-10-25T17:03:49.766Z",
+  "tools/ship/channelPage-selfcheck.mjs": "2026-10-25T17:03:51.897Z",
+  "tools/ship/flightMap-selfcheck.mjs": "2026-10-25T17:03:54.222Z",
+  "tools/ship/tournamentDogfight-selfcheck.mjs": "2026-10-25T17:03:58.808Z"
  },
  "capAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 20000,
@@ -8574,7 +8646,31 @@
   "render/snowFrameTiming-selfcheck.mjs": 300000,
   "render/snowGpuScale-selfcheck.mjs": 300000,
   "render/snowHoist-selfcheck.mjs": 300000,
-  "tools/ship/flightCamera-selfcheck.mjs": 20000
+  "tools/ship/flightCamera-selfcheck.mjs": 20000,
+  "brain/autopilotDrone-selfcheck.mjs": 300000,
+  "brain/autopilotJet-selfcheck.mjs": 300000,
+  "brain/dogfightTournament-selfcheck.mjs": 300000,
+  "brain/droneTask-selfcheck.mjs": 300000,
+  "brain/jetFight-selfcheck.mjs": 300000,
+  "brain/jetLeagueSets-selfcheck.mjs": 300000,
+  "brain/pilotDroneMlp-selfcheck.mjs": 300000,
+  "brain/pilotDronePolicy-selfcheck.mjs": 300000,
+  "brain/pilotJetMlp-selfcheck.mjs": 300000,
+  "brain/pilotJetPolicy-selfcheck.mjs": 300000,
+  "brain/pilotSubCircuit-selfcheck.mjs": 300000,
+  "brain/pilotSubCircuitState-selfcheck.mjs": 300000,
+  "brain/pilotSubFish-selfcheck.mjs": 300000,
+  "net/bridgeBase-selfcheck.mjs": 300000,
+  "physics/mechanics/atmosphereISA-selfcheck.mjs": 300000,
+  "physics/mechanics/multirotorModel6dof-selfcheck.mjs": 300000,
+  "tools/fishCaveExport-selfcheck.mjs": 300000,
+  "tools/fishCircuit-selfcheck.mjs": 300000,
+  "tools/fishHmi-selfcheck.mjs": 300000,
+  "tools/fishInputSide-selfcheck.mjs": 300000,
+  "tools/flyCx-selfcheck.mjs": 300000,
+  "tools/ship/channelPage-selfcheck.mjs": 300000,
+  "tools/ship/flightMap-selfcheck.mjs": 300000,
+  "tools/ship/tournamentDogfight-selfcheck.mjs": 300000
  },
  "finished": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": true,
@@ -10688,7 +10784,31 @@
   "render/snowFrameTiming-selfcheck.mjs": true,
   "render/snowGpuScale-selfcheck.mjs": true,
   "render/snowHoist-selfcheck.mjs": true,
-  "tools/ship/flightCamera-selfcheck.mjs": true
+  "tools/ship/flightCamera-selfcheck.mjs": true,
+  "brain/autopilotDrone-selfcheck.mjs": true,
+  "brain/autopilotJet-selfcheck.mjs": true,
+  "brain/dogfightTournament-selfcheck.mjs": true,
+  "brain/droneTask-selfcheck.mjs": true,
+  "brain/jetFight-selfcheck.mjs": true,
+  "brain/jetLeagueSets-selfcheck.mjs": true,
+  "brain/pilotDroneMlp-selfcheck.mjs": true,
+  "brain/pilotDronePolicy-selfcheck.mjs": true,
+  "brain/pilotJetMlp-selfcheck.mjs": true,
+  "brain/pilotJetPolicy-selfcheck.mjs": true,
+  "brain/pilotSubCircuit-selfcheck.mjs": true,
+  "brain/pilotSubCircuitState-selfcheck.mjs": true,
+  "brain/pilotSubFish-selfcheck.mjs": true,
+  "net/bridgeBase-selfcheck.mjs": true,
+  "physics/mechanics/atmosphereISA-selfcheck.mjs": true,
+  "physics/mechanics/multirotorModel6dof-selfcheck.mjs": true,
+  "tools/fishCaveExport-selfcheck.mjs": true,
+  "tools/fishCircuit-selfcheck.mjs": true,
+  "tools/fishHmi-selfcheck.mjs": true,
+  "tools/fishInputSide-selfcheck.mjs": true,
+  "tools/flyCx-selfcheck.mjs": true,
+  "tools/ship/channelPage-selfcheck.mjs": true,
+  "tools/ship/flightMap-selfcheck.mjs": true,
+  "tools/ship/tournamentDogfight-selfcheck.mjs": true
  },
  "crossings": {
   "brain/gunnerPolicy-selfcheck.mjs": 2,
@@ -12930,7 +13050,31 @@
   "render/snowFrameTiming-selfcheck.mjs": 8723,
   "render/snowGpuScale-selfcheck.mjs": 12449,
   "render/snowHoist-selfcheck.mjs": 13847,
-  "tools/ship/flightCamera-selfcheck.mjs": 1906
+  "tools/ship/flightCamera-selfcheck.mjs": 1906,
+  "brain/autopilotDrone-selfcheck.mjs": 901,
+  "brain/autopilotJet-selfcheck.mjs": 2896,
+  "brain/dogfightTournament-selfcheck.mjs": 9749,
+  "brain/droneTask-selfcheck.mjs": 16091,
+  "brain/jetFight-selfcheck.mjs": 23466,
+  "brain/jetLeagueSets-selfcheck.mjs": 126,
+  "brain/pilotDroneMlp-selfcheck.mjs": 18439,
+  "brain/pilotDronePolicy-selfcheck.mjs": 24958,
+  "brain/pilotJetMlp-selfcheck.mjs": 3627,
+  "brain/pilotJetPolicy-selfcheck.mjs": 3536,
+  "brain/pilotSubCircuit-selfcheck.mjs": 6798,
+  "brain/pilotSubCircuitState-selfcheck.mjs": 8900,
+  "brain/pilotSubFish-selfcheck.mjs": 4824,
+  "net/bridgeBase-selfcheck.mjs": 46,
+  "physics/mechanics/atmosphereISA-selfcheck.mjs": 39,
+  "physics/mechanics/multirotorModel6dof-selfcheck.mjs": 694,
+  "tools/fishCaveExport-selfcheck.mjs": 75344,
+  "tools/fishCircuit-selfcheck.mjs": 512,
+  "tools/fishHmi-selfcheck.mjs": 1710,
+  "tools/fishInputSide-selfcheck.mjs": 787,
+  "tools/flyCx-selfcheck.mjs": 908,
+  "tools/ship/channelPage-selfcheck.mjs": 1954,
+  "tools/ship/flightMap-selfcheck.mjs": 2132,
+  "tools/ship/tournamentDogfight-selfcheck.mjs": 4338
  },
  "serialAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-10-22T02:39:10.708Z",
@@ -14940,7 +15084,31 @@
   "render/snowFrameTiming-selfcheck.mjs": "2026-10-25T14:03:45.738Z",
   "render/snowGpuScale-selfcheck.mjs": "2026-10-25T14:03:58.378Z",
   "render/snowHoist-selfcheck.mjs": "2026-10-25T14:04:12.401Z",
-  "tools/ship/flightCamera-selfcheck.mjs": "2026-10-25T14:34:17.137Z"
+  "tools/ship/flightCamera-selfcheck.mjs": "2026-10-25T14:34:17.137Z",
+  "brain/autopilotDrone-selfcheck.mjs": "2026-10-25T17:00:22.171Z",
+  "brain/autopilotJet-selfcheck.mjs": "2026-10-25T17:00:25.247Z",
+  "brain/dogfightTournament-selfcheck.mjs": "2026-10-25T17:00:35.216Z",
+  "brain/droneTask-selfcheck.mjs": "2026-10-25T17:00:51.544Z",
+  "brain/jetFight-selfcheck.mjs": "2026-10-25T17:01:15.206Z",
+  "brain/jetLeagueSets-selfcheck.mjs": "2026-10-25T17:01:15.529Z",
+  "brain/pilotDroneMlp-selfcheck.mjs": "2026-10-25T17:01:34.190Z",
+  "brain/pilotDronePolicy-selfcheck.mjs": "2026-10-25T17:01:59.353Z",
+  "brain/pilotJetMlp-selfcheck.mjs": "2026-10-25T17:02:03.195Z",
+  "brain/pilotJetPolicy-selfcheck.mjs": "2026-10-25T17:02:06.911Z",
+  "brain/pilotSubCircuit-selfcheck.mjs": "2026-10-25T17:02:13.885Z",
+  "brain/pilotSubCircuitState-selfcheck.mjs": "2026-10-25T17:02:23.009Z",
+  "brain/pilotSubFish-selfcheck.mjs": "2026-10-25T17:02:28.047Z",
+  "net/bridgeBase-selfcheck.mjs": "2026-10-25T17:02:28.349Z",
+  "physics/mechanics/atmosphereISA-selfcheck.mjs": "2026-10-25T17:02:28.587Z",
+  "physics/mechanics/multirotorModel6dof-selfcheck.mjs": "2026-10-25T17:02:29.459Z",
+  "tools/fishCaveExport-selfcheck.mjs": "2026-10-25T17:03:45.023Z",
+  "tools/fishCircuit-selfcheck.mjs": "2026-10-25T17:03:45.759Z",
+  "tools/fishHmi-selfcheck.mjs": "2026-10-25T17:03:47.723Z",
+  "tools/fishInputSide-selfcheck.mjs": "2026-10-25T17:03:48.676Z",
+  "tools/flyCx-selfcheck.mjs": "2026-10-25T17:03:49.766Z",
+  "tools/ship/channelPage-selfcheck.mjs": "2026-10-25T17:03:51.897Z",
+  "tools/ship/flightMap-selfcheck.mjs": "2026-10-25T17:03:54.222Z",
+  "tools/ship/tournamentDogfight-selfcheck.mjs": "2026-10-25T17:03:58.808Z"
  },
  "serialRing": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": [
@@ -24787,6 +24955,78 @@
   "tools/ship/flightCamera-selfcheck.mjs": [
    1789,
    1906
+  ],
+  "brain/autopilotDrone-selfcheck.mjs": [
+   901
+  ],
+  "brain/autopilotJet-selfcheck.mjs": [
+   2896
+  ],
+  "brain/dogfightTournament-selfcheck.mjs": [
+   9749
+  ],
+  "brain/droneTask-selfcheck.mjs": [
+   16091
+  ],
+  "brain/jetFight-selfcheck.mjs": [
+   23466
+  ],
+  "brain/jetLeagueSets-selfcheck.mjs": [
+   126
+  ],
+  "brain/pilotDroneMlp-selfcheck.mjs": [
+   18439
+  ],
+  "brain/pilotDronePolicy-selfcheck.mjs": [
+   24958
+  ],
+  "brain/pilotJetMlp-selfcheck.mjs": [
+   3627
+  ],
+  "brain/pilotJetPolicy-selfcheck.mjs": [
+   3536
+  ],
+  "brain/pilotSubCircuit-selfcheck.mjs": [
+   6798
+  ],
+  "brain/pilotSubCircuitState-selfcheck.mjs": [
+   8900
+  ],
+  "brain/pilotSubFish-selfcheck.mjs": [
+   4824
+  ],
+  "net/bridgeBase-selfcheck.mjs": [
+   46
+  ],
+  "physics/mechanics/atmosphereISA-selfcheck.mjs": [
+   39
+  ],
+  "physics/mechanics/multirotorModel6dof-selfcheck.mjs": [
+   694
+  ],
+  "tools/fishCaveExport-selfcheck.mjs": [
+   75344
+  ],
+  "tools/fishCircuit-selfcheck.mjs": [
+   512
+  ],
+  "tools/fishHmi-selfcheck.mjs": [
+   1710
+  ],
+  "tools/fishInputSide-selfcheck.mjs": [
+   787
+  ],
+  "tools/flyCx-selfcheck.mjs": [
+   908
+  ],
+  "tools/ship/channelPage-selfcheck.mjs": [
+   1954
+  ],
+  "tools/ship/flightMap-selfcheck.mjs": [
+   2132
+  ],
+  "tools/ship/tournamentDogfight-selfcheck.mjs": [
+   4338
   ]
  },
  "contended": {
@@ -26797,7 +27037,31 @@
   "render/snowFrameTiming-selfcheck.mjs": false,
   "render/snowGpuScale-selfcheck.mjs": false,
   "render/snowHoist-selfcheck.mjs": false,
-  "tools/ship/flightCamera-selfcheck.mjs": false
+  "tools/ship/flightCamera-selfcheck.mjs": false,
+  "brain/autopilotDrone-selfcheck.mjs": false,
+  "brain/autopilotJet-selfcheck.mjs": false,
+  "brain/dogfightTournament-selfcheck.mjs": false,
+  "brain/droneTask-selfcheck.mjs": false,
+  "brain/jetFight-selfcheck.mjs": false,
+  "brain/jetLeagueSets-selfcheck.mjs": false,
+  "brain/pilotDroneMlp-selfcheck.mjs": false,
+  "brain/pilotDronePolicy-selfcheck.mjs": false,
+  "brain/pilotJetMlp-selfcheck.mjs": false,
+  "brain/pilotJetPolicy-selfcheck.mjs": false,
+  "brain/pilotSubCircuit-selfcheck.mjs": false,
+  "brain/pilotSubCircuitState-selfcheck.mjs": false,
+  "brain/pilotSubFish-selfcheck.mjs": false,
+  "net/bridgeBase-selfcheck.mjs": false,
+  "physics/mechanics/atmosphereISA-selfcheck.mjs": false,
+  "physics/mechanics/multirotorModel6dof-selfcheck.mjs": false,
+  "tools/fishCaveExport-selfcheck.mjs": false,
+  "tools/fishCircuit-selfcheck.mjs": false,
+  "tools/fishHmi-selfcheck.mjs": false,
+  "tools/fishInputSide-selfcheck.mjs": false,
+  "tools/flyCx-selfcheck.mjs": false,
+  "tools/ship/channelPage-selfcheck.mjs": false,
+  "tools/ship/flightMap-selfcheck.mjs": false,
+  "tools/ship/tournamentDogfight-selfcheck.mjs": false
  },
  "kinds": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "loaded",
@@ -28916,7 +29180,31 @@
   "render/snowFrameTiming-selfcheck.mjs": "alone",
   "render/snowGpuScale-selfcheck.mjs": "alone",
   "render/snowHoist-selfcheck.mjs": "alone",
-  "tools/ship/flightCamera-selfcheck.mjs": "alone"
+  "tools/ship/flightCamera-selfcheck.mjs": "alone",
+  "brain/autopilotDrone-selfcheck.mjs": "alone",
+  "brain/autopilotJet-selfcheck.mjs": "alone",
+  "brain/dogfightTournament-selfcheck.mjs": "alone",
+  "brain/droneTask-selfcheck.mjs": "alone",
+  "brain/jetFight-selfcheck.mjs": "alone",
+  "brain/jetLeagueSets-selfcheck.mjs": "alone",
+  "brain/pilotDroneMlp-selfcheck.mjs": "alone",
+  "brain/pilotDronePolicy-selfcheck.mjs": "alone",
+  "brain/pilotJetMlp-selfcheck.mjs": "alone",
+  "brain/pilotJetPolicy-selfcheck.mjs": "alone",
+  "brain/pilotSubCircuit-selfcheck.mjs": "alone",
+  "brain/pilotSubCircuitState-selfcheck.mjs": "alone",
+  "brain/pilotSubFish-selfcheck.mjs": "alone",
+  "net/bridgeBase-selfcheck.mjs": "alone",
+  "physics/mechanics/atmosphereISA-selfcheck.mjs": "alone",
+  "physics/mechanics/multirotorModel6dof-selfcheck.mjs": "alone",
+  "tools/fishCaveExport-selfcheck.mjs": "alone",
+  "tools/fishCircuit-selfcheck.mjs": "alone",
+  "tools/fishHmi-selfcheck.mjs": "alone",
+  "tools/fishInputSide-selfcheck.mjs": "alone",
+  "tools/flyCx-selfcheck.mjs": "alone",
+  "tools/ship/channelPage-selfcheck.mjs": "alone",
+  "tools/ship/flightMap-selfcheck.mjs": "alone",
+  "tools/ship/tournamentDogfight-selfcheck.mjs": "alone"
  },
  "boxScale": {
   "2026-10-21T09:12:55.584Z": {

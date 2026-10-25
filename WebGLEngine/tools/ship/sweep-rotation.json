@@ -1,11 +1,11 @@
 {
  "generatedFrom": "tools/ship/sweepRotation.mjs",
  "note": "The over-budget gates this rotation re-timed SERIALLY, with the reading that had evicted each. Written only by tools/ship/sweepRotation.mjs -- sweep-timings.json has a different owner. MERGED BY GATE (v4535): `at` on the file is the LAST run, `at` on a row is the run that measured that row, and a row survives until its own gate is re-timed. `poolAt` (v4725) is the last UNFILTERED stalest-first run -- --gate, --band and --killed do not move it. `poolHorizon` (v4816) is the stamp of the first pool entry that run did NOT take: it reached every entry stamped earlier and none stamped at or after it.",
- "at": "2026-10-25T14:16:54.592Z",
+ "at": "2026-10-25T17:03:58.808Z",
  "poolAt": "2026-10-25T14:16:54.592Z",
  "poolHorizon": "2026-10-20T16:40:35.872Z",
  "budgetMs": 3000,
- "lastRun": 34,
+ "lastRun": 1,
  "rotated": [
   {
    "gate": "ai-bridge/assetSync-perf-selfcheck.mjs",
@@ -78,10 +78,22 @@
    "at": "2026-09-28T18:58:39.328Z"
   },
   {
+   "gate": "brain/autopilotDrone-selfcheck.mjs",
+   "ms": 901,
+   "code": 0,
+   "at": "2026-10-25T17:00:22.171Z"
+  },
+  {
    "gate": "brain/autopilotFlight-selfcheck.mjs",
    "ms": 508,
    "code": 0,
    "at": "2026-10-16T04:25:37.387Z"
+  },
+  {
+   "gate": "brain/autopilotJet-selfcheck.mjs",
+   "ms": 2896,
+   "code": 0,
+   "at": "2026-10-25T17:00:25.247Z"
   },
   {
    "gate": "brain/autopilotRotor-selfcheck.mjs",
@@ -137,11 +149,23 @@
    "at": "2026-10-18T04:26:51.824Z"
   },
   {
+   "gate": "brain/dogfightTournament-selfcheck.mjs",
+   "ms": 9749,
+   "code": 0,
+   "at": "2026-10-25T17:00:35.216Z"
+  },
+  {
    "gate": "brain/dogfightTrain-selfcheck.mjs",
    "ms": 11147,
    "code": 0,
    "priorMs": 11518,
    "at": "2026-10-20T16:44:10.975Z"
+  },
+  {
+   "gate": "brain/droneTask-selfcheck.mjs",
+   "ms": 16091,
+   "code": 0,
+   "at": "2026-10-25T17:00:51.544Z"
   },
   {
    "gate": "brain/flightTask-selfcheck.mjs",
@@ -156,6 +180,18 @@
    "code": 0,
    "priorMs": 6300,
    "at": "2026-10-21T17:51:49.092Z"
+  },
+  {
+   "gate": "brain/jetFight-selfcheck.mjs",
+   "ms": 23466,
+   "code": 0,
+   "at": "2026-10-25T17:01:15.206Z"
+  },
+  {
+   "gate": "brain/jetLeagueSets-selfcheck.mjs",
+   "ms": 126,
+   "code": 0,
+   "at": "2026-10-25T17:01:15.529Z"
   },
   {
    "gate": "brain/missionTask-selfcheck.mjs",
@@ -177,6 +213,18 @@
    "code": 0,
    "priorMs": 20030,
    "at": "2026-10-12T03:36:21.444Z"
+  },
+  {
+   "gate": "brain/pilotDroneMlp-selfcheck.mjs",
+   "ms": 18439,
+   "code": 0,
+   "at": "2026-10-25T17:01:34.190Z"
+  },
+  {
+   "gate": "brain/pilotDronePolicy-selfcheck.mjs",
+   "ms": 24958,
+   "code": 0,
+   "at": "2026-10-25T17:01:59.353Z"
   },
   {
    "gate": "brain/pilotFlightGpu-selfcheck.mjs",
@@ -206,6 +254,18 @@
    "at": "2026-10-16T17:18:50.784Z"
   },
   {
+   "gate": "brain/pilotJetMlp-selfcheck.mjs",
+   "ms": 3627,
+   "code": 0,
+   "at": "2026-10-25T17:02:03.195Z"
+  },
+  {
+   "gate": "brain/pilotJetPolicy-selfcheck.mjs",
+   "ms": 3536,
+   "code": 0,
+   "at": "2026-10-25T17:02:06.911Z"
+  },
+  {
    "gate": "brain/pilotRoster-selfcheck.mjs",
    "ms": 33664,
    "code": 0,
@@ -223,6 +283,24 @@
    "ms": 62387,
    "code": 0,
    "at": "2026-10-19T15:36:31.941Z"
+  },
+  {
+   "gate": "brain/pilotSubCircuit-selfcheck.mjs",
+   "ms": 6798,
+   "code": 0,
+   "at": "2026-10-25T17:02:13.885Z"
+  },
+  {
+   "gate": "brain/pilotSubCircuitState-selfcheck.mjs",
+   "ms": 8900,
+   "code": 0,
+   "at": "2026-10-25T17:02:23.009Z"
+  },
+  {
+   "gate": "brain/pilotSubFish-selfcheck.mjs",
+   "ms": 4824,
+   "code": 0,
+   "at": "2026-10-25T17:02:28.047Z"
   },
   {
    "gate": "brain/pilotSubPolicy-selfcheck.mjs",
@@ -647,6 +725,12 @@
    "at": "2026-10-21T13:39:28.080Z"
   },
   {
+   "gate": "net/bridgeBase-selfcheck.mjs",
+   "ms": 46,
+   "code": 0,
+   "at": "2026-10-25T17:02:28.349Z"
+  },
+  {
    "gate": "physics/adaptiveKnob-selfcheck.mjs",
    "ms": 3666,
    "code": 0,
@@ -801,6 +885,12 @@
    "at": "2026-10-23T12:10:31.195Z"
   },
   {
+   "gate": "physics/mechanics/atmosphereISA-selfcheck.mjs",
+   "ms": 39,
+   "code": 0,
+   "at": "2026-10-25T17:02:28.587Z"
+  },
+  {
    "gate": "physics/mechanics/bomber-selfcheck.mjs",
    "ms": 224,
    "code": 0,
@@ -843,6 +933,12 @@
    "ms": 181,
    "code": 0,
    "at": "2026-10-18T04:27:09.493Z"
+  },
+  {
+   "gate": "physics/mechanics/multirotorModel6dof-selfcheck.mjs",
+   "ms": 694,
+   "code": 0,
+   "at": "2026-10-25T17:02:29.459Z"
   },
   {
    "gate": "physics/mechanics/reposeOps-selfcheck.mjs",
@@ -1958,6 +2054,36 @@
    "code": 0,
    "priorMs": 6589,
    "at": "2026-10-22T01:50:40.708Z"
+  },
+  {
+   "gate": "tools/fishCaveExport-selfcheck.mjs",
+   "ms": 75344,
+   "code": 0,
+   "at": "2026-10-25T17:03:45.023Z"
+  },
+  {
+   "gate": "tools/fishCircuit-selfcheck.mjs",
+   "ms": 512,
+   "code": 1,
+   "at": "2026-10-25T17:03:45.759Z"
+  },
+  {
+   "gate": "tools/fishHmi-selfcheck.mjs",
+   "ms": 1710,
+   "code": 0,
+   "at": "2026-10-25T17:03:47.723Z"
+  },
+  {
+   "gate": "tools/fishInputSide-selfcheck.mjs",
+   "ms": 787,
+   "code": 0,
+   "at": "2026-10-25T17:03:48.676Z"
+  },
+  {
+   "gate": "tools/flyCx-selfcheck.mjs",
+   "ms": 908,
+   "code": 0,
+   "at": "2026-10-25T17:03:49.766Z"
   },
   {
    "gate": "tools/frame-budget-selfcheck.mjs",
@@ -3207,6 +3333,12 @@
    "at": "2026-09-09T17:59:42.840Z"
   },
   {
+   "gate": "tools/ship/channelPage-selfcheck.mjs",
+   "ms": 1954,
+   "code": 0,
+   "at": "2026-10-25T17:03:51.897Z"
+  },
+  {
    "gate": "tools/ship/checkerCensus-selfcheck.mjs",
    "ms": 6505,
    "code": 0,
@@ -3719,6 +3851,12 @@
    "ms": 1789,
    "code": 0,
    "at": "2026-10-25T14:04:14.425Z"
+  },
+  {
+   "gate": "tools/ship/flightMap-selfcheck.mjs",
+   "ms": 2132,
+   "code": 0,
+   "at": "2026-10-25T17:03:54.222Z"
   },
   {
    "gate": "tools/ship/flightPage-selfcheck.mjs",
@@ -5506,6 +5644,12 @@
    "code": "timeout/signal",
    "priorMs": 20008,
    "at": "2026-09-09T17:59:42.840Z"
+  },
+  {
+   "gate": "tools/ship/tournamentDogfight-selfcheck.mjs",
+   "ms": 4338,
+   "code": 0,
+   "at": "2026-10-25T17:03:58.808Z"
   },
   {
    "gate": "tools/ship/traderGraph-selfcheck.mjs",
