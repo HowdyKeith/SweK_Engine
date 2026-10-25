@@ -121,3 +121,16 @@ node tools\ship\takeSnowFrameTiming.mjs --ablate --terms deform,fine,hoist,coars
 ## The fine-relief hoist and the coarse forms (built, off by default; the rig timing is owed)
 
 `createSnowGpu({ hoistFine: true })` evaluates windLocal (veer, stretch) and the scour noise once per VERTEX and interpolates them; `createSnowGpu({ coarseForms: true })` fades the 0.31 detail layer out sooner (footprint 0.45 m, was 0.7; not read under a weight of 0.03, was 0.001) and runs the haze through `applyAerialLean`, which skips the sky reads that cannot show. Both are WGSL `override` constants, so the exact path is still the one compiled when they are off. `--terms hoist,coarse` times each against the exact path as `with hoist` / `with coarse` rows (the same baseline-term-baseline interleave). Pictures against the exact path on the software adapter, mean absolute difference per channel of 255: hoist 0.006 near the origin and 0.67 at 3 km (the interpolated angle is multiplied by the world position, so far out the sastrugi ridges slide sideways; no seam), coarse 0.025 in three views. Removing the whole detail term moves the orbit view by 1.33. NOT YET KNOWN: what either saves on a GPU, which is what the owed Intel and 1080 runs are for.
+
+## Intel gen-9, 2026-10-25: the deform texture, the forms and the TAA history (`snow-forms-intel.json`, `snow-taa-intel.json`, `snow-taa-hw-intel.json`)
+
+Beauty pass ~61 ms at 1280x720 (65 before), baselines drifting 3 to 5%; 16.8 ms at 640x360.
+
+| term | 1280x720: saves | share | 640x360: saves | share |
+|---|---|---|---|---|
+| fine (compiled out) | 22.5 ms | 37% | 6.4 ms | 38% |
+| deform (compiled out; was 20.1 ms / 32% before the texture) | 7.2 ms | 12% | 1.6 ms | 10% |
+| coarse forms ON | 5.8 ms | 9.4% | 1.7 ms | 10% |
+| hoist ON | -2.7 ms | -4.4% (inside the drift) | 1.5 ms | 8.8% |
+
+Item 1 (the deform texture) took the deform term from 20.1 to 7.2 ms at 720p. The hoist is not a win here at 720p and is left off. The coarse forms save about a tenth of the pass for a picture 0.025/255 different (software adapter). TAA pass, two runs two minutes apart with the beauty pass equal (66.1 and 65.8 ms): 7.64 ms with the history read by hand, 5.15 ms through the hardware sampler (-33%); the earlier 7.9 ms against 7.64 now says the one-texel neighbourhood taps changed nothing measurable. `?scale=auto` on this GPU: looks and runs great (the user's trial), and is now the page default.
