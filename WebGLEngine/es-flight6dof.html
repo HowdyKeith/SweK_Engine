@@ -51,6 +51,7 @@
   <button id="rosterBtn" title="Load Pilots: choose who flies each aircraft -- the PD autopilot, the same laws written through the fruit fly's network, noise on those weights, an imported pilot, or you on the keyboard -- then Start.">&#9992; Load Pilots</button>
   <label>camera <select id="camMode"><option value="chase">chase</option><option value="orbit">orbit</option></select>
     <select id="camTarget"><option value="0">aircraft 1</option><option value="1">aircraft 2</option><option value="2">aircraft 3</option></select></label>
+  <label>map <select id="mapSel"><option value="flat">flat field</option><option value="hills">hills</option><option value="circuit">race circuit</option><option value="circuitHills">circuit on hills</option></select></label>
   <label>wind <input id="windSpeed" type="range" min="0" max="12" step="0.5" value="0"><span id="windSpeedV">0</span> m/s</label>
   <label>from <input id="windDir" type="range" min="0" max="355" step="5" value="90"><span id="windDirV">90</span>&deg;</label>
   <label>gusts <input id="windGust" type="range" min="0" max="4" step="0.5" value="0"><span id="windGustV">0</span> m/s</label>
@@ -79,6 +80,8 @@
 <script type="module">
 import * as THREE from "/vendor/three/three.module.js";
 import { OrbitControls } from "/vendor/three/jsm/controls/OrbitControls.js";
+import { createTerrain, meshOf, FLAT } from "/physics/mechanics/terrain.mjs";
+import * as RT from "/world/raceTrack.mjs";   // the racing city's seeded circuit, scaled up to fly
 import { WadMap } from "/world/WadMap.js";   // the engine's own top-right minimap (main.js builds the same one)
 import * as RB from "/physics/mechanics/rigidBody6dof.mjs";
 import * as F from "/physics/mechanics/flightModel6dof.mjs";
@@ -132,6 +135,51 @@ const sun = new THREE.DirectionalLight(0xffffff, 1.6); sun.position.set(500, -30
   for (let i = 0; i < 260; i++) { const h = 20 + rnd() * 90; m.compose(new THREE.Vector3((rnd() - 0.5) * 9000, (rnd() - 0.5) * 9000, h / 2), new THREE.Quaternion(), new THREE.Vector3(1, 1, h)); pylons.setMatrixAt(i, m); }
   scene.add(pylons);
 }
+// ---- THE MAP: the ground the flight model collides with and the page draws are ONE height function (physics/mechanics/terrain.mjs), and the racing city's circuit (world/raceTrack.mjs) is laid on it. The default stays the
+// flat field, which the pilots were trained and gated on, bit for bit (FLAT takes the model's fast path); the hills are low enough (45 m) against the mission's 220 to 380 m that the pilots, which read no terrain, still fly it.
+const MAPS = Object.freeze({
+  flat: { label: "flat field", terrain: null, circuit: false },
+  hills: { label: "hills", terrain: { kind: "fbm", seed: 7, amplitude: 45, wavelength: 900, octaves: 4, level: 0, clearing: [0, 0, 300, 900] }, circuit: false },
+  circuit: { label: "race circuit", terrain: null, circuit: true },
+  circuitHills: { label: "circuit on hills", terrain: { kind: "fbm", seed: 7, amplitude: 45, wavelength: 900, octaves: 4, level: 0, clearing: [0, 0, 300, 900] }, circuit: true },
+});
+const CIRCUIT_SCALE = 40;   // a 10 m tile becomes 400 m: a 12 x 12 grid is 4.8 km across, a lap of about 17 km, a few minutes at 45 m/s
+let terrain = FLAT, mapName = "flat", circuitLayout = null;
+const mapGroup = new THREE.Group(); scene.add(mapGroup);
+const flatGround = scene.children.find((o) => o.isMesh && o.geometry && o.geometry.type === "PlaneGeometry");
+function buildMap(name) {
+  if (!MAPS[name]) name = "flat";
+  mapName = name; const m = MAPS[name];
+  for (const o of [...mapGroup.children]) { mapGroup.remove(o); if (o.geometry) o.geometry.dispose(); }
+  terrain = m.terrain ? createTerrain(m.terrain) : FLAT; circuitLayout = null;
+  if (flatGround) flatGround.position.z = m.terrain ? -(m.terrain.amplitude || 0) - 2 : 0;
+  if (m.terrain) {
+    const mesh = meshOf(terrain, { x0: -4800, y0: -4800, nx: 193, ny: 193, step: 50 }), g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.BufferAttribute(mesh.positions, 3)); g.setAttribute("normal", new THREE.BufferAttribute(mesh.normals, 3)); g.setIndex(new THREE.BufferAttribute(mesh.indices, 1));
+    mapGroup.add(new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: 0x5f7a45, roughness: 1 })));
+  }
+  if (m.circuit) {
+    const track = RT.generateTrack({ seed: 3 }), S = CIRCUIT_SCALE, pts = RT.centreline(track), at = (x, z) => [x * S, -z * S];   // the track's z runs south, the flight's y runs north
+    const hAt = (x, y) => (terrain.flat ? 0 : terrain.height(x, y)) + 1.5, ribbon = [];
+    for (let i = 0; i <= pts.length; i++) { const [x, y] = at(...pts[i % pts.length]); ribbon.push(new THREE.Vector3(x, y, hAt(x, y))); }
+    const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(ribbon), new THREE.LineBasicMaterial({ color: 0xffd84a })); mapGroup.add(line);
+    const tile = RT.TILE * S, half = RT.HALF_WIDTH * S / 5;
+    const road = [];   // the asphalt: a quad strip along the centreline, 10 per cent of a tile each side (the kerbs' own width scaled by 1/5 so a lap is readable from 300 m)
+    for (let i = 0; i < pts.length; i++) {
+      const a = at(...pts[i]), b = at(...pts[(i + 1) % pts.length]), dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy) || 1, nx = -dy / l * half, ny = dx / l * half;
+      for (const [x, y] of [[a[0] + nx, a[1] + ny], [a[0] - nx, a[1] - ny], [b[0] + nx, b[1] + ny], [b[0] + nx, b[1] + ny], [a[0] - nx, a[1] - ny], [b[0] - nx, b[1] - ny]]) road.push(x, y, hAt(x, y) - 0.5);
+    }
+    const rg = new THREE.BufferGeometry(); rg.setAttribute("position", new THREE.Float32BufferAttribute(road, 3)); rg.computeVertexNormals();
+    mapGroup.add(new THREE.Mesh(rg, new THREE.MeshBasicMaterial({ color: 0x35373c, side: THREE.DoubleSide })));
+    for (const c of RT.checkpoints(track)) {   // a gate ring at each checkpoint, the finish line taller and white
+      const [x, y] = at(c.x, c.z), ring = new THREE.Mesh(new THREE.TorusGeometry(c.index === 0 ? 70 : 45, 3, 6, 24), new THREE.MeshBasicMaterial({ color: c.index === 0 ? 0xffffff : 0x2fd6b0 }));
+      ring.position.set(x, y, hAt(x, y) + (c.index === 0 ? 75 : 50)); ring.rotation.y = Math.PI / 2 * ((c.dir === "N" || c.dir === "S") ? 0 : 1) + Math.PI / 2; mapGroup.add(ring);
+    }
+    circuitLayout = { rooms: track.cells.map((cell, i) => { const [cx, cz] = RT.cellCentre(track, cell[0], cell[1]), [fx, fy] = at(cx, cz); return { id: "", x: fx - tile / 2, z: fy - tile / 2, w: tile, d: tile, kind: "road" }; }), corridors: [] };
+  }
+  try { mapGen._lastLevel = circuitLayout; } catch {}
+}
+const mapGen = { _lastLevel: null };
 const HULL = [0x2fd6b0, 0xf6a623, 0x9b8cff].map((c) => new THREE.MeshStandardMaterial({ color: c, metalness: 0.2, roughness: 0.55 }));
 const HULL_DEAD = new THREE.MeshStandardMaterial({ color: 0x6b2222, roughness: 0.9 });
 function makeAircraft(i) {
@@ -279,7 +327,7 @@ function stepFleet(gpuControls = null) {
     const s = fleet[i]; if (s.status !== "airborne") continue;
     if (ps[i].gpu && !gpuControls) throw new Error("a GPU pilot is seated: step with stepFleetGpu() (the device answers later than this tick)");
     const c = ps[i].gpu ? (gpuControls[i] || s.controls) : ps[i].fn(s.state, target, wind); s.controls = F.sanitize(c);
-    const r = F.stepFlight(model, s.state, c, DT, wind); s.state = r.state;
+    const r = F.stepFlight(model, s.state, c, DT, wind, terrain); s.state = r.state;
     if (r.status !== "airborne") { s.status = r.status; continue; }
     const a = F.attitude(s.state, wind), he = Math.atan2(Math.sin(target.heading - a.heading), Math.cos(target.heading - a.heading));
     s.eAlt += Math.min(3, Math.abs(a.altitude - target.altitude) / 50); s.eHdg += Math.min(3, Math.abs(he)); s.eSpd += Math.min(3, Math.abs(a.airspeed - target.airspeed) / 10); s.flown++;
@@ -403,7 +451,7 @@ window.__flightDemo = {
 };
 // the minimap: world/WadMap.js, the widget main.js puts top-right. It wants a camera (x, z and yaw), a bot list and a layout; the flight is z-up, so the map's z is the flight's y. The followed aircraft is the player dot, the other two are the blips.
 const mapCam = { position: { x: 0, y: 0, z: 0 }, yaw: 0 }, mapBots = { bots: new Map() };
-const wadMap = new WadMap({ camera: mapCam, ollamaLevelGen: { _lastLevel: null }, botManager: mapBots });
+const wadMap = new WadMap({ camera: mapCam, ollamaLevelGen: mapGen, botManager: mapBots });
 wadMap.start();
 function updateMinimap() {
   const me = Number(document.getElementById("camTarget").value) || 0, s = fleet[me]; if (!s) return;
@@ -415,6 +463,13 @@ function updateMinimap() {
 }
 window.__flightDemo.minimap = wadMap; window.__flightDemo.cameraSteps = (n = 1) => { for (let i = 0; i < n; i++) updateCamera(); };   // the gate's clock for the camera: the page lerps it once a FRAME, and a software frame is slow
 Object.defineProperties(window.__flightDemo, { camera: { get() { return camera; } }, chase: { get() { return chase; } }, mapBots: { get() { return mapBots; } } });
+{
+  const sel = document.getElementById("mapSel"), q = new URLSearchParams(location.search).get("map"); let saved = null; try { saved = localStorage.getItem("flightMap"); } catch {}
+  const start = MAPS[q] ? q : MAPS[saved] ? saved : "flat"; sel.value = start; buildMap(start); if (start !== "flat") reset();
+  sel.onchange = () => { buildMap(sel.value); reset(); try { localStorage.setItem("flightMap", sel.value); } catch {} };
+  Object.assign(window.__flightDemo, { setMap(n) { sel.value = n; buildMap(n); reset(); }, maps: Object.keys(MAPS), place(i, pos) { fleet[i].state.pos = pos.slice(); fleet[i].status = "airborne"; } });
+  Object.defineProperties(window.__flightDemo, { map: { get() { return mapName; } }, terrain: { get() { return terrain; } }, mapGroup: { get() { return mapGroup; } }, mapLayout: { get() { return mapGen._lastLevel; } } });   // live accessors (Object.assign would copy their values once)
+}
 requestAnimationFrame(frame);
 </script>
 </body>
