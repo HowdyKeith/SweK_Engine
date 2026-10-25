@@ -29,7 +29,7 @@ const mean = (a) => a.reduce((s, v) => s + v, 0) / a.length;
 export const PITCH_LADDER = Object.freeze([0.5, 1, 2, 4, 8].map((kNm, rung) => Object.freeze({ rung, trimNm: kNm * 1000, kick: [0.05, 0.1, 0.2, 0.3, 0.4][rung] })));   // trim torque (N m), kick (rad/s)
 export const HAZARD_LADDER = Object.freeze([[8, 3], [6, 4], [5, 5], [4, 6], [3, 7]].map(([flight, reach], rung) => Object.freeze({ rung, flight, reach })));   // flight time (s), reach (m)
 export const HAZARD = Object.freeze({ speed: 3, pulse: 0.4, pulseTicks: 3, pulseBelowCg: 0.1 });   // m/s; sway-velocity step (m/s); ticks it is applied over; m below the centre of gravity
-export const REFLEX = Object.freeze({ threshold: 0.08, hold: 3 });   // the first tick the sideslip exceeds 0.08 rad; held 3 s
+export const REFLEX = Object.freeze({ rate: 0.02, hold: 3 });   // Addendum 3 (Run 1 used a LEVEL, sideslip above 0.08 rad, which fires on the autopilot's own turn): the first tick the sideslip CHANGES by more than 0.02 rad; held 3 s
 export const COST_FLOOR = 0.05, RECOVER_FRACTION = 0.5;
 
 // ---- the runner: subTask.fly() with room for a disturbance --------------------------------------------------------------------------------------------------------------------------------------------------
@@ -107,13 +107,18 @@ export function hazardDisturbance(dive, rung, { push = true } = {}) {
         },
     };
 }
-/** The four hand-written reflexes of the note: yaw "away" from or "toward" the hazard's side, thrust +1 or -1, held 3 s from the first tick the sideslip exceeds 0.08 rad; the autopilot flies pitch and ballast throughout and everything after. */
+/** The cue detector of Addendum 3, one per dive (it remembers the last tick's sideslip): called once a tick with (state, current), it returns +1 on the tick the sideslip DROPS by more than REFLEX.rate (a leftward push: a hazard on the right), -1 on a rise of that size, else 0. */
+export function cueDetector() {
+    let prev = null;
+    return (state, current) => { const b = S.attitude(state, current).beta, d = prev === null ? 0 : b - prev; prev = b; return Math.abs(d) > REFLEX.rate ? (d < 0 ? 1 : -1) : 0; };
+}
+/** The four hand-written reflexes of the note: yaw "away" from or "toward" the hazard's side, thrust +1 or -1, held 3 s from the first tick the cue detector fires; the autopilot flies pitch and ballast throughout and everything after. */
 export function reflex(base, { yaw, thrust }) {
-    let tgt = null, trig = -1, call = 0, side = 0; const hold = Math.round(REFLEX.hold / T.DT);
+    let tgt = null, det = null, trig = -1, call = 0, side = 0; const hold = Math.round(REFLEX.hold / T.DT);
     return (state, target, current) => {
-        if (target !== tgt) { tgt = target; trig = -1; call = 0; side = 0; }   // a new dive is a new target object
-        const c = base(state, target, current), k = call++, beta = S.attitude(state, current).beta;
-        if (trig < 0 && Math.abs(beta) > REFLEX.threshold) { trig = k; side = beta < 0 ? 1 : -1; }   // a leftward slip is a hazard on the right
+        if (target !== tgt) { tgt = target; det = cueDetector(); trig = -1; call = 0; side = 0; }   // a new dive is a new target object
+        const c = base(state, target, current), k = call++, d = det(state, current);
+        if (trig < 0 && d !== 0) { trig = k; side = d; }
         return trig >= 0 && k - trig < hold ? { ...c, yaw: (yaw === "away" ? -1 : 1) * side, thrust } : c;
     };
 }
@@ -170,9 +175,52 @@ export function selfTestSigns() {
         { let st = fresh(), tgt = sc.target; const dd = hazardDisturbance(dive, 1); for (let i = 0; i < 12; i++) { if (dd.kick) st = dd.kick(i, st) || st; const c = rf(st, tgt, [0, 0, 0]); if (!trigSide && c.yaw !== AUTOPILOT(st, tgt, [0, 0, 0]).yaw) trigSide = -Math.sign(c.yaw); const fm = S.forcesAndMoments(model, st, c, [0, 0, 0], 0); dd.load(i, st, fm.acc); st = step(st, fm.acc, T.DT); } }
         out.push([`the "away" reflex turns away from a ${side > 0 ? "right" : "left"}-hand hazard (yaw ${side > 0 ? "left, negative" : "right, positive"})`, trigSide === side]);
     }
-    const quiet = T.TRAIN_SET.filter((q) => q.kind === "nominal").map((q) => { const rf = reflex(AUTOPILOT, REFLEXES[0]); let st = S.createState({ ...q.start, model }), n = 0; for (let i = 0; i < 1800; i++) { const c = rf(st, q.target, [0, 0, 0]); if (c.yaw !== AUTOPILOT(st, q.target, [0, 0, 0]).yaw) n++; const res = S.stepSub(model, st, c, T.DT, [0, 0, 0], q.weightError); st = res.state; if (res.status !== "submerged") break; } return n; });
-    out.push(["the reflex never fires on the 10 nominal dives with no hazard", quiet.every((n) => n === 0)]);
     return out;
+}
+/**
+ * The three conditions of Addendum 3, which must hold before a Run 2 counts. (a) the cue detector fires on none of the 10 nominal dives with no hazard (and the largest one-tick change of sideslip on them is returned, for the record);
+ * (b) on all 40 hazard dives it fires within 1 to 2 ticks of the launch; (c) it reads the right side on all 40.
+ */
+export function selfTestTrigger() {
+    const watch = (sc, disturb) => {
+        const det = cueDetector(); let k = 0, first = -1, side = 0, maxStep = 0, prev = null;
+        run((state, target, current) => { const b = S.attitude(state, current).beta; if (prev !== null) maxStep = Math.max(maxStep, Math.abs(b - prev)); prev = b; const d = det(state, current); if (first < 0 && d !== 0) { first = k; side = d; } k++; return AUTOPILOT(state, target, current); }, sc, { disturb });
+        return { first, side, maxStep };
+    };
+    const quiet = T.TRAIN_SET.filter((q) => q.kind === "nominal").map((q) => watch(q, null)), dives = hazardDives(), seen = dives.map((d) => ({ d, w: watch(d.sc, hazardDisturbance(d, 0)) }));
+    const lag = seen.map(({ d, w }) => w.first - Math.round(d.t0 / T.DT));
+    return { a: quiet.every((q) => q.first < 0), maxQuietStep: Math.max(...quiet.map((q) => q.maxStep)), b: lag.every((l) => l >= 1 && l <= 2), lags: [Math.min(...lag), Math.max(...lag)], c: seen.every(({ d, w }) => w.side === d.side), n: dives.length };
+}
+
+/**
+ * NOT A RULE -- what a STATELESS pilot (the kind 4b trains) can see of the cue, as levels at one tick. On the 10 cue-free nominal dives: the largest |roll rate|, |bank| and |sideslip| anywhere in the dive. On the 40 hazard dives at rung 0 (the cue
+ * does not depend on the rung): the smallest, over the dives, of the peak of each in the 10 ticks after the launch. A ratio above 1 means the cue's peak exceeds anything the autopilot's own flying produces on those channels, so a level threshold could in principle find it.
+ */
+export function cueSeparation() {
+    const peak = (sc, disturb, from, to) => { let roll = 0, bank = 0, beta = 0, k = 0; run((st, tg, cu) => { if (k >= from && k < to) { const a = S.attitude(st, cu); roll = Math.max(roll, Math.abs(S.rates(st).roll)); bank = Math.max(bank, Math.abs(a.bank)); beta = Math.max(beta, Math.abs(a.beta)); } k++; return AUTOPILOT(st, tg, cu); }, sc, { disturb }); return { roll, bank, beta }; };
+    const quiet = T.TRAIN_SET.filter((q) => q.kind === "nominal").map((q) => peak(q, null, 0, 1800)), cue = hazardDives().map((d) => { const i0 = Math.round(d.t0 / T.DT); return peak(d.sc, hazardDisturbance(d, 0), i0, i0 + 10); });
+    const out = {}; for (const ch of ["roll", "bank", "beta"]) { const q = Math.max(...quiet.map((x) => x[ch])), c = Math.min(...cue.map((x) => x[ch])); out[ch] = { quietMax: q, cueMin: c, ratio: c / q }; }
+    return out;
+}
+
+/** NOT A RULE: how long the roll-rate cue lasts: over the 40 hazard dives at rung 0, the fewest and the most ticks, in the 3 s after the launch, with |roll rate| above `threshold` (rad/s), and the latest such tick after the launch (30 ticks = 1 s). */
+export function cueDuration(threshold = 0.15) {
+    const rows = hazardDives().map((d) => { const i0 = Math.round(d.t0 / T.DT); let k = 0, n = 0, last = -1; run((st, tg, cu) => { if (k >= i0 && k < i0 + 90 && Math.abs(S.rates(st).roll) > threshold) { n++; last = k - i0; } k++; return AUTOPILOT(st, tg, cu); }, d.sc, { disturb: hazardDisturbance(d, 0) }); return [n, last]; });
+    return { min: Math.min(...rows.map((r) => r[0])), max: Math.max(...rows.map((r) => r[0])), lastTick: Math.max(...rows.map((r) => r[1])) };
+}
+/** NOT A RULE: a hand-written STATELESS reflex, the most a pilot of the kind 4b trains could do: the same four yaw and thrust choices, applied only on the ticks on which |roll rate| exceeds `threshold` (rad/s; between the cue-free maximum 0.079 and the smallest cue peak 0.244 that cueSeparation() reports), the side read from the sign of the roll rate (positive = right side down = a right-hand hazard). */
+export function statelessReflex(base, { yaw, thrust }, threshold = 0.15) {
+    return (state, target, current) => { const c = base(state, target, current), r = S.rates(state).roll; return Math.abs(r) <= threshold ? c : { ...c, yaw: (yaw === "away" ? -1 : 1) * (r > 0 ? 1 : -1), thrust }; };
+}
+/** NOT A RULE: the stateless reflexes on the 40 hazard dives at every rung, like measureE(): { rung, cost, reflexes: [{ name, hits, recovered }], best, recovered }. */
+export function measureStatelessE() {
+    const dives = hazardDives(), clean = mean(dives.map((d) => T.fly(AUTOPILOT, d.sc).score));
+    return HAZARD_LADDER.map((L) => {
+        const ap = mean(dives.map((d) => run(AUTOPILOT, d.sc, { disturb: hazardDisturbance(d, L.rung) }).score)), cost = clean - ap;
+        const reflexes = REFLEXES.map((R) => { const rs = dives.map((d) => run(statelessReflex(AUTOPILOT, R), d.sc, { disturb: hazardDisturbance(d, L.rung) })); return { name: R.name, hits: rs.filter((r) => r.status === "hit").length, recovered: (mean(rs.map((r) => r.score)) - ap) / cost }; });
+        const best = reflexes.reduce((a, b) => (b.recovered > a.recovered ? b : a));
+        return { rung: L.rung, cost, reflexes, best: best.name, recovered: best.recovered };
+    });
 }
 
 const f = (v, d = 4) => (Number.isFinite(v) ? v.toFixed(d) : "n/a");
@@ -183,12 +231,19 @@ if (typeof process !== "undefined" && Array.isArray(process.argv)) {
         console.log(`self-test 1: run() with no disturbance reproduces subTask.fly() on ${st.n} scenarios: ${st.bad.length ? "NO, differs on " + st.bad.join(", ") : "yes (score, status and fingerprint)"}`);
         for (const [what, ok] of selfTestSigns()) console.log(`self-test sign: ${ok ? "ok  " : "FAIL"} ${what}`);
         if (st.bad.length) process.exit(1);
+        const tt = selfTestTrigger();
+        console.log(`self-test trigger (Addendum 3): (a) fires on none of the 10 cue-free nominal dives: ${tt.a ? "yes" : "NO"} (largest one-tick change of sideslip on them ${f(tt.maxQuietStep, 4)} rad, threshold ${REFLEX.rate}); (b) fires 1 to 2 ticks after the launch on all ${tt.n} hazard dives: ${tt.b ? "yes" : "NO"} (lags ${tt.lags[0]} to ${tt.lags[1]}); (c) reads the right side on all ${tt.n}: ${tt.c ? "yes" : "NO"}`);
         const P = measureP();
         console.log(`\n4b-P pitch-hold, the autopilot alone on the 40 TRAIN_SET dives; clean mean score ${f(P.clean)}; floor: cost >= ${COST_FLOOR}`);
         console.log("  rung  trim kN m  kick rad/s  cost(full)  trim only  kicks only  ended early");
         for (const r of P.rungs) console.log(`  ${r.rung}     ${f(PITCH_LADDER[r.rung].trimNm / 1000, 1).padStart(5)}      ${f(PITCH_LADDER[r.rung].kick, 2)}        ${f(r.cost)}     ${f(r.trimOnly)}     ${f(r.kicksOnly)}      ${r.early}`);
         console.log(P.chosen === null ? "  RESULT: no rung costs the autopilot 0.05 -> 4b-P is VOID" : `  RESULT: the task is rung ${P.chosen}`);
+        if (!(tt.a && tt.b && tt.c)) { console.log("\n4b-E: the repair FAILED its conditions (Addendum 3) -> 4b-E is reported untestable with a sideslip-rate trigger and is not measured; the decision goes to Keith"); process.exit(2); }
         const E = measureE();
+        const cs = cueSeparation();
+        const cd = cueDuration(); console.log(`  (not a rule) the roll-rate cue lasts: |roll rate| > 0.15 rad/s on ${cd.min} to ${cd.max} ticks after the launch, the last at tick ${cd.lastTick} (30 ticks = 1 s)`);
+        for (const r of measureStatelessE()) console.log(`  (not a rule) stateless roll-rate reflex, rung ${r.rung}: best ${r.best} recovers ${f(r.recovered, 2)}; hits ${r.reflexes.map((x) => `${x.name} ${x.hits}/40`).join("  ")}`);
+        console.log("  (not a rule) what a stateless pilot can see of the cue, as levels: " + Object.entries(cs).map(([ch, v]) => `${ch}: cue-free max ${f(v.quietMax, 3)}, smallest cue peak ${f(v.cueMin, 3)}, ratio ${f(v.ratio, 2)}`).join("; "));
         console.log(`\n4b-E hazard, the autopilot and four reflexes on the 40 dives (10 nominal seeds x 2 sides x 2 launch times); clean mean score ${f(E.clean)}; rules: cost >= ${COST_FLOOR} and best reflex recovers >= ${RECOVER_FRACTION} of it`);
         console.log("  rung  T(s) R(m)  cost    autopilot hits  hits without the push   best reflex (recovered)   every reflex: hits / mean score");
         for (const r of E.rungs) console.log(`  ${r.rung}     ${HAZARD_LADDER[r.rung].flight}    ${HAZARD_LADDER[r.rung].reach}   ${f(r.cost)}      ${String(r.autopilotHits).padStart(2)}/40            ${String(r.noPushHits).padStart(2)}/40               ${r.best} (${f(r.recovered, 2)})${r.qualifies ? "  QUALIFIES" : ""}      ${r.reflexes.map((x) => `${x.name} ${x.hits}/${f(x.score, 3)}`).join("  ")}`);
