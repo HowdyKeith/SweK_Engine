@@ -3,6 +3,7 @@
 // Run: node tools/ship/takeSnowFrameTiming.mjs [--sizes 320x180,1280x720] [--frames 30] [--warmup 2] [--out snow-frame-timing.json]
 //                                          [--passes] [--shadow-res 1024] [--shadow-sweep] [--bracket] [--ablate]     --passes adds a per-pass GPU-millisecond line a size (timestamp queries);
 //                                          [--ablate] [--terms shadow,sss,...]     --ablate times the BEAUTY pass with each shading term compiled out of the shader (baseline, term, baseline, ... so drift cancels) and prints what each is worth;
+//                                          (`--terms hoist` is the one term that removes nothing: it times the pass with the fine relief's slow fields (windLocal, scour) read from the vertex stage, against the exact per-pixel path)
 //                                          --shadow-res times with another shadow map size;
 //                                          --shadow-sweep times every size at shadow maps of 2048, 1024 and 512 in one run (the comparison the shadow cost needs);
 //                                          --bracket times the first configuration AGAIN at the end and prints the drift between the two (thermal and power state move a laptop GPU by tens of percent over a run)
@@ -17,7 +18,7 @@ import { createRequire } from "node:module";
 import { parseOrExit } from "./cliArgs.mjs";
 import { resolveWebgpu, configureVulkanIcd, headlessGpuSkipReason, exitCleanly, FINE_CLOCK_FLAG } from "./headlessGpu.mjs";
 import { ABLATION_NAMES } from "../../render/snowAblate.mjs";
-import { timeFrames, timingLine, passLine, bracketLine, ablationRows, ablationLine, runAblation, summarise, DEFAULT_SIZES, TIMED_FRAMES, WARMUP_FRAMES } from "../../render/snowFrameTiming.mjs";
+import { HOIST_TERM, timeFrames, timingLine, passLine, bracketLine, ablationRows, ablationLine, runAblation, summarise, DEFAULT_SIZES, TIMED_FRAMES, WARMUP_FRAMES } from "../../render/snowFrameTiming.mjs";
 
 const cli = parseOrExit("takeSnowFrameTiming", { values: { "--sizes": "string", "--frames": "number", "--warmup": "number", "--out": "path", "--shadow-res": "number", "--terms": "string" }, flags: ["--passes", "--shadow-sweep", "--bracket", "--ablate"] });
 const shadowRes = cli.values["--shadow-res"] ?? 0, wantPasses = cli.flags.has("--passes"), shadowList = cli.flags.has("--shadow-sweep") ? [2048, 1024, 512] : [shadowRes], frames = cli.values["--frames"] ?? TIMED_FRAMES, warmup = cli.values["--warmup"] ?? WARMUP_FRAMES;
@@ -25,7 +26,7 @@ const sizes = cli.values["--sizes"] ? cli.values["--sizes"].split(",").map((s) =
 if (sizes.some((s) => s.length !== 2 || !s.every((v) => Number.isInteger(v) && v >= 16 && v <= 4096))) { console.error("[takeSnowFrameTiming] --sizes wants WIDTHxHEIGHT pairs, 16..4096 each, e.g. 320x180,1280x720"); exitCleanly(2); }
 if (shadowRes && !([256, 512, 1024, 1536, 2048, 4096].includes(shadowRes))) { console.error("[takeSnowFrameTiming] --shadow-res wants 256, 512, 1024, 1536, 2048 or 4096"); exitCleanly(2); }
 const terms = cli.values["--terms"] ? cli.values["--terms"].split(",").map((t) => t.trim()) : [...ABLATION_NAMES, "all"];
-if (cli.flags.has("--ablate") && terms.some((t) => t !== "all" && !ABLATION_NAMES.includes(t))) { console.error("[takeSnowFrameTiming] --terms wants some of: " + ABLATION_NAMES.join(", ") + ", all"); exitCleanly(2); }
+if (cli.flags.has("--ablate") && terms.some((t) => t !== "all" && t !== HOIST_TERM && !ABLATION_NAMES.includes(t))) { console.error("[takeSnowFrameTiming] --terms wants some of: " + ABLATION_NAMES.join(", ") + ", hoist, all"); exitCleanly(2); }
 if (!(Number.isInteger(frames) && frames >= 3 && Number.isInteger(warmup) && warmup >= 1)) { console.error("[takeSnowFrameTiming] --frames wants an integer >= 3 and --warmup an integer >= 1"); exitCleanly(2); }
 
 const require_ = createRequire(import.meta.url);

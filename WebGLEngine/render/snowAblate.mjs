@@ -23,7 +23,7 @@ export const ABLATIONS = Object.freeze({
     detail:  { why: "the three detail-normal layers (blended with RNM) of the wind-scoured surface",
                edits: [once("detail branch", "if (F.wind.z > 0.001) {", "if (false) {")] },
     fine:    { why: "the filtered fine relief (sastrugi, ripple, grain) in the fragment's normal",
-               edits: [once("terrainFineFiltered call", /let fine = terrainFineFiltered\(\s*world\.xz, F\.wind\.x, exposure, F\.wind\.y, footprint\s*\);/, "let fine = vec3f(0.0);")] },
+               edits: [once("fineRelief call", /let fine = fineRelief\(world\.xz, exposure, footprint, input\.fineWl\);/, "let fine = vec3f(0.0);")] },
     deform:  { why: "the footprint deformation read (five taps, only where a footprint is)",
                edits: [once("deform branch", "if (dWeight > 0.001) {", "if (false) {")] },
     aerial:  { why: "the aerial perspective (the haze: near-sky blur and the Mie forward lobe)",
