@@ -8,6 +8,13 @@
 // that plus under ~8 s of its own work. The browser rows are unchanged except where a part says otherwise. The six: snowGpu (maths, source, the core stages), snowGpuField (the
 // compute-stepped deformation), snowGpuTaa (the TAA kernel, the flicker, the sky dome), snowGpuLookA (the shadow maps and cascades, fine relief, subsurface scattering),
 // snowGpuLookB (glints) and snowGpuLive (the live loop and its rate). THIS ONE: the TAA texture kernel against the CPU resolve, the frame-to-frame flicker with and without the resolve, and the sky dome the right way round.
+// v4897 -- THE TAA PIXEL TAPS AND THE HARDWARE HISTORY (snow-taa-cost-on-igpu): the kernel reads the 3x3 neighbourhood and the depth as single texels (tapCur, tapDepth) and can read the history through a filtering sampler (HW_HIST).
+// The kernel row now runs a calm history and a far one (so the variance clip, which is the neighbourhood's moments, decides the result), each for both history paths. SABOTAGES, RESULTS BY NAME (against render/snowGpu.mjs, restored identical):
+//   S1 tapCur's window shifted one column (q.x + i + 1)                              -> 2 RED: both kernel rows (exact history and hardware history)
+//   S2 the hardware history read with uv.y not flipped                               -> 1 RED: the hardware-history row
+//   S3 tapDepth reading three columns over                                           -> 2 RED: both kernel rows
+//   S4 tapCur's rows doubled (q.y - j * 2)                                           -> 2 RED: both kernel rows
+//   (NOT a sabotage: negating i or j in tapCur reads the same nine texels, the neighbourhood being symmetric -- it stayed green, rightly. The first draft of the far history was also too close to the frame for the clip to bite, and S1 and S3 went unseen until it was made far.)
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -52,11 +59,13 @@ if (skipWhy) {
                 const d16 = (b) => { const s = (b & 0x8000) ? -1 : 1, e = (b >> 10) & 31, m = b & 1023; return e === 0 ? s * Math.pow(2, -14) * (m / 1024) : s * Math.pow(2, e - 15) * (1 + m / 1024); };
                 let seed = 21; const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
                 const mk = (fn) => { const a = new Float32Array(w * h * 4), q = new Uint16Array(w * h * 4); for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const c = fn(x, y), o = (y * w + x) * 4; for (let k = 0; k < 3; k++) { q[o + k] = f16(c[k]); a[o + k] = d16(q[o + k]); } q[o + 3] = f16(1); a[o + 3] = 1; } return { a, q }; };
-                const cur = mk((x, y) => [0.4 + 0.3 * Math.sin(x * 0.4) + 0.1 * rnd(), 0.3 + 0.2 * Math.cos(y * 0.5), 0.5 + 0.1 * rnd()]), hist = mk((x, y) => [0.4 + 0.3 * Math.sin(x * 0.4 + 0.2) + 0.1 * rnd(), 0.3 + 0.2 * Math.cos(y * 0.5), 0.5]);
+                const cur = mk((x, y) => [0.4 + 0.3 * Math.sin(x * 0.4) + 0.1 * rnd(), 0.3 + 0.2 * Math.cos(y * 0.5) + 0.15 * Math.sin(x * 2.1 + y * 1.9), 0.5 + 0.1 * rnd()]), mkHist = (strong) => mk((x, y) => strong ? [1.6 * Math.sin(x * 1.7 + y), 0.1 + 1.4 * Math.cos(y * 1.3 + x * 0.3), 0.9 + 0.8 * Math.sin(y * 0.9)] : [0.4 + 0.3 * Math.sin(x * 0.4 + 0.2) + 0.1 * rnd(), 0.3 + 0.2 * Math.cos(y * 0.5), 0.5]);   // calm: a history near the frame; strong: far from it, so the variance clip (the 3x3 neighbourhood's moments) decides the result
                 const depth = new Float32Array(w * h); for (let i = 0; i < depth.length; i++) depth[i] = 15 + 10 * rnd();
                 const tanX = 0.9, tanY = 0.6, vp = new Array(16).fill(0); vp[0] = 1 / tanX; vp[5] = 1 / tanY; vp[10] = 1; vp[11] = 1; const vp2 = vp.slice(); vp2[12] = 0.04; vp2[13] = -0.02;
                 const iv = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1], jit = [0.02, -0.03];
                 const flip = (img) => { const o = new Float32Array(img.length); for (let y = 0; y < h; y++) o.set(img.subarray(y * w * 4, (y + 1) * w * 4), (h - 1 - y) * w * 4); return o; };
+                const scenario = async (strong) => {
+                const hist = mkHist(strong);
                 const S2 = { w, h, cur: flip(cur.a), hist: flip(hist.a), depth: (() => { const o = new Float32Array(w * h); for (let y = 0; y < h; y++) o.set(depth.subarray(y * w, (y + 1) * w), (h - 1 - y) * w); return o; })(), prevViewProj: vp2, invView: iv, projInfo: [tanX, tanY], jitterNdc: jit, historyValid: 1, enabled: 1, feedback: 0.9 };
                 const twin = flip(T.resolveFrame(S2));
                 const mkTex = (fmt, usage) => d.createTexture({ size: [w, h], format: fmt, usage });
@@ -64,14 +73,21 @@ if (skipWhy) {
                 d.queue.writeTexture({ texture: tc }, cur.q, { bytesPerRow: w * 8 }, [w, h]); d.queue.writeTexture({ texture: th }, hist.q, { bytesPerRow: w * 8 }, [w, h]); d.queue.writeTexture({ texture: td }, depth, { bytesPerRow: w * 4 }, [w, h]);
                 const u = new Float32Array(44); u.set(vp2, 0); u.set(iv, 16); u.set([tanX, tanY, 1 / w, 1 / h, jit[0], jit[1], 1, 1, 0.9, 0, 0, 0], 32);
                 const ub = d.createBuffer({ size: 176, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }); d.queue.writeBuffer(ub, 0, u);
-                const pipe = d.createComputePipeline({ layout: "auto", compute: { module: d.createShaderModule({ code: M.TAA_GPU_WGSL }), entryPoint: "main" } });
-                const bg = d.createBindGroup({ layout: pipe.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: ub } }, { binding: 1, resource: tc.createView() }, { binding: 2, resource: th.createView() }, { binding: 3, resource: td.createView() }, { binding: 4, resource: to.createView() }] });
+                const samp = d.createSampler({ magFilter: "linear", minFilter: "linear", addressModeU: "clamp-to-edge", addressModeV: "clamp-to-edge" });
+                const one = async (hw) => {
+                const pipe = d.createComputePipeline({ layout: "auto", compute: { module: d.createShaderModule({ code: M.TAA_GPU_WGSL }), entryPoint: "main", constants: { HW_HIST: hw } } });
+                const bg = d.createBindGroup({ layout: pipe.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: ub } }, { binding: 1, resource: tc.createView() }, { binding: 2, resource: th.createView() }, { binding: 3, resource: td.createView() }, { binding: 4, resource: to.createView() }, { binding: 5, resource: samp }] });
                 const bpr = 256, rb = d.createBuffer({ size: bpr * h, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ }), e = d.createCommandEncoder(), cp = e.beginComputePass(); cp.setPipeline(pipe); cp.setBindGroup(0, bg); cp.dispatchWorkgroups(3, 2); cp.end();
                 e.copyTextureToBuffer({ texture: to }, { buffer: rb, bytesPerRow: bpr }, [w, h]); d.queue.submit([e.finish()]); await rb.mapAsync(GPUMapMode.READ);
                 const raw = new Uint16Array(rb.getMappedRange().slice(0)); let worst = 0; for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) for (let k = 0; k < 3; k++) worst = Math.max(worst, Math.abs(d16(raw[y * (bpr / 2) + x * 4 + k]) - twin[(y * w + x) * 4 + k]) / Math.max(Math.abs(twin[(y * w + x) * 4 + k]), 0.05));
-                return { worst };
+                return worst; };
+                return [await one(0), await one(1)];
+                };
+                const calm = await scenario(false), strong = await scenario(true);
+                return { worst: Math.max(calm[0], strong[0]), worstHw: Math.max(calm[1], strong[1]) };
             });
             ok("!! the TAA texture kernel (rgba16float history and frame, r32float depth, storage-texture output, rows flipped to upstream's y-up) equals the CPU resolve on the same images with a moving camera and a jittered ray: worst relative difference " + (taaK.worst * 100).toFixed(2) + "% (half-float output)", taaK.worst < 0.01);
+            ok("!! and with the history read through the HARDWARE bilinear sampler (HW_HIST, the filterable texture the pass cost came down to) it equals the same CPU resolve: worst relative difference " + (taaK.worstHw * 100).toFixed(2) + "% (bound 1%: an 8-bit-weight filter on a real GPU is looser than this software one)", taaK.worstHw < 0.01);
             const flick = await run(async () => {
                 const S = window.__snowgpu, g = S.gpu, cam = { pos: [0, 2.2, -9], target: [0, 0.5, 0], fovY: 60 };
                 const mean = async (taa) => { g.state.taa = true; g.state.resolve = taa; g.state.jitter = true; g.state.historyValid = 0; for (let i = 0; i < 6; i++) await g.frame(0.016, { x: 0, z: 0 }, cam, { present: false }); const shots = []; for (let i = 0; i < 6; i++) shots.push((await g.shot(0.016, { x: 0, z: 0 }, cam)).pixels);

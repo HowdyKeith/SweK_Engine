@@ -508,6 +508,8 @@ struct Params { prevViewProj: mat4x4f, invView: mat4x4f, projInfo: vec2f, invRes
 @group(0) @binding(2) var histTex: texture_2d<f32>;
 @group(0) @binding(3) var depthTex: texture_2d<f32>;
 @group(0) @binding(4) var outTex: texture_storage_2d<rgba16float, write>;
+@group(0) @binding(5) var histSampler: sampler;
+override HW_HIST: bool = false;
 
 const POST_FAR: f32 = ${POST_FAR}.0;
 fn lumaPost(c: vec3f) -> f32 { return dot(c, vec3f(0.2126, 0.7152, 0.0722)); }
@@ -529,6 +531,7 @@ fn sampleCur(uv: vec2f) -> vec3f {
     return mix(mix(loadCur(x0, y0), loadCur(x0 + 1, y0), f.x), mix(loadCur(x0, y0 + 1), loadCur(x0 + 1, y0 + 1), f.x), f.y);
 }
 fn sampleHist(uv: vec2f) -> vec3f {
+    if (HW_HIST) { return textureSampleLevel(histTex, histSampler, vec2f(uv.x, 1.0 - uv.y), 0.0).rgb; }
     let d = dims();
     let p = clamp(vec2f(uv.x * d.x - 0.5, rowOf(uv.y)), vec2f(0.0), d - 1.0);
     let b = floor(p);
@@ -546,6 +549,11 @@ fn sampleDepth(uv: vec2f) -> f32 {
     let y0 = i32(b.y);
     return mix(mix(loadDepth(x0, y0), loadDepth(x0 + 1, y0), f.x), mix(loadDepth(x0, y0 + 1), loadDepth(x0 + 1, y0 + 1), f.x), f.y);
 }
+// v4897 -- the pixel's own taps (taaResolve.mjs): the 3x3 neighbourhood and the depth are read at integer offsets from this pixel's centre, so each is ONE textureLoad where sampleCur and sampleDepth made four. Rows run top-down
+// here and uv.y runs up, so a +j in uv is a row - j. The pixel is found by floor of the centre's coordinate (a half texel from any edge), never by truncating a reciprocal.
+fn pixelOf(uv: vec2f) -> vec2i { let d = dims(); return vec2i(i32(floor(uv.x * d.x)), i32(floor((1.0 - uv.y) * d.y))); }
+fn tapCur(uv: vec2f, i: i32, j: i32) -> vec3f { let q = pixelOf(uv); return loadCur(q.x + i, q.y - j); }
+fn tapDepth(uv: vec2f) -> f32 { let q = pixelOf(uv); return loadDepth(q.x, q.y); }
 ${TAA_WGSL}
 @compute @workgroup_size(8, 8)
 fn main(@builtin(global_invocation_id) gid: vec3u) {
@@ -598,7 +606,7 @@ export function skyAmbient(sunDir, intensity, groundBounce) {
  * Build the whole frame graph on `device`. Options: { canvas (a canvas with a webgpu context, optional), format (the canvas format), width, height, deformRes, deformSize, gridN, levels, baseSpacing, shadowRes }.
  * Returns the driver: frame(dt, focus, cam, opts), stamp(...), setSun(elev, azim), readField(), readSky(), dumpTerrain(verts), shot(), errors, stats, and the resources the gate reads.
  */
-export async function createSnowGpu(device, { canvas = null, format = "bgra8unorm", width = 320, height = 180, deformRes = 128, deformSize = 20, gridN = 32, levels = 5, baseSpacing = 0.2, shadowRes = SHADOW_RES, passTimers = false, ablate = [], hoistFine = false, coarseForms = false } = {}) {   // `ablate`: terms of the beauty shader compiled OUT, for measuring (render/snowAblate.mjs); the picture is wrong on purpose
+export async function createSnowGpu(device, { canvas = null, format = "bgra8unorm", width = 320, height = 180, deformRes = 128, deformSize = 20, gridN = 32, levels = 5, baseSpacing = 0.2, shadowRes = SHADOW_RES, passTimers = false, ablate = [], hoistFine = false, coarseForms = false, taaHwHistory = false } = {}) {   // `ablate`: terms of the beauty shader compiled OUT, for measuring (render/snowAblate.mjs); the picture is wrong on purpose
     const GU = U().GPUBufferUsage, TU = U().GPUTextureUsage, SS = U().GPUShaderStage, MM = U().GPUMapMode;
     const errors = []; device.addEventListener("uncapturederror", (e) => errors.push(String(e.error && e.error.message || e)));
     const mkBuf = (size, usage, label) => device.createBuffer({ size: Math.max(16, Math.ceil(size / 4) * 4), usage, label });
@@ -657,7 +665,7 @@ export async function createSnowGpu(device, { canvas = null, format = "bgra8unor
     const bakePipe = device.createComputePipeline({ layout: "auto", compute: { module: device.createShaderModule({ code: BAKE_KERNEL_WGSL }), entryPoint: "main" } });
     const mipPipe = device.createComputePipeline({ layout: "auto", compute: { module: device.createShaderModule({ code: MIP_KERNEL_WGSL }), entryPoint: "main" } });
     const detailBakePipe = device.createComputePipeline({ layout: "auto", compute: { module: device.createShaderModule({ code: DETAIL_BAKE_KERNEL_WGSL, label: "detail bake" }), entryPoint: "main" } }), detailMipPipe = device.createComputePipeline({ layout: "auto", compute: { module: device.createShaderModule({ code: DETAIL_MIP_KERNEL_WGSL }), entryPoint: "main" } });
-    const taaPipe = device.createComputePipeline({ layout: "auto", compute: { module: device.createShaderModule({ code: TAA_GPU_WGSL, label: "taa" }), entryPoint: "main" } });
+    const taaPipe = device.createComputePipeline({ layout: "auto", compute: { module: device.createShaderModule({ code: TAA_GPU_WGSL, label: "taa" }), entryPoint: "main", constants: { HW_HIST: taaHwHistory ? 1 : 0 } } }), taaSampler = device.createSampler({ magFilter: "linear", minFilter: "linear", addressModeU: "clamp-to-edge", addressModeV: "clamp-to-edge" });
     const presentModule = device.createShaderModule({ code: PRESENT_WGSL });
     const presentPipe = (fmt) => device.createRenderPipeline({ layout: "auto", vertex: { module: presentModule, entryPoint: "vs" }, fragment: { module: presentModule, entryPoint: "fs", targets: [{ format: fmt }] }, primitive: { topology: "triangle-list" } });
     const presentCanvas = presentPipe(format), presentShot = presentPipe("rgba8unorm");
@@ -735,7 +743,7 @@ export async function createSnowGpu(device, { canvas = null, format = "bgra8unor
           p.setBindGroup(0, mainBG[cur]); p.setPipeline(skyPipe); p.draw(3); p.setPipeline(terrainPipe); p.setVertexBuffer(0, vbuf); p.setIndexBuffer(ibuf, "uint32"); p.drawIndexed(clip.indices.length); p.end(); }
         // TAA: current + history -> the other history
         const hi = state.histIdx, ho = 1 - hi;
-        { const bg = device.createBindGroup({ layout: taaPipe.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: taaU } }, { binding: 1, resource: hdr.createView() }, { binding: 2, resource: hist[hi].createView() }, { binding: 3, resource: depthCol.createView() }, { binding: 4, resource: hist[ho].createView() }] });
+        { const bg = device.createBindGroup({ layout: taaPipe.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: taaU } }, { binding: 1, resource: hdr.createView() }, { binding: 2, resource: hist[hi].createView() }, { binding: 3, resource: depthCol.createView() }, { binding: 4, resource: hist[ho].createView() }, { binding: 5, resource: taaSampler }] });
           const cp = enc.beginComputePass({ timestampWrites: tw("taa") }); cp.setPipeline(taaPipe); cp.setBindGroup(0, bg); cp.dispatchWorkgroups(Math.ceil(W / 8), Math.ceil(H / 8)); cp.end(); }
         // present
         let shotBuf = null, bpr = 0;

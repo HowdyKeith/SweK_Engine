@@ -139,6 +139,10 @@ fn sampleDepth(uv: vec2f) -> f32 {
     return mix(mix(a, bb, f.x), mix(c, dd, f.x), f.y);
 }
 
+// v4897 -- THE PIXEL'S OWN TAPS. resolve reads the pixel (i = j = 0) and its eight neighbours, each at an INTEGER offset from a pixel centre, and the depth at the centre: positions where a bilinear fetch is a single
+// texel and costs four. tapCur and tapDepth are those fetches, named so a kernel that knows its pixel can read one texel (snowGpu's does); here, where the position is a uv, they are the bilinear fetch they replaced.
+fn tapCur(uv: vec2f, i: i32, j: i32) -> vec3f { return sampleCur(uv + vec2f(f32(i), f32(j)) * uniforms.invRes); }
+fn tapDepth(uv: vec2f) -> f32 { return sampleDepth(uv); }
 // ---- upstream post/taa.fragment.wgsl, bodies unchanged except the texture fetches
 fn historyCatmullRom(uv: vec2f, texSize: vec2f) -> vec3f {
     let samplePos = uv * texSize;
@@ -167,11 +171,11 @@ fn historyCatmullRom(uv: vec2f, texSize: vec2f) -> vec3f {
 }
 
 fn resolve(uv: vec2f) -> vec3f {
-    let cur = sampleCur(uv);
+    let cur = tapCur(uv, 0, 0);
 
     if (uniforms.enabled < 0.5 || uniforms.historyValid < 0.5) { return cur; }
 
-    let z = sampleDepth(uv);
+    let z = tapDepth(uv);
     let ndc = uv * 2.0 - 1.0 - uniforms.jitterNdc;
     let view = vec3f(ndc.x * uniforms.projInfo.x, ndc.y * uniforms.projInfo.y, 1.0)
              * min(z, POST_FAR);
@@ -188,7 +192,7 @@ fn resolve(uv: vec2f) -> vec3f {
     var m2 = vec3f(0.0);
     for (var j = -1; j <= 1; j++) {
         for (var i = -1; i <= 1; i++) {
-            let s = tonemapWeight(sampleCur(uv + vec2f(f32(i), f32(j)) * uniforms.invRes));
+            let s = tonemapWeight(tapCur(uv, i, j));
             m1 += s;
             m2 += s * s;
         }

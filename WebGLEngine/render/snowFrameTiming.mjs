@@ -58,8 +58,8 @@ export function parseTimingLine(line) {
  * Warm up, then time `frames` frames one at a time (latency) and `frames` more submitted back to back (throughput), on `device`, at width x height. `now` and `idle` are injectable so the rules are
  * driven on fixtures; live they are performance.now and device.queue.onSubmittedWorkDone. Returns the raw lists and the GPU errors the device raised (an uncaptured error is a failed frame, not a slow one).
  */
-export async function timeFrames(device, { width = 320, height = 180, warmup = WARMUP_FRAMES, warmupMs = WARMUP_MS, frames = TIMED_FRAMES, shadowRes, passTimers = false, ablate = [], hoistFine = false, coarseForms = false, now = () => performance.now(), idle = () => device.queue.onSubmittedWorkDone(), create = createSnowGpu } = {}) {
-    const g = await create(device, { canvas: null, width, height, ...(shadowRes ? { shadowRes } : {}), ...(passTimers ? { passTimers: true } : {}), ...(ablate.length ? { ablate } : {}), ...(hoistFine ? { hoistFine: true } : {}), ...(coarseForms ? { coarseForms: true } : {}) });
+export async function timeFrames(device, { width = 320, height = 180, warmup = WARMUP_FRAMES, warmupMs = WARMUP_MS, frames = TIMED_FRAMES, shadowRes, passTimers = false, ablate = [], hoistFine = false, coarseForms = false, taaHwHistory = false, now = () => performance.now(), idle = () => device.queue.onSubmittedWorkDone(), create = createSnowGpu } = {}) {
+    const g = await create(device, { canvas: null, width, height, ...(shadowRes ? { shadowRes } : {}), ...(passTimers ? { passTimers: true } : {}), ...(ablate.length ? { ablate } : {}), ...(hoistFine ? { hoistFine: true } : {}), ...(coarseForms ? { coarseForms: true } : {}), ...(taaHwHistory ? { taaHwHistory: true } : {}) });
     let i = 0;
     const w0 = now();
     for (let k = 0; k < warmup || now() - w0 < warmupMs; k++, i++) { const o = orbitAt(i); await g.frame(1 / 60, o.focus, o.cam); await idle(); }
