@@ -134,3 +134,16 @@ Beauty pass ~61 ms at 1280x720 (65 before), baselines drifting 3 to 5%; 16.8 ms 
 | hoist ON | -2.7 ms | -4.4% (inside the drift) | 1.5 ms | 8.8% |
 
 Item 1 (the deform texture) took the deform term from 20.1 to 7.2 ms at 720p. The hoist is not a win here at 720p and is left off. The coarse forms save about a tenth of the pass for a picture 0.025/255 different (software adapter). TAA pass, two runs two minutes apart with the beauty pass equal (66.1 and 65.8 ms): 7.64 ms with the history read by hand, 5.15 ms through the hardware sampler (-33%); the earlier 7.9 ms against 7.64 now says the one-texel neighbourhood taps changed nothing measurable. `?scale=auto` on this GPU: looks and runs great (the user's trial), and is now the page default.
+
+## GTX 1080 (nvidia pascal, D3D12), 2026-10-25: the same runs (`snow-forms-1080.json`, `snow-taa-1080.json`, `snow-taa-hw-1080.json`)
+
+Beauty pass 7.66 ms at 1280x720, 2.29 ms at 640x360; the frame 8.9 ms; no drift (bracket 8.94 to 8.91).
+
+| term | 1280x720: saves | share | 640x360: saves | share |
+|---|---|---|---|---|
+| fine (compiled out) | 2.88 ms | 37.6% | 1.00 ms | 43.5% |
+| deform (compiled out) | 1.53 ms | 20.0% | 0.50 ms | 21.9% |
+| coarse forms ON | 0.49 ms | 6.4% | 0.15 ms | 6.5% |
+| hoist ON | 0.11 ms | 1.5% | 0.07 ms | 3.2% |
+
+TAA pass: 0.187 ms by hand, 0.120 ms through the hardware sampler (-36%; the Intel -33%). **Decided from the two GPUs:** the coarse forms and the hardware TAA history are now the page's defaults (`createSnowGpu` defaults `coarseForms` and `taaHwHistory` to true); the hoist stays off (a 2.7 ms loss on the Intel at 720p, 0.11 ms on the 1080). `takeSnowFrameTiming --exact` times with every form off, and the `--ablate` form terms (`hoist`, `coarse`) are always measured against that exact path.

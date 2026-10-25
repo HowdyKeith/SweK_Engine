@@ -606,7 +606,7 @@ export function skyAmbient(sunDir, intensity, groundBounce) {
  * Build the whole frame graph on `device`. Options: { canvas (a canvas with a webgpu context, optional), format (the canvas format), width, height, deformRes, deformSize, gridN, levels, baseSpacing, shadowRes }.
  * Returns the driver: frame(dt, focus, cam, opts), stamp(...), setSun(elev, azim), readField(), readSky(), dumpTerrain(verts), shot(), errors, stats, and the resources the gate reads.
  */
-export async function createSnowGpu(device, { canvas = null, format = "bgra8unorm", width = 320, height = 180, deformRes = 128, deformSize = 20, gridN = 32, levels = 5, baseSpacing = 0.2, shadowRes = SHADOW_RES, passTimers = false, ablate = [], hoistFine = false, coarseForms = false, taaHwHistory = false } = {}) {   // `ablate`: terms of the beauty shader compiled OUT, for measuring (render/snowAblate.mjs); the picture is wrong on purpose
+export async function createSnowGpu(device, { canvas = null, format = "bgra8unorm", width = 320, height = 180, deformRes = 128, deformSize = 20, gridN = 32, levels = 5, baseSpacing = 0.2, shadowRes = SHADOW_RES, passTimers = false, ablate = [], hoistFine = false, coarseForms = true, taaHwHistory = true } = {}) {   // `ablate`: terms of the beauty shader compiled OUT, for measuring (render/snowAblate.mjs); the picture is wrong on purpose
     const GU = U().GPUBufferUsage, TU = U().GPUTextureUsage, SS = U().GPUShaderStage, MM = U().GPUMapMode;
     const errors = []; device.addEventListener("uncapturederror", (e) => errors.push(String(e.error && e.error.message || e)));
     const mkBuf = (size, usage, label) => device.createBuffer({ size: Math.max(16, Math.ceil(size / 4) * 4), usage, label });
@@ -762,7 +762,7 @@ export async function createSnowGpu(device, { canvas = null, format = "bgra8unor
         for (let y = 0; y < OH; y++) out.set(raw.subarray(y * bpr, y * bpr + OW * 4), y * OW * 4);
         shotBuf.unmap(); shotBuf.destroy(); shotTex.destroy(); return { pixels: out, width: OW, height: OH };
     }
-    const stats = { passTimers: !!timers, passMs: null, frames: 0, bakes: 0, vertices: clip.vertices, triangles: clip.triangles, terrainDrawCalls: 1, cascades: CASCADE_COUNT, indices: clip.indices.length, shadowRes };
+    const stats = { hoistFine, coarseForms, taaHwHistory, passTimers: !!timers, passMs: null, frames: 0, bakes: 0, vertices: clip.vertices, triangles: clip.triangles, terrainDrawCalls: 1, cascades: CASCADE_COUNT, indices: clip.indices.length, shadowRes };
     async function readBuf(buf, bytes) { const r = mkBuf(bytes, GU.COPY_DST | GU.MAP_READ), e = device.createCommandEncoder(); e.copyBufferToBuffer(buf, 0, r, 0, bytes); device.queue.submit([e.finish()]); await r.mapAsync(MM.READ); const out = new Float32Array(r.getMappedRange().slice(0)); r.unmap(); r.destroy(); return out; }
     return {
         device, field, clip, stats, errors, state, baseSpacing, gridN, levels, deformRes,

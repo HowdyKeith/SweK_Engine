@@ -4,7 +4,7 @@
 //                                          [--passes] [--shadow-res 1024] [--shadow-sweep] [--bracket] [--ablate]     --passes adds a per-pass GPU-millisecond line a size (timestamp queries);
 //                                          [--ablate] [--terms shadow,sss,...]     --ablate times the BEAUTY pass with each shading term compiled out of the shader (baseline, term, baseline, ... so drift cancels) and prints what each is worth;
 //                                          (`--terms hoist,coarse` are the two terms that remove nothing: hoist times the pass with the fine relief's slow fields (windLocal, scour) read from the vertex stage, coarse with the detail layer fading out sooner and the haze skipping the sky reads that cannot show -- each against the exact path)
-//                                          [--taa-hw]     reads the TAA history through the hardware bilinear sampler (taaHwHistory); run --passes with and without it to see what the taa pass saves;
+//                                          [--exact]      times with every cheaper form OFF (the hoist, the coarse forms, the hardware TAA history); without it the run is the shipped defaults (coarse forms and the hardware TAA history ON). The --ablate form terms (hoist, coarse, taa) are always measured against the exact path;
 //                                          --shadow-res times with another shadow map size;
 //                                          --shadow-sweep times every size at shadow maps of 2048, 1024 and 512 in one run (the comparison the shadow cost needs);
 //                                          --bracket times the first configuration AGAIN at the end and prints the drift between the two (thermal and power state move a laptop GPU by tens of percent over a run)
@@ -19,10 +19,10 @@ import { createRequire } from "node:module";
 import { parseOrExit } from "./cliArgs.mjs";
 import { resolveWebgpu, configureVulkanIcd, headlessGpuSkipReason, exitCleanly, FINE_CLOCK_FLAG } from "./headlessGpu.mjs";
 import { ABLATION_NAMES } from "../../render/snowAblate.mjs";
-import { FORM_TERMS, timeFrames, timingLine, passLine, bracketLine, ablationRows, ablationLine, runAblation, summarise, DEFAULT_SIZES, TIMED_FRAMES, WARMUP_FRAMES } from "../../render/snowFrameTiming.mjs";
+import { FORM_TERMS, EXACT_FORMS, timeFrames, timingLine, passLine, bracketLine, ablationRows, ablationLine, runAblation, summarise, DEFAULT_SIZES, TIMED_FRAMES, WARMUP_FRAMES } from "../../render/snowFrameTiming.mjs";
 
-const cli = parseOrExit("takeSnowFrameTiming", { values: { "--sizes": "string", "--frames": "number", "--warmup": "number", "--out": "path", "--shadow-res": "number", "--terms": "string" }, flags: ["--passes", "--shadow-sweep", "--bracket", "--ablate", "--taa-hw"] });
-const shadowRes = cli.values["--shadow-res"] ?? 0, wantPasses = cli.flags.has("--passes"), taaHw = cli.flags.has("--taa-hw"), shadowList = cli.flags.has("--shadow-sweep") ? [2048, 1024, 512] : [shadowRes], frames = cli.values["--frames"] ?? TIMED_FRAMES, warmup = cli.values["--warmup"] ?? WARMUP_FRAMES;
+const cli = parseOrExit("takeSnowFrameTiming", { values: { "--sizes": "string", "--frames": "number", "--warmup": "number", "--out": "path", "--shadow-res": "number", "--terms": "string" }, flags: ["--passes", "--shadow-sweep", "--bracket", "--ablate", "--exact"] });
+const shadowRes = cli.values["--shadow-res"] ?? 0, wantPasses = cli.flags.has("--passes"), forms = cli.flags.has("--exact") ? EXACT_FORMS : {}, shadowList = cli.flags.has("--shadow-sweep") ? [2048, 1024, 512] : [shadowRes], frames = cli.values["--frames"] ?? TIMED_FRAMES, warmup = cli.values["--warmup"] ?? WARMUP_FRAMES;
 const sizes = cli.values["--sizes"] ? cli.values["--sizes"].split(",").map((s) => s.trim().split("x").map(Number)) : DEFAULT_SIZES.map((s) => [...s]);
 if (sizes.some((s) => s.length !== 2 || !s.every((v) => Number.isInteger(v) && v >= 16 && v <= 4096))) { console.error("[takeSnowFrameTiming] --sizes wants WIDTHxHEIGHT pairs, 16..4096 each, e.g. 320x180,1280x720"); exitCleanly(2); }
 if (shadowRes && !([256, 512, 1024, 1536, 2048, 4096].includes(shadowRes))) { console.error("[takeSnowFrameTiming] --shadow-res wants 256, 512, 1024, 1536, 2048 or 4096"); exitCleanly(2); }
@@ -47,7 +47,7 @@ const device = await adapter.requestDevice({ requiredFeatures: hasTs ? ["timesta
 const out = { generatedFrom: "tools/ship/takeSnowFrameTiming.mjs", at: new Date().toISOString(), platform: process.platform + " " + process.arch, adapter: name, frames, warmup, runs: [] };
 let bad = 0, first = null;
 for (const sr of shadowList) for (const [w, h] of sizes) {
-    const r = await timeFrames(device, { width: w, height: h, warmup, frames, shadowRes: sr, taaHwHistory: taaHw });
+    const r = await timeFrames(device, { width: w, height: h, warmup, frames, shadowRes: sr, ...forms });
     await new Promise((res) => setTimeout(res, 50));   // an uncaptured error arrives after the queue is idle
     if (r.errors.length) bad++;
     if (!first) first = { r, w, h, sr };
@@ -55,7 +55,7 @@ for (const sr of shadowList) for (const [w, h] of sizes) {
     if (r.errors.length) console.log("  FAIL  GPU errors at " + w + "x" + h + ": " + r.errors.slice(0, 3).join(" | ").slice(0, 300));
     let passRun = null;
     if (wantPasses && hasTs) {
-        passRun = await timeFrames(device, { width: w, height: h, warmup, frames, shadowRes: sr, passTimers: true, taaHwHistory: taaHw });
+        passRun = await timeFrames(device, { width: w, height: h, warmup, frames, shadowRes: sr, passTimers: true, ...forms });
         console.log("  ----  " + passLine(passRun, name, summarise(r.perFrame).median));
     }
     out.runs.push({ width: w, height: h, shadowRes: sr || 2048, passes: passRun ? Object.fromEntries(Object.entries(passRun.passes).map(([n, l]) => [n, summarise(l.map((v) => Math.max(v, 1e-6)))])) : null, perFrame: r.perFrame, encode: r.encode, batchedMs: r.batchedMs, batchedFrames: r.batchedFrames, errors: r.errors, summary: summarise(r.perFrame) });

@@ -58,8 +58,8 @@ export function parseTimingLine(line) {
  * Warm up, then time `frames` frames one at a time (latency) and `frames` more submitted back to back (throughput), on `device`, at width x height. `now` and `idle` are injectable so the rules are
  * driven on fixtures; live they are performance.now and device.queue.onSubmittedWorkDone. Returns the raw lists and the GPU errors the device raised (an uncaptured error is a failed frame, not a slow one).
  */
-export async function timeFrames(device, { width = 320, height = 180, warmup = WARMUP_FRAMES, warmupMs = WARMUP_MS, frames = TIMED_FRAMES, shadowRes, passTimers = false, ablate = [], hoistFine = false, coarseForms = false, taaHwHistory = false, now = () => performance.now(), idle = () => device.queue.onSubmittedWorkDone(), create = createSnowGpu } = {}) {
-    const g = await create(device, { canvas: null, width, height, ...(shadowRes ? { shadowRes } : {}), ...(passTimers ? { passTimers: true } : {}), ...(ablate.length ? { ablate } : {}), ...(hoistFine ? { hoistFine: true } : {}), ...(coarseForms ? { coarseForms: true } : {}), ...(taaHwHistory ? { taaHwHistory: true } : {}) });
+export async function timeFrames(device, { width = 320, height = 180, warmup = WARMUP_FRAMES, warmupMs = WARMUP_MS, frames = TIMED_FRAMES, shadowRes, passTimers = false, ablate = [], hoistFine, coarseForms, taaHwHistory, now = () => performance.now(), idle = () => device.queue.onSubmittedWorkDone(), create = createSnowGpu } = {}) {
+    const g = await create(device, { canvas: null, width, height, ...(shadowRes ? { shadowRes } : {}), ...(passTimers ? { passTimers: true } : {}), ...(ablate.length ? { ablate } : {}), ...(hoistFine !== undefined ? { hoistFine } : {}), ...(coarseForms !== undefined ? { coarseForms } : {}), ...(taaHwHistory !== undefined ? { taaHwHistory } : {}) });   // undefined = the shipped default
     let i = 0;
     const w0 = now();
     for (let k = 0; k < warmup || now() - w0 < warmupMs; k++, i++) { const o = orbitAt(i); await g.frame(1 / 60, o.focus, o.cam); await idle(); }
@@ -145,10 +145,12 @@ export const HOIST_TERM = "hoist";
 /** and item 3's: the detail layer fades out sooner and the haze skips the sky reads that cannot show (COARSE_FORMS; the picture differs slightly) */
 export const COARSE_TERM = "coarse";
 /** the terms of --ablate that remove nothing but turn a cheaper form ON: their "saves" is what the form is worth */
+/** the exact path, every cheaper form off: the baseline an --ablate form term is measured against (the shipped defaults have coarse forms and the hardware TAA history ON) */
+export const EXACT_FORMS = Object.freeze({ hoistFine: false, coarseForms: false, taaHwHistory: false });
 export const FORM_TERMS = Object.freeze({ [HOIST_TERM]: { hoistFine: true }, [COARSE_TERM]: { coarseForms: true } });
 /** Run the whole ablation on `device`: base, each term, base, ... base, each a pass-timed run at width x height; returns the sequence of beauty-pass medians for ablationRows. */
 export async function runAblation(device, { width, height, terms, warmup = WARMUP_FRAMES, frames = TIMED_FRAMES, shadowRes, run = timeFrames } = {}) {
-    const seq = [], one = async (name, ablate, form = {}) => { const r = await run(device, { width, height, warmup, frames, shadowRes, passTimers: true, ablate, ...form }); const b = r.passes && r.passes.beauty; if (!b || !b.length) throw new Error("runAblation: no beauty-pass time (this adapter has no timestamp-query?)"); seq.push({ name, beauty: summarise(b.map((v) => Math.max(v, 1e-6))).median }); };
+    const seq = [], one = async (name, ablate, form = {}) => { const r = await run(device, { width, height, warmup, frames, shadowRes, passTimers: true, ablate, ...EXACT_FORMS, ...form }); const b = r.passes && r.passes.beauty; if (!b || !b.length) throw new Error("runAblation: no beauty-pass time (this adapter has no timestamp-query?)"); seq.push({ name, beauty: summarise(b.map((v) => Math.max(v, 1e-6))).median }); };
     await one("base", []);
     for (const t of terms) { await (FORM_TERMS[t] ? one(t, [], FORM_TERMS[t]) : one(t, [t])); await one("base", []); }   // `hoist` removes nothing: it TURNS ON the vertex-stage fine fields, so its "saves" is what the hoist is worth
     return seq;
