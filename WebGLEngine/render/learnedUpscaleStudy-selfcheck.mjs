@@ -13,6 +13,10 @@
 // test seeds -> 1 red each; R67c the training command without its samples -> 2 red. Each restored byte-identical.
 // SECTION 156: V156a round 67's candidate typed 2, V156b its test's commit typed 881fd268, V156c H2's count typed 17, V156d U's mean
 // typed 2.154e-3 -> 1 red each. Each restored byte-identical.
+// SECTION 157: S1 round 68's R test seeds onto round 67's, S2 its variant "box", S3 the training without the variant, S4 C2 without
+// it, S5 H2 against bilinear, S6 the cache bypassed, S7 the EASU weight read off tap 0, S8 the test's commit read at the end, S9 the
+// prior not handed on, S10 the prior file round 68's own -> 1 red each; S11 the cache key without ref2 -> *** 0 RED at first ***, then
+// 1 with the key row added for it. Each restored byte-identical.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -85,7 +89,7 @@ console.log("\n4. THE COMMANDS");
     const cli = fs.readFileSync(path.join(ENG, "tools/denoiseStudy.mjs"), "utf8"), br = (flag) => { const b0 = cli.indexOf(`} else if (args.includes("${flag}")) {`); return b0 >= 0 ? cli.slice(b0, cli.indexOf("} else if (", b0 + 10)).replace(/\/\/.*$/gm, "") : ""; };
     const a = br("--harvest-upscale-train"), b = br("--harvest-upscale-test");
     ok("!! --harvest-upscale-train runs runUpscaleTraining under harvest, writes its round's file (render/upscale-net-r65.json, or r67's) and never an existing one, with every seed's net, C2's, the shipped sha-256 and the commit",
-        /runUpscaleTraining\(\{ splits: RD\.splits, sppRef: RD\.sppRef, net: decodeNet\(shipped\.net\), harvest: true/.test(a) && /path\.join\(ENG, RD\.net\)/.test(a) && /existsSync\(file\)/.test(a) && /c2: \{/.test(a) && /sha256/.test(a) && /commit: git/.test(a) && !/verdict/.test(a));
+        /runUpscaleTraining\(\{ splits: RD\.splits, sppRef: RD\.sppRef, net: decodeNet\(shipped\.net\), harvest: true/.test(a) && /path\.join\(ENG, RD\.net\)/.test(a) && /existsSync\(file\)/.test(a) && /c2: \{/.test(a) && /sha256/.test(a) && /commit: startCommit/.test(a) && /startCommit = git\("rev-parse"/.test(a) && !/verdict/.test(a));
     ok("!! --harvest-upscale-test reads the committed training file's candidate and C2's U, runs runUpscaleTest under harvest, writes its own file and never an existing one, and records both commits",
         /tr\.runs\.find\(\(x\) => x\.seed === tr\.candidate\)/.test(b) && /Uc2: decodeNet\(tr\.c2\.net\)/.test(b) && /harvest: true/.test(b) && /path\.join\(ENG, RD\.results\)/.test(b) && /existsSync\(file\)/.test(b) && /out\.commit = /.test(b) && /commit: tr\.commit/.test(b));
     // section 148's order -- this code, then the training harvest, then the test harvest: the test names the training file and the
@@ -143,6 +147,55 @@ console.log("\n6. ROUND 67 (section 155): THE SAME ROUND, 512-SAMPLE TARGETS, A 
     const mean = (a) => a.reduce((q, v) => q + v, 0) / a.length;
     ok("  ...and the tie it describes: U's mean display relMSE 2.254e-3 against EASU's 2.252e-3, the 2048-sample floor 2.48e-4 under every arm",
         Math.abs(mean(T.U) - 2.254e-3) < 5e-7 && Math.abs(mean(T.easu) - 2.252e-3) < 5e-7 && Math.abs(mean(T.floor) - 2.475e-4) < 5e-7 && T.floor.every((f, i) => f < 0.2 * T.easu[i]));
+}
+
+console.log("\n7. ROUND 68 (section 157): U_E -- EASU OFFERED AS A 17TH TAP, 32 WIDE -- ON NEW TEST SCENES, H2 AGAINST ROUND 67'S U");
+{
+    const R = LS.ROUND_UPSCALE_LEARNED_68, S = D.SPLITS_UPSCALE_LEARNED_68, old = new Set([...D.SPLITS_UPSCALE_LEARNED.T1.seeds, ...D.SPLITS_UPSCALE_LEARNED_67.T1.seeds]);
+    ok("!! ROUND_UPSCALE_LEARNED_68: round 67's training and validation scenes and samples, U_E's variant, 24 new test scenes (69000-69011 R, 70000-70011 C), round 67's net as H2's prior, its own two files",
+        S.train === D.SPLITS_UPSCALE_LEARNED.train && S.val === D.SPLITS_UPSCALE_LEARNED.val && R.splits === S && R.sppRef === 512 && R.sppRefTest === 2048 && R.variant === "easu" && R.round === 68 &&
+        S.T1.seeds.slice(0, 12).every((x, i) => x === 69000 + i && S.T1.families[i] === "R") && S.T1.seeds.slice(12).every((x, i) => x === 70000 + i && S.T1.families[12 + i] === "C") &&
+        S.T1.seeds.every((x) => D.isDatasetSeed(x) && !old.has(x)) && R.prior === LS.ROUND_UPSCALE_LEARNED_67.net && R.net === "render/upscale-net-r68.json" && R.results === "render/denoise-results-upscale-learned-r68.json" &&
+        ["image", "sppIn", "test", "c1Of", "c1Min", "seeds", "train"].every((k) => R[k] === LS.ROUND_UPSCALE_LEARNED_67[k]) &&
+        LS.ROUND_UPSCALE_LEARNED.variant === "box" && LS.ROUND_UPSCALE_LEARNED_67.variant === "box" && LS.ROUND_UPSCALE_LEARNED.round === 65 && LS.ROUND_UPSCALE_LEARNED_67.round === 67);
+    let bad = null; try { LS.upscaleRound(69); } catch (e) { bad = e.message; }
+    ok("  upscaleRound: 68 is round 68's, and 69 refused", LS.upscaleRound(68) === R && LS.upscaleRound(67) === LS.ROUND_UPSCALE_LEARNED_67 && /no round 69 -- 65, 67 or 68/.test(bad || ""));
+    const os = await import("node:os"), { openCache } = await imp("render/denoiseCache.mjs"), dir = fs.mkdtempSync(path.join(os.tmpdir(), "up68-"));
+    const opt = { splits: mini, net, W: 32, sppIn: 2, sppRef: 4, seeds: [1, 2], train: { steps: 6, batch: 2, crop: 16 }, variant: "easu" };
+    const c1 = openCache(dir, { t: 68 }), e1 = LS.runUpscaleTraining({ ...opt, cache: c1 }), c2 = openCache(dir, { t: 68 }), e2 = LS.runUpscaleTraining({ ...opt, cache: c2 });
+    const same = (a, b) => a.layers.every((L, i) => L.W.every((v, j) => Object.is(v, b.layers[i].W[j])) && L.b.every((v, j) => Object.is(v, b.layers[i].b[j])));
+    ok("!! the training trains U_E -- 17 taps, 32 wide, EASU's logit at -8 before the first step -- for every seed and C2, and records the variant and its shape",
+        e1.runs.every((r) => r.net.layers[3].Cout === 17 && r.net.layers[0].Cout === 32) && e1.c2.net.layers[3].Cout === 17 && e1.config.variant === "easu" && e1.config.shape === U.UPE_SHAPE &&
+        same(U.trainUpscaler([0, 1, 2].map((i) => U.upscaleExample(mini.train.families[i], mini.train.seeds[i], net, { W: 32, H: 32, sppIn: 2, sppRef: 4 })), { seed: 1, steps: 6, batch: 2, crop: 16, variant: "easu" }).net, e1.runs[0].net));
+    ok("!! ...and its examples come from the cache when it holds them: a second run reads all four back (none rendered) and trains the same nets bit for bit",
+        c1.misses === 4 && c1.hits === 0 && c2.hits === 4 && c2.misses === 0 && e1.candidate === e2.candidate && e1.runs.every((r, i) => same(r.net, e2.runs[i].net) && Object.is(r.valMean, e2.runs[i].valMean)) && same(e1.c2.net, e2.c2.net),
+        `first ${c1.misses} rendered, second ${c2.hits} read`);
+    // sabotage S11 (the key without ref2) went 0 red before this row: a test example, with its second reference, and a training
+    // example of the same scene would share one record
+    const base = { W: 32, sppIn: 2, sppRef: 4, ref2: false, harvest: false }, k0 = LS.exampleKey("R", 1, base);
+    ok("  the cache's key names everything an example depends on: family, seed, size, both sample counts, the second reference, harvest",
+        [LS.exampleKey("C", 1, base), LS.exampleKey("R", 2, base), LS.exampleKey("R", 1, { ...base, W: 64 }), LS.exampleKey("R", 1, { ...base, sppIn: 4 }), LS.exampleKey("R", 1, { ...base, sppRef: 8 }),
+         LS.exampleKey("R", 1, { ...base, ref2: true }), LS.exampleKey("R", 1, { ...base, harvest: true })].every((k, i, all) => k !== k0 && all.indexOf(k) === i));
+    const Ue = e1.runs.find((r) => r.seed === e1.candidate).net, Up = tr.runs.find((r) => r.seed === tr.candidate).net;
+    const out = LS.runUpscaleTest({ splits: mini, net, U: Ue, Uc2: e1.c2.net, Uprior: Up, round: 68, W: 32, sppIn: 2, sppRef: 4, c1Min: 2 });
+    const ex = U.upscaleExample("R", 990934, net, { W: 32, H: 32, sppIn: 2, sppRef: 4, ref2: true }), g = (y) => LS.gradeDisplay(y, ex);
+    const { effects } = await imp("render/denoiseStats.mjs"), mean = (xs) => xs.reduce((q, v) => q + v, 0) / xs.length;
+    ok("!! the test grades U_E's chain and round 67's U's on the same scene, bit for bit, and H2 is U_E against the prior -- bilinear only a secondary",
+        Object.is(out.tables.U[0], g(U.upscaleChain(Ue, ex))) && Object.is(out.tables.prior[0], g(U.upscaleChain(Up, ex))) &&
+        Math.abs(out.verdict.hypotheses.H2.meanD - mean(effects(out.tables.prior, out.tables.U))) < 1e-15 && Math.abs(out.verdict.hypotheses.H1.meanD - mean(effects(out.tables.easu, out.tables.U))) < 1e-15 &&
+        out.secondary.bilinear.length === 2 && out.verdict.controls.C2.citedFrom === 68, `H2 ${out.verdict.hypotheses.H2.meanD}`);
+    const w = U.learnedUpscale(Ue, ex.x, ex.half, ex.w, ex.h, ex.easuUp).w; let sw = 0; for (let p = 0; p < 32 * 32; p++) sw += w[p * 17 + 16];
+    ok("  ...and P4's figure, the mean weight on EASU's tap, is recorded per scene from U_E's own softmax -- none for round 65's U",
+        Math.abs(out.secondary.easuWeight[0] - sw / 1024) < 1e-15 && out.secondary.easuWeight.length === 2 && LS.easuWeight(Up, ex) === null, `scene 1 ${out.secondary.easuWeight[0]}`);
+    fs.rmSync(dir, { recursive: true, force: true });
+    const cli = fs.readFileSync(path.join(ENG, "tools/denoiseStudy.mjs"), "utf8"), br = (flag) => { const b0 = cli.indexOf(`} else if (args.includes("${flag}")) {`); return b0 >= 0 ? cli.slice(b0, cli.indexOf("} else if (", b0 + 10)).replace(/\/\/.*$/gm, "") : ""; };
+    const a = br("--harvest-upscale-train"), b = br("--harvest-upscale-test");
+    ok("!! *** both commands record the commit they STARTED at (section 157): rev-parse before the harvest runs, that value written -- never HEAD read after ***",
+        a.indexOf("startCommit = git(\"rev-parse\"") >= 0 && a.indexOf("startCommit = git(\"rev-parse\"") < a.indexOf("LS.runUpscaleTraining(") && /commit: startCommit/.test(a) && (a.match(/rev-parse/g) || []).length === 1 &&
+        b.indexOf("startCommit = git(\"rev-parse\"") >= 0 && b.indexOf("startCommit = git(\"rev-parse\"") < b.indexOf("LS.runUpscaleTest(") && /out\.commit = startCommit;/.test(b) && (b.match(/rev-parse/g) || []).length === 1);
+    ok("!! ...the training hands on the round's variant and the cache; the test reads the prior file's candidate, and hands on it, the round and the cache",
+        /harvest: true, variant: RD\.variant, cache,/.test(a) && /RD\.prior \? JSON\.parse\(fs\.readFileSync\(path\.join\(ENG, RD\.prior\)/.test(b) && /pr\.runs\.find\(\(x\) => x\.seed === pr\.candidate\)\.net/.test(b) &&
+        /Uprior, round: RD\.round, harvest: true, cache,/.test(b) && /round: RD\.round/.test(a) && /out\.round = RD\.round;/.test(b) && /function upscaleCache\(args, git, results\)/.test(cli));
 }
 
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)`);

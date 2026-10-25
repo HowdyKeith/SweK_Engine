@@ -27,6 +27,7 @@
 //       node tools/denoiseStudy.mjs --harvest-upscale-train     FSR4 round 65: U trained, the candidate chosen (section 148)
 //                                                  -> render/upscale-net-r65.json
 //       node tools/denoiseStudy.mjs --harvest-upscale-test      FSR4 round 65: the 24 test scenes -> render/denoise-results-upscale-learned.json
+//                                                  (either with --round 67 or 68 for sections 155 and 157, and --cache <dir> to resume)
 //       node tools/denoiseStudy.mjs --harvest-r47  round 11 with the network 16 channels wide, the 32-channel one beside it (section 116) -> render/denoise-results-r47.json
 //       node tools/denoiseStudy.mjs --harvest-r11  one large network trained on families R and C together (section 32) -> render/denoise-results-r11.json
 //       node tools/denoiseStudy.mjs --secondary-r11  round 11 again, for section 32's secondary the first run skipped (section 33)
@@ -70,6 +71,12 @@ import crypto from "node:crypto";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
+/** FSR4's harvests (section 157): --cache <dir>, stamped by the results file, the commit and the uncommitted diff, so an interrupted run resumes. */
+function upscaleCache(args, git, results) {
+    const at = args.indexOf("--cache"), dir = at >= 0 ? args[at + 1] : null;
+    if (at >= 0 && !dir) { console.log("[denoiseStudy] --cache needs a directory"); process.exit(2); }
+    return dir ? openCache(path.resolve(dir), { results, commit: git("rev-parse", "HEAD").trim(), diff: hashArrays([git("diff", "HEAD", "--", "render", "brain", "physics", "tools/denoiseStudy.mjs")]) }) : null;
+}
 
 if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
     const args = process.argv.slice(2);
@@ -304,11 +311,13 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
         if (fs.existsSync(file)) { console.log(`[denoiseStudy] ${RD.net} exists -- a harvest's results are never overwritten`); process.exit(2); }
         const bytes = fs.readFileSync(path.join(ENG, SHIPPED_NET)), shipped = JSON.parse(bytes.toString("utf8"));
         const git = (...a) => execFileSync("git", a, { cwd: ENG, encoding: "utf8", maxBuffer: 1 << 28 });
-        const r = LS.runUpscaleTraining({ splits: RD.splits, sppRef: RD.sppRef, net: decodeNet(shipped.net), harvest: true, log: (m) => console.log("[denoiseStudy] " + m) });
+        // section 157: the commit this harvest STARTED at, which is the code it loaded -- not the HEAD when it finished
+        const startCommit = git("rev-parse", "--short=8", "HEAD").trim(), cache = upscaleCache(args, git, RD.net);
+        const r = LS.runUpscaleTraining({ splits: RD.splits, sppRef: RD.sppRef, net: decodeNet(shipped.net), harvest: true, variant: RD.variant, cache, log: (m) => console.log("[denoiseStudy] " + m) });
         const out = { candidate: r.candidate, runs: r.runs.map((x) => ({ seed: x.seed, valMean: x.valMean, val: x.val, losses: x.losses, net: enc(x.net) })),
                       c2: { seed: r.c2.seed, shuffle: r.c2.shuffle, losses: r.c2.losses, net: enc(r.c2.net) }, config: r.config, ms: r.ms,
-                      shipped: { file: SHIPPED_NET, sha256: crypto.createHash("sha256").update(bytes).digest("hex") }, commit: git("rev-parse", "--short=8", "HEAD").trim(),
-                      round: RD === LS.ROUND_UPSCALE_LEARNED_67 ? 67 : 65 };
+                      shipped: { file: SHIPPED_NET, sha256: crypto.createHash("sha256").update(bytes).digest("hex") }, commit: startCommit,
+                      round: RD.round, ...(cache ? { cache: { hits: cache.hits, misses: cache.misses } } : {}) };
         fs.writeFileSync(file, JSON.stringify(out, (k, v) => (v instanceof Float64Array ? Array.from(v) : v), 1) + "\n");
         console.log(`[denoiseStudy] wrote ${RD.net}`);
     } else if (args.includes("--harvest-upscale-test")) {
@@ -320,11 +329,16 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
         const tr = JSON.parse(fs.readFileSync(path.join(ENG, RD.net), "utf8")), cand = tr.runs.find((x) => x.seed === tr.candidate);
         const bytes = fs.readFileSync(path.join(ENG, SHIPPED_NET)), shipped = JSON.parse(bytes.toString("utf8"));
         const git = (...a) => execFileSync("git", a, { cwd: ENG, encoding: "utf8", maxBuffer: 1 << 28 });
-        const out = LS.runUpscaleTest({ splits: RD.splits, sppRef: RD.sppRefTest ?? RD.sppRef, net: decodeNet(shipped.net), U: decodeNet(cand.net), Uc2: decodeNet(tr.c2.net), harvest: true, log: (m) => console.log("[denoiseStudy] " + m) });
+        const startCommit = git("rev-parse", "--short=8", "HEAD").trim(), cache = upscaleCache(args, git, RD.results);
+        // section 157: round 68's H2 is U_E against round 67's candidate U, read from its committed training file
+        const pr = RD.prior ? JSON.parse(fs.readFileSync(path.join(ENG, RD.prior), "utf8")) : null, Uprior = pr ? decodeNet(pr.runs.find((x) => x.seed === pr.candidate).net) : null;
+        const out = LS.runUpscaleTest({ splits: RD.splits, sppRef: RD.sppRefTest ?? RD.sppRef, net: decodeNet(shipped.net), U: decodeNet(cand.net), Uc2: decodeNet(tr.c2.net), Uprior, round: RD.round, harvest: true, cache, log: (m) => console.log("[denoiseStudy] " + m) });
         out.trained = { file: RD.net, candidate: tr.candidate, commit: tr.commit };
-        out.round = RD === LS.ROUND_UPSCALE_LEARNED_67 ? 67 : 65;
+        if (pr) out.prior = { file: RD.prior, candidate: pr.candidate, commit: pr.commit };
+        out.round = RD.round;
         out.shipped = { file: SHIPPED_NET, sha256: crypto.createHash("sha256").update(bytes).digest("hex") };
-        out.commit = git("rev-parse", "--short=8", "HEAD").trim();
+        out.commit = startCommit;
+        if (cache) out.cache = { hits: cache.hits, misses: cache.misses };
         fs.writeFileSync(file, JSON.stringify(out, (k, v) => (v instanceof Float64Array ? Array.from(v) : v), 1) + "\n");
         console.log(`[denoiseStudy] wrote ${RD.results}`);
     } else if (round) {

@@ -10258,3 +10258,51 @@ Each is committed byte for byte before the next runs. Section 156 is the verdict
 - What could change that is a design, not a re-read: a wider network, more training scenes, temporal input as FSR4's own
   network takes. Each would be its own round, and Keith's call.
 - EASU stays the chain's upscale.
+
+## 157. FSR4 ROUND 68 -- A LEARNED KERNEL OFFERED EASU, WIDER: FIXED BEFORE ITS CODE AND ITS SCENES
+
+**Why.** Section 156 found round 67's U, a 4 x 4 kernel learned from a box, equal to EASU and no better. Keith asked for a
+different FSR4 design. The one fixed here changes two things:
+- **what U can choose from:** EASU's own output at the pixel, as a 17th tap beside the sixteen half-size texels. Where EASU is
+  right, U can take it; where it is wrong, U can leave it;
+- **how much it can hold:** 32 channels, not 16.
+
+**A pilot, before this was fixed (synthetic discs, 300 steps, seeds 1-3, flat and textured).** The first draft of this section
+started U_E **at** EASU: the 17th logit biased +8, 99.47 % of every pixel on EASU. It never left it -- every run ended at EASU's
+error to four digits. Biases of 0 and -1.5, and once -3, fell into the same place: all weight on EASU's tap, the sixteen's
+gradient gone with it. A bias of **-8** (the start the box, 2.1e-5 on EASU) fell into it in none of six runs, beat EASU in all
+six, and ended with 36-47 % of the weight on EASU's tap. So that is the start fixed here, and a gate row holds the +8 failure.
+
+**The network, U_E (render/learnedUpscale.mjs).**
+- The same 12-channel input. Three 3 x 3 layers of **32**, then a 1 x 1 head of **17** logits.
+- The softmax runs over U's sixteen half-size taps **and EASU's own light-free output at the pixel**, the 17th.
+- At the start the head's weights are zero and the 17th logit's bias is -8: round 67's box start, with e^-8 / (16 + e^-8) =
+  2.1e-5 on EASU. A gate row holds the figure.
+- The pixel is still a convex mix of what EASU and the half-size frame give, so it adds no light that neither has.
+
+**Training, as round 67's (section 155).**
+- The same 200 + 20 scenes at 512 samples, seeds 1-3, the candidate chosen by validation, C2's U_E on shuffled targets.
+- The examples can be cached on disk (`--cache <dir>`, render/denoiseCache.mjs, keyed by scene, size and samples, the directory
+  stamped by the results file and the commit), so an interrupted harvest resumes where it stopped and renders nothing twice.
+- The results go to render/upscale-net-r68.json.
+
+**The test.**
+- **24 new scenes:** 12 R (69000-69011) and 12 C (70000-70011), against two 2048-sample references.
+- **H1:** U_E's chain beats EASU's.
+- **H2:** U_E's chain beats round 67's U (render/upscale-net-r67.json's candidate) on the same scenes. That says whether the
+  design moved anything.
+- Display space, the sign-flip test, Holm, C1-C5 as before (C1 at 22 of 24, C2 the shuffled U_E against EASU).
+- The results go to render/denoise-results-upscale-learned-r68.json.
+
+**A change to the harvests' bookkeeping, fixed now.** The upscale harvests record the commit they **started at**, not the
+HEAD when they finished. They load their code at the start, so that is the commit that ran, and work committed during a
+harvest no longer misattributes its results. A gate row reads it off the command.
+
+**Predictions, fixed now, deciding nothing.**
+- **P1:** C1 and C3 hold.
+- **P2:** H1 is supported, by a mean d under 0.05. The synthetic pilot's margin was large, but round 67 says the path tracer's
+  frames leave EASU less to fix.
+- **P3:** H2 is supported.
+- **P4:** the trained U_E puts between 20 % and 80 % of its weight on EASU's tap on the mean (the pilot: 36-47 %).
+
+Section 158 is the verdict.

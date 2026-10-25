@@ -13,6 +13,8 @@
 // not zeroed -> 1 red (the box); U5 the crop's pad 1 -> 3 red (NaN); U6 the x phase flipped -> 2 red; U7 the loss in linear
 // radiance -> 3 red (U7 had no row of its own before it was run: the gradient check stays consistent with whichever loss it is
 // given, so the definition row was added for it); U8 the crop's composite without E -> 1 red.
+// SECTION 157 (U_E): E1 EASU's logit back at +8 -> 2 red; E2 the 17th tap read from the half frame -> 2 red; E3 the head not
+// zeroed -> 1 red; E4 the first layer 16 wide -> 2 red; E5 the crop's EASU halved -> 2 red. Each restored byte-identical.
 "use strict";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -107,6 +109,41 @@ console.log("\n4. THE TRAINING");
     const learned = test.map((t) => score(t, U.learnedUpscale(a.net, t.x, t.half, t.w, t.h).y)), bilinear = test.map((t) => { const y = new Float64Array(32 * 32 * 3);
         for (let p = 0; p < 1024; p++) for (let c = 0; c < 3; c++) y[p * 3 + c] = t.x[p * 12 + c]; return score(t, y); });
     ok("!! ...and on two held-out frames of known truth it beats the bilinear upsample it is fed, in display space", learned.every((v, i) => v < bilinear[i]), learned.map((v, i) => `${v.toExponential(2)} against ${bilinear[i].toExponential(2)}`).join("; "));
+}
+
+console.log("\n5. ROUND 68 (section 157): U_E, A LEARNED CORRECTION OF EASU");
+{
+    const { upscale } = await imp("render/denoiseUpscale.mjs"), withEasu = (sc) => ({ ...sc, easuUp: upscale(sc.half, sc.w, sc.h, 2 * sc.w, 2 * sc.h, "easu") });
+    const s = withEasu(scene(16, 12, 21)), u0 = U.makeUpscalerE(4), r0 = U.learnedUpscale(u0, s.x, s.half, s.w, s.h, s.easuUp), K = U.UPE_TAPS;
+    const wE = Math.exp(U.UPE_EASU_BIAS) / (16 + Math.exp(U.UPE_EASU_BIAS));
+    let worstW = 0, worstY = 0; for (let p = 0; p < 16 * 12; p++) { worstW = Math.max(worstW, Math.abs(r0.w[p * K + 16] - wE));
+        const T = U.upTaps(p % 16, (p / 16) | 0, 8, 6); for (let c = 0; c < 3; c++) { const box = Array.from(T).reduce((q, i) => q + s.half[i * 3 + c], 0) / 16;
+            worstY = Math.max(worstY, Math.abs(r0.y[p * 3 + c] - (wE * s.easuUp[p * 3 + c] + (1 - wE) * box))); } }
+    ok("!! an untrained U_E -- the head zero, EASU's logit biased -8 -- is round 67's box start, with e^-8 / (16 + e^-8) = 2.10e-5 of every pixel on EASU's own output",
+        U.UPE_TAPS === 17 && U.UPE_EASU_BIAS === -8 && Math.abs(wE - 2.0966e-5) < 1e-9 && worstW < 1e-14 && worstY < 1e-13 && U.UPE_SHAPE[0][1] === 32 && U.UPE_SHAPE[3][1] === 17,
+        `weight on EASU ${wE.toExponential(4)}; worst ${worstY.toExponential(2)}`);
+    let refused = null; try { U.learnedUpscale(u0, s.x, s.half, s.w, s.h); } catch (e) { refused = e.message; }
+    ok("  ...and U_E without EASU's output is refused, not run on a missing tap", /pass easuUp/.test(refused || ""));
+    const g8 = withEasu(scene(8, 8, 23)), net = U.makeUpscalerE(5);
+    net.layers.forEach((L, li) => { const r = seededRandom(30 + li); for (let i = 0; i < L.W.length; i++) L.W[i] += 0.05 * (r.u() - 0.5); });
+    for (let p = 0; p < 64; p++) if (p % 7 === 0) { g8.cov[p] = 0.4; for (let c = 0; c < 3; c++) g8.E[p * 3 + c] = 0.6; }
+    const G = U.upLossAndGrads(net, g8.x, g8.half, g8.w, g8.h, g8.ref, g8.cov, g8.E, g8.easuUp), L = () => U.upLossAndGrads(net, g8.x, g8.half, g8.w, g8.h, g8.ref, g8.cov, g8.E, g8.easuUp).loss;
+    let worst = 0;
+    for (const [li, wi] of [[0, 9], [1, 500], [2, 3000], [3, 16], [3, 16 * 32 + 5], [3, 540]]) { const Wt = net.layers[li].W, keep = Wt[wi], e = 1e-5; Wt[wi] = keep + e; const a1 = L(); Wt[wi] = keep - e; const b1 = L(); Wt[wi] = keep;
+        const fd = (a1 - b1) / (2 * e), an = G.grads[li].dW[wi]; worst = Math.max(worst, Math.abs(fd - an) / Math.max(1e-9, Math.abs(fd) + Math.abs(an))); }
+    ok("!! U_E's gradient, through EASU's tap as well as the sixteen, matches central differences (step 1e-5: the head's entries are ~1e-6, below 1e-6's roundoff) in every layer within 1e-5 relative", worst < 1e-5, `worst ${worst.toExponential(2)}`);
+    const C8 = U.cropLoss(net, g8, 0, 0, 8); let gd = 0; C8.grads.forEach((q, i) => q.dW.forEach((v, j) => { gd = Math.max(gd, Math.abs(v - G.grads[i].dW[j])); }));
+    ok("  ...and a crop of the whole frame gives the whole frame's loss and gradients, EASU's tap cropped with it", Math.abs(C8.loss - G.loss) < 1e-15 && gd < 1e-15);
+    const ex = [5, 6, 7, 8].map((k) => withEasu(scene(32, 32, 300 + k))), test = [withEasu(scene(32, 32, 400)), withEasu(scene(32, 32, 401))];
+    const run = (steps) => U.trainUpscaler(ex, { seed: 3, steps, batch: 2, crop: 16, variant: "easu" }), a0 = run(20), b0 = run(20), a = run(300);
+    ok("  U_E trains deterministically by seed", a0.net.layers.every((Lr, i) => Lr.W.every((v, j) => Object.is(v, b0.net.layers[i].W[j]))) && a.net.layers[3].Cout === 17);
+    const disp = (y) => Float64Array.from(y, toPerceptual), score = (t, y) => relMSE(disp(y), disp(t.ref));
+    const learned = test.map((t) => score(t, U.learnedUpscale(a.net, t.x, t.half, t.w, t.h, t.easuUp).y)), easu = test.map((t) => score(t, t.easuUp));
+    ok("!! ...and on two held-out frames of known truth 300 steps from the box start beat EASU, the tap it is offered, in display space", learned.every((v, i) => v < easu[i]), learned.map((v, i) => `${v.toExponential(3)} against ${easu[i].toExponential(3)}`).join("; "));
+    const stuck = U.trainUpscaler(ex, { seed: 3, steps: 300, batch: 2, crop: 16, variant: "easu", easuBias: 8 }).net, atE = test.map((t) => score(t, U.learnedUpscale(stuck, t.x, t.half, t.w, t.h, t.easuUp).y));
+    ok("  ...where the same 300 steps from a start at EASU (its logit +8) never leave it, to 3 digits -- section 157's pilot, why U_E starts from the box", atE.every((v, i) => Math.abs(v - easu[i]) < 1e-3 * easu[i]), atE.map((v, i) => `${v.toExponential(3)} against ${easu[i].toExponential(3)}`).join("; "));
+    let bad = null; try { U.trainUpscaler([scene(16, 16, 1)], { seed: 1, steps: 1, batch: 1, crop: 16, variant: "easu" }); } catch (e) { bad = e.message; }
+    ok("  ...and U_E's training refuses examples without EASU's output, and the variant is box or easu", /carry easuUp/.test(bad || "") && U.UP_VARIANTS.join() === "box,easu");
 }
 
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +

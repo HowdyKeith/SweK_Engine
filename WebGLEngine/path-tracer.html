@@ -300,6 +300,32 @@
     </div>
   </div>
 
+
+  <h2 style="margin-top:34px">Frame generation, live &mdash; FSR3's half-way frame between two traced ones</h2>
+  <p class="sub" style="max-width:760px">
+    The camera orbits one of the denoiser arc's scenes. Each <b>real</b> frame is path traced in a worker, with the scene's own
+    motion field from the frame before; between two real frames the page <b>generates</b> the half-way one
+    (<code>render/frameGenLive.mjs</code>: <code>interpolateFrameCPU</code>, indexed by the newer frame, round 66's scaled fill,
+    the holes it leaves cross-faded). <code>render/framePacer.mjs</code>'s midpoint policy puts it up when its newer frame is
+    ready and the newer frame half a real interval later, on <code>requestAnimationFrame</code>'s own clock. The orbit moves a
+    fixed 3&deg; a real frame, so it turns as fast as the tracer traces. Generation adds images, not tracing: headless
+    Chromium on this repo's container measured 32.8 new images a second without it and 49.5 with it, at 2 spp &mdash; the line
+    below reports your own.
+  </p>
+  <div class="wrap">
+    <div><canvas id="fgcv" width="128" height="128" style="width:100%;max-width:384px;height:auto"></canvas>
+      <div id="fgprog" class="sub" style="margin-top:6px">idle</div></div>
+    <div class="panel">
+      <label>Samples per pixel <span id="fgsppv" class="sub"></span></label>
+      <input id="fgspp" type="range" min="1" max="8" value="2" style="width:220px" />
+      <label><input id="fggen" type="checkbox" checked /> generate the half-way frame (off: the real frames alone)</label>
+      <p><button id="fggo">Start</button> <button id="fgstop">Stop</button></p>
+      <div id="fgout" class="sub" style="margin-top:10px;white-space:pre;font-family:ui-monospace,monospace"></div>
+      <div class="note">Graded by render/frameGenLive-selfcheck.mjs: against a frame traced at the half-way eye, the generated
+        frame is nearer than the older frame held and than the cross-fade.</div>
+    </div>
+  </div>
+
 <script type="module">
 import { render, coverage } from "/physics/render/pathTracer.mjs";
 import { buildTable as mkT } from "/physics/render/energyCompensation.mjs";
@@ -887,6 +913,57 @@ $("ebgo").onclick = () => {
   im.data.set(head.data); cx.putImageData(im, 0, 0);
   $("ebprog").textContent = "headlit sphere shown";
   $("ebout").textContent = out;
+};
+</script>
+<script type="module">
+// backlog denoise-framegen-page: FSR3's frame generation on the path tracer's own frames, paced on the browser's clock
+import { LIVE, makeLiveFrameGen, toBytes } from "/render/frameGenLive.mjs";
+import { makeLivePacing, refreshFromStamps } from "/render/framePacer.mjs";
+const $ = (id) => document.getElementById(id);
+const fgctx = $("fgcv").getContext("2d"), fgImg = fgctx.createImageData(LIVE.w, LIVE.h);
+$("fgspp").oninput = () => { $("fgsppv").textContent = $("fgspp").value; }; $("fgspp").oninput();
+let fg = null;
+function fgStop() { if (!fg) return; fg.stop = true; fg.worker.terminate(); $("fgprog").textContent = "stopped"; fg = null; }
+$("fgstop").onclick = fgStop;
+$("fggo").onclick = () => {
+  fgStop();
+  const run = fg = { stop: false, stamps: [], view: null, live: makeLivePacing(), k: 0, sent: 0, traceMs: 0,
+                     worker: new Worker("/render/frameGenLive-worker.mjs", { type: "module" }), spp: +$("fgspp").value };
+  // a real frame is asked for when the last one comes back -- traced back to back, as the pacer's schedule assumes
+  const ask = () => { run.sent = performance.now(); run.worker.postMessage({ k: run.k, spp: run.spp }); };
+  run.worker.onmessage = (e) => {
+    if (run.stop) return;
+    const job = e.data, ready = performance.now();
+    run.traceMs = job.ms;
+    if (run.view) { run.view.real(job, run.sent, ready); run.live.real(job.k, run.sent, ready); run.k++; }
+    ask();
+  };
+  $("fgprog").textContent = "measuring the refresh...";
+  let lastOut = 0;
+  function fgTick(stamp) {
+    if (run.stop) return;
+    if (!run.view) {
+      // the refresh first, from the browser's own timestamps; then the real frames start
+      run.stamps.push(stamp);
+      if (run.stamps.length === 20) { run.view = makeLiveFrameGen({ refresh: refreshFromStamps(run.stamps), generate: $("fggen").checked }); ask(); $("fgprog").textContent = "running"; }
+      requestAnimationFrame(fgTick); return;
+    }
+    const s = run.view.at(stamp);
+    if (s.frame) { toBytes(s.frame, LIVE.w, LIVE.h, fgImg.data); fgctx.putImageData(fgImg, 0, 0); }
+    run.live.tick(stamp, s.kind === "hold" && s.k < 0 ? null : s);
+    if (stamp - lastOut > 500) {
+      lastOut = stamp;
+      let line = `refresh ${run.view.pacer.refresh.toFixed(2)} ms, a real frame traced in ${run.traceMs.toFixed(0)} ms (${run.spp} spp, ${LIVE.w} x ${LIVE.h})\n` +
+                 `real frames ${run.k}, generated ${run.view.generated}`;
+      try { const m = run.live.metrics(2000);
+        const reals = run.live.shown.filter((q) => q.kind === "real" && q.time > stamp - 2000).length / 2;
+        line += `\nover 2 s: ${m.newPerSecond.toFixed(1)} new images/s from ${reals.toFixed(1)} real frames/s, judder ${m.judder.toFixed(1)} ms, latency ${m.meanLatency.toFixed(0)} ms` +
+                (s.kind === "gen" ? `\nthis refresh: generated, ${s.holes} holes cross-faded` : ""); } catch { line += "\n(collecting two seconds of refreshes)"; }
+      $("fgout").textContent = line;
+    }
+    requestAnimationFrame(fgTick);
+  }
+  requestAnimationFrame(fgTick);
 };
 </script>
 </body>
