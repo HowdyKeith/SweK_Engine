@@ -157,4 +157,22 @@ Written and pushed before `tools/subVestibularTasks.mjs` exists or anything has 
 
 **Not decided here, left to the result:** whether the task found is a task worth a training run; that is Keith's call on the numbers, not this note's.
 
+### Run 1, 2026-10-25 (`node tools/subVestibularTasks.mjs`, 8 s; the tool exactly as first committed, 40 dives each, the autopilot and the four reflexes only, no circuit)
+**Self-tests:** the runner reproduces `subTask.fly()` on 12 scenarios (score, status, fingerprint): yes. Signs: a +y torque lowers the nose; a nose-down kick reads as a negative pitch rate; a right-hand hazard gives sideslip negative, roll rate and bank positive, and the "away" reflex turns left (the mirror for a left-hand hazard): all ok. **One FAILED: "the reflex never fires on the 10 nominal dives with no hazard."**
+
+**4b-P (autopilot alone, `TRAIN_SET`, clean mean score -0.5741):**
+
+| rung | 0 | 1 | 2 | 3 | 4 |
+|---|---|---|---|---|---|
+| cost, trim + kicks | 0.0136 | **0.0517** | 0.2124 | 1.0189 | 2.6591 |
+| trim only | 0.0118 | 0.0469 | 0.1722 | 0.8661 | 2.6254 |
+| kicks only | 0.0018 | 0.0059 | 0.0298 | 0.0864 | 0.1688 |
+| dives ended early | 0 | 0 | 0 | 5 | 15 |
+
+By the rule **the task is rung 1** (trim 1 kN m, kicks 0.1 rad/s), by a margin of 0.0017 over the floor. At that rung the trim does 0.0469 of the 0.0517 and the kicks 0.0059: the task is almost entirely the tonic part; the phasic part does not cost the autopilot anything worth the name until rung 3.
+
+**4b-E (autopilot and four reflexes, clean mean score -0.5312):** the hazard costs the autopilot 3.11 to 4.09 (it is hit in 38 to 40 of 40 dives at every rung; without the pulse's push 39 to 40, so the push does not dodge it). The best reflex recovers **0.41** of the cost at rung 0 (away, thrust +1: 21 hits; away, thrust -1: 33; toward +1: 38; toward -1: 24) and **0.01 or 0.00 at rungs 1 to 4**. By the rule **no rung qualifies and 4b-E is VOID.**
+
+**But the failed self-test says this VOID is not yet a statement about the hazard.** The trigger the note registered (the first tick on which the sideslip exceeds 0.08 rad) fires on the autopilot's own turn: on 7 of the 10 nominal dives the sideslip passes 0.08 within 24 to 43 ticks of the start (the dives turn up to 2 rad to a new heading; the peak is 0.14 to 0.32 rad) and stays over it for 300 to 1,030 ticks. The reflexes' one-shot 3 s hold is therefore spent in the first two seconds of those dives, 15 s or more before the hazard, and does nothing at the cue. Only seeds 2, 3 and 5 (12 of the 40 dives) never pass 0.08 without the cue. So Run 1 shows that **a reflex with THAT trigger cannot dodge the hazard; it shows nothing about a reflex that can see the cue.** (This was found by a self-test written to check that the reflex fires only on the cue, not by looking at the outcome; the outcome had already been printed when it was read, and that is said here.)
+
 NOT CHECKED: the four cited papers beyond the sentences quoted above; that the matrices agree with the skeletons and JSON files in the Source Data zip (listed, not opened); whether 5.5 dpf wiring is the right thing to model a pitch-hold task on; the Fish1 data terms (unread); the Mauthner identification.
