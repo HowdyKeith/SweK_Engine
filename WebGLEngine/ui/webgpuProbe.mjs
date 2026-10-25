@@ -205,6 +205,25 @@ export async function probeAdapter(env = {}) {
 }
 
 /**
+ * Which backend a three WebGPURenderer page should ask for. Consoles and TV browsers (Xbox Edge among them) ship a Chromium
+ * with WebGL2 and no navigator.gpu; the renderer already has a WebGL2 backend, so "no WebGPU" there means forceWebGL, not "give up".
+ * Pages that drive raw WebGPU compute (blobulator-gpu) have no such backend and keep their describeWebGPU gate.
+ * PURE: `webgl2` is a boolean the caller measured (a throwaway canvas getContext("webgl2")), so each environment is a literal here.
+ * @returns {{ backend: "webgpu"|"webgl2"|"none", forceWebGL: boolean, reason: string }}
+ */
+export async function pickRenderBackend(env = {}) {
+    const first = await probeAdapter(env);
+    if (first.available) return { backend: "webgpu", forceWebGL: false, reason: first.reason };
+    if (env.webgl2) return { backend: "webgl2", forceWebGL: true, reason: first.reason };
+    return { backend: "none", forceWebGL: false, reason: first.reason };
+}
+
+/** Caller-side measurement for pickRenderBackend's `webgl2`: true when a throwaway canvas yields a WebGL2 context. */
+export function hasWebGL2(doc = typeof document !== "undefined" ? document : null) {
+    try { return !!(doc && doc.createElement("canvas").getContext("webgl2")); } catch (e) { return false; }
+}
+
+/**
  * The options to hand navigator.gpu.requestAdapter for a power preference -- or none where the browser says it ignores one. Chrome on Windows logs "The powerPreference option is currently
  * ignored when calling requestAdapter() on Windows" (crbug.com/369219127) EVERY time a page names one, on every page that benchmarks: the preference did nothing there and the console
  * said so each load (Keith's rig, webgpu-bench.html). Where a preference IS honoured (Linux, macOS, ChromeOS) it travels unchanged; on Windows the adapter is whichever the OS's graphics
