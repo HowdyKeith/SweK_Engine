@@ -960,8 +960,9 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // And one more, tools/subDropout-selfcheck.mjs (the compass dropout), defining ok(n, c, d) once and naming first: gates 2128 -> 2129, usesOk 2107 -> 2108, definesOk 2099 -> 2100, nameFirst 1997 -> 1998 (read off the code).
     // And one more, tools/flyCx-selfcheck.mjs (the fly heading loop from the hemibrain export), defining ok(n, c, d) once and naming first: gates 2129 -> 2130, usesOk 2108 -> 2109, definesOk 2100 -> 2101, nameFirst 1998 -> 1999 (read off the code).
     // And two more, brain/pilotSubCircuitState-selfcheck.mjs (the stateful reservoir pilot) and tools/ship/trainSubState-selfcheck.mjs (the rung 4a study library and its command), each defining ok(n, c, d) once and naming first: gates 2130 -> 2132, usesOk 2109 -> 2111, definesOk 2101 -> 2103, nameFirst 1999 -> 2001 (read off the code: the gate reported exactly these four drifting).
-    gates: 2132, usesOk: 2111, definesOk: 2103, importsOk: 0,
-    distinctDefinitions: 45, nameFirst: 2001, condFirst: 99, unknownSignature: 11,
+    // And one more, tools/subNavigator-selfcheck.mjs (the dead-reckoning navigator and the rung 4a reference arm), defining ok(n, c, d) once and naming first: gates 2132 -> 2133, usesOk 2111 -> 2112, definesOk 2103 -> 2104, nameFirst 2001 -> 2002 (read off the code: the gate reported exactly these four drifting).
+    gates: 2133, usesOk: 2112, definesOk: 2104, importsOk: 0,
+    distinctDefinitions: 45, nameFirst: 2002, condFirst: 99, unknownSignature: 11,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([
