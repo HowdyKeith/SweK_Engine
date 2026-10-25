@@ -384,6 +384,13 @@ export const RECORD_HANDOVERS = Object.freeze([
         evidence: "boxId() reads linux-x64-4c-16gb-142c0d at v4880; the shared record still names 420793, captured by the v4877 round. " +
                   "The round's sweeps wrote tools/ship/sweep-timings.linux-x64-4c-16gb-142c0d.json and refused the shared record; " +
                   "that local file and its ledger are deleted at the handover, as at v4818, v4838 and v4850. 420793 held the record from v4877 to v4880." }),
+    // v4897 -- AND TO 420793, BECAUSE THE SANDBOX CAME BACK ON THE 2.80GHz HOST AND THE ROUND'S GATES HAD NOWHERE TO BE RECORDED. Nine new gates (the beauty-pass round's eight and the flight page's camera gate) were in no shared record:
+    // the first verdict read budgetEvidence at nine new against its handful of eight, declaredCost at one header against a shared reading, and the sweep's rotation and verdict wrote only sweep-timings.local.json. Keith chose the handover.
+    Object.freeze({ at: "v4897", from: "linux-x64-4c-16gb-142c0d", to: "linux-x64-4c-16gb-420793",
+        decidedBy: "Keith",
+        evidence: "Keith's answer \"This box, 420793\" to the record-owner question on 2026-10-25. boxId() reads linux-x64-4c-16gb-420793 at v4897; the shared record still named 142c0d, captured 2026-10-23T13:04Z. " +
+                  "The round's rotation (34 readings) and first verdict's sweep went to sweep-timings.local.json and refused the shared record; that local file and its ledger are deleted at the handover, as at v4818, v4838, v4850 and v4877. " +
+                  "142c0d held the record from v4880 to v4897." }),
 ]);
 
 /** The box that may write a record whose `host` reads `host`, after following every handover. */

@@ -259,5 +259,16 @@ ok("the ledger and the sweep it folds are paths beside the module, named",
     O.LEDGER_PATH === wantLedger && O.SWEEP_PATH === wantSweep,
     "O.LEDGER_PATH and O.SWEEP_PATH");
 
+// v4897 -- A BOX THAT DOES NOT OWN THE SHARED RECORD STILL OBSERVES. The writer folds every tools/ship/sweep-timings.<box>.json (the tracked per-box records, not the gitignored .local scratch) into what it merges, the shared file's entry
+// winning where both have one: nine gates a round added on a foreign box were seen to finish and were in no file the writer read, which made budgetEvidence read nine "new since the capture" against its handful of eight.
+// SABOTAGE (v4897): the fold's file pattern made to match nothing -> the writer-source row RED, and budgetEvidence-selfcheck red with it on a foreign box; restored.
+{
+    const src = fs.readFileSync(beside("observedGates.mjs"), "utf8");
+    const fold = /for \(const f of fs\.readdirSync\(HERE\)\.filter\(\(x\) => \/\^sweep-timings\\\.\[a-z0-9-\]\+\\\.json\$\/\.test\(x\) && x !== "sweep-timings\.local\.json"\)/.test(src);
+    const shared = /timings: \{ \.\.\.\(box\.timings \|\| \{\}\), \.\.\.\(sweep\.timings \|\| \{\}\) \}, codes: \{ \.\.\.\(box\.codes \|\| \{\}\), \.\.\.\(sweep\.codes \|\| \{\}\) \}/.test(src);
+    ok("!! the writer folds the tracked per-box sweep records (not the gitignored local scratch) into the ledger, the shared file's entry winning", fold && shared,
+        "an observation made on another box is still an observation made, and the ledger never erases one");
+}
+
 console.log("observedGates-selfcheck: " + (fails ? fails + " FAILED" : "all pass"));
 process.exit(fails ? 1 : 0);

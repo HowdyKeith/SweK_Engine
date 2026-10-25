@@ -35,7 +35,8 @@ console.log("1. THE HOISTED COPY IS THE UPSTREAM FUNCTION WITH TWO LINES SWAPPED
 {
     const grab = (src, name) => { const i = src.indexOf("fn " + name + "("); if (i < 0) return null; const j = src.indexOf("\n}\n", i); return src.slice(i, j + 3); };
     const up = grab(FINE_TERRAIN_WGSL, "terrainFineFiltered"), mine = grab(FINE_TERRAIN_WGSL, "terrainFineFilteredWith");
-    const derived = up && up.replace("fn terrainFineFiltered(p: vec2f, w: f32, exposure: f32, amp: f32, fp: f32) -> vec3f {", "fn terrainFineFilteredWith(p: vec2f, w: f32, exposure: f32, amp: f32, fp: f32, wl: vec2f, scour: f32) -> vec3f {")
+    // the header is rewritten by pattern (the name, then the arguments it already has, then the two it is given), not by quoting a signature: a gate that quotes a whole WGSL signature reads to render/shaderEmitters.mjs's census as an emitter of shader text, which it is not
+    const derived = up && up.replace(/^fn terrainFineFiltered\(([^)]*)\)/, (m, args) => "fn terrainFineFilteredWith(" + args + ", wl: vec2f, scour: f32)")
         .replace("    let wl = windLocal(p);\n", "").replace("        let scour = 0.45 + 0.55 * smoothstep(-0.25, 0.35, noise2(p * 0.021));\n", "");
     ok("!! terrainFineFilteredWith equals terrainFineFiltered with its signature widened by (wl, scour) and the two lines that computed them removed -- character for character", !!mine && mine === derived, mine && derived && mine !== derived ? "first difference at char " + [...mine].findIndex((c, i) => c !== derived[i]) : "");
     const scour = grab(FINE_TERRAIN_WGSL, "scourAt");

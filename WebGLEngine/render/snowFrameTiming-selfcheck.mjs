@@ -6,7 +6,7 @@
 // puts it in tools/ship/realGpuRun.mjs's native sweep: `realGpuRun.mjs --native --only render/` on the Windows rig runs it on D3D12, and the reading line it prints is the first honest look at what the frame costs
 // on a real GPU (the browser route there lands on the software adapter). On the software adapter the reading is a CPU's, and the line names the adapter so it cannot be mistaken.
 //
-// SABOTAGES, RESULTS BY NAME (each against render/snowFrameTiming.mjs, this gate run, restored identical):
+// SABOTAGES, RESULTS BY NAME (each against render/snowFrameTiming.mjs, this gate run, restored identical): 
 //   S1 the median of an even-length list takes the upper middle value         -> 2 RED: the even-list row, and the line's round trip (its median is read back wrong)
 //   S2 timeFrames leaves the warm-up out (no warm-up run)                      -> 2 RED: the fake-clock call-count row and the live frame-count row (7 frames expected, 6 run)
 //   S3 the latency list is the encode-only time                                -> 2 RED: the fake-clock row (latency must be encode PLUS the wait) and the live row (encode must sit below latency)
@@ -19,6 +19,8 @@
 //   S8 warm-up ignores the time (frame count only)                                 -> 1 RED: the warm-up row
 //   S9 the bracket's drift taken the wrong way round (start over end)             -> 1 RED: the bracket row
 //   S5 timingLine drops the adapter name                                       -> 3 RED: the line row, the round trip and the live row (a reading that does not say what ran is the 0.4 fps lie again)
+//   v4897, FOUR MORE (section 4b, the ablation run): S8 the baseline runs without EXACT_FORMS -> 1 RED (the exact-baseline row); S9 a form term sent to the shader ablation instead of turning its form on -> 2 RED (the term row and the arithmetic row);
+//   S10 the line always saying `without` -> 1 RED (the line row); S11 EXACT_FORMS with the coarse forms ON -> 2 RED (the exact-baseline row and the arithmetic row).
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -26,7 +28,7 @@ import { createRequire } from "node:module";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { resolveWebgpu, configureVulkanIcd, headlessGpuSkipReason, noteNativeAdapter, exitCleanly } from "../tools/ship/headlessGpu.mjs";
-import { summarise, timingLine, parseTimingLine, passLine, parsePassLine, bracketLine, parseBracketLine, PASS_ORDER, orbitAt, timeFrames, RADIUS, SPEED, WARMUP_FRAMES, WARMUP_MS, TIMED_FRAMES, DEFAULT_SIZES } from "./snowFrameTiming.mjs";
+import { summarise, timingLine, parseTimingLine, passLine, parsePassLine, bracketLine, parseBracketLine, PASS_ORDER, orbitAt, timeFrames, RADIUS, SPEED, WARMUP_FRAMES, WARMUP_MS, TIMED_FRAMES, DEFAULT_SIZES, runAblation, ablationRows, ablationLine, parseAblationLine, HOIST_TERM, COARSE_TERM, EXACT_FORMS, FORM_TERMS } from "./snowFrameTiming.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const require_ = createRequire(import.meta.url);
@@ -104,6 +106,21 @@ console.log("\n4. THE LOOP, DRIVEN ON A FAKE CLOCK");
         ok("the bracket line gives the first configuration's median at the start and at the end and the drift between them (8 -> 9.2 ms is +15%), and parses back", pb && pb.start === 8 && pb.end === 9.2 && pb.drift === 15 && pb.width === 320 && pb.shadowRes === 2048 && pb.adapter === "adapter x" && parseBracketLine("reading snowFrame: x") === null, b);
     }
     ok("the size is passed to the renderer with no canvas (a native device has none to present to), and the device's errors and triangle count come back", created && created.canvas === null && created.width === 64 && created.height === 32 && r.errors.length === 1 && r.triangles === 77);
+}
+
+console.log("\n4b. THE ABLATION RUN: THE EXACT PATH AS THE BASELINE, THE FORMS AS TERMS (snow-beauty-pass-cost)");
+{
+    const calls = [];
+    const fakeRun = async (dev, o) => { calls.push({ ablate: o.ablate, hoistFine: o.hoistFine, coarseForms: o.coarseForms, taaHwHistory: o.taaHwHistory }); const beauty = o.ablate.length ? 40 : o.hoistFine ? 50 : o.coarseForms ? 45 : 60; return { passes: { beauty: [beauty, beauty, beauty] } }; };
+    const seq = await runAblation({ queue: {} }, { width: 64, height: 32, terms: ["shadow", HOIST_TERM, COARSE_TERM], run: fakeRun });
+    ok("the sequence is base, term, base, term, base, term, base, in the order asked (" + seq.map((x) => x.name).join(", ") + ")", seq.map((x) => x.name).join() === "base,shadow,base,hoist,base,coarse,base");
+    ok("!! EVERY baseline run is the EXACT path (EXACT_FORMS: hoist, coarse forms and the hardware TAA history all off), because the shipped defaults have two of them ON and a baseline that already had the coarse forms would make that term read zero", calls.filter((_, i) => i % 2 === 0).every((c) => c.hoistFine === EXACT_FORMS.hoistFine && c.coarseForms === EXACT_FORMS.coarseForms && c.taaHwHistory === EXACT_FORMS.taaHwHistory) && EXACT_FORMS.coarseForms === false && EXACT_FORMS.hoistFine === false && EXACT_FORMS.taaHwHistory === false);
+    ok("a removal term compiles its shader term OUT and a form term turns its form ON and removes nothing: shadow ablates ['shadow'], hoist asks for hoistFine, coarse for coarseForms (FORM_TERMS names " + Object.keys(FORM_TERMS).join(" and ") + ")",
+        JSON.stringify(calls[1].ablate) === '["shadow"]' && calls[3].ablate.length === 0 && calls[3].hoistFine === true && calls[5].ablate.length === 0 && calls[5].coarseForms === true && FORM_TERMS[HOIST_TERM].hoistFine === true && FORM_TERMS[COARSE_TERM].coarseForms === true);
+    const rows = ablationRows(seq), by = Object.fromEntries(rows.map((r) => [r.term, r]));
+    ok("what each is worth is the baseline minus the variant: shadow saves 20 ms (60 to 40), hoist 10, coarse 15", Math.abs(by.shadow.saves - 20) < 1e-9 && Math.abs(by.hoist.saves - 10) < 1e-9 && Math.abs(by.coarse.saves - 15) < 1e-9);
+    const lines = rows.map((r) => ablationLine(64, 32, 2048, r, "fake")), back = lines.map(parseAblationLine);
+    ok("the line says `without` for a removal and `with` for a form, and both parse back to the same term and saving (" + lines[0].match(/; (with(?:out)? \w+)/)[1] + " / " + lines[1].match(/; (with(?:out)? \w+)/)[1] + ")", lines.some((l) => /; without shadow /.test(l)) && lines.some((l) => /; with hoist /.test(l)) && back.every((b, i) => b && b.term === rows[i].term && Math.abs(b.saves - rows[i].saves) < 0.01));
 }
 
 console.log("\n5. THE COMMAND REFUSES WHAT IT DOES NOT UNDERSTAND");

@@ -413,7 +413,8 @@ function updateMinimap() {
   fleet.forEach((o, i) => { if (i !== me) mapBots.bots.set(i, { entityId: i, x: o.state.pos[0], z: o.state.pos[1], kind: "aircraft", hp: o.status === "airborne" ? 1 : 0, state: o.status }); });
   wadMap.tick(0);
 }
-window.__flightDemo.minimap = wadMap; Object.defineProperties(window.__flightDemo, { camera: { get() { return camera; } }, chase: { get() { return chase; } }, mapBots: { get() { return mapBots; } } });
+window.__flightDemo.minimap = wadMap; window.__flightDemo.cameraSteps = (n = 1) => { for (let i = 0; i < n; i++) updateCamera(); };   // the gate's clock for the camera: the page lerps it once a FRAME, and a software frame is slow
+Object.defineProperties(window.__flightDemo, { camera: { get() { return camera; } }, chase: { get() { return chase; } }, mapBots: { get() { return mapBots; } } });
 requestAnimationFrame(frame);
 </script>
 </body>

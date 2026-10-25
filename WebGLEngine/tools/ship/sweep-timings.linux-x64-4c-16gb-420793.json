@@ -1,7 +1,7 @@
 {
  "host": "linux-x64-4c-16gb-420793",
  "note": "THIS BOX'S OWN gate runtimes, written by tools/ship/boxTimings.mjs. The shared sweep-timings.json is host-claimed and a foreign box cannot write it (v4647, and that refusal is right); this is how a box records what IT measured without overwriting another machine's numbers. `kinds` says which quantity each ms is, as in the shared record: `alone` is an uncontended serial reading, `capped` is a FLOOR and not a runtime. Read for COVERAGE -- has this gate ever been timed -- and NOT for the ship-time budget, which still reads the shared file. See task #87. `serialRing` holds the last three alone readings; recordReach's margin row reads it on a box that does not own the shared record, because that row asks what a gate costs HERE and nothing here can refresh another box's ring.",
- "captured": "2026-10-22T15:09:45.532Z",
+ "captured": "2026-10-25T14:01:06.216Z",
  "timings": {
   "tools/ship/cloneProvision-selfcheck.mjs": 7171,
   "tools/ship/exitBusy-selfcheck.mjs": 15284,
@@ -91,7 +91,17 @@
   "render/snowGpuTaa-selfcheck.mjs": 16258,
   "render/snowGpuLookA-selfcheck.mjs": 16805,
   "render/snowGpuLookB-selfcheck.mjs": 15811,
-  "render/snowGpuLive-selfcheck.mjs": 9744
+  "render/snowGpuLive-selfcheck.mjs": 9744,
+  "render/autoScale-selfcheck.mjs": 56,
+  "render/deformTexture-selfcheck.mjs": 251,
+  "render/presentScale-selfcheck.mjs": 10010,
+  "render/snowAblate-selfcheck.mjs": 12699,
+  "render/snowCoarse-selfcheck.mjs": 17901,
+  "render/snowFrameTiming-selfcheck.mjs": 9766,
+  "render/snowGpuScale-selfcheck.mjs": 14367,
+  "render/snowHoist-selfcheck.mjs": 15419,
+  "tools/ship/flightCamera-selfcheck.mjs": 40128,
+  "tools/ship/wasmDoors-selfcheck.mjs": 1284
  },
  "at": {
   "tools/ship/cloneProvision-selfcheck.mjs": "2026-09-25T03:35:16.858Z",
@@ -182,7 +192,17 @@
   "render/snowGpuTaa-selfcheck.mjs": "2026-10-22T15:09:45.532Z",
   "render/snowGpuLookA-selfcheck.mjs": "2026-10-22T15:09:45.532Z",
   "render/snowGpuLookB-selfcheck.mjs": "2026-10-22T15:09:45.532Z",
-  "render/snowGpuLive-selfcheck.mjs": "2026-10-22T15:09:45.532Z"
+  "render/snowGpuLive-selfcheck.mjs": "2026-10-22T15:09:45.532Z",
+  "render/autoScale-selfcheck.mjs": "2026-10-25T13:31:01.565Z",
+  "render/deformTexture-selfcheck.mjs": "2026-10-25T13:31:01.565Z",
+  "render/presentScale-selfcheck.mjs": "2026-10-25T13:31:01.565Z",
+  "render/snowAblate-selfcheck.mjs": "2026-10-25T13:31:01.565Z",
+  "render/snowCoarse-selfcheck.mjs": "2026-10-25T13:31:01.565Z",
+  "render/snowFrameTiming-selfcheck.mjs": "2026-10-25T13:31:01.565Z",
+  "render/snowGpuScale-selfcheck.mjs": "2026-10-25T13:31:01.565Z",
+  "render/snowHoist-selfcheck.mjs": "2026-10-25T13:31:01.565Z",
+  "tools/ship/flightCamera-selfcheck.mjs": "2026-10-25T13:31:01.565Z",
+  "tools/ship/wasmDoors-selfcheck.mjs": "2026-10-25T14:01:06.216Z"
  },
  "kinds": {
   "tools/ship/cloneProvision-selfcheck.mjs": "alone",
@@ -273,7 +293,17 @@
   "render/snowGpuTaa-selfcheck.mjs": "alone",
   "render/snowGpuLookA-selfcheck.mjs": "alone",
   "render/snowGpuLookB-selfcheck.mjs": "alone",
-  "render/snowGpuLive-selfcheck.mjs": "alone"
+  "render/snowGpuLive-selfcheck.mjs": "alone",
+  "render/autoScale-selfcheck.mjs": "alone",
+  "render/deformTexture-selfcheck.mjs": "alone",
+  "render/presentScale-selfcheck.mjs": "alone",
+  "render/snowAblate-selfcheck.mjs": "alone",
+  "render/snowCoarse-selfcheck.mjs": "alone",
+  "render/snowFrameTiming-selfcheck.mjs": "alone",
+  "render/snowGpuScale-selfcheck.mjs": "alone",
+  "render/snowHoist-selfcheck.mjs": "alone",
+  "tools/ship/flightCamera-selfcheck.mjs": "alone",
+  "tools/ship/wasmDoors-selfcheck.mjs": "alone"
  },
  "codes": {
   "tools/ship/cloneProvision-selfcheck.mjs": 0,
@@ -364,7 +394,17 @@
   "render/snowGpuTaa-selfcheck.mjs": 0,
   "render/snowGpuLookA-selfcheck.mjs": 0,
   "render/snowGpuLookB-selfcheck.mjs": 0,
-  "render/snowGpuLive-selfcheck.mjs": 0
+  "render/snowGpuLive-selfcheck.mjs": 0,
+  "render/autoScale-selfcheck.mjs": 0,
+  "render/deformTexture-selfcheck.mjs": 0,
+  "render/presentScale-selfcheck.mjs": 0,
+  "render/snowAblate-selfcheck.mjs": 0,
+  "render/snowCoarse-selfcheck.mjs": 0,
+  "render/snowFrameTiming-selfcheck.mjs": 0,
+  "render/snowGpuScale-selfcheck.mjs": 0,
+  "render/snowHoist-selfcheck.mjs": 0,
+  "tools/ship/flightCamera-selfcheck.mjs": 0,
+  "tools/ship/wasmDoors-selfcheck.mjs": 0
  },
  "serialRing": {
   "tools/ship/frozenRecords-selfcheck.mjs": [
@@ -788,6 +828,56 @@
    9689,
    9700,
    9744
+  ],
+  "render/autoScale-selfcheck.mjs": [
+   55,
+   51,
+   56
+  ],
+  "render/deformTexture-selfcheck.mjs": [
+   287,
+   210,
+   251
+  ],
+  "render/presentScale-selfcheck.mjs": [
+   8123,
+   9902,
+   10010
+  ],
+  "render/snowAblate-selfcheck.mjs": [
+   11217,
+   11971,
+   12699
+  ],
+  "render/snowCoarse-selfcheck.mjs": [
+   16284,
+   16487,
+   17901
+  ],
+  "render/snowFrameTiming-selfcheck.mjs": [
+   8939,
+   10581,
+   9766
+  ],
+  "render/snowGpuScale-selfcheck.mjs": [
+   12563,
+   14023,
+   14367
+  ],
+  "render/snowHoist-selfcheck.mjs": [
+   16062,
+   17349,
+   15419
+  ],
+  "tools/ship/flightCamera-selfcheck.mjs": [
+   41004,
+   32650,
+   40128
+  ],
+  "tools/ship/wasmDoors-selfcheck.mjs": [
+   1292,
+   1279,
+   1284
   ]
  }
 }

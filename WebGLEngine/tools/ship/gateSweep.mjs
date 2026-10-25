@@ -16149,6 +16149,13 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
         widened: Object.freeze([]),
         verdict: "the snowGpu browser half split into five gates under the 20 s cap beside the trimmed core, the D3D12 readings and the truncation guard (found by mutating the real snowGpu.mjs, which the first detector missed), the TV package knowledge, the dry-run planner that executes nothing, and SweK Home's launcher (a pure Shelf.java driven by javac); each run alone and green, and each sabotaged to go red by name",
     }),
+    since609: Object.freeze({
+        at: "v4897", swept: 9, green: 9, red: 0,
+        added: Object.freeze(["render/autoScale-selfcheck.mjs", "render/deformTexture-selfcheck.mjs", "render/presentScale-selfcheck.mjs", "render/snowAblate-selfcheck.mjs", "render/snowCoarse-selfcheck.mjs", "render/snowFrameTiming-selfcheck.mjs", "render/snowGpuScale-selfcheck.mjs", "render/snowHoist-selfcheck.mjs", "tools/ship/flightCamera-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "the auto render scale rule, the deform field through a filterable texture, the present upsample, the beauty-pass term ablation, the coarse forms and their lean haze, the native frame timing, the scale page, the fine-relief hoist and the flight page's camera and minimap; each run alone and green, and each sabotaged to go red by name",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
