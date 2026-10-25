@@ -889,6 +889,8 @@ window.addEventListener("load", function () {
             <a href="/device-present.html" target="_blank" rel="noopener" title="Presented frame check -- a known pattern drawn through gfx/device.js on a PRESENTED canvas, read back by the device, by an offscreen frame and by a 2D drawImage of the canvas, all three compared. Rig-only for WebGPU: the build box loses the device on a presented pass.">Presented frame</a>
             <!-- RTX round 3 -- the present path. An <a> so it is reachable. -->
             <a href="/rtx-viewer.html" target="_blank" rel="noopener" title="RTX viewer -- physics/render/rtPipeline.mjs's BVH-accelerated, barycentric-shaded compute kernel (rounds 1-2) traces a Kenney pavement tile, render/rtViewer.mjs's accumulate kernel folds successive frames into a running mean, and a fullscreen-triangle present kernel reads that mean straight out of the storage buffer a prior compute pass wrote -- no texture, no copy. Drag to orbit, wheel to dolly; either resets the accumulation. WebGPU only.">RTX viewer</a>
+            <!-- UNNUMBERED -- channel.html (a YouTube channel's videos, info and the GitHub repos they name) arrives here so pageReach can see it; pageSections.mjs files it in the YouTubes drawer. -->
+            <a href="/channel.html" target="_blank" rel="noopener" title="YouTube channel -- a channel's videos with their dates, views, chapters and descriptions, and an index of the GitHub repositories the videos name, each with the videos that name it. Rendered from a snapshot that tools/ship/takeYoutubeChannel.mjs writes (template: @TheNextNewThingAI); SweK Engine's own channel will use the same page.">YouTube channel</a>
             <a href="/turing.html" target="_blank" rel="noopener" title="integrates six Fourier modes and puts them on Re lambda(k) with the exact threshold">Turing</a>
             <a href="/beam.html" target="_blank" rel="noopener" title="solves and draws the real deflected centreline plus the transcendental root">Beam</a>
             <!-- v3410 -- THE INBOUND PATCH SHIPPED waveguide.html UNLINKED AND pageReach CAUGHT IT, which is the
@@ -1321,6 +1323,7 @@ window.addEventListener("load", function () {
         <button class="gtab" data-tab="avatars"><span class="gtabTog">&#9656;</span><span>&#128100; Avatars</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="toroidal"><span class="gtabTog">&#9656;</span><span>&#127760; Toroidal Buffers</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="rtx"><span class="gtabTog">&#9656;</span><span>&#128294; RTX</span><span class="gtabState"></span></button>
+        <button class="gtab" data-tab="youtubes"><span class="gtabTog">&#9656;</span><span>&#9654;&#65039; YouTubes</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="flybrain"><span class="gtabTog">&#9656;</span><span>&#129712; Fruit Fly Brain</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="fsr"><span class="gtabTog">&#9656;</span><span>&#128269; FSR</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="denoiser"><span class="gtabTog">&#9656;</span><span>&#10024; Denoiser</span><span class="gtabState"></span></button>
@@ -1921,6 +1924,12 @@ window.addEventListener("load", function () {
           <div class="gpanelHdr">&#128294; RTX</div>
           <div style="font-size:11px;color:var(--dim);margin:6px 0;">The rtx line: the path-traced viewer (rtx-viewer.html), Newtonian 6DOF combat (es-box3d-6dof.html) and aerodynamic flight (es-aircraft.html) on the same rigid-body substrate, and the fly connectome (fly-connectome.html), which Fruit Fly Brain shows too. Pages in this drawer are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is wherever it is ASSIGNED, not wherever somebody remembered a line; a page two drawers claim is moved by the first and cloned into the second.</div>
           <div data-panel-pages="rtx" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
+        </div>
+        <!-- UNNUMBERED -- Keith: "we can make a link bucket on server.html that says YouTubes". A channel page, today with the template channel and later with SweK Engine's own; the anchor stays in Arriving and pageSections.mjs moves it here. -->
+        <div class="gpanel" data-panel="youtubes" hidden>
+          <div class="gpanelHdr">&#9654;&#65039; YouTubes</div>
+          <div style="font-size:11px;color:var(--dim);margin:6px 0;">YouTube channels as pages: the videos with their dates, views, chapters and descriptions, and the GitHub repositories the videos name (channel.html). The template is @TheNextNewThingAI; SweK Engine's own channel will use the same page. Make a snapshot with <code>node tools/ship/takeYoutubeChannel.mjs --handle TheNextNewThingAI</code> on a machine that can reach YouTube.</div>
+          <div data-panel-pages="youtubes" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
         </div>
         <!-- v4778 -- Keith: "There can be duplicate links in folder buckets. So Fruit Fly Brain could have its own link
              bucket too." Every page built on the male-cns connectome, found by what it imports rather than by its

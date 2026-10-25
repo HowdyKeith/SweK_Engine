@@ -663,6 +663,10 @@ export const SECTIONS = [
     // es-aircraft are a physics substrate wearing an es- prefix; fly-connectome had no neuron drawer at all. They
     // are filed by the LINE that made them, which is the decision Keith made, and four is above the founding size
     // of Blobs, PetFBI and Toroidal Buffers.
+    // UNNUMBERED -- YOUTUBES, KEITH'S CALL: "we can make a link bucket on server.html that says YouTubes." One page today (channel.html, the template channel's videos and the GitHub repos they name) and a bucket by
+    // decision, as RTX was: SweK Engine's own channel will be a second entry in the same page's index, and any later channel page belongs here.
+    { id: "youtubes", tab: "youtubes", label: "YouTubes", note: "YouTube channels as pages: their videos, and the GitHub repos the videos name",
+      pages: ["channel.html"] },
     { id: "rtx", tab: "rtx", label: "RTX", note: "the rtx line: the path-traced viewer, 6DOF and aerodynamic flight, and the fly connectome",
       pages: ["rtx-viewer.html", "es-box3d-6dof.html", "es-aircraft.html", "es-flight6dof.html", "fly-connectome.html"] },
     // v4778 -- FRUIT FLY BRAIN, KEITH'S CALL, AND THE FIRST SECTION WHOSE EVERY PAGE IS ALSO SOMEWHERE ELSE. Keith:
