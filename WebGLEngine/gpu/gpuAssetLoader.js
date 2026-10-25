@@ -21,6 +21,7 @@
 // gracefully into the negative cache.
 
 import { GLBParser } from "./GLBParser.js";
+import { bridgeBase } from "../net/bridgeBase.mjs";
 import { OBJParser } from "./OBJParser.js";
 import { DEFAULT_MESHES, KIND_TO_ARCHETYPE } from "./defaultMeshes.js";
 
@@ -32,7 +33,7 @@ export class GPUAssetLoader {
         this.inflight = new Map(); // name -> Promise (for dedup)
         // Round 45 — Ollama auto-generation hooks
         this.ollama = opts.ollama ?? null;
-        this.bridgeBaseUrl = opts.bridgeBaseUrl ?? `http://${location.hostname}:8787`;
+        this.bridgeBaseUrl = opts.bridgeBaseUrl ?? bridgeBase(location).http;
         this._ollamaRequested = new Set();   // names already attempted; never retry
         this._ollamaDescriptions = new Map(); // name -> description
         // Round 117 — keep the raw OBJ text returned by ollama for

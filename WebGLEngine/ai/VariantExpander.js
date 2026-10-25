@@ -26,6 +26,7 @@
 //   await expand("tree_oak", 5)              -> count of variants added
 //   await regenerateFailed()                  -> count of descriptions rewritten
 
+import { bridgeBase } from "../net/bridgeBase.mjs";
 import {
     addRuntimeVariant,
     updateVariantDescription,
@@ -44,7 +45,7 @@ export class VariantExpander {
         this.ollama = ollama;
         this.assetLoader = assetLoader;
         this.bridgeBaseUrl = bridgeBaseUrl
-            ?? `http://${typeof location !== "undefined" ? location.hostname : "localhost"}:8787`;
+            ?? bridgeBase(typeof location !== "undefined" ? location : {}).http;
         this._busy = false;
     }
 
