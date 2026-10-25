@@ -73,7 +73,7 @@ export function createView3d(THREE, canvas, { length = 500, width = 300, depthMa
     const floor = new THREE.Mesh(new THREE.PlaneGeometry(length, width), new THREE.MeshStandardMaterial({ color: 0x1d2a25, roughness: 1 })); floor.rotation.x = -Math.PI / 2; floor.position.set(length / 2, -depthMax, width / 2); scene.add(floor);
     const box = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(length, depthMax, width)), new THREE.LineBasicMaterial({ color: 0x1c2c44 })); box.position.set(length / 2, -depthMax / 2, width / 2); scene.add(box);
     const camera = new THREE.PerspectiveCamera(50, canvas.width / canvas.height, 1, 4000);
-    const view = { yaw: 0.6, pitch: 0.55, dist: 620 };
+    const view = { yaw: 0.6, pitch: 0.55, dist: 430 };   // v4899: closer, so the tank fills its panel
     const subs = new Map(), geo = {};
     const place = () => { camera.position.set(length / 2 + view.dist * Math.sin(view.yaw) * Math.cos(view.pitch), view.dist * Math.sin(view.pitch) - 10, width / 2 + view.dist * Math.cos(view.yaw) * Math.cos(view.pitch)); camera.lookAt(length / 2, -15, width / 2); };
     return {

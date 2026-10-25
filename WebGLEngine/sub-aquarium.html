@@ -35,10 +35,23 @@
   button:hover { border-color:var(--cyan); }
   .chip { display:inline-flex; align-items:center; gap:6px; background:#141821; border:1px solid #2a3242; border-radius:4px; padding:2px 8px; font-size:11px; }
   .dot { width:9px; height:9px; border-radius:50%; background:#555; }
-  main { display:flex; gap:12px; padding:6px 16px 16px; flex-wrap:wrap; align-items:flex-start; }
-  .tank { flex:1 1 560px; min-width:300px; }
-  canvas { display:block; width:100%; background:#04101c; border:1px solid var(--line); border-radius:8px; }
-  .side { width:300px; max-width:100%; background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:8px; max-height:640px; overflow-y:auto; }
+  body { min-height:100vh; display:flex; flex-direction:column; }
+  /* THE WORKSPACE: the 3D tank takes the left two thirds at the full height of what is left of the window; the plan (top view) and the depth (side) view stack in a third-width column on the right, with the list of subs under them. */
+  main { flex:1 1 auto; min-height:520px; display:grid; grid-template-columns:minmax(0,2fr) minmax(280px,1fr); gap:12px; padding:6px 16px 12px; }
+  .panel { display:flex; flex-direction:column; min-height:0; min-width:0; background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:6px 8px 8px; }
+  .panel h2 { margin:0 0 6px; font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--cyan); font-weight:600; display:flex; justify-content:space-between; gap:8px; }
+  .panel h2 .hint { color:var(--dim); letter-spacing:0; text-transform:none; font-weight:400; }
+  .p3d { grid-row:1; }
+  .col { display:flex; flex-direction:column; gap:12px; min-height:0; min-width:0; }
+  .col .panel.p2d { flex:0 0 auto; }
+  .col .panel.plist { flex:1 1 170px; min-height:170px; }
+  .canvasbox { position:relative; flex:1 1 auto; min-height:260px; }
+  .canvasbox canvas { position:absolute; inset:0; width:100%; height:100%; }
+  canvas { display:block; width:100%; background:#04101c; border:1px solid var(--line); border-radius:6px; }
+  .p2d canvas { height:auto; }
+  .side { flex:1 1 auto; min-height:0; overflow-y:auto; }
+  .tank-note { color:var(--dim); font-size:11px; padding-top:5px; }
+  @media (max-width: 900px) { main { grid-template-columns:minmax(0,1fr); } .canvasbox { min-height:60vh; } .col { gap:12px; } }
   .row { display:flex; gap:8px; align-items:flex-start; padding:5px 4px; border-bottom:1px solid #12203a; }
   .row.sel { background:#12203a; }
   .sw { width:11px; height:11px; border-radius:50%; flex:none; margin-top:3px; }
@@ -63,15 +76,18 @@
   <span id="msg" class="sub"></span>
 </div>
 <main>
-  <div class="tank">
-    <canvas id="plan" width="1000" height="600" aria-label="Plan view of the tank"></canvas>
-    <div style="height:10px"></div>
-    <canvas id="sideView" width="1000" height="220" aria-label="Side view of the tank: depth against length"></canvas>
-    <div style="height:10px"></div>
-    <canvas id="view3d" width="1000" height="420" aria-label="Three-dimensional view of the tank: the physics sea above, the subs beneath it" style="width:100%;cursor:grab"></canvas>
-    <div class="small" id="view3dNote" style="color:#7c93b8;font-size:12px">3D: the sea is the physics surface a hull would float on (render/seaThree.mjs); subs are tinted toward the water colour by depth. Drag to orbit, wheel to zoom.</div>
+  <section class="panel p3d" aria-label="Three-dimensional view of the tank">
+    <h2>3D view <span class="hint">drag to orbit &middot; wheel to zoom</span></h2>
+    <div class="canvasbox"><canvas id="view3d" width="1000" height="700" aria-label="Three-dimensional view of the tank: the physics sea above, the subs beneath it" style="cursor:grab"></canvas></div>
+    <div class="tank-note" id="view3dNote">The sea is the physics surface a hull would float on (render/seaThree.mjs); subs are tinted toward the water colour by depth, and each sub&rsquo;s tail planes and rudder follow its pilot&rsquo;s command.</div>
+  </section>
+  <div class="col">
+    <section class="panel p2d" aria-label="Plan view of the tank"><h2>Top view <span class="hint">500 &times; 300 m</span></h2>
+      <canvas id="plan" width="1000" height="600" aria-label="Plan view of the tank"></canvas></section>
+    <section class="panel p2d" aria-label="Depth view of the tank"><h2>Depth view <span class="hint">depth against length</span></h2>
+      <canvas id="sideView" width="1000" height="220" aria-label="Side view of the tank: depth against length"></canvas></section>
+    <section class="panel plist" aria-label="The subs in the tank"><h2>Subs</h2><div class="side" id="list"></div></section>
   </div>
-  <div class="side" id="list"></div>
 </main>
 <p class="note" id="fishDetail"></p>
 <script type="module">
@@ -86,13 +102,14 @@ let view3d = null;
 try {   // v4895: the tank in 3D. A page without WebGL keeps its two 2D views.
     const THREE = await import("/vendor/three/three.module.js"), cv = $("view3d");
     view3d = createView3d(THREE, cv, { length: LENGTH, width: WIDTH, depthMax: 50 });
-    view3d.resize(cv.width, cv.height);
+    const fit = () => { const r = cv.parentElement.getBoundingClientRect(); view3d.resize(Math.max(2, Math.round(r.width)), Math.max(2, Math.round(r.height))); };   // the canvas is as big as its panel
+    fit(); new ResizeObserver(fit).observe(cv.parentElement);
     let drag = null; const V = () => view3d.getView();
     cv.addEventListener("pointerdown", (e) => { drag = { x: e.clientX, y: e.clientY, v: V() }; cv.setPointerCapture(e.pointerId); cv.style.cursor = "grabbing"; });
     cv.addEventListener("pointermove", (e) => { if (!drag) return; view3d.setView(drag.v.yaw - (e.clientX - drag.x) * 0.006, drag.v.pitch + (e.clientY - drag.y) * 0.004, drag.v.dist); });
     cv.addEventListener("pointerup", () => { drag = null; cv.style.cursor = "grab"; });
     cv.addEventListener("wheel", (e) => { e.preventDefault(); const v = V(); view3d.setView(v.yaw, v.pitch, v.dist * (e.deltaY < 0 ? 0.9 : 1.1)); }, { passive: false });
-} catch (e) { view3d = null; $("view3d").style.display = "none"; $("view3dNote").textContent = "3D view unavailable here (" + String((e && e.message) || e).slice(0, 80) + "); the plan and side views are unaffected."; }
+} catch (e) { view3d = null; $("view3d").style.display = "none"; $("view3dNote").textContent = "3D view unavailable here (" + String((e && e.message) || e).slice(0, 80) + "); the top and depth views are unaffected."; }
 {   // the hull picker: the labels are text; changing it puts every sub back in the water on the new vessel
     const sel = $("hullSel");
     for (const [name, label] of Object.entries(LABELS)) { const o = document.createElement("option"); o.value = name; o.textContent = label; sel.appendChild(o); }
@@ -159,13 +176,13 @@ function render() {
   pg.strokeStyle = "#1c2c44"; pg.lineWidth = 1; for (let x = 0; x <= LENGTH; x += 50) { pg.beginPath(); pg.moveTo(x * sx, 0); pg.lineTo(x * sx, plan.height); pg.stroke(); } for (let y = 0; y <= WIDTH; y += 50) { pg.beginPath(); pg.moveTo(0, y * sy); pg.lineTo(plan.width, y * sy); pg.stroke(); }
   const dx = side.width / LENGTH, dz = side.height / 50;
   sg.fillStyle = "#07243a"; sg.fillRect(0, DEPTH_MIN * dz, side.width, (DEPTH_MAX - DEPTH_MIN) * dz); sg.strokeStyle = "#1c2c44"; sg.strokeRect(0, 0, side.width, side.height);
-  sg.fillStyle = "#7c93b8"; sg.font = "12px monospace"; sg.fillText("surface", 6, 12); sg.fillText("depth " + DEPTH_MIN + "–" + DEPTH_MAX + " m", 6, DEPTH_MIN * dz - 4); sg.fillText("floor 50 m", 6, side.height - 6);
+  sg.fillStyle = "#7c93b8"; sg.font = "16px monospace"; sg.fillText("surface", 6, 12); sg.fillText("depth " + DEPTH_MIN + "–" + DEPTH_MAX + " m", 6, DEPTH_MIN * dz - 4); sg.fillText("floor 50 m", 6, side.height - 6);
   for (const s of snap) {
     const sel = s.id === selected;
     pg.strokeStyle = `hsl(${s.hue} 70% 55% / .35)`; pg.lineWidth = 1.5; pg.beginPath(); s.trail.forEach((p, i) => { i ? pg.lineTo(p[0] * sx, p[1] * sy) : pg.moveTo(p[0] * sx, p[1] * sy); }); pg.stroke();
     sg.strokeStyle = `hsl(${s.hue} 70% 55% / .35)`; sg.beginPath(); s.trail.forEach((p, i) => { i ? sg.lineTo(p[0] * dx, p[2] * dz) : sg.moveTo(p[0] * dx, p[2] * dz); }); sg.stroke();
-    drawSub(pg, s.x * sx, s.y * sy, s.heading, s.hue, 16, sel); drawSub(sg, s.x * dx, s.depth * dz, -s.pitch, s.hue, 12, sel);
-    pg.fillStyle = sel ? "#fff" : "#dbe7ff"; pg.font = "13px monospace"; pg.fillText(s.name, s.x * sx + 20, s.y * sy - 8);
+    drawSub(pg, s.x * sx, s.y * sy, s.heading, s.hue, 22, sel); drawSub(sg, s.x * dx, s.depth * dz, -s.pitch, s.hue, 16, sel);
+    pg.fillStyle = sel ? "#fff" : "#dbe7ff"; pg.font = "16px monospace"; pg.fillText(s.name, s.x * sx + 26, s.y * sy - 10);
   }
   if (view3d) view3d.render(snap, performance.now() / 1000);
   updateStats(snap);
