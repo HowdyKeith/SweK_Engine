@@ -9,6 +9,11 @@
 //                   flat; a sub at 14 m is more saturated than the same sub at 40 m (the tint, seen through the real renderer); the hull's long axis follows the heading (a sub at heading 0 is wider on
 //                   screen along x than one at heading pi/2 seen from straight above); a sub that leaves the snapshot leaves the scene; the sea moves between two times;
 //   3  THE PAGE     sub-aquarium.html builds the view with createView3d and renders it from the same frame loop that draws the 2D views.
+//   2b THE TOWER AND THE TAIL  the sub is built here with the real three.js: a conning tower above the hull and forward, a periscope above that, a stern plane pair and a rudder aft, each hinged at its leading edge; the
+//                   drawn trailing edges are TIED TO THE PHYSICS, not to a comment: at speed, pitch +1 makes a tail force DOWN (subModel6dof.forcesAndMoments) and the planes' trailing edges go UP, yaw +1 makes a tail force LEFT
+//                   and the rudder's trailing edge goes RIGHT; full command is the model's own finMax; the tank's snapshot carries each pilot's command; the live render poses the fins from it.
+//   SABOTAGED (each run alone, restored; red BY NAME): A plane sign flipped -> 3 red; B rudder sign flipped -> 1; C tower under the hull -> 1; D fins at the nose -> 1; F finMax doubled -> 2; G the snapshot drops cmd -> 1;
+//   E render() stops posing the fins -> 0 red AT FIRST (the hand-called poseFins test cannot see the render path), which is what section 2's live row "the live render poses the fins from each row's command" was added for -> 1 red.
 // NOT GRADED, said plainly: that it looks like a tank, any timing, a real GPU, and the pilots (the subs here are rows of numbers).
 "use strict";
 import fs from "node:fs";
@@ -17,6 +22,9 @@ import http from "node:http";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import * as V3 from "./subAquarium3d.mjs";
+import * as THREE from "../vendor/three/three.module.js";
+import * as SM from "../physics/mechanics/subModel6dof.mjs";
+import { createTank } from "./subAquariumSim.mjs";
 import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL, webglLaunchArgs } from "../tools/ship/playwrightResolve.mjs";
 
 const require_ = createRequire(import.meta.url);
@@ -79,9 +87,14 @@ console.log("\n2. THE DRAW");
                 const sh = one(14, 0), dp = one(40, 0), h0 = one(14, 0), h90 = one(14, Math.PI / 2);
                 const shallow = Math.round(sh.dist), deep = Math.round(dp.dist);
                 view.render(four.slice(0, 2), 0); const count2 = view.subs.size;
-                return { A, count4, diff, total: a.length, shallow, deep, h0: [h0.w, h0.h], h90: [h90.w, h90.h], n: [sh.n, dp.n], count2 };
+                // the render path itself poses the fins from the row's command (not only poseFins when called by hand)
+                const cm = (cmd) => { view.render([{ ...four[0], cmd }], 0); const P = view.subs.get(four[0].id).userData.parts; return [P.planes.rotation.z, P.rudder.rotation.y]; };
+                const fins = { up: cm({ pitch: 1, yaw: 0 }), right: cm({ pitch: 0, yaw: 1 }), none: cm(undefined) };
+                return { fins, A, count4, diff, total: a.length, shallow, deep, h0: [h0.w, h0.h], h90: [h90.w, h90.h], n: [sh.n, dp.n], count2 };
             });
             ok("!! the view draws: " + r.A.n + " of " + 320 * 200 + " pixels lit, " + r.A.colours + " distinct colours, four subs in the scene", r.A.n > 320 * 200 * 0.5 && r.A.colours > 12 && r.count4 === 4);
+            ok("!! the live render poses the fins from each row's command: pitch +1 sets the stern planes to -finMax (" + r.fins.up[0].toFixed(3) + ") and leaves the rudder straight; yaw +1 sets the rudder to -finMax (" + r.fins.right[1].toFixed(3) + "); a row with no command draws them straight",
+                Math.abs(r.fins.up[0] + V3.FIN_MAX) < 1e-9 && r.fins.up[1] === 0 && Math.abs(r.fins.right[1] + V3.FIN_MAX) < 1e-9 && r.fins.right[0] === 0 && r.fins.none[0] === 0 && r.fins.none[1] === 0);
             ok("!! the sea moves between two times (" + r.diff + " of " + r.total + " channel values differ)", r.diff > r.total * 0.002);
             ok("!! the tint is seen through the real renderer: one sub's mean distance from the water colour (0x0a3b46) is " + r.shallow + " at 14 m and " + r.deep + " at 40 m (deeper is closer to the water; the sub is isolated by differencing against the empty tank, " + r.n.join(" and ") + " pixels)", r.n[0] > 30 && r.n[1] > 30 && r.shallow > r.deep + 30, "");
             ok("!! the hull follows its heading: from straight above a sub at heading 0 is wider along x than along z (" + r.h0.join("x") + " px) and at heading pi/2 the other way round (" + r.h90.join("x") + " px)", r.h0[0] > r.h0[1] * 1.5 && r.h90[1] > r.h90[0] * 1.5);
@@ -89,6 +102,55 @@ console.log("\n2. THE DRAW");
             ok("  no page or console error", errs.length === 0, errs.join(" | ").slice(0, 200));
         } finally { await br.close(); server.close(); }
     }
+}
+
+console.log("\n2b. THE CONNING TOWER AND THE TAIL: built here with the real three.js (geometry needs no GL), and tied to the physics' fin forces");
+{
+    const mat = new THREE.MeshBasicMaterial(), geo = {}, g = V3.buildSub(THREE, mat, geo), P = g.userData.parts;
+    g.updateMatrixWorld(true);
+    const box = (m) => new THREE.Box3().setFromObject(m), hull = box(P.hull), tower = box(P.tower), planes = box(P.planes), rudder = box(P.rudder);
+    ok("!! the sub has a conning tower: a sail standing ABOVE the hull's top (its top is higher than the hull's), forward of amidships (its centre ahead of x = 0), with a periscope higher still",
+        tower.max.y > hull.max.y && (tower.min.x + tower.max.x) / 2 > 0 && box(P.scope).max.y > tower.max.y,
+        `hull top ${hull.max.y.toFixed(2)}, tower top ${tower.max.y.toFixed(2)} at x ${((tower.min.x + tower.max.x) / 2).toFixed(2)}, scope top ${box(P.scope).max.y.toFixed(2)}`);
+    ok("!! the tail's control surfaces are AFT (both entirely behind amidships), the stern planes span the beam (wider across than the hull) and the rudder spans the height (taller than the hull is deep)",
+        planes.max.x < 0 && rudder.max.x < 0 && planes.max.z - planes.min.z > hull.max.z - hull.min.z && rudder.max.y - rudder.min.y > (hull.max.y - hull.min.y) * 0.9,
+        `planes x ${planes.min.x.toFixed(1)}..${planes.max.x.toFixed(1)} span ${(planes.max.z - planes.min.z).toFixed(1)} vs beam ${(hull.max.z - hull.min.z).toFixed(1)}; rudder height ${(rudder.max.y - rudder.min.y).toFixed(1)}`);
+    ok("  at no command the fins are straight (angles exactly 0) and a missing, NaN or out-of-range command is read as 0 or clamped to +-1, not drawn", (() => {
+        const z = V3.finAngles({ pitch: 0, yaw: 0 }), n = V3.finAngles({ pitch: NaN, yaw: "x" }), e = V3.finAngles(null), big = V3.finAngles({ pitch: 9, yaw: -9 });
+        return z.plane === 0 && z.rudder === 0 && n.plane === 0 && n.rudder === 0 && e.plane === 0 && e.rudder === 0 && Math.abs(big.plane) === V3.FIN_MAX && Math.abs(big.rudder) === V3.FIN_MAX;
+    })());
+    ok("  full command is the MODEL's own deflection limit (finMax " + SM.EXPLORER.finMax + " rad), not a number chosen for looks", V3.FIN_MAX === SM.EXPLORER.finMax && Math.abs(V3.finAngles({ pitch: 1, yaw: 1 }).plane) === SM.EXPLORER.finMax);
+    // the trailing edge is the fin's aft end: the point of its box at the smallest x
+    // the trailing edge, measured directly: the middle of the fin's aft edge carried through its hinge and the group into the scene
+    const aftPoint = (m) => { m.updateWorldMatrix(true, false); m.geometry.computeBoundingBox(); return m.localToWorld(new THREE.Vector3(m.geometry.boundingBox.min.x, 0, 0)); };   // the middle of the aft edge, in the scene
+    V3.poseFins(g, { pitch: 0, yaw: 0 }); g.updateMatrixWorld(true);
+    const t0p = aftPoint(P.planes), t0r = aftPoint(P.rudder);
+    // the physics: at speed, the force each fin makes for a command, and which way it pushes the TAIL
+    const model = SM.createSubModel(SM.EXPLORER), st = SM.createState({ depth: 30, speed: 3, model });
+    const fins = (c) => SM.forcesAndMoments(model, st, c).fins;
+    const fp = fins({ pitch: 1, yaw: 0, thrust: 0, ballast: 0 }).plane, fr = fins({ pitch: 0, yaw: 1, thrust: 0, ballast: 0 }).rudder;
+    // a fin pushes the water toward its trailing edge and is pushed the OTHER way: plane force along body +Z(up), rudder force along body +Y(left)
+    V3.poseFins(g, { pitch: 1, yaw: 0 }); g.updateMatrixWorld(true);
+    const dy = aftPoint(P.planes).y - t0p.y;
+    V3.poseFins(g, { pitch: 0, yaw: 1 }); g.updateMatrixWorld(true);
+    const dz = aftPoint(P.rudder).z - t0r.z;   // scene +Z is the vessel's LEFT
+    ok("!! pitch +1 (nose up): the physics pushes the tail DOWN and the drawn stern planes' trailing edges go UP (the water is thrown up, the tail pushed down)",
+        fp < 0 && dy > 0, `plane force ${fp.toFixed(1)} N (body +Z up), trailing edge moved ${dy.toFixed(2)} (up is +)`);
+    ok("!! yaw +1 (nose right): the physics pushes the tail LEFT and the drawn rudder's trailing edge goes RIGHT (the water is thrown right, the tail pushed left)",
+        fr > 0 && dz < 0, `rudder force ${fr.toFixed(1)} N (body +Y left), trailing edge moved ${dz.toFixed(2)} (left is +)`);
+    V3.poseFins(g, { pitch: -1, yaw: -1 }); g.updateMatrixWorld(true);
+    ok("  and the opposite command swings each the opposite way, by the same amount (symmetric about straight)",
+        Math.abs((aftPoint(P.planes).y - t0p.y) + dy) < 1e-6 && Math.abs((aftPoint(P.rudder).z - t0r.z) + dz) < 1e-6 && dy > 0.5,
+        `plane +-${dy.toFixed(2)}, rudder +-${Math.abs(dz).toFixed(2)} at ${SM.EXPLORER.finMax} rad on a ${(P.planes.geometry.parameters.width).toFixed(1)}-long chord`);
+    V3.poseFins(g, { pitch: 0.5, yaw: 0 });
+    ok("  a half command is a half deflection", Math.abs(P.planes.rotation.z + 0.5 * SM.EXPLORER.finMax) < 1e-12 && P.rudder.rotation.y === 0);
+    // the tank hands the page the pilot's command
+    const tank = createTank(); tank.sync([{ id: "a", name: "a", hue: 10, pilot: "pd", from: "x", local: true }]); tank.step(2);
+    const row = tank.snapshot()[0], c = row.cmd;
+    ok("!! the tank's snapshot carries the pilot's command each sub was flown with (four finite numbers within -1..+1), so the page draws the fins from what the pilot asked, not from the attitude",
+        c && ["pitch", "yaw", "thrust", "ballast"].every((k) => Number.isFinite(c[k]) && Math.abs(c[k]) <= 1) && (Math.abs(c.pitch) + Math.abs(c.yaw) + Math.abs(c.thrust) > 0),
+        JSON.stringify(c));
+    mat.dispose(); for (const k of Object.keys(geo)) geo[k].dispose();
 }
 
 console.log("\n3. THE PAGE");

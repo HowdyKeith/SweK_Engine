@@ -85,7 +85,8 @@ export function createTank({ hull = "nominal" } = {}) {
                     if (!inside && sub.wasInside) { sub.target = { depth: sub.target.depth, heading: wrap(headingTo(x, y, LENGTH / 2, WIDTH / 2) + (sub.rng() - 0.5) * 0.8), speed: Math.min(sub.target.speed, 2.5) }; sub.nextTarget = sub.age + 15 + sub.rng() * 15; }
                     sub.wasInside = inside;
                     const t = inside ? sub.target : { depth: sub.target.depth, heading: headingTo(x, y, LENGTH / 2, WIDTH / 2), speed: Math.min(sub.target.speed, 2) };
-                    const res = S.stepSub(MODEL, s, sub.pilot(s, t, [0, 0, 0]), dt);
+                    const cmd = sub.pilot(s, t, [0, 0, 0]), res = S.stepSub(MODEL, s, cmd, dt);
+                    sub.cmd = { pitch: cmd.pitch, yaw: cmd.yaw, thrust: cmd.thrust, ballast: cmd.ballast };   // what the pilot asked for this tick: the page draws the fins from it
                     sub.state = res.state;
                     if (res.status !== "submerged" || !Number.isFinite(res.state.pos[0])) { sub.lost++; sub.status = res.status; sub.state = spawn(sub, sub.rng, true); sub.trail.length = 0; sub.wasInside = true; retarget(sub); continue; }
                     sub.status = "swimming";
@@ -96,7 +97,7 @@ export function createTank({ hull = "nominal" } = {}) {
         },
         /** What a page draws: one plain record per sub. */
         snapshot() {
-            return [...subs.values()].map((sub) => { const a = S.attitude(sub.state); return { hull: hullName, id: sub.id, name: sub.name, hue: sub.hue, pilot: sub.pilotKind, from: sub.from, local: sub.local, x: sub.state.pos[0], y: sub.state.pos[1], depth: a.depth, heading: a.heading, pitch: a.pitch, speed: a.speed, target: sub.target, lost: sub.lost, status: sub.status, trail: sub.trail.slice() }; });
+            return [...subs.values()].map((sub) => { const a = S.attitude(sub.state); return { hull: hullName, id: sub.id, name: sub.name, hue: sub.hue, pilot: sub.pilotKind, from: sub.from, local: sub.local, x: sub.state.pos[0], y: sub.state.pos[1], depth: a.depth, heading: a.heading, pitch: a.pitch, speed: a.speed, cmd: sub.cmd ? { ...sub.cmd } : { pitch: 0, yaw: 0, thrust: 0, ballast: 0 }, target: sub.target, lost: sub.lost, status: sub.status, trail: sub.trail.slice() }; });
         },
     };
 }
