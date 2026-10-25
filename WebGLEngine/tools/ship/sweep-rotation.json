@@ -1,7 +1,7 @@
 {
  "generatedFrom": "tools/ship/sweepRotation.mjs",
  "note": "The over-budget gates this rotation re-timed SERIALLY, with the reading that had evicted each. Written only by tools/ship/sweepRotation.mjs -- sweep-timings.json has a different owner. MERGED BY GATE (v4535): `at` on the file is the LAST run, `at` on a row is the run that measured that row, and a row survives until its own gate is re-timed. `poolAt` (v4725) is the last UNFILTERED stalest-first run -- --gate, --band and --killed do not move it. `poolHorizon` (v4816) is the stamp of the first pool entry that run did NOT take: it reached every entry stamped earlier and none stamped at or after it.",
- "at": "2026-10-25T17:03:58.808Z",
+ "at": "2026-10-25T17:07:03.785Z",
  "poolAt": "2026-10-25T14:16:54.592Z",
  "poolHorizon": "2026-10-20T16:40:35.872Z",
  "budgetMs": 3000,
@@ -5650,6 +5650,12 @@
    "ms": 4338,
    "code": 0,
    "at": "2026-10-25T17:03:58.808Z"
+  },
+  {
+   "gate": "tools/ship/tournamentDogfightShipped-selfcheck.mjs",
+   "ms": 184768,
+   "code": 0,
+   "at": "2026-10-25T17:07:03.785Z"
   },
   {
    "gate": "tools/ship/traderGraph-selfcheck.mjs",

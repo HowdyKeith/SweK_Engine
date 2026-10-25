@@ -2266,7 +2266,8 @@
   "tools/flyCx-selfcheck.mjs": 908,
   "tools/ship/channelPage-selfcheck.mjs": 1954,
   "tools/ship/flightMap-selfcheck.mjs": 2132,
-  "tools/ship/tournamentDogfight-selfcheck.mjs": 4338
+  "tools/ship/tournamentDogfight-selfcheck.mjs": 4338,
+  "tools/ship/tournamentDogfightShipped-selfcheck.mjs": 184768
  },
  "codes": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 0,
@@ -4409,7 +4410,8 @@
   "tools/flyCx-selfcheck.mjs": 0,
   "tools/ship/channelPage-selfcheck.mjs": 0,
   "tools/ship/flightMap-selfcheck.mjs": 0,
-  "tools/ship/tournamentDogfight-selfcheck.mjs": 0
+  "tools/ship/tournamentDogfight-selfcheck.mjs": 0,
+  "tools/ship/tournamentDogfightShipped-selfcheck.mjs": 0
  },
  "at": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-10-25T14:34:32.781Z",
@@ -6552,7 +6554,8 @@
   "tools/flyCx-selfcheck.mjs": "2026-10-25T17:03:49.766Z",
   "tools/ship/channelPage-selfcheck.mjs": "2026-10-25T17:03:51.897Z",
   "tools/ship/flightMap-selfcheck.mjs": "2026-10-25T17:03:54.222Z",
-  "tools/ship/tournamentDogfight-selfcheck.mjs": "2026-10-25T17:03:58.808Z"
+  "tools/ship/tournamentDogfight-selfcheck.mjs": "2026-10-25T17:03:58.808Z",
+  "tools/ship/tournamentDogfightShipped-selfcheck.mjs": "2026-10-25T17:07:03.785Z"
  },
  "capAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 20000,
@@ -8670,7 +8673,8 @@
   "tools/flyCx-selfcheck.mjs": 300000,
   "tools/ship/channelPage-selfcheck.mjs": 300000,
   "tools/ship/flightMap-selfcheck.mjs": 300000,
-  "tools/ship/tournamentDogfight-selfcheck.mjs": 300000
+  "tools/ship/tournamentDogfight-selfcheck.mjs": 300000,
+  "tools/ship/tournamentDogfightShipped-selfcheck.mjs": 300000
  },
  "finished": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": true,
@@ -10808,7 +10812,8 @@
   "tools/flyCx-selfcheck.mjs": true,
   "tools/ship/channelPage-selfcheck.mjs": true,
   "tools/ship/flightMap-selfcheck.mjs": true,
-  "tools/ship/tournamentDogfight-selfcheck.mjs": true
+  "tools/ship/tournamentDogfight-selfcheck.mjs": true,
+  "tools/ship/tournamentDogfightShipped-selfcheck.mjs": true
  },
  "crossings": {
   "brain/gunnerPolicy-selfcheck.mjs": 2,
@@ -13074,7 +13079,8 @@
   "tools/flyCx-selfcheck.mjs": 908,
   "tools/ship/channelPage-selfcheck.mjs": 1954,
   "tools/ship/flightMap-selfcheck.mjs": 2132,
-  "tools/ship/tournamentDogfight-selfcheck.mjs": 4338
+  "tools/ship/tournamentDogfight-selfcheck.mjs": 4338,
+  "tools/ship/tournamentDogfightShipped-selfcheck.mjs": 184768
  },
  "serialAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-10-22T02:39:10.708Z",
@@ -15108,7 +15114,8 @@
   "tools/flyCx-selfcheck.mjs": "2026-10-25T17:03:49.766Z",
   "tools/ship/channelPage-selfcheck.mjs": "2026-10-25T17:03:51.897Z",
   "tools/ship/flightMap-selfcheck.mjs": "2026-10-25T17:03:54.222Z",
-  "tools/ship/tournamentDogfight-selfcheck.mjs": "2026-10-25T17:03:58.808Z"
+  "tools/ship/tournamentDogfight-selfcheck.mjs": "2026-10-25T17:03:58.808Z",
+  "tools/ship/tournamentDogfightShipped-selfcheck.mjs": "2026-10-25T17:07:03.785Z"
  },
  "serialRing": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": [
@@ -25027,6 +25034,9 @@
   ],
   "tools/ship/tournamentDogfight-selfcheck.mjs": [
    4338
+  ],
+  "tools/ship/tournamentDogfightShipped-selfcheck.mjs": [
+   184768
   ]
  },
  "contended": {
@@ -27061,7 +27071,8 @@
   "tools/flyCx-selfcheck.mjs": false,
   "tools/ship/channelPage-selfcheck.mjs": false,
   "tools/ship/flightMap-selfcheck.mjs": false,
-  "tools/ship/tournamentDogfight-selfcheck.mjs": false
+  "tools/ship/tournamentDogfight-selfcheck.mjs": false,
+  "tools/ship/tournamentDogfightShipped-selfcheck.mjs": false
  },
  "kinds": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "loaded",
@@ -29204,7 +29215,8 @@
   "tools/flyCx-selfcheck.mjs": "alone",
   "tools/ship/channelPage-selfcheck.mjs": "alone",
   "tools/ship/flightMap-selfcheck.mjs": "alone",
-  "tools/ship/tournamentDogfight-selfcheck.mjs": "alone"
+  "tools/ship/tournamentDogfight-selfcheck.mjs": "alone",
+  "tools/ship/tournamentDogfightShipped-selfcheck.mjs": "alone"
  },
  "boxScale": {
   "2026-10-21T09:12:55.584Z": {

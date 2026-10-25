@@ -9,6 +9,10 @@
 // has been parsed by this file. What it grades is that the parser does what it says on a feed of that shape, including the traps (entities, CDATA, braces inside JSON strings, look-alike GitHub URLs); whether YouTube has
 // reshaped its pages since is what the first run of tools/ship/takeYoutubeChannel.mjs on a machine that can reach it will say, and it refuses an empty parse rather than writing one.
 //
+// *** THE FIRST LIVE RUN HAPPENED, 2026-10-25, ON THE USER'S MACHINE (this sandbox still cannot reach YouTube): `takeYoutubeChannel.mjs --handle TheNextNewThingAI --details` wrote data/channels/thenextnewthingai.json: 15 videos, every one with its
+// duration and view count, 10 with chapters, 34 distinct GitHub repositories named, the channel's id, name, avatar and first-published date. TWO THINGS THE LIVE PAGES DID NOT GIVE, and the page shows neither rather than inventing them: the SUBSCRIBER
+// COUNT (null: the channel page carried no subscriber text this parser could find) and each video's KEYWORDS (empty on all 15). Section 8 below holds that snapshot, and any other in the tree, to the format. ***
+//
 // SABOTAGES, RESULTS BY NAME (each against ui/channelFeed.mjs, this gate run, restored identical):
 //   L1 the reserved GitHub owners (sponsors, settings, orgs, ...) no longer refused               -> 1 RED: the not-a-repository row
 //   L2 chapters no longer required to start at 0:00                                                -> 1 RED: the chapter-rules row
@@ -20,6 +24,7 @@
 //   L8 repoIndex keys on the case as written                                                       -> 1 RED: the index row (UNSEEN the first time: no fixture spelled a repo two ways)
 //   L9 firstSeen taken from the newest reading, not the first                                      -> 1 RED: the field-survival row
 //   L10 any host ending in github.com accepted (evilgithub.com)                                    -> 1 RED: the not-a-repository row
+//   L11 a repo name under four characters refused (github.com/morluto/rea is real)                 -> 1 RED: the real-snapshot row (section 8: the file's repos no longer reproduce)
 "use strict";
 import * as C from "./channelFeed.mjs";
 
@@ -105,6 +110,20 @@ ok("a watch page: duration in seconds, keywords, category; and a page with only 
 
 console.log("\n7. WHICH LINKS THE PAGE MAY OPEN");
 ok("!! safeHref allows https to YouTube, GitHub and their image hosts and nothing else: javascript:, data:, http, a look-alike host, a subdomain trick and a non-URL are all null", ["https://www.youtube.com/watch?v=x", "https://youtu.be/x", "https://github.com/a/b", "https://i.ytimg.com/vi/x/hq.jpg", "https://yt3.ggpht.com/a"].every((u) => C.safeHref(u) === new URL(u).href) && ["javascript:alert(1)", "data:text/html,x", "http://www.youtube.com/x", "https://youtube.com.evil.example/x", "https://evil.example/youtube.com", "https://github.com@evil.example/x", "//youtube.com/x", "nonsense", null, undefined].every((u) => C.safeHref(u) === null));
+
+console.log("\n8. ANY REAL SNAPSHOT IN THE TREE (data/channels/*.json), HELD TO THE FORMAT -- no counts, since a re-run grows the file");
+{
+    const fs = await import("node:fs"), path = await import("node:path"), { fileURLToPath } = await import("node:url");
+    const dir = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "data", "channels"), files = fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => f.endsWith(".json") && f !== "index.json") : [];
+    const idx = fs.existsSync(path.join(dir, "index.json")) ? JSON.parse(fs.readFileSync(path.join(dir, "index.json"), "utf8")) : { channels: [] };
+    ok("the channel index lists exactly the snapshot files that exist, each with a file name that is a plain .json in the folder", eq(idx.channels.map((c) => c.file).sort(), files.slice().sort()) && idx.channels.every((c) => /^[\w-]+\.json$/.test(c.file)), files.join(", ") || "(no snapshots yet)");
+    for (const f of files) {
+        const snap = JSON.parse(fs.readFileSync(path.join(dir, f), "utf8")), bad = C.validateSnapshot(snap), repos = C.repoIndex(snap.videos);
+        ok("!! " + f + " is a sound swek-channel-v1 snapshot: it validates clean, every video has a title, a published date and a https youtube.com URL, every repo it names is a repo githubRepo accepts, and re-analysing a video's description reproduces its repos and chapters (the file and the parser agree)",
+            bad.length === 0 && snap.videos.every((v) => v.title && !Number.isNaN(Date.parse(v.published)) && C.safeHref(v.url) === v.url) && repos.every((r) => { const g = C.githubRepo(r.url); return g && g.kind === "repo"; }) &&
+            snap.videos.every((v) => { const a = C.analyseVideo(v); return eq(a.repos, v.repos) && eq(a.chapters, v.chapters); }), bad.join("; ") + " (" + snap.videos.length + " videos, " + repos.length + " repos)");
+    }
+}
 
 console.log(`\nchannelFeed-selfcheck: ${fails === 0 ? "all passed" : fails + " FAILED"}`);
 console.log("unchecked here: a LIVE YouTube feed, channel page or watch page (this sandbox cannot reach YouTube) -- tools/ship/takeYoutubeChannel.mjs refuses an empty parse, and its first run on a machine that can reach it is the check.");
