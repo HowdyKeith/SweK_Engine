@@ -33,7 +33,7 @@ import path from "node:path";
 // warning lives -- this gate holds the decision, not the console line.
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { describeWebGPU, probeAdapter, adapterOptions } from "./webgpuProbe.mjs";
+import { describeWebGPU, probeAdapter, adapterOptions, pickRenderBackend, hasWebGL2 } from "./webgpuProbe.mjs";
 import { SOURCE_EXT } from "../tools/ship/moduleRefs.mjs";
 
 let fails = 0;
@@ -239,6 +239,20 @@ const env = (gpu, secure, host, proto = "http:") => ({
     const naked = files.filter((f) => /requestAdapter\(\s*\{\s*powerPreference/.test(readFileSync(path.join(root, f), "utf8")));
     const users = files.filter((f) => /adapterOptions\(/.test(readFileSync(path.join(root, f), "utf8")));
     ok("!! NO BROWSER PAGE NAMES A POWER PREFERENCE TO requestAdapter DIRECTLY: every html page and gfx/*.js goes through adapterOptions() (Chrome on Windows logs the ignored option on each load, the console line Keith's rig showed on webgpu-bench.html); the Deno entry brain/gpu.js and the cell-tracking tool are outside this scan on purpose (the warning is the browser's)", naked.length === 0 && users.length >= 12 && users.includes("webgpu-bench.html") && users.includes("gfx/device.js"), `${users.length} files use it; direct: ${naked.join(", ") || "none"}`);
+}
+// ---- pickRenderBackend: no navigator.gpu is a reason to use the WebGL2 backend, not to give up (Xbox Edge: Chromium, WebGL2, no WebGPU)
+{
+    const gpuOk = { requestAdapter: async () => ({}) }, gpuNone = { requestAdapter: async () => null };
+    const pick = (gpu, secure, host, webgl2) => pickRenderBackend({ ...env(gpu, secure, host), webgl2 });
+    const xbox = await pick(null, true, "example.com", true), lan = await pick(null, false, "192.168.10.53", true);
+    const desk = await pick(gpuOk, true, "localhost", true), noAd = await pick(gpuNone, true, "localhost", true), dead = await pick(null, true, "example.com", false);
+    ok("!! a browser with WebGL2 and no navigator.gpu (Xbox Edge) is told to force the WebGL2 backend", xbox.backend === "webgl2" && xbox.forceWebGL === true && xbox.reason === "no-webgpu", JSON.stringify(xbox));
+    ok("...an insecure LAN origin gets the same fallback, and the reason still names the origin", lan.backend === "webgl2" && lan.forceWebGL && lan.reason === "insecure-origin", JSON.stringify(lan));
+    ok("...a real WebGPU adapter keeps WebGPU and does not force WebGL", desk.backend === "webgpu" && desk.forceWebGL === false, JSON.stringify(desk));
+    ok("...navigator.gpu present but no adapter falls back to WebGL2 rather than a blank canvas", noAd.backend === "webgl2" && noAd.forceWebGL && noAd.reason === "no-adapter", JSON.stringify(noAd));
+    ok("...neither backend available says so ('none'), and never forces WebGL", dead.backend === "none" && dead.forceWebGL === false, JSON.stringify(dead));
+    const doc = (ctx) => ({ createElement: () => ({ getContext: (k) => (k === "webgl2" ? ctx : null) }) });
+    ok("...hasWebGL2 reads a throwaway canvas, and is false with no document or a throwing one", hasWebGL2(doc({})) === true && hasWebGL2(doc(null)) === false && hasWebGL2(null) === false && hasWebGL2({ createElement() { throw new Error("x"); } }) === false);
 }
 console.log("webgpuProbe-selfcheck: " + (fails ? fails + " FAILED" : "all pass"));
 process.exit(fails ? 1 : 0);

@@ -29,6 +29,7 @@
 // same ceiling render/badTvTsl.mjs's own demo pages use.
 "use strict";
 import { SECONDS_PER_WORD } from "./captionClock.js";
+import { pickRenderBackend, hasWebGL2 } from "./webgpuProbe.mjs";
 
 /** The key ai-presence-orb.html's species picker saves under, and this widget reads. One spelling, exported. */
 export const ORB_SPECIES_KEY = "swek.orbSpecies";
@@ -90,8 +91,12 @@ export async function mountAiPresenceOrbWidget(opts = {}) {
 
     let renderer = null;
     try {
-        const rendererOpts = { canvas, forceWebGL: opts.forceWebGL === true, antialias: false, alpha: true };
-        if (opts.forceWebGL === true) {
+        // No navigator.gpu but WebGL2 present (Xbox Edge, TV browsers) -> take the WebGL2 backend up front, by the
+        // same pre-created-context route opts.forceWebGL already uses, instead of a failed WebGPU init and a warn.
+        const pick = await pickRenderBackend({ navigator, isSecureContext: window.isSecureContext, location, webgl2: hasWebGL2() });
+        const forceWebGL = opts.forceWebGL === true || pick.forceWebGL;
+        const rendererOpts = { canvas, forceWebGL, antialias: false, alpha: true };
+        if (forceWebGL) {
             // vendor/three-webgpu/three.webgpu.js's WebGLBackend.init() builds its own gl context from a
             // hardcoded attributes object (antialias/alpha/depth/stencil only) -- no renderer option reaches
             // it, so preserveDrawingBuffer above is silently dropped and any readPixels outside the render's
