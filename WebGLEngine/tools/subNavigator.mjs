@@ -7,7 +7,7 @@
 //     d(heading)/dt = -(omega_z - f_z (f . omega)) / (f_x^2 + f_y^2)          (heading = atan2(-f_y, f_x), as brain/autopilotSub.mjs and physics/mechanics/subModel6dof.mjs have it)
 // Turning the world about the vertical changes neither omega_z, f_z, f . omega nor f_x^2 + f_y^2, so the rate read from the dropout's rotated copy of the world is the true rate. Integrated by the trapezoid rule over the 30 Hz ticks from the last valid tick.
 // On real flown dives the estimate stays within 2.4e-3 rad of the true heading over a whole 60 s dive.
-// WHAT IT READS: the state and the current it is handed, and the fourth argument { compassValid }; a pilot is told the compass is valid on every tick the dropout says so, and then the wrapper is a pass-through that remembers the true heading and rate. A NEW DIVE is
+// WHAT IT READS: the state and the current it is handed, and the fourth argument { compassValid }; a pilot is told the compass is valid on every tick the dropout says so, and then the wrapper is a pass-through that remembers the true heading and rate. (The turn handed to turnWorld is not wrapped to a half turn: a rotation by 2 pi more is the same rotation.) A NEW DIVE is
 // recognised by the scenario's target object changing (as tools/subDropout.mjs and tools/subDisturb.mjs do). It has no knowledge of the windows.
 // WHAT IT IS NOT: a model of a real navigator. The simulator's body rates are exact, so this is a CEILING for dead reckoning with a perfect gyro; a real gyro drifts. And it is not a pilot: it only changes the heading the inner pilot reads.
 // Pure: no I/O, no clock, no Math.random.
@@ -15,8 +15,6 @@
 import * as S from "../physics/mechanics/subModel6dof.mjs";
 import { rotateByQuat } from "../physics/mechanics/rigidBody6dof.mjs";
 import { turnWorld } from "./subDropout.mjs";
-
-const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 
 /** The rate of change of the heading (rad/s) of a vessel state, from its body rates and its orientation. 0 for a vessel pointing straight up or down (the heading is undefined there). */
 export function headingRate(state) {
@@ -34,7 +32,7 @@ export function navigator(inner, opts = {}) {
         if (valid || !started) { est = shown; lastRate = rate; started = true; wrapped.last = { estimate: est, shown, rate }; return inner(state, tgt, current, aux); }
         est += 0.5 * (lastRate + rate) * dt; lastRate = rate;
         wrapped.last = { estimate: est, shown, rate };
-        const seen = turnWorld(state, current, wrap(est - shown));
+        const seen = turnWorld(state, current, est - shown);
         return inner(seen.state, tgt, seen.current, aux);
     };
     wrapped.last = { estimate: 0, shown: 0, rate: 0 };
