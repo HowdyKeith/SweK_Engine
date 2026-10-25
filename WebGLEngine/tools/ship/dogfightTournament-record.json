@@ -1,0 +1,328 @@
+{
+ "set": {
+  "name": "TOURNAMENT_SET",
+  "scenarios": 120,
+  "kind": "duel",
+  "seeds": [
+   4000,
+   4119
+  ]
+ },
+ "pilots": [
+  {
+   "id": "autopilot",
+   "label": "PD autopilot (the hand rule)",
+   "file": null,
+   "hash": null
+  },
+  {
+   "id": "flyFlight",
+   "label": "fruit fly trained to FLY",
+   "file": "pilotFlightWeightsDefault.json",
+   "hash": "88b2761f"
+  },
+  {
+   "id": "flyDogfight",
+   "label": "fruit fly trained to FIGHT",
+   "file": "pilotDogfightWeightsDefault.json",
+   "hash": "dc5ee8ed"
+  },
+  {
+   "id": "gpuFlight",
+   "label": "GPU Brain trained to FLY (CPU twin)",
+   "file": "pilotFlightMlpWeightsDefault.json",
+   "hash": "1ba1b116"
+  },
+  {
+   "id": "gpuDogfight",
+   "label": "GPU Brain trained to FIGHT (CPU twin)",
+   "file": "pilotDogfightMlpWeightsDefault.json",
+   "hash": "6c2cb228"
+  }
+ ],
+ "pairs": [
+  {
+   "x": "autopilot",
+   "y": "flyFlight",
+   "fights": 240,
+   "winsX": 68,
+   "winsY": 74,
+   "draws": 98,
+   "edge": 0.017013,
+   "se": 0.061336,
+   "z": 0.277377,
+   "meanX": 0.030544,
+   "meanY": 0.013531,
+   "killsX": 31,
+   "killsY": 23,
+   "collisions": 1,
+   "groundX": 0,
+   "groundY": 0
+  },
+  {
+   "x": "autopilot",
+   "y": "flyDogfight",
+   "fights": 240,
+   "winsX": 12,
+   "winsY": 169,
+   "draws": 59,
+   "edge": -1.058679,
+   "se": 0.073087,
+   "z": -14.485144,
+   "meanX": -0.479549,
+   "meanY": 0.57913,
+   "killsX": 7,
+   "killsY": 109,
+   "collisions": 3,
+   "groundX": 0,
+   "groundY": 0
+  },
+  {
+   "x": "autopilot",
+   "y": "gpuFlight",
+   "fights": 240,
+   "winsX": 62,
+   "winsY": 110,
+   "draws": 68,
+   "edge": -0.202008,
+   "se": 0.054264,
+   "z": -3.722702,
+   "meanX": -0.083052,
+   "meanY": 0.118955,
+   "killsX": 26,
+   "killsY": 33,
+   "collisions": 6,
+   "groundX": 0,
+   "groundY": 0
+  },
+  {
+   "x": "autopilot",
+   "y": "gpuDogfight",
+   "fights": 240,
+   "winsX": 37,
+   "winsY": 75,
+   "draws": 128,
+   "edge": -0.360631,
+   "se": 0.076108,
+   "z": -4.738442,
+   "meanX": -0.155477,
+   "meanY": 0.205155,
+   "killsX": 13,
+   "killsY": 56,
+   "collisions": 3,
+   "groundX": 0,
+   "groundY": 0
+  },
+  {
+   "x": "flyFlight",
+   "y": "flyDogfight",
+   "fights": 240,
+   "winsX": 41,
+   "winsY": 172,
+   "draws": 27,
+   "edge": -0.871144,
+   "se": 0.077054,
+   "z": -11.305573,
+   "meanX": -0.45678,
+   "meanY": 0.414364,
+   "killsX": 28,
+   "killsY": 104,
+   "collisions": 0,
+   "groundX": 44,
+   "groundY": 4
+  },
+  {
+   "x": "flyFlight",
+   "y": "gpuFlight",
+   "fights": 240,
+   "winsX": 36,
+   "winsY": 179,
+   "draws": 25,
+   "edge": -0.627841,
+   "se": 0.04805,
+   "z": -13.06644,
+   "meanX": -0.436707,
+   "meanY": 0.191135,
+   "killsX": 5,
+   "killsY": 26,
+   "collisions": 1,
+   "groundX": 92,
+   "groundY": 3
+  },
+  {
+   "x": "flyFlight",
+   "y": "gpuDogfight",
+   "fights": 240,
+   "winsX": 76,
+   "winsY": 66,
+   "draws": 98,
+   "edge": -0.150497,
+   "se": 0.075345,
+   "z": -1.997434,
+   "meanX": -0.039229,
+   "meanY": 0.111268,
+   "killsX": 28,
+   "killsY": 51,
+   "collisions": 0,
+   "groundX": 0,
+   "groundY": 0
+  },
+  {
+   "x": "flyDogfight",
+   "y": "gpuFlight",
+   "fights": 240,
+   "winsX": 126,
+   "winsY": 80,
+   "draws": 34,
+   "edge": 0.514664,
+   "se": 0.110063,
+   "z": 4.676095,
+   "meanX": 0.2894,
+   "meanY": -0.225264,
+   "killsX": 100,
+   "killsY": 34,
+   "collisions": 0,
+   "groundX": 15,
+   "groundY": 0
+  },
+  {
+   "x": "flyDogfight",
+   "y": "gpuDogfight",
+   "fights": 240,
+   "winsX": 133,
+   "winsY": 54,
+   "draws": 53,
+   "edge": 0.585543,
+   "se": 0.100164,
+   "z": 5.845852,
+   "meanX": 0.344639,
+   "meanY": -0.240905,
+   "killsX": 101,
+   "killsY": 45,
+   "collisions": 0,
+   "groundX": 7,
+   "groundY": 0
+  },
+  {
+   "x": "gpuFlight",
+   "y": "gpuDogfight",
+   "fights": 240,
+   "winsX": 72,
+   "winsY": 75,
+   "draws": 93,
+   "edge": -0.203082,
+   "se": 0.051854,
+   "z": -3.916441,
+   "meanX": -0.063722,
+   "meanY": 0.13936,
+   "killsX": 27,
+   "killsY": 56,
+   "collisions": 0,
+   "groundX": 0,
+   "groundY": 0
+  }
+ ],
+ "ratings": [
+  {
+   "id": "flyDogfight",
+   "rating": 130.943574
+  },
+  {
+   "id": "gpuFlight",
+   "rating": 43.413814
+  },
+  {
+   "id": "gpuDogfight",
+   "rating": -14.60359
+  },
+  {
+   "id": "autopilot",
+   "rating": -76.701568
+  },
+  {
+   "id": "flyFlight",
+   "rating": -79.553512
+  }
+ ],
+ "converged": true,
+ "fieldEdge": [
+  {
+   "id": "flyDogfight",
+   "edge": 0.757508
+  },
+  {
+   "id": "gpuDogfight",
+   "edge": 0.032167
+  },
+  {
+   "id": "gpuFlight",
+   "edge": 0.028026
+  },
+  {
+   "id": "autopilot",
+   "edge": -0.401076
+  },
+  {
+   "id": "flyFlight",
+   "edge": -0.416624
+  }
+ ],
+ "seat": {
+  "autopilot": {
+   "n": 120,
+   "mean": -0.029632,
+   "se": 0.098834
+  },
+  "flyFlight": {
+   "n": 120,
+   "mean": -0.078478,
+   "se": 0.0723
+  },
+  "flyDogfight": {
+   "n": 120,
+   "mean": -0.027427,
+   "se": 0.151689
+  },
+  "gpuFlight": {
+   "n": 120,
+   "mean": 0.17906,
+   "se": 0.077069
+  },
+  "gpuDogfight": {
+   "n": 120,
+   "mean": 0.221175,
+   "se": 0.106075
+  }
+ },
+ "cycles": [],
+ "upsets": [
+  {
+   "lower": "gpuDogfight",
+   "higher": "gpuFlight",
+   "edge": 0.203082,
+   "z": 3.916441
+  }
+ ],
+ "stability": [
+  {
+   "n": 10,
+   "maxShift": 31.925089,
+   "sameOrder": false
+  },
+  {
+   "n": 20,
+   "maxShift": 23.276727,
+   "sameOrder": true
+  },
+  {
+   "n": 40,
+   "maxShift": 19.172993,
+   "sameOrder": true
+  },
+  {
+   "n": 80,
+   "maxShift": 11.276418,
+   "sameOrder": true
+  }
+ ]
+}

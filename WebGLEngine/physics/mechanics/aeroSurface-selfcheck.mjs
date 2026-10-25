@@ -34,6 +34,8 @@
 //   C  the drag polar's k formula's aspectRatio and oswaldEfficiency swapped in the denominator (1/(pi*AR*e)
 //      -- algebraically identical when they're literally multiplied, so INSTEAD sabotaged as dropping
 //      oswaldEfficiency entirely: k = 1/(pi*aspectRatio)) -> red: section 6's direct k-value check.
+//   THE DENSITY ARGUMENT (section 16, added with the jet; unnumbered): six mutants of surfaceForce / applySurfaceForce, each red by name (the number is how many rows went red): R1 the default density 1.2 3 | R2 the density argument ignored 2 | R3 applySurfaceForce drops the density 1 |
+//      R4 the density squared 3 | R5 applySurfaceForce's own default 1.2 1 | R6 the density added and not multiplied 2.
 //   D  dynamic pressure reverted to the FULL 3D flow speed (norm3(flowBody) instead of norm3(planar)) -- an
 //      ADVERSARIAL REVIEW's own finding 1, caught here BEFORE it ever shipped -> 1 red: section 3's spanwise-
 //      flow-must-not-scale-force check (34.9996N unsabotaged vs 13896.2N sabotaged -- the exact 397x-scale
@@ -250,6 +252,16 @@ console.log("\n15. *** THE OPT-IN STALL (v4866) -- NOTHING STALLS UNLESS A SURFA
     const atTilt = A.surfaceForce(flowAt(12), tilted), noTilt = A.surfaceForce(flowAt(12), plain);   // 12 deg + 5.73 deg of incidence = 17.7 deg total, in the blend
     ok("!! the stall angle is the TOTAL alpha: 12 deg of flow + 0.1 rad of incidence stalls (cl differs from the un-stalled form), 12 deg alone does not", atTilt.alpha > A.STALL.angle && atTilt.cl !== noTilt.cl && A.surfaceForce(flowAt(12), stalled).cl === A.surfaceForce(flowAt(12), wing).cl, `alpha=${(atTilt.alpha / D).toFixed(2)}deg`);
     ok("!! no NaN or Infinity anywhere in -180..180 degrees at 0.5 deg steps, and cl never exceeds the flat plate's 1.0 once past the blend", (() => { for (let deg = -180; deg <= 180; deg += 0.5) { const r = A.surfaceForce(flowAt(deg), stalled); if (!Number.isFinite(r.cl) || !Number.isFinite(r.cd) || !r.force.every(Number.isFinite)) return false; if (Math.abs(deg) >= 23 && Math.abs(deg) <= 157 && Math.abs(r.cl) > 1 + 1e-12) return false; } return true; })());
+}
+
+
+// ---- the density argument (added with the jet, which flies where the air is thin) --------------------------------------------------------------------------------------------------------------------------------
+console.log("\n16. THE DENSITY ARGUMENT -- the sea-level value unless told otherwise, and then everything scales with it");
+{
+    const D = Math.PI / 180, surf = A.createSurface({ area: 9.4, aspectRatio: 4.7, clAlpha: 4.5, stall: A.STALL, incidence: 0.035 }), flow = (deg) => [Math.cos(deg * D) * 120, 0, -Math.sin(deg * D) * 120];
+    ok("!! THE DEFAULT IS THE SEA-LEVEL DENSITY, TO THE BIT: surfaceForce(flow, surface) is surfaceForce(flow, surface, 1.225) in every field (cl, cd, alpha, q and each force component) over -40..40 degrees, and applySurfaceForce likewise puts the same force on the accumulator", (() => { for (let deg = -40; deg <= 40; deg += 2.5) { const a = A.surfaceForce(flow(deg), surf), b = A.surfaceForce(flow(deg), surf, A.AIR_DENSITY_SEA_LEVEL); if (a.cl !== b.cl || a.cd !== b.cd || a.alpha !== b.alpha || a.q !== b.q || a.force.some((x, i) => x !== b.force[i])) return false; } return true; })() && (() => { const acc1 = A.createAccumulator(), acc2 = A.createAccumulator(); A.applySurfaceForce(acc1, flow(5), surf); A.applySurfaceForce(acc2, flow(5), surf, 1.225); return acc1.force.every((x, i) => x === acc2.force[i]) && acc1.torque.every((x, i) => x === acc2.torque[i]); })());
+    ok("!! FORCE AND DYNAMIC PRESSURE ARE LINEAR IN THE DENSITY: at 0.6, 0.3 and 1.7 kg/m^3 the force and q are the sea-level ones times rho / 1.225 (to 1e-12 relative), and the coefficients and angle of attack are untouched, bit for bit", [0.6, 0.3, 1.7].every((rho) => [-12, 3, 9, 20].every((deg) => { const a = A.surfaceForce(flow(deg), surf), b = A.surfaceForce(flow(deg), surf, rho), r = rho / 1.225; return b.cl === a.cl && b.cd === a.cd && b.alpha === a.alpha && Math.abs(b.q - a.q * r) <= 1e-12 * a.q && b.force.every((x, i) => Math.abs(x - a.force[i] * r) <= 1e-12 * Math.max(1, Math.abs(a.force[i]))); })));
+    ok("!! A VACUUM MAKES NO FORCE: density 0 gives zero q and the zero vector (not NaN), and applySurfaceForce passes the density on (the force on the accumulator at 0.6 is half what it is at 1.2, to 1e-12)", (() => { const z = A.surfaceForce(flow(5), surf, 0); return z.q === 0 && z.force.every((x) => x === 0); })() && (() => { const a1 = A.createAccumulator(), a2 = A.createAccumulator(); A.applySurfaceForce(a1, flow(5), surf, 0.6); A.applySurfaceForce(a2, flow(5), surf, 1.2); return a1.force.every((x, i) => Math.abs(x * 2 - a2.force[i]) <= 1e-12 * Math.max(1, Math.abs(a2.force[i]))); })());
 }
 
 console.log(fails ? `\naeroSurface-selfcheck: ${fails} FAILED` : "\naeroSurface-selfcheck: all checks pass");

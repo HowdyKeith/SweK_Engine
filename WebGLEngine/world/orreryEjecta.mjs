@@ -640,17 +640,27 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
     // (path.join(ROOT, "vendor", "male-cns", ...)) the substring rule never saw.
     // v4875 -- 8 -> 10: ai-bridge/subAquariumBridge.js and its selfcheck name vendor/male-cns/giant-fiber-circuit.json to ask whether the fly circuit is on the disk (the FLY BRAIN chip's availability probe); the file is not read, it is
     // looked for. A dependant by the substring rule's own test, the same kind as the three citations above, and listed because the fleet counts it.
+    // UNNUMBERED (the fish round) -- 10 -> 11: tools/fishCircuit-selfcheck.mjs READS vendor/male-cns/giant-fiber-circuit.json, to hold that the vendored fish circuit has the fly circuit file's shape (the keys the baker reads); a real reader, and the only new one.
     "male-cns": Object.freeze([
         "ai-bridge/subAquariumBridge-selfcheck.mjs",
         "ai-bridge/subAquariumBridge.js",
         "brain/gunnerPolicy-selfcheck.mjs",
         "fly-connectome.html",
         "tools/bakeGfcTopology.mjs",
+        "tools/fishCircuit-selfcheck.mjs",
         "tools/maleCnsBake.mjs",
         "tools/maleCnsLoader-selfcheck.mjs",
         "tools/ship/drivePolicy-selfcheck.mjs",
         "tools/ship/flyConnectomePage-selfcheck.mjs",
         "tools/ship/pilotPolicy-selfcheck.mjs",
+    ]),
+    // UNNUMBERED (the fish round) -- vendor/zebrafish arrived (the Fish1 TEN-analysis core, baked circuit JSON) with no entry, which importPosition-selfcheck's "every vendored body has an entry" turned red on. The list is dependantsOf() over
+    // engineSources(), run, not typed: the command that writes it (tools/fishCircuit.mjs) and three files that read it (the fish circuit's gate, the fish pilot's gate, the aquarium bridge's gate, which writes a temp tree with a vendor/zebrafish/ in it).
+    "zebrafish": Object.freeze([
+        "ai-bridge/subAquariumBridge-selfcheck.mjs",
+        "brain/pilotSubFish-selfcheck.mjs",
+        "tools/fishCircuit-selfcheck.mjs",
+        "tools/fishCircuit.mjs",
     ]),
     // vendor/mikktspace is xatlas's shape: a C reference oracle, compiled on demand by its one dependant to grade
     // physics/mesh/mikktSpace.mjs. The substring rule sees NONE -- the path is built with path.join -- which is the

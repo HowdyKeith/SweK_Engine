@@ -428,6 +428,15 @@ sec("7. THE v4297 RECORD RECONCILES, NAMES ITS REGRESSIONS, AND EVERY NAME STILL
        (uncovered > 0 ? `. ${uncovered} STILL UNSWEPT -- name them and run them; a surplus that is only ` +
                         `counted goes stale the way the equality it replaced did`
                       : `. Nothing is unaccounted for, and the next gate added makes this red until it is run.`));
+    // *** UNNUMBERED -- THE ROW ABOVE IS ONE-SIDED, AND A GATE CLAIMED TWICE FILLS IN FOR A GATE NOBODY RAN. *** `uncovered <= 0` refuses a surplus that is too SMALL and says nothing about one that is too LARGE:
+    // name a gate already swept by an older closing (or name one twice) and write swept and green one higher, and the counts add up, the sum goes one past the tree and `uncovered` goes to -1 -- which passes -- while a gate that
+    // was never run can sit unswept behind the extra claim. FOUND BY SABOTAGE: a closing with 21 of 21 where one of the 21 was an older closing's gate, and one where the same gate was listed twice, both read 0 red. The ledger today
+    // has 743 claims and 743 distinct gates, so the row costs nothing to keep true.
+    const claimed = closings.flatMap((c) => c.added || []), twice = [...new Set(claimed.filter((g, i) => claimed.indexOf(g) !== i))];
+    ok(twice.length === 0,
+       "!! *** no gate is claimed by two closings, or twice by one -- the surplus arithmetic only refuses too FEW ***",
+       twice.length ? `CLAIMED MORE THAN ONCE: ${twice.slice(0, 6).join(", ")}${twice.length > 6 ? ` and ${twice.length - 6} more` : ""} -- an extra claim lets a gate nobody ran hide behind it` :
+                      `${claimed.length} claims, ${new Set(claimed).size} distinct gates across ${closings.length} closings`);
     ok(closings.every((c) => c.green + c.red === c.swept && c.red === c.redOnArrival.length && c.added.length === c.swept &&
                              c.redOnArrival.every((r) => c.added.includes(r.gate) && typeof r.why === "string" && r.why.length > 40)),
        "...the second closing's reds are named with why (red on arrival, red on origin/main too), and its count adds up",
@@ -631,6 +640,21 @@ sec("7. THE v4297 RECORD RECONCILES, NAMES ITS REGRESSIONS, AND EVERY NAME STILL
 //   *** AND THE FIRST RUN OF THE NEW CHECK READ 0 RED BECAUSE THE GATE WAS CRASHING. *** It used ENG, which
 //   this file does not define, so the process died before printing a single FAIL line and `grep -c FAIL`
 //   returned zero. A COUNT OF FAILURES IS NOT A VERDICT UNLESS THE PROCESS FINISHED, and this one did not.
+// UNNUMBERED SABOTAGE -- the since608 closing (twenty gates of the unnumbered line), twelve mutants of tools/ship/gateSweep.mjs, each applied IN PLACE with the file restored after every one and its hash checked at the end
+//   (a scratch tree of symlinks is no use here: enumerateGates does not walk a symlinked directory, so it finds 951 gates of 2124 and every mutant reads the same two reds, a result that says nothing about the mutant):
+//   G01 a gate dropped from `added` (19 listed, 20 claimed)               1 red: the count-adds-up row
+//   G02 swept says 19                                                      2 red: 1 STILL UNSWEPT, and the count-adds-up row
+//   G03 green says 19                                                      1 red: the count-adds-up row
+//   G04 red says 1 with nothing named                                      1 red: the count-adds-up row
+//   G05 the key collides with since607                                     2 red: the duplicate ordinal row, and 10 STILL UNSWEPT
+//   G06 a gate that is not on disk is claimed                              2 red: the count-adds-up row, and "every gate the record names still exists"
+//   G07 a gate an older closing swept, claimed again (21 listed, 20)       1 red: the count-adds-up row
+//   G08 a gate listed twice in `added` (21 listed, 20)                     1 red: the count-adds-up row
+//   G09 redOnArrival names a gate while red is 0                           1 red: the count-adds-up row
+//   G10 the whole closing absent                                           1 red: 20 STILL UNSWEPT
+//   G11 an older closing's gate claimed again WITH THE COUNTS MADE TO ADD UP (21 of 21)     *** 0 RED *** -- a finding: `uncovered <= 0` refuses a surplus that is too small and has nothing to say about one that is too large
+//   G12 a gate listed twice WITH THE COUNTS MADE TO ADD UP (21 of 21)                       *** 0 RED *** -- the same finding
+//   FIXED by the row "no gate is claimed by two closings, or twice by one" (743 claims, 743 distinct gates today, so it is true of the live record); G11 and G12 re-run: 1 red each, that row, naming the gate.
 /* ------------------------------------------------------------------------------------------------------------
  * v4409 -- A FIXTURE IS NOT A GATE, AND enumerateGates COULD NOT TELL THE DIFFERENCE
  *

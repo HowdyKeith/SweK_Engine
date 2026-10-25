@@ -6,9 +6,9 @@
 // rules it must keep, and it DRIVES the page in headless Chromium against the REAL bridge (ai-bridge/subAquariumBridge.js) behind a real HTTP server, with a hostile sub in the tank.
 //   1  THE SOURCE   the page imports the tank (/render/subAquariumSim.mjs); every route it fetches is one the bridge OWNS; it never writes network text as markup (no innerHTML, outerHTML, insertAdjacentHTML,
 //                   document.write, eval or new Function anywhere in the page); it loads nothing from outside (no http(s) script, style, image or fetch); it carries the demo: meta tags and a link back to server.html; it says
-//                   STAND-IN (the network is the fruit fly's circuit; no fish circuit is vendored)
+//                   what it flies (the subs in the tank are the fruit fly's circuit; a Fish1 zebrafish core is vendored and a pilot is wired to it, but the page does not fly that body yet) and the chip colours of every state
 //   2  THE BRIDGE'S ROUTES   the four routes the page uses exist in the bridge's route table and the page uses POST only where the bridge wants POST
-//   3  THE LIVE PAGE (needs a browser; SKIPPED, and said, without one)  loads with no script error and no console error; the empty tank says so; the FISH BRAIN chip reads 'stand-in' in amber with the STAND-IN detail;
+//   3  THE LIVE PAGE (needs a browser; SKIPPED, and said, without one)  loads with no script error and no console error; the empty tank says so; the FISH BRAIN chip reads 'live' in green on THIS tree (a fish circuit vendored and brain/pilotSubWeightsFishWip.json declaring it) and its detail says the tank still flies fly-wired subs;
 //                   'Offer my subs' puts four rows in the list; both canvases are drawn; the stats line says m/s; a click selects a row and a second click deselects it; a sub whose NAME is markup (put into the
 //                   tank past the validator, to test the PAGE and not the server) appears as text: no <img> exists, no handler ran; a sub from a peer says where it came from and has no remove button, a local one has
 //                   it and removing really removes it; the speed selector works
@@ -18,7 +18,7 @@
 //   P9 the tank import path wrong 6 | P10 nothing drawn 3 | P11 selection never toggles 1 | P12 the stats never updated 2 | P13 the demo meta dropped 1 | P15 the page calls /arrive 1 | P16 an eval in the page 1
 //   P17 remove posts to the wrong route 3 | P18 the speed selector ignored 1 | P20 an outside image 3 | P21 the frame loop never starts (see the run) | P22 the fish chip never polled 1 | P23 the empty message dropped 1
 //   P24 the remove buttons on the REMOTE rows instead of the local ones 3
-//   P14 (one of THREE statements that no fish circuit is vendored removed -- the header comment, the demo:desc meta and the bridge's chip detail all say it) is an EQUIVALENT MUTANT, left standing and said.
+//   P14 (one of THREE statements that no fish circuit is vendored removed -- the header comment, the demo:desc meta and the bridge's chip detail all said it) WAS AN EQUIVALENT MUTANT, left standing and said; the page's statements changed when the fish pilot was written (see the log below), and P14 no longer exists as a mutant.
 // P4 first read 'every route is owned' off bridge.owns(), which owns the WHOLE /subaquarium namespace -- so a typo'd /subaquarium/lst passed; the row reads the bridge's explicit ROUTE TABLE now. THE GATE ITSELF WAS FLAKY: one run
 // in four failed under CPU load on a 900 ms sleep; every fixed sleep is now a wait for the page to BE ready (the chip answered, four stats lines say m/s, the canvas has pixels, the hostile row has its stats), and five
 // runs in a row pass. A page that shows a stranger's name is where this kind of gate earns its keep: P1 and P2 (innerHTML) are caught BOTH by the source scan and by the live hostile-name row.
@@ -53,7 +53,7 @@ console.log("1. THE SOURCE");
     const ext = [...body.matchAll(/(?:src|href)\s*=\s*"(https?:\/\/[^"]+)"|fetch\(\s*"(https?:\/\/[^"]+)"|url\(\s*"?(https?:\/\/[^")]+)/g)];
     ok("!! the page loads NOTHING from outside: no http(s) script, stylesheet, image or fetch", ext.length === 0, ext.map((m) => m[0]).join(" | "));
     ok("the page has the demo: meta tags (title, desc, category), a <title>, and a link back to server.html", /name="demo:title"/.test(raw) && /name="demo:desc"/.test(raw) && /name="demo:category"/.test(raw) && /<title>[^<]+<\/title>/.test(raw) && /href="\/server\.html"/.test(raw));
-    ok("!! the page is honest about the stand-in: it says STAND-IN / 'no fish circuit is vendored' in its own header and tags the chip 'stand-in'", /STAND-IN/.test(raw) && /no fish circuit is vendored/.test(raw) && /standin: "stand-in"/.test(code));
+    ok("!! the page is honest about what it flies: its header says the subs it flies are still the fly's, that a zebrafish circuit is vendored and a pilot wired to it, and that it does not fly an 803-weight fish body yet; the chip's words and colours for every state are in the code (live green, stand-in amber, offline red)", /still the fly's/.test(raw) && /does not fly an 803-weight fish body yet/.test(raw) && /vendor\/zebrafish\/PROVENANCE\.md/.test(raw) && /standin: "stand-in"/.test(code) && /live: "live"/.test(code) && /live: "#4ade80"/.test(code) && /standin: "#f6a623"/.test(code) && /offline: "#ff5a5a"/.test(code));
 }
 
 console.log("\n2. THE BRIDGE'S ROUTES");
@@ -90,7 +90,7 @@ console.log("\n3. THE LIVE PAGE");
             await pg.waitForFunction(() => document.getElementById("fishWord").textContent !== "checking\u2026" && document.getElementById("list").textContent.length > 0, null, { timeout: 10000 }).catch(() => {});
             ok("!! the page loads with no script error and no console error", errs.length === 0 && cerrs.length === 0, (errs.concat(cerrs)).join(" | ").slice(0, 300));
             const empty = await pg.textContent("#list"), chip = await pg.evaluate(() => ({ word: document.getElementById("fishWord").textContent, dot: getComputedStyle(document.getElementById("fishDot")).backgroundColor, detail: document.getElementById("fishDetail").textContent }));
-            ok("!! the empty tank SAYS it is empty (and how to fill it); the FISH BRAIN chip reads 'stand-in' in AMBER (rgb 246,166,35) and the detail line says STAND-IN and that there is no fish circuit", /tank is empty/i.test(empty) && chip.word === "stand-in" && chip.dot === "rgb(246, 166, 35)" && /STAND-IN/.test(chip.detail) && /No fish circuit/.test(chip.detail), JSON.stringify(chip).slice(0, 160));
+            ok("!! the empty tank SAYS it is empty (and how to fill it); the FISH BRAIN chip reads 'live' in GREEN (rgb 74,222,128) on this tree -- a fish circuit is vendored and a pilot declares it -- and the detail line says so AND that the tank still flies the FLY-wired subs", /tank is empty/i.test(empty) && chip.word === "live" && chip.dot === "rgb(74, 222, 128)" && /vendored fish circuit/.test(chip.detail) && /still flies the FLY-wired subs/.test(chip.detail), JSON.stringify(chip).slice(0, 200));
             await pg.click("#seedBtn"); await pg.waitForFunction(() => document.querySelectorAll("#list .row").length === 6, null, { timeout: 5000 }).catch(() => {});
             const rows = await pg.$$eval("#list .row", (r) => r.map((x) => ({ name: x.querySelector(".nm").textContent, remove: !!x.querySelector("button") })));
             ok("!! 'Offer my subs' puts this box's six champions in the list (names as text), each with a remove button (they are LOCAL), and the message says 'offered 6 subs'", rows.length === 6 && rows.every((r) => r.remove) && rows.some((r) => r.name === "Explorer PD autopilot") && /offered 6 subs/.test(await pg.textContent("#msg")), rows.map((r) => r.name).join(" | "));

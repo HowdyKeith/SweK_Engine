@@ -117,7 +117,7 @@ function flyBrainHealth(has) {
 function fishBrainHealth(has, counts = { total: 0, local: 0, remote: 0 }) {
     const pilots = (has && has.pilots) || [], tank = ` Aquarium: ${counts.total} sub${counts.total === 1 ? "" : "s"} (${counts.local} here, ${counts.remote} from peers).`;
     const fishPilots = (has && has.fishPilots) || [];   // pilot weight files that DECLARE they are wired to a fish circuit (circuit: "fish"); a file in vendor/zebrafish does not make a fly-wired pilot a fish
-    if (has && has.fishCircuit && fishPilots.length) return { state: "live", detail: `fish brain: a vendored fish circuit and ${fishPilots.length} sub pilot${fishPilots.length === 1 ? "" : "s"} wired to it.` + tank };
+    if (has && has.fishCircuit && fishPilots.length) return { state: "live", detail: `fish brain: a vendored fish circuit and ${fishPilots.length} sub pilot${fishPilots.length === 1 ? "" : "s"} wired to it. The tank itself still flies the FLY-wired subs: this page does not fly a fish-wired body yet.` + tank };
     if (has && has.fishCircuit && pilots.length) return { state: "standin", detail: `fish brain: STAND-IN. A fish circuit is vendored, but no pilot is wired to it yet; ${pilots.length} sub pilot${pilots.length === 1 ? " is" : "s are"} still wired to the FLY's Giant Fiber Circuit.` + tank };
     if (pilots.length) return { state: "standin", detail: `fish brain: STAND-IN. No fish circuit is vendored (ZAPBench is activity, not wiring); ${pilots.length} sub pilot${pilots.length === 1 ? " is" : "s are"} trained on the FLY's Giant Fiber Circuit and can fly.` + tank };
     return { state: "offline", detail: "fish brain: no sub pilot weights in this tree (brain/pilotSubWeights*Wip.json)." + tank };
