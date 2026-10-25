@@ -1,7 +1,7 @@
 {
  "version": 1,
  "generated": "derived by tools/ship/buildPageIndex.mjs -- DO NOT HAND-EDIT, the group comes from tools/ship/pageSections.mjs",
- "count": 492,
+ "count": 493,
  "pages": [
   {
    "f": "AudioLab.html",
@@ -645,6 +645,13 @@
    "t": "SweK Changelog",
    "d": "",
    "g": "systools",
+   "p": 0
+  },
+  {
+   "f": "channel.html",
+   "t": "Channel &middot; videos and repos",
+   "d": "A YouTube channel as a page: the channel's description and numbers, every video with its date, views, chapters and description, and an index of the GitHub repositories the videos mention, each with the videos that name it. Rendered from a snapshot data/channels/<slug>.json that tools/ship/takeYoutubeChannel.mjs writes; template https://www.youtube.com/@TheNextNewThingAI, the same format for SweK Engine's own channel.",
+   "g": "youtubes",
    "p": 0
   },
   {
