@@ -82,3 +82,7 @@ That paper's reconstructions are in a CATMAID server (`zf.hms.harvard.edu`), not
 - **What drives movement is not in the files as a connection.** The paper says central vestibular neurons "project directly to oculomotor and spinal neurons to drive behaviors"; the files stop at the central neurons. The nearest output readouts are cells, not circuits: the vestibulospinal neurons (their `.swc` skeletons are here) and the Mauthner cell.
 
 NOT CHECKED: that the 106 afferents are all of the right ear's utricular afferents (the paper's own statement of completeness was not read against these counts); that the `.swc` and JSON files agree with the matrices (they were listed, not opened); whether a left-right pairing exists (every name is `_R`); whether 5 dpf wiring is what a pitch-hold task should be modelled on.
+
+## What this record could not establish
+
+NOT ESTABLISHED: that the article's CC BY 4.0 licence covers the Supplementary Data and Source Data files (its text speaks of "images or other third party material"; reading it as covering them is a reading, not a quotation). NOT ESTABLISHED: that the proof-of-work-gated PMC copies are byte-identical to these files; the md5 comparison was against the bucket's own metadata only. RECORDED AS: the paper's DOI and PMCID above, the AWS bucket and keys, the fetch date, and the per-file sha256 taken on receipt and again after copying.

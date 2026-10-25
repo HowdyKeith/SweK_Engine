@@ -16177,6 +16177,13 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
         widened: Object.freeze([]),
         verdict: "the auto render scale rule, the deform field through a filterable texture, the present upsample, the beauty-pass term ablation, the coarse forms and their lean haze, the native frame timing, the scale page, the fine-relief hoist and the flight page's camera and minimap; each run alone and green, and each sabotaged to go red by name",
     }),
+    since610: Object.freeze({
+        at: "v4898", swept: 4, green: 4, red: 0,
+        added: Object.freeze(["net/bridgeBase-selfcheck.mjs", "tools/ship/channelPage-selfcheck.mjs", "tools/ship/flightMap-selfcheck.mjs", "ui/channelFeed-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "the flight page's map selector (one height function drawn and collided with, the racing circuit scaled up), the channel page and its parser against a fixture feed and a real snapshot, and the same-origin bridge URLs; each run alone and green, and each sabotaged to go red by name",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

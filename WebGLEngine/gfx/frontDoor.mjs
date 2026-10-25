@@ -349,6 +349,9 @@ export const REACH_ARRIVALS_SINCE_V4407 = Object.freeze([
     // v4895 -- found by afterVerdict again: the zoom-blur wiring round (zoomBlur-wiring) made the engine's bloom pass import the zoom-blur module.
     Object.freeze({ module: "render/zoomBlur.mjs",
         why: "v4895 (zoom-blur wiring): render/bloomPass.js imports it, so the engine's own bloom path now reaches the zoom-blur pass the engine used to carry only as a gate-read module" }),
+    // v4898 -- found by afterVerdict: the bridge-base round (the Public tunnel's page-origin bridge) made ui/memoryHUD.js import it, and main.js reaches that HUD.
+    Object.freeze({ module: "net/bridgeBase.mjs",
+        why: "v4898: ui/memoryHUD.js imports it to find the bridge from the page's own location (LAN :8787, or the page origin behind the Public tunnel), and main.js reaches the HUD" }),
 ]);
 export const REACH_LOST_SINCE_V4407 = Object.freeze([]);
 

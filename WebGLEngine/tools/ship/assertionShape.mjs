@@ -962,8 +962,9 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // And one more, tools/flyCx-selfcheck.mjs (the fly heading loop from the hemibrain export), defining ok(n, c, d) once and naming first: gates 2129 -> 2130, usesOk 2108 -> 2109, definesOk 2100 -> 2101, nameFirst 1998 -> 1999 (read off the code).
     // And two more, brain/pilotSubCircuitState-selfcheck.mjs (the stateful reservoir pilot) and tools/ship/trainSubState-selfcheck.mjs (the rung 4a study library and its command), each defining ok(n, c, d) once and naming first: gates 2130 -> 2132, usesOk 2109 -> 2111, definesOk 2101 -> 2103, nameFirst 1999 -> 2001 (read off the code: the gate reported exactly these four drifting).
     // And one more, tools/subNavigator-selfcheck.mjs (the dead-reckoning navigator and the rung 4a reference arm), defining ok(n, c, d) once and naming first: gates 2132 -> 2133, usesOk 2111 -> 2112, definesOk 2103 -> 2104, nameFirst 2001 -> 2002 (read off the code: the gate reported exactly these four drifting).
-    gates: 2133, usesOk: 2112, definesOk: 2104, importsOk: 0,
-    distinctDefinitions: 45, nameFirst: 2002, condFirst: 99, unknownSignature: 11,
+    // v4898 -- the merged tree: the beauty-pass round's nine gates (v4897 -- 2104 -> 2113, counted on the branch before the merges), this round's four (flightMap, channelFeed, channelPage, bridgeBase) and the fish and submarine lines' gates, each spelling ok(name, cond, detail): gates 2133 -> 2146, usesOk 2112 -> 2125, definesOk 2104 -> 2117, distinctDefinitions 45 -> 46 (one of the nine spells its own ok), nameFirst 2002 -> 2015 (read off the code).
+    gates: 2146, usesOk: 2125, definesOk: 2117, importsOk: 0,
+    distinctDefinitions: 46, nameFirst: 2015, condFirst: 99, unknownSignature: 11,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

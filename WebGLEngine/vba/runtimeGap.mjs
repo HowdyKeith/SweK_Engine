@@ -646,7 +646,7 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // v4881 -- the CPU sea (physics/ocean/oceanSurface.mjs and its gate): files 4853 -> 4855, ES modules 4546 -> 4548, closures 4383 -> 4385, performance.now 260 -> 261 (the gate names it in its list of things the module must not read); the other rows held.
     // v4880 (later) -- tools/ship/register-audit-v4490.mjs, the auditCap snapshot: files 4852 -> 4853, ES modules 4545 -> 4546, WebAssembly 27 -> 28 (read off the gate).
     // v4880 -- the orrery-seeded merge (24 files): files 4828 -> 4852, ES modules 4521 -> 4545, closures 4362 -> 4383, async/await 1829 -> 1837, typed arrays 1367 -> 1371, Promises 451 -> 452, WebGL 200 -> 202, WebGPU 64 -> 65; the other rows held. Read off the gate, not typed.
-    files: 4960,                              // v4897 -- RE-DERIVED over the beauty-pass round (+14 files). v4895 -- RE-DERIVED over the snow/sea round (+39 files; threads 26 and wasm 28 did not move). v4776 -- RE-DERIVED over the merged tree: 4316 on this line, 4453 on the exported-functions-mesh line, 4494 merged (they share files). ten rows moved, three held (fetch/XHR, threads, WebAssembly).
+    files: 5036,                              // v4897 -- RE-DERIVED over the beauty-pass round (+14 files). v4895 -- RE-DERIVED over the snow/sea round (+39 files; threads 26 and wasm 28 did not move). v4776 -- RE-DERIVED over the merged tree: 4316 on this line, 4453 on the exported-functions-mesh line, 4494 merged (they share files). ten rows moved, three held (fetch/XHR, threads, WebAssembly).
     // (v4691 note, carried)                               // v4691 -- RE-DERIVED: tools/ship/textureInProbe.mjs arrived, one ES module with a closure and top-level await -- four rows moved (files, ES modules, closures, async/await) and eight held.
                                // v4639: 4260 -> 4261 for tools/ship/fsrPage-selfcheck.mjs, named by the pre-flight before the verify rather than after
                           // ROUNDS, THREE RE-TAKES, each caught by the ship gate rather than by me.
@@ -1282,8 +1282,9 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // v4877 -- the rotorcraft branch and the sub work since v4875 (files 4789 -> 4813): ES modules 4482 -> 4506, closures 4325 -> 4347, async/await 1813 -> 1826, typed arrays 1346 -> 1357, Promises 444 -> 449, performance.now 255 -> 259; the other rows held.
     // v4896 -- files 4930 -> 4946, ES modules 4622 -> 4637, closures 4456 -> 4471, async/await 1877 -> 1885, typed arrays 1404 -> 1407, Promises 466 -> 471, fetch/XHR 257 -> 258: the TV commands and gates, the snowGpu split gates, the truncation guard, SweK Home's Shelf check, read off the gate; the other rows hold.
     // v4897 -- files 4946 -> 4960, ES modules 4637 -> 4651, closures 4471 -> 4484, async/await 1885 -> 1895, typed arrays 1407 -> 1410, Promises 471 -> 478, performance.now 267 -> 274, WebGPU 71 -> 78: the beauty-pass round's nine gates and its five modules (deform texture, term ablation, auto scale, frame timing, the command), read off the gate; the other rows hold.
-    esModules: 4651, closures: 4484, asyncAwait: 1895, typedArrays: 1410, promises: 478,
-    fetchXhr: 258, performanceNow: 274, raf: 131, webgl: 205, webgpu: 78, threads: 26, wasm: 28,
+    // v4898 -- files 4960 -> 5036, ES modules 4651 -> 4727, closures 4484 -> 4551, async/await 1895 -> 1929, typed arrays 1410 -> 1428, Promises 478 -> 486, performance.now 274 -> 275, fetch/XHR 258 -> 259, WebGL 205 -> 207: the channel page, the map selector, the two merged lines' modules and gates, read off the gate; the other rows hold.
+    esModules: 4727, closures: 4551, asyncAwait: 1929, typedArrays: 1428, promises: 486,
+    fetchXhr: 259, performanceNow: 275, raf: 131, webgl: 207, webgpu: 78, threads: 26, wasm: 28,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was
     // already stale by one when this round's own note strings landed. Every row below is now a red if it drifts.

@@ -1,6 +1,6 @@
 // WebGLEngine/tools/subNavigator-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node tools/subNavigator-selfcheck.mjs      (~60 s)
+// Run: node tools/subNavigator-selfcheck.mjs      (~3 s)
 //
 // THE GATE OF tools/subNavigator.mjs (the dead-reckoning navigator) AND OF THE REFERENCE ARM'S MEASUREMENT, tools/ship/subNavigatorReference.mjs with its command file tools/ship/subNavigatorReferenceCmd.mjs: the arm registered in brain/SUBMARINE_WIP.md before it was built.
 // Worked by hand:

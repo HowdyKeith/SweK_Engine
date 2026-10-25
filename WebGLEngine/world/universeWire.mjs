@@ -269,18 +269,25 @@ export const KEY_DRIFT_V4460 = Object.freeze({
             cause: "vendor/snowflow, the snow pieces the GPU lift read and adapted, is a new BODY with its own orbit, stock and prices -- v4504's field, for one body. " +
                    "Nothing in the engine loads it; the adaptations in render/ and their gates read it",
             control: "on today's tree, dropping snowflow alone gives f0fde581, the key of the move above" }),
+        // v4898 -- THREE NEW BODIES AT ONE MERGE (the fish and submarine branches): vendor/hemibrain, vendor/zebrafish and vendor/zebrafish-vestibular are new directories under vendor/, so orrery.json
+        // gained three bodies, each with its own orbit, stock and prices -- v4504's field, for three bodies. Measured on this tree by dropping the three: the hash goes back to fa9b80eb.
+        Object.freeze({ version: "v4898", commit: "ship", hash: "d4d55077", file: "orrery.json",
+            field: "bodies", bodiesTouched: 3,
+            cause: "vendor/hemibrain, vendor/zebrafish and vendor/zebrafish-vestibular, the connectome and article data the fish and fly submarine pilots read, are three new BODIES with their own orbits, stock and prices -- v4504's field, for three bodies. " +
+                   "Only the circuit commands, trainers and their gates depend on them (zebrafish-vestibular on none)",
+            control: "on today's tree, dropping hemibrain, zebrafish and zebrafish-vestibular together gives fa9b80eb, the key of the move above" }),
     ]),
-    current: "fa9b80eb",
+    current: "d4d55077",
     // *** MEASURED AND NEGATIVE, AND IT CORRECTS MY OWN FIRST WRITING OF THE ENTRY ABOVE. *** The re-bake's
     // diff moved TWO fields on 16 bodies each, `arrived` and `sha`, and I wrote "arrived + sha" into this
     // record straight off that diff -- the exact mistake bytesDoNotReachTheEconomy exists to record, made
     // again in the same file four moves later. `sha` reaches NOTHING: each of the 18 bodies' sha set to
     // forty zeros in turn, one at a time, and the hash never moved. A DIFF NAMES WHAT CHANGED, NOT WHAT
     // COUNTED, and the only way to tell them apart is to run it.
-    shaDoesNotReachTheEconomy: Object.freeze({ bodiesTried: 25, movedTheHash: 0,
+    shaDoesNotReachTheEconomy: Object.freeze({ bodiesTried: 28, movedTheHash: 0,
         note: "against `arrived`, the same probe on the same 22 bodies: 22 of 22 moved the hash. 18 at " +
               "v4534; xatlas made it 19 at v4560; draco-encoder made it 20 at v4535; male-cns and mikktspace " +
-              "made it 22 at v4778; three-webgpu-r185 made it 23 at v4819; web-ocean made it 24 at v4880, and the probe is re-run rather than the count adjusted" }),
+              "made it 22 at v4778; three-webgpu-r185 made it 23 at v4819; web-ocean made it 24 at v4880; snowflow made it 25 at v4895 and hemibrain, zebrafish and zebrafish-vestibular made it 28 at v4898, and the probe is re-run rather than the count adjusted" }),
     // WHY THE 2026-09-07 DRIFT SHIPPED ANYWAY, read from tools/ship/sweep-timings.json rather than argued:
     // the gate is over the ship-time budget, so quickSweep does not run it, so its recorded verdict is a
     // snapshot of a tree that no longer exists. The RELATION (gate slower than budget) is asserted live in

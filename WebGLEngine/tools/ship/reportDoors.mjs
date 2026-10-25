@@ -94,7 +94,8 @@ export function population(root) {
     walk(root);
     // second pass, once the whole tree's gate names are known: a gate that does not sit beside its subject
     // is still a gate, and the two facts are kept apart rather than one standing in for the other
-    for (const r of out) r.gateAnywhere = r.hasGate || gateNames.has(path.basename(r.rel).replace(/\.(js|mjs)$/, "-selfcheck.mjs"));
+    for (const r of out) r.gateAnywhere = r.hasGate || gateNames.has(path.basename(r.rel).replace(/\.(js|mjs)$/, "-selfcheck.mjs")) ||
+        (GATED_ELSEWHERE[r.rel] !== undefined && (() => { try { return fs.readFileSync(path.join(root, GATED_ELSEWHERE[r.rel]), "utf8").includes(path.basename(r.rel)); } catch { return false; } })());
     out.sort((a, b) => a.rel.localeCompare(b.rel));
     if (_memo) _memo.set(root, out.map((r) => ({ ...r })));
     return out;
@@ -143,6 +144,11 @@ export const FORMATTERS = Object.freeze([
     // one alone. The note above was written about exactly this and it did not stop me: the round that adds
     // a formatter is the round least likely to remember there are two lists of them.
     "tools/ship/quickSweep.mjs",          // v4647f: reportLines(r) -- renders a sweep result, bare call throws
+    // v4898 -- FOUR ARRIVALS FROM THE JET / SUBMARINE BRANCHES, each found by this gate reading 13 formatters against 9 registered, and each confirmed by CALLING it bare (the section 3 loop).
+    "brain/dogfightTournament.mjs",
+    "tools/ship/subNavigatorReference.mjs",
+    "tools/ship/trainSubCircuits.mjs",
+    "tools/ship/trainSubState.mjs",
 ]);
 
 // *** AND Function.length CANNOT TELL THE LAST TWO FROM THE FIRST FOUR EITHER, WHICH IS THE THIRD INSTRUMENT
@@ -188,6 +194,11 @@ export const STRICT_FORMATTERS = Object.freeze([
     // v4647o -- measured the same way, by CALLING it bare: "Cannot read properties of undefined (reading
     // 'ran')". It refuses, so it is strict; it does not fabricate a report out of nothing.
     "tools/ship/quickSweep.mjs",
+    // v4898 -- FOUR ARRIVALS FROM THE JET / SUBMARINE BRANCHES, each found by this gate reading 13 formatters against 9 registered, and each confirmed by CALLING it bare (the section 3 loop).
+    "brain/dogfightTournament.mjs",
+    "tools/ship/subNavigatorReference.mjs",
+    "tools/ship/trainSubCircuits.mjs",
+    "tools/ship/trainSubState.mjs",
 ]);
 export const TOLERANT_FORMATTERS = Object.freeze([
     "tools/roundhouse/curriculum.mjs",
@@ -443,9 +454,17 @@ export const UNGATED_ANYWHERE_V4565 = Object.freeze([
  *  wrote it down, v4540 when it arrived here through a merge and v4587 on main. Concatenating would count it
  *  twice and hand every future arrival a permanent credit of one, which is the fault closingCoverage was
  *  rebuilt for at v4399: freeze by NAME, not by COUNT. */
+/** v4898 -- tools/ship/subNavigatorReference.mjs arrived at the submarine merge with its gate in tools/subNavigator-selfcheck.mjs (which imports it), not beside it. */
+export const NO_GATE_V4898 = Object.freeze([
+    "tools/ship/subNavigatorReference.mjs",
+]);
+/** A module whose gate carries ANOTHER module's name and imports this one. The name-based second pass cannot see it, so it is declared here and VERIFIED where it is read (the gate file exists and names the module). */
+export const GATED_ELSEWHERE = Object.freeze({
+    "tools/ship/subNavigatorReference.mjs": "tools/subNavigator-selfcheck.mjs",
+});
 export const NO_GATE_ALL = Object.freeze([...new Set(
     [...NO_GATE_V4458, ...NO_GATE_V4531, ...NO_GATE_V4565, ...NO_GATE_V4540, ...NO_GATE_V4587,
-     ...NO_GATE_V4778])].sort());
+     ...NO_GATE_V4778, ...NO_GATE_V4898])].sort());
 
 /** This module's own front door -- it is a member of the population it counts. */
 export function reportLines() {

@@ -1,6 +1,6 @@
 // WebGLEngine/tools/subDropout-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node tools/subDropout-selfcheck.mjs      (~10 s)
+// Run: node tools/subDropout-selfcheck.mjs      (~4 s)
 //
 // THE GATE OF tools/subDropout.mjs: a compass that stops reporting, around any pilot. Every number is worked out by hand.
 //   WINDOWS (defaults: 2 windows of 16 s between 5 s and 59 s of a 60 s dive, 30 ticks a second): len 480 ticks, lo 150, hi 1770, slot (1770 - 150) / 2 = 810, slack 810 - 480 = 330.

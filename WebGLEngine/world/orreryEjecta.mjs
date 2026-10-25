@@ -656,12 +656,26 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
     ]),
     // UNNUMBERED (the fish round) -- vendor/zebrafish arrived (the Fish1 TEN-analysis core, baked circuit JSON) with no entry, which importPosition-selfcheck's "every vendored body has an entry" turned red on. The list is dependantsOf() over
     // engineSources(), run, not typed: the command that writes it (tools/fishCircuit.mjs) and three files that read it (the fish circuit's gate, the fish pilot's gate, the aquarium bridge's gate, which writes a temp tree with a vendor/zebrafish/ in it).
+    // v4898 -- RE-TAKEN 4 -> 8 at the merge of the submarine branches (dependantsOf over the swept files, run): the hindbrain-integrator command (tools/fishHmi.mjs), the rung-3 trainer and its gate, and the circuit pilot's gate now read the baked circuit.
     "zebrafish": Object.freeze([
         "ai-bridge/subAquariumBridge-selfcheck.mjs",
+        "brain/pilotSubCircuit-selfcheck.mjs",
         "brain/pilotSubFish-selfcheck.mjs",
         "tools/fishCircuit-selfcheck.mjs",
         "tools/fishCircuit.mjs",
+        "tools/fishHmi.mjs",
+        "tools/ship/trainSubCircuits-selfcheck.mjs",
+        "tools/ship/trainSubCircuits.mjs",
     ]),
+    // v4898 -- vendor/hemibrain (the fly central-complex heading loop) arrived at the merge with no entry; its four dependants, dependantsOf run, not typed: the exporter (tools/flyCx.mjs), the rung-4a trainer and its gate, and the stateful pilot's gate.
+    "hemibrain": Object.freeze([
+        "brain/pilotSubCircuitState-selfcheck.mjs",
+        "tools/flyCx.mjs",
+        "tools/ship/trainSubState-selfcheck.mjs",
+        "tools/ship/trainSubState.mjs",
+    ]),
+    // v4898 -- vendor/zebrafish-vestibular is a PAPER-ONLY body: the supplementary files of an article, read by no source file (dependantsOf returns []), which is a measurement and not an omission.
+    "zebrafish-vestibular": Object.freeze([]),
     // vendor/mikktspace is xatlas's shape: a C reference oracle, compiled on demand by its one dependant to grade
     // physics/mesh/mikktSpace.mjs. The substring rule sees NONE -- the path is built with path.join -- which is the
     // v4410 case this record exists for, and the positional rule's `joined` kind is what finds it.
@@ -676,6 +690,8 @@ export const EJECTA_BASELINE = Object.freeze(Object.fromEntries(
 
 /** The three that are paperwork rather than payload, named so a rise or a fall is visible. */
 export const PAPER_ONLY_BODIES = Object.freeze(["grass", "keyhunt", "slug"]);
+/** v4898 -- bodies that hold DATA and no code, reached by no source file: zebrafish-vestibular is the supplementary tables (two spreadsheets, a zip) of an article, which a gate may read one day but no file in the tree does. They are payload, so they are not PAPER_ONLY_BODIES, and they are not code, so the "no vendored code nothing reaches" claim survives; the gate checks the second half against the disk. */
+export const DATA_ONLY_BODIES = Object.freeze(["zebrafish-vestibular"]);
 
 /**
  * Every directory named `vendor` in the tree, not just the top-level one.

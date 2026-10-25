@@ -151,6 +151,11 @@ export const NOT_A_LICENCE_BODY = Object.freeze([
         "it NAMES the Creative Commons Attribution 4.0 International License and links it, and does not carry the licence's legal code, " +
         "which is what identify() reads for. The same file says that the paragraph speaks of 'images or other third party material' and that its " +
         "covering the supplementary files is a reading. Nothing here for identify() to match." },
+    // v4898 -- two more at the fish and fly merges, each read off its register row and PROVENANCE.md here rather than typed from memory.
+    { path: "vendor/zebrafish", why: "the grant is the Fish1 release's DATA POLICY, recorded in PROVENANCE.md as a policy that asks for citation. " +
+        "It is not CC-BY or any named licence and carries no licence text, so there is no body for identify() to match." },
+    { path: "vendor/hemibrain", why: "the grant is the release's stated CC-BY 4.0 as a NAME recorded in PROVENANCE.md, which says in the same " +
+        "breath that it was not re-read from the release's own text. A name is not CC-BY's legal code, so identify() has nothing to read." },
     { path: "vendor/mikktspace", why: "the grant is the zlib text in the header comment of mikktspace.h and " +
         "mikktspace.c, verbatim; the upstream repository carries no LICENSE file. identify() knows the MIT, " +
         "0BSD, OFL and Apache bodies and has no zlib clause set, so it correctly returns null here." },

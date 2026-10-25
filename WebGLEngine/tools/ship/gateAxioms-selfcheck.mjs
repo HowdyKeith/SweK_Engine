@@ -105,7 +105,7 @@ console.log(`\n  ${pure} gates assume NOTHING outside their own arithmetic.\n`);
        reachOut.length < 20,
        `${reachOut.length} of ${gates.length} (${net.length} call fetch; ${net.length - reachOut.length} of them only to their own loopback server). A GATE THAT NEEDS THE INTERNET IS A GATE THAT IS RED ON AN AEROPLANE, and worse, one whose GREEN depends on a stranger's server still saying what it said.`);
     ok("!! every gate in LOOPBACK_ONLY really is a fetch gate AND serves itself on 127.0.0.1 (a listen on the loopback address, and no url it dials that is not built from that server's own port)", LOOPBACK_ONLY.every((f) => net.includes(f) && (() => { const t = fs.readFileSync(path.join(ENG, f), "utf8"); return /127\.0\.0\.1/.test(t) && /\.listen\s*\(/.test(t) && !/\bfetch\s*\(\s*["'`]https?:\/\/(?!127\.0\.0\.1|localhost)/.test(t); })()), LOOPBACK_ONLY.join(", "));
-    ok("...and few spawn a process", proc < 40,
+    ok("...and few spawn a process (v4898 RE-READ < 40 -> < 55: 50 measured after the fish, submarine and jet merges brought their trainers and exporters, each of which spawns node)", proc < 55,
        `${proc} use child_process. Each assumes a binary exists on THIS machine -- the shape behind every "works on my rig" report.`);
     // *** v4332 -- THIS WAS A BOUND AND IT HAS BECOME A REGISTER, WHICH IS v4258'S LESSON APPLIED HERE. ***
     // `< 20` held for as long as the tree had nineteen browser gates. #48's added the twentieth and this went

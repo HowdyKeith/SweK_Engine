@@ -247,6 +247,22 @@
    ]
   },
   {
+   "name": "hemibrain",
+   "arrived": "2026-10-24",
+   "sha": "2418774882837c1702bb36d34f7536be4a043a3b",
+   "bytes": 115350,
+   "files": [
+    {
+     "path": "hemibrain-cx-heading-loop.json",
+     "bytes": 111824
+    },
+    {
+     "path": "PROVENANCE.md",
+     "bytes": 3526
+    }
+   ]
+  },
+  {
    "name": "htmx",
    "arrived": "2026-08-19",
    "sha": "66db97c45b5286d98d1c018506effca552f05a23",
@@ -2039,6 +2055,50 @@
     {
      "path": "xatlas.h",
      "bytes": 9904
+    }
+   ]
+  },
+  {
+   "name": "zebrafish",
+   "arrived": "2026-10-23",
+   "sha": "e998ee215638a8522087fe83cd596c9d12ac5361",
+   "bytes": 26027,
+   "files": [
+    {
+     "path": "fish1-hmi-spn.json",
+     "bytes": 11232
+    },
+    {
+     "path": "fish1-ten-core.json",
+     "bytes": 7682
+    },
+    {
+     "path": "PROVENANCE.md",
+     "bytes": 7113
+    }
+   ]
+  },
+  {
+   "name": "zebrafish-vestibular",
+   "arrived": "2026-10-24",
+   "sha": "894bd65159b001c770ad2dced7582dc8cab4342b",
+   "bytes": 2491929,
+   "files": [
+    {
+     "path": "41467_2022_32824_MOESM11_ESM.zip",
+     "bytes": 2401174
+    },
+    {
+     "path": "41467_2022_32824_MOESM4_ESM.xlsx",
+     "bytes": 45452
+    },
+    {
+     "path": "41467_2022_32824_MOESM5_ESM.xlsx",
+     "bytes": 32249
+    },
+    {
+     "path": "PROVENANCE.md",
+     "bytes": 13054
     }
    ]
   }

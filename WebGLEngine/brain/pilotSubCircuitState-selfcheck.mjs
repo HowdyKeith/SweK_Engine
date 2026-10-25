@@ -1,6 +1,6 @@
 // WebGLEngine/brain/pilotSubCircuitState-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node brain/pilotSubCircuitState-selfcheck.mjs      (~30 s)
+// Run: node brain/pilotSubCircuitState-selfcheck.mjs      (~9 s)
 //
 // THE GATE OF brain/pilotSubCircuitState.mjs: a submarine pilot whose only memory is a circuit's wiring. Every number is worked out by hand on two circuits of three cells.
 //

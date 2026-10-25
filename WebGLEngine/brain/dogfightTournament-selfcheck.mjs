@@ -1,6 +1,6 @@
 // WebGLEngine/brain/dogfightTournament-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node brain/dogfightTournament-selfcheck.mjs      (~30 s)
+// Run: node brain/dogfightTournament-selfcheck.mjs      (~10 s)
 //
 // THE ROUND ROBIN, HELD TO ANSWERS KNOWN BY CONSTRUCTION. A tournament over the shipped pilots has no answer anyone knew beforehand, so this gate does not ask it one: it flies REAL duels between stand-ins whose result is forced (the autopilot, a copy of the autopilot written as a different function,
 // a pilot that holds a heading and does nothing else, a pilot with no controls) and drives the counting, the rating and the checks on numbers made up for them. brain/dogfightTournament.mjs is the machinery under test; the pilots are tools/ship/tournamentDogfight.mjs's business.
