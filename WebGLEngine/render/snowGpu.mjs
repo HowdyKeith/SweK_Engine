@@ -29,7 +29,7 @@ import { KERNEL_WGSL, NOISE_WGSL, DeformField, MAX_BRUSHES, packParams } from ".
 import { DEFORM_READ_WGSL } from "./deformRead.mjs";
 import { CLIPMAP_WGSL, buildClipmap } from "./clipmapTerrain.mjs";
 import { BAKE_KERNEL_WGSL, sunFrom, bakeSky, MIP_KERNEL_WGSL, SKY_LEVELS, mipFloats } from "./skyBake.mjs";
-import { AERIAL_WGSL } from "./aerial.mjs";
+import { AERIAL_WGSL, AERIAL_LEAN_WGSL } from "./aerial.mjs";
 import { FINE_NOISE_WGSL, FINE_TERRAIN_WGSL, DETAIL_BAKE_KERNEL_WGSL, DETAIL_MIP_KERNEL_WGSL, DETAIL_RES, DETAIL_LEVELS, GRAIN_SCALE } from "./snowFine.mjs";
 import { SHADING_WGSL, projectSH } from "./snowShading.mjs";
 import { CASCADE_SHADOW_WGSL, fitCascades, CASCADE_COUNT, SPLITS } from "./cascades.mjs";
@@ -226,8 +226,10 @@ override CASCADE: u32 = 0u;
 export const BEAUTY_WGSL = FRAME_STRUCT + SKY_SAMPLE_WGSL + SURFACE_WGSL + /* wgsl */ `
 ${SHADING_WGSL}
 ${AERIAL_WGSL}
+${AERIAL_LEAN_WGSL}
 ${CASCADE_SHADOW_WGSL}
 override HOIST_FINE: bool = false;
+override COARSE_FORMS: bool = false;
 @group(0) @binding(6) var detailTex: texture_2d<f32>;
 @group(0) @binding(7) var detailTexSampler: sampler;
 
@@ -263,6 +265,11 @@ fn detailNormal(
     return n;
 }
 
+// COARSE_FORMS (snow-beauty-pass-cost item 3): the haze through applyAerialLean, which is the upstream arithmetic without the reads that cannot show (render/aerial.mjs)
+fn aerialPick(color: vec3f, camPos: vec3f, worldPos: vec3f, viewDir: vec3f, sunDir: vec3f, sunColor: vec3f, density: f32, heightFalloff: f32, fogStart: f32, strength: f32) -> vec3f {
+    if (COARSE_FORMS) { return applyAerialLean(color, camPos, worldPos, viewDir, sunDir, sunColor, density, heightFalloff, fogStart, strength); }
+    return applyAerial(color, camPos, worldPos, viewDir, sunDir, sunColor, density, heightFalloff, fogStart, strength);
+}
 // the fine relief: the exact windLocal and scour per pixel, or the vertex stage's two fields interpolated (HOIST_FINE; snow-beauty-pass-cost item 2)
 fn fineRelief(p: vec2f, exposure: f32, footprint: f32, wl: vec3f) -> vec3f {
     if (HOIST_FINE) { return terrainFineFilteredWith(p, F.wind.x, exposure, F.wind.y, footprint, wl.xy, wl.z); }
@@ -336,8 +343,8 @@ fn fineRelief(p: vec2f, exposure: f32, footprint: f32, wl: vec3f) -> vec3f {
             let d = detailNormal(world, N, 1.7, steep, ddxW, ddyW);
             acc = blendNormalRNM(acc, mix(vec3f(0.0, 0.0, 1.0), d, f1 * 0.85));
         }
-        let f2 = 1.0 - smoothstep(0.1, 0.7, footprint);
-        if (f2 > 0.001) {
+        let f2 = 1.0 - smoothstep(0.1, select(0.7, 0.45, COARSE_FORMS), footprint);
+        if (f2 > select(0.001, 0.03, COARSE_FORMS)) {
             let d = detailNormal(world, N, 0.31, steep, ddxW, ddyW);
             acc = blendNormalRNM(acc, mix(vec3f(0.0, 0.0, 1.0), d, f2 * 0.6));
         }
@@ -443,7 +450,7 @@ fn fineRelief(p: vec2f, exposure: f32, footprint: f32, wl: vec3f) -> vec3f {
     let caveTint = mix(vec3f(1.0), vec3f(0.55, 0.72, 1.0), (1.0 - ao) * 0.95);
     color *= ao * caveTint;
 
-    color = applyAerial(
+    color = aerialPick(
         color, F.camPos.xyz, world, -V, L,
         sunRadiance,
         F.fog.x, F.fog.y, F.fog.z,
@@ -591,7 +598,7 @@ export function skyAmbient(sunDir, intensity, groundBounce) {
  * Build the whole frame graph on `device`. Options: { canvas (a canvas with a webgpu context, optional), format (the canvas format), width, height, deformRes, deformSize, gridN, levels, baseSpacing, shadowRes }.
  * Returns the driver: frame(dt, focus, cam, opts), stamp(...), setSun(elev, azim), readField(), readSky(), dumpTerrain(verts), shot(), errors, stats, and the resources the gate reads.
  */
-export async function createSnowGpu(device, { canvas = null, format = "bgra8unorm", width = 320, height = 180, deformRes = 128, deformSize = 20, gridN = 32, levels = 5, baseSpacing = 0.2, shadowRes = SHADOW_RES, passTimers = false, ablate = [], hoistFine = false } = {}) {   // `ablate`: terms of the beauty shader compiled OUT, for measuring (render/snowAblate.mjs); the picture is wrong on purpose
+export async function createSnowGpu(device, { canvas = null, format = "bgra8unorm", width = 320, height = 180, deformRes = 128, deformSize = 20, gridN = 32, levels = 5, baseSpacing = 0.2, shadowRes = SHADOW_RES, passTimers = false, ablate = [], hoistFine = false, coarseForms = false } = {}) {   // `ablate`: terms of the beauty shader compiled OUT, for measuring (render/snowAblate.mjs); the picture is wrong on purpose
     const GU = U().GPUBufferUsage, TU = U().GPUTextureUsage, SS = U().GPUShaderStage, MM = U().GPUMapMode;
     const errors = []; device.addEventListener("uncapturederror", (e) => errors.push(String(e.error && e.error.message || e)));
     const mkBuf = (size, usage, label) => device.createBuffer({ size: Math.max(16, Math.ceil(size / 4) * 4), usage, label });
@@ -642,7 +649,7 @@ export async function createSnowGpu(device, { canvas = null, format = "bgra8unor
     const shadowPipe = [0, 1, 2].map((c) => device.createRenderPipeline({ layout: device.createPipelineLayout({ bindGroupLayouts: [bglShadow] }), vertex: { module: vModule, entryPoint: "vsShadow", constants: { CASCADE: c }, buffers: [vbufLayout] }, primitive: { topology: "triangle-list", cullMode: "none" }, depthStencil: { format: "depth32float", depthWriteEnabled: true, depthCompare: "less" } }));
     const targets = [{ format: HDR_FORMAT }, { format: DEPTH_FORMAT }];
     const mainLayout = device.createPipelineLayout({ bindGroupLayouts: [bglMain] });
-    const terrainPipe = device.createRenderPipeline({ layout: mainLayout, vertex: { module: vModule, entryPoint: "vsMain", constants: { HOIST_FINE: hoistFine ? 1 : 0 }, buffers: [vbufLayout] }, fragment: { module: bModule, entryPoint: "fsTerrain", constants: { HOIST_FINE: hoistFine ? 1 : 0 }, targets }, primitive: { topology: "triangle-list", cullMode: "none" }, depthStencil: { format: "depth32float", depthWriteEnabled: true, depthCompare: "less" } });
+    const terrainPipe = device.createRenderPipeline({ layout: mainLayout, vertex: { module: vModule, entryPoint: "vsMain", constants: { HOIST_FINE: hoistFine ? 1 : 0 }, buffers: [vbufLayout] }, fragment: { module: bModule, entryPoint: "fsTerrain", constants: { HOIST_FINE: hoistFine ? 1 : 0, COARSE_FORMS: coarseForms ? 1 : 0 }, targets }, primitive: { topology: "triangle-list", cullMode: "none" }, depthStencil: { format: "depth32float", depthWriteEnabled: true, depthCompare: "less" } });
     const skyPipe = device.createRenderPipeline({ layout: mainLayout, vertex: { module: bModule, entryPoint: "vsSky" }, fragment: { module: bModule, entryPoint: "fsSky", targets }, primitive: { topology: "triangle-list" }, depthStencil: { format: "depth32float", depthWriteEnabled: false, depthCompare: "always" } });
     const dumpPipe = device.createComputePipeline({ layout: device.createPipelineLayout({ bindGroupLayouts: [bglShadow, bglDump] }), compute: { module: vModule, entryPoint: "dumpTerrain" } });
     const deformPipe = device.createComputePipeline({ layout: "auto", compute: { module: device.createShaderModule({ code: KERNEL_WGSL }), entryPoint: "main" } });

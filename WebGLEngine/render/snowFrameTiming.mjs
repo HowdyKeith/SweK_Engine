@@ -58,8 +58,8 @@ export function parseTimingLine(line) {
  * Warm up, then time `frames` frames one at a time (latency) and `frames` more submitted back to back (throughput), on `device`, at width x height. `now` and `idle` are injectable so the rules are
  * driven on fixtures; live they are performance.now and device.queue.onSubmittedWorkDone. Returns the raw lists and the GPU errors the device raised (an uncaptured error is a failed frame, not a slow one).
  */
-export async function timeFrames(device, { width = 320, height = 180, warmup = WARMUP_FRAMES, warmupMs = WARMUP_MS, frames = TIMED_FRAMES, shadowRes, passTimers = false, ablate = [], hoistFine = false, now = () => performance.now(), idle = () => device.queue.onSubmittedWorkDone(), create = createSnowGpu } = {}) {
-    const g = await create(device, { canvas: null, width, height, ...(shadowRes ? { shadowRes } : {}), ...(passTimers ? { passTimers: true } : {}), ...(ablate.length ? { ablate } : {}), ...(hoistFine ? { hoistFine: true } : {}) });
+export async function timeFrames(device, { width = 320, height = 180, warmup = WARMUP_FRAMES, warmupMs = WARMUP_MS, frames = TIMED_FRAMES, shadowRes, passTimers = false, ablate = [], hoistFine = false, coarseForms = false, now = () => performance.now(), idle = () => device.queue.onSubmittedWorkDone(), create = createSnowGpu } = {}) {
+    const g = await create(device, { canvas: null, width, height, ...(shadowRes ? { shadowRes } : {}), ...(passTimers ? { passTimers: true } : {}), ...(ablate.length ? { ablate } : {}), ...(hoistFine ? { hoistFine: true } : {}), ...(coarseForms ? { coarseForms: true } : {}) });
     let i = 0;
     const w0 = now();
     for (let k = 0; k < warmup || now() - w0 < warmupMs; k++, i++) { const o = orbitAt(i); await g.frame(1 / 60, o.focus, o.cam); await idle(); }
@@ -134,7 +134,7 @@ export function ablationRows(seq) {
 }
 /** One line a term:  reading snowAblate: native 1280x720 shadowRes 2048 beauty pass 50.2 ms; without shadow 48.0 ms (saves 2.20 ms, 4.4% of the pass; baselines 50.1 and 50.3); adapter NAME */
 export function ablationLine(w, h, shadowRes, row, adapter) {
-    return `reading snowAblate: native ${w}x${h} shadowRes ${shadowRes || 2048} beauty pass ${f1(row.base)} ms; ${row.term === HOIST_TERM ? "with" : "without"} ${row.term} ${f1(row.without)} ms (saves ${row.saves.toFixed(2)} ms, ${row.pct.toFixed(1)}% of the pass; baselines ${f1(row.before)} and ${f1(row.after)}); adapter ${adapter}`;
+    return `reading snowAblate: native ${w}x${h} shadowRes ${shadowRes || 2048} beauty pass ${f1(row.base)} ms; ${FORM_TERMS[row.term] ? "with" : "without"} ${row.term} ${f1(row.without)} ms (saves ${row.saves.toFixed(2)} ms, ${row.pct.toFixed(1)}% of the pass; baselines ${f1(row.before)} and ${f1(row.after)}); adapter ${adapter}`;
 }
 export function parseAblationLine(line) {
     const m = /reading snowAblate: native (\d+)x(\d+) shadowRes (\d+) beauty pass ([\d.]+) ms; with(?:out)? (\w+) ([\d.]+) ms \(saves (-?[\d.]+) ms, (-?[\d.]+)% of the pass; baselines ([\d.]+) and ([\d.]+)\); adapter (.*)$/.exec(line);
@@ -142,10 +142,14 @@ export function parseAblationLine(line) {
 }
 /** the one term of --ablate that is not a removal: the beauty pass with the fine relief's slow fields interpolated from the vertex stage (snow-beauty-pass-cost item 2) */
 export const HOIST_TERM = "hoist";
+/** and item 3's: the detail layer fades out sooner and the haze skips the sky reads that cannot show (COARSE_FORMS; the picture differs slightly) */
+export const COARSE_TERM = "coarse";
+/** the terms of --ablate that remove nothing but turn a cheaper form ON: their "saves" is what the form is worth */
+export const FORM_TERMS = Object.freeze({ [HOIST_TERM]: { hoistFine: true }, [COARSE_TERM]: { coarseForms: true } });
 /** Run the whole ablation on `device`: base, each term, base, ... base, each a pass-timed run at width x height; returns the sequence of beauty-pass medians for ablationRows. */
 export async function runAblation(device, { width, height, terms, warmup = WARMUP_FRAMES, frames = TIMED_FRAMES, shadowRes, run = timeFrames } = {}) {
-    const seq = [], one = async (name, ablate, hoistFine = false) => { const r = await run(device, { width, height, warmup, frames, shadowRes, passTimers: true, ablate, ...(hoistFine ? { hoistFine: true } : {}) }); const b = r.passes && r.passes.beauty; if (!b || !b.length) throw new Error("runAblation: no beauty-pass time (this adapter has no timestamp-query?)"); seq.push({ name, beauty: summarise(b.map((v) => Math.max(v, 1e-6))).median }); };
+    const seq = [], one = async (name, ablate, form = {}) => { const r = await run(device, { width, height, warmup, frames, shadowRes, passTimers: true, ablate, ...form }); const b = r.passes && r.passes.beauty; if (!b || !b.length) throw new Error("runAblation: no beauty-pass time (this adapter has no timestamp-query?)"); seq.push({ name, beauty: summarise(b.map((v) => Math.max(v, 1e-6))).median }); };
     await one("base", []);
-    for (const t of terms) { await (t === HOIST_TERM ? one(t, [], true) : one(t, [t])); await one("base", []); }   // `hoist` removes nothing: it TURNS ON the vertex-stage fine fields, so its "saves" is what the hoist is worth
+    for (const t of terms) { await (FORM_TERMS[t] ? one(t, [], FORM_TERMS[t]) : one(t, [t])); await one("base", []); }   // `hoist` removes nothing: it TURNS ON the vertex-stage fine fields, so its "saves" is what the hoist is worth
     return seq;
 }

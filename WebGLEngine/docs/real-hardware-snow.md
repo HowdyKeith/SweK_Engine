@@ -115,5 +115,9 @@ Why the two big ones are expensive. **fine**: `terrainFineFiltered` runs a 3-oct
 To see what it did on the Intel (the term was 20.1 ms of a 65 ms pass at 1280x720), from the same clone after `git pull`:
 ```bat
 cd /d C:\SweK_timing\WebGLEngine
-node tools\ship\takeSnowFrameTiming.mjs --ablate --terms deform,fine --passes --bracket --sizes 1280x720,640x360 --out snow-deform-texture-intel.json
+node tools\ship\takeSnowFrameTiming.mjs --ablate --terms deform,fine,hoist,coarse --passes --bracket --sizes 1280x720,640x360 --out snow-forms-intel.json
 ```
+
+## The fine-relief hoist and the coarse forms (built, off by default; the rig timing is owed)
+
+`createSnowGpu({ hoistFine: true })` evaluates windLocal (veer, stretch) and the scour noise once per VERTEX and interpolates them; `createSnowGpu({ coarseForms: true })` fades the 0.31 detail layer out sooner (footprint 0.45 m, was 0.7; not read under a weight of 0.03, was 0.001) and runs the haze through `applyAerialLean`, which skips the sky reads that cannot show. Both are WGSL `override` constants, so the exact path is still the one compiled when they are off. `--terms hoist,coarse` times each against the exact path as `with hoist` / `with coarse` rows (the same baseline-term-baseline interleave). Pictures against the exact path on the software adapter, mean absolute difference per channel of 255: hoist 0.006 near the origin and 0.67 at 3 km (the interpolated angle is multiplied by the world position, so far out the sastrugi ridges slide sideways; no seam), coarse 0.025 in three views. Removing the whole detail term moves the orbit view by 1.33. NOT YET KNOWN: what either saves on a GPU, which is what the owed Intel and 1080 runs are for.

@@ -27,7 +27,7 @@ export const ABLATIONS = Object.freeze({
     deform:  { why: "the footprint deformation read (five taps, only where a footprint is)",
                edits: [once("deform branch", "if (dWeight > 0.001) {", "if (false) {")] },
     aerial:  { why: "the aerial perspective (the haze: near-sky blur and the Mie forward lobe)",
-               edits: [once("applyAerial call", /color = applyAerial\(\s*color, F\.camPos\.xyz, world, -V, L,\s*sunRadiance,\s*F\.fog\.x, F\.fog\.y, F\.fog\.z,\s*F\.fog\.w\s*\);/, "")] },
+               edits: [once("aerialPick call", /color = aerialPick\(\s*color, F\.camPos\.xyz, world, -V, L,\s*sunRadiance,\s*F\.fog\.x, F\.fog\.y, F\.fog\.z,\s*F\.fog\.w\s*\);/, "")] },
 });
 /** The names, in the order the pass evaluates them; `all` is every one of them at once, the pass with only albedo, a wrap diffuse and a constant ambient left. */
 export const ABLATION_NAMES = Object.freeze(["shadow", "sss", "spec", "sh", "skyrefl", "glints", "detail", "fine", "deform", "aerial"]);
