@@ -10211,3 +10211,50 @@ hypotheses (H1 against EASU, H2 against bilinear), the test, Holm, C1-C5, C1 at 
 
 **The runs.** `node tools/denoiseStudy.mjs --harvest-upscale-train --round 67`, then `--harvest-upscale-test --round 67`.
 Each is committed byte for byte before the next runs. Section 156 is the verdict.
+
+## 156. FSR4 ROUND 67 -- REPORTED, NEITHER SUPPORTED: THE LEARNED UPSCALER TIES EASU, AND ITS EDGE OVER BILINEAR MISSES HOLM
+
+**What arrived.**
+- render/upscale-net-r67.json: the training harvest at dd00f88b, committed at 881fd267. Its validation losses were
+  2.069e-3, 2.175e-3 and 2.656e-3, so the candidate is seed 1. Its log was seen before its commit; no test scene had been
+  rendered.
+- render/denoise-results-upscale-learned-r67.json: the test harvest at 881fd267, in 13,818 s, committed byte for byte
+  (8d8a3c6d) before it was read.
+
+**The run is REPORTED.** Every control held.
+- **C1:** U beat the noisy floor on 24 of 24.
+- **C2:** the shuffled U lost to EASU on 24 of 24, by a mean d of 1.90.
+- **C3:** no image within 2 x of its floor. The 2048-sample floor is 0.19 of EASU's error at the worst.
+- C4 and C5 held.
+- The quieter truth did what section 155 fixed it to do: the floor's mean is 2.48e-4, against every arm near 2.3e-3.
+
+| | H1: U against EASU | H2: U against bilinear |
+|---|---|---|
+| mean d (display) | -0.020 (R -0.006, C -0.034) | +0.027 (R +0.042, C +0.012) |
+| images U won | 10 of 24 (R 5, C 5) | 16 of 24 (R 8, C 8) |
+| sign-flip p (Holm threshold) | 0.868 (0.05) | 0.037 (0.025) |
+| status | **not supported** | **not supported** |
+
+- Holm takes the smaller p first. H2's 0.037 is over its threshold of 0.025, so neither is supported.
+- **The mean display-space relMSE:** U 2.254e-3, EASU 2.252e-3, bilinear 2.310e-3, the noisy floor 4.85e-3.
+- In linear radiance, H1 reads 6 of 24 (mean d -0.043) and H2 16 of 24 (+0.049). EASU beat bilinear on 17 of 24.
+
+**The predictions, read as made.**
+- **P1 held:** C3 held.
+- **P2 FAILED:** H2 is not supported, though its sign held on 16 of 24 and p missed by 0.012.
+- **P3 held:** H1 is not supported.
+- **P4 held:** C1 holds.
+
+**What it says.**
+- **This round's learned upscaler is EASU's equal, not its better.** The two differ by 0.09 % in mean relMSE, with
+  10 wins against 14.
+- Trained on quiet targets, with guides EASU does not have, a 6,656-parameter U learned what EASU does by hand, and no more.
+- **FSR4's step, as this arc built it, buys nothing on the path tracer's frames,** and it would cost a network pass where
+  EASU costs 0.6 ms.
+- Rounds 65 and 67 are the arc's FSR4. Round 65 could not resolve its arms; round 67 resolved them and found a tie.
+
+**What changes.**
+- `fsr4-learned-upscaler` is closed as a measured negative: U ties EASU at the round's size and training.
+- What could change that is a design, not a re-read: a wider network, more training scenes, temporal input as FSR4's own
+  network takes. Each would be its own round, and Keith's call.
+- EASU stays the chain's upscale.

@@ -106,6 +106,9 @@ node tools/ship/versionPreflight.mjs --next    # the next free version and sweep
    - **Round 66 (section 152): holes show the cross-fade** (24 of 24 over black; the newer frame not better). **FSR4 round 65
      (section 154): NOT REPORTED** -- C1 and C3; the 32-sample truth was noisier than every arm. U lost to EASU on 17 of 24,
      described. A cleaner-truth round is Keith's call.
+   - **FSR4 round 67 (section 156): REPORTED, neither supported.** Retrained on 512-sample targets and graded against a
+     2048-sample truth, U ties EASU (2.254e-3 against 2.252e-3, 10 of 24) and misses Holm against bilinear (p 0.037).
+     `fsr4-learned-upscaler` is closed as a measured negative; EASU stays.
    - Every default that the Intel's runs at 7b871372 decided is now carried out. The denoiser entries still open, after
      rounds 56-58, are `denoise-subgroup-reduction`, `denoise-temporalup-device` and `denoise-1080-native-crash` (all three
      owed the GTX 1080), and `denoise-fsr3-framegen`, whose upstream is closed.

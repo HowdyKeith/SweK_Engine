@@ -11,6 +11,8 @@
 // typed b9f2cdac -> 2 red; V154d the floor typed 5.401e-3 -> 1 red. Each restored byte-identical.
 // SECTION 155: R67a the targets at 32 samples, R67b the test truth at 512, R67d the test handed the training's samples, R67e round 65's
 // test seeds -> 1 red each; R67c the training command without its samples -> 2 red. Each restored byte-identical.
+// SECTION 156: V156a round 67's candidate typed 2, V156b its test's commit typed 881fd268, V156c H2's count typed 17, V156d U's mean
+// typed 2.154e-3 -> 1 red each. Each restored byte-identical.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -126,7 +128,21 @@ console.log("\n6. ROUND 67 (section 155): THE SAME ROUND, 512-SAMPLE TARGETS, A 
     ok("!! both commands take --round, write the round's own files, and hand the round's splits and samples on -- training its 512-sample targets, the test its 2048-sample truth",
         /LS\.upscaleRound\(/.test(a) && /path\.join\(ENG, RD\.net\)/.test(a) && /splits: RD\.splits, sppRef: RD\.sppRef,/.test(a) &&
         /LS\.upscaleRound\(/.test(b) && /path\.join\(ENG, RD\.results\)/.test(b) && /readFileSync\(path\.join\(ENG, RD\.net\)/.test(b) && /splits: RD\.splits, sppRef: RD\.sppRefTest \?\? RD\.sppRef,/.test(b));
-    ok("  round 67's files are not yet written: section 156 reads them", !fs.existsSync(path.join(ENG, R.net)) && !fs.existsSync(path.join(ENG, R.results)));
+    // section 156: the committed harvests read back -- REPORTED, neither supported; U ties EASU
+    const tr = JSON.parse(fs.readFileSync(path.join(ENG, R.net), "utf8")), res = JSON.parse(fs.readFileSync(path.join(ENG, R.results), "utf8")), T = res.tables;
+    ok("!! round 67's training file: 512-sample targets, the candidate seed 1 with the lowest validation loss (2.069e-3), at dd00f88b, round 67",
+        tr.round === 67 && tr.config.sppRef === 512 && tr.candidate === 1 && tr.commit === "dd00f88b" && tr.runs.find((r) => r.seed === 1).valMean === Math.min(...tr.runs.map((r) => r.valMean)) && tr.c2.seed === 1);
+    const { verdict } = await imp("render/denoiseStats.mjs");
+    const again = verdict({ sets: { H1: { noisy: T.noisy, filter: T.easu, net: [T.U], floor: T.floor }, H2: { noisy: T.noisy, filter: T.bilinear, net: [T.U], floor: T.floor } }, shuffled: null,
+        c2Prior: { round: 65, meanD: res.verdict.controls.C2.meanD, ok: res.verdict.controls.C2.ok }, determinism: res.determinism, seedsDistinct: true, test: "signflip", c1Of: "candidate", c1Min: 22 });
+    const H1 = again.hypotheses.H1, H2 = again.hypotheses.H2;
+    ok("!! *** section 156: verdict() over the committed tables gives the file's verdict -- REPORTED, every control held, NEITHER supported: H1 10 of 24 (p 0.868), H2 16 of 24 (p 0.037 against Holm's 0.025) ***",
+        again.run === "reported" && res.verdict.run === "reported" && H1.status === "not supported" && H2.status === "not supported" && H1.k === 10 && H2.k === 16 &&
+        Math.abs(H2.p - 0.037429213523864746) < 1e-12 && H2.threshold === 0.025 && H1.c3.nearFloor === 0 && H1.c1.netWins === 24 && res.commit === "881fd267" && res.round === 67 && res.trained.candidate === 1,
+        `H1 ${H1.k}/24 ${H1.meanD.toFixed(4)}; H2 ${H2.k}/24 ${H2.meanD.toFixed(4)} p ${H2.p.toFixed(4)}`);
+    const mean = (a) => a.reduce((q, v) => q + v, 0) / a.length;
+    ok("  ...and the tie it describes: U's mean display relMSE 2.254e-3 against EASU's 2.252e-3, the 2048-sample floor 2.48e-4 under every arm",
+        Math.abs(mean(T.U) - 2.254e-3) < 5e-7 && Math.abs(mean(T.easu) - 2.252e-3) < 5e-7 && Math.abs(mean(T.floor) - 2.475e-4) < 5e-7 && T.floor.every((f, i) => f < 0.2 * T.easu[i]));
 }
 
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)`);
