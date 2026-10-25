@@ -56,6 +56,9 @@ EngineProject_*/
 # forks and caught this as collateral; without it a fresh clone's cast button fails with
 # "couldn't read channel zip". The tools/ship/deleted/deleted_*.zip tombstones stay out.
 !WebGLEngine/roku-channel/voxelcaster.zip
+# ...and the one zip in vendor/zebrafish-vestibular/ is DATA, taken byte for byte from an open-access paper (its Source Data: SWC skeletons and figure JSON), recorded with its sha256
+# in that folder's PROVENANCE.md. The *.zip rule above caught it as collateral and the first commit of the folder went in WITHOUT it while its PROVENANCE.md said three files.
+!WebGLEngine/vendor/zebrafish-vestibular/*.zip
 
 # Large/generated binaries — uncomment if you'd rather keep them off-repo (use Git LFS)
 # **/*.onnx
