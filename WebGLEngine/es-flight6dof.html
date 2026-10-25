@@ -71,7 +71,7 @@
   <div style="color:#5f7590;line-height:1.4;">Every fruit-fly pilot is the same network, wired like a fly's Giant Fiber circuit, with the autopilot's contract (pitch, roll, yaw and throttle from the pointing errors, the rates and the air data); a choice picks which WEIGHTS fly it. The PD autopilot is not a network, and the hand weights are that autopilot written through the network (they fly the same flight); the shipped pilot is the same network with weights trained on the job the number under each name is graded on. The GPU brain is a DIFFERENT network (two dense layers, 1,796 weights) trained on the same job and run on a WebGPU device. A change applies at once, mid-flight; Start also respawns. <b>You</b>: S/&darr; pull back (nose up), W/&uarr; push, A/&larr; roll left, D/&rarr; roll right, Q/E rudder, R/F throttle up/down; neutral is trimmed for your airspeed.</div>
 </div>
 <div id="board"></div>
-<div id="hint">real physics: gravity, a stalling wing, a ground that ends the flight &mdash; drag to orbit, scroll to zoom (orbit camera)</div>
+<div id="hint">real physics: gravity, a stalling wing, a ground that ends the flight &mdash; drag to turn the camera, scroll to zoom, double-click to reset (chase and orbit cameras both)</div>
 
 <script type="importmap">
 { "imports": { "three": "/vendor/three/three.module.js" } }
@@ -79,6 +79,7 @@
 <script type="module">
 import * as THREE from "/vendor/three/three.module.js";
 import { OrbitControls } from "/vendor/three/jsm/controls/OrbitControls.js";
+import { WadMap } from "/world/WadMap.js";   // the engine's own top-right minimap (main.js builds the same one)
 import * as RB from "/physics/mechanics/rigidBody6dof.mjs";
 import * as F from "/physics/mechanics/flightModel6dof.mjs";
 import * as AF from "/brain/autopilotFlight.mjs";
@@ -313,14 +314,27 @@ function syncScene() {
   }
 }
 const camPos = new THREE.Vector3(), camLook = new THREE.Vector3();
+const chase = { yaw: 0, pitch: 0, zoom: 1 };
+{
+  const el = renderer.domElement; let drag = null;
+  el.style.touchAction = "none";
+  el.addEventListener("pointerdown", (e) => { if (document.getElementById("camMode").value !== "chase") return; drag = { x: e.clientX, y: e.clientY }; try { el.setPointerCapture(e.pointerId); } catch {} });
+  el.addEventListener("pointermove", (e) => { if (!drag) return; chase.yaw -= (e.clientX - drag.x) * 0.006; chase.pitch = Math.max(-0.3, Math.min(1.3, chase.pitch + (e.clientY - drag.y) * 0.004)); drag.x = e.clientX; drag.y = e.clientY; });
+  const end = (e) => { drag = null; try { el.releasePointerCapture(e.pointerId); } catch {} };
+  el.addEventListener("pointerup", end); el.addEventListener("pointercancel", end);
+  el.addEventListener("wheel", (e) => { if (document.getElementById("camMode").value !== "chase") return; e.preventDefault(); chase.zoom = Math.max(0.3, Math.min(12, chase.zoom * Math.exp(e.deltaY * 0.001))); }, { passive: false });
+  el.addEventListener("dblclick", () => { chase.yaw = 0; chase.pitch = 0; chase.zoom = 1; });
+}
 function updateCamera() {
   const mode = document.getElementById("camMode").value;
   orbit.enabled = mode === "orbit";
   const s = fleet[Number(document.getElementById("camTarget").value) || 0]; if (!s) return;
   const p = s.state.pos, f = RB.rotateByQuat(s.state.q, [1, 0, 0]);
   if (mode === "orbit") { orbit.target.set(p[0], p[1], p[2]); orbit.update(); return; }
-  const back = new THREE.Vector3(f[0], f[1], 0).normalize().multiplyScalar(-34);
-  camPos.lerp(new THREE.Vector3(p[0] + back.x, p[1] + back.y, p[2] + 9), 0.12);
+  // the chase camera is dragged and scrolled by hand too (it was OrbitControls-only, so on the default chase camera nothing answered the mouse): drag turns it round the aircraft, scroll moves it in and out, a double click puts it back
+  const D = Math.hypot(34, 9) * chase.zoom, el = Math.atan2(9, 34) + chase.pitch, hz = D * Math.cos(el), bx = -f[0], by = -f[1], bl = Math.hypot(bx, by) || 1, ca = Math.cos(chase.yaw), sa = Math.sin(chase.yaw);
+  const back = new THREE.Vector3(((bx * ca - by * sa) / bl) * hz, ((bx * sa + by * ca) / bl) * hz, 0);
+  camPos.lerp(new THREE.Vector3(p[0] + back.x, p[1] + back.y, p[2] + D * Math.sin(el)), 0.12);
   camLook.lerp(new THREE.Vector3(p[0] + f[0] * 25, p[1] + f[1] * 25, p[2] + f[2] * 25), 0.2);
   camera.position.copy(camPos); camera.lookAt(camLook);
 }
@@ -372,7 +386,7 @@ function frame(now) {
   } else {
   while (acc >= DT && n < 8) { stepFleet(); acc -= DT; n++; } if (acc > DT * 8) acc = 0;
   }
-  syncScene(); updateCamera(); updateBoard(); renderer.render(scene, camera);
+  syncScene(); updateCamera(); updateBoard(); updateMinimap(); renderer.render(scene, camera);
   requestAnimationFrame(frame);
 }
 setWind(0, 90, 0); renderRoster(); pilotLine(); reset();
@@ -387,6 +401,19 @@ window.__flightDemo = {
   reset, setWind, get specs() { return specs.slice(); }, setSpec(i, spec) { specs[i] = spec; saveSpecs(); renderRoster(); resolvePilots(); },
   roster: { get labels() { return resolvePilots().map((p) => p.label); }, get choices() { return [...document.getElementById("pilot0").options].map((o) => o.value); }, importBlob, loadShipped, loadGpuShipped, get gpu() { return { trained: gpuBrains.has("trained"), hand: gpuBrains.has("hand"), weights: gpuW, error: gpuErr, weightsError: gpuWErr, lost: gpuLost, info: gpuInfo, dispatches: [...gpuBrains.values()].reduce((a, b) => a + b.dispatches, 0) }; }, simulateGpuLoss() { gpuFault = "simulated device loss"; }, get shipped() { return shippedW; }, get shippedError() { return shippedErr; }, get imported() { return importedW; }, get importError() { return importErr; } },
 };
+// the minimap: world/WadMap.js, the widget main.js puts top-right. It wants a camera (x, z and yaw), a bot list and a layout; the flight is z-up, so the map's z is the flight's y. The followed aircraft is the player dot, the other two are the blips.
+const mapCam = { position: { x: 0, y: 0, z: 0 }, yaw: 0 }, mapBots = { bots: new Map() };
+const wadMap = new WadMap({ camera: mapCam, ollamaLevelGen: { _lastLevel: null }, botManager: mapBots });
+wadMap.start();
+function updateMinimap() {
+  const me = Number(document.getElementById("camTarget").value) || 0, s = fleet[me]; if (!s) return;
+  const f = RB.rotateByQuat(s.state.q, [1, 0, 0]);
+  mapCam.position.x = s.state.pos[0]; mapCam.position.y = s.state.pos[2]; mapCam.position.z = s.state.pos[1]; mapCam.yaw = Math.atan2(f[0], f[1]);
+  mapBots.bots.clear();
+  fleet.forEach((o, i) => { if (i !== me) mapBots.bots.set(i, { entityId: i, x: o.state.pos[0], z: o.state.pos[1], kind: "aircraft", hp: o.status === "airborne" ? 1 : 0, state: o.status }); });
+  wadMap.tick(0);
+}
+window.__flightDemo.minimap = wadMap; Object.defineProperties(window.__flightDemo, { camera: { get() { return camera; } }, chase: { get() { return chase; } }, mapBots: { get() { return mapBots; } } });
 requestAnimationFrame(frame);
 </script>
 </body>

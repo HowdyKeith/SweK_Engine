@@ -4410,6 +4410,8 @@ A password fetches a token from the list server; an unregistered callsign needs 
         // fights the info body for the height above. The page still DECLARES all six in SERVER_GAUGES; the
         // dock takes the first three, so there is still one declaration of which gauges this page shows.
         dockMax: 3,
+        // v4897 -- [Gauges] while a panel is staged hands the panel back, exactly as "back to the right" does (the lock refused the click, so the tab looked dead).
+        onLockedGauges: () => { const b = document.getElementById("stageBack"); if (b) b.click(); },
       });
       if (gi) {
         window._gaugeInfo = gi;
