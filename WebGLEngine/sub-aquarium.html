@@ -62,6 +62,12 @@
   .empty { color:var(--dim); line-height:1.7; padding:10px 4px; }
   .note { padding:4px 16px 24px; color:#55617a; max-width:900px; line-height:1.7; }
   .err { color:var(--red); }
+  .dropout { padding:6px 16px 8px; max-width:1040px; }
+  .dropout h2 { font-size:13px; letter-spacing:.11em; text-transform:uppercase; color:var(--cyan); margin:10px 0 6px; }
+  .dropbar { display:flex; gap:8px; align-items:center; flex-wrap:wrap; padding:6px 0; }
+  .dropbar input[type=range] { flex:1 1 220px; min-width:140px; }
+  .dropout canvas { margin:8px 0; }
+  .droprow { display:flex; gap:8px; align-items:flex-start; padding:5px 4px; border-bottom:1px solid #12203a; }
 </style>
 </head>
 <body>
@@ -102,6 +108,11 @@
   </div>
 </main>
 <p class="note" id="fishDetail"></p>
+<section id="dropout" class="dropout">
+  <h2>When the compass goes dark</h2>
+  <p class="desc">One dive, flown again and again by different pilots through the same two 16-second stretches in which the heading each is shown stays frozen (the turning rate, depth and speed stay true). The plain autopilot steers on a heading that has stopped being true; the oracle navigator integrates the exact turning rate; the two circuit estimators are reservoirs fitted to do the same. They are drawn together so that what each recovers can be seen, not only counted.</p>
+  <div id="dropoutHost"><p class="sub" id="dropoutStatus">loading the dropout view&hellip;</p></div>
+</section>
 <script type="module">
 import { createTank, LENGTH, WIDTH, DEPTH_MIN, DEPTH_MAX } from "/render/subAquariumSim.mjs";
 import { LABELS } from "/physics/mechanics/subHulls.mjs";
@@ -282,6 +293,15 @@ function frame(now) {
   render(); requestAnimationFrame(frame);
 }
 refresh(); fishHealth(); setInterval(refresh, 3000); setInterval(fishHealth, 5000); requestAnimationFrame(frame);
+(async () => {   // the compass-dropout view (UNNUMBERED): mounted after the tank is running; a failure here leaves the tank alone
+    const host = $("dropoutHost");
+    try {
+        const [view, cj] = await Promise.all([import("/render/subDropoutView.mjs"), import("/vendor/hemibrain/hemibrain-cx-heading-loop.json", { with: { type: "json" } })]);
+        const j = cj.default;
+        await new Promise((r) => setTimeout(r, 60));   // let the tank paint a frame before the first dive is flown
+        view.mountDropoutView(host, { circuit: { neurons: j.neurons, edges: j.edges, io: j.io } });
+    } catch (e) { host.textContent = "The compass-dropout view is unavailable here (" + String((e && e.message) || e).slice(0, 100) + "). The tank above is not affected."; }
+})();
 </script>
 <p class="note">Names and addresses reach this page as text only. A sub is numbers; the code that flies it is the code this page already loaded.</p>
 </body>
