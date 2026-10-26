@@ -1,7 +1,7 @@
 {
  "host": "linux-x64-4c-16gb-142c0d",
  "note": "THIS BOX'S OWN gate runtimes, written by tools/ship/boxTimings.mjs. The shared sweep-timings.json is host-claimed and a foreign box cannot write it (v4647, and that refusal is right); this is how a box records what IT measured without overwriting another machine's numbers. `kinds` says which quantity each ms is, as in the shared record: `alone` is an uncontended serial reading, `capped` is a FLOOR and not a runtime. Read for COVERAGE -- has this gate ever been timed -- and NOT for the ship-time budget, which still reads the shared file. See task #87. `serialRing` holds the last three alone readings; recordReach's margin row reads it on a box that does not own the shared record, because that row asks what a gate costs HERE and nothing here can refresh another box's ring.",
- "captured": "2026-10-26T20:58:00.897Z",
+ "captured": "2026-10-26T21:39:09.818Z",
  "timings": {
   "render/denoiseDevice-selfcheck.mjs": 5461,
   "render/denoiseTiming-selfcheck.mjs": 8195,
@@ -33,7 +33,9 @@
   "render/subBallastCues-selfcheck.mjs": 4439,
   "render/subTournamentView-selfcheck.mjs": 2649,
   "tools/subReservoirV3-selfcheck.mjs": 16743,
-  "tools/subHeadingEstimator-selfcheck.mjs": 20719
+  "tools/subHeadingEstimator-selfcheck.mjs": 20719,
+  "render/subDropoutScene-selfcheck.mjs": 2762,
+  "render/subDropoutView-selfcheck.mjs": 9705
  },
  "at": {
   "render/denoiseDevice-selfcheck.mjs": "2026-10-09T21:00:45.655Z",
@@ -66,7 +68,9 @@
   "render/subBallastCues-selfcheck.mjs": "2026-10-26T20:21:25.204Z",
   "render/subTournamentView-selfcheck.mjs": "2026-10-26T20:21:25.204Z",
   "tools/subReservoirV3-selfcheck.mjs": "2026-10-26T20:21:25.204Z",
-  "tools/subHeadingEstimator-selfcheck.mjs": "2026-10-26T20:58:00.897Z"
+  "tools/subHeadingEstimator-selfcheck.mjs": "2026-10-26T20:58:00.897Z",
+  "render/subDropoutScene-selfcheck.mjs": "2026-10-26T21:39:09.818Z",
+  "render/subDropoutView-selfcheck.mjs": "2026-10-26T21:39:09.818Z"
  },
  "kinds": {
   "render/denoiseDevice-selfcheck.mjs": "alone",
@@ -99,7 +103,9 @@
   "render/subBallastCues-selfcheck.mjs": "alone",
   "render/subTournamentView-selfcheck.mjs": "alone",
   "tools/subReservoirV3-selfcheck.mjs": "alone",
-  "tools/subHeadingEstimator-selfcheck.mjs": "alone"
+  "tools/subHeadingEstimator-selfcheck.mjs": "alone",
+  "render/subDropoutScene-selfcheck.mjs": "alone",
+  "render/subDropoutView-selfcheck.mjs": "alone"
  },
  "codes": {
   "render/denoiseDevice-selfcheck.mjs": 0,
@@ -132,7 +138,9 @@
   "render/subBallastCues-selfcheck.mjs": 0,
   "render/subTournamentView-selfcheck.mjs": 0,
   "tools/subReservoirV3-selfcheck.mjs": 0,
-  "tools/subHeadingEstimator-selfcheck.mjs": 0
+  "tools/subHeadingEstimator-selfcheck.mjs": 0,
+  "render/subDropoutScene-selfcheck.mjs": 0,
+  "render/subDropoutView-selfcheck.mjs": 0
  },
  "serialRing": {
   "render/denoiseDevice-selfcheck.mjs": [
@@ -284,6 +292,16 @@
    19707,
    20176,
    20719
+  ],
+  "render/subDropoutScene-selfcheck.mjs": [
+   2477,
+   2619,
+   2762
+  ],
+  "render/subDropoutView-selfcheck.mjs": [
+   11132,
+   8897,
+   9705
   ]
  }
 }
