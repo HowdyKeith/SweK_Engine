@@ -16184,6 +16184,13 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
         widened: Object.freeze([]),
         verdict: "the flight page's map selector (one height function drawn and collided with, the racing circuit scaled up), the channel page and its parser against a fixture feed and a real snapshot, and the same-origin bridge URLs; each run alone and green, and each sabotaged to go red by name",
     }),
+    since611: Object.freeze({
+        at: "v4899", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "no gate file added, so nothing is claimed here (a gate may be claimed by ONE closing, and these three are already in earlier ones); three gates grew a section each (render/subAquarium3d-selfcheck, ui/avatarSwitch-selfcheck, tools/ship/quickSweep-selfcheck) -- the submarines' tower and fins tied to the physics' fin forces (and a live-render row), the avatar button's walk past a missing asset, and quickSweep's carry-over of a foreign over-budget reading; each run alone and green, and each sabotaged to go red by name",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

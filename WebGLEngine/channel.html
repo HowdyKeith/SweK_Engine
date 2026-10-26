@@ -18,7 +18,7 @@
 <title>Channel &middot; videos and repos</title>
 <style>
   :root { --bg:#0a1626; --panel:#0f1d33; --line:#2a4366; --text:#cfe0f5; --dim:#7f9bbd; --accent:#5ad6ff; --good:#2fd6b0; --warn:#f6a623; --bad:#ff7b7b; }
-  @media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) { --bg:#f2f6fb; --panel:#fff; --line:#c3d2e6; --text:#16263d; --dim:#53698a; --accent:#0a6fb0; --good:#0c8a6e; --warn:#a86500; --bad:#b32d2d; } }
+  /* v4899 -- ONE GROUND, THE TREE'S DARK ONE. This page followed the viewer's OS (a light variant under prefers-color-scheme) and pageGround-selfcheck found it painting #ffffff on a light box where every other page paints dark; a page may follow the scheme only with a switcher (petfbi-board), and this has none. */
   * { box-sizing:border-box; }
   html,body { margin:0; background:var(--bg); color:var(--text); font:14px/1.45 system-ui,-apple-system,Segoe UI,sans-serif; }
   a { color:var(--accent); text-decoration:none; } a:hover { text-decoration:underline; }

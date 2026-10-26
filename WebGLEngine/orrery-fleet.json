@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "90c972d41907be176233c340a896340a84ec2a32",
+ "head": "0fa4e216ac567937c0e3abbddcfef4196b12481e",
  "bodies": {
   "box3d": [
    {
@@ -326,7 +326,7 @@
    {
     "path": "brain/pilotSubCircuitState-selfcheck.mjs",
     "bytes": 29802,
-    "sha": "2708b83b78889e065f2f9b645f9ea3d0fcc23f23"
+    "sha": "d4cc23c4ec8beb962f40866504b88fc497abc964"
    },
    {
     "path": "tools/flyCx.mjs",
@@ -495,7 +495,7 @@
    {
     "path": "tools/fishCircuit-selfcheck.mjs",
     "bytes": 29671,
-    "sha": "fb8b5ecd0e83cfda7f7da017c93c0e6a4b66256e"
+    "sha": "d4cc23c4ec8beb962f40866504b88fc497abc964"
    },
    {
     "path": "tools/maleCnsBake.mjs",
@@ -850,8 +850,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 3701687,
-    "sha": "9a1677af0b5c095a8f6ed4fd67e82dd4a451e24e"
+    "bytes": 3702873,
+    "sha": "d4cc23c4ec8beb962f40866504b88fc497abc964"
    },
    {
     "path": "mpm3d.html",
@@ -885,8 +885,8 @@
    },
    {
     "path": "render/subAquarium3d-selfcheck.mjs",
-    "bytes": 9860,
-    "sha": "c58b227665da9d3c6681cc7e5d1acc0793306949"
+    "bytes": 17711,
+    "sha": "1ce4aafb9d645f241bf7c90c46cc0d92e0ad0116"
    },
    {
     "path": "render/svgExtrude.js",
@@ -945,8 +945,8 @@
    },
    {
     "path": "sub-aquarium.html",
-    "bytes": 14960,
-    "sha": "ab2a94c0451801e19f9c025a966a1f0557c471a8"
+    "bytes": 16920,
+    "sha": "c7457cf5aa5a8e3a11887249e81e21dda69aed83"
    },
    {
     "path": "svg-forge.html",
@@ -1593,17 +1593,17 @@
    {
     "path": "brain/pilotSubCircuit-selfcheck.mjs",
     "bytes": 40408,
-    "sha": "8212bae1e4a1e7f907571360c59e0fadd09f2c11"
+    "sha": "d4cc23c4ec8beb962f40866504b88fc497abc964"
    },
    {
     "path": "brain/pilotSubFish-selfcheck.mjs",
     "bytes": 22089,
-    "sha": "ed6a008ccc539d71b1350927f57aa59655064a92"
+    "sha": "d4cc23c4ec8beb962f40866504b88fc497abc964"
    },
    {
     "path": "tools/fishCircuit-selfcheck.mjs",
     "bytes": 29671,
-    "sha": "fb8b5ecd0e83cfda7f7da017c93c0e6a4b66256e"
+    "sha": "d4cc23c4ec8beb962f40866504b88fc497abc964"
    },
    {
     "path": "tools/fishCircuit.mjs",

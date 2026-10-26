@@ -710,3 +710,15 @@ export const COMMIT_BELT_DRIFT_V4898 = Object.freeze({
     }),
     bodiesNow: 28,
 });
+
+/** v4899 -- THE SHIP COMMIT OF v4898 TOUCHED TWO VENDOR BODIES (a "What this record could not establish" section appended to the zebrafish and zebrafish-vestibular PROVENANCE.md files), and a commit cannot know its own hash, so the belt that shipped with it could not name it. Read off git here, not typed. */
+export const COMMIT_BELT_DRIFT_V4899 = Object.freeze({
+    ...COMMIT_BELT_DRIFT_V4898,
+    at: "v4899",
+    arrivedSince4475: Object.freeze({
+        ...COMMIT_BELT_DRIFT_V4898.arrivedSince4475,
+        "zebrafish": Object.freeze({ now: Object.freeze(["d4cc23c4", "391c66c8", "e998ee21"]), why: COMMIT_BELT_DRIFT_V4898.arrivedSince4475["zebrafish"].why + "; v4898's ship commit then appended the record's own statement of what it could not establish" }),
+        "zebrafish-vestibular": Object.freeze({ now: Object.freeze(["d4cc23c4", "eec0a3e6", "ffd17c49", "894bd651"]), why: COMMIT_BELT_DRIFT_V4898.arrivedSince4475["zebrafish-vestibular"].why + "; v4898's ship commit then appended the record's own statement of what it could not establish" }),
+    }),
+    bodiesNow: 28,
+});

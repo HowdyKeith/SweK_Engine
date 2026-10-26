@@ -403,7 +403,7 @@ export const REACH_AT_V4548 = Object.freeze({
     // wasmTeardown-selfcheck reads it and grades every gate reaching a door against it.
     // v4886 -- 178 -> 180: PROBE_AT_V4675 and one more, both guarded by recordProbe-selfcheck / frozenRecords; read off the gate.
     // v4894 -- 181 -> 182: READINGS_AT_V4892 (ui/oceanReadings.mjs), GUARDED by ui/oceanReadings-selfcheck.mjs at about 130 ms.
-    total: 185,   // v4898 -- 184 -> 185: COMMIT_BELT_DRIFT_V4898 (world/orreryFleet.mjs, GUARDED by tools/ship/orreryFleet-selfcheck.mjs). Earlier at v4898 -- 183 -> 184, one record with no field on its own line, read off the live census. v4895 -- 182 -> 183: COMMIT_BELT_DRIFT_V4895 (world/orreryFleet.mjs), GUARDED by tools/ship/orreryFleet-selfcheck.mjs.
+    total: 186,   // v4899 -- 185 -> 186: COMMIT_BELT_DRIFT_V4899 (world/orreryFleet.mjs, GUARDED by tools/ship/orreryFleet-selfcheck.mjs). v4898 -- 184 -> 185: COMMIT_BELT_DRIFT_V4898 (world/orreryFleet.mjs, GUARDED by tools/ship/orreryFleet-selfcheck.mjs). Earlier at v4898 -- 183 -> 184, one record with no field on its own line, read off the live census. v4895 -- 182 -> 183: COMMIT_BELT_DRIFT_V4895 (world/orreryFleet.mjs), GUARDED by tools/ship/orreryFleet-selfcheck.mjs.
     // *** READ OFF THE INSTRUMENT, NOT PREDICTED. *** The first draft of this record guessed 53/21/19/40 from
     // which gates the round had sped up, and was wrong on three of the four: the comment-strip fix below
     // moved two records the other way at the same time, and a guess cannot see two changes at once.
@@ -481,7 +481,8 @@ export const REACH_AT_V4548 = Object.freeze({
     // v4898 -- READ OFF reach() on the sandbox box after the merges: checked 122, overBudget 46, unguarded 17, unchecked 63 (was 43 / 62). RE-TAKEN 62 -> 63 for ONE named cause: COMMIT_BELT_DRIFT_V4898 (this round's new record) is
     // guarded only by orreryFleet-selfcheck, which runs ~30 s and is over the sweep's line. The overBudget move (43 -> 46) is the box: orreryEjecta-selfcheck runs ~3.4-4.0 s HERE and ran ~3.4 s at v4897 too (measured on a v4897 worktree),
     // so it reads over the line on this box and under it on the rig; the ceiling is a ceiling because that class is decided by how loaded or slow the box is.
-    checked: 122, overBudget: 46, unguarded: 17, unchecked: 63,
+    checked: 122, overBudget: 47, unguarded: 17, unchecked: 64,
+    // v4899 -- 46 -> 47 and 63 -> 64: COMMIT_BELT_DRIFT_V4899 is guarded only by orreryFleet-selfcheck (about 30 s, over the line), the same cause as v4898's +1; the ceiling follows.
     // v4550 -- the UNMEASURED class was split out of over-budget after this gate went red twice inside full
     // sweeps and passed 68 times under load; the trigger was a concurrent REWRITE of sweep-timings.json, not
     // contention. Zero records sit in it on a settled tree, which is the expected reading.
@@ -670,7 +671,7 @@ export const UNGUARDED_SPLIT_V4577 = Object.freeze({
     // v4819 -- 156 -> 157, COMMIT_BELT_DRIFT_V4819 re-taken above; `unguarded` does not move.
     // v4840 -- 157 -> 158, DOORS_AT_V4840 re-taken above; `unguarded` does not move.
     // v4880 -- 158 -> 170: twelve records arrive with the orrery-seeded merge; `unguarded` does not move (16 of 170, all documentary). Read off the gate.
-    structural: Object.freeze({ total: 185, unguarded: 17, documentaryOfThose: 16, readByCodeOfThose: 1 }),
+    structural: Object.freeze({ total: 186, unguarded: 17, documentaryOfThose: 16, readByCodeOfThose: 1 }),
     // BEFORE, on the tree this round opened on:
     before: Object.freeze({ total: 104, checked: 72, overBudget: 20, unmeasured: 0, unguarded: 12, unchecked: 32 }),
     // AFTER, as one reading rather than as a constant -- see the note above. Taken with the round's own
