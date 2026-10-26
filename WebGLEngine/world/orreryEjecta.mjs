@@ -505,6 +505,11 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
         "sub-aquarium.html",
         "ui/seaDepthTint-selfcheck.mjs",
         "ui/seaFrame-selfcheck.mjs",
+        // v4901 -- the Sea OGRE round: the 3D replay's gate and its page, and the sea picker's and ballast cues' gates, each importing the vendored three.js to draw a scene (named, not counted).
+        "render/seaOgre3d-selfcheck.mjs",
+        "render/seaPicker-selfcheck.mjs",
+        "render/subBallastCues-selfcheck.mjs",
+        "sea-ogre.html",
     ]),
     "three-webgpu": Object.freeze([
         // backlog #31/#49/#51 -- the AI-presence orb (krispuckett/murmur-web ported into tslSource.mjs) is a
@@ -604,6 +609,8 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
         // v4854 -- three's own textureBarrier unit test, run before and after its one-line diff through this body's r186
         // (the page imports three.webgpu.js and three.tsl.js, as threeUpstream does). One arrival.
         "tools/ship/threeTextureBarrier-selfcheck.mjs",
+        // v4901 -- the merged FSR4 branch's frame-generation cost gate.
+        "render/denoiseFrameGenCost-selfcheck.mjs",
     ]),
     // v4805 -- r185's three files, kept unchanged for the r185 drafts when vendor/three-webgpu moved to r186. Nothing in the engine
     // imports them: the patch applier reads them, and the upstream gates load them by a path they build.
@@ -673,6 +680,8 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
         "tools/flyCx.mjs",
         "tools/ship/trainSubState-selfcheck.mjs",
         "tools/ship/trainSubState.mjs",
+        // v4901 -- the aquarium page loads the hemibrain-backed pilots (named by the sub-aquarium round).
+        "sub-aquarium.html",
     ]),
     // v4898 -- vendor/zebrafish-vestibular is a PAPER-ONLY body: the supplementary files of an article, read by no source file (dependantsOf returns []), which is a measurement and not an omission.
     "zebrafish-vestibular": Object.freeze([]),

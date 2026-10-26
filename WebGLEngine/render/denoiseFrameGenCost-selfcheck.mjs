@@ -18,12 +18,14 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { runInEngineOrigin, webgpuSkipReason } from "../tools/ship/webgpuHarness.mjs";
+import { gateReport } from "../tools/ship/gateReport.mjs";   // v4901 -- this gate prints tables of numbers (the cost lines below); gateReport keeps them (found by gateReport-selfcheck at the merge)
+const REPORT = gateReport("render/denoiseFrameGenCost-selfcheck.mjs"), SAID = [];
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const imp = (p) => import(pathToFileURL(path.join(ENG, p)).href);
 let fails = 0;
 const ok = (label, cond, detail) => { if (!cond) fails++; console.log(`  ${cond ? "PASS" : "FAIL"}  ${label}${detail ? "   " + detail : ""}`); return !!cond; };
-const say = (s) => console.log(`  ----  ${s}`);
+const say = (s) => { SAID.push([String(s)]); console.log(`  ----  ${s}`); };
 const t0 = Date.now();
 
 const { makeScene } = await imp("render/denoiseScenes.mjs");
@@ -340,5 +342,7 @@ else {
 // fails the threshold, and the speed row); V149b the Intel's first ratio typed 0.247 -> 1 red; V149c run b's clock typed wall -> 1 red.
 // SECTION 146: V146a H63_RATIO 0.6 -> 2 red (the rule's fixtures, the verdict row); V146b run a's generator typed 9.900 in its
 // committed report -> 2 red (the verdict, the presented rate); V146c the verdict's first ratio typed 0.575 -> 1 red.
+REPORT.table("every measured line this gate printed, in order", ["line"], SAID, `${SAID.length} lines`);
+REPORT.write();
 console.log(fails ? `FAIL -- ${fails} check(s) (${Date.now() - t0} ms)` : `ALL GREEN (${Date.now() - t0} ms)`);
 process.exit(fails ? 1 : 0);

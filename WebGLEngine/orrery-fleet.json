@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "aa6f4f6dc84cb58954015bd993a5333b057c6366",
+ "head": "9cacca007c389601967ca33c22604841c1c7aad4",
  "bodies": {
   "box3d": [
    {
@@ -468,7 +468,7 @@
    {
     "path": "tools/ship/orphanSets.mjs",
     "bytes": 39179,
-    "sha": "73795feb626921ab015e3c9b64dd55387c7f7b24"
+    "sha": "a987a4714e8969cce831583f07dd85dec5c267b1"
    }
   ],
   "male-cns": [
@@ -602,7 +602,7 @@
    {
     "path": "tools/ship/orphanSets.mjs",
     "bytes": 39179,
-    "sha": "73795feb626921ab015e3c9b64dd55387c7f7b24"
+    "sha": "a987a4714e8969cce831583f07dd85dec5c267b1"
    },
    {
     "path": "tools/ship/snowflowVendor-selfcheck.mjs",
@@ -881,7 +881,7 @@
    {
     "path": "render/seaOgre3d-selfcheck.mjs",
     "bytes": 18440,
-    "sha": "4fb1551b514f2915e5188fbd8e27bcfeec6f1bc2"
+    "sha": "a987a4714e8969cce831583f07dd85dec5c267b1"
    },
    {
     "path": "render/seaPicker-selfcheck.mjs",
@@ -906,7 +906,7 @@
    {
     "path": "render/subBallastCues-selfcheck.mjs",
     "bytes": 19979,
-    "sha": "eeed7a4effda2e8edb0befc0345ec053396bb41b"
+    "sha": "a987a4714e8969cce831583f07dd85dec5c267b1"
    },
    {
     "path": "render/svgExtrude.js",
@@ -1026,7 +1026,7 @@
    {
     "path": "tools/ship/orphanSets.mjs",
     "bytes": 39179,
-    "sha": "73795feb626921ab015e3c9b64dd55387c7f7b24"
+    "sha": "a987a4714e8969cce831583f07dd85dec5c267b1"
    },
    {
     "path": "tools/ship/pipboyWireframe-selfcheck.mjs",
@@ -1282,7 +1282,7 @@
    },
    {
     "path": "render/denoiseFrameGenCost-selfcheck.mjs",
-    "bytes": 39518,
+    "bytes": 39949,
     "sha": "64756e00412e827dcd998f721371c5383d8e5407"
    },
    {
@@ -1500,7 +1500,7 @@
    {
     "path": "tools/ship/orphanSets.mjs",
     "bytes": 39179,
-    "sha": "73795feb626921ab015e3c9b64dd55387c7f7b24"
+    "sha": "a987a4714e8969cce831583f07dd85dec5c267b1"
    },
    {
     "path": "tools/ship/threePatch.mjs",
@@ -1559,7 +1559,7 @@
    {
     "path": "tools/ship/orphanSets.mjs",
     "bytes": 39179,
-    "sha": "73795feb626921ab015e3c9b64dd55387c7f7b24"
+    "sha": "a987a4714e8969cce831583f07dd85dec5c267b1"
    },
    {
     "path": "tools/ship/seaPatch-selfcheck.mjs",

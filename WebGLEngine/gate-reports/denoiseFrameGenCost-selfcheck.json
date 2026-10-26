@@ -1,0 +1,44 @@
+{
+ "gate": "render/denoiseFrameGenCost-selfcheck.mjs",
+ "at": "2026-10-26",
+ "tables": [
+  {
+   "title": "every measured line this gate printed, in order",
+   "columns": [
+    "line"
+   ],
+   "rows": [
+    [
+     "section 151: pacing on the gtx1080 costs (T 38, G 4.34): 60 Hz -- none 26.4 new images/s, judder 10.97 ms, latency 8.0; midpoint 52.9/s, judder 5.60, latency 21.0 | VRR 30-144 -- none 26.6/s, midpoint 52.9/s, judder 0.00, latency 13.8"
+    ],
+    [
+     "section 151: pacing on the gtx1080 jittered costs (T 38, G 4.34): 60 Hz -- none 27.0 new images/s, judder 11.88 ms, latency 8.1; midpoint 53.7/s, judder 7.08, latency 20.7 | VRR 30-144 -- none 26.9/s, midpoint 53.5/s, judder 4.38, latency 13.8"
+    ],
+    [
+     "section 151: pacing on the intel-gen9 costs (T 447, G 105): 60 Hz -- none 2.2 new images/s, judder 129.03 ms, latency 8.2; midpoint 4.5/s, judder 64.61, latency 221.5 | VRR 30-144 -- none 2.3/s, midpoint 4.5/s, judder 0.00, latency 216.8"
+    ],
+    [
+     "section 151: pacing on the intel-gen9 jittered costs (T 447, G 105): 60 Hz -- none 2.3 new images/s, judder 140.69 ms, latency 8.5; midpoint 4.5/s, judder 86.40, latency 223.9 | VRR 30-144 -- none 2.3/s, midpoint 4.5/s, judder 51.47, latency 215.7"
+    ],
+    [
+     "adapter: google / swiftshader"
+    ],
+    [
+     "section 143: the generator at 480 x 270 2221.800 ms (wall, median of 7)"
+    ],
+    [
+     "section 143: the field on the device at 480 x 270 6.105 ms (device)"
+    ],
+    [
+     "section 143: the field's holes at 480 x 270: 5931 of 129600 before the fill, 0 pixels with no vector"
+    ],
+    [
+     "section 147: the compute generator at 480 x 270 56.279 ms (device); clear 1.556, splat 15.711, winner 14.539, fill 15.686, gather 8.122; 0 holes left"
+    ]
+   ],
+   "note": "9 lines"
+  }
+ ],
+ "notes": [],
+ "skipped": []
+}
