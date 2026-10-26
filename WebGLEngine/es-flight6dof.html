@@ -49,6 +49,7 @@
   <span id="stat" style="color:#9fe6c0"></span>
   <button id="resetBtn" title="respawn all three aircraft and restart the mission">&#8635; Reset</button>
   <button id="rosterBtn" title="Load Pilots: choose who flies each aircraft -- the PD autopilot, the same laws written through the fruit fly's network, noise on those weights, an imported pilot, or you on the keyboard -- then Start.">&#9992; Load Pilots</button>
+  <label title="Your keyboard stick with the autopilot's inner loops under it: A / D set a bank angle (up to 40 degrees) instead of a raw aileron, and when you let go the wings come back to level and the climb is drawn back to zero. Off is the raw stick: it rolls at 190 degrees a second and does not come back."><input id="assistBox" type="checkbox" checked> stability assist</label>
   <label>camera <select id="camMode"><option value="chase">chase</option><option value="orbit">orbit</option></select>
     <select id="camTarget"><option value="0">aircraft 1</option><option value="1">aircraft 2</option><option value="2">aircraft 3</option></select></label>
   <label>map <select id="mapSel"><option value="flat">flat field</option><option value="hills">hills</option><option value="circuit">race circuit</option><option value="circuitHills">circuit on hills</option></select></label>
@@ -86,6 +87,7 @@ import { WadMap } from "/world/WadMap.js";   // the engine's own top-right minim
 import * as RB from "/physics/mechanics/rigidBody6dof.mjs";
 import * as F from "/physics/mechanics/flightModel6dof.mjs";
 import * as AF from "/brain/autopilotFlight.mjs";
+import * as MA from "/brain/manualAssist.mjs";
 import * as PF from "/brain/pilotFlightPolicy.mjs";
 import * as MF from "/brain/pilotFlightMlp.mjs";
 import { GpuPilotBrain } from "/brain/pilotFlightGpu.mjs";
@@ -213,9 +215,10 @@ const gpuBrains = new Map();   // "trained" | "hand" -> GpuPilotBrain
 const rosterCtx = () => ({ PP: PF, shipped: shippedW, imported: importedW, brainPilotOn: false, ...NAMES });
 const saveSpecs = () => { try { localStorage.setItem(ROSTER_KEY, JSON.stringify(specs)); } catch {} };
 const keys = new Set(); let stickPitch = 0, stickRoll = 0, stickYaw = 0, throttleHeld = 0.66;
-function manualPilot(state, target, wind) {
-  const gd = AF.guidance(state, target, wind);
-  return { pitch: Math.max(-1, Math.min(1, gd.stickTrim + 0.55 * stickPitch)), roll: stickRoll, yaw: 0.6 * stickYaw, throttle: throttleHeld };
+let assistOn = true; try { assistOn = localStorage.getItem("flight6dof.assist") !== "0"; } catch {}
+{ const box = document.getElementById("assistBox"); box.checked = assistOn; box.addEventListener("change", () => { assistOn = box.checked; try { localStorage.setItem("flight6dof.assist", assistOn ? "1" : "0"); } catch {} }); }
+function manualPilot(state, target, wind) {   // brain/manualAssist.mjs: the stick is a bank angle and the wings come back to level (or the raw stick, with the box unticked)
+  return MA.assisted(state, target, wind, { pitch: stickPitch, roll: stickRoll, yaw: stickYaw, throttle: throttleHeld }, { assist: assistOn });
 }
 let pilots = [], pilotKey = "";
 function resolvePilots() {
