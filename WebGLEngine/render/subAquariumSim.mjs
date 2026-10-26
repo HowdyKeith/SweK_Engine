@@ -17,11 +17,28 @@ import * as S from "../physics/mechanics/subModel6dof.mjs";
 import * as AS from "../brain/autopilotSub.mjs";
 import * as PS from "../brain/pilotSubPolicy.mjs";
 import * as H from "../physics/mechanics/subHulls.mjs";
+import * as FL from "../brain/floodTask.mjs";
+import * as EP from "../brain/emergencyPilot.mjs";
+import * as SP from "../brain/surfacePilot.mjs";
 
 export const LENGTH = 500, WIDTH = 300, MARGIN = 60, DEPTH_MIN = 14, DEPTH_MAX = 40, TRAIL = 80, TRAIL_EVERY = 0.5, MAX_STEP = 0.1;
 const DT = S.DT, wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 const mulberry = (a) => () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
 const hash = (str) => { let h = 2166136261; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; };
+
+// ---- EVENTS (v4901): a sub in the tank can be flooded or told to surface -----------------------------------------------------------------------------------------------------------------------------------
+// *** OFF BY DEFAULT: a sub with no event is flown exactly as before (the hull's own model, the pilot alone, no tank state). *** An event puts the sub on a model with a TANK (physics/mechanics/subModel6dof.mjs v4901: a pump that moves
+// 0.25 level units a second, a 1.5 bottle, an emergency blow, a 6% drop weight -- brain/floodTask.mjs FLOOD_SPEC's fields on the sub's own hull) and wraps its pilot:
+//   "flood"    a leak of LEAK (6%) of the weight builds over 5 s, the target depth is held where it was, and the pilot is brain/emergencyPilot.mjs's wrap (blow, then the drop weight): the boat holds
+//   "sink"     the same leak and NO rescue: the autopilot blows its tank to the stop and still sinks to the seabed; the boat is lost and put back (the count shows it)
+//   "surface"  brain/surfacePilot.mjs's wrap with `surface: true` in the target: the boat rises, blows its tank and rides on its buoyancy with the tower out of the water
+// setEvent(id, null) ends it: the leak stops, the tank state goes (the boat is repaired and the weight is back: it is an aquarium), the sub is flown as before. Pure like the rest: no clock but the tank's.
+export const EVENTS = Object.freeze(["flood", "sink", "surface"]);
+export const LEAK = 0.06;
+const TANK_FIELDS = Object.freeze({ tankRate: FL.FLOOD_SPEC.tankRate, airMax: FL.FLOOD_SPEC.airMax, emergencyRate: FL.FLOOD_SPEC.emergencyRate, emergencyAirCost: FL.FLOOD_SPEC.emergencyAirCost, dropMass: FL.FLOOD_SPEC.dropMass });
+// the tank is 50 m deep and a sub may be 40 m down when the leak starts, so the rescue works to the room there is: blow at 2 m deeper than the held depth, drop the weight at 4 (brain/emergencyPilot.mjs defaults, 5 and 10, are the flood task's, where a boat starts 25..35 m down)
+export const RESCUE = Object.freeze({ blowDepth: 2, releaseDepth: 4 });
+const withTank = (model) => S.createSubModel(Object.freeze({ ...model.spec, ...TANK_FIELDS }));
 
 /** The heading that points from (x, y) at (tx, ty), in the engine's convention (0 = +x, a right turn increases it). */
 export const headingTo = (x, y, tx, ty) => Math.atan2(-(ty - y), tx - x);
@@ -48,9 +65,14 @@ export function createTank({ hull = "nominal" } = {}) {
         sub.target = { depth: DEPTH_MIN + r * (DEPTH_MAX - DEPTH_MIN), heading: (q - 0.5) * 2 * Math.PI, speed: 1.5 + z * 1.5 };
         sub.nextTarget = sub.age + 20 + sub.rng() * 25;
     }
+    function clearEvent(sub) {
+        if (!sub.event) return;
+        if (sub.state && sub.state.tank) { const { tank, ...rest } = sub.state; sub.state = rest; }
+        sub.event = null; sub.eventT = 0; sub.eventModel = null; sub.eventPilot = null;
+    }
     function add(entry) {
         const rng = mulberry(hash(entry.id));
-        const sub = { id: entry.id, name: entry.name, hue: entry.hue, pilotKind: entry.pilot, from: entry.from, local: !!entry.local, rng, pilot: pilotFor(entry), state: null, target: null, nextTarget: 0, age: 0, lost: 0, wasInside: true, status: "swimming", trail: [], trailT: 0 };
+        const sub = { id: entry.id, name: entry.name, hue: entry.hue, pilotKind: entry.pilot, from: entry.from, local: !!entry.local, rng, pilot: pilotFor(entry), state: null, target: null, nextTarget: 0, age: 0, lost: 0, wasInside: true, status: "swimming", trail: [], trailT: 0, event: null, eventT: 0, eventModel: null, eventPilot: null, holdDepth: 0 };
         sub.state = spawn(entry, rng); retarget(sub);
         subs.set(entry.id, sub);
         return sub;
@@ -62,8 +84,22 @@ export function createTank({ hull = "nominal" } = {}) {
         /** Change the vessel of the whole tank (a name from physics/mechanics/subHulls.mjs; an unknown name throws and changes nothing). Every sub is put back in the water on the new hull, at a fresh start, with its trail cleared. */
         setHull(name) {
             const m = H.model(name); MODEL = m; hullName = name;
-            for (const sub of subs.values()) { sub.state = spawn(sub, sub.rng, true); sub.trail.length = 0; sub.wasInside = true; sub.status = "swimming"; retarget(sub); }
+            for (const sub of subs.values()) { clearEvent(sub); sub.state = spawn(sub, sub.rng, true); sub.trail.length = 0; sub.wasInside = true; sub.status = "swimming"; retarget(sub); }
             return name;
+        },
+        /**
+         * Start (or, with null, end) an event on one sub: "flood", "sink" or "surface" (see EVENTS). Returns the event now running, or null. An unknown event name throws and changes nothing; an unknown id does nothing and returns null.
+         * Starting one on a sub that already has one swaps it: the tank state is kept (a dropped weight stays dropped, the air stays spent), the leak and the clock start again.
+         */
+        setEvent(id, ev) {
+            const sub = subs.get(id);
+            if (ev !== null && ev !== undefined && ev !== "" && !EVENTS.includes(ev)) throw new Error(`subAquariumSim.setEvent: unknown event "${ev}" (${EVENTS.join(", ")})`);
+            if (!sub) return null;
+            if (ev === null || ev === undefined || ev === "") { clearEvent(sub); return null; }
+            if (!sub.event) { sub.eventModel = withTank(MODEL); sub.state = { ...sub.state, tank: { ...S.initialTank(sub.eventModel), level: sub.cmd ? Math.max(-1, Math.min(1, sub.cmd.ballast)) : 0 } }; }
+            sub.event = ev; sub.eventT = 0; sub.holdDepth = -sub.state.pos[2];
+            sub.eventPilot = ev === "flood" ? EP.wrap(sub.pilot, RESCUE) : ev === "surface" ? SP.wrap(sub.pilot, { model: sub.eventModel }) : sub.pilot;
+            return ev;
         },
         /** Reconcile with the aquarium's list [{ id, name, hue, pilot, from, local, weights }]: new ids join, ids that are gone leave, the ones that stay keep swimming. Returns { added, removed }. */
         sync(list) {
@@ -85,10 +121,15 @@ export function createTank({ hull = "nominal" } = {}) {
                     if (!inside && sub.wasInside) { sub.target = { depth: sub.target.depth, heading: wrap(headingTo(x, y, LENGTH / 2, WIDTH / 2) + (sub.rng() - 0.5) * 0.8), speed: Math.min(sub.target.speed, 2.5) }; sub.nextTarget = sub.age + 15 + sub.rng() * 15; }
                     sub.wasInside = inside;
                     const t = inside ? sub.target : { depth: sub.target.depth, heading: headingTo(x, y, LENGTH / 2, WIDTH / 2), speed: Math.min(sub.target.speed, 2) };
-                    const cmd = sub.pilot(s, t, [0, 0, 0]), res = S.stepSub(MODEL, s, cmd, dt);
+                    const ev = sub.event, model = ev ? sub.eventModel : MODEL;
+                    const tg = ev === "surface" ? { ...t, surface: true } : ev ? { ...t, depth: sub.holdDepth } : t;   // a flooded boat holds the depth it was at; a surfacing one is asked to surface
+                    const cmd = (ev ? sub.eventPilot : sub.pilot)(s, tg, [0, 0, 0]);
+                    const res = S.stepSub(model, s, cmd, dt, [0, 0, 0], ev === "flood" || ev === "sink" ? FL.leakAt({ leak: LEAK }, sub.eventT) : 0);
+                    if (ev) sub.eventT += dt;
                     sub.cmd = { pitch: cmd.pitch, yaw: cmd.yaw, thrust: cmd.thrust, ballast: cmd.ballast };   // what the pilot asked for this tick: the page draws the fins from it
+                    if (cmd.blow !== undefined) sub.cmd.blow = cmd.blow; if (cmd.release !== undefined) sub.cmd.release = cmd.release;
                     sub.state = res.state;
-                    if (res.status !== "submerged" || !Number.isFinite(res.state.pos[0])) { sub.lost++; sub.status = res.status; sub.state = spawn(sub, sub.rng, true); sub.trail.length = 0; sub.wasInside = true; retarget(sub); continue; }
+                    if (res.status !== "submerged" || !Number.isFinite(res.state.pos[0])) { sub.lost++; sub.status = res.status; clearEvent(sub); sub.state = spawn(sub, sub.rng, true); sub.trail.length = 0; sub.wasInside = true; retarget(sub); continue; }
                     sub.status = "swimming";
                     sub.trailT += dt;
                     if (sub.trailT >= TRAIL_EVERY) { sub.trailT = 0; sub.trail.push([sub.state.pos[0], sub.state.pos[1], -sub.state.pos[2]]); if (sub.trail.length > TRAIL) sub.trail.shift(); }
@@ -97,7 +138,7 @@ export function createTank({ hull = "nominal" } = {}) {
         },
         /** What a page draws: one plain record per sub. */
         snapshot() {
-            return [...subs.values()].map((sub) => { const a = S.attitude(sub.state); return { hull: hullName, id: sub.id, name: sub.name, hue: sub.hue, pilot: sub.pilotKind, from: sub.from, local: sub.local, x: sub.state.pos[0], y: sub.state.pos[1], depth: a.depth, heading: a.heading, pitch: a.pitch, speed: a.speed, cmd: sub.cmd ? { ...sub.cmd } : { pitch: 0, yaw: 0, thrust: 0, ballast: 0 }, target: sub.target, lost: sub.lost, status: sub.status, trail: sub.trail.slice() }; });
+            return [...subs.values()].map((sub) => { const a = S.attitude(sub.state); return { hull: hullName, id: sub.id, name: sub.name, hue: sub.hue, pilot: sub.pilotKind, from: sub.from, local: sub.local, x: sub.state.pos[0], y: sub.state.pos[1], depth: a.depth, heading: a.heading, pitch: a.pitch, speed: a.speed, cmd: sub.cmd ? { ...sub.cmd } : { pitch: 0, yaw: 0, thrust: 0, ballast: 0 }, event: sub.event, tank: sub.state.tank ? { level: sub.state.tank.level, air: sub.state.tank.air, airMax: sub.eventModel ? sub.eventModel.spec.airMax : null, released: sub.state.tank.released, blowing: !!(sub.cmd && sub.cmd.blow > 0.5) } : null, target: sub.target, lost: sub.lost, status: sub.status, trail: sub.trail.slice() }; });
         },
     };
 }
