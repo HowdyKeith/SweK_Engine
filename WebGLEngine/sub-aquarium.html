@@ -50,6 +50,7 @@
   canvas { display:block; width:100%; background:#04101c; border:1px solid var(--line); border-radius:6px; }
   .p2d canvas { height:auto; }
   .side { flex:1 1 auto; min-height:0; overflow-y:auto; }
+  .cmd { color:var(--dim); font-size:11px; line-height:1.5; font-variant-numeric:tabular-nums; }
   .tank-note { color:var(--dim); font-size:11px; padding-top:5px; }
   @media (max-width: 900px) { main { grid-template-columns:minmax(0,1fr); } .canvasbox { min-height:60vh; } .col { gap:12px; } }
   .row { display:flex; gap:8px; align-items:flex-start; padding:5px 4px; border-bottom:1px solid #12203a; }
@@ -77,7 +78,7 @@
 </div>
 <main>
   <section class="panel p3d" aria-label="Three-dimensional view of the tank">
-    <h2>3D view <span class="hint">drag to orbit &middot; wheel to zoom</span></h2>
+    <h2>3D view <span class="hint"><label title="Click a sub in the list, then tick this: the camera follows it and comes in close enough to see its tower and tail fins"><input type="checkbox" id="followBox"> follow the selected sub</label> &nbsp; drag to orbit &middot; wheel to zoom</span></h2>
     <div class="canvasbox"><canvas id="view3d" width="1000" height="700" aria-label="Three-dimensional view of the tank: the physics sea above, the subs beneath it" style="cursor:grab"></canvas></div>
     <div class="tank-note" id="view3dNote">The sea is the physics surface a hull would float on (render/seaThree.mjs); subs are tinted toward the water colour by depth, and each sub&rsquo;s tail planes and rudder follow its pilot&rsquo;s command.</div>
   </section>
@@ -117,6 +118,9 @@ try {   // v4895: the tank in 3D. A page without WebGL keeps its two 2D views.
     sel.addEventListener("change", () => { try { tank.setHull(sel.value); $("msg").textContent = "hull: " + (LABELS[sel.value] || sel.value); } catch (e) { sel.value = tank.hull; $("msg").textContent = "that hull is not available"; } });
 }
 let selected = null, lastFrame = 0, listErr = false;
+// follow: the camera follows the selected sub when the box is ticked; ticking it with nothing selected picks the first sub in the list
+function syncFollow(fromBox) { if (!view3d) return; const on = $("followBox").checked; if (on && !selected && fromBox) { const f = tank.snapshot()[0]; if (f) { selected = f.id; renderList(); } } view3d.setFollow(on ? selected : null); }
+$("followBox").addEventListener("change", () => syncFollow(true));
 const DOT = { live: "#4ade80", standin: "#f6a623", offline: "#ff5a5a", err: "#555" }, WORD = { live: "live", standin: "stand-in", offline: "offline", err: "unreachable" };
 
 async function refresh() {
@@ -149,14 +153,17 @@ function renderList() {
     const sw = document.createElement("span"); sw.className = "sw"; sw.style.background = `hsl(${s.hue} 80% 60%)`;
     const t = document.createElement("div"), n = document.createElement("div"), m = document.createElement("div"); n.className = "nm"; m.className = "sub";
     n.textContent = s.name; m.id = "m_" + s.id;
-    t.appendChild(n); t.appendChild(m); row.appendChild(sw); row.appendChild(t);
-    row.onclick = () => { selected = s.id === selected ? null : s.id; renderList(); };
+    const cm = document.createElement("div"); cm.className = "cmd"; cm.id = "c_" + s.id;   // the pilot's four commands this tick: the tail planes and rudder in the 3D view are drawn from these
+    t.appendChild(n); t.appendChild(m); t.appendChild(cm); row.appendChild(sw); row.appendChild(t);
+    row.onclick = () => { selected = s.id === selected ? null : s.id; renderList(); syncFollow(); };
     if (s.local) { const x = document.createElement("button"); x.textContent = "✕"; x.title = "Remove from the tank"; x.style.marginLeft = "auto"; x.onclick = async (e) => { e.stopPropagation(); await post("/subaquarium/remove", { id: s.id }); refresh(); }; row.appendChild(x); }
     box.appendChild(row);
   }
 }
 function updateStats(snap) {
   for (const s of snap) {
+    const cm = document.getElementById("c_" + s.id);
+    if (cm && s.cmd) { const f = (v, w) => (v >= 0 ? "+" : "") + v.toFixed(w); cm.textContent = `pitch ${f(s.cmd.pitch, 2)} · yaw ${f(s.cmd.yaw, 2)} · thrust ${f(s.cmd.thrust, 2)} · ballast ${f(s.cmd.ballast, 2)}`; }
     const m = document.getElementById("m_" + s.id); if (!m) continue;
     m.textContent = `${s.pilot === "network" ? "network" : "PD autopilot"} · ${s.local ? "this box" : "from " + s.from} · ${s.depth.toFixed(0)} m · ${s.speed.toFixed(1)} m/s` + (s.hull && s.hull !== "nominal" ? ` · ${LABELS[s.hull] || s.hull}` : "") + (s.lost ? ` · lost ${s.lost}×` : "");
   }

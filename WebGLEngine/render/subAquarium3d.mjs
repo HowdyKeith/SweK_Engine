@@ -60,6 +60,19 @@ export function poseFins(group, cmd) {
 /** The scene pose of a snapshot row ({x, y, depth, heading, pitch}). */
 export function subPose(s) { return { x: s.x, y: -s.depth, z: s.y, rotY: s.heading, rotZ: s.pitch }; }
 
+/** How close the camera sits to a sub it is following (metres): the hull is drawn 32 m long, so the tower and the tail fill the panel. */
+export const FOLLOW_DIST = 70;
+/** The camera for an orbit `view` ({ yaw, pitch, dist }) around `centre` ({ x, y, z }): a point on a sphere about the centre, looking at it. At the tank's centre this is the pose the page has always had. */
+export function cameraPose(centre, view) {
+    return { pos: [centre.x + view.dist * Math.sin(view.yaw) * Math.cos(view.pitch), centre.y + 5 + view.dist * Math.sin(view.pitch), centre.z + view.dist * Math.cos(view.yaw) * Math.cos(view.pitch)],
+             look: [centre.x, centre.y, centre.z] };
+}
+/** One frame of the follow: the centre moves a fraction `k` of the way to the target (an exponential approach, so a sub that turns is followed and a jump is not a cut). */
+export function followStep(centre, target, k = 0.18) {
+    const f = Math.max(0, Math.min(1, k));
+    return { x: centre.x + (target.x - centre.x) * f, y: centre.y + (target.y - centre.y) * f, z: centre.z + (target.z - centre.z) * f };
+}
+
 /**
  * @returns { render(snapshot, t), setView(yaw, pitch, dist), resize(w, h), sea, subs: Map, dispose() }
  */
@@ -75,10 +88,21 @@ export function createView3d(THREE, canvas, { length = 500, width = 300, depthMa
     const camera = new THREE.PerspectiveCamera(50, canvas.width / canvas.height, 1, 4000);
     const view = { yaw: 0.6, pitch: 0.55, dist: 430 };   // v4899: closer, so the tank fills its panel
     const subs = new Map(), geo = {};
-    const place = () => { camera.position.set(length / 2 + view.dist * Math.sin(view.yaw) * Math.cos(view.pitch), view.dist * Math.sin(view.pitch) - 10, width / 2 + view.dist * Math.cos(view.yaw) * Math.cos(view.pitch)); camera.lookAt(length / 2, -15, width / 2); };
+    // v4899 -- FOLLOW: the camera orbits a centre, and the centre is the tank's middle unless a sub is being followed, when it eases toward that sub (and eases back when it is not).
+    const home = { x: length / 2, y: -15, z: width / 2 };
+    let centre = { ...home }, follow = null, distBefore = null;
+    const place = () => { const q = cameraPose(centre, view); camera.position.set(q.pos[0], q.pos[1], q.pos[2]); camera.lookAt(q.look[0], q.look[1], q.look[2]); };
     return {
         sea, subs, scene, camera, renderer,
-        setView(yaw, pitch, dist) { view.yaw = yaw; view.pitch = Math.max(0.05, Math.min(1.5, pitch)); view.dist = Math.max(80, Math.min(1500, dist)); },
+        setView(yaw, pitch, dist) { view.yaw = yaw; view.pitch = Math.max(0.05, Math.min(1.5, pitch)); view.dist = Math.max(25, Math.min(1500, dist)); },
+        /** Follow a sub by id (null stops). Following from far away moves in to FOLLOW_DIST and remembers where it was; stopping puts the distance back. Returns what is followed now. */
+        setFollow(id) {
+            if (id && subs.has(id)) { if (follow === null && view.dist > 150) { distBefore = view.dist; view.dist = FOLLOW_DIST; } follow = id; }
+            else { follow = null; if (distBefore !== null) { view.dist = distBefore; distBefore = null; } }
+            return follow;
+        },
+        getFollow: () => follow,
+        getCentre: () => ({ ...centre }),
         getView: () => ({ ...view }),
         resize(w, h) { renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); },
         render(snapshot, t = 0) {
@@ -95,6 +119,9 @@ export function createView3d(THREE, canvas, { length = 500, width = 300, depthMa
                 const p = subPose(s); m.position.set(p.x, p.y, p.z); m.rotation.set(0, p.rotY, p.rotZ); poseFins(m, s.cmd);
             }
             for (const [id, m] of subs) if (!live.has(id)) { scene.remove(m); m.userData.mat.dispose(); subs.delete(id); }
+            if (follow !== null && !subs.has(follow)) { follow = null; if (distBefore !== null) { view.dist = distBefore; distBefore = null; } }   // the followed sub left the tank
+            const tgt = follow !== null ? subs.get(follow).position : home;
+            centre = followStep(centre, { x: tgt.x, y: tgt.y, z: tgt.z });
             place(); renderer.render(scene, camera);
         },
         dispose() { sea.dispose(); for (const k of Object.keys(geo)) geo[k].dispose(); renderer.dispose(); },
