@@ -188,7 +188,7 @@ console.log("\n3. THE PAGE");
     const aq = fs.readFileSync(path.join(ENG, "sub-aquarium.html"), "utf8");
     ok("!! the page has the follow control and the readout: a followBox checkbox wired to view3d.setFollow through syncFollow (ticking it with nothing selected picks the first sub, deselecting does not), and every list row carries a .cmd line filled from the snapshot's cmd",
         /id="followBox"/.test(aq) && /view3d\.setFollow\(on \? selected : null\)/.test(aq) && /on && !selected && fromBox/.test(aq) && /className = "cmd"/.test(aq) && /s\.cmd\) \{/.test(aq) && /pitch \$\{f\(s\.cmd\.pitch/.test(aq));
-    ok("!! sub-aquarium.html builds the 3D view with createView3d from the same tank and renders it from the frame loop that draws the 2D views; a page without WebGL keeps its 2D views", /import \{ createView3d \} from "\/render\/subAquarium3d\.mjs"/.test(aq) && /createView3d\(THREE, cv, \{ length: LENGTH, width: WIDTH/.test(aq) && /view3d\.render\(snap/.test(aq) && /catch \(e\) \{ view3d = null;/.test(aq));
+    ok("!! sub-aquarium.html builds the 3D view with createView3d from the same tank (its own length and width, so a bigger tank is drawn as big) and renders it from the frame loop that draws the 2D views; a page without WebGL keeps its 2D views", /import \{ createView3d \} from "\/render\/subAquarium3d\.mjs"/.test(aq) && /createView3d\(THREE, cv, \{ length: tank\.length, width: tank\.width/.test(aq) && /view3d\.render\(snap/.test(aq) && /catch \(e\) \{ view3d = null;/.test(aq));
 }
 
 console.log(`\nsubAquarium3d-selfcheck: ${fails === 0 ? "all passed" : fails + " FAILED"}`);

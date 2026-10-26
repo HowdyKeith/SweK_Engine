@@ -61,12 +61,14 @@ export const insideBox = (x, y) => x >= MARGIN && x <= LENGTH - MARGIN && y >= M
 
 
 /** A new tank. `sync(list)` reconciles it with the aquarium's list; `step(seconds)` advances it; `subs` are the live boats. */
-export function createTank({ hull = "nominal" } = {}) {
+export function createTank({ hull = "nominal", length = LENGTH, width = WIDTH } = {}) {
+    // v4902 -- the tank may be bigger than the default 500 x 300 m (the subs need room to swim: the Sea OGRE and a crowded tank both do); every wall below is THIS tank's own
+    const insideBox = (x, y) => x >= MARGIN && x <= length - MARGIN && y >= MARGIN && y <= width - MARGIN;
     const subs = new Map();   // id -> live sub
     let clock = 0, hullName = hull, MODEL = H.model(hull);   // the vessel every sub in the tank is (physics/mechanics/subHulls.mjs); the pilots do not know which
 
     function spawn(entry, rng, atCentre = false) {
-        const x = atCentre ? LENGTH / 2 + (rng() - 0.5) * 60 : MARGIN + rng() * (LENGTH - 2 * MARGIN), y = atCentre ? WIDTH / 2 + (rng() - 0.5) * 40 : MARGIN + rng() * (WIDTH - 2 * MARGIN);
+        const x = atCentre ? length / 2 + (rng() - 0.5) * 60 : MARGIN + rng() * (length - 2 * MARGIN), y = atCentre ? width / 2 + (rng() - 0.5) * 40 : MARGIN + rng() * (width - 2 * MARGIN);
         const depth = DEPTH_MIN + rng() * (DEPTH_MAX - DEPTH_MIN), heading = (rng() - 0.5) * 2 * Math.PI;
         return S.createState({ depth, pos: [x, y, -depth], speed: 2, heading, model: MODEL });
     }
@@ -108,7 +110,7 @@ export function createTank({ hull = "nominal" } = {}) {
         return sub;
     }
     return {
-        subs,
+        subs, length, width,
         get clock() { return clock; },
         get hull() { return hullName; },
         /** Change the vessel of the whole tank (a name from physics/mechanics/subHulls.mjs; an unknown name throws and changes nothing). Every sub is put back in the water on the new hull, at a fresh start, with its trail cleared. */
@@ -151,9 +153,9 @@ export function createTank({ hull = "nominal" } = {}) {
                     const s = sub.state, x = s.pos[0], y = s.pos[1];
                     if (sub.age >= sub.nextTarget) retarget(sub);
                     const inside = insideBox(x, y);
-                    if (!inside && sub.wasInside) { sub.target = { depth: sub.target.depth, heading: wrap(headingTo(x, y, LENGTH / 2, WIDTH / 2) + (sub.rng() - 0.5) * 0.8), speed: Math.min(sub.target.speed, 2.5) }; sub.nextTarget = sub.age + 15 + sub.rng() * 15; }
+                    if (!inside && sub.wasInside) { sub.target = { depth: sub.target.depth, heading: wrap(headingTo(x, y, length / 2, width / 2) + (sub.rng() - 0.5) * 0.8), speed: Math.min(sub.target.speed, 2.5) }; sub.nextTarget = sub.age + 15 + sub.rng() * 15; }
                     sub.wasInside = inside;
-                    const t = sub.tgt = inside ? sub.target : { depth: sub.target.depth, heading: headingTo(x, y, LENGTH / 2, WIDTH / 2), speed: Math.min(sub.target.speed, 2) };
+                    const t = sub.tgt = inside ? sub.target : { depth: sub.target.depth, heading: headingTo(x, y, length / 2, width / 2), speed: Math.min(sub.target.speed, 2) };
                     sub.tickDt = dt;   // the navigator integrates over THIS tick, which is shorter than DT when a frame ends mid-tick
                     const ev = sub.event, model = ev ? sub.eventModel : MODEL;
                     const tg = ev === "surface" ? { ...t, surface: true } : ev === "flood" || ev === "sink" ? { ...t, depth: sub.holdDepth } : t;   // a flooded boat holds the depth it was at; a surfacing one is asked to surface

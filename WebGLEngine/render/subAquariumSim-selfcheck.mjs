@@ -168,5 +168,15 @@ console.log("\n11. THE NAMED CONSTANTS (DEPTH_MIN, DEPTH_MAX, TRAIL_EVERY)");
     ok("!! the swimming band is 14..40 m (DEPTH_MIN, DEPTH_MAX) and a trail point is laid at the first 30 Hz tick at or past every 0.5 s (TRAIL_EVERY; 16 ticks = 0.533 s, so thirty seconds of swimming leave 56 points, not 60 -- said here rather than rounded away)", A.DEPTH_MIN === 14 && A.DEPTH_MAX === 40 && A.TRAIL_EVERY === 0.5 && n >= 54 && n <= 58, `${n} points`);
 }
 
+// BIG TANK sabotages: Z1 the tank ignores the size it was given (1 red). Z2 the wall test kept at 500 x 300 inside a big tank: 0 red, SAID PLAINLY -- the wall logic only acts when a sub CROSSES from inside to outside
+// and a sub is spawned anywhere in the tank, so that mutant changes where a boat turns back, not whether the big tank is used; no row of this gate tells it from the true one, and none is claimed.
+console.log("\nBIG TANK");
+{
+    const big = A.createTank({ length: 1500, width: 900 }), small = A.createTank();
+    ok("!! a tank asked for 1500 x 900 m says so, the default is still 500 x 300", big.length === 1500 && big.width === 900 && small.length === A.LENGTH && small.width === A.WIDTH);
+    const e = (id) => ({ id, name: id, hue: 10, pilot: "pd", from: "x", local: true }); big.sync([e("a"), e("b"), e("c")]); let maxX = 0, maxY = 0, inside = true, far = 0, total = 0;
+    for (let i = 0; i < 30 * 600; i++) { big.step(1 / 30); if (i % 30 === 0 && i > 30 * 300) for (const q of big.subs.values()) { const p = q.state.pos; total++; if (p[0] > 500) far++; maxX = Math.max(maxX, p[0]); maxY = Math.max(maxY, p[1]); inside &&= p[0] > 0 && p[0] < 1500 && p[1] > 0 && p[1] < 900; } }
+    ok("!! subs swim the whole of a big tank: after the first five minutes (the spawn is anywhere in the tank) they stay inside its walls and still reach past the small tank's 500 m and 300 m, spending more than a fifth of their time beyond 500 m", inside && maxX > 560 && maxY > 360 && far / total > 0.2, `max x ${maxX.toFixed(0)}, max y ${maxY.toFixed(0)}, ${(100 * far / total).toFixed(0)}% of the time beyond 500 m`);
+}
 console.log(fails ? `\n${fails} FAIL` : "\nall checks pass");
 process.exit(fails ? 1 : 0);

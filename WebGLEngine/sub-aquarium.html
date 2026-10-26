@@ -75,6 +75,7 @@
   <button id="refreshBtn" title="Fetch the tank's list now">Refresh</button>
   <label>speed <select id="speedSel"><option value="1">1&times;</option><option value="4" selected>4&times;</option><option value="10">10&times;</option></select></label>
   <label>hull <select id="hullSel" title="The vessel every sub in the tank is flown on. The pilots are not told which one it is."></select></label>
+  <label title="The tank's size. Standard is 500 x 300 m; Large (1500 x 900) and Open (3000 x 1800) give the subs room to swim and spread out. Changing it reloads the page."><span>tank</span> <select id="sizeSel"><option value="standard">500 x 300 m</option><option value="large">1500 x 900 m</option><option value="open">3000 x 1800 m</option></select></label>
   <label>sea <select id="seaSel" title="The water above the tank. The three physics seas are the same Gerstner surface a hull floats on, in calm, default and rough swell, and work on every GPU. The GPU ocean is the vendored web-ocean sea (sea-host.html) drawn behind this canvas; it needs WebGPU, and the subs are drawn in front of all of its water (the depth tint puts them under it)."></select> <span class="sub" id="seaState"></span></label>
   <span title="Pick a sub in the list, then press one: a leak the tank cannot trim out (the boat blows its tank and drops its weight), the same leak with no rescue (it grounds), or surface (it blows its tank and rides on its buoyancy with the tower out of the water)">event on the selected sub:
     <button id="floodBtn">flood</button> <button id="sinkBtn">sink</button> <button id="surfaceBtn">surface</button> <button id="clearBtn">restore</button></span>
@@ -113,11 +114,12 @@ import { dialInfo, pair, pushTrace, lineFor, drawDial, drawTrace } from "/render
 
 const $ = (id) => document.getElementById(id);
 const plan = $("plan"), side = $("sideView"), pg = plan.getContext("2d"), sg = side.getContext("2d");
-const tank = createTank();
+const SIZES = { standard: [LENGTH, WIDTH], large: [1500, 900], open: [3000, 1800] }, sizeKey = Object.hasOwn(SIZES, new URLSearchParams(location.search).get("size")) ? new URLSearchParams(location.search).get("size") : "standard";
+const tank = createTank({ length: SIZES[sizeKey][0], width: SIZES[sizeKey][1] });   // v4902: room to swim; the page reloads with ?size= to change it
 let view3d = null;
 try {   // v4895: the tank in 3D. A page without WebGL keeps its two 2D views.
     const THREE = await import("/vendor/three/three.module.js"), cv = $("view3d");
-    view3d = createView3d(THREE, cv, { length: LENGTH, width: WIDTH, depthMax: 50 });
+    view3d = createView3d(THREE, cv, { length: tank.length, width: tank.width, depthMax: 50 });
     const fit = () => { const r = cv.parentElement.getBoundingClientRect(); view3d.resize(Math.max(2, Math.round(r.width)), Math.max(2, Math.round(r.height))); };   // the canvas is as big as its panel
     fit(); new ResizeObserver(fit).observe(cv.parentElement);
     let drag = null; const V = () => view3d.getView();
@@ -126,6 +128,9 @@ try {   // v4895: the tank in 3D. A page without WebGL keeps its two 2D views.
     cv.addEventListener("pointerup", () => { drag = null; cv.style.cursor = "grab"; });
     cv.addEventListener("wheel", (e) => { e.preventDefault(); const v = V(); view3d.setView(v.yaw, v.pitch, v.dist * (e.deltaY < 0 ? 0.9 : 1.1)); }, { passive: false });
 } catch (e) { view3d = null; $("view3d").style.display = "none"; $("view3dNote").textContent = "3D view unavailable here (" + String((e && e.message) || e).slice(0, 80) + "); the top and depth views are unaffected."; }
+{   // v4902 -- the size picker reloads with ?size= (the tank and its 3D view are built once)
+  const sz = $("sizeSel"); sz.value = sizeKey; sz.addEventListener("change", () => { const u = new URL(location.href); u.searchParams.set("size", sz.value); location.href = u.toString(); });
+}
 {   // the hull picker: the labels are text; changing it puts every sub back in the water on the new vessel
     const sel = $("hullSel");
     for (const [name, label] of Object.entries(LABELS)) { const o = document.createElement("option"); o.value = name; o.textContent = label; sel.appendChild(o); }
@@ -254,9 +259,9 @@ function drawCompass(snap) {
 function render() {
   const snap = tank.snapshot();
   pg.clearRect(0, 0, plan.width, plan.height); sg.clearRect(0, 0, side.width, side.height);
-  const sx = plan.width / LENGTH, sy = plan.height / WIDTH;
-  pg.strokeStyle = "#1c2c44"; pg.lineWidth = 1; for (let x = 0; x <= LENGTH; x += 50) { pg.beginPath(); pg.moveTo(x * sx, 0); pg.lineTo(x * sx, plan.height); pg.stroke(); } for (let y = 0; y <= WIDTH; y += 50) { pg.beginPath(); pg.moveTo(0, y * sy); pg.lineTo(plan.width, y * sy); pg.stroke(); }
-  const dx = side.width / LENGTH, dz = side.height / 50;
+  const sx = plan.width / tank.length, sy = plan.height / tank.width;
+  pg.strokeStyle = "#1c2c44"; pg.lineWidth = 1; for (let x = 0; x <= tank.length; x += tank.length / 10) { pg.beginPath(); pg.moveTo(x * sx, 0); pg.lineTo(x * sx, plan.height); pg.stroke(); } for (let y = 0; y <= tank.width; y += tank.width / 6) { pg.beginPath(); pg.moveTo(0, y * sy); pg.lineTo(plan.width, y * sy); pg.stroke(); }
+  const dx = side.width / tank.length, dz = side.height / 50;
   sg.fillStyle = "#07243a"; sg.fillRect(0, DEPTH_MIN * dz, side.width, (DEPTH_MAX - DEPTH_MIN) * dz); sg.strokeStyle = "#1c2c44"; sg.strokeRect(0, 0, side.width, side.height);
   sg.fillStyle = "#7c93b8"; sg.font = "16px monospace"; sg.fillText("surface", 6, 12); sg.fillText("depth " + DEPTH_MIN + "–" + DEPTH_MAX + " m", 6, DEPTH_MIN * dz - 4); sg.fillText("floor 50 m", 6, side.height - 6);
   for (const s of snap) {
