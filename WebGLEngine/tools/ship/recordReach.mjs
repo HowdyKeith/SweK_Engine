@@ -403,7 +403,7 @@ export const REACH_AT_V4548 = Object.freeze({
     // wasmTeardown-selfcheck reads it and grades every gate reaching a door against it.
     // v4886 -- 178 -> 180: PROBE_AT_V4675 and one more, both guarded by recordProbe-selfcheck / frozenRecords; read off the gate.
     // v4894 -- 181 -> 182: READINGS_AT_V4892 (ui/oceanReadings.mjs), GUARDED by ui/oceanReadings-selfcheck.mjs at about 130 ms.
-    total: 186,   // v4899 -- 185 -> 186: COMMIT_BELT_DRIFT_V4899 (world/orreryFleet.mjs, GUARDED by tools/ship/orreryFleet-selfcheck.mjs). v4898 -- 184 -> 185: COMMIT_BELT_DRIFT_V4898 (world/orreryFleet.mjs, GUARDED by tools/ship/orreryFleet-selfcheck.mjs). Earlier at v4898 -- 183 -> 184, one record with no field on its own line, read off the live census. v4895 -- 182 -> 183: COMMIT_BELT_DRIFT_V4895 (world/orreryFleet.mjs), GUARDED by tools/ship/orreryFleet-selfcheck.mjs.
+    total: 187,   // v4901 -- 186 -> 187: one more frozen record (see frozenRecords' v4901 note; documentary, read by code in one place). v4899: v4899 -- 185 -> 186: COMMIT_BELT_DRIFT_V4899 (world/orreryFleet.mjs, GUARDED by tools/ship/orreryFleet-selfcheck.mjs). v4898 -- 184 -> 185: COMMIT_BELT_DRIFT_V4898 (world/orreryFleet.mjs, GUARDED by tools/ship/orreryFleet-selfcheck.mjs). Earlier at v4898 -- 183 -> 184, one record with no field on its own line, read off the live census. v4895 -- 182 -> 183: COMMIT_BELT_DRIFT_V4895 (world/orreryFleet.mjs), GUARDED by tools/ship/orreryFleet-selfcheck.mjs.
     // *** READ OFF THE INSTRUMENT, NOT PREDICTED. *** The first draft of this record guessed 53/21/19/40 from
     // which gates the round had sped up, and was wrong on three of the four: the comment-strip fix below
     // moved two records the other way at the same time, and a guess cannot see two changes at once.
@@ -671,7 +671,7 @@ export const UNGUARDED_SPLIT_V4577 = Object.freeze({
     // v4819 -- 156 -> 157, COMMIT_BELT_DRIFT_V4819 re-taken above; `unguarded` does not move.
     // v4840 -- 157 -> 158, DOORS_AT_V4840 re-taken above; `unguarded` does not move.
     // v4880 -- 158 -> 170: twelve records arrive with the orrery-seeded merge; `unguarded` does not move (16 of 170, all documentary). Read off the gate.
-    structural: Object.freeze({ total: 186, unguarded: 17, documentaryOfThose: 16, readByCodeOfThose: 1 }),
+    structural: Object.freeze({ total: 187, unguarded: 18, documentaryOfThose: 16, readByCodeOfThose: 2 }),
     // BEFORE, on the tree this round opened on:
     before: Object.freeze({ total: 104, checked: 72, overBudget: 20, unmeasured: 0, unguarded: 12, unchecked: 32 }),
     // AFTER, as one reading rather than as a constant -- see the note above. Taken with the round's own

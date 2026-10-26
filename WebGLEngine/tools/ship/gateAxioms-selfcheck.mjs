@@ -145,6 +145,10 @@ console.log(`\n  ${pure} gates assume NOTHING outside their own arithmetic.\n`);
         // UNNUMBERED -- 25 -> 26: render/subDropoutView-selfcheck.mjs loads sub-aquarium.html in headless Chromium and reads the pixels of the compass-dropout view's three 2D canvases (the plan, the headings, the errors) to prove they are
         // drawn, and the page's tank canvas to prove the tank still runs; the rest of the gate runs the view on a fake DOM that records its drawing calls. The browser half SKIPS BY NAME without a browser.
         "render/subDropoutView-selfcheck.mjs",
+        // v4901 -- 31 -> 37: six gates of the submarine and Sea OGRE round that SKIP BY NAME without a browser and need a canvas or WebGL context where one exists: render/brainPanel-selfcheck.mjs and render/compassView-selfcheck.mjs and
+        // render/subTournamentView-selfcheck.mjs load their pages in headless Chromium and read canvas pixels; render/seaPicker-selfcheck.mjs and render/subBallastCues-selfcheck.mjs and render/seaOgre3d-selfcheck.mjs draw a three.js scene
+        // (the sea styles, the ballast cues, the Sea OGRE and its first-person camera) through WebGL and read the pixels back.
+        "render/brainPanel-selfcheck.mjs", "render/compassView-selfcheck.mjs", "render/seaOgre3d-selfcheck.mjs", "render/seaPicker-selfcheck.mjs", "render/subBallastCues-selfcheck.mjs", "render/subTournamentView-selfcheck.mjs",
     ]);
     const gpuNow = [...byGate.entries()].filter(([, h]) => h.includes("gpu")).map(([f]) => f).sort();
     const arrived = gpuNow.filter((g) => !GPU_GATES.includes(g));

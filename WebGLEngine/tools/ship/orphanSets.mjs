@@ -312,6 +312,8 @@ export const RECORDED = Object.freeze({
         "world/nodeGlPlatforms.mjs",
         "world/populationPolicy.mjs",
         "world/traderGraphGithub.mjs",
+        // v4901 -- ARRIVED through the merge of the FSR4 / frame-generation branch (its round 63: MOTION_WGSL, a shipping compute module whose only callers are its own gates); recorded by name rather than argued away, and the branch's owner decides whether to wire it.
+        "render/denoiseFrameGenGPU.mjs",
     ]),
     // referenceKind-selfcheck: no resolved non-gate importer, held off the census by a MENTION somewhere.
     proseRescued: Object.freeze([
@@ -671,6 +673,9 @@ export const RECORDED = Object.freeze({
         "vendor/snowflow/src/terrain/deformation.js",
         "vendor/snowflow/src/terrain/heightfield.js",
         "vendor/web-ocean/js/main.js",
+        // v4901 -- ARRIVED through the two merges (the FSR4 branch's render/denoiseFrameGenGPU.mjs, and the submarine chat's tools/selfPlaySubTactics.mjs); each is named in prose by its own gate and header and by nothing that calls it.
+        "render/denoiseFrameGenGPU.mjs",
+        "tools/selfPlaySubTactics.mjs",
     ]),
     // referenceKind-selfcheck: the subset of proseRescued whose rescuers include tools/ship/gateSweep.mjs --
     // the sweep closing the ship ritual REQUIRES every gate-adding round to write.

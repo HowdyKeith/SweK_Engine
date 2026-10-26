@@ -35,7 +35,7 @@ else {
         const win = f.contentWindow, wait = (ms) => new Promise((r) => setTimeout(r, ms)), t0 = performance.now();
         while (performance.now() - t0 < 40000 && (!win.__flightDemo || win.__flightDemo.state().tick < 1)) await wait(200);
         if (!win.__flightDemo) return { booted: false };
-        const D = win.__flightDemo, doc = win.document, cv = doc.querySelector("canvas:not(#wadmap-widget canvas)") || doc.querySelectorAll("canvas")[0];
+        const D = win.__flightDemo, doc = win.document, cv = doc.querySelector("canvas:not(#wadmap-widget canvas):not(#brainBox canvas)") || doc.querySelectorAll("canvas")[0];
         const view = () => { const p = D.state().fleet[0].pos, c = D.camera.position; const dx = c.x - p[0], dy = c.y - p[1], dz = c.z - p[2]; return { dist: Math.hypot(dx, dy, dz), az: Math.atan2(dy, dx) }; };
         const settle = async () => { D.cameraSteps(120); return view(); };   // the camera lerps 12% a step toward its goal: 120 steps of the page's own updateCamera settle it, with no wait on a software frame
         const ev = (type, init) => cv.dispatchEvent(type === "wheel" ? new win.WheelEvent("wheel", { bubbles: true, cancelable: true, ...init }) : type === "dblclick" ? new win.MouseEvent("dblclick", { bubbles: true, ...init }) : new win.PointerEvent(type, { bubbles: true, pointerId: 7, ...init }));

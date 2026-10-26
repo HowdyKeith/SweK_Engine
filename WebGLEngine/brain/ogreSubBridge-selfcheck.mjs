@@ -1,6 +1,6 @@
 // WebGLEngine/brain/ogreSubBridge-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node brain/ogreSubBridge-selfcheck.mjs      (~8 s)
+// Run: node brain/ogreSubBridge-selfcheck.mjs      (~2 s)
 //
 // THE BRIDGE FROM THE SUB BRAINS TO THE VOXEL OGRE WORLD (brain/ogreSubBridge.mjs, and the hook in simulation/OgreScenario.js):
 //   1  THE MAPPING    a brain starts at the entry's place, nose toward the OGRE (hand-worked at four bearings: the voxel +z is the vessel's LEFT, so an OGRE at +z is a NEGATIVE relative bearing); 2 m/s is 2 u/s

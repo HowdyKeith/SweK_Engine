@@ -2581,6 +2581,11 @@ export const INSTRUMENTS = [
       measures: "THE FLY'S HEADING LOOP AGAINST ITS CONTROLS, AS THE PRE-REGISTERED RUNG 4a OF brain/SUBMARINE_WIP.md (\"the fly central complex as a stateful heading pilot\", fixed before anything was built, and again after the real export was read). brain/pilotSubCircuitState.mjs is a pilot",
       key: "THE FLY'S HEADING LOOP AGAINST ITS CONTROLS, AS THE PRE-REGISTERED RUNG 4a OF brain/SUBMARINE_WIP.md (\"the fly central complex as a stateful heading pilot\", fixed before anything was built, and again after the real export was read). brain/pilotSubCircuitState.mjs is a pilot (lifted from the module's own report)",
       gate: "tools/ship/trainSubState-selfcheck.mjs" },
+    // v4901 -- brain/subTournament.mjs, registered at the round it arrived: its `measures` is the module's OWN first header sentence and its key the module's own line on the pair, LIFTED and not composed.
+    { id: "sub-tournament", page: "instrument-bench.html", name: "(brain/dogfightTournament.mjs) and the sea had none. This is it, built ON that module's own statistics rather ", area: "brain",
+      measures: "(brain/dogfightTournament.mjs) and the sea had none. This is it, built ON that module's own statistics rather than beside them: the duel is subDuel's (sonar, four torpedoes, 100 hit points, the same seats and the same score formula for either side, which subDuel's",
+      key: "* A FIGHT is one duel; a PAIR is one geometry flown TWICE, X in seat A and then in seat B (seat A starts with B within 60 degrees of its nose, so the seats are NOT equal: the pair cancels it and seatBias() measures it). (lifted from the module's own header)",
+      gate: "brain/subTournament-selfcheck.mjs" },
 ];
 
 export const AREAS = [...new Set(INSTRUMENTS.map((i) => i.area))];

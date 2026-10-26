@@ -1,6 +1,6 @@
 // WebGLEngine/render/subAquariumEvents-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node render/subAquariumEvents-selfcheck.mjs      (~8 s)
+// Run: node render/subAquariumEvents-selfcheck.mjs      (~1 s)
 //
 // A SUB IN THE TANK CAN BE FLOODED OR TOLD TO SURFACE. render/subAquariumSim.mjs gained setEvent(id, "flood" | "sink" | "surface" | null) in v4901; this gate holds it:
 //   1  OFF BY DEFAULT   a tank where setEvent was never called, and one where it was called and undone before the first tick, swim to the bit; no event means `event` and `tank` are null in the snapshot

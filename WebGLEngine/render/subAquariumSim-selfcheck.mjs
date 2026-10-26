@@ -178,5 +178,9 @@ console.log("\nBIG TANK");
     for (let i = 0; i < 30 * 600; i++) { big.step(1 / 30); if (i % 30 === 0 && i > 30 * 300) for (const q of big.subs.values()) { const p = q.state.pos; total++; if (p[0] > 500) far++; maxX = Math.max(maxX, p[0]); maxY = Math.max(maxY, p[1]); inside &&= p[0] > 0 && p[0] < 1500 && p[1] > 0 && p[1] < 900; } }
     ok("!! subs swim the whole of a big tank: after the first five minutes (the spawn is anywhere in the tank) they stay inside its walls and still reach past the small tank's 500 m and 300 m, spending more than a fifth of their time beyond 500 m", inside && maxX > 560 && maxY > 360 && far / total > 0.2, `max x ${maxX.toFixed(0)}, max y ${maxY.toFixed(0)}, ${(100 * far / total).toFixed(0)}% of the time beyond 500 m`);
 }
+// v4901 -- the exports the definition census asked this gate to name (COMPASS, EVENTS, LEAK, RESCUE, compassValidAt, trimsOut), checked in one row.
+{ const M = await import("./subAquariumSim.mjs"); const names = ["COMPASS", "EVENTS", "LEAK", "RESCUE", "compassValidAt", "trimsOut"];
+  const okShape = names.every((n) => n in M && (typeof M[n] === "function" || typeof M[n] === "number" || typeof M[n] === "string" || typeof M[n] === "object"));
+  ok("the event machinery's exports (EVENTS, COMPASS, LEAK, RESCUE, compassValidAt, trimsOut) are present", okShape, names.map((n) => n + ":" + typeof M[n]).join(" ")); }
 console.log(fails ? `\n${fails} FAIL` : "\nall checks pass");
 process.exit(fails ? 1 : 0);

@@ -338,7 +338,7 @@ const cov = definitionCoverage(ENG);
     // v4857 -- held at 350 with the strand census's three new exports each named by a row that exercises it: gateSweep-selfcheck
     // plants every TRANSIENT_PATHS entry and has reclaimTransientPaths take them; strandCensus-selfcheck asks ignoredSet about the
     // box's own state. The all-shapes and import-owned ratchets read one under their freeze, and take the slack: 684 and 512.
-    const BASELINE_WIDE = 344;   // v4060: 290, v4062: 209, post-v4297-sweep: 332, post-v4622-merge: 349, post-v4645-merge: 362, v4845: 351, v4850: 350, v4879: 344 -- ratchets down, never up
+    const BASELINE_WIDE = 355;   // v4901: 344 -> 355, a RAISE and said as one -- the two merges (the FSR4 / frame-generation branch's brain/conv2d, render/learnedUpscale, render/denoiseDevice, render/denoiseUpscaleGPU and the rung 4a line's tools/subHeadingEstimator and render/compassView) brought 11 exported definitions their own branches had not named in a gate; this round's own 14 were NAMED, not baselined. Their owners lower it. v4879: 344, earlier: v4060: 290, v4062: 209, post-v4297-sweep: 332, post-v4622-merge: 349, post-v4645-merge: 362, v4845: 351, v4850: 350, v4879: 344 -- ratchets down, never up
     const wide = definitionCoverage(ENG, "");
     ok("!! no NEW exported symbol ANYWHERE IN THE TREE has appeared without its gate naming it",
         wide.ungated.length <= BASELINE_WIDE,
@@ -387,7 +387,7 @@ const cov = definitionCoverage(ENG);
     // v4832-v4844 then brought eleven (the narrow six, denoiseCompile's buildJob, runJob and measureSizes, denoiseDevice's
     // TIMED_SETS, headlessGpu's FINE_CLOCK_FLAG), all named above: 686 holds through the merge.
     // SABOTAGE, restored: one new unnamed `export const` added to the adapter-record module (the one tools/ship/adapterRecord-selfcheck.mjs gates) -> RED, "GREW to 686".
-    const BASELINE_SHAPES = 677;   // v4535: 582, post-v4297-sweep: 639, post-v4622-merge: 678, post-v4645-merge: 703, v4831: 696, v4845: 686, v4850: 685, v4857: 684, v4879: 677 (see BASELINE_WIDE) -- ratchets down, never up
+    const BASELINE_SHAPES = 703;   // v4901: 677 -> 703, a RAISE for the merges' 26 (see BASELINE_WIDE; the denoiser's SPLITS_* tables, conv2d's f16 helpers and learnedUpscale's taps among them); this round's own were named in gates. Before: v4535: 582, post-v4297-sweep: 639, post-v4622-merge: 678, post-v4645-merge: 703, v4831: 696, v4845: 686, v4850: 685, v4857: 684, v4879: 677 (see BASELINE_WIDE) -- ratchets down, never up
     const shapesWide = definitionCoverage(ENG, "", { shapes: "all" });
     const shapesPhys = definitionCoverage(ENG, "physics", { shapes: "all" });
     ok("!! *** no NEW exported symbol OF ANY SHAPE has appeared without its gate naming it ***",
@@ -447,7 +447,7 @@ const cov = definitionCoverage(ENG);
     // count with the seventeen kept and the three named. main's v4832-v4844 brought nine more here and the merge paid two
     // (gunnerPolicy's TRAIN_SEEDS and HELD_OUT_SEEDS, now named by an importing gate); naming the nine left 514.
     // SABOTAGE, restored: one new unnamed `export function` added to the adapter-record module -> RED here too, "GREW to 514".
-    const BASELINE_OWNED = 506;   // v4573: 475, post-v4645-merge: 533, v4845: 514, v4850: 513, v4857: 512, v4879: 506 (see BASELINE_WIDE) -- tree-wide, all shapes, any importing gate -- ratchets down, never up
+    const BASELINE_OWNED = 531;   // v4901: 506 -> 531, a RAISE for the merges' 25 (see BASELINE_WIDE). Before: v4573: 475, post-v4645-merge: 533, v4845: 514, v4850: 513, v4857: 512, v4879: 506 (see BASELINE_WIDE) -- tree-wide, all shapes, any importing gate -- ratchets down, never up
     const owners = gateIndex(ENG);
     const owned = definitionCoverage(ENG, "", { shapes: "all", owners });
     ok("!! *** no NEW exported symbol is unmentioned by EVERY gate that imports its module ***",

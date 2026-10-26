@@ -1,6 +1,6 @@
 // WebGLEngine/brain/subSquad-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node brain/subSquad-selfcheck.mjs      (~6 s)
+// Run: node brain/subSquad-selfcheck.mjs      (~2 s)
 //
 // A SQUAD OF DEFENDING SUBS THAT SPREAD OUT, SHARE WHAT THEY HEAR AND SEND PROBES (brain/subSquad.mjs, wired into brain/seaOgre.mjs by its `squad` option):
 //   1  THE STATIONS  n boats on an arc across the threat axis, `spread` radians apart at `radius` metres, each in its own depth band (16, 24, 32 m); hand-worked at axis 0 and at axis pi/2; the waypoint sweeps

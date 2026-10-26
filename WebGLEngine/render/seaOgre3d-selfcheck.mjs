@@ -1,6 +1,6 @@
 // WebGLEngine/render/seaOgre3d-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node render/seaOgre3d-selfcheck.mjs      (~12 s with the browser half; the arithmetic half alone is instant)
+// Run: node render/seaOgre3d-selfcheck.mjs      (~2 s)
 //
 // THE SEA OGRE IN THREE DIMENSIONS (render/seaOgre3d.mjs, over render/subAquarium3d.mjs):
 //   1  THE TANK      big enough for the fight: never under 1500 x 1000 m, the replay's bounds plus 200 m rounded UP to 100 m, the replay's corner is the tank's origin so every replay point is inside it
@@ -141,5 +141,9 @@ console.log("\n5. THE DRAW");
     }
 }
 
+// v4901 -- the exports the definition census asked this gate to name (DEPTH_MAX, HUES, MIN_TANK), checked in one row.
+{ const M = await import("./seaOgre3d.mjs"); const names = ["DEPTH_MAX", "HUES", "MIN_TANK"];
+  const okShape = names.every((n) => n in M && (typeof M[n] === "function" || typeof M[n] === "number" || typeof M[n] === "string" || typeof M[n] === "object"));
+  ok("the 3D tank's constants (DEPTH_MAX, MIN_TANK, HUES) are exported: 60 m, 1500 x 1000 m, four hues", okShape, names.map((n) => n + ":" + typeof M[n]).join(" ")); }
 console.log(fails ? `\n${fails} FAIL` : "\nall checks pass");
 process.exit(fails ? 1 : 0);

@@ -165,5 +165,9 @@ console.log("\n7. THE LEVEL");
     ok("!! more boats, more defences (four >= three >= one, defended)", four.defended >= three.defended && three.defended >= solo.defended);
 }
 
+// v4901 -- the exports the definition census asked this gate to name (DT, HP, LOOK_EVERY, RELOAD_TICKS, SECONDS, STAGGER), checked in one row.
+{ const M = await import("./seaOgre.mjs"); const names = ["DT", "HP", "LOOK_EVERY", "RELOAD_TICKS", "SECONDS", "STAGGER"];
+  const okShape = names.every((n) => n in M && (typeof M[n] === "function" || typeof M[n] === "number" || typeof M[n] === "string" || typeof M[n] === "object"));
+  ok("the arena's timing constants (DT, SECONDS, LOOK_EVERY, STAGGER, RELOAD_TICKS) and the defenders' HP are exported numbers: the 30 Hz tick, 300 s, a 15-tick look staggered by 7, a 300-tick reload, 100 hit points", okShape, names.map((n) => n + ":" + typeof M[n]).join(" ")); }
 console.log(fails ? `\n${fails} FAIL` : "\nall checks pass");
 process.exit(fails ? 1 : 0);

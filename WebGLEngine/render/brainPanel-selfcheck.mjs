@@ -1,6 +1,6 @@
 // WebGLEngine/render/brainPanel-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node render/brainPanel-selfcheck.mjs      (~3 s)
+// Run: node render/brainPanel-selfcheck.mjs      (~22 s)
 //
 // THE SELECTED BRAIN ACTIVITY PANEL (render/brainPanel.mjs), the sub aquarium's and the flight page's: the activity of the selected vessel's brain drawn the way that kind of brain is, and a policy map computed by CALLING the pilot.
 //   1  THE KINDS     autopilot, fly, gpu, fish, manual; the fish is not flown by either page and says so; an unknown kind is described, not thrown on
@@ -247,5 +247,9 @@ console.log("\n10. THE PAGES THAT FLY IT (a browser; SKIPPED, and said, without 
     }
 }
 
+// v4901 -- the exports the definition census asked this gate to name (drawHeat), checked in one row.
+{ const M = await import("./brainPanel.mjs"); const names = ["drawHeat"];
+  const okShape = names.every((n) => n in M && (typeof M[n] === "function" || typeof M[n] === "number" || typeof M[n] === "string" || typeof M[n] === "object"));
+  ok("drawHeat, the heat-map drawer the panels share, is exported as a function", okShape, names.map((n) => n + ":" + typeof M[n]).join(" ")); }
 console.log(fails ? `\n${fails} FAIL` : "\nall checks pass");
 process.exit(fails ? 1 : 0);

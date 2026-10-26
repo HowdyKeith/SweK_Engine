@@ -164,4 +164,8 @@ console.log("\n7. THE PAGE");
 }
 
 console.log(`\nsubBallastCues-selfcheck: ${fails === 0 ? "all passed" : fails + " FAILED"}`);
+// v4901 -- the exports the definition census asked this gate to name (AIR_LOW, BUBBLE_LIFE, BUBBLE_RATE, BUBBLE_RISE, WEIGHT_G, WEIGHT_STAY), checked in one row.
+{ const M = await import("./subBallastCues.mjs"); const names = ["AIR_LOW", "BUBBLE_LIFE", "BUBBLE_RATE", "BUBBLE_RISE", "WEIGHT_G", "WEIGHT_STAY"];
+  const okShape = names.every((n) => n in M && (typeof M[n] === "function" || typeof M[n] === "number" || typeof M[n] === "string" || typeof M[n] === "object"));
+  ok("the cue constants (AIR_LOW, BUBBLE_RATE, BUBBLE_LIFE, BUBBLE_RISE, WEIGHT_G, WEIGHT_STAY) are exported numbers", okShape, names.map((n) => n + ":" + typeof M[n]).join(" ")); }
 process.exit(fails === 0 ? 0 : 1);

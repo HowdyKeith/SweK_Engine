@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "a2d65575f8dfe3dd11d31322d3e979152a601d9c",
+ "head": "aa6f4f6dc84cb58954015bd993a5333b057c6366",
  "bodies": {
   "box3d": [
    {
@@ -467,7 +467,7 @@
    },
    {
     "path": "tools/ship/orphanSets.mjs",
-    "bytes": 38550,
+    "bytes": 39179,
     "sha": "73795feb626921ab015e3c9b64dd55387c7f7b24"
    }
   ],
@@ -601,7 +601,7 @@
    },
    {
     "path": "tools/ship/orphanSets.mjs",
-    "bytes": 38550,
+    "bytes": 39179,
     "sha": "73795feb626921ab015e3c9b64dd55387c7f7b24"
    },
    {
@@ -856,7 +856,7 @@
    {
     "path": "main.js",
     "bytes": 3702524,
-    "sha": "4fb1551b514f2915e5188fbd8e27bcfeec6f1bc2"
+    "sha": "aa6f4f6dc84cb58954015bd993a5333b057c6366"
    },
    {
     "path": "mpm3d.html",
@@ -880,7 +880,7 @@
    },
    {
     "path": "render/seaOgre3d-selfcheck.mjs",
-    "bytes": 17958,
+    "bytes": 18440,
     "sha": "4fb1551b514f2915e5188fbd8e27bcfeec6f1bc2"
    },
    {
@@ -905,7 +905,7 @@
    },
    {
     "path": "render/subBallastCues-selfcheck.mjs",
-    "bytes": 19323,
+    "bytes": 19979,
     "sha": "eeed7a4effda2e8edb0befc0345ec053396bb41b"
    },
    {
@@ -1025,7 +1025,7 @@
    },
    {
     "path": "tools/ship/orphanSets.mjs",
-    "bytes": 38550,
+    "bytes": 39179,
     "sha": "73795feb626921ab015e3c9b64dd55387c7f7b24"
    },
    {
@@ -1499,7 +1499,7 @@
    },
    {
     "path": "tools/ship/orphanSets.mjs",
-    "bytes": 38550,
+    "bytes": 39179,
     "sha": "73795feb626921ab015e3c9b64dd55387c7f7b24"
    },
    {
@@ -1558,7 +1558,7 @@
    },
    {
     "path": "tools/ship/orphanSets.mjs",
-    "bytes": 38550,
+    "bytes": 39179,
     "sha": "73795feb626921ab015e3c9b64dd55387c7f7b24"
    },
    {

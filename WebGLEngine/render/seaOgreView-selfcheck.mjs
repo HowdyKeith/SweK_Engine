@@ -1,6 +1,6 @@
 // WebGLEngine/render/seaOgreView-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node render/seaOgreView-selfcheck.mjs      (~3 s)
+// Run: node render/seaOgreView-selfcheck.mjs      (~0.5 s)
 //
 // WHAT sea-ogre.html SHOWS (render/seaOgreView.mjs):
 //   1  THE BOUNDS   the whole replay and the headquarters at the origin, padded, never under 200 m each way; an empty replay has a default
@@ -124,5 +124,9 @@ console.log("\n6. THE PAGE");
     ok("the page index knows it", /"sea-ogre\.html"/.test(rd("page-index.json")));
 }
 
+// v4901 -- the exports the definition census asked this gate to name (HQ_COLOUR), checked in one row.
+{ const M = await import("./seaOgreView.mjs"); const names = ["HQ_COLOUR"];
+  const okShape = names.every((n) => n in M && (typeof M[n] === "function" || typeof M[n] === "number" || typeof M[n] === "string" || typeof M[n] === "object"));
+  ok("HQ_COLOUR, the headquarters' colour, is exported next to the other plan colours", okShape, names.map((n) => n + ":" + typeof M[n]).join(" ")); }
 console.log(fails ? `\n${fails} FAIL` : "\nall checks pass");
 process.exit(fails ? 1 : 0);

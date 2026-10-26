@@ -1,6 +1,6 @@
 // WebGLEngine/brain/manualAssist-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node brain/manualAssist-selfcheck.mjs      (~3 s)
+// Run: node brain/manualAssist-selfcheck.mjs      (~0.3 s)
 //
 // THE HUMAN'S STICK, WITH THE WINGS COMING BACK. brain/manualAssist.mjs puts the autopilot's inner loops under the keyboard of es-flight6dof.html: roll is a bank angle, a released stick levels the wings, the climb is drawn to zero when the pitch
 // stick is neutral. The report that started it: a held left key rolled the aircraft over "way too fast" and it did not come back. Measured here before the assist existed: full left stick is 185-200 degrees a second and the aircraft is on the ground in 7.6 s.
@@ -111,5 +111,9 @@ console.log("\n8. THE PAGE");
     ok("!! the assist checkbox exists, is on by default and is remembered", /id="assistBox"[^>]*checked/.test(aq) && /localStorage\.setItem\("flight6dof\.assist"/.test(aq) && /let assistOn = true; try \{ assistOn = localStorage\.getItem\("flight6dof\.assist"\) !== "0"/.test(aq));
 }
 
+// v4901 -- the exports the definition census asked this gate to name (MAX_BANK, PITCH_AUTH, YAW_AUTH), checked in one row.
+{ const M = await import("./manualAssist.mjs"); const names = ["MAX_BANK", "PITCH_AUTH", "YAW_AUTH"];
+  const okShape = names.every((n) => n in M && (typeof M[n] === "function" || typeof M[n] === "number" || typeof M[n] === "string" || typeof M[n] === "object"));
+  ok("the stability assist's three authority constants (MAX_BANK, PITCH_AUTH, YAW_AUTH) are exported numbers, the ones sections 1-3 compute with", okShape, names.map((n) => n + ":" + typeof M[n]).join(" ")); }
 console.log(fails ? `\n${fails} FAIL` : "\nall checks pass");
 process.exit(fails ? 1 : 0);

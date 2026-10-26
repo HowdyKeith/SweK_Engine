@@ -1,6 +1,6 @@
 // WebGLEngine/tools/subReservoirV3-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node tools/subReservoirV3-selfcheck.mjs      (~40 s)
+// Run: node tools/subReservoirV3-selfcheck.mjs      (~17 s)
 //
 // THE GATE OF tools/subReservoirV3.mjs (the relu and tanh reservoirs, the drive scale, the edge of stability, the gains of an arm, the score with its cap count), tools/ship/subEstimatorStudyV3.mjs (one circuit under one arm, the verdict per arm, the report and its bottom line, the command)
 // and tools/ship/subEstimatorStudyV3Cmd.mjs: the study of brain/SUBMARINE_WIP.md "RUNG 4a VERSION 3", registered before any v3 circuit was scored. Every number is worked out by hand on small fixtures:
@@ -20,6 +20,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import * as E from "./subHeadingEstimator.mjs";
 import * as V from "./subReservoirV3.mjs";
 import * as ST from "./ship/subEstimatorStudy.mjs";
@@ -235,7 +236,7 @@ await guarded("section 9", async () => {
     ok("a circuit file that cannot be read is exit 1 'cannot read the circuit file'", code === 1 && /cannot read the circuit file/.test(errs[0] || ""));
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "v3cmd-")); const real = path.join(tmp, "r.jsonl");
     try {
-        const cmdFile = path.join(path.dirname(new URL(import.meta.url).pathname), "ship", "subEstimatorStudyV3Cmd.mjs"), cp = (await import("node:child_process")).spawnSync(process.execPath, [cmdFile, "report", "--in", real], { encoding: "utf8" });
+        const cmdFile = path.join(path.dirname(fileURLToPath(import.meta.url)), "ship", "subEstimatorStudyV3Cmd.mjs"), cp = (await import("node:child_process")).spawnSync(process.execPath, [cmdFile, "report", "--in", real], { encoding: "utf8" });
         ok("the command file runs the command and sets the exit code from it: a report of a file that is not there prints the message and exits 1", cp.status === 1 && /subEstimatorStudyV3: /.test(cp.stderr), `${cp.status} ${cp.stderr.slice(0, 80)}`);
     } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 });

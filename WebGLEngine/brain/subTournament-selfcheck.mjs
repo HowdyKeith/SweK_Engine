@@ -1,6 +1,6 @@
 // WebGLEngine/brain/subTournament-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node brain/subTournament-selfcheck.mjs      (~8 s)
+// Run: node brain/subTournament-selfcheck.mjs      (~3 s)
 //
 // EVERY SUBMARINE SIDE AGAINST EVERY OTHER (brain/subTournament.mjs), built on subDuel's duel and dogfightTournament's statistics:
 //   1  THE SIDES     makeSide: the default is the hand tactician and the PD autopilot, a theta is clamped into its bounds, 963 weights make the network pilot and any other length is REFUSED BY NAME, and every call of side() is a fresh

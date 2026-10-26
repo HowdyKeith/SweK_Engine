@@ -420,7 +420,7 @@ export const MEASURED_AT_V4486 = Object.freeze({
     v4895: Object.freeze({ rows: 52, agreement: 48, handVerifiedEmitters: 23, handVerifiedQuoters: 29, reportedEmitters: 25, reportedQuoters: 27 }),
     v4896: Object.freeze({ rows: 53, agreement: 48, handVerifiedEmitters: 23, handVerifiedQuoters: 30, reportedEmitters: 26, reportedQuoters: 27 }),
     // Against backendParity's own figures, unchanged and deliberately not widened.
-    preambleCensus: Object.freeze({ glslBearing: 170, wgslBearing: 134, both: 27 }),   // v4897: wgslBearing 132 -> 134 with backendParity (render/deformTexture.mjs and its gate). v4880: were 150 / 72 / 16 at v4486; restated with backendParity; v4891: wgslBearing 115 -> 116 with it (render/denoiseUpscaleGPU.mjs)
+    preambleCensus: Object.freeze({ glslBearing: 170, wgslBearing: 135, both: 27 }),   // v4901: wgslBearing 134 -> 135 with backendParity (render/denoiseFrameGenGPU.mjs, merged from the FSR4 branch). v4897: wgslBearing 132 -> 134 with backendParity (render/deformTexture.mjs and its gate). v4880: were 150 / 72 / 16 at v4486; restated with backendParity; v4891: wgslBearing 115 -> 116 with it (render/denoiseUpscaleGPU.mjs)
     // Of the fourteen, how many are invisible for a reason a wider PATTERN could fix: the two whose only
     // problem is that the framework tell is a uniform declaration. The other twelve are structural.
     fixableByPattern: 2,
