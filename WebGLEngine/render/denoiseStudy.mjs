@@ -21,15 +21,16 @@
 // Without it everything is computed, as before; with it the result is the same, bit for bit
 // (render/denoiseCache-selfcheck.mjs). A scene rendered under --harvest is never served to a run without it.
 "use strict";
-import { SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, SPLITS_R8, SPLITS_R9, SPLITS_R10, SPLITS_R11, SPLITS_MESH, SPLITS_FSR1, SPLITS_HALFRES, SPLITS_EMITTER, SPLITS_TEMPORALUP, familyOf, makeScene, IMAGE, SPP_IN, SPP_REF, renderImages, renderSeeds, inputChannels, remodulate } from "./denoiseScenes.mjs";
+import { SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, SPLITS_R8, SPLITS_R9, SPLITS_R10, SPLITS_R11, SPLITS_MESH, SPLITS_FSR1, SPLITS_HALFRES, SPLITS_EMITTER, SPLITS_TEMPORALUP, SPLITS_R47, SPLITS_MESH_C, SPLITS_PAGE, SPLITS_FRAMEGEN, SPLITS_FRAMEGEN_LF, SPLITS_FRAMEGEN_DISPLAY, SPLITS_FRAMEGEN_LARGE, SPLITS_FRAMEGEN_HOLES, familyOf, makeScene, IMAGE, SPP_IN, SPP_REF, renderImages, renderSeeds, inputChannels, remodulate } from "./denoiseScenes.mjs";
 import { renderSequence, temporalChannels, sequenceSeeds } from "./denoiseTemporal.mjs";
 import { withMask, emitterCoverage, emitterRadiance, MASK_STRIDE, MASK_CHANNEL, COVERAGE_GRID } from "./denoiseMask.mjs";
 import { jointBilateral, tuneFilter } from "./denoiseFilter.mjs";
 import { trainDenoiser, denoise, TRAIN, TRAIN_LONG, INIT } from "./denoiseNet.mjs";
 import { relMSE, verdict, trainFit, historyFit, trainSanity, effects } from "./denoiseStats.mjs";
 import { cached, cachedMany, hashArrays } from "./denoiseCache.mjs";
-import { upscale, renderUpscaleImages, renderSeedsUpscale, emitterAwareUpscale, fillEmitters, compositeEmitters, nearEmitterShare, RCAS_SHARPNESS, RCAS_DENOISE, GAMMA } from "./denoiseUpscale.mjs";
+import { upscale, renderUpscaleImages, renderSeedsUpscale, emitterAwareUpscale, fillEmitters, compositeEmitters, nearEmitterShare, RCAS_SHARPNESS, RCAS_DENOISE, GAMMA, toPerceptual } from "./denoiseUpscale.mjs";
 import { trainParallel } from "./denoisePool.mjs";
+import { renderFrameGenImages, frameGenSeeds, frameGenFrames, FRAMEGEN_FILL, HOLE_FILL } from "./denoiseFrameGen.mjs";
 import { renderTemporalUpscaleImages, temporalUpscaleSeeds, accumulateUpscaled, shiftResample, sequenceGeometry, halfShift, JITTER } from "./denoiseTemporalUpscale.mjs";
 
 export const SEEDS = Object.freeze([1, 2, 3]);
@@ -44,6 +45,7 @@ export const RESULTS_R8 = "render/denoise-results-r8.json";
 export const RESULTS_R9 = "render/denoise-results-r9.json";
 export const RESULTS_R10 = "render/denoise-results-r10.json";
 export const RESULTS_R11 = "render/denoise-results-r11.json";
+export const RESULTS_R47 = "render/denoise-results-r47.json";
 
 /**
  * The two harvests, each exactly as its section of the pre-registration fixed it. ROUND1 is kept so its recorded run
@@ -111,10 +113,19 @@ export const ROUND11 = Object.freeze({ splits: SPLITS_R11, init: INIT, c0: true,
                                        temporal: false, emitterMask: true, c1OnTraining: true, test: "signflip",
                                        compareTrainSplits: Object.freeze({ R: SPLITS_R7.train, C: SPLITS_R10.train }), results: RESULTS_R11 });
 /**
+ * Section 116, round 47 (denoise-smaller-network): round 11 exactly -- its 192 training scenes, schedule, seeds, test and
+ * controls -- with ONE change, the network 16 channels wide (size "w16", SHAPE_KERNEL_W16), on new test scenes of both families.
+ * Secondary: the 32-channel network round 11 shipped, trained again on the same scenes with the same schedule (compareSize),
+ * measured on the same test images, so what the narrowing costs is read on one set of images.
+ */
+export const ROUND47 = Object.freeze({ ...ROUND11, splits: SPLITS_R47, size: "w16", compareTrainSplits: null,
+                                       compareSize: Object.freeze({ size: "large", train: TRAIN_LONG }), results: RESULTS_R47 });
+/**
  * tools/denoiseStudy.mjs's commands, each to its round, newest first (section 33). --secondary-r11 is round 11 exactly, writing its own file: the harvest's
  * results (render/denoise-results-r11.json) were written without section 32's secondary, and are never overwritten.
  */
 export const HARVESTS = Object.freeze({
+    "--harvest-r47": ROUND47,
     "--secondary-r11": Object.freeze({ ...ROUND11, results: "render/denoise-results-r11-secondary.json" }),
     "--harvest-r11": ROUND11, "--harvest-r10": ROUND10, "--harvest-r9": ROUND9, "--harvest-r8": ROUND8, "--harvest-r7": ROUND7, "--harvest-r6": ROUND6,
     "--harvest-r5": ROUND5, "--harvest-r4": ROUND4, "--harvest-r3": ROUND3, "--harvest-r2": ROUND2, "--harvest-r1": ROUND1,
@@ -139,22 +150,36 @@ export const SHIPPED_NET = "render/denoise-net-r11.json";
 export const ROUND_MESH = Object.freeze({ splits: SPLITS_MESH, emitterMask: true, test: "signflip",
                                           c2Prior: Object.freeze({ round: 11, meanD: -1.8564223228700172, ok: true }), results: RESULTS_MESH });
 /**
+ * Round 56 (pre-registration section 127): section 79's round on the same shapes in family C's materials and light --
+ * families VC and MC, the shipped pair, nothing trained, C2 cited from round 11 as section 79 cites it.
+ */
+export const RESULTS_MESH_C = "render/denoise-results-mesh-c.json";
+export const ROUND_MESH_C = Object.freeze({ splits: SPLITS_MESH_C, emitterMask: true, test: "signflip", c2Prior: ROUND_MESH.c2Prior, results: RESULTS_MESH_C });
+/**
+ * Round 58 (pre-registration section 131): the same pair on path-tracer.html's own six scenes -- family P, one test set of 6,
+ * so one hypothesis (no Holm step) and C1 at 5 of 6.
+ */
+export const RESULTS_PAGE = "render/denoise-results-page.json";
+export const ROUND_PAGE = Object.freeze({ splits: SPLITS_PAGE, emitterMask: true, test: "signflip", c2Prior: ROUND_MESH.c2Prior, c1Min: 5, results: RESULTS_PAGE });
+/**
  * The shipped pair on a test set, end to end: render T1 and T2 (each with its second reference, for C3), measure noisy,
  * filter, network and floor per image exactly as runStudy's `measure` does, and hand them to verdict(). C4 here is the
  * question a round with no training can ask -- the forward pass, run twice, bit for bit -- and C5 is runStudy's.
  * The network's column is ONE seed, the shipped one: a deployment question, about what the page runs.
  */
-export function runShippedStudy({ splits = ROUND_MESH.splits, net, filter, emitterMask = ROUND_MESH.emitterMask, test = ROUND_MESH.test, c2Prior = ROUND_MESH.c2Prior,
+export function runShippedStudy({ splits = ROUND_MESH.splits, net, filter, emitterMask = ROUND_MESH.emitterMask, test = ROUND_MESH.test, c2Prior = ROUND_MESH.c2Prior, c1Min = undefined,
                                   harvest = false, image = IMAGE, sppIn = SPP_IN, sppRef = SPP_REF, cache = null, log = () => {} } = {}) {
     if (!net || !filter) throw new Error("denoiseStudy: runShippedStudy needs the shipped network and filter, decoded by its caller");
     const t0 = Date.now(), timings = {};
     const lap = (k) => { timings[k] = Date.now() - t0; log(`${k} at ${(timings[k] / 1000).toFixed(1)} s`); };
-    const config = { image, sppIn, sppRef, harvest, emitterMask, test, c2Prior, filter, trained: "nothing -- the shipped network and filter",
+    // round 58: the test sets are the split's own (T1, T2, ...), H1 on T1 and so on -- one set for the page's six scenes
+    const sets = Object.keys(splits).filter((k) => /^T\d+$/.test(k)).sort();
+    const config = { image, sppIn, sppRef, harvest, emitterMask, test, c2Prior, filter, ...(c1Min !== undefined ? { c1Min } : {}), trained: "nothing -- the shipped network and filter",
                      splits: Object.fromEntries(Object.entries(splits).map(([k, v]) => [k, { family: v.family, n: v.seeds.length, first: v.seeds[0] }])) };
     const R = {};
-    for (const name of ["T1", "T2"]) R[name] = renderSplit(splits[name], { harvest, image, sppIn, sppRef, ref2: true, emitterMask, cache });
+    for (const name of sets) R[name] = renderSplit(splits[name], { harvest, image, sppIn, sppRef, ref2: true, emitterMask, cache });
     lap("tests rendered");
-    const outs = Object.fromEntries(["T1", "T2"].map((name) => [name, R[name].map((im) => denoise(net, im.x, image, image).y)]));
+    const outs = Object.fromEntries(sets.map((name) => [name, R[name].map((im) => denoise(net, im.x, image, image).y)]));
     const again = R.T1.map((im) => denoise(net, im.x, image, image).y);
     const determinism = again.every((y, i) => y.length === outs.T1[i].length && y.every((v, j) => Object.is(v, outs.T1[i][j])));
     const allSeeds = Object.values(splits).flatMap((s) => s.seeds).flatMap((s) => { const r = renderSeeds(s); return [r.input, r.ref, r.ref2]; });
@@ -165,9 +190,9 @@ export function runShippedStudy({ splits = ROUND_MESH.splits, net, filter, emitt
         net: [R[name].map((im, i) => relMSE(outs[name][i], im.ref))],
         floor: R[name].map((im) => relMSE(im.ref2 ?? im.ref, im.ref)),
     });
-    const tables = { T1: measure("T1"), T2: measure("T2") };
+    const tables = Object.fromEntries(sets.map((name) => [name, measure(name)]));
     lap("measured");
-    const V = verdict({ sets: { H1: tables.T1, H2: tables.T2 }, shuffled: null, c2Prior, determinism, seedsDistinct, test });
+    const V = verdict({ sets: Object.fromEntries(sets.map((name) => ["H" + name.slice(1), tables[name]])), shuffled: null, c2Prior, determinism, seedsDistinct, test, ...(c1Min !== undefined ? { c1Min } : {}) });
     return { verdict: V, tables, filter, timings, determinism, seedsDistinct, seedCount: allSeeds.length, config };
 }
 
@@ -370,6 +395,107 @@ export function runTemporalUpscaleStudy({ splits = ROUND_TEMPORALUP.splits, net,
     const seedsDistinct = new Set(allSeeds).size === allSeeds.length;
     const V = verdict({ sets: temporalUpSets(tables), shuffled: null, c2Prior, determinism, seedsDistinct, test });
     const secondary = { clamp: effects(tables.BtNoClamp, tables.Bt), historyAtFull: effects(tables.D1, tables.Dt), dAwareVsBt: effects(tables.DtAware, tables.Bt), history };
+    return { verdict: V, tables, secondary, timings, determinism, seedsDistinct, seedCount: allSeeds.length, config };
+}
+
+/**
+ * Section 133, ROUND 59, FSR3's FRAME GENERATION between two of round 32's chain frames (render/denoiseFrameGen.mjs). Per image,
+ * against a frame traced at the midpoint of the orbit's last step:
+ *   G  the CANDIDATE -- interpolateFrameCPU at t = 0.5 between O6 and O7 along the scene's own motion, FRAMEGEN_FILL
+ *   X  the cross-fade, 0.5 O6 + 0.5 O7         R  O6, the older frame repeated
+ * H1: G beats X. H2: G beats R. Each hypothesis's noisy frame is the newer frame's half-size input through the chain's fill,
+ * bilinear upscale, shift and composite. Reported, never tested: Bmid1 (the chain on the midpoint frame alone), G without its
+ * fill, the holes, the field's check on the geometry.
+ */
+export const RESULTS_FRAMEGEN = "render/denoise-results-framegen.json";
+export const ROUND_FRAMEGEN = Object.freeze({ splits: SPLITS_FRAMEGEN, image: 256, test: "signflip", c2Prior: ROUND_MESH.c2Prior, results: RESULTS_FRAMEGEN });
+/** Section 133's two hypotheses over a round 59 table, by name, so the run and the verdict's re-derivation read one definition. */
+export const frameGenSets = (t) => ({ H1: { noisy: t.noisy, filter: t.X, net: [t.G], floor: t.floor }, H2: { noisy: t.noisy, filter: t.R, net: [t.G], floor: t.floor } });
+/**
+ * Section 136, ROUND 60: the same generator between LIGHT-FREE frames (the chain's accumulations before the composite), every arm
+ * then composited with the light sources at the midpoint (emitterRadiance from the midpoint eye) -- G' against the cross-fade X'
+ * and the held frame R' made the same way, over the newer frame's noisy input composited the same way.
+ */
+export const RESULTS_FRAMEGEN_LF = "render/denoise-results-framegen-lf.json";
+export const ROUND_FRAMEGEN_LF = Object.freeze({ splits: SPLITS_FRAMEGEN_LF, image: 256, test: "signflip", c2Prior: ROUND_MESH.c2Prior, arrangement: "lightFree", results: RESULTS_FRAMEGEN_LF });
+export const frameGenSetsLightFree = (t) => ({ H1: { noisy: t.noisyMid, filter: t.Xl, net: [t.Gl], floor: t.floor }, H2: { noisy: t.noisyMid, filter: t.Rl, net: [t.Gl], floor: t.floor } });
+/** Section 139, ROUND 61: the light-free arrangement graded in display space, C1 asked of the candidate alone, on new seeds. */
+export const RESULTS_FRAMEGEN_DISPLAY = "render/denoise-results-framegen-display.json";
+export const ROUND_FRAMEGEN_DISPLAY = Object.freeze({ splits: SPLITS_FRAMEGEN_DISPLAY, image: 256, test: "signflip", c2Prior: ROUND_MESH.c2Prior, arrangement: "lightFreeDisplay", c1Of: "candidate", results: RESULTS_FRAMEGEN_DISPLAY });
+/**
+ * Section 142, ROUND 62: round 61's arrangement, grading and C1-of-the-candidate on a test set twice its size, fixed before it
+ * exists -- 12 R and 12 C, new seeds. C1 at 22 of 24, round 61's 11 of 12 in proportion; 24 is the largest set section 28's
+ * exact sign-flip test enumerates (signFlipUpper).
+ */
+export const RESULTS_FRAMEGEN_LARGE = "render/denoise-results-framegen-large.json";
+export const ROUND_FRAMEGEN_LARGE = Object.freeze({ splits: SPLITS_FRAMEGEN_LARGE, image: 256, test: "signflip", c2Prior: ROUND_MESH.c2Prior, arrangement: "lightFreeDisplay", c1Of: "candidate", c1Min: 22, results: RESULTS_FRAMEGEN_LARGE });
+/**
+ * Section 151, ROUND 66: what a hole should show. The light-free generator with its fill scaled to 1080p's holes (HOLE_FILL),
+ * its holes black (Gh), from the cross-fade (GhX), from L7 (GhC); H1 GhX against Gh, H2 GhC against GhX, display space, C1 of
+ * each candidate at 22 of 24, on new seeds.
+ */
+export const RESULTS_FRAMEGEN_HOLES = "render/denoise-results-framegen-holes.json";
+export const ROUND_FRAMEGEN_HOLES = Object.freeze({ splits: SPLITS_FRAMEGEN_HOLES, image: 256, test: "signflip", c2Prior: ROUND_MESH.c2Prior, arrangement: "holes", c1Of: "candidate", c1Min: 22, results: RESULTS_FRAMEGEN_HOLES });
+export const frameGenSetsHoles = (t) => ({ H1: { noisy: t.noisyMid, filter: t.Gh, net: [t.GhX], floor: t.floor }, H2: { noisy: t.noisyMid, filter: t.GhX, net: [t.GhC], floor: t.floor } });
+/** relMSE (denoiseStats.mjs's) over the pixels a mask names -- section 151's hole pixels -- or null when it names none. */
+export function relMSEMasked(a, ref, mask) {
+    const n = mask.reduce((x, m) => x + (m ? 3 : 0), 0), A = new Float64Array(n), B = new Float64Array(n);
+    let k = 0;
+    for (let p = 0; p < mask.length; p++) if (mask[p]) for (let c = 0; c < 3; c++) { A[k] = a[p * 3 + c]; B[k] = ref[p * 3 + c]; k++; }
+    return k ? relMSE(A, B) : null;
+}
+/** Round 26's transfer, Reinhard then gamma 2.2 -- the display space a secondary grades every arm in too, and round 61 grades in. */
+export const toDisplay = (y) => Float64Array.from(y, toPerceptual);
+export function runFrameGenStudy({ splits = ROUND_FRAMEGEN.splits, net, test = ROUND_FRAMEGEN.test, c2Prior = ROUND_FRAMEGEN.c2Prior, arrangement = "shown", c1Min = null,
+                                   harvest = false, image = IMAGE, sppIn = SPP_IN, sppRef = SPP_REF, cache = null, log = () => {} } = {}) {
+    if (!net) throw new Error("denoiseStudy: runFrameGenStudy needs the shipped network, decoded by its caller");
+    if (!["shown", "lightFree", "lightFreeDisplay", "holes"].includes(arrangement)) throw new Error(`denoiseStudy: runFrameGenStudy's arrangement is "shown" (section 133), "lightFree" (section 136), "lightFreeDisplay" (section 139) or "holes" (section 151), not ${arrangement}`);
+    // round 61: "lightFreeDisplay" is round 60's arms graded in display space, and its linear grading kept as the secondary
+    // round 66: "holes" is the display-graded light-free arrangement with the scaled fill's holes filled three ways
+    const hl = arrangement === "holes", lf = arrangement !== "shown", disp = arrangement === "lightFreeDisplay" || hl;
+    const t0 = Date.now(), timings = {}, split = splits.T1;
+    const lap = (k) => { timings[k] = Date.now() - t0; log(`${k} at ${(timings[k] / 1000).toFixed(1)} s`); };
+    const config = { image, half: image / 2, sppIn, sppRef, harvest, test, c2Prior, fill: FRAMEGEN_FILL, t: 0.5, field: "the scene's own: eye 7's first hits projected into camera 6, per pixel",
+                     trained: "nothing -- the shipped network", split: { family: split.family, n: split.seeds.length, first: split.seeds[0] },
+                     arrangement, ...(hl ? { holeFill: HOLE_FILL } : {}), grading: disp ? "display: round 26's transfer, Reinhard then gamma 2.2, before relMSE" : "linear radiance", ...(disp ? { c1Of: "candidate" } : {}), ...(c1Min !== null ? { c1Min } : {}), hypotheses: lf
+                         ? { H1: "G' (generated between L6 and L7, lit at the midpoint) against X' (their cross-fade, lit the same)", H2: "G' against R' (L6 held, lit the same)" }
+                         : { H1: "G (generated between O6 and O7) against X (their cross-fade)", H2: "G against R (O6 repeated)" } };
+    const keys = hl ? ["Gh", "GhX", "GhC", "GhP", "noisyMid", "Gl"] : lf ? ["Gl", "Xl", "Rl", "noisyMid", "GlNoFill", "G", "X", "R", "O7", "noisy", "Bmid1"] : ["G", "X", "R", "O7", "noisy", "Bmid1", "GNoFill"], tables = Object.fromEntries(keys.map((k) => [k, []]));
+    // round 60: and every arm graded in display space too, reported
+    const display = lf && !hl ? Object.fromEntries(["Gl", "Xl", "Rl", "G", "X", "R"].map((k) => [k, []])) : null;
+    tables.floor = [];
+    const field = [], holePix = [];
+    let determinism = true;
+    // ONE IMAGE AT A TIME, as round 32: a sequence is nine frames and four full-size images
+    split.seeds.forEach((seed, i) => {
+        const fam = familyOf(split, i);
+        const seq = cached(cache, `framegen-${fam}-${seed}-${image}-${sppIn}-${sppRef}-${harvest ? "harvest" : "gate"}`,
+            () => renderFrameGenImages(fam, seed, { harvest, w: image, h: image, sppIn, sppRef }));
+        const F = frameGenFrames(seq, net, { holes: hl });
+        const rD = disp ? toDisplay(seq.ref) : null;
+        for (const k of keys) tables[k].push(disp ? relMSE(toDisplay(F[k]), rD) : relMSE(F[k], seq.ref));
+        tables.floor.push(disp ? relMSE(toDisplay(seq.ref2), rD) : relMSE(seq.ref2, seq.ref));
+        // the other space's grading, reported: display beside a linear run, linear beside a display one
+        if (display) { const r = disp ? seq.ref : toDisplay(seq.ref); for (const k of Object.keys(display)) display[k].push(disp ? relMSE(F[k], r) : relMSE(toDisplay(F[k]), r)); }
+        field.push(hl ? { ...F.field, holesScaled: F.holesScaled } : F.field);
+        // round 66: relMSE on the scaled fill's hole pixels alone, per arm, in the grading's space
+        if (hl) { const rD2 = toDisplay(seq.ref); holePix.push(Object.fromEntries(["Gh", "GhX", "GhC", "GhP"].map((k) => [k, relMSEMasked(toDisplay(F[k]), rD2, F.holeMask)]))); }
+        // C4: the candidate re-made from the same sequence, bit for bit -- the chain twice, the field, the splat, the fill
+        const cand = hl ? ["GhX", "GhC"] : [lf ? "Gl" : "G"];
+        if (i === 0) { const again = frameGenFrames(seq, net, { holes: hl }); determinism = cand.every((c) => again[c].every((v, j) => Object.is(v, F[c][j]))); }
+        lap(`image ${i + 1} of ${split.seeds.length} (${fam} ${seed})`);
+    });
+    const allSeeds = split.seeds.flatMap((s) => { const r = frameGenSeeds(s); return [...r.half, r.mid, r.ref, r.ref2]; });
+    const seedsDistinct = new Set(allSeeds).size === allSeeds.length;
+    const V = verdict({ sets: (hl ? frameGenSetsHoles : lf ? frameGenSetsLightFree : frameGenSets)(tables), shuffled: null, c2Prior, determinism, seedsDistinct, test, ...(disp ? { c1Of: "candidate" } : {}), ...(c1Min !== null ? { c1Min } : {}) });
+    const secondary = hl
+        ? { holeShare: field.map((f) => f.holesScaled / (image * image)), holePixels: holePix, prevFill: effects(tables.GhX, tables.GhP), vsFullFill: effects(tables.GhX, tables.Gl), field }
+        : lf
+        ? { midTraced: effects(tables.Bmid1, tables.Gl), fill: effects(tables.GlNoFill, tables.Gl), overShown: effects(tables.G, tables.Gl), shown: { H1: effects(tables.X, tables.G), H2: effects(tables.R, tables.G) },
+            // the other space's grading, named by its space: display beside a linear run (round 60), linear beside a display one (round 61)
+            [disp ? "linear" : "display"]: { H1: effects(display.Xl, display.Gl), H2: effects(display.Rl, display.Gl), shownH1: effects(display.X, display.G) },
+            [disp ? "linearTables" : "displayTables"]: display, field }
+        : { midTraced: effects(tables.Bmid1, tables.G), fill: effects(tables.GNoFill, tables.G), newerShown: effects(tables.O7, tables.G), field };
     return { verdict: V, tables, secondary, timings, determinism, seedsDistinct, seedCount: allSeeds.length, config };
 }
 

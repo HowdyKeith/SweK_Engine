@@ -1,0 +1,143 @@
+0.071 s  pid 38456  native: the ladder starts, sets r12,r15,r18t,r18u,r27w,r40s,r41h
+0.072 s  pid 38456  native 64x64: requestAdapter
+0.073 s  pid 38456  native 64x64: requestDevice for r12,r15,r18t,r18u,r27w,r41h
+0.086 s  pid 38456  native 64x64: build r12
+0.190 s  pid 38456  native 64x64: build r15
+1.411 s  pid 38456  native 64x64: build r18t
+2.905 s  pid 38456  native 64x64: build r18u
+8.792 s  pid 38456  native 64x64: build r27w
+10.872 s  pid 38456  native 64x64: build r41h
+17.742 s  pid 38456  native 64x64: round 0 time r12
+18.115 s  pid 38456  native 64x64: round 0 time r15
+18.177 s  pid 38456  native 64x64: round 0 time r18t
+18.236 s  pid 38456  native 64x64: round 0 time r18u
+18.282 s  pid 38456  native 64x64: round 0 time r27w
+18.363 s  pid 38456  native 64x64: round 0 time r41h
+18.424 s  pid 38456  native 64x64: round 1 time r41h
+18.487 s  pid 38456  native 64x64: round 1 time r27w
+18.580 s  pid 38456  native 64x64: round 1 time r18u
+18.624 s  pid 38456  native 64x64: round 1 time r18t
+18.677 s  pid 38456  native 64x64: round 1 time r15
+18.805 s  pid 38456  native 64x64: round 1 time r12
+19.150 s  pid 38456  native 64x64: round 2 time r12
+19.531 s  pid 38456  native 64x64: round 2 time r15
+19.585 s  pid 38456  native 64x64: round 2 time r18t
+19.637 s  pid 38456  native 64x64: round 2 time r18u
+19.679 s  pid 38456  native 64x64: round 2 time r27w
+19.758 s  pid 38456  native 64x64: round 2 time r41h
+19.823 s  pid 38456  native 64x64: output check r12
+19.858 s  pid 38456  native 64x64: output check r15
+19.868 s  pid 38456  native 64x64: output check r18t
+19.875 s  pid 38456  native 64x64: output check r18u
+19.880 s  pid 38456  native 64x64: output check r27w
+19.888 s  pid 38456  native 64x64: output check r41h
+19.895 s  pid 38456  native 64x64: destroy the denoisers
+19.898 s  pid 38456  native 64x64: destroy the device
+19.904 s  pid 38456  native 128x128: requestAdapter
+19.905 s  pid 38456  native 128x128: requestDevice for r12,r15,r18t,r18u,r27w,r41h
+19.929 s  pid 38456  native 128x128: build r12
+20.097 s  pid 38456  native 128x128: build r15
+22.313 s  pid 38456  native 128x128: build r18t
+24.721 s  pid 38456  native 128x128: build r18u
+30.322 s  pid 38456  native 128x128: build r27w
+32.363 s  pid 38456  native 128x128: build r41h
+39.066 s  pid 38456  native 128x128: round 0 time r12
+39.818 s  pid 38456  native 128x128: round 0 time r15
+39.992 s  pid 38456  native 128x128: round 0 time r18t
+40.154 s  pid 38456  native 128x128: round 0 time r18u
+40.268 s  pid 38456  native 128x128: round 0 time r27w
+40.564 s  pid 38456  native 128x128: round 0 time r41h
+40.778 s  pid 38456  native 128x128: round 1 time r41h
+40.977 s  pid 38456  native 128x128: round 1 time r27w
+41.250 s  pid 38456  native 128x128: round 1 time r18u
+41.387 s  pid 38456  native 128x128: round 1 time r18t
+41.542 s  pid 38456  native 128x128: round 1 time r15
+41.732 s  pid 38456  native 128x128: round 1 time r12
+42.469 s  pid 38456  native 128x128: round 2 time r12
+43.100 s  pid 38456  native 128x128: round 2 time r15
+43.263 s  pid 38456  native 128x128: round 2 time r18t
+43.442 s  pid 38456  native 128x128: round 2 time r18u
+43.555 s  pid 38456  native 128x128: round 2 time r27w
+43.848 s  pid 38456  native 128x128: round 2 time r41h
+44.046 s  pid 38456  native 128x128: destroy the denoisers
+44.048 s  pid 38456  native 128x128: destroy the device
+44.057 s  pid 38456  native 256x256: requestAdapter
+44.058 s  pid 38456  native 256x256: requestDevice for r12,r15,r18t,r18u,r27w,r41h
+44.094 s  pid 38456  native 256x256: build r12
+44.368 s  pid 38456  native 256x256: build r15
+46.426 s  pid 38456  native 256x256: build r18t
+48.968 s  pid 38456  native 256x256: build r18u
+54.937 s  pid 38456  native 256x256: build r27w
+57.056 s  pid 38456  native 256x256: build r41h
+63.983 s  pid 38456  native 256x256: round 0 time r12
+65.403 s  pid 38456  native 256x256: round 0 time r15
+65.960 s  pid 38456  native 256x256: round 0 time r18t
+66.528 s  pid 38456  native 256x256: round 0 time r18u
+66.939 s  pid 38456  native 256x256: round 0 time r27w
+67.610 s  pid 38456  native 256x256: round 0 time r41h
+68.210 s  pid 38456  native 256x256: round 1 time r41h
+68.799 s  pid 38456  native 256x256: round 1 time r27w
+69.494 s  pid 38456  native 256x256: round 1 time r18u
+69.911 s  pid 38456  native 256x256: round 1 time r18t
+70.435 s  pid 38456  native 256x256: round 1 time r15
+70.999 s  pid 38456  native 256x256: round 1 time r12
+72.390 s  pid 38456  native 256x256: round 2 time r12
+73.774 s  pid 38456  native 256x256: round 2 time r15
+74.304 s  pid 38456  native 256x256: round 2 time r18t
+74.865 s  pid 38456  native 256x256: round 2 time r18u
+75.266 s  pid 38456  native 256x256: round 2 time r27w
+75.908 s  pid 38456  native 256x256: round 2 time r41h
+76.508 s  pid 38456  native 256x256: destroy the denoisers
+76.510 s  pid 38456  native 256x256: destroy the device
+76.527 s  pid 38456  native 512x512: requestAdapter
+76.528 s  pid 38456  native 512x512: requestDevice for r15,r18t,r18u,r27w,r41h
+76.641 s  pid 38456  native 512x512: build r15
+79.456 s  pid 38456  native 512x512: build r18t
+81.895 s  pid 38456  native 512x512: build r18u
+87.540 s  pid 38456  native 512x512: build r27w
+89.976 s  pid 38456  native 512x512: build r41h
+97.119 s  pid 38456  native 512x512: round 0 time r15
+97.922 s  pid 38456  native 512x512: round 0 time r18t
+98.660 s  pid 38456  native 512x512: round 0 time r18u
+99.354 s  pid 38456  native 512x512: round 0 time r27w
+100.516 s  pid 38456  native 512x512: round 0 time r41h
+101.339 s  pid 38456  native 512x512: round 1 time r41h
+102.138 s  pid 38456  native 512x512: round 1 time r27w
+103.302 s  pid 38456  native 512x512: round 1 time r18u
+103.974 s  pid 38456  native 512x512: round 1 time r18t
+104.684 s  pid 38456  native 512x512: round 1 time r15
+105.446 s  pid 38456  native 512x512: round 2 time r15
+106.408 s  pid 38456  native 512x512: round 2 time r18t
+107.353 s  pid 38456  native 512x512: round 2 time r18u
+108.143 s  pid 38456  native 512x512: round 2 time r27w
+109.574 s  pid 38456  native 512x512: round 2 time r41h
+110.518 s  pid 38456  native 512x512: destroy the denoisers
+110.519 s  pid 38456  native 512x512: destroy the device
+110.593 s  pid 38456  native 1024x1024: requestAdapter
+110.594 s  pid 38456  native 1024x1024: requestDevice for r15,r18t,r18u,r41h
+111.008 s  pid 38456  native 1024x1024: build r15
+113.532 s  pid 38456  native 1024x1024: build r18t
+116.682 s  pid 38456  native 1024x1024: build r18u
+123.451 s  pid 38456  native 1024x1024: build r41h
+131.410 s  pid 38456  native 1024x1024: round 0 time r15
+133.326 s  pid 38456  native 1024x1024: round 0 time r18t
+135.329 s  pid 38456  native 1024x1024: round 0 time r18u
+136.635 s  pid 38456  native 1024x1024: round 0 time r41h
+139.064 s  pid 38456  native 1024x1024: round 1 time r41h
+141.444 s  pid 38456  native 1024x1024: round 1 time r18u
+142.687 s  pid 38456  native 1024x1024: round 1 time r18t
+144.509 s  pid 38456  native 1024x1024: round 1 time r15
+146.334 s  pid 38456  native 1024x1024: round 2 time r15
+148.152 s  pid 38456  native 1024x1024: round 2 time r18t
+149.990 s  pid 38456  native 1024x1024: round 2 time r18u
+151.225 s  pid 38456  native 1024x1024: round 2 time r41h
+153.758 s  pid 38456  native 1024x1024: destroy the denoisers
+153.760 s  pid 38456  native 1024x1024: destroy the device
+154.345 s  pid 38456  native 1920x1080: requestAdapter
+154.347 s  pid 38456  native 1920x1080: requestDevice for r18u,r41h
+155.149 s  pid 38456  native 1920x1080: build r18u
+161.005 s  pid 38456  native 1920x1080: build r41h
+168.375 s  pid 38456  native 1920x1080: round 0 time r18u
+170.813 s  pid 38456  native 1920x1080: round 0 time r41h
+175.286 s  pid 38456  native 1920x1080: round 1 time r41h
+179.590 s  pid 38456  native 1920x1080: destroy the device

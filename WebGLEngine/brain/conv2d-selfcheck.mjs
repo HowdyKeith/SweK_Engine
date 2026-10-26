@@ -11,6 +11,27 @@
 // v4868): WINO_CB, WINO_G4S, winoShape, winoFilter, conv2dCpuWino, conv2dCpuWinoFma, conv2dWinoWgsl, packWinoUniforms, winoWorkgroups.
 // Round 19 (section 66, v4851): which rounds' device rows stand aside, by adapter and by the run's compiler (nativeStandAside).
 // Round 22 (section 71, v4859): round 16's rows run on D3D12 under DXC too, so only FXC (or an unread compiler) stands aside there.
+// Round 40 (section 108): SUB_WG, subShape, subSpan, subWorkgroups, packSubUniforms, conv2dSubWgsl -- the subgroup kernel, cell for
+// cell against conv2dCpu natively where the adapter has subgroups (standing aside on D3D12 under FXC), and its CPU shape and text.
+// Sabotaged with render/denoiseDevice-selfcheck.mjs, by the byte-safe runner, each restored byte-identical (sha256); the reds in
+// both gates together:
+//   G1  the shuffle reading lane + kx, not lane + kx - 1                9 RED (five device cases here; K0s natively and in the
+//                                                                          browser, the small network, r15's bits there)
+//   G2  a halo lane writing its column                                 9 RED (the same nine)
+//   G3  the span taken as S, not S - 2                                 10 RED (the same nine and the identity key here)
+//   G4  a row outside the image read from the edge row, not skipped    9 RED (the same nine)
+//   G5  the channels before the taps within a row (cj before kx)       8 RED (the five here; K0s natively and in the browser, the
+//                                                                          small network -- r15's bits row holds only where nothing fused)
+// Round 41 (section 109): FAST_ARITH, f16round, f16bits, conv2dCpuF16, conv2dCpuF16Fma -- the half-precision template (f32: r18u's text,
+// frozen by sha256; f16; f16emu, the test instrument) and its twin. The f16 device rows SKIP here (no shader-f16) and run on the Intel.
+// Sabotaged with render/denoiseDevice-selfcheck.mjs, by the byte-safe runner, each restored byte-identical (sha256):
+//   H1  the packing's halves swapped (zw for xy)                       4 RED (every emulation case)
+//   H2  a weight's word index one on (c + 1 over 2)                    3 RED (the three one-group cases; the three-group 1 x 1 reads
+//                                                                          through the z-group index, which H2 leaves alone)
+//   H3  the packed weights not f16-rounded first                       1 RED (the packing row). f16bits rounds the mantissa itself, so the
+//                                                                          emulation saw nearly the same words: the packing row is the catch
+//   H4  r18u's f32 text changed (0.00 for 0.0)                         1 RED (the sha256 row -- added because no cell moves)
+//   H5  conv2dCpuF16 rounding to f32                                   2 RED (the twin row; r41h's image row in the device gate)
 //
 // What it holds: the twin to the f64 reference within f32 rounding; the identity kernel exact through every pass;
 // a 1x1 convolution BIT-IDENTICAL to the GPU Brain's dense layer (render/brainTsl.mjs's mlpLayerCpu), so the dense
@@ -109,6 +130,7 @@
 // have read it, every time. On a real GPU the same defect would be intermittent; here it is deterministic.
 "use strict";
 import fs from "node:fs";
+import crypto from "node:crypto";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -119,7 +141,8 @@ const { TILE, K_MAX, CB, COUT_MAX, conv2dForward, conv2dCpu, conv2dCpuFma, conv2
         packProbeUniforms, probeFixture, probeCpu, keyCpu, PROBES, FAST_GROUP, UNIFORM_MAX, fastShape, conv2dFastWgsl, packFastUniforms,
         headShape, conv2dHeadWgsl, packHeadUniforms, planarToChannelsLast, tileShape, conv2dTileWgsl, packTileUniforms, tileWorkgroups,
         fastAltShape, conv2dFastAltWgsl, packFastAltUniforms, WINO_CB, WINO_G4S, winoShape, winoFilter, conv2dCpuWino, conv2dCpuWinoFma, conv2dWinoWgsl,
-        packWinoUniforms, winoWorkgroups } = C;
+        packWinoUniforms, winoWorkgroups, SUB_WG, subShape, subSpan, subWorkgroups, packSubUniforms, conv2dSubWgsl,
+        FAST_ARITH, f16round, f16bits, conv2dCpuF16, conv2dCpuF16Fma } = C;
 const { mlpLayerCpu } = await imp("render/brainTsl.mjs");
 const H = await imp("tools/ship/headlessGpu.mjs");
 // v4838: the device cases as a report table (tools/ship/gateReport.mjs) -- the counts every PASS line prints, kept past the terminal
@@ -158,10 +181,14 @@ function nativeStandAside(adapter, compiler, round) {
     if (!fxcAdapter(adapter)) return null;
     // v4868 -- round 27 (section 83): the Winograd kernel runs under DXC, which built every shape the rig was handed (sections 65, 71),
     // and stands aside under FXC, where nobody has built it -- an FXC that never finishes a pipeline stops this gate (section 56)
-    if ((round === 16 || round === 17 || round === 27) && compiler === "DXC") return null;
+    if ((round === 16 || round === 17 || round === 27 || round === 40 || round === 41) && compiler === "DXC") return null;
     const said = compiler === "DXC" || compiler === "FXC" ? compiler : `an unread compiler (${JSON.stringify(compiler ?? null)}), counted as FXC`;
     if (round === 17) return `${FXC_SKIP_R17}; this run compiles with ${said}, and under DXC (node-webgpu 0.6.2) they run (section 66)`;
     if (round === 16) return `${FXC_SKIP}; this run compiles with ${said}, and under DXC (node-webgpu 0.6.2) they run (section 71)`;
+    // round 41 (section 109): FXC has no 16-bit types
+    if (round === 41) return `round 41's half-precision kernel needs 16-bit types, shader model 6.2, which FXC cannot compile; this run compiles with ${said}, and under DXC it runs (section 109)`;
+    // round 40 (section 108): the subgroup kernel's wave operations are shader model 6, which FXC does not compile
+    if (round === 40) return `round 40's subgroup kernel uses wave operations, shader model 6, which FXC cannot compile; this run compiles with ${said}, and under DXC it runs (section 108)`;
     if (round === 27) return `round 27's Winograd kernel has never been built under FXC, and stands aside there on the safe side; this run compiles with ${said}, and under DXC it runs (section 83)`;
     return `round ${round}'s kernels are not named by section 66 and stand aside on a D3D12 adapter under any compiler; this run compiles with ${said}`;
 }
@@ -418,6 +445,17 @@ console.log("\n5e. WHICH ROUNDS' DEVICE ROWS STAND ASIDE, BY ADAPTER AND COMPILE
             return why.includes("section 83") && (c === "FXC" ? /this run compiles with FXC,/.test(why) : why.includes(`an unread compiler (${JSON.stringify(c ?? null)}), counted as FXC`)); })) &&
             OFF.every((a) => [...NOT_DXC, "DXC"].every((c) => runs(a, c, 27))),
         `the 1080: under DXC ${runs(gtx, "DXC", 27) ? "runs" : "aside"}, under FXC ${runs(gtx, "FXC", 27) ? "runs" : "aside"}; SwiftShader under FXC ${runs(OFF[0], "FXC", 27) ? "runs" : "aside"}`);
+    // round 40 (section 108): the subgroup kernel's device rows as round 27's are -- under DXC on D3D12, anywhere else whatever the compiler
+    ok("!! round 40 (section 108): on a D3D12 adapter the subgroup kernel's device rows run under DXC and stand aside under FXC, an unread compiler or none, the SKIP line naming the compiler and section 108; off D3D12 they run under any compiler",
+        RIG.every((a) => runs(a, "DXC", 40) && NOT_DXC.every((c) => { const why = nativeStandAside(a, c, 40) || "";
+            return why.includes("section 108") && /shader model 6/.test(why) && (c === "FXC" ? /this run compiles with FXC,/.test(why) : why.includes(`an unread compiler (${JSON.stringify(c ?? null)}), counted as FXC`)); })) &&
+            OFF.every((a) => [...NOT_DXC, "DXC"].every((c) => runs(a, c, 40))),
+        `the 1080: under DXC ${runs(gtx, "DXC", 40) ? "runs" : "aside"}, under FXC ${runs(gtx, "FXC", 40) ? "runs" : "aside"}; SwiftShader under FXC ${runs(OFF[0], "FXC", 40) ? "runs" : "aside"}`);
+    // round 41 (section 109): the half-precision kernel's device rows the same way
+    ok("!! round 41 (section 109): on a D3D12 adapter the half-precision kernel's device rows run under DXC and stand aside under FXC, an unread compiler or none, naming 16-bit types and section 109; off D3D12 they run under any compiler",
+        RIG.every((a) => runs(a, "DXC", 41) && NOT_DXC.every((c) => { const why = nativeStandAside(a, c, 41) || ""; return why.includes("section 109") && /16-bit types/.test(why); })) &&
+            OFF.every((a) => [...NOT_DXC, "DXC"].every((c) => runs(a, c, 41))),
+        `the Intel: under DXC ${runs(intel, "DXC", 41) ? "runs" : "aside"}, under FXC ${runs(intel, "FXC", 41) ? "runs" : "aside"}`);
     // SABOTAGED v4851: every adapter stands aside unless the compiler is DXC (the D3D12 test made compiler-only) -> RED by name (this row alone; SwiftShader's own
     //   round-16 and round-17 device rows then printed SKIP, 82 PASS falling to 53 with no other red -- why this row has to exist); restored.
     ok("  round 19: off D3D12 -- SwiftShader, Vulkan, Metal, an adapter with no description, none -- both rounds run whatever compiler is named, and round 17's inline rows keep the hoisted tile as their comparator",
@@ -533,6 +571,80 @@ function winoByMatrices(x, H, W, L, f32) {
         /fn k_conv_wino/.test(c1) && (c1.match(/var m\d+_\d+ = vec4<f32>\(0\.0\);/g) || []).length === 16 && (c2.match(/var m\d+_\d+ = vec4<f32>\(0\.0\);/g) || []).length === 32 &&
             /@binding\(3\) var<storage, read>\s+U: array<vec4<f32>>/.test(c1) && /struct WP \{ H: u32, W: u32, pad0: u32, pad1: u32, b: array<vec4<f32>, 8> \}/.test(c1),
         `g4 1: ${(c1.match(/var m\d+_\d+/g) || []).length} accumulators, g4 2: ${(c2.match(/var m\d+_\d+/g) || []).length}`);
+}
+
+console.log("\n5g. THE SUBGROUP KERNEL'S SHAPE, UNIFORM BLOCK AND TEXT, ON THE CPU (round 40, section 108)");
+{
+    const L32 = { Cin: 32, Cout: 32, k: 3, act: "relu" }, S = subShape(L32), F = probeFixture({ H: 7, W: 9, Cin: 16, Cout: 11, k: 3, act: "none", seed: 5 });
+    const refuse = (f) => { try { f(); return null; } catch (e) { return e.message; } };
+    // the uniform block is the pixel-tiled kernel's at one pixel and the same vec4s -- every byte -- and the shape's vec4s are the tile's
+    const pu = packSubUniforms({ H: 7, W: 9, layer: F.layer }, { rows: 2, g4: 2 }), tu = packTileUniforms({ H: 7, W: 9, layer: F.layer }, { px: 1, g4: 2 });
+    ok("  round 40: the subgroup kernel holds 32 -> 32 at 3 x 3 in 8 vec4s and 2 rows, one z group, the tile kernel's C4; its uniform block is the tile kernel's at 1 pixel, bit for bit; a subgroup of 32 writes 30 columns and of 4 writes 2",
+        S.fits && S.g4 === 8 && S.rows === 2 && S.groups === 1 && S.C4 === tileShape(L32, { px: 1, g4: 8 }).C4 && S.R === 1 &&
+        same(Array.from(pu), Array.from(tu)) && subSpan(32, 3) === 30 && subSpan(4, 3) === 2 && subSpan(32, 1) === 32 && SUB_WG === 64 &&
+        same(subWorkgroups(1080, 1920, L32, {}, 32), [Math.ceil(1920 / 60), 540, 1]) && same(subWorkgroups(13, 19, L32, { rows: 4 }, 4), [Math.ceil(19 / 32), 4, 1]),
+        `${S.bytes} bytes of weights; 1920 x 1080 at 32 lanes: ${subWorkgroups(1080, 1920, L32, {}, 32).join(" x ")} workgroups`);
+    ok("  round 40: and it refuses, by name, what it cannot hold -- input channels not in whole blocks of 8 (the network's first layer, 10 -> 32), an even k, 3 rows",
+        /whole blocks of 8/.test(refuse(() => conv2dSubWgsl({ Cin: 10, Cout: 32, k: 3 })) || "") && !subShape({ Cin: 10, Cout: 32, k: 3 }).fits &&
+        /odd k/.test(refuse(() => conv2dSubWgsl({ Cin: 8, Cout: 8, k: 2 })) || "") && /rows in 1\/2\/4/.test(refuse(() => conv2dSubWgsl(L32, { rows: 3 })) || "") &&
+        /cannot hold 10 -> 32/.test(refuse(() => packSubUniforms({ H: 2, W: 2, layer: { Cin: 10, Cout: 32, k: 3, W: new Float32Array(2880), b: new Float32Array(32) } })) || ""));
+    // the text: the subgroups extension, shuffles and no barrier or workgroup memory at all; the span named by the subgroup's first index
+    const code = conv2dSubWgsl(L32);
+    ok("  round 40: its WGSL enables subgroups, shuffles its neighbours' columns, keeps no workgroup memory and passes no barrier, and names a subgroup's span by its first thread's index over the subgroup size",
+        /^enable subgroups;/.test(code) && /fn k_conv_sub/.test(code) && (code.match(/subgroupShuffle\(/g) || []).length === 4 * 2 * 8 && !/workgroupBarrier|var<workgroup>|atomic/.test(code) &&
+        /let slot = subgroupBroadcastFirst\(li\) \/ ss;/.test(code) && /@workgroup_size\(64, 1, 1\)/.test(code),
+        `${code.split("\n").length} lines, ${(code.match(/subgroupShuffle\(/g) || []).length} shuffles`);
+}
+
+console.log("\n5h. HALF PRECISION: THE ROUNDING, THE TWIN, THE PACKING AND THE KERNEL'S TEXT, ON THE CPU (round 41, section 109)");
+{
+    // f16round and f16bits on cases worked by hand: ties to even both ways, the smallest subnormal and half of it, the largest
+    // finite, the last value that rounds to it and the first that overflows, and two values with no exact f16
+    const H16 = [[1, 1, 0x3c00], [65504, 65504, 0x7bff], [65519, 65504, 0x7bff], [65520, Infinity, 0x7c00], [2 ** -24, 2 ** -24, 1], [2 ** -25, 0, 0],
+                 [1.5 * 2 ** -25, 2 ** -24, 1], [1 + 2 ** -11, 1, 0x3c00], [1 + 3 * 2 ** -11, 1 + 2 ** -9, 0x3c02], [-2.5, -2.5, 0xc100], [0.1, 0.0999755859375, 0x2e66],
+                 [2 ** -14, 2 ** -14, 0x0400], [1 / 3, 0.333251953125, 0x3555]];
+    ok("  round 41: f16round is binary16's round to nearest, ties to even -- subnormals, 65504, 65520 overflowing -- and f16bits its bits",
+        H16.every(([x, v, b]) => f16round(x) === v && f16bits(f16round(x)) === b) && f16round(-0) === -0 && f16bits(-0) === 0x8000 && Number.isNaN(f16round(NaN)),
+        H16.filter(([x, v, b]) => !(f16round(x) === v && f16bits(f16round(x)) === b)).map(([x]) => x).join(", ") || `${H16.length} cases`);
+    // the twin: every value an f16, the f32 twin's bits nowhere it matters, and the mirror another rounding of the same sums
+    const F = probeFixture({ H: 9, W: 7, Cin: 19, Cout: 12, k: 3, act: "relu", seed: 61 }), t16 = conv2dCpuF16(F.x, F.H, F.W, F.layer), m16 = conv2dCpuF16Fma(F.x, F.H, F.W, F.layer), t32 = conv2dCpu(F.x, F.H, F.W, F.layer);
+    ok("  round 41: conv2dCpuF16 is f16-valued everywhere, not the f32 twin, and its fused mirror is f16-valued and close to it",
+        t16.every((v) => f16round(v) === v) && m16.every((v) => f16round(v) === v) && diffCount(Array.from(t16), Array.from(t32)) > t16.length / 2 &&
+        Array.from(t16).every((v, i) => Math.abs(v - m16[i]) <= 1e-2 * (Math.abs(v) + 1)),
+        `${diffCount(Array.from(t16), Array.from(t32))} of ${t16.length} cells differ from the f32 twin, ${diffCount(Array.from(t16), Array.from(m16))} from the mirror`);
+    // the template: the f32 setting is the default's text; the f16 kernel's every other line carries its types, its weight read or its
+    // conversions; the emulation is the f16 kernel with f32 types and unpack2x16float -- the same lines elsewhere
+    const L32 = { Cin: 32, Cout: 32, k: 3, act: "relu" }, R18 = { reads: "f32", unroll: true };
+    const base = conv2dFastAltWgsl(L32, R18), k16 = conv2dFastAltWgsl(L32, { ...R18, arith: "f16" }), kem = conv2dFastAltWgsl(L32, { ...R18, arith: "f16emu" });
+    const bl = base.split("\n"), hl = k16.split("\n"), el = kem.split("\n"), d16 = hl.filter((l, i) => l !== bl[i]), dem = el.filter((l, i) => l !== bl[i]);
+    ok("  round 41: the template's f32 setting is r18u's own kernel, the f16 kernel is it line for line but where its types, weight reads and conversions differ, and the emulation differs only in its weight reads",
+        conv2dFastAltWgsl(L32, { ...R18, arith: "f32" }) === base && hl.length === bl.length && el.length === bl.length && /^enable f16;/.test(k16) && !/enable f16/.test(kem) &&
+        d16.every((l) => /f16|bitcast|vec4<u32>|0\.0h|= f32\(a\d\.[xyzw]\)/.test(l)) && dem.every((l) => /unpack2x16float|vec4<u32>/.test(l)) && (k16.match(/bitcast<vec4<f16>>/g) || []).length === 9 * 8 * 8 &&
+        /var<workgroup> T: array<f16,/.test(k16) && /= f32\(a0\.x\);/.test(k16) && /max\(a0, vec4<f16>\(0\.0h\)\)/.test(k16) && /v = f16\(X\[/.test(k16) && !/f16/.test(kem.replace(/2x16float/g, "")),
+        `${d16.length} line(s) differ in the f16 kernel, ${dem.length} in the emulation, of ${bl.length}`);
+    // the packing: decoded as bitcast<vec4<f16>> reads it -- word v / 2 of a block, its xy half for an even v, zw for an odd -- every
+    // weight is the f16-rounded weight, in the same order as the f32 block; the bias stays f32; half the weight bytes
+    const L = probeFixture({ H: 2, W: 2, Cin: 19, Cout: 16, k: 3, seed: 62 }).layer, P16 = { ...R18, arith: "f16" }, S16 = fastAltShape(L, P16), S32 = fastAltShape(L, R18);
+    const p16 = packFastAltUniforms({ H: 2, W: 2, layer: L }, P16), p32 = packFastAltUniforms({ H: 2, W: 2, layer: L }, R18);
+    const u16 = new Uint16Array(p16.buffer), w0 = 4 + 4 * S16.C4, back = (bits) => { const e = (bits >> 10) & 31, m = bits & 1023, sg = bits & 0x8000 ? -1 : 1; return sg * (e ? (1 + m / 1024) * 2 ** (e - 15) : m * 2 ** -24); };
+    let bad = 0;
+    for (let b = 0; b < S16.blocks; b++) for (let v = 0; v < S16.perBlock; v++) for (let lane = 0; lane < 4; lane++) {
+        const word = b * (S16.perBlock / 2) + (v >> 1), half = v % 2 ? 2 : 0, bits = u16[2 * w0 + 2 * (4 * word + half + (lane >> 1)) + (lane & 1)];
+        if (back(bits) !== f16round(p32[w0 + 4 * (b * S32.perBlock + v) + lane])) bad++;
+    }
+    ok("  round 41: the packed f16 weights, decoded as bitcast<vec4<f16>> reads them, are the f32 block's weights f16-rounded, in its order; the bias stays f32; the weights take half the bytes",
+        bad === 0 && Array.from(p16.slice(0, w0)).every((v, i) => Object.is(v, p32[i])) && S16.bytes - (16 + 16 * S16.C4) === (S32.bytes - (16 + 16 * S32.C4)) / 2 && S16.fits,
+        `${S16.blocks} blocks x ${S16.perBlock} vec4s; ${bad} weight(s) wrong; ${S16.bytes} bytes against ${S32.bytes}`);
+    // r18u's own kernel text, frozen at the round that made it a template's f32 setting: the sha256 of both its shapes, taken at the
+    // commit before round 41 and after it alike -- so a change to r18u's text is red even where it moves no cell
+    const sha = (t) => crypto.createHash("sha256").update(t).digest("hex");
+    ok("!! round 41 (section 109): r18u's kernel text is what it was before the template -- 32 -> 32 and the 10 -> 32 first layer, by sha256",
+        sha(base) === "1102b3dc38f811deab6e3584716c0fbf19519b6b9c33971946e30ae73940956e" &&
+        sha(conv2dFastAltWgsl({ Cin: 10, Cout: 32, k: 3, act: "relu" }, R18)) === "52f968042a427267c1743515127de260f0a67e68e62908bd85b2d6251721c7d9",
+        `${sha(base).slice(0, 12)}...`);
+    ok("  round 41: and the half-precision ways refuse what they cannot pack -- vec4 reads, a block not written out, an unknown arithmetic",
+        !fastAltShape(L32, { reads: "vec4", unroll: true, arith: "f16" }).fits && !fastAltShape(L32, { reads: "f32", unroll: false, arith: "f16" }).fits &&
+        !fastAltShape(L32, { ...R18, arith: "bf16" }).fits && FAST_ARITH.join() === "f32,f16,f16emu" && /arith f32 or f16 or f16emu/.test((() => { try { conv2dFastAltWgsl(L32, { reads: "vec4", unroll: true, arith: "f16" }); } catch (e) { return e.message; } })() || ""));
 }
 
 console.log("\n6. *** EVERY KERNEL ON THE DEVICE, CELL FOR CELL AGAINST THE TWIN ***");
@@ -713,6 +825,70 @@ else {
         for (const g4 of [1, 2]) { const r = await wino(I, { g4 }, { H: I.H, W: I.W, x: xi, layer: LI }); outI.push(r.ok && refI.every((v, i) => Math.fround(r.values[i]) === v)); }
         ok("!! round 27's exact key on the device: integers in, integer weights -- the Winograd kernel gives conv2dForward's bits at 1 and 2 vec4s a thread, whatever order a compiler kept",
             outI.every(Boolean), outI.join(", "));
+    }
+    // round 40 (section 108): the subgroup kernel against conv2dCpu and its fused mirror, and against the pixel-tiled kernel's
+    // bits (edge zero, the r18t configuration's way with a tap outside) where neither fused -- 32 -> 32 on odd sizes at 1, 2 and 4
+    // rows, 16 -> 11 on a wide image (partial spans and a partial vec4 group), the 1 x 1 head (no halo), and a 5 x 3 image
+    // narrower than one span. It needs the subgroups feature: an adapter without it skips the rows by name. 4 rows at 8 vec4s (128
+    // accumulator floats a thread) is not a case: natively here it crashed SwiftShader's pipeline build, the process dying with no row,
+    // as written-out blocks of the fast kernel did (section 59); 4 rows run at 2 vec4s, and the set runs 2 rows (section 108).
+    const aside40 = nativeStandAside(adapter, COMPILER, 40);
+    if (aside40) console.log(`  SKIP  round 40's device cases: ${aside40}`);
+    else {
+        const sub = (a, cfg, minSize) => { const F = probeFixture(a); return H.runWgslComputeNative({ code: conv2dSubWgsl(a, cfg), entryPoint: "k_conv_sub", outCount: a.H * a.W * a.Cout,
+            uniforms: packSubUniforms({ H: a.H, W: a.W, layer: F.layer }, cfg), workgroups: subWorkgroups(a.H, a.W, a, cfg, minSize), inputs: [{ binding: 2, data: F.x }], features: ["subgroups"] }); };
+        const tile = (a, cfg) => { const F = probeFixture(a); return H.runWgslComputeNative({ code: conv2dTileWgsl(a, cfg), entryPoint: "k_conv_tile", outCount: a.H * a.W * a.Cout,
+            uniforms: packTileUniforms({ H: a.H, W: a.W, layer: F.layer }, cfg), workgroups: tileWorkgroups(a.H, a.W, a, cfg), inputs: [{ binding: 2, data: F.x }] }); };
+        const probe = await sub({ H: 1, W: 1, Cin: 8, Cout: 4, k: 1, act: "none", seed: 1 }, { rows: 1, g4: 1 }, 4);
+        if (probe.skipped) console.log(`  SKIP  round 40's device cases: ${probe.reason}`);
+        else {
+            const minSize = (probe.subgroups && probe.subgroups.min) || 4;
+            for (const [a, cfgs] of [[{ H: 19, W: 13, Cin: 32, Cout: 32, k: 3, act: "relu", seed: 43 }, [{ rows: 2, g4: 8 }, { rows: 1, g4: 4 }]],
+                                     [{ H: 11, W: 37, Cin: 16, Cout: 11, k: 3, act: "none", seed: 53 }, [{ rows: 2, g4: 2 }, { rows: 4, g4: 2 }]],
+                                     [{ H: 9, W: 17, Cin: 32, Cout: 81, k: 1, act: "none", seed: 47 }, [{ rows: 2, g4: 8 }]],
+                                     [{ H: 5, W: 3, Cin: 8, Cout: 6, k: 3, act: "relu", seed: 3 }, [{ rows: 2, g4: 8 }]]]) {
+                const rt = await tile(a, { px: 1, g4: 8, edge: "zero", weights: "inline" }), jt = rt.ok ? judge(rt, a) : null;
+                for (const cfg of cfgs) {
+                    const r = await sub(a, cfg, minSize), j = r.ok ? judge(r, a) : null, S = subShape(a, cfg);
+                    if (j) CASES.push([`conv2d.conv2dSubWgsl rows ${cfg.rows} g4 ${S.g4}`, a.H, a.W, a.Cin, a.Cout, j.n - j.fused, j.fused, j.unexplained]);
+                    ok(`!! round 40: the subgroup kernel, ${a.H} x ${a.W}, ${a.Cin} -> ${a.Cout}, k ${a.k}, ${cfg.rows} row${cfg.rows > 1 ? "s" : ""} x ${S.g4} vec4s (${S.groups} z group${S.groups > 1 ? "s" : ""}), subgroups of ${minSize}: every cell explained -- and where neither fused, the pixel-tiled kernel's own bits`,
+                        r.ok && rt.ok && j.unexplained === 0 && (j.fused || jt.fused || same(Array.from(r.values), Array.from(rt.values))),
+                        r.ok && rt.ok ? `sub ${j.fused} fused, tile ${jt.fused} fused of ${j.n}` : (r.reason || rt.reason) + " " + (r.errors || []).join("; "));
+                }
+            }
+            const K = keyCpu({ H: 9, W: 21, C: 8 }), kt = await H.runWgslComputeNative({ code: conv2dSubWgsl(K.layer, { rows: 2, g4: 2 }), entryPoint: "k_conv_sub", outCount: K.x.length,
+                uniforms: packSubUniforms({ H: K.H, W: K.W, layer: K.layer }, { rows: 2, g4: 2 }), workgroups: subWorkgroups(K.H, K.W, K.layer, { rows: 2, g4: 2 }, minSize), inputs: [{ binding: 2, data: K.x }], features: ["subgroups"] });
+            ok("  round 40: the identity key on the device, 9 x 21, eight channels: the subgroup kernel returns its input bit for bit", kt.ok && K.x.every((v, i) => Math.fround(kt.values[i]) === v), kt.ok ? "" : kt.reason);
+        }
+    }
+    // round 41 (section 109): the half-precision kernel -- here as its emulation (the same packed words through unpack2x16float, f32
+    // types), held to conv2dCpu on f16-rounded weights; and as itself where the adapter offers shader-f16, held to conv2dCpuF16 or its
+    // mirror. Odd sizes, partial channel blocks (10 and 19 inputs), three z groups. Under FXC on D3D12 they stand aside (no 16-bit types).
+    const aside41 = nativeStandAside(adapter, COMPILER, 41);
+    if (aside41) console.log(`  SKIP  round 41's device cases: ${aside41}`);
+    else {
+        const R18 = { reads: "f32", unroll: true };
+        const alt16 = (a, arith, features = []) => { const F = probeFixture(a), cfg = { ...R18, arith }; return H.runWgslComputeNative({ code: conv2dFastAltWgsl(a, cfg), entryPoint: "k_conv_fast_alt", outCount: a.H * a.W * a.Cout,
+            uniforms: packFastAltUniforms({ H: a.H, W: a.W, layer: F.layer }, cfg), workgroups: [Math.ceil(a.W / TILE), Math.ceil(a.H / TILE), fastAltShape(a, cfg).groups], inputs: [{ binding: 2, data: F.x }], features }); };
+        const judgeWith = (r, a, tw, fm) => { let unexplained = 0, fused = 0; for (let i = 0; i < tw.length; i++) { const v = Math.fround(r.values[i]); if (v === tw[i]) continue; if (v === fm[i]) fused++; else unexplained++; } return { unexplained, fused, n: tw.length }; };
+        const CASES41 = [{ H: 19, W: 13, Cin: 32, Cout: 32, k: 3, act: "relu", seed: 43 }, { H: 21, W: 19, Cin: 10, Cout: 32, k: 3, act: "relu", seed: 41 },
+                         { H: 11, W: 7, Cin: 19, Cout: 12, k: 3, act: "none", seed: 53 }, { H: 9, W: 17, Cin: 32, Cout: 80, k: 1, act: "none", seed: 47 }];
+        for (const a of CASES41) {
+            const F = probeFixture(a), Lr = { ...F.layer, W: Float64Array.from(F.layer.W, f16round) }, r = await alt16(a, "f16emu");
+            const j = r.ok ? judgeWith(r, a, conv2dCpu(F.x, a.H, a.W, Lr), conv2dCpuFma(F.x, a.H, a.W, Lr)) : null;
+            if (j) CASES.push(["conv2d.conv2dFastAltWgsl f16emu", a.H, a.W, a.Cin, a.Cout, j.n - j.fused, j.fused, j.unexplained]);
+            ok(`!! round 41: the half-precision kernel's emulation, ${a.H} x ${a.W}, ${a.Cin} -> ${a.Cout}, k ${a.k} (${fastAltShape(a, { ...R18, arith: "f16emu" }).groups} z group(s)): every cell conv2dCpu's on the f16-rounded weights, or its fused mirror's -- the packed words read in the right order`,
+                r.ok && j.unexplained === 0, r.ok ? `${j.n - j.fused} plain, ${j.fused} fused, ${j.unexplained} unexplained` : r.reason + " " + (r.errors || []).join("; "));
+        }
+        const probe16 = await alt16(CASES41[2], "f16", ["shader-f16"]);
+        if (probe16.skipped) console.log(`  SKIP  round 41's f16 device cases: ${probe16.reason} -- the Intel gen-9 has it, natively and in Chrome (section 109)`);
+        else for (const a of CASES41) {
+            const F = probeFixture(a), r = a === CASES41[2] ? probe16 : await alt16(a, "f16", ["shader-f16"]);
+            const j = r.ok ? judgeWith(r, a, conv2dCpuF16(F.x, a.H, a.W, F.layer), conv2dCpuF16Fma(F.x, a.H, a.W, F.layer)) : null;
+            if (j) CASES.push(["conv2d.conv2dFastAltWgsl f16", a.H, a.W, a.Cin, a.Cout, j.n - j.fused, j.fused, j.unexplained]);
+            ok(`!! round 41: the half-precision kernel, ${a.H} x ${a.W}, ${a.Cin} -> ${a.Cout}, k ${a.k}: every cell conv2dCpuF16's or its fused mirror's`,
+                r.ok && j.unexplained === 0, r.ok ? `${j.n - j.fused} plain, ${j.fused} fused, ${j.unexplained} unexplained` : r.reason + " " + (r.errors || []).join("; "));
+        }
     }
     {
         const K1 = keyCpu({ k: 1, C: 5 }), n = K1.H * K1.W, ka1 = { H: K1.H, W: K1.W, Cin: K1.layer.Cin, Cout: K1.layer.Cout, k: 1, act: "none" };

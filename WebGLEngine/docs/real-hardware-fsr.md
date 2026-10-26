@@ -61,8 +61,9 @@ git checkout claude/denoiser-device
 
 The run's second line, `on <commit> <date> <subject>`, should then show this branch's latest commit.
 
-- **`render/denoiseDevice-selfcheck.mjs`** (exact) holds round 11's network on the device to its CPU twin, cell for
-  cell, and drives `denoise.html` in the browser. On a GPU its rows should hold. A conv cell the GPU fused is allowed (the
+- **`render/denoiseDevice-selfcheck.mjs`** holds round 11's network on the device to its CPU twin, cell for cell, and
+  drives `denoise.html` in the browser. The run sorts it as timing since round 40, which gave it a small ladder of its own.
+  Its rows are exactness rows. On a GPU its rows should hold. A conv cell the GPU fused is allowed (the
   twin's fused mirror); an unexplained one is a finding.
 - **`render/denoiseTiming-selfcheck.mjs`** (timing) is what the run is for. It times one pass of the network and its kernel
   on a ladder of sizes, 64 x 64 up to a 1920 x 1080 frame, two ways:
@@ -568,6 +569,290 @@ set SWEK_TIMING_TRACE=
   device step: requestAdapter, requestDevice or destroy.
 - **Don't commit or pull between runs.**
 - **Send back** the console output with its three `echo` lines, the five `trace35-*.txt` files, and the two JSON files.
+
+**The outcome (section 102): no crash in five runs, and the list fill holds on the 1080 too.** All three solo runs and both
+`realGpuRun` runs exited 0 with every gate green. The list fill took 24.0 and 25.4 ms against the old fill's 26.9 and 26.2.
+The crash stays open, with these traces as its record.
+
+### Round 36: the list fill is the chain's default (pre-registration section 103)
+
+No run is owed. The chain gate now runs the list fill unless asked for the old one, and checks the two bit for bit. Its
+report keeps the `section 93:`, `section 97:` and `section 99:` lines with the same meanings, and adds a `section 103:` line
+that names the default fill. Any later rig run of the chain gate checks the change on that GPU as it goes.
+
+### Round 37: the fill eight rings a pass, in tiles (pre-registration section 104)
+
+On each GPU, in a clone on the branch at a commit carrying section 104 (`git log -1 --oneline` shows it):
+
+```
+cd WebGLEngine
+set SWEK_WEBGPU=
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r37-a.json
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r37-b.json
+```
+
+- **What is new:** the chain gate also runs the tile fill, checks it against the CPU and against the list fill bit for bit,
+  and times it. A `section 104:` line puts the two fills side by side.
+- **Section 104 predicts:** on the 1080, 2-10 ms against the list fill's 24-25. On the Intel, nothing either way. Every
+  gate is green.
+- **Don't commit or pull between runs.**
+- **Send back all four JSON files.**
+
+**The outcome (section 105): the tile fill holds on the 1080 and loses on the Intel.** On the 1080 it took 16.8 and 16.7 ms
+against the list fill's 22.6 and 23.1. On the Intel it took 67.3 and 68.9 against 22.3 and 24.6. Every gate was green on
+both. The default stays the list fill.
+
+### Round 38: the tile fill over the lights' tiles only (pre-registration section 106)
+
+On each GPU, in a clone on the branch at a commit carrying section 106 (`git log -1 --oneline` shows it):
+
+```
+cd WebGLEngine
+set SWEK_WEBGPU=
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r38-a.json
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r38-b.json
+```
+
+- **What is new:** the chain gate also runs round 37's tile fill over the tiles that hold a light pixel only, checks it
+  against the CPU and both fills bit for bit, and times it. A `section 106:` line puts it beside the list fill.
+- **Section 106 predicts:** 2-8 ms on the 1080 and 5-15 ms on the Intel, against the list fill's 22-25 on both. Every gate is
+  green.
+- **Don't commit or pull between runs.**
+- **Send back all four JSON files.**
+
+### Round 39: the coverage bounded to the pixels that can see a light (pre-registration section 107)
+
+On each GPU, in a clone on the branch at a commit carrying section 107 (`git log -1 --oneline` shows it):
+
+```
+cd WebGLEngine
+set SWEK_WEBGPU=
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r39-a.json
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r39-b.json
+```
+
+- **What is new:** the chain gate also runs the coverage with a bound that skips the pixels no ray of which can meet a light,
+  checks it against the old coverage bit for bit at both sizes, and times it. A `section 107:` line puts the two side by side.
+- **Section 107 predicts:** at 1920 x 1080, 10-40 ms against ~250 on the Intel and 1-4 ms against ~17.5 on the 1080. Every gate
+  is green.
+- **Don't commit or pull between runs.**
+- **Send back all four JSON files.**
+
+### Round 40: the 1080's hidden layers sharing inputs across a subgroup (pre-registration section 108)
+
+The same two runs on each GPU serve rounds 38, 39 and 40, at a commit carrying section 108 (`git log -1 --oneline` shows it):
+
+```
+cd WebGLEngine
+set SWEK_WEBGPU=
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r40-a.json
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r40-b.json
+```
+
+- **What is new:** both ladders also time `r40s` where the adapter has subgroups (the 1080), with `r40s against r18t` lines
+  tagged section 108; the device gate holds it cell for cell natively and in Chrome. On the Intel it stands aside by name.
+- **Section 108 predicts:** r40s 0.8-1.3 x r18t at 1920 x 1080 on the 1080; H40 is not called either way. Every gate green.
+- **Don't commit or pull between runs.**
+- **Send back all four JSON files.**
+
+### Round 41: the Intel's hidden layers in half precision (pre-registration section 109)
+
+The same two runs on each GPU serve rounds 38 to 41, at a commit carrying section 109 (`git log -1 --oneline` shows it):
+
+```
+cd WebGLEngine
+set SWEK_WEBGPU=
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r41-a.json
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r41-b.json
+```
+
+- **What is new:** on the Intel, both ladders also time `r41h` (shader-f16), with `r41h against r18u` lines tagged section 109;
+  the device and conv2d gates hold it cell for cell against its f16 twin, natively and in Chrome. **This is the first time
+  the f16 kernel is compiled anywhere** -- a red here names the kernel. On the 1080 it stands aside by name.
+- **Section 109 predicts:** r41h 1.1-1.8 x r18u at 1920 x 1080 on the Intel. Every gate green.
+- **Don't commit or pull between runs.**
+- **Send back all four JSON files.**
+
+### Round 42: the chain's rest, split into its passes (pre-registration section 110)
+
+Nothing extra to run: the same two runs on each GPU carry it, at a commit carrying section 110. The chain gate adds a
+`section 110:` line with the rest's three passes timed apart and the transfer without its atomic. Section 110 predicts EASU
+the largest on the Intel (20-35 ms of ~42), and the atomic a third or more of the transfer's own time.
+
+### Rounds 43 and 44: the listed tile fill and the bounded coverage are the chain's defaults (sections 112 and 113)
+
+No run is owed. Both swap a default for a pass the rig already measured (rounds 38 and 39), bit for bit. The chain gate
+holds each default to its reference and keeps every rig line's meaning. Any later rig run of the chain gate checks both on
+that GPU as it goes.
+
+### Round 45: r41h's 1080p pass under a cap that admits it (pre-registration section 114)
+
+**On the Intel gen-9, two runs**, at a commit carrying section 114 (`git log -1 --oneline` shows it):
+
+```
+cd WebGLEngine
+set SWEK_WEBGPU=
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r45-a.json
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r45-b.json
+```
+
+- **What is new:** r41h's ladder cap is 4000 ms (`SET_CAP_MS`), so its 1920 x 1080 pass runs on both ladders, native and
+  page. Every other set keeps 1500. Expect the timing gate to take about 20 s longer.
+- **Section 114 predicts:** r41h at 0.45-0.60 x r18u at 1920 x 1080, so H41 fails and `denoise-f16-intel` closes. Every gate
+  green.
+- **On the GTX 1080, nothing is owed.** r41h stands aside by name, since the 1080 has no shader-f16. One run with the same
+  command (`--out denoise-rig-r45-a_1080.json`) is optional, a hardware check of rounds 43 and 44's defaults that no rule
+  reads.
+- **Don't commit or pull between runs.**
+- **Send back the JSON files.**
+
+### Round 46: EASU in quads, and fused with the composite (pre-registration section 115)
+
+Nothing extra to run: the same two Intel runs carry it, if they are made at a commit carrying section 115 as well. The chain
+gate holds both new kernels bit for bit against EASU then the composite, and adds a `section 115:` line. Section 115
+predicts the fused pass at 0.55-0.80 x EASU and the composite together on the Intel, which would hold H46.
+
+### Round 48: the accumulation's clamp read from a workgroup tile (pre-registration section 117)
+
+Nothing extra to run: the same two Intel runs carry it, if they are made at a commit carrying section 117 as well. The chain
+gate holds the tiled accumulation bit for bit against the accumulation, and adds a `section 117:` line. Section 117 predicts
+0.60-0.85 x the accumulation on the Intel, which would hold H48, narrowly.
+
+### Rounds 51-52: the runs at d77592b2, and r41h's cap put back (sections 121-122)
+
+The two Intel runs at d77592b2 died in the timing gate, inside r41h's 1920 x 1080 pass: past Windows' GPU timeout once round
+45 lifted its cap. The cap is back at 1500 ms and r41h is closed. The runs below must be at a commit carrying section 122.
+
+### Round 49: the w16 network on the Intel, timed natively (pre-registration section 119)
+
+**On the Intel gen-9, two more runs**, at a commit carrying section 119 (`git log -1 --oneline` shows it). These are not the
+round 45 runs, which were made before it. Pull first, then:
+
+```
+cd WebGLEngine
+set SWEK_WEBGPU=
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r49-a.json
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-r49-b.json
+```
+
+- **What is new:** the device gate holds the exported w16 network cell for cell natively, and the timing gate's native
+  ladder times it beside the shipped network, adding `native: w16 against the shipped network` lines tagged section 119.
+  Expect the timing gate to take about a minute longer.
+- **Section 119 predicts** 2.5-3.5 x at 1920 x 1080 on r18u, so H49 holds.
+- On the 1080, one run is optional.
+- **Round 50 (section 120) rides the same two runs** if they are made at a commit carrying it. The timing gate's page
+  ladder then times the w16 network too, adding `page: w16 against the shipped network` lines tagged section 120.
+
+### Round 53: the Intel runs the w16 network (pre-registration section 124)
+
+No run is owed. On the Intel in Chrome, denoise.html now loads the w16 network and says so, and `tools/denoiseDevice.mjs
+--which` names it natively. Every gate that compares against the shipped network asks for it by name (`?net=shipped`), so
+the rig's lines keep their meanings. Any later Intel run of the device gate checks that the page runs w16 there.
+
+### Round 54: the chain's rest runs fused (pre-registration section 125)
+
+No run is owed. The page's half-size chain now runs the transfer and the fused EASU and composite, and shows the three-pass
+rest as a reference (29 rows). The rig's section 103 line says `rest fused`, and a new section 125 line carries both rests.
+
+### Round 55: the history's accumulation tiles (pre-registration section 126)
+
+No run is owed. The page's history now runs the tiled accumulation (`accumT`), and shows the plain one as a reference (31
+rows). The rig's section 103 line says `accumulation tiled`, and a new section 126 line carries both.
+
+### Round 57: activations stored in f16 (pre-registration sections 129-130) -- run on the Intel, closed
+
+The set r57p is r18u's kernels with the activations between layers stored as packed f16. Its arithmetic stays f32, and it
+needs no feature. Two `realGpuRun --only denoise` runs, a and b, on whichever GPU you run, at the branch head:
+- K0p must be green natively and in the browser.
+- The timing gate prints `native: r57p against r18u at ...` and `against r18t` lines, on both paths. H57 reads the Intel's
+  1920 x 1080 ratio against r18u, and H57b the 1080's against r18t.
+
+Send the two reports back; they are committed byte for byte before they are read.
+
+The Intel's two runs came back with K0p red natively and r57p at 0.95-1.04 x r18u at 1080p. The entry is closed as a
+measured negative (section 130), and no 1080 run is owed.
+
+### Section 135: the 1080's owed runs, and FSR 1-3 on both GPUs at the head
+
+On the GTX 1080, from `C:\SweK_r33`, nothing pulled or committed between the runs:
+
+```
+git fetch origin ccr-6c3eeb7c-pxz6kx
+git checkout ccr-6c3eeb7c-pxz6kx
+git pull origin ccr-6c3eeb7c-pxz6kx
+git log -1 --oneline
+cd WebGLEngine
+set SWEK_WEBGPU=
+set SWEK_TIMING_TRACE=%CD%\trace135-a.txt
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-s135-a-gtx1080.json
+set SWEK_TIMING_TRACE=%CD%\trace135-b.txt
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-s135-b-gtx1080.json
+set SWEK_TIMING_TRACE=
+node tools/ship/realGpuRun.mjs --out fsr-rig-s135-gtx1080.json
+```
+
+On the Intel, the same four git lines and `cd WebGLEngine`, then `node tools/ship/realGpuRun.mjs --out fsr-rig-s135-intel-gen9.json`.
+
+Send back the three 1080 JSON files, `trace135-a.txt` and `trace135-b.txt`, and the Intel's JSON file.
+
+### Sections 141 and 143: K0p's bound by the device's store rule, the 1080's round-33 runs again, and what a generated frame costs
+
+The same two runs on each GPU answer both sections. Nothing is pulled or committed between them, and both machines must
+show the same commit on `git log -1 --oneline`.
+
+On the GTX 1080, from `C:\SweK_r33`:
+
+```
+git fetch origin ccr-6c3eeb7c-pxz6kx
+git checkout ccr-6c3eeb7c-pxz6kx
+git pull origin ccr-6c3eeb7c-pxz6kx
+git log -1 --oneline
+cd WebGLEngine
+set SWEK_WEBGPU=
+set SWEK_TIMING_TRACE=%CD%\trace141-a.txt
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-s141-a-gtx1080.json
+set SWEK_TIMING_TRACE=%CD%\trace141-b.txt
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-s141-b-gtx1080.json
+set SWEK_TIMING_TRACE=
+```
+
+On the Intel, the same four git lines, then:
+
+```
+cd WebGLEngine
+set SWEK_WEBGPU=
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-s141-a-intel-gen9.json
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-s141-b-intel-gen9.json
+```
+
+Send back the four JSON files, `trace141-a.txt` and `trace141-b.txt`.
+
+### Section 147: FSR3's generator as compute passes, timed
+
+The same commands as sections 141 and 143, on a newer commit, with new file names. On the GTX 1080, from `C:\SweK_r33`:
+
+```
+git fetch origin ccr-6c3eeb7c-pxz6kx
+git checkout ccr-6c3eeb7c-pxz6kx
+git pull origin ccr-6c3eeb7c-pxz6kx
+git log -1 --oneline
+cd WebGLEngine
+set SWEK_WEBGPU=
+set SWEK_TIMING_TRACE=
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-s147-a-gtx1080.json
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-s147-b-gtx1080.json
+```
+
+On the Intel, the same four git lines, then:
+
+```
+cd WebGLEngine
+set SWEK_WEBGPU=
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-s147-a-intel-gen9.json
+node tools/ship/realGpuRun.mjs --only denoise --out denoise-rig-s147-b-intel-gen9.json
+```
+
+Both machines should show the same commit. Send back the four JSON files.
 
 ## Send back
 

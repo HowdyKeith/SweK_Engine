@@ -37,7 +37,85 @@ node tools/ship/versionPreflight.mjs --next    # the next free version and sweep
 
 ## What is next -- Keith picks
 
-1. **`denoise-1080-native-crash`, round 35 (section 101).** On the 1080 the timing gate dies inside its native ladder in most
+1. **Section 111 read rounds 38-42 off four rig runs at ce1cca35** (`render/denoise-rig-r42-{a,b}-*.json`, committed at
+   2e80def5; the Intel's run a was seen before that commit, the other three were not):
+   - **H38 held on both GPUs:** the listed tile fill took 17-19 ms against the list fill's 22-31. Next is
+     **`denoise-listedtile-default`**, done as round 43 (section 112): the chain's default fill now, the list fill and the ring
+     fill kept as references. `denoise-fill-per-adapter` closed unbuilt.
+   - **H39 held on both GPUs:** the bounded coverage took 0.07-0.09 x round 31's at 1080p, bit for bit. Next is
+     **`denoise-coverage-bound-default`**, done as round 44 (section 113): the chain's and the page's mask now, round
+     31's kept as the reference. Both of `denoise-halfres-fixed-costs`'s levers are closed.
+   - **H40 failed on both of the 1080's paths:** r40s ran at 0.26-0.27 x r18t. It is a measured negative, and both entries
+     stay r18t.
+   - **H41 has no verdict.** K0h was green on the Intel, so the f16 kernel compiled and was exact. But the 1500 ms cap
+     skipped r41h's 1080p pass, and r41h ran at 0.49-0.61 x r18u wherever it was timed. Keith chose the capped-for round:
+     **round 45 (section 114)**, r41h's cap at 4000 ms, owed two runs on the Intel (the 1080 optional).
+   - **Section 110:** EASU is at least half the rest on the Intel, and the atomic costs nothing. Next is
+     **`denoise-easu-cost`**.
+2. **Since section 111:** rounds 43-44 made the listed tile fill and the bounded coverage the defaults (sections 112-113).
+   - Round 45 (section 114) lifts r41h's cap for H41.
+   - Round 46 (section 115) is EASU in quads, fused with the composite.
+   - Rounds 45 and 46 share two Intel rig runs.
+   - **Round 47 (sections 116 and 118): reported, both supported.**
+     - The 16-channel network beats the filter on new R (10 of 12, +0.376) and new C (11 of 12, +0.425).
+     - Its error is 1.117 x the shipped network's on R and 1.297 x on C.
+     - Next is **`denoise-w16-device`**. Keith decided: w16 on the Intel only. Round 49 (section 119) exports it, holds it
+       and times it natively, and is owed two Intel runs of its own.
+   - **Sections 121-124:** the Intel runs at d77592b2 died in r41h's 1080p pass, past Windows' GPU timeout. r41h's cap is back,
+     and `denoise-f16-intel` is closed (Keith).
+   - The runs at 7b871372 held H46 (fused EASU, 0.794 / 0.799), H48 (tiled accumulation, 0.523 / 0.544) and H49 (w16 2.84 /
+     2.66 x natively).
+   - **Round 53 filled the Intel's network entries with w16.**
+   - **Round 54 (section 125) made the fused EASU and composite the chain's rest; the three passes are the reference.**
+   - **Round 55 (section 126) made the tiled accumulation the history's; the plain pass is the reference.**
+   - **Round 56 (sections 127-128): neither held.** The engine's meshes in family C's materials: VC mean d -0.145,
+     MC 0.182 (p 0.036 against Holm's 0.025). The scope note stands; `denoise-mesh-other-materials` is closed.
+   - **Rounds 57 (sections 129-130): r57p, activations stored as packed f16.** On the Intel, K0p went red natively and
+     r57p ran 0.95-1.04 x r18u at 1080p. `denoise-f16-storage` is closed as a measured negative (Keith).
+   - **Round 58 (sections 131-132): on path-tracer.html's own six scenes the network beat the filter** (mean d 0.480,
+     p 0.031). The page's note says so; the furnace pair are ties.
+   - **Round 59 (sections 133-134): FSR3's generator between two chain frames -- not reported (C1).** It carries the light
+     sources across their silhouettes; the next round generates between light-free frames and composites them at the
+     generated time.
+   - **Round 60 (sections 136, 138): between light-free frames, lit at the generated time -- not reported (C1 on a control).**
+     The light-source error is gone; against the cross-fade 5 of 12 in linear radiance, 8 of 12 in display space.
+   - **Round 61 (sections 139-140): graded in display space, C1 on the candidate alone -- not reported (C1, 10 of 12).**
+     Had C1 held, H1 (7 of 12, p 0.038) and H2 (11 of 12) would both have been supported. No fourth round relaxes C1;
+     whether `denoise-fsr3-framegen` closes on three not-reported rounds is Keith's call.
+   - **Section 137: section 135's rig runs.** No 1080 run died (R1 not reproduced again). H135 has no verdict: the device
+     gate was red in both 1080 runs on K0p natively (1.998 / 1.984 x read, would have held). K0p's reading is identical on
+     both vendors, so Direct3D's f16 conversion truncates; the cell key holds and the image bound fails. Every exact FSR
+     gate is green on both GPUs; `fsr2-half-stall-rig` is the one FSR quality red.
+   - **Section 141: K0p's bound follows the device's store rule.** The truncating CPU twin reads 1.318e-3 and the rig's
+     cell counts exactly; a truncating device is held to 7.5e-3 (that twin x 5.7). The 1080's two runs and one Intel run
+     are asked again; section 144 reads them.
+   - **Rounds 62 and 63 (sections 142, 143), Keith's two FSR3 rounds.** Round 62: round 61's test on 24 new scenes, C1 at
+     22 of 24 (section 145). Round 63: a generated frame's device cost against a traced one, H63 G <= 0.25 T (section 146).
+   - **Round 62 (section 145): REPORTED, both supported.** C1 23 of 24; against the cross-fade 17 of 24, p 0.0479 (narrow,
+     display space only -- linear 12 of 24); against the held frame 19 of 24, p 7.1e-5. The traced midpoint still wins 16
+     of 24. Nothing ships until round 63's rig runs read.
+   - **Sections 144 and 146: the 1080's runs at 3d215c83.** K0p green under store rule rtz; H141 holds (1.973 / 1.992 x), so
+     round 33 has its verdict on both GPUs. H63 FAILS: a generated frame costs 0.53-0.57 of a traced one on the 1080, the
+     generator 18-20 ms of it. `denoise-fsr3-framegen` closes; nothing ships. The Intel's two runs did not come back.
+   - **Round 64 (section 147): the generator as compute passes**, exact against interpolateFrameCPU on two fields;
+     two `--only denoise` runs a GPU owed (section 149). **FSR4 round 65 (section 148):** a learned 2x upscaler in EASU's
+     place, designed; its code, training and test come next.
+   - **Sections 149-150: H64 HOLDS on both GPUs.** With the compute generator a generated frame costs 0.11 of a traced one on
+     the 1080 (2.4 ms against three.js's 18-19) and 0.22-0.25 on the Intel: 1.80 x and 1.60-1.64 x the frames. Putting it on
+     the page is `denoise-framegen-page`, Keith's call.
+   - **Round 66 (section 152): holes show the cross-fade** (24 of 24 over black; the newer frame not better). **FSR4 round 65
+     (section 154): NOT REPORTED** -- C1 and C3; the 32-sample truth was noisier than every arm. U lost to EASU on 17 of 24,
+     described. A cleaner-truth round is Keith's call.
+   - **FSR4 round 67 (section 156): REPORTED, neither supported.** Retrained on 512-sample targets and graded against a
+     2048-sample truth, U ties EASU (2.254e-3 against 2.252e-3, 10 of 24) and misses Holm against bilinear (p 0.037).
+     `fsr4-learned-upscaler` is closed as a measured negative; EASU stays.
+   - Every default that the Intel's runs at 7b871372 decided is now carried out. The denoiser entries still open, after
+     rounds 56-58, are `denoise-subgroup-reduction`, `denoise-temporalup-device` and `denoise-1080-native-crash` (all three
+     owed the GTX 1080), and `denoise-fsr3-framegen`, whose upstream is closed.
+   - Round 48 (section 117) is the accumulation's clamp read from a tile, on the same Intel runs as rounds 45 and 46.
+   Round 36 (section 103) made the list fill the default, with round 31's ring fill kept as its reference.
+   **`denoise-1080-native-crash`:** round 35 did not reproduce it in five runs (section 102). The traces stay armed.
+   **Earlier, `denoise-1080-native-crash`, round 35 (section 101).** On the 1080 the timing gate dies inside its native ladder in most
    runs. The 1080 has no verdict for rounds 33 and 34 until this is settled. Round 35 traces the ladder step by step and keeps
    each gate's exit code; it waits on the 1080's five runs. Round 34 (section 100) holds on the Intel: the fill over the
    lights' pixels only is about 13 x faster, and the chain went from about 1.5 x to 2.0-2.2 x against today's page.

@@ -53,10 +53,21 @@
 //   D40 SPLITS_HALFRES's C half drawn as family R                                 1 RED
 //   D41 (section 91) SPLITS_EMITTER left out of the dataset refusal               1 RED here (and 1 in denoiseStudy-selfcheck: the refusal row)
 //   D42 SPLITS_EMITTER's C half drawn as family R                                 1 RED
+//   D43 (section 127) VC and MC drawn from family R's scene                       3 RED. As first written the row's loop read past the
+//       end of C's scene when R's had another length, and the gate CRASHED; it now marks the scene as not C's, a row's red
+//   D44 a mesh given a fixed grey albedo instead of its sphere's material        2 RED (section 11's material row and section 17's)
+//   D45 SPLITS_MESH_C left out of the dataset refusal                             1 RED here (and 1 in denoiseStudy-selfcheck: the refusal row)
+//   D46 MC drawing only lathes                                                    1 RED here (and 1 in section 11: M draws only lathes too)
+//   D47 (section 131) the page's gradient sky drawn at 1.5 for 1.75                1 RED (the page's own SCENES row)
+//   D48 renderImages ignoring a scene's depth                                     1 RED (the depth row: at 12 x 12 and at 24 x 24 the two
+//       depths drew the same pixels -- measured -- so it renders the pair at 32 x 32, where they do not)
+//   D49 SPLITS_PAGE left out of the dataset refusal                               2 RED (the split row; the study gate's refusal row)
+//   D50 PAGE_DEPTH 8, the tracer's default                                        2 RED (the camera and depth row; the depth row)
 //   D4  an emitter's base colour taken from its albedo (0) instead of 1          1 RED
 //   D5  remodulate multiplying by the raw albedo, not the floored one            1 RED -- ZERO on the first draft, whose
 //       round trip never saw an albedo under the floor; the near-black row was written for it
 "use strict";
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -498,6 +509,22 @@ console.log("\n15. ROUND 32'S SPLIT (pre-registration section 95)");
         `${refused} of 12 refused`);
 }
 
+console.log("\n16. ROUND 47'S SPLITS (pre-registration section 116)");
+{
+    const { SPLITS_R47, SPLITS_TEMPORALUP, SPLITS_EMITTER, SPLITS_HALFRES, SPLITS_FSR1, SPLITS_MESH } = D;
+    const earlier = new Set([SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, SPLITS_R8, SPLITS_R9, SPLITS_R10, SPLITS_R11, SPLITS_MESH, SPLITS_FSR1, SPLITS_HALFRES, SPLITS_EMITTER, SPLITS_TEMPORALUP]
+        .flatMap((S) => Object.values(S).flatMap((x) => x.seeds)));
+    const tests = [...SPLITS_R47.T1.seeds.map((s2) => ["R", s2]), ...SPLITS_R47.T2.seeds.map((s2) => ["C", s2])];
+    let refused = 0;
+    for (const [f, s2] of tests) { try { renderImages(f, s2, { w: 2, h: 2, sppIn: 1, sppRef: 1 }); } catch (e) { if (/dataset seed/.test(e.message)) refused++; } }
+    ok("!! SPLITS_R47: round 11's training and val scenes exactly (the same objects), H1 on 12 new scenes of R (48000) and H2 on 12 of C (49000), on seeds no earlier split used, every test seed refused without harvest",
+        Object.keys(SPLITS_R47).join() === "train,val,T1,T2" && SPLITS_R47.train === SPLITS_R11.train && SPLITS_R47.val === SPLITS_R11.val &&
+        SPLITS_R47.T1.family === "R" && SPLITS_R47.T1.seeds.every((s2, i) => s2 === 48000 + i) && SPLITS_R47.T1.seeds.length === 12 &&
+        SPLITS_R47.T2.family === "C" && SPLITS_R47.T2.seeds.every((s2, i) => s2 === 49000 + i) && SPLITS_R47.T2.seeds.length === 12 &&
+        tests.every(([, s2]) => !earlier.has(s2)) && refused === 24,
+        `${refused} of 24 refused`);
+}
+
 // round 32: guideBuffers' offset shifts the grid as the path tracer's pixelOffset does -- none and [0, 0] the same buffers, and a
 // one-pixel offset pixel x's guides what pixel x + 1's were
 {
@@ -506,6 +533,110 @@ console.log("\n15. ROUND 32'S SPLIT (pre-registration section 95)");
     for (let y = 0; y < 16; y++) for (let x = 0; x < 23; x++) for (let c = 0; c < 3; c++) { n += 2; k += Object.is(g1.albedo[(y * 24 + x) * 3 + c], g0.albedo[(y * 24 + x + 1) * 3 + c]) + Object.is(g1.normal[(y * 24 + x) * 3 + c], g0.normal[(y * 24 + x + 1) * 3 + c]); }
     ok("round 32: guideBuffers with offset [0, 0] is guideBuffers bit for bit, and a one-pixel offset is the next pixel's guides",
        g0.albedo.every((v, i) => Object.is(v, gz.albedo[i])) && g0.normal.every((v, i) => Object.is(v, gz.normal[i])) && k === n && new Set(Array.from(g0.normal)).size > 10, `${k} of ${n}`);
+}
+
+console.log("\n17. ROUND 56: FAMILIES VC AND MC, THE SAME SHAPES IN FAMILY C'S MATERIALS AND LIGHT (pre-registration section 127)");
+{
+    const { SPLITS_MESH_C, SPLITS_MESH, SPLITS_FSR1, SPLITS_HALFRES, SPLITS_EMITTER, SPLITS_TEMPORALUP, SPLITS_R47, signedVolume } = D;
+    const { render } = await import(pathToFileURL(path.join(ENG, "physics", "render", "pathTracer.mjs")).href);
+    const { triNormal } = await import(pathToFileURL(path.join(ENG, "mesh", "meshBVH.mjs")).href);
+    // family C is the family VC and MC are built from: it draws what it drew before R existed (section 10's fingerprint, again here)
+    let fp = 0, k = 1;
+    const walk = (v) => { if (typeof v === "number") fp += v * ((k++ % 97) + 1); else if (Array.isArray(v)) v.forEach(walk); else if (v && typeof v === "object") for (const key of Object.keys(v).sort()) walk(v[key]); };
+    for (let s2 = 900000; s2 < 900040; s2++) { const S = makeScene("C", s2); walk(S); for (const d of [[0, 1, 0], [0, -1, 0], [0.6, 0.2, 0.77]]) walk(S.sky(d)); }
+    ok("!! family C is untouched by VC and MC: the fingerprint of 40 C scenes is the one recorded before R existed",
+        fp.toPrecision(17) === "1793200622.0119343" && k === 2781, `${fp.toPrecision(17)} over ${k - 1} numbers`);
+    // every VC and MC scene is C's scene for its seed, each resting sphere replaced, in its footprint, with its material;
+    // and its shapes are V's and M's kinds -- voxels facing along one axis, lathes and extrusions
+    const same = (a, b) => JSON.stringify(a) === JSON.stringify(b), matOf = (o) => { const { centre, radius, bvh, mesh, ...m } = o; return m; };
+    let asC = true, inBox = true, out = true, axisAligned = true, materials = true, counted = 0, kinds = { lathe: 0, extrude: 0 }, mats = { sigma: 0, ior: 0 };
+    for (const fam of ["VC", "MC"]) for (let s2 = 900400; s2 < 900430; s2++) {
+        const S = makeScene(fam, s2), C = makeScene("C", s2);
+        asC &&= S.family === fam && S.skyKind === "dark" && S.scene.length === C.scene.length && same(S.scene[0], C.scene[0]) && same(S.eye, C.eye) && same(S.look, C.look) &&
+            S.fovDeg === C.fovDeg && S.skyKind === C.skyKind && [[0, 1, 0], [0.3, -0.2, 0.93]].every((d) => S.sky(d) === C.sky(d));
+        S.scene.forEach((o, i) => {
+            const c = C.scene[i];
+            if (!c) { asC = false; return; }   // D43 drew R's scene, of another length: a row's red, not a crash
+            if (i === 0 || c.emit) { asC &&= same(o, c); return; }
+            counted++;
+            const t = o.bvh && o.bvh.tris, [x, , z] = c.centre, rad = c.radius;
+            if (!t) { asC = false; return; }
+            const want = matOf(c); if (want.albedo === undefined) want.albedo = 0;
+            materials &&= same(matOf(o), want) && o.mesh.kind === fam;
+            if (o.sigma !== undefined) mats.sigma++; if (o.ior !== undefined) mats.ior++;
+            const e = 1e-6;
+            for (let j = 0; j < t.length; j += 3) inBox &&= t[j] >= x - rad - e && t[j] <= x + rad + e && t[j + 1] >= -e && t[j + 1] <= 2 * rad + e && t[j + 2] >= z - rad - e && t[j + 2] <= z + rad + e;
+            out &&= signedVolume(t) > 0;
+            if (fam === "VC") for (let j = 0; j < t.length; j += 9) { const n = triNormal(t, j); axisAligned &&= n.filter((v) => Math.abs(v) > 1e-9).length === 1; }
+            else (o.mesh.tris % 48 === 0 && o.mesh.tris >= 4 * 48 ? kinds.lathe++ : kinds.extrude++);
+        });
+    }
+    ok("!! round 56: VC and MC are C's scene for the same seed -- its ground, coloured emitters, dark sky, camera -- with every resting sphere replaced by a mesh",
+        asC && counted > 100, `${counted} meshes over 60 scenes`);
+    ok("!! ...each mesh carrying its sphere's material and nothing else, rough-diffuse and dielectric both (a dielectric's never-read albedo set to 0), inside the sphere's footprint, wound outward",
+        materials && inBox && out && mats.sigma > 10 && mats.ior > 10, JSON.stringify(mats));
+    ok("  ...VC's every triangle faces along one axis, and MC draws both of its kinds", axisAligned && kinds.lathe > 5 && kinds.extrude > 5, JSON.stringify(kinds));
+    // a dielectric's albedo is never read: one dielectric mesh rendered at albedo 0 and at 1, bit for bit
+    let probe = null;
+    for (let s2 = 900400; s2 < 900430 && !probe; s2++) { const S = makeScene("MC", s2); const i = S.scene.findIndex((o) => o.bvh && o.ior !== undefined); if (i > 0) probe = { S, i }; }
+    if (probe) {
+        const o = (sc) => render(sc, { w: 12, h: 12, spp: 4, seed: 3, rgb: true, eye: probe.S.eye, look: probe.S.look, up: probe.S.up, fovDeg: probe.S.fovDeg, sky: probe.S.sky });
+        const at = (a) => probe.S.scene.map((x, j) => (j === probe.i ? { ...x, albedo: a } : x));
+        const y0 = o(at(0)), y1 = o(at(1));
+        ok("!! a dielectric mesh's albedo is NEVER READ: rendered at albedo 0 and at 1, the image is the same bit for bit",
+            y0.every((v, j) => Object.is(v, y1[j])) && y0.some((v) => v > 0), `scene ${probe.S.seed}, entry ${probe.i}`);
+    } else ok("!! a dielectric mesh to render was found in 30 MC scenes", false);
+    // the splits: test sets only, on ranges no earlier split touched, refused without harvest, C5 across the round
+    const earlier = new Set([SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, SPLITS_R8, SPLITS_R9, SPLITS_R10, SPLITS_R11, SPLITS_MESH, SPLITS_FSR1, SPLITS_HALFRES, SPLITS_EMITTER, SPLITS_TEMPORALUP, SPLITS_R47].flatMap((S) => Object.values(S).flatMap((x) => x.seeds)));
+    const mc = [...SPLITS_MESH_C.T1.seeds, ...SPLITS_MESH_C.T2.seeds];
+    let refused = 0;
+    for (const s2 of mc) { try { renderImages(SPLITS_MESH_C.T1.seeds.includes(s2) ? "VC" : "MC", s2, { w: 2, h: 2, sppIn: 1, sppRef: 1 }); } catch (e) { if (/dataset seed/.test(e.message)) refused++; } }
+    const rs = mc.flatMap((s2) => { const r = D.renderSeeds(s2); return [r.input, r.ref, r.ref2]; });
+    ok("!! SPLITS_MESH_C: no training split; H1 on 12 of VC (50000), H2 on 12 of MC (51000), no seed an earlier split used, every one refused without harvest, 72 distinct render seeds",
+        Object.keys(SPLITS_MESH_C).join() === "T1,T2" && SPLITS_MESH_C.T1.family === "VC" && SPLITS_MESH_C.T1.seeds[0] === 50000 && SPLITS_MESH_C.T1.seeds.length === 12 &&
+        SPLITS_MESH_C.T2.family === "MC" && SPLITS_MESH_C.T2.seeds[0] === 51000 && SPLITS_MESH_C.T2.seeds.length === 12 && mc.every((s2) => !earlier.has(s2)) &&
+        refused === 24 && new Set(rs).size === 72, `${refused} of 24 refused`);
+}
+
+console.log("\n18. ROUND 58: FAMILY P, path-tracer.html'S OWN SIX SCENES (pre-registration section 131)");
+{
+    const { SPLITS_PAGE, PAGE_SCENES, PAGE_DEPTH, SPLITS_MESH_C, SPLITS_MESH, SPLITS_FSR1, SPLITS_HALFRES, SPLITS_EMITTER, SPLITS_TEMPORALUP, SPLITS_R47 } = D;
+    const { render } = await import(pathToFileURL(path.join(ENG, "physics", "render", "pathTracer.mjs")).href);
+    const { buildTable } = await import(pathToFileURL(path.join(ENG, "physics", "render", "energyCompensation.mjs")).href);
+    // the page's own SCENES object, evaluated from its text with its own RHO and its own table builder -- so family P is the page's
+    // scenes, not a copy of them, and a change to the page shows here
+    const page = fs.readFileSync(path.join(ENG, "path-tracer.html"), "utf8");
+    const block = (page.match(/const RHO = [\d.]+;\s*const SCENES = \{[\s\S]*?\n\};/) || [""])[0];
+    const mkLine = (page.match(/const mkTable = \(a\) => \(_tables\[a\] \|\|= mkT\(a, (\{[^}]*\})\)\);/) || [])[1] || "";
+    let P = null, err = null;
+    try { const _tables = {}, mkT = buildTable, mkTable = (a) => (_tables[a] ||= mkT(a, Function(`return (${mkLine})`)()));
+          P = Function("mkTable", `${block}\nreturn { RHO, SCENES };`)(mkTable); } catch (e) { err = e.message; }
+    const cam = page.match(/const CAM = \{ w:\d+, h:\d+, eye:\[([^\]]*)\], look:\[([^\]]*)\], fovDeg:(\d+) \};/), dep = page.match(/<input id="dep" [^>]*value="(\d+)"/);
+    const dirs = [[0, 1, 0], [0, -1, 0], [0.6, 0.2, 0.77], [0.3, 0.9, -0.3]], same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+    const ours = PAGE_SCENES.map((nm, i) => makeScene("P", 52000 + ((i - 52000 % 6 + 6) % 6)));
+    const match = !!P && PAGE_SCENES.join() === Object.keys(P.SCENES).sort((a, b) => PAGE_SCENES.indexOf(a) - PAGE_SCENES.indexOf(b)).join() && Object.keys(P.SCENES).length === 6 &&
+        ours.every((S, i) => { const pg = P.SCENES[PAGE_SCENES[i]]; return S.page === PAGE_SCENES[i] && same(S.scene, pg.scene) && dirs.every((d) => S.sky(d) === pg.sky(d)); });
+    ok("!! family P is path-tracer.html's own SCENES, evaluated from the page's text with its RHO and its table builder -- every scene's spheres, materials, table and sky the same, in the page's six",
+        match && P.RHO === 0.18 && /K: 24, N: 140, M: 140/.test(mkLine), err || PAGE_SCENES.map((nm, i) => `${nm} ${ours[i].scene.length}`).join(", "));
+    ok("!! ...seen from the page's camera, eye (0, 0, 4) at the origin, 40 degrees, at its slider's default depth of 6 bounces",
+        !!cam && cam[1].replace(/\s/g, "") === "0,0,4" && cam[2].replace(/\s/g, "") === "0,0,0" && cam[3] === "40" && !!dep && +dep[1] === PAGE_DEPTH && PAGE_DEPTH === 6 &&
+        ours.every((S) => same(S.eye, [0, 0, 4]) && same(S.look, [0, 0, 0]) && S.fovDeg === 40 && S.maxDepth === 6), cam ? cam[0] : "no CAM line");
+    // renderImages renders a scene at the depth it names: the pair at 6 bounces is the tracer's own at 6, and not its default's 8
+    // at 32 x 32 and 16 samples on this seed: smaller, no path of the pair's lives past 6 bounces and the depths cannot be told apart (measured)
+    const pr = makeScene("P", 990806), ri = renderImages("P", 990806, { w: 32, h: 32, sppIn: 16, sppRef: 1 }), rs = D.renderSeeds(990806);
+    const at = (dpt) => render(pr.scene, { w: 32, h: 32, spp: 16, seed: rs.input, rgb: true, eye: pr.eye, look: pr.look, up: pr.up, fovDeg: pr.fovDeg, sky: pr.sky, ...(dpt ? { maxDepth: dpt } : {}) });
+    const d6 = at(6), d8 = at(null);
+    ok("  renderImages renders family P at its depth: the pair's input is the tracer's at 6 bounces bit for bit, and not its default's",
+        pr.page === "pair" && ri.input.every((v, i) => Object.is(v, d6[i])) && !d8.every((v, i) => Object.is(v, d6[i])));
+    // the split: one test set, every scene once, on seeds no earlier split used, refused without harvest, 18 distinct render seeds
+    const earlier = new Set([SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, SPLITS_R8, SPLITS_R9, SPLITS_R10, SPLITS_R11, SPLITS_MESH, SPLITS_FSR1, SPLITS_HALFRES, SPLITS_EMITTER, SPLITS_TEMPORALUP, SPLITS_R47, SPLITS_MESH_C].flatMap((S) => Object.values(S).flatMap((x) => x.seeds)));
+    const ps = SPLITS_PAGE.T1.seeds;
+    let refused = 0;
+    for (const s2 of ps) { try { renderImages("P", s2, { w: 2, h: 2, sppIn: 1, sppRef: 1 }); } catch (e) { if (/dataset seed/.test(e.message)) refused++; } }
+    const rsd = ps.flatMap((s2) => { const r = D.renderSeeds(s2); return [r.input, r.ref, r.ref2]; });
+    ok("!! SPLITS_PAGE: one test set, T1 of P at 52000-52005, each of the six scenes once, no seed an earlier split used, every one refused without harvest, 18 distinct render seeds",
+        Object.keys(SPLITS_PAGE).join() === "T1" && SPLITS_PAGE.T1.family === "P" && ps[0] === 52000 && ps.length === 6 && new Set(ps.map((s2) => makeScene("P", s2).page)).size === 6 &&
+        ps.every((s2) => !earlier.has(s2)) && refused === 6 && new Set(rsd).size === 18, `${ps.map((s2) => makeScene("P", s2).page).join(", ")}; ${refused} of 6 refused`);
 }
 
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +

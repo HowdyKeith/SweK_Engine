@@ -2,6 +2,8 @@
 //
 // Run:  node tools/denoiseDevice.mjs --export-r11 --cache <dir> --key <record>
 //           round 11's seed-1 network, from its harvest's cache, as data a page can load -> render/denoise-net-r11.json
+//       node tools/denoiseDevice.mjs --export-r47 --cache <dir> --key <record>
+//           round 47's seed-1 w16 network (sections 116-119), the same way -> render/denoise-net-r47-w16.json
 //       node tools/denoiseDevice.mjs --measure-r12 [--cache <dir>]
 //           section 35's measurement: the shipped network, on the CPU and on the device, on round 11's 24 test images
 //           -> render/denoise-results-r12.json
@@ -41,15 +43,15 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
 import { openCache, loadRecord, hashArrays } from "../render/denoiseCache.mjs";
-import { renderSplit, RESULTS_R11 } from "../render/denoiseStudy.mjs";
+import { renderSplit, RESULTS_R11, RESULTS_R47 } from "../render/denoiseStudy.mjs";
 import { SPLITS_R11 } from "../render/denoiseScenes.mjs";
 import { denoise } from "../render/denoiseNet.mjs";
 import { relMSE } from "../render/denoiseStats.mjs";
-import { APPLY_TOL, kernelApplyCpu, judgeHeadApply, deviceLayers, createDeviceDenoiser, createNativeDenoiser, encodeNet, decodeNet, nativeSetsFor, twinsOf } from "../render/denoiseDevice.mjs";
+import { APPLY_TOL, kernelApplyCpu, judgeHeadApply, deviceLayers, createDeviceDenoiser, createNativeDenoiser, encodeNet, decodeNet, nativeSetsFor, twinsOf, nativeAdapterKey, nativeNetworkFor, networkFile, NATIVE_NETWORKS_BY_ADAPTER, NETWORKS_DECIDED_BY } from "../render/denoiseDevice.mjs";
 import * as GPU from "./ship/headlessGpu.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const NET_FILE = "render/denoise-net-r11.json", RESULTS_R12 = "render/denoise-results-r12.json", RESULTS_R13 = "render/denoise-results-r13.json";
+const NET_FILE = "render/denoise-net-r11.json", NET_FILE_W16 = "render/denoise-net-r47-w16.json", RESULTS_R12 = "render/denoise-results-r12.json", RESULTS_R13 = "render/denoise-results-r13.json";
 const RESULTS_R14 = "render/denoise-results-r14.json", RESULTS_R15 = "render/denoise-results-r15.json";
 const RESULTS_R18T = "render/denoise-results-r18t.json", RESULTS_R18U = "render/denoise-results-r18u.json", RESULTS_R27W = "render/denoise-results-r27w.json";
 // each measurement, by flag: the kernel set it runs the device pass on, and the file it writes (sections 35, 39, 43, 46 and 61)
@@ -81,6 +83,24 @@ if (args.includes("--export-r11")) {
         net: encodeNet(net),
     }) + "\n");
     console.log(`[denoiseDevice] wrote ${NET_FILE}`);
+} else if (args.includes("--export-r47")) {
+    // round 49 (section 119): round 47's seed-1 network, 16 channels wide, as --export-r11 wrote round 11's -- the same record format,
+    // the filter its harvest tuned (round 11's setting exactly), and refused unless the record is that harvest's w16 shape
+    refuseIfExists(NET_FILE_W16);
+    const dir = arg("--cache"), key = arg("--key");
+    if (!dir || !key) { console.log("[denoiseDevice] --export-r47 needs --cache <the round 47 harvest's cache> and --key <its seed-1 w16 network record>"); process.exit(2); }
+    const net = loadRecord(path.resolve(dir), key), R47 = JSON.parse(fs.readFileSync(path.join(ENG, RESULTS_R47), "utf8"));
+    if (!net) { console.log(`[denoiseDevice] no record ${key} in ${dir}`); process.exit(2); }
+    if (net.layers.map((L) => L.Cout).join("/") !== "16/16/16/16/81") { console.log(`[denoiseDevice] ${key} is not a w16 network: ${net.layers.map((L) => L.Cout).join("/")}`); process.exit(2); }
+    const { score, ...filter } = R47.filter;
+    fs.writeFileSync(path.join(ENG, NET_FILE_W16), JSON.stringify({
+        about: "The denoiser arc's round 47 network (pre-registration sections 116 and 118): the kernel-predicting network 16 channels wide, trained on round 11's 96 scenes " +
+               "of family R and 96 of family C, seed 1, as render/denoiseDevice.mjs decodes it. Trained on R and C only; on them, 1.117 x the shipped network's error on R and 1.297 x on C.",
+        source: { results: RESULTS_R47, harvest: "c912e1ff", seed: 1, cacheKey: key },
+        filter, scenes: { families: ["R", "C"], image: R47.config.image, sppIn: R47.config.sppIn, emitterMask: true },
+        net: encodeNet(net),
+    }) + "\n");
+    console.log(`[denoiseDevice] wrote ${NET_FILE_W16}`);
 } else if (args.includes("--which")) {
     // v4852 -- round 20 (section 68): the native caller, run once. The compiler is read off the package with the flags the device
     // is made with (none: Dawn as shipped), as the gates read it; the pick is render/denoiseDevice.mjs's nativePick.
@@ -93,7 +113,11 @@ if (args.includes("--export-r11")) {
     const info = adapter.info || {}, dev = await adapter.requestDevice();
     console.log(`[denoiseDevice] --which: adapter ${[info.vendor, info.architecture, info.description].filter(Boolean).join(" / ") || "(unnamed)"}; ` +
                 `node-webgpu ${(pkg && pkg.version) || "(version unread)"} from ${W.from}; compiler ${compiler || `none on ${process.platform}`}`);
-    const net = decodeNet(JSON.parse(fs.readFileSync(path.join(ENG, NET_FILE), "utf8")).net), N = 64, C = 10;
+    // round 53 (section 124): the network this adapter's key names in NATIVE_NETWORKS_BY_ADAPTER, else the shipped one -- said on a
+    // line of its own, so the pick line keeps the shape the rig's earlier --which logs were parsed by
+    const nKey = nativeAdapterKey(info, process.platform), netName = nativeNetworkFor(nKey);
+    console.log(`[denoiseDevice] --which: network ${netName} -- ${Object.hasOwn(NATIVE_NETWORKS_BY_ADAPTER, nKey || "") ? `the table's for ${nKey} (${NETWORKS_DECIDED_BY[nKey]})` : `no entry for ${nKey || "(no key)"}, the shipped network`}`);
+    const net = decodeNet(JSON.parse(fs.readFileSync(path.join(ENG, networkFile(netName)), "utf8")).net), N = 64, C = 10;
     // a fixed synthetic input: nine channels of smooth values and an emitter mask of zeros, so the pass is the same on every box
     const x = new Float32Array(N * N * C);
     for (let i = 0; i < N * N; i++) for (let c = 0; c < C - 1; c++) x[i * C + c] = 0.5 + 0.4 * Math.sin(0.37 * i + 1.3 * c);
