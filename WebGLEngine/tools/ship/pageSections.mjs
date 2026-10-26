@@ -712,6 +712,12 @@ export const SECTIONS = [
     // founds at one page and grows as the arc does.
     { id: "denoiser", tab: "denoiser", label: "Denoiser", note: "the learned path-tracer denoiser, on the device, beside the filter it was tested against",
       pages: ["denoise.html"] },
+    // UNNUMBERED -- FLIGHT SIMULATION, KEITH'S CALL: "is there more than 1 sub page? is there more than 1 flight, 6dof, free flight pages? they can all be in a 'Flight Simulation' link bucket on Server.html." Every page that flies a craft
+    // under a physics model, FILED AFTER the drawers that already hold most of them so that those keep their homes and these show here as well (the mover moves the anchor for the first section that claims a page and CLONES it into every
+    // later one): the aircraft (flight.html, flight-gpu.html, flight-coop.html, es-flight6dof.html, es-aircraft.html, es-box3d-fly3d.html), the 6DOF and dogfight pages (es-box3d-6dof.html, dogfight.html, bomber.html, space-battleship.html), the
+    // submarine tank (sub-aquarium.html) and the ships on the sea (battleship3d.html). flight-coop.html and battleship3d.html had NO anchor on server.html at all (nothing linked them from it); they have one in Arriving now.
+    { id: "flightsim", tab: "flightsim", label: "Flight Simulation", note: "every page that flies an aircraft, a spacecraft, a ship or a submarine under a physics model: free flight, 6DOF, dogfights, the tank of submarines",
+      pages: ["flight.html", "flight-gpu.html", "flight-coop.html", "es-flight6dof.html", "es-aircraft.html", "es-box3d-fly3d.html", "es-box3d-6dof.html", "dogfight.html", "bomber.html", "space-battleship.html", "sub-aquarium.html", "battleship3d.html"] },
 ];
 
 /** Keith's rule. A drawer of 25 is the flat row again with a lid on it. */
@@ -898,14 +904,10 @@ export const UNPLACED = new Map([
     ["bzflag-info.html", "same bzflag cluster, same two-anchor conflict: an 'Open BZFlag page' link already sits inside the bzflag gpanel"],
     ["bzflag-test.html", "same bzflag cluster, same two-anchor conflict: a 'Network test' link already sits inside the bzflag gpanel"],
     ["rocket-league.html", "fits Game Theory the same way bzflag.html does, and fails the same way: an 'Open full page' link already sits inside its own rocketleague gpanel"],
-    // UNNUMBERED (the v4874 ship) -- the three pages of the guns line, linked from server.html's Arriving area so that pageReach can see them (it caught all three
+    // UNNUMBERED (the v4874 ship; the four combat and submarine entries that stood here were REMOVED when Keith's Flight Simulation drawer claimed them) -- the three pages of the guns line, linked from server.html's Arriving area so that pageReach can see them (it caught all three
     // as born invisible at the first verdict). WHICH DRAWER IS KEITH'S CALL, as it was for the rtx pages: the fruit-fly drawer already holds es-flight6dof.html, whose pilots
     // these pages fly, but a combat page is not obviously a brain page, and the choice is one he makes with the three side by side.
-    ["dogfight.html", "two aircraft fight, a window per craft: linked from Arriving so it is reachable; the drawer is Keith's call (the fruit-fly drawer holds es-flight6dof.html, whose pilots it flies, but a fight is not obviously a brain page)"],
-    ["bomber.html", "a B-29-class bomber and its gun seats against fighters, a window per craft and per seat: linked from Arriving so it is reachable; the drawer is Keith's call, decided with dogfight.html and space-battleship.html side by side"],
-    ["space-battleship.html", "a Yamato-like capital ship and its thirteen gun seats against fighters in a 6DOF vacuum: linked from Arriving so it is reachable; the drawer is Keith's call, decided with dogfight.html and bomber.html side by side"],
     // UNNUMBERED -- the sub aquarium (WIP, the submarine line). Linked from Arriving so it is reachable, and it is the FISH BRAIN chip's click-through; the drawer is Keith's call: it is a brain page (the GFC pilots) AND a fleet page (peers send subs).
-    ["sub-aquarium.html", "a tank of submarines flown by the Giant Fiber Circuit stand-in pilots, and peers send subs here: linked from Arriving so it is reachable; the drawer is Keith's call (Fruit Fly Brain or Fleet)"],
 ]);
 
 /** Every page claimed by a section, flat. Arriving keeps what is NOT in here. */

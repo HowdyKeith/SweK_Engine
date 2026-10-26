@@ -733,6 +733,8 @@ window.addEventListener("load", function () {
                  skeletons rather than a stylized model. Same class as the five physics front doors above it. -->
             <a href="/fly-connectome.html" target="_blank" rel="noopener" title="Fly Connectome: 34 real neurons from Janelia's male-cns connectome -- the fruit fly's Giant Fiber escape circuit, the fastest reflex in the animal's nervous system -- drawn as their own traced skeletons from a one-time Neuprint fetch. Orbit the circuit and pick a neuron to see its actual synaptic connections." style="color:#9fe6c0;text-decoration:none;border:1px solid #2a5a3a;padding:2px 6px;border-radius:3px;font-size:11px;">&#9670; Fly Connectome</a>
             <a href="/sub-aquarium.html" target="_blank" rel="noopener" title="Sub Aquarium: submarines flown by the fruit fly's Giant Fiber Circuit (the fish-brain STAND-IN) swim in a tank; peers can send theirs here, and each peer row has a Sub button to send one of yours." style="color:#9fe6c0;text-decoration:none;border:1px solid #2a5a3a;padding:2px 6px;border-radius:3px;font-size:11px;">&#9670; Sub Aquarium</a>
+            <a href="/flight-coop.html" target="_blank" rel="noopener" title="Co-op lockstep flight (Endless Sky on Box3D): two machines fly the same deterministic simulation in lockstep." style="color:#9fe6c0;text-decoration:none;border:1px solid #2a5a3a;padding:2px 6px;border-radius:3px;font-size:11px;">&#9992; Flight co-op</a>
+            <a href="/battleship3d.html" target="_blank" rel="noopener" title="ABYSS 3D Battleship: ships on the physics sea (render/seaThree.mjs)." style="color:#9fe6c0;text-decoration:none;border:1px solid #2a5a3a;padding:2px 6px;border-radius:3px;font-size:11px;">&#9875; Battleship 3D</a>
             <a href="/settings.html" target="_blank" rel="noopener" title="Settings -- engine, cloud, tunnel, brain and hosting configuration; most of its controls drive other subsystems, so it is filed with the System Tools it operates.">Settings</a>
             <a href="/node-bun.html" target="_blank" rel="noopener" title="Node / Bun -- which runtime is serving this box, the Bun-vs-Node capability surface run on demand, and the one optional dependency (ws) that Bun ships built in. Filed with System Tools because it operates the rig: it reads /runtime, writes the use_bun.flag preference, and spawns tools/ship/bunSurface.mjs under each runtime.">Node / Bun</a>
             <!-- v4009 -- webgpu-llm.html SHIPPED AT v4007 AND WAS NEVER LINKED. The same defect this round fixed
@@ -1327,6 +1329,7 @@ window.addEventListener("load", function () {
         <button class="gtab" data-tab="flybrain"><span class="gtabTog">&#9656;</span><span>&#129712; Fruit Fly Brain</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="fsr"><span class="gtabTog">&#9656;</span><span>&#128269; FSR</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="denoiser"><span class="gtabTog">&#9656;</span><span>&#10024; Denoiser</span><span class="gtabState"></span></button>
+        <button class="gtab" data-tab="flightsim"><span class="gtabTog">&#9656;</span><span>&#9992;&#65039; Flight Simulation</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="box3d"><span class="gtabTog">&#9656;</span><span>&#127922; Box3D</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="blobs"><span class="gtabTog">&#9656;</span><span>&#129514; Blobs</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="face"><span class="gtabTog">&#9656;</span><span>&#128100; Face &amp; Population</span><span class="gtabState"></span></button>
@@ -1955,6 +1958,12 @@ window.addEventListener("load", function () {
           <div class="gpanelHdr">&#10024; Denoiser</div>
           <div style="font-size:11px;color:var(--dim);margin:6px 0;">The learned path-tracer denoiser (denoise.html): a small kernel-predicting network trained on two scene families, run as WebGPU compute beside the joint bilateral filter it was tested against, with a self-check against the network on the CPU and a timing table for whatever GPU the browser hands it. It renders the two families it was trained on and nothing else -- render/learned-denoiser-preregistration.md says why.</div>
           <div data-panel-pages="denoiser" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
+        </div>
+        <!-- UNNUMBERED -- Keith: "they can all be in a 'Flight Simulation' link bucket on Server.html". Every page that flies a craft under a physics model; most also stay in the drawer they were already in, and pageSections.mjs clones them here. -->
+        <div class="gpanel" data-panel="flightsim" hidden>
+          <div class="gpanelHdr">&#9992;&#65039; Flight Simulation</div>
+          <div style="font-size:11px;color:var(--dim);margin:6px 0;">Every page that flies something under a physics model: free flight (flight.html, flight-gpu.html, flight-coop.html), real 6DOF flight with pilots to choose (es-flight6dof.html, es-aircraft.html), 6DOF and dogfight combat (es-box3d-6dof.html, dogfight.html, bomber.html, space-battleship.html), and the water: the tank of submarines (sub-aquarium.html) and the ships on the physics sea (battleship3d.html).</div>
+          <div data-panel-pages="flightsim" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
         </div>
         <div class="gpanel" data-panel="box3d" hidden>
           <div class="gpanelHdr">&#127922; Box3D</div>
