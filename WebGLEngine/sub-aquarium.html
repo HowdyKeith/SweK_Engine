@@ -51,6 +51,7 @@
   .p2d canvas { height:auto; }
   .side { flex:1 1 auto; min-height:0; overflow-y:auto; }
   .cmd { color:var(--dim); font-size:11px; line-height:1.5; font-variant-numeric:tabular-nums; }
+  .cmd.tk { color:var(--amber); }
   .tank-note { color:var(--dim); font-size:11px; padding-top:5px; }
   @media (max-width: 900px) { main { grid-template-columns:minmax(0,1fr); } .canvasbox { min-height:60vh; } .col { gap:12px; } }
   .row { display:flex; gap:8px; align-items:flex-start; padding:5px 4px; border-bottom:1px solid #12203a; }
@@ -73,6 +74,8 @@
   <button id="refreshBtn" title="Fetch the tank's list now">Refresh</button>
   <label>speed <select id="speedSel"><option value="1">1&times;</option><option value="4" selected>4&times;</option><option value="10">10&times;</option></select></label>
   <label>hull <select id="hullSel" title="The vessel every sub in the tank is flown on. The pilots are not told which one it is."></select></label>
+  <span title="Pick a sub in the list, then press one: a leak the tank cannot trim out (the boat blows its tank and drops its weight), the same leak with no rescue (it grounds), or surface (it blows its tank and rides on its buoyancy with the tower out of the water)">event on the selected sub:
+    <button id="floodBtn">flood</button> <button id="sinkBtn">sink</button> <button id="surfaceBtn">surface</button> <button id="clearBtn">restore</button></span>
   <span class="chip"><span class="dot" id="fishDot"></span><b>FISH BRAIN</b> <span id="fishWord">checking&hellip;</span></span>
   <span id="msg" class="sub"></span>
 </div>
@@ -80,7 +83,7 @@
   <section class="panel p3d" aria-label="Three-dimensional view of the tank">
     <h2>3D view <span class="hint"><label title="Click a sub in the list, then tick this: the camera follows it and comes in close enough to see its tower and tail fins"><input type="checkbox" id="followBox"> follow the selected sub</label> &nbsp; drag to orbit &middot; wheel to zoom</span></h2>
     <div class="canvasbox"><canvas id="view3d" width="1000" height="700" aria-label="Three-dimensional view of the tank: the physics sea above, the subs beneath it" style="cursor:grab"></canvas></div>
-    <div class="tank-note" id="view3dNote">The sea is the physics surface a hull would float on (render/seaThree.mjs); subs are tinted toward the water colour by depth, and each sub&rsquo;s tail planes and rudder follow its pilot&rsquo;s command.</div>
+    <div class="tank-note" id="view3dNote">The sea is the physics surface a hull would float on (render/seaThree.mjs); subs are tinted toward the water colour by depth, and each sub&rsquo;s tail planes and rudder follow its pilot&rsquo;s command. A sub in an event shows its tank as a gauge on the hull, sheds bubbles when it blows, and a released weight falls to the floor.</div>
   </section>
   <div class="col">
     <section class="panel p2d" aria-label="Plan view of the tank"><h2>Top view <span class="hint">500 &times; 300 m</span></h2>
@@ -95,6 +98,7 @@
 import { createTank, LENGTH, WIDTH, DEPTH_MIN, DEPTH_MAX } from "/render/subAquariumSim.mjs";
 import { LABELS } from "/physics/mechanics/subHulls.mjs";
 import { createView3d } from "/render/subAquarium3d.mjs";
+import { readout } from "/render/subBallastCues.mjs";
 
 const $ = (id) => document.getElementById(id);
 const plan = $("plan"), side = $("sideView"), pg = plan.getContext("2d"), sg = side.getContext("2d");
@@ -121,6 +125,9 @@ let selected = null, lastFrame = 0, listErr = false;
 // follow: the camera follows the selected sub when the box is ticked; ticking it with nothing selected picks the first sub in the list
 function syncFollow(fromBox) { if (!view3d) return; const on = $("followBox").checked; if (on && !selected && fromBox) { const f = tank.snapshot()[0]; if (f) { selected = f.id; renderList(); } } view3d.setFollow(on ? selected : null); }
 $("followBox").addEventListener("change", () => syncFollow(true));
+// v4901 -- events on the selected sub (render/subAquariumSim.mjs setEvent): the tank, the emergency blow and the drop weight show in the 3D view and in the list
+function setEvent(ev) { if (!selected) { $("msg").textContent = "pick a sub in the list first"; return; } try { const r = tank.setEvent(selected, ev); $("msg").textContent = r ? r + " on the selected sub" : "restored"; } catch (e) { $("msg").textContent = String((e && e.message) || e).slice(0, 80); } }
+$("floodBtn").onclick = () => setEvent("flood"); $("sinkBtn").onclick = () => setEvent("sink"); $("surfaceBtn").onclick = () => setEvent("surface"); $("clearBtn").onclick = () => setEvent(null);
 const DOT = { live: "#4ade80", standin: "#f6a623", offline: "#ff5a5a", err: "#555" }, WORD = { live: "live", standin: "stand-in", offline: "offline", err: "unreachable" };
 
 async function refresh() {
@@ -154,7 +161,8 @@ function renderList() {
     const t = document.createElement("div"), n = document.createElement("div"), m = document.createElement("div"); n.className = "nm"; m.className = "sub";
     n.textContent = s.name; m.id = "m_" + s.id;
     const cm = document.createElement("div"); cm.className = "cmd"; cm.id = "c_" + s.id;   // the pilot's four commands this tick: the tail planes and rudder in the 3D view are drawn from these
-    t.appendChild(n); t.appendChild(m); t.appendChild(cm); row.appendChild(sw); row.appendChild(t);
+    const tk = document.createElement("div"); tk.className = "cmd tk"; tk.id = "t_" + s.id;   // the tank: the event, the water in it, the air, the weight (render/subBallastCues.mjs readout)
+    t.appendChild(n); t.appendChild(m); t.appendChild(cm); t.appendChild(tk); row.appendChild(sw); row.appendChild(t);
     row.onclick = () => { selected = s.id === selected ? null : s.id; renderList(); syncFollow(); };
     if (s.local) { const x = document.createElement("button"); x.textContent = "✕"; x.title = "Remove from the tank"; x.style.marginLeft = "auto"; x.onclick = async (e) => { e.stopPropagation(); await post("/subaquarium/remove", { id: s.id }); refresh(); }; row.appendChild(x); }
     box.appendChild(row);
@@ -164,6 +172,7 @@ function updateStats(snap) {
   for (const s of snap) {
     const cm = document.getElementById("c_" + s.id);
     if (cm && s.cmd) { const f = (v, w) => (v >= 0 ? "+" : "") + v.toFixed(w); cm.textContent = `pitch ${f(s.cmd.pitch, 2)} · yaw ${f(s.cmd.yaw, 2)} · thrust ${f(s.cmd.thrust, 2)} · ballast ${f(s.cmd.ballast, 2)}`; }
+    const tk = document.getElementById("t_" + s.id); if (tk) tk.textContent = readout(s);
     const m = document.getElementById("m_" + s.id); if (!m) continue;
     m.textContent = `${s.pilot === "network" ? "network" : "PD autopilot"} · ${s.local ? "this box" : "from " + s.from} · ${s.depth.toFixed(0)} m · ${s.speed.toFixed(1)} m/s` + (s.hull && s.hull !== "nominal" ? ` · ${LABELS[s.hull] || s.hull}` : "") + (s.lost ? ` · lost ${s.lost}×` : "");
   }

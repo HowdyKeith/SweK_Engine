@@ -12,6 +12,7 @@ import { createSeaMesh, CALM_OPTIONS } from "./seaThree.mjs";
 import { createSurface, defaultComponents } from "../physics/ocean/oceanSurface.mjs";
 import { applyDepthTint } from "../ui/seaDepthTint.mjs";
 import { EXPLORER } from "../physics/mechanics/subModel6dof.mjs";
+import { attachCues, poseCues, bubbleStep, dropStep, BUBBLE_MAX } from "./subBallastCues.mjs";
 
 export const HULL_LENGTH = 16;     // metres on screen: a sub is drawn larger than life so a 500 m tank can be read
 export const WATER_COLOUR = 0x0a3b46;
@@ -88,6 +89,11 @@ export function createView3d(THREE, canvas, { length = 500, width = 300, depthMa
     const camera = new THREE.PerspectiveCamera(50, canvas.width / canvas.height, 1, 4000);
     const view = { yaw: 0.6, pitch: 0.55, dist: 430 };   // v4899: closer, so the tank fills its panel
     const subs = new Map(), geo = {};
+    // v4901 -- the ballast: bubbles while a tank is blown, a drop weight that falls (render/subBallastCues.mjs holds the arithmetic)
+    let bubbles = { list: [], counter: 0 }, weights = [], lastT = null; const wasReleased = new Map();
+    const bubbleGeo = new THREE.BufferGeometry(); bubbleGeo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(BUBBLE_MAX * 3), 3)); bubbleGeo.setDrawRange(0, 0);
+    const bubblePts = new THREE.Points(bubbleGeo, new THREE.PointsMaterial({ color: 0xcdf2ff, size: 1.4, transparent: true, opacity: 0.8, depthWrite: false })); bubblePts.frustumCulled = false; scene.add(bubblePts);
+    const weightMat = new THREE.MeshStandardMaterial({ color: 0x3a3f45, roughness: 0.8, metalness: 0.4 });
     // v4899 -- FOLLOW: the camera orbits a centre, and the centre is the tank's middle unless a sub is being followed, when it eases toward that sub (and eases back when it is not).
     const home = { x: length / 2, y: -15, z: width / 2 };
     let centre = { ...home }, follow = null, distBefore = null;
@@ -114,17 +120,30 @@ export function createView3d(THREE, canvas, { length = 500, width = 300, depthMa
                 if (!m) {
                     const mat = new THREE.MeshStandardMaterial({ color: new THREE.Color().setHSL((s.hue % 360) / 360, 0.7, 0.55), roughness: 0.5, metalness: 0.2 });
                     applyDepthTint(THREE, mat, { level: 0, density: TINT_DENSITY, color: WATER_COLOUR });
-                    m = buildSub(THREE, mat, geo); m.userData.mat = mat; scene.add(m); subs.set(s.id, m);
+                    m = buildSub(THREE, mat, geo); attachCues(THREE, m, geo, HULL_LENGTH); m.userData.mat = mat; scene.add(m); subs.set(s.id, m);
                 }
-                const p = subPose(s); m.position.set(p.x, p.y, p.z); m.rotation.set(0, p.rotY, p.rotZ); poseFins(m, s.cmd);
+                const p = subPose(s); m.position.set(p.x, p.y, p.z); m.rotation.set(0, p.rotY, p.rotZ); poseFins(m, s.cmd); poseCues(m, s);
             }
-            for (const [id, m] of subs) if (!live.has(id)) { scene.remove(m); m.userData.mat.dispose(); subs.delete(id); }
+            for (const [id, m] of subs) if (!live.has(id)) { scene.remove(m); m.userData.mat.dispose(); subs.delete(id); wasReleased.delete(id); }
+            // the ballast cues that live in the world, not on the hull: the bubbles of a tank being blown, and a weight that has just been released
+            const dt = lastT === null ? 0 : Math.max(0, Math.min(0.25, t - lastT)); lastT = t;
+            const emits = snapshot.filter((s) => s.tank && s.tank.blowing).map((s) => [s.x, -s.depth, s.y]);
+            bubbles = bubbleStep(bubbles.list, dt, emits, bubbles.counter);
+            const pos = bubbleGeo.attributes.position.array; bubbles.list.forEach((b, i) => { pos[i * 3] = b.x; pos[i * 3 + 1] = b.y; pos[i * 3 + 2] = b.z; }); bubbleGeo.attributes.position.needsUpdate = true; bubbleGeo.setDrawRange(0, bubbles.list.length);
+            for (const s of snapshot) {
+                const rel = !!(s.tank && s.tank.released);
+                if (rel && wasReleased.get(s.id) === false) { const mesh = new THREE.Mesh(geo.weight || (geo.weight = new THREE.BoxGeometry(HULL_LENGTH * 0.25, HULL_LENGTH * 0.28 * 0.12, HULL_LENGTH * 0.28 * 0.5)), weightMat); scene.add(mesh); weights.push({ mesh, x: s.x, y: -s.depth - HULL_LENGTH * 0.28 * 1.05, z: s.y, v: 0, rest: -1, gone: false }); }
+                wasReleased.set(s.id, rel);
+            }
+            weights = weights.map((w) => { const n = { ...dropStep(w, dt, -depthMax + 0.4), mesh: w.mesh }; n.mesh.position.set(n.x, n.y, n.z); if (n.gone) scene.remove(n.mesh); return n; }).filter((w) => !w.gone);
             if (follow !== null && !subs.has(follow)) { follow = null; if (distBefore !== null) { view.dist = distBefore; distBefore = null; } }   // the followed sub left the tank
             const tgt = follow !== null ? subs.get(follow).position : home;
             centre = followStep(centre, { x: tgt.x, y: tgt.y, z: tgt.z });
             place(); renderer.render(scene, camera);
         },
-        dispose() { sea.dispose(); for (const k of Object.keys(geo)) geo[k].dispose(); renderer.dispose(); },
+        /** For a gate: how many bubbles the view holds and how many it DRAWS, and how many dropped weights it holds, right now. */
+        cues() { return { bubbles: bubbles.list.length, drawn: bubbleGeo.drawRange.count, weights: weights.length, resting: weights.filter((w) => w.rest >= 0).length }; },
+        dispose() { bubbleGeo.dispose(); weightMat.dispose(); sea.dispose(); for (const k of Object.keys(geo)) geo[k].dispose(); renderer.dispose(); },
     };
 }
 
