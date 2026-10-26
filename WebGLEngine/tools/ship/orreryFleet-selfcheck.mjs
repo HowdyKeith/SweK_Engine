@@ -263,6 +263,16 @@ console.log("\n7. *** THE COMMIT BELT, RE-MEASURED RATHER THAN TRUSTED ***");
     // loosened comparison: a 7-character prefix of a 40-character hash still names one commit in a repository
     // of 1,237, and the ORDER and COUNT are compared exactly as before.
     const sameList = (a, b) => a.length === b.length && a.every((x, i) => b[i].startsWith(x));
+    // v4899 SABOTAGES (each alone, restored md5-identical): A the ship-subject test removed -> 1 red; B any number of extra heads allowed -> 1; C the rest of the list not compared -> 1; D the allowance never recorded or printed -> 0 red AT FIRST (the live tree has no such body today), which is why the NAMED row reads its own source -> 1.
+    // *** v4899 -- THE SHIP COMMIT CANNOT NAME ITSELF, AND A FULL CHECKOUT CALLED THAT A DRIFT. *** v4898's ship commit appended a "what this record could not establish" section to two vendored PROVENANCE.md files; the belt that shipped
+    // with it could not hold the hash of the commit that was about to carry it, so on a full history the live list had ONE MORE entry at the head than the record and the row went red -- found by afterVerdict after the
+    // SHIP verdict (the verdict runs before the commit exists), and again by the rig. A shallow clone never saw it (its tail comparison already lets work above the recorded entries through). The rule here is NARROW: the live
+    // list may exceed the record by exactly ONE commit, at the HEAD of the list, whose subject is a ship subject (`vNNNN: ...`), with everything below it equal to the record; that body is NAMED, not silently passed, and the next
+    // ship's belt record takes the hash. Anything else -- two extra, an extra that is not a ship commit, an extra in the middle -- is still a drift. Pure, so the fixtures below drive every branch.
+    const SHIP_SUBJECT = /^v\d{3,5}[a-z]?: /;
+    const carriesShipCommit = (exp, live, subjectOf) => live.length === exp.length + 1 && sameList(exp, live.slice(1)) && SHIP_SUBJECT.test(String(subjectOf(live[0]) || ""));
+    const subjectOf = (h) => { try { return execFileSync("git", ["log", "-1", "--format=%s", h], { cwd: REPO, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim(); } catch { return ""; } };
+    const shipExcused = {};
     // *** THE COMPARATOR ITSELF, ON FIXED STRINGS. *** The ambiguity row below checks the RECORD's prefixes;
     // it says nothing about how they are compared, so sabotage GA cut the match to a single character and
     // went 0 RED -- the two are independent and only one was being exercised. A prefix match is only a
@@ -311,7 +321,11 @@ console.log("\n7. *** THE COMMIT BELT, RE-MEASURED RATHER THAN TRUSTED ***");
     const agreesWithin = (n) => {
         const vis = visibleOf(liveShas[n]);
         const exp = expectedFor(n);
-        if (!graft.size) return sameList(exp, liveShas[n]);       // full history: the old comparison, unchanged
+        if (!graft.size) {                                        // full history: the old comparison, plus the one narrow allowance above
+            if (sameList(exp, liveShas[n])) return true;
+            if (carriesShipCommit(exp, liveShas[n], subjectOf)) { shipExcused[n] = liveShas[n][0]; return true; }
+            return false;
+        }
         const seen = exp.filter((h) => vis.some((v) => v.startsWith(h)));
         if (!seen.length) return true;                            // everything recorded is under the boundary
         const tail = vis.slice(vis.length - seen.length);
@@ -325,10 +339,26 @@ console.log("\n7. *** THE COMMIT BELT, RE-MEASURED RATHER THAN TRUSTED ***");
             `of ${names.length} bodies have recorded commits the graft swallowed (` +
             `${names.reduce((a, n) => a + belowGraft(n).length, 0)} hashes unobservable here). What IS visible ` +
             `agrees with the record, in order, for every body -- a full checkout is the instrument for the rest. ` : "") +
+        (Object.keys(shipExcused).length ? `NOTE: ${Object.keys(shipExcused).map((n) => n + " carries the ship commit " + shipExcused[n].slice(0, 8)).join(", ")} -- a ship commit cannot name itself, so the NEXT ship's belt record takes it. ` : "") +
         `${names.length} bodies, ${Object.values(live).reduce((a, b) => a + b, 0)} commit sightings, every hash ` +
         `re-derived from git rather than trusted. ${short.size} bodies are recorded at an abbreviation shorter ` +
         `than git now renders (${F.COMMIT_BELT_DRIFT_V4819.abbreviationWas} against ` +
         `${F.COMMIT_BELT_DRIFT_V4819.abbreviationNow}) and match by prefix, which is why %h was the wrong read.`);
+    ok("!! ...and the allowance is NAMED where it is used: a body that carries a ship commit is recorded in shipExcused and printed as a NOTE (the live tree has none today, so this reads the row's own source)",
+        /shipExcused\[n\] = liveShas\[n\]\[0\]; return true;/.test(fs.readFileSync(fileURLToPath(import.meta.url), "utf8")) && /carries the ship commit/.test(fs.readFileSync(fileURLToPath(import.meta.url), "utf8")),
+        "an allowance that passes silently is the exemption this row exists to refuse");
+    {   // v4899 -- carriesShipCommit, driven on lists where the answer is known (the live tree has at most one such body, so most branches are unreachable from it)
+        const subj = { s1: "v4900: a ship", o1: "Fish HMI (checkpoint): a vendored circuit", s2: "v4901: another ship" }, sub = (h) => subj[h.slice(0, 2)] || "";
+        const exp = ["a1", "b2"], live = (...h) => h.map((x) => x + "00000000");
+        ok("!! a ship commit at the HEAD of the live list, with everything below equal to the record, is allowed and NAMED; nothing else is",
+            carriesShipCommit(exp, ["s100000000", "a100000000", "b200000000"], sub) &&
+            !carriesShipCommit(exp, ["o100000000", "a100000000", "b200000000"], sub) &&                       // an extra that is not a ship commit
+            !carriesShipCommit(exp, ["s100000000", "s200000000", "a100000000", "b200000000"], sub) &&          // two extra
+            !carriesShipCommit(exp, ["a100000000", "s100000000", "b200000000"], sub) &&                        // the ship commit in the middle
+            !carriesShipCommit(exp, ["s100000000", "a100000000", "c300000000"], sub) &&                        // the rest does not equal the record
+            !carriesShipCommit(exp, ["a100000000", "b200000000"], sub),                                        // no extra at all is the plain match, which this helper does not claim
+            "a ship commit is `vNNNN: ...`; the allowance is for exactly the commit that cannot name itself, and a vendored change that is not a ship's, or any second one, is still red");
+    }
     // *** THE READ IS THE FULL IDENTITY, ASSERTED. *** Prefix-matching makes the comparison tolerant of
     // whatever length git renders, so reverting to %h no longer changes today's answer -- sabotage GB went
     // 0 RED. That tolerance is the point, and it is not a reason to read an abbreviation: %h can also get
