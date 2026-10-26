@@ -145,6 +145,9 @@ console.log(`\n  ${pure} gates assume NOTHING outside their own arithmetic.\n`);
         // UNNUMBERED -- 25 -> 26: render/subDropoutView-selfcheck.mjs loads sub-aquarium.html in headless Chromium and reads the pixels of the compass-dropout view's three 2D canvases (the plan, the headings, the errors) to prove they are
         // drawn, and the page's tank canvas to prove the tank still runs; the rest of the gate runs the view on a fake DOM that records its drawing calls. The browser half SKIPS BY NAME without a browser.
         "render/subDropoutView-selfcheck.mjs",
+        // UNNUMBERED -- 26 -> 27: tools/ship/subAquariumCompassPage-selfcheck.mjs loads sub-aquarium.html in headless Chromium and reads the pixels of the tank's plan and side canvases to prove that the amber ring of a sub whose compass is dark is drawn (and is NOT drawn while the compass is lit);
+        // it SKIPS BY NAME without a browser.
+        "tools/ship/subAquariumCompassPage-selfcheck.mjs",
     ]);
     const gpuNow = [...byGate.entries()].filter(([, h]) => h.includes("gpu")).map(([f]) => f).sort();
     const arrived = gpuNow.filter((g) => !GPU_GATES.includes(g));

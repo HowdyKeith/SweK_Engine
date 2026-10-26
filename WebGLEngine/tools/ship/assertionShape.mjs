@@ -963,8 +963,9 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // And one more, tools/subNavigator-selfcheck.mjs (the dead-reckoning navigator and the rung 4a reference arm), defining ok(n, c, d) once and naming first: gates 2132 -> 2133, usesOk 2111 -> 2112, definesOk 2103 -> 2104, nameFirst 2001 -> 2002 (read off the code: the gate reported exactly these four drifting).
     // And one more, tools/subHeadingEstimator-selfcheck.mjs (the reservoir estimator of rung 4a version 2 and its study), defining ok(n, c, d) once and naming first: gates 2133 -> 2134, usesOk 2112 -> 2113, definesOk 2104 -> 2105, nameFirst 2002 -> 2003 (read off the code: the gate reported exactly these four drifting).
     // And two more, render/subDropoutScene-selfcheck.mjs (the compass-dropout scene and the study numbers it draws) and render/subDropoutView-selfcheck.mjs (the view that draws it, on a fake DOM and in the live page), each defining ok(n, c, d) once and naming first: gates 2134 -> 2136, usesOk 2113 -> 2115, definesOk 2105 -> 2107, nameFirst 2003 -> 2005 (read off the code: the gate reported exactly these four drifting).
-    gates: 2136, usesOk: 2115, definesOk: 2107, importsOk: 0,
-    distinctDefinitions: 45, nameFirst: 2005, condFirst: 99, unknownSignature: 11,
+    // And three more, tools/subReservoirV3-selfcheck.mjs (the matched-gain reservoirs and their study), render/subAquariumCompass-selfcheck.mjs (the tank's compass dropout and navigator) and tools/ship/subAquariumCompassPage-selfcheck.mjs (the live page), each defining ok(n, c, d) once and naming first: gates 2136 -> 2139, usesOk 2115 -> 2118, definesOk 2107 -> 2110, nameFirst 2005 -> 2008 (read off the code: the gate reported exactly these four drifting).
+    gates: 2139, usesOk: 2118, definesOk: 2110, importsOk: 0,
+    distinctDefinitions: 45, nameFirst: 2008, condFirst: 99, unknownSignature: 11,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([
