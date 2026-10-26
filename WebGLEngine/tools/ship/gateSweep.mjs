@@ -16198,6 +16198,13 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
         widened: Object.freeze([]),
         verdict: "no gate file added, so nothing is claimed here (a gate may be claimed by ONE closing); four gates grew rows (tools/ship/orreryFleet-selfcheck, render/subAquarium3d-selfcheck, tools/ship/multigrid3dTiming-selfcheck, tools/ship/capReading-selfcheck), each run alone and green and each sabotaged to go red by name",
     }),
+    since613: Object.freeze({
+        at: "v4901", swept: 21, green: 21, red: 0,
+        added: Object.freeze(["brain/emergencyPilot-selfcheck.mjs", "brain/manualAssist-selfcheck.mjs", "brain/ogreSubBridge-selfcheck.mjs", "brain/seaOgre-selfcheck.mjs", "brain/subSquad-selfcheck.mjs", "brain/subTournament-selfcheck.mjs", "brain/surfacePilot-selfcheck.mjs", "render/brainPanel-selfcheck.mjs", "render/compassView-selfcheck.mjs", "render/denoiseFrameGen-selfcheck.mjs", "render/denoiseFrameGenCost-selfcheck.mjs", "render/frameGenLive-selfcheck.mjs", "render/learnedUpscale-selfcheck.mjs", "render/learnedUpscaleStudy-selfcheck.mjs", "render/seaOgre3d-selfcheck.mjs", "render/seaOgreView-selfcheck.mjs", "render/seaPicker-selfcheck.mjs", "render/subAquariumEvents-selfcheck.mjs", "render/subBallastCues-selfcheck.mjs", "render/subTournamentView-selfcheck.mjs", "tools/subReservoirV3-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "the Sea OGRE round's gates (the level, its view and 3D camera, the squad, the voxel bridge) and the sub round's (ballast pilots, manual assist, brain panel, sub tournament and its view, sea picker, compass view) plus the merged FSR4 / frame-generation gates; each run alone and green on the merged tree, and each sabotaged to go red by name with the results in its header",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

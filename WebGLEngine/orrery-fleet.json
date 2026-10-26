@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "a669772a093accbaabd9c6501ba4800b02a888fc",
+ "head": "a2d65575f8dfe3dd11d31322d3e979152a601d9c",
  "bodies": {
   "box3d": [
    {
@@ -329,6 +329,11 @@
     "sha": "d4cc23c4ec8beb962f40866504b88fc497abc964"
    },
    {
+    "path": "sub-aquarium.html",
+    "bytes": 30172,
+    "sha": "8964284314deb31910ce6f27836f215cba4c90a0"
+   },
+   {
     "path": "tools/flyCx.mjs",
     "bytes": 6499,
     "sha": "2418774882837c1702bb36d34f7536be4a043a3b"
@@ -362,8 +367,8 @@
    },
    {
     "path": "server.html",
-    "bytes": 898577,
-    "sha": "e73435b8e10260a568f06cd79d8d63266ec2d76a"
+    "bytes": 901321,
+    "sha": "c74b3f3cbee29d7c7927d8b2f22b08f04b41fccc"
    },
    {
     "path": "tools/ship/artifactWeight.mjs",
@@ -606,7 +611,7 @@
    },
    {
     "path": "tools/ship/wgslCorpus.mjs",
-    "bytes": 149962,
+    "bytes": 156018,
     "sha": "9a1677af0b5c095a8f6ed4fd67e82dd4a451e24e"
    }
   ],
@@ -725,8 +730,8 @@
    },
    {
     "path": "es-aircraft.html",
-    "bytes": 25020,
-    "sha": "5ff856fb3f5611941c35fe069f2a21881af5256a"
+    "bytes": 26843,
+    "sha": "21b389696adb458d2297a9a3daeda21dbe650ae8"
    },
    {
     "path": "es-box3d-3d.html",
@@ -740,13 +745,13 @@
    },
    {
     "path": "es-box3d-fly3d.html",
-    "bytes": 106773,
-    "sha": "55b5f11279559a30b5a75b32b8c5a8f73de55035"
+    "bytes": 109273,
+    "sha": "21b389696adb458d2297a9a3daeda21dbe650ae8"
    },
    {
     "path": "es-flight6dof.html",
-    "bytes": 46744,
-    "sha": "c38a0a0387fed9cf2cffd9fecfd4d94733463269"
+    "bytes": 49368,
+    "sha": "37448787a12088ccd47ffd39201e01bc6fde87d1"
    },
    {
     "path": "ev/esShipModels.js",
@@ -850,8 +855,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 3702282,
-    "sha": "926188a6177de585cd2f5bc653e246ccb3667324"
+    "bytes": 3702524,
+    "sha": "4fb1551b514f2915e5188fbd8e27bcfeec6f1bc2"
    },
    {
     "path": "mpm3d.html",
@@ -874,6 +879,16 @@
     "sha": "a8e63be48bd09ad1587373c5321be7985733066c"
    },
    {
+    "path": "render/seaOgre3d-selfcheck.mjs",
+    "bytes": 17958,
+    "sha": "4fb1551b514f2915e5188fbd8e27bcfeec6f1bc2"
+   },
+   {
+    "path": "render/seaPicker-selfcheck.mjs",
+    "bytes": 17420,
+    "sha": "19f50377e874b430dbc3da3b28d29c11102662ef"
+   },
+   {
     "path": "render/seaThree-selfcheck.mjs",
     "bytes": 12601,
     "sha": "73795feb626921ab015e3c9b64dd55387c7f7b24"
@@ -885,8 +900,13 @@
    },
    {
     "path": "render/subAquarium3d-selfcheck.mjs",
-    "bytes": 22697,
-    "sha": "5f09a90e91768ffc0c1447f9e011bbb547622dfa"
+    "bytes": 22770,
+    "sha": "8964284314deb31910ce6f27836f215cba4c90a0"
+   },
+   {
+    "path": "render/subBallastCues-selfcheck.mjs",
+    "bytes": 19323,
+    "sha": "eeed7a4effda2e8edb0befc0345ec053396bb41b"
    },
    {
     "path": "render/svgExtrude.js",
@@ -909,9 +929,14 @@
     "sha": "22dd961165d358d15814c8fe839236ef9ba047c2"
    },
    {
+    "path": "sea-ogre.html",
+    "bytes": 12836,
+    "sha": "4fb1551b514f2915e5188fbd8e27bcfeec6f1bc2"
+   },
+   {
     "path": "server.html",
-    "bytes": 898577,
-    "sha": "e73435b8e10260a568f06cd79d8d63266ec2d76a"
+    "bytes": 901321,
+    "sha": "c74b3f3cbee29d7c7927d8b2f22b08f04b41fccc"
    },
    {
     "path": "shipavatar.html",
@@ -945,8 +970,8 @@
    },
    {
     "path": "sub-aquarium.html",
-    "bytes": 18170,
-    "sha": "5f09a90e91768ffc0c1447f9e011bbb547622dfa"
+    "bytes": 30172,
+    "sha": "8964284314deb31910ce6f27836f215cba4c90a0"
    },
    {
     "path": "svg-forge.html",
@@ -1254,6 +1279,11 @@
     "path": "orrery-gpu.html",
     "bytes": 49611,
     "sha": "cc2293510dd6de403175380275e7a76a7a4ececf"
+   },
+   {
+    "path": "render/denoiseFrameGenCost-selfcheck.mjs",
+    "bytes": 39518,
+    "sha": "64756e00412e827dcd998f721371c5383d8e5407"
    },
    {
     "path": "render/flowReconcileTsl-selfcheck.mjs",
