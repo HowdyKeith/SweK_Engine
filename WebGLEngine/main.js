@@ -18878,6 +18878,13 @@ window.ogre = {
     // it surfaces periodically for cannon volleys and fires torpedoes
     // while submerged.
     sub:   () => ogreScenario.start({ environment: "sea", variant: "mk10" }),  // round 36
+    // v4902 -- the defender subs flown by brains instead of walking at the OGRE: ogre.brainSubs() (the hand tactician and the PD autopilot) or ogre.brainSubs({ theta }), ogre.brainSubs(false) to go back.
+    brainSubs: async (opts) => {
+        if (opts === false) return ogreScenario.setSubBrains(null);
+        const [B, T] = await Promise.all([import("./brain/ogreSubBridge.mjs"), import("./brain/subTournament.mjs")]);
+        const side = T.makeSide("ogre-defender", { theta: (opts && opts.theta) || { fireRange: 420, blindSnr: 22, pingAfter: 1, trackSpeed: 2.5 }, weights: (opts && opts.weights) || null });
+        return ogreScenario.setSubBrains(B.createBridge(side.side, { seed: (opts && opts.seed) || 1 }));
+    },
     submarine: () => ogreScenario.start({ environment: "sea", variant: "mk10" }),
     carrier: () => ogreScenario.start({ variant: "mk11" }),                     // round 38
     aircraft_carrier: () => ogreScenario.start({ variant: "mk11" }),
