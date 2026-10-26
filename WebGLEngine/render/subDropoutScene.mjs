@@ -59,7 +59,7 @@ export function flyScene(sc, defs) {
             return cmd;
         };
         const r = T.fly(outer, sc);
-        if (!windows.length) windows = w.log.windows.map(([a, b]) => [a, b]);
+        windows = w.log.windows.map(([a, b]) => [a, b]);   // the same for every pilot (seeded by the dive's number in its own wrapper)
         ticks = Math.max(ticks, x.length);
         pilots.push({ id: def.id, name: def.name, hue: def.hue, blurb: def.blurb, score: r.score, status: r.status, ticks: x.length, dark: Uint8Array.from(dark), x: Float32Array.from(x), y: Float32Array.from(y), depth: Float32Array.from(depth), heading: Float32Array.from(heading), believed: Float32Array.from(believed), error: Float32Array.from(error) });
     }
