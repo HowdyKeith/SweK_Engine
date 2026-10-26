@@ -142,6 +142,9 @@ console.log(`\n  ${pure} gates assume NOTHING outside their own arithmetic.\n`);
         // v4883 -- 24 -> 25: tools/ship/oceanDefaultPage-selfcheck.mjs loads ocean-default.html in headless Chromium and needs a WebGL2 context for it to draw at all (it
         // reads the canvas's pixels back to prove the water is a picture and not one flat colour); it SKIPS BY NAME without a browser, and the page's own no-WebGL2 branch is graded with the context taken away.
         "tools/ship/oceanDefaultPage-selfcheck.mjs",
+        // UNNUMBERED -- 25 -> 26: render/subDropoutView-selfcheck.mjs loads sub-aquarium.html in headless Chromium and reads the pixels of the compass-dropout view's three 2D canvases (the plan, the headings, the errors) to prove they are
+        // drawn, and the page's tank canvas to prove the tank still runs; the rest of the gate runs the view on a fake DOM that records its drawing calls. The browser half SKIPS BY NAME without a browser.
+        "render/subDropoutView-selfcheck.mjs",
     ]);
     const gpuNow = [...byGate.entries()].filter(([, h]) => h.includes("gpu")).map(([f]) => f).sort();
     const arrived = gpuNow.filter((g) => !GPU_GATES.includes(g));

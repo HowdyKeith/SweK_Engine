@@ -9,7 +9,18 @@
 // NOT CHECKED, said plainly: how it looks (a screenshot is written for a person to look at); a touch screen; a browser other than the one the sandbox has; that the numbers are the study's (render/subDropoutScene-selfcheck.mjs).
 //
 // SABOTAGE LOG (the thing broken -> the rows that went red; every mutant must be red BY NAME):
-//   (filled in when the sabotage is run)
+//   render/subDropoutView.mjs, 78 mutants: 70 red by name on the first run, EIGHT 0-red (fixed in the gate, then every one red by name: W25 W28 W29 W43 W45 W55 W56 W77). The rest, by what was broken: the source rules (words set with innerHTML or outerHTML, the root cleared with innerHTML, an eval, a fetch, an http
+//   address, Math.random, a second import, a handler attribute); the canvases and controls (a canvas's height, the speeds, the default speed, the scrub range, the dive labels, the legend's blurb and result lines, the swatch, the order of the elements, the pickers' labels, the ready flag, the notes and the
+//   intro); the drawing (the lightness of a hue, the time axis, the shade too faint or on one window only, the line's height inverted, a dark stretch drawn light, the alpha swapped, the plan's two axes, the plan's scale by the wrong side, the glyph turned the wrong way or by the world heading, the target line sloped or
+//   in the wrong place, the plan a tick ahead or rounded, the plain pilot as narrow as the others, the background not painted, the believed line from the wrong pilot or solid or thick, the cursor, the heading scale without its pad or from the ticks so far, the target line's height, the error scale, the error chart
+//   drawing the heading or not shaded); the clock (the total in tenths, a rounded tick, the live line's depth and decimals, the scrub bar showing a fractional tick); the controls (a new dive not starting over, a wild dive number, the picker out of step, a long frame not clamped, the speed ignored, the time divided
+//   wrongly, the end not stopping, 'replay' missing or not starting over, pause not cancelling the frame, a stale clock on resume, a new dive not stopping play or not resetting the button, the scrub bar ignored, dispose leaving the root or the frame going, the legend piling up rows, setTick unclamped, the state's scores
+//   cut). Findings: a line left dashed (W25) and a plan scaled by the larger side (W29: the two scales differ by 7 percent and the 20 m pad kept every point inside, so only an exactly-filled side catches it); the plan flipped (W28: the oracle flies straight, so its direction cannot tell a flip: the widest swing of the plain pilot
+//   does); the heading scale's pad (W43) and the target line's height (W45: checked against where the oracle ends, on the target); an unclamped dive number that THREW with no row naming it (W55: that row now runs in a try, and the crash is a named red); the picker out of step (W56) and the intro (W77). Dead code the sabotage
+//   found and cut: a `disposed` flag that `playing = false` already did, a `rows.clear()`, a literal scrub range the first dive overwrote, an unused `now`.
+//   sub-aquarium.html (its dropout section and mount), 17 mutants, 17 red by name: a static import of the view, the view or its circuit file named wrongly, the circuit imported without its JSON attribute or handed over whole, the catch without its words or writing markup, the mount missing, the wait for the
+//   tank's first frame gone, the section, the host or the heading renamed, the loading line gone, and three sentences of the section's description removed in turn.
+//   NOT CHECKED here: that the CSS lays the section out well (a screenshot is written for a person to look at).
 "use strict";
 import fs from "node:fs";
 import http from "node:http";

@@ -958,7 +958,7 @@
   {
    "f": "dogfight.html",
    "t": "SweK &middot; Dogfight",
-   "d": "Dogfight: two aircraft fight under brain/dogfightTask.mjs's rules (pursuit guidance, a hand trigger, a 300 m/s gun that falls, 20 hits kill) stepped by brain/dogfightArena.mjs, each with a window down the right that a click switches between the plane from outside, the pilot's seat, the gun's sight with its lead pip, and the pilot's network thinking, live. Pilots: the PD autopilot, the fruit fly's network (hand weights, trained to fly, trained to fight) and the GPU Brain's network (the same three, on its CPU twin). Answer-key gates: dogfightArena-selfcheck, flightViews-selfcheck, dogfightTask-selfcheck, dogfightPage-selfcheck.",
+   "d": "Dogfight: two aircraft fight under brain/dogfightTask.mjs's rules (pursuit guidance, a hand trigger, a 300 m/s gun that falls, 20 hits kill) stepped by brain/dogfightArena.mjs, each with a window down the right that a click switches between the plane from outside, the pilot's seat, the gun's sight with its lead pip, and the pilot's network thinking, live. Pilots: the PD autopilot, the fruit fly's network (hand weights, trained to fly, trained to fight) and the GPU Brain's network (the same three, on its CPU twin). Aircraft: the trainer, or a light jet (140 m/s, a nose cannon and no missiles; brain/jetFight.mjs) flown by hand-written pilots and by the two networks in their jet layouts. Answer-key gates: dogfightArena-selfcheck, flightViews-selfcheck, dogfightTask-selfcheck, dogfightPage-selfcheck, jetFight-selfcheck, pilotJetPolicy-selfcheck, pilotJetMlp-selfcheck.",
    "g": "",
    "p": 0
   },
@@ -2988,7 +2988,7 @@
   {
    "f": "sub-aquarium.html",
    "t": "SweK &middot; Sub Aquarium",
-   "d": "A tank of submarines, each flown by its own pilot (the PD autopilot, or a connectome-wired network with the weights it arrived with). Peers detected on the LAN can send their subs here from server.html's peer list. The network is the fruit fly's Giant Fiber Circuit as a stand-in; no fish circuit is vendored.",
+   "d": "A tank of submarines, each flown by its own pilot (the PD autopilot, or a connectome-wired network with the weights it arrived with). Peers detected on the LAN can send their subs here from server.html's peer list. The network in every sub the page flies is still the fruit fly's Giant Fiber Circuit; a zebrafish circuit (Fish1) is vendored and a pilot is wired to it, but the page does not fly that body yet.",
    "g": "",
    "p": 0
   },
