@@ -1,7 +1,7 @@
 {
  "version": 1,
  "generated": "derived by tools/ship/buildPageIndex.mjs -- DO NOT HAND-EDIT, the group comes from tools/ship/pageSections.mjs",
- "count": 494,
+ "count": 495,
  "pages": [
   {
    "f": "AudioLab.html",
@@ -2661,6 +2661,13 @@
    "t": "SweK &middot; Sea host",
    "d": "The patched vendored web-ocean sea, hosted for a parent page: live tuning, an external camera and a 64-point GPU height probe through window.seaApi. Needs WebGPU.",
    "g": "",
+   "p": 0
+  },
+  {
+   "f": "sea-ogre.html",
+   "t": "SweK &middot; Sea OGRE vs Subs",
+   "d": "A sea monster with four hit zones (tubes, sonar, cannon, engine) marches on a headquarters; up to four submarine sides hold it. Watch a replay or run a dozen seeds and read the defence rate.",
+   "g": "flightsim",
    "p": 0
   },
   {

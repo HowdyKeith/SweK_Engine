@@ -1,0 +1,104 @@
+<!doctype html>
+<!-- sea-ogre.html -- UNNUMBERED (the version is chosen at ship time): THE SEA OGRE AGAINST THE SUBS.
+
+     brain/seaOgre.mjs brings the water-borne OGRE of the voxel tower-defence scenario onto the submarine arena: ONE monster marches on a headquarters at the origin, and up to four submarines (any side of the sub tournament:
+     a tactician and a motion pilot) hold it. The OGRE is a 40 m hull with FOUR HIT ZONES (tubes, sonar, cannon, engine: the voxel OGRE's turret hard points, translated): kill the tubes or the sonar and it cannot fire,
+     kill the cannon and it cannot shell the headquarters, kill the engine and it crawls. It dives and surfaces on a cycle, launches escort subs under half its hull, and goes berserk under a fifth.
+     ROUTE ONE of two: this is the physics arena's OGRE, not the voxel game's own world (the voxel port is not done). TOP VIEW AND REPLAY ONLY: no first-person view and no human seat. Nothing here comes from the network
+     except the JSON the repository ships (brain/*.json), fetched as data. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="Sea OGRE vs Subs">
+<meta name="demo:desc" content="A sea monster with four hit zones (tubes, sonar, cannon, engine) marches on a headquarters; up to four submarine sides hold it. Watch a replay or run a dozen seeds and read the defence rate.">
+<meta name="demo:category" content="science">
+<title>SweK &middot; Sea OGRE vs Subs</title>
+<style>
+  :root { --bg:#050a12; --panel:#0b131f; --line:#1c2c44; --fg:#dbe7ff; --dim:#7c93b8; --cyan:#59d1ff; --amber:#f6a623; --green:#5fe08a; --red:#ff7a7a; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:13px ui-monospace, Menlo, monospace; }
+  header { padding:14px 16px 6px; } h1 { font-size:15px; letter-spacing:.13em; text-transform:uppercase; color:var(--cyan); margin:0 0 6px; }
+  .desc { color:var(--dim); max-width:980px; line-height:1.6; margin:0 0 6px; }
+  .bar { display:flex; gap:8px; align-items:center; flex-wrap:wrap; padding:6px 16px; }
+  button, select, input[type=number] { background:var(--panel); color:var(--fg); border:1px solid var(--line); border-radius:5px; padding:4px 10px; font:inherit; }
+  button { cursor:pointer; } button:hover { border-color:var(--cyan); } button:disabled { opacity:.5; cursor:default; }
+  main { display:grid; grid-template-columns:minmax(240px,1fr) minmax(0,3fr); gap:12px; padding:6px 16px 20px; }
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:8px 10px; min-width:0; }
+  .panel h2 { margin:0 0 6px; font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--cyan); font-weight:600; }
+  .note { color:var(--dim); line-height:1.6; font-size:12px; margin:6px 0 0; } canvas { width:100%; background:#050a12; border:1px solid var(--line); border-radius:6px; display:block; }
+  .slot { display:flex; gap:6px; align-items:center; padding:3px 0; } .slot b { width:18px; } .slot select { flex:1; min-width:0; }
+  table { border-collapse:collapse; width:100%; font-size:12px; } th, td { border:1px solid var(--line); padding:3px 5px; text-align:center; } th { color:var(--dim); font-weight:400; }
+  .win { color:var(--green); } .lose { color:var(--red); } @media (max-width:900px) { main { grid-template-columns:minmax(0,1fr); } }
+</style>
+</head>
+<body>
+<header>
+  <h1>&#9670; Sea OGRE vs Subs</h1>
+  <p class="desc">One OGRE, four hit zones, a headquarters to hold. The <b>tubes</b> and the <b>sonar</b> are what let it shoot; the <b>cannon</b> shells the headquarters while it is surfaced; the <b>engine</b> is its speed. A torpedo detonates on the nearest zone and hurts the hull for half of it. Pick up to four defenders (each a tactician plus a pilot), choose a seed and <b>watch</b>, or <b>run 12 seeds</b> for the defence rate. Plan view and replay only.</p>
+</header>
+<div class="bar">
+  <label>defenders <select id="nDef"><option>1</option><option>2</option><option selected>3</option><option>4</option></select></label>
+  <label>seed <input id="seed" type="number" min="1" max="999" value="2" style="width:64px"></label>
+  <button id="watchBtn">Watch</button>
+  <button id="runBtn" title="Fly seeds 1..12 with this roster and tally the outcomes">Run 12 seeds</button>
+  <span id="msg" class="note"></span>
+</div>
+<main>
+  <div style="display:flex;flex-direction:column;gap:12px;min-width:0">
+    <section class="panel"><h2>Defenders</h2><div id="slots"></div><p class="note" id="rosterNote"></p></section>
+    <section class="panel"><h2>Twelve seeds</h2><div id="tally"><p class="note">not run yet</p></div></section>
+  </div>
+  <section class="panel"><h2>The fight</h2><canvas id="replay" width="900" height="520" aria-label="Plan view of the Sea OGRE fight"></canvas><p class="note" id="verdict"></p></section>
+</main>
+<script type="module">
+import * as G from "/brain/seaOgre.mjs";
+import * as T from "/brain/subTournament.mjs";
+import { roster } from "/render/subTournamentView.mjs";
+import { frameAt, boundsOf, drawLevel, verdictLine } from "/render/seaOgreView.mjs";
+
+const $ = (id) => document.getElementById(id);
+let sides = [], trace = null, bounds = null, clock = 0, last = 0, names = [], busy = false;
+const fetchJson = (u) => fetch(u, { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+const GUNNER = { fireRange: 420, blindSnr: 22, pingAfter: 1, trackSpeed: 2.5 };
+async function load() {
+  const [weights, theta, ping, league] = await Promise.all(["/brain/pilotSubWeightsWip.json", "/brain/subTacticsThetaWip.json", "/brain/subTacticsThetaSearchPingWip.json", "/brain/subTacticsLeagueWip.json"].map(fetchJson));
+  sides = roster({ weights, theta, ping, league });
+  sides.push({ id: "gunner", label: "gunner (fires from 420 m on a loud contact) + PD autopilot", note: "the hand tactician with a theta that shoots at the OGRE: the baseline that can win this level", side: T.makeSide("gunner", { theta: GUNNER }) });
+  $("rosterNote").textContent = sides.length + " sides on offer; the default hand tactician has no way to shoot a monster that outranges its fire gate -- on this level it is breached every time (the point of the 'gunner').";
+  slots();
+}
+function slots() {
+  const n = Number($("nDef").value), box = $("slots"), keep = [...box.querySelectorAll("select")].map((s) => s.value); box.textContent = "";
+  for (let i = 0; i < n; i++) { const d = document.createElement("div"); d.className = "slot"; const b = document.createElement("b"); b.textContent = i + 1; const s = document.createElement("select"); for (const x of sides) { const o = document.createElement("option"); o.value = x.id; o.textContent = x.id; o.title = x.label; s.appendChild(o); } s.value = keep[i] || "gunner"; d.append(b, s); box.appendChild(d); }
+}
+const picked = () => [...$("slots").querySelectorAll("select")].map((s) => sides.find((x) => x.id === s.value));
+const tick = () => new Promise((r) => setTimeout(r, 0));
+async function watch() {
+  if (busy) return; const pick = picked(), n = pick.length, sc = G.scenario(Math.max(1, Number($("seed").value) || 1), n), tr = [];
+  $("msg").textContent = "flying the fight ..."; await tick();
+  const r = G.fight(pick.map((s) => s.side.side()), sc, { trace: tr });
+  trace = tr; bounds = boundsOf(tr); clock = 0; names = pick.map((s, i) => s.id + (pick.filter((q) => q.id === s.id).length > 1 ? "#" + (i + 1) : ""));
+  $("msg").textContent = ""; $("verdict").textContent = verdictLine(r, names);
+}
+async function run() {
+  if (busy) return; busy = true; $("runBtn").disabled = $("watchBtn").disabled = true; const pick = picked(), n = pick.length, o = { defended: 0, breached: 0, holdout: 0 }, rows = []; let sum = 0, lost = 0;
+  for (let s = 1; s <= 12; s++) { $("msg").textContent = `seed ${s} of 12`; await tick(); const r = G.fight(pick.map((q) => q.side.side()), G.scenario(s, n)); o[r.outcome]++; sum += r.score; lost += r.lost; rows.push(r); }
+  const t = document.createElement("table"), h = document.createElement("tr"); for (const c of ["seed", "outcome", "time s", "hull left", "HQ", "boats lost", "score"]) { const th = document.createElement("th"); th.textContent = c; h.appendChild(th); } t.appendChild(h);
+  rows.forEach((r, i) => { const tr = document.createElement("tr"); for (const c of [i + 1, r.outcome, (r.ticks / 30).toFixed(0), Math.round(r.hull), Math.round(r.hq), r.lost, r.score.toFixed(2)]) { const td = document.createElement("td"); td.textContent = c; if (c === "defended") td.className = "win"; if (c === "breached") td.className = "lose"; tr.appendChild(td); } t.appendChild(tr); });
+  const box = $("tally"); box.textContent = ""; const p = document.createElement("p"); p.className = "note"; p.textContent = `defended ${o.defended}, breached ${o.breached}, holdout ${o.holdout}; mean score ${(sum / 12).toFixed(2)}; ${lost} boats lost in 12 fights`; box.append(p, t);
+  $("msg").textContent = ""; busy = false; $("runBtn").disabled = $("watchBtn").disabled = false;
+}
+const cv = $("replay"), g = cv.getContext("2d");
+function frame(now) {
+  const dt = last ? Math.min(0.1, (now - last) / 1000) : 0; last = now;
+  if (trace && trace.length) { clock += dt * 8; if (clock > trace.at(-1).tick / 30 + 3) clock = 0; }
+  drawLevel(g, cv.width, cv.height, trace ? frameAt(trace, clock) : null, bounds || { x0: -100, x1: 100, y0: -100, y1: 100 }, { names });
+  requestAnimationFrame(frame);
+}
+$("watchBtn").onclick = watch; $("runBtn").onclick = run; $("nDef").onchange = slots;
+load().then(() => { requestAnimationFrame(frame); });
+window.__seaOgre = { get sides() { return sides; }, watch, run, get trace() { return trace; } };
+</script>
+</body>
+</html>
