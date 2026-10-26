@@ -17,6 +17,11 @@ import * as AS from "../brain/autopilotSub.mjs";
 import * as AF from "../brain/autopilotFlight.mjs";
 import * as PS from "../brain/pilotSubPolicy.mjs";
 import * as PF from "../brain/pilotFlightPolicy.mjs";
+import * as AP from "../brain/autopilotAircraft.mjs";
+import * as PA from "../brain/pilotAircraftPolicy.mjs";
+import * as PP from "../brain/pilotPolicy.mjs";
+import * as TX from "../ev/esTactics.js";
+import { rotateByQuat, worldToBody } from "../physics/mechanics/rigidBody6dof.mjs";
 import { pilotRows, drawRows } from "./flightViews.mjs";
 import { mlpLayerCpu } from "./brainTsl.mjs";
 
@@ -40,7 +45,7 @@ export function activations(policy, w, x, outputNames) {
     let hidden = input;
     for (let i = 0; i < layers.length - 1; i++) hidden = mlpLayerCpu(layers[i], hidden, 1);
     const c = policy.forward(w, input);
-    return { input, hidden, output: Float32Array.from(outputNames, (n) => (n === "throttle" ? c[n] * 2 - 1 : num(c[n]))) };
+    return { input, hidden, output: Float32Array.from(outputNames, (n, i) => (Array.isArray(c) ? num(c[i]) : n === "throttle" ? c[n] * 2 - 1 : num(c[n]))) };
 }
 
 /** The autopilot's rows for a sub: its own features, then the intermediate numbers of its laws as fractions of a sensible full scale, then its four outputs. */
@@ -98,6 +103,7 @@ export function mapPoint(map, ox, oy, x, y, w, h) {
 
 /** Draw a policy map in the box (x, y, w, h) of a 2D context: a heat cell per grid cell (blue, stronger as the command is), an arrow in the direction of the command, the target's cross at the centre, the vessel's ring. Returns { cells, arrows }. */
 export function drawMap(g, x, y, w, h, map, { title = "" } = {}) {
+    if (map.kind === "tactics") return drawHeat(g, x, y, w, h, map, { title });
     g.fillStyle = "#050805"; g.fillRect(x, y, w, h);
     const cw = w / map.n, ch = h / map.n; let arrows = 0;
     for (const c of map.cells) {
@@ -152,16 +158,135 @@ export function flightPanel(probe) {
     return { kind: "autopilot", label: d.label, note: "no network: the intermediate numbers of its laws and its four outputs; the map is what its laws command off target", rows: flightAutopilotRows(probe.state, probe.target, wind), map };
 }
 
+const MAP_TITLES = Object.freeze({ sub: "policy: heading x depth", flight: "policy: heading x altitude", aircraft: "target in the nose's frame -> push", fly3d: "target bearing -> turn / pitch", tactics: "target attractiveness" });
 /** Draw a panel on a 2D context of w x h: the bars on the left half, the map on the right (or the bars across the whole width when there is no map), the note under. Returns { bars, arrows }. */
 export function drawPanel(g, w, h, panel, { title = "" } = {}) {
     g.fillStyle = "#050805"; g.fillRect(0, 0, w, h);
     const noteH = 28, bodyH = h - noteH, mapW = panel.map ? Math.min(bodyH, Math.floor(w * 0.45)) : 0;
     let bars = 0, arrows = 0;
     if (panel.rows.length) { g.save && g.save(); g.beginPath && g.beginPath(); g.rect && g.rect(0, 0, w - mapW, bodyH); g.clip && g.clip(); bars = drawRows(g, w - mapW, bodyH, panel.rows, { title: title || panel.label }); g.restore && g.restore(); }
-    if (panel.map) arrows = drawMap(g, w - mapW, 0, mapW, bodyH, panel.map, { title: panel.map.spec === "sub" ? "policy: heading x depth" : "policy: heading x altitude" }).arrows;
+    if (panel.map) arrows = drawMap(g, w - mapW, 0, mapW, bodyH, panel.map, { title: MAP_TITLES[panel.map.spec] || "policy map" }).arrows;
     g.fillStyle = "#7c93b8"; g.font = "10px ui-monospace,Menlo,monospace";
     const words = panel.note.split(" "); let line = "", yy = bodyH + 11;
     for (const wd of words) { if ((line + wd).length * 5.6 > w - 6) { g.fillText(line, 3, yy); yy += 11; line = ""; } line += wd + " "; if (yy > h) break; }
     if (yy <= h) g.fillText(line, 3, yy);
     return { bars, arrows };
+}
+
+
+// ---- the other flight pages (es-aircraft, es-box3d-fly3d, flight-gpu) -----------------------------------------------------------------------------------------------------------------------------------------
+// The SAME rule for every map: the axes say where the TARGET is as the nose sees it (right = to the right or the way a positive turn goes, up = above), the arrow is where the controller pushes the nose, the centre is on target, the ring is where the
+// target REALLY is. A controller that works has arrows that point the way the target is; the gate holds that for each.
+const unit = (v) => { const n = Math.hypot(v[0], v[1], v[2]) || 1; return [v[0] / n, v[1] / n, v[2] / n]; };
+const mapOf = (id, cells, marker, spanX, spanY, extra = {}) => ({ spec: id, n: Math.round(Math.sqrt(cells.length)), cells, maxMag: Math.max(0, ...cells.map((c) => c.mag)), marker, yUp: true, spanX, spanY, ...extra });
+
+/**
+ * THE AIRCRAFT MAP (es-aircraft.html): `pilot` is (body, desiredForward) -> { controls: { pitch, roll, yaw } } (the autopilot's own contract and the network's). For a grid of target directions in the nose's frame (u rad to the RIGHT, v rad ABOVE the nose,
+ * +-span) it builds the world direction, asks the pilot, and draws (-yaw, -pitch): the aircraft's yaw and pitch commands are positive for a target to the LEFT and BELOW (measured on autopilotAircraft.decide, pinned in the gate), so the screen arrow is
+ * the command with both signs turned. The ring is the real `desired`'s direction in the nose's frame.
+ */
+export function aircraftMap(pilot, body, desired, { n = 9, span = 0.8 } = {}) {
+    const f = rotateByQuat(body.q, [1, 0, 0]), l = rotateByQuat(body.q, [0, 1, 0]), up = rotateByQuat(body.q, [0, 0, 1]), k = Math.max(3, n | 0), cells = [];
+    for (let j = 0; j < k; j++) for (let i = 0; i < k; i++) {
+        const u = span * (2 * i / (k - 1) - 1), v = span * (2 * j / (k - 1) - 1);
+        const d = unit([f[0] - Math.tan(u) * l[0] + Math.tan(v) * up[0], f[1] - Math.tan(u) * l[1] + Math.tan(v) * up[1], f[2] - Math.tan(u) * l[2] + Math.tan(v) * up[2]]);
+        let a = 0, b = 0; try { const c = pilot(body, d); if (c && c.controls) { a = -num(c.controls.yaw); b = -num(c.controls.pitch); } } catch { a = b = 0; }
+        cells.push({ ox: u, oy: v, a, b, mag: Math.hypot(a, b) });
+    }
+    const db = worldToBody(body.q, unit([num(desired[0]), num(desired[1]), num(desired[2])])), mu = Math.atan2(-db[1], db[0]), mv = Math.atan2(db[2], Math.hypot(db[0], db[1]));
+    return mapOf("aircraft", cells, { ox: mu, oy: mv, inside: Math.abs(mu) <= span && Math.abs(mv) <= span }, span, span);
+}
+
+/**
+ * THE FLY-3D MAP (es-box3d-fly3d.html): the network pilot (brain/pilotPolicy.mjs) asked over a grid of yaw and pitch ERRORS (the target's bearing off the nose, +-span rad), every other feature as it is NOW; the arrow is (turn, pitch). The ring is the
+ * real error. A feature-slice map: it needs the weights, not a ship to place a target for.
+ */
+export function fly3dMap(weights, features, { n = 9, span = 1.0 } = {}) {
+    const k = Math.max(3, n | 0), cells = [];
+    for (let j = 0; j < k; j++) for (let i = 0; i < k; i++) {
+        const u = span * (2 * i / (k - 1) - 1), v = span * (2 * j / (k - 1) - 1), x = Array.from(features, num); x[1] = u * 180 / Math.PI / 180; x[2] = v * 180 / Math.PI / 180;
+        const y = PP.forward(weights, x), a = num(y[0]), b = num(y[1]);
+        cells.push({ ox: u, oy: v, a, b, mag: Math.hypot(a, b) });
+    }
+    const ru = num(features[1]) * Math.PI, rv = num(features[2]) * Math.PI;
+    return mapOf("fly3d", cells, { ox: ru, oy: rv, inside: Math.abs(ru) <= span && Math.abs(rv) <= span }, span, span);
+}
+
+/** The panel of an aircraft on es-aircraft.html: probe { kind ("autopilot" | "fly"), weights, body, desired }. */
+export function aircraftPanel(probe) {
+    if (!probe) return { kind: "none", label: "none", note: "no aircraft selected", rows: [], map: null };
+    const d = describeKind(probe.kind), x = PA.features(probe.body, probe.desired);
+    if (probe.kind === "fly" && probe.weights) {
+        const act = activations(PA, probe.weights, x, PA.OUTPUT_NAMES);
+        return { kind: "fly", label: d.label, note: "features, the 34 hidden neurons and the three outputs; the map is where this brain pushes the nose for a target in each direction", rows: pilotRows({ who: "fly", act, featureNames: PA.FEATURE_NAMES, outputNames: PA.OUTPUT_NAMES }), map: aircraftMap(PA.pilotFor(probe.weights), probe.body, probe.desired) };
+    }
+    const r = AP.decide(probe.body, probe.desired), g = PA.geometry(probe.body, probe.desired);
+    const laws = [g.eBody[1] / Math.PI, g.eBody[2] / Math.PI, g.bankErr / Math.PI, g.facingCos, g.desiredBank / 0.52].map((v) => clamp(num(v), -1, 1));
+    return { kind: "autopilot", label: KINDS.autopilot.label, note: "no network: the pointing errors, the bank it asks for and its three outputs; the map is where its PD law pushes the nose", rows: [
+        { who: "autopilot", layer: "features", names: PA.FEATURE_NAMES, values: Array.from(x, num) },
+        { who: "autopilot", layer: "laws", label: "laws", names: ["errPitch", "errYaw", "bankErr", "facing", "bankCmd"], values: laws },
+        { who: "autopilot", layer: "outputs", names: PA.OUTPUT_NAMES, values: [r.controls.pitch, r.controls.roll, r.controls.yaw].map(num) }], map: aircraftMap((b, dd) => AP.decide(b, dd), probe.body, probe.desired) };
+}
+
+/** The panel of a ship on es-box3d-fly3d.html: probe { kind ("fly" | "scripted"), weights, ship, target, opts }. The scripted AI is rules and not a network: its rows are the seven numbers it is given, its map none. */
+export function fly3dPanel(probe) {
+    if (!probe) return { kind: "none", label: "none", note: "no ship selected", rows: [], map: null };
+    const x = PP.features(probe.ship, probe.target, probe.opts || {});
+    if (probe.kind === "fly" && probe.weights) {
+        const act = activations(PP, probe.weights, x, PP.OUTPUT_NAMES);
+        return { kind: "fly", label: KINDS.fly.label, note: "the seven features, the 34 hidden neurons and turn / pitch / thrust / firing; the map is what this brain turns and pitches for a target at each bearing off the nose", rows: pilotRows({ who: "fly", act, featureNames: PP.FEATURE_NAMES, outputNames: PP.OUTPUT_NAMES }), map: fly3dMap(probe.weights, x) };
+    }
+    return { kind: "scripted", label: "scripted AI (stepAI3d)", note: "rules, not a network: it is shown the same seven numbers the network is given; there are no neurons to draw and no learned policy to slice", rows: [{ who: "scripted", layer: "features", names: PP.FEATURE_NAMES, values: Array.from(x, num) }], map: null };
+}
+
+// ---- the tactics brain (flight-gpu.html): WHO to shoot and WHETHER to fight --------------------------------------------------------------------------------------------------------------------------------------
+/**
+ * The heat map of a tactics brain: how attractive a target at each point around `self` would be, by the policy's own scoring (ev/esTactics.js: reach x (wClose + wWeak weakness + wThreat threat + wPlayer isPlayer + wFocus focus)), a
+ * hypothetical target having the MEAN weakness and threat of the real foes. The foes are the dots, the chosen one ringed.
+ */
+export function tacticsMap(self, foes, w, opts = {}, { n = 13 } = {}) {
+    const range = opts.range || 1400, live = (foes || []).filter((f) => f && !f.dead && f !== self), k = Math.max(3, n | 0);
+    const fe = live.map((f) => TX.features(self, f, opts)), mean = (key) => (fe.length ? fe.reduce((a, b) => a + b[key], 0) / fe.length : 0);
+    const far = Math.max(range, ...live.map((f) => Math.hypot(f.x - self.x, f.y - self.y) * 1.05)), cells = [];
+    for (let j = 0; j < k; j++) for (let i = 0; i < k; i++) {
+        const ox = far * (2 * i / (k - 1) - 1), oy = far * (2 * j / (k - 1) - 1), d = Math.hypot(ox, oy), reach = range / (range + d);
+        const desire = w.wClose + w.wWeak * mean("weakness") + w.wThreat * mean("threat") + w.wPlayer * 0 + w.wFocus * 0;
+        cells.push({ ox, oy, a: 0, b: 0, mag: Math.max(0, reach * desire) });
+    }
+    const d = TX.decide(self, live, w, opts), chosen = d.target && !d.target._flee ? d.target : null;
+    const points = live.map((f) => ({ ox: f.x - self.x, oy: f.y - self.y, id: f.id, chosen: f === chosen, score: TX.chooseTarget(self, [f], w, opts) ? TX.chooseTarget(self, [f], w, opts).score : 0 }));
+    return { kind: "tactics", spec: "tactics", n: k, cells, maxMag: Math.max(0, ...cells.map((c) => c.mag)), spanX: far, spanY: far, yUp: true, points, fleeing: !!d.fleeing, engaging: !!d.engaging, marker: { ox: 0, oy: 0, inside: true } };
+}
+
+/** Draw a tactics map: the heat of the scoring, the foes as dots (the chosen one ringed, a fleeing ship's heat dimmed), the ship at the centre. */
+export function drawHeat(g, x, y, w, h, map, { title = "" } = {}) {
+    g.fillStyle = "#050805"; g.fillRect(x, y, w, h);
+    const cw = w / map.n, ch = h / map.n;
+    for (const c of map.cells) {
+        const fx = (c.ox + map.spanX) / (2 * map.spanX), fy = (c.oy + map.spanY) / (2 * map.spanY), px = x + Math.min(map.n - 1, Math.round(fx * (map.n - 1))) * cw, py = y + Math.min(map.n - 1, Math.round((1 - fy) * (map.n - 1))) * ch;
+        const heat = map.maxMag > 0 ? c.mag / map.maxMag : 0;
+        g.fillStyle = `rgba(${map.fleeing ? "255,122,122" : "89,209,255"},${(0.06 + 0.7 * heat).toFixed(3)})`; g.fillRect(px, py, cw - 1, ch - 1);
+    }
+    let dots = 0;
+    for (const p of map.points) {
+        const [px, py] = mapPoint(map, p.ox, p.oy, x, y, w, h);
+        g.fillStyle = "#f6a623"; g.beginPath(); g.arc(px, py, 3, 0, Math.PI * 2); g.fill(); dots++;
+        if (p.chosen) { g.strokeStyle = "#ffffff"; g.lineWidth = 2; g.beginPath(); g.arc(px, py, 7, 0, Math.PI * 2); g.stroke(); }
+    }
+    const [sx, sy] = mapPoint(map, 0, 0, x, y, w, h);
+    g.strokeStyle = "#5fe08a"; g.lineWidth = 1; g.beginPath(); g.moveTo(sx - 6, sy); g.lineTo(sx + 6, sy); g.moveTo(sx, sy - 6); g.lineTo(sx, sy + 6); g.stroke();
+    g.fillStyle = "#9fb2d4"; g.font = "10px ui-monospace,Menlo,monospace"; g.fillText((title || "target attractiveness around this ship").slice(0, 60), x + 3, y + 10);
+    return { cells: map.cells.length, arrows: 0, dots };
+}
+
+/** The panel of a tactics brain: probe { self, foes, w (the weights of its side), opts ({ lastTargetId, wasFleeing, range }), label }. */
+export function tacticsPanel(probe) {
+    if (!probe || !probe.self) return { kind: "none", label: "none", note: "no ship selected", rows: [], map: null };
+    const w = probe.w || TX.DEFAULT_W, opts = probe.opts || {}, live = (probe.foes || []).filter((f) => f && !f.dead && f !== probe.self), cand = live.map((f) => ({ f, feat: TX.features(probe.self, f, opts), score: TX.chooseTarget(probe.self, [f], w, opts).score })).sort((a, b) => b.score - a.score);
+    const d = TX.decide(probe.self, live, w, opts), hp = TX.healthFrac(probe.self), mine = TX.strength(probe.self), theirs = live.reduce((a, f) => a + TX.strength(f), 0), odds = mine + theirs > 0 ? mine / (mine + theirs) : 1;
+    const keys = TX.FEATURE_KEYS, W = [w.wClose, w.wWeak, w.wThreat, w.wPlayer, w.wFocus];
+    const rows = [{ who: "tactics", layer: "weights", label: "weights", names: ["close", "weak", "threat", "player", "focus"], values: W.map(num) }];
+    for (const c of cand.slice(0, 4)) rows.push({ who: "tactics", layer: "target", label: `${String(c.f.id).slice(0, 5)} ${c.score.toFixed(2)}`, names: keys, values: keys.map((k) => num(c.feat[k])) });
+    rows.push({ who: "tactics", layer: "flee", label: "flee", names: ["health", "bar", "odds", "bar"], values: [hp, w.fleeHealth + (opts.wasFleeing ? w.fleeHyst : 0), odds, w.fleeOdds].map(num) });
+    return { kind: "tactics", label: probe.label || "tactics brain", note: (d.fleeing ? "FLEEING: health under the bar and the odds under theirs. " : d.engaging ? `ENGAGING ${d.target.id}. ` : "no target. ") + "weights, the features of the best candidates (their score beside them) and the flee test; the map is how attractive a target would be at each point, by the weights", rows, map: tacticsMap(probe.self, live, w, opts) };
 }

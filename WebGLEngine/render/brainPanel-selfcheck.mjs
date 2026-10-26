@@ -11,6 +11,8 @@
 //   5  THE PANELS    the fly sub's panel has 14 / 34 / 4 rows and the hand weights' map agrees with the autopilot's (they are the same laws); the autopilot sub's has 14 / 6 / 4; a GPU aircraft's 18 / 32 / 4; a manual one the stick and no map; a fish nothing
 //   6  THE DRAWING   with a context that records its calls: an arrow per cell that commands anything, the target's cross in green, the vessel's ring white on the grid and red off it, the bars of the rows, the note wrapped under
 //   7  THE SIM       tank.probe(id): kind fly for a sub given 963 weights and autopilot for one with none, the live state and the target it was flown to, null for an unknown id
+//   9  THE OTHER FLIGHT PAGES  es-aircraft (the PD law and the network, a map of where the nose is pushed), es-box3d-fly3d (the fly network and the scripted AI), the tactics pages flight-gpu and es-box3d (the weights, the candidates' features, the flee test, and a heat map of how attractive a target would be around the ship)
+//  10  THE PAGES THAT FLY IT   source rows for the four pages and flight.html's absence; a browser run of three of them
 //   8  THE PAGES     sub-aquarium.html and es-flight6dof.html have the canvas, import the panel and draw the SELECTED vessel's (the list selection; the camera's aircraft) five times a second
 //
 // SABOTAGE LOG -- THIRTY-FOUR, each applied in place, the gate run, the file restored; every one red by name (rows red; "crash" is red without a FAIL line):
@@ -19,6 +21,11 @@
 //   B17 the y axis not flipped for an aircraft 1 | B18 the off-grid ring not red 1 | B19 an arrow in every cell 2 | B20 a fish probe drawn 1 | B21 the fly shown as the autopilot 2 | B22 a human given a map 1 | B23 the map given no room 0 THE FIRST TIME (see below) | 
 //   render/subAquariumSim.mjs: B24 probe returns nothing (crash) | B25 every sub a fly 1 | B26 the wander target in place of the flown one 0 THE FIRST TIME | B27 any weights taken, not only 963 1
 //   pages: H1 the aquarium draws the first sub, not the selected one 1 | H2 no throttle on the redraw 1 | H3 drawBrain never called 1 | H4 a GPU pilot labelled fly 1 | H5 the flight page always draws aircraft 1 1 | H6 updateBoard never draws 1
+// SECTIONS 9 AND 10 (the other flight pages), THIRTY-ONE more, each in place and restored (rows red): aircraftMap A1 the left axis flipped 1 | A2 yaw not negated 1 | A3 pitch not negated 1 | A4 the ring's u sign 1 | A5 the ring read in the world frame 1 | A6 span 0.4 1
+//   fly3dMap F1 the yaw error entered in radians, not radians / pi 1 | F2 the ring unscaled 1 | F3 turn and pitch swapped 1 | F4 the scripted panel given a map 0 (the object's later `map: null` wins: an EQUIVALENT mutant)
+//   tactics T1 no mean weakness or threat in the heat 1 | T2 no reach 1 | T3 the first foe ringed 2 | T4 a dead foe a point 1 | T5 no hysteresis in the flee bar 1 | T6 candidates the wrong way up 1 | T7 one candidate 2 | T8 never fleeing 2 | T9 the heat not red 1 | T10 no heat dispatch 1 | T11 the map's title 1 | T12 a ring on every foe 1
+//   pages P1 the aircraft picker ignored 1 | P2 one weight set for every aircraft 0 (EQUIVALENT: a squadron flies one set) | P3 the fly-3D picker ignored 1 | P4 the fly-3D kind always scripted 1 | P5 the tactics panel without the side's weights 1 | P6 es-box3d never draws 1 | P7 a dead ship picked 0 (EQUIVALENT: the fallback is the first live A ship)
+// A1, A6, F1, T4, T5 and P3 went 0 red the first time: A1's pattern changed the nose-axis component, which is zero for the test body; F1's tanh saturates the hand weights; T4 was masked by the panel's own filter; T5 and P3 had no row. Each has one now.
 // B23 and B26 went 0 red the first time: no row looked at WHERE the panel put the map, and inside the steering box the flown target IS the wander target; the rows for the map's place on the canvas and for a sub outside the box now do.
 "use strict";
 import fs from "node:fs";
@@ -33,6 +40,13 @@ import * as PS from "../brain/pilotSubPolicy.mjs";
 import * as PF from "../brain/pilotFlightPolicy.mjs";
 import * as MF from "../brain/pilotFlightMlp.mjs";
 import { createTank } from "./subAquariumSim.mjs";
+import * as AP from "../brain/autopilotAircraft.mjs";
+import * as PA from "../brain/pilotAircraftPolicy.mjs";
+import * as PP from "../brain/pilotPolicy.mjs";
+import * as TX from "../ev/esTactics.js";
+import http from "node:http";
+import { createRequire } from "node:module";
+import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL, webglLaunchArgs } from "../tools/ship/playwrightResolve.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 let fails = 0;
@@ -144,6 +158,93 @@ console.log("\n8. THE PAGES");
     const aq = fs.readFileSync(path.join(ENG, "sub-aquarium.html"), "utf8"), fl = fs.readFileSync(path.join(ENG, "es-flight6dof.html"), "utf8");
     ok("!! the aquarium: a brainView canvas, the panel imported, and drawBrain draws the SELECTED sub's probe through subPanel / drawPanel at most every 200 ms, from the frame loop", /id="brainView"/.test(aq) && /import \{ subPanel, drawPanel \} from "\/render\/brainPanel\.mjs"/.test(aq) && /selected \? tank\.probe\(selected\) : null/.test(aq) && /subPanel\(pr\)/.test(aq) && /now - lastBrain < 200/.test(aq) && /drawCompass\(snap\); drawBrain\(\)/.test(aq));
     ok("!! the flight page: a brainView canvas, the panel imported, every pilot record carries its kind (manual, gpu, fly twice, autopilot), and drawBrain draws the aircraft the CAMERA follows through flightPanel at most every 200 ms, from updateBoard", /id="brainView"/.test(fl) && /import \{ flightPanel, drawPanel \} from "\/render\/brainPanel\.mjs"/.test(fl) && /kind: "manual"/.test(fl) && /kind: "gpu", policy: MF/.test(fl) && (fl.match(/kind: "fly", policy: PF/g) || []).length === 2 && /kind: "autopilot" \}/.test(fl) && /document\.getElementById\("camTarget"\)\.value\) \|\| 0, s = fleet\[me\], p = resolvePilots\(\)\[me\]/.test(fl) && /flightPanel\(\{ kind: p\.kind/.test(fl) && /now - lastBrain < 200/.test(fl) && /function updateBoard\(\) \{\s*drawBrain\(\);/.test(fl));
+}
+
+console.log("\n9. THE OTHER FLIGHT PAGES: es-aircraft, es-box3d-fly3d, the tactics pages (flight-gpu, es-box3d)");
+{
+    const body = { q: [1, 0, 0, 0], pos: [0, 0, 100], vel: [30, 0, 0], w: [0, 0, 0] }, desired = [1, 0.3, 0.1];
+    const pa = B.aircraftPanel({ kind: "autopilot", body, desired }), pf = B.aircraftPanel({ kind: "fly", weights: PA.handWeights(), body, desired });
+    ok("!! the aircraft's panels: the autopilot's 12 features / 5 laws / 3 outputs and a map, the network's 12 / 34 hidden / 3 and a map; the autopilot's outputs ARE decide()'s (pitch, roll, yaw)", pa.rows.map((r) => r.layer + r.values.length).join() === "features12,laws5,outputs3" && pf.rows.map((r) => r.layer + r.values.length).join() === "features12,hidden34,outputs3" && pa.map.cells.length === 81 && pf.map.cells.length === 81 && (() => { const c = AP.decide(body, desired).controls; return near(pa.rows[2].values[0], c.pitch, 1e-9) && near(pa.rows[2].values[1], c.roll, 1e-9) && near(pa.rows[2].values[2], c.yaw, 1e-9); })());
+    const pointsToward = (m) => m.cells.every((c) => (Math.abs(c.ox) < 0.3 || Math.sign(c.a) === Math.sign(c.ox)) && (Math.abs(c.oy) < 0.3 || Math.sign(c.b) === Math.sign(c.oy)));
+    ok("!! THE SIGNS: in every cell a target 0.3 rad or more to the RIGHT of the nose gets an arrow pointing right, to the LEFT left, ABOVE up, BELOW down -- for the autopilot and for the network (the controller pushes the nose toward the target; the aircraft's yaw and pitch commands are positive for a target to the left and below, and the map turns both)", pointsToward(pa.map) && pointsToward(pf.map) && pa.map.yUp === true, `centre ${pa.map.cells[40].a.toFixed(3)}, ${pa.map.cells[40].b.toFixed(3)}`);
+    ok("!! the ring is the real target in the nose's frame: [1, 0.3, 0.1] is 0.29 rad to the LEFT (u = -0.2915) and 0.0955 above; and it holds for an aircraft yawed 90 degrees (a target along world +y is dead ahead: ring at the centre)", near(pa.map.marker.ox, -Math.atan(0.3), 1e-9) && near(pa.map.marker.oy, Math.atan2(0.1, Math.hypot(1, 0.3)), 1e-9) && (() => { const yawed = { ...body, q: [Math.SQRT1_2, 0, 0, Math.SQRT1_2] }, m = B.aircraftPanel({ kind: "autopilot", body: yawed, desired: [0, 1, 0] }).map; return Math.abs(m.marker.ox) < 1e-9 && Math.abs(m.marker.oy) < 1e-9; })());
+    ok("!! the aircraft map's grid is +-0.8 rad both ways (9 x 9, ring and cells on the same scale)", pa.map.spanX === 0.8 && pa.map.spanY === 0.8 && near(pa.map.cells[0].ox, -0.8) && near(pa.map.cells[80].oy, 0.8));
+    ok("a throwing pilot leaves zeros, and no probe says no aircraft", B.aircraftMap(() => { throw new Error("x"); }, body, desired).cells.every((c) => c.mag === 0) && B.aircraftPanel(null).rows.length === 0);
+
+    const ship = { x: 0, y: 0, z: 0, heading: 0, pitch: 0 }, target = { x: 500, y: 300, z: 100 }, hw = PP.handWeights();
+    const f3 = B.fly3dPanel({ kind: "fly", weights: hw, ship, target }), sc = B.fly3dPanel({ kind: "scripted", ship, target });
+    ok("!! the fly-3D panel: features 7, hidden 34, outputs 4 (turn, pitch, thrust, firing) equal to the policy's own forward(); the scripted AI shows its seven features and NO map and says it is rules", f3.rows.map((r) => r.layer + r.values.length).join() === "features7,hidden34,outputs4" && PP.OUTPUT_NAMES.every((n, i) => near(f3.rows[2].values[i], PP.forward(hw, PP.features(ship, target))[i], 1e-6)) && sc.rows.length === 1 && sc.rows[0].values.length === 7 && sc.map === null && /rules, not a network/.test(sc.note));
+    ok("!! the fly-3D map: the arrow is (turn, pitch) and follows the error (hand weights: a yaw error of 1 rad turns the same way, a pitch error up pitches up), the ring is the real error (yaw error / 180 x pi, pitch error / 180 x pi), and the centre is quiet", f3.map.cells.every((c) => (Math.abs(c.ox) < 0.3 || Math.sign(c.a) === Math.sign(c.ox)) && (Math.abs(c.oy) < 0.3 || Math.sign(c.b) === Math.sign(c.oy))) && near(f3.map.marker.ox, PP.features(ship, target)[1] * Math.PI, 1e-9) && near(f3.map.marker.oy, PP.features(ship, target)[2] * Math.PI, 1e-9) && Math.hypot(f3.map.cells[40].a, f3.map.cells[40].b) < 0.2);
+
+    ok("!! the fly-3D map's cells are the network's own forward() with the yaw error entered as radians / pi (a 0.5 rad cell is feature 0.1592): recomputed here for three cells", [7, 40, 66].every((i) => { const c = f3.map.cells[i], x = Array.from(PP.features(ship, target)); x[1] = c.ox / Math.PI; x[2] = c.oy / Math.PI; const y = PP.forward(hw, x); return near(c.a, y[0], 1e-9) && near(c.b, y[1], 1e-9); }));
+    const me = { id: "A#0", x: 0, y: 0, team: "A", shield: 80, armor: 80, maxShield: 100, maxArmor: 100, dps: 10 };
+    const foe = (id, x, y, hp, extra = {}) => ({ id, x, y, team: "B", shield: hp, armor: hp, maxShield: 100, maxArmor: 100, dps: 10, ...extra });
+    const foes = [foe("B#0", 500, 200, 100), foe("B#1", -800, -300, 20), foe("B#2", 100, 100, 100, { dead: true })];
+    const tp = B.tacticsPanel({ self: me, foes, w: TX.DEFAULT_W, opts: { range: 1400 }, label: "side A" });
+    ok("!! the tactics panel: a weights row (5), the BEST candidates' features (5 each, the dead one left out) labelled with the id and the score, best first (the wounded B#1 outscores the healthy B#0 under the default weights), and the flee test (4)", tp.rows[0].layer === "weights" && tp.rows[0].values.length === 5 && tp.rows.filter((r) => r.layer === "target").length === 2 && /^B#1 /.test(tp.rows[1].label) && /^B#0 /.test(tp.rows[2].label) && tp.rows.at(-1).layer === "flee" && tp.rows.at(-1).values.length === 4 && near(tp.rows[1].values[1], 0.8, 1e-9), tp.rows.map((r) => r.label).join(" | "));
+    ok("!! it says what the brain DECIDED: ENGAGING the chosen target in the note, the chosen foe ringed in the map (decide()'s own pick), the dead foe not a point", /ENGAGING B#1/.test(tp.note) && tp.map.points.length === 2 && tp.map.points.find((p) => p.chosen).id === "B#1" && tp.map.points.filter((p) => p.chosen).length === 1 && TX.decide(me, foes, TX.DEFAULT_W, { range: 1400 }).target.id === "B#1");
+    ok("!! the map's own foe filter: a dead ship is not a point (tacticsMap given the dead one directly), and the flee row's bar is the health bar PLUS the hysteresis once the ship was fleeing (0.30 -> 0.42)", B.tacticsMap(me, foes, TX.DEFAULT_W, { range: 1400 }).points.length === 2 && near(B.tacticsPanel({ self: me, foes, w: TX.DEFAULT_W, opts: { range: 1400 } }).rows.at(-1).values[1], 0.30, 1e-9) && near(B.tacticsPanel({ self: me, foes, w: TX.DEFAULT_W, opts: { range: 1400, wasFleeing: true } }).rows.at(-1).values[1], 0.42, 1e-9));
+    const hot = tp.map.cells, near0 = hot[Math.floor(hot.length / 2)], edge = hot[0];
+    ok("!! the heat is the scoring: strongest where a target would be CLOSEST (the centre, reach 1) and weaker at the corner; at the centre it is the whole desire (wClose + wWeak x the mean weakness + wThreat x the mean threat) to 1e-9", near0.mag > edge.mag && near(near0.mag, (() => { const fe = foes.filter((f) => !f.dead).map((f) => TX.features(me, f, { range: 1400 })), m = (k) => fe.reduce((a, b) => a + b[k], 0) / fe.length; return TX.DEFAULT_W.wClose + TX.DEFAULT_W.wWeak * m("weakness") + TX.DEFAULT_W.wThreat * m("threat"); })(), 1e-9), `${near0.mag.toFixed(3)} against ${edge.mag.toFixed(3)}`);
+    const weak = { ...me, shield: 5, armor: 5 }, fl = B.tacticsPanel({ self: weak, foes: [foe("B#0", 300, 0, 100), foe("B#1", 400, 100, 100)], w: TX.DEFAULT_W, opts: { range: 1400 } });
+    ok("!! a ship that is hurt and outgunned FLEES: the note says FLEEING, the map is flagged and the flee row shows health under its bar and the odds under theirs, and no foe is ringed", /^FLEEING/.test(fl.note) && fl.map.fleeing === true && fl.rows.at(-1).values[0] < fl.rows.at(-1).values[1] && fl.rows.at(-1).values[2] < fl.rows.at(-1).values[3] && !fl.map.points.some((p) => p.chosen));
+    const alone = B.tacticsPanel({ self: me, foes: [], w: TX.DEFAULT_W });
+    ok("no foes: no target rows, a map with no points, the note says there is no target; no ship: nothing", alone.rows.length === 2 && alone.map.points.length === 0 && /^no target/.test(alone.note) && B.tacticsPanel(null).rows.length === 0 && B.tacticsPanel({}).rows.length === 0);
+    const g = rec(), r = B.drawMap(g, 0, 0, 260, 260, tp.map), c = g.calls;
+    ok("!! drawMap on a tactics map is the heat: a cell per grid cell (13 x 13 = 169 plus the background), a dot per foe, ONE white ring on the chosen one, the ship's green cross, no arrows; a fleeing ship's heat is red", r.cells === 169 && r.dots === 2 && r.arrows === 0 && c.filter((x) => x[0] === "fillRect").length === 170 && c.filter((x) => x[0] === "set:strokeStyle" && x[1] === "#ffffff").length === 1 && c.some((x) => x[0] === "set:strokeStyle" && x[1] === "#5fe08a") && !c.some((x) => typeof x[1] === "string" && /^rgba\(255,122,122/.test(x[1])) && (() => { const q = rec(); B.drawMap(q, 0, 0, 260, 260, fl.map); return q.calls.some((x) => typeof x[1] === "string" && /^rgba\(255,122,122/.test(x[1])); })());
+    const gp = rec(), pr = B.drawPanel(gp, 520, 250, tp);
+    ok("!! drawPanel takes the tactics panel whole (the rows' bars and the heat on its right) and every map has its own title (aircraft, fly3d, tactics, sub, flight)", pr.bars === 19 && gp.calls.filter((x) => x[0] === "fillText" && /target attractiveness/.test(x[1])).length === 1 && gp.calls.filter((x) => x[0] === "fillText" && /target in the nose's frame/.test(String(x[1]))).length === 0 && (() => { const q = rec(); B.drawPanel(q, 520, 250, pa); return q.calls.some((x) => x[0] === "fillText" && /target in the nose's frame/.test(x[1])); })());
+}
+
+console.log("\n10. THE PAGES THAT FLY IT (a browser; SKIPPED, and said, without one)");
+{
+    const ENGdir = ENG, types = { ".html": "text/html", ".mjs": "text/javascript", ".js": "text/javascript", ".json": "application/json" };
+    const srcOf = (f) => fs.readFileSync(path.join(ENG, f), "utf8");
+    const ac = srcOf("es-aircraft.html"), f3s = srcOf("es-box3d-fly3d.html"), gpu = srcOf("flight-gpu.html"), e2 = srcOf("es-box3d.html");
+    ok("!! es-aircraft: the canvas and the aircraft picker (three), aircraftPanel fed the SELECTED aircraft's body, its heading target and the squadron's weights for that aircraft, drawn from frame() at most every 200 ms", /id="brainView"/.test(ac) && /id="brainPick"/.test(ac) && /import \{ aircraftPanel, drawPanel \}/.test(ac) && /Number\(brainSel\.value\) \|\| 0/.test(ac) && /squad\.weights\[Math\.min\(i, squad\.weights\.length - 1\)\]/.test(ac) && /aircraftPanel\(\{ kind: w \? "fly" : "autopilot", weights: w, body: s\.body, desired: HEADINGS\[s\.headingIdx\] \}\)/.test(ac) && /now - lastBrain < 200/.test(ac) && /  drawBrain\(\);\n  syncScene/.test(ac));
+    ok("!! es-box3d-fly3d: the canvas and a ship picker over BOTH teams, fly3dPanel fed the picked ship, the target the TACTICS layer gave it (tacticsDecide with its side's weights) and the roster's weights for that ship (scripted when the side is), from frame()", /id="brainView"/.test(f3s) && /id="brainPick"/.test(f3s) && /import \{ fly3dPanel, drawPanel \}/.test(f3s) && /tacticsDecide\(e, foes, W, \{ lastTargetId: e\._tgtId, wasFleeing: e\._fleeing, range: 1400 \}\)/.test(f3s) && /kind: w \? "fly" : "scripted"/.test(f3s) && /r && !r\.scripted && r\.weights\.length/.test(f3s) && /function frame\(\) \{\n  const dt = 1 \/ 30, nowMs = t \* 1000;\n  drawBrain\(\);/.test(f3s));
+    ok("!! flight-gpu and es-box3d (the same fight in 3D and 2D): the canvas, the ship picker, tacticsPanel fed the picked ship, the foes and its SIDE's weights from roster.weights(team), drawBrain on the page's own door (__tacticsFight.drawBrain) and called from the render loop", [gpu, e2].every((src) => /id="brainView"/.test(src) && /id="brainPick"/.test(src) && /import \{ tacticsPanel, drawPanel \}/.test(src) && /tacticsPanel\(\{ self: e, foes, w: roster\.weights\(team\)/.test(src) && /window\.__tacticsFight = \{ drawBrain,/.test(src)) && /updateFx\(frameDt\);\n  drawBrain\(\);\n  render\(\);/.test(gpu) && /stepSim\(\);\n  drawBrain\(\);/.test(e2));
+    ok("flight.html is the menu of the flight pages and flies nothing: it has no brain to show and gets no panel (said here so the absence is a decision)", !/brainView/.test(srcOf("flight.html")) && !/<canvas/.test(srcOf("flight.html")));
+    const { chromium, from: pwFrom } = resolvePlaywright(createRequire(import.meta.url)), skip = browserSkipReason(chromium, pwFrom, HEADLESS_SHELL);
+    if (skip) { console.log("  ----  live half SKIPPED -- " + skip); console.log("  ----  *** THAT IS A SKIP AND NOT A PASS: the section's other rows are arithmetic and source; only a page shows the canvas drawn"); }
+    else {
+        const server = http.createServer((req, res) => { const u = decodeURIComponent(req.url.split("?")[0]), fp = path.join(ENGdir, u); if (fp.startsWith(ENGdir) && fs.existsSync(fp) && fs.statSync(fp).isFile()) { res.writeHead(200, { "Content-Type": types[path.extname(fp)] || "text/plain" }); return res.end(fs.readFileSync(fp)); } res.writeHead(404); res.end("not found"); });
+        await new Promise((r) => server.listen(0, "127.0.0.1", r));
+        const br = await chromium.launch({ executablePath: HEADLESS_SHELL, args: webglLaunchArgs().args });
+        try {
+            const base = "http://127.0.0.1:" + server.address().port;
+            {   // the NETWORK branch of the two pages that default to the scripted pilot: set the roster to the hand-weight network and read what the page says it is drawing
+                const pg = await (await br.newContext()).newPage(), errs = [];
+                pg.on("pageerror", (e) => errs.push(String(e.message)));
+                await pg.goto(base + "/es-box3d-fly3d.html", { waitUntil: "load" }); await pg.waitForTimeout(1500);
+                await pg.evaluate(() => { window.__fly3d.setSpecs({ ...window.__fly3d.specs, A: "hand" }); window.__fly3d.startFight(); }); await pg.waitForTimeout(1500);
+                const who = await pg.$eval("#brainWho", (e) => e.textContent), ink = await pg.evaluate(() => { const c = document.getElementById("brainView"), d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data; let k = 0; for (let i = 0; i < d.length; i += 4) if (d[i] > 60 || d[i + 1] > 60 || d[i + 2] > 80) k++; return k; });
+                ok("!! es-box3d-fly3d with team A on the hand-weight network draws the NETWORK's panel (the header names the pilot, not the scripted AI; hidden neurons and the map inked)", !/scripted/i.test(who) && who.length > 0 && ink > 3000 && errs.length === 0, `"${who}", ${ink} px, ${errs.join("|").slice(0, 100)}`);
+                await pg.selectOption("#brainPick", "B#0"); await pg.waitForTimeout(1200);
+                const whoB = await pg.$eval("#brainWho", (e) => e.textContent);
+                ok("!! picking a ship of the OTHER team (B#0, scripted) changes what the panel draws: the header now names the scripted AI and not the hand-weight network", /scripted/i.test(whoB) && whoB !== who, `"${whoB}"`);
+                await pg.close();
+                const pa = await (await br.newContext()).newPage(), errs2 = [];
+                pa.on("pageerror", (e) => errs2.push(String(e.message)));
+                await pa.goto(base + "/es-aircraft.html", { waitUntil: "load" }); await pa.waitForTimeout(1200);
+                await pa.evaluate(() => { const r = window.__aircraftDemo ? window.__aircraftDemo.roster : null; if (r) r.setSpec("hand"); });
+                await pa.selectOption("#brainPick", "1"); await pa.waitForTimeout(1200);
+                const who2 = await pa.$eval("#brainWho", (e) => e.textContent);
+                ok("!! es-aircraft with the squadron on the hand-weight network and aircraft 2 picked names the network pilot in the header and draws without error", /hand/i.test(who2) && errs2.length === 0, `"${who2}" ${errs2.join("|").slice(0, 100)}`);
+                await pa.close();
+            }
+            for (const [file, ready] of [["es-aircraft.html", null], ["es-box3d-fly3d.html", null], ["es-box3d.html", "window.__tacticsFight && window.__tacticsFight.ready"]]) {
+                const pg = await (await br.newContext()).newPage(); const errs = [];
+                pg.on("pageerror", (e) => errs.push(String(e.message))); pg.on("console", (m) => { if (m.type() === "error" && !/Failed to load resource|WebGPU|webgpu/.test(m.text())) errs.push(m.text()); });
+                await pg.goto(base + "/" + file, { waitUntil: "load" }); await pg.waitForTimeout(2500);
+                if (ready) { await pg.evaluate(() => { window.__tacticsFight.step(60); window.__tacticsFight.drawBrain(true); }); }
+                const info = await pg.evaluate(() => { const c = document.getElementById("brainView"), d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data; let k = 0; for (let i = 0; i < d.length; i += 4) if (d[i] > 60 || d[i + 1] > 60 || d[i + 2] > 80) k++; return { ink: k, opts: document.getElementById("brainPick").options.length, who: document.getElementById("brainWho").textContent }; });
+                ok(`!! ${file} draws its selected brain: ${info.ink} inked pixels, ${info.opts} choices in the picker, the header says "${info.who.slice(0, 40)}"`, info.ink > 3000 && info.opts >= 3 && info.who.length > 0, "");
+                ok(`  ${file}: no page or console error`, errs.length === 0, errs.join(" | ").slice(0, 200));
+                await pg.close();
+            }
+        } finally { await br.close(); server.close(); }
+    }
 }
 
 console.log(fails ? `\n${fails} FAIL` : "\nall checks pass");
