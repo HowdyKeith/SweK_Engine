@@ -14,7 +14,7 @@
 //                    them and the fix, and a fight WITHOUT a squad is bit-for-bit the fight it was (the same fingerprint as before this option existed); a quiet OGRE (start.loud) is heard later
 //
 // SABOTAGES (each mutant breaks the thing a row guards; the row that went red, by name; an entry that went 0 red is a finding, and was fixed):
-//   brain/subSquad.mjs: Q1 radius doubled (2) | Q2 depth step 0 (2) | Q3 sweep a full spread (2) | Q4 offsets not centred (3) | Q5 axis ignored (1) | Q6 fix window 60 s (1) | Q7 minimum angle 0 (1) | Q8 one source
+//   brain/subSquad.mjs: Q22 loiter ignored (1) | Q1 radius doubled (2) | Q2 depth step 0 (2) | Q3 sweep a full spread (2) | Q4 offsets not centred (3) | Q5 axis ignored (1) | Q6 fix window 60 s (1) | Q7 minimum angle 0 (1) | Q8 one source
 //   counted twice (1) | Q9 fix y sign (3) | Q10 own ear ignored (1) | Q11 patrol keeps firing/pinging (1) | Q12 patrol speed 4 (1) | Q13 echo bearing ignores the heading (1) | Q14 echo range 0 (1) | Q15 probe cooldown 0 (2) |
 //   Q16 anyone carries probes (2) | Q17 stock ignored (1) | Q18 probe sent with a fix too (2) | Q19 probe life 300 s (1) | Q20 five probes a boat (0 red THE FIRST TIME: no fight sent a fourth; the stock the arena
 //   tells each look is read now, 1) | Q21 sweep period 7 s (0 red THE FIRST TIME: only the amplitude was read; the quarter-period rows now, 1). THE FIRST ROW OF THE STATIONS WAS RED ON A REAL DEFECT: the sweep of 0.3 rad
@@ -80,6 +80,8 @@ console.log("\n3. THE WRAP");
         ok("!! a boat that hears the OGRE itself is left alone: the tactician's command comes back untouched", own.heading === 0.123 && own.fire === true && own.ping === true && own.speed === 3 && !own.probe);
         const lone = d(mk()), st = sq.station(1, 20), want = Math.atan2(-(st.y - 0), st.x - 0);
         ok("!! a boat that hears nothing and has no fix goes to its station: heading at it, 2 m/s, its depth band (24 m), no fire and no ping", near(lone.heading, want, 1e-9) && lone.speed === 2 && lone.depth === 24 && lone.fire === false && lone.ping === false);
+        const here = d({ ...mk({ x: st.x, y: st.y }) }), near30 = d(mk({ x: st.x - 30, y: st.y })), far = d(mk({ x: st.x - 60, y: st.y }));
+        ok("!! it eases in: 2 m/s from 40 m or more out, 1.5 m/s at 30 m, the 0.5 m/s creep ON the station (the speed command is what it is, whatever the tactician wanted)", far.speed === 2 && near30.speed === 1.5 && here.speed === 0.5, `${far.speed} / ${near30.speed} / ${here.speed}`);
         ok("a boat that does not carry probes never asks for one", lone.probe === undefined);
     }
     {

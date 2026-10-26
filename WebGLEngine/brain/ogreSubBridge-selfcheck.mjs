@@ -17,7 +17,10 @@
 //   B5 brain ticks floor 0 (1) | B6 cap 400 (1) | B7 OGRE not loud (1) | B8 four torpedoes (3) | B9 reload 100 ticks (1) | B10 hit points ignore maxHp (0 red THE FIRST TIME: 30 of 30 and 15 of 30 read the same
 //   either way; 15 of 60 now, 1) | B11 hostiles not heard (1) | B12 torpedoes heard as boats (1) | B13 a dead boat keeps stepping (1) | B14 a loss ignored (1) | B15 the entry not moved (3) | B16 world z mapped to x
 //   (2) | B18 spawn ignores the entry's place (1) | B21 every boat the same id (0 red THE FIRST TIME; the ids row now, 1). Two mutants that were not mutants were dropped (a no-op edit). The scenario's hook:
-//   H1 brain not spawned (2) | H2 ttl 30 (1) | H3 fires at the OGRE instead of along the nose (1) | H4 brain subs still walk (3) | H5 a dead brain not removed (0 red THE FIRST TIME: only hp 0 was tried;
+//   THE SQUAD (section 6): S1 squad ignored (2) | S2 a squad of one (2) | S3 the axis not from the OGRE (2) | S4 boats never report (0 red THE FIRST TIME: the row said 'a fix or a projectile'; the boats-only datalink row now, 1) |
+//   S5 probes never listen (0 red THE FIRST TIME; the probes-hear-what-boats-cannot row, 1) | S6 no probe ever launched (1) | S7 the stock unlimited (0 red THE FIRST TIME: a two-minute run against the cap of three, 1) |
+//   S8 every boat index 0 (2) | S9 probe z left in metres (0 red THE FIRST TIME; the 37.5 u row, 1) | S10 the world's clock dropped (1). The two boats' crossing (2 u) was a real defect: a patrol at 2 m/s circles its station;
+//   the boat eases to a 0.5 m/s creep within 40 m now. The scenario's hook: H1 brain not spawned (2) | H2 ttl 30 (1) | H3 fires at the OGRE instead of along the nose (1) | H4 brain subs still walk (3) | H5 a dead brain not removed (0 red THE FIRST TIME: only hp 0 was tried;
 //   a boat lost to the floor now, 1) | H6 the world's torpedoes include the defenders' own (1) | H7 dead escorts heard (1) | H8 maxHp not set (1).
 "use strict";
 import fs from "node:fs";
@@ -127,6 +130,32 @@ console.log("\n5. THE WORLD");
     ok("!! the brain's world: the OGRE's place, the LIVING escorts, and only the OGRE's torpedoes", bw.ogre.x === 60 && bw.ogre.z === -40 && bw.hostiles.length === 1 && bw.hostiles[0].x === 5 && bw.torps.length === 1 && bw.torps[0].x === 1);
     const main = rd("main.js");
     ok("!! main.js exposes ogre.brainSubs and imports the bridge lazily (not at load)", /brainSubs: async/.test(main) && /import\("\.\/brain\/ogreSubBridge\.mjs"\)/.test(main) && !/^import .*ogreSubBridge/m.test(main) && /setSubBrains\(null\)/.test(main));
+}
+
+console.log("\n6. THE SQUAD IN THE VOXEL WORLD");
+{
+    const mkWorld = (bridge, ogre) => { const sc = Object.create(OgreScenario.prototype), execs = []; Object.assign(sc, { defenderSubs: [], subBrains: null, escortSubs: [], projectiles: [], router: { exec: (c) => { execs.push(c); return { id: execs.length }; } }, particles: null, _sfxAt() {}, _currentEnv: "sea", _surfaceY: () => 0, _dock: { x: 0, z: 0, destroyed: false }, ogre: { position: ogre }, active: true, _lastDefenderSubT: 0 }); sc.setSubBrains(bridge); return sc; };
+    const run = (bridge, seconds, ogre = { x: 700, z: 0 }) => { const sc = mkWorld(bridge, ogre); let t = 100; const gaps = [], depths = []; let maxProbes = 0; for (let i = 0; i < seconds * 60; i++) { t += 1 / 60; sc._tickDefenderSubs(1 / 60, t); if (i % 60 === 0) maxProbes = Math.max(maxProbes, bridge.probes(t * bridge.cfg.timeScale).length); if (i % 60 === 0 && sc.defenderSubs.length === 2) { const [a, b] = sc.defenderSubs; gaps.push(Math.hypot(a.x - b.x, a.z - b.z)); depths.push([a.brain.depth, b.brain.depth]); } } return { sc, gaps, depths, t, maxProbes }; };
+    const sqd = B.createBridge(gunner, { squad: { n: 2, probes: [0], hq: [0, 0] } }), r = run(sqd, 90);
+    ok("!! the squad is built from the first boat and the OGRE's side: two stations across the approach axis (the OGRE is at +x: axis 0)", sqd.squad() && sqd.squad().config.n === 2 && sqd.squad().config.axis === 0 && sqd.squad().config.hq[0] === 0 && sqd.squad().config.probes[0] === 0);
+    ok("!! the two boats keep apart once both are in the water (over 7.5 u = 30 m: the design floor is 0.4 of the 22 u between their stations, 8.8 u, since each sweeps 0.3 of the spread; from 40 s after the second is out)", r.gaps.length >= 20 && r.gaps.slice(40).every((g) => g > 7.5), `min ${Math.min(...r.gaps.slice(40)).toFixed(0)} u`);
+    ok("each is in its own depth band (the two depths differ by 4 m or more after the first minute)", r.depths.slice(-5).every(([a, b]) => Math.abs(a - b) > 4), r.depths.at(-1).map((d) => d.toFixed(0)).join(" / "));
+    const tb = r.t * sqd.cfg.timeScale, pr = { length: r.maxProbes };
+    ok("!! a carrier sends a probe (a stationary hydrophone, listed in units with its depth) and the world gave the squad its clock (brain seconds = voxel x 4)", pr.length >= 1 && pr.length <= 3 && sqd.squad() && tb > 400 && sqd.probes(r.t * 4 - 100).every((p) => Number.isFinite(p.x) && Number.isFinite(p.z) && p.depth > 10), `${pr.length} probe(s) at most at once`);
+    const plain = B.createBridge(gunner), r2 = run(plain, 60);
+    ok("without a squad: no squad object, no probes", plain.squad() === null && plain.probes(r2.t * 4).length === 0);
+    // the datalink, row by row: boats alone (no probes), then probes alone (the OGRE past the boats' ears, inside a probe's), then the stock
+    const watch = (bridge, ogre, seconds) => { const sc = mkWorld(bridge, ogre); let t = 100; const seen = new Set(), tally = { b: 0, p: 0 }; let fixAt = null, near = null; for (let i = 0; i < seconds * 60; i++) { t += 1 / 60; sc._tickDefenderSubs(1 / 60, t); if (i % 30 === 0 && bridge.squad()) { for (const id of bridge.squad().heard(t * 4)) { seen.add(id); tally[id[0]]++; } if (bridge.squad().fix(t * 4) && fixAt === null) fixAt = i / 60; if (near === null && bridge.probes(t * 4).length) { const p = bridge.probes(t * 4)[0]; near = Math.min(...sc.defenderSubs.map((q) => Math.hypot(q.x - p.x, q.z - p.z))); } } } return { sc, seen, fixAt, near, t, tally }; };
+    const w1 = watch(B.createBridge(gunner, { squad: { n: 2, probes: [] } }), { x: 260, z: 0 }, 80);
+    ok("!! boats alone share: both boats hear an OGRE at 1 km, the datalink holds a bearing from each and a FIX comes of it (no probes in this squad)", w1.seen.has("b1") && w1.seen.has("b2") && ![...w1.seen].some((id) => id[0] === "p") && w1.fixAt !== null, `fix at ${w1.fixAt}s`);
+    const w2 = watch(B.createBridge(gunner, { squad: { n: 2, probes: [0, 1] } }), { x: 540, z: 0 }, 80);
+    ok("!! probes hear what the boats cannot: an OGRE 2 km out (past a boat's 1.4 km, inside a probe's 2.2) is heard by the probes on at least three times as many samples as by the boats", w2.tally.p > 0 && w2.tally.p >= 3 * w2.tally.b, JSON.stringify(w2.tally));
+    ok("!! a probe is dropped 150 m (37.5 u) ahead of a boat, in UNITS (within 4 u of that at the first sample)", w2.near !== null && Math.abs(w2.near - 37.5) < 4, `${w2.near && w2.near.toFixed(1)} u`);
+    { const b3 = B.createBridge(gunner, { squad: { n: 2, probes: [0] } }), sc3 = mkWorld(b3, { x: 900, z: 0 }); let t3 = 100, checked = 0, good = true;
+      for (let i = 0; i < 60 * 40; i++) { t3 += 1 / 60; sc3._tickDefenderSubs(1 / 60, t3); if (i % 30 === 0) { const raw = b3.squad() ? b3.squad().liveProbes(t3 * 4) : [], us = b3.probes(t3 * 4); if (raw.length) { checked++; good &&= us.length === raw.length && us.every((u, k) => near(u.x * 4, raw[k].x, 1e-9) && near(u.z * 4, raw[k].y, 1e-9) && u.depth === raw[k].depth && u.id === raw[k].id); } } }
+      ok("!! the probes list is the squad's own probes in UNITS: x and z times 4 m a unit are the metre positions, the depth and id the same (at every sample with a probe up)", checked >= 10 && good, `${checked} samples`); }
+    const stock = B.createBridge(gunner, { squad: { n: 2, probes: [0] } }); watch(stock, { x: 900, z: 0 }, 118);
+    ok("!! three probes to a carrier and no more, though it would send one every 10 voxel seconds for two minutes", stock.probesSent() === 3, `${stock.probesSent()}`);
 }
 
 console.log(fails ? `\n${fails} FAIL` : "\nall checks pass");

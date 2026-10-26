@@ -1932,8 +1932,9 @@ export class OgreScenario {
     setSubBrains(bridge) { this.subBrains = bridge || null; return !!this.subBrains; }
 
     // What the brains can hear, in the world's units: the OGRE, its escort subs and its torpedoes.
-    _brainWorld() {
+    _brainWorld(t) {
         return {
+            t: Number.isFinite(t) && this.subBrains && this.subBrains.cfg ? t * this.subBrains.cfg.timeScale : undefined,   // the squad's clock, in brain seconds
             ogre: this.ogre ? { x: this.ogre.position.x, z: this.ogre.position.z } : null,
             hostiles: (this.escortSubs || []).filter((e) => e.hp > 0).map((e) => ({ x: e.x, z: e.z })),
             torps: (this.projectiles || []).filter((p) => p.team === "ogre" && p.torpedo).map((p) => ({ x: p.x, z: p.z })),
@@ -2031,7 +2032,7 @@ export class OgreScenario {
             const dist = Math.hypot(dx, dz) || 1;
             if (s.brain) {
                 // v4902 -- a brain flies this one: it moves where its hull goes and fires along its nose
-                const r = this.subBrains.step(s, dt, this._brainWorld());
+                const r = this.subBrains.step(s, dt, this._brainWorld(t));
                 if (!r.alive) s.hp = 0;
                 else if (r.fire) { s.phase = "firing"; s.phaseT = 0; this._defenderSubFireTorpedo(s, r.fire); s.lastFireT = t; }
                 else if (s.phase === "firing" && s.phaseT > 0.8) { s.phase = "approaching"; s.phaseT = 0; }

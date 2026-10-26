@@ -18,7 +18,7 @@
 // Pure: no DOM, no Math.random, no clock.
 "use strict";
 
-export const SQUAD = Object.freeze({ radius: 160, spread: 0.55, sweepFrac: 0.3, sweepPeriod: 70, patrolSpeed: 2, depthBase: 16, depthStep: 8, fixWindow: 6, minAngle: 12 * Math.PI / 180, probeEvery: 40, probeAhead: 150, probeLife: 120, probesPerBoat: 3, probeDi: 20 });
+export const SQUAD = Object.freeze({ radius: 160, spread: 0.55, sweepFrac: 0.3, sweepPeriod: 70, patrolSpeed: 2, loiterSpeed: 0.5, loiterWithin: 40, depthBase: 16, depthStep: 8, fixWindow: 6, minAngle: 12 * Math.PI / 180, probeEvery: 40, probeAhead: 150, probeLife: 120, probesPerBoat: 3, probeDi: 20 });
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 
 /**
@@ -53,6 +53,8 @@ export function createSquad(n, { axis = 0, hq = [0, 0], radius = SQUAD.radius, s
         const det = a11 * a22 - a12 * a12; if (Math.abs(det) < 1e-9) return null;
         return { x: (a22 * b1 - a12 * b2) / det, y: (a11 * b2 - a12 * b1) / det, sources: rs.length, spanDeg: widest * 180 / Math.PI };
     }
+    /** The ids of the sources that have a bearing inside the fix window at t (boats are "b"+id, probes "p"+n): who is hearing the threat right now. */
+    const heard = (t) => reports.filter((r) => t - r.t <= SQUAD.fixWindow && t - r.t >= 0).map((r) => r.id);
     const addProbe = (p) => { live.push({ ...p }); return live.length; };
     const liveProbes = (t) => live.filter((p) => t >= p.t0 && t <= p.t0 + SQUAD.probeLife);
     let lastProbe = new Array(n).fill(-1e9);
@@ -69,11 +71,11 @@ export function createSquad(n, { axis = 0, hq = [0, 0], radius = SQUAD.radius, s
             const cmd = { ...(tactics(o) || {}) };
             if (!own && !f) {
                 const st = station(i, t), dx = st.x - s.x, dy = st.y - s.y;
-                cmd.heading = Math.atan2(-dy, dx); cmd.depth = st.depth; cmd.speed = SQUAD.patrolSpeed; cmd.fire = false; cmd.ping = false;
+                cmd.heading = Math.atan2(-dy, dx); cmd.depth = st.depth; const away = Math.hypot(dx, dy); cmd.speed = away >= SQUAD.loiterWithin ? SQUAD.patrolSpeed : Math.max(SQUAD.loiterSpeed, SQUAD.patrolSpeed * away / SQUAD.loiterWithin); cmd.fire = false; cmd.ping = false;   // it slows as it arrives (at 40 m out it starts to ease, on the station it creeps at 0.5 m/s: a boat that circled a station would cross its neighbour)
                 if (carry.has(i) && (s.probes ?? 0) > 0 && t - lastProbe[i] >= SQUAD.probeEvery) { cmd.probe = true; lastProbe[i] = t; }
             }
             return cmd;
         };
     }
-    return { station, report, fix, wrap: wrapTactics, addProbe, liveProbes, offset, config: Object.freeze({ n, axis, hq, radius, spread, probes: [...carry] }) };
+    return { station, report, fix, heard, wrap: wrapTactics, addProbe, liveProbes, offset, config: Object.freeze({ n, axis, hq, radius, spread, probes: [...carry] }) };
 }
