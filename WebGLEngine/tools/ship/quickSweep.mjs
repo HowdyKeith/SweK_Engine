@@ -443,6 +443,31 @@ export function ownTimings(shared, { file = DEFAULTS.timingsFile, local = LOCAL_
 }
 
 /**
+ * *** v4899 -- A GATE THIS BOX HAS NEVER TIMED, BUT ANOTHER BOX HAS TIMED OVER THE BUDGET, IS NOT "UNMEASURED". *** ownTimings chooses by THIS box's own record, and a gate that record has no row for is run as a new gate
+ * (selectGates: `ms == null` -> unmeasured, run). That is right for a gate nobody has timed and WRONG for one the record's owner timed at 18 to 800 seconds: at v4898 the merged fish, submarine and jet branches brought ten
+ * such gates, the rig's own record (made before the merge) had no row for them, and the rig's sweep ran all ten under the 20 s cap and killed them alone -- "nothing timed out alone under the cap" -- on a tree whose every
+ * gate finishes green on the box that timed them (brain/jetFight 23 s, pilotDroneMlp 18 s, fishCaveExport 75 s, trainDogfightLeague 802 s). v4850 and v4877 met the same shape and answered it by handing the shared
+ * record to whichever box needed it. This answers it at the selection: a gate missing from `own` that `shared` has a reading ABOVE the budget for is moved from run/unmeasured to skipped and NAMED. The foreign reading is
+ * evidence a gate is EXPENSIVE, never that it is cheap -- a foreign reading under the budget carries nothing, and the gate runs as new as before -- and it is never written into this box's record (two machines'
+ * runtimes in one set of fields is not a record). Pure; returns the gates carried over with the reading that carried them, and edits `sel` in place.
+ */
+export function carryOverForeign(sel, own, shared, budgetMs) {
+    const carried = [];
+    if (!own || !shared || own.rec === shared) return carried;             // this box owns the shared record, or has none of its own: nothing is foreign
+    const mine = (own.rec && own.rec.timings) || {}, theirs = shared.timings || {};
+    for (const g of [...sel.unmeasured]) {
+        const f = theirs[g];
+        if (mine[g] != null || typeof f !== "number" || !(f > budgetMs)) continue;
+        carried.push({ gate: g, ms: f });
+    }
+    if (carried.length) {
+        const drop = new Set(carried.map((c) => c.gate));
+        sel.run = sel.run.filter((g) => !drop.has(g)); sel.unmeasured = sel.unmeasured.filter((g) => !drop.has(g)); sel.skipped = sel.skipped.concat([...drop]);
+    }
+    return carried;
+}
+
+/**
  * Which gates to run: every enumerated gate whose last observed time is under the budget, plus every gate
  * with no observation at all (new gates always earn one). Returns { run, skipped, dropped, unmeasured }.
  */
@@ -933,6 +958,8 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = sw
     const inputRecord = readInputRecord(root);
     const sel = selectGates(all, prior.timings || {}, budgetMs,
         { crossings: prior.crossings || {}, inputRecord, skipUnchanged, scaleOf: scaleLookup(prior) });
+    const carriedOver = carryOverForeign(sel, own, shared, budgetMs);
+    if (carriedOver.length) log(`[sweep] ${carriedOver.length} gate(s) this box has never timed were timed OVER the ${budgetMs} ms budget by ${shared.host || "the record's owner"} and are not run here: ${carriedOver.map((c) => c.gate + " (" + c.ms + " ms)").join(", ")}`);
     const phase1 = new Map();
     let next = 0, done = 0;
     async function worker() {
@@ -1191,7 +1218,7 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = sw
     const out = {
         at: out0.at, budgetMs, workers, capMs, ms: Date.now() - t00,
         timingsHost, foreignTimings, box: boxId(), timingsFrom: own.file, timingsWhy: own.why,
-        enumerated: all.length, ran: sel.run.length, skippedOverBudget: sel.skipped.length, newGates: sel.unmeasured,
+        enumerated: all.length, ran: sel.run.length, skippedOverBudget: sel.skipped.length, newGates: sel.unmeasured, carriedOver,
         // v4566: what an incremental sweep WOULD have skipped. Reported on every run, acted on only under
         // skipUnchanged, so the number earns trust in public before it is allowed to change anything.
         unchangedInputs: (sel.unchanged || []).length, skippedUnchanged: skipUnchanged,
