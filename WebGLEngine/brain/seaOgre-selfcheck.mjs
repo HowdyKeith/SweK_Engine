@@ -75,7 +75,7 @@ console.log("\n3. THE CONTRACT");
     ok("!! a trace changes nothing: the same fingerprint and score with and without it", noTrace.fingerprint === a.r.fingerprint && noTrace.score === a.r.score);
     ok("!! a frame every 6 ticks (the number is pinned, not read back from the module)", G.TRACE_EVERY === 6 && a.trace.length === Math.ceil(a.r.ticks / 6) && a.trace.every((f, i) => f.tick === i * 6));
     const f = a.trace[10];
-    ok("the frame carries what the page draws", Object.keys(f).sort().join() === "boats,escorts,hq,ogre,tick,torps" && f.boats.length === 3 && Object.keys(f.ogre).sort().join() === "depth,heading,hull,phase,speed,surfaced,x,y,zones" && Object.keys(f.ogre.zones).sort().join() === "cannon,engine,sonar,tubes");
+    ok("the frame carries what the page draws", Object.keys(f).sort().join() === "boats,escorts,fix,hq,ogre,probes,tick,torps" && f.boats.length === 3 && Object.keys(f.ogre).sort().join() === "depth,heading,hull,phase,speed,surfaced,x,y,zones" && Object.keys(f.ogre.zones).sort().join() === "cannon,engine,sonar,tubes");
     ok("the verdict carries what the page tells", ["outcome", "score", "hull", "hq", "hullDamage", "lost", "fates", "fired", "hits", "ogreFired", "zones", "phase", "escorts", "ticks", "events", "seed", "n", "fingerprint"].every((k) => k in a.r));
 }
 

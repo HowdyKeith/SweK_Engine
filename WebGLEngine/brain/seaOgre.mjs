@@ -25,6 +25,7 @@ import * as K from "../physics/mechanics/subSonar.mjs";
 import * as Tp from "../physics/mechanics/subTorpedo.mjs";
 import { createActuators } from "../physics/mechanics/subActuators.mjs";
 import { foldHash } from "../physics/raceCar.mjs";
+import { createSquad, SQUAD } from "./subSquad.mjs";
 
 export const TRACE_EVERY = 6;
 export const DT = S.DT, SECONDS = 300, LOOK_EVERY = 15, STAGGER = 7, RELOAD_TICKS = 300, HP = 100;
@@ -71,16 +72,17 @@ export const phaseOf = (hull) => (hull < OGRE.phase3 * OGRE.hull ? 3 : hull < OG
 /**
  * Fight one level. `sides` is a list of FRESH side objects { tactics, pilot } (one per defender; subTournament's makeSide(...).side()). Options: { seconds, dt, actuators, model, trace (an array pushed a frame every
  * TRACE_EVERY ticks: { tick, boats: [{ id, x, y, depth, heading, pitch, hp, alive, ammo }], torps: [{ id, owner, x, y, depth }], ogre: { x, y, depth, heading, speed, hull, surfaced, phase, zones: { tubes, sonar, cannon, engine } },
- * escorts: [{ id, x, y, depth, hp }], hq: hp }), start ({ hull, zones, hq }: a damaged OGRE or headquarters to begin with: a test, or a handicap) }. Returns { outcome, score, hull (left), hq (left), hullDamage (fraction), lost, fates, fired, hits, zones (what is left), phase, escorts (launched), ticks, events, seed, fingerprint }.
+ * escorts: [{ id, x, y, depth, hp }], hq: hp, probes: [{ id, x, y, depth }], fix: null | { x, y, sources, spanDeg } }), squad (null, or { probes: [boat indices that carry probes], spread, radius }: the defenders spread, share what they hear and send probes out: brain/subSquad.mjs), start ({ hull, zones, hq, loud (dB over a boat of the same speed: the OGRE's noise, 10 by default; a quiet one is harder to find) }: a damaged OGRE or headquarters to begin with: a test, or a handicap) }. Returns { outcome, score, hull (left), hq (left), hullDamage (fraction), lost, fates, fired, hits, zones (what is left), phase, escorts (launched), ticks, events, seed, fingerprint }.
  */
-export function fight(sides, sc, { seconds = SECONDS, dt = DT, actuators = null, model = seaModel(), trace = null, start = {} } = {}) {
+export function fight(sides, sc, { seconds = SECONDS, dt = DT, actuators = null, model = seaModel(), trace = null, start = {}, squad = null } = {}) {
     if (!Array.isArray(sides) || sides.length !== sc.n) throw new Error(`seaOgre.fight: ${sc.n} defenders in the scenario, ${Array.isArray(sides) ? sides.length : 0} sides`);
-    const total = Math.round(seconds / dt), seed = sc.seed, events = [], O = OGRE;
+    const total = Math.round(seconds / dt), seed = sc.seed, events = [], O = OGRE, loud = Number.isFinite(start.loud) ? start.loud : O.loudBonus;
+    const sq = squad ? createSquad(sc.n, { axis: Math.atan2(-sc.ogre.pos[1], sc.ogre.pos[0]), ...squad }) : null, probesOf = (i) => (sq && sq.config.probes.includes(i) ? SQUAD.probesPerBoat : 0);
     const boats = sides.map((sd, i) => { const st = sc.defenders[i];
-        return { id: i + 1, state: S.createState({ depth: st.depth, pos: [st.pos[0], st.pos[1], -st.depth], speed: st.speed, heading: st.heading, model }), tactics: sd.tactics, pilot: sd.pilot, act: actuators ? createActuators(actuators) : null,
+        return { id: i + 1, state: S.createState({ depth: st.depth, pos: [st.pos[0], st.pos[1], -st.depth], speed: st.speed, heading: st.heading, model }), tactics: sq ? sq.wrap(i, sd.tactics) : sd.tactics, pilot: sd.pilot, probes: probesOf(i), act: actuators ? createActuators(actuators) : null,
             hp: HP, ammo: AMMO, cooldown: 0, target: { depth: st.depth, heading: st.heading, speed: st.speed }, alive: true, fate: "afloat", echoes: [], pings: [], fired: 0, hits: 0 }; });
     const og = { x: sc.ogre.pos[0], y: sc.ogre.pos[1], depth: O.subDepth, heading: sc.ogre.heading, speed: O.speed, hull: Number.isFinite(start.hull) ? start.hull : O.hull, zones: { ...Object.fromEntries(ZONES.map((z) => [z.name, z.hp])), ...(start.zones || {}) }, cycle: 0, fireIn: Math.round(2 * 30), cannonIn: 0, escortIn: Math.round(O.escortEvery / dt), contact: null };
-    const escorts = [], torps = []; let hq = Number.isFinite(start.hq) ? start.hq : HQ_HP, nextTorp = 1, nextEscort = 1, launched = 0, h = 0x811c9dc5, flown = 0, outcome = "holdout", ogreFired = 0;
+    const escorts = [], torps = []; let probesSent = 0; let hq = Number.isFinite(start.hq) ? start.hq : HQ_HP, nextTorp = 1, nextEscort = 1, launched = 0, h = 0x811c9dc5, flown = 0, outcome = "holdout", ogreFired = 0;
     const plat = (b) => K.platformOf(b.state), att = (b) => S.attitude(b.state);
     const ogrePlat = () => ({ pos: [og.x, og.y, -og.depth], heading: og.heading, speed: og.speed });
     const surfaced = () => og.cycle >= O.subTicks;
@@ -92,18 +94,27 @@ export function fight(sides, sc, { seconds = SECONDS, dt = DT, actuators = null,
         for (const b of boats) {
             if (!b.alive || (tick + STAGGER * b.id) % LOOK_EVERY !== 0) continue;
             const a = att(b), me = plat(b), contacts = [];
-            const oc = K.listen(me, ogrePlat(), { seed, tick, channel: b.id, sl: K.sourceLevel(og.speed) + O.loudBonus }); if (oc) contacts.push({ kind: "boat", bearing: oc.bearing, elevation: oc.elevation, snr: oc.snr });
+            const oc = K.listen(me, ogrePlat(), { seed, tick, channel: b.id, sl: K.sourceLevel(og.speed) + loud }); if (oc) { contacts.push({ kind: "boat", bearing: oc.bearing, elevation: oc.elevation, snr: oc.snr }); if (sq) sq.report({ id: "b" + b.id, x: b.state.pos[0], y: b.state.pos[1] }, wrap(a.heading + oc.bearing), tick * dt); }
             for (const e of escorts) { const c = K.listen(me, { pos: [e.x, e.y, -e.depth], heading: e.heading, speed: O.escortSpeed }, { seed, tick, channel: b.id + 40 + e.id }); if (c) contacts.push({ kind: "boat", bearing: c.bearing, elevation: c.elevation, snr: c.snr }); }
             for (const t of torps) { if (t.status !== "running" || t.owner !== O.id) continue; const c = K.listen(me, Tp.platformOf(t), { seed, tick, channel: b.id + 10 + t.id, sl: K.SONAR.torpedoSL }); if (c) contacts.push({ kind: "torpedo", bearing: c.bearing, elevation: c.elevation, snr: c.snr }); }
-            const obs = { t: tick * dt, self: { depth: a.depth, heading: a.heading, speed: a.speed, x: b.state.pos[0], y: b.state.pos[1], hp: b.hp, ammo: b.ammo, ready: b.cooldown <= 0 && b.ammo > 0 }, contacts, echoes: b.echoes, pings: b.pings };
+            const obs = { t: tick * dt, self: { depth: a.depth, heading: a.heading, speed: a.speed, x: b.state.pos[0], y: b.state.pos[1], hp: b.hp, ammo: b.ammo, ready: b.cooldown <= 0 && b.ammo > 0, ...(sq ? { probes: b.probes } : {}) }, contacts, echoes: b.echoes, pings: b.pings };
             b.echoes = []; b.pings = [];
             const cmd = b.tactics(obs) || {};
             b.target = { depth: clamp(Number.isFinite(cmd.depth) ? cmd.depth : a.depth, 12, 45), heading: Number.isFinite(cmd.heading) ? cmd.heading : a.heading, speed: clamp(Number.isFinite(cmd.speed) ? cmd.speed : a.speed, 0.3, 4.5) };
             if (cmd.fire === true && b.ammo > 0 && b.cooldown <= 0) { torps.push(Tp.launch(b.id, { pos: b.state.pos, heading: a.heading, pitch: a.pitch }, { id: nextTorp++ })); b.ammo--; b.fired++; b.cooldown = RELOAD_TICKS; events.push({ tick, type: "fire", boat: b.id }); }
+            if (cmd.probe === true && sq && b.probes > 0) {   // a probe, dropped SQUAD.probeAhead m along the nose at the boat's depth
+                b.probes--; probesSent++; const px = b.state.pos[0] + SQUAD.probeAhead * Math.cos(a.heading), py = b.state.pos[1] - SQUAD.probeAhead * Math.sin(a.heading);
+                sq.addProbe({ id: "p" + probesSent, x: px, y: py, depth: a.depth, t0: tick * dt, boat: b.id }); events.push({ tick, type: "probe", boat: b.id });
+            }
             if (cmd.ping === true) {
                 events.push({ tick, type: "ping", boat: b.id });
                 const e = K.ping(me, ogrePlat(), { seed, tick, channel: b.id }); if (e) b.echoes.push({ bearing: e.bearing, elevation: e.elevation, range: e.range });
             }
+        }
+        // ---- the probes: stationary hydrophones, each listening at 2 Hz and reporting to the datalink ----
+        if (sq && tick % LOOK_EVERY === 3) for (const [k, p] of sq.liveProbes(tick * dt).entries()) {
+            const c = K.listen({ pos: [p.x, p.y, -p.depth], heading: 0, speed: 0.5 }, ogrePlat(), { seed, tick, channel: 70 + k, sl: K.sourceLevel(og.speed) + loud, di: SQUAD.probeDi });
+            if (c) sq.report({ id: p.id, x: p.x, y: p.y }, wrap(c.bearing), tick * dt);
         }
         // ---- the OGRE: sonar (every 15th tick), steering, the cycle, the guns ----
         og.cycle = (og.cycle + 1) % (O.subTicks + O.surfTicks);
@@ -171,12 +182,12 @@ export function fight(sides, sc, { seconds = SECONDS, dt = DT, actuators = null,
         }
         flown++;
         if (trace && tick % TRACE_EVERY === 0) trace.push({ tick, boats: boats.map((b) => { const a = att(b); return { id: b.id, x: b.state.pos[0], y: b.state.pos[1], depth: a.depth, heading: a.heading, pitch: a.pitch, hp: b.hp, alive: b.alive, ammo: b.ammo }; }), torps: torps.filter((q) => q.status === "running").map((q) => ({ id: q.id, owner: q.owner, x: q.pos[0], y: q.pos[1], depth: -q.pos[2] })),
-            ogre: { x: og.x, y: og.y, depth: og.depth, heading: og.heading, speed: og.speed, hull: og.hull, surfaced: surfaced(), phase: phaseOf(og.hull), zones: { ...og.zones } }, escorts: escorts.map((e) => ({ id: e.id, x: e.x, y: e.y, depth: e.depth, hp: e.hp })), hq });
+            ogre: { x: og.x, y: og.y, depth: og.depth, heading: og.heading, speed: og.speed, hull: og.hull, surfaced: surfaced(), phase: phaseOf(og.hull), zones: { ...og.zones } }, escorts: escorts.map((e) => ({ id: e.id, x: e.x, y: e.y, depth: e.depth, hp: e.hp })), hq, probes: sq ? sq.liveProbes(tick * dt).map((p) => ({ id: p.id, x: p.x, y: p.y, depth: p.depth })) : [], fix: sq ? sq.fix(tick * dt) : null });
         if (tick % 30 === 0) { for (const c of [og.x, og.y, og.depth, og.hull, hq]) h = foldHash(h, Math.round(c * 1000) & 0xffffffff); for (const b of boats) for (const c of b.state.pos) h = foldHash(h, Math.round(c * 1000) & 0xffffffff); }
         if (og.hull <= 0) { outcome = "defended"; break; }
         if (hq <= 0 || Math.hypot(og.x, og.y) <= O.breachRange) { outcome = "breached"; break; }
     }
     const lost = boats.filter((b) => !b.alive).length, frac = 1 - og.hull / O.hull, left = 1 - flown / total;
     const score = frac + (outcome === "defended" ? 1 + 0.5 * left : 0) - (outcome === "breached" ? 1 : 0) - 0.15 * lost;
-    return { outcome, score, hull: og.hull, hq, hullDamage: frac, lost, fates: boats.map((b) => b.fate), fired: boats.map((b) => b.fired), hits: boats.map((b) => b.hits), ogreFired, zones: { ...og.zones }, phase: phaseOf(og.hull), escorts: launched, ticks: flown, events, seed, n: sc.n, fingerprint: (h >>> 0).toString(16) };
+    return { outcome, score, hull: og.hull, hq, hullDamage: frac, lost, fates: boats.map((b) => b.fate), fired: boats.map((b) => b.fired), hits: boats.map((b) => b.hits), ogreFired, zones: { ...og.zones }, phase: phaseOf(og.hull), escorts: launched, probes: probesSent, squad: !!sq, ticks: flown, events, seed, n: sc.n, fingerprint: (h >>> 0).toString(16) };
 }
