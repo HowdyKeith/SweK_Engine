@@ -92,6 +92,9 @@
       <canvas id="plan" width="1000" height="600" aria-label="Plan view of the tank"></canvas></section>
     <section class="panel p2d" aria-label="Depth view of the tank"><h2>Depth view <span class="hint">depth against length</span></h2>
       <canvas id="sideView" width="1000" height="220" aria-label="Side view of the tank: depth against length"></canvas></section>
+    <section class="panel p2d" aria-label="Compass dropout: the plain autopilot beside the navigator"><h2>Compass dropout <span class="hint"><button id="compassBtn" title="Take the compass away on two subs at once, in the same windows: the first sub keeps the plain autopilot, the second flies behind the dead-reckoning navigator. Press again to end it.">compass test</button></span></h2>
+      <canvas id="compassView" width="1000" height="330" aria-label="Two compass dials and the heading error of each over time"></canvas>
+      <div class="tank-note" id="compassNote">Both subs lose the compass for 16 s in every 40 (after 10 s of it working). Green is the true heading, amber is what the pilot is shown. The plain autopilot is shown the last good heading and drifts off it; the navigator integrates the hull&rsquo;s own turn rate and keeps it. Its rate gyro is exact here, so this is the best a navigator can do.</div></section>
     <section class="panel plist" aria-label="The subs in the tank"><h2>Subs</h2><div class="side" id="list"></div></section>
   </div>
 </main>
@@ -103,6 +106,7 @@ import { createView3d } from "/render/subAquarium3d.mjs";
 import { readout } from "/render/subBallastCues.mjs";
 import { LABELS as SEA_LABELS, GPU, DEFAULT_STYLE, isStyle, gpuSeaAvailable } from "/render/seaStyles.mjs";
 import { hostUrl } from "/ui/seaFrame.mjs";
+import { dialInfo, pair, pushTrace, lineFor, drawDial, drawTrace } from "/render/compassView.mjs";
 
 const $ = (id) => document.getElementById(id);
 const plan = $("plan"), side = $("sideView"), pg = plan.getContext("2d"), sg = side.getContext("2d");
@@ -160,6 +164,15 @@ function syncFollow(fromBox) { if (!view3d) return; const on = $("followBox").ch
 $("followBox").addEventListener("change", () => syncFollow(true));
 // v4901 -- events on the selected sub (render/subAquariumSim.mjs setEvent): the tank, the emergency blow and the drop weight show in the 3D view and in the list
 function setEvent(ev) { if (!selected) { $("msg").textContent = "pick a sub in the list first"; return; } try { const r = tank.setEvent(selected, ev); $("msg").textContent = r ? r + " on the selected sub" : "restored"; } catch (e) { $("msg").textContent = String((e && e.message) || e).slice(0, 80); } }
+// the compass test: the first two subs in the list, one on the plain dropout and one behind the navigator, started on the same tick so they meet the same windows
+let compassOn = false;
+$("compassBtn").onclick = () => {
+  const ids = tank.snapshot().map((s) => s.id);
+  if (compassOn) { for (const id of ids) { const s = tank.subs.get(id); if (s && (s.event === "dropout" || s.event === "navigator")) tank.setEvent(id, null); } compassOn = false; $("msg").textContent = "compass test ended"; return; }
+  if (!ids.length) { $("msg").textContent = "no subs in the tank to test"; return; }
+  tank.setEvent(ids[0], "dropout"); if (ids[1]) tank.setEvent(ids[1], "navigator"); compassOn = true;
+  $("msg").textContent = ids[1] ? "compass test: " + tank.subs.get(ids[0]).name + " on the plain autopilot, " + tank.subs.get(ids[1]).name + " on the navigator" : "compass test: only one sub, on the plain autopilot (a second sub is needed for the navigator)";
+};
 $("floodBtn").onclick = () => setEvent("flood"); $("sinkBtn").onclick = () => setEvent("sink"); $("surfaceBtn").onclick = () => setEvent("surface"); $("clearBtn").onclick = () => setEvent(null);
 const DOT = { live: "#4ade80", standin: "#f6a623", offline: "#ff5a5a", err: "#555" }, WORD = { live: "live", standin: "stand-in", offline: "offline", err: "unreachable" };
 
@@ -205,7 +218,7 @@ function updateStats(snap) {
   for (const s of snap) {
     const cm = document.getElementById("c_" + s.id);
     if (cm && s.cmd) { const f = (v, w) => (v >= 0 ? "+" : "") + v.toFixed(w); cm.textContent = `pitch ${f(s.cmd.pitch, 2)} · yaw ${f(s.cmd.yaw, 2)} · thrust ${f(s.cmd.thrust, 2)} · ballast ${f(s.cmd.ballast, 2)}`; }
-    const tk = document.getElementById("t_" + s.id); if (tk) tk.textContent = readout(s);
+    const tk = document.getElementById("t_" + s.id); if (tk) tk.textContent = readout(s) || lineFor(s);
     const m = document.getElementById("m_" + s.id); if (!m) continue;
     m.textContent = `${s.pilot === "network" ? "network" : "PD autopilot"} · ${s.local ? "this box" : "from " + s.from} · ${s.depth.toFixed(0)} m · ${s.speed.toFixed(1)} m/s` + (s.hull && s.hull !== "nominal" ? ` · ${LABELS[s.hull] || s.hull}` : "") + (s.lost ? ` · lost ${s.lost}×` : "");
   }
@@ -217,6 +230,14 @@ function drawSub(g, px, py, heading, hue, len, sel) {
   g.beginPath(); g.ellipse(0, 0, len, len * 0.28, 0, 0, Math.PI * 2); g.fill(); g.stroke();
   g.fillStyle = "#0006"; g.fillRect(len * 0.1, -len * 0.38, len * 0.2, len * 0.14);
   g.restore();
+}
+const cv = $("compassView"), cg = cv.getContext("2d"); let tracePlain = [], traceNav = [], lastTrace = 0;
+function drawCompass(snap) {
+  const p = pair(snap), now = performance.now() / 1000;
+  if (now - lastTrace >= 0.1) { lastTrace = now; if (p.plain) tracePlain = pushTrace(tracePlain, p.plain, now); if (p.nav) traceNav = pushTrace(traceNav, p.nav, now); if (!p.plain && tracePlain.length) tracePlain = []; if (!p.nav && traceNav.length) traceNav = []; }
+  cg.clearRect(0, 0, cv.width, cv.height);
+  drawDial(cg, 250, 120, 80, dialInfo(p.plain), "plain autopilot"); drawDial(cg, 750, 120, 80, dialInfo(p.nav), "navigator");
+  drawTrace(cg, 20, 235, 960, 85, tracePlain, traceNav);
 }
 function render() {
   const snap = tank.snapshot();
@@ -233,6 +254,7 @@ function render() {
     drawSub(pg, s.x * sx, s.y * sy, s.heading, s.hue, 22, sel); drawSub(sg, s.x * dx, s.depth * dz, -s.pitch, s.hue, 16, sel);
     pg.fillStyle = sel ? "#fff" : "#dbe7ff"; pg.font = "16px monospace"; pg.fillText(s.name, s.x * sx + 26, s.y * sy - 10);
   }
+  drawCompass(snap);
   if (view3d) view3d.render(snap, performance.now() / 1000);
   updateStats(snap);
 }

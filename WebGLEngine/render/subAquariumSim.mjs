@@ -20,6 +20,8 @@ import * as H from "../physics/mechanics/subHulls.mjs";
 import * as FL from "../brain/floodTask.mjs";
 import * as EP from "../brain/emergencyPilot.mjs";
 import * as SP from "../brain/surfacePilot.mjs";
+import { turnWorld } from "../tools/subDropout.mjs";
+import { navigator as deadReckoning } from "../tools/subNavigator.mjs";
 
 export const LENGTH = 500, WIDTH = 300, MARGIN = 60, DEPTH_MIN = 14, DEPTH_MAX = 40, TRAIL = 80, TRAIL_EVERY = 0.5, MAX_STEP = 0.1;
 const DT = S.DT, wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
@@ -33,7 +35,16 @@ const hash = (str) => { let h = 2166136261; for (let i = 0; i < str.length; i++)
 //   "sink"     the same leak and NO rescue: the autopilot blows its tank to the stop and still sinks to the seabed; the boat is lost and put back (the count shows it)
 //   "surface"  brain/surfacePilot.mjs's wrap with `surface: true` in the target: the boat rises, blows its tank and rides on its buoyancy with the tower out of the water
 // setEvent(id, null) ends it: the leak stops, the tank state goes (the boat is repaired and the weight is back: it is an aquarium), the sub is flown as before. Pure like the rest: no clock but the tank's.
-export const EVENTS = Object.freeze(["flood", "sink", "surface"]);
+export const EVENTS = Object.freeze(["flood", "sink", "surface", "dropout", "navigator"]);
+// THE COMPASS EVENTS (tools/subDropout.mjs and tools/subNavigator.mjs, rung 4a, in the tank): for the event's own clock the compass reports for COMPASS.darkFrom seconds, then stops for COMPASS.darkLen seconds, and repeats every COMPASS.period.
+//   "dropout"    the plain pilot, shown a heading that stays at the last valid one while the compass is dark (a rotated copy of the world: body rates, pitch, depth and speed stay true)
+//   "navigator"  the SAME pilot behind the dead-reckoning navigator: it integrates the vessel's own heading rate through the dark and hands the pilot that estimate. Started on two subs at once the two meet the same windows.
+// Neither needs a tank: the sub keeps its hull's own model. The snapshot's `compass` says { valid, seen (the heading the pilot is shown, rad), error (seen less true, wrapped, rad) }.
+export const COMPASS = Object.freeze({ period: 40, darkFrom: 10, darkLen: 16 });
+/** Is the compass reporting at event time t (seconds)? */
+export const compassValidAt = (t) => { const p = ((t % COMPASS.period) + COMPASS.period) % COMPASS.period; return !(p >= COMPASS.darkFrom && p < COMPASS.darkFrom + COMPASS.darkLen); };
+const isCompass = (ev) => ev === "dropout" || ev === "navigator";
+const needsTank = (ev) => ev === "flood" || ev === "sink" || ev === "surface";
 export const LEAK = 0.06;
 const TANK_FIELDS = Object.freeze({ tankRate: FL.FLOOD_SPEC.tankRate, airMax: FL.FLOOD_SPEC.airMax, emergencyRate: FL.FLOOD_SPEC.emergencyRate, emergencyAirCost: FL.FLOOD_SPEC.emergencyAirCost, dropMass: FL.FLOOD_SPEC.dropMass });
 // the tank is 50 m deep and a sub may be 40 m down when the leak starts, so the rescue works to the room there is: blow at 2 m deeper than the held depth, drop the weight at 4 (brain/emergencyPilot.mjs defaults, 5 and 10, are the flood task's, where a boat starts 25..35 m down)
@@ -68,14 +79,30 @@ export function createTank({ hull = "nominal" } = {}) {
         sub.target = { depth: DEPTH_MIN + r * (DEPTH_MAX - DEPTH_MIN), heading: (q - 0.5) * 2 * Math.PI, speed: 1.5 + z * 1.5 };
         sub.nextTarget = sub.age + 20 + sub.rng() * 25;
     }
+    // the compass events' pilot: the same inner pilot, shown the held heading in the dark (tools/subDropout.mjs turnWorld), behind the dead-reckoning navigator for "navigator". The navigator tells a new target by its IDENTITY, and the
+    // tank makes a fresh target object every tick outside the steering box, so the pilot is handed ONE object that is rewritten each tick.
+    function compassPilot(sub, nav) {
+        const inner = nav ? deadReckoning(sub.pilot) : sub.pilot, tgt = {}; let held = null;
+        return (state, t, current) => {
+            Object.assign(tgt, t);
+            const valid = compassValidAt(sub.eventT), psi = S.attitude(state).heading;
+            if (valid || held === null) held = psi;
+            if (valid) { sub.compass = { valid: true, seen: psi, error: 0 }; return inner(state, tgt, current, { compassValid: 1, dt: sub.tickDt }); }
+            const seen = turnWorld(state, current, held - psi);
+            const cmd = inner(seen.state, tgt, seen.current, { compassValid: 0, dt: sub.tickDt });
+            const b = nav ? inner.last.estimate : held;
+            sub.compass = { valid: false, seen: b, error: wrap(b - psi) };
+            return cmd;
+        };
+    }
     function clearEvent(sub) {
         if (!sub.event) return;
         if (sub.state && sub.state.tank) { const { tank, ...rest } = sub.state; sub.state = rest; }
-        sub.event = null; sub.eventT = 0; sub.eventModel = null; sub.eventPilot = null;
+        sub.event = null; sub.eventT = 0; sub.eventModel = null; sub.eventPilot = null; sub.compass = null;
     }
     function add(entry) {
         const rng = mulberry(hash(entry.id));
-        const sub = { id: entry.id, name: entry.name, hue: entry.hue, pilotKind: entry.pilot, from: entry.from, local: !!entry.local, rng, pilot: pilotFor(entry), state: null, target: null, nextTarget: 0, age: 0, lost: 0, wasInside: true, status: "swimming", trail: [], trailT: 0, event: null, eventT: 0, eventModel: null, eventPilot: null, holdDepth: 0 };
+        const sub = { id: entry.id, name: entry.name, hue: entry.hue, pilotKind: entry.pilot, from: entry.from, local: !!entry.local, rng, pilot: pilotFor(entry), state: null, target: null, nextTarget: 0, age: 0, lost: 0, wasInside: true, status: "swimming", trail: [], trailT: 0, event: null, eventT: 0, eventModel: null, eventPilot: null, holdDepth: 0, compass: null };
         sub.state = spawn(entry, rng); retarget(sub);
         subs.set(entry.id, sub);
         return sub;
@@ -99,9 +126,12 @@ export function createTank({ hull = "nominal" } = {}) {
             if (ev !== null && ev !== undefined && ev !== "" && !EVENTS.includes(ev)) throw new Error(`subAquariumSim.setEvent: unknown event "${ev}" (${EVENTS.join(", ")})`);
             if (!sub) return null;
             if (ev === null || ev === undefined || ev === "") { clearEvent(sub); return null; }
-            if (!sub.event) { sub.eventModel = withTank(MODEL); sub.state = { ...sub.state, tank: { ...S.initialTank(sub.eventModel), level: sub.cmd ? Math.max(-1, Math.min(1, sub.cmd.ballast)) : 0 } }; }
-            sub.event = ev; sub.eventT = 0; sub.holdDepth = -sub.state.pos[2];
-            sub.eventPilot = ev === "flood" ? (trimsOut(sub.eventModel) ? sub.pilot : EP.wrap(sub.pilot, RESCUE)) : ev === "surface" ? SP.wrap(sub.pilot, { model: sub.eventModel }) : sub.pilot;
+            if (needsTank(ev)) {
+                if (!sub.state.tank) { sub.eventModel = withTank(MODEL); sub.state = { ...sub.state, tank: { ...S.initialTank(sub.eventModel), level: sub.cmd ? Math.max(-1, Math.min(1, sub.cmd.ballast)) : 0 } }; }
+            } else if (sub.state.tank) { const { tank, ...rest } = sub.state; sub.state = rest; sub.eventModel = MODEL; }   // a compass event has no tank
+            else sub.eventModel = MODEL;
+            sub.event = ev; sub.eventT = 0; sub.holdDepth = -sub.state.pos[2]; sub.compass = null;
+            sub.eventPilot = ev === "flood" ? (trimsOut(sub.eventModel) ? sub.pilot : EP.wrap(sub.pilot, RESCUE)) : ev === "surface" ? SP.wrap(sub.pilot, { model: sub.eventModel }) : isCompass(ev) ? compassPilot(sub, ev === "navigator") : sub.pilot;
             return ev;
         },
         /** Reconcile with the aquarium's list [{ id, name, hue, pilot, from, local, weights }]: new ids join, ids that are gone leave, the ones that stay keep swimming. Returns { added, removed }. */
@@ -124,8 +154,9 @@ export function createTank({ hull = "nominal" } = {}) {
                     if (!inside && sub.wasInside) { sub.target = { depth: sub.target.depth, heading: wrap(headingTo(x, y, LENGTH / 2, WIDTH / 2) + (sub.rng() - 0.5) * 0.8), speed: Math.min(sub.target.speed, 2.5) }; sub.nextTarget = sub.age + 15 + sub.rng() * 15; }
                     sub.wasInside = inside;
                     const t = inside ? sub.target : { depth: sub.target.depth, heading: headingTo(x, y, LENGTH / 2, WIDTH / 2), speed: Math.min(sub.target.speed, 2) };
+                    sub.tickDt = dt;   // the navigator integrates over THIS tick, which is shorter than DT when a frame ends mid-tick
                     const ev = sub.event, model = ev ? sub.eventModel : MODEL;
-                    const tg = ev === "surface" ? { ...t, surface: true } : ev ? { ...t, depth: sub.holdDepth } : t;   // a flooded boat holds the depth it was at; a surfacing one is asked to surface
+                    const tg = ev === "surface" ? { ...t, surface: true } : ev === "flood" || ev === "sink" ? { ...t, depth: sub.holdDepth } : t;   // a flooded boat holds the depth it was at; a surfacing one is asked to surface
                     const cmd = (ev ? sub.eventPilot : sub.pilot)(s, tg, [0, 0, 0]);
                     const res = S.stepSub(model, s, cmd, dt, [0, 0, 0], ev === "flood" || ev === "sink" ? FL.leakAt({ leak: LEAK }, sub.eventT) : 0);
                     if (ev) sub.eventT += dt;
@@ -141,7 +172,7 @@ export function createTank({ hull = "nominal" } = {}) {
         },
         /** What a page draws: one plain record per sub. */
         snapshot() {
-            return [...subs.values()].map((sub) => { const a = S.attitude(sub.state); return { hull: hullName, id: sub.id, name: sub.name, hue: sub.hue, pilot: sub.pilotKind, from: sub.from, local: sub.local, x: sub.state.pos[0], y: sub.state.pos[1], depth: a.depth, heading: a.heading, pitch: a.pitch, speed: a.speed, cmd: sub.cmd ? { ...sub.cmd } : { pitch: 0, yaw: 0, thrust: 0, ballast: 0 }, event: sub.event, tank: sub.state.tank ? { level: sub.state.tank.level, air: sub.state.tank.air, airMax: sub.eventModel ? sub.eventModel.spec.airMax : null, released: sub.state.tank.released, blowing: !!(sub.cmd && sub.cmd.blow > 0.5) } : null, target: sub.target, lost: sub.lost, status: sub.status, trail: sub.trail.slice() }; });
+            return [...subs.values()].map((sub) => { const a = S.attitude(sub.state); return { hull: hullName, id: sub.id, name: sub.name, hue: sub.hue, pilot: sub.pilotKind, from: sub.from, local: sub.local, x: sub.state.pos[0], y: sub.state.pos[1], depth: a.depth, heading: a.heading, pitch: a.pitch, speed: a.speed, cmd: sub.cmd ? { ...sub.cmd } : { pitch: 0, yaw: 0, thrust: 0, ballast: 0 }, event: sub.event, compass: sub.compass ? { ...sub.compass } : null, tank: sub.state.tank ? { level: sub.state.tank.level, air: sub.state.tank.air, airMax: sub.eventModel ? sub.eventModel.spec.airMax : null, released: sub.state.tank.released, blowing: !!(sub.cmd && sub.cmd.blow > 0.5) } : null, target: sub.target, lost: sub.lost, status: sub.status, trail: sub.trail.slice() }; });
         },
     };
 }

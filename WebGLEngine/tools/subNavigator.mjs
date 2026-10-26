@@ -23,14 +23,14 @@ export function headingRate(state) {
     return -(om[2] - f[2] * (f[0] * om[0] + f[1] * om[1] + f[2] * om[2])) / h2;
 }
 
-/** `inner` ((state, target, current, aux) -> controls) behind a dead-reckoning navigator. `opts.dt` is the tick (default the simulator's). Exposes `last` ({ estimate, shown, rate }) for the gate. */
+/** `inner` ((state, target, current, aux) -> controls) behind a dead-reckoning navigator. `opts.dt` is the tick (default the simulator's); a caller whose ticks differ passes `aux.dt` (seconds, above 0) on each call and that is used instead. Exposes `last` ({ estimate, shown, rate }) for the gate. */
 export function navigator(inner, opts = {}) {
     const dt = opts.dt ?? S.DT; let target = null, est = 0, lastRate = 0, started = false;
     const wrapped = (state, tgt, current, aux = null) => {
         if (tgt !== target) { target = tgt; started = false; }
         const rate = headingRate(state), shown = S.attitude(state).heading, valid = !(aux && aux.compassValid === 0);
         if (valid || !started) { est = shown; lastRate = rate; started = true; wrapped.last = { estimate: est, shown, rate }; return inner(state, tgt, current, aux); }
-        est += 0.5 * (lastRate + rate) * dt; lastRate = rate;
+        est += 0.5 * (lastRate + rate) * (aux.dt > 0 ? aux.dt : dt); lastRate = rate;   // v4901: a caller whose ticks are not all the same length (the Sub Aquarium's tank clips its last tick to the frame) says how long THIS one was
         wrapped.last = { estimate: est, shown, rate };
         const seen = turnWorld(state, current, est - shown);
         return inner(seen.state, tgt, seen.current, aux);
