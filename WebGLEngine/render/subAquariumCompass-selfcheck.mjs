@@ -54,12 +54,13 @@ await guarded("section 2", async () => {
 
 sec("3. the schedule, seen from the tank");
 await guarded("section 3", async () => {
-    const run = (id, seconds) => { const t = A.createTank(); t.setCompass("dropout"); t.sync([entry(id)]); const flags = [], left = []; let phase = null; for (let i = 0; i < Math.round(seconds * 30); i++) { t.step(DT); const s = t.snapshot()[0]; flags.push(s.dark); left.push(s.darkLeft); phase = t.subs.get(id).phase; } return { flags, left, phase }; };
+    const run = (id, seconds) => { const t = A.createTank(); t.setCompass("dropout"); t.sync([entry(id)]); const flags = [], left = [], shown = []; let phase = null; for (let i = 0; i < Math.round(seconds * 30); i++) { t.step(DT); const s = t.snapshot()[0]; flags.push(s.dark); left.push(s.darkLeft); phase = t.subs.get(id).phase; shown.push([s.shown, s.heading, t.subs.get(id).held]); } return { flags, left, phase, shown }; };
     const a = run("alpha", 200), b = run("beta", 200), a2 = run("alpha", 200);
     const age = (i) => (i + 1) * DT;
     ok("!! on every tick of 200 s the dark flag is what compassState says for the sub's age and its own phase, and the seconds left are compassState's (1e-6)", a.flags.every((f, i) => f === A.compassState(age(i), a.phase).dark) && a.left.every((l, i) => near(l, A.compassState(age(i), a.phase).left, 1e-6)) && a.flags.some(Boolean) && !a.flags.every(Boolean));
     let runs = []; let n = 0; a.flags.forEach((f, i) => { if (f) n++; else if (n) { runs.push(n); n = 0; } });
     ok("!! the dark stretches are 16 s long (480 ticks, one tick either way) and the compass is dark a third of the time (within four percent)", runs.length >= 3 && runs.every((r) => Math.abs(r - 480) <= 1) && Math.abs(a.flags.filter(Boolean).length / a.flags.length - 1 / 3) < 0.04, `runs ${J(runs)}, share ${(a.flags.filter(Boolean).length / a.flags.length).toFixed(3)}`);
+    ok("!! the snapshot's shown heading is the compass reading: the TRUE heading on a lit tick and the held heading (constant through the stretch, the heading of the last lit tick) on a dark one", a.shown.every(([sh, h, held], i) => (a.flags[i] ? sh === held : sh === h)) && a.shown.some(([sh, h], i) => a.flags[i] && Math.abs(sh - h) > 0.05));
     const first = a.flags.indexOf(true);
     ok("!! the seconds left count down by one tick a tick inside a stretch: 16 at its start, then 15.967 (1e-6)", near(a.left[first], 16, 0.04) && near(a.left[first] - a.left[first + 1], DT, 1e-6) && near(a.left[first] - a.left[first + 100], 100 * DT, 1e-6) && a.left.every((l, i) => (l === 0) === !a.flags[i]));
     ok("!! two ids have two phases and so two schedules; the same id is the same schedule twice (a tank is deterministic)", a.phase !== b.phase && a.phase >= 0 && a.phase < 48 && b.phase >= 0 && b.phase < 48 && a.flags.join() !== b.flags.join() && a.flags.join() === a2.flags.join() && a.phase === a2.phase);
