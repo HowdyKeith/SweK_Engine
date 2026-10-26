@@ -73,6 +73,7 @@
   <div style="color:#5f7590;line-height:1.4;">Every fruit-fly pilot is the same network, wired like a fly's Giant Fiber circuit, with the autopilot's contract (pitch, roll, yaw and throttle from the pointing errors, the rates and the air data); a choice picks which WEIGHTS fly it. The PD autopilot is not a network, and the hand weights are that autopilot written through the network (they fly the same flight); the shipped pilot is the same network with weights trained on the job the number under each name is graded on. The GPU brain is a DIFFERENT network (two dense layers, 1,796 weights) trained on the same job and run on a WebGPU device. A change applies at once, mid-flight; Start also respawns. <b>You</b>: S/&darr; pull back (nose up), W/&uarr; push, A/&larr; roll left, D/&rarr; roll right, Q/E rudder, R/F throttle up/down; neutral is trimmed for your airspeed.</div>
 </div>
 <div id="board"></div>
+<div id="brainBox" style="position:fixed;right:8px;bottom:8px;width:520px;background:#0b131fcc;border:1px solid #1c2c44;border-radius:6px;padding:4px 6px;z-index:5"><div style="font:11px ui-monospace,Menlo,monospace;color:#59d1ff;display:flex;justify-content:space-between"><span>Selected brain activity</span><span id="brainWho" style="color:#7c93b8"></span></div><canvas id="brainView" width="520" height="250" style="width:520px;height:250px;display:block"></canvas></div>
 <div id="hint">real physics: gravity, a stalling wing, a ground that ends the flight &mdash; drag to turn the camera, scroll to zoom, double-click to reset (chase and orbit cameras both)</div>
 
 <script type="importmap">
@@ -88,6 +89,7 @@ import * as RB from "/physics/mechanics/rigidBody6dof.mjs";
 import * as F from "/physics/mechanics/flightModel6dof.mjs";
 import * as AF from "/brain/autopilotFlight.mjs";
 import * as MA from "/brain/manualAssist.mjs";
+import { flightPanel, drawPanel } from "/render/brainPanel.mjs";
 import * as PF from "/brain/pilotFlightPolicy.mjs";
 import * as MF from "/brain/pilotFlightMlp.mjs";
 import { GpuPilotBrain } from "/brain/pilotFlightGpu.mjs";
@@ -225,16 +227,16 @@ function resolvePilots() {
   const key = specs.join("|") + "|" + avail; if (pilots.length && pilotKey === key) return pilots;
   pilotKey = key; const notes = [];
   pilots = specs.map((spec, i) => {
-    if (spec === "manual") return { fn: manualPilot, label: "you (keyboard)", manual: true };
+    if (spec === "manual") return { fn: manualPilot, label: "you (keyboard)", manual: true, kind: "manual" };
     if (spec === "gpu" || spec === "gpuHand") {
       const brain = gpuBrains.get(spec === "gpu" ? "trained" : "hand"), sw = gpuInfo && gpuInfo.software ? ", software adapter" : "";
-      if (brain) return { gpu: brain, label: spec === "gpu" ? `GPU brain pilot (WebGPU${sw})` : `GPU brain, hand weights (WebGPU${sw})` };
+      if (brain) return { gpu: brain, label: spec === "gpu" ? `GPU brain pilot (WebGPU${sw})` : `GPU brain, hand weights (WebGPU${sw})`, kind: "gpu", policy: MF, weights: brain.weights };
       notes.push(`${spec}: no GPU brain here (${gpuLost || gpuErr || gpuWErr || "the shipped GPU pilot has not loaded"}); the fruit fly's hand weights fly instead`);
-      return { fn: PF.pilotFor(PF.handWeights()), label: "hand weights (no GPU brain here)" };
+      { const hw = PF.handWeights(); return { fn: PF.pilotFor(hw), label: "hand weights (no GPU brain here)", kind: "fly", policy: PF, weights: hw }; }
     }
     const r = PR.resolveTeam("A", spec, rosterCtx(), N); notes.push(...r.problems);
-    if (r.scripted) return { fn: (s, t, w) => AF.pilot(s, t, w), label: NAMES.scriptedName };
-    return { fn: PF.pilotFor(r.weights[i]), label: r.label };
+    if (r.scripted) return { fn: (s, t, w) => AF.pilot(s, t, w), label: NAMES.scriptedName, kind: "autopilot" };
+    return { fn: PF.pilotFor(r.weights[i]), label: r.label, kind: "fly", policy: PF, weights: r.weights[i] };
   });
   const el = document.getElementById("rosterNote"); if (el) el.textContent = pilots.map((p, i) => `${i + 1}: ${p.label}`).join("  |  ") + (notes.length ? "  --  " + notes.join("; ") : "");
   return pilots;
@@ -393,7 +395,18 @@ function updateCamera() {
 // ---- the board: one card per aircraft, the mission, the stat line ---------------------------------------------------------------------------------------------------------------------------------------------
 const board = document.getElementById("board");
 for (let i = 0; i < N; i++) { const d = document.createElement("div"); d.className = "card"; d.id = "card" + i; board.appendChild(d); }
+// the selected brain (the aircraft the camera follows): its network's bars and the policy map, five times a second (render/brainPanel.mjs)
+const brainCv = document.getElementById("brainView"), brainCtx = brainCv.getContext("2d"); let lastBrain = 0;
+function drawBrain() {
+  const now = performance.now(); if (now - lastBrain < 200) return; lastBrain = now;
+  const me = Number(document.getElementById("camTarget").value) || 0, s = fleet[me], p = resolvePilots()[me]; if (!s || !p) return;
+  const wind = windNow(tick), target = missionAt(tick);
+  const panel = flightPanel({ kind: p.kind || "autopilot", policy: p.policy, weights: p.weights, pilot: p.fn || (p.policy ? (st, t, w) => p.policy.pilotFor(p.weights)(st, t, w) : null), state: s.state, target, wind, stick: { pitch: s.controls.pitch, roll: s.controls.roll, yaw: s.controls.yaw, throttle: s.controls.throttle } });
+  document.getElementById("brainWho").textContent = `${me + 1}. ${p.label}`;
+  drawPanel(brainCtx, brainCv.width, brainCv.height, panel, { title: p.label });
+}
 function updateBoard() {
+  drawBrain();
   const tg = missionAt(tick), left = LEG_SECONDS - ((tick % LEG_TICKS) * DT), nxt = MISSION[(Math.floor(tick / LEG_TICKS) + 1) % MISSION.length], ps = resolvePilots();
   document.getElementById("mission").textContent = `target: altitude ${tg.altitude} m · heading ${(tg.heading * R2D).toFixed(0)}° · ${tg.airspeed} m/s   (next in ${left.toFixed(0)} s: ${nxt.altitude} m, ${(nxt.heading * R2D).toFixed(0)}°, ${nxt.airspeed} m/s)`;
   const wind = windNow(tick);
