@@ -18,7 +18,9 @@ import * as S from "../physics/mechanics/subModel6dof.mjs";
 import * as A from "./autopilotSub.mjs";
 
 export const SURFACED_DEPTH = 0.564;   // the centre of gravity of a boat blown to the stop, derived: R - 2 R (1 - ballastRange)
-export const SURFACE = Object.freeze({ nearDepth: 3 });
+export const SURFACE = Object.freeze({ nearDepth: 3, kBlowBrake: 4, blowBrakeFrom: 0.1, brakeRange: 0.1 });
+/** Where a vessel's centre of gravity floats with its tank blown to the stop: 2R(1 - ballastRange) - R below the surface (the submerged fraction is (R - z) / 2R and the weight is 1 - ballastRange of the buoyancy). The EXPLORER's is 0.564 m, a 25% main ballast's 0.3 m. */
+export const surfacedDepth = (model) => { const R = model.spec.radius; return 2 * R * (1 - model.spec.ballastRange) - R; };
 
 /** "dive" (no surface asked) | "rise" | "afloat". */
 export function stage(state, target, opts = {}) {
@@ -27,16 +29,16 @@ export function stage(state, target, opts = {}) {
     return -state.pos[2] < g.nearDepth ? "afloat" : "rise";
 }
 
-/** The wrapper: `base` is a pilot function (state, target, current) -> controls. `model` is the vessel (default the autopilot's). */
+/** The wrapper: `base` is a pilot function (state, target, current) -> controls. `opts.model` is the vessel (its float depth comes from surfacedDepth; without it the EXPLORER's SURFACED_DEPTH). */
 export const wrap = (base, opts = {}) => (state, target, current = [0, 0, 0]) => {
-    const st = stage(state, target, opts);
+    const st = stage(state, target, opts), SD = opts.model ? surfacedDepth(opts.model) : SURFACED_DEPTH;
     if (st === "dive") return base(state, target, current);
     if (st === "rise") {
-        const c = base(state, { ...target, depth: SURFACED_DEPTH }, current);
+        const c = base(state, { ...target, depth: SD }, current);
         // a finite bottle is RATIONED on the way up: the pilot's ballast law blows and floods with every correction of the depth, and measured on the flood vessel it spends the whole bottle (1.5) by the time a boat
         // from 38 m arrives, leaving the afloat blow nothing (it floated with the tank at -0.45). The planes carry a moving boat up; the tank is kept for the surface.
         return state.tank && Number.isFinite(state.tank.air) && c.ballast < 0 ? S.sanitize({ ...c, ballast: 0 }) : c;
     }
-    const g = { ...A.AUTOPILOT_SUB, ...opts }, d = A.guidance(state, { depth: SURFACED_DEPTH, heading: target.heading, speed: 0 }, current, opts), r = d.rates;
-    return S.sanitize({ pitch: d.sched * (g.kTheta * (0 - d.att.pitch) - g.kQ * r.pitch), yaw: d.sched * (g.kHdg * d.headingErr - g.kR * r.yaw) - g.kBeta * d.att.beta, thrust: 0, ballast: -1 });
+    const g = { ...A.AUTOPILOT_SUB, ...SURFACE, ...opts }, d = A.guidance(state, { depth: SD, heading: target.heading, speed: 0 }, current, opts), r = d.rates, brake = opts.model && opts.model.spec.ballastRange > g.brakeRange ? g.kBlowBrake : 0;
+    return S.sanitize({ pitch: d.sched * (g.kTheta * (0 - d.att.pitch) - g.kQ * r.pitch), yaw: d.sched * (g.kHdg * d.headingErr - g.kR * r.yaw) - g.kBeta * d.att.beta, thrust: 0, ballast: Math.min(1, -1 + brake * Math.max(0, d.climb - g.blowBrakeFrom)) });
 };

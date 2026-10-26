@@ -13,6 +13,12 @@
 //   6  THE FREEBOARD the derived float depth R - 2R(1 - ballastRange) is 0.564 and a boat trimmed neutral hangs at R = 0.6: the blow buys 3.6 cm, said plainly (the tower is what shows)
 //   7  THE FRONT DOOR the export list is pinned
 //
+//   6b THE HIGH RIDER (v4901) the same wrapper on a hull with a 25% ballast range floats at the depth derived from ITS model (0.3 m), on the plain vessel and with a tank
+//
+// HIGH RIDER LOG (v4901, 6b) -- EIGHT more, each in place, restored, red by name (rows red): G14 surfacedDepth a constant 3 | G15 the rise not flown to the model's float depth 0 THE FIRST TIME (the afloat law blows to the stop whatever the target says; the spy row now reads the depth the pilot underneath is asked for: 1)
+//   G16 the brake range compare inverted 5 | G17 no brake 3 | G18 brake on every vessel (it spends the EXPLORER's bottle) 3 | G19 brake gain 0.5 3 | G20 the brake keyed to sinking not rising 3 | G21 float depth with the sign of the range wrong 4
+// A first draft of the high rider's afloat law blew to -1 at 3 m and BROACHED in 4 of 4 flights (20.8 s in: a boat 25% light, rising at 2.7 m/s, leaves the water); the brake is the fix and the control row proves it matters. A first brake on EVERY vessel pumped the EXPLORER's bottle empty (level -0.746, air 0.00), so it is the big tank's alone.
+//
 // SABOTAGE LOG -- THIRTEEN, each applied to brain/surfacePilot.mjs in place, the gate run, the file restored; every one red by name (rows red in brackets):
 //   G1 surfaced depth 1.5 m 4 | G2 the afloat line at 6 m 2 | G3 at 1 m 2 | G4 3 m exactly counted afloat 1 | G5 the tank not blown afloat 5 | G6 screw at full afloat 3 | G7 pitch hold zeroed 1 | G8 heading hold zeroed 1
 //   G9 `surface` ignored 4 | G10 no rationing 2 (and a crash: the mutant leaves a pilot with no ballast to read) | G11 rationing applied on a vessel with no bottle 1 | G12 the rise flies the target's own depth 5 | G13 a dive flown to the surface depth 3
@@ -108,8 +114,39 @@ console.log("\n6. THE FREEBOARD");
     })());
 }
 
+console.log("\n6b. THE HIGH RIDER: a larger ballast range is a different SPEC, not a different pilot");
+{
+    const H = await import("../physics/mechanics/subHulls.mjs");
+    const hr = H.model("highRider"), hrTank = S.createSubModel(Object.freeze({ ...hr.spec, ...F.FLOOD_SPEC, ballastRange: 0.25, name: "high-rider-tank" }));
+    ok("!! surfacedDepth is derived from the model: 0.564 m for the EXPLORER (the constant), 0.3 m for a 25% main ballast, and the hull's crown stands 0.3 m out of the water against 4 cm", Math.abs(P.surfacedDepth(plain) - P.SURFACED_DEPTH) < 1e-9 && Math.abs(P.surfacedDepth(hr) - 0.3) < 1e-9 && Math.abs((hr.spec.radius - P.surfacedDepth(hr)) - 0.3) < 1e-9, `${P.surfacedDepth(plain).toFixed(4)} and ${P.surfacedDepth(hr).toFixed(4)} m`);
+    for (const [name, model] of [["high rider", hr], ["high rider with a tank", hrTank]]) {
+        let worst = { err: 0, speed: 0, ended: 0, n: 0 };
+        for (const d of [15, 38]) for (const v of [1.5, 2.5]) {
+            const w = P.wrap(A.pilot({ model }), { model });
+            let s2 = S.createState({ depth: d, speed: v, model }), ended = false;
+            for (let i = 0; i < 9000; i++) { const r = S.stepSub(model, s2, w(s2, { depth: 20, heading: 0, speed: 2, surface: true }, [0, 0, 0])); s2 = r.state; if (r.status !== "submerged") { ended = true; break; } }
+            const a = S.attitude(s2); worst.n++; if (ended) worst.ended++; worst.err = Math.max(worst.err, Math.abs(a.depth - P.surfacedDepth(model))); worst.speed = Math.max(worst.speed, a.speed);
+        }
+        ok(`!! ${name}: all ${worst.n} flights end afloat at ITS float depth (0.3 m, within 0.1 m), nearly stopped, none ended`, worst.ended === 0 && worst.err < 0.1 && worst.speed < 0.5, `worst depth error ${worst.err.toFixed(3)} m, speed ${worst.speed.toFixed(2)} m/s`);
+    }
+}
+
+{
+    const H = await import("../physics/mechanics/subHulls.mjs"), hr = H.model("highRider");
+    let ends = 0, n = 0;
+    for (const d of [15, 38]) for (const v of [1.5, 2.5]) {
+        const w = P.wrap(A.pilot({ model: hr }), { model: hr, brakeRange: 1 });   // the blow brake switched off
+        let s2 = S.createState({ depth: d, speed: v, model: hr }); n++;
+        for (let i = 0; i < 2400; i++) { const r = S.stepSub(hr, s2, w(s2, { depth: 20, heading: 0, speed: 2, surface: true }, [0, 0, 0])); s2 = r.state; if (r.status !== "submerged") { ends++; break; } }
+    }
+    ok("!! THE CONTROL: the same high rider with the blow brake off BROACHES (the centre leaves the water: a boat 25% light shoots out of the sea on its own momentum) in " + ends + " of " + n + " flights; the brake (ballast eased off while it is still rising fast) is what keeps it in", ends >= 2);
+    const spy = (model) => { let seen = null; P.wrap((st, t) => { seen = t.depth; return { pitch: 0, yaw: 0, thrust: 0, ballast: 0 }; }, { model })(S.createState({ depth: 20, speed: 2, model }), { depth: 20, heading: 0, speed: 2, surface: true }, [0, 0, 0]); return seen; };
+    ok("!! the rise is flown to the vessel's OWN float depth: the pilot underneath is asked for 0.564 m on the EXPLORER and 0.3 m on the high rider (and 0.564 with no model named)", Math.abs(spy(plain) - 0.564) < 1e-9 && Math.abs(spy(hr) - 0.3) < 1e-9, `${spy(plain)} and ${spy(hr)}`);
+    ok("the brake belongs to the big tank: the EXPLORER's wrapper sends a full blow (-1) on a rising boat just below the surface, the high rider's eases off", (() => { const up = (model) => { const s3 = S.createState({ depth: 2, speed: 2, model }); return P.wrap(A.pilot({ model }), { model })({ ...s3, vel: [s3.vel[0], s3.vel[1], 1.0] }, { depth: 20, heading: 0, speed: 2, surface: true }, [0, 0, 0]).ballast; }; return up(plain) === -1 && up(H.model("highRider")) > -0.5; })());
+}
+
 console.log("\n7. THE FRONT DOOR");
-ok("surfacePilot's exports are pinned and SURFACE is frozen at 3 m", Object.keys(P).sort().join(",") === "SURFACE,SURFACED_DEPTH,stage,wrap" && Object.isFrozen(P.SURFACE) && P.SURFACE.nearDepth === 3, Object.keys(P).sort().join(","));
+ok("surfacePilot's exports are pinned and SURFACE is frozen at 3 m", Object.keys(P).sort().join(",") === "SURFACE,SURFACED_DEPTH,stage,surfacedDepth,wrap" && Object.isFrozen(P.SURFACE) && P.SURFACE.nearDepth === 3, Object.keys(P).sort().join(","));
 
 console.log(fails ? `\n${fails} FAIL` : "\nall checks pass");
 process.exit(fails ? 1 : 0);

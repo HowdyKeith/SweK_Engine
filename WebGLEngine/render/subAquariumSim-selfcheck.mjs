@@ -156,7 +156,7 @@ console.log("\n10. THE HULL");
     ok("!! an unknown hull name throws and changes NOTHING (the tank keeps its hull and its subs)", threw && t.hull === "munk5" && t.snapshot().length === 2);
     let threw2 = false; try { A.createTank({ hull: "nope" }); } catch { threw2 = true; }
     ok("an unknown hull name at creation throws too", threw2);
-    ok("!! every named hull has a picker label and builds a finite model, and the labels cover exactly the hulls (a hull with no label would be an unreachable option in the page)", Object.keys(H.SPECS).sort().join() === Object.keys(H.LABELS).sort().join() && Object.keys(H.SPECS).every((n) => Number.isFinite(H.model(n).mass)) && Object.keys(H.SPECS).length === 12);
+    ok("!! every named hull has a picker label and builds a finite model, and the labels cover exactly the hulls (v4901 added highRider; a hull with no label would be an unreachable option in the page)", Object.keys(H.SPECS).sort().join() === Object.keys(H.LABELS).sort().join() && Object.keys(H.SPECS).every((n) => Number.isFinite(H.model(n).mass)) && Object.keys(H.SPECS).length === 13);
     const x5 = A.createTank({ hull: "munk5" }); x5.sync([entry("n", { pilot: "network", weights: seed[4].weights })]); run(x5, 300); const sn = x5.snapshot()[0];
     ok("!! even on the extreme Munk x5 hull a five-minute swim leaves a finite state in the tank (the boat may be lost and respawned, never NaN)", Number.isFinite(sn.x) && Number.isFinite(sn.y) && Number.isFinite(sn.depth));
 }

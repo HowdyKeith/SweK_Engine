@@ -38,6 +38,9 @@ export const LEAK = 0.06;
 const TANK_FIELDS = Object.freeze({ tankRate: FL.FLOOD_SPEC.tankRate, airMax: FL.FLOOD_SPEC.airMax, emergencyRate: FL.FLOOD_SPEC.emergencyRate, emergencyAirCost: FL.FLOOD_SPEC.emergencyAirCost, dropMass: FL.FLOOD_SPEC.dropMass });
 // the tank is 50 m deep and a sub may be 40 m down when the leak starts, so the rescue works to the room there is: blow at 2 m deeper than the held depth, drop the weight at 4 (brain/emergencyPilot.mjs defaults, 5 and 10, are the flood task's, where a boat starts 25..35 m down)
 export const RESCUE = Object.freeze({ blowDepth: 2, releaseDepth: 4 });
+// a vessel whose tank can offset the leak twice over (a 25% main ballast against a 6% leak) has no emergency: its own ballast law trims it out, and the full blow of the rescue would only spend the bottle (measured: it emptied the 1.5 bottle
+// in 15 s on the high rider and the boat grounded). The EXPLORER's 3% cannot, and gets the rescue.
+export const trimsOut = (model) => model.spec.ballastRange >= 2 * LEAK;
 const withTank = (model) => S.createSubModel(Object.freeze({ ...model.spec, ...TANK_FIELDS }));
 
 /** The heading that points from (x, y) at (tx, ty), in the engine's convention (0 = +x, a right turn increases it). */
@@ -98,7 +101,7 @@ export function createTank({ hull = "nominal" } = {}) {
             if (ev === null || ev === undefined || ev === "") { clearEvent(sub); return null; }
             if (!sub.event) { sub.eventModel = withTank(MODEL); sub.state = { ...sub.state, tank: { ...S.initialTank(sub.eventModel), level: sub.cmd ? Math.max(-1, Math.min(1, sub.cmd.ballast)) : 0 } }; }
             sub.event = ev; sub.eventT = 0; sub.holdDepth = -sub.state.pos[2];
-            sub.eventPilot = ev === "flood" ? EP.wrap(sub.pilot, RESCUE) : ev === "surface" ? SP.wrap(sub.pilot, { model: sub.eventModel }) : sub.pilot;
+            sub.eventPilot = ev === "flood" ? (trimsOut(sub.eventModel) ? sub.pilot : EP.wrap(sub.pilot, RESCUE)) : ev === "surface" ? SP.wrap(sub.pilot, { model: sub.eventModel }) : sub.pilot;
             return ev;
         },
         /** Reconcile with the aquarium's list [{ id, name, hue, pilot, from, local, weights }]: new ids join, ids that are gone leave, the ones that stay keep swimming. Returns { added, removed }. */

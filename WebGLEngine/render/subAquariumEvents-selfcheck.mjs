@@ -9,6 +9,7 @@
 //   4  SINK             the same leak with no rescue: the boat grounds, is counted lost, and comes back with the event cleared
 //   5  SURFACE          from wherever it was, the boat comes up and rides: depth under 1 m, speed under 0.5 m/s, tank blown to the stop with air left, never lost
 //   6  ENDING           ending a surface puts the boat back to wandering (it is below 5 m again within a minute) with no tank state; swapping flood -> surface keeps the dropped weight
+//   8  THE HIGH RIDER  surfacing on the hull with a 25% ballast range floats at its own 0.3 m; a 6% flood on it is trimmed out by the tank with no weight dropped
 //   7  THE REST         an event on one sub leaves the others in the tank bit-identical to a tank where nothing happened; setHull clears every event
 //
 // SABOTAGE LOG -- SEVENTEEN, each applied to render/subAquariumSim.mjs in place, the gate run, the file restored; every one red by name (rows red in brackets):
@@ -96,6 +97,15 @@ console.log("\n7. THE REST");
     ok("!! a flood on sub a leaves sub b swimming to the bit like the tank where nothing happened", JSON.stringify([ra.x, ra.y, ra.depth, ra.heading]) === JSON.stringify([rb.x, rb.y, rb.depth, rb.heading]));
     b.setEvent("a", "surface"); b.setHull("munk3");
     ok("!! setHull clears every event and every tank", b.snapshot().every((s) => s.event === null && s.tank === null));
+}
+
+console.log("\n8. THE HIGH RIDER (a hull with a 25% main ballast, picked from the hull list)");
+{
+    const t = A.createTank({ hull: "highRider" }); t.sync([entry("a")]); run(t, 40); t.setEvent("a", "surface"); run(t, 260);
+    const s = snap(t);
+    ok("!! told to surface on the high rider, the boat rides with its centre 0.3 m down (0.2..0.4 m), not the EXPLORER's 0.564, nearly stopped, never lost", s.depth > 0.2 && s.depth < 0.4 && s.speed < 0.6 && s.lost === 0, `${s.depth.toFixed(3)} m, ${s.speed.toFixed(2)} m/s, lost ${s.lost}`);
+    const u = A.createTank({ hull: "highRider" }); u.sync([entry("a")]); run(u, 40); const d0 = snap(u).depth; u.setEvent("a", "flood"); let worst = 0; for (let k = 0; k < 24; k++) { run(u, 5); worst = Math.max(worst, Math.abs(snap(u).depth - d0)); }
+    ok("!! a 6% flood on the high rider is within what its tank trims out: it holds its depth to 8 m, is never lost and does NOT drop its weight (the EXPLORER's tank cannot do that)", worst < 8 && snap(u).lost === 0 && snap(u).tank && snap(u).tank.released === false, `worst ${worst.toFixed(2)} m, released ${snap(u).tank && snap(u).tank.released}`);
 }
 
 console.log(fails ? `\n${fails} FAIL` : "\nall checks pass");
