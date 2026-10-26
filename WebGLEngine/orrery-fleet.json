@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "0fa4e216ac567937c0e3abbddcfef4196b12481e",
+ "head": "a669772a093accbaabd9c6501ba4800b02a888fc",
  "bodies": {
   "box3d": [
    {
@@ -850,8 +850,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 3702873,
-    "sha": "d4cc23c4ec8beb962f40866504b88fc497abc964"
+    "bytes": 3702282,
+    "sha": "926188a6177de585cd2f5bc653e246ccb3667324"
    },
    {
     "path": "mpm3d.html",
@@ -885,8 +885,8 @@
    },
    {
     "path": "render/subAquarium3d-selfcheck.mjs",
-    "bytes": 17711,
-    "sha": "1ce4aafb9d645f241bf7c90c46cc0d92e0ad0116"
+    "bytes": 22697,
+    "sha": "5f09a90e91768ffc0c1447f9e011bbb547622dfa"
    },
    {
     "path": "render/svgExtrude.js",
@@ -945,8 +945,8 @@
    },
    {
     "path": "sub-aquarium.html",
-    "bytes": 16920,
-    "sha": "c7457cf5aa5a8e3a11887249e81e21dda69aed83"
+    "bytes": 18170,
+    "sha": "5f09a90e91768ffc0c1447f9e011bbb547622dfa"
    },
    {
     "path": "svg-forge.html",
