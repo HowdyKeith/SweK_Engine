@@ -132,7 +132,7 @@ export async function command(argv, io = {}) {
     }
     let circuit; try { circuit = o.circuitFile ? loadCircuit(o.circuitFile) : loadCircuit(); } catch (e) { err("subEstimatorStudy: cannot read the circuit file: " + e.message); return 1; }
     let have = []; if (exists(o.out)) { try { have = readRecords(readFile(o.out)); } catch (e) { err("subEstimatorStudy: " + e.message); return 1; } }
-    const stale = have.filter((r) => r.smoke !== o.smoke || r.auditBase !== (o.smoke ? null : o.auditBase));
+    const stale = have.filter((r) => r.auditBase !== (o.smoke ? null : o.auditBase));   // a smoke record has no audit range, so the range alone tells a smoke record from a real one
     if (stale.length) { err(`subEstimatorStudy: ${o.out} holds ${stale.length} record(s) of another audit range or a smoke run (${stale.map((r) => r.spec).join(", ")}): it is not mixed with this run -- use another --out`); return 1; }
     const done = new Set(have.map((r) => r.spec)), specs = parseSpecs(o.specs), todo = specs.filter((s) => !done.has(specName(s))), needRefs = !done.has("refs");
     out(`[subEstimatorStudy] ${specs.length} circuits asked for, ${specs.length - todo.length} already in ${o.out}, ${todo.length} to run; references ${needRefs ? "to run" : "already there"}; audits on ${o.smoke ? "a few throwaway dives" : "base " + o.auditBase}; closed loop ${o.closedLoop ? "on" : "off"}`);
