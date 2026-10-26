@@ -17,7 +17,7 @@
 //                 fraction + (defended: 1 + 0.5 x the fraction of the time left) - (breached: 1) - 0.15 per defender lost.
 //
 // WHAT IT IS NOT: the OGRE is not a 6-DOF body (a heading, a speed and a depth step, turn-limited); its torpedoes are the defenders' torpedoes; the Sky scenario and the carrier (mk11) variant of the voxel game do
-// not translate (a plane cannot take off from the water here) and are NOT here; and nothing in it is first person.
+// not translate (a plane cannot take off from the water here) and are NOT here; and no human flies a boat in it: it is watched as a recording, from outside or from the bow of a defender (render/seaOgre3d.mjs).
 // Deterministic from a seed. Pure: no DOM, no Math.random, no clock.
 "use strict";
 import * as S from "../physics/mechanics/subModel6dof.mjs";

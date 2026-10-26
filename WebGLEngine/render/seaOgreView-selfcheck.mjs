@@ -8,7 +8,7 @@
 //   3  THE VERDICT  one line per outcome naming the hull, the headquarters, the zones destroyed and the boats lost
 //   4  THE DRAWING  with a context that records its calls: a ring for the cannon's reach and one for the breach, a square for the headquarters, a dot per running torpedo coloured by who fired it, a square per
 //                   escort, four zone dots on the hull in the colour of what is left, a line and a nose dot per boat (a dead one dimmed), the hull bar in proportion and the label text; an empty frame says what to do
-//   6  THE PAGE     sea-ogre.html wires the modules and its controls, is a top view with nothing first-person in its script, is filed on server.html, in the Flight Simulation bucket and in the page index
+//   6  THE PAGE     sea-ogre.html wires the modules and its controls, carries the 3D view and its cameras but no player control in its script, is filed on server.html, in the Flight Simulation bucket and in the page index
 //   5  THE REAL FIGHT  a traced fight of brain/seaOgre.mjs drawn frame by frame without a throw, the counts matching the frame, no first-person anything on the page's module
 //
 // SABOTAGES (each mutant breaks the thing a row guards; the row that went red, by name; an entry that went 0 red is a finding, and was fixed):
@@ -19,7 +19,7 @@
 //   (1) | V13b escort wrong colour (1) | V14 zone dots on the wrong end (0 red THE FIRST TIME: colours only, no positions; read at the zone's place now, 1) | V15 dead boat not dimmed (1) | V16 submerged OGRE not dimmed (1) |
 //   V17 hull bar unscaled (1) | V18 headquarters bar by the hull (1) | V19 phase label dropped (1) | V20 empty frame draws rings (1) | V21 three zones (2) | V22 first-person code (a camera word) in the module (0 red
 //   THE FIRST TIME: the mutant was a comment and comments are stripped on purpose; a code line now, 1) | page: P1 no watch button (1) | P2 pointer lock in the page script (1) | P3 no gunner side (1) | P4 link off server.html (1) |
-//   P5 out of the Flight Simulation bucket (1) | P6 out of page-index.json (1).
+//   P5 out of the Flight Simulation bucket (1) | P6 out of page-index.json (1) | probes and fix: V23 probes not drawn (1) | V24 fix cross not drawn (1) (see the list below).
 "use strict";
 import * as V from "./seaOgreView.mjs";
 import * as G from "../brain/seaOgre.mjs";
@@ -90,6 +90,9 @@ console.log("\n4. THE DRAWING");
     ok("!! the hull bar is in proportion (150 of 300 = half of 36% of the width)", bar.length >= 2 && near(bar[1][3], 600 * 0.36 * 0.5, 0.01), bar.map((q) => q[3]).join());
     ok("!! the headquarters bar is in proportion (70 of 100)", bar.length >= 4 && near(bar[3][3], 600 * 0.36 * 0.7, 0.01));
     ok("the labels: the OGRE's hull, phase and 'submerged', the headquarters, each boat by name", /OGRE hull 150/.test(txt) && /phase 2/.test(txt) && /submerged/.test(txt) && /headquarters 70/.test(txt) && /alpha 100 hp 6t/.test(txt) && /beta 40 hp 3t/.test(txt), txt);
+    const gp = rec(), cp = V.drawLevel(gp, 600, 300, frame({ probes: [{ id: "p1", x: 50, y: 60, depth: 20 }, { id: "p2", x: 300, y: -20, depth: 20 }], fix: { x: 120, y: 80, sources: 2, spanDeg: 40 } }), B), pa = V.toScreen(B, 50, 60, 600, 300), fx = V.toScreen(B, 120, 80, 600, 300);
+    ok("!! probes are yellow diamonds at their places (a move to the top vertex, 5 px above), counted", cp.probes === 2 && gp.calls.some((q) => q[0] === "moveTo" && near(q[1], pa[0], 0.01) && near(q[2], pa[1] - 5, 0.01)) && gp.calls.some((q, i) => q[0] === "set:fillStyle" && q[1] === V.PROBE_COLOUR && gp.calls.slice(i, i + 8).some((r) => r[0] === "fill")));
+    ok("!! the squad's fix is a white cross at the fix (8 px arms), and only when there is one", cp.fix === true && gp.calls.some((q) => q[0] === "moveTo" && near(q[1], fx[0] - 8, 0.01) && near(q[2], fx[1], 0.01)) && gp.calls.some((q) => q[0] === "lineTo" && near(q[1], fx[0] + 8, 0.01)) && gp.calls.some((q) => q[0] === "set:strokeStyle" && q[1] === V.FIX_COLOUR) && gp.calls.some((q, i) => q[0] === "lineTo" && near(q[1], fx[0] + 8, 0.01) && gp.calls.slice(i, i + 5).some((r) => r[0] === "stroke")) && cnt.fix === false && cnt.probes === 0);
     const gs = rec(); V.drawLevel(gs, 600, 300, frame({ ogre: { ...frame().ogre, surfaced: true } }), B);
     ok("a surfaced OGRE is drawn solid and says SURFACED", !gs.calls.some((q) => q[0] === "set:globalAlpha" && q[1] === 0.65) && gs.calls.some((q) => q[0] === "fillText" && /SURFACED/.test(q[1])));
     const g0 = rec(), e = V.drawLevel(g0, 600, 300, null, B);
@@ -107,14 +110,15 @@ console.log("\n5. THE REAL FIGHT");
     ok("the OGRE of the first frame lands inside the canvas", x0[0] >= 0 && x0[0] <= 800 && x0[1] >= 0 && x0[1] <= 400);
     ok("the verdict line of the real result reads", /DEFENDED|BREACHED|HOLDOUT/.test(V.verdictLine(r, ["a", "b", "c"])));
     const src = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "seaOgreView.mjs"), "utf8");
-    ok("!! no first person: the view module names no camera, pointer lock, key or human seat", !/pointerLock|requestPointerLock|keydown|getUserMedia|firstPerson|cockpit/i.test(src.replace(/^\/\/.*$/gm, "")));
+    ok("!! the PLAN view module (not the 3D one) names no camera, pointer lock, key or human seat", !/pointerLock|requestPointerLock|keydown|getUserMedia|firstPerson|cockpit/i.test(src.replace(/^\/\/.*$/gm, "")));
 }
 
 console.log("\n6. THE PAGE");
 {
     const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", ""), rd = (f) => fs.readFileSync(path.join(root, f), "utf8"), html = rd("sea-ogre.html"), code = html.slice(html.indexOf("<script"));
     ok("!! the page loads the fight, the view and the roster of the tournament and wires its buttons", /from "\/brain\/seaOgre\.mjs"/.test(code) && /from "\/render\/seaOgreView\.mjs"/.test(code) && /roster/.test(code) && ["watchBtn", "runBtn", "nDef", "seed", "replay", "verdict", "slots", "tally"].every((id) => html.includes(`id="${id}"`)));
-    ok("!! it is a top view only: no pointer lock, key handler, camera or seat for a human in the page's own script", !/pointerLock|keydown|keyup|getUserMedia|THREE|firstPerson|cockpit/i.test(code));
+    ok("!! a REPLAY with no player control: the page's own script has no pointer lock, key or pointer-move handler, gamepad or camera feed (the cameras are a menu, and the 3D view's own module is held to the same by seaOgre3d-selfcheck)", !/pointerLock|requestPointerLock|keydown|keyup|pointermove|mousemove|gamepad|getUserMedia/i.test(code));
+    ok("!! it carries the 3D view and its camera menu (first person from a defender's bow among them), the squad and quiet-OGRE switches, and a tank sized by the replay", /createSeaOgre3d/.test(code) && /cameraChoices/.test(code) && /id="camSel"/.test(html) && /id="view3d"/.test(html) && /id="squad"/.test(html) && /id="quiet"/.test(html) && /squad: \$\("squad"\)\.checked/.test(code) && /loud: -15/.test(code));
     ok("it offers a defender that can win (the gunner) beside the tournament's sides, and says what the default does", /id: "gunner"/.test(code) && /breached every time/.test(code));
     ok("!! it is filed: a link on server.html and a place in the Flight Simulation bucket", /href="\/sea-ogre\.html"/.test(rd("server.html")) && /"sea-ogre\.html"/.test(rd("tools/ship/pageSections.mjs")));
     ok("the page index knows it", /"sea-ogre\.html"/.test(rd("page-index.json")));

@@ -129,7 +129,7 @@ console.log("\n5. THE WORLD");
     const cs = mkWorld(B.createBridge(gunner), { escortSubs: [{ x: 5, z: 5, hp: 10 }, { x: 9, z: 9, hp: 0 }], projectiles: [{ team: "ogre", torpedo: true, x: 1, z: 2 }, { team: "defender", torpedo: true, x: 3, z: 3 }, { team: "ogre", torpedo: false, x: 4, z: 4 }] }).sc, bw = cs._brainWorld();
     ok("!! the brain's world: the OGRE's place, the LIVING escorts, and only the OGRE's torpedoes", bw.ogre.x === 60 && bw.ogre.z === -40 && bw.hostiles.length === 1 && bw.hostiles[0].x === 5 && bw.torps.length === 1 && bw.torps[0].x === 1);
     const main = rd("main.js");
-    ok("!! main.js exposes ogre.brainSubs and imports the bridge lazily (not at load)", /brainSubs: async/.test(main) && /import\("\.\/brain\/ogreSubBridge\.mjs"\)/.test(main) && !/^import .*ogreSubBridge/m.test(main) && /setSubBrains\(null\)/.test(main));
+    ok("!! main.js exposes ogre.brainSubs and imports the bridge lazily (not at load)", /brainSubs: async/.test(main) && /import\("\.\/brain\/ogreSubBridge\.mjs"\)/.test(main) && !/^import .*ogreSubBridge/m.test(main) && /setSubBrains\(null\)/.test(main) && /squad: opts && opts\.squad \? \{ n: 2, probes: \[0\]/.test(main));
 }
 
 console.log("\n6. THE SQUAD IN THE VOXEL WORLD");

@@ -77,9 +77,9 @@ export function followStep(centre, target, k = 0.18) {
 }
 
 /**
- * @returns { render(snapshot, t), setView(yaw, pitch, dist), resize(w, h), sea, subs: Map, dispose() }
+ * @returns { render(snapshot, t, pov), setView(yaw, pitch, dist), resize(w, h), sea, subs: Map, dispose() }
  */
-export function createView3d(THREE, canvas, { length = 500, width = 300, depthMax = 50, seed = 1 } = {}) {
+export function createView3d(THREE, canvas, { length = 500, width = 300, depthMax = 50, seed = 1, subScale = 1 } = {}) {
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
     renderer.setPixelRatio(1); renderer.setClearColor(0x03121c, 1);   // the vendored three.js makes the drawing buffer's alpha either way (measured: getContextAttributes().alpha is true with `alpha: false`), so the backdrop needs only a transparent CLEAR; it stays opaque until setBackdrop
     const scene = new THREE.Scene(); scene.background = new THREE.Color(0x03121c);
@@ -102,7 +102,7 @@ export function createView3d(THREE, canvas, { length = 500, width = 300, depthMa
     const weightMat = new THREE.MeshStandardMaterial({ color: 0x3a3f45, roughness: 0.8, metalness: 0.4 });
     // v4899 -- FOLLOW: the camera orbits a centre, and the centre is the tank's middle unless a sub is being followed, when it eases toward that sub (and eases back when it is not).
     const home = { x: length / 2, y: -15, z: width / 2 };
-    let centre = { ...home }, follow = null, distBefore = null;
+    let centre = { ...home }, follow = null, distBefore = null, focus = null;   // focus: a scene point the camera orbits instead of a sub (the Sea OGRE's monster), overriding the follow
     const place = () => { const q = cameraPose(centre, view); camera.position.set(q.pos[0], q.pos[1], q.pos[2]); camera.lookAt(q.look[0], q.look[1], q.look[2]); };
     return {
         get sea() { return sea; }, subs, scene, camera, renderer,
@@ -129,10 +129,13 @@ export function createView3d(THREE, canvas, { length = 500, width = 300, depthMa
             return follow;
         },
         getFollow: () => follow,
+        /** Orbit a scene point [X, Y, Z] (or null to stop): the centre eases to it like a follow. */
+        setFocus(p) { focus = p ? { x: p[0], y: p[1], z: p[2] } : null; return focus; },
         getCentre: () => ({ ...centre }),
         getView: () => ({ ...view }),
         resize(w, h) { renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); },
-        render(snapshot, t = 0) {
+        /** One frame. `pov` (optional) is { pos: [x, y, z], look: [x, y, z] } in scene coordinates and REPLACES the orbit camera for this frame (a first-person view; the follow centre keeps easing as before). */
+        render(snapshot, t = 0, pov = null) {
             sea.update(t);
             const live = new Set();
             for (const s of snapshot) {
@@ -141,7 +144,7 @@ export function createView3d(THREE, canvas, { length = 500, width = 300, depthMa
                 if (!m) {
                     const mat = new THREE.MeshStandardMaterial({ color: new THREE.Color().setHSL((s.hue % 360) / 360, 0.7, 0.55), roughness: 0.5, metalness: 0.2 });
                     applyDepthTint(THREE, mat, { level: 0, density: TINT_DENSITY, color: WATER_COLOUR });
-                    m = buildSub(THREE, mat, geo); attachCues(THREE, m, geo, HULL_LENGTH); m.userData.mat = mat; scene.add(m); subs.set(s.id, m);
+                    m = buildSub(THREE, mat, geo); attachCues(THREE, m, geo, HULL_LENGTH); m.scale.setScalar(subScale); m.userData.mat = mat; scene.add(m); subs.set(s.id, m);
                 }
                 const p = subPose(s); m.position.set(p.x, p.y, p.z); m.rotation.set(0, p.rotY, p.rotZ); poseFins(m, s.cmd); poseCues(m, s);
             }
@@ -158,9 +161,10 @@ export function createView3d(THREE, canvas, { length = 500, width = 300, depthMa
             }
             weights = weights.map((w) => { const n = { ...dropStep(w, dt, -depthMax + 0.4), mesh: w.mesh }; n.mesh.position.set(n.x, n.y, n.z); if (n.gone) scene.remove(n.mesh); return n; }).filter((w) => !w.gone);
             if (follow !== null && !subs.has(follow)) { follow = null; if (distBefore !== null) { view.dist = distBefore; distBefore = null; } }   // the followed sub left the tank
-            const tgt = follow !== null ? subs.get(follow).position : home;
+            const tgt = focus ? focus : follow !== null ? subs.get(follow).position : home;
             centre = followStep(centre, { x: tgt.x, y: tgt.y, z: tgt.z });
             place();
+            if (pov) { camera.position.set(pov.pos[0], pov.pos[1], pov.pos[2]); camera.lookAt(pov.look[0], pov.look[1], pov.look[2]); }
             if (backdrop) { const a = backdropApi(); if (a && a.ready) { const d = new THREE.Vector3(); camera.getWorldDirection(d); a.camera = seaCameraFromView([camera.position.x, camera.position.y, camera.position.z], [d.x, d.y, d.z], camera.fov); } }
             renderer.render(scene, camera);
         },

@@ -4,7 +4,7 @@
      brain/seaOgre.mjs brings the water-borne OGRE of the voxel tower-defence scenario onto the submarine arena: ONE monster marches on a headquarters at the origin, and up to four submarines (any side of the sub tournament:
      a tactician and a motion pilot) hold it. The OGRE is a 40 m hull with FOUR HIT ZONES (tubes, sonar, cannon, engine: the voxel OGRE's turret hard points, translated): kill the tubes or the sonar and it cannot fire,
      kill the cannon and it cannot shell the headquarters, kill the engine and it crawls. It dives and surfaces on a cycle, launches escort subs under half its hull, and goes berserk under a fifth.
-     ROUTE ONE of two: this is the physics arena's OGRE, not the voxel game's own world (the voxel port is not done). TOP VIEW AND REPLAY ONLY: no first-person view and no human seat. Nothing here comes from the network
+     ROUTE ONE of two: this is the physics arena's OGRE, not the voxel game's own world (the voxel port is not done). A REPLAY, NOT A GAME: the fight is flown first and then WATCHED -- in plan, in 3D from the tank, and in first person from the bow of any defender (live in the replay). There is no player control and no human seat; the camera is a menu and nothing a viewer does changes the fight. Nothing here comes from the network
      except the JSON the repository ships (brain/*.json), fetched as data. -->
 <html lang="en">
 <head>
@@ -29,17 +29,20 @@
   .note { color:var(--dim); line-height:1.6; font-size:12px; margin:6px 0 0; } canvas { width:100%; background:#050a12; border:1px solid var(--line); border-radius:6px; display:block; }
   .slot { display:flex; gap:6px; align-items:center; padding:3px 0; } .slot b { width:18px; } .slot select { flex:1; min-width:0; }
   table { border-collapse:collapse; width:100%; font-size:12px; } th, td { border:1px solid var(--line); padding:3px 5px; text-align:center; } th { color:var(--dim); font-weight:400; }
+  .panel h2 .hint { color:var(--dim); letter-spacing:0; text-transform:none; font-weight:400; margin-left:12px; }
   .win { color:var(--green); } .lose { color:var(--red); } @media (max-width:900px) { main { grid-template-columns:minmax(0,1fr); } }
 </style>
 </head>
 <body>
 <header>
   <h1>&#9670; Sea OGRE vs Subs</h1>
-  <p class="desc">One OGRE, four hit zones, a headquarters to hold. The <b>tubes</b> and the <b>sonar</b> are what let it shoot; the <b>cannon</b> shells the headquarters while it is surfaced; the <b>engine</b> is its speed. A torpedo detonates on the nearest zone and hurts the hull for half of it. Pick up to four defenders (each a tactician plus a pilot), choose a seed and <b>watch</b>, or <b>run 12 seeds</b> for the defence rate. Plan view and replay only.</p>
+  <p class="desc">One OGRE, four hit zones, a headquarters to hold. The <b>tubes</b> and the <b>sonar</b> are what let it shoot; the <b>cannon</b> shells the headquarters while it is surfaced; the <b>engine</b> is its speed. A torpedo detonates on the nearest zone and hurts the hull for half of it. Pick up to four defenders (each a tactician plus a pilot), choose a seed and <b>watch</b>, or <b>run 12 seeds</b> for the defence rate. The fight is a replay you can watch from outside, in plan, or <b>from the bow of any defender</b> (first person, no controls: it is a recording). The tank is sized to hold the whole fight (at least 1500 x 1000 m) and the boats are drawn three times life size.</p>
 </header>
 <div class="bar">
   <label>defenders <select id="nDef"><option>1</option><option>2</option><option selected>3</option><option>4</option></select></label>
   <label>seed <input id="seed" type="number" min="1" max="999" value="2" style="width:64px"></label>
+  <label title="The defenders spread on stations across the OGRE's approach (one depth band each, patrolling while they hear nothing), share what they hear over a datalink (a fix from crossing bearings) and the first boat sends out sensor probes (three stationary hydrophones, 150 m ahead, 120 s each)."><input type="checkbox" id="squad" checked> squad (spread, share a fix, probes)</label>
+  <label title="How loud the OGRE is, in dB over a boat of the same speed: 10 is the default, lower is harder to find."><input type="checkbox" id="quiet"> quiet OGRE (-15 dB)</label>
   <button id="watchBtn">Watch</button>
   <button id="runBtn" title="Fly seeds 1..12 with this roster and tally the outcomes">Run 12 seeds</button>
   <span id="msg" class="note"></span>
@@ -49,16 +52,21 @@
     <section class="panel"><h2>Defenders</h2><div id="slots"></div><p class="note" id="rosterNote"></p></section>
     <section class="panel"><h2>Twelve seeds</h2><div id="tally"><p class="note">not run yet</p></div></section>
   </div>
-  <section class="panel"><h2>The fight</h2><canvas id="replay" width="900" height="520" aria-label="Plan view of the Sea OGRE fight"></canvas><p class="note" id="verdict"></p></section>
+  <div style="display:flex;flex-direction:column;gap:12px;min-width:0">
+  <section class="panel"><h2>In 3D <span class="hint"><label>camera <select id="camSel"></select></label> <span id="camLabel"></span></span></h2><canvas id="view3d" width="900" height="520" aria-label="The Sea OGRE fight in three dimensions" style="height:520px"></canvas><p class="note" id="view3dNote"></p></section>
+  <section class="panel"><h2>The fight in plan</h2><canvas id="replay" width="900" height="420" aria-label="Plan view of the Sea OGRE fight"></canvas><p class="note" id="verdict"></p></section>
+  </div>
 </main>
 <script type="module">
 import * as G from "/brain/seaOgre.mjs";
 import * as T from "/brain/subTournament.mjs";
 import { roster } from "/render/subTournamentView.mjs";
 import { frameAt, boundsOf, drawLevel, verdictLine } from "/render/seaOgreView.mjs";
+import { createSeaOgre3d, cameraChoices } from "/render/seaOgre3d.mjs";
 
 const $ = (id) => document.getElementById(id);
-let sides = [], trace = null, bounds = null, clock = 0, last = 0, names = [], busy = false;
+let THREE3 = null; try { THREE3 = await import("/vendor/three/three.module.js"); } catch (e) { THREE3 = null; }
+let sea3d = null, camId = "tank", sides = [], trace = null, bounds = null, clock = 0, last = 0, names = [], busy = false;
 const fetchJson = (u) => fetch(u, { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
 const GUNNER = { fireRange: 420, blindSnr: 22, pingAfter: 1, trackSpeed: 2.5 };
 async function load() {
@@ -74,16 +82,23 @@ function slots() {
 }
 const picked = () => [...$("slots").querySelectorAll("select")].map((s) => sides.find((x) => x.id === s.value));
 const tick = () => new Promise((r) => setTimeout(r, 0));
+const opts = () => ({ squad: $("squad").checked ? { probes: [0] } : null, start: $("quiet").checked ? { loud: -15 } : {} });
+function remake3d(n) {
+  const cv3 = $("view3d"); if (sea3d) { sea3d.dispose(); sea3d = null; }
+  try { sea3d = createSeaOgre3d(THREE3, cv3, bounds); sea3d.view.resize(cv3.width, cv3.height); $("view3dNote").textContent = `tank ${sea3d.tank.length} x ${sea3d.tank.width} m, ${sea3d.tank.depthMax} m deep; boats drawn x${sea3d.subScale}`; }
+  catch (e) { sea3d = null; $("view3dNote").textContent = "3D unavailable here (" + String((e && e.message) || e).slice(0, 80) + "); the plan is unaffected."; }
+  const sel = $("camSel"); sel.textContent = ""; for (const c of cameraChoices(n)) { const o = document.createElement("option"); o.value = c.id; o.textContent = c.label; sel.appendChild(o); } sel.value = camId = "tank";
+}
 async function watch() {
   if (busy) return; const pick = picked(), n = pick.length, sc = G.scenario(Math.max(1, Number($("seed").value) || 1), n), tr = [];
   $("msg").textContent = "flying the fight ..."; await tick();
-  const r = G.fight(pick.map((s) => s.side.side()), sc, { trace: tr });
-  trace = tr; bounds = boundsOf(tr); clock = 0; names = pick.map((s, i) => s.id + (pick.filter((q) => q.id === s.id).length > 1 ? "#" + (i + 1) : ""));
+  const r = G.fight(pick.map((s) => s.side.side()), sc, { trace: tr, ...opts() });
+  trace = tr; bounds = boundsOf(tr); remake3d(pick.length); clock = 0; names = pick.map((s, i) => s.id + (pick.filter((q) => q.id === s.id).length > 1 ? "#" + (i + 1) : ""));
   $("msg").textContent = ""; $("verdict").textContent = verdictLine(r, names);
 }
 async function run() {
   if (busy) return; busy = true; $("runBtn").disabled = $("watchBtn").disabled = true; const pick = picked(), n = pick.length, o = { defended: 0, breached: 0, holdout: 0 }, rows = []; let sum = 0, lost = 0;
-  for (let s = 1; s <= 12; s++) { $("msg").textContent = `seed ${s} of 12`; await tick(); const r = G.fight(pick.map((q) => q.side.side()), G.scenario(s, n)); o[r.outcome]++; sum += r.score; lost += r.lost; rows.push(r); }
+  for (let s = 1; s <= 12; s++) { $("msg").textContent = `seed ${s} of 12`; await tick(); const r = G.fight(pick.map((q) => q.side.side()), G.scenario(s, n), opts()); o[r.outcome]++; sum += r.score; lost += r.lost; rows.push(r); }
   const t = document.createElement("table"), h = document.createElement("tr"); for (const c of ["seed", "outcome", "time s", "hull left", "HQ", "boats lost", "score"]) { const th = document.createElement("th"); th.textContent = c; h.appendChild(th); } t.appendChild(h);
   rows.forEach((r, i) => { const tr = document.createElement("tr"); for (const c of [i + 1, r.outcome, (r.ticks / 30).toFixed(0), Math.round(r.hull), Math.round(r.hq), r.lost, r.score.toFixed(2)]) { const td = document.createElement("td"); td.textContent = c; if (c === "defended") td.className = "win"; if (c === "breached") td.className = "lose"; tr.appendChild(td); } t.appendChild(tr); });
   const box = $("tally"); box.textContent = ""; const p = document.createElement("p"); p.className = "note"; p.textContent = `defended ${o.defended}, breached ${o.breached}, holdout ${o.holdout}; mean score ${(sum / 12).toFixed(2)}; ${lost} boats lost in 12 fights`; box.append(p, t);
@@ -93,12 +108,15 @@ const cv = $("replay"), g = cv.getContext("2d");
 function frame(now) {
   const dt = last ? Math.min(0.1, (now - last) / 1000) : 0; last = now;
   if (trace && trace.length) { clock += dt * 8; if (clock > trace.at(-1).tick / 30 + 3) clock = 0; }
-  drawLevel(g, cv.width, cv.height, trace ? frameAt(trace, clock) : null, bounds || { x0: -100, x1: 100, y0: -100, y1: 100 }, { names });
+  const fr = trace ? frameAt(trace, clock) : null;
+  drawLevel(g, cv.width, cv.height, fr, bounds || { x0: -100, x1: 100, y0: -100, y1: 100 }, { names });
+  if (sea3d && fr) { try { const o = sea3d.update(fr, performance.now() / 1000, camId, names); $("camLabel").textContent = o.label; } catch (e) { $("view3dNote").textContent = "3D stopped: " + String((e && e.message) || e).slice(0, 100); sea3d = null; } }
   requestAnimationFrame(frame);
 }
+$("camSel").onchange = () => { camId = $("camSel").value; };
 $("watchBtn").onclick = watch; $("runBtn").onclick = run; $("nDef").onchange = slots;
 load().then(() => { requestAnimationFrame(frame); });
-window.__seaOgre = { get sides() { return sides; }, watch, run, get trace() { return trace; } };
+window.__seaOgre = { get sides() { return sides; }, watch, run, get trace() { return trace; }, get view3d() { return sea3d; }, setCamera: (id) => { camId = id; $("camSel").value = id; } };
 </script>
 </body>
 </html>
