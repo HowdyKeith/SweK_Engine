@@ -13,7 +13,12 @@
 // NOT CHECKED, said plainly: how the page draws the dark subs (tools/ship/subAquariumCompassPage-selfcheck.mjs); that the tank's wandering targets are the study's dives (they are not).
 //
 // SABOTAGE LOG (the thing broken -> the rows that went red; every mutant must be red BY NAME):
-//   (filled in when the sabotage is run)
+//   render/subAquariumSim.mjs, 47 mutants (the compass mode, the navigator kind, the registered kinds, the steering object and the snapshot), every one red BY NAME: the clock (the cycle, the dark length, the boundary one tick late, the seconds left from the wrong end or when lit, a negative age not wrapped, the phase ignored, halved
+//   or the same for every sub); the modes (a name changed, not frozen, the check off, the mode not set, the getter lying, the held heading not taken at the switch); the kinds (the registration unchecked or taking an empty kind, registered kinds never used, the navigator not built, built behind no spy or a spy that reads the pitch,
+//   believed never offered, withBelief returning the spy); the steering object (a new one every tick, the heading not copied); the dark path (the lit mode going dark, the dropout never dark, the tank's clock for the sub's, the held heading never updated or updated in the dark, the world turned the wrong way or not at all, the flag
+//   inverted or not passed, the dark flag or the seconds left not kept); a lost sub and a new hull (the held heading or the steering object kept); the snapshot (shown, believed, compass, seconds left, the held heading starting at zero). FINDINGS from the first run: K10 (the phase range halved: the two pinned phases were both in the lower half
+//   of the range -> two more in the upper half), K24 (the steering target's heading not copied: nothing read the values inside the box -> a row that compares them, inside and outside the box), K40 (the snapshot's shown heading the true one: only the lit case was read -> a row on every tick of a long run). After the pilot refactor into
+//   withBelief four patterns of the list were rewritten.
 "use strict";
 import { createRequire } from "node:module";
 import * as A from "./subAquariumSim.mjs";

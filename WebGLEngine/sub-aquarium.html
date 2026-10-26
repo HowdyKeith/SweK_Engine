@@ -179,7 +179,7 @@ function drawSub(g, px, py, heading, hue, len, sel) {
   g.fillStyle = "#0006"; g.fillRect(len * 0.1, -len * 0.38, len * 0.2, len * 0.14);
   g.restore();
 }
-function drawDark(g, px, py, heading, believed, r) {   // an amber ring round a sub whose compass is dark, and a ghost line along the heading its autopilot believes (the engine's heading increases clockwise on the screen: the nose is (cos h, -sin h))
+function drawDark(g, px, py, believed, r) {   // an amber ring round a sub whose compass is dark, and a ghost line along the heading its autopilot believes (the engine's heading increases clockwise on the screen: the nose is (cos h, -sin h))
   g.save(); g.strokeStyle = "#f6a623"; g.lineWidth = 1.5; g.setLineDash([4, 3]); g.beginPath(); g.arc(px, py, r, 0, Math.PI * 2); g.stroke(); g.setLineDash([]);
   g.lineWidth = 2; g.beginPath(); g.moveTo(px, py); g.lineTo(px + Math.cos(believed) * r * 2.2, py - Math.sin(believed) * r * 2.2); g.stroke(); g.restore();
 }
@@ -196,7 +196,7 @@ function render() {
     pg.strokeStyle = `hsl(${s.hue} 70% 55% / .35)`; pg.lineWidth = 1.5; pg.beginPath(); s.trail.forEach((p, i) => { i ? pg.lineTo(p[0] * sx, p[1] * sy) : pg.moveTo(p[0] * sx, p[1] * sy); }); pg.stroke();
     sg.strokeStyle = `hsl(${s.hue} 70% 55% / .35)`; sg.beginPath(); s.trail.forEach((p, i) => { i ? sg.lineTo(p[0] * dx, p[2] * dz) : sg.moveTo(p[0] * dx, p[2] * dz); }); sg.stroke();
     drawSub(pg, s.x * sx, s.y * sy, s.heading, s.hue, 16, sel); drawSub(sg, s.x * dx, s.depth * dz, -s.pitch, s.hue, 12, sel);
-    if (s.dark) { drawDark(pg, s.x * sx, s.y * sy, s.believed, s.believed, 24); sg.save(); sg.strokeStyle = "#f6a623"; sg.setLineDash([4, 3]); sg.beginPath(); sg.arc(s.x * dx, s.depth * dz, 16, 0, Math.PI * 2); sg.stroke(); sg.restore(); }
+    if (s.dark) { drawDark(pg, s.x * sx, s.y * sy, s.believed, 24); sg.save(); sg.strokeStyle = "#f6a623"; sg.setLineDash([4, 3]); sg.beginPath(); sg.arc(s.x * dx, s.depth * dz, 16, 0, Math.PI * 2); sg.stroke(); sg.restore(); }
     pg.fillStyle = sel ? "#fff" : "#dbe7ff"; pg.font = "13px monospace"; pg.fillText(s.name, s.x * sx + 20, s.y * sy - 8);
   }
   if (view3d) view3d.render(snap, performance.now() / 1000);
