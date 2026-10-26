@@ -1,7 +1,7 @@
 {
  "version": 1,
  "generated": "derived by tools/ship/buildPageIndex.mjs -- DO NOT HAND-EDIT, the group comes from tools/ship/pageSections.mjs",
- "count": 493,
+ "count": 494,
  "pages": [
   {
    "f": "AudioLab.html",
@@ -2996,6 +2996,13 @@
    "f": "sub-aquarium.html",
    "t": "SweK &middot; Sub Aquarium",
    "d": "A tank of submarines, each flown by its own pilot (the PD autopilot, or a connectome-wired network with the weights it arrived with). Peers detected on the LAN can send their subs here from server.html's peer list. The network in every sub the page flies is still the fruit fly's Giant Fiber Circuit; a zebrafish circuit (Fish1) is vendored and a pilot is wired to it, but the page does not fly that body yet.",
+   "g": "flightsim",
+   "p": 0
+  },
+  {
+   "f": "sub-tournament.html",
+   "t": "SweK &middot; Sub Tournament",
+   "d": "Every submarine side against every other, from both seats, on the same geometries: the hand doctrine, the tuned and search-ping champions, two self-play leagues, each with the autopilot or the fruit fly network. A Bradley-Terry rating, a head-to-head matrix, the seat's measured worth, and a replay of any duel.",
    "g": "flightsim",
    "p": 0
   },
