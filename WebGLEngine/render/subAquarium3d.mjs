@@ -9,6 +9,8 @@
 // rotation about Y by the heading, nose-up pitch about Z). THREE is passed in.
 "use strict";
 import { createSeaMesh, CALM_OPTIONS } from "./seaThree.mjs";
+import { STYLES, DEFAULT_STYLE } from "./seaStyles.mjs";
+import { seaCameraFromView } from "../ui/seaFrame.mjs";
 import { createSurface, defaultComponents } from "../physics/ocean/oceanSurface.mjs";
 import { applyDepthTint } from "../ui/seaDepthTint.mjs";
 import { EXPLORER } from "../physics/mechanics/subModel6dof.mjs";
@@ -79,12 +81,16 @@ export function followStep(centre, target, k = 0.18) {
  */
 export function createView3d(THREE, canvas, { length = 500, width = 300, depthMax = 50, seed = 1 } = {}) {
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
-    renderer.setPixelRatio(1);
+    renderer.setPixelRatio(1); renderer.setClearColor(0x03121c, 1);   // the vendored three.js makes the drawing buffer's alpha either way (measured: getContextAttributes().alpha is true with `alpha: false`), so the backdrop needs only a transparent CLEAR; it stays opaque until setBackdrop
     const scene = new THREE.Scene(); scene.background = new THREE.Color(0x03121c);
     scene.add(new THREE.AmbientLight(0x88aacc, 0.8)); const sun = new THREE.DirectionalLight(0xffffff, 1.1); sun.position.set(-200, 300, 100); scene.add(sun);
-    const sea = createSeaMesh(THREE, createSurface({ components: defaultComponents(seed, CALM_OPTIONS) }), { half: Math.max(length, width) * 0.55, n: 64, color: WATER_COLOUR, opacity: 0.55 });
-    sea.mesh.position.set(length / 2, 0, width / 2); scene.add(sea.mesh);
+    const makeSea = (style) => { const q = createSeaMesh(THREE, createSurface({ components: defaultComponents(seed, STYLES[style]) }), { half: Math.max(length, width) * 0.55, n: 64, color: WATER_COLOUR, opacity: 0.55 }); q.mesh.position.set(length / 2, 0, width / 2); return q; };
+    let seaStyle = DEFAULT_STYLE, sea = makeSea(seaStyle); scene.add(sea.mesh);
     const floor = new THREE.Mesh(new THREE.PlaneGeometry(length, width), new THREE.MeshStandardMaterial({ color: 0x1d2a25, roughness: 1 })); floor.rotation.x = -Math.PI / 2; floor.position.set(length / 2, -depthMax, width / 2); scene.add(floor);
+    // v4901 -- the GPU sea as a backdrop: a same-origin frame (sea-host.html) sits BEHIND this canvas, which goes transparent; each frame the sea's camera is set to this camera's pose (ui/seaFrame.mjs). The physics sea and the floor are hidden
+    // (the floor is opaque and would cover the sea). It is the documented approximation: the subs are drawn in front of all the water, the depth tint is what puts them under it.
+    let backdrop = null;
+    const backdropApi = () => { try { return backdrop && backdrop.contentWindow && backdrop.contentWindow.seaApi || null; } catch { return null; } };
     const box = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(length, depthMax, width)), new THREE.LineBasicMaterial({ color: 0x1c2c44 })); box.position.set(length / 2, -depthMax / 2, width / 2); scene.add(box);
     const camera = new THREE.PerspectiveCamera(50, canvas.width / canvas.height, 1, 4000);
     const view = { yaw: 0.6, pitch: 0.55, dist: 430 };   // v4899: closer, so the tank fills its panel
@@ -99,7 +105,22 @@ export function createView3d(THREE, canvas, { length = 500, width = 300, depthMa
     let centre = { ...home }, follow = null, distBefore = null;
     const place = () => { const q = cameraPose(centre, view); camera.position.set(q.pos[0], q.pos[1], q.pos[2]); camera.lookAt(q.look[0], q.look[1], q.look[2]); };
     return {
-        sea, subs, scene, camera, renderer,
+        get sea() { return sea; }, subs, scene, camera, renderer,
+        /** The physics sea's style (a key of render/seaStyles.mjs STYLES): rebuilds the surface and puts the mesh where the old one was. An unknown name throws and changes nothing. Returns the style now drawn. */
+        setSeaStyle(name) {
+            if (!Object.prototype.hasOwnProperty.call(STYLES, name)) throw new Error(`subAquarium3d.setSeaStyle: unknown style "${name}" (${Object.keys(STYLES).join(", ")})`);
+            const vis = sea.mesh.visible, next = makeSea(name); scene.remove(sea.mesh); sea.dispose(); sea = next; sea.mesh.visible = vis; scene.add(sea.mesh); seaStyle = name; return seaStyle;
+        },
+        getSeaStyle: () => seaStyle,
+        /** Turn the GPU sea backdrop on with its frame element (or off with null). On: the canvas clears transparent, the physics sea and the floor are hidden. Returns "on" or "off". */
+        setBackdrop(frame) {
+            backdrop = frame || null;
+            scene.background = backdrop ? null : new THREE.Color(0x03121c); renderer.setClearColor(0x03121c, backdrop ? 0 : 1);
+            sea.mesh.visible = !backdrop; floor.visible = !backdrop;
+            return backdrop ? "on" : "off";
+        },
+        /** "off" (no backdrop), "waiting" (the frame's sea is not ready) or "live" (the sea's camera follows this one). */
+        backdropState() { if (!backdrop) return "off"; const a = backdropApi(); return a && a.ready ? "live" : "waiting"; },
         setView(yaw, pitch, dist) { view.yaw = yaw; view.pitch = Math.max(0.05, Math.min(1.5, pitch)); view.dist = Math.max(25, Math.min(1500, dist)); },
         /** Follow a sub by id (null stops). Following from far away moves in to FOLLOW_DIST and remembers where it was; stopping puts the distance back. Returns what is followed now. */
         setFollow(id) {
@@ -139,7 +160,9 @@ export function createView3d(THREE, canvas, { length = 500, width = 300, depthMa
             if (follow !== null && !subs.has(follow)) { follow = null; if (distBefore !== null) { view.dist = distBefore; distBefore = null; } }   // the followed sub left the tank
             const tgt = follow !== null ? subs.get(follow).position : home;
             centre = followStep(centre, { x: tgt.x, y: tgt.y, z: tgt.z });
-            place(); renderer.render(scene, camera);
+            place();
+            if (backdrop) { const a = backdropApi(); if (a && a.ready) { const d = new THREE.Vector3(); camera.getWorldDirection(d); a.camera = seaCameraFromView([camera.position.x, camera.position.y, camera.position.z], [d.x, d.y, d.z], camera.fov); } }
+            renderer.render(scene, camera);
         },
         /** For a gate: how many bubbles the view holds and how many it DRAWS, and how many dropped weights it holds, right now. */
         cues() { return { bubbles: bubbles.list.length, drawn: bubbleGeo.drawRange.count, weights: weights.length, resting: weights.filter((w) => w.rest >= 0).length }; },

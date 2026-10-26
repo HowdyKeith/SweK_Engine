@@ -46,7 +46,8 @@
   .col .panel.p2d { flex:0 0 auto; }
   .col .panel.plist { flex:1 1 170px; min-height:170px; }
   .canvasbox { position:relative; flex:1 1 auto; min-height:260px; }
-  .canvasbox canvas { position:absolute; inset:0; width:100%; height:100%; }
+  .canvasbox canvas { position:absolute; inset:0; width:100%; height:100%; z-index:1; }
+  .canvasbox iframe { position:absolute; inset:0; width:100%; height:100%; border:0; z-index:0; pointer-events:none; background:#000; }
   canvas { display:block; width:100%; background:#04101c; border:1px solid var(--line); border-radius:6px; }
   .p2d canvas { height:auto; }
   .side { flex:1 1 auto; min-height:0; overflow-y:auto; }
@@ -74,6 +75,7 @@
   <button id="refreshBtn" title="Fetch the tank's list now">Refresh</button>
   <label>speed <select id="speedSel"><option value="1">1&times;</option><option value="4" selected>4&times;</option><option value="10">10&times;</option></select></label>
   <label>hull <select id="hullSel" title="The vessel every sub in the tank is flown on. The pilots are not told which one it is."></select></label>
+  <label>sea <select id="seaSel" title="The water above the tank. The three physics seas are the same Gerstner surface a hull floats on, in calm, default and rough swell, and work on every GPU. The GPU ocean is the vendored web-ocean sea (sea-host.html) drawn behind this canvas; it needs WebGPU, and the subs are drawn in front of all of its water (the depth tint puts them under it)."></select> <span class="sub" id="seaState"></span></label>
   <span title="Pick a sub in the list, then press one: a leak the tank cannot trim out (the boat blows its tank and drops its weight), the same leak with no rescue (it grounds), or surface (it blows its tank and rides on its buoyancy with the tower out of the water)">event on the selected sub:
     <button id="floodBtn">flood</button> <button id="sinkBtn">sink</button> <button id="surfaceBtn">surface</button> <button id="clearBtn">restore</button></span>
   <span class="chip"><span class="dot" id="fishDot"></span><b>FISH BRAIN</b> <span id="fishWord">checking&hellip;</span></span>
@@ -82,7 +84,7 @@
 <main>
   <section class="panel p3d" aria-label="Three-dimensional view of the tank">
     <h2>3D view <span class="hint"><label title="Click a sub in the list, then tick this: the camera follows it and comes in close enough to see its tower and tail fins"><input type="checkbox" id="followBox"> follow the selected sub</label> &nbsp; drag to orbit &middot; wheel to zoom</span></h2>
-    <div class="canvasbox"><canvas id="view3d" width="1000" height="700" aria-label="Three-dimensional view of the tank: the physics sea above, the subs beneath it" style="cursor:grab"></canvas></div>
+    <div class="canvasbox"><iframe id="seaFrame" title="GPU ocean (web-ocean), behind the 3D view" aria-hidden="true" tabindex="-1" style="display:none"></iframe><canvas id="view3d" width="1000" height="700" aria-label="Three-dimensional view of the tank: the physics sea above, the subs beneath it" style="cursor:grab"></canvas></div>
     <div class="tank-note" id="view3dNote">The sea is the physics surface a hull would float on (render/seaThree.mjs); subs are tinted toward the water colour by depth, and each sub&rsquo;s tail planes and rudder follow its pilot&rsquo;s command. A sub in an event shows its tank as a gauge on the hull, sheds bubbles when it blows, and a released weight falls to the floor.</div>
   </section>
   <div class="col">
@@ -99,6 +101,8 @@ import { createTank, LENGTH, WIDTH, DEPTH_MIN, DEPTH_MAX } from "/render/subAqua
 import { LABELS } from "/physics/mechanics/subHulls.mjs";
 import { createView3d } from "/render/subAquarium3d.mjs";
 import { readout } from "/render/subBallastCues.mjs";
+import { LABELS as SEA_LABELS, GPU, DEFAULT_STYLE, isStyle, gpuSeaAvailable } from "/render/seaStyles.mjs";
+import { hostUrl } from "/ui/seaFrame.mjs";
 
 const $ = (id) => document.getElementById(id);
 const plan = $("plan"), side = $("sideView"), pg = plan.getContext("2d"), sg = side.getContext("2d");
@@ -120,6 +124,35 @@ try {   // v4895: the tank in 3D. A page without WebGL keeps its two 2D views.
     for (const [name, label] of Object.entries(LABELS)) { const o = document.createElement("option"); o.value = name; o.textContent = label; sel.appendChild(o); }
     sel.value = tank.hull;
     sel.addEventListener("change", () => { try { tank.setHull(sel.value); $("msg").textContent = "hull: " + (LABELS[sel.value] || sel.value); } catch (e) { sel.value = tank.hull; $("msg").textContent = "that hull is not available"; } });
+}
+// v4901 -- the sea picker: three physics styles (rebuild the surface in place) and the GPU ocean (sea-host.html in a frame behind the transparent canvas; the sea's camera follows the view's)
+{
+    const sel = $("seaSel"), frame = $("seaFrame"), store = () => { try { return window.localStorage; } catch { return null; } };
+    for (const [name, label] of Object.entries(SEA_LABELS)) { const o = document.createElement("option"); o.value = name; o.textContent = label; sel.appendChild(o); }
+    let current = DEFAULT_STYLE, watch = null;
+    const stopWatch = () => { if (watch) { clearInterval(watch); watch = null; } };
+    function physics(name) {
+        stopWatch(); frame.style.display = "none"; frame.src = "about:blank"; $("view3d").style.background = ""; $("seaState").textContent = "";
+        if (view3d) { view3d.setBackdrop(null); view3d.setSeaStyle(name); }
+        current = name; sel.value = name;
+    }
+    function gpu() {
+        const a = gpuSeaAvailable(navigator, window.isSecureContext);
+        if (!a.ok) { $("msg").textContent = "GPU ocean: " + a.reason; sel.value = current; return false; }
+        if (!view3d) { $("msg").textContent = "GPU ocean needs the 3D view, which is not available here"; sel.value = current; return false; }
+        frame.style.display = "block"; frame.src = hostUrl({}); $("view3d").style.background = "transparent"; view3d.setBackdrop(frame); current = GPU; sel.value = GPU;
+        const t0 = performance.now(); stopWatch();
+        watch = setInterval(() => {
+          const st = view3d.backdropState(); $("seaState").textContent = "GPU ocean: " + st;
+          if (st === "live") return;
+          if (performance.now() - t0 > 12000) { stopWatch(); let why = ""; try { const e = frame.contentDocument.getElementById("err"); why = e && e.textContent ? e.textContent.slice(0, 80) : ""; } catch (e) {} physics(DEFAULT_STYLE); $("msg").textContent = "the GPU ocean did not start" + (why ? " (" + why + ")" : " (no WebGPU adapter answered)") + "; back to the physics sea"; }
+        }, 500);
+        return true;
+    }
+    function choose(name, remember = true) { if (!isStyle(name)) return; const ok = name === GPU ? gpu() : (physics(name), true); if (ok && remember) { try { store() && store().setItem("subAquarium.sea", name); } catch (e) {} } }
+    sel.value = DEFAULT_STYLE; sel.addEventListener("change", () => choose(sel.value));
+    let saved = null; try { saved = store() && store().getItem("subAquarium.sea"); } catch (e) {}
+    if (saved && saved !== DEFAULT_STYLE) choose(saved, false);
 }
 let selected = null, lastFrame = 0, listErr = false;
 // follow: the camera follows the selected sub when the box is ticked; ticking it with nothing selected picks the first sub in the list
