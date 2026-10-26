@@ -1,7 +1,7 @@
 // WebGLEngine/render/subDropoutScene.mjs -- UNNUMBERED (the version is chosen at ship time; the gate is render/subDropoutScene-selfcheck.mjs)
 //
 // THE COMPASS-DROPOUT SCENE, WITHOUT A PAGE: one dive flown by several pilots through the SAME compass dropout (tools/subDropout.mjs: for two windows of 16 s the heading each pilot is shown stays at its last valid value; the body rates, depth, pitch, bank and speed stay true),
-// every tick recorded, ready to be drawn. The pilots are the plain PD autopilot, the autopilot behind the ORACLE navigator (tools/subNavigator.mjs: the exact heading rate integrated, a perfect gyro), and the autopilot behind a RESERVOIR ESTIMATOR (tools/subHeadingEstimator.mjs) made from
+// every tick recorded, ready to be drawn (the track of each pilot also in the plan's own frame: `u` metres along the target heading from the start, `v` metres to the RIGHT of it, so that a dive straight at the target runs left to right and a right turn goes down). The pilots are the plain PD autopilot, the autopilot behind the ORACLE navigator (tools/subNavigator.mjs: the exact heading rate integrated, a perfect gyro), and the autopilot behind a RESERVOIR ESTIMATOR (tools/subHeadingEstimator.mjs) made from
 // the vendored fruit fly heading loop and from the best random wiring of the same size, with the readouts the study fitted (render/subDropoutData.mjs). Pure: no DOM, no I/O, no clock, no Math.random. The view that draws it is render/subDropoutView.mjs.
 //   THE DIVES   three dives of TRAIN_SET (not an audit set), the one of each kind on which the dropout costs the plain autopilot most (a rule the gate checks): nominal seed 7, recovery seed 8, current seed 9. Each is flown on its own, so its windows are those of a dropout's dive number 1.
 //   WHAT A PILOT SEES  `believed` is the heading the AUTOPILOT inside the chain reads on that tick: for the plain pilot it is the shown (held) heading; behind the oracle or an estimator it is the shown heading turned by the estimate of the drift.
@@ -23,6 +23,8 @@ export const DIVES = Object.freeze([
 ]);
 export const TICK = T.DT, STATUS_WORDS = Object.freeze({ submerged: "completed", broached: "broached", grounded: "hit the floor", crushed: "crushed", lost: "lost" });
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
+/** A world position (x, y) in the plan's frame, given the target heading `t`: [u (metres along the target heading), v (metres to the right of it)]. The vessel's heading is clockwise-positive: it travels (cos h, -sin h) in (x, y). */
+export const planFrame = (x, y, t) => [x * Math.cos(t) - y * Math.sin(t), -(x * Math.sin(t) + y * Math.cos(t))];
 const f3 = (v) => v.toFixed(3);
 
 /**
@@ -43,7 +45,7 @@ export function pilotDefs(circuit, study = STUDY) {
 
 /**
  * Fly `sc` once for each pilot of `defs`, through its own dropout wrapper (so every pilot meets the same windows), and record every tick:
- * { dt, ticks, windows: [[firstTick, endTick)], target, cleanScore, pilots: [{ id, name, hue, blurb, score, status, ticks, dark (1 | 0 a tick), x, y, depth, heading, believed, error (the absolute angle from the target heading, at most pi) }] }.
+ * { dt, ticks, windows: [[firstTick, endTick)], target, cleanScore, pilots: [{ id, name, hue, blurb, score, status, ticks, dark (1 | 0 a tick), x, y, depth, heading, believed, error (the absolute angle from the target heading, at most pi), u, v (the track in the plan's frame: along the target heading, and to the right of it) }] }.
  */
 export function flyScene(sc, defs) {
     const pilots = [];
@@ -51,17 +53,17 @@ export function flyScene(sc, defs) {
     for (const def of defs) {
         const ap = A.pilot(), seen = { believed: 0 };
         const spy = (st, tgt, cur, aux) => { seen.believed = S.attitude(st).heading; return ap(st, tgt, cur, aux); };
-        const w = D.dropout(def.build(spy)), x = [], y = [], depth = [], heading = [], believed = [], dark = [], error = [];
+        const w = D.dropout(def.build(spy)), x = [], y = [], u = [], v = [], depth = [], heading = [], believed = [], dark = [], error = [];
         const outer = (st, tgt, cur) => {
             const cmd = w(st, tgt, cur), a = S.attitude(st);
-            x.push(st.pos[0]); y.push(st.pos[1]); depth.push(-st.pos[2]); heading.push(a.heading); believed.push(seen.believed); dark.push(w.log.valid[w.log.valid.length - 1] === 0 ? 1 : 0);
+            x.push(st.pos[0]); y.push(st.pos[1]); { const [pu, pv] = planFrame(st.pos[0], st.pos[1], sc.target.heading); u.push(pu); v.push(pv); } depth.push(-st.pos[2]); heading.push(a.heading); believed.push(seen.believed); dark.push(w.log.valid[w.log.valid.length - 1] === 0 ? 1 : 0);
             error.push(Math.abs(wrap(sc.target.heading - a.heading)));
             return cmd;
         };
         const r = T.fly(outer, sc);
         windows = w.log.windows.map(([a, b]) => [a, b]);   // the same for every pilot (seeded by the dive's number in its own wrapper)
         ticks = Math.max(ticks, x.length);
-        pilots.push({ id: def.id, name: def.name, hue: def.hue, blurb: def.blurb, score: r.score, status: r.status, ticks: x.length, dark: Uint8Array.from(dark), x: Float32Array.from(x), y: Float32Array.from(y), depth: Float32Array.from(depth), heading: Float32Array.from(heading), believed: Float32Array.from(believed), error: Float32Array.from(error) });
+        pilots.push({ id: def.id, name: def.name, hue: def.hue, blurb: def.blurb, score: r.score, status: r.status, ticks: x.length, dark: Uint8Array.from(dark), x: Float32Array.from(x), y: Float32Array.from(y), u: Float32Array.from(u), v: Float32Array.from(v), depth: Float32Array.from(depth), heading: Float32Array.from(heading), believed: Float32Array.from(believed), error: Float32Array.from(error) });
     }
     return { dt: TICK, ticks, windows, target: sc.target, kind: sc.kind, seed: sc.seed, cleanScore: T.fly(A.pilot(), sc).score, pilots };
 }
@@ -73,11 +75,11 @@ export function compassLine(windows, tick, dt = TICK) {
     const i = windowAt(windows, tick);
     return i < 0 ? "compass valid" : `COMPASS DARK, ${((windows[i][1] - tick) * dt).toFixed(1)} s left in this window`;
 }
-/** The size of the scene in the plan: { minX, maxX, minY, maxY } over every pilot's track, padded by `pad` metres on each side. */
+/** The size of the scene in the plan's frame: { minU, maxU, minV, maxV } over every pilot's track, padded by `pad` metres on each side. */
 export function planBounds(scene, pad = 20) {
-    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-    for (const p of scene.pilots) for (let i = 0; i < p.ticks; i++) { if (p.x[i] < minX) minX = p.x[i]; if (p.x[i] > maxX) maxX = p.x[i]; if (p.y[i] < minY) minY = p.y[i]; if (p.y[i] > maxY) maxY = p.y[i]; }
-    return { minX: minX - pad, maxX: maxX + pad, minY: minY - pad, maxY: maxY + pad };
+    let minU = Infinity, maxU = -Infinity, minV = Infinity, maxV = -Infinity;
+    for (const p of scene.pilots) for (let i = 0; i < p.ticks; i++) { if (p.u[i] < minU) minU = p.u[i]; if (p.u[i] > maxU) maxU = p.u[i]; if (p.v[i] < minV) minV = p.v[i]; if (p.v[i] > maxV) maxV = p.v[i]; }
+    return { minU: minU - pad, maxU: maxU + pad, minV: minV - pad, maxV: maxV + pad };
 }
 /** The result line for one pilot at the end of the dive. */
 export const resultLine = (p, scene) => `${p.name}: score ${f3(p.score)} (the clean autopilot ${f3(scene.cleanScore)})${p.status === "submerged" ? "" : "; " + STATUS_WORDS[p.status] + " after " + (p.ticks * scene.dt).toFixed(0) + " s"}`;

@@ -9,14 +9,16 @@ import { DIVES, TICK, pilotDefs, flyScene, compassLine, planBounds, resultLine, 
 const PLAN_W = 1000, PLAN_H = 360, CHART_W = 1000, HEAD_H = 200, ERR_H = 150;
 const hsl = (hue, a = 1) => `hsl(${hue} 75% 58% / ${a})`;
 const SPEEDS = [1, 4, 10, 30];
+const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
+const LINE_W = [5, 2.5, 2, 2];   // the plain autopilot is drawn first and widest: a pilot that flew the same line as it shows as a thin line inside its band (the fly estimator in the study recovered nothing, and this is how that looks)
 
-export function mountDropoutView(root, { circuit, doc = (typeof document !== "undefined" ? document : null), raf = (typeof requestAnimationFrame !== "undefined" ? requestAnimationFrame : null), caf = (typeof cancelAnimationFrame !== "undefined" ? cancelAnimationFrame : null), now = () => (typeof performance !== "undefined" ? performance.now() : 0) }) {
+export function mountDropoutView(root, { circuit, doc = (typeof document !== "undefined" ? document : null), raf = (typeof requestAnimationFrame !== "undefined" ? requestAnimationFrame : null), caf = (typeof cancelAnimationFrame !== "undefined" ? cancelAnimationFrame : null) }) {
     const el = (tag, text, cls) => { const e = doc.createElement(tag); if (text !== undefined && text !== null) e.textContent = text; if (cls) e.className = cls; return e; };
     const defs = pilotDefs(circuit);
     root.textContent = "";
-    const intro = el("p", "One dive, flown by four pilots through the same compass dropout. Press play. Heavy stretches of a track are flown with the compass dark.", "sub");
+    const intro = el("p", "Press play. Heavy stretches of a track are flown with the compass dark; the grey dashed line is the heading the plain autopilot believes.", "sub");
     const bar = el("div", null, "dropbar"), diveSel = el("select"), playBtn = el("button", "play"), speedSel = el("select"), scrub = el("input"), clock = el("span", "", "sub");
-    diveSel.title = "Which dive to fly"; speedSel.title = "Replay speed"; scrub.type = "range"; scrub.min = "0"; scrub.max = "1799"; scrub.value = "0"; scrub.title = "Scrub through the dive";
+    diveSel.title = "Which dive to fly"; speedSel.title = "Replay speed"; scrub.type = "range"; scrub.min = "0"; scrub.value = "0"; scrub.title = "Scrub through the dive";
     DIVES.forEach((d, i) => { const o = el("option", d.label); o.value = String(i); diveSel.appendChild(o); });
     SPEEDS.forEach((s) => { const o = el("option", s + "×"); o.value = String(s); if (s === 4) o.selected = true; speedSel.appendChild(o); });
     for (const [label, node] of [["dive", diveSel], ["speed", speedSel]]) { const l = el("label", label + " "); l.appendChild(node); bar.appendChild(l); }
@@ -28,10 +30,10 @@ export function mountDropoutView(root, { circuit, doc = (typeof document !== "un
     for (const n of [intro, bar, plan, heads, errs, legend, notes]) root.appendChild(n);
     plan.id = "dropPlan"; heads.id = "dropHeads"; errs.id = "dropErrs"; playBtn.id = "dropPlay"; diveSel.id = "dropDive"; speedSel.id = "dropSpeed"; scrub.id = "dropScrub"; clock.id = "dropClock"; legend.id = "dropLegend";
 
-    let scene = null, dive = 0, tick = 0, playing = false, last = 0, handle = null, disposed = false;
+    let scene = null, dive = 0, tick = 0, playing = false, last = 0, handle = null;
     const rows = new Map();
     const buildLegend = () => {
-        legend.textContent = ""; rows.clear();
+        legend.textContent = "";
         for (const p of scene.pilots) {
             const row = el("div", null, "droprow"), sw = el("span", null, "sw"), body = el("div"), nm = el("div", p.name, "nm"), bl = el("div", p.blurb, "sub"), live = el("div", "", "sub"), res = el("div", resultLine(p, scene), "sub");
             sw.style.background = hsl(p.hue); body.appendChild(nm); body.appendChild(bl); body.appendChild(live); body.appendChild(res); row.appendChild(sw); row.appendChild(body); legend.appendChild(row); rows.set(p.id, live);
@@ -45,16 +47,16 @@ export function mountDropoutView(root, { circuit, doc = (typeof document !== "un
         g.stroke(); g.setLineDash([]);
     };
     function drawPlan() {
-        const g = plan.getContext("2d"), b = planBounds(scene), s = Math.min(PLAN_W / (b.maxX - b.minX), PLAN_H / (b.maxY - b.minY)), px = (x) => (x - b.minX) * s, py = (y) => (b.maxY - y) * s;   // north up: a right turn is clockwise on the screen
+        const g = plan.getContext("2d"), b = planBounds(scene), s = Math.min(PLAN_W / (b.maxU - b.minU), PLAN_H / (b.maxV - b.minV)), px = (u) => (u - b.minU) * s, py = (v) => (v - b.minV) * s;   // the target heading points right; a right turn goes down the screen (clockwise)
         g.clearRect(0, 0, PLAN_W, PLAN_H); g.fillStyle = "#04101c"; g.fillRect(0, 0, PLAN_W, PLAN_H);
-        g.strokeStyle = "#1c2c44"; g.lineWidth = 1; for (let x = Math.ceil(b.minX / 50) * 50; x < b.maxX; x += 50) { g.beginPath(); g.moveTo(px(x), 0); g.lineTo(px(x), PLAN_H); g.stroke(); } for (let y = Math.ceil(b.minY / 50) * 50; y < b.maxY; y += 50) { g.beginPath(); g.moveTo(0, py(y)); g.lineTo(PLAN_W, py(y)); g.stroke(); }
-        const p0 = scene.pilots[0], ox = px(p0.x[0]), oy = py(p0.y[0]), tl = 90 * s;   // the target heading, drawn from the start
-        g.strokeStyle = "rgba(255,255,255,.45)"; g.setLineDash([6, 6]); g.beginPath(); g.moveTo(ox, oy); g.lineTo(ox + Math.cos(scene.target.heading) * tl, oy + Math.sin(scene.target.heading) * tl); g.stroke(); g.setLineDash([]);
-        for (const p of scene.pilots) {
+        g.strokeStyle = "#1c2c44"; g.lineWidth = 1; for (let u = Math.ceil(b.minU / 50) * 50; u < b.maxU; u += 50) { g.beginPath(); g.moveTo(px(u), 0); g.lineTo(px(u), PLAN_H); g.stroke(); } for (let v = Math.ceil(b.minV / 50) * 50; v < b.maxV; v += 50) { g.beginPath(); g.moveTo(0, py(v)); g.lineTo(PLAN_W, py(v)); g.stroke(); }
+        const ox = px(0), oy = py(0);   // the target heading, drawn from the start
+        g.strokeStyle = "rgba(255,255,255,.45)"; g.setLineDash([6, 6]); g.beginPath(); g.moveTo(ox, oy); g.lineTo(PLAN_W, oy); g.stroke(); g.setLineDash([]);
+        scene.pilots.forEach((p, k) => {
             const n = Math.min(Math.floor(tick) + 1, p.ticks);
-            for (let i = 1; i < n; i++) { g.strokeStyle = hsl(p.hue, p.dark[i] ? 0.95 : 0.5); g.lineWidth = p.dark[i] ? 3.5 : 1.5; g.beginPath(); g.moveTo(px(p.x[i - 1]), py(p.y[i - 1])); g.lineTo(px(p.x[i]), py(p.y[i])); g.stroke(); }
-            const i = Math.max(0, n - 1); g.save(); g.translate(px(p.x[i]), py(p.y[i])); g.rotate(p.heading[i]); g.fillStyle = hsl(p.hue); g.strokeStyle = "#0009"; g.beginPath(); g.ellipse(0, 0, 13, 4.4, 0, 0, Math.PI * 2); g.fill(); g.stroke(); g.restore();
-        }
+            for (let i = 1; i < n; i++) { g.strokeStyle = hsl(p.hue, p.dark[i] ? 0.95 : 0.5); g.lineWidth = (p.dark[i] ? 3.5 : 1.5) + (k === 0 ? 3 : 0); g.beginPath(); g.moveTo(px(p.u[i - 1]), py(p.v[i - 1])); g.lineTo(px(p.u[i]), py(p.v[i])); g.stroke(); }
+            const i = Math.max(0, n - 1); g.save(); g.translate(px(p.u[i]), py(p.v[i])); g.rotate(wrap(p.heading[i] - scene.target.heading)); g.fillStyle = hsl(p.hue); g.strokeStyle = "#0009"; g.beginPath(); g.ellipse(0, 0, 13, 4.4, 0, 0, Math.PI * 2); g.fill(); g.stroke(); g.restore();
+        });
     }
     function drawHeads() {
         const g = heads.getContext("2d"); g.clearRect(0, 0, CHART_W, HEAD_H); g.fillStyle = "#04101c"; g.fillRect(0, 0, CHART_W, HEAD_H); shade(g, CHART_W, HEAD_H);
@@ -63,13 +65,13 @@ export function mountDropoutView(root, { circuit, doc = (typeof document !== "un
         g.strokeStyle = "rgba(255,255,255,.5)"; g.setLineDash([6, 6]); g.beginPath(); g.moveTo(0, HEAD_H - t * (HEAD_H - 12) - 6); g.lineTo(CHART_W, HEAD_H - t * (HEAD_H - 12) - 6); g.stroke(); g.setLineDash([]);
         const plain = scene.pilots[0], n0 = Math.min(Math.floor(tick) + 1, plain.ticks);
         line(g, plain.believed, n0, CHART_W, HEAD_H, lo, hi, "rgba(190,200,215,.8)", 1.5, [3, 3]);
-        for (const p of scene.pilots) line(g, p.heading, Math.min(Math.floor(tick) + 1, p.ticks), CHART_W, HEAD_H, lo, hi, hsl(p.hue), 2);
+        scene.pilots.forEach((p, k) => line(g, p.heading, Math.min(Math.floor(tick) + 1, p.ticks), CHART_W, HEAD_H, lo, hi, hsl(p.hue), LINE_W[k]));
         const x = tx(tick, CHART_W); g.strokeStyle = "#fff"; g.lineWidth = 1; g.beginPath(); g.moveTo(x, 0); g.lineTo(x, HEAD_H); g.stroke();
         g.fillStyle = "#7c93b8"; g.font = "12px monospace"; g.fillText("heading (rad): target dashed white; what the plain autopilot believes dashed grey; shaded = compass dark", 8, 14);
     }
     function drawErrs() {
         const g = errs.getContext("2d"); g.clearRect(0, 0, CHART_W, ERR_H); g.fillStyle = "#04101c"; g.fillRect(0, 0, CHART_W, ERR_H); shade(g, CHART_W, ERR_H);
-        for (const p of scene.pilots) line(g, p.error, Math.min(Math.floor(tick) + 1, p.ticks), CHART_W, ERR_H, 0, Math.PI, hsl(p.hue), 2);
+        scene.pilots.forEach((p, k) => line(g, p.error, Math.min(Math.floor(tick) + 1, p.ticks), CHART_W, ERR_H, 0, Math.PI, hsl(p.hue), LINE_W[k]));
         const x = tx(tick, CHART_W); g.strokeStyle = "#fff"; g.lineWidth = 1; g.beginPath(); g.moveTo(x, 0); g.lineTo(x, ERR_H); g.stroke();
         g.fillStyle = "#7c93b8"; g.font = "12px monospace"; g.fillText("error against the target heading (0 to pi rad)", 8, 14);
     }
@@ -84,7 +86,7 @@ export function mountDropoutView(root, { circuit, doc = (typeof document !== "un
         dive = Math.max(0, Math.min(DIVES.length - 1, k | 0)); diveSel.value = String(dive); scene = flyScene(DIVES[dive].scenario, defs); tick = 0; scrub.max = String(scene.ticks - 1); buildLegend(); paintAll();
     }
     function frame(t) {
-        if (!playing || disposed) return;
+        if (!playing) return;
         const dt = last ? Math.min(0.1, (t - last) / 1000) : 0; last = t;
         tick = Math.min(scene.ticks - 1, tick + dt * (Number(speedSel.value) || 4) / TICK);
         paintAll();
@@ -103,6 +105,6 @@ export function mountDropoutView(root, { circuit, doc = (typeof document !== "un
     return {
         setDive, setTick(k) { tick = Math.max(0, Math.min(scene.ticks - 1, k)); paintAll(); }, play: () => setPlaying(true), pause: () => setPlaying(false),
         state: () => ({ dive, tick: Math.floor(tick), playing, ticks: scene.ticks, scores: scene.pilots.map((p) => p.score), windows: scene.windows }),
-        dispose() { disposed = true; playing = false; if (handle !== null && caf) caf(handle); root.textContent = ""; },
+        dispose() { playing = false; if (handle !== null && caf) caf(handle); root.textContent = ""; },
     };
 }
