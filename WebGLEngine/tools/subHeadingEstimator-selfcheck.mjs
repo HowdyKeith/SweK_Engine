@@ -9,7 +9,7 @@
 //   THE RESERVOIR. On the two-cell loop at radius 0.9 the gain is g = 0.9 / 6 = 0.15; a pulse d into cell 0 comes back after two ticks as g x 3 x d x g x 12 = 0.81 d (0.9^2): 0.45 d on cell 1 after one. With cell 1 inhibitory the return is relu(-) = 0.
 //   THE LEAKY UNIT. Fed 1, 0, 0 at sigma 0.5 it reads 1, 0.5, 0.25. Normal equations of its reading [g, 1] against cum = [1, 2, 3]: A = [[1.3125, 1.75], [1.75, 3]], b = [2.75, 6].
 //   THE SCORE. Six ticks fed 0.1 0.2 0.4 0.8 1.0 2.0, valid 1 1 0 0 1 0, delta 0 0 0.25 0.5 0 1.5, a readout that reads the input (cum_hat = the input): the estimate is held at the last valid tick (0.2, then 1.0), so delta_hat = 0.2, 0.6, 1.0 against 0.25, 0.5, 1.5 -> squared errors 0.0025,
-//   0.01, 0.25; a second dive fed 1, 3, 5, valid 0 0 1, delta 0.5 1 0 (it STARTS dark: the estimate is held at its first tick) gives delta_hat 0, 2 against 0.5, 1 -> 0.25, 1. Five dark ticks in all, sum of squares 1.5125, RMSE sqrt(0.3025) = 0.55; saying zero: sqrt(3.8125 / 5) = 0.873212.
+//   0.01, 0.25; a second dive fed 1.5, 3.5, 5, valid 0 0 1, delta 0.5 1.5 0 (it STARTS dark: the estimate is held at its first tick, not at the last tick of the dive before) gives delta_hat 0, 2 against 0.5, 1.5 -> 0.25, 0.25. Five dark ticks in all, sum of squares 0.7625, RMSE sqrt(0.1525) = 0.390512; saying zero: sqrt(5.0625 / 5) = 1.006231.
 //   THE LOOP. The pure integrator (a unit with sigma 1 read at 0.2 / 30) is the heading rate integrated by the Riemann sum, so in the loop it is the oracle navigator to within 1e-3 of a score. By hand on level states yawing 0.1 rad/s (w_z = -0.1; the input is 0.1 / 0.2 = 0.5 a tick): reading 0.5, 1.0, 1.5 held 0.5 at the last valid tick, the inner pilot is handed
 //   the shown heading 0.3 turned by 0, 0.5, 1.0.
 //   THE VERDICT. Family RMSE 0.20 0.22 0.18 0.20 has mean 0.20 and sd 0.01633, so a win needs max(0.02, 0.03266): cx at 0.10 wins (margin 0.10), at 0.17 does not (margin 0.03 < 0.03266).
@@ -79,6 +79,10 @@ await guarded("section 2", async () => {
     ok("with cell 1 inhibitory the return is cut by the relu: the pulse reads [d, 0], [0, 0.45 d], [0, 0] (cell 0 is driven below zero and is silent)", nearAll(his[0], [drive, 0], 1e-9) && nearAll(his[1], [0, 0.45 * drive], 1e-9) && nearAll(his[2], [0, 0], 1e-12), J(his));
     const Mn = E.circuitModel(loop(), 0.9, false); let hn = Mn.init(); hn = Mn.step(hn, x); const hn2 = Mn.step(hn, new Float64Array(15));
     ok("NO STATE: the pulse is not carried -- [d, 0] and then [0, 0] -- and its radius is irrelevant", nearAll(Array.from(hn), [drive, 0], 1e-9) && nearAll(Array.from(hn2), [0, 0], 1e-12));
+    const Mc = E.circuitModel(chain, 0.9); let hc = Mc.init(); hc = Mc.step(hc, x); const hc2 = Mc.step(hc, new Float64Array(15));
+    ok("a chain (spectral radius 0) has no recurrence: the pulse reads [d, 0, 0] and then [0, 0, 0] -- finite, not divided by a zero radius -- and the model reports rho 0", Array.from(hc).every(Number.isFinite) && Array.from(hc2).every(Number.isFinite) && nearAll(Array.from(hc2), [0, 0, 0], 1e-12) && Mc.rho === 0);
+    const Mg = E.circuitModel(loop(), 0.9, true, 12); let hg = Mg.init(); const hgs = []; for (let t = 0; t < 3; t++) { hg = Mg.step(hg, t === 0 ? x : new Float64Array(15)); hgs.push(Array.from(hg)); }
+    ok("a radius handed to circuitModel is used and not measured again: with rho 12 the gain is 0.9 / 12 = 0.075 and the pulse reads 0.225 d on cell 1 after one tick (0.075 x 3 d) and comes back as 0.2025 d on cell 0 after two (0.075 x 12 x 0.225 d), and the model reports 12", near(Mg.rho, 12, 0) && nearAll(hgs[1], [0, 0.225 * drive], 1e-9) && nearAll(hgs[2], [0.2025 * drive, 0], 1e-9), J(hgs));
     const z = new Float64Array(2); M.read(z, Float64Array.from([5, 7]));
     ok("the reading is the output cells plus a constant 1: cell 1's 7 and 1", J(Array.from(z)) === "[7,1]" && E.circuitModel(real, 0.9).n === 65);
     // a five-cell circuit with mixed signs against a naive dense implementation
@@ -97,13 +101,13 @@ await guarded("section 3", async () => {
     ok("a leaky unit at sigma 0.5 fed 1, 0, 0 reads 1, 0.5, 0.25; read as [g, 1]", nearAll(gs, [1, 0.5, 0.25], 1e-12) && leaky.n === 2);
     const d1 = dive([1, 0, 0], [1, 1, 1], [0, 0, 0], [0, 0, 0], [1, 2, 3]), ne = E.normalEquations(leaky, [d1]);
     ok("normal equations of [g, 1] against cum = [1, 2, 3]: A = [[1.3125, 1.75], [1.75, 3]], b = [2.75, 6] over 3 ticks (1e-9)", nearAll(Array.from(ne.A), [1.3125, 1.75, 1.75, 3], 1e-9) && nearAll(Array.from(ne.b), [2.75, 6], 1e-9) && ne.ticks === 3, J(Array.from(ne.A)));
-    const sigma0 = E.leakyModel(0), a = dive([0.1, 0.2, 0.4, 0.8, 1.0, 2.0], [1, 1, 0, 0, 1, 0], [0, 0, 0.25, 0.5, 0, 1.5], [0, 0, 0.26, 0.5, 0, 1.48]), b = dive([1, 3, 5], [0, 0, 1], [0.5, 1, 0], [0.5, 1, 0]);
+    const sigma0 = E.leakyModel(0), a = dive([0.1, 0.2, 0.4, 0.8, 1.0, 2.0], [1, 1, 0, 0, 1, 0], [0, 0, 0.25, 0.5, 0, 1.5], [0, 0, 0.26, 0.5, 0, 1.48]), b = dive([1.5, 3.5, 5], [0, 0, 1], [0.5, 1.5, 0], [0.5, 1.5, 0]);
     const sc = E.scoreReadouts(sigma0, [Float64Array.from([1, 0]), Float64Array.from([0, 0])], [a, b]);
-    ok("the score by hand: the estimate is held at the last valid tick (and at the first tick of a dive that starts dark): delta_hat 0.2, 0.6, 1.0 and 0, 2 -> sum of squares 1.5125 over 5 dark ticks; the readout that says 0 scores 3.8125 (= the size of delta); the oracle's miss 0.0005 (1e-6)",
-        near(sc.sumSq[0], 1.5125, 1e-6) && near(sc.sumSq[1], 3.8125, 1e-6) && sc.dark === 5 && near(sc.none, 3.8125, 1e-6) && near(sc.oracle, 0.0005, 1e-6), J([Array.from(sc.sumSq), sc.dark, sc.none, sc.oracle]));
-    ok("RMSE 0.55 (sqrt(0.3025)); referenceScores gives the same none and oracle RMSEs by themselves (0.873212 and sqrt(0.0001) = 0.01)", near(E.rmseOf(sc.sumSq[0], sc.dark), 0.55, 1e-6) && near(E.referenceScores([a, b]).none, Math.sqrt(0.7625), 1e-6) && near(E.referenceScores([a, b]).oracle, 0.01, 1e-6) && E.referenceScores([a, b]).darkTicks === 5 && E.rmseOf(1, 0) === null);
+    ok("the score by hand: the estimate is held at the last valid tick (and at the first tick of a dive that starts dark -- not at the last tick of the dive before): delta_hat 0.2, 0.6, 1.0 and 0, 2 -> sum of squares 0.7625 over 5 dark ticks; the readout that says 0 scores 5.0625 (= the size of delta); the oracle's miss 0.0005 (1e-6)",
+        near(sc.sumSq[0], 0.7625, 1e-6) && near(sc.sumSq[1], 5.0625, 1e-6) && sc.dark === 5 && near(sc.none, 5.0625, 1e-6) && near(sc.oracle, 0.0005, 1e-6), J([Array.from(sc.sumSq), sc.dark, sc.none, sc.oracle]));
+    ok("RMSE sqrt(0.1525) = 0.390512; referenceScores gives the same none and oracle RMSEs by themselves (1.006231 and sqrt(0.0001) = 0.01)", near(E.rmseOf(sc.sumSq[0], sc.dark), Math.sqrt(0.1525), 1e-6) && near(E.referenceScores([a, b]).none, Math.sqrt(1.0125), 1e-6) && near(E.referenceScores([a, b]).oracle, 0.01, 1e-6) && E.referenceScores([a, b]).darkTicks === 5 && E.rmseOf(1, 0) === null);
     const fitx = { setting: 0, lambda: 0, readout: [1, 0] }, fs = E.scoreFit(() => sigma0, fitx, [a, b]);
-    ok("scoreFit: rmse 0.55, none 0.873212, skill 1 - 0.55 / 0.873212 = 0.370145, 5 dark ticks (1e-6)", near(fs.rmse, 0.55, 1e-6) && near(fs.none, Math.sqrt(0.7625), 1e-6) && near(fs.skill, 1 - 0.55 / Math.sqrt(0.7625), 1e-6) && fs.darkTicks === 5);
+    ok("scoreFit: rmse 0.390512, none 1.006231, skill 1 - 0.390512 / 1.006231 = 0.611910, 5 dark ticks (1e-6)", near(fs.rmse, Math.sqrt(0.1525), 1e-6) && near(fs.none, Math.sqrt(1.0125), 1e-6) && near(fs.skill, 1 - Math.sqrt(0.1525) / Math.sqrt(1.0125), 1e-6) && fs.darkTicks === 5);
     ok("a dive with no dark tick scores nothing (RMSE null, skill null) and does not divide by zero", E.scoreFit(() => sigma0, fitx, [dive([1, 2], [1, 1], [0, 0], [0, 0])]).rmse === null && E.scoreFit(() => sigma0, fitx, [dive([1, 2], [1, 1], [0, 0], [0, 0])]).skill === null);
     // the fit: a target that IS the leaky unit at sigma 0.5; the fit must find sigma 0.5 and the readout [1, 0]
     let seed = 11; const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
@@ -112,12 +116,23 @@ await guarded("section 3", async () => {
     ok("the fit finds the leak that made the target: of sigma 0.25, 0.5, 0.75 and five lambdas (15 candidates) it chooses 0.5 with the smallest lambda, the readout [1, 0] (1e-3) and a selection RMSE under 1e-3", ft.setting === 0.5 && ft.lambda === 1e-6 && ft.candidates.length === 15 && near(ft.readout[0], 1, 1e-3) && near(ft.readout[1], 0, 1e-3) && ft.selRmse < 1e-3, J([ft.setting, ft.lambda, ft.readout, ft.selRmse]));
     const sc2 = E.scoreFit((s) => E.leakyModel(s), ft, selD);
     ok("and it scores the same dives it was chosen on at skill above 0.999", sc2.skill > 0.999, String(sc2.skill));
+    const m5 = E.leakyModel(0.5), ne5 = E.normalEquations(m5, fitD); let tr5 = 0; for (let i = 0; i < 2; i++) tr5 += ne5.A[i * 2 + i]; tr5 /= 2;
+    const heavy = E.fitModel(() => m5, [0.5], [100], fitD, selD), want = Array.from(E.ridgeSolve(ne5.A, ne5.b, 2, 100 * tr5));
+    ok("the penalty is RELATIVE to the mean diagonal of the normal equations (" + tr5.toFixed(3) + "): with the single lambda 100 the readout is the ridge solution for 100 x " + tr5.toFixed(3) + ", and it is NOT the near-exact one (1e-9)", nearAll(heavy.readout, want, 1e-9) && Math.abs(heavy.readout[0] - 1) > 0.05, J([heavy.readout, want]));
+    const noisySel = [synth(), synth()].map((d) => ({ ...d, cum: Float32Array.from(d.cum, (v, i) => v + 0.3 * Math.sin(i)) })), ft2 = E.fitModel((s) => E.leakyModel(s), [0.5], [1e-6], fitD, noisySel), ne2 = E.normalEquations(E.leakyModel(0.5), fitD);
+    let tr2 = 0; for (let i = 0; i < 2; i++) tr2 += ne2.A[i * 2 + i]; tr2 /= 2;
+    ok("the readout is fitted on the FITTING dives alone, however the selection dives look: with selection dives whose target is not the unit's, the readout is still the ridge solution on the fitting dives (1e-9)", nearAll(ft2.readout, Array.from(E.ridgeSolve(ne2.A, ne2.b, 2, 1e-6 * tr2)), 1e-9));
     const tie = E.fitModel(() => E.leakyModel(0.5), [0.1, 0.2], [1e-6], fitD, selD);
     ok("ties go to the first (the smaller) setting: two settings that are the same model choose the first", tie.setting === 0.1);
     const nanModel = { n: 2, init: () => new Float64Array(1), step: () => Float64Array.from([NaN]), read(out) { out[0] = NaN; out[1] = 1; } };
-    const mixed = E.fitModel((s) => (s === 1 ? nanModel : E.leakyModel(0.5)), [1, 0.5], [1e-6, 1], fitD, selD), onlyNan = E.fitModel(() => nanModel, [1], [1e-6], fitD, selD);
+    const mixed = val(() => E.fitModel((s) => (s === 1 ? nanModel : E.leakyModel(0.5)), [1, 0.5], [1e-6, 1], fitD, selD)), onlyNan = val(() => E.fitModel(() => nanModel, [1], [1e-6], fitD, selD));
     ok("a setting whose activity overflows (NaN) scores Infinity and is never chosen when another is usable; if every setting overflows the fit still returns (RMSE Infinity, a zero readout) and does not throw",
-        mixed.setting === 0.5 && mixed.candidates.filter((c) => c.setting === 1).every((c) => c.rmse === Infinity) && onlyNan.selRmse === Infinity && J(onlyNan.readout) === "[0,0]", J(mixed.candidates.slice(0, 2)));
+        mixed.setting === 0.5 && mixed.candidates.filter((c) => c.setting === 1).every((c) => c.rmse === Infinity) && onlyNan.selRmse === Infinity && J(onlyNan.readout) === "[0,0]", J(mixed.candidates ? mixed.candidates.slice(0, 2) : mixed));
+    // a model that is fine on the fitting dives and runs away on the selection dives (marked by slot 0 = 7): its candidates score NaN in the selection, which must count as Infinity and never be chosen
+    const edgy = { n: 2, init: () => new Float64Array(1), step: (g, x) => { const o = new Float64Array(1); o[0] = x[0] === 7 ? NaN : 0.5 * g[0] + x[5]; return o; }, read(out, g) { out[0] = g[0]; out[1] = 1; } };
+    const selMarked = selD.map((d) => { const X = Float32Array.from(d.X); for (let t = 0; t < d.ticks; t++) X[t * 15] = 7; return { ...d, X }; });
+    const picky = val(() => E.fitModel((s) => (s === 1 ? edgy : E.leakyModel(0.5)), [1, 0.5], [1e-6], fitD, selMarked));
+    ok("a model whose selection run is NaN (the fit was fine) scores Infinity there and is not chosen over a working one, whichever comes first", picky.setting === 0.5 && picky.candidates.filter((c) => c.setting === 1).every((c) => c.rmse === Infinity), J(picky.candidates ? picky.candidates : picky));
 });
 
 sec("4. the senses and the recorded dives");
@@ -141,19 +156,29 @@ await guarded("section 4", async () => {
     }
     ok("the record is consistent: delta is 0 on valid ticks; on dark ticks the oracle's estimate is within 3e-3 of delta (the largest " + worst.toExponential(1) + ") and delta equals cum(t) - cum(last valid) to 1e-4 (the largest " + cumWorst.toExponential(1) + "); the compass flag in slot 14 is the valid flag; no slot but 5 and 14 is ever non-zero",
         deltaOnValid === 0 && worst < 3e-3 && cumWorst < 1e-4 && flagBad === 0 && offSlot === 0 && rec.every((d) => d.cum[0] === 0));
+    const crossing = { ...T.TRAIN_SET[0], start: { ...T.TRAIN_SET[0].start, heading: 3.1 }, target: { ...T.TRAIN_SET[0].target, heading: -3.1 } }, rc = E.recordSet([crossing])[0]; let jump = 0, cross = false;
+    for (let t = 1; t < rc.ticks; t++) jump = Math.max(jump, Math.abs(rc.cum[t] - rc.cum[t - 1]));
+    cross = Array.from(rc.cum).some((v) => Math.abs(v) > 0);
+    ok("a dive that turns through the +-pi cut (heading 3.1 to a target of -3.1): cum is the sum of the WRAPPED one-tick changes, so it never jumps by 2 pi (the largest step: " + jump.toExponential(1) + " rad, under 0.2) and delta stays within +-pi", jump < 0.2 && cross && Array.from(rc.delta).every((v) => Math.abs(v) <= Math.PI), String(jump));
+    const short = E.recordSet(T.TRAIN_SET.slice(0, 1), { windows: 1, seconds: 8 })[0];
+    ok("the window options reach the dropout: one window of 8 s is 240 dark ticks of the 1800 (not the default 960)", short.valid.reduce((s, v) => s + (v ? 0 : 1), 0) === 240);
     ok("the dives were flown with the oracle behind the dropout, so they are well flown: the second dive's heading changes by less than pi over the dive (cum stays finite and within +-4)", rec.every((d) => Array.from(d.cum).every((v) => Number.isFinite(v) && Math.abs(v) < 4)));
 });
 
 sec("5. the estimator in the loop");
 await guarded("section 5", async () => {
-    const integ = E.leakyModel(1), ro = Float64Array.from([0.2 / 30, 0]), tg = { depth: 30, heading: 0, speed: 2 }, cur = [0, 0, 0], seen = [];
-    const inner = (st) => { seen.push({ st, h: S.attitude(st).heading }); return { pitch: 0, yaw: 0, thrust: 0, ballast: 0 }; };
+    const integ = E.leakyModel(1), ro = Float64Array.from([0.2 / 30, 0]), tg = { depth: 30, heading: 0, speed: 2 }, cur = [1, 0, 0], seen = [];
+    const inner = (st, t, c, aux) => { seen.push({ st, h: S.attitude(st).heading, c, aux }); return { pitch: 0, yaw: 0, thrust: 0, ballast: 0 }; };
     const est = E.estimatorPilot(integ, Float64Array.from([1, 0]), inner), lvl = () => mk({ heading: 0.3, w: [0, 0, -0.1] });
     const v1 = lvl(); est(v1, tg, cur, { compassValid: 1 }); est(lvl(), tg, cur, { compassValid: 0 }); est(lvl(), tg, cur, { compassValid: 0 });
     ok("by hand: level states yawing 0.1 rad/s read 0.5, 1.0, 1.5 (the unit integrates 0.1 / 0.2 a tick); the first (valid) tick holds 0.5 and is handed the state itself; the two dark ticks are handed the shown heading 0.3 turned by 0.5 and 1.0: 0.8 and 1.3 (1e-9)",
         seen.length === 3 && seen[0].st === v1 && near(seen[0].h, 0.3, 1e-9) && near(seen[1].h, 0.8, 1e-9) && near(seen[2].h, 1.3, 1e-9) && near(est.last.estimate, 1.0, 1e-9), J(seen.map((s) => +s.h.toFixed(4))));
-    const t2 = { depth: 30, heading: 0, speed: 2 }; est(lvl(), t2, cur, { compassValid: 0 }); est(lvl(), t2, cur, { compassValid: 0 });
-    ok("a NEW target object is a new dive: the unit and the held estimate start again, so its first dark tick (no valid tick behind it) holds its own reading and turns the world by 0 (0.3), the next by 0.5 (0.8)", near(seen[3].h, 0.3, 1e-9) && near(seen[4].h, 0.8, 1e-9));
+    ok("on a dark tick the pilot is handed the current turned with the world -- [1, 0, 0] turned by 0.5 is [cos 0.5, -sin 0.5, 0] = [0.877583, -0.479426, 0] -- and the compass flag as it came (0); on a valid tick the very current it was given", nearAll(seen[1].c, [Math.cos(0.5), -Math.sin(0.5), 0], 1e-9) && seen[1].aux.compassValid === 0 && seen[2].aux.compassValid === 0 && seen[0].c === cur && seen[0].aux.compassValid === 1);
+    // a leaky unit (sigma 0.5, readout [1, 0]) fed 0.5 a tick reads 0.5, 0.75, 0.875, ...: its state at the end of a dive is NOT zero, so a dive that does not start from zero shows
+    const leak5 = E.estimatorPilot(E.leakyModel(0.5), Float64Array.from([1, 0]), inner), nd = seen.length, tA = { depth: 30, heading: 0, speed: 2 }, tB = { depth: 30, heading: 0, speed: 2 };
+    leak5(lvl(), tA, cur, { compassValid: 1 }); leak5(lvl(), tA, cur, { compassValid: 1 }); leak5(lvl(), tA, cur, { compassValid: 1 });
+    leak5(lvl(), tB, cur, { compassValid: 0 }); leak5(lvl(), tB, cur, { compassValid: 0 });
+    ok("a NEW target object is a new dive, from scratch: the unit restarts (0.5 again, not 0.9375) and the hold restarts, so its first dark tick (no valid tick behind it) holds its own reading and turns the world by 0 (0.3), and the next by 0.75 - 0.5 = 0.25 (0.55) -- not by anything left from the dive before (1e-9)", near(seen[nd + 3].h, 0.3, 1e-9) && near(seen[nd + 4].h, 0.55, 1e-9), J(seen.slice(nd).map((q) => +q.h.toFixed(5))));
     const bare = []; const e2 = E.estimatorPilot(integ, Float64Array.from([1, 0]), (st, t, c, aux) => { bare.push(aux); return {}; }); e2(lvl(), tg, cur); e2(lvl(), tg, cur);
     ok("with no 4th argument the compass is read as valid (a pass-through each time, the world untouched)", bare.length === 2 && bare.every((a) => a === null));
     const set = T.TRAIN_SET.filter((d, i) => i % 13 === 0).slice(0, 3), mkpilot = () => D.dropout(E.estimatorPilot(integ, ro, A.pilot()));
