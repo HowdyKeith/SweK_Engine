@@ -73,7 +73,7 @@
   <div style="color:#5f7590;line-height:1.4;">Every fruit-fly pilot is the same network, wired like a fly's Giant Fiber circuit, with the autopilot's contract (pitch, roll, yaw and throttle from the pointing errors, the rates and the air data); a choice picks which WEIGHTS fly it. The PD autopilot is not a network, and the hand weights are that autopilot written through the network (they fly the same flight); the shipped pilot is the same network with weights trained on the job the number under each name is graded on. The GPU brain is a DIFFERENT network (two dense layers, 1,796 weights) trained on the same job and run on a WebGPU device. A change applies at once, mid-flight; Start also respawns. <b>You</b>: S/&darr; pull back (nose up), W/&uarr; push, A/&larr; roll left, D/&rarr; roll right, Q/E rudder, R/F throttle up/down; neutral is trimmed for your airspeed.</div>
 </div>
 <div id="board"></div>
-<div id="brainBox" style="position:fixed;right:8px;bottom:8px;width:520px;background:#0b131fcc;border:1px solid #1c2c44;border-radius:6px;padding:4px 6px;z-index:5"><div style="font:11px ui-monospace,Menlo,monospace;color:#59d1ff;display:flex;justify-content:space-between"><span>Selected brain activity</span><span id="brainWho" style="color:#7c93b8"></span></div><canvas id="brainView" width="520" height="250" style="width:520px;height:250px;display:block"></canvas></div>
+<div id="brainBox" style="position:fixed;right:8px;bottom:8px;width:520px;background:#0b131fcc;border:1px solid #1c2c44;border-radius:6px;padding:4px 6px;z-index:5"><div style="font:11px ui-monospace,Menlo,monospace;color:#59d1ff;display:flex;justify-content:space-between"><span>Selected brain activity</span><label style="color:#7c93b8">view <select id="brainMode" style="font:inherit;background:#0c1424;color:#b9d4ff;border:1px solid #2f486c" title="bars: activations, steer lens and policy map. layers: every layer as a column of dots. Click a lens row or a dot to select a neuron and read its wiring."><option value="bars">bars</option><option value="layers">layers</option></select></label><span id="brainWho" style="color:#7c93b8"></span></div><canvas id="brainView" width="520" height="250" style="width:520px;height:250px;display:block"></canvas></div>
 <div id="hint">real physics: gravity, a stalling wing, a ground that ends the flight &mdash; drag to turn the camera, scroll to zoom, double-click to reset (chase and orbit cameras both)</div>
 
 <script type="importmap">
@@ -90,6 +90,7 @@ import * as F from "/physics/mechanics/flightModel6dof.mjs";
 import * as AF from "/brain/autopilotFlight.mjs";
 import * as MA from "/brain/manualAssist.mjs";
 import { flightPanel, drawPanel } from "/render/brainPanel.mjs";
+import { createBrainUi } from "/render/brainUi.mjs";
 import * as PF from "/brain/pilotFlightPolicy.mjs";
 import * as MF from "/brain/pilotFlightMlp.mjs";
 import { GpuPilotBrain } from "/brain/pilotFlightGpu.mjs";
@@ -397,13 +398,14 @@ const board = document.getElementById("board");
 for (let i = 0; i < N; i++) { const d = document.createElement("div"); d.className = "card"; d.id = "card" + i; board.appendChild(d); }
 // the selected brain (the aircraft the camera follows): its network's bars and the policy map, five times a second (render/brainPanel.mjs)
 const brainCv = document.getElementById("brainView"), brainCtx = brainCv.getContext("2d"); let lastBrain = 0;
+const bui = createBrainUi({ canvas: brainCv, modeEl: document.getElementById("brainMode"), onChange: () => { lastBrain = 0; drawBrain(); } });   // v4904: click a lens row or a dot to select a neuron; the view picker
 function drawBrain() {
   const now = performance.now(); if (now - lastBrain < 200) return; lastBrain = now;
   const me = Number(document.getElementById("camTarget").value) || 0, s = fleet[me], p = resolvePilots()[me]; if (!s || !p) return;
-  const wind = windNow(tick), target = missionAt(tick);
-  const panel = flightPanel({ kind: p.kind || "autopilot", policy: p.policy, weights: p.weights, pilot: p.fn || (p.policy ? (st, t, w) => p.policy.pilotFor(p.weights)(st, t, w) : null), state: s.state, target, wind, stick: { pitch: s.controls.pitch, roll: s.controls.roll, yaw: s.controls.yaw, throttle: s.controls.throttle } });
+  const wind = windNow(tick), target = missionAt(tick); bui.forWho(me + ":" + (p.label || ""));
+  const panel = flightPanel({ kind: p.kind || "autopilot", policy: p.policy, weights: p.weights, pilot: p.fn || (p.policy ? (st, t, w) => p.policy.pilotFor(p.weights)(st, t, w) : null), state: s.state, target, wind, stick: { pitch: s.controls.pitch, roll: s.controls.roll, yaw: s.controls.yaw, throttle: s.controls.throttle } }, { neuron: bui.neuron });
   document.getElementById("brainWho").textContent = `${me + 1}. ${p.label}`;
-  drawPanel(brainCtx, brainCv.width, brainCv.height, panel, { title: p.label });
+  bui.setRects(drawPanel(brainCtx, brainCv.width, brainCv.height, panel, { title: p.label, view: bui.view }).rects);
 }
 function updateBoard() {
   drawBrain();

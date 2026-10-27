@@ -32,6 +32,10 @@
 // SECTION 12 (the layered map, the selected neuron, the steer, v4904), ELEVEN more, each in place and restored (rows red): M1 the hidden columns without their relu 1 | M2 the contributions not sorted 1 | M3 the selection ignored 5 | M4 pickNeuron ignoring the radius 1 | M5 no incoming
 //   lines for a selection 1 | M6 steerWeights editing the original 2 | M7 the steer's sign flipped 2 | M8 negative lines drawn blue 1 | M9 linkLine giving a feature inputs 1 (a CRASH the first time, red but not by name: the row now catches it) | M10 netOf dropping the selection 3 | M11 the layers view ignored 1.
 //   FIXTURES THAT HAD TO BE STRONGER: the GPU net's hand weights are sparse (8 of 1024 nonzero in h1 -> h2, four active neurons per hidden layer), so the most active neuron's lines are already among the top two and a selection added none; the row now picks the first active neuron that gains lines.
+// SECTION 13 (the aquarium's clicks, v4904, a browser), FIVE page sabotages, each in place on sub-aquarium.html and restored: A1 the click picking nothing 2 (+ a page click that cannot reach a disabled button, caught) | A2 the steer delta zero 2 | A3 any selected neuron pushable 1 | A4 the view picker ignored 2 | A5 the header never saying STEERED 1.
+//   The first run clicked outside the viewport (the canvas sits below the fold: the click now scrolls it into view) and then used the no-selection layout for the layers view (a selected neuron puts the wiring line on top and shifts the map 14 px down).
+// SECTION 14 (the flight pages' clicks, v4904), SIX more, each in place and restored: U1 a second click not letting go (render/brainUi.mjs) 1 | U2 page coordinates not scaled to the canvas 2 | U3 the selection kept for somebody else 1 | U4 the view always bars 1+ (and it broke the aquarium rows too: see the next line) |
+//   U5 es-aircraft's panel built without the selection 3 | U6 es-box3d-fly3d never saying WHO the panel is about 1. THE AQUARIUM ROWS OF SECTION 13 FLAKED ONCE under that load (the first click came before the first drawing): they now wait for the header, not for half a second; three clean runs after.
 // B23 and B26 went 0 red the first time: no row looked at WHERE the panel put the map, and inside the steering box the flown target IS the wander target; the rows for the map's place on the canvas and for a sub outside the box now do.
 "use strict";
 import fs from "node:fs";
@@ -163,7 +167,7 @@ console.log("\n7. THE SIM");
 console.log("\n8. THE PAGES");
 {
     const aq = fs.readFileSync(path.join(ENG, "sub-aquarium.html"), "utf8"), fl = fs.readFileSync(path.join(ENG, "es-flight6dof.html"), "utf8");
-    ok("!! the aquarium: a brainView canvas, the panel imported, and drawBrain draws the SELECTED sub's probe through subPanel / drawPanel at most every 200 ms, from the frame loop", /id="brainView"/.test(aq) && /import \{ subPanel, drawPanel \} from "\/render\/brainPanel\.mjs"/.test(aq) && /selected \? tank\.probe\(selected\) : null/.test(aq) && /subPanel\(pr\)/.test(aq) && /now - lastBrain < 200/.test(aq) && /drawCompass\(snap\); drawBrain\(\)/.test(aq));
+    ok("!! the aquarium: a brainView canvas, the panel imported, and drawBrain draws the SELECTED sub's probe through subPanel / drawPanel at most every 200 ms, from the frame loop", /id="brainView"/.test(aq) && /import \{ subPanel, drawPanel \} from "\/render\/brainPanel\.mjs"/.test(aq) && /selected \? tank\.probe\(selected\) : null/.test(aq) && /subPanel\(pr, \{ neuron: brainSel \}\)/.test(aq) && /now - lastBrain < 200/.test(aq) && /drawCompass\(snap\); drawBrain\(\)/.test(aq));
     ok("!! the flight page: a brainView canvas, the panel imported, every pilot record carries its kind (manual, gpu, fly twice, autopilot), and drawBrain draws the aircraft the CAMERA follows through flightPanel at most every 200 ms, from updateBoard", /id="brainView"/.test(fl) && /import \{ flightPanel, drawPanel \} from "\/render\/brainPanel\.mjs"/.test(fl) && /kind: "manual"/.test(fl) && /kind: "gpu", policy: MF/.test(fl) && (fl.match(/kind: "fly", policy: PF/g) || []).length === 2 && /kind: "autopilot" \}/.test(fl) && /document\.getElementById\("camTarget"\)\.value\) \|\| 0, s = fleet\[me\], p = resolvePilots\(\)\[me\]/.test(fl) && /flightPanel\(\{ kind: p\.kind/.test(fl) && /now - lastBrain < 200/.test(fl) && /function updateBoard\(\) \{\s*drawBrain\(\);/.test(fl));
 }
 
@@ -209,7 +213,7 @@ console.log("\n10. THE PAGES THAT FLY IT (a browser; SKIPPED, and said, without 
     const ENGdir = ENG, types = { ".html": "text/html", ".mjs": "text/javascript", ".js": "text/javascript", ".json": "application/json" };
     const srcOf = (f) => fs.readFileSync(path.join(ENG, f), "utf8");
     const ac = srcOf("es-aircraft.html"), f3s = srcOf("es-box3d-fly3d.html"), gpu = srcOf("flight-gpu.html"), e2 = srcOf("es-box3d.html");
-    ok("!! es-aircraft: the canvas and the aircraft picker (three), aircraftPanel fed the SELECTED aircraft's body, its heading target and the squadron's weights for that aircraft, drawn from frame() at most every 200 ms", /id="brainView"/.test(ac) && /id="brainPick"/.test(ac) && /import \{ aircraftPanel, drawPanel \}/.test(ac) && /Number\(brainSel\.value\) \|\| 0/.test(ac) && /squad\.weights\[Math\.min\(i, squad\.weights\.length - 1\)\]/.test(ac) && /aircraftPanel\(\{ kind: w \? "fly" : "autopilot", weights: w, body: s\.body, desired: HEADINGS\[s\.headingIdx\] \}\)/.test(ac) && /now - lastBrain < 200/.test(ac) && /  drawBrain\(\);\n  syncScene/.test(ac));
+    ok("!! es-aircraft: the canvas and the aircraft picker (three), aircraftPanel fed the SELECTED aircraft's body, its heading target and the squadron's weights for that aircraft, drawn from frame() at most every 200 ms", /id="brainView"/.test(ac) && /id="brainPick"/.test(ac) && /import \{ aircraftPanel, drawPanel \}/.test(ac) && /Number\(brainSel\.value\) \|\| 0/.test(ac) && /squad\.weights\[Math\.min\(i, squad\.weights\.length - 1\)\]/.test(ac) && /aircraftPanel\(\{ kind: w \? "fly" : "autopilot", weights: w, body: s\.body, desired: HEADINGS\[s\.headingIdx\] \}, \{ neuron: bui\.neuron \}\)/.test(ac) && /now - lastBrain < 200/.test(ac) && /  drawBrain\(\);\n  syncScene/.test(ac));
     ok("!! es-box3d-fly3d: the canvas and a ship picker over BOTH teams, fly3dPanel fed the picked ship, the target the TACTICS layer gave it (tacticsDecide with its side's weights) and the roster's weights for that ship (scripted when the side is), from frame()", /id="brainView"/.test(f3s) && /id="brainPick"/.test(f3s) && /import \{ fly3dPanel, drawPanel \}/.test(f3s) && /tacticsDecide\(e, foes, W, \{ lastTargetId: e\._tgtId, wasFleeing: e\._fleeing, range: 1400 \}\)/.test(f3s) && /kind: w \? "fly" : "scripted"/.test(f3s) && /r && !r\.scripted && r\.weights\.length/.test(f3s) && /function frame\(\) \{\n  const dt = 1 \/ 30, nowMs = t \* 1000;\n  drawBrain\(\);/.test(f3s));
     ok("!! flight-gpu and es-box3d (the same fight in 3D and 2D): the canvas, the ship picker, tacticsPanel fed the picked ship, the foes and its SIDE's weights from roster.weights(team), drawBrain on the page's own door (__tacticsFight.drawBrain) and called from the render loop", [gpu, e2].every((src) => /id="brainView"/.test(src) && /id="brainPick"/.test(src) && /import \{ tacticsPanel, drawPanel \}/.test(src) && /tacticsPanel\(\{ self: e, foes, w: roster\.weights\(team\)/.test(src) && /window\.__tacticsFight = \{ drawBrain,/.test(src)) && /updateFx\(frameDt\);\n  drawBrain\(\);\n  render\(\);/.test(gpu) && /stepSim\(\);\n  drawBrain\(\);/.test(e2));
     ok("flight.html is the menu of the flight pages and flies nothing: it has no brain to show and gets no panel (said here so the absence is a decision)", !/brainView/.test(srcOf("flight.html")) && !/<canvas/.test(srcOf("flight.html")));
@@ -336,6 +340,98 @@ console.log("\n12. THE LAYERED MAP, THE SELECTED NEURON AND THE STEER (v4904): t
     ok("!! drawPanel in the bars view returns the lens rows' hit boxes (eight rows) and tints the selected row; in the layers view it draws the whole map (154 dots for the fly), the wiring line along the top, and returns the dots' hit areas", rb.view === "bars" && rb.rects.length === 8 && gB.calls.some((x) => x[0] === "set:fillStyle" && x[1] === "#16301c") && rl.view === "layers" && rl.dots === 154 && rl.rects.length === 154 && gL.calls.some((x) => x[0] === "fillText" && String(x[1]) === pS.links) && rl.lensBars === 0, `bars: ${rb.rects.length} row boxes; layers: ${rl.dots} dots, ${rl.lines} lines`);
     const gp0 = rec(), rp = B.drawPanel(gp0, 640, 300, pA, { view: "layers" });
     ok("  a panel with no network asked for the layers view draws its bars as usual (no crash, no map)", rp.view === "bars" || rp.dots === undefined);
+}
+
+console.log("\n13. THE AQUARIUM'S CLICKS (v4904; a browser, SKIPPED and said without one): select a neuron, read its wiring, push it, let go");
+{
+    const aq = fs.readFileSync(path.join(ENG, "sub-aquarium.html"), "utf8");
+    ok("!! the page (v4904) has the view picker (bars or layers), the three steer buttons (disabled until a last-hidden-layer neuron is selected), the dose picker, a click handler that picks from the last drawn hit areas, and drives tank.setSteer from the lens's own scale",
+        /id="brainMode"/.test(aq) && /id="steerUp" disabled/.test(aq) && /id="steerDown" disabled/.test(aq) && /id="steerClear" disabled/.test(aq) && /id="steerDose"/.test(aq) && /import \{ pickNeuron \} from "\/render\/brainLens\.mjs"/.test(aq) && /pickNeuron\(lastRects, x, y\)/.test(aq) && /subPanel\(pr, \{ neuron: brainSel \}\)/.test(aq) && /view: \$\("brainMode"\)\.value/.test(aq) && /tank\.setSteer\(selected, brainSel\.i, sign \* Number\(\$\("steerDose"\)\.value\) \* lastPanel\.lens\.scale\)/.test(aq) && /brainSel\.layer !== lastPanel\.lens\.col/.test(aq));
+    const { chromium, from: pwFrom } = resolvePlaywright(createRequire(import.meta.url)), skip = browserSkipReason(chromium, pwFrom, HEADLESS_SHELL);
+    if (skip) { console.log("  ----  live half SKIPPED -- " + skip); console.log("  ----  *** THAT IS A SKIP AND NOT A PASS: the clicks are only a page's"); }
+    else {
+        const types = { ".html": "text/html", ".mjs": "text/javascript", ".js": "text/javascript", ".json": "application/json" };
+        const subs = [{ id: "net1", name: "Neuron", hue: 200, pilot: "network", from: "this-box", local: true, weights: Array.from(PS.handWeights()) }];
+        const server = http.createServer((req, res) => {
+            const u = decodeURIComponent(req.url.split("?")[0]);
+            if (u === "/subaquarium/list") { res.writeHead(200, { "Content-Type": "application/json" }); return res.end(JSON.stringify({ ok: true, subs })); }
+            if (u.startsWith("/ai/")) { res.writeHead(200, { "Content-Type": "application/json" }); return res.end("{}"); }
+            const fp = path.join(ENG, u); if (fp.startsWith(ENG) && fs.existsSync(fp) && fs.statSync(fp).isFile()) { res.writeHead(200, { "Content-Type": types[path.extname(fp)] || "text/plain" }); return res.end(fs.readFileSync(fp)); }
+            res.writeHead(404); res.end("not found");
+        });
+        await new Promise((r) => server.listen(0, "127.0.0.1", r));
+        const br = await chromium.launch({ executablePath: HEADLESS_SHELL, args: webglLaunchArgs().args });
+        try {
+            const pg = await (await br.newContext()).newPage(), errs = [];
+            pg.on("pageerror", (e) => errs.push(String(e.message))); pg.on("console", (m) => { if (m.type() === "error" && !/Failed to load resource/.test(m.text())) errs.push(m.text()); });
+            await pg.goto("http://127.0.0.1:" + server.address().port + "/sub-aquarium.html", { waitUntil: "load" });
+            await pg.waitForFunction(() => document.querySelectorAll("#list .row").length === 1, null, { timeout: 8000 }).catch(() => {});
+            await pg.click("#list .row");
+            await pg.waitForFunction(() => /Giant Fiber/.test(document.getElementById("brainWho").textContent), null, { timeout: 20000 }).catch(() => {});   // WAIT FOR THE DRAWING, NOT THE CLOCK: the panel redraws five times a second and a loaded box has not drawn it after half a second
+            await pg.waitForTimeout(500);
+            const at = async (cx, cy) => { const b = await pg.$eval("#brainView", (e) => { e.scrollIntoView({ block: "center" }); const r = e.getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, h: r.height, cw: e.width, ch: e.height }; }); await pg.mouse.click(b.x + cx * b.w / b.cw, b.y + cy * b.h / b.ch); await pg.waitForTimeout(450); };
+            const txt = (id) => pg.$eval(id, (e) => e.textContent), dis = () => pg.evaluate(() => [document.getElementById("steerUp").disabled, document.getElementById("steerDown").disabled, document.getElementById("steerClear").disabled]);
+            const before = await dis(); await at(60, 193);   // the first row of the steer lens: the bars view's lower left
+            const m1 = await txt("#steerMsg"), d1 = await dis();
+            ok("!! a click on the first row of the steer lens selects that neuron of the last hidden layer: the line says h<i> is selected and can be pushed, and the push buttons come alive", before[0] && before[1] && /^h\d+ selected: push it up or down/.test(m1) && !d1[0] && !d1[1] && d1[2], JSON.stringify({ before, m1, d1 }));
+            await pg.click("#steerUp", { timeout: 3000 }).catch(() => {}); await pg.waitForTimeout(500);
+            const who = await txt("#brainWho"), m2 = await txt("#steerMsg"), d2 = await dis();
+            ok("!! pushing it steers the sub: the panel's header says STEERED h<i>, the message gives the push in hidden units, the clear button comes alive", /STEERED h\d+/.test(who) && /^steering h\d+ by \+\d/.test(m2) && !d2[2], JSON.stringify({ who: who.slice(-30), m2 }));
+            await pg.click("#steerClear"); await pg.waitForTimeout(500);
+            const who3 = await txt("#brainWho"), d3 = await dis();
+            ok("  clearing lets go: no STEERED in the header and the clear button is disabled again", !/STEERED/.test(who3) && d3[2], who3.slice(-30));
+            await pg.selectOption("#brainMode", "layers"); await pg.waitForTimeout(500);
+            await at(26, 44);   // the first dot of the features column (the map sits 14 px lower while a neuron is selected: the wiring line takes the top, and h<i> is still selected from the lens)
+            const m4 = await txt("#steerMsg"), d4 = await dis();
+            const ink = await pg.evaluate(() => { const c = document.getElementById("brainView"), d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data; let k = 0; for (let i = 0; i < d.length; i += 4) if (d[i] > 60 || d[i + 1] > 60 || d[i + 2] > 60) k++; return k; });
+            ok("!! in the layers view (" + ink + " inked pixels) a click on a dot of the FEATURES column selects it: it can be read and not pushed (the message says so, the push buttons stay disabled); a second click on the same dot lets go of it", /not in the last hidden layer/.test(m4) && d4[0] && d4[1] && ink > 3000 && await (async () => { await at(26, 44); return /click a neuron to select it/.test(await txt("#steerMsg")); })(), m4);
+            ok("  no page or console error", errs.length === 0, errs.join(" | ").slice(0, 200));
+        } finally { await br.close(); server.close(); }
+    }
+}
+
+console.log("\n14. THE FLIGHT PAGES' CLICKS (v4904): render/brainUi.mjs, and the three pages that use it (select, read the wiring, the layers view; no steer there)");
+{
+    const U = await import("./brainUi.mjs"), L = await import("./brainLens.mjs");
+    const listeners = {}, canvas = { width: 520, height: 250, style: {}, addEventListener: (t, f) => { listeners[t] = f; }, getBoundingClientRect: () => ({ left: 100, top: 40, width: 260, height: 125 }) };
+    const modeListeners = {}, mode = { value: "bars", addEventListener: (t, f) => { modeListeners[t] = f; } };
+    let changes = 0; const ui = U.createBrainUi({ canvas, modeEl: mode, onChange: () => { changes++; } });
+    ui.setRects([{ layer: 2, i: 7, x: 100, y: 60, r: 5 }, { layer: 3, i: 1, x: 300, y: 60, r: 5 }]);
+    listeners.click({ clientX: 100 + 50, clientY: 40 + 30 });   // the page shows the canvas at half size: client (150, 70) is canvas (100, 60)
+    ok("!! a click maps the page's coordinates to the canvas's (the canvas is drawn at half its size here) and selects the dot under it; the pointer cursor is set", JSON.stringify(ui.neuron) === JSON.stringify({ layer: 2, i: 7 }) && changes === 1 && canvas.style.cursor === "pointer", JSON.stringify(ui.neuron));
+    ui.click(100, 60); const second = ui.neuron; ui.click(100, 60); ui.click(0, 0);
+    ok("!! a second click on the selected neuron lets go of it, a click on another selects that one, and a click on nothing clears the selection", second === null && JSON.stringify((ui.click(300, 60), ui.neuron)) === JSON.stringify({ layer: 3, i: 1 }) && (ui.click(0, 0), ui.neuron) === null, "");
+    ui.click(100, 60); ui.forWho("a"); const afterA = ui.neuron; ui.forWho("b"); const afterB = ui.neuron; ui.click(100, 60); ui.forWho("b"); const same = ui.neuron;
+    ok("!! forWho lets go of the selection when the panel is about somebody else (a selection made before forWho(a) is dropped by it, and again by forWho(b)) and keeps it for the same one (a repeated forWho(b))", afterA === null && afterB === null && JSON.stringify(same) === JSON.stringify({ layer: 2, i: 7 }));
+    mode.value = "layers"; const n0 = changes; modeListeners.change();
+    ok("!! the view follows the picker (bars, then layers; anything else reads as bars) and a change of it asks the page to redraw", ui.view === "layers" && changes === n0 + 1 && (() => { mode.value = "x"; return ui.view === "bars"; })() && U.createBrainUi({ canvas: null }).view === "bars");
+    ui.setRects("not an array"); ok("  a bad hit-area list is an empty one (a click on it selects nothing)", ui.click(100, 60) === null);
+    // the three pages
+    const pages = [["es-aircraft.html", /aircraftPanel\(\{[^}]*\}, \{ neuron: bui\.neuron \}\)/, /bui\.forWho\(i\)/], ["es-flight6dof.html", /throttle: s\.controls\.throttle \} \}, \{ neuron: bui\.neuron \}\)/, /bui\.forWho\(me \+ ":" \+ \(p\.label \|\| ""\)\)/], ["es-box3d-fly3d.html", /fly3dPanel\(\{ kind: w \? "fly" : "scripted"[^)]*\}, \{ neuron: bui\.neuron \}\)/, /bui\.forWho\(e\.id\)/]];
+    const bad = pages.filter(([f, panelRe, whoRe]) => { const src = fs.readFileSync(path.join(ENG, f), "utf8"); return !(/import \{ createBrainUi \} from "\/render\/brainUi\.mjs"/.test(src) && /id="brainMode"/.test(src) && /createBrainUi\(\{ canvas: brainCv, modeEl: document\.getElementById\("brainMode"\)/.test(src) && panelRe.test(src) && whoRe.test(src) && /bui\.setRects\(drawPanel\(brainCtx, brainCv\.width, brainCv\.height,/.test(src) && /view: bui\.view \}\)\.rects\)/.test(src)); }).map(([f]) => f);
+    ok("!! es-aircraft, es-flight6dof and es-box3d-fly3d each import the controller, have the view picker, build their panel with the selection, name WHO it is about, and hand the drawing's hit areas back", bad.length === 0, bad.length ? "MISSING in: " + bad.join(", ") : pages.map(([f]) => f).join(", "));
+    const { chromium, from: pwFrom } = resolvePlaywright(createRequire(import.meta.url)), skip = browserSkipReason(chromium, pwFrom, HEADLESS_SHELL);
+    if (skip) { console.log("  ----  live half SKIPPED -- " + skip); console.log("  ----  *** THAT IS A SKIP AND NOT A PASS: the clicks are only a page's"); }
+    else {
+        const types = { ".html": "text/html", ".mjs": "text/javascript", ".js": "text/javascript", ".json": "application/json" };
+        const server = http.createServer((req, res) => { const u = decodeURIComponent(req.url.split("?")[0]), fp = path.join(ENG, u); if (fp.startsWith(ENG) && fs.existsSync(fp) && fs.statSync(fp).isFile()) { res.writeHead(200, { "Content-Type": types[path.extname(fp)] || "text/plain" }); return res.end(fs.readFileSync(fp)); } res.writeHead(404); res.end("nf"); });
+        await new Promise((r) => server.listen(0, "127.0.0.1", r));
+        const br = await chromium.launch({ executablePath: HEADLESS_SHELL, args: webglLaunchArgs().args });
+        try {
+            const pa = await (await br.newContext()).newPage(), errs = [];
+            pa.on("pageerror", (e) => errs.push(String(e.message))); pa.on("console", (m) => { if (m.type() === "error" && !/Failed to load resource|WebGPU|webgpu/.test(m.text())) errs.push(m.text()); });
+            await pa.goto("http://127.0.0.1:" + server.address().port + "/es-aircraft.html", { waitUntil: "load" }); await pa.waitForTimeout(1500);
+            await pa.evaluate(() => { const r = window.__aircraftDemo ? window.__aircraftDemo.roster : null; if (r) r.setSpec("hand"); });
+            await pa.selectOption("#brainPick", "1"); await pa.selectOption("#brainMode", "layers"); await pa.waitForTimeout(900);
+            const white = () => pa.evaluate(() => { const c = document.getElementById("brainView"), d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data; let k = 0, ink = 0; for (let i = 0; i < d.length; i += 4) { if (d[i] > 60 || d[i + 1] > 60 || d[i + 2] > 60) ink++; if (d[i] > 235 && d[i + 1] > 235 && d[i + 2] > 235) k++; } return { k, ink }; });
+            const w0 = await white();
+            const box = await pa.$eval("#brainView", (e) => { e.scrollIntoView({ block: "center" }); const r = e.getBoundingClientRect(); return { x: r.left, y: r.top, s: r.width / e.width }; });
+            await pa.mouse.click(box.x + 26 * box.s, box.y + 33 * box.s); await pa.waitForTimeout(500);   // the first dot of the features column (the map is 22 px under the top)
+            const w1 = await white();
+            ok("!! es-aircraft on the hand network in the layers view (" + w0.ink + " inked pixels): a click on the first features dot rings it in white and writes its wiring along the top (more white pixels than before)", w0.ink > 3000 && w1.k > w0.k + 20, JSON.stringify({ before: w0.k, after: w1.k }));
+            ok("  no page or console error", errs.length === 0, errs.join(" | ").slice(0, 200));
+        } finally { await br.close(); server.close(); }
+    }
 }
 
 // v4901 -- the exports the definition census asked this gate to name (drawHeat), checked in one row.

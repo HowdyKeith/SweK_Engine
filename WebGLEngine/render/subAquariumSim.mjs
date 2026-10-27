@@ -22,6 +22,7 @@ import * as EP from "../brain/emergencyPilot.mjs";
 import * as SP from "../brain/surfacePilot.mjs";
 import { turnWorld } from "../tools/subDropout.mjs";
 import { navigator as deadReckoning } from "../tools/subNavigator.mjs";
+import { steerWeights } from "../render/brainLens.mjs";
 
 export const LENGTH = 500, WIDTH = 300, MARGIN = 60, DEPTH_MIN = 14, DEPTH_MAX = 40, TRAIL = 80, TRAIL_EVERY = 0.5, MAX_STEP = 0.1;
 const DT = S.DT, wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
@@ -129,6 +130,20 @@ export function createTank({ hull = "nominal", length = LENGTH, width = WIDTH } 
             for (const sub of subs.values()) { clearEvent(sub); sub.state = spawn(sub, sub.rng, true); sub.trail.length = 0; sub.wasInside = true; sub.status = "swimming"; retarget(sub); }
             return name;
         },
+        /**
+         * STEER a hidden neuron of a network sub (v4904): neuron `i` of the last hidden layer is pushed by `delta` (hidden units; the brain panel's lens names a push in the same units), through the output layer -- the weights the sub flies on become a copy
+         * with each output's bias moved by W[j,i] x delta (render/brainLens.mjs steerWeights), so the panel's outputs show it and the sub flies it. `i` null (or delta 0) clears it. Returns { neuron, delta } or null. Only a sub given the 963 weights has a
+         * network (anything else throws and changes nothing); a bad neuron throws; an unknown id returns null; a sub with an EVENT running is refused (an event wraps the pilot it was started with: end it first). The steer survives a loss and respawn.
+         */
+        setSteer(id, i, delta) {
+            const sub = subs.get(id); if (!sub) return null;
+            if (!sub.weights) throw new Error("subAquariumSim.setSteer: only a sub flown by a network (963 weights) has a neuron to steer");
+            if (sub.event) throw new Error("subAquariumSim.setSteer: end the sub's event first (an event wraps the pilot it was started with)");
+            if (i === null || i === undefined || delta === 0) { sub.steer = null; sub.steerW = null; sub.pilot = PS.pilotFor(Float32Array.from(sub.weights)); return null; }
+            const w = steerWeights(PS, sub.weights, i, delta); if (!w) throw new Error(`subAquariumSim.setSteer: neuron ${i} is not one of the ${PS.HIDDEN} hidden neurons, or delta ${delta} is not a number`);
+            sub.steer = { neuron: i, delta }; sub.steerW = w; sub.pilot = PS.pilotFor(Float32Array.from(w));
+            return { ...sub.steer };
+        },
         /** A page's estimator pilot for an estimator event (fly-estimator, er-estimator): build(inner) -> pilot(state, target, current, aux), `inner` the sub's own pilot seen through a spy. Applies to events started AFTER the call. A bad name or builder throws and changes nothing. */
         registerEstimator(event, build) {
             if (!isEstimator(event)) throw new Error(`subAquariumSim.registerEstimator: an estimator event (${ESTIMATORS.join(", ")}), got ${JSON.stringify(event)}`);
@@ -141,6 +156,7 @@ export function createTank({ hull = "nominal", length = LENGTH, width = WIDTH } 
          */
         setEvent(id, ev) {
             const sub = subs.get(id);
+            if (sub && sub.steer && ev !== null && ev !== undefined && ev !== "") throw new Error("subAquariumSim.setEvent: clear the sub's steer first (an event wraps the pilot it was started with)");
             if (ev !== null && ev !== undefined && ev !== "" && !EVENTS.includes(ev)) throw new Error(`subAquariumSim.setEvent: unknown event "${ev}" (${EVENTS.join(", ")})`);
             if (isEstimator(ev) && !estimators.has(ev)) throw new Error(`subAquariumSim.setEvent: no builder is registered for "${ev}" (a page registers one with registerEstimator)`);
             if (!sub) return null;
@@ -190,10 +206,10 @@ export function createTank({ hull = "nominal", length = LENGTH, width = WIDTH } 
             }
         },
         /** What a brain panel needs of one sub (render/brainPanel.mjs subPanel): { id, name, kind ("fly" when it was given the 963 weights, else "autopilot"), weights, state, target (the one it was flown to last tick) }, or null for an unknown id. The state is the live one: read it, do not keep it. */
-        probe(id) { const sub = subs.get(id); return sub ? { id: sub.id, name: sub.name, kind: sub.weights ? "fly" : "autopilot", weights: sub.weights, state: sub.state, target: sub.tgt || sub.target } : null; },
+        probe(id) { const sub = subs.get(id); return sub ? { id: sub.id, name: sub.name, kind: sub.weights ? "fly" : "autopilot", weights: sub.steerW || sub.weights, steer: sub.steer ? { ...sub.steer } : null, state: sub.state, target: sub.tgt || sub.target } : null; },
         /** What a page draws: one plain record per sub. */
         snapshot() {
-            return [...subs.values()].map((sub) => { const a = S.attitude(sub.state); return { hull: hullName, id: sub.id, name: sub.name, hue: sub.hue, pilot: sub.pilotKind, from: sub.from, local: sub.local, x: sub.state.pos[0], y: sub.state.pos[1], depth: a.depth, heading: a.heading, pitch: a.pitch, speed: a.speed, cmd: sub.cmd ? { ...sub.cmd } : { pitch: 0, yaw: 0, thrust: 0, ballast: 0 }, event: sub.event, compass: sub.compass ? { ...sub.compass } : null, tank: sub.state.tank ? { level: sub.state.tank.level, air: sub.state.tank.air, airMax: sub.eventModel ? sub.eventModel.spec.airMax : null, released: sub.state.tank.released, blowing: !!(sub.cmd && sub.cmd.blow > 0.5) } : null, target: sub.target, lost: sub.lost, status: sub.status, trail: sub.trail.slice() }; });
+            return [...subs.values()].map((sub) => { const a = S.attitude(sub.state); return { hull: hullName, id: sub.id, name: sub.name, hue: sub.hue, pilot: sub.pilotKind, from: sub.from, local: sub.local, x: sub.state.pos[0], y: sub.state.pos[1], depth: a.depth, heading: a.heading, pitch: a.pitch, speed: a.speed, cmd: sub.cmd ? { ...sub.cmd } : { pitch: 0, yaw: 0, thrust: 0, ballast: 0 }, event: sub.event, steer: sub.steer ? { ...sub.steer } : null, compass: sub.compass ? { ...sub.compass } : null, tank: sub.state.tank ? { level: sub.state.tank.level, air: sub.state.tank.air, airMax: sub.eventModel ? sub.eventModel.spec.airMax : null, released: sub.state.tank.released, blowing: !!(sub.cmd && sub.cmd.blow > 0.5) } : null, target: sub.target, lost: sub.lost, status: sub.status, trail: sub.trail.slice() }; });
         },
     };
 }

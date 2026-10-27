@@ -101,7 +101,13 @@
     <section class="panel p2d" aria-label="Depth view of the tank"><h2>Depth view <span class="hint">depth against length</span></h2>
       <canvas id="sideView" width="1000" height="220" aria-label="Side view of the tank: depth against length"></canvas></section>
     <section class="panel p2d" aria-label="Selected brain activity"><h2>Selected brain activity <span class="hint" id="brainWho">pick a sub in the list</span></h2>
-      <canvas id="brainView" width="520" height="300" aria-label="The selected sub's brain: its activations and the policy map"></canvas></section>
+      <canvas id="brainView" width="520" height="300" aria-label="The selected sub's brain: its activations and the policy map" style="cursor:pointer"></canvas>
+      <div class="tank-note" id="brainCtl" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+        <label>view <select id="brainMode" title="bars: the activations, the steer lens and the policy map. layers: every layer as a column of dots with the strongest weights between them"><option value="bars">bars + lens + policy map</option><option value="layers">layers</option></select></label>
+        <span title="Click a row of the steer lens or a dot of the layers view to select a neuron; its wiring is written along the top. A neuron of the last hidden layer can be pushed: the sub flies on the pushed copy of its weights.">
+          <button id="steerUp" disabled>push +</button> <button id="steerDown" disabled>push &minus;</button> <button id="steerClear" disabled>clear</button>
+          <label>dose <select id="steerDose"><option value="1">1</option><option value="4">4</option><option value="8" selected>8</option><option value="16">16</option></select> &times; the lens's push</label></span>
+        <span class="sub" id="steerMsg">click a neuron to select it</span></div></section>
     <section class="panel p2d" aria-label="Compass dropout: the plain autopilot beside the navigator"><h2>Compass dropout <span class="hint"><button id="compassBtn" title="Take the compass away on two subs at once, in the same windows: the first sub keeps the plain autopilot, the second flies behind the dead-reckoning navigator. Press again to end it.">compass test</button></span></h2>
       <canvas id="compassView" width="1000" height="330" aria-label="Two compass dials and the heading error of each over time"></canvas>
       <div class="tank-note" id="compassNote">Both subs lose the compass for 16 s in every 40 (after 10 s of it working). Green is the true heading, amber is what the pilot is shown. The plain autopilot is shown the last good heading and drifts off it; the navigator integrates the hull&rsquo;s own turn rate and keeps it. Its rate gyro is exact here, so this is the best a navigator can do.</div></section>
@@ -122,6 +128,7 @@ import { readout } from "/render/subBallastCues.mjs";
 import { LABELS as SEA_LABELS, GPU, DEFAULT_STYLE, isStyle, gpuSeaAvailable } from "/render/seaStyles.mjs";
 import { hostUrl } from "/ui/seaFrame.mjs";
 import { subPanel, drawPanel } from "/render/brainPanel.mjs";
+import { pickNeuron } from "/render/brainLens.mjs";
 import { dialInfo, pair, pushTrace, lineFor, drawDial, drawTrace, drawDark } from "/render/compassView.mjs";
 
 const $ = (id) => document.getElementById(id);
@@ -253,14 +260,34 @@ function drawSub(g, px, py, heading, hue, len, sel) {
   g.restore();
 }
 // the selected brain: bars for what the brain is made of (a network's neurons, or the autopilot's laws) and the policy map, redrawn five times a second
-const bcv = $("brainView"), bg = bcv.getContext("2d"); let lastBrain = 0;
+const bcv = $("brainView"), bg = bcv.getContext("2d"); let lastBrain = 0, brainSel = null, brainSelFor = null, lastRects = [], lastPanel = null;
+// v4904 -- the selected neuron ({ layer, i } in the layered map's columns): a click on a lens row or a dot; it belongs to the sub that was selected when it was made
+function steerButtons(panel, pr) {
+  const can = !!(pr && pr.kind === "fly" && panel && panel.lens && brainSel && brainSel.layer === panel.lens.col);
+  $("steerUp").disabled = $("steerDown").disabled = !can; $("steerClear").disabled = !(pr && pr.steer);
+  $("steerMsg").textContent = pr && pr.steer ? `steering h${pr.steer.neuron} by ${pr.steer.delta >= 0 ? "+" : ""}${pr.steer.delta.toFixed(2)} (hidden units)` : brainSel ? (can ? `h${brainSel.i} selected: push it up or down` : "this neuron is not in the last hidden layer: it can be read, not pushed") : "click a neuron to select it";
+}
 function drawBrain() {
   const now = performance.now(); if (now - lastBrain < 200) return; lastBrain = now;
   const pr = selected ? tank.probe(selected) : null;
-  if (!pr) { bg.fillStyle = "#050805"; bg.fillRect(0, 0, bcv.width, bcv.height); bg.fillStyle = "#7c93b8"; bg.font = "14px monospace"; bg.fillText("Pick a sub in the list: its brain is drawn here, the way that kind of brain is.", 20, 40); $("brainWho").textContent = "pick a sub in the list"; return; }
-  const panel = subPanel(pr); $("brainWho").textContent = pr.name + " · " + panel.label;
-  drawPanel(bg, bcv.width, bcv.height, panel, { title: pr.name });
+  if (selected !== brainSelFor) { brainSel = null; brainSelFor = selected; }
+  if (!pr) { lastRects = []; lastPanel = null; steerButtons(null, null); bg.fillStyle = "#050805"; bg.fillRect(0, 0, bcv.width, bcv.height); bg.fillStyle = "#7c93b8"; bg.font = "14px monospace"; bg.fillText("Pick a sub in the list: its brain is drawn here, the way that kind of brain is.", 20, 40); $("brainWho").textContent = "pick a sub in the list"; return; }
+  const panel = lastPanel = subPanel(pr, { neuron: brainSel }); $("brainWho").textContent = pr.name + " · " + panel.label + (pr.steer ? " · STEERED h" + pr.steer.neuron : "");
+  const r = drawPanel(bg, bcv.width, bcv.height, panel, { title: pr.name, view: $("brainMode").value }); lastRects = r.rects || [];
+  steerButtons(panel, pr);
 }
+bcv.addEventListener("click", (e) => {
+  const b = bcv.getBoundingClientRect(), x = (e.clientX - b.left) * bcv.width / b.width, y = (e.clientY - b.top) * bcv.height / b.height, hit = pickNeuron(lastRects, x, y);
+  brainSel = hit && brainSel && brainSel.layer === hit.layer && brainSel.i === hit.i ? null : hit; lastBrain = 0; drawBrain();   // a second click on the same neuron lets go of it
+});
+$("brainMode").addEventListener("change", () => { lastBrain = 0; drawBrain(); });
+function steer(sign) {
+  if (!selected || !brainSel || !lastPanel || !lastPanel.lens || brainSel.layer !== lastPanel.lens.col) return;
+  try { tank.setSteer(selected, brainSel.i, sign * Number($("steerDose").value) * lastPanel.lens.scale); } catch (e) { $("steerMsg").textContent = String((e && e.message) || e).slice(0, 90); return; }
+  lastBrain = 0; drawBrain();
+}
+$("steerUp").onclick = () => steer(1); $("steerDown").onclick = () => steer(-1);
+$("steerClear").onclick = () => { if (selected) { try { tank.setSteer(selected, null, 0); } catch (e) {} lastBrain = 0; drawBrain(); } };
 const cv = $("compassView"), cg = cv.getContext("2d"); let tracePlain = [], traceNav = [], lastTrace = 0;
 function drawCompass(snap) {
   const p = pair(snap), now = performance.now() / 1000;

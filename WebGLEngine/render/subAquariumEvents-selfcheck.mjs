@@ -17,12 +17,15 @@
 //   V7 the surface flag not in the target 2 | V8 the held depth not used 3 | V9 a loss leaves the event on 1 | V10 setHull leaves events 1 | V11 sink given the rescue 1 | V12 the tank model never used 5 | V13 the weight error not applied 5
 //   V14 the snapshot's tank always false 6 | V15 an unknown id throws 1 | V16 a swap keeps the old clock 1 | V17 the tank starts at 0, not the commanded level 1
 // First runs crashed with no FAIL line (V2, V4, V12, V15: a row read s.tank.air on a null tank; the snapshot read eventModel.spec on a cleared event) -- a crash is red but not red BY NAME, so the snapshot is now defensive and the rows say "no tank".
+// SECTION 10 (steering, v4904), SIX more, each in place on render/subAquariumSim.mjs and restored: T1 the steered weights never flown 1 | T2 the probe showing the original weights 1 | T3 clearing leaving the steered pilot 1 (0 THE FIRST TIME: nothing compared the pilot after the clear; the row now asks both pilots for one state) | T4 a steer allowed during an event 1 |
+//   T5 a sub with no network steered 1 (0 THE FIRST TIME: a null weights array threw a TypeError that the row counted as the refusal; it now wants the message) | T6 the snapshot without `steer` 2 (+ a crash in the first row, and the snapshot row of subAquariumSim-selfcheck).
 // SECTION 9 (v4904), SIX more, each applied to render/subAquariumSim.mjs in place and restored: E1 EVENTS without the two names 1 (the pinned names; the section then CRASHES on the unknown event, red but not red by name) | E2 an estimator with no builder not refused 1 | E3 `seen` the held heading, not the autopilot's read 2 |
 //   E4 the lit phase's `seen` the true heading, not the read 1 | E5 registerEstimator accepting any name 1 | E6 the builder handed the sub's own pilot, not the spy 3.
 // V16 and V17 went 0 red the first time: no row looked at the clock or at the starting level; the two rows in section 6 now do.
 "use strict";
 import * as A from "./subAquariumSim.mjs";
 import { turnWorld } from "../tools/subDropout.mjs";
+import { mlpLayerCpu as mlpRef } from "./brainTsl.mjs";
 
 let fails = 0;
 function ok(name, cond, detail) { console.log(`  ${cond ? "PASS" : "FAIL"}  ${name}${detail ? "   " + detail : ""}`); if (!cond) fails++; }
@@ -136,6 +139,25 @@ console.log("\n9. THE TWO ESTIMATOR EVENTS (v4904, ported from the tank-wide com
     // the same through the second estimator: its own builder, its own event, the same machinery
     const t2 = A.createTank(); t2.sync([entry("a")]); run(t2, 40); t2.registerEstimator("er-estimator", lying); t2.setEvent("a", "er-estimator"); run(t2, 10); const g10 = snap(t2).heading; run(t2, 6);
     ok("  the random-wiring event runs the same way through its own builder (dark at 16 s, the read the frozen heading plus 0.5 rad)", snap(t2).event === "er-estimator" && snap(t2).compass.valid === false && Math.abs(wrapA(snap(t2).compass.seen - (g10 + 0.5))) < 0.05);
+}
+
+console.log("\n10. STEERING A HIDDEN NEURON (v4904): the sub flies on a copy of its weights whose output biases moved, and the probe says so");
+{
+    const PS = await import("../brain/pilotSubPolicy.mjs"), BL = await import("./brainLens.mjs");
+    const W = Float32Array.from(PS.handWeights()), net = (id, extra = {}) => entry(id, { weights: Array.from(W), ...extra });
+    const t0 = A.createTank(); t0.sync([entry("plain"), net("net")]); run(t0, 20);
+    let e1 = 0; try { t0.setSteer("plain", 3, 1); } catch (e) { if (/only a sub flown by a network/.test(String(e.message))) e1++; }
+    ok("!! a sub with no network has no neuron to steer: setSteer throws and changes nothing; an unknown id answers null; a bad neuron and a NaN delta throw", e1 === 1 && t0.setSteer("nobody", 3, 1) === null && (() => { let n = 0; for (const [i, d] of [[999, 1], [-1, 1], [3, NaN]]) { try { t0.setSteer("net", i, d); } catch { n++; } } return n === 3 && snap(t0, 1).steer === null; })());
+    const base = A.createTank(), st = A.createTank(); for (const t of [base, st]) { t.sync([net("net")]); run(t, 20); }
+    const lens = BL.steerLens(PS.layersOf(W), (() => { const p = st.probe("net"); return B_act(p); })(), PS.OUTPUT_NAMES), top = lens.rows[0].i;
+    function B_act(p) { let h = PS.features(p.state, p.target, [0, 0, 0]); for (const l of PS.layersOf(p.weights).slice(0, -1)) h = mlpRef(l, h, 1); return h; }
+    const r = st.setSteer("net", top, 8 * lens.scale);
+    ok("!! setSteer answers { neuron, delta }, the snapshot says so, and the probe's weights are a COPY (the original untouched) whose output biases moved by W x delta; the panel's weights are what the sub flies on", r && r.neuron === top && r.delta === 8 * lens.scale && snap(st).steer.neuron === top && (() => { const p = st.probe("net"); const O0 = PS.layersOf(W).at(-1), O1 = PS.layersOf(p.weights).at(-1); return p.weights !== W && p.steer.neuron === top && PS.OUTPUT_NAMES.every((_, j) => Math.abs(O1.b[j] - O0.b[j] - O0.W[j * O0.nIn + top] * r.delta) < 1e-4); })());
+    run(base, 20); run(st, 20);
+    const a = snap(base), b = snap(st);
+    ok("!! a steered sub flies differently from the same sub unsteered (its position after 20 s is not the same to a metre), and clearing the steer restores the original pilot (the probe's weights are the original again, the snapshot's steer null, and the pilot's command for one and the same state is the unsteered pilot's again and was NOT before)", Math.hypot(a.x - b.x, a.y - b.y, a.depth - b.depth) > 1 && (() => { const q = st.subs.get("net"), bq = base.subs.get("net"), states = [], cmds = (pl) => states.map((x) => JSON.stringify(pl(x, q.target, [0, 0, 0]))); for (let k = 0; k < 6; k++) { run(st, 3); states.push(q.state); } const steered = cmds(q.pilot).some((c, k) => c !== cmds(bq.pilot)[k]); st.setSteer("net", null); return steered && cmds(q.pilot).every((c, k) => c === cmds(bq.pilot)[k]); })() && snap(st).steer === null && st.probe("net").weights.every((v, k) => v === W[k]) && st.probe("net").steer === null, `${Math.hypot(a.x - b.x, a.y - b.y, a.depth - b.depth).toFixed(1)} m apart`);
+    let e2 = 0; st.setSteer("net", top, 1); try { st.setEvent("net", "flood"); } catch { e2++; } st.setSteer("net", null); st.setEvent("net", "flood"); let e3 = 0; try { st.setSteer("net", top, 1); } catch { e3++; }
+    ok("!! an event and a steer do not mix (each wraps or replaces the pilot): starting an event on a steered sub and steering a sub with an event both throw, and clearing first works", e2 === 1 && e3 === 1 && snap(st).event === "flood" && snap(st).steer === null);
 }
 
 console.log(fails ? `\n${fails} FAIL` : "\nall checks pass");

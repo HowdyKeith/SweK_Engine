@@ -65,7 +65,7 @@
   <div id="pilotFleetStatus"></div>
   <div id="pilotFleetList"></div>
 </div>
-<div id="brainBox" style="position:fixed;left:8px;bottom:8px;width:520px;background:#0b131fcc;border:1px solid #1c2c44;border-radius:6px;padding:4px 6px;z-index:5"><div style="font:11px ui-monospace,Menlo,monospace;color:#59d1ff;display:flex;justify-content:space-between;gap:8px"><span>Selected brain activity</span><label style="color:#7c93b8">ship <select id="brainPick" style="font:inherit;background:#0c1424;color:#b9d4ff;border:1px solid #2f486c"></select></label><span id="brainWho" style="color:#7c93b8"></span></div><canvas id="brainView" width="520" height="250" style="width:520px;height:250px;display:block"></canvas></div>
+<div id="brainBox" style="position:fixed;left:8px;bottom:8px;width:520px;background:#0b131fcc;border:1px solid #1c2c44;border-radius:6px;padding:4px 6px;z-index:5"><div style="font:11px ui-monospace,Menlo,monospace;color:#59d1ff;display:flex;justify-content:space-between;gap:8px"><span>Selected brain activity</span><label style="color:#7c93b8">ship <select id="brainPick" style="font:inherit;background:#0c1424;color:#b9d4ff;border:1px solid #2f486c"></select></label><label style="color:#7c93b8">view <select id="brainMode" style="font:inherit;background:#0c1424;color:#b9d4ff;border:1px solid #2f486c" title="bars: activations, steer lens and policy map. layers: every layer as a column of dots. Click a lens row or a dot to select a neuron and read its wiring."><option value="bars">bars</option><option value="layers">layers</option></select></label><span id="brainWho" style="color:#7c93b8"></span></div><canvas id="brainView" width="520" height="250" style="width:520px;height:250px;display:block"></canvas></div>
 <div id="rosterPanel" style="position:fixed;top:40px;right:870px;z-index:3;display:none;background:#0a1220;border:1px solid #2f486c;border-radius:8px;padding:10px;max-width:420px;box-shadow:0 8px 30px #000a;color:#b9d4ff;font:11px ui-monospace,monospace;">
   <div style="margin-bottom:6px;color:#f6a623;letter-spacing:.08em;">LOAD PILOTS</div>
   <table style="border-collapse:collapse;margin-bottom:6px;"><tbody>
@@ -96,6 +96,7 @@ import { forward3d, stepAI3d } from "/ev/flightModel3d.js";
 import * as PP from "/brain/pilotPolicy.mjs";   // task 4 of the fly-connectome integration -- the brain pilots this dogfight
 import * as PR from "/brain/pilotRoster.mjs";   // v4829 -- who flies each side: the scripted AI or a brain on one of several weight sets
 import { fly3dPanel, drawPanel } from "/render/brainPanel.mjs";   // the selected brain activity panel
+import { createBrainUi } from "/render/brainUi.mjs";
 import * as PB from "/brain/peerBrain.mjs";      // the same portable export/import/fleet-share format race-brain.html uses
 import { weightsHash } from "/brain/drivePolicy.mjs";   // FNV-1a over the weight bytes, for the export filename (race-brain.html's own convention)
 import { bakeNebulaCubemap } from "/render/nebulaSkybox.js";   // v3833 -- baked nebula/star backdrop
@@ -685,17 +686,19 @@ function syncScene(dt) {   // v3845 -- dt is a PARAMETER: the debris step below 
 
 // the selected brain (render/brainPanel.mjs fly3dPanel): the ship picked in the list, with the target the tactics layer gave it, five times a second
 const brainCv = document.getElementById("brainView"), brainCtx = brainCv.getContext("2d"), brainSel = document.getElementById("brainPick"); let lastBrain = 0, brainKey = "";
+const bui = createBrainUi({ canvas: brainCv, modeEl: document.getElementById("brainMode"), onChange: () => { lastBrain = 0; drawBrain(); } });   // v4904: click a lens row or a dot to select a neuron; the view picker
 function drawBrain() {
   const now = performance.now(); if (now - lastBrain < 200) return; lastBrain = now;
   const ids = [...A.map((e) => e.id), ...B.map((e) => e.id)], key = ids.join();
   if (key !== brainKey) { brainKey = key; const keep = brainSel.value; brainSel.textContent = ""; for (const id of ids) { const o = document.createElement("option"); o.value = id; o.textContent = id; brainSel.appendChild(o); } if (ids.includes(keep)) brainSel.value = keep; }
   const e = A.concat(B).find((x) => x.id === brainSel.value) || A.find((x) => !x.dead) || A[0]; if (!e || e.dead) return;
+  bui.forWho(e.id);
   const team = e.team || (A.includes(e) ? "A" : "B"), mine = team === "A" ? A : B, foes = snapshot(team === "A" ? B : A), W = team === "A" ? W_A : W_B, r = lineup && lineup[team];
   const d = tacticsDecide(e, foes, W, { lastTargetId: e._tgtId, wasFleeing: e._fleeing, range: 1400 });
   const w = r && !r.scripted && r.weights.length ? r.weights[Math.min(Number((/#(\d+)$/.exec(String(e.id)) || [0, 0])[1]), r.weights.length - 1)] : null;
   document.getElementById("brainWho").textContent = r ? r.label : "";
-  if (!d.target) { drawPanel(brainCtx, brainCv.width, brainCv.height, fly3dPanel(null), { title: e.id }); return; }
-  drawPanel(brainCtx, brainCv.width, brainCv.height, fly3dPanel({ kind: w ? "fly" : "scripted", weights: w, ship: e, target: d.target, opts: { range: 1400, standoff: d.fleeing ? 0 : 160 } }), { title: e.id });
+  if (!d.target) { bui.setRects(drawPanel(brainCtx, brainCv.width, brainCv.height, fly3dPanel(null), { title: e.id }).rects); return; }
+  bui.setRects(drawPanel(brainCtx, brainCv.width, brainCv.height, fly3dPanel({ kind: w ? "fly" : "scripted", weights: w, ship: e, target: d.target, opts: { range: 1400, standoff: d.fleeing ? 0 : 160 } }, { neuron: bui.neuron }), { title: e.id, view: bui.view }).rects);
 }
 function frame() {
   const dt = 1 / 30, nowMs = t * 1000;
