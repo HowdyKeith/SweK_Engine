@@ -13,6 +13,8 @@
 // The selection model is a plain object with no DOM in it, so all of that is assertable here rather than only
 // visible in a browser. The mounting code is separate and is checked structurally.
 
+// v4897 -- [Gauges] CLICKED WHILE A PANEL IS STAGED. SABOTAGES, RESULTS BY NAME: S1 the tab handler's locked branch disabled -> 1 RED (the handler row); S2 server.html's callback made to do nothing
+// -> 1 RED (the page row); S3 show()'s lock check removed -> 1 RED (the lock-unchanged row).
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -360,6 +362,18 @@ const A = { id: "a", title: "Alpha" }, B = { id: "b", title: "Beta" };
         /addEventListener\("pointerenter"/.test(src) && /addEventListener\("pointerleave"/.test(src),
         "A HOOK NOBODY ATTACHES IS A CONTROL THAT DOES NOTHING -- the shape this tree shipped a gate about at " +
         "v3783");
+}
+
+// ---- A CLICK ON [Gauges] WHILE A PANEL IS STAGED (v4897) ----------------------------------------------------
+{
+    const src = fs.readFileSync(new URL("./gaugeInfoPanel.js", import.meta.url), "utf8"), page = fs.readFileSync(path.join(ENG, "server.html"), "utf8");
+    const click = /tGauges\.addEventListener\("click", \(\) => \{[\s\S]{0,400}?\}\);/.exec(src);
+    ok("!! the [Gauges] tab, clicked while the lock is held, calls the page's onLockedGauges (the lock refused every route back, the deliberate click included, and the tab looked dead)",
+        !!click && /locked && typeof onLockedGauges === "function"/.test(click[0]) && /onLockedGauges\(\)/.test(click[0]) && /onLockedGauges = null/.test(src),
+        "show(\"gauges\") still refuses while locked: an automatic route (hover, repaint, a timer) can still not bring the gauges back");
+    ok("!! server.html passes it, and what it does is the stage's own \"back to the right\" (which unlocks and shows the gauges)",
+        /onLockedGauges: \(\) => \{ const b = document\.getElementById\("stageBack"\); if \(b\) b\.click\(\); \}/.test(page));
+    ok("the lock itself is unchanged: show() still refuses anything but info while locked", /if \(locked && which !== "info"\) return;/.test(src));
 }
 
 console.log(fails ? ("[gaugeInfoPanel-selfcheck] FAILED " + fails) : "[gaugeInfoPanel-selfcheck] all passed");

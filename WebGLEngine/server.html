@@ -733,6 +733,10 @@ window.addEventListener("load", function () {
                  skeletons rather than a stylized model. Same class as the five physics front doors above it. -->
             <a href="/fly-connectome.html" target="_blank" rel="noopener" title="Fly Connectome: 34 real neurons from Janelia's male-cns connectome -- the fruit fly's Giant Fiber escape circuit, the fastest reflex in the animal's nervous system -- drawn as their own traced skeletons from a one-time Neuprint fetch. Orbit the circuit and pick a neuron to see its actual synaptic connections." style="color:#9fe6c0;text-decoration:none;border:1px solid #2a5a3a;padding:2px 6px;border-radius:3px;font-size:11px;">&#9670; Fly Connectome</a>
             <a href="/sub-aquarium.html" target="_blank" rel="noopener" title="Sub Aquarium: submarines flown by the fruit fly's Giant Fiber Circuit (the fish-brain STAND-IN) swim in a tank; peers can send theirs here, and each peer row has a Sub button to send one of yours." style="color:#9fe6c0;text-decoration:none;border:1px solid #2a5a3a;padding:2px 6px;border-radius:3px;font-size:11px;">&#9670; Sub Aquarium</a>
+            <a href="/sub-tournament.html" target="_blank" rel="noopener" title="Sub Tournament: every submarine side (a tactician and a pilot) against every other from both seats, with a Bradley-Terry rating, a head-to-head matrix, the seat's measured worth and a replay of any duel." style="color:#9fe6c0;text-decoration:none;border:1px solid #2a5a3a;padding:2px 6px;border-radius:3px;font-size:11px;">&#9876; Sub Tournament</a>
+            <a href="/sea-ogre.html" target="_blank" rel="noopener" title="Sea OGRE vs Subs: a sea monster with four hit zones (tubes, sonar, cannon, engine) marches on a headquarters and up to four submarine sides hold it; watch a replay or run twelve seeds. Plan view only." style="color:#9fe6c0;text-decoration:none;border:1px solid #2a5a3a;padding:2px 6px;border-radius:3px;font-size:11px;">&#128025; Sea OGRE vs Subs</a>
+            <a href="/flight-coop.html" target="_blank" rel="noopener" title="Co-op lockstep flight (Endless Sky on Box3D): two machines fly the same deterministic simulation in lockstep." style="color:#9fe6c0;text-decoration:none;border:1px solid #2a5a3a;padding:2px 6px;border-radius:3px;font-size:11px;">&#9992; Flight co-op</a>
+            <a href="/battleship3d.html" target="_blank" rel="noopener" title="ABYSS 3D Battleship: ships on the physics sea (render/seaThree.mjs)." style="color:#9fe6c0;text-decoration:none;border:1px solid #2a5a3a;padding:2px 6px;border-radius:3px;font-size:11px;">&#9875; Battleship 3D</a>
             <a href="/settings.html" target="_blank" rel="noopener" title="Settings -- engine, cloud, tunnel, brain and hosting configuration; most of its controls drive other subsystems, so it is filed with the System Tools it operates.">Settings</a>
             <a href="/node-bun.html" target="_blank" rel="noopener" title="Node / Bun -- which runtime is serving this box, the Bun-vs-Node capability surface run on demand, and the one optional dependency (ws) that Bun ships built in. Filed with System Tools because it operates the rig: it reads /runtime, writes the use_bun.flag preference, and spawns tools/ship/bunSurface.mjs under each runtime.">Node / Bun</a>
             <!-- v4009 -- webgpu-llm.html SHIPPED AT v4007 AND WAS NEVER LINKED. The same defect this round fixed
@@ -889,6 +893,8 @@ window.addEventListener("load", function () {
             <a href="/device-present.html" target="_blank" rel="noopener" title="Presented frame check -- a known pattern drawn through gfx/device.js on a PRESENTED canvas, read back by the device, by an offscreen frame and by a 2D drawImage of the canvas, all three compared. Rig-only for WebGPU: the build box loses the device on a presented pass.">Presented frame</a>
             <!-- RTX round 3 -- the present path. An <a> so it is reachable. -->
             <a href="/rtx-viewer.html" target="_blank" rel="noopener" title="RTX viewer -- physics/render/rtPipeline.mjs's BVH-accelerated, barycentric-shaded compute kernel (rounds 1-2) traces a Kenney pavement tile, render/rtViewer.mjs's accumulate kernel folds successive frames into a running mean, and a fullscreen-triangle present kernel reads that mean straight out of the storage buffer a prior compute pass wrote -- no texture, no copy. Drag to orbit, wheel to dolly; either resets the accumulation. WebGPU only.">RTX viewer</a>
+            <!-- UNNUMBERED -- channel.html (a YouTube channel's videos, info and the GitHub repos they name) arrives here so pageReach can see it; pageSections.mjs files it in the YouTubes drawer. -->
+            <a href="/channel.html" target="_blank" rel="noopener" title="YouTube channel -- a channel's videos with their dates, views, chapters and descriptions, and an index of the GitHub repositories the videos name, each with the videos that name it. Rendered from a snapshot that tools/ship/takeYoutubeChannel.mjs writes (template: @TheNextNewThingAI); SweK Engine's own channel will use the same page.">YouTube channel</a>
             <a href="/turing.html" target="_blank" rel="noopener" title="integrates six Fourier modes and puts them on Re lambda(k) with the exact threshold">Turing</a>
             <a href="/beam.html" target="_blank" rel="noopener" title="solves and draws the real deflected centreline plus the transcendental root">Beam</a>
             <!-- v3410 -- THE INBOUND PATCH SHIPPED waveguide.html UNLINKED AND pageReach CAUGHT IT, which is the
@@ -1321,9 +1327,11 @@ window.addEventListener("load", function () {
         <button class="gtab" data-tab="avatars"><span class="gtabTog">&#9656;</span><span>&#128100; Avatars</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="toroidal"><span class="gtabTog">&#9656;</span><span>&#127760; Toroidal Buffers</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="rtx"><span class="gtabTog">&#9656;</span><span>&#128294; RTX</span><span class="gtabState"></span></button>
+        <button class="gtab" data-tab="youtubes"><span class="gtabTog">&#9656;</span><span>&#9654;&#65039; YouTubes</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="flybrain"><span class="gtabTog">&#9656;</span><span>&#129712; Fruit Fly Brain</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="fsr"><span class="gtabTog">&#9656;</span><span>&#128269; FSR</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="denoiser"><span class="gtabTog">&#9656;</span><span>&#10024; Denoiser</span><span class="gtabState"></span></button>
+        <button class="gtab" data-tab="flightsim"><span class="gtabTog">&#9656;</span><span>&#9992;&#65039; Flight Simulation</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="box3d"><span class="gtabTog">&#9656;</span><span>&#127922; Box3D</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="blobs"><span class="gtabTog">&#9656;</span><span>&#129514; Blobs</span><span class="gtabState"></span></button>
         <button class="gtab" data-tab="face"><span class="gtabTog">&#9656;</span><span>&#128100; Face &amp; Population</span><span class="gtabState"></span></button>
@@ -1922,6 +1930,12 @@ window.addEventListener("load", function () {
           <div style="font-size:11px;color:var(--dim);margin:6px 0;">The rtx line: the path-traced viewer (rtx-viewer.html), Newtonian 6DOF combat (es-box3d-6dof.html) and aerodynamic flight (es-aircraft.html) on the same rigid-body substrate, and the fly connectome (fly-connectome.html), which Fruit Fly Brain shows too. Pages in this drawer are MOVED here from Arriving by tools/ship/pageSections.mjs -- a page is wherever it is ASSIGNED, not wherever somebody remembered a line; a page two drawers claim is moved by the first and cloned into the second.</div>
           <div data-panel-pages="rtx" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
         </div>
+        <!-- UNNUMBERED -- Keith: "we can make a link bucket on server.html that says YouTubes". A channel page, today with the template channel and later with SweK Engine's own; the anchor stays in Arriving and pageSections.mjs moves it here. -->
+        <div class="gpanel" data-panel="youtubes" hidden>
+          <div class="gpanelHdr">&#9654;&#65039; YouTubes</div>
+          <div style="font-size:11px;color:var(--dim);margin:6px 0;">YouTube channels as pages: the videos with their dates, views, chapters and descriptions, and the GitHub repositories the videos name (channel.html). The template is @TheNextNewThingAI; SweK Engine's own channel will use the same page. Make a snapshot with <code>node tools/ship/takeYoutubeChannel.mjs --handle TheNextNewThingAI</code> on a machine that can reach YouTube.</div>
+          <div data-panel-pages="youtubes" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
+        </div>
         <!-- v4778 -- Keith: "There can be duplicate links in folder buckets. So Fruit Fly Brain could have its own link
              bucket too." Every page built on the male-cns connectome, found by what it imports rather than by its
              name. All three are ALSO in another drawer (RTX, Racing City, Game: Endless Sky); the first drawer moves
@@ -1946,6 +1960,12 @@ window.addEventListener("load", function () {
           <div class="gpanelHdr">&#10024; Denoiser</div>
           <div style="font-size:11px;color:var(--dim);margin:6px 0;">The learned path-tracer denoiser (denoise.html): a small kernel-predicting network trained on two scene families, run as WebGPU compute beside the joint bilateral filter it was tested against, with a self-check against the network on the CPU and a timing table for whatever GPU the browser hands it. It renders the two families it was trained on and nothing else -- render/learned-denoiser-preregistration.md says why.</div>
           <div data-panel-pages="denoiser" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
+        </div>
+        <!-- UNNUMBERED -- Keith: "they can all be in a 'Flight Simulation' link bucket on Server.html". Every page that flies a craft under a physics model; most also stay in the drawer they were already in, and pageSections.mjs clones them here. -->
+        <div class="gpanel" data-panel="flightsim" hidden>
+          <div class="gpanelHdr">&#9992;&#65039; Flight Simulation</div>
+          <div style="font-size:11px;color:var(--dim);margin:6px 0;">Every page that flies something under a physics model: free flight (flight.html, flight-gpu.html, flight-coop.html), real 6DOF flight with pilots to choose (es-flight6dof.html, es-aircraft.html), 6DOF and dogfight combat (es-box3d-6dof.html, dogfight.html, bomber.html, space-battleship.html), and the water: the tank of submarines and its tournament (sub-aquarium.html, sub-tournament.html), the Sea OGRE the subs defend against (sea-ogre.html) and the ships on the physics sea (battleship3d.html).</div>
+          <div data-panel-pages="flightsim" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;"></div>
         </div>
         <div class="gpanel" data-panel="box3d" hidden>
           <div class="gpanelHdr">&#127922; Box3D</div>
@@ -4410,6 +4430,8 @@ A password fetches a token from the list server; an unregistered callsign needs 
         // fights the info body for the height above. The page still DECLARES all six in SERVER_GAUGES; the
         // dock takes the first three, so there is still one declaration of which gauges this page shows.
         dockMax: 3,
+        // v4897 -- [Gauges] while a panel is staged hands the panel back, exactly as "back to the right" does (the lock refused the click, so the tab looked dead).
+        onLockedGauges: () => { const b = document.getElementById("stageBack"); if (b) b.click(); },
       });
       if (gi) {
         window._gaugeInfo = gi;

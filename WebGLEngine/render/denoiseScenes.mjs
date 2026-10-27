@@ -16,6 +16,7 @@ import { buildVoxelMeshGreedy } from "../mesh/voxelMeshGreedy.js";
 import { lathe } from "../mesh/lathe.mjs";
 import { extrudePolygon } from "../mesh/extrudePolygon.mjs";
 import { MeshBVH } from "../mesh/meshBVH.mjs";
+import { buildTable } from "../physics/render/energyCompensation.mjs";
 
 export const IMAGE = 64;          // the pre-registration's 64 x 64
 export const SPP_IN = 4;
@@ -142,6 +143,54 @@ export const SPLITS_MESH = Object.freeze({
     T2: Object.freeze({ family: "M", seeds: range(37000, 12) }),
 });
 /**
+ * Round 56's splits (pre-registration section 127): the same shapes in family C's materials and light, nothing trained --
+ * H1 on 12 scenes of family VC (C's scene, voxel structures, 50000), H2 on 12 of MC (C's scene, lathed and extruded
+ * solids, 51000), on ranges no earlier split touched.
+ */
+/**
+ * Round 58's split (pre-registration section 131): path-tracer.html's own six scenes, once each, nothing trained -- H1 on
+ * family P at 52000-52005, where seed s draws the page's scene s mod 6 in PAGE_SCENES' order.
+ */
+export const SPLITS_PAGE = Object.freeze({ T1: Object.freeze({ family: "P", seeds: range(52000, 6) }) });
+/** Round 59's split (pre-registration section 133): FSR3's generator between two of round 32's chain frames -- round 32's shape, 6 of R and 6 of C, new seeds. */
+export const SPLITS_FRAMEGEN = Object.freeze({
+    T1: Object.freeze({ family: "R+C", families: Object.freeze([...rep("R", 6), ...rep("C", 6)]), seeds: Object.freeze([...range(53000, 6), ...range(54000, 6)]) }),
+});
+/** Round 60's split (pre-registration section 136): the light-free generator, round 59's shape on new seeds. */
+export const SPLITS_FRAMEGEN_LF = Object.freeze({
+    T1: Object.freeze({ family: "R+C", families: Object.freeze([...rep("R", 6), ...rep("C", 6)]), seeds: Object.freeze([...range(55000, 6), ...range(56000, 6)]) }),
+});
+/** Round 61's split (pre-registration section 139): the light-free generator graded in display space, new seeds. */
+export const SPLITS_FRAMEGEN_DISPLAY = Object.freeze({
+    T1: Object.freeze({ family: "R+C", families: Object.freeze([...rep("R", 6), ...rep("C", 6)]), seeds: Object.freeze([...range(57000, 6), ...range(58000, 6)]) }),
+});
+/** Round 62's split (pre-registration section 142): round 61's arrangement on a test set twice its size, 12 R and 12 C, new seeds. */
+export const SPLITS_FRAMEGEN_LARGE = Object.freeze({
+    T1: Object.freeze({ family: "R+C", families: Object.freeze([...rep("R", 12), ...rep("C", 12)]), seeds: Object.freeze([...range(59000, 12), ...range(60000, 12)]) }),
+});
+/** Round 66's split (pre-registration section 151): what a hole should show, 12 R and 12 C, new seeds. */
+export const SPLITS_FRAMEGEN_HOLES = Object.freeze({
+    T1: Object.freeze({ family: "R+C", families: Object.freeze([...rep("R", 12), ...rep("C", 12)]), seeds: Object.freeze([...range(65000, 12), ...range(66000, 12)]) }),
+});
+/** FSR4's round 65 (pre-registration section 148): U's training (100 R, 100 C), validation (10 and 10) and test (12 and 12), all new. */
+export const SPLITS_UPSCALE_LEARNED = Object.freeze({
+    train: Object.freeze({ family: "R+C", families: Object.freeze([...rep("R", 100), ...rep("C", 100)]), seeds: Object.freeze([...range(61000, 100), ...range(61100, 100)]) }),
+    val: Object.freeze({ family: "R+C", families: Object.freeze([...rep("R", 10), ...rep("C", 10)]), seeds: Object.freeze([...range(62000, 10), ...range(62010, 10)]) }),
+    T1: Object.freeze({ family: "R+C", families: Object.freeze([...rep("R", 12), ...rep("C", 12)]), seeds: Object.freeze([...range(63000, 12), ...range(64000, 12)]) }),
+});
+/** FSR4's round 67 (pre-registration section 155): round 65's training and validation scenes, and a new test set, 12 R and 12 C. */
+export const SPLITS_UPSCALE_LEARNED_67 = Object.freeze({ train: SPLITS_UPSCALE_LEARNED.train, val: SPLITS_UPSCALE_LEARNED.val,
+    T1: Object.freeze({ family: "R+C", families: Object.freeze([...rep("R", 12), ...rep("C", 12)]), seeds: Object.freeze([...range(67000, 12), ...range(68000, 12)]) }),
+});
+/** FSR4's round 68 (pre-registration section 157): round 65's training and validation scenes, and a new test set, 12 R and 12 C. */
+export const SPLITS_UPSCALE_LEARNED_68 = Object.freeze({ train: SPLITS_UPSCALE_LEARNED.train, val: SPLITS_UPSCALE_LEARNED.val,
+    T1: Object.freeze({ family: "R+C", families: Object.freeze([...rep("R", 12), ...rep("C", 12)]), seeds: Object.freeze([...range(69000, 12), ...range(70000, 12)]) }),
+});
+export const SPLITS_MESH_C = Object.freeze({
+    T1: Object.freeze({ family: "VC", seeds: range(50000, 12) }),
+    T2: Object.freeze({ family: "MC", seeds: range(51000, 12) }),
+});
+/**
  * Section 81's split, the upscale round: ONE test set, read by both hypotheses -- 6 new scenes of R (40000) and 6 of C
  * (41000), the families the shipped network was trained on, so what changes is the RESOLUTION and nothing about the
  * scenes. No training: the network and the filter are the shipped ones.
@@ -167,9 +216,14 @@ export const SPLITS_EMITTER = Object.freeze({
 export const SPLITS_TEMPORALUP = Object.freeze({
     T1: Object.freeze({ family: "R+C", families: Object.freeze([...rep("R", 6), ...rep("C", 6)]), seeds: Object.freeze([...range(46000, 6), ...range(47000, 6)]) }),
 });
+/**
+ * Section 116's splits, round 47 (denoise-smaller-network): round 11's training and val scenes exactly -- the 192 the shipped
+ * network was trained on -- and 12 new scenes of R (48000) for H1 and 12 of C (49000) for H2, on ranges no earlier split touched.
+ */
+export const SPLITS_R47 = Object.freeze({ train: SPLITS_R11.train, val: SPLITS_R11.val, T1: Object.freeze({ family: "R", seeds: range(48000, 12) }), T2: Object.freeze({ family: "C", seeds: range(49000, 12) }) });
 /** The family of a split's i-th scene: its own entry in `families` when the split mixes them, else the split's. */
 export const familyOf = (split, i) => (split.families ? split.families[i] : split.family);
-const RESERVED = new Set([SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, SPLITS_R8, SPLITS_R9, SPLITS_R10, SPLITS_R11, SPLITS_MESH, SPLITS_FSR1, SPLITS_HALFRES, SPLITS_EMITTER, SPLITS_TEMPORALUP].flatMap((S) => Object.values(S).flatMap((s) => s.seeds)));
+const RESERVED = new Set([SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, SPLITS_R8, SPLITS_R9, SPLITS_R10, SPLITS_R11, SPLITS_MESH, SPLITS_FSR1, SPLITS_HALFRES, SPLITS_EMITTER, SPLITS_TEMPORALUP, SPLITS_R47, SPLITS_MESH_C, SPLITS_PAGE, SPLITS_FRAMEGEN, SPLITS_FRAMEGEN_LF, SPLITS_FRAMEGEN_DISPLAY, SPLITS_FRAMEGEN_LARGE, SPLITS_FRAMEGEN_HOLES, SPLITS_UPSCALE_LEARNED, SPLITS_UPSCALE_LEARNED_67, SPLITS_UPSCALE_LEARNED_68].flatMap((S) => Object.values(S).flatMap((s) => s.seeds)));
 export const isDatasetSeed = (seed) => RESERVED.has(seed);
 
 /** The render seeds of a scene: the input, the reference and the second reference -- distinct for every scene seed. */
@@ -183,8 +237,9 @@ export function renderSeeds(seed) { return { input: seed * 8 + 1, ref: seed * 8 
 export function makeScene(family, seed) {
     if (family === "C") return makeSceneC(seed);
     if (family === "R") return makeSceneR(seed);
-    if (family === "V" || family === "M") return makeSceneMesh(family, seed);
-    if (family !== "A" && family !== "B") throw new Error("denoiseScenes: family is A, B, C, R, V or M, got " + family);
+    if (family === "V" || family === "M" || family === "VC" || family === "MC") return makeSceneMesh(family, seed);
+    if (family === "P") return makeScenePage(seed);
+    if (family !== "A" && family !== "B") throw new Error("denoiseScenes: family is A, B, C, R, V, M, VC, MC or P, got " + family);
     const r = rng(((seed >>> 0) * 2654435761 + (family === "A" ? 17 : 29)) >>> 0);
     const U = (a, b) => a + (b - a) * r();
     const scene = [{ centre: [0, -100, 0], radius: 100, albedo: [U(0.3, 0.7), U(0.3, 0.7), U(0.3, 0.7)] }];
@@ -307,7 +362,13 @@ function makeSceneR(seed) {
  * Every mesh is wound OUTWARD (its signed volume positive) -- the tracer takes a hit's normal as it comes, and a sphere's
  * always faces out. The emitters stay spheres: next-event estimation samples a sphere's solid angle.
  */
-const MESH_SALT = Object.freeze({ V: 43, M: 47 });
+/*
+ * Families VC and MC (round 56, pre-registration section 127): the same shapes in FAMILY C's scene -- its Oren-Nayar
+ * ground, its two coloured emitters, its near-black sky, its camera, and every resting sphere's place, size and material
+ * (rough-diffuse, or a dielectric reflector) -- each sphere replaced as V and M replace R's. A dielectric's albedo, like a
+ * conductor's, is never read and set to 0.
+ */
+const MESH_SALT = Object.freeze({ V: 43, M: 47, VC: 53, MC: 59 });
 /** Signed volume of a flat triangle buffer (9 floats a triangle): positive when the mesh is wound outward. */
 export function signedVolume(tris) {
     let v = 0;
@@ -364,13 +425,13 @@ function solidMesh(U, r, x, rad, z) {
     return outward(m.positions, m.indices, (a, b, c) => [x + a, c + h / 2, z + b]);
 }
 function makeSceneMesh(family, seed) {
-    const S = makeSceneR(seed);
+    const C = family.length === 2, S = C ? makeSceneC(seed) : makeSceneR(seed), shape = family[0];   // round 56: VC and MC on C
     const r = rng(((seed >>> 0) * 2654435761 + MESH_SALT[family]) >>> 0);
     const U = (a, b) => a + (b - a) * r();
     const scene = S.scene.map((o, i) => {
         if (i === 0 || o.emit) return o;                       // the ground and the emitters, as R drew them
         const [x, , z] = o.centre, rad = o.radius;
-        const tris = family === "V" ? voxelMesh(U, r, x, rad, z) : solidMesh(U, r, x, rad, z);
+        const tris = shape === "V" ? voxelMesh(U, r, x, rad, z) : solidMesh(U, r, x, rad, z);
         const { centre, radius, ...material } = o;             // the sphere's material, nothing else
         // A CONDUCTOR'S albedo IS NEVER READ -- its branch returns before the Lambertian alb() and its light
         // sampling skips the Lambertian loop -- but the tracer refuses a mesh entry without the field, so it gets
@@ -379,6 +440,29 @@ function makeSceneMesh(family, seed) {
         return { ...material, bvh: new MeshBVH(tris), mesh: { kind: family, tris: tris.length / 9, footprint: [x, rad, z, rad] } };
     });
     return { ...S, family, seed, scene };
+}
+
+/**
+ * Family P (round 58, pre-registration section 131): path-tracer.html's own scenes, as its SCENES object writes them -- RHO
+ * 0.18, roughcomp's table built as the page builds it -- seen from its camera (eye (0, 0, 4) at the origin, 40 degrees) at its
+ * default depth, the slider's 6 bounces. Seed s draws scene s mod 6, in this order. render/denoiseScenes-selfcheck.mjs holds
+ * each scene's literal to the page's text.
+ */
+export const PAGE_SCENES = Object.freeze(["furnace", "gradient", "pair", "enclosed", "rough", "roughcomp"]);
+export const PAGE_DEPTH = 6;
+const PAGE_RHO = 0.18;
+let pageTable = null;   // buildTable is 24 quadratures: built once, on first use, as the page builds it at load
+function makeScenePage(seed) {
+    const name = PAGE_SCENES[((seed % 6) + 6) % 6];
+    const def = {
+        furnace: () => ({ scene: [{ centre: [0, 0, 0], radius: 1, albedo: PAGE_RHO }], sky: () => 1 }),
+        gradient: () => ({ scene: [{ centre: [0, 0, 0], radius: 1, albedo: 0.6 }], sky: (d) => 0.25 + 1.75 * Math.max(0, d[1]) }),
+        pair: () => ({ scene: [{ centre: [0, -0.4, 0], radius: 1, albedo: 0.7 }, { centre: [0.9, 1.5, 0.4], radius: 0.7, albedo: 0.35 }], sky: (d) => 0.3 + 1.4 * Math.max(0, d[1]) }),
+        enclosed: () => ({ scene: [{ centre: [0, 0, 0], radius: 1, albedo: PAGE_RHO }, { centre: [0, 0, 0], radius: 40, emit: 1, albedo: 0 }], sky: () => 0 }),
+        rough: () => ({ scene: [{ centre: [0, 0, 0], radius: 1, roughness: 0.8 }], sky: () => 1 }),
+        roughcomp: () => ({ scene: [{ centre: [0, 0, 0], radius: 1, roughness: 0.8, msTable: (pageTable ||= buildTable(0.8, { K: 24, N: 140, M: 140 })) }], sky: () => 1 }),
+    }[name]();
+    return { family: "P", seed, page: name, ...def, skyKind: name, lightRadius: null, eye: [0, 0, 4], look: [0, 0, 0], up: [0, 1, 0], fovDeg: 40, maxDepth: PAGE_DEPTH };
 }
 
 /**
@@ -410,7 +494,8 @@ export function guideBuffers(S, w = IMAGE, h = IMAGE, offset = null) {
 export function renderImages(family, seed, { harvest = false, ref2 = false, w = IMAGE, h = IMAGE, sppIn = SPP_IN, sppRef = SPP_REF } = {}) {
     if (isDatasetSeed(seed) && !harvest) throw new Error(`denoiseScenes: seed ${seed} is a dataset seed -- rendering it needs { harvest: true }`);
     const S = makeScene(family, seed), rs = renderSeeds(seed);
-    const opts = (spp, s) => ({ w, h, spp, seed: s, rgb: true, eye: S.eye, look: S.look, up: S.up, fovDeg: S.fovDeg, sky: S.sky });
+    // round 58: a scene that names its depth (family P, the page's 6 bounces) is rendered at it; every other family at the tracer's default
+    const opts = (spp, s) => ({ w, h, spp, seed: s, rgb: true, eye: S.eye, look: S.look, up: S.up, fovDeg: S.fovDeg, sky: S.sky, ...(S.maxDepth ? { maxDepth: S.maxDepth } : {}) });
     const out = { family, seed, w, h, seeds: rs, input: render(S.scene, opts(sppIn, rs.input)), ref: render(S.scene, opts(sppRef, rs.ref)), ...guideBuffers(S, w, h) };
     if (ref2) out.ref2 = render(S.scene, opts(sppRef, rs.ref2));
     return out;

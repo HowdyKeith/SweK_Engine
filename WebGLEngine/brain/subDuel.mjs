@@ -24,6 +24,7 @@ import * as AS from "./autopilotSub.mjs";
 import * as TA from "./subTactics.mjs";
 import { foldHash } from "../physics/raceCar.mjs";
 
+export const TRACE_EVERY = 6;   // ticks between the frames of an optional `trace` (the duel's replay): 5 a second
 export const DT = S.DT, SECONDS = 240, LOOK_EVERY = 15, STAGGER = 7, AMMO = 4, RELOAD_TICKS = 300, HP = 100, KILL_BONUS = 0.5, SPEED_BONUS = 0.5;
 export const KINDS = TA.SCRIPTED_KINDS;
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
@@ -45,10 +46,10 @@ const duelModel = () => MODEL || (MODEL = S.createSubModel());
 
 /**
  * Fight one duel. `side` is { tactics: (obs) -> { depth, heading, speed, fire, ping } (a FRESH one: it has memory), pilot: (state, target, current) -> controls } for A; B is the scenario's scripted drone flown by the
- * PD autopilot. Options: { seconds, dt, actuators (a rate set: both boats), model, opponent (a { tactics, pilot } that replaces the drone: a test, or self-play) }. Returns { score, winner ("A" | "B" | "draw"), hp: [A, B], damage: [dealt by A, dealt by B], fired: [A, B], hits: [A, B],
+ * PD autopilot. Options: { seconds, dt, actuators (a rate set: both boats), model, opponent (a { tactics, pilot } that replaces the drone: a test, or self-play), trace (an array that is pushed a frame every TRACE_EVERY ticks: { tick, boats: [{ id, x, y, depth, heading, pitch, hp, alive, ammo }], torps: [{ id, owner, x, y, depth }] }; the fight is the same with or without it) }. Returns { score, winner ("A" | "B" | "draw"), hp: [A, B], damage: [dealt by A, dealt by B], fired: [A, B], hits: [A, B],
  * pings: [A, B], fates: [A, B] ("afloat" | "sunk" | "grounded" | "broached" | "crushed" | "lost"), ticks, events (what happened: { tick, type: "fire" | "ping" | "hit" | "loss", boat, ... }), fingerprint }. Deterministic.
  */
-export function duel(side, sc, { seconds = SECONDS, dt = DT, actuators = null, model = duelModel(), opponent = null } = {}) {
+export function duel(side, sc, { seconds = SECONDS, dt = DT, actuators = null, model = duelModel(), opponent = null, trace = null } = {}) {
     const total = Math.round(seconds / dt), seed = sc.seed, events = [];
     const mk = (id, start, tactics, pilot) => ({ id, state: S.createState({ depth: start.depth, pos: start.pos ? [start.pos[0], start.pos[1], -start.depth] : [0, 0, -start.depth], speed: start.speed, heading: start.heading, model }), tactics, pilot, act: actuators ? createActuators(actuators) : null,
         hp: HP, ammo: AMMO, cooldown: 0, target: { depth: start.depth, heading: start.heading, speed: start.speed }, alive: true, fate: "afloat", echoes: [], pings: [], dealt: 0, fired: 0, hits: 0, pinged: 0 });
@@ -97,6 +98,7 @@ export function duel(side, sc, { seconds = SECONDS, dt = DT, actuators = null, m
             }
         }
         flown++;
+        if (trace && tick % TRACE_EVERY === 0) trace.push({ tick, boats: boats.map((b) => { const a = att(b); return { id: b.id, x: b.state.pos[0], y: b.state.pos[1], depth: a.depth, heading: a.heading, pitch: a.pitch, hp: b.hp, alive: b.alive, ammo: b.ammo }; }), torps: torps.filter((q) => q.status === "running").map((q) => ({ id: q.id, owner: q.owner, x: q.pos[0], y: q.pos[1], depth: -q.pos[2] })) });   // v4901: an optional record for a replay (the tournament page); it reads, it never changes the fight
         if (tick % 30 === 0) for (const b of boats) for (const c of [b.state.pos[0], b.state.pos[1], b.state.pos[2]]) h = foldHash(h, Math.round(c * 1000) & 0xffffffff);
         if (!A.alive || !B.alive) break;
     }

@@ -1,6 +1,6 @@
 // WebGLEngine/brain/pilotDroneMlp-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node brain/pilotDroneMlp-selfcheck.mjs      (~60 s)
+// Run: node brain/pilotDroneMlp-selfcheck.mjs      (~18 s)
 //
 // THE SIBLING GATE OF brain/pilotDroneMlp.mjs: the GPU Brain's plain multilayer perceptron (20 -> 32 -> 32 -> 4) as a quadrotor pilot, whose hand weights are the hand pilot written through eight relu channels of each layer. As for the fruit fly (brain/pilotDronePolicy-selfcheck.mjs),
 // the claim worth a gate is "the weights ARE the hand pilot", and the network is held to an independent restatement written here (brain/pilotRotorMlp-selfcheck.mjs is the helicopter's, and the discipline is the same):

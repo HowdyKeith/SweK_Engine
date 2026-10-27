@@ -1,6 +1,6 @@
 // WebGLEngine/brain/pilotJetMlp-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node brain/pilotJetMlp-selfcheck.mjs      (~8 s)
+// Run: node brain/pilotJetMlp-selfcheck.mjs      (~3.6 s)
 //
 // THE SIBLING GATE OF brain/pilotJetMlp.mjs: the GPU Brain's plain multilayer perceptron as the JET's pilot, whose hand weights are the jet's fighting autopilot written through nine relu channels of each layer. The network (the three layers, the forward pass, the GPU layer views) is the trainer's MLP's and is held by brain/pilotFlightMlp-selfcheck.mjs; the features and the
 // jet's laws are brain/pilotJetPolicy.mjs's and are held by its gate. What this gate holds is the part that is new: THE WEIGHTS ARE THE AUTOPILOT, to float32, through THESE layers, and they are the fruit fly's -- the two brains start from the same laws.

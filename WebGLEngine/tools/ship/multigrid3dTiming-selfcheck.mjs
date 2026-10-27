@@ -4,7 +4,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { timeConfig, separated, compare, domain, usable, UNUSABLE_SPREAD } from "../multigrid3dTiming.mjs";
+import { timeConfig, timeConfigs, collect, separated, compare, domain, usable, UNUSABLE_SPREAD } from "../multigrid3dTiming.mjs";
 import { noComments, prose } from "./sourceScan.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -30,8 +30,7 @@ ok("...and non-overlapping bands ARE separated, in the right direction",
 
 // ---- 2. THE NULL TEST, DRIVEN FOR REAL. THIS IS THE ANSWER KEY. ---------------------------------------------
 const n = 16;
-const a = timeConfig(n, { pre: 2, post: 2 }, {}, { trials: 5, warm: 2 });
-const b = timeConfig(n, { pre: 2, post: 2 }, {}, { trials: 5, warm: 2 });
+const [a, b] = timeConfigs(n, [{ opts: { pre: 2, post: 2 } }, { opts: { pre: 2, post: 2 } }], { trials: 5, warm: 2 });   // v4899: interleaved -- see below
 say("null test at " + n + "^3: A [" + a.min + ".." + a.p95 + "] B [" + b.min + ".." + b.p95 + "]  -> " +
     (separated(a, b) ? "SEPARATED" : "indistinguishable"));
 ok("!! *** the SAME config under two labels comes out indistinguishable ***",
@@ -40,6 +39,30 @@ ok("!! *** the SAME config under two labels comes out indistinguishable ***",
     "machine noise and every verdict it prints is suspect -- which is exactly what happened at v3354 when one " +
     "cold trial per config ranked five of them and produced an impossible row");
 
+// ---- 2b. v4899 -- THE MACHINE'S DRIFT MUST LAND ON BOTH CONFIGS, AND THE OLD ORDER FAILED THE NULL TEST WHEN IT DIDN'T -------------
+// The null test above timed A's five trials and then B's five. On a box running other gates at once, or a CPU the gate was not written on, the speed STEPS between the two blocks: both bands are tight, they land at
+// different heights, and the same config under two labels is "SEPARATED" -- the rig's 12-core box under the 8-wide sweep read this red once and 3.6 s green alone. Driven here on a runner whose speed steps by 25% at the boundary
+// between the two configs' blocks (call 9: after A's last trial, before B's first -- and in the interleaved order it falls in the middle of both bands) (no real solve, so no real noise): the sequential order separates the SAME config from itself, and the interleaved order does not.
+{
+    const mkRunner = (calls, base = 100) => (k) => { const c = calls.n++; return { ms: Math.round(base * (c < calls.at ? 1 : 1.25) + (c % 3)), iters: 7, res: 1e-9 }; };
+    const seqCalls = { n: 0, at: 9 }, ilCalls = { n: 0, at: 9 };
+    const spec = { opts: { pre: 2, post: 2 } };
+    const [sa, sb] = collect(16, [spec, spec], { trials: 5, warm: 2, order: "sequential", runner: mkRunner(seqCalls) });
+    const [ia, ib] = collect(16, [spec, spec], { trials: 5, warm: 2, order: "interleaved", runner: mkRunner(ilCalls) });
+    ok("!! *** under a 25% step in the machine's speed the SEQUENTIAL order calls the same config under two labels SEPARATED (the defect), and the INTERLEAVED order does not (the repair) ***",
+        separated(sa, sb) !== null && separated(ia, ib) === null,
+        `sequential A [${sa.min}..${sa.p95}] B [${sb.min}..${sb.p95}] -> ${separated(sa, sb) ? "SEPARATED" : "indistinguishable"}; interleaved A [${ia.min}..${ia.p95}] B [${ib.min}..${ib.p95}] -> ${separated(ia, ib) ? "SEPARATED" : "indistinguishable"}`);
+    ok("  ...and the interleaved order still separates configs that really differ (B always 2x A, through the same 25% step), so the repair is not a way of seeing nothing",
+        (() => { const c = { n: 0, at: 9 }; const r = (k) => { const m = c.n++ < c.at ? 1 : 1.25; return { ms: Math.round((k === 0 ? 100 : 200) * m), iters: 7, res: 1e-9 }; };
+                 const [ra, rb] = collect(16, [spec, spec], { trials: 5, warm: 2, order: "interleaved", runner: r }); const sp = separated(ra, rb); return !!sp && sp.faster === "a"; })(),
+        "a harness that can only say indistinguishable is the other way to be useless");
+    ok("  and the library holds both orders, the tool and the null test use the interleaved one",
+        /order = "interleaved"/.test(src) && /timeConfigs\(n, cfgs\.map/.test(src) && !/timeConfig\(n, o, s/.test(src) && /timeConfigs\(n, \[\{ opts: \{ pre: 2, post: 2 \} \}/.test(src),
+        "timeConfig keeps its signature (one config) and is collect() over one spec");
+}
+
+// SABOTAGED (v4899, each alone, restored): the default order made sequential -> 1 red; the interleaved branch looping a config's trials in a block -> 0 red AT FIRST (the step landed inside A's block and the two bands touched), so the step moved to the block boundary -> red;
+// the tool's main back on a timeConfig loop -> 0 red at first, so the source row now refuses `timeConfig(n, o, s` -> red; usable() always true -> 1.
 // ---- 3. WARM-UP IS DISCARDED **AND REPORTED** ---------------------------------------------------------------
 ok("!! warm-up runs are discarded AND the count is returned",
     a.warm === 2 && a.trials === 5 && Array.isArray(a.runs) && a.runs.length === 5,

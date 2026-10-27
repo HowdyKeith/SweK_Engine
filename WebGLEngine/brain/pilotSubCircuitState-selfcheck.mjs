@@ -1,6 +1,6 @@
 // WebGLEngine/brain/pilotSubCircuitState-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node brain/pilotSubCircuitState-selfcheck.mjs      (~30 s)
+// Run: node brain/pilotSubCircuitState-selfcheck.mjs      (~9 s)
 //
 // THE GATE OF brain/pilotSubCircuitState.mjs: a submarine pilot whose only memory is a circuit's wiring. Every number is worked out by hand on two circuits of three cells.
 //
@@ -189,6 +189,8 @@ sec("7. NOT CHECKED");
 console.log("  NOT CHECKED  that the pilot can use its memory: this gate holds the build (the start is the autopilot, the dynamics are the ones worked by hand, the reset and the flag do what they say); whether a search finds a use for the wiring is the experiment's");
 console.log("  NOT CHECKED  that the singular-value scaling is the right way to make a reservoir of a connectome (it is the one the note fixed); the fly's own gain is not known");
 
+// v4898 -- FEATURES by name (definitionGates counts an export no gate names): the stateful pilot reads the base policy's features plus ONE (the carried state's input), which is what sizes its input weights.
+ok("FEATURES is the base policy's FEATURES + 1 (the extra input the carried state occupies)", C.FEATURES === PS.FEATURES + 1 && C.FEATURES > PS.FEATURES);
 finished = true;
 console.log(fails ? `\npilotSubCircuitState-selfcheck: ${fails} FAILED` : "\npilotSubCircuitState-selfcheck: all checks pass");
 process.exit(fails ? 1 : 0);

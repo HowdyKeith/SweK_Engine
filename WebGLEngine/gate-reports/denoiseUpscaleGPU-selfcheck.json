@@ -1,6 +1,6 @@
 {
  "gate": "render/denoiseUpscaleGPU-selfcheck.mjs",
- "at": "2026-10-21",
+ "at": "2026-10-23",
  "tables": [
   {
    "title": "section 94: today's page against the half-size chain at 1920 x 1080, ms",
@@ -131,6 +131,169 @@
      87,
      0,
      2.179
+    ]
+   ],
+   "note": null
+  },
+  {
+   "title": "section 102: round 34 on both GPUs, the ring fill against the list fill at 960 x 540, ms",
+   "columns": [
+    "GPU",
+    "run",
+    "ring fill",
+    "list fill",
+    "chain ratio with the list fill",
+    "all gates green"
+   ],
+   "rows": [
+    [
+     "intel-gen9",
+     "a",
+     301.6,
+     23.9,
+     2.042,
+     "yes"
+    ],
+    [
+     "intel-gen9",
+     "b",
+     302.8,
+     23,
+     2.179,
+     "yes"
+    ],
+    [
+     "gtx1080",
+     "a",
+     26.9,
+     24,
+     1.424,
+     "yes"
+    ],
+    [
+     "gtx1080",
+     "b",
+     26.2,
+     25.4,
+     1.395,
+     "yes"
+    ]
+   ],
+   "note": null
+  },
+  {
+   "title": "section 105: round 37 on both GPUs, the list fill against the tile fill at 960 x 540, ms",
+   "columns": [
+    "GPU",
+    "run",
+    "list fill",
+    "tile fill",
+    "tile / list",
+    "chain ratio, tile",
+    "chain ratio, list"
+   ],
+   "rows": [
+    [
+     "intel-gen9",
+     "a",
+     22.3,
+     67.3,
+     3.018,
+     1.935,
+     2.066
+    ],
+    [
+     "intel-gen9",
+     "b",
+     24.6,
+     68.9,
+     2.801,
+     1.978,
+     2.113
+    ],
+    [
+     "gtx1080",
+     "a",
+     22.6,
+     16.8,
+     0.743,
+     1.601,
+     1.454
+    ],
+    [
+     "gtx1080",
+     "b",
+     23.1,
+     16.7,
+     0.723,
+     1.571,
+     1.417
+    ]
+   ],
+   "note": null
+  },
+  {
+   "title": "section 111: rounds 38, 39 and 42 on both GPUs, ms",
+   "columns": [
+    "GPU",
+    "run",
+    "list fill",
+    "listed tile fill",
+    "covFull",
+    "covFullB",
+    "toT",
+    "EASU",
+    "composite",
+    "toT, no atomic"
+   ],
+   "rows": [
+    [
+     "intel-gen9",
+     "a",
+     22.2,
+     18.7,
+     297.326,
+     26.423,
+     2.357,
+     30.058,
+     22.673,
+     2.396
+    ],
+    [
+     "intel-gen9",
+     "b",
+     25.3,
+     17.4,
+     252.139,
+     22.39,
+     1.556,
+     25.737,
+     17.133,
+     1.627
+    ],
+    [
+     "gtx1080",
+     "a",
+     31.1,
+     17.1,
+     17.075,
+     1.222,
+     0.084,
+     0.59,
+     0.332,
+     0.068
+    ],
+    [
+     "gtx1080",
+     "b",
+     24.9,
+     17.5,
+     16.863,
+     1.229,
+     0.084,
+     0.59,
+     0.329,
+     0.067
     ]
    ],
    "note": null

@@ -1,6 +1,6 @@
 {
  "note": "WHO the bytes say wrote each vendored body, read from the copyright line in its licence and from a PROVENANCE.md where one records an upstream. Baked by tools/ship/orreryAuthorScan.mjs. A body whose author cannot be read is in `unattributed` -- never dropped, never given a placeholder.",
- "built": "2026-10-22",
+ "built": "2026-10-25",
  "bodies": [
   {
    "name": "box3d",
@@ -110,6 +110,22 @@
     "repo": "heerich"
    },
    "bytes": 119532
+  },
+  {
+   "name": "hemibrain",
+   "kind": "disclaimed",
+   "who": null,
+   "line": null,
+   "licenceFile": "PROVENANCE.md",
+   "licences": 1,
+   "upstreamFile": "PROVENANCE.md",
+   "alsoHolders": [],
+   "upstream": {
+    "url": "https://storage.googleapis.com/hemibrain/v1.2/exported-traced-adjacencies-v1.2.tar.gz`",
+    "owner": null,
+    "repo": null
+   },
+   "bytes": 115350
   },
   {
    "name": "htmx",
@@ -402,6 +418,38 @@
     "repo": "xatlas"
    },
    "bytes": 345457
+  },
+  {
+   "name": "zebrafish",
+   "kind": "disclaimed",
+   "who": null,
+   "line": null,
+   "licenceFile": "PROVENANCE.md",
+   "licences": 1,
+   "upstreamFile": "PROVENANCE.md",
+   "alsoHolders": [],
+   "upstream": {
+    "url": "https://fish1-release.storage.googleapis.com/",
+    "owner": null,
+    "repo": null
+   },
+   "bytes": 26027
+  },
+  {
+   "name": "zebrafish-vestibular",
+   "kind": "disclaimed",
+   "who": null,
+   "line": null,
+   "licenceFile": "PROVENANCE.md",
+   "licences": 1,
+   "upstreamFile": "PROVENANCE.md",
+   "alsoHolders": [],
+   "upstream": {
+    "url": "https://github.com/bagnall-lab/EM_analysis",
+    "owner": "bagnall-lab",
+    "repo": "EM_analysis"
+   },
+   "bytes": 2491929
   }
  ],
  "systems": [
@@ -556,6 +604,11 @@
  ],
  "unattributed": [
   {
+   "name": "hemibrain",
+   "kind": "disclaimed",
+   "licenceFile": "PROVENANCE.md"
+  },
+  {
    "name": "htmx",
    "kind": "disclaimed",
    "licenceFile": "LICENSE"
@@ -569,18 +622,28 @@
    "name": "male-cns",
    "kind": "disclaimed",
    "licenceFile": "PROVENANCE.md"
+  },
+  {
+   "name": "zebrafish",
+   "kind": "disclaimed",
+   "licenceFile": "PROVENANCE.md"
+  },
+  {
+   "name": "zebrafish-vestibular",
+   "kind": "disclaimed",
+   "licenceFile": "PROVENANCE.md"
   }
  ],
  "counts": {
-  "bodies": 25,
+  "bodies": 28,
   "attributed": 22,
   "authors": 18,
   "covered": 22,
-  "missing": 3,
-  "withUpstream": 20,
+  "missing": 6,
+  "withUpstream": 21,
   "person": 17,
   "collective": 5,
-  "disclaimed": 2,
+  "disclaimed": 5,
   "prose": 1,
   "none": 0,
   "unread": 0

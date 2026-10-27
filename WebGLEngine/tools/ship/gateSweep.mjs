@@ -16149,26 +16149,61 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
         widened: Object.freeze([]),
         verdict: "the snowGpu browser half split into five gates under the 20 s cap beside the trimmed core, the D3D12 readings and the truncation guard (found by mutating the real snowGpu.mjs, which the first detector missed), the TV package knowledge, the dry-run planner that executes nothing, and SweK Home's launcher (a pure Shelf.java driven by javac); each run alone and green, and each sabotaged to go red by name",
     }),
-    // since608, from `versionPreflight --next` (highest declared: since607). THIRTY-FIVE gate files, all the unnumbered line's: the jet league (its sets, its trainer rows, the networks' mutate and perturb), the front doors of the jet autopilot and the multirotor
-    // model, the drone and fish gates (the fish input side's the hindbrain-circuit extraction's, the circuit-only submarine pilot's and the family trainer's among them), the dogfight tournament's two gates, the dead-reckoning navigator and the rung 4a reference arm (a linear-rate dive worked by hand, where a left-hand sum is 3.3e-3 short; 77 mutants, nine findings fixed, one equivalent mutant's dead code cut), the reservoir estimator of rung 4a version 2 with its study and command (ridge regression, a spectral radius and a five-cell reservoir checked against a dense reckoning, the hold and the score worked by hand; 140 mutants, thirty-two findings fixed, one clause of dead code cut, one hang and two equivalent mutants said so), the compass-dropout view's two gates (the scene and the study numbers it draws from: 103 mutants, 100 red by name and three equivalent said so; the view itself, on a fake DOM that refuses markup and in the live page: 78 mutants of the view, nine of them 0-red on a run and fixed, and 17 of the page's mount, every one red by name), the live tank's two (the tank's compass dropout and navigator pilot: 47 mutants, all red by name after three findings; the live page's ring, menu and added subs: 31 mutants, all red by name after one), the matched-gain reservoirs of rung 4a version 3 with their study (69 mutants of the library, 106 of the study: 26 findings fixed in the gate, three equivalents said so), and the CAVE export script's stand-in server. `at` names the line, as the ocean spike's closing did, because the version is chosen at ship time.
+    // since608, from `versionPreflight --next` (highest declared: since607). THIRTY-TWO gate files, all the unnumbered line's: the jet league (its sets, its trainer rows, the networks' mutate and perturb), the front doors of the jet autopilot and the multirotor
+    // model, the drone and fish gates (the fish input side's the hindbrain-circuit extraction's, the circuit-only submarine pilot's and the family trainer's among them), the dogfight tournament's two gates, the dead-reckoning navigator and the rung 4a reference arm (a linear-rate dive worked by hand, where a left-hand sum is 3.3e-3 short; 77 mutants, nine findings fixed, one equivalent mutant's dead code cut), the reservoir estimator of rung 4a version 2 with its study and command (ridge regression, a spectral radius and a five-cell reservoir checked against a dense reckoning, the hold and the score worked by hand; 140 mutants, thirty-two findings fixed, one clause of dead code cut, one hang and two equivalent mutants said so), the compass-dropout view's two gates (the scene and the study numbers it draws from: 103 mutants, 100 red by name and three equivalent said so; the view itself, on a fake DOM that refuses markup and in the live page: 78 mutants of the view, eight of them 0-red on the first run and fixed, and 17 of the page's mount, every one red by name), and the CAVE export script's stand-in server. `at` names the line, as the ocean spike's closing did, because the version is chosen at ship time.
     since608: Object.freeze({
-        at: "unnumbered line", swept: 35, green: 35, red: 0,
+        at: "unnumbered line", swept: 32, green: 32, red: 0,
         added: Object.freeze([
             "brain/autopilotDrone-selfcheck.mjs", "brain/autopilotJet-selfcheck.mjs", "brain/dogfightTournament-selfcheck.mjs", "brain/droneTask-selfcheck.mjs",
             "brain/jetFight-selfcheck.mjs", "brain/jetLeagueSets-selfcheck.mjs", "brain/pilotDroneMlp-selfcheck.mjs", "brain/pilotDronePolicy-selfcheck.mjs",
             "brain/pilotJetMlp-selfcheck.mjs", "brain/pilotJetPolicy-selfcheck.mjs", "brain/pilotSubCircuit-selfcheck.mjs", "brain/pilotSubCircuitState-selfcheck.mjs", "brain/pilotSubFish-selfcheck.mjs", "physics/mechanics/atmosphereISA-selfcheck.mjs",
-            "physics/mechanics/multirotorModel6dof-selfcheck.mjs", "render/subAquariumCompass-selfcheck.mjs", "render/subDropoutScene-selfcheck.mjs", "render/subDropoutView-selfcheck.mjs", "tools/fishCaveExport-selfcheck.mjs", "tools/fishCircuit-selfcheck.mjs", "tools/fishHmi-selfcheck.mjs", "tools/fishInputSide-selfcheck.mjs", "tools/flyCx-selfcheck.mjs", "tools/subDropout-selfcheck.mjs", "tools/subHeadingEstimator-selfcheck.mjs", "tools/subNavigator-selfcheck.mjs", "tools/subReservoirV3-selfcheck.mjs", "tools/ship/subAquariumCompassPage-selfcheck.mjs", "tools/ship/tournamentDogfight-selfcheck.mjs",
+            "physics/mechanics/multirotorModel6dof-selfcheck.mjs", "render/subDropoutScene-selfcheck.mjs", "render/subDropoutView-selfcheck.mjs", "tools/fishCaveExport-selfcheck.mjs", "tools/fishCircuit-selfcheck.mjs", "tools/fishHmi-selfcheck.mjs", "tools/fishInputSide-selfcheck.mjs", "tools/flyCx-selfcheck.mjs", "tools/subDropout-selfcheck.mjs", "tools/subHeadingEstimator-selfcheck.mjs", "tools/subNavigator-selfcheck.mjs", "tools/ship/tournamentDogfight-selfcheck.mjs",
             "tools/ship/tournamentDogfightShipped-selfcheck.mjs", "tools/ship/trainDogfightLeague-selfcheck.mjs", "tools/ship/trainDronePilot-selfcheck.mjs", "tools/ship/trainSubCircuits-selfcheck.mjs", "tools/ship/trainSubPilot-selfcheck.mjs", "tools/ship/trainSubState-selfcheck.mjs",
         ]),
         redOnArrival: Object.freeze([]),
         widened: Object.freeze([]),
-        verdict: "the unnumbered line's thirty-five gates, each run alone and serially on the merged tree (main at v4896 in), all green, none red on arrival: the jet league (sets on seeds 15000 and up, the " +
+        verdict: "the unnumbered line's thirty-two gates, each run alone and serially on the merged tree (main at v4896 in), all green, none red on arrival: the jet league (sets on seeds 15000 and up, the " +
                  "trainer's jet path with its cache keys unchanged for the trainers, the jet networks' mutate and perturb), the jet autopilot's and the multirotor model's front doors, the drone and " +
                  "dogfight tournament gates, the fish pilot, the fish cells' input side (planted clouds with hand-worked counts; 61 mutants, every one red by name), the hindbrain-circuit extraction (an xlsx the gate writes itself, an eleven-cell fixture with every count worked out by hand; 131 mutants of the library and 51 of the command, every one red by name after two 0-red results were fixed), the circuit-only submarine pilot (a fixture of eight cells and the pass worked by hand; 92 mutants, seven 0-red found and fixed, two that hang and are said so), the family trainer with the pre-registered verdict (92 mutants, five 0-red found and fixed), the compass dropout (44 mutants, one 0-red and one nameless red found and fixed), the fly heading loop out of the hemibrain export (41 + 31 mutants, one equivalent mutant found and its dead code cut), the stateful reservoir pilot of rung 4a (a chain and an inhibition fixture worked by hand; 65 mutants, eight 0-red found and fixed, one dead guard cut), the rung 4a study library and its command (the verdict from hand-built records, the heading error against the dive runner's own count, stand-in children; 117 mutants of the library and 4 of the command file, 32 found 0-red or nameless and fixed, four that would run the real training at full size and so hang said so), and the CAVE export script's stand-in server (the big-neuron finder, with numpy integers from the server; version 5 adds --signs and --boxes, 50 mutants). All thirty were sabotaged " +
                  "and went red by name, the 0-red results and the equivalent mutants named in each gate's header. ONE OF THEM HAD NOT BEEN WHEN THIS CLOSING WAS FIRST WRITTEN: tools/ship/tournamentDogfightShipped-selfcheck.mjs was committed with its sabotage log " +
                  "reading 'filled in below once run' and had never been run; this closing found the placeholder, and the run (43 mutants, 40 red, 3 equivalent and said so) is now in its header. The closing's own sabotage found a hole in " +
                  "tools/ship/gateSweep-selfcheck.mjs, which refused a surplus that was too small and not one that was too large: a gate claimed twice, with the counts made to add up, read green; a row now refuses it. NOT CLOSED: the sweep-timings " +
-                 "readings for these thirty-five, a ship-time step not taken here",
+                 "readings for these thirty-two, a ship-time step not taken here",
+    }),
+    since609: Object.freeze({
+        at: "v4897", swept: 9, green: 9, red: 0,
+        added: Object.freeze(["render/autoScale-selfcheck.mjs", "render/deformTexture-selfcheck.mjs", "render/presentScale-selfcheck.mjs", "render/snowAblate-selfcheck.mjs", "render/snowCoarse-selfcheck.mjs", "render/snowFrameTiming-selfcheck.mjs", "render/snowGpuScale-selfcheck.mjs", "render/snowHoist-selfcheck.mjs", "tools/ship/flightCamera-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "the auto render scale rule, the deform field through a filterable texture, the present upsample, the beauty-pass term ablation, the coarse forms and their lean haze, the native frame timing, the scale page, the fine-relief hoist and the flight page's camera and minimap; each run alone and green, and each sabotaged to go red by name",
+    }),
+    since610: Object.freeze({
+        at: "v4898", swept: 4, green: 4, red: 0,
+        added: Object.freeze(["net/bridgeBase-selfcheck.mjs", "tools/ship/channelPage-selfcheck.mjs", "tools/ship/flightMap-selfcheck.mjs", "ui/channelFeed-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "the flight page's map selector (one height function drawn and collided with, the racing circuit scaled up), the channel page and its parser against a fixture feed and a real snapshot, and the same-origin bridge URLs; each run alone and green, and each sabotaged to go red by name",
+    }),
+    since611: Object.freeze({
+        at: "v4899", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "no gate file added, so nothing is claimed here (a gate may be claimed by ONE closing, and these three are already in earlier ones); three gates grew a section each (render/subAquarium3d-selfcheck, ui/avatarSwitch-selfcheck, tools/ship/quickSweep-selfcheck) -- the submarines' tower and fins tied to the physics' fin forces (and a live-render row), the avatar button's walk past a missing asset, and quickSweep's carry-over of a foreign over-budget reading; each run alone and green, and each sabotaged to go red by name",
+    }),
+    since612: Object.freeze({
+        at: "v4900", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "no gate file added, so nothing is claimed here (a gate may be claimed by ONE closing); four gates grew rows (tools/ship/orreryFleet-selfcheck, render/subAquarium3d-selfcheck, tools/ship/multigrid3dTiming-selfcheck, tools/ship/capReading-selfcheck), each run alone and green and each sabotaged to go red by name",
+    }),
+    since613: Object.freeze({
+        at: "v4901", swept: 21, green: 21, red: 0,
+        added: Object.freeze(["brain/emergencyPilot-selfcheck.mjs", "brain/manualAssist-selfcheck.mjs", "brain/ogreSubBridge-selfcheck.mjs", "brain/seaOgre-selfcheck.mjs", "brain/subSquad-selfcheck.mjs", "brain/subTournament-selfcheck.mjs", "brain/surfacePilot-selfcheck.mjs", "render/brainPanel-selfcheck.mjs", "render/compassView-selfcheck.mjs", "render/denoiseFrameGen-selfcheck.mjs", "render/denoiseFrameGenCost-selfcheck.mjs", "render/frameGenLive-selfcheck.mjs", "render/learnedUpscale-selfcheck.mjs", "render/learnedUpscaleStudy-selfcheck.mjs", "render/seaOgre3d-selfcheck.mjs", "render/seaOgreView-selfcheck.mjs", "render/seaPicker-selfcheck.mjs", "render/subAquariumEvents-selfcheck.mjs", "render/subBallastCues-selfcheck.mjs", "render/subTournamentView-selfcheck.mjs", "tools/subReservoirV3-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "the Sea OGRE round's gates (the level, its view and 3D camera, the squad, the voxel bridge) and the sub round's (ballast pilots, manual assist, brain panel, sub tournament and its view, sea picker, compass view) plus the merged FSR4 / frame-generation gates; each run alone and green on the merged tree, and each sabotaged to go red by name with the results in its header",
     }),
 });
 

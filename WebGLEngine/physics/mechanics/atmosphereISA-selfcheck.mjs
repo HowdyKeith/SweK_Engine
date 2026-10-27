@@ -1,6 +1,6 @@
 // WebGLEngine/physics/mechanics/atmosphereISA-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node physics/mechanics/atmosphereISA-selfcheck.mjs      (~1 s)
+// Run: node physics/mechanics/atmosphereISA-selfcheck.mjs      (~0.04 s)
 //
 // THE STANDARD ATMOSPHERE, HELD TO THE TEXTBOOK AND TO PHYSICS. physics/mechanics/atmosphereISA.mjs is three formulas; a wrong exponent in the middle one still gives an atmosphere that thins with height. So the rows are held to two things the formulas were NOT written from: the ICAO
 // standard-atmosphere table (the pressure and density at seven heights) and the law the whole thing is a solution of (hydrostatic balance, dp/dh = -rho g, taken as a numerical derivative of the module's own pressure).

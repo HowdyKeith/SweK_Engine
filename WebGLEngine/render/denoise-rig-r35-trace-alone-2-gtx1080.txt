@@ -1,0 +1,149 @@
+0.561 s  pid 14816  native: the ladder starts, sets r12,r15,r18t,r18u,r27w
+0.563 s  pid 14816  native 64x64: requestAdapter
+0.563 s  pid 14816  native 64x64: requestDevice for r12,r15,r18t,r18u,r27w
+0.611 s  pid 14816  native 64x64: build r12
+0.726 s  pid 14816  native 64x64: build r15
+2.684 s  pid 14816  native 64x64: build r18t
+4.441 s  pid 14816  native 64x64: build r18u
+7.921 s  pid 14816  native 64x64: build r27w
+9.198 s  pid 14816  native 64x64: round 0 time r12
+9.362 s  pid 14816  native 64x64: round 0 time r15
+9.386 s  pid 14816  native 64x64: round 0 time r18t
+9.401 s  pid 14816  native 64x64: round 0 time r18u
+9.418 s  pid 14816  native 64x64: round 0 time r27w
+9.434 s  pid 14816  native 64x64: round 1 time r27w
+9.448 s  pid 14816  native 64x64: round 1 time r18u
+9.460 s  pid 14816  native 64x64: round 1 time r18t
+9.472 s  pid 14816  native 64x64: round 1 time r15
+9.485 s  pid 14816  native 64x64: round 1 time r12
+9.551 s  pid 14816  native 64x64: round 2 time r12
+9.613 s  pid 14816  native 64x64: round 2 time r15
+9.660 s  pid 14816  native 64x64: round 2 time r18t
+9.672 s  pid 14816  native 64x64: round 2 time r18u
+9.682 s  pid 14816  native 64x64: round 2 time r27w
+9.695 s  pid 14816  native 64x64: output check r12
+9.703 s  pid 14816  native 64x64: output check r15
+9.706 s  pid 14816  native 64x64: output check r18t
+9.708 s  pid 14816  native 64x64: output check r18u
+9.710 s  pid 14816  native 64x64: output check r27w
+9.713 s  pid 14816  native 64x64: destroy the denoisers
+9.714 s  pid 14816  native 64x64: destroy the device
+9.728 s  pid 14816  native 128x128: requestAdapter
+9.729 s  pid 14816  native 128x128: requestDevice for r12,r15,r18t,r18u,r27w
+9.780 s  pid 14816  native 128x128: build r12
+9.876 s  pid 14816  native 128x128: build r15
+11.169 s  pid 14816  native 128x128: build r18t
+12.645 s  pid 14816  native 128x128: build r18u
+16.001 s  pid 14816  native 128x128: build r27w
+17.258 s  pid 14816  native 128x128: round 0 time r12
+17.374 s  pid 14816  native 128x128: round 0 time r15
+17.389 s  pid 14816  native 128x128: round 0 time r18t
+17.405 s  pid 14816  native 128x128: round 0 time r18u
+17.423 s  pid 14816  native 128x128: round 0 time r27w
+17.450 s  pid 14816  native 128x128: round 1 time r27w
+17.478 s  pid 14816  native 128x128: round 1 time r18u
+17.496 s  pid 14816  native 128x128: round 1 time r18t
+17.512 s  pid 14816  native 128x128: round 1 time r15
+17.527 s  pid 14816  native 128x128: round 1 time r12
+17.631 s  pid 14816  native 128x128: round 2 time r12
+17.740 s  pid 14816  native 128x128: round 2 time r15
+17.756 s  pid 14816  native 128x128: round 2 time r18t
+17.771 s  pid 14816  native 128x128: round 2 time r18u
+17.789 s  pid 14816  native 128x128: round 2 time r27w
+17.816 s  pid 14816  native 128x128: destroy the denoisers
+17.817 s  pid 14816  native 128x128: destroy the device
+17.832 s  pid 14816  native 256x256: requestAdapter
+17.833 s  pid 14816  native 256x256: requestDevice for r12,r15,r18t,r18u,r27w
+17.896 s  pid 14816  native 256x256: build r12
+18.057 s  pid 14816  native 256x256: build r15
+19.381 s  pid 14816  native 256x256: build r18t
+20.861 s  pid 14816  native 256x256: build r18u
+24.290 s  pid 14816  native 256x256: build r27w
+25.546 s  pid 14816  native 256x256: round 0 time r12
+26.155 s  pid 14816  native 256x256: round 0 time r15
+26.192 s  pid 14816  native 256x256: round 0 time r18t
+26.228 s  pid 14816  native 256x256: round 0 time r18u
+26.280 s  pid 14816  native 256x256: round 0 time r27w
+26.406 s  pid 14816  native 256x256: round 1 time r27w
+26.502 s  pid 14816  native 256x256: round 1 time r18u
+26.553 s  pid 14816  native 256x256: round 1 time r18t
+26.589 s  pid 14816  native 256x256: round 1 time r15
+26.627 s  pid 14816  native 256x256: round 1 time r12
+27.227 s  pid 14816  native 256x256: round 2 time r12
+27.833 s  pid 14816  native 256x256: round 2 time r15
+27.870 s  pid 14816  native 256x256: round 2 time r18t
+27.907 s  pid 14816  native 256x256: round 2 time r18u
+27.959 s  pid 14816  native 256x256: round 2 time r27w
+28.057 s  pid 14816  native 256x256: destroy the denoisers
+28.058 s  pid 14816  native 256x256: destroy the device
+28.075 s  pid 14816  native 512x512: requestAdapter
+28.076 s  pid 14816  native 512x512: requestDevice for r12,r15,r18t,r18u,r27w
+28.150 s  pid 14816  native 512x512: build r12
+28.311 s  pid 14816  native 512x512: build r15
+29.613 s  pid 14816  native 512x512: build r18t
+31.101 s  pid 14816  native 512x512: build r18u
+34.467 s  pid 14816  native 512x512: build r27w
+35.734 s  pid 14816  native 512x512: round 0 time r12
+36.732 s  pid 14816  native 512x512: round 0 time r15
+36.864 s  pid 14816  native 512x512: round 0 time r18t
+37.010 s  pid 14816  native 512x512: round 0 time r18u
+37.202 s  pid 14816  native 512x512: round 0 time r27w
+37.562 s  pid 14816  native 512x512: round 1 time r27w
+37.923 s  pid 14816  native 512x512: round 1 time r18u
+38.134 s  pid 14816  native 512x512: round 1 time r18t
+38.257 s  pid 14816  native 512x512: round 1 time r15
+38.404 s  pid 14816  native 512x512: round 1 time r12
+39.183 s  pid 14816  native 512x512: round 2 time r12
+40.138 s  pid 14816  native 512x512: round 2 time r15
+40.268 s  pid 14816  native 512x512: round 2 time r18t
+40.411 s  pid 14816  native 512x512: round 2 time r18u
+40.603 s  pid 14816  native 512x512: round 2 time r27w
+40.963 s  pid 14816  native 512x512: destroy the denoisers
+40.963 s  pid 14816  native 512x512: destroy the device
+40.994 s  pid 14816  native 1024x1024: requestAdapter
+40.994 s  pid 14816  native 1024x1024: requestDevice for r12,r15,r18t,r18u,r27w
+41.129 s  pid 14816  native 1024x1024: build r12
+41.313 s  pid 14816  native 1024x1024: build r15
+42.633 s  pid 14816  native 1024x1024: build r18t
+44.170 s  pid 14816  native 1024x1024: build r18u
+47.544 s  pid 14816  native 1024x1024: build r27w
+48.866 s  pid 14816  native 1024x1024: round 0 time r12
+50.871 s  pid 14816  native 1024x1024: round 0 time r15
+51.394 s  pid 14816  native 1024x1024: round 0 time r18t
+51.869 s  pid 14816  native 1024x1024: round 0 time r18u
+52.533 s  pid 14816  native 1024x1024: round 0 time r27w
+53.268 s  pid 14816  native 1024x1024: round 1 time r27w
+53.989 s  pid 14816  native 1024x1024: round 1 time r18u
+54.642 s  pid 14816  native 1024x1024: round 1 time r18t
+55.114 s  pid 14816  native 1024x1024: round 1 time r15
+55.621 s  pid 14816  native 1024x1024: round 1 time r12
+57.604 s  pid 14816  native 1024x1024: round 2 time r12
+59.574 s  pid 14816  native 1024x1024: round 2 time r15
+60.086 s  pid 14816  native 1024x1024: round 2 time r18t
+60.557 s  pid 14816  native 1024x1024: round 2 time r18u
+61.239 s  pid 14816  native 1024x1024: round 2 time r27w
+61.950 s  pid 14816  native 1024x1024: destroy the denoisers
+61.951 s  pid 14816  native 1024x1024: destroy the device
+61.991 s  pid 14816  native 1920x1080: requestAdapter
+61.992 s  pid 14816  native 1920x1080: requestDevice for r15,r18t,r18u,r27w
+62.288 s  pid 14816  native 1920x1080: build r15
+63.673 s  pid 14816  native 1920x1080: build r18t
+65.246 s  pid 14816  native 1920x1080: build r18u
+68.705 s  pid 14816  native 1920x1080: build r27w
+70.104 s  pid 14816  native 1920x1080: round 0 time r15
+70.910 s  pid 14816  native 1920x1080: round 0 time r18t
+71.652 s  pid 14816  native 1920x1080: round 0 time r18u
+72.566 s  pid 14816  native 1920x1080: round 0 time r27w
+73.715 s  pid 14816  native 1920x1080: round 1 time r27w
+74.850 s  pid 14816  native 1920x1080: round 1 time r18u
+75.744 s  pid 14816  native 1920x1080: round 1 time r18t
+76.512 s  pid 14816  native 1920x1080: round 1 time r15
+77.293 s  pid 14816  native 1920x1080: round 2 time r15
+78.065 s  pid 14816  native 1920x1080: round 2 time r18t
+78.811 s  pid 14816  native 1920x1080: round 2 time r18u
+79.695 s  pid 14816  native 1920x1080: round 2 time r27w
+80.879 s  pid 14816  native 1920x1080: destroy the denoisers
+80.880 s  pid 14816  native 1920x1080: destroy the device
+80.926 s  pid 14816  native ladder done
+80.927 s  pid 14816  native: the ladder returned
+160.925 s  pid 14816  the gate ends, 0 fail(s)

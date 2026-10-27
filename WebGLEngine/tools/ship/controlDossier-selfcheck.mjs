@@ -1,6 +1,6 @@
 // tools/ship/controlDossier-selfcheck.mjs
 //
-// Run: node tools/ship/controlDossier-selfcheck.mjs   (~4s — MEASURED v3941, was ~5s)
+// Run: node tools/ship/controlDossier-selfcheck.mjs   (~1.7s — re-measured v4902: 1.7 s alone; was ~4s at v3941)
 //
 // v3176 -- THE 114 CONTROLS ARE FIVE DECISIONS, NOT A HUNDRED AND FOURTEEN.
 //

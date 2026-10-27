@@ -1,6 +1,6 @@
 // WebGLEngine/tools/subHeadingEstimator-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node tools/subHeadingEstimator-selfcheck.mjs      (~60 s)
+// Run: node tools/subHeadingEstimator-selfcheck.mjs      (~21 s)
 //
 // THE GATE OF tools/subHeadingEstimator.mjs (the reservoir estimator: record, ridge fit, score, the estimator in the loop), tools/ship/subEstimatorStudy.mjs (the registered study: verdict, report, command) and tools/ship/subEstimatorStudyCmd.mjs, the study of
 // brain/SUBMARINE_WIP.md "THE ESTIMATOR" and its AMENDMENT. Every number is worked out by hand on small fixtures:

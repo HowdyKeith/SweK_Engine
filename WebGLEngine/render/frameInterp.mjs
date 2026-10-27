@@ -140,7 +140,7 @@ export function compositeUiCPU({ frame, ui, w, h }) {
  * default neighbour is the FARTHER one and why the switch exists at all.
  */
 export function interpolateFrameCPU({ prev, cur, w, h, flow, bw, bh, block, depthBlock, indexedBy,
-                                     nearerIsLess = true, t = 0.5, fill = null, toT = null }) {
+                                     nearerIsLess = true, t = 0.5, fill = null, toT = null, holes: holeRule = "zero" }) {
     if (!(block >= 1) || block !== Math.floor(block))
         throw new Error(`interpolateFrameCPU: block must be a whole number of pixels, at least 1 -- got ${block}`);
     if (bw !== Math.ceil(w / block) || bh !== Math.ceil(h / block))
@@ -157,6 +157,10 @@ export function interpolateFrameCPU({ prev, cur, w, h, flow, bw, bh, block, dept
             'render/opticalFlow.mjs and render/flowReconcile.mjs both return "cur"; a field built by walking the PREVIOUS frame is "prev". ' +
             "There is no default, because the two differ by the whole displacement wherever motion is not uniform and no measurement in this arc could tell them apart until v4680.");
 
+    // the denoiser arc's round 66 (render/learned-denoiser-preregistration.md section 152): what a hole left after the fill shows --
+    // "zero" (the default, as every gate before it measured) or "crossfade", the two frames' mean at the pixel, which beat black on
+    // all 24 of that round's scenes and the newer frame alone on 17
+    if (holeRule !== "zero" && holeRule !== "crossfade") throw new Error(`interpolateFrameCPU: holes must be "zero" or "crossfade" -- got ${JSON.stringify(holeRule)}`);
     if (toT && (toT.length < bw * bh * 2 || indexedBy !== "cur"))
         throw new Error('interpolateFrameCPU: toT must be bw*bh*2 and the field indexedBy "cur" -- it is the displacement from each block\'s CUR position to time t');
     if (toT && fill && (fill.side === undefined ? "derived" : fill.side) !== "blend")
@@ -247,7 +251,11 @@ export function interpolateFrameCPU({ prev, cur, w, h, flow, bw, bh, block, dept
     let holes = 0;
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
         const j = y * w + x;
-        if (hole[j]) { holes++; continue; }             // left at zero on purpose -- see the header
+        if (hole[j]) {                                  // left at zero on purpose -- see the header -- unless asked for the cross-fade
+            holes++;
+            if (holeRule === "crossfade") for (let c = 0; c < 4; c++) frame[j * 4 + c] = prev[j * 4 + c] * (1 - t) + cur[j * 4 + c] * t;
+            continue;
+        }
         const vx = vec[j * 2], vy = vec[j * 2 + 1];
         if (toT) { fetch4(prev, w, h, x + vecPrev[j * 2], y + vecPrev[j * 2 + 1], a, 0); fetch4(cur, w, h, x + vx, y + vy, b, 0); }
         else {

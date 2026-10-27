@@ -10,6 +10,25 @@
 //                                                     upscale and composited at full size -> render/denoise-results-emitter.json
 //       node tools/denoiseStudy.mjs --harvest-mesh  the SHIPPED network and filter on the engine's own geometry, nothing trained (section 79)
 //                                                  -> render/denoise-results-mesh.json
+//       node tools/denoiseStudy.mjs --harvest-mesh-c  the same, the shapes in family C's materials and light (section 127)
+//                                                  -> render/denoise-results-mesh-c.json
+//       node tools/denoiseStudy.mjs --harvest-page  the same on path-tracer.html's own six scenes (section 131)
+//                                                  -> render/denoise-results-page.json
+//       node tools/denoiseStudy.mjs --harvest-framegen  FSR3's generator between two of round 32's chain frames (section 133)
+//                                                  -> render/denoise-results-framegen.json
+//       node tools/denoiseStudy.mjs --harvest-framegen-lf  the same between light-free frames, lit at the midpoint (section 136)
+//                                                  -> render/denoise-results-framegen-lf.json
+//       node tools/denoiseStudy.mjs --harvest-framegen-display  round 60's arms graded in display space, C1 of the candidate (section 139)
+//                                                  -> render/denoise-results-framegen-display.json
+//       node tools/denoiseStudy.mjs --harvest-framegen-large    round 61's arrangement on 24 new scenes, C1 at 22 (section 142)
+//                                                  -> render/denoise-results-framegen-large.json
+//       node tools/denoiseStudy.mjs --harvest-framegen-holes    what a hole should show, the scaled fill (section 151)
+//                                                  -> render/denoise-results-framegen-holes.json
+//       node tools/denoiseStudy.mjs --harvest-upscale-train     FSR4 round 65: U trained, the candidate chosen (section 148)
+//                                                  -> render/upscale-net-r65.json
+//       node tools/denoiseStudy.mjs --harvest-upscale-test      FSR4 round 65: the 24 test scenes -> render/denoise-results-upscale-learned.json
+//                                                  (either with --round 67 or 68 for sections 155 and 157, and --cache <dir> to resume)
+//       node tools/denoiseStudy.mjs --harvest-r47  round 11 with the network 16 channels wide, the 32-channel one beside it (section 116) -> render/denoise-results-r47.json
 //       node tools/denoiseStudy.mjs --harvest-r11  one large network trained on families R and C together (section 32) -> render/denoise-results-r11.json
 //       node tools/denoiseStudy.mjs --secondary-r11  round 11 again, for section 32's secondary the first run skipped (section 33)
 //                                                    -> render/denoise-results-r11-secondary.json
@@ -46,12 +65,18 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { execFileSync } from "node:child_process";
 import { openCache, hashArrays } from "../render/denoiseCache.mjs";
-import { runStudy, MINI, HARVESTS, studyOptions, runShippedStudy, ROUND_MESH, SHIPPED_NET, runUpscaleStudy, ROUND_FSR1, ROUND_HALFRES, runEmitterAwareStudy, ROUND_EMITTER, runTemporalUpscaleStudy, ROUND_TEMPORALUP } from "../render/denoiseStudy.mjs";
+import { runStudy, MINI, HARVESTS, studyOptions, runShippedStudy, ROUND_MESH, ROUND_MESH_C, ROUND_PAGE, SHIPPED_NET, runUpscaleStudy, ROUND_FSR1, ROUND_HALFRES, runEmitterAwareStudy, ROUND_EMITTER, runTemporalUpscaleStudy, ROUND_TEMPORALUP, runFrameGenStudy, ROUND_FRAMEGEN, ROUND_FRAMEGEN_LF, ROUND_FRAMEGEN_DISPLAY, ROUND_FRAMEGEN_LARGE, ROUND_FRAMEGEN_HOLES } from "../render/denoiseStudy.mjs";
 import { decodeNet } from "../render/denoiseDevice.mjs";
 import crypto from "node:crypto";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
+/** FSR4's harvests (section 157): --cache <dir>, stamped by the results file, the commit and the uncommitted diff, so an interrupted run resumes. */
+function upscaleCache(args, git, results) {
+    const at = args.indexOf("--cache"), dir = at >= 0 ? args[at + 1] : null;
+    if (at >= 0 && !dir) { console.log("[denoiseStudy] --cache needs a directory"); process.exit(2); }
+    return dir ? openCache(path.resolve(dir), { results, commit: git("rev-parse", "HEAD").trim(), diff: hashArrays([git("diff", "HEAD", "--", "render", "brain", "physics", "tools/denoiseStudy.mjs")]) }) : null;
+}
 
 if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
     const args = process.argv.slice(2);
@@ -147,6 +172,175 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
         if (cache) out.cache = { hits: cache.hits, misses: cache.misses };
         fs.writeFileSync(file, JSON.stringify(out, (k, v) => (v instanceof Float64Array ? Array.from(v) : v), 1) + "\n");
         console.log(`[denoiseStudy] wrote ${ROUND_MESH.results}`);
+    } else if (args.includes("--harvest-mesh-c")) {
+        // section 127: section 79's round in family C's materials and light, nothing trained -- the shipped pair, decoded here exactly as denoise.html decodes it (decodeNet over
+        // the file's `net`, the filter the file names), and the file's own sha-256 written beside the results
+        const file = path.join(ENG, ROUND_MESH_C.results);
+        if (fs.existsSync(file)) { console.log(`[denoiseStudy] ${ROUND_MESH_C.results} exists -- a harvest's results are never overwritten`); process.exit(2); }
+        const bytes = fs.readFileSync(path.join(ENG, SHIPPED_NET)), shipped = JSON.parse(bytes.toString("utf8"));
+        const at = args.indexOf("--cache"), dir = at >= 0 ? args[at + 1] : null;
+        if (at >= 0 && !dir) { console.log("[denoiseStudy] --cache needs a directory"); process.exit(2); }
+        const git = (...a) => execFileSync("git", a, { cwd: ENG, encoding: "utf8", maxBuffer: 1 << 28 });
+        const cache = dir ? openCache(path.resolve(dir), { results: ROUND_MESH_C.results, commit: git("rev-parse", "HEAD").trim(),
+                                                         diff: hashArrays([git("diff", "HEAD", "--", "render", "brain", "physics", "mesh", "tools/denoiseStudy.mjs")]) }) : null;
+        if (cache) console.log(`[denoiseStudy] cache ${cache.dir}`);
+        const out = runShippedStudy({ splits: ROUND_MESH_C.splits, net: decodeNet(shipped.net), filter: shipped.filter, harvest: true, cache, log: (m) => console.log("[denoiseStudy] " + m) });
+        out.shipped = { file: SHIPPED_NET, sha256: crypto.createHash("sha256").update(bytes).digest("hex"), source: shipped.source };
+        if (cache) out.cache = { hits: cache.hits, misses: cache.misses };
+        fs.writeFileSync(file, JSON.stringify(out, (k, v) => (v instanceof Float64Array ? Array.from(v) : v), 1) + "\n");
+        console.log(`[denoiseStudy] wrote ${ROUND_MESH_C.results}`);
+    } else if (args.includes("--harvest-page")) {
+        // section 131: section 79's round on path-tracer.html's own six scenes, nothing trained -- the shipped pair, decoded here exactly as denoise.html decodes it (decodeNet over
+        // the file's `net`, the filter the file names), and the file's own sha-256 written beside the results
+        const file = path.join(ENG, ROUND_PAGE.results);
+        if (fs.existsSync(file)) { console.log(`[denoiseStudy] ${ROUND_PAGE.results} exists -- a harvest's results are never overwritten`); process.exit(2); }
+        const bytes = fs.readFileSync(path.join(ENG, SHIPPED_NET)), shipped = JSON.parse(bytes.toString("utf8"));
+        const at = args.indexOf("--cache"), dir = at >= 0 ? args[at + 1] : null;
+        if (at >= 0 && !dir) { console.log("[denoiseStudy] --cache needs a directory"); process.exit(2); }
+        const git = (...a) => execFileSync("git", a, { cwd: ENG, encoding: "utf8", maxBuffer: 1 << 28 });
+        const cache = dir ? openCache(path.resolve(dir), { results: ROUND_PAGE.results, commit: git("rev-parse", "HEAD").trim(),
+                                                         diff: hashArrays([git("diff", "HEAD", "--", "render", "brain", "physics", "mesh", "tools/denoiseStudy.mjs")]) }) : null;
+        if (cache) console.log(`[denoiseStudy] cache ${cache.dir}`);
+        const out = runShippedStudy({ splits: ROUND_PAGE.splits, c1Min: ROUND_PAGE.c1Min, net: decodeNet(shipped.net), filter: shipped.filter, harvest: true, cache, log: (m) => console.log("[denoiseStudy] " + m) });
+        out.shipped = { file: SHIPPED_NET, sha256: crypto.createHash("sha256").update(bytes).digest("hex"), source: shipped.source };
+        if (cache) out.cache = { hits: cache.hits, misses: cache.misses };
+        fs.writeFileSync(file, JSON.stringify(out, (k, v) => (v instanceof Float64Array ? Array.from(v) : v), 1) + "\n");
+        console.log(`[denoiseStudy] wrote ${ROUND_PAGE.results}`);
+    } else if (args.includes("--harvest-framegen")) {
+        // section 133, round 59: FSR3's generator between two of round 32's chain frames -- nothing trained, the shipped
+        // network decoded as denoise.html decodes it, its sha-256 beside the results
+        const file = path.join(ENG, ROUND_FRAMEGEN.results);
+        if (fs.existsSync(file)) { console.log(`[denoiseStudy] ${ROUND_FRAMEGEN.results} exists -- a harvest's results are never overwritten`); process.exit(2); }
+        const bytes = fs.readFileSync(path.join(ENG, SHIPPED_NET)), shipped = JSON.parse(bytes.toString("utf8"));
+        const at = args.indexOf("--cache"), dir = at >= 0 ? args[at + 1] : null;
+        if (at >= 0 && !dir) { console.log("[denoiseStudy] --cache needs a directory"); process.exit(2); }
+        const git = (...a) => execFileSync("git", a, { cwd: ENG, encoding: "utf8", maxBuffer: 1 << 28 });
+        const cache = dir ? openCache(path.resolve(dir), { results: ROUND_FRAMEGEN.results, commit: git("rev-parse", "HEAD").trim(),
+                                                         diff: hashArrays([git("diff", "HEAD", "--", "render", "brain", "physics", "mesh", "fx/fsr", "tools/denoiseStudy.mjs")]) }) : null;
+        if (cache) console.log(`[denoiseStudy] cache ${cache.dir}`);
+        const out = runFrameGenStudy({ splits: ROUND_FRAMEGEN.splits, image: ROUND_FRAMEGEN.image, test: ROUND_FRAMEGEN.test, c2Prior: ROUND_FRAMEGEN.c2Prior,
+                                              net: decodeNet(shipped.net), harvest: true, cache, log: (m) => console.log("[denoiseStudy] " + m) });
+        out.shipped = { file: SHIPPED_NET, sha256: crypto.createHash("sha256").update(bytes).digest("hex"), source: shipped.source };
+        out.commit = git("rev-parse", "--short=8", "HEAD").trim();
+        if (cache) out.cache = { hits: cache.hits, misses: cache.misses };
+        fs.writeFileSync(file, JSON.stringify(out, (k, v) => (v instanceof Float64Array ? Array.from(v) : v), 1) + "\n");
+        console.log(`[denoiseStudy] wrote ${ROUND_FRAMEGEN.results}`);
+    } else if (args.includes("--harvest-framegen-lf")) {
+        // section 136, round 60: the same generator between LIGHT-FREE frames, the lights put back at the midpoint -- nothing trained, the shipped
+        // network decoded as denoise.html decodes it, its sha-256 beside the results
+        const file = path.join(ENG, ROUND_FRAMEGEN_LF.results);
+        if (fs.existsSync(file)) { console.log(`[denoiseStudy] ${ROUND_FRAMEGEN_LF.results} exists -- a harvest's results are never overwritten`); process.exit(2); }
+        const bytes = fs.readFileSync(path.join(ENG, SHIPPED_NET)), shipped = JSON.parse(bytes.toString("utf8"));
+        const at = args.indexOf("--cache"), dir = at >= 0 ? args[at + 1] : null;
+        if (at >= 0 && !dir) { console.log("[denoiseStudy] --cache needs a directory"); process.exit(2); }
+        const git = (...a) => execFileSync("git", a, { cwd: ENG, encoding: "utf8", maxBuffer: 1 << 28 });
+        const cache = dir ? openCache(path.resolve(dir), { results: ROUND_FRAMEGEN_LF.results, commit: git("rev-parse", "HEAD").trim(),
+                                                         diff: hashArrays([git("diff", "HEAD", "--", "render", "brain", "physics", "mesh", "fx/fsr", "tools/denoiseStudy.mjs")]) }) : null;
+        if (cache) console.log(`[denoiseStudy] cache ${cache.dir}`);
+        const out = runFrameGenStudy({ splits: ROUND_FRAMEGEN_LF.splits, image: ROUND_FRAMEGEN_LF.image, arrangement: ROUND_FRAMEGEN_LF.arrangement, test: ROUND_FRAMEGEN_LF.test, c2Prior: ROUND_FRAMEGEN_LF.c2Prior,
+                                              net: decodeNet(shipped.net), harvest: true, cache, log: (m) => console.log("[denoiseStudy] " + m) });
+        out.shipped = { file: SHIPPED_NET, sha256: crypto.createHash("sha256").update(bytes).digest("hex"), source: shipped.source };
+        out.commit = git("rev-parse", "--short=8", "HEAD").trim();
+        if (cache) out.cache = { hits: cache.hits, misses: cache.misses };
+        fs.writeFileSync(file, JSON.stringify(out, (k, v) => (v instanceof Float64Array ? Array.from(v) : v), 1) + "\n");
+        console.log(`[denoiseStudy] wrote ${ROUND_FRAMEGEN_LF.results}`);
+    } else if (args.includes("--harvest-framegen-display")) {
+        // section 139, round 61: round 60's arrangement graded in display space, C1 of the candidate alone -- nothing trained, the shipped
+        // network decoded as denoise.html decodes it, its sha-256 beside the results
+        const file = path.join(ENG, ROUND_FRAMEGEN_DISPLAY.results);
+        if (fs.existsSync(file)) { console.log(`[denoiseStudy] ${ROUND_FRAMEGEN_DISPLAY.results} exists -- a harvest's results are never overwritten`); process.exit(2); }
+        const bytes = fs.readFileSync(path.join(ENG, SHIPPED_NET)), shipped = JSON.parse(bytes.toString("utf8"));
+        const at = args.indexOf("--cache"), dir = at >= 0 ? args[at + 1] : null;
+        if (at >= 0 && !dir) { console.log("[denoiseStudy] --cache needs a directory"); process.exit(2); }
+        const git = (...a) => execFileSync("git", a, { cwd: ENG, encoding: "utf8", maxBuffer: 1 << 28 });
+        const cache = dir ? openCache(path.resolve(dir), { results: ROUND_FRAMEGEN_DISPLAY.results, commit: git("rev-parse", "HEAD").trim(),
+                                                         diff: hashArrays([git("diff", "HEAD", "--", "render", "brain", "physics", "mesh", "fx/fsr", "tools/denoiseStudy.mjs")]) }) : null;
+        if (cache) console.log(`[denoiseStudy] cache ${cache.dir}`);
+        const out = runFrameGenStudy({ splits: ROUND_FRAMEGEN_DISPLAY.splits, image: ROUND_FRAMEGEN_DISPLAY.image, arrangement: ROUND_FRAMEGEN_DISPLAY.arrangement, test: ROUND_FRAMEGEN_DISPLAY.test, c2Prior: ROUND_FRAMEGEN_DISPLAY.c2Prior,
+                                              net: decodeNet(shipped.net), harvest: true, cache, log: (m) => console.log("[denoiseStudy] " + m) });
+        out.shipped = { file: SHIPPED_NET, sha256: crypto.createHash("sha256").update(bytes).digest("hex"), source: shipped.source };
+        out.commit = git("rev-parse", "--short=8", "HEAD").trim();
+        if (cache) out.cache = { hits: cache.hits, misses: cache.misses };
+        fs.writeFileSync(file, JSON.stringify(out, (k, v) => (v instanceof Float64Array ? Array.from(v) : v), 1) + "\n");
+        console.log(`[denoiseStudy] wrote ${ROUND_FRAMEGEN_DISPLAY.results}`);
+    } else if (args.includes("--harvest-framegen-large")) {
+        // section 142, round 62: round 61's arrangement on 24 new scenes, C1 at 22 of the candidate alone -- nothing trained, the shipped
+        // network decoded as denoise.html decodes it, its sha-256 beside the results
+        const file = path.join(ENG, ROUND_FRAMEGEN_LARGE.results);
+        if (fs.existsSync(file)) { console.log(`[denoiseStudy] ${ROUND_FRAMEGEN_LARGE.results} exists -- a harvest's results are never overwritten`); process.exit(2); }
+        const bytes = fs.readFileSync(path.join(ENG, SHIPPED_NET)), shipped = JSON.parse(bytes.toString("utf8"));
+        const at = args.indexOf("--cache"), dir = at >= 0 ? args[at + 1] : null;
+        if (at >= 0 && !dir) { console.log("[denoiseStudy] --cache needs a directory"); process.exit(2); }
+        const git = (...a) => execFileSync("git", a, { cwd: ENG, encoding: "utf8", maxBuffer: 1 << 28 });
+        const cache = dir ? openCache(path.resolve(dir), { results: ROUND_FRAMEGEN_LARGE.results, commit: git("rev-parse", "HEAD").trim(),
+                                                         diff: hashArrays([git("diff", "HEAD", "--", "render", "brain", "physics", "mesh", "fx/fsr", "tools/denoiseStudy.mjs")]) }) : null;
+        if (cache) console.log(`[denoiseStudy] cache ${cache.dir}`);
+        const out = runFrameGenStudy({ splits: ROUND_FRAMEGEN_LARGE.splits, image: ROUND_FRAMEGEN_LARGE.image, arrangement: ROUND_FRAMEGEN_LARGE.arrangement, test: ROUND_FRAMEGEN_LARGE.test, c2Prior: ROUND_FRAMEGEN_LARGE.c2Prior, c1Min: ROUND_FRAMEGEN_LARGE.c1Min,
+                                              net: decodeNet(shipped.net), harvest: true, cache, log: (m) => console.log("[denoiseStudy] " + m) });
+        out.shipped = { file: SHIPPED_NET, sha256: crypto.createHash("sha256").update(bytes).digest("hex"), source: shipped.source };
+        out.commit = git("rev-parse", "--short=8", "HEAD").trim();
+        if (cache) out.cache = { hits: cache.hits, misses: cache.misses };
+        fs.writeFileSync(file, JSON.stringify(out, (k, v) => (v instanceof Float64Array ? Array.from(v) : v), 1) + "\n");
+        console.log(`[denoiseStudy] wrote ${ROUND_FRAMEGEN_LARGE.results}`);
+    } else if (args.includes("--harvest-framegen-holes")) {
+        // section 151, round 66: what a hole should show -- the scaled fill's holes black, cross-faded, from L7; C1 at 22 of each candidate -- nothing trained, the shipped
+        // network decoded as denoise.html decodes it, its sha-256 beside the results
+        const file = path.join(ENG, ROUND_FRAMEGEN_HOLES.results);
+        if (fs.existsSync(file)) { console.log(`[denoiseStudy] ${ROUND_FRAMEGEN_HOLES.results} exists -- a harvest's results are never overwritten`); process.exit(2); }
+        const bytes = fs.readFileSync(path.join(ENG, SHIPPED_NET)), shipped = JSON.parse(bytes.toString("utf8"));
+        const at = args.indexOf("--cache"), dir = at >= 0 ? args[at + 1] : null;
+        if (at >= 0 && !dir) { console.log("[denoiseStudy] --cache needs a directory"); process.exit(2); }
+        const git = (...a) => execFileSync("git", a, { cwd: ENG, encoding: "utf8", maxBuffer: 1 << 28 });
+        const cache = dir ? openCache(path.resolve(dir), { results: ROUND_FRAMEGEN_HOLES.results, commit: git("rev-parse", "HEAD").trim(),
+                                                         diff: hashArrays([git("diff", "HEAD", "--", "render", "brain", "physics", "mesh", "fx/fsr", "tools/denoiseStudy.mjs")]) }) : null;
+        if (cache) console.log(`[denoiseStudy] cache ${cache.dir}`);
+        const out = runFrameGenStudy({ splits: ROUND_FRAMEGEN_HOLES.splits, image: ROUND_FRAMEGEN_HOLES.image, arrangement: ROUND_FRAMEGEN_HOLES.arrangement, test: ROUND_FRAMEGEN_HOLES.test, c2Prior: ROUND_FRAMEGEN_HOLES.c2Prior, c1Min: ROUND_FRAMEGEN_HOLES.c1Min,
+                                              net: decodeNet(shipped.net), harvest: true, cache, log: (m) => console.log("[denoiseStudy] " + m) });
+        out.shipped = { file: SHIPPED_NET, sha256: crypto.createHash("sha256").update(bytes).digest("hex"), source: shipped.source };
+        out.commit = git("rev-parse", "--short=8", "HEAD").trim();
+        if (cache) out.cache = { hits: cache.hits, misses: cache.misses };
+        fs.writeFileSync(file, JSON.stringify(out, (k, v) => (v instanceof Float64Array ? Array.from(v) : v), 1) + "\n");
+        console.log(`[denoiseStudy] wrote ${ROUND_FRAMEGEN_HOLES.results}`);
+    } else if (args.includes("--harvest-upscale-train")) {
+        // FSR4, round 65 (section 148): U trained on three seeds over the training split, the candidate chosen on the validation split,
+        // and C2's U on shuffled targets -- written with the shipped denoiser's sha-256 and the commit, before any test scene exists
+        const LS = await import("../render/learnedUpscaleStudy.mjs"), { encodeNet: enc } = await import("../render/denoiseDevice.mjs");
+        // section 155: --round 67 runs round 67's (512-sample targets); round 65's otherwise
+        const ri = args.indexOf("--round"), RD = LS.upscaleRound(ri >= 0 ? +args[ri + 1] : null);
+        const file = path.join(ENG, RD.net);
+        if (fs.existsSync(file)) { console.log(`[denoiseStudy] ${RD.net} exists -- a harvest's results are never overwritten`); process.exit(2); }
+        const bytes = fs.readFileSync(path.join(ENG, SHIPPED_NET)), shipped = JSON.parse(bytes.toString("utf8"));
+        const git = (...a) => execFileSync("git", a, { cwd: ENG, encoding: "utf8", maxBuffer: 1 << 28 });
+        // section 157: the commit this harvest STARTED at, which is the code it loaded -- not the HEAD when it finished
+        const startCommit = git("rev-parse", "--short=8", "HEAD").trim(), cache = upscaleCache(args, git, RD.net);
+        const r = LS.runUpscaleTraining({ splits: RD.splits, sppRef: RD.sppRef, net: decodeNet(shipped.net), harvest: true, variant: RD.variant, cache, log: (m) => console.log("[denoiseStudy] " + m) });
+        const out = { candidate: r.candidate, runs: r.runs.map((x) => ({ seed: x.seed, valMean: x.valMean, val: x.val, losses: x.losses, net: enc(x.net) })),
+                      c2: { seed: r.c2.seed, shuffle: r.c2.shuffle, losses: r.c2.losses, net: enc(r.c2.net) }, config: r.config, ms: r.ms,
+                      shipped: { file: SHIPPED_NET, sha256: crypto.createHash("sha256").update(bytes).digest("hex") }, commit: startCommit,
+                      round: RD.round, ...(cache ? { cache: { hits: cache.hits, misses: cache.misses } } : {}) };
+        fs.writeFileSync(file, JSON.stringify(out, (k, v) => (v instanceof Float64Array ? Array.from(v) : v), 1) + "\n");
+        console.log(`[denoiseStudy] wrote ${RD.net}`);
+    } else if (args.includes("--harvest-upscale-test")) {
+        // FSR4, round 65 (section 148): the 24 test scenes, the candidate U and C2's U read from the committed training file
+        const LS = await import("../render/learnedUpscaleStudy.mjs");
+        const ri = args.indexOf("--round"), RD = LS.upscaleRound(ri >= 0 ? +args[ri + 1] : null);
+        const file = path.join(ENG, RD.results);
+        if (fs.existsSync(file)) { console.log(`[denoiseStudy] ${RD.results} exists -- a harvest's results are never overwritten`); process.exit(2); }
+        const tr = JSON.parse(fs.readFileSync(path.join(ENG, RD.net), "utf8")), cand = tr.runs.find((x) => x.seed === tr.candidate);
+        const bytes = fs.readFileSync(path.join(ENG, SHIPPED_NET)), shipped = JSON.parse(bytes.toString("utf8"));
+        const git = (...a) => execFileSync("git", a, { cwd: ENG, encoding: "utf8", maxBuffer: 1 << 28 });
+        const startCommit = git("rev-parse", "--short=8", "HEAD").trim(), cache = upscaleCache(args, git, RD.results);
+        // section 157: round 68's H2 is U_E against round 67's candidate U, read from its committed training file
+        const pr = RD.prior ? JSON.parse(fs.readFileSync(path.join(ENG, RD.prior), "utf8")) : null, Uprior = pr ? decodeNet(pr.runs.find((x) => x.seed === pr.candidate).net) : null;
+        const out = LS.runUpscaleTest({ splits: RD.splits, sppRef: RD.sppRefTest ?? RD.sppRef, net: decodeNet(shipped.net), U: decodeNet(cand.net), Uc2: decodeNet(tr.c2.net), Uprior, round: RD.round, harvest: true, cache, log: (m) => console.log("[denoiseStudy] " + m) });
+        out.trained = { file: RD.net, candidate: tr.candidate, commit: tr.commit };
+        if (pr) out.prior = { file: RD.prior, candidate: pr.candidate, commit: pr.commit };
+        out.round = RD.round;
+        out.shipped = { file: SHIPPED_NET, sha256: crypto.createHash("sha256").update(bytes).digest("hex") };
+        out.commit = startCommit;
+        if (cache) out.cache = { hits: cache.hits, misses: cache.misses };
+        fs.writeFileSync(file, JSON.stringify(out, (k, v) => (v instanceof Float64Array ? Array.from(v) : v), 1) + "\n");
+        console.log(`[denoiseStudy] wrote ${RD.results}`);
     } else if (round) {
         const file = path.join(ENG, round.results);
         if (fs.existsSync(file)) { console.log(`[denoiseStudy] ${round.results} exists -- a harvest's results are never overwritten`); process.exit(2); }
@@ -166,7 +360,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
         // section 33: the verdict is in the file, which is committed before it is read -- the log says only that it was written
         console.log(`[denoiseStudy] wrote ${round.results}`);
     } else {
-        console.log("usage: node tools/denoiseStudy.mjs --mini | --harvest-temporalup | --harvest-emitter | --harvest-halfres | --harvest-fsr1 | --harvest-mesh | --secondary-r11 | --harvest-r11 | --harvest-r10 | --harvest-r9 | --harvest-r8 | --harvest-r7 | --harvest-r6 | --harvest-r5 | --harvest-r4 | --harvest-r3 | --harvest-r2 | --harvest-r1 [--cache <dir>] [--workers <n>]   (a harvest renders the pre-registered dataset; see render/learned-denoiser-preregistration.md)");
+        console.log("usage: node tools/denoiseStudy.mjs --mini | --harvest-temporalup | --harvest-emitter | --harvest-halfres | --harvest-fsr1 | --harvest-mesh | --harvest-mesh-c | --harvest-page | --harvest-framegen | --harvest-framegen-lf | --harvest-framegen-display | --harvest-framegen-large | --harvest-framegen-holes | --harvest-upscale-train | --harvest-upscale-test | --harvest-r47 | --secondary-r11 | --harvest-r11 | --harvest-r10 | --harvest-r9 | --harvest-r8 | --harvest-r7 | --harvest-r6 | --harvest-r5 | --harvest-r4 | --harvest-r3 | --harvest-r2 | --harvest-r1 [--cache <dir>] [--workers <n>]   (a harvest renders the pre-registered dataset; see render/learned-denoiser-preregistration.md)");
         process.exit(2);
     }
 }

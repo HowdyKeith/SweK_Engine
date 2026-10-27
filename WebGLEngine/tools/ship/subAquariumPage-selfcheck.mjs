@@ -115,7 +115,7 @@ console.log("\n3. THE LIVE PAGE");
             await pg.selectOption("#speedSel", "10"); await pg.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));   // two frames at 10x, not a sleep
             ok("the speed selector accepts 10x and the page keeps running without error", (await pg.$eval("#speedSel", (e) => e.value)) === "10" && errs.length === 0);
             const hulls = await pg.$$eval("#hullSel option", (o) => o.map((x) => [x.value, x.textContent]));
-            ok("!! the hull picker lists all twelve hulls of physics/mechanics/subHulls.mjs, each with its label as TEXT, and starts on the nominal hull", hulls.length === 12 && hulls.every(([v, t]) => v && t.length > 3) && (await pg.$eval("#hullSel", (e) => e.value)) === "nominal" && hulls.some(([v]) => v === "munk5"));
+            ok("!! the hull picker lists all thirteen hulls of physics/mechanics/subHulls.mjs, each with its label as TEXT, and starts on the nominal hull", hulls.length === 13 && hulls.every(([v, t]) => v && t.length > 3) && (await pg.$eval("#hullSel", (e) => e.value)) === "nominal" && hulls.some(([v]) => v === "munk5"));
             await pg.selectOption("#hullSel", "munk5"); await pg.waitForFunction(() => /hull: Munk x5/.test(document.getElementById("msg").textContent), null, { timeout: 5000 }).catch(() => {});
             await pg.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
             const afterHull = await pg.$$eval("#list .row .sub", (e) => e.map((x) => x.textContent));

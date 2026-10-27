@@ -14,8 +14,10 @@
     opts = opts || {};
     const host = opts.host || location.hostname || "localhost";
     const port = opts.port || 8787;
-    this.httpBase = `http://${host}:${port}`;
-    this.wsUrl = `ws://${host}:${port}`;
+    // https page (Public tunnel): same origin over https/wss -- there is no :port on that host (net/bridgeBase.mjs, same rule)
+    const tls = location.protocol === "https:" && !opts.host && !opts.port;
+    this.httpBase = tls ? location.origin : `http://${host}:${port}`;
+    this.wsUrl = tls ? "wss://" + location.host : `ws://${host}:${port}`;
     this.pollMs = opts.pollMs || 500;
     this.onState = null;
     this.onStatus = null;          // (connected:boolean, via:"ws"|"poll") => {}

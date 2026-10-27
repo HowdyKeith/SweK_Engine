@@ -1,6 +1,6 @@
 // WebGLEngine/tools/fishCaveExport-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node tools/fishCaveExport-selfcheck.mjs      (~15 s; needs `python3`)
+// Run: node tools/fishCaveExport-selfcheck.mjs      (~75 s; needs `python3`)
 //
 // THE GATE OF tools/fishCaveExport.py, THE SCRIPT KEITH RUNS ON HIS OWN MACHINE WITH HIS OWN TOKEN. The sandbox this tree is built in cannot reach the Fish1 CAVE server (global.brain-wire-test.org answers 403 to its proxy), so the script
 // was written against caveclient's documented API and has NEVER TALKED TO THE REAL SERVER. This gate holds everything that can be held without it, and says in row 12 what it cannot:

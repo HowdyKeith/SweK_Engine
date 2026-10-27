@@ -266,4 +266,7 @@ console.log("  NOT CHECKED  that the verdict rule is the right rule: it is the o
 
 finished = true;
 console.log(fails ? `\ntrainSubState-selfcheck: ${fails} FAILED` : "\ntrainSubState-selfcheck: all checks pass");
+// v4898 -- MAX_INDEX and SEARCH_BASE by name (definitionGates counts an export no gate names): the last index of a family, and the seed the searches start from (rung 4a's own, not rung 3's).
+ok("MAX_INDEX (19) is the last index parseSpecs takes and one past it is refused; SEARCH_BASE (31000) starts the searches: the first search seed of a spec is SEARCH_BASE + 10 x its ordinal (cx 0, er:0 1, er:2 3)",
+    L.MAX_INDEX === 19 && L.SEARCH_BASE === 31000 && L.parseSpecs("er:" + L.MAX_INDEX).length === 1 && !!throws(() => L.parseSpecs("er:" + (L.MAX_INDEX + 1))) && L.ordinalOf(L.parseSpecs("cx")[0]) === 0 && L.ordinalOf(L.parseSpecs("er:0")[0]) === 1 && L.seedBaseOf(L.parseSpecs("er:2")[0]) === L.SEARCH_BASE + 30);
 process.exit(fails ? 1 : 0);

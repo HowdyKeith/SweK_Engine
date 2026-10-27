@@ -1,6 +1,6 @@
 // WebGLEngine/tools/subNavigator-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node tools/subNavigator-selfcheck.mjs      (~60 s)
+// Run: node tools/subNavigator-selfcheck.mjs      (~3 s)
 //
 // THE GATE OF tools/subNavigator.mjs (the dead-reckoning navigator) AND OF THE REFERENCE ARM'S MEASUREMENT, tools/ship/subNavigatorReference.mjs with its command file tools/ship/subNavigatorReferenceCmd.mjs: the arm registered in brain/SUBMARINE_WIP.md before it was built.
 // Worked by hand:
@@ -21,6 +21,7 @@
 //   FIRST RUN, 9 FINDINGS: N25 (EQUIVALENT: turnWorld takes the angle as it comes and a rotation by 2 pi more is the same rotation, so the wrap to a half turn was DEAD CODE -- CUT, and the mutant dropped); N29 (the flag not passed on killed a row with a crash instead of failing it: the row now reads it safely);
 //   R11 and R12 (an audit flown on the audit set: the measurement's own rows only checked that the numbers were finite -> each audit is checked against the plain evaluation on its own set, and the three are different numbers); R15, R16 and R17 (the mechanism of the autopilot / navigator / on the reserve -> checked against a direct computation, and the pieces differ);
 //   R28 (a smoke record's line: the real record's was the only one checked, and a ternary that is always false for it is no different -> a smoke row); R41 (the audit range the command asked for: the stand-in only checked the keys it was handed -> the very sets are compared with setsOf at that range and not at the default). After the fixes all 28 + 7 re-run mutants are red.
+//   v4901, TWO MORE of tools/subNavigator.mjs (aux.dt): aux.dt ignored -> 1 red; aux.dt taken whenever it is truthy (a negative one integrates backwards) -> 1 red. A third, the `aux &&` guard in front of it, went 0 red and was CUT: a dark tick always has an aux (valid is read from it), so the guard could never be false.
 //   NOT SABOTAGED: the wording of the READ AS lines beyond their first clause, the order of the progress lines, and the precision of the printed numbers past what the rows read.
 //
 "use strict";
@@ -91,6 +92,7 @@ await guarded("section 2", async () => {
     ok("a NEW target object is a new dive: its first dark tick has no valid tick behind it, so it is handed what it shows (0.9) and not the old dive's estimate (" + drifted.toFixed(4) + " for the old dive)", near(drifted, 0.2 + 1 / 30, 1e-9) && near(seen[seen.length - 1].h, 0.9, 1e-9));
     const bare = []; const w5 = N.navigator((st, t, c, aux) => { bare.push(aux); return {}; }); w5(mk({ heading: 0.3 }), tgt, cur); w5(mk({ heading: 0.3, w: [0, 0, -1] }), tgt, cur);
     ok("with no 4th argument the compass is read as valid (a pilot not told is not told it is dark): the second call is a pass-through at 0.3", bare.length === 2 && bare[0] === null && bare[1] === null);
+    ok("!! v4901: a call that says how long ITS tick was (aux.dt = 0.05) advances the estimate by that and not by the constructor's tick: a constant rate of 0.2 gives 0.01 on that tick, 0.02 on a tick of 0.1, and a bad aux.dt (0, negative, NaN) falls back to the tick of the constructor", (() => { const step = (adt) => { const o = []; const w = N.navigator((st) => { o.push(S.attitude(st).heading); return {}; }, { dt: 1 / 30 }), tg = {}; w(mk({ heading: 0, w: [0, 0, -0.2] }), tg, cur, { compassValid: 1 }); w(mk({ heading: 0, w: [0, 0, -0.2] }), tg, cur, { compassValid: 0, dt: adt }); return o[1]; }; return near(step(0.05), 0.01, 1e-9) && near(step(0.1), 0.02, 1e-9) && near(step(0), 0.2 / 30, 1e-9) && near(step(-1), 0.2 / 30, 1e-9) && near(step(NaN), 0.2 / 30, 1e-9) && near(step(undefined), 0.2 / 30, 1e-9); })());
     ok("a custom tick: with dt = 0.1 a constant rate of 0.2 advances the estimate by 0.02 a tick", (() => { const o = []; const w6 = N.navigator((st) => { o.push(S.attitude(st).heading); return {}; }, { dt: 0.1 }); const tg = {}; w6(mk({ heading: 0, w: [0, 0, -0.2] }), tg, cur, { compassValid: 1 }); w6(mk({ heading: 0, w: [0, 0, -0.2] }), tg, cur, { compassValid: 0 }); return near(o[1], 0.02, 1e-9); })());
 });
 

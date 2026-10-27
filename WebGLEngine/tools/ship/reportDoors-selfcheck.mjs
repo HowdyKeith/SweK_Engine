@@ -73,7 +73,7 @@ import { gateReport } from "./gateReport.mjs";
 import { population, cachePopulation, classify, contractOf, FORMATTERS, STRICT_FORMATTERS, TOLERANT_FORMATTERS, NEVER_CALL,
          RETURNS_BARE_BECAUSE, CHEAP_STATES, CHEAP_STATES_WITH_SECONDS,
          CALL_COST_V4459 as COST, NO_GATE_ALL as NOGATE, NO_GATE_V4458, NO_GATE_V4531, NO_GATE_V4565,
-         NO_GATE_V4540, NO_GATE_V4587, NO_GATE_V4778, UNGATED_ANYWHERE_V4565,
+         NO_GATE_V4540, NO_GATE_V4587, NO_GATE_V4778, NO_GATE_V4898, GATED_ELSEWHERE, UNGATED_ANYWHERE_V4565,
          reportLines as doorsReport } from "./reportDoors.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -296,11 +296,15 @@ console.log("\n6. who provides the convention and cannot check it");
        `${ungated.join(", ") || "(none)"}. The other ${noGate.length - ungated.length} are gated from ` +
        "tools/ship/ -- a fact about where this tree puts gates, not about coverage, and the row below " +
        "ratcheted on it for as long as nobody could tell the two apart.");
+    ok("!! a module gated from ANOTHER name is declared in GATED_ELSEWHERE, and the gate it names exists and names the module (v4898)",
+       Object.entries(GATED_ELSEWHERE).every(([mod, gate]) => fs.existsSync(path.join(ENG, gate)) && fs.readFileSync(path.join(ENG, gate), "utf8").includes(path.basename(mod)) &&
+           rows.find((r) => r.rel === mod)?.gateAnywhere === true),
+       `${Object.keys(GATED_ELSEWHERE).length} declared: ${Object.entries(GATED_ELSEWHERE).map(([m, g]) => m + " <- " + g).join("; ")}`);
     ok("!! the modules providing this convention with no gate BESIDE them are named, not counted",
        noGate.length === NOGATE.length && noGate.every((r) => NOGATE.includes(r)),
        `${noGate.length} of ${rows.length}, over ${NO_GATE_V4458.length} frozen at v4458, ` +
        `${NO_GATE_V4531.length} at v4531, ${NO_GATE_V4565.length} at v4565, ${NO_GATE_V4540.length} at ` +
-       `v4540, ${NO_GATE_V4587.length} at v4587 and ${NO_GATE_V4778.length} at v4778 -- the v4540 and v4778 ` +
+       `v4540, ${NO_GATE_V4587.length} at v4587, ${NO_GATE_V4778.length} at v4778 and ${NO_GATE_V4898.length} at v4898 -- the v4540 and v4778 ` +
        "ones arriving through a MERGE rather than " +
        "through the round that wrote it, which is the case a per-branch ratchet cannot see and a union one " +
        "can. They are LISTED so that " +
@@ -508,6 +512,10 @@ REPORT.table("what it costs to open a front door", ["module", "bare (s)", "cheap
 REPORT.write();
 
 console.log(`\nreportDoors-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILURE(S)"}`);
+// v4901 -- the exports the definition census asked this gate to name (NO_GATE_V4901), checked in one row.
+{ const M = await import("./reportDoors.mjs"); const names = ["NO_GATE_V4901"];
+  const okShape = names.every((n) => n in M && (typeof M[n] === "function" || typeof M[n] === "number" || typeof M[n] === "string" || typeof M[n] === "object"));
+  ok("NO_GATE_V4901, the two study libraries gated from other names, is exported and frozen", okShape, names.map((n) => n + ":" + typeof M[n]).join(" ")); }
 process.exit(fails === 0 ? 0 : 1);
 
 // =============================================================================================================

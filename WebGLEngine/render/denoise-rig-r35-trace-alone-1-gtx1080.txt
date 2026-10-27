@@ -1,0 +1,149 @@
+0.516 s  pid 22108  native: the ladder starts, sets r12,r15,r18t,r18u,r27w
+0.517 s  pid 22108  native 64x64: requestAdapter
+0.518 s  pid 22108  native 64x64: requestDevice for r12,r15,r18t,r18u,r27w
+0.615 s  pid 22108  native 64x64: build r12
+0.937 s  pid 22108  native 64x64: build r15
+2.870 s  pid 22108  native 64x64: build r18t
+4.913 s  pid 22108  native 64x64: build r18u
+8.335 s  pid 22108  native 64x64: build r27w
+9.626 s  pid 22108  native 64x64: round 0 time r12
+9.693 s  pid 22108  native 64x64: round 0 time r15
+9.715 s  pid 22108  native 64x64: round 0 time r18t
+9.727 s  pid 22108  native 64x64: round 0 time r18u
+9.739 s  pid 22108  native 64x64: round 0 time r27w
+9.751 s  pid 22108  native 64x64: round 1 time r27w
+9.764 s  pid 22108  native 64x64: round 1 time r18u
+9.776 s  pid 22108  native 64x64: round 1 time r18t
+9.786 s  pid 22108  native 64x64: round 1 time r15
+9.797 s  pid 22108  native 64x64: round 1 time r12
+9.855 s  pid 22108  native 64x64: round 2 time r12
+9.913 s  pid 22108  native 64x64: round 2 time r15
+9.925 s  pid 22108  native 64x64: round 2 time r18t
+9.936 s  pid 22108  native 64x64: round 2 time r18u
+9.947 s  pid 22108  native 64x64: round 2 time r27w
+9.959 s  pid 22108  native 64x64: output check r12
+9.966 s  pid 22108  native 64x64: output check r15
+9.968 s  pid 22108  native 64x64: output check r18t
+9.970 s  pid 22108  native 64x64: output check r18u
+9.973 s  pid 22108  native 64x64: output check r27w
+9.975 s  pid 22108  native 64x64: destroy the denoisers
+9.976 s  pid 22108  native 64x64: destroy the device
+9.987 s  pid 22108  native 128x128: requestAdapter
+9.988 s  pid 22108  native 128x128: requestDevice for r12,r15,r18t,r18u,r27w
+10.035 s  pid 22108  native 128x128: build r12
+10.131 s  pid 22108  native 128x128: build r15
+11.439 s  pid 22108  native 128x128: build r18t
+12.909 s  pid 22108  native 128x128: build r18u
+16.358 s  pid 22108  native 128x128: build r27w
+17.619 s  pid 22108  native 128x128: round 0 time r12
+17.732 s  pid 22108  native 128x128: round 0 time r15
+17.748 s  pid 22108  native 128x128: round 0 time r18t
+17.774 s  pid 22108  native 128x128: round 0 time r18u
+17.796 s  pid 22108  native 128x128: round 0 time r27w
+17.825 s  pid 22108  native 128x128: round 1 time r27w
+17.868 s  pid 22108  native 128x128: round 1 time r18u
+17.887 s  pid 22108  native 128x128: round 1 time r18t
+17.902 s  pid 22108  native 128x128: round 1 time r15
+17.918 s  pid 22108  native 128x128: round 1 time r12
+18.025 s  pid 22108  native 128x128: round 2 time r12
+18.134 s  pid 22108  native 128x128: round 2 time r15
+18.149 s  pid 22108  native 128x128: round 2 time r18t
+18.164 s  pid 22108  native 128x128: round 2 time r18u
+18.183 s  pid 22108  native 128x128: round 2 time r27w
+18.269 s  pid 22108  native 128x128: destroy the denoisers
+18.270 s  pid 22108  native 128x128: destroy the device
+18.284 s  pid 22108  native 256x256: requestAdapter
+18.285 s  pid 22108  native 256x256: requestDevice for r12,r15,r18t,r18u,r27w
+18.335 s  pid 22108  native 256x256: build r12
+18.434 s  pid 22108  native 256x256: build r15
+19.768 s  pid 22108  native 256x256: build r18t
+21.296 s  pid 22108  native 256x256: build r18u
+24.623 s  pid 22108  native 256x256: build r27w
+25.853 s  pid 22108  native 256x256: round 0 time r12
+26.465 s  pid 22108  native 256x256: round 0 time r15
+26.502 s  pid 22108  native 256x256: round 0 time r18t
+26.537 s  pid 22108  native 256x256: round 0 time r18u
+26.589 s  pid 22108  native 256x256: round 0 time r27w
+26.683 s  pid 22108  native 256x256: round 1 time r27w
+26.828 s  pid 22108  native 256x256: round 1 time r18u
+26.892 s  pid 22108  native 256x256: round 1 time r18t
+26.929 s  pid 22108  native 256x256: round 1 time r15
+26.966 s  pid 22108  native 256x256: round 1 time r12
+27.582 s  pid 22108  native 256x256: round 2 time r12
+28.176 s  pid 22108  native 256x256: round 2 time r15
+28.213 s  pid 22108  native 256x256: round 2 time r18t
+28.248 s  pid 22108  native 256x256: round 2 time r18u
+28.338 s  pid 22108  native 256x256: round 2 time r27w
+28.434 s  pid 22108  native 256x256: destroy the denoisers
+28.435 s  pid 22108  native 256x256: destroy the device
+28.451 s  pid 22108  native 512x512: requestAdapter
+28.452 s  pid 22108  native 512x512: requestDevice for r12,r15,r18t,r18u,r27w
+28.521 s  pid 22108  native 512x512: build r12
+28.626 s  pid 22108  native 512x512: build r15
+29.946 s  pid 22108  native 512x512: build r18t
+31.416 s  pid 22108  native 512x512: build r18u
+34.776 s  pid 22108  native 512x512: build r27w
+36.044 s  pid 22108  native 512x512: round 0 time r12
+37.025 s  pid 22108  native 512x512: round 0 time r15
+37.179 s  pid 22108  native 512x512: round 0 time r18t
+37.302 s  pid 22108  native 512x512: round 0 time r18u
+37.495 s  pid 22108  native 512x512: round 0 time r27w
+37.864 s  pid 22108  native 512x512: round 1 time r27w
+38.244 s  pid 22108  native 512x512: round 1 time r18u
+38.451 s  pid 22108  native 512x512: round 1 time r18t
+38.574 s  pid 22108  native 512x512: round 1 time r15
+38.723 s  pid 22108  native 512x512: round 1 time r12
+39.710 s  pid 22108  native 512x512: round 2 time r12
+40.661 s  pid 22108  native 512x512: round 2 time r15
+40.822 s  pid 22108  native 512x512: round 2 time r18t
+40.945 s  pid 22108  native 512x512: round 2 time r18u
+41.141 s  pid 22108  native 512x512: round 2 time r27w
+41.518 s  pid 22108  native 512x512: destroy the denoisers
+41.519 s  pid 22108  native 512x512: destroy the device
+41.540 s  pid 22108  native 1024x1024: requestAdapter
+41.540 s  pid 22108  native 1024x1024: requestDevice for r12,r15,r18t,r18u,r27w
+41.699 s  pid 22108  native 1024x1024: build r12
+41.871 s  pid 22108  native 1024x1024: build r15
+43.202 s  pid 22108  native 1024x1024: build r18t
+44.729 s  pid 22108  native 1024x1024: build r18u
+48.082 s  pid 22108  native 1024x1024: build r27w
+49.405 s  pid 22108  native 1024x1024: round 0 time r12
+51.582 s  pid 22108  native 1024x1024: round 0 time r15
+52.148 s  pid 22108  native 1024x1024: round 0 time r18t
+52.650 s  pid 22108  native 1024x1024: round 0 time r18u
+53.348 s  pid 22108  native 1024x1024: round 0 time r27w
+54.086 s  pid 22108  native 1024x1024: round 1 time r27w
+54.903 s  pid 22108  native 1024x1024: round 1 time r18u
+55.559 s  pid 22108  native 1024x1024: round 1 time r18t
+56.038 s  pid 22108  native 1024x1024: round 1 time r15
+56.541 s  pid 22108  native 1024x1024: round 1 time r12
+58.524 s  pid 22108  native 1024x1024: round 2 time r12
+60.528 s  pid 22108  native 1024x1024: round 2 time r15
+61.032 s  pid 22108  native 1024x1024: round 2 time r18t
+61.503 s  pid 22108  native 1024x1024: round 2 time r18u
+62.174 s  pid 22108  native 1024x1024: round 2 time r27w
+62.997 s  pid 22108  native 1024x1024: destroy the denoisers
+62.997 s  pid 22108  native 1024x1024: destroy the device
+63.042 s  pid 22108  native 1920x1080: requestAdapter
+63.043 s  pid 22108  native 1920x1080: requestDevice for r15,r18t,r18u,r27w
+63.416 s  pid 22108  native 1920x1080: build r15
+64.781 s  pid 22108  native 1920x1080: build r18t
+66.324 s  pid 22108  native 1920x1080: build r18u
+69.673 s  pid 22108  native 1920x1080: build r27w
+71.011 s  pid 22108  native 1920x1080: round 0 time r15
+71.883 s  pid 22108  native 1920x1080: round 0 time r18t
+72.633 s  pid 22108  native 1920x1080: round 0 time r18u
+73.522 s  pid 22108  native 1920x1080: round 0 time r27w
+74.431 s  pid 22108  native 1920x1080: round 1 time r27w
+75.571 s  pid 22108  native 1920x1080: round 1 time r18u
+76.457 s  pid 22108  native 1920x1080: round 1 time r18t
+77.235 s  pid 22108  native 1920x1080: round 1 time r15
+77.988 s  pid 22108  native 1920x1080: round 2 time r15
+78.730 s  pid 22108  native 1920x1080: round 2 time r18t
+79.468 s  pid 22108  native 1920x1080: round 2 time r18u
+80.242 s  pid 22108  native 1920x1080: round 2 time r27w
+81.410 s  pid 22108  native 1920x1080: destroy the denoisers
+81.411 s  pid 22108  native 1920x1080: destroy the device
+81.467 s  pid 22108  native ladder done
+81.468 s  pid 22108  native: the ladder returned
+173.388 s  pid 22108  the gate ends, 0 fail(s)

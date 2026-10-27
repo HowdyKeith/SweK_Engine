@@ -1,6 +1,6 @@
 {
  "gate": "brain/conv2d-selfcheck.mjs",
- "at": "2026-10-16",
+ "at": "2026-10-22",
  "tables": [
   {
    "title": "the manifest's kernels on the device: each cell the f32 twin's (plain), the fused mirror's, or unexplained",
@@ -142,6 +142,106 @@
      6,
      7,
      105,
+     0,
+     0
+    ],
+    [
+     "conv2d.conv2dSubWgsl rows 2 g4 8",
+     19,
+     13,
+     32,
+     32,
+     7904,
+     0,
+     0
+    ],
+    [
+     "conv2d.conv2dSubWgsl rows 1 g4 4",
+     19,
+     13,
+     32,
+     32,
+     7904,
+     0,
+     0
+    ],
+    [
+     "conv2d.conv2dSubWgsl rows 2 g4 2",
+     11,
+     37,
+     16,
+     11,
+     4477,
+     0,
+     0
+    ],
+    [
+     "conv2d.conv2dSubWgsl rows 4 g4 2",
+     11,
+     37,
+     16,
+     11,
+     4477,
+     0,
+     0
+    ],
+    [
+     "conv2d.conv2dSubWgsl rows 2 g4 8",
+     9,
+     17,
+     32,
+     81,
+     12393,
+     0,
+     0
+    ],
+    [
+     "conv2d.conv2dSubWgsl rows 2 g4 2",
+     5,
+     3,
+     8,
+     6,
+     90,
+     0,
+     0
+    ],
+    [
+     "conv2d.conv2dFastAltWgsl f16emu",
+     19,
+     13,
+     32,
+     32,
+     7904,
+     0,
+     0
+    ],
+    [
+     "conv2d.conv2dFastAltWgsl f16emu",
+     21,
+     19,
+     10,
+     32,
+     12768,
+     0,
+     0
+    ],
+    [
+     "conv2d.conv2dFastAltWgsl f16emu",
+     11,
+     7,
+     19,
+     12,
+     924,
+     0,
+     0
+    ],
+    [
+     "conv2d.conv2dFastAltWgsl f16emu",
+     9,
+     17,
+     32,
+     80,
+     12240,
      0,
      0
     ]

@@ -71,3 +71,7 @@ counted. Sides: 12 neurons unknown, 75 left, 12 right -- **46 of the 50 SPNs are
 **What it is, said plainly**: real, human-traced wiring of a hindbrain circuit that the paper links to turning and forward swimming. It is a curated and
 partial tracing (the tuples are what a person marked, 1,254 of 3,013 end on a cell nobody identified), so its weights are tuple counts and not synapse
 sizes, and the closure is one rule with one knob. No claim is made that it can steer a body: that is what `brain/SUBMARINE_WIP.md` tests.
+
+## What this record could not establish
+
+NOT ESTABLISHED: any licence. The release states a data policy that asks for citation and no licence text; the terms have not been confirmed with the Fish1 team (the register row says so). NOT ESTABLISHED: that either circuit steers a body. RECORDED AS: the bucket, the two package names and their sha256 values, and the extraction rules above.

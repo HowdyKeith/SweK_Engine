@@ -384,6 +384,13 @@ export const RECORD_HANDOVERS = Object.freeze([
         evidence: "boxId() reads linux-x64-4c-16gb-142c0d at v4880; the shared record still names 420793, captured by the v4877 round. " +
                   "The round's sweeps wrote tools/ship/sweep-timings.linux-x64-4c-16gb-142c0d.json and refused the shared record; " +
                   "that local file and its ledger are deleted at the handover, as at v4818, v4838 and v4850. 420793 held the record from v4877 to v4880." }),
+    // v4897 -- AND TO 420793, BECAUSE THE SANDBOX CAME BACK ON THE 2.80GHz HOST AND THE ROUND'S GATES HAD NOWHERE TO BE RECORDED. Nine new gates (the beauty-pass round's eight and the flight page's camera gate) were in no shared record:
+    // the first verdict read budgetEvidence at nine new against its handful of eight, declaredCost at one header against a shared reading, and the sweep's rotation and verdict wrote only sweep-timings.local.json. Keith chose the handover.
+    Object.freeze({ at: "v4897", from: "linux-x64-4c-16gb-142c0d", to: "linux-x64-4c-16gb-420793",
+        decidedBy: "Keith",
+        evidence: "Keith's answer \"This box, 420793\" to the record-owner question on 2026-10-25. boxId() reads linux-x64-4c-16gb-420793 at v4897; the shared record still named 142c0d, captured 2026-10-23T13:04Z. " +
+                  "The round's rotation (34 readings) and first verdict's sweep went to sweep-timings.local.json and refused the shared record; that local file and its ledger are deleted at the handover, as at v4818, v4838, v4850 and v4877. " +
+                  "142c0d held the record from v4880 to v4897." }),
 ]);
 
 /** The box that may write a record whose `host` reads `host`, after following every handover. */
@@ -433,6 +440,31 @@ export function ownTimings(shared, { file = DEFAULTS.timingsFile, local = LOCAL_
     if (canonicalId(mine.host) === id && Object.keys(mine.timings || {}).length > 0)
         return { rec: mine, file: local, own: true, why: `${file} belongs to ${owner}; choosing by this box's own ${local}` };
     return { rec: shared, file, own: false, why: `${file} belongs to ${owner} and this box (${id}) has no record of its own yet; choosing by ${owner}'s` };
+}
+
+/**
+ * *** v4899 -- A GATE THIS BOX HAS NEVER TIMED, BUT ANOTHER BOX HAS TIMED OVER THE BUDGET, IS NOT "UNMEASURED". *** ownTimings chooses by THIS box's own record, and a gate that record has no row for is run as a new gate
+ * (selectGates: `ms == null` -> unmeasured, run). That is right for a gate nobody has timed and WRONG for one the record's owner timed at 18 to 800 seconds: at v4898 the merged fish, submarine and jet branches brought ten
+ * such gates, the rig's own record (made before the merge) had no row for them, and the rig's sweep ran all ten under the 20 s cap and killed them alone -- "nothing timed out alone under the cap" -- on a tree whose every
+ * gate finishes green on the box that timed them (brain/jetFight 23 s, pilotDroneMlp 18 s, fishCaveExport 75 s, trainDogfightLeague 802 s). v4850 and v4877 met the same shape and answered it by handing the shared
+ * record to whichever box needed it. This answers it at the selection: a gate missing from `own` that `shared` has a reading ABOVE the budget for is moved from run/unmeasured to skipped and NAMED. The foreign reading is
+ * evidence a gate is EXPENSIVE, never that it is cheap -- a foreign reading under the budget carries nothing, and the gate runs as new as before -- and it is never written into this box's record (two machines'
+ * runtimes in one set of fields is not a record). Pure; returns the gates carried over with the reading that carried them, and edits `sel` in place.
+ */
+export function carryOverForeign(sel, own, shared, budgetMs) {
+    const carried = [];
+    if (!own || !shared || own.rec === shared) return carried;             // this box owns the shared record, or has none of its own: nothing is foreign
+    const mine = (own.rec && own.rec.timings) || {}, theirs = shared.timings || {};
+    for (const g of [...sel.unmeasured]) {
+        const f = theirs[g];
+        if (mine[g] != null || typeof f !== "number" || !(f > budgetMs)) continue;
+        carried.push({ gate: g, ms: f });
+    }
+    if (carried.length) {
+        const drop = new Set(carried.map((c) => c.gate));
+        sel.run = sel.run.filter((g) => !drop.has(g)); sel.unmeasured = sel.unmeasured.filter((g) => !drop.has(g)); sel.skipped = sel.skipped.concat([...drop]);
+    }
+    return carried;
 }
 
 /**
@@ -926,6 +958,8 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = sw
     const inputRecord = readInputRecord(root);
     const sel = selectGates(all, prior.timings || {}, budgetMs,
         { crossings: prior.crossings || {}, inputRecord, skipUnchanged, scaleOf: scaleLookup(prior) });
+    const carriedOver = carryOverForeign(sel, own, shared, budgetMs);
+    if (carriedOver.length) log(`[sweep] ${carriedOver.length} gate(s) this box has never timed were timed OVER the ${budgetMs} ms budget by ${shared.host || "the record's owner"} and are not run here: ${carriedOver.map((c) => c.gate + " (" + c.ms + " ms)").join(", ")}`);
     const phase1 = new Map();
     let next = 0, done = 0;
     async function worker() {
@@ -1184,7 +1218,7 @@ export async function runQuickSweep({ budgetMs = DEFAULTS.budgetMs, workers = sw
     const out = {
         at: out0.at, budgetMs, workers, capMs, ms: Date.now() - t00,
         timingsHost, foreignTimings, box: boxId(), timingsFrom: own.file, timingsWhy: own.why,
-        enumerated: all.length, ran: sel.run.length, skippedOverBudget: sel.skipped.length, newGates: sel.unmeasured,
+        enumerated: all.length, ran: sel.run.length, skippedOverBudget: sel.skipped.length, newGates: sel.unmeasured, carriedOver,
         // v4566: what an incremental sweep WOULD have skipped. Reported on every run, acted on only under
         // skipUnchanged, so the number earns trust in public before it is allowed to change anything.
         unchangedInputs: (sel.unchanged || []).length, skippedUnchanged: skipUnchanged,

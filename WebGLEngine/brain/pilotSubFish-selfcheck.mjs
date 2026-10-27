@@ -1,6 +1,6 @@
 // WebGLEngine/brain/pilotSubFish-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node brain/pilotSubFish-selfcheck.mjs      (~25 s)
+// Run: node brain/pilotSubFish-selfcheck.mjs      (~5 s)
 //
 // THE SIBLING GATE OF brain/pilotSubFish.mjs AND brain/zebrafishTopology.mjs: the Fish1 core as the submarine's pilot, and the random control of its size. brain/pilotSubPolicy-selfcheck.mjs holds createSubPolicy() itself for the fly
 // and for a synthetic ring; this gate asks the same questions of THE FISH, with the circuit restated here from the vendored data and not from the module that was baked from it, so that a network that quietly used another circuit,

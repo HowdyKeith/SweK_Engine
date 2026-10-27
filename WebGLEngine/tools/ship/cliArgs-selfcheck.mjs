@@ -260,10 +260,10 @@ console.log("\nv4826. parseOrExit, the positional spec, and the fifteen tools");
     const L5 = { err: [], exit: [] }; parseOrExit("t", { values: { "--out": "path" } }, ["loose"], io(L5));
     ok2("a bare word under a spec that takes no files is refused, by name", L5.exit[0] === 2 && /unexpected argument "loose"/.test(L5.err[0]));
 
-    // v4896 -- takeTvPackages, takeTvPlan and takeTruncations (the export-free commands written this round) import the parser and are driven below.
+    // v4896 -- takeTvPackages, takeTvPlan, takeTruncations and takeSnowFrameTiming (the export-free commands written this round) import the parser and are driven below.
     // v4871 -- versionPreflight (--next, its version as a positional word) and shipVerdict (verify's options, read for the label) adopted
     // the parser. SABOTAGED: shipVerdict's parseOrExit line commented out -> this row RED (shipVerdict ran on past the option); restored.
-    const fs2 = (await import("node:fs")).default, NEWER = ["tools/ship/lockstepPeer.mjs", "tools/ship/lockstepRelay.mjs", "tools/ship/flakeProbe.mjs", "tools/ship/afterVerdict.mjs", "tools/ship/versionPreflight.mjs", "tools/ship/shipVerdict.mjs", "tools/ship/takeTvPackages.mjs", "tools/ship/takeTvPlan.mjs", "tools/ship/takeTruncations.mjs"], BETWEEN = ["tools/ship/boxTimings.mjs", "tools/ship/gateProfile.mjs", "tools/ship/realGpuRun.mjs", "tools/ship/rtPipelineDiag.mjs", "tools/ship/textureInProbe.mjs", "tools/ship/threePatch.mjs"];
+    const fs2 = (await import("node:fs")).default, NEWER = ["tools/ship/lockstepPeer.mjs", "tools/ship/lockstepRelay.mjs", "tools/ship/flakeProbe.mjs", "tools/ship/afterVerdict.mjs", "tools/ship/versionPreflight.mjs", "tools/ship/shipVerdict.mjs", "tools/ship/takeTvPackages.mjs", "tools/ship/takeTvPlan.mjs", "tools/ship/takeTruncations.mjs", "tools/ship/takeSnowFrameTiming.mjs", "tools/ship/takeYoutubeChannel.mjs"], BETWEEN = ["tools/ship/boxTimings.mjs", "tools/ship/gateProfile.mjs", "tools/ship/realGpuRun.mjs", "tools/ship/rtPipelineDiag.mjs", "tools/ship/textureInProbe.mjs", "tools/ship/threePatch.mjs"];
     const tools = [...SILENT_AT_V4647G.wasSilent, ...SILENT_AT_V4647G.adopted, ...BETWEEN, ...NEWER];
     const spawnRefusal = (m) => new Promise((resolve) => {
         const p = spawn(process.execPath, [path.join(ENG, m), "--an-option-nobody-has-spelled"], { cwd: ENG }); let out = ""; const t0 = Date.now();

@@ -694,3 +694,31 @@ export const COMMIT_BELT_DRIFT_V4895 = Object.freeze({
     }),
     bodiesNow: 25,
 });
+
+/** v4898 -- THREE BODIES ARRIVED AT THE MERGE OF THE FISH AND SUBMARINE BRANCHES (the fly heading loop's hemibrain export, the Fish1 zebrafish circuit, the zebrafish vestibular article's supplementary files). Commits read off git here, not typed. */
+export const COMMIT_BELT_DRIFT_V4898 = Object.freeze({
+    ...COMMIT_BELT_DRIFT_V4895,
+    at: "v4898",
+    arrivedSince4475: Object.freeze({
+        ...COMMIT_BELT_DRIFT_V4895.arrivedSince4475,
+        "hemibrain": Object.freeze({ now: Object.freeze(["24187748"]),
+            why: "the fly central complex's heading loop (Janelia FlyEM and Google hemibrain v1.2 adjacency export, CC-BY 4.0 as the release states it): one baked circuit of 148 neurons and 7,080 edges, vendored with its PROVENANCE.md at the rung 4a checkpoint" }),
+        "zebrafish": Object.freeze({ now: Object.freeze(["391c66c8", "e998ee21"]),
+            why: "the Fish1 larval-zebrafish connectome's baked circuits (the 34-neuron TEN core, then the 99-neuron hindbrain-integrator route), from an open bucket under the Fish1 data policy; data, not code" }),
+        "zebrafish-vestibular": Object.freeze({ now: Object.freeze(["eec0a3e6", "ffd17c49", "894bd651"]),
+            why: "the supplementary files of the zebrafish vestibular article (CC-BY 4.0 as the article states it), paper-only: no source file reads them" }),
+    }),
+    bodiesNow: 28,
+});
+
+/** v4899 -- THE SHIP COMMIT OF v4898 TOUCHED TWO VENDOR BODIES (a "What this record could not establish" section appended to the zebrafish and zebrafish-vestibular PROVENANCE.md files), and a commit cannot know its own hash, so the belt that shipped with it could not name it. Read off git here, not typed. */
+export const COMMIT_BELT_DRIFT_V4899 = Object.freeze({
+    ...COMMIT_BELT_DRIFT_V4898,
+    at: "v4899",
+    arrivedSince4475: Object.freeze({
+        ...COMMIT_BELT_DRIFT_V4898.arrivedSince4475,
+        "zebrafish": Object.freeze({ now: Object.freeze(["d4cc23c4", "391c66c8", "e998ee21"]), why: COMMIT_BELT_DRIFT_V4898.arrivedSince4475["zebrafish"].why + "; v4898's ship commit then appended the record's own statement of what it could not establish" }),
+        "zebrafish-vestibular": Object.freeze({ now: Object.freeze(["d4cc23c4", "eec0a3e6", "ffd17c49", "894bd651"]), why: COMMIT_BELT_DRIFT_V4898.arrivedSince4475["zebrafish-vestibular"].why + "; v4898's ship commit then appended the record's own statement of what it could not establish" }),
+    }),
+    bodiesNow: 28,
+});

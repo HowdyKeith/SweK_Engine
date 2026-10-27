@@ -1,7 +1,7 @@
 {
  "host": "linux-x64-4c-16gb-142c0d",
  "note": "THIS BOX'S OWN gate runtimes, written by tools/ship/boxTimings.mjs. The shared sweep-timings.json is host-claimed and a foreign box cannot write it (v4647, and that refusal is right); this is how a box records what IT measured without overwriting another machine's numbers. `kinds` says which quantity each ms is, as in the shared record: `alone` is an uncontended serial reading, `capped` is a FLOOR and not a runtime. Read for COVERAGE -- has this gate ever been timed -- and NOT for the ship-time budget, which still reads the shared file. See task #87. `serialRing` holds the last three alone readings; recordReach's margin row reads it on a box that does not own the shared record, because that row asks what a gate costs HERE and nothing here can refresh another box's ring.",
- "captured": "2026-10-22T02:25:33.564Z",
+ "captured": "2026-10-26T21:39:09.818Z",
  "timings": {
   "render/denoiseDevice-selfcheck.mjs": 5461,
   "render/denoiseTiming-selfcheck.mjs": 8195,
@@ -11,7 +11,31 @@
   "tools/ship/statedRuntime-selfcheck.mjs": 1301,
   "tools/ship/tacticsTrain-selfcheck.mjs": 200109,
   "oceanSpikePage-selfcheck": 33,
-  "render/snowGpu-selfcheck.mjs": 37967
+  "render/snowGpu-selfcheck.mjs": 37967,
+  "brain/emergencyPilot-selfcheck.mjs": 2147,
+  "brain/manualAssist-selfcheck.mjs": 238,
+  "brain/ogreSubBridge-selfcheck.mjs": 1583,
+  "brain/seaOgre-selfcheck.mjs": 6815,
+  "brain/subSquad-selfcheck.mjs": 1492,
+  "brain/subTournament-selfcheck.mjs": 2689,
+  "brain/surfacePilot-selfcheck.mjs": 1562,
+  "render/brainPanel-selfcheck.mjs": 22121,
+  "render/compassView-selfcheck.mjs": 15597,
+  "render/denoiseFrameGen-selfcheck.mjs": 2145,
+  "render/denoiseFrameGenCost-selfcheck.mjs": 25083,
+  "render/frameGenLive-selfcheck.mjs": 640,
+  "render/learnedUpscale-selfcheck.mjs": 41156,
+  "render/learnedUpscaleStudy-selfcheck.mjs": 17038,
+  "render/seaOgre3d-selfcheck.mjs": 1892,
+  "render/seaOgreView-selfcheck.mjs": 359,
+  "render/seaPicker-selfcheck.mjs": 5830,
+  "render/subAquariumEvents-selfcheck.mjs": 743,
+  "render/subBallastCues-selfcheck.mjs": 4439,
+  "render/subTournamentView-selfcheck.mjs": 2649,
+  "tools/subReservoirV3-selfcheck.mjs": 16743,
+  "tools/subHeadingEstimator-selfcheck.mjs": 20719,
+  "render/subDropoutScene-selfcheck.mjs": 2762,
+  "render/subDropoutView-selfcheck.mjs": 9705
  },
  "at": {
   "render/denoiseDevice-selfcheck.mjs": "2026-10-09T21:00:45.655Z",
@@ -22,7 +46,31 @@
   "tools/ship/statedRuntime-selfcheck.mjs": "2026-10-04T00:49:42.184Z",
   "tools/ship/tacticsTrain-selfcheck.mjs": "2026-10-13T06:52:27.604Z",
   "oceanSpikePage-selfcheck": "2026-10-20T15:25:36.693Z",
-  "render/snowGpu-selfcheck.mjs": "2026-10-22T02:25:33.564Z"
+  "render/snowGpu-selfcheck.mjs": "2026-10-22T02:25:33.564Z",
+  "brain/emergencyPilot-selfcheck.mjs": "2026-10-26T20:21:25.204Z",
+  "brain/manualAssist-selfcheck.mjs": "2026-10-26T20:21:25.204Z",
+  "brain/ogreSubBridge-selfcheck.mjs": "2026-10-26T20:21:25.204Z",
+  "brain/seaOgre-selfcheck.mjs": "2026-10-26T20:21:25.204Z",
+  "brain/subSquad-selfcheck.mjs": "2026-10-26T20:21:25.204Z",
+  "brain/subTournament-selfcheck.mjs": "2026-10-26T20:21:25.204Z",
+  "brain/surfacePilot-selfcheck.mjs": "2026-10-26T20:21:25.204Z",
+  "render/brainPanel-selfcheck.mjs": "2026-10-26T20:21:25.204Z",
+  "render/compassView-selfcheck.mjs": "2026-10-26T20:21:25.204Z",
+  "render/denoiseFrameGen-selfcheck.mjs": "2026-10-26T20:21:25.204Z",
+  "render/denoiseFrameGenCost-selfcheck.mjs": "2026-10-26T20:21:25.204Z",
+  "render/frameGenLive-selfcheck.mjs": "2026-10-26T20:21:25.204Z",
+  "render/learnedUpscale-selfcheck.mjs": "2026-10-26T20:21:25.204Z",
+  "render/learnedUpscaleStudy-selfcheck.mjs": "2026-10-26T20:21:25.204Z",
+  "render/seaOgre3d-selfcheck.mjs": "2026-10-26T20:21:25.204Z",
+  "render/seaOgreView-selfcheck.mjs": "2026-10-26T20:21:25.204Z",
+  "render/seaPicker-selfcheck.mjs": "2026-10-26T20:21:25.204Z",
+  "render/subAquariumEvents-selfcheck.mjs": "2026-10-26T20:21:25.204Z",
+  "render/subBallastCues-selfcheck.mjs": "2026-10-26T20:21:25.204Z",
+  "render/subTournamentView-selfcheck.mjs": "2026-10-26T20:21:25.204Z",
+  "tools/subReservoirV3-selfcheck.mjs": "2026-10-26T20:21:25.204Z",
+  "tools/subHeadingEstimator-selfcheck.mjs": "2026-10-26T20:58:00.897Z",
+  "render/subDropoutScene-selfcheck.mjs": "2026-10-26T21:39:09.818Z",
+  "render/subDropoutView-selfcheck.mjs": "2026-10-26T21:39:09.818Z"
  },
  "kinds": {
   "render/denoiseDevice-selfcheck.mjs": "alone",
@@ -33,7 +81,31 @@
   "tools/ship/statedRuntime-selfcheck.mjs": "alone",
   "tools/ship/tacticsTrain-selfcheck.mjs": "capped",
   "oceanSpikePage-selfcheck": "alone",
-  "render/snowGpu-selfcheck.mjs": "alone"
+  "render/snowGpu-selfcheck.mjs": "alone",
+  "brain/emergencyPilot-selfcheck.mjs": "alone",
+  "brain/manualAssist-selfcheck.mjs": "alone",
+  "brain/ogreSubBridge-selfcheck.mjs": "alone",
+  "brain/seaOgre-selfcheck.mjs": "alone",
+  "brain/subSquad-selfcheck.mjs": "alone",
+  "brain/subTournament-selfcheck.mjs": "alone",
+  "brain/surfacePilot-selfcheck.mjs": "alone",
+  "render/brainPanel-selfcheck.mjs": "alone",
+  "render/compassView-selfcheck.mjs": "alone",
+  "render/denoiseFrameGen-selfcheck.mjs": "alone",
+  "render/denoiseFrameGenCost-selfcheck.mjs": "alone",
+  "render/frameGenLive-selfcheck.mjs": "alone",
+  "render/learnedUpscale-selfcheck.mjs": "alone",
+  "render/learnedUpscaleStudy-selfcheck.mjs": "alone",
+  "render/seaOgre3d-selfcheck.mjs": "alone",
+  "render/seaOgreView-selfcheck.mjs": "alone",
+  "render/seaPicker-selfcheck.mjs": "alone",
+  "render/subAquariumEvents-selfcheck.mjs": "alone",
+  "render/subBallastCues-selfcheck.mjs": "alone",
+  "render/subTournamentView-selfcheck.mjs": "alone",
+  "tools/subReservoirV3-selfcheck.mjs": "alone",
+  "tools/subHeadingEstimator-selfcheck.mjs": "alone",
+  "render/subDropoutScene-selfcheck.mjs": "alone",
+  "render/subDropoutView-selfcheck.mjs": "alone"
  },
  "codes": {
   "render/denoiseDevice-selfcheck.mjs": 0,
@@ -44,7 +116,31 @@
   "tools/ship/statedRuntime-selfcheck.mjs": 0,
   "tools/ship/tacticsTrain-selfcheck.mjs": null,
   "oceanSpikePage-selfcheck": 1,
-  "render/snowGpu-selfcheck.mjs": 0
+  "render/snowGpu-selfcheck.mjs": 0,
+  "brain/emergencyPilot-selfcheck.mjs": 0,
+  "brain/manualAssist-selfcheck.mjs": 0,
+  "brain/ogreSubBridge-selfcheck.mjs": 0,
+  "brain/seaOgre-selfcheck.mjs": 0,
+  "brain/subSquad-selfcheck.mjs": 0,
+  "brain/subTournament-selfcheck.mjs": 0,
+  "brain/surfacePilot-selfcheck.mjs": 0,
+  "render/brainPanel-selfcheck.mjs": 0,
+  "render/compassView-selfcheck.mjs": 0,
+  "render/denoiseFrameGen-selfcheck.mjs": 0,
+  "render/denoiseFrameGenCost-selfcheck.mjs": 0,
+  "render/frameGenLive-selfcheck.mjs": 0,
+  "render/learnedUpscale-selfcheck.mjs": 0,
+  "render/learnedUpscaleStudy-selfcheck.mjs": 0,
+  "render/seaOgre3d-selfcheck.mjs": 0,
+  "render/seaOgreView-selfcheck.mjs": 0,
+  "render/seaPicker-selfcheck.mjs": 0,
+  "render/subAquariumEvents-selfcheck.mjs": 0,
+  "render/subBallastCues-selfcheck.mjs": 0,
+  "render/subTournamentView-selfcheck.mjs": 0,
+  "tools/subReservoirV3-selfcheck.mjs": 0,
+  "tools/subHeadingEstimator-selfcheck.mjs": 0,
+  "render/subDropoutScene-selfcheck.mjs": 0,
+  "render/subDropoutView-selfcheck.mjs": 0
  },
  "serialRing": {
   "render/denoiseDevice-selfcheck.mjs": [
@@ -86,6 +182,126 @@
    37987,
    37344,
    37967
+  ],
+  "brain/emergencyPilot-selfcheck.mjs": [
+   2277,
+   2419,
+   2147
+  ],
+  "brain/manualAssist-selfcheck.mjs": [
+   272,
+   316,
+   238
+  ],
+  "brain/ogreSubBridge-selfcheck.mjs": [
+   1835,
+   1498,
+   1583
+  ],
+  "brain/seaOgre-selfcheck.mjs": [
+   7039,
+   6749,
+   6815
+  ],
+  "brain/subSquad-selfcheck.mjs": [
+   1641,
+   1875,
+   1492
+  ],
+  "brain/subTournament-selfcheck.mjs": [
+   3097,
+   2459,
+   2689
+  ],
+  "brain/surfacePilot-selfcheck.mjs": [
+   1587,
+   1505,
+   1562
+  ],
+  "render/brainPanel-selfcheck.mjs": [
+   23921,
+   22132,
+   22121
+  ],
+  "render/compassView-selfcheck.mjs": [
+   15867,
+   15455,
+   15597
+  ],
+  "render/denoiseFrameGen-selfcheck.mjs": [
+   2405,
+   2054,
+   2145
+  ],
+  "render/denoiseFrameGenCost-selfcheck.mjs": [
+   25360,
+   25346,
+   25083
+  ],
+  "render/frameGenLive-selfcheck.mjs": [
+   597,
+   767,
+   640
+  ],
+  "render/learnedUpscale-selfcheck.mjs": [
+   40002,
+   40095,
+   41156
+  ],
+  "render/learnedUpscaleStudy-selfcheck.mjs": [
+   16640,
+   17102,
+   17038
+  ],
+  "render/seaOgre3d-selfcheck.mjs": [
+   1880,
+   1854,
+   1892
+  ],
+  "render/seaOgreView-selfcheck.mjs": [
+   400,
+   466,
+   359
+  ],
+  "render/seaPicker-selfcheck.mjs": [
+   5690,
+   5611,
+   5830
+  ],
+  "render/subAquariumEvents-selfcheck.mjs": [
+   774,
+   725,
+   743
+  ],
+  "render/subBallastCues-selfcheck.mjs": [
+   2544,
+   4336,
+   4439
+  ],
+  "render/subTournamentView-selfcheck.mjs": [
+   2747,
+   2703,
+   2649
+  ],
+  "tools/subReservoirV3-selfcheck.mjs": [
+   16507,
+   16060,
+   16743
+  ],
+  "tools/subHeadingEstimator-selfcheck.mjs": [
+   19707,
+   20176,
+   20719
+  ],
+  "render/subDropoutScene-selfcheck.mjs": [
+   2477,
+   2619,
+   2762
+  ],
+  "render/subDropoutView-selfcheck.mjs": [
+   11132,
+   8897,
+   9705
   ]
  }
 }

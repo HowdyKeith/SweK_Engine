@@ -184,6 +184,41 @@
 //   W2  the rig file: the 1080 under DXC given a reason nativePick does not  -> 1 RED: the same row
 //   W3  the rig file: the Intel's DXC pass 2e-4 from the f64 network         -> 1 RED: the same row
 //   W4  the version test reading 0.6.1 as DXC-capable                        -> 1 RED: the same row (the Intel's installed 0.6.1)
+// ROUND 40 (section 108), against the r40s set, by the byte-safe runner with brain/conv2d-selfcheck.mjs, each restored
+// byte-identical (sha256) -- the kernel's own sabotages, G1-G5, are logged there (8-10 RED across both gates); the set's here:
+//   G6  createDeviceDenoiser building r40s on a device without subgroups   1 RED (the refusal row: WGSL did not compile, not refused by name)
+//   G7  the ladder keeping r40s on an adapter without subgroups            1 RED (the hidden-feature ladder row: it threw instead). It would
+//       have been 0 RED -- a gate that dies prints no FAIL line -- before that row caught the throw, and the runner now counts a crash
+// ROUND 41 (section 109), against the r41h set, with brain/conv2d-selfcheck.mjs (H1-H5 logged there); the set's here:
+//   H6  F16_IMAGE_TOL widened to 1e-1                                     1 RED (the r41h row)
+//   H7  createDeviceDenoiser building r41h on a device without shader-f16 1 RED (the refusal row: WGSL did not compile, not refused by name)
+//   K0h natively and in the browser SKIP here (no shader-f16): the Intel runs them, and no sabotage of the f16 kernel's own types is seen
+// ROUND 57 (section 129), against the r57p set, by the byte-safe runner:
+//   F1  the store packing a vec4's halves crossed (.yx)                   3 RED (K0p natively, its small network, K0p in the browser)
+//   F2  the load reading a channel's word without its half select         3 RED (the same three)
+//   F3  the storing twin not rounding (conv2dCpu for a storing layer)     3 RED (the static row; K0p natively; in the browser)
+//   F4  a packed layer read back as f32, not unpacked                     3 RED (K0p natively, its small network, in the browser)
+//   F5  r57p not standing aside under FXC                                 2 RED (the FXC row; the runnable-sets row)
+//   F6  F16S_IMAGE_TOL widened tenfold                                    1 RED (the static row holds the bound at 1e-3)
+// SECTION 141, each restored byte-identical (sha-256):
+//   K141a f16StoreRule reading rtz whenever a cell took the other nearest    1 RED (the rule's fixtures: mixed read rtz)
+//   K141b F16S_IMAGE_TOL_RTZ 7.5e-2                                         1 RED (the derivation row)
+//   K141c f16sImageTol giving the truncating bound to "mixed" too            1 RED (the derivation row)
+//   K141d f16roundTZ rounding to nearest                                    3 RED (the derivation, the fixtures, the simulated device)
+//   K141e the judge counting cells rounded to nearest as truncated           1 RED (the simulated device reads mixed)
+//   K141f k0pImage taking the truncating bound whatever the rule             1 RED (the simulated device: the nearest rule's refusal)
+//   K141g f16StoreRule reading rtz with no other nearest                     3 RED (the fixtures, the simulated device, K0p natively here)
+// SECTION 144, each restored byte-identical: V144a the first run's ratio typed 1.974 -> 1 red (H141's row); V144b the runs'
+//   commit typed 3d215c84 -> 1 red (H141's row: none counts); V144c the store rule read as rn -> 1 red (R141's row); V144d the
+//   second pair's trace ending "1 fail(s)" -> 1 red (R1's row)
+//   F7  r57p left out of the timed sets                                   1 RED (the static row)
+// and section 130's verdict, by the same runner:
+//   V1  the rig reports' commit check accepting any commit                0 RED as first written: with the device gate red, C1 was false
+//                                                                         whatever the commit. The commit is held on its own now; the
+//                                                                         commit read as another, 1 RED
+//   V2  H57's rule without C1 and C2                                      1 RED (the verdict row: it reads "fails")
+//   V3  H57's bound at 0.94                                               2 RED (the verdict row's fixtures; the figures row)
+//   before it does
 // v4868 -- ROUND 27 (section 83), against the r27w set, twinsOf and FXC_UNTRIED_SETS. Each restored byte-identical (md5):
 //   Y1  kernelFor never picks the Winograd kernel for r27w                  -> 6 RED: the whole-twin row, the layers row, K0w natively,
 //       the not-r15's-bits row, the small network, K0w in the browser (and 2 in render/denoiseTiming-selfcheck.mjs: different kernels)
@@ -227,17 +262,18 @@ import { spawnSync } from "node:child_process";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const imp = (p) => import(pathToFileURL(path.join(ENG, p)).href);
+const { PAGE_NETWORKS_BY_ADAPTER, NATIVE_NETWORKS_BY_ADAPTER, NETWORKS, NETWORKS_DECIDED_BY, pageNetworkFor, nativeNetworkFor, networkFile } = await imp("render/denoiseDevice.mjs");
 const { APPLY_TOL, kernelApplyWgsl, packApplyUniforms, kernelApplyCpu, kernelFor, deviceLayers, denoiseTwin, createDeviceDenoiser, encodeNet, decodeNet,
         KERNEL_SETS, DEFAULT_KERNELS, PAGE_KERNELS, applyFor, kernelApplyFastWgsl, kernelHeadApplyWgsl, judgeHeadApply,
         R18_KERNELS, FXC_UNBUILT_SETS, isD3D12Native, nativeSetsFor, PAGE_KERNELS_BY_ADAPTER, pageAdapterKey, pageKernelsFor, passBytes, TIMED_SETS,
         isDxcCompiler, NATIVE_KERNELS_BY_ADAPTER, NATIVE_KERNELS_DECIDED_BY, nativeAdapterKey, nativeKernelsFor, nativePick, createNativeDenoiser,
-        R27_KERNELS, FXC_UNTRIED_SETS, twinsOf } = await imp("render/denoiseDevice.mjs");
+        R27_KERNELS, FXC_UNTRIED_SETS, twinsOf, R40_KERNELS, SUBGROUP_SETS, featureSetsFor, timingLadder, R41_KERNELS, F16_SETS, SET_FEATURES, F16_IMAGE_TOL, R57_KERNELS, F16S_IMAGE_TOL, F16S_IMAGE_TOL_RTZ, f16StoreRule, f16sImageTol } = await imp("render/denoiseDevice.mjs");
 // v4862 -- the native table as sections 67 and 68 measured it, before section 78 gave the 1080 r18t. Rows about what the rig ran THEN
 // (section 68's --which runs, round 19's verdict) are held to it; rows about what a native run picks NOW, to the shipped table.
 const NATIVE_KERNELS_AT_V4852 = Object.freeze({ "win32/intel/gen-9": "r18u" });
 const CMP = await imp("render/denoiseCompile.mjs");
 const { makeDenoiser, denoise, KERNEL_TAPS, shapeFor, paramCount } = await imp("render/denoiseNet.mjs");
-const { conv2dCpu, conv2dCpuFma, COUT_MAX, tileShape, fastAltShape, conv2dTileWgsl, conv2dFastAltWgsl, conv2dCpuWino, conv2dCpuWinoFma, winoShape, conv2dWinoWgsl } = await imp("brain/conv2d.mjs");
+const { conv2dCpu, conv2dCpuFma, COUT_MAX, tileShape, fastAltShape, conv2dTileWgsl, conv2dFastAltWgsl, conv2dCpuWino, conv2dCpuWinoFma, winoShape, conv2dWinoWgsl, conv2dCpuF16, conv2dCpuF16Fma, conv2dCpuStoreF16, conv2dCpuStoreF16Fma, f16Bracket, f16roundTZ, f16round } = await imp("brain/conv2d.mjs");
 const { seededRandom } = await imp("brain/convNet.mjs");
 const { ALBEDO_FLOOR } = await imp("render/denoiseScenes.mjs");
 const H = await imp("tools/ship/headlessGpu.mjs");
@@ -400,7 +436,7 @@ console.log("1. THE KERNEL'S TWIN, ON THE CPU");
         L14s.map((l) => l.kernel).join() === "fast,fast,fast,head" && kernelFor({ Cin: 32, Cout: 81, k: 1 }, "r14", false) === "fast",
         `${L14.map((l) => l.kernel).join()} + ${applyFor(L14)}; a 1 x 1 layer that is not the last stays on the fast kernel`);
     ok(`!! round 13: the r13 set runs every layer of the large network on the fast kernel, the ${KERNEL_TAPS}-logit head among them (section 39)`,
-        L13.map((l) => l.kernel).join() === "fast,fast,fast,fast,fast" && KERNEL_SETS.join() === "r12,r13,r14,r15,r18t,r18u,r27w" &&
+        L13.map((l) => l.kernel).join() === "fast,fast,fast,fast,fast" && KERNEL_SETS.join() === "r12,r13,r14,r15,r18t,r18u,r27w,r40s,r41h,r57p" &&
         kernelFor({ Cin: 64, Cout: 32, k: 3 }, "r13") === "tiled" && /no kernel set "r16"/.test(noSet || ""),
         "a layer too big for one uniform binding (64 -> 32 at 3 x 3) falls back to its r12 kernel; an unknown set is refused by name");
     const L15 = deviceLayers(net, "r15"), L15s = deviceLayers(makeDenoiser(4, "he", "kernel", 9), "r15");
@@ -430,6 +466,56 @@ console.log("1. THE KERNEL'S TWIN, ON THE CPU");
             kernelFor({ Cin: 32, Cout: 32, k: 1 }, "r27w") === "fast" && kernelFor({ Cin: 4, Cout: 4, k: 5 }, "r27w") === "fast" &&
             twinsOf(Lw[0]).twin === conv2dCpuWino && twinsOf(Lw[0]).mirror === conv2dCpuWinoFma && twinsOf(Lw[4]).twin === conv2dCpu && twinsOf(L15[0]).twin === conv2dCpu && twinsOf(L15[0]).mirror === conv2dCpuFma,
             `${Lw.map((l) => l.kernel).join()}; small network ${Lws.map((l) => l.kernel).join()}`);
+        // round 40 (section 108): the subgroup set's layers -- the first layer's 10 channels are not whole blocks of 8, so r15's kernel;
+        // the small network's 9 the same and its 16 hidden channels two blocks -- and which adapters may run it at all
+        const Ls = deviceLayers(net, "r40s"), Lss = deviceLayers(makeDenoiser(4, "he", "kernel", 9), "r40s"), Cs = R40_KERNELS.r40s.cfg;
+        const withSg = { features: new Set(["subgroups", "timestamp-query"]) }, without = { features: new Set(["timestamp-query"]) };
+        ok(`!! round 40 (section 108): r40s runs every hidden layer the subgroup kernel holds on it at 2 rows x 8 vec4s, the first layer (10 channels, not whole blocks) on r15's fast kernel, and the ${KERNEL_TAPS}-logit head as r15 does; it needs the subgroups feature, and featureSetsFor leaves it out of an adapter without it, by name of the set alone`,
+            Ls.map((l) => l.kernel).join() === "fast,sub,sub,sub,head_apply" && applyFor(Ls) === "head_apply" && Lss.map((l) => l.kernel).join() === "fast,sub,sub,head_apply" &&
+            Cs.rows === 2 && Cs.g4 === 8 && Object.isFrozen(Cs) && Object.isFrozen(R40_KERNELS) && SUBGROUP_SETS.join() === "r40s" && Object.isFrozen(SUBGROUP_SETS) &&
+            kernelFor({ Cin: 10, Cout: 32, k: 3 }, "r40s") === "fast" && kernelFor({ Cin: 32, Cout: 32, k: 1 }, "r40s") === "sub" && twinsOf(Ls[1]).twin === conv2dCpu && twinsOf(Ls[1]).mirror === conv2dCpuFma &&
+            featureSetsFor(withSg, KERNEL_SETS).join() === KERNEL_SETS.filter((s) => s !== "r41h").join() && featureSetsFor(without, KERNEL_SETS).join() === KERNEL_SETS.filter((s) => s !== "r40s" && s !== "r41h").join() &&
+            featureSetsFor(null, ["r15", "r40s"]).join() === "r15" && featureSetsFor({}, ["r40s"]).length === 0,
+            `${Ls.map((l) => l.kernel).join()}; small network ${Lss.map((l) => l.kernel).join()}; without subgroups: ${featureSetsFor(without, KERNEL_SETS).join(",")}`);
+        // round 41 (section 109): the half-precision set's layers, its feature, the twin it answers to -- and its image on the CPU against
+        // the f64 network: within F16_IMAGE_TOL, and NOT within f32 rounding, which is why it has a bound of its own
+        const Lh = deviceLayers(net, "r41h"), Lhs = deviceLayers(makeDenoiser(4, "he", "kernel", 9), "r41h"), Ch = R41_KERNELS.r41h.cfg;
+        const withF16 = { features: new Set(["shader-f16"]) }, xh = synth(HH, WW, 10, 7), yh = denoiseTwin(net, xh, HH, WW, "r41h").y, y64 = denoise(net, xh, HH, WW).y, wh = worstRel(yh, y64, 1e-12);
+        ok(`!! round 41 (section 109): r41h runs every layer r18u writes out on the half-precision kernel (fast_unroll_h: f16 arithmetic, f32 reads, packed f16 weights) and the ${KERNEL_TAPS}-logit head as r15 does, in f32; it needs shader-f16; twinsOf holds a half-precision layer to conv2dCpuF16 and its mirror -- and its twin's image is within F16_IMAGE_TOL of the f64 network, and not within f32 rounding`,
+            Lh.map((l) => l.kernel).join() === "fast_unroll_h,fast_unroll_h,fast_unroll_h,fast_unroll_h,head_apply" && Lhs.map((l) => l.kernel).join() === "fast_unroll_h,fast_unroll_h,fast_unroll_h,head_apply" &&
+            Ch.arith === "f16" && Ch.unroll === true && Ch.reads === "f32" && Object.isFrozen(Ch) && Object.isFrozen(R41_KERNELS) && F16_SETS.join() === "r41h" && SET_FEATURES.r41h === "shader-f16" && SET_FEATURES.r40s === "subgroups" &&
+            twinsOf(Lh[0]).twin === conv2dCpuF16 && twinsOf(Lh[0]).mirror === conv2dCpuF16Fma && twinsOf(Lh[4]).twin === conv2dCpu &&
+            featureSetsFor(withF16, KERNEL_SETS).join() === KERNEL_SETS.filter((s) => s !== "r40s").join() && F16_IMAGE_TOL === 1e-2 && wh <= F16_IMAGE_TOL && wh > 1e-5,
+            `${Lh.map((l) => l.kernel).join()}; its twin against the f64 network ${wh.toExponential(2)} (bound ${F16_IMAGE_TOL}); with shader-f16 only: ${featureSetsFor(withF16, KERNEL_SETS).join(",")}`);
+        // round 57 (section 129): the half-precision STORAGE set -- r18u's kernels, the activations between two of them packed f16, no
+        // feature; the first layer reads f32, the layer before the head writes f32; a storing layer's twin is the f32 twin rounded to f16
+        const Lp = deviceLayers(net, "r57p"), Lps = deviceLayers(makeDenoiser(4, "he", "kernel", 9), "r57p"), Cp = R57_KERNELS.r57p.cfg;
+        const io = (Ls) => Ls.filter((l) => l.io).map((l) => l.io.x + ">" + l.io.y).join(",");
+        const yp = denoiseTwin(net, xh, HH, WW, "r57p").y, wp = worstRel(yp, y64, 1e-12);
+        ok(`!! round 57 (section 129): r57p runs every layer r18u writes out on r18u's kernel with its activations stored as packed f16 between two such layers (fast_unroll_p) -- f32 in at the first, f32 out at the last before the ${KERNEL_TAPS}-logit head, which runs as r15's; it needs no feature; twinsOf holds a storing layer to the f32 twin rounded to f16; its twin's image is within F16S_IMAGE_TOL of the f64 network, and not within f32 rounding`,
+            Lp.map((l) => l.kernel).join() === "fast_unroll_p,fast_unroll_p,fast_unroll_p,fast_unroll_p,head_apply" && io(Lp) === "f32>f16,f16>f16,f16>f16,f16>f32" &&
+            Lps.map((l) => l.kernel).join() === "fast_unroll_p,fast_unroll_p,fast_unroll_p,head_apply" && io(Lps) === "f32>f16,f16>f16,f16>f32" && Lp.every((l) => !l.io || Object.isFrozen(l.io)) &&
+            Cp.reads === "f32" && Cp.unroll === true && !("arith" in Cp) && Object.isFrozen(Cp) && Object.isFrozen(R57_KERNELS) && !Object.hasOwn(SET_FEATURES, "r57p") &&
+            twinsOf(Lp[0]).twin === conv2dCpuStoreF16 && twinsOf(Lp[0]).mirror === conv2dCpuStoreF16Fma && twinsOf(Lp[3]).twin === conv2dCpu && twinsOf(Lp[3]).mirror === conv2dCpuFma &&
+            featureSetsFor({ features: new Set() }, ["r57p"]).join() === "r57p" && TIMED_SETS.includes("r57p") && F16S_IMAGE_TOL === 1e-3 && wp <= F16S_IMAGE_TOL && wp > 1e-5,
+            `${Lp.map((l) => l.kernel).join()}; io ${io(Lp)}; small network io ${io(Lps)}; its twin against the f64 network ${wp.toExponential(2)} (bound ${F16S_IMAGE_TOL})`);
+        // section 141: the TRUNCATING twin -- every storing layer's f32 cells converted toward zero, as both rig GPUs were measured to
+        // through Direct3D (section 137) -- and F16S_IMAGE_TOL_RTZ derived from it as F16S_IMAGE_TOL was from the nearest twin: x 5.7
+        const storeTwin = (rnd) => { let a = Float32Array.from(xh); for (const L of Lp) a = L.io && L.io.y === "f16" ? Float32Array.from(conv2dCpu(a, HH, WW, L), rnd) : twinsOf(L).twin(a, HH, WW, L); return kernelApplyCpu(xh, a, HH, WW); };
+        const wtz = worstRel(storeTwin(f16roundTZ), y64, 1e-12), wrn = worstRel(storeTwin(f16round), y64, 1e-12);
+        ok(`!! section 141: the truncating twin's image is ${wtz.toExponential(2)} from the f64 network -- over F16S_IMAGE_TOL, as both rig GPUs read 1.32e-3 -- and F16S_IMAGE_TOL_RTZ is it x 5.7, held at 7.5e-3; the nearest twin, built the same way, is r57p's own twin`,
+            F16S_IMAGE_TOL_RTZ === 7.5e-3 && wtz > F16S_IMAGE_TOL && Math.abs(wtz - 1.32e-3) < 0.01e-3 && Math.abs(wtz * 5.7 - F16S_IMAGE_TOL_RTZ) < 0.03e-3 && Object.is(wrn, wp) &&
+            f16sImageTol("rtz") === F16S_IMAGE_TOL_RTZ && f16sImageTol("rn") === F16S_IMAGE_TOL && f16sImageTol("mixed") === F16S_IMAGE_TOL,
+            `truncating ${wtz.toExponential(3)}, x 5.7 = ${(wtz * 5.7).toExponential(3)}; nearest ${wrn.toExponential(3)}`);
+        // f16roundTZ on values whose answers are known, and f16StoreRule on judged layers whose rule is known
+        const tzOk = f16roundTZ(1 + 2 ** -11) === 1 && f16roundTZ(1 + 3 * 2 ** -11) === 1 + 2 ** -10 && f16roundTZ(-(1 + 3 * 2 ** -11)) === -(1 + 2 ** -10) &&
+            f16roundTZ(70000) === 65504 && f16roundTZ(-70000) === -65504 && f16roundTZ(3 * 2 ** -25) === 2 ** -24 && f16roundTZ(2 ** -26) === 0 && f16roundTZ(0.5) === 0.5 &&
+            f16round(1 + 3 * 2 ** -11) === 1 + 2 ** -9;
+        const lay = (other, tz, stored) => ({ kernel: "fast_unroll_p", plain: stored - other, fused: 0, other, unexplained: 0, stored, tz });
+        const ruleFx = [f16StoreRule([lay(0, 9000, 12768), lay(0, 9000, 12768)]), f16StoreRule([lay(3038, 12768, 12768), lay(0, 12768, 12768)]),
+            f16StoreRule([lay(3038, 12767, 12768)]), f16StoreRule([{ kernel: "head_apply", image: true }])];
+        ok("  ...and f16roundTZ takes the bracketing f16 nearer zero (65504 above it, 0 under the least subnormal), and f16StoreRule reads rn with no other nearest, rtz when every stored cell is truncated, mixed when one is not",
+            tzOk && ruleFx.join() === "rn,rtz,mixed,rn", ruleFx.join());
         // v4849 -- round 19 (section 66): which sets a native gate builds, by the run's compiler as well as its adapter. Round 18's
         // row here ("r18t and r18u are browser-only on D3D12") held the adapter alone. On 0.6.2 the rig's descriptions are "D3D12
         // driver version ..." under either compiler, so the compiler comes from the package (headlessGpu's nativeCompiler: "DXC" or
@@ -454,10 +540,11 @@ console.log("1. THE KERNEL'S TWIN, ON THE CPU");
             `true for ${DXC_SAID.map(said).join(", ")}; false for ${notDxc.map(said).join(", ")}`);
         // v4868 -- round 27 (section 83): r27w was never built under FXC, so it stands aside there on the safe side -- a list of its own,
         // since FXC_UNBUILT_SETS is the sets FXC was SEEN to fail (section 60)
-        ok("!! round 27 (section 83): FXC_UNTRIED_SETS is r27w alone, and nativeSetsFor drops it on a D3D12 adapter under FXC, an unknown compiler or none, keeps it under DXC, and keeps it off D3D12 under anything",
-            FXC_UNTRIED_SETS.join() === "r27w" && Object.isFrozen(FXC_UNTRIED_SETS) && !FXC_UNBUILT_SETS.includes("r27w") &&
-            [d3d, d3n].every((a) => FXC_SAID.every((c) => !setsBy(a, c).includes("r27w")) && DXC_SAID.every((c) => setsBy(a, c).includes("r27w"))) &&
-            [...FXC_SAID, ...DXC_SAID].every((c) => setsBy(vk, c).includes("r27w")),
+        // round 40 (section 108): and r40s, whose wave operations FXC cannot compile at all
+        ok("!! round 27 (section 83), round 40 (section 108), round 41 (section 109) and round 57 (section 129): FXC_UNTRIED_SETS is r27w, r40s, r41h and r57p, and nativeSetsFor drops them on a D3D12 adapter under FXC, an unknown compiler or none, keeps them under DXC, and keeps them off D3D12 under anything",
+            FXC_UNTRIED_SETS.join() === "r27w,r40s,r41h,r57p" && Object.isFrozen(FXC_UNTRIED_SETS) && ["r27w", "r40s", "r41h", "r57p"].every((t) => !FXC_UNBUILT_SETS.includes(t)) &&
+            ["r27w", "r40s", "r41h", "r57p"].every((t) => [d3d, d3n].every((a) => FXC_SAID.every((c) => !setsBy(a, c).split(",").includes(t)) && DXC_SAID.every((c) => setsBy(a, c).split(",").includes(t))) &&
+                [...FXC_SAID, ...DXC_SAID].every((c) => setsBy(vk, c).split(",").includes(t))),
             `the 1080 under "FXC": ${setsBy(d3n, "FXC")}; under "DXC": ${setsBy(d3n, "DXC")}`);
         // v4849 -- round 19 (section 66): the native set by adapter, for a DXC run only, keyed as the timing gate prints it.
         // v4852 -- section 67 read the rule off both GPUs' round-19 runs; the verdict rows below derive the table from them.
@@ -645,6 +732,188 @@ console.log("1. THE KERNEL'S TWIN, ON THE CPU");
                 fusedW.every((m) => m.length === 2 && m.every((x) => +x[1] === 131072 && +x[2] === 0 && +x[3] === 0)),
                 `the Winograd kernel's compile-gate job, as shipped and use_dxc, per run: ${fusedW.map((m) => m.map((x) => `${x[1]} plain + ${x[2]} fused`).join(" / ")).join("; ")}`);
         }
+        // ROUNDS 40 AND 41'S VERDICTS (section 111): sections 108 and 109's rules, per path, read off the four committed reports
+        // Sabotaged by the byte-safe runner, each restored byte-identical: J4 H40's margin at 0.25 x, 2 RED (the H40 row and its fixtures);
+        // J5 C3 dropped, 1 RED (the H41 row: no pass at 1920 x 1080 is no longer what keeps it from a verdict)
+        // (render/denoise-rig-r42-{a,b}-*.json, realGpuRun --only denoise at ce1cca35, which carries both sections). A path's key holds when
+        // its row is not skipped and the gate is green: K0s and K0h passing in the browser print no line, natively they print one.
+        {
+            const RIG_COMMITS = Object.freeze(["ce1cca35"]);   // the rig's commit; sections 108 and 109 were first carried by 3e0f7155 and 190bb8e0
+            const rig = (f) => JSON.parse(fs.readFileSync(path.join(ENG, "render", f), "utf8"));
+            const R = { intel: ["a", "b"].map((r) => rig(`denoise-rig-r42-${r}-intel-gen9.json`)), gtx1080: ["a", "b"].map((r) => rig(`denoise-rig-r42-${r}-gtx1080.json`)) };
+            // one run, one set against its entry, per path: C1 every gate green with exit 0 at the commit; C2 the key natively (its line) and
+            // in the browser (no SKIP, the gate green); C3 both sets' 1920 x 1080 passes on the device's clock; the ratio at 1920 x 1080
+            const read = (rep, set, vs, key, round) => {
+                const dev = rigGate(rep, "denoiseDevice"), tim = rigGate(rep, "denoiseTiming"), T = rigLines(tim), D = rigLines(dev), S = (dev && dev.skips) || [];
+                const c1 = RIG_COMMITS.includes(String(rep.commit || "").slice(0, 8)) && (rep.gates || []).length === 4 && rep.gates.every((g) => g.ok === true && g.exit && g.exit.status === 0);
+                const nat = new RegExp(`^native ${key} for round ${round}'s set on .*: ${set} green \\(\\d+ of \\d+ native rows\\)$`), skipB = new RegExp(`^SKIP  ${key} in the browser for ${set}:`);
+                const pass = (p, s) => T.find((l) => l.startsWith(`${p} ${s}: 1920 x 1080: `)) || T.find((l) => l.startsWith(`${p} ${s}: 1920 x 1080 skipped`)) || "";
+                return Object.fromEntries(["native", "page"].map((p) => {
+                    const c2 = p === "native" ? D.some((l) => nat.test(l)) : !!dev && dev.ok && D.some((l) => nat.test(l)) &&
+                        S.filter((l) => /browser|chromium/i.test(l)).every((l) => !skipB.test(l) && /^SKIP  K0[sh] in the browser for r4[01][sh]: /.test(l));
+                    const c3 = [set, vs].every((s) => /: 1920 x 1080: [\d.]+ ms a pass .*; on the device's clock [\d.]+ ms;/.test(pass(p, s)));
+                    const m = T.map((l) => l.match(new RegExp(`^${p}: ${set} against ${vs} at 1920 x 1080: ([\\d.]+) x as fast, on the device's clock`))).find(Boolean);
+                    const big = sizeRatios(T, `${p}: ${set} against ${vs} at `);
+                    return [p, { c1, c2, c3, r: m ? +m[1] : null, at: big.length ? big[big.length - 1] : null, skipped: /skipped/.test(pass(p, set)) ? pass(p, set).replace(/^.*skipped -- /, "") : null }];
+                }));
+            };
+            const H = (runs, p) => (runs.every((e) => e[p].c1 && e[p].c2 && e[p].c3 && e[p].r !== null) ? (runs.every((e) => e[p].r >= 1.05) ? "holds" : "fails") : "no verdict");
+            const r40 = R.gtx1080.map((rep) => read(rep, "r40s", "r18t", "K0s", 40)), r41 = R.intel.map((rep) => read(rep, "r41h", "r18u", "K0h", 41));
+            const fmt = (runs, p) => runs.map((e, i) => `run ${"ab"[i]} ${e[p].r !== null ? `${e[p].r} x` : `no 1920 x 1080 ratio (${e[p].skipped || "not timed"}; at ${e[p].at ? `${e[p].at.size} ${e[p].at.r} x` : "no size"})`}`).join(", ");
+            for (const p of ["native", "page"]) console.log(`  ----  section 111 on the 1080, ${p}: r40s against r18t, ${fmt(r40, p)}; on the Intel, ${p}: r41h against r18u, ${fmt(r41, p)}`);
+            ok("!! *** section 111, by section 108's rule: H40 FAILS ON BOTH OF THE 1080's PATHS -- every gate green at ce1cca35, K0s held natively and in the browser, both passes on the device's clock, r40s about 0.27 x r18t at 1920 x 1080 -- so r40s is a measured negative and both 1080 entries stay r18t ***",
+                H(r40, "native") === "fails" && H(r40, "page") === "fails" && r40.every((e) => e.native.r < 0.3 && e.page.r < 0.3) &&
+                NATIVE_KERNELS_BY_ADAPTER["win32/nvidia/pascal"] === "r18t" && PAGE_KERNELS_BY_ADAPTER["Windows/nvidia/pascal"] === "r18t",
+                `native ${H(r40, "native")} (${fmt(r40, "native")}); page ${H(r40, "page")} (${fmt(r40, "page")})`);
+            // H41 is owed on both paths, not failed: C3 asks for r41h's 1920 x 1080 pass, and the ladder's 1500 ms cap skipped it in all four
+            // readings (predicted 2192-2485 ms). C1 and C2 held. What it measured -- 0.49-0.61 x r18u at every size it ran -- is reported
+            const capped = r41.every((e) => ["native", "page"].every((p) => e[p].c1 && e[p].c2 && !e[p].c3 && e[p].r === null && /over the 1500 ms cap$/.test(e[p].skipped || "")));
+            const below = r41.every((e) => ["native", "page"].every((p) => sizeRatios(rigLines(rigGate(R.intel[r41.indexOf(e)], "denoiseTiming")), `${p}: r41h against r18u at `).every((x) => x.r < 0.65)));
+            ok("!! *** section 111, by section 109's rule: H41 HAS NO VERDICT ON EITHER INTEL PATH -- every gate green, K0h held natively and in the browser, but C3 is unmet: r41h's 1920 x 1080 pass was over the ladder's 1500 ms cap in both runs on both paths ***",
+                H(r41, "native") === "no verdict" && H(r41, "page") === "no verdict" && capped && below &&
+                NATIVE_KERNELS_BY_ADAPTER["win32/intel/gen-9"] === "r18u" && PAGE_KERNELS_BY_ADAPTER["Windows/intel/gen-9"] === "r18u",
+                `native: ${fmt(r41, "native")}; page: ${fmt(r41, "page")}; below 0.65 x at every size timed: ${below}`);
+            // the rule's fixtures: a 1080 lifted to 1.06 x in both runs holds on that path alone; in one run it fails; a browser SKIP takes the
+            // page's C2; the Intel given a 1920 x 1080 line at 1.10 x on both runs holds natively
+            const lift = (rep, re, line) => { const c = JSON.parse(JSON.stringify(rep)); const g = rigGate(c, "denoiseTiming"); g.measured = g.measured.map((l) => (re.test(l) ? l.replace(/: [\d.]+ x as fast/, ": 1.060 x as fast") : l)).concat(line || []); return c; };
+            const nvUp = R.gtx1080.map((r) => read(lift(r, /^native: r40s against r18t at 1920 x 1080/), "r40s", "r18t", "K0s", 40));
+            const nvSkip = R.gtx1080.map((r) => { const c = JSON.parse(JSON.stringify(r)); rigGate(c, "denoiseDevice").skips.push("SKIP  K0s in the browser for r40s: no browser"); return read(c, "r40s", "r18t", "K0s", 40); });
+            const itUp = R.intel.map((r) => { const c = lift(r, /^$/, ["native: r41h against r18u at 1920 x 1080: 1.100 x as fast, on the device's clock -- section 109"]); const g = rigGate(c, "denoiseTiming");
+                g.measured = g.measured.map((l) => l.replace(/^native r41h: 1920 x 1080 skipped -- .*$/, "native r41h: 1920 x 1080: 1000.000 ms a pass (10th-90th 990.000-1010.000, 3 passes); on the device's clock 999.000 ms; 2.0 Mpx/s")); return read(c, "r41h", "r18u", "K0h", 41); });
+            ok("  ...and it discriminates: the 1080 lifted to 1.06 x natively in both runs holds there and not on the page, in one run it fails; a browser SKIP leaves the page no verdict; the Intel given a 1920 x 1080 pass at 1.10 x holds natively",
+                H(nvUp, "native") === "holds" && H(nvUp, "page") === "fails" && H([nvUp[0], r40[1]], "native") === "fails" && H(nvSkip, "page") === "no verdict" && H(nvSkip, "native") === "fails" &&
+                H(itUp, "native") === "holds" && H(itUp, "page") === "no verdict",
+                `lifted: native ${H(nvUp, "native")}, page ${H(nvUp, "page")}, one run ${H([nvUp[0], r40[1]], "native")}; browser skipped: page ${H(nvSkip, "page")}; Intel lifted: native ${H(itUp, "native")}`);
+            // the predictions as made: r40s 0.8-1.3 x (MISSED, both paths, both runs); r41h 1.1-1.8 x (MISSED at every size it ran); each set
+            // standing aside by name on the other GPU (held)
+            const aside = R.intel.every((r) => (rigGate(r, "denoiseDevice").skips || []).some((l) => /^SKIP  K0s natively for r40s: the adapter has no subgroups feature/.test(l))) &&
+                R.gtx1080.every((r) => (rigGate(r, "denoiseDevice").skips || []).some((l) => /^SKIP  K0h natively for r41h: the adapter has no shader-f16 feature/.test(l)));
+            ok("  ...and sections 108 and 109's predictions are read as made: r40s MISSED its 0.8-1.3 x on both paths in both runs, r41h MISSED its 1.1-1.8 x at every size it ran, and each set stood aside by name on the other GPU",
+                r40.every((e) => ["native", "page"].every((p) => !(e[p].r >= 0.8 && e[p].r <= 1.3))) && below && aside,
+                `r40s ${fmt(r40, "native")} natively; r41h at most ${Math.max(...R.intel.flatMap((r) => ["native", "page"].flatMap((p) => sizeRatios(rigLines(rigGate(r, "denoiseTiming")), `${p}: r41h against r18u at `).map((x) => x.r))))} x; stood aside ${aside}`);
+        }
+        // ROUND 49'S VERDICT (section 123): section 119's rule, natively, read off the two Intel reports at 7b871372 (render/denoise-rig-r52-
+        // {a,b}-intel-gen9.json, committed before they were read). C1 every gate green with exit 0; C2 the w16 network's native K0 green on
+        // r18u; C3 both networks' 1920 x 1080 passes on r18u on the device's clock; H49 the w16 network >= 1.5 x the shipped one there in both
+        {
+            const rig = (f) => JSON.parse(fs.readFileSync(path.join(ENG, "render", f), "utf8"));
+            const read49 = (rep) => {
+                const dev = rigGate(rep, "denoiseDevice"), T = rigLines(rigGate(rep, "denoiseTiming")), D = rigLines(dev);
+                const c1 = String(rep.commit || "").startsWith("7b871372") && (rep.gates || []).length === 4 && rep.gates.every((g) => g.ok === true && g.exit && g.exit.status === 0);
+                const c2 = D.some((l) => /^native K0 for round 49's w16 network on win32\/intel\/gen-9, .*: .*\br18u green\b/.test(l));
+                const c3 = ["native r18u: 1920 x 1080: ", "native w16 r18u: 1920 x 1080: "].every((h) => T.some((l) => l.startsWith(h) && /; on the device's clock [\d.]+ ms/.test(l)));
+                const m = T.map((l) => l.match(/^native: w16 against the shipped network on r18u at 1920 x 1080: ([\d.]+) x as fast, on the device's clock -- section 119$/)).find(Boolean);
+                const pg = T.map((l) => l.match(/^page: w16 against the shipped network on r18u at 1920 x 1080: ([\d.]+) x as fast, on the device's clock -- section 120$/)).find(Boolean);
+                return { c1, c2, c3, r: m ? +m[1] : null, page: pg ? +pg[1] : null };
+            };
+            const H49 = (rs) => (rs.every((e) => e.c1 && e.c2 && e.c3 && e.r !== null) ? (rs.every((e) => e.r >= 1.5) ? "holds" : "fails") : "no verdict");
+            const R49 = ["a", "b"].map((k) => read49(rig(`denoise-rig-r52-${k}-intel-gen9.json`)));
+            const fx49 = [H49(R49.map((e, i) => (i ? { ...e, r: 1.4 } : e))), H49(R49.map((e, i) => (i ? { ...e, c2: false } : e))), H49(R49.map((e, i) => (i ? { ...e, c1: false } : e)))];
+            ok("!! *** section 123, by section 119's rule: H49 HOLDS -- every gate green at 7b871372, the w16 network's native K0 green on r18u, both 1080p passes on the device's clock, the w16 network 2.84 and 2.66 x as fast as the shipped one on r18u at 1920 x 1080 -- so the Intel gen-9's two network entries name it, as denoise-w16-intel-entries ***",
+                H49(R49) === "holds" && fx49[0] === "fails" && fx49[1] === "no verdict" && fx49[2] === "no verdict" &&
+                NATIVE_NETWORKS_BY_ADAPTER["win32/intel/gen-9"] === "w16" && PAGE_NETWORKS_BY_ADAPTER["Windows/intel/gen-9"] === "w16" && NETWORKS_DECIDED_BY["win32/intel/gen-9"] === "section 123",
+                `native ${R49.map((e) => e.r).join(" / ")} x; page (reported, section 120) ${R49.map((e) => e.page).join(" / ")} x; fixtures: ${fx49.join(" | ")}`);
+            ok("  ...and section 119's prediction is read as made: 2.5-3.5 x MET in both runs (2.84 / 2.66); the page, reported, 2.74 / 2.69",
+                R49.every((e) => e.r >= 2.5 && e.r <= 3.5 && e.page !== null), R49.map((e) => `${e.r} native, ${e.page} page`).join("; "));
+        }
+        // ROUND 57'S VERDICT ON THE INTEL (section 130): section 129's rule read off the two Intel reports at 1ae24f06 (render/denoise-rig-r57-
+        // {a,b}-intel-gen9.json, committed before they were read). C1 every gate green; C2 K0p green natively and in the browser; C3 both sets'
+        // 1920 x 1080 rows measured on both paths; H57 r57p >= 1.05 x r18u there, both paths, both runs
+        {
+            const rig = (f) => JSON.parse(fs.readFileSync(path.join(ENG, "render", f), "utf8"));
+            const read57 = (rep) => {
+                const dev = rigGate(rep, "denoiseDevice"), T = rigLines(rigGate(rep, "denoiseTiming")), fails = (dev && dev.fails) || [];
+                const commit = String(rep.commit || "").slice(0, 8), c1 = commit === "1ae24f06" && (rep.gates || []).length === 4 && rep.gates.every((g) => g.ok === true && g.exit && g.exit.status === 0);
+                const k0pNative = !fails.some((l) => /K0p natively/.test(l)), k0pPage = !fails.some((l) => /K0p in the browser/.test(l)) && !!dev;
+                const c3 = ["native", "page"].every((p) => ["r18u", "r57p"].every((s) => T.some((l) => l.startsWith(`${p} ${s}: 1920 x 1080: `) && /; on the device's clock [\d.]+ ms/.test(l))));
+                const at = (p) => { const m = T.map((l) => l.match(new RegExp(`^${p}: r57p against r18u at 1920 x 1080: ([\\d.]+) x as fast, on the device's clock -- section 129$`))).find(Boolean); return m ? +m[1] : null; };
+                const other = (fails.find((l) => /K0p natively/.test(l)) || "").match(/(\d+)o\b/g);
+                return { commit, c1, c2: k0pNative && k0pPage, k0pNative, k0pPage, c3, native: at("native"), page: at("page"), other: other ? other.map((o) => +o.slice(0, -1)) : [],
+                         onlyRed: fails.length === 1 && rep.gates.filter((g) => !g.ok).map((g) => g.gate).join() === "render/denoiseDevice-selfcheck.mjs",
+                         adapter: (dev && dev.adapters || []).join() };
+            };
+            const H57 = (rs) => (rs.every((e) => e.c1 && e.c2 && e.c3 && e.native !== null && e.page !== null) ? (rs.every((e) => e.native >= 1.05 && e.page >= 1.05) ? "holds" : "fails") : "no verdict");
+            const R57 = ["a", "b"].map((k) => read57(rig(`denoise-rig-r57-${k}-intel-gen9.json`)));
+            const green = (rs) => rs.map((e) => ({ ...e, c1: true, c2: true })), fast = (rs) => rs.map((e) => ({ ...e, native: 1.06, page: 1.06 }));
+            const fx57 = [H57(green(R57)), H57(fast(green(R57))), H57(fast(R57))];
+            ok("!! *** section 130, by section 129's rule: H57 HAS NO VERDICT ON THE INTEL -- at 1ae24f06 the device gate was red in both runs on K0p natively alone (K0p in the browser green), so C1 and C2 fail; C3 holds ***",
+                // V1 went 0 red before this: with the device gate red C1 is false whatever the commit, so the commit is held on its own
+                H57(R57) === "no verdict" && R57.every((e) => e.commit === "1ae24f06" && !e.c1 && !e.k0pNative && e.k0pPage && e.c3 && e.onlyRed) && fx57.join() === "fails,holds,no verdict",
+                `${R57.map((e, i) => `run ${"ab"[i]}: native K0p ${e.k0pNative ? "green" : "red"}, browser ${e.k0pPage ? "green" : "red"}, 1080p ${e.c3 ? "measured" : "not"}`).join("; ")}; fixtures, green: ${fx57[0]}, green and fast: ${fx57[1]}, fast but red: ${fx57[2]}`);
+            ok("  ...and its figures, reported because C3 holds: r57p 0.948 / 1.021 x r18u natively and 1.027 / 1.037 x on the page at 1920 x 1080 -- none reaches 1.05, so with K0p green it would have failed",
+                JSON.stringify(R57.map((e) => [e.native, e.page])) === "[[0.948,1.027],[1.021,1.037]]" && H57(green(R57)) === "fails", R57.map((e) => `${e.native} / ${e.page}`).join("; "));
+            // section 129's predictions, read as made: P1 FAILED (red natively, and the other-nearest count far from zero, the same in both runs);
+            // P2's range 0.95-1.10 met by three of the four 1080p ratios, run a's native just below it; P3 no reading (no 1080 run)
+            ok("  ...and section 129's predictions as made: P1 FAILED -- the other nearest counted on the first three layers, 3038 / 3400 / 2592, the same in both runs; P2's 0.95-1.10 met by three of four, run a's native 0.948 below it; P3 not read",
+                R57.every((e) => e.other.slice(0, 3).join() === "3038,3400,2592") && R57.flatMap((e) => [e.native, e.page]).filter((r) => r >= 0.95 && r <= 1.10).length === 3 && R57[0].native < 0.95,
+                R57.map((e) => e.other.join("/")).join("; "));
+        }
+        // SECTION 137: section 135's rig runs read back (render/denoise-rig-s135-{a,b}-gtx1080.json, render/fsr-rig-s135-{gtx1080,intel-gen9}.json,
+        // render/denoise-rig-s135-a-trace-gtx1080.txt, committed at 8e7176ef before they were read). R1 the crash; H135 full / temporal > 1.0 on both
+        // 1080 runs, which count only when every --only denoise gate is green with exit 0; the FSR census, exact gates holding on both GPUs
+        {
+            const rig = (f) => JSON.parse(fs.readFileSync(path.join(ENG, "render", f), "utf8"));
+            const D = ["a", "b"].map((k) => rig(`denoise-rig-s135-${k}-gtx1080.json`)), F = ["gtx1080", "intel-gen9"].map((k) => rig(`fsr-rig-s135-${k}.json`));
+            const hist = (rep) => { const m = rigLines(rigGate(rep, "denoiseUpscaleGPU")).map((l) => l.match(/^section 103: .*; the half-size chain ([\d.]+) ms, ratio ([\d.]+) x; with its history ([\d.]+) ms, ratio ([\d.]+) x$/)).find(Boolean);
+                return m ? { chain: +m[2], temporal: +m[4] } : null; };
+            const counts = (rep) => String(rep.commit || "").slice(0, 8) === "0a4e6cbf" && rep.only === "denoise" && rep.gates.length === 4 && rep.gates.every((g) => g.ok === true && g.exit && g.exit.status === 0);
+            const H135 = (rs, ratios) => (rs.every(Boolean) ? (ratios.every((r) => r !== null && r > 1.0) ? "holds" : "fails") : "no verdict");
+            const died = (rep) => rep.gates.filter((g) => !g.exit || g.exit.signal || g.exit.status === null).length;
+            const traces = ["a", "b"].map((k) => fs.readFileSync(path.join(ENG, "render", `denoise-rig-s135-${k}-trace-gtx1080.txt`), "utf8").trimEnd().split("\n"));
+            const traceOk = (t) => /the gate ends, 0 fail\(s\)$/.test(t[t.length - 1]) && /native w16 ladder done$/.test(t[t.length - 2]) && t.some((l) => /native ladder done$/.test(l));
+            ok("!! *** section 137, R1: NOT REPRODUCED AGAIN -- no gate in either 1080 denoise run, nor in either full run, died on a signal or without an exit status, all four at 0a4e6cbf; both runs' traces walk both ladders to the end and end 'the gate ends, 0 fail(s)' ***",
+                [...D, ...F].every((r) => died(r) === 0 && String(r.commit).slice(0, 8) === "0a4e6cbf") && traces.every(traceOk),
+                `${[...D, ...F].map((r) => `${r.gates.length} gates, ${died(r)} died`).join("; ")}; traces ${traces.map((t) => t.length).join(" and ")} lines`);
+            const R = D.map((r) => ({ counts: counts(r), h: hist(r), red: r.gates.filter((g) => !g.ok).map((g) => g.gate).join(), fails: (rigGate(r, "denoiseDevice") || {}).fails || [] }));
+            const fx = [H135([true, true], R.map((e) => e.h && e.h.temporal)), H135([true, true], [R[0].h.temporal, 0.99])];
+            ok("!! *** section 137, by section 135's rule: H135 HAS NO VERDICT -- neither 1080 run counts, the device gate red in both on K0p natively alone; full / temporal read 1.998 and 1.984 x, which would have held ***",
+                H135(R.map((e) => e.counts), R.map((e) => e.h && e.h.temporal)) === "no verdict" && R.every((e) => !e.counts && e.red === "render/denoiseDevice-selfcheck.mjs" && e.fails.length === 1 && /K0p natively/.test(e.fails[0])) &&
+                JSON.stringify(R.map((e) => [e.h.chain, e.h.temporal])) === "[[2.099,1.998],[2.085,1.984]]" && fx.join() === "holds,fails",
+                `${R.map((e, i) => `run ${"ab"[i]}: ${e.counts ? "counts" : "does not count"}, chain ${e.h && e.h.chain} x, with its history ${e.h && e.h.temporal} x`).join("; ")}; fixtures, counted: ${fx[0]}, one under 1.0: ${fx[1]}`);
+            // the K0p reading, the same cell for cell on both vendors as round 57's Intel: no cell unexplained, the other nearest on the first three
+            // layers, and the image against f64 over F16S_IMAGE_TOL -- the red is the image bound alone
+            const k0 = (rep) => { const l = rigLines(rigGate(rep, "denoiseDevice")).find((x) => x.startsWith("native K0p for r57p, the reading: ")) || "";
+                return { other: [...l.matchAll(/(\d+) other nearest/g)].map((m) => +m[1]).join(), unexplained: [...l.matchAll(/(\d+) unexplained/g)].every((m) => m[1] === "0") && /unexplained/.test(l), w64: +((l.match(/against f64 ([\d.e+-]+) /) || [])[1]) }; };
+            const K = [...D, ...F].map(k0);
+            ok("  ...and the K0p reading the same on the 1080 as on the Intel: other nearest 3038 / 3400 / 2592 / 0, no cell unexplained, the image 1.32e-3 against F16S_IMAGE_TOL 1e-3 -- the cell key holds and the image bound is what fails",
+                K.every((k) => k.other === "3038,3400,2592,0" && k.unexplained && k.w64 === 1.32e-3) && F16S_IMAGE_TOL === 1e-3, K.map((k) => `${k.other} ${k.w64}`).join("; "));
+            // the FSR census: realGpuRun's own summary, and which rows are red
+            const sum = (rep) => rep.summary, red = (rep, cat) => rep.gates.filter((g) => g.category === cat && !g.ok).map((g) => g.gate.split("/").pop().replace("-selfcheck.mjs", "")).join();
+            const stall = (rep) => (rep.gates.find((g) => g.gate === "fx/fsr/fsrTemporalHalfQuality-selfcheck.mjs") || {}).fails || [];
+            const outside = (rep) => stall(rep).map((l) => +((l.match(/ (\d+) outside -- /) || [])[1])).join();
+            const snow = (rep) => rigLines(rep.gates.find((g) => /snowGpuLive/.test(g.gate))).find((l) => l.startsWith("reading snowGpu: live loop")) || "";
+            ok("!! *** section 137, the FSR census: every exact gate held on both GPUs (20 of 20); quality red only on fsrTemporalHalfQuality's four stall rows; timing red on the device gate (K0p) and snowGpuLive ***",
+                F.every((r) => sum(r) === "exact 20/20, quality 25/26, timing 9/11" && red(r, "exact") === "" && red(r, "quality") === "fsrTemporalHalfQuality" && red(r, "timing") === "denoiseDevice,snowGpuLive" && stall(r).length === 4),
+                F.map((r) => `${sum(r)}; red ${red(r, "quality")} | ${red(r, "timing")}`).join("; "));
+            ok("  ...and the stall rows the same on both vendors, 28 and 18 (1080) and 28 and 17 (Intel) of 12288 outside the truncating bound against 12 allowed, as rig run 13 read on the 1080; snowGpuLive's live loop on adapter 'google', a software one",
+                outside(F[0]) === "28,18,28,18" && outside(F[1]) === "28,17,28,17" && F.every((r) => / adapter google$/.test(snow(r))), `${F.map(outside).join(" | ")}; ${F.map(snow).join(" | ")}`);
+            ok("  ...and section 135's predictions as made: P1 held (neither run died); P2 has no reading -- the ratio was above 1.0 in both, the runs did not count; P3 held (no exact gate red)",
+                [...D, ...F].every((r) => died(r) === 0) && R.every((e) => e.h.temporal > 1.0 && !e.counts) && F.every((r) => red(r, "exact") === ""));
+        }
+        // SECTION 144: section 141's rig runs read back (render/denoise-rig-s141-{a,b}-gtx1080.json, the pre-registered pair, and
+        // -{a,b}-gtx10802.json, a second pair on the same 1080; committed at 0bffdc17 before they were read). R141 K0p green with store
+        // rule rtz; H141 full / temporal > 1.0 in both pre-registered runs, which count when every gate is green with exit 0
+        {
+            const rig = (f) => JSON.parse(fs.readFileSync(path.join(ENG, "render", f), "utf8"));
+            const R = ["a-gtx1080", "b-gtx1080", "a-gtx10802", "b-gtx10802"].map((k) => rig(`denoise-rig-s141-${k}.json`));
+            const hist = (rep) => { const m = rigLines(rigGate(rep, "denoiseUpscaleGPU")).map((l) => l.match(/^section 103: .*; with its history [\d.]+ ms, ratio ([\d.]+) x$/)).find(Boolean); return m ? +m[1] : null; };
+            const counts = (rep) => String(rep.commit || "").slice(0, 8) === "3d215c83" && rep.only === "denoise" && rep.gates.length === 5 && rep.gates.every((g) => g.ok === true && g.exit && g.exit.status === 0 && !g.exit.signal);
+            const k0 = (rep) => rigLines(rigGate(rep, "denoiseDevice")).find((l) => l.startsWith("native K0p for r57p, the reading: ")) || "";
+            const H141 = (rs) => (rs.every((r) => counts(r)) ? (rs.every((r) => hist(r) > 1.0) ? "holds" : "fails") : "no verdict");
+            const traces = ["a", "b", "a2", "b21"].map((k) => fs.readFileSync(path.join(ENG, "render", `denoise-rig-s141-${k}-trace.txt`), "utf8").trimEnd().split("\n"));
+            ok("!! *** section 144, by section 135's rule: H141 HOLDS -- both pre-registered 1080 runs count (five gates green, exit 0, at 3d215c83), full / temporal 1.973 and 1.992 x; the second pair 1.961 and 1.961 ***",
+                H141(R.slice(0, 2)) === "holds" && R.every(counts) && JSON.stringify(R.map(hist)) === "[1.973,1.992,1.961,1.961]" && R.every((r) => /nvidia pascal/.test(r.verdict)) &&
+                H141([R[0], { ...R[1], gates: R[1].gates.map((g, i) => (i ? g : { ...g, ok: false })) }]) === "no verdict",
+                R.map((r, i) => `${["a", "b", "a2", "b2"][i]} ${counts(r) ? "counts" : "does not"} ${hist(r)} x`).join("; "));
+            // realGpuRun keeps 400 characters of a measured line, and the reading line runs out at the rule's first count -- so the row
+            // reads the rule and that count, and the bound follows from the rule (f16sImageTol); later runs print the rule on its own line
+            ok("  ...and R141: K0p natively green in all four, each reading store rule rtz (its first layer's 12768 cells truncated, where the report's 400 characters end), the counts 3038 / 3400 / 2592 / 0, the image 1.32e-3 inside f16sImageTol(rtz)",
+                f16sImageTol("rtz") === 7.5e-3 && R.every((r) => !(rigGate(r, "denoiseDevice").fails || []).length && /; store rule rtz, 12768 ?$/.test(k0(r)) &&
+                    [...k0(r).matchAll(/(\d+) other nearest/g)].map((m) => m[1]).join() === "3038,3400,2592,0" && /against f64 1\.32e-3 /.test(k0(r))), k0(R[0]).slice(-120));
+            ok("  ...and R1: no gate died in any of the four, and every trace walks both ladders to 'the gate ends, 0 fail(s)'",
+                R.every((r) => r.gates.every((g) => g.exit && g.exit.status === 0 && g.exit.signal === null)) &&
+                traces.every((t) => /the gate ends, 0 fail\(s\)$/.test(t[t.length - 1]) && /native w16 ladder done$/.test(t[t.length - 2]) && t.some((l) => /native ladder done$/.test(l))));
+        }
         // v4852+ -- SECTION 68'S OUTCOME (round 20): the rig's six --which lines per GPU, held to the table fixed before they ran, and
         // each re-derived from nativePick on the adapter and compiler the line itself names -- so the rig's reasons are this code's
         {
@@ -792,9 +1061,10 @@ else try {
     // before any CPU work long enough to matter
     // round 12's kernels unless told otherwise -- the rows below that name no set are about them, whatever the default is
     const job = async (net, x, h, w, C, kernels = "r12") => {
-        const adapter = await gpu.requestAdapter(), dev = await adapter.requestDevice(), info = adapter.info || {};
+        // round 40: the subgroups feature asked for where the adapter offers it -- r40s needs it, and no other set's kernels read it
+        const adapter = await gpu.requestAdapter(), dev = await adapter.requestDevice({ requiredFeatures: adapter.features.has("subgroups") ? ["subgroups"] : [] }), info = adapter.info || {};
         try {
-            const D = await createDeviceDenoiser(dev, net, { H: h, W: w, C, kernels });
+            const D = await createDeviceDenoiser(dev, net, { H: h, W: w, C, kernels, subgroupMinSize: info.subgroupMinSize });
             const out = await D.run(x, { keep: true });
             D.destroy();
             return { ...out, adapter: [info.vendor, info.architecture, info.description].filter(Boolean).join(" / ") };
@@ -806,11 +1076,33 @@ else try {
         if (L.kernel === "head_apply") return { kernel: L.kernel, plain: 0, fused: 0, unexplained: 0, image: true };
         // v4868 -- round 27: the twin and mirror this layer's kernel answers to (twinsOf): the Winograd pair for a Winograd layer
         const input = i ? acts[i - 1] : Float32Array.from(x), T = twinsOf(L), tw = T.twin(input, h, w, L), fm = T.mirror(input, h, w, L);
-        let plain = 0, fused = 0, unexplained = 0;
-        for (let j = 0; j < tw.length; j++) { const v = acts[i][j]; if (v === tw[j]) plain++; else if (v === fm[j]) fused++; else unexplained++; }
-        return { kernel: L.kernel, plain, fused, unexplained };
+        // round 57: a layer storing f16 may take the OTHER f16 value bracketing the f32 cell, as WGSL allows a conversion -- counted apart
+        const store = L.io && L.io.y === "f16", raw = store ? conv2dCpu(input, h, w, L) : null, rawF = store ? conv2dCpuFma(input, h, w, L) : null;
+        let plain = 0, fused = 0, other = 0, unexplained = 0, tz = 0;
+        for (let j = 0; j < tw.length; j++) { const v = acts[i][j]; if (v === tw[j]) plain++; else if (v === fm[j]) fused++;
+            else if (store && (f16Bracket(raw[j]).includes(v) || f16Bracket(rawF[j]).includes(v))) other++; else unexplained++;
+            // section 141: the cell as a truncating conversion stores it, counted apart -- f16StoreRule reads the device's rule from these
+            if (store && (v === f16roundTZ(raw[j]) || v === f16roundTZ(rawF[j]))) tz++; }
+        return { kernel: L.kernel, plain, fused, other, unexplained, ...(store ? { stored: tw.length, tz } : {}) };
     });
     const net = makeDenoiser(3, "he", "kernel", 10, "large"), x = synth(HH, WW, 10, 7);
+    // section 141: K0p's image row, one function for the rig's row and the simulated one -- the bound of the rule the cells say
+    const k0pImage = (J, w) => w <= f16sImageTol(f16StoreRule(J));
+    // section 141: K0p's judge on a device it knows -- the truncating twin's own layers handed to judge as the device's, and the
+    // nearest twin's -- so the rule the rig's row reads, and the bound it takes, are this code's before any GPU runs it
+    {
+        const L = deviceLayers(net, "r57p"), y64 = denoise(net, x, HH, WW).y;
+        const fake = (rnd) => { const acts = []; let a = Float32Array.from(x);
+            for (const l of L) { a = l.io && l.io.y === "f16" ? Float32Array.from(conv2dCpu(a, HH, WW, l), rnd) : twinsOf(l).twin(a, HH, WW, l); acts.push(l.kernel === "head_apply" ? null : a); }
+            return { acts, y: kernelApplyCpu(x, a, HH, WW) }; };
+        const T = fake(f16roundTZ), Nr = fake(f16round), JT = judge(net, x, HH, WW, T.acts, "r57p"), JN = judge(net, x, HH, WW, Nr.acts, "r57p");
+        const rT = f16StoreRule(JT.slice(0, 4)), rN = f16StoreRule(JN.slice(0, 4)), wT = worstRel(T.y, y64, 1e-12), wN = worstRel(Nr.y, y64, 1e-12);
+        ok("!! section 141: a truncating device, simulated by the truncating twin's own layers, judges every cell explained, store rule rtz, its image within F16S_IMAGE_TOL_RTZ and outside F16S_IMAGE_TOL; the nearest twin's judges rn, within F16S_IMAGE_TOL",
+            JT.slice(0, 4).every((j) => j.unexplained === 0) && rT === "rtz" && JT.slice(0, 3).every((j) => j.other > 0) && k0pImage(JT.slice(0, 4), wT) && wT > F16S_IMAGE_TOL &&
+            JN.slice(0, 4).every((j) => j.unexplained === 0 && j.other === 0) && rN === "rn" && k0pImage(JN.slice(0, 4), wN) &&
+            !k0pImage(JN.slice(0, 4), wT) && !k0pImage(JT.slice(0, 4), 2 * F16S_IMAGE_TOL_RTZ),
+            `truncating: other ${JT.slice(0, 4).map((j) => j.other).join("/")}, truncated ${JT.slice(0, 4).map((j) => j.tz).join("/")} of ${JT[0].stored}, rule ${rT}, image ${wT.toExponential(2)}; nearest: rule ${rN}, image ${wN.toExponential(2)}`);
+    }
     // v4845 -- passBytes is what round 15 REPORTS a pass allocating; held here to what createDeviceDenoiser actually asks the device
     // for: every STORAGE buffer it creates, summed, for an unfused set (r12) and the fused one (r15, whose head keeps its logits).
     // MEASURED, the first time this row ran: r12 allocated 487,628 B against passBytes' 354,312 and r15 exactly its 225,036. The
@@ -970,6 +1262,117 @@ else try {
         KW.push(ok("  ...and r27w on the small network, no mask: every Winograd cell explained against its twin, the image within its bound and within 1e-5 of the f64 network",
             Jw.slice(0, -1).every((j) => j.unexplained === 0 && j.kernel === "wino") && jw.worst <= APPLY_TOL && w64 < 1e-5, `head and kernel ${jw.worst.toExponential(2)}; against f64 ${w64.toExponential(2)}`));
     } else console.log("  SKIP  r27w on the small network: one of FXC_UNTRIED_SETS, under FXC on a D3D12 adapter (section 83)");
+    // round 40 (section 108): r40s -- K0s natively where nativeSetsFor and the adapter's features allow (DXC on D3D12, and off it; the
+    // subgroups feature): its hidden layers cell for cell against conv2dCpu or its mirror, the head through the image; where nothing
+    // fused, r15's every layer bit for bit -- the key every set but r27w is held to; on the small network too. KS keeps the native rows.
+    const native40 = featureSetsFor(NATIVE, nativeSetsFor(NATIVE, ["r40s"], { compiler: COMPILER })), KS = [];
+    if (!native40.includes("r40s")) console.log(`  SKIP  K0s natively for r40s: ${NATIVE && NATIVE.features && NATIVE.features.has("subgroups") ? `one of FXC_UNTRIED_SETS, on a D3D12 adapter whose run compiles with ${compilerSaid} -- wave operations are shader model 6` : "the adapter has no subgroups feature"} (section 108)`);
+    else {
+        const r40 = await job(net, x, HH, WW, 10, "r40s"), J40 = judge(net, x, HH, WW, r40.acts, "r40s"), L40 = deviceLayers(net, "r40s");
+        const j40 = judgeHeadApply(x, r40.acts[3], L40[4], r40.y, HH, WW), w64 = worstRel(r40.y, ref, 1e-12);
+        k0row("native", "r40s", J40, j40.worst);
+        KS.push(ok(`!! *** K0s natively (section 108): the r40s set -- its first layer (fast) and hidden layers (sub) every cell the twin's or the fused mirror's, given the device's own input; k_head_apply's image within APPLY_TOL ***`,
+            J40.slice(0, 4).every((j) => j.unexplained === 0) && J40.map((j) => j.kernel).join() === "fast,sub,sub,sub,head_apply" && r40.acts[4] === null && j40.worst <= APPLY_TOL && w64 < 1e-5,
+            J40.slice(0, 4).map((j) => `${j.kernel} ${j.plain}+${j.fused}f${j.unexplained ? "+" + j.unexplained + "?" : ""}`).join(", ") + `; head and kernel ${j40.worst.toExponential(2)}; against f64 ${w64.toExponential(2)}`));
+        const none40 = [...J15, ...J40].every((j) => j.fused === 0);
+        KS.push(ok("  ...and where no cell of r15 or r40s fused, r40s's every hidden layer and its image are r15's, bit for bit -- the subgroup kernel moves where the inputs come from, never the order",
+            !none40 || (r40.y.every((v, i) => Object.is(v, r15.y[i])) && r40.acts.slice(0, 4).every((a, i) => a.every((v, j) => Object.is(v, r15.acts[i][j])))),
+            none40 ? "no cell fused in either set on this device: every layer must agree exactly" : "a set fused cells here, so the layers may differ where it did"));
+        const rs = await job(net9, x9, 13, 11, 9, "r40s"), Ls9 = deviceLayers(net9, "r40s"), Js = judge(net9, x9, 13, 11, rs.acts, "r40s");
+        const js = judgeHeadApply(x9, rs.acts[Ls9.length - 2], Ls9[Ls9.length - 1], rs.y, 13, 11);
+        KS.push(ok("  ...and r40s on the small network, no mask: nine inputs on the fast kernel, 16 hidden channels (two blocks) on the subgroup kernel, every cell explained, the image within its bound",
+            Js.slice(0, -1).every((j) => j.unexplained === 0) && Js.map((j) => j.kernel).join() === "fast,sub,sub,head_apply" && js.worst <= APPLY_TOL, `head and kernel ${js.worst.toExponential(2)}`));
+        // a device made WITHOUT the feature is refused by name, before any work, whatever its adapter offers
+        let noSg = null;
+        try { const a = await gpu.requestAdapter(), dv = await a.requestDevice(); try { await createDeviceDenoiser(dv, net, { H: 4, W: 4, C: 10, kernels: "r40s" }); } finally { dv.destroy(); } } catch (e) { noSg = e.message; }
+        KS.push(ok("  ...and r40s on a device made without the subgroups feature is refused by name, not built", /needs a device with the "subgroups" feature -- this one has none \(section 108\)/.test(noSg || ""), noSg || "built"));
+    }
+    // round 41 (section 109): r41h -- K0h natively where the adapter offers shader-f16 (the Intel; not SwiftShader, so here it SKIPs by
+    // name): every half-precision layer's cells conv2dCpuF16's or its mirror's, the f32 head through the image, the image within
+    // F16_IMAGE_TOL of the f64 network; and on the small network. KH keeps the native rows. A device without the feature refuses r41h
+    // by name whatever the adapter offers -- which runs everywhere.
+    const native41 = featureSetsFor(NATIVE, nativeSetsFor(NATIVE, ["r41h"], { compiler: COMPILER })), KH = [];
+    if (!native41.includes("r41h")) console.log(`  SKIP  K0h natively for r41h: ${NATIVE && NATIVE.features && NATIVE.features.has("shader-f16") ? `one of FXC_UNTRIED_SETS, on a D3D12 adapter whose run compiles with ${compilerSaid} -- FXC has no 16-bit types` : "the adapter has no shader-f16 feature"} (section 109)`);
+    else {
+        const jobH = async (n, xx, h, w, C) => { const a = await gpu.requestAdapter(), dv = await a.requestDevice({ requiredFeatures: ["shader-f16"] });
+            try { const D = await createDeviceDenoiser(dv, n, { H: h, W: w, C, kernels: "r41h" }); const out = await D.run(xx, { keep: true }); D.destroy(); return out; } finally { dv.destroy(); } };
+        const r41 = await jobH(net, x, HH, WW, 10), J41 = judge(net, x, HH, WW, r41.acts, "r41h"), L41 = deviceLayers(net, "r41h");
+        const j41 = judgeHeadApply(x, r41.acts[3], L41[4], r41.y, HH, WW), w64 = worstRel(r41.y, ref, 1e-12);
+        k0row("native", "r41h", J41, j41.worst);
+        KH.push(ok(`!! *** K0h natively (section 109): the r41h set -- its half-precision layers every cell conv2dCpuF16's or its fused mirror's, given the device's own input; k_head_apply's image within APPLY_TOL; the image within F16_IMAGE_TOL of the f64 network ***`,
+            J41.slice(0, 4).every((j) => j.unexplained === 0) && J41.map((j) => j.kernel).join() === "fast_unroll_h,fast_unroll_h,fast_unroll_h,fast_unroll_h,head_apply" && r41.acts[4] === null && j41.worst <= APPLY_TOL && w64 <= F16_IMAGE_TOL,
+            J41.slice(0, 4).map((j) => `${j.kernel} ${j.plain}+${j.fused}f${j.unexplained ? "+" + j.unexplained + "?" : ""}`).join(", ") + `; head and kernel ${j41.worst.toExponential(2)}; against f64 ${w64.toExponential(2)}`));
+        const rh = await jobH(net9, x9, 13, 11, 9), Lh9 = deviceLayers(net9, "r41h"), Jh = judge(net9, x9, 13, 11, rh.acts, "r41h");
+        const jh = judgeHeadApply(x9, rh.acts[Lh9.length - 2], Lh9[Lh9.length - 1], rh.y, 13, 11);
+        KH.push(ok("  ...and r41h on the small network, no mask: nine inputs and 16 hidden channels in half precision, every cell explained, the image within its bound",
+            Jh.slice(0, -1).every((j) => j.unexplained === 0 && j.kernel === "fast_unroll_h") && jh.worst <= APPLY_TOL, `head and kernel ${jh.worst.toExponential(2)}`));
+    }
+    {
+        let noF16 = null;
+        try { const a = await gpu.requestAdapter(), dv = await a.requestDevice(); try { await createDeviceDenoiser(dv, net, { H: 4, W: 4, C: 10, kernels: "r41h" }); } finally { dv.destroy(); } } catch (e) { noF16 = e.message; }
+        ok("  round 41 (section 109): r41h on a device made without the shader-f16 feature is refused by name, not built", /needs a device with the "shader-f16" feature -- this one has none \(section 109\)/.test(noF16 || ""), noF16 || "built");
+    }
+    // round 57 (section 129): r57p -- K0p natively, no feature asked: every storing layer's cells the f32 twin's rounded to f16 (or, where
+    // WGSL lets a conversion take the other nearest, that one, counted -- and none on a software adapter, whose pack2x16float was measured
+    // to round to nearest even), every other layer K0's; k_head_apply's image within APPLY_TOL; the image within F16S_IMAGE_TOL of f64
+    const native57 = nativeSetsFor(NATIVE, ["r57p"], { compiler: COMPILER }), KP = [];
+    if (!native57.includes("r57p")) console.log(`  SKIP  K0p natively for r57p: one of FXC_UNTRIED_SETS, on a D3D12 adapter whose run compiles with ${compilerSaid} (section 129)`);
+    else {
+        const jobP = async (n, xx, h, w, C) => { const a = await gpu.requestAdapter(), dv = await a.requestDevice();
+            try { const D = await createDeviceDenoiser(dv, n, { H: h, W: w, C, kernels: "r57p" }); const out = await D.run(xx, { keep: true }); D.destroy(); return out; } finally { dv.destroy(); } };
+        const soft = !!(NATIVE && NATIVE.info && /swiftshader|llvmpipe|software/i.test([NATIVE.info.vendor, NATIVE.info.architecture, NATIVE.info.description].join(" ")));
+        const r57 = await jobP(net, x, HH, WW, 10), J57 = judge(net, x, HH, WW, r57.acts, "r57p"), L57 = deviceLayers(net, "r57p");
+        const j57 = judgeHeadApply(x, r57.acts[3], L57[4], r57.y, HH, WW), w64 = worstRel(r57.y, ref, 1e-12), others = J57.reduce((a, j) => a + (j.other || 0), 0);
+        // section 141: the device's store rule, read from its own cells, and the image's bound for that rule
+        const rule57 = f16StoreRule(J57.slice(0, 4)), tol57 = f16sImageTol(rule57);
+        k0row("native", "r57p", J57, j57.worst);
+        // round 57 (section 130): the row's reading on a line of its own, so a report that cuts a failing row's line short still has it
+        console.log(`  ----  native K0p for r57p, the reading: ${J57.slice(0, 4).map((j, i) => `layer ${i} ${j.plain} plain, ${j.fused} fused, ${j.other || 0} other nearest, ${j.unexplained} unexplained`).join("; ")}; ` +
+            `head and kernel ${j57.worst.toExponential(2)} (APPLY_TOL ${APPLY_TOL}); against f64 ${w64.toExponential(2)} (F16S_IMAGE_TOL ${F16S_IMAGE_TOL}); ` +
+            `store rule ${rule57}, ${J57.slice(0, 4).map((j) => j.tz ?? "-").join(" / ")} cells truncated, so the bound ${tol57} (section 141)`);
+        // section 144: the reading line outruns realGpuRun's 400 characters at the rule's first count, so the rule and its bound again, short
+        console.log(`  ----  native K0p for r57p: store rule ${rule57}, the image ${w64.toExponential(2)} against the bound ${tol57} (section 141)`);
+        KP.push(ok(`!! *** K0p natively (section 129): the r57p set -- its storing layers every cell the f32 twin's rounded to f16 (or the other nearest, counted${soft ? ", and none here: a software adapter" : ""}), its last written-out layer K0's, given the device's own input; k_head_apply's image within APPLY_TOL; the image within its store rule's bound of the f64 network (section 141) ***`,
+            J57.slice(0, 4).every((j) => j.unexplained === 0) && J57.map((j) => j.kernel).join() === "fast_unroll_p,fast_unroll_p,fast_unroll_p,fast_unroll_p,head_apply" && r57.acts[4] === null &&
+            (!soft || (others === 0 && rule57 === "rn")) && j57.worst <= APPLY_TOL && k0pImage(J57.slice(0, 4), w64),
+            J57.slice(0, 4).map((j) => `${j.kernel} ${j.plain}+${j.fused}f${j.other ? "+" + j.other + "o" : ""}${j.unexplained ? "+" + j.unexplained + "?" : ""}`).join(", ") + `; head and kernel ${j57.worst.toExponential(2)}; against f64 ${w64.toExponential(2)}`));
+        const rp = await jobP(net9, x9, 13, 11, 9), Lp9 = deviceLayers(net9, "r57p"), Jp = judge(net9, x9, 13, 11, rp.acts, "r57p");
+        const jp = judgeHeadApply(x9, rp.acts[Lp9.length - 2], Lp9[Lp9.length - 1], rp.y, 13, 11);
+        KP.push(ok("  ...and r57p on the small network, no mask: nine inputs and 16 hidden channels stored in f16, every cell explained, the image within its bound",
+            Jp.slice(0, -1).every((j) => j.unexplained === 0 && j.kernel === "fast_unroll_p") && (!soft || Jp.every((j) => !j.other)) && jp.worst <= APPLY_TOL, `head and kernel ${jp.worst.toExponential(2)}`));
+    }
+    console.log(`  ----  native K0p for round 57's set: ${native57.includes("r57p") ? `r57p ${KP.length && KP.every(Boolean) ? "green" : "RED"} (${KP.filter(Boolean).length} of ${KP.length} native rows)` : "r57p not built natively (one of FXC_UNTRIED_SETS, under FXC)"}`);
+    console.log(`  ----  native K0h for round 41's set on ${nativeAdapterKey(NATIVE && NATIVE.info, process.platform) || "(an adapter with no vendor)"}, compiler ${compilerSaid}: ` +
+        (!native41.includes("r41h") ? `r41h not built natively (${NATIVE && NATIVE.features && NATIVE.features.has("shader-f16") ? "one of FXC_UNTRIED_SETS, under FXC" : "no shader-f16 feature"})` : `r41h ${KH.length && KH.every(Boolean) ? "green" : "RED"} (${KH.filter(Boolean).length} of ${KH.length} native rows)`));
+    // round 40: the ladder on an adapter WITHOUT subgroups -- this box's adapter has them, so the Intel's case is made here: the real
+    // native adapter with the feature hidden. r40s must stand aside by name at every size, and the set beside it still be timed.
+    {
+        const hide = (a) => new Proxy(a, { get: (t, k) => (k === "features" ? new Set([...t.features].filter((f) => f !== "subgroups")) : (typeof t[k] === "function" ? t[k].bind(t) : t[k])) });
+        let L = null, threw = null;
+        try { L = await timingLadder(makeDenoiser(4, "he", "kernel", 9), async () => hide(await gpu.requestAdapter()), { sizes: [[8, 8], [16, 16]], sets: ["r15", "r40s"], rounds: 1, maxReps: 3, minReps: 1, warmup: 0 }); }
+        catch (e) { threw = String(e.message).slice(0, 200); }
+        if (!L) ok("  round 40 (section 108): on an adapter without the subgroups feature the ladder stands r40s aside -- it threw instead", false, threw);
+        else ok("  round 40 (section 108): on an adapter without the subgroups feature the ladder stands r40s aside at every size, naming the feature and section 108, and still times the set beside it",
+            L.rows.r40s.length === 2 && L.rows.r40s.every((x) => x.skipped && /no subgroups feature/.test(x.reason) && /section 108/.test(x.reason)) && L.rows.r15.every((x) => !x.skipped && x.wall.median > 0),
+            `r40s: ${L.rows.r40s.map((x) => x.reason).join(" | ")}; r15 ${L.rows.r15.map((x) => (x.skipped ? "skipped" : x.wall.median.toFixed(1) + " ms")).join(", ")}`);
+    }
+    // ROUND 49 (section 119): the w16 network AS EXPORTED (render/denoise-net-r47-w16.json) on the sets the tables use -- r15, the
+    // shipped default, and both round-18 sets, the Intel's r18u among them -- every hidden layer's cells explained against conv2dCpu or
+    // its fused mirror on the device's own input, and the fused head's image within APPLY_TOL: the key the shipped network is held to
+    const W16 = [];
+    {
+        const j16 = JSON.parse(fs.readFileSync(path.join(ENG, "render", "denoise-net-r47-w16.json"), "utf8")), net16 = decodeNet(j16.net), x16 = synth(15, 13, 10, 49);
+        for (const set of ["r15", ...native18]) {
+            const r16 = await job(net16, x16, 15, 13, 10, set), L16 = deviceLayers(net16, set), J16 = judge(net16, x16, 15, 13, r16.acts, set);
+            const h16 = judgeHeadApply(x16, r16.acts[L16.length - 2], L16[L16.length - 1], r16.y, 15, 13), w64 = worstRel(r16.y, denoise(net16, x16, 15, 13).y, 1e-12);
+            W16.push({ set, ok: J16.slice(0, -1).every((jj) => jj.unexplained === 0) && h16.worst <= APPLY_TOL && L16.slice(0, -1).every((L) => L.Cout === 16), kernels: L16.map((L) => L.kernel).join(","), w: h16.worst, w64 });
+        }
+        ok("!! round 49: the exported w16 network on the device -- r15 and the round-18 sets this compiler builds -- every hidden layer's cells explained, the head's image within APPLY_TOL, natively",
+            j16.source.seed === 1 && j16.source.cacheKey === "net-8f65da8060752453-5668b0251a72b854" && net16.layers.map((L) => L.Cout).join("/") === "16/16/16/16/81" &&
+            W16.length >= 1 && W16.every((o) => o.ok) && W16[0].set === "r15" && native18.every((s2) => W16.some((o) => o.set === s2)), W16.map((o) => `${o.set} [${o.kernels}] head ${o.w.toExponential(2)}, against f64 ${o.w64.toExponential(2)}`).join("; "));
+    }
+    console.log(`  ----  native K0 for round 49's w16 network on ${nativeAdapterKey(NATIVE && NATIVE.info, process.platform) || "(an adapter with no vendor)"}, compiler ${compilerSaid}: ` +
+        W16.map((o) => `${o.set} ${o.ok ? "green" : "RED"}`).join("; "));
     // v4849 -- round 19 (section 66)'s condition (1), readable off the rig's report: realGpuRun keeps measured and failing lines,
     // never a PASS or a SKIP, so which round-18 sets' native rows ran here, under which compiler, and whether every one was green
     // is said on one measured line -- by the key nativeAdapterKey gives this adapter
@@ -980,6 +1383,9 @@ else try {
     // which compiler, and whether every one was green
     console.log(`  ----  native K0w for round 27's set on ${nativeAdapterKey(NATIVE && NATIVE.info, process.platform) || "(an adapter with no vendor)"}, compiler ${compilerSaid}: ` +
         (!native27.includes("r27w") ? "r27w not built natively (one of FXC_UNTRIED_SETS, under FXC)" : `r27w ${KW.length && KW.every(Boolean) ? "green" : "RED"} (${KW.filter(Boolean).length} of ${KW.length} native rows)`));
+    // round 40 (section 108)'s condition C2, readable off the rig's report the same way: whether r40s's native rows ran, and were all green
+    console.log(`  ----  native K0s for round 40's set on ${nativeAdapterKey(NATIVE && NATIVE.info, process.platform) || "(an adapter with no vendor)"}, compiler ${compilerSaid}: ` +
+        (!native40.includes("r40s") ? `r40s not built natively (${NATIVE && NATIVE.features && NATIVE.features.has("subgroups") ? "one of FXC_UNTRIED_SETS, under FXC" : "no subgroups feature"})` : `r40s ${KS.length && KS.every(Boolean) ? "green" : "RED"} (${KS.filter(Boolean).length} of ${KS.length} native rows)`));
     let refusedC = null;
     // v4852 -- round 20 (section 68): this box's native pick, and the builder held to it. This box picks r15 whatever a caller does,
     // so a builder that ignored the pick would pass section 6's row; here the pick is forced off r15 through a fixture table naming
@@ -1000,6 +1406,23 @@ else try {
     ok("  a network handed an input of the wrong width is refused, not read at the wrong stride", /10 input channels was handed an input of 9/.test(refusedC || ""));
     console.log(`  ....  adapter: ${r.adapter}; one ${HH} x ${WW} pass ${r.ms.toFixed(0)} ms (SwiftShader's, a JIT's cost and not a GPU's)`);
 } catch (e) { ok("!! the device section ran to its end", false, String(e && e.message || e).slice(0, 200)); }
+
+// ROUND 50 (section 120): the network table -- NETWORKS names exactly the two exported files, both tables are empty and frozen, a key
+// either table does not name runs the shipped network, a fixture table's entry is honoured, and an unknown name is refused
+{
+    const refuse = (f) => { try { f(); return false; } catch (e) { return /no network "nope" -- the networks are shipped, w16/.test(e.message); } };
+    ok("!! rounds 50 and 53: NETWORKS names the shipped and w16 files; each network table names the Intel gen-9's key alone, with w16, by section 123; every other key -- the 1080's among them -- runs the shipped network; a fixture table's entry is honoured and an unknown name refused",
+        JSON.stringify(NETWORKS) === JSON.stringify({ shipped: "render/denoise-net-r11.json", w16: "render/denoise-net-r47-w16.json" }) &&
+        JSON.stringify(PAGE_NETWORKS_BY_ADAPTER) === '{"Windows/intel/gen-9":"w16"}' && JSON.stringify(NATIVE_NETWORKS_BY_ADAPTER) === '{"win32/intel/gen-9":"w16"}' &&
+        Object.isFrozen(PAGE_NETWORKS_BY_ADAPTER) && Object.isFrozen(NATIVE_NETWORKS_BY_ADAPTER) &&
+        NETWORKS_DECIDED_BY["Windows/intel/gen-9"] === "section 123" && NETWORKS_DECIDED_BY["win32/intel/gen-9"] === "section 123" &&
+        pageNetworkFor("Windows/intel/gen-9") === "w16" && nativeNetworkFor("win32/intel/gen-9") === "w16" &&
+        ["Windows/nvidia/pascal", "Linux/google/swiftshader", null].every((k) => pageNetworkFor(k) === "shipped") && ["win32/nvidia/pascal", "linux/google/swiftshader", null].every((k) => nativeNetworkFor(k) === "shipped") &&
+        pageNetworkFor("Windows/intel/gen-9", { "Windows/intel/gen-9": "w16" }) === "w16" && nativeNetworkFor("win32/intel/gen-9", { "win32/intel/gen-9": "w16" }) === "w16" &&
+        networkFile("w16") === NETWORKS.w16 && refuse(() => networkFile("nope")) && refuse(() => pageNetworkFor("k", { k: "nope" })) &&
+        Object.values(NETWORKS).every((f) => fs.existsSync(path.join(ENG, f))),
+        JSON.stringify(NETWORKS));
+}
 
 console.log("\n4. THE PAGE, IN CHROMIUM: denoise.html ON ITS OWN DEVICE");
 {
@@ -1035,6 +1458,37 @@ console.log("\n4. THE PAGE, IN CHROMIUM: denoise.html ON ITS OWN DEVICE");
         ok("  ...and it refuses a round 11 test seed before rendering it, and says above everything that it covers R and C only",
             /35000 belongs to the arc's dataset and is refused/.test(R.refused?.status || "") && /only those/.test(R.scope || "") && /not<\/b>|not trained on/.test(R.scope || ""),
             (R.refused?.status || "").slice(0, 100));
+        // round 50 (section 120): with no ?net= and an empty network table, the page runs the shipped network and says so
+        // round 53 (section 124): the network the page's own key names -- here SwiftShader's, so the shipped one; on the rig's Intel, w16,
+        // with the image row above holding it to THAT network's f64 image (the page checks against the network it loaded)
+        const wantNet = pageNetworkFor(R.key), tabled = !!R.key && Object.hasOwn(PAGE_NETWORKS_BY_ADAPTER, R.key);
+        ok(`  rounds 50 and 53: ...and with no ?net= the page runs the network its key names -- ${wantNet}${tabled ? `, the table's for ${R.key}` : `, no entry for ${R.key || "(no key)"}`} -- and says so`,
+            new RegExp(`network ${wantNet}${tabled ? ` \\(the table's for ${R.key.replace(/[/]/g, "\\/")}\\)` : "(?! \\()"}`).test(run.cap || ""), (run.cap || "").slice(0, 160));
+    }
+    // ROUND 50: ?net=w16 runs the w16 network on the page's device, held to that network's f64 image as the page holds the shipped one;
+    // ?net=nope is refused by name before anything runs
+    const r50 = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 180000, args: { seed: 991235 }, script: `async (a) => {
+        const out = {};
+        for (const q of ["?net=w16", "?net=nope"]) {
+            const f = document.createElement("iframe"); f.style.width = "1200px"; f.style.height = "900px"; f.src = "/denoise.html" + q; document.body.appendChild(f);
+            await new Promise((r) => f.onload = r);
+            const d = f.contentDocument, $ = (id) => d.getElementById(id), wait = (ms) => new Promise((r) => setTimeout(r, ms));
+            for (let i = 0; i < 100 && !$("go"); i++) await wait(50);
+            $("family").value = "R"; $("seed").value = String(a.seed); $("refspp").value = "64"; $("status").textContent = "idle"; $("go").click();
+            const t = Date.now();
+            while (Date.now() - t < 100000) { const s = $("status").textContent; if (/rendered in|failed|refused/.test(s)) break; await wait(100); }
+            out[q] = { status: $("status").textContent, cap: $("netCap").textContent };
+            f.remove();
+        }
+        return out;
+    }` });
+    if (r50.skipped) console.log("  SKIP  " + r50.reason);
+    else {
+        const W = (r50.result || {})["?net=w16"] || {}, N = (r50.result || {})["?net=nope"] || {}, m = /worst relative difference ([0-9.e+-]+)/.exec(W.status || ""), wd = m ? Number(m[1]) : NaN;
+        ok("!! round 50: denoise.html?net=w16 runs the w16 network on its device, names it as asked, and its image is that network's f64 image within f32 rounding; ?net=nope is refused by name",
+            r50.ok && /on the device/.test(W.cap || "") && /network w16 \(asked by \?net=\)/.test(W.cap || "") && wd < 1e-5 &&
+            /failed: denoiseDevice: no network "nope" -- the networks are shipped, w16/.test(N.status || ""),
+            `${(W.cap || "").slice(0, 120)}; worst ${wd}; nope: ${(N.status || "").slice(0, 100)}`);
     }
 }
 
@@ -1049,16 +1503,21 @@ console.log("\n5. EVERY KERNEL SET IN THE BROWSER, CELL FOR CELL (rounds 13-15, 
         if (!navigator.gpu) return { error: "no navigator.gpu" };
         for (const set of D.KERNEL_SETS) {
             const a = await navigator.gpu.requestAdapter(); if (!a) return { error: "no adapter" };
-            const dev = await a.requestDevice();
+            // round 40: a set the adapter's features cannot build stands aside by name; the feature asked for where offered
+            if (!D.featureSetsFor(a, [set]).length) { out[set] = { aside: "the adapter has no " + D.SET_FEATURES[set] + " feature (" + (set === "r41h" ? "section 109" : "section 108") + ")" }; continue; }
+            const dev = await a.requestDevice({ requiredFeatures: ["subgroups", "shader-f16"].filter((f) => a.features.has(f)) });
             try {
-                const Dn = await D.createDeviceDenoiser(dev, net, { H: h, W: w, C: 10, kernels: set }), res = await Dn.run(x, { keep: true });
+                const Dn = await D.createDeviceDenoiser(dev, net, { H: h, W: w, C: 10, kernels: set, subgroupMinSize: a.info && a.info.subgroupMinSize }), res = await Dn.run(x, { keep: true });
                 const DL = D.deviceLayers(net, set), fusedLast = DL[DL.length - 1].kernel === "head_apply";
                 const layers = DL.map((L, i) => {
                     if (L.kernel === "head_apply") return { kernel: L.kernel, plain: 0, fused: 0, unexplained: 0 };
                     const input = i ? res.acts[i - 1] : Float32Array.from(x), T = D.twinsOf(L), tw = T.twin(input, h, w, L), fm = T.mirror(input, h, w, L);
-                    let plain = 0, fused = 0, unexplained = 0;
-                    for (let j = 0; j < tw.length; j++) { const v = res.acts[i][j]; if (v === tw[j]) plain++; else if (v === fm[j]) fused++; else unexplained++; }
-                    return { kernel: L.kernel, plain, fused, unexplained };
+                    // round 57: a storing layer's other nearest f16, counted apart, as natively
+                    const store = !!L.io && L.io.y === "f16", raw = store ? Cv.conv2dCpu(input, h, w, L) : null, rawF = store ? Cv.conv2dCpuFma(input, h, w, L) : null;
+                    let plain = 0, fused = 0, other = 0, unexplained = 0;
+                    for (let j = 0; j < tw.length; j++) { const v = res.acts[i][j]; if (v === tw[j]) plain++; else if (v === fm[j]) fused++;
+                        else if (store && (Cv.f16Bracket(raw[j]).includes(v) || Cv.f16Bracket(rawF[j]).includes(v))) other++; else unexplained++; }
+                    return { kernel: L.kernel, plain, fused, other, unexplained };
                 });
                 // a fused last pass is judged through its image, on the twin's logits and the fused mirror's
                 let worst = 0;
@@ -1073,15 +1532,17 @@ console.log("\n5. EVERY KERNEL SET IN THE BROWSER, CELL FOR CELL (rounds 13-15, 
     }` });
     if (r.skipped) console.log("  SKIP  " + r.reason);
     else {
-        const O = (r.result && r.result.out) || {}, line = (s) => O[s] ? O[s].layers.map((j) => `${j.kernel} ${j.plain}+${j.fused}f${j.unexplained ? "+" + j.unexplained + "?" : ""}`).join(", ") : "not run";
-        for (const s of KERNEL_SETS) if (O[s]) k0row("browser", s, O[s].layers, O[s].worst);
+        const O = (r.result && r.result.out) || {}, line = (s) => O[s] ? O[s].layers.map((j) => `${j.kernel} ${j.plain}+${j.fused}f${j.other ? "+" + j.other + "o" : ""}${j.unexplained ? "+" + j.unexplained + "?" : ""}`).join(", ") : "not run";
+        for (const s of KERNEL_SETS) if (O[s] && !O[s].aside) k0row("browser", s, O[s].layers, O[s].worst);
         for (const s of KERNEL_SETS)
-            ok(`!! ${s !== "r12" ? `*** K0${s === "r27w" ? "w" : ""} in the browser: ` : ""}the ${s} set in the browser's own device, every cell ${s === "r27w" ? "the Winograd twin's or its fused mirror's" : "the twin's or the fused mirror's"}, the kernel within APPLY_TOL` +
+            if (O[s] && O[s].aside) console.log(`  SKIP  K0${s === "r41h" ? "h" : "s"} in the browser for ${s}: ${O[s].aside}`);
+            else ok(`!! ${s !== "r12" ? `*** K0${s === "r27w" ? "w" : s === "r40s" ? "s" : s === "r41h" ? "h" : s === "r57p" ? "p" : ""} in the browser: ` : ""}the ${s} set in the browser's own device, every cell ${s === "r27w" ? "the Winograd twin's or its fused mirror's" : "the twin's or the fused mirror's"}, the kernel within APPLY_TOL` +
                `${s === "r27w" ? ", the image within 1e-5 of the f64 network (section 83)" : ""}${s !== "r12" ? " ***" : ""}`,
-                r.ok && !r.pageErrors.length && !!O[s] && O[s].layers.length === 5 && O[s].layers.every((j) => j.unexplained === 0) && O[s].worst <= APPLY_TOL && (s !== "r27w" || O[s].w64 < 1e-5) &&
+                r.ok && !r.pageErrors.length && !!O[s] && O[s].layers.length === 5 && O[s].layers.every((j) => j.unexplained === 0) && O[s].worst <= APPLY_TOL && (s !== "r27w" || O[s].w64 < 1e-5) && (s !== "r41h" || O[s].w64 <= F16_IMAGE_TOL) && (s !== "r57p" || O[s].w64 <= F16S_IMAGE_TOL) &&
                 O[s].kernels.join() === { r12: "tiled,tiled,tiled,tiled,direct", r13: "fast,fast,fast,fast,fast", r14: "fast,fast,fast,fast,head", r15: "fast,fast,fast,fast,head_apply",
                                          r18t: "tile_inline,tile_inline,tile_inline,tile_inline,head_apply", r18u: "fast_unroll,fast_unroll,fast_unroll,fast_unroll,head_apply",
-                                         r27w: "wino,wino,wino,wino,head_apply" }[s],
+                                         r27w: "wino,wino,wino,wino,head_apply", r40s: "fast,sub,sub,sub,head_apply", r41h: "fast_unroll_h,fast_unroll_h,fast_unroll_h,fast_unroll_h,head_apply",
+                                         r57p: "fast_unroll_p,fast_unroll_p,fast_unroll_p,fast_unroll_p,head_apply" }[s],
                 r.ok ? `${line(s)}; kernel ${O[s] ? O[s].worst.toExponential(2) : "-"}; image against f64 ${O[s] ? O[s].w64.toExponential(2) : "-"}` + (r.result && r.result.error ? "; " + r.result.error : "") : r.reason);
     }
 }
@@ -1093,10 +1554,12 @@ if (W.refused || skip) console.log("  SKIP  the native caller needs a device her
 else {
     const r = spawnSync(process.execPath, [path.join(ENG, "tools", "denoiseDevice.mjs"), "--which"], { cwd: ENG, encoding: "utf8", timeout: 240000 });
     const said = String(r.stdout || ""), m = said.match(/--which: key (\S+); kernels (\S+) -- (.*)/), ran = said.match(/--which: (\S+) built and ran one 64 x 64 pass in ([\d.]+) ms; worst relative difference from the f64 network on the CPU ([\d.e+-]+)/);
-    const want = HERE_PICK || { key: null, kernels: null };
+    const want = HERE_PICK || { key: null, kernels: null }, netLine = said.match(/--which: network (\S+) -- (.*)/);
     console.log(`  ----  native caller here: ${m ? `key ${m[1]}, kernels ${m[2]} (${m[3]})` : "no pick line"}; ${ran ? `ran in ${ran[2]} ms, worst ${ran[3]}` : "no run line"}`);
     ok("!! round 20 (section 68): the native caller picks what nativePick gives this adapter and this run's compiler, builds it, and runs one pass within 1e-4 of the f64 network",
-        r.status === 0 && !!m && !!ran && m[1] === (want.key || "(none)") && m[2] === want.kernels && ran[1] === want.kernels && +ran[3] <= 1e-4,
+        r.status === 0 && !!m && !!ran && m[1] === (want.key || "(none)") && m[2] === want.kernels && ran[1] === want.kernels && +ran[3] <= 1e-4 &&
+        // round 53 (section 124): and the network its key's NATIVE_NETWORKS_BY_ADAPTER entry names, on a line of its own
+        !!netLine && netLine[1] === nativeNetworkFor(want.key),
         `exit ${r.status}; the gate's own pick ${want.key} ${want.kernels}` + (r.status ? "; " + String(r.stderr || said).trim().split("\n").slice(-2).join(" | ") : ""));
 }
 

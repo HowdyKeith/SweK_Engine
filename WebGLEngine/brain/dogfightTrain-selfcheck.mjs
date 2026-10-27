@@ -1,6 +1,6 @@
 // WebGLEngine/brain/dogfightTrain-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node brain/dogfightTrain-selfcheck.mjs      (~10 s)
+// Run: node brain/dogfightTrain-selfcheck.mjs      (~20 s alone on the sandbox box, measured v4898; was ~10 s)
 //
 // THE SEARCH WITH THE JOB TAKEN OUT, HELD TO THE ORIGINALS. brain/dogfightTrain.mjs is the (1+1)-ES and the prune that brain/pilotFlightPolicy.mjs and brain/pilotFlightMlp.mjs each carry, with the score handed in. A restatement is only as
 // good as the check that it IS the thing it restates, so this gate runs it beside the originals:

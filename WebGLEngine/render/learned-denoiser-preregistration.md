@@ -6807,3 +6807,3502 @@ set SWEK_TIMING_TRACE=
 ```
 `git log -1 --oneline` must show this branch's latest commit, not 468766f9. Send back the console output with its three
 `echo` lines, the five trace files and the two JSON files.
+
+## 102. ROUNDS 34 AND 35 -- THE VERDICT: THE 1080 DID NOT CRASH IN FIVE RUNS, AND THE LIST FILL HOLDS ON BOTH GPUS
+
+**What arrived.** Eight files from the GTX 1080, all at bc6fbed2, the branch head carrying sections 99-101. They were committed
+as received at cbdb2c13, before this section was written:
+- section 101's step 1: the timing gate run alone three times, with its console (`render/denoise-rig-r35-console-gtx1080.txt`)
+  and three traces (`render/denoise-rig-r35-trace-alone-{1,2,3}-gtx1080.txt`);
+- section 101's step 2, which is also round 34 on the 1080: two `realGpuRun --only denoise` runs
+  (`render/denoise-rig-r34-{a,b}-gtx1080.json`) and their traces (`render/denoise-rig-r35-trace-r34-{a,b}-gtx1080.txt`).
+
+`render/denoiseUpscaleGPU-selfcheck.mjs`'s section 9 re-derives every figure here from those files. Sabotaged A1-A5.
+
+**Round 35, by section 101's rule: the crash is NOT REPRODUCED.**
+- All three solo runs ended ALL GREEN with exit code 0. Each trace runs to "the ladder returned" and "the gate ends, 0 fail(s)",
+  through all six sizes.
+- In both `realGpuRun` runs every gate was green, and every gate's exit is now recorded: 0, with nothing on stderr.
+- **The predictions all missed.** None of the five died, so there was no 0xC0000005 and no last device step.
+- The crash stays open in the backlog (`denoise-1080-native-crash`), named, with these five traces as its record. The only
+  abnormal behaviour in the five runs is below. It is reported, not proposed as the cause.
+
+**Reported, deciding nothing.**
+- **r27w at 1920 x 1080 stalled twice.** In run a's native ladder it took 15,100.6 ms a pass, against about 249 ms in the
+  other four, nearly all of it in one layer (13,921.5 ms). That run's trace shows two of its timing rounds there taking about
+  30 s each (75.3 -> 106.4 -> 136.7 s). In run b the page's r27w at the same size took 10,247.4 ms a pass. A GPU stall that long
+  is the kind of event that could end a process, but nothing here shows the earlier deaths were one.
+- **Run a's trace, as received, is not whole.** It stops at 149.4 s on "round 2 time r27w" at 1920 x 1080, yet that run's
+  timing gate passed, including the row that reads the trace to its return. So the file read inside the run was whole and the
+  one sent was not. That is unexplained here.
+
+**Round 34 on the 1080, by section 99's rule, with section 101 naming these runs: H holds.**
+
+| GPU | Ring fill (a / b) | List fill (a / b) | Chain against today's page with the list fill | H |
+|---|---|---|---|---|
+| Intel gen-9 (section 100) | 301.6 / 302.8 ms | 23.9 / 23.0 ms | 2.042 / 2.179 x | holds |
+| GTX 1080 | 26.9 / 26.2 ms | **24.0 / 25.4 ms** | 1.424 / 1.395 x | **holds** |
+
+C1 (every gate green), C2 (87 rings, 25,765 listed, 0 left) and C3 (both networks on the device's clock) held in both runs.
+
+**So, by section 99's rule: the list fill becomes the chain's fill, in a round of its own** that changes the runner's
+default and holds the change to today's rows. The fill lever of `denoise-halfres-fixed-costs` is closed; the coverage lever
+stays open.
+
+**The predictions for the 1080 missed, and by a lot.**
+- **The list fill:** predicted 1-6 ms, measured 24.0 and 25.4 ms.
+- **The ratio:** predicted 1.9-2.3 x, measured 1.424 and 1.395 x.
+- **Why:** on the 1080 the fill was never the pixels. Cutting them to 5 % of the frame took 3-11 % off. What remains is about
+  99 small passes, each a compute pass on its own, timed by the wall clock. On the Intel, where each ring pass over the frame
+  cost about 3 ms, the same change was 13 x. A fill that runs its rings inside fewer passes is the lever this points to on the
+  1080; the list fill does not reach it.
+
+**Round 33 on the 1080, stated so it is not decided by default.** These two runs also carry section 97's line: the chain with
+its history at 1.325 and 1.341 x, every gate green. Section 98 closed round 33 for the 1080 ("no verdict; the next round is
+the crash"), and nothing in section 101 re-opened it. As in sections 76 and 100, it stays closed: the numbers are reported and
+do not count.
+
+**Nothing changes in this section:** the chain's default fill, the page, the network, every kernel table, and `fx/fsr`.
+
+## 103. ROUND 36 -- THE LIST FILL BECOMES THE CHAIN'S DEFAULT, WITH ROUND 31'S RING FILL KEPT AS ITS REFERENCE
+
+**Why now.** Section 102's rule: the list fill held on both GPUs, so it becomes the chain's fill, in a round of its own that
+changes the runner's default and holds the change to today's rows. This is that round (`denoise-listfill-default`). It
+measures nothing new, so it has no prediction to miss and no rig run to wait for. It is fixed here before its code.
+
+**What changes, in `render/denoiseUpscaleGPU.mjs`:**
+- `fill(...)` and `chain(...)` run the list fill unless asked `{ list: false }`, which runs round 31's ring fill. The ring fill
+  stays, unchanged, as the reference the default is held to.
+- `timeHalfChain`'s `half` and `temporal` sum the list fill (`fillList`), and the result says so: `fill: "list"`.
+  `halfRing` and `temporalRing` are round 31's and round 33's sums with the ring fill (`fill`). `halfList` and `temporalList`
+  go, as they would be `half` and `temporal` under a second name. A report with no `fill` key is from before this round, and its
+  `half` and `temporal` are the ring fill's.
+- The step keys do not change. `fill` and `whole` are still the ring fill's steps; `fillList` and `wholeList` the list fill's.
+
+**What changes on the page (`denoise.html`'s "Time the half-size chain"):** the fill row, "the half-size chain in all", the
+one-frame row and "the half-size chain with its history, in all" report the list fill. Round 31's ring fill keeps four rows
+of its own, as the reference: its fill, its steps in one frame, its chain in all, and that with the history. 15 rows, not 14.
+The status line's ratio is the default chain's, with the ring fill's beside it.
+
+**What does NOT change: the lines the rig's reports carry.** Sections 94, 98, 100 and 102 read `section 93:`, `section 97:`
+and `section 99:` lines out of committed reports. Each keeps its meaning from this round on: section 93's and 97's chain is
+the ring fill's (`halfRing`, `temporalRing`), section 99's "with the list fill" is the list fill's (now `half`, `temporal`).
+A new `section 103:` line names the default fill and gives its chain and ratio. The four lines are made by one function, and
+the pilot-size row checks each line's figure against the sum it names, so a line cannot change meaning with no row red.
+
+**The rows that hold the change (the gate's sections 3 and 4):**
+1. `fill()` with nothing asked is the list fill: the same `listed` count, and the same floats, bit for bit, as
+   `{ list: true }`, on all six of round 34's frames. `{ list: false }` lists nothing and stays fillEmittersBounded's.
+2. `chain()` with nothing asked is the list fill's chain, bit for bit, on all four scenes. `{ list: false }` stays round 31's
+   chain within 1e-3 of emitterAwareUpscale, and the default stays within 1e-6 of it.
+3. At the pilot size the page's `half` is the half-size network plus coverage at both sizes, `fillList` and the rest;
+   `temporal` that plus the history's four passes; `halfRing` and `temporalRing` the same with `fill`; `fill` is `"list"`;
+   the table has 15 rows.
+4. The four rig lines, made from the pilot's report, each carry the figure of the sum named above.
+
+**Sabotages, by the byte-safe runner (B1-B6):** `fill()`'s default back to the ring fill; `chain()`'s the same; `half`
+summing `fill`; `halfRing` summing `fillList`; the page without the ring fill's chain row; and section 93's line made from
+`half`. Each must turn at least one row red. A sabotage that goes 0 red is a finding to fix before the round is committed.
+
+**The rule.** The round holds when rows 1-4 pass on SwiftShader and every gate the branch runs stays as green as it was.
+No rig run is owed: the kernels, their order and every timed step are round 34's, measured on both GPUs in sections 100 and
+102. The next rig run of this gate checks rows 1-4 on that GPU as it goes.
+
+**Nothing else changes:** the network, every kernel table, the kernels themselves, and `fx/fsr`.
+
+## 104. ROUND 37 -- A FILL THAT RUNS EIGHT RINGS A PASS, IN TILES: FIXED BEFORE THE RIG RUNS IT
+
+**The question.** Section 102 found the 1080's fill cost is passes, not pixels: the list fill cut the pixels it touches to
+about 5 % of the frame and took 3-11 % off, leaving about 99 compute passes of roughly 0.25 ms each on the wall clock. Does a
+fill that runs several rings in one pass, in workgroup memory, take the 1080's fill well below the list fill's, without
+losing on the Intel? (`denoise-fill-fewer-passes`.)
+
+**The fill, `fill(..., { tile: true })` and `chain(..., { tile: true })`.**
+- One init pass turns the known flags into each pixel's ring: 0 if known, UNKNOWN (0xffffffff) if not.
+- Then one pass per FILL_TILE_RINGS = 8 rings. Each workgroup of 16 x 16 threads loads a 32 x 32 tile into workgroup
+  memory: its 16 x 16 interior and a halo of 8 on every side. It runs up to 8 rings there. Each ring is two phases split by
+  barriers: every cell still UNKNOWN works out the mean of its 8-neighbours whose ring is below this one, and only then do
+  the cells that found one take that value and this ring's number. It writes back the interior alone, ping-ponging the
+  image and the rings between two buffers.
+- A ring at a pixel reads only pixels one step away, so after k rings a value is exact wherever the tile holds every pixel
+  within k of it. With a halo of 8 and at most 8 rings a pass, every interior pixel is exact. Cells outside the frame are
+  a third mark that is never below any ring and is never filled, which is the CPU's bounds check.
+- A left pass then zeroes each pixel still UNKNOWN and counts it.
+- The sums run in the CPU's order, dy then dx, in f32, as the list fill's do, so the floats should be the list fill's bit
+  for bit. Each interior fill counts in its ring's `filled`, once.
+- The tile kernel counts its passes into a buffer that is read back (`tilePasses`). As round 34's Y7 showed, two fills that
+  agree float for float cannot otherwise tell which one ran.
+- At the chain's 96 rings: 14 passes (init, 12 tile passes, left), against the list fill's 99 and the ring fill's 97.
+
+**Timed.** `time()` adds `fillTile` and `wholeTile` by the wall clock, as the list fill is timed (one clock across the
+fills, though 14 passes would fit the device's 30). `timeHalfChain` adds `halfTile` and `temporalTile`. The page adds three
+rows (18): the tile fill, the half-size chain with it, and that with the history. A `section 104:` line carries them for the
+rig. The default stays the list fill (section 103) until this round's verdict says otherwise.
+
+**The rows (the gate's sections 2-4).**
+1. The tile kernel validates and holds its constants: 32 = 16 + 2 x 8, and 16 KB of workgroup memory, within WebGPU's
+   default limit.
+2. The tile fill is fillEmittersBounded's within 1e-5, with the same rings ring by ring and the same pixels left, on round
+   34's six frames. It is also the list fill's bit for bit, on those six frames and on the 96 x 64 frame at 13 rings, where
+   the last pass runs 5. `tilePasses` is ceil(maxRings / 8).
+3. The chain with the tile fill is the list fill's chain, bit for bit, on all four scenes.
+4. At the pilot size, `halfTile` is the half-size chain with `fillTile` in the fill's place and `temporalTile` that with the
+   history. The page has 18 rows. The `section 104:` line carries both figures.
+
+**The rig run.** On each GPU, in a fresh clone of a commit carrying this section, two
+`realGpuRun --only denoise` runs, as in round 34.
+
+**The rule (H37), per GPU, on the two runs' `section 104:` and `section 99:` lines.**
+- **C1:** every gate is green.
+- **C2:** the tile fill reaches every pixel: its rings equal the list fill's, and 0 are left.
+- **H37 holds on a GPU** when, in both runs, the tile fill is at least 10 % faster than the list fill (fillTile <=
+  0.9 x fillList).
+- **What it buys:**
+  - If it holds on the 1080 and the Intel's tile fill is no slower than its list fill in both runs, the tile fill
+    becomes the default, in a round of its own, as round 36 was.
+  - If it holds on one GPU only, it is reported and choosing the fill per adapter goes to the backlog.
+  - If it holds on neither, the tile fill is kept as a measured negative, and the 1080's fill lever is closed.
+
+**Predictions (stated so they can miss).**
+- **GTX 1080:** the tile fill 2-10 ms against the list fill's 24-25. That is 14 passes at the ~0.25 ms each section 102
+  implies, plus the tiles' work. H37 holds.
+- **Intel gen-9:** a ring pass over the whole frame there cost about 3 ms. A tile pass reads the frame four times over
+  (32^2 for 16^2) and does 8 rings of work in workgroup memory, so 12 of them could cost 10-60 ms against the list fill's
+  23-24. H37 is not predicted either way on the Intel.
+- Every gate is green on both.
+
+**Sabotages, by the byte-safe runner (C1-C7):**
+- a ring reading neighbours filled in the same ring (one barrier instead of two phases);
+- a halo of 7 with 8 rings a pass;
+- the cells outside the frame marked UNKNOWN;
+- the interior fills not counted;
+- the tile option running the list fill;
+- `halfTile` summing `fillList`;
+- the page without the tile fill's chain row.
+
+Each must turn at least one row red.
+
+**Nothing else changes:** the default fill (still the list fill), the network, every kernel table, and `fx/fsr`.
+
+**Two corrections and one report, made before the round was committed and before anything was measured on a GPU.**
+- The page has 18 rows, not 17: section 103's 15, and three more.
+- Sabotage C1 as first written (`<=` for `<`) went 0 RED. Under two phases, no cell carries this ring's number while the
+  means are taken, so `<=` changes nothing. The sabotage now does what its name says: one phase that writes as it goes and
+  reads this ring's fills. That turns four rows red. Its control, one phase with `<`, is green, as it should be: that is the
+  list fill's in-place rule. The two phases are kept so that no read of workgroup memory races a write; the answer does not
+  need them.
+- Reported, deciding nothing: on SwiftShader, a CPU emulating workgroup memory, the tile fill took 193.9 ms against the
+  list fill's 11.4 ms at the pilot size.
+
+## 105. ROUND 37 -- THE VERDICT: THE TILE FILL HOLDS ON THE GTX 1080 AND LOSES ON THE INTEL, SO THE DEFAULT STAYS THE LIST FILL
+
+**What arrived.** Four reports: two `realGpuRun --only denoise` runs on each GPU, all at 3d2ae54c, the commit carrying
+section 104 with its kernel fixed. They were committed as received at f8686aaf, before this section was written:
+`render/denoise-rig-r37-{a,b}-{intel-gen9,gtx1080}.json`. 49e124cb also carried section 104, but its module did not load,
+so no run at it could count; the rule counts 3d2ae54c alone. `render/denoiseUpscaleGPU-selfcheck.mjs`'s section 10
+re-derives every figure here from the four files. Sabotaged D1-D5.
+
+**C1 and C2 held in all four runs.**
+- **C1:** every gate was green with exit 0.
+- **C2:** the tile fill reached 87 rings, the list fill's count, in 12 passes, with 0 left.
+
+**H37, by section 104's rule:**
+
+| GPU | List fill (a / b) | Tile fill (a / b) | Tile / list | H37 | Chain against today's page, tile / list |
+|---|---|---|---|---|---|
+| GTX 1080 | 22.6 / 23.1 ms | **16.8 / 16.7 ms** | 0.743 / 0.723 | **holds** | 1.601 / 1.571 x against 1.454 / 1.417 x |
+| Intel gen-9 | 22.3 / 24.6 ms | **67.3 / 68.9 ms** | 3.018 / 2.801 | **fails** | 1.935 / 1.978 x against 2.066 / 2.113 x |
+
+**So, by the rule: it holds on one GPU only.** The default stays the list fill (section 103), and choosing the fill per
+adapter goes to the backlog (`denoise-fill-per-adapter`). On the 1080 the tile fill takes about a quarter off the fill and
+lifts the chain from about 1.44 x to 1.59 x against today's page. On the Intel it costs about three times the list fill.
+
+**The predictions missed, both of them.**
+- **GTX 1080:** predicted 2-10 ms, measured 16.8 and 16.7. The prediction priced a pass at the ~0.25 ms that the list fill's 99
+  passes imply (22.6 ms). The tile fill's 14 passes cost about 1.2 ms each. So the tile passes' own work dominates, not their
+  number: every pass loads every tile of the frame four times over (32^2 for 16^2) and runs 8 rings over all 1,024 cells,
+  while the lights' pixels are about 5 % of the frame (25,765 of 518,400). The list fill touches that 5 % alone.
+- **Intel gen-9:** "could cost 10-60 ms", measured 67.3 and 68.9. On the Intel, where the ring fill over the whole frame
+  cost ~300 ms and the list fill 23, the pixels are the cost. A fill that works over the whole frame again, even in 12
+  passes, loses to one that works over 5 % of it in 99.
+- Every gate was green on both GPUs, as predicted.
+
+**What this points to, reported and not decided here.** The two fills each cut one cost: the list fill the pixels, the tile
+fill the passes. A tile fill dispatched only over the tiles that hold an unknown pixel would cut both. With a list of those
+tiles, its length as an indirect dispatch as round 34 did, the work would scale with the lights and the passes would stay
+at 12. That is `denoise-fill-listed-tiles`. It would be pre-registered against both fills as they are now.
+
+**Nothing changes in this section:** the default fill (the list fill), the page, the network, every kernel table, and
+`fx/fsr`.
+
+## 106. ROUND 38 -- THE TILE FILL OVER THE LIGHTS' TILES ONLY: FIXED BEFORE THE RIG RUNS IT
+
+**The question.** Section 105: the list fill cut the pixels, which is the Intel's cost, and the tile fill cut the passes,
+which is the 1080's. Does a tile fill dispatched only over the tiles holding an unknown pixel cut both, and beat the
+default list fill on both GPUs? (`denoise-fill-listed-tiles`.)
+
+**The fill, `fill(..., { tile: "listed" })` and `chain(..., { tile: "listed" })`.**
+- **The init pass** writes each pixel's ring into both ring buffers and its value into the second image. It also flags each
+  16 x 16 tile holding an unknown pixel and appends it to a list, once.
+- **One thread** writes the list's length as an indirect dispatch's workgroup count, as round 34's args kernel does.
+- **The tile passes** are round 37's kernel, from the same template; round 37's own text is unchanged, byte for byte. Each
+  workgroup reads its tile from the list and fills it, ping-ponging as before. There are 12 at 96 rings.
+- **The left pass** is round 37's, over the frame. That makes 15 passes at 96 rings.
+- **Why skipping is exact.** A tile with no unknown pixel when the fill starts never gets one, because a ring only turns
+  UNKNOWN into a ring. Its pixels need no pass. Because the init pass wrote both buffers alike, whichever buffer the last pass
+  leaves as the answer holds those tiles unchanged. The listed tiles are written by every pass. Their halos are read from the
+  buffer the pass before left, and that buffer is exact for the listed tiles' interiors and unchanged elsewhere.
+- **What is read back:** `tilesListed`, the list's length.
+
+**Measured on the CPU, before this section was written, as a property of the fixture:** at 960 x 540 the rig's scene,
+R 990000, has 25,765 pixels in view of its light (the rig's own count). They lie in **123 of the frame's 2,040 tiles, 6.0 %**.
+
+**Timed.** `time()` adds `fillLTile` and `wholeLTile` by the wall clock. `timeHalfChain` adds `halfLTile` and
+`temporalLTile`. The page gains three rows (21). A `section 106:` line carries them for the rig. The default stays the list
+fill.
+
+**The rows (the gate's sections 2-4).**
+1. The listed tile kernel is the tile kernel's text with the tile read from the list. Every other line is the same, and round
+   37's text is unchanged.
+2. The listed tile fill is fillEmittersBounded's within 1e-5, and the list fill's and the tile fill's bit for bit. That holds
+   on round 34's six frames and at 13 rings. `tilesListed` is the CPU's count of tiles with an unknown pixel, frame by frame.
+3. The chain with it is the list fill's chain bit for bit, on all four scenes.
+4. At the pilot size, `halfLTile` is the half-size chain with `fillLTile`, and the `section 106:` line carries it. The
+   pilot's check lists exactly the CPU's count of tiles.
+
+**The rig run.** On each GPU, two `realGpuRun --only denoise` runs, at a commit carrying this section.
+
+**The rule (H38), per GPU, on the two runs' `section 106:` lines.**
+- **C1:** every gate is green with exit 0.
+- **C2:** the listed tile fill reaches the list fill's rings with 0 left, in 12 passes, over 123 tiles.
+- **H38 holds on a GPU** when, in both runs, fillLTile <= 0.9 x fillList, the default.
+- **What it buys:**
+  - If it holds on both GPUs, the listed tile fill becomes the default, in a round of its own, and
+    `denoise-fill-per-adapter` closes unbuilt.
+  - If it holds on one GPU, `denoise-fill-per-adapter` goes ahead, naming each GPU's fastest fill from these runs.
+  - If it holds on neither, it is kept as a measured negative and `denoise-fill-per-adapter` goes ahead with round 37's
+    figures.
+
+**Predictions (stated so they can miss).** Section 105's per-pass figures, split into a fixed cost and work that scales with
+the tiles: about 0.25 ms fixed a pass, the rest of round 37's tile pass scaled by 6 %.
+- **GTX 1080:** the listed tile fill 2-8 ms against the list fill's 22.6-23.1. H38 holds.
+- **Intel gen-9:** 5-15 ms against 22.3-24.6. The init and left passes over the whole frame are most of it. H38 holds.
+- So the listed tile fill becomes the default, and every gate is green on both.
+
+**Sabotages, by the byte-safe runner (E1-E6):**
+- the init pass writing the second ring buffer and not the second image;
+- a tile listed by its column alone;
+- the args kernel dispatching every tile (the tile fill again);
+- the listed option running the tile fill;
+- `halfLTile` summing `fillTile`;
+- the page without the listed tile fill's chain row.
+
+Each must turn at least one row red.
+
+**Nothing else changes:** the default fill (still the list fill), round 37's tile kernel, the network, every kernel table,
+and `fx/fsr`.
+
+**Two corrections to the rows, made before the round was committed and before anything was measured on a GPU.** Both rows
+went red on their first run here; the fill itself was bit for bit in every case.
+- Row 1 asked round 37's kernel for 120 lines, a number written without counting. It has 90, and the row now holds it to
+  that.
+- Row 2 asked the frame with no unknown pixel for 1 tile pass, and read 0. No tile is listed there, so every tile pass
+  dispatches no workgroup and none is counted. A frame with nothing to fill does no tile work, which is what the fill is
+  for. The row now asks for 0 passes where no tile is listed.
+- Reported, deciding nothing: at the pilot size on SwiftShader, the listed tile fill took 83.7 ms against the list fill's
+  16.3, over 4 of the 12 tiles. That is a CPU's time.
+
+## 107. ROUND 39 -- THE COVERAGE BOUNDED TO THE PIXELS THAT CAN SEE A LIGHT: FIXED BEFORE THE RIG RUNS IT
+
+**The question.** The fill lever is being settled (sections 103-106), which leaves `denoise-halfres-fixed-costs`'s other
+lever: the coverage. In round 37's runs (section 105) it is now the chain's largest step. The coverage at 1920 x 1080 took
+247.6-252.8 ms on the Intel and 17.2-17.8 ms on the 1080; at 960 x 540, 59.9-66.4 and 4.3-4.6 ms. Every pixel traces 64 rays
+against every sphere, though about 5 % of the frame can see a light. Does a coverage pass that skips the pixels no ray of
+which can meet an emitter, with the same answer bit for bit, cut that cost at least in half on both GPUs?
+
+**The bound, `coverage(..., { bound: true })` (COVERAGE_BOUND_WGSL).**
+- **The test.** Before its 64 rays, a pixel compares its centre ray with each emitter sphere. It traces if the eye is inside
+  or at the sphere (distance <= 1.001 r + 1e-4). It also traces if the angle from its centre ray to the sphere's centre is
+  within all three of these together:
+  - the sphere's angular radius, asin(r / d);
+  - the pixel's half-diagonal on the image plane, times COVERAGE_BOUND_ARC = 1.6;
+  - COVERAGE_BOUND_SLACK = 2e-3 rad.
+- **Why the margins.** An arc is at most pi / 2 times its chord, and the chord is within the pixel on a plane at distance
+  >= 1. f32's acos near 1 is good to about 5e-4.
+- **Otherwise** the pixel writes 0 coverage and 0 emission, untraced. Those are the values its 64 rays would give, since no
+  ray of it meets an emitter, and they are the same bits (+0).
+- **Unchanged otherwise.** The kernel is round 31's text from one template, round 31's own unchanged byte for byte. A traced
+  pixel runs the same code, so the answer is the same bits everywhere. `traced` counts the pixels traced.
+- **The CPU twin**, `coverageMayHit`, makes the same test in f64.
+
+**Measured on the CPU before this section was written, as properties of the fixtures and the rig's scene:**
+- The twin traced every pixel `emitterRadiance` lights, missing none, on 13 views: R 44001, 44002, 44004 and 990000 at
+  32 x 32, 64 x 64 and 128 x 72, and R 990000 at 960 x 540.
+- At the rig's sizes it traces 27,023 of 518,400 pixels (5.2 %) at 960 x 540, and **106,709 of 2,073,600 (5.1 %) at
+  1920 x 1080**.
+
+**Timed.** `time()` adds `covHalfB` and `covFullB`: one pass each, on the device's clock where the device has one, as the
+coverage is.
+- It also compares the bounded coverage's last frames with round 31's, bit for bit at both sizes (`boundCheck.sameHalf`,
+  `sameFull`), and reads back what each traced.
+- `timeHalfChain` adds `fullBound` (today's page with the bounded mask; the page's own mask is this coverage at W x H),
+  `halfBound` and `temporalBound` (the chain with its default fill and the bounded coverage).
+- The page gains four rows (25). A `section 107:` line carries them for the rig.
+- Nothing's default changes in this round.
+
+**The rows (the gate's sections 2-4).**
+1. The bounded kernel is round 31's text plus the bound, and round 31's own text is unchanged. It carries
+   COVERAGE_BOUND_ARC and COVERAGE_BOUND_SLACK.
+2. On the device, on the four scenes at both sizes, the bounded coverage is round 31's bit for bit. Its traced count is
+   within 2 % of the twin's, and every pixel round 31's lights is traced. On the scene with the light behind the camera, it
+   traces nothing.
+3. The twin traces every lit pixel on the CPU views above.
+4. At the pilot size, `halfBound` and `fullBound` are their sums, the page has 25 rows, `boundCheck` is bit for bit at both
+   sizes, and the `section 107:` line carries the sums.
+
+**The rig run.** On each GPU, two `realGpuRun --only denoise` runs, at a commit carrying this section.
+
+**The rule (H39), per GPU, on the two runs' `section 107:` lines.**
+- **C1:** every gate is green with exit 0.
+- **C2:** at both sizes the bounded coverage is round 31's bit for bit (`sameHalf`, `sameFull`), and it traced 106,709 +-
+  2 % at 1920 x 1080.
+- **C3:** both coverages at both sizes are on the device's clock.
+- **H39 holds on a GPU** when, in both runs, covFullB <= 0.5 x covFull.
+- **What it buys:**
+  - If it holds on both GPUs, the bounded coverage becomes the chain's and the page's mask, in a round of its own, and the
+    coverage lever closes.
+  - If it holds on one, it is reported and the coverage per adapter goes to the backlog.
+  - If it holds on neither, it is a measured negative.
+- **Reported, deciding nothing:** the chain's ratio against today's page, since the page's mask gets the same saving.
+
+**Predictions (stated so they can miss).** The coverage's cost is its rays, so the bounded pass should cost about the
+traced share of it, rounded up for 8 x 8 workgroups that hold both kinds of pixel, plus the bound's own test over the frame.
+- **Intel gen-9:** covFullB 10-40 ms against covFull's ~250, and covHalfB 3-15 ms against ~63.
+- **GTX 1080:** covFullB 1-4 ms against ~17.5, and covHalfB 0.3-1.5 ms against ~4.5.
+- H39 holds on both, and every gate is green.
+
+**Sabotages, by the byte-safe runner (F1-F6):**
+- the slack and the arc factor dropped (`asin` alone);
+- the bound tested against every sphere, not the emitters;
+- the bound's skipped pixels writing the emitter's colour (1 for coverage);
+- `coverage(..., { bound: true })` running round 31's kernel;
+- `halfBound` summing `covFull`;
+- the page without the bounded chain's row.
+
+Each must turn at least one row red.
+
+**Nothing else changes:** the default coverage, the fill, the network, every kernel table, and `fx/fsr`.
+
+**One correction to the rows, made before the round was committed and before anything was measured on a GPU.** Row 1 held
+the bound to 23 added lines, a number written without counting. It adds 20, and the row now holds it to that. The other
+rows passed on their first run here, the device tracing exactly the twin's count on all eight views. Reported, deciding
+nothing: at the pilot size on SwiftShader the bounded coverage at 128 x 72 took 4.7 ms against round 31's 51.3. That is a
+CPU's time.
+
+## 108. ROUND 40 -- THE GTX 1080's HIDDEN LAYERS SHARING THEIR INPUTS ACROSS A SUBGROUP: FIXED BEFORE THE RIG RUNS IT
+
+**The question.** With the fill and the coverage in hand (sections 103-107), the network is the chain's largest cost on both
+GPUs. On the 1080 it is r18t: ~18 ms at 960 x 540 and ~75 ms at 1920 x 1080 natively, its hidden layers at ~2.2-2.3
+TFLOP/s, about a quarter of the GPU's peak. Of the backlog's levers for the network, `denoise-subgroup-reduction` is the one
+that can be built and tested in this sandbox before the rig sees it: SwiftShader exposes `subgroups` here, natively and in
+Chromium, and not `shader-f16`. Does a hidden-layer kernel that shares its input values across a subgroup, in place of
+r18t's tile in workgroup memory, run the 1080's network faster than r18t, with every cell still explained?
+
+**The kernel, `k_conv_sub` (brain/conv2d.mjs's `conv2dSubWgsl`), and the set `r40s`.**
+- **A thread's work is r18t's:** 2 output rows (`rows: 2`, as r18t's 2 pixels) and all 32 output channels, as 8 vec4
+  accumulators a row (`g4: 8`), from r18t's own uniform block of weights (`packTileUniforms` at 1 pixel, 8 vec4s).
+- **The inputs are not staged.** A workgroup is 64 threads in a row. Each subgroup claims a span of columns through a
+  workgroup atomic, so nothing assumes which threads share a subgroup or in what order. Each lane loads its own column. It
+  gets its left and right neighbours' values with `subgroupShuffle`, and the subgroup's two edge lanes serve as halo only. A
+  subgroup of S lanes writes S - 2 columns: 30 on the 1080, 2 on SwiftShader's 4. Every size is read from the
+  `subgroup_size` builtin, and the host dispatches by the adapter's smallest subgroup size. A larger one leaves the
+  workgroups past the image idle.
+- **No barrier, and no workgroup memory but the atomic.**
+- **The input rows are streamed** one at a time and fed to the output rows that use them. Every block's channels and taps are
+  unrolled at generation, so no array is indexed at run time.
+- **THE ORDER DOES NOT MOVE.** Each accumulator adds the bias, then block by block, ky, kx, ci. A row outside the image is
+  skipped, as r18t skips it. A column outside adds the zero its lane loaded, as r18t's zero edge does. So the kernel is held
+  to conv2dCpu, or its fused mirror, cell for cell, at zero. That is the key every set but r27w is held to; no restated
+  tolerance is needed.
+- **The set `r40s`** is r18t with every hidden layer the kernel holds on `k_conv_sub`, and r15's fused head. It needs the
+  adapter's `subgroups` feature (SUBGROUP_SETS). On an adapter without it, the Intel gen-9 among them, it is left out by name
+  and nothing else changes. Its devices request `subgroups` where the adapter offers it.
+
+**Timed.** Both ladders, native and the page's, add `r40s` to TIMED_SETS where the adapter has subgroups. The sets keep
+taking turns. New lines, `native: r40s against r18t at W x H` and `page: ...`, are r18t's median over r40s's, tagged section
+108, beside a line against r15.
+
+**The rows.**
+1. `conv2dSubWgsl`'s shape, its refusals, and its uniform block (r18t's at 1 pixel, 8 vec4s, bit for bit).
+2. On the device, natively and in Chromium, at odd sizes that leave partial spans and rows and blocks of fewer than 8
+   channels: every cell is explained by conv2dCpu or its fused mirror, at zero.
+3. `r40s`'s layers: every hidden layer on `sub`, the head on `head_apply`, and a layer the kernel cannot hold falling back
+   to r15's kernel.
+4. K0s: the whole pass on the device is the twin's, every layer's cells explained, natively and in the browser, under the
+   key every set but r27w is held to.
+5. An adapter without subgroups drops `r40s` by name, from the ladders and from any request.
+
+**The rig run.** On each GPU, two `realGpuRun --only denoise` runs, at a commit carrying this section. On the Intel they
+check that `r40s` stands aside by name and that the rest is unchanged.
+
+**The rule (H40), on the GTX 1080, per path (native under DXC, and the page in Chrome).**
+- **C1:** every gate is green with exit 0.
+- **C2:** K0s holds on that path in both runs.
+- **C3:** both sets' 1920 x 1080 passes are on the device's clock.
+- **H40 holds on a path** when, in both runs, r40s is at least 1.05 x as fast as r18t at 1920 x 1080 (section 66's margin).
+- **What it buys:**
+  - If it holds on both paths, the 1080's two table entries (PAGE_KERNELS_BY_ADAPTER, NATIVE_KERNELS_BY_ADAPTER) move to
+    r40s, in a round of its own.
+  - If it holds on one, that path's entry moves in that round and the other stays r18t.
+  - If it holds on neither, r40s is kept as a measured negative and the 1080's network lever goes back to the backlog.
+- On the Intel nothing can move: `r40s` must stand aside by name, with every other line as before.
+
+**Predictions (stated so they can miss).**
+- **r40s against r18t at 1920 x 1080 on the 1080: 0.8-1.3 x, on both paths.** The kernel trades r18t's cooperative
+  staging and two barriers a block for four global loads and eight shuffles a lane a block. It also gives up 2 of every 32
+  lanes to halo. Which of those wins is not known from here. H40 is not predicted either way.
+- Every gate is green on both GPUs. On the Intel, r40s stands aside.
+
+**Sabotages, by the byte-safe runner (G1-G7):**
+- the shuffle reading lane + kx instead of lane + kx - 1;
+- a halo lane writing its column;
+- the span taken as S, not S - 2;
+- a row outside the image read from the image's edge row, not skipped (a row "added as zeros" would change only the
+  sign of a zero, which the cell check does not see, so it would test nothing);
+- the channel blocks summed out of order (cj before kx);
+- `r40s` built on a device without subgroups;
+- the ladder keeping `r40s` on an adapter without subgroups.
+
+Each must turn at least one row red.
+
+**Nothing else changes:** every table entry, the default fill and coverage, every other kernel, and `fx/fsr`.
+
+**A correction to the kernel, made before anything was committed or measured on a GPU.** As first written, each subgroup
+claimed its span of columns through a workgroup atomic. On SwiftShader that atomic returned 0 to every subgroup's first lane,
+so every subgroup wrote the same columns and most cells came out wrong (6,688 of 7,904 at 19 x 13, 32 -> 32). A probe showed
+SwiftShader's subgroups to be contiguous, aligned runs of a workgroup's threads (first indices 0, 4, 8, ...). So a subgroup
+now takes the span its first thread's index names: that index over the subgroup size. WGSL does not promise that layout.
+An adapter that broke it would turn the cell-for-cell rows red, on the rig as here, so it cannot pass unseen.
+
+**And one case dropped from the conv2d gate.** At 4 rows and 8 vec4s, 128 accumulator floats a thread, the kernel crashed
+SwiftShader's native pipeline build. The process died with a segmentation fault and no row, as written-out blocks of the fast
+kernel did in section 59. `r40s` runs 2 rows, so that configuration is not a case. 4 rows are tested at 2 vec4s.
+
+**Sabotages, by the byte-safe runner, before commit.** G1-G5 turned 8-10 rows red each, across the conv2d gate's device
+cases, K0s natively and in the browser, and the small network. G6 turned 1 red (the refusal row) and G7 1 red (the ladder row
+on an adapter with the feature hidden). G7 needed that row. This box's adapter has subgroups, so nothing exercised the ladder
+standing aside, and a ladder that threw would have killed the gate with no FAIL line, which the runner counted as 0. The row
+now catches the throw, and the runner now counts a gate that exits non-zero with no FAIL line as a crash, red.
+Reported, deciding nothing: on SwiftShader at 64 x 64, r40s took about 9-10 x r18t's time on both ladders. Those are a CPU's
+4-lane subgroups, half of every subgroup halo.
+
+
+## 109. ROUND 41 -- THE INTEL'S HIDDEN LAYERS IN HALF PRECISION: FIXED BEFORE THE RIG RUNS IT
+
+**The question.** On the Intel gen-9 the network is the half-size chain's largest cost by far: r18u at 960 x 540 took
+274-283 ms in round 37's runs, against tens of ms for each other step once rounds 38-39 land. Gen-9 runs f16 arithmetic at
+twice its f32 rate, and both its paths expose `shader-f16` (the features probe). Does r18u with its hidden layers' arithmetic
+in f16 run the Intel's network faster, its image held to a bound against the f64 network that this section fixes before it
+is run? (`denoise-f16-intel`.)
+
+**This round's first measurements are on the rig.** SwiftShader exposes no `shader-f16`, natively or in Chromium, so the
+f16 kernel cannot compile here. What can be held here is held: the f32 setting of the template is r18u's text byte for byte;
+an emulation that reads the same packed f16 weights through `unpack2x16float` and computes in f32 runs on SwiftShader against
+conv2dCpu on f16-rounded weights; and the twin, the packing and the bound are CPU rows. The f16 type tokens themselves -- the
+tile, the accumulators, the literals, the conversions -- are first compiled and run on the Intel.
+
+**The kernel: `conv2dFastAltWgsl(L, { reads: "f32", unroll: true, arith: "f16" })`, and the set `r41h`.**
+- r18u's kernel, one block written out, with `enable f16;`. The input tile holds f16, converted once at the load. The 8
+  accumulators are `vec4<f16>`, starting from the bias converted once. Every multiply-add is f16, and the output is written f32.
+- The weights are rounded to f16 on the host and packed two vec4s of f16 to a uniform `vec4<u32>`, read with
+  `bitcast<vec4<f16>>`. That is half r18u's weight bytes. Element 0 is the low half of the first u32, little-endian, as
+  WebGPU is.
+- `arith: "f16emu"` is the same kernel with f32 types, decoding the same packed words with `unpack2x16float`. It is a test
+  instrument, never a set's kernel.
+- **The set `r41h`** is r18u with every layer r18u runs on `fast_unroll` (all four 3 x 3 layers, the first with its 10
+  channels) on the f16 kernel, called `fast_unroll_h`. The head is r15's fused `head_apply`, in f32: the softmax over 81
+  logits stays f32. It needs the `shader-f16` feature, and `featureSetsFor` leaves it out by name wherever that is missing,
+  the 1080 and SwiftShader among them. It is in FXC_UNTRIED_SETS, since FXC has no 16-bit types.
+
+**Its twin and its key.**
+- `conv2dCpuF16` does the kernel's order, the canonical one (b, then block by block, ky, kx, ci). Every input, weight and
+  bias is rounded to f16 (`f16round`, ties to even) and every product and sum too. `conv2dCpuF16Fma` rounds each multiply-add
+  once.
+- **K0h:** every f16 layer's cells are the twin's or the mirror's, given the device's own input. The f32 head's image is
+  within APPLY_TOL. And the bridge to f64: the image within **F16_IMAGE_TOL = 1e-2 relative** of the f64 network on every value.
+- **Measured on the CPU before this section was written**, the r41h twin against the f64 network on the device gate's
+  fixture (the large random network, 21 x 19): at most 1.75e-3 relative, 2.6e-4 on average. At 64 x 64, 3.45e-3. The
+  shipped network on the ladder's input reached 1.25e-2 relative, but only on values near zero; its largest absolute
+  difference is 3.4e-3. The bound holds the gate's fixture, at about 5.7 x its largest.
+- The f32 twin, for comparison, is within 6.6e-7.
+
+**What K0h does NOT settle.** Every other set is within f32 rounding of the network the arc measured; r41h's image is not.
+Whether 1e-3-level differences move any denoise verdict -- the arc's d -- is not measured here. So **no table entry can move on
+H41 alone:** if it holds, the quality question is a round of its own before the Intel's entries change.
+
+**Timed.** Both ladders add `r41h` to TIMED_SETS where the adapter has `shader-f16`, with `r41h against r18u` and
+`against r15` lines tagged section 109.
+
+**The rows.**
+1. `f16round` and `f16bits` on exact cases: ties to even, subnormals, 65504, and the overflow at 65520.
+2. The template's f32 setting is r18u's text byte for byte.
+3. The f16 kernel's text is r18u's line for line but for its types, its weight reads and its conversions.
+4. The packed weights, decoded as `bitcast` would, are the f16-rounded weights.
+5. On the device here, the emulation kernel is conv2dCpu on f16-rounded weights, cell for cell, on odd sizes and partial
+   blocks.
+6. The f16 twin is f16-valued, differs from the f32 twin, and is within the bound on the gate's fixture.
+7. r41h's layers and features, its refusal on a device without the feature, and the ladder standing it aside.
+8. K0h natively and in the browser, where the feature exists: the Intel. Here those rows SKIP by name.
+
+**The rule (H41), on the Intel gen-9, per path (native under DXC, and the page in Chrome).**
+- **C1:** every gate is green with exit 0.
+- **C2:** K0h held on that path in both runs, read off its measured line.
+- **C3:** both sets' 1920 x 1080 passes are on the device's clock.
+- **H41 holds on a path** when, in both runs, r41h is at least 1.05 x as fast as r18u at 1920 x 1080.
+- **What it buys:**
+  - If it holds on either path, the next round measures r41h's quality on the arc's images, its d against r18u's, before any
+    table entry moves.
+  - If it holds on neither, r41h is kept as a measured negative and `denoise-f16-intel` closes.
+  - If K0h fails, the fault is the kernel's, named by its rows, and it is fixed before any timing is read.
+
+**Predictions (stated so they can miss).**
+- **r41h against r18u at 1920 x 1080 on the Intel: 1.1-1.8 x, on both paths.** f16 doubles the ALU rate, but section 54 put
+  the hidden layers at about a fifth of the f32 peak, so not all of the cost is arithmetic. The tile in f16 halves its
+  workgroup memory, and the weights are half the bytes.
+- K0h holds on both paths, and every gate is green on both GPUs. On the 1080, r41h stands aside.
+
+**Sabotages, by the byte-safe runner (H1-H7):**
+- the packing's halves swapped (zw for xy);
+- a weight's vec4 index off by one within a pair;
+- the packed weights not rounded to f16 first (truncated);
+- the f32 setting changed;
+- the twin rounding to f32, not f16;
+- the bound widened to 1e-1;
+- r41h built on a device without `shader-f16`.
+
+Each must turn at least one row red here, or, where only the Intel can see it, the section says so.
+
+**Nothing else changes:** every table entry, every other kernel, and `fx/fsr`.
+
+**Two changes to the rows, made before the round was committed and before anything was measured on a GPU.**
+- The kernel-text row's list of what an f16 line may carry was written too narrow and went red on the kernel as intended.
+  It missed the `0.0h` literal and the store's `f32(...)` conversion, which are in the design above. The list now names them.
+- Sabotage H4 (the f32 setting changed) could not have gone red as the rows stood. They compared the f32 setting with the
+  default, which would change with it, and a cosmetic change moves no cell. So r18u's kernel text is now frozen by sha256 at
+  both of its shapes. The hashes were taken at the commit before this round and after it alike, and they match.
+
+**Sabotages, by the byte-safe runner, before commit: H1-H7 each turned at least one row red here.** H1 turned 4 rows red, H2 3,
+H3 1, H4 1, H5 2, H6 1 and H7 1. H3 was caught only by the packing row: f16bits rounds the mantissa itself, so unrounded weights
+mostly packed to the same words. H2 left the three-group 1 x 1 case alone, since it reads through the z-group index. As this
+section says, no sabotage of the f16 kernel's own type tokens can be seen before the Intel compiles it.
+
+
+## 110. ROUND 42 -- THE CHAIN'S "REST", SPLIT INTO ITS THREE PASSES: A MEASUREMENT, FIXED BEFORE THE RIG RUNS IT
+
+**The question.** The step every round has called "rest" is three passes: the transfer at w x h (`toT`, which also finds the
+frame's brightest t), EASU to W x H, and the composite at W x H. In round 37's runs it was 41.1-42.8 ms on the Intel at
+960 x 540 -> 1920 x 1080 and 1.0 ms on the 1080. With rounds 38-41 aimed at the fill, the coverage and the network, it is the
+Intel's next fixed cost beside the history's accumulation. Nothing has timed its passes apart. One of them is suspect by its
+shape: `toT` finds the brightest t with an `atomicMax` that every one of its 518,400 threads sends to **the same 32-bit
+word**. This round measures; it moves nothing.
+
+**What is timed (`time()`, one pass each, on the device's clock where the device has one, as `rest` is):**
+- `restToT` -- the transfer alone;
+- `restEasu` -- EASU alone;
+- `restComp` -- the composite alone;
+- `restToTFree` -- **a diagnostic, never run in any chain**: the transfer with its `atomicMax` line removed (TO_T_FREE_WGSL,
+  made from TO_T_WGSL by deleting that one line). `restToT - restToTFree` is what the single-word atomic costs.
+- A `section 110:` line carries the four and `rest` beside them.
+
+**The rows.**
+1. TO_T_FREE_WGSL is TO_T_WGSL less exactly its `atomicMax` line, and nothing else.
+2. At the pilot size each new step is one pass on `rest`'s clock, positive and finite, and the line carries them.
+3. The chain's kernels, its sums and every earlier row are unchanged: the new steps are timed beside the chain, not in it.
+
+**The rig run** is the same pair of runs per GPU as rounds 38-41, at a commit carrying this section.
+
+**Reading it (no rule moves anything; this fixes how the next round is chosen).**
+- On the Intel, with both runs' passes on the device's clock: the pass that is at least half of `restToT + restEasu +
+  restComp` in both runs is the next round's target.
+- If `restToT - restToTFree` is at least half of `restToT` in both runs, that target is the brightest t's reduction (a
+  workgroup reduction, then one atomic a workgroup), whichever pass is largest.
+- If no pass is half, the rest is reported as spread and dropped from the backlog's levers.
+
+**Predictions (stated so they can miss), on the Intel at 960 x 540 -> 1920 x 1080.**
+- EASU is the largest: 20-35 ms of the ~42. It runs 12 taps at each of 2,073,600 output pixels.
+- The composite: 4-12 ms.
+- `restToT`: 2-12 ms, of which the atomic is a third or more.
+- On the 1080 the three sum to about its 1.0 ms. Nothing there is read.
+
+**Sabotages, by the byte-safe runner (I1-I3):**
+- TO_T_FREE_WGSL keeping the atomic;
+- `restEasu` timing the composite;
+- the split steps run inside the `rest` frame (no longer one pass each).
+
+Each must turn at least one row red.
+
+**Nothing else changes:** every kernel the chain runs, every sum, every table, and `fx/fsr`.
+
+**Before commit.** I1-I3 each turned at least one row red. I2 (`restEasu` timing the composite) could not have gone red as the
+rows were first written, because a time does not say which kernel made it. So the rest steps now record which of the
+runner's pipelines they dispatched, through a wrapper on those five steps alone, so no other step's timing changes. The
+split row holds each step to its kernel. Reported, deciding nothing: on SwiftShader at the pilot size the transfer took
+0.48 ms and the transfer without its atomic 0.16 ms.
+
+
+## 111. ROUNDS 38-42 -- THE VERDICTS: THE LISTED TILE FILL AND THE BOUNDED COVERAGE HOLD ON BOTH GPUS, THE SUBGROUP KERNEL LOSES, THE f16 KERNEL IS OWED, AND EASU IS NEXT
+
+**What arrived.** Four reports: two `realGpuRun --only denoise` runs on each GPU, all at ce1cca35, the commit carrying
+sections 106-110. They were committed as received at 2e80def5, before this section was written:
+`render/denoise-rig-r42-{a,b}-{intel-gen9,gtx1080}.json`. **One of them was read first.** The Intel's run a was shown in
+the session as it arrived, before the commit; the other three were committed unread. The rules were fixed in sections
+106-110 before any of them ran, so the order changed nothing that could be chosen, but the method asks for the commit
+first, and it was not first for that one.
+- `render/denoiseUpscaleGPU-selfcheck.mjs`'s section 11 re-derives sections 106, 107 and 110 from the four files.
+- `render/denoiseDevice-selfcheck.mjs` re-derives sections 108 and 109, each rule with fixtures that move it.
+
+**C1 held in all four runs:** every gate green with exit 0, at ce1cca35.
+
+**H38, by section 106's rule.** In every run the listed tile fill reached 87 rings, the list fill's count, in 12 passes over
+123 tiles, with 0 left (C2).
+
+| GPU | List fill (a / b) | Listed tile fill (a / b) | Listed / list | H38 |
+|---|---|---|---|---|
+| GTX 1080 | 31.1 / 24.9 ms | **17.1 / 17.5 ms** | 0.550 / 0.703 | **holds** |
+| Intel gen-9 | 22.2 / 25.3 ms | **18.7 / 17.4 ms** | 0.842 / 0.688 | **holds** |
+
+**So, by the rule: it holds on both GPUs.** The listed tile fill becomes the chain's default (`denoise-listedtile-default`), and
+`denoise-fill-per-adapter` closes unbuilt.
+- **The predictions missed, both of them.** The 1080 was predicted 2-8 ms and the Intel 5-15 ms; each took 17-19 ms. The
+  prediction scaled the tile passes' work by the 6 % of tiles listed. On the 1080 the listed tile fill (17.1 / 17.5) costs
+  what round 37's whole-frame tile fill did (16.8 / 16.7). So on that GPU its passes' fixed costs, not their tiles, are
+  most of it. The prediction priced those at 0.25 ms a pass, and they are about 1.2 ms. H38 held on both, as predicted.
+- **The fill is timed by the wall clock.** The 1080's list fill read 31.1 ms in run a, against 22.6-24.9 in its other three
+  runs since round 37. Both runs still hold.
+
+**H39, by section 107's rule.** In every run the bounded coverage was round 31's bit for bit at both sizes. It traced 106,709
+(the 1080) and 106,622 (the Intel) at 1920 x 1080, both within 2 % (C2). Every coverage was on the device's clock (C3).
+
+| GPU | covFull (a / b) | covFullB (a / b) | Bounded / full | covHalf (a / b) | covHalfB (a / b) | H39 |
+|---|---|---|---|---|---|---|
+| GTX 1080 | 17.08 / 16.86 ms | **1.22 / 1.23 ms** | 0.072 / 0.073 | 4.23 / 4.26 ms | 0.35 / 0.36 ms | **holds** |
+| Intel gen-9 | 297.3 / 252.1 ms | **26.4 / 22.4 ms** | 0.089 / 0.089 | 76.4 / 62.9 ms | 6.67 / 5.61 ms | **holds** |
+
+**So, by the rule: it holds on both GPUs.** The bounded coverage becomes the chain's and the page's mask
+(`denoise-coverage-bound-default`), and the coverage lever closes.
+- **All four predictions were met**, in both runs.
+- **Reported, deciding nothing.**
+  - The Intel traced 87 pixels fewer than the twin at 1920 x 1080, and 29 fewer at 960 x 540. Its output was bit for bit
+    all the same, so no pixel it skipped had a ray meeting a light. The 1080 traced exactly the twin's counts.
+  - The half-size chain with the bounded coverage, against today's page given the same mask: 1.454 / 1.641 x on the 1080
+    and 3.015 / 3.496 x on the Intel.
+
+**H40, by section 108's rule, on the GTX 1080.**
+- C1, C2 and C3 held on both paths. K0s was green natively in both runs ("4 of 4 native rows"). In the browser its row
+  passed, which prints no line: the gate was green and that row was not skipped. Both sets' 1920 x 1080 passes were on the
+  device's clock.
+
+| Path | r40s against r18t at 1920 x 1080 (a / b) | H40 |
+|---|---|---|
+| native (DXC) | **0.273 / 0.263 x** | **fails** |
+| page (Chrome) | **0.269 / 0.266 x** | **fails** |
+
+**So, by the rule: it fails on both paths.** r40s is kept as a measured negative. Both of the 1080's entries stay r18t, and
+its network lever goes back to the backlog.
+- **The prediction (0.8-1.3 x) missed:** r40s took 3.4-3.8 x r18t's time at every size from 128 x 128 up. Its hidden layers
+  ran at about 500 GFLOP/s against r18t's 2,350, about 83 ms a layer against 16. The prediction said it did not know which
+  side would win, and it was not close. The cause is not measured here. The kernel's 2 x 8 vec4 accumulators a thread with
+  streamed rows, and the shuffles in place of one staged tile, are candidates. Neither is tested.
+- On the Intel, r40s stood aside by name (no subgroups feature), as predicted.
+
+**H41, by section 109's rule, on the Intel gen-9: NO VERDICT on either path.**
+- **C1 held.** Every gate was green with exit 0.
+- **C2 held.** K0h was green natively in both runs ("2 of 2 native rows"). In the browser its row passed: the gate was
+  green and that row was not skipped. **The f16 kernel compiled and was exact on its first hardware.**
+- **C3 was not met.** The ladder's 1500 ms cap skipped r41h's 1920 x 1080 pass on both paths in both runs. Its predicted
+  pass times were 2192-2485 ms. With no pass at that size there is no ratio there, so the rule decides nothing.
+- **What was measured, reported, deciding nothing:** r41h ran at **0.49-0.61 x** r18u's speed at every size it reached, 64 x 64
+  to 1024 x 1024, on both paths and in both runs. At 1024 x 1024 that was 0.514 / 0.490 x natively and 0.522 / 0.516 x on
+  the page. **The prediction, 1.1-1.8 x, missed at every size measured.**
+- **What follows.** No table entry moves. `denoise-f16-intel` stays open, owed to a reading that can meet C3. A rerun as
+  things stand cannot meet it, because the cap would skip the same pass again. The two ways on are:
+  - a round that times r41h and r18u at 1920 x 1080 under a cap that admits them, fixed before it runs; or
+  - closing the entry on these figures, as a judgement and not this rule's outcome.
+  Neither is taken here.
+- On the 1080, r41h stood aside by name (no shader-f16 feature), as predicted.
+
+**Section 110's reading, on the Intel at 960 x 540 -> 1920 x 1080.** Every pass was on the device's clock.
+
+| Run | rest | toT | EASU | composite | toT without its atomic | EASU's share of the three |
+|---|---|---|---|---|---|---|
+| a | 54.9 ms | 2.36 ms | **30.06 ms** | 22.67 ms | 2.40 ms | 0.546 |
+| b | 44.4 ms | 1.56 ms | **25.74 ms** | 17.13 ms | 1.63 ms | 0.579 |
+
+- **EASU is at least half of the three passes in both runs, so EASU is the next round's target** (section 110's first
+  reading).
+- **The single-word atomic costs nothing measurable.** The transfer without it took slightly longer in both runs. So the
+  brightest t's reduction is not the target (the second reading).
+- **The predictions, as made:**
+  - EASU 20-35 ms: met in both runs.
+  - The composite 4-12 ms: missed in both (22.7 and 17.1). It is the second largest pass, not a small one.
+  - restToT 2-12 ms: met in run a (2.36) and missed in run b (1.56).
+  - The atomic a third or more of the transfer: missed.
+  - The 1080's three passes summing to about its 1.0 ms: met (1.006 and 1.003 against rest's 1.003 and 1.000).
+- The Intel's rest read 54.9 and 44.4 ms, against 41.1-42.8 in round 37's runs. That is the run-to-run spread on that GPU.
+  The coverage and the rest read high in run a, though the network at 1920 x 1080 did not (1228 against 1308 ms).
+
+**A label that moved, reported and not changed.** realGpuRun now files `render/denoiseDevice-selfcheck.mjs` as a timing
+gate, not an exact one: the summary reads "exact 1/1, timing 3/3", where round 37's read "exact 2/2, timing 2/2".
+`categorize` reads the gate's source. Round 40's ladder-proxy row, which checks that the ladder stands r40s aside on an
+adapter with the feature hidden, calls `timingLadder(`, and that call is what flips the label. The gate's rows are
+unchanged, and no rule here reads the category.
+
+**Sabotages, by the byte-safe runner (J1-J6), each restored byte-identical:** J1, H38 at 0.5 x, 1 red; J2, the traced
+count read off the half size, 2 red; J3, EASU read off the composite's figure, 2 red; J4, H40's margin at 0.25 x, 2 red;
+J5, C3 dropped, 1 red; J6, the chain's verdict read off round 37's reports, 7 red.
+
+**What changes in this section: nothing in the code but the verdict rows.** The default fill and coverage, every kernel
+table, the network and `fx/fsr` are as section 110 left them. The two defaults that H38 and H39 move to are the backlog's
+`denoise-listedtile-default` and `denoise-coverage-bound-default`.
+
+## 112. ROUND 43 -- THE LISTED TILE FILL BECOMES THE CHAIN'S DEFAULT, WITH THE LIST FILL AND THE RING FILL KEPT AS REFERENCES
+
+**Why now.** Section 111, by section 106's rule: H38 held on both GPUs, so the listed tile fill becomes the chain's fill, in
+a round of its own that changes the runner's default and holds the change to today's rows. This is that round
+(`denoise-listedtile-default`), in round 36's shape (section 103). It measures nothing new, so it has no prediction to miss
+and no rig run to wait for. It is fixed here before its code.
+
+**What changes, in `render/denoiseUpscaleGPU.mjs`:**
+- **`fill(...)` and `chain(...)` with nothing asked run the listed tile fill.** Every explicit option keeps its meaning:
+  - `{ list: true }` runs round 34's list fill, as it always has;
+  - `{ list: false }` runs round 31's ring fill;
+  - `{ tile: true }` runs round 37's tile fill;
+  - `{ tile: "listed" }` runs round 38's listed tile fill.
+  So no caller that names its fill gets a different one. A caller that names none gets the new default.
+- **`timeHalfChain`'s `half` and `temporal` sum the listed tile fill (`fillLTile`)**, and the result says so: `fill: "listedTile"`.
+  - `halfList` and `temporalList` are new: the same two sums with the list fill (`fillList`), the reference.
+  - `halfLTile` and `temporalLTile` go. They would be `half` and `temporal` under a second name, as `halfList` was in round 36.
+  - `halfBound` and `temporalBound` are section 107's "chain with its default fill and the bounded coverage", so they now
+    sum `fillLTile`.
+- The step keys do not change. `fillList`, `fillLTile` and their `whole` steps keep their meanings.
+
+**What changes on the page (`denoise.html`'s "Time the half-size chain"):**
+- The default rows report the listed tile fill: the fill row, "the half-size chain in all", the one-frame row and "the
+  half-size chain with its history, in all".
+- Round 34's list fill takes the place of round 38's group as a reference with four rows: its fill, its steps in one frame,
+  its chain in all, and that with the history. That makes 26 rows, not 25.
+- The status line's ratio is the default chain's, with the list fill's beside it.
+
+**What does NOT change: the lines the rig's reports carry.** Each keeps its meaning from this round on.
+- Section 93's and 97's lines: the ring fill's chain.
+- Section 99's "with the list fill": the list fill's chain, now `halfList` and `temporalList`.
+- Section 103's line: the default fill by name and the default chain.
+- Section 106's "with the listed tile fill": the listed tile fill's chain, now `half` and `temporal`.
+- Section 107's line: the chain with the default fill and the bounded coverage. Its figure moves with the default, as its
+  definition says.
+- Sections 105 and 111 read committed reports from before this round, whose keys are as they were.
+- The pilot-size row checks each line's figure against the sum it names, so no line can change meaning with no row red.
+
+**The rows that hold the change (the gate's sections 3 and 4):**
+1. **`fill()` with nothing asked is the listed tile fill.** It has the same `tilesListed`, the same `tilePasses` and the same
+   floats, bit for bit, as `{ tile: "listed" }`, on all six of round 34's frames. `{ list: true }` is still round 34's (its
+   `listed` count, no tiles listed), and `{ list: false }` lists nothing and stays fillEmittersBounded's.
+2. **`chain()` with nothing asked is the listed tile fill's chain**, bit for bit, on all four scenes. It stays within 1e-6
+   of emitterAwareUpscale, as the list fill's did.
+3. **At the pilot size:**
+   - the page's `half` is the half-size network, the coverage at both sizes, `fillLTile` and the rest;
+   - `temporal` is that plus the history's four passes;
+   - `halfList` and `temporalList` are the same with `fillList`;
+   - `fill` is `"listedTile"`, and the table has 26 rows.
+4. **The rig lines**, made from the pilot's report, each carry the figure of the sum named above.
+
+**Sabotages, by the byte-safe runner (K1-K6):**
+- `fill()`'s default back to the list fill;
+- `chain()`'s the same;
+- `{ list: true }` running the listed tile fill;
+- `half` summing `fillList`;
+- `halfList` summing `fillLTile`;
+- the page without the list fill's chain row.
+Each must turn at least one row red. A sabotage that goes 0 red is a finding to fix before the round is committed.
+
+**The rule.** The round holds when rows 1-4 pass on SwiftShader and every gate the branch runs stays as green as it was.
+No rig run is owed: the kernels, their order and every timed step are round 38's, measured on both GPUs in section 111.
+The next rig run of this gate checks rows 1-4 on that GPU as it goes.
+
+**Nothing else changes:** the coverage (section 107's default round is `denoise-coverage-bound-default`, after this one),
+the network, every kernel table, the kernels themselves, and `fx/fsr`.
+
+**Before commit.** Rows 1-4 passed on their first run here. K1-K6 each turned at least one row red and were restored
+byte-identical: K1 1 red, K2 1, K3 5, K4 1, K5 1, K6 1.
+
+## 113. ROUND 44 -- THE BOUNDED COVERAGE BECOMES THE CHAIN'S MASK AND THE PAGE'S, WITH ROUND 31'S KEPT AS THE REFERENCE
+
+**Why now.** Section 111, by section 107's rule: H39 held on both GPUs, so the bounded coverage becomes the chain's and the
+page's mask, and the coverage lever closes. This is that round (`denoise-coverage-bound-default`), in the shape of rounds 36
+and 43 (sections 103 and 112). The bounded coverage is round 31's bit for bit, so no image moves. The round measures nothing
+new, so it has no prediction to miss and no rig run to wait for. It is fixed here before its code.
+
+**What changes, in `render/denoiseUpscaleGPU.mjs`:**
+- **`coverage(S, w, h)` with nothing asked runs the bounded coverage** (`COVERAGE_BOUND_WGSL`, round 39). `{ bound: false }`
+  runs round 31's, which stays unchanged as the reference. `{ bound: true }` keeps its meaning.
+- **`timeHalfChain`'s defaults take the bounded coverage at both sizes,** and the result says so: `coverage: "bound"`.
+  - `full` (today's page) is the network at W x H plus `covFullB`.
+  - `half` and `temporal` are the chain on its default fill (the listed tile fill, section 112) with `covHalfB` and
+    `covFullB`.
+- **The reference keeps round 31's coverage:** `fullUnbound`, `halfUnbound` and `temporalUnbound` are new. They are the same
+  three sums with `covHalf` and `covFull`.
+- `fullBound`, `halfBound` and `temporalBound` go. They would be `full`, `half` and `temporal` under a second name.
+- **The other references keep round 31's coverage,** so their figures stay comparable with every earlier round's: the ring
+  fill's (`halfRing`, `temporalRing`), the tile fill's (`halfTile`, `temporalTile`) and the list fill's (`halfList`,
+  `temporalList`).
+- The step keys do not change. `covHalf` and `covFull` are round 31's; `covHalfB` and `covFullB` the bounded pass.
+
+**What changes on the page (`denoise.html`'s "Time the half-size chain"):**
+- The two coverage rows report the bounded coverage, with the pixels it traced. The rows that follow from them change with
+  them: "today's page in all", "the half-size chain in all" and "with its history".
+- Round 39's group of four rows becomes round 31's coverage as the reference: its coverage at both sizes, today's page with
+  that mask, the chain with it, and that with the history. The table stays at 26 rows.
+- The status line's ratio is the default page against the default chain, with round 31's coverage's beside it.
+
+**What does NOT change: the lines the rig's reports carry.** Each keeps its meaning from this round on.
+- **Section 93's line:** "today's page" is round 31's mask (`fullUnbound`) against the ring fill's chain (`halfRing`). Its
+  ratio is the one sections 94 and 98 read.
+- **Section 97's line:** the ring fill's chain with its history, against `fullUnbound`.
+- **The ratios of sections 99, 104 and 106:** each fill's chain against today's page with round 31's mask (`fullUnbound`),
+  as they were measured.
+  - Section 106's "with the listed tile fill" is `halfUnbound` and `temporalUnbound`. That is the listed tile fill with
+    round 31's coverage, which was `half` before this round.
+- **Section 103's line:** the default fill by name, and the default chain against the default page. Both are bounded now,
+  and the line names the coverage as well as the fill.
+- **Section 107's line:** today's page "with it" (`full`), and the chain "with it" on the default fill (`half`). That is the
+  sum section 107 defined.
+- Sections 105 and 111 read committed reports, whose keys are as they were.
+- The pilot-size row checks each line's figure against the sum it names.
+
+**The rows that hold the change (the gate's sections 3 and 4):**
+1. **`coverage()` with nothing asked is the bounded coverage.** On the four scenes at both sizes and on the light behind the
+   camera, it has the same `traced` and the same bits as `{ bound: true }`. `{ bound: false }` traces 0, as round 31's
+   kernel counts nothing, and is round 31's.
+2. **At the pilot size:**
+   - `full` is the network at W x H plus `covFullB`;
+   - `half` is the network at w x h, `covHalfB`, `covFullB`, `fillLTile` and the rest, and `temporal` that plus the four
+     history passes;
+   - `fullUnbound`, `halfUnbound` and `temporalUnbound` are the same with `covHalf` and `covFull`;
+   - `coverage` is `"bound"`, `fill` is `"listedTile"`, and the table has 26 rows.
+3. **The rig lines**, made from the pilot's report, each carry the figure of the sum named above.
+
+**Sabotages, by the byte-safe runner (L1-L7):**
+- `coverage()`'s default back to round 31's;
+- `{ bound: false }` running the bounded kernel;
+- `full` summing `covFull`;
+- `half` summing `covHalf`;
+- `fullUnbound` summing `covFullB`;
+- the page without round 31's mask's page row;
+- section 93's line made from `full`.
+Each must turn at least one row red. A sabotage that goes 0 red is a finding to fix before the round is committed.
+
+**The rule.** The round holds when rows 1-3 pass on SwiftShader and every gate the branch runs stays as green as it was.
+No rig run is owed: the kernel and every timed step are round 39's, measured on both GPUs in section 111.
+
+**Nothing else changes:** the fill (section 112's), the network, every kernel table, the kernels themselves, and `fx/fsr`.
+With this round both of `denoise-halfres-fixed-costs`'s levers are closed. The Intel's next fixed cost is EASU
+(`denoise-easu-cost`).
+
+**Before commit.** Rows 1-3 passed on their first run here. L1-L7 each turned at least one row red and were restored
+byte-identical: L1, L3, L4, L5, L6 and L7 one red each.
+- **L2, as first written, left the bounded kernel's `traced` buffer unbound.** The device threw before any row could judge
+  it. It was red, but not by a row. Redone with the binding whole, it turned 2 rows red: round 39's and this round's, since
+  round 31's pass counts nothing.
+
+
+## 114. ROUND 45 -- r41h's 1080p PASS UNDER A CAP THAT ADMITS IT: SECTION 109's RULE, OWED AGAIN, FIXED BEFORE THE RIG RUNS IT
+
+**Why now.** Section 111: H41 had no verdict. C3 asks for both sets' 1920 x 1080 passes on the device's clock, and the
+ladder's 1500 ms cap skipped r41h's in all four readings, because its predicted passes were 2192-2485 ms. A rerun as things
+stood could not meet C3. Keith chose the round that lifts the cap for that pass, over closing `denoise-f16-intel` on
+section 111's figures.
+
+**What changes, in `render/denoiseDevice.mjs`:**
+- **`SET_CAP_MS = { r41h: 4000 }`**, a cap a pass for the sets that need one above the ladder's own. `timingLadder` reads a
+  set's cap there and every other set's from `capMs`, as before.
+- The default stays `capMs`. So the gate's native ladder, its page ladder and the page's own ladder (`denoise.html`) each
+  take r41h's cap with no change of their own.
+- **Why 4000.** r41h's largest predicted pass was 2485 ms, so 4000 is 1.6 x over it. That leaves room for run-to-run spread
+  on the Intel; section 111's runs differed by up to 12 % at 1024 x 1024. It also stays under the gate's minutes: three
+  timed passes and one warmup at about 2.4 s add about 10 s a path.
+- **r18u keeps 1500 ms.** It ran its 1920 x 1080 pass in all four of section 111's readings (1121-1181 ms).
+- **No other set's cap moves**, and no kernel, table or ladder size changes.
+
+**The rows (the timing gate's arithmetic section, and the device gate):**
+1. `SET_CAP_MS` is exactly `{ r41h: 4000 }`, and every set it names is in KERNEL_SETS.
+2. On a fixture ladder, a set with a cap of its own is skipped only past that cap, and every other set at `capMs`. A
+   prediction between the two runs r41h and skips another set.
+3. The gate's "the cap skips only the sizes the last pass predicts past" row reads each set's own cap.
+
+**The rig run.** **On the Intel gen-9: two `realGpuRun --only denoise` runs**, at a commit carrying this section, read by
+**section 109's rule unchanged (H41)**:
+- C1 every gate green with exit 0;
+- C2 K0h on that path in both runs;
+- C3 both sets' 1920 x 1080 passes on the device's clock;
+- H41 holds on a path when r41h is at least 1.05 x as fast as r18u at 1920 x 1080 in both runs;
+- what it buys is section 109's.
+
+**On the GTX 1080 nothing is owed.** r41h needs `shader-f16`, which the 1080 does not offer, so it stands aside by name
+whatever its cap. An optional run there checks rounds 43 and 44's defaults (sections 112-113) on hardware, which no rule
+reads.
+
+**Predictions (stated so they can miss).** From section 111's ratios, r41h at 0.49-0.61 x r18u at every size it ran, falling
+slightly with size:
+- **r41h against r18u at 1920 x 1080: 0.45-0.60 x, on both paths, in both runs. H41 fails on both paths**, so r41h is
+  kept as a measured negative and `denoise-f16-intel` closes.
+- r41h's 1920 x 1080 pass is 1900-2700 ms, under the new cap.
+- Every gate is green.
+
+**Sabotages, by the byte-safe runner (M1-M4):**
+- `SET_CAP_MS` at 2000, which would still skip it;
+- `timingLadder` reading `capMs` for every set;
+- the gate's cap row reading `capMs` for every set;
+- the cap given to r18u as well.
+Each must turn at least one row red.
+
+**Nothing else changes:** every kernel, every table entry, the ladder's sizes, every other set's cap, and `fx/fsr`.
+
+**Before commit.** Rows 1-3 passed here, and the timing gate is green, with no r41h on SwiftShader. Two rows were added before
+commit:
+- **The mini ladder.** Rows 1 and 2 held the arithmetic and not the ladder's use of it. So a small real ladder now gives r15
+  a cap of its own and r12 none, and reads which one ran. Its first spelling made a second `create` call, which round 19's
+  one-create row turned red. It now reuses the native ladder's instance.
+- **The cap lookup.** M3 (the gate's cap row reading CAP for every set) went 0 red as first written, because no set here
+  has a cap of its own. So the lookup is now one function, with a row over section 111's r41h figures.
+
+The sabotages, each restored byte-identical:
+- M1, 2 red;
+- M2, 1 red (the mini ladder's row);
+- M3 redone, 1 red;
+- M4, 2 red.
+
+## 115. ROUND 46 -- EASU IN 2 x 2 QUADS, AND FUSED WITH THE COMPOSITE: FIXED BEFORE THE RIG RUNS IT
+
+**The question.** Section 111, by section 110's reading: EASU is at least half of the rest's three passes on the Intel
+(30.1 / 25.7 ms at 960 x 540 -> 1920 x 1080), and the composite is the second (22.7 / 17.1). This round is
+`denoise-easu-cost`. Each EASU thread loads 12 texels and computes 12 lumas for one output pixel. The composite then reads
+EASU's whole W x H buffer back, four floats a pixel, to write three. Does one pass that runs EASU four output pixels a thread
+and composites in-register cost the Intel at most 0.8 x the two passes it replaces, with every output bit the same?
+
+**Why a quad shares its loads exactly.** The chain upscales by exactly 2. An output column x maps to
+`(x + 0.5) * w / W - 0.5`, which is `x / 2 - 0.25`. So the outputs 2q - 1 and 2q both have base texel q - 1. In f32 the
+product and the quotient are exact at these sizes, since every value is a multiple of a quarter below 2^24. Rows do the
+same. So the 2 x 2 outputs (2q - 1 .. 2q, 2r - 1 .. 2r) share one base texel and one 12-tap footprint.
+
+**The kernels (`render/denoiseUpscaleGPU.mjs`, from one template, `easuQuadWgsl({ fused })`):**
+- **Its text is EASU's own, sliced, never rewritten.** It takes `fx/fsr/fsrKernels.js`'s EASU_WGSL text: its uniform, its
+  bindings and its four functions (`ld`, `lum`, `easuSet`, `easuTap`). From its `main` it takes the statements from the edge
+  analysis through `let pix = ...;`, verbatim. `fx/fsr` itself does not change.
+- **A thread is a quad.** It loads the 12 texels around base (q - 1, r - 1) once and computes their lumas once. Then, for
+  each of its four outputs inside the frame, it computes that output's sub-texel offset with EASU's own expression and runs
+  the sliced statements. The dispatch is (w + 1) x (h + 1) quads, so the frame's edge columns and rows are covered.
+- **`EASU_QUAD_WGSL`** writes `pix` as EASU does: four floats a pixel, alpha 1.
+- **`EASU_COMP_WGSL`** composites `pix` instead, with COMPOSITE_WGSL's own `fromT` (sliced from its text) and its own line:
+  `emis + (1 - cov) x fromT(min(max(pix, 0), tMax))`. It writes three floats a pixel to the chain's output, and the `up`
+  buffer is never written. The transfer still runs first, since it finds tMax.
+- **Exact 2 x only.** The host refuses any other ratio by name. The chain's is always 2.
+- No default changes in this round. The chain runs EASU and the composite as before.
+
+**Timed (`time()`, one pass each, on rest's clock):** `restEasuQ`, the quad EASU alone, and `restEasuComp`, the fused pass.
+The `section 115:` line carries them beside `restEasu` and `restComp`.
+
+**The rows (the gate's sections 3 and 4):**
+1. The template's text: the four functions and the sliced statements are EASU_WGSL's byte for byte, and `fromT` is
+   COMPOSITE_WGSL's. EASU_WGSL's own text is unchanged (sha256).
+2. On the device, on the four scenes and at odd half sizes (an odd w and h leave partial quads):
+   - `EASU_QUAD_WGSL`'s buffer is EASU_WGSL's, bit for bit;
+   - `EASU_COMP_WGSL`'s output is EASU then the composite, bit for bit;
+   - `chain()`'s output is matched by the fused pass, bit for bit.
+3. A ratio other than 2 is refused by name.
+4. At the pilot size the two new steps are one pass each on rest's clock, each dispatching its own kernel alone, and the
+   line carries them.
+
+**The rig run.** The same two `realGpuRun --only denoise` runs on the Intel that section 114 asks for, at a commit carrying
+both sections. They serve both rounds. On the 1080 the optional run reports the figures, and no rule reads them.
+
+**The rule (H46), on the Intel gen-9, on the two runs' `section 115:` lines.**
+- **C1:** every gate green with exit 0. That includes rows 1-4 on the Intel, so a pass that is not bit for bit there fails
+  C1, and the kernel is at fault.
+- **C2:** all four steps on the device's clock.
+- **H46 holds** when, in both runs, restEasuComp <= 0.8 x (restEasu + restComp).
+- **What it buys:**
+  - If it holds, the fused pass becomes the chain's EASU and composite, in a round in the shape of rounds 43 and 44.
+  - If not, it is kept as a measured negative, and `restEasuQ` against `restEasu` says whether the quads or the fusion
+    failed.
+- **Reported, deciding nothing:** restEasuQ / restEasu on both GPUs, and the 1080's figures.
+
+**Predictions (stated so they can miss), on the Intel.**
+- `restEasuQ` about 0.5-0.8 x `restEasu`. The loads and lumas fall to a quarter, while the arithmetic a pixel stays.
+- `restEasuComp` 0.55-0.80 x `restEasu + restComp`. The composite's read of `up` and EASU's write of it go, and the
+  composite's `pow`s stay. **H46 holds.**
+- Every gate green, the kernels bit for bit on both GPUs.
+
+**Sabotages, by the byte-safe runner (N1-N6):**
+- the quad's base texel at q, not q - 1;
+- an output's sub-texel offset taken from the quad's base, not its own;
+- a quad's fourth output skipped;
+- the fused pass compositing with its neighbour's coverage (as first written this was "without the clamp to tMax", which
+  cannot go red: EASU's dering clamp keeps every output within its four nearest texels, so the clamp to tMax never binds
+  on EASU's output);
+- `restEasuComp` timing EASU_QUAD_WGSL;
+- a ratio of 3 accepted.
+
+Each must turn at least one row red.
+
+**Nothing else changes:** every default, the network, every table, the fill, the coverage, and `fx/fsr`.
+
+**Before commit.** Rows 1-4 passed here: on SwiftShader both kernels were bit for bit on all six fixtures (0 floats differ in
+the buffer, the quad composite and the fused output). Two corrections were made before commit:
+- The text row's pattern for the sliced statements first missed their trailing newline.
+- The device script first used a template string inside the gate's own template literal.
+
+The sabotages, each restored byte-identical:
+- N1, 2 red; N2, 2 red; N3, 1 red; N4 (the neighbour's coverage), 2 red; N5, 1 red; N6, 2 red.
+- Row 2 above names N4's change from "without the clamp to tMax", and why.
+- Reported, deciding nothing: on SwiftShader at the pilot size the quad EASU took 1.42 ms against EASU's 1.84, and the fused
+  pass 2.59 ms against EASU and the composite's 3.10. Those are a CPU's times.
+
+
+## 116. ROUND 47 -- THE NETWORK AT 16 CHANNELS, ON ROUND 11's SCENES: FIXED BEFORE ANY OF ITS TEST SCENES EXIST
+
+Committed with the code that implements it. No scene of this round's T1 or T2 has been rendered, and no network of this
+round has been trained.
+
+**The question.** Rounds 12-46 made the shipped network cheaper without changing a weight. It is still the chain's largest
+cost on both GPUs: on the Intel, r18u at 960 x 540 took 283-306 ms in section 111's runs, against tens of ms for every other
+step. `denoise-smaller-network` is the largest single lever, because the hidden layers' arithmetic goes with the square of
+their width. It is also the one that reopens the quality question, which is why section 39 kept it out of every kernel
+round. Keith chose it for this round.
+
+> **Trained as the shipped network was trained, on the same scenes, does a network of half its width still beat the
+> filter on new scenes of both families?**
+
+**One deliberate change from round 11: the hidden layers are 16 channels, not 32 (`size: "w16"`, SHAPE_KERNEL_W16).**
+- **What stays:** the same four 3 x 3 layers, the same 9 x 9 receptive field (the window the kernel weighs), and the same
+  1 x 1 head of 81 taps. That makes 9,793 parameters with the mask, against 33,329.
+- **The cost:** the hidden layers' arithmetic is about a quarter of the shipped network's. Measured here, a training step
+  took 236 ms against 832 ms (0.28 x).
+- **Everything else is round 11's,** option by option (render/denoiseStudy-selfcheck.mjs holds ROUND47 to ROUND11 except the
+  names below):
+  - the 192 training scenes (round 7's 96 of R and round 10's 96 of C, the same objects) and its 8 val scenes;
+  - 4,500 steps, seeds 1, 2 and 3, Adam at 1e-3, zero-last init, the emitter mask;
+  - the filter and its grid, tuned on the 192;
+  - the sign-flip test, Holm over {H1, H2}, and C0-C5 with the stop before the tests.
+- **H1 is new scenes of R; H2 is new scenes of C,** as in round 11.
+
+**Splits (`SPLITS_R47`):**
+
+| Split | Scenes | Seeds |
+|---|---|---|
+| train | round 11's 96 of R and 96 of C | 20000-20095 and 30000-30095 |
+| val | round 11's 4 of R and 4 of C | 21000-21003 and 31000-31003 |
+| T1 -> **H1** | 12 of R | **48000-48011** |
+| T2 -> **H2** | 12 of C | **49000-49011** |
+
+Both test ranges are new, and render/denoiseScenes-selfcheck.mjs refuses every test seed without the harvest's flag.
+
+**Secondary (reported, never tested): the 32-channel network beside it** (`compareSize: { size: "large", train: TRAIN_LONG }`).
+- This is round 11's network, trained again from nothing on the same scenes with the same schedule and seeds, and
+  measured on this round's test images.
+- Its statistics against the same filter are reported for both hypotheses. So what the narrowing costs is read on one set
+  of images, not across rounds.
+- The 1- and 16-sample inputs, val and time are reported, as always.
+
+**What was seen first.**
+- Everything in sections 1-115.
+- **No pilot.** No network of this width has been trained on these scenes, and none of their figures has been seen. The one
+  measurement is the step time above, on random data.
+- Round 9 is the nearest evidence. There, round 8's small network (three layers of 16, a 7 x 7 field, 1,500 steps) won 11 of
+  12 on held-out R with error 28 % above the large one's. This network has the large one's depth and field and its
+  4,500 steps.
+
+**Predictions (stated so they can miss).**
+- **C0 and C1 hold** on the training images.
+- **H1 supported:** mean d +0.30 to +0.50, against round 11's +0.548 for the large network on its own test set.
+- **H2 supported:** mean d +0.40 to +0.70, against round 11's +0.765.
+- **The w16 network's error 10-25 % above the large network's** on each family, on this round's own images (the secondary).
+
+**The command:** `node tools/denoiseStudy.mjs --harvest-r47 --cache <dir> --workers 4` -> `render/denoise-results-r47.json`.
+- It refuses if the file exists.
+- It trains 10 networks: four of w16 (seeds 1-3, and C4's second seed 1), three shuffled-target ones of w16, and three large
+  ones.
+- It renders 224 scenes, plus the secondary inputs. Expect about 2.5-3 hours on this host and one resume past the
+  background limit (sections 24 and 30).
+
+**The outcomes:**
+- **H1 and H2 supported:** the narrower network beats one filter on new scenes of both families it was trained on.
+  - It goes to the device, in rounds of its own: the export, its kernel sets, the tables and the rig's timing.
+  - The secondary's gap to the large network is reported beside it.
+- **H1 only, or H2 only, or neither:** it does not go to the device. The large network on the same images says whether the
+  narrowing lost what round 11's network had.
+- **Not reported:** C0 or C1 fired on the training images, or C4 or C5 fired.
+
+**Sabotages, by the byte-safe runner (O1-O5):**
+- ROUND47 training the large network as its primary;
+- T1 on round 11's test range (34000);
+- SPLITS_R47 left out of the dataset refusal;
+- the w16 network's hidden layers at 24 channels;
+- the comparison network dropped.
+
+Each must turn at least one row red.
+
+**Nothing else changes:** the shipped network and every page and device path, every kernel table, and `fx/fsr`.
+
+**Before commit.** Every new row passed on its first run here, and the miniature ran the w16 primary with the large network
+beside it. O1-O5 each turned 1 row red and were restored byte-identical.
+
+## 117. ROUND 48 -- THE ACCUMULATION's 3 x 3 CLAMP READ FROM A WORKGROUP TILE: FIXED BEFORE THE RIG RUNS IT
+
+**The question.** Rounds 43-46 took the fill, the coverage and the rest in hand. On the Intel the history's four passes are
+the chain's other fixed cost: 112.8 and 87.6 ms a frame at 1920 x 1080 in section 111's runs, against about 1.9 ms on the
+1080. The accumulation is half of them in both runs (56.5 and 46.1 ms; 0.501 and 0.526). It reads 27 floats of the current
+frame a pixel for its 3 x 3 clamp, and an 8 x 8 workgroup's neighbourhoods overlap almost wholly. Does an accumulation that
+stages the current frame's 10 x 10 around each workgroup once, and clamps from that, cost the Intel at most 0.8 x
+ACCUM_WGSL, with every output bit the same? (`denoise-history-cost`.)
+
+**The kernel, `ACCUM_TILE_WGSL` (`accumTileWgsl()` in render/denoiseUpscaleGPU.mjs).** It is made from ACCUM_WGSL's text by
+exactly three replacements (ACCUM_TILE_EDITS). Each must land once, or the generator refuses:
+1. a workgroup array of 100 vec3s;
+2. at the top of `main`, before its first return: every thread loads its share of the 10 x 10 around its workgroup (the
+   pixels outside the frame are never read), then one `workgroupBarrier()`, then the bounds check as before;
+3. the clamp's one load line, now reading the tile at the thread's own position plus (dx, dy).
+
+Every other line is the accumulation's own: its reprojection, its taps, its history length and its blend. The clamp takes
+min and max over the same nine values, so the result is the same bits.
+
+**What changes elsewhere:**
+- `accumulate(..., { tile: true })` runs it; nothing else does, and no chain or default moves.
+- `time()` adds `accumT`, one pass on the accumulation's clock, and records the kernel it dispatched, as the rest steps do.
+- The chain gate gains a `section 117:` line with `accum` and `accumT`.
+
+**The rows (the gate's sections 2, 4 and 6):**
+1. The kernel's text is ACCUM_WGSL with exactly its three edits. Three of ACCUM_WGSL's lines are gone and no other, one
+   barrier sits before the first return, and the tile is read twice (the load and the clamp). An edit that does not land
+   once is refused.
+2. On the device, `accumulate` with the tile matches it without, bit for bit: the light, the history length and the
+   composite. That holds clamped and unclamped on round 33's 64 x 64 sequence, and at 61 x 45 with the device's own hits,
+   where the right and bottom tiles are partial. The clamp moves values there, so it is exercised.
+3. At the pilot size `accumT` is one pass on the accumulation's clock and dispatches its own kernel alone, and the line
+   carries both figures.
+
+**The rig run.** The same two `realGpuRun --only denoise` runs on the Intel that sections 114 and 115 ask for, at a commit
+carrying all three sections. They serve all three rounds. On the 1080 the optional run reports the figures, and no rule reads
+them.
+
+**The rule (H48), on the Intel gen-9, on the two runs' `section 117:` lines.**
+- **C1:** every gate green with exit 0, rows 1-3 included on the Intel. So a kernel that is not bit for bit there fails C1,
+  and the kernel is at fault.
+- **C2:** both steps on the device's clock.
+- **H48 holds** when, in both runs, accumT <= 0.8 x accum.
+- **What it buys:**
+  - If it holds, the tiled accumulation becomes the history's, in a round in the shape of rounds 43 and 44.
+  - If not, it is a measured negative. The accumulation's cost is then the reprojected taps and the history's reads, not
+    the clamp.
+
+**Predictions (stated so they can miss).**
+- **accumT 0.60-0.85 x accum on the Intel.** The clamp's reads are about 27 of a pixel's roughly 70 loads, and the tile costs
+  one barrier and about 1.6 loads a pixel. **H48 is predicted to hold, narrowly.**
+- On SwiftShader, before this section was written, the tiled pass took 16.6 ms against 6.6 at the pilot size. That is a
+  CPU's time, where a barrier is costly, and it decides nothing.
+- Every gate green, the kernel bit for bit on both GPUs.
+
+**Sabotages, by the byte-safe runner (P1-P5):**
+- the tile's columns loaded one to the right;
+- the clamp reading the tile one column left;
+- the barrier removed;
+- `accumulate({ tile: true })` running the plain kernel;
+- the `accumT` step timing the plain kernel.
+
+Each must turn at least one row red, or the section says why it cannot.
+
+**Nothing else changes:** every default, the chain, the network, every table, and `fx/fsr`.
+
+**Before commit.** Rows 1-3 passed here, the kernel bit for bit at both sizes, clamped and not.
+- **The sabotages, each restored byte-identical:** P1, 1 red; P2, 1 red; P3, 2 red; P5, 1 red.
+- **P5 needed a record.** As drafted, `time()` recorded dispatched kernels for the rest steps alone. So `accumT` now records
+  its own, and its row asks for it.
+- **P4 went 0 red as first written.** The tiled run that secretly ran the plain kernel matched the plain run bit for bit,
+  so nothing could see it. `accumulate` now returns the kernel it dispatched, and the row asks for it. Redone, P4 went red.
+
+
+## 118. ROUND 47 -- REPORTED: H1 SUPPORTED, H2 SUPPORTED -- THE NETWORK AT 16 CHANNELS STILL BEATS THE FILTER ON BOTH FAMILIES
+
+**What ran.** `node tools/denoiseStudy.mjs --harvest-r47 --cache <scratch> --workers 4` at c912e1ff, the commit carrying
+section 116. It ran in one go, 13,423 s, from an empty cache (0 hits, 283 misses), with no resume. The rig's runs for rounds
+45, 46 and 48 were not involved. `render/denoise-results-r47.json` was committed at 4e4f99ff as written, before any of it was
+read. render/denoiseStudy-selfcheck.mjs section 12c re-derives the verdict from that file with the study's own `verdict()`.
+The one input it carries in, not re-derives, is C2: the shuffled-target networks' errors are not kept in the file.
+
+**The controls held, all of them.**
+- **C0:** the three w16 networks fit the training images at 0.185, 0.177 and 0.188 x the noisy error (needs <= 0.8).
+- **C1, on the training images:** the network beat the noisy input on 192 of 192 and the filter on 189 (needs 176).
+- **C2:** the shuffled-target networks lost to the filter on H1's set by a mean d of -1.614 (needs <= 0).
+- **C4:** seed 1 trained twice came out bit for bit.
+- **C5:** 672 render seeds, all distinct.
+- **The filter tuned on the 192 chose round 11's setting exactly:** sS 1, sN 1, sA 0.2, sI 4.
+
+**H1 and H2, by the sign-flip test with Holm (section 116's rule):**
+
+| | Network wins (of 12) | mean d | sign-flip p | (sign test p) | Status |
+|---|---|---|---|---|---|
+| **H1**, new scenes of R (48000) | 10 | **+0.376** | 0.0012 | (0.019) | **supported** |
+| **H2**, new scenes of C (49000) | 11 | **+0.425** | 0.00049 | (0.0032) | **supported** |
+
+Geometric means of relMSE on the test images:
+
+| | noisy | filter | **w16 network**, seeds 1-3 | large network, seeds 1-3 (secondary) | floor |
+|---|---|---|---|---|---|
+| R (T1) | 0.0299 | 0.0072 | **0.0049** | 0.0044 | 0.00032 |
+| C (T2) | 0.0125 | 0.0046 | **0.0030** | 0.0023 | 0.00010 |
+
+**So, by section 116's rule: both supported.**
+- The narrower network, trained as the shipped one was on the same scenes, beats the one filter on new scenes of both
+  families it was trained on.
+- It goes to the device, in the rounds `denoise-w16-device` names: the export, its kernel sets, the tables and the rig's
+  timing.
+- As section 11's outcome said of round 11, this claims nothing for any family outside R and C.
+
+**What the narrowing costs, on the same images (the secondary, reported and never tested).**
+- The 32-channel network, trained again here, won 12 of 12 on both sets: mean d +0.487 on R and +0.685 on C, each sign-flip
+  p 0.00024. Round 11's network had +0.548 and +0.765 on its own test sets.
+- The w16 network's error over the large one's, as a geometric mean of the seed-mean errors, is **1.117 x on R and 1.297 x on
+  C**. On R it gives up a fifth of the large network's lead over the filter. On C it gives up over a third.
+- Every other figure is in the file and decides nothing: the w16 network against the filter at 1 sample (0.0136 against
+  0.0196 on R, 0.0050 against 0.0115 on C) and at 16 (0.0034 against 0.0043, and 0.0018 against 0.0029), and val
+  (0.0043 against 0.0061).
+
+**The predictions, as made.**
+- **C0 and C1 hold:** met.
+- **H1 +0.30 to +0.50:** met (+0.376). **H2 +0.40 to +0.70:** met (+0.425, near its floor).
+- **The w16 error 10-25 % above the large network's:** met on R (11.7 %), **missed on C (29.7 %)**. The narrowing costs C
+  more than R, which the prediction did not foresee.
+
+**What this does NOT settle.**
+- **Whether the gap matters on screen.** The verdict is against the filter, as every round's has been. The w16 network is
+  measurably worse than the shipped one on both families, by the figures above. Whether to ship it in place of the shipped
+  network, beside it, or only where the network is the bottleneck (the Intel) is the next round's question, decided before
+  its timing is read.
+- **The speed itself.** A training step here was 0.28 x the large one's, but no kernel has run it on either GPU. Its hidden
+  layers are a quarter of the arithmetic; what the device kernels make of that is for the rig.
+
+**Sabotages, by the byte-safe runner (Q1-Q3):** the verdict read off round 11's file, Q1; the rule's fixture shifted too
+little to move it, Q2; and C's gap read as within its prediction, Q3. Each was restored byte-identical: Q1 turned 2 rows red, Q2 1
+and Q3 1.
+
+## 119. ROUND 49 -- THE w16 NETWORK EXPORTED, HELD ON THE DEVICE, AND TIMED NATIVELY: FIXED BEFORE THE RIG RUNS IT
+
+**Why now.** Section 118, by section 116's rule: the w16 network beat the filter on both families, so it goes to the device.
+Its error is 1.117 x the shipped network's on R and 1.297 x on C. So `denoise-w16-device` first asked which network a device
+runs. **Keith chose: the w16 network on the Intel gen-9 only**, where the network is the chain's bottleneck (r18u at
+960 x 540 took 283-306 ms in section 111's runs). The shipped network stays wherever it is fast enough: the 1080, about 18 ms.
+Following the arc's rule that no table entry moves without the rig's measurement, this round builds, holds and times. The
+Intel's entry moves in the round after it, if this one's rule holds.
+
+**One finding first, from round 47's cache.** The 32-channel network section 118 compared against was trained again from
+nothing, and its seed 1 has the shipped network's cache key (`net-8f65da8060752453-22465a5eb663642f`). Its 33,329 weights are
+the shipped file's, bit for bit. So section 118's comparison network IS the shipped network, not a replica of it, and its
+gap figures are against the network the page runs.
+
+**What this round adds:**
+- **The export.** `node tools/denoiseDevice.mjs --export-r47 --cache <round 47's cache> --key
+  net-8f65da8060752453-5668b0251a72b854` wrote `render/denoise-net-r47-w16.json`, in the same record format as round 11's
+  export. It holds the seed-1 w16 network, and the filter its harvest tuned (round 11's setting exactly). It refuses a record
+  that is not the w16 shape. Read back, it is the cache's network bit for bit, 9,793 values.
+- **On the device (render/denoiseDevice-selfcheck.mjs).** The exported network on r15 and on the round-18 sets the compiler
+  builds natively (the Intel's r18u among them). Every hidden layer's cells are explained against conv2dCpu or its fused
+  mirror, given the device's own input, and the fused head's image is within APPLY_TOL. That is the key the shipped network
+  is held to. A `native K0 for round 49's w16 network` line carries it for the rig.
+- **Timed (render/denoiseTiming-selfcheck.mjs).** After the shipped network's native ladder, a second native ladder times
+  the w16 network on the same sets with the same cap and budget. `native: w16 against the shipped network on <set> at
+  W x H` lines give the shipped network's median over the w16's, on the device's clock, tagged section 119. The page's
+  ladder is unchanged: the page's network choice is the next round's.
+- **Nothing moves:** every table, the page's network, every kernel and `fx/fsr`.
+
+**Measured here, on SwiftShader, before this section was written:**
+- every row green;
+- the w16 network on r15, r18t and r18u within 5.8e-7 of the f64 network;
+- the w16 network 1.4-2.6 x as fast as the shipped one at 64 x 64 and 128 x 128 (the cap stops a CPU there).
+
+Those are a CPU's times, and they decide nothing.
+
+**The rig run.** **On the Intel gen-9: two `realGpuRun --only denoise` runs** at a commit carrying this section.
+- The runs Keith is making now are at 90ebf7f3, before it. They serve rounds 45, 46 and 48, and this round is owed its own.
+- On the 1080 the same run is optional and reported.
+
+**The rule (H49), on the Intel gen-9, natively.**
+- **C1:** every gate green with exit 0.
+- **C2:** the `native K0 for round 49's w16 network` line green on r18u in both runs.
+- **C3:** both networks' 1920 x 1080 passes on r18u on the device's clock.
+- **H49 holds** when, in both runs, the w16 network on r18u is at least 1.5 x as fast as the shipped network on r18u at
+  1920 x 1080.
+- **What it buys:**
+  - If it holds, the Intel gen-9's entries run the w16 network: a network table beside the kernel tables, the page and the
+    native caller each loading it by adapter key, in the next round.
+  - If not, the w16 network stays exported and off every table, and the reason is read off the per-layer times.
+
+**Predictions (stated so they can miss).**
+- **The w16 network 2.5-3.5 x as fast as the shipped one on r18u at 1920 x 1080 on the Intel.** Its hidden layers are a
+  quarter of the arithmetic. The head (81 taps from 16 channels instead of 32) and the kernel apply are a smaller share that
+  does not fall as fast.
+- **H49 holds.** Every gate green.
+
+**Sabotages, by the byte-safe runner (R1-R4):**
+- the device row judging the shipped network;
+- the device row dropping r18u;
+- the w16 ladder timing the shipped network;
+- the w16 ladder leaving out r18u.
+
+Each must turn at least one row red.
+
+**Before commit.** Every row passed here. The sabotages R1-R4 each turned 1 row red and were restored byte-identical. Two of
+the rows were widened before the sabotages ran, so that R2 and R4 could be seen:
+- the device row asks for r18u wherever the compiler builds it;
+- the ladder row asks that its network is the w16 shape and includes r18u wherever the shipped ladder ran it.
+
+## 120. ROUND 50 -- A NETWORK TABLE BESIDE THE KERNEL TABLES, EMPTY UNTIL H49 FILLS IT: FIXED BEFORE ITS CODE
+
+**Why now.** Keith's choice (section 119): the w16 network on the Intel gen-9 only. If H49 holds, the Intel's entries run it.
+That needs what the arc has for kernels and not for networks: a table by adapter key that the page and the native caller each
+read. This round builds that table empty. **No entry moves here.** Section 119's verdict fills the Intel's two entries by
+H49's rule, or leaves them empty. The round measures nothing new, and it is fixed here before its code.
+
+**What changes, in `render/denoiseDevice.mjs`:**
+- **`NETWORKS`** names the arc's two exported networks by name: `shipped` is `render/denoise-net-r11.json`, and `w16` is
+  `render/denoise-net-r47-w16.json`.
+- **`PAGE_NETWORKS_BY_ADAPTER = {}` and `NATIVE_NETWORKS_BY_ADAPTER = {}`**, keyed as the kernel tables are, by
+  `pageAdapterKey` and `nativeAdapterKey`. Both are empty this round.
+- **`pageNetworkFor(key, table)` and `nativeNetworkFor(key, table)`** return the table's name for the key, else `shipped`.
+  An unknown name is refused by name.
+
+**What changes on the page (`denoise.html`):**
+- **The page reads its adapter key before it loads a network**, and loads the file `pageNetworkFor` names. With the table
+  empty, that is always the shipped network's file, as today.
+- **The page says which network it runs**, beside the kernel set it already names.
+- **A query parameter, `?net=w16`,** loads the named network whatever the table says. It is for the gates and the rig, so
+  the page's own timing ladder can time the w16 network before any entry names it. An unknown name is refused on the page,
+  by name.
+
+**What changes in the gates.**
+- The timing gate drives the page's ladder a second time with `?net=w16`, on the sets the page tables use. Its
+  `page: w16 against the shipped network on <set> at W x H` lines are tagged section 120 and reported beside section 119's
+  native ones.
+- On the Intel, the rig's runs at a commit carrying this section give H49's page path too. H49's rule stays native, as
+  section 119 fixed it, so the page figures are reported and decide nothing until the verdict reads them beside the native
+  ones.
+
+**The rows:**
+1. `NETWORKS` names exactly the two files. Both tables are empty and frozen. Each function returns `shipped` for every key,
+   names a fixture table's entry when it is in it, and refuses an unknown name.
+2. The page with no parameter loads the shipped network and says so. With `?net=w16` it loads the w16 file and says so,
+   and its denoise image is the w16 network's: section 119's device key on the page. With `?net=nope` it refuses by name.
+3. The page's ladder under `?net=w16` times the w16 network. The pass's buffers are the w16 network's size, so the ladder
+   cannot secretly time the shipped one.
+4. Nothing else moves: every kernel table, every set, the chain, `fx/fsr`.
+
+**Sabotages, by the byte-safe runner (S1-S5):**
+- a table shipped with the Intel's entry filled;
+- `pageNetworkFor` ignoring its table;
+- the page loading the shipped file whatever it is asked;
+- `?net=` accepting an unknown name;
+- the page ladder timing the shipped network under `?net=w16`.
+
+Each must turn at least one row red.
+
+**The rule.** The round holds when rows 1-4 pass on SwiftShader and every gate stays as green as it was. No rig run is
+owed of its own. The Intel runs owed to section 119 serve it if they are made at a commit carrying both sections.
+
+**Before commit.**
+- Every row passed on its first run here.
+- On the page, the w16 network's image was within 8.9e-7 of its f64 image.
+- The page's ladder under `?net=w16` timed it on r15, r18t and r18u, by name and by its 9,793 parameters.
+- S1-S5 each turned rows red and were restored byte-identical: S1 2, S2 1, S3 2, S4 2, S5 2.
+
+## 121. ROUNDS 45-50 ON THE INTEL -- NOT REPORTED: THE TIMING GATE DIED IN BOTH RUNS, AND A BUG OF MINE HID THE NATIVE LADDER'S ROWS SINCE ROUND 45
+
+**What arrived.** Two `realGpuRun --only denoise` runs on the Intel gen-9 at d77592b2, which carries sections 114, 115, 117,
+119 and 120. They were committed as received at 2a538594: `render/denoise-rig-r49-{a,b}-intel-gen9.json`. **Both were
+shown in the session as they were uploaded, before that commit**, so the method's order (commit, then read) was not kept for
+either.
+
+**C1 fails in both runs. No rule in sections 114-120 gives a verdict on these runs.**
+- **What failed:** the timing gate exited 1 in both runs: `FAIL !! the native ladder ran AbortError`, then a TypeError at
+  render/denoiseTiming-selfcheck.mjs:583, reading `rows` of null.
+- **What held:** the compile, device and chain gates were green with exit 0 in both.
+- **The consequence:** every rule here asks for every gate green with exit 0, so none is read: H41 (section 114), H46
+  (115), H48 (117) and H49 (119). Section 120's rows are SwiftShader's and owe no rig reading.
+
+**Two faults, kept apart.**
+- **The TypeError is mine: a bracing bug from round 45.**
+  - Round 45 put its mini-ladder block between the native ladder's `if (err) ok(...)` and the `else { ... }` that holds the
+    ladder's trace row, its paired rows, its report and its clock rows. Round 49 put another block in the same place.
+  - That bound the `else` to the new block's condition. On the rig, where the ladder errored, the condition was false: the
+    `else` ran with no ladder (`r` null) and threw.
+  - **On SwiftShader, where the ladder did not error, the condition was true and the `else` never ran.** From round 45's
+    commit (e171b422) to this section, the native ladder's own rows were skipped here, 38 of them, with every gate green.
+    Rows that do not run cannot go red. The sabotage rounds since then (M, P, R and S) never touched those rows, so none
+    could have seen it.
+  - **Fixed here:** the `else` is back on its own `if`, with the later blocks after it. A flag set inside the `else` alone now
+    backs a row that goes red whenever the ladder ran and its report did not. T1, a block put back between the `if` and its
+    `else` as the two rounds put theirs, turns that row red. On SwiftShader the timing gate now passes 111 rows against
+    73, the 38 restored rows among them.
+- **The AbortError is the native ladder's own, and not yet explained.**
+  - Both runs died about 180-190 s in, near the end of a ladder that took 193 s in section 111's runs.
+  - **The leading suspect is round 45's cap.** With r41h allowed up to 4000 ms a pass, its 1920 x 1080 pass (predicted
+    2192-2485 ms) runs for the first time. A single GPU submission over about 2 s meets Windows' GPU timeout (TDR), which
+    resets the device. A reset device would reject the ladder's next call, which is what an AbortError from node-webgpu
+    looks like.
+  - **This is a suspicion, not a finding.** The trace file each run names (`swek-denoise-timing-trace-38456.txt` and
+    `-47172.txt` under `%TEMP%`) holds the last step before the death, and settles it.
+
+**Reported, deciding nothing (the chain gate was green, and its lines are whole).**
+
+| | run a | run b |
+|---|---|---|
+| H46: restEasuComp / (restEasu + restComp) | 44.14 / 55.52 = **0.795** | 31.46 / 40.09 = **0.785** |
+| ...the quads alone, restEasuQ / restEasu | 35.69 / 31.67 = 1.127 | 25.83 / 24.76 = 1.043 |
+| H48: accumT / accum | 34.23 / 59.41 = **0.576** | 22.00 / 43.91 = **0.501** |
+
+- **The fused pass sits just inside H46's 0.8 in both runs.** The quads alone are slower than EASU: the gain is the fusion's,
+  not the quads'.
+- **The tiled accumulation is well inside H48's 0.8.** That is outside section 117's predicted 0.60-0.85, on the fast side.
+- **Section 119's C2 held:** `native K0 for round 49's w16 network on win32/intel/gen-9 ... r15 green; r18t green; r18u
+  green`, in both runs.
+- None of these is a verdict. The rules ask for a run whose every gate is green.
+
+**What is owed.**
+- **The two trace files from these runs**, to name the step the ladder died in.
+- **Then, if the trace shows r41h's 1920 x 1080 pass:** the cap that made H41 measurable also makes it unrunnable on this
+  GPU, since one submission cannot run that long. Whether to put r41h's cap back under the timeout (H41 then has no verdict
+  for good, and `denoise-f16-intel` is closed on section 111's figures), or to time that pass another way, is Keith's call.
+  Nothing is changed here until the trace has been read.
+- **Then two more Intel runs**, at a commit carrying this section's fix and whatever the trace calls for.
+
+## 122. ROUND 52 -- r41h's CAP PUT BACK UNDER THE GPU's TIMEOUT, AND `denoise-f16-intel` CLOSED AS A MEASURED NEGATIVE
+
+**What the traces showed.** The two runs' timing traces are committed as received at 50945d36:
+`render/denoise-rig-r49-a-trace-38456.txt` and `render/denoise-rig-r49-b-trace-47172.txt`, each named by the run whose
+report names it. Both stop inside r41h's 1920 x 1080 timing:
+- run a after r41h's round 1 began at 175.3 s, the device destroyed at 179.6 s;
+- run b in its round 0 at 187.5 s, the device destroyed at 189.7 s.
+
+In both, r18u's 1920 x 1080 round 0 completed first, at about 1.1 s a pass. So the device survived the shipped network's
+1080p pass and died inside r41h's, at about 2.4 s a pass. That is the window in which Windows resets a GPU whose one
+submission runs too long (TDR, near 2 s). Run a surviving one of r41h's rounds is what a limit that close to the pass's
+length allows. **Section 121's suspicion is confirmed as far as the traces can confirm it:** the death is r41h's 1080p pass,
+which round 45's 4000 ms cap admitted.
+
+**Keith's decision:** put the cap back, and close `denoise-f16-intel`.
+- **`SET_CAP_MS` is empty again.** Every set takes the ladder's 1500 ms cap. The table and `capSkip` stay, held on round 45's
+  table as a fixture. A new row holds every entry to at most the ladder's cap, so no set can be given a pass that long
+  again.
+- **H41 can never meet its C3 on this GPU.** A 1920 x 1080 pass of r41h needs one submission longer than the GPU allows. So
+  H41 has no verdict for good.
+- **`denoise-f16-intel` closes as a measured negative, by Keith's judgement and not by H41's rule.**
+  - What was measured: r41h at 0.49-0.61 x r18u at every size from 64 x 64 to 1024 x 1024, on both paths, in both of
+    section 111's runs.
+  - K0h held natively and in Chrome, so the f16 kernel was exact on its first hardware.
+  - No table entry ever named it.
+
+**What stays owed, unchanged by this section: two Intel runs** at a commit carrying it. Those runs read:
+- H46 (section 115) and H48 (section 117), from the chain gate's lines;
+- H49 (section 119), natively;
+- section 120's page lines, reported.
+
+Section 121's figures are not those runs. Nothing here changes how any of those rules reads.
+
+**Sabotages, by the byte-safe runner (U1-U2):**
+- the table given r41h's 4000 ms again;
+- the cap lookup ignoring the table it is handed.
+
+Each must turn at least one row red. Both did, 1 row each, restored byte-identical. The timing gate is green here.
+
+## 123. ROUNDS 46, 48 AND 49 -- THE VERDICTS: ALL THREE HOLD ON THE INTEL
+
+**What arrived.** Two `realGpuRun --only denoise` runs on the Intel gen-9 at 7b871372, the commit carrying sections 115, 117,
+119, 120 and 122. They were committed as received at 1c31213c, **before either was read**. Every gate was green with exit
+0 in both, so C1 holds for every rule here. Section 121's runs at d77592b2 do not count: their timing gate died.
+- render/denoiseUpscaleGPU-selfcheck.mjs section 12 re-derives H46 and H48 from the two files.
+- render/denoiseDevice-selfcheck.mjs re-derives H49. Each rule has fixtures that move it.
+
+**H46, by section 115's rule: holds, at its edge.** Every step was on the device's clock (C2).
+
+| run | restEasu | restComp | restEasuComp (fused) | fused / both | restEasuQ (quads alone) |
+|---|---|---|---|---|---|
+| a | 25.64 ms | 15.57 ms | 32.71 ms | **0.794** | 26.02 ms (1.015 x EASU) |
+| b | 24.46 ms | 15.00 ms | 31.52 ms | **0.799** | 25.76 ms (1.053 x EASU) |
+
+- **So the fused pass becomes the chain's EASU and composite**, as `denoise-easu-fused-default`, a round in the shape of rounds
+  43-44. It saves about 8.5 ms a frame on the Intel at 1080p.
+- **The quads alone are no faster than EASU.** The saving is the fusion's, the `up` buffer's write and read, not the shared
+  footprint's.
+- **Predictions:** the fused pass's 0.55-0.80 was met, at its edge. The quads' 0.5-0.8 x EASU **missed**.
+
+**H48, by section 117's rule: holds.** Both steps were on the device's clock (C2). The tiled accumulation took **0.523 and
+0.544 x** the accumulation (22.79 / 43.60 ms and 23.18 / 42.61 ms).
+- **So the tiled accumulation becomes the history's**, as `denoise-accum-tile-default`. It saves about 20 ms a frame on the
+  Intel.
+- **The prediction (0.60-0.85) missed, on the fast side.** The clamp's 27 reads a pixel cost more than their share of the
+  pass's loads, and one barrier cost less than predicted.
+
+**H49, by section 119's rule, natively: holds.**
+- C2: the w16 network's native K0 was green on r18u in both runs.
+- C3: both 1920 x 1080 passes on r18u were on the device's clock. The shipped network took 1455.6 and 1358.4 ms; the w16
+  network took 513.2 and 511.5 ms.
+- **The w16 network was 2.836 and 2.656 x as fast as the shipped one** on r18u at 1920 x 1080 (needs 1.5 x).
+- **So the Intel gen-9's two network entries name it**, as `denoise-w16-intel-entries`: `NATIVE_NETWORKS_BY_ADAPTER` and
+  `PAGE_NETWORKS_BY_ADAPTER`, `win32/intel/gen-9` and `Windows/intel/gen-9` to `w16`. Both tables stay empty until that round.
+- **The prediction (2.5-3.5 x) was met in both runs.**
+- **The page (section 120, reported and deciding nothing):** 2.743 and 2.688 x on r18u at 1920 x 1080 in Chrome. That is the
+  same gain on the path the page runs.
+
+**Reported, deciding nothing.** The shipped network's native 1080p pass on r18u (1455.6 ms in run a) is within 50 ms of the
+ladder's cap and about 0.5 s of the GPU's timeout. On this GPU the w16 network takes the network well clear of both.
+
+**Sabotages, by the byte-safe runner (V1-V4), each restored byte-identical:**
+- H46 at 0.79, not 0.8: 1 red;
+- H48's tiled time read off the plain accumulation's figure: 2 red;
+- H49 at 3.0 x, not 1.5: 1 red;
+- H49 read at section 121's commit: 1 red.
+
+## 124. ROUND 53 -- THE INTEL GEN-9's NETWORK ENTRIES NAME THE w16 NETWORK: FIXED BEFORE ITS CODE
+
+**Why now.** Section 123, by section 119's rule: H49 held natively, at 2.836 and 2.656 x. So the Intel gen-9's two network
+entries name the w16 network. This is that round (`denoise-w16-intel-entries`), in the shape of section 67's table rounds. It
+measures nothing new, so it has no prediction to miss and no rig run to wait for. It is fixed here before its code.
+
+**What changes, in `render/denoiseDevice.mjs`:**
+- `NATIVE_NETWORKS_BY_ADAPTER` is `{ "win32/intel/gen-9": "w16" }`, and `PAGE_NETWORKS_BY_ADAPTER` is
+  `{ "Windows/intel/gen-9": "w16" }`. Every other key still runs the shipped network, the 1080's among them.
+- `NETWORKS_DECIDED_BY` names section 123 for both entries, as `NATIVE_KERNELS_DECIDED_BY` does for the kernel tables.
+- **The native caller** (`tools/denoiseDevice.mjs --which` and the device gate's native-caller row) reads its network by
+  `nativeNetworkFor`, as the page reads `pageNetworkFor`, and says which network it ran.
+
+**What changes on the page:** nothing in its code. It already loads by `pageNetworkFor`. On the Intel in Chrome it will now
+load the w16 network and say so: "network w16 (the table's for Windows/intel/gen-9)".
+
+**What must not change: the lines the rig's reports carry.** With the Intel's page entry filled, a page ladder there with no
+`?net=` would time the w16 network. That would change, with no row red, what every page line on the Intel has meant since
+section 37. So every gate drive that measures the shipped network names it:
+- the timing gate's first page ladder runs `denoise.html?net=shipped`, the second `?net=w16`, as section 120 has them
+  compared;
+- the chain gate's page drives (section 93's rig size and the pilot) run `?net=shipped`, so section 93's network figures
+  stay the shipped network's.
+
+**The rows:**
+1. **The tables.** Each names exactly the Intel's key, with `w16`, decided by section 123. Every other key, the 1080's
+   among them, runs the shipped network. Section 123's H49 row now holds the entries to its verdict, not to empty tables.
+2. **The native caller** picks the network its key's entry names, prints it, and runs it.
+3. **The page with no `?net=`** runs `pageNetworkFor` of its own key. Here that is SwiftShader's, so the shipped network, and
+   the row says which key it read. On the rig's Intel the same row reads w16, and the page's image is held to that
+   network's f64 image. The rig checks it on that GPU as it goes.
+4. **Every gate drive that measures the shipped network asks for it by name,** and the timing gate's page ladders are
+   checked by parameter count: the shipped network's 33,329, then the w16's 9,793.
+
+**Sabotages, by the byte-safe runner (W1-W5):**
+- the native entry given to the 1080;
+- the page entry dropped;
+- the native caller ignoring its network table;
+- the timing gate's first page ladder without `?net=shipped`;
+- the chain gate's page drive without `?net=shipped`.
+
+Each must turn at least one row red.
+
+**The rule.** The round holds when rows 1-4 pass on SwiftShader and every gate stays as green as it was. The next rig run of
+the device gate checks row 3 on the Intel.
+
+**Recorded after the code (round 53).** Rows 1-4 passed on SwiftShader on the first run, and the device, timing and chain
+gates stayed green. The byte-safe runner turned every sabotage red and restored each file byte for byte:
+- W1, the native entry given to the 1080: 2 red;
+- W2, the page entry dropped: 2 red;
+- W3, the native caller ignoring its network table: 1 red;
+- W4, the timing gate's first page ladder without `?net=shipped`: 1 red;
+- W5, the chain gate's page drive without `?net=shipped`: 1 red.
+
+The round holds by its rule. `denoise-w16-intel-entries` is closed. Row 3 on the Intel waits on the next rig run of the
+device gate.
+
+## 125. ROUND 54 -- THE CHAIN's REST RUNS FUSED BY DEFAULT (`denoise-easu-fused-default`): FIXED BEFORE ITS CODE
+
+Section 123 found H46 holding on the Intel: the quad EASU fused with the composite costs 0.794 and 0.799 of the two passes it
+stands in for. Section 115's rule said that, on a hold, the fused pass becomes the chain's. This round makes it so, in the
+shape of rounds 43 and 44: the new default, the old path kept as a named reference, and both held bit for bit.
+
+**What changes:**
+- `chain()` asked nothing about its rest runs the transfer and then `EASU_COMP_WGSL`, two passes in place of three.
+  - `{ rest: "easu" }` runs the three passes as before: the reference.
+  - At any ratio other than exactly 2 x, asked nothing, it runs the three passes. The fused pass refuses those ratios
+    (round 46), so the fallback stands in for the refusal.
+  - `{ rest: "fused" }` at such a ratio is refused by name.
+  - The result names the rest that ran (`rest: "fused"` or `"easu"`), because two rests that agree bit for bit cannot
+    otherwise say which ran (round 48's P4).
+- `time()` gains one step, `restF`: the transfer and the fused pass in one frame, on rest's own clock, its kernels recorded
+  (`toT`, `easuC`).
+- `timeHalfChain` reports `rest: "fused"`. Its `half` and `temporal` take `restF` in `rest`'s place.
+  - `halfTwoPass` and `temporalTwoPass` keep `rest`: they are the defaults of rounds 44-53, and the reference.
+  - Every other reference sum (halfRing, halfTile, halfList, halfUnbound and their temporals) keeps `rest`, so each keeps
+    the meaning a committed report gave it.
+- The page shows the fused rest in the default's place and the three-pass rest with its two chains as a reference. That is
+  three rows more, 29 in all.
+- The rig's section 103 line names the rest as well as the fill and the coverage. A new section 125 line carries `rest`,
+  `restF` and the three-pass chains.
+
+**Rows (the chain gate):**
+1. `chain()` asked nothing, on all four scenes, is `{ rest: "easu" }`'s chain bit for bit, says `rest: "fused"`, and every
+   emitter pixel is reached. `{ rest: "easu" }` says `"easu"`.
+2. On a 13 x 9 -> 39 x 27 frame, `chain()` asked nothing runs the three passes and says so. `{ rest: "fused" }` there is
+   refused by name.
+3. `restF` is one frame on rest's own clock, dispatching `toT` and `easuC`. `half` and `temporal` are their sums with `restF`,
+   and `halfTwoPass` and `temporalTwoPass` the same sums with `rest`.
+4. The page shows its 29 rows. The section 103 line names `rest fused`, and the section 125 line carries each figure it names.
+
+**Sabotages, by the byte-safe runner (X1-X6):**
+- X1: chain()'s default back to the three passes;
+- X2: the result's `rest` always saying "fused";
+- X3: the fallback dropped, so a ratio of 3 asked nothing is refused;
+- X4: `half` summing `rest`;
+- X5: `restF` timing the composite after the fused pass;
+- X6: the page without the reference's chain row.
+
+Each must turn at least one row red.
+
+**The prediction.** None of timing. The kernel and its step are round 46's, and section 123 measured them. No rig run is owed.
+On SwiftShader `half` falls by about `rest - restF`. That is reported, not asserted: a CPU's figures decide nothing.
+
+**The rule.** The round holds when rows 1-4 pass, every gate stays as green as it was, and each sabotage goes red.
+
+**Recorded after the code (round 54).** Rows 1-4 passed on SwiftShader on the first run, and the chain gate stayed ALL GREEN.
+On all four scenes the default chain said "fused" and matched the three-pass chain bit for bit, tMax and all. At 13 x 9 ->
+39 x 27 it ran the three passes, and `{ rest: "fused" }` there was refused by name. The pilot's figures, reported and not
+asserted: `rest` 1.632 ms, `restF` 1.388 ms, both on the device's clock; the half-size chain fused 183.279 ms against
+183.523 ms in three passes.
+
+Every sabotage went red, and the runner restored each file byte for byte:
+- X1, chain()'s default back to the three passes: 1 red;
+- X2, the result's `rest` always "fused": 2 red;
+- X3, the fallback dropped: 1 red;
+- X4, `half` summing `rest`: 1 red;
+- X5, `restF` timing the composite after the fused pass: 1 red;
+- X6, the page without the reference's chain row: 1 red.
+
+X3 needed a change to the gate before it could judge cleanly. As first written, the ratio-3 chain sat bare in the device
+script, so X3's throw would have failed the whole drive and no single row would have judged it. The chain now sits in a
+try, and its error lands in the ratio-3 row. The round holds by its rule, and `denoise-easu-fused-default` is closed.
+
+## 126. ROUND 55 -- THE HISTORY's ACCUMULATION TILES BY DEFAULT (`denoise-accum-tile-default`): FIXED BEFORE ITS CODE
+
+Section 123 found H48 holding on the Intel: the accumulation with its clamp read from a workgroup tile costs 0.523 and 0.544
+of the plain pass. Section 117's rule said that, on a hold, the tiled pass becomes the history's. This round makes it so, in
+the shape of rounds 43, 44 and 54.
+
+**What changes:**
+- `accumulate()` asked nothing runs `ACCUM_TILE_WGSL` (`tile` defaults to true). `{ tile: false }` runs `ACCUM_WGSL`: the
+  reference. The result already names its kernel (round 48), so the default is held to having dispatched `accumT`.
+- `timeHalfChain` reports `accumulation: "tiled"`. Its `temporal` takes `accumT` in `accum`'s place.
+  - `temporalUntiled` keeps `accum`: the default of round 54, and the reference.
+  - Every other history sum (temporalRing, temporalTile, temporalList, temporalUnbound, temporalTwoPass) keeps `accum`, so
+    each keeps the meaning a committed report gave it.
+- The page's history row shows `accumT` in `accum`'s place. The plain accumulation and its chain with history become a
+  reference: two rows more, 31 in all.
+- The rig's section 103 line names the accumulation. A new section 126 line carries `accum`, `accumT` and the two chains with
+  history.
+
+**Rows (the chain gate):**
+1. `accumulate()` asked nothing, clamped and not, on round 33's fixture is `{ tile: false }`'s bit for bit (light, history
+   length, composite), and so is the same call at 61 x 45. The kernels run are, in order: the plain reference, then the
+   defaults (clamped, unclamped, with the device's own hits), `{ tile: true }`, the plain 61 x 45, and the default 61 x 45.
+   That reads `accum, accumT, accumT, accumT, accumT, accum, accumT`.
+2. Round 33's rows against accumulateUpscaled now judge the default, so the CPU's tolerances hold for the tiled pass.
+3. `temporal` is its sum with `accumT`, and `temporalUntiled` the same with `accum`.
+4. The page shows its 31 rows. The section 103 line names `accumulation tiled`, and the section 126 line carries each figure
+   it names.
+
+**Sabotages, by the byte-safe runner (Q1-Q6):**
+- Q1: accumulate()'s default back to the plain pass;
+- Q2: `{ tile: false }` running the tiled kernel;
+- Q3: `temporal` summing `accum`;
+- Q4: `temporalUntiled` summing `accumT`;
+- Q5: the page without the reference's chain row;
+- Q6: the section 103 line without the accumulation.
+
+Each must turn at least one row red.
+
+**The prediction.** None of timing. The kernel and its step are round 48's, and section 123 measured them. No rig run is owed.
+
+**The rule.** The round holds when rows 1-4 pass, every gate stays as green as it was, and each sabotage goes red.
+
+**Recorded after the code (round 55).** Rows 1-4 passed on SwiftShader on the first run, and the chain gate stayed ALL GREEN.
+The default accumulation matched `{ tile: false }` bit for bit: clamped, unclamped, asked for by name, and at 61 x 45. The clamp
+moved 17,362 values, so it was exercised. The kernels ran in the order the rows fixed.
+
+The pilot's figures, reported and not asserted: `accum` 1.950 ms, `accumT` 8.160 ms, both on the device's clock; the chain
+with its history 195.271 ms tiled against 189.060 ms untiled. On SwiftShader the tiled pass is the slower one, by about four
+times. That is a CPU emulating workgroup memory, and it decides nothing: section 123 measured the Intel at 0.523 and 0.544.
+A GPU on which the tile does not pay would show it in the section 126 line.
+
+Every sabotage went red, and the runner restored each file byte for byte:
+- Q1, accumulate()'s default back to the plain pass: 1 red;
+- Q2, `{ tile: false }` running the tiled kernel: 1 red;
+- Q3, `temporal` summing `accum`: 2 red;
+- Q4, `temporalUntiled` summing `accumT`: 1 red;
+- Q5, the page without the reference's chain row: 1 red;
+- Q6, the section 103 line without the accumulation: 1 red.
+
+The round holds by its rule, and `denoise-accum-tile-default` is closed.
+
+## 127. ROUND 56 -- THE ENGINE's OWN GEOMETRY IN FAMILY C's MATERIALS AND LIGHT (`denoise-mesh-other-materials`): FIXED BEFORE ANY OF ITS TEST SCENES EXIST
+
+Committed with the code that implements it. No scene of this round's two test sets has been rendered.
+
+**Why this round.** Section 80 widened the page's scope to the engine's voxel structures and its lathed and extruded solids,
+in family R's materials, light and sky, and only those. Ten rounds found the network failing where materials and light
+changed, and section 80 changed only the shape. The two have not been crossed. This round crosses them, and asks nothing else.
+
+> **Does the network the device ships beat the filter it ships, on the engine's own geometry in family C's materials and light?**
+
+**Nothing is trained or tuned.** This is section 79's design, and every part of it below is section 79's unless it says so:
+- the network is round 11's seed 1, from `render/denoise-net-r11.json` (sha-256 `f1a84d47...`), decoded as the page decodes it;
+- the filter is the setting that file names;
+- the input is 64 x 64 at 4 samples, with the nine channels and the emitter mask;
+- the references are 1024 samples, each with a second one for C3;
+- one network, not three seeds' mean.
+
+**The two families, both new, both built from C.** `render/denoiseScenes.mjs`'s families VC and MC take family C's scene for
+their own seed, exactly as C draws it:
+- the Oren-Nayar ground;
+- the two coloured emitters;
+- the near-black sky;
+- the camera;
+- every resting sphere's place, size and material, whether rough-diffuse (`sigma`) or a dielectric reflector
+  (`roughness`, `ior`).
+
+Each resting sphere is then replaced by a closed triangle mesh, built exactly as round 25 built it, inside the sphere's
+footprint and with the sphere's material:
+- VC's meshes are V's voxel structures;
+- MC's are M's lathed and extruded solids.
+
+The shapes draw from a stream of their own, so C's draws are C's whatever VC and MC do.
+- **So two things differ from the families the network was trained on, and each was varied alone before.** Shape was
+  varied in section 79 (V and M, in R's materials). C's materials and light were trained on, in round 11. They have never
+  met.
+- Every mesh is wound outward, and the emitters stay spheres.
+- A dielectric's albedo, like a conductor's, is never read, and the tracer refuses a mesh entry without one, so it is set
+  to 0. The gate renders one dielectric mesh at 0 and at 1 and holds the two images equal.
+- C's own draws are untouched. Its fingerprint over 40 scenes is still the one recorded before R existed.
+
+**Splits** (`SPLITS_MESH_C`), test sets only:
+
+| Set | Family | Seeds |
+|---|---|---|
+| T1 -> **H1** | 12 of VC | **50000-50011** |
+| T2 -> **H2** | 12 of MC | **51000-51011** |
+
+No earlier split touched these seeds. C5 holds over the round's 72 render seeds.
+
+**The statistic is section 6's, with section 28's test, exactly as section 79 ran it.**
+- Per image, `d_i = ln relMSE(filter_i) - ln relMSE(net_i)`. Positive means the network won.
+- Each hypothesis is supported iff its mean d over 12 images is > 0 and its exact one-sided sign-flip p is below its Holm
+  threshold. Holm-Bonferroni runs over {H1, H2} at family alpha 0.05.
+
+**Controls:** C1-C5 as in section 79.
+- **C1:** both methods beat the noisy input on at least 11 of 12 images of each set, or the run is not reported.
+- **C2:** cited from round 11 (mean d -1.856, held).
+- **C3:** a set is not resolvable if the network is within 2 x of its floor on more than half its images.
+- **C4:** the forward pass twice over T1, bit for bit.
+- **C5:** the 72 render seeds are distinct.
+
+**What each outcome buys.**
+- **H1 and H2 supported:** the page's scope note may say the shipped network also beats the shipped filter on these shapes
+  in family C's materials, light and sky as well as R's. It may say nothing about any other material, light or sky.
+- **One only:** the note may name that family alone.
+- **Neither:** the note stays as section 80 left it, and the crossing is a recorded negative.
+- **Not reported or not resolvable:** nothing moves.
+
+**Not in this round: path-tracer.html's own scenes.** The backlog entry named them beside C's materials. They are
+diagnostic scenes, not a family of scenes to sample:
+- six fixed scenes with no seed;
+- scalar albedos;
+- sky light and no emitter in four of them;
+- a furnace built to render flat, whose 4-sample input may already sit at its reference's floor.
+
+C3 and the guide channels would need their own design for them, so they go to an entry of their own,
+`denoise-pathtracer-page-scenes`, rather than into this round's test.
+
+**Predictions, fixed now, deciding nothing.**
+- **P1:** C1 holds on both sets.
+- **P2 and P3:** H1 and H2 are both supported. The network beat the filter on C's spheres (round 11's H2, mean d 0.765) and
+  on R's meshes (section 80), and I expect the crossing to keep the sign of both.
+- **P4:** each set's mean d is below C's 0.765, and MC's is below VC's. Section 80 had M (0.304) below V (0.647).
+- All four are reported either way.
+
+**Secondary, reported, never tested:** per-image d, each set's noisy error and floor, and time.
+
+**What was seen first.**
+- Everything in sections 1-126.
+- **The pilot, on seeds 90200-90207, outside every split, with NO network or filter:** brightness, the noisy input against a
+  256-sample reference, and time.
+
+| family | mean radiance, median [range] | noisy relMSE vs 256 spp, median [range] | 256 spp, median | triangles, median |
+|---|---|---|---|---|
+| C | 0.160 [0.015-0.384] | 0.0119 [0.0027-0.1035] | 2.1 s | 0 |
+| VC | 0.159 [0.006-0.368] | 0.0206 [0.0012-0.2073] | 7.1 s | 446 |
+| MC | 0.163 [0.022-0.393] | 0.0134 [0.0014-0.0874] | 5.5 s | 692 |
+
+  - VC and MC sit where C does, so relMSE's 0.01 offset treats them as it treats C.
+  - C is about 2.5 x darker than R (section 79's pilot: 0.393), as round 11 found. So the offset weighs more here than it
+    did in section 79, and that holds alike for the filter and the network.
+- `render/denoiseScenes-selfcheck.mjs` section 17 holds the families on 60 scenes outside every split. VC and MC are C's
+  scene, each mesh carries its sphere's material, a dielectric mesh's albedo is never read, and C's fingerprint is
+  unchanged. `render/denoiseStudy-selfcheck.mjs` section 14b runs the shipped pair end to end on four 16 x 16 scenes of
+  VC and MC outside every split. It prints no error and no effect, and none was read.
+- Nothing of either test set has been rendered.
+
+**The command:** `node tools/denoiseStudy.mjs --harvest-mesh-c --cache <dir>` -> `render/denoise-results-mesh-c.json`.
+- It refuses if the file exists.
+- It runs here. The file is committed byte for byte before it is read, and section 128 reads it.
+
+## 129. ROUND 57 -- ACTIVATIONS STORED IN HALF PRECISION, ARITHMETIC IN f32 (`denoise-f16-storage`): FIXED BEFORE ITS CODE
+
+**Why this round.** Keith asked for it, with the timing on either GPU or both. The backlog's own arithmetic expects little:
+- the hidden layers move about 1 GB a 1024 x 1024 pass on the Intel, about 1.8 GB/s against about 34;
+- they move about 2 GB a 1080p frame on the 1080, about 33 GB/s against its 320.
+
+So neither looks bandwidth-bound. Section 122 found f16 ARITHMETIC (r41h) at about half r18u's speed on the Intel. This
+round stores in f16 and computes in f32, so it asks whether halving the activations' traffic pays where halving the
+arithmetic's precision did not.
+
+**The set, r57p.** It is r18u's kernels exactly, with every hidden activation that passes between two written-out layers
+stored as packed f16.
+- Each `u32` word holds two channels:
+  - `pack2x16float` on the store;
+  - `unpack2x16float` on the tile's load;
+  - the arithmetic, the weights and the bias stay r18u's f32.
+- Layer 0 reads the f32 input, as r18u's does.
+- Layers 1-3 read packed f16.
+- Layers 0-2 write packed f16.
+- Layer 3 writes f32, because r15's fused head (`k_head_apply`) reads it, and the head is unchanged.
+- **No feature is needed.** `pack2x16float` and `unpack2x16float` are core WGSL on f32 values, so r57p runs on SwiftShader
+  here and on both GPUs, natively and in Chrome. It stands aside under FXC by name with the other untried sets: FXC has not
+  been tried on it.
+
+**The exactness key, K0p.** It is K0 with one change: a layer that stores f16 is held to the f32 twin's value rounded to f16.
+- **The twin:** `conv2dCpu` (or its fused mirror) over the device's own input, which for layers 1-3 is already f16 values,
+  then each cell rounded to the nearest f16, ties to even. A layer that stores f32 is K0's, unchanged.
+- **The tolerance:** WGSL lets a conversion to f16 take either of the two nearest values. So a stored cell is explained when
+  it is the twin's rounding or the other f16 value bracketing the twin's f32 value. The gate counts the second kind.
+  - Measured before this was written, on SwiftShader: `pack2x16float` gave round-to-nearest-even on 1,048,576 values of
+    1,048,576, the halfway cases and f16's subnormals among them. So on SwiftShader the count must be zero.
+  - On a GPU it is reported, not required.
+- The head's image is within `APPLY_TOL` of the twin's head, as K0 asks.
+- **The image's bound against the f64 network** is fixed from this box's run before any rig run, as section 109 fixed r41h's
+  (`F16S_IMAGE_TOL`). It is the measured worst on the device gate's fixture times 5.7, round 41's margin, and the gate prints
+  the measured worst.
+
+**Hypotheses** (timing gate; the rig's two runs; the ladder's sizes; native and page paths):
+- **H57:** on the Intel gen-9, r57p is at least 1.05 x as fast as r18u at 1920 x 1080. That must hold on both paths in both
+  runs.
+- **H57b:** on the GTX 1080, r57p is at least 1.05 x as fast as r18t, the 1080's entry, at 1920 x 1080. That too must hold
+  on both paths in both runs. Against r18u, the kernel it is built on, it is reported.
+
+**Conditions**, as section 109's:
+- C1: every gate green;
+- C2: K0p green natively and in the browser on that GPU;
+- C3: the 1920 x 1080 row measured, not skipped, on both paths.
+
+A GPU whose runs miss a condition has no verdict.
+
+**What each outcome buys.**
+- **H57 holds:** the Intel's two entries become r57p.
+- **H57b holds:** the 1080's two entries become r57p.
+- **A hypothesis fails:** that GPU's entries stay as they are, and r57p is a measured negative there.
+- No rig run is asked of a GPU Keith does not run. Either GPU alone decides its own entries.
+
+**Predictions, fixed now, deciding nothing.**
+- **P1:** K0p holds natively and in the browser on both GPUs. The "other nearest" count is zero on both, because both
+  vendors' converters round to nearest even.
+- **P2:** H57 fails. r57p runs at 0.95-1.10 x r18u on the Intel, because the arithmetic above says it is not bandwidth-bound,
+  and the unpack and pack are extra instructions in a compute-bound loop.
+- **P3:** H57b fails. r57p runs below r18t on the 1080, as r18u does (0.657 x, section 67's reading).
+- All three are reported either way.
+
+**Sabotages planned (a byte-safe runner, each to go red before the commit):**
+- a store packing the wrong half;
+- the load reading channel c's word without its half select;
+- layer 3 storing f16 for the head;
+- the twin not rounding;
+- r57p not standing aside under FXC;
+- the bound widened tenfold.
+
+## 128. ROUND 56 -- THE VERDICT: NEITHER HOLDS. THE SHIPPED NETWORK DOES NOT BEAT THE SHIPPED FILTER ON THE ENGINE's GEOMETRY IN FAMILY C's MATERIALS AND LIGHT
+
+**What arrived.** `render/denoise-results-mesh-c.json` (sha-256 `4729a0ce...`).
+- It was written by `tools/denoiseStudy.mjs --harvest-mesh-c` at debf6207, section 127's commit, and committed byte for
+  byte (af3e0eb8) before it was read.
+- The shipped file it ran is the one section 127 named (`f1a84d47...`).
+- A container restart killed the first run partway. It was restarted at the same commit, from its cache (keyed by the
+  commit and the tree's diff), and resumed.
+- It took 1,512 s to render, and 15 s to measure.
+  - **The time is not a clean figure.** The device and timing gates of round 57 ran beside the second half of the run, so
+    this box was shared. Time is secondary and reported; it decides nothing.
+
+**The run is reported. Every control held.**
+- **C1:** on VC the network beat the noisy input on 11 of 12 and the filter on 12 of 12. On MC both beat it on 12 of 12.
+  VC's 11 is the least C1 allows.
+- **C2:** cited from round 11, mean d -1.856, held.
+- **C3:** no image of either set within 2 x of its floor, so both sets are resolvable.
+- **C4:** the forward pass twice over T1, bit for bit.
+- **C5:** 72 distinct render seeds.
+
+| | H1: 12 of VC, voxel structures | H2: 12 of MC, lathed and extruded solids |
+|---|---|---|
+| mean d | **-0.145** | **0.182** |
+| images the network won | 5 of 12 | 9 of 12 |
+| sign-flip p (Holm threshold) | 0.684 (0.05) | 0.0364 (0.025) |
+| sign test p, reported | 0.806 | 0.073 |
+| **status** | **not supported** | **not supported** |
+
+**So the page's scope note stays as section 80 left it, as section 127 fixed.** The crossing is a recorded negative: on
+the engine's own geometry in family C's materials, light and sky, the shipped network did not beat the shipped filter.
+The note already says nothing of any other material, light or sky, and it says no more now.
+
+**H2 fails on Holm, not on its sign.**
+- Its p of 0.036 would have passed alone at 0.05.
+- Holm takes the smaller p first, H2's, against 0.025, and 0.036 is above it. So H2 is not supported, and H1 cannot be.
+- That is the test section 127 fixed, and it is read as fixed.
+- On MC the network won 9 of 12, its losses small (the largest -0.204) and one win large (1.098). What MC shows is a
+  lean, not a result.
+
+**H1 turns on one image.**
+- **VC's second scene, seed 50001.** The network's error is 0.867, about five times the noisy input's 0.161 and twenty
+  times the filter's 0.042: d -3.02. It is the only image of either set on which the network did worse than the input it
+  was given.
+- **The other eleven** sum to a d of +1.29, but 6 of them are losses, so without that scene H1 still would not hold by
+  count (5 of 11 won).
+- Nothing measured why it fails there. The scene is reported, and no cause is proposed.
+
+**The predictions.**
+- **P1 held:** C1 held on both sets.
+- **P2 and P3 FAILED:** neither hypothesis is supported. I expected the crossing to keep the sign of both the network's
+  win on C's spheres and its win on R's meshes. On VC it did not, and on MC it did not pass its test.
+- **P4 is half wrong.** Both means are below C's 0.765, as predicted. But MC's (0.182) is above VC's (-0.145), not below
+  it. Section 80 had M below V, and in C's materials the order turned.
+
+**What it does not change.** No kernel, table, weight or filter changes, and nor does the page's note. A round that trains
+on mesh scenes in C's materials would be a later question, pre-registered on its own, and no backlog entry asks for it.
+
+**Recorded after the code (round 57), before any rig run.**
+- **K0p held on SwiftShader, natively and in the browser.** On the device gate's fixture every cell of the four storage
+  layers matched the f16-rounded twin (12,768 of 12,768 a layer), with no other-nearest cell and none unexplained. The
+  head's image is within `APPLY_TOL`. The small network matched every cell too.
+- **The bound:** the image's worst against the f64 network is 1.78e-4. That times 5.7 is 1.01e-3, so `F16S_IMAGE_TOL` is
+  held at 1e-3. The shipped network's image on the same input is 5.91e-4: within the bound, with less margin. That is
+  reported here so a rig run near it is not a surprise.
+- **SwiftShader's timing figures, reported and not asserted:** r57p at 1.027 x r18u natively and 0.994 x on the page at
+  64 x 64. They are a CPU's figures.
+
+Every sabotage went red, each file restored byte for byte. The plan named six; seven ran. "Layer 3 storing f16 for the
+head" became F4 and F7, because that edit throws before any row can judge it.
+- F1, the store packing a vec4's halves crossed: 3 red;
+- F2, the load without its half select: 3 red;
+- F3, the storing twin not rounding: 3 red;
+- F4, a packed layer read back as f32: 3 red;
+- F5, r57p not standing aside under FXC: 2 red;
+- F6, the bound widened tenfold: 1 red;
+- F7, r57p left out of the timed sets: 1 red.
+
+**Owed:** `realGpuRun --only denoise`, twice, on either GPU or both (Keith's choice), at the commit carrying this section.
+Committed byte for byte before it is read, and section 130 reads it.
+
+## 130. ROUND 57 -- THE VERDICT ON THE INTEL: H57 HAS NO VERDICT. K0p WAS RED NATIVELY, AND THE FIGURES FALL SHORT OF 1.05 ANYWAY
+
+**What arrived.** Two `realGpuRun --only denoise` reports from the Intel gen-9, runs a and b:
+- `render/denoise-rig-r57-a-intel-gen9.json` (sha-256 `fe9b2352...`);
+- `render/denoise-rig-r57-b-intel-gen9.json` (sha-256 `91a2a675...`).
+
+Both ran at 1ae24f06, the commit carrying section 129. Both were committed byte for byte (5b2651ae) before they were read.
+No 1080 run was made, so H57b has no reading.
+
+**The conditions, by section 129's rule.**
+- **C3 holds.** Both sets' 1920 x 1080 rows were measured on both paths in both runs, on the device's clock.
+- **C1 and C2 fail.** In both runs the device gate was red on one row, K0p natively. The other three gates were green, and
+  so was every other row of the device gate, K0p in the browser among them.
+- **So H57 has no verdict.** That is the rule's word, and this section does not soften it.
+
+**What K0p's red shows, and what it does not.**
+- The two runs gave the same counts to the cell. On the first three storing layers, 3,038, 3,400 and 2,592 cells of
+  12,768 a layer were the OTHER f16 value bracketing the f32 cell, not the one nearest to it. The key allows such a cell,
+  and counts it. Section 129 predicted none.
+- A count near a quarter of the cells is not ties. On this box, rounding every stored value toward zero instead of to
+  nearest gives 9,145 such cells over the same three layers of the CPU twin. The rig gave 9,030. So the Intel's native
+  `pack2x16float` very likely truncates. That is a reading, not a measurement of the converter.
+- **What turned the row red is not in the report.** `realGpuRun` keeps a failing row's first 400 characters, and the row's
+  line was cut inside the fourth layer's counts, before the head's figure and the image's. Truncation alone does not
+  break the image bound on the CPU: 7.80e-4 against 1e-3. So the cut-off clause is most likely the fourth layer: cells
+  unexplained where an f16 input is read. **That cause is not established**, and this section does not name one.
+- In the browser, on the same GPU in Chrome, K0p was green in both runs. The browser's conversion therefore matched the
+  rule there; how it rounds is not recorded, since a passing row prints no counts.
+
+**The figures, reported because C3 holds.**
+
+| r57p against r18u at 1920 x 1080 | run a | run b |
+|---|---|---|
+| native | 0.948 x | 1.021 x |
+| page | 1.027 x | 1.037 x |
+
+- None reaches H57's 1.05. Even had K0p held, H57 would have failed by its own number.
+- Across the ladder, r57p ran 0.98-1.16 x r18u, both paths, both runs. Against r18t (not the Intel's entry) it ran
+  1.36-1.81 x, as r18u does.
+
+**The predictions.**
+- **P1 FAILED.** K0p was red natively, and the other-nearest count was not zero.
+- **P2 is held by its figures and missed by its range once.** I predicted H57 would fail with r57p at 0.95-1.10 x r18u.
+  It did not reach 1.05; three of the four 1080p ratios fall in the range, and run a's native 0.948 falls just below it.
+- **P3 has no reading.** No 1080 run was made.
+
+**What it changes.** Nothing in the tables: the Intel's entries stay r18u.
+
+**The gate is changed so the next red names its clause.** The native K0p row now also prints, on a line of its own:
+- each layer's counts;
+- the head's figure;
+- the image's figure against the f64 network.
+
+A truncated failing row then still has its reading in the report.
+
+**The rows re-deriving this section** (render/denoiseDevice-selfcheck.mjs) were sabotaged red:
+- V1, the rig reports' commit read as another: 1 red. As first written V1 went 0 red. With the device gate red, C1 was
+  false whatever the commit, so the row now holds the commit on its own.
+- V2, H57's rule without C1 and C2: 1 red.
+- V3, H57's bound at 0.94: 2 red.
+
+**Closed by Keith's judgement.** `denoise-f16-storage` closes as a measured negative on the Intel, as section 122 closed
+`denoise-f16-intel`. That is his call, not H57's rule, which gave no verdict. No 1080 run is owed: on the 1080, r18u runs at
+about 0.66 x r18t (section 67's reading), so r57p would need about 1.6 x r18u there for H57b to hold, and on the Intel it
+ran within 5% of r18u. The set, its twin, its rows and its ladder lines stay in the tree, as r41h's did, and no table entry
+names it.
+
+## 131. ROUND 58 -- THE SHIPPED PAIR ON path-tracer.html's OWN SIX SCENES (`denoise-pathtracer-page-scenes`): FIXED BEFORE ANY OF ITS TEST IMAGES EXIST
+
+Committed before the code that implements it, which follows in its own commit. No test image of this round has been rendered.
+
+**Why this round.** Section 127 split these scenes off `denoise-mesh-other-materials`, because they are not a family to
+sample. They are the path tracer page's validation scenes, each built to show one thing:
+- furnace: a grey sphere in a white sky, which must look flat;
+- gradient: the same sphere under a sky brightest overhead;
+- pair: two spheres, one shadowing the other;
+- enclosed: the furnace lit by an emitting shell instead of the sky, which must look identical to the furnace;
+- rough: a GGX microfacet sphere in the white furnace, visibly dark;
+- roughcomp: the same sphere with energy compensation, which must vanish.
+
+> **On the path tracer page's own scenes, does the network the device ships beat the filter it ships?**
+
+**Nothing is trained or tuned.** The network, the filter, the input, the references and the statistic are section 79's,
+except where stated below.
+
+**The scenes: family P.** `render/denoiseScenes.mjs`'s family P draws path-tracer.html's scenes exactly as the page
+defines them:
+- its `SCENES` object, with RHO 0.18 and roughcomp's table built as the page builds it (`buildTable(0.8, { K: 24, N: 140,
+  M: 140 })`);
+- its camera: eye (0, 0, 4), looking at the origin, 40 degrees;
+- its default depth: 6 bounces, the page's slider default.
+
+The scene is chosen by the seed: seed s draws scene (s mod 6), in the page's order above. The image is 64 x 64, the arc's
+size, not the page's 128. The gate holds every scene's literal to path-tracer.html's text, so if the page changes, this
+family no longer matches it and the gate says so.
+
+**What is unusual, said before any test image exists.**
+- **Six images, one test.** H1 is decided over 6 images, one per scene. The smallest one-sided sign-flip p over 6 is
+  1/64 = 0.0156, so H1 can be supported only with nearly every image won. There is one hypothesis, so there is no Holm
+  step: its threshold is 0.05.
+- **Two of the six are one picture.** The pilot gave furnace and enclosed the same reference to the bit, as the page
+  intends. In the test each is rendered on its own render seeds, so their inputs differ but their pictures do not. They
+  stay in as two images, because the page shows both. That leaves five independent pictures, and this section says so
+  now.
+- **Scalar albedos and a rough sphere with no F0** go through `guideBuffers` as they stand: a scalar albedo as three equal
+  channels, a microfacet hit with no F0 as 1.
+- **Enclosed's camera sits inside its emitter.** The emitter mask runs as on any scene, and nothing is special-cased.
+
+**Splits** (`SPLITS_PAGE`): T1 -> **H1**, 6 of P, seeds **52000-52005**, each scene once. (Corrected before any test
+image was rendered: this first said "in order", but seed s draws scene s mod 6, so 52000 draws rough, then roughcomp,
+furnace, gradient, pair, enclosed.) No earlier split
+touched them. C5 holds over the 18 render seeds.
+
+**H1** is supported iff the mean d over the 6 images is > 0 and the exact one-sided sign-flip p is < 0.05.
+
+**Controls**, section 79's, scaled to 6:
+- **C1:** both methods beat the noisy input on at least 5 of 6 images, or the run is not reported.
+- **C2:** cited from round 11.
+- **C3:** not resolvable if the network is within 2 x of its floor on more than 3 of 6.
+- **C4:** the forward pass twice, bit for bit.
+- **C5:** distinct render seeds.
+
+**What each outcome buys.**
+- **Supported:** the page's scope note may say the shipped network also beats the filter on the path tracer page's own
+  six scenes. No more than that: those are six fixed scenes.
+- **Not supported:** the note's "the path tracer's own scenes included" stays a statement of what was never shown, now
+  with a measured negative under it.
+- **Not reported or not resolvable:** nothing moves.
+
+**Predictions, fixed now, deciding nothing.**
+- **P1:** C1 holds.
+- **P2:** H1 is NOT supported. The network was trained on scenes lit by small visible emitters with an emitter mask that
+  marks them. These are sky-lit, flat-shaded validation scenes, and the furnace pair's error is already small at 4
+  samples (pilot: 3.8e-3), where the filter's smoothing is hard to beat.
+- **P3:** the network's largest wins, if any, are on rough and roughcomp, the pilot's noisiest (relMSE 0.118 and 0.075).
+- All three are reported either way.
+
+**What was seen first.**
+- Everything in sections 1-130.
+- **The pilot, with NO network or filter:** the six scenes at 64 x 64, 8 bounces, with input and reference render seeds
+  990801 and 990802, outside every split.
+
+| scene | mean radiance (256 spp) | noisy relMSE vs 256 spp | time |
+|---|---|---|---|
+| furnace | 0.676 | 3.77e-3 | 0.6 s |
+| gradient | 0.421 | 4.87e-2 | 0.7 s |
+| pair | 0.429 | 4.13e-2 | 0.8 s |
+| enclosed | 0.676 | 3.77e-3 | 0.9 s |
+| rough | 0.807 | 1.18e-1 | 0.8 s |
+| roughcomp | 1.001 | 7.47e-2 | 0.9 s |
+
+  - Every image was finite.
+  - The guide channels carried 0.18, 0.60, 0.35 and 0.70 as albedos, and 1 for the sky and the microfacet spheres.
+  - The pilot ran at 8 bounces, the tracer's default. The round runs at 6, the page's.
+- Nothing of the test set has been rendered.
+
+**The code, gated before the harvest.**
+- `verdict()` takes `c1Min` (11 unless a round says otherwise), and `runShippedStudy` runs the split's own test sets.
+- `render/denoiseScenes-selfcheck.mjs` section 18 evaluates path-tracer.html's `SCENES` from the page's text and holds
+  family P to it.
+- `render/denoiseStudy-selfcheck.mjs` section 14c runs the shipped pair on the six scenes, on seeds outside every split.
+- Sabotages D47-D50, R78-R80 and S81 each turned red. R79 needed the miniature's row to ask which C1 judged it.
+
+**The command:** `node tools/denoiseStudy.mjs --harvest-page --cache <dir>` -> `render/denoise-results-page.json`.
+- It refuses if the file exists.
+- It runs here, in minutes.
+- The file is committed byte for byte before it is read, and section 132 reads it.
+
+## 132. ROUND 58 -- THE VERDICT: H1 SUPPORTED. THE SHIPPED NETWORK BEATS THE SHIPPED FILTER ON path-tracer.html's OWN SIX SCENES
+
+**What arrived.** `render/denoise-results-page.json` (sha-256 `a3ac73d1...`). It was written by
+`tools/denoiseStudy.mjs --harvest-page` at a32550c1, the commit carrying section 131's code, and committed byte for byte
+(b50b3bd9) before it was read. The shipped file it ran is section 79's (`f1a84d47...`). It took 39 s to render and 5 s to
+measure.
+
+**The run is reported. Every control held.**
+- **C1, at 5 of 6:** the network and the filter each beat the noisy input on 5 of 6. Each lost once, on the furnace.
+- **C2:** cited from round 11.
+- **C3:** no image within 2 x of its floor.
+- **C4:** the forward pass twice, bit for bit.
+- **C5:** 18 distinct render seeds.
+
+| scene (seed) | d | noisy | network | filter | floor |
+|---|---|---|---|---|---|
+| rough (52000) | **0.833** | 1.22e-1 | 4.63e-3 | 1.07e-2 | 9.6e-4 |
+| roughcomp (52001) | 0.489 | 7.17e-2 | 3.63e-3 | 5.92e-3 | 5.5e-4 |
+| furnace (52002) | -0.012 | 4.87e-3 | 5.20e-3 | 5.14e-3 | 2.9e-5 |
+| gradient (52003) | 0.807 | 4.53e-2 | 1.71e-3 | 3.83e-3 | 3.4e-4 |
+| pair (52004) | 0.741 | 3.95e-2 | 2.11e-3 | 4.43e-3 | 3.2e-4 |
+| enclosed (52005) | 0.021 | 3.87e-3 | 3.49e-3 | 3.57e-3 | 3.3e-5 |
+
+- **H1: mean d 0.480, 5 of 6 won, sign-flip p 0.031 against 0.05: SUPPORTED.**
+- The sign test is reported, not tested: p 0.109.
+
+**So the page's scope note widens, as section 131 allowed.** It now says the shipped network beat the filter on the path
+tracer page's own six scenes as that page draws them. It names the furnace, where both methods made the input worse, and
+it still says nothing of any other material, light or sky.
+
+**What the six say, beyond the verdict.**
+- **The wins are on the four scenes that are not flat:** rough, gradient, pair and roughcomp, by about 2-2.3 x in relMSE.
+- **The furnace and enclosed are ties.** They are the one picture lit two ways, as section 131 said. On the furnace both
+  methods are a hair WORSE than the 4-sample input: the network 5.20e-3 and the filter 5.14e-3 against the input's
+  4.87e-3. A flat grey disc in a white sky leaves nothing to denoise, and smoothing it only adds error. The test held,
+  but those two images decide nothing.
+- So the support rests on four images. With six, the smallest p is 1/64, and this one is 2/64. Section 131 said so before
+  any image existed.
+
+**The predictions.**
+- **P1 held:** C1 held.
+- **P2 FAILED.** I predicted H1 would not hold, because these are sky-lit validation scenes unlike the training families.
+  It held, by margins (0.74-0.83 on three scenes) larger than section 80's M.
+- **P3 is half right.** The largest win is on rough, as predicted, but roughcomp's (0.489) is only fourth, below gradient
+  and pair.
+
+**What it does not change.** No kernel, table, weight or filter changes, only the page's note.
+
+## 133. ROUND 59 -- FSR3's FRAME GENERATION BETWEEN THE CHAIN's FRAMES (`denoise-fsr3-framegen`): FIXED BEFORE ITS CODE AND ITS TEST SCENES
+
+Committed with the code that implements it. No scene of this round's test set has been rendered.
+
+**Why this round.** Keith asked for FSR 1, 2 and 3 completed before FSR4 starts. For three.js scenes, FSR3's frame
+generation has run v4736-v4812. On the path tracer's output it has not run. Round 32 (section 96) showed round 30's
+half-size chain, accumulated over eight jittered frames, beats both of its arms. This round puts FSR3's generator between
+two of that chain's frames:
+
+> **Is a frame generated halfway between two of the chain's frames, along the scene's own motion, closer to a frame really
+> traced there than the two cheaper frames that could be shown instead?**
+
+**Nothing is trained or tuned.** The network is round 11's seed 1 (section 79's sha-256). The chain is round 32's
+(section 95) exactly, at round 32's size, 256 x 256 (each frame traced at 128 x 128): each frame half size at 4 samples, denoised, filled, EASU to full size, shifted to its unjittered
+grid, accumulated with the clamp, the light sources composited once. The generator is the one FSR3 runs on
+fsr-three.html, as its defaults stand: `render/frameInterp.mjs`'s `interpolateFrameCPU`, the CPU reference the TSL
+generator is held to. In detail:
+- a per-pixel field (block 1), indexed by the newer frame;
+- nearest-surface depth;
+- `fill: { radius: 4, reach: 16, side: "blend" }` (prefer "farther"), `fsrFrameGenTsl.mjs`'s `makeFrameGen` default;
+- t = 0.5.
+
+**The sequence, per scene.** It is round 32's camera path: the orbit of FRAMES = 8 frames, arriving at the scene's eye,
+each frame jittered by JITTER.
+- **O6 and O7** are the chain's outputs after frames 6 and 7, accumulated through them, each composited with the light
+  sources at its own eye, on its own unjittered grid. So O7 is round 32's Bt.
+- **The midpoint eye** is halfway along the orbit's last step: the same ring and height, at the mean of frames 6's and
+  7's angles.
+- **The truth** is a full-size reference at 1024 samples from the midpoint eye, unjittered, with a second one for C3.
+
+**The motion field: the scene's own.** It is what an engine hands FSR3, with no optical flow. For each pixel of O7's grid,
+the first hit from eye 7 is projected into camera 6, by `reproject`'s own inversion of `pixelRay`. The pixel's vector is
+its position in frame 7 less its position in frame 6. A sky pixel's direction is projected the same way, as a point at
+infinity. Depth is the distance along camera 7's forward axis, with sky at 1e9.
+
+**The arms, each against the truth:**
+- **G**, the candidate: `interpolateFrameCPU({ prev: O6, cur: O7, flow, depthBlock: depth, block: 1, indexedBy: "cur",
+  t: 0.5, fill })`.
+- **X**: the cross-fade, `crossFadeCPU`, 0.5 O6 + 0.5 O7.
+- **R**: repeating the older frame, O6.
+
+**Hypotheses**, with section 6's statistic and section 28's test, Holm over the two at 0.05:
+- **H1: G beats X**, `d = ln relMSE(X) - ln relMSE(G)`;
+- **H2: G beats R**, `d = ln relMSE(R) - ln relMSE(G)`.
+
+**The split** (`SPLITS_FRAMEGEN`): T1, 6 of R (**53000-53005**) and 6 of C (**54000-54005**), each as its own family. That
+is round 32's split shape, on seeds no earlier split touched.
+
+**Controls.**
+- **C1, per hypothesis:** both of its arms beat the noisy frame on at least 11 of 12. The noisy frame is the newer frame's
+  half-size input, bilinear to full size, shifted and composited (round 32's noisyHalf, at frame 7).
+- **C2:** cited from round 11.
+- **C3:** G within 2 x of the floor on more than half the images makes that hypothesis not resolvable.
+- **C4:** G re-made from the same sequence, bit for bit.
+- **C5:** distinct render seeds.
+
+**Secondary, reported, never tested:**
+- **Bmid1:** the chain on the midpoint frame alone, traced there (half size, 4 samples, denoised, filled, EASU,
+  composited), with no history. It is the cost of not generating.
+- G without the fill (its holes left black).
+- The holes, and how many pixels the fill reached.
+- The field's own check, on the geometry: each pixel's first hit from eye 7 against the hit from eye 6 at the pixel its
+  vector points to, against the same pixel unmoved, as mean point distances. It was first written on the images, as O6
+  moved along the field against O7. That reads the composited light sources, up to 30 x their surroundings, and a
+  one-pixel rounding at a light's edge outweighed every other pixel: moved read WORSE than unmoved on the pilot while
+  the geometry said the field was right.
+
+**What each outcome buys.**
+- **H1 and H2 supported:** FSR3's arrangement runs on the path tracer's output as it runs on fsr-three.html's. A device
+  round, the generator's TSL pass after the chain on denoise.html, is next, then a rig timing round.
+- **H2 only:** the generated frame beats showing the old one but not the cross-fade. That is fsrFrameGen-selfcheck's own
+  finding on smooth content, now on path-traced frames, and the device round is not owed.
+- **Neither, not reported or not resolvable:** recorded as found.
+
+**Predictions, fixed now, deciding nothing.**
+- **P1:** C1 holds.
+- **P2: H2 is supported.** Repeating O6 is half a step behind the truth, everywhere.
+- **P3: H1 is supported, by less than H2.** The orbit's steps are 1.5-4 degrees, a few pixels at 256 x 256. The
+  cross-fade doubles every edge by that much, and the generator moves the edge instead. fsr-three.html's margin over the
+  cross-fade was +0.15 to +1.00 dB.
+- **P4:** Bmid1, the midpoint traced alone, loses to G on most images. One frame's 4 samples without history is round 32's
+  B1, which Bt beat on 12 of 12.
+- All four are reported either way.
+
+**What was seen first.**
+- Everything in sections 1-132.
+- **The pilot, on R 990901 and C 990902 outside every split, at 64 x 64 with 64-sample references, NO arm graded against
+  them:**
+  - every arm was finite;
+  - the splat left 206 and 150 holes, and the fill reached all of them;
+  - the field moved pixels 2.7 and 2.3 px on average, on orbit steps of 3.6 and 2.4 degrees;
+  - moved along it, a pixel's surface point lay 0.048 and 0.019 from the newer frame's, against 0.129 and 0.065 unmoved;
+  - an image took 2-3 s to render and 1-1.5 s to make its frames.
+- Nothing of the test set has been rendered.
+
+**The code, gated before the harvest.**
+- `render/denoiseFrameGen.mjs` is gated by its own `render/denoiseFrameGen-selfcheck.mjs`:
+  - the midpoint;
+  - `projectTo` inverting `pixelRay`;
+  - the field on the geometry;
+  - G as `interpolateFrameCPU`'s own frame;
+  - X as the cross-fade;
+  - FRAMEGEN_FILL as `makeFrameGen`'s default, read off its text;
+  - the seeds and the split.
+- `render/denoiseStudy-selfcheck.mjs` section 14d covers the round and its command.
+- Sabotages FG1-FG7, R84 and R85 each turned red.
+
+**The command:** `node tools/denoiseStudy.mjs --harvest-framegen --cache <dir>` -> `render/denoise-results-framegen.json`.
+- It refuses if the file exists.
+- It runs here, about as long as round 32's harvest (35 minutes).
+- The file is committed byte for byte before it is read, and section 134 reads it.
+
+## 134. ROUND 59 -- NOT REPORTED: C1 FIRED. THE GENERATED FRAME CARRIES THE LIGHT SOURCES ACROSS THEIR SILHOUETTES
+
+**What arrived.** `render/denoise-results-framegen.json` (sha-256 `6e58cb01...`).
+- It was written by `--harvest-framegen` at 5f1f344c, the commit carrying section 133's code. It was committed byte for
+  byte (1bfe900e) before it was read. The shipped file is section 79's (`f1a84d47...`).
+- It took 6,057 s, about 8 minutes an image, against section 133's guess of 35 minutes in all. That guess was round 32's
+  time, and this round's sequences cost about four times as much here. Nothing else ran beside it.
+
+**The run is NOT REPORTED.** C1 fired on both hypotheses: the candidate G beat the noisy frame on only 5 of 12, where C1
+needs 11. The comparators beat it on 12 (X) and 10 (R). C2-C5 held, and no image was near its floor.
+
+| | H1: G against the cross-fade X | H2: G against repeating O6 |
+|---|---|---|
+| mean d (reported, decides nothing) | -1.728 | -1.103 |
+| images G won | 2 of 12 | 3 of 12 |
+| sign-flip p | 0.999 | 0.951 |
+
+By section 133's rule nothing moves. The device round is not owed.
+
+**What G did, measured on the test images after the verdict was fixed: descriptive, not a test.** These figures come from
+the harvest's own cached sequences, re-made with the committed code.
+- **G puts light where there is none.** In 8 of 12 images, between 79 and 1,293 of G's pixels are brighter than the truth
+  by more than 1. On C 54000, the worst, 0.1% of the pixels carry 99% of G's error.
+- **The mechanism**, from a pixel on a pilot scene outside the split (R 990923): a sky pixel at a light source's edge,
+  where O6, O7 and the truth all read 0.59, comes out of the generator at 15.3.
+  - Its vector is the sky's, -7.8 px. The sky moves faster across the screen than the light source in front of it.
+  - So the gather's taps, half a vector back in O6 and half forward in O7, land on the light source as it stood in the
+    other frame.
+  - It is the generator's disocclusion error. Here it is fatal because the frames are linear radiance with light sources
+    near 30, so one wrong tap costs about 1,800 in relMSE at that pixel.
+  - The cross-fade never samples off its own pixel, so it cannot make this error.
+- **It is not only the scale.** Graded in display space instead (round 26's transfer, Reinhard then gamma 2.2), G beats X
+  on 4 of 12, is level on a fifth (C 54003), and loses on 7. fsr-three.html's frames were display frames all along, which
+  is where its +0.15 to +1.00 dB over the cross-fade was measured.
+- **Two checks that this is the generator's doing and not the code's:**
+  - The field held on all 12. Moved along it, a pixel's surface point lay 0.004-0.019 from the newer frame's, against
+    0.064-0.151 unmoved, on motions of 5-20 px.
+  - G is `interpolateFrameCPU`'s own frame, which the round's gate holds bit for bit.
+- **The fill is not the cause.** With its holes left black G was worse, not better: by a mean d of 0.248, the fill helped
+  on 5 of 12.
+
+**The predictions.**
+- **P1 FAILED:** C1 did not hold, on either hypothesis.
+- **P2 and P3** have no reading: the run is not reported. Descriptively, both point the other way.
+- **P4 HELD, emphatically.** Bmid1, the midpoint traced alone, beat G on 11 of 12, by a mean d of 4.37. A traced frame's
+  light sources are where the scene puts them.
+
+**What it says for FSR3 on the path tracer.** The arrangement as fsr-three.html runs it does not carry over unchanged. The
+light sources are the problem, and the arc already has the answer for that shape of problem:
+- round 30 took the light sources out of the upscale and put them back from the geometry (section 91);
+- v4755 composited FSR3's UI at the generated time instead of warping it.
+
+A round that generates between light-free frames, and composites `emitterRadiance` from the geometry at the generated
+time, is the next question. It is `denoise-fsr3-framegen`'s next step, pre-registered on its own and not this round.
+
+## 135. THE RIG RUNS AT THE HEAD: THE 1080's OWED DENOISER RUNS, AND FSR 1-3 ON BOTH GPUs -- FIXED BEFORE THEY RUN
+
+**Why.** Keith asked for FSR 1-3 completed at its best before FSR4. Three things are owed a GPU:
+- the GTX 1080's native crash (`denoise-1080-native-crash`), never reproduced since section 102;
+- the 1080's verdict on round 33's question (`denoise-temporalup-device`), which it has lacked since its run b died;
+- one run of every FSR and frame-generation gate on a real GPU at the current head. The rig runs since v4778 have all
+  been `--only denoise`.
+
+**The runs, at the branch head, nothing pulled or committed between them:**
+- **On the GTX 1080:** two `realGpuRun --only denoise` runs, a and b, each with `SWEK_TIMING_TRACE` naming a trace file of
+  its own. Then one full `realGpuRun`, every gate.
+- **On the Intel gen-9:** one full `realGpuRun`.
+
+**R1, the crash.** If a 1080 run dies, its trace's last line names the step it died in. The JSON keeps its exit code and
+its stderr's end. If neither run dies, "not reproduced" is recorded again with the head's commit.
+
+**H135, round 33's question on the 1080 at today's defaults.** Today's defaults are the listed tile fill, the bounded
+coverage, the fused rest and the tiled accumulation, with the shipped network. The question: is the half-size chain with
+its history (`temporal`) cheaper than today's page (`full`) at 1920 x 1080?
+- It holds when both runs count and the ratio full / temporal, read off each run's section 103 line, is above 1.0 in both.
+- A run counts when every gate of `--only denoise` is green with exit 0, at the commit the runs were taken at, and both
+  networks' 1080p rows are on the device's clock.
+- If H135 holds, round 33's 1080 verdict is given at the head, and `denoise-temporalup-device`'s rig half is done.
+
+**The FSR census, per GPU.** Every gate's kind is read from its source, as `realGpuRun` sorts them:
+- **exact** gates must hold. A red exact row is a bug on that GPU, and a finding.
+- **quality** rows should hold. A miss of a few hundredths of a dB is the margin; a large one is a finding.
+- **timing** gates are the point of the run. Their figures are reported, and the cost-model rows say "NOT ASSERTED" on
+  hardware, by v4778's decision.
+
+**Predictions, fixed now, deciding nothing.**
+- **P1:** neither 1080 run dies, as in section 102.
+- **P2: H135 holds.** Section 98's run a gave 1.405 x at round 33's defaults, and every default since has been faster on
+  the device's clock.
+- **P3:** every exact gate holds on both GPUs, and any red falls in quality or timing.
+
+**The reports are committed byte for byte before they are read.** Section 137 reads them. Section 136 is round 60's.
+
+## 136. ROUND 60 -- FSR3's GENERATOR BETWEEN LIGHT-FREE FRAMES, THE LIGHT SOURCES PUT BACK AT THE GENERATED TIME: FIXED BEFORE ITS CODE AND ITS TEST SCENES
+
+Committed with the code that implements it. No scene of this round's test set has been rendered.
+
+**Why this round.** Section 134 found FSR3's generator carrying the light sources across their silhouettes. At a light's
+edge the gather's taps land on the light as it stood in the other frame, and in linear radiance one such tap costs
+~1,800 in relMSE. The arc has met this shape twice and answered it the same way both times:
+- round 30 took the light sources out before the upscale and put them back from the geometry (section 91);
+- v4755 composited FSR3's UI at the generated time instead of warping it (`fx/fsr/fsrFrameGenUi-selfcheck.mjs`).
+
+This round does that for the generator.
+
+> **Generated between the chain's frames with the light sources taken out, and the light sources put back where the
+> geometry puts them at the generated time, is the frame closer to a frame traced there than the cheaper frames made the
+> same way?**
+
+**Everything is section 133's except the arrangement:**
+- the network and the chain (256 x 256, each frame traced at 128 x 128);
+- the sequence and the midpoint eye;
+- the scene's own motion field;
+- the generator with FRAMEGEN_FILL at t = 0.5;
+- the truth, a 1024-sample frame from the midpoint eye, with a second one for C3.
+
+**The arrangement.**
+- **L6 and L7** are the chain's accumulations through frames 6 and 7, BEFORE the composite. Their light-source pixels are
+  already filled from their neighbours before EASU (round 30's fill), so they hold no light source.
+- **E_mid** is `emitterRadiance` from the midpoint eye at full size: the light sources' coverage and emission, from the
+  geometry alone. Nothing is traced for it, and it is exact.
+- **The three arms, each composited with E_mid the same way:**
+  - **G'**, the candidate: `compositeEmitters(interpolateFrameCPU(L6, L7, ...), E_mid)`;
+  - **X'**: `compositeEmitters(0.5 L6 + 0.5 L7, E_mid)`, the cross-fade;
+  - **R'**: `compositeEmitters(L6, E_mid)`, the older frame held.
+
+  So the arms differ ONLY in how the light-free frame between is made: warped, averaged, or held.
+
+**Hypotheses**, section 6's statistic and section 28's test, Holm over the two at 0.05:
+- **H1: G' beats X'**;
+- **H2: G' beats R'**.
+
+**The split** (`SPLITS_FRAMEGEN_LF`): 6 of R (**55000-55005**) and 6 of C (**56000-56005**), new seeds.
+
+**Controls:** section 133's, with one change. The noisy frame is the newer frame's half-size input through the chain's
+fill, bilinear upscale and shift, composited with E_mid, so it is treated as the arms are. C2-C5 are as before.
+
+**Secondary, reported, never tested:**
+- round 59's three arms on these images (G, X, R as shown, each frame's own lights);
+- Bmid1;
+- G' without its fill;
+- the field's check;
+- every arm graded in display space too (round 26's transfer), since fsr-three.html's frames were display frames.
+
+**What each outcome buys.**
+- **H1 and H2 supported:** FSR3's arrangement, with the light sources composited at the generated time, runs on the path
+  tracer's output. The device round (the generator's TSL pass and the composite after the chain on denoise.html) and a
+  rig timing round follow.
+- **H2 only:** the generated frame beats holding the old one but not the cross-fade, on these motions. The device round
+  is not owed.
+- **Neither, not reported or not resolvable:** recorded as found. FSR3 on the path tracer is then a measured negative in
+  both arrangements.
+
+**Predictions, fixed now, deciding nothing.**
+- **P1:** C1 holds.
+- **P2: H2 is supported.** Holding L6 is half a step behind everywhere, and the orbit moves pixels 5-20 px here.
+- **P3: H1 is supported.** With the lights out, the generator's disocclusion errors are bounded by the scene's own
+  radiance. The cross-fade doubles every edge by half the motion, 2.5-10 px.
+- **P4:** G' beats round 59's G on every image. The light-source error section 134 measured is gone by construction.
+- All four are reported either way.
+
+**The code, gated before the harvest.**
+- `frameGenFrames` returns the light-free arms beside round 59's, from the same L6 and L7. Round 59's O6 and O7 are those
+  lit with their own eyes' light sources, bit for bit.
+- `runFrameGenStudy({ arrangement: "lightFree" })` grades them, and grades every arm in display space as well.
+- `render/denoiseFrameGen-selfcheck.mjs` section 5 holds G', X', R' and the noisy frame to their definitions, bit for bit.
+- `render/denoiseStudy-selfcheck.mjs` section 14e covers the round and its command.
+- Sabotages LF1-LF7 each turned red.
+- Round 59's own gate rows and re-derivation are unchanged and green.
+
+**The command:** `node tools/denoiseStudy.mjs --harvest-framegen-lf --cache <dir>` -> `render/denoise-results-framegen-lf.json`.
+It refuses if the file exists. It runs here for about 100 minutes, as round 59's did. The file is committed byte for byte
+before it is read, and section 138 reads it. Section 137 is kept for the rig reports section 135 asked for.
+
+## 137. SECTION 135's RIG RUNS, READ: NO CRASH, H135 WITHOUT A VERDICT, EVERY EXACT GATE GREEN ON BOTH GPUs
+
+**What arrived.** Six files, all at 0a4e6cbf. Five were committed byte for byte (8e7176ef) before they were read. Two
+exceptions: each run's trace was shown to me by its upload before it was committed, so both were seen first.
+- `render/denoise-rig-s135-a-gtx1080.json` and `-b-`: the two `--only denoise` runs on the 1080.
+- `render/fsr-rig-s135-gtx1080.json` and `render/fsr-rig-s135-intel-gen9.json`: the full runs, 57 gates each.
+- `render/denoise-rig-s135-a-trace-gtx1080.txt` and `-b-`: the runs' traces. Run b's came back after the rest.
+
+**R1, the crash: not reproduced again.** No gate in any of the four reports died on a signal or without an exit
+status. Both runs' traces walk the native ladder and the w16 ladder to their ends and end "the gate ends, 0 fail(s)".
+Neither 1080 run died, nor did the full one. **P1 held.**
+
+**H135: NO VERDICT, by section 135's own rule.**
+- A run counts only when every `--only denoise` gate is green with exit 0. In both 1080 runs the device gate was red,
+  on one row, K0p natively. So neither run counts.
+- The figures, reported and deciding nothing: full / temporal read **1.998 x and 1.984 x**, the chain without its
+  history 2.099 x and 2.085 x. The full 1080 run read 1.979 x, the Intel 2.923 x. Had the runs counted, H135 would have held.
+- **This is my miss in writing section 135.** Round 57 had already shown K0p red natively on the Intel (section 130),
+  and I wrote a counting rule that a red K0p row breaks, without asking whether the 1080 would show the same.
+  **P2 has no reading.**
+
+**K0p on the 1080: the same reading as the Intel's, cell for cell.**
+- Its first three layers read 3038, 3400 and 2592 cells at the other nearest f16, and the fourth reads 0. No cell is
+  unexplained, on either GPU.
+- The image against the f64 network is 1.32e-3, against F16S_IMAGE_TOL's 1e-3.
+- So the cell key holds on both vendors, and what fails is the image bound. That bound was set for a conversion that
+  rounds to nearest.
+- Two vendors giving identical counts says this is Direct3D's conversion, not the Intel's. The FSR gates' own probe
+  reads "rtz" (toward zero) on both GPUs. Section 130 put it on the Intel; it belongs to the backend.
+- `denoise-f16-storage` stays closed (Keith's call). The K0p row will stay red on every Direct3D rig run until its image
+  bound follows the probed rule. That needs a derived bound, not 1.32e-3 read off this run. It is Keith's call whether
+  to do that.
+
+**The FSR census.** Both GPUs read "exact 20/20, quality 25/26, timing 9/11", the same rows red on each.
+- **Exact: every gate held on both GPUs. P3 held.**
+- **Quality:** the one red gate is `fsrTemporalHalfQuality`, on its four stall rows.
+  - Of 12288 history values, 28 and 18 (1080) and 28 and 17 (Intel) sit outside the truncating stall bound, which
+    allows 12.
+  - These are the same 28 and 18 that v4778's rig run 13 read on the 1080, now matched on the Intel. They sit on no
+    mask flip and touch no half subnormal.
+  - The PSNR rows held on both GPUs. The miss is about two and a half times the allowance: a finding, not a margin.
+  - It belongs to FSR2's half history, not to this arc. It is logged as `fsr2-half-stall-rig`.
+- **Timing:** the device gate (K0p, above) and `snowGpuLive`.
+  - snowGpuLive's live loop ran 7 and 3 frames in nine seconds, on adapter "google", a software adapter. Its browser
+    did not land on the GPU, as with rig run 13's three gates before PARITY_ARGS.
+  - That is the snow stack's launch, and is reported to Keith for `snow-d3d12-readings-from-the-rig`. It is not a GPU's figure.
+
+## 138. ROUND 60 -- NOT REPORTED: C1 FIRED ON H2'S CONTROL. LIT AT THE GENERATED TIME THE GENERATOR LEAVES ITS LIGHT-SOURCE ERROR BEHIND, AND STILL LOSES TO THE CROSS-FADE IN LINEAR RADIANCE
+
+**What arrived.** `render/denoise-results-framegen-lf.json` (sha-256 `8961b8cb...`).
+- It was written by `--harvest-framegen-lf` at 3917dac6, the commit carrying section 136's code. It was committed byte
+  for byte (4557bc30) before it was read.
+- It took 5,158 s. Nothing else ran beside it.
+
+**The run is NOT REPORTED.** C1 fired on H2 alone, and on its CONTROL: the held frame R' beat the noisy frame on 10 of 12,
+where both arms need 11. The candidate G' beat the noisy frame on 11 of 12, and so passed its own C1 on both hypotheses.
+C2-C5 held.
+
+| | H1: G' against the cross-fade X' | H2: G' against the held frame R' |
+|---|---|---|
+| mean d (reported, decides nothing) | -0.221 | +0.431 |
+| images G' won | 5 of 12 | 9 of 12 |
+| sign-flip p (Holm threshold) | 0.890 (0.05) | 0.011 (0.025) |
+
+- **H2 would have been supported**, had its control beaten the noisy frame once more. The rule is the rule, and section
+  136 named this outcome "not reported": nothing moves.
+- **That C1 can fire on a control arm here is a fault in my design, not in the run.** C1 was written for a denoiser and a
+  filter, two methods that both start from the noisy frame. The held frame starts from the older frame, not the noisy
+  one, so it has no reason to beat it. Section 136 carried section 133's C1 over without asking that, and it is said here
+  so that a later round does not.
+
+**What the light-free arrangement did, reported.**
+- **It removed round 59's failure.** G' beat round 59's G on 10 of 12, by a mean d of 6.29. The other two (R 55001 and
+  R 55002) are exact ties: no light source is in view there, so the two arrangements make the same frame. Section 134's
+  light-source error is gone by construction, as predicted.
+- **Against the cross-fade it still loses in linear radiance**, 5 of 12. Its largest losses are C 56004 (-1.48), C 56000
+  (-0.87) and R 55001 (-0.85). The cross-fade blurs an edge that moves, and the generator moves the edge, but where it is
+  wrong it is wrong by a whole surface.
+- **In display space** (round 26's transfer, reported, never tested), G' beats the cross-fade on 8 of 12 by a mean d of
+  0.106, and the held frame on 11 of 12 by 0.469. Round 59's shown arrangement there beat the cross-fade on 1 of 12.
+- **The midpoint traced alone (Bmid1) beat G' on 10 of 12**, by a mean d of 0.83.
+- **The fill helped on 12 of 12**, by a mean d of 1.36.
+
+**The predictions.**
+- **P1 FAILED:** C1 fired, on H2's control.
+- **P2 and P3** have no reading. Descriptively, P2's sign held and P3's did not.
+- **P4 FAILED as written:** "G' beats G on every image." It beat G on 10 and tied on 2. The ties are the two scenes with
+  no light source in view, where nothing could differ, and P4 should have said "where a light source is in view".
+
+**What it says.** On the path tracer's output in linear radiance, with the light sources put where the geometry puts them,
+FSR3's generator does not beat a cross-fade between two of the chain's frames on orbits of 1.5-4 degrees a frame. It beats
+holding the older frame, though the test that would have said so was not reported. Graded as a display shows it, it
+edges the cross-fade, which is where fsr-three.html measured it. A round that pre-registers the display-space grading,
+with C1 asked of the candidate alone, is the honest next question. It is Keith's call, not this section's, because it
+would be chosen after seeing this round's display figures, and a new round on new seeds is the only fair way to ask it.
+
+## 139. ROUND 61 -- THE LIGHT-FREE GENERATOR GRADED AS A DISPLAY SHOWS IT, C1 ASKED OF THE CANDIDATE ALONE: FIXED BEFORE ITS CODE AND ITS TEST SCENES
+
+Committed with the code that implements it. No scene of this round's test set has been rendered.
+
+**Why this round, and what it is not.** Keith asked for it after section 138. Section 138 said two things:
+- in display space, round 60's G' beat the cross-fade on 8 of 12 and the held frame on 11 of 12;
+- its C1 had been asked of a control that does not start from the noisy frame.
+
+**This round was chosen after seeing those display figures.** So it asks its question on NEW scenes, and round 60's figures
+are only the reason it is asked, never its evidence.
+
+> **Graded as a display shows it, is FSR3's generator, between light-free chain frames lit at the generated time, closer
+> to a frame traced there than the cross-fade and the held frame made the same way?**
+
+**Everything is section 136's except two things:** the network, the chain, the sequence, the midpoint eye, the field, the
+generator, FRAMEGEN_FILL, the light-free arrangement and its three arms (G', X', R'), and the truth.
+
+1. **The grading space.** Every arm, the noisy frame, the truth and the second truth go through round 26's transfer
+   (section 81) before relMSE: per channel, t = (x / (1 + x))^(1 / 2.2), Reinhard then gamma 2.2. This is the space
+   fsr-three.html's frames were in. relMSE and its 0.01 offset are unchanged; C3's floor is the second truth's, in the
+   same space.
+2. **C1 asks the candidate alone.** G' must beat the noisy frame (lit at the midpoint, in display space) on at least 11 of
+   12. The controls are not asked. A held frame does not start from the noisy frame, so whether it beats it says nothing
+   about the run (section 138).
+
+`verdict()` gains `c1Of`: "both" unless a round says "candidate".
+
+**Hypotheses**, section 6's statistic and section 28's test, Holm over the two at 0.05:
+- **H1: G' beats X'**;
+- **H2: G' beats R'**.
+
+**The split** (`SPLITS_FRAMEGEN_DISPLAY`): 6 of R (**57000-57005**) and 6 of C (**58000-58005**), new seeds.
+
+**Controls:** C1 as above; C2-C5 as section 133's.
+
+**Secondary, reported, never tested:**
+- the same arms graded in linear radiance, as rounds 59 and 60 graded them;
+- Bmid1 in display space;
+- G' without its fill;
+- the field's check.
+
+**What each outcome buys.**
+- **H1 and H2 supported:** FSR3's arrangement, lit at the generated time, runs on the path tracer's display output. The
+  device round (the generator's TSL pass and the composite after the chain on denoise.html) and a rig timing round follow.
+- **H2 only:** generating beats holding the older frame, but not the cross-fade. The page could offer the generated frame
+  over a held one, and the device round is owed only if Keith asks for that.
+- **Neither, not reported or not resolvable:** FSR3 on the path tracer closes as a measured negative in all three
+  arrangements.
+
+**Predictions, fixed now, deciding nothing, made knowing round 60's display figures.**
+- **P1:** C1 holds. G' beat round 60's noisy frame on 11 of 12 in linear radiance.
+- **P2: H2 is supported.** Round 60's display H2 was 11 of 12 at a mean d of 0.469.
+- **P3: H1 is NOT supported.** Round 60's display H1 was 8 of 12 at a mean d of only 0.106. That is a lean, and 12 new
+  scenes need not keep it at p < 0.025 or 0.05.
+- All three are reported either way.
+
+**The code, gated before the harvest.**
+- `runFrameGenStudy({ arrangement: "lightFreeDisplay" })` grades in display space through `toDisplay`, which is
+  `render/denoiseUpscale.mjs`'s `toPerceptual`, round 26's own. It reports the linear grading beside.
+- `verdict()`'s `c1Of` is gated in `render/denoiseStats-selfcheck.mjs` section 9.
+- `render/denoiseStudy-selfcheck.mjs` section 14f recomputes the miniature's display tables bit for bit.
+- Sabotages DS1-DS6 each turned red.
+
+**The command:** `node tools/denoiseStudy.mjs --harvest-framegen-display --cache <dir>` -> `render/denoise-results-framegen-display.json`.
+It refuses if the file exists. About 90 minutes here. Committed byte for byte before it is read; section 140 reads it.
+
+## 140. ROUND 61 -- NOT REPORTED: C1 FIRED ON THE CANDIDATE, 10 OF 12. HAD IT HELD, BOTH HYPOTHESES WOULD HAVE BEEN SUPPORTED
+
+**What arrived.** `render/denoise-results-framegen-display.json` (sha-256 `f3060ab9...`).
+- It was written by `--harvest-framegen-display` at 0a4e6cbf, the commit carrying section 139's code. It was committed
+  byte for byte (93f5c81c) before it was read.
+- It took 4,957 s. Nothing else ran beside it; Keith's rig reports arrived during it and were left unread until it had
+  written.
+
+**The run is NOT REPORTED.** C1, asked of the candidate alone, fired: G' beat the noisy frame in display space on 10 of
+12, where it needs 11. C2-C5 held, and no image was near its floor.
+- The two images it lost are C 58002 and C 58003, both dark C scenes, by 2.25e-3 against 1.94e-3 and 3.35e-3 against
+  3.11e-3.
+- On both, the cross-fade beat the noisy frame too, and the midpoint traced alone beat everything.
+
+| | H1: G' against the cross-fade X' | H2: G' against the held frame R' |
+|---|---|---|
+| mean d (reported, decides nothing) | +0.287 | +0.606 |
+| images G' won | 7 of 12 | 11 of 12 |
+| sign-flip p (Holm threshold) | 0.038 (0.05) | 0.00049 (0.025) |
+
+- **Had C1 held, both would have been supported.** H2's p is far under its threshold. H1's then takes the second threshold,
+  0.05, and 0.038 is under it.
+- C1 did not hold, and nothing moves.
+
+**The predictions.**
+- **P1 FAILED:** C1 fired, by one image.
+- **P2 and P3** have no reading. Descriptively, P2's sign held, and P3, that H1 would NOT be supported, would have been wrong.
+
+**Reported beside it.**
+- Graded in linear radiance, the same arms gave H1 6 of 12 (mean d -0.116) and H2 11 of 12. Round 60's linear figures
+  were 5 of 12 and 9 of 12.
+- The midpoint traced alone beat G' on 12 of 12, by a mean d of 0.45.
+- The fill helped on 12 of 12, by 2.92.
+
+**What three rounds of FSR3 on the path tracer have found, and where this stops.** Sections 133, 136 and 139 were each
+pre-registered before their scenes existed, and each came back not reported, for a different reason:
+- round 59's generator carried the light sources across their silhouettes;
+- round 60's control could not meet a C1 written for another kind of comparison;
+- round 61's candidate missed C1 by one dark scene.
+
+Across rounds 60 and 61, descriptively, the arrangement with the light sources lit at the generated time beats holding the
+older frame on 20 of 24 scenes. Graded as a display shows it, it edges the cross-fade.
+
+**No round has passed its own controls, and I do not propose a fourth that relaxes C1 after seeing where this one fell.**
+That would be choosing the test by its outcome. The record stands as three not-reported rounds whose descriptive figures
+lean one way. Whether FSR3 on the path tracer closes on that, or gets a round of a different kind, is Keith's call.
+A different kind would be a larger test set fixed in advance, or a device timing round that asks whether a generated
+frame is worth its cost at all.
+
+## 141. K0p's IMAGE BOUND FOLLOWS THE DEVICE'S OWN STORE RULE, AND THE 1080's ROUND-33 RUNS AGAIN: FIXED BEFORE THEY RUN
+
+**Why.** Section 137 found K0p red natively on both rig GPUs, on its image bound alone, with identical cell counts on the two
+vendors. Keith asked for the bound fixed and the runs given again.
+
+**What was found, before any change.**
+- The CPU twin that converts each stored cell **toward zero** (`f16roundTZ`, brain/conv2d.mjs) lands 1.318e-3 from the
+  f64 network on the device gate's fixture. Both GPUs read 1.32e-3.
+- Its layers handed to the gate's own judge read 3038, 3400, 2592 and 0 cells at the other nearest. The rig read the same.
+- So the rig's devices are the truncating twin, cell for cell on the counts. That can be said of these counts and this fixture;
+  it is not shown for every cell value a device can see.
+
+**The change, derived, not read off the run.**
+- `F16S_IMAGE_TOL` was the nearest twin's figure × 5.7, held at 1e-3 (section 129).
+- `F16S_IMAGE_TOL_RTZ` is the truncating twin's 1.318e-3 × 5.7 = 7.51e-3, held at **7.5e-3**.
+- Which bound a device takes is read from its own cells by `f16StoreRule`:
+  - **rn** when no cell took the other nearest;
+  - **rtz** when every stored cell is the f32 cell (or its fused mirror's) truncated toward zero;
+  - **mixed** otherwise, which keeps the round-to-nearest bound.
+- A software adapter must still read rn with no other nearest, as before. The cell key (no cell unexplained) and
+  k_head_apply's bound are unchanged.
+- The gate holds the derivation, the rule on fixtures, and a simulated truncating device (rtz, 1.32e-3, within its bound;
+  the same image under the nearest rule refused).
+- **This is a change made after a run showed it was needed.** It does not reach back: sections 130 and 137 stand as written,
+  read off the reports they read.
+
+**The runs, all at one commit, nothing pulled or committed between them.**
+- **On the GTX 1080:** two `realGpuRun --only denoise` runs, a and b, each with its own trace.
+- **On the Intel gen-9:** two `realGpuRun --only denoise` runs, a and b.
+- These are also round 63's runs (section 143): `--only denoise` carries its gate, so one session on each GPU answers both.
+  The cost is that a red in round 63's gate stops a 1080 run counting for H141 too.
+
+**H141, round 33's question on the 1080 again, by section 135's rule unchanged:**
+- full / temporal, read off each 1080 run's section 103 line, is above 1.0 in both;
+- a run counts when every `--only denoise` gate is green with exit 0, at the runs' commit, with both networks' 1080p rows
+  on the device's clock.
+- If H141 holds, `denoise-temporalup-device`'s rig half is done.
+
+**R141, the bound on the device.** K0p natively is green on all four runs, and each run's reading names store rule rtz.
+
+**Predictions, fixed now, deciding nothing.**
+- **P1:** all four runs read store rule rtz, and the cell counts 3038 / 3400 / 2592 / 0 again.
+- **P2:** H141 holds, near section 137's 1.99 x.
+- **P3:** neither 1080 run dies.
+
+**The reports are committed byte for byte before they are read.** Section 144 reads them; sections 142 and 143 are the two
+FSR3 rounds Keith asked for.
+
+## 142. ROUND 62 -- ROUND 61's ARRANGEMENT ON A TEST SET TWICE ITS SIZE: FIXED BEFORE ITS SCENES EXIST
+
+**Why.** Section 140 left FSR3 on the path tracer with three not-reported rounds and declined to relax C1 after seeing where
+round 61 fell. Keith asked for two rounds of a different kind. This is the first: the same test asked of more scenes, every
+rule fixed before any of them is rendered. Section 143 is the second, a device timing round.
+
+**What does not change from round 61 (section 139).**
+- The arrangement: light-free frames L6 and L7. Every arm is lit with emitterRadiance at the generated time.
+- The arms: the generator G', the cross-fade X', the held frame R', the noisy midpoint frame, and the midpoint traced alone.
+- The grading is in display space (round 26's transfer) before relMSE, with linear radiance reported beside it.
+- The sign-flip test (section 28), with Holm over H1 and H2. C2 is cited from round 54, and C3 is within 2 x of the floor.
+- C1 is asked of the candidate alone.
+- The frames are 256 x 256, at 4 spp in and 32 spp for the truth.
+- The shipped network (r11 seed 1) and the fill: nothing is trained.
+
+**What changes.**
+- **The test set: 24 scenes**, 12 of R (seeds 59000-59011) and 12 of C (seeds 60000-60011). None of them has been rendered
+  by any round. Section 28's exact sign-flip test enumerates every sign assignment, and 24 is the most it takes; that is why
+  24, not more.
+- **C1 at 22 of 24**, round 61's 11 of 12 in proportion. It is not relaxed. At this C1, round 61's own 10 of 12 would still
+  have fired (20 of 24).
+
+**The hypotheses, as round 61's.**
+- **H1:** G' beats the cross-fade X'.
+- **H2:** G' beats the held frame R'.
+
+**What is reported beside the verdict, deciding nothing.**
+- The figures per family, R and C. Round 61 lost its two C1 images on C.
+- Linear radiance's H1 and H2.
+- The midpoint traced alone against G'.
+- The fill.
+- G' against round 59's arrangement.
+
+**Predictions, fixed now, deciding nothing.**
+- **P1:** C1 holds. This is the uncertain one: round 61 met 10 of 12, and this needs 22 of 24.
+- **P2:** H2 is supported. Round 61 read 11 of 12, p 0.00049.
+- **P3:** H1 is supported. Round 61 read 7 of 12, p 0.038, with a mean d of +0.287; twice the scenes at that effect would
+  give a smaller p.
+- **P4:** if C1 fires, it fires on C, as in round 61.
+
+**The run.** `node tools/denoiseStudy.mjs --harvest-framegen-large`, on this box, detached. It writes
+`render/denoise-results-framegen-large.json`, which is committed byte for byte before it is read, at about 10,000 s.
+Section 145 is its verdict; section 144 reads section 141's rig runs.
+
+## 143. ROUND 63 -- IS A GENERATED FRAME CHEAP ENOUGH TO BE WORTH IT ON THE DEVICE? FIXED BEFORE ITS CODE
+
+**Why.** Rounds 59-62 ask whether a generated frame looks better than what it replaces. This one asks the other half: what it
+costs on a real GPU against tracing the frame. A generated frame that costs as much as a traced one presents nothing extra.
+Keith asked for both rounds.
+
+**What is timed, at 1920 x 1080, on each rig GPU.**
+- **T, a traced frame:** the half-size chain with its history, as section 103's line reports it ("with its history").
+- **G, a generated frame,** in the light-free arrangement of rounds 60-62, is four parts summed:
+  1. **the generator:** fx/fsr/fsrFrameGenTsl.mjs's makeFrameGen, as fsr-three.html runs it, with round 59's fill. It is fed
+     a real scene's field at 1920 x 1080: eye 7's first hits projected into camera 6, as render/denoiseFrameGen.mjs's
+     motionField computes it, on a scene seeded outside every split. It runs in the browser on three.js, on the wall clock
+     after the queue drains, median of its passes.
+  2. **the field on the device:** a new pass, render/denoiseFrameGenGPU.mjs's MOTION_WGSL. It turns the history's first
+     hits at eye 7 (the chain's `hits` pass, already paid for in T) into the generator's motion and depth. It is held to
+     motionField on the CPU, then timed.
+  3. **the light at the generated time:** the bounded coverage at full size (`covFullB`, section 107's line).
+  4. **the composite:** `restComp`, section 110's line.
+
+**H63: G ≤ 0.25 × T on both GPUs, in both of each GPU's runs.**
+- At 0.25, generating every other frame presents frames at 2T / (T + G) ≥ 1.6 x the traced rate for the same work.
+- A run counts when every `--only denoise` gate is green with exit 0, all runs on one commit. All five figures must be in
+  the run's own report.
+- The four parts of G come from three clocks: the generator's wall clock, the device clock for MOTION_WGSL where the
+  adapter has timestamps, and the device clocks of `covFullB` and `restComp`. A wall clock counts against G, never for it.
+
+**What is reported beside it, deciding nothing.**
+- Each part of G on its own.
+- The generator's share of G.
+- The field's holes at 1920 x 1080.
+- G against the chain without its history.
+
+**What this round does not ask.** Whether the generated frame is good enough to show: that is rounds 60-62's question.
+Nor what an FSR3 frame costs with an optical flow; round 59's arrangement takes the scene's own field.
+
+**Predictions, fixed now, deciding nothing.**
+- **P1:** H63 holds on both GPUs.
+- **P2:** G / T is 0.08-0.20 on the 1080 and 0.10-0.30 on the Intel. The 1080 read `covFullB` 1.23 ms and `restComp`
+  0.34 ms against T at 37.5 ms (section 137); the generator is the unknown.
+- **P3:** the generator is most of G on both GPUs.
+
+**The runs: two `realGpuRun --only denoise` runs on each GPU, section 141's.** They are committed byte for byte before
+they are read. Section 146 reads them; section 144 is section 141's rig runs, section 145 round 62's verdict.
+
+## 145. ROUND 62 -- REPORTED: BOTH HYPOTHESES SUPPORTED. ON 24 SCENES THE LIGHT-FREE GENERATOR BEATS THE CROSS-FADE AND THE HELD FRAME, AS A DISPLAY SHOWS THEM
+
+**What arrived.** `render/denoise-results-framegen-large.json` (sha-256 `13c12303...`).
+- It was written by `--harvest-framegen-large` at 3d215c83, the commit carrying section 142's code, in 6,678 s.
+- It was committed byte for byte (51f7605c) before it was read.
+- A first start at b2c9e744 died at once on a missing import, before any scene was rendered. That was fixed at 3d215c83,
+  with a gate row.
+
+**The run is REPORTED.**
+- **C1 held:** G' beat the noisy frame in display space on 23 of 24, where 22 were needed. The one it lost is C 60008.
+- C2 is cited from round 54. C3: no image is near its floor. C4 (determinism) and C5 (distinct seeds) held.
+
+| | H1: G' against the cross-fade X' | H2: G' against the held frame R' |
+|---|---|---|
+| mean d | +0.178 | +0.570 |
+| images G' won | 17 of 24 (R 9 of 12, C 8 of 12) | 19 of 24 (R 10 of 12, C 9 of 12) |
+| sign-flip p (Holm threshold) | 0.0479 (0.05) | 0.00007 (0.025) |
+| status | **supported** | **supported** |
+
+**The predictions, read as made.**
+- **P1 held:** C1 held, 23 of 24.
+- **P2 held:** H2 is supported.
+- **P3 held:** H1 is supported, by a narrow margin: p 0.0479 against 0.05. Its mean d, +0.178, is smaller than round 61's +0.287.
+- **P4 has no reading:** C1 did not fire. The one loss was on C, as P4 expected of a firing.
+
+**What it says, and what it does not.**
+- **On these scenes, graded as a display shows them, FSR3's generator between light-free frames, lit at the generated time,
+  is the better frame to put between two traced ones.** It beats both a cross-fade and holding the older frame.
+- **H1 is narrow, and only in display space.** Graded in linear radiance, G' beats the cross-fade on 12 of 24 (mean d
+  -0.168), which is no win. H2 holds in both spaces (linear 19 of 24, mean d +0.425). The pre-registered grading is display
+  space (section 139's reason: a display shows Reinhard and gamma, not radiance), and the verdict is in it. The linear figure
+  is reported so that nobody reads H1 as more than it is.
+- **This is the third round to ask H1 of this arrangement.**
+  - Round 60 was not reported (C1 on its control); its display-space H1 read 8 of 12, described.
+  - Round 61 was not reported (C1 on the candidate).
+  - Round 62 is the first to pass its controls.
+  - No round's C1 was relaxed, and round 62's test set was fixed before any of its scenes existed. Even so, a reader
+    weighing the arc as a whole should know the question was asked three times.
+- **A frame traced at the midpoint is still better.** The midpoint's own half-size frame, traced alone, beat G' on 16 of 24
+  (mean d -0.290, the traced frame's way). A generated frame is the cheaper substitute, not the equal.
+  Round 63 asks how much cheaper.
+- The fill helped on 24 of 24 (mean d +2.82). G' beat round 59's arrangement on 13 of 24 (mean d +0.759).
+
+**What changes.**
+- `denoise-fsr3-framegen` keeps its quality answer: on the path tracer, the light-free generator is supported over both
+  controls in display space.
+- The entry stays open on round 63 (section 143), which asks whether it is cheap enough on the device to be worth it.
+- No default moves: nothing ships a generated frame on the path tracer's page until round 63 has read.
+
+## 144. SECTION 141's RIG RUNS, READ: K0p GREEN UNDER ITS STORE RULE, AND H141 HOLDS -- ROUND 33's 1080 VERDICT IS GIVEN
+
+**What arrived.** Eight files, all at 3d215c83, committed byte for byte (0bffdc17) before the JSON was read. The upload
+displayed the four traces before that commit.
+- `render/denoise-rig-s141-a-gtx1080.json` and `-b-`: the two pre-registered 1080 runs.
+- `-a-gtx10802.json` and `-b-gtx10802.json`: a second pair, also on the 1080 (adapter "nvidia pascal"), run after.
+- The four traces.
+- **No Intel run came back.** Section 141 asked for two Intel runs.
+
+**R1, the crash: not reproduced.** No gate in any of the four reports died; every exit is status 0. Every trace walks both
+ladders and ends "the gate ends, 0 fail(s)". **P3 held.**
+
+**R141: K0p natively is green in all four 1080 runs.**
+- Each reading names store rule rtz, with 12768 cells truncated on each storing layer.
+- The counts are 3038 / 3400 / 2592 / 0 again. The image is 1.32e-3 against the truncating bound of 7.5e-3.
+- **P1 held on the 1080**; it has no reading on the Intel.
+
+**H141 HOLDS.** Both pre-registered 1080 runs count: every `--only denoise` gate is green with exit 0, at one commit, with
+both networks' 1080p rows on the device's clock.
+- full / temporal read **1.973 x and 1.992 x**, both above 1.0.
+- The second pair read 1.961 x and 1.961 x, which agrees.
+- **P2 held:** near section 137's 1.99 x.
+
+**What this closes.** The half-size chain with its history is cheaper than today's page at 1920 x 1080 on the GTX 1080, as
+it was on the Intel (section 98). `denoise-temporalup-device`'s rig half is done: round 33 has its verdict on both GPUs.
+`denoise-1080-native-crash` has not been seen since section 101: twelve 1080 runs since, five in section 102, three in
+section 137 and four here, and none died.
+
+## 146. ROUND 63 -- H63 FAILS ON THE 1080: A GENERATED FRAME COSTS ABOUT 0.55 OF A TRACED ONE, NOT 0.25
+
+**The runs.** These are section 144's four 1080 reports. The two pre-registered ones count, and so do the second pair.
+
+| run | generator | field | covFullB | restComp | G | T | G / T |
+|---|---|---|---|---|---|---|---|
+| a | 19.900 | 0.353 | 1.221 | 0.341 | 21.815 | 37.982 | **0.574** |
+| b | 18.300 | 0.353 | 1.217 | 0.356 | 20.226 | 38.088 | **0.531** |
+| a (second pair) | 18.300 | 0.352 | 1.226 | 0.341 | 20.219 | 37.436 | 0.540 |
+| b (second pair) | 18.700 | 0.355 | 1.218 | 0.356 | 20.629 | 37.234 | 0.554 |
+
+All figures are ms. The generator is on the wall clock; the other three parts are on the device's clock.
+
+**H63 FAILS.** It asked G ≤ 0.25 T on both GPUs, in both of each GPU's runs. The 1080's two pre-registered runs count and
+read 0.574 and 0.531. No Intel run can change that, and none came back.
+
+**The predictions, read as made.**
+- **P1 FAILED.**
+- **P2 FAILED:** 0.53-0.57 on the 1080, against 0.08-0.20.
+- **P3 held:** the generator is 90-91 % of G.
+
+**What it says.**
+- **On the 1080 a generated frame costs about half a traced one.** Generating every other frame presents 2T / (T + G)
+  ≈ **1.27-1.31 x** the traced rate for the same work, not the 1.6 x H63 asked.
+- That is still more frames than tracing alone. It is not the near-doubling FSR3 is used for. And by section 145 the
+  generated frame is the worse of the two frames it sits between: the traced midpoint beats it on 16 of 24.
+- **The cost is the generator's: 18-20 ms of 20-22.** The field the device computes is 0.35 ms, and the light at the
+  generated time with its composite is 1.6 ms.
+- The generator is three.js's: fx/fsr/fsrFrameGenTsl.mjs, a chain of full-screen render passes timed on the wall clock.
+  The arc's own passes are compute kernels on the device's clock.
+- Whether 18 ms is the generator's cost or the way it is driven is not measured here. The field's holes at 1920 x 1080
+  were 95,516 of 2,073,600 (4.6 %), which is not a large fill.
+
+**What changes.**
+- Nothing ships a generated frame on the path tracer's page.
+- `denoise-fsr3-framegen` closes with both halves measured. The quality question is supported (section 145, narrowly
+  against the cross-fade). The cost question failed (here).
+- A cheaper generator, the same algorithm as compute passes on the device, would be a new entry and its own round.
+  It is not proposed here; Keith decides whether it is worth one.
+
+## 147. ROUND 64 -- THE SAME GENERATOR AS COMPUTE PASSES ON THE DEVICE: IS IT CHEAP ENOUGH NOW? FIXED BEFORE ITS CODE
+
+**Why.** Section 146 found a generated frame costs 0.53-0.57 of a traced one on the 1080. Nearly all of that, 18-20 ms of
+20-22, is the generator: three.js's chain of full-screen render passes, on the wall clock. Keith asked for a cheaper
+generator. This round writes the same algorithm as compute passes, held to the same CPU reference, and asks section 143's
+question again.
+
+**The generator, as compute (render/denoiseFrameGenGPU.mjs).** It is render/frameInterp.mjs's interpolateFrameCPU with
+fsr-three.html's settings, the ones rounds 59-62 graded: block 1, indexed by the newer frame, t = 0.5, and the fill of
+radius 4, reach 16, side blend, the farther neighbour. Four passes:
+1. **the depth splat:** each pixel's vector lands where its content is at t; atomicMin keeps the nearest depth there.
+2. **the winner:** among the pixels that landed with that depth, atomicMin keeps the first in scan order. This is the CPU's
+   tie rule exactly: strictly nearer, and the first writer stays.
+3. **the fill:** each hole takes the farthest landed vector within 4 px, else within 16, reading only the splat's own mask,
+   as fillHolesCPU's one pass does.
+4. **the gather:** each pixel samples the older frame back along its vector and the newer forward, bilinear with clamped
+   edges, and blends them at t.
+
+It is held to interpolateFrameCPU on round 63's fixture, fed the device's own field:
+- the landed mask the same at all but 1 in 10,000 pixels (a landing at a half-pixel rounds in f32 or f64);
+- where the masks agree, every vector bit for bit;
+- the frame within 1e-5 relative.
+
+**What is timed, on each rig GPU, at 1920 x 1080.**
+- **G₆₄** is the four passes on the device's clock where it has timestamps, plus round 63's field, `covFullB` and `restComp`.
+- **T** is section 103's chain with its history, as round 63 read it.
+- They are read by readH64, which is readH63 with the generator's line replaced by the compute generator's.
+
+**H64: G₆₄ ≤ 0.25 × T on both GPUs, in both of each GPU's runs.**
+- That is H63's threshold, unchanged: at least 1.6 x the traced rate presented.
+- A run counts as in section 143: every `--only denoise` gate green with exit 0, at one commit.
+- If only one GPU's runs come back, H64 gets no verdict on the other, and none overall unless the GPU that came back fails.
+
+**What is reported beside it, deciding nothing.**
+- Each pass's ms.
+- The three.js generator's ms in the same run, so the two are compared on one machine at one commit.
+- The holes, as round 63 read them.
+
+**Predictions, fixed now, deciding nothing.**
+- **P1:** H64 holds on the 1080.
+- **P2:** the four passes take under 3 ms on the 1080. They are four full-screen compute passes, against the chain's
+  four-pass history at 1.9 ms (section 98), and the fill reads 81 taps a hole on 4.6 % of the frame.
+- **P3:** the Intel's G₆₄ / T is within 0.25 as well. Its chain is 10x the 1080's, and passes like these scale with it.
+
+**The runs.** Two `realGpuRun --only denoise` on each GPU, at round 64's commit. They are committed byte for byte before they
+are read. Section 149 reads them; section 148 is FSR4's first pre-registration.
+
+## 148. FSR4, ROUND 65 -- A LEARNED UPSCALER IN EASU's PLACE: THE DESIGN, FIXED BEFORE ITS CODE, ITS TRAINING AND ITS SCENES
+
+**Why.** Keith asked for FSR4 once FSR 1-3 were done at their best. They now are:
+- FSR1/EASU is the half-size chain's upscale (rounds 26-31), on the device and timed;
+- FSR2's temporal history is round 32's, on the device (round 33), its verdict on both GPUs (section 144);
+- FSR3's frame generation is measured both ways (sections 145, 146, and round 64 running).
+
+FSR4's step is that the upscale itself is learned. render/learned-preregistration.md (v4689) declined a learned upscaler
+because the tree had no trained network on a device. It has one now: the denoiser, through the same conv kernels.
+
+> **On the path tracer's half-size chain, does a small trained network that upscales 2x, guided by full-size albedo, normals
+> and depth, bring the frame closer to the reference than EASU does at the same input?**
+
+**What is learned, and what is not.**
+- **The network, U** (render/learnedUpscale.mjs), predicts each full-size pixel as a normalised kernel over the 4 x 4
+  half-size texels nearest it: KERNEL_TAPS-style, softmax weights, so it cannot add energy that is not in the input.
+- U's input per full-size pixel:
+  - the half-size denoised frame, bilinearly upsampled;
+  - the full-size albedo, normals and depth (guideBuffers at full size, which the coverage pass already traces);
+  - the pixel's sub-texel phase.
+- Three 3 x 3 conv layers of 16 channels, then the 16-logit kernel head. That is about the shipped denoiser's size, so it
+  runs on the same device kernels.
+- **The light sources stay out of it,** as round 30 took them out of EASU: fill, upscale, composite at full size.
+- **Nothing else changes:** the shipped denoiser at half size, the fill, the composite, all of render/denoiseUpscale.mjs's chain.
+
+**Training, fixed now.**
+- Families R and C. Training seeds 61000-61199 (100 R, 100 C) and validation 62000-62019, all new and reserved.
+- Each image is the chain's half-size denoised, filled frame of a 256 x 256 scene (128 x 128 at 4 spp). Its target is the
+  full-size reference at 32 spp, light-free.
+- Loss: relMSE in display space (round 26's transfer), the grading rounds 61-62 used.
+- Adam, the denoiser's TRAIN schedule, 3 seeds. The seed with the best validation loss is the candidate, chosen before any
+  test scene exists.
+- **C2's network:** the same training with targets shuffled across images, as round 11's C2.
+
+**The test.**
+- **24 new scenes:** 12 R (63000-63011) and 12 C (64000-64011), 256 x 256, the chain's single frame (round 30's B, no history).
+- **H1:** the chain with U in EASU's place beats the chain with EASU.
+- **H2:** it beats bilinear in EASU's place, the floor any upscaler must clear.
+- The sign-flip test (24 is its limit), Holm over {H1, H2}, graded in display space.
+- **C1:** U's chain beats the half-size noisy input upscaled bilinearly on 22 of 24.
+- **C2:** the shuffled-target U does not beat EASU (mean d ≤ 0).
+- **C3:** no image near its floor. **C4:** the candidate re-made bit for bit on the first image. **C5:** all seeds distinct.
+- Reported beside it:
+  - each family's figures;
+  - linear radiance;
+  - U against the full-size page (today's denoiser at full size, the cost T avoids);
+  - the train/validation curves.
+
+**What each outcome does.**
+- **H1 supported:** U goes to the device as a kernel set beside EASU, and a device round times it against EASU's 0.6 ms on
+  the 1080. A learned upscale that costs a full network pass may not be worth it; that is its own question, as round 63 was
+  frame generation's.
+- **H2 alone:** U learned to upscale but not as well as EASU's hand-written edges, and the backlog records it.
+- **Neither:** a measured negative, and FSR4 stops at its first round unless Keith asks for a different design.
+
+**Predictions, fixed now, deciding nothing.**
+- **P1:** H2 is supported. Anything trained beats bilinear.
+- **P2:** H1 is supported, by a mean d under 0.3. EASU is strong on these scenes' sphere edges, and the guides give U the
+  same edges EASU infers.
+- **P3:** C1 holds.
+
+**What this section is.** The design, fixed before anything is written. The code, its gate rows, the training harvest and the
+test harvest come in that order, each committed before the next runs, as rounds 1-12 did for the denoiser.
+
+## 149. ROUND 64, THE INTEL's HALF -- H64 HOLDS THERE, BY A HAIR; THE 1080's RUNS ARE OWED
+
+**What arrived.** Four `--only denoise` reports, all on the Intel gen-9 and all at df12b982, committed byte for byte
+(1f59df80) before they were read.
+- `render/denoise-rig-s147-a-intel-gen9.json` and `-b-` are the names section 147's commands give, so they are the
+  pre-registered pair.
+- `-a-intel-gen91.json` and `-b-intel-gen91.json` are a second pair. Their timestamps put them 35 minutes earlier.
+- Every gate is green with exit 0 in all four. No 1080 report came back.
+
+| run | compute generator | field | covFullB | restComp | G₆₄ | T | G₆₄ / T | three.js generator, same run |
+|---|---|---|---|---|---|---|---|---|
+| a | 57.612 | 10.446 | 23.381 | 16.130 | 107.569 | 433.718 | **0.248** | 180.6 |
+| b | 49.881 | 10.719 | 21.953 | 15.487 | 98.040 | 446.970 | **0.219** | 161.9 |
+| a (other pair) | 63.139 | 11.636 | 21.595 | 15.208 | 111.578 | 447.224 | 0.249 | 182.4 |
+| b (other pair) | 62.138 | 11.009 | 21.202 | 15.051 | 109.400 | 447.809 | 0.244 | 195.4 |
+
+All figures are ms, every part of G₆₄ on the device's clock.
+
+**On the Intel, H64's condition holds in both pre-registered runs (0.248, 0.219), and in the other pair too.**
+- **The margin is small:** run a is 0.002 under the threshold.
+- **H64 has no verdict yet:** it needs the 1080's two runs.
+
+**What it says so far.**
+- **The compute generator is 2.9-3.2 x faster than three.js's on the same machine and run:** 50-63 ms against 162-195.
+- **The fill and the gather are most of it** (39-56 ms of 50-63). The clear, the splat and the winner come to 10 ms.
+- **P3 held on the Intel:** G₆₄ / T is within 0.25 there.
+- **P2 has no reading:** it was the 1080's.
+- **15,886 holes stay holes after the fill** at 1920 x 1080 (0.77 %): no landed vector within 16 px. interpolateFrameCPU
+  leaves them too; the parity rows hold the two to each other. The generated frame is black there before the light
+  composite. Rounds 59-62 graded the same rule at 256 x 256, where none was left.
+
+**The 1080's two runs are owed**, at the same commit, by section 147's commands. Section 149 is completed when they are read.
+
+## 150. ROUND 64 -- H64 HOLDS ON BOTH GPUs: WITH THE GENERATOR AS COMPUTE PASSES, A GENERATED FRAME COSTS 0.11 OF A TRACED ONE ON THE 1080 AND 0.22-0.25 ON THE INTEL
+
+Section 149's second half. Section 148 is FSR4's design and keeps its number.
+
+**What arrived.** Four `--only denoise` reports, all on the GTX 1080 and all at df12b982, committed byte for byte (93bfb8eb)
+before they were read.
+- `-a-gtx1080` and `-b-gtx1080` are section 147's names, so they are the pre-registered pair.
+- `-a-gtx10801` and `-b-gtx10801` are an earlier pair. Every gate is green with exit 0 in all four.
+
+| run | compute generator | field | covFullB | restComp | G₆₄ | T | G₆₄ / T | three.js generator, same run |
+|---|---|---|---|---|---|---|---|---|
+| a | 2.429 | 0.353 | 1.226 | 0.332 | 4.340 | 38.474 | **0.113** | 18.8 |
+| b | 2.378 | 0.353 | 1.231 | 0.357 | 4.319 | 37.453 | **0.115** | 18.2 |
+| a (earlier pair) | 2.424 | 0.353 | 1.228 | 0.356 | 4.361 | 37.712 | 0.116 | 17.8 |
+| b (earlier pair) | 2.394 | 0.354 | 1.230 | 0.360 | 4.338 | 37.715 | 0.115 | 17.9 |
+
+All figures are ms, every part of G₆₄ on the device's clock.
+
+**H64 HOLDS.** Both GPUs' pre-registered pairs count. G₆₄ / T is 0.113 and 0.115 on the 1080 and 0.248 and 0.219 on the Intel
+(section 149), each at or under 0.25. Every other pair agrees.
+
+**The predictions, read as made.**
+- **P1 held:** H64 holds on the 1080.
+- **P2 held:** the four passes take 2.38-2.43 ms there, under 3. The fill is half of it, the gather a quarter.
+- **P3 held:** the Intel is within 0.25, by 0.002 in its run a.
+
+**What it says.**
+- **The compute generator is 7.3-7.7 x faster than three.js's on the 1080, and 2.9-3.2 x on the Intel,** for the same
+  algorithm, held to the same CPU reference.
+- **Generating every other frame presents 2T / (T + G₆₄):**
+  - **1.80 x the traced rate on the 1080**, against 1.27-1.31 x with three.js's generator (section 146);
+  - 1.60-1.64 x on the Intel.
+- **With section 145, both halves of FSR3 on the path tracer are now supported.**
+  - Quality: in display space the generator beats the cross-fade (narrowly) and the held frame, on 24 scenes.
+  - Cost: it presents 1.6-1.8 x the frames.
+- **What section 145 also said still stands:** the traced midpoint is better than the generated one on 16 of 24. Generation
+  is the cheaper substitute.
+- **15,886 pixels (0.77 %) stay holes at 1920 x 1080,** and are black before the light composite. That is the algorithm's
+  rule, the CPU's too, and rounds 59-62 never met it at 256 x 256.
+
+**What changes.**
+- `denoise-framegen-compute` is done.
+- **Nothing ships by this round alone.** Putting a generated frame on path-tracer.html's page is a page change with its own
+  questions: a pacing loop, and the holes past the reach. It is logged as `denoise-framegen-page`, and is Keith's call.
+
+## 151. ROUND 66 -- WHAT A HOLE SHOULD SHOW, AND A FRAME PACER: FIXED BEFORE THEIR CODE AND ROUND 66's SCENES
+
+**Why.** Section 150 left two things between the compute generator and path-tracer.html (`denoise-framegen-page`). Keith
+asked for both:
+- 0.77 % of a 1920 x 1080 generated frame has no vector within the reach and is black before the light composite;
+- nothing yet presents a generated frame between two traced ones at an even rhythm.
+
+### Part A: the holes, as a quality round
+
+**The problem's size, measured before this section.** At 256 x 256 the generator's fill (radius 4, reach 16) leaves no hole
+on rounds 59-62's scenes. Its reach is 16 pixels at any size, so the same disocclusion leaves holes at 1080p that it closes
+at 256.
+- Scaled by 256 / 1920, the fill is **radius 1, reach 2.** On round 63's scene (R 990914) that leaves 0.97 % holes at 256,
+  against 0.77 % with the full fill at 1920 x 1080.
+- On three more non-dataset scenes it leaves 0.81 %, 5.65 % and 0.60 %.
+- So round 66 grades at 256 x 256 with the scaled fill: 1080p's hole geometry at a size a harvest can trace.
+
+**The arms.** The light-free arrangement of rounds 60-62, the scaled generator, and four ways to fill what it leaves. Each
+is composited with the light sources at the midpoint, as G' is.
+- **Gh, the control:** holes left black, as today.
+- **GhX, the first candidate:** holes from the cross-fade of L6 and L7, the frame that is safe where nothing is known.
+- **GhC, the second candidate:** holes from L7, the newer frame. A disocclusion under an orbiting camera uncovers content
+  the newer frame shows.
+- **GhP**, holes from L6: reported only.
+
+**The test.**
+- **H1:** GhX beats Gh. **H2:** GhC beats GhX.
+- Graded in display space, the sign-flip test, Holm over {H1, H2}.
+- **C1**, asked of each hypothesis's candidate: it beats the noisy midpoint frame on 22 of 24.
+- C2 is cited from round 54. C3: none near its floor. C4: the candidate re-made bit for bit. C5: the seeds distinct.
+
+**The scenes.** 24 new ones: 12 R (65000-65011) and 12 C (66000-66011), 256 x 256, 4 spp in and 32 for the truth, all reserved.
+
+**Reported beside it.**
+- The holes' share per image.
+- relMSE on the hole pixels alone, per arm.
+- GhX against round 62's full-fill G' on the same scenes. That says what the scaled fill itself costs, which is not the
+  question here.
+
+**What each outcome does.**
+- H2 supported: the generator fills holes from the newer frame.
+- H1 alone: it fills them from the cross-fade.
+- Neither: they stay black, and the backlog says so.
+- The CPU reference and render/denoiseFrameGenGPU.mjs's gather take the rule together. The gather's parity rows hold them
+  to each other, as before.
+
+**Predictions, fixed now, deciding nothing.**
+- **P1:** H1 is supported on 24 of 24. Black is the worst answer a hole can have.
+- **P2:** H2 is supported, by a mean d under 0.05. The holes are 1 % of a frame.
+- **P3:** C1 holds for GhX.
+
+### Part B: the frame pacer -- the tree's own, driven by the path tracer's costs
+
+**A correction before any code ran.** This part first described a new pacer. **The tree already has one:**
+render/framePacer.mjs (v4743-v4756), FSR3's, with fx/fsr's gates behind it. It has:
+- a display that refreshes at a fixed rate or when told (VRR);
+- FSR3's "midpoint" policy, which holds the traced frame half an interval after the generated one, and is the rule written
+  here first;
+- a generation cost;
+- judder, new images a second, and latency (`scheduleCPU`, `scheduleVrrCPU`, `pacingMetrics`).
+
+Writing it here, I overwrote that file. It was restored from git before anything ran, and nothing of mine replaces it. Part B
+is therefore no new code.
+
+**What Part B does instead.** It drives the existing pacer with section 150's measured costs. The traced frame is T: 38.0 ms
+on the 1080 and 447 ms on the Intel. Generation is G₆₄: 4.34 ms and 98-112 ms. Both use policy "midpoint" against "none".
+- **On a 60 Hz display** (`scheduleCPU`, refresh 16.667 ms, pairs "two", which makeFsr3({ hold: 2 }) keeps), and **on a
+  variable-refresh display** from 30 to 144 Hz (`scheduleVrrCPU`).
+- Over 120 traced frames at a steady T, and with T jittered ±20 % from a fixed seed.
+
+**Its rows, in render/denoiseFrameGenCost-selfcheck.mjs (they read the tree's pacer and assert only what follows from it):**
+- On the 1080's costs, "midpoint" shows at least 1.6 x the new images a second "none" does, on both displays.
+- Its latency is within T / 2 + G + one refresh of the traced frame's.
+- Every present follows the readiness of what it shows: a schedule property the pacer's own gate holds, read here as well.
+- The Intel's figures, and the judder of each, are reported and decide nothing.
+
+**Not this round.** Wiring the pacer and the generator into path-tracer.html's own loop. That is the page change
+`denoise-framegen-page` names; it follows these two pieces.
+
+## 152. ROUND 66 -- REPORTED: A HOLE SHOULD SHOW THE CROSS-FADE. BLACK LOSES ON EVERY SCENE; THE NEWER FRAME DOES NOT BEAT THE CROSS-FADE
+
+**What arrived.** `render/denoise-results-framegen-holes.json`.
+- It was written by `--harvest-framegen-holes` at d3863c27, the commit carrying section 151's code, in 7,064 s.
+- It was committed byte for byte (d8c7bf1a) before it was read.
+
+**The run is REPORTED.**
+- C1 held for both candidates: GhX and GhC each beat the noisy midpoint frame on 24 of 24.
+- C2 is cited, C3 found none near its floor, and C4 (both candidates re-made bit for bit) and C5 held.
+
+| | H1: GhX (cross-fade) against Gh (black) | H2: GhC (newer frame) against GhX |
+|---|---|---|
+| mean d | **+1.968** (R +2.78, C +1.15) | -0.011 |
+| images the candidate won | **24 of 24** | 7 of 24 (R 4, C 3) |
+| sign-flip p (Holm threshold) | 6.0e-8 (0.025) | 0.887 (0.05) |
+| status | **supported** | **not supported** |
+
+**The predictions, read as made.**
+- **P1 held:** H1 is supported on 24 of 24.
+- **P2 FAILED:** H2 is not supported. Its mean d is the cross-fade's way, though under P2's 0.05 in size.
+- **P3 held:** C1 holds for GhX.
+
+**Reported beside it.**
+- **The scaled fill's holes:** 1.45 % of a frame on the mean, 0.48-2.99 % per scene.
+- **relMSE on the hole pixels alone, the mean over scenes:**
+
+  | Gh, black | GhX, the cross-fade | GhP, the older frame | GhC, the newer frame |
+  |---|---|---|---|
+  | 0.859 | 4.97e-4 | 8.06e-4 | 1.32e-3 |
+
+  The cross-fade is the best of the three on the holes themselves. A hole's content is in neither frame for certain, and the
+  mean of the two is the safer guess.
+- **The older frame against the cross-fade:** the cross-fade is better on 17 of 24, by a mean d of 0.0004.
+- **GhX against round 62's full fill G' on the same scenes:** GhX is better on all 24, by a mean d of 0.078. At 256 x 256 the
+  scaled fill with the cross-fade in its holes beats the full fill's 4-to-16-pixel reach. Nothing was pre-registered on it,
+  so it decides nothing; it suggests the reach's long searches at 256 take vectors from too far away.
+
+**What changes, by section 151's rule.**
+- **The generator fills what it leaves from the cross-fade.**
+- interpolateFrameCPU gains `holes: "crossfade"` (default "zero", so fx/fsr's FSR3 gates and rounds 59-64 are unchanged).
+- render/denoiseFrameGenGPU.mjs's gather writes the cross-fade in a hole.
+- The cost gate's parity rows hold the two to each other on both fields, as before.
+- On the path tracer's page this closes the 0.77 % of a 1080p frame left black.
+
+## 153. FSR4 ROUND 65's CODE: FOUR DETAILS SECTION 148 LEFT OPEN, FIXED BEFORE THE TRAINING HARVEST RUNS
+
+Section 152 is round 66's verdict, written when its harvest has read. The code section 148 called for now exists:
+- render/learnedUpscale.mjs: U, its input, its apply, its loss, its training;
+- render/learnedUpscaleStudy.mjs: the two harvests;
+- `--harvest-upscale-train` and `--harvest-upscale-test`;
+- their gates: render/learnedUpscale-selfcheck.mjs and render/learnedUpscaleStudy-selfcheck.mjs, on synthetic and non-dataset
+  scenes only, every row sabotaged.
+
+Writing it fixed four things section 148 had left open. None is a result; no scene of the round has been rendered.
+
+1. **"Light-free" is the composite's.** The loss grades O = E + (1 - cov) U, the chain's own composite, against the full
+   reference, in display space. U is then asked only for the light the light sources do not cover, which is what section 148
+   meant by a light-free target. It needs no light-free reference, and the test grades the same composite.
+2. **The depth guide is d / (1 + d) along the camera's forward axis,** 0 on sky. The **phase** is ±0.25 on each axis: where
+   the pixel's centre falls in its half-size texel.
+3. **An untrained U is the 4 x 4 box.** The head's weights start at zero, as the denoiser's zero-last.
+   - Its parameter count is 6,656 (not "about the shipped denoiser's"; that one has 6,387).
+   - A crop's taps are read from a two-texel window round it, so a crop is graded exactly as the whole frame would be at
+     those pixels. A gate row holds this bit for bit.
+4. **C2's shuffle** permutes the training references across images with no image keeping its own (seed 65). Each input
+   keeps its own scene's light sources. Its U is trained on the candidate's seed.
+
+**The order from here, each step committed before the next runs:**
+1. this code;
+2. `--harvest-upscale-train`, writing render/upscale-net-r65.json;
+3. `--harvest-upscale-test`, writing render/denoise-results-upscale-learned.json;
+4. the verdict.
+
+## 154. FSR4 ROUND 65 -- NOT REPORTED: C1 AND C3. THE 32-SAMPLE TRUTH IS NOISIER THAN EVERY ARM, SO THE TEST COULD NOT RESOLVE THEM
+
+**What arrived.**
+- render/upscale-net-r65.json: the training harvest at 64756e00, committed at b9f2cdab. Its validation losses were 4.351e-3,
+  4.488e-3 and 4.198e-3, so the candidate is seed 3. Its log was seen before its commit; no test scene had been rendered.
+- render/denoise-results-upscale-learned.json: the test harvest at b9f2cdab, committed byte for byte (07fceeaa) before it
+  was read.
+
+**The run is NOT REPORTED, on two controls.**
+- **C1 fired:** U's chain beat the noisy floor on 18 of 24, where 22 were needed.
+- **C3 fired:** 23 of 24 images sit within 2 x of their floor, so neither hypothesis is resolvable.
+  - The floor is relMSE between the two 32-sample references, in display space. Its mean is 5.50e-3.
+  - The arms' means are U 4.90e-3, EASU 4.99e-3, bilinear 5.31e-3 and the noisy floor 6.15e-3.
+  - Every arm is closer to one reference than the second reference is. The truth's own noise is the largest error in the
+    table, and it hides differences of the size the round asked about.
+- C2 held: the shuffled-target U lost to EASU on all 24, by a mean d of 1.11. So U learned from its targets, not from
+  their noise.
+- C4 and C5 held.
+
+**Reported, deciding nothing.**
+
+| | U against EASU | U against bilinear |
+|---|---|---|
+| images U won | 7 of 24 (R 2, C 5) | 14 of 24 (R 2, C 12) |
+| mean d (display) | -0.053 (R -0.114, C +0.008) | +0.018 (R -0.065, C +0.100) |
+| mean d (linear) | -0.111 | -0.064 |
+
+EASU beat bilinear on 22 of 24.
+
+**The predictions, read as made.**
+- **P3 FAILED:** C1 did not hold.
+- **P1 and P2 have no reading.** Descriptively, P1 (U beats bilinear) is half true: on C 12 of 12, on R 2 of 12. P2 (U beats
+  EASU) is not seen at all.
+
+**What it says.** Nothing is decided, and two things are owed.
+- **This is my design's fault, and C3 caught it.**
+  - Section 148 kept the 32-sample truth of rounds 59-62. Those rounds graded frames generated from noisy inputs, whose
+    errors sat well above it.
+  - Here every arm is the shipped denoiser's half-size output upscaled, and they all sit at or under the truth's own noise.
+    I did not check the floor against the arms before fixing the design.
+- U was also trained on 32-sample targets. Noisy targets are unbiased, but they slow what it can learn.
+
+**What a next round would be, for Keith to decide.** It would not be a re-read of these 24.
+- New test seeds, and a truth of 512 samples: about 16 x quieter, so the floor falls well under the arms.
+- The same U, so the training's choice stands; or U retrained on 512-sample targets as well.
+
+`fsr4-learned-upscaler` stays open on that decision.
+
+## 155. FSR4 ROUND 67 -- U RETRAINED ON 512-SAMPLE TARGETS, TESTED AGAINST A 2048-SAMPLE TRUTH: FIXED BEFORE ITS CODE AND ITS SCENES
+
+**Why.** Section 154's round could not resolve its arms: the 32-sample truth's own noise was above all of them. Keith chose
+the second of its two options: U retrained on quieter targets, and tested again on new scenes against a quieter truth.
+
+**The floor, measured before this section, on two non-dataset scenes at 256 x 256.** The table is display-space relMSE
+against one reference.
+
+| scene | spp | second reference (the floor) | EASU's chain | bilinear's | the noisy floor |
+|---|---|---|---|---|---|
+| R 990940 | 512 | 1.95e-4 | 8.74e-4 | 9.19e-4 | 3.62e-3 |
+| C 990941 | 512 | 3.18e-3 | 6.12e-3 | 5.81e-3 | 9.63e-3 |
+
+- On R, 512 samples puts the floor at 0.22 of EASU's error, so it resolves.
+- On C, 512 leaves it at 0.52: within C3's 2 x, not resolvable. C's light reaches through glossy paths whose samples are rare.
+- So the **test's truth is 2048 samples**, 4 x quieter again: C's floor near 8e-4 against arms near 6e-3.
+- The **training targets are 512.** A noisy target is unbiased, so it slows learning and does not mislead it. At 512, 220
+  training scenes cost about 4.4 hours; at 2048 they would cost about 18.
+
+**What changes from round 65 (sections 148, 153).**
+- **Training and validation targets: 512 samples,** on the same 200 + 20 scenes (61000-61199, 62000-62019). Those were
+  never test scenes, and re-rendering them at 512 changes the targets alone.
+- **U is retrained on seeds 1-3,** the candidate again the lowest validation loss, and C2's shuffled U on the candidate's
+  seed. The results go to render/upscale-net-r67.json.
+- **The test: 24 new scenes,** 12 R (67000-67011) and 12 C (68000-68011). The two references are each 2048 samples.
+  The results go to render/denoise-results-upscale-learned-r67.json.
+
+**What does not change.** U's shape and input, its loss (display space through the composite), the schedule, the
+hypotheses (H1 against EASU, H2 against bilinear), the test, Holm, C1-C5, C1 at 22 of 24, and the grading.
+
+**Predictions, fixed now, deciding nothing.**
+- **P1:** C3 holds this time (no more than 12 of 24 within 2 x of the floor).
+- **P2:** H2 is supported.
+- **P3:** H1 is not supported. Section 154's descriptive figures had U losing to EASU on 17 of 24, and quieter targets alone
+  are not likely to turn that.
+- **P4:** C1 holds.
+
+**The runs.** `node tools/denoiseStudy.mjs --harvest-upscale-train --round 67`, then `--harvest-upscale-test --round 67`.
+Each is committed byte for byte before the next runs. Section 156 is the verdict.
+
+## 156. FSR4 ROUND 67 -- REPORTED, NEITHER SUPPORTED: THE LEARNED UPSCALER TIES EASU, AND ITS EDGE OVER BILINEAR MISSES HOLM
+
+**What arrived.**
+- render/upscale-net-r67.json: the training harvest at dd00f88b, committed at 881fd267. Its validation losses were
+  2.069e-3, 2.175e-3 and 2.656e-3, so the candidate is seed 1. Its log was seen before its commit; no test scene had been
+  rendered.
+- render/denoise-results-upscale-learned-r67.json: the test harvest at 881fd267, in 13,818 s, committed byte for byte
+  (8d8a3c6d) before it was read.
+
+**The run is REPORTED.** Every control held.
+- **C1:** U beat the noisy floor on 24 of 24.
+- **C2:** the shuffled U lost to EASU on 24 of 24, by a mean d of 1.90.
+- **C3:** no image within 2 x of its floor. The 2048-sample floor is 0.19 of EASU's error at the worst.
+- C4 and C5 held.
+- The quieter truth did what section 155 fixed it to do: the floor's mean is 2.48e-4, against every arm near 2.3e-3.
+
+| | H1: U against EASU | H2: U against bilinear |
+|---|---|---|
+| mean d (display) | -0.020 (R -0.006, C -0.034) | +0.027 (R +0.042, C +0.012) |
+| images U won | 10 of 24 (R 5, C 5) | 16 of 24 (R 8, C 8) |
+| sign-flip p (Holm threshold) | 0.868 (0.05) | 0.037 (0.025) |
+| status | **not supported** | **not supported** |
+
+- Holm takes the smaller p first. H2's 0.037 is over its threshold of 0.025, so neither is supported.
+- **The mean display-space relMSE:** U 2.254e-3, EASU 2.252e-3, bilinear 2.310e-3, the noisy floor 4.85e-3.
+- In linear radiance, H1 reads 6 of 24 (mean d -0.043) and H2 16 of 24 (+0.049). EASU beat bilinear on 17 of 24.
+
+**The predictions, read as made.**
+- **P1 held:** C3 held.
+- **P2 FAILED:** H2 is not supported, though its sign held on 16 of 24 and p missed by 0.012.
+- **P3 held:** H1 is not supported.
+- **P4 held:** C1 holds.
+
+**What it says.**
+- **This round's learned upscaler is EASU's equal, not its better.** The two differ by 0.09 % in mean relMSE, with
+  10 wins against 14.
+- Trained on quiet targets, with guides EASU does not have, a 6,656-parameter U learned what EASU does by hand, and no more.
+- **FSR4's step, as this arc built it, buys nothing on the path tracer's frames,** and it would cost a network pass where
+  EASU costs 0.6 ms.
+- Rounds 65 and 67 are the arc's FSR4. Round 65 could not resolve its arms; round 67 resolved them and found a tie.
+
+**What changes.**
+- `fsr4-learned-upscaler` is closed as a measured negative: U ties EASU at the round's size and training.
+- What could change that is a design, not a re-read: a wider network, more training scenes, temporal input as FSR4's own
+  network takes. Each would be its own round, and Keith's call.
+- EASU stays the chain's upscale.
+
+## 157. FSR4 ROUND 68 -- A LEARNED KERNEL OFFERED EASU, WIDER: FIXED BEFORE ITS CODE AND ITS SCENES
+
+**Why.** Section 156 found round 67's U, a 4 x 4 kernel learned from a box, equal to EASU and no better. Keith asked for a
+different FSR4 design. The one fixed here changes two things:
+- **what U can choose from:** EASU's own output at the pixel, as a 17th tap beside the sixteen half-size texels. Where EASU is
+  right, U can take it; where it is wrong, U can leave it;
+- **how much it can hold:** 32 channels, not 16.
+
+**A pilot, before this was fixed (synthetic discs, 300 steps, seeds 1-3, flat and textured).** The first draft of this section
+started U_E **at** EASU: the 17th logit biased +8, 99.47 % of every pixel on EASU. It never left it -- every run ended at EASU's
+error to four digits. Biases of 0 and -1.5, and once -3, fell into the same place: all weight on EASU's tap, the sixteen's
+gradient gone with it. A bias of **-8** (the start the box, 2.1e-5 on EASU) fell into it in none of six runs, beat EASU in all
+six, and ended with 36-47 % of the weight on EASU's tap. So that is the start fixed here, and a gate row holds the +8 failure.
+
+**The network, U_E (render/learnedUpscale.mjs).**
+- The same 12-channel input. Three 3 x 3 layers of **32**, then a 1 x 1 head of **17** logits.
+- The softmax runs over U's sixteen half-size taps **and EASU's own light-free output at the pixel**, the 17th.
+- At the start the head's weights are zero and the 17th logit's bias is -8: round 67's box start, with e^-8 / (16 + e^-8) =
+  2.1e-5 on EASU. A gate row holds the figure.
+- The pixel is still a convex mix of what EASU and the half-size frame give, so it adds no light that neither has.
+
+**Training, as round 67's (section 155).**
+- The same 200 + 20 scenes at 512 samples, seeds 1-3, the candidate chosen by validation, C2's U_E on shuffled targets.
+- The examples can be cached on disk (`--cache <dir>`, render/denoiseCache.mjs, keyed by scene, size and samples, the directory
+  stamped by the results file and the commit), so an interrupted harvest resumes where it stopped and renders nothing twice.
+- The results go to render/upscale-net-r68.json.
+
+**The test.**
+- **24 new scenes:** 12 R (69000-69011) and 12 C (70000-70011), against two 2048-sample references.
+- **H1:** U_E's chain beats EASU's.
+- **H2:** U_E's chain beats round 67's U (render/upscale-net-r67.json's candidate) on the same scenes. That says whether the
+  design moved anything.
+- Display space, the sign-flip test, Holm, C1-C5 as before (C1 at 22 of 24, C2 the shuffled U_E against EASU).
+- The results go to render/denoise-results-upscale-learned-r68.json.
+
+**A change to the harvests' bookkeeping, fixed now.** The upscale harvests record the commit they **started at**, not the
+HEAD when they finished. They load their code at the start, so that is the commit that ran, and work committed during a
+harvest no longer misattributes its results. A gate row reads it off the command.
+
+**Predictions, fixed now, deciding nothing.**
+- **P1:** C1 and C3 hold.
+- **P2:** H1 is supported, by a mean d under 0.05. The synthetic pilot's margin was large, but round 67 says the path tracer's
+  frames leave EASU less to fix.
+- **P3:** H2 is supported.
+- **P4:** the trained U_E puts between 20 % and 80 % of its weight on EASU's tap on the mean (the pilot: 36-47 %).
+
+Section 158 is the verdict.

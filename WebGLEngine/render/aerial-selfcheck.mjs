@@ -11,6 +11,7 @@
 //   4  THE KERNEL (needs the software WebGPU adapter; SKIPPED, and said, without one) applyAerial as a compute kernel over the chain equals the twin over 200 queries.
 // NOT GRADED, said plainly: the look, a real GPU.
 // SABOTAGE LOG (v4895, each on the real file, restored, git-clean verified): the Mie g 0.62 -> 0.5 in the JS twin's lobe -> 1 red by name (the kernel-vs-twin row, 34.7% off).
+// v4897 -- THE LEAN KERNEL'S ROW (section 4): applyAerialLean's early return raised from an extinction of 0.002 to 0.3 -> 1 RED, the lean-against-exact row (restored identical).
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -95,6 +96,10 @@ console.log("\n4. THE KERNEL");
             let worst = 0, mid = 0; for (let i = 0; i < N; i++) for (let c = 0; c < 3; c++) { worst = Math.max(worst, Math.abs(g.values[i * 3 + c] - tw[i][c]) / Math.max(Math.abs(tw[i][c]), 0.05)); }
             ok("!! applyAerial as a compute kernel over the sky chain equals the twin over 200 queries (worst relative difference " + (worst * 100).toFixed(3) + "%)", worst < 5e-3 && !g.wroteNothing, "adapter " + ((g.adapter && g.adapter.description) || "?"));
             reading("aerial: applyAerial kernel vs twin (relative)", worst, 5e-3, N * 3, ((g.adapter && g.adapter.description) || "?"));
+            // v4897 -- applyAerialLean (A.AERIAL_LEAN_WGSL, run through A.AERIAL_LEAN_KERNEL_WGSL): the same arithmetic with the reads that cannot show left out (an extinction under 0.002 returns the colour; the crossfade reads only the sky sample that has weight). On this table it equals the exact kernel everywhere the early-out does not fire, and by under 0.5% where it does (render/snowCoarse-selfcheck.mjs holds it on a table built to visit every branch).
+            const gl = await runWgslComputeNative({ code: A.AERIAL_LEAN_KERNEL_WGSL, outCount: N * 3, inputs: [{ binding: 1, data: chain }, { binding: 2, data: Q }], workgroups: Math.ceil(N / 64), requireFn: require_ });
+            if (!gl.ok) ok("!! the lean aerial kernel runs", false, (gl.reason || "") + " " + (gl.errors || []).join(" | "));
+            else { let wl = 0; for (let i = 0; i < N * 3; i++) wl = Math.max(wl, Math.abs(gl.values[i] - g.values[i]) / Math.max(Math.abs(g.values[i]), 0.05)); ok("!! AERIAL_LEAN_KERNEL_WGSL (applyAerialLean, AERIAL_LEAN_WGSL spliced after AERIAL_WGSL) equals the exact kernel on the GPU over the same 200 queries (worst relative difference " + (wl * 100).toExponential(1) + "%, bound 0.5%)", wl < 5e-3 && A.AERIAL_LEAN_KERNEL_WGSL.includes(A.AERIAL_LEAN_WGSL.trim().slice(0, 40)) && /fn applyAerialLean\(/.test(A.AERIAL_LEAN_WGSL)); }
         }
     }
 }

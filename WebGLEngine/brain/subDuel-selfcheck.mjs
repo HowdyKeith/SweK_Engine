@@ -13,6 +13,7 @@
 //                  (recomputed here to 1e-12); a boat that is hit loses (-1.5 when it dies having dealt nothing); the owner's own torpedoes never touch it
 //   7  LOSSES      a boat that drives into the floor is lost (-0.5), and the duel ends; nobody firing for four minutes is a draw of score 0
 //   8  THE OPTIONS actuators: INSTANT rates are bit-for-bit none, the real rates change the duel; an `opponent` replaces the drone; a duel is deterministic
+//   9b THE TRACE   (v4901) an optional `trace` array gets a frame every 6 ticks (both boats, the running torpedoes) and the duel is the same duel with or without it, to the bit
 //   9  THE SETS    disjoint, 24 / 24 / 24 / 32, frozen; the hand tactician's score is PINNED on TRAIN, HELD_OUT and BASELINE
 //
 // SABOTAGE LOG -- THIRTY-FIVE, each applied to brain/subDuel.mjs in place (by a script, restored after each; cmp against the saved original at the end: byte-for-byte), the gate run; every one red by name (the number is how many rows went red):
@@ -22,6 +23,7 @@
 //   D25 the owner can be hit (targets emptied) 5 | D26 the hull ignores the actuators 1 | D27 the opponent override ignored 4 | D28 the drone range 150..350 2 | D29 the depth order clamp 80 (1, after the row below) | D30 a contact leaks a range 1
 //   D31 an echo without a range 2 | D32 the ping count not kept 2 | D33 the fire count not kept 3 | D34 the torpedo's floor 3 m 5 | D35 loss events not logged 1
 //   F1-F6 (scoreFor, the score from either seat): the seats swapped 4 | a loss not penalised 3 | the loser gets the speed bonus 1 | the duel's length ignored 1 | a kill bonus for ANY loss, not only a sinking 1 (it went 0 red until the row where A drives into the floor and B must score exactly 0) | B's damage not subtracted 3
+//   v4901, THE TRACE (section 11b), EIGHT of brain/subDuel.mjs: R1 a frame every 30 ticks 1 | R2 the trace never written (a crash) | R3 the depth negated 2 | R4 every torpedo ever fired kept in the frames 0 THE FIRST TIME (no duel here fires more than four, so the list of all of them was the same as the list of those running until a torpedo ended; scenario 10 and its last frame now hold it: 1) | R5 the torpedo's depth signed wrong 1 | R6 one boat in a frame 1 | R8 the first frame skipped 1 | R9 `alive` always true 0 THE FIRST TIME (the row looked for a dead boat in a frame the trace never landed on; scenario 10 ends on a tick it does: 1). A mutant that rewrote hp in place (R7) is the same fight and the same trace, and is not counted.
 // D29 went 0 red the first time: no tactician in the gate ever asked for a depth the arena had to refuse. The row that asks for 70 m (the floor is at 50) holds the clamp.
 "use strict";
 import * as D from "./subDuel.mjs";
@@ -148,6 +150,19 @@ console.log("\n9. THE SETS");
     ok("!! the HAND TACTICIAN's score is PINNED on TRAIN, HELD_OUT and BASELINE (it moves when the arena, the sonar, the torpedo or the tactician moves -- that is the point of pinning it)", pin(tr, 0.9977) && pin(ho, 1.3072) && pin(bl, 0.8150), `${tr.score.toFixed(4)} ${ho.score.toFixed(4)} ${bl.score.toFixed(4)}`);
     ok("evaluate() counts wins, losses and draws (they sum to the set), and describeEval quotes the four kinds and the W/L/D", tr.wins + tr.losses + tr.draws === 24 && /hunter/.test(D.describeEval(tr)) && /W .* L .* D/.test(D.describeEval(tr)));
     // AUDIT_SET is deliberately NOT evaluated here: it is for a champion, once.
+}
+
+console.log("\n11b. THE TRACE (v4901: an optional record of a duel for a replay)");
+{
+    const sc = D.scenario(1, "patrol"), tr = [], plain = D.duel(D.sideHand()(), sc, { opponent: D.sideHand()() }), traced = D.duel(D.sideHand()(), sc, { opponent: D.sideHand()(), trace: tr });
+    ok("!! a duel flown with a trace is THE SAME DUEL: the fingerprint, the score, the fates, the damage, the tick count and the events are identical (the trace reads and never changes the fight)", plain.fingerprint === traced.fingerprint && plain.score === traced.score && JSON.stringify(plain.fates) === JSON.stringify(traced.fates) && JSON.stringify(plain.damage) === JSON.stringify(traced.damage) && plain.ticks === traced.ticks && JSON.stringify(plain.events) === JSON.stringify(traced.events));
+    ok("!! a frame every TRACE_EVERY (6) ticks from tick 0 (the duel's " + traced.ticks + " ticks make " + tr.length + " frames), in tick order, each with both boats (id, x, y, depth, heading, pitch, hp, alive, ammo)", D.TRACE_EVERY === 6 && tr.length === Math.ceil(traced.ticks / 6) && tr[0].tick === 0 && tr.every((f, i) => f.tick === i * 6 && f.boats.length === 2 && f.boats[0].id === 1 && f.boats[1].id === 2 && ["x", "y", "depth", "heading", "pitch", "hp", "alive", "ammo"].every((k) => k in f.boats[0])));
+    ok("!! the frames agree with the fight: the first frame (one tick in) has A within 0.5 m of the origin and the scenario's depth, B within 0.5 m of its start, 100 hit points and four torpedoes each", Math.abs(tr[0].boats[0].x) < 0.5 && Math.abs(tr[0].boats[0].depth - sc.a.depth) < 0.5 && Math.abs(tr[0].boats[1].x - sc.b.pos[0]) < 0.5 && Math.abs(tr[0].boats[1].depth - sc.b.depth) < 0.5 && tr[0].boats.every((b) => b.hp === 100 && b.ammo === 4 && b.alive), `A ${tr[0].boats[0].depth.toFixed(1)} m, B ${tr[0].boats[1].depth.toFixed(1)} m`);
+    const withTorp = tr.filter((f) => f.torps.length), fired = traced.fired[0] + traced.fired[1];
+    ok("!! torpedoes appear in the frames while they RUN (" + withTorp.length + " frames with one or more of the " + fired + " fired), each with an owner (1 or 2), a position and a positive depth, and none after it hit or ran out; a frame with none has an empty list", fired > 0 && withTorp.length > 0 && withTorp.every((f) => f.torps.every((q) => (q.owner === 1 || q.owner === 2) && Number.isFinite(q.x) && q.depth > 0)) && tr.some((f) => f.torps.length === 0));
+    const t10 = [], r10 = D.duel(D.sideHand()(), D.scenario(10, "patrol"), { opponent: D.sideHand()(), trace: t10 }), last = t10.at(-1);
+    ok("!! the depth is POSITIVE DOWN (the vessel's own: a boat at 25 m has depth 25); and in scenario 10, which ends on a sinking at tick " + r10.ticks + " (a tick the trace lands on: (ticks - 1) is a multiple of 6), the LAST frame shows the sunk boat dead with its hit points at 0", tr[0].boats[0].depth > 0 && (r10.ticks - 1) % 6 === 0 && last.tick === r10.ticks - 1 && last.boats.some((b) => !b.alive && b.hp === 0) && last.boats.some((b) => b.alive), JSON.stringify(last.boats.map((b) => [b.alive, b.hp])));
+    ok("!! a torpedo that has HIT or run out is out of the frames: in scenario 10 the four torpedoes fired are not all in the last frame (" + last.torps.length + " of " + (r10.fired[0] + r10.fired[1]) + " running), and at some frame none is", last.torps.length < r10.fired[0] + r10.fired[1] && t10.some((f, i) => f.torps.length === 0 && i > 100));
 }
 
 console.log("\n12. THE RULES AS LITERALS (the constants that make a score a score)");

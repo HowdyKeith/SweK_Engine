@@ -35,10 +35,26 @@
   button:hover { border-color:var(--cyan); }
   .chip { display:inline-flex; align-items:center; gap:6px; background:#141821; border:1px solid #2a3242; border-radius:4px; padding:2px 8px; font-size:11px; }
   .dot { width:9px; height:9px; border-radius:50%; background:#555; }
-  main { display:flex; gap:12px; padding:6px 16px 16px; flex-wrap:wrap; align-items:flex-start; }
-  .tank { flex:1 1 560px; min-width:300px; }
-  canvas { display:block; width:100%; background:#04101c; border:1px solid var(--line); border-radius:8px; }
-  .side { width:300px; max-width:100%; background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:8px; max-height:640px; overflow-y:auto; }
+  body { min-height:100vh; display:flex; flex-direction:column; }
+  /* THE WORKSPACE: the 3D tank takes the left two thirds at the full height of what is left of the window; the plan (top view) and the depth (side) view stack in a third-width column on the right, with the list of subs under them. */
+  main { flex:1 1 auto; min-height:520px; display:grid; grid-template-columns:minmax(0,2fr) minmax(280px,1fr); gap:12px; padding:6px 16px 12px; }
+  .panel { display:flex; flex-direction:column; min-height:0; min-width:0; background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:6px 8px 8px; }
+  .panel h2 { margin:0 0 6px; font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--cyan); font-weight:600; display:flex; justify-content:space-between; gap:8px; }
+  .panel h2 .hint { color:var(--dim); letter-spacing:0; text-transform:none; font-weight:400; }
+  .p3d { grid-row:1; }
+  .col { display:flex; flex-direction:column; gap:12px; min-height:0; min-width:0; }
+  .col .panel.p2d { flex:0 0 auto; }
+  .col .panel.plist { flex:1 1 170px; min-height:170px; }
+  .canvasbox { position:relative; flex:1 1 auto; min-height:260px; }
+  .canvasbox canvas { position:absolute; inset:0; width:100%; height:100%; z-index:1; }
+  .canvasbox iframe { position:absolute; inset:0; width:100%; height:100%; border:0; z-index:0; pointer-events:none; background:#000; }
+  canvas { display:block; width:100%; background:#04101c; border:1px solid var(--line); border-radius:6px; }
+  .p2d canvas { height:auto; }
+  .side { flex:1 1 auto; min-height:0; overflow-y:auto; }
+  .cmd { color:var(--dim); font-size:11px; line-height:1.5; font-variant-numeric:tabular-nums; }
+  .cmd.tk { color:var(--amber); }
+  .tank-note { color:var(--dim); font-size:11px; padding-top:5px; }
+  @media (max-width: 900px) { main { grid-template-columns:minmax(0,1fr); } .canvasbox { min-height:60vh; } .col { gap:12px; } }
   .row { display:flex; gap:8px; align-items:flex-start; padding:5px 4px; border-bottom:1px solid #12203a; }
   .row.sel { background:#12203a; }
   .sw { width:11px; height:11px; border-radius:50%; flex:none; margin-top:3px; }
@@ -65,22 +81,31 @@
   <button id="refreshBtn" title="Fetch the tank's list now">Refresh</button>
   <label>speed <select id="speedSel"><option value="1">1&times;</option><option value="4" selected>4&times;</option><option value="10">10&times;</option></select></label>
   <label>hull <select id="hullSel" title="The vessel every sub in the tank is flown on. The pilots are not told which one it is."></select></label>
-  <label>compass <select id="compassSel" title="'dropout' takes the compass away from every sub for 16 s in every 48 s, each on its own clock: the pilot is shown the heading it last saw lit"><option value="lit">lit</option><option value="dropout">dropout</option></select></label>
-  <label>add <select id="addKind" title="A kind of pilot with no weights to send: it is made here, kept on this page and never offered to a peer"><option value="navigator">PD + navigator</option></select></label><button id="addBtn" title="Put one in the tank">Add</button><button id="addClear" title="Take away the subs added here">Clear added</button>
+  <label title="The tank's size. Standard is 500 x 300 m; Large (1500 x 900) and Open (3000 x 1800) give the subs room to swim and spread out. Changing it reloads the page."><span>tank</span> <select id="sizeSel"><option value="standard">500 x 300 m</option><option value="large">1500 x 900 m</option><option value="open">3000 x 1800 m</option></select></label>
+  <label>sea <select id="seaSel" title="The water above the tank. The three physics seas are the same Gerstner surface a hull floats on, in calm, default and rough swell, and work on every GPU. The GPU ocean is the vendored web-ocean sea (sea-host.html) drawn behind this canvas; it needs WebGPU, and the subs are drawn in front of all of its water (the depth tint puts them under it)."></select> <span class="sub" id="seaState"></span></label>
+  <span title="Pick a sub in the list, then press one: a leak the tank cannot trim out (the boat blows its tank and drops its weight), the same leak with no rescue (it grounds), or surface (it blows its tank and rides on its buoyancy with the tower out of the water)">event on the selected sub:
+    <button id="floodBtn">flood</button> <button id="sinkBtn">sink</button> <button id="surfaceBtn">surface</button> <button id="clearBtn">restore</button></span>
   <span class="chip"><span class="dot" id="fishDot"></span><b>FISH BRAIN</b> <span id="fishWord">checking&hellip;</span></span>
   <span id="msg" class="sub"></span>
 </div>
 <main>
-  <div class="tank">
-    <canvas id="plan" width="1000" height="600" aria-label="Plan view of the tank"></canvas>
-    <div style="height:10px"></div>
-    <canvas id="sideView" width="1000" height="220" aria-label="Side view of the tank: depth against length"></canvas>
-    <div style="height:10px"></div>
-    <canvas id="view3d" width="1000" height="420" aria-label="Three-dimensional view of the tank: the physics sea above, the subs beneath it" style="width:100%;cursor:grab"></canvas>
-    <div class="small" id="view3dNote" style="color:#7c93b8;font-size:12px">3D: the sea is the physics surface a hull would float on (render/seaThree.mjs); subs are tinted toward the water colour by depth. Drag to orbit, wheel to zoom.</div>
-    <div class="sub" id="compassNote" style="margin-top:6px">COMPASS DROPOUT (the compass menu above): every sub's compass goes dark for 16 s in every 48 s, each sub on its own clock. A sub in the dark is ringed in amber; its pilot is shown the heading it last saw lit (the ghost line from the sub is the heading its autopilot believes; the sub's own nose is the truth). A PD sub steers on that stale heading and drifts off its line; a navigator sub integrates the exact turning rate and keeps its line -- the exact rate is what a simulator can give and a real gyro cannot, and the page says so. The estimators are the study's reservoirs, which recovered little or nothing.</div>
+  <section class="panel p3d" aria-label="Three-dimensional view of the tank">
+    <h2>3D view <span class="hint"><label title="Click a sub in the list, then tick this: the camera follows it and comes in close enough to see its tower and tail fins"><input type="checkbox" id="followBox"> follow the selected sub</label> &nbsp; drag to orbit &middot; wheel to zoom</span></h2>
+    <div class="canvasbox"><iframe id="seaFrame" title="GPU ocean (web-ocean), behind the 3D view" aria-hidden="true" tabindex="-1" style="display:none"></iframe><canvas id="view3d" width="1000" height="700" aria-label="Three-dimensional view of the tank: the physics sea above, the subs beneath it" style="cursor:grab"></canvas></div>
+    <div class="tank-note" id="view3dNote">The sea is the physics surface a hull would float on (render/seaThree.mjs); subs are tinted toward the water colour by depth, and each sub&rsquo;s tail planes and rudder follow its pilot&rsquo;s command. A sub in an event shows its tank as a gauge on the hull, sheds bubbles when it blows, and a released weight falls to the floor.</div>
+  </section>
+  <div class="col">
+    <section class="panel p2d" aria-label="Plan view of the tank"><h2>Top view <span class="hint">500 &times; 300 m</span></h2>
+      <canvas id="plan" width="1000" height="600" aria-label="Plan view of the tank"></canvas></section>
+    <section class="panel p2d" aria-label="Depth view of the tank"><h2>Depth view <span class="hint">depth against length</span></h2>
+      <canvas id="sideView" width="1000" height="220" aria-label="Side view of the tank: depth against length"></canvas></section>
+    <section class="panel p2d" aria-label="Selected brain activity"><h2>Selected brain activity <span class="hint" id="brainWho">pick a sub in the list</span></h2>
+      <canvas id="brainView" width="520" height="300" aria-label="The selected sub's brain: its activations and the policy map"></canvas></section>
+    <section class="panel p2d" aria-label="Compass dropout: the plain autopilot beside the navigator"><h2>Compass dropout <span class="hint"><button id="compassBtn" title="Take the compass away on two subs at once, in the same windows: the first sub keeps the plain autopilot, the second flies behind the dead-reckoning navigator. Press again to end it.">compass test</button></span></h2>
+      <canvas id="compassView" width="1000" height="330" aria-label="Two compass dials and the heading error of each over time"></canvas>
+      <div class="tank-note" id="compassNote">Both subs lose the compass for 16 s in every 40 (after 10 s of it working). Green is the true heading, amber is what the pilot is shown. The plain autopilot is shown the last good heading and drifts off it; the navigator integrates the hull&rsquo;s own turn rate and keeps it. Its rate gyro is exact here, so this is the best a navigator can do.</div></section>
+    <section class="panel plist" aria-label="The subs in the tank"><h2>Subs</h2><div class="side" id="list"></div></section>
   </div>
-  <div class="side" id="list"></div>
 </main>
 <p class="note" id="fishDetail"></p>
 <section id="dropout" class="dropout">
@@ -89,42 +114,91 @@
   <div id="dropoutHost"><p class="sub" id="dropoutStatus">loading the dropout view&hellip;</p></div>
 </section>
 <script type="module">
-import { createTank, withBelief, LENGTH, WIDTH, DEPTH_MIN, DEPTH_MAX } from "/render/subAquariumSim.mjs";
+import { createTank, LENGTH, WIDTH, DEPTH_MIN, DEPTH_MAX } from "/render/subAquariumSim.mjs";
 import { LABELS } from "/physics/mechanics/subHulls.mjs";
 import { createView3d } from "/render/subAquarium3d.mjs";
+import { readout } from "/render/subBallastCues.mjs";
+import { LABELS as SEA_LABELS, GPU, DEFAULT_STYLE, isStyle, gpuSeaAvailable } from "/render/seaStyles.mjs";
+import { hostUrl } from "/ui/seaFrame.mjs";
+import { subPanel, drawPanel } from "/render/brainPanel.mjs";
+import { dialInfo, pair, pushTrace, lineFor, drawDial, drawTrace } from "/render/compassView.mjs";
 
 const $ = (id) => document.getElementById(id);
 const plan = $("plan"), side = $("sideView"), pg = plan.getContext("2d"), sg = side.getContext("2d");
-const tank = createTank();
+const SIZES = { standard: [LENGTH, WIDTH], large: [1500, 900], open: [3000, 1800] }, sizeKey = Object.hasOwn(SIZES, new URLSearchParams(location.search).get("size")) ? new URLSearchParams(location.search).get("size") : "standard";
+const tank = createTank({ length: SIZES[sizeKey][0], width: SIZES[sizeKey][1] });   // v4902: room to swim; the page reloads with ?size= to change it
 let view3d = null;
 try {   // v4895: the tank in 3D. A page without WebGL keeps its two 2D views.
     const THREE = await import("/vendor/three/three.module.js"), cv = $("view3d");
-    view3d = createView3d(THREE, cv, { length: LENGTH, width: WIDTH, depthMax: 50 });
-    view3d.resize(cv.width, cv.height);
+    view3d = createView3d(THREE, cv, { length: tank.length, width: tank.width, depthMax: 50 });
+    const fit = () => { const r = cv.parentElement.getBoundingClientRect(); view3d.resize(Math.max(2, Math.round(r.width)), Math.max(2, Math.round(r.height))); };   // the canvas is as big as its panel
+    fit(); new ResizeObserver(fit).observe(cv.parentElement);
     let drag = null; const V = () => view3d.getView();
     cv.addEventListener("pointerdown", (e) => { drag = { x: e.clientX, y: e.clientY, v: V() }; cv.setPointerCapture(e.pointerId); cv.style.cursor = "grabbing"; });
     cv.addEventListener("pointermove", (e) => { if (!drag) return; view3d.setView(drag.v.yaw - (e.clientX - drag.x) * 0.006, drag.v.pitch + (e.clientY - drag.y) * 0.004, drag.v.dist); });
     cv.addEventListener("pointerup", () => { drag = null; cv.style.cursor = "grab"; });
     cv.addEventListener("wheel", (e) => { e.preventDefault(); const v = V(); view3d.setView(v.yaw, v.pitch, v.dist * (e.deltaY < 0 ? 0.9 : 1.1)); }, { passive: false });
-} catch (e) { view3d = null; $("view3d").style.display = "none"; $("view3dNote").textContent = "3D view unavailable here (" + String((e && e.message) || e).slice(0, 80) + "); the plan and side views are unaffected."; }
+} catch (e) { view3d = null; $("view3d").style.display = "none"; $("view3dNote").textContent = "3D view unavailable here (" + String((e && e.message) || e).slice(0, 80) + "); the top and depth views are unaffected."; }
+{   // v4902 -- the size picker reloads with ?size= (the tank and its 3D view are built once)
+  const sz = $("sizeSel"); sz.value = sizeKey; sz.addEventListener("change", () => { const u = new URL(location.href); u.searchParams.set("size", sz.value); location.href = u.toString(); });
+}
 {   // the hull picker: the labels are text; changing it puts every sub back in the water on the new vessel
     const sel = $("hullSel");
     for (const [name, label] of Object.entries(LABELS)) { const o = document.createElement("option"); o.value = name; o.textContent = label; sel.appendChild(o); }
     sel.value = tank.hull;
     sel.addEventListener("change", () => { try { tank.setHull(sel.value); $("msg").textContent = "hull: " + (LABELS[sel.value] || sel.value); } catch (e) { sel.value = tank.hull; $("msg").textContent = "that hull is not available"; } });
 }
-{   // the compass picker and the 'add a sub' picker: the labels are text; a sub made here has no weights and is kept on this page
-  $("compassSel").addEventListener("change", () => { try { tank.setCompass($("compassSel").value); $("msg").textContent = "compass: " + tank.compass; } catch (e) { $("compassSel").value = tank.compass; $("msg").textContent = "that compass is not available"; } });
+// v4901 -- the sea picker: three physics styles (rebuild the surface in place) and the GPU ocean (sea-host.html in a frame behind the transparent canvas; the sea's camera follows the view's)
+{
+    const sel = $("seaSel"), frame = $("seaFrame"), store = () => { try { return window.localStorage; } catch { return null; } };
+    for (const [name, label] of Object.entries(SEA_LABELS)) { const o = document.createElement("option"); o.value = name; o.textContent = label; sel.appendChild(o); }
+    let current = DEFAULT_STYLE, watch = null;
+    const stopWatch = () => { if (watch) { clearInterval(watch); watch = null; } };
+    function physics(name) {
+        stopWatch(); frame.style.display = "none"; frame.src = "about:blank"; $("view3d").style.background = ""; $("seaState").textContent = "";
+        if (view3d) { view3d.setBackdrop(null); view3d.setSeaStyle(name); }
+        current = name; sel.value = name;
+    }
+    function gpu() {
+        const a = gpuSeaAvailable(navigator, window.isSecureContext);
+        if (!a.ok) { $("msg").textContent = "GPU ocean: " + a.reason; sel.value = current; return false; }
+        if (!view3d) { $("msg").textContent = "GPU ocean needs the 3D view, which is not available here"; sel.value = current; return false; }
+        frame.style.display = "block"; frame.src = hostUrl({}); $("view3d").style.background = "transparent"; view3d.setBackdrop(frame); current = GPU; sel.value = GPU;
+        const t0 = performance.now(); stopWatch();
+        watch = setInterval(() => {
+          const st = view3d.backdropState(); $("seaState").textContent = "GPU ocean: " + st;
+          if (st === "live") return;
+          if (performance.now() - t0 > 12000) { stopWatch(); let why = ""; try { const e = frame.contentDocument.getElementById("err"); why = e && e.textContent ? e.textContent.slice(0, 80) : ""; } catch (e) {} physics(DEFAULT_STYLE); $("msg").textContent = "the GPU ocean did not start" + (why ? " (" + why + ")" : " (no WebGPU adapter answered)") + "; back to the physics sea"; }
+        }, 500);
+        return true;
+    }
+    function choose(name, remember = true) { if (!isStyle(name)) return; const ok = name === GPU ? gpu() : (physics(name), true); if (ok && remember) { try { store() && store().setItem("subAquarium.sea", name); } catch (e) {} } }
+    sel.value = DEFAULT_STYLE; sel.addEventListener("change", () => choose(sel.value));
+    let saved = null; try { saved = store() && store().getItem("subAquarium.sea"); } catch (e) {}
+    if (saved && saved !== DEFAULT_STYLE) choose(saved, false);
 }
-let selected = null, lastFrame = 0, listErr = false, lastList = [];
-const extras = [], KIND_NAMES = { navigator: "PD + navigator", "fly-estimator": "PD + fly heading-loop estimator", "er-estimator": "PD + random-wiring estimator", network: "network" };   // subs made on this page: no weights, never sent anywhere
-const syncTank = () => tank.sync([...lastList, ...extras]);
+let selected = null, lastFrame = 0, listErr = false;
+// follow: the camera follows the selected sub when the box is ticked; ticking it with nothing selected picks the first sub in the list
+function syncFollow(fromBox) { if (!view3d) return; const on = $("followBox").checked; if (on && !selected && fromBox) { const f = tank.snapshot()[0]; if (f) { selected = f.id; renderList(); } } view3d.setFollow(on ? selected : null); }
+$("followBox").addEventListener("change", () => syncFollow(true));
+// v4901 -- events on the selected sub (render/subAquariumSim.mjs setEvent): the tank, the emergency blow and the drop weight show in the 3D view and in the list
+function setEvent(ev) { if (!selected) { $("msg").textContent = "pick a sub in the list first"; return; } try { const r = tank.setEvent(selected, ev); $("msg").textContent = r ? r + " on the selected sub" : "restored"; } catch (e) { $("msg").textContent = String((e && e.message) || e).slice(0, 80); } }
+// the compass test: the first two subs in the list, one on the plain dropout and one behind the navigator, started on the same tick so they meet the same windows
+let compassOn = false;
+$("compassBtn").onclick = () => {
+  const ids = tank.snapshot().map((s) => s.id);
+  if (compassOn) { for (const id of ids) { const s = tank.subs.get(id); if (s && (s.event === "dropout" || s.event === "navigator")) tank.setEvent(id, null); } compassOn = false; $("msg").textContent = "compass test ended"; return; }
+  if (!ids.length) { $("msg").textContent = "no subs in the tank to test"; return; }
+  tank.setEvent(ids[0], "dropout"); if (ids[1]) tank.setEvent(ids[1], "navigator"); compassOn = true;
+  $("msg").textContent = ids[1] ? "compass test: " + tank.subs.get(ids[0]).name + " on the plain autopilot, " + tank.subs.get(ids[1]).name + " on the navigator" : "compass test: only one sub, on the plain autopilot (a second sub is needed for the navigator)";
+};
+$("floodBtn").onclick = () => setEvent("flood"); $("sinkBtn").onclick = () => setEvent("sink"); $("surfaceBtn").onclick = () => setEvent("surface"); $("clearBtn").onclick = () => setEvent(null);
 const DOT = { live: "#4ade80", standin: "#f6a623", offline: "#ff5a5a", err: "#555" }, WORD = { live: "live", standin: "stand-in", offline: "offline", err: "unreachable" };
 
 async function refresh() {
   try {
     const j = await fetch("/subaquarium/list", { cache: "no-store" }).then((r) => r.json());
-    if (j && j.ok) { lastList = j.subs; syncTank(); listErr = false; } else listErr = true;
+    if (j && j.ok) { tank.sync(j.subs); listErr = false; } else listErr = true;
   } catch (e) { listErr = true; }
   renderList();
 }
@@ -137,13 +211,6 @@ async function post(path, body) { return fetch(path, { method: "POST", headers: 
 
 $("seedBtn").onclick = async () => { const r = await post("/subaquarium/seed"); $("msg").textContent = r.ok ? `offered ${r.added} sub${r.added === 1 ? "" : "s"}` + (r.skipped && r.skipped.length ? `, skipped ${r.skipped.length}` : "") : "not allowed: " + (r.error || "?"); refresh(); fishHealth(); };
 $("refreshBtn").onclick = () => { refresh(); fishHealth(); };
-$("addBtn").onclick = () => {
-  const kind = $("addKind").value, n = extras.filter((e) => e.pilot === kind).length + 1, hue = { navigator: 140, "fly-estimator": 200, "er-estimator": 40 }[kind] ?? 100;
-  if (extras.length >= 12) { $("msg").textContent = "twelve added subs are enough"; return; }
-  extras.push({ id: "page-" + kind + "-" + Date.now().toString(36) + n, name: (KIND_NAMES[kind] || kind) + " " + n, hue, pilot: kind, from: "this page", local: false, weights: null });
-  syncTank(); renderList(); $("msg").textContent = "added " + (KIND_NAMES[kind] || kind);
-};
-$("addClear").onclick = () => { extras.length = 0; syncTank(); renderList(); $("msg").textContent = "the added subs are gone"; };
 
 function renderList() {
   const box = $("list"); box.textContent = "";
@@ -158,17 +225,21 @@ function renderList() {
     const sw = document.createElement("span"); sw.className = "sw"; sw.style.background = `hsl(${s.hue} 80% 60%)`;
     const t = document.createElement("div"), n = document.createElement("div"), m = document.createElement("div"); n.className = "nm"; m.className = "sub";
     n.textContent = s.name; m.id = "m_" + s.id;
-    t.appendChild(n); t.appendChild(m); row.appendChild(sw); row.appendChild(t);
-    row.onclick = () => { selected = s.id === selected ? null : s.id; renderList(); };
+    const cm = document.createElement("div"); cm.className = "cmd"; cm.id = "c_" + s.id;   // the pilot's four commands this tick: the tail planes and rudder in the 3D view are drawn from these
+    const tk = document.createElement("div"); tk.className = "cmd tk"; tk.id = "t_" + s.id;   // the tank: the event, the water in it, the air, the weight (render/subBallastCues.mjs readout)
+    t.appendChild(n); t.appendChild(m); t.appendChild(cm); t.appendChild(tk); row.appendChild(sw); row.appendChild(t);
+    row.onclick = () => { selected = s.id === selected ? null : s.id; renderList(); syncFollow(); };
     if (s.local) { const x = document.createElement("button"); x.textContent = "✕"; x.title = "Remove from the tank"; x.style.marginLeft = "auto"; x.onclick = async (e) => { e.stopPropagation(); await post("/subaquarium/remove", { id: s.id }); refresh(); }; row.appendChild(x); }
-    else if (extras.some((e) => e.id === s.id)) { const x = document.createElement("button"); x.textContent = "✕"; x.title = "Remove from the tank (it lives on this page only)"; x.style.marginLeft = "auto"; x.onclick = (e) => { e.stopPropagation(); extras.splice(extras.findIndex((q) => q.id === s.id), 1); syncTank(); renderList(); }; row.appendChild(x); }
     box.appendChild(row);
   }
 }
 function updateStats(snap) {
   for (const s of snap) {
+    const cm = document.getElementById("c_" + s.id);
+    if (cm && s.cmd) { const f = (v, w) => (v >= 0 ? "+" : "") + v.toFixed(w); cm.textContent = `pitch ${f(s.cmd.pitch, 2)} · yaw ${f(s.cmd.yaw, 2)} · thrust ${f(s.cmd.thrust, 2)} · ballast ${f(s.cmd.ballast, 2)}`; }
+    const tk = document.getElementById("t_" + s.id); if (tk) tk.textContent = readout(s) || lineFor(s);
     const m = document.getElementById("m_" + s.id); if (!m) continue;
-    m.textContent = `${KIND_NAMES[s.pilot] || "PD autopilot"} · ${s.local ? "this box" : "from " + s.from} · ${s.depth.toFixed(0)} m · ${s.speed.toFixed(1)} m/s` + (s.hull && s.hull !== "nominal" ? ` · ${LABELS[s.hull] || s.hull}` : "") + (s.lost ? ` · lost ${s.lost}×` : "") + (s.dark ? ` · COMPASS DARK ${s.darkLeft.toFixed(0)} s` : s.compass === "dropout" ? " · compass lit" : "");
+    m.textContent = `${s.pilot === "network" ? "network" : "PD autopilot"} · ${s.local ? "this box" : "from " + s.from} · ${s.depth.toFixed(0)} m · ${s.speed.toFixed(1)} m/s` + (s.hull && s.hull !== "nominal" ? ` · ${LABELS[s.hull] || s.hull}` : "") + (s.lost ? ` · lost ${s.lost}×` : "");
   }
 }
 
@@ -179,26 +250,39 @@ function drawSub(g, px, py, heading, hue, len, sel) {
   g.fillStyle = "#0006"; g.fillRect(len * 0.1, -len * 0.38, len * 0.2, len * 0.14);
   g.restore();
 }
-function drawDark(g, px, py, believed, r) {   // an amber ring round a sub whose compass is dark, and a ghost line along the heading its autopilot believes (the engine's heading increases clockwise on the screen: the nose is (cos h, -sin h))
-  g.save(); g.strokeStyle = "#f6a623"; g.lineWidth = 1.5; g.setLineDash([4, 3]); g.beginPath(); g.arc(px, py, r, 0, Math.PI * 2); g.stroke(); g.setLineDash([]);
-  g.lineWidth = 2; g.beginPath(); g.moveTo(px, py); g.lineTo(px + Math.cos(believed) * r * 2.2, py - Math.sin(believed) * r * 2.2); g.stroke(); g.restore();
+// the selected brain: bars for what the brain is made of (a network's neurons, or the autopilot's laws) and the policy map, redrawn five times a second
+const bcv = $("brainView"), bg = bcv.getContext("2d"); let lastBrain = 0;
+function drawBrain() {
+  const now = performance.now(); if (now - lastBrain < 200) return; lastBrain = now;
+  const pr = selected ? tank.probe(selected) : null;
+  if (!pr) { bg.fillStyle = "#050805"; bg.fillRect(0, 0, bcv.width, bcv.height); bg.fillStyle = "#7c93b8"; bg.font = "14px monospace"; bg.fillText("Pick a sub in the list: its brain is drawn here, the way that kind of brain is.", 20, 40); $("brainWho").textContent = "pick a sub in the list"; return; }
+  const panel = subPanel(pr); $("brainWho").textContent = pr.name + " · " + panel.label;
+  drawPanel(bg, bcv.width, bcv.height, panel, { title: pr.name });
+}
+const cv = $("compassView"), cg = cv.getContext("2d"); let tracePlain = [], traceNav = [], lastTrace = 0;
+function drawCompass(snap) {
+  const p = pair(snap), now = performance.now() / 1000;
+  if (now - lastTrace >= 0.1) { lastTrace = now; if (p.plain) tracePlain = pushTrace(tracePlain, p.plain, now); if (p.nav) traceNav = pushTrace(traceNav, p.nav, now); if (!p.plain && tracePlain.length) tracePlain = []; if (!p.nav && traceNav.length) traceNav = []; }
+  cg.clearRect(0, 0, cv.width, cv.height);
+  drawDial(cg, 250, 120, 80, dialInfo(p.plain), "plain autopilot"); drawDial(cg, 750, 120, 80, dialInfo(p.nav), "navigator");
+  drawTrace(cg, 20, 235, 960, 85, tracePlain, traceNav);
 }
 function render() {
   const snap = tank.snapshot();
   pg.clearRect(0, 0, plan.width, plan.height); sg.clearRect(0, 0, side.width, side.height);
-  const sx = plan.width / LENGTH, sy = plan.height / WIDTH;
-  pg.strokeStyle = "#1c2c44"; pg.lineWidth = 1; for (let x = 0; x <= LENGTH; x += 50) { pg.beginPath(); pg.moveTo(x * sx, 0); pg.lineTo(x * sx, plan.height); pg.stroke(); } for (let y = 0; y <= WIDTH; y += 50) { pg.beginPath(); pg.moveTo(0, y * sy); pg.lineTo(plan.width, y * sy); pg.stroke(); }
-  const dx = side.width / LENGTH, dz = side.height / 50;
+  const sx = plan.width / tank.length, sy = plan.height / tank.width;
+  pg.strokeStyle = "#1c2c44"; pg.lineWidth = 1; for (let x = 0; x <= tank.length; x += tank.length / 10) { pg.beginPath(); pg.moveTo(x * sx, 0); pg.lineTo(x * sx, plan.height); pg.stroke(); } for (let y = 0; y <= tank.width; y += tank.width / 6) { pg.beginPath(); pg.moveTo(0, y * sy); pg.lineTo(plan.width, y * sy); pg.stroke(); }
+  const dx = side.width / tank.length, dz = side.height / 50;
   sg.fillStyle = "#07243a"; sg.fillRect(0, DEPTH_MIN * dz, side.width, (DEPTH_MAX - DEPTH_MIN) * dz); sg.strokeStyle = "#1c2c44"; sg.strokeRect(0, 0, side.width, side.height);
-  sg.fillStyle = "#7c93b8"; sg.font = "12px monospace"; sg.fillText("surface", 6, 12); sg.fillText("depth " + DEPTH_MIN + "–" + DEPTH_MAX + " m", 6, DEPTH_MIN * dz - 4); sg.fillText("floor 50 m", 6, side.height - 6);
+  sg.fillStyle = "#7c93b8"; sg.font = "16px monospace"; sg.fillText("surface", 6, 12); sg.fillText("depth " + DEPTH_MIN + "–" + DEPTH_MAX + " m", 6, DEPTH_MIN * dz - 4); sg.fillText("floor 50 m", 6, side.height - 6);
   for (const s of snap) {
     const sel = s.id === selected;
     pg.strokeStyle = `hsl(${s.hue} 70% 55% / .35)`; pg.lineWidth = 1.5; pg.beginPath(); s.trail.forEach((p, i) => { i ? pg.lineTo(p[0] * sx, p[1] * sy) : pg.moveTo(p[0] * sx, p[1] * sy); }); pg.stroke();
     sg.strokeStyle = `hsl(${s.hue} 70% 55% / .35)`; sg.beginPath(); s.trail.forEach((p, i) => { i ? sg.lineTo(p[0] * dx, p[2] * dz) : sg.moveTo(p[0] * dx, p[2] * dz); }); sg.stroke();
-    drawSub(pg, s.x * sx, s.y * sy, s.heading, s.hue, 16, sel); drawSub(sg, s.x * dx, s.depth * dz, -s.pitch, s.hue, 12, sel);
-    if (s.dark) { drawDark(pg, s.x * sx, s.y * sy, s.believed, 24); sg.save(); sg.strokeStyle = "#f6a623"; sg.setLineDash([4, 3]); sg.beginPath(); sg.arc(s.x * dx, s.depth * dz, 16, 0, Math.PI * 2); sg.stroke(); sg.restore(); }
-    pg.fillStyle = sel ? "#fff" : "#dbe7ff"; pg.font = "13px monospace"; pg.fillText(s.name, s.x * sx + 20, s.y * sy - 8);
+    drawSub(pg, s.x * sx, s.y * sy, s.heading, s.hue, 22, sel); drawSub(sg, s.x * dx, s.depth * dz, -s.pitch, s.hue, 16, sel);
+    pg.fillStyle = sel ? "#fff" : "#dbe7ff"; pg.font = "16px monospace"; pg.fillText(s.name, s.x * sx + 26, s.y * sy - 10);
   }
+  drawCompass(snap); drawBrain();
   if (view3d) view3d.render(snap, performance.now() / 1000);
   updateStats(snap);
 }
@@ -215,16 +299,7 @@ refresh(); fishHealth(); setInterval(refresh, 3000); setInterval(fishHealth, 500
         const [view, cj] = await Promise.all([import("/render/subDropoutView.mjs"), import("/vendor/hemibrain/hemibrain-cx-heading-loop.json", { with: { type: "json" } })]);
         const j = cj.default;
         await new Promise((r) => setTimeout(r, 60));   // let the tank paint a frame before the first dive is flown
-        const circuit = { neurons: j.neurons, edges: j.edges, io: j.io };
-        view.mountDropoutView(host, { circuit });
-        try {   // the study's two estimators as pilot kinds for the tank (the same readouts as the view): PD autopilot behind the estimator, flown through the tank's own compass dropout
-          const sc = await import("/render/subDropoutScene.mjs"), defs = sc.pilotDefs(circuit);
-          for (const [kind, id] of [["fly-estimator", "cx"], ["er-estimator", "er"]]) {
-            const def = defs.find((d) => d.id === id); if (!def) continue;
-            tank.registerPilot(kind, () => withBelief(def.build));
-            const o = document.createElement("option"); o.value = kind; o.textContent = KIND_NAMES[kind]; $("addKind").appendChild(o);
-          }
-        } catch (e) { $("msg").textContent = "the estimator pilots are not available here"; }
+        view.mountDropoutView(host, { circuit: { neurons: j.neurons, edges: j.edges, io: j.io } });
     } catch (e) { host.textContent = "The compass-dropout view is unavailable here (" + String((e && e.message) || e).slice(0, 100) + "). The tank above is not affected."; }
 })();
 </script>

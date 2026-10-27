@@ -1,7 +1,7 @@
 {
  "version": 1,
  "generated": "derived by tools/ship/buildPageIndex.mjs -- DO NOT HAND-EDIT, the group comes from tools/ship/pageSections.mjs",
- "count": 492,
+ "count": 495,
  "pages": [
   {
    "f": "AudioLab.html",
@@ -245,7 +245,7 @@
    "f": "battleship3d.html",
    "t": "ABYSS — 3D Battleship",
    "d": "3D naval combat with deep-water atmosphere.",
-   "g": "",
+   "g": "flightsim",
    "p": 0
   },
   {
@@ -399,7 +399,7 @@
    "f": "bomber.html",
    "t": "SweK &middot; Bomber",
    "d": "Bomber: a B-29-style bomber with five gun seats, each with a gunner, against trained fighters -- a window per craft (plane, pilot, each gun seat, the networks) stepped by brain/dogfightArena.mjs under brain/bomberFight.mjs.",
-   "g": "",
+   "g": "flightsim",
    "p": 0
   },
   {
@@ -645,6 +645,13 @@
    "t": "SweK Changelog",
    "d": "",
    "g": "systools",
+   "p": 0
+  },
+  {
+   "f": "channel.html",
+   "t": "Channel &middot; videos and repos",
+   "d": "A YouTube channel as a page: the channel's description and numbers, every video with its date, views, chapters and description, and an index of the GitHub repositories the videos mention, each with the videos that name it. Rendered from a snapshot data/channels/<slug>.json that tools/ship/takeYoutubeChannel.mjs writes; template https://www.youtube.com/@TheNextNewThingAI, the same format for SweK Engine's own channel.",
+   "g": "youtubes",
    "p": 0
   },
   {
@@ -959,7 +966,7 @@
    "f": "dogfight.html",
    "t": "SweK &middot; Dogfight",
    "d": "Dogfight: two aircraft fight under brain/dogfightTask.mjs's rules (pursuit guidance, a hand trigger, a 300 m/s gun that falls, 20 hits kill) stepped by brain/dogfightArena.mjs, each with a window down the right that a click switches between the plane from outside, the pilot's seat, the gun's sight with its lead pip, and the pilot's network thinking, live. Pilots: the PD autopilot, the fruit fly's network (hand weights, trained to fly, trained to fight) and the GPU Brain's network (the same three, on its CPU twin). Aircraft: the trainer, or a light jet (140 m/s, a nose cannon and no missiles; brain/jetFight.mjs) flown by hand-written pilots and by the two networks in their jet layouts. Answer-key gates: dogfightArena-selfcheck, flightViews-selfcheck, dogfightTask-selfcheck, dogfightPage-selfcheck, jetFight-selfcheck, pilotJetPolicy-selfcheck, pilotJetMlp-selfcheck.",
-   "g": "",
+   "g": "flightsim",
    "p": 0
   },
   {
@@ -1225,7 +1232,7 @@
    "f": "flight-coop.html",
    "t": "SweK &middot; Co-op Lockstep (Endless Sky on Box3D)",
    "d": "",
-   "g": "",
+   "g": "flightsim",
    "p": 0
   },
   {
@@ -2657,6 +2664,13 @@
    "p": 0
   },
   {
+   "f": "sea-ogre.html",
+   "t": "SweK &middot; Sea OGRE vs Subs",
+   "d": "A sea monster with four hit zones (tubes, sonar, cannon, engine) marches on a headquarters; up to four submarine sides hold it. Watch a replay or run a dozen seeds and read the defence rate.",
+   "g": "flightsim",
+   "p": 0
+  },
+  {
    "f": "server.html",
    "t": "Server Mode",
    "d": "",
@@ -2863,7 +2877,7 @@
    "f": "space-battleship.html",
    "t": "SweK &middot; Space battleship",
    "d": "Battleship: a Yamato-like space battleship with thirteen gun seats, each with a gunner, against the 6DOF fighters -- a window per craft (plane, pilot, each gun seat, the networks) stepped by brain/spaceArena.mjs under brain/battleshipFight.mjs.",
-   "g": "",
+   "g": "flightsim",
    "p": 0
   },
   {
@@ -2989,7 +3003,14 @@
    "f": "sub-aquarium.html",
    "t": "SweK &middot; Sub Aquarium",
    "d": "A tank of submarines, each flown by its own pilot (the PD autopilot, or a connectome-wired network with the weights it arrived with). Peers detected on the LAN can send their subs here from server.html's peer list. The network in every sub the page flies is still the fruit fly's Giant Fiber Circuit; a zebrafish circuit (Fish1) is vendored and a pilot is wired to it, but the page does not fly that body yet.",
-   "g": "",
+   "g": "flightsim",
+   "p": 0
+  },
+  {
+   "f": "sub-tournament.html",
+   "t": "SweK &middot; Sub Tournament",
+   "d": "Every submarine side against every other, from both seats, on the same geometries: the hand doctrine, the tuned and search-ping champions, two self-play leagues, each with the autopilot or the fruit fly network. A Bradley-Terry rating, a head-to-head matrix, the seat's measured worth, and a replay of any duel.",
+   "g": "flightsim",
    "p": 0
   },
   {

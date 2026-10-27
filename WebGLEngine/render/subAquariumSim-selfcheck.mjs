@@ -132,7 +132,7 @@ console.log("\n9. SNAPSHOT");
 {
     const t = A.createTank(); t.sync([entry("p", { name: "Pip", hue: 42, from: "10.0.0.2", local: true })]); run(t, 60);
     const s = t.snapshot()[0], tr = s.trail.length; s.trail.push([0, 0, 0]); s.trail.length = 0;
-    ok("!! a snapshot is a plain record with exactly the fields the page draws (id, name, hue, hull, pilot, from, local, x, y, depth, heading, pitch, speed, target, lost, status, trail, and since the compass mode compass, dark, darkLeft, shown, believed), and its trail is a COPY (emptying it does not empty the boat's)", Object.keys(s).sort().join() === "believed,compass,dark,darkLeft,depth,from,heading,hue,hull,id,local,lost,name,pilot,pitch,speed,shown,status,target,trail,x,y".split(",").sort().join() && s.compass === "lit" && s.dark === false && s.darkLeft === 0 && s.shown === s.heading && t.snapshot()[0].trail.length === tr && tr > 50 && s.name === "Pip" && s.hue === 42 && s.from === "10.0.0.2" && s.local === true && s.pilot === "autopilot");
+    ok("!! a snapshot is a plain record with exactly the fields the page draws (id, name, hue, hull, pilot, from, local, x, y, depth, heading, pitch, speed, cmd, event, compass, tank, target, lost, status, trail -- v4901 added event and tank, v4899 added cmd, the pilot's four commands this tick, which the 3D view draws the fins from), and its trail is a COPY (emptying it does not empty the boat's)", Object.keys(s).sort().join() === "cmd,compass,depth,event,from,heading,hue,hull,id,local,lost,name,pilot,pitch,speed,status,tank,target,trail,x,y".split(",").sort().join() && t.snapshot()[0].trail.length === tr && tr > 50 && s.name === "Pip" && s.hue === 42 && s.from === "10.0.0.2" && s.local === true && s.pilot === "autopilot");
     run(t, 300);
     ok("!! a trail never grows past 80 points however long the boat swims (5 minutes more)", t.snapshot()[0].trail.length === 80 && A.TRAIL === 80 && t.snapshot()[0].trail.every((p) => p.length === 3 && p.every(Number.isFinite)));
     const big = A.createTank(); big.sync(Array.from({ length: 24 }, (_, i) => entry("g" + i, i % 2 ? { pilot: "network", weights: seed[2].weights } : {}))); const t0 = Date.now(); run(big, 60);
@@ -156,7 +156,7 @@ console.log("\n10. THE HULL");
     ok("!! an unknown hull name throws and changes NOTHING (the tank keeps its hull and its subs)", threw && t.hull === "munk5" && t.snapshot().length === 2);
     let threw2 = false; try { A.createTank({ hull: "nope" }); } catch { threw2 = true; }
     ok("an unknown hull name at creation throws too", threw2);
-    ok("!! every named hull has a picker label and builds a finite model, and the labels cover exactly the hulls (a hull with no label would be an unreachable option in the page)", Object.keys(H.SPECS).sort().join() === Object.keys(H.LABELS).sort().join() && Object.keys(H.SPECS).every((n) => Number.isFinite(H.model(n).mass)) && Object.keys(H.SPECS).length === 12);
+    ok("!! every named hull has a picker label and builds a finite model, and the labels cover exactly the hulls (v4901 added highRider; a hull with no label would be an unreachable option in the page)", Object.keys(H.SPECS).sort().join() === Object.keys(H.LABELS).sort().join() && Object.keys(H.SPECS).every((n) => Number.isFinite(H.model(n).mass)) && Object.keys(H.SPECS).length === 13);
     const x5 = A.createTank({ hull: "munk5" }); x5.sync([entry("n", { pilot: "network", weights: seed[4].weights })]); run(x5, 300); const sn = x5.snapshot()[0];
     ok("!! even on the extreme Munk x5 hull a five-minute swim leaves a finite state in the tank (the boat may be lost and respawned, never NaN)", Number.isFinite(sn.x) && Number.isFinite(sn.y) && Number.isFinite(sn.depth));
 }
@@ -168,5 +168,19 @@ console.log("\n11. THE NAMED CONSTANTS (DEPTH_MIN, DEPTH_MAX, TRAIL_EVERY)");
     ok("!! the swimming band is 14..40 m (DEPTH_MIN, DEPTH_MAX) and a trail point is laid at the first 30 Hz tick at or past every 0.5 s (TRAIL_EVERY; 16 ticks = 0.533 s, so thirty seconds of swimming leave 56 points, not 60 -- said here rather than rounded away)", A.DEPTH_MIN === 14 && A.DEPTH_MAX === 40 && A.TRAIL_EVERY === 0.5 && n >= 54 && n <= 58, `${n} points`);
 }
 
+// BIG TANK sabotages: Z1 the tank ignores the size it was given (1 red). Z2 the wall test kept at 500 x 300 inside a big tank: 0 red, SAID PLAINLY -- the wall logic only acts when a sub CROSSES from inside to outside
+// and a sub is spawned anywhere in the tank, so that mutant changes where a boat turns back, not whether the big tank is used; no row of this gate tells it from the true one, and none is claimed.
+console.log("\nBIG TANK");
+{
+    const big = A.createTank({ length: 1500, width: 900 }), small = A.createTank();
+    ok("!! a tank asked for 1500 x 900 m says so, the default is still 500 x 300", big.length === 1500 && big.width === 900 && small.length === A.LENGTH && small.width === A.WIDTH);
+    const e = (id) => ({ id, name: id, hue: 10, pilot: "pd", from: "x", local: true }); big.sync([e("a"), e("b"), e("c")]); let maxX = 0, maxY = 0, inside = true, far = 0, total = 0;
+    for (let i = 0; i < 30 * 600; i++) { big.step(1 / 30); if (i % 30 === 0 && i > 30 * 300) for (const q of big.subs.values()) { const p = q.state.pos; total++; if (p[0] > 500) far++; maxX = Math.max(maxX, p[0]); maxY = Math.max(maxY, p[1]); inside &&= p[0] > 0 && p[0] < 1500 && p[1] > 0 && p[1] < 900; } }
+    ok("!! subs swim the whole of a big tank: after the first five minutes (the spawn is anywhere in the tank) they stay inside its walls and still reach past the small tank's 500 m and 300 m, spending more than a fifth of their time beyond 500 m", inside && maxX > 560 && maxY > 360 && far / total > 0.2, `max x ${maxX.toFixed(0)}, max y ${maxY.toFixed(0)}, ${(100 * far / total).toFixed(0)}% of the time beyond 500 m`);
+}
+// v4901 -- the exports the definition census asked this gate to name (COMPASS, EVENTS, LEAK, RESCUE, compassValidAt, trimsOut), checked in one row.
+{ const M = await import("./subAquariumSim.mjs"); const names = ["COMPASS", "EVENTS", "LEAK", "RESCUE", "compassValidAt", "trimsOut"];
+  const okShape = names.every((n) => n in M && (typeof M[n] === "function" || typeof M[n] === "number" || typeof M[n] === "string" || typeof M[n] === "object"));
+  ok("the event machinery's exports (EVENTS, COMPASS, LEAK, RESCUE, compassValidAt, trimsOut) are present", okShape, names.map((n) => n + ":" + typeof M[n]).join(" ")); }
 console.log(fails ? `\n${fails} FAIL` : "\nall checks pass");
 process.exit(fails ? 1 : 0);

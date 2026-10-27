@@ -62,6 +62,7 @@
   <button id="resetBtn" title="respawn the patrol now">&#8635; Reset patrol</button>
   <button id="rosterBtn" title="Load Pilots (v4839): choose who flies the squadron -- the PD heading-hold autopilot this page has always flown, or a brain (hand weights, zero, noise, the pilot this page ships, one you imported) -- then Start Patrol. Every brain is the same fly-wired network; a choice is a choice of weights. The hand brain IS the autopilot, written through the network.">&#9992; Load Pilots</button>
 </div>
+<div id="brainBox" style="position:fixed;right:8px;bottom:8px;width:520px;background:#0b131fcc;border:1px solid #1c2c44;border-radius:6px;padding:4px 6px;z-index:5"><div style="font:11px ui-monospace,Menlo,monospace;color:#59d1ff;display:flex;justify-content:space-between;gap:8px"><span>Selected brain activity</span><label style="color:#7c93b8">aircraft <select id="brainPick" style="font:inherit;background:#0c1424;color:#b9d4ff;border:1px solid #2f486c"></select></label><span id="brainWho" style="color:#7c93b8"></span></div><canvas id="brainView" width="520" height="250" style="width:520px;height:250px;display:block"></canvas></div>
 <div id="rosterPanel" style="position:fixed;top:40px;left:10px;z-index:3;display:none;background:#0a1220;border:1px solid #2f486c;border-radius:8px;padding:10px;max-width:430px;box-shadow:0 8px 30px #000a;color:#b9d4ff;">
   <div style="margin-bottom:6px;color:#f6a623;letter-spacing:.08em;">LOAD PILOTS</div>
   <table style="border-collapse:collapse;margin-bottom:6px;"><tbody>
@@ -87,6 +88,7 @@ import { relativeAirflow, applySurfaceForce } from "/physics/mechanics/aeroSurfa
 import * as AP from "/brain/autopilotAircraft.mjs";
 import * as PA from "/brain/pilotAircraftPolicy.mjs";   // v4839 -- a learned pilot with the autopilot's own contract
 import * as PR from "/brain/pilotRoster.mjs";            // v4839 -- who flies the squadron: the PD autopilot, or a brain on one of several weight sets
+import { aircraftPanel, drawPanel } from "/render/brainPanel.mjs";   // the selected brain activity panel
 import * as PB from "/brain/peerBrain.mjs";              // v4839 -- the portable brain format the shipped pilot and an imported one travel in
 import { weightsHash } from "/brain/drivePolicy.mjs";
 
@@ -230,9 +232,21 @@ function syncScene() {
   }
 }
 
+// the selected brain: one aircraft of the squadron (render/brainPanel.mjs aircraftPanel), five times a second
+const brainCv = document.getElementById("brainView"), brainCtx = brainCv.getContext("2d"), brainSel = document.getElementById("brainPick"); let lastBrain = 0;
+for (let i = 0; i < N_AIRCRAFT; i++) { const o = document.createElement("option"); o.value = String(i); o.textContent = String(i + 1); brainSel.appendChild(o); }
+function drawBrain() {
+  const now = performance.now(); if (now - lastBrain < 200) return; lastBrain = now;
+  const i = Math.min(fleet.length - 1, Number(brainSel.value) || 0), s = fleet[i], pilots = squadPilots(); if (!s) return;
+  const w = squad && !squad.scripted ? squad.weights[Math.min(i, squad.weights.length - 1)] : null;
+  const panel = aircraftPanel({ kind: w ? "fly" : "autopilot", weights: w, body: s.body, desired: HEADINGS[s.headingIdx] });
+  document.getElementById("brainWho").textContent = squad ? squad.label : "";
+  drawPanel(brainCtx, brainCv.width, brainCv.height, panel, { title: `aircraft ${i + 1}` });
+}
 function frame() {
   const dt = 1 / 30;
   stepFleet(dt);
+  drawBrain();
   syncScene(); controls.update();
   renderer.render(scene, camera);
   const lead = fleet[0];

@@ -1,0 +1,292 @@
+{
+ "generatedFrom": "tools/ship/realGpuRun.mjs",
+ "at": "2026-10-23T02:16:42.422Z",
+ "platform": "win32 10.0.22631 x64",
+ "node": "v24.17.0",
+ "commit": "d77592b2 2026-10-23 Denoiser arc, round 50: a network table beside the kernel tables, empty until H49 fills it (section ",
+ "only": "denoise",
+ "native": false,
+ "launchArgs": [
+  "--enable-unsafe-webgpu",
+  "--use-angle=d3d11"
+ ],
+ "gates": [
+  {
+   "gate": "render/denoiseCompile-selfcheck.mjs",
+   "category": "timing",
+   "ok": true,
+   "ms": 51091,
+   "exit": {
+    "status": 0,
+    "signal": null
+   },
+   "stderrTail": [],
+   "adapters": [
+    "intel gen-9"
+   ],
+   "software": false,
+   "fails": [],
+   "measured": [
+    "node-webgpu 0.6.2 from C:\\Users\\Keith\\AppData\\Roaming\\npm\\node_modules\\webgpu\\index.js; native compilers: D3D12; DXC ships beside dawn.node -- runs as shipped, use_dxc and use_dxc off, from the package alone; modes: as shipped, use_dxc, use_dxc off",
+    "native / as shipped in all: 11 of 11 built; dumps: 11 DXC (DXIL); compiler, from the package: DXC; dumps at C:\\Users\\Keith\\AppData\\Local\\Temp\\swek-denoise-dump-0.6.2-as_shipped-*.txt",
+    "section 66, native / as shipped under DXC: at 64 x 64, r15's hidden kernel (r13-fast-3x3) over r18t's (r18t-tile-inline-3x3): 1.098 x (1.036 ms against 0.944 ms); r18u's (r18u-fast-unroll-3x3): 1.777 x (1.036 ms against 0.583 ms); r27w's (r27w-wino-3x3): 0.615 x (1.036 ms against 1.685 ms) -- deciding nothing",
+    "native / use_dxc in all: 11 of 11 built; dumps: 11 DXC (DXIL); compiler, from the package: DXC; dumps at C:\\Users\\Keith\\AppData\\Local\\Temp\\swek-denoise-dump-0.6.2-use_dxc-*.txt",
+    "section 66, native / use_dxc under DXC: at 64 x 64, r15's hidden kernel (r13-fast-3x3) over r18t's (r18t-tile-inline-3x3): 1.082 x (1.012 ms against 0.935 ms); r18u's (r18u-fast-unroll-3x3): 1.759 x (1.012 ms against 0.575 ms); r27w's (r27w-wino-3x3): 0.600 x (1.012 ms against 1.685 ms) -- deciding nothing",
+    "native / use_dxc off in all: 1 of 1 built; dumps: 1 FXC (DXBC); compiler, from the package: FXC; dumps at C:\\Users\\Keith\\AppData\\Local\\Temp\\swek-denoise-dump-0.6.2-use_dxc_off-*.txt",
+    "native / as shipped: r12-tiled-3x3: build 86 ms, pass 8.887 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 623 lines, 0 loops, 0 indexable-temp lines, 4 barriers",
+    "native / as shipped: r13-fast-3x3: build 165 ms, pass 1.036 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 1329 lines, 0 loops, 0 indexable-temp lines, 4 barriers",
+    "native / as shipped: r12-direct-head: build 53 ms, pass 4.365 ms (device clock, 30 passes), 331776 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 362 lines, 0 loops, 0 indexable-temp lines, 0 barriers",
+    "native / as shipped: r13-fast-head: build 122 ms, pass 0.449 ms (device clock, 30 passes), 110430 plain, 221346 fused, 0 unexplained; dump: DXC (DXIL), 1168 lines, 0 loops, 0 indexable-temp lines, 4 barriers",
+    "native / as shipped: r14-head: build 39 ms, pass 1.315 ms (device clock, 30 passes), 110430 plain, 221346 fused, 0 unexplained; dump: DXC (DXIL), 238 lines, 0 loops, 0 indexable-temp lines, 0 barriers",
+    "native / as shipped: r12-apply: build 91 ms, pass 1.154 ms (device clock, 30 passes), worst 4.59e-7 (APPLY_TOL 0.00001); dump: DXC (DXIL), 588 lines, 0 loops, 0 indexable-temp lines, 0 barriers",
+    "native / as shipped: r14-apply-fast: build 116 ms, pass 0.425 ms (device clock, 30 passes), worst 4.59e-7 (APPLY_TOL 0.00001); dump: DXC (DXIL), 625 lines, 0 loops, 0 indexable-temp lines, 3 barriers",
+    "native / as shipped: r15-head-apply: build 1928 ms, pass 0.403 ms (device clock, 30 passes), worst 5.45e-7 against the twin's logits, which are the fused mirror's here (APPLY_TOL 0.00001); dump: DXC (DXIL), 9526 lines, 0 loops, 0 indexable-temp lines, 3 barriers",
+    "native / as shipped: r18t-tile-inline-3x3: build 713 ms, pass 0.944 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 1981 lines, 0 loops, 0 indexable-temp lines, 4 barriers",
+    "native / as shipped: r18u-fast-unroll-3x3: build 1529 ms, pass 0.583 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 12463 lines, 0 loops, 0 indexable-temp lines, 4 barriers",
+    "native / as shipped: r27w-wino-3x3: build 140 ms, pass 1.685 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 1270 lines, 0 loops, 0 indexable-temp lines, 4 barriers",
+    "native / use_dxc: r12-tiled-3x3: build 103 ms, pass 8.449 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 623 lines, 0 loops, 0 indexable-temp lines, 4 barriers",
+    "native / use_dxc: r13-fast-3x3: build 165 ms, pass 1.012 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 1329 lines, 0 loops, 0 indexable-temp lines, 4 barriers",
+    "native / use_dxc: r12-direct-head: build 65 ms, pass 4.553 ms (device clock, 30 passes), 331776 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 362 lines, 0 loops, 0 indexable-temp lines, 0 barriers",
+    "native / use_dxc: r13-fast-head: build 634 ms, pass 0.581 ms (device clock, 30 passes), 110430 plain, 221346 fused, 0 unexplained; dump: DXC (DXIL), 1168 lines, 0 loops, 0 indexable-temp lines, 4 barriers",
+    "native / use_dxc: r14-head: build 37 ms, pass 1.305 ms (device clock, 30 passes), 110430 plain, 221346 fused, 0 unexplained; dump: DXC (DXIL), 238 lines, 0 loops, 0 indexable-temp lines, 0 barriers",
+    "native / use_dxc: r12-apply: build 80 ms, pass 1.147 ms (device clock, 30 passes), worst 4.59e-7 (APPLY_TOL 0.00001); dump: DXC (DXIL), 588 lines, 0 loops, 0 indexable-temp lines, 0 barriers",
+    "native / use_dxc: r14-apply-fast: build 94 ms, pass 0.413 ms (device clock, 30 passes), worst 4.59e-7 (APPLY_TOL 0.00001); dump: DXC (DXIL), 625 lines, 0 loops, 0 indexable-temp lines, 3 barriers",
+    "native / use_dxc: r15-head-apply: build 2200 ms, pass 0.433 ms (device clock, 30 passes), worst 5.45e-7 against the twin's logits, which are the fused mirror's here (APPLY_TOL 0.00001); dump: DXC (DXIL), 9526 lines, 0 loops, 0 indexable-temp lines, 3 barriers",
+    "native / use_dxc: r18t-tile-inline-3x3: build 186 ms, pass 0.935 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 1981 lines, 0 loops, 0 indexable-temp lines, 4 barriers",
+    "native / use_dxc: r18u-fast-unroll-3x3: build 1392 ms, pass 0.575 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 12463 lines, 0 loops, 0 indexable-temp lines, 4 barriers",
+    "native / use_dxc: r27w-wino-3x3: build 134 ms, pass 1.685 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained; dump: DXC (DXIL), 1270 lines, 0 loops, 0 indexable-temp lines, 4 barriers",
+    "native / use_dxc off: r12-tiled-3x3: build 986 ms, pass 8.473 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained; dump: FXC (DXBC), 363 lines, 9 loops, 37 indexable-temp lines, 3 barriers",
+    "browser / Chrome's: r12-tiled-3x3: build 91 ms, pass 7.414 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained",
+    "browser / Chrome's: r13-fast-3x3: build 147 ms, pass 1.050 ms (device clock, 30 passes), 131072 plain, 0 fused, 0 unexplained",
+    "browser / Chrome's: r12-direct-head: build 43 ms, pass 4.352 ms (device clock, 30 passes), 331776 plain, 0 fused, 0 unexplained",
+    "browser / Chrome's: r13-fast-head: build 592 ms, pass 0.518 ms (device clock, 30 passes), 110430 plain, 221346 fused, 0 unexplained",
+    "browser / Chrome's: r14-head: build 27 ms, pass 2.198 ms (device clock, 30 passes), 110430 plain, 221346 fused, 0 unexplained",
+    "browser / Chrome's: r12-apply: build 116 ms, pass 1.823 ms (device clock, 30 passes), worst 4.59e-7 (APPLY_TOL 0.00001)",
+    "browser / Chrome's: r14-apply-fast: build 600 ms, pass 0.640 ms (device clock, 30 passes), worst 4.59e-7 (APPLY_TOL 0.00001)",
+    "browser / Chrome's: r15-head-apply: build 2667 ms, pass 0.446 ms (device clock, 30 passes), worst 5.45e-7 against the twin's logits, which are the fused mirror's here (APPLY_TOL 0.00001)"
+   ],
+   "skips": [
+    "SKIP  section 87: native / use_dxc off is FXC -- the denoiser's FXC paths are retired; r12-tiled-3x3 alone is built, as FXC's control, and the other 7 stand aside, not counted as unbuilt (SWEK_DENOISE_FXC=all builds them)",
+    "SKIP  section 66: native / use_dxc off: the DXC-only hidden kernels (r18t-tile-inline-3x3, r18u-fast-unroll-3x3, r27w-wino-3x3) stand aside, not counted as unbuilt -- the compiler is FXC, not DXC"
+   ]
+  },
+  {
+   "gate": "render/denoiseDevice-selfcheck.mjs",
+   "category": "timing",
+   "ok": true,
+   "ms": 153660,
+   "exit": {
+    "status": 0,
+    "signal": null
+   },
+   "stderrTail": [],
+   "adapters": [
+    "intel gen-9 D3D12 driver version 31.0.101.2137 (native)",
+    "intel gen-9"
+   ],
+   "software": false,
+   "fails": [],
+   "measured": [
+    "section 66 on win32/intel/gen-9: r18t K1 9.02 x at 256 x 256, 0.951 x r15 under DXC at 1024 x 1024, 0.881 x r15 under FXC at 1024 x 1024, fails condition 3; r18u K1 14.01 x at 256 x 256, 1.59 x r15 under DXC at 1024 x 1024, 1.474 x r15 under FXC at 1024 x 1024, qualifies -> r18u",
+    "section 66 on win32/nvidia/pascal: r18t K1 24.99 x at 1920 x 1080, 1.076 x r15 under DXC at 1920 x 1080, 0.996 x r15 under FXC at 1920 x 1080, fails condition 4; r18u K1 15.17 x at 1920 x 1080, 0.653 x r15 under DXC at 1920 x 1080, 0.605 x r15 under FXC at 1920 x 1080, fails condition 3 -> no entry",
+    "section 75 on win32/intel/gen-9: run a r18u (r18t K1 9.04 x at 256 x 256, 1.024 x r15 under DXC at 1024 x 1024, 0.967 x r15 under FXC at 1024 x 1024, fails condition 3; r18u K1 14.57 x at 256 x 256, 1.514 x r15 under DXC at 1024 x 1024, 1.431 x r15 under FXC at 1024 x 1024, qualifies) | run b none (r18t K1 9.11 x at 256 x 256, 1.021 x r15 under DXC at 1024 x 1024, 1.011 x r15 under FXC at 1024 x 1",
+    "section 75 on win32/nvidia/pascal: run a r18t (r18t K1 24.76 x at 1024 x 1024, 1.086 x r15 under DXC at 1920 x 1080, 1.016 x r15 under FXC at 1920 x 1080, qualifies; r18u K1 14.77 x at 1024 x 1024, 0.659 x r15 under DXC at 1920 x 1080, 0.617 x r15 under FXC at 1920 x 1080, fails condition 3) | run b none (r18t K1 17.33 x at 1920 x 1080, 1.091 x r15 under DXC at 1920 x 1080, 1.027 x r15 under FXC a",
+    "section 77 on win32/intel/gen-9: run a r18u, run b r18u; r18t K1 9.56 x at 256 x 256, 0.951 x r15 under DXC at 1024 x 1024, 1.012 x r15 under FXC at 1024 x 1024, fails condition 3; r18u K1 13.93 x at 256 x 256, 1.526 x r15 under DXC at 1024 x 1024, 1.623 x r15 under FXC at 1024 x 1024, qualifies",
+    "section 77 on win32/nvidia/pascal: run a r18t, run b r18t; r18t K1 25.58 x at 1024 x 1024, 1.08 x r15 under DXC at 1920 x 1080, 1.032 x r15 under FXC at 1920 x 1080, qualifies; r18u K1 15.08 x at 1024 x 1024, 0.655 x r15 under DXC at 1920 x 1080, 0.626 x r15 under FXC at 1920 x 1080, fails condition 3",
+    "section 83 on win32/intel/gen-9: run a native: K1 5.12 x at 256 x 256, 0.348 x r18u at 512 x 512, fails condition 3 | run b native: K1 4.82 x at 256 x 256, 0.326 x r18u at 512 x 512, fails condition 3",
+    "section 83 on Windows/intel/gen-9: run a page: K1 4.59 x at 256 x 256, 0.338 x r18u at 512 x 512, fails condition 3 | run b page: K1 4.06 x at 256 x 256, 0.369 x r18u at 512 x 512, fails condition 3",
+    "section 83 on win32/nvidia/pascal: run a native: K1 7.8 x at 1024 x 1024, 0.297 x r18t at 1920 x 1080, fails condition 3 | run b native: K1 7.85 x at 1024 x 1024, 0.296 x r18t at 1920 x 1080, fails condition 3",
+    "section 83 on Windows/nvidia/pascal: run a page: K1 7.68 x at 1024 x 1024, 0.301 x r18t at 1920 x 1080, fails condition 3 | run b page: K1 7.71 x at 1024 x 1024, 0.297 x r18t at 1920 x 1080, fails condition 3",
+    "section 111 on the 1080, native: r40s against r18t, run a 0.273 x, run b 0.263 x; on the Intel, native: r41h against r18u, run a no 1920 x 1080 ratio (predicted 2485 ms a pass, over the 1500 ms cap; at 1024 x 1024 0.514 x), run b no 1920 x 1080 ratio (predicted 2356 ms a pass, over the 1500 ms cap; at 1024 x 1024 0.49 x)",
+    "section 111 on the 1080, page: r40s against r18t, run a 0.269 x, run b 0.266 x; on the Intel, page: r41h against r18u, run a no 1920 x 1080 ratio (predicted 2318 ms a pass, over the 1500 ms cap; at 1024 x 1024 0.522 x), run b no 1920 x 1080 ratio (predicted 2192 ms a pass, over the 1500 ms cap; at 1024 x 1024 0.516 x)",
+    "section 68: the packages the rig had installed (the pin is 0.6.0): intel 0.6.1, nvidia 0.6.0",
+    "section 87, reported and not deciding: compile gate 50 s on the Intel (bound 200) and 35 s on the 1080 (bound 120); timing gate 193 s (bound 351) and 154 s (bound 230)",
+    "native adapter: intel / gen-9 / D3D12 driver version 31.0.101.2137 (hardware); compiler, from the package: DXC",
+    "native K0h for round 41's set on win32/intel/gen-9, compiler DXC, from node-webgpu 0.6.2: r41h green (2 of 2 native rows)",
+    "native K0 for round 49's w16 network on win32/intel/gen-9, compiler DXC, from node-webgpu 0.6.2: r15 green; r18t green; r18u green",
+    "native K0 for round 18's sets on win32/intel/gen-9, compiler DXC, from node-webgpu 0.6.2: r18t green (3 of 3 native rows); r18u green (3 of 3 native rows)",
+    "native K0w for round 27's set on win32/intel/gen-9, compiler DXC, from node-webgpu 0.6.2: r27w green (2 of 2 native rows)",
+    "native K0s for round 40's set on win32/intel/gen-9, compiler DXC, from node-webgpu 0.6.2: r40s not built natively (no subgroups feature)",
+    "native caller here: key win32/intel/gen-9, kernels r18u (section 67's for win32/intel/gen-9, under DXC); ran in 8.908 ms, worst 1.05e-6"
+   ],
+   "skips": [
+    "SKIP  K0s natively for r40s: the adapter has no subgroups feature (section 108)",
+    "SKIP  K0s in the browser for r40s: the adapter has no subgroups feature (section 108)"
+   ]
+  },
+  {
+   "gate": "render/denoiseTiming-selfcheck.mjs",
+   "category": "timing",
+   "ok": false,
+   "ms": 190359,
+   "exit": {
+    "status": 1,
+    "signal": null
+   },
+   "stderrTail": [
+    "TypeError: Cannot read properties of null (reading 'rows')",
+    "    at file:///C:/SweK_r33/WebGLEngine/render/denoiseTiming-selfcheck.mjs:583:67",
+    "    at Array.flatMap (<anonymous>)",
+    "    at file:///C:/SweK_r33/WebGLEngine/render/denoiseTiming-selfcheck.mjs:583:50",
+    "Node.js v24.17.0"
+   ],
+   "adapters": [
+    "intel gen-9 D3D12 driver version 31.0.101.2137 (native)"
+   ],
+   "software": false,
+   "fails": [
+    "FAIL  !! the native ladder ran   AbortError"
+   ],
+   "measured": [
+    "native: the trace is C:\\Users\\Keith\\AppData\\Local\\Temp\\swek-denoise-timing-trace-47172.txt",
+    "native adapter: intel / gen-9 / D3D12 driver version 31.0.101.2137 (hardware); compiler, from the package: DXC",
+    "native: this adapter's key for section 66's table: win32/intel/gen-9",
+    "native: node-webgpu 0.6.2; compiler, read off the package with this device's flags: DXC; sets timed: r12, r15, r18t, r18u, r27w, r40s, r41h"
+   ],
+   "skips": []
+  },
+  {
+   "gate": "render/denoiseUpscaleGPU-selfcheck.mjs",
+   "category": "exact",
+   "ok": true,
+   "ms": 70744,
+   "exit": {
+    "status": 0,
+    "signal": null
+   },
+   "stderrTail": [],
+   "adapters": [
+    "intel gen-9"
+   ],
+   "software": false,
+   "fails": [],
+   "measured": [
+    "adapter: intel / gen-9; backend webgpu",
+    "section 93: intel / gen-9, kernels r18u; the network at 1920 x 1080 1195.159 ms (device), at 960 x 540 299.216 ms (device); today's page (network and mask) 1440.254 ms (device); the half-size chain 940.353 ms (device + wall); ratio 1.532 x",
+    "section 93: the chain's steps -- covHalf 58.598 ms (device); covFull 245.095 ms (device); fill 295.500 ms (wall); rest 41.944 ms (device); whole 644.900 ms (wall); 87 of 96 rings filled",
+    "section 97: the history's passes -- hits 10.573 ms (device); shift 13.997 ms (device); accum 43.908 ms (device); final 15.177 ms (device); the half-size chain with its history 1024.009 ms (device + wall); ratio 1.406 x",
+    "section 99: the fills -- fill 295.500 ms (wall); fillList 24.600 ms (wall); whole 644.900 ms (wall); wholeList 376.500 ms (wall); the list fill 25765 listed, 87 of 96 rings, 0 left; the half-size chain with the list fill 669.453 ms, ratio 2.151 x; with its history 753.109 ms, ratio 1.912 x",
+    "section 103: the default fill listedTile, coverage bound; the half-size chain 384.583 ms, ratio 3.164 x; with its history 468.239 ms, ratio 2.599 x",
+    "section 104: the tile fill -- fillList 24.600 ms (wall); fillTile 63.400 ms (wall); wholeList 376.500 ms (wall); wholeTile 421.600 ms (wall); the tile fill 12 passes, 87 of 96 rings, 0 left; the half-size chain with the tile fill 708.253 ms, ratio 2.034 x; with its history 791.909 ms, ratio 1.819 x",
+    "section 106: the listed tile fill -- fillList 24.600 ms (wall); fillLTile 16.200 ms (wall); wholeList 376.500 ms (wall); wholeLTile 367.800 ms (wall); the listed tile fill 123 of 2040 tiles, 12 passes, 87 of 96 rings, 0 left; the half-size chain with the listed tile fill 661.053 ms, ratio 2.179 x; with its history 744.709 ms, ratio 1.934 x",
+    "section 107: the bounded coverage -- covHalf 58.598 ms (device); covHalfB 5.543 ms (device); covFull 245.095 ms (device); covFullB 21.680 ms (device); traced 26994 of 518400 and 106622 of 2073600; bit for bit at both sizes; today's page with it 1216.839 ms; the half-size chain with it 384.583 ms, ratio 3.164 x; with its history 468.239 ms, ratio 2.599 x",
+    "section 110: rest's passes -- rest 41.944 ms (device); restToT 1.544 ms (device); restEasu 24.760 ms (device); restComp 15.333 ms (device); restToTFree 1.605 ms (device)",
+    "section 115: EASU in quads -- restEasu 24.760 ms (device); restComp 15.333 ms (device); restEasuQ 25.831 ms (device); restEasuComp 31.464 ms (device)",
+    "section 117: the accumulation tiled -- accum 43.908 ms (device); accumT 22.002 ms (device)",
+    "section 94, intel-gen9: the network at 960 x 540 307.6 / 347.1 ms; the chain's own steps (both coverages, the fill, the rest) 727.7 / 820.5 ms -- reported, deciding nothing",
+    "section 94, gtx1080: the network at 960 x 540 18.4 / 18.4 ms; the chain's own steps (both coverages, the fill, the rest) 45.7 / 42.2 ms -- reported, deciding nothing",
+    "section 98, intel-gen9: the history's four passes 86.13 / 83.07 ms, the accumulation 44.78 / 43.61 of it; the chain without them 1.452 / 1.427 x -- reported, deciding nothing",
+    "section 98, gtx1080: the history's four passes 1.92 / 1.88 ms, the accumulation 0.90 / 0.89 of it; the chain without them 1.447 / 1.528 x -- reported, deciding nothing",
+    "section 100, gtx1080: the timing gate died in 3 of 5 realGpuRun runs (b at 17.7 s, b2 at 6.5 s, extra-b at 40.4 s), each with no FAIL line, and once more run alone -- reported, deciding nothing",
+    "section 102, gtx1080: r27w at 1920 x 1080 -- native 15100.641 / 249.7 ms a pass, page 251.9 / 10247.4 ms (about 250 ms is its usual reading) -- reported, deciding nothing",
+    "section 105: the half-size chain against today's page with the tile fill -- 1080 1.601 / 1.571 x, with the list fill 1.454 / 1.417 x; Intel 1.935 / 1.978 x, with the list fill 2.066 / 2.113 x -- reported, deciding nothing",
+    "section 111: the half-size chain against today's page with the bounded coverage -- 1080 1.454 / 1.641 x, Intel 3.015 / 3.496 x (each against today's page with the bounded mask too) -- reported, deciding nothing"
+   ],
+   "skips": []
+  }
+ ],
+ "adapters": [
+  {
+   "name": "intel gen-9",
+   "software": false,
+   "launchArgs": [
+    "--enable-unsafe-webgpu",
+    "--use-angle=d3d11"
+   ],
+   "native": false,
+   "caps": {
+    "features": [
+     "bgra8unorm-storage",
+     "chromium-experimental-multi-draw-indirect",
+     "chromium-experimental-sampling-resource-table",
+     "chromium-experimental-timestamp-query-inside-passes",
+     "clip-distances",
+     "core-features-and-limits",
+     "depth-clip-control",
+     "depth32float-stencil8",
+     "dual-source-blending",
+     "float32-blendable",
+     "float32-filterable",
+     "indirect-first-instance",
+     "primitive-index",
+     "rg11b10ufloat-renderable",
+     "shader-f16",
+     "texture-component-swizzle",
+     "texture-compression-bc",
+     "texture-compression-bc-sliced-3d",
+     "texture-compression-unaligned",
+     "texture-formats-tier1",
+     "texture-formats-tier2",
+     "timestamp-query"
+    ],
+    "limits": {
+     "maxComputeWorkgroupStorageSize": 32768,
+     "maxComputeInvocationsPerWorkgroup": 1024,
+     "maxComputeWorkgroupSizeX": 1024,
+     "maxStorageBufferBindingSize": 2147483644,
+     "maxUniformBufferBindingSize": 65536,
+     "maxBufferSize": 2147483648,
+     "maxStorageBuffersPerShaderStage": 16
+    },
+    "subgroups": {
+     "min": 16,
+     "max": 16
+    }
+   }
+  },
+  {
+   "name": "intel gen-9 D3D12 driver version 31.0.101.2137",
+   "software": false,
+   "launchArgs": [
+    "node-webgpu (native)"
+   ],
+   "native": true,
+   "caps": {
+    "features": [
+     "bgra8unorm-storage",
+     "clip-distances",
+     "core-features-and-limits",
+     "depth-clip-control",
+     "depth32float-stencil8",
+     "dual-source-blending",
+     "float32-blendable",
+     "float32-filterable",
+     "indirect-first-instance",
+     "primitive-index",
+     "rg11b10ufloat-renderable",
+     "shader-f16",
+     "texture-component-swizzle",
+     "texture-compression-bc",
+     "texture-compression-bc-sliced-3d",
+     "texture-compression-unaligned",
+     "texture-formats-tier1",
+     "texture-formats-tier2",
+     "timestamp-query"
+    ],
+    "limits": {
+     "maxComputeWorkgroupStorageSize": 32768,
+     "maxComputeInvocationsPerWorkgroup": 1024,
+     "maxComputeWorkgroupSizeX": 1024,
+     "maxStorageBufferBindingSize": 2147483648,
+     "maxUniformBufferBindingSize": 65536,
+     "maxBufferSize": 2147483648,
+     "maxStorageBuffersPerShaderStage": 16
+    },
+    "subgroups": {
+     "min": 16,
+     "max": 16
+    }
+   }
+  }
+ ],
+ "verdict": "a real-hardware run on intel gen-9; intel gen-9 D3D12 driver version 31.0.101.2137 (native)",
+ "summary": "exact 1/1, quality 0/0, timing 2/3",
+ "nodeWebgpu": {
+  "version": "0.6.2",
+  "from": "C:\\Users\\Keith\\AppData\\Roaming\\npm\\node_modules\\webgpu\\index.js",
+  "dir": "C:\\Users\\Keith\\AppData\\Roaming\\npm\\node_modules\\webgpu",
+  "dxcBeside": true,
+  "compiler": "DXC",
+  "chosenBy": "the resolver's list"
+ }
+}

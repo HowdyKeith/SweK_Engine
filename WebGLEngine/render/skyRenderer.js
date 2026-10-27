@@ -26,8 +26,8 @@ void main() {
 }`;
 
 const FS = `#version 300 es
-${SKY_STARS_GLSL}
 precision highp float;
+${SKY_STARS_GLSL}
 in vec2 vClipPos;
 out vec4 outColor;
 

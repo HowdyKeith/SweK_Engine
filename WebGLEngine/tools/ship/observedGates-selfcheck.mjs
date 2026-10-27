@@ -91,9 +91,9 @@ const SELF = "observedGates-selfcheck.mjs";
     ok("!! *** GATES REST THEIR ONLY RUNTIME EVIDENCE ON A FILE REWRITTEN EVERY RUN ***",
         // v4880 -- 215 at v4485 and 55 now: the durable register (gate-timings.json) and budgetEvidence's named list absorbed most of them in the meantime, which is the
         // defect shrinking, not the premise failing. What the row still claims is that the dependence is real and not small, so it holds the count to the figure read at v4880
-        // within ten, and names both numbers. v4886 -- RE-READ 55 -> 68 at the merge of the tooling chain: its five gates and the rotation's returnees are in the sweep file and not yet in the durable register. v4896 -- RE-READ 96 -> 107: the ten gates this round added are in the sweep file and not yet in the durable register, plus one rotation returnee. v4895 -- RE-READ 68 -> 96: the rotation and the verdict sweeps since v4886 put more gates into the sweep file than the durable register has absorbed (the row defends that the dependence exists, not its size).
-        sweepOnly.length > 20 && Math.abs(sweepOnly.length - 107) <= 10,
-        `${sweepOnly.length} of them, against 107 read at v4896 (96 at v4895) (68 at v4886) (55 at v4880) and ${M.evidenceOnlyFromScratch} measured at v4485. Any one, killed ` +
+        // within ten, and names both numbers. v4886 -- RE-READ 55 -> 68 at the merge of the tooling chain: its five gates and the rotation's returnees are in the sweep file and not yet in the durable register. v4902 -- RE-READ 148 -> 172: the Sea OGRE, sub-squad and 3D-replay gates of v4901 and the rotation's returnees since are in the sweep file and not yet in the durable register (the row defends that the dependence exists, not its size). v4898 -- RE-READ 107 -> 148: this round's new gates (map, channel, fish, submarine merges) are in the sweep file and not yet in the durable register. v4896 -- RE-READ 96 -> 107: the ten gates this round added are in the sweep file and not yet in the durable register, plus one rotation returnee. v4895 -- RE-READ 68 -> 96: the rotation and the verdict sweeps since v4886 put more gates into the sweep file than the durable register has absorbed (the row defends that the dependence exists, not its size).
+        sweepOnly.length > 20 && Math.abs(sweepOnly.length - 172) <= 10,
+        `${sweepOnly.length} of them, against 172 read at v4902 (148 at v4898) (107 at v4896) (96 at v4895) (68 at v4886) (55 at v4880) and ${M.evidenceOnlyFromScratch} measured at v4485. Any one, killed ` +
         "at the cap on a busy box, erased the wall's green -- and the sweep file's own note says it is not a " +
         "claim about the tree");
 
@@ -258,6 +258,17 @@ const wantLedger = beside("observed-gates.json"), wantSweep = beside("sweep-timi
 ok("the ledger and the sweep it folds are paths beside the module, named",
     O.LEDGER_PATH === wantLedger && O.SWEEP_PATH === wantSweep,
     "O.LEDGER_PATH and O.SWEEP_PATH");
+
+// v4897 -- A BOX THAT DOES NOT OWN THE SHARED RECORD STILL OBSERVES. The writer folds every tools/ship/sweep-timings.<box>.json (the tracked per-box records, not the gitignored .local scratch) into what it merges, the shared file's entry
+// winning where both have one: nine gates a round added on a foreign box were seen to finish and were in no file the writer read, which made budgetEvidence read nine "new since the capture" against its handful of eight.
+// SABOTAGE (v4897): the fold's file pattern made to match nothing -> the writer-source row RED, and budgetEvidence-selfcheck red with it on a foreign box; restored.
+{
+    const src = fs.readFileSync(beside("observedGates.mjs"), "utf8");
+    const fold = /for \(const f of fs\.readdirSync\(HERE\)\.filter\(\(x\) => \/\^sweep-timings\\\.\[a-z0-9-\]\+\\\.json\$\/\.test\(x\) && x !== "sweep-timings\.local\.json"\)/.test(src);
+    const shared = /timings: \{ \.\.\.\(box\.timings \|\| \{\}\), \.\.\.\(sweep\.timings \|\| \{\}\) \}, codes: \{ \.\.\.\(box\.codes \|\| \{\}\), \.\.\.\(sweep\.codes \|\| \{\}\) \}/.test(src);
+    ok("!! the writer folds the tracked per-box sweep records (not the gitignored local scratch) into the ledger, the shared file's entry winning", fold && shared,
+        "an observation made on another box is still an observation made, and the ledger never erases one");
+}
 
 console.log("observedGates-selfcheck: " + (fails ? fails + " FAILED" : "all pass"));
 process.exit(fails ? 1 : 0);

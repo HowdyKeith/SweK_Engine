@@ -1,0 +1,1346 @@
+{
+ "format": "swek-channel-v1",
+ "handle": "@TheNextNewThingAI",
+ "fetchedAt": "2026-10-25T17:03:46.028Z",
+ "channel": {
+  "id": "NZEktrsM5oJZ-MK4jKPMOQ",
+  "name": "The Next New Thing",
+  "nameFrom": "page",
+  "description": "How to build profitable AI startups | Hosted by Andrew Warner | Presented by Zapier\n",
+  "subscribers": null,
+  "avatar": "https://yt3.googleusercontent.com/ubw-qu3I8u2GG27Cw8TRwCshGU6YdB2bL2oBKMvXEiWs58-ziD8SYXaw180RTsV7vGQ7lF4o8A=s900-c-k-c0x00ffffff-no-rj",
+  "url": "https://www.youtube.com/channel/UCNZEktrsM5oJZ-MK4jKPMOQ",
+  "since": "2025-10-02T21:38:07+00:00",
+  "links": []
+ },
+ "videos": [
+  {
+   "id": "qsQ6w99txII",
+   "title": "Story of a startup that closed after ChatGPT",
+   "published": "2026-10-25T15:38:57+00:00",
+   "updated": "2026-10-25T15:52:27+00:00",
+   "description": "What happens when you build an innovative AI product, only to see its features absorbed by ChatGPT and Claude? In this interview, Andrew Warner sits down with Nathan Baschez, founder of Lex, to discuss why the AI writing tool is winding down and what founders can learn from its journey.\n\nLex started as a better writing experience: a place where people could write while using AI as a thought partner, sparring partner, and idea generator. But as general-purpose AI tools added similar capabilities, competing as a standalone writing product became increasingly difficult.\n\nNathan shares why helping people improve their writing can be a tougher business than helping people build things they couldn't create before. He and Andrew discuss choosing the right market, building for enthusiastic AI users, and the challenges of creating a sustainable AI business in a rapidly changing landscape.\n\nMost importantly, Nathan explains why founders should pursue what genuinely excites them instead of blindly following conventional business advice. His perspective is a reminder that even when a startup doesn't become a lasting independent business, the experience, lessons, relationships, and judgment gained along the way can be invaluable.\n\nLink to Resources: https://thenextnewthing.ai/my-resources\nPresented by Zapier: https://zapier.com/\n\n\n00:00 - Why Lex Is Shutting Down\n01:12 - Nathan Baschez on the Future of Lex\n02:42 - The Original Idea Behind Lex\n03:18 - AI as a Thought Partner for Writers\n04:03 - Why Saving Time Matters More Than Incremental Improvements\n05:33 - How ChatGPT Changed the AI Writing Market\n06:18 - Why Choosing the Right Market Matters\n07:48 - Lessons for Founders Building AI Products\n08:15 - Sell to Valuable Markets and Enthusiastic AI Users\n08:51 - Follow Your Curiosity Instead of Conventional Advice\n10:21 - Should Lex Have Stayed a Side Project?\n11:33 - Build What You Love, Even If the Outcome Is Uncertain\n12:36 - Why Experimentation Is the Only Way to Learn\n13:57 - The Best Moments of Building Lex\n14:36 - Lex's $2.8 Million Seed Round\n14:51 - Why Lex Couldn't Continue as an Independent Business\n\nMedia/Sponsorship Inquiries: https://thenextnewthing.ai/l/sponsor\n\n👉 Join us: https://thenextnewthing.ai/",
+   "thumbnail": "https://i2.ytimg.com/vi/qsQ6w99txII/hqdefault.jpg",
+   "views": 242,
+   "ratingCount": 12,
+   "rating": 5,
+   "lengthSeconds": 909,
+   "keywords": [],
+   "category": "Science & Technology",
+   "url": "https://www.youtube.com/watch?v=qsQ6w99txII",
+   "firstSeen": "2026-10-25T17:03:46.028Z",
+   "repos": [],
+   "owners": [],
+   "links": [
+    "https://thenextnewthing.ai/my-resources",
+    "https://zapier.com/",
+    "https://thenextnewthing.ai/l/sponsor",
+    "https://thenextnewthing.ai/"
+   ],
+   "chapters": [
+    {
+     "t": 0,
+     "label": "Why Lex Is Shutting Down"
+    },
+    {
+     "t": 72,
+     "label": "Nathan Baschez on the Future of Lex"
+    },
+    {
+     "t": 162,
+     "label": "The Original Idea Behind Lex"
+    },
+    {
+     "t": 198,
+     "label": "AI as a Thought Partner for Writers"
+    },
+    {
+     "t": 243,
+     "label": "Why Saving Time Matters More Than Incremental Improvements"
+    },
+    {
+     "t": 333,
+     "label": "How ChatGPT Changed the AI Writing Market"
+    },
+    {
+     "t": 378,
+     "label": "Why Choosing the Right Market Matters"
+    },
+    {
+     "t": 468,
+     "label": "Lessons for Founders Building AI Products"
+    },
+    {
+     "t": 495,
+     "label": "Sell to Valuable Markets and Enthusiastic AI Users"
+    },
+    {
+     "t": 531,
+     "label": "Follow Your Curiosity Instead of Conventional Advice"
+    },
+    {
+     "t": 621,
+     "label": "Should Lex Have Stayed a Side Project?"
+    },
+    {
+     "t": 693,
+     "label": "Build What You Love, Even If the Outcome Is Uncertain"
+    },
+    {
+     "t": 756,
+     "label": "Why Experimentation Is the Only Way to Learn"
+    },
+    {
+     "t": 837,
+     "label": "The Best Moments of Building Lex"
+    },
+    {
+     "t": 876,
+     "label": "Lex's $2.8 Million Seed Round"
+    },
+    {
+     "t": 891,
+     "label": "Why Lex Couldn't Continue as an Independent Business"
+    }
+   ]
+  },
+  {
+   "id": "BrBQRNIDRS8",
+   "title": "Copy viral videos, change your TV’s OS, free MailChimp and all the top repos",
+   "published": "2026-10-23T22:34:38+00:00",
+   "updated": "2026-10-25T15:23:58+00:00",
+   "description": "Link to Resource: https://thenextnewthing.ai/l/github-repos-oct23\nPresented by Zapier: https://zapier.com/\nAndrew Warner and Adam break down trending GitHub repositories and open-source AI tools of the week. From AI coding agents and security plugins to local voice cloning and shared memory systems, discover the projects developers are watching.\n\nThey explore REA, a tool for recreating software features, and debate when inspiration becomes code theft. They also cover Claude's official security plugins, Ruflo's multi-agent coding teams, Android's official AI skills, scientific research skills, and OpenCode's open-source coding environment.\n\nPlus, see how CLI-Anything gives AI agents access to desktop apps, Cursor plugins extend coding workflows, and AI Memory helps agents share context across models and devices. The episode also features Mailcheap, an open-source newsletter alternative; CleanYourTV for customizing smart TVs; and Hypeit for recreating viral video formats.\n\nIn the community showcase, Andrew and Adam highlight viewer-built projects, explore smarter AI model routing, and explain how secure containers help protect your computer and sensitive files.\n\nRepo featured:\n\n1. REA — Recreate Software Features: https://github.com/morluto/rea\n2. Claude Plugins Official — Security and Coding Skills: https://github.com/anthropics/claude-plugins-official\n3. Ruflo — Multi-Agent Coding Teams: https://github.com/ruvnet/ruflo\n4. Android Skills — Build Better Android Apps With AI: https://github.com/android/skills\n5. Scientific Agent Skills — AI Skills for Research: https://github.com/K-Dense-AI/scientific-agent-skills\n6. OpenCode — Open-Source AI Coding Agent: https://github.com/anomalyco/opencode\n7. CLI-Anything — Connect AI Agents to Desktop Applications: https://github.com/HKUDS/CLI-Anything\n8. Cursor Plugins — Skills, Tools, and Integrations: https://github.com/cursor/plugins\n9. AI Memory — Shared Memory Across AI Agents: https://github.com/akitaonrails/ai-memory\n10. VoiceStudio — Local AI Voice Cloning: https://github.com/debpalash/VoiceStudio\n\nOther Repos Discussed:\n\n- Mailcheap — An open-source, agent-friendly newsletter platform: https://github.com/marclou/mailcheap\n- CleanYourTV — Customize your smart TV and reduce unwanted bloatware: https://github.com/Gathin23/cleanyourtv\n- Hypeit — Recreate viral video formats with AI: https://github.com/hypit-ai/hypit\n\nFirst Star Repos:\n\n- Presenter — Generate and narrate presentations with AI: https://github.com/bisque-cloud/presenter\n- Delegate Router — Route tasks to the right AI model: https://github.com/pvjbuilds/delegate-router\n- This Thing Show — AI-powered book content ratings: https://github.com/R8rly/show\n- Kapathi Skills Extended — A coding agent that asks instead of guessing: https://github.com/anshuxinha/karpathy-skills-extended\n- Container — Run AI agents inside a Linux sandbox: https://github.com/aerovato/container\n\n00:00 - This Week's Hottest GitHub Repositories\n00:18 - Mailcheap: An Open-Source Alternative to Beehiiv\n02:26 - CleanYourTV: Remove Smart TV Bloatware\n03:41 - Hypeit: Recreate Viral Video Formats\n05:29 - REA: Copying Software Features With AI\n09:19 - Claude Plugins Official: Scan Code for Security Issues\n11:21 - Ruflo: Build a Team of AI Coding Agents\n12:54 - Zapier: Automate Workflows and Reduce AI Costs\n14:25 - Android Skills: Help AI Build Better Apps\n16:48 - Scientific Agent Skills for Researchers\n18:12 - OpenCode: An Open-Source AI Coding Agent\n20:37 - CLI-Anything: Give AI Agents Access to Desktop Apps\n22:34 - The Road to 100,000 Subscribers\n23:32 - Cursor Plugins and P-Stack Skills\n24:40 - The Ketchup Skill: Catch Up on Your AI Conversations\n25:01 - AI Memory: Share Context Across Agents and Devices\n26:54 - VoiceStudio: Run Voice Cloning Locally\n28:26 - Community Projects From Viewers\n28:57 - Delegate Router: Choose the Right AI Model for Each Task\n30:36 - AI-Powered Book Content Ratings\n31:53 - Kapathi Skills Extended: An Agent That Asks Questions\n32:11 - Container: Keep AI Agents in a Safe Sandbox\n33:22 - Final Thoughts and Community Feedback\n\n👉 Media/Sponsorship Inquiries: https://thenextnewthing.ai/l/sponsor\n\n👉 Join us: https://thenextnewthing.ai/\n\n🔥 Say hi to Adam: https://www.linkedin.com/in/adam-brakhane",
+   "thumbnail": "https://i3.ytimg.com/vi/BrBQRNIDRS8/hqdefault.jpg",
+   "views": 42773,
+   "ratingCount": 752,
+   "rating": 5,
+   "lengthSeconds": 2039,
+   "keywords": [],
+   "category": "Science & Technology",
+   "url": "https://www.youtube.com/watch?v=BrBQRNIDRS8",
+   "firstSeen": "2026-10-25T17:03:46.028Z",
+   "repos": [
+    {
+     "owner": "morluto",
+     "repo": "rea",
+     "url": "https://github.com/morluto/rea"
+    },
+    {
+     "owner": "anthropics",
+     "repo": "claude-plugins-official",
+     "url": "https://github.com/anthropics/claude-plugins-official"
+    },
+    {
+     "owner": "ruvnet",
+     "repo": "ruflo",
+     "url": "https://github.com/ruvnet/ruflo"
+    },
+    {
+     "owner": "android",
+     "repo": "skills",
+     "url": "https://github.com/android/skills"
+    },
+    {
+     "owner": "K-Dense-AI",
+     "repo": "scientific-agent-skills",
+     "url": "https://github.com/K-Dense-AI/scientific-agent-skills"
+    },
+    {
+     "owner": "anomalyco",
+     "repo": "opencode",
+     "url": "https://github.com/anomalyco/opencode"
+    },
+    {
+     "owner": "HKUDS",
+     "repo": "CLI-Anything",
+     "url": "https://github.com/HKUDS/CLI-Anything"
+    },
+    {
+     "owner": "cursor",
+     "repo": "plugins",
+     "url": "https://github.com/cursor/plugins"
+    },
+    {
+     "owner": "akitaonrails",
+     "repo": "ai-memory",
+     "url": "https://github.com/akitaonrails/ai-memory"
+    },
+    {
+     "owner": "debpalash",
+     "repo": "VoiceStudio",
+     "url": "https://github.com/debpalash/VoiceStudio"
+    },
+    {
+     "owner": "marclou",
+     "repo": "mailcheap",
+     "url": "https://github.com/marclou/mailcheap"
+    },
+    {
+     "owner": "Gathin23",
+     "repo": "cleanyourtv",
+     "url": "https://github.com/Gathin23/cleanyourtv"
+    },
+    {
+     "owner": "hypit-ai",
+     "repo": "hypit",
+     "url": "https://github.com/hypit-ai/hypit"
+    },
+    {
+     "owner": "bisque-cloud",
+     "repo": "presenter",
+     "url": "https://github.com/bisque-cloud/presenter"
+    },
+    {
+     "owner": "pvjbuilds",
+     "repo": "delegate-router",
+     "url": "https://github.com/pvjbuilds/delegate-router"
+    },
+    {
+     "owner": "R8rly",
+     "repo": "show",
+     "url": "https://github.com/R8rly/show"
+    },
+    {
+     "owner": "anshuxinha",
+     "repo": "karpathy-skills-extended",
+     "url": "https://github.com/anshuxinha/karpathy-skills-extended"
+    },
+    {
+     "owner": "aerovato",
+     "repo": "container",
+     "url": "https://github.com/aerovato/container"
+    }
+   ],
+   "owners": [],
+   "links": [
+    "https://thenextnewthing.ai/l/github-repos-oct23",
+    "https://zapier.com/",
+    "https://thenextnewthing.ai/l/sponsor",
+    "https://thenextnewthing.ai/",
+    "https://www.linkedin.com/in/adam-brakhane"
+   ],
+   "chapters": [
+    {
+     "t": 0,
+     "label": "This Week's Hottest GitHub Repositories"
+    },
+    {
+     "t": 18,
+     "label": "Mailcheap: An Open-Source Alternative to Beehiiv"
+    },
+    {
+     "t": 146,
+     "label": "CleanYourTV: Remove Smart TV Bloatware"
+    },
+    {
+     "t": 221,
+     "label": "Hypeit: Recreate Viral Video Formats"
+    },
+    {
+     "t": 329,
+     "label": "REA: Copying Software Features With AI"
+    },
+    {
+     "t": 559,
+     "label": "Claude Plugins Official: Scan Code for Security Issues"
+    },
+    {
+     "t": 681,
+     "label": "Ruflo: Build a Team of AI Coding Agents"
+    },
+    {
+     "t": 774,
+     "label": "Zapier: Automate Workflows and Reduce AI Costs"
+    },
+    {
+     "t": 865,
+     "label": "Android Skills: Help AI Build Better Apps"
+    },
+    {
+     "t": 1008,
+     "label": "Scientific Agent Skills for Researchers"
+    },
+    {
+     "t": 1092,
+     "label": "OpenCode: An Open-Source AI Coding Agent"
+    },
+    {
+     "t": 1237,
+     "label": "CLI-Anything: Give AI Agents Access to Desktop Apps"
+    },
+    {
+     "t": 1354,
+     "label": "The Road to 100,000 Subscribers"
+    },
+    {
+     "t": 1412,
+     "label": "Cursor Plugins and P-Stack Skills"
+    },
+    {
+     "t": 1480,
+     "label": "The Ketchup Skill: Catch Up on Your AI Conversations"
+    },
+    {
+     "t": 1501,
+     "label": "AI Memory: Share Context Across Agents and Devices"
+    },
+    {
+     "t": 1614,
+     "label": "VoiceStudio: Run Voice Cloning Locally"
+    },
+    {
+     "t": 1706,
+     "label": "Community Projects From Viewers"
+    },
+    {
+     "t": 1737,
+     "label": "Delegate Router: Choose the Right AI Model for Each Task"
+    },
+    {
+     "t": 1836,
+     "label": "AI-Powered Book Content Ratings"
+    },
+    {
+     "t": 1913,
+     "label": "Kapathi Skills Extended: An Agent That Asks Questions"
+    },
+    {
+     "t": 1931,
+     "label": "Container: Keep AI Agents in a Safe Sandbox"
+    },
+    {
+     "t": 2002,
+     "label": "Final Thoughts and Community Feedback"
+    }
+   ]
+  },
+  {
+   "id": "ZgAG5v_QPt4",
+   "title": "This AI Tool Can Rebuild Apps — But Is It Copying?",
+   "published": "2026-10-22T20:30:22+00:00",
+   "updated": "2026-10-23T14:57:58+00:00",
+   "description": "Link to the Resource Vault: https://thenextnewthing.ai/Resources\n(There is also a clickable link in my bio)\n\n🔗 Watch the full podcast here: https://youtu.be/BctbCJP9lKU\n\nWhat if you could recreate your favorite software using AI?\n\nREA (Reverse Engineer Anything) lets AI coding agents inspect how existing applications work and rebuild their features.\n\nAndrew Warner reacts to a CapCut-inspired video editor built using REA and explores an interesting question: When does copying software become creating something new?\n\n🔗 Explore REA Tools: https://rea.tools/\n\n#ai  #REATools #reverseengineering  #claudecode  #softwaredevelopment",
+   "thumbnail": "https://i3.ytimg.com/vi/ZgAG5v_QPt4/hqdefault.jpg",
+   "views": 2274,
+   "ratingCount": 41,
+   "rating": 5,
+   "lengthSeconds": 73,
+   "keywords": [],
+   "category": "Science & Technology",
+   "url": "https://www.youtube.com/watch?v=ZgAG5v_QPt4",
+   "firstSeen": "2026-10-25T17:03:46.028Z",
+   "repos": [],
+   "owners": [],
+   "links": [
+    "https://thenextnewthing.ai/Resources",
+    "https://youtu.be/BctbCJP9lKU",
+    "https://rea.tools/"
+   ],
+   "chapters": []
+  },
+  {
+   "id": "tqpOfHS5-VY",
+   "title": "Make your AI agent pay for itself (and this week's biggest AI news)",
+   "published": "2026-10-22T19:32:35+00:00",
+   "updated": "2026-10-23T19:06:21+00:00",
+   "description": "Get $100 in bonus credits on any paid plan if you use the link from my interview with Hyperagent - https://www.hyperagent.com/agencies?utm_source=youtube&utm_medium=influencer&utm_campaign=TNNT\n\nLink to Resource: https://thenextnewthing.ai/l/corey-ganim-shownotes-oct22\nPresented by Zapier: https://zapier.com/\nAndrew Warner and Corey Ganim break down 15 AI launches, tools, and stories shaping the future of AI agents, from Claude Duet and Hyperagent for agencies to AI-powered email, design, video creation, and business automation.\n\nThis week, they explore whether Claude Duet can compete with other personal AI agents, why multi-agent workflows matter for businesses, and how agents can help identify savings and new revenue opportunities. They also look at creative AI businesses like Pet Plus Us, OpenUI’s visual interfaces, Pika’s ChatGPT integration, and tools that give agents access to phones, design canvases, and new workflows. Plus, discover MailCheap’s challenge to Beehiiv, Grok Bot’s new report and dashboard features, tools for researching YouTube thumbnails and managing email, how developers are customizing smart TVs with Claude Code, and the latest warnings about critical PHP vulnerabilities.\n\nLinks featured:\n\n1. Claude Duet: A New Proactive AI Agent\n- Claude announcement: https://x.com/claudeai/status/2112984664256241837\n- Peter Yang’s personal agent comparison: https://x.com/petergyang/status/2113042717270049028\n\n2. Hyperagent Launches for Agencies\n- Announcement: https://www.linkedin.com/posts/alexqmcdonnell_were-launching-hyperagent-for-agencies-ugcPost-7514050570240802818-0-Av/\n\n3. AI Agents Pay for Themselves\n- Elon Musk’s post: https://x.com/elonmusk/status/2111612315204272233\n- Saving money with Grok Bot: https://x.com/akshayadinesh19/status/2111999738015101197\n\n4. Pet Portraits: Pet Plus Us\n- Website: https://www.pet-plus-us.com/keepsakes\n- Revenue on TrustMRR: https://trustmrr.com/startup/pet-plus-us\n\n5. OpenUI: An Open Standard for Generative Interfaces\n- Website: https://www.openui.com/\n- GitHub: https://github.com/thesysdev/openui\n\n6. Pika Brings a Creative Studio Into ChatGPT\n- Website: https://pika.art/mcp/chatgpt\n\n7. PhoneUse Gives AI Agents Their Own Phones\n- Announcement: https://x.com/abdullababakre/status/2112971597648978044\n- Website: https://www.phoneuse.com/\n\n8. MuseCourt: AI Agents Sue Each Other\n- Announcement: https://x.com/danbuildss/status/2112561811518095809\n- Example case: https://www.musecourt.xyz/casebook/case_5dad67ce37544e289501577597ab9507\n\n9. OpenDesign: An Open-Source Claude Design Alternative\n- Website: https://open-design.ai/\n\n10. MailCheap Takes on Beehiiv\n- Marc Lou’s announcement: https://x.com/marclou/status/2110743912885489960\n- Website: https://mailcheap.ai/\n- Tyler Denk’s response: https://x.com/denk_tweets/status/2112559474120552548\n- Revenue on TrustMRR: https://trustmrr.com/startup/mailcheap\n\n11. Grok Bot Builds Reports, Memos, and Dashboards\n- Announcement: https://x.com/bot/status/2112992872857252082\n- Example report: https://morning-top-10-oct-22-2026-wr4o.pages.grok.bot/\n\n12. Thumbsy: Research YouTube Thumbnails\n- Announcement: https://x.com/PhedEU/status/2112672587239063872\n- Website: https://www.thumbsy.io/\n\n13. Inbox Zero: Open-Source AI Email Automation\n- Website: https://www.getinboxzero.com/\n- GitHub: https://github.com/elie222/inbox-zero\n\n14. Customize Your TV With Claude Code\n- Ryan Doyle’s post: https://x.com/doooyle/status/2111196679680540724\n- CleanYourTV GitHub: https://github.com/Gathin23/cleanyourtv\n\n15. NSA Warns of Critical PHP Vulnerabilities\n- NSA advisory: https://x.com/NSACyber/status/2112903220209098897\n- Nevo David’s profile: https://x.com/wickedguro\n- Related search: https://x.com/search?q=php banks&src=typed_query\n\n00:00 - 15 AI Releases and Tools to Know\n00:25 - Claude Duet: Anthropic’s New AI Agent\n01:02 - Claude Duet vs. ChatGPT and Grok Bot\n02:12 - Why Businesses Need Multiple Specialized Agents\n02:46 - Hyperagent for Agencies\n03:40 - AI Agents That Find Savings and New Revenue\n05:04 - Pet Plus Us: Turn Pet Photos Into Portraits\n07:31 - OpenUI: Make AI Responses More Visual\n08:53 - Pika: Create Product Videos Inside ChatGPT\n10:07 - PhoneUse: Give AI Agents a Real Phone\n12:46 - MuseCourt: AI Agents in a Virtual Courtroom\n13:39 - OpenDesign: Collaborate With AI on Design\n14:46 - MailCheap: An Agent-Friendly Beehiiv Alternative\n18:37 - Grok Bot: Build Reports, Memos, and Dashboards\n20:53 - Thumbsy: A Searchable YouTube Thumbnail Library\n21:35 - Inbox Zero: Open-Source AI Email Automation\n23:08 - CleanYourTV: Customize Your TV With Claude Code\n24:50 - Critical PHP Vulnerabilities and Cybersecurity Risks\n26:02 - The Impact on Developers and Online Services\n27:00 - Final Thoughts and More AI Releases\n\n👉 Media/Sponsorship Inquiries: https://thenextnewthing.ai/l/sponsor\n\n👉 Join us: https://thenextnewthing.ai/",
+   "thumbnail": "https://i1.ytimg.com/vi/tqpOfHS5-VY/hqdefault.jpg",
+   "views": 17881,
+   "ratingCount": 237,
+   "rating": 5,
+   "lengthSeconds": 1656,
+   "keywords": [],
+   "category": "Science & Technology",
+   "url": "https://www.youtube.com/watch?v=tqpOfHS5-VY",
+   "firstSeen": "2026-10-25T17:03:46.028Z",
+   "repos": [
+    {
+     "owner": "thesysdev",
+     "repo": "openui",
+     "url": "https://github.com/thesysdev/openui"
+    },
+    {
+     "owner": "elie222",
+     "repo": "inbox-zero",
+     "url": "https://github.com/elie222/inbox-zero"
+    },
+    {
+     "owner": "Gathin23",
+     "repo": "cleanyourtv",
+     "url": "https://github.com/Gathin23/cleanyourtv"
+    }
+   ],
+   "owners": [],
+   "links": [
+    "https://www.hyperagent.com/agencies?utm_source=youtube&utm_medium=influencer&utm_campaign=TNNT",
+    "https://thenextnewthing.ai/l/corey-ganim-shownotes-oct22",
+    "https://zapier.com/",
+    "https://x.com/claudeai/status/2112984664256241837",
+    "https://x.com/petergyang/status/2113042717270049028",
+    "https://www.linkedin.com/posts/alexqmcdonnell_were-launching-hyperagent-for-agencies-ugcPost-7514050570240802818-0-Av/",
+    "https://x.com/elonmusk/status/2111612315204272233",
+    "https://x.com/akshayadinesh19/status/2111999738015101197",
+    "https://www.pet-plus-us.com/keepsakes",
+    "https://trustmrr.com/startup/pet-plus-us",
+    "https://www.openui.com/",
+    "https://pika.art/mcp/chatgpt",
+    "https://x.com/abdullababakre/status/2112971597648978044",
+    "https://www.phoneuse.com/",
+    "https://x.com/danbuildss/status/2112561811518095809",
+    "https://www.musecourt.xyz/casebook/case_5dad67ce37544e289501577597ab9507",
+    "https://open-design.ai/",
+    "https://x.com/marclou/status/2110743912885489960",
+    "https://mailcheap.ai/",
+    "https://x.com/denk_tweets/status/2112559474120552548",
+    "https://trustmrr.com/startup/mailcheap",
+    "https://x.com/bot/status/2112992872857252082",
+    "https://morning-top-10-oct-22-2026-wr4o.pages.grok.bot/",
+    "https://x.com/PhedEU/status/2112672587239063872",
+    "https://www.thumbsy.io/",
+    "https://www.getinboxzero.com/",
+    "https://x.com/doooyle/status/2111196679680540724",
+    "https://x.com/NSACyber/status/2112903220209098897",
+    "https://x.com/wickedguro",
+    "https://x.com/search?q=php",
+    "https://thenextnewthing.ai/l/sponsor",
+    "https://thenextnewthing.ai/"
+   ],
+   "chapters": [
+    {
+     "t": 0,
+     "label": "15 AI Releases and Tools to Know"
+    },
+    {
+     "t": 25,
+     "label": "Claude Duet: Anthropic’s New AI Agent"
+    },
+    {
+     "t": 62,
+     "label": "Claude Duet vs. ChatGPT and Grok Bot"
+    },
+    {
+     "t": 132,
+     "label": "Why Businesses Need Multiple Specialized Agents"
+    },
+    {
+     "t": 166,
+     "label": "Hyperagent for Agencies"
+    },
+    {
+     "t": 220,
+     "label": "AI Agents That Find Savings and New Revenue"
+    },
+    {
+     "t": 304,
+     "label": "Pet Plus Us: Turn Pet Photos Into Portraits"
+    },
+    {
+     "t": 451,
+     "label": "OpenUI: Make AI Responses More Visual"
+    },
+    {
+     "t": 533,
+     "label": "Pika: Create Product Videos Inside ChatGPT"
+    },
+    {
+     "t": 607,
+     "label": "PhoneUse: Give AI Agents a Real Phone"
+    },
+    {
+     "t": 766,
+     "label": "MuseCourt: AI Agents in a Virtual Courtroom"
+    },
+    {
+     "t": 819,
+     "label": "OpenDesign: Collaborate With AI on Design"
+    },
+    {
+     "t": 886,
+     "label": "MailCheap: An Agent-Friendly Beehiiv Alternative"
+    },
+    {
+     "t": 1117,
+     "label": "Grok Bot: Build Reports, Memos, and Dashboards"
+    },
+    {
+     "t": 1253,
+     "label": "Thumbsy: A Searchable YouTube Thumbnail Library"
+    },
+    {
+     "t": 1295,
+     "label": "Inbox Zero: Open-Source AI Email Automation"
+    },
+    {
+     "t": 1388,
+     "label": "CleanYourTV: Customize Your TV With Claude Code"
+    },
+    {
+     "t": 1490,
+     "label": "Critical PHP Vulnerabilities and Cybersecurity Risks"
+    },
+    {
+     "t": 1562,
+     "label": "The Impact on Developers and Online Services"
+    },
+    {
+     "t": 1620,
+     "label": "Final Thoughts and More AI Releases"
+    }
+   ]
+  },
+  {
+   "id": "fC-qxqdFp4Y",
+   "title": "Hindsight — The AI Memory That Remembers You Across Sessions",
+   "published": "2026-10-21T20:30:16+00:00",
+   "updated": "2026-10-22T21:56:02+00:00",
+   "description": "Link to the Resource Vault: https://thenextnewthing.ai/Resources\n(There is also a clickable link in my bio)\n\nLink to the full video: https://www.youtube.com/watch?v=CQhWqUOouYM\n\nHindsight is an open-source AI memory system that remembers you across sessions. Plenty of memory tools are trending, and it’s hard to tell them apart, but Hindsight stands out because it’s backed by a real company, Vectorize. That matters if you build your agents or routines around a memory system: if it doesn’t keep getting updated as new models come out, you fall behind and have to switch. A company behind it means ongoing updates and better reliability and maintainability. You can fiddle with the open-source version yourself, or use the cloud service if you’d rather have it hosted and share it with your team. For anyone building with AI coding agents, that makes it an easy memory layer to rely on.\n\n#Hindsight #Vectorize #AIAgents #AIMemory #AICoding #OpenSource #AITools\n\n🔗 GitHub: https://github.com/vectorize-io/hindsight\n🔗 Website: https://hindsight.vectorize.io/",
+   "thumbnail": "https://i3.ytimg.com/vi/fC-qxqdFp4Y/hqdefault.jpg",
+   "views": 2114,
+   "ratingCount": 38,
+   "rating": 5,
+   "lengthSeconds": 53,
+   "keywords": [],
+   "category": "Science & Technology",
+   "url": "https://www.youtube.com/watch?v=fC-qxqdFp4Y",
+   "firstSeen": "2026-10-25T17:03:46.028Z",
+   "repos": [
+    {
+     "owner": "vectorize-io",
+     "repo": "hindsight",
+     "url": "https://github.com/vectorize-io/hindsight"
+    }
+   ],
+   "owners": [],
+   "links": [
+    "https://thenextnewthing.ai/Resources",
+    "https://www.youtube.com/watch?v=CQhWqUOouYM",
+    "https://hindsight.vectorize.io/"
+   ],
+   "chapters": []
+  },
+  {
+   "id": "oGSShssjn9c",
+   "title": "AI Agents Finally Share One Memory (Claude Mem Explained)",
+   "published": "2026-10-21T18:39:31+00:00",
+   "updated": "2026-10-22T21:41:39+00:00",
+   "description": "Link to Resources: https://thenextnewthing.ai/my-resources\nPresented by Zapier: https://zapier.com/\n\nWhat if Claude, ChatGPT, and GrokBot could share memories and pick up each other’s work without you having to repeat instructions? Alex Newman demonstrates Claude Mem, an open-source tool designed to connect AI agents through shared memory.\n\nAndrew Warner shows how he uses Claude Mem to bring work from Claude Code into ChatGPT, generate clear visual summaries from coding tasks, and access ideas and context from previous projects. Alex and Andrew explore how to install Claude Mem, connect different agents, keep memory local or run a self-hosted server, and reduce the manual work involved in switching between AI tools.\n\nThe bigger vision is a universal memory layer for AI agents—one that lets you use the best model for each task while keeping your projects, research, and ideas connected across tools.\n\nLinks featured:\n\n- Claude Mem: https://github.com/thedotmack/claude-mem\n- Grok Mem: https://grok-mem.ai/\n\n00:00 - Claude Mem: Share Memory Across AI Agents\n00:36 - Live Demo: Bring Claude Code Work Into ChatGPT\n01:12 - Generate Infographics From Coding Tasks\n02:06 - Connect Claude, ChatGPT, and GrokBot\n02:24 - Privacy and Security: Where Is Your Memory Stored?\n02:42 - Run Claude Mem Locally or With Your Own Server\n03:36 - Install Claude Mem and Connect Your Agents\n04:12 - Connect GrokBot to Shared Memory\n04:30 - Use the Best AI Model for Each Task\n05:15 - Eliminate Manual Handoffs Between AI Tools\n05:33 - Can AI Agents Hand Work Off to Each Other?\n05:51 - The Vision: A Universal Memory Adapter for AI Agents\n06:18 - Explore the Top 10 Trending GitHub Repositories\n\n👉 Media/Sponsorship Inquiries: https://thenextnewthing.ai/l/sponsor\n\n👉 Join us: https://thenextnewthing.ai/",
+   "thumbnail": "https://i4.ytimg.com/vi/oGSShssjn9c/hqdefault.jpg",
+   "views": 10027,
+   "ratingCount": 106,
+   "rating": 5,
+   "lengthSeconds": 387,
+   "keywords": [],
+   "category": "Science & Technology",
+   "url": "https://www.youtube.com/watch?v=oGSShssjn9c",
+   "firstSeen": "2026-10-25T17:03:46.028Z",
+   "repos": [
+    {
+     "owner": "thedotmack",
+     "repo": "claude-mem",
+     "url": "https://github.com/thedotmack/claude-mem"
+    }
+   ],
+   "owners": [],
+   "links": [
+    "https://thenextnewthing.ai/my-resources",
+    "https://zapier.com/",
+    "https://grok-mem.ai/",
+    "https://thenextnewthing.ai/l/sponsor",
+    "https://thenextnewthing.ai/"
+   ],
+   "chapters": [
+    {
+     "t": 0,
+     "label": "Claude Mem: Share Memory Across AI Agents"
+    },
+    {
+     "t": 36,
+     "label": "Live Demo: Bring Claude Code Work Into ChatGPT"
+    },
+    {
+     "t": 72,
+     "label": "Generate Infographics From Coding Tasks"
+    },
+    {
+     "t": 126,
+     "label": "Connect Claude, ChatGPT, and GrokBot"
+    },
+    {
+     "t": 144,
+     "label": "Privacy and Security: Where Is Your Memory Stored?"
+    },
+    {
+     "t": 162,
+     "label": "Run Claude Mem Locally or With Your Own Server"
+    },
+    {
+     "t": 216,
+     "label": "Install Claude Mem and Connect Your Agents"
+    },
+    {
+     "t": 252,
+     "label": "Connect GrokBot to Shared Memory"
+    },
+    {
+     "t": 270,
+     "label": "Use the Best AI Model for Each Task"
+    },
+    {
+     "t": 315,
+     "label": "Eliminate Manual Handoffs Between AI Tools"
+    },
+    {
+     "t": 333,
+     "label": "Can AI Agents Hand Work Off to Each Other?"
+    },
+    {
+     "t": 351,
+     "label": "The Vision: A Universal Memory Adapter for AI Agents"
+    },
+    {
+     "t": 378,
+     "label": "Explore the Top 10 Trending GitHub Repositories"
+    }
+   ]
+  },
+  {
+   "id": "1I7-OvFQxBk",
+   "title": "Turn Claude skills into revenue",
+   "published": "2026-10-20T22:08:00+00:00",
+   "updated": "2026-10-21T22:05:53+00:00",
+   "description": "Resources: https://thenextnewthing.ai/my-resources\n\nPresented by Zapier: https://zapier.com/\n\nJosh Pigford explains how he grew First Index to roughly $570,000 ARR in under a month using AI to automate most of the work.\n\nAndrew Warner talks with Josh Pigford about First Index, a done-for-you SEO and AEO service that helps companies improve how they appear in Google, ChatGPT, Claude, and other discovery tools. Josh explains how he turned a system he had built for his own sites into a $1,000-a-month service, signed up roughly 30 clients, and built an operation largely powered by Claude, Python, GitHub, Notion, Slack, Google Search Console, and inexpensive SEO data. The bigger lesson is how AI can let one person run a service business that would traditionally require a much larger team—while still keeping a human in the loop for judgment, quality control, and the parts clients simply want handled for them.\n\nLinks featured:\n\nFirst Index — https://firstindex.com/\n\n00:00 - $570K ARR in Under a Month: Josh Pigford turns his SEO and AEO system into a fast-growing service business.\n01:12 - The First Index Offer: Charge $1,000 a month to help companies show up in Google, ChatGPT, Claude, and other discovery tools.\n02:24 - SEO + AEO Strategy: Combine traditional SEO with AI mention tracking and daily optimization.\n03:18 - One Person + AI: Josh runs the service himself with Claude handling much of the workload.\n04:03 - Client Isolation: Keep every client in separate GitHub repos and Claude sessions to prevent context bleed.\n04:39 - Client Data: Store research, work logs, Search Console data, references, and AI visibility tracking for each customer.\n05:33 - What Actually Gets Optimized: Focus primarily on on-site improvements, content, outreach, and correcting inaccurate information.\n07:39 - Client Onboarding: Ingest websites, docs, competitors, positioning, tone, and business goals before creating content.\n08:24 - Skills + Code: Use Claude skills for repeatable workflows and Python when the process needs to be deterministic.\n09:18 - Automating Operations: Create Notion docs, request client feedback in Slack, and collect responses automatically.\n10:21 - The Tech Stack: Run the business with Slack, Notion, Claude Code, Cloudflare, Python, and a Mac Mini.\n10:57 - Daily AI Workflow: Automatically decide the highest-impact SEO or AEO task for every client multiple times a day.\n12:09 - Why Josh Built His Own Agent System: Avoid the extra complexity of general-purpose agent platforms and build only what the business needs.\n13:12 - From One Skill to a Business: See how a simple SEO skill gradually evolved into a full operating system for First Index.\n13:57 - When AI Isn’t Reliable Enough: Move fact checking, validation, testing, and other deterministic work into code.\n14:51 - FirstIndex.com: Josh explains why the website is still extremely simple while demand is already strong.\n15:36 - DataForSEO: Get programmatic SEO data for roughly $100 a week across about 30 clients instead of paying thousands.\n16:48 - The One-Person Agency Model: Build a potentially multi-million-dollar service company with one human and an AI-powered operating system.\n17:06 - The Bigger Opportunity: Use AI to make humans dramatically more productive instead of trying to remove them completely.\n18:18 - Knockoff: Apply the same model to brand-protection work and automate the labor-intensive parts of takedown requests.\n21:00 - Human-in-the-Loop Businesses: Automate almost everything while keeping a person responsible for the judgment and legally sensitive steps.\n21:27 - Sell the Outcome, Not the AI: Customers care about getting the problem solved, not which models or tools are doing the work.\n22:12 - Why It Isn’t Pure SaaS: Some services still require judgment and hands-on execution that customers don’t want to manage themselves.\n22:48 - Tracking AI Rankings: Use Notion, GitHub, and automated queries to monitor whether clients appear in LLM-generated answers.\n23:51 - Keep the Stack Simple: Josh explains why solving the problem matters more than having a perfectly engineered system.\n24:18 - Moving AI Work Into Code: Andrew explains why deterministic workflows can save money, reduce mistakes, and preserve AI usage for higher-value tasks.\n\n👉 Media/Sponsorship Inquiries: https://thenextnewthing.ai/l/sponsor\n\n👉 Join us: https://thenextnewthing.ai/",
+   "thumbnail": "https://i2.ytimg.com/vi/1I7-OvFQxBk/hqdefault.jpg",
+   "views": 25950,
+   "ratingCount": 301,
+   "rating": 5,
+   "lengthSeconds": 1520,
+   "keywords": [],
+   "category": "Science & Technology",
+   "url": "https://www.youtube.com/watch?v=1I7-OvFQxBk",
+   "firstSeen": "2026-10-25T17:03:46.028Z",
+   "repos": [],
+   "owners": [],
+   "links": [
+    "https://thenextnewthing.ai/my-resources",
+    "https://zapier.com/",
+    "https://firstindex.com/",
+    "https://thenextnewthing.ai/l/sponsor",
+    "https://thenextnewthing.ai/"
+   ],
+   "chapters": [
+    {
+     "t": 0,
+     "label": "$570K ARR in Under a Month: Josh Pigford turns his SEO and AEO system into a fast-growing service business."
+    },
+    {
+     "t": 72,
+     "label": "The First Index Offer: Charge $1,000 a month to help companies show up in Google, ChatGPT, Claude, and other discovery tools."
+    },
+    {
+     "t": 144,
+     "label": "SEO + AEO Strategy: Combine traditional SEO with AI mention tracking and daily optimization."
+    },
+    {
+     "t": 198,
+     "label": "One Person + AI: Josh runs the service himself with Claude handling much of the workload."
+    },
+    {
+     "t": 243,
+     "label": "Client Isolation: Keep every client in separate GitHub repos and Claude sessions to prevent context bleed."
+    },
+    {
+     "t": 279,
+     "label": "Client Data: Store research, work logs, Search Console data, references, and AI visibility tracking for each customer."
+    },
+    {
+     "t": 333,
+     "label": "What Actually Gets Optimized: Focus primarily on on-site improvements, content, outreach, and correcting inaccurate information."
+    },
+    {
+     "t": 459,
+     "label": "Client Onboarding: Ingest websites, docs, competitors, positioning, tone, and business goals before creating content."
+    },
+    {
+     "t": 504,
+     "label": "Skills + Code: Use Claude skills for repeatable workflows and Python when the process needs to be deterministic."
+    },
+    {
+     "t": 558,
+     "label": "Automating Operations: Create Notion docs, request client feedback in Slack, and collect responses automatically."
+    },
+    {
+     "t": 621,
+     "label": "The Tech Stack: Run the business with Slack, Notion, Claude Code, Cloudflare, Python, and a Mac Mini."
+    },
+    {
+     "t": 657,
+     "label": "Daily AI Workflow: Automatically decide the highest-impact SEO or AEO task for every client multiple times a day."
+    },
+    {
+     "t": 729,
+     "label": "Why Josh Built His Own Agent System: Avoid the extra complexity of general-purpose agent platforms and build only what the business needs."
+    },
+    {
+     "t": 792,
+     "label": "From One Skill to a Business: See how a simple SEO skill gradually evolved into a full operating system for First Index."
+    },
+    {
+     "t": 837,
+     "label": "When AI Isn’t Reliable Enough: Move fact checking, validation, testing, and other deterministic work into code."
+    },
+    {
+     "t": 891,
+     "label": "FirstIndex.com: Josh explains why the website is still extremely simple while demand is already strong."
+    },
+    {
+     "t": 936,
+     "label": "DataForSEO: Get programmatic SEO data for roughly $100 a week across about 30 clients instead of paying thousands."
+    },
+    {
+     "t": 1008,
+     "label": "The One-Person Agency Model: Build a potentially multi-million-dollar service company with one human and an AI-powered operating system."
+    },
+    {
+     "t": 1026,
+     "label": "The Bigger Opportunity: Use AI to make humans dramatically more productive instead of trying to remove them completely."
+    },
+    {
+     "t": 1098,
+     "label": "Knockoff: Apply the same model to brand-protection work and automate the labor-intensive parts of takedown requests."
+    },
+    {
+     "t": 1260,
+     "label": "Human-in-the-Loop Businesses: Automate almost everything while keeping a person responsible for the judgment and legally sensitive steps."
+    },
+    {
+     "t": 1287,
+     "label": "Sell the Outcome, Not the AI: Customers care about getting the problem solved, not which models or tools are doing the work."
+    },
+    {
+     "t": 1332,
+     "label": "Why It Isn’t Pure SaaS: Some services still require judgment and hands-on execution that customers don’t want to manage themselves."
+    },
+    {
+     "t": 1368,
+     "label": "Tracking AI Rankings: Use Notion, GitHub, and automated queries to monitor whether clients appear in LLM-generated answers."
+    },
+    {
+     "t": 1431,
+     "label": "Keep the Stack Simple: Josh explains why solving the problem matters more than having a perfectly engineered system."
+    },
+    {
+     "t": 1458,
+     "label": "Moving AI Work Into Code: Andrew explains why deterministic workflows can save money, reduce mistakes, and preserve AI usage for higher-value tasks."
+    }
+   ]
+  },
+  {
+   "id": "avZKjaaD2Zo",
+   "title": "Ghidra  — AI Agents Can Now Use the NSA’s Ghidra to Open a Vault",
+   "published": "2026-10-20T20:30:17+00:00",
+   "updated": "2026-10-23T23:06:58+00:00",
+   "description": "Link to the Resource Vault: https://thenextnewthing.ai/Resources\n(There is also a clickable link in my bio)\n\nLink to the full video: https://www.youtube.com/watch?v=kqn_mSjSWMs\n\nGhidra is the NSA’s free, open-source software reverse engineering framework, and AI agents can now drive it. In this demo, the agent installs Java, builds a small app called “the vault,” and tests it with a wrong password, which gets denied. Then it decompiles the app with Ghidra, spots a hex value in the code, prints it out, and uses it to open the vault it built. Ghidra was released to the public in 2019 and is widely used by security analysts, malware researchers, and students as a free alternative to expensive proprietary tools. Watching an agent chain these steps together on its own shows how quickly AI is changing security work.\n\nThis demo used an app the agent built itself. Only analyze software you own or have permission to test.\n\n#Ghidra #NSA #AIAgents #ReverseEngineering #CyberSecurity #OpenSource #AITools\n\n🔗 GitHub: https://github.com/nationalsecurityagency/ghidra",
+   "thumbnail": "https://i2.ytimg.com/vi/avZKjaaD2Zo/hqdefault.jpg",
+   "views": 2054,
+   "ratingCount": 24,
+   "rating": 5,
+   "lengthSeconds": 44,
+   "keywords": [],
+   "category": "Science & Technology",
+   "url": "https://www.youtube.com/watch?v=avZKjaaD2Zo",
+   "firstSeen": "2026-10-25T17:03:46.028Z",
+   "repos": [
+    {
+     "owner": "nationalsecurityagency",
+     "repo": "ghidra",
+     "url": "https://github.com/nationalsecurityagency/ghidra"
+    }
+   ],
+   "owners": [],
+   "links": [
+    "https://thenextnewthing.ai/Resources",
+    "https://www.youtube.com/watch?v=kqn_mSjSWMs"
+   ],
+   "chapters": []
+  },
+  {
+   "id": "BctbCJP9lKU",
+   "title": "REA use cases you'll love",
+   "published": "2026-10-19T23:47:32+00:00",
+   "updated": "2026-10-20T18:11:11+00:00",
+   "description": "Resources: https://thenextnewthing.ai/my-resources\nPresented by Zapier: https://zapier.com/\nAndrew Warner tests what Reverse Engineer Anything can actually do by reacting to real software-cloning demos.\n\nAndrew Warner looks at REA, or Reverse Engineer Anything, through a series of YouTube demos showing how coding agents can inspect closed-source apps, understand how features work, and rebuild or adapt them. The episode covers cloning QuickTime Player, TickTick, WhisperFlow, a video editor inspired by CapCut, and Loom, plus using REA to find bugs in your own software. Andrew also digs into the bigger question behind all of this: when does reverse engineering become a legitimate way to learn, customize, or improve software, and when does it cross the line into copying?\n\n00:00 - Reverse Engineer Anything: See how REA lets coding agents inspect closed-source software and rebuild features from it.\n01:12 - REA Setup: Install the MCP server and skill that teaches your coding agent how to investigate applications.\n01:39 - QuickTime Player Clone: Rebuild QuickTime with more granular playback speed controls and extra features.\n03:27 - How REA Works: Use tools like Ghidra, Hopper, and IDA Pro through plain-language agent commands.\n04:30 - TickTick Clone: Reverse engineer a task manager and rebuild its task lists, calendar, tags, and workflows.\n06:54 - Premium Features: See REA recreate functionality that was hidden behind TickTick’s paid plan.\n07:39 - Where the Clone Fails: Look at missing features, UI differences, and the extra prompting still needed.\n09:54 - WhisperFlow Clone: Rebuild a voice-to-text desktop app with local transcription and multilingual input.\n13:39 - Bug Testing: Use REA on your own app to uncover issues that might not be obvious from reading the code.\n16:03 - CapCut-Inspired Video Editor: Build a simpler editor with timeline controls, splitting, captions, and export.\n19:21 - Inspiration vs Copying: Andrew explores whether using an existing app as a starting point becomes legitimate once you change the product.\n19:48 - Loom Clone: Recreate Loom-style recording, movable camera bubbles, and local file storage without copying the exact UI.\n21:00 - Final Take: Andrew weighs the practical value of REA against the ethical questions around cloning software.\n\n👉 Media/Sponsorship Inquiries: https://thenextnewthing.ai/l/sponsor\n\n👉 Join us: https://thenextnewthing.ai/",
+   "thumbnail": "https://i3.ytimg.com/vi/BctbCJP9lKU/hqdefault.jpg",
+   "views": 35796,
+   "ratingCount": 484,
+   "rating": 5,
+   "lengthSeconds": 1275,
+   "keywords": [],
+   "category": "Science & Technology",
+   "url": "https://www.youtube.com/watch?v=BctbCJP9lKU",
+   "firstSeen": "2026-10-25T17:03:46.028Z",
+   "repos": [],
+   "owners": [],
+   "links": [
+    "https://thenextnewthing.ai/my-resources",
+    "https://zapier.com/",
+    "https://thenextnewthing.ai/l/sponsor",
+    "https://thenextnewthing.ai/"
+   ],
+   "chapters": [
+    {
+     "t": 0,
+     "label": "Reverse Engineer Anything: See how REA lets coding agents inspect closed-source software and rebuild features from it."
+    },
+    {
+     "t": 72,
+     "label": "REA Setup: Install the MCP server and skill that teaches your coding agent how to investigate applications."
+    },
+    {
+     "t": 99,
+     "label": "QuickTime Player Clone: Rebuild QuickTime with more granular playback speed controls and extra features."
+    },
+    {
+     "t": 207,
+     "label": "How REA Works: Use tools like Ghidra, Hopper, and IDA Pro through plain-language agent commands."
+    },
+    {
+     "t": 270,
+     "label": "TickTick Clone: Reverse engineer a task manager and rebuild its task lists, calendar, tags, and workflows."
+    },
+    {
+     "t": 414,
+     "label": "Premium Features: See REA recreate functionality that was hidden behind TickTick’s paid plan."
+    },
+    {
+     "t": 459,
+     "label": "Where the Clone Fails: Look at missing features, UI differences, and the extra prompting still needed."
+    },
+    {
+     "t": 594,
+     "label": "WhisperFlow Clone: Rebuild a voice-to-text desktop app with local transcription and multilingual input."
+    },
+    {
+     "t": 819,
+     "label": "Bug Testing: Use REA on your own app to uncover issues that might not be obvious from reading the code."
+    },
+    {
+     "t": 963,
+     "label": "CapCut-Inspired Video Editor: Build a simpler editor with timeline controls, splitting, captions, and export."
+    },
+    {
+     "t": 1161,
+     "label": "Inspiration vs Copying: Andrew explores whether using an existing app as a starting point becomes legitimate once you change the product."
+    },
+    {
+     "t": 1188,
+     "label": "Loom Clone: Recreate Loom-style recording, movable camera bubbles, and local file storage without copying the exact UI."
+    },
+    {
+     "t": 1260,
+     "label": "Final Take: Andrew weighs the practical value of REA against the ethical questions around cloning software."
+    }
+   ]
+  },
+  {
+   "id": "BL3UQPoPG7Y",
+   "title": "AnyPS5  — This AI Rewrites a PS5 Game to Run on Your PC",
+   "published": "2026-10-19T20:30:16+00:00",
+   "updated": "2026-10-23T03:02:31+00:00",
+   "description": "Link to the Resource Vault: https://thenextnewthing.ai/Resources\n(There is also a clickable link in my bio)\n\nLink to the full video: https://www.youtube.com/watch?v=Wsru44p-J14\n\nAnyPS5 is an open-source tool that uses AI to read a PS5 game’s files and convert them into a version that runs natively on Windows or Linux. It isn’t an emulator, which is what makes it different, and it’s taking off even though it only works with one game so far. The big catch is that PS5 games are encrypted on the disc, so the tool can’t work on just any new release. The community is already debating whether this is a glimpse of where AI porting is headed or whether it will get taken down quickly, since Sony’s lawyers are almost certainly paying attention.\n\nThis video is for information only, so please respect copyright and only use software and games you have the legal right to use.\n\n#AnyPS5 #PS5 #AI #OpenSource #GitHub #Gaming #AITools\n\n🔗 GitHub: https://github.com/boykopovar/AnyPS5\n🔗 Website: https://boykopovar.github.io/AnyPS5/",
+   "thumbnail": "https://i3.ytimg.com/vi/BL3UQPoPG7Y/hqdefault.jpg",
+   "views": 9726,
+   "ratingCount": 84,
+   "rating": 5,
+   "lengthSeconds": 58,
+   "keywords": [],
+   "category": "Science & Technology",
+   "url": "https://www.youtube.com/watch?v=BL3UQPoPG7Y",
+   "firstSeen": "2026-10-25T17:03:46.028Z",
+   "repos": [
+    {
+     "owner": "boykopovar",
+     "repo": "AnyPS5",
+     "url": "https://github.com/boykopovar/AnyPS5"
+    }
+   ],
+   "owners": [],
+   "links": [
+    "https://thenextnewthing.ai/Resources",
+    "https://www.youtube.com/watch?v=Wsru44p-J14",
+    "https://boykopovar.github.io/AnyPS5/"
+   ],
+   "chapters": []
+  },
+  {
+   "id": "U4k67VOKaEU",
+   "title": "First look: How agents manage WordPress",
+   "published": "2026-10-18T15:00:20+00:00",
+   "updated": "2026-10-19T14:23:14+00:00",
+   "description": "Link to Resources: https://thenextnewthing.ai/my-resources\nPresented by Zapier: https://zapier.com/\nWordPress is becoming agent-first. In this live demo, Andrew Warner and WPVibe founder John Turner show how AI agents like Claude can build, edit, and manage WordPress websites using simple prompts.\n\nDiscover how WPVibe lets you create landing pages, add countdown timers and exit popups, build membership courses, and customize your website without manually handling the code. John also explains how agents can connect WPVibe with other tools through MCP, including Google Analytics and Zapier, to build more powerful workflows.\n\nAndrew explores why WordPress’s open-source infrastructure and extensive plugin ecosystem still matter in the age of AI, how you can keep control of your website, and why you may not need to rebuild everything from scratch. Plus, learn about WPVibe’s free plan, which includes up to 100 tool calls per day, and its offer of 15% off a year of any paid plan.\n\n**Links featured:**\n\n- WPVibe: https://wpvibe.ai\n- https://wordpress.org/plugins/vibe-ai/\n- Zapier: https://zapier.com/\n\n00:00 - WPVibe: Make WordPress Agent-First\n00:36 - Live Demo: Build and Edit a WordPress Website\n00:54 - Claude: Turn a Static Header Into a Video Background\n01:21 - Browser vs. Terminal: Making AI Accessible\n01:39 - Connect WPVibe to Claude and ChatGPT\n02:15 - MCP Setup: Connect Other AI Agents\n02:39 - Build a Landing Page From a Simple Prompt\n03:36 - Landing Page Review: What AI Creates\n04:03 - Improve the Page With Iterative Prompts\n04:57 - Add a Countdown Timer and Fix Layout Issues\n05:33 - Create a More Effective Landing Page\n06:00 - Exit Popups: Add a 10% Discount Offer\n06:45 - Zapier: Connect Popups to Email Marketing\n07:12 - Build a Membership Website With WordPress\n07:39 - Create a Membership Course With AI\n08:24 - Review the Course Structure and Content\n09:09 - Test Membership Access and Enrollment\n10:12 - Edit Website Pages With Simple Prompts\n10:30 - Why Use WordPress Instead of Vibe Coding?\n11:24 - The Value of WordPress Plugins and Infrastructure\n12:09 - Customize WordPress With AI-Generated Code\n12:45 - Connect Analytics to Improve Landing Pages\n13:30 - Let Different AI Agents Work Together\n13:57 - Do You Still Own Your Website Without WPVibe?\n14:24 - SaaS Subscriptions and Ongoing Website Maintenance\n15:09 - WPVibe Pricing: Free Access and 15% Off\n15:36 - Build a Website With AI in Just Two Hours\n\nMedia/Sponsorship Inquiries: https://thenextnewthing.ai/l/sponsor\n\n👉 Join us: https://thenextnewthing.ai/",
+   "thumbnail": "https://i2.ytimg.com/vi/U4k67VOKaEU/hqdefault.jpg",
+   "views": 9284,
+   "ratingCount": 115,
+   "rating": 5,
+   "lengthSeconds": 981,
+   "keywords": [],
+   "category": "Science & Technology",
+   "url": "https://www.youtube.com/watch?v=U4k67VOKaEU",
+   "firstSeen": "2026-10-25T17:03:46.028Z",
+   "repos": [],
+   "owners": [],
+   "links": [
+    "https://thenextnewthing.ai/my-resources",
+    "https://zapier.com/",
+    "https://wpvibe.ai",
+    "https://wordpress.org/plugins/vibe-ai/",
+    "https://thenextnewthing.ai/l/sponsor",
+    "https://thenextnewthing.ai/"
+   ],
+   "chapters": [
+    {
+     "t": 0,
+     "label": "WPVibe: Make WordPress Agent-First"
+    },
+    {
+     "t": 36,
+     "label": "Live Demo: Build and Edit a WordPress Website"
+    },
+    {
+     "t": 54,
+     "label": "Claude: Turn a Static Header Into a Video Background"
+    },
+    {
+     "t": 81,
+     "label": "Browser vs. Terminal: Making AI Accessible"
+    },
+    {
+     "t": 99,
+     "label": "Connect WPVibe to Claude and ChatGPT"
+    },
+    {
+     "t": 135,
+     "label": "MCP Setup: Connect Other AI Agents"
+    },
+    {
+     "t": 159,
+     "label": "Build a Landing Page From a Simple Prompt"
+    },
+    {
+     "t": 216,
+     "label": "Landing Page Review: What AI Creates"
+    },
+    {
+     "t": 243,
+     "label": "Improve the Page With Iterative Prompts"
+    },
+    {
+     "t": 297,
+     "label": "Add a Countdown Timer and Fix Layout Issues"
+    },
+    {
+     "t": 333,
+     "label": "Create a More Effective Landing Page"
+    },
+    {
+     "t": 360,
+     "label": "Exit Popups: Add a 10% Discount Offer"
+    },
+    {
+     "t": 405,
+     "label": "Zapier: Connect Popups to Email Marketing"
+    },
+    {
+     "t": 432,
+     "label": "Build a Membership Website With WordPress"
+    },
+    {
+     "t": 459,
+     "label": "Create a Membership Course With AI"
+    },
+    {
+     "t": 504,
+     "label": "Review the Course Structure and Content"
+    },
+    {
+     "t": 549,
+     "label": "Test Membership Access and Enrollment"
+    },
+    {
+     "t": 612,
+     "label": "Edit Website Pages With Simple Prompts"
+    },
+    {
+     "t": 630,
+     "label": "Why Use WordPress Instead of Vibe Coding?"
+    },
+    {
+     "t": 684,
+     "label": "The Value of WordPress Plugins and Infrastructure"
+    },
+    {
+     "t": 729,
+     "label": "Customize WordPress With AI-Generated Code"
+    },
+    {
+     "t": 765,
+     "label": "Connect Analytics to Improve Landing Pages"
+    },
+    {
+     "t": 810,
+     "label": "Let Different AI Agents Work Together"
+    },
+    {
+     "t": 837,
+     "label": "Do You Still Own Your Website Without WPVibe?"
+    },
+    {
+     "t": 864,
+     "label": "SaaS Subscriptions and Ongoing Website Maintenance"
+    },
+    {
+     "t": 909,
+     "label": "WPVibe Pricing: Free Access and 15% Off"
+    },
+    {
+     "t": 936,
+     "label": "Build a Website With AI in Just Two Hours"
+    }
+   ]
+  },
+  {
+   "id": "0SDz3rjZBC4",
+   "title": "Amazon and others want to block your agents.",
+   "published": "2026-10-17T17:00:09+00:00",
+   "updated": "2026-10-21T03:09:32+00:00",
+   "description": "After his agent ran into problems shopping on Amazon Mexico, Andrew explored alternative ways to keep it working. In this episode, he demonstrates each tool, explains how to get started, and compares running a browser on your own computer with using a hosted service.\n\nAndrew shares three tools he’s tested to help AI agents access websites that block them: Camoufox, Browserbase, and AgentWeb.\n\nYou’ll see what worked, what stopped working, and the tradeoffs around cost, passwords, and computer resources. Andrew also explains why he keeps multiple options ready when a site blocks one approach.\n\nLinks featured:\n• Camoufox: https://github.com/daijro/camoufox\n• Browserbase: https://www.browserbase.com/\n• AgentWeb: https://useagentweb.com\n\n00:00 - Opening: Why websites are blocking AI agents\n02:49 - Camoufox: Run an open-source browser on your computer\n03:22 - Browserbase: Give your agent a cloud browser\n04:29 - AgentWeb: Connect your agent to supported websites\n\nMedia/Sponsorship Inquiries: https://thenextnewthing.ai/l/sponsor\n\n👉 Join us: https://thenextnewthing.ai/",
+   "thumbnail": "https://i1.ytimg.com/vi/0SDz3rjZBC4/hqdefault.jpg",
+   "views": 7730,
+   "ratingCount": 106,
+   "rating": 5,
+   "lengthSeconds": 519,
+   "keywords": [],
+   "category": "Science & Technology",
+   "url": "https://www.youtube.com/watch?v=0SDz3rjZBC4",
+   "firstSeen": "2026-10-25T17:03:46.028Z",
+   "repos": [
+    {
+     "owner": "daijro",
+     "repo": "camoufox",
+     "url": "https://github.com/daijro/camoufox"
+    }
+   ],
+   "owners": [],
+   "links": [
+    "https://www.browserbase.com/",
+    "https://useagentweb.com",
+    "https://thenextnewthing.ai/l/sponsor",
+    "https://thenextnewthing.ai/"
+   ],
+   "chapters": [
+    {
+     "t": 0,
+     "label": "Opening: Why websites are blocking AI agents"
+    },
+    {
+     "t": 169,
+     "label": "Camoufox: Run an open-source browser on your computer"
+    },
+    {
+     "t": 202,
+     "label": "Browserbase: Give your agent a cloud browser"
+    },
+    {
+     "t": 269,
+     "label": "AgentWeb: Connect your agent to supported websites"
+    }
+   ]
+  },
+  {
+   "id": "kqn_mSjSWMs",
+   "title": "GitHub’s top: Copy any app, create gorgeous videos, 3d print anything & more",
+   "published": "2026-10-16T22:21:02+00:00",
+   "updated": "2026-10-19T14:10:59+00:00",
+   "description": "Resources: https://thenextnewthing.ai/l/github-repos-oct16\nPresented by Zapier: https://zapier.com/\nAndrew Warner and Adam explore AI tools that copy apps, reverse-engineer software, create videos and diagrams, and build custom apps and 3D designs.\n\nAndrew Warner and Adam break down this week’s top GitHub repos, including REA for reverse engineering apps, Matt Pocock’s developer skills, Hyperframes for AI-generated videos, and Ghidra, the NSA’s decompiler. They also explore tools for creating branded diagrams, extending AI coding sessions with compressed context, generating 3D-printable designs with Text to CAD, improving SwiftUI development, and tracking workouts with an open-source gym app. The big takeaway: AI agents are making powerful developer tools more accessible, while specialized tools still offer greater control, better workflows, and more customization.\n\nRepos featured:\n\n1. rea: https://github.com/morluto/rea\n2. AnyPS5: https://github.com/boykopovar/AnyPS5\n3. Skills by Matt Pocock: https://github.com/mattpocock/skills\n4. HyperFrames: https://github.com/heygen-com/hyperframes\n5. Diagram Design: https://github.com/cathrynlavery/diagram-design\n6. Ghidra: https://github.com/NationalSecurityAgency/ghidra\n7. Billion Context: https://github.com/ranxianglei/billion-context\n8. Text to CAD: https://github.com/earthtojake/text-to-cad\n9. SwiftUI Agent Skill: https://github.com/twostraws/SwiftUI-Agent-Skill\n10. openGym: https://github.com/DuarteSantos8/openGym\n\nTimestamps:\n\n00:00 - Top GitHub Repos: Apps, AI Videos & Diagrams\n00:21 - REA: Copy Apps with AI Agents\n03:27 - REA Demo: Rebuilding the 2048 Game\n05:11 - PS5 Game Files: Reverse Engineering Without an Emulator\n06:29 - Matt Pocock's Skills: Better AI Coding with TDD\n09:32 - Why Developers Use Battle-Tested Skills\n09:42 - Zapier: Supporting AI Builders\n10:10 - Hyperframes: Turn Webpages into Videos\n11:41 - Hyperframes Demo: Generate a YouTube Short\n12:46 - Branded Diagrams: Create Clean, Custom Visuals\n14:40 - Ghidra: The NSA's Decompiler Meets AI Agents\n16:07 - REA + Ghidra: Making Reverse Engineering Easier\n17:00 - Billion Context: Extend AI Coding Sessions\n18:15 - Why Compressed AI Context Can Lose Details\n20:31 - Text to CAD: Generate 3D-Printable Designs\n21:46 - AI + 3D Printing: Build and Refine Products\n23:09 - SwiftUI Agent Skill: Give AI Better Documentation\n24:18 - Gym Tracker You Own: An Open-Source Fitness App\n25:04 - Why Open-Source Apps Can Beat Ad-Driven Alternatives\n26:04 - The Goal: 100,000 Subscribers\n\n👉 Media/Sponsorship Inquiries: https://thenextnewthing.ai/l/sponsor\n\n👉 Join us: https://thenextnewthing.ai/",
+   "thumbnail": "https://i4.ytimg.com/vi/kqn_mSjSWMs/hqdefault.jpg",
+   "views": 75436,
+   "ratingCount": 926,
+   "rating": 5,
+   "lengthSeconds": 1603,
+   "keywords": [],
+   "category": "Science & Technology",
+   "url": "https://www.youtube.com/watch?v=kqn_mSjSWMs",
+   "firstSeen": "2026-10-25T17:03:46.028Z",
+   "repos": [
+    {
+     "owner": "morluto",
+     "repo": "rea",
+     "url": "https://github.com/morluto/rea"
+    },
+    {
+     "owner": "boykopovar",
+     "repo": "AnyPS5",
+     "url": "https://github.com/boykopovar/AnyPS5"
+    },
+    {
+     "owner": "mattpocock",
+     "repo": "skills",
+     "url": "https://github.com/mattpocock/skills"
+    },
+    {
+     "owner": "heygen-com",
+     "repo": "hyperframes",
+     "url": "https://github.com/heygen-com/hyperframes"
+    },
+    {
+     "owner": "cathrynlavery",
+     "repo": "diagram-design",
+     "url": "https://github.com/cathrynlavery/diagram-design"
+    },
+    {
+     "owner": "NationalSecurityAgency",
+     "repo": "ghidra",
+     "url": "https://github.com/NationalSecurityAgency/ghidra"
+    },
+    {
+     "owner": "ranxianglei",
+     "repo": "billion-context",
+     "url": "https://github.com/ranxianglei/billion-context"
+    },
+    {
+     "owner": "earthtojake",
+     "repo": "text-to-cad",
+     "url": "https://github.com/earthtojake/text-to-cad"
+    },
+    {
+     "owner": "twostraws",
+     "repo": "SwiftUI-Agent-Skill",
+     "url": "https://github.com/twostraws/SwiftUI-Agent-Skill"
+    },
+    {
+     "owner": "DuarteSantos8",
+     "repo": "openGym",
+     "url": "https://github.com/DuarteSantos8/openGym"
+    }
+   ],
+   "owners": [],
+   "links": [
+    "https://thenextnewthing.ai/l/github-repos-oct16",
+    "https://zapier.com/",
+    "https://thenextnewthing.ai/l/sponsor",
+    "https://thenextnewthing.ai/"
+   ],
+   "chapters": [
+    {
+     "t": 0,
+     "label": "Top GitHub Repos: Apps, AI Videos & Diagrams"
+    },
+    {
+     "t": 21,
+     "label": "REA: Copy Apps with AI Agents"
+    },
+    {
+     "t": 207,
+     "label": "REA Demo: Rebuilding the 2048 Game"
+    },
+    {
+     "t": 311,
+     "label": "PS5 Game Files: Reverse Engineering Without an Emulator"
+    },
+    {
+     "t": 389,
+     "label": "Matt Pocock's Skills: Better AI Coding with TDD"
+    },
+    {
+     "t": 572,
+     "label": "Why Developers Use Battle-Tested Skills"
+    },
+    {
+     "t": 582,
+     "label": "Zapier: Supporting AI Builders"
+    },
+    {
+     "t": 610,
+     "label": "Hyperframes: Turn Webpages into Videos"
+    },
+    {
+     "t": 701,
+     "label": "Hyperframes Demo: Generate a YouTube Short"
+    },
+    {
+     "t": 766,
+     "label": "Branded Diagrams: Create Clean, Custom Visuals"
+    },
+    {
+     "t": 880,
+     "label": "Ghidra: The NSA's Decompiler Meets AI Agents"
+    },
+    {
+     "t": 967,
+     "label": "REA + Ghidra: Making Reverse Engineering Easier"
+    },
+    {
+     "t": 1020,
+     "label": "Billion Context: Extend AI Coding Sessions"
+    },
+    {
+     "t": 1095,
+     "label": "Why Compressed AI Context Can Lose Details"
+    },
+    {
+     "t": 1231,
+     "label": "Text to CAD: Generate 3D-Printable Designs"
+    },
+    {
+     "t": 1306,
+     "label": "AI + 3D Printing: Build and Refine Products"
+    },
+    {
+     "t": 1389,
+     "label": "SwiftUI Agent Skill: Give AI Better Documentation"
+    },
+    {
+     "t": 1458,
+     "label": "Gym Tracker You Own: An Open-Source Fitness App"
+    },
+    {
+     "t": 1504,
+     "label": "Why Open-Source Apps Can Beat Ad-Driven Alternatives"
+    },
+    {
+     "t": 1564,
+     "label": "The Goal: 100,000 Subscribers"
+    }
+   ]
+  },
+  {
+   "id": "AiZ4HWBlLow",
+   "title": "Copy any software (free), clone viral videos, and more",
+   "published": "2026-10-15T20:15:35+00:00",
+   "updated": "2026-10-16T17:30:22+00:00",
+   "description": "https://thenextnewthing.ai/l/corey-ganim-shownotes-oct15\nPresented by Zapier: https://zapier.com/\nAndrew Warner and Corey Ganim explore five AI-powered business opportunities, from reverse-engineering software for free to getting products discovered through AI agents and cloning viral video formats.\n\nIn this episode, discover REA (Reverse Engineer Anything), a tool that lets you recreate software products and customize your own versions. Andrew and Corey discuss Grok Bot’s new connector marketplace and how businesses can turn their workflows into plugins that AI agents can discover and use. They also explore Agent Use Cases, the new Grok Voice 3.0 model, and Hypit, which helps recreate viral video formats. Finally, they break down how 1 Million Pixels is reportedly generating $37,000 in revenue in just five days—and what this says about the business opportunities emerging from simple ideas and AI-powered distribution.\n\nLinks featured:\n\n- Reverse Engineer Anything (REA): https://rea.tools/\n- Demo video: https://www.youtube.com/watch?v=FnB9tHKBJXQ\n- Grok Bot Plugin Marketplace: https://x.ai/bot/marketplace/submit-a-plugin\n- Discussion by Shub Gaur: https://x.com/shubgaur/status/2110436619895570567\n- Agent Use Cases: https://agentusecases.ai/\n- Alex Finn’s post: https://x.com/AlexFinn/status/2110082377552888312\n- Hypit: https://hypit.ai/\n- Alex Prompter’s post: https://x.com/alex_prompter/status/2110630504819241137\n- 1 Million Pixels: https://1milllionpixels.com/\n- MakerThrive’s post: https://x.com/MakerThrive/status/2092776507018006976\n- Zapier: https://zapier.com/\n\n00:00 - Five AI Launches and Business Opportunities\n00:18 - REA: Reverse Engineer Almost Any Software\n00:52 - Clone Existing Apps and Rebuild Expensive Tools\n01:54 - Grok Bot: A New Connector Marketplace\n02:51 - Turn Your Product Into an AI Agent Plugin\n03:39 - Automate AI Assessments With Connectors\n04:20 - Agent Use Cases: Find Ideas for AI Agents\n05:03 - Can AI Use-Case Marketplaces Become Businesses?\n06:32 - Grok Voice 3.0: The Future of AI Receptionists\n07:48 - Hypit: Recreate Viral Videos With AI\n08:45 - Why Short-Form AI Videos Can Drive More Views\n09:50 - 1 Million Pixels: A Surprisingly Profitable Idea\n10:24 - How a Pixel Advertising Site Made $37,000 in Five Days\n11:04 - Why Simple Business Ideas Can Work\n11:45 - Is This a Real Business or a Short-Term Cash Grab?\n12:34 - What AI Means for New Business Opportunities\n\nMedia/Sponsorship Inquiries: https://thenextnewthing.ai/l/sponsor\n\n👉 Join us: https://thenextnewthing.ai/",
+   "thumbnail": "https://i2.ytimg.com/vi/AiZ4HWBlLow/hqdefault.jpg",
+   "views": 23406,
+   "ratingCount": 413,
+   "rating": 5,
+   "lengthSeconds": 776,
+   "keywords": [],
+   "category": "Science & Technology",
+   "url": "https://www.youtube.com/watch?v=AiZ4HWBlLow",
+   "firstSeen": "2026-10-25T17:03:46.028Z",
+   "repos": [],
+   "owners": [],
+   "links": [
+    "https://thenextnewthing.ai/l/corey-ganim-shownotes-oct15",
+    "https://zapier.com/",
+    "https://rea.tools/",
+    "https://www.youtube.com/watch?v=FnB9tHKBJXQ",
+    "https://x.ai/bot/marketplace/submit-a-plugin",
+    "https://x.com/shubgaur/status/2110436619895570567",
+    "https://agentusecases.ai/",
+    "https://x.com/AlexFinn/status/2110082377552888312",
+    "https://hypit.ai/",
+    "https://x.com/alex_prompter/status/2110630504819241137",
+    "https://1milllionpixels.com/",
+    "https://x.com/MakerThrive/status/2092776507018006976",
+    "https://thenextnewthing.ai/l/sponsor",
+    "https://thenextnewthing.ai/"
+   ],
+   "chapters": [
+    {
+     "t": 0,
+     "label": "Five AI Launches and Business Opportunities"
+    },
+    {
+     "t": 18,
+     "label": "REA: Reverse Engineer Almost Any Software"
+    },
+    {
+     "t": 52,
+     "label": "Clone Existing Apps and Rebuild Expensive Tools"
+    },
+    {
+     "t": 114,
+     "label": "Grok Bot: A New Connector Marketplace"
+    },
+    {
+     "t": 171,
+     "label": "Turn Your Product Into an AI Agent Plugin"
+    },
+    {
+     "t": 219,
+     "label": "Automate AI Assessments With Connectors"
+    },
+    {
+     "t": 260,
+     "label": "Agent Use Cases: Find Ideas for AI Agents"
+    },
+    {
+     "t": 303,
+     "label": "Can AI Use-Case Marketplaces Become Businesses?"
+    },
+    {
+     "t": 392,
+     "label": "Grok Voice 3.0: The Future of AI Receptionists"
+    },
+    {
+     "t": 468,
+     "label": "Hypit: Recreate Viral Videos With AI"
+    },
+    {
+     "t": 525,
+     "label": "Why Short-Form AI Videos Can Drive More Views"
+    },
+    {
+     "t": 590,
+     "label": "1 Million Pixels: A Surprisingly Profitable Idea"
+    },
+    {
+     "t": 624,
+     "label": "How a Pixel Advertising Site Made $37,000 in Five Days"
+    },
+    {
+     "t": 664,
+     "label": "Why Simple Business Ideas Can Work"
+    },
+    {
+     "t": 705,
+     "label": "Is This a Real Business or a Short-Term Cash Grab?"
+    },
+    {
+     "t": 754,
+     "label": "What AI Means for New Business Opportunities"
+    }
+   ]
+  },
+  {
+   "id": "grh6GjYLyyI",
+   "title": "Financial Services — Anthropic Built 10 AI Finance Agents That Do the Grunt Work",
+   "published": "2026-10-14T20:30:03+00:00",
+   "updated": "2026-10-18T00:37:46+00:00",
+   "description": "Link to the Resource Vault: https://thenextnewthing.ai/Resources\n(There is also a clickable link in my bio)\n\nLink to the full video: https://www.youtube.com/watch?v=hlOk-EFUITQ\n\nFinancial Services from Anthropic is a repo of 10 finance agents that handle the grunt work, a bit like having your own financial company analyzing stocks for you. At first it looks built for banks, with things like KYC screening that most of us will never need. But Anthropic has also released legal skills along the same lines, and one lawyer is using them to run his firm and shave hours off his week, enough free time to study to be a sommelier. For beginners, the skills work straight off the shelf. For professionals, they’re easy to customize to very specific demands, so you get both a higher floor and a superpower version.\n\n#Anthropic #Claude #AIAgents #Finance #FinTech #OpenSource #AITools\n\n🔗 GitHub: https://github.com/anthropics/financial-services\n🔗 Website: https://claude.com/solutions/financial-services",
+   "thumbnail": "https://i4.ytimg.com/vi/grh6GjYLyyI/hqdefault.jpg",
+   "views": 1496,
+   "ratingCount": 36,
+   "rating": 5,
+   "lengthSeconds": 84,
+   "keywords": [],
+   "category": "Science & Technology",
+   "url": "https://www.youtube.com/watch?v=grh6GjYLyyI",
+   "firstSeen": "2026-10-25T17:03:46.028Z",
+   "repos": [
+    {
+     "owner": "anthropics",
+     "repo": "financial-services",
+     "url": "https://github.com/anthropics/financial-services"
+    }
+   ],
+   "owners": [],
+   "links": [
+    "https://thenextnewthing.ai/Resources",
+    "https://www.youtube.com/watch?v=hlOk-EFUITQ",
+    "https://claude.com/solutions/financial-services"
+   ],
+   "chapters": []
+  }
+ ]
+}

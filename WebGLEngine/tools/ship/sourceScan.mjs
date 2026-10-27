@@ -282,32 +282,65 @@ export function codeLines(src, re) {
  * for is TEXT the code contains (an event name, a URL, a route); use codeOnly when it is an IDIOM.
  */
 export function noComments(src) {
-    let out = "", i = 0, mode = null;
-    while (i < src.length) {
+    // v4896 -- THE SAME ANSWER WITHOUT LOOKING BACK, FOR noComments AS v4814 DID FOR codeOnly. This kept `out` built with += and asked regexAllowedHere(out) at every `/`,
+    // which indexes into `out` and so makes V8 flatten everything emitted so far: 632 ms on main.js (3.7 MB) against codeOnly's 80 ms on the same file, and the wasmDoors census
+    // reads main.js through it. The three facts regexAllowedHere needs -- the last non-whitespace character emitted and the identifier run ending there -- are tracked as the text is
+    // emitted (the same note() as codeOnly), the text is kept in chunks and joined once, and plain code and string interiors go out as runs. PROVEN, not argued: sourceScan-selfcheck
+    // section 11 keeps the look-back algorithm as the reference and compares byte for byte on fixtures and a slice of the tree; at the change it agreed on every .js/.mjs/.cjs/.html file.
+    const parts = [], n = src.length;
+    let i = 0, mode = null, last = -1, inWord = false, word = "";
+    const note = (t) => {
+        let j = t.length - 1;
+        while (j >= 0 && isWs(t.charCodeAt(j), t[j])) j--;
+        if (j < 0) { if (t.length) inWord = false; return; }
+        const code = t.charCodeAt(j);
+        last = code;
+        if (isIdent(code)) {
+            let k = j;
+            while (k >= 0 && isIdent(t.charCodeAt(k))) k--;
+            const run = t.slice(k + 1, j + 1);
+            word = k < 0 && inWord ? word + run : run;
+        } else word = "";
+        inWord = j === t.length - 1 && isIdent(code);
+    };
+    const emit = (t) => { parts.push(t); note(t); };
+    const allowed = () => {
+        if (last < 0) return true;
+        if (isIdent(last)) return /^[0-9]/.test(word) ? false : REGEX_ALLOWED_KEYWORDS.has(word);
+        if (last === 41 || last === 93) return false;     // ")" "]"
+        if (last === 60) return false;                     // "<" -- see regexAllowedHere
+        return true;
+    };
+    while (i < n) {
         const c = src[i], d = src[i + 1];
         if (mode === null) {
             if (c === "/" && d === "/") { mode = "line"; i += 2; continue; }
             if (c === "/" && d === "*") { mode = "block"; i += 2; continue; }
             // v4846: a template is kept whole, verbatim as before, to its true end (see templateEnd)
-            if (c === "`") { const e = templateEnd(src, i); out += src.slice(i, e); i = e; continue; }
-            if (c === "'" || c === '"') { mode = c; out += c; i++; continue; }
-            if (c === "/" && regexAllowedHere(out)) {
+            if (c === "`") { const e = templateEnd(src, i); emit(src.slice(i, e)); i = e; continue; }
+            if (c === "'" || c === '"') { mode = c; emit(c); i++; continue; }
+            if (c === "/" && allowed()) {
                 const r = regexBody(src, i);
                 // KEPT VERBATIM, unlike codeOnly: this function only strips comments, never content -- a
                 // regex literal's pattern is TEXT the code contains, the same reasoning that keeps string
                 // contents here (v3052, in this function's own docstring below).
-                if (r) { out += src.slice(i, r.end); i = r.end; continue; }
+                if (r) { emit(src.slice(i, r.end)); i = r.end; continue; }
             }
-            out += c; i++; continue;
+            // a run of plain code up to the next character that could change mode (a lone "/" that is neither comment nor regex goes out with its run)
+            let j = i + 1;
+            while (j < n) { const k = src.charCodeAt(j); if (k === 47 || k === 39 || k === 34 || k === 96) break; j++; }
+            emit(src.slice(i, j)); i = j; continue;
         }
-        if (mode === "line") { if (c === "\n") { mode = null; out += "\n"; } i++; continue; }
-        if (mode === "block") { if (c === "*" && d === "/") { mode = null; i += 2; continue; } if (c === "\n") out += "\n"; i++; continue; }
-        out += c;
-        if (c === "\\") { out += src[i + 1] || ""; i += 2; continue; }
-        if (c === mode) mode = null;
-        i++;
+        if (mode === "line") { if (c === "\n") { mode = null; emit("\n"); } i++; continue; }
+        if (mode === "block") { if (c === "*" && d === "/") { mode = null; i += 2; continue; } if (c === "\n") emit("\n"); i++; continue; }
+        // inside a string literal: kept as written, a backslash taking the character after it, up to the closing quote
+        if (c === "\\") { emit("\\" + (src[i + 1] || "")); i += 2; continue; }
+        if (c === mode) { emit(c); mode = null; i++; continue; }
+        let j = i + 1;
+        while (j < n) { const k = src[j]; if (k === mode || k === "\\") break; j++; }
+        emit(src.slice(i, j)); i = j;
     }
-    return out;
+    return parts.join("");
 }
 
 /**

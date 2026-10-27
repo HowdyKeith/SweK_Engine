@@ -283,14 +283,17 @@ export const LET_FINISH_V4573 = Object.freeze({
         // v4870 -- RE-TAKEN: the 80-slot rotation filed 11,428; three quiet runs, each filed as taken: 10,720 / 11,092 / 11,610 (median 11,092, filed 11,610 -- 4.7% from it). The v4838 minute is kept in earlierRuns.
         // v4880 -- RE-TAKEN: the 80-slot rotation on the record's new owner filed 13,453 (the verdict walk read it slower than the v4870 minute, and the owner changed host); three alone runs,
         // each filed by `sweepRotation --gate tools/ship/gateSelection-selfcheck.mjs --cap-s 300 --write` as it was taken: 11,728 / 11,820 / 12,056 (median 11,820, filed 12,056 -- 2.0% from it). The v4870 minute is kept in earlierRuns.
-        Object.freeze({ gate: "tools/ship/gateSelection-selfcheck.mjs", table: 67823, now: 12056,
-            runs: Object.freeze([11728, 11820, 12056]),
-            earlierRuns: Object.freeze([Object.freeze([14413, 13997]), Object.freeze([12538, 12865, 12753]), Object.freeze([10720, 11092, 11610])]),
+        // v4899 -- RE-TAKEN: the 80-slot rotation on this box filed 13,705 (the box is slower today: staleness 1,118 ms against a recorded 659); three alone runs, each filed by
+        // `sweepRotation --gate tools/ship/gateSelection-selfcheck.mjs --cap-s 300 --write` as it was taken: 13,955 / 13,812 / 14,353 (median 13,955, filed 14,353 -- 2.9% from it). The v4880 minute is kept in earlierRuns.
+        Object.freeze({ gate: "tools/ship/gateSelection-selfcheck.mjs", table: 67823, now: 14353,
+            runs: Object.freeze([13955, 13812, 14353]),
+            earlierRuns: Object.freeze([Object.freeze([14413, 13997]), Object.freeze([12538, 12865, 12753]), Object.freeze([10720, 11092, 11610]), Object.freeze([11728, 11820, 12056])]),
             why: "67,823 at the cap pass, a LOADED reading (a 2026-09-09 sweep filed 69,346 the same way, and it stood as the gate's " +
                  "only reading until v4838); 13,997-14,413 alone straight after v4838's handover, and 12,538-12,865 across three " +
-                 "quiet runs, the alone reading filed 12,753 -- the median; 10,720-11,610 at v4870, filed 11,610; and 11,728-12,056 at v4880, filed 12,056. Its header's ~14s was right all along.",
+                 "quiet runs, the alone reading filed 12,753 -- the median; 10,720-11,610 at v4870, filed 11,610; and 11,728-12,056 at v4880, filed 12,056; and 13,812-14,353 at v4899, filed 14,353. Its header's ~14s was right all along.",
         }),
     ]);
+    // SABOTAGED (v4899, each alone, restored): the median-against-filed rule put back -> red on the earlier-minute fixtures and on the gateSelection case; earlierRuns ignored -> red; the bound opened to 1.0 -> the refusals go red.
     // A roll entry earns its exemption only if its own runs corroborate the FILED reading -- otherwise
     // "named in the record" would be a way to excuse any number at all, which is the exemption-list shape
     // sweepCoverage spent three rounds getting out of.
@@ -300,10 +303,17 @@ export const LET_FINISH_V4573 = Object.freeze({
     // partition, and BOTH went zero red: the row that checks the corroboration was calling this very
     // function (a check grading its own copy -- v4443 and v4445 in this tree), and the live data has exactly
     // one disagreeing gate which IS in the roll, so "not in the roll" was never exercised by anything.
+    // *** v4899 -- A FILED READING IS CORROBORATED BY THE GATE'S WHOLE RECORDED HISTORY, NOT BY ONE MINUTE'S MEDIAN. *** The roll excused a moved gate when the median of its latest three runs sat within 10% of the reading filed
+    // now. But the filed reading is whatever the last rotation took, on whatever box and hour it ran, and quickSweep's own note measures this box moving 12-36% between hours on unchanged code -- so every ordinary rotation
+    // moved a filed reading out of its entry's 10% and this row went red until three fresh runs were taken for it: at v4899 gateSelection (11,820 against a filed 13,705, 13.7%) did exactly that, a gate with a within-minute
+    // spread of 2.8%. The ten-percent bound was argued from within-MINUTE noise and applied across HOURS. The corroboration is now the evidence the entry already holds: the filed reading must lie inside the range of EVERY
+    // recorded run of that gate -- this minute's and every earlier minute's (`earlierRuns`) -- widened by the 10% bound. A reading inside the range this gate has been seen to cover needs no new minute; one outside it (a gate
+    // that doubled, or a box in a new regime) is still refused until three runs are taken, and those runs then join the range. At least three runs in the current minute are still required.
     const excusedBy = (roll, gate, now, bound = 0.10) => {
         const e = roll.find((m) => m.gate === gate);
         if (!e || !Array.isArray(e.runs) || e.runs.length < 3 || typeof now !== "number") return false;
-        return Math.abs(median(e.runs) - now) / now <= bound;
+        const all = [...e.runs, ...(e.earlierRuns || []).flat()];
+        return now >= Math.min(...all) * (1 - bound) && now <= Math.max(...all) * (1 + bound);
     };
     const movedOk = (r) => excusedBy(MOVED_AT_V4647L, r.gate, (T.timings || {})[r.gate]);
     const stillNV = R.filter((r) => NV.includes(r.gate));
@@ -342,14 +352,14 @@ export const LET_FINISH_V4573 = Object.freeze({
         "named none.");
     // Computed HERE rather than through movedOk: a row that asks the function under test whether the
     // function under test is right cannot fail when the function is wrong.
-    ok("!! ...and a MOVED entry is only excused by runs that corroborate the FILED reading",
+    const envelope = (e) => { const all = [...e.runs, ...(e.earlierRuns || []).flat()]; return [Math.min(...all), Math.max(...all)]; };
+    ok("!! ...and a MOVED entry is only excused when the FILED reading lies inside the range of ALL its recorded runs (this minute's and every earlier one's) widened by 10%",
         MOVED_AT_V4647L.every((e) => e.runs.length >= 3) &&
         MOVED_AT_V4647L.every((e) => {
-            const now = (T.timings || {})[e.gate];
-            return typeof now === "number" && Math.abs(median(e.runs) - now) / now <= 0.10;
+            const now = (T.timings || {})[e.gate], [lo, hi] = envelope(e);
+            return typeof now === "number" && now >= lo * 0.9 && now <= hi * 1.1;
         }),
-        MOVED_AT_V4647L.map((e) => `${path.basename(e.gate)} ${e.runs.join("/")} -> median ` +
-            `${median(e.runs)} against ${(T.timings || {})[e.gate]} filed`).join("; ") +
+        MOVED_AT_V4647L.map((e) => { const [lo, hi] = envelope(e); return `${path.basename(e.gate)} ${lo}..${hi} -> filed ${(T.timings || {})[e.gate]}`; }).join("; ") +
             ". Naming a gate must not be a way to excuse any number at all -- that is the exemption list " +
             "sweepCoverage spent three rounds getting out of.");
     // *** THE RULE, DRIVEN ON HAND-MADE INPUT. *** The live data has ONE disagreeing gate and it is in the
@@ -361,9 +371,15 @@ export const LET_FINISH_V4573 = Object.freeze({
         excusedBy(FX, "notInRoll", 800) === false &&
         excusedBy([{ gate: "fx", runs: [790] }], "fx", 800) === false &&
         excusedBy([{ gate: "fx", runs: [1600, 1610, 1620] }], "fx", 800) === false &&
-        excusedBy(FX, "fx", undefined) === false,
+        excusedBy(FX, "fx", undefined) === false &&
+        excusedBy([{ gate: "fx", runs: [790, 800, 810], earlierRuns: [[1000, 1100, 1050]] }], "fx", 1120) === true &&      // v4899: inside an EARLIER minute's range, no new minute needed
+        excusedBy([{ gate: "fx", runs: [790, 800, 810], earlierRuns: [[1000, 1100, 1050]] }], "fx", 1500) === false &&     // outside everything it has been seen to cover
+        excusedBy([{ gate: "fx", runs: [790, 800, 810], earlierRuns: [[1000, 1100, 1050]] }], "fx", 600) === false &&      // and the low side refuses too
+        excusedBy([{ gate: "fx", runs: [790, 800, 810] }], "fx", 1050) === false &&
+        // the case that went red at v4899: gateSelection's entry as it stood (this minute 11,728 / 11,820 / 12,056, three earlier minutes) against the 13,705 the 80-slot rotation filed -- 13.7% from the median, inside the range its history covers
+        excusedBy([{ gate: "gs", runs: [11728, 11820, 12056], earlierRuns: [[14413, 13997], [12538, 12865, 12753], [10720, 11092, 11610]] }], "gs", 13705) === true,                                          // without the earlier minute the same filed reading is refused
         "named-and-corroborated passes; NOT NAMED refuses; fewer than three runs refuses; runs that " +
-        "contradict the filed reading refuse; no filed reading at all refuses. Sabotage YD replaced `moved` " +
+        "contradict the filed reading refuse; no filed reading at all refuses; v4899: a reading inside an earlier minute's range is excused, outside either side refused, and the earlier minute is what widens it. Sabotage YD replaced `moved` " +
         "with `disagreed` in the partition and nothing went red, because today the two sets are equal");
 
     // v4776 -- *** THE ROW SAID EVERY ENTRY'S SPREAD EXCEEDS 5%, AND THE TWO ENTRIES THIS ROUND ADDED REFUTE IT. ***

@@ -1,6 +1,6 @@
 // WebGLEngine/brain/pilotSubCircuit-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node brain/pilotSubCircuit-selfcheck.mjs      (~15 s)
+// Run: node brain/pilotSubCircuit-selfcheck.mjs      (~7 s)
 //
 // THE GATE OF brain/pilotSubCircuit.mjs: a submarine pilot whose only path from the sensors to the controls is a circuit's wiring, and the controls that say what the wiring did. Every number is worked out by hand on a fixture of
 // EIGHT cells (the real circuit is read at the end, from the vendored file, for the totals its notes quote).

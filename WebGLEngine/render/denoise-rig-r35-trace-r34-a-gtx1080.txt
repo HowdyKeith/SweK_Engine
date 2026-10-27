@@ -1,0 +1,148 @@
+0.430 s  pid 20580  native: the ladder starts, sets r12,r15,r18t,r18u,r27w
+0.431 s  pid 20580  native 64x64: requestAdapter
+0.433 s  pid 20580  native 64x64: requestDevice for r12,r15,r18t,r18u,r27w
+0.473 s  pid 20580  native 64x64: build r12
+0.598 s  pid 20580  native 64x64: build r15
+2.086 s  pid 20580  native 64x64: build r18t
+4.054 s  pid 20580  native 64x64: build r18u
+7.452 s  pid 20580  native 64x64: build r27w
+8.739 s  pid 20580  native 64x64: round 0 time r12
+8.836 s  pid 20580  native 64x64: round 0 time r15
+8.850 s  pid 20580  native 64x64: round 0 time r18t
+8.865 s  pid 20580  native 64x64: round 0 time r18u
+8.882 s  pid 20580  native 64x64: round 0 time r27w
+8.900 s  pid 20580  native 64x64: round 1 time r27w
+8.918 s  pid 20580  native 64x64: round 1 time r18u
+8.932 s  pid 20580  native 64x64: round 1 time r18t
+8.948 s  pid 20580  native 64x64: round 1 time r15
+8.959 s  pid 20580  native 64x64: round 1 time r12
+9.025 s  pid 20580  native 64x64: round 2 time r12
+9.093 s  pid 20580  native 64x64: round 2 time r15
+9.103 s  pid 20580  native 64x64: round 2 time r18t
+9.115 s  pid 20580  native 64x64: round 2 time r18u
+9.126 s  pid 20580  native 64x64: round 2 time r27w
+9.139 s  pid 20580  native 64x64: output check r12
+9.146 s  pid 20580  native 64x64: output check r15
+9.148 s  pid 20580  native 64x64: output check r18t
+9.151 s  pid 20580  native 64x64: output check r18u
+9.157 s  pid 20580  native 64x64: output check r27w
+9.195 s  pid 20580  native 64x64: destroy the denoisers
+9.196 s  pid 20580  native 64x64: destroy the device
+9.209 s  pid 20580  native 128x128: requestAdapter
+9.210 s  pid 20580  native 128x128: requestDevice for r12,r15,r18t,r18u,r27w
+9.255 s  pid 20580  native 128x128: build r12
+9.355 s  pid 20580  native 128x128: build r15
+10.677 s  pid 20580  native 128x128: build r18t
+12.159 s  pid 20580  native 128x128: build r18u
+15.597 s  pid 20580  native 128x128: build r27w
+16.859 s  pid 20580  native 128x128: round 0 time r12
+16.969 s  pid 20580  native 128x128: round 0 time r15
+16.984 s  pid 20580  native 128x128: round 0 time r18t
+17.021 s  pid 20580  native 128x128: round 0 time r18u
+17.039 s  pid 20580  native 128x128: round 0 time r27w
+17.066 s  pid 20580  native 128x128: round 1 time r27w
+17.095 s  pid 20580  native 128x128: round 1 time r18u
+17.113 s  pid 20580  native 128x128: round 1 time r18t
+17.129 s  pid 20580  native 128x128: round 1 time r15
+17.144 s  pid 20580  native 128x128: round 1 time r12
+17.249 s  pid 20580  native 128x128: round 2 time r12
+17.355 s  pid 20580  native 128x128: round 2 time r15
+17.369 s  pid 20580  native 128x128: round 2 time r18t
+17.384 s  pid 20580  native 128x128: round 2 time r18u
+17.401 s  pid 20580  native 128x128: round 2 time r27w
+17.429 s  pid 20580  native 128x128: destroy the denoisers
+17.430 s  pid 20580  native 128x128: destroy the device
+17.443 s  pid 20580  native 256x256: requestAdapter
+17.444 s  pid 20580  native 256x256: requestDevice for r12,r15,r18t,r18u,r27w
+17.502 s  pid 20580  native 256x256: build r12
+17.655 s  pid 20580  native 256x256: build r15
+18.986 s  pid 20580  native 256x256: build r18t
+20.479 s  pid 20580  native 256x256: build r18u
+23.785 s  pid 20580  native 256x256: build r27w
+25.056 s  pid 20580  native 256x256: round 0 time r12
+25.667 s  pid 20580  native 256x256: round 0 time r15
+25.706 s  pid 20580  native 256x256: round 0 time r18t
+25.743 s  pid 20580  native 256x256: round 0 time r18u
+25.796 s  pid 20580  native 256x256: round 0 time r27w
+25.922 s  pid 20580  native 256x256: round 1 time r27w
+26.020 s  pid 20580  native 256x256: round 1 time r18u
+26.071 s  pid 20580  native 256x256: round 1 time r18t
+26.108 s  pid 20580  native 256x256: round 1 time r15
+26.145 s  pid 20580  native 256x256: round 1 time r12
+26.730 s  pid 20580  native 256x256: round 2 time r12
+27.345 s  pid 20580  native 256x256: round 2 time r15
+27.383 s  pid 20580  native 256x256: round 2 time r18t
+27.418 s  pid 20580  native 256x256: round 2 time r18u
+27.471 s  pid 20580  native 256x256: round 2 time r27w
+27.566 s  pid 20580  native 256x256: destroy the denoisers
+27.567 s  pid 20580  native 256x256: destroy the device
+27.583 s  pid 20580  native 512x512: requestAdapter
+27.584 s  pid 20580  native 512x512: requestDevice for r12,r15,r18t,r18u,r27w
+27.659 s  pid 20580  native 512x512: build r12
+27.807 s  pid 20580  native 512x512: build r15
+29.123 s  pid 20580  native 512x512: build r18t
+30.597 s  pid 20580  native 512x512: build r18u
+33.963 s  pid 20580  native 512x512: build r27w
+35.256 s  pid 20580  native 512x512: round 0 time r12
+36.072 s  pid 20580  native 512x512: round 0 time r15
+36.203 s  pid 20580  native 512x512: round 0 time r18t
+36.345 s  pid 20580  native 512x512: round 0 time r18u
+36.565 s  pid 20580  native 512x512: round 0 time r27w
+36.946 s  pid 20580  native 512x512: round 1 time r27w
+37.328 s  pid 20580  native 512x512: round 1 time r18u
+37.546 s  pid 20580  native 512x512: round 1 time r18t
+37.670 s  pid 20580  native 512x512: round 1 time r15
+37.800 s  pid 20580  native 512x512: round 1 time r12
+38.784 s  pid 20580  native 512x512: round 2 time r12
+39.753 s  pid 20580  native 512x512: round 2 time r15
+39.917 s  pid 20580  native 512x512: round 2 time r18t
+40.040 s  pid 20580  native 512x512: round 2 time r18u
+40.236 s  pid 20580  native 512x512: round 2 time r27w
+40.614 s  pid 20580  native 512x512: destroy the denoisers
+40.615 s  pid 20580  native 512x512: destroy the device
+40.636 s  pid 20580  native 1024x1024: requestAdapter
+40.637 s  pid 20580  native 1024x1024: requestDevice for r12,r15,r18t,r18u,r27w
+40.762 s  pid 20580  native 1024x1024: build r12
+40.936 s  pid 20580  native 1024x1024: build r15
+42.286 s  pid 20580  native 1024x1024: build r18t
+43.810 s  pid 20580  native 1024x1024: build r18u
+47.244 s  pid 20580  native 1024x1024: build r27w
+48.530 s  pid 20580  native 1024x1024: round 0 time r12
+49.951 s  pid 20580  native 1024x1024: round 0 time r15
+50.463 s  pid 20580  native 1024x1024: round 0 time r18t
+50.941 s  pid 20580  native 1024x1024: round 0 time r18u
+51.621 s  pid 20580  native 1024x1024: round 0 time r27w
+52.436 s  pid 20580  native 1024x1024: round 1 time r27w
+53.154 s  pid 20580  native 1024x1024: round 1 time r18u
+53.849 s  pid 20580  native 1024x1024: round 1 time r18t
+54.337 s  pid 20580  native 1024x1024: round 1 time r15
+54.842 s  pid 20580  native 1024x1024: round 1 time r12
+56.230 s  pid 20580  native 1024x1024: round 2 time r12
+57.640 s  pid 20580  native 1024x1024: round 2 time r15
+58.143 s  pid 20580  native 1024x1024: round 2 time r18t
+58.621 s  pid 20580  native 1024x1024: round 2 time r18u
+59.288 s  pid 20580  native 1024x1024: round 2 time r27w
+60.103 s  pid 20580  native 1024x1024: destroy the denoisers
+60.104 s  pid 20580  native 1024x1024: destroy the device
+60.141 s  pid 20580  native 1920x1080: requestAdapter
+60.142 s  pid 20580  native 1920x1080: requestDevice for r12,r15,r18t,r18u,r27w
+60.457 s  pid 20580  native 1920x1080: build r12
+60.648 s  pid 20580  native 1920x1080: build r15
+62.050 s  pid 20580  native 1920x1080: build r18t
+63.628 s  pid 20580  native 1920x1080: build r18u
+67.140 s  pid 20580  native 1920x1080: build r27w
+68.853 s  pid 20580  native 1920x1080: round 0 time r12
+72.966 s  pid 20580  native 1920x1080: round 0 time r15
+73.738 s  pid 20580  native 1920x1080: round 0 time r18t
+74.493 s  pid 20580  native 1920x1080: round 0 time r18u
+75.343 s  pid 20580  native 1920x1080: round 0 time r27w
+106.393 s  pid 20580  native 1920x1080: round 1 time r27w
+136.740 s  pid 20580  native 1920x1080: round 1 time r18u
+137.554 s  pid 20580  native 1920x1080: round 1 time r18t
+138.335 s  pid 20580  native 1920x1080: round 1 time r15
+139.116 s  pid 20580  native 1920x1080: round 1 time r12
+143.055 s  pid 20580  native 1920x1080: round 2 time r12
+147.002 s  pid 20580  native 1920x1080: round 2 time r15
+147.781 s  pid 20580  native 1920x1080: round 2 time r18t
+148.517 s  pid 20580  native 1920x1080: round 2 time r18u
+149.396 s  pid 20580  native 1920x1080: round 2 time r27w

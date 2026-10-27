@@ -46,16 +46,22 @@ export const headOf = (net) => (net.layers[net.layers.length - 1].Cout === KERNE
  */
 export const SHAPE_KERNEL_LARGE = Object.freeze([Object.freeze([CHANNELS, 32, "relu"]), Object.freeze([32, 32, "relu"]), Object.freeze([32, 32, "relu"]),
                                                  Object.freeze([32, 32, "relu"]), Object.freeze([32, KERNEL_TAPS, "none", 1])]);
-export const SIZES = Object.freeze(["small", "large"]);
+/**
+ * Section 116's narrower kernel network (round 47, denoise-smaller-network): the large network's four 3 x 3 layers and its
+ * 9 x 9 field, at 16 channels instead of 32 -- about a quarter of the hidden layers' arithmetic. 9,793 parameters with the mask.
+ */
+export const SHAPE_KERNEL_W16 = Object.freeze([Object.freeze([CHANNELS, 16, "relu"]), Object.freeze([16, 16, "relu"]), Object.freeze([16, 16, "relu"]),
+                                               Object.freeze([16, 16, "relu"]), Object.freeze([16, KERNEL_TAPS, "none", 1])]);
+export const SIZES = Object.freeze(["small", "large", "w16"]);
 
 /**
  * The shape for a head, an input width and a size: the first layer takes `cin` channels (9, the mask's 10, or the
- * temporal round's 13). "large" exists for the kernel head only.
+ * temporal round's 13). "large" and "w16" exist for the kernel head only.
  */
 export function shapeFor(head, cin = CHANNELS, size = "small") {
     if (!SIZES.includes(size)) throw new Error(`denoiseNet: size "${size}" is not one of ${SIZES.join(", ")}`);
-    if (size === "large" && head !== "kernel") throw new Error("denoiseNet: the large network is a kernel-predicting network");
-    const base = size === "large" ? SHAPE_KERNEL_LARGE : head === "kernel" ? SHAPE_KERNEL : SHAPE;
+    if (size !== "small" && head !== "kernel") throw new Error(`denoiseNet: the ${size} network is a kernel-predicting network`);
+    const base = size === "large" ? SHAPE_KERNEL_LARGE : size === "w16" ? SHAPE_KERNEL_W16 : head === "kernel" ? SHAPE_KERNEL : SHAPE;
     return cin === CHANNELS ? base : Object.freeze([Object.freeze([cin, ...base[0].slice(1)]), ...base.slice(1)]);
 }
 function initDenoiser(rand, init, head = "residual", cin = CHANNELS, size = "small") {

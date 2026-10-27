@@ -98,8 +98,8 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SELF = fileURLToPath(import.meta.url);
 const imp = (p) => import(pathToFileURL(path.join(ENG, p)).href);
-const { TIMING_SIZES, largestBuffer, passBytes, timingInput, summarize, adapterOf, timingLadder, decodeNet, KERNEL_SETS, TIMED_SETS, FXC_UNBUILT_SETS, FXC_UNTRIED_SETS, nativeSetsFor,
-        isDxcCompiler, nativeAdapterKey } = await imp("render/denoiseDevice.mjs");
+const { TIMING_SIZES, largestBuffer, passBytes, timingInput, summarize, adapterOf, timingLadder, decodeNet, KERNEL_SETS, TIMED_SETS, SUBGROUP_SETS, SET_FEATURES, FXC_UNBUILT_SETS, FXC_UNTRIED_SETS, nativeSetsFor,
+        isDxcCompiler, nativeAdapterKey, SET_CAP_MS, capSkip } = await imp("render/denoiseDevice.mjs");
 const { dawnFlags } = await imp("render/denoiseCompile.mjs");
 const H = await imp("tools/ship/headlessGpu.mjs");
 const { runInEngineOrigin } = await imp("tools/ship/webgpuHarness.mjs");
@@ -133,7 +133,18 @@ const FXC_SETS = Object.freeze(["r12", "r15"]), FXC_FLAGS = dawnFlags(["disable-
 const FXC_CHILD = process.argv.includes("--fxc-ladder"), RESULT = process.argv.includes("--result") ? process.argv[process.argv.indexOf("--result") + 1] : null;
 
 // what any ladder must be, wherever it ran: returns the rows that were measured
-function holds(label, r) {
+// SABOTAGED round 45 (section 114), each restored byte-identical: M1 SET_CAP_MS at 2000, 2 red; M2 timingLadder reading capMs for
+// every set, 1 red (the mini ladder's row); M3 the cap row reading CAP for every set went 0 RED as first written -- on SwiftShader no
+// set has a cap of its own -- so the lookup is capOfSet with a row over section 111's r41h, and M3 redone turned that row red; M4 the
+// cap given to r18u as well, 2 red
+// round 45: the cap a set's skips are judged by -- its own (SET_CAP_MS) where it has one, the ladder's CAP otherwise; and the cap
+// row's test, apart, so a fixture can hold both (on SwiftShader no set has a cap of its own, so a live ladder cannot)
+const capOfSet = (set, caps = SET_CAP_MS) => (set && Object.hasOwn(caps, set) ? caps[set] : CAP);
+const capRowHolds = (rows, cap) => { let last = null, capped = true;
+    for (const x of rows) { if (!x.skipped) { last = x; continue; } if (/cap/.test(x.reason)) capped &&= !!last && last.elapsed.median * (x.H * x.W) / (last.H * last.W) > cap && x.reason.endsWith(`over the ${cap} ms cap`); }
+    return capped; };
+function holds(label, r, set = null) {
+    const capOf = capOfSet(set);
     const done = r ? r.rows.filter((x) => !x.skipped) : [];
     ok(`!! ${label}: the first size, ${TIMING_SIZES[0].join(" x ")}, measured; every time finite and positive; every skip says why`,
         !!r && done.length >= 1 && !r.rows[0].skipped && done.every((x) => [...x.raw.wall, ...(x.raw.gpu || [])].every((v) => Number.isFinite(v) && v > 0)) &&
@@ -150,12 +161,7 @@ function holds(label, r) {
         !!r && done.every((x) => x.timestamps === r.adapter.timestamps), `the adapter ${r?.adapter?.timestamps ? "offers" : "does not offer"} them`);
     ok(`!! ${label}: timing changes nothing -- the image a timed pass wrote is an untimed run's, bit for bit`, !!r && r.invisible === true);
     // a size is skipped by the cap only when the last measured pass, scaled by pixels, really predicts past it
-    let last = null, capped = true;
-    for (const x of r ? r.rows : []) {
-        if (!x.skipped) { last = x; continue; }
-        if (/cap/.test(x.reason)) capped &&= !!last && last.elapsed.median * (x.H * x.W) / (last.H * last.W) > CAP;
-    }
-    ok(`  ${label}: and the cap skips only the sizes the last measured pass predicts past ${CAP} ms`, capped);
+    ok(`  ${label}: and the cap skips only the sizes the last measured pass predicts past ${capOf} ms, its own cap`, capRowHolds(r ? r.rows : [], capOf));
     return done;
 }
 // the conv layers' multiply-adds a pixel, for a GFLOP/s figure beside each measured size (section 38's arithmetic)
@@ -210,11 +216,46 @@ function report(label, r) {
         });
         if (vs.length) REPORT.table(`${label}: r27w against r15 and each round-18 set -- that set's median over r27w's (section 83)`, ["against", "W", "H", "x as fast", "clock"], vs);
     }
+    // round 40 (section 108): r40s against r15 and each round-18 set at every size both measured -- r18t's ratio is what section 108's rule reads
+    if (r.rows.r40s && r.rows.r40s.some((x) => !x.skipped)) {
+        const vs = [];
+        for (const A of r.sets.filter((s) => s === "r15" || /^r18/.test(s))) r.rows.r40s.forEach((b, i) => {
+            const a = r.rows[A][i];
+            if (a.skipped || b.skipped) return;
+            say(vsSetLine(label, "r40s", A, b, a, "section 108"));
+            vs.push([A, b.W, b.H, a.gpu && b.gpu ? a.gpu.median / b.gpu.median : a.wall.median / b.wall.median, a.gpu && b.gpu ? "device" : "wall"]);
+        });
+        if (vs.length) REPORT.table(`${label}: r40s against r15 and each round-18 set -- that set's median over r40s's (section 108)`, ["against", "W", "H", "x as fast", "clock"], vs);
+    } else if (r.rows.r40s) say(`${label}: r40s stands aside -- ${(r.rows.r40s[0] || {}).reason || "not measured"} (section 108)`);
+    // round 41 (section 109): r41h against r18u (the Intel's present entry, the ratio section 109's rule reads) and r15, at every size both measured
+    if (r.rows.r41h && r.rows.r41h.some((x) => !x.skipped)) {
+        const vs = [];
+        for (const A of r.sets.filter((s) => s === "r15" || s === "r18u")) r.rows.r41h.forEach((b, i) => {
+            const a = r.rows[A][i];
+            if (a.skipped || b.skipped) return;
+            say(vsSetLine(label, "r41h", A, b, a, "section 109"));
+            vs.push([A, b.W, b.H, a.gpu && b.gpu ? a.gpu.median / b.gpu.median : a.wall.median / b.wall.median, a.gpu && b.gpu ? "device" : "wall"]);
+        });
+        if (vs.length) REPORT.table(`${label}: r41h against r15 and r18u -- that set's median over r41h's (section 109)`, ["against", "W", "H", "x as fast", "clock"], vs);
+    } else if (r.rows.r41h) say(`${label}: r41h stands aside -- ${(r.rows.r41h[0] || {}).reason || "not measured"}`);
+    // round 57 (section 129): r57p against r18u (the kernel it is built on, H57's ratio on the Intel) and r18t (the 1080's entry,
+    // H57b's), at every size both measured
+    if (r.rows.r57p && r.rows.r57p.some((x) => !x.skipped)) {
+        const vs = [];
+        for (const A of r.sets.filter((s) => s === "r18u" || s === "r18t")) r.rows.r57p.forEach((b, i) => {
+            const a = r.rows[A][i];
+            if (a.skipped || b.skipped) return;
+            say(vsSetLine(label, "r57p", A, b, a, "section 129"));
+            vs.push([A, b.W, b.H, a.gpu && b.gpu ? a.gpu.median / b.gpu.median : a.wall.median / b.wall.median, a.gpu && b.gpu ? "device" : "wall"]);
+        });
+        if (vs.length) REPORT.table(`${label}: r57p against r18u and r18t -- that set's median over r57p's (section 129)`, ["against", "W", "H", "x as fast", "clock"], vs);
+    } else if (r.rows.r57p) say(`${label}: r57p stands aside -- ${(r.rows.r57p[0] || {}).reason || "not measured"} (section 129)`);
 }
 // v4868 -- round 27 (section 83): set B's row `b` against set A's row `a` at one size: A's median over B's, on the device's clock where both have one
-function vsSetLine(label, B, A, b, a) {
+// round 40: tagged by the section whose rule reads it -- section 83's for r27w, section 108's for r40s
+function vsSetLine(label, B, A, b, a, section = "section 83") {
     const dev = !!(a.gpu && b.gpu), ratio = dev ? a.gpu.median / b.gpu.median : a.wall.median / b.wall.median;
-    return `${label}: ${B} against ${A} at ${b.W} x ${b.H}: ${ratio.toFixed(3)} x as fast, on the ${dev ? "device's clock" : "wall clock"} -- section 83`;
+    return `${label}: ${B} against ${A} at ${b.W} x ${b.H}: ${ratio.toFixed(3)} x as fast, on the ${dev ? "device's clock" : "wall clock"} -- ${section}`;
 }
 // Round 19 (section 66): the rule an "rXX against r15" line is read by -- the page's, section 61's; a native ladder's, section 66's
 const r15Section = (label) => (/^native\b/.test(label) ? "section 66" : "section 61");
@@ -238,21 +279,29 @@ function vsFxc(dxc, fxc, B) {
 }
 // what a PAIRED ladder must be, wherever it ran (section 39): both sets, each held as a ladder, taking turns in the stated
 // order on one device, different kernels, and a speedup that is the ratio of the two medians on the clock it names
-function pairedHolds(label, r, want = KERNEL_SETS) {
-    for (const s of want) holds(`${label} ${s}`, r ? { adapter: r.adapter, rows: r.rows[s], invisible: r.invisible[s] } : null);
+function pairedHolds(label, r, wantAll = KERNEL_SETS) {
+    // round 40 (section 108): a set the adapter's features cannot build stood aside at every size, by name -- it is held to that, then
+    // left out of the rows that ask every set to have measured
+    // round 41: any set whose feature (SET_FEATURES) the adapter lacked -- r40s's subgroups, r41h's shader-f16
+    const aside = r ? wantAll.filter((s) => Object.hasOwn(SET_FEATURES, s) && r.rows[s] && r.rows[s].every((x) => x.skipped && x.reason === `the adapter has no ${SET_FEATURES[s]} feature, which this set's kernel needs (${s === "r41h" ? "section 109" : "section 108"})`)) : [];
+    for (const s of aside) console.log(`  SKIP  ${label} ${s}: ${r.rows[s][0].reason}`);
+    const want = wantAll.filter((s) => !aside.includes(s));
+    for (const s of want) holds(`${label} ${s}`, r ? { adapter: r.adapter, rows: r.rows[s], invisible: r.invisible[s] } : null, s);
     const A = want[0], others = want.slice(1);
     const turns = [...want, ...[...want].reverse(), ...want].join();
     // the sizes every set measured: there the sets took turns on one device, in the stated order
     const all = r ? r.rows[A].map((a, i) => want.map((s) => r.rows[s][i])).filter((xs) => xs.every((x) => !x.skipped)) : [];
     ok(`!! ${label}: every set (${want.join(", ")}) measured at the first size, on one device, taking turns -- ${turns.replace(/,/g, " ")} -- each set's passes pooled across the rounds`,
-        !!r && r.sets.join() === want.join() && all.length >= 1 && want.every((s) => !r.rows[s][0].skipped) &&
+        !!r && r.sets.join() === wantAll.join() && all.length >= 1 && want.every((s) => !r.rows[s][0].skipped) &&
         // one shared turn order (compared by value: the page's ladder arrives as JSON)
         all.every((xs) => xs.every((x) => x.order.join() === turns && x.wall.n >= 3)),
         all.length ? `${all.length} size(s) with every set; ${all[0].map((x) => x.wall.n).join(", ")} passes at the first` : "none with every set");
     // what each set's layers run on, read off the pass names the ladder printed
     const kinds = { r12: "tiled,tiled,tiled,tiled,direct|apply", r13: "fast,fast,fast,fast,fast|apply", r14: "fast,fast,fast,fast,head|apply_fast",
                     r15: "fast,fast,fast,fast,head_apply|head_apply", r18t: "tile_inline,tile_inline,tile_inline,tile_inline,head_apply|head_apply",
-                    r18u: "fast_unroll,fast_unroll,fast_unroll,fast_unroll,head_apply|head_apply", r27w: "wino,wino,wino,wino,head_apply|head_apply" };
+                    r18u: "fast_unroll,fast_unroll,fast_unroll,fast_unroll,head_apply|head_apply", r27w: "wino,wino,wino,wino,head_apply|head_apply",
+                    r40s: "fast,sub,sub,sub,head_apply|head_apply", r41h: "fast_unroll_h,fast_unroll_h,fast_unroll_h,fast_unroll_h,head_apply|head_apply",
+                    r57p: "fast_unroll_p,fast_unroll_p,fast_unroll_p,fast_unroll_p,head_apply|head_apply" };
     // the apply is the sixth pass, or -- r15, whose head and kernel are one pass -- the fifth's
     const kindOf = (x) => x.passes.slice(0, 5).map((n) => /\((\w+),/.exec(n)[1]).join() + "|" + (x.passes[5] ? /\((\w+)\)$/.exec(x.passes[5])[1] : /\((\w+),/.exec(x.passes[4])[1]);
     ok(`  ${label}: and they are different kernels -- ${want.map((s) => `${s} ${kinds[s]}`).join("; ")}`,
@@ -310,7 +359,7 @@ async function nativeLadder(W, { fxc = false, totalMs, onPlan = () => {} }) {
     trace(`native${fxc ? " FXC" : ""}: the ladder starts, sets ${plan.sets.join(",")}`);
     const r = await timingLadder(net, () => gpu.requestAdapter(), { sets: plan.sets, ...LADDER, totalMs, trace: (l) => trace(`native${fxc ? " FXC" : ""} ${l}`) });
     trace(`native${fxc ? " FXC" : ""}: the ladder returned`);
-    return { plan, r };
+    return { plan, r, gpu };
 }
 // the FXC ladder, from the gate: this file again in a child (spawnSync, stopped at FXC_CHILD_MS), its ladder back through a file --
 // on Windows a pipe can lose the last line a process writes (section 45; render/denoiseCompile-selfcheck.mjs's children)
@@ -347,6 +396,31 @@ console.log("1. THE LADDER'S ARITHMETIC");
         TIMING_SIZES[0].join() === "64,64" && TIMING_SIZES.at(-1).join() === "1920,1080" && TIMING_SIZES.every((z, i) => !i || z[0] * z[1] > TIMING_SIZES[i - 1][0] * TIMING_SIZES[i - 1][1]));
     ok("  a pass's largest buffer is the head's 81 logits a pixel: 672 MB at 1080p, what a device's storage limit is checked against",
         largestBuffer(net, 1080, 1920) === 1920 * 1080 * 81 * 4 && largestBuffer(net, 64, 64) === 64 * 64 * 81 * 4);
+    // ROUND 45 (section 114): r41h's own cap, so its 1920 x 1080 pass runs where section 111's predicted 2192-2485 ms; every
+    // other set keeps the ladder's. capSkip is the ladder's own skip (timingLadder calls it), so these rows are its arithmetic
+    // ROUND 52 (section 122): section 121's traces -- the Intel reset inside r41h's ~2.4 s 1080p pass -- put the table back to empty;
+    // the mechanism stays, held below on a fixture table, and no entry may ever lift a set's cap above the ladder's
+    ok("!! round 52: SET_CAP_MS is empty and frozen -- no set's cap is above the ladder's 1500 ms, since a pass near 2 s meets Windows' GPU timeout (section 121) -- and r41h takes the ladder's cap",
+        JSON.stringify(SET_CAP_MS) === "{}" && Object.isFrozen(SET_CAP_MS) && Object.values(SET_CAP_MS).every((v) => v <= CAP) && capOfSet("r41h") === CAP,
+        JSON.stringify(SET_CAP_MS));
+    {
+        // the cap row's own judgement, on section 111's r41h: a 1080p pass predicted at 2373 ms is skipped rightly by the ladder's 1500
+        // ms cap and wrongly by r41h's own 4000 -- so the row must judge r41h by 4000, and r18u by 1500 (M3 went 0 red before this)
+        const fx = (reason) => [{ W: 1024, H: 1024, skipped: false, elapsed: { median: 1200 } }, { W: 1920, H: 1080, skipped: true, reason }];
+        const old = fx(`predicted 2373 ms a pass, over the ${CAP} ms cap`);
+        const F = Object.freeze({ r41h: 4000 });   // round 45's table, now a fixture (section 122)
+        ok("  round 45: the cap row judges each set by its own cap -- on round 45's table, r41h by 4000 ms, so section 111's skip at a predicted 2373 ms is wrong for it and right for r18u at 1500",
+            capOfSet("r41h", F) === 4000 && capOfSet("r18u", F) === CAP && capOfSet(null, F) === CAP &&
+            capRowHolds(old, capOfSet("r18u", F)) === true && capRowHolds(old, capOfSet("r41h", F)) === false && capRowHolds(fx("predicted 4351 ms a pass, over the 4000 ms cap").map((x, i) => (i ? x : { ...x, elapsed: { median: 2200 } })), capOfSet("r41h", F)) === true,
+            `r41h ${capOfSet("r41h", F)} ms, r18u ${capOfSet("r18u", F)} ms`);
+        const last = { ms: 1200, px: 1024 * 1024 }, at1080 = 1920 * 1080;   // 1200 ms at 1024 x 1024 predicts about 2373 at 1080p, section 111's r41h
+        const r41 = capSkip("r41h", last, at1080, { capMs: CAP, capBySet: F }), r18 = capSkip("r18u", last, at1080, { capMs: CAP, capBySet: F });
+        const over = capSkip("r41h", { ms: 2200, px: 1024 * 1024 }, at1080, { capMs: CAP, capBySet: F }), none = capSkip("r41h", null, at1080, { capMs: CAP, capBySet: F });
+        const flat = capSkip("r41h", last, at1080, { capMs: CAP, capBySet: {} });
+        ok("  round 45: a prediction between the two caps runs r41h and skips another set, a prediction past r41h's own cap skips it by that cap, and without the table it falls back to the ladder's",
+            r41 === null && r18 === `predicted 2373 ms a pass, over the ${CAP} ms cap` && over === "predicted 4351 ms a pass, over the 4000 ms cap" && none === null && flat === r18,
+            `r41h ${r41}; r18u ${r18}; r41h at 2200 ms ${over}; no table ${flat}`);
+    }
     const px = 1920 * 1080;
     ok("  round 15: a pass's buffers are the input, every layer's output and the image -- and r15 allocates no logits, 81 channels a pixel fewer than r14",
         passBytes(net, 1080, 1920, "r14") === px * 4 * (10 + 4 * 32 + 81 + 3) && passBytes(net, 1080, 1920, "r15") === passBytes(net, 1080, 1920, "r14") - px * 81 * 4 &&
@@ -356,9 +430,9 @@ console.log("1. THE LADDER'S ARITHMETIC");
     // round 19 (section 66): by the run's compiler -- FXC, none named, or one a dump could not read keep round 18's two sets out on
     // D3D12; DXC (as nativeCompiler names it, or as a dump reads it) builds all four; Vulkan builds all four whatever is named
     const all = TIMED_SETS.join(), by = (ad, compiler) => nativeSetsFor(ad, TIMED_SETS, { compiler }).join();
-    ok("  round 19: both ladders time r12, r15, r18t, r18u and (round 27) r27w -- r12 first, the reference every speedup is read against -- and natively on a D3D12 adapter by the run's compiler: " +
-        "under FXC, none named or one unread, r12 and r15 alone; under DXC all five; on Vulkan all five",
-        all === "r12,r15,r18t,r18u,r27w" && TIMED_SETS.every((s) => KERNEL_SETS.includes(s)) && FXC_UNBUILT_SETS.join() === "r18t,r18u" && FXC_UNTRIED_SETS.join() === "r27w" &&
+    ok("  round 19: both ladders time r12, r15, r18t, r18u, (round 27) r27w, (round 40) r40s, (round 41) r41h and (round 57) r57p -- r12 first, the reference every speedup is read against -- and natively on a D3D12 adapter by the run's compiler: " +
+        "under FXC, none named or one unread, r12 and r15 alone; under DXC all eight; on Vulkan all eight",
+        all === "r12,r15,r18t,r18u,r27w,r40s,r41h,r57p" && TIMED_SETS.every((s) => KERNEL_SETS.includes(s)) && FXC_UNBUILT_SETS.join() === "r18t,r18u" && FXC_UNTRIED_SETS.join() === "r27w,r40s,r41h,r57p" &&
         by(d3d, "FXC") === "r12,r15" && by(d3d, null) === "r12,r15" && by(d3d, "unknown (no dump)") === "r12,r15" && nativeSetsFor(d3d, TIMED_SETS).join() === "r12,r15" &&
         by(d3d, "DXC") === all && by(d3d, "DXC (DXIL)") === all && by(vk, null) === all && by(vk, "FXC") === all && by({ info: {} }, null) === all,
         `D3D12: FXC ${by(d3d, "FXC")}, none ${by(d3d, null)}, DXC ${by(d3d, "DXC")}; Vulkan: ${by(vk, null)} -- section 60: node-webgpu 0.6.0's FXC stopped on r18t's kernel and crashed on r18u's; section 65: 0.6.2's DXC built both`);
@@ -369,10 +443,10 @@ console.log("1. THE LADDER'S ARITHMETIC");
           p061 = plan(d3d, { version: "0.6.1", dxcBeside: true }, "win32", shipped), pUnread = plan(d3d, null, "win32", shipped),
           pChild = plan(d3d, { version: "0.6.2", dxcBeside: true }, "win32", FXC_FLAGS), pLinux = plan(vk, { version: "0.6.2", dxcBeside: true }, "linux", shipped);
     const says = (p) => `${p.compiler || "none"}: ${p.sets.join(",")}; FXC ladder ${p.fxcSkip ? "skipped" : "runs"}`;
-    ok("!! round 19: a native run's plan is read off its package WITH ITS DEVICE'S FLAGS -- 0.6.2 shipping DXC on D3D12: DXC, all five sets, and the FXC ladder; 0.6.0, 0.6.1 with the DLL " +
-        "copied beside, or a package unread: FXC, r12 and r15, no FXC ladder; the FXC child's own flags on 0.6.2: FXC; Linux: no D3D compiler, all five, no FXC ladder",
+    ok("!! round 19: a native run's plan is read off its package WITH ITS DEVICE'S FLAGS -- 0.6.2 shipping DXC on D3D12: DXC, all eight sets, and the FXC ladder; 0.6.0, 0.6.1 with the DLL " +
+        "copied beside, or a package unread: FXC, r12 and r15, no FXC ladder; the FXC child's own flags on 0.6.2: FXC; Linux: no D3D compiler, all eight, no FXC ladder",
         p062.compiler === "DXC" && p062.sets.join() === all && p062.dropped.length === 0 && p062.fxcSkip === null &&
-        [p060, p061, pUnread].every((p) => p.compiler === "FXC" && p.sets.join() === "r12,r15" && p.dropped.join() === "r18t,r18u,r27w" && /as shipped is FXC/.test(p.fxcSkip || "")) &&
+        [p060, p061, pUnread].every((p) => p.compiler === "FXC" && p.sets.join() === "r12,r15" && p.dropped.join() === "r18t,r18u,r27w,r40s,r41h,r57p" && /as shipped is FXC/.test(p.fxcSkip || "")) &&
         /before 0\.6\.2 forces use_dxc off/.test(p061.fxcSkip) && /no dxcompiler\.dll/.test(p060.fxcSkip) &&
         pChild.compiler === "FXC" && pChild.sets.join() === "r12,r15" && pLinux.compiler === null && pLinux.sets.join() === all && /linux has no D3D compiler/.test(pLinux.fxcSkip || ""),
         [p062, p060, p061, pUnread, pChild, pLinux].map(says).join("  /  "));
@@ -419,6 +493,11 @@ console.log("1. THE LADDER'S ARITHMETIC");
     ok("!! round 27: each \"r27w against rXX\" line is that set's median over r27w's, tagged section 83 on either ladder -- the ratio section 83's rule reads",
         l27[0] === "native: r27w against r18t at 1920 x 1080: 1.250 x as fast, on the device's clock -- section 83" && l27[1] === "page: r27w against r18u at 1024 x 1024: 1.250 x as fast, on the wall clock -- section 83",
         l27.join(" / "));
+    // round 40 (section 108): r40s's lines, tagged section 108; and an adapter without subgroups names why r40s stands aside
+    const l40 = vsSetLine("native", "r40s", "r18t", row(1920, 1080, 6), row(1920, 1080, 9), "section 108");
+    ok("!! round 40: each \"r40s against rXX\" line is that set's median over r40s's, tagged section 108 -- the ratio section 108's rule reads -- and r27w's lines keep section 83",
+        l40 === "native: r40s against r18t at 1920 x 1080: 1.500 x as fast, on the device's clock -- section 108" && vsSetLine("page", "r27w", "r15", row(64, 64, 2), row(64, 64, 3)).endsWith("-- section 83") &&
+        SUBGROUP_SETS.join() === "r40s" && vsSetLine("native", "r41h", "r18u", row(1920, 1080, 6), row(1920, 1080, 9), "section 109") === "native: r41h against r18u at 1920 x 1080: 1.500 x as fast, on the device's clock -- section 109", l40);
     // round 19 (section 66, test 4): the unpaired line, at the largest size BOTH ladders measured -- here 256 x 256: the DXC ladder
     // measured r18t to 512, the FXC ladder r15 only to 256
     const dxcL = { rows: { r18t: [row(64, 64, 1), row(128, 128, 2), row(256, 256, 8), row(512, 512, 30), row(1024, 1024, 0, true)] } };
@@ -452,7 +531,7 @@ console.log("\n2. NATIVE: node-webgpu's default adapter (on the rig, the GPU)");
 if (W0.refused) ok(`!! ${H.WEBGPU_ENV} names a node-webgpu package this box can load -- a refused one is a red here, never a skip`, false, W0.refused);
 else if (skip) console.log("  SKIP  " + skip);
 else {
-    let r = null, err = null, plan = null, noted = null, key = null, vendor = null;
+    let r = null, err = null, plan = null, noted = null, key = null, vendor = null, nativeGpu = null;
     // printed before the ladder, so a run that dies still names its trace
     say(`native: the trace is ${TRACE_FILE}`);
     try {
@@ -461,7 +540,7 @@ else {
         // fast pipeline cost minutes to build under the D3D12 compiler node-webgpu 0.6.0 ships -- with a 600 s ladder budget;
         // round 15 (section 46) adds r15, whose hidden layers are r14's; since section 57, r12 and r15; since section 61,
         // TIMED_SETS less what nativeSetsFor leaves out on this adapter; since section 66, by the compiler read off the package
-        ({ r, plan } = await nativeLadder(W0, { totalMs: NATIVE_MS, onPlan: (adapter, p) => {
+        ({ r, plan, gpu: nativeGpu } = await nativeLadder(W0, { totalMs: NATIVE_MS, onPlan: (adapter, p) => {
             plan = p; NATIVE_SETS = p.sets;
             // the rig's report names every adapter a gate ran on; this one is not reached through the browser harness, so it
             // says itself -- a "----" line realGpuRun keeps, and the SWEK_ADAPTER_LOG record it reads adapters from
@@ -477,8 +556,13 @@ else {
                     "the page times it, and a package that ships DXC times it here (section 66)");
         } }));
     } catch (e) { err = String(e && e.message || e); }
+    // round 51 (section 121): rounds 45 and 49 put their blocks between this if and its else, which bound the else to them -- so the
+    // native ladder's own rows were skipped here (no error, their condition true) and ran on null on the rig (an error). The flag
+    // below is set inside the else alone, and the row after both says whether the report ran whenever the ladder did
+    let nativeReported = false;
     if (err) ok("!! the native ladder ran", false, err.slice(0, 200));
     else {
+        nativeReported = true;
         // round 35: the trace holds this run's ladder, step by step -- a device asked for at every size it measured, and its end.
         // SABOTAGED round 35: timingLadder not tracing its requestDevice -> 1 red; the gate not handing timingLadder its trace -> 1 red;
         // restored, sha-256 identical.
@@ -516,12 +600,48 @@ else {
             }
         }
     }
+    ok("!! round 51: whenever the native ladder ran, its own report ran too -- the trace, the paired rows, the report and the clock rows",
+        !!err || nativeReported, err ? "the ladder failed -- its row above is red" : "the report ran");
+    // ROUND 45 (section 114): the ladder itself reads a set's own cap -- r41h's cannot be seen here (no shader-f16), so a set this
+    // adapter builds is given one: r15 a cap no pass reaches and r12 none, under a capMs the first size already predicts past.
+    // r15 climbs to the second size and r12 stops there, by its cap's own words
+    if (!err && r && nativeGpu) {
+        let mini = null, mErr = null;
+        try { mini = await timingLadder(net, () => nativeGpu.requestAdapter(), { sizes: [[64, 64], [128, 128]], sets: ["r15", "r12"], rounds: 1, capMs: 0.001, capBySet: { r15: 1e9 }, warmup: 1, minReps: 1, maxReps: 2, budgetMs: 50, totalMs: 120000 }); }
+        catch (e) { mErr = String(e && e.message || e); }
+        const r15 = mini && mini.rows.r15[1], r12 = mini && mini.rows.r12[1];
+        ok("  round 45: the ladder reads a set's own cap -- given r15 one no pass reaches and r12 none, under a cap the first size predicts past, r15 runs its second size and r12 is skipped by the ladder's cap",
+            !!r15 && !r15.skipped && !!r12 && r12.skipped && /over the 0\.001 ms cap$/.test(r12.reason || ""),
+            mErr || (r12 ? `r15 ${r15.skipped ? "skipped: " + r15.reason : "ran"}; r12 ${r12.skipped ? r12.reason : "ran"}` : "no ladder"));
+    }
+    // ROUND 49 (section 119): round 47's w16 network, as exported, timed natively on the sets the tables use that this ladder ran --
+    // r15 and the round-18 sets -- against the shipped network on the same set at every size both measured. Its own lines, not
+    // report()'s: report() counts the shipped network's arithmetic
+    if (!err && r && nativeGpu) {
+        const net16 = decodeNet(JSON.parse(fs.readFileSync(path.join(ENG, "render", "denoise-net-r47-w16.json"), "utf8")).net);
+        const sets16 = ["r15", "r18t", "r18u"].filter((s2) => r.sets.includes(s2));
+        let r16 = null, e16 = null;
+        try { r16 = await timingLadder(net16, () => nativeGpu.requestAdapter(), { sets: sets16, ...LADDER, totalMs: NATIVE_MS, trace: (l) => trace(`native w16 ${l}`) }); } catch (e) { e16 = String(e && e.message || e); }
+        if (e16) ok("!! round 49: the w16 network's native ladder ran", false, e16.slice(0, 200));
+        else {
+            for (const s2 of sets16) holds(`native w16 ${s2}`, { adapter: r16.adapter, rows: r16.rows[s2], invisible: r16.invisible[s2] }, s2);
+            for (const s2 of sets16) for (const x of r16.rows[s2]) say(x.skipped ? `native w16 ${s2}: ${x.W} x ${x.H} skipped -- ${x.reason}` :
+                `native w16 ${s2}: ${x.W} x ${x.H}: ${x.wall.median.toFixed(3)} ms a pass (10th-90th ${x.wall.p10.toFixed(3)}-${x.wall.p90.toFixed(3)}, ${x.wall.n} passes)` +
+                (x.gpu ? `; on the device's clock ${x.gpu.median.toFixed(3)} ms` : "; no timestamp queries"));
+            const vs16 = sets16.flatMap((s2) => r16.rows[s2].map((b) => [s2, b, r.rows[s2].find((a2) => a2.W === b.W && a2.H === b.H)]).filter(([, b, a2]) => a2 && !a2.skipped && !b.skipped));
+            for (const [s2, b, a2] of vs16) say(vsSetLine("native", "w16", `the shipped network on ${s2}`, b, a2, "section 119"));
+            ok("  round 49: the w16 network's native ladder timed every set it was given at the first size, and each is set against the shipped network on the same set at every size both measured",
+                net16.layers.map((L) => L.Cout).join("/") === "16/16/16/16/81" && sets16.includes("r18u") === r.sets.includes("r18u") &&
+                sets16.length >= 1 && sets16.every((s2) => r16.rows[s2] && !r16.rows[s2][0].skipped) && vs16.length >= sets16.length,
+                `${sets16.join(", ")}; ${vs16.length} sizes compared`);
+        }
+    }
 }
 
 console.log("\n3. THE PAGE: denoise.html's \"Time the network\", in Chromium (on the rig, the browser's GPU)");
 {
     const r = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 600000, script: `async () => {
-        const f = document.createElement("iframe"); f.style.width = "1200px"; f.style.height = "900px"; f.src = "/denoise.html"; document.body.appendChild(f);
+        const f = document.createElement("iframe"); f.style.width = "1200px"; f.style.height = "900px"; f.src = "/denoise.html?net=shipped"; document.body.appendChild(f);
         await new Promise((r) => f.onload = r);
         const d = f.contentDocument, $ = (id) => d.getElementById(id), wait = (ms) => new Promise((r) => setTimeout(r, ms));
         for (let i = 0; i < 100 && !$("time"); i++) await wait(50);
@@ -545,6 +665,34 @@ console.log("\n3. THE PAGE: denoise.html's \"Time the network\", in Chromium (on
             ok("  round 18: the page's report carries its adapter's key -- platform, vendor and architecture -- or says it has none", "pageKey" in L &&
                 (L.pageKey === null || /^[^/]+\/[^/]+\/[^/]*$/.test(L.pageKey)), String(L.pageKey));
             ok("  the page and the harness agree on what the device is", r.software === null || L.adapter.software === r.software, `harness says ${r.software ? "software" : "hardware"}`);
+            // round 53 (section 124): the Intel's page entry names w16, so this ladder asks for the shipped network by name -- every page line
+            // on every GPU keeps the meaning it has had since section 37
+            ok("  rounds 50 and 53: the page's first ladder ran the shipped network, asked for by name (?net=shipped), by name and by size",
+                L.network === "shipped (asked by ?net=)" && L.params === 33329, `${L.network}, ${L.params} parameters`);
+        }
+        // ROUND 50 (section 120): the page's ladder again, on the w16 network (?net=w16), on the sets the page tables use -- set against
+        // the shipped network's page ladder above, on the same set at every size both measured; reported, deciding nothing
+        if (L) {
+            const sets16 = ["r15", "r18t", "r18u"].filter((s2) => L.sets.includes(s2));
+            const r2 = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 600000, args: { q: `?net=w16&sets=${sets16.join(",")}` }, script: `async (a) => {
+                const f = document.createElement("iframe"); f.style.width = "1200px"; f.style.height = "900px"; f.src = "/denoise.html" + a.q; document.body.appendChild(f);
+                await new Promise((r) => f.onload = r);
+                const d = f.contentDocument, $ = (id) => d.getElementById(id), wait = (ms) => new Promise((r) => setTimeout(r, ms));
+                for (let i = 0; i < 100 && !$("time"); i++) await wait(50);
+                $("time").click();
+                const t = Date.now();
+                while (Date.now() - t < 590000 && ($("time").disabled || !$("timeJson").textContent) && !/failed|no WebGPU/.test($("timeStatus").textContent)) await wait(100);
+                return { status: $("timeStatus").textContent, json: $("timeJson").textContent };
+            }` });
+            let L2 = null; try { L2 = JSON.parse(r2.result?.json || "null"); } catch {}
+            if (r2.skipped) console.log("  SKIP  " + r2.reason);
+            else {
+                const vs = L2 ? sets16.flatMap((s2) => (L2.rows[s2] || []).map((b) => [s2, b, (L.rows[s2] || []).find((a2) => a2.W === b.W && a2.H === b.H)]).filter(([, b, a2]) => a2 && !a2.skipped && !b.skipped)) : [];
+                for (const [s2, b, a2] of vs) say(vsSetLine("page", "w16", `the shipped network on ${s2}`, b, a2, "section 120"));
+                ok("!! round 50: the page's ladder under ?net=w16 timed the w16 network -- by name and by its 9,793 parameters -- on exactly the sets asked, each set against the shipped network's page ladder",
+                    r2.ok && !!L2 && /^w16 \(asked by \?net=\)$/.test(L2.network) && L2.params === 9793 && L2.sets.join() === sets16.join() && vs.length >= sets16.length && !r2.pageErrors.length,
+                    L2 ? `${L2.network}, ${L2.params} parameters, sets ${L2.sets.join(", ")}; ${vs.length} sizes compared` : (r2.reason || (r2.result || {}).status || "no result"));
+            }
         }
     }
 }

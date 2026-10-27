@@ -152,6 +152,14 @@ export const VENDORED = Object.freeze([
             "and that the version was not independently re-confirmed against Janelia's publication terms -- verify " +
             "before any redistribution wider than this repo's demo use. CC-BY asks for attribution, which that " +
             "file carries." },
+    // THE LARVAL-ZEBRAFISH GRAVITY-SENSING CONNECTIVITY (UNNUMBERED, the fish vestibular helper branch). Data, not code, taken from an OPEN-ACCESS paper's supplementary files, byte for byte; the grant is the
+    // article's own CC BY 4.0 licence element, quoted word for word in PROVENANCE.md, which also says what that licence text does and does not say about the supplementary files.
+    { path: "vendor/zebrafish-vestibular", kind: KIND.THIRD_PARTY, spdx: "CC-BY-4.0", grant: GRANT.NAMED_OTHER, file: "PROVENANCE.md",
+      upstream: "https://pmc-oa-opendata.s3.amazonaws.com/PMC9420129.1/ (PubMed Central Open Access Subset; Liu, Hildebrand, Morgan, Jia, Slimmon, Bagnall 2022, Nat Commun 13:5060, doi:10.1038/s41467-022-32824-w)",
+      pin: "PMC9420129.1, fetched 2026-10-24T22:25Z; sha256 of all three files in PROVENANCE.md",
+      note: "*** DATA, NOT CODE, AND THE GRANT IS THE ARTICLE'S CC BY 4.0, QUOTED IN PROVENANCE.md. *** Two connectivity tables (hair cell to afferent, afferent to central target) and the Source Data zip (SWC skeletons and figure JSON), " +
+            "none opened for editing. The article's licence speaks of 'images or other third party material in this article'; it does not say in so many words that the supplementary files are under it, and PROVENANCE.md says " +
+            "that covering them is a reading, not a quotation. CC BY asks for credit to the authors and the source, a link to the licence and a note of changes (none were made); PROVENANCE.md carries the citation." },
     // THE FISH1 TEN-ANALYSIS CORE, AND THE GRANT HERE IS A DATA POLICY, NOT A LICENCE. Recorded the way male-cns is (the grant lives in PROVENANCE.md), but the facts differ and are said:
     // the Fish1 data policy (https://fish1-release.storage.googleapis.com/data_policy.html) makes the release open access and asks that work using it cite the resource paper; it states NO licence text
     // and names no licence, and PROVENANCE.md quotes it as that. The identifier below is an SPDX LicenseRef, a label for that policy, not a licence anyone granted by name.

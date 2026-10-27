@@ -1,0 +1,13 @@
+{
+ "format": "swek-channel-index-v1",
+ "channels": [
+  {
+   "slug": "thenextnewthingai",
+   "handle": "@TheNextNewThingAI",
+   "name": "The Next New Thing",
+   "file": "thenextnewthingai.json",
+   "videos": 15,
+   "updated": "2026-10-25T17:03:46.028Z"
+  }
+ ]
+}

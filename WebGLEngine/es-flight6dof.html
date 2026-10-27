@@ -49,8 +49,10 @@
   <span id="stat" style="color:#9fe6c0"></span>
   <button id="resetBtn" title="respawn all three aircraft and restart the mission">&#8635; Reset</button>
   <button id="rosterBtn" title="Load Pilots: choose who flies each aircraft -- the PD autopilot, the same laws written through the fruit fly's network, noise on those weights, an imported pilot, or you on the keyboard -- then Start.">&#9992; Load Pilots</button>
+  <label title="Your keyboard stick with the autopilot's inner loops under it: A / D set a bank angle (up to 40 degrees) instead of a raw aileron, and when you let go the wings come back to level and the climb is drawn back to zero. Off is the raw stick: it rolls at 190 degrees a second and does not come back."><input id="assistBox" type="checkbox" checked> stability assist</label>
   <label>camera <select id="camMode"><option value="chase">chase</option><option value="orbit">orbit</option></select>
     <select id="camTarget"><option value="0">aircraft 1</option><option value="1">aircraft 2</option><option value="2">aircraft 3</option></select></label>
+  <label>map <select id="mapSel"><option value="flat">flat field</option><option value="hills">hills</option><option value="circuit">race circuit</option><option value="circuitHills">circuit on hills</option></select></label>
   <label>wind <input id="windSpeed" type="range" min="0" max="12" step="0.5" value="0"><span id="windSpeedV">0</span> m/s</label>
   <label>from <input id="windDir" type="range" min="0" max="355" step="5" value="90"><span id="windDirV">90</span>&deg;</label>
   <label>gusts <input id="windGust" type="range" min="0" max="4" step="0.5" value="0"><span id="windGustV">0</span> m/s</label>
@@ -71,7 +73,8 @@
   <div style="color:#5f7590;line-height:1.4;">Every fruit-fly pilot is the same network, wired like a fly's Giant Fiber circuit, with the autopilot's contract (pitch, roll, yaw and throttle from the pointing errors, the rates and the air data); a choice picks which WEIGHTS fly it. The PD autopilot is not a network, and the hand weights are that autopilot written through the network (they fly the same flight); the shipped pilot is the same network with weights trained on the job the number under each name is graded on. The GPU brain is a DIFFERENT network (two dense layers, 1,796 weights) trained on the same job and run on a WebGPU device. A change applies at once, mid-flight; Start also respawns. <b>You</b>: S/&darr; pull back (nose up), W/&uarr; push, A/&larr; roll left, D/&rarr; roll right, Q/E rudder, R/F throttle up/down; neutral is trimmed for your airspeed.</div>
 </div>
 <div id="board"></div>
-<div id="hint">real physics: gravity, a stalling wing, a ground that ends the flight &mdash; drag to orbit, scroll to zoom (orbit camera)</div>
+<div id="brainBox" style="position:fixed;right:8px;bottom:8px;width:520px;background:#0b131fcc;border:1px solid #1c2c44;border-radius:6px;padding:4px 6px;z-index:5"><div style="font:11px ui-monospace,Menlo,monospace;color:#59d1ff;display:flex;justify-content:space-between"><span>Selected brain activity</span><span id="brainWho" style="color:#7c93b8"></span></div><canvas id="brainView" width="520" height="250" style="width:520px;height:250px;display:block"></canvas></div>
+<div id="hint">real physics: gravity, a stalling wing, a ground that ends the flight &mdash; drag to turn the camera, scroll to zoom, double-click to reset (chase and orbit cameras both)</div>
 
 <script type="importmap">
 { "imports": { "three": "/vendor/three/three.module.js" } }
@@ -79,9 +82,14 @@
 <script type="module">
 import * as THREE from "/vendor/three/three.module.js";
 import { OrbitControls } from "/vendor/three/jsm/controls/OrbitControls.js";
+import { createTerrain, meshOf, FLAT } from "/physics/mechanics/terrain.mjs";
+import * as RT from "/world/raceTrack.mjs";   // the racing city's seeded circuit, scaled up to fly
+import { WadMap } from "/world/WadMap.js";   // the engine's own top-right minimap (main.js builds the same one)
 import * as RB from "/physics/mechanics/rigidBody6dof.mjs";
 import * as F from "/physics/mechanics/flightModel6dof.mjs";
 import * as AF from "/brain/autopilotFlight.mjs";
+import * as MA from "/brain/manualAssist.mjs";
+import { flightPanel, drawPanel } from "/render/brainPanel.mjs";
 import * as PF from "/brain/pilotFlightPolicy.mjs";
 import * as MF from "/brain/pilotFlightMlp.mjs";
 import { GpuPilotBrain } from "/brain/pilotFlightGpu.mjs";
@@ -131,6 +139,51 @@ const sun = new THREE.DirectionalLight(0xffffff, 1.6); sun.position.set(500, -30
   for (let i = 0; i < 260; i++) { const h = 20 + rnd() * 90; m.compose(new THREE.Vector3((rnd() - 0.5) * 9000, (rnd() - 0.5) * 9000, h / 2), new THREE.Quaternion(), new THREE.Vector3(1, 1, h)); pylons.setMatrixAt(i, m); }
   scene.add(pylons);
 }
+// ---- THE MAP: the ground the flight model collides with and the page draws are ONE height function (physics/mechanics/terrain.mjs), and the racing city's circuit (world/raceTrack.mjs) is laid on it. The default stays the
+// flat field, which the pilots were trained and gated on, bit for bit (FLAT takes the model's fast path); the hills are low enough (45 m) against the mission's 220 to 380 m that the pilots, which read no terrain, still fly it.
+const MAPS = Object.freeze({
+  flat: { label: "flat field", terrain: null, circuit: false },
+  hills: { label: "hills", terrain: { kind: "fbm", seed: 7, amplitude: 45, wavelength: 900, octaves: 4, level: 0, clearing: [0, 0, 300, 900] }, circuit: false },
+  circuit: { label: "race circuit", terrain: null, circuit: true },
+  circuitHills: { label: "circuit on hills", terrain: { kind: "fbm", seed: 7, amplitude: 45, wavelength: 900, octaves: 4, level: 0, clearing: [0, 0, 300, 900] }, circuit: true },
+});
+const CIRCUIT_SCALE = 40;   // a 10 m tile becomes 400 m: a 12 x 12 grid is 4.8 km across, a lap of about 17 km, a few minutes at 45 m/s
+let terrain = FLAT, mapName = "flat", circuitLayout = null;
+const mapGroup = new THREE.Group(); scene.add(mapGroup);
+const flatGround = scene.children.find((o) => o.isMesh && o.geometry && o.geometry.type === "PlaneGeometry");
+function buildMap(name) {
+  if (!MAPS[name]) name = "flat";
+  mapName = name; const m = MAPS[name];
+  for (const o of [...mapGroup.children]) { mapGroup.remove(o); if (o.geometry) o.geometry.dispose(); }
+  terrain = m.terrain ? createTerrain(m.terrain) : FLAT; circuitLayout = null;
+  if (flatGround) flatGround.position.z = m.terrain ? -(m.terrain.amplitude || 0) - 2 : 0;
+  if (m.terrain) {
+    const mesh = meshOf(terrain, { x0: -4800, y0: -4800, nx: 193, ny: 193, step: 50 }), g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.BufferAttribute(mesh.positions, 3)); g.setAttribute("normal", new THREE.BufferAttribute(mesh.normals, 3)); g.setIndex(new THREE.BufferAttribute(mesh.indices, 1));
+    mapGroup.add(new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: 0x5f7a45, roughness: 1 })));
+  }
+  if (m.circuit) {
+    const track = RT.generateTrack({ seed: 3 }), S = CIRCUIT_SCALE, pts = RT.centreline(track), at = (x, z) => [x * S, -z * S];   // the track's z runs south, the flight's y runs north
+    const hAt = (x, y) => (terrain.flat ? 0 : terrain.height(x, y)) + 1.5, ribbon = [];
+    for (let i = 0; i <= pts.length; i++) { const [x, y] = at(...pts[i % pts.length]); ribbon.push(new THREE.Vector3(x, y, hAt(x, y))); }
+    const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(ribbon), new THREE.LineBasicMaterial({ color: 0xffd84a })); mapGroup.add(line);
+    const tile = RT.TILE * S, half = RT.HALF_WIDTH * S / 5;
+    const road = [];   // the asphalt: a quad strip along the centreline, 10 per cent of a tile each side (the kerbs' own width scaled by 1/5 so a lap is readable from 300 m)
+    for (let i = 0; i < pts.length; i++) {
+      const a = at(...pts[i]), b = at(...pts[(i + 1) % pts.length]), dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy) || 1, nx = -dy / l * half, ny = dx / l * half;
+      for (const [x, y] of [[a[0] + nx, a[1] + ny], [a[0] - nx, a[1] - ny], [b[0] + nx, b[1] + ny], [b[0] + nx, b[1] + ny], [a[0] - nx, a[1] - ny], [b[0] - nx, b[1] - ny]]) road.push(x, y, hAt(x, y) - 0.5);
+    }
+    const rg = new THREE.BufferGeometry(); rg.setAttribute("position", new THREE.Float32BufferAttribute(road, 3)); rg.computeVertexNormals();
+    mapGroup.add(new THREE.Mesh(rg, new THREE.MeshBasicMaterial({ color: 0x35373c, side: THREE.DoubleSide })));
+    for (const c of RT.checkpoints(track)) {   // a gate ring at each checkpoint, the finish line taller and white
+      const [x, y] = at(c.x, c.z), ring = new THREE.Mesh(new THREE.TorusGeometry(c.index === 0 ? 70 : 45, 3, 6, 24), new THREE.MeshBasicMaterial({ color: c.index === 0 ? 0xffffff : 0x2fd6b0 }));
+      ring.position.set(x, y, hAt(x, y) + (c.index === 0 ? 75 : 50)); ring.rotation.y = Math.PI / 2 * ((c.dir === "N" || c.dir === "S") ? 0 : 1) + Math.PI / 2; mapGroup.add(ring);
+    }
+    circuitLayout = { rooms: track.cells.map((cell, i) => { const [cx, cz] = RT.cellCentre(track, cell[0], cell[1]), [fx, fy] = at(cx, cz); return { id: "", x: fx - tile / 2, z: fy - tile / 2, w: tile, d: tile, kind: "road" }; }), corridors: [] };
+  }
+  try { mapGen._lastLevel = circuitLayout; } catch {}
+}
+const mapGen = { _lastLevel: null };
 const HULL = [0x2fd6b0, 0xf6a623, 0x9b8cff].map((c) => new THREE.MeshStandardMaterial({ color: c, metalness: 0.2, roughness: 0.55 }));
 const HULL_DEAD = new THREE.MeshStandardMaterial({ color: 0x6b2222, roughness: 0.9 });
 function makeAircraft(i) {
@@ -164,25 +217,26 @@ const gpuBrains = new Map();   // "trained" | "hand" -> GpuPilotBrain
 const rosterCtx = () => ({ PP: PF, shipped: shippedW, imported: importedW, brainPilotOn: false, ...NAMES });
 const saveSpecs = () => { try { localStorage.setItem(ROSTER_KEY, JSON.stringify(specs)); } catch {} };
 const keys = new Set(); let stickPitch = 0, stickRoll = 0, stickYaw = 0, throttleHeld = 0.66;
-function manualPilot(state, target, wind) {
-  const gd = AF.guidance(state, target, wind);
-  return { pitch: Math.max(-1, Math.min(1, gd.stickTrim + 0.55 * stickPitch)), roll: stickRoll, yaw: 0.6 * stickYaw, throttle: throttleHeld };
+let assistOn = true; try { assistOn = localStorage.getItem("flight6dof.assist") !== "0"; } catch {}
+{ const box = document.getElementById("assistBox"); box.checked = assistOn; box.addEventListener("change", () => { assistOn = box.checked; try { localStorage.setItem("flight6dof.assist", assistOn ? "1" : "0"); } catch {} }); }
+function manualPilot(state, target, wind) {   // brain/manualAssist.mjs: the stick is a bank angle and the wings come back to level (or the raw stick, with the box unticked)
+  return MA.assisted(state, target, wind, { pitch: stickPitch, roll: stickRoll, yaw: stickYaw, throttle: throttleHeld }, { assist: assistOn });
 }
 let pilots = [], pilotKey = "";
 function resolvePilots() {
   const key = specs.join("|") + "|" + avail; if (pilots.length && pilotKey === key) return pilots;
   pilotKey = key; const notes = [];
   pilots = specs.map((spec, i) => {
-    if (spec === "manual") return { fn: manualPilot, label: "you (keyboard)", manual: true };
+    if (spec === "manual") return { fn: manualPilot, label: "you (keyboard)", manual: true, kind: "manual" };
     if (spec === "gpu" || spec === "gpuHand") {
       const brain = gpuBrains.get(spec === "gpu" ? "trained" : "hand"), sw = gpuInfo && gpuInfo.software ? ", software adapter" : "";
-      if (brain) return { gpu: brain, label: spec === "gpu" ? `GPU brain pilot (WebGPU${sw})` : `GPU brain, hand weights (WebGPU${sw})` };
+      if (brain) return { gpu: brain, label: spec === "gpu" ? `GPU brain pilot (WebGPU${sw})` : `GPU brain, hand weights (WebGPU${sw})`, kind: "gpu", policy: MF, weights: brain.weights };
       notes.push(`${spec}: no GPU brain here (${gpuLost || gpuErr || gpuWErr || "the shipped GPU pilot has not loaded"}); the fruit fly's hand weights fly instead`);
-      return { fn: PF.pilotFor(PF.handWeights()), label: "hand weights (no GPU brain here)" };
+      { const hw = PF.handWeights(); return { fn: PF.pilotFor(hw), label: "hand weights (no GPU brain here)", kind: "fly", policy: PF, weights: hw }; }
     }
     const r = PR.resolveTeam("A", spec, rosterCtx(), N); notes.push(...r.problems);
-    if (r.scripted) return { fn: (s, t, w) => AF.pilot(s, t, w), label: NAMES.scriptedName };
-    return { fn: PF.pilotFor(r.weights[i]), label: r.label };
+    if (r.scripted) return { fn: (s, t, w) => AF.pilot(s, t, w), label: NAMES.scriptedName, kind: "autopilot" };
+    return { fn: PF.pilotFor(r.weights[i]), label: r.label, kind: "fly", policy: PF, weights: r.weights[i] };
   });
   const el = document.getElementById("rosterNote"); if (el) el.textContent = pilots.map((p, i) => `${i + 1}: ${p.label}`).join("  |  ") + (notes.length ? "  --  " + notes.join("; ") : "");
   return pilots;
@@ -278,7 +332,7 @@ function stepFleet(gpuControls = null) {
     const s = fleet[i]; if (s.status !== "airborne") continue;
     if (ps[i].gpu && !gpuControls) throw new Error("a GPU pilot is seated: step with stepFleetGpu() (the device answers later than this tick)");
     const c = ps[i].gpu ? (gpuControls[i] || s.controls) : ps[i].fn(s.state, target, wind); s.controls = F.sanitize(c);
-    const r = F.stepFlight(model, s.state, c, DT, wind); s.state = r.state;
+    const r = F.stepFlight(model, s.state, c, DT, wind, terrain); s.state = r.state;
     if (r.status !== "airborne") { s.status = r.status; continue; }
     const a = F.attitude(s.state, wind), he = Math.atan2(Math.sin(target.heading - a.heading), Math.cos(target.heading - a.heading));
     s.eAlt += Math.min(3, Math.abs(a.altitude - target.altitude) / 50); s.eHdg += Math.min(3, Math.abs(he)); s.eSpd += Math.min(3, Math.abs(a.airspeed - target.airspeed) / 10); s.flown++;
@@ -313,14 +367,27 @@ function syncScene() {
   }
 }
 const camPos = new THREE.Vector3(), camLook = new THREE.Vector3();
+const chase = { yaw: 0, pitch: 0, zoom: 1 };
+{
+  const el = renderer.domElement; let drag = null;
+  el.style.touchAction = "none";
+  el.addEventListener("pointerdown", (e) => { if (document.getElementById("camMode").value !== "chase") return; drag = { x: e.clientX, y: e.clientY }; try { el.setPointerCapture(e.pointerId); } catch {} });
+  el.addEventListener("pointermove", (e) => { if (!drag) return; chase.yaw -= (e.clientX - drag.x) * 0.006; chase.pitch = Math.max(-0.3, Math.min(1.3, chase.pitch + (e.clientY - drag.y) * 0.004)); drag.x = e.clientX; drag.y = e.clientY; });
+  const end = (e) => { drag = null; try { el.releasePointerCapture(e.pointerId); } catch {} };
+  el.addEventListener("pointerup", end); el.addEventListener("pointercancel", end);
+  el.addEventListener("wheel", (e) => { if (document.getElementById("camMode").value !== "chase") return; e.preventDefault(); chase.zoom = Math.max(0.3, Math.min(12, chase.zoom * Math.exp(e.deltaY * 0.001))); }, { passive: false });
+  el.addEventListener("dblclick", () => { chase.yaw = 0; chase.pitch = 0; chase.zoom = 1; });
+}
 function updateCamera() {
   const mode = document.getElementById("camMode").value;
   orbit.enabled = mode === "orbit";
   const s = fleet[Number(document.getElementById("camTarget").value) || 0]; if (!s) return;
   const p = s.state.pos, f = RB.rotateByQuat(s.state.q, [1, 0, 0]);
   if (mode === "orbit") { orbit.target.set(p[0], p[1], p[2]); orbit.update(); return; }
-  const back = new THREE.Vector3(f[0], f[1], 0).normalize().multiplyScalar(-34);
-  camPos.lerp(new THREE.Vector3(p[0] + back.x, p[1] + back.y, p[2] + 9), 0.12);
+  // the chase camera is dragged and scrolled by hand too (it was OrbitControls-only, so on the default chase camera nothing answered the mouse): drag turns it round the aircraft, scroll moves it in and out, a double click puts it back
+  const D = Math.hypot(34, 9) * chase.zoom, el = Math.atan2(9, 34) + chase.pitch, hz = D * Math.cos(el), bx = -f[0], by = -f[1], bl = Math.hypot(bx, by) || 1, ca = Math.cos(chase.yaw), sa = Math.sin(chase.yaw);
+  const back = new THREE.Vector3(((bx * ca - by * sa) / bl) * hz, ((bx * sa + by * ca) / bl) * hz, 0);
+  camPos.lerp(new THREE.Vector3(p[0] + back.x, p[1] + back.y, p[2] + D * Math.sin(el)), 0.12);
   camLook.lerp(new THREE.Vector3(p[0] + f[0] * 25, p[1] + f[1] * 25, p[2] + f[2] * 25), 0.2);
   camera.position.copy(camPos); camera.lookAt(camLook);
 }
@@ -328,7 +395,18 @@ function updateCamera() {
 // ---- the board: one card per aircraft, the mission, the stat line ---------------------------------------------------------------------------------------------------------------------------------------------
 const board = document.getElementById("board");
 for (let i = 0; i < N; i++) { const d = document.createElement("div"); d.className = "card"; d.id = "card" + i; board.appendChild(d); }
+// the selected brain (the aircraft the camera follows): its network's bars and the policy map, five times a second (render/brainPanel.mjs)
+const brainCv = document.getElementById("brainView"), brainCtx = brainCv.getContext("2d"); let lastBrain = 0;
+function drawBrain() {
+  const now = performance.now(); if (now - lastBrain < 200) return; lastBrain = now;
+  const me = Number(document.getElementById("camTarget").value) || 0, s = fleet[me], p = resolvePilots()[me]; if (!s || !p) return;
+  const wind = windNow(tick), target = missionAt(tick);
+  const panel = flightPanel({ kind: p.kind || "autopilot", policy: p.policy, weights: p.weights, pilot: p.fn || (p.policy ? (st, t, w) => p.policy.pilotFor(p.weights)(st, t, w) : null), state: s.state, target, wind, stick: { pitch: s.controls.pitch, roll: s.controls.roll, yaw: s.controls.yaw, throttle: s.controls.throttle } });
+  document.getElementById("brainWho").textContent = `${me + 1}. ${p.label}`;
+  drawPanel(brainCtx, brainCv.width, brainCv.height, panel, { title: p.label });
+}
 function updateBoard() {
+  drawBrain();
   const tg = missionAt(tick), left = LEG_SECONDS - ((tick % LEG_TICKS) * DT), nxt = MISSION[(Math.floor(tick / LEG_TICKS) + 1) % MISSION.length], ps = resolvePilots();
   document.getElementById("mission").textContent = `target: altitude ${tg.altitude} m · heading ${(tg.heading * R2D).toFixed(0)}° · ${tg.airspeed} m/s   (next in ${left.toFixed(0)} s: ${nxt.altitude} m, ${(nxt.heading * R2D).toFixed(0)}°, ${nxt.airspeed} m/s)`;
   const wind = windNow(tick);
@@ -372,7 +450,7 @@ function frame(now) {
   } else {
   while (acc >= DT && n < 8) { stepFleet(); acc -= DT; n++; } if (acc > DT * 8) acc = 0;
   }
-  syncScene(); updateCamera(); updateBoard(); renderer.render(scene, camera);
+  syncScene(); updateCamera(); updateBoard(); updateMinimap(); renderer.render(scene, camera);
   requestAnimationFrame(frame);
 }
 setWind(0, 90, 0); renderRoster(); pilotLine(); reset();
@@ -387,6 +465,27 @@ window.__flightDemo = {
   reset, setWind, get specs() { return specs.slice(); }, setSpec(i, spec) { specs[i] = spec; saveSpecs(); renderRoster(); resolvePilots(); },
   roster: { get labels() { return resolvePilots().map((p) => p.label); }, get choices() { return [...document.getElementById("pilot0").options].map((o) => o.value); }, importBlob, loadShipped, loadGpuShipped, get gpu() { return { trained: gpuBrains.has("trained"), hand: gpuBrains.has("hand"), weights: gpuW, error: gpuErr, weightsError: gpuWErr, lost: gpuLost, info: gpuInfo, dispatches: [...gpuBrains.values()].reduce((a, b) => a + b.dispatches, 0) }; }, simulateGpuLoss() { gpuFault = "simulated device loss"; }, get shipped() { return shippedW; }, get shippedError() { return shippedErr; }, get imported() { return importedW; }, get importError() { return importErr; } },
 };
+// the minimap: world/WadMap.js, the widget main.js puts top-right. It wants a camera (x, z and yaw), a bot list and a layout; the flight is z-up, so the map's z is the flight's y. The followed aircraft is the player dot, the other two are the blips.
+const mapCam = { position: { x: 0, y: 0, z: 0 }, yaw: 0 }, mapBots = { bots: new Map() };
+const wadMap = new WadMap({ camera: mapCam, ollamaLevelGen: mapGen, botManager: mapBots });
+wadMap.start();
+function updateMinimap() {
+  const me = Number(document.getElementById("camTarget").value) || 0, s = fleet[me]; if (!s) return;
+  const f = RB.rotateByQuat(s.state.q, [1, 0, 0]);
+  mapCam.position.x = s.state.pos[0]; mapCam.position.y = s.state.pos[2]; mapCam.position.z = s.state.pos[1]; mapCam.yaw = Math.atan2(f[0], f[1]);
+  mapBots.bots.clear();
+  fleet.forEach((o, i) => { if (i !== me) mapBots.bots.set(i, { entityId: i, x: o.state.pos[0], z: o.state.pos[1], kind: "aircraft", hp: o.status === "airborne" ? 1 : 0, state: o.status }); });
+  wadMap.tick(0);
+}
+window.__flightDemo.minimap = wadMap; window.__flightDemo.cameraSteps = (n = 1) => { for (let i = 0; i < n; i++) updateCamera(); };   // the gate's clock for the camera: the page lerps it once a FRAME, and a software frame is slow
+Object.defineProperties(window.__flightDemo, { camera: { get() { return camera; } }, chase: { get() { return chase; } }, mapBots: { get() { return mapBots; } } });
+{
+  const sel = document.getElementById("mapSel"), q = new URLSearchParams(location.search).get("map"); let saved = null; try { saved = localStorage.getItem("flightMap"); } catch {}
+  const start = MAPS[q] ? q : MAPS[saved] ? saved : "flat"; sel.value = start; buildMap(start); if (start !== "flat") reset();
+  sel.onchange = () => { buildMap(sel.value); reset(); try { localStorage.setItem("flightMap", sel.value); } catch {} };
+  Object.assign(window.__flightDemo, { setMap(n) { sel.value = n; buildMap(n); reset(); }, maps: Object.keys(MAPS), place(i, pos) { fleet[i].state.pos = pos.slice(); fleet[i].status = "airborne"; } });
+  Object.defineProperties(window.__flightDemo, { map: { get() { return mapName; } }, terrain: { get() { return terrain; } }, mapGroup: { get() { return mapGroup; } }, mapLayout: { get() { return mapGen._lastLevel; } } });   // live accessors (Object.assign would copy their values once)
+}
 requestAnimationFrame(frame);
 </script>
 </body>

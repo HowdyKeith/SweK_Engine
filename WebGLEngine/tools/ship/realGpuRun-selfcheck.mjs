@@ -41,11 +41,12 @@ const gates = gateList(ENG);
 const fsr = fs.readdirSync(path.join(ENG, "fx/fsr")).filter((f) => f.endsWith("-selfcheck.mjs")).length;
 const tsl = fs.readdirSync(path.join(ENG, "render")).filter((f) => /Tsl.*-selfcheck\.mjs$/.test(f)).length;
 // round 31 adds the denoiser's fourth, the half-size chain's (render/denoiseUpscaleGPU-selfcheck.mjs), which times the chain at 1080p on a GPU
+// round 63 (section 143) adds the denoiser's fifth, render/denoiseFrameGenCost-selfcheck.mjs: a generated frame's field and generator at 1080p
 // v4896 adds the snow stack's six browser gates (render/snowGpu*-selfcheck.mjs), whose live loop (snowGpuLive) prints the frame rate as a "reading" line for the report
-ok(`every fx/fsr gate (${fsr}), every render/*Tsl* gate (${tsl}), the translucent layer's, the denoiser's four and the snow stack's six: ${gates.length} gates`,
-   gates.length === fsr + tsl + 5 + 6 && ["snowGpu", "snowGpuField", "snowGpuTaa", "snowGpuLookA", "snowGpuLookB", "snowGpuLive"].every((n) => gates.includes(`render/${n}-selfcheck.mjs`)) && gates.includes("render/translucentLayer-selfcheck.mjs") && gates.includes("render/temporalTslCompute-selfcheck.mjs") &&
+ok(`every fx/fsr gate (${fsr}), every render/*Tsl* gate (${tsl}), the translucent layer's, the denoiser's five and the snow stack's six: ${gates.length} gates`,
+   gates.length === fsr + tsl + 6 + 6 && ["snowGpu", "snowGpuField", "snowGpuTaa", "snowGpuLookA", "snowGpuLookB", "snowGpuLive"].every((n) => gates.includes(`render/${n}-selfcheck.mjs`)) && gates.includes("render/translucentLayer-selfcheck.mjs") && gates.includes("render/temporalTslCompute-selfcheck.mjs") &&
    gates.includes("render/denoiseDevice-selfcheck.mjs") && gates.includes("render/denoiseTiming-selfcheck.mjs") && gates.includes("render/denoiseCompile-selfcheck.mjs") &&
-   gates.includes("render/denoiseUpscaleGPU-selfcheck.mjs"));
+   gates.includes("render/denoiseUpscaleGPU-selfcheck.mjs") && gates.includes("render/denoiseFrameGenCost-selfcheck.mjs"));
 ok(`  ...and each may run ${GATE_TIMEOUT_MS / 60000} minutes -- the rig's Intel took 498 s over one denoiser gate when the cap was 600 s (section 42)`,
    GATE_TIMEOUT_MS >= 3 * 498000);
 const kinds = Object.fromEntries(gates.map((g) => [g, categorize(fs.readFileSync(path.join(ENG, g), "utf8"))]));
@@ -53,7 +54,9 @@ const of = (k) => gates.filter((g) => kinds[g] === k);
 ok(`sorted by the doc's rule -- a clock read is timing, a dB grade quality, the rest exact: timing ${of("timing").length} (${of("timing").map((g) => path.basename(g, "-selfcheck.mjs")).join(", ")}), quality ${of("quality").length}, exact ${of("exact").length}`,
    kinds["fx/fsr/fsr3LiveClock-selfcheck.mjs"] === "timing" && kinds["fx/fsr/fsrFlowCost-selfcheck.mjs"] === "timing" && kinds["fx/fsr/fsrFrameGen-selfcheck.mjs"] === "quality" &&
    kinds["render/opticalFlowTsl-selfcheck.mjs"] === "exact" && kinds["render/temporalTslZoo-selfcheck.mjs"] === "exact" &&
-   kinds["render/denoiseTiming-selfcheck.mjs"] === "timing" && kinds["render/denoiseDevice-selfcheck.mjs"] === "exact" && kinds["render/denoiseCompile-selfcheck.mjs"] === "timing");
+   // the denoiser's round 40 (section 108) gave the device gate a small ladder of its own -- r40s standing aside on an adapter
+   // without subgroups -- so by the rule it reads a clock, and is timing; its rows are exactness rows, and the doc says both
+   kinds["render/denoiseTiming-selfcheck.mjs"] === "timing" && kinds["render/denoiseDevice-selfcheck.mjs"] === "timing" && kinds["render/denoiseCompile-selfcheck.mjs"] === "timing");
 ok("  ...and the rule on text: a clock is timing even beside dB, dB is quality, neither is exact",
    categorize("const t = performance.now(); // 3 dB") === "timing" && categorize("Math.log10(1 / mse)") === "quality" && categorize("same vector at every block") === "exact");
 const rows = parseRows("\n1. X\n  PASS  a\n  FAIL  *** b wrong ***   detail\n  ----  belt8: 12.3 dB\n\nFAIL -- 1 check(s)\n");

@@ -1,6 +1,6 @@
 // WebGLEngine/brain/pilotJetPolicy-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node brain/pilotJetPolicy-selfcheck.mjs      (~8 s)
+// Run: node brain/pilotJetPolicy-selfcheck.mjs      (~3.5 s)
 //
 // THE SIBLING GATE OF brain/pilotJetPolicy.mjs: the fruit fly's 34-neuron circuit as the JET's pilot, whose hand weights are the jet's fighting autopilot written through it. The network itself (the circuit, the forward pass, the weight layout) is the trainer's pilot's and is held by brain/pilotFlightPolicy-selfcheck.mjs; what this module adds is a
 // reading of the jet's senses into eighteen numbers and a set of weights, and the claim worth a gate is the same one: THE WEIGHTS ARE THE AUTOPILOT, to float32 -- in the jet's whole envelope, and in a fight.

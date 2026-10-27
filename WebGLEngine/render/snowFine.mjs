@@ -223,6 +223,39 @@ fn terrainFineFiltered(p: vec2f, w: f32, exposure: f32, amp: f32, fp: f32) -> ve
     }
     return vec3f(h, d);
 }
+fn scourAt(p: vec2f) -> f32 {
+    return 0.45 + 0.55 * smoothstep(-0.25, 0.35, noise2(p * 0.021));
+}
+// OURS, not upstream's (terrainFineFiltered above stays byte for byte): the same function with windLocal and the scour given. wl = windLocal(p) and scour = scourAt(p), either exact or interpolated from the vertex stage (snow-beauty-pass-cost item 2)
+fn terrainFineFilteredWith(p: vec2f, w: f32, exposure: f32, amp: f32, fp: f32, wl: vec2f, scour: f32) -> vec3f {
+    var h = 0.0;
+    var d = vec2f(0.0);
+    let fadeS = 1.0 - smoothstep(0.35, 1.6, fp);
+    if (fadeS > 0.001) {
+        let m3 = windMat(w + wl.x, 1.0, wl.y, 2.3);
+        let sas = ridgedd(m3 * p, 3, 2.11, 0.52);
+        let a = 0.125 * amp * mix(0.45, 1.0, exposure) * scour * fadeS;
+        h += (sas.x - 0.35) * a;
+        d += (sas.yz * m3) * a;
+    }
+    let fadeR = 1.0 - smoothstep(0.06, 0.3, fp);
+    if (fadeR > 0.001) {
+        let m4 = windMat(w + wl.x * 0.5, 2.9, 1.0, 0.42);
+        let rip = noised(m4 * p);
+        let a = 0.024 * amp * mix(1.0, 0.45, exposure) * fadeR;
+        h += rip.x * a;
+        d += (rip.yz * m4) * a;
+    }
+    let fadeG = 1.0 - smoothstep(0.016, 0.08, fp);
+    if (fadeG > 0.001) {
+        let m5 = windMat(w, 1.0, 1.0, 0.115);
+        let gr = noised(m5 * p);
+        let a = 0.0075 * amp * fadeG;
+        h += gr.x * a;
+        d += (gr.yz * m5) * a;
+    }
+    return vec3f(h, d);
+}
 `;
 export const DETAIL_WGSL = /* wgsl */ `
 fn hashTile(id: vec2f, period: f32) -> vec2f {
