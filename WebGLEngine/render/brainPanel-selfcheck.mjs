@@ -36,6 +36,8 @@
 //   The first run clicked outside the viewport (the canvas sits below the fold: the click now scrolls it into view) and then used the no-selection layout for the layers view (a selected neuron puts the wiring line on top and shifts the map 14 px down).
 // SECTION 14 (the flight pages' clicks, v4904), SIX more, each in place and restored: U1 a second click not letting go (render/brainUi.mjs) 1 | U2 page coordinates not scaled to the canvas 2 | U3 the selection kept for somebody else 1 | U4 the view always bars 1+ (and it broke the aquarium rows too: see the next line) |
 //   U5 es-aircraft's panel built without the selection 3 | U6 es-box3d-fly3d never saying WHO the panel is about 1. THE AQUARIUM ROWS OF SECTION 13 FLAKED ONCE under that load (the first click came before the first drawing): they now wait for the header, not for half a second; three clean runs after.
+// THE HOLD SLIDER (v4904, section 13), FIVE page sabotages: S1 the slider never steering 3 | S2 the slider's position recomputed from the moving lens scale 1 | S3 zero not calling the clear 0 -- EQUIVALENT: tank.setSteer treats a delta of 0 as a clear, so the other branch does the same thing; the line stays as the intent |
+//   S4 the slider snapping back while it is dragged 1 (the source row only: a headless drag cannot be told from a click) | S5 the outputs never named in the readout 2.
 // B23 and B26 went 0 red the first time: no row looked at WHERE the panel put the map, and inside the steering box the flown target IS the wander target; the rows for the map's place on the canvas and for a sub outside the box now do.
 "use strict";
 import fs from "node:fs";
@@ -346,7 +348,7 @@ console.log("\n13. THE AQUARIUM'S CLICKS (v4904; a browser, SKIPPED and said wit
 {
     const aq = fs.readFileSync(path.join(ENG, "sub-aquarium.html"), "utf8");
     ok("!! the page (v4904) has the view picker (bars or layers), the three steer buttons (disabled until a last-hidden-layer neuron is selected), the dose picker, a click handler that picks from the last drawn hit areas, and drives tank.setSteer from the lens's own scale",
-        /id="brainMode"/.test(aq) && /id="steerUp" disabled/.test(aq) && /id="steerDown" disabled/.test(aq) && /id="steerClear" disabled/.test(aq) && /id="steerDose"/.test(aq) && /import \{ pickNeuron \} from "\/render\/brainLens\.mjs"/.test(aq) && /pickNeuron\(lastRects, x, y\)/.test(aq) && /subPanel\(pr, \{ neuron: brainSel \}\)/.test(aq) && /view: \$\("brainMode"\)\.value/.test(aq) && /tank\.setSteer\(selected, brainSel\.i, sign \* Number\(\$\("steerDose"\)\.value\) \* lastPanel\.lens\.scale\)/.test(aq) && /brainSel\.layer !== lastPanel\.lens\.col/.test(aq));
+        /id="brainMode"/.test(aq) && /id="steerUp" disabled/.test(aq) && /id="steerDown" disabled/.test(aq) && /id="steerClear" disabled/.test(aq) && /id="steerDose"/.test(aq) && /import \{ pickNeuron \} from "\/render\/brainLens\.mjs"/.test(aq) && /pickNeuron\(lastRects, x, y\)/.test(aq) && /subPanel\(pr, \{ neuron: brainSel \}\)/.test(aq) && /view: \$\("brainMode"\)\.value/.test(aq) && /tank\.setSteer\(selected, brainSel\.i, v \* steerScale\)/.test(aq) && /steerScale = lastPanel\.lens\.scale/.test(aq) && /id="steerSlider" min="-16" max="16" step="0.5" value="0" disabled/.test(aq) && /\$\("steerSlider"\)\.addEventListener\("input", \(\) => \{[^}]*steer\(Number\(\$\("steerSlider"\)\.value\)\)/.test(aq) && /if \(!sliding\)/.test(aq) && /brainSel\.layer !== lastPanel\.lens\.col/.test(aq));
     const { chromium, from: pwFrom } = resolvePlaywright(createRequire(import.meta.url)), skip = browserSkipReason(chromium, pwFrom, HEADLESS_SHELL);
     if (skip) { console.log("  ----  live half SKIPPED -- " + skip); console.log("  ----  *** THAT IS A SKIP AND NOT A PASS: the clicks are only a page's"); }
     else {
@@ -376,7 +378,16 @@ console.log("\n13. THE AQUARIUM'S CLICKS (v4904; a browser, SKIPPED and said wit
             ok("!! a click on the first row of the steer lens selects that neuron of the last hidden layer: the line says h<i> is selected and can be pushed, and the push buttons come alive", before[0] && before[1] && /^h\d+ selected: push it up or down/.test(m1) && !d1[0] && !d1[1] && d1[2], JSON.stringify({ before, m1, d1 }));
             await pg.click("#steerUp", { timeout: 3000 }).catch(() => {}); await pg.waitForTimeout(500);
             const who = await txt("#brainWho"), m2 = await txt("#steerMsg"), d2 = await dis();
-            ok("!! pushing it steers the sub: the panel's header says STEERED h<i>, the message gives the push in hidden units, the clear button comes alive", /STEERED h\d+/.test(who) && /^steering h\d+ by \+\d/.test(m2) && !d2[2], JSON.stringify({ who: who.slice(-30), m2 }));
+            ok("!! pushing it steers the sub: the panel's header says STEERED h<i>, the message gives the held push in hidden units and what it does to each output, the clear button comes alive", /STEERED h\d+/.test(who) && /^holding h\d+ at \+\d/.test(m2) && /-> outputs /.test(m2) && !d2[2], JSON.stringify({ who: who.slice(-30), m2 }));
+            // v4904 -- the slider HOLDS a push live: moving it sets the steer at that many times the lens's push, the readout follows, zero lets go; the slider's own position is the held push / the scale it began with
+            const slide = async (v) => { await pg.$eval("#steerSlider", (e, val) => { e.value = String(val); e.dispatchEvent(new Event("input", { bubbles: true })); }, v); await pg.waitForTimeout(500); };
+            await slide(-6);
+            const sw = await txt("#brainWho"), sm = await txt("#steerMsg"), sv = await pg.$eval("#steerSlider", (e) => e.value), sd = await dis();
+            await slide(6); const sm2 = await txt("#steerMsg"), sv2 = await pg.$eval("#steerSlider", (e) => e.value);
+            ok("!! the hold slider (disabled until a pushable neuron is selected) holds a push at -6, then +6, times the lens's push: the header says STEERED, the message gives the held value (negative, then positive) and the outputs it moves, the slider keeps its position as the lens's own scale moves", /STEERED h\d+/.test(sw) && /^holding h\d+ at -\d/.test(sm) && /-> outputs/.test(sm) && Number(sv) === -6 && !sd[0] && /^holding h\d+ at \+\d/.test(sm2) && Number(sv2) === 6, JSON.stringify({ sm, sv, sm2, sv2 }));
+            await slide(0); const sw0 = await txt("#brainWho"), sm0 = await txt("#steerMsg");
+            ok("  moving it back to zero lets go: no STEERED in the header and the message offers the push again", !/STEERED/.test(sw0) && /selected: push it up or down/.test(sm0), sm0);
+            await pg.click("#steerUp", { timeout: 3000 }).catch(() => {}); await pg.waitForTimeout(400);
             await pg.click("#steerClear"); await pg.waitForTimeout(500);
             const who3 = await txt("#brainWho"), d3 = await dis();
             ok("  clearing lets go: no STEERED in the header and the clear button is disabled again", !/STEERED/.test(who3) && d3[2], who3.slice(-30));

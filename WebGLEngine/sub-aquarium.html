@@ -106,6 +106,7 @@
         <label>view <select id="brainMode" title="bars: the activations, the steer lens and the policy map. layers: every layer as a column of dots with the strongest weights between them"><option value="bars">bars + lens + policy map</option><option value="layers">layers</option></select></label>
         <span title="Click a row of the steer lens or a dot of the layers view to select a neuron; its wiring is written along the top. A neuron of the last hidden layer can be pushed: the sub flies on the pushed copy of its weights.">
           <button id="steerUp" disabled>push +</button> <button id="steerDown" disabled>push &minus;</button> <button id="steerClear" disabled>clear</button>
+          <label>hold <input type="range" id="steerSlider" min="-16" max="16" step="0.5" value="0" disabled style="vertical-align:middle;width:150px" title="Hold a push on the selected neuron while the sub flies: &times; the lens's push (the brain panel's steer lens). Zero lets go."> <b id="steerVal">0</b></label>
           <label>dose <select id="steerDose"><option value="1">1</option><option value="4">4</option><option value="8" selected>8</option><option value="16">16</option></select> &times; the lens's push</label></span>
         <span class="sub" id="steerMsg">click a neuron to select it</span></div></section>
     <section class="panel p2d" aria-label="Compass dropout: the plain autopilot beside the navigator"><h2>Compass dropout <span class="hint"><button id="compassBtn" title="Take the compass away on two subs at once, in the same windows: the first sub keeps the plain autopilot, the second flies behind the dead-reckoning navigator. Press again to end it.">compass test</button></span></h2>
@@ -262,10 +263,16 @@ function drawSub(g, px, py, heading, hue, len, sel) {
 // the selected brain: bars for what the brain is made of (a network's neurons, or the autopilot's laws) and the policy map, redrawn five times a second
 const bcv = $("brainView"), bg = bcv.getContext("2d"); let lastBrain = 0, brainSel = null, brainSelFor = null, lastRects = [], lastPanel = null;
 // v4904 -- the selected neuron ({ layer, i } in the layered map's columns): a click on a lens row or a dot; it belongs to the sub that was selected when it was made
+let steerScale = 0, sliding = false;   // the hidden units one "x the lens's push" was worth when the steer began: held, so the slider does not drift as the lens's rms moves
 function steerButtons(panel, pr) {
-  const can = !!(pr && pr.kind === "fly" && panel && panel.lens && brainSel && brainSel.layer === panel.lens.col);
-  $("steerUp").disabled = $("steerDown").disabled = !can; $("steerClear").disabled = !(pr && pr.steer);
-  $("steerMsg").textContent = pr && pr.steer ? `steering h${pr.steer.neuron} by ${pr.steer.delta >= 0 ? "+" : ""}${pr.steer.delta.toFixed(2)} (hidden units)` : brainSel ? (can ? `h${brainSel.i} selected: push it up or down` : "this neuron is not in the last hidden layer: it can be read, not pushed") : "click a neuron to select it";
+  const can = !!(pr && pr.kind === "fly" && panel && panel.lens && brainSel && brainSel.layer === panel.lens.col), mine = !!(pr && pr.steer && brainSel && brainSel.layer === (panel && panel.lens ? panel.lens.col : -1) && brainSel.i === pr.steer.neuron);
+  $("steerUp").disabled = $("steerDown").disabled = !can; $("steerClear").disabled = !(pr && pr.steer); $("steerSlider").disabled = !can;
+  if (!sliding) { const v = mine && steerScale > 0 ? pr.steer.delta / steerScale : 0; $("steerSlider").value = String(Math.max(-16, Math.min(16, v))); $("steerVal").textContent = (Math.round(v * 10) / 10).toString(); }
+  if (pr && pr.steer) {   // what the push does to each output, read off the lens row of the pushed neuron (the direct path, before the panel's range mapping)
+    const row = panel && panel.lens ? panel.lens.rows.find((r) => r.i === pr.steer.neuron) : null, k = panel && panel.lens && panel.lens.scale > 0 ? pr.steer.delta / panel.lens.scale : 0;
+    const eff = row ? panel.lens.outputs.map((o, j) => [o, row.push[j] * k]).filter(([, d]) => Math.abs(d) >= 0.005).map(([o, d]) => `${o} ${d >= 0 ? "+" : ""}${d.toFixed(2)}`).join(", ") : "";
+    $("steerMsg").textContent = `holding h${pr.steer.neuron} at ${pr.steer.delta >= 0 ? "+" : ""}${pr.steer.delta.toFixed(2)}` + (eff ? ` -> outputs ${eff}` : "");
+  } else $("steerMsg").textContent = brainSel ? (can ? `h${brainSel.i} selected: push it up or down` : "this neuron is not in the last hidden layer: it can be read, not pushed") : "click a neuron to select it";
 }
 function drawBrain() {
   const now = performance.now(); if (now - lastBrain < 200) return; lastBrain = now;
@@ -281,12 +288,18 @@ bcv.addEventListener("click", (e) => {
   brainSel = hit && brainSel && brainSel.layer === hit.layer && brainSel.i === hit.i ? null : hit; lastBrain = 0; drawBrain();   // a second click on the same neuron lets go of it
 });
 $("brainMode").addEventListener("change", () => { lastBrain = 0; drawBrain(); });
-function steer(sign) {
+function steer(v) {   // v: the push in units of the lens's push (the buttons give +-dose, the slider whatever it says); 0 lets go
   if (!selected || !brainSel || !lastPanel || !lastPanel.lens || brainSel.layer !== lastPanel.lens.col) return;
-  try { tank.setSteer(selected, brainSel.i, sign * Number($("steerDose").value) * lastPanel.lens.scale); } catch (e) { $("steerMsg").textContent = String((e && e.message) || e).slice(0, 90); return; }
+  const cur = tank.probe(selected), mine = cur && cur.steer && cur.steer.neuron === brainSel.i;
+  try {
+    if (v === 0) tank.setSteer(selected, null, 0);
+    else { if (!mine || !(steerScale > 0)) steerScale = lastPanel.lens.scale; tank.setSteer(selected, brainSel.i, v * steerScale); }
+  } catch (e) { $("steerMsg").textContent = String((e && e.message) || e).slice(0, 90); return; }
   lastBrain = 0; drawBrain();
 }
-$("steerUp").onclick = () => steer(1); $("steerDown").onclick = () => steer(-1);
+$("steerUp").onclick = () => steer(Number($("steerDose").value)); $("steerDown").onclick = () => steer(-Number($("steerDose").value));
+$("steerSlider").addEventListener("pointerdown", () => { sliding = true; }); addEventListener("pointerup", () => { sliding = false; });
+$("steerSlider").addEventListener("input", () => { $("steerVal").textContent = $("steerSlider").value; steer(Number($("steerSlider").value)); });
 $("steerClear").onclick = () => { if (selected) { try { tank.setSteer(selected, null, 0); } catch (e) {} lastBrain = 0; drawBrain(); } };
 const cv = $("compassView"), cg = cv.getContext("2d"); let tracePlain = [], traceNav = [], lastTrace = 0;
 function drawCompass(snap) {
