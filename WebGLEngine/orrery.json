@@ -2082,11 +2082,15 @@
    "name": "zebrafish-vestibular",
    "arrived": "2026-10-24",
    "sha": "894bd65159b001c770ad2dced7582dc8cab4342b",
-   "bytes": 2491929,
+   "bytes": 2579651,
    "files": [
     {
      "path": "41467_2022_32824_MOESM11_ESM.zip",
      "bytes": 2401174
+    },
+    {
+     "path": "41467_2022_32824_MOESM11_SourceData.xlsx",
+     "bytes": 86497
     },
     {
      "path": "41467_2022_32824_MOESM4_ESM.xlsx",
@@ -2098,7 +2102,7 @@
     },
     {
      "path": "PROVENANCE.md",
-     "bytes": 13054
+     "bytes": 14279
     }
    ]
   }
