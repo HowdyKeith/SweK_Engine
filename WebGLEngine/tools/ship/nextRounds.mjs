@@ -2623,9 +2623,9 @@ export const NEXT_ROUNDS = [
     {
         id: "needs-pieces-3-and-4-task-and-stateful-pilot",
         blocker: "OPEN",
-        what: "Pieces 3 and 4 of Keith's parked needs-and-limits idea (brain/SUBMARINE_WIP.md \"Parked idea\"): a TASK that puts the charge and the hull in conflict, with audits and controls, and a STATEFUL pilot for it. Not built.",
-        how: "Register the task, its audits and its controls BEFORE running anything (the standing rule for the fish ladder); the refill-trip rule in brain/needsPilot.mjs is the baseline to beat, not a result. Energy and hull strain are slow internal states, which is what a stateless pilot cannot hold and a persistent-activity circuit might.",
-        why: "Nothing built so far claims any pilot does better or worse with needs; the refill trip is a stand-in rule that exists so the model can be seen working. The fish/fly question is untouched until this is run.",
+        what: "Piece 4 of Keith's needs-and-limits idea: a STATEFUL pilot for the survey run, scored against the rule pilot GUARDED. PIECE 3 IS BUILT (v4905 work: brain/needsTask.mjs, its two gates, brain/NEEDS_AND_LIMITS.md \"Round 2\"): the task, four kinds, five rule baselines (SPIN the safe harbour, DIRECT, TRIP, HULLONLY, GUARDED), the validity rows. No learned or circuit pilot has been run on it, and the AUDIT_SET (seeds 51-62) is unread.",
+        how: "Register the controls BEFORE running (the standing rule): the same circuit with no state, a size-matched random wiring, and the same wiring with the energy and hull readings withheld. Verdict rule is in NEEDS_AND_LIMITS.md: F beats GUARDED on AUDIT_SET iff mean(F) - mean(GUARDED) > max(0.02, 2 sd) and F is crushed in no more runs. The task's scenario ranges and baselines were TUNED on BASELINE_SET (seeds 501-508), so the baselines must be re-scored on AUDIT_SET fresh before the comparison. Energy and hull strain are slow internal states, which a stateless pilot cannot hold and a persistent-activity circuit might.",
+        why: "Nothing built so far claims any pilot does better or worse with needs; GUARDED is a hand-written rule that scores 0.85 on far, 0.81 on both against the safe harbour's 0.55. The fish/fly question is untouched until a stateful pilot is run against it.",
     },
     {
         id: "needs-tank-scale-numbers",
@@ -2637,9 +2637,9 @@ export const NEXT_ROUNDS = [
     {
         id: "needs-not-modelled",
         blocker: "OPEN",
-        what: "What the needs model leaves out: pumps to clear a flood (flooding is only ever added, to the 15% cap), repair (the aquarium's restore resets the sub), the snorkel's noise beyond its `exposed` flag, and the power the ballast pump draws (a dead screw still pumps for free).",
-        how: "Each is a small addition to physics/mechanics/subNeeds.mjs with its own gate row and mutant: a pump rate that works against the leak at a power cost, a repair that costs time at the surface, an exposure cost that a pilot can be audited on, and a pump draw in the power formula.",
-        why: "None is needed to show the charge and the pressure working; each changes what a pilot has to trade, so each belongs with piece 3 (the task) and not before it.",
+        what: "What the needs model STILL leaves out after v4905 (built then, opt-in through stepNeeds' aux: the flood pump, repair at the surface, the snorkel's exposure seconds as a reading, the ballast pump's electrical draw and a boat with no charge being unable to work the normal pump): a COMPRESSOR (the air bottle never refills; the survey task works around it with a six-level bottle), a charge cost for the exposure (it is a reading only; no task charges it), a pump whose power or rate varies with the pilot's choice beyond 0..1, and the aquarium PAGE's controls for the pump and repair (the sim's setNeeds/injure take no aux yet).",
+        how: "Each is a small addition to physics/mechanics/subNeeds.mjs or the aquarium with its own gate row and mutant: a compressor that refills `air` at the surface for watts; an exposure charge in the task's score (registered first); aquarium buttons that pass aux for a selected sub.",
+        why: "None is needed to show the charge, the pressure, the pump or the repair working; the compressor matters only to a task that surfaces more than a six-level bottle allows.",
     },
     {
         id: "ai-managed-sub-stations",
@@ -2648,6 +2648,13 @@ export const NEXT_ROUNDS = [
         how: "No work proposed. If taken up: a station is a function from what that station can sense to what it commands, a captain layer decides between them, and the existing per-purpose pieces (the PD autopilot, the surfacing and emergency wrappers, the navigator and the estimators, the refill trip) are the first station brains.",
         why: "Logged so the idea is not lost; it only means something once the needs task (piece 3) exists, because the stations only conflict when the boat has needs.",
         upstream: "needs-pieces-3-and-4-task-and-stateful-pilot",
+    },
+    {
+        id: "fish-vestibular-data-arrived-partial",
+        blocker: "OPEN",
+        what: "Keith supplied a zip (Nature Communications 2022, article 41467_2022_32824, supplementary MOESM11: zebrafish otolith afferents and central vestibular neurons; Source Data xlsx, 44 SWC neuron morphologies in nm, and CATMAID layout JSONs). It was inspected and NOT added to the tree. It holds NO synapse adjacency: the JSONs are only lists of skeleton ids for the viewer at zf.hms.harvard.edu/hildebrand16 (not reachable from the sandbox), so the wiring behind rung 4b is still not in hand. What it does hold: per-afferent tuning and ribbon counts (Fig 2g, 5f-h), central neuron tuning angles (Fig 3d, 4a-c), afferent-to-neuron connection percentages by striolar / extrastriolar / immature class (Fig 6b, c), and morphologies for the VS, tangential nucleus and superior VN neurons.",
+        how: "Decide with Keith what to take: (a) the tuning and the class-level connection percentages are enough to build a SMALL class-level circuit (afferent classes -> vestibulospinal neurons) for pitch, labelled as built from published percentages and not from a connectome; (b) the full wiring needs the CATMAID connectivity export for the listed skeleton ids, from a box that can reach the server. Copy the xlsx (86 KB) into vendor/ with its licence note if (a); leave the SWC files out unless a morphology-based model is wanted (7 MB).",
+        why: "SUBMARINE_WIP.md rung 4b was held until this data arrived; a part of it did, and the part that did not is named so the circuit is not built from more than the data says.",
     },
 ];
 

@@ -11,7 +11,9 @@
 //   6  LEAK        none at damage 0; more with depth and with damage; capped at 15%; a leaking boat sinks against a sound one
 //   7  INJURE      adds, clamps to 1, ignores NaN, negatives and strings, never edits its argument
 //   8  THE TRIP    needsPilot: the hysteresis, the surface flag for a battery and the snorkel depth for a snorkel, a hull that never refills passes through untouched; and a closed loop on the real physics: a battery boat at 25% surfaces, charges to 90%, dives back
+//   9  THE FOUR ADDITIONS (v4905, opt-in through aux): A1 aux absent/zero/garbage is bit-identical and a command over 1 reads as 1; A2 the flood pump (rate x head factor x dt, its watts, nothing dead); A3 repair (surface only, nearly stopped); A4 exposure seconds; A5 the ballast pump's draw and a dead boat's frozen pump; A6 unlimited
 // WHAT IT DOES NOT CLAIM: that the numbers are a real boat's (tank-scale), that a pilot is better or worse with needs (piece 3, registered first), a pump or a repair.
+// v4905 SABOTAGE (section 9, each applied in place to subNeeds.mjs, the gate run, the file restored md5-identical; rows red in brackets): pump ignoring the head [2] | pump working dead [1] | repair at any depth [1] | repair when dead [1] | repair twice as fast [1] | repair at speed [1] | exposure counting always [1] | no ballast draw [1] | no pump watts [1] | a dead boat's pump not frozen [1] | aux unclamped [0 -> 1 after the A1b row; the first draft's NaN/negative garbage never reached the clamp because `> 0` already refuses them, so a command of 7 was added].
 //
 // SABOTAGE LOG -- TWENTY-THREE, each applied in place to physics/mechanics/subNeeds.mjs (N1-N18) or brain/needsPilot.mjs (N19-N22), the gate run, the file restored (md5-identical); rows red in brackets:
 //   N1 power without the efficiency 2 | N2 no hotel load 5 | N3 a dead screw still pushing 2 | N4 refilling at depth and not at the surface 2 | N5 the snorkel never exposed 3 | N6 no capacity cap 1 | N7 the charge able to go negative 1 | N8 damage costing a quarter, not a half, of the collapse depth 3 |
@@ -150,6 +152,44 @@ console.log("\n8. THE TRIP");
     const lb = loop("battery"), ls = loop("snorkel");
     ok("!! on the real physics a battery boat at 25% climbs to the surface (centre under 0.8 m), charges to 90%, and dives back to its 20 m task, without ending", lb.minD < 0.8 && lb.full !== null && lb.back !== null && lb.back > lb.full && lb.status === "submerged", `surfaced to ${lb.minD.toFixed(2)} m, 90% at ${lb.full && lb.full.toFixed(0)} s, back at depth by ${lb.back && lb.back.toFixed(0)} s`);
     ok("!! a snorkel boat does the same without breaking the surface (its centre never above 1 m, charging at a mast depth of 4 m or less), EXPOSED while it charges", ls.minD > 1 && ls.minD < 4 && ls.exposed && ls.full !== null && ls.back !== null && ls.status === "submerged", `${ls.minD.toFixed(2)} m, exposed ${ls.exposed}, 90% at ${ls.full && ls.full.toFixed(0)} s`);
+}
+
+console.log("\n9. THE FOUR ADDITIONS (v4905: pump, repair, exposure, the ballast pump's draw -- all opt-in through aux)");
+{
+    const step = (nd, st, aux, model = M, cmd = { pitch: 0, yaw: 0, thrust: 0, ballast: 0 }) => N.stepNeeds(model, st, nd, cmd, DT, [0, 0, 0], 0, aux);
+    const at = (depth, speed = 0, model = M) => S.createState({ depth, speed, model });
+    // A1 aux absent / all zero / garbage changes nothing, 600 ticks, state and needs
+    { let a = at(25, 1.5), b = at(25, 1.5), c = at(25, 1.5), na = { ...N.initialNeeds("battery"), damage: 0.3, flood: 0.01 }, nb = na, nc = na, same = true; const p = AS.pilot(), tg = { depth: 30, heading: 0.2, speed: 2 };
+      for (let i = 0; i < 600; i++) { const ra = N.stepNeeds(M, a, na, p(a, tg, [0, 0, 0]), DT), rb = N.stepNeeds(M, b, nb, p(b, tg, [0, 0, 0]), DT, [0, 0, 0], 0, { pump: 0, repair: 0 }), rc = N.stepNeeds(M, c, nc, p(c, tg, [0, 0, 0]), DT, [0, 0, 0], 0, { pump: NaN, repair: -3 });
+        if (JSON.stringify(ra) !== JSON.stringify(rb) || JSON.stringify(ra) !== JSON.stringify(rc)) same = false; a = ra.state; na = ra.needs; b = rb.state; nb = rb.needs; c = rc.state; nc = rc.needs; }
+      ok("!! A1 aux absent, all zero, NaN or negative is bit-identical to a call without it for 600 ticks (state, needs, watts)", same); }
+    // A1b the commands are clamped to [0, 1]: seven is one
+    { const nd0 = { ...N.initialNeeds("battery"), flood: 0.05, damage: 0.3 }, sf = at(0.4, 0);
+      ok("!! A1 a command over 1 is read as 1 (pump 7 = pump 1 in flood and watts; repair 9 = repair 1 at the surface)", JSON.stringify(step(nd0, at(30, 0), { pump: 7 })) === JSON.stringify(step(nd0, at(30, 0), { pump: 1 })) && JSON.stringify(step(nd0, sf, { repair: 9 })) === JSON.stringify(step(nd0, sf, { repair: 1 }))); }
+    // A2 the pump
+    { const nd0 = { ...N.initialNeeds("battery"), flood: 0.05 }, st = at(30, 0), r = step(nd0, st, { pump: 1 }), expect = 0.05 - N.PUMP.rate * (1 - 30 / N.PUMP.headDepth) * DT;
+      ok("!! A2 the pump removes flood at rate x (1 - depth/head) x dt x command (30 m, full, then half) and no leak at damage 0", near(r.needs.flood, expect, 1e-7) && near(step(nd0, st, { pump: 0.5 }).needs.flood, 0.05 - 0.5 * N.PUMP.rate * (1 - 30 / N.PUMP.headDepth) * DT, 1e-7) && r.needs.flood < 0.05 - 1e-4 * 0 && Math.abs((0.05 - r.needs.flood) - N.PUMP.rate * (1 - 30 / N.PUMP.headDepth) * DT) < 1e-7, `${r.needs.flood}`);
+      ok("!! A2 it works against the head: no effect at 90 m, and never takes the flood under 0", step({ ...nd0 }, at(90, 0), { pump: 1 }).needs.flood === 0.05 && step({ ...nd0, flood: 1e-9 }, st, { pump: 1 }).needs.flood === 0);
+      ok("!! A2 it costs PUMP.watts x the command on top of the hotel load, and nothing at energy 0 (flood stays, no draw)", near(r.watts - step(nd0, st, null).watts, N.PUMP.watts, 1e-9) && near(step(nd0, st, { pump: 0.5 }).watts - step(nd0, st, null).watts, 0.5 * N.PUMP.watts, 1e-9) && step({ ...nd0, energy: 0 }, st, { pump: 1 }).needs.flood === 0.05);
+      // closed loop: a flooded boat held at depth with the pump on ends lighter than the same boat without it
+      const dive = (pump) => { let s = at(20, 1.5), nd = { ...N.initialNeeds("battery"), flood: 0.04 }; const p = AS.pilot(), tg = { depth: 20, heading: 0, speed: 1.5 }; for (let i = 0; i < 20 * 30; i++) { const rr = N.stepNeeds(M, s, nd, p(s, tg, [0, 0, 0]), DT, [0, 0, 0], 0, { pump }); s = rr.state; nd = rr.needs; } return nd.flood; };
+      ok("!! A2 on the physics, 20 s of pumping takes a 4% flood to under 3.9% and without the pump it stays", dive(1) < 0.0395 && dive(0) === 0.04, `${dive(1)} vs ${dive(0)}`); }
+    // A3 repair
+    { const nd0 = { ...N.initialNeeds("battery"), damage: 0.3 }, surf = at(0.5, 0), r = step(nd0, surf, { repair: 1 });
+      ok("!! A3 repair removes damage at rate x dt x command at the surface and the collapse depth rises with it", near(r.needs.damage, 0.3 - N.REPAIR.rate * DT, 1e-12) && N.collapseDepth(M, r.needs.damage) > N.collapseDepth(M, 0.3) && near(step(nd0, surf, { repair: 0.5 }).needs.damage, 0.3 - 0.5 * N.REPAIR.rate * DT, 1e-12));
+      ok("!! A3 not at 2 m, not at 1 m/s, never under 0, costs its watts, nothing at energy 0", step(nd0, at(2, 0), { repair: 1 }).needs.damage === 0.3 && step(nd0, at(0.5, 1), { repair: 1 }).needs.damage === 0.3 && step({ ...nd0, damage: 1e-9 }, surf, { repair: 1 }).needs.damage === 0 && near(r.watts - step(nd0, surf, null).watts, N.REPAIR.watts, 1e-9) && step({ ...nd0, energy: 0 }, surf, { repair: 1 }).needs.damage === 0.3); }
+    // A4 exposure
+    { const sn = { ...N.initialNeeds("snorkel") }, ba = N.initialNeeds("battery"), s3 = at(3, 0), r = step(sn, s3, null), r5 = step(sn, at(5, 0), null);
+      ok("!! A4 a snorkel boat's exposedS grows by dt inside its mast depth and not outside, a battery boat's never grows, and readings reports it", near(r.needs.exposedS, DT, 1e-12) && r5.needs.exposedS === 0 && step(ba, at(0.3, 0), null).needs.exposedS === 0 && N.readings(M, { ...sn, exposedS: 7 }, s3).exposedS === 7 && N.readings(M, sn, s3).exposedS === 0); }
+    // A5 the ballast pump's draw, and a dead boat's frozen pump
+    { const nd = N.initialNeeds("battery"), st = { ...at(20, 0, TANKM), tank: { ...S.initialTank(TANKM), level: 0 } }, flood = { pitch: 0, yaw: 0, thrust: 0, ballast: 1 };
+      const a = step(nd, st, null, TANKM, flood), b = step(nd, st, null, TANKM, { ...flood, ballast: 0 }), hdr = step(nd, at(20, 0), null, M, flood), hdr0 = step(nd, at(20, 0), null, M, { ...flood, ballast: 0 }), moved = Math.abs(a.state.tank.level);
+      ok("!! A5 on a model with a tank, moving the tank draws wPerUnit x |level change|/dt on top of the hotel load; holding it draws nothing; on the header model (instant ballast) nothing is drawn", near(a.watts - b.watts, N.BALLAST_PUMP.wPerUnit * moved / DT, 1e-9) && moved > 0 && b.watts === N.POWER.hotelW && hdr.watts === hdr0.watts, `${(a.watts - b.watts).toFixed(1)} W for ${moved.toFixed(5)}`);
+      const dead = { ...nd, energy: 0 }, d1 = step(dead, st, null, TANKM, flood), e1 = step(dead, st, null, TANKM, { ...flood, ballast: 0, blow: 1 });
+      ok("!! A5 a boat with no charge cannot work the normal pump (its tank level stays) but its emergency blow (stored air) still moves the tank", d1.state.tank.level === 0 && e1.state.tank.level < 0, `normal ${d1.state.tank.level}, blow ${e1.state.tank.level}`); }
+    // A6 unlimited and a header model are untouched by the pump rules
+    { const un = N.initialNeeds("unlimited"), r = step({ ...un, flood: 0.05 }, at(30, 0), { pump: 1 }), r0 = step({ ...un, flood: 0.05 }, at(30, 0), null);
+      ok("!! A6 an unlimited hull pumps without losing charge (energy stays Infinity) and its pump still takes the flood down", r.needs.energy === Infinity && r.needs.flood < 0.05 && r0.needs.flood === 0.05); }
 }
 
 console.log(fails ? `\n${fails} FAIL` : "\nall checks pass");

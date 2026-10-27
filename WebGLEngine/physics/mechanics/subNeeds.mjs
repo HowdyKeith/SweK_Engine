@@ -24,6 +24,10 @@ export const CLASSES = Object.freeze({
 });
 export const POWER = Object.freeze({ hotelW: 200, efficiency: 0.5 });
 export const HULL = Object.freeze({ yieldFrac: 0.8, creepPerS: 0.002, collapseLoss: 0.5, leakAtFull: 0.01, floodMax: 0.15 });
+// v4905 -- the four things v4904 left out (brain/NEEDS_AND_LIMITS.md "Round 2", written first). All OPT-IN through stepNeeds' `aux` ({ pump, repair }, each 0..1), tank-scale, said plainly.
+export const PUMP = Object.freeze({ rate: 0.01, headDepth: 90, watts: 1500 });            // flood removed, fraction of the weight per second at full and zero head; the pump works against the depth
+export const REPAIR = Object.freeze({ rate: 0.004, watts: 800, maxDepth: 1.0, maxSpeed: 0.5 });   // damage removed per second at full, ONLY at the surface and nearly stopped
+export const BALLAST_PUMP = Object.freeze({ wPerUnit: 600 });                              // watts per (level unit / second) the tank is moved, on a model whose ballast has dynamics
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 const num = (v) => (Number.isFinite(v) ? v : 0);
 
@@ -56,29 +60,38 @@ export function injure(needs, amount) {
 /** What a pilot or a page can read: the charge, the pressure and the strain, the damage, the flooding, the collapse depth. */
 export function readings(model, needs, state) {
     const depth = -state.pos[2], c = CLASSES[needs.cls], cap = c.capacityJ, r = refillAt(needs.cls, depth), cd = collapseDepth(model, needs.damage, needs.crush);
-    return { cls: needs.cls, energy: needs.energy, capacity: cap, frac: cap === Infinity ? 1 : needs.energy / cap, depth, pressure: S.WATER_DENSITY * S.GRAVITY * Math.max(0, depth), strain: depth > 0 ? depth / cd : 0, damage: needs.damage, flood: needs.flood, collapseDepth: cd, canRefill: r.ok, exposed: r.exposed, refills: c.chargeW > 0, refillDepth: c.refillDepth };
+    return { cls: needs.cls, energy: needs.energy, capacity: cap, frac: cap === Infinity ? 1 : needs.energy / cap, depth, pressure: S.WATER_DENSITY * S.GRAVITY * Math.max(0, depth), strain: depth > 0 ? depth / cd : 0, damage: needs.damage, flood: needs.flood, exposedS: needs.exposedS || 0, collapseDepth: cd, canRefill: r.ok, exposed: r.exposed, refills: c.chargeW > 0, refillDepth: c.refillDepth };
 }
 
 /**
  * One tick with needs: the same as S.stepSub plus the advanced `needs` and { watts, charging, exposed, thrustApplied }. `needs` null is S.stepSub unchanged (with `needs: null`). `extraWeight` is any weight the caller adds on top of the
- * leak (a flood event). A dead screw (energy 0 on a class that has a limit) has the thrust command forced to 0 BEFORE the step.
+ * leak (a flood event). A dead screw (energy 0 on a class that has a limit) has the thrust command forced to 0 BEFORE the step. `aux` ({ pump, repair }, 0..1, optional) works the flood pump and the repair (see PUMP, REPAIR); on a tank with dynamics the pump's draw is charged and a boat with no charge cannot work the normal pump.
  */
-export function stepNeeds(model, state, needs, controls, dt = S.DT, current = [0, 0, 0], extraWeight = 0) {
+// a boat with no charge cannot work the normal pump: the same model with the pump rate at 0 (the emergency blow is stored air and keeps its own rate). One per model, built once.
+const FROZEN = new WeakMap();
+const frozenPump = (model) => { let m = FROZEN.get(model); if (!m) { m = S.createSubModel({ ...model.spec, tankRate: 0 }); FROZEN.set(model, m); } return m; };
+
+export function stepNeeds(model, state, needs, controls, dt = S.DT, current = [0, 0, 0], extraWeight = 0, aux = null) {
     if (!needs) return { ...S.stepSub(model, state, controls, dt, current, extraWeight), needs: null };
     const c = CLASSES[needs.cls], limited = !c.free, dead = limited && needs.energy <= 0, san = S.sanitize(controls);
     const cmd = dead ? { ...san, thrust: 0 } : san;
     const frac = S.submerged(model, state.pos[2]), s = model.spec;
     const thrustN = s.thrustMax * (cmd.thrust >= 0 ? cmd.thrust : cmd.thrust * s.reverseFraction) * frac;
     const rel = [state.vel[0] - current[0], state.vel[1] - current[1], state.vel[2] - current[2]], forward = worldToBody(state.q, rel)[0];
-    const watts = power(thrustN, forward), res = S.stepSub(model, state, cmd, dt, current, extraWeight + needs.flood);
+    const pumpC = aux ? clamp(num(aux.pump), 0, 1) : 0, repC = aux ? clamp(num(aux.repair), 0, 1) : 0, pumpOn = pumpC > 0 && !dead;
+    const atSurface = -state.pos[2] <= REPAIR.maxDepth && Math.hypot(state.vel[0], state.vel[1], state.vel[2]) <= REPAIR.maxSpeed, repairOn = repC > 0 && !dead && atSurface;
+    const tankLive = S.hasTank(model) && S.dynamicTank(model);
+    let watts = power(thrustN, forward) + (pumpOn ? PUMP.watts * pumpC : 0) + (repairOn ? REPAIR.watts * repC : 0);
+    const res = S.stepSub(dead && tankLive ? frozenPump(model) : model, state, cmd, dt, current, extraWeight + needs.flood);
+    if (tankLive && state.tank && res.state.tank) watts += BALLAST_PUMP.wPerUnit * Math.abs(res.state.tank.level - state.tank.level) / dt;
     const depthNow = -res.state.pos[2], r = refillAt(needs.cls, depthNow);
     let energy = needs.energy;
     if (limited) energy = clamp(energy + ((r.ok ? c.chargeW : 0) - watts) * dt, 0, c.capacityJ);
     // the hull: strain at the depth the vessel has reached, the damage that depth does, the leak that damage lets in
     const strain = strainOf(model, depthNow, needs.damage, needs.crush);
-    const damage = clamp(needs.damage + (strain > HULL.yieldFrac ? HULL.creepPerS * (strain - HULL.yieldFrac) / (1 - HULL.yieldFrac) * dt : 0), 0, 1);
-    const flood = Math.min(HULL.floodMax, needs.flood + HULL.leakAtFull * needs.damage * strain * strain * dt);
-    const next = { ...needs, energy, damage, flood };
+    const damage = clamp(needs.damage + (strain > HULL.yieldFrac ? HULL.creepPerS * (strain - HULL.yieldFrac) / (1 - HULL.yieldFrac) * dt : 0) - (repairOn ? REPAIR.rate * repC * dt : 0), 0, 1);
+    const flood = Math.max(0, Math.min(HULL.floodMax, needs.flood + HULL.leakAtFull * needs.damage * strain * strain * dt) - (pumpOn ? PUMP.rate * clamp(1 - depthNow / PUMP.headDepth, 0, 1) * pumpC * dt : 0));
+    const next = { ...needs, energy, damage, flood, exposedS: (needs.exposedS || 0) + (r.exposed ? dt : 0) };
     if (res.status === "submerged" && depthNow > collapseDepth(model, damage, needs.crush)) return { ...res, status: "crushed", depth: depthNow, needs: next, watts, charging: r.ok, exposed: r.exposed, thrustApplied: thrustN };
     return { ...res, needs: next, watts, charging: r.ok, exposed: r.exposed, thrustApplied: thrustN };
 }
