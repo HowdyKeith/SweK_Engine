@@ -1,6 +1,6 @@
 // tools/ship/controlDossier-selfcheck.mjs
 //
-// Run: node tools/ship/controlDossier-selfcheck.mjs   (~0.8s — re-measured v4903: 0.72, 0.81 and 0.77 s wall in three runs alone on a 4-core box; v4902 had written ~1.7s and was ~4s at v3941)
+// Run: node tools/ship/controlDossier-selfcheck.mjs   (~1.2s — two boxes disagree by 2x and the header says so: 0.72, 0.81 and 0.77 s wall in three runs alone on one 4-core box at v4903, 1.67 s in the shared timing record from the other; v4902 had written ~1.7s, which the first box beats by more than the 2x statedRuntime allows, and ~0.8s would break declaredCost's 2x against the record)
 //
 // v3176 -- THE 114 CONTROLS ARE FIVE DECISIONS, NOT A HUNDRED AND FOURTEEN.
 //
