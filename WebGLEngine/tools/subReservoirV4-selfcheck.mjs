@@ -1,6 +1,6 @@
 // WebGLEngine/tools/subReservoirV4-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node tools/subReservoirV4-selfcheck.mjs      (~14 s -- 13.9 s alone at v4905 WIP, to be restated at ship)
+// Run: node tools/subReservoirV4-selfcheck.mjs      (~12 s -- measured alone, see the foot of this header)
 //
 // THE GATE OF tools/subReservoirV4.mjs (the ring map, the matched-drive weight, the reservoir with W_in as a parameter, the edge under an arm's own input, the gains of an arm), tools/ship/subEstimatorStudyV4.mjs (one circuit under one arm, the bottom line over the two arms, the report, the
 // arguments) and tools/ship/subEstimatorStudyV4Cmd.mjs: the study of brain/SUBMARINE_WIP.md "RUNG 4a VERSION 4", registered before any code for it and before any v4 circuit was scored. THE STUDY HAS NOT BEEN RUN; this gate holds the code the run will use.
@@ -117,6 +117,7 @@ sec("5. THE EDGE, UNDER THE ARM'S OWN INPUT");
 sec("6. THE STUDY ON SMOKE DIVES");
 {
     const data = ST.prepare({ auditBase: 70000, smoke: true }), cache = new Map(), spec = (s) => L.parseSpecs(s)[0];
+    data.fit = data.fit.slice(0, 2); data.sel = data.sel.slice(0, 1);   // two fitting dives and one held-out: the gate asks what the code does, not what a full run finds, and the sweep's cap is 20 s
     const fe = S4.runCircuit(V.ARMS.FE, spec("cx"), cxCircuit, data, { smoke: true, edgeCache: cache, closedLoop: false });
     const rm = S4.runCircuit(V.ARMS.RM, spec("cx"), cxCircuit, data, { smoke: true, edgeCache: cache, closedLoop: false });
     const rn = S4.runCircuit(V.ARMS.RM, spec("nostate:0"), cxCircuit, data, { smoke: true, edgeCache: cache, closedLoop: false });
@@ -126,7 +127,10 @@ sec("6. THE STUDY ON SMOKE DIVES");
     ok("!! FE's g* is the one v3's procedure finds for cx on the same fitting dives (the only change in FE is the grid)", fe.calibration.gStar === V3.edgeGain(cxCircuit, data.fit, { rho: E.spectralRadius(CS.reservoirOf(cxCircuit)) }).gain);
     ok("!! NO STATE has no edge and a single setting, under the ring map too; the three audits are scored for every record", rn.calibration.gStar === null && rn.calibration.status === "noRecurrence" && ["audit", "safetyAudit", "reserve"].every((a) => a in fe.scores || Object.keys(fe.scores).length === 3) && Object.keys(fe.scores).length === 3 && Object.keys(rm.scores).length === 3);
     // the record recomputed from the library's own parts: the readout and the choice are what a fit of the arm's own model gives (FE random input, RM ring input)
-    const refit = (arm, rec) => { const c = cxCircuit, rho = E.spectralRadius(CS.reservoirOf(c)), win = V.windowFor(arm, c, data.fit), g = V.gainsFor(arm, c, data.fit, { rho, win }), mk = (gain) => V.reservoirModel(c, { unit: "relu", gain, rho, persist: true, readAll: false, inScale: 1, win }), f = E.fitModel(mk, g.settings, V.LAMBDAS, data.fit, data.sel); return J(f.readout) === J(rec.readout) && f.lambda === rec.chosen.lambda && f.setting === rec.chosen.setting; };
+    const refit = (arm, rec) => { const c = cxCircuit, rho = E.spectralRadius(CS.reservoirOf(c)), win = V.windowFor(arm, c, data.fit), g = V.gainsFor(arm, c, data.fit, { rho, win, edge: cache.get(arm.id + "|cx") }), mk = (gain) => V.reservoirModel(c, { unit: "relu", gain, rho, persist: true, readAll: false, inScale: 1, win }), f = E.fitModel(mk, g.settings, V.LAMBDAS, data.fit, data.sel); return J(f.readout) === J(rec.readout) && f.lambda === rec.chosen.lambda && f.setting === rec.chosen.setting; };
+    // the edge of a record, checked WITHOUT searching for it again: no cell passes the bound at g* and some cell does at 1.003 g*, driven by the fitting dives under the arm's own window
+    const blowsAt = (arm, gain) => { const rho = E.spectralRadius(CS.reservoirOf(cxCircuit)), m = V.reservoirModel(cxCircuit, { unit: "relu", gain, rho, win: V.windowFor(arm, cxCircuit, data.fit) }); for (const d of data.fit) { let h = m.init(); for (let t = 0; t < d.ticks; t++) { h = m.step(h, d.X.subarray(t * NF, t * NF + NF)); for (let i = 0; i < h.length; i++) if (h[i] > V.BLOWUP) return true; } } return false; };
+    ok("!! each record's g* is the edge of THAT ARM'S OWN input (FE random, RM ring): no cell passes the bound at g* and one does at 1.003 g*", [[V.ARMS.FE, fe], [V.ARMS.RM, rm]].every(([arm, r]) => !blowsAt(arm, r.calibration.gStar) && blowsAt(arm, r.calibration.gStar * 1.003)));
     ok("!! each record is what a fit of that arm's own model gives, recomputed here from the library's parts (FE with the random input, RM with the ring input): same readout, same lambda, same gain", refit(V.ARMS.FE, fe) && refit(V.ARMS.RM, rm) && J(fe.readout) !== J(rm.readout));
     ok("!! the readout has 65 numbers (the 64 output cells and a constant), the closed loop is null when asked off", fe.readout.length === 65 && rm.readout.length === 65 && fe.closedLoop === null);
     const ctl = L.circuitFor(spec("layer:0"), cxCircuit), er = L.circuitFor(spec("er:0"), cxCircuit), dg = L.circuitFor(spec("degree:0"), cxCircuit), sg = L.circuitFor(spec("sign:0"), cxCircuit), ct = L.circuitFor(spec("count:0"), cxCircuit);
