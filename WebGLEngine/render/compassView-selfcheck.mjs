@@ -18,6 +18,7 @@
 //   K8 the true needle not green (see below) | K9 a dark face not red 2 | K10 the trace scale 180 2 | K11 the error printed signed 2 | K12 a NaN time pushed 3 | K13 any event accepted as a compass row 2
 //   render/subAquariumSim.mjs: K14 the dark window at 20 s 3 | K15 the navigator not behind the navigator (a crash too: the navigator's `last` is read) 1 | K16 the dropout flown behind the navigator 4 | K17 the navigator not told how long a tick was 1 | K18 a compass event given a tank 5
 //   K19 the pilot handed a new target object each tick (a crash too: the navigator is reset every tick and has no estimate) 1 | K20 the held heading follows the true one in the dark 1 | K21 the world not turned in the dark 3 | K22 error 0.01 in the light 2
+//   v4901, found by the rig's verify (a slower box, 'compass ok' where DARK was due): the row after the 10 s window waited 9 s of WALL time and the page steps the tank per frame, so a slow box had simulated less; it POLLS FOR THE DARK STATE now (60 s). K21 the dark window never opening (darkFrom 1000 in the sim) 3 red, by name.
 //   sub-aquarium.html: P1 the two events swapped 4 | P2 the dials never drawn 2 | P3 the list line never written 4
 // K8 was applied against a text that did not contain it on the first pass (the shell had left the file mid-restore from the battery before it) and the run printed NOT APPLIED rather than 0 red; the file was found with an amber true needle afterwards, mended, and K8 re-run alone.
 // TWO FINDINGS THE GATE MADE BEFORE ANY SABOTAGE: the navigator integrates over a fixed tick, and the tank clips its last tick to the frame (3-7 degrees of error at 10x in the page against 0.1 in a whole-tick run): tools/subNavigator.mjs gained an optional aux.dt and the 13.7 ms row holds it; and a pilot handed a fresh target object each tick resets the navigator every time (the tank makes one outside its steering box), so the pilot is handed one object.
@@ -159,7 +160,9 @@ console.log("\n5. THE PAGE");
             const msg = await pg.$eval("#msg", (e) => e.textContent), after = await ink();
             const lines = await pg.evaluate(() => [...document.querySelectorAll(".tk")].map((e) => e.textContent));
             ok("!! the compass test names who is on what, draws the dials (" + after + " inked pixels, empty faces were " + before + ") and puts a compass line on each list row", /Pike on the plain autopilot, Murmur on the navigator/.test(msg) && after > 20000 && before > 20000 && lines.length === 2 && /^PLAIN AUTOPILOT · compass/.test(lines[0]) && /^NAVIGATOR · compass/.test(lines[1]), JSON.stringify(lines).slice(0, 160));
-            await pg.waitForTimeout(9000);
+            // v4901 -- WAIT FOR THE STATE, NOT FOR THE CLOCK: the page steps the tank per frame, so at 10x speed a slower box has simulated less than ten seconds after 9 s of wall time (the rig read 'compass ok' there, a flake of this row's own making). Poll until the plain row reads DARK, up to 60 s; a page that never gets there still fails the row below.
+            await pg.waitForFunction(() => { const t = document.querySelectorAll(".tk"); return t.length > 0 && /compass DARK/.test(t[0].textContent); }, null, { timeout: 60000, polling: 250 }).catch(() => {});
+            await pg.waitForTimeout(500);
             const dark = await pg.evaluate(() => [...document.querySelectorAll(".tk")].map((e) => e.textContent));
             ok("!! ten seconds in (the 10 s window has opened at 10x speed) the plain row reads DARK with a heading error and the navigator's stays under 2 degrees", /compass DARK/.test(dark[0]) && /compass DARK · heading error [0-1]°/.test(dark[1]), JSON.stringify(dark).slice(0, 200));
             await pg.click("#compassBtn"); await pg.waitForTimeout(400);
