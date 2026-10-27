@@ -15567,6 +15567,12 @@ const ogreScenario = new OgreScenario({
     entityMeshRenderer,        // round 33 — for env sun
     bridge,                    // round 131 — multiplayer shared OGRE HP
 });
+// v4904 -- THE OGRE NEEDS THE WORLD DRAWN. gridWorld.on() and the blank sandbox's stage set window._demoIsolation to "exclusive", which hides the voxels, sky, water and every entity the stage did not register, so `ogre.sub()` ran its waves and scored them against a bare grid floor. Any OGRE start leaves both first.
+const _ogreStart = ogreScenario.start.bind(ogreScenario);
+ogreScenario.start = (...a) => {
+    try { if (window._demoIsolation === "exclusive" || window._demoIsolation === "clean") { window.gridWorld?.off?.(); window._stage?.leave?.(); if (window._demoIsolation === "exclusive" || window._demoIsolation === "clean") window._demoIsolation = "active"; console.log("[ogre] left", "stage isolation so the world is drawn"); } } catch (e) { console.warn("[ogre] isolation exit failed:", e && e.message); }
+    return _ogreStart(...a);
+};
 // Round 126 — give CivManager + KaijuManager handles to ogreScenario
 // so hellspawn-summon eligibility can be checked (CivManager) and
 // kaiju can target the OGRE chassis (KaijuManager).
