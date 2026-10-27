@@ -17,9 +17,12 @@
 //   V7 the surface flag not in the target 2 | V8 the held depth not used 3 | V9 a loss leaves the event on 1 | V10 setHull leaves events 1 | V11 sink given the rescue 1 | V12 the tank model never used 5 | V13 the weight error not applied 5
 //   V14 the snapshot's tank always false 6 | V15 an unknown id throws 1 | V16 a swap keeps the old clock 1 | V17 the tank starts at 0, not the commanded level 1
 // First runs crashed with no FAIL line (V2, V4, V12, V15: a row read s.tank.air on a null tank; the snapshot read eventModel.spec on a cleared event) -- a crash is red but not red BY NAME, so the snapshot is now defensive and the rows say "no tank".
+// SECTION 9 (v4904), SIX more, each applied to render/subAquariumSim.mjs in place and restored: E1 EVENTS without the two names 1 (the pinned names; the section then CRASHES on the unknown event, red but not red by name) | E2 an estimator with no builder not refused 1 | E3 `seen` the held heading, not the autopilot's read 2 |
+//   E4 the lit phase's `seen` the true heading, not the read 1 | E5 registerEstimator accepting any name 1 | E6 the builder handed the sub's own pilot, not the spy 3.
 // V16 and V17 went 0 red the first time: no row looked at the clock or at the starting level; the two rows in section 6 now do.
 "use strict";
 import * as A from "./subAquariumSim.mjs";
+import { turnWorld } from "../tools/subDropout.mjs";
 
 let fails = 0;
 function ok(name, cond, detail) { console.log(`  ${cond ? "PASS" : "FAIL"}  ${name}${detail ? "   " + detail : ""}`); if (!cond) fails++; }
@@ -44,7 +47,7 @@ console.log("1. OFF BY DEFAULT");
 console.log("\n2. THE CALL");
 {
     const t = one();
-    ok("the names are pinned: flood, sink, surface, dropout, navigator (the last two are held by render/compassView-selfcheck.mjs); the leak is 6%; the rescue blows at 2 m and drops the weight at 4 m", A.EVENTS.join() === "flood,sink,surface,dropout,navigator" && A.LEAK === 0.06 && A.RESCUE.blowDepth === 2 && A.RESCUE.releaseDepth === 4 && Object.isFrozen(A.EVENTS) && Object.isFrozen(A.RESCUE));
+    ok("the names are pinned: flood, sink, surface, dropout, navigator and the two estimators (the compass ones are held by render/compassView-selfcheck.mjs and section 9); the leak is 6%; the rescue blows at 2 m and drops the weight at 4 m", A.EVENTS.join() === "flood,sink,surface,dropout,navigator,fly-estimator,er-estimator" && A.ESTIMATORS.join() === "fly-estimator,er-estimator" && A.LEAK === 0.06 && A.RESCUE.blowDepth === 2 && A.RESCUE.releaseDepth === 4 && Object.isFrozen(A.EVENTS) && Object.isFrozen(A.RESCUE));
     ok("!! setEvent answers the event now running, and the snapshot carries it with a tank at level and air", t.setEvent("a", "flood") === "flood" && snap(t).event === "flood" && snap(t).tank && snap(t).tank.airMax === 1.5 && snap(t).tank.released === false);
     let threw = false; try { t.setEvent("a", "capsize"); } catch (e) { threw = /unknown event "capsize"/.test(e.message); }
     ok("!! an unknown event throws by name and changes nothing (the flood is still running)", threw && snap(t).event === "flood");
@@ -106,6 +109,33 @@ console.log("\n8. THE HIGH RIDER (a hull with a 25% main ballast, picked from th
     ok("!! told to surface on the high rider, the boat rides with its centre 0.3 m down (0.2..0.4 m), not the EXPLORER's 0.564, nearly stopped, never lost", s.depth > 0.2 && s.depth < 0.4 && s.speed < 0.6 && s.lost === 0, `${s.depth.toFixed(3)} m, ${s.speed.toFixed(2)} m/s, lost ${s.lost}`);
     const u = A.createTank({ hull: "highRider" }); u.sync([entry("a")]); run(u, 40); const d0 = snap(u).depth; u.setEvent("a", "flood"); let worst = 0; for (let k = 0; k < 24; k++) { run(u, 5); worst = Math.max(worst, Math.abs(snap(u).depth - d0)); }
     ok("!! a 6% flood on the high rider is within what its tank trims out: it holds its depth to 8 m, is never lost and does NOT drop its weight (the EXPLORER's tank cannot do that)", worst < 8 && snap(u).lost === 0 && snap(u).tank && snap(u).tank.released === false, `worst ${worst.toFixed(2)} m, released ${snap(u).tank && snap(u).tank.released}`);
+}
+
+console.log("\n9. THE TWO ESTIMATOR EVENTS (v4904, ported from the tank-wide compass): a page's pilot, the autopilot's own read in the snapshot");
+{
+    const wrapA = (x) => Math.atan2(Math.sin(x), Math.cos(x));
+    const t0 = A.createTank(); t0.sync([entry("a"), entry("b")]); run(t0, 40);
+    let threw = 0; try { t0.setEvent("a", "fly-estimator"); } catch { threw++; }
+    ok("!! an estimator event with no builder registered throws and changes nothing (no event, no compass in the snapshot), and an unknown id with none registered throws too", threw === 1 && snap(t0).event === null && snap(t0).compass === null && (() => { try { t0.setEvent("zz", "er-estimator"); return false; } catch { return true; } })());
+    let bad = 0; for (const [ev, b] of [["navigator", () => 0], ["fly-estimator", null], ["fly-estimator", "x"], [null, () => 0]]) { try { t0.registerEstimator(ev, b); } catch { bad++; } }
+    ok("  registerEstimator refuses a name that is not an estimator event (navigator, null) and a builder that is not a function", bad === 4);
+    // an estimator that LIES: it shows the autopilot a world turned 0.5 rad, so the heading the autopilot reads is the true one plus 0.5 in the light and in the dark -- which neither the held heading nor the true one is
+    const calls = { n: 0 };
+    const lying = (inner) => (st, t, c, aux) => { calls.n++; const w = turnWorld(st, c, 0.5); return inner(w.state, t, w.current, aux); };
+    const t1 = A.createTank(), base = A.createTank(); for (const t of [t1, base]) { t.sync([entry("a"), entry("b")]); run(t, 40); }
+    t1.registerEstimator("fly-estimator", lying); ok("  a registered builder is accepted and the event starts: it answers the event now running", t1.setEvent("a", "fly-estimator") === "fly-estimator" && snap(t1).event === "fly-estimator");
+    run(t1, 4); const lit = snap(t1);
+    ok("!! in the light the snapshot's `seen` is what the AUTOPILOT read (the true heading plus the estimator's 0.5 rad), not the true heading, and `error` is that difference wrapped; the compass is valid", lit.compass && lit.compass.valid === true && Math.abs(wrapA(lit.compass.seen - lit.heading) - 0.5) < 0.02 && Math.abs(lit.compass.error - 0.5) < 0.02, lit.compass ? `seen - true = ${wrapA(lit.compass.seen - lit.heading).toFixed(3)}, error ${lit.compass.error.toFixed(3)}` : "no compass");
+    run(t1, 6); const h10 = snap(t1).heading;   // event time 10 s: the last lit heading the dark window will freeze
+    run(t1, 6);
+    const dark = snap(t1);
+    ok("!! at event time 16 s the compass is dark (10..26 s): not valid, and `seen` is the autopilot's own read of the FROZEN world (the heading at 10 s plus the estimator's 0.5 rad), not the true heading plus 0.5; error is seen less true, wrapped", dark.compass && dark.compass.valid === false && Math.abs(wrapA(dark.compass.seen - (h10 + 0.5))) < 0.05 && Math.abs(dark.compass.error - wrapA(dark.compass.seen - dark.heading)) < 0.02 && Math.abs(wrapA(dark.heading - h10)) > 0.02,
+        dark.compass ? `seen ${dark.compass.seen.toFixed(3)}, frozen heading + 0.5 = ${wrapA(h10 + 0.5).toFixed(3)}, true ${dark.heading.toFixed(3)}, error ${dark.compass.error.toFixed(3)}` : "no compass");
+    ok("  the builder's pilot was called every tick of the event (the spy inner is the sub's own pilot)", calls.n >= 16 * 30 - 2 && calls.n <= 16 * 30 + 2, `${calls.n} calls in 16 s`);
+    ok("!! the OTHER sub is bit-identical to a tank where nothing happened, and the first sub's event ends clean: compass null, event null", (() => { run(base, 16); const same = JSON.stringify(snap(t1, 1)) === JSON.stringify(snap(base, 1)); t1.setEvent("a", null); return same && snap(t1).event === null && snap(t1).compass === null; })());
+    // the same through the second estimator: its own builder, its own event, the same machinery
+    const t2 = A.createTank(); t2.sync([entry("a")]); run(t2, 40); t2.registerEstimator("er-estimator", lying); t2.setEvent("a", "er-estimator"); run(t2, 10); const g10 = snap(t2).heading; run(t2, 6);
+    ok("  the random-wiring event runs the same way through its own builder (dark at 16 s, the read the frozen heading plus 0.5 rad)", snap(t2).event === "er-estimator" && snap(t2).compass.valid === false && Math.abs(wrapA(snap(t2).compass.seen - (g10 + 0.5))) < 0.05);
 }
 
 console.log(fails ? `\n${fails} FAIL` : "\nall checks pass");

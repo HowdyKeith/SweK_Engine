@@ -11,14 +11,16 @@
 "use strict";
 
 export const TRACE_MAX = 300, TRACE_SPAN_DEG = 90;
+// v4904 -- the two estimator events (render/subAquariumSim.mjs) read like the others: a dial figure and a list line; their `seen` is the heading the autopilot read last
+const KINDS = Object.freeze({ dropout: "plain autopilot", navigator: "navigator", "fly-estimator": "fly estimator", "er-estimator": "random-wiring estimator" });
 const DEG = 180 / Math.PI, wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 const finite = (v) => (Number.isFinite(v) ? v : 0);
 
-/** A snapshot row's dial: { kind ("plain autopilot" | "navigator"), valid, dark, trueDeg, seenDeg, errDeg } -- degrees, the error wrapped to -180..180 -- or null for a row with no compass event. */
+/** A snapshot row's dial: { kind ("plain autopilot" | "navigator" | "fly estimator" | "random-wiring estimator"), valid, dark, trueDeg, seenDeg, errDeg } -- degrees, the error wrapped to -180..180 -- or null for a row with no compass event. */
 export function dialInfo(row) {
-    if (!row || !row.compass || (row.event !== "dropout" && row.event !== "navigator")) return null;
+    if (!row || !row.compass || !Object.prototype.hasOwnProperty.call(KINDS, row.event)) return null;
     const err = finite(row.compass.error);
-    return { kind: row.event === "navigator" ? "navigator" : "plain autopilot", valid: !!row.compass.valid, dark: !row.compass.valid, trueDeg: finite(row.heading) * DEG, seenDeg: finite(row.compass.seen) * DEG, errDeg: wrap(err) * DEG };
+    return { kind: KINDS[row.event], valid: !!row.compass.valid, dark: !row.compass.valid, trueDeg: finite(row.heading) * DEG, seenDeg: finite(row.compass.seen) * DEG, errDeg: wrap(err) * DEG };
 }
 
 /** The two rows to show beside each other: the first sub on the plain dropout and the first on the navigator ({ plain, nav }, each a row or null). */
@@ -33,6 +35,19 @@ export function pushTrace(trace, row, t) {
     if (!d || !Number.isFinite(t)) return trace;
     const out = trace.concat([{ t, e: Math.abs(d.errDeg), dark: d.dark }]);
     return out.length > TRACE_MAX ? out.slice(out.length - TRACE_MAX) : out;
+}
+
+/**
+ * v4904 -- THE TANK'S OWN MARK OF A DARK COMPASS (ported from the tank-wide compass of b6b418f..b30f9e0): an amber dashed ring of radius `r` round a sub whose compass is dark, and an amber GHOST LINE from the sub's centre along the heading its
+ * autopilot BELIEVES (`believed`, the snapshot's compass.seen) for 2.2 r. The plan view's convention: the nose of a heading h points to (cos h, -sin h) on the canvas, so the sub's own nose (drawn separately) is the TRUTH and this line is the belief;
+ * the gap between them is the error. Returns { ring: true, tipX, tipY } what was drawn (the tip is where the ghost line ends); a non-finite belief draws the ring and no line.
+ */
+export function drawDark(g, px, py, believed, r) {
+    g.save && g.save(); g.strokeStyle = "#f6a623"; g.lineWidth = 1.5; g.setLineDash && g.setLineDash([4, 3]); g.beginPath(); g.arc(px, py, r, 0, Math.PI * 2); g.stroke(); g.setLineDash && g.setLineDash([]);
+    let tipX = null, tipY = null;
+    if (Number.isFinite(believed)) { tipX = px + Math.cos(believed) * r * 2.2; tipY = py - Math.sin(believed) * r * 2.2; g.lineWidth = 2; g.beginPath(); g.moveTo(px, py); g.lineTo(tipX, tipY); g.stroke(); }
+    g.restore && g.restore();
+    return { ring: true, tipX, tipY };
 }
 
 /** The list row's compass line, or "". */

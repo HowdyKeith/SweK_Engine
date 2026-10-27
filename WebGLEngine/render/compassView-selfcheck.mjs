@@ -13,6 +13,9 @@
 //   5  THE PAGE      (a browser with WebGL; SKIPPED, and said, without one) the compass test button puts the first sub on the dropout and the second on the navigator, the canvas is drawn (non-empty), the list rows carry the line, and pressing
 //                    it again ends both
 //
+// v4904 -- SECTION 1 gained the estimator kinds and 1b the tank's mark (drawDark). SABOTAGES (each in place on render/compassView.mjs, restored): C1 the estimator kinds missing from KINDS 1 | C2 a prototype key accepted as an event (`in`) 1 | C3 the ghost line's y not flipped 1 | C4 the ring drawn solid 1 | C5 the line drawn for a NaN belief 1. (C1 first CRASHED, red but not by name, on a null dial; the row now reads `(dialInfo(...) || {}).kind`.)
+//   sub-aquarium.html (v4904), each in place and restored: P4 the plan ring never drawn 2 (the source row and the live row) | P5 the builders never registered 2 | P6 the fly button starting the other event 2 | P7 the ghost line along the TRUE heading, not the belief 1 (the source row only: the live row cannot tell the two lines apart; the belief itself is held by
+//   subAquariumEvents-selfcheck section 9). The live row first ran on a sub with its event started by a click on the LIST ROW, which selects it.
 // SABOTAGE LOG -- TWENTY-SIX, each applied in place, the gate run, the file restored; every one red by name (rows red in brackets):
 //   render/compassView.mjs: K1 the error not wrapped 2 | K2 the two names swapped 5 | K3 the LAST plain row taken 2 | K4 the trace not capped 3 | K5 the trace edited in place 3 | K6 the needle's y sign flipped 3 | K7 the shown needle as long as the true 2
 //   K8 the true needle not green (see below) | K9 a dark face not red 2 | K10 the trace scale 180 2 | K11 the error printed signed 2 | K12 a NaN time pushed 3 | K13 any event accepted as a compass row 2
@@ -58,6 +61,19 @@ console.log("1. THE NUMBERS");
     let big = []; for (let i = 0; i < 400; i++) big = CV.pushTrace(big, row(), i);
     ok("!! the trace keeps the newest 300 points", big.length === CV.TRACE_MAX && CV.TRACE_MAX === 300 && big[0].t === 100 && big[299].t === 399);
     ok("!! the list line names the pilot, the compass state and the whole degrees of error; empty for a row with none", CV.lineFor(row()) === "PLAIN AUTOPILOT · compass DARK · heading error 60°" && CV.lineFor(row({ event: "navigator", compass: { valid: true, seen: 0, error: 0.4 * D } })) === "NAVIGATOR · compass ok · heading error 0°" && CV.lineFor(row({ compass: null })) === "");
+    // v4904 -- the two estimator events read like the others (their `seen` is the heading the autopilot read last), and a prototype key is not an event
+    ok("!! the fly estimator and the random-wiring estimator are named, dial and list line alike; `constructor`, `toString` and `__proto__` are not events", (CV.dialInfo(row({ event: "fly-estimator" })) || {}).kind === "fly estimator" && (CV.dialInfo(row({ event: "er-estimator" })) || {}).kind === "random-wiring estimator" && CV.lineFor(row({ event: "fly-estimator" })) === "FLY ESTIMATOR · compass DARK · heading error 60°" && CV.lineFor(row({ event: "er-estimator", compass: { valid: true, seen: 0, error: 0 } })) === "RANDOM-WIRING ESTIMATOR · compass ok · heading error 0°" && ["constructor", "toString", "__proto__"].every((e) => CV.dialInfo(row({ event: e })) === null));
+    ok("  and pair still takes the first plain and the first navigator when estimator rows are listed first (an estimator is neither)", (() => { const p = CV.pair([row({ id: "f", event: "fly-estimator" }), row({ id: "e", event: "er-estimator" }), row({ id: "n", event: "navigator" }), row({ id: "p" })]); return p.plain.id === "p" && p.nav.id === "n"; })());
+}
+
+console.log("\n1b. THE TANK'S MARK OF A DARK COMPASS: the amber ring and the ghost line along the believed heading (v4904)");
+{
+    const rec = () => { const calls = []; return new Proxy({}, { get: (_, k) => (k === "calls" ? calls : (...a) => { calls.push([k, ...a]); }), set: (_, k, v) => { calls.push(["set:" + k, v]); return true; } }); };
+    const g = rec(), r = CV.drawDark(g, 100, 80, 0, 24), c = g.calls;
+    ok("!! drawDark: an amber dashed ring of the radius given, centred on the sub", c.some((x) => x[0] === "arc" && x[1] === 100 && x[2] === 80 && x[3] === 24) && c.some((x) => x[0] === "set:strokeStyle" && x[1] === "#f6a623") && c.some((x) => x[0] === "setLineDash" && x[1].length === 2));
+    ok("!! ...and a ghost line from the centre along the BELIEVED heading for 2.2 r: east for 0, and the canvas's y is flipped (a belief of +90 degrees points UP the screen, not down)", Math.abs(r.tipX - (100 + 24 * 2.2)) < 1e-9 && Math.abs(r.tipY - 80) < 1e-9 && c.some((x) => x[0] === "lineTo" && Math.abs(x[1] - r.tipX) < 1e-9) && (() => { const q = CV.drawDark(rec(), 0, 0, Math.PI / 2, 10); return Math.abs(q.tipX) < 1e-9 && q.tipY < -21.9; })());
+    const h = rec(), n = CV.drawDark(h, 0, 0, NaN, 10);
+    ok("  a belief that is not a number draws the ring and no line", n.ring === true && n.tipX === null && !h.calls.some((x) => x[0] === "lineTo"));
 }
 
 console.log("\n2. THE DRAWING");
@@ -133,6 +149,8 @@ console.log("\n5. THE PAGE");
 {
     const aq = fs.readFileSync(path.join(ENG, "sub-aquarium.html"), "utf8");
     ok("!! the page has the panel, the compass test button and the imports; the button starts the dropout on the first sub and the navigator on the second, and ends them again", /id="compassBtn"/.test(aq) && /id="compassView"/.test(aq) && /from "\/render\/compassView\.mjs"/.test(aq) && /tank\.setEvent\(ids\[0\], "dropout"\); if \(ids\[1\]\) tank\.setEvent\(ids\[1\], "navigator"\)/.test(aq) && /s\.event === "navigator"\)\) tank\.setEvent\(id, null\)/.test(aq) && /readout\(s\) \|\| lineFor\(s\)/.test(aq) && /drawCompass\(snap\)/.test(aq));
+    ok("!! the page (v4904) has the two estimator buttons (disabled until the circuit loads), starts them as events on the selected sub, registers each builder from the scene's pilotDefs (cx -> fly-estimator, er -> er-estimator), and marks a dark compass with drawDark: the ring on the plan view along the AUTOPILOT's belief (compass.seen), a ring alone on the depth view",
+        /id="flyEstBtn" disabled/.test(aq) && /id="erEstBtn" disabled/.test(aq) && /setEvent\("fly-estimator"\)/.test(aq) && /setEvent\("er-estimator"\)/.test(aq) && /registerEstimator\(ev, def\.build\)/.test(aq) && /\["fly-estimator", "cx", "flyEstBtn"\]/.test(aq) && /\["er-estimator", "er", "erEstBtn"\]/.test(aq) && /import \{[^}]*\bdrawDark\b[^}]*\} from "\/render\/compassView\.mjs"/.test(aq) && /s\.compass && !s\.compass\.valid\) \{ drawDark\(pg, s\.x \* sx, s\.y \* sy, s\.compass\.seen, 30\); drawDark\(sg, s\.x \* dx, s\.depth \* dz, NaN, 20\)/.test(aq));
     const { chromium, from: pwFrom } = resolvePlaywright(require_);
     const skip = browserSkipReason(chromium, pwFrom, HEADLESS_SHELL);
     if (skip) { report("live half SKIPPED -- " + skip); report("*** THAT IS A SKIP AND NOT A PASS: sections 1-4 are arithmetic and the sim; only a page shows the canvas drawn and the button wired"); }
@@ -168,6 +186,17 @@ console.log("\n5. THE PAGE");
             await pg.click("#compassBtn"); await pg.waitForTimeout(400);
             const end = await pg.evaluate(() => [[...document.querySelectorAll(".tk")].map((e) => e.textContent).join(""), document.getElementById("msg").textContent]);
             ok("!! pressing it again ends both: the lines are empty and the page says so", end[0] === "" && /ended/.test(end[1]), JSON.stringify(end).slice(0, 160));
+            // v4904 -- the two estimator events, live: the buttons come alive when the circuit has loaded, one starts on the SELECTED sub, the list row says so, and once its compass is dark the plan view carries the amber ring
+            await pg.waitForFunction(() => { const b = document.getElementById("flyEstBtn"); return b && !b.disabled; }, null, { timeout: 20000 }).catch(() => {});
+            const enabled = await pg.evaluate(() => [!document.getElementById("flyEstBtn").disabled, !document.getElementById("erEstBtn").disabled]);
+            await pg.click("#list .row"); await pg.click("#flyEstBtn");
+            const msg2 = await pg.$eval("#msg", (e) => e.textContent);
+            await pg.waitForFunction(() => { const t = document.querySelectorAll(".tk"); return t.length > 0 && /FLY ESTIMATOR · compass DARK/.test(t[0].textContent); }, null, { timeout: 60000, polling: 250 }).catch(() => {});
+            await pg.waitForTimeout(300);
+            const amber = await pg.evaluate(() => { const c = document.getElementById("plan"), d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 0; i < d.length; i += 4) if (d[i] > 220 && d[i + 1] > 140 && d[i + 1] < 190 && d[i + 2] < 70 && d[i + 3] > 200) n++; return n; });
+            const row1 = await pg.evaluate(() => document.querySelector(".tk") && document.querySelector(".tk").textContent);
+            ok("!! the estimator buttons come alive with the circuit, the fly estimator starts on the selected sub, its list row reads FLY ESTIMATOR with the compass DARK, and the plan view carries the amber ring and ghost line (" + amber + " amber pixels)", enabled[0] && enabled[1] && /fly-estimator on the selected sub/.test(msg2) && /FLY ESTIMATOR · compass DARK/.test(row1 || "") && amber > 150, JSON.stringify({ enabled, msg2, row1, amber }).slice(0, 220));
+            await pg.click("#clearBtn");
             ok("  no page or console error", errs.length === 0, errs.join(" | ").slice(0, 200));
         } finally { await br.close(); server.close(); }
     }

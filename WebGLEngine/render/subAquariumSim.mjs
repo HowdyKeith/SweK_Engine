@@ -35,15 +35,21 @@ const hash = (str) => { let h = 2166136261; for (let i = 0; i < str.length; i++)
 //   "sink"     the same leak and NO rescue: the autopilot blows its tank to the stop and still sinks to the seabed; the boat is lost and put back (the count shows it)
 //   "surface"  brain/surfacePilot.mjs's wrap with `surface: true` in the target: the boat rises, blows its tank and rides on its buoyancy with the tower out of the water
 // setEvent(id, null) ends it: the leak stops, the tank state goes (the boat is repaired and the weight is back: it is an aquarium), the sub is flown as before. Pure like the rest: no clock but the tank's.
-export const EVENTS = Object.freeze(["flood", "sink", "surface", "dropout", "navigator"]);
+export const EVENTS = Object.freeze(["flood", "sink", "surface", "dropout", "navigator", "fly-estimator", "er-estimator"]);
 // THE COMPASS EVENTS (tools/subDropout.mjs and tools/subNavigator.mjs, rung 4a, in the tank): for the event's own clock the compass reports for COMPASS.darkFrom seconds, then stops for COMPASS.darkLen seconds, and repeats every COMPASS.period.
 //   "dropout"    the plain pilot, shown a heading that stays at the last valid one while the compass is dark (a rotated copy of the world: body rates, pitch, depth and speed stay true)
 //   "navigator"  the SAME pilot behind the dead-reckoning navigator: it integrates the vessel's own heading rate through the dark and hands the pilot that estimate. Started on two subs at once the two meet the same windows.
+//   "fly-estimator" / "er-estimator"  (v4904, PORTED from the tank-wide compass of b6b418f..b30f9e0 onto these per-sub events): the study's two estimators, the fly's heading-loop circuit and the best random wiring, each a pilot a PAGE builds
+//                (tank.registerEstimator(event, build): build(inner) -> pilot(state, target, current, aux), `inner` the sub's own pilot seen through a spy). The sub is flown through the same dark windows as the others; the heading the
+//                autopilot read on its LAST tick (the spy) is what the snapshot's `compass.seen` carries, so a page draws the amber ring and the ghost line along the heading the autopilot BELIEVES while the sub's own nose is the truth.
+//                An estimator event with no builder registered throws and changes nothing (a tank without the page's circuit has none to run).
 // Neither needs a tank: the sub keeps its hull's own model. The snapshot's `compass` says { valid, seen (the heading the pilot is shown, rad), error (seen less true, wrapped, rad) }.
 export const COMPASS = Object.freeze({ period: 40, darkFrom: 10, darkLen: 16 });
 /** Is the compass reporting at event time t (seconds)? */
 export const compassValidAt = (t) => { const p = ((t % COMPASS.period) + COMPASS.period) % COMPASS.period; return !(p >= COMPASS.darkFrom && p < COMPASS.darkFrom + COMPASS.darkLen); };
-const isCompass = (ev) => ev === "dropout" || ev === "navigator";
+export const ESTIMATORS = Object.freeze(["fly-estimator", "er-estimator"]);
+const isEstimator = (ev) => ESTIMATORS.includes(ev);
+const isCompass = (ev) => ev === "dropout" || ev === "navigator" || isEstimator(ev);
 const needsTank = (ev) => ev === "flood" || ev === "sink" || ev === "surface";
 export const LEAK = 0.06;
 const TANK_FIELDS = Object.freeze({ tankRate: FL.FLOOD_SPEC.tankRate, airMax: FL.FLOOD_SPEC.airMax, emergencyRate: FL.FLOOD_SPEC.emergencyRate, emergencyAirCost: FL.FLOOD_SPEC.emergencyAirCost, dropMass: FL.FLOOD_SPEC.dropMass });
@@ -65,6 +71,7 @@ export function createTank({ hull = "nominal", length = LENGTH, width = WIDTH } 
     // v4902 -- the tank may be bigger than the default 500 x 300 m (the subs need room to swim: the Sea OGRE and a crowded tank both do); every wall below is THIS tank's own
     const insideBox = (x, y) => x >= MARGIN && x <= length - MARGIN && y >= MARGIN && y <= width - MARGIN;
     const subs = new Map();   // id -> live sub
+    const estimators = new Map();   // event name -> build(inner) -> pilot, registered by a page (the estimators need the fly circuit it loads)
     let clock = 0, hullName = hull, MODEL = H.model(hull);   // the vessel every sub in the tank is (physics/mechanics/subHulls.mjs); the pilots do not know which
 
     function spawn(entry, rng, atCentre = false) {
@@ -83,16 +90,19 @@ export function createTank({ hull = "nominal", length = LENGTH, width = WIDTH } 
     }
     // the compass events' pilot: the same inner pilot, shown the held heading in the dark (tools/subDropout.mjs turnWorld), behind the dead-reckoning navigator for "navigator". The navigator tells a new target by its IDENTITY, and the
     // tank makes a fresh target object every tick outside the steering box, so the pilot is handed ONE object that is rewritten each tick.
-    function compassPilot(sub, nav) {
-        const inner = nav ? deadReckoning(sub.pilot) : sub.pilot, tgt = {}; let held = null;
+    function compassPilot(sub, kind) {
+        // kind: "plain", "nav" (the dead-reckoning navigator) or an estimator event name (the page's build(spy))
+        const nav = kind === "nav", seen = { h: 0 };
+        const spy = (st, tg, cur, aux) => { seen.h = S.attitude(st).heading; return sub.pilot(st, tg, cur, aux); };   // the heading the autopilot READ on its last tick
+        const inner = nav ? deadReckoning(sub.pilot) : estimators.has(kind) ? estimators.get(kind)(spy) : sub.pilot, tgt = {}; let held = null;
         return (state, t, current) => {
             Object.assign(tgt, t);
             const valid = compassValidAt(sub.eventT), psi = S.attitude(state).heading;
             if (valid || held === null) held = psi;
-            if (valid) { sub.compass = { valid: true, seen: psi, error: 0 }; return inner(state, tgt, current, { compassValid: 1, dt: sub.tickDt }); }
-            const seen = turnWorld(state, current, held - psi);
-            const cmd = inner(seen.state, tgt, seen.current, { compassValid: 0, dt: sub.tickDt });
-            const b = nav ? inner.last.estimate : held;
+            if (valid) { const cmd = inner(state, tgt, current, { compassValid: 1, dt: sub.tickDt }); sub.compass = { valid: true, seen: estimators.has(kind) ? seen.h : psi, error: estimators.has(kind) ? wrap(seen.h - psi) : 0 }; return cmd; }
+            const sw = turnWorld(state, current, held - psi);
+            const cmd = inner(sw.state, tgt, sw.current, { compassValid: 0, dt: sub.tickDt });
+            const b = nav ? inner.last.estimate : estimators.has(kind) ? seen.h : held;
             sub.compass = { valid: false, seen: b, error: wrap(b - psi) };
             return cmd;
         };
@@ -119,6 +129,12 @@ export function createTank({ hull = "nominal", length = LENGTH, width = WIDTH } 
             for (const sub of subs.values()) { clearEvent(sub); sub.state = spawn(sub, sub.rng, true); sub.trail.length = 0; sub.wasInside = true; sub.status = "swimming"; retarget(sub); }
             return name;
         },
+        /** A page's estimator pilot for an estimator event (fly-estimator, er-estimator): build(inner) -> pilot(state, target, current, aux), `inner` the sub's own pilot seen through a spy. Applies to events started AFTER the call. A bad name or builder throws and changes nothing. */
+        registerEstimator(event, build) {
+            if (!isEstimator(event)) throw new Error(`subAquariumSim.registerEstimator: an estimator event (${ESTIMATORS.join(", ")}), got ${JSON.stringify(event)}`);
+            if (typeof build !== "function") throw new Error("subAquariumSim.registerEstimator: a builder (a function) is needed");
+            estimators.set(event, build);
+        },
         /**
          * Start (or, with null, end) an event on one sub: "flood", "sink" or "surface" (see EVENTS). Returns the event now running, or null. An unknown event name throws and changes nothing; an unknown id does nothing and returns null.
          * Starting one on a sub that already has one swaps it: the tank state is kept (a dropped weight stays dropped, the air stays spent), the leak and the clock start again.
@@ -126,6 +142,7 @@ export function createTank({ hull = "nominal", length = LENGTH, width = WIDTH } 
         setEvent(id, ev) {
             const sub = subs.get(id);
             if (ev !== null && ev !== undefined && ev !== "" && !EVENTS.includes(ev)) throw new Error(`subAquariumSim.setEvent: unknown event "${ev}" (${EVENTS.join(", ")})`);
+            if (isEstimator(ev) && !estimators.has(ev)) throw new Error(`subAquariumSim.setEvent: no builder is registered for "${ev}" (a page registers one with registerEstimator)`);
             if (!sub) return null;
             if (ev === null || ev === undefined || ev === "") { clearEvent(sub); return null; }
             if (needsTank(ev)) {
@@ -133,7 +150,7 @@ export function createTank({ hull = "nominal", length = LENGTH, width = WIDTH } 
             } else if (sub.state.tank) { const { tank, ...rest } = sub.state; sub.state = rest; sub.eventModel = MODEL; }   // a compass event has no tank
             else sub.eventModel = MODEL;
             sub.event = ev; sub.eventT = 0; sub.holdDepth = -sub.state.pos[2]; sub.compass = null;
-            sub.eventPilot = ev === "flood" ? (trimsOut(sub.eventModel) ? sub.pilot : EP.wrap(sub.pilot, RESCUE)) : ev === "surface" ? SP.wrap(sub.pilot, { model: sub.eventModel }) : isCompass(ev) ? compassPilot(sub, ev === "navigator") : sub.pilot;
+            sub.eventPilot = ev === "flood" ? (trimsOut(sub.eventModel) ? sub.pilot : EP.wrap(sub.pilot, RESCUE)) : ev === "surface" ? SP.wrap(sub.pilot, { model: sub.eventModel }) : isCompass(ev) ? compassPilot(sub, ev === "navigator" ? "nav" : ev === "dropout" ? "plain" : ev) : sub.pilot;
             return ev;
         },
         /** Reconcile with the aquarium's list [{ id, name, hue, pilot, from, local, weights }]: new ids join, ids that are gone leave, the ones that stay keep swimming. Returns { added, removed }. */

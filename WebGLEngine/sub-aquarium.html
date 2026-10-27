@@ -84,7 +84,8 @@
   <label title="The tank's size. Standard is 500 x 300 m; Large (1500 x 900) and Open (3000 x 1800) give the subs room to swim and spread out. Changing it reloads the page."><span>tank</span> <select id="sizeSel"><option value="standard">500 x 300 m</option><option value="large">1500 x 900 m</option><option value="open">3000 x 1800 m</option></select></label>
   <label>sea <select id="seaSel" title="The water above the tank. The three physics seas are the same Gerstner surface a hull floats on, in calm, default and rough swell, and work on every GPU. The GPU ocean is the vendored web-ocean sea (sea-host.html) drawn behind this canvas; it needs WebGPU, and the subs are drawn in front of all of its water (the depth tint puts them under it)."></select> <span class="sub" id="seaState"></span></label>
   <span title="Pick a sub in the list, then press one: a leak the tank cannot trim out (the boat blows its tank and drops its weight), the same leak with no rescue (it grounds), or surface (it blows its tank and rides on its buoyancy with the tower out of the water)">event on the selected sub:
-    <button id="floodBtn">flood</button> <button id="sinkBtn">sink</button> <button id="surfaceBtn">surface</button> <button id="clearBtn">restore</button></span>
+    <button id="floodBtn">flood</button> <button id="sinkBtn">sink</button> <button id="surfaceBtn">surface</button> <button id="clearBtn">restore</button>
+    <button id="flyEstBtn" disabled title="The fly's heading-loop circuit as an estimator behind the autopilot, flown through the compass dropout (available once the page has loaded the circuit)">fly estimator</button> <button id="erEstBtn" disabled title="The best random wiring of the same size, fitted the same way, behind the autopilot (available once the page has loaded the circuit)">random-wiring estimator</button></span>
   <span class="chip"><span class="dot" id="fishDot"></span><b>FISH BRAIN</b> <span id="fishWord">checking&hellip;</span></span>
   <span id="msg" class="sub"></span>
 </div>
@@ -121,7 +122,7 @@ import { readout } from "/render/subBallastCues.mjs";
 import { LABELS as SEA_LABELS, GPU, DEFAULT_STYLE, isStyle, gpuSeaAvailable } from "/render/seaStyles.mjs";
 import { hostUrl } from "/ui/seaFrame.mjs";
 import { subPanel, drawPanel } from "/render/brainPanel.mjs";
-import { dialInfo, pair, pushTrace, lineFor, drawDial, drawTrace } from "/render/compassView.mjs";
+import { dialInfo, pair, pushTrace, lineFor, drawDial, drawTrace, drawDark } from "/render/compassView.mjs";
 
 const $ = (id) => document.getElementById(id);
 const plan = $("plan"), side = $("sideView"), pg = plan.getContext("2d"), sg = side.getContext("2d");
@@ -192,6 +193,7 @@ $("compassBtn").onclick = () => {
   tank.setEvent(ids[0], "dropout"); if (ids[1]) tank.setEvent(ids[1], "navigator"); compassOn = true;
   $("msg").textContent = ids[1] ? "compass test: " + tank.subs.get(ids[0]).name + " on the plain autopilot, " + tank.subs.get(ids[1]).name + " on the navigator" : "compass test: only one sub, on the plain autopilot (a second sub is needed for the navigator)";
 };
+$("flyEstBtn").onclick = () => setEvent("fly-estimator"); $("erEstBtn").onclick = () => setEvent("er-estimator");   // v4904: the study's two estimators as events on the selected sub; their builders are registered below once the circuit is loaded
 $("floodBtn").onclick = () => setEvent("flood"); $("sinkBtn").onclick = () => setEvent("sink"); $("surfaceBtn").onclick = () => setEvent("surface"); $("clearBtn").onclick = () => setEvent(null);
 const DOT = { live: "#4ade80", standin: "#f6a623", offline: "#ff5a5a", err: "#555" }, WORD = { live: "live", standin: "stand-in", offline: "offline", err: "unreachable" };
 
@@ -280,6 +282,7 @@ function render() {
     pg.strokeStyle = `hsl(${s.hue} 70% 55% / .35)`; pg.lineWidth = 1.5; pg.beginPath(); s.trail.forEach((p, i) => { i ? pg.lineTo(p[0] * sx, p[1] * sy) : pg.moveTo(p[0] * sx, p[1] * sy); }); pg.stroke();
     sg.strokeStyle = `hsl(${s.hue} 70% 55% / .35)`; sg.beginPath(); s.trail.forEach((p, i) => { i ? sg.lineTo(p[0] * dx, p[2] * dz) : sg.moveTo(p[0] * dx, p[2] * dz); }); sg.stroke();
     drawSub(pg, s.x * sx, s.y * sy, s.heading, s.hue, 22, sel); drawSub(sg, s.x * dx, s.depth * dz, -s.pitch, s.hue, 16, sel);
+    if (s.compass && !s.compass.valid) { drawDark(pg, s.x * sx, s.y * sy, s.compass.seen, 30); drawDark(sg, s.x * dx, s.depth * dz, NaN, 20); }   // v4904: an amber ring on a sub whose compass is dark and a ghost line along the heading its autopilot believes (the nose is the truth)
     pg.fillStyle = sel ? "#fff" : "#dbe7ff"; pg.font = "16px monospace"; pg.fillText(s.name, s.x * sx + 26, s.y * sy - 10);
   }
   drawCompass(snap); drawBrain();
@@ -299,7 +302,15 @@ refresh(); fishHealth(); setInterval(refresh, 3000); setInterval(fishHealth, 500
         const [view, cj] = await Promise.all([import("/render/subDropoutView.mjs"), import("/vendor/hemibrain/hemibrain-cx-heading-loop.json", { with: { type: "json" } })]);
         const j = cj.default;
         await new Promise((r) => setTimeout(r, 60));   // let the tank paint a frame before the first dive is flown
-        view.mountDropoutView(host, { circuit: { neurons: j.neurons, edges: j.edges, io: j.io } });
+        const circuit = { neurons: j.neurons, edges: j.edges, io: j.io };
+        view.mountDropoutView(host, { circuit });
+        try {   // v4904: the study's two estimators as compass events on the tank's subs (the same readouts as the view above): the autopilot behind the estimator, flown through the tank's own dark windows
+            const sc = await import("/render/subDropoutScene.mjs"), defs = sc.pilotDefs(circuit);
+            for (const [ev, id, btn] of [["fly-estimator", "cx", "flyEstBtn"], ["er-estimator", "er", "erEstBtn"]]) {
+                const def = defs.find((d) => d.id === id); if (!def) continue;
+                tank.registerEstimator(ev, def.build); $(btn).disabled = false;
+            }
+        } catch (e) { $("msg").textContent = "the estimator events are not available here"; }
     } catch (e) { host.textContent = "The compass-dropout view is unavailable here (" + String((e && e.message) || e).slice(0, 100) + "). The tank above is not affected."; }
 })();
 </script>
