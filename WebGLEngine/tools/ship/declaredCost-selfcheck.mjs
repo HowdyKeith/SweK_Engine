@@ -1,3 +1,4 @@
+// v4904 SABOTAGE: the read cache keyed on the path alone (size and mtime ignored) -> 1 RED (the rewritten-gate row), which the first draft had none of.
 // SABOTAGE (each restored, run in place): the range's high end ignored (`ms` the low end) -> 4 RED (the parse row, the controlDossier row and the two census ratchets it fed); the rot test back to the single-number rule on `ms` ->
 // 1 RED (the controlDossier row: 1.67 s read as rotted); the low bound never tested (`r < 0.5 * d.lo` dropped) -> 3 RED (the controlDossier row's 0.3 s arm and two older rows that bend a reading to a quarter); the reversed range accepted -> 1 RED (the parse row).
 // WebGLEngine/tools/ship/declaredCost-selfcheck.mjs -- v4666
@@ -391,6 +392,20 @@ console.log("\n6. *** WHICH BOX'S READINGS COST A GATE: this one, then one of it
     let c; try { c = census(T, { timings: { [g]: 6400 } }, { id: "linux-x64-4c-16gb-aaaaaa" }); } finally { fs.rmSync(T, { recursive: true, force: true }); }
     ok("...and timings handed in are the only record read: no box's file overrides them",
         c.rotted.length === 1 && c.rotted[0].recordedMs === 6400, `given 6400 ms, read ${(c.rotted[0] || {}).recordedMs} ms`);
+}
+
+{
+    // v4904 -- the census reads each gate file once per (size, mtime): a file rewritten between two censuses is read again, never served from the cache
+    const T = fs.mkdtempSync(path.join(os.tmpdir(), "declaredCost-cache-")), ship = path.join(T, "tools", "ship"), g = "tools/ship/cache-selfcheck.mjs";
+    fs.mkdirSync(ship, { recursive: true });
+    fs.writeFileSync(path.join(T, g), `// ${g}\n//\n// Run: node ${g}   (~1s)\n`);
+    let b; try {
+        census(T, { timings: { [g]: 1000 } });
+        fs.writeFileSync(path.join(T, g), `// ${g}\n//\n// Run: node ${g}   (~90s)\n`);
+        b = census(T, { timings: { [g]: 1000 } });
+    } finally { fs.rmSync(T, { recursive: true, force: true }); }
+    ok("a gate rewritten between two censuses is read again: the second census sees the new header (rotted against 1,000 ms), not the cached one",
+        b.rotted.length === 1 && b.rotted[0].declaredMs === 90000, `${b.rotted.length} rotted, declared ${(b.rotted[0] || {}).declaredMs} ms`);
 }
 
 console.log(fails ? `\ndeclaredCost-selfcheck: ${fails} FAILED` : "\ndeclaredCost-selfcheck: all checks pass");

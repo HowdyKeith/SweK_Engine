@@ -57,6 +57,15 @@ export function declaredOf(src) {
     return { ms: hiN * k, lo: n * k, number: hiN, unit: m[4], names: m[1], range: m[3] !== undefined };
 }
 
+// v4904 -- ONE READ PER GATE FILE PER (size, mtime), NOT ONE PER CENSUS. The gate takes the census fourteen times over ~2,170 gate files; on the rig (Windows, a scanner on every open) that was ~30,000 reads and the gate ran 52 s alone against a
+// 20 s cap, where Linux does the same in 2.5 s. A file that changes (a fixture a row writes) changes size or mtime and is read again, so the cache cannot serve a stale header.
+const SRC = new Map();
+function readGate(file) {
+    const st = fs.statSync(file), key = st.size + ":" + st.mtimeMs, hit = SRC.get(file);
+    if (hit && hit.key === key) return hit.src;
+    const src = fs.readFileSync(file, "utf8"); SRC.set(file, { key, src }); return src;
+}
+
 export function walkGates(root = ENG) {
     const out = [];
     (function w(d) {
@@ -82,7 +91,7 @@ export function census(root = ENG, timings = null, { exclude = null, id = boxId(
     const gates = walkGates(root).map(rel).filter((g) => !exclude || !exclude(g));
     const declared = new Map(), missing = [];
     for (const g of gates) {
-        let src = ""; try { src = fs.readFileSync(path.join(root, g), "utf8"); } catch { continue; }
+        let src = ""; try { src = readGate(path.join(root, g)); } catch { continue; }
         const d = declaredOf(src);
         if (d) declared.set(g, d); else missing.push(g);
     }
