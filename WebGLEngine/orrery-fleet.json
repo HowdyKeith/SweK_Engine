@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "e7d3d2aac8fc7d1c0bdc416af5e4e6a36300e67d",
+ "head": "cecc622dcf598eaa920957e6db533a8599d57546",
  "bodies": {
   "box3d": [
    {
@@ -330,8 +330,8 @@
    },
    {
     "path": "sub-aquarium.html",
-    "bytes": 38974,
-    "sha": "2bb69fd1bc7136951dfd1131ce6b6bfe22d80cef"
+    "bytes": 39240,
+    "sha": "cecc622dcf598eaa920957e6db533a8599d57546"
    },
    {
     "path": "tools/flyCx.mjs",
@@ -856,7 +856,7 @@
    {
     "path": "main.js",
     "bytes": 3712490,
-    "sha": "207b38023c7665835473f35d1012864c7926ed39"
+    "sha": "cecc622dcf598eaa920957e6db533a8599d57546"
    },
    {
     "path": "mpm3d.html",
@@ -970,8 +970,8 @@
    },
    {
     "path": "sub-aquarium.html",
-    "bytes": 38974,
-    "sha": "2bb69fd1bc7136951dfd1131ce6b6bfe22d80cef"
+    "bytes": 39240,
+    "sha": "cecc622dcf598eaa920957e6db533a8599d57546"
    },
    {
     "path": "svg-forge.html",
@@ -1005,8 +1005,8 @@
    },
    {
     "path": "tools/ship/boundaryLint-selfcheck.mjs",
-    "bytes": 19584,
-    "sha": "0e3d9e5900f47a319e13790cf6488fad33d97add"
+    "bytes": 19681,
+    "sha": "cecc622dcf598eaa920957e6db533a8599d57546"
    },
    {
     "path": "tools/ship/dracoEncode-selfcheck.mjs",
