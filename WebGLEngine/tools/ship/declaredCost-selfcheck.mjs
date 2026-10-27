@@ -1,3 +1,5 @@
+// SABOTAGE (each restored, run in place): the range's high end ignored (`ms` the low end) -> 4 RED (the parse row, the controlDossier row and the two census ratchets it fed); the rot test back to the single-number rule on `ms` ->
+// 1 RED (the controlDossier row: 1.67 s read as rotted); the low bound never tested (`r < 0.5 * d.lo` dropped) -> 3 RED (the controlDossier row's 0.3 s arm and two older rows that bend a reading to a quarter); the reversed range accepted -> 1 RED (the parse row).
 // WebGLEngine/tools/ship/declaredCost-selfcheck.mjs -- v4666
 //
 // Run: node tools/ship/declaredCost-selfcheck.mjs   (~1.3s -- re-measured v4844, the cost note below; it read ~0.6s MEASURED v4666)
@@ -87,6 +89,24 @@ console.log("1. *** THE UNIT IS PART OF THE READING, NOT A SUFFIX GUESSED AFTERW
 }
 
 // -----------------------------------------------------------------------------------------------------------
+console.log("\n1b. *** A HEADER MAY STATE A RANGE, BECAUSE TWO BOXES CAN DIFFER BY 2x AND ONE NUMBER CANNOT SATISFY BOTH (v4904) ***");
+// SABOTAGE (each restored): the range's high end ignored (`ms` the low end) -> 2 RED (the parse row and the agree-above-the-low-end arm); the rot test back to the single-number rule on `ms` -> 1 RED (the 1.67 s arm);
+// the low bound never tested (`r < 0.5 * d.lo` dropped) -> 1 RED (the too-fast arm); the reversed range accepted -> 1 RED (the parse row).
+{
+    const L = (t) => "// tools/x.mjs\n//\n// Run: node tools/x.mjs   " + t + "\n";
+    const rc = [["(~0.7-1.7s)", 700, 1700], ["(~0.7\u20131.7s)", 700, 1700], ["(~2-37s -- the pure sections ~2s)", 2000, 37000], ["(~500-900ms)", 500, 900], ["(~1-2s pure; live sections need a browser)", 1000, 2000], ["(~1.2s)", 1200, 1200]];
+    const bad = rc.filter(([t, lo, hi]) => { const d = declaredOf(L(t)); return !d || d.lo !== lo || d.ms !== hi; });
+    ok("!! a range reads as { lo, ms: the HIGH end }, an en dash too, and a single number has lo === ms; a reversed range (high under low) is no declaration", bad.length === 0 && declaredOf(L("(~5-2s)")) === null && declaredOf(L("(~0.7-1.7s)")).range === true && declaredOf(L("(~1.2s)")).range === false,
+        bad.length ? "WRONG: " + bad.map(([t]) => t).join("; ") : rc.map(([t, lo, hi]) => `${t} = ${lo}..${hi} ms`).join("  "));
+    const T = JSON.parse(fs.readFileSync(path.join(ENG, "tools", "ship", "sweep-timings.json"), "utf8"));
+    const G = "tools/ship/controlDossier-selfcheck.mjs", d0 = declaredOf(fs.readFileSync(path.join(ENG, G), "utf8"));
+    const at = (ms) => { const t = JSON.parse(JSON.stringify(T)); t.timings[G] = ms; t.finished = t.finished || {}; t.finished[G] = true; if (t.serial) delete t.serial[G]; if (t.serialRing) delete t.serialRing[G];
+        return census(ENG, t, { exclude: (g) => g === SELF_REL, id: "none-x64-0c-0gb-000000" }).rotted.some((r) => r.gate === G); };
+    ok("!! controlDossier states the range of the two boxes that measured it (0.7-1.7 s) and the census holds it to that: 0.72 s and 1.67 s both agree, a reading past twice the top (4 s) or under half the bottom (0.3 s) has rotted",
+        d0 && d0.range === true && d0.lo === 700 && d0.ms === 1700 && !at(720) && !at(1670) && !at(3300) && at(4000) && at(300),
+        d0 ? `declares ${d0.lo}..${d0.ms} ms; rotted at 0.72 s ${at(720)}, 1.67 s ${at(1670)}, 3.3 s ${at(3300)}, 4 s ${at(4000)}, 0.3 s ${at(300)}` : "no declaration read");
+}
+
 console.log("\n2. *** THE TWO WAYS A HEADER AND A RECORD DISAGREE ARE DIFFERENT FACTS ***");
 {
     // Driven on a SYNTHETIC timings record over the real tree, so the classifier is exercised on both arms

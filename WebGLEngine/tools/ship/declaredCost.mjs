@@ -39,7 +39,10 @@ export const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".
  * tree and differ by a thousand; a regex that captured the number and assumed seconds would read the second as
  * eighty hours. "m" is accepted because a handful write minutes.
  */
-export const DECLARED_RE = /^\/\/\s*Run:\s*node\s+(\S+)[^(\n]*\(\s*~\s*([0-9.]+)\s*(ms|s|m)\b/mi;
+export const DECLARED_RE = /^\/\/\s*Run:\s*node\s+(\S+)[^(\n]*\(\s*~\s*([0-9.]+)(?:\s*[-\u2013]\s*([0-9.]+))?\s*(ms|s|m)\b/mi;
+// v4904 -- *** A HEADER MAY STATE A RANGE, `(~0.7-1.7s)`, BECAUSE TWO BOXES CAN DIFFER BY 2x AND ONE NUMBER CANNOT SATISFY BOTH. *** statedRuntime-selfcheck measures the box it runs on and this census reads the shared record,
+// so controlDossier's header (0.72-0.81 s here, 1.67 s in the shared record) had to state a 1.2 s compromise both accepted. A range keeps the old rule at its ends: the record agrees when it lies within 2x of the range
+// (not under half the low end, not over twice the high end); `ms` is the HIGH end (the budget the header asks for), `lo` the low, and a single number has lo === ms.
 
 /** Only the first 4 KB is read: the line is by convention the third, and scanning a 40 KB gate for it is a
  *  cost this file exists to be careful about. */
@@ -48,10 +51,10 @@ const HEAD_BYTES = 4000;
 export function declaredOf(src) {
     const m = DECLARED_RE.exec(src.slice(0, HEAD_BYTES));
     if (!m) return null;
-    const n = Number(m[2]);
-    if (!Number.isFinite(n) || n < 0) return null;
-    const ms = m[3] === "ms" ? n : m[3] === "m" ? n * 60000 : n * 1000;
-    return { ms, number: n, unit: m[3], names: m[1] };
+    const n = Number(m[2]), hiN = m[3] === undefined ? n : Number(m[3]);
+    if (!Number.isFinite(n) || n < 0 || !Number.isFinite(hiN) || hiN < n) return null;
+    const k = m[4] === "ms" ? 1 : m[4] === "m" ? 60000 : 1000;
+    return { ms: hiN * k, lo: n * k, number: hiN, unit: m[4], names: m[1], range: m[3] !== undefined };
 }
 
 export function walkGates(root = ENG) {
@@ -144,7 +147,7 @@ export function census(root = ENG, timings = null, { exclude = null, id = boxId(
         if (r === null) { noRecord.push({ gate: g, declaredMs: d.ms }); continue; }
         const f = from.get(g);
         const row = { gate: g, declaredMs: d.ms, recordedMs: r, ratio: r > 0 ? d.ms / r : Infinity, source: f === "the shared record's newest" ? "timings" : "serial", from: f };
-        if (d.ms > 0 && (r / d.ms > 2 || d.ms / r > 2)) rotted.push(row);
+        if (d.ms > 0 && (r > 2 * d.ms || r < 0.5 * d.lo)) rotted.push(row);
         else agree.push(row);
     }
     const bySize = (a, b) => b.ratio - a.ratio;

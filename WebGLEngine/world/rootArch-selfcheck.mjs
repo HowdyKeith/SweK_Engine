@@ -1,6 +1,6 @@
 // WebGLEngine/world/rootArch-selfcheck.mjs — v4077
 //
-// Run: node world/rootArch-selfcheck.mjs   (~1-2s pure; live sections need a browser, skip with a reason otherwise)
+// Run: node world/rootArch-selfcheck.mjs   (~2-37s -- the pure sections ~2s, the live browser sections bring it to 32-37 s on a box that has one (measured alone, three runs, v4904); without a browser they skip with a reason)
 //
 // Keith: could Sylva's (github.com/MengTo/sylva -- all-rights-reserved, so nothing of its CODE is used, only the
 // idea) procedural root/arch geometry fold into the engine too -- the follow-on v4076's moss round named rather

@@ -1,6 +1,6 @@
 // WebGLEngine/render/mossField-selfcheck.mjs — v4077
 //
-// Run: node render/mossField-selfcheck.mjs   (~1-2s pure; live sections need a browser, skip with a reason otherwise)
+// Run: node render/mossField-selfcheck.mjs   (~2-37s -- the pure sections ~2s, the live browser sections bring it to 32-37 s on a box that has one (measured alone, three runs, v4904); without a browser they skip with a reason)
 //
 // Keith: could a moss/root demo (github.com/MengTo/sylva's IDEA, not its all-rights-reserved code) fold into the
 // engine's own terrain generation, on both terrain kinds. This is the gate for render/mossField.js, the shared

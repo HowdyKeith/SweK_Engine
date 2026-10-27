@@ -92,8 +92,11 @@ console.log("\n4. *** AND IT KNOWS WHETHER THE CODE IT IS ABOUT HAS MOVED -- THE
     ok("the target list is derived from the table, not typed", targets.length > 0 && targets.length <= MUTATIONS.length,
        `${targets.length} files across ${MUTATIONS.length} mutations: ${targets.join(", ")}`);
 
+    // v4904 -- A SHALLOW CLONE CANNOT SAY WHICH FILES MOVED SINCE THE RECORDED COMMIT (the publish route the tree prints clones --depth 1): `git log <commit>..HEAD` there reads the whole tree as changed and this row went RED on a tree that
+    // had not moved. It is NOT GRADED, said so, with the one command that fixes it (afterVerdict.mjs does the same for orreryFleet and budgetExile).
+    const shallow = (() => { try { return execFileSync("git", ["rev-parse", "--is-shallow-repository"], { cwd: ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim() === "true"; } catch { return false; } })();
     let changed = null;
-    try {
+    if (!shallow) try {
         const rel = targets.map((t) => path.join("WebGLEngine", t));
         const out = execFileSync("git", ["log", "--name-only", "--format=", `${SCORE.commit}..HEAD`, "--", ...rel],
                                  { cwd: ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
@@ -101,7 +104,7 @@ console.log("\n4. *** AND IT KNOWS WHETHER THE CODE IT IS ABOUT HAS MOVED -- THE
     } catch { changed = null; }
 
     if (changed === null) {
-        skip("git could not be asked whether the targets moved", "no verdict, rather than a green one");
+        skip(shallow ? "NOT GRADED: this clone is shallow, so git cannot say whether the targets moved" : "git could not be asked whether the targets moved", shallow ? "run git fetch --unshallow, then this gate again -- no verdict, not a green one" : "no verdict, rather than a green one");
     } else {
         ok("*** no file the score is ABOUT has changed since the run -- so the number still describes THIS tree ***",
            changed.length === 0,

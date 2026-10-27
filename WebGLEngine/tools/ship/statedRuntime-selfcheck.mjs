@@ -58,7 +58,10 @@ const TIMINGS = path.join(HERE, "gate-timings.json");
 
 // The header form is `// Run: node <path>   (~40s)`. MINUTES ACCEPTED TOO, because three gates use them and a
 // scanner that silently skipped those would under-report and call it clean.
-const RX = /^\/\/\s*Run:.*?\(~\s*([0-9.]+)\s*(s|sec|secs|seconds|min|minutes?)\b/mi;
+// v4904 -- AND A RANGE, `(~0.7-1.7s)`: groups are 1 low, 2 high (undefined for a single number), 3 unit. A range is drifted only when the observed time is past 2x either end (see declaredCost.mjs's DECLARED_RE for why).
+const RX = /^\/\/\s*Run:.*?\(~\s*([0-9.]+)(?:\s*[-\u2013]\s*([0-9.]+))?\s*(s|sec|secs|seconds|min|minutes?)\b/mi;
+const rangeOf = (m) => { const k = /min/i.test(m[3]) ? 60000 : 1000, lo = parseFloat(m[1]) * k; return { lo, hi: m[2] === undefined ? lo : parseFloat(m[2]) * k }; };
+const effClaim = (obs, { lo, hi }) => Math.min(Math.max(obs, lo), hi);   // the end of the stated range nearest the reading (the reading itself when it lies inside)
 
 /**
  * The finest distinction a `(~Xs)` header can carry. A gate stating 0.1s and running in 45ms is not making a
@@ -82,10 +85,10 @@ for (const g of gateFiles().map((p) => path.relative(ROOT, p).replace(/\\/g, "/"
     const m = src.match(RX);
     if (!m) continue;
     stated++;
-    const claimMs = /min/i.test(m[2]) ? parseFloat(m[1]) * 60000 : parseFloat(m[1]) * 1000;
-    const obs = timings[g];
+    const R = rangeOf(m), obs = timings[g];
     if (obs === undefined) continue;          // never timed: a gap, not a drift
     joined++;
+    const claimMs = effClaim(obs, R);
     const ratio = obs / claimMs;
     // *** v3941 -- A RATIO ALONE CANNOT TELL DRIFT FROM THE FORMAT'S OWN RESOLUTION. ***
     // Thirteen of the twenty-six "drifted" headers this round were the SAME CASE: the header says ~0.1s and the
@@ -99,7 +102,7 @@ for (const g of gateFiles().map((p) => path.relative(ROOT, p).replace(/\\/g, "/"
     // spacesimStart (1s vs 0.10s -> 0.9s) still drifts, brusselator (0.4s vs 1.0s -> 0.6s) still drifts. The
     // floor removes exactly the cases where the stated number and the measured one round to each other.
     const gap = Math.abs(obs - claimMs);
-    if ((ratio > 2 || ratio < 0.5) && gap >= HEADER_RESOLUTION_MS) drifted.push({ gate: g, claimMs, obs, ratio });
+    if ((ratio > 2 || ratio < 0.5) && gap >= HEADER_RESOLUTION_MS) drifted.push({ gate: g, claimMs, obs, ratio, R });
 }
 
 const base = fs.existsSync(BASELINE) ? JSON.parse(fs.readFileSync(BASELINE, "utf8")) : null;
@@ -181,7 +184,7 @@ const frozen = new Set(JSON.parse(fs.readFileSync(BASELINE, "utf8")).gates);
     const CONTROL = "tools/ship/spacesimStart-selfcheck.mjs";
     const ctlSrc = fs.readFileSync(path.join(ROOT, CONTROL), "utf8").split("\n").filter((l) => !/SUPERSEDED/.test(l)).join("\n");
     const cm = ctlSrc.match(RX);
-    const ctlClaim = cm ? (/min/i.test(cm[2]) ? parseFloat(cm[1]) * 60000 : parseFloat(cm[1]) * 1000) : null;
+    const ctlClaim = cm ? rangeOf(cm).hi : null;
     const ctlMs = ctlClaim ? minRun(CONTROL) : null;
     const k = ctlClaim ? Math.max(1, ctlMs / ctlClaim) : 1;
     console.log(`  ----  box calibration: ${path.basename(CONTROL)} states ${ctlClaim} ms and ran ${ctlMs} ms here -- ` +
@@ -191,7 +194,7 @@ const frozen = new Set(JSON.parse(fs.readFileSync(BASELINE, "utf8")).gates);
     for (const g of arrived) {
         const d = byGate.get(g);
         if (!d || d.claimMs > RUN_CAP_MS) { unrunnable.push(g); continue; }
-        ran.push({ gate: g, ms: minRun(g), claimMs: d.claimMs, obs: d.obs });
+        const ms = minRun(g); ran.push({ gate: g, ms, claimMs: effClaim(ms, d.R), obs: d.obs });
     }
     // The SAME two-part test the record join uses above: a ratio AND a gap wider than the header's own
     // resolution, so this row cannot report the notation instead of the gate -- with the ratio's upper bound
@@ -216,6 +219,17 @@ const frozen = new Set(JSON.parse(fs.readFileSync(BASELINE, "utf8")).gates);
               " -- correct the header from THIS measurement, not from the record. DO NOT ADD IT TO THE " +
               "BASELINE: that is a ratchet growing back, the one thing a ratchet must never do");
 
+    // *** v4904 -- A HEADER MAY STATE A RANGE (`(~0.7-1.7s)`), AND THE DRIFT TEST JUDGES THE READING AGAINST THE NEAR END. *** Two boxes can differ 2x; one number could not satisfy both, so controlDossier stated a 1.2 s compromise.
+    // SABOTAGE (each restored): effClaim returning the high end always -> 1 RED (the inside-the-range arm); RX not accepting the dash -> 1 RED (the parse arm); the unit factor ignoring minutes -> 2 RED (the minutes arm and the older "no NEW header has drifted" row, which has a minutes header).
+    {
+        const at = (line) => { const m = ("// Run: node x.mjs   " + line).match(RX); return m ? rangeOf(m) : null; };
+        const r1 = at("(~0.7-1.7s)"), r2 = at("(~0.7\u20131.7s)"), r3 = at("(~1.2s)"), r4 = at("(~1-2 min)");
+        const drift = (obs, R) => { const c = effClaim(obs, R); return (obs / c > 2 || obs / c < 0.5) && Math.abs(obs - c) >= HEADER_RESOLUTION_MS; };
+        ok("!! a range header parses (dash and en dash), a single number is a range of one point, minutes scale, and a reading inside the range is no drift while one past twice an end is",
+            r1 && r1.lo === 700 && r1.hi === 1700 && r2 && r2.hi === 1700 && r3 && r3.lo === 1200 && r3.hi === 1200 && r4 && r4.lo === 60000 && r4.hi === 120000 &&
+            !drift(720, r1) && !drift(1670, r1) && !drift(3300, r1) && drift(4000, r1) && drift(300, r1) && drift(3000, r3),
+            r1 ? `0.7-1.7 s: 0.72 s ${drift(720, r1)}, 1.67 s ${drift(1670, r1)}, 3.3 s ${drift(3300, r1)}, 4 s ${drift(4000, r1)}, 0.3 s ${drift(300, r1)}; the single 1.2 s at 3 s ${drift(3000, r3)}` : "no range parsed");
+    }
     // *** v4640 -- AND ONE TIMED `// Run:` LINE PER GATE, BECAUSE THE SCANNER TAKES THE FIRST. ***
     // spacesimStart carried two: a superseded ~1.36s taken from gate-timings.json, and below it the live
     // ~0.14s measured at v4575. RX is anchored with /m and returns the FIRST match, so the stale line was the
@@ -227,7 +241,7 @@ const frozen = new Set(JSON.parse(fs.readFileSync(BASELINE, "utf8")).gates);
     const twoRun = [];
     for (const g of gateFiles().map((q) => path.relative(ROOT, q).replace(/\\/g, "/"))) {
         let src; try { src = fs.readFileSync(path.join(ROOT, g), "utf8"); } catch { continue; }
-        const hits = src.match(/^\/\/\s*Run:.*?\(~\s*[0-9.]+\s*(?:s|sec|secs|seconds|min|minutes?)\b/gmi);
+        const hits = src.match(/^\/\/\s*Run:.*?\(~\s*[0-9.]+(?:\s*[-\u2013]\s*[0-9.]+)?\s*(?:s|sec|secs|seconds|min|minutes?)\b/gmi);
         if (hits && hits.length > 1) twoRun.push(`${g} (${hits.length})`);
     }
     ok("!! *** no gate carries TWO timed `// Run:` lines, because the scanner reads the first and a correction written below it is invisible ***",

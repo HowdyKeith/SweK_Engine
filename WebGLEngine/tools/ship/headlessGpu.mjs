@@ -132,6 +132,13 @@ export const ICD_LEAVES = Object.freeze([
     path.join("chrome-win", "vk_swiftshader_icd.json"),
     path.join("chrome-win64", "vk_swiftshader_icd.json"),
     path.join("chrome-mac", "vk_swiftshader_icd.json"),
+    // v4904 -- the layouts a current Playwright unpacks (Chrome-for-Testing's naming), which SHELL_LEAVES already knew and this list did not: on a fresh Linux box the full browser is chrome-linux64 and the
+    // headless shell chrome-headless-shell-linux64, neither named above, so findVulkanIcds found no driver and thirteen GPU gates read red for want of a Vulkan ICD. Mirrored from playwrightResolve.mjs's leaves.
+    path.join("chrome-linux64", "vk_swiftshader_icd.json"),
+    path.join("chrome-headless-shell-linux64", "vk_swiftshader_icd.json"),
+    path.join("chrome-headless-shell-win64", "vk_swiftshader_icd.json"),
+    path.join("chrome-headless-shell-mac-arm64", "vk_swiftshader_icd.json"),
+    path.join("chrome-headless-shell-mac-x64", "vk_swiftshader_icd.json"),
 ]);
 export const ICD_LEAF = ICD_LEAVES[0];   // back-compat: the value every existing caller of this name expects
 

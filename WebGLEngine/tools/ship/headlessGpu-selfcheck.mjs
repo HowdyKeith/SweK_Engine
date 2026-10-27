@@ -524,6 +524,26 @@ sec("9. THE TEXTURE READ-BACK ARITHMETIC");
         HG.ICD_LEAF);
 }
 
+// v4904 -- THE VULKAN ICD LEAVES MIRROR THE SHELL LEAVES. A fresh Linux box with a current Playwright keeps the full browser in chrome-linux64 and the headless shell in chrome-headless-shell-linux64; ICD_LEAVES named
+// neither, so findVulkanIcds found no driver and thirteen GPU gates read red for want of one. Two rows: the two Linux layouts are FOUND in a fixture root, and every folder playwrightResolve.mjs's SHELL_LEAVES names has an
+// ICD leaf under it (the older bare chrome-linux, chrome-win and chrome-mac folders are named). SABOTAGE (each restored): chrome-linux64 removed from ICD_LEAVES -> 1 RED, the fixture row (the mirror row does not see it: SHELL_LEAVES names
+// no chrome-linux64 folder, which is why the fixture exists); chrome-headless-shell-linux64 removed -> 2 RED, the fixture and the mirror.
+{
+    const { SHELL_LEAVES } = await import("./playwrightResolve.mjs");
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "swek-icd-layouts-"));
+    try {
+        for (const d of ["chromium-9999/chrome-linux64", "chromium_headless_shell-9999/chrome-headless-shell-linux64"]) { fs.mkdirSync(path.join(root, d), { recursive: true }); fs.writeFileSync(path.join(root, d, "vk_swiftshader_icd.json"), "{}"); }
+        const found = HG.findVulkanIcds(root).map((f) => path.relative(root, f).split(path.sep).join("/"));
+        ok(found.length === 2 && found.includes("chromium-9999/chrome-linux64/vk_swiftshader_icd.json") && found.includes("chromium_headless_shell-9999/chrome-headless-shell-linux64/vk_swiftshader_icd.json"),
+            "findVulkanIcds finds the driver in BOTH layouts a current Playwright unpacks on Linux (chrome-linux64 and chrome-headless-shell-linux64), not only the old chrome-linux", found.join(", "));
+    } finally { fs.rmSync(root, { recursive: true, force: true }); }
+    const OLD_BARE = new Set(["chrome-linux", "chrome-win", "chrome-mac"]);   // the older bare folders: ICD_LEAVES has chrome-linux, chrome-win and chrome-mac by name already
+    const folders = [...new Set(SHELL_LEAVES.map((l) => l.split(path.sep)[0]))], have = new Set(HG.ICD_LEAVES.map((l) => l.split(path.sep)[0])), missing = folders.filter((f) => !have.has(f));
+    ok(folders.length >= 8 && missing.length === 0 && [...OLD_BARE].every((f) => have.has(f)),
+        "every folder playwrightResolve.mjs's SHELL_LEAVES names has a Vulkan ICD leaf under it too, so the next layout rename is one red row and not thirteen red gates",
+        missing.length ? "MISSING an ICD leaf for: " + missing.join(", ") : `${folders.length} folders, all mirrored`);
+}
+
 // v4896 -- readingLine and reading: the measured line a kernel-versus-twin gate prints for the real-hardware report. The full grading (format, margin, NaN, the parser carrying it)
 // is tools/ship/snowReadings-selfcheck.mjs; the two are named here, beside the module that owns them, with the one property a rig run leans on.
 {
