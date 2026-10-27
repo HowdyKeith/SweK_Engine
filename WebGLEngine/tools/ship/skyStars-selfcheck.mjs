@@ -268,6 +268,12 @@ console.log("\n4. the mistake I made twice, and why it does not get a new instru
        "a truncated literal loses main() and its closing brace, which is what a stray backtick produces");
 }
 
+{   // the star GLSL is injected into FS: a `precision` statement AFTER it leaves its float functions without one and the program never links (the sky and the rest of the frame then fail, seen on the rig)
+    const fs0 = skySrc.slice(skySrc.indexOf("const FS = `")), pAt = fs0.indexOf("precision highp float;"), sAt = fs0.indexOf("${SKY_STARS_GLSL}");
+    ok("!! the fragment shader declares float precision BEFORE the injected star GLSL", pAt > 0 && sAt > 0 && pAt < sAt,
+       "a function with float arguments ahead of the precision statement fails to compile (\"No precision specified for (float)\"), the program does not link and every uniform lookup after it reads null");
+}
+
 console.log();
 console.log("  ----  WHAT THIS DOES NOT CLAIM");
 console.log("  ----  THAT THE GLSL EXECUTES. No GL context is taken: the shader text is held to the JS twin by");

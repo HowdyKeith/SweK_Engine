@@ -31192,6 +31192,7 @@ function loop(t, xrFrame) {
     // MAKES the scene change; skipping those would freeze the world, so nothing would ever go dirty and the
     // screen would never come back. Ticks always run; only the drawing is optional. Everything below the
     // guard is render work (renderPrep through hudUpdate) and declares nothing used after it.
+    let visible = [];   // hoisted: the HUD readout below the draw guard reads it on frames where the guard or the XR branch skipped the draw
     const _fdDecision = frameDirty.shouldRender();
     if (_fdDecision.render) {
     // v4179 -- in a session the world is drawn twice, once per eye, into the headset's own framebuffer, and
@@ -31202,7 +31203,7 @@ function loop(t, xrFrame) {
     if (xr.isActive() && _xrFrame) { _renderXRFrame(_xrFrame); } else {
     // RENDER — branches on whether the TV wall is active
     profStart("renderPrep");
-    const visible = world.getVisibleChunks();
+    visible = world.getVisibleChunks();
 
     // Round 48 — collect dynamic lights from active projectiles +
     // missile in flight. Voxel shader supports up to 8 simultaneously.
