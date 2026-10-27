@@ -2619,6 +2619,36 @@ export const NEXT_ROUNDS = [
         how: "Seen while measuring v4868's avatar fix: after resizing 1900 -> 1400 the dials read 357 px where a fresh 1400 load reads 321, the ratio of a 1.0 zoom to 0.9. Inferred from that ratio, not read off the zoom itself; confirm before changing anything (server.html line ~3420 sets it).",
         why: "A window dragged narrower keeps the wider window's scale.",
     },
+    // ---- the submarine's needs and limits (pieces 1 and 2 are BUILT, v4904 work: brain/NEEDS_AND_LIMITS.md, physics/mechanics/subNeeds.mjs, brain/needsPilot.mjs): what that round left, written down where it will be re-read.
+    {
+        id: "needs-pieces-3-and-4-task-and-stateful-pilot",
+        blocker: "OPEN",
+        what: "Pieces 3 and 4 of Keith's parked needs-and-limits idea (brain/SUBMARINE_WIP.md \"Parked idea\"): a TASK that puts the charge and the hull in conflict, with audits and controls, and a STATEFUL pilot for it. Not built.",
+        how: "Register the task, its audits and its controls BEFORE running anything (the standing rule for the fish ladder); the refill-trip rule in brain/needsPilot.mjs is the baseline to beat, not a result. Energy and hull strain are slow internal states, which is what a stateless pilot cannot hold and a persistent-activity circuit might.",
+        why: "Nothing built so far claims any pilot does better or worse with needs; the refill trip is a stand-in rule that exists so the model can be seen working. The fish/fly question is untouched until this is run.",
+    },
+    {
+        id: "needs-tank-scale-numbers",
+        blocker: "OPEN",
+        what: "The needs model's numbers are TANK-SCALE: a minute's swim costs about 5% of the charge (capacities of 3 MJ and 12 MJ, a 6 kW charge rate) and the hull's undamaged collapse depth is 60 m so the 50 m tank can feel it. A real boat's battery is about 100x bigger.",
+        how: "If a realistic mode is wanted: a second table of classes (hours of endurance, a real collapse depth) and the audits written against it, kept beside the tank-scale one, not replacing it. Nothing to do while the aquarium is the only caller.",
+        why: "Said plainly in the module and the gate so the numbers are not read as a real boat's; recorded here so a realistic mode starts from the gap and not from a surprise.",
+    },
+    {
+        id: "needs-not-modelled",
+        blocker: "OPEN",
+        what: "What the needs model leaves out: pumps to clear a flood (flooding is only ever added, to the 15% cap), repair (the aquarium's restore resets the sub), the snorkel's noise beyond its `exposed` flag, and the power the ballast pump draws (a dead screw still pumps for free).",
+        how: "Each is a small addition to physics/mechanics/subNeeds.mjs with its own gate row and mutant: a pump rate that works against the leak at a power cost, a repair that costs time at the surface, an exposure cost that a pilot can be audited on, and a pump draw in the power formula.",
+        why: "None is needed to show the charge and the pressure working; each changes what a pilot has to trade, so each belongs with piece 3 (the task) and not before it.",
+    },
+    {
+        id: "ai-managed-sub-stations",
+        blocker: "UPSTREAM",
+        what: "IDEA ONLY, NOT STARTED AND NOT DESIGNED (Keith): the engine's AI managing ALL the stations of a submarine -- helm and planes, ballast and trim, navigation, the sensors, and the energy and hull -- each by a brain, instead of one pilot flying the whole boat. If \"stations\" meant something else, correct this entry.",
+        how: "No work proposed. If taken up: a station is a function from what that station can sense to what it commands, a captain layer decides between them, and the existing per-purpose pieces (the PD autopilot, the surfacing and emergency wrappers, the navigator and the estimators, the refill trip) are the first station brains.",
+        why: "Logged so the idea is not lost; it only means something once the needs task (piece 3) exists, because the stations only conflict when the boat has needs.",
+        upstream: "needs-pieces-3-and-4-task-and-stateful-pilot",
+    },
 ];
 
 // *** v4549 -- THIS REPORT WAS HIDING THREE OF ITS OWN OPEN ITEMS, AND HAD BEEN FOR SEVERAL ROUNDS. ***

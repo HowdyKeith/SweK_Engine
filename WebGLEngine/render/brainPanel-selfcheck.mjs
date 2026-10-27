@@ -37,7 +37,7 @@
 // SECTION 14 (the flight pages' clicks, v4904), SIX more, each in place and restored: U1 a second click not letting go (render/brainUi.mjs) 1 | U2 page coordinates not scaled to the canvas 2 | U3 the selection kept for somebody else 1 | U4 the view always bars 1+ (and it broke the aquarium rows too: see the next line) |
 //   U5 es-aircraft's panel built without the selection 3 | U6 es-box3d-fly3d never saying WHO the panel is about 1. THE AQUARIUM ROWS OF SECTION 13 FLAKED ONCE under that load (the first click came before the first drawing): they now wait for the header, not for half a second; three clean runs after.
 // THE HOLD SLIDER (v4904, section 13), FIVE page sabotages: S1 the slider never steering 3 | S2 the slider's position recomputed from the moving lens scale 1 | S3 zero not calling the clear 0 -- EQUIVALENT: tank.setSteer treats a delta of 0 as a clear, so the other branch does the same thing; the line stays as the intent |
-//   S4 the slider snapping back while it is dragged 1 (the source row only: a headless drag cannot be told from a click) | S5 the outputs never named in the readout 2.
+//   S4 the slider snapping back while it is dragged 2 (the source row and the REAL-DRAG row: mouse down on the thumb, pull, clear the steer from elsewhere with the hand still down, release; first written as a dispatched event, which could not tell it from a click) | S5 the outputs never named in the readout 2.
 // B23 and B26 went 0 red the first time: no row looked at WHERE the panel put the map, and inside the steering box the flown target IS the wander target; the rows for the map's place on the canvas and for a sub outside the box now do.
 "use strict";
 import fs from "node:fs";
@@ -387,6 +387,16 @@ console.log("\n13. THE AQUARIUM'S CLICKS (v4904; a browser, SKIPPED and said wit
             ok("!! the hold slider (disabled until a pushable neuron is selected) holds a push at -6, then +6, times the lens's push: the header says STEERED, the message gives the held value (negative, then positive) and the outputs it moves, the slider keeps its position as the lens's own scale moves", /STEERED h\d+/.test(sw) && /^holding h\d+ at -\d/.test(sm) && /-> outputs/.test(sm) && Number(sv) === -6 && !sd[0] && /^holding h\d+ at \+\d/.test(sm2) && Number(sv2) === 6, JSON.stringify({ sm, sv, sm2, sv2 }));
             await slide(0); const sw0 = await txt("#brainWho"), sm0 = await txt("#steerMsg");
             ok("  moving it back to zero lets go: no STEERED in the header and the message offers the push again", !/STEERED/.test(sw0) && /selected: push it up or down/.test(sm0), sm0);
+            // v4904 -- A REAL DRAG, NOT A DISPATCHED EVENT: press on the thumb, pull it left, and (the hand still down) let go of the steer from elsewhere. While the pointer is down the slider is the HAND'S and the redraw must not fight it: the slider stays
+            // where it is held while the page's state (no steer) says zero; on release it follows the state. A page that overwrote the slider on every redraw would snap it to 0 under the hand, and a click cannot show the difference.
+            const sb = await pg.$eval("#steerSlider", (e) => { e.scrollIntoView({ block: "center" }); const r = e.getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, h: r.height }; });
+            await pg.mouse.move(sb.x + sb.w / 2, sb.y + sb.h / 2); await pg.mouse.down(); await pg.mouse.move(sb.x + sb.w * 0.2, sb.y + sb.h / 2, { steps: 6 }); await pg.waitForTimeout(500);
+            const dv1 = Number(await pg.$eval("#steerSlider", (e) => e.value)), dw1 = await txt("#brainWho");
+            await pg.evaluate(() => document.getElementById("steerClear").click()); await pg.waitForTimeout(800);   // the steer is cleared from elsewhere, the pointer still down; several redraws pass
+            const dv2 = Number(await pg.$eval("#steerSlider", (e) => e.value)), dw2 = await txt("#brainWho");
+            await pg.mouse.up(); await pg.waitForTimeout(800);
+            const dv3 = Number(await pg.$eval("#steerSlider", (e) => e.value));
+            ok("!! a real drag of the hold slider pulls it left and steers (the header says STEERED), and with the hand still down a steer cleared from elsewhere does NOT snap the slider back under it (it stays where held, the header no longer says STEERED); on release it follows the state back to 0", dv1 < -4 && /STEERED h\d+/.test(dw1) && dv2 === dv1 && !/STEERED/.test(dw2) && dv3 === 0, JSON.stringify({ dv1, dv2, dv3 }));
             await pg.click("#steerUp", { timeout: 3000 }).catch(() => {}); await pg.waitForTimeout(400);
             await pg.click("#steerClear"); await pg.waitForTimeout(500);
             const who3 = await txt("#brainWho"), d3 = await dis();
