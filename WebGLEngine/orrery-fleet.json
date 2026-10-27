@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "9cacca007c389601967ca33c22604841c1c7aad4",
+ "head": "95d3e3e4bc3dcb721133d97791c939f082373e53",
  "bodies": {
   "box3d": [
    {
@@ -855,8 +855,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 3702524,
-    "sha": "aa6f4f6dc84cb58954015bd993a5333b057c6366"
+    "bytes": 3704340,
+    "sha": "95d3e3e4bc3dcb721133d97791c939f082373e53"
    },
    {
     "path": "mpm3d.html",
@@ -1283,7 +1283,7 @@
    {
     "path": "render/denoiseFrameGenCost-selfcheck.mjs",
     "bytes": 39949,
-    "sha": "64756e00412e827dcd998f721371c5383d8e5407"
+    "sha": "22a84e6160a83ffe35e1c66afe2758e1fe2ce6da"
    },
    {
     "path": "render/flowReconcileTsl-selfcheck.mjs",
