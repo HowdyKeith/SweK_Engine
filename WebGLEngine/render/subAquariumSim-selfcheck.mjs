@@ -132,7 +132,7 @@ console.log("\n9. SNAPSHOT");
 {
     const t = A.createTank(); t.sync([entry("p", { name: "Pip", hue: 42, from: "10.0.0.2", local: true })]); run(t, 60);
     const s = t.snapshot()[0], tr = s.trail.length; s.trail.push([0, 0, 0]); s.trail.length = 0;
-    ok("!! a snapshot is a plain record with exactly the fields the page draws (id, name, hue, hull, pilot, from, local, x, y, depth, heading, pitch, speed, cmd, event, steer, compass, tank, target, lost, status, trail -- v4904 added steer, v4901 added event and tank, v4899 added cmd, the pilot's four commands this tick, which the 3D view draws the fins from), and its trail is a COPY (emptying it does not empty the boat's)", Object.keys(s).sort().join() === "cmd,compass,depth,event,from,heading,hue,hull,id,local,lost,name,pilot,pitch,speed,status,steer,tank,target,trail,x,y".split(",").sort().join() && t.snapshot()[0].trail.length === tr && tr > 50 && s.name === "Pip" && s.hue === 42 && s.from === "10.0.0.2" && s.local === true && s.pilot === "autopilot");
+    ok("!! a snapshot is a plain record with exactly the fields the page draws (id, name, hue, hull, pilot, from, local, x, y, depth, heading, pitch, speed, cmd, event, steer, needs, compass, tank, target, lost, status, trail -- v4904 added steer, v4901 added event and tank, v4899 added cmd, the pilot's four commands this tick, which the 3D view draws the fins from), and its trail is a COPY (emptying it does not empty the boat's)", Object.keys(s).sort().join() === "cmd,compass,depth,event,from,heading,hue,hull,id,local,lost,name,needs,pilot,pitch,speed,status,steer,tank,target,trail,x,y".split(",").sort().join() && t.snapshot()[0].trail.length === tr && tr > 50 && s.name === "Pip" && s.hue === 42 && s.from === "10.0.0.2" && s.local === true && s.pilot === "autopilot");
     run(t, 300);
     ok("!! a trail never grows past 80 points however long the boat swims (5 minutes more)", t.snapshot()[0].trail.length === 80 && A.TRAIL === 80 && t.snapshot()[0].trail.every((p) => p.length === 3 && p.every(Number.isFinite)));
     const big = A.createTank(); big.sync(Array.from({ length: 24 }, (_, i) => entry("g" + i, i % 2 ? { pilot: "network", weights: seed[2].weights } : {}))); const t0 = Date.now(); run(big, 60);
@@ -179,8 +179,8 @@ console.log("\nBIG TANK");
     ok("!! subs swim the whole of a big tank: after the first five minutes (the spawn is anywhere in the tank) they stay inside its walls and still reach past the small tank's 500 m and 300 m, spending more than a fifth of their time beyond 500 m", inside && maxX > 560 && maxY > 360 && far / total > 0.2, `max x ${maxX.toFixed(0)}, max y ${maxY.toFixed(0)}, ${(100 * far / total).toFixed(0)}% of the time beyond 500 m`);
 }
 // v4901 -- the exports the definition census asked this gate to name (COMPASS, EVENTS, LEAK, RESCUE, compassValidAt, trimsOut), checked in one row.
-{ const M = await import("./subAquariumSim.mjs"); const names = ["COMPASS", "EVENTS", "LEAK", "RESCUE", "compassValidAt", "trimsOut"];
+{ const M = await import("./subAquariumSim.mjs"); const names = ["COMPASS", "EVENTS", "LEAK", "RESCUE", "compassValidAt", "trimsOut", "ESTIMATORS", "NEEDS_CRUSH"];   // v4904: the two estimator events' names and the needs hull's tank-scale crush depth (rows in subAquariumEvents-selfcheck sections 9 and 11)
   const okShape = names.every((n) => n in M && (typeof M[n] === "function" || typeof M[n] === "number" || typeof M[n] === "string" || typeof M[n] === "object"));
-  ok("the event machinery's exports (EVENTS, COMPASS, LEAK, RESCUE, compassValidAt, trimsOut) are present", okShape, names.map((n) => n + ":" + typeof M[n]).join(" ")); }
+  ok("the event machinery's exports (EVENTS, COMPASS, LEAK, RESCUE, compassValidAt, trimsOut, ESTIMATORS, NEEDS_CRUSH) are present", okShape, names.map((n) => n + ":" + typeof M[n]).join(" ")); }
 console.log(fails ? `\n${fails} FAIL` : "\nall checks pass");
 process.exit(fails ? 1 : 0);

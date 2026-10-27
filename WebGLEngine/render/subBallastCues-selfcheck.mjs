@@ -158,7 +158,7 @@ console.log("\n7. THE PAGE");
 {
     const aq = fs.readFileSync(path.join(ENG, "sub-aquarium.html"), "utf8");
     ok("!! the page has four event buttons (flood, sink, surface, restore) wired to tank.setEvent on the SELECTED sub, and says so when none is picked", ["floodBtn", "sinkBtn", "surfaceBtn", "clearBtn"].every((id) => new RegExp(`id="${id}"`).test(aq)) && /tank\.setEvent\(selected, ev\)/.test(aq) && /if \(!selected\)/.test(aq) && /setEvent\("flood"\)/.test(aq) && /setEvent\("sink"\)/.test(aq) && /setEvent\("surface"\)/.test(aq) && /setEvent\(null\)/.test(aq));
-    ok("!! every list row carries a tank line, filled from the snapshot by readout()", /id = "t_" \+ s\.id/.test(aq) && /textContent = readout\(s\)/.test(aq) && /import \{ readout \} from "\/render\/subBallastCues\.mjs"/.test(aq));
+    ok("!! every list row carries a tank line, filled from the snapshot by readout()", /id = "t_" \+ s\.id/.test(aq) && /textContent = needsLine\(s\) \|\| readout\(s\)/.test(aq) && /import \{ readout \} from "\/render\/subBallastCues\.mjs"/.test(aq));
     const t = createTank(); t.sync([{ id: "x", name: "x", hue: 10, pilot: "pd", from: "x", local: true }]); for (let i = 0; i < 1200; i++) t.step(1 / 30); t.setEvent("x", "surface"); for (let i = 0; i < 30; i++) t.step(1 / 30);
     ok("!! the real tank's row for a surfacing sub gives the line a tank: " + C.readout(t.snapshot()[0]), /^SURFACING · tank \d+% water · air [\d.]+\/1\.5 · weight on/.test(C.readout(t.snapshot()[0])));
 }

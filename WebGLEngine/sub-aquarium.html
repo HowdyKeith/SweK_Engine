@@ -85,6 +85,7 @@
   <label>sea <select id="seaSel" title="The water above the tank. The three physics seas are the same Gerstner surface a hull floats on, in calm, default and rough swell, and work on every GPU. The GPU ocean is the vendored web-ocean sea (sea-host.html) drawn behind this canvas; it needs WebGPU, and the subs are drawn in front of all of its water (the depth tint puts them under it)."></select> <span class="sub" id="seaState"></span></label>
   <span title="Pick a sub in the list, then press one: a leak the tank cannot trim out (the boat blows its tank and drops its weight), the same leak with no rescue (it grounds), or surface (it blows its tank and rides on its buoyancy with the tower out of the water)">event on the selected sub:
     <button id="floodBtn">flood</button> <button id="sinkBtn">sink</button> <button id="surfaceBtn">surface</button> <button id="clearBtn">restore</button>
+    <label title="Give the selected sub a charge that its thrust drains and only the surface (a battery boat) or a snorkel depth refills, and a hull that feels the pressure: it takes the refill trip by itself when the charge is low. Tank-scale numbers (minutes, not days) and a 60 m hull."><span>needs</span> <select id="needsSel"><option value="">off</option><option value="battery">battery</option><option value="snorkel">battery + snorkel</option><option value="airIndependent">air-independent</option><option value="unlimited">unlimited</option></select></label> <button id="injureBtn" title="Hurt the selected sub's hull by 20% of its life: its collapse depth falls and it leaks more the deeper it goes">injure +20%</button>
     <button id="flyEstBtn" disabled title="The fly's heading-loop circuit as an estimator behind the autopilot, flown through the compass dropout (available once the page has loaded the circuit)">fly estimator</button> <button id="erEstBtn" disabled title="The best random wiring of the same size, fitted the same way, behind the autopilot (available once the page has loaded the circuit)">random-wiring estimator</button></span>
   <span class="chip"><span class="dot" id="fishDot"></span><b>FISH BRAIN</b> <span id="fishWord">checking&hellip;</span></span>
   <span id="msg" class="sub"></span>
@@ -130,6 +131,7 @@ import { LABELS as SEA_LABELS, GPU, DEFAULT_STYLE, isStyle, gpuSeaAvailable } fr
 import { hostUrl } from "/ui/seaFrame.mjs";
 import { subPanel, drawPanel } from "/render/brainPanel.mjs";
 import { pickNeuron } from "/render/brainLens.mjs";
+import { needsLine } from "/render/needsView.mjs";
 import { dialInfo, pair, pushTrace, lineFor, drawDial, drawTrace, drawDark } from "/render/compassView.mjs";
 
 const $ = (id) => document.getElementById(id);
@@ -202,6 +204,8 @@ $("compassBtn").onclick = () => {
   $("msg").textContent = ids[1] ? "compass test: " + tank.subs.get(ids[0]).name + " on the plain autopilot, " + tank.subs.get(ids[1]).name + " on the navigator" : "compass test: only one sub, on the plain autopilot (a second sub is needed for the navigator)";
 };
 $("flyEstBtn").onclick = () => setEvent("fly-estimator"); $("erEstBtn").onclick = () => setEvent("er-estimator");   // v4904: the study's two estimators as events on the selected sub; their builders are registered below once the circuit is loaded
+$("needsSel").onchange = () => { if (!selected) { $("msg").textContent = "pick a sub in the list first"; $("needsSel").value = ""; return; } try { const v = $("needsSel").value; if (v === "") { tank.setEvent(selected, null); $("msg").textContent = "needs off: restored"; } else { tank.setNeeds(selected, v); $("msg").textContent = v + " needs on the selected sub (a 60 m hull, tank-scale charge)"; } } catch (e) { $("msg").textContent = String((e && e.message) || e).slice(0, 90); $("needsSel").value = ""; } };
+$("injureBtn").onclick = () => { if (!selected) { $("msg").textContent = "pick a sub in the list first"; return; } try { const d = tank.injure(selected, 0.2); $("msg").textContent = d === null ? "no such sub" : "hull damage " + Math.round(d * 100) + "%"; } catch (e) { $("msg").textContent = "turn the needs on first (the needs menu)"; } };
 $("floodBtn").onclick = () => setEvent("flood"); $("sinkBtn").onclick = () => setEvent("sink"); $("surfaceBtn").onclick = () => setEvent("surface"); $("clearBtn").onclick = () => setEvent(null);
 const DOT = { live: "#4ade80", standin: "#f6a623", offline: "#ff5a5a", err: "#555" }, WORD = { live: "live", standin: "stand-in", offline: "offline", err: "unreachable" };
 
@@ -247,7 +251,7 @@ function updateStats(snap) {
   for (const s of snap) {
     const cm = document.getElementById("c_" + s.id);
     if (cm && s.cmd) { const f = (v, w) => (v >= 0 ? "+" : "") + v.toFixed(w); cm.textContent = `pitch ${f(s.cmd.pitch, 2)} · yaw ${f(s.cmd.yaw, 2)} · thrust ${f(s.cmd.thrust, 2)} · ballast ${f(s.cmd.ballast, 2)}`; }
-    const tk = document.getElementById("t_" + s.id); if (tk) tk.textContent = readout(s) || lineFor(s);
+    const tk = document.getElementById("t_" + s.id); if (tk) tk.textContent = needsLine(s) || readout(s) || lineFor(s);
     const m = document.getElementById("m_" + s.id); if (!m) continue;
     m.textContent = `${s.pilot === "network" ? "network" : "PD autopilot"} · ${s.local ? "this box" : "from " + s.from} · ${s.depth.toFixed(0)} m · ${s.speed.toFixed(1)} m/s` + (s.hull && s.hull !== "nominal" ? ` · ${LABELS[s.hull] || s.hull}` : "") + (s.lost ? ` · lost ${s.lost}×` : "");
   }

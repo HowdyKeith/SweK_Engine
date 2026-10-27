@@ -391,6 +391,13 @@ console.log("\n13. THE AQUARIUM'S CLICKS (v4904; a browser, SKIPPED and said wit
             await pg.click("#steerClear"); await pg.waitForTimeout(500);
             const who3 = await txt("#brainWho"), d3 = await dis();
             ok("  clearing lets go: no STEERED in the header and the clear button is disabled again", !/STEERED/.test(who3) && d3[2], who3.slice(-30));
+            // v4904 -- NEEDS AND LIMITS on the page: the menu starts a charge and a hull on the selected sub, the list row says so, and injure hurts the hull
+            await pg.selectOption("#needsSel", "battery"); await pg.waitForTimeout(700);
+            const nl = await pg.evaluate(() => { const t = document.querySelector(".tk"); return t ? t.textContent : ""; });
+            await pg.click("#injureBtn"); await pg.waitForTimeout(600);
+            const nl2 = await pg.evaluate(() => { const t = document.querySelector(".tk"); return t ? t.textContent : ""; });
+            ok("!! the needs menu gives the selected sub a battery and a 60 m hull (the list row reads battery, charge, kW, hull strain of 60 m, damage 0%), and injure hurts the hull by 20%", /^battery · charge \d+% · [\d.]+ kW.* · hull [\d.]+ of 60 m · damage 0% · flood 0\.0%$/.test(nl) && /damage 20% /.test(nl2) && /of 54 m/.test(nl2), JSON.stringify({ nl: nl.slice(0, 90), nl2: nl2.slice(-60) }));
+            await pg.selectOption("#needsSel", ""); await pg.waitForTimeout(400);
             await pg.selectOption("#brainMode", "layers"); await pg.waitForTimeout(500);
             await at(26, 44);   // the first dot of the features column (the map sits 14 px lower while a neuron is selected: the wiring line takes the top, and h<i> is still selected from the lens)
             const m4 = await txt("#steerMsg"), d4 = await dis();

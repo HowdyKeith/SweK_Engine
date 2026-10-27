@@ -23,6 +23,8 @@ import * as SP from "../brain/surfacePilot.mjs";
 import { turnWorld } from "../tools/subDropout.mjs";
 import { navigator as deadReckoning } from "../tools/subNavigator.mjs";
 import { steerWeights } from "../render/brainLens.mjs";
+import * as N from "../physics/mechanics/subNeeds.mjs";
+import * as NP from "../brain/needsPilot.mjs";
 
 export const LENGTH = 500, WIDTH = 300, MARGIN = 60, DEPTH_MIN = 14, DEPTH_MAX = 40, TRAIL = 80, TRAIL_EVERY = 0.5, MAX_STEP = 0.1;
 const DT = S.DT, wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
@@ -36,7 +38,7 @@ const hash = (str) => { let h = 2166136261; for (let i = 0; i < str.length; i++)
 //   "sink"     the same leak and NO rescue: the autopilot blows its tank to the stop and still sinks to the seabed; the boat is lost and put back (the count shows it)
 //   "surface"  brain/surfacePilot.mjs's wrap with `surface: true` in the target: the boat rises, blows its tank and rides on its buoyancy with the tower out of the water
 // setEvent(id, null) ends it: the leak stops, the tank state goes (the boat is repaired and the weight is back: it is an aquarium), the sub is flown as before. Pure like the rest: no clock but the tank's.
-export const EVENTS = Object.freeze(["flood", "sink", "surface", "dropout", "navigator", "fly-estimator", "er-estimator"]);
+export const EVENTS = Object.freeze(["flood", "sink", "surface", "dropout", "navigator", "fly-estimator", "er-estimator", "needs"]);
 // THE COMPASS EVENTS (tools/subDropout.mjs and tools/subNavigator.mjs, rung 4a, in the tank): for the event's own clock the compass reports for COMPASS.darkFrom seconds, then stops for COMPASS.darkLen seconds, and repeats every COMPASS.period.
 //   "dropout"    the plain pilot, shown a heading that stays at the last valid one while the compass is dark (a rotated copy of the world: body rates, pitch, depth and speed stay true)
 //   "navigator"  the SAME pilot behind the dead-reckoning navigator: it integrates the vessel's own heading rate through the dark and hands the pilot that estimate. Started on two subs at once the two meet the same windows.
@@ -44,6 +46,9 @@ export const EVENTS = Object.freeze(["flood", "sink", "surface", "dropout", "nav
 //                (tank.registerEstimator(event, build): build(inner) -> pilot(state, target, current, aux), `inner` the sub's own pilot seen through a spy). The sub is flown through the same dark windows as the others; the heading the
 //                autopilot read on its LAST tick (the spy) is what the snapshot's `compass.seen` carries, so a page draws the amber ring and the ghost line along the heading the autopilot BELIEVES while the sub's own nose is the truth.
 //                An estimator event with no builder registered throws and changes nothing (a tank without the page's circuit has none to run).
+//   "needs"      (v4904, physics/mechanics/subNeeds.mjs and brain/needsPilot.mjs): the sub has a CHARGE that its thrust drains and only the surface (a battery hull) or a snorkel depth refills, and a HULL that feels the pressure and can be injured (a collapse depth that damage
+//                lowers, a leak that grows with depth and damage). It rides the tank model of the flood events (so it can blow its tank and surface) and flies behind the refill-trip rule over the surfacing pilot: low charge -> up, charged -> back to its task. `setNeeds(id, class, { crushDepth })`
+//                starts it (the tank-scale crush depth is 60 m: the Explorer's 100 m would never be felt in a 50 m tank), `injure(id, amount)` hurts the hull. One event at a time: it does not mix with the flood events or the compass ones.
 // Neither needs a tank: the sub keeps its hull's own model. The snapshot's `compass` says { valid, seen (the heading the pilot is shown, rad), error (seen less true, wrapped, rad) }.
 export const COMPASS = Object.freeze({ period: 40, darkFrom: 10, darkLen: 16 });
 /** Is the compass reporting at event time t (seconds)? */
@@ -51,8 +56,9 @@ export const compassValidAt = (t) => { const p = ((t % COMPASS.period) + COMPASS
 export const ESTIMATORS = Object.freeze(["fly-estimator", "er-estimator"]);
 const isEstimator = (ev) => ESTIMATORS.includes(ev);
 const isCompass = (ev) => ev === "dropout" || ev === "navigator" || isEstimator(ev);
-const needsTank = (ev) => ev === "flood" || ev === "sink" || ev === "surface";
+const needsTank = (ev) => ev === "flood" || ev === "sink" || ev === "surface" || ev === "needs";
 export const LEAK = 0.06;
+export const NEEDS_CRUSH = 60;   // the tank-scale hull: the 50 m tank would never feel the Explorer's 100 m
 const TANK_FIELDS = Object.freeze({ tankRate: FL.FLOOD_SPEC.tankRate, airMax: FL.FLOOD_SPEC.airMax, emergencyRate: FL.FLOOD_SPEC.emergencyRate, emergencyAirCost: FL.FLOOD_SPEC.emergencyAirCost, dropMass: FL.FLOOD_SPEC.dropMass });
 // the tank is 50 m deep and a sub may be 40 m down when the leak starts, so the rescue works to the room there is: blow at 2 m deeper than the held depth, drop the weight at 4 (brain/emergencyPilot.mjs defaults, 5 and 10, are the flood task's, where a boat starts 25..35 m down)
 export const RESCUE = Object.freeze({ blowDepth: 2, releaseDepth: 4 });
@@ -111,7 +117,7 @@ export function createTank({ hull = "nominal", length = LENGTH, width = WIDTH } 
     function clearEvent(sub) {
         if (!sub.event) return;
         if (sub.state && sub.state.tank) { const { tank, ...rest } = sub.state; sub.state = rest; }
-        sub.event = null; sub.eventT = 0; sub.eventModel = null; sub.eventPilot = null; sub.compass = null;
+        sub.event = null; sub.eventT = 0; sub.eventModel = null; sub.eventPilot = null; sub.compass = null; sub.needs = null; sub.needsInfo = null;
     }
     function add(entry) {
         const rng = mulberry(hash(entry.id));
@@ -144,6 +150,21 @@ export function createTank({ hull = "nominal", length = LENGTH, width = WIDTH } 
             sub.steer = { neuron: i, delta }; sub.steerW = w; sub.pilot = PS.pilotFor(Float32Array.from(w));
             return { ...sub.steer };
         },
+        /**
+         * Start the needs event on a sub with a hull CLASS (subNeeds.CLASSES: battery, snorkel, airIndependent, unlimited) and an undamaged collapse depth (default NEEDS_CRUSH). A bad class or crush depth throws and changes nothing; an unknown id answers null; a sub with a steer is refused
+         * (see setEvent). Returns the event now running ("needs").
+         */
+        setNeeds(id, cls, { crushDepth = NEEDS_CRUSH } = {}) {
+            const n = N.initialNeeds(cls, { crushDepth });   // throws on a bad class or crush depth BEFORE anything changes
+            const sub = subs.get(id); if (!sub) return null;
+            sub.pendingNeeds = n; try { return this.setEvent(id, "needs"); } catch (e) { sub.pendingNeeds = null; throw e; }
+        },
+        /** Hurt the hull of a sub that has needs by `amount` of its life (0..1; NaN and negatives do nothing). Answers its damage now; an unknown id answers null; a sub with no needs throws (start them with setNeeds). */
+        injure(id, amount) {
+            const sub = subs.get(id); if (!sub) return null;
+            if (!sub.needs) throw new Error("subAquariumSim.injure: the sub has no needs (start them with setNeeds)");
+            sub.needs = N.injure(sub.needs, amount); return sub.needs.damage;
+        },
         /** A page's estimator pilot for an estimator event (fly-estimator, er-estimator): build(inner) -> pilot(state, target, current, aux), `inner` the sub's own pilot seen through a spy. Applies to events started AFTER the call. A bad name or builder throws and changes nothing. */
         registerEstimator(event, build) {
             if (!isEstimator(event)) throw new Error(`subAquariumSim.registerEstimator: an estimator event (${ESTIMATORS.join(", ")}), got ${JSON.stringify(event)}`);
@@ -165,8 +186,9 @@ export function createTank({ hull = "nominal", length = LENGTH, width = WIDTH } 
                 if (!sub.state.tank) { sub.eventModel = withTank(MODEL); sub.state = { ...sub.state, tank: { ...S.initialTank(sub.eventModel), level: sub.cmd ? Math.max(-1, Math.min(1, sub.cmd.ballast)) : 0 } }; }
             } else if (sub.state.tank) { const { tank, ...rest } = sub.state; sub.state = rest; sub.eventModel = MODEL; }   // a compass event has no tank
             else sub.eventModel = MODEL;
-            sub.event = ev; sub.eventT = 0; sub.holdDepth = -sub.state.pos[2]; sub.compass = null;
-            sub.eventPilot = ev === "flood" ? (trimsOut(sub.eventModel) ? sub.pilot : EP.wrap(sub.pilot, RESCUE)) : ev === "surface" ? SP.wrap(sub.pilot, { model: sub.eventModel }) : isCompass(ev) ? compassPilot(sub, ev === "navigator" ? "nav" : ev === "dropout" ? "plain" : ev) : sub.pilot;
+            sub.event = ev; sub.eventT = 0; sub.holdDepth = -sub.state.pos[2]; sub.compass = null; sub.needsInfo = null;
+            if (ev === "needs") { sub.needs = sub.pendingNeeds || N.initialNeeds("battery", { crushDepth: NEEDS_CRUSH }); sub.pendingNeeds = null; } else sub.needs = null;
+            sub.eventPilot = ev === "needs" ? NP.wrap(SP.wrap(sub.pilot, { model: sub.eventModel }), { read: () => N.readings(sub.eventModel, sub.needs, sub.state) }) : ev === "flood" ? (trimsOut(sub.eventModel) ? sub.pilot : EP.wrap(sub.pilot, RESCUE)) : ev === "surface" ? SP.wrap(sub.pilot, { model: sub.eventModel }) : isCompass(ev) ? compassPilot(sub, ev === "navigator" ? "nav" : ev === "dropout" ? "plain" : ev) : sub.pilot;
             return ev;
         },
         /** Reconcile with the aquarium's list [{ id, name, hue, pilot, from, local, weights }]: new ids join, ids that are gone leave, the ones that stay keep swimming. Returns { added, removed }. */
@@ -193,7 +215,9 @@ export function createTank({ hull = "nominal", length = LENGTH, width = WIDTH } 
                     const ev = sub.event, model = ev ? sub.eventModel : MODEL;
                     const tg = ev === "surface" ? { ...t, surface: true } : ev === "flood" || ev === "sink" ? { ...t, depth: sub.holdDepth } : t;   // a flooded boat holds the depth it was at; a surfacing one is asked to surface
                     const cmd = (ev ? sub.eventPilot : sub.pilot)(s, tg, [0, 0, 0]);
-                    const res = S.stepSub(model, s, cmd, dt, [0, 0, 0], ev === "flood" || ev === "sink" ? FL.leakAt({ leak: LEAK }, sub.eventT) : 0);
+                    let res;
+                    if (ev === "needs") { res = N.stepNeeds(model, s, sub.needs, cmd, dt, [0, 0, 0], 0); sub.needs = res.needs; sub.needsInfo = { watts: res.watts, charging: res.charging, exposed: res.exposed }; }
+                    else res = S.stepSub(model, s, cmd, dt, [0, 0, 0], ev === "flood" || ev === "sink" ? FL.leakAt({ leak: LEAK }, sub.eventT) : 0);
                     if (ev) sub.eventT += dt;
                     sub.cmd = { pitch: cmd.pitch, yaw: cmd.yaw, thrust: cmd.thrust, ballast: cmd.ballast };   // what the pilot asked for this tick: the page draws the fins from it
                     if (cmd.blow !== undefined) sub.cmd.blow = cmd.blow; if (cmd.release !== undefined) sub.cmd.release = cmd.release;
@@ -209,7 +233,7 @@ export function createTank({ hull = "nominal", length = LENGTH, width = WIDTH } 
         probe(id) { const sub = subs.get(id); return sub ? { id: sub.id, name: sub.name, kind: sub.weights ? "fly" : "autopilot", weights: sub.steerW || sub.weights, steer: sub.steer ? { ...sub.steer } : null, state: sub.state, target: sub.tgt || sub.target } : null; },
         /** What a page draws: one plain record per sub. */
         snapshot() {
-            return [...subs.values()].map((sub) => { const a = S.attitude(sub.state); return { hull: hullName, id: sub.id, name: sub.name, hue: sub.hue, pilot: sub.pilotKind, from: sub.from, local: sub.local, x: sub.state.pos[0], y: sub.state.pos[1], depth: a.depth, heading: a.heading, pitch: a.pitch, speed: a.speed, cmd: sub.cmd ? { ...sub.cmd } : { pitch: 0, yaw: 0, thrust: 0, ballast: 0 }, event: sub.event, steer: sub.steer ? { ...sub.steer } : null, compass: sub.compass ? { ...sub.compass } : null, tank: sub.state.tank ? { level: sub.state.tank.level, air: sub.state.tank.air, airMax: sub.eventModel ? sub.eventModel.spec.airMax : null, released: sub.state.tank.released, blowing: !!(sub.cmd && sub.cmd.blow > 0.5) } : null, target: sub.target, lost: sub.lost, status: sub.status, trail: sub.trail.slice() }; });
+            return [...subs.values()].map((sub) => { const a = S.attitude(sub.state); return { hull: hullName, id: sub.id, name: sub.name, hue: sub.hue, pilot: sub.pilotKind, from: sub.from, local: sub.local, x: sub.state.pos[0], y: sub.state.pos[1], depth: a.depth, heading: a.heading, pitch: a.pitch, speed: a.speed, cmd: sub.cmd ? { ...sub.cmd } : { pitch: 0, yaw: 0, thrust: 0, ballast: 0 }, event: sub.event, steer: sub.steer ? { ...sub.steer } : null, needs: sub.needs ? { ...N.readings(sub.eventModel, sub.needs, sub.state), refilling: !!(sub.eventPilot && sub.eventPilot.refilling), watts: sub.needsInfo ? sub.needsInfo.watts : 0, charging: !!(sub.needsInfo && sub.needsInfo.charging) } : null, compass: sub.compass ? { ...sub.compass } : null, tank: sub.state.tank ? { level: sub.state.tank.level, air: sub.state.tank.air, airMax: sub.eventModel ? sub.eventModel.spec.airMax : null, released: sub.state.tank.released, blowing: !!(sub.cmd && sub.cmd.blow > 0.5) } : null, target: sub.target, lost: sub.lost, status: sub.status, trail: sub.trail.slice() }; });
         },
     };
 }

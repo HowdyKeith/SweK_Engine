@@ -126,6 +126,7 @@ console.log("\n7. INJURE");
 
 console.log("\n8. THE TRIP");
 {
+    ok("  the trip's numbers are pinned (REFILL): it goes under 30% and returns over 90%, a snorkel boat flies to three quarters of its mast depth, and a target with no speed is given 1.5 m/s", NP.REFILL.low === 0.3 && NP.REFILL.high === 0.9 && NP.REFILL.snorkelFraction === 0.75 && NP.REFILL.speed === 1.5 && Object.isFrozen(NP.REFILL));
     const calls = [], inner = (st, t) => { calls.push(t); return { pitch: 0, yaw: 0, thrust: 0, ballast: 0 }; };
     let r = { frac: 0.5, refills: true, refillDepth: 0.7 };
     const p = NP.wrap(inner, { read: () => r }), t0 = { depth: 20, heading: 0, speed: 2 };

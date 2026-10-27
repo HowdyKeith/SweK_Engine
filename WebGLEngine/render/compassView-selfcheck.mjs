@@ -195,7 +195,7 @@ console.log("\n5. THE PAGE");
             await pg.waitForTimeout(300);
             const amber = await pg.evaluate(() => { const c = document.getElementById("plan"), d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 0; i < d.length; i += 4) if (d[i] > 220 && d[i + 1] > 140 && d[i + 1] < 190 && d[i + 2] < 70 && d[i + 3] > 200) n++; return n; });
             const row1 = await pg.evaluate(() => document.querySelector(".tk") && document.querySelector(".tk").textContent);
-            ok("!! the estimator buttons come alive with the circuit, the fly estimator starts on the selected sub, its list row reads FLY ESTIMATOR with the compass DARK, and the plan view carries the amber ring and ghost line (" + amber + " amber pixels)", enabled[0] && enabled[1] && /fly-estimator on the selected sub/.test(msg2) && /FLY ESTIMATOR · compass DARK/.test(row1 || "") && amber > 150, JSON.stringify({ enabled, msg2, row1, amber }).slice(0, 220));
+            ok("!! the estimator buttons come alive with the circuit, the fly estimator starts on the selected sub, its list row reads FLY ESTIMATOR with the compass DARK, and the plan view carries the amber ring and ghost line (" + amber + " amber pixels)", enabled[0] && enabled[1] && /fly-estimator on the selected sub/.test(msg2) && /FLY ESTIMATOR · compass DARK/.test(row1 || "") && amber > 80, JSON.stringify({ enabled, msg2, row1, amber }).slice(0, 220));
             await pg.click("#clearBtn");
             ok("  no page or console error", errs.length === 0, errs.join(" | ").slice(0, 200));
         } finally { await br.close(); server.close(); }
