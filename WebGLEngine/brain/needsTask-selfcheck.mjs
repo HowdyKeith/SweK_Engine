@@ -17,6 +17,9 @@
 // the first station not clamped into reach [1 / 1] | `stranded` never true [0 / 1] | RISE_RATE 0.4 -> 4 [1 / 4] | the plain kind not on a full charge [2 / 0] | TRIP back to needsPilot's 0.9 [0 / 1] | GUARDED farthest first [4 / 2] | DIRECT taking the stations last-first [1 / 0] | the hull term ignored [1 / 0].
 // FIRST RUNS WENT 0 RED for three, and the rows were written because of them: `returned` at 30 m (nothing tested the 3 m line: the order / returned rows), DIRECT's station order (the means did not care: the order row), and the hull term (SPIN repairs to full so hull was 1 whatever the formula: the no-repair row). A fourth 0 was a mutant that never applied (the string was not in the file) and was re-run.
 "use strict";
+import fs from "node:fs";
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import * as T from "./needsTask.mjs";
 import * as N from "../physics/mechanics/subNeeds.mjs";
 import * as AS from "./autopilotSub.mjs";
@@ -101,6 +104,12 @@ console.log("\n5. V7 -- the impossible is not charged");
     const sc = T.scenario(501, "both"), un = sc.stations.filter((q) => q.unreachable).length, r = T.fly(T.GUARDED, sc);
     ok("!! a scenario with stations the damaged hull cannot take counts only the reachable ones: `reachable` is 3 minus the unreachable ones, and `visited` never exceeds it", un >= 1 && r.reachable === 3 - un && r.visited <= r.reachable, `${un} unreachable, reachable ${r.reachable}, visited ${r.visited}`);
     ok("!! GUARDED's pump kept the hull afloat and its repair put the hull right: no flood-sinking, the damage ends at or under where it started", [501, 502, 503, 504].every((s) => { const q = T.fly(T.GUARDED, T.scenario(s, "both")); return !q.crushed && q.damageEnd <= q.damage0 + 1e-6; }));
+}
+
+// the library's caller that is not a gate: an export-free command that prints the table, and refuses the audit set (piece 4's) unless told to read it
+{
+    const cmd = fs.readFileSync(new URL("../tools/ship/takeNeedsTask.mjs", import.meta.url), "utf8"), r = spawnSync(process.execPath, [fileURLToPath(new URL("../tools/ship/takeNeedsTask.mjs", import.meta.url)), "--set", "audit"], { encoding: "utf8" });
+    ok("!! tools/ship/takeNeedsTask.mjs has no exports (it is the library's caller that is not a gate) and refuses the audit set without --read-audit-once (exit 2, nothing printed on stdout)", !/^export /m.test(cmd) && /from "\.\.\/\.\.\/brain\/needsTask\.mjs"/.test(cmd) && r.status === 2 && r.stdout === "" && /read-audit-once/.test(r.stderr), `exit ${r.status}`);
 }
 
 console.log(fails ? `\n${fails} FAIL` : "\nall checks pass");
