@@ -29,12 +29,16 @@
 // SECTION 11 (the steer lens, render/brainLens.mjs), TEN more, each in place and restored (rows red): L1 the ablation sign flipped 1 | L2 the rank ascending 2 | L3 no floor on the layer's rms 1 | L4 the push ignoring the dose 1 | L5 connections unsorted 1 (0 THE FIRST TIME: the hand weights
 //   happen to be in order, so the row now uses a fixture whose weights are not) | L6 a negative push drawn as a positive bar 1 and L6b a negative bar not moved left of the centre 1 (0 THE FIRST TIME: nothing looked at the bar's colour or side) | L7 the aircraft panel without a lens 1 | L8 the lens never drawn 1.
 //   NOT SEEN: the lens on a real page. The aquarium's and the flight pages' canvases were not opened for it; the lens takes the lower 40% of the left half of the brain canvas.
+// SECTION 12 (the layered map, the selected neuron, the steer, v4904), ELEVEN more, each in place and restored (rows red): M1 the hidden columns without their relu 1 | M2 the contributions not sorted 1 | M3 the selection ignored 5 | M4 pickNeuron ignoring the radius 1 | M5 no incoming
+//   lines for a selection 1 | M6 steerWeights editing the original 2 | M7 the steer's sign flipped 2 | M8 negative lines drawn blue 1 | M9 linkLine giving a feature inputs 1 (a CRASH the first time, red but not by name: the row now catches it) | M10 netOf dropping the selection 3 | M11 the layers view ignored 1.
+//   FIXTURES THAT HAD TO BE STRONGER: the GPU net's hand weights are sparse (8 of 1024 nonzero in h1 -> h2, four active neurons per hidden layer), so the most active neuron's lines are already among the top two and a selection added none; the row now picks the first active neuron that gains lines.
 // B23 and B26 went 0 red the first time: no row looked at WHERE the panel put the map, and inside the steering box the flown target IS the wander target; the rows for the map's place on the canvas and for a sub outside the box now do.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as B from "./brainPanel.mjs";
+import { mlpLayerCpu } from "./brainTsl.mjs";
 import * as S from "../physics/mechanics/subModel6dof.mjs";
 import * as F from "../physics/mechanics/flightModel6dof.mjs";
 import * as AS from "../brain/autopilotSub.mjs";
@@ -284,6 +288,54 @@ console.log("\n11. THE STEER LENS (render/brainLens.mjs): which hidden neurons d
     ok("!! drawPanel draws the lens bars under the rows (bars of the rows are the same with and without it) and a panel without a lens draws none", res.lensBars > 0 && res2.lensBars === 0 && res.bars <= res2.bars + 0 && g.calls.some((c) => c[0] === "fillText" && /steer lens/.test(String(c[1]))), `${res.lensBars} lens bars; rows ${res.bars} against ${res2.bars}`);
     const g3 = rec(), dn = L.drawLens(g3, 0, 0, 300, 160, null);
     ok("  a null lens is said on the canvas and draws no bars", dn.bars === 0 && g3.calls.some((c) => c[0] === "fillText" && /does not read its hidden layer/.test(String(c[1]))));
+}
+
+console.log("\n12. THE LAYERED MAP, THE SELECTED NEURON AND THE STEER (v4904): the picture of the network's own numbers, what a neuron is wired to, a push that is a copy");
+{
+    const L = await import("./brainLens.mjs");
+    const synth = [{ nIn: 4, nOut: 2, W: Float32Array.from([0.5, 0.5, 0.5, 0.5, 0.1, -0.7, 0.4, -0.2]), b: new Float32Array(2), act: "relu" }, { nIn: 2, nOut: 3, W: Float32Array.from([0.9, 0.2, 0.9, -0.9, 0.9, 0.5]), b: new Float32Array(3), act: "none" }];
+    const hw = MF.handWeights(), gl = MF.layersOf(hw), gx = Float32Array.from({ length: 18 }, (_, i) => Math.sin(i + 1));
+    const st = L.layerStates(gl, gx, { output: MF.OUTPUT_NAMES });
+    let cur = Float32Array.from(gx); for (const l of gl) { cur = mlpLayerCpu(l, cur, 1); }
+    ok("!! layerStates of the GPU network: four columns of 18, 32, 32 and 4, labelled features, h1, h2, outputs; the last is the output layer's own result, the hidden ones have their relu applied (no negative value)", st.map((c) => c.n).join() === "18,32,32,4" && st.map((c) => c.label).join() === "features,h1,h2,outputs" && st[3].values.every((v, k) => v === cur[k]) && st[1].values.every((v) => v >= 0) && st[2].values.every((v) => v >= 0) && st[3].names === MF.OUTPUT_NAMES, st.map((c) => c.n + " " + c.label).join(" | "));
+    const m0 = L.layerMap(gl, gx), act2 = Array.from(m0.cols[1].values, (v, k) => k).filter((k) => m0.cols[1].values[k] > 0).find((k) => L.layerMap(gl, gx, { sel: { layer: 1, i: k } }).edges.length > m0.edges.length) ?? 0, m1 = L.layerMap(gl, gx, { sel: { layer: 1, i: act2 } }), mBad = L.layerMap(gl, gx, { sel: { layer: 9, i: 0 } });
+    // brute force: the two biggest contributions into neuron 7 of layer 1 (the layer between columns 1 and 2)
+    const L1 = gl[1], contrib = Array.from({ length: L1.nIn }, (_, f) => [f, L1.W[7 * L1.nIn + f] * m0.cols[1].values[f]]).filter(([, c]) => c !== 0).sort((p, q) => Math.abs(q[1]) - Math.abs(p[1]) || p[0] - q[0]).slice(0, 2).map(([f]) => f).sort((p, q) => p - q);
+    const got = m0.edges.filter((e) => e.l === 1 && e.to === 7).map((e) => e.from).sort((p, q) => p - q);
+    ok("!! layerMap keeps the two biggest contributions (weight x the sender's value) into every neuron and no zero ones: into neuron 7 of h2 they are the ones brute force picks", got.join() === contrib.join() && m0.edges.every((e) => e.c !== 0 && Math.abs(e.c - e.w * m0.cols[e.l].values[e.from]) < 1e-6) && [0, 1, 2].every((l) => m0.edges.filter((e) => e.l === l).length <= 2 * gl[l].nOut), `into h2.7: ${got.join(", ")} (brute force ${contrib.join(", ")}); ${m0.edges.length} lines`);
+    ok("!! a selected neuron adds its biggest contributions in and out (more lines than without a selection, and the new ones touch it); a selection that names no neuron is dropped and changes nothing", m1.sel && m1.sel.layer === 1 && m1.sel.i === act2 && m1.edges.length > m0.edges.length && m1.edges.filter((e) => (e.l === 0 && e.to === act2) || (e.l === 1 && e.from === act2)).length >= 3 && mBad.sel === null && mBad.edges.length === m0.edges.length, `${m0.edges.length} lines, ${m1.edges.length} with h1.${act2} selected (the first active neuron that gains lines: a silent relu neuron contributes none, and the most active one is already among the top two)`);
+    const fm = L.layerMap(PS.layersOf(PS.handWeights()), PS.features(subState(), subTarget, [0, 0, 0]));
+    ok("  the fly circuit unrolls its three recurrent steps: six columns of 14, 34, 34, 34, 34 and 4", fm.cols.map((c) => c.n).join() === "14,34,34,34,34,4");
+    // the drawing
+    const g = rec(), r = L.drawLayerMap(g, 0, 0, 400, 300, m1), c = g.calls;
+    ok("!! drawLayerMap draws a dot per neuron (18 + 32 + 32 + 4 = 86) and a line per kept contribution, gives every dot a hit area of radius 4 or more, rings the selected neuron in white, and draws the selected neuron's lines last (brighter)", r.dots === 86 && r.lines === m1.edges.length && r.rects.length === 86 && r.rects.every((q) => q.r >= 4) && c.some((x) => x[0] === "set:strokeStyle" && x[1] === "#ffffff") && c.filter((x) => x[0] === "stroke").length >= r.lines, `${r.dots} dots, ${r.lines} lines`);
+    const col = (fn) => { const q = rec(); fn(q); const fills = []; let cl = null; for (const x of q.calls) { if (x[0] === "set:fillStyle") cl = x[1]; else if (x[0] === "fill") fills.push(cl); } return fills; };
+    const two = { cols: [{ n: 2, values: Float32Array.from([1, -1]), label: "a" }, { n: 1, values: Float32Array.from([0.5]), label: "b" }], edges: [{ l: 0, from: 0, to: 0, w: 1, c: 1 }, { l: 0, from: 1, to: 0, w: 1, c: -1 }], sel: null };
+    const f2 = col((q) => L.drawLayerMap(q, 0, 0, 200, 100, two)), lc = []; { const q = rec(); L.drawLayerMap(q, 0, 0, 200, 100, two); let cl = null; for (const x of q.calls) { if (x[0] === "set:strokeStyle") cl = x[1]; else if (x[0] === "stroke") lc.push(cl); } }
+    ok("!! a positive neuron is blue and a negative one amber, and so are the lines of a positive and a negative contribution", f2.includes("#59d1ff") && f2.includes("#f6a623") && lc.includes("#59d1ff") && lc.includes("#f6a623"), `dots ${[...new Set(f2)].join(" ")} lines ${[...new Set(lc)].join(" ")}`);
+    const ge = rec(); ok("  no network to draw says so and draws nothing", L.drawLayerMap(ge, 0, 0, 100, 50, null).dots === 0 && ge.calls.some((x) => x[0] === "fillText" && /no network to draw/.test(String(x[1]))));
+    // picking
+    const pt = r.rects[40], far = L.pickNeuron(r.rects, -50, -50), hit = L.pickNeuron(r.rects, pt.x + 1, pt.y + 1);
+    ok("!! pickNeuron answers the dot under the point (the nearest one when areas overlap), a lens row's box anywhere along the row, and null for a miss", hit && hit.layer === pt.layer && hit.i === pt.i && far === null && (() => { const rr = [{ layer: 2, i: 9, bx: 0, by: 100, bw: 300, bh: 12 }, { layer: 1, i: 3, x: 150, y: 106, r: 5 }]; const p = L.pickNeuron(rr, 150, 106); return p.layer === 2 && p.i === 9 && L.pickNeuron(rr, 150, 130) === null; })());
+    // the links line, on a fixture whose weights are known
+    const sm = L.layerMap(synth, Float32Array.from([1, 1, 1, 1]));
+    ok("!! linkLine: neuron 1 of the hidden layer, its three biggest weights in (f1 -0.70, f2 +0.40, f3 -0.20) then out (o1 -0.90, o2 +0.50, o0 +0.20); a feature has no inputs and an output no outputs; a selection that names nothing is null", L.linkLine(synth, sm.cols, { layer: 1, i: 1 }) === "h1 <- f1 -0.70, f2 +0.40, f3 -0.20 | -> o1 -0.90, o2 +0.50, o0 +0.20" && !/<-/.test((() => { try { return L.linkLine(synth, sm.cols, { layer: 0, i: 2 }); } catch { return "<- THREW"; } })()) && !/->/.test(L.linkLine(synth, sm.cols, { layer: 2, i: 0 })) && L.linkLine(synth, sm.cols, { layer: 5, i: 0 }) === null && L.linkLine(synth, sm.cols, null) === null, L.linkLine(synth, sm.cols, { layer: 1, i: 1 }));
+    // the steer
+    const x14 = PS.features(subState(), subTarget, [0, 0, 0]), sw = PS.handWeights(), sa = B.activations(PS, sw, x14, PS.OUTPUT_NAMES), lens = L.steerLens(PS.layersOf(sw), sa.hidden, PS.OUTPUT_NAMES), ni = lens.rows[0].i, snap0 = Float32Array.from(sw);
+    const cw = L.steerWeights(PS, sw, ni, lens.scale), ca = B.activations(PS, cw, x14, PS.OUTPUT_NAMES), Lo = PS.layersOf(sw).at(-1), Lc = PS.layersOf(cw).at(-1);
+    const dOut = PS.OUTPUT_NAMES.map((_, j) => mlpLayerCpu(Lc, sa.hidden, 1)[j] - mlpLayerCpu(Lo, sa.hidden, 1)[j]);
+    ok("!! steerWeights: a COPY (the original is bit-identical), the hidden layer unchanged, and every output of the output layer moves by exactly the lens's push for that neuron", cw && cw !== sw && sw.every((v, k) => v === snap0[k]) && ca.hidden.every((v, k) => v === sa.hidden[k]) && dOut.every((d, j) => near(d, lens.rows[0].push[j], 1e-5)), `neuron ${ni}: outputs moved ${dOut.map((d) => d.toFixed(3)).join(", ")}; lens push ${lens.rows[0].push.map((d) => d.toFixed(3)).join(", ")}`);
+    ok("  and a bad neuron, a NaN dose, or a policy whose layers are copies of the weights (the steer would be lost) answers null", L.steerWeights(PS, sw, 999, 1) === null && L.steerWeights(PS, sw, -1, 1) === null && L.steerWeights(PS, sw, 0, NaN) === null && L.steerWeights({ layersOf: (w) => PS.layersOf(Float32Array.from(w)) }, sw, 0, 1) === null);
+    const gw = L.steerWeights(MF, hw, 3, 0.5); ok("  the GPU network steers the same way (a copy, its output layer's bias moved by W x 0.5)", gw && gw !== hw && near(MF.layersOf(gw).at(-1).b[1] - MF.layersOf(hw).at(-1).b[1], MF.layersOf(hw).at(-1).W[1 * 32 + 3] * 0.5, 1e-6));
+    // the panels
+    const probe = { kind: "fly", weights: sw, state: subState(), target: subTarget }, pS = B.subPanel(probe, { neuron: { layer: 4, i: ni } }), pN = B.subPanel(probe), pBad = B.subPanel(probe, { neuron: { layer: 4, i: 99 } }), pA = B.subPanel({ kind: "autopilot", state: subState(), target: subTarget });
+    ok("!! a network panel carries the layered map (six columns for the fly), the selection it was given and the wiring line (h<i> <- ..., | -> ...); none selected has no line; a selection naming no neuron is dropped; the autopilot has no map", pS.layers && pS.layers.cols.length === 6 && pS.sel && pS.sel.layer === 4 && pS.sel.i === ni && new RegExp("^h" + ni + " <- ").test(pS.links) && /\| -> /.test(pS.links) && pN.sel === null && pN.links === null && pBad.sel === null && pBad.links === null && !pA.layers, pS.links);
+    const gp = B.flightPanel({ kind: "gpu", policy: MF, weights: hw, pilot: MF.pilotFor(hw), state: flState(), target: flTarget, wind: [0, 0, 0] }, { neuron: { layer: 2, i: 5 } });
+    ok("  the GPU aircraft's panel has its four columns and honours a selection in them", gp.layers.cols.map((c) => c.n).join() === "18,32,32,4" && gp.sel && gp.sel.layer === 2 && gp.sel.i === 5 && /^h5 <- /.test(gp.links));
+    const gB = rec(), rb = B.drawPanel(gB, 640, 300, pS), gL = rec(), rl = B.drawPanel(gL, 640, 300, pS, { view: "layers" });
+    ok("!! drawPanel in the bars view returns the lens rows' hit boxes (eight rows) and tints the selected row; in the layers view it draws the whole map (154 dots for the fly), the wiring line along the top, and returns the dots' hit areas", rb.view === "bars" && rb.rects.length === 8 && gB.calls.some((x) => x[0] === "set:fillStyle" && x[1] === "#16301c") && rl.view === "layers" && rl.dots === 154 && rl.rects.length === 154 && gL.calls.some((x) => x[0] === "fillText" && String(x[1]) === pS.links) && rl.lensBars === 0, `bars: ${rb.rects.length} row boxes; layers: ${rl.dots} dots, ${rl.lines} lines`);
+    const gp0 = rec(), rp = B.drawPanel(gp0, 640, 300, pA, { view: "layers" });
+    ok("  a panel with no network asked for the layers view draws its bars as usual (no crash, no map)", rp.view === "bars" || rp.dots === undefined);
 }
 
 // v4901 -- the exports the definition census asked this gate to name (drawHeat), checked in one row.
