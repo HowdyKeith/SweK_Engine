@@ -26,6 +26,9 @@
 //   tactics T1 no mean weakness or threat in the heat 1 | T2 no reach 1 | T3 the first foe ringed 2 | T4 a dead foe a point 1 | T5 no hysteresis in the flee bar 1 | T6 candidates the wrong way up 1 | T7 one candidate 2 | T8 never fleeing 2 | T9 the heat not red 1 | T10 no heat dispatch 1 | T11 the map's title 1 | T12 a ring on every foe 1
 //   pages P1 the aircraft picker ignored 1 | P2 one weight set for every aircraft 0 (EQUIVALENT: a squadron flies one set) | P3 the fly-3D picker ignored 1 | P4 the fly-3D kind always scripted 1 | P5 the tactics panel without the side's weights 1 | P6 es-box3d never draws 1 | P7 a dead ship picked 0 (EQUIVALENT: the fallback is the first live A ship)
 // A1, A6, F1, T4, T5 and P3 went 0 red the first time: A1's pattern changed the nose-axis component, which is zero for the test body; F1's tanh saturates the hand weights; T4 was masked by the panel's own filter; T5 and P3 had no row. Each has one now.
+// SECTION 11 (the steer lens, render/brainLens.mjs), TEN more, each in place and restored (rows red): L1 the ablation sign flipped 1 | L2 the rank ascending 2 | L3 no floor on the layer's rms 1 | L4 the push ignoring the dose 1 | L5 connections unsorted 1 (0 THE FIRST TIME: the hand weights
+//   happen to be in order, so the row now uses a fixture whose weights are not) | L6 a negative push drawn as a positive bar 1 and L6b a negative bar not moved left of the centre 1 (0 THE FIRST TIME: nothing looked at the bar's colour or side) | L7 the aircraft panel without a lens 1 | L8 the lens never drawn 1.
+//   NOT SEEN: the lens on a real page. The aquarium's and the flight pages' canvases were not opened for it; the lens takes the lower 40% of the left half of the brain canvas.
 // B23 and B26 went 0 red the first time: no row looked at WHERE the panel put the map, and inside the steering box the flown target IS the wander target; the rows for the map's place on the canvas and for a sub outside the box now do.
 "use strict";
 import fs from "node:fs";
@@ -173,6 +176,7 @@ console.log("\n9. THE OTHER FLIGHT PAGES: es-aircraft, es-box3d-fly3d, the tacti
 
     const ship = { x: 0, y: 0, z: 0, heading: 0, pitch: 0 }, target = { x: 500, y: 300, z: 100 }, hw = PP.handWeights();
     const f3 = B.fly3dPanel({ kind: "fly", weights: hw, ship, target }), sc = B.fly3dPanel({ kind: "scripted", ship, target });
+    ok("  the aircraft fly net's panel and the fly-3D ship's each carry a steer lens over their 34 hidden neurons, the scripted AI none", pf.lens && pf.lens.rows.length === 34 && f3.lens && f3.lens.rows.length === 34 && !sc.lens);
     ok("!! the fly-3D panel: features 7, hidden 34, outputs 4 (turn, pitch, thrust, firing) equal to the policy's own forward(); the scripted AI shows its seven features and NO map and says it is rules", f3.rows.map((r) => r.layer + r.values.length).join() === "features7,hidden34,outputs4" && PP.OUTPUT_NAMES.every((n, i) => near(f3.rows[2].values[i], PP.forward(hw, PP.features(ship, target))[i], 1e-6)) && sc.rows.length === 1 && sc.rows[0].values.length === 7 && sc.map === null && /rules, not a network/.test(sc.note));
     ok("!! the fly-3D map: the arrow is (turn, pitch) and follows the error (hand weights: a yaw error of 1 rad turns the same way, a pitch error up pitches up), the ring is the real error (yaw error / 180 x pi, pitch error / 180 x pi), and the centre is quiet", f3.map.cells.every((c) => (Math.abs(c.ox) < 0.3 || Math.sign(c.a) === Math.sign(c.ox)) && (Math.abs(c.oy) < 0.3 || Math.sign(c.b) === Math.sign(c.oy))) && near(f3.map.marker.ox, PP.features(ship, target)[1] * Math.PI, 1e-9) && near(f3.map.marker.oy, PP.features(ship, target)[2] * Math.PI, 1e-9) && Math.hypot(f3.map.cells[40].a, f3.map.cells[40].b) < 0.2);
 
@@ -245,6 +249,41 @@ console.log("\n10. THE PAGES THAT FLY IT (a browser; SKIPPED, and said, without 
             }
         } finally { await br.close(); server.close(); }
     }
+}
+
+console.log("\n11. THE STEER LENS (render/brainLens.mjs): which hidden neurons drive which outputs, and what a push would do");
+{
+    const L = await import("./brainLens.mjs");
+    const w = PS.handWeights(), st = subState(), x = PS.features(st, subTarget, [0, 0, 0]), act = B.activations(PS, w, x, PS.OUTPUT_NAMES), layers = PS.layersOf(w), Lo = layers[layers.length - 1];
+    const lens = L.steerLens(layers, act.hidden, PS.OUTPUT_NAMES);
+    ok("!! the lens has a row for every one of the fly's 34 hidden neurons and an entry for each of the four outputs", lens && lens.rows.length === 34 && lens.outputs.length === 4 && lens.rows.every((r) => r.push.length === 4 && r.ablate.length === 4), lens ? `${lens.rows.length} rows` : "null");
+    ok("!! the ablation of neuron i is minus what it contributes to each output (the output layer is linear for the fly: -W[j,i] x h[i])", lens.rows.every((r) => PS.OUTPUT_NAMES.every((_, j) => near(r.ablate[j], -Lo.W[j * Lo.nIn + r.i] * act.hidden[r.i], 1e-4))), "every neuron, every output, to 1e-4");
+    ok("!! the push of neuron i is +W[j,i] x scale (the dose x the layer's rms), the same for every neuron's own weight", lens.rows.every((r) => PS.OUTPUT_NAMES.every((_, j) => near(r.push[j], Lo.W[j * Lo.nIn + r.i] * lens.scale, 1e-4))), `scale ${lens.scale.toFixed(4)} = ${L.LENS.dose} x rms`);
+    ok("!! the rows are ranked by what the neuron is doing now (drive) and then by what it could do (reach), never the other way", lens.rows.every((r, k) => k === 0 || lens.rows[k - 1].drive > r.drive || (lens.rows[k - 1].drive === r.drive && lens.rows[k - 1].reach >= r.reach)), `top ${lens.rows[0].i} drive ${lens.rows[0].drive.toFixed(3)}`);
+    const quiet = L.steerLens(layers, new Float32Array(34), PS.OUTPUT_NAMES);
+    ok("!! a silent hidden layer still gets a measurable push (the floor), and no neuron is doing anything: every ablation is zero", quiet.scale === L.LENS.floorRms * L.LENS.dose && quiet.rows.every((r) => r.drive === 0) && quiet.rows.some((r) => r.reach > 0), `scale ${quiet.scale}`);
+    ok("  a lens over a hidden layer the output layer does not read is null, and so is lensOf for a brain whose hidden IS its input", L.steerLens(layers, new Float32Array(5), PS.OUTPUT_NAMES) === null && B.lensOf({ input: x, hidden: x, output: act.output }, PS, w, PS.OUTPUT_NAMES) === null);
+    const cn = L.connections(layers, lens.rows[0].i, { k: 3, outputNames: PS.OUTPUT_NAMES });
+    ok("!! connections: the strongest three outputs of the top neuron by |weight|, sorted, and its inputs named h<k> where the layer reads hidden neurons", cn.out.length === 3 && cn.out.every((c, k) => k === 0 || Math.abs(cn.out[k - 1].w) >= Math.abs(c.w)) && cn.out.every((c) => near(c.w, Lo.W[c.to * Lo.nIn + lens.rows[0].i], 1e-9) && c.name === PS.OUTPUT_NAMES[c.to]) && cn.into.length === 3 && cn.into.every((c) => /^h\d+$/.test(c.name)), `${cn.out.map((c) => c.name + " " + c.w.toFixed(2)).join(", ")}`);
+    const first = L.connections([layers[0], Lo], 0, { inputNames: PS.FEATURE_NAMES, k: 2 });
+    ok("  and an input layer that reads the features names them", first.into.length === 2 && first.into.every((c) => PS.FEATURE_NAMES.includes(c.name)), first.into.map((c) => c.name).join(", "));
+    // a fixture whose weights are NOT already in order, so a missing sort cannot pass: neuron 1 feeds three outputs with 0.2, -0.9, 0.5 and the layer before it reads four inputs with 0.1, -0.7, 0.4, -0.2
+    const synth = [{ nIn: 4, nOut: 2, W: Float32Array.from([0.5, 0.5, 0.5, 0.5, 0.1, -0.7, 0.4, -0.2]), b: new Float32Array(2), act: "relu" }, { nIn: 2, nOut: 3, W: Float32Array.from([0.9, 0.2, 0.9, -0.9, 0.9, 0.5]), b: new Float32Array(3), act: "none" }];
+    const sc2 = L.connections(synth, 1, { k: 2, inputNames: ["a", "b", "c", "d"], outputNames: ["x", "y", "z"] });
+    ok("!! connections on a fixture out of order: the two strongest outputs of neuron 1 are y (-0.9) then z (0.5), its two strongest inputs b (-0.7) then c (0.4), each by |weight|", sc2.out.map((c) => c.name).join() === "y,z" && sc2.into.map((c) => c.name).join() === "b,c", sc2.out.map((c) => c.name + c.w).join(" ") + " | " + sc2.into.map((c) => c.name + c.w).join(" "));
+    // the drawing: a positive push is the blue bar and a negative one the amber, to the left of the cell's centre
+    const gl = rec(); L.drawLens(gl, 0, 0, 300, 160, { outputs: ["p", "n"], dose: 0.5, scale: 1, base: [0, 0], rows: [{ i: 0, h: 1, push: [0.8, -0.8], ablate: [0, 0], drive: 0, reach: 0.8 }] });
+    const fills = []; let colour = null; for (const c of gl.calls) { if (c[0] === "set:fillStyle") colour = c[1]; else if (c[0] === "fillRect") fills.push([colour, ...c.slice(1)]); }
+    const blue = fills.find((f) => f[0] === "#59d1ff"), amber = fills.find((f) => f[0] === "#f6a623");
+    ok("!! drawLens: a positive push is a blue bar starting at its cell's centre, a negative one an amber bar ending at its cell's centre", blue && amber && near(blue[1], 120.5, 1e-6) && blue[3] > 0 && near(amber[1] + amber[3], 237.5, 1e-6) && amber[3] > 0, blue && amber ? `blue starts at ${blue[1].toFixed(1)} (column 0 centre is 120.5), amber ends at ${(amber[1] + amber[3]).toFixed(1)} (column 1 centre is 237.5)` : "a bar is missing");
+    const pf = B.subPanel({ kind: "fly", weights: w, state: st, target: subTarget }), pa = B.subPanel({ kind: "autopilot", state: st, target: subTarget });
+    ok("!! the fly sub's panel carries the lens, the PD autopilot's (no network) carries none", pf.lens && pf.lens.rows.length === 34 && !pa.lens);
+    const hw = MF.handWeights(), pg = B.flightPanel({ kind: "gpu", policy: MF, weights: hw, pilot: MF.pilotFor(hw), state: flState(), target: flTarget, wind: [0, 0, 0] });
+    ok("  the GPU aircraft's lens is over its 32 hidden neurons", pg.lens && pg.lens.rows.length === 32);
+    const g = rec(), res = B.drawPanel(g, 640, 300, pf), g2 = rec(), res2 = B.drawPanel(g2, 640, 300, { ...pf, lens: null });
+    ok("!! drawPanel draws the lens bars under the rows (bars of the rows are the same with and without it) and a panel without a lens draws none", res.lensBars > 0 && res2.lensBars === 0 && res.bars <= res2.bars + 0 && g.calls.some((c) => c[0] === "fillText" && /steer lens/.test(String(c[1]))), `${res.lensBars} lens bars; rows ${res.bars} against ${res2.bars}`);
+    const g3 = rec(), dn = L.drawLens(g3, 0, 0, 300, 160, null);
+    ok("  a null lens is said on the canvas and draws no bars", dn.bars === 0 && g3.calls.some((c) => c[0] === "fillText" && /does not read its hidden layer/.test(String(c[1]))));
 }
 
 // v4901 -- the exports the definition census asked this gate to name (drawHeat), checked in one row.

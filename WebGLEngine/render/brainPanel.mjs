@@ -24,6 +24,7 @@ import * as TX from "../ev/esTactics.js";
 import { rotateByQuat, worldToBody } from "../physics/mechanics/rigidBody6dof.mjs";
 import { pilotRows, drawRows } from "./flightViews.mjs";
 import { mlpLayerCpu } from "./brainTsl.mjs";
+import { steerLens, drawLens } from "./brainLens.mjs";
 
 export const KINDS = Object.freeze({
     autopilot: Object.freeze({ label: "PD autopilot", network: false, flown: true }),
@@ -47,6 +48,9 @@ export function activations(policy, w, x, outputNames) {
     const c = policy.forward(w, input);
     return { input, hidden, output: Float32Array.from(outputNames, (n, i) => (Array.isArray(c) ? num(c[i]) : n === "throttle" ? c[n] * 2 - 1 : num(c[n]))) };
 }
+
+/** The steer lens of a network panel (render/brainLens.mjs): which hidden neurons drive which outputs right now. `act` is activations()'s result; null for a brain with no hidden layer. */
+export const lensOf = (act, policy, w, outputNames) => (act && act.hidden && act.hidden !== act.input ? steerLens(policy.layersOf(w), act.hidden, outputNames) : null);
 
 /** The autopilot's rows for a sub: its own features, then the intermediate numbers of its laws as fractions of a sensible full scale, then its four outputs. */
 export function subAutopilotRows(state, target, current = [0, 0, 0]) {
@@ -133,7 +137,7 @@ export function subPanel(probe) {
     const current = [0, 0, 0];
     if (probe.kind === "fly" && probe.weights) {
         const x = PS.features(probe.state, probe.target, current), act = activations(PS, probe.weights, x, PS.OUTPUT_NAMES);
-        return { kind: "fly", label: d.label, note: "features, the 34 hidden neurons (after three recurrent steps) and the four outputs; the map is what this brain would command off target", rows: pilotRows({ who: "fly", act, featureNames: PS.FEATURE_NAMES, outputNames: PS.OUTPUT_NAMES }), map: policyMap((s, t, c) => PS.forward(probe.weights, PS.features(s, t, c)), probe.state, probe.target, SUB_MAP, { env: current }) };
+        return { kind: "fly", label: d.label, note: "features, the 34 hidden neurons (after three recurrent steps) and the four outputs; the map is what this brain would command off target", lens: lensOf(act, PS, probe.weights, PS.OUTPUT_NAMES), rows: pilotRows({ who: "fly", act, featureNames: PS.FEATURE_NAMES, outputNames: PS.OUTPUT_NAMES }), map: policyMap((s, t, c) => PS.forward(probe.weights, PS.features(s, t, c)), probe.state, probe.target, SUB_MAP, { env: current }) };
     }
     return { kind: "autopilot", label: d.label, note: "no network: the intermediate numbers of its six laws and its four outputs; the map is what its laws command off target", rows: subAutopilotRows(probe.state, probe.target, current), map: policyMap((s, t, c) => AS.decide(s, t, c), probe.state, probe.target, SUB_MAP, { env: current }) };
 }
@@ -153,7 +157,7 @@ export function flightPanel(probe) {
     const map = probe.pilot ? policyMap(probe.pilot, probe.state, probe.target, FLIGHT_MAP, { env: wind }) : null;
     if (d.network && probe.policy && probe.weights) {
         const x = PF.features(probe.state, probe.target, wind), act = activations(probe.policy, probe.weights, x, PF.OUTPUT_NAMES);
-        return { kind: probe.kind, label: d.label, note: "features, the hidden layer and the four outputs; the map is what this brain would command off target", rows: pilotRows({ who: probe.kind, act, featureNames: PF.FEATURE_NAMES, outputNames: PF.OUTPUT_NAMES }), map };
+        return { kind: probe.kind, label: d.label, note: "features, the hidden layer and the four outputs; the map is what this brain would command off target", lens: lensOf(act, probe.policy, probe.weights, PF.OUTPUT_NAMES), rows: pilotRows({ who: probe.kind, act, featureNames: PF.FEATURE_NAMES, outputNames: PF.OUTPUT_NAMES }), map };
     }
     return { kind: "autopilot", label: d.label, note: "no network: the intermediate numbers of its laws and its four outputs; the map is what its laws command off target", rows: flightAutopilotRows(probe.state, probe.target, wind), map };
 }
@@ -164,13 +168,16 @@ export function drawPanel(g, w, h, panel, { title = "" } = {}) {
     g.fillStyle = "#050805"; g.fillRect(0, 0, w, h);
     const noteH = 28, bodyH = h - noteH, mapW = panel.map ? Math.min(bodyH, Math.floor(w * 0.45)) : 0;
     let bars = 0, arrows = 0;
-    if (panel.rows.length) { g.save && g.save(); g.beginPath && g.beginPath(); g.rect && g.rect(0, 0, w - mapW, bodyH); g.clip && g.clip(); bars = drawRows(g, w - mapW, bodyH, panel.rows, { title: title || panel.label }); g.restore && g.restore(); }
+    const lensH = panel.lens ? Math.floor(bodyH * 0.4) : 0, barsH = bodyH - lensH;
+    if (panel.rows.length) { g.save && g.save(); g.beginPath && g.beginPath(); g.rect && g.rect(0, 0, w - mapW, barsH); g.clip && g.clip(); bars = drawRows(g, w - mapW, barsH, panel.rows, { title: title || panel.label }); g.restore && g.restore(); }
+    let lensBars = 0;
+    if (panel.lens) lensBars = drawLens(g, 0, barsH, w - mapW, lensH, panel.lens).bars;
     if (panel.map) arrows = drawMap(g, w - mapW, 0, mapW, bodyH, panel.map, { title: MAP_TITLES[panel.map.spec] || "policy map" }).arrows;
     g.fillStyle = "#7c93b8"; g.font = "10px ui-monospace,Menlo,monospace";
     const words = panel.note.split(" "); let line = "", yy = bodyH + 11;
     for (const wd of words) { if ((line + wd).length * 5.6 > w - 6) { g.fillText(line, 3, yy); yy += 11; line = ""; } line += wd + " "; if (yy > h) break; }
     if (yy <= h) g.fillText(line, 3, yy);
-    return { bars, arrows };
+    return { bars, arrows, lensBars };
 }
 
 
@@ -218,7 +225,7 @@ export function aircraftPanel(probe) {
     const d = describeKind(probe.kind), x = PA.features(probe.body, probe.desired);
     if (probe.kind === "fly" && probe.weights) {
         const act = activations(PA, probe.weights, x, PA.OUTPUT_NAMES);
-        return { kind: "fly", label: d.label, note: "features, the 34 hidden neurons and the three outputs; the map is where this brain pushes the nose for a target in each direction", rows: pilotRows({ who: "fly", act, featureNames: PA.FEATURE_NAMES, outputNames: PA.OUTPUT_NAMES }), map: aircraftMap(PA.pilotFor(probe.weights), probe.body, probe.desired) };
+        return { kind: "fly", label: d.label, note: "features, the 34 hidden neurons and the three outputs; the map is where this brain pushes the nose for a target in each direction", lens: lensOf(act, PA, probe.weights, PA.OUTPUT_NAMES), rows: pilotRows({ who: "fly", act, featureNames: PA.FEATURE_NAMES, outputNames: PA.OUTPUT_NAMES }), map: aircraftMap(PA.pilotFor(probe.weights), probe.body, probe.desired) };
     }
     const r = AP.decide(probe.body, probe.desired), g = PA.geometry(probe.body, probe.desired);
     const laws = [g.eBody[1] / Math.PI, g.eBody[2] / Math.PI, g.bankErr / Math.PI, g.facingCos, g.desiredBank / 0.52].map((v) => clamp(num(v), -1, 1));
@@ -234,7 +241,7 @@ export function fly3dPanel(probe) {
     const x = PP.features(probe.ship, probe.target, probe.opts || {});
     if (probe.kind === "fly" && probe.weights) {
         const act = activations(PP, probe.weights, x, PP.OUTPUT_NAMES);
-        return { kind: "fly", label: KINDS.fly.label, note: "the seven features, the 34 hidden neurons and turn / pitch / thrust / firing; the map is what this brain turns and pitches for a target at each bearing off the nose", rows: pilotRows({ who: "fly", act, featureNames: PP.FEATURE_NAMES, outputNames: PP.OUTPUT_NAMES }), map: fly3dMap(probe.weights, x) };
+        return { kind: "fly", label: KINDS.fly.label, note: "the seven features, the 34 hidden neurons and turn / pitch / thrust / firing; the map is what this brain turns and pitches for a target at each bearing off the nose", lens: lensOf(act, PP, probe.weights, PP.OUTPUT_NAMES), rows: pilotRows({ who: "fly", act, featureNames: PP.FEATURE_NAMES, outputNames: PP.OUTPUT_NAMES }), map: fly3dMap(probe.weights, x) };
     }
     return { kind: "scripted", label: "scripted AI (stepAI3d)", note: "rules, not a network: it is shown the same seven numbers the network is given; there are no neurons to draw and no learned policy to slice", rows: [{ who: "scripted", layer: "features", names: PP.FEATURE_NAMES, values: Array.from(x, num) }], map: null };
 }
