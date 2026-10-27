@@ -1,6 +1,6 @@
 // WebGLEngine/physics/mechanics/subNeeds-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node physics/mechanics/subNeeds-selfcheck.mjs      (~3 s)
+// Run: node physics/mechanics/subNeeds-selfcheck.mjs      (~1.3s -- measured v4904, 1.28 s alone, three runs)
 //
 // NEEDS AND LIMITS FOR THE SUBMARINE (physics/mechanics/subNeeds.mjs and brain/needsPilot.mjs; the design and the pass/fail were written first, in brain/NEEDS_AND_LIMITS.md, and the rows below are that list):
 //   1  UNTOUCHED   a vessel with needs null is bit-identical to stepSub over 600 ticks; the `unlimited` class changes no number of the physics

@@ -285,7 +285,8 @@ export const POSIX_AT_V4485 = Object.freeze({
     // tools/ship/adapterRecord-selfcheck.mjs (the definitionGates naming), tools/ship/headlessGpu.mjs (round 19's core) -- four, inside the band -- and
     // THIS round's tools/ship/realGpuRun.mjs (nativeGateList's relative paths), the fifth, one past it. NOTHING WAS UN-NORMALISED: a re-take, not a tolerance.
     // v4896 -- 187 callers / 132 normalising -> 193 / 136: six more files that join a path (the TV commands and gates, the snowGpu split gates), four normalising and two not; calls 254 -> 272. Read off the gate, not typed.
-    separator: Object.freeze({ callers: 193, calls: 272, normalised: 136, never: 57 }),
+    // v4904 -- 193 callers / 136 normalising -> 198 / 137: five more files that join a path (this round's gates and tools: the needs gate, the brain panel's page rows, the compass and steer rows, the shallow-clone and ICD rows), one normalising and four not; calls 272 -> 281. Read off the gate, not typed.
+    separator: Object.freeze({ callers: 198, calls: 281, normalised: 137, never: 61 }),
     rulesTried: Object.freeze([53, 74, 90]),
     notClaimed: "that the 90 are defects. A relative path that is only printed is portable already; the ones " +
                 "that bite are compared against a stored form, and three static rules for 'compared against' " +

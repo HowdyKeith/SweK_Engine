@@ -132,6 +132,7 @@ import { hostUrl } from "/ui/seaFrame.mjs";
 import { subPanel, drawPanel } from "/render/brainPanel.mjs";
 import { pickNeuron } from "/render/brainLens.mjs";
 import { needsLine } from "/render/needsView.mjs";
+import { CLASSES as NEEDS_CLASSES } from "/physics/mechanics/subNeeds.mjs";   // the menu's values are checked against the model's own class table
 import { dialInfo, pair, pushTrace, lineFor, drawDial, drawTrace, drawDark } from "/render/compassView.mjs";
 
 const $ = (id) => document.getElementById(id);
@@ -204,7 +205,7 @@ $("compassBtn").onclick = () => {
   $("msg").textContent = ids[1] ? "compass test: " + tank.subs.get(ids[0]).name + " on the plain autopilot, " + tank.subs.get(ids[1]).name + " on the navigator" : "compass test: only one sub, on the plain autopilot (a second sub is needed for the navigator)";
 };
 $("flyEstBtn").onclick = () => setEvent("fly-estimator"); $("erEstBtn").onclick = () => setEvent("er-estimator");   // v4904: the study's two estimators as events on the selected sub; their builders are registered below once the circuit is loaded
-$("needsSel").onchange = () => { if (!selected) { $("msg").textContent = "pick a sub in the list first"; $("needsSel").value = ""; return; } try { const v = $("needsSel").value; if (v === "") { tank.setEvent(selected, null); $("msg").textContent = "needs off: restored"; } else { tank.setNeeds(selected, v); $("msg").textContent = v + " needs on the selected sub (a 60 m hull, tank-scale charge)"; } } catch (e) { $("msg").textContent = String((e && e.message) || e).slice(0, 90); $("needsSel").value = ""; } };
+$("needsSel").onchange = () => { if (!selected) { $("msg").textContent = "pick a sub in the list first"; $("needsSel").value = ""; return; } try { const v = $("needsSel").value; if (v !== "" && !Object.prototype.hasOwnProperty.call(NEEDS_CLASSES, v)) throw new Error("no such needs class: " + v); if (v === "") { tank.setEvent(selected, null); $("msg").textContent = "needs off: restored"; } else { tank.setNeeds(selected, v); $("msg").textContent = v + " needs on the selected sub (a 60 m hull, tank-scale charge)"; } } catch (e) { $("msg").textContent = String((e && e.message) || e).slice(0, 90); $("needsSel").value = ""; } };
 $("injureBtn").onclick = () => { if (!selected) { $("msg").textContent = "pick a sub in the list first"; return; } try { const d = tank.injure(selected, 0.2); $("msg").textContent = d === null ? "no such sub" : "hull damage " + Math.round(d * 100) + "%"; } catch (e) { $("msg").textContent = "turn the needs on first (the needs menu)"; } };
 $("floodBtn").onclick = () => setEvent("flood"); $("sinkBtn").onclick = () => setEvent("sink"); $("surfaceBtn").onclick = () => setEvent("surface"); $("clearBtn").onclick = () => setEvent(null);
 const DOT = { live: "#4ade80", standin: "#f6a623", offline: "#ff5a5a", err: "#555" }, WORD = { live: "live", standin: "stand-in", offline: "offline", err: "unreachable" };

@@ -1,7 +1,7 @@
 {
  "host": "linux-x64-4c-16gb-420793",
  "note": "THIS BOX'S OWN gate runtimes, written by tools/ship/boxTimings.mjs. The shared sweep-timings.json is host-claimed and a foreign box cannot write it (v4647, and that refusal is right); this is how a box records what IT measured without overwriting another machine's numbers. `kinds` says which quantity each ms is, as in the shared record: `alone` is an uncontended serial reading, `capped` is a FLOOR and not a runtime. Read for COVERAGE -- has this gate ever been timed -- and NOT for the ship-time budget, which still reads the shared file. See task #87. `serialRing` holds the last three alone readings; recordReach's margin row reads it on a box that does not own the shared record, because that row asks what a gate costs HERE and nothing here can refresh another box's ring.",
- "captured": "2026-10-27T03:51:26.161Z",
+ "captured": "2026-10-27T15:56:50.144Z",
  "timings": {
   "tools/ship/cloneProvision-selfcheck.mjs": 7171,
   "tools/ship/exitBusy-selfcheck.mjs": 15284,
@@ -106,7 +106,8 @@
   "render/denoiseFrameGenCost-selfcheck.mjs": 30251,
   "render/learnedUpscale-selfcheck.mjs": 43938,
   "tools/subHeadingEstimator-selfcheck.mjs": 20556,
-  "tools/ship/fsrCaches-selfcheck.mjs": 4627
+  "tools/ship/fsrCaches-selfcheck.mjs": 4627,
+  "physics/mechanics/subNeeds-selfcheck.mjs": 1280
  },
  "at": {
   "tools/ship/cloneProvision-selfcheck.mjs": "2026-09-25T03:35:16.858Z",
@@ -212,7 +213,8 @@
   "render/denoiseFrameGenCost-selfcheck.mjs": "2026-10-27T03:51:26.161Z",
   "render/learnedUpscale-selfcheck.mjs": "2026-10-27T03:51:26.161Z",
   "tools/subHeadingEstimator-selfcheck.mjs": "2026-10-27T03:51:26.161Z",
-  "tools/ship/fsrCaches-selfcheck.mjs": "2026-10-27T03:51:26.161Z"
+  "tools/ship/fsrCaches-selfcheck.mjs": "2026-10-27T03:51:26.161Z",
+  "physics/mechanics/subNeeds-selfcheck.mjs": "2026-10-27T15:56:50.144Z"
  },
  "kinds": {
   "tools/ship/cloneProvision-selfcheck.mjs": "alone",
@@ -318,7 +320,8 @@
   "render/denoiseFrameGenCost-selfcheck.mjs": "alone",
   "render/learnedUpscale-selfcheck.mjs": "alone",
   "tools/subHeadingEstimator-selfcheck.mjs": "alone",
-  "tools/ship/fsrCaches-selfcheck.mjs": "alone"
+  "tools/ship/fsrCaches-selfcheck.mjs": "alone",
+  "physics/mechanics/subNeeds-selfcheck.mjs": "alone"
  },
  "codes": {
   "tools/ship/cloneProvision-selfcheck.mjs": 0,
@@ -424,7 +427,8 @@
   "render/denoiseFrameGenCost-selfcheck.mjs": 0,
   "render/learnedUpscale-selfcheck.mjs": 0,
   "tools/subHeadingEstimator-selfcheck.mjs": 0,
-  "tools/ship/fsrCaches-selfcheck.mjs": 0
+  "tools/ship/fsrCaches-selfcheck.mjs": 0,
+  "physics/mechanics/subNeeds-selfcheck.mjs": 0
  },
  "serialRing": {
   "tools/ship/frozenRecords-selfcheck.mjs": [
@@ -923,6 +927,11 @@
    4611,
    4342,
    4627
+  ],
+  "physics/mechanics/subNeeds-selfcheck.mjs": [
+   1154,
+   1023,
+   1280
   ]
  }
 }

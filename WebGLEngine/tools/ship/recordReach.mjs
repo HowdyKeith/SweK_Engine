@@ -481,7 +481,8 @@ export const REACH_AT_V4548 = Object.freeze({
     // v4898 -- READ OFF reach() on the sandbox box after the merges: checked 122, overBudget 46, unguarded 17, unchecked 63 (was 43 / 62). RE-TAKEN 62 -> 63 for ONE named cause: COMMIT_BELT_DRIFT_V4898 (this round's new record) is
     // guarded only by orreryFleet-selfcheck, which runs ~30 s and is over the sweep's line. The overBudget move (43 -> 46) is the box: orreryEjecta-selfcheck runs ~3.4-4.0 s HERE and ran ~3.4 s at v4897 too (measured on a v4897 worktree),
     // so it reads over the line on this box and under it on the rig; the ceiling is a ceiling because that class is decided by how loaded or slow the box is.
-    checked: 122, overBudget: 47, unguarded: 17, unchecked: 64,
+    checked: 122, overBudget: 47, unguarded: 17, unchecked: 65,
+    // v4904 -- 64 -> 65: the box, named. The structural pin (18 unguarded, NO_GATE_V4901 documentary) was set at v4901 beside an overBudget reading of 46; this box reads 47 over the line (boundaryLint-selfcheck, the others the verdict listed as now over budget), so 47 + 18 = 65. No record lost a guardian this round.
     // v4899 -- 46 -> 47 and 63 -> 64: COMMIT_BELT_DRIFT_V4899 is guarded only by orreryFleet-selfcheck (about 30 s, over the line), the same cause as v4898's +1; the ceiling follows.
     // v4550 -- the UNMEASURED class was split out of over-budget after this gate went red twice inside full
     // sweeps and passed 68 times under load; the trigger was a concurrent REWRITE of sweep-timings.json, not

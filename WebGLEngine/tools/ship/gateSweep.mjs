@@ -16205,6 +16205,13 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
         widened: Object.freeze([]),
         verdict: "the Sea OGRE round's gates (the level, its view and 3D camera, the squad, the voxel bridge) and the sub round's (ballast pilots, manual assist, brain panel, sub tournament and its view, sea picker, compass view) plus the merged FSR4 / frame-generation gates; each run alone and green on the merged tree, and each sabotaged to go red by name with the results in its header",
     }),
+    since614: Object.freeze({
+        at: "v4904", swept: 1, green: 1, red: 0,
+        added: Object.freeze(["physics/mechanics/subNeeds-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "the submarine's needs and limits gate (energy that only the surface refills, a hull that feels the pressure, the refill-trip pilot; 23 mutants, one equivalent, said so), run alone and green; the rows other gates grew this round (brainPanel, compassView, subAquariumEvents, subAquariumSim, subBallastCues, headlessGpu, declaredCost, statedRuntime, afterVerdict and the three staleness gates) are in no closing because a gate may be claimed by ONE closing and they were swept at their own.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

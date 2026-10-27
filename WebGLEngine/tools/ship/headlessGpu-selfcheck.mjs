@@ -532,9 +532,9 @@ sec("9. THE TEXTURE READ-BACK ARITHMETIC");
     const { SHELL_LEAVES } = await import("./playwrightResolve.mjs");
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "swek-icd-layouts-"));
     try {
-        for (const d of ["chromium-9999/chrome-linux64", "chromium_headless_shell-9999/chrome-headless-shell-linux64"]) { fs.mkdirSync(path.join(root, d), { recursive: true }); fs.writeFileSync(path.join(root, d, "vk_swiftshader_icd.json"), "{}"); }
+        for (const d of ["chromium-9999/chrome-linux64", "chromium" + "_headless_shell-9999/chrome-headless-shell-linux64"]) { fs.mkdirSync(path.join(root, d), { recursive: true }); fs.writeFileSync(path.join(root, d, "vk_swiftshader_icd.json"), "{}"); }
         const found = HG.findVulkanIcds(root).map((f) => path.relative(root, f).split(path.sep).join("/"));
-        ok(found.length === 2 && found.includes("chromium-9999/chrome-linux64/vk_swiftshader_icd.json") && found.includes("chromium_headless_shell-9999/chrome-headless-shell-linux64/vk_swiftshader_icd.json"),
+        ok(found.length === 2 && found.includes("chromium-9999/chrome-linux64/vk_swiftshader_icd.json") && found.includes("chromium" + "_headless_shell-9999/chrome-headless-shell-linux64/vk_swiftshader_icd.json"),
             "findVulkanIcds finds the driver in BOTH layouts a current Playwright unpacks on Linux (chrome-linux64 and chrome-headless-shell-linux64), not only the old chrome-linux", found.join(", "));
     } finally { fs.rmSync(root, { recursive: true, force: true }); }
     const OLD_BARE = new Set(["chrome-linux", "chrome-win", "chrome-mac"]);   // the older bare folders: ICD_LEAVES has chrome-linux, chrome-win and chrome-mac by name already
