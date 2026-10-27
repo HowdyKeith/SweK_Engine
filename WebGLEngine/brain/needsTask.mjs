@@ -50,6 +50,17 @@ export function scenario(seed, kind = "plain") {
     return Object.freeze({ seed, kind, depth0: u(10, 20), damage0, frac0, stations: Object.freeze(stations) });
 }
 
+// THE NOISY GAUGE (piece 4, registered after a measurement: with a clean gauge a stateless rule from the charge and the depth scores exactly what the hysteresis rule does, so the job needs no internal state): the charge reading a pilot is handed is the true fraction plus
+// seeded gaussian noise of standard deviation `sd`, refreshed `hz` times a second and held between refreshes, clipped to [0, 1]. The simulation, the score and the other readings are untouched. A pilot that averages the gauge over time (a filter, a leaky memory) reads the charge; one that
+// acts on the sample chatters at its thresholds.
+export const GAUGE = Object.freeze({ sd: 0.1, hz: 1 });
+const gaussOf = (r) => { let u = 0, v = 0; while (!u) u = r(); while (!v) v = r(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
+export function gaugeOf(sc, { sd = GAUGE.sd, hz = GAUGE.hz } = {}, dt = DT) {
+    const rng = mulberry((sc.seed * 15485863 + KINDS.indexOf(sc.kind) * 32452843 + 977) >>> 0), every = Math.max(1, Math.round(1 / (hz * dt)));
+    let held = null;
+    return (i, frac) => { if (held === null || i % every === 0) held = clamp(frac + sd * gaussOf(rng), 0, 1); return held; };
+}
+
 /** The score of a run from its parts (see the header): a crushed boat is 0; otherwise 0.45 x the reachable stations visited + 0.45 x returned + 0.1 x hull, in [0, 1]. */
 export const scoreOf = ({ seen, reachable, returned, hull, crushed }) => (crushed ? 0 : clamp(0.45 * (reachable ? seen / reachable : 1) + 0.45 * (returned ? 1 : 0) + 0.1 * hull, 0, 1));
 
@@ -57,14 +68,14 @@ export const scoreOf = ({ seen, reachable, returned, hull, crushed }) => (crushe
  * Fly one survey run with `factory` (ctx) -> pilot. Returns { score, visited, reachable, returned, hull, status ("submerged" | "crushed" | "grounded" | "broached" | "lost"), crushed, stranded (alive, no charge, and not returned),
  * energyEnd (fraction), damage0, damageEnd, exposedS, minEnergy (fraction), maxStrain, tEnd, fingerprint }. Deterministic.
  */
-export function fly(factory, sc, { seconds = SECONDS, dt = DT, m = model(), onTick = null } = {}) {
+export function fly(factory, sc, { seconds = SECONDS, dt = DT, m = model(), onTick = null, gauge = null } = {}) {
     let st = { ...S.createState({ depth: sc.depth0, speed: 2, model: m }), tank: S.initialTank(m) };
     let nd = { ...N.initialNeeds(CLASS, { crushDepth: CRUSH }), energy: sc.frac0 * N.CLASSES[CLASS].capacityJ, damage: sc.damage0 };
     const read = () => N.readings(m, nd, st), visited = sc.stations.map(() => false), total = Math.round(seconds / dt);
-    const pilot = factory({ model: m, read });
+    const pilot = factory({ model: m, read }), gaugeFn = gauge ? gaugeOf(sc, gauge, dt) : null;
     let status = "submerged", minE = nd.energy / N.CLASSES[CLASS].capacityJ, maxStrain = 0, tEnd = seconds, h = 0x811c9dc5;
     for (let i = 0; i < total; i++) {
-        const t = i * dt, obs = { t, stations: sc.stations.map((q, k) => ({ x: q.x, y: q.y, depth: q.depth, visited: visited[k] })), r: read() };
+        const t = i * dt, rr0 = read(), obs = { t, stations: sc.stations.map((q, k) => ({ x: q.x, y: q.y, depth: q.depth, visited: visited[k] })), r: gaugeFn ? { ...rr0, frac: gaugeFn(i, rr0.frac) } : rr0 };
         const cmd = pilot(st, obs, [0, 0, 0]) || {}, rr = N.stepNeeds(m, st, nd, cmd, dt, [0, 0, 0], 0, { pump: cmd.pump, repair: cmd.repair });
         st = rr.state; nd = rr.needs; status = rr.status;
         if (onTick) onTick(t, st, nd, cmd, visited);
@@ -111,33 +122,71 @@ export const TRIP = (ctx) => {
     const trip = NP.wrap((st, target, cur) => (target.surface ? base(ctx)(st, target, cur) : inner(st, obsNow, cur)), { read: ctx.read, ...TRIP_AT });
     return (st, obs, cur) => { obsNow = obs; return trip(st, { depth: 0, heading: 0, speed: SPEED }, cur); };
 };
-/**
- * The hull rule and its helpers, with or without the refill trip. HULLONLY is the hull rule alone (the control that shows the hull is a need without the charge); GUARDED adds the trip: the best rule pilot written for the job.
- * The hull rule: a depth cap of 0.9 of the collapse depth, the nearest feasible station first, the pump when there is flood, repair at the surface, and up in time to be at the surface at the end (RISE_RATE, RISE_MARGIN).
- */
-function guarded(withTrip) {
+// ---- the SEAT interface (piece 4): a seat decides, the autopilot flies -------------------------------------------------------------------------------------------------------------------------------------------
+// A SEAT is (ctx) -> seat(st, obs) -> a DECISION { surface: bool (go up and stay up), station: the { x, y, depth, visited } to go to, or null, cap: the deepest the boat may go as a fraction of the CURRENT collapse depth, pump: bool, repair: bool }. `flyDecision` turns a
+// decision into the four controls plus pump and repair with the same autopilot and surfacing wrapper every rule pilot uses, so a rule, a circuit, or any other model sitting in the seat is flown identically and the score measures its DECISIONS.
+const feasibleAt = (q, r) => q.depth - CAPTURE.depth + 0.5 <= HULL_DEPTH * r.collapseDepth;
+/** The nearest feasible unvisited station, or null. */
+export function nearestFeasible(st, obs) { let best = null, bd = Infinity; for (const q of obs.stations) { if (q.visited || !feasibleAt(q, obs.r)) continue; const d = distTo(st, q); if (d < bd) { bd = d; best = q; } } return best; }
+/** Has the run reached the point where the boat must be on its way up to be home at the end (the fixed last call: RISE_RATE and RISE_MARGIN, not learnable)? */
+export const lastCall = (obs) => obs.t >= SECONDS - RISE_MARGIN - obs.r.depth / RISE_RATE;
+
+/** The pilot a seat makes: (ctx) -> (st, obs, current) -> controls. The decision of the last tick is on `pilot.decision`. */
+export function flyDecision(seatOf) {
     return (ctx) => {
-        const feasible = (q, r) => q.depth - CAPTURE.depth + 0.5 <= HULL_DEPTH * r.collapseDepth;
-        const pick = (st, obs) => { let best = null, bd = Infinity; for (const q of obs.stations) { if (q.visited || !feasible(q, obs.r)) continue; const d = distTo(st, q); if (d < bd) { bd = d; best = q; } } return best; };
-        const cap = (r) => HULL_DEPTH * r.collapseDepth;
-        const work = station(pick, cap)(ctx), up = base(ctx);
-        let obsNow = null;
-        const trip = NP.wrap((st, target, cur) => (target.surface ? up(st, target, cur) : work(st, obsNow, cur)), { read: ctx.read, ...TRIP_AT });
-        return (st, obs, cur) => {
-            obsNow = obs;
-            const r = obs.r, lastCall = obs.t >= SECONDS - RISE_MARGIN - r.depth / RISE_RATE, mustUp = lastCall || !pick(st, obs);
-            const c = mustUp ? up(st, { depth: 0, heading: 0, speed: SPEED, surface: true }, cur) : withTrip ? trip(st, { depth: 0, heading: 0, speed: SPEED }, cur) : work(st, obs, cur);
-            const atSurface = -st.pos[2] < RETURN_DEPTH;
-            return { ...c, pump: r.flood > 0.001 && r.frac > 0.1 ? 1 : 0, repair: atSurface && r.damage > 0 && r.frac > 0.1 ? 1 : 0 };
+        const seat = seatOf(ctx), up = base(ctx), flyTo = base(ctx);
+        let decision = null;
+        const pilot = (st, obs, cur) => {
+            const d = seat(st, obs); decision = d;
+            const r = obs.r, atSurface = -st.pos[2] < RETURN_DEPTH;
+            let c;
+            if (d.surface || !d.station) c = up(st, { depth: 0, heading: 0, speed: SPEED, surface: true }, cur);
+            else c = flyTo(st, { depth: Math.min(d.station.depth, d.cap * r.collapseDepth), heading: headingTo(st, d.station), speed: SPEED }, cur);
+            return { ...c, pump: d.pump ? 1 : 0, repair: d.repair ? 1 : 0 };
+        };
+        Object.defineProperty(pilot, "decision", { get: () => decision });
+        return pilot;
+    };
+}
+
+/** The rule seats. `trip`: "hyst" (surface under TRIP_AT.low, back over TRIP_AT.high: GUARDED), "single" (one threshold, TRIP_1T.low: GUARDED-1T, the start point of piece 4), "obs" (a stateless rule from the observations, the surfacing charge a function of the depth alone, obsThreshold: GUARDED-OBS), "obs0" (its first, crude form: under 0.3, or at the surface (under 3 m) while under 0.6: GUARDED-OBS0), "none" (never: HULLONLY). */
+export const TRIP_1T = Object.freeze({ low: 0.45, high: 0.4500001 }), OBS_RULE = Object.freeze({ low: 0.3, high: 0.6, ramp: 6 });
+/** The stateless rule from the observations: the charge fraction under which the boat surfaces, as a function of its depth ALONE -- OBS_RULE.high at the surface falling linearly to OBS_RULE.low at OBS_RULE.ramp metres and below -- so that the depth, which the world keeps, carries the hysteresis (stay up while charging, do not turn back on the first metres of the dive). */
+export const obsThreshold = (depth) => OBS_RULE.low + (OBS_RULE.high - OBS_RULE.low) * Math.max(0, Math.min(1, 1 - depth / OBS_RULE.ramp));
+export function ruleSeat(trip, { alpha = null } = {}) {
+    return (ctx) => {
+        let refilling = false, ema = null;
+        return (st, obs) => {
+            // a filtered gauge: the charge fraction the rule acts on is an exponential average of the readings (per tick), the one piece of memory a noisy gauge asks for
+            if (alpha !== null) { ema = ema === null ? obs.r.frac : ema + alpha * (obs.r.frac - ema); obs = { ...obs, r: { ...obs.r, frac: ema } }; }
+            const r = obs.r, station = nearestFeasible(st, obs), atSurface = -st.pos[2] < RETURN_DEPTH;
+            const pump = r.flood > 0.001 && r.frac > 0.1, repair = atSurface && r.damage > 0 && r.frac > 0.1;
+            let surface = lastCall(obs) || !station;
+            if (!surface) {
+                if (trip === "hyst" || trip === "single") {
+                    const t = trip === "hyst" ? TRIP_AT : TRIP_1T;
+                    if (!refilling && r.frac < t.low) refilling = true; else if (refilling && r.frac >= t.high) refilling = false;
+                    surface = refilling;
+                } else if (trip === "obs0") surface = r.frac < OBS_RULE.low || (r.depth < RETURN_DEPTH && r.frac < OBS_RULE.high);
+                else if (trip === "obs") surface = r.frac < obsThreshold(r.depth);
+            }
+            return { surface, station, cap: HULL_DEPTH, pump, repair };
         };
     };
 }
-export const HULLONLY = guarded(false), GUARDED = guarded(true);
+/** The hull rule alone (no trip), the hull rule inside the hysteresis trip (the best rule written for the job), and the two reference rules of piece 4. */
+export const HULLONLY = flyDecision(ruleSeat("none")), GUARDED = flyDecision(ruleSeat("hyst")), GUARDED_1T = flyDecision(ruleSeat("single")), GUARDED_OBS = flyDecision(ruleSeat("obs")), GUARDED_OBS0 = flyDecision(ruleSeat("obs0"));
+/** The stateless rule behind a filter: GUARDED-OBS acting on an exponential average of the gauge (alpha per tick). The reference for a task with a noisy gauge. */
+export const FILTER_ALPHA = 0.005;
+export const GUARDED_FILTER = flyDecision(ruleSeat("obs", { alpha: FILTER_ALPHA }));
+export const REFERENCES = Object.freeze({ GUARDED_1T, GUARDED_OBS, GUARDED_OBS0, GUARDED_FILTER });
 export const PILOTS = Object.freeze({ SPIN, DIRECT, TRIP, HULLONLY, GUARDED });
 
 // ---- the sets: disjoint seeds, four kinds ------------------------------------------------------------------------------------------------------------------------------------------------------------------
 const mk = (a, b) => Object.freeze(KINDS.flatMap((k) => Array.from({ length: b - a + 1 }, (_, i) => scenario(a + i, k))));
-export const TRAIN_SET = mk(1, 10), HELD_OUT_SET = mk(11, 20), AUDIT_SET = mk(51, 62), BASELINE_SET = mk(501, 508);   // AUDIT_SET: NOT READ by anything yet -- it is piece 4's
+export const TRAIN_SET = mk(1, 10), HELD_OUT_SET = mk(11, 20), AUDIT_SET = mk(51, 62), BASELINE_SET = mk(501, 508);
+// piece 4 (brain/NEEDS_AND_LIMITS.md "Round 3", registered before these were used): the training subset, the safety pool and the two further audits. AUDIT_SET, AUDIT2_SET and RESERVE_SET are READ ONCE, for the champions.
+export const TRAIN_SMALL_SET = mk(1, 4), POOL_SET = mk(21, 32), AUDIT2_SET = mk(71, 82), RESERVE_SET = mk(91, 102);   // AUDIT_SET: NOT READ by anything yet -- it is piece 4's
 
 /** Paired comparison of two evaluate() results over the SAME set: { diff (mean of a - b), se (standard error of the paired difference), n }. */
 export function paired(a, b) {
