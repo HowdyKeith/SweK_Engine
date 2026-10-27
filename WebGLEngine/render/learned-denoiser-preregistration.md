@@ -10306,3 +10306,44 @@ harvest no longer misattributes its results. A gate row reads it off the command
 - **P4:** the trained U_E puts between 20 % and 80 % of its weight on EASU's tap on the mean (the pilot: 36-47 %).
 
 Section 158 is the verdict.
+
+## 158. FSR4 ROUND 68'S VERDICT -- REPORTED; BOTH HYPOTHESES SUPPORTED AS THE TEST READS THEM, AND U_E IS EASU
+
+**Where it ran, and one breach of the order.** Both harvests ran on Keith's rig at fe2f443a, the training and then the test, so
+the test read the training file before it was committed (rounds 65 and 67 ran the test at a later commit carrying it). The test
+file names the candidate and commit it read (seed 1, fe2f443a), and the committed training file says the same. **The results file
+was shown to me when it was uploaded, before it was committed** (8d68c6e4, byte for byte, sha-256 5a7a65d8...). Nothing below was
+changed after that: every number is section 157's test, re-derived by render/learnedUpscaleStudy-selfcheck.mjs section 8.
+
+**The training.** All three seeds ended in one place: validation 1.9073e-3 for each, the same to 3e-11. The candidate is seed 1.
+
+**The test, as fixed.**
+- C1, C3, C4, C5 held; C2 held (the shuffled U_E lost to EASU on all 24, mean d -1.64).
+- **H1, U_E against EASU: supported** -- 16 of 24, sign-flip p 0.0111 against Holm's 0.05.
+- **H2, U_E against round 67's U: supported** -- 19 of 24, p 0.00063 against 0.025, mean d +0.098.
+
+**What that means: nothing was learned.** U_E's chain equals EASU's to 4.2e-10 relative on every scene. H1's mean d is
+**3.6e-11**. The softmax puts at least 99.99994 % of every scene's weight on EASU's tap. The committed candidate, run on a
+scene of no split, does the same (99.999 %). H1's "support" is the sign of a residual 1e-8 of weight left on the sixteen taps,
+consistently that way and far below anything visible. Section 157 fixed no smallest effect worth reporting. I add none after the
+fact; I record instead that this support is not an improvement. H2 is the same comparison as EASU against round 67's U:
+EASU beats it on the same 19 of 24, each scene's d the same to 1e-9. On these scenes round 67's U lost to EASU (2.60e-3 against
+2.35e-3). On round 67's own it had tied (2.254e-3 against 2.252e-3).
+
+**The predictions.**
+- **P1 (C1 and C3 hold): held.**
+- **P2 (H1 supported, mean d under 0.05): held as worded, vacuously.** The d is 3.6e-11.
+- **P3 (H2 supported): held,** by EASU's margin, not by anything U_E learned.
+- **P4 (20-80 % of the weight on EASU's tap): MISSED.** It is over 99.9999 %. The pilot had shown the attractor and moved the
+  start to -8 to avoid it. At full scale (1500 steps, batch 4, 32-pixel crops of 220 path-traced scenes) training reached it
+  anyway, from all three seeds.
+
+**What follows.** EASU stays the chain's upscale. Three rounds have now tried to learn past it, and none did:
+- round 65: not reported;
+- round 67: a tie;
+- round 68: a collapse onto it.
+
+Offering EASU as a softmax choice cannot work as built: the per-pixel gradient on EASU's logit wins wherever EASU beats the
+current mix, and that holds early everywhere. A further design would have to keep EASU out of the competition. For example, a
+residual added to EASU with its scale held, or a loss on where EASU is wrong. That would be a new round, and none is fixed
+here.
