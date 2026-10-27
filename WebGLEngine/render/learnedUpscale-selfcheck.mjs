@@ -15,6 +15,8 @@
 // given, so the definition row was added for it); U8 the crop's composite without E -> 1 red.
 // SECTION 157 (U_E): E1 EASU's logit back at +8 -> 2 red; E2 the 17th tap read from the half frame -> 2 red; E3 the head not
 // zeroed -> 1 red; E4 the first layer 16 wide -> 2 red; E5 the crop's EASU halved -> 2 red. Each restored byte-identical.
+// SECTION 159 (U_R): R1 the hold 0.6, R2 the derivative without tanh', R3 the head not zeroed, R5 the residual additive -> 2 red
+// each; R4 the input without EASU, R6 the crop's E zeroed, R7 the chain without EASU for U_R -> 1 red each. Each restored byte-identical.
 "use strict";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -143,7 +145,42 @@ console.log("\n5. ROUND 68 (section 157): U_E, A LEARNED CORRECTION OF EASU");
     const stuck = U.trainUpscaler(ex, { seed: 3, steps: 300, batch: 2, crop: 16, variant: "easu", easuBias: 8 }).net, atE = test.map((t) => score(t, U.learnedUpscale(stuck, t.x, t.half, t.w, t.h, t.easuUp).y));
     ok("  ...where the same 300 steps from a start at EASU (its logit +8) never leave it, to 3 digits -- section 157's pilot, why U_E starts from the box", atE.every((v, i) => Math.abs(v - easu[i]) < 1e-3 * easu[i]), atE.map((v, i) => `${v.toExponential(3)} against ${easu[i].toExponential(3)}`).join("; "));
     let bad = null; try { U.trainUpscaler([scene(16, 16, 1)], { seed: 1, steps: 1, batch: 1, crop: 16, variant: "easu" }); } catch (e) { bad = e.message; }
-    ok("  ...and U_E's training refuses examples without EASU's output, and the variant is box or easu", /carry easuUp/.test(bad || "") && U.UP_VARIANTS.join() === "box,easu");
+    ok("  ...and U_E's training refuses examples without EASU's output, and the variant is box, easu or (round 69) residual", /carry easuUp/.test(bad || "") && U.UP_VARIANTS.join() === "box,easu,residual");
+}
+
+console.log("\n6. ROUND 69 (section 159): U_R, A HELD RESIDUAL ON EASU");
+{
+    const { upscale } = await imp("render/denoiseUpscale.mjs"), withEasu = (sc) => ({ ...sc, easuUp: upscale(sc.half, sc.w, sc.h, 2 * sc.w, 2 * sc.h, "easu") });
+    const s = withEasu(scene(16, 12, 21)), u0 = U.makeUpscalerR(4), r0 = U.learnedUpscale(u0, s.x, s.half, s.w, s.h, s.easuUp), xr = U.residualInput(s.x, s.easuUp, 16, 12);
+    ok("!! an untrained U_R -- the head zero -- is EASU's output exactly, bit for bit; its input U's twelve channels and EASU's three; 32 wide, a 3-channel head; the hold 0.5",
+        r0.y.every((v, i) => Object.is(v, s.easuUp[i])) && U.UPR_CHANNELS === 15 && U.UPR_SCALE === 0.5 && U.UPR_SHAPE[0][0] === 15 && U.UPR_SHAPE[0][1] === 32 && U.UPR_SHAPE[3][1] === 3 && U.isResidual(u0) &&
+        !U.isResidual(U.makeUpscalerE(4)) && !U.isResidual(U.makeUpscaler(4)) &&
+        [0, 50, 191].every((p) => [...Array(12).keys()].every((c) => xr[p * 15 + c] === s.x[p * 12 + c]) && [0, 1, 2].every((c) => xr[p * 15 + 12 + c] === s.easuUp[p * 3 + c])));
+    const net = U.makeUpscalerR(5);
+    net.layers.forEach((L, li) => { const r = seededRandom(40 + li); for (let i = 0; i < L.W.length; i++) L.W[i] += 0.3 * (r.u() - 0.5); for (let i = 0; i < L.b.length; i++) L.b[i] += 0.3 * (r.u() - 0.5); });
+    const o = U.learnedUpscale(net, s.x, s.half, s.w, s.h, s.easuUp);
+    let held = true; for (let i = 0; i < o.y.length; i++) { const k = o.y[i] / s.easuUp[i]; if (s.easuUp[i] > 0 && !(k >= 0.5 - 1e-12 && k <= 1.5 + 1e-12 && Math.abs(k - (1 + 0.5 * Math.tanh(o.w[i]))) < 1e-12)) held = false; }
+    ok("!! any U_R's pixel is EASU's times 1 + 0.5 tanh(r): within half and one and a half of EASU on every channel, never negative where EASU is not",
+        held && o.w.some((v) => Math.abs(v) > 0.05), `residual range ${Math.min(...o.w).toFixed(3)} to ${Math.max(...o.w).toFixed(3)}`);
+    let refused = null; try { U.learnedUpscale(u0, s.x, s.half, s.w, s.h); } catch (e) { refused = e.message; }
+    ok("  ...and U_R without EASU's output is refused", /U_R corrects EASU's output/.test(refused || ""));
+    const g8 = withEasu(scene(8, 8, 23));
+    for (let p = 0; p < 64; p++) if (p % 7 === 0) { g8.cov[p] = 0.4; for (let c = 0; c < 3; c++) g8.E[p * 3 + c] = 0.6; }
+    const G = U.upLossAndGrads(net, g8.x, g8.half, g8.w, g8.h, g8.ref, g8.cov, g8.E, g8.easuUp), L = () => U.upLossAndGrads(net, g8.x, g8.half, g8.w, g8.h, g8.ref, g8.cov, g8.E, g8.easuUp).loss;
+    let worst = 0;
+    for (const [li, wi] of [[0, 9], [0, 14 * 9 + 4], [1, 500], [2, 3000], [3, 5], [3, 70]]) { const Wt = net.layers[li].W, keep = Wt[wi], e = 1e-5; Wt[wi] = keep + e; const a1 = L(); Wt[wi] = keep - e; const b1 = L(); Wt[wi] = keep;
+        const fd = (a1 - b1) / (2 * e), an = G.grads[li].dW[wi]; worst = Math.max(worst, Math.abs(fd - an) / Math.max(1e-9, Math.abs(fd) + Math.abs(an))); }
+    ok("!! U_R's gradient, through the composite, the transfer and 1 + 0.5 tanh(r), matches central differences in every layer within 1e-5 relative", worst < 1e-5, `worst ${worst.toExponential(2)}`);
+    const C8 = U.cropLoss(net, g8, 0, 0, 8); let gd = 0; C8.grads.forEach((q, i) => q.dW.forEach((v, j) => { gd = Math.max(gd, Math.abs(v - G.grads[i].dW[j])); }));
+    ok("  ...and a crop of the whole frame gives the whole frame's loss and gradients", Math.abs(C8.loss - G.loss) < 1e-15 && gd < 1e-15);
+    const ex = [5, 6, 7, 8].map((k) => withEasu(scene(32, 32, 300 + k))), test = [withEasu(scene(32, 32, 400)), withEasu(scene(32, 32, 401))];
+    const run = (steps) => U.trainUpscaler(ex, { seed: 3, steps, batch: 2, crop: 16, variant: "residual" }), a0 = run(20), b0 = run(20), a = run(300);
+    ok("  U_R trains deterministically by seed", a0.net.layers.every((Lr, i) => Lr.W.every((v, j) => Object.is(v, b0.net.layers[i].W[j]))) && U.isResidual(a.net));
+    const disp = (y) => Float64Array.from(y, toPerceptual), score = (t, y) => relMSE(disp(y), disp(t.ref));
+    const learned = test.map((t) => score(t, U.learnedUpscale(a.net, t.x, t.half, t.w, t.h, t.easuUp).y)), easu = test.map((t) => score(t, t.easuUp));
+    ok("!! ...and on two held-out frames of known truth, 300 steps from EASU leave it -- and beat it, in display space", learned.every((v, i) => v < 0.95 * easu[i]), learned.map((v, i) => `${v.toExponential(3)} against ${easu[i].toExponential(3)}`).join("; "));
+    let bad = null; try { U.trainUpscaler([scene(16, 16, 1)], { seed: 1, steps: 1, batch: 1, crop: 16, variant: "residual" }); } catch (e) { bad = e.message; }
+    ok("  ...and U_R's training refuses examples without EASU's output", /U_R trains on examples that carry easuUp/.test(bad || ""));
 }
 
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +

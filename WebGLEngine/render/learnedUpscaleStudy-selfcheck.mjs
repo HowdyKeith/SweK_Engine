@@ -20,6 +20,8 @@
 // SECTION 158: V158a round 68's candidate typed 2, V158b H1's count typed 17, V158c the test's commit typed fe2f443b, V158d the
 // collapse bound 1e-10, V158e the weight bound 0.9999999, V158f H2 re-derived against EASU, V158g round 67's mean typed 2.54e-3,
 // V158h the decoded candidate's bound 0.999995 -> 1 red each. Each restored byte-identical.
+// SECTION 159: S1 round 69's R test seeds onto round 68's, S2 its variant easu, S3 the residual size without the hold, S4 the config's
+// shape U's, S5 round 69's net file round 68's -> 1 red each. Each restored byte-identical.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -161,8 +163,8 @@ console.log("\n7. ROUND 68 (section 157): U_E -- EASU OFFERED AS A 17TH TAP, 32 
         S.T1.seeds.every((x) => D.isDatasetSeed(x) && !old.has(x)) && R.prior === LS.ROUND_UPSCALE_LEARNED_67.net && R.net === "render/upscale-net-r68.json" && R.results === "render/denoise-results-upscale-learned-r68.json" &&
         ["image", "sppIn", "test", "c1Of", "c1Min", "seeds", "train"].every((k) => R[k] === LS.ROUND_UPSCALE_LEARNED_67[k]) &&
         LS.ROUND_UPSCALE_LEARNED.variant === "box" && LS.ROUND_UPSCALE_LEARNED_67.variant === "box" && LS.ROUND_UPSCALE_LEARNED.round === 65 && LS.ROUND_UPSCALE_LEARNED_67.round === 67);
-    let bad = null; try { LS.upscaleRound(69); } catch (e) { bad = e.message; }
-    ok("  upscaleRound: 68 is round 68's, and 69 refused", LS.upscaleRound(68) === R && LS.upscaleRound(67) === LS.ROUND_UPSCALE_LEARNED_67 && /no round 69 -- 65, 67 or 68/.test(bad || ""));
+    let bad = null; try { LS.upscaleRound(66); } catch (e) { bad = e.message; }
+    ok("  upscaleRound: 68 is round 68's, and 66 refused (section 159 made 69 a round)", LS.upscaleRound(68) === R && LS.upscaleRound(67) === LS.ROUND_UPSCALE_LEARNED_67 && /no round 66/.test(bad || ""));
     const os = await import("node:os"), { openCache } = await imp("render/denoiseCache.mjs"), dir = fs.mkdtempSync(path.join(os.tmpdir(), "up68-"));
     const opt = { splits: mini, net, W: 32, sppIn: 2, sppRef: 4, seeds: [1, 2], train: { steps: 6, batch: 2, crop: 16 }, variant: "easu" };
     const c1 = openCache(dir, { t: 68 }), e1 = LS.runUpscaleTraining({ ...opt, cache: c1 }), c2 = openCache(dir, { t: 68 }), e2 = LS.runUpscaleTraining({ ...opt, cache: c2 });
@@ -228,6 +230,32 @@ console.log("\n8. SECTION 158: ROUND 68's COMMITTED HARVESTS, READ BACK -- U_E C
     ok("!! ...and H2 is therefore EASU against round 67's U: EASU beats it on the same 19 of 24, each scene's effect the same to 1e-9 -- round 67's U lost to EASU here (2.60e-3 against 2.35e-3)",
         pe.filter((d) => d > 0).length === 19 && pe.every((d, i) => Math.abs(d - pu[i]) < 1e-9) && Math.abs(mean(T.prior) - 2.5993e-3) < 5e-7 && Math.abs(mean(T.easu) - 2.3483e-3) < 5e-7,
         `round 67's U ${mean(T.prior).toExponential(4)}, EASU ${mean(T.easu).toExponential(4)}`);
+}
+
+console.log("\n9. ROUND 69 (section 159): U_R -- A HELD RESIDUAL ON EASU -- ON NEW TEST SCENES, H2 AGAINST ROUND 67'S U");
+{
+    const R = LS.ROUND_UPSCALE_LEARNED_69, S = D.SPLITS_UPSCALE_LEARNED_69, R8 = LS.ROUND_UPSCALE_LEARNED_68;
+    const old = new Set([D.SPLITS_UPSCALE_LEARNED, D.SPLITS_UPSCALE_LEARNED_67, D.SPLITS_UPSCALE_LEARNED_68].flatMap((x) => x.T1.seeds));
+    ok("!! ROUND_UPSCALE_LEARNED_69: round 68's training and validation scenes and samples, U_R's variant, 24 new test scenes (71000-71011 R, 72000-72011 C), round 67's net as H2's prior, its own two files",
+        S.train === D.SPLITS_UPSCALE_LEARNED.train && S.val === D.SPLITS_UPSCALE_LEARNED.val && R.splits === S && R.sppRef === 512 && R.sppRefTest === 2048 && R.variant === "residual" && R.round === 69 &&
+        S.T1.seeds.slice(0, 12).every((x, i) => x === 71000 + i && S.T1.families[i] === "R") && S.T1.seeds.slice(12).every((x, i) => x === 72000 + i && S.T1.families[12 + i] === "C") &&
+        S.T1.seeds.every((x) => D.isDatasetSeed(x) && !old.has(x)) && R.prior === "render/upscale-net-r67.json" && R.net === "render/upscale-net-r69.json" && R.results === "render/denoise-results-upscale-learned-r69.json" &&
+        ["image", "sppIn", "test", "c1Of", "c1Min", "seeds", "train"].every((k) => R[k] === R8[k]));
+    let bad = null; try { LS.upscaleRound(70); } catch (e) { bad = e.message; }
+    ok("  upscaleRound: 69 is round 69's, and 70 refused", LS.upscaleRound(69) === R && LS.upscaleRound(68) === R8 && /no round 70 -- 65, 67, 68 or 69/.test(bad || ""));
+    const opt = { splits: mini, net, W: 32, sppIn: 2, sppRef: 4, seeds: [1, 2], train: { steps: 6, batch: 2, crop: 16 }, variant: "residual" }, e1 = LS.runUpscaleTraining(opt);
+    ok("!! the training trains U_R for every seed and C2, and records the variant and its shape",
+        e1.runs.every((r) => U.isResidual(r.net)) && U.isResidual(e1.c2.net) && e1.config.variant === "residual" && e1.config.shape === U.UPR_SHAPE);
+    const Ur = e1.runs.find((r) => r.seed === e1.candidate).net, Up = tr.runs.find((r) => r.seed === tr.candidate).net;
+    const out = LS.runUpscaleTest({ splits: mini, net, U: Ur, Uc2: e1.c2.net, Uprior: Up, round: 69, W: 32, sppIn: 2, sppRef: 4, c1Min: 2 });
+    const ex = U.upscaleExample("R", 990934, net, { W: 32, H: 32, sppIn: 2, sppRef: 4, ref2: true }), r = U.learnedUpscale(Ur, ex.x, ex.half, ex.w, ex.h, ex.easuUp).w;
+    let sz = 0; for (const v of r) sz += Math.abs(U.UPR_SCALE * Math.tanh(v)) / r.length;
+    ok("!! the test grades U_R's chain bit for bit, and records P4's figure, each scene's mean |0.5 tanh r| -- no EASU weight, and none for a U",
+        Object.is(out.tables.U[0], LS.gradeDisplay(U.upscaleChain(Ur, ex), ex)) && Math.abs(out.secondary.residualSize[0] - sz) < 1e-15 && out.secondary.residualSize.length === 2 &&
+        out.secondary.easuWeight === undefined && LS.residualSize(Up, ex) === null && out.verdict.controls.C2.citedFrom === 69, `scene 1 ${out.secondary.residualSize[0]}`);
+    const cli = fs.readFileSync(path.join(ENG, "tools/denoiseStudy.mjs"), "utf8");
+    ok("  the commands take --round 69: the round's variant, prior and files ride on RD as round 68's did",
+        /harvest: true, variant: RD\.variant, cache,/.test(cli) && /Uprior, round: RD\.round, harvest: true, cache,/.test(cli) && /--round 67, 68 or 69/.test(cli));
 }
 
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)`);

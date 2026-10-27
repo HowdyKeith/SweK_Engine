@@ -27,7 +27,7 @@
 //       node tools/denoiseStudy.mjs --harvest-upscale-train     FSR4 round 65: U trained, the candidate chosen (section 148)
 //                                                  -> render/upscale-net-r65.json
 //       node tools/denoiseStudy.mjs --harvest-upscale-test      FSR4 round 65: the 24 test scenes -> render/denoise-results-upscale-learned.json
-//                                                  (either with --round 67 or 68 for sections 155 and 157, and --cache <dir> to resume)
+//                                                  (either with --round 67, 68 or 69 for sections 155, 157 and 159, and --cache <dir> to resume)
 //       node tools/denoiseStudy.mjs --harvest-r47  round 11 with the network 16 channels wide, the 32-channel one beside it (section 116) -> render/denoise-results-r47.json
 //       node tools/denoiseStudy.mjs --harvest-r11  one large network trained on families R and C together (section 32) -> render/denoise-results-r11.json
 //       node tools/denoiseStudy.mjs --secondary-r11  round 11 again, for section 32's secondary the first run skipped (section 33)

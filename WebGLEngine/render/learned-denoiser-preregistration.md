@@ -10347,3 +10347,65 @@ Offering EASU as a softmax choice cannot work as built: the per-pixel gradient o
 current mix, and that holds early everywhere. A further design would have to keep EASU out of the competition. For example, a
 residual added to EASU with its scale held, or a loss on where EASU is wrong. That would be a new round, and none is fixed
 here.
+
+## 159. FSR4 ROUND 69 -- A HELD RESIDUAL ON EASU: FIXED BEFORE ITS SCENES
+
+**Why.** Keith asked for section 158's residual design. Round 68's U_E could only choose between EASU and the half-size frame,
+and the choice collapsed onto EASU. U_R does not choose; it corrects. Its pixel is EASU's own, scaled per channel:
+
+**y = EASU · (1 + 0.5 tanh(r))**, r the network's 3-channel output.
+
+- **No attractor to fall into.** There is no softmax. At r = 0 the gradient on r is the loss's gradient times 0.5 · EASU, at full
+  strength. EASU is the start, not a choice that can win.
+- **Held.** The correction is at most half of EASU either way on each channel. It cannot run away, go negative, or add light where
+  EASU has none.
+- **It sees what it corrects.** Its input is U's twelve channels and EASU's three (UPR_CHANNELS 15).
+
+**The code was written before this section, and this section is fixed before any scene of round 69.** The order differs from
+earlier rounds because a Bash fault left me unable to run anything for a time and I wrote the code then. Its gate rows, in
+render/learnedUpscale-selfcheck.mjs section 6, hold:
+- an untrained U_R is EASU bit for bit;
+- any U_R stays within 0.5-1.5 times EASU;
+- its gradient matches central differences (worst 7.5e-8);
+- a crop gives the whole frame's loss and gradients;
+- 300 steps on synthetic frames beat EASU.
+
+**The network, U_R (render/learnedUpscale.mjs).** Three 3 x 3 layers of 32, then a 1 x 1 head of 3, its weights and biases zero.
+
+**A pilot (synthetic discs, textured, 300 steps, seeds 1-3).**
+- U_R beat EASU on every seed: 8.02e-3, 8.16e-3 and 7.85e-3 against EASU's 2.11e-2.
+- It beat round 67's box U on every seed (1.35e-2, 1.31e-2, 2.31e-2).
+- Its mean correction was 5.4-6.1 % of EASU.
+
+Round 68's pilot also looked good and full scale collapsed, so the pilot decides nothing.
+
+**Training, as round 68's.**
+- The same 200 + 20 scenes at 512 samples, seeds 1-3, the candidate chosen by validation, and C2's U_R on shuffled targets.
+- The results go to render/upscale-net-r69.json.
+
+**The test.**
+- **24 new scenes:** 12 R (71000-71011) and 12 C (72000-72011), against two 2048-sample references.
+- **H1:** U_R's chain beats EASU's.
+- **H2:** U_R's chain beats round 67's U.
+- Display space, the sign-flip test, Holm, and C1-C5 as before.
+- The results go to render/denoise-results-upscale-learned-r69.json, with each scene's mean |0.5 tanh r| (`residualSize`).
+
+**New, after round 68: the smallest effect worth reporting, fixed now.** H1's support counts as an improvement only if U_R's mean
+display relMSE is **at least 1 % below EASU's**. Round 68 was supported by a mean d of 3.6e-11, and section 158 had no rule to
+call that nothing. If the test supports H1 by less, the verdict says so and EASU stays.
+
+**Predictions, fixed now, deciding nothing.**
+- **P1:** C1 and C3 hold.
+- **P2:** H1 is supported, and the mean relMSE is 1-10 % below EASU's.
+  - The pilot's margin was far larger, but the path tracer's frames have far less for EASU to get wrong.
+  - Round 67's U came within 0.1 % of EASU.
+- **P3:** H2 is supported.
+- **P4:** the mean correction on the test scenes is between 0.5 % and 20 % of EASU. It must not be at zero (a collapse) and
+  not near the hold (saturating).
+
+**The run.** On Keith's rig, as round 68's:
+- `--harvest-upscale-train --round 69`;
+- commit the training file;
+- `--harvest-upscale-test --round 69` at that commit.
+
+Section 160 is the verdict.

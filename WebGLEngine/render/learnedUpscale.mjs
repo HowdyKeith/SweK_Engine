@@ -41,16 +41,37 @@ export const UPE_TAPS = UP_TAPS + 1, UPE_EASU_BIAS = -8;
 export const UPE_SHAPE = Object.freeze([Object.freeze([UP_CHANNELS, 32, "relu"]), Object.freeze([32, 32, "relu"]), Object.freeze([32, 32, "relu"]), Object.freeze([32, UPE_TAPS, "none", 1])]);
 /** The two designs' start: "box" (round 65/67's U, the head zero) or "easu" (U_E: the head zero, so the sixteen start as the box, and EASU's
  * logit biased -8, offered rather than imposed -- section 157 found a start at EASU never left it). */
-export const UP_VARIANTS = Object.freeze(["box", "easu"]);
+export const UP_VARIANTS = Object.freeze(["box", "easu", "residual"]);
+
+// ---- ROUND 69: U_R, a held residual on EASU ----------------------------------------------------------------------------------
+/** U_R's input: U's twelve channels and EASU's light-free output at the pixel (12-14). */
+export const UPR_CHANNELS = UP_CHANNELS + 3;
+/** U_R's correction's hold: each channel of EASU's output is scaled by 1 + UPR_SCALE tanh(r), so by 0.5 to 1.5 at most. */
+export const UPR_SCALE = 0.5;
+/** Three 3 x 3 layers of 32, then the 3-channel residual head as 1 x 1. */
+export const UPR_SHAPE = Object.freeze([Object.freeze([UPR_CHANNELS, 32, "relu"]), Object.freeze([32, 32, "relu"]), Object.freeze([32, 32, "relu"]), Object.freeze([32, 3, "none", 1])]);
+/** Whether a net is U_R: a 15-channel input and a 3-channel head. */
+export const isResidual = (net) => net.layers[0].Cin === UPR_CHANNELS && net.layers[net.layers.length - 1].Cout === 3;
+/** U_R's input: the 12 channels of `x` (W x H) with `easuUp` appended. */
+export function residualInput(x, easuUp, W, H) {
+    const n = W * H, out = new Float64Array(n * UPR_CHANNELS);
+    for (let p = 0; p < n; p++) { for (let c = 0; c < UP_CHANNELS; c++) out[p * UPR_CHANNELS + c] = x[p * UP_CHANNELS + c]; for (let c = 0; c < 3; c++) out[p * UPR_CHANNELS + UP_CHANNELS + c] = easuUp[p * 3 + c]; }
+    return out;
+}
+// U_R's pixel from its residual r: EASU's times 1 + S tanh(r), and its derivative in r
+const resY = (e, r, S) => e * (1 + S * Math.tanh(r)), resDY = (e, r, S) => { const t = Math.tanh(r); return e * S * (1 - t * t); };
+
 function initVariant(rand, variant, easuBias = UPE_EASU_BIAS) {
-    if (!UP_VARIANTS.includes(variant)) throw new Error(`learnedUpscale: the variant is "box" or "easu" -- got ${JSON.stringify(variant)}`);
-    const net = initNet(variant === "easu" ? UPE_SHAPE : UP_SHAPE, rand), last = net.layers[net.layers.length - 1];
+    if (!UP_VARIANTS.includes(variant)) throw new Error(`learnedUpscale: the variant is "box", "easu" or "residual" -- got ${JSON.stringify(variant)}`);
+    const net = initNet(variant === "easu" ? UPE_SHAPE : variant === "residual" ? UPR_SHAPE : UP_SHAPE, rand), last = net.layers[net.layers.length - 1];
     last.W.fill(0);
     if (variant === "easu") last.b[UP_TAPS] = easuBias;
     return net;
 }
 /** A fresh U_E from a seed: its untrained pixel is round 67's box start, with e^-8 / (16 + e^-8) = 2.1e-5 of it on EASU. */
 export const makeUpscalerE = (seed) => initVariant(seededRandom(seed), "easu");
+/** A fresh U_R from a seed: the head zero, so its untrained pixel is EASU's exactly. */
+export const makeUpscalerR = (seed) => initVariant(seededRandom(seed), "residual");
 /** A net's tap count: 16 for U, 17 for U_E. */
 export const tapsOf = (net) => net.layers[net.layers.length - 1].Cout;
 
@@ -84,7 +105,14 @@ export function upscaleInput(half, w, h, albedo, normal, depth) {
  * U applied: the softmax of each pixel's logits over its 4 x 4 taps -- and, for U_E, EASU's light-free pixel (`easuUp`, W x H x 3)
  * as a 17th -- and the weighted sum. { y (W x H x 3), w (weights, W x H x the net's taps), acts }.
  */
-export function learnedUpscale(net, x, half, w, h, easuUp = null) {
+export function learnedUpscale(net, x, half, w, h, easuUp = null, S = UPR_SCALE) {
+    if (isResidual(net)) {
+        // U_R: { y, w: the residual r (W x H x 3), acts }
+        if (!easuUp) throw new Error("learnedUpscale: U_R corrects EASU's output -- pass easuUp");
+        const W = 2 * w, H = 2 * h, acts = netForward(net, residualInput(x, easuUp, W, H), H, W), r = acts[acts.length - 1], y = new Float64Array(W * H * 3);
+        for (let i = 0; i < y.length; i++) y[i] = resY(easuUp[i], r[i], S);
+        return { y, w: r, acts };
+    }
     const K = tapsOf(net);
     if (K === UPE_TAPS && !easuUp) throw new Error("learnedUpscale: U_E's 17th tap is EASU's output -- pass easuUp");
     const W = 2 * w, H = 2 * h, acts = netForward(net, x, H, W), z = acts[acts.length - 1], y = new Float64Array(W * H * 3), wt = new Float64Array(W * H * K);
@@ -107,6 +135,7 @@ const dToPerceptual = (v) => { const a = Math.max(v, T_FLOOR); return v <= 0 ? 0
  * and carried back through the transfer, the composite, the weighted sum and the softmax to the logits, then through the network.
  */
 export function upLossAndGrads(net, x, half, w, h, ref, cov, E, easuUp = null) {
+    if (isResidual(net)) return residualLoss(net, x, easuUp, 2 * w, 2 * h, ref, cov, E);
     const K = tapsOf(net), W = 2 * w, H = 2 * h, N = W * H * 3, { y, w: wt, acts } = learnedUpscale(net, x, half, w, h, easuUp);
     let loss = 0; const gY = new Float64Array(N);
     for (let p = 0; p < W * H; p++) for (let c = 0; c < 3; c++) {
@@ -121,6 +150,19 @@ export function upLossAndGrads(net, x, half, w, h, ref, cov, E, easuUp = null) {
         for (let t = 0; t < K; t++) { const src = t < UP_TAPS ? half : easuUp, q = t < UP_TAPS ? T[t] : p;
             g[t] = gY[p * 3] * src[q * 3] + gY[p * 3 + 1] * src[q * 3 + 1] + gY[p * 3 + 2] * src[q * 3 + 2]; s += wt[p * K + t] * g[t]; }
         for (let t = 0; t < K; t++) dz[p * K + t] = wt[p * K + t] * (g[t] - s);
+    }
+    return { loss: loss / N, ...netBackward(net, acts, H, W, dz) };
+}
+
+/** U_R's loss and gradients on a W x H frame (or crop): the composite's display-space relMSE, back through 1 + S tanh(r) to r and the network. */
+export function residualLoss(net, x, easuUp, W, H, ref, cov, E, S = UPR_SCALE) {
+    if (!easuUp) throw new Error("learnedUpscale: U_R corrects EASU's output -- pass easuUp");
+    const N = W * H * 3, acts = netForward(net, residualInput(x, easuUp, W, H), H, W), r = acts[acts.length - 1], dz = new Float64Array(N);
+    let loss = 0;
+    for (let p = 0; p < W * H; p++) for (let c = 0; c < 3; c++) {
+        const i = p * 3 + c, o = E[i] + (1 - cov[p]) * resY(easuUp[i], r[i], S), to = toPerceptual(o), tr = toPerceptual(ref[i]), den = tr * tr + REL_EPS, e = to - tr;
+        loss += e * e / den;
+        dz[i] = 2 * e / den / N * dToPerceptual(o) * (1 - cov[p]) * resDY(easuUp[i], r[i], S);
     }
     return { loss: loss / N, ...netBackward(net, acts, H, W, dz) };
 }
@@ -152,7 +194,7 @@ export function trainUpscaler(examples, { seed, steps = UP_TRAIN.steps, batch = 
     if (!Number.isInteger(seed)) throw new Error("learnedUpscale: training needs an integer seed");
     if (crop % 2 || examples.some((e) => 2 * e.w < crop || 2 * e.h < crop)) throw new Error(`learnedUpscale: an even crop no larger than every frame -- got ${crop}`);
     // round 68: the variant's start -- "box" draws round 65's weights from the stream exactly as before
-    if (variant === "easu" && examples.some((e) => !e.easuUp)) throw new Error("learnedUpscale: U_E trains on examples that carry easuUp");
+    if ((variant === "easu" || variant === "residual") && examples.some((e) => !e.easuUp)) throw new Error(`learnedUpscale: ${variant === "easu" ? "U_E" : "U_R"} trains on examples that carry easuUp`);
     const rand = seededRandom(seed), net = initVariant(rand, variant, easuBias), state = adamState(net), losses = [];
     for (let step = 0; step < steps; step++) {
         let loss = 0, acc = null;
@@ -174,6 +216,7 @@ export function trainUpscaler(examples, { seed, steps = UP_TRAIN.steps, batch = 
 /** One crop's loss and gradients, its taps read from the padded half-size frame upCrop gives (offset by its two-texel pad). */
 export function cropLoss(net, ex, cx, cy, size) {
     const C = upCrop(ex, cx, cy, size), W = size, H = size;
+    if (isResidual(net)) return residualLoss(net, C.x, C.easuUp, W, H, C.ref, C.cov, C.E);
     // the crop's own half frame, as a (size/2) x (size/2) image whose taps the network reads -- re-indexed into the padded copy
     const view = { half: C.half, w: C.hw, h: C.hw, off: C.pad };
     return upLossAndGradsAt(net, C.x, view, W, H, C.ref, C.cov, C.E, C.easuUp);
@@ -225,4 +268,4 @@ export function upscaleExample(family, seed, net, { harvest = false, W = 256, H 
              noisy: compositeEmitters(upscale(noisyHalf, w, h, W, H, "bilinear"), full) };
 }
 /** U's chain on an example: U in the upscale's place, composited as the others are. */
-export const upscaleChain = (net, ex) => compositeEmitters(learnedUpscale(net, ex.x, ex.half, ex.w, ex.h, tapsOf(net) === UPE_TAPS ? ex.easuUp : null).y, { cov: ex.cov, E: ex.E });
+export const upscaleChain = (net, ex) => compositeEmitters(learnedUpscale(net, ex.x, ex.half, ex.w, ex.h, tapsOf(net) === UPE_TAPS || isResidual(net) ? ex.easuUp : null).y, { cov: ex.cov, E: ex.E });
