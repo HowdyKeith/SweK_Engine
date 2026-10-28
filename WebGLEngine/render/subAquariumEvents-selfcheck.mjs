@@ -1,6 +1,6 @@
 // WebGLEngine/render/subAquariumEvents-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node render/subAquariumEvents-selfcheck.mjs      (~1 s)
+// Run: node render/subAquariumEvents-selfcheck.mjs      (~1.5 s)
 //
 // A SUB IN THE TANK CAN BE FLOODED OR TOLD TO SURFACE. render/subAquariumSim.mjs gained setEvent(id, "flood" | "sink" | "surface" | null) in v4901; this gate holds it:
 //   1  OFF BY DEFAULT   a tank where setEvent was never called, and one where it was called and undone before the first tick, swim to the bit; no event means `event` and `tank` are null in the snapshot
@@ -25,6 +25,8 @@
 //   time: the rows read `.needs.frac` of a null; they now read `(... || {})`) | Q5 the needs never advanced 2 | Q6 no refill trip, the plain pilot 1 | Q7 ending an event leaving the needs 2 | Q8 injure not applied 1 | Q9 the tank-scale crush depth ignored 3 | Q10 the chosen class never used (the default battery) 1 (0 THE FIRST TIME:
 //   every row used the default; the air-independent row now asks for its class by name). THE LIST LINE (render/needsView.mjs): V1 the charge not rounded 1 | V2 the exposed flag dropped 1 | V3 the trip never shown 1 | V4 a row with no needs given a line 1 | V5 unlimited shown as a percentage 1. THE PAGE: G1 the menu always starting a battery 1 |
 //   G2 injure hurting nothing 2 (this gate and the live row of brainPanel-selfcheck section 13) | G3 needsLine never written 2.
+// SECTION 12 (the pump and the repair, v4905), FOURTEEN, each in place on render/subAquariumSim.mjs, render/needsView.mjs or sub-aquarium.html and restored, every one red BY NAME: S1 setAux not clamped | S2 NaN kept | S3 no throw without needs (those three share the clamping row) | S4 aux not passed to stepNeeds 2 | S5 aux kept when the needs restart 1 | S6 snapshot pump always 0 1 | S7 `repairing` ignoring the depth 1 | S8 ignoring the speed 1 | S14 snapshot repair always 0 1 |
+//   S9 the line without the pump 1 | S10 the line always waiting 1 | S11 the page boxes inverted 1 | S12 the page never disabling them 1 | S13 the page boxes not following the snapshot 1. Four went 0 red the first time and each became a row: S7 and S8 (the wandering boat is fast AND deep, so each leg of the conjunction hid the other: the rows now set the state by hand), S14 (nothing read the repair back) and S5 (the clear in clearEvent and the one in setEvent each hid the other; the clearEvent one is deleted as unobservable, since a sub with no needs has no aux to see).
 // V16 and V17 went 0 red the first time: no row looked at the clock or at the starting level; the two rows in section 6 now do.
 "use strict";
 import fs from "node:fs";
@@ -197,6 +199,42 @@ console.log("\n11. NEEDS AND LIMITS IN THE TANK (v4904): a charge only the surfa
     ok("!! the page has the needs menu (off, battery, battery + snorkel, air-independent, unlimited), the injure button, starts the event with tank.setNeeds, hurts with tank.injure(selected, 0.2), and writes needsLine(s) before the other list lines", /id="needsSel"/.test(aqSrc) && /value="airIndependent"/.test(aqSrc) && /id="injureBtn"/.test(aqSrc) && /tank\.setNeeds\(selected, v\)/.test(aqSrc) && /tank\.injure\(selected, 0\.2\)/.test(aqSrc) && /needsLine\(s\) \|\| readout\(s\) \|\| lineFor\(s\)/.test(aqSrc) && /import \{ needsLine \} from "\/render\/needsView\.mjs"/.test(aqSrc) && /import \{ CLASSES as NEEDS_CLASSES \} from "\/physics\/mechanics\/subNeeds\.mjs"/.test(aqSrc) && /hasOwnProperty\.call\(NEEDS_CLASSES, v\)/.test(aqSrc));
     const t5 = A.createTank(); t5.sync([entry("a", { weights: Array.from(PSN.handWeights()) })]); t5.setSteer("a", 3, 1); let e5 = 0; try { t5.setNeeds("a", "battery"); } catch { e5++; }
     ok("  a steered sub is refused the needs (the event wraps the pilot it was started with), and nothing is left pending", e5 === 1 && snap(t5).event === null && snap(t5).needs === null && (t5.setSteer("a", null, 0), t5.setNeeds("a", "battery") === "needs"));
+}
+
+console.log("\n12. THE PUMP AND THE REPAIR (v4905): two numbers a page works on a sub that has needs");
+{
+    const N = await import("../physics/mechanics/subNeeds.mjs");
+    const mk = () => { const t = A.createTank(); t.sync([entry("a")]); run(t, 20); t.setNeeds("a", "battery"); return t; };
+    const t0 = mk(), n0 = snap(t0).needs;
+    ok("!! off by default: a fresh needs event has pump 0, repair 0 and repairing false in the snapshot", n0.pump === 0 && n0.repair === 0 && n0.repairing === false);
+    const r1 = t0.setAux("a", { pump: 7, repair: 0.5 }), r2 = t0.setAux("a", { pump: NaN, repair: -1 }), r3 = t0.setAux("a", null);
+    let e1 = 0; const tn = A.createTank(); tn.sync([entry("a")]); try { tn.setAux("a", { pump: 1 }); } catch (e) { if (/no needs/.test(String(e.message))) e1++; }
+    ok("!! setAux answers the clamped pair (7 -> 1, 0.5 stays; NaN and -1 -> 0; null -> 0, 0), an unknown id answers null, and a sub with no needs throws", r1.pump === 1 && r1.repair === 0.5 && r2.pump === 0 && r2.repair === 0 && r3.pump === 0 && r3.repair === 0 && t0.setAux("nobody", { pump: 1 }) === null && e1 === 1);
+    t0.setAux("a", { pump: 1, repair: 0 }); const sn = snap(t0).needs;
+    ok("  the snapshot carries what was asked (pump 1, repair 0)", sn.pump === 1 && sn.repair === 0);
+    // the pump bails and costs: two identical tanks, 3% flooding and a sound hull, one pumped for 20 s
+    const tp = mk(), tq = mk(); for (const t of [tp, tq]) { t.subs.get("a").needs.flood = 0.03; t.subs.get("a").needs.damage = 0; } tp.setAux("a", { pump: 1, repair: 0 }); run(tp, 20); run(tq, 20);
+    const fp = snap(tp).needs.flood, fq = snap(tq).needs.flood, ep = tp.subs.get("a").needs.energy, eq = tq.subs.get("a").needs.energy;
+    ok("!! the pump bails the flood and draws power: after 20 s a sound hull pumped from 3% flooding is below 0.5% while the unpumped twin still holds 3%, and the pumped boat has spent over 20 kJ more", fp < 0.005 && fq > 0.0299 && eq - ep > 20e3, `flood ${fp.toFixed(4)} against ${fq.toFixed(4)}, ${((eq - ep) / 1e3).toFixed(1)} kJ more`);
+    // the repair waits for the surface: while the boat is deeper than 1.5 m the damage never falls and the snapshot says it is not repairing
+    const tr = mk(); tr.injure("a", 0.1); tr.setAux("a", { pump: 0, repair: 1 }); let fell = 0, said = 0, seen = 0, prev = snap(tr).needs.damage;
+    for (let i = 0; i < 30 * 30; i++) { tr.step(1 / 30); const q = snap(tr), d = q.needs.damage; if (q.depth > 1.5) { seen++; if (d < prev - 1e-12) fell++; if (q.needs.repairing) said++; } prev = d; }
+    ok("!! the repair does nothing below a metre: over 30 s with the repair asked for, whenever the boat is deeper than 1.5 m the damage never falls and `repairing` is false", seen > 100 && fell === 0 && said === 0, `${seen} ticks deeper than 1.5 m`);
+    // ... and mends at the surface: the boat put at 0.3 m, stopped, loses REPAIR.rate x dt of damage in one tick
+    const ts = mk(); ts.injure("a", 0.5); ts.setAux("a", { pump: 0, repair: 1 }); const sb = ts.subs.get("a"); sb.state.pos[2] = -0.3; sb.state.vel[0] = sb.state.vel[1] = sb.state.vel[2] = 0; const d0 = sb.needs.damage, repairingNow = snap(ts).needs.repairing; ts.step(1 / 30);
+    const drop = d0 - sb.needs.damage;
+    ok("!! at 0.3 m and stopped the repair mends: `repairing` is true and one tick takes off about REPAIR.rate x dt (0.004 x 1/30) of the damage", repairingNow === true && drop > 0.5 * N.REPAIR.rate / 30 && drop < 1.5 * N.REPAIR.rate / 30, `${repairingNow} ${(drop * 1e6).toFixed(0)} per million, expected ${(N.REPAIR.rate / 30 * 1e6).toFixed(0)}`);
+    // `repairing` is the conjunction the model uses: within a metre AND nearly still. Each leg alone is not enough (the state is set and the snapshot read before any tick)
+    const tg = mk(); tg.setAux("a", { pump: 0, repair: 0.5 }); const gb = tg.subs.get("a"), rep = (z, v) => { gb.state.pos[2] = z; gb.state.vel[0] = v; gb.state.vel[1] = gb.state.vel[2] = 0; return snap(tg).needs.repairing; };
+    ok("!! `repairing` needs the surface AND a near stop: 0.3 m and still is true; 5 m and still is false; 0.3 m at 2 m/s is false; and the snapshot carries the repair asked for (0.5)", rep(-0.3, 0) === true && rep(-5, 0) === false && rep(-0.3, 2) === false && rep(-0.3, 0.4) === true && snap(tg).needs.repair === 0.5);
+    // starting the needs again (a restart, or after ending the event) finds them off
+    tp.setNeeds("a", "battery");
+    ok("  starting the needs again on a sub that had the pump and the repair on finds them off", snap(tp).needs.pump === 0 && snap(tp).needs.repair === 0 && tp.subs.get("a").aux === null);
+    // the list line and the page
+    const V = await import("./needsView.mjs"), pg = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "sub-aquarium.html"), "utf8");
+    const rw = (o) => ({ needs: { cls: "battery", frac: 0.5, watts: 1000, refilling: false, charging: false, exposed: false, strain: 0.1, damage: 0, flood: 0, collapseDepth: 60, ...o } });
+    ok("!! the list line adds ' · pump 100%' and ' · repair 50% (waits for the surface)' only when asked for, and drops the wait once the repair can work", /damage 0% · flood 0\.0% · pump 100% · repair 50% \(waits for the surface\)$/.test(V.needsLine(rw({ pump: 1, repair: 0.5, repairing: false }))) && /· repair 50%$/.test(V.needsLine(rw({ repair: 0.5, repairing: true }))) && !/pump|repair/.test(V.needsLine(rw({ pump: 0, repair: 0 }))));
+    ok("!! the page has a pump box and a repair box that call tank.setAux(selected, ...) and follow the selected sub's own state from the snapshot, disabled when it has no needs", /id="pumpChk"/.test(pg) && /id="repairChk"/.test(pg) && /tank\.setAux\(selected, \{ pump: \$\("pumpChk"\)\.checked \? 1 : 0, repair: \$\("repairChk"\)\.checked \? 1 : 0 \}\)/.test(pg) && /me\.needs\.pump > 0/.test(pg) && /me\.needs\.repair > 0/.test(pg) && /\.disabled = !on/.test(pg));
 }
 
 console.log(fails ? `\n${fails} FAIL` : "\nall checks pass");

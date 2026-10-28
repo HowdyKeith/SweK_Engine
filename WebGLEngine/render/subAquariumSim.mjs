@@ -165,6 +165,17 @@ export function createTank({ hull = "nominal", length = LENGTH, width = WIDTH } 
             if (!sub.needs) throw new Error("subAquariumSim.injure: the sub has no needs (start them with setNeeds)");
             sub.needs = N.injure(sub.needs, amount); return sub.needs.damage;
         },
+        /**
+         * v4905 -- work the flood pump and the repair on a sub that has needs: `aux` is { pump, repair }, each 0..1 (NaN, missing and negatives are 0; above 1 is 1), the same two numbers physics/mechanics/subNeeds.js stepNeeds takes. The pump
+         * draws power and bails the flood while the sub is shallower than the pump's head; the repair draws power and mends the hull only while the sub is within a metre of the surface and nearly still. Starting or ending any event clears them. Answers the clamped pair now;
+         * an unknown id answers null; a sub with no needs throws (start them with setNeeds).
+         */
+        setAux(id, aux) {
+            const sub = subs.get(id); if (!sub) return null;
+            if (!sub.needs) throw new Error("subAquariumSim.setAux: the sub has no needs (start them with setNeeds)");
+            const c = (v) => (Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 0), a = aux || {};
+            sub.aux = { pump: c(a.pump), repair: c(a.repair) }; return { ...sub.aux };
+        },
         /** A page's estimator pilot for an estimator event (fly-estimator, er-estimator): build(inner) -> pilot(state, target, current, aux), `inner` the sub's own pilot seen through a spy. Applies to events started AFTER the call. A bad name or builder throws and changes nothing. */
         registerEstimator(event, build) {
             if (!isEstimator(event)) throw new Error(`subAquariumSim.registerEstimator: an estimator event (${ESTIMATORS.join(", ")}), got ${JSON.stringify(event)}`);
@@ -186,7 +197,7 @@ export function createTank({ hull = "nominal", length = LENGTH, width = WIDTH } 
                 if (!sub.state.tank) { sub.eventModel = withTank(MODEL); sub.state = { ...sub.state, tank: { ...S.initialTank(sub.eventModel), level: sub.cmd ? Math.max(-1, Math.min(1, sub.cmd.ballast)) : 0 } }; }
             } else if (sub.state.tank) { const { tank, ...rest } = sub.state; sub.state = rest; sub.eventModel = MODEL; }   // a compass event has no tank
             else sub.eventModel = MODEL;
-            sub.event = ev; sub.eventT = 0; sub.holdDepth = -sub.state.pos[2]; sub.compass = null; sub.needsInfo = null;
+            sub.event = ev; sub.eventT = 0; sub.holdDepth = -sub.state.pos[2]; sub.compass = null; sub.needsInfo = null; sub.aux = null;
             if (ev === "needs") { sub.needs = sub.pendingNeeds || N.initialNeeds("battery", { crushDepth: NEEDS_CRUSH }); sub.pendingNeeds = null; } else sub.needs = null;
             sub.eventPilot = ev === "needs" ? NP.wrap(SP.wrap(sub.pilot, { model: sub.eventModel }), { read: () => N.readings(sub.eventModel, sub.needs, sub.state) }) : ev === "flood" ? (trimsOut(sub.eventModel) ? sub.pilot : EP.wrap(sub.pilot, RESCUE)) : ev === "surface" ? SP.wrap(sub.pilot, { model: sub.eventModel }) : isCompass(ev) ? compassPilot(sub, ev === "navigator" ? "nav" : ev === "dropout" ? "plain" : ev) : sub.pilot;
             return ev;
@@ -216,7 +227,7 @@ export function createTank({ hull = "nominal", length = LENGTH, width = WIDTH } 
                     const tg = ev === "surface" ? { ...t, surface: true } : ev === "flood" || ev === "sink" ? { ...t, depth: sub.holdDepth } : t;   // a flooded boat holds the depth it was at; a surfacing one is asked to surface
                     const cmd = (ev ? sub.eventPilot : sub.pilot)(s, tg, [0, 0, 0]);
                     let res;
-                    if (ev === "needs") { res = N.stepNeeds(model, s, sub.needs, cmd, dt, [0, 0, 0], 0); sub.needs = res.needs; sub.needsInfo = { watts: res.watts, charging: res.charging, exposed: res.exposed }; }
+                    if (ev === "needs") { res = N.stepNeeds(model, s, sub.needs, cmd, dt, [0, 0, 0], 0, sub.aux); sub.needs = res.needs; sub.needsInfo = { watts: res.watts, charging: res.charging, exposed: res.exposed }; }
                     else res = S.stepSub(model, s, cmd, dt, [0, 0, 0], ev === "flood" || ev === "sink" ? FL.leakAt({ leak: LEAK }, sub.eventT) : 0);
                     if (ev) sub.eventT += dt;
                     sub.cmd = { pitch: cmd.pitch, yaw: cmd.yaw, thrust: cmd.thrust, ballast: cmd.ballast };   // what the pilot asked for this tick: the page draws the fins from it
@@ -233,7 +244,7 @@ export function createTank({ hull = "nominal", length = LENGTH, width = WIDTH } 
         probe(id) { const sub = subs.get(id); return sub ? { id: sub.id, name: sub.name, kind: sub.weights ? "fly" : "autopilot", weights: sub.steerW || sub.weights, steer: sub.steer ? { ...sub.steer } : null, state: sub.state, target: sub.tgt || sub.target } : null; },
         /** What a page draws: one plain record per sub. */
         snapshot() {
-            return [...subs.values()].map((sub) => { const a = S.attitude(sub.state); return { hull: hullName, id: sub.id, name: sub.name, hue: sub.hue, pilot: sub.pilotKind, from: sub.from, local: sub.local, x: sub.state.pos[0], y: sub.state.pos[1], depth: a.depth, heading: a.heading, pitch: a.pitch, speed: a.speed, cmd: sub.cmd ? { ...sub.cmd } : { pitch: 0, yaw: 0, thrust: 0, ballast: 0 }, event: sub.event, steer: sub.steer ? { ...sub.steer } : null, needs: sub.needs ? { ...N.readings(sub.eventModel, sub.needs, sub.state), refilling: !!(sub.eventPilot && sub.eventPilot.refilling), watts: sub.needsInfo ? sub.needsInfo.watts : 0, charging: !!(sub.needsInfo && sub.needsInfo.charging) } : null, compass: sub.compass ? { ...sub.compass } : null, tank: sub.state.tank ? { level: sub.state.tank.level, air: sub.state.tank.air, airMax: sub.eventModel ? sub.eventModel.spec.airMax : null, released: sub.state.tank.released, blowing: !!(sub.cmd && sub.cmd.blow > 0.5) } : null, target: sub.target, lost: sub.lost, status: sub.status, trail: sub.trail.slice() }; });
+            return [...subs.values()].map((sub) => { const a = S.attitude(sub.state); return { hull: hullName, id: sub.id, name: sub.name, hue: sub.hue, pilot: sub.pilotKind, from: sub.from, local: sub.local, x: sub.state.pos[0], y: sub.state.pos[1], depth: a.depth, heading: a.heading, pitch: a.pitch, speed: a.speed, cmd: sub.cmd ? { ...sub.cmd } : { pitch: 0, yaw: 0, thrust: 0, ballast: 0 }, event: sub.event, steer: sub.steer ? { ...sub.steer } : null, needs: sub.needs ? { ...N.readings(sub.eventModel, sub.needs, sub.state), pump: sub.aux ? sub.aux.pump : 0, repair: sub.aux ? sub.aux.repair : 0, repairing: !!(sub.aux && sub.aux.repair > 0 && -sub.state.pos[2] <= N.REPAIR.maxDepth && Math.hypot(sub.state.vel[0], sub.state.vel[1], sub.state.vel[2]) <= N.REPAIR.maxSpeed), refilling: !!(sub.eventPilot && sub.eventPilot.refilling), watts: sub.needsInfo ? sub.needsInfo.watts : 0, charging: !!(sub.needsInfo && sub.needsInfo.charging) } : null, compass: sub.compass ? { ...sub.compass } : null, tank: sub.state.tank ? { level: sub.state.tank.level, air: sub.state.tank.air, airMax: sub.eventModel ? sub.eventModel.spec.airMax : null, released: sub.state.tank.released, blowing: !!(sub.cmd && sub.cmd.blow > 0.5) } : null, target: sub.target, lost: sub.lost, status: sub.status, trail: sub.trail.slice() }; });
         },
     };
 }
