@@ -184,12 +184,12 @@ sec("6. THE COMMAND");
     ok("!! the command file is three lines that import command from the library and set the exit code", /import \{ command \} from "\.\/advisorChipStudy\.mjs"/.test(cmdSrc) && /process\.exitCode = await command\(process\.argv\.slice\(2\)\)/.test(cmdSrc));
 }
 
-sec("7. THE DIVES (real flights, one dive per audit)");
+sec("7. THE DIVES (real flights, one BASELINE dive for each audit slot: the fresh audit seeds are not flown here)");
 {
-    const sets = Object.fromEntries(S.AUDITS.map((k, i) => [k, T.setOf(["far"], A.ADV_SEEDS[i][0], A.ADV_SEEDS[i][0])]));
+    const sets = Object.fromEntries(S.AUDITS.map((k, i) => [k, T.setOf(["far"], 501 + i, 501 + i)]));   // BASELINE seeds: the fresh audit seeds are not flown by this gate (see Round 4 Amendment 1 item 5)
     const cx = TR.loadCircuit(), rec = S.runCircuit({ family: "cx", index: 0 }, cx, { weights: null, hadChampion: false }, { sets });
     const flown = (f, k) => T.evaluate(f, sets[k], { gauge: T.GAUGE });
-    ok("!! the untrained circuit ALONE is GUARDED-OBS exactly (the Round 3 start identity, here through the study's own arms) on the three fresh dives", S.AUDITS.every((k) => rec.arms.ALONE[k].score === flown(T.GUARDED_OBS, k).score));
+    ok("!! the untrained circuit ALONE is GUARDED-OBS exactly (the Round 3 start identity, here through the study's own arms) on three baseline dives", S.AUDITS.every((k) => rec.arms.ALONE[k].score === flown(T.GUARDED_OBS, k).score));
     const vetoed = A.advisedPilot(T.ruleSeat("obs"), A.ADVISORS.GUARDED, "VETO"), staled = A.advisedPilot(T.ruleSeat("obs"), A.ADVISORS.GUARDED, "STALE");
     ok("!! the advised arms are the independently built pilots: GUARDED:VETO and GUARDED:STALE of the start equal GUARDED-OBS vetoed and staled by GUARDED built here, and the stats of the arm are recorded (at most 18,000 ticks a dive: a crushed boat ends its run early)", S.AUDITS.every((k) => rec.arms["GUARDED:VETO"][k].score === flown(vetoed, k).score && rec.arms["GUARDED:STALE"][k].score === flown(staled, k).score) && S.AUDITS.every((k) => rec.stats["GUARDED:VETO"][k].ticks > 0 && rec.stats["GUARDED:VETO"][k].ticks <= 18000 && (rec.stats.ALONE[k].surface || 0) === 0));
     const idn = S.identityChecks();
