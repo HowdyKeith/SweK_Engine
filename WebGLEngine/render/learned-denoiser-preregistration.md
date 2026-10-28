@@ -10515,5 +10515,11 @@ size at 4 samples on round 32's JITTER, references at the scene's eye.
 - the training file committed unread;
 - `--harvest-upscale-temporal-test` at that commit.
 
-A pilot on non-dataset scenes may run before the harvests. It decides nothing and is reported here if it does. Section 162 is
-the verdict.
+**A pilot, run after this section was fixed and before any scene of the round.** It changed nothing above.
+- **Setup:** 16 training and 8 test sequences of non-dataset scenes at 64 x 64, references at 256 samples, 400 steps.
+- **Result:** U_T beat Bt on 8, 7 and 7 of 8 for seeds 1-3. Mean relMSE 5.82e-3, 6.24e-3 and 5.84e-3, against Bt's 7.24e-3 (14-20 %
+  below). Mean corrections 6.6-8.1 %.
+- **Caveat:** at 64 x 64 the half-size frames are 32 x 32, and the denoiser does badly there. The noisy floor (6.64e-3) was BELOW
+  Bt, which a 256 x 256 round 32 never saw.
+
+Rounds 68 and 69 had good pilots too, so this decides nothing. Section 162 is the verdict.

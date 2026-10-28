@@ -959,8 +959,10 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // gates 2106 -> 2108, usesOk 2085 -> 2087, definesOk 2077 -> 2079, nameFirst 1975 -> 1977 (read off the code).
     // the live frame-generation view -- one new gate (render/frameGenLive-selfcheck.mjs), spelling ok(n, c, d):
     // gates 2108 -> 2109, usesOk 2087 -> 2088, definesOk 2079 -> 2080, nameFirst 1977 -> 1978 (read off the code).
-    gates: 2109, usesOk: 2088, definesOk: 2080, importsOk: 0,
-    distinctDefinitions: 46, nameFirst: 1978, condFirst: 99, unknownSignature: 11,
+    // FSR4 round 70 -- one new gate (render/learnedUpscaleTemporal-selfcheck.mjs), spelling ok(n, c, d):
+    // gates 2109 -> 2110, usesOk 2088 -> 2089, definesOk 2080 -> 2081, nameFirst 1978 -> 1979 (read off the code).
+    gates: 2110, usesOk: 2089, definesOk: 2081, importsOk: 0,
+    distinctDefinitions: 46, nameFirst: 1979, condFirst: 99, unknownSignature: 11,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([
