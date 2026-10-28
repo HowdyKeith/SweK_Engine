@@ -2637,9 +2637,17 @@ export const NEXT_ROUNDS = [
     {
         id: "needs-not-modelled",
         blocker: "OPEN",
-        what: "What the needs model STILL leaves out after v4905 (built then, opt-in through stepNeeds' aux: the flood pump, repair at the surface, the snorkel's exposure seconds as a reading, the ballast pump's electrical draw and a boat with no charge being unable to work the normal pump): a COMPRESSOR (the air bottle never refills; the survey task works around it with a six-level bottle), a charge cost for the exposure (it is a reading only; no task charges it), a pump whose power or rate varies with the pilot's choice beyond 0..1, and the aquarium PAGE's controls for the pump and repair (the sim's setNeeds/injure take no aux yet).",
-        how: "Each is a small addition to physics/mechanics/subNeeds.mjs or the aquarium with its own gate row and mutant: a compressor that refills `air` at the surface for watts; an exposure charge in the task's score (registered first); aquarium buttons that pass aux for a selected sub.",
+        what: "What the needs model STILL leaves out after v4905 (built then, opt-in through stepNeeds' aux: the flood pump, repair at the surface, the snorkel's exposure seconds as a reading, the ballast pump's electrical draw and a boat with no charge being unable to work the normal pump): a COMPRESSOR (the air bottle never refills; the survey task works around it with a six-level bottle), a charge cost for the exposure (it is a reading only; no task charges it), a pump whose power or rate varies with the pilot's choice beyond 0..1. (The aquarium PAGE's pump and repair boxes are BUILT, unshipped, after v4905: tank.setAux and two checkboxes, render/subAquariumEvents-selfcheck.mjs section 12.)",
+        how: "Each is a small addition to physics/mechanics/subNeeds.mjs with its own gate row and mutant: a compressor that refills `air` at the surface for watts; an exposure charge in the task's score (registered first).",
         why: "None is needed to show the charge, the pressure, the pump or the repair working; the compressor matters only to a task that surfaces more than a six-level bottle allows.",
+    },
+    {
+        id: "advisor-chip-guarded-first",
+        blocker: "OPEN",
+        what: "REGISTERED 2026-10-28, NOT BUILT: brain/NEEDS_AND_LIMITS.md \"Round 4\" (Keith: plug an AI model into the fish/fly brain as a smart or conscience chip). The socket is the seat interface; the first chip is the hand-written rule GUARDED (and GUARDED-FILTER for scale), combined by VETO (surface/pump/repair OR, cap min, infeasible station replaced), with the one-field arms and a 30-decision STALE content control, on FRESH audits 111-122, 131-142, 151-162. Asks whether any advisor helps a given brain, whether the real wiring gains more than its controls, whether the brain adds to the rule, and whether the content matters. Expectation recorded first: the chip's value tracks the champion's level, not the wiring (WIRING-CHIP PASS about 10 percent).",
+        how: "Needs Round 3's stage A result (brain/needsCircuitStageA.jsonl, 13 records) for the champions. Build brain/advisorChip.mjs, then tools/ship/advisorChipStudy.mjs with its gate, mutate both, then run (about 25 core-minutes) and read by Section 6. A language-model chip is a LATER round on the same socket with recorded decisions; its audit seeds 171-182, 191-202, 211-222 are reserved and read by nothing.",
+        why: "So the number every later chip is read against exists before a learned or language model is put in the socket, and so a chip that only repairs a weak brain is not mistaken for a brain that uses it well.",
+        upstream: "needs-pieces-3-and-4-task-and-stateful-pilot",
     },
     {
         id: "ai-managed-sub-stations",
