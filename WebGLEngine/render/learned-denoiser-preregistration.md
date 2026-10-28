@@ -10409,3 +10409,52 @@ call that nothing. If the test supports H1 by less, the verdict says so and EASU
 - `--harvest-upscale-test --round 69` at that commit.
 
 Section 160 is the verdict.
+
+## 160. FSR4 ROUND 69'S VERDICT -- REPORTED; H1 NOT SUPPORTED: U_R MOVED OFF EASU AND DID NOT BEAT IT
+
+**How it ran.** On Keith's rig, in section 159's order:
+- the training at 7a85a917;
+- its file committed unread (735cd305);
+- the test at 735cd305.
+
+The results file was shown to me when it was uploaded, before its commit (fff15384, byte for byte). Every number below is section
+159's test, re-derived by render/learnedUpscaleStudy-selfcheck.mjs section 10.
+
+**The training.** The seeds ended apart this time: validation 1.845e-3, 1.876e-3 and 1.837e-3. Round 68's three were the same
+to 3e-11. The candidate is seed 3.
+
+**The test, as fixed.**
+- C1, C3, C4, C5 held; C2 held (the shuffled U_R lost to EASU on all 24, mean d -3.18).
+- **H1, U_R against EASU: NOT SUPPORTED** -- 14 of 24, mean d +0.0067, sign-flip p 0.201.
+- **H2, U_R against round 67's U: supported** -- 15 of 24, p 0.0092 against Holm's 0.025, mean d +0.063.
+- **Section 159's 1 % rule:** U_R's mean display relMSE is 2.3120e-3 against EASU's 2.3107e-3, 0.06 % *above* it. The rule
+  is not met, and would not have been had H1 passed.
+
+**What it means.** The residual did what round 68 could not, and moved:
+- its mean correction is 0.92 % of EASU, from 0.19 % to 2.50 % by scene;
+- the seeds learned different corrections.
+
+On the test scenes those corrections helped as often as they hurt. Descriptively, U_R did a little better on C (8 of 12, mean d
++0.020) and a little worse on R (6 of 12, mean d -0.007); no hypothesis was fixed on that split. H2's edge over round 67's U is
+0.87 % of mean relMSE. On these scenes EASU itself beats round 67's U on 16 of 24.
+
+**The predictions.**
+- **P1 (C1 and C3 hold): held.**
+- **P2 (H1 supported, 1-10 % below EASU): MISSED.** It is 0.06 % above.
+- **P3 (H2 supported): held.**
+- **P4 (mean correction 0.5-20 %): held,** at 0.92 %.
+
+**What follows.** EASU stays the chain's upscale. Four FSR4 rounds have now been run on these 200 training scenes, each on new
+test scenes:
+
+| round | design | result |
+|---|---|---|
+| 65 | box start | not reported |
+| 67 | box start, a cleaner truth | a tie |
+| 68 | EASU offered | a collapse onto EASU |
+| 69 | a held residual | a learned correction that does not generalise past EASU |
+
+The validation loss fell below round 68's (1.837e-3 against 1.907e-3), and the test did not follow. A residual that fits the
+200 training scenes better than EASU, and the test scenes no better, points at the data more than the design. These scenes give
+EASU little to get wrong at a 2048-sample truth. More scenes, temporal input (FSR4's real input is a jittered history), or
+another loss would each be a new round. None is fixed here.

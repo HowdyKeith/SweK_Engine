@@ -22,6 +22,8 @@
 // V158h the decoded candidate's bound 0.999995 -> 1 red each. Each restored byte-identical.
 // SECTION 159: S1 round 69's R test seeds onto round 68's, S2 its variant easu, S3 the residual size without the hold, S4 the config's
 // shape U's, S5 round 69's net file round 68's -> 1 red each. Each restored byte-identical.
+// SECTION 160: V160a round 69's candidate typed 1, V160b H1's count typed 15, V160c the test's commit typed 7a85a917, V160d the 1 %
+// rule read as met, V160e the correction's mean typed 0.0092 to 1e-6 -> 1 red each. Each restored byte-identical.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -256,6 +258,32 @@ console.log("\n9. ROUND 69 (section 159): U_R -- A HELD RESIDUAL ON EASU -- ON N
     const cli = fs.readFileSync(path.join(ENG, "tools/denoiseStudy.mjs"), "utf8");
     ok("  the commands take --round 69: the round's variant, prior and files ride on RD as round 68's did",
         /harvest: true, variant: RD\.variant, cache,/.test(cli) && /Uprior, round: RD\.round, harvest: true, cache,/.test(cli) && /--round 67, 68 or 69/.test(cli));
+}
+
+console.log("\n10. SECTION 160: ROUND 69's COMMITTED HARVESTS, READ BACK -- U_R MOVED, AND DID NOT BEAT EASU");
+{
+    const R = LS.ROUND_UPSCALE_LEARNED_69, tr = JSON.parse(fs.readFileSync(path.join(ENG, R.net), "utf8")), res = JSON.parse(fs.readFileSync(path.join(ENG, R.results), "utf8")), T = res.tables;
+    const vals = tr.runs.map((r) => r.valMean), mean = (a) => a.reduce((q, v) => q + v, 0) / a.length;
+    ok("!! round 69's training file: U_R (variant residual), 512-sample targets, the candidate seed 3 with the lowest validation loss (1.837e-3), at 7a85a917 -- the seeds apart this time (1.845e-3, 1.876e-3)",
+        tr.round === 69 && tr.config.variant === "residual" && tr.config.sppRef === 512 && tr.candidate === 3 && tr.commit === "7a85a917" && tr.runs.length === 3 &&
+        tr.runs.find((r) => r.seed === 3).valMean === Math.min(...vals) && Math.abs(vals[2] - 1.8368e-3) < 5e-8 && (Math.max(...vals) - Math.min(...vals)) / Math.min(...vals) > 0.01 && tr.c2.seed === 3);
+    const { verdict } = await imp("render/denoiseStats.mjs");
+    const again = verdict({ sets: { H1: { noisy: T.noisy, filter: T.easu, net: [T.U], floor: T.floor }, H2: { noisy: T.noisy, filter: T.prior, net: [T.U], floor: T.floor } }, shuffled: null,
+        c2Prior: { round: 69, meanD: res.verdict.controls.C2.meanD, ok: res.verdict.controls.C2.ok }, determinism: res.determinism, seedsDistinct: true, test: "signflip", c1Of: "candidate", c1Min: 22 });
+    const H1 = again.hypotheses.H1, H2 = again.hypotheses.H2;
+    ok("!! *** section 160: verdict() over the committed tables gives the file's verdict -- REPORTED, every control held, H1 NOT SUPPORTED (14 of 24, p 0.201), H2 supported (15 of 24, p 0.0092) ***",
+        again.run === "reported" && res.verdict.run === "reported" && H1.status === "not supported" && H2.status === "supported" && H1.k === 14 && H2.k === 15 &&
+        Math.abs(H1.p - 0.2008931040763855) < 1e-12 && Math.abs(H2.p - 0.009198546409606934) < 1e-12 && H1.c1.netWins === 24 && H1.c3.nearFloor === 0 && res.verdict.controls.C2.ok === true &&
+        res.round === 69 && res.commit === "735cd305" && res.trained.candidate === 3 && res.trained.commit === "7a85a917" && res.prior.commit === "dd00f88b",
+        `H1 ${H1.k}/24 p ${H1.p.toFixed(4)}; H2 ${H2.k}/24 p ${H2.p.toFixed(4)}`);
+    const below = 1 - mean(T.U) / mean(T.easu);
+    ok("!! ...and section 159's 1 % rule is not met either way: U_R's mean display relMSE 2.3120e-3 against EASU's 2.3107e-3, 0.06 % ABOVE it -- EASU stays",
+        below < 0 && below > -0.001 && Math.abs(mean(T.U) - 2.3120e-3) < 5e-8 && Math.abs(mean(T.easu) - 2.3107e-3) < 5e-8, `${(100 * below).toFixed(3)} % below EASU`);
+    const z = res.secondary.residualSize;
+    ok("!! ...though U_R did not collapse: its mean correction 0.92 % of EASU (0.19-2.50 % by scene) -- P4 (0.5-20 %) held, and the training moved it, unlike round 68",
+        z.length === 24 && Math.abs(mean(z) - 0.009215) < 1e-5 && Math.min(...z) > 0.0019 && Math.max(...z) < 0.0251, `mean ${(100 * mean(z)).toFixed(2)} %`);
+    ok("  H2 is a small edge over round 67's U (0.87 % lower mean relMSE), not over EASU: EASU itself beats that U on 16 of 24 here",
+        Math.abs(1 - mean(T.U) / mean(T.prior) - 0.0087) < 5e-4 && T.prior.filter((v, i) => v > T.easu[i]).length === 16);
 }
 
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)`);
