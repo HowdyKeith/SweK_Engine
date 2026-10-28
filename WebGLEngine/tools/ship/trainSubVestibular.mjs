@@ -35,9 +35,10 @@ export const RUNG = Object.freeze({ P: 1, E: 0 });
 export const FAMILIES = Object.freeze(["er", "class", "degree", "count", "tuning"]), VERDICT_FAMILIES = Object.freeze(["er", "class", "degree"]);
 export const CONTROL_BASE = Object.freeze({ er: 1000, class: 2000, degree: 3000, count: 4000, tuning: 5000 });
 export const VERDICT_CELLS = Object.freeze([["P", "B"], ["P", "whole"], ["E", "E"], ["E", "whole"]]), CROSS_CELLS = Object.freeze([["P", "E"], ["E", "B"]]);
+export const DENSE_FAMILIES = Object.freeze(["dcx", "dnostate"]), DENSE_CELL = "P/whole";   // Addendum 8: 4b-D exists on the whole arm of 4b-P only, reported and not judged, with no controls
 export const ALIGNED = Object.freeze({ P: "B", E: "E" }), CROSS_OF = Object.freeze({ P: "E", E: "B" });
 export const STAGE_A_CELL = "cx,nostate,er:0-9,class:0-9,degree:0-9,count:0-3,tuning:0-3", STAGE_B_CELL = "er:10-19,class:10-19,degree:10-19";
-export const STAGE_A = [...VERDICT_CELLS.map(([t, a]) => STAGE_A_CELL.split(",").map((x) => `${t}/${a}/${x}`).join(",")), ...CROSS_CELLS.map(([t, a]) => `${t}/${a}/cx`)].join(",");
+export const STAGE_A = [...VERDICT_CELLS.map(([t, a]) => STAGE_A_CELL.split(",").map((x) => `${t}/${a}/${x}`).join(",")), ...CROSS_CELLS.map(([t, a]) => `${t}/${a}/cx`), ...DENSE_FAMILIES.map((f) => `${DENSE_CELL}/${f}`)].join(",");
 export const AUDITS = Object.freeze(["a1", "a2", "a3"]);
 /** The fresh audit blocks, written in Addendum 7 BEFORE any training and read by nothing else in the tree: 4b-P, three blocks of 10 seeds x 3 kinds (30 dives each); 4b-E, three blocks of 8 nominal seeds x 2 sides x 2 launch times (32 dives each). */
 export const AUDIT_SEEDS = Object.freeze({ P: Object.freeze([[81001, 81010], [81011, 81020], [81021, 81030]]), E: Object.freeze([[82001, 82008], [82009, 82016], [82017, 82024]]) });
@@ -83,7 +84,7 @@ export function parseSpecs(text) {
     const out = [], seen = new Set();
     for (const raw of String(text).split(",")) {
         const part = raw.trim(); if (!part) throw new Error(`trainSubVestibular.parseSpecs: an empty spec in ${JSON.stringify(text)}`);
-        const m = /^([A-Za-z]+)\/([A-Za-z]+)\/(cx|nostate|[a-z]+:\d+(?:-\d+)?)$/.exec(part);
+        const m = /^([A-Za-z]+)\/([A-Za-z]+)\/(cx|nostate|dcx|dnostate|[a-z]+:\d+(?:-\d+)?)$/.exec(part);
         if (!m) throw new Error(`trainSubVestibular.parseSpecs: cannot read ${JSON.stringify(part)} (a spec is task/arm/cx, task/arm/nostate or task/arm/family:K or family:K-L)`);
         const [, task, arm, fam] = m;
         if (!TASK_NAMES.includes(task)) throw new Error(`trainSubVestibular.parseSpecs: unknown task ${JSON.stringify(task)} (${TASK_NAMES.join(", ")})`);
@@ -93,6 +94,7 @@ export function parseSpecs(text) {
             if (cell === "cross" && family !== "cx") throw new Error(`trainSubVestibular.parseSpecs: the cross cell ${task}/${arm} is cx only, not ${family}`);
             const name = specName({ task, arm, family, index }); if (seen.has(name)) throw new Error(`trainSubVestibular.parseSpecs: ${name} is named twice`); seen.add(name); out.push({ task, arm, family, index });
         };
+        if (DENSE_FAMILIES.includes(fam)) { if (`${task}/${arm}` !== DENSE_CELL) throw new Error(`trainSubVestibular.parseSpecs: ${fam} (4b-D) exists on ${DENSE_CELL} only, not ${task}/${arm}`); add(fam, 0); continue; }
         if (fam === "cx" || fam === "nostate") { add(fam, 0); continue; }
         const q = /^([a-z]+):(\d+)(?:-(\d+))?$/.exec(fam);
         if (!FAMILIES.includes(q[1])) throw new Error(`trainSubVestibular.parseSpecs: unknown family ${JSON.stringify(q[1])} (known: cx, nostate, ${FAMILIES.join(", ")})`);
@@ -103,18 +105,18 @@ export function parseSpecs(text) {
     }
     return out;
 }
-export const specName = (s) => `${s.task}/${s.arm}/${s.family === "cx" || s.family === "nostate" ? s.family : `${s.family}:${s.index}`}`;
+export const specName = (s) => `${s.task}/${s.arm}/${s.family === "cx" || s.family === "nostate" || DENSE_FAMILIES.includes(s.family) ? s.family : `${s.family}:${s.index}`}`;
 const FAM_SLOT = Object.freeze({ cx: 0, nostate: 1, er: 2, class: 22, degree: 42, count: 62, tuning: 82 }), CELL_SLOTS = 102;
 const CELL_ORDER = Object.freeze([...VERDICT_CELLS, ...CROSS_CELLS].map((c) => c.join("/")));
 /** Where a spec sits in the fixed order (the six cells, then cx, nostate, er 0-19, class 0-19, degree 0-19, count 0-19, tuning 0-19): the first search seed is SEARCH_BASE + 10 x that. */
-export const ordinalOf = (s) => CELL_ORDER.indexOf(`${s.task}/${s.arm}`) * CELL_SLOTS + FAM_SLOT[s.family] + s.index;
+export const ordinalOf = (s) => (DENSE_FAMILIES.includes(s.family) ? CELL_ORDER.length * CELL_SLOTS + DENSE_FAMILIES.indexOf(s.family) : CELL_ORDER.indexOf(`${s.task}/${s.arm}`) * CELL_SLOTS + FAM_SLOT[s.family] + s.index);
 export const seedBaseOf = (s) => SEARCH_BASE + 10 * ordinalOf(s);
 let EXTRACTION = null;
 export const extraction = () => EXTRACTION || (EXTRACTION = F.extract());
 export const armCircuit = (arm) => V.circuitOf(extraction(), arm);
 export const circuitFor = (spec, x = extraction()) => { const base = V.circuitOf(x, spec.arm); return VERDICT_FAMILIES.includes(spec.family) || spec.family === "count" || spec.family === "tuning" ? V.CONTROLS[spec.family](base, CONTROL_BASE[spec.family] + spec.index) : base; };
 /** The policy of a spec on its task: the task's evaluator is the seam, the scales are the task's. */
-export const policyOf = (spec, scales, circuit = circuitFor(spec)) => V.createVestibularPolicy(circuit, specName(spec), { persist: spec.family !== "nostate", scales, evaluate: (pilot, set) => evalDives(pilot, set) });
+export const policyOf = (spec, scales, circuit = circuitFor(spec)) => V.createVestibularPolicy(circuit, specName(spec), { persist: spec.family !== "nostate" && spec.family !== "dnostate", dense: DENSE_FAMILIES.includes(spec.family), scales, evaluate: (pilot, set) => evalDives(pilot, set) });
 
 // ---- one search and one circuit -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 /** One search of the recipe from the start weights; returns { k, seed, weights, trainScore, improved, neutral, moved, kept, pruneEvals }. */
@@ -171,7 +173,8 @@ export function refsRecord(task, opts = {}) {
         const rs = H.REFLEXES.map((R) => ({ name: R.name, score: meanOf(dives.map((d) => H.run(H.reflex(AP, R), d.sc, { disturb: H.hazardDisturbance(d, RUNG.E) }).score)) }));
         const best = rs.reduce((a, b) => (b.score > a.score ? b : a)); rec.reflex = { best: best.name, recovered: cost > 0 ? (best.score - base.score) / cost : NaN };
     }
-    rec.startCheck = ARM_NAMES.map((arm) => { const Pol = mkPolicy({ task, arm, family: "cx", index: 0 }, scales), hand = Pol.handWeights(), probe = sets.train.slice(0, 4), a = Pol.evaluate(hand, probe), b = evalDives(AP, probe); return { arm, same: a.score === b.score || Math.abs(a.score - b.score) < 1e-9 }; });
+    const starts = [...ARM_NAMES.map((arm) => ({ arm, family: "cx" })), ...(task === "P" ? [{ arm: "whole", family: "dcx", label: "whole-dense" }] : [])];
+    rec.startCheck = starts.map(({ arm, family, label }) => { const Pol = mkPolicy({ task, arm, family, index: 0 }, scales), hand = Pol.handWeights(), probe = sets.train.slice(0, 4), a = Pol.evaluate(hand, probe), b = evalDives(AP, probe); return { arm: label || arm, same: a.score === b.score || Math.abs(a.score - b.score) < 1e-9 }; });
     return rec;
 }
 
@@ -212,6 +215,14 @@ export function cellVerdict(recs, refs) {
     const reachRows = recs.filter((r) => ["cx", ...VERDICT_FAMILIES].includes(r.family)), reach = reachRows.length >= 3 ? AUDITS.map((a) => ({ audit: a, rho: spearman(reachRows.map((r) => r.reach), reachRows.map((r) => eff(r)[a].score)) })) : null;
     return { cx, wiring, autopilot, memory, families, strongest, reach };
 }
+/** 4b-D (Addendum 8), REPORTED AND NOT JUDGED: the dense-input variant on P/whole against the autopilot, against the tuning-derived P/whole cx and against its own NO STATE, per audit. null with no dcx record. */
+export function denseReading(recs, refs, cxCell) {
+    const d = recs.find((r) => r.family === "dcx");
+    if (!d || !refs) return null;
+    const F_ = effectiveOf(d, refs), ns = recs.find((r) => r.family === "dnostate"), cx = cxCell && cxCell.cx ? effectiveOf(cxCell.cx, refs) : null;
+    const against = (other) => AUDITS.map((a) => ({ audit: a, ...beats(F_[a].score, [other[a].score]) }));
+    return { rec: d, scores: F_, autopilot: AUDITS.map((a) => ({ audit: a, diff: F_[a].score - refs.autopilot[a].score })), vsCx: cx ? against(cx) : null, vsNoState: ns ? against(effectiveOf(ns, refs)) : null };
+}
 /** The two-pathway claim from the four verdict cells' verdicts and the two cross cells' cx records: { holds, rows, passed }. */
 export function pathwayClaim(cells, crossRecs, refsByTask) {
     const rows = []; let holds = true;
@@ -231,8 +242,8 @@ export function verdictOf(records) {
     const refsByTask = Object.fromEntries(records.filter((r) => r.family === "refs").map((r) => [r.task, r])), cellsRecs = byCell(records), cells = {}, crossRecs = {};
     for (const [t, a] of VERDICT_CELLS) { const k = `${t}/${a}`; if (cellsRecs[k]) cells[k] = cellVerdict(cellsRecs[k], refsByTask[t]); }
     for (const [t, a] of CROSS_CELLS) { const k = `${t}/${a}`, c = (cellsRecs[k] || []).find((r) => r.family === "cx"); if (c) crossRecs[k] = c; }
-    const checks = Object.fromEntries(TASK_NAMES.filter((t) => refsByTask[t]).map((t) => [t, checksOf(refsByTask[t])])), claim = pathwayClaim(cells, crossRecs, refsByTask);
-    return { checks, cells, claim, passed: Object.values(cells).filter((c) => c.wiring.verdict === "PASS").length, assessed: Object.values(cells).filter((c) => c.wiring.verdict !== "NOT ASSESSED").length, refsByTask };
+    const checks = Object.fromEntries(TASK_NAMES.filter((t) => refsByTask[t]).map((t) => [t, checksOf(refsByTask[t])])), claim = pathwayClaim(cells, crossRecs, refsByTask), dense = denseReading(cellsRecs[DENSE_CELL] || [], refsByTask.P, cells[DENSE_CELL]);
+    return { checks, cells, claim, dense, passed: Object.values(cells).filter((c) => c.wiring.verdict === "PASS").length, assessed: Object.values(cells).filter((c) => c.wiring.verdict !== "NOT ASSESSED").length, refsByTask };
 }
 export function reportLines(records) {
     const v = verdictOf(records), L = [], rs = records.filter((r) => r.family !== "refs");
@@ -248,6 +259,12 @@ export function reportLines(records) {
         if (c.reach) L.push(`    reach (pairs) vs score across cx and the verdict controls, rank correlation: ${c.reach.map((x) => `${x.audit} ${x.rho === null ? "n/a" : x.rho.toFixed(2)}`).join(" | ")}${c.wiring.verdict === "PASS" && c.reach.some((x) => x.rho !== null && x.rho > 0.5) ? " -- A PASS READ AS CONFOUNDED BY REACH" : ""}`);
         L.push(`    WIRING VERDICT ${k}: ${checkOk ? c.wiring.verdict : "NOT READ (a check failed)"} -- ${c.wiring.why}`);
         if (c.autopilot) L.push(`    AUTOPILOT VERDICT ${k}: ${c.autopilot.verdict} -- ${c.autopilot.rows.map((x) => `${x.audit} ${x.diff >= 0 ? "+" : ""}${f3(x.diff)} (needs ${f3(x.needs)}; early ${x.early} against ${x.apEarly})`).join(" | ")}`);
+    }
+    if (v.dense) {
+        const d = v.dense, w = (rows) => rows.map((x) => `${f3(x.margin)} (needs ${f3(x.needs)}: ${x.wins ? "ahead" : "not ahead"})`).join(" | ");
+        L.push(`  4b-D on ${DENSE_CELL} (REPORTED, NOT JUDGED, no controls): ${d.rec.asStart ? "NO ELIGIBLE CHAMPION (scored as its start, the autopilot)" : `champion seed ${d.rec.champion}, lambda ${f3(d.rec.movement.lambda)}`} | ${AUDITS.map((x) => `${x} ${f3(d.scores[x].score)}`).join(" | ")}; against the autopilot ${d.autopilot.map((x) => (x.diff >= 0 ? "+" : "") + f3(x.diff)).join(" | ")}`);
+        if (d.vsCx) L.push(`    against the tuning-derived ${DENSE_CELL} cx (does the data's tilt encoding buy anything over a dense trained input?): ${w(d.vsCx)}`);
+        if (d.vsNoState) L.push(`    against its own NO STATE: ${w(d.vsNoState)}`);
     }
     for (const r of v.claim.rows) L.push(`  TWO-PATHWAY ${r.task}: ${r.status}${r.audits ? ` -- aligned ${r.aligned} ${r.alignedPasses ? "PASSES" : "does not pass"}; beats cross ${r.cross} on ${r.crossWins} of 3 audits (${r.audits.map((x) => `${f3(x.diff)} needs ${f3(x.needs)}`).join(" | ")})` : ` -- ${r.why}`}`);
     L.push(`RUNG 4b: ${v.passed} of ${v.assessed} assessed verdict cells PASSED (a pass in one of four is "one of four", not "the wiring works")`);

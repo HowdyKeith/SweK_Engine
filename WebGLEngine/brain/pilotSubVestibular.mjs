@@ -13,6 +13,7 @@
 //           the state is reset whenever the target object changes (a new dive, as tools/subDisturb.mjs detects one). NO STATE (`persist: false`) is lambda fixed at 0 and has no weight slot.
 //   mirror  the tables are the RIGHT side only, so the pilot is a MIRRORED PAIR: the left copy has the SAME weights (tied) and the cosine (lateral) input terms sign-flipped; the two readouts are summed, yaw odd under the mirror
 //           (the left copy's yaw is negated) and pitch, thrust and ballast even
+//   4b-D    (option `dense`) the variant of Addendum 8: afferent i is driven by the 14 features through 14 trained weights (1,176 for the whole arm) instead of the tuning angle; the mirror flips the lateral features (headingErr, yawRate, beta, bank); the rest is unchanged
 //   readout the four controls read ALL the central cells of the arm (dense, trainable, from zero) plus four biases
 //   weights [ edge magnitudes: E ][ biases: inputs + cells ][ W_out: 4 x cells ][ b_out: 4 ][ lambda: 1, only with a state ]    (E arm: 31 + 30 + 20 + 4 = 85, and lambda = 86; the registration's 85 did not count lambda)
 //
@@ -27,8 +28,10 @@ import * as T from "./subTask.mjs";
 import { FEATURES, OUTPUTS, features, mulberry } from "./pilotSubPolicy.mjs";
 
 export { FEATURES, OUTPUTS };
-export const INIT = Object.freeze({ seed: 4711, recScale: 0.3, bias: 0, lambda0: 0.99 });
+export const INIT = Object.freeze({ seed: 4711, recScale: 0.3, bias: 0, lambda0: 0.99, inScale: 0.2 });
 export const ARMS = Object.freeze(["whole", "B", "E"]);
+/** The lateral features among the 14 (headingErr, yawRate, beta, bank): odd under the mirror in the dense variant. */
+export const LATERAL = Object.freeze([4, 5, 6, 11]);
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 const fin = (v) => (Number.isFinite(v) ? v : 0);
 const gauss = (rng) => { let u = 0, v = 0; while (!u) u = rng(); while (!v) v = rng(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
@@ -136,9 +139,9 @@ export function driveOf(a, sensed, scales, mirror = false) {
  * `init`. Returns the contract of brain/pilotSubPolicy.mjs's createSubPolicy -- { name, FEATURES, HIDDEN, OUTPUTS, WEIGHT_COUNT, zeroWeights, pilotFor, handWeights, perturb, mutate, evaluate, train, prune, reportLines } -- plus `step`, `LAMBDA_INDEX` and the arm's sizes.
  */
 export function createVestibularPolicy(circuit, name = "circuit", opts = {}, init = INIT) {
-    const persist = opts.persist !== false, wrap = opts.wrap || ((p) => p), run = opts.evaluate || T.evaluate, scales = { pTonic: 1, rTonic: 1, pPhasic: 1, rPhasic: 1, ...(opts.scales || {}) };
+    const persist = opts.persist !== false, dense = opts.dense === true, wrap = opts.wrap || ((p) => p), run = opts.evaluate || T.evaluate, scales = { pTonic: 1, rTonic: 1, pPhasic: 1, rPhasic: 1, ...(opts.scales || {}) };
     const topo = topologyOf(circuit), { NI, NC, E, from, to, count } = topo, NB = NI + NC;
-    const OFF_B = E, OFF_W2 = OFF_B + NB, OFF_B2 = OFF_W2 + OUTPUTS * NC, OFF_L = OFF_B2 + OUTPUTS, WEIGHT_COUNT = OFF_L + (persist ? 1 : 0), LAMBDA_INDEX = persist ? OFF_L : -1;
+    const OFF_B = E, OFF_W2 = OFF_B + NB, OFF_B2 = OFF_W2 + OUTPUTS * NC, OFF_L = OFF_B2 + OUTPUTS, OFF_IN = OFF_L + (persist ? 1 : 0), WEIGHT_COUNT = OFF_IN + (dense ? FEATURES * NI : 0), LAMBDA_INDEX = persist ? OFF_L : -1;
     const meanCount = E ? count.reduce((s, v) => s + v, 0) / E : 1, K = AS.AUTOPILOT_SUB;
     const zeroWeights = () => new Float32Array(WEIGHT_COUNT);
     const law = (x) => [0.3 * K.kTheta * x[2] - 0.2 * K.kQ * x[3], Math.PI * K.kHdg * x[4] - 0.2 * K.kR * x[5] - 0.2 * K.kBeta * x[6], x[1] + K.kSpd * x[7], 10 * K.kBalD * x[8] + 0.5 * K.kBalV * x[9]];
@@ -148,12 +151,19 @@ export function createVestibularPolicy(circuit, name = "circuit", opts = {}, ini
         for (let k = 0; k < E; k++) w[k] = (init.recScale * count[k]) / meanCount;
         for (let i = 0; i < NB; i++) w[OFF_B + i] = init.bias;
         if (persist) w[OFF_L] = init.lambda0;
+        if (dense) { const rng = mulberry(init.seed); for (let i = 0; i < FEATURES * NI; i++) w[OFF_IN + i] = gauss(rng) * init.inScale; }
         return w;
+    }
+    /** 4b-D: afferent i driven by the 14 features through its trained weights; the mirror flips the LATERAL features (headingErr, yawRate, beta, bank). `x` is the feature vector. */
+    function denseDrive(w, i, x, mirror) {
+        let sum = 0; const row = OFF_IN + i * FEATURES;
+        for (let f = 0; f < FEATURES; f++) sum += w[row + f] * (mirror && LATERAL.includes(f) ? -1 : 1) * fin(x[f]);
+        return sum;
     }
     /** One tick of one copy, in place: `h` holds the last activity of the NB cells (inputs first, then the central cells) and is replaced by the new one. */
     function updateInto(w, sensed, mirror, h, tmp) {
         const lam = lambdaOf(w);
-        for (let i = 0; i < NI; i++) tmp[i] = Math.max(0, w[OFF_B + i] + driveOf(circuit.inputs[i], sensed, scales, mirror)) + lam * h[i];
+        for (let i = 0; i < NI; i++) tmp[i] = Math.max(0, w[OFF_B + i] + (dense ? denseDrive(w, i, sensed, mirror) : driveOf(circuit.inputs[i], sensed, scales, mirror))) + lam * h[i];
         for (let c = 0; c < NC; c++) tmp[NI + c] = w[OFF_B + NI + c];
         for (let k = 0; k < E; k++) tmp[NI + to[k]] += Math.abs(w[k]) * tmp[from[k]];
         for (let c = 0; c < NC; c++) { const v = tmp[NI + c]; tmp[NI + c] = (v > 0 ? v : 0) + lam * h[NI + c]; }
@@ -177,9 +187,9 @@ export function createVestibularPolicy(circuit, name = "circuit", opts = {}, ini
         let target = null; const hr = new Float64Array(NB), hl = new Float64Array(NB), tmp = new Float64Array(NB);
         return (state, tgt, current = [0, 0, 0]) => {
             if (tgt !== target) { target = tgt; hr.fill(0); hl.fill(0); }
-            const sensed = sense(state);
+            const x = features(state, tgt, current), sensed = dense ? x : sense(state);
             updateInto(w, sensed, false, hr, tmp); updateInto(w, sensed, true, hl, tmp);
-            return decode(w, features(state, tgt, current), hr, hl);
+            return decode(w, x, hr, hl);
         };
     };
     /** The activity of all NB cells (inputs first) after each of a list of `sense` results, from rest; `mirror` for the left copy. For the gate and for reading a trained pilot. */
@@ -223,8 +233,8 @@ export function createVestibularPolicy(circuit, name = "circuit", opts = {}, ini
     }
     const reach = reachOf(circuit);
     function reportLines() {
-        return [`[pilotSubVestibular] ${name} (${NI} inputs, ${NC} cells, ${E} synapses) as a ${persist ? "leaky-state" : "NO-STATE"} mirrored pair: tuning-derived input -> ${NC} cells -> ${OUTPUTS} controls added to the autopilot's, ${WEIGHT_COUNT} trained weights`,
+        return [`[pilotSubVestibular] ${name} (${NI} inputs, ${NC} cells, ${E} synapses) as a ${persist ? "leaky-state" : "NO-STATE"} mirrored pair: ${dense ? "DENSE trained input from the 14 features" : "tuning-derived input"} -> ${NC} cells -> ${OUTPUTS} controls added to the autopilot's, ${WEIGHT_COUNT} trained weights`,
             `  ${reach.inputsReaching} of ${NI} inputs reach a cell; ${reach.cellsReached} of ${NC} cells are reached`];
     }
-    return { name, FEATURES, HIDDEN: NB, OUTPUTS, WEIGHT_COUNT, INPUTS: NI, CELLS: NC, EDGES: E, LAMBDA_INDEX, persist, zeroWeights, handWeights, activityTrace, pilotFor, perturb, mutate, evaluate, train, prune, reportLines, reach, scales };
+    return { name, FEATURES, HIDDEN: NB, OUTPUTS, WEIGHT_COUNT, INPUTS: NI, CELLS: NC, EDGES: E, LAMBDA_INDEX, persist, dense, zeroWeights, handWeights, activityTrace, pilotFor, perturb, mutate, evaluate, train, prune, reportLines, reach, scales };
 }

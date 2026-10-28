@@ -1,6 +1,6 @@
 // WebGLEngine/brain/pilotSubVestibular-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node brain/pilotSubVestibular-selfcheck.mjs      (~6 s here, one core)
+// Run: node brain/pilotSubVestibular-selfcheck.mjs      (~1 s here, one core)
 //
 // THE GATE OF brain/pilotSubVestibular.mjs: the rung 4b pilot (a circuit with a per-cell leak, tuning-derived input, a mirrored pair and the autopilot's laws plus a residual). Built and gated BEFORE any training, as Addendum 5 of
 // brain/FISH_VESTIBULAR_HELPER_WIP.md registered. Nothing here is trained. Every number is worked out by hand on a toy circuit, then the real arms are held to the registration's counts.
@@ -34,6 +34,9 @@
 //   GUARDS in degreeControl, CUT; O24 showed that `sense(state, current)` never used its second argument (attitude and the rates do not depend on the water's current), the argument CUT; O27 showed that the `fin` on the features in the decode was dead (features() already returns finite numbers), CUT;
 //   the rest got rows: the default scales option, a negative bias on a central cell, the readout biases (a yaw bias cancels under the mirror and a thrust bias doubles), a non-finite weight on each output row (it had been pitch only), the current reaching the laws, perturb moving every weight,
 //   a child scoring exactly its parent counted as neutral, prune's final pass that reverts nothing (passes >= 2), the persist flag, the sort order of the inputs (the real table is already sorted, so a hand-made one), and the number of weights a mutation changes. Four mutants had patterns that matched nothing and were fixed.
+// ADDENDUM 8 (4b-D, the dense variant): 25 more mutants, 157 in all, every one red by name: the option off or always on, the offset and the count of the dense block, the start (scale, seed, length, none), the mirror (none, of everything, of the wrong features, with a feature missing, wrong or extra),
+//   a missing finite guard, the row of weights an afferent reads (found 0 red: with this toy's weights a wrong row read the same value by coincidence -- the rows now give input 1 its own weight, 2, so a misplaced row reads 0.2 for 0.4), the drive not used, the tuning drive added, the features not handed over, the report label, the flag, the start scale, the left copy unmirrored.
+//   Six patterns of the first pass matched nothing after the edit and were rewritten.
 // NOT SABOTAGED: the report line's text beyond the arm label and the sizes; what a TRAINED weight vector does (nothing is trained).
 "use strict";
 import fs from "node:fs";
@@ -167,6 +170,39 @@ sec("5. THE LEAK (worked numbers on the toy)");
     const pa = p.pilotFor(ww), a1 = thr(pa, pulseS, tgtA), a2 = thr(pa, rest, tgtA), a3 = thr(pa, rest, tgtA);
     const pb = p.pilotFor(ww); thr(pb, pulseS, tgtA); const b2 = thr(pb, rest, tgtB), pc = p.pilotFor(ww), c1 = thr(pc, rest, tgtA);
     ok("!! the state is held while the target object is the same (a pulse leaves the thrust raised on the next two ticks: the cells leak their own activity and the central cell takes the afferent's, so the response builds before it fades) and RESET when it changes (a new target object reads exactly as a fresh pilot)", a1 > 1e-4 && a2 > a1 && a3 > 1e-4 && near(b2, c1, 1e-9) && c1 < 1e-6);
+}
+
+sec("5d. 4b-D, THE DENSE-INPUT VARIANT (Addendum 8)");
+{
+    const dp = V.createVestibularPolicy(TOY, "toyD", { dense: true }), dn = V.createVestibularPolicy(TOY, "toyD", { dense: true, persist: false });
+    ok("!! the dense variant's counts: the toy has 14 x 2 = 28 more weights (48 with the leak, 47 without); the real arms are the registration's D counts, 1,831 (whole), 1,655 (B) and 435 (E) with no state and one more with the leak; the tuning-derived pilot is unchanged (20 on the toy)", dp.WEIGHT_COUNT === 48 && dn.WEIGHT_COUNT === 47 && V.createVestibularPolicy(TOY, "t").WEIGHT_COUNT === 20 && [["whole", 1831], ["B", 1655], ["E", 435]].every(([arm, d]) => V.createVestibularPolicy(V.circuitOf(X, arm), arm, { dense: true, persist: false }).WEIGHT_COUNT === d && V.createVestibularPolicy(V.circuitOf(X, arm), arm, { dense: true }).WEIGHT_COUNT === d + 1 && F.armOf(X, arm).trainableD === d) && dp.dense === true && dn.dense === true && V.createVestibularPolicy(TOY, "t").dense === false && dp.LAMBDA_INDEX === 19 && dn.LAMBDA_INDEX === -1);
+    const OFF_IN = 20, wD = (extra = {}) => { const w = new Float32Array(48); w[0] = w[1] = w[2] = 1; w[19] = 0.5; for (const [k, v] of Object.entries(extra)) w[Number(k)] = v; return w; };
+    const x0 = (o) => { const x = new Array(14).fill(0); for (const [k, v] of Object.entries(o)) x[Number(k)] = v; return x; };
+    // input 0 reads pitchErr (2) and headingErr (4); input 1 reads pitchRate (3)
+    const W1 = wD({ [OFF_IN + 0 * 14 + 2]: 1, [OFF_IN + 0 * 14 + 4]: 1, [OFF_IN + 1 * 14 + 3]: 2 }), tr = dp.activityTrace(W1, [x0({ 2: 0.1, 4: 0.3, 3: -0.2 })]), trL = dp.activityTrace(W1, [x0({ 2: 0.1, 4: 0.3, 3: -0.2 })], true);
+    ok("!! worked: input 0 = pitchErr 0.1 + headingErr 0.3 = 0.4, input 1 = 2 x pitchRate -0.2 -> relu 0; cell 0 = 0.4 (edge 0>0, weight 1), cell 1 = 0; the LEFT copy flips headingErr (lateral): input 0 = 0.1 - 0.3 -> relu 0, everything 0", near(tr[0][0], 0.4) && tr[0][1] === 0 && near(tr[0][2], 0.4) && tr[0][3] === 0 && trL[0].every((v) => v === 0));
+    const tr2 = dp.activityTrace(W1, [x0({ 3: 0.2 })]), tr2L = dp.activityTrace(W1, [x0({ 3: 0.2 })], true);
+    ok("!! pitchRate is even under the mirror: both copies read input 1 = 2 x 0.2 = 0.4 (its own row of weights, not input 0's), so cell 0 = 0.4 (edge 1>0) and cell 1 = 0.4 (edge 1>1) in both", near(tr2[0][1], 0.4) && near(tr2[0][2], 0.4) && near(tr2[0][3], 0.4) && J(tr2) === J(tr2L));
+    const lat = [4, 5, 6, 11], side = [];
+    for (let f = 0; f < 14; f++) { const w = wD({ [OFF_IN + f]: 1 }), a = dp.activityTrace(w, [x0({ [f]: 0.3 })])[0][0], b = dp.activityTrace(w, [x0({ [f]: 0.3 })], true)[0][0]; side.push([f, near(a, 0.3), lat.includes(f) ? b === 0 : near(b, 0.3)]); }
+    ok("!! exactly four features are odd under the mirror: headingErr (4), yawRate (5), beta (6) and bank (11) read 0.3 in the right copy and are flipped (relu 0) in the left; the other ten are the same in both", J(V.LATERAL) === J([4, 5, 6, 11]) && Object.isFrozen(V.LATERAL) && side.every(([, r, l]) => r && l));
+    const permuted = { ...TOY, inputs: TOY.inputs.map((a, i) => ({ ...a, theta: 2.5 + i, myelinated: !a.myelinated })) }, dq = V.createVestibularPolicy(permuted, "q", { dense: true });
+    ok("!! the dense variant does not read the tuning angles or the kinetic classes: a circuit with other angles and the classes swapped gives the same activity", J(dq.activityTrace(W1, [x0({ 2: 0.1, 4: 0.3, 3: 0.2 })])) === J(dp.activityTrace(W1, [x0({ 2: 0.1, 4: 0.3, 3: 0.2 })])));
+    const nan = dp.activityTrace(W1, [x0({ 2: NaN, 4: 0.3 })]);
+    ok("!! a non-finite feature counts as 0 in the dense drive (input 0 = 0.3, not NaN)", nan[0].every(Number.isFinite) && near(nan[0][0], 0.3));
+    const hw = dp.handWeights(), gaussSeq = (() => { let a = 4711; const rng = () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; const g = () => { let u = 0, v = 0; while (!u) u = rng(); while (!v) v = rng(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }; return Array.from({ length: 28 }, () => g() * 0.2); })();
+    ok("!! the dense start: the 28 input weights are the seeded gaussians x 0.2 (seed 4711, the other dense pilots' start; re-derived here), after the lambda; the edges, biases and lambda are as for the tuning-derived pilot, the readout zero; the tuning-derived pilot has no such block", gaussSeq.every((g, i) => near(hw[OFF_IN + i], g, 1e-6)) && near(hw[19], 0.99, 1e-6) && near(hw[0], 0.3 * 2 / (8 / 3), 1e-6) && hw.slice(7, 19).every((v) => v === 0) && V.INIT.inScale === 0.2 && V.createVestibularPolicy(TOY, "t").handWeights().length === 20);
+    const dE = V.createVestibularPolicy(V.circuitOf(X, "whole"), "whole", { dense: true }), setD = T.BASELINE_SET.filter((q) => q.kind === "nominal").slice(0, 2);
+    ok("!! the dense start IS the autopilot too (the readout is zero): the hand weights score the PD autopilot on two dives; and a dense weight vector of zeros likewise", near(dE.evaluate(dE.handWeights(), setD).score, T.evaluate(AS.pilot(), setD).score, 1e-9) && near(dE.evaluate(dE.zeroWeights(), setD).score, T.evaluate(AS.pilot(), setD).score, 1e-9));
+    // the mirror end to end: weights from input 0 on bank (11); yaw and pitch read cell 0
+    const RW = (o, cell) => 7 + o * 2 + cell, W3 = wD({ [OFF_IN + 11]: 1, [RW(1, 0)]: 1, [RW(0, 0)]: 1 }), tgt = { depth: 30, heading: 0, speed: 2.5 };
+    const res = (state) => { const o = dp.pilotFor(W3)(state, tgt, [0, 0, 0]), b = AS.decide(state, tgt); return { yaw: o.yaw - b.yaw, pitch: o.pitch - b.pitch }; };
+    const rr = res(st({ bank: 0.1 })), rl = res(st({ bank: -0.1 }));
+    ok("!! MIRROR end to end (dense): a right-side-down and a left-side-down body give residual yaw of equal size and opposite sign and the same pitch, and the feature read is the bank the pilot is given", rr.yaw > 0.01 && near(rr.yaw, -rl.yaw, 1e-9) && near(rr.pitch, rl.pitch, 1e-9) && rr.pitch > 0.01);
+    const big = dp.perturb(wD(), 50, rng0(3));
+    ok("!! mutate and perturb keep lambda (index 19, BEFORE the dense block) in [0, 1] and leave the dense weights free; the weights stay in the dense block's range", big[19] >= 0 && big[19] <= 1 && Array.from(big.slice(20)).some((v) => Math.abs(v) > 1) && dp.mutate(wD(), 50, rng0(5), 4).length === 48);
+    ok("!! the report says the input is DENSE from the 14 features and counts the dense weights; the tuning-derived pilot's report does not", /DENSE trained input from the 14 features/.test(dp.reportLines()[0]) && /48 trained weights/.test(dp.reportLines()[0]) && !/DENSE/.test(V.createVestibularPolicy(TOY, "t").reportLines()[0]) && /tuning-derived input/.test(V.createVestibularPolicy(TOY, "t").reportLines()[0]));
+    function rng0(a = 5) { return () => { a = (a * 1103515245 + 12345) & 0x7fffffff; return a / 0x7fffffff; }; }
 }
 
 sec("6. THE PILOT (the start, the mirror, the clamps, the sign on real hazard dives)");
