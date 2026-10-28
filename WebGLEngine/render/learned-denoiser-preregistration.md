@@ -10458,3 +10458,62 @@ The validation loss fell below round 68's (1.837e-3 against 1.907e-3), and the t
 200 training scenes better than EASU, and the test scenes no better, points at the data more than the design. These scenes give
 EASU little to get wrong at a 2048-sample truth. More scenes, temporal input (FSR4's real input is a jittered history), or
 another loss would each be a new round. None is fixed here.
+
+## 161. FSR4 ROUND 70 -- A LEARNED CORRECTION OF THE TEMPORAL UPSCALE: FIXED BEFORE ITS CODE AND ITS SCENES
+
+**Why.** Section 160 found four single-frame designs no better than EASU, and pointed at the input. Keith asked for the temporal
+design. FSR2-4's real input is a jittered history, and the arc has one: round 32's Bt
+(render/denoiseTemporalUpscale.mjs's accumulateUpscaled).
+- Eight jittered half-size frames, each through the shipped denoiser, the emitter fill and EASU.
+- Reprojected at full size, the history clamped to the current frame's 3 x 3 range, a running average.
+- It beat the single-frame chain on 12 of 12 (section 96, mean d +0.259).
+
+So a temporal FSR4's bar is **Bt, not EASU**. Bt's weak points are a learned upscaler's chance: the clamp's ghosting and
+over-clamping, and the disocclusions that restart at one frame.
+
+**The network, U_T (render/learnedUpscaleTemporal.mjs).** It uses section 159's held residual, put on the temporal frame instead of
+EASU's:
+
+**y = A · (1 + 0.5 tanh(r))**, A the light-free accumulation (Bt before its composite), r the network's 3-channel output.
+
+- **Its input, 17 channels a full-size pixel:**
+  - A, the clamped accumulation (0-2);
+  - the same accumulation unclamped (3-5), so it can see where the clamp acted;
+  - the current frame's EASU on the unjittered grid (6-8);
+  - the history length n / 8 (9);
+  - albedo (10-12) and normal (13-15);
+  - depth as d / (1 + d) (16).
+- Three 3 x 3 layers of 32, a 1 x 1 head of 3, its weights and biases zero, so an untrained U_T is Bt exactly.
+- Trained as rounds 67-69 were: display-space relMSE of the composite, Adam, 1500 steps of 4 crops of 32, seeds 1-3, the
+  candidate by validation, and C2's U_T on targets shuffled across the training sequences.
+
+**The data.** Every example is a sequence: round 32's camera path (8 frames orbiting to the scene's eye), the frames at half
+size at 4 samples on round 32's JITTER, references at the scene's eye.
+- **Training and validation:** round 65's 200 + 20 scenes (61000-61199, 62000-62019), their sequences rendered here, the
+  references at 512 samples.
+- **Test:** 24 new scenes, 12 R (73000-73011) and 12 C (74000-74011), against two 2048-sample references.
+- 256 x 256, as every FSR4 round.
+
+**The test.**
+- **H1:** U_T's chain beats Bt's -- the learned temporal upscale against the hand-written one.
+- **H2:** U_T's chain beats B1's, the single-frame chain (EASU on the measured frame alone). This is expected from round 32. It
+  says whether U_T keeps the history's lead.
+- Display space, the sign-flip test, Holm, and C1-C5 as before (C1 at 22 of 24, the noisy floor the last frame's half-size input,
+  bilinear and composited).
+- **Section 159's rule, again:** H1 counts as an improvement only at a mean display relMSE at least 1 % below Bt's.
+- The results go to render/denoise-results-upscale-temporal-r70.json, the nets to render/upscale-net-r70.json. Each scene's mean
+  correction is recorded (P4).
+
+**Predictions, fixed now, deciding nothing.**
+- **P1:** C1 and C3 hold.
+- **P2:** H1 is supported, 1-10 % below Bt. Bt has errors a learner can see (the clamp, the restarts), which EASU did not.
+- **P3:** H2 is supported.
+- **P4:** the mean correction is between 0.5 % and 20 % of Bt.
+
+**The run.** On Keith's rig:
+- `--harvest-upscale-temporal-train`;
+- the training file committed unread;
+- `--harvest-upscale-temporal-test` at that commit.
+
+A pilot on non-dataset scenes may run before the harvests. It decides nothing and is reported here if it does. Section 162 is
+the verdict.
