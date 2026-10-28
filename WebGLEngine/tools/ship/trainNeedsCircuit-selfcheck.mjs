@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/trainNeedsCircuit-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node tools/ship/trainNeedsCircuit-selfcheck.mjs      (~12 s -- to be restated at ship)
+// Run: node tools/ship/trainNeedsCircuit-selfcheck.mjs      (~9 s on an idle 4-core box; 8-17 s under load -- to be restated at ship)
 //
 // THE GATE OF tools/ship/trainNeedsCircuit.mjs (and its command): the training and grading of piece 4, registered in brain/NEEDS_AND_LIMITS.md ("Round 3", Amendments 1 and 2) before it was written. Nothing is trained for real here; the search runs on a STUB POLICY whose score is a known function of one weight, so every branch of the recipe has a worked answer, and the verdicts run on
 // hand-built records.
@@ -14,7 +14,19 @@
 //   8  THE COMMAND  arguments, the references first, one line a circuit, resumable, workers by child processes (stubbed), the refusals (another condition or recipe, smoke records, clean for a control), the report.
 // NOT CHECKED, said plainly: that a real training finds anything (that is the experiment); the process spawning itself beyond its arguments.
 //
-// SABOTAGE LOG: filled in at the foot of this header when run.
+// SABOTAGE LOG (47 mutants of trainNeedsCircuit.mjs, each run against a copy of this gate, 4 at a time; the first pass left 15 at 0 red and each was a finding):
+//   RED by name: eligibility strict / lenient; champion = worst held-out; the audit set leaking into held-out; prune keeps only gains / keeps losses / budget not spent / reverts toward the best instead of the start; the seed
+//   stride 11; ordinal ignoring the family; the margin as sd only; PASS on some family; the strongest family as the weakest; the rule ignoring crushed runs; the start read as GUARDED; clean allowing a control; the start check
+//   as some; the task re-check without deep; the memory check in clean; one control enough; no resume; references recomputed; nostate with memory; withheld not withheld; control index dropped; smoke every 4th dive; asStart
+//   never; index 20 allowed; smoke records read without the flag; runs 3 by default; moved/kept swapped; references on the wrong audit or without the gauge; the search without the gauge; the start pool read on the train set; the
+//   rule against GUARDED-1T; the rule on means not pairs.
+//   0 RED on the first pass, fixed by a new row: a tie on held-out broken to the last search (a flat stub); improvements counting ties and neutral accepting losses (the stub's log and a stub whose weights 5 to 9 hurt); the
+//   search seed shared by all searches (the seeds are read off the record); the margin floor only (a hand record with a wide paired spread); FAIL needing 3 lost audits (cx wins one of three); the bottom line with or for and, and a
+//   tie read as 'not all wins' (the bottom line is read for a tie and for a win on some audits); a smoke or other-condition REFERENCES record (each now has its own run); moved/kept swapped (the prune now moves weights);
+//   references on the wrong audit set / without the gauge (each audit read against an independent flight); the search without the gauge and the start pool on the train set (the stub's evaluate seam logs each call's set and gauge);
+//   the champion choice (it now runs on a ladder of pilots so the held-out scores differ).
+//   Removed as dead after the first pass: the condition and smoke tests inside sameRecipe, which the stale-records test before it already makes.
+//   THE SEAM: evaluateW calls Pol.evaluate when a policy has one (the gate's stub does; the real policies do not), so the gate can log every evaluation and fly each distinct pilot only once.
 "use strict";
 import fs from "node:fs";
 import * as T from "../../brain/needsTask.mjs";
@@ -58,32 +70,44 @@ sec("3. THE SETS");
 }
 
 // a stub policy: the score is a function of weight 0 (>= 0.5 -> GUARDED, else SPIN) so the recipe has worked answers; weights 1..9 are irrelevant
-const stub = (opts = {}) => { const calls = { pilotFor: 0 }; return { calls, name: "stub", WEIGHT_COUNT: 10, handWeights: () => new Float32Array(10), mutate: (w, sigma, rng, maxK) => { const o = Float32Array.from(w), k = 1 + Math.floor(rng() * maxK); for (let j = 0; j < k; j++) { const i = Math.floor(rng() * 10); o[i] += i === 0 ? 0.5 : 1; } return o; }, pilotFor: (w) => { calls.pilotFor++; return (opts.crashIfMoved && [...w].slice(1).some((v) => v !== 0)) ? T.DIRECT : (w[0] >= 0.5 ? T.GUARDED : T.SPIN); } }; };
-const trainTiny = T.setOf(["plain"], 1, 2);
+// the stub's evaluate is the seam of evaluateW: it flies the real task but remembers every (pilot, set, gauge) it has flown, and it LOGS every call, so the gauge and the set a search reads are checked by looking at the log
+const memo = new Map();
+const flown = (pilot, set, gauge) => { let a = memo.get(pilot); if (!a) memo.set(pilot, a = new Map()); let b = a.get(set); if (!b) a.set(set, b = new Map()); if (!b.has(gauge)) b.set(gauge, T.evaluate(pilot, set, { gauge })); return b.get(gauge); };
+const stub = (opts = {}) => { const calls = { pilotFor: 0, log: [] }; return { calls, name: "stub", WEIGHT_COUNT: 10, handWeights: () => new Float32Array(10), mutate: (w, sigma, rng, maxK) => { const o = Float32Array.from(w), k = 1 + Math.floor(rng() * maxK); for (let j = 0; j < k; j++) { const i = Math.floor(rng() * 10); o[i] += i === 0 ? 0.5 : 1; } return o; }, pilotFor: (w) => { calls.pilotFor++; if (opts.always) return opts.always; if (opts.ladder) return w[0] >= 1 ? T.GUARDED : w[0] >= 0.5 ? T.HULLONLY : T.SPIN; if (opts.hurt && [...w].slice(5).some((v) => v >= 1)) return T.SPIN; return (opts.crashIfMoved && [...w].slice(1).some((v) => v !== 0)) ? T.DIRECT : (w[0] >= 0.5 ? T.GUARDED : T.SPIN); }, evaluate: (pilot, set, o) => { calls.log.push({ set, gauge: o.gauge }); return flown(pilot, set, o.gauge); } }; };
+const trainTiny = T.setOf(["plain"], 1, 1);
 
 sec("4. THE SEARCH (on the stub)");
 {
-    const S = stub(), r1 = TR.search(S, 777, 0, { iters: 12, sigma: 0.3, maxK: 4, pruneBudget: 60 }, trainTiny, null), r2 = TR.search(S, 777, 0, { iters: 12, sigma: 0.3, maxK: 4, pruneBudget: 60 }, trainTiny, null);
-    const gScore = T.evaluate(T.GUARDED, trainTiny).score, sScore = T.evaluate(T.SPIN, trainTiny).score;
-    ok("!! a search is deterministic from its seed (same weights, same counts) and improves the score: from SPIN's to GUARDED's on two plain dives (each computed independently) once weight 0 reaches 0.5", J([...r1.weights]) === J([...r2.weights]) && r1.improved === r2.improved && near(r1.trainScore, gScore, 1e-12) && gScore > sScore + 0.1 && r1.improved >= 1, `train ${r1.trainScore}, ${r1.improved} improvements, ${r1.neutral} neutral`);
+    const S = stub(), r1 = TR.search(S, 777, 0, { iters: 5, sigma: 0.3, maxK: 4, pruneBudget: 60 }, trainTiny, T.GAUGE), r2 = TR.search(S, 777, 0, { iters: 5, sigma: 0.3, maxK: 4, pruneBudget: 60 }, trainTiny, T.GAUGE);
+    const gScore = T.evaluate(T.GUARDED, trainTiny, { gauge: T.GAUGE }).score, sScore = T.evaluate(T.SPIN, trainTiny, { gauge: T.GAUGE }).score;
+    ok("!! a search is deterministic from its seed (same weights, same counts) and improves the score: from SPIN's to GUARDED's on one plain dive (each computed independently) once weight 0 reaches 0.5", J([...r1.weights]) === J([...r2.weights]) && r1.improved === r2.improved && near(r1.trainScore, gScore, 1e-12) && gScore > sScore + 0.1 && r1.improved >= 1, `train ${r1.trainScore}, ${r1.improved} improvements, ${r1.neutral} neutral`);
     ok("!! the prune puts the irrelevant moved weights back and keeps the essential one: after the prune only weight 0 differs from the start, kept < moved (moved counts every changed weight before the prune)", r1.kept === 1 && r1.weights[0] >= 0.5 && [...r1.weights].slice(1).every((v) => v === 0) && r1.moved > r1.kept, `moved ${r1.moved}, kept ${r1.kept}, ${r1.pruneEvals} evaluations`);
-    const r0 = TR.search(S, 777, 0, { iters: 12, sigma: 0.3, maxK: 4, pruneBudget: 0 }, trainTiny, null);
-    ok("!! a prune budget of 0 does nothing (kept = moved, no evaluations), and a budget of 2 uses at most 2", r0.kept === r0.moved && r0.pruneEvals === 0 && TR.search(S, 777, 0, { iters: 12, sigma: 0.3, maxK: 4, pruneBudget: 2 }, trainTiny, null).pruneEvals <= 2);
-    const rn = TR.search(S, 5, 0, { iters: 0, sigma: 0.3, maxK: 4, pruneBudget: 60 }, trainTiny, null);
+    ok("!! every evaluation of a search reads the training set under the gauge the search was given (the stub's log), and exactly one improvement is counted (the jump of weight 0), the rest neutral", S.calls.log.length > 0 && S.calls.log.every((c) => c.set === trainTiny && c.gauge === T.GAUGE) && r1.improved === 1 && r1.neutral >= 1 && r1.improved + r1.neutral <= 8);
+    const SH = stub({ hurt: true }), rh = TR.search(SH, 777, 0, { iters: 30, sigma: 0.3, maxK: 4, pruneBudget: 0 }, trainTiny, T.GAUGE), pilotScore = (w) => T.evaluate(stub({ hurt: true }).pilotFor(w), trainTiny, { gauge: T.GAUGE }).score;
+    ok("!! a candidate that scores worse is never accepted: with weights 5 to 9 making the pilot worse, the returned weights score exactly the returned train score and never lose what a better candidate had won", near(pilotScore(rh.weights), rh.trainScore, 1e-12) && rh.trainScore >= sScore - 1e-12 && (rh.trainScore > sScore ? [...rh.weights].slice(5).every((v) => v === 0) : true), `train ${rh.trainScore}, ${rh.improved} improvements`);
+    const r0 = TR.search(S, 777, 0, { iters: 5, sigma: 0.3, maxK: 4, pruneBudget: 0 }, trainTiny, T.GAUGE);
+    ok("!! a prune budget of 0 does nothing (kept = moved, no evaluations), and a budget of 2 uses at most 2", r0.kept === r0.moved && r0.pruneEvals === 0 && TR.search(S, 777, 0, { iters: 5, sigma: 0.3, maxK: 4, pruneBudget: 2 }, trainTiny, T.GAUGE).pruneEvals <= 2);
+    const rn = TR.search(S, 5, 0, { iters: 0, sigma: 0.3, maxK: 4, pruneBudget: 60 }, trainTiny, T.GAUGE);
     ok("!! with no children the search returns the start itself (moved 0, kept 0, its own train score: SPIN's)", rn.moved === 0 && rn.kept === 0 && near(rn.trainScore, sScore, 1e-12) && [...rn.weights].every((v) => v === 0));
 }
 
 sec("5. ONE CIRCUIT (stub policy, tiny sets): eligibility, the champion, the start, and the audits read once");
 {
-    const recipe = { runs: 2, iters: 6, sigma: 0.3, maxK: 4, pruneBudget: 3 }, spec = { family: "cx", index: 0 };
+    const recipe = { runs: 2, iters: 8, sigma: 0.3, maxK: 4, pruneBudget: 20 }, spec = { family: "cx", index: 0 };
     const tiny = { train: T.setOf(["plain"], 1, 1), heldOut: T.setOf(["plain"], 3, 3), pool: T.setOf(["deep"], 1, 1), audit: T.setOf(["plain"], 4, 4), audit2: T.setOf(["plain"], 5, 5), reserve: T.setOf(["plain"], 6, 6) };
     const S1 = stub(), rec = TR.runCircuit(spec, cx, { recipe, sets: tiny, smoke: true, condition: "noisy", policyOf: () => S1 });
     ok("!! a circuit with a champion: the record names its spec, condition, seed base, the champion's seed (the best held-out of the eligible), the weights (10), the movement and its scores on the THREE audits", rec.spec === "cx" && rec.condition === "noisy" && rec.seedBase === 61000 && rec.champion !== null && rec.asStart === false && rec.weightCount === 10 && rec.weights.length === 10 && TR.AUDITS.every((a) => rec.scores.champion[a].runs.length === 4 || rec.scores.champion[a].runs.length === 1) && rec.searches.length === 2 && rec.movement.kept >= 0 && rec.smoke === true, `champion seed ${rec.champion}`);
-    const elig = rec.searches.filter((s) => s.eligible), best = elig.reduce((b, s) => (s.heldOut > b.heldOut ? s : b), elig[0]);
-    ok("!! the champion is the eligible search with the best held-out mean", rec.champion === best.seed && elig.every((s) => s.heldOut <= best.heldOut + 1e-12));
+    ok("!! the searches of a circuit take the seeds base, base+1 (61000, 61001 for cx); the champion's movement is its search's moved and kept weights; the first evaluation is the start on the POOL and the last three are the audit, audit2 and reserve sets in that order, every one under the noisy gauge", J(rec.searches.map((q) => q.seed)) === J([61000, 61001]) && rec.movement.moved > rec.movement.kept && rec.movement.kept >= 1 && S1.calls.log[0].set === tiny.pool && J(S1.calls.log.slice(-3).map((c) => c.set)) === J([tiny.audit, tiny.audit2, tiny.reserve]) && S1.calls.log.every((c) => c.gauge === T.GAUGE));
+    const lad = TR.runCircuit(spec, cx, { recipe: { ...recipe, runs: 5 }, sets: { ...tiny, heldOut: T.setOf(["far"], 3, 3) }, smoke: true, condition: "noisy", policyOf: () => stub({ ladder: true }) });
+    const elig = lad.searches.filter((s) => s.eligible), best = elig.reduce((b, s) => (s.heldOut > b.heldOut ? s : b), elig[0]);
+    ok("!! the champion is the eligible search with the best held-out mean (on a ladder of pilots, so the searches differ)", new Set(lad.searches.map((q) => q.heldOut)).size >= 2 && lad.champion === best.seed && elig.every((s) => s.heldOut <= best.heldOut + 1e-12));
     // the evaluations: 1 (the start's pool) + per search (iters + 1 start + prune evals + held-out + pool) + 3 audits
     const searchEvals = rec.searches.reduce((n, s) => n + recipe.iters + 1 + 1 + 1, 0), pruneEvals = S1.calls.pilotFor - 1 - searchEvals - 3;
     ok("!! the audits are read exactly three times (once each) for a champion: the evaluations made are 1 + the searches' + the prune's (at most 3 a search) + 3", pruneEvals >= 0 && pruneEvals <= 2 * recipe.pruneBudget && S1.calls.pilotFor === 1 + searchEvals + pruneEvals + 3, `${S1.calls.pilotFor} evaluations`);
+    const flat = TR.runCircuit(spec, cx, { recipe, sets: tiny, smoke: true, condition: "noisy", policyOf: () => stub({ always: T.GUARDED }) });
+    ok("!! searches that tie on held-out are broken toward the lower search (the champion is seed 61000 when all are equal)", flat.champion === 61000 && flat.searches.every((q) => q.eligible));
+    const dir = TR.runCircuit(spec, cx, { recipe, sets: tiny, smoke: true, condition: "noisy", policyOf: () => stub({ always: T.DIRECT }) });
+    ok("!! eligibility is against the start's crushed runs ON THE POOL: a start crushed on the pool (DIRECT on deep) and searches crushed as often are eligible and a champion exists", dir.startPoolCrashed >= 1 && dir.searches.every((q) => q.eligible) && dir.champion === 61000, `start crushed ${dir.startPoolCrashed}`);
     const S3 = stub({ crashIfMoved: true }), none = TR.runCircuit(spec, cx, { recipe: { runs: 2, iters: 8, sigma: 0.3, maxK: 4, pruneBudget: 0 }, sets: tiny, smoke: true, condition: "noisy", policyOf: () => S3 });
     ok("!! a search whose pilot is crushed on the pool when the start is not is NOT eligible; when no search is eligible there is NO champion: asStart, scores.champion null, no weights, and THE AUDITS WERE NOT READ (the evaluations are the start's pool + each search's children, start, held-out and pool, and not one more)", none.searches.every((s) => !s.eligible) && none.asStart === true && none.champion === null && none.scores.champion === null && none.weights === null && none.movement === null && S3.calls.pilotFor === 1 + none.searches.length * (8 + 1 + 1 + 1), `${S3.calls.pilotFor} evaluations, eligible ${none.searches.map((s) => s.eligible ? "E" : "n").join("")}`);
     ok("!! a condition that is neither noisy nor clean is refused", /condition/.test(throws(() => TR.runCircuit(spec, cx, { recipe, sets: tiny, condition: "foggy", policyOf: () => stub() })) || ""));
@@ -95,6 +119,8 @@ sec("6. THE REFERENCES AND THE CHECKS");
 {
     const one = { audit: T.setOf(["far"], 4, 4), audit2: T.setOf(["far"], 5, 5), reserve: T.setOf(["far"], 6, 6) }, refs = TR.refsRecord(cx, { smoke: true, condition: "noisy", sets: one });
     ok("!! the references record: seven rules on each of the three audits, a summary each (score, runs with kind and crushed, byKind), and the start check on four runs all the same (the untrained cx pilot is GUARDED-OBS)", refs.family === "refs" && refs.condition === "noisy" && TR.REFERENCE_NAMES.every((n) => TR.AUDITS.every((a) => refs.references[n][a].runs.length === 1 && Number.isFinite(refs.references[n][a].score))) && refs.startCheck.length === 4 && refs.startCheck.every((x) => x.same === true), refs.startCheck.map((x) => x.kind + x.seed + (x.gauge ? "+g" : "")).join(" "));
+    const og = T.evaluate(T.GUARDED_OBS, one.audit2, { gauge: T.GAUGE }).score, og0 = T.evaluate(T.GUARDED_OBS, one.audit2).score;
+    ok("!! each reference is flown on its OWN audit under the condition's gauge: GUARDED-OBS on audit2 equals an independent noisy flight of the audit2 set, which differs from a clean one", og !== og0 && refs.references.GUARDED_OBS.audit2.score === og && refs.references.GUARDED_OBS.audit.score === T.evaluate(T.GUARDED_OBS, one.audit, { gauge: T.GAUGE }).score && refs.references.GUARDED_OBS.reserve.score === T.evaluate(T.GUARDED_OBS, one.reserve, { gauge: T.GAUGE }).score);
     // hand-built references for the checks: the per-run scores are chosen
     const mkS = (fn) => ({ score: 0, crashed: 0, stranded: 0, byKind: {}, runs: ["far", "both", "deep", "plain"].flatMap((k) => Array.from({ length: 12 }, (_, i) => ({ kind: k, score: fn(k, i), crushed: false }))) });
     const H = (over = {}) => { const base = { SPIN: () => 0.55, DIRECT: (k) => (k === "deep" ? 0 : 0.5), HULLONLY: () => 0.6, GUARDED: () => 0.85, GUARDED_1T: () => 0.4, GUARDED_OBS: () => 0.85, GUARDED_FILTER: () => 0.85, ...over }, R = {}; for (const n of TR.REFERENCE_NAMES) R[n] = Object.fromEntries(TR.AUDITS.map((a) => { const s = mkS(base[n]); s.score = s.runs.reduce((x, r) => x + r.score, 0) / s.runs.length; s.crashed = n === "DIRECT" ? 12 : 0; if (n === "DIRECT") s.runs.forEach((r) => { if (r.kind === "deep") r.crushed = true; }); return [a, s]; })); return R; };
@@ -136,6 +162,12 @@ sec("7. THE VERDICTS");
     const b = (v) => TR.bottomLine(v, "noisy");
     ok("!! the bottom line: all four wins reads 'used the needs better than its controls and than the rule'; a tie with NO STATE reads 'the memory did not matter'; a tie with WITHHELD reads 'the needs did not matter to what was learned'", /used the needs better than its controls and than the rule/.test(b(p)) && /ties NO STATE: the memory did not matter/.test(b(tieNs)) && /ties WITHHELD: the needs did not matter to what was learned/.test(b(tieWh)));
     ok("!! a wiring FAIL reads 'wiring FAIL' with the rule verdict and the memory and needs readings; a failed check makes the bottom line NOT READ and names it; too few controls is NOT YET", /wiring FAIL, does not beat the rule/.test(b(f)) && /NOT READ.*MEMORY-NEED/.test(b(vOf(wired([0.9, 0.9, 0.9], 0.5, 0.5, 0.5, 0.5).map((x, i) => (i === 0 ? { ...x, references: { ...x.references, GUARDED_FILTER: x.references.GUARDED_OBS } } : x))))) && /NOT YET/.test(b(na)));
+    const lost2 = vOf(wired([0.9, 0.4, 0.4], 0.5, 0.5, 0.5, 0.5));
+    ok("!! losing to the strongest family on two of three audits is FAIL (cx wins one) and on one is IN BETWEEN", lost2.wiring.verdict === "FAIL" && ib.wiring.verdict === "IN BETWEEN");
+    const wide = wired([0.85, 0.85, 0.85], 0.5, 0.5, 0.5, 0.5); for (const a of TR.AUDITS) wide[1].scores.champion[a] = summ(0.85, 8, 0, 0.3);
+    ok("!! the RULE margin uses the paired spread: cx 0.05 above GUARDED with a run-to-run spread of 0.3 does NOT beat it (needs well over the 0.02 floor)", vOf(wide).rule.verdict === "DOES NOT BEAT THE RULE" && vOf(wide).rule.rows.every((x) => x.needs > 0.05));
+    const some = wired([0.9, 0.9, 0.9], 0.5, 0.5, 0.5, 0.5); some[2] = rec("nostate", 0, [0.5, 0.5, 0.9]);
+    ok("!! the bottom line separates a win on every audit from a tie and from a win on some: a tie with either control is NOT the 'used the needs better' line, and a win on two of three audits reads 'on some audits only'", !/used the needs better/.test(b(tieNs)) && !/used the needs better/.test(b(tieWh)) && /beats NO STATE on some audits only/.test(b(vOf(some))) && !/ties NO STATE/.test(b(vOf(some))));
     const lines = TR.reportLines(wired([0.9, 0.9, 0.9], 0.5, 0.5, 0.5, 0.5)).join("\n");
     ok("!! the report prints the checks first, the references, cx, NO STATE, WITHHELD, the three families, the training line, both verdicts and the bottom line (in that order)", /PIECE 4, condition noisy[\s\S]*START CHECK[\s\S]*references[\s\S]*CX:[\s\S]*NO STATE:[\s\S]*WITHHELD:[\s\S]*ER x3[\s\S]*TYPE-BLOCK x3[\s\S]*DEGREE x3[\s\S]*training:[\s\S]*WIRING VERDICT \(noisy\): PASS[\s\S]*RULE VERDICT \(noisy\): BEATS THE RULE[\s\S]*BOTTOM LINE/.test(lines) && TR.reportLines([rec("cx", 0, [1, 1, 1])]).length === 1);
 }
@@ -158,6 +190,8 @@ sec("8. THE COMMAND");
     files.set("S.jsonl", J({ ...lines1[1], condition: "clean" }) + "\n"); const code3 = await run(["run", "--specs", "cx", "--out", "S.jsonl"]);
     files.set("T.jsonl", J({ ...lines1[1], recipe: { ...lines1[1].recipe, iters: 5 } }) + "\n"); const code4 = await run(["run", "--specs", "cx", "--out", "T.jsonl"]);
     ok("!! a results file holding another condition, or another recipe, is refused (exit 1), not mixed", code3 === 1 && code4 === 1 && errs.some((m) => /another condition, recipe/.test(m)));
+    files.set("Q.jsonl", J({ ...lines1[0], smoke: true }) + "\n"); const code7 = await run(["run", "--specs", "cx", "--out", "Q.jsonl"]);
+    ok("!! a smoke REFERENCES record is refused too, in a real run", code7 === 1 && errs.some((m) => /smoke run/.test(m)));
     const before = calls.runs.length, code5 = await run(["run", "--specs", "cx,nostate", "--workers", "2", "--out", "W.jsonl", "--quiet"]);
     ok("!! with --workers above 1 each circuit goes to a child process (the spawner) and the parent keeps the records; nothing is trained in the parent", code5 === 0 && J(calls.spawn.slice().sort()) === J(["cx", "nostate"]) && calls.runs.length === before && String(files.get("W.jsonl")).trim().split("\n").length === 3);
     const code6 = await run(["run", "--one", "er:1", "--quiet"]);

@@ -68,7 +68,8 @@ export const policyOf = (spec, circuit) => P.createNeedsPolicy(circuitFor(spec, 
 // ---- evaluation and one search -----------------------------------------------------------------------------------------------------------------------------------------------------------------
 /** A summary of an evaluate() result that a record can keep: { score, crashed, stranded, runs: [{ kind, score, crushed }], byKind }. */
 export const summary = (e) => ({ score: e.score, crashed: e.crashed, stranded: e.stranded, runs: e.runs.map((r) => ({ kind: r.kind, score: r.score, crushed: !!r.crushed })), byKind: Object.fromEntries(Object.entries(e.byKind).map(([k, v]) => [k, { score: v.score, crushed: v.crushed, stranded: v.stranded }])) });
-export const evaluateW = (Pol, w, set, gauge) => T.evaluate(Pol.pilotFor(w), set, { gauge });
+/** `Pol.evaluate` is a seam for the gate (a stub that counts and remembers its calls); a real policy has none. */
+export const evaluateW = (Pol, w, set, gauge) => (Pol.evaluate || T.evaluate)(Pol.pilotFor(w), set, { gauge });
 
 /** One search of the recipe from the start weights; returns { k, seed, weights, trainScore, improved, neutral, moved, kept, pruneEvals }. */
 export function search(Pol, seed, k, recipe, trainSet, gauge) {
@@ -216,7 +217,7 @@ export function parseArgs(argv) {
     if (condition === "clean") for (const s of parseSpecs(o.specs)) if (!["cx", "nostate", "withheld"].includes(s.family)) throw new Error(`the clean condition is run for cx, nostate and withheld only (registered), not ${specName(s)}`);
     return o;
 }
-const sameRecipe = (rec, o) => ["runs", "iters", "sigma", "maxK", "pruneBudget"].every((k) => rec.recipe[k] === o.recipe[k]) && rec.condition === o.condition && !!rec.smoke === o.smoke;
+const sameRecipe = (rec, o) => ["runs", "iters", "sigma", "maxK", "pruneBudget"].every((k) => rec.recipe[k] === o.recipe[k]);
 /**
  * THE COMMAND, as a function: `run` computes the references record (once per file), trains the specs not yet in --out (each in its own process when --workers is above 1, by --one), appends one line each, and prints the report; `report` prints it for a results file. Returns the exit code: 0, 1 a refusal while running, 2 a bad argument.
  * `io` is for the gate: { out, err, readFile, appendFile, exists, runner, refsRunner, spawner }.
