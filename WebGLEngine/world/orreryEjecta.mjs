@@ -678,6 +678,8 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
     "hemibrain": Object.freeze([
         "brain/pilotSubCircuitState-selfcheck.mjs",
         "tools/flyCx.mjs",
+        // v4905 -- the piece 4 trainer reads the vendored circuit (CIRCUIT_FILE), ARRIVED named by orreryEjecta-selfcheck.
+        "tools/ship/trainNeedsCircuit.mjs",
         "tools/ship/trainSubState-selfcheck.mjs",
         "tools/ship/trainSubState.mjs",
         // v4901 -- the aquarium page loads the hemibrain-backed pilots (named by the sub-aquarium round).

@@ -722,3 +722,14 @@ export const COMMIT_BELT_DRIFT_V4899 = Object.freeze({
     }),
     bodiesNow: 28,
 });
+
+/** v4905 -- vendor/zebrafish-vestibular GAINED ONE COMMIT this round: cda083cb, the rung 4a version 4 registration, which vendored the Source Data workbook (an 86 KB .xlsx) and added its PROVENANCE row. A commit that is not the ship commit can be named, so it is. The piece 4 trainer also became the sixth importer of vendor/hemibrain (world/orreryEjecta.mjs, DEPENDANTS), which moves a satellite count and no hash. Read off git here, not typed. */
+export const COMMIT_BELT_DRIFT_V4905 = Object.freeze({
+    ...COMMIT_BELT_DRIFT_V4899,
+    at: "v4905",
+    arrivedSince4475: Object.freeze({
+        ...COMMIT_BELT_DRIFT_V4899.arrivedSince4475,
+        "zebrafish-vestibular": Object.freeze({ now: Object.freeze(["cda083cb", ...COMMIT_BELT_DRIFT_V4899.arrivedSince4475["zebrafish-vestibular"].now]), why: COMMIT_BELT_DRIFT_V4899.arrivedSince4475["zebrafish-vestibular"].why + "; v4905 then vendored the article's Source Data workbook (86 KB .xlsx) beside the supplementary files" }),
+    }),
+    bodiesNow: 28,
+});

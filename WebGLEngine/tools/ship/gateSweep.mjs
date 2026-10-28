@@ -16212,6 +16212,13 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
         widened: Object.freeze([]),
         verdict: "the submarine's needs and limits gate (energy that only the surface refills, a hull that feels the pressure, the refill-trip pilot; 23 mutants, one equivalent, said so), run alone and green; the rows other gates grew this round (brainPanel, compassView, subAquariumEvents, subAquariumSim, subBallastCues, headlessGpu, declaredCost, statedRuntime, afterVerdict and the three staleness gates) are in no closing because a gate may be claimed by ONE closing and they were swept at their own.",
     }),
+    since615: Object.freeze({
+        at: "v4905", swept: 7, green: 7, red: 0,
+        added: Object.freeze(["brain/needsTask-selfcheck.mjs", "brain/needsTaskValidity-selfcheck.mjs", "brain/needsTaskReferences-selfcheck.mjs", "brain/pilotNeedsCircuit-selfcheck.mjs", "tools/subReservoirV4-selfcheck.mjs", "tools/subReservoirV5-selfcheck.mjs", "tools/ship/trainNeedsCircuit-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "the survey run and its references (23 + validity + 60 pinned fingerprints), the piece 4 pilot (38 mutants), the rung 4a v4 and v5 libraries (37 and 33 mutants) and the piece 4 trainer (47 mutants, 15 of which went 0 red on the first pass and each became a row); each run alone and green, 8 to 13 s each, the trainer's 9 s; subNeeds-selfcheck grew rows this round and is in v4904's closing, not this one.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

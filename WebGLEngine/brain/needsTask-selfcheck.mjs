@@ -1,6 +1,6 @@
 // WebGLEngine/brain/needsTask-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node brain/needsTask-selfcheck.mjs      (~11s -- measured 10.9 s alone at v4905 WIP, to be restated at ship)
+// Run: node brain/needsTask-selfcheck.mjs      (~13.5s -- measured 13.4-13.7 s alone at v4905)
 //
 // THE SURVEY RUN (brain/needsTask.mjs; the task, the baselines and the validity rows were written first, in brain/NEEDS_AND_LIMITS.md "Round 2"). This gate holds the MECHANICS and the first half of the task-validity rows (kinds plain and deep);
 // brain/needsTaskValidity-selfcheck.mjs holds the second half (far and both). NO PILOT IS LEARNED: the baselines are rules. The audit set is NOT read here or anywhere (it is piece 4's).

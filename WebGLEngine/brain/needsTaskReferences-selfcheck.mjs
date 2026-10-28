@@ -1,6 +1,6 @@
 // WebGLEngine/brain/needsTaskReferences-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node brain/needsTaskReferences-selfcheck.mjs      (~9 s -- to be restated at ship)
+// Run: node brain/needsTaskReferences-selfcheck.mjs      (~9 s -- measured 8.7-9.3 s alone at v4905)
 //
 // THE MEASUREMENTS BEHIND PIECE 4 (brain/NEEDS_AND_LIMITS.md "Round 3" and "Amendment 1"), held as rows so they cannot drift: what a lack of a held decision costs, whether the world holds the decision (it does), and what the noisy gauge does to a stateless rule and to a filtered one. Far and both kinds, seeds 501-504 (8 runs a pilot)
 // -- THE CALIBRATION SEEDS, said plainly: the task was tuned on 501-508, so these rows say the references behave so ON THEM; the audits (51-62, 71-82, 91-102) are read by the experiment and not here.

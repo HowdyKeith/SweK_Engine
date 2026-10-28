@@ -1,6 +1,6 @@
 // WebGLEngine/tools/subReservoirV4-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node tools/subReservoirV4-selfcheck.mjs      (~12 s -- measured alone, see the foot of this header)
+// Run: node tools/subReservoirV4-selfcheck.mjs      (~12 s -- measured 11.9-12.9 s alone at v4905, see the foot of this header)
 //
 // THE GATE OF tools/subReservoirV4.mjs (the ring map, the matched-drive weight, the reservoir with W_in as a parameter, the edge under an arm's own input, the gains of an arm), tools/ship/subEstimatorStudyV4.mjs (one circuit under one arm, the bottom line over the two arms, the report, the
 // arguments) and tools/ship/subEstimatorStudyV4Cmd.mjs: the study of brain/SUBMARINE_WIP.md "RUNG 4a VERSION 4", registered before any code for it and before any v4 circuit was scored. THE STUDY HAS NOT BEEN RUN; this gate holds the code the run will use.
@@ -181,6 +181,8 @@ sec("8. THE ARGUMENTS AND THE COMMAND");
     const cmdSrc = fs.readFileSync(new URL("./ship/subEstimatorStudyV4Cmd.mjs", import.meta.url), "utf8");
     ok("!! the command file is three lines that import command from the study and set the exit code", /import \{ command \} from "\.\/subEstimatorStudyV4\.mjs"/.test(cmdSrc) && /process\.exitCode = await command\(process\.argv\.slice\(2\)\)/.test(cmdSrc));
 }
+
+ok("!! v4 scores an arm with version 3's own scoreWith (the same function, re-exported), so a v4 score and a v3 score are the same quantity", V.scoreWith === V3.scoreWith && typeof V.scoreWith === "function");
 
 console.log(fails ? `\n${fails} FAIL` : "\nall checks pass");
 finished = true;

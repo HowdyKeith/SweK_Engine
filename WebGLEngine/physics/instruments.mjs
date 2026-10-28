@@ -2586,6 +2586,11 @@ export const INSTRUMENTS = [
       measures: "(brain/dogfightTournament.mjs) and the sea had none. This is it, built ON that module's own statistics rather than beside them: the duel is subDuel's (sonar, four torpedoes, 100 hit points, the same seats and the same score formula for either side, which subDuel's",
       key: "* A FIGHT is one duel; a PAIR is one geometry flown TWICE, X in seat A and then in seat B (seat A starts with B within 60 degrees of its nose, so the seats are NOT equal: the pair cancels it and seatBias() measures it). (lifted from the module's own header)",
       gate: "brain/subTournament-selfcheck.mjs" },
+    // v4905 -- tools/ship/trainNeedsCircuit.mjs, registered at the round it arrived: its `measures` is the module's own second header paragraph and its key the module's own line on the verdicts, LIFTED and not composed.
+    { id: "train-needs-circuit", page: "instrument-bench.html", name: "PIECE 4 OF THE NEEDS-AND-LIMITS IDEA, AS REGISTERED IN brain/NEEDS_AND_LIMITS.md (\"Round 3\" and its Amen", area: "brain",
+      measures: "PIECE 4 OF THE NEEDS-AND-LIMITS IDEA, AS REGISTERED IN brain/NEEDS_AND_LIMITS.md (\"Round 3\" and its Amendments 1 and 2, written before any of this): the survey run (brain/needsTask.mjs) flown by a pilot whose decisions come from a circuit with memory (brain/pilotNeedsCircuit.mjs), the real heading loop against its controls and against the hand-written rules.",
+      key: "THE VERDICTS (registered, section 8): a pilot A beats B on an audit iff mean(A) - mean(B) > max(0.02, 2 sd of B's family). WIRING: PASS iff cx beats ER, TYPE-BLOCK and DEGREE on all three audits. (lifted from the module's own header)",
+      gate: "tools/ship/trainNeedsCircuit-selfcheck.mjs" },
 ];
 
 export const AREAS = [...new Set(INSTRUMENTS.map((i) => i.area))];

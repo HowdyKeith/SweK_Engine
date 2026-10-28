@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "ecbc42839fd990f9646f555cab80d4e6e7c81f9d",
+ "head": "ae4fb1e66aaa1162d23b98d6d330880cca63634e",
  "bodies": {
   "box3d": [
    {
@@ -337,6 +337,11 @@
     "path": "tools/flyCx.mjs",
     "bytes": 6499,
     "sha": "2418774882837c1702bb36d34f7536be4a043a3b"
+   },
+   {
+    "path": "tools/ship/trainNeedsCircuit.mjs",
+    "bytes": 32433,
+    "sha": "6661aeb91eb0011f06707e62784b9b98c66b5b40"
    },
    {
     "path": "tools/ship/trainSubState-selfcheck.mjs",
@@ -855,7 +860,7 @@
    },
    {
     "path": "main.js",
-    "bytes": 3712490,
+    "bytes": 3716228,
     "sha": "cecc622dcf598eaa920957e6db533a8599d57546"
    },
    {

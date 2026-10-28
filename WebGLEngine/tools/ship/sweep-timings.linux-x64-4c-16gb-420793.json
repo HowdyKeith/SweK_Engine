@@ -1,7 +1,7 @@
 {
  "host": "linux-x64-4c-16gb-420793",
  "note": "THIS BOX'S OWN gate runtimes, written by tools/ship/boxTimings.mjs. The shared sweep-timings.json is host-claimed and a foreign box cannot write it (v4647, and that refusal is right); this is how a box records what IT measured without overwriting another machine's numbers. `kinds` says which quantity each ms is, as in the shared record: `alone` is an uncontended serial reading, `capped` is a FLOOR and not a runtime. Read for COVERAGE -- has this gate ever been timed -- and NOT for the ship-time budget, which still reads the shared file. See task #87. `serialRing` holds the last three alone readings; recordReach's margin row reads it on a box that does not own the shared record, because that row asks what a gate costs HERE and nothing here can refresh another box's ring.",
- "captured": "2026-10-27T15:56:50.144Z",
+ "captured": "2026-10-28T00:58:35.866Z",
  "timings": {
   "tools/ship/cloneProvision-selfcheck.mjs": 7171,
   "tools/ship/exitBusy-selfcheck.mjs": 15284,
@@ -107,7 +107,14 @@
   "render/learnedUpscale-selfcheck.mjs": 43938,
   "tools/subHeadingEstimator-selfcheck.mjs": 20556,
   "tools/ship/fsrCaches-selfcheck.mjs": 4627,
-  "physics/mechanics/subNeeds-selfcheck.mjs": 1280
+  "physics/mechanics/subNeeds-selfcheck.mjs": 1280,
+  "brain/needsTask-selfcheck.mjs": 13721,
+  "brain/needsTaskValidity-selfcheck.mjs": 9180,
+  "brain/needsTaskReferences-selfcheck.mjs": 9250,
+  "brain/pilotNeedsCircuit-selfcheck.mjs": 1949,
+  "tools/subReservoirV4-selfcheck.mjs": 11876,
+  "tools/subReservoirV5-selfcheck.mjs": 10706,
+  "tools/ship/trainNeedsCircuit-selfcheck.mjs": 9014
  },
  "at": {
   "tools/ship/cloneProvision-selfcheck.mjs": "2026-09-25T03:35:16.858Z",
@@ -214,7 +221,14 @@
   "render/learnedUpscale-selfcheck.mjs": "2026-10-27T03:51:26.161Z",
   "tools/subHeadingEstimator-selfcheck.mjs": "2026-10-27T03:51:26.161Z",
   "tools/ship/fsrCaches-selfcheck.mjs": "2026-10-27T03:51:26.161Z",
-  "physics/mechanics/subNeeds-selfcheck.mjs": "2026-10-27T15:56:50.144Z"
+  "physics/mechanics/subNeeds-selfcheck.mjs": "2026-10-27T15:56:50.144Z",
+  "brain/needsTask-selfcheck.mjs": "2026-10-28T00:58:35.866Z",
+  "brain/needsTaskValidity-selfcheck.mjs": "2026-10-28T00:58:35.866Z",
+  "brain/needsTaskReferences-selfcheck.mjs": "2026-10-28T00:58:35.866Z",
+  "brain/pilotNeedsCircuit-selfcheck.mjs": "2026-10-28T00:58:35.866Z",
+  "tools/subReservoirV4-selfcheck.mjs": "2026-10-28T00:58:35.866Z",
+  "tools/subReservoirV5-selfcheck.mjs": "2026-10-28T00:58:35.866Z",
+  "tools/ship/trainNeedsCircuit-selfcheck.mjs": "2026-10-28T00:58:35.866Z"
  },
  "kinds": {
   "tools/ship/cloneProvision-selfcheck.mjs": "alone",
@@ -321,7 +335,14 @@
   "render/learnedUpscale-selfcheck.mjs": "alone",
   "tools/subHeadingEstimator-selfcheck.mjs": "alone",
   "tools/ship/fsrCaches-selfcheck.mjs": "alone",
-  "physics/mechanics/subNeeds-selfcheck.mjs": "alone"
+  "physics/mechanics/subNeeds-selfcheck.mjs": "alone",
+  "brain/needsTask-selfcheck.mjs": "alone",
+  "brain/needsTaskValidity-selfcheck.mjs": "alone",
+  "brain/needsTaskReferences-selfcheck.mjs": "alone",
+  "brain/pilotNeedsCircuit-selfcheck.mjs": "alone",
+  "tools/subReservoirV4-selfcheck.mjs": "alone",
+  "tools/subReservoirV5-selfcheck.mjs": "alone",
+  "tools/ship/trainNeedsCircuit-selfcheck.mjs": "alone"
  },
  "codes": {
   "tools/ship/cloneProvision-selfcheck.mjs": 0,
@@ -428,7 +449,14 @@
   "render/learnedUpscale-selfcheck.mjs": 0,
   "tools/subHeadingEstimator-selfcheck.mjs": 0,
   "tools/ship/fsrCaches-selfcheck.mjs": 0,
-  "physics/mechanics/subNeeds-selfcheck.mjs": 0
+  "physics/mechanics/subNeeds-selfcheck.mjs": 0,
+  "brain/needsTask-selfcheck.mjs": 0,
+  "brain/needsTaskValidity-selfcheck.mjs": 0,
+  "brain/needsTaskReferences-selfcheck.mjs": 0,
+  "brain/pilotNeedsCircuit-selfcheck.mjs": 0,
+  "tools/subReservoirV4-selfcheck.mjs": 0,
+  "tools/subReservoirV5-selfcheck.mjs": 0,
+  "tools/ship/trainNeedsCircuit-selfcheck.mjs": 0
  },
  "serialRing": {
   "tools/ship/frozenRecords-selfcheck.mjs": [
@@ -932,6 +960,41 @@
    1154,
    1023,
    1280
+  ],
+  "brain/needsTask-selfcheck.mjs": [
+   13673,
+   13421,
+   13721
+  ],
+  "brain/needsTaskValidity-selfcheck.mjs": [
+   9801,
+   9225,
+   9180
+  ],
+  "brain/needsTaskReferences-selfcheck.mjs": [
+   8965,
+   8739,
+   9250
+  ],
+  "brain/pilotNeedsCircuit-selfcheck.mjs": [
+   2404,
+   1983,
+   1949
+  ],
+  "tools/subReservoirV4-selfcheck.mjs": [
+   12156,
+   12898,
+   11876
+  ],
+  "tools/subReservoirV5-selfcheck.mjs": [
+   11007,
+   10376,
+   10706
+  ],
+  "tools/ship/trainNeedsCircuit-selfcheck.mjs": [
+   9313,
+   9848,
+   9014
   ]
  }
 }

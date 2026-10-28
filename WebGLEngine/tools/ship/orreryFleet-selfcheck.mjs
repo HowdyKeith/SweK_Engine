@@ -295,8 +295,8 @@ console.log("\n7. *** THE COMMIT BELT, RE-MEASURED RATHER THAN TRUSTED ***");
            ". ORDER and COUNT are still compared exactly; only the LENGTH of each identity is tolerated.");
     }
 
-    const moved = F.COMMIT_BELT_DRIFT_V4899.movedSince4475;   // v4899: the newest record
-    const arrived = F.COMMIT_BELT_DRIFT_V4899.arrivedSince4475;
+    const moved = F.COMMIT_BELT_DRIFT_V4905.movedSince4475;   // v4905: the newest record
+    const arrived = F.COMMIT_BELT_DRIFT_V4905.arrivedSince4475;
     const expectedFor = (n) => (moved[n] ? moved[n].now : arrived[n] ? arrived[n].now : (R.perBody[n] || []));
 
     // *** v4665 -- AND THE THIRD TIME THIS ROW HAS COMPARED A RENDERING RATHER THAN AN IDENTITY. *** v4472
@@ -398,7 +398,7 @@ console.log("\n7. *** THE COMMIT BELT, RE-MEASURED RATHER THAN TRUSTED ***");
     // *** THE TWO FAILURE MODES ARE DIFFERENT FACTS AND WERE REPORTED AS ONE. *** "git renders hashes one
     // character longer now" needs nothing; "this body has new commits" needs a recorded reason. The old row
     // said the same sentence for both and buried one real change under fourteen that had not happened.
-    const D = F.COMMIT_BELT_DRIFT_V4899;   // v4899: the newest record; v4778's is graded below as history
+    const D = F.COMMIT_BELT_DRIFT_V4905;   // v4905: the newest record; v4778's is graded below as history
     // v4776 -- THE v4621 RECORD IS KEPT, SO IT IS GRADED. COMMIT_BELT_DRIFT_V4776 is built by spreading it and
     // extending ONE body; a later edit that changed any other body in the new record, or rewrote the old one, would
     // turn "recorded beside it" into "recorded over it". recordReach counts a record no gate names as unguarded,
@@ -480,6 +480,15 @@ console.log("\n7. *** THE COMMIT BELT, RE-MEASURED RATHER THAN TRUSTED ***");
         ok("!! the v4899 belt record is v4898's with NO arrival added and TWO extended (zebrafish, zebrafish-vestibular: the ship commit's own hash, which it could not name); every other entry is v4898's own object",
            added.length === 0 && changed.join(",") === "zebrafish,zebrafish-vestibular" && O.at === "v4898" && N.at === "v4899" && N.bodiesNow === O.bodiesNow && N.movedSince4475 === O.movedSince4475 &&
            ["zebrafish", "zebrafish-vestibular"].every((k) => N.arrivedSince4475[k].now.slice(1).join() === O.arrivedSince4475[k].now.join()),
+           `bodiesNow ${O.bodiesNow} -> ${N.bodiesNow}; extends ${changed.join(", ")}`);
+    }
+    {
+        const O = F.COMMIT_BELT_DRIFT_V4899, N = F.COMMIT_BELT_DRIFT_V4905;
+        const added = Object.keys(N.arrivedSince4475).filter((k) => !(k in O.arrivedSince4475));
+        const changed = Object.keys(O.arrivedSince4475).filter((k) => N.arrivedSince4475[k] !== O.arrivedSince4475[k]);
+        ok("!! the v4905 belt record is v4899's with NO arrival added and ONE extended (zebrafish-vestibular: the workbook's commit, cda083cb, in front of the four it had); every other entry is v4899's own object",
+           added.length === 0 && changed.join(",") === "zebrafish-vestibular" && O.at === "v4899" && N.at === "v4905" && N.bodiesNow === O.bodiesNow && N.movedSince4475 === O.movedSince4475 &&
+           N.arrivedSince4475["zebrafish-vestibular"].now[0] === "cda083cb" && N.arrivedSince4475["zebrafish-vestibular"].now.slice(1).join() === O.arrivedSince4475["zebrafish-vestibular"].now.join(),
            `bodiesNow ${O.bodiesNow} -> ${N.bodiesNow}; extends ${changed.join(", ")}`);
     }
     // *** v4665 -- agreesWithin, NOT sameList, AND A FOURTH CLASS BESIDE IT. ***

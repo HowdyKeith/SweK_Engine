@@ -513,9 +513,9 @@ REPORT.write();
 
 console.log(`\nreportDoors-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILURE(S)"}`);
 // v4901 -- the exports the definition census asked this gate to name (NO_GATE_V4901), checked in one row.
-{ const M = await import("./reportDoors.mjs"); const names = ["NO_GATE_V4901"];
+{ const M = await import("./reportDoors.mjs"); const names = ["NO_GATE_V4901", "NO_GATE_V4905"];
   const okShape = names.every((n) => n in M && (typeof M[n] === "function" || typeof M[n] === "number" || typeof M[n] === "string" || typeof M[n] === "object"));
-  ok("NO_GATE_V4901, the two study libraries gated from other names, is exported and frozen", okShape, names.map((n) => n + ":" + typeof M[n]).join(" ")); }
+  ok("NO_GATE_V4901 and NO_GATE_V4905, the study libraries gated from other names, are exported and frozen", okShape, names.map((n) => n + ":" + typeof M[n]).join(" ")); }
 process.exit(fails === 0 ? 0 : 1);
 
 // =============================================================================================================

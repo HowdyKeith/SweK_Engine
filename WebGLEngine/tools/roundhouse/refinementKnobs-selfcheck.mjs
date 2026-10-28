@@ -1,6 +1,6 @@
 // tools/roundhouse/refinementKnobs-selfcheck.mjs
 //
-// Run: node tools/roundhouse/refinementKnobs-selfcheck.mjs   (~10s)
+// Run: node tools/roundhouse/refinementKnobs-selfcheck.mjs   (~20s: 19.9 s alone on the 4-core sandbox at v4905, one rotation reading was cut off at the 20 s cap; its last header said ~10 s)
 // Gated by tools/ship/selfchecks.mjs (discovery gate).
 //
 // v2907 -- CRITERION 3. TWO CLEAN CONVERGENCES, ONE OBSERVABLE THAT NEVER HAD ANY, AND A PREDICTION OF MINE

@@ -153,6 +153,10 @@ export const FORMATTERS = Object.freeze([
     "brain/subTournament.mjs",
     "tools/ship/subEstimatorStudy.mjs",
     "tools/ship/subEstimatorStudyV3.mjs",
+    // v4905 -- THREE ARRIVALS, found by this gate reading 19 formatters against 16 registered and each confirmed by CALLING it bare (the section 3 loop): the rung 4a v4 and v5 study libraries and the piece 4 trainer, each reportLines(records ...) with no default.
+    "tools/ship/subEstimatorStudyV4.mjs",
+    "tools/ship/subEstimatorStudyV5.mjs",
+    "tools/ship/trainNeedsCircuit.mjs",
 ]);
 
 // *** AND Function.length CANNOT TELL THE LAST TWO FROM THE FIRST FOUR EITHER, WHICH IS THE THIRD INSTRUMENT
@@ -207,6 +211,10 @@ export const STRICT_FORMATTERS = Object.freeze([
     "brain/subTournament.mjs",
     "tools/ship/subEstimatorStudy.mjs",
     "tools/ship/subEstimatorStudyV3.mjs",
+    // v4905 -- the three arrivals of FORMATTERS' v4905 entry, each confirmed by CALLING it bare: they refuse.
+    "tools/ship/subEstimatorStudyV4.mjs",
+    "tools/ship/subEstimatorStudyV5.mjs",
+    "tools/ship/trainNeedsCircuit.mjs",
 ]);
 export const TOLERANT_FORMATTERS = Object.freeze([
     "tools/roundhouse/curriculum.mjs",
@@ -472,15 +480,23 @@ export const GATED_ELSEWHERE = Object.freeze({
     // v4901 -- the merged rung 4a line's study libraries: each is imported by a gate that carries another module's name (tools/subHeadingEstimator-selfcheck.mjs and tools/subReservoirV3-selfcheck.mjs).
     "tools/ship/subEstimatorStudy.mjs": "tools/subHeadingEstimator-selfcheck.mjs",
     "tools/ship/subEstimatorStudyV3.mjs": "tools/subReservoirV3-selfcheck.mjs",
+    // v4905 -- the v4 and v5 study libraries, each imported by the gate of its reservoir library (tools/subReservoirV4-selfcheck.mjs and V5).
+    "tools/ship/subEstimatorStudyV4.mjs": "tools/subReservoirV4-selfcheck.mjs",
+    "tools/ship/subEstimatorStudyV5.mjs": "tools/subReservoirV5-selfcheck.mjs",
 });
 /** v4901 -- the two study libraries of the merged rung 4a line (tools/ship/subEstimatorStudy.mjs and subEstimatorStudyV3.mjs): gated from tools/subHeadingEstimator-selfcheck.mjs and tools/subReservoirV3-selfcheck.mjs, which carry other names (see GATED_ELSEWHERE). */
 export const NO_GATE_V4901 = Object.freeze([
     "tools/ship/subEstimatorStudy.mjs",
     "tools/ship/subEstimatorStudyV3.mjs",
 ]);
+/** v4905 -- the rung 4a v4 and v5 study libraries, gated from the gates of their reservoir libraries (see GATED_ELSEWHERE). */
+export const NO_GATE_V4905 = Object.freeze([
+    "tools/ship/subEstimatorStudyV4.mjs",
+    "tools/ship/subEstimatorStudyV5.mjs",
+]);
 export const NO_GATE_ALL = Object.freeze([...new Set(
     [...NO_GATE_V4458, ...NO_GATE_V4531, ...NO_GATE_V4565, ...NO_GATE_V4540, ...NO_GATE_V4587,
-     ...NO_GATE_V4778, ...NO_GATE_V4898, ...NO_GATE_V4901])].sort());
+     ...NO_GATE_V4778, ...NO_GATE_V4898, ...NO_GATE_V4901, ...NO_GATE_V4905])].sort());
 
 /** This module's own front door -- it is a member of the population it counts. */
 export function reportLines() {

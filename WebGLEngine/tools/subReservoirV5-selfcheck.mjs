@@ -1,6 +1,6 @@
 // WebGLEngine/tools/subReservoirV5-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node tools/subReservoirV5-selfcheck.mjs      (~10 s -- measured alone at v5 build)
+// Run: node tools/subReservoirV5-selfcheck.mjs      (~10.7 s -- measured 10.4-11.0 s alone at v4905)
 //
 // THE GATE OF tools/subReservoirV5.mjs (the two flag-free maps, the matched weight, the windows, the gains, the signal check), tools/ship/subEstimatorStudyV5.mjs (one circuit under one arm with its in-sample skill, the bottom line, the side-coding line, the report, the arguments) and
 // tools/ship/subEstimatorStudyV5Cmd.mjs: the study of brain/SUBMARINE_WIP.md "RUNG 4a VERSION 5", registered before any code for it and before any v5 circuit was scored. THE STUDY HAS NOT BEEN RUN when this gate is written; it holds the code the run will use.

@@ -1,6 +1,6 @@
 // WebGLEngine/brain/pilotNeedsCircuit-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node brain/pilotNeedsCircuit-selfcheck.mjs      (~8 s -- to be restated at ship)
+// Run: node brain/pilotNeedsCircuit-selfcheck.mjs      (~2 s -- measured 1.9-2.4 s alone at v4905)
 //
 // THE GATE OF brain/pilotNeedsCircuit.mjs: the piece 4 pilot of the survey run, registered in brain/NEEDS_AND_LIMITS.md ("Round 3", "Amendment 1", "Amendment 2") before it was written. Nothing is trained here; this holds the code the training will use.
 //   1  CONSTANTS   21 features, 7 outputs, one reservoir step a second (30 ticks), 6 global + 5 per station, the scales, the cap residual, the surfacing gain 10, the switch gain 2 (Amendment 2), all frozen where they are records.

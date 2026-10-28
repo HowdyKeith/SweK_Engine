@@ -1,6 +1,6 @@
 // WebGLEngine/brain/needsTaskValidity-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node brain/needsTaskValidity-selfcheck.mjs      (~9s -- measured 8.8 s alone at v4905 WIP, to be restated at ship)
+// Run: node brain/needsTaskValidity-selfcheck.mjs      (~9.5s -- measured 9.2-9.8 s alone at v4905)
 //
 // THE SECOND HALF OF THE SURVEY RUN'S VALIDITY (brain/needsTask.mjs; the rows were written first, in brain/NEEDS_AND_LIMITS.md "Round 2", and revised in the open there). Kinds `far` and `both`, five rule pilots, eight seeds each (501-508).
 //   1  V4 FAR      the charge is a need: DIRECT (no trip) ends stranded or crushed in at least 3 of 8; TRIP and GUARDED (the trip) in none; GUARDED beats HULLONLY (the same hull rule WITHOUT the trip) by more than max(0.03, 2 se)

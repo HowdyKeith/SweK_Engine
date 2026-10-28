@@ -276,8 +276,15 @@ export const KEY_DRIFT_V4460 = Object.freeze({
             cause: "vendor/hemibrain, vendor/zebrafish and vendor/zebrafish-vestibular, the connectome and article data the fish and fly submarine pilots read, are three new BODIES with their own orbits, stock and prices -- v4504's field, for three bodies. " +
                    "Only the circuit commands, trainers and their gates depend on them (zebrafish-vestibular on none)",
             control: "on today's tree, dropping hemibrain, zebrafish and zebrafish-vestibular together gives fa9b80eb, the key of the move above" }),
+        // v4905 -- ONE NEW FILE IN ONE BODY: vendor/zebrafish-vestibular gained the article's Source Data workbook (41467_2022_32824_MOESM11_SourceData.xlsx, 86,497 bytes), so its `files` list went from four entries to five and its cargo,
+        // at max(1, bytes/4096) per file, grew by one file's worth -- v4416's mechanism, for one body. MEASURED here (world/orrery.mjs through makeGitEconomy, seed 7, 400 ticks) and not read off the diff.
+        Object.freeze({ version: "v4905", commit: "ship", hash: "d10dceab", file: "orrery.json",
+            field: "files", bodiesTouched: 1,
+            cause: "vendor/zebrafish-vestibular, the paper-only supplementary files, gained the article's Source Data workbook: its `files` list grew by one entry (86,497 bytes) and PROVENANCE.md grew from 13,054 to 14,279 bytes. " +
+                   "v4416's mechanism a fifth time, from an ordinary vendoring commit. Its top-level `bytes` moved too (2,491,929 to 2,579,651) and reaches nothing, as recorded",
+            control: "on today's tree, dropping ONLY the workbook's entry from `files` gives d4d55077 -- exactly the previous key -- and putting back only `bytes` or only PROVENANCE.md's size leaves d10dceab" }),
     ]),
-    current: "d4d55077",
+    current: "d10dceab",
     // *** MEASURED AND NEGATIVE, AND IT CORRECTS MY OWN FIRST WRITING OF THE ENTRY ABOVE. *** The re-bake's
     // diff moved TWO fields on 16 bodies each, `arrived` and `sha`, and I wrote "arrived + sha" into this
     // record straight off that diff -- the exact mistake bytesDoNotReachTheEconomy exists to record, made
