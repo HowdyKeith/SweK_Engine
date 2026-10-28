@@ -80,9 +80,11 @@ export function pitchDisturbance(sc, rung, { trim = true, kicks = true } = {}) {
 
 // ---- 4b-E ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 /** The 40 dives of 4b-E: the 10 nominal seeds of TRAIN_SET x side (-1 left, +1 right) x 2 launch times drawn from the dive's seed in [15, 35] s. */
-export function hazardDives() {
+export const hazardDives = () => hazardDivesFor(Array.from({ length: 10 }, (_, i) => i + 1));
+/** The dives of 4b-E for any list of nominal seeds: each seed x side (-1 left, +1 right) x 2 launch times drawn from the dive's seed in [15, 35] s (the 40 of Addendum 2 are seeds 1-10). */
+export function hazardDivesFor(seeds) {
     const out = [];
-    for (let seed = 1; seed <= 10; seed++) {
+    for (const seed of seeds) {
         const sc = T.scenario(seed, "nominal"), r = rngFor(sc, 20011), t0s = [15 + 20 * r(), 15 + 20 * r()];
         for (const side of [-1, 1]) for (const t0 of t0s) out.push(Object.freeze({ sc, side, t0 }));
     }
