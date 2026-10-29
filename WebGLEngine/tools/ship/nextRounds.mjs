@@ -2665,6 +2665,13 @@ export const NEXT_ROUNDS = [
         why: "So that the earlier wrong reading is corrected where it was written.",
     },
     {
+        id: "fish-4b-p-wiring-at-low-start-registered-not-run",
+        blocker: "OPEN",
+        what: "REGISTERED AND BUILT 2026-10-29 (Addendum 11 of brain/FISH_VESTIBULAR_HELPER_WIP.md), NOT RUN: the three Stage A shuffled-wiring controls (ER, class-block, degree-preserving; the same shuffles, indices 0-3) trained from lambda 0.5 on 4b-P cells P/B and P/whole (24 circuits), scored on Addendum 10's fresh audits 83001-83060 beside the real wiring's rl50 replicates; reported, not judged. Keyword `lowControls`; gate section 14.",
+        how: "On the rig: git pull, then node tools/ship/trainSubVestibularCmd.mjs run --specs lowControls --out brain/fishVestibularReplicates.jsonl --workers 4 (the SAME file as Addendum 10, so the references and the rl50 replicates are there; about 8 core-hours), then report --in that file. 4b-E is not covered.",
+        why: "Stage A's 4b-P wiring verdicts could not pass because the real wiring never left the autopilot at lambda 0.99; from lambda 0.5 it can, so the question whether the real wiring beats shuffled wiring can finally be asked.",
+    },
+    {
         id: "fish-4b-p-replicates-run-reported",
         blocker: "OPEN",
         what: "RUN 2026-10-29 (Addendum 10 of brain/FISH_VESTIBULAR_HELPER_WIP.md; result in brain/rig-results/fishVestibularReplicates.jsonl): rl50 ties NO STATE on both cells (3 of 3 audits each, all 8 off the autopilot); rl70 is BEHIND NO STATE on both (3 of 3); none ahead; none stuck; so on 4b-P a longer memory costs and never pays, and the single-search tie of Addendum 9 repeats. Reported, not judged. REGISTERED AND BUILT: 24 replicate circuits on 4b-P (P/B and P/whole x lambda starts 0.5 and 0.7 and NO STATE x 4 search seeds), scored on FRESH audit seeds 83001-83060 (60 dives a block) and the autopilot on them (refs:PR); reported, not judged, no controls, in no verdict. Trainer keyword `replicate`; gate section 13, about 296 mutants. The reading and expectations are written before any run.",

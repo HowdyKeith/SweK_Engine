@@ -43,7 +43,12 @@ export const LAMBDA_SPECS = Object.freeze(LAMBDA_CELLS.flatMap((c) => LAMBDA_FAM
 export const REPL_START = Object.freeze({ rl50: 0.5, rl70: 0.7, rns: null }), REPL_FAMILIES = Object.freeze(Object.keys(REPL_START)), REPL_CELLS = LAMBDA_CELLS, REPL_N = 4;
 export const REPL_AUDIT_SEEDS = Object.freeze([[83001, 83020], [83021, 83040], [83041, 83060]]);
 export const REPL_SPECS = Object.freeze(REPL_CELLS.flatMap((c) => REPL_FAMILIES.map((f) => `${c}/${f}:0-${REPL_N - 1}`))), REPL_STUDY = REPL_SPECS.join(",");
-export const isRepl = (family) => REPL_FAMILIES.includes(family);
+/** Addendum 11, REPORTED AND NOT JUDGED: the three shuffled-wiring controls of Stage A (ER, class-block, degree-preserving; the same shuffles, indices 0-3) trained from the SAME lower lambda start as rl50, on the same cells, recipe and fresh audits, so the real wiring's rl50 replicates can be set beside them. */
+export const CTRL50 = Object.freeze({ er50: "er", cl50: "class", dg50: "degree" }), CTRL50_FAMILIES = Object.freeze(Object.keys(CTRL50)), CTRL50_START = 0.5;
+export const CTRL50_SPECS = Object.freeze(REPL_CELLS.flatMap((c) => CTRL50_FAMILIES.map((f) => `${c}/${f}:0-${REPL_N - 1}`))), CTRL50_STUDY = CTRL50_SPECS.join(",");
+export const isCtrl50 = (family) => CTRL50_FAMILIES.includes(family);
+export const isRepl = (family) => REPL_FAMILIES.includes(family) || isCtrl50(family);
+const replStart = (family) => (isCtrl50(family) ? CTRL50_START : REPL_START[family]);
 export const ALIGNED = Object.freeze({ P: "B", E: "E" }), CROSS_OF = Object.freeze({ P: "E", E: "B" });
 export const STAGE_A_CELL = "cx,nostate,er:0-9,class:0-9,degree:0-9,count:0-3,tuning:0-3", STAGE_B_CELL = "er:10-19,class:10-19,degree:10-19";
 export const STAGE_A = [...VERDICT_CELLS.map(([t, a]) => STAGE_A_CELL.split(",").map((x) => `${t}/${a}/${x}`).join(",")), ...CROSS_CELLS.map(([t, a]) => `${t}/${a}/cx`), ...DENSE_FAMILIES.map((f) => `${DENSE_CELL}/${f}`)].join(",");
@@ -93,7 +98,7 @@ export function parseSpecs(text) {
     const out = [], seen = new Set();
     for (const raw of String(text).split(",")) {
         const part = raw.trim(); if (!part) throw new Error(`trainSubVestibular.parseSpecs: an empty spec in ${JSON.stringify(text)}`);
-        const m = /^([A-Za-z]+)\/([A-Za-z]+)\/(cx|nostate|dcx|dnostate|cxl50|cxl90|(?:rl50|rl70):\d+(?:-\d+)?|[a-z]+:\d+(?:-\d+)?)$/.exec(part);
+        const m = /^([A-Za-z]+)\/([A-Za-z]+)\/(cx|nostate|dcx|dnostate|cxl50|cxl90|(?:rl50|rl70|er50|cl50|dg50):\d+(?:-\d+)?|[a-z]+:\d+(?:-\d+)?)$/.exec(part);
         if (!m) throw new Error(`trainSubVestibular.parseSpecs: cannot read ${JSON.stringify(part)} (a spec is task/arm/cx, task/arm/nostate or task/arm/family:K or family:K-L)`);
         const [, task, arm, fam] = m;
         if (!TASK_NAMES.includes(task)) throw new Error(`trainSubVestibular.parseSpecs: unknown task ${JSON.stringify(task)} (${TASK_NAMES.join(", ")})`);
@@ -103,7 +108,7 @@ export function parseSpecs(text) {
             if (cell === "cross" && family !== "cx") throw new Error(`trainSubVestibular.parseSpecs: the cross cell ${task}/${arm} is cx only, not ${family}`);
             const name = specName({ task, arm, family, index }); if (seen.has(name)) throw new Error(`trainSubVestibular.parseSpecs: ${name} is named twice`); seen.add(name); out.push({ task, arm, family, index });
         };
-        const rq = /^(rl50|rl70|rns):(\d+)(?:-(\d+))?$/.exec(fam);
+        const rq = /^(rl50|rl70|rns|er50|cl50|dg50):(\d+)(?:-(\d+))?$/.exec(fam);
         if (rq) {
             if (!REPL_CELLS.includes(`${task}/${arm}`)) throw new Error(`trainSubVestibular.parseSpecs: ${rq[1]} (the replicates of Addendum 10) exist on ${REPL_CELLS.join(" and ")} only, not ${task}/${arm}`);
             const lo = Number(rq[2]), hi = rq[3] === undefined ? lo : Number(rq[3]);
@@ -128,14 +133,15 @@ export const specName = (s) => `${s.task}/${s.arm}/${s.family === "cx" || s.fami
 const FAM_SLOT = Object.freeze({ cx: 0, nostate: 1, er: 2, class: 22, degree: 42, count: 62, tuning: 82 }), CELL_SLOTS = 102;
 const CELL_ORDER = Object.freeze([...VERDICT_CELLS, ...CROSS_CELLS].map((c) => c.join("/")));
 /** Where a spec sits in the fixed order (the six cells, then cx, nostate, er 0-19, class 0-19, degree 0-19, count 0-19, tuning 0-19): the first search seed is SEARCH_BASE + 10 x that. */
-export const ordinalOf = (s) => (isRepl(s.family) ? CELL_ORDER.length * CELL_SLOTS + DENSE_FAMILIES.length + LAMBDA_SPECS.length + REPL_CELLS.indexOf(`${s.task}/${s.arm}`) * REPL_FAMILIES.length * REPL_N + REPL_FAMILIES.indexOf(s.family) * REPL_N + s.index : LAMBDA_FAMILIES.includes(s.family) ? CELL_ORDER.length * CELL_SLOTS + DENSE_FAMILIES.length + LAMBDA_SPECS.indexOf(`${s.task}/${s.arm}/${s.family}`) : DENSE_FAMILIES.includes(s.family) ? CELL_ORDER.length * CELL_SLOTS + DENSE_FAMILIES.indexOf(s.family) : CELL_ORDER.indexOf(`${s.task}/${s.arm}`) * CELL_SLOTS + FAM_SLOT[s.family] + s.index);
+export const ordinalOf = (s) => (isCtrl50(s.family) ? CELL_ORDER.length * CELL_SLOTS + DENSE_FAMILIES.length + LAMBDA_SPECS.length + REPL_CELLS.length * REPL_FAMILIES.length * REPL_N + REPL_CELLS.indexOf(`${s.task}/${s.arm}`) * CTRL50_FAMILIES.length * REPL_N + CTRL50_FAMILIES.indexOf(s.family) * REPL_N + s.index : isRepl(s.family) ? CELL_ORDER.length * CELL_SLOTS + DENSE_FAMILIES.length + LAMBDA_SPECS.length + REPL_CELLS.indexOf(`${s.task}/${s.arm}`) * REPL_FAMILIES.length * REPL_N + REPL_FAMILIES.indexOf(s.family) * REPL_N + s.index : LAMBDA_FAMILIES.includes(s.family) ? CELL_ORDER.length * CELL_SLOTS + DENSE_FAMILIES.length + LAMBDA_SPECS.indexOf(`${s.task}/${s.arm}/${s.family}`) : DENSE_FAMILIES.includes(s.family) ? CELL_ORDER.length * CELL_SLOTS + DENSE_FAMILIES.indexOf(s.family) : CELL_ORDER.indexOf(`${s.task}/${s.arm}`) * CELL_SLOTS + FAM_SLOT[s.family] + s.index);
 export const seedBaseOf = (s) => SEARCH_BASE + 10 * ordinalOf(s);
 let EXTRACTION = null;
 export const extraction = () => EXTRACTION || (EXTRACTION = F.extract());
 export const armCircuit = (arm) => V.circuitOf(extraction(), arm);
-export const circuitFor = (spec, x = extraction()) => { const base = V.circuitOf(x, spec.arm); return VERDICT_FAMILIES.includes(spec.family) || spec.family === "count" || spec.family === "tuning" ? V.CONTROLS[spec.family](base, CONTROL_BASE[spec.family] + spec.index) : base; };
+export const circuitFor = (spec, x = extraction()) => { const base = V.circuitOf(x, spec.arm); if (isCtrl50(spec.family)) return V.CONTROLS[CTRL50[spec.family]](base, CONTROL_BASE[CTRL50[spec.family]] + spec.index);
+    return VERDICT_FAMILIES.includes(spec.family) || spec.family === "count" || spec.family === "tuning" ? V.CONTROLS[spec.family](base, CONTROL_BASE[spec.family] + spec.index) : base; };
 /** The policy of a spec on its task: the task's evaluator is the seam, the scales are the task's. */
-export const policyOf = (spec, scales, circuit = circuitFor(spec)) => V.createVestibularPolicy(circuit, specName(spec), { persist: spec.family !== "nostate" && spec.family !== "dnostate" && spec.family !== "rns", dense: DENSE_FAMILIES.includes(spec.family), scales, evaluate: (pilot, set) => evalDives(pilot, set) }, LAMBDA_FAMILIES.includes(spec.family) ? { ...V.INIT, lambda0: LAMBDA_START[spec.family] } : REPL_START[spec.family] ? { ...V.INIT, lambda0: REPL_START[spec.family] } : V.INIT);
+export const policyOf = (spec, scales, circuit = circuitFor(spec)) => V.createVestibularPolicy(circuit, specName(spec), { persist: spec.family !== "nostate" && spec.family !== "dnostate" && spec.family !== "rns", dense: DENSE_FAMILIES.includes(spec.family), scales, evaluate: (pilot, set) => evalDives(pilot, set) }, LAMBDA_FAMILIES.includes(spec.family) ? { ...V.INIT, lambda0: LAMBDA_START[spec.family] } : replStart(spec.family) ? { ...V.INIT, lambda0: replStart(spec.family) } : V.INIT);
 
 // ---- one search and one circuit -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 /** One search of the recipe from the start weights; returns { k, seed, weights, trainScore, improved, neutral, moved, kept, pruneEvals }. */
@@ -273,6 +279,28 @@ export function replicateReading(cellsRecs, refs) {
             });
             out.push({ cell, family: fam, start: REPL_START[fam], n: rs.length, stuck: rs.filter((r) => r.asStart).length, lambdas: rs.map((r) => (r.movement ? r.movement.lambda : null)), audits });
         }
+        // Addendum 11: the shuffled-wiring controls at the same start, each set against the real wiring's rl50 mean by the margin rule (needs the larger of 0.02 and 2 sd of the control's replicates)
+        const rl = by("rl50"), rlS = scoresOf(rl);
+        for (const fam of CTRL50_FAMILIES) {
+            const rs = by(fam); if (!rs.length) continue;
+            const S = scoresOf(rs);
+            const audits = AUDITS.map((a) => {
+                const v = S[a], m = meanOf(v), d = m - refs.autopilot[a].score, row = { audit: a, mean: m, sd: sdOf(v), min: Math.min(...v), max: Math.max(...v), vsAutopilot: d, offAutopilot: d > MIN_EDGE };
+                if (rl.length) { const b = beats(meanOf(rlS[a]), v); row.realVsControl = { margin: b.margin, needs: b.needs, reading: b.margin > b.needs ? "ahead" : b.margin < -b.needs ? "behind" : "tie" }; }
+                return row;
+            });
+            out.push({ cell, family: fam, start: CTRL50_START, control: CTRL50[fam], n: rs.length, stuck: rs.filter((r) => r.asStart).length, lambdas: rs.map((r) => (r.movement ? r.movement.lambda : null)), audits });
+        }
+    }
+    return out;
+}
+/** Addendum 11, REPORTED AND NOT JUDGED: per cell, on how many of the three audits the real wiring's rl50 replicates are AHEAD of each shuffled-wiring control's, and of all three families at once. [] with no control rows. */
+export function wiringAtLowStart(repl) {
+    const out = [];
+    for (const cell of REPL_CELLS) {
+        const rows = repl.filter((x) => x.cell === cell && x.audits[0].realVsControl); if (!rows.length) continue;
+        const per = Object.fromEntries(rows.map((x) => [x.family, { ahead: x.audits.filter((a) => a.realVsControl.reading === "ahead").length, tie: x.audits.filter((a) => a.realVsControl.reading === "tie").length, behind: x.audits.filter((a) => a.realVsControl.reading === "behind").length }]));
+        out.push({ cell, families: per, n: rows.length, aheadOfAll: rows.length === CTRL50_FAMILIES.length ? AUDITS.filter((a, i) => rows.every((x) => x.audits[i].realVsControl.reading === "ahead")).length : null });
     }
     return out;
 }
@@ -296,8 +324,8 @@ export function verdictOf(records) {
     for (const [t, a] of VERDICT_CELLS) { const k = `${t}/${a}`; if (cellsRecs[k]) cells[k] = cellVerdict(cellsRecs[k], refsByTask[t]); }
     for (const [t, a] of CROSS_CELLS) { const k = `${t}/${a}`, c = (cellsRecs[k] || []).find((r) => r.family === "cx"); if (c) crossRecs[k] = c; }
     const checks = Object.fromEntries(TASK_NAMES.filter((t) => refsByTask[t]).map((t) => [t, checksOf(refsByTask[t])])), claim = pathwayClaim(cells, crossRecs, refsByTask), dense = denseReading(cellsRecs[DENSE_CELL] || [], refsByTask.P, cells[DENSE_CELL]), lambda = lambdaReading(cellsRecs, refsByTask.P);
-    const repl = replicateReading(cellsRecs, refsRepl);
-    return { checks, cells, claim, dense, lambda, repl, passed: Object.values(cells).filter((c) => c.wiring.verdict === "PASS").length, assessed: Object.values(cells).filter((c) => c.wiring.verdict !== "NOT ASSESSED").length, refsByTask };
+    const repl = replicateReading(cellsRecs, refsRepl), wiring50 = wiringAtLowStart(repl);
+    return { checks, cells, claim, dense, lambda, repl, wiring50, passed: Object.values(cells).filter((c) => c.wiring.verdict === "PASS").length, assessed: Object.values(cells).filter((c) => c.wiring.verdict !== "NOT ASSESSED").length, refsByTask };
 }
 export function reportLines(records) {
     const v = verdictOf(records), L = [], rs = records.filter((r) => r.family !== "refs");
@@ -328,10 +356,12 @@ export function reportLines(records) {
     }
     for (const x of v.repl) {
         const sm = (a) => `${f3(a.mean)} sd ${f3(a.sd)} [${f3(a.min)}..${f3(a.max)}]`;
-        L.push(`  REPLICATES ${x.cell}/${x.family} (${x.family === "rns" ? "NO STATE" : "lambda start " + x.start}, Addendum 10; REPORTED, NOT JUDGED, fresh audits 83001-83060): ${x.n} circuit(s), ${x.stuck} with no eligible champion; final lambdas ${x.lambdas.map((l) => (l === null ? "none" : f3(l))).join(" ")}`);
+        L.push(`  REPLICATES ${x.cell}/${x.family} (${x.family === "rns" ? "NO STATE" : x.control ? "the " + x.control + " control at lambda " + x.start : "lambda start " + x.start}, Addendum ${x.control ? 11 : 10}; REPORTED, NOT JUDGED, fresh audits 83001-83060): ${x.n} circuit(s), ${x.stuck} with no eligible champion; final lambdas ${x.lambdas.map((l) => (l === null ? "none" : f3(l))).join(" ")}`);
         L.push(`    ${x.audits.map((a) => `${a.audit} ${sm(a)}`).join(" | ")}; against the autopilot ${x.audits.map((a) => (a.vsAutopilot >= 0 ? "+" : "") + f3(a.vsAutopilot) + (a.offAutopilot ? " (off it)" : " (not off it)")).join(" | ")}`);
+        if (x.audits[0].realVsControl) L.push(`    the real wiring's rl50 mean against these: ${x.audits.map((a) => `${f3(a.realVsControl.margin)} (needs ${f3(a.realVsControl.needs)}: ${a.realVsControl.reading})`).join(" | ")}`);
         if (x.audits[0].vsNoState) L.push(`    against the ${x.cell} NO STATE replicates: ${x.audits.map((a) => `${f3(a.vsNoState.margin)} (needs ${f3(a.vsNoState.needs)}: ${a.vsNoState.reading})`).join(" | ")}`);
     }
+    for (const w of v.wiring50) L.push(`  WIRING AT LAMBDA 0.5 ${w.cell} (Addendum 11; REPORTED, NOT JUDGED): the real wiring is ahead of ${Object.entries(w.families).map(([f, c]) => `${CTRL50[f]} on ${c.ahead} of 3 (tie ${c.tie}, behind ${c.behind})`).join(", ")}; ahead of ${w.aheadOfAll === null ? "(not all three families are in)" : "all three families on " + w.aheadOfAll + " of 3 audits"}`);
     for (const r of v.claim.rows) L.push(`  TWO-PATHWAY ${r.task}: ${r.status}${r.audits ? ` -- aligned ${r.aligned} ${r.alignedPasses ? "PASSES" : "does not pass"}; beats cross ${r.cross} on ${r.crossWins} of 3 audits (${r.audits.map((x) => `${f3(x.diff)} needs ${f3(x.needs)}`).join(" | ")})` : ` -- ${r.why}`}`);
     L.push(`RUNG 4b: ${v.passed} of ${v.assessed} assessed verdict cells PASSED (a pass in one of four is "one of four", not "the wiring works")`);
     L.push(`RUNG 4b TWO-PATHWAY CLAIM: ${v.claim.rows.length === TASK_NAMES.length && v.claim.rows.every((r) => r.status !== "NOT ASSESSED") && TASK_NAMES.every((t) => v.checks[t] && v.checks[t].ok) ? (v.claim.holds ? "HOLDS (a double dissociation)" : "DOES NOT HOLD") : "NOT ASSESSED"}`);
@@ -351,7 +381,7 @@ export function parseArgs(argv) {
     if (cmd === "report") { if (!given.in) throw new Error("report needs --in <results file>"); return { cmd, in: given.in, allowSmoke: !!given["allow-smoke"] }; }
     if (!given.one && !given.specs) throw new Error("run needs --specs <list> (the registered stage A: --specs stageA; Addendum 9: --specs lambdaStudy)");
     if (!given.one && !given.out) throw new Error("run needs --out <results file>");
-    const text = given.specs === "stageA" ? STAGE_A : given.specs === "lambdaStudy" ? LAMBDA_STUDY : given.specs === "replicate" ? REPL_STUDY : given.specs || given.one;
+    const text = given.specs === "stageA" ? STAGE_A : given.specs === "lambdaStudy" ? LAMBDA_STUDY : given.specs === "replicate" ? REPL_STUDY : given.specs === "lowControls" ? CTRL50_STUDY : given.specs || given.one;
     const o = { cmd, specs: text, one: given.one || null, out: given.out || null, workers: given.workers ?? 1, recipe: { runs: given.runs ?? RECIPE.runs, iters: given.iters ?? RECIPE.iters, sigma: given.sigma ?? RECIPE.sigma, maxK: given.maxK ?? RECIPE.maxK, pruneBudget: given["prune-budget"] ?? RECIPE.pruneBudget }, smoke: !!given.smoke, quiet: !!given.quiet };
     for (const [k, v] of [["workers", o.workers], ["runs", o.recipe.runs], ["iters", o.recipe.iters], ["maxK", o.recipe.maxK]]) if (!(Number.isInteger(v) && v >= 1)) throw new Error(`--${k} must be a whole number of 1 or more, got ${v}`);
     if (!(o.recipe.sigma > 0)) throw new Error(`--sigma must be above 0, got ${o.recipe.sigma}`);
