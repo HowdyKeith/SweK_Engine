@@ -2665,10 +2665,10 @@ export const NEXT_ROUNDS = [
         why: "So that the earlier wrong reading is corrected where it was written.",
     },
     {
-        id: "fish-4b-p-replicates-registered-not-run",
+        id: "fish-4b-p-replicates-run-reported",
         blocker: "OPEN",
-        what: "REGISTERED AND BUILT 2026-10-29 (Addendum 10 of brain/FISH_VESTIBULAR_HELPER_WIP.md), NOT RUN: 24 replicate circuits on 4b-P (P/B and P/whole x lambda starts 0.5 and 0.7 and NO STATE x 4 search seeds), scored on FRESH audit seeds 83001-83060 (60 dives a block) and the autopilot on them (refs:PR); reported, not judged, no controls, in no verdict. Trainer keyword `replicate`; gate section 13, about 296 mutants. The reading and expectations are written before any run.",
-        how: "On the rig: git pull, then node tools/ship/trainSubVestibularCmd.mjs run --specs replicate --out brain/fishVestibularReplicates.jsonl --workers 4 (about 8 core-hours), then report --in the same file. Its own file, not the stage A file. Nothing here says anything about the wiring: no ER/class/degree controls at the low start.",
+        what: "RUN 2026-10-29 (Addendum 10 of brain/FISH_VESTIBULAR_HELPER_WIP.md; result in brain/rig-results/fishVestibularReplicates.jsonl): rl50 ties NO STATE on both cells (3 of 3 audits each, all 8 off the autopilot); rl70 is BEHIND NO STATE on both (3 of 3); none ahead; none stuck; so on 4b-P a longer memory costs and never pays, and the single-search tie of Addendum 9 repeats. Reported, not judged. REGISTERED AND BUILT: 24 replicate circuits on 4b-P (P/B and P/whole x lambda starts 0.5 and 0.7 and NO STATE x 4 search seeds), scored on FRESH audit seeds 83001-83060 (60 dives a block) and the autopilot on them (refs:PR); reported, not judged, no controls, in no verdict. Trainer keyword `replicate`; gate section 13, about 296 mutants. The reading and expectations are written before any run.",
+        how: "(Done; to repeat) node tools/ship/trainSubVestibularCmd.mjs run --specs replicate --out brain/fishVestibularReplicates.jsonl --workers 4 (about 8 core-hours), then report --in the same file. Its own file, not the stage A file. Nothing here says anything about the wiring: no ER/class/degree controls at the low start.",
         why: "Addendum 9 had one search per circuit; a tie with NO STATE from single searches cannot separate no gain from noise, and 0.7 was untried.",
     },
     {
