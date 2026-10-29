@@ -24,7 +24,7 @@ import * as V from "../../brain/pilotSubVestibular.mjs";
 import * as H from "../subVestibularTasks.mjs";
 import * as F from "../fishVestibularCircuit.mjs";
 import { mulberry } from "../../brain/pilotSubPolicy.mjs";
-import { meanOf, beats, spearman, readRecords, MIN_EDGE, SD_FACTOR, MIN_CONTROLS } from "./trainSubCircuits.mjs";
+import { meanOf, sdOf, beats, spearman, readRecords, MIN_EDGE, SD_FACTOR, MIN_CONTROLS } from "./trainSubCircuits.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export { MIN_EDGE, SD_FACTOR, MIN_CONTROLS };
@@ -39,6 +39,11 @@ export const DENSE_FAMILIES = Object.freeze(["dcx", "dnostate"]), DENSE_CELL = "
 /** Addendum 9 (post hoc, reported and not judged, no controls): the real wiring of 4b-P with a LOWER STARTING LAMBDA (lambda stays trained and free), on P/B and P/whole. */
 export const LAMBDA_START = Object.freeze({ cxl50: 0.5, cxl90: 0.9 }), LAMBDA_FAMILIES = Object.freeze(Object.keys(LAMBDA_START)), LAMBDA_CELLS = Object.freeze(["P/B", "P/whole"]);
 export const LAMBDA_SPECS = Object.freeze(LAMBDA_CELLS.flatMap((c) => LAMBDA_FAMILIES.map((f) => `${c}/${f}`))), LAMBDA_STUDY = LAMBDA_SPECS.join(",");
+/** Addendum 10, REPORTED AND NOT JUDGED: replicate searches of the lower-lambda starts and of NO STATE on 4b-P, each with its own search seeds, scored on FRESH audit seeds read by nothing else. rl50 and rl70 start lambda at 0.5 and 0.7; rns is NO STATE. Indices 0-3. */
+export const REPL_START = Object.freeze({ rl50: 0.5, rl70: 0.7, rns: null }), REPL_FAMILIES = Object.freeze(Object.keys(REPL_START)), REPL_CELLS = LAMBDA_CELLS, REPL_N = 4;
+export const REPL_AUDIT_SEEDS = Object.freeze([[83001, 83020], [83021, 83040], [83041, 83060]]);
+export const REPL_SPECS = Object.freeze(REPL_CELLS.flatMap((c) => REPL_FAMILIES.map((f) => `${c}/${f}:0-${REPL_N - 1}`))), REPL_STUDY = REPL_SPECS.join(",");
+export const isRepl = (family) => REPL_FAMILIES.includes(family);
 export const ALIGNED = Object.freeze({ P: "B", E: "E" }), CROSS_OF = Object.freeze({ P: "E", E: "B" });
 export const STAGE_A_CELL = "cx,nostate,er:0-9,class:0-9,degree:0-9,count:0-3,tuning:0-3", STAGE_B_CELL = "er:10-19,class:10-19,degree:10-19";
 export const STAGE_A = [...VERDICT_CELLS.map(([t, a]) => STAGE_A_CELL.split(",").map((x) => `${t}/${a}/${x}`).join(",")), ...CROSS_CELLS.map(([t, a]) => `${t}/${a}/cx`), ...DENSE_FAMILIES.map((f) => `${DENSE_CELL}/${f}`)].join(",");
@@ -47,7 +52,7 @@ export const AUDITS = Object.freeze(["a1", "a2", "a3"]);
 export const AUDIT_SEEDS = Object.freeze({ P: Object.freeze([[81001, 81010], [81011, 81020], [81021, 81030]]), E: Object.freeze([[82001, 82008], [82009, 82016], [82017, 82024]]) });
 export const HELD_OUT_SEEDS = Object.freeze({ P: Object.freeze([11, 20]), E: Object.freeze([11, 20]) });
 export const COST_FLOOR = H.COST_FLOOR, RECOVER_FRACTION = H.RECOVER_FRACTION;
-export const REFS_NAME = (task) => `refs:${task}`;
+export const REFS_NAME = (task) => `refs:${task}`, REFS_REPL = "refs:PR";
 const KIND3 = T.KINDS;
 const range = ([a, b]) => Array.from({ length: b - a + 1 }, (_, i) => a + i);
 const f3 = (v) => (v === null || v === undefined || !Number.isFinite(v) ? "n/a" : v.toFixed(3));
@@ -62,11 +67,12 @@ export function diveOf(task, sc, extra = {}) {
 const pitchDives = (seeds) => KIND3.flatMap((kind) => seeds.map((seed) => diveOf("P", T.scenario(seed, kind))));
 const hazardDives = (seeds) => H.hazardDivesFor(seeds).map((d) => diveOf("E", d.sc, d));
 /** The sets of a task: { train (the 40 dives of Addendum 2), heldOut, a1, a2, a3 }; `smoke` shrinks each to every eighth dive. */
-export function setsOf(task, { smoke = false } = {}) {
+export function setsOf(task, { smoke = false, replicate = false } = {}) {
     if (!TASK_NAMES.includes(task)) throw new Error(`trainSubVestibular.setsOf: task ${JSON.stringify(task)} (${TASK_NAMES.join(", ")})`);
+    if (replicate && task !== "P") throw new Error("trainSubVestibular.setsOf: the replicate audits (Addendum 10) exist for 4b-P only");
     const mk = task === "P" ? pitchDives : hazardDives;
     const trainP = () => T.TRAIN_SET.map((sc) => diveOf("P", sc)), s = { train: task === "P" ? trainP() : hazardDives(range([1, 10])), heldOut: mk(range(HELD_OUT_SEEDS[task])) };
-    AUDITS.forEach((a, i) => { s[a] = mk(range(AUDIT_SEEDS[task][i])); });
+    AUDITS.forEach((a, i) => { s[a] = mk(range((replicate ? REPL_AUDIT_SEEDS : AUDIT_SEEDS[task])[i])); });
     return smoke ? Object.fromEntries(Object.entries(s).map(([k, v]) => [k, v.filter((_, i) => i % 8 === 0)])) : s;
 }
 /** Fly `dives` with `pilot`: { score (mean), early (dives that ended early), runs: [{ kind, seed, side, score, status }] }. */
@@ -87,7 +93,7 @@ export function parseSpecs(text) {
     const out = [], seen = new Set();
     for (const raw of String(text).split(",")) {
         const part = raw.trim(); if (!part) throw new Error(`trainSubVestibular.parseSpecs: an empty spec in ${JSON.stringify(text)}`);
-        const m = /^([A-Za-z]+)\/([A-Za-z]+)\/(cx|nostate|dcx|dnostate|cxl50|cxl90|[a-z]+:\d+(?:-\d+)?)$/.exec(part);
+        const m = /^([A-Za-z]+)\/([A-Za-z]+)\/(cx|nostate|dcx|dnostate|cxl50|cxl90|(?:rl50|rl70):\d+(?:-\d+)?|[a-z]+:\d+(?:-\d+)?)$/.exec(part);
         if (!m) throw new Error(`trainSubVestibular.parseSpecs: cannot read ${JSON.stringify(part)} (a spec is task/arm/cx, task/arm/nostate or task/arm/family:K or family:K-L)`);
         const [, task, arm, fam] = m;
         if (!TASK_NAMES.includes(task)) throw new Error(`trainSubVestibular.parseSpecs: unknown task ${JSON.stringify(task)} (${TASK_NAMES.join(", ")})`);
@@ -97,6 +103,15 @@ export function parseSpecs(text) {
             if (cell === "cross" && family !== "cx") throw new Error(`trainSubVestibular.parseSpecs: the cross cell ${task}/${arm} is cx only, not ${family}`);
             const name = specName({ task, arm, family, index }); if (seen.has(name)) throw new Error(`trainSubVestibular.parseSpecs: ${name} is named twice`); seen.add(name); out.push({ task, arm, family, index });
         };
+        const rq = /^(rl50|rl70|rns):(\d+)(?:-(\d+))?$/.exec(fam);
+        if (rq) {
+            if (!REPL_CELLS.includes(`${task}/${arm}`)) throw new Error(`trainSubVestibular.parseSpecs: ${rq[1]} (the replicates of Addendum 10) exist on ${REPL_CELLS.join(" and ")} only, not ${task}/${arm}`);
+            const lo = Number(rq[2]), hi = rq[3] === undefined ? lo : Number(rq[3]);
+            if (hi < lo) throw new Error(`trainSubVestibular.parseSpecs: the range ${JSON.stringify(part)} runs backwards`);
+            if (hi > REPL_N - 1) throw new Error(`trainSubVestibular.parseSpecs: ${JSON.stringify(part)} is past index ${REPL_N - 1}`);
+            for (let k = lo; k <= hi; k++) add(rq[1], k);
+            continue;
+        }
         if (LAMBDA_FAMILIES.includes(fam)) { if (!LAMBDA_CELLS.includes(`${task}/${arm}`)) throw new Error(`trainSubVestibular.parseSpecs: ${fam} (the lower-lambda start of Addendum 9) exists on ${LAMBDA_CELLS.join(" and ")} only, not ${task}/${arm}`); add(fam, 0); continue; }
         if (DENSE_FAMILIES.includes(fam)) { if (`${task}/${arm}` !== DENSE_CELL) throw new Error(`trainSubVestibular.parseSpecs: ${fam} (4b-D) exists on ${DENSE_CELL} only, not ${task}/${arm}`); add(fam, 0); continue; }
         if (fam === "cx" || fam === "nostate") { add(fam, 0); continue; }
@@ -113,14 +128,14 @@ export const specName = (s) => `${s.task}/${s.arm}/${s.family === "cx" || s.fami
 const FAM_SLOT = Object.freeze({ cx: 0, nostate: 1, er: 2, class: 22, degree: 42, count: 62, tuning: 82 }), CELL_SLOTS = 102;
 const CELL_ORDER = Object.freeze([...VERDICT_CELLS, ...CROSS_CELLS].map((c) => c.join("/")));
 /** Where a spec sits in the fixed order (the six cells, then cx, nostate, er 0-19, class 0-19, degree 0-19, count 0-19, tuning 0-19): the first search seed is SEARCH_BASE + 10 x that. */
-export const ordinalOf = (s) => (LAMBDA_FAMILIES.includes(s.family) ? CELL_ORDER.length * CELL_SLOTS + DENSE_FAMILIES.length + LAMBDA_SPECS.indexOf(`${s.task}/${s.arm}/${s.family}`) : DENSE_FAMILIES.includes(s.family) ? CELL_ORDER.length * CELL_SLOTS + DENSE_FAMILIES.indexOf(s.family) : CELL_ORDER.indexOf(`${s.task}/${s.arm}`) * CELL_SLOTS + FAM_SLOT[s.family] + s.index);
+export const ordinalOf = (s) => (isRepl(s.family) ? CELL_ORDER.length * CELL_SLOTS + DENSE_FAMILIES.length + LAMBDA_SPECS.length + REPL_CELLS.indexOf(`${s.task}/${s.arm}`) * REPL_FAMILIES.length * REPL_N + REPL_FAMILIES.indexOf(s.family) * REPL_N + s.index : LAMBDA_FAMILIES.includes(s.family) ? CELL_ORDER.length * CELL_SLOTS + DENSE_FAMILIES.length + LAMBDA_SPECS.indexOf(`${s.task}/${s.arm}/${s.family}`) : DENSE_FAMILIES.includes(s.family) ? CELL_ORDER.length * CELL_SLOTS + DENSE_FAMILIES.indexOf(s.family) : CELL_ORDER.indexOf(`${s.task}/${s.arm}`) * CELL_SLOTS + FAM_SLOT[s.family] + s.index);
 export const seedBaseOf = (s) => SEARCH_BASE + 10 * ordinalOf(s);
 let EXTRACTION = null;
 export const extraction = () => EXTRACTION || (EXTRACTION = F.extract());
 export const armCircuit = (arm) => V.circuitOf(extraction(), arm);
 export const circuitFor = (spec, x = extraction()) => { const base = V.circuitOf(x, spec.arm); return VERDICT_FAMILIES.includes(spec.family) || spec.family === "count" || spec.family === "tuning" ? V.CONTROLS[spec.family](base, CONTROL_BASE[spec.family] + spec.index) : base; };
 /** The policy of a spec on its task: the task's evaluator is the seam, the scales are the task's. */
-export const policyOf = (spec, scales, circuit = circuitFor(spec)) => V.createVestibularPolicy(circuit, specName(spec), { persist: spec.family !== "nostate" && spec.family !== "dnostate", dense: DENSE_FAMILIES.includes(spec.family), scales, evaluate: (pilot, set) => evalDives(pilot, set) }, LAMBDA_FAMILIES.includes(spec.family) ? { ...V.INIT, lambda0: LAMBDA_START[spec.family] } : V.INIT);
+export const policyOf = (spec, scales, circuit = circuitFor(spec)) => V.createVestibularPolicy(circuit, specName(spec), { persist: spec.family !== "nostate" && spec.family !== "dnostate" && spec.family !== "rns", dense: DENSE_FAMILIES.includes(spec.family), scales, evaluate: (pilot, set) => evalDives(pilot, set) }, LAMBDA_FAMILIES.includes(spec.family) ? { ...V.INIT, lambda0: LAMBDA_START[spec.family] } : REPL_START[spec.family] ? { ...V.INIT, lambda0: REPL_START[spec.family] } : V.INIT);
 
 // ---- one search and one circuit -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 /** One search of the recipe from the start weights; returns { k, seed, weights, trainScore, improved, neutral, moved, kept, pruneEvals }. */
@@ -147,7 +162,7 @@ export function search(Pol, seed, k, recipe, trainSet) {
 }
 /** Train and grade one circuit. Returns the record the file keeps. THE AUDITS ARE READ HERE, ONCE, FOR THE CHAMPION. */
 export function runCircuit(spec, opts = {}, log = () => {}) {
-    const recipe = { ...RECIPE, ...(opts.recipe || {}) }, sets = opts.sets || setsOf(spec.task, { smoke: !!opts.smoke }), scales = opts.scales || scalesOf(sets.train);
+    const recipe = { ...RECIPE, ...(opts.recipe || {}) }, sets = opts.sets || setsOf(spec.task, { smoke: !!opts.smoke, replicate: isRepl(spec.family) }), scales = opts.scales || scalesOf(sets.train);
     const name = specName(spec), Pol = (opts.policyOf || policyOf)(spec, scales), base = seedBaseOf(spec), hand = Pol.handWeights(), startHeld = Pol.evaluate(hand, sets.heldOut), runs = [];
     for (let k = 0; k < recipe.runs; k++) {
         const r = search(Pol, base + k, k, recipe, sets.train), held = Pol.evaluate(r.weights, sets.heldOut);
@@ -156,7 +171,7 @@ export function runCircuit(spec, opts = {}, log = () => {}) {
     }
     const eligible = runs.filter((r) => r.eligible).sort((a, b) => b.heldOut - a.heldOut || a.k - b.k), c = eligible[0] || null;
     const champion = c ? Object.fromEntries(AUDITS.map((a) => [a, summary(Pol.evaluate(c.weights, sets[a]))])) : null;
-    return { spec: name, task: spec.task, arm: spec.arm, family: spec.family, index: spec.index, smoke: !!opts.smoke, recipe, seedBase: base, weightCount: Pol.WEIGHT_COUNT, reach: Pol.reach.pairs, scales, champion: c ? c.seed : null, asStart: !c, startHeldEarly: startHeld.early,
+    return { spec: name, task: spec.task, arm: spec.arm, family: spec.family, index: spec.index, ...(isRepl(spec.family) ? { replicate: true } : {}), smoke: !!opts.smoke, recipe, seedBase: base, weightCount: Pol.WEIGHT_COUNT, reach: Pol.reach.pairs, scales, champion: c ? c.seed : null, asStart: !c, startHeldEarly: startHeld.early,
         searches: runs.map((r) => ({ k: r.k, seed: r.seed, trainScore: r.trainScore, heldOut: r.heldOut, heldEarly: r.heldEarly, eligible: r.eligible, improved: r.improved, neutral: r.neutral, moved: r.moved, kept: r.kept })),
         movement: c ? { moved: c.moved, kept: c.kept, largest: Math.max(...Array.from(c.weights, (v, i) => Math.abs(v - hand[i]))), lambda: Pol.persist ? c.weights[Pol.LAMBDA_INDEX] : 0 } : null, scores: { champion }, weights: c ? Array.from(c.weights, (v) => Math.round(v * 1e6) / 1e6) : null };
 }
@@ -165,10 +180,10 @@ export function runCircuit(spec, opts = {}, log = () => {}) {
 /** The autopilot alone on the task's three audits (it selects nothing), the TASK RE-CHECK on the 40 training dives, the self-tests of the task module, and the START CHECK of every arm. */
 export function refsRecord(task, opts = {}) {
     const TM = opts.tasks || H, mkPolicy = opts.policyOf || policyOf;
-    const sets = opts.sets || setsOf(task, { smoke: !!opts.smoke }), AP = AS.pilot(), scales = opts.scales || scalesOf(sets.train);
+    const sets = opts.sets || setsOf(task, { smoke: !!opts.smoke, replicate: !!opts.replicate }), AP = AS.pilot(), scales = opts.scales || scalesOf(sets.train);
     const autopilot = Object.fromEntries(AUDITS.map((a) => [a, summary(evalDives(AP, sets[a]))]));
     const trainDist = evalDives(AP, sets.train), clean = meanOf(sets.train.map((d) => T.fly(AP, d.sc).score)), cost = clean - trainDist.score;
-    const rec = { family: "refs", spec: REFS_NAME(task), task, smoke: !!opts.smoke, autopilot, cleanTrain: clean, disturbedTrain: trainDist.score, cost, scales };
+    const rec = { family: "refs", spec: opts.replicate ? REFS_REPL : REFS_NAME(task), task, ...(opts.replicate ? { replicate: true } : {}), smoke: !!opts.smoke, autopilot, cleanTrain: clean, disturbedTrain: trainDist.score, cost, scales };
     const runner = TM.selfTestRunner(), signs = TM.selfTestSigns();
     rec.selfTests = { runnerBad: runner.bad, signsFailed: signs.filter(([, ok]) => !ok).map(([w]) => w) };
     if (task === "E") {
@@ -241,6 +256,26 @@ export function lambdaReading(cellsRecs, refs) {
     }
     return out;
 }
+/** Addendum 10, REPORTED AND NOT JUDGED: per cell and per start (rl50, rl70, rns) the replicates' effective scores on the FRESH audits (mean, sd, range), each mean's difference from the autopilot, and the lower-lambda means against the cell's NO STATE replicates by the margin rule (ahead / tie / behind). [] with no replicate references record. */
+export function replicateReading(cellsRecs, refs) {
+    if (!refs) return [];
+    const out = [];
+    for (const cell of REPL_CELLS) {
+        const recs = cellsRecs[cell] || [], by = (f) => recs.filter((r) => r.family === f).sort((a, b) => a.index - b.index);
+        const scoresOf = (rs) => Object.fromEntries(AUDITS.map((a) => [a, rs.map((r) => effectiveOf(r, refs)[a].score)])), ns = by("rns"), nsS = scoresOf(ns);
+        for (const fam of REPL_FAMILIES) {
+            const rs = by(fam); if (!rs.length) continue;
+            const S = scoresOf(rs);
+            const audits = AUDITS.map((a) => {
+                const v = S[a], m = meanOf(v), d = m - refs.autopilot[a].score, row = { audit: a, mean: m, sd: sdOf(v), min: Math.min(...v), max: Math.max(...v), vsAutopilot: d, offAutopilot: d > MIN_EDGE };
+                if (fam !== "rns" && ns.length) { const b = beats(m, nsS[a]); row.vsNoState = { margin: b.margin, needs: b.needs, reading: b.margin > b.needs ? "ahead" : b.margin < -b.needs ? "behind" : "tie" }; }
+                return row;
+            });
+            out.push({ cell, family: fam, start: REPL_START[fam], n: rs.length, stuck: rs.filter((r) => r.asStart).length, lambdas: rs.map((r) => (r.movement ? r.movement.lambda : null)), audits });
+        }
+    }
+    return out;
+}
 /** The two-pathway claim from the four verdict cells' verdicts and the two cross cells' cx records: { holds, rows, passed }. */
 export function pathwayClaim(cells, crossRecs, refsByTask) {
     const rows = []; let holds = true;
@@ -257,11 +292,12 @@ export function pathwayClaim(cells, crossRecs, refsByTask) {
 const byCell = (records) => { const m = {}; for (const r of records.filter((x) => x.family !== "refs")) (m[`${r.task}/${r.arm}`] = m[`${r.task}/${r.arm}`] || []).push(r); return m; };
 /** Every verdict over a results file's records: { checks: { P, E }, cells, claim, passed }. */
 export function verdictOf(records) {
-    const refsByTask = Object.fromEntries(records.filter((r) => r.family === "refs").map((r) => [r.task, r])), cellsRecs = byCell(records), cells = {}, crossRecs = {};
+    const refsByTask = Object.fromEntries(records.filter((r) => r.family === "refs" && !r.replicate).map((r) => [r.task, r])), refsRepl = records.find((r) => r.family === "refs" && r.replicate) || null, cellsRecs = byCell(records), cells = {}, crossRecs = {};
     for (const [t, a] of VERDICT_CELLS) { const k = `${t}/${a}`; if (cellsRecs[k]) cells[k] = cellVerdict(cellsRecs[k], refsByTask[t]); }
     for (const [t, a] of CROSS_CELLS) { const k = `${t}/${a}`, c = (cellsRecs[k] || []).find((r) => r.family === "cx"); if (c) crossRecs[k] = c; }
     const checks = Object.fromEntries(TASK_NAMES.filter((t) => refsByTask[t]).map((t) => [t, checksOf(refsByTask[t])])), claim = pathwayClaim(cells, crossRecs, refsByTask), dense = denseReading(cellsRecs[DENSE_CELL] || [], refsByTask.P, cells[DENSE_CELL]), lambda = lambdaReading(cellsRecs, refsByTask.P);
-    return { checks, cells, claim, dense, lambda, passed: Object.values(cells).filter((c) => c.wiring.verdict === "PASS").length, assessed: Object.values(cells).filter((c) => c.wiring.verdict !== "NOT ASSESSED").length, refsByTask };
+    const repl = replicateReading(cellsRecs, refsRepl);
+    return { checks, cells, claim, dense, lambda, repl, passed: Object.values(cells).filter((c) => c.wiring.verdict === "PASS").length, assessed: Object.values(cells).filter((c) => c.wiring.verdict !== "NOT ASSESSED").length, refsByTask };
 }
 export function reportLines(records) {
     const v = verdictOf(records), L = [], rs = records.filter((r) => r.family !== "refs");
@@ -290,6 +326,12 @@ export function reportLines(records) {
         if (x.vsCx) L.push(`    against the registered cx of ${x.cell} (lambda 0.99): ${w(x.vsCx)}`);
         if (x.vsNoState) L.push(`    against ${x.cell} NO STATE: ${w(x.vsNoState)}`);
     }
+    for (const x of v.repl) {
+        const sm = (a) => `${f3(a.mean)} sd ${f3(a.sd)} [${f3(a.min)}..${f3(a.max)}]`;
+        L.push(`  REPLICATES ${x.cell}/${x.family} (${x.family === "rns" ? "NO STATE" : "lambda start " + x.start}, Addendum 10; REPORTED, NOT JUDGED, fresh audits 83001-83060): ${x.n} circuit(s), ${x.stuck} with no eligible champion; final lambdas ${x.lambdas.map((l) => (l === null ? "none" : f3(l))).join(" ")}`);
+        L.push(`    ${x.audits.map((a) => `${a.audit} ${sm(a)}`).join(" | ")}; against the autopilot ${x.audits.map((a) => (a.vsAutopilot >= 0 ? "+" : "") + f3(a.vsAutopilot) + (a.offAutopilot ? " (off it)" : " (not off it)")).join(" | ")}`);
+        if (x.audits[0].vsNoState) L.push(`    against the ${x.cell} NO STATE replicates: ${x.audits.map((a) => `${f3(a.vsNoState.margin)} (needs ${f3(a.vsNoState.needs)}: ${a.vsNoState.reading})`).join(" | ")}`);
+    }
     for (const r of v.claim.rows) L.push(`  TWO-PATHWAY ${r.task}: ${r.status}${r.audits ? ` -- aligned ${r.aligned} ${r.alignedPasses ? "PASSES" : "does not pass"}; beats cross ${r.cross} on ${r.crossWins} of 3 audits (${r.audits.map((x) => `${f3(x.diff)} needs ${f3(x.needs)}`).join(" | ")})` : ` -- ${r.why}`}`);
     L.push(`RUNG 4b: ${v.passed} of ${v.assessed} assessed verdict cells PASSED (a pass in one of four is "one of four", not "the wiring works")`);
     L.push(`RUNG 4b TWO-PATHWAY CLAIM: ${v.claim.rows.length === TASK_NAMES.length && v.claim.rows.every((r) => r.status !== "NOT ASSESSED") && TASK_NAMES.every((t) => v.checks[t] && v.checks[t].ok) ? (v.claim.holds ? "HOLDS (a double dissociation)" : "DOES NOT HOLD") : "NOT ASSESSED"}`);
@@ -309,7 +351,7 @@ export function parseArgs(argv) {
     if (cmd === "report") { if (!given.in) throw new Error("report needs --in <results file>"); return { cmd, in: given.in, allowSmoke: !!given["allow-smoke"] }; }
     if (!given.one && !given.specs) throw new Error("run needs --specs <list> (the registered stage A: --specs stageA; Addendum 9: --specs lambdaStudy)");
     if (!given.one && !given.out) throw new Error("run needs --out <results file>");
-    const text = given.specs === "stageA" ? STAGE_A : given.specs === "lambdaStudy" ? LAMBDA_STUDY : given.specs || given.one;
+    const text = given.specs === "stageA" ? STAGE_A : given.specs === "lambdaStudy" ? LAMBDA_STUDY : given.specs === "replicate" ? REPL_STUDY : given.specs || given.one;
     const o = { cmd, specs: text, one: given.one || null, out: given.out || null, workers: given.workers ?? 1, recipe: { runs: given.runs ?? RECIPE.runs, iters: given.iters ?? RECIPE.iters, sigma: given.sigma ?? RECIPE.sigma, maxK: given.maxK ?? RECIPE.maxK, pruneBudget: given["prune-budget"] ?? RECIPE.pruneBudget }, smoke: !!given.smoke, quiet: !!given.quiet };
     for (const [k, v] of [["workers", o.workers], ["runs", o.recipe.runs], ["iters", o.recipe.iters], ["maxK", o.recipe.maxK]]) if (!(Number.isInteger(v) && v >= 1)) throw new Error(`--${k} must be a whole number of 1 or more, got ${v}`);
     if (!(o.recipe.sigma > 0)) throw new Error(`--sigma must be above 0, got ${o.recipe.sigma}`);
@@ -339,6 +381,7 @@ export async function command(argv, io = {}) {
     const done = new Set(have.map((r) => r.spec)), specs = parseSpecs(o.specs), todo = specs.filter((s) => !done.has(specName(s))), tasks = TASK_NAMES.filter((t) => specs.some((s) => s.task === t)), records = [...have];
     log(`[trainSubVestibular] ${specs.length} circuits, ${specs.length - todo.length} already in ${o.out}, ${todo.length} to train; ${o.workers} worker(s); recipe ${o.recipe.runs} x ${o.recipe.iters}${o.smoke ? " (SMOKE)" : ""}`);
     const keep = (rec) => { appendFile(o.out, JSON.stringify(rec) + "\n"); records.push(rec); };
+    if (specs.some((s) => isRepl(s.family)) && !done.has(REFS_REPL)) { keep((io.refsRunner || refsRecord)("P", { ...opts, replicate: true })); log("[trainSubVestibular] references for the replicate audits (Addendum 10) done"); }
     for (const t of tasks) if (!done.has(REFS_NAME(t))) { keep((io.refsRunner || refsRecord)(t, opts)); log(`[trainSubVestibular] references for 4b-${t} done`); }
     const spawner = io.spawner || ((spec) => runChild(spec, o)), queue = [...todo];
     const worker = async () => { while (queue.length) { const s = queue.shift(); const rec = o.workers > 1 ? await spawner(s) : (io.runner || runCircuit)(s, opts, o.quiet ? () => {} : (m) => log(m)); keep(rec); log(`[trainSubVestibular] ${specName(s)} done${rec.asStart ? " (no eligible champion)" : " (champion seed " + rec.champion + ")"}`); } };

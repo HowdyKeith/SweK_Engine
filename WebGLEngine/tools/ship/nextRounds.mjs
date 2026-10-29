@@ -2665,6 +2665,13 @@ export const NEXT_ROUNDS = [
         why: "So that the earlier wrong reading is corrected where it was written.",
     },
     {
+        id: "fish-4b-p-replicates-registered-not-run",
+        blocker: "OPEN",
+        what: "REGISTERED AND BUILT 2026-10-29 (Addendum 10 of brain/FISH_VESTIBULAR_HELPER_WIP.md), NOT RUN: 24 replicate circuits on 4b-P (P/B and P/whole x lambda starts 0.5 and 0.7 and NO STATE x 4 search seeds), scored on FRESH audit seeds 83001-83060 (60 dives a block) and the autopilot on them (refs:PR); reported, not judged, no controls, in no verdict. Trainer keyword `replicate`; gate section 13, about 296 mutants. The reading and expectations are written before any run.",
+        how: "On the rig: git pull, then node tools/ship/trainSubVestibularCmd.mjs run --specs replicate --out brain/fishVestibularReplicates.jsonl --workers 4 (about 8 core-hours), then report --in the same file. Its own file, not the stage A file. Nothing here says anything about the wiring: no ER/class/degree controls at the low start.",
+        why: "Addendum 9 had one search per circuit; a tie with NO STATE from single searches cannot separate no gain from noise, and 0.7 was untried.",
+    },
+    {
         id: "auto-install-browser-gates-under-the-cap",
         blocker: "OPEN",
         what: "BUILT 2026-10-29, UNSHIPPED, NEVER RUN ON A BOX THAT LACKS THE BROWSER: tools/ship/ensureBrowserGates.mjs + ensureBrowserGatesCmd.mjs (gate ensureBrowserGates-selfcheck.mjs, 54 mutants). Installs tools/render-qa's dependencies (shipVerdict.fixCommand's own flags, as an argument list) and copies dxcompiler.dll beside the headless shell (ensureDxc), but only under the engine's own auto-install limits (ai-bridge/autoInstall.js): the download estimate may not exceed autoCapMB in ~/.voxelbridge/autoinstall.json (100 MB when absent, 0 unlimited, --cap-mb N for one run) and free space must be 3x the estimate. The estimates are broad guesses: 280 MB for the browser, 15 MB for Playwright alone, so at the DEFAULT cap the browser download refuses and says to raise the slider.",
