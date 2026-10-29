@@ -13,6 +13,7 @@
 //   6  THE SOURCE     no shell is enabled, no exec, the key is read from the environment only and written nowhere.
 // NOT CHECKED, said plainly: any real model or the real API (no key, no network here); the quality of any advice.
 //
+// 2026-10-29 cleanTerminal (ollama word-wrap redraw broke 46 of 169 replies in the first practice run): 13 mutants, every one red by name after one row was added (text between a cursor-back and an erase cancels it); identity reads 0.
 // SABOTAGE LOG: 88 mutants of advisorLive.mjs, each run against a copy of this gate, 4 at a time (splitter quotes/backslash/whitespace/unclosed, scrub value/shape/short key, command stdin/shell/error/status/empty/timeout/stderr scrub, request
 // slash/temperature/model/messages/key-in-headers, reply blocks/error/blank, child key source/exit codes/status/header, api key check/shell/status/error/scrub/key-in-input, forbidden audits/reserved block/range end/refusal/kind/cross product, call ceiling,
 // seed ranges, budget cache/off-by-one/none/hits/memory/onNew/count/string/default, record vs replay mode, mode pass-through, stats, crushed flags, mean line, caveat, every argument check, dry-run, overwrite, resume, calls log, transcript write, partial-run hint,
