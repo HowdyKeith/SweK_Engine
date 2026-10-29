@@ -36,6 +36,9 @@ export const FAMILIES = Object.freeze(["er", "class", "degree", "count", "tuning
 export const CONTROL_BASE = Object.freeze({ er: 1000, class: 2000, degree: 3000, count: 4000, tuning: 5000 });
 export const VERDICT_CELLS = Object.freeze([["P", "B"], ["P", "whole"], ["E", "E"], ["E", "whole"]]), CROSS_CELLS = Object.freeze([["P", "E"], ["E", "B"]]);
 export const DENSE_FAMILIES = Object.freeze(["dcx", "dnostate"]), DENSE_CELL = "P/whole";   // Addendum 8: 4b-D exists on the whole arm of 4b-P only, reported and not judged, with no controls
+/** Addendum 9 (post hoc, reported and not judged, no controls): the real wiring of 4b-P with a LOWER STARTING LAMBDA (lambda stays trained and free), on P/B and P/whole. */
+export const LAMBDA_START = Object.freeze({ cxl50: 0.5, cxl90: 0.9 }), LAMBDA_FAMILIES = Object.freeze(Object.keys(LAMBDA_START)), LAMBDA_CELLS = Object.freeze(["P/B", "P/whole"]);
+export const LAMBDA_SPECS = Object.freeze(LAMBDA_CELLS.flatMap((c) => LAMBDA_FAMILIES.map((f) => `${c}/${f}`))), LAMBDA_STUDY = LAMBDA_SPECS.join(",");
 export const ALIGNED = Object.freeze({ P: "B", E: "E" }), CROSS_OF = Object.freeze({ P: "E", E: "B" });
 export const STAGE_A_CELL = "cx,nostate,er:0-9,class:0-9,degree:0-9,count:0-3,tuning:0-3", STAGE_B_CELL = "er:10-19,class:10-19,degree:10-19";
 export const STAGE_A = [...VERDICT_CELLS.map(([t, a]) => STAGE_A_CELL.split(",").map((x) => `${t}/${a}/${x}`).join(",")), ...CROSS_CELLS.map(([t, a]) => `${t}/${a}/cx`), ...DENSE_FAMILIES.map((f) => `${DENSE_CELL}/${f}`)].join(",");
@@ -84,7 +87,7 @@ export function parseSpecs(text) {
     const out = [], seen = new Set();
     for (const raw of String(text).split(",")) {
         const part = raw.trim(); if (!part) throw new Error(`trainSubVestibular.parseSpecs: an empty spec in ${JSON.stringify(text)}`);
-        const m = /^([A-Za-z]+)\/([A-Za-z]+)\/(cx|nostate|dcx|dnostate|[a-z]+:\d+(?:-\d+)?)$/.exec(part);
+        const m = /^([A-Za-z]+)\/([A-Za-z]+)\/(cx|nostate|dcx|dnostate|cxl50|cxl90|[a-z]+:\d+(?:-\d+)?)$/.exec(part);
         if (!m) throw new Error(`trainSubVestibular.parseSpecs: cannot read ${JSON.stringify(part)} (a spec is task/arm/cx, task/arm/nostate or task/arm/family:K or family:K-L)`);
         const [, task, arm, fam] = m;
         if (!TASK_NAMES.includes(task)) throw new Error(`trainSubVestibular.parseSpecs: unknown task ${JSON.stringify(task)} (${TASK_NAMES.join(", ")})`);
@@ -94,6 +97,7 @@ export function parseSpecs(text) {
             if (cell === "cross" && family !== "cx") throw new Error(`trainSubVestibular.parseSpecs: the cross cell ${task}/${arm} is cx only, not ${family}`);
             const name = specName({ task, arm, family, index }); if (seen.has(name)) throw new Error(`trainSubVestibular.parseSpecs: ${name} is named twice`); seen.add(name); out.push({ task, arm, family, index });
         };
+        if (LAMBDA_FAMILIES.includes(fam)) { if (!LAMBDA_CELLS.includes(`${task}/${arm}`)) throw new Error(`trainSubVestibular.parseSpecs: ${fam} (the lower-lambda start of Addendum 9) exists on ${LAMBDA_CELLS.join(" and ")} only, not ${task}/${arm}`); add(fam, 0); continue; }
         if (DENSE_FAMILIES.includes(fam)) { if (`${task}/${arm}` !== DENSE_CELL) throw new Error(`trainSubVestibular.parseSpecs: ${fam} (4b-D) exists on ${DENSE_CELL} only, not ${task}/${arm}`); add(fam, 0); continue; }
         if (fam === "cx" || fam === "nostate") { add(fam, 0); continue; }
         const q = /^([a-z]+):(\d+)(?:-(\d+))?$/.exec(fam);
@@ -105,18 +109,18 @@ export function parseSpecs(text) {
     }
     return out;
 }
-export const specName = (s) => `${s.task}/${s.arm}/${s.family === "cx" || s.family === "nostate" || DENSE_FAMILIES.includes(s.family) ? s.family : `${s.family}:${s.index}`}`;
+export const specName = (s) => `${s.task}/${s.arm}/${s.family === "cx" || s.family === "nostate" || DENSE_FAMILIES.includes(s.family) || LAMBDA_FAMILIES.includes(s.family) ? s.family : `${s.family}:${s.index}`}`;
 const FAM_SLOT = Object.freeze({ cx: 0, nostate: 1, er: 2, class: 22, degree: 42, count: 62, tuning: 82 }), CELL_SLOTS = 102;
 const CELL_ORDER = Object.freeze([...VERDICT_CELLS, ...CROSS_CELLS].map((c) => c.join("/")));
 /** Where a spec sits in the fixed order (the six cells, then cx, nostate, er 0-19, class 0-19, degree 0-19, count 0-19, tuning 0-19): the first search seed is SEARCH_BASE + 10 x that. */
-export const ordinalOf = (s) => (DENSE_FAMILIES.includes(s.family) ? CELL_ORDER.length * CELL_SLOTS + DENSE_FAMILIES.indexOf(s.family) : CELL_ORDER.indexOf(`${s.task}/${s.arm}`) * CELL_SLOTS + FAM_SLOT[s.family] + s.index);
+export const ordinalOf = (s) => (LAMBDA_FAMILIES.includes(s.family) ? CELL_ORDER.length * CELL_SLOTS + DENSE_FAMILIES.length + LAMBDA_SPECS.indexOf(`${s.task}/${s.arm}/${s.family}`) : DENSE_FAMILIES.includes(s.family) ? CELL_ORDER.length * CELL_SLOTS + DENSE_FAMILIES.indexOf(s.family) : CELL_ORDER.indexOf(`${s.task}/${s.arm}`) * CELL_SLOTS + FAM_SLOT[s.family] + s.index);
 export const seedBaseOf = (s) => SEARCH_BASE + 10 * ordinalOf(s);
 let EXTRACTION = null;
 export const extraction = () => EXTRACTION || (EXTRACTION = F.extract());
 export const armCircuit = (arm) => V.circuitOf(extraction(), arm);
 export const circuitFor = (spec, x = extraction()) => { const base = V.circuitOf(x, spec.arm); return VERDICT_FAMILIES.includes(spec.family) || spec.family === "count" || spec.family === "tuning" ? V.CONTROLS[spec.family](base, CONTROL_BASE[spec.family] + spec.index) : base; };
 /** The policy of a spec on its task: the task's evaluator is the seam, the scales are the task's. */
-export const policyOf = (spec, scales, circuit = circuitFor(spec)) => V.createVestibularPolicy(circuit, specName(spec), { persist: spec.family !== "nostate" && spec.family !== "dnostate", dense: DENSE_FAMILIES.includes(spec.family), scales, evaluate: (pilot, set) => evalDives(pilot, set) });
+export const policyOf = (spec, scales, circuit = circuitFor(spec)) => V.createVestibularPolicy(circuit, specName(spec), { persist: spec.family !== "nostate" && spec.family !== "dnostate", dense: DENSE_FAMILIES.includes(spec.family), scales, evaluate: (pilot, set) => evalDives(pilot, set) }, LAMBDA_FAMILIES.includes(spec.family) ? { ...V.INIT, lambda0: LAMBDA_START[spec.family] } : V.INIT);
 
 // ---- one search and one circuit -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 /** One search of the recipe from the start weights; returns { k, seed, weights, trainScore, improved, neutral, moved, kept, pruneEvals }. */
@@ -223,6 +227,20 @@ export function denseReading(recs, refs, cxCell) {
     const against = (other) => AUDITS.map((a) => ({ audit: a, ...beats(F_[a].score, [other[a].score]) }));
     return { rec: d, scores: F_, autopilot: AUDITS.map((a) => ({ audit: a, diff: F_[a].score - refs.autopilot[a].score })), vsCx: cx ? against(cx) : null, vsNoState: ns ? against(effectiveOf(ns, refs)) : null };
 }
+/** Addendum 9, REPORTED AND NOT JUDGED: each lower-lambda-start circuit of 4b-P against the autopilot, against its cell's registered cx (lambda 0.99) and against its cell's NO STATE. [] with none. */
+export function lambdaReading(cellsRecs, refs) {
+    if (!refs) return [];
+    const out = [];
+    for (const cell of LAMBDA_CELLS) {
+        const recs = cellsRecs[cell] || [], cx = recs.find((r) => r.family === "cx"), ns = recs.find((r) => r.family === "nostate");
+        for (const fam of LAMBDA_FAMILIES) {
+            const r = recs.find((x) => x.family === fam); if (!r) continue;
+            const F_ = effectiveOf(r, refs), against = (other) => AUDITS.map((a) => ({ audit: a, ...beats(F_[a].score, [other[a].score]) }));
+            out.push({ cell, family: fam, start: LAMBDA_START[fam], rec: r, scores: F_, autopilot: AUDITS.map((a) => ({ audit: a, diff: F_[a].score - refs.autopilot[a].score })), vsCx: cx ? against(effectiveOf(cx, refs)) : null, vsNoState: ns ? against(effectiveOf(ns, refs)) : null });
+        }
+    }
+    return out;
+}
 /** The two-pathway claim from the four verdict cells' verdicts and the two cross cells' cx records: { holds, rows, passed }. */
 export function pathwayClaim(cells, crossRecs, refsByTask) {
     const rows = []; let holds = true;
@@ -242,8 +260,8 @@ export function verdictOf(records) {
     const refsByTask = Object.fromEntries(records.filter((r) => r.family === "refs").map((r) => [r.task, r])), cellsRecs = byCell(records), cells = {}, crossRecs = {};
     for (const [t, a] of VERDICT_CELLS) { const k = `${t}/${a}`; if (cellsRecs[k]) cells[k] = cellVerdict(cellsRecs[k], refsByTask[t]); }
     for (const [t, a] of CROSS_CELLS) { const k = `${t}/${a}`, c = (cellsRecs[k] || []).find((r) => r.family === "cx"); if (c) crossRecs[k] = c; }
-    const checks = Object.fromEntries(TASK_NAMES.filter((t) => refsByTask[t]).map((t) => [t, checksOf(refsByTask[t])])), claim = pathwayClaim(cells, crossRecs, refsByTask), dense = denseReading(cellsRecs[DENSE_CELL] || [], refsByTask.P, cells[DENSE_CELL]);
-    return { checks, cells, claim, dense, passed: Object.values(cells).filter((c) => c.wiring.verdict === "PASS").length, assessed: Object.values(cells).filter((c) => c.wiring.verdict !== "NOT ASSESSED").length, refsByTask };
+    const checks = Object.fromEntries(TASK_NAMES.filter((t) => refsByTask[t]).map((t) => [t, checksOf(refsByTask[t])])), claim = pathwayClaim(cells, crossRecs, refsByTask), dense = denseReading(cellsRecs[DENSE_CELL] || [], refsByTask.P, cells[DENSE_CELL]), lambda = lambdaReading(cellsRecs, refsByTask.P);
+    return { checks, cells, claim, dense, lambda, passed: Object.values(cells).filter((c) => c.wiring.verdict === "PASS").length, assessed: Object.values(cells).filter((c) => c.wiring.verdict !== "NOT ASSESSED").length, refsByTask };
 }
 export function reportLines(records) {
     const v = verdictOf(records), L = [], rs = records.filter((r) => r.family !== "refs");
@@ -266,6 +284,12 @@ export function reportLines(records) {
         if (d.vsCx) L.push(`    against the tuning-derived ${DENSE_CELL} cx (does the data's tilt encoding buy anything over a dense trained input?): ${w(d.vsCx)}`);
         if (d.vsNoState) L.push(`    against its own NO STATE: ${w(d.vsNoState)}`);
     }
+    for (const x of v.lambda) {
+        const w = (rows) => rows.map((y) => `${f3(y.margin)} (needs ${f3(y.needs)}: ${y.wins ? "ahead" : "not ahead"})`).join(" | ");
+        L.push(`  LOWER LAMBDA START ${x.cell}/${x.family} (lambda ${x.start}, Addendum 9; REPORTED, NOT JUDGED, no controls): ${x.rec.asStart ? "NO ELIGIBLE CHAMPION (scored as its start, the autopilot)" : `champion seed ${x.rec.champion}, kept ${x.rec.movement.kept}, final lambda ${f3(x.rec.movement.lambda)}`} | ${AUDITS.map((a) => `${a} ${f3(x.scores[a].score)}`).join(" | ")}; against the autopilot ${x.autopilot.map((y) => (y.diff >= 0 ? "+" : "") + f3(y.diff)).join(" | ")}`);
+        if (x.vsCx) L.push(`    against the registered cx of ${x.cell} (lambda 0.99): ${w(x.vsCx)}`);
+        if (x.vsNoState) L.push(`    against ${x.cell} NO STATE: ${w(x.vsNoState)}`);
+    }
     for (const r of v.claim.rows) L.push(`  TWO-PATHWAY ${r.task}: ${r.status}${r.audits ? ` -- aligned ${r.aligned} ${r.alignedPasses ? "PASSES" : "does not pass"}; beats cross ${r.cross} on ${r.crossWins} of 3 audits (${r.audits.map((x) => `${f3(x.diff)} needs ${f3(x.needs)}`).join(" | ")})` : ` -- ${r.why}`}`);
     L.push(`RUNG 4b: ${v.passed} of ${v.assessed} assessed verdict cells PASSED (a pass in one of four is "one of four", not "the wiring works")`);
     L.push(`RUNG 4b TWO-PATHWAY CLAIM: ${v.claim.rows.length === TASK_NAMES.length && v.claim.rows.every((r) => r.status !== "NOT ASSESSED") && TASK_NAMES.every((t) => v.checks[t] && v.checks[t].ok) ? (v.claim.holds ? "HOLDS (a double dissociation)" : "DOES NOT HOLD") : "NOT ASSESSED"}`);
@@ -283,9 +307,9 @@ export function parseArgs(argv) {
         if (known[k] === Boolean) given[k] = true; else { const v = rest[++i]; if (v == null || v.startsWith("--")) throw new Error(`${a} needs a value`); given[k] = known[k] === Number ? Number(v) : v; if (known[k] === Number && !Number.isFinite(given[k])) throw new Error(`${a} needs a number, got ${JSON.stringify(v)}`); }
     }
     if (cmd === "report") { if (!given.in) throw new Error("report needs --in <results file>"); return { cmd, in: given.in, allowSmoke: !!given["allow-smoke"] }; }
-    if (!given.one && !given.specs) throw new Error("run needs --specs <list> (the registered stage A: --specs stageA)");
+    if (!given.one && !given.specs) throw new Error("run needs --specs <list> (the registered stage A: --specs stageA; Addendum 9: --specs lambdaStudy)");
     if (!given.one && !given.out) throw new Error("run needs --out <results file>");
-    const text = given.specs === "stageA" ? STAGE_A : given.specs || given.one;
+    const text = given.specs === "stageA" ? STAGE_A : given.specs === "lambdaStudy" ? LAMBDA_STUDY : given.specs || given.one;
     const o = { cmd, specs: text, one: given.one || null, out: given.out || null, workers: given.workers ?? 1, recipe: { runs: given.runs ?? RECIPE.runs, iters: given.iters ?? RECIPE.iters, sigma: given.sigma ?? RECIPE.sigma, maxK: given.maxK ?? RECIPE.maxK, pruneBudget: given["prune-budget"] ?? RECIPE.pruneBudget }, smoke: !!given.smoke, quiet: !!given.quiet };
     for (const [k, v] of [["workers", o.workers], ["runs", o.recipe.runs], ["iters", o.recipe.iters], ["maxK", o.recipe.maxK]]) if (!(Number.isInteger(v) && v >= 1)) throw new Error(`--${k} must be a whole number of 1 or more, got ${v}`);
     if (!(o.recipe.sigma > 0)) throw new Error(`--sigma must be above 0, got ${o.recipe.sigma}`);
