@@ -49,6 +49,31 @@ export function scrub(text, env = process.env) {
     return s.replace(/sk-[A-Za-z0-9_-]{8,}/g, "[key]");
 }
 
+/**
+ * A command's output as a person would have read it on the screen. A terminal program (ollama run measured 2026-10-29: 46 of 169 replies) word-wraps by writing a word, moving the cursor back over it (ESC [ n D), erasing
+ * to the end of the line (ESC [ K) and writing it again on the next line, so the raw bytes read `"repair": fals<ESC>[4D<ESC>[K\nfalse}`: not JSON, though the screen showed JSON. Cursor-back-then-erase removes the last n characters of the
+ * current line; every other escape sequence is dropped; carriage returns are dropped. Text with no escape in it is returned as it is.
+ */
+export function cleanTerminal(text) {
+    const t = String(text); if (!t.includes("\x1b") && !t.includes("\r")) return t;
+    let out = "", back = 0;
+    for (let i = 0; i < t.length; i++) {
+        const c = t[i];
+        if (c === "\x1b" && t[i + 1] === "[") {
+            let j = i + 2; while (j < t.length && /[0-?]/.test(t[j])) j++;
+            while (j < t.length && /[ -\/]/.test(t[j])) j++;
+            const params = t.slice(i + 2, j).replace(/[ -\/]+$/, ""), fin = t[j];
+            if (fin === "D") back = params === "" ? 1 : Number(params) || 0;
+            else if (fin === "K" && back) { const nl = out.lastIndexOf("\n"); out = out.slice(0, Math.max(nl + 1, out.length - back)); back = 0; }
+            else back = 0;
+            i = j; continue;
+        }
+        if (c === "\x1b") { const m = /^\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/.exec(t.slice(i)); i += m ? m[0].length - 1 : 1; back = 0; continue; }
+        if (c === "\r") continue;
+        back = 0; out += c;
+    }
+    return out;
+}
 /** modelFn from a command: (prompt) -> the command's stdout. The prompt goes to stdin; no shell. Throws on a spawn error, a timeout, a non-zero exit or empty output (with scrubbed stderr). */
 export function modelFnFromCommand({ command, timeoutMs = DEFAULT_TIMEOUT_MS, spawn = spawnSync, env = process.env }) {
     const words = splitCommand(command); if (!words.length) throw new Error("advisorLive.modelFnFromCommand: an empty command");
@@ -56,7 +81,7 @@ export function modelFnFromCommand({ command, timeoutMs = DEFAULT_TIMEOUT_MS, sp
         const r = spawn(words[0], words.slice(1), { input: prompt, encoding: "utf8", timeout: timeoutMs, maxBuffer: 4 * 1024 * 1024, shell: false, env });
         if (r.error) throw new Error(`advisorLive: the model command failed to run (${scrub(r.error.code || r.error.message, env)})`);
         if (r.status !== 0) throw new Error(`advisorLive: the model command exited ${r.status}${r.signal ? " (signal " + r.signal + ")" : ""}: ${scrub(String(r.stderr || "").slice(0, 300), env)}`);
-        const out = String(r.stdout || ""); if (!out.trim()) throw new Error("advisorLive: the model command answered nothing");
+        const out = cleanTerminal(String(r.stdout || "")); if (!out.trim()) throw new Error("advisorLive: the model command answered nothing");
         return out;
     };
 }

@@ -12,6 +12,7 @@
 import os from "node:os";
 import { spawnSync } from "node:child_process";
 import * as X from "../../brain/advisorTranscript.mjs";
+import { cleanTerminal } from "./advisorLive.mjs";
 
 export const INVENTORY_AS_OF = "2026-10-29";
 export const LIBRARY_URL = "https://ollama.com/library";
@@ -180,9 +181,9 @@ export async function command(argv, io = {}) {
     for (let k = 1; k <= given.tries; k++) {
         const t0 = Date.now(), r = spawn("ollama", ["run", tag], { input: prompt, encoding: "utf8", timeout: 180000, shell: false }), sec = ((Date.now() - t0) / 1000).toFixed(1);
         if (r.error || r.status !== 0) { log(`  try ${k}: the model command failed (${r.error ? r.error.code || r.error.message : "exit " + r.status}) after ${sec} s`); continue; }
-        const p = X.parseReply(String(r.stdout || ""));
+        const text = cleanTerminal(String(r.stdout || "")), p = X.parseReply(text);
         if (p.ok) good++;
-        log(`  try ${k}: ${p.ok ? "PARSES" : "DOES NOT PARSE (" + p.why + ")"} in ${sec} s -- ${String(r.stdout || "").replace(/\s+/g, " ").trim().slice(0, 160)}`);
+        log(`  try ${k}: ${p.ok ? "PARSES" : "DOES NOT PARSE (" + p.why + ")"} in ${sec} s -- ${text.replace(/\s+/g, " ").trim().slice(0, 160)}`);
     }
     log(`smoke: ${good} of ${given.tries} replies parse in the advisor's format. A reply that does not parse is read as no advice, so a model that rarely parses will look like the brain alone. ${good === given.tries ? "Worth a practice run." : "Try another model before spending a practice run."}`);
     return good === given.tries ? 0 : 1;

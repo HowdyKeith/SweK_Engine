@@ -104,6 +104,18 @@ http.createServer((q,r)=>{let b="";q.on("data",d=>b+=d);q.on("end",()=>{fs.write
     } finally { srv.kill(); }
 }
 
+sec("3b. A TERMINAL PROGRAM'S OUTPUT AS THE SCREEN SHOWED IT (measured 2026-10-29: ollama run, 46 of 169 replies)");
+{
+    const ESC = "\x1b", raw1 = '{"surface": false, "station": 2, "cap": 0.38, "pump": false, "repair": fals' + ESC + "[4D" + ESC + "[K\nfalse}\n\n", raw2 = '{"cap": 0.6, "repair": false' + ESC + "[5D" + ESC + "[K\nfalse}\n";
+    const c1 = L.cleanTerminal(raw1), c2 = L.cleanTerminal(raw2);
+    ok("!! the word-wrap redraw (write 'fals', cursor back 4, erase to end of line, write 'false}' on the next line) reads as the JSON the screen showed: it parses, with repair false, and so does a redraw of a whole word (back 5 over 'false')", (() => { try { return JSON.parse(c1).repair === false && JSON.parse(c1).station === 2 && JSON.parse(c2).repair === false && JSON.parse(c2).cap === 0.6; } catch { return false; } })());
+    ok("!! text with no escape is returned exactly as it is (the same string), including newlines and a lone brace; carriage returns are dropped", L.cleanTerminal("plain {text}\nline 2") === "plain {text}\nline 2" && L.cleanTerminal("a\r\nb") === "a\nb");
+    ok("!! other escape sequences (colour, cursor show/hide, a title) are dropped and leave the text; an unfinished escape at the end does not throw", L.cleanTerminal(ESC + "[31mred" + ESC + "[0m ok") === "red ok" && L.cleanTerminal(ESC + "[?25lhi" + ESC + "[?25h") === "hi" && L.cleanTerminal("x" + ESC + "]0;title\x07y") === "xy" && L.cleanTerminal("end" + ESC) === "end" && L.cleanTerminal("end" + ESC + "[") === "end");
+    ok("!! cursor-back erases only on the CURRENT line (it never eats a newline or the line above), by the count given (a bare ESC[D is 1), and only when an erase follows it directly (text or another sequence between them cancels it, an approximation of overwriting that nothing here needs); a cursor-back with no erase removes nothing", L.cleanTerminal("ab\nxyz" + ESC + "[9D" + ESC + "[Kq") === "ab\nq" && L.cleanTerminal("abc" + ESC + "[D" + ESC + "[K") === "ab" && L.cleanTerminal("abc" + ESC + "[2D" + "d") === "abcd" && L.cleanTerminal("abc" + ESC + "[2D" + ESC + "[31m" + ESC + "[Kd") === "abcd" && L.cleanTerminal("abc" + ESC + "[2D" + "d" + ESC + "[K") === "abcd");
+    const viaCmd = L.modelFnFromCommand({ command: "x", spawn: () => ({ status: 0, stdout: raw1, stderr: "" }) });
+    ok("!! a model command's output goes through it: the function the seat calls returns the cleaned reply", viaCmd("p") === c1 && !viaCmd("p").includes(ESC));
+}
+
 sec("4. THE GUARDS");
 {
     const forbidden = [51, 62, 71, 82, 91, 102, 111, 122, 131, 142, 151, 162, 171, 182, 191, 202, 211, 222];
