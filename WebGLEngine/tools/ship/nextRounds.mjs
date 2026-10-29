@@ -2665,6 +2665,13 @@ export const NEXT_ROUNDS = [
         why: "So that the earlier wrong reading is corrected where it was written.",
     },
     {
+        id: "local-model-for-the-advisor-practice-run",
+        blocker: "OPEN",
+        what: "BUILT 2026-10-29, UNSHIPPED, NOTHING RUN ON A REAL MODEL: tools/ship/localModel.mjs + localModelCmd.mjs (gate localModel-selfcheck.mjs, 80 mutants): `status` (machine, ollama, the choice and its reason), `setup [--model tag] [--yes]` (install Ollama through winget or brew and pull the model; Linux's install script is printed, never run; nothing runs without --yes), `inventory [--check-new]` (the table of candidates, sizes from memory and dated, plus the names the ollama.com/library page advertises that no inventory family covers), `smoke` (the real advisor prompt through the model N times, scored by the advisor's own strict reader).",
+        how: "On the rig: node tools/ship/localModelCmd.mjs status, then setup --yes, then smoke, then the practice run with --cmd \"ollama run <tag>\". The inventory sizes are NOT measured here; the choice rule knows size and a JSON-habit note only; a model it names has not been shown to advise well, and a model that rarely parses will read as the brain alone.",
+        why: "So the live practice run needs no key, and a newly advertised model is reported (not recommended) until it has been tried on the advisor prompt.",
+    },
+    {
         id: "fish-rung-4b-pilot-built-not-trained",
         blocker: "OPEN",
         what: "BUILT 2026-10-28, UNSHIPPED, NOTHING TRAINED: the rung 4b pilot and its trainer (brain/pilotSubVestibular.mjs, gate brain/pilotSubVestibular-selfcheck.mjs, 157 mutants) per brain/FISH_VESTIBULAR_HELPER_WIP.md Addenda 5 and 6: the autopilot's laws plus a residual from the zebrafish vestibular circuit, tuning-derived input, a per-cell leak (lambda one trained scalar, start 0.99), a mirrored pair, the controls ER / CLASS / DEGREE / COUNT / TUNING and NO STATE. The extraction tool (tools/fishVestibularCircuit.mjs) and the task module (tools/subVestibularTasks.mjs, 4b-E rung 0 / 4b-P rung 1) already exist.",
