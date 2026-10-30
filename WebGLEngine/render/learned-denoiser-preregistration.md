@@ -10814,3 +10814,41 @@ Both count, so **H71 fails on the 1080 by its own rule**, not only by the Intel'
 **Round 72's training, now running on the rig, must be at 670c28bd too.** At cebdc006 the training command has no `--round`, so
 it would retrain round 70's U_T, not U_TH. The training file's own `commit` field will say which ran, and it is checked before
 anything is read.
+
+## 169. ROUND 74 -- U_TH WITH A COALESCED DOWN PASS: THE SAME COST QUESTION, ONE KERNEL REWRITTEN. FIXED BEFORE ITS CODE
+
+**Why.** Round 73's 1080 pair (s168, both counting at 670c28bd, read in full in section 170 with the Intel's) put U_TH at 13.69 and
+13.55 ms, U / T 0.36, so H73 fails. Of that, **8.29-8.43 ms is DOWN_WGSL**, the 2 x 2 average of the 17 input channels. That pass
+reads ~141 MB and writes ~35 MB, about 0.6 ms at the 1080's ~320 GB/s. The four layers took 4.6 ms and the upsample and hold
+0.6, inside P4's 2.5-6 ms. DOWN_WGSL gives each thread one half-size pixel and loops over its 17 channels, so neighbouring
+threads read 17 floats apart and the reads do not coalesce. Keith asked for the faster pass.
+
+**The change, and only it: DOWN_FAST_WGSL (render/learnedUpscaleTemporalGPU.mjs).**
+- **One thread per value:** one per half-size pixel and channel, a 1-D dispatch of 256-thread groups.
+- **Coalesced:** neighbouring threads read neighbouring floats, and write the output in order.
+- **The same arithmetic in the same order:** (a + b + c + d) / 4. Its output is held to DOWN_WGSL's **bit for bit** on the device,
+  and to halfInput within 1e-6.
+- Everything else in U_TH's six passes is round 73's. Round 73's line (section 167, the loop pass) is still printed beside the
+  new one, so one run compares the two.
+
+**Timed as round 73:** at 1920 x 1080 on the device's clock, against T off the same run, in realGpuRun's denoise selection. The new
+line is `section 169: U_TH at 1920 x 1080 ... ms`, read by readH74.
+
+**H74: U ≤ 0.25 × T on both GPUs, in both of each GPU's runs** (H73's threshold and counting).
+
+**Predictions, fixed now, deciding nothing.**
+- **P1:** on the 1080, DOWN_FAST_WGSL takes 0.4-1.5 ms, U 5-7 ms, U / T 0.13-0.19. **H74 holds on the 1080.**
+- **P2:** on the Intel, H74 fails. Round 71's U_T cost 30-33 x the 1080's there. U_TH's layers and upsample (5.3 ms on the
+  1080) at that factor are 160-175 ms against T ~500, which is 0.32-0.35 before the down pass. The Intel's own round 73 pair,
+  still owed, may move this; P2 stands as made.
+- **P3:** the down passes agree bit for bit on both GPUs.
+
+**What each outcome means.**
+- **P1 and P2 as predicted:** U_TH is real-time on the 1080 class and not on the Intel's integrated graphics, which is then
+  said plainly.
+- **H74 holds on both:** U_TH fits a quarter of a frame everywhere tested.
+
+Either way, whether U_TH is worth running is round 72's quality question. This round leaves it alone.
+
+**The runs.** Two `realGpuRun --only denoise` a GPU at round 74's commit, committed byte for byte before they are read. Section 170
+reads round 73's Intel pair and the 1080's together. Section 171 reads round 74's.
