@@ -2665,10 +2665,10 @@ export const NEXT_ROUNDS = [
         why: "So that the earlier wrong reading is corrected where it was written.",
     },
     {
-        id: "fish-4b-p-no-state-on-shuffled-wiring-registered-not-run",
+        id: "fish-4b-p-no-state-on-shuffled-wiring-run-reported",
         blocker: "OPEN",
-        what: "REGISTERED AND BUILT 2026-10-30 (Addendum 12 of brain/FISH_VESTIBULAR_HELPER_WIP.md), NOT RUN: NO STATE on the real wiring (qns) against NO STATE on ER, class-block and degree-preserving shuffled wirings (qer, qcl, qdg; shuffle indices 20-23, never used), four searches each on 4b-P cells P/B and P/whole (32 circuits), scored on FRESH audits 84001-84060 (refs:PQ). A PRESPECIFIED test per cell: each search scored as the mean of its three audits, the four real against the twelve shuffled by the exact one-sided permutation test, supported at p <= 0.05; overall supported / mixed / not supported. Keyword `noStateShuffled`; gate section 15.",
-        how: "On the rig: git pull, then node tools/ship/trainSubVestibularCmd.mjs run --specs noStateShuffled --out brain/fishVestibularGen2.jsonl --workers 4 (about 10 core-hours), then report --in the same file. Its own file.",
+        what: "RUN 2026-10-30 (result in Addendum 12 and brain/rig-results/fishVestibularGen2.jsonl): the registered test is NOT MET in either cell (P/B p = 0.1308; P/whole p = 0.0516, missing the 0.05 line), so 'the real wiring matters without memory' is NOT SUPPORTED; the real wiring is about 0.02 above shuffled ones on a gain of about 0.17-0.19 over the autopilot, i.e. shuffled wirings keep about 88 percent of the gain. REGISTERED AND BUILT: NO STATE on the real wiring (qns) against NO STATE on ER, class-block and degree-preserving shuffled wirings (qer, qcl, qdg; shuffle indices 20-23, never used), four searches each on 4b-P cells P/B and P/whole (32 circuits), scored on FRESH audits 84001-84060 (refs:PQ). A PRESPECIFIED test per cell: each search scored as the mean of its three audits, the four real against the twelve shuffled by the exact one-sided permutation test, supported at p <= 0.05; overall supported / mixed / not supported. Keyword `noStateShuffled`; gate section 15.",
+        how: "(Done; to repeat) node tools/ship/trainSubVestibularCmd.mjs run --specs noStateShuffled --out brain/fishVestibularGen2.jsonl --workers 4 (about 10 core-hours), then report --in the same file. Its own file.",
         why: "Addendum 11's rank test (p about 0.004-0.007 on the whole arm) was chosen after seeing the data; this is the same hypothesis on circuits and audits not yet seen, direction fixed in advance.",
     },
     {
