@@ -2665,10 +2665,10 @@ export const NEXT_ROUNDS = [
         why: "So that the earlier wrong reading is corrected where it was written.",
     },
     {
-        id: "fish-4b-p-wiring-at-low-start-registered-not-run",
+        id: "fish-4b-p-wiring-at-low-start-run-reported",
         blocker: "OPEN",
-        what: "REGISTERED AND BUILT 2026-10-29 (Addendum 11 of brain/FISH_VESTIBULAR_HELPER_WIP.md), NOT RUN: the three Stage A shuffled-wiring controls (ER, class-block, degree-preserving; the same shuffles, indices 0-3) trained from lambda 0.5 on 4b-P cells P/B and P/whole (24 circuits), scored on Addendum 10's fresh audits 83001-83060 beside the real wiring's rl50 replicates; reported, not judged. Keyword `lowControls`; gate section 14.",
-        how: "On the rig: git pull, then node tools/ship/trainSubVestibularCmd.mjs run --specs lowControls --out brain/fishVestibularReplicates.jsonl --workers 4 (the SAME file as Addendum 10, so the references and the rl50 replicates are there; about 8 core-hours), then report --in that file. 4b-E is not covered.",
+        what: "RUN 2026-10-30 (result in Addendum 11 and brain/rig-results/fishVestibularReplicates.jsonl): by the registered margin rule the real wiring TIES all three shuffled controls at lambda 0.5 (17 of 18 comparisons tie, 1 ahead on P/whole; none behind). POST HOC and exploratory: the real wiring is above every control mean on all 18 comparisons and a rank test of the four real searches against the twelve shuffled ones gives p about 0.004-0.007 on the whole arm and 0.02-0.07 on B, a hypothesis not a finding. OPEN: a NO STATE pilot on shuffled wiring (not built) would say whether the wiring matters without memory. REGISTERED AND BUILT: the three Stage A shuffled-wiring controls (ER, class-block, degree-preserving; the same shuffles, indices 0-3) trained from lambda 0.5 on 4b-P cells P/B and P/whole (24 circuits), scored on Addendum 10's fresh audits 83001-83060 beside the real wiring's rl50 replicates; reported, not judged. Keyword `lowControls`; gate section 14.",
+        how: "(Done; to repeat) node tools/ship/trainSubVestibularCmd.mjs run --specs lowControls --out brain/fishVestibularReplicates.jsonl --workers 4 (the SAME file as Addendum 10, so the references and the rl50 replicates are there; about 8 core-hours), then report --in that file. 4b-E is not covered.",
         why: "Stage A's 4b-P wiring verdicts could not pass because the real wiring never left the autopilot at lambda 0.99; from lambda 0.5 it can, so the question whether the real wiring beats shuffled wiring can finally be asked.",
     },
     {
