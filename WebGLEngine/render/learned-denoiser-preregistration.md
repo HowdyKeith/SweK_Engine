@@ -10797,3 +10797,20 @@ at half size and 16 wide.
 - The test: `--harvest-upscale-temporal-test --round 72` at that commit.
 
 All are committed byte for byte before they are read. Section 168 reads them.
+
+## 168. THE s167 RIG REPORTS -- RUN AT THE OLD COMMIT: NO ROUND 73 VERDICT, BUT ROUND 71 GETS ITS 1080 PAIR
+
+**What arrived.** Four `realGpuRun --only denoise` reports, `s167-{a,b}-{gtx1080,intel}`, committed byte for byte (07df01a8) before
+they were read. All four ran at **cebdc006**, round 71's commit. Round 73's code is 670c28bd, so none carries a U_TH line:
+**H73 has no verdict, and its runs are owed at 670c28bd.** Every gate is green in all four.
+
+**What they do give: round 71's 1080 pair, clean.** U_T at 1920 x 1080 on the 1080:
+- run a: **47.840 ms** against T 38.512, **1.24**;
+- run b: **47.063 ms** against T 38.345, **1.23**.
+
+Both count, so **H71 fails on the 1080 by its own rule**, not only by the Intel's (section 166 had one counting run there, at
+1.16). On the Intel, U_T read 1361.5 and 1412.1 ms against T 494.2 and 495.3: 2.76 and 2.85, as section 165 found.
+
+**Round 72's training, now running on the rig, must be at 670c28bd too.** At cebdc006 the training command has no `--round`, so
+it would retrain round 70's U_T, not U_TH. The training file's own `commit` field will say which ran, and it is checked before
+anything is read.

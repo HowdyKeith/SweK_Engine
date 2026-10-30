@@ -20,6 +20,7 @@
 // on a seeded U_TH (the cost does not depend on its weights), and timed at 1920 x 1080: the line readH73 reads.
 // ROUND 73 (section 167): G1 the down pass averaging three corners -> 2 red, G2 the upsample nearest -> 2, G3 readH73 reading U_T's
 // line -> 1, G4 U_TH's layers at full size -> 4. Each restored byte-identical.
+// SECTION 168: V168a the s167 reports read as carrying a U_TH line, V168b the 1080's U_T typed 47.0 -> 1 red each.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -101,6 +102,18 @@ console.log("\n1c. SECTION 166: THE 1080's PAIR AT cebdc006, READ BACK");
     ok("!! ...and run a does not count: two other denoise gates died opening committed rig reports the checkout had lost (ENOENT) -- its own line, 48.834 / 38.286 = 1.28, is reported, not counted; the 1080's pair alone gives no verdict",
         a.pascal && a.commit === "cebdc006" && !a.counts && a.enoent && a.red.join() === "render/denoiseDevice-selfcheck.mjs,render/denoiseFrameGenCost-selfcheck.mjs" &&
         Math.abs(a.U - 48.834) < 1e-9 && G.h71([a, b]) === "no verdict" && G.h71([b]) === "fails");
+}
+
+console.log("\n1d. SECTION 168: THE s167 REPORTS RAN AT cebdc006 -- NO ROUND 73 LINE, AND A COUNTING 1080 PAIR FOR ROUND 71");
+{
+    const rd = (k) => { const rep = JSON.parse(fs.readFileSync(path.join(ENG, `render/denoise-rig-s167-${k}.json`), "utf8")); return { h73: G.readH73(rep), h71: G.readH71(rep), pascal: /nvidia pascal/.test(rep.verdict) }; };
+    const R = ["a-gtx1080", "b-gtx1080", "a-intel", "b-intel"].map(rd);
+    ok("!! all four ran at cebdc006, before round 73's code (670c28bd): no U_TH line, so H73 has no verdict from them",
+        R.every((r) => r.h73.commit === "cebdc006" && r.h73.counts && r.h73.U === null && r.h73.ratio === null) && G.h71(R.map((r) => r.h73)) === "no verdict");
+    const N = R.filter((r) => r.pascal).map((r) => r.h71);
+    ok("!! *** ...but they are a clean, counting pair on the 1080 for round 71: U_T 47.840 and 47.063 ms, U / T 1.24 and 1.23 -- H71 fails on the 1080 by its own rule too ***",
+        N.length === 2 && N.every((r) => r.counts && r.commit === "cebdc006") && Math.abs(N[0].U - 47.84) < 1e-9 && Math.abs(N[1].U - 47.063) < 1e-9 && G.h71(N) === "fails",
+        N.map((r) => `${r.U} / ${r.T} = ${r.ratio.toFixed(3)}`).join("; "));
 }
 
 console.log("\n2. ON THE DEVICE: U_T held to the CPU, then timed at 1920 x 1080");
