@@ -21,6 +21,8 @@
 // ROUND 73 (section 167): G1 the down pass averaging three corners -> 2 red, G2 the upsample nearest -> 2, G3 readH73 reading U_T's
 // line -> 1, G4 U_TH's layers at full size -> 4. Each restored byte-identical.
 // SECTION 168: V168a the s167 reports read as carrying a U_TH line, V168b the 1080's U_T typed 47.0 -> 1 red each.
+// ROUND 74 (section 169): F1 the coalesced pass's row stride the half width's -> 1 red, F2 it averaging three corners -> 2, F3 its
+// dispatch one group short -> 2, F4 readH74 reading round 73's line -> 1, F5 the "fast" option building the loop pass -> 1.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -65,6 +67,12 @@ console.log("1. ON THE CPU");
     ok("!! readH73, section 167's rule: U_TH's 1920 x 1080 line against T, h71's verdict rule; U_T's line is not U_TH's, nor the other way",
         q.U === 3.5 && Math.abs(q.ratio - 3.5 / 37.483) < 1e-12 && G.h71([q, q]) === "holds" && G.readH71(both).U === 45 && q0.U === null && q0.ratio === null &&
         G.readH73({ ...both, gates: [both.gates[0], { ...both.gates[1], measured: ["section 167: U_TH at 1920 x 1080 0.000 ms (device)"] }] }).U === null);
+    // round 74: readH74 reads its own line, not round 73's; the dispatch fits WebGPU's 65535 groups a dimension at 1920 x 1080
+    const r74 = { commit: "x", gates: [rep("45.000").gates[0], { ...rep("45.000").gates[1], measured: ["section 167: U_TH at 1920 x 1080 13.600 ms (device); x", "section 169: U_TH at 1920 x 1080 5.900 ms (device); y"] }] };
+    const [gx, gy] = G.downFastGroups(540, 960);
+    ok("!! readH74, section 169's rule: round 74's line (5.900), not round 73's (13.600), and neither reads the other; the coalesced pass's dispatch at 960 x 540 x 17 is within 65535 groups and covers every value",
+        G.readH74(r74).U === 5.9 && G.readH73(r74).U === 13.6 && G.readH74(rep("45.000")).U === null && gx <= 65535 && gx * gy * G.DOWN_FAST_GROUP >= 960 * 540 * 17 && (gx * gy - 1) * G.DOWN_FAST_GROUP < 960 * 540 * 17 + G.DOWN_FAST_GROUP * gx &&
+        /fn k_down_fast/.test(G.DOWN_FAST_WGSL) && /Y\[i\] = \(X\[a\] \+ X\[b\] \+ X\[c\] \+ X\[d\]\) \/ 4\.0;/.test(G.DOWN_FAST_WGSL), `${gx} x ${gy} groups`);
     ok("  U_TH's device buffers: its input at full size is the largest, 141,004,800 bytes at 1920 x 1080 -- over the default binding too, so temporalDevice raises it",
         G.temporalBytes(1080, 1920, true) === 1920 * 1080 * 17 * 4 && G.temporalBytes(1080, 1920, true) > 134217728 && /fn k_down/.test(G.DOWN_WGSL) && /fn k_uphold/.test(G.UPHOLD_WGSL));
     // section 164: the rig's first 1080 runs printed 0.000 ms from passes that failed on the default binding limit, and readH71 read it
@@ -150,7 +158,12 @@ else {
         const bigH = await TG.createDeviceTemporal(g, netH, { H, W }), tmH = await bigH.time(xb, { warmup: 2, reps: soft ? 3 : 9 });
         const H_ = { y: Array.from(oh.y), r: Array.from(oh.r), xh: Array.from(oh.xh), acts: oh.acts.map((v) => Array.from(v)), tm: tmH, passes: bigH.passes, half: bigH.half };
         smallH.destroy(); bigH.destroy();
-        return { y: Array.from(o.y), r: Array.from(o.r), acts: o.acts.map((v) => Array.from(v)), tm, W, H, soft, errs, passes: big.passes, H_,
+        // round 74 (section 169): the same U_TH with the coalesced down pass -- its output beside round 73's, then its time
+        const smallF = await TG.createDeviceTemporal(g, netH, { H: a.Hs, W: a.Ws, down: "fast" }), of = await smallF.run(Float32Array.from(a.x), { keep: true });
+        const bigF = await TG.createDeviceTemporal(g, netH, { H, W, down: "fast" }), tmF = await bigF.time(xb, { warmup: 2, reps: soft ? 3 : 9 });
+        const F_ = { y: Array.from(of.y), xh: Array.from(of.xh), tm: tmF, passes: bigF.passes, down: bigF.down };
+        smallF.destroy(); bigF.destroy();
+        return { y: Array.from(o.y), r: Array.from(o.r), acts: o.acts.map((v) => Array.from(v)), tm, W, H, soft, errs, passes: big.passes, H_, F_,
                  adapter: [info.vendor, info.architecture, info.description].filter(Boolean).join(" / ") };
     }` });
     if (r.skipped) console.log("  SKIP  " + r.reason);
@@ -190,6 +203,14 @@ else {
         if (!R.errs.length && th.ms > 0) say(`section 167: U_TH at ${R.W} x ${R.H} ${th.ms.toFixed(3)} ms (${th.clock}); ${pmH}`);
         ok(`  ...and U_TH's line is printed, at ${R.soft ? "240 x 136 on this software adapter, which readH73 does not read" : "1920 x 1080 on hardware, which readH73 reads"}`,
             !R.errs.length && Number.isFinite(th.ms) && th.ms > 0 && Q.passes.length === 6 && Q.passes[0] === "down" && Q.passes[5] === "upsample and hold");
+        // ---- ROUND 74 (section 169): the coalesced down pass ------------------------------------------------------------------
+        const F = R.F_, sameBits = (u, v) => u.length === v.length && u.every((x, i) => Object.is(x, v[i]));
+        ok("!! round 74: DOWN_FAST_WGSL's half-size input is DOWN_WGSL's bit for bit, and so U_TH's whole output is round 73's bit for bit",
+            F.down === "fast" && sameBits(F.xh, Q.xh) && sameBits(F.y, Q.y), `${F.xh.length} values`);
+        const tf = F.tm, pmF = tf.passMs ? tf.passMs.map((v, i) => `${F.passes[i].split(" (")[0]} ${v.toFixed(3)}`).join(", ") : "no per-pass clock";
+        if (!R.errs.length && tf.ms > 0) say(`section 169: U_TH at ${R.W} x ${R.H} ${tf.ms.toFixed(3)} ms (${tf.clock}); ${pmF}`);
+        ok(`  ...and its line is printed, at ${R.soft ? "240 x 136 on this software adapter, which readH74 does not read" : "1920 x 1080 on hardware, which readH74 reads"}`,
+            !R.errs.length && Number.isFinite(tf.ms) && tf.ms > 0 && F.passes.length === 6);
     }
 }
 
