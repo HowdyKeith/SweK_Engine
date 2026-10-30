@@ -10734,3 +10734,66 @@ None is fixed here. They are Keith's call.
 
 **What changes.** Nothing ships. The temporal page (section 163) keeps U_T as a view at 128 x 128, where it costs what the page
 shows.
+
+## 167. ROUNDS 72 AND 73 -- U_T AT HALF SIZE AND 16 WIDE: DOES A SIXTEENTH OF THE COST KEEP THE GAIN? FIXED BEFORE THE CODE
+
+**Why.** Section 166 closed round 71: U_T costs 1.16 traced frames on the 1080 and ~3 on the Intel. Section 163 named two cuts,
+each roughly a quarter of the cost, and Keith asked for both together. That is **U_TH**: section 161's design with its network
+at half size and 16 wide.
+
+**U_TH (render/learnedUpscaleTemporal.mjs, the "half" variant).**
+- **Its input:** U_T's 17 channels, each averaged over 2 x 2 to half size (960 x 540 at 1080p).
+- **Its network:** three 3 x 3 layers of **16** with ReLU, then a 1 x 1 head of 3, its weights and biases zero, at half size.
+- **Its correction:** the head's r, upsampled to full size bilinearly (pixel centres, edges clamped, as U's bilinear channel is
+  made), then section 159's hold on Bt's light at FULL size:
+
+  **y = A · (1 + 0.5 tanh(up(r)))**
+
+  So the correction is half-size and smooth, and the image it corrects keeps Bt's full-size detail. An untrained U_TH is Bt
+  exactly.
+- **Its cost, estimated from the arc's numbers:** 7.1 k multiply-adds a half-size pixel against U_T's 23.4 k a full-size one,
+  about 1/13 of U_T.
+
+**ROUND 72, the quality, as round 70's (section 161) in every way but the network.**
+- **Training and validation:** round 65's 200 + 20 scenes as sequences, 512 samples, seeds 1-3, the candidate by validation, and
+  C2 on shuffled targets.
+- **Test:** 24 new scenes, 12 R (75000-75011) and 12 C (76000-76011), against two 2048-sample references.
+- **H72a:** U_TH's chain beats Bt's -- with section 159's rule, a mean display relMSE at least 1 % below Bt's.
+- **H72b:** U_TH's chain beats B1's, as round 70's H2.
+- Files: render/upscale-net-r72.json and render/denoise-results-upscale-temporal-r72.json. The test also records each scene's
+  mean correction, and U_TH's gain over Bt as a fraction of round 70's 9.65 % (descriptive: a different test set, so not a
+  hypothesis).
+
+**ROUND 73, the cost, as round 71's (section 163) in every way but the network.**
+- **The passes on the device (render/learnedUpscaleTemporalGPU.mjs):**
+  - the 2 x 2 average of the input to half size;
+  - four layers on the fast kernel at half size;
+  - the upsample and the hold at full size.
+- **Held to the CPU** at 64 x 64 on family R's seed 990914, as round 71's was. The weights are a seeded U_TH with its head made
+  non-zero: the cost does not depend on the weights, so round 73 does not wait for round 72's training.
+- **Timed at 1920 x 1080** on the device's clock, against T read off the same run.
+- **H73: U ≤ 0.25 × T on both GPUs, in both of each GPU's runs.** That is H71's threshold and counting rule.
+
+**Predictions, fixed now, deciding nothing.**
+- **P1:** C1 and C3 hold in round 72.
+- **P2:** H72a is supported, at a gain over Bt of 2-8 %. Half the pixels' worth of correction keeps much of U_T's, since U_T's
+  corrections were small and smooth (0.66 % on the mean, section 162).
+- **P3:** H72b is supported.
+- **P4:** on the 1080, U is 2.5-6 ms and U / T 0.06-0.15, so H73 holds there. The two 16 -> 16 layers at 960 x 540 take about
+  1 ms each by the fast kernel's 32-wide rate, at a quarter of the channels squared and a quarter of the pixels; 16-wide
+  vec4 groups are less efficient, so allow 2 x.
+- **P5:** on the Intel, U / T is 0.15-0.35. Its 32-wide ratio was 2.95, and 1/13 of that is 0.23. **H73 on the Intel is a coin
+  toss**, so H73 overall is too.
+
+**What each outcome means, fixed now.**
+- **Both hold:** U_TH is a real-time temporal FSR4 on the 1080 (and on the Intel if P5 lands low), and the page and the chain
+  can take it.
+- **H72a fails:** the cut threw away the gain, and U_T stays a quality-only result.
+- **H73 fails on the Intel only:** U_TH is real-time on the 1080 class alone, and that is said.
+
+**The runs, on Keith's rig, at round 72's commit.**
+- The device: two `realGpuRun --only denoise` a GPU, which include round 73's gate.
+- The training: `--harvest-upscale-temporal-train --round 72`, its file committed unread.
+- The test: `--harvest-upscale-temporal-test --round 72` at that commit.
+
+All are committed byte for byte before they are read. Section 168 reads them.
