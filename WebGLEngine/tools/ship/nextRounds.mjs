@@ -2672,10 +2672,10 @@ export const NEXT_ROUNDS = [
         why: "Addendum 11's rank test (p about 0.004-0.007 on the whole arm) was chosen after seeing the data; this is the same hypothesis on circuits and audits not yet seen, direction fixed in advance.",
     },
     {
-        id: "fish-4b-e-replicates-registered-not-run",
+        id: "fish-4b-e-replicates-run-reported",
         blocker: "OPEN",
-        what: "REGISTERED AND BUILT 2026-10-30 (Addendum 13), NOT RUN: replicate searches on 4b-E cells E/E and E/whole of the registered start (el99), a lower start (el50) and NO STATE (ens), four each (24 circuits), scored on FRESH audits 85001-85048 (64 dives a block, refs:ER); reported, not judged, no controls. Stage A left the 4b-E real wiring NOT stuck (lambda 0.99 -> 0.787 / 0.771, +1.7 to +2.2 over the autopilot) with audits disagreeing in sign against NO STATE from a single search. Keyword `escapeReplicates`.",
-        how: "On the rig: git pull, then node tools/ship/trainSubVestibularCmd.mjs run --specs escapeReplicates --out brain/fishVestibularGen3.jsonl --workers 4 (about 5.5 core-hours by a short timing here), then report --in the same file. The reading is registered in Addendum 13 before any run.",
+        what: "RUN 2026-10-30 (result in Addendum 13 and brain/rig-results/fishVestibularGen3.jsonl): on 4b-E the registered start (lambda 0.99) is BEHIND NO STATE on all three audits in both cells (by 0.5 to 1.1), lambda 0.5 TIES NO STATE, and lambda 0.5 is ahead of 0.99 on E/whole; so memory does not help escape and the registered start hurts; Stage A's single-search a2 gap was noise. Reported, not judged. REGISTERED AND BUILT: replicate searches on 4b-E cells E/E and E/whole of the registered start (el99), a lower start (el50) and NO STATE (ens), four each (24 circuits), scored on FRESH audits 85001-85048 (64 dives a block, refs:ER); reported, not judged, no controls. Stage A left the 4b-E real wiring NOT stuck (lambda 0.99 -> 0.787 / 0.771, +1.7 to +2.2 over the autopilot) with audits disagreeing in sign against NO STATE from a single search. Keyword `escapeReplicates`.",
+        how: "(Done; to repeat) node tools/ship/trainSubVestibularCmd.mjs run --specs escapeReplicates --out brain/fishVestibularGen3.jsonl --workers 4 (about 5.5 core-hours by a short timing here), then report --in the same file. The reading is registered in Addendum 13 before any run.",
         why: "Whether memory helps escape is the open question of the escape pathway; one search per circuit cannot say.",
     },
     {
