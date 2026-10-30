@@ -57,7 +57,7 @@ console.log("\n3. THE PAGE");
 {
     const html = fs.readFileSync(path.join(ENG, "path-tracer.html"), "utf8"), wk = fs.readFileSync(path.join(ENG, "render/temporalLive-worker.mjs"), "utf8");
     ok("!! path-tracer.html has the temporal view: the worker, U_T on WebGPU through createDeviceTemporal, its image composited with the light sources, the three canvases",
-        /new Worker\("\/render\/temporalLive-worker\.mjs", \{ type: "module" \}\)/.test(html) && /import \{ createDeviceTemporal \} from "\/render\/learnedUpscaleTemporalGPU\.mjs"/.test(html) &&
+        /new Worker\("\/render\/temporalLive-worker\.mjs", \{ type: "module" \}\)/.test(html) && /import \{ createDeviceTemporal, temporalDevice \} from "\/render\/learnedUpscaleTemporalGPU\.mjs"/.test(html) && /dev = ad && await temporalDevice\(ad, m\.W, m\.W\)/.test(html) &&
         /run\.gpu = await createDeviceTemporal\(dev, decodeNet\(m\.ut\), \{ H: m\.W, W: m\.W \}\)/.test(html) && /compositeEmitters\(Float64Array\.from\(o\.y\), \{ cov: m\.cov, E: m\.E \}\)/.test(html) &&
         ["tlb1", "tlbt", "tlut"].every((id) => html.includes(`id="${id}"`)));
     ok("  ...the CPU fallback when the page has no WebGPU or the box is ticked, and a line naming where U_T ran and its ms",

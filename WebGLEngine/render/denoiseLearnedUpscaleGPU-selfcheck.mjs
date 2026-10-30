@@ -50,6 +50,12 @@ console.log("1. ON THE CPU");
     const swl = { commit: "x", gates: [{ gate: "render/denoiseUpscaleGPU-selfcheck.mjs", ok: true, exit: { status: 0 }, measured: up },
         { gate: "render/denoiseLearnedUpscaleGPU-selfcheck.mjs", ok: true, exit: { status: 0 }, measured: ["section 163: U_T at 240 x 136 812.000 ms (wall)"] }] };
     ok("  ...and a software run's line, at 240 x 136, is not read: no U, no ratio", G.readH71(swl).U === null && G.readH71(swl).ratio === null);
+    // section 164: the rig's first 1080 runs printed 0.000 ms from passes that failed on the default binding limit, and readH71 read it
+    const zero = G.readH71(rep("0.000"));
+    ok("!! a time of 0.000 is a pass that did not run: readH71 reads no U and no ratio from it (section 164)", zero.U === null && zero.ratio === null && G.h71([zero]) === "no verdict");
+    let refused = null; try { await G.createDeviceTemporal({ limits: { maxStorageBufferBindingSize: 134217728, maxBufferSize: 268435456 } }, Ut, { H: 1080, W: 1920 }); } catch (e) { refused = e.message; }
+    ok("!! U_T at 1920 x 1080 binds 265,420,800 bytes, and a device with the default 128 MiB binding is refused by name before anything is built",
+        G.temporalBytes(1080, 1920) === 265420800 && /binds 265420800 bytes, over this device's 134217728 -- make it with temporalDevice/.test(refused || ""), refused);
     // sabotage D8 (timed at 960 x 540 on hardware) went 0 red before this row: the container's adapter is software, so the hardware size never ran
     const [hw, hh] = G.UT_TIMING.hw, hwLine = { ...swl, gates: [swl.gates[0], { ...swl.gates[1], measured: [`section 163: U_T at ${hw} x ${hh} 40.000 ms (device)`] }] };
     ok("!! the gate times U_T on hardware at UT_TIMING.hw = 1920 x 1080, section 163's size -- the one line readH71 reads", hw === 1920 && hh === 1080 && G.readH71(hwLine).U === 40 && G.UT_TIMING.soft.join() === "240,136");
@@ -63,9 +69,11 @@ else {
     const ex = T.temporalExample("R", 990914, net, { W: 64, sppIn: 2, sppRef: 4 }), Hs = 64, Ws = 64;
     const enc = (n) => n.layers.map((L) => ({ Cin: L.Cin, Cout: L.Cout, k: L.k, act: L.act, W: Array.from(L.W), b: Array.from(L.b) }));
     const r = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 900000, args: { net: enc(Ut), x: Array.from(ex.x), Hs, Ws }, script: `async (a) => {
-        const { requestDevice } = await import("/gfx/device.js"), TG = await import("/render/learnedUpscaleTemporalGPU.mjs");
-        const cv = document.createElement("canvas"); cv.width = 8; cv.height = 8;
-        const dev = await requestDevice(cv, { backend: "webgpu", offscreen: true }), g = dev.gpu, errs = [];
+        const TG = await import("/render/learnedUpscaleTemporalGPU.mjs");
+        // section 164: the device from temporalDevice, its storage limits raised for 1920 x 1080 -- the default 128 MiB binding failed every pass
+        const ad = await navigator.gpu.requestAdapter(), info = (ad && ad.info) || {}, soft = !!(ad && ad.isFallbackAdapter) || /swiftshader|llvmpipe|software/i.test([info.vendor, info.architecture, info.description].join(" "));
+        const [W, H] = soft ? TG.UT_TIMING.soft : TG.UT_TIMING.hw, g = await TG.temporalDevice(ad, H, W), errs = [];
+        if (!g) return { compileError: "the adapter cannot hold U_T at " + W + " x " + H };
         if (g.addEventListener) g.addEventListener("uncapturederror", (e) => errs.push(String(e.error && e.error.message).slice(0, 200)));
         const net = { layers: a.net.map((L) => ({ ...L, W: Float64Array.from(L.W), b: Float64Array.from(L.b) })) };
         let small;
@@ -73,8 +81,7 @@ else {
         const o = await small.run(Float32Array.from(a.x), { keep: true });
         // the size: 1920 x 1080 on hardware, 240 x 136 on a software adapter (the header says why); the input synthetic -- the cost
         // does not depend on what it shows
-        const ad = await navigator.gpu.requestAdapter(), info = (ad && ad.info) || {}, soft = !!(ad && ad.isFallbackAdapter) || /swiftshader|llvmpipe|software/i.test([info.vendor, info.architecture, info.description].join(" "));
-        const [W, H] = soft ? TG.UT_TIMING.soft : TG.UT_TIMING.hw, big = await TG.createDeviceTemporal(g, net, { H, W });
+        const big = await TG.createDeviceTemporal(g, net, { H, W });
         const xb = new Float32Array(W * H * 17); let s = 7; for (let i = 0; i < xb.length; i++) { s = (s * 1103515245 + 12345) >>> 0; xb[i] = (s >>> 8) / 16777216; }
         const tm = await big.time(xb, { warmup: 2, reps: soft ? 3 : 9 });
         small.destroy(); big.destroy();
@@ -97,9 +104,10 @@ else {
         ok("!! the whole pass is temporalUpscale in f64 within 1e-4 relative -- the committed U_T, which moves the frame here (it is not the identity)",
             wc <= 1e-4 && moved > n, `worst ${wc.toExponential(2)}; ${moved} of ${n * 3} values corrected`);
         const tm = R.tm, pm = tm.passMs ? tm.passMs.map((v, i) => `${["layer 0", "layer 1", "layer 2", "layer 3", "hold"][i]} ${v.toFixed(3)}`).join(", ") : "no per-pass clock";
-        say(`section 163: U_T at ${R.W} x ${R.H} ${tm.ms.toFixed(3)} ms (${tm.clock}); ${pm}`);
+        // section 164: the line only from a clean run -- the rig's first runs printed 0.000 from passes that had failed
+        if (!R.errs.length && tm.ms > 0) say(`section 163: U_T at ${R.W} x ${R.H} ${tm.ms.toFixed(3)} ms (${tm.clock}); ${pm}`);
         ok(`  ...and its line is printed, at ${R.soft ? "240 x 136 on this software adapter, which readH71 does not read" : "1920 x 1080 on hardware, which readH71 reads"}`,
-            Number.isFinite(tm.ms) && tm.ms > 0 && [R.W, R.H].join() === (R.soft ? G.UT_TIMING.soft : G.UT_TIMING.hw).join() && R.passes.length === 5);
+            !R.errs.length && Number.isFinite(tm.ms) && tm.ms > 0 && [R.W, R.H].join() === (R.soft ? G.UT_TIMING.soft : G.UT_TIMING.hw).join() && R.passes.length === 5);
     }
 }
 

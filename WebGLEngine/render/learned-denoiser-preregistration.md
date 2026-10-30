@@ -10628,3 +10628,35 @@ Its gate holds its sequence to temporalExample's construction and its U_T to tem
 
 **The runs.** Two `realGpuRun --only denoise` on each GPU at round 71's commit, committed byte for byte before they are read.
 Section 164 reads them.
+
+## 164. ROUND 71's FIRST RIG RUNS -- NO VERDICT: MY GATE FAILED ON BOTH GPUs, FOR TWO DIFFERENT REASONS. FIXED; RUN AGAIN
+
+**What arrived.** Four `realGpuRun --only denoise` reports at 4c111f6b, two a GPU, committed byte for byte (9b61434d) before they
+were read. In each, five of the six denoise gates are green and render/denoiseLearnedUpscaleGPU-selfcheck.mjs is red. No run
+counts, so **H71 has no verdict.** T read as usual: 37.629 and 37.403 ms on the 1080, 504.5 and 503.8 ms on the Intel.
+
+**On the 1080: the default storage binding.**
+- U_T's 32-channel layer outputs at 1920 x 1080 are 265,420,800 bytes each.
+- That is over WebGPU's default maxStorageBufferBindingSize of 128 MiB, and the gate made its device with the defaults. Every
+  pass failed with "Binding size ... is larger than the maximum storage buffer binding size".
+- The gate then printed `U_T at 1920 x 1080 0.000 ms (device)` from passes that had not run.
+- **readH71 read that 0.000 as U, and a ratio of 0.** Only the red gate kept those runs from counting.
+- The denoiser's own timing never met the default limit: render/denoiseDevice.mjs's timingDevice raises it. On SwiftShader at
+  240 x 136 nothing reached the limit, so the gate was green here.
+
+**On the Intel: the checkout.** The gate died at its first line: `ENOENT ... C:\v4902\WebGLEngine\render\upscale-net-r70.json`.
+- That file is tracked, committed at a621735c, an ancestor of 4c111f6b, and the 1080's checkout had it.
+- Why the Intel box's tree lacked it is not known here; Keith is asked to check.
+
+**The fixes (this commit).**
+- **temporalDevice:** a device made with its storage limits raised to fit U_T, and timestamp queries where offered, as
+  timingDevice does. The gate and the page use it.
+- **A named refusal:** createDeviceTemporal refuses, by name, a device whose limit is below U_T's largest buffer.
+- **The line only from a clean run:** the gate prints U_T's timing only when the run had no uncaptured error and a time above
+  zero.
+- **readH71:** it never reads a time of zero as U.
+
+Each has a row in the gate, and each row's sabotage goes red.
+
+**H71, P1-P3 and the threshold are unchanged.** Section 163's predictions stand as made. The runs are owed again at this commit,
+two a GPU, and section 165 reads them.

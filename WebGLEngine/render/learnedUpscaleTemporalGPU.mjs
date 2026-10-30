@@ -42,11 +42,25 @@ export function deviceLayersT(net) {
 }
 
 /**
+ * Section 164: the largest buffer U_T binds at H x W -- a 32-channel layer's output, 265 MB at 1920 x 1080, over WebGPU's default
+ * 128 MiB storage binding. The rig's first runs bound it on a default device and every pass failed; the device must be asked for more.
+ */
+export const temporalBytes = (H, W) => H * W * 32 * 4;
+/** A device from `adapter` that can hold U_T at H x W: its storage limits raised to fit, timestamp queries when offered; null if the adapter cannot. */
+export async function temporalDevice(adapter, H, W) {
+    const bytes = temporalBytes(H, W), cap = Math.min(adapter.limits.maxStorageBufferBindingSize, adapter.limits.maxBufferSize);
+    if (bytes > cap) return null;
+    const want = Math.max(bytes, Math.min(cap, 134217728));
+    return adapter.requestDevice({ requiredFeatures: ["timestamp-query"].filter((f) => adapter.features.has(f)), requiredLimits: { maxStorageBufferBindingSize: want, maxBufferSize: want } });
+}
+
+/**
  * U_T on `dev` (a GPUDevice) at H x W: run(x, { keep }) -> { y, r, acts?, ms }, time(x) -> { gpu, perPass, wall, timestamps, passes },
  * destroy(). x is temporalInput's 17 channels a pixel. Buffers and pipelines are built once.
  */
 export async function createDeviceTemporal(dev, net, { H, W }) {
-    const layers = deviceLayersT(net);
+    const layers = deviceLayersT(net), need = temporalBytes(H, W), lim = dev.limits ? Math.min(dev.limits.maxStorageBufferBindingSize, dev.limits.maxBufferSize) : Infinity;
+    if (need > lim) throw new Error(`learnedUpscaleTemporalGPU: U_T at ${W} x ${H} binds ${need} bytes, over this device's ${lim} -- make it with temporalDevice (section 164)`);
     if (layers[0].Cin !== UT_CHANNELS || layers[layers.length - 1].Cout !== 3) throw new Error("learnedUpscaleTemporalGPU: U_T takes 17 channels and gives 3");
     const errors = [], build = async (code, entryPoint) => {
         const m = dev.createShaderModule({ code }), info = m.getCompilationInfo ? await m.getCompilationInfo() : { messages: [] };
@@ -132,7 +146,8 @@ export function holdCpu(x, r, H, W) {
 export function readH71(rep) {
     const base = readH63(rep), g = (rep.gates || []).find((x) => x.gate === "render/denoiseLearnedUpscaleGPU-selfcheck.mjs");
     let U = null, clock = null;
-    for (const l of (g && g.measured) || []) { const m = l.match(/^section 163: U_T at 1920 x 1080 ([\d.]+) ms \((device|wall)\)/); if (m) { U = +m[1]; clock = m[2]; break; } }
+    // section 164: a time of zero is a pass that did not run (the rig's first runs printed 0.000 for every pass), never a reading
+    for (const l of (g && g.measured) || []) { const m = l.match(/^section 163: U_T at 1920 x 1080 ([\d.]+) ms \((device|wall)\)/); if (m && +m[1] > 0) { U = +m[1]; clock = m[2]; break; } }
     return { commit: base.commit, counts: base.counts, T: base.T, U, clock, ratio: U !== null && base.T !== null ? U / base.T : null };
 }
 export const H71_RATIO = 0.25;

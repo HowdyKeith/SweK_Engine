@@ -990,7 +990,7 @@ $("fggo").onclick = () => {
 <script type="module">
 // backlog fsr4-temporal-page (section 163): round 70's temporal chain and U_T, live -- the chain in a worker, U_T on WebGPU or the CPU
 import { decodeNet } from "/render/denoiseDevice.mjs";
-import { createDeviceTemporal } from "/render/learnedUpscaleTemporalGPU.mjs";
+import { createDeviceTemporal, temporalDevice } from "/render/learnedUpscaleTemporalGPU.mjs";
 import { compositeEmitters } from "/render/denoiseUpscale.mjs";
 import { toBytes } from "/render/frameGenLive.mjs";
 const $ = (id) => document.getElementById(id);
@@ -1010,7 +1010,7 @@ $("tlgo").onclick = async () => {
     if (m.type === "ready") {
       // U_T on this page's WebGPU device when it has one (and the box is not ticked), else in the worker on the CPU
       if (!run.cpu && navigator.gpu) try {
-        const ad = await navigator.gpu.requestAdapter(), dev = ad && await ad.requestDevice();
+        const ad = await navigator.gpu.requestAdapter(), dev = ad && await temporalDevice(ad, m.W, m.W);
         if (dev) { run.gpu = await createDeviceTemporal(dev, decodeNet(m.ut), { H: m.W, W: m.W }); run.where = "WebGPU" + (ad.info && ad.info.description ? ` (${ad.info.description})` : ""); }
       } catch (err) { run.gpu = null; run.where = "the CPU (WebGPU failed: " + String(err.message).slice(0, 80) + ")"; }
       run.W = m.W;
