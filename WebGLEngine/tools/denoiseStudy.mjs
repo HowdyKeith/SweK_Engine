@@ -30,6 +30,7 @@
 //                                                  (either with --round 67, 68 or 69 for sections 155, 157 and 159, and --cache <dir> to resume)
 //       node tools/denoiseStudy.mjs --harvest-upscale-temporal-train   FSR4 round 70: U_T on sequences (section 161) -> render/upscale-net-r70.json
 //       node tools/denoiseStudy.mjs --harvest-upscale-temporal-test    FSR4 round 70: the 24 test sequences -> render/denoise-results-upscale-temporal-r70.json
+//                                                  (either with --round 72 for section 167's U_TH, half size and 16 wide)
 //       node tools/denoiseStudy.mjs --harvest-r47  round 11 with the network 16 channels wide, the 32-channel one beside it (section 116) -> render/denoise-results-r47.json
 //       node tools/denoiseStudy.mjs --harvest-r11  one large network trained on families R and C together (section 32) -> render/denoise-results-r11.json
 //       node tools/denoiseStudy.mjs --secondary-r11  round 11 again, for section 32's secondary the first run skipped (section 33)
@@ -305,13 +306,14 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
         console.log(`[denoiseStudy] wrote ${ROUND_FRAMEGEN_HOLES.results}`);
     } else if (args.includes("--harvest-upscale-temporal-train")) {
         // FSR4, round 70 (section 161): U_T trained on three seeds over the training sequences, the candidate by validation, and C2's U_T
-        const LT = await import("../render/learnedUpscaleTemporalStudy.mjs"), { encodeNet: enc } = await import("../render/denoiseDevice.mjs"), RD = LT.ROUND_UPSCALE_TEMPORAL;
+        // section 167: --round 72 trains U_TH (half size, 16 wide); round 70's U_T otherwise
+        const LT = await import("../render/learnedUpscaleTemporalStudy.mjs"), { encodeNet: enc } = await import("../render/denoiseDevice.mjs"), ri = args.indexOf("--round"), RD = LT.temporalRound(ri >= 0 ? +args[ri + 1] : null);
         const file = path.join(ENG, RD.net);
         if (fs.existsSync(file)) { console.log(`[denoiseStudy] ${RD.net} exists -- a harvest's results are never overwritten`); process.exit(2); }
         const bytes = fs.readFileSync(path.join(ENG, SHIPPED_NET)), shipped = JSON.parse(bytes.toString("utf8"));
         const git = (...a) => execFileSync("git", a, { cwd: ENG, encoding: "utf8", maxBuffer: 1 << 28 });
         const startCommit = git("rev-parse", "--short=8", "HEAD").trim(), cache = upscaleCache(args, git, RD.net);
-        const r = LT.runTemporalTraining({ splits: RD.splits, W: RD.image, sppIn: RD.sppIn, sppRef: RD.sppRef, net: decodeNet(shipped.net), harvest: true, cache, log: (m) => console.log("[denoiseStudy] " + m) });
+        const r = LT.runTemporalTraining({ splits: RD.splits, W: RD.image, sppIn: RD.sppIn, sppRef: RD.sppRef, net: decodeNet(shipped.net), harvest: true, cache, variant: RD.variant, log: (m) => console.log("[denoiseStudy] " + m) });
         const out = { candidate: r.candidate, runs: r.runs.map((x) => ({ seed: x.seed, valMean: x.valMean, val: x.val, losses: x.losses, net: enc(x.net) })),
                       c2: { seed: r.c2.seed, shuffle: r.c2.shuffle, losses: r.c2.losses, net: enc(r.c2.net) }, config: r.config, ms: r.ms,
                       shipped: { file: SHIPPED_NET, sha256: crypto.createHash("sha256").update(bytes).digest("hex") }, commit: startCommit,
@@ -320,14 +322,14 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
         console.log(`[denoiseStudy] wrote ${RD.net}`);
     } else if (args.includes("--harvest-upscale-temporal-test")) {
         // FSR4, round 70 (section 161): the 24 test sequences, the candidate U_T and C2's read from the committed training file
-        const LT = await import("../render/learnedUpscaleTemporalStudy.mjs"), RD = LT.ROUND_UPSCALE_TEMPORAL;
+        const LT = await import("../render/learnedUpscaleTemporalStudy.mjs"), ri = args.indexOf("--round"), RD = LT.temporalRound(ri >= 0 ? +args[ri + 1] : null);
         const file = path.join(ENG, RD.results);
         if (fs.existsSync(file)) { console.log(`[denoiseStudy] ${RD.results} exists -- a harvest's results are never overwritten`); process.exit(2); }
         const tr = JSON.parse(fs.readFileSync(path.join(ENG, RD.net), "utf8")), cand = tr.runs.find((x) => x.seed === tr.candidate);
         const bytes = fs.readFileSync(path.join(ENG, SHIPPED_NET)), shipped = JSON.parse(bytes.toString("utf8"));
         const git = (...a) => execFileSync("git", a, { cwd: ENG, encoding: "utf8", maxBuffer: 1 << 28 });
         const startCommit = git("rev-parse", "--short=8", "HEAD").trim(), cache = upscaleCache(args, git, RD.results);
-        const out = LT.runTemporalTest({ splits: RD.splits, W: RD.image, sppIn: RD.sppIn, sppRef: RD.sppRefTest, net: decodeNet(shipped.net), U: decodeNet(cand.net), Uc2: decodeNet(tr.c2.net), c1Min: RD.c1Min, harvest: true, cache, log: (m) => console.log("[denoiseStudy] " + m) });
+        const out = LT.runTemporalTest({ splits: RD.splits, W: RD.image, sppIn: RD.sppIn, sppRef: RD.sppRefTest, net: decodeNet(shipped.net), U: decodeNet(cand.net), Uc2: decodeNet(tr.c2.net), c1Min: RD.c1Min, round: RD.round, harvest: true, cache, log: (m) => console.log("[denoiseStudy] " + m) });
         out.trained = { file: RD.net, candidate: tr.candidate, commit: tr.commit };
         out.round = RD.round;
         out.shipped = { file: SHIPPED_NET, sha256: crypto.createHash("sha256").update(bytes).digest("hex") };

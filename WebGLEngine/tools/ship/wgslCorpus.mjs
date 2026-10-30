@@ -1248,6 +1248,11 @@ export const EXCLUDED = Object.freeze([
     // round 71 (section 163) -- U_T on the device (render/learnedUpscaleTemporalGPU.mjs): the last of five passes, after four fast-kernel layers
     Object.freeze({ id: "learnedUpscaleTemporalGPU.HOLD_WGSL", kind: "ordered multi-dispatch chain, graded against a CPU twin",
         why: "U_T's hold, y = A (1 + 0.5 tanh r), reads the input and the head layer's residual, which only the four conv passes before it write; render/denoiseLearnedUpscaleGPU-selfcheck.mjs holds it to holdCpu on the device's own residual (within 1e-5) and the whole chain to temporalUpscale in f64 (within 1e-4)" }),
+    // round 73 (section 167) -- U_TH's own two passes, first and last of its six
+    Object.freeze({ id: "learnedUpscaleTemporalGPU.DOWN_WGSL", kind: "ordered multi-dispatch chain, graded against a CPU twin",
+        why: "U_TH's first pass, the 17 channels averaged over 2 x 2 for the half-size layers after it; render/denoiseLearnedUpscaleGPU-selfcheck.mjs reads it back and holds it to halfInput (within 1e-6)" }),
+    Object.freeze({ id: "learnedUpscaleTemporalGPU.UPHOLD_WGSL", kind: "ordered multi-dispatch chain, graded against a CPU twin",
+        why: "U_TH's last pass, the half-size head's residual upsampled and the hold at full size, reading what the four conv passes wrote; held to holdCpu(half) on the device's own residual (within 1e-5) and the whole chain to temporalUpscale (within 1e-4)" }),
 ]);
 
 /**

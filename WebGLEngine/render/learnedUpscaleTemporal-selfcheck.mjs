@@ -14,6 +14,9 @@
 // then 1 each with the two rows added for them.
 // SECTION 162: V162a the candidate typed 2, V162b H1's count typed 19, V162c the test's commit typed 2daaa618, V162d the rule read at
 // 10 %, V162f the losses typed 3,4,7,10 -> 1 red each; V162e H1 re-derived against B1 -> 2 red. Each restored byte-identical.
+// ROUND 72 (section 167): H1 halfInput one corner -> 3 red, H2 the upsample's centres shifted -> 2, H3 the backward without the
+// transpose -> 1, H4 width 8 -> 3, S1 round 72's variant full -> 1, S2 its test seeds onto round 70's -> 1; H5 U_TH's crops at odd
+// corners and S3 the study's training without the variant -> *** 0 RED at first ***, then 1 each with the two rows added for them.
 "use strict";
 import fs from "node:fs";
 import os from "node:os";
@@ -160,6 +163,58 @@ console.log("\n5. SECTION 162: ROUND 70's COMMITTED HARVESTS, READ BACK -- U_T B
     ok("  descriptively: U_T won all 12 C scenes (11.5 % below Bt) and 8 of 12 R (3.2 %); its four losses are R 73003, 73004, 73007, 73011, each by under 2 %",
         d.slice(12).every((x) => x > 0) && d.slice(0, 12).filter((x) => x > 0).length === 8 && Math.abs(gC - 0.1153) < 5e-4 && Math.abs(gR - 0.0319) < 5e-4 &&
         d.map((x, i) => (x < 0 ? i : -1)).filter((i) => i >= 0).join() === "3,4,7,11" && d.every((x) => x > -0.02));
+}
+
+console.log("\n6. ROUND 72 (section 167): U_TH -- THE NETWORK AT HALF SIZE AND 16 WIDE");
+{
+    const C = T.UT_CHANNELS, hw = W / 2, xh = T.halfInput(ex.x, W, W), p = 5 * hw + 7, k = 9;
+    const avg = (ex.x[((10) * W + 14) * C + k] + ex.x[((10) * W + 15) * C + k] + ex.x[((11) * W + 14) * C + k] + ex.x[((11) * W + 15) * C + k]) / 4;
+    ok("!! halfInput averages each of the 17 channels over its 2 x 2 block: half pixel (7, 5) is full (14-15, 10-11)", xh.length === hw * hw * C && xh[p * C + k] === avg);
+    const r = { u: (() => { let s7 = 11; return () => ((s7 = (s7 * 1103515245 + 12345) >>> 0) >>> 8) / 16777216 - 0.5; })() };
+    const a = Float64Array.from({ length: 6 * 5 * 3 }, r.u), gF = Float64Array.from({ length: 12 * 10 * 3 }, r.u), ua = T.upHalf(a, 6, 5), tg = T.upHalfT(gF, 6, 5);
+    let lhs = 0, rhs = 0; for (let i = 0; i < ua.length; i++) lhs += ua[i] * gF[i]; for (let i = 0; i < a.length; i++) rhs += a[i] * tg[i];
+    const flat = T.upHalf(Float64Array.from({ length: 6 * 5 * 3 }, () => 0.7), 6, 5);
+    ok("!! upHalf is bilinear at pixel centres, edges clamped (a flat field stays flat), and upHalfT is its transpose: <up a, g> = <a, up^T g>",
+        Math.abs(lhs - rhs) < 1e-12 && flat.every((v) => Math.abs(v - 0.7) < 1e-15) && ua.length === 12 * 10 * 3, `${lhs.toExponential(6)} against ${rhs.toExponential(6)}`);
+    const u0 = T.makeUpscalerT(4, "half");
+    ok("!! an untrained U_TH is Bt exactly; it is three 3 x 3 layers of 16 and a 3-channel head, run at half size, and isHalfT tells it from U_T",
+        T.temporalChain(u0, ex).every((v, i) => Object.is(v, ex.bt[i])) && T.UTH_SHAPE.map((l) => `${l[0]}-${l[1]}`).join() === "17-16,16-16,16-16,16-3" && T.isHalfT(u0) && !T.isHalfT(T.makeUpscalerT(4)) &&
+        T.temporalUpscale(u0, ex.x, W, W).rh.length === hw * hw * 3);
+    const nh = T.makeUpscalerT(5, "half");
+    nh.layers.forEach((L, li) => { const q = seededRandom(80 + li); for (let i = 0; i < L.W.length; i++) L.W[i] += 0.3 * (q.u() - 0.5); for (let i = 0; i < L.b.length; i++) L.b[i] += 0.3 * (q.u() - 0.5); });
+    const G = T.temporalLoss(nh, ex.x, W, W, ex.ref, ex.cov, ex.E), Lf = () => T.temporalLoss(nh, ex.x, W, W, ex.ref, ex.cov, ex.E).loss;
+    let worst = 0;
+    for (const [li, wi] of [[0, 9], [0, 17 * 9 + 2], [1, 200], [2, 1000], [3, 5], [3, 40]]) { const Wt = nh.layers[li].W, keep = Wt[wi], e = 1e-5; Wt[wi] = keep + e; const a1 = Lf(); Wt[wi] = keep - e; const b1 = Lf(); Wt[wi] = keep;
+        const fd = (a1 - b1) / (2 * e), an = G.grads[li].dW[wi]; worst = Math.max(worst, Math.abs(fd - an) / Math.max(1e-9, Math.abs(fd) + Math.abs(an))); }
+    ok("!! U_TH's gradient, through the hold, the upsample (its transpose) and the half-size network, matches central differences within 1e-5 relative", worst < 1e-5, `worst ${worst.toExponential(2)}`);
+    const a2 = T.trainTemporal(seqs, { seed: 3, steps: 6, batch: 2, crop: 16, variant: "half" }), b2 = T.trainTemporal(seqs, { seed: 3, steps: 6, batch: 2, crop: 16, variant: "half" });
+    let odd = null; try { T.trainTemporal(seqs, { seed: 1, steps: 1, crop: 15, variant: "half" }); } catch (e) { odd = e.message; }
+    ok("  U_TH trains deterministically by seed, on even crops at even corners (an odd crop refused)", a2.net.layers.every((L, i) => L.W.every((v, j) => Object.is(v, b2.net.layers[i].W[j]))) && T.isHalfT(a2.net) && /even crops/.test(odd || ""));
+    // sabotage H5 (U_TH's crops at odd corners) went 0 red before this row: the training stayed deterministic and still learned
+    const corners = []; T.trainTemporal(seqs, { seed: 4, steps: 20, batch: 2, crop: 16, variant: "half", onCrop: (cx, cy) => corners.push(cx, cy) });
+    ok("  ...every U_TH crop corner is even, so a crop's 2 x 2 blocks are the frame's own, and the corners reach the frame's far edge",
+        corners.length === 80 && corners.every((v) => v % 2 === 0 && v >= 0 && v <= W - 16) && corners.some((v) => v > 0));
+    const long = T.trainTemporal(seqs, { seed: 2, steps: 150, batch: 2, crop: 16, variant: "half" }), m = (xs) => xs.reduce((q2, v) => q2 + v, 0) / xs.length;
+    const g2 = (y, e) => relMSE(Float64Array.from(y, toPerceptual), Float64Array.from(e.ref, toPerceptual));
+    const fit = seqs.map((e) => g2(T.temporalChain(long.net, e), e)), bt = seqs.map((e) => g2(e.bt, e));
+    ok("!! ...and it learns: 150 steps on four sequences bring their loss below Bt's on the mean", m(fit) < m(bt), `${m(fit).toExponential(3)} against Bt's ${m(bt).toExponential(3)}`);
+    // sabotage S3 (the study's training ignoring the variant) went 0 red before this row: only round 70's variant had been run through it
+    const miniH = Object.freeze({ train: Object.freeze({ family: "R+C", families: Object.freeze(["R", "C"]), seeds: Object.freeze([990951, 990952]) }),
+                                  val: Object.freeze({ family: "R", families: Object.freeze(["R"]), seeds: Object.freeze([990955]) }) });
+    const th = LT.runTemporalTraining({ splits: miniH, net, ...o, seeds: [1], train: { steps: 4, batch: 2, crop: 16 }, variant: "half" });
+    ok("!! the study's training under round 72's variant trains U_TH for every seed and C2, and records the variant and its shape",
+        th.runs.every((q) => T.isHalfT(q.net)) && T.isHalfT(th.c2.net) && th.config.variant === "half" && th.config.shape === T.UTH_SHAPE);
+    const R72 = LT.ROUND_UPSCALE_TEMPORAL_72, S72 = D.SPLITS_UPSCALE_TEMPORAL_72, prev = new Set([...D.SPLITS_UPSCALE_TEMPORAL.T1.seeds, ...D.SPLITS_UPSCALE_LEARNED_69.T1.seeds]);
+    let bad = null; try { LT.temporalRound(71); } catch (e) { bad = e.message; }
+    ok("!! ROUND_UPSCALE_TEMPORAL_72: U_TH's variant, round 70's training and samples, 24 new test scenes (75000-75011 R, 76000-76011 C), the 1 % rule, its own two files; temporalRound 70 / 72, 71 refused",
+        R72.variant === "half" && R72.round === 72 && R72.splits === S72 && S72.train === D.SPLITS_UPSCALE_LEARNED.train && S72.T1.seeds.slice(0, 12).every((x, i) => x === 75000 + i && S72.T1.families[i] === "R") &&
+        S72.T1.seeds.slice(12).every((x, i) => x === 76000 + i && S72.T1.families[12 + i] === "C") && S72.T1.seeds.every((x) => D.isDatasetSeed(x) && !prev.has(x)) &&
+        ["image", "sppIn", "sppRef", "sppRefTest", "c1Min", "minGain", "seeds", "train"].every((key) => R72[key] === LT.ROUND_UPSCALE_TEMPORAL[key]) && LT.ROUND_UPSCALE_TEMPORAL.variant === "full" &&
+        R72.net === "render/upscale-net-r72.json" && R72.results === "render/denoise-results-upscale-temporal-r72.json" && LT.temporalRound(72) === R72 && LT.temporalRound(null) === LT.ROUND_UPSCALE_TEMPORAL && /no temporal round 71/.test(bad || ""));
+    const cli = fs.readFileSync(path.join(ENG, "tools/denoiseStudy.mjs"), "utf8"), br = (flag) => { const b0 = cli.indexOf(`} else if (args.includes("${flag}")) {`); return b0 >= 0 ? cli.slice(b0, cli.indexOf("} else if (", b0 + 10)).replace(/\/\/.*$/gm, "") : ""; };
+    const ta = br("--harvest-upscale-temporal-train"), tb = br("--harvest-upscale-temporal-test");
+    ok("!! both temporal commands take --round (LT.temporalRound), the training hands on the round's variant, the test its round for C2's citation",
+        /RD = LT\.temporalRound\(/.test(ta) && /variant: RD\.variant/.test(ta) && /RD = LT\.temporalRound\(/.test(tb) && /round: RD\.round, harvest: true/.test(tb));
 }
 
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +

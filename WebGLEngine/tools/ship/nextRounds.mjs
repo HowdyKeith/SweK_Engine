@@ -2526,6 +2526,13 @@ export const NEXT_ROUNDS = [
         why: "Section 162 found U_T better and left it untimed; a correction that costs more than the frame it corrects is not a win.",
     },
     {
+        id: "fsr4-temporal-half",
+        blocker: "OPEN",
+        what: "ROUNDS 72-73 BUILT, AWAITING THE RIG (section 167), Keith's call after round 71: U_TH, U_T's network at half size and 16 wide (the 17 channels averaged over 2 x 2, three layers of 16, the correction upsampled bilinearly, Bt held at full size) -- about 1/13 of U_T's work. Round 72, its quality as round 70's (H72a against Bt with the 1 % rule, H72b against B1, test 75000 R / 76000 C); round 73, its cost as round 71's (H73: U <= 0.25 T on both GPUs), timed with seeded weights so it runs beside the training. Predicted: H72a at 2-8 %, U 2.5-6 ms on the 1080, the Intel a coin toss.",
+        how: "On the rig at round 72's commit: two realGpuRun --only denoise a GPU; --harvest-upscale-temporal-train --round 72, its file committed; --harvest-upscale-temporal-test --round 72 at that commit. Section 168 reads them.",
+        why: "Round 71 found U_T 9.65 % better and 1.16-3 traced frames dear; a sixteenth of the cost might keep enough of the gain to be real-time.",
+    },
+    {
         id: "fsr4-temporal-page",
         blocker: "CLOSED",
         what: "CLOSED, THE PAGE WIRED (unshipped): path-tracer.html's \"Temporal upscale, learned\" view -- a live orbit, each frame half-size traced on round 32's jitter, denoised, filled and EASU'd in a worker (render/temporalLive.mjs, render/temporalLive-worker.mjs), the last eight accumulated into Bt, and U_T run on the page's WebGPU device (createDeviceTemporal) or the CPU; the single frame, Bt and U_T side by side with each step's ms. Its example is held bit for bit to round 70's temporalExample by render/temporalLive-selfcheck.mjs. Headless Chromium here: about 0.4 s a frame for the chain and 0.6 s for U_T on SwiftShader at 128 x 128 -- a CPU's numbers, not a GPU's.",

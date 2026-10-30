@@ -30,9 +30,44 @@ export const UT_SCALE = 0.5;
 /** Three 3 x 3 layers of 32, then the 3-channel residual head as 1 x 1. */
 export const UT_SHAPE = Object.freeze([Object.freeze([UT_CHANNELS, 32, "relu"]), Object.freeze([32, 32, "relu"]), Object.freeze([32, 32, "relu"]), Object.freeze([32, 3, "none", 1])]);
 
-/** A fresh U_T from a seed's stream: the head's weights and biases zero, so its untrained frame is A exactly. */
-export function makeUpscalerT(rand) {
-    const net = initNet(UT_SHAPE, typeof rand === "number" ? seededRandom(rand) : rand), last = net.layers[net.layers.length - 1];
+// ---- ROUNDS 72-73 (section 167): U_TH, the network at half size and 16 wide ------------------------------------------------
+/** U_TH's width, and its shape: three 3 x 3 layers of 16, then the 3-channel head as 1 x 1 -- run on the 17 channels averaged to half size. */
+export const UTH_WIDTH = 16;
+export const UTH_SHAPE = Object.freeze([Object.freeze([UT_CHANNELS, UTH_WIDTH, "relu"]), Object.freeze([UTH_WIDTH, UTH_WIDTH, "relu"]), Object.freeze([UTH_WIDTH, UTH_WIDTH, "relu"]), Object.freeze([UTH_WIDTH, 3, "none", 1])]);
+/** The two variants: "full" (round 70's U_T) and "half" (U_TH). A net is U_TH when its first layer is 16 wide. */
+export const UT_VARIANTS = Object.freeze(["full", "half"]);
+export const isHalfT = (net) => net.layers[0].Cout === UTH_WIDTH;
+/** The 17 channels of a W x H input averaged over 2 x 2: (W / 2) x (H / 2) x 17. */
+export function halfInput(x, W, H) {
+    if (W % 2 || H % 2) throw new Error(`learnedUpscaleTemporal: a ${W} x ${H} input has no half size`);
+    const w = W / 2, h = H / 2, C = UT_CHANNELS, o = new Float64Array(w * h * C);
+    for (let y = 0; y < h; y++) for (let xx = 0; xx < w; xx++) for (let c = 0; c < C; c++)
+        o[(y * w + xx) * C + c] = (x[((2 * y) * W + 2 * xx) * C + c] + x[((2 * y) * W + 2 * xx + 1) * C + c] + x[((2 * y + 1) * W + 2 * xx) * C + c] + x[((2 * y + 1) * W + 2 * xx + 1) * C + c]) / 4;
+    return o;
+}
+// a full-size pixel's bilinear taps into the half-size grid: its centre at half-size (X + 0.5) / 2 - 0.5, clamped -- U's bilinear channel's rule
+function upTapsH(X, Y, w, h) {
+    const u = Math.min(w - 1, Math.max(0, (X + 0.5) / 2 - 0.5)), v = Math.min(h - 1, Math.max(0, (Y + 0.5) / 2 - 0.5));
+    const x0 = Math.floor(u), y0 = Math.floor(v), x1 = Math.min(w - 1, x0 + 1), y1 = Math.min(h - 1, y0 + 1), tx = u - x0, ty = v - y0;
+    return [[y0 * w + x0, (1 - tx) * (1 - ty)], [y0 * w + x1, tx * (1 - ty)], [y1 * w + x0, (1 - tx) * ty], [y1 * w + x1, tx * ty]];
+}
+/** A half-size 3-channel field upsampled bilinearly to 2w x 2h. */
+export function upHalf(rh, w, h) {
+    const W = 2 * w, H = 2 * h, r = new Float64Array(W * H * 3);
+    for (let Y = 0; Y < H; Y++) for (let X = 0; X < W; X++) { const p = Y * W + X; for (const [q, a] of upTapsH(X, Y, w, h)) for (let c = 0; c < 3; c++) r[p * 3 + c] += a * rh[q * 3 + c]; }
+    return r;
+}
+/** upHalf's transpose: a full-size gradient gathered back onto the half-size field. */
+export function upHalfT(g, w, h) {
+    const W = 2 * w, H = 2 * h, o = new Float64Array(w * h * 3);
+    for (let Y = 0; Y < H; Y++) for (let X = 0; X < W; X++) { const p = Y * W + X; for (const [q, a] of upTapsH(X, Y, w, h)) for (let c = 0; c < 3; c++) o[q * 3 + c] += a * g[p * 3 + c]; }
+    return o;
+}
+
+/** A fresh U_T (or, `variant` "half", U_TH) from a seed's stream: the head's weights and biases zero, so its untrained frame is A exactly. */
+export function makeUpscalerT(rand, variant = "full") {
+    if (!UT_VARIANTS.includes(variant)) throw new Error(`learnedUpscaleTemporal: the variant is "full" or "half" -- got ${JSON.stringify(variant)}`);
+    const net = initNet(variant === "half" ? UTH_SHAPE : UT_SHAPE, typeof rand === "number" ? seededRandom(rand) : rand), last = net.layers[net.layers.length - 1];
     last.W.fill(0); last.b.fill(0);
     return net;
 }
@@ -52,11 +87,13 @@ export function temporalInput(A, Au, C, n, albedo, normal, depth, W, H) {
 const T_FLOOR = 1e-6;
 const dToPerceptual = (v) => { const a = Math.max(v, T_FLOOR); return v <= 0 ? 0 : toPerceptual(a) / (GAMMA * a * (1 + a)); };
 
-/** U_T applied to a W x H input: { y (W x H x 3), r (the residual), acts }. The base A is the input's channels 0-2. */
+/** U_T applied to a W x H input: { y (W x H x 3), r (the residual at full size), acts }. The base A is the input's channels 0-2. U_TH runs on the
+ * half-size input and its residual is upsampled (rh beside it). */
 export function temporalUpscale(net, x, W, H) {
-    const acts = netForward(net, x, H, W), r = acts[acts.length - 1], y = new Float64Array(W * H * 3);
+    const half = isHalfT(net), acts = half ? netForward(net, halfInput(x, W, H), H / 2, W / 2) : netForward(net, x, H, W), rh = acts[acts.length - 1];
+    const r = half ? upHalf(rh, W / 2, H / 2) : rh, y = new Float64Array(W * H * 3);
     for (let p = 0; p < W * H; p++) for (let c = 0; c < 3; c++) y[p * 3 + c] = x[p * UT_CHANNELS + c] * (1 + UT_SCALE * Math.tanh(r[p * 3 + c]));
-    return { y, r, acts };
+    return { y, r, acts, ...(half ? { rh } : {}) };
 }
 
 /** The loss and its gradients on a W x H frame or crop: display-space relMSE of E + (1 - cov) y, back through the hold to r and the network. */
@@ -68,7 +105,8 @@ export function temporalLoss(net, x, W, H, ref, cov, E) {
         loss += e * e / den;
         dz[i] = 2 * e / den / N * dToPerceptual(o) * (1 - cov[p]) * x[p * UT_CHANNELS + c] * UT_SCALE * (1 - t * t);
     }
-    return { loss: loss / N, ...netBackward(net, acts, H, W, dz) };
+    // U_TH: the full-size gradient on r carried back through the upsample onto the half-size head
+    return { loss: loss / N, ...(isHalfT(net) ? netBackward(net, acts, H / 2, W / 2, upHalfT(dz, W / 2, H / 2)) : netBackward(net, acts, H, W, dz)) };
 }
 
 /** A size x size crop of an example at (cx, cy): its input, reference, coverage and emission. */
@@ -84,15 +122,19 @@ export function temporalCrop(ex, cx, cy, size) {
 }
 
 /** Train U_T on `examples` ([{ x, W, H, ref, cov, E }]): `steps` Adam steps on `batch` crops of `crop`, the image and corner from the seed's stream after the weights. */
-export function trainTemporal(examples, { seed, steps = UP_TRAIN.steps, batch = UP_TRAIN.batch, crop = UP_TRAIN.crop, adam = ADAM } = {}) {
+export function trainTemporal(examples, { seed, steps = UP_TRAIN.steps, batch = UP_TRAIN.batch, crop = UP_TRAIN.crop, adam = ADAM, variant = "full", onCrop = null } = {}) {
     if (!Number.isInteger(seed)) throw new Error("learnedUpscaleTemporal: training needs an integer seed");
     if (examples.some((e) => e.W < crop || e.H < crop)) throw new Error(`learnedUpscaleTemporal: a crop no larger than every frame -- got ${crop}`);
-    const rand = seededRandom(seed), net = makeUpscalerT(rand), state = adamState(net), losses = [];
+    if (variant === "half" && crop % 2) throw new Error(`learnedUpscaleTemporal: U_TH trains on even crops -- got ${crop}`);
+    const rand = seededRandom(seed), net = makeUpscalerT(rand, variant), state = adamState(net), losses = [];
     for (let step = 0; step < steps; step++) {
         let loss = 0, acc = null;
         for (let b = 0; b < batch; b++) {
             const ex = examples[Math.floor(rand.u() * examples.length)];
-            const cx = Math.floor(rand.u() * (ex.W - crop + 1)), cy = Math.floor(rand.u() * (ex.H - crop + 1)), C = temporalCrop(ex, cx, cy, crop);
+            // round 70's corners as they were; U_TH's on even pixels, so a crop's 2 x 2 blocks are the frame's
+            const cx = variant === "half" ? 2 * Math.floor(rand.u() * ((ex.W - crop) / 2 + 1)) : Math.floor(rand.u() * (ex.W - crop + 1));
+            const cy = variant === "half" ? 2 * Math.floor(rand.u() * ((ex.H - crop) / 2 + 1)) : Math.floor(rand.u() * (ex.H - crop + 1)), C = temporalCrop(ex, cx, cy, crop);
+            if (onCrop) onCrop(cx, cy);
             const g = temporalLoss(net, C.x, crop, crop, C.ref, C.cov, C.E);
             loss += g.loss / batch;
             if (!acc) acc = g.grads.map((q) => ({ dW: q.dW.map((v) => v / batch), db: q.db.map((v) => v / batch) }));

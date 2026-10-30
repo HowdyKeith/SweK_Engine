@@ -8,7 +8,7 @@
 // temporal view. readH71 is section 163's rule over a realGpuRun report.
 "use strict";
 import { conv2dFastWgsl, packFastUniforms, fastShape, TILE } from "../brain/conv2d.mjs";
-import { UT_CHANNELS, UT_SCALE } from "./learnedUpscaleTemporal.mjs";
+import { UT_CHANNELS, UT_SCALE, isHalfT, upHalf } from "./learnedUpscaleTemporal.mjs";
 import { readH63 } from "./denoiseFrameGenGPU.mjs";
 
 const BU = Object.freeze({ MAP_READ: 0x1, COPY_SRC: 0x4, COPY_DST: 0x8, UNIFORM: 0x40, STORAGE: 0x80, QUERY_RESOLVE: 0x200 });
@@ -32,6 +32,42 @@ fn k_hold(@builtin(global_invocation_id) gid: vec3<u32>) {
 }
 `;
 
+// ---- ROUND 73 (section 167): U_TH's two passes of its own -- the input to half size, and the upsample with the hold -----------
+/** The 17 channels averaged over 2 x 2: (W / 2) x (H / 2) x 17, as halfInput does. */
+export const DOWN_WGSL = /* wgsl */`
+struct DP { w: u32, h: u32, W: u32, pad: u32 };
+@group(0) @binding(0) var<storage, read_write> Y: array<f32>;   // h x w x ${UT_CHANNELS}
+@group(0) @binding(1) var<uniform> U: DP;
+@group(0) @binding(2) var<storage, read>       X: array<f32>;   // H x W x ${UT_CHANNELS}
+@compute @workgroup_size(${TILE}, ${TILE}, 1)
+fn k_down(@builtin(global_invocation_id) gid: vec3<u32>) {
+    if (gid.x >= U.w || gid.y >= U.h) { return; }
+    let a = (2u * gid.y * U.W + 2u * gid.x) * ${UT_CHANNELS}u; let b = a + ${UT_CHANNELS}u; let c = a + U.W * ${UT_CHANNELS}u; let d = c + ${UT_CHANNELS}u;
+    let o = (gid.y * U.w + gid.x) * ${UT_CHANNELS}u;
+    for (var k = 0u; k < ${UT_CHANNELS}u; k = k + 1u) { Y[o + k] = (X[a + k] + X[b + k] + X[c + k] + X[d + k]) / 4.0; }
+}
+`;
+/** The head's half-size residual upsampled bilinearly (upHalf's taps), then the hold on A at full size. */
+export const UPHOLD_WGSL = /* wgsl */`
+struct UP { W: u32, H: u32, w: u32, h: u32 };
+@group(0) @binding(0) var<storage, read_write> Y: array<f32>;   // H x W x 3
+@group(0) @binding(1) var<uniform> U: UP;
+@group(0) @binding(2) var<storage, read>       X: array<f32>;   // H x W x ${UT_CHANNELS}, A in channels 0-2
+@group(0) @binding(3) var<storage, read>       R: array<f32>;   // h x w x 3, the head's half-size residual
+@compute @workgroup_size(${TILE}, ${TILE}, 1)
+fn k_uphold(@builtin(global_invocation_id) gid: vec3<u32>) {
+    if (gid.x >= U.W || gid.y >= U.H) { return; }
+    let u = clamp((f32(gid.x) + 0.5) / 2.0 - 0.5, 0.0, f32(U.w - 1u)); let v = clamp((f32(gid.y) + 0.5) / 2.0 - 0.5, 0.0, f32(U.h - 1u));
+    let x0 = u32(floor(u)); let y0 = u32(floor(v)); let x1 = min(U.w - 1u, x0 + 1u); let y1 = min(U.h - 1u, y0 + 1u);
+    let tx = u - f32(x0); let ty = v - f32(y0); let p = gid.y * U.W + gid.x;
+    for (var c = 0u; c < 3u; c = c + 1u) {
+        let r = (1.0 - tx) * (1.0 - ty) * R[(y0 * U.w + x0) * 3u + c] + tx * (1.0 - ty) * R[(y0 * U.w + x1) * 3u + c]
+              + (1.0 - tx) * ty * R[(y1 * U.w + x0) * 3u + c] + tx * ty * R[(y1 * U.w + x1) * 3u + c];
+        Y[p * 3u + c] = X[p * ${UT_CHANNELS}u + c] * (1.0 + ${UT_SCALE} * tanh(clamp(r, -${HOLD_CLAMP}.0, ${HOLD_CLAMP}.0)));
+    }
+}
+`;
+
 /** U_T's layers as the device takes them: f32 weights, each on the fast kernel, refused by name if one does not fit it. */
 export function deviceLayersT(net) {
     return net.layers.map((L, i) => {
@@ -45,10 +81,10 @@ export function deviceLayersT(net) {
  * Section 164: the largest buffer U_T binds at H x W -- a 32-channel layer's output, 265 MB at 1920 x 1080, over WebGPU's default
  * 128 MiB storage binding. The rig's first runs bound it on a default device and every pass failed; the device must be asked for more.
  */
-export const temporalBytes = (H, W) => H * W * 32 * 4;
+export const temporalBytes = (H, W, half = false) => (half ? Math.max(H * W * UT_CHANNELS * 4, (H / 2) * (W / 2) * 16 * 4) : H * W * 32 * 4);
 /** A device from `adapter` that can hold U_T at H x W: its storage limits raised to fit, timestamp queries when offered; null if the adapter cannot. */
-export async function temporalDevice(adapter, H, W) {
-    const bytes = temporalBytes(H, W), cap = Math.min(adapter.limits.maxStorageBufferBindingSize, adapter.limits.maxBufferSize);
+export async function temporalDevice(adapter, H, W, half = false) {
+    const bytes = Math.max(temporalBytes(H, W, half), H * W * UT_CHANNELS * 4), cap = Math.min(adapter.limits.maxStorageBufferBindingSize, adapter.limits.maxBufferSize);
     if (bytes > cap) return null;
     const want = Math.max(bytes, Math.min(cap, 134217728));
     return adapter.requestDevice({ requiredFeatures: ["timestamp-query"].filter((f) => adapter.features.has(f)), requiredLimits: { maxStorageBufferBindingSize: want, maxBufferSize: want } });
@@ -59,7 +95,7 @@ export async function temporalDevice(adapter, H, W) {
  * destroy(). x is temporalInput's 17 channels a pixel. Buffers and pipelines are built once.
  */
 export async function createDeviceTemporal(dev, net, { H, W }) {
-    const layers = deviceLayersT(net), need = temporalBytes(H, W), lim = dev.limits ? Math.min(dev.limits.maxStorageBufferBindingSize, dev.limits.maxBufferSize) : Infinity;
+    const half = isHalfT(net), layers = deviceLayersT(net), need = temporalBytes(H, W, half), lim = dev.limits ? Math.min(dev.limits.maxStorageBufferBindingSize, dev.limits.maxBufferSize) : Infinity;
     if (need > lim) throw new Error(`learnedUpscaleTemporalGPU: U_T at ${W} x ${H} binds ${need} bytes, over this device's ${lim} -- make it with temporalDevice (section 164)`);
     if (layers[0].Cin !== UT_CHANNELS || layers[layers.length - 1].Cout !== 3) throw new Error("learnedUpscaleTemporalGPU: U_T takes 17 channels and gives 3");
     const errors = [], build = async (code, entryPoint) => {
@@ -69,19 +105,25 @@ export async function createDeviceTemporal(dev, net, { H, W }) {
     };
     const pipes = [];
     for (const L of layers) pipes.push(await build(conv2dFastWgsl(L), "k_conv_fast"));
-    const hold = await build(HOLD_WGSL, "k_hold");
+    const hold = half ? await build(UPHOLD_WGSL, "k_uphold") : await build(HOLD_WGSL, "k_hold"), down = half ? await build(DOWN_WGSL, "k_down") : null;
     if (errors.length) throw new Error("learnedUpscaleTemporalGPU: WGSL did not compile: " + errors.join("; "));
     const owned = [], buffer = (bytes, usage, data = null) => { const b = dev.createBuffer({ size: Math.max(16, bytes), usage }); if (data) dev.queue.writeBuffer(b, 0, data); owned.push(b); return b; };
-    const S = BU.STORAGE | BU.COPY_DST | BU.COPY_SRC, xBuf = buffer(H * W * UT_CHANNELS * 4, S), outs = layers.map((L) => buffer(H * W * L.Cout * 4, S)), yBuf = buffer(H * W * 3 * 4, S);
-    const groups = [Math.ceil(W / TILE), Math.ceil(H / TILE)];
-    const steps = layers.map((L, i) => {
-        const p = pipes[i], uni = packFastUniforms({ H, W, layer: L });
-        return { p, wg: [...groups, fastShape(L).groups], bind: dev.createBindGroup({ layout: p.getBindGroupLayout(0), entries: [
+    // U_TH (round 73): the layers run at half size on the averaged input
+    const h = half ? H / 2 : H, w = half ? W / 2 : W;
+    const S = BU.STORAGE | BU.COPY_DST | BU.COPY_SRC, xBuf = buffer(H * W * UT_CHANNELS * 4, S), xhBuf = half ? buffer(h * w * UT_CHANNELS * 4, S) : null;
+    const outs = layers.map((L) => buffer(h * w * L.Cout * 4, S)), yBuf = buffer(H * W * 3 * 4, S);
+    const groups = [Math.ceil(W / TILE), Math.ceil(H / TILE)], hgroups = [Math.ceil(w / TILE), Math.ceil(h / TILE)];
+    const steps = [];
+    if (half) steps.push({ p: down, wg: [...hgroups, 1], bind: dev.createBindGroup({ layout: down.getBindGroupLayout(0), entries: [
+        { binding: 0, resource: { buffer: xhBuf } }, { binding: 1, resource: { buffer: buffer(16, BU.UNIFORM | BU.COPY_DST, new Uint32Array([w, h, W, 0])) } }, { binding: 2, resource: { buffer: xBuf } }] }) });
+    layers.forEach((L, i) => {
+        const p = pipes[i], uni = packFastUniforms({ H: h, W: w, layer: L });
+        steps.push({ p, wg: [...hgroups, fastShape(L).groups], bind: dev.createBindGroup({ layout: p.getBindGroupLayout(0), entries: [
             { binding: 0, resource: { buffer: outs[i] } }, { binding: 1, resource: { buffer: buffer(uni.byteLength, BU.UNIFORM | BU.COPY_DST, uni) } },
-            { binding: 2, resource: { buffer: i ? outs[i - 1] : xBuf } }] }) };
+            { binding: 2, resource: { buffer: i ? outs[i - 1] : half ? xhBuf : xBuf } }] }) });
     });
     steps.push({ p: hold, wg: [...groups, 1], bind: dev.createBindGroup({ layout: hold.getBindGroupLayout(0), entries: [
-        { binding: 0, resource: { buffer: yBuf } }, { binding: 1, resource: { buffer: buffer(16, BU.UNIFORM | BU.COPY_DST, new Uint32Array([H, W, 0, 0])) } },
+        { binding: 0, resource: { buffer: yBuf } }, { binding: 1, resource: { buffer: buffer(16, BU.UNIFORM | BU.COPY_DST, half ? new Uint32Array([W, H, w, h]) : new Uint32Array([H, W, 0, 0])) } },
         { binding: 2, resource: { buffer: xBuf } }, { binding: 3, resource: { buffer: outs[outs.length - 1] } }] }) });
     const readBack = async (src, n) => {
         const rb = dev.createBuffer({ size: n * 4, usage: BU.COPY_DST | BU.MAP_READ }), enc = dev.createCommandEncoder();
@@ -95,15 +137,17 @@ export async function createDeviceTemporal(dev, net, { H, W }) {
     const now = () => (globalThis.performance ?? Date).now();
     return {
         layers,
-        passes: [...layers.map((L, i) => `layer ${i} (fast, ${L.Cin} -> ${L.Cout}, ${L.k} x ${L.k})`), "hold"],
+        half,
+        passes: [...(half ? ["down"] : []), ...layers.map((L, i) => `layer ${i} (fast, ${L.Cin} -> ${L.Cout}, ${L.k} x ${L.k})`), half ? "upsample and hold" : "hold"],
         async run(x, { keep = false } = {}) {
             if (x.length !== H * W * UT_CHANNELS) throw new Error(`learnedUpscaleTemporalGPU: an input of ${x.length} values for ${H} x ${W} x ${UT_CHANNELS}`);
             const t0 = now();
             dev.queue.writeBuffer(xBuf, 0, Float32Array.from(x));
             const enc = dev.createCommandEncoder(); encode(enc); dev.queue.submit([enc.finish()]);
-            const y = await readBack(yBuf, H * W * 3), ms = now() - t0, r = await readBack(outs[outs.length - 1], H * W * 3);
-            const acts = keep ? await Promise.all(layers.map((L, i) => readBack(outs[i], H * W * L.Cout))) : null;
-            return { y, r, acts, ms };
+            const y = await readBack(yBuf, H * W * 3), ms = now() - t0, r = await readBack(outs[outs.length - 1], h * w * 3);
+            const acts = keep ? await Promise.all(layers.map((L, i) => readBack(outs[i], h * w * L.Cout))) : null;
+            const xh = keep && half ? await readBack(xhBuf, h * w * UT_CHANNELS) : null;
+            return { y, r, acts, ms, ...(xh ? { xh } : {}) };
         },
         /** `warmup` untimed passes, then up to `reps` timed: the five passes on the device's clock where it has timestamp-query, else submit to done. */
         async time(x, { warmup = 2, reps = 9 } = {}) {
@@ -132,8 +176,10 @@ export async function createDeviceTemporal(dev, net, { H, W }) {
     };
 }
 
-/** The hold on the CPU in f64, applied to a residual r the device gave: y = A (1 + 0.5 tanh r), as HOLD_WGSL does (the clamp included). */
-export function holdCpu(x, r, H, W) {
+/** The hold on the CPU in f64, applied to a residual r the device gave: y = A (1 + 0.5 tanh r), as HOLD_WGSL does (the clamp included).
+ * With `half`, r is the half-size head's, upsampled first (upHalf) as UPHOLD_WGSL does. */
+export function holdCpu(x, r, H, W, half = false) {
+    if (half) r = upHalf(r, W / 2, H / 2);
     const y = new Float64Array(H * W * 3);
     for (let p = 0; p < H * W; p++) for (let c = 0; c < 3; c++) y[p * 3 + c] = x[p * UT_CHANNELS + c] * (1 + UT_SCALE * Math.tanh(Math.min(HOLD_CLAMP, Math.max(-HOLD_CLAMP, r[p * 3 + c]))));
     return y;
@@ -151,6 +197,13 @@ export function readH71(rep) {
     return { commit: base.commit, counts: base.counts, T: base.T, U, clock, ratio: U !== null && base.T !== null ? U / base.T : null };
 }
 export const H71_RATIO = 0.25;
+/** SECTION 167's RULE (H73), readH71's for U_TH: its gate line, against the same T. h71 is the verdict rule for both. */
+export function readH73(rep) {
+    const base = readH63(rep), g = (rep.gates || []).find((x) => x.gate === "render/denoiseLearnedUpscaleGPU-selfcheck.mjs");
+    let U = null, clock = null;
+    for (const l of (g && g.measured) || []) { const m = l.match(/^section 167: U_TH at 1920 x 1080 ([\d.]+) ms \((device|wall)\)/); if (m && +m[1] > 0) { U = +m[1]; clock = m[2]; break; } }
+    return { commit: base.commit, counts: base.counts, T: base.T, U, clock, ratio: U !== null && base.T !== null ? U / base.T : null };
+}
 /** The sizes the gate times U_T at: 1920 x 1080 on hardware (section 163's, the line readH71 reads), 240 x 136 on a software adapter. */
 export const UT_TIMING = Object.freeze({ hw: Object.freeze([1920, 1080]), soft: Object.freeze([240, 136]) });
 /** H71 over one GPU's runs: "holds" when every run counts and U / T <= 0.25 in each; "fails" when all count and one is over; else "no verdict". */

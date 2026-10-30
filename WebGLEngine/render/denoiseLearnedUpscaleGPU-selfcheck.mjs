@@ -16,6 +16,10 @@
 // counting -> 1 red each. Each restored byte-identical.
 // SECTION 166: V166a run b's U typed 45.0, V166b run a read as counting, V166c the 1080's run b read as holding -> 1 red each. Each
 // restored byte-identical.
+// ROUND 73 (section 167): U_TH's passes -- the 2 x 2 average, four half-size layers, the upsample and hold -- held to the CPU the same way,
+// on a seeded U_TH (the cost does not depend on its weights), and timed at 1920 x 1080: the line readH73 reads.
+// ROUND 73 (section 167): G1 the down pass averaging three corners -> 2 red, G2 the upsample nearest -> 2, G3 readH73 reading U_T's
+// line -> 1, G4 U_TH's layers at full size -> 4. Each restored byte-identical.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -54,6 +58,14 @@ console.log("1. ON THE CPU");
     const swl = { commit: "x", gates: [{ gate: "render/denoiseUpscaleGPU-selfcheck.mjs", ok: true, exit: { status: 0 }, measured: up },
         { gate: "render/denoiseLearnedUpscaleGPU-selfcheck.mjs", ok: true, exit: { status: 0 }, measured: ["section 163: U_T at 240 x 136 812.000 ms (wall)"] }] };
     ok("  ...and a software run's line, at 240 x 136, is not read: no U, no ratio", G.readH71(swl).U === null && G.readH71(swl).ratio === null);
+    // round 73: readH73, section 167's rule -- U_TH's own line, the same T and counting; and it does not read U_T's line, nor U_T's its
+    const both = { commit: "x", gates: [rep("45.000").gates[0], { ...rep("45.000").gates[1], measured: ["section 163: U_T at 1920 x 1080 45.000 ms (device); x", "section 167: U_TH at 1920 x 1080 3.500 ms (device); y"] }] };
+    const q = G.readH73(both), q0 = G.readH73(rep("45.000"));
+    ok("!! readH73, section 167's rule: U_TH's 1920 x 1080 line against T, h71's verdict rule; U_T's line is not U_TH's, nor the other way",
+        q.U === 3.5 && Math.abs(q.ratio - 3.5 / 37.483) < 1e-12 && G.h71([q, q]) === "holds" && G.readH71(both).U === 45 && q0.U === null && q0.ratio === null &&
+        G.readH73({ ...both, gates: [both.gates[0], { ...both.gates[1], measured: ["section 167: U_TH at 1920 x 1080 0.000 ms (device)"] }] }).U === null);
+    ok("  U_TH's device buffers: its input at full size is the largest, 141,004,800 bytes at 1920 x 1080 -- over the default binding too, so temporalDevice raises it",
+        G.temporalBytes(1080, 1920, true) === 1920 * 1080 * 17 * 4 && G.temporalBytes(1080, 1920, true) > 134217728 && /fn k_down/.test(G.DOWN_WGSL) && /fn k_uphold/.test(G.UPHOLD_WGSL));
     // section 164: the rig's first 1080 runs printed 0.000 ms from passes that failed on the default binding limit, and readH71 read it
     const zero = G.readH71(rep("0.000"));
     ok("!! a time of 0.000 is a pass that did not run: readH71 reads no U and no ratio from it (section 164)", zero.U === null && zero.ratio === null && G.h71([zero]) === "no verdict");
@@ -98,7 +110,11 @@ else {
     const net = decodeNet(JSON.parse(fs.readFileSync(path.join(ENG, "render", "denoise-net-r11.json"), "utf8")).net);
     const ex = T.temporalExample("R", 990914, net, { W: 64, sppIn: 2, sppRef: 4 }), Hs = 64, Ws = 64;
     const enc = (n) => n.layers.map((L) => ({ Cin: L.Cin, Cout: L.Cout, k: L.k, act: L.act, W: Array.from(L.W), b: Array.from(L.b) }));
-    const r = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 900000, args: { net: enc(Ut), x: Array.from(ex.x), Hs, Ws }, script: `async (a) => {
+    // section 167 (round 73): U_TH -- a seeded one, its head made non-zero so the device's correction is not the identity; the cost does not
+    // depend on the weights, so this does not wait for round 72's training
+    const Uh = T.makeUpscalerT(73, "half"), { seededRandom } = await imp("brain/convNet.mjs"), rq = seededRandom(730);
+    for (const Lr of Uh.layers) { for (let i = 0; i < Lr.W.length; i++) Lr.W[i] += 0.2 * (rq.u() - 0.5); for (let i = 0; i < Lr.b.length; i++) Lr.b[i] += 0.1 * (rq.u() - 0.5); }
+    const r = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 900000, args: { net: enc(Ut), netH: enc(Uh), x: Array.from(ex.x), Hs, Ws }, script: `async (a) => {
         const TG = await import("/render/learnedUpscaleTemporalGPU.mjs");
         // section 164: the device from temporalDevice, its storage limits raised for 1920 x 1080 -- the default 128 MiB binding failed every pass
         const ad = await navigator.gpu.requestAdapter(), info = (ad && ad.info) || {}, soft = !!(ad && ad.isFallbackAdapter) || /swiftshader|llvmpipe|software/i.test([info.vendor, info.architecture, info.description].join(" "));
@@ -115,7 +131,13 @@ else {
         const xb = new Float32Array(W * H * 17); let s = 7; for (let i = 0; i < xb.length; i++) { s = (s * 1103515245 + 12345) >>> 0; xb[i] = (s >>> 8) / 16777216; }
         const tm = await big.time(xb, { warmup: 2, reps: soft ? 3 : 9 });
         small.destroy(); big.destroy();
-        return { y: Array.from(o.y), r: Array.from(o.r), acts: o.acts.map((v) => Array.from(v)), tm, W, H, soft, errs, passes: big.passes,
+        // round 73: U_TH on the same device -- its parity at 64 x 64, then its time at the round's size
+        const netH = { layers: a.netH.map((L) => ({ ...L, W: Float64Array.from(L.W), b: Float64Array.from(L.b) })) };
+        const smallH = await TG.createDeviceTemporal(g, netH, { H: a.Hs, W: a.Ws }), oh = await smallH.run(Float32Array.from(a.x), { keep: true });
+        const bigH = await TG.createDeviceTemporal(g, netH, { H, W }), tmH = await bigH.time(xb, { warmup: 2, reps: soft ? 3 : 9 });
+        const H_ = { y: Array.from(oh.y), r: Array.from(oh.r), xh: Array.from(oh.xh), acts: oh.acts.map((v) => Array.from(v)), tm: tmH, passes: bigH.passes, half: bigH.half };
+        smallH.destroy(); bigH.destroy();
+        return { y: Array.from(o.y), r: Array.from(o.r), acts: o.acts.map((v) => Array.from(v)), tm, W, H, soft, errs, passes: big.passes, H_,
                  adapter: [info.vendor, info.architecture, info.description].filter(Boolean).join(" / ") };
     }` });
     if (r.skipped) console.log("  SKIP  " + r.reason);
@@ -138,6 +160,23 @@ else {
         if (!R.errs.length && tm.ms > 0) say(`section 163: U_T at ${R.W} x ${R.H} ${tm.ms.toFixed(3)} ms (${tm.clock}); ${pm}`);
         ok(`  ...and its line is printed, at ${R.soft ? "240 x 136 on this software adapter, which readH71 does not read" : "1920 x 1080 on hardware, which readH71 reads"}`,
             !R.errs.length && Number.isFinite(tm.ms) && tm.ms > 0 && [R.W, R.H].join() === (R.soft ? G.UT_TIMING.soft : G.UT_TIMING.hw).join() && R.passes.length === 5);
+        // ---- ROUND 73 (section 167): U_TH on the device -----------------------------------------------------------------------
+        const Q = R.H_, hs = Hs / 2, ws = Ws / 2, LH = G.deviceLayersT(Uh);
+        const dn = rel(Q.xh, T.halfInput(ex.x, Ws, Hs));
+        ok("!! round 73: U_TH's first pass is halfInput, the 17 channels averaged over 2 x 2, within 1e-6 relative", Q.half && dn <= 1e-6 && Q.xh.length === hs * ws * 17, `worst ${dn.toExponential(2)}`);
+        const perH = LH.map((l, i) => rel(Q.acts[i], conv2dCpu(i ? Float32Array.from(Q.acts[i - 1]) : Float32Array.from(Q.xh), hs, ws, l)));
+        ok("!! ...its four layers at half size, 16 wide, are conv2dCpu on the device's own input to each, within 1e-5 relative",
+            perH.every((v) => v <= 1e-5) && LH.map((l) => `${l.Cin}-${l.Cout}-${l.k}`).join() === "17-16-3,16-16-3,16-16-3,16-3-1", perH.map((v, i) => `layer ${i} ${v.toExponential(2)}`).join(", "));
+        const yq = G.holdCpu(ex.x, Q.r, Hs, Ws, true), wq = rel(Q.y, yq);
+        ok("!! ...its last pass upsamples the half-size residual bilinearly (upHalf) and holds A at full size, within 1e-5 relative of holdCpu on the device's own residual",
+            wq <= 1e-5 && Q.r.length === hs * ws * 3, `worst ${wq.toExponential(2)}`);
+        const yt = T.temporalUpscale(Uh, ex.x, Ws, Hs).y, wt = rel(Q.y, yt);
+        let movedH = 0; for (let i = 0; i < yt.length; i++) if (Math.abs(yt[i] - ex.x[Math.floor(i / 3) * 17 + (i % 3)]) > 1e-6) movedH++;
+        ok("!! ...and the whole of U_TH is temporalUpscale in f64 within 1e-4 relative, on a seeded U_TH that moves the frame", wt <= 1e-4 && movedH > n, `worst ${wt.toExponential(2)}; ${movedH} corrected`);
+        const th = Q.tm, pmH = th.passMs ? th.passMs.map((v, i) => `${Q.passes[i].split(" (")[0]} ${v.toFixed(3)}`).join(", ") : "no per-pass clock";
+        if (!R.errs.length && th.ms > 0) say(`section 167: U_TH at ${R.W} x ${R.H} ${th.ms.toFixed(3)} ms (${th.clock}); ${pmH}`);
+        ok(`  ...and U_TH's line is printed, at ${R.soft ? "240 x 136 on this software adapter, which readH73 does not read" : "1920 x 1080 on hardware, which readH73 reads"}`,
+            !R.errs.length && Number.isFinite(th.ms) && th.ms > 0 && Q.passes.length === 6 && Q.passes[0] === "down" && Q.passes[5] === "upsample and hold");
     }
 }
 
