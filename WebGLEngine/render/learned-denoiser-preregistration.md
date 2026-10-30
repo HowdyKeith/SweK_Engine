@@ -10579,3 +10579,51 @@ history gives the network errors it can see, which a single EASU'd frame did not
 **What follows.** Two backlog entries:
 - `fsr4-temporal-device`: U_T as a compute pass after Bt's, timed on the rig;
 - `fsr4-temporal-page`: path-tracer.html's view through it.
+
+## 163. ROUND 71 -- U_T ON THE DEVICE: WHAT THE LEARNED TEMPORAL CORRECTION COSTS A FRAME. FIXED BEFORE ITS CODE
+
+**Why.** Section 162 found U_T 9.65 % better than Bt and left it untimed. Keith asked for its device round. A correction is worth
+running only if it costs less than the frame it corrects.
+
+**U_T on the device (render/learnedUpscaleTemporalGPU.mjs).** Five compute passes at full size:
+- U_T's four layers, each on brain/conv2d.mjs's fast kernel (r15's, the page's default): 17 -> 32, 32 -> 32 and 32 -> 32 at
+  3 x 3 with ReLU, then 32 -> 3 at 1 x 1;
+- the hold, y = A (1 + 0.5 tanh r), A read from the input's channels 0-2.
+
+It is held to the CPU at 64 x 48 on a sequence of family R's seed 990914, outside every split:
+- each layer within 1e-5 relative of conv2dCpu (f32, the fast kernel's order) on the device's own input to it;
+- the image within 1e-5 relative of the hold applied in f64 to the device's own r;
+- the whole chain within 1e-4 relative of temporalUpscale in f64.
+
+**What is timed, on each rig GPU, at 1920 x 1080.**
+- **U** is the five passes, on the device's clock where it has timestamps, median of the timed passes.
+- **T** is section 103's chain with its history, read off the same run's denoiseUpscaleGPU line, as rounds 63-64 read it.
+- The gate is render/denoiseLearnedUpscaleGPU-selfcheck.mjs, in realGpuRun's denoise selection. readH71 reads a report.
+
+**H71: U ≤ 0.25 x T on both GPUs, in both of each GPU's runs.** That is rounds 63-64's threshold: a quarter of a traced frame.
+A run counts as there: every `--only denoise` gate green with exit 0, at one commit.
+
+**Predictions, fixed now, deciding nothing.** The arc already has the numbers to predict this. On the 1080 at 1920 x 1080, r15's
+fast kernel takes 17.7-18.3 ms for a 32 -> 32 3 x 3 layer and 5.85 ms for 10 -> 32 (section 141's runs, the denoiseTiming
+lines). U_T has two 32 -> 32 layers, a 17 -> 32 one and a small head, at full size.
+- **P1: H71 FAILS on the 1080.** U is about 45 ms (40-50): two layers at ~18, the first at ~10, the head and the hold ~1. U / T
+  is about 1.2 (1.0-1.4): U_T costs MORE than the traced frame it corrects.
+- **P2: H71 fails on the Intel too,** by a similar ratio.
+- **P3:** every parity row is green on both GPUs.
+
+**If H71 fails, what follows is fixed now.** U_T as trained is a quality result without a real-time place. A next round would cut its
+cost by 4x or more, and each cut is a NEW network needing its own quality round (section 161's test again):
+- U_T at half size (the correction's input and output at 960 x 540, upsampled), a quarter of the pixels;
+- or 16 wide instead of 32, a quarter of the multiply-adds in the middle layers.
+None of those is fixed here.
+
+**The page (backlog fsr4-temporal-page), alongside and outside the hypothesis.** path-tracer.html gains a view of the temporal chain:
+- the path-traced half-size frames on round 32's jitter through the shipped denoiser and EASU, in a worker;
+- accumulated over the last 8 frames into Bt;
+- U_T run on WebGPU where the page has it, else on the CPU;
+- shown beside the single-frame chain and Bt, with each step's ms.
+
+Its gate holds its sequence to temporalExample's construction and its U_T to temporalChain. It decides nothing in this round.
+
+**The runs.** Two `realGpuRun --only denoise` on each GPU at round 71's commit, committed byte for byte before they are read.
+Section 164 reads them.
