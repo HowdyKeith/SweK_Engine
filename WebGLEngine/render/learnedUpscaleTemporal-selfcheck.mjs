@@ -12,6 +12,8 @@
 // validation, S5 the test's truth 512, S6 the test's commit read after -> 1 red each; T2 the hold 0.6, S4 the test seeds onto round
 // 69's -> 2 red; T5 the measured frame's EASU left jittered and T8 the reference at the orbit's first eye -> *** 0 RED at first ***,
 // then 1 each with the two rows added for them.
+// SECTION 162: V162a the candidate typed 2, V162b H1's count typed 19, V162c the test's commit typed 2daaa618, V162d the rule read at
+// 10 %, V162f the losses typed 3,4,7,10 -> 1 red each; V162e H1 re-derived against B1 -> 2 red. Each restored byte-identical.
 "use strict";
 import fs from "node:fs";
 import os from "node:os";
@@ -132,6 +134,34 @@ console.log("\n4. THE STUDY");
         /existsSync\(file\)/.test(b) && b.indexOf("startCommit = git(") < b.indexOf("LT.runTemporalTest(") && /out\.commit = startCommit;/.test(b) && /commit: tr\.commit/.test(b));
 }
 
+console.log("\n5. SECTION 162: ROUND 70's COMMITTED HARVESTS, READ BACK -- U_T BEAT Bt");
+{
+    const R = LT.ROUND_UPSCALE_TEMPORAL, tr = JSON.parse(fs.readFileSync(path.join(ENG, R.net), "utf8")), res = JSON.parse(fs.readFileSync(path.join(ENG, R.results), "utf8")), Tb = res.tables;
+    const vals = tr.runs.map((r) => r.valMean), mean = (a) => a.reduce((q, v) => q + v, 0) / a.length;
+    ok("!! round 70's training file: 512-sample targets at 256 x 256, the candidate seed 1 with the lowest validation loss (1.637e-3), at 2daaa618",
+        tr.round === 70 && tr.config.sppRef === 512 && tr.config.W === 256 && tr.candidate === 1 && tr.commit === "2daaa618" && tr.runs.length === 3 &&
+        tr.runs.find((r) => r.seed === 1).valMean === Math.min(...vals) && Math.abs(vals[0] - 1.6371e-3) < 5e-8 && tr.c2.seed === 1);
+    const { verdict } = await imp("render/denoiseStats.mjs");
+    const again = verdict({ sets: { H1: { noisy: Tb.noisy, filter: Tb.bt, net: [Tb.U], floor: Tb.floor }, H2: { noisy: Tb.noisy, filter: Tb.b1, net: [Tb.U], floor: Tb.floor } }, shuffled: null,
+        c2Prior: { round: 70, meanD: res.verdict.controls.C2.meanD, ok: res.verdict.controls.C2.ok }, determinism: res.determinism, seedsDistinct: true, test: "signflip", c1Of: "candidate", c1Min: 22 });
+    const H1 = again.hypotheses.H1, H2 = again.hypotheses.H2;
+    ok("!! *** section 162: verdict() over the committed tables gives the file's verdict -- REPORTED, every control held, H1 SUPPORTED (20 of 24, p 7.0e-6), H2 supported (22 of 24, p 4.8e-7) ***",
+        again.run === "reported" && res.verdict.run === "reported" && H1.status === "supported" && H2.status === "supported" && H1.k === 20 && H2.k === 22 &&
+        Math.abs(H1.p - 0.000006973743438720703) < 1e-15 && Math.abs(H2.p - 4.76837158203125e-7) < 1e-15 && H1.c1.netWins === 24 && H1.c3.nearFloor === 0 && res.verdict.controls.C2.ok === true &&
+        res.round === 70 && res.commit === "a621735c" && res.trained.candidate === 1 && res.trained.commit === "2daaa618", `H1 ${H1.k}/24 p ${H1.p.toExponential(2)}; H2 ${H2.k}/24`);
+    const gain = 1 - mean(Tb.U) / mean(Tb.bt);
+    ok("!! *** ...and section 161's 1 % rule is MET: U_T's mean display relMSE 1.7503e-3 against Bt's 1.9373e-3, 9.65 % below -- inside P2's 1-10 % ***",
+        gain >= R.minGain && Math.abs(gain - 0.09653) < 5e-5 && Math.abs(res.secondary.gainOverBt - gain) < 1e-15 && Math.abs(mean(Tb.U) - 1.7503e-3) < 5e-8 && Math.abs(mean(Tb.bt) - 1.9373e-3) < 5e-8,
+        `${(100 * gain).toFixed(2)} % below Bt`);
+    const z = res.secondary.correction;
+    ok("!! P4 held: the mean correction 0.66 % of Bt (0.11-1.95 % by scene) -- small, and not collapsed",
+        z.length === 24 && Math.abs(mean(z) - 0.006603) < 1e-5 && Math.min(...z) > 0.0011 && Math.max(...z) < 0.0196);
+    const d = H1.d, gR = 1 - mean(Tb.U.slice(0, 12)) / mean(Tb.bt.slice(0, 12)), gC = 1 - mean(Tb.U.slice(12)) / mean(Tb.bt.slice(12));
+    ok("  descriptively: U_T won all 12 C scenes (11.5 % below Bt) and 8 of 12 R (3.2 %); its four losses are R 73003, 73004, 73007, 73011, each by under 2 %",
+        d.slice(12).every((x) => x > 0) && d.slice(0, 12).filter((x) => x > 0).length === 8 && Math.abs(gC - 0.1153) < 5e-4 && Math.abs(gR - 0.0319) < 5e-4 &&
+        d.map((x, i) => (x < 0 ? i : -1)).filter((i) => i >= 0).join() === "3,4,7,11" && d.every((x) => x > -0.02));
+}
+
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +
-    "\nnot closed here: whether U_T beats Bt on the path tracer's sequences. That is round 70's harvest, section 161's.");
+    "\nnot closed here: what U_T costs on a device, or how it looks on a page. Section 162 leaves those to the next rounds.");
 process.exit(fails ? 1 : 0);

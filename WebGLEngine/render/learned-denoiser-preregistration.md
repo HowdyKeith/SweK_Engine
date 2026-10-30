@@ -10523,3 +10523,59 @@ size at 4 samples on round 32's JITTER, references at the scene's eye.
   Bt, which a 256 x 256 round 32 never saw.
 
 Rounds 68 and 69 had good pilots too, so this decides nothing. Section 162 is the verdict.
+
+## 162. FSR4 ROUND 70'S VERDICT -- REPORTED, BOTH SUPPORTED: THE LEARNED CORRECTION OF THE TEMPORAL UPSCALE BEATS IT BY 9.7 %
+
+**How it ran.** On Keith's rig, in section 161's order:
+- the training at 2daaa618;
+- its file committed unread (a621735c);
+- the test at a621735c.
+
+The results file was shown to me when it was uploaded, before its commit (87127416, byte for byte). Every number below is section
+161's test, re-derived by render/learnedUpscaleTemporal-selfcheck.mjs section 5.
+
+**The training.** Validation 1.637e-3, 1.667e-3 and 1.658e-3 for seeds 1-3; the candidate is seed 1.
+
+**The test, as fixed.**
+- C1, C3, C4, C5 held; C2 held (the shuffled U_T lost to Bt on all 24, mean d -3.70).
+- **H1, U_T against Bt: SUPPORTED** -- 20 of 24, sign-flip p 7.0e-6 against Holm's 0.05, mean d +0.099.
+- **H2, U_T against the single-frame chain B1: supported** -- 22 of 24, p 4.8e-7, mean d +0.262.
+- **Section 161's 1 % rule: met.** U_T's mean display relMSE is 1.7503e-3 against Bt's 1.9373e-3, **9.65 % below**. B1 is
+  2.3226e-3.
+
+**This is the first FSR4 round to beat its hand-written baseline.**
+
+| round | input | result |
+|---|---|---|
+| 65 | one frame (box start) | not reported |
+| 67 | one frame (box start, cleaner truth) | a tie |
+| 68 | one frame, EASU offered | a collapse onto EASU |
+| 69 | one frame, held residual | a tie |
+| **70** | **the jittered history** | **9.7 % below the temporal upscale** |
+
+The head is round 69's, and only the input changed. Section 160 read round 69 as pointing at the data, and this agrees: the
+history gives the network errors it can see, which a single EASU'd frame did not.
+
+**Descriptively, decided by nothing:**
+- U_T won all 12 C scenes (11.5 % below Bt) and 8 of 12 R (3.2 %).
+- Its four losses are R 73003, 73004, 73007 and 73011, each by under 2 %.
+- The mean correction is 0.66 % of Bt (0.11-1.95 % by scene), largest on C. It is a small, consistent correction, not a
+  reconstruction.
+
+**The predictions.** All four held:
+- **P1:** C1 and C3 held.
+- **P2:** H1 supported, 1-10 % below Bt. 9.65 %, near the top of the range.
+- **P3:** H2 supported.
+- **P4:** the mean correction 0.5-20 %. 0.66 %, near the bottom.
+
+**What it does not say.**
+- **Nothing is timed.** U_T is three 3 x 3 layers of 32 at full size a frame, on top of Bt's own pass. Its cost on a GPU is a
+  device round's to measure, as round 33 measured Bt's.
+- **One camera move, from a cold start.** Round 32's eight-frame orbit, nothing in the scene moving. Disocclusion is only what
+  the orbit uncovers.
+- **One resolution, 256 x 256, 2x.** Nothing about 1080p, or about other ratios.
+- **The shipped denoiser and EASU stay as they are.** U_T sits after Bt in the chain. Nothing on the page changes in this round.
+
+**What follows.** Two backlog entries:
+- `fsr4-temporal-device`: U_T as a compute pass after Bt's, timed on the rig;
+- `fsr4-temporal-page`: path-tracer.html's view through it.
