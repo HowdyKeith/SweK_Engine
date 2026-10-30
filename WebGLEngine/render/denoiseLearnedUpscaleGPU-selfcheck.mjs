@@ -12,6 +12,8 @@
 // 2, D4 layer 1 reading the input -> 2 red each; D5 readH71's T halved, D6 the threshold 0.5, D7 readH71 reading any size's line -> 1
 // red each; D8 the hardware timing at 960 x 540 -> *** 0 RED at first *** (this container's adapter is software), then 1 with
 // UT_TIMING and its row.
+// SECTION 165: V165a the Intel's commit typed 4c111f6b, V165b its U typed 1614.0, V165c H71 typed holds, V165d the 1080's old runs read as
+// counting -> 1 red each. Each restored byte-identical.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -59,6 +61,19 @@ console.log("1. ON THE CPU");
     // sabotage D8 (timed at 960 x 540 on hardware) went 0 red before this row: the container's adapter is software, so the hardware size never ran
     const [hw, hh] = G.UT_TIMING.hw, hwLine = { ...swl, gates: [swl.gates[0], { ...swl.gates[1], measured: [`section 163: U_T at ${hw} x ${hh} 40.000 ms (device)`] }] };
     ok("!! the gate times U_T on hardware at UT_TIMING.hw = 1920 x 1080, section 163's size -- the one line readH71 reads", hw === 1920 && hh === 1080 && G.readH71(hwLine).U === 40 && G.UT_TIMING.soft.join() === "240,136");
+}
+
+console.log("\n1b. SECTION 165: THE COMMITTED RIG RUNS, READ BACK");
+{
+    const read = (k) => { const rep = JSON.parse(fs.readFileSync(path.join(ENG, `render/denoise-rig-${k}.json`), "utf8")); return { ...G.readH71(rep), intel: /intel gen-9/.test(rep.verdict), pascal: /nvidia pascal/.test(rep.verdict) }; };
+    const I = ["s164-a-intel-gen9", "s164-b-intel-gen9"].map(read);
+    ok("!! *** section 165: the Intel's pair at cebdc006 counts, and H71 FAILS there -- U_T 1614.7 and 1484.3 ms against T 549.3 and 498.5, U / T 2.94 and 2.98 ***",
+        I.every((r) => r.intel && r.counts && r.commit === "cebdc006" && r.clock === "device") && Math.abs(I[0].U - 1614.681) < 1e-9 && Math.abs(I[1].U - 1484.288) < 1e-9 &&
+        Math.abs(I[0].T - 549.298) < 1e-9 && Math.abs(I[1].T - 498.453) < 1e-9 && I.every((r) => r.ratio > 2.9 && r.ratio < 3) && G.h71(I) === "fails",
+        I.map((r) => `${r.U} / ${r.T} = ${r.ratio.toFixed(3)}`).join("; "));
+    const N = ["s164-a-GTX", "s164-b-GTX", "s163-a-gtx1080", "s163-b-gtx1080"].map(read);
+    ok("!! ...and the 1080 has NO verdict: its four reports all ran at 4c111f6b, before section 164's fix, every one red -- and readH71 reads no U from their 0.000 lines",
+        N.every((r) => r.pascal && r.commit === "4c111f6b" && !r.counts && r.U === null && r.ratio === null) && G.h71(N) === "no verdict");
 }
 
 console.log("\n2. ON THE DEVICE: U_T held to the CPU, then timed at 1920 x 1080");

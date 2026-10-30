@@ -10660,3 +10660,34 @@ Each has a row in the gate, and each row's sabotage goes red.
 
 **H71, P1-P3 and the threshold are unchanged.** Section 163's predictions stand as made. The runs are owed again at this commit,
 two a GPU, and section 165 reads them.
+
+## 165. ROUND 71, THE INTEL's HALF -- H71 FAILS THERE: U_T COSTS 2.9-3.0 TRACED FRAMES. THE 1080's RUNS ARE OWED AGAIN
+
+**What arrived.** Four `realGpuRun --only denoise` reports, committed byte for byte (e638bd7f) before they were read.
+- **The Intel's pair, `s164-a-intel-gen9` and `s164-b-intel-gen9`:** at cebdc006, section 164's fix, with every gate green and exit 0.
+  Its checkout had lost three committed files to working-tree deletions; `git restore` brought them back before the runs.
+- **The 1080's pair, named `s164-a-GTX` and `s164-b-GTX`:** at **4c111f6b**, the commit BEFORE the fix. That box did not move to
+  cebdc006, so the gate failed as in section 164. readH71, now fixed, reads no U from their 0.000 lines. They give no verdict.
+
+**The Intel (ms, every part on the device's clock).**
+
+| run | layer 0 | layer 1 | layer 2 | layer 3 (head) | hold | **U** | **T** | **U / T** |
+|---|---|---|---|---|---|---|---|---|
+| a | 315.5 | 614.2 | 618.4 | 50.4 | 27.4 | **1614.7** | 549.3 | **2.94** |
+| b | 297.9 | 572.0 | 548.7 | 43.3 | 21.9 | **1484.3** | 498.5 | **2.98** |
+
+**H71 FAILS on the Intel.** Both runs count, and U / T is 2.94 and 2.98 against 0.25. U_T at 1920 x 1080 costs about three traced
+frames there.
+
+**The predictions, so far.**
+- **P2 held as to the verdict, missed as to the size.** H71 fails on the Intel, but by 2.9-3.0, not the "similar ratio" (~1.2)
+  P1 put on the 1080.
+  - The Intel's T is about 13 x the 1080's, and its U about 33 x P1's estimate. Full-size 32-channel layers cost the Intel
+    more than the half-size chain does.
+  - Its two 32 -> 32 layers alone are 1.1-1.2 s.
+- **P3 held on the Intel:** every parity row green.
+- **P1 waits on the 1080's runs at cebdc006.**
+
+**What already follows.** H71 needs both GPUs to hold, and it has failed on one. So **H71 fails whatever the 1080 shows**, and section 163's
+follow-ups stand: U_T at half size, or 16 wide, each a new quality round. The 1080's runs are still owed, for P1 and for the
+number. They must be at cebdc006 (or later): `git checkout cebdc006` first, then `git log -1` to see it.
