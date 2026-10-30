@@ -14,6 +14,8 @@
 // UT_TIMING and its row.
 // SECTION 165: V165a the Intel's commit typed 4c111f6b, V165b its U typed 1614.0, V165c H71 typed holds, V165d the 1080's old runs read as
 // counting -> 1 red each. Each restored byte-identical.
+// SECTION 166: V166a run b's U typed 45.0, V166b run a read as counting, V166c the 1080's run b read as holding -> 1 red each. Each
+// restored byte-identical.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -74,6 +76,19 @@ console.log("\n1b. SECTION 165: THE COMMITTED RIG RUNS, READ BACK");
     const N = ["s164-a-GTX", "s164-b-GTX", "s163-a-gtx1080", "s163-b-gtx1080"].map(read);
     ok("!! ...and the 1080 has NO verdict: its four reports all ran at 4c111f6b, before section 164's fix, every one red -- and readH71 reads no U from their 0.000 lines",
         N.every((r) => r.pascal && r.commit === "4c111f6b" && !r.counts && r.U === null && r.ratio === null) && G.h71(N) === "no verdict");
+}
+
+console.log("\n1c. SECTION 166: THE 1080's PAIR AT cebdc006, READ BACK");
+{
+    const rd = (k) => { const rep = JSON.parse(fs.readFileSync(path.join(ENG, `render/denoise-rig-s165-${k}-gtx1080.json`), "utf8"));
+        return { ...G.readH71(rep), pascal: /nvidia pascal/.test(rep.verdict), red: rep.gates.filter((g) => !g.ok).map((g) => g.gate), enoent: rep.gates.some((g) => (g.stderrTail || []).join(" ").includes("ENOENT")) }; };
+    const a = rd("a"), b = rd("b");
+    ok("!! *** section 166: the 1080's run b at cebdc006 counts -- U_T 46.475 ms against T 40.026, U / T 1.16, over 0.25: P1's U 40-50 and ratio 1.0-1.4 held ***",
+        b.pascal && b.commit === "cebdc006" && b.counts && b.clock === "device" && Math.abs(b.U - 46.475) < 1e-9 && Math.abs(b.T - 40.026) < 1e-9 && b.ratio > 1.1 && b.ratio < 1.2 && b.U >= 40 && b.U <= 50,
+        `${b.U} / ${b.T} = ${b.ratio.toFixed(3)}`);
+    ok("!! ...and run a does not count: two other denoise gates died opening committed rig reports the checkout had lost (ENOENT) -- its own line, 48.834 / 38.286 = 1.28, is reported, not counted; the 1080's pair alone gives no verdict",
+        a.pascal && a.commit === "cebdc006" && !a.counts && a.enoent && a.red.join() === "render/denoiseDevice-selfcheck.mjs,render/denoiseFrameGenCost-selfcheck.mjs" &&
+        Math.abs(a.U - 48.834) < 1e-9 && G.h71([a, b]) === "no verdict" && G.h71([b]) === "fails");
 }
 
 console.log("\n2. ON THE DEVICE: U_T held to the CPU, then timed at 1920 x 1080");

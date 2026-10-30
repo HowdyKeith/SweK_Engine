@@ -10691,3 +10691,46 @@ frames there.
 **What already follows.** H71 needs both GPUs to hold, and it has failed on one. So **H71 fails whatever the 1080 shows**, and section 163's
 follow-ups stand: U_T at half size, or 16 wide, each a new quality round. The 1080's runs are still owed, for P1 and for the
 number. They must be at cebdc006 (or later): `git checkout cebdc006` first, then `git log -1` to see it.
+
+## 166. ROUND 71, THE 1080's HALF -- U_T COSTS 1.16 TRACED FRAMES THERE, AS PREDICTED. ROUND 71 IS CLOSED: H71 FAILS
+
+**What arrived.** Two `realGpuRun --only denoise` reports on the GTX 1080, both at cebdc006, committed byte for byte (fb87b4f1)
+before they were read.
+- **Run b counts:** every gate green, exit 0.
+- **Run a does not.** Two OTHER denoise gates, denoiseDevice and denoiseFrameGenCost, died opening committed rig reports that
+  the checkout (`C:\v4904`) had lost to working-tree deletions, as the Intel's had in section 165. U_T's own gate was green there.
+  Its line is reported below and counted nowhere.
+
+**The 1080 (ms, on the device's clock).**
+
+| run | layer 0 | layer 1 | layer 2 | layer 3 (head) | hold | **U** | **T** | **U / T** | counts |
+|---|---|---|---|---|---|---|---|---|---|
+| b | 9.570 | 17.463 | 17.468 | 1.370 | 0.569 | **46.475** | 40.026 | **1.16** | yes |
+| a | 10.236 | 18.406 | 18.015 | 1.365 | 0.569 | 48.834 | 38.286 | 1.28 | no (two other gates red) |
+
+**Round 71's verdict.**
+- **H71 FAILS.** On the Intel both runs count, at 2.94 and 2.98 (section 165).
+- On the 1080 the one counting run is 1.16, over 0.25 by more than 4 x. The 1080's pair gives no verdict by the counting rule,
+  and none is needed: H71 needed both GPUs to hold.
+
+**The predictions, all read.**
+- **P1 held:** U on the 1080 is 46.5 ms, inside 40-50, and U / T 1.16, inside 1.0-1.4. The estimate came from the arc's own
+  r15 layer timings. Each 32 -> 32 layer is 17.5 ms against r15's 17.7-18.3 for the denoiser's layers at the same size, and the
+  first 9.6 against the estimate's ~10.
+- **P2 held as to the verdict, missed as to the size** (section 165): 2.9-3.0 on the Intel, not ~1.2.
+- **P3 held:** every parity row green on both GPUs, in every run where U_T's gate ran.
+
+**What it says.**
+- U_T is a quality result without a real-time place on either GPU.
+  - It takes 9.65 % off Bt's display error (section 162), at 1.16 traced frames on the 1080 and ~3 on the Intel.
+  - Running it every frame would cut the 1080's frame rate by more than half and the Intel's by three quarters.
+- The cost is where section 163 said: two 32 -> 32 layers at full size, 75 % of U on both GPUs.
+- Section 163's follow-ups stand, each a NEW network needing its own quality round (section 161's test) before any timing:
+  - U_T at half size: a quarter of the pixels, so roughly 12 ms on the 1080;
+  - U_T 16 wide: about a quarter of the middle layers' multiply-adds;
+  - both together, roughly 1/16.
+
+None is fixed here. They are Keith's call.
+
+**What changes.** Nothing ships. The temporal page (section 163) keeps U_T as a view at 128 x 128, where it costs what the page
+shows.
