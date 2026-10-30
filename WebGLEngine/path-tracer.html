@@ -301,6 +301,27 @@
   </div>
 
 
+  <h2 style="margin-top:34px">Temporal upscale, learned &mdash; FSR4's correction on the jittered history</h2>
+  <p class="sub" style="max-width:760px">
+    The camera orbits one of the denoiser arc's scenes, 2.5&deg; a frame. Each frame is path traced at half size (64 &times; 64, 4
+    samples) on round 32's jitter, then denoised by the shipped network, filled and upscaled by EASU, in a worker. The last eight
+    frames are accumulated at full size into <b>Bt</b>, the hand-written temporal upscale. <b>U_T</b>, round 70's learned
+    correction, then runs on this page's WebGPU device, or on the CPU without one (<code>render/temporalLive.mjs</code>,
+    <code>render/learnedUpscaleTemporalGPU.mjs</code>). On 24 test scenes U_T was 9.65 % below Bt in display-space error
+    (section 162). Its cost at 1920 &times; 1080 is round 71's to measure. The three views are the single frame alone, Bt, and U_T.
+  </p>
+  <div class="wrap">
+    <div><canvas id="tlb1" width="128" height="128" style="width:100%;max-width:256px;height:auto"></canvas><div class="sub">the frame alone (EASU)</div></div>
+    <div><canvas id="tlbt" width="128" height="128" style="width:100%;max-width:256px;height:auto"></canvas><div class="sub">Bt: eight frames accumulated</div></div>
+    <div><canvas id="tlut" width="128" height="128" style="width:100%;max-width:256px;height:auto"></canvas><div class="sub">U_T: Bt corrected</div></div>
+  </div>
+  <div class="panel" style="max-width:760px">
+    <p><button id="tlgo">Start</button> <button id="tlstop">Stop</button>
+       <label style="display:inline"><input id="tlcpu" type="checkbox" /> run U_T on the CPU even with WebGPU</label></p>
+    <div id="tlprog" class="sub">idle</div>
+    <div id="tlout" class="sub" style="margin-top:6px;white-space:pre;font-family:ui-monospace,monospace"></div>
+  </div>
+
   <h2 style="margin-top:34px">Frame generation, live &mdash; FSR3's half-way frame between two traced ones</h2>
   <p class="sub" style="max-width:760px">
     The camera orbits one of the denoiser arc's scenes. Each <b>real</b> frame is path traced in a worker, with the scene's own
@@ -964,6 +985,50 @@ $("fggo").onclick = () => {
     requestAnimationFrame(fgTick);
   }
   requestAnimationFrame(fgTick);
+};
+</script>
+<script type="module">
+// backlog fsr4-temporal-page (section 163): round 70's temporal chain and U_T, live -- the chain in a worker, U_T on WebGPU or the CPU
+import { decodeNet } from "/render/denoiseDevice.mjs";
+import { createDeviceTemporal } from "/render/learnedUpscaleTemporalGPU.mjs";
+import { compositeEmitters } from "/render/denoiseUpscale.mjs";
+import { toBytes } from "/render/frameGenLive.mjs";
+const $ = (id) => document.getElementById(id);
+const paintRgb = (id, rgb, W) => { const n = W * W, f = new Float32Array(n * 4); for (let p = 0; p < n; p++) { f[p * 4] = rgb[p * 3]; f[p * 4 + 1] = rgb[p * 3 + 1]; f[p * 4 + 2] = rgb[p * 3 + 2]; f[p * 4 + 3] = 1; }
+  const cx = $(id).getContext("2d"), im = cx.createImageData(W, W); toBytes(f, W, W, im.data); cx.putImageData(im, 0, 0); };
+let tl = null;
+function tlStop() { if (!tl) return; tl.stop = true; tl.worker.terminate(); if (tl.gpu) tl.gpu.destroy(); $("tlprog").textContent = "stopped"; tl = null; }
+$("tlstop").onclick = tlStop;
+$("tlgo").onclick = async () => {
+  tlStop();
+  const run = tl = { stop: false, worker: new Worker("/render/temporalLive-worker.mjs", { type: "module" }), gpu: null, where: "the CPU", k: 0, cpu: $("tlcpu").checked };
+  $("tlprog").textContent = "loading the networks...";
+  run.worker.onmessage = async (e) => {
+    const m = e.data;
+    if (run.stop) return;
+    if (m.type === "error") { $("tlprog").textContent = "error: " + m.message; return; }
+    if (m.type === "ready") {
+      // U_T on this page's WebGPU device when it has one (and the box is not ticked), else in the worker on the CPU
+      if (!run.cpu && navigator.gpu) try {
+        const ad = await navigator.gpu.requestAdapter(), dev = ad && await ad.requestDevice();
+        if (dev) { run.gpu = await createDeviceTemporal(dev, decodeNet(m.ut), { H: m.W, W: m.W }); run.where = "WebGPU" + (ad.info && ad.info.description ? ` (${ad.info.description})` : ""); }
+      } catch (err) { run.gpu = null; run.where = "the CPU (WebGPU failed: " + String(err.message).slice(0, 80) + ")"; }
+      run.W = m.W;
+      run.worker.postMessage({ type: "step", k: 0 }); return;
+    }
+    if (m.type !== "step") return;
+    if (!m.ready) { $("tlprog").textContent = `filling the history: ${m.have} of 8 frames (a frame ${m.ms.frame.toFixed(0)} ms)`; run.worker.postMessage({ type: "step", k: m.k + 1 }); return; }
+    // ask for the next frame first, so the worker traces while this one is shown
+    run.worker.postMessage({ type: "step", k: m.k + 1 });
+    let ut = m.ut, utMs = m.ms.ut;
+    if (run.gpu) { const o = await run.gpu.run(m.x); ut = compositeEmitters(Float64Array.from(o.y), { cov: m.cov, E: m.E }); utMs = o.ms; }
+    if (run.stop) return;
+    paintRgb("tlb1", m.b1, run.W); paintRgb("tlbt", m.bt, run.W); if (ut) paintRgb("tlut", ut, run.W);
+    $("tlprog").textContent = `frame ${m.k}: U_T on ${run.where}`;
+    $("tlout").textContent = `a frame traced, denoised and upscaled in ${m.ms.frame.toFixed(0)} ms; eight accumulated in ${m.ms.accumulate.toFixed(0)} ms` +
+      (ut ? `; U_T in ${utMs.toFixed(1)} ms on ${run.gpu ? "the device (with its upload and read-back)" : "the CPU"}` : "; U_T: none (no device, and the CPU box is off)");
+  };
+  run.worker.postMessage({ type: "init", cpuUT: run.cpu || !navigator.gpu });
 };
 </script>
 </body>

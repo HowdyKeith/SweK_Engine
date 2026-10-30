@@ -1245,6 +1245,9 @@ export const EXCLUDED = Object.freeze([
     ...["GEN_CLEAR_WGSL", "GEN_SPLAT_WGSL", "GEN_WIN_WGSL", "GEN_FILL_WGSL", "GEN_GATHER_WGSL"].map((k) => Object.freeze({ id: `denoiseFrameGenGPU.${k}`,
         kind: "ordered multi-dispatch chain, graded against a CPU twin",
         why: "one of the generator's five passes -- clear, the depth splat, the winner, the fill, the gather -- each reading the last's buffers (atomic keys, winners, the filled field); one dispatch grades nothing. render/denoiseFrameGenCost-selfcheck.mjs holds the chain to interpolateFrameCPU: the mask and every vector bit for bit, the frame within 1e-5" })),
+    // round 71 (section 163) -- U_T on the device (render/learnedUpscaleTemporalGPU.mjs): the last of five passes, after four fast-kernel layers
+    Object.freeze({ id: "learnedUpscaleTemporalGPU.HOLD_WGSL", kind: "ordered multi-dispatch chain, graded against a CPU twin",
+        why: "U_T's hold, y = A (1 + 0.5 tanh r), reads the input and the head layer's residual, which only the four conv passes before it write; render/denoiseLearnedUpscaleGPU-selfcheck.mjs holds it to holdCpu on the device's own residual (within 1e-5) and the whole chain to temporalUpscale in f64 (within 1e-4)" }),
 ]);
 
 /**

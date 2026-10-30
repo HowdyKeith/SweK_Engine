@@ -10590,7 +10590,8 @@ running only if it costs less than the frame it corrects.
   3 x 3 with ReLU, then 32 -> 3 at 1 x 1;
 - the hold, y = A (1 + 0.5 tanh r), A read from the input's channels 0-2.
 
-It is held to the CPU at 64 x 48 on a sequence of family R's seed 990914, outside every split:
+It is held to the CPU at 64 x 64 on a sequence of family R's seed 990914, outside every split (*corrected before the code
+first ran: this line said 64 x 48, and temporalExample makes square frames*):
 - each layer within 1e-5 relative of conv2dCpu (f32, the fast kernel's order) on the device's own input to it;
 - the image within 1e-5 relative of the hold applied in f64 to the device's own r;
 - the whole chain within 1e-4 relative of temporalUpscale in f64.

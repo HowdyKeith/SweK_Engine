@@ -2521,15 +2521,15 @@ export const NEXT_ROUNDS = [
     {
         id: "fsr4-temporal-device",
         blocker: "OPEN",
-        what: "U_T (render/learnedUpscaleTemporal.mjs, section 162: 9.65 % below round 32's temporal upscale) as a WebGPU compute pass after Bt's accumulation -- three 3 x 3 layers of 32 and a 3-channel head at full size, held to the CPU reference by K0p's rule -- and timed on Keith's rig at 1920 x 1080, as round 33 timed Bt.",
-        how: "The denoiser arc's conv kernels (brain/conv2d.mjs's WGSL) at 17 input channels; a device gate against temporalUpscale; then a timing round pre-registered with what a frame may cost.",
+        what: "ROUND 71 BUILT, AWAITING THE RIG (section 163): U_T as five compute passes (render/learnedUpscaleTemporalGPU.mjs -- four layers on brain/conv2d.mjs's fast kernel, then the hold), bit for bit conv2dCpu layer by layer here, timed by render/denoiseLearnedUpscaleGPU-selfcheck.mjs at 1920 x 1080 inside realGpuRun's denoise selection. H71: U <= 0.25 T on both GPUs. PREDICTED TO FAIL from the arc's own r15 timings: U ~ 45 ms against T 37.5 on the 1080 -- U_T at full size costs more than the frame it corrects. Two `realGpuRun --only denoise` a GPU; section 164 reads them.",
+        how: "readH71 over each report; if H71 fails, section 163 fixed the follow-ups: U_T at half size, or 16 wide, each a new quality round.",
         why: "Section 162 found U_T better and left it untimed; a correction that costs more than the frame it corrects is not a win.",
     },
     {
         id: "fsr4-temporal-page",
-        blocker: "OPEN",
-        what: "path-tracer.html's frame-generation view (render/frameGenLive.mjs) through the arc's chain with Bt and U_T, once fsr4-temporal-device gives it a device pass.",
-        how: "denoise-framegen-page-chain's worker producing Bt's accumulation each real frame, U_T on the device, the pacer unchanged.",
+        blocker: "CLOSED",
+        what: "CLOSED, THE PAGE WIRED (unshipped): path-tracer.html's \"Temporal upscale, learned\" view -- a live orbit, each frame half-size traced on round 32's jitter, denoised, filled and EASU'd in a worker (render/temporalLive.mjs, render/temporalLive-worker.mjs), the last eight accumulated into Bt, and U_T run on the page's WebGPU device (createDeviceTemporal) or the CPU; the single frame, Bt and U_T side by side with each step's ms. Its example is held bit for bit to round 70's temporalExample by render/temporalLive-selfcheck.mjs. Headless Chromium here: about 0.4 s a frame for the chain and 0.6 s for U_T on SwiftShader at 128 x 128 -- a CPU's numbers, not a GPU's.",
+        how: "Round 71's rig runs say what U_T costs on a real GPU at 1080p; the page reports its own ms.",
         why: "So the page shows the measured result, not only the measurements.",
     },
     {
