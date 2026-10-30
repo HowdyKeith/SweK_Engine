@@ -2665,6 +2665,20 @@ export const NEXT_ROUNDS = [
         why: "So that the earlier wrong reading is corrected where it was written.",
     },
     {
+        id: "fish-4b-p-no-state-on-shuffled-wiring-registered-not-run",
+        blocker: "OPEN",
+        what: "REGISTERED AND BUILT 2026-10-30 (Addendum 12 of brain/FISH_VESTIBULAR_HELPER_WIP.md), NOT RUN: NO STATE on the real wiring (qns) against NO STATE on ER, class-block and degree-preserving shuffled wirings (qer, qcl, qdg; shuffle indices 20-23, never used), four searches each on 4b-P cells P/B and P/whole (32 circuits), scored on FRESH audits 84001-84060 (refs:PQ). A PRESPECIFIED test per cell: each search scored as the mean of its three audits, the four real against the twelve shuffled by the exact one-sided permutation test, supported at p <= 0.05; overall supported / mixed / not supported. Keyword `noStateShuffled`; gate section 15.",
+        how: "On the rig: git pull, then node tools/ship/trainSubVestibularCmd.mjs run --specs noStateShuffled --out brain/fishVestibularGen2.jsonl --workers 4 (about 10 core-hours), then report --in the same file. Its own file.",
+        why: "Addendum 11's rank test (p about 0.004-0.007 on the whole arm) was chosen after seeing the data; this is the same hypothesis on circuits and audits not yet seen, direction fixed in advance.",
+    },
+    {
+        id: "fish-4b-e-replicates-registered-not-run",
+        blocker: "OPEN",
+        what: "REGISTERED AND BUILT 2026-10-30 (Addendum 13), NOT RUN: replicate searches on 4b-E cells E/E and E/whole of the registered start (el99), a lower start (el50) and NO STATE (ens), four each (24 circuits), scored on FRESH audits 85001-85048 (64 dives a block, refs:ER); reported, not judged, no controls. Stage A left the 4b-E real wiring NOT stuck (lambda 0.99 -> 0.787 / 0.771, +1.7 to +2.2 over the autopilot) with audits disagreeing in sign against NO STATE from a single search. Keyword `escapeReplicates`.",
+        how: "On the rig: git pull, then node tools/ship/trainSubVestibularCmd.mjs run --specs escapeReplicates --out brain/fishVestibularGen3.jsonl --workers 4 (about 5.5 core-hours by a short timing here), then report --in the same file. The reading is registered in Addendum 13 before any run.",
+        why: "Whether memory helps escape is the open question of the escape pathway; one search per circuit cannot say.",
+    },
+    {
         id: "fish-4b-p-wiring-at-low-start-run-reported",
         blocker: "OPEN",
         what: "RUN 2026-10-30 (result in Addendum 11 and brain/rig-results/fishVestibularReplicates.jsonl): by the registered margin rule the real wiring TIES all three shuffled controls at lambda 0.5 (17 of 18 comparisons tie, 1 ahead on P/whole; none behind). POST HOC and exploratory: the real wiring is above every control mean on all 18 comparisons and a rank test of the four real searches against the twelve shuffled ones gives p about 0.004-0.007 on the whole arm and 0.02-0.07 on B, a hypothesis not a finding. OPEN: a NO STATE pilot on shuffled wiring (not built) would say whether the wiring matters without memory. REGISTERED AND BUILT: the three Stage A shuffled-wiring controls (ER, class-block, degree-preserving; the same shuffles, indices 0-3) trained from lambda 0.5 on 4b-P cells P/B and P/whole (24 circuits), scored on Addendum 10's fresh audits 83001-83060 beside the real wiring's rl50 replicates; reported, not judged. Keyword `lowControls`; gate section 14.",
