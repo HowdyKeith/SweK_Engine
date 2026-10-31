@@ -37,7 +37,6 @@ export const COMPARATORS = Object.freeze({
 });
 export const REAL_GROUP = Object.freeze({ P: "qns", E: "ens" }), SHUFFLED = Object.freeze(["qer", "qcl", "qdg"]);
 const f3 = (v) => (v === null || v === undefined || !Number.isFinite(v) ? "n/a" : v.toFixed(3));
-const f4 = (v) => (v === null || v === undefined || !Number.isFinite(v) ? "n/a" : v.toFixed(4));
 const range = ([a, b]) => Array.from({ length: b - a + 1 }, (_, i) => a + i);
 
 // ---- jobs: a pilot to train or a comparator to re-fly ---------------------------------------------------------------------------------------------------------------------------------------------------------------
