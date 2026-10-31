@@ -39,6 +39,10 @@
 // THE HOLD SLIDER (v4904, section 13), FIVE page sabotages: S1 the slider never steering 3 | S2 the slider's position recomputed from the moving lens scale 1 | S3 zero not calling the clear 0 -- EQUIVALENT: tank.setSteer treats a delta of 0 as a clear, so the other branch does the same thing; the line stays as the intent |
 //   S4 the slider snapping back while it is dragged 2 (the source row and the REAL-DRAG row: mouse down on the thumb, pull, clear the steer from elsewhere with the hand still down, release; first written as a dispatched event, which could not tell it from a click) | S5 the outputs never named in the readout 2.
 // B23 and B26 went 0 red the first time: no row looked at WHERE the panel put the map, and inside the steering box the flown target IS the wander target; the rows for the map's place on the canvas and for a sub outside the box now do.
+// ADDENDUM (v4907 work, the stateful fly pilot's panel, kind flycx; brain/TANK_PILOTS_WIP.md): FOURTEEN MORE MUTANTS of render/brainPanel.mjs, each run against a copy of this gate, ALL RED BY NAME (rows in brackets): N01 the kind's label changed [2] | N02 the kind marked a network [1] |
+//   N03 the kind marked not flown [5] | N04 the panel's kind test mistyped [3] | N05 the panel reporting kind autopilot [2] | N06 the panel's label wrong [2] | N07 the note saying the circuit's activity IS drawn [1] | N08 the note dropping "the LAWS ALONE" [1] |
+//   N09 the note dropping "learned residual" [1] | N10 the note saying the pilot is stateless [1] | N11 the note not naming the 64 output cells [1] | N12 the rows empty [2] | N13 the map absent [1] | N14 the map not the laws' [1].
+//   N13 went red only by a THROWN ERROR the first time (the row read `px.map.cells` with the map null and the gate died with it); the row asks for the map before it reads it now, and N13 is red by name.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -48,6 +52,7 @@ import { mlpLayerCpu } from "./brainTsl.mjs";
 import * as S from "../physics/mechanics/subModel6dof.mjs";
 import * as F from "../physics/mechanics/flightModel6dof.mjs";
 import * as AS from "../brain/autopilotSub.mjs";
+import * as FXK from "./subAquariumFlyCx.mjs";
 import * as AF from "../brain/autopilotFlight.mjs";
 import * as PS from "../brain/pilotSubPolicy.mjs";
 import * as PF from "../brain/pilotFlightPolicy.mjs";
@@ -70,11 +75,12 @@ const rec = () => { const calls = []; return new Proxy({}, { get: (_, k) => (k =
 const subState = (o = {}) => S.createState({ depth: 25, speed: 2, heading: 0.4, ...o }), subTarget = { depth: 30, heading: 0, speed: 2.5 };
 const flState = () => F.createState({ pos: [0, 0, 300], speed: 45, heading: 0.3, mass: AF.defaultModel().mass, inertia: AF.defaultModel().inertia }), flTarget = { altitude: 300, heading: 0, airspeed: 45 };
 
+const J_ = JSON.stringify;
 console.log("brainPanel-selfcheck -- what the selected brain is doing\n");
 
 console.log("1. THE KINDS");
 {
-    ok("!! five kinds; the fly and the GPU net are networks, the autopilot and the human are not, and the zebrafish circuit is NOT flown by these pages", Object.keys(B.KINDS).join() === "autopilot,fly,gpu,fish,manual" && B.KINDS.fly.network && B.KINDS.gpu.network && !B.KINDS.autopilot.network && !B.KINDS.manual.network && B.KINDS.fish.flown === false && B.KINDS.autopilot.flown && Object.isFrozen(B.KINDS));
+    ok("!! six kinds; the fly and the GPU net are networks, the autopilot, the human and the stateful fly pilot are not (its circuit is a reservoir, not a layered network to draw), and the zebrafish circuit is NOT flown by these pages", Object.keys(B.KINDS).join() === "autopilot,fly,gpu,fish,flycx,manual" && B.KINDS.flycx.flown === true && B.KINDS.flycx.network === false && B.KINDS.flycx.label === FXK.LABEL && /148 cells/.test(B.KINDS.flycx.label) && B.KINDS.fly.network && B.KINDS.gpu.network && !B.KINDS.autopilot.network && !B.KINDS.manual.network && B.KINDS.fish.flown === false && B.KINDS.autopilot.flown && Object.isFrozen(B.KINDS));
     ok("an unknown kind is described as itself, no network, not flown (it does not throw)", (() => { const d = B.describeKind("toString"); const e = B.describeKind("nonsense"); return d.label === "toString" && e.label === "nonsense" && !e.network && !e.flown; })());
 }
 
@@ -134,6 +140,12 @@ console.log("\n5. THE PANELS");
     ok("!! the zebrafish circuit says it is not flown here and draws nothing; no probe says no sub is selected", fish.rows.length === 0 && fish.map === null && /does not fly that brain/.test(fish.note) && none.rows.length === 0 && /no sub selected/.test(none.note) && B.flightPanel(null).rows.length === 0);
 }
 
+{
+    const st = subState(), px = B.subPanel({ kind: "flycx", state: st, target: subTarget }), pa2 = B.subPanel({ kind: "autopilot", state: st, target: subTarget }), pn = B.subPanel({ kind: "fish", state: st, target: subTarget });
+    ok("!! THE STATEFUL FLY PILOT'S PANEL (kind flycx): it is FLOWN (not 'this page does not fly that brain'), carries the kind's label, and shows the rows of the autopilot's laws it adds a residual to -- features 14, laws 6, outputs 4, the very numbers of the autopilot panel on the same state -- with a 9 x 9 map of the laws", px.kind === "flycx" && px.label === FXK.LABEL && px.rows.map((r) => r.layer + r.values.length).join() === "features14,laws6,outputs4" && J_(px.rows) === J_(pa2.rows) && !!px.map && px.map.cells.length === 81 && J_(px.map) === J_(pa2.map) && !/does not fly/.test(px.note) && pn.rows.length === 0);
+    ok("!! and it SAYS what it does not show, in its note: the circuit's own activity is NOT drawn; the rows and the map are the laws alone; the residual and the memory are named", /circuit's own activity is NOT drawn/.test(px.note) && /LAWS ALONE/.test(px.note) && /learned residual/.test(px.note) && /memory/.test(px.note) && /64 output cells/.test(px.note) && px.note !== pa2.note);
+}
+
 console.log("\n6. THE DRAWING");
 {
     const p = B.subPanel({ kind: "autopilot", state: subState(), target: subTarget }), g = rec();
@@ -164,6 +176,14 @@ console.log("\n7. THE SIM");
     const outside = tank.probe("p"), HT = Math.atan2(-(150 - 150), 250 - sub.state.pos[0]);
     ok("!! outside the steering box the probe's target is the one the sub was FLOWN to this tick (back to the middle, heading toward 250, 150), not the wander target it will take up again", Math.abs(Math.atan2(Math.sin(outside.target.heading - HT), Math.cos(outside.target.heading - HT))) < 0.3 && outside.target !== sub.target && outside.target.speed <= 2, `heading ${outside.target.heading.toFixed(2)}`);
     ok("!! and the panel built from a real probe has the fly's 34 hidden neurons and a map (the whole path: tank -> probe -> panel)", (() => { const p = B.subPanel(tank.probe("n")); return p.rows.map((r) => r.layer + r.values.length).join() === "features14,hidden34,outputs4" && p.map.cells.length === 81; })());
+}
+
+{
+    const cjx = JSON.parse(fs.readFileSync(path.join(ENG, "vendor/hemibrain/hemibrain-cx-heading-loop.json"), "utf8")), wfx = JSON.parse(fs.readFileSync(path.join(ENG, "brain/pilotSubFlyCxWip.json"), "utf8")).weights, tq = createTank();
+    tq.registerPilotKind("flycx", FXK.flyCxKind({ neurons: cjx.neurons, edges: cjx.edges, io: cjx.io })); tq.sync([{ id: "x", name: "Stateful", hue: 5, pilot: "stateful", circuit: "flycx", from: "x", local: true, weights: wfx }, { id: "w", name: "Waiting", hue: 6, pilot: "stateful", circuit: "other", from: "x", local: true, weights: wfx }]);
+    for (let i = 0; i < 90; i++) tq.step(1 / 30);
+    const pr = tq.probe("x"), pw = tq.probe("w"), pan = B.subPanel(pr), panW = B.subPanel(pw);
+    ok("!! THE WHOLE PATH for the stateful pilot (tank -> probe -> panel): the probe says kind flycx with no 963-weight network, and the panel is the flycx panel with the live state's numbers; a sub of a circuit nobody registered is probed as the autopilot and drawn as the autopilot", pr.kind === "flycx" && pr.weights === null && pan.kind === "flycx" && pan.rows.length === 3 && pw.kind === "autopilot" && panW.kind === "autopilot");
 }
 
 console.log("\n8. THE PAGES");

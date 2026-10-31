@@ -33,3 +33,40 @@ Rung 4a's RESULT (`brain/SUBMARINE_WIP.md`): the `cx` champion gains 0.143 over 
 ## NOT in this round, said now
 
 The fish pilot (803 weights, `brain/pilotSubFish.mjs`) is one more kind of the same shape and is not built here. The 3D view draws every sub alike. A peer needs the same page code to fly a stateful sub it is sent (the wire is data; a peer without the kind flies the autopilot, which is the existing rule). The circuit's activity is not drawn.
+
+## BUILT (2026-10-31, same day; UNNUMBERED; what is in the tree, each piece gated and sabotaged)
+
+* `tools/ship/flyCxPilotFile.mjs` (+ gate, 79 mutants all red) writes `brain/pilotSubFlyCxWip.json` from the `cx` record of `brain/flyCxStageA.jsonl` (champion seed 31003, 1,729 weights, memory gain checked in [0, 1], sha256 of the weights, the audit scores and a `limits` paragraph that says the gain is the recipe's generic gain and not a compass skill). `--check` goes red if the source moves and the file does not.
+* `ai-bridge/subAquariumCore.js` (gate: 32 more mutants, 29 red on the first run, the rest closed or said): `WEIGHTS = { gfc: 963, flycx: 1729 }`, the list says `stateful` for a flycx sub, a seed recipe that names its circuit needs a file that declares it, `SEED_RECIPES` offers "Fly heading-loop pilot (rung 4a)". The bridge gate counts seven offered subs.
+* `render/subAquariumFlyCx.mjs` (gate: 38 mutants, all red): the kind. One target object per dive; the memory restarts when `sub.target` changes (retarget, wall turn, respawn) and **not** on the fresh target objects the tank hands the pilot every tick. Said plainly in the file: in the tank the memory restarts at every new wandering target.
+* `render/subAquariumSim.mjs` (gate section 12: 54 mutants, 49 red by name, 4 red by a thrown error, 1 equivalent): `registerPilotKind(circuit, kind)`, re-seating subs that were waiting, a throwing builder leaves the sub on the autopilot and says so (`kindError`), the snapshot carries `circuit`, `kind`, `kindError`.
+* `render/brainPanel.mjs` (gate: 14 mutants, all red by name): the `flycx` kind is flown, shows the autopilot's laws it adds a residual to, and says on the panel that the circuit's activity is **not** drawn.
+* `sub-aquarium.html` (page gate: 9 mutants, all red by name): imports the kind after the circuit loads and registers it; the list reads `stateful` only for a sub the tank really flies with the kind (a module that fails to load leaves the sub on the autopilot, the list reads `PD autopilot`, and a row of the page gate refuses the module in a real browser to prove it).
+* `tools/tankFlyCxBench.mjs` (+ gate, 56 mutants, all red by name): the measurement below.
+
+## MEASURED: what the stateful pilot does in the tank (`node tools/tankFlyCxBench.mjs --ids 24 --seconds 240`, 21 s)
+
+Four arms in four one-sub tanks, the same 24 sub ids in every arm (so the same spawn and the same first targets), 240 s each, once with no event and once through the tank's own compass dropout (16 s dark in every 40). The number is the angle between the sub's heading and its wandering target's, in radians, mean +- sd over the 24 ids. Two readings: SETTLED (at least 12 s after the target last changed, "does it hold its line") and ALL ticks (includes the slow turn onto each new target; the vessel turns at about 0.06 rad/s at full rudder, so a half-turn takes 40 s and the target changes every 20 to 45 s).
+
+SETTLED ticks:
+
+| arm | no event, lit | dropout, lit | dropout, DARK | dark - autopilot (paired) | dark - lit |
+|---|---|---|---|---|---|
+| autopilot | 0.639 +- 0.235 | 0.691 +- 0.272 | 0.709 +- 0.274 | 0 | +0.018 +- 0.268 |
+| network (gfc, 963) | 0.418 +- 0.218 | 0.410 +- 0.184 | 0.342 +- 0.153 | -0.367 +- 0.207 | -0.068 +- 0.192 |
+| stateful (flycx, 1,729) | 0.558 +- 0.243 | 0.566 +- 0.242 | 0.579 +- 0.220 | -0.131 +- 0.175 | +0.012 +- 0.210 |
+| stateless (same weights, memory off) | 0.611 +- 0.242 | 0.631 +- 0.267 | 0.638 +- 0.231 | -0.071 +- 0.113 | +0.007 +- 0.256 |
+
+(ALL ticks reads the same way: dark - autopilot -0.251 network, -0.106 stateful, -0.064 stateless; nothing was lost in any run. Full tables: the command above.)
+
+**What it says.**
+* The stateful sub holds its line better than the plain autopilot in the tank (dark minus autopilot -0.131 with a spread of 0.175 over 24 ids, a standard error near 0.036), **and it does so with the compass lit too** (0.558 against 0.639 with no event at all). Its advantage in the dark (-0.131) is the same size as in the light (dropout lit 0.566 against 0.691, -0.125). The dropout adds nothing to it: its dark minus lit is +0.012, the autopilot's +0.018. **This is rung 4a's finding again, in a different place: the gain is generic and it is not a compass skill.** A pilot that integrated a heading through the dark would show a dark advantage larger than its lit one; this one does not.
+* The memory is worth something in the tank but not much and not shown to be more than that: the stateless arm (same weights, memory wiped every tick) sits between the autopilot and the stateful one in every column (dark minus autopilot -0.071 against -0.131). The difference between the two arms is NOT paired-tested here (each paired sd is against the autopilot), so it is read off the table and not claimed.
+* The 963-weight network (the noisy-senses champion, trained on a different task) holds its line better than either, lit and dark. That is the tank's order of pilots, not a statement about circuits: it is a different training, a different run length and a different network.
+* **The dropout barely hurts a settled sub in this tank.** Dark minus lit is within 0.07 of zero for every arm (spreads 0.19 to 0.27): a sub on a settled target flies straight whether or not it can read the compass, so the settled reading cannot separate a compass skill. The tank is a poor place to test the thing the dropout was built to test (the study's 60 s dives with a current are the place); it is a fine place to see the pilots fly.
+
+**What it does not say.** One champion (seed 31003), one hull (nominal), no current in the tank (`[0, 0, 0]`), 24 ids of 240 s, a heading-error reading that is not the study's score. It does not say the stateful pilot is better than the autopilot at anything the study scored beyond what rung 4a already said. It does not show the circuit's activity: the panel says so.
+
+## Left for later, said
+
+The fish pilot (803 weights) is one more kind of the same shape and is not built. A peer needs the page's registration to fly a stateful sub it is sent (the wire is data; a page without the kind flies the autopilot, the rule that already stood). The 3D view draws every sub alike. A paired test of stateful against stateless on the same ids is one more column in the bench, not run.

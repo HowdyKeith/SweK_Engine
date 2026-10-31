@@ -2,11 +2,11 @@
 <!-- sub-aquarium.html -- UNNUMBERED (the version is chosen at ship time): A TANK OF SUBMARINES, AND PEERS CAN SEND THEIRS.
 
      Every submarine in the tank swims with ITS OWN pilot, through the same vessel and the same pilot contract as the rest of the submarine work (render/subAquariumSim.mjs: physics/mechanics/subModel6dof.mjs, the PD autopilot, and the
-     connectome-wired network flying the 963 weights the sub arrived with). It wanders: a new heading, depth and speed every 20-45 s, and back to the middle of the tank near a wall. A boat that is lost (the floor, the surface) is put
+     connectome-wired network flying the 963 weights the sub arrived with, or the stateful fly pilot -- the autopilot plus a residual read from the fly's heading loop run with a memory, 1,729 weights). It wanders: a new heading, depth and speed every 20-45 s, and back to the middle of the tank near a wall. A boat that is lost (the floor, the surface) is put
      back and the count is shown -- a pilot that keeps failing is a pilot you can SEE failing.
 
      WHERE THE SUBS COME FROM: "Offer my subs" puts this box's own champions in the tank (ai-bridge/subAquariumBridge.js /subaquarium/seed). server.html's peer list has a "send sub" button per detected peer: it asks THIS box to
-     send the chosen sub to that peer's /subaquarium/arrive, and it appears in THEIR tank here. Subs from peers are marked with the address that sent them. WHAT A SUB IS: a name, 963 numbers and twelve more -- data, never code;
+     send the chosen sub to that peer's /subaquarium/arrive, and it appears in THEIR tank here. Subs from peers are marked with the address that sent them. WHAT A SUB IS: a name, a circuit, 963 (gfc) or 1,729 (flycx) numbers and twelve more -- data, never code;
      this page flies it with code it already has.
 
      THE STAND-IN, SAID PLAINLY: the network in every sub THIS PAGE FLIES is wired like the fruit fly's Giant Fiber Circuit (34 neurons, 313 synapses). A real zebrafish circuit IS vendored now -- the densest 34-neuron, 153-synapse core of the
@@ -257,7 +257,7 @@ function updateStats(snap) {
     if (cm && s.cmd) { const f = (v, w) => (v >= 0 ? "+" : "") + v.toFixed(w); cm.textContent = `pitch ${f(s.cmd.pitch, 2)} · yaw ${f(s.cmd.yaw, 2)} · thrust ${f(s.cmd.thrust, 2)} · ballast ${f(s.cmd.ballast, 2)}`; }
     const tk = document.getElementById("t_" + s.id); if (tk) tk.textContent = needsLine(s) || readout(s) || lineFor(s);
     const m = document.getElementById("m_" + s.id); if (!m) continue;
-    m.textContent = `${s.pilot === "network" ? "network" : "PD autopilot"} · ${s.local ? "this box" : "from " + s.from} · ${s.depth.toFixed(0)} m · ${s.speed.toFixed(1)} m/s` + (s.hull && s.hull !== "nominal" ? ` · ${LABELS[s.hull] || s.hull}` : "") + (s.lost ? ` · lost ${s.lost}×` : "");
+    m.textContent = `${s.kind === "flycx" ? "stateful" : s.pilot === "network" ? "network" : "PD autopilot"} · ${s.local ? "this box" : "from " + s.from} · ${s.depth.toFixed(0)} m · ${s.speed.toFixed(1)} m/s` + (s.hull && s.hull !== "nominal" ? ` · ${LABELS[s.hull] || s.hull}` : "") + (s.lost ? ` · lost ${s.lost}×` : "");
   }
 }
 
@@ -359,6 +359,10 @@ refresh(); fishHealth(); setInterval(refresh, 3000); setInterval(fishHealth, 500
                 tank.registerEstimator(ev, def.build); $(btn).disabled = false;
             }
         } catch (e) { $("msg").textContent = "the estimator events are not available here"; }
+        try {   // UNNUMBERED (brain/TANK_PILOTS_WIP.md): the stateful fly pilot as a kind of sub the tank can fly -- the autopilot's laws plus a residual read from this circuit run with a memory (1,729 weights); registering re-seats any such sub already in the tank
+            const fx = await import("/render/subAquariumFlyCx.mjs");
+            tank.registerPilotKind(fx.CIRCUIT, fx.flyCxKind(circuit));
+        } catch (e) { $("msg").textContent = "the stateful fly pilot is not available here: its subs fly the autopilot"; }
     } catch (e) { host.textContent = "The compass-dropout view is unavailable here (" + String((e && e.message) || e).slice(0, 100) + "). The tank above is not affected."; }
 })();
 </script>
