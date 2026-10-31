@@ -58,12 +58,12 @@ sec("1. THE WORDS");
 sec("2. THE COMMAND (a real subprocess, no shell)");
 {
     const nasty = "line one $(echo PWNED) `id` \"quoted\" 'single' ; rm -rf / | cat > /tmp/x\nline two";
-    const echo = L.modelFnFromCommand({ command: `${NODE} ${echoScript}` });
+    const echo = L.modelFnFromCommand({ command: `"${NODE}" ${echoScript}` });
     ok("!! the prompt goes in on stdin and the reply is stdout, byte for byte, even when the prompt is full of shell syntax (nothing ran, nothing was expanded)", echo(nasty) === "GOT:" + nasty && !/PWNED/.test(echo("x $(echo PWNED)").replace("GOT:x $(echo PWNED)", "")));
-    const failing = L.modelFnFromCommand({ command: `${NODE} ${failScript}`, env: { ...process.env, ANTHROPIC_API_KEY: "sk-secretvalue12345" } });
+    const failing = L.modelFnFromCommand({ command: `"${NODE}" ${failScript}`, env: { ...process.env, ANTHROPIC_API_KEY: "sk-secretvalue12345" } });
     const e1 = throws(() => failing("p"));
     ok("!! a command that exits non-zero THROWS with its exit code and its stderr, and the key's value in that stderr is scrubbed", /exited 7/.test(e1 || "") && /boom with key \[key\]/.test(e1 || "") && !/secretvalue/.test(e1 || ""));
-    ok("!! a command that is not there throws (not an empty answer); one that answers only spaces throws; a command that outlives its timeout throws", /failed to run/.test(throws(() => L.modelFnFromCommand({ command: "no-such-command-xyz" })("p")) || "") && /answered nothing/.test(throws(() => L.modelFnFromCommand({ command: `${NODE} ${emptyScript}` })("p")) || "") && /failed to run \(ETIMEDOUT\)/.test(throws(() => L.modelFnFromCommand({ command: `${NODE} ${slowScript}`, timeoutMs: 300 })("p")) || ""));
+    ok("!! a command that is not there throws (not an empty answer); one that answers only spaces throws; a command that outlives its timeout throws", /failed to run/.test(throws(() => L.modelFnFromCommand({ command: "no-such-command-xyz" })("p")) || "") && /answered nothing/.test(throws(() => L.modelFnFromCommand({ command: `"${NODE}" ${emptyScript}` })("p")) || "") && /failed to run \(ETIMEDOUT\)/.test(throws(() => L.modelFnFromCommand({ command: `"${NODE}" ${slowScript}`, timeoutMs: 300 })("p")) || ""));
     ok("!! an empty command is refused when the function is built, and an injected spawner is what is called (the words, the input, shell false and the timeout are passed)", /empty command/.test(throws(() => L.modelFnFromCommand({ command: "  " })) || "") && (() => { let seen = null; const f = L.modelFnFromCommand({ command: "x -a 'b c'", timeoutMs: 777, spawn: (cmd, args, o) => { seen = { cmd, args, o }; return { status: 0, stdout: "ok" }; } }); const r = f("PROMPT"); return r === "ok" && seen.cmd === "x" && J(seen.args) === J(["-a", "b c"]) && seen.o.input === "PROMPT" && seen.o.shell === false && seen.o.timeout === 777; })());
     ok("  scrub removes the key's value (when set) and anything shaped like an API key", L.scrub("a sk-ant-api03-abcdefgh1234 b", {}) === "a [key] b" && L.scrub("my KEYVALUE99 here", { ANTHROPIC_API_KEY: "KEYVALUE99" }) === "my [key] here" && L.scrub("short", { ANTHROPIC_API_KEY: "abc" }) === "short");
 }
@@ -133,7 +133,7 @@ sec("4. THE GUARDS");
 
 sec("5. THE RUN (real flights; a scripted model as the command)");
 {
-    const base = ["record", "--model-id", "scripted-1", "--cmd", `${NODE} ${modelScript}`, "--seeds", "501", "--kinds", "far", "--every", "600"];
+    const base = ["record", "--model-id", "scripted-1", "--cmd", `"${NODE}" ${modelScript}`, "--seeds", "501", "--kinds", "far", "--every", "600"];
     const out = path.join(tmp, "t.jsonl"), logs = [], errs = [], io = { out: (m) => logs.push(m), err: (m) => errs.push(m) };
     const dry = await L.command([...base, "--out", out, "--dry-run"], io);
     ok("!! --dry-run prints the dive count and the most calls it could make (30 at every 600 ticks) and the ceiling, calls nothing and writes nothing", dry === 0 && logs.some((m) => /1 practice dives[^\n]*at most 30 calls[^\n]*ceiling is 200/.test(m)) && logs.some((m) => /--dry-run: nothing was called/.test(m)) && !fs.existsSync(out) && !fs.existsSync(out + ".calls.jsonl"));
