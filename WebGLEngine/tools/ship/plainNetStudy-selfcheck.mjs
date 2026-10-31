@@ -1,0 +1,310 @@
+// WebGLEngine/tools/ship/plainNetStudy-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
+//
+// Run: node tools/ship/plainNetStudy-selfcheck.mjs      (about 25 s: three real comparators are rebuilt and flown at full size, a short pilot search runs on stub dives, and one command runs two jobs in child processes)
+//
+// THE GATE OF tools/ship/plainNetStudy.mjs: the plain-net control of rung 4b (brain/PLAIN_NET_CONTROL_WIP.md, the registration and its Amendment 1). Built and gated BEFORE any plain-net pilot is trained for the study. Every number of the readings is worked by hand on a fixture of fabricated scores.
+//
+// THE FIXTURES: scores are ranks. A circuit of rank r scores -0.6 + 0.01 r on every audit; the autopilot scores -0.6. Four REAL circuits and eight PLAIN ones share the ranks 1-12, so the exact test is a function of which four ranks are REAL: ranks 9, 10, 11, 12 are the top four, U = 32 of 32 and p = 1/495 = 0.00202;
+//   ranks 4, 10, 11, 12 give U = 27 and p = 18/495 = 0.0364 (SUPPORTED) and ranks 3, 10, 11, 12 give U = 26 and p = 27/495 = 0.0545 (not supported): no arrangement lands between them, so these two are the pair that straddle the registered line of 0.05. The twelve shuffled circuits against eight PLAIN
+//   ones, all above: p = 1 / C(20, 12) = 1/125,970. A circuit's gain over the autopilot is 0.01 r; the margin rule needs the larger of 0.02 and 2 sd of the PLAIN circuits (ranks 1-8: sd 2.449 x 0.01 = 0.0245, so 0.049).
+// WHAT IT HOLDS
+//   1 THE JOBS     48 pilots (MN 8 + MG 4 in each of four cells) and 64 comparators (20 in each 4b-P cell, 12 in each 4b-E cell); names, ordinals 0-47, search seeds 79000 + 10 x ordinal, init seeds 4711 + ordinal, the widths 65 / 72 / 9 / 72 and the GPU Brain's [32, 32]; the audit blocks are disjoint from every other audit and search range in the 4b trainer; the spec parser.
+//   2 THE SETS     the 4b training and held-out dives and THIS round's audits: 60 dives a 4b-P block (20 seeds x 3 kinds), 64 a 4b-E block (16 seeds x 2 sides x 2 launch times), the seeds in the registered ranges, every eighth under --smoke, no sharing between smoke and full.
+//   3 A PILOT      runPilot on stub dives: the seeds, the eligibility rule, the champion (best held-out among the eligible, ties to the first), no eligible champion -> the start and no audit flown, the audits read once, the record's fields.
+//   4 COMPARATORS  the real 4b records: 4 of each group in each cell, every one with weights; three rebuilt at full size reproduce their recorded scores to 1e-5; a tampered weight does not; a circuit with no champion; the refusals.
+//   5 REFERENCES   the autopilot alone on the fresh audits, the task re-check, the START CHECK of every plain-net pilot of the task's cells.
+//   6 THE READINGS validity, the registered test (the straddling pair), the margin rule, the share kept, the decomposition, the other groups, the overall line, the checks, the report.
+//   7 THE COMMAND  the arguments; resume; the references written once; pilots before comparators; stale files refused; smoke refused by the report; --one; two real child processes.
+//   8 THE SOURCE   pure apart from the files it reads and the processes it starts.
+// NOT CHECKED, said plainly: a full-size plain-net pilot (about 20 minutes each: the smoke run times it); the 64 comparators other than the three flown here (each is a rebuild of the same code); the verdict of the study (nothing has been run).
+//
+// SABOTAGED -- (the log goes here when the mutants have been run)
+"use strict";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { execFileSync } from "node:child_process";
+import * as T from "../../brain/subTask.mjs";
+import * as AS from "../../brain/autopilotSub.mjs";
+import * as P from "../../brain/pilotSubPlainNet.mjs";
+import * as TR from "./trainSubVestibular.mjs";
+import * as PN from "./plainNetStudy.mjs";
+
+let fails = 0, finished = false;
+const died = (e) => { console.log("  FAIL  !! THE GATE THREW before it finished: " + String((e && e.stack) || e).split("\n").slice(0, 3).join(" | ").slice(0, 400)); process.exit(1); };
+process.on("uncaughtException", died); process.on("unhandledRejection", died);
+process.on("exit", () => { if (!finished) { console.log("  FAIL  !! THE GATE ENDED BEFORE IT FINISHED"); process.exitCode = 1; } });
+const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
+const sec = (t) => console.log("\n" + t);
+const throws = (f) => { try { f(); return null; } catch (e) { return String(e.message || e); } };
+const near = (a, b, e = 1e-9) => Math.abs(a - b) <= e, J = JSON.stringify, A3 = ["a1", "a2", "a3"];
+console.log("plainNetStudy-selfcheck -- the plain-net control of rung 4b\n");
+const AP = Object.fromEntries(A3.map((a) => [a, { score: -0.6 }]));
+const refsP = { family: "refs", spec: "refs:NP", task: "P", cost: 0.06, autopilot: AP, selfTests: { runnerBad: [], signsFailed: [] }, startCheck: [{ arm: "B/mn", same: true }], smoke: false };
+const refsE = { family: "refs", spec: "refs:NE", task: "E", cost: 3.1, autopilot: AP, selfTests: { runnerBad: [], signsFailed: [] }, startCheck: [{ arm: "E/mn", same: true }], reflex: { best: "x", recovered: 0.88 }, trigger: { a: true, b: true, c: true, n: 40 }, smoke: false };
+
+sec("1. THE JOBS (names, ordinals, seeds, widths, the spec parser)");
+{
+    const pilots = PN.pilotJobs(), cmps = PN.comparatorJobs(), names = pilots.map(PN.specName);
+    ok("!! 48 pilots: in each of the four cells MN 0-7 then MG 0-3, in the order P/B, P/whole, E/E, E/whole", pilots.length === 48 && names[0] === "P/B/mn:0" && names[7] === "P/B/mn:7" && names[8] === "P/B/mg:0" && names[11] === "P/B/mg:3" && names[12] === "P/whole/mn:0" && names[24] === "E/E/mn:0" && names[36] === "E/whole/mn:0" && names[47] === "E/whole/mg:3" && new Set(names).size === 48);
+    ok("!! 64 comparators: qns, qer, qcl, qdg and rl50 (4 each) in each 4b-P cell and ens, el50, el99 (4 each) in each 4b-E cell", cmps.length === 64 && cmps.filter((c) => c.task === "P").length === 40 && cmps.filter((c) => c.task === "E").length === 24 && ["qns", "qer", "qcl", "qdg", "rl50"].every((g) => cmps.filter((c) => c.arm === "B" && c.group === g).length === 4) && ["ens", "el50", "el99"].every((g) => cmps.filter((c) => c.arm === "E" && c.group === g).length === 4) && PN.specName(cmps[0]) === "cmp:P/B/qns:0");
+    ok("!! the ordinal of a pilot is 12 x its cell + 0 (MN) or 8 (MG) + its index: 0..47, each once", pilots.map(PN.ordinalOf).every((o, i) => o === i) && PN.PER_CELL === 12 && PN.FAMILIES.mn.n === 8 && PN.FAMILIES.mg.n === 4 && PN.FAMILIES.mg.offset === 8);
+    ok("!! search seeds 79000 + 10 x ordinal (the four searches of a pilot take base + 0..3): 79000 to 79470, ten apart", PN.SEARCH_BASE === 79000 && pilots.map(PN.seedBaseOf).every((b, i) => b === 79000 + 10 * i) && PN.seedBaseOf(pilots[47]) === 79470);
+    ok("!! init seeds 4711 + ordinal, one for each pilot", pilots.map(PN.initSeedOf).every((s, i) => s === 4711 + i) && P.INIT.seed === 4711);
+    ok("!! the ordinal of something that is not a pilot of the study is refused", /plainNetStudy\.ordinalOf/.test(throws(() => PN.ordinalOf({ task: "P", arm: "E", family: "mn", index: 0 })) || "") && /plainNetStudy\.ordinalOf/.test(throws(() => PN.ordinalOf({ task: "P", arm: "B", family: "cx", index: 0 })) || ""));
+    ok("!! the widths: MN is matched to the circuit's NO STATE count of its arm (65 on B, 72 on the whole arm, 9 on E), MG is the GPU Brain's [32, 32]", PN.widthsOf({ family: "mn", arm: "B" })[0] === 65 && PN.widthsOf({ family: "mn", arm: "whole" })[0] === 72 && PN.widthsOf({ family: "mn", arm: "E" })[0] === 9 && J(PN.widthsOf({ family: "mg", arm: "B" })) === J([32, 32]) && PN.noStateCount("B") === 591 && PN.noStateCount("whole") === 655 && PN.noStateCount("E") === 85);
+    const pol = PN.policyOf(pilots[12], { pTonic: 2, rTonic: 1, pPhasic: 1, rPhasic: 1 }), want = P.createPlainNetPolicy([72], "x", { seed: 4711 + 12 }).handWeights();
+    ok("!! a pilot's policy: P/whole/mn:0 is 72 hidden units, 652 weights, the init draw of seed 4711 + 12, the task's scales, the 4b evaluator", pol.WEIGHT_COUNT === 652 && J(pol.widths) === J([72]) && J(Array.from(pol.handWeights())) === J(Array.from(want)) && pol.scales.pTonic === 2 && pol.name === "P/whole/mn:0");
+    // the fresh ranges against every range the 4b trainer uses
+    const mine = [...PN.AUDIT_SEEDS.P, ...PN.AUDIT_SEEDS.E], theirs = [...TR.AUDIT_SEEDS.P, ...TR.AUDIT_SEEDS.E, ...TR.REPL_AUDIT_SEEDS, ...TR.GENS[2].audits, ...TR.GENS[3].audits, [1, 40], [11, 20], [TR.SEARCH_BASE, TR.SEARCH_BASE + 10 * (TR.GENS[3].firstOrdinal + 2 * 3 * TR.GEN_N - 1) + 3]];
+    const overlap = (a, b) => a[0] <= b[1] && b[0] <= a[1];
+    const mySearch = [PN.seedBaseOf(pilots[0]), PN.seedBaseOf(pilots[47]) + 3];
+    ok("!! THE AUDIT AND SEARCH RANGES ARE FRESH: no audit block, and no search seed (79000-79473), overlaps one the 4b trainer uses (its stage A, replicate and generation audits, its training and held-out seeds, its search seeds up to the last ordinal, 721, which is seed 78213)", mine.every((m) => theirs.every((t) => !overlap(m, t))) && theirs.every((t) => !overlap(mySearch, t)) && mySearch[0] === 79000 && mySearch[1] === 79473 && theirs[theirs.length - 1][1] === 78213);
+    ok("!! the registered audit blocks: 4b-P 86001-86020, 86021-86040, 86041-86060; 4b-E 88001-88016, 88017-88032, 88033-88048; the references records refs:NP and refs:NE", J(PN.AUDIT_SEEDS.P) === J([[86001, 86020], [86021, 86040], [86041, 86060]]) && J(PN.AUDIT_SEEDS.E) === J([[88001, 88016], [88017, 88032], [88033, 88048]]) && PN.REFS.P === "refs:NP" && PN.REFS.E === "refs:NE");
+    ok("!! the registered constants: four real circuits a group, the reproduction tolerance 1e-5 (Amendment 1), the recipe and the rank line are the 4b trainer's", PN.REAL_N === 4 && PN.REPRO_TOL === 1e-5 && PN.RECIPE === TR.RECIPE && PN.RANK_ALPHA === 0.05 && PN.RANK_ALPHA === TR.RANK_ALPHA && PN.REAL_GROUP.P === "qns" && PN.REAL_GROUP.E === "ens" && J(PN.SHUFFLED) === J(["qer", "qcl", "qdg"]));
+    ok("!! the cells are frozen and in order", J(PN.CELL_NAMES) === J(["P/B", "P/whole", "E/E", "E/whole"]) && Object.isFrozen(PN.CELLS) && Object.isFrozen(PN.CELLS[0]) && Object.isFrozen(PN.FAMILIES) && Object.isFrozen(PN.AUDIT_SEEDS) && Object.isFrozen(PN.COMPARATORS) && Object.isFrozen(PN.REFS));
+    const sp = PN.parseSpecs("P/B/mn:0-2,E/whole/mg:3,cmp:P/whole/qns:1-3,cmp:E/E/el99:0");
+    ok("!! the spec parser expands ranges and names pilots and comparators", sp.length === 8 && J(sp.map(PN.specName)) === J(["P/B/mn:0", "P/B/mn:1", "P/B/mn:2", "E/whole/mg:3", "cmp:P/whole/qns:1", "cmp:P/whole/qns:2", "cmp:P/whole/qns:3", "cmp:E/E/el99:0"]) && sp[0].kind === "pilot" && sp[4].kind === "cmp" && sp[4].group === "qns");
+    const bad = ["", "P/B/mn:0,", "Q/B/mn:0", "P/E/mn:0", "P/B/xx:0", "P/B/mn:8", "P/B/mg:4", "P/B/mn:3-1", "P/B/mn:0,P/B/mn:0", "cmp:E/E/qns:0", "cmp:P/B/qns:4", "cmp:P/B/mn:0", "P/B/qns:0", "P/B/mn", "P/B/mn:a"].map((t) => throws(() => PN.parseSpecs(t)));
+    ok("!! the parser refuses: nothing, an empty item, an unknown task / cell / family, an index past the family (MN 8, MG 4, comparators 4), a backwards range, a repeat, a comparator group of the other task, a pilot family as a comparator and the reverse, a missing index", bad.every((m) => m && /plainNetStudy\.parseSpecs/.test(m)));
+}
+
+sec("2. THE SETS");
+{
+    const P_ = PN.setsFor("P"), E_ = PN.setsFor("E"), Ps = PN.setsFor("P", { smoke: true }), Es = PN.setsFor("E", { smoke: true }), base = TR.setsOf("P"), baseE = TR.setsOf("E");
+    ok("!! 4b-P: 40 training dives, 30 held-out (the 4b trainer's own), and three audits of 60 dives (20 seeds x the three kinds)", P_.train.length === 40 && P_.heldOut.length === 30 && A3.every((a) => P_[a].length === 60) && J(P_.train.map((d) => d.seed)) === J(base.train.map((d) => d.seed)) && J(P_.heldOut.map((d) => d.seed)) === J(base.heldOut.map((d) => d.seed)));
+    ok("!! 4b-P audit seeds: a1 86001-86020, a2 86021-86040, a3 86041-86060, each in the three kinds; none are the 4b audits'", [[86001, 86020], [86021, 86040], [86041, 86060]].every(([lo, hi], i) => { const seeds = P_[A3[i]].map((d) => d.seed); return Math.min(...seeds) === lo && Math.max(...seeds) === hi && new Set(seeds).size === 20 && new Set(P_[A3[i]].map((d) => d.kind)).size === 3; }) && P_.a1[0].seed !== base.a1[0].seed);
+    ok("!! 4b-E: 40 training dives, 40 held-out (the 4b trainer's own), three audits of 64 dives (16 nominal seeds x 2 sides x 2 launch times)", E_.train.length === 40 && E_.heldOut.length === 40 && A3.every((a) => E_[a].length === 64) && J(E_.train.map((d) => [d.seed, d.side])) === J(baseE.train.map((d) => [d.seed, d.side])));
+    ok("!! 4b-E audit seeds: a1 88001-88016, a2 88017-88032, a3 88033-88048, both sides", [[88001, 88016], [88017, 88032], [88033, 88048]].every(([lo, hi], i) => { const seeds = E_[A3[i]].map((d) => d.seed); return Math.min(...seeds) === lo && Math.max(...seeds) === hi && new Set(seeds).size === 16 && new Set(E_[A3[i]].map((d) => d.side)).size === 2 && new Set(E_[A3[i]].map((d) => d.t0)).size >= 2; }));
+    ok("!! --smoke keeps every eighth dive of every set (training, held-out and all three audits), and does not change the full sets", Ps.train.length === 5 && A3.every((a) => Ps[a].length === 8) && Es.train.length === 5 && A3.every((a) => Es[a].length === 8) && P_.a1.length === 60 && PN.setsFor("P").a1 === P_.a1 && Ps.a1[1].seed === P_.a1[8].seed);
+    ok("!! a dive flies: the task's runner takes a pilot and scores it", typeof P_.a1[0].fly === "function" && Number.isFinite(TR.evalDives(AS.pilot(), Ps.a1).score) && TR.evalDives(AS.pilot(), Ps.a1).runs.length === 8);
+}
+
+sec("3. A PILOT (runPilot on stub dives)");
+{
+    const probe = T.BASELINE_SET[0], tgtP = probe.target;
+    // a stub dive: the pilot's thrust at a fixed state scores it; `early(w)` decides the status
+    const S_ = await import("../../physics/mechanics/subModel6dof.mjs"), model = S_.createSubModel(), state = S_.createState({ depth: 30, speed: 2.5, pitch: -0.02, w: [0, 0.2, 0], model });
+    const calls = { audit: 0 }, base0 = AS.decide(state, tgtP).thrust;
+    const dive = (tag, kind = "nominal", seed = 1) => ({ task: "P", kind, seed, side: 0, fly: (pilot) => { if (tag.startsWith("a")) calls.audit++; return { score: -Math.abs(pilot(state, tgtP, [0, 0, 0]).thrust - 0.6), status: "submerged" }; } });
+    const sets = { train: [dive("train"), dive("train", "deep", 2)], heldOut: [dive("held"), dive("held", "far", 3)], a1: [dive("a1")], a2: [dive("a2"), dive("a2", "deep", 5)], a3: [dive("a3")] };
+    const spec = { kind: "pilot", task: "P", arm: "B", family: "mn", index: 2 }, recipe = { runs: 3, iters: 25, sigma: 0.3, maxK: 4, pruneBudget: 10 };
+    const lines = [], r = PN.runPilot(spec, { recipe, sets, scales: { pTonic: 2, rTonic: 1, pPhasic: 1, rPhasic: 1 } }, (m) => lines.push(m));
+    ok("!! the record names the pilot and what it was: spec, task, arm, family, index, the recipe, the seed base 79000 + 10 x 2, the init seed 4711 + 2, the widths [65], 589 weights, the reach 4 x 65, the scales given, no smoke", r.spec === "P/B/mn:2" && r.task === "P" && r.arm === "B" && r.family === "mn" && r.index === 2 && J(r.recipe) === J(recipe) && r.seedBase === 79020 && r.initSeed === 4713 && J(r.widths) === J([65]) && r.weightCount === 589 && r.reach === 260 && r.scales.pTonic === 2 && r.smoke === false);
+    ok("!! three searches with the seeds base + 0, 1, 2 (79020, 79021, 79022), each logged with its train and held-out score", r.searches.length === 3 && J(r.searches.map((s) => s.seed)) === J([79020, 79021, 79022]) && J(r.searches.map((s) => s.k)) === J([0, 1, 2]) && lines.length === 3 && /search 2\/3 \(seed 79021\)/.test(lines[1]) && r.searches.every((s) => Number.isFinite(s.trainScore) && Number.isFinite(s.heldOut) && s.eligible === true && s.moved >= s.kept));
+    const best = [...r.searches].sort((a, b) => b.heldOut - a.heldOut || a.k - b.k)[0];
+    ok("!! the champion is the eligible search with the best held-out score, and the search improved on the start (the stub task is how close the thrust is to 0.6)", r.champion === best.seed && r.asStart === false && r.scores.champion !== null && r.weights.length === 589 && r.searches.some((s) => s.trainScore > -Math.abs(base0 - 0.6)) && r.startHeldEarly === 0);
+    ok("!! the champion's audits are read ONCE each: three audits, 1 + 2 + 1 dives, flown once for the champion and not for the other searches", J(Object.keys(r.scores.champion)) === J(["a1", "a2", "a3"]) && r.scores.champion.a2.runs.length === 2 && calls.audit === 4);
+    ok("!! the record keeps the weights rounded to six decimals, as 4b's do, and the movement of the champion from its start", r.weights.every((v) => Math.abs(v * 1e6 - Math.round(v * 1e6)) < 1e-6) && r.movement.moved >= r.movement.kept && r.movement.largest > 0);
+    // eligibility, on a fake policy so that it is exact: the training score is the sum of the weights (every accepted child moves it, nothing prunes back), and a held-out dive ends early iff the weights are not the start
+    const fake = (heldScore, early) => (spec_, scales_) => { const pol = P.createPlainNetPolicy([3], "fake", { scales: scales_ }); return { ...pol, handWeights: () => new Float32Array(pol.WEIGHT_COUNT), evaluate: (w, set) => { if (set === fakeSets.a1 || set === fakeSets.a2 || set === fakeSets.a3) reads.n++; return set === fakeSets.heldOut ? { score: heldScore(w), early: early(w), runs: [] } : { score: Array.from(w).reduce((a, b) => a + b, 0), early: 0, runs: [] }; } }; };
+    const fakeSets = { train: [{}], heldOut: [{}], a1: [{}], a2: [{}], a3: [{}] }, reads = { n: 0 };
+    const moved = (w) => Array.from(w).some((v) => v !== 0), asc = { runs: 3, iters: 30, sigma: 0.3, maxK: 4, pruneBudget: 5 };
+    const n = PN.runPilot(spec, { recipe: asc, sets: fakeSets, scales: { pTonic: 1, rTonic: 1, pPhasic: 1, rPhasic: 1 }, policyOf: fake(() => -1, (w) => (moved(w) ? 2 : 0)) });
+    ok("!! with every search ending a held-out dive early (the start does not) no search is eligible: the pilot is scored as its start, the record says so, no weights are kept and NO AUDIT IS FLOWN", n.asStart === true && n.champion === null && n.scores.champion === null && n.weights === null && n.movement === null && reads.n === 0 && n.searches.length === 3 && n.searches.every((s_) => s_.eligible === false && s_.heldEarly === 2 && s_.kept >= 1));
+    const tie = PN.runPilot(spec, { recipe: asc, sets: fakeSets, scales: { pTonic: 1, rTonic: 1, pPhasic: 1, rPhasic: 1 }, policyOf: fake(() => -1, () => 0) });
+    ok("!! three eligible searches with the SAME held-out score: the champion is the first (seed 79020), and its audits are read", tie.champion === 79020 && tie.asStart === false && tie.searches.every((s_) => s_.eligible && s_.heldOut === -1) && reads.n === 3);
+    const worse = PN.runPilot(spec, { recipe: asc, sets: fakeSets, scales: { pTonic: 1, rTonic: 1, pPhasic: 1, rPhasic: 1 }, policyOf: fake((w) => Array.from(w).reduce((a, b) => a + Math.abs(b), 0), (w) => (Array.from(w).reduce((a, b) => a + Math.abs(b), 0) > 5 ? 2 : 0)) });
+    const el = worse.searches.filter((s_) => s_.eligible), bestEl = [...el].sort((a, b) => b.heldOut - a.heldOut || a.k - b.k)[0], inel = worse.searches.filter((s_) => !s_.eligible);
+    ok("!! an INELIGIBLE search is never the champion, however good its held-out score reads: here the held-out score rewards big weights and the two searches over the limit read higher than the one under it, which is still the champion", inel.length === 2 && el.length === 1 && inel.every((s_) => s_.heldOut > el[0].heldOut) && worse.champion === bestEl.seed && worse.champion === 79021);
+    // the start itself ends the held-out dive early: then ending early is no worse than the start
+    const sets2 = { ...fakeSets }, m = PN.runPilot(spec, { recipe: asc, sets: sets2, scales: { pTonic: 1, rTonic: 1, pPhasic: 1, rPhasic: 1 }, policyOf: fake(() => -1, () => 1) });
+    ok("!! a search is eligible if it ends early in NO MORE held-out dives than the start: when the start ends the held-out dive early (1) so does every search (1), and all are eligible", m.startHeldEarly === 1 && m.searches.every((s_) => s_.eligible === true && s_.heldEarly === 1) && m.asStart === false);
+    // the options: recipe overrides, policyOf seam, smoke flag, default recipe
+    const seen = []; const o2 = PN.runPilot(spec, { recipe: { runs: 1, iters: 3, pruneBudget: 2 }, sets, scales: { pTonic: 1, rTonic: 1, pPhasic: 1, rPhasic: 1 }, smoke: true, policyOf: (s, sc) => { seen.push(s.family); return P.createPlainNetPolicy([3], "seam", { scales: sc, evaluate: (p_, set) => TR.evalDives(p_, set) }); } });
+    ok("!! the options: a recipe overrides the 4b one field by field (1 search of 3 children), the policy seam is used, the smoke flag is recorded", o2.recipe.runs === 1 && o2.recipe.iters === 3 && o2.recipe.sigma === 0.3 && o2.recipe.maxK === 4 && o2.recipe.pruneBudget === 2 && seen.length === 1 && o2.weightCount === 31 && o2.smoke === true && o2.searches.length === 1);
+    const d = PN.runPilot(spec, { recipe: { runs: 1, iters: 2, pruneBudget: 1 }, sets });
+    ok("!! with no scales given the pilot measures them over the training dives (the 4b scalesOf): the record carries four finite scales", ["pTonic", "rTonic", "pPhasic", "rPhasic"].every((k) => Number.isFinite(d.scales[k]) && d.scales[k] > 0));
+}
+
+sec("4. THE COMPARATORS (the real 4b records)");
+{
+    const src = PN.sourceRecords(), cmps = PN.comparatorJobs();
+    ok("!! every one of the 64 comparators is in the 4b records, under the name the study uses, with a task, an arm, a group and an index", cmps.every((c) => { const s = src.get(PN.sourceSpec(c)); return s && s.rec.task === c.task && s.rec.arm === c.arm && s.rec.family === c.group && s.rec.index === c.index; }) && PN.sourceSpec(cmps[0]) === "P/B/qns:0");
+    const without = cmps.filter((c) => !src.get(PN.sourceSpec(c)).rec.weights);
+    ok("!! every comparator has its weights (none of the 64 ended with no eligible champion), and each record carries its audit scores and its scales", without.length === 0 && cmps.every((c) => { const r = src.get(PN.sourceSpec(c)).rec; return r.weights.length > 0 && r.scales && r.scores.champion.a1.score < 0; }));
+    ok("!! the files: the P comparators come from Gen 2 (qns, qer, qcl, qdg) and the replicates (rl50), the E comparators from Gen 3", src.get("P/B/qns:0").file === "fishVestibularGen2.jsonl" && src.get("P/B/rl50:0").file === "fishVestibularReplicates.jsonl" && src.get("E/E/ens:0").file === "fishVestibularGen3.jsonl" && src.get("E/whole/el99:3").file === "fishVestibularGen3.jsonl");
+    ok("!! a missing file is an error naming the file and the directory", /plainNetStudy\.sourceRecords: cannot read .*fishVestibularGen2\.jsonl/.test(throws(() => PN.sourceRecords("/nonexistent-dir-for-the-gate")) || ""));
+    const first = PN.sourceRecords("/x", (f) => (f.endsWith("Gen2.jsonl") ? '{"spec":"refs:PQ","family":"refs"}\n{"spec":"P/B/qns:0","family":"qns","task":"P","arm":"B","index":0,"weights":[1]}\n{"spec":"P/B/qns:0","family":"qns","task":"P","arm":"B","index":0,"weights":[2]}\n' : "{}\n"));
+    ok("!! the references records of the 4b files are not comparators, and the first record of a name wins", !first.has("refs:PQ") && first.get("P/B/qns:0").rec.weights[0] === 1);
+    const t0 = Date.now(), job = { kind: "cmp", task: "P", arm: "B", group: "qns", index: 0 }, g = PN.flyComparator(job, { source: src });
+    ok("!! A REAL COMPARATOR REBUILT AND FLOWN (P/B/qns:0): its original audits reproduce the recorded scores to 1e-5, and it is flown once on each fresh audit", g.reproduced.ok === true && g.reproduced.maxDiff < 1e-5 && g.reproduced.maxDiff > 0 && J(Object.keys(g.reproduced.recorded)) === J(A3) && g.scores.champion.a1.runs.length === 60 && g.scores.champion.a3.runs.length === 60 && g.weightCount === 591 && g.family === "cmp" && g.spec === "cmp:P/B/qns:0" && g.asStart === false && g.source === "fishVestibularGen2.jsonl", `largest difference ${g.reproduced.maxDiff.toExponential(2)}, ${((Date.now() - t0) / 1000).toFixed(1)} s`);
+    ok("!! its fresh scores are the fresh audits' and not the original ones: they differ from the recorded audit scores", A3.every((a) => Math.abs(g.scores.champion[a].score - src.get("P/B/qns:0").rec.scores.champion[a].score) > 1e-3) && g.scores.champion.a1.runs[0].seed === 86001);
+    const tam = new Map(src); const rec = JSON.parse(JSON.stringify(src.get("P/B/qns:0").rec)); rec.weights[10] += 0.3; rec.weights[200] -= 0.3; tam.set("P/B/qns:0", { rec, file: "x" });
+    const tt = PN.flyComparator(job, { source: tam });
+    ok("!! A TAMPERED WEIGHT DOES NOT REPRODUCE: two weights moved by 0.3 give a difference far above 1e-5 and ok false (a rebuilt pilot that is not the trained one is caught)", tt.reproduced.ok === false && tt.reproduced.maxDiff > 1e-5);
+    const e = PN.flyComparator({ kind: "cmp", task: "E", arm: "E", group: "ens", index: 0 }, { source: src });
+    ok("!! A REAL 4b-E COMPARATOR (E/E/ens:0): reproduces on its original audits (Gen 3's) and is flown once on 88001-88048", e.reproduced.ok === true && e.scores.champion.a2.runs.length === 64 && e.scores.champion.a3.runs[0].seed === 88033 && e.weightCount === 85);
+    const none = new Map(src); none.set("P/B/qns:1", { rec: { ...JSON.parse(JSON.stringify(src.get("P/B/qns:1").rec)), weights: null, champion: null, scores: { champion: null } }, file: "x" });
+    const ns = PN.flyComparator({ kind: "cmp", task: "P", arm: "B", group: "qns", index: 1 }, { source: none });
+    ok("!! a circuit with no eligible champion has no weights to rebuild: the record says so, it reproduces by definition and its scores are null (the reading uses the autopilot's)", ns.asStart === true && ns.scores.champion === null && ns.reproduced.ok === true && ns.reproduced.asStart === true && ns.weightCount === null);
+    const wrong = new Map(src); wrong.set("P/B/qns:2", { rec: { ...JSON.parse(JSON.stringify(src.get("P/B/qns:2").rec)), weights: [0.1, 0.2] }, file: "x" });
+    ok("!! a record whose weights are the wrong number for the rebuilt pilot is refused, naming both counts", /2 weights in its record and 591 in the rebuilt pilot/.test(throws(() => PN.flyComparator({ kind: "cmp", task: "P", arm: "B", group: "qns", index: 2 }, { source: wrong })) || ""));
+    ok("!! a comparator not in the records is refused, naming it and the files", /plainNetStudy\.flyComparator: P\/B\/qns:9 is not in the 4b records \(fishVestibularGen2\.jsonl, fishVestibularReplicates\.jsonl\)/.test(throws(() => PN.flyComparator({ kind: "cmp", task: "P", arm: "B", group: "qns", index: 9 }, { source: src })) || ""));
+    const sm = PN.flyComparator(job, { source: src, smoke: true });
+    ok("!! under --smoke the reproduction is skipped (the recorded scores are of full audits): ok null, the reason given, and the fresh audits are the smoke ones", sm.reproduced.ok === null && sm.reproduced.skipped === "smoke" && sm.smoke === true && sm.scores.champion.a1.runs.length === 8);
+}
+
+sec("5. THE REFERENCES RECORDS");
+{
+    const rp = PN.refsRecord("P", { smoke: true }), re = PN.refsRecord("E", { smoke: true });
+    ok("!! 4b-P: named refs:NP, the audit seeds written in, the autopilot alone on the three fresh audits, the task re-check numbers of the 4b trainer", rp.spec === "refs:NP" && rp.family === "refs" && rp.task === "P" && J(rp.audits) === J(PN.AUDIT_SEEDS.P) && A3.every((a) => Number.isFinite(rp.autopilot[a].score) && rp.autopilot[a].runs.length === 8) && Number.isFinite(rp.cost) && rp.smoke === true && rp.scales.pTonic > 0);
+    ok("!! the autopilot score on a fresh audit is the autopilot flown on THAT audit", near(rp.autopilot.a2.score, TR.evalDives(AS.pilot(), PN.setsFor("P", { smoke: true }).a2).score, 1e-12));
+    ok("!! 4b-P START CHECK: the untrained MN and MG pilot of each of the cells' arms (B and whole) scores the autopilot on four training dives", J(rp.startCheck.map((x) => x.arm)) === J(["B/mn", "B/mg", "whole/mn", "whole/mg"]) && rp.startCheck.every((x) => x.same === true));
+    ok("!! 4b-E: refs:NE, the E arm and the whole arm checked, the reflex and cue-detector checks of 4b-E present", re.spec === "refs:NE" && re.task === "E" && J(re.startCheck.map((x) => x.arm)) === J(["E/mn", "E/mg", "whole/mn", "whole/mg"]) && re.startCheck.every((x) => x.same) && re.reflex && re.trigger && J(re.audits) === J(PN.AUDIT_SEEDS.E));
+}
+
+sec("6. THE READINGS (worked by hand on rank fixtures)");
+{
+    const refs = refsP;
+    const sc = (r) => -0.6 + 0.01 * r, tri = (r) => Object.fromEntries(A3.map((a) => [a, { score: sc(r) }]));
+    const pil = (cell, family, i, r, extra = {}) => ({ spec: `${cell}/${family}:${i}`, family, task: cell[0], arm: cell.slice(2), index: i, asStart: false, scores: { champion: tri(r) }, ...extra });
+    const cmp = (cell, group, i, r, extra = {}) => ({ spec: `cmp:${cell}/${group}:${i}`, family: "cmp", group, task: cell[0], arm: cell.slice(2), index: i, asStart: false, reproduced: { ok: true, maxDiff: 1e-8 }, scores: { champion: tri(r) }, ...extra });
+    const build = (cell, realRanks, extra = []) => { const plain = Array.from({ length: 12 }, (_, i) => i + 1).filter((r) => !realRanks.includes(r)); return [...realRanks.map((r, i) => cmp(cell, PN.REAL_GROUP[cell[0]], i, r)), ...plain.map((r, i) => pil(cell, "mn", i, r)), ...extra]; };
+    const top = cellReadingOf("P/B", build("P/B", [9, 10, 11, 12]));
+    function cellReadingOf(cell, recs, r = refs) { return PN.cellReading(cell, recs, r); }
+    ok("!! the four top ranks: U = 32 of 32, p = 1/495 = 0.0020 over 495 splits -> SUPPORTED", top.status === "SUPPORTED" && top.test.U === 32 && top.test.max === 32 && near(top.test.p, 1 / 495, 1e-12) && top.test.splits === 495 && top.test.supported === true && top.test.plainAhead === false);
+    const s18 = cellReadingOf("P/B", build("P/B", [4, 10, 11, 12])), s27 = cellReadingOf("P/B", build("P/B", [3, 10, 11, 12]));
+    ok("!! THE LINE OF 0.05: ranks 4, 10, 11, 12 give U = 27, p = 18/495 = 0.0364 -> SUPPORTED; ranks 3, 10, 11, 12 give U = 26, p = 27/495 = 0.0545 -> not supported", s18.test.U === 27 && near(s18.test.p, 18 / 495, 1e-12) && s18.status === "SUPPORTED" && s27.test.U === 26 && near(s27.test.p, 27 / 495, 1e-12) && s27.status === "NOT SUPPORTED" && s27.test.supported === false);
+    const a = top.audits[0];
+    ok("!! per audit: the autopilot's score, REAL's mean 0.01 x 10.5 above it (sd 1.29 x 0.01), PLAIN's mean 0.01 x 4.5 above it (ranks 1-8: sd 2.449 x 0.01), the extremes", near(a.autopilot, -0.6) && near(a.real.mean, -0.495, 1e-12) && near(a.real.sd, 0.01 * Math.sqrt(5 / 3), 1e-12) && near(a.plain.mean, -0.555, 1e-12) && near(a.plain.sd, 0.01 * Math.sqrt(6), 1e-12) && near(a.real.min, -0.51, 1e-12) && near(a.real.max, -0.48, 1e-12) && near(a.plain.min, -0.59, 1e-12) && near(a.plain.max, -0.52, 1e-12) && a.real.n === 4 && a.plain.n === 8);
+    ok("!! the margin rule: REAL - PLAIN = 0.06 against the larger of 0.02 and 2 sd of PLAIN (0.049) -> ahead; the share PLAIN keeps is (0.045)/(0.105) = 43 percent", near(a.margin.margin, 0.06, 1e-12) && near(a.margin.needs, 0.02 * Math.sqrt(6), 1e-12) && a.margin.reading === "ahead" && near(a.kept, 0.045 / 0.105, 1e-12));
+    const tie = cellReadingOf("P/B", build("P/B", [4, 10, 11, 12]));
+    ok("!! the rule and the test can disagree and both are printed: ranks 4, 10, 11, 12 are SUPPORTED by the test (p 0.0364) while the margin of 0.0413 is read against 2 sd of PLAIN (ranks 1-3, 5-9: sd 0.029, so 0.058) -> a TIE", tie.audits[0].margin.reading === "tie" && tie.status === "SUPPORTED" && near(tie.audits[0].margin.margin, 0.01 * (9.25 - 5.125), 1e-12));
+    const behind = cellReadingOf("P/B", build("P/B", [1, 2, 3, 4]));
+    ok("!! PLAIN AHEAD: REAL at ranks 1-4 gives U = 0, p = 1 -> not supported, every audit reads REAL behind (-0.06 against 0.049) and the plain-ahead flag is raised", behind.test.U === 0 && behind.test.p === 1 && behind.status === "NOT SUPPORTED" && behind.audits.every((x) => x.margin.reading === "behind") && behind.test.plainAhead === true && near(behind.audits[0].margin.margin, -0.06, 1e-12));
+    const oneBehind = build("P/B", [1, 2, 3, 4]).map((r) => (r.family === "cmp" ? { ...r, scores: { champion: { a1: r.scores.champion.a1, a2: { score: -0.45 }, a3: { score: -0.45 } } } } : r)), ob = cellReadingOf("P/B", oneBehind);
+    ok("!! the plain-ahead flag needs at least TWO audits behind: with REAL lifted to -0.45 on a2 and a3 only one audit reads behind and the flag stays down", ob.audits[0].margin.reading === "behind" && ob.audits[1].margin.reading === "ahead" && ob.test.plainAhead === false);
+    // validity
+    const flat = (g) => { const recs = build("P/B", [9, 10, 11, 12]).filter((r) => r.family === "cmp"); const plain = Array.from({ length: 8 }, (_, i) => pil("P/B", "mn", i, 0, { scores: { champion: Object.fromEntries(A3.map((x) => [x, { score: g[x] }])) } })); return [...recs, ...plain]; };
+    const dnl = cellReadingOf("P/B", flat({ a1: -0.6, a2: -0.6, a3: -0.6 })), one = cellReadingOf("P/B", flat({ a1: -0.5799, a2: -0.6, a3: -0.6 })), two = cellReadingOf("P/B", flat({ a1: -0.5799, a2: -0.5799, a3: -0.6 })), edge = cellReadingOf("P/B", flat({ a1: -0.5801, a2: -0.5801, a3: -0.5801 }));
+    ok("!! VALIDITY (the control must learn): a plain net AT the autopilot is NOT ASSESSED: THE CONTROL DID NOT LEARN (its test is still computed); off it on ONE audit is not enough; on TWO it is; a gain of 0.0199 is not 'above 0.02'", dnl.status === "NOT ASSESSED: THE CONTROL DID NOT LEARN" && dnl.validity.learned === false && dnl.test !== null && one.validity.learned === false && two.validity.learned === true && two.audits.map((x) => x.plainOffAutopilot).join() === "true,true,false" && edge.validity.learned === false);
+    ok("!! the share PLAIN keeps is n/a where REAL's own gain is not above 0.02 (REAL at -0.585 is 0.015 off the autopilot)", (() => { const r = build("P/B", [9, 10, 11, 12]).map((x) => (x.family === "cmp" ? { ...x, scores: { champion: tri(1.5) } } : x)); const c = cellReadingOf("P/B", r); return c.audits[0].kept === null; })());
+    // incomplete
+    const inc = cellReadingOf("P/B", build("P/B", [9, 10, 11, 12]).filter((r, i) => i !== 0)), inc2 = cellReadingOf("P/B", build("P/B", [9, 10, 11, 12]).filter((r) => !(r.family === "mn" && r.index === 7)));
+    ok("!! a cell without all 4 REAL and all 8 PLAIN circuits is NOT ASSESSED: INCOMPLETE, saying how many it has, and nothing is computed", /^NOT ASSESSED: INCOMPLETE \(3 of 4 real, 8 of 8 plain-net circuits\)$/.test(inc.status) && /\(4 of 4 real, 7 of 8 plain-net circuits\)$/.test(inc2.status) && inc.test === null && inc.audits.length === 0 && cellReadingOf("E/E", []).status.startsWith("NOT ASSESSED: INCOMPLETE (0 of 4"));
+    // audit order: a circuit with different scores on the three audits
+    const diffAud = build("P/B", [9, 10, 11, 12]).map((r) => (r.family === "cmp" && r.index === 0 ? { ...r, scores: { champion: { a1: { score: -0.1 }, a2: { score: -0.2 }, a3: { score: -0.3 } } } } : r)), da = cellReadingOf("P/B", diffAud);
+    ok("!! each audit is read from its own score: a REAL circuit with -0.1, -0.2, -0.3 on a1, a2, a3 moves the three REAL means by (-0.1 - -0.51) / 4 ... in order", near(da.audits[0].real.max, -0.1, 1e-12) && near(da.audits[1].real.max, -0.2, 1e-12) && near(da.audits[2].real.max, -0.3, 1e-12) && near(da.audits[0].real.mean - da.audits[2].real.mean, (0.2) / 4, 1e-12));
+    // a circuit's score for the test is the mean of its three audits
+    const swap = build("P/B", [9, 10, 11, 12]).map((r) => (r.family === "mn" && r.index === 0 ? { ...r, scores: { champion: { a1: { score: -0.1 }, a2: { score: -0.9 }, a3: { score: -0.9 } } } } : r)), sw = cellReadingOf("P/B", swap);
+    ok("!! the test scores a circuit by the MEAN of its three audits: a plain circuit at -0.1, -0.9, -0.9 (mean -0.633) stays below all four REAL circuits, U stays 32", sw.test.U === 32);
+    // stuck circuits
+    const stuck = build("P/B", [9, 10, 11, 12]).map((r) => (r.family === "mn" && r.index < 2 ? { ...r, asStart: true, scores: { champion: null } } : r)), st_ = cellReadingOf("P/B", stuck);
+    ok("!! a plain circuit with no eligible champion counts as the AUTOPILOT's score (-0.6, below everything) and is counted: 2 stuck", st_.stuck === 2 && near(st_.audits[0].plain.min, -0.6, 1e-12) && st_.test.U === 32);
+    // ties count one half
+    const tied = build("P/B", [9, 10, 11, 12]).map((r) => ({ ...r, scores: { champion: tri(5) } })), td = cellReadingOf("P/B", tied);
+    ok("!! all twelve circuits at one score: every pair is a tie (one half): U = 16 of 32, p = 1 -> not supported", td.test.U === 16 && td.test.p === 1 && td.status === "NOT SUPPORTED");
+    // decomposition (4b-P only)
+    const shuf = (ranks) => ["qer", "qcl", "qdg"].flatMap((g) => [0, 1, 2, 3].map((i) => cmp("P/B", g, i, ranks[("qer qcl qdg".split(" ").indexOf(g)) * 4 + i])));
+    const dec = cellReadingOf("P/B", build("P/B", [9, 10, 11, 12], shuf([13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24])));
+    ok("!! DECOMPOSITION (4b-P): the 12 shuffled circuits above all 8 PLAIN ones give U = 96 of 96 and p = 1 / C(20, 12) = 1/125,970 over 125,970 splits; it does not enter the status", dec.decomposition && dec.decomposition.U === 96 && dec.decomposition.max === 96 && dec.decomposition.splits === 125970 && near(dec.decomposition.p, 1 / 125970, 1e-12) && dec.decomposition.supported === true && dec.decomposition.n === 12 && dec.status === "SUPPORTED");
+    const dec2 = cellReadingOf("P/B", build("P/B", [9, 10, 11, 12], shuf([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])));
+    ok("!! shuffled circuits BELOW the plain nets are not 'above': p = 1, not supported; fewer than 12 shuffled circuits give no decomposition; none on 4b-E even when given", dec2.decomposition.supported === false && dec2.decomposition.p === 1 && cellReadingOf("P/B", build("P/B", [9, 10, 11, 12], shuf([13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24]).slice(1))).decomposition === null && (() => { const r = [...[9, 10, 11, 12].map((x, i) => cmp("E/E", "ens", i, x)), ...[1, 2, 3, 4, 5, 6, 7, 8].map((x, i) => pil("E/E", "mn", i, x)), ...["qer", "qcl", "qdg"].flatMap((g) => [0, 1, 2, 3].map((i) => cmp("E/E", g, i, 20)))]; return PN.cellReading("E/E", r, { ...refs, task: "E" }).decomposition === null; })());
+    // the other groups
+    const withG = cellReadingOf("P/B", build("P/B", [9, 10, 11, 12], [...[0, 1, 2, 3].map((i) => pil("P/B", "mg", i, 7)), ...[0, 1, 2, 3].map((i) => cmp("P/B", "rl50", i, 11, i === 3 ? { asStart: true, scores: { champion: null } } : {}))]));
+    const mgG = withG.groups.find((g) => g.group === "mg"), rl = withG.groups.find((g) => g.group === "rl50");
+    ok("!! the other groups are reported beside, not judged: MG (4 circuits at rank 7: mean -0.53, 0.07 off the autopilot, REAL ahead of it by the margin rule (rank 10.5 against 7, sd 0) and PLAIN behind it (rank 4.5 against 7: 0.025 against the 0.02 floor)), rl50 with one stuck circuit (the autopilot's -0.6 counted)", withG.groups.length === 2 && withG.groups.map((g) => g.group).join() === "rl50,mg" && mgG.n === 4 && near(mgG.audits[0].mean, -0.53, 1e-12) && near(mgG.audits[0].vsAutopilot, 0.07, 1e-12) && mgG.audits[0].realVs === "ahead" && mgG.audits[0].plainVs === "behind" && rl.stuck === 1 && near(rl.audits[0].mean, (3 * sc(11) - 0.6) / 4, 1e-12) && withG.groups.every((g) => g.group !== "qns" && g.group !== "mn"));
+    // the overall line
+    const o = (...s) => PN.overallOf(s.map((status) => ({ status })));
+    ok("!! OVERALL: all four supported -> SUPPORTED; none -> NOT SUPPORTED; one to three -> MIXED; unassessed cells are left out and counted; nothing assessed -> NOT ASSESSED", J(o("SUPPORTED", "SUPPORTED", "SUPPORTED", "SUPPORTED")) === J({ word: "SUPPORTED", assessed: 4, supported: 4 }) && o("NOT SUPPORTED", "NOT SUPPORTED", "NOT SUPPORTED", "NOT SUPPORTED").word === "NOT SUPPORTED" && o("SUPPORTED", "NOT SUPPORTED", "NOT SUPPORTED", "NOT SUPPORTED").word === "MIXED" && o("SUPPORTED", "SUPPORTED", "SUPPORTED", "NOT ASSESSED: INCOMPLETE (x)").word === "MIXED" && J(o("SUPPORTED", "SUPPORTED", "SUPPORTED", "NOT ASSESSED: INCOMPLETE (x)")) === J({ word: "MIXED", assessed: 3, supported: 3 }) && o("NOT SUPPORTED", "NOT ASSESSED: THE CONTROL DID NOT LEARN", "NOT ASSESSED: INCOMPLETE (x)", "NOT ASSESSED: INCOMPLETE (x)").word === "NOT SUPPORTED" && o("NOT ASSESSED: INCOMPLETE (x)").word === "NOT ASSESSED");
+    // the checks and the report
+    const file = (extra = []) => [refsP, refsE, ...CELL_FIX(), ...extra];
+    function CELL_FIX() {
+        const out = [];
+        for (const cell of PN.CELL_NAMES) { const task = cell[0]; for (let i = 0; i < 4; i++) out.push(cmp(cell, PN.REAL_GROUP[task], i, [9, 10, 11, 12][i])); for (let i = 0; i < 8; i++) out.push(pil(cell, "mn", i, i + 1)); }
+        return out;
+    }
+    const good = PN.studyChecks(file());
+    ok("!! the checks of a good file: the four 4b task rows of each task pass and COMPARATOR REPRODUCTION passes, naming the largest difference", good.ok === true && good.rows.some((r) => r.name === "4b-P: TASK RE-CHECK (4b-P, cost)") && good.rows.some((r) => r.name === "4b-E: CUE DETECTOR (Addendum 3)") && good.rows.every((r) => r.ok) && /^16 of 16 comparator champions, rebuilt from their records and flown on their original audits, reproduce the recorded scores to 0.00001 \(largest difference 1.00e-8\)$/.test(good.rows.find((r) => r.name === "COMPARATOR REPRODUCTION").text));
+    const noRefs = PN.studyChecks(file().filter((r) => r.spec !== "refs:NE")), lowCost = PN.studyChecks(file().map((r) => (r.spec === "refs:NP" ? { ...r, cost: 0.01 } : r))), badRepro = PN.studyChecks(file().map((r, i) => (r.family === "cmp" && r.index === 1 && r.group === "qns" && r.arm === "B" ? { ...r, reproduced: { ok: false, maxDiff: 3e-4 } } : r))), emptyCmp = PN.studyChecks([refsP, refsE]);
+    ok("!! a failing check is named: a missing references record, a task that costs the autopilot too little, a comparator that does not reproduce (NAMED, with its own difference), a file with no comparator at all", noRefs.ok === false && noRefs.rows.some((r) => !r.ok && /refs:NE/.test(r.text)) && lowCost.ok === false && lowCost.rows.some((r) => !r.ok && /TASK RE-CHECK/.test(r.name)) && badRepro.ok === false && /cmp:P\/B\/qns:1 \(3\.00e-4\)/.test(badRepro.rows.find((r) => r.name === "COMPARATOR REPRODUCTION").text) && emptyCmp.ok === false);
+    const bothBad = PN.studyChecks(file().map((r) => (r.family === "cmp" && r.group === "qns" && r.arm === "B" ? { ...r, reproduced: { ok: false, maxDiff: r.index === 0 ? 3e-4 : 7e-3 } } : r)));
+    ok("!! each failing comparator is listed with ITS OWN difference", /cmp:P\/B\/qns:0 \(3\.00e-4\)/.test(bothBad.rows.find((r) => r.name === "COMPARATOR REPRODUCTION").text) && /cmp:P\/B\/qns:1 \(7\.00e-3\)/.test(bothBad.rows.find((r) => r.name === "COMPARATOR REPRODUCTION").text));
+    const malformed = PN.studyChecks(file().map((r) => (r.family === "cmp" && r.index === 0 && r.arm === "B" && r.group === "qns" ? { ...r, reproduced: undefined } : r))), brokenRefs = PN.studyChecks(file().map((r) => (r.spec === "refs:NE" ? { family: "refs", spec: "refs:NE", task: "E" } : r)));
+    ok("!! a comparator record with no reproduction block is a FAILED check (named), and a references record that cannot be read is a failed check naming the record, not a crash", malformed.ok === false && /cmp:P\/B\/qns:0 \(Infinity\)/.test(malformed.rows.find((r) => r.name === "COMPARATOR REPRODUCTION").text) && brokenRefs.ok === false && brokenRefs.rows.some((r) => !r.ok && /the refs:NE record cannot be read/.test(r.text)));
+    const skipped = PN.studyChecks(file().map((r) => (r.family === "cmp" ? { ...r, reproduced: { ok: null, maxDiff: null, skipped: "smoke" } } : r)));
+    ok("!! a smoke file (reproduction skipped) is not failed for it, and the report line says NOTHING WAS CHECKED rather than claiming a reproduction", skipped.ok === true && /NOT CHECKED/.test(skipped.rows.find((r) => r.name === "COMPARATOR REPRODUCTION").text));
+    const rep = PN.reportLines(file()), text = rep.join("\n");
+    ok("!! the report: the question first, the counts, the checks, one section for each of the four cells with its status, the registered test line, and an OVERALL line that counts cells", /^THE PLAIN-NET CONTROL OF RUNG 4b/.test(rep[0]) && /^32 of 48 plain-net pilots and 16 of 64 comparators in the file$/.test(rep[1]) && CELL_NAMES_ALL().every((c) => new RegExp(`^CELL ${c}: `, "m").test(text)) && /REGISTERED TEST: REAL above PLAIN, U 32 of 32, exact one-sided p 0\.0020 over 495 splits -> SUPPORTED/.test(text) && /OVERALL: MIXED|OVERALL: SUPPORTED|OVERALL: NOT SUPPORTED/.test(text) && /of 4 assessed cells supported; 4 cells in all\)/.test(text));
+    function CELL_NAMES_ALL() { return PN.CELL_NAMES; }
+    const bad = PN.reportLines(file().map((r) => (r.spec === "refs:NP" ? { ...r, cost: 0.01 } : r)));
+    ok("!! A FAILED CHECK STOPS THE REPORT: the failure is stated, the verdicts are NOT READ and no cell section follows", /CHECK FAIL/.test(bad.join("\n")) && /A CHECK FAILED: it is stated above and the verdicts below are NOT READ\./.test(bad.join("\n")) && !/^CELL /m.test(bad.join("\n")) && !/OVERALL/.test(bad.join("\n")));
+    ok("!! the cell sections say, per audit, REAL against PLAIN with the margin and what it needs, and the share kept; the decomposition and the other groups are listed on 4b-P", /a1: autopilot -0\.600 \| REAL -0\.495 \(sd 0\.013, -0\.510 to -0\.480\) \| PLAIN -0\.555 \(sd 0\.024, -0\.590 to -0\.520\) \| REAL against PLAIN: ahead \(0\.060 against 0\.049\) \| PLAIN keeps 43 percent of REAL's gain/.test(text) && /VALIDITY: the plain net learned/.test(text));
+    const withD = PN.reportLines(file([...shuf([13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24]).map((r) => ({ ...r, task: "P", arm: "B" })), ...[0, 1, 2, 3].map((i) => pil("P/B", "mg", i, 7))]));
+    ok("!! with shuffled circuits the report prints the DECOMPOSITION and with MG the group lines: 'DECOMPOSITION (reported): the 12 shuffled NO STATE circuits above PLAIN', 'mg (4)'", /DECOMPOSITION \(reported\): the 12 shuffled NO STATE circuits above PLAIN, U 96 of 96, p 0\.0000 over 125970 splits -> above/.test(withD.join("\n")) && /^  mg \(4\): /m.test(withD.join("\n")));
+    const dnlRep = PN.reportLines(file().map((r) => (r.family === "mn" && r.arm === "B" && r.task === "P" ? { ...r, scores: { champion: tri(0) } } : r)));
+    ok("!! a plain net that did not learn is said so in the report: 'DID NOT LEARN' and the cell is NOT ASSESSED", /CELL P\/B: NOT ASSESSED: THE CONTROL DID NOT LEARN/.test(dnlRep.join("\n")) && /DID NOT LEARN \(fewer than 2 audits\)/.test(dnlRep.join("\n")));
+    const ahead = PN.reportLines(file().map((r) => (r.task === "P" && r.arm === "B" && r.family === "cmp" ? { ...r, scores: { champion: tri(r.index - 4) } } : r)));
+    ok("!! 'the PLAIN NET is AHEAD of REAL' is printed when the flag is raised", /PLAIN NET is AHEAD of REAL by the margin rule on at least 2 audits/.test(ahead.join("\n")));
+}
+
+sec("7. THE COMMAND");
+{
+    const base = ["run", "--specs", "P/B/mn:0", "--out", "/tmp/x"];
+    const a = PN.parseArgs(base);
+    ok("!! the defaults: the 4b recipe (4 x 300, sigma 0.3, maxK 4, prune 60), one worker, the rig directory, no smoke", a.cmd === "run" && a.workers === 1 && J(a.recipe) === J({ runs: 4, iters: 300, sigma: 0.3, maxK: 4, pruneBudget: 60 }) && a.smoke === false && a.quiet === false && a.rigDir === PN.RIG_DIR && /brain[\\/]rig-results$/.test(PN.RIG_DIR) && a.one === null && a.out === "/tmp/x");
+    const b = PN.parseArgs(["run", "--specs", "all", "--out", "o", "--workers", "4", "--runs", "2", "--iters", "9", "--sigma", "0.5", "--maxK", "3", "--prune-budget", "0", "--rig-dir", "/d", "--smoke", "--quiet"]);
+    ok("!! every option is read: workers 4, recipe 2 x 9, sigma 0.5, maxK 3, prune budget 0 (allowed), the rig directory, smoke, quiet; 'all' is the 48 pilots and the 64 comparators", b.workers === 4 && b.recipe.runs === 2 && b.recipe.iters === 9 && b.recipe.sigma === 0.5 && b.recipe.maxK === 3 && b.recipe.pruneBudget === 0 && b.rigDir === "/d" && b.smoke && b.quiet && PN.parseSpecs(b.specs).length === 112);
+    ok("!! 'pilots' is the 48 pilots, 'comparators' the 64, a list is itself", PN.parseSpecs(PN.parseArgs(["run", "--specs", "pilots", "--out", "o"]).specs).length === 48 && PN.parseSpecs(PN.parseArgs(["run", "--specs", "comparators", "--out", "o"]).specs).every((s) => s.kind === "cmp") && PN.parseArgs(["run", "--specs", "comparators", "--out", "o"]).specs.split(",").length === 64);
+    const bad = [[], ["go"], ["run"], ["run", "--specs", "P/B/mn:0"], ["run", "--out", "o"], ["run", "--specs", "P/B/mn:0", "--out", "o", "--bogus"], ["run", "--specs", "P/B/mn:0", "--out"], ["run", "--specs", "P/B/mn:0", "--out", "o", "--workers", "0"], ["run", "--specs", "P/B/mn:0", "--out", "o", "--workers", "x"], ["run", "--specs", "P/B/mn:0", "--out", "o", "--iters", "1.5"], ["run", "--specs", "P/B/mn:0", "--out", "o", "--sigma", "0"], ["run", "--specs", "P/B/mn:0", "--out", "o", "--prune-budget", "-1"], ["run", "--specs", "P/B/zz:0", "--out", "o"], ["run", "--one", "P/B/mn:0-1"], ["run", "--specs", "P/B/mn:0", "--out", "o", "stray"], ["report"], ["report", "--in"], ["report", "--in", "f", "--smoke"]].map((v) => throws(() => PN.parseArgs(v)));
+    ok("!! the arguments refused: no command, an unknown one, no specs, no output file, an unknown option, an option with no value, workers 0 or not a number, a fractional count, sigma 0, a negative prune budget, a bad spec, --one with two jobs, a stray word, report with no file or an option of run", bad.every((m) => m && m.length > 5));
+    ok("!! --one needs no --out; report takes --in and --allow-smoke", PN.parseArgs(["run", "--one", "P/B/mn:1"]).one === "P/B/mn:1" && PN.parseArgs(["report", "--in", "f", "--allow-smoke"]).allowSmoke === true && PN.parseArgs(["report", "--in", "f"]).allowSmoke === false);
+
+    // the command with injected io
+    const mem = (files = {}) => { const log = [], errs = [], ran = [], refsRan = []; const io = { out: (m) => log.push(m), err: (m) => errs.push(m), readFile: (f) => { if (!(f in files)) throw new Error("ENOENT " + f); return files[f]; }, appendFile: (f, t) => { files[f] = (files[f] || "") + t; }, exists: (f) => f in files,
+        runner: (s, opts, lg) => { ran.push(PN.specName(s)); return s.kind === "cmp" ? { family: "cmp", spec: PN.specName(s), task: s.task, arm: s.arm, group: s.group, index: s.index, smoke: !!opts.smoke, reproduced: { ok: true, maxDiff: 0 }, scores: { champion: null } } : { spec: PN.specName(s), family: s.family, task: s.task, arm: s.arm, index: s.index, smoke: !!opts.smoke, recipe: opts.recipe, asStart: false, champion: 79000, scores: { champion: null } }; },
+        refsRunner: (t, opts) => { refsRan.push(t); return { ...(t === "P" ? refsP : refsE), smoke: !!opts.smoke }; } }; return { io, files, log, errs, ran, refsRan }; };
+    const m = mem();
+    const code = await PN.command(["run", "--specs", "cmp:P/B/qns:0,P/B/mn:0-1,E/E/mn:0", "--out", "R", "--quiet"], m.io);
+    const lines = m.files.R.trim().split("\n").map((l) => JSON.parse(l));
+    ok("!! a run: the references of each task needed are written FIRST and once (P and E), then the pilots, then the comparator (pilots before comparators whatever the order asked), one line each", code === 0 && J(m.refsRan) === J(["P", "E"]) && J(m.ran) === J(["P/B/mn:0", "P/B/mn:1", "E/E/mn:0", "cmp:P/B/qns:0"]) && lines.length === 6 && lines[0].spec === "refs:NP" && lines[1].spec === "refs:NE" && lines.slice(2).map((r) => r.spec).join() === "P/B/mn:0,P/B/mn:1,E/E/mn:0,cmp:P/B/qns:0");
+    const again = mem({ ...m.files });
+    const code2 = await PN.command(["run", "--specs", "cmp:P/B/qns:0,P/B/mn:0-1,P/B/mn:2", "--out", "R", "--quiet"], again.io);
+    ok("!! RESUME: a second run into the same file does only what is not in it (the pilot P/B/mn:2), does not write the references again, and keeps the earlier lines", code2 === 0 && J(again.ran) === J(["P/B/mn:2"]) && again.refsRan.length === 0 && again.files.R.trim().split("\n").length === 7);
+    const loud = mem(); await PN.command(["run", "--specs", "P/B/mn:0", "--out", "R"], loud.io);
+    ok("!! unless --quiet the command says what it does: the job count, the references, each job done and the report", loud.log.some((l) => /^\[plainNetStudy\] 1 jobs, 0 already in R, 1 to run; 1 worker\(s\); recipe 4 x 300$/.test(l)) && loud.log.some((l) => /references for 4b-P done/.test(l)) && loud.log.some((l) => /P\/B\/mn:0 done \(champion seed 79000\)/.test(l)) && loud.log.some((l) => /^THE PLAIN-NET CONTROL/.test(l)));
+    const sm = mem(); await PN.command(["run", "--specs", "P/B/mn:0", "--out", "R", "--smoke", "--quiet"], sm.io);
+    ok("!! a smoke run is marked in every record it writes", sm.files.R.trim().split("\n").every((l) => JSON.parse(l).smoke === true) && sm.log.some((l) => /\(SMOKE\)/.test(l)) === false);
+    const smLoud = mem(); await PN.command(["run", "--specs", "P/B/mn:0", "--out", "R", "--smoke"], smLoud.io);
+    ok("!! and the log says SMOKE", smLoud.log.some((l) => /recipe 4 x 300 \(SMOKE\)/.test(l)));
+    const stale = mem({ R: JSON.stringify({ spec: "P/B/mn:0", family: "mn", recipe: { runs: 4, iters: 100, sigma: 0.3, maxK: 4, pruneBudget: 60 }, smoke: false }) + "\n" }), cs = await PN.command(["run", "--specs", "P/B/mn:1", "--out", "R", "--quiet"], stale.io);
+    ok("!! a file of another recipe is refused, naming the records, and nothing is run (exit 1)", cs === 1 && stale.ran.length === 0 && /holds 1 record\(s\) of another recipe or a smoke run \(P\/B\/mn:0\)/.test(stale.errs.join()));
+    const mixed = mem({ R: JSON.stringify({ spec: "P/B/mn:0", family: "mn", recipe: { runs: 4, iters: 300, sigma: 0.3, maxK: 4, pruneBudget: 60 }, smoke: true }) + "\n" }), cm = await PN.command(["run", "--specs", "P/B/mn:1", "--out", "R", "--quiet"], mixed.io);
+    ok("!! a smoke record in a full run's file is refused too (exit 1)", cm === 1 && mixed.ran.length === 0);
+    const refsOk = mem({ R: JSON.stringify({ spec: "refs:NP", family: "refs", smoke: false }) + "\n" + JSON.stringify({ spec: "cmp:P/B/qns:0", family: "cmp", smoke: false, reproduced: { ok: true, maxDiff: 0 } }) + "\n" }), cr = await PN.command(["run", "--specs", "P/B/mn:0", "--out", "R", "--quiet"], refsOk.io);
+    ok("!! references and comparator records carry no recipe and are not 'stale': the run goes on (exit 0)", cr === 0 && refsOk.ran.length === 1);
+    const garbled = mem({ R: "not json\n" }), cg = await PN.command(["run", "--specs", "P/B/mn:0", "--out", "R", "--quiet"], garbled.io);
+    ok("!! a results file that is not JSON is an error naming the line (exit 1)", cg === 1 && /line 1 is not JSON/.test(garbled.errs.join()));
+    const badArg = mem(), cb = await PN.command(["run", "--specs", "nope", "--out", "R"], badArg.io);
+    ok("!! a bad argument is exit 2 with the reason, prefixed by the tool's name", cb === 2 && /^plainNetStudy: /.test(badArg.errs[0]));
+    const one = mem(), co = await PN.command(["run", "--one", "P/B/mg:1", "--quiet"], one.io);
+    ok("!! --one runs a single job and prints it as a RESULT line, writes no file and no references", co === 0 && one.log.length === 1 && /^RESULT \{"spec":"P\/B\/mg:1"/.test(one.log[0]) && J(one.ran) === J(["P/B/mg:1"]) && one.refsRan.length === 0 && Object.keys(one.files).length === 0);
+    const multi = mem(), spawned = [], cw = await PN.command(["run", "--specs", "P/B/mn:0-2,cmp:P/B/qns:0", "--out", "R", "--workers", "3", "--quiet"], { ...multi.io, spawner: async (s) => { spawned.push(PN.specName(s)); return multi.io.runner(s, { smoke: false, recipe: PN.RECIPE }); } });
+    ok("!! with more than one worker the jobs go to the spawner (one child each), the references are still made here, and every record is written", cw === 0 && spawned.length === 4 && multi.refsRan.length === 1 && multi.files.R.trim().split("\n").length === 5);
+    const solo = mem(), spawnedSolo = [], c1 = await PN.command(["run", "--specs", "P/B/mn:0-2", "--out", "R", "--workers", "1", "--quiet"], { ...solo.io, spawner: async (s) => { spawnedSolo.push(1); return {}; } });
+    ok("!! with one worker nothing is spawned", c1 === 0 && spawnedSolo.length === 0 && solo.ran.length === 3);
+    const rp = mem({ F: m.files.R }), cr1 = await PN.command(["report", "--in", "F"], rp.io), sf = mem({ F: JSON.stringify({ spec: "x", smoke: true }) + "\n" }), cr2 = await PN.command(["report", "--in", "F"], sf.io), cr3 = await PN.command(["report", "--in", "F", "--allow-smoke"], sf.io), nf = mem(), cr4 = await PN.command(["report", "--in", "none"], nf.io), ef = mem({ F: "" }), cr5 = await PN.command(["report", "--in", "F"], ef.io);
+    ok("!! report: prints the report of a file (exit 0); refuses a smoke file unless --allow-smoke (exit 1, naming the flag); a missing or an empty file is exit 1", cr1 === 0 && rp.log.length > 3 && cr2 === 1 && /--allow-smoke/.test(sf.errs.join()) && cr3 === 0 && cr4 === 1 && cr5 === 1 && /no records/.test(ef.errs.join()));
+    // two REAL child processes
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "plainnet-gate-")), outFile = path.join(tmp, "real.jsonl"), quiet = [];
+    try {
+        const t0 = Date.now(), code3 = await PN.command(["run", "--specs", "P/B/mn:0,cmp:P/B/qer:1", "--out", outFile, "--workers", "2", "--smoke", "--runs", "1", "--iters", "3", "--prune-budget", "3", "--quiet"], { out: (l) => quiet.push(l), err: (l) => quiet.push("ERR " + l) });
+        const recs = fs.readFileSync(outFile, "utf8").trim().split("\n").map((l) => JSON.parse(l));
+        ok("!! TWO REAL CHILD PROCESSES (one pilot, one comparator, smoke): the command spawns plainNetStudyCmd.mjs with --one for each, reads their RESULT lines, writes the references and both records, and prints the report", code3 === 0 && recs.length === 3 && recs[0].spec === "refs:NP" && recs.some((r) => r.spec === "P/B/mn:0" && r.family === "mn" && r.smoke === true && r.recipe.iters === 3) && recs.some((r) => r.spec === "cmp:P/B/qer:1" && r.reproduced.skipped === "smoke") && quiet.some((l) => /^THE PLAIN-NET CONTROL/.test(l)), `${((Date.now() - t0) / 1000).toFixed(1)} s`);
+        const one1 = JSON.parse(execFileSync(process.execPath, [path.join(path.dirname(new URL(import.meta.url).pathname), "plainNetStudyCmd.mjs"), "run", "--one", "P/B/mg:0", "--smoke", "--runs", "1", "--iters", "2", "--prune-budget", "2", "--quiet"], { encoding: "utf8" }).split("\n").find((l) => l.startsWith("RESULT ")).slice(7));
+        ok("!! the command-line file runs --one by itself: a RESULT line with the pilot's record (the 4-32-32-4 net, 1,348 weights)", one1.spec === "P/B/mg:0" && one1.weightCount === 1348 && one1.smoke === true && one1.recipe.iters === 2 && J(one1.widths) === J([32, 32]));
+        const pre = fs.readFileSync(outFile, "utf8"), rep2 = execFileSync(process.execPath, [path.join(path.dirname(new URL(import.meta.url).pathname), "plainNetStudyCmd.mjs"), "report", "--in", outFile, "--allow-smoke"], { encoding: "utf8" });
+        ok("!! and the command-line report prints a file's report (a partial smoke file: the 4b-E references are missing, said first, and the verdicts NOT READ)", /^THE PLAIN-NET CONTROL/.test(rep2) && /CHECK FAIL  REFERENCES 4b-E/.test(rep2) && /NOT READ/.test(rep2) && pre === fs.readFileSync(outFile, "utf8"));
+    } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+}
+
+sec("8. THE SOURCE");
+{
+    const code = fs.readFileSync(new URL("./plainNetStudy.mjs", import.meta.url), "utf8").split("\n").filter((l) => !l.trim().startsWith("//") && !l.trim().startsWith("*") && !l.trim().startsWith("/**")).join("\n");
+    ok("!! no Math.random and no clock (it reads files and starts processes, as the 4b trainer does, and nothing else)", !/Math\.random|Date\.now|new Date|performance\.now|fetch\(|node:net|node:http/.test(code));
+}
+
+console.log(fails ? `\n${fails} FAIL` : "\nall checks pass");
+finished = true;
+process.exitCode = fails ? 1 : 0;
