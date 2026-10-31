@@ -27,7 +27,7 @@ export const RECIPE = TR.RECIPE, AUDITS = TR.AUDITS, RANK_ALPHA = TR.RANK_ALPHA;
 export const CELLS = Object.freeze([["P", "B"], ["P", "whole"], ["E", "E"], ["E", "whole"]].map((c) => Object.freeze(c)));
 export const CELL_NAMES = Object.freeze(CELLS.map(([t, a]) => `${t}/${a}`));
 export const FAMILIES = Object.freeze({ mn: Object.freeze({ id: "mn", n: 8, offset: 0 }), mg: Object.freeze({ id: "mg", n: 4, offset: 8 }) });
-export const PER_CELL = 12, SEARCH_BASE = 79000, REAL_N = 4, REPRO_TOL = 1e-5;
+export const PER_CELL = 12, SEARCH_BASE = 79000, REAL_N = 4, REPRO_TOL = 1e-5, START_PROBE = 4;
 export const AUDIT_SEEDS = Object.freeze({ P: Object.freeze([[86001, 86020], [86021, 86040], [86041, 86060]]), E: Object.freeze([[88001, 88016], [88017, 88032], [88033, 88048]]) });
 export const REFS = Object.freeze({ P: "refs:NP", E: "refs:NE" });
 /** The comparators: the records they come from, per task, and the group names within them. */
@@ -106,7 +106,7 @@ export function runPilot(spec, opts = {}, log = () => {}) {
         log(`  ${name}: search ${k + 1}/${recipe.runs} (seed ${base + k}): ${r.moved} moved weights pruned to ${r.kept} (${r.pruneEvals} evaluations), train ${r.trainScore.toFixed(4)}, held-out ${held.score.toFixed(4)}, ended early ${held.early} (start ${startHeld.early}) ${held.early <= startHeld.early ? "eligible" : "NOT eligible"}`);
     }
     const eligible = runs.filter((r) => r.eligible).sort((a, b) => b.heldOut - a.heldOut || a.k - b.k), c = eligible[0] || null;
-    const champion = c ? Object.fromEntries(AUDITS.map((a) => [a, TR.summary(Pol.evaluate(c.weights, sets[a]))])) : null;
+    const champion = c ? Object.fromEntries(AUDITS.map((a) => [a, Pol.evaluate(c.weights, sets[a])])) : null;
     return { spec: name, task: spec.task, arm: spec.arm, family: spec.family, index: spec.index, smoke: !!opts.smoke, recipe, seedBase: base, initSeed: initSeedOf(spec), widths: Pol.widths, weightCount: Pol.WEIGHT_COUNT, reach: Pol.reach.pairs, scales, champion: c ? c.seed : null, asStart: !c, startHeldEarly: startHeld.early,
         searches: runs.map((r) => ({ k: r.k, seed: r.seed, trainScore: r.trainScore, heldOut: r.heldOut, heldEarly: r.heldEarly, eligible: r.eligible, improved: r.improved, neutral: r.neutral, moved: r.moved, kept: r.kept })),
         movement: c ? { moved: c.moved, kept: c.kept, largest: Math.max(...Array.from(c.weights, (v, i) => Math.abs(v - hand[i]))) } : null, scores: { champion }, weights: c ? Array.from(c.weights, (v) => Math.round(v * 1e6) / 1e6) : null };
@@ -133,24 +133,24 @@ export function flyComparator(job, opts = {}) {
     if (!rec.weights) return { ...head, weightCount: null, reproduced: { ok: true, maxDiff: 0, asStart: true, recorded: null, refly: null }, scores: { champion: null } };
     const Pol = TR.policyOf({ task: job.task, arm: job.arm, family: job.group, index: job.index }, rec.scales), w = Float32Array.from(rec.weights);
     if (Pol.WEIGHT_COUNT !== rec.weights.length) throw new Error(`plainNetStudy.flyComparator: ${sourceSpec(job)} has ${rec.weights.length} weights in its record and ${Pol.WEIGHT_COUNT} in the rebuilt pilot`);
-    const gen = TR.replGenOf(rec.family), original = TR.setsOf(job.task, { smoke: !!opts.smoke, replicate: gen === 1 ? true : gen }), fresh = opts.sets || setsFor(job.task, { smoke: !!opts.smoke });
+    const fresh = opts.sets || setsFor(job.task, { smoke: !!opts.smoke });
     let reproduced;
     if (opts.smoke) reproduced = { ok: null, maxDiff: null, skipped: "smoke", recorded: null, refly: null };
     else {
-        const recorded = Object.fromEntries(AUDITS.map((a) => [a, rec.scores.champion[a].score])), refly = Object.fromEntries(AUDITS.map((a) => [a, Pol.evaluate(w, original[a]).score])), maxDiff = Math.max(...AUDITS.map((a) => Math.abs(refly[a] - recorded[a])));
+        const original = TR.setsOf(job.task, { replicate: TR.replGenOf(rec.family) }), recorded = Object.fromEntries(AUDITS.map((a) => [a, rec.scores.champion[a].score])), refly = Object.fromEntries(AUDITS.map((a) => [a, Pol.evaluate(w, original[a]).score])), maxDiff = Math.max(...AUDITS.map((a) => Math.abs(refly[a] - recorded[a])));
         reproduced = { ok: maxDiff <= REPRO_TOL, maxDiff, recorded, refly };
     }
-    return { ...head, weightCount: Pol.WEIGHT_COUNT, reproduced, scores: { champion: Object.fromEntries(AUDITS.map((a) => [a, TR.summary(Pol.evaluate(w, fresh[a]))])) } };
+    return { ...head, weightCount: Pol.WEIGHT_COUNT, reproduced, scores: { champion: Object.fromEntries(AUDITS.map((a) => [a, Pol.evaluate(w, fresh[a])])) } };
 }
 
 // ---- the references record ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 /** The autopilot alone on this round's audits, the 4b task re-check on the training dives, and the START CHECK of every plain-net pilot of the task's cells (the untrained pilot scores the autopilot on four training dives). */
 export function refsRecord(task, opts = {}) {
     const sets = opts.sets || setsFor(task, { smoke: !!opts.smoke }), scales = opts.scales || TR.scalesOf(sets.train), arms = CELLS.filter((c) => c[0] === task).map((c) => c[1]);
-    const rec = TR.refsRecord(task, { sets, scales, smoke: !!opts.smoke, policyOf: (spec, sc) => P.createPlainNetPolicy([P.matchedHidden(noStateCount(spec.arm))], "start", { scales: sc, evaluate: (pilot, set) => TR.evalDives(pilot, set) }) });
-    const probe = sets.train.slice(0, 4), want = TR.evalDives(AS.pilot(), probe).score;
+    const rec = TR.refsRecord(task, { sets, scales, smoke: !!opts.smoke }), mk = opts.policyOf || policyOf;
+    const probe = sets.train.slice(0, START_PROBE), want = TR.evalDives(AS.pilot(), probe).score;
     rec.spec = REFS[task]; rec.audits = AUDIT_SEEDS[task];
-    rec.startCheck = arms.flatMap((arm) => Object.keys(FAMILIES).map((family) => { const Pol = policyOf({ kind: "pilot", task, arm, family, index: 0 }, scales), got = Pol.evaluate(Pol.handWeights(), probe).score; return { arm: `${arm}/${family}`, same: got === want || Math.abs(got - want) < 1e-9 }; }));
+    rec.startCheck = arms.flatMap((arm) => Object.keys(FAMILIES).map((family) => { const Pol = mk({ kind: "pilot", task, arm, family, index: 0 }, scales), got = Pol.evaluate(Pol.handWeights(), probe).score; return { arm: `${arm}/${family}`, same: got === want || Math.abs(got - want) < 1e-9 }; }));
     return rec;
 }
 
@@ -159,7 +159,7 @@ const eff = (rec, refs) => TR.effectiveOf(rec, refs);
 const stats = (v) => ({ mean: meanOf(v), sd: sdOf(v), min: Math.min(...v), max: Math.max(...v), n: v.length });
 const readingOf = (b) => (b.margin > b.needs ? "ahead" : b.margin < -b.needs ? "behind" : "tie");
 /** The members of a group in a cell, by index: pilots by family, comparators by group. */
-const members = (recs, cell, g) => recs.filter((r) => `${r.task}/${r.arm}` === cell && (r.family === "cmp" ? r.group === g : r.family === g)).sort((a, b) => a.index - b.index);
+const members = (recs, cell, g) => recs.filter((r) => `${r.task}/${r.arm}` === cell && (r.family === "cmp" ? r.group === g : r.family === g));
 /**
  * The reading of one cell from its records and its task's references record: validity, the registered test, the margin view, the share kept, the decomposition (4b-P), and every other group's mean beside. Never throws on a partial file: a cell without its 4 REAL and 8 MN circuits is INCOMPLETE and not assessed.
  */
@@ -216,7 +216,7 @@ export function reportLines(records) {
     L.push(`${pilots.length} of ${pilotJobs().length} plain-net pilots and ${records.filter((r) => r.family === "cmp").length} of ${comparatorJobs().length} comparators in the file`);
     for (const r of checks.rows) L.push(`  CHECK ${r.ok ? "PASS" : "FAIL"}  ${r.name}: ${r.text}`);
     if (!checks.ok) { L.push("A CHECK FAILED: it is stated above and the verdicts below are NOT READ."); return L; }
-    const cells = CELL_NAMES.map((cell) => cellReading(cell, records.filter((r) => r.family !== "refs"), refsBy[cell[0]]));
+    const cells = CELL_NAMES.map((cell) => cellReading(cell, records, refsBy[cell[0]]));
     for (const c of cells) {
         L.push(`CELL ${c.cell}: ${c.status}`);
         if (!c.audits.length) continue;
@@ -278,16 +278,20 @@ export async function command(argv, io = {}) {
     for (const t of tasks) if (!done.has(REFS[t])) { keep((io.refsRunner || refsRecord)(t, opts)); log(`[plainNetStudy] references for 4b-${t} done`); }
     const spawner = io.spawner || ((spec) => runChild(spec, o)), queue = [...todo.filter((s) => s.kind === "pilot"), ...todo.filter((s) => s.kind === "cmp")];
     const worker = async () => { while (queue.length) { const s = queue.shift(), rec = o.workers > 1 ? await spawner(s) : runJob(s, o.quiet ? () => {} : (m) => log(m)); keep(rec); log(`[plainNetStudy] ${specName(s)} done${s.kind === "cmp" ? (rec.reproduced.ok === false ? " (DOES NOT REPRODUCE)" : "") : rec.asStart ? " (no eligible champion)" : " (champion seed " + rec.champion + ")"}`); } };
-    await Promise.all(Array.from({ length: Math.max(1, Math.min(o.workers, queue.length || 1)) }, worker));
+    try { await Promise.all(Array.from({ length: Math.max(1, Math.min(o.workers, queue.length || 1)) }, worker)); } catch (e) { err("plainNetStudy: " + e.message + " (the records finished so far are in " + o.out + "; run the same command again to resume)"); return 1; }
     for (const l of reportLines(records)) out(l);
     return 0;
 }
-/** One job in a child process (this command with --one): resolves the record. */
-function runChild(spec, o) {
+/** One job in a child process (this command with --one; `script` is for the gate): resolves the record. */
+export function runChild(spec, o, script = path.join(HERE, "plainNetStudyCmd.mjs")) {
     return new Promise((resolve, reject) => {
-        const args = [path.join(HERE, "plainNetStudyCmd.mjs"), "run", "--one", specName(spec), "--runs", String(o.recipe.runs), "--iters", String(o.recipe.iters), "--sigma", String(o.recipe.sigma), "--maxK", String(o.recipe.maxK), "--prune-budget", String(o.recipe.pruneBudget), "--rig-dir", o.rigDir, "--quiet", ...(o.smoke ? ["--smoke"] : [])];
+        const args = [script, "run", "--one", specName(spec), "--runs", String(o.recipe.runs), "--iters", String(o.recipe.iters), "--sigma", String(o.recipe.sigma), "--maxK", String(o.recipe.maxK), "--prune-budget", String(o.recipe.pruneBudget), "--rig-dir", o.rigDir, "--quiet", ...(o.smoke ? ["--smoke"] : [])];
         const p = spawn(process.execPath, args, { stdio: ["ignore", "pipe", "inherit"] }); let buf = "";
         p.stdout.on("data", (d) => { buf += d; }); p.on("error", reject);
-        p.on("close", (code) => { const line = buf.split("\n").find((l) => l.startsWith("RESULT ")); if (!line) reject(new Error(`child for ${specName(spec)} ended with ${code} and no RESULT`)); else resolve(JSON.parse(line.slice(7))); });
+        p.on("close", (code) => {
+            const line = buf.split("\n").find((l) => l.startsWith("RESULT "));
+            if (!line) return reject(new Error(`child for ${specName(spec)} ended with ${code} and no RESULT`));
+            try { resolve(JSON.parse(line.slice(7))); } catch (e) { reject(new Error(`child for ${specName(spec)} printed a RESULT that is not JSON: ${e.message}`)); }
+        });
     });
 }
