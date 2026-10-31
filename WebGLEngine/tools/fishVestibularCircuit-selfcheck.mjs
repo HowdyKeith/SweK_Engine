@@ -137,5 +137,8 @@ sec("5. THE REAL TABLES (every number the registration quotes)");
 }
 function CLASS_COUNTS(f) { return Object.fromEntries(F.CLASS_ORDER.map((c) => [c, f.byClass[c].cells])); }
 
+sec("9. THREE CONSTANTS THE EXTRACTION IS BUILT ON (named here so the definition ratchet can see them)");
+ok("!! CLASSES are the five cell classes in the order the pilot reads them (vestibular, superior vestibular nucleus, tangential, commissural, Mauthner); FEATURES is the 14 the tuning gives; MYELINATED_RE names the sixteen anterior-macula afferents 01-16 and no other", F.CLASSES.length === 5 && F.CLASSES[4][1] === "Mauthner" && F.FEATURES === 14 && F.MYELINATED_RE.test("Ear_AnteriorMacula_R_05") && F.MYELINATED_RE.test("Ear_AnteriorMacula_R_16") && !F.MYELINATED_RE.test("Ear_AnteriorMacula_R_17") && !F.MYELINATED_RE.test("Ear_AnteriorMacula_R_00"));
+
 console.log(fails ? `\n${fails} FAIL` : "\nall checks pass");
 finished = true;

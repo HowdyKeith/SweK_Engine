@@ -2591,6 +2591,19 @@ export const INSTRUMENTS = [
       measures: "PIECE 4 OF THE NEEDS-AND-LIMITS IDEA, AS REGISTERED IN brain/NEEDS_AND_LIMITS.md (\"Round 3\" and its Amendments 1 and 2, written before any of this): the survey run (brain/needsTask.mjs) flown by a pilot whose decisions come from a circuit with memory (brain/pilotNeedsCircuit.mjs), the real heading loop against its controls and against the hand-written rules.",
       key: "THE VERDICTS (registered, section 8): a pilot A beats B on an audit iff mean(A) - mean(B) > max(0.02, 2 sd of B's family). WIRING: PASS iff cx beats ER, TYPE-BLOCK and DEGREE on all three audits. (lifted from the module's own header)",
       gate: "tools/ship/trainNeedsCircuit-selfcheck.mjs" },
+    // v4906 -- three more modules written to be READ as well as checked (a reportLines beside the gate), registered at the round they arrived: the advisor chip study, the Round 5 language-model audit and the rung 4b trainer. Each `measures` and `key` is taken from the module's own header paragraph, as the v4905 entry was.
+    { id: "advisor-chip-study", page: "instrument-bench.html", name: "THE ADVISOR CHIP TEST, AS REGISTERED IN brain/NEEDS_AND_LIMITS.md (\"Round 4\")", area: "brain",
+      measures: "THE ADVISOR CHIP TEST, AS REGISTERED IN brain/NEEDS_AND_LIMITS.md (\"Round 4\" and its Amendment 1, written before any of this): the champions Round 3 trained flown ALONE and with an advisor beside them (GUARDED, and GUARDED-FILTER for scale) in the modes of brain/advisorChip.mjs, on FRESH audits (seeds 111-162), then graded by the registered rules. Nothing is trained and nothing is selected on the audits. (lifted from the module's own header)",
+      key: "A pilot A beats B on an audit iff the paired mean difference exceeds max(0.02, 2 se) (the same dives); the family comparison uses the sd of the family's effects, as Round 3. (lifted from the module's own header)",
+      gate: "tools/ship/advisorChipStudy-selfcheck.mjs" },
+    { id: "advisor-llm-audit", page: "instrument-bench.html", name: "THE LANGUAGE-MODEL CHIP, ROUND 5 (brain/NEEDS_AND_LIMITS.md)", area: "brain",
+      measures: "THE LANGUAGE-MODEL CHIP, ROUND 5 (brain/NEEDS_AND_LIMITS.md, registered BEFORE this file existed and before any reserved seed was flown): a local language model in the Round 4 socket (the VETO combination) beside the brain GUARDED-OBS, flown on the seeds RESERVED for it (171-182, 191-202, 211-222; four kinds; 48 dives each) and read against ALONE, three FIXED DEPTH CAPS (0.50, 0.65, 0.75) and the two rule advisors, on the SAME dives. (lifted from the module's own header)",
+      key: "A model has to beat the best fixed cap, per audit, to be credited with reading the situation: A beats B on an audit iff the paired mean difference exceeds max(0.02, 2 se). (lifted from the module's own header)",
+      gate: "tools/ship/advisorLlmAudit-selfcheck.mjs" },
+    { id: "train-sub-vestibular", page: "instrument-bench.html", name: "RUNG 4b: THE TRAINER AND THE VERDICTS, AS REGISTERED IN brain/FISH_VESTIBULAR_HELPER_WIP.md", area: "brain",
+      measures: "RUNG 4b: THE TRAINER AND THE VERDICTS, AS REGISTERED IN brain/FISH_VESTIBULAR_HELPER_WIP.md (Addenda 1, 2, 5 and 7, all written before any training): it trains the pilots of brain/pilotSubVestibular.mjs on the two tasks of tools/subVestibularTasks.mjs and grades each (task, arm) cell by rung 3's rule; addenda 9 to 13 add the reported, not judged, lower-lambda, replicate, wiring and escape studies on their own fresh audits. (lifted from the module's own header)",
+      key: "Rung 3's rule: F beats a control family on an audit iff mean(F) - mean(family) > max(0.02, 2 sd of the family); a verdict cell PASSES iff cx beats ER, class-block and degree controls on all three audits. (lifted from the module's own header)",
+      gate: "tools/ship/trainSubVestibular-selfcheck.mjs" },
 ];
 
 export const AREAS = [...new Set(INSTRUMENTS.map((i) => i.area))];

@@ -196,5 +196,16 @@ sec("7. THE DIVES (real flights, one BASELINE dive for each audit slot: the fres
     ok("!! the four identity checks run and are all the same (null advisor, a copy of the brain, GUARDED by GUARDED, GUARDED-FILTER by itself)", idn.length === 4 && idn.every((x) => x.same === true));
 }
 
+sec("8. THE EXPORTS THE OTHER SECTIONS REACH ONLY THROUGH THE COMMAND (named here so the definition ratchet can see them)");
+{
+    const rec = { arms: { ALONE: {}, "GUARDED:VETO": {} } };
+    for (const a of A.ADV_AUDIT_NAMES) { rec.arms.ALONE[a] = { runs: [{ score: 0.2 }, { score: 0.4 }, { score: 0.6 }] }; rec.arms["GUARDED:VETO"][a] = { runs: [{ score: 0.5 }, { score: 0.7 }, { score: 0.9 }] }; }
+    const e = S.effectOf(rec, "GUARDED");
+    ok("!! effectOf: the chip effect of a circuit is the paired VETO minus ALONE per audit: +0.3 on each of the three audits, sign +1 (a win by the margin rule)", A.ADV_AUDIT_NAMES.every((a) => Math.abs(e[a].diff - 0.3) < 1e-9 && e[a].sign === 1));
+    const stub = () => ({ seatFor: (w) => ({ w }), handWeights: () => "HAND" });
+    ok("!! brainSeatOf: the champion's weights are the brain; with no champion the brain is the untrained start (the hand weights, GUARDED-OBS exactly)", S.brainSeatOf({}, {}, null, stub).w === "HAND" && S.brainSeatOf({}, {}, { weights: [1] }, stub).w[0] === 1);
+    ok("!! armFactory builds a pilot factory from a brain seat and an arm (ALONE with no advisor, VETO with GUARDED), and CHIP_MODES are the Round 4 modes without ALONE", typeof S.armFactory(() => () => ({}), { adv: null, mode: "ALONE" }) === "function" && typeof S.armFactory(() => () => ({}), { adv: "GUARDED", mode: "VETO" }) === "function" && JSON.stringify(S.CHIP_MODES) === JSON.stringify(A.MODES.filter((m) => m !== "ALONE")));
+}
+
 console.log(fails ? `\n${fails} FAIL` : "\nall checks pass");
 finished = true;

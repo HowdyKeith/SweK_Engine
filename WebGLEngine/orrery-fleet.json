@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "ae4fb1e66aaa1162d23b98d6d330880cca63634e",
+ "head": "86ce37b7a3b05e186e50553d7eb649916b3b8971",
  "bodies": {
   "box3d": [
    {
@@ -330,8 +330,8 @@
    },
    {
     "path": "sub-aquarium.html",
-    "bytes": 39240,
-    "sha": "cecc622dcf598eaa920957e6db533a8599d57546"
+    "bytes": 40615,
+    "sha": "0fa44c1d032de7c5e4b9552738fca5e4693e1eaa"
    },
    {
     "path": "tools/flyCx.mjs",
@@ -340,8 +340,8 @@
    },
    {
     "path": "tools/ship/trainNeedsCircuit.mjs",
-    "bytes": 32433,
-    "sha": "6661aeb91eb0011f06707e62784b9b98c66b5b40"
+    "bytes": 33594,
+    "sha": "c1ec0cb0c471b04d1bfdcc8687c04f77a95f2617"
    },
    {
     "path": "tools/ship/trainSubState-selfcheck.mjs",
@@ -860,8 +860,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 3716228,
-    "sha": "cecc622dcf598eaa920957e6db533a8599d57546"
+    "bytes": 3721569,
+    "sha": "1f9f183a7bcf0e6068e41dffe184ea0e34b4769b"
    },
    {
     "path": "mpm3d.html",
@@ -975,8 +975,8 @@
    },
    {
     "path": "sub-aquarium.html",
-    "bytes": 39240,
-    "sha": "cecc622dcf598eaa920957e6db533a8599d57546"
+    "bytes": 40615,
+    "sha": "0fa44c1d032de7c5e4b9552738fca5e4693e1eaa"
    },
    {
     "path": "svg-forge.html",
@@ -1661,6 +1661,12 @@
     "sha": "199e650941fe3b2c1e2fb815cfd4f798192f2f46"
    }
   ],
-  "zebrafish-vestibular": []
+  "zebrafish-vestibular": [
+   {
+    "path": "tools/fishVestibularCircuit.mjs",
+    "bytes": 15553,
+    "sha": "36295e5cc40b03935bc3b050ee89612a99ee88dd"
+   }
+  ]
  }
 }

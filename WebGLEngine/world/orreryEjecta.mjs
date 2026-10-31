@@ -686,7 +686,10 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
         "sub-aquarium.html",
     ]),
     // v4898 -- vendor/zebrafish-vestibular is a PAPER-ONLY body: the supplementary files of an article, read by no source file (dependantsOf returns []), which is a measurement and not an omission.
-    "zebrafish-vestibular": Object.freeze([]),
+    // v4906 -- ONE DEPENDANT ARRIVED: tools/fishVestibularCircuit.mjs reads the supplementary spreadsheets (the rung 4b extraction), so the body is no longer reached by nothing. It is still DATA and holds no code on disk.
+    "zebrafish-vestibular": Object.freeze([
+        "tools/fishVestibularCircuit.mjs",
+    ]),
     // vendor/mikktspace is xatlas's shape: a C reference oracle, compiled on demand by its one dependant to grade
     // physics/mesh/mikktSpace.mjs. The substring rule sees NONE -- the path is built with path.join -- which is the
     // v4410 case this record exists for, and the positional rule's `joined` kind is what finds it.

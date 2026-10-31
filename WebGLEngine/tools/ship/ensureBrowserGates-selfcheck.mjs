@@ -105,6 +105,9 @@ sec("7. THE SOURCE");
     ok("!! the command file imports command from the library, sets the exit code, and has no exports", /import \{ command \} from "\.\/ensureBrowserGates\.mjs"/.test(cmdSrc) && /process\.exitCode = command\(process\.argv\.slice\(2\)\)/.test(cmdSrc) && !/^export /m.test(cmdSrc));
 }
 
+sec("8. WHERE THE SETTING IS READ FROM (named here so the definition ratchet can see it)");
+ok("!! PREFS_FILE is the engine's own auto-install file, ~/.voxelbridge/autoinstall.json, the one ai-bridge/autoInstall.js writes", /\.voxelbridge[\\/]autoinstall\.json$/.test(E.PREFS_FILE));
+
 console.log(fails ? `\n${fails} FAIL` : "\nall checks pass");
 finished = true;
 process.exitCode = fails ? 1 : 0;

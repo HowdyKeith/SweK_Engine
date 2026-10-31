@@ -157,6 +157,10 @@ export const FORMATTERS = Object.freeze([
     "tools/ship/subEstimatorStudyV4.mjs",
     "tools/ship/subEstimatorStudyV5.mjs",
     "tools/ship/trainNeedsCircuit.mjs",
+    // v4906 -- THREE ARRIVALS, found by this gate reading 22 formatters against 19 registered and each confirmed by CALLING it bare: the advisor chip study, the Round 5 language-model audit and the rung 4b trainer; each refuses.
+    "tools/ship/advisorChipStudy.mjs",
+    "tools/ship/advisorLlmAudit.mjs",
+    "tools/ship/trainSubVestibular.mjs",
 ]);
 
 // *** AND Function.length CANNOT TELL THE LAST TWO FROM THE FIRST FOUR EITHER, WHICH IS THE THIRD INSTRUMENT
@@ -215,6 +219,10 @@ export const STRICT_FORMATTERS = Object.freeze([
     "tools/ship/subEstimatorStudyV4.mjs",
     "tools/ship/subEstimatorStudyV5.mjs",
     "tools/ship/trainNeedsCircuit.mjs",
+    // v4906 -- THREE ARRIVALS, found by this gate reading 22 formatters against 19 registered and each confirmed by CALLING it bare: the advisor chip study, the Round 5 language-model audit and the rung 4b trainer; each refuses.
+    "tools/ship/advisorChipStudy.mjs",
+    "tools/ship/advisorLlmAudit.mjs",
+    "tools/ship/trainSubVestibular.mjs",
 ]);
 export const TOLERANT_FORMATTERS = Object.freeze([
     "tools/roundhouse/curriculum.mjs",

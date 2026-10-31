@@ -966,8 +966,9 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4901 -- the Sea OGRE round on the merged tree (the FSR4 branch and the rung 4a line included): gates 2146 -> 2170, usesOk 2125 -> 2149, definesOk 2117 -> 2141, distinctDefinitions 46 -> 47, nameFirst 2015 -> 2039, read off the code's own report.
     // v4904 -- one more, physics/mechanics/subNeeds-selfcheck.mjs (the submarine's needs and limits), defining ok(l, c, n) once and naming first: gates 2170 -> 2171, usesOk 2149 -> 2150, definesOk 2141 -> 2142, nameFirst 2039 -> 2040, read off the code's own report.
     // v4905 -- seven more, the survey run, the piece 4 pilot, the rung 4a v4 and v5 libraries and the piece 4 trainer, each defining ok(name, cond, detail) once and naming first: gates 2171 -> 2178, usesOk 2150 -> 2157, definesOk 2142 -> 2149, nameFirst 2040 -> 2047, read off the code's own report.
-    gates: 2178, usesOk: 2157, definesOk: 2149, importsOk: 0,
-    distinctDefinitions: 47, nameFirst: 2047, condFirst: 99, unknownSignature: 11,
+    // v4906 -- ten more, the advisor chip, its study, the recorded-decision seat, the live adapter, the local-model tool, the browser-gates installer, the language-model audit, the vestibular extraction, pilot and trainer, each defining ok(name, cond, detail) once and naming first: gates 2178 -> 2188, usesOk 2157 -> 2167, definesOk 2149 -> 2159, nameFirst 2047 -> 2057, read off the code's own report.
+    gates: 2188, usesOk: 2167, definesOk: 2159, importsOk: 0,
+    distinctDefinitions: 47, nameFirst: 2057, condFirst: 99, unknownSignature: 11,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

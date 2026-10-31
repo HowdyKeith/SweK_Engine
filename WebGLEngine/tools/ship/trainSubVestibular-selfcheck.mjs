@@ -569,6 +569,12 @@ sec("9. THE SOURCE");
     ok("!! the command file is three lines that import command from the library and set the exit code", /import \{ command \} from "\.\/trainSubVestibular\.mjs"/.test(cmd) && /process\.exitCode = await command\(process\.argv\.slice\(2\)\)/.test(cmd));
 }
 
+sec("16. THE EXPORTS THE VERDICT AND THE COMMAND REACH ONLY THROUGH THEIR OWN LINES (named here so the definition ratchet can see them)");
+{
+    ok("!! the reading functions return nothing without their references record (denseReading, lambdaReading, replicateReading, groupReading) and wiringAtLowStart of nothing is nothing", L.lambdaReading({}, null).length === 0 && L.replicateReading({}, null).length === 0 && L.groupReading({}, null, 2).rows.length === 0 && L.groupReading({}, null, 3).cells.length === 0 && L.wiringAtLowStart([]).length === 0 && typeof L.denseReading === "function");
+    ok("!! the families and cells the studies are written over: REPL_FAMILIES rl50 / rl70 / rns, CTRL50_FAMILIES er50 / cl50 / dg50, the stage A cell is cx + nostate + 10 each of ER, class and degree + 4 each of count and tuning, stage B is ER, class and degree 10-19, the registered comparisons of generations 2 and 3, and the rank line 0.05", J(L.REPL_FAMILIES) === J(["rl50", "rl70", "rns"]) && J(L.CTRL50_FAMILIES) === J(["er50", "cl50", "dg50"]) && L.STAGE_A_CELL === "cx,nostate,er:0-9,class:0-9,degree:0-9,count:0-3,tuning:0-3" && L.STAGE_B_CELL === "er:10-19,class:10-19,degree:10-19" && J(L.GEN_COMPARE[2]) === J([["qns", "qer"], ["qns", "qcl"], ["qns", "qdg"]]) && J(L.GEN_COMPARE[3]) === J([["el99", "ens"], ["el50", "ens"], ["el50", "el99"]]) && L.RANK_ALPHA === 0.05);
+}
+
 console.log(fails ? `\n${fails} FAIL` : "\nall checks pass");
 finished = true;
 process.exitCode = fails ? 1 : 0;

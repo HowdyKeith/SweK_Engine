@@ -207,5 +207,8 @@ sec("6. THE SOURCE");
 }
 
 fs.rmSync(tmp, { recursive: true, force: true });
+sec("7. TWO CONSTANTS THE COMMAND READS (named here so the definition ratchet can see them)");
+ok("!! DEFAULT_TIMEOUT_MS is two minutes a call, and DIVE_KINDS are the survey run's four kinds (plain, deep, far, both)", L.DEFAULT_TIMEOUT_MS === 120000 && J(L.DIVE_KINDS) === J(T.KINDS) && J(L.DIVE_KINDS) === J(["plain", "deep", "far", "both"]));
+
 console.log(fails ? `\n${fails} FAIL` : "\nall checks pass");
 finished = true;

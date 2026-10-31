@@ -133,6 +133,14 @@ sec("10. THE SOURCE");
     ok("!! the command file imports command from the library, sets the exit code, and has no exports", /import \{ command \} from "\.\/localModel\.mjs"/.test(cmd) && /process\.exitCode = await command\(process\.argv\.slice\(2\)\)/.test(cmd) && !/^export /m.test(cmd));
 }
 
+sec("10. THE EXPORTS THE COMMAND REACHES ONLY THROUGH ITS OWN LINES (named here so the definition ratchet can see them)");
+{
+    const p = M.SMOKE_PROMPT();
+    ok("!! SMOKE_PROMPT is the real advisor prompt of one fixed situation (schema 1, the reply format named, three stations), the same text every time", /prompt schema 1/.test(p) && /Reply with ONE json object/.test(p) && (p.match(/^station \d/gm) || []).length === 3 && p === M.SMOKE_PROMPT());
+    const sys = { ramGb: 16, vramGb: 8, gpu: "GTX 1080", platform: "win32" }, pick = M.pickModel(sys), l = M.statusLines({ sys, pick, ollama: { haveOllama: true, running: true, installed: [pick.model.tag], why: null }, split: M.installedSplit([pick.model.tag]), plan: [] });
+    ok("!! statusLines: five lines (machine, ollama, choice with its reason, the way there, the next command); with the model already pulled and ollama answering it says nothing is to install", l.length === 5 && /GTX 1080, 8 GB video memory/.test(l[0]) && /installed and answering/.test(l[1]) && l[2].includes(pick.model.tag) && /nothing to install/.test(l[3]) && /advisorLiveCmd\.mjs record/.test(l[4]));
+}
+
 console.log(fails ? `\n${fails} FAIL` : "\nall checks pass");
 finished = true;
 process.exitCode = fails ? 1 : 0;

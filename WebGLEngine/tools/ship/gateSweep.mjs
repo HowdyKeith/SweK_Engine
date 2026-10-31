@@ -16219,6 +16219,13 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
         widened: Object.freeze([]),
         verdict: "the survey run and its references (23 + validity + 60 pinned fingerprints), the piece 4 pilot (38 mutants), the rung 4a v4 and v5 libraries (37 and 33 mutants) and the piece 4 trainer (47 mutants, 15 of which went 0 red on the first pass and each became a row); each run alone and green, 8 to 13 s each, the trainer's 9 s; subNeeds-selfcheck grew rows this round and is in v4904's closing, not this one.",
     }),
+    since616: Object.freeze({
+        at: "v4906", swept: 10, green: 10, red: 0,
+        added: Object.freeze(["brain/advisorChip-selfcheck.mjs", "brain/advisorTranscript-selfcheck.mjs", "brain/pilotSubVestibular-selfcheck.mjs", "tools/fishVestibularCircuit-selfcheck.mjs", "tools/ship/advisorChipStudy-selfcheck.mjs", "tools/ship/advisorLive-selfcheck.mjs", "tools/ship/advisorLlmAudit-selfcheck.mjs", "tools/ship/ensureBrowserGates-selfcheck.mjs", "tools/ship/localModel-selfcheck.mjs", "tools/ship/trainSubVestibular-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "the advisor chip (30 mutants) and its study (48), the recorded-decision seat (42), the live adapter (101), the local-model tool (80), the browser-gates installer (54), the Round 5 audit (104, 23 of which first read 0 red and drove new rows), the vestibular extraction (48), pilot (157) and trainer (about 410 over addenda 7 to 13); each run alone and green on the final tree (0.1 to 17 s, the trainer 14.7 s and the Round 5 audit 16.8 s alone, the latter two killed at the 20 s cap when 8 run at once and green when re-run alone); the definition ratchets were PAID DOWN by naming 23 exports in their gates' rows, not raised"
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
