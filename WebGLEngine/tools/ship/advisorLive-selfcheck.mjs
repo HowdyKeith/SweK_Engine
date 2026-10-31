@@ -140,6 +140,7 @@ sec("5. THE RUN (real flights; a scripted model as the command)");
     logs.length = 0;
     const c1 = await L.command([...base, "--out", out], io), tr = X.parseTranscript(fs.readFileSync(out, "utf8")), log1 = fs.readFileSync(out + ".calls.jsonl", "utf8").split("\n").filter(Boolean);
     ok("!! record flies the dive twice (brain alone, brain advised), writes the transcript (header: the model id and the delay of 600 ticks) and the calls log (one line per answer), and prints the rows with the practice-run caveat", c1 === 0 && tr.header.model.id === "scripted-1" && tr.header.every === 600 && tr.entries.size > 0 && tr.entries.size <= 30 && log1.length === tr.entries.size && logs.some((m) => /far\s+501\s+brain alone [\d.]+\s+advised [\d.]+/.test(m)) && logs.some((m) => /A PRACTICE RUN/.test(m)) && logs.some((m) => new RegExp(`model calls ${tr.entries.size}`).test(m)));
+    const recorded = logs.map((m) => /far\s+501\s+brain alone ([\d.]+)\s+advised ([\d.]+)/.exec(m)).find(Boolean);
     const e0 = errs.length, c2 = await L.command([...base, "--out", out], io);
     ok("!! a transcript is not overwritten: the same --out again is refused (exit 1) and says so", c2 === 1 && errs.length === e0 + 1 && /already exists/.test(errs[e0]));
     const out2 = path.join(tmp, "t2.jsonl"); fs.copyFileSync(out + ".calls.jsonl", out2 + ".calls.jsonl"); logs.length = 0;
@@ -148,8 +149,7 @@ sec("5. THE RUN (real flights; a scripted model as the command)");
     logs.length = 0; const c4 = await L.command(["replay", "--in", out, "--seeds", "501", "--kinds", "far"], io), row = (m) => /far\s+501\s+brain alone ([\d.]+)\s+advised ([\d.]+)/.exec(m);
     const recRow = logs.length ? null : null;
     ok("!! replay reproduces the recorded run's scores with NO model (it is given none and could not call one), printing 'model calls 0'", c4 === 0 && logs.some((m) => /model calls 0/.test(m)) && (() => { const r = logs.map(row).find(Boolean); const first = fs.readFileSync(out, "utf8"); return !!r && first.length > 0; })());
-    const outA = path.join(tmp, "ta.jsonl"); logs.length = 0; await L.command([...base.slice(0, 7), "--seeds", "501", "--kinds", "far", "--every", "600", "--out", outA], io);
-    const recorded = logs.map((m) => /far\s+501\s+brain alone ([\d.]+)\s+advised ([\d.]+)/.exec(m)).find(Boolean); logs.length = 0; await L.command(["replay", "--in", outA, "--seeds", "501", "--kinds", "far"], io); const replayed = logs.map((m) => /far\s+501\s+brain alone ([\d.]+)\s+advised ([\d.]+)/.exec(m)).find(Boolean);
+    const replayed = logs.map((m) => /far\s+501\s+brain alone ([\d.]+)\s+advised ([\d.]+)/.exec(m)).find(Boolean);   // v4906: the row of the replay just above, against the record of the first run -- one flight pair fewer on a box that spawns slowly
     ok("!! the replayed rows are the recorded rows to three decimals (brain alone and advised)", !!recorded && !!replayed && recorded[1] === replayed[1] && recorded[2] === replayed[2]);
     const e1 = errs.length, c5 = await L.command(["replay", "--in", out, "--seeds", "502", "--kinds", "deep"], io);
     ok("!! replaying that transcript on another dive is refused (a missing situation), exit 1, not answered", c5 === 1 && errs.length === e1 + 1 && /no recorded answer/.test(errs[e1]));
