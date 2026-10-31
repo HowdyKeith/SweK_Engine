@@ -20,7 +20,7 @@ import { FlowFieldSolverCPU } from "./flowfieldCpu.js";
 export const REGION = Object.freeze({ x0: -40, x1: 440, y0: -140, y1: 140 });
 export const CELL = 5, GRID_W = 96, GRID_H = 56;
 export const HULL_HALF = 4, MARGIN = 6;   // MARGIN 6 m is the REGISTERED margin beyond the half-hull (brain/SUB_FIELD_NAV_WIP.md); Amendment 1 sweeps it on the DEV set (MARGINS)
-export const ROUTE_MARGIN = MARGIN, MARGINS = Object.freeze([6, 12, 18, 24, 30, 36]);   // the scenario generator guarantees a route at ROUTE_MARGIN; a wider margin may close a gap, and the field then says so
+export const ROUTE_MARGIN = MARGIN, MARGINS = Object.freeze([6, 12, 18, 24, 30, 36]);   // a route exists at ROUTE_MARGIN for every seed measured (the gate asserts it); a wider margin may close a gap, and the field then says so (noRoute)
 export const FREE_H = 20, BLOCKED_H = 40, IMPASS_DH = 10;
 export const SECONDS = 200, BLOCK_LINE = 14, CRUISE = MT.CRUISE;
 export const KINDS = Object.freeze(["nav", "nav-current"]);
@@ -59,28 +59,23 @@ export function buildField(sc, { margin = MARGIN } = {}) {
 }
 
 /**
- * A scenario: { seed, kind, start { x, y, depth, speed, pitch, bank, heading }, goal { x, y, depth }, discs [{ x, y, r }], blocked, current, weightError }. Discs are drawn until the start's cell can reach the waypoint's in the inflated grid
- * (a draw that cuts the vessel off is thrown away and drawn again), so a route always exists in the field's own terms.
+ * A scenario: { seed, kind, start { x, y, depth, speed, pitch, bank, heading }, goal { x, y, depth }, discs [{ x, y, r }], blocked, current, weightError }. Discs keep 24 m of clear water between them and (r + 40) m from the waypoint (and from the start, which the
+ * ranges guarantee). THAT A ROUTE EXISTS in the field at ROUTE_MARGIN is not enforced here but MEASURED: over seeds 1 to 3000 no layout cut the vessel off (a reject-and-redraw guard that was written first never fired and was removed), and the
+ * gate asserts it for the DEV and HELD seeds.
  */
 export function navScenario(seed, kind = "nav") {
     if (!KINDS.includes(kind)) throw new Error(`subFieldNav.navScenario: unknown kind "${kind}" (${KINDS.join(", ")})`);
     const r = mulberry((seed * 7919 + KINDS.indexOf(kind) * 104729 + 971) >>> 0), u = (lo, hi) => lo + (hi - lo) * r();
     const start = { x: u(0, 20), y: u(-40, 40), depth: u(20, 30), speed: u(2, 3), pitch: u(-0.05, 0.05), bank: u(-0.08, 0.08), heading: 0 };
     const goal = { x: u(360, 400), y: u(-80, 80), depth: u(15, 40) };
-    let discs = null;
-    for (let attempt = 0; attempt < 200 && !discs; attempt++) {
-        const K = 3 + Math.floor(r() * 4), placed = [];
-        for (let tries = 0; tries < 2000 && placed.length < K; tries++) {
-            const d = { r: u(14, 28), x: u(90, 310), y: u(-110, 110) };
-            if (Math.hypot(d.x - start.x, d.y - start.y) < d.r + 40 || Math.hypot(d.x - goal.x, d.y - goal.y) < d.r + 40) continue;
-            if (placed.some((p) => Math.hypot(d.x - p.x, d.y - p.y) < d.r + p.r + 24)) continue;
-            placed.push(d);
-        }
-        if (placed.length < K) continue;
-        const f = buildField({ discs: placed, goal }, { margin: ROUTE_MARGIN }), sc = cellOf(f, start.x, start.y);
-        if (sc && f.dist[sc.i] < BIG) discs = placed.map((d) => Object.freeze({ x: d.x, y: d.y, r: d.r }));
+    const K = 3 + Math.floor(r() * 4), placed = [];
+    for (let tries = 0; tries < 2000 && placed.length < K; tries++) {
+        const d = { r: u(14, 28), x: u(90, 310), y: u(-110, 110) };
+        if (Math.hypot(d.x - goal.x, d.y - goal.y) < d.r + 40) continue;   // (the start needs no test: its x is at most 20 and a centre's at least 90, so 70 m apart at the least, and r + 40 is 68 at the most)
+        if (placed.some((p) => Math.hypot(d.x - p.x, d.y - p.y) < d.r + p.r + 24)) continue;
+        placed.push(d);
     }
-    if (!discs) throw new Error(`subFieldNav.navScenario: no obstacle layout for seed ${seed}`);
+    const discs = placed.map((d) => Object.freeze({ x: d.x, y: d.y, r: d.r }));
     let current = null, weightError = 0;
     if (kind === "nav-current") {
         const mean = [u(-0.4, 0.4), u(-0.4, 0.4), u(-0.05, 0.05)], amp = [u(0.05, 0.15), u(0.05, 0.15), u(0.02, 0.06)];
