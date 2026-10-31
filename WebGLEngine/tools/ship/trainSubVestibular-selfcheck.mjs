@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/trainSubVestibular-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node tools/ship/trainSubVestibular-selfcheck.mjs      (~12 s here, one core)
+// Run: node tools/ship/trainSubVestibular-selfcheck.mjs      (~12-50s: 12 on the Linux build box, 50 on the Windows rig)
 //
 // THE GATE OF tools/ship/trainSubVestibular.mjs: the trainer and the verdicts of rung 4b (brain/FISH_VESTIBULAR_HELPER_WIP.md, Addendum 7). Nothing is trained for real here. The search, the champion rule and the audit reads are held on stub policies with worked answers; the verdicts on records
 // written by hand so that every branch has a known answer; the dives, the scales, the references record and one tiny real search on the real tasks (smoke sets).

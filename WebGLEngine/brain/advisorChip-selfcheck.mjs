@@ -1,6 +1,6 @@
 // WebGLEngine/brain/advisorChip-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node brain/advisorChip-selfcheck.mjs      (~5 s -- to be restated at ship)
+// Run: node brain/advisorChip-selfcheck.mjs      (~5-16s: 5 on the Linux build box, 16 on the Windows rig)
 //
 // THE GATE OF brain/advisorChip.mjs, the advisor chip registered in brain/NEEDS_AND_LIMITS.md "Round 4" (written first). Hand-worked fixtures for every field and every branch of the combination, the seat that runs two seats on the SAME observation, the 30 s stale
 // advisor, and a few real dives for the identities the registration asks for.

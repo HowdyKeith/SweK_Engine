@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/advisorChipStudy-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node tools/ship/advisorChipStudy-selfcheck.mjs      (~13 s -- to be restated at ship)
+// Run: node tools/ship/advisorChipStudy-selfcheck.mjs      (~13-27s: 13 on the Linux build box, 27 on the Windows rig)
 //
 // THE GATE OF tools/ship/advisorChipStudy.mjs (and its command): the advisor chip test registered in brain/NEEDS_AND_LIMITS.md "Round 4" and its Amendment 1. Nothing real is graded here; the arms run on a STUB EVALUATOR whose scores are a known table, and the verdicts run on hand-built
 // records, so every branch of Section 6 has a worked answer. A few real dives close the loop (the untrained circuit advised by nobody IS GUARDED-OBS).

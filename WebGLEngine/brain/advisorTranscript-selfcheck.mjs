@@ -1,6 +1,6 @@
 // WebGLEngine/brain/advisorTranscript-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node brain/advisorTranscript-selfcheck.mjs      (~1 s)
+// Run: node brain/advisorTranscript-selfcheck.mjs      (~1-2.5s: 1 on the Linux build box, 2.5 on the Windows rig)
 //
 // THE GATE OF brain/advisorTranscript.mjs, the recorded-decision seat a language-model chip plugs into (brain/NEEDS_AND_LIMITS.md Round 4: "a language-model chip is a LATER round on the same socket with recorded decisions"). No model exists here: `modelFn` is a scripted function, so every
 // branch has a worked answer.

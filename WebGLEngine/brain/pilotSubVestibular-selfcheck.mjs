@@ -1,6 +1,6 @@
 // WebGLEngine/brain/pilotSubVestibular-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node brain/pilotSubVestibular-selfcheck.mjs      (~1 s here, one core)
+// Run: node brain/pilotSubVestibular-selfcheck.mjs      (~1-2.5s: 1 on the Linux build box, 2.5 on the Windows rig)
 //
 // THE GATE OF brain/pilotSubVestibular.mjs: the rung 4b pilot (a circuit with a per-cell leak, tuning-derived input, a mirrored pair and the autopilot's laws plus a residual). Built and gated BEFORE any training, as Addendum 5 of
 // brain/FISH_VESTIBULAR_HELPER_WIP.md registered. Nothing here is trained. Every number is worked out by hand on a toy circuit, then the real arms are held to the registration's counts.
