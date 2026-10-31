@@ -36,12 +36,12 @@ process.on("exit", () => { if (!finished) { console.log("  FAIL  !! THE GATE END
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
 const sec = (t) => console.log("\n" + t);
 const throws = (f) => { try { f(); return null; } catch (e) { return String(e.message || e); } };
-const J = JSON.stringify, NODE = process.execPath;
+const J = JSON.stringify, NODE = process.execPath.replace(/\\/g, "/");   // v4906: forward slashes -- splitCommand reads a backslash as an escape, so a Windows path in a command string lost its separators (ENOENT on the rig)
 const pa2 = (a) => throws(() => L.parseArgs(a));
 console.log("advisorLive-selfcheck -- the live adapter of the language-model chip\n");
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "advlive-"));
-const write = (name, text) => { const f = path.join(tmp, name); fs.writeFileSync(f, text); return f; };
+const write = (name, text) => { const f = path.join(tmp, name); fs.writeFileSync(f, text); return f.replace(/\\/g, "/"); };
 // a scripted "model" as a command: reads the prompt on stdin, answers a json decision that surfaces when the prompt says the depth is over 15 m
 const modelScript = write("model.mjs", `let s="";process.stdin.on("data",d=>s+=d);process.stdin.on("end",()=>{const m=/ depth ([\\d.]+) m\\. charge/.exec(s);const d=m?Number(m[1]):0;process.stdout.write(JSON.stringify({surface:d>15,station:0,cap:0.85,pump:false,repair:false}))});`);
 const echoScript = write("echo.mjs", `let s="";process.stdin.on("data",d=>s+=d);process.stdin.on("end",()=>process.stdout.write("GOT:"+s))`);

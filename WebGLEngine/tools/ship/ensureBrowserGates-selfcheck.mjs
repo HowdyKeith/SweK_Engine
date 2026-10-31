@@ -14,6 +14,7 @@ process.on("uncaughtException", died); process.on("unhandledRejection", died);
 process.on("exit", () => { if (!finished) { console.log("  FAIL  !! THE GATE ENDED BEFORE IT FINISHED"); process.exitCode = 1; } });
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
 const sec = (t) => console.log("\n" + t);
+const fwd = (x) => String(x).replace(/\\/g, "/");   // v4906: the rig is Windows, where path.join gives backslashes
 const J = JSON.stringify, throws = (f) => { try { f(); return false; } catch { return true; } };
 
 sec("1. THE SETTING (the same numbers as ai-bridge/autoInstall.js)");
@@ -59,7 +60,7 @@ sec("5. RUNNING npm (no shell string)");
 {
     const nix = E.npmInvocation({ platform: "linux" }), cli = E.npmInvocation({ platform: "win32", execPath: "C:\\n\\node.exe", exists: () => true }), cmd = E.npmInvocation({ platform: "win32", execPath: "C:\\n\\node.exe", exists: () => false });
     ok("!! Linux/macOS: npm, no shell; Windows with node's own npm-cli.js: node running that file, no shell; Windows without it: npm.cmd through a shell (the arguments are fixed)", nix.cmd === "npm" && nix.shell === false && cli.cmd === "C:\\n\\node.exe" && /npm-cli\.js$/.test(cli.prefix[0]) && cli.shell === false && cmd.cmd === "npm.cmd" && cmd.shell === true);
-    ok("!! the arguments are shipVerdict's fixCommand as a list: install --no-audit --no-fund [--ignore-scripts only where the browser is on disk and Playwright is not] --prefix <render-qa>", J(E.npmArgs("/e", { playwright: false, shell: false })) === J(["install", "--no-audit", "--no-fund", "--prefix", "/e/tools/render-qa"]) && E.npmArgs("/e", { playwright: false, shell: true }).includes("--ignore-scripts") && !E.npmArgs("/e", { playwright: true, shell: true }).includes("--ignore-scripts") && !E.npmArgs("/e", { playwright: false, shell: false }).includes("--ignore-scripts"));
+    ok("!! the arguments are shipVerdict's fixCommand as a list: install --no-audit --no-fund [--ignore-scripts only where the browser is on disk and Playwright is not] --prefix <render-qa>", J(E.npmArgs("/e", { playwright: false, shell: false }).map(fwd)) === J(["install", "--no-audit", "--no-fund", "--prefix", "/e/tools/render-qa"]) && E.npmArgs("/e", { playwright: false, shell: true }).includes("--ignore-scripts") && !E.npmArgs("/e", { playwright: true, shell: true }).includes("--ignore-scripts") && !E.npmArgs("/e", { playwright: false, shell: false }).includes("--ignore-scripts"));
     ok("!! and they say the same as the verdict's own command text (so the two cannot drift): the same flags in the same order for each of the four cases", [[false, false], [false, true], [true, false], [true, true]].every(([playwright, shell]) => E.npmArgs("/e", { playwright, shell }).join(" ") === SV.fixCommand("/e", { playwright, shell }).replace(/"/g, "").replace(/^npm /, "")));
 }
 
@@ -72,13 +73,13 @@ sec("6. THE COMMAND");
     const r0 = mk({ readiness: () => [] }); const c0 = E.command([], r0.io);
     ok("!! a box that is already ready installs nothing, probes nothing, exits 0", c0 === 0 && r0.calls.length === 0 && /nothing to install/.test(r0.out.join("")));
     const r1 = mk(); const c1 = E.command([], r1.io);
-    ok("!! under the cap (400 MB in the prefs): runs npm install once with the fixed list, output inherited, the cwd untouched, checks readiness again, exits 0 and says done", c1 === 0 && r1.calls.length === 1 && r1.calls[0].c === "npm" && r1.calls[0].a.join(" ") === "install --no-audit --no-fund --prefix /e/tools/render-qa" && r1.calls[0].o.stdio === "inherit" && r1.calls[0].o.shell === false && /done; the browser gates can run/.test(r1.out[r1.out.length - 1]));
+    ok("!! under the cap (400 MB in the prefs): runs npm install once with the fixed list, output inherited, the cwd untouched, checks readiness again, exits 0 and says done", c1 === 0 && r1.calls.length === 1 && r1.calls[0].c === "npm" && r1.calls[0].a.map(fwd).join(" ") === "install --no-audit --no-fund --prefix /e/tools/render-qa" && r1.calls[0].o.stdio === "inherit" && r1.calls[0].o.shell === false && /done; the browser gates can run/.test(r1.out[r1.out.length - 1]));
     const r2 = mk({ readPrefs: () => "" }); const c2 = E.command([], r2.io);
     ok("!! at the default cap the browser download is NOT run: exit 1, no spawn, the reasons, and the by-hand command", c2 === 1 && r2.calls.length === 0 && /NOT installing/.test(r2.out.join("\n")) && /cap is 100 MB/.test(r2.out.join("\n")) && /by hand: npm install --no-audit --no-fund --prefix/.test(r2.out.join("\n")));
     const r3 = mk({ readPrefs: () => "" }); const c3 = E.command(["--cap-mb", "300"], r3.io);
     ok("!! --cap-mb overrides the prefs for the run and says so", c3 === 0 && r3.calls.length === 1 && /\(this run\)/.test(r3.out.join("\n")));
     let asked = null; const r4a = mk({ freeMB: (d) => { asked = d; return 50000; } }); E.command([], r4a.io);
-    ok("!! free space is measured on the folder installed into (tools/render-qa under the engine root)", asked === "/e/tools/render-qa");
+    ok("!! free space is measured on the folder installed into (tools/render-qa under the engine root)", fwd(asked) === "/e/tools/render-qa");
     const r4 = mk({ freeMB: () => 100 }); const c4 = E.command([], r4.io);
     ok("!! low free space refuses even under the cap", c4 === 1 && r4.calls.length === 0 && /100 MB free/.test(r4.out.join("\n")));
     const r5 = mk(); const c5 = E.command(["--dry-run"], r5.io);
