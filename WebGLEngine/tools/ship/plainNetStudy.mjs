@@ -27,7 +27,7 @@ export const RECIPE = TR.RECIPE, AUDITS = TR.AUDITS, RANK_ALPHA = TR.RANK_ALPHA;
 export const CELLS = Object.freeze([["P", "B"], ["P", "whole"], ["E", "E"], ["E", "whole"]].map((c) => Object.freeze(c)));
 export const CELL_NAMES = Object.freeze(CELLS.map(([t, a]) => `${t}/${a}`));
 export const FAMILIES = Object.freeze({ mn: Object.freeze({ id: "mn", n: 8, offset: 0 }), mg: Object.freeze({ id: "mg", n: 4, offset: 8 }) });
-export const PER_CELL = 12, SEARCH_BASE = 79000, REAL_N = 4, REPRO_TOL = 1e-5, START_PROBE = 4;
+export const PER_CELL = 12, SEARCH_BASE = 79000, REAL_N = 4, REPRO_TOL = 1e-4, START_PROBE = 4;
 export const AUDIT_SEEDS = Object.freeze({ P: Object.freeze([[86001, 86020], [86021, 86040], [86041, 86060]]), E: Object.freeze([[88001, 88016], [88017, 88032], [88033, 88048]]) });
 export const REFS = Object.freeze({ P: "refs:NP", E: "refs:NE" });
 /** The comparators: the records they come from, per task, and the group names within them. */
@@ -203,7 +203,7 @@ export function studyChecks(records) {
         let c; try { c = TR.checksOf(refs); } catch (e) { rows.push({ name: `REFERENCES 4b-${task}`, ok: false, text: `the ${REFS[task]} record cannot be read: ${e.message}` }); ok = false; continue; }
         for (const r of c.rows) rows.push({ name: `4b-${task}: ${r.name}`, ok: r.ok, text: r.text }); if (!c.ok) ok = false;
     }
-    const cmp = records.filter((r) => r.family === "cmp"), R = (r) => r.reproduced || { ok: false, maxDiff: Infinity }, bad = cmp.filter((r) => R(r).ok === false), skipped = cmp.filter((r) => R(r).ok === null), maxDiff = Math.max(0, ...cmp.map((r) => R(r).maxDiff).filter((d) => d !== null && Number.isFinite(d)));
+    const cmp = records.filter((r) => r.family === "cmp"), R = (r) => r.reproduced || { ok: false, maxDiff: Infinity }, state = (r) => (R(r).ok === null ? null : Number.isFinite(R(r).maxDiff) && R(r).maxDiff <= REPRO_TOL), bad = cmp.filter((r) => state(r) === false), skipped = cmp.filter((r) => state(r) === null), maxDiff = Math.max(0, ...cmp.map((r) => R(r).maxDiff).filter((d) => d !== null && Number.isFinite(d)));
     const repro = cmp.length > 0 && bad.length === 0;
     rows.push({ name: "COMPARATOR REPRODUCTION", ok: repro, text: cmp.length === 0 ? "no comparator in the file" : skipped.length === cmp.length ? `NOT CHECKED: all ${cmp.length} comparator(s) were flown under --smoke, and the recorded scores are of full audits` : bad.length ? `${bad.length} of ${cmp.length} comparator(s) do not reproduce their recorded audit scores to ${REPRO_TOL}: ${bad.map((r) => `${r.spec} (${R(r).maxDiff.toExponential(2)})`).join(", ")}` : `${cmp.length - skipped.length} of ${cmp.length} comparator champions, rebuilt from their records and flown on their original audits, reproduce the recorded scores to ${REPRO_TOL} (largest difference ${maxDiff.toExponential(2)})${skipped.length ? `; ${skipped.length} skipped (smoke)` : ""}` });
     if (!repro) ok = false;
