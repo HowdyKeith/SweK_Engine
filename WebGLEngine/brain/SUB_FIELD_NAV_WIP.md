@@ -62,3 +62,35 @@ The live Sub Aquarium tank has no obstacles and no goals (its subs wander); putt
 **What stays.** The arms, the flight, the sets' seeds, R1 to R5 and the verdict rule are as registered. If M* is large the cost in path length (R3) is likely to rise, and that is the trade the study is for.
 
 **The sweep's answer (from a scratch script on the DEV set; the command that reproduces it comes with the study's gate): M\* = 12 m.** DEV mean success over the two field arms and both kinds: 6 m 0.742, **12 m 0.867**, 18 m 0.808, 24 m 0.817, 30 m 0.683 (4 of 30 scenarios of each kind have no route), 36 m 0.550 (8 to 11 of 30 have none). So the primary HELD read is at 12 m and the secondary at 6 m. The remaining DEV failures at 12 m are 2 to 7 collisions in 30 for each arm and kind; nothing further is tuned.
+
+## RESULT (2026-10-31; `node tools/ship/subFieldNavStudy.mjs --set held --write`, the HELD set read once; every flight is in `brain/subFieldNavHeld.jsonl`, 720 records): **NOT SUPPORTED** under the registered verdict rule and Amendment 1 -- field-smooth got there in 92% of still-water scenarios and in 78% of current ones (R2 asked for 90% and 80%: it missed the second by ONE scenario of 60, 47 against 48), and both field arms flew a median path 14% longer than the straight line where R3 asked for 10% (smooth) or 15% (cell)
+
+PRIMARY read, margin 12 m (the margin the DEV sweep chose; 60 scenarios of each kind; the pilot is the PD autopilot in every arm):
+
+| kind | arm | reached | collided | left | timed out | median path vs straight (pairs) | median least clearance |
+|---|---|---|---|---|---|---|---|
+| nav (still) | straight | 16/60 (27%) | 44 | 0 | 0 | - | -0.02 m |
+| nav | field-cell | 43/60 (72%) | 2 | 0 | 15 | 1.14 (9) | 5.71 m |
+| nav | **field-smooth** | **55/60 (92%)** | 1 | 0 | 4 | 1.14 (13) | 6.62 m |
+| nav-current | straight | 11/60 (18%) | 49 | 0 | 0 | - | -0.03 m |
+| nav-current | field-cell | 42/60 (70%) | 4 | 1 | 13 | 1.14 (7) | 7.70 m |
+| nav-current | **field-smooth** | **47/60 (78%)** | 4 | 1 | 8 | 1.14 (9) | 7.78 m |
+
+Straight in still water: 2 of 46 blocked scenarios, 14 of 14 unblocked. No route was missing at 12 m in any scenario.
+
+Predictions scored: **R1 held** (blocked 2/46, unblocked 14/14). **R2 MISSED for both arms**: field-smooth 92% / 78%, field-cell 72% / 70%. **R3 missed for field-smooth** (1.14 against 1.10) **and held for field-cell** (1.14 against 1.15), which does not matter because field-cell missed R2. **R4 held** (smooth's median clearance is at least cell's in both kinds: 6.62 against 5.71 and 7.78 against 7.70, the second by a hair). **R5 held** (both arms do worse in current: cell 72 to 70, smooth 92 to 78). The verdict rule says NOT SUPPORTED because R2 failed for both; the near miss is said here and not hidden in a rounding.
+
+SECONDARY read, the registered margin of 6 m (nothing in the verdict): field-cell 35% / 53% and field-smooth 62% / 60% reached, with 18 to 30 collisions in 60 for each arm: the guess of 6 m was wrong in the way the DEV trace showed (the field turns the heading by 45 degrees at the edge of the inflated zone and a vessel that needs about 35 m for a quarter turn cannot follow it). R5 missed there (the cell arm did better in current, 35% to 53%): the secondary read is noisier than the primary.
+
+**What it says.**
+* The brain's flow field, handed to the PD autopilot as a heading, does what the straight line cannot: it takes the vessel round the obstacles. Straight reaches the waypoint in 2 of the 46 blocked still-water scenarios; field-smooth at 12 m in 92% of all of them, with a median least clearance of 6.6 m (positive: it does not touch). It collides in 1 flight of 60 in still water and 4 of 60 in current.
+* The margin matters more than the grid: 6 m collides in a third to half of the flights, 12 m in under 7%. The field does not know the turning radius; the margin is what pays for it.
+* **POST HOC, not registered, not a test (the HELD set has been read and cannot confirm anything), from a throwaway script:** every one of the 40 timed-out field flights at 12 m (15 + 4 + 13 + 8) came within 25 m of the waypoint on the plane, with a median closest approach of 11 to 12 m against the 10 m capture circle -- and none was off in depth. They are near misses of the arrival rule, then circles the vessel cannot close. Counted as "reached or came within 25 m" field-smooth is 59/60 (98%) in still water and 55/60 (92%) in current, field-cell 58/60 and 55/60. Read as a hypothesis: the failures that cost the registered bar are the ARRIVAL (a heading quantised to 45 degrees weaves around the line, and a vessel with a 35 m turning radius that misses a 10 m circle by a metre cannot turn back), not the routing.
+* The path is 14% longer than the straight line on the scenarios both reach (a median over 7 to 13 pairs a cell): part of that is the detour round the obstacles the straight line did not take, part is the weave of the 8-direction field. This study does not separate them.
+* A saddle-point failure of the bilinear blend is pinned by the gate (a vessel dead on the line through a disc's centre: the two cells that straddle the line flow to opposite sides and their blend points at the disc); the HELD set does not say how often it bites.
+
+**What it does not say.** The registration's list stands: a perfect fix and an exact map, static round obstacles, plan view with depth held, one hull and autopilot, a field that does not know the current. In addition: the margin was chosen on DEV and the secondary read shows the registered one failing, so the 92% is a tuned figure with one tuned parameter (a 60-scenario DEV set, six margins); 60 scenarios a kind is a 5-point step per scenario in the rates; and the post hoc paragraph is a hypothesis about arrival, nothing more.
+
+**Correction to Amendment 1, item 3.** It said the scenario generator "still guarantees a route at the registered 6 m margin". The generator enforces no such thing: a reject-and-redraw guard that was written first never fired in 3,000 seeds and was removed as dead code. That a route exists at 6 m for every DEV and HELD seed is MEASURED, by a row of the library's gate.
+
+**Not built, and what would be next (neither is registered).** An arrival rule (steer on the straight bearing, or on a lookahead point along the field's path, inside a radius of the waypoint, or a capture circle the vessel can hold); a smoother heading (a lookahead point on the path, or a low-pass on the commanded heading) to cut the weave; a margin that scales with the turning radius; the current in the field; the live Sub Aquarium tank (no obstacles or goals in it); the GPU solver (the CPU Dijkstra was the field here and was fast: 720 flights, the field builds included, in 11 s).

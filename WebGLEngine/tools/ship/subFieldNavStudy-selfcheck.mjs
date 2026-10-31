@@ -13,7 +13,7 @@
 //   5  THE TEXT        a line for every (kind, arm), n/a for a number that is not there, '-' for the straight arm's ratio, the verdict block names the arms
 //   6  THE COMMAND     bad arguments (exit 2, named, nothing flown), the sweep, the dev set, the held set at the primary AND the registered margin (a margin of 6 asked for is ONE read), --write only with the held set and what it writes, the defaults
 //
-// SABOTAGE LOG -- NINETY-FIVE mutants of tools/ship/subFieldNavStudy.mjs, each run against a copy of this gate, 4 at a time. 91 RED BY NAME on the final run (rows in brackets), ONE EQUIVALENT (S85):
+// SABOTAGE LOG -- NINETY-TWO mutants (95 were written, three were dead code and were cut) of tools/ship/subFieldNavStudy.mjs, each run against a copy of this gate, 4 at a time. 91 RED BY NAME on the final run (rows in brackets), ONE EQUIVALENT (S85):
 //   S01 primary margin [3]; S02 registered margin [3]; S03 out path [1]; S04 r2 still [1]; S05 r2 current [1]; S06 r1 blocked [1]; S07 r1 unblocked [1]; S08 r3 smooth [2]; S09 r3 cell [2]; S10 median even [2]; S11
 //   median unsorted [3]; S12 median mutates [1]; S13 median empty [1]; S14 median lexicographic [1]; S16 summary key [2]; S17 straight by arm [5]; S18 pairs need straight reached [1]; S19 pairs need arm reached
 //   [3]; S20 ratio inverted [4]; S21 ratio mean [1]; S22 ratio no pairs [3]; S23 straight ratio [2]; S24 other count [1]; S25 other includes timeout [1]; S26 noRoute count [1]; S27 clearance mean [2]; S28 collided
