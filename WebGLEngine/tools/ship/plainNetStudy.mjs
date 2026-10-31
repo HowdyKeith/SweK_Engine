@@ -150,7 +150,7 @@ export function refsRecord(task, opts = {}) {
     const rec = TR.refsRecord(task, { sets, scales, smoke: !!opts.smoke }), mk = opts.policyOf || policyOf;
     const probe = sets.train.slice(0, START_PROBE), want = TR.evalDives(AS.pilot(), probe).score;
     rec.spec = REFS[task]; rec.audits = AUDIT_SEEDS[task];
-    rec.startCheck = arms.flatMap((arm) => Object.keys(FAMILIES).map((family) => { const Pol = mk({ kind: "pilot", task, arm, family, index: 0 }, scales), got = Pol.evaluate(Pol.handWeights(), probe).score; return { arm: `${arm}/${family}`, same: got === want || Math.abs(got - want) < 1e-9 }; }));
+    rec.startCheck = arms.flatMap((arm) => Object.keys(FAMILIES).map((family) => { const Pol = mk({ kind: "pilot", task, arm, family, index: 0 }, scales), got = Pol.evaluate(Pol.handWeights(), probe).score; return { arm: `${arm}/${family}`, same: got === want || Math.abs(got - want) < 1e-9, weights: Pol.WEIGHT_COUNT }; }));
     return rec;
 }
 
