@@ -9,7 +9,12 @@
 //   4  T1 TO T3        judge at each boundary (the 10-sea bar, the hit order with ties, the arrivals of any+predict against the others)
 //   5  THE COMMAND     bad arguments (exit 2, named), a short run end to end, the table and the verdict, --write puts one JSON line a sub in brain/tankNavRun.jsonl
 //
-// SABOTAGE LOG -- (filled in below after the mutants have been run)
+// SABOTAGE LOG -- 55 mutants of tools/ship/tankNavRun.mjs, each run against a copy of this gate, 2 to 3 at a time. ALL 55 RED BY NAME:
+//   R01-R08 the constants (file, seas, seconds, navigator seed, the 10-sea bar, the start, the arm order); R09-R17 flyCourier (the navigator's seed, the hull, a current, a loss that does not stop the flight, the record's lost, the default seconds, the start's depth sign, the clock,
+//   the pilot given and its default); R18-R25 the totals (arrivals, hits, plans, travel, seas with an arrival, lost, subs, the arm filter); R26-R34 T1 to T3 at their boundaries and each link, and a missing arm; R35-R38 the table and the verdict lines; R39-R48 the command
+//   (--write, whole numbers, the defaults, the seas flown, the first line, the seconds, the path, the wrote line, the unknown-argument message, the verdict printed); R49-R55 the pilot, --dry (parsed, returned, before the line) and the tick count.
+//   ON THE FIRST RUN SIX WENT 0 RED and the gate grew what separated them: R13 and R14 (a vessel the sea itself ends: a pilot that floods its tank until it grounds, and `ticks` in the record), R35 and R36 (the table's header and its kilometres), R38 (each verdict line is its own prediction),
+//   R41 (the defaults: `--dry` says what would be flown without flying 48 flights); a seventh, the pilot's default current argument, was REDUNDANT (the loop always hands the pilot the still water) and was cut: the default is AP.decide.
 "use strict";
 import * as R from "./tankNavRun.mjs";
 import * as TN from "../../brain/subTankNav.mjs";
