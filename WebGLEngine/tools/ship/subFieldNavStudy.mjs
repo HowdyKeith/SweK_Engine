@@ -6,7 +6,10 @@
 //   node tools/ship/subFieldNavStudy.mjs --set dev|held [--margin M] [--seeds N] [--write]
 //                                                                         flies the set at M* (default: the amended 12 m; PRIMARY) and, for the held set, also at the registered 6 m (SECONDARY, labelled); prints the tables and the verdict
 //                                                                         --write puts every flight (primary and secondary) in brain/subFieldNavHeld.jsonl (held only)
-// HELD is read ONCE, by this command, after the library and this gate are sabotaged. Pure apart from the file --write puts down. No clock, no Math.random.
+//   node tools/ship/subFieldNavStudy.mjs --set held2 [--margin M] [--seeds N] [--write]
+//                                                                         THE ARRIVAL RULE'S SET (seeds 201 to 260, read once): the seven arms (straight, and each field arm plain, +approach, +approach+slow) at the primary margin, the tables and the verdict of the
+//                                                                         follow-up in brain/SUB_FIELD_NAV_WIP.md (predictions A1 to A5); --write puts the flights in brain/subFieldNavHeld2.jsonl.  --arrivals adds the arrival arms to a dev run.
+// HELD and HELD2 are each read ONCE, by this command, after the library and this gate are sabotaged. Pure apart from the file --write puts down. No clock, no Math.random.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -15,7 +18,7 @@ import * as N from "../../brain/subFieldNav.mjs";
 import * as AP from "../../brain/autopilotSub.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url)), ENG = path.resolve(HERE, "..", "..");
-export const OUT = "brain/subFieldNavHeld.jsonl";
+export const OUT = "brain/subFieldNavHeld.jsonl", OUT2 = "brain/subFieldNavHeld2.jsonl";
 export const PRIMARY_MARGIN = 12, REGISTERED_MARGIN = N.MARGIN;
 export const THRESH = Object.freeze({ r1BlockedMax: 0.25, r1UnblockedMin: 0.9, r2Still: 0.9, r2Current: 0.8, r3Smooth: 1.10, r3Cell: 1.15 });
 const FIELD_ARMS = Object.freeze(["field-cell", "field-smooth"]);
@@ -38,7 +41,7 @@ export function summarize(runs) {
     for (const r of runs) if (r.arm === "straight") straightBy.set(key(r), r);
     for (const kind of N.KINDS) {
         cells[kind] = {};
-        for (const arm of N.ARMS) {
+        for (const arm of N.ALL_ARMS) {
             const rs = runs.filter((r) => r.kind === kind && r.arm === arm);
             if (!rs.length) continue;
             const count = (s) => rs.filter((r) => r.status === s).length, pairs = arm === "straight" ? [] : rs.filter((r) => r.reached && straightBy.has(key(r)) && straightBy.get(key(r)).reached);
@@ -71,6 +74,33 @@ export function judge(sum) {
     return { r1, arms, r4, r5, verdict: both.length ? "SUPPORTED" : r2only.length ? "PARTLY SUPPORTED" : "NOT SUPPORTED", supportedBy: both, r2by: r2only };
 }
 
+const BASES = Object.freeze(["field-cell", "field-smooth"]);
+/**
+ * The arrival rule's predictions A1 to A5 and its verdict from a summary of the seven arms (brain/SUB_FIELD_NAV_WIP.md, "FOLLOW-UP: THE ARRIVAL RULE"). Each of A1 to A4 is read for every base arm and both kinds: A1 the `+approach` arm reaches at least as many as its plain arm; A2
+ * field-smooth+approach times out in at most 2 of a kind's scenarios; A3 neither rule's arm collides more than its plain arm plus one; A4 `+approach+slow` reaches at least as many as `+approach`. A5 and the verdict: some arrival arm meets the success bars (R2's) and its path bound (R3's).
+ */
+export function judgeArrival(sum) {
+    const c = sum.cells, cell = (kind, arm) => (c[kind] && c[kind][arm]) || null, both = (f) => BASES.every((b) => N.KINDS.every((k) => { const x = cell(k, b), y = cell(k, b + "+approach"), z = cell(k, b + "+approach+slow"); return !!(x && y && z) && f(x, y, z); }));
+    const a1 = both((x, y) => y.reached >= x.reached), a3 = both((x, y, z) => y.collided <= x.collided + 1 && z.collided <= x.collided + 1), a4 = both((x, y, z) => z.reached >= y.reached);
+    const a2 = N.KINDS.every((k) => { const y = cell(k, "field-smooth+approach"); return !!y && y.timeout <= 2; });
+    const arms = {};
+    for (const arm of N.ARRIVAL_ARMS) {
+        const still = cell("nav", arm), cur = cell("nav-current", arm), smooth = arm.startsWith("field-smooth"), bound = smooth ? THRESH.r3Smooth : THRESH.r3Cell, ratio = still ? still.medianPathRatio : NaN;
+        const success = !!(still && cur && still.rate >= THRESH.r2Still && cur.rate >= THRESH.r2Current);
+        arms[arm] = { success, ratio, bound, path: Number.isFinite(ratio) && ratio <= bound };
+    }
+    const full = N.ARRIVAL_ARMS.filter((a) => arms[a].success && arms[a].path), succ = N.ARRIVAL_ARMS.filter((a) => arms[a].success);
+    return { a1, a2, a3, a4, arms, verdict: full.length ? "SUPPORTED" : succ.length ? "PARTLY SUPPORTED" : "NOT SUPPORTED", supportedBy: full, successBy: succ };
+}
+/** The arrival block: A1 to A4 held or missed, the arrival arms against the bars, the verdict. */
+export function arrivalText(j) {
+    const yn = (v) => (v ? "HELD" : "MISSED"), lines = [`A1 each +approach arm reaches at least as many as its plain arm (both field arms, both kinds): ${yn(j.a1)}`, `A2 field-smooth+approach times out in at most 2 scenarios of each kind: ${yn(j.a2)}`,
+        `A3 neither rule collides more than its plain arm plus one (both field arms, both kinds): ${yn(j.a3)}`, `A4 +approach+slow reaches at least as many as +approach (both field arms, both kinds): ${yn(j.a4)}`];
+    for (const arm of N.ARRIVAL_ARMS) lines.push(`${arm}: success bars (>= ${pct(THRESH.r2Still)} still and >= ${pct(THRESH.r2Current)} current): ${j.arms[arm].success ? "HELD" : "MISSED"}; path bound (median ratio ${f2(j.arms[arm].ratio)} <= ${j.arms[arm].bound}): ${j.arms[arm].path ? "HELD" : "MISSED"}`);
+    lines.push(`A5 / VERDICT: ${j.verdict}${j.supportedBy.length ? " (by " + j.supportedBy.join(", ") + ")" : j.successBy.length ? " (the success bars held for " + j.successBy.join(", ") + ")" : ""}`);
+    return lines.join("\n");
+}
+
 /** The margin the DEV sweep picks: the highest mean success over the field arms and both kinds; ties go to the smaller margin. `byMargin` is { margin: runs }. Returns { margin, means: { margin: mean } }. */
 export function chooseMargin(byMargin) {
     const means = {};
@@ -85,7 +115,7 @@ const f2 = (v) => (Number.isFinite(v) ? v.toFixed(2) : "n/a");
 /** The table of a summary, one line a (kind, arm). */
 export function table(sum, title) {
     const lines = [title, "kind         | arm          | reached      | collided left timeout noRoute | median path ratio vs straight (pairs) | median min clearance (m)"];
-    for (const kind of N.KINDS) for (const arm of N.ARMS) {
+    for (const kind of N.KINDS) for (const arm of N.ALL_ARMS) {
         const x = sum.cells[kind] && sum.cells[kind][arm]; if (!x) continue;
         lines.push(`${kind.padEnd(12)} | ${arm.padEnd(12)} | ${(`${x.reached}/${x.n} ${pct(x.rate)}`).padEnd(12)} | ${String(x.collided).padStart(8)} ${String(x.left).padStart(4)} ${String(x.timeout).padStart(7)} ${String(x.noRoute).padStart(7)} | ${(x.medianPathRatio === null ? "-" : `${f2(x.medianPathRatio)} (${x.pairs})`).padEnd(37)} | ${f2(x.medianClearance)}`);
     }
@@ -105,16 +135,18 @@ export function verdictText(j) {
 /** The command as a function: returns the exit code (0 fine, 2 a bad argument). `io` is for the gate: { out, err, writeFile }. */
 export function command(argv, io = {}) {
     const out = io.out || ((m) => console.log(m)), err = io.err || ((m) => console.error(m)), writeFile = io.writeFile || fs.writeFileSync;
-    const o = { sweep: false, set: "dev", margin: PRIMARY_MARGIN, seeds: null, write: false };
+    const o = { sweep: false, set: "dev", margin: PRIMARY_MARGIN, seeds: null, write: false, arrivals: false };
     for (let i = 0; i < argv.length; i++) {
         const a = argv[i];
         if (a === "--sweep") o.sweep = true;
         else if (a === "--write") o.write = true;
+        else if (a === "--arrivals") o.arrivals = true;
         else if (a === "--set") { o.set = argv[++i]; if (!N.SETS[o.set]) { err(`subFieldNavStudy: --set needs one of ${Object.keys(N.SETS).join(", ")}`); return 2; } }
         else if (a === "--margin" || a === "--seeds") { const v = Number(argv[++i]); if (!Number.isFinite(v) || v <= 0 || (a === "--seeds" && !Number.isInteger(v))) { err(`subFieldNavStudy: ${a} needs a positive number${a === "--seeds" ? " (a whole one)" : ""}`); return 2; } o[a.slice(2)] = v; }
         else { err(`subFieldNavStudy: unknown argument ${JSON.stringify(a)}`); return 2; }
     }
-    if (o.write && (o.sweep || o.set !== "held")) { err("subFieldNavStudy: --write goes with --set held only"); return 2; }
+    if (o.write && (o.sweep || (o.set !== "held" && o.set !== "held2"))) { err("subFieldNavStudy: --write goes with --set held or --set held2 only"); return 2; }
+    if (o.arrivals && o.sweep) { err("subFieldNavStudy: --arrivals does not go with --sweep"); return 2; }
     const scenariosOf = (name) => { const seeds = o.seeds ? N.SETS[name].slice(0, o.seeds) : N.SETS[name]; return N.KINDS.flatMap((k) => seeds.map((s) => N.navScenario(s, k))); };
     if (o.sweep) {
         const set = scenariosOf("dev"), byMargin = {};
@@ -125,14 +157,15 @@ export function command(argv, io = {}) {
         out(`M* = ${pick.margin} m (the highest mean success; ties to the smaller)`);
         return 0;
     }
+    const arrivalMode = o.set === "held2" || o.arrivals, arms = arrivalMode ? N.ALL_ARMS : N.ARMS, file = o.set === "held2" ? OUT2 : OUT;
     const set = scenariosOf(o.set), margins = o.set === "held" ? [o.margin, REGISTERED_MARGIN].filter((m, i, a) => a.indexOf(m) === i) : [o.margin], all = [];
-    out(`${o.set.toUpperCase()} set: ${set.length / N.KINDS.length} scenarios of each kind, ${N.ARMS.length} arms`);
+    out(`${o.set.toUpperCase()} set: ${set.length / N.KINDS.length} scenarios of each kind, ${arms.length} arms`);
     margins.forEach((m, idx) => {
-        const runs = N.evaluate(pilot, set, N.ARMS, { margin: m }), sum = summarize(runs), j = judge(sum);
+        const runs = N.evaluate(pilot, set, arms, { margin: m }), sum = summarize(runs);
         for (const r of runs) all.push({ set: o.set, role: idx === 0 ? "primary" : "as-registered", ...r });
-        out(""); out(table(sum, `margin ${m} m -- ${idx === 0 ? "PRIMARY" : "SECONDARY, as first registered (reads nothing into the verdict)"}`)); out(verdictText(j));
+        out(""); out(table(sum, `margin ${m} m -- ${idx === 0 ? "PRIMARY" : "SECONDARY, as first registered (reads nothing into the verdict)"}`)); out(arrivalMode ? arrivalText(judgeArrival(sum)) : verdictText(judge(sum)));
     });
-    if (o.write) { writeFile(path.join(ENG, OUT), all.map((r) => JSON.stringify(r)).join("\n") + "\n"); out(`wrote ${all.length} flights to ${OUT}`); }
+    if (o.write) { writeFile(path.join(ENG, file), all.map((r) => JSON.stringify(r)).join("\n") + "\n"); out(`wrote ${all.length} flights to ${file}`); }
     return 0;
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) process.exitCode = command(process.argv.slice(2));

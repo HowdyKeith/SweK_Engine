@@ -26,6 +26,17 @@ export const SECONDS = 200, BLOCK_LINE = 14, CRUISE = MT.CRUISE;
 export const KINDS = Object.freeze(["nav", "nav-current"]);
 export const ARMS = Object.freeze(["straight", "field-cell", "field-smooth"]);
 export const BIG = 1e9;
+// THE ARRIVAL RULE (brain/SUB_FIELD_NAV_WIP.md, "FOLLOW-UP: THE ARRIVAL RULE", registered before it was built): inside ARRIVAL_RADIUS of the waypoint a field arm steers on the STRAIGHT BEARING instead of the field's heading ("+approach"), and
+// with "+slow" also drops its speed target to ARRIVAL_SLOW. 30 m is derived: every disc's edge is at least 40 m from the waypoint (the generator's r + 40), so the straight segment from anywhere inside 30 m cannot cross a disc.
+export const ARRIVAL_RADIUS = 30, ARRIVAL_SLOW = 1.5;
+export const ARRIVAL_ARMS = Object.freeze(["field-cell", "field-smooth"].flatMap((a) => [a + "+approach", a + "+approach+slow"]));
+export const ALL_ARMS = Object.freeze([...ARMS, ...ARRIVAL_ARMS]);
+/** An arm name taken apart: { base ("straight" | "field-cell" | "field-smooth"), approach, slow }; throws, naming every arm, on one that is not in ALL_ARMS. */
+export function parseArm(arm, who = "subFieldNav.parseArm") {
+    if (!ALL_ARMS.includes(arm)) throw new Error(`${who}: unknown arm "${arm}" (${ALL_ARMS.join(", ")})`);
+    const approach = arm.includes("+approach");
+    return { base: approach ? arm.slice(0, arm.indexOf("+")) : arm, approach, slow: arm.endsWith("+slow") };
+}
 
 const mulberry = (a) => () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
@@ -106,10 +117,10 @@ export function fieldHeading(field, x, y, mode = "cell") {
 
 /** The target (depth, heading, speed) an arm gives the autopilot at a state: the waypoint's depth and the cruise speed always; the heading by the arm. `field` is the scenario's (null for straight). */
 export function armTarget(arm, state, field, goal) {
-    const straight = MT.waypointTarget(state, goal, CRUISE);
-    if (arm === "straight") return straight;
-    if (arm !== "field-cell" && arm !== "field-smooth") throw new Error(`subFieldNav.armTarget: unknown arm "${arm}" (${ARMS.join(", ")})`);
-    const h = fieldHeading(field, state.pos[0], state.pos[1], arm === "field-smooth" ? "smooth" : "cell");
+    const a = parseArm(arm, "subFieldNav.armTarget"), straight = MT.waypointTarget(state, goal, CRUISE);
+    if (a.base === "straight") return straight;
+    if (a.approach && Math.hypot(goal.x - state.pos[0], goal.y - state.pos[1]) <= ARRIVAL_RADIUS) return a.slow ? { ...straight, speed: ARRIVAL_SLOW } : straight;
+    const h = fieldHeading(field, state.pos[0], state.pos[1], a.base === "field-smooth" ? "smooth" : "cell");
     return h === null ? straight : { ...straight, heading: h };
 }
 
@@ -125,8 +136,8 @@ export const clearanceAt = (discs, x, y) => discs.reduce((m, d) => Math.min(m, M
  * then falls back to the straight bearing) }. `field` may be handed in (the scenario's, built once for the arms that need it); `margin` is the field's margin beyond the half-hull when it is built here. Deterministic.
  */
 export function fly(pilot, sc, arm, { seconds = SECONDS, dt = S.DT, model = navModel(), field = null, margin = MARGIN } = {}) {
-    if (!ARMS.includes(arm)) throw new Error(`subFieldNav.fly: unknown arm "${arm}" (${ARMS.join(", ")})`);
-    const f = arm === "straight" ? null : field || buildField(sc, { margin }), total = Math.round(seconds / dt), st = sc.start;
+    const base = parseArm(arm, "subFieldNav.fly").base;
+    const f = base === "straight" ? null : field || buildField(sc, { margin }), total = Math.round(seconds / dt), st = sc.start;
     const sc0 = f ? cellOf(f, st.x, st.y) : null, noRoute = f ? !(sc0 && f.dist[sc0.i] < BIG) : false;
     let s = S.createState({ pos: [st.x, st.y, -st.depth], speed: st.speed, heading: st.heading, pitch: st.pitch, bank: st.bank, gamma: 0, w: [0, 0, 0], model });
     let status = "timeout", path = 0, minClear = clearanceAt(sc.discs, st.x, st.y), ticks = 0, t = null;
@@ -146,9 +157,9 @@ export function fly(pilot, sc, arm, { seconds = SECONDS, dt = S.DT, model = navM
     return { arm, kind: sc.kind, seed: sc.seed, blocked: sc.blocked, status, reached: status === "reached", t, path, minClearance: minClear, ticks, margin: f ? f.margin : null, noRoute };
 }
 
-/** The scenarios of a set: its seeds of each kind, frozen. DEV seeds 1..30 (1..12 as first registered, widened by Amendment 1) and HELD seeds 101..160 (brain/SUB_FIELD_NAV_WIP.md). */
+/** The scenarios of a set: its seeds of each kind, frozen. DEV seeds 1..30 (1..12 as first registered, widened by Amendment 1), HELD seeds 101..160 and HELD2 seeds 201..260, the arrival rule's (brain/SUB_FIELD_NAV_WIP.md). */
 export const range = (a, b) => Array.from({ length: b - a + 1 }, (_, i) => a + i);
-export const SETS = Object.freeze({ dev: range(1, 30), held: range(101, 160) });
+export const SETS = Object.freeze({ dev: range(1, 30), held: range(101, 160), held2: range(201, 260) });   // held2: the arrival rule's set (the follow-up), read once
 export const setOf = (name) => { if (!SETS[name]) throw new Error(`subFieldNav.setOf: unknown set "${name}" (${Object.keys(SETS).join(", ")})`); return Object.freeze(KINDS.flatMap((k) => SETS[name].map((s) => navScenario(s, k)))); };
 
 /** Every arm over a set of scenarios: the list of fly() results, scenario by scenario (the field is built once per scenario). */
