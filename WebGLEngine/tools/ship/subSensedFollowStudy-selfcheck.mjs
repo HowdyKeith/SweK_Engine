@@ -10,7 +10,13 @@
 //   5  THE TEXT        the table of each study (kind blocks, the pooled block, the width table for the gap study only), each line of each verdict block reads its own judgement
 //   6  THE COMMAND     bad arguments (exit 2, named), the scenarios flown by default, a short DEV run of each study end to end, --write goes with held7 only and puts one JSON line a flight, tagged with the study, in that study's file
 //
-// SABOTAGE LOG -- (filled in below after the mutants have been run)
+// SABOTAGE LOG -- 154 mutants of tools/ship/subSensedFollowStudy.mjs, each run against a copy of this gate, 4 at a time (the scratch-tree runner). ALL 154 RED BY NAME (none by a thrown error), none equivalent:
+//   Z01-Z18 the output files, which arms and which designated arm each study has, the sets, every threshold and their freezing; Z19-Z43 summarize (the empty cell, the rate, what counts as reached, each status count, other, the medians over the arrivals or over all, the ensonified / offset / plans filters, the study's own arms, the kind and arm filters,
+//   the pooled cell, the gaps by width and their filters); Z44-Z71 the gap study's bar, harm (strict, one-sided, each kind, and), gain, verdict rule and D1 to D6 (each step, strictness, reversal, the weights of D5, the sensed arm, the kind); Z72-Z95 the fix study's closeness (every kind, either side, a missing arm), gain, verdict rule and E1 to E6; Z96 the dispatch by study;
+//   Z97-Z112 the text (the percent, two decimals, the kinds, the absent arms, the pooled block, the width block for the gap study only and its cells, each column); Z113-Z132 HELD against MISSED and the judgement each line of each verdict block prints; Z133-Z154 the command (the study, set and seed checks, the study needed, --write with DEV, the slice and the default, the arms and kinds
+//   flown, the record's tags and target, the count said, the unknown flag and its exit code, the header, the title, the study handed to judge, table and summarize).
+//   ON THE FIRST RUN ELEVEN WENT 0 RED and the gate grew what separated them: a broached flight counted as `other` and a time-out not (Z25); a cell whose flights carry no ensonified share, offset or plans says NaN (Z30 to Z32); the bar with a harm and a gain of only 6 is NOT SUPPORTED (Z53); a share of exactly 80% of the omniscient sonar's holds (44 of 55: Z60); D5 weighed by FLIGHTS, with unequal numbers of flights per width (Z65), and a width with no flights
+//   read as unreadable even when the other two could be (Z66); a width table whose cells are what was REACHED and not what was flown (Z104); a third bar pattern in the gap verdict text (Z116); and the verdict block printed by --write compared with the judgement of the flights it wrote (Z152: the fix study was being judged by the gap study's rules and nothing noticed).
 "use strict";
 import path from "node:path";
 import * as St from "./subSensedFollowStudy.mjs";
