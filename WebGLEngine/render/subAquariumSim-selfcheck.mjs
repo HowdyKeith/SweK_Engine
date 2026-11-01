@@ -248,7 +248,7 @@ console.log("\n12. PILOT KINDS (unnumbered work: a circuit other than gfc is flo
 }
 
 console.log("\n13. NAVIGATION (UNNUMBERED, brain/SUB_FIELD_NAV_WIP.md FOLLOW-UP 4: a sea of obstacles in the tank and couriers that sail through it)");
-{
+try {
     const TN = await import("../brain/subTankNav.mjs"), HLm = await import("../physics/mechanics/subHulls.mjs");
     const mkTank = (n = 1) => { const t = A.createTank(); t.sync(Array.from({ length: n }, (_, i) => entry("n" + i))); return t; };
     const thrown = (f) => { try { f(); return "no throw"; } catch (e) { return String(e.message); } };
@@ -256,7 +256,7 @@ console.log("\n13. NAVIGATION (UNNUMBERED, brain/SUB_FIELD_NAV_WIP.md FOLLOW-UP 
     ok("!! a tank has no sea until one is set: scene is null, sceneNow is [], and a sub's snapshot has nav null", t0.scene === null && t0.sceneNow().length === 0 && t0.snapshot()[0].nav === null);
     const t1 = mkTank(2), r1 = t1.setScene(3), sc3 = TN.tankScene(3);
     ok("!! setScene(seed) puts that sea in the tank and says so: { seed, obstacles } with the scene's obstacle count; `scene` is { seed, length, width }; sceneNow lists every obstacle as a plain record (type, group, x, y, r, keel)", J(r1) === J({ seed: 3, obstacles: sc3.obstacles.length }) && J(t1.scene) === J({ seed: 3, length: 500, width: 300 }) && t1.sceneNow().length === sc3.obstacles.length && t1.sceneNow().every((o) => Object.keys(o).join() === "type,group,x,y,r,keel"));
-    ok("!! a bad seed throws and changes nothing (1.5, '3', NaN); a tank that is not the standard size has no sea (setScene throws, naming the size, and the scene stays null); setScene(null) takes the sea away and returns null", /whole-number seed/.test(thrown(() => t1.setScene(1.5))) && /whole-number seed/.test(thrown(() => t1.setScene("3"))) && /whole-number seed/.test(thrown(() => t1.setScene(NaN))) && t1.scene.seed === 3 && (() => { const big = A.createTank({ length: 1500, width: 900 }); const m = thrown(() => big.setScene(1)); return /standard 500 x 300/.test(m) && big.scene === null; })() && (() => { const t = mkTank(1); t.setScene(2); return t.setScene(null) === null && t.scene === null && t.sceneNow().length === 0; })());
+    ok("!! a bad seed throws and changes nothing (1.5, '3', NaN); a tank that is not the standard size has no sea (setScene throws, naming the size, and the scene stays null); setScene(null) takes the sea away and returns null", /whole-number seed/.test(thrown(() => t1.setScene(1.5))) && /whole-number seed/.test(thrown(() => t1.setScene("3"))) && /whole-number seed/.test(thrown(() => t1.setScene(NaN))) && t1.scene.seed === 3 && (() => { const big = A.createTank({ length: 1500, width: 900 }); const m = thrown(() => big.setScene(1)); return /standard 500 x 300/.test(m) && big.scene === null; })() && (() => { const t = mkTank(1); t.setScene(2); const a = t.setScene(undefined); const u = a === null && t.scene === null && t.sceneNow().length === 0; t.setScene(2); return u && t.setScene(null) === null && t.scene === null && t.sceneNow().length === 0; })());
     const ship = t1.sceneNow().findIndex((o) => o.type === "ship"), before = t1.sceneNow(); run(t1, 20); const after = t1.sceneNow();
     ok("!! the sea moves with the tank's clock: after 20 s the ships are elsewhere and the islands and icebergs are where they were", ship >= 0 && before.every((o, i) => (o.type === "ship") === (o.x !== after[i].x || o.y !== after[i].y)) && before.some((o) => o.type === "ship"));
     const t2 = mkTank(2); t2.setScene(1);
@@ -265,13 +265,14 @@ console.log("\n13. NAVIGATION (UNNUMBERED, brain/SUB_FIELD_NAV_WIP.md FOLLOW-UP 
     ok("!! a courier's snapshot carries its navigation: { arm, goal { x, y, depth }, arrivals, hits, replans, noRoute, margin, travel, contact } (a goal and the time t exist only after its first step); the other sub's nav is null", s2.find((q) => q.id === "n1").nav === null && nv !== null && nv.arm === "any+predict" && nv.goal === null && Object.keys(nv).sort().join() === "arm,arrivals,contact,goal,hits,margin,noRoute,replans,t,travel");
     run(t2, 300);
     const c2 = t2.snapshot().find((q) => q.id === "n0");
+    ok("!! a courier's snapshot target is the NAVIGATOR'S (the goal's depth, the cruise speed 3), not a wandering one", c2.target.speed === 3 && Math.abs(c2.target.depth - c2.nav.goal.depth) < 1e-9);
     ok("!! a courier SAILS: 300 tank-seconds on the PD autopilot in sea 1 and it has a goal in the tank, arrivals counted (at least 2), plans made, 700 m or more travelled, not lost, and the other (wandering) sub never gets a navigator", c2.nav.goal !== null && c2.nav.arrivals >= 2 && c2.nav.replans > 20 && c2.nav.travel > 700 && c2.lost === 0 && t2.snapshot().find((q) => q.id === "n1").nav === null);
     const pr = t2.probe("n0");
     ok("!! the brain panel's probe shows the courier's target (the navigator's: the goal's depth and the cruise speed 3)", pr.target.speed === 3 && Math.abs(pr.target.depth - c2.nav.goal.depth) < 1e-9);
     const ta = mkTank(2), tb = mkTank(2); tb.setScene(1); run(ta, 60); run(tb, 60);
     ok("!! a SEA changes nothing for a sub that has no navigator: two tanks of the same subs, one with a sea, are in the same place to the digit after a minute", J(ta.snapshot().map((q) => [q.x, q.y, q.depth, q.heading])) === J(tb.snapshot().map((q) => [q.x, q.y, q.depth, q.heading])));
-    const tc = mkTank(1); tc.setScene(1); tc.setNav("n0", "any"); run(tc, 30); tc.setNav("n0", null); const afterOff = tc.snapshot()[0]; run(tc, 90);
-    ok("!! setNav(id, null) sends the courier wandering again: nav null, a fresh wandering target, still swimming and not lost after 90 s more", afterOff.nav === null && tc.setNav("n0", null) === null && tc.snapshot()[0].nav === null && tc.snapshot()[0].lost === 0 && tc.subs.get("n0").nextTarget > tc.subs.get("n0").age);
+    const tc = mkTank(1); tc.setScene(1); tc.setNav("n0", "any"); run(tc, 60); tc.setNav("n0", null); const afterOff = tc.snapshot()[0], freshT = tc.subs.get("n0").nextTarget > tc.subs.get("n0").age; run(tc, 90);
+    ok("!! setNav(id, null) sends the courier wandering again: nav null, a FRESH wandering target at once (its next change is still ahead although it sailed 60 s, longer than a wander lasts), still swimming and not lost after 90 s more; \"\" and undefined mean off too and answer null", afterOff.nav === null && freshT && tc.setNav("n0", null) === null && tc.snapshot()[0].nav === null && tc.snapshot()[0].lost === 0 && (() => { tc.setNav("n0", "any"); const r1 = tc.setNav("n0", ""); const on = tc.snapshot()[0].nav; tc.setNav("n0", "any"); const r2 = tc.setNav("n0", undefined); return r1 === null && r2 === null && on === null && tc.snapshot()[0].nav === null; })());
     const td = mkTank(2); td.setScene(1); td.setNav("n0", "any"); td.setNav("n1", "straight"); run(td, 120); const dn = td.snapshot().map((q) => q.nav), g0 = dn[0].goal; td.setScene(4);
     ok("!! a new sea gives each courier a NEW navigator in it (the arm kept, the counters from zero, no goal yet) and setScene(null) ends them all", td.snapshot().map((q) => q.nav.arm).join() === "any,straight" && td.snapshot().every((q) => q.nav.arrivals === 0 && q.nav.hits === 0 && q.nav.goal === null) && dn[0].travel > 0 && (td.setScene(null), td.snapshot().every((q) => q.nav === null)));
     const te = mkTank(1); te.setScene(2); te.setNav("n0", "any+predict"); te.setEvent("n0", "flood"); run(te, 40); const ev = te.snapshot()[0];
@@ -280,6 +281,13 @@ console.log("\n13. NAVIGATION (UNNUMBERED, brain/SUB_FIELD_NAV_WIP.md FOLLOW-UP 
     ok("!! a hull change puts the courier back in the water and it sails on (the navigator stays, a plan is made again)", th.snapshot()[0].nav !== null && th.snapshot()[0].nav.arm === "any+replan" && th.snapshot()[0].lost === 0 && th.snapshot()[0].nav.replans > 5);
     const tj = mkTank(2); tj.setScene(1); tj.setNav("n0", "any"); tj.setNav("n1", "any"); run(tj, 1); const gj = tj.snapshot().map((q) => q.nav.goal), tk = mkTank(2); tk.setScene(4); tk.setNav("n0", "any"); run(tk, 1);
     ok("!! each courier has ITS OWN goals (two couriers of one arm in one sea draw different goals) and a sea has its own (the same sub in sea 4 draws another goal than in sea 1)", gj[0] !== null && gj[1] !== null && J(gj[0]) !== J(gj[1]) && J(tk.snapshot()[0].nav.goal) !== J(gj[0]));
+    const gs = []; for (let sd = 1; sd <= 8; sd++) { const tq = mkTank(1); tq.setScene(sd); tq.setNav("n0", "any"); run(tq, 0.2); gs.push(tq.snapshot()[0].nav.goal.x.toFixed(1)); }
+    ok("!! a navigator's seed carries the SEA: the same sub's first goal in seas 1 to 8 is a different goal every time (8 distinct)", new Set(gs).size === 8);
+    const tx = mkTank(1); tx.setScene(1); tx.setNav("n0", "straight"); const isl1 = tx.sceneNow().find((o) => o.type === "island"), sx = tx.subs.get("n0"); sx.state = { ...sx.state, pos: [isl1.x, isl1.y, -20] }; run(tx, 0.2); const inIsl = tx.snapshot()[0].nav;
+    sx.state = { ...sx.state, pos: [60, 60, -20] }; run(tx, 1.5); const outIsl = tx.snapshot()[0].nav;
+    ok("!! a courier set down on an island is in CONTACT (hits 1, contact on); set down in open water and a second and a half later the contact is over (the tank hands the navigator the tick, so the clear second runs)", inIsl.hits === 1 && inIsl.contact === true && outIsl.hits === 1 && outIsl.contact === false);
+    const tn = mkTank(1); tn.setScene(1); tn.setNav("n0", "any"); run(tn, 120); tn.setNav("n0", null); run(tn, 60); const gq = tn.snapshot()[0];
+    ok("!! GOLDEN: a courier that sailed 120 s in sea 1 and was then sent wandering is at (191.4, 23.4) at 20.5 m after 60 s more -- the wander schedule and its random draws are not disturbed by the time it spent navigating", Math.abs(gq.x - 191.36) < 0.5 && Math.abs(gq.y - 23.4) < 0.5 && Math.abs(gq.depth - 20.45) < 0.3);
     const tw1 = mkTank(2), tw2 = mkTank(2); tw1.setScene(1); run(tw1, 30); run(tw2, 30); tw1.setScene(null); tw1.setNav("n0", null); run(tw1, 60); run(tw2, 60);
     ok("!! ending a navigation that was never started changes nothing: setScene(null) and setNav(id, null) on wanderers leave them swimming exactly as a tank where neither was called", J(tw1.snapshot().map((q) => [q.x, q.y, q.depth, q.heading])) === J(tw2.snapshot().map((q) => [q.x, q.y, q.depth, q.heading])));
     const tl = A.createTank(); tl.sync([entry("n0")]); run(tl, 40); tl.setScene(1); tl.setNav("n0", "any"); run(tl, 10);
@@ -290,7 +298,7 @@ console.log("\n13. NAVIGATION (UNNUMBERED, brain/SUB_FIELD_NAV_WIP.md FOLLOW-UP 
     ok("!! a hull change makes the courier plan again from where it is put (an `any` courier: exactly one more plan)", tY.snapshot()[0].nav.replans === rp + 1);
     const tf = mkTank(2), tg = mkTank(2); for (const t of [tf, tg]) { t.setScene(5); t.setNav("n0", "any+predict"); t.setNav("n1", "any+replan"); run(t, 120); }
     ok("!! the same tank twice is the same sea and the same sailing: identical navigation records after 120 s", J(tf.snapshot().map((q) => q.nav)) === J(tg.snapshot().map((q) => q.nav)) && tf.snapshot().every((q) => q.nav.travel > 200));
-}
+} catch (e) { fails++; console.log(`  FAIL  !! section 13 ran to the end (THE GATE THREW: ${String((e && e.message) || e).slice(0, 160)})`); }
 
 console.log("\nBIG TANK");
 {

@@ -32,13 +32,13 @@ console.log("1. THE CONSTANTS");
 console.log("\n2. THE COURIER");
 {
     const a = safe(() => R.flyCourier(1, "any", { seconds: 120 })), b = safe(() => R.flyCourier(1, "any", { seconds: 120 }));
-    ok("!! flyCourier returns { seed, arm, arrivals, hits, replans, travel, noRoute, lost } and is a function of its inputs (twice, identical)", !!a && Object.keys(a).sort().join() === "arm,arrivals,hits,lost,noRoute,replans,seed,travel" && same(a, b) && a.seed === 1 && a.arm === "any" && a.lost === null);
+    ok("!! flyCourier returns { seed, arm, arrivals, hits, replans, travel, noRoute, lost } and is a function of its inputs (twice, identical)", !!a && Object.keys(a).sort().join() === "arm,arrivals,hits,lost,noRoute,replans,seed,ticks,travel" && a.ticks === 120 * 30 && same(a, b) && a.seed === 1 && a.arm === "any" && a.lost === null);
     const short = safe(() => R.flyCourier(1, "straight", { seconds: 10 })), longer = safe(() => R.flyCourier(1, "straight", { seconds: 60 }));
     ok("!! it flies for the seconds it is given and from the start: 10 s of a vessel starting at 2 m/s sails 15 to 35 m, 60 s 120 to 200 m, and the longer flight has sailed farther", !!short && !!longer && short.travel > 15 && short.travel < 35 && longer.travel > 120 && longer.travel < 200 && longer.travel > short.travel);
     const sea1 = safe(() => R.flyCourier(1, "any", { seconds: 300 })), sea2 = safe(() => R.flyCourier(2, "any", { seconds: 300 })), dflt = safe(() => R.flyCourier(1, "straight"));
     ok("!! the sea is the seed's: seas 1 and 2 give different flights; the default length is 600 s (the default straight flight sails about twice 300 s's distance)", !!sea1 && !!sea2 && !same(sea1, sea2) && !!dflt && dflt.travel > 1500 && dflt.travel < 1900);
     const sunk = safe(() => R.flyCourier(1, "straight", { seconds: 200, pilot: () => ({ ballast: 1, thrust: 0 }) }));
-    ok("!! a vessel the sea itself ends is reported: a pilot that floods its tank until it grounds gives lost = the vessel's own word (not null) and the flight stops there (it sails far less than 200 s of a swimming vessel would)", !!sunk && sunk.lost !== null && typeof sunk.lost === "string" && sunk.travel < 150);
+    ok("!! a vessel the sea itself ends is reported: a pilot that floods its tank until it grounds gives lost = the vessel's own word (not null) and the flight stops there (it sails far less than 200 s of a swimming vessel would)", !!sunk && sunk.lost !== null && typeof sunk.lost === "string" && sunk.travel < 150 && sunk.ticks < 200 * 30 && sunk.ticks > 100 && sunk.ticks === Math.round(sunk.ticks));
     const c1 = safe(() => R.flyCourier(1, "any+predict", { seconds: 300 })), c2 = safe(() => R.flyCourier(1, "straight", { seconds: 300 }));
     ok("!! GOLDEN (sea 1, 300 s): `any` 3 arrivals, 2 hits, 4 plans; `any+predict` 3, 1, 102; straight 3, 2, 0 -- the same counts the navigator's own gate pins, because it is the same loop", !!sea1 && sea1.arrivals === 3 && sea1.hits === 2 && sea1.replans === 4 && !!c1 && c1.arrivals === 3 && c1.hits === 1 && c1.replans === 102 && !!c2 && c2.arrivals === 3 && c2.hits === 2 && c2.replans === 0 && c1.noRoute === false);
 }

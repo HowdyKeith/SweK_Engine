@@ -21,17 +21,17 @@ export const OUT = "brain/tankNavRun.jsonl", SEEDS = 12, SECONDS = 600, NAV_SEED
 export const START = Object.freeze({ x: 100, y: 150, depth: 25, speed: 2, heading: 0 });
 export const ORDER = Object.freeze(["straight", "any", "any+replan", "any+predict"]);
 
-/** One courier: the tank's own per-sub loop (a navigator's target, the PD autopilot, the nominal hull) for `seconds` from START in sea `seed`. Returns { seed, arm, arrivals, hits, replans, travel, noRoute, lost (the vessel's own status, or null) }. */
-export function flyCourier(seed, arm, { seconds = SECONDS, pilot = (st, tg, cur) => AP.decide(st, tg, cur) } = {}) {
+/** One courier: the tank's own per-sub loop (a navigator's target, the PD autopilot, the nominal hull) for `seconds` from START in sea `seed`. Returns { seed, arm, arrivals, hits, replans, travel, noRoute, lost (the vessel's own status, or null), ticks (steps flown; fewer than seconds / DT when the vessel was lost) }. */
+export function flyCourier(seed, arm, { seconds = SECONDS, pilot = AP.decide } = {}) {
     const scene = TN.tankScene(seed), nav = TN.createNavigator(scene, { arm, seed: NAV_SEED }), model = HL.model("nominal");
-    let s = S.createState({ depth: START.depth, pos: [START.x, START.y, -START.depth], speed: START.speed, heading: START.heading, model }), t = 0, lost = null;
+    let s = S.createState({ depth: START.depth, pos: [START.x, START.y, -START.depth], speed: START.speed, heading: START.heading, model }), t = 0, lost = null, ticks = 0;
     for (let i = 0, n = Math.round(seconds / S.DT); i < n; i++) {
         const tg = nav.step(s, t, S.DT), res = S.stepSub(model, s, pilot(s, tg, [0, 0, 0]), S.DT, [0, 0, 0], 0);
-        s = res.state; t += S.DT;
+        s = res.state; t += S.DT; ticks++;
         if (res.status !== "submerged") { lost = res.status; break; }
     }
     const k = nav.snapshot();
-    return { seed, arm, arrivals: k.arrivals, hits: k.hits, replans: k.replans, travel: k.travel, noRoute: k.noRoute, lost };
+    return { seed, arm, arrivals: k.arrivals, hits: k.hits, replans: k.replans, travel: k.travel, noRoute: k.noRoute, lost, ticks };
 }
 /** The totals per arm: { arm: { subs, arrivals, hits, replans, travel, seasWithArrival, lost } }. */
 export function summarize(runs) {

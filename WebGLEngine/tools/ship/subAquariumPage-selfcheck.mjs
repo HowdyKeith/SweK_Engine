@@ -35,6 +35,7 @@ import http from "node:http";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL, webglLaunchArgs } from "./playwrightResolve.mjs";
+import * as TN from "../../brain/subTankNav.mjs";
 
 const require_ = createRequire(import.meta.url);
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -56,6 +57,10 @@ console.log("1. THE SOURCE");
     const hits = ["innerHTML", "outerHTML", "insertAdjacentHTML", "document.write", "eval(", "new Function", "setAttribute(\"on", "srcdoc"].filter((w) => body.includes(w));
     ok("!! the page NEVER turns data into markup: no innerHTML, outerHTML, insertAdjacentHTML, document.write, eval, new Function, onXXX attributes or srcdoc anywhere in it", hits.length === 0, hits.join(", "));
     ok("!! every name and address reaches the DOM through textContent (the list code sets .textContent for the name and the stats line)", /n\.textContent\s*=\s*s\.name/.test(code) && /m\.textContent\s*=/.test(code));
+    const navOptions = [...raw.matchAll(/<select id="navSel">([\s\S]*?)<\/select>/g)].map((m) => [...m[1].matchAll(/<option value="([^"]*)"/g)].map((o) => o[1]));
+    ok("!! the page's NAVIGATION controls (unnumbered, FOLLOW-UP 4): a select whose values are the off value and exactly the tank's four arms (subTankNav.TANK_ARMS, not a list of the page's own), a new-sea button that starts disabled, calls to tank.setScene and tank.setNav, and a sea drawn from tank.sceneNow() and each sub's nav -- the page imports no navigation code itself and fetches nothing for it",
+        navOptions.length === 1 && navOptions[0].join("|") === ["", ...[...TN.TANK_ARMS].reverse().slice(0, 0), "any+predict", "any+replan", "any", "straight"].join("|") && [...TN.TANK_ARMS].sort().join() === navOptions[0].filter(Boolean).sort().join() && /<button id="navSeaBtn" disabled/.test(raw) && /tank\.setScene\(/.test(code) && /tank\.setNav\(/.test(code) && /tank\.sceneNow\(\)/.test(code) && /s\.nav\b/.test(code) && !/subTankNav|tankScene|createNavigator/.test(code));
+    ok("!! the sea is for the standard tank only: the page disables the picker for any other size and says why; a goal and a contact ring are drawn from the snapshot (s.nav.goal, s.nav.contact)", /sizeKey !== "standard"/.test(code) && /\$\("navSel"\)\.disabled = true/.test(code) && /s\.nav\.goal/.test(code) && /s\.nav\.contact/.test(code));
     const ext = [...body.matchAll(/(?:src|href)\s*=\s*"(https?:\/\/[^"]+)"|fetch\(\s*"(https?:\/\/[^"]+)"|url\(\s*"?(https?:\/\/[^")]+)/g)];
     ok("!! the page loads NOTHING from outside: no http(s) script, stylesheet, image or fetch", ext.length === 0, ext.map((m) => m[0]).join(" | "));
     ok("the page has the demo: meta tags (title, desc, category), a <title>, and a link back to server.html", /name="demo:title"/.test(raw) && /name="demo:desc"/.test(raw) && /name="demo:category"/.test(raw) && /<title>[^<]+<\/title>/.test(raw) && /href="\/server\.html"/.test(raw));
@@ -137,6 +142,28 @@ console.log("\n3. THE LIVE PAGE");
             await pg.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
             const afterHull = await pg.$$eval("#list .row .sub", (e) => e.map((x) => x.textContent));
             ok("!! choosing the Munk x5 hull says so, resets the subs on the new vessel without a script error, and the rows keep their live stats (a depth in m and a speed in m/s)", /hull: Munk x5/.test(await pg.textContent("#msg")) && (await pg.$eval("#hullSel", (e) => e.value)) === "munk5" && errs.length === 0 && afterHull.length > 0 && afterHull.every((t) => /\d+ m · \d+\.\d m\/s · Munk x5 \(extreme\)/.test(t)), afterHull[0]);
+            // UNNUMBERED (brain/SUB_FIELD_NAV_WIP.md FOLLOW-UP 4) -- NAVIGATION, DRIVEN: an arm puts the sea in the tank and sends every sub to goals; the message says so, the stats lines carry arrivals and hits, the plan canvas gets the islands (their outline colour); off takes it all away; a large tank cannot use it
+            const landPx = () => pg.evaluate(() => { const c = document.getElementById("plan"), d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 0; i < d.length; i += 4) if (d[i + 3] > 200 && Math.abs(d[i] - 61) <= 3 && Math.abs(d[i + 1] - 107) <= 3 && Math.abs(d[i + 2] - 58) <= 3) n++; return n; });
+            const land0 = await landPx(), navBtn0 = await pg.$eval("#navSeaBtn", (e) => e.disabled);
+            await pg.selectOption("#navSel", "any+predict");
+            await pg.waitForFunction(() => /navigation \(plan ahead\): sea 1, \d+ subs? sent to goals/.test(document.getElementById("msg").textContent), null, { timeout: 8000 }).catch(() => {});
+            await pg.waitForFunction(() => { const e = [...document.querySelectorAll("#list .row .sub")]; return e.length > 0 && e.every((x) => /plan ahead: \d+ arrivals?, \d+ hits?/.test(x.textContent)); }, null, { timeout: 8000 }).catch(() => {});
+            await pg.waitForFunction(() => { const c = document.getElementById("plan"), d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 0; i < d.length; i += 4) if (d[i + 3] > 200 && Math.abs(d[i] - 61) <= 3 && Math.abs(d[i + 1] - 107) <= 3 && Math.abs(d[i + 2] - 58) <= 3) n++; return n > 20; }, null, { timeout: 8000 }).catch(() => {});
+            const navMsg = await pg.textContent("#msg"), navStats = await pg.$$eval("#list .row .sub", (e) => e.map((x) => x.textContent)), land1 = await landPx(), navBtn1 = await pg.$eval("#navSeaBtn", (e) => e.disabled);
+            ok("!! choosing 'plan ahead' puts sea 1 in the tank: the message says navigation (plan ahead), sea 1 and how many subs were sent; EVERY row's stats line carries its arrivals and hits; the plan view gets the islands (their green outline, none before); the new-sea button is enabled (it was not)", /navigation \(plan ahead\): sea 1, \d+ subs? sent to goals/.test(navMsg) && navStats.length >= 6 && navStats.every((x) => /plan ahead: \d+ arrivals?, \d+ hits?/.test(x)) && land0 === 0 && land1 > 20 && navBtn0 === true && navBtn1 === false && errs.length === 0, `${land0} -> ${land1}; ${navStats[0]}`);
+            await pg.click("#navSeaBtn"); await pg.waitForFunction(() => /a new sea \(2\)/.test(document.getElementById("msg").textContent), null, { timeout: 5000 }).catch(() => {});
+            const seaMsg = await pg.textContent("#msg");
+            await pg.selectOption("#navSel", "straight"); await pg.waitForFunction(() => /navigation \(straight at the goal\): sea 2/.test(document.getElementById("msg").textContent), null, { timeout: 8000 }).catch(() => {});
+            const arms2 = await pg.textContent("#msg");
+            ok("!! 'new sea' draws sea 2 (the message says so) and a change of arm keeps that sea and sends every sub through it ('straight at the goal', sea 2)", /a new sea \(2\)/.test(seaMsg) && /navigation \(straight at the goal\): sea 2/.test(arms2));
+            await pg.selectOption("#navSel", ""); await pg.waitForFunction(() => /navigation off/.test(document.getElementById("msg").textContent) && [...document.querySelectorAll("#list .row .sub")].every((x) => !/arrival/.test(x.textContent)), null, { timeout: 8000 }).catch(() => {});
+            const offMsg = await pg.textContent("#msg"), offStats = await pg.$$eval("#list .row .sub", (e) => e.map((x) => x.textContent)), land2 = await landPx();
+            ok("!! 'off' takes the sea away and sends the subs wandering: the message says navigation off, no row mentions an arrival, the islands are gone from the plan view, the new-sea button is disabled again", /navigation off/.test(offMsg) && offStats.length > 0 && offStats.every((x) => !/arrival|plan ahead/.test(x)) && land2 === 0 && (await pg.$eval("#navSeaBtn", (e) => e.disabled)) === true && errs.length === 0);
+            const pgL = await (await b.newContext({ viewport: { width: 1200, height: 900 } })).newPage(), errsL = []; pgL.on("pageerror", (e) => errsL.push(String(e.message)));
+            await pgL.goto(base + "/sub-aquarium.html?size=large", { waitUntil: "load" });
+            await pgL.waitForFunction(() => document.getElementById("navSel").disabled, null, { timeout: 10000 }).catch(() => {});   // the page's module runs after its first await: wait for it, not for 'load'
+            const largeNav = await pgL.evaluate(() => ({ disabled: document.getElementById("navSel").disabled, title: document.getElementById("navSel").title }));
+            ok("!! on a large tank the navigation picker is DISABLED and says why (the sea is for the standard 500 x 300 m tank), and the page throws nothing", largeNav.disabled === true && /standard 500 x 300/.test(largeNav.title) && errsL.length === 0);
             // unnumbered work -- THE KIND CANNOT BE LOADED (its module is refused): the stateful sub is still in the list, flies the PD autopilot, SAYS it does ("PD autopilot", never "stateful") and the page says why; nothing throws
             const pg2 = await (await b.newContext({ viewport: { width: 1200, height: 900 } })).newPage(), errs2 = []; pg2.on("pageerror", (e) => errs2.push(String(e.message)));
             await pg2.route("**/render/subAquariumFlyCx.mjs", (r) => r.abort());
