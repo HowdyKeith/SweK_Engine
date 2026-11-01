@@ -28,6 +28,13 @@
 // P4 first read 'every route is owned' off bridge.owns(), which owns the WHOLE /subaquarium namespace -- so a typo'd /subaquarium/lst passed; the row reads the bridge's explicit ROUTE TABLE now. THE GATE ITSELF WAS FLAKY: one run
 // in four failed under CPU load on a 900 ms sleep; every fixed sleep is now a wait for the page to BE ready (the chip answered, four stats lines say m/s, the canvas has pixels, the hostile row has its stats), and five
 // runs in a row pass. A page that shows a stranger's name is where this kind of gate earns its keep: P1 and P2 (innerHTML) are caught BOTH by the source scan and by the live hostile-name row.
+// ADDENDUM (UNNUMBERED, the navigation picker and drawing; brain/SUB_FIELD_NAV_WIP.md FOLLOW-UP 4): THIRTY MORE MUTANTS of sub-aquarium.html, each run against a copy of this gate, 2 at a time. ALL 30 RED BY NAME (24 on the first run, 6 after the gate grew):
+//   A01 to A04 the picker's options (a renamed arm, a missing one, the new-sea button enabled from the start, the off value); A05 to A16 the controls (no sea set, the sea not taken away on off, the button not disabled again, the two messages, the sub count, the button not enabled,
+//   the picker not reset after an error, a new sea without a new seed, the large-tank guard and its title); A17 the refresh that sends a latecomer to goals; A18 and A19 the stats line and the arm names; A20 to A30 the drawing (the sea not drawn, the island colour, its outline,
+//   the depth view's columns, the goal diamond, the contact ring, the keel label, the goal in the depth view, the handlers, the ship colour).
+//   ON THE FIRST RUN SIX WENT 0 RED and the gate grew what separated them: A10 (the picker itself must send the subs: the stats are read two frames after the choice, not after the 3 s refresh that would send them anyway), A12 (forced past the disabled picker on a large tank, the TANK refuses and the page puts the picker back
+//   to off), A17 (a sub that joins while navigation is on gets a navigator: a latecomer's line says so), A21 (the island outline colour is matched EXACTLY, not within 3), A23 (the islands reach the floor in the depth view: the outline colour in the bottom 15 percent of the canvas), A24 (a goal diamond in the sub's own colour, found by converting the swatch's colour to the goal marker's lightness).
+//   ONE EXISTING ROW FLAKED ONCE under the load of five gates at once (a peer sub's stats line, `PD autopilot . from ...`, read before the first render after it joined) and passed on the next two runs; it is not one of this addendum's rows and was not changed.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
