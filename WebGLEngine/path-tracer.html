@@ -305,19 +305,20 @@
   <p class="sub" style="max-width:760px">
     The camera orbits one of the denoiser arc's scenes, 2.5&deg; a frame. Each frame is path traced at half size (64 &times; 64, 4
     samples) on round 32's jitter, then denoised by the shipped network, filled and upscaled by EASU, in a worker. The last eight
-    frames are accumulated at full size into <b>Bt</b>, the hand-written temporal upscale. <b>U_T</b>, round 70's learned
-    correction, then runs on this page's WebGPU device, or on the CPU without one (<code>render/temporalLive.mjs</code>,
-    <code>render/learnedUpscaleTemporalGPU.mjs</code>). On 24 test scenes U_T was 9.65 % below Bt in display-space error
-    (section 162). Its cost at 1920 &times; 1080 is round 71's to measure. The three views are the single frame alone, Bt, and U_T.
+    frames are accumulated at full size into <b>Bt</b>, the hand-written temporal upscale. <b>U_TH</b>, round 72's learned
+    correction -- its network at half size and 16 wide -- then runs on this page's WebGPU device, or on the CPU without one
+    (<code>render/temporalLive.mjs</code>, <code>render/learnedUpscaleTemporalGPU.mjs</code>). On 24 test scenes U_TH was 5.44 %
+    below Bt in display-space error (section 170); at 1920 &times; 1080 it costs 5.9 ms on a GTX 1080, 0.15 of a traced frame, and
+    0.28-0.30 of one on Intel gen-9 graphics (section 171). The three views are the single frame alone, Bt, and U_TH.
   </p>
   <div class="wrap">
     <div><canvas id="tlb1" width="128" height="128" style="width:100%;max-width:256px;height:auto"></canvas><div class="sub">the frame alone (EASU)</div></div>
     <div><canvas id="tlbt" width="128" height="128" style="width:100%;max-width:256px;height:auto"></canvas><div class="sub">Bt: eight frames accumulated</div></div>
-    <div><canvas id="tlut" width="128" height="128" style="width:100%;max-width:256px;height:auto"></canvas><div class="sub">U_T: Bt corrected</div></div>
+    <div><canvas id="tlut" width="128" height="128" style="width:100%;max-width:256px;height:auto"></canvas><div class="sub">U_TH: Bt corrected</div></div>
   </div>
   <div class="panel" style="max-width:760px">
     <p><button id="tlgo">Start</button> <button id="tlstop">Stop</button>
-       <label style="display:inline"><input id="tlcpu" type="checkbox" /> run U_T on the CPU even with WebGPU</label></p>
+       <label style="display:inline"><input id="tlcpu" type="checkbox" /> run U_TH on the CPU even with WebGPU</label></p>
     <div id="tlprog" class="sub">idle</div>
     <div id="tlout" class="sub" style="margin-top:6px;white-space:pre;font-family:ui-monospace,monospace"></div>
   </div>
@@ -988,7 +989,7 @@ $("fggo").onclick = () => {
 };
 </script>
 <script type="module">
-// backlog fsr4-temporal-page (section 163): round 70's temporal chain and U_T, live -- the chain in a worker, U_T on WebGPU or the CPU
+// backlog fsr4-temporal-page (sections 163, 172): round 70's temporal chain and round 72's U_TH, live -- the chain in a worker, U_TH on WebGPU or the CPU
 import { decodeNet } from "/render/denoiseDevice.mjs";
 import { createDeviceTemporal, temporalDevice } from "/render/learnedUpscaleTemporalGPU.mjs";
 import { compositeEmitters } from "/render/denoiseUpscale.mjs";
@@ -1008,10 +1009,10 @@ $("tlgo").onclick = async () => {
     if (run.stop) return;
     if (m.type === "error") { $("tlprog").textContent = "error: " + m.message; return; }
     if (m.type === "ready") {
-      // U_T on this page's WebGPU device when it has one (and the box is not ticked), else in the worker on the CPU
+      // U_TH (section 172) on this page's WebGPU device, its coalesced down pass (round 74), when it has one (and the box is not ticked), else in the worker on the CPU
       if (!run.cpu && navigator.gpu) try {
-        const ad = await navigator.gpu.requestAdapter(), dev = ad && await temporalDevice(ad, m.W, m.W);
-        if (dev) { run.gpu = await createDeviceTemporal(dev, decodeNet(m.ut), { H: m.W, W: m.W }); run.where = "WebGPU" + (ad.info && ad.info.description ? ` (${ad.info.description})` : ""); }
+        const ad = await navigator.gpu.requestAdapter(), dev = ad && await temporalDevice(ad, m.W, m.W, true);
+        if (dev) { run.gpu = await createDeviceTemporal(dev, decodeNet(m.ut), { H: m.W, W: m.W, down: "fast" }); run.where = "WebGPU" + (ad.info && ad.info.description ? ` (${ad.info.description})` : ""); }
       } catch (err) { run.gpu = null; run.where = "the CPU (WebGPU failed: " + String(err.message).slice(0, 80) + ")"; }
       run.W = m.W;
       run.worker.postMessage({ type: "step", k: 0 }); return;
@@ -1024,9 +1025,9 @@ $("tlgo").onclick = async () => {
     if (run.gpu) { const o = await run.gpu.run(m.x); ut = compositeEmitters(Float64Array.from(o.y), { cov: m.cov, E: m.E }); utMs = o.ms; }
     if (run.stop) return;
     paintRgb("tlb1", m.b1, run.W); paintRgb("tlbt", m.bt, run.W); if (ut) paintRgb("tlut", ut, run.W);
-    $("tlprog").textContent = `frame ${m.k}: U_T on ${run.where}`;
+    $("tlprog").textContent = `frame ${m.k}: U_TH on ${run.where}`;
     $("tlout").textContent = `a frame traced, denoised and upscaled in ${m.ms.frame.toFixed(0)} ms; eight accumulated in ${m.ms.accumulate.toFixed(0)} ms` +
-      (ut ? `; U_T in ${utMs.toFixed(1)} ms on ${run.gpu ? "the device (with its upload and read-back)" : "the CPU"}` : "; U_T: none (no device, and the CPU box is off)");
+      (ut ? `; U_TH in ${utMs.toFixed(1)} ms on ${run.gpu ? "the device (with its upload and read-back)" : "the CPU"}` : "; U_TH: none (no device, and the CPU box is off)");
   };
   run.worker.postMessage({ type: "init", cpuUT: run.cpu || !navigator.gpu });
 };

@@ -182,6 +182,9 @@
 //   Q4  temporalUntiled summing accumT                                 1 RED (round 55's reference row)
 //   Q5  the page without the reference's chain row                     1 RED (the page's 31 rows)
 //   Q6  the section 103 line without the accumulation                  1 RED (the lines row)
+// ROUND 75 (section 172), U_TH after the history, by the same runner: C1 the pack reading the clamped history for the twin's channels,
+// C2 the history length not over 8, C3 the sky's albedo 0, C4 the pack from one corner, C6 the twin clamped -> 2 red each; C5 the
+// hold 0.6, C7 temporalUT keeping the final pass, C9 the adapter table adding the Intel -> 1 red each; C8 an emitter's albedo 0 -> 3.
 "use strict";
 import fs from "node:fs";
 import crypto from "node:crypto";
@@ -584,8 +587,9 @@ else {
 
 console.log("\n4. THE CALLER: denoise.html's \"Time the half-size chain\", at its pilot size, in Chromium");
 {
-    const drive = (size, ms) => runInEngineOrigin({ engineRoot: ENG, timeoutMs: ms + 60000, args: { size, ms }, script: `async (a) => {
-        const f = document.createElement("iframe"); f.style.width = "1200px"; f.style.height = "900px"; f.src = "/denoise.html?net=shipped"; document.body.appendChild(f);
+    // section 172: the pilot asks for U_TH after the history (?ut=1); the rig's size runs it where UTH_BY_ADAPTER says
+    const drive = (size, ms, query = "") => runInEngineOrigin({ engineRoot: ENG, timeoutMs: ms + 60000, args: { size, ms, query }, script: `async (a) => {
+        const f = document.createElement("iframe"); f.style.width = "1200px"; f.style.height = "900px"; f.src = "/denoise.html?net=shipped" + a.query; document.body.appendChild(f);
         await new Promise((r) => f.onload = r);
         const d = f.contentDocument, $ = (id) => d.getElementById(id), wait = (ms) => new Promise((r) => setTimeout(r, ms));
         for (let i = 0; i < 100 && !$("chain"); i++) await wait(50);
@@ -594,7 +598,7 @@ console.log("\n4. THE CALLER: denoise.html's \"Time the half-size chain\", at it
         while (Date.now() - t < a.ms && ($("chain").disabled || !$("chainJson").textContent) && !/failed|no WebGPU/.test($("chainStatus").textContent)) await wait(100);
         return { status: $("chainStatus").textContent, json: $("chainJson").textContent, shown: $("chainTable").style.display !== "none", rows: $("chainTable").querySelectorAll("tbody tr").length };
     }` });
-    const pg = await drive("128x72", 540000);
+    const pg = await drive("128x72", 540000, "&ut=1");
     if (pg.skipped) console.log("  SKIP  " + pg.reason);
     else {
         let J = null; try { J = JSON.parse(pg.result?.json || "null"); } catch {}
@@ -644,10 +648,14 @@ console.log("\n4. THE CALLER: denoise.html's \"Time the half-size chain\", at it
                     (K.full && K.half && K.halfTwoPass && K.temporal && K.temporalTwoPass ? `; the half-size chain fused ${K.half.ms.toFixed(3)} ms, in three passes ${K.halfTwoPass.ms.toFixed(3)} ms; with its history fused ${K.temporal.ms.toFixed(3)} ms, in three passes ${K.temporalTwoPass.ms.toFixed(3)} ms` : "; no sum: a part was not measured"),
                 // round 55 (section 126): the tiled accumulation the history runs by default, beside the plain one, and the chain with each
                 "section 126: the accumulation by default -- " + ["accum", "accumT"].map((k) => `${k} ${fine(ks[k]) ? ks[k].ms.toFixed(3) + " ms (" + ks[k].clock + ")" : "not measured"}`).join("; ") +
-                    (K.temporal && K.temporalUntiled ? `; the half-size chain with its history tiled ${K.temporal.ms.toFixed(3)} ms, untiled ${K.temporalUntiled.ms.toFixed(3)} ms` : "; no sum: a part was not measured")];
+                    (K.temporal && K.temporalUntiled ? `; the half-size chain with its history tiled ${K.temporal.ms.toFixed(3)} ms, untiled ${K.temporalUntiled.ms.toFixed(3)} ms` : "; no sum: a part was not measured"),
+                // round 75 (section 172): U_TH after the history, its passes, and the chain with it beside the chain with its history
+                K.temporalUT ? "section 172: U_TH after the history -- " + ["accumU", "packH", "ut0", "ut1", "ut2", "ut3", "upholdC", "final"].map((k) => `${k} ${fine(ks[k]) ? ks[k].ms.toFixed(3) + " ms (" + ks[k].clock + ")" : "not measured"}`).join("; ") +
+                    `; the half-size chain with its history and U_TH ${K.temporalUT.ms.toFixed(3)} ms, with its history ${K.temporal.ms.toFixed(3)} ms, ratio ${(K.temporalUT.ms / K.temporal.ms).toFixed(3)} x`
+                    : `section 172: U_TH after the history -- off on this adapter (${K.pageKey || "no key"})`];
         };
         ok("!! the page timed every step of the chain and both networks at its pilot size -- each a positive time on a named clock, the table shown, no page error",
-            pg.ok && !!st && keys.every((k) => fine(st[k])) && fine(J.networkFull) && fine(J.networkHalf) && !!J.full && !!J.half && !!J.temporal && !!J.halfRing && !!J.temporalRing && !!J.halfTile && !!J.temporalTile && !!J.halfList && !!J.temporalList && !J.halfLTile && !J.temporalLTile && !!J.fullUnbound && !!J.halfUnbound && !!J.temporalUnbound && !J.fullBound && !J.halfBound && !J.temporalBound && J.fill === "listedTile" && J.coverage === "bound" && J.rest === "fused" && !!J.halfTwoPass && !!J.temporalTwoPass && J.accumulation === "tiled" && !!J.temporalUntiled && J.network === "shipped (asked by ?net=)" && J.params === 33329 && pg.result.shown && pg.result.rows === 31 && !pg.pageErrors.length,
+            pg.ok && !!st && keys.every((k) => fine(st[k])) && fine(J.networkFull) && fine(J.networkHalf) && !!J.full && !!J.half && !!J.temporal && !!J.halfRing && !!J.temporalRing && !!J.halfTile && !!J.temporalTile && !!J.halfList && !!J.temporalList && !J.halfLTile && !J.temporalLTile && !!J.fullUnbound && !!J.halfUnbound && !!J.temporalUnbound && !J.fullBound && !J.halfBound && !J.temporalBound && J.fill === "listedTile" && J.coverage === "bound" && J.rest === "fused" && !!J.halfTwoPass && !!J.temporalTwoPass && J.accumulation === "tiled" && !!J.temporalUntiled && J.network === "shipped (asked by ?net=)" && J.params === 33329 && pg.result.shown && pg.result.rows === 33 && !pg.pageErrors.length,
             pg.ok ? (pg.result?.status || "").slice(0, 200) : pg.reason);
         if (st) {
             // the network times are the ladder's rows, w x h then W x H (T4 went 0 RED before this held which was which); today's page
@@ -742,6 +750,14 @@ console.log("\n4. THE CALLER: denoise.html's \"Time the half-size chain\", at it
             // round 55 (section 126): the chain with its history on the plain accumulation (temporalUntiled), the reference -- the
             // default's sum with accum in accumT's place; the rig's section 126 line carrying each figure
             const l126 = rigLines(J)[12];
+            // round 75 (section 172): the pilot asked for U_TH (?ut=1), so it ran: the chain with it is the chain with its history, the
+            // final pass out and U_TH's seven passes in, each one pass on the history's clock; the rig's line carries both sums
+            const UTS = ["accumU", "packH", "ut0", "ut1", "ut2", "ut3", "upholdC"], l172 = rigLines(J)[13];
+            ok("!! round 75: with U_TH after the history the chain is the chain with its history, the final pass out and U_TH's seven passes in -- each timed, one pass, on the history's clock -- and the rig's section 172 line carries both sums",
+                J.ut === "render/upscale-net-r72.json" && !!J.temporalUT && UTS.every((k) => fine(st[k]) && st[k].clock === st.hits.clock) &&
+                Math.abs(J.temporalUT.ms - (J.temporal.ms - st.final.ms + UTS.reduce((q, k) => q + st[k].ms, 0))) < 1e-9 &&
+                /^section 172: U_TH after the history -- accumU/.test(l172 || "") && n(/with its history and U_TH ([0-9.]+) ms/, l172) === at3(J.temporalUT) && n(/, with its history ([0-9.]+) ms/, l172) === at3(J.temporal),
+                l172);
             ok("  round 55: the chain with its history on the plain accumulation (temporalUntiled) is the default's sum with accum in accumT's place, and the rig's section 126 line carries accum, accumT and both chains",
                 !!J.temporalUntiled && Math.abs(J.temporalUntiled.ms - (J.temporal.ms - st.accumT.ms + st.accum.ms)) < 1e-9 && Math.abs(J.temporalUntiled.ms - (hb + hist.reduce((a, k) => a + st[k].ms, 0))) < 1e-9 &&
                 /^section 126: /.test(l126 || "") && n(/accum ([0-9.]+) ms/, l126) === at3(st.accum) && n(/accumT ([0-9.]+) ms/, l126) === at3(st.accumT) &&
@@ -897,6 +913,60 @@ console.log("\n6. ROUND 33: ROUND 32'S ACCUMULATION ON THE DEVICE, AGAINST rende
         ok("  ...and with its own first hits the whole accumulation has at most 1 in 1,000 pixels with a history length off by over 1e-4, and the light within 1e-3",
             cOwn.nDiff <= N * N / 1000 && cOwn.worst <= 1e-3, `${cOwn.nDiff} of ${N * N} pixels' n differ by over 1e-4 (worst ${cOwn.nWorst.toExponential(1)}); light worst ${cOwn.worst.toExponential(1)}`);
     }
+}
+
+console.log("\n6b. SECTION 172: U_TH AFTER THE HISTORY, ON THE DEVICE, AGAINST render/learnedUpscaleTemporal.mjs");
+{
+    const { firstHits: hitsCPU, cameraPath } = await import(pathToFileURL(path.join(ENG, "render", "denoiseTemporal.mjs")).href);
+    const { accumulateUpscaled, JITTER, halfShift, shiftResample } = await import(pathToFileURL(path.join(ENG, "render", "denoiseTemporalUpscale.mjs")).href);
+    const { compositeEmitters } = await import(pathToFileURL(path.join(ENG, "render", "denoiseUpscale.mjs")).href);
+    const T = await import(pathToFileURL(path.join(ENG, "render", "learnedUpscaleTemporal.mjs")).href), TG = await import(pathToFileURL(path.join(ENG, "render", "learnedUpscaleTemporalGPU.mjs")).href);
+    const { decodeNet } = await import(pathToFileURL(path.join(ENG, "render", "denoiseDevice.mjs")).href), { guideBuffers } = await import(pathToFileURL(path.join(ENG, "render", "denoiseScenes.mjs")).href);
+    const { cameraBasis } = await import(pathToFileURL(path.join(ENG, "physics", "render", "pathTracer.mjs")).href);
+    const UG = await import(pathToFileURL(path.join(ENG, "render", "denoiseUpscaleGPU.mjs")).href);
+    const tr = JSON.parse(fs.readFileSync(path.join(ENG, TG.UTH_NET), "utf8")), Uh = decodeNet(tr.runs.find((r) => r.seed === tr.candidate).net);
+    // round 33's fixture: family R's seed 990000 at 64 x 64, its orbit, the CPU's first hits, smooth frames with grain
+    const N = 64, S = makeScene("R", 990000), eyes = cameraPath(S).eyes, geo = eyes.map((e) => hitsCPU(S, e, N, N)), full = emitterRadiance(S, N, N), F = eyes.length;
+    let sd2 = 77; const r2 = () => (sd2 = (sd2 * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+    const frames = eyes.map((_, f) => ({ y: Float64Array.from({ length: N * N * 3 }, (_, i) => 0.3 + 0.4 * ((i / 3 | 0) % N) / N + 0.1 * (i % 3) + 0.05 * r2()), shift: halfShift(JITTER[f]) }));
+    const ref = accumulateUpscaled(frames, geo, N, N), refNo = accumulateUpscaled(frames, geo, N, N, { clamp: false }), C = shiftResample(frames[F - 1].y, N, N, ...frames[F - 1].shift);
+    const g = guideBuffers({ ...S, eye: eyes[F - 1] }, N, N), B = cameraBasis({ ...S, eye: eyes[F - 1] }), hl = geo[F - 1], depth = new Float64Array(N * N).fill(1e9);
+    for (let p = 0; p < N * N; p++) if (hl.obj[p] >= 0) depth[p] = (hl.pos[p * 3] - eyes[F - 1][0]) * B.fwd[0] + (hl.pos[p * 3 + 1] - eyes[F - 1][1]) * B.fwd[1] + (hl.pos[p * 3 + 2] - eyes[F - 1][2]) * B.fwd[2];
+    const x = T.temporalInput(ref.A, refNo.A, C, ref.n, g.albedo, g.normal, depth, N, N), xh = T.halfInput(x, N, N), yCPU = compositeEmitters(T.temporalUpscale(Uh, x, N, N).y, full);
+    const at = UG.albedoTable(S.scene);
+    ok("  albedoTable is guideBuffers' albedo, sphere by sphere: at every pixel of the newest eye's first hits that meets a sphere, the table's colour is the guide's",
+        Array.from({ length: N * N }, (_, p) => p).every((p) => hl.obj[p] < 0 ? g.albedo[p * 3] === 1 : [0, 1, 2].every((c) => Math.fround(g.albedo[p * 3 + c]) === at[hl.obj[p] * 3 + c])));
+    const A = (q) => Array.from(q), wireS = { scene: S.scene, eye: S.eye, look: S.look, up: S.up, fovDeg: S.fovDeg }, enc = (n) => n.layers.map((L) => ({ Cin: L.Cin, Cout: L.Cout, k: L.k, act: L.act, W: A(L.W), b: A(L.b) }));
+    const pl = { S: wireS, eyes, N, frames: frames.map((f) => ({ y: A(f.y), shift: f.shift })), geo: geo.map((q) => ({ pos: A(q.pos), nrm: A(q.nrm), obj: A(q.obj) })), full: { cov: A(full.cov), E: A(full.E) }, net: enc(Uh) };
+    const q = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 600000, args: { pl }, script: `async (a) => {
+        const P = a.pl, { requestDevice } = await import("/gfx/device.js"), { DenoiseUpscaleGPU } = await import("/render/denoiseUpscaleGPU.mjs");
+        const cv = document.createElement("canvas"); cv.width = 8; cv.height = 8;
+        const dev = await requestDevice(cv, { backend: "webgpu", offscreen: true }), errs = [];
+        if (dev.gpu && dev.gpu.addEventListener) dev.gpu.addEventListener("uncapturederror", (e) => errs.push(String(e.error && e.error.message).slice(0, 200)));
+        const g = new DenoiseUpscaleGPU(dev), fr = P.frames.map((f) => ({ y: Float64Array.from(f.y), shift: f.shift }));
+        const geo = P.geo.map((x) => ({ pos: Float64Array.from(x.pos), nrm: Float64Array.from(x.nrm), obj: Int32Array.from(x.obj) })), full = { cov: Float64Array.from(P.full.cov), E: Float64Array.from(P.full.E) };
+        let refused = null; try { await g.accumulate(P.S, P.eyes, fr, P.N, P.N, { geo, full, ut: true }); } catch (e) { refused = e.message; }
+        g.setUT({ layers: P.net.map((L) => ({ ...L, W: Float64Array.from(L.W), b: Float64Array.from(L.b) })) });
+        const r = await g.accumulate(P.S, P.eyes, fr, P.N, P.N, { geo, full, ut: true }), plain = await g.accumulate(P.S, P.eyes, fr, P.N, P.N, { geo, full });
+        const A = (x) => Array.from(x);
+        return { y: A(r.y), plainY: A(plain.y), ut: { y: A(r.ut.y), xh: A(r.ut.xh), rh: A(r.ut.rh), Au: A(r.ut.Au) }, refused, errs };
+    }` });
+    if (q.skipped) console.log("  SKIP  " + q.reason);
+    else if (!q.ok || !q.result) ok("!! section 172: the device ran U_TH after the history", false, `${q.reason || "no result"} ${JSON.stringify(q.pageErrors || []).slice(0, 300)}`);
+    else {
+        const Q = q.result, rel = (u, v) => { let w = 0; for (let i = 0; i < u.length; i++) w = Math.max(w, Math.abs(u[i] - v[i]) / (1 + Math.abs(v[i]))); return w; };
+        ok("  no uncaptured WebGPU error; accumulate({ ut: true }) refused by name before setUT; Bt's composite with U_TH running is the plain call's bit for bit",
+            !Q.errs.length && /needs setUT\(net\) first/.test(Q.refused || "") && Q.y.every((v, i) => Object.is(v, Q.plainY[i])), Q.errs.join("; "));
+        const wAu = rel(Q.ut.Au, refNo.A), wx = rel(Q.ut.xh, xh);
+        ok("!! section 172: the unclamped twin is accumulateUpscaled unclamped (within 1e-5), and PACKH_WGSL's half-size input is halfInput of temporalInput's 17 channels -- within 1e-5",
+            wAu <= 1e-5 && wx <= 1e-5 && Q.ut.xh.length === (N / 2) * (N / 2) * 17, `twin ${wAu.toExponential(2)}; packed input ${wx.toExponential(2)}`);
+        const wy = rel(Q.ut.y, yCPU); let moved = 0; for (let i = 0; i < yCPU.length; i++) if (Math.abs(Q.ut.y[i] - Q.plainY[i]) > 1e-6) moved++;
+        ok("!! ...and the chain's U_TH image -- four layers, the upsample, the hold, the light sources -- is compositeEmitters(temporalUpscale(U_TH, x)) within 1e-4, and it is not Bt's",
+            wy <= 1e-4 && moved > N * N, `worst ${wy.toExponential(2)}; ${moved} of ${N * N * 3} values corrected`);
+    }
+    ok("  UTH_BY_ADAPTER: on for the 1080 class (nvidia pascal, native and page keys, section 171), off for the Intel and for an unmeasured adapter; UTH_NET round 72's file",
+        TG.uthFor("win32/nvidia/pascal") && TG.uthFor("Windows/nvidia/pascal") && !TG.uthFor("win32/intel/gen-9") && !TG.uthFor("Windows/intel/gen-9") && !TG.uthFor("Linux/google/swiftshader") && !TG.uthFor(null) &&
+        TG.UTH_NET === "render/upscale-net-r72.json" && Object.keys(TG.UTH_BY_ADAPTER).length === 2);
 }
 
 console.log("\n7. SECTION 98: ROUND 33'S VERDICT, RE-DERIVED FROM THE FOUR REPORTS AS COMMITTED");

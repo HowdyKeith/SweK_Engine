@@ -2533,9 +2533,16 @@ export const NEXT_ROUNDS = [
         why: "Round 71 found U_T 9.65 % better and 1.16-3 traced frames dear; a sixteenth of the cost might keep enough of the gain to be real-time.",
     },
     {
+        id: "fsr4-temporal-chain",
+        blocker: "OPEN",
+        what: "ROUND 75 BUILT, AWAITING THE RIG (section 172): U_TH after Bt's history in the device chain (render/denoiseUpscaleGPU.mjs: an unclamped twin accumulation, PACKH_WGSL to the half-size 17 channels, four fast-kernel layers, UPHOLD_COMP_WGSL in the final pass's place), held to the CPU (packed input 1.4e-6, image 1.3e-7 on SwiftShader), on by adapter key for nvidia pascal only (UTH_BY_ADAPTER, section 171). denoise.html's chain times it beside the chain with its history. H75: <= 1.25 x on the 1080, predicted 1.14-1.20. Two realGpuRun --only denoise on the 1080, from a fresh clone; section 173 reads them.",
+        how: "readH75 over each report.",
+        why: "Section 171 found U_TH real-time on the 1080 standalone; this is it where the chain runs.",
+    },
+    {
         id: "fsr4-temporal-page",
         blocker: "CLOSED",
-        what: "CLOSED, THE PAGE WIRED (unshipped): path-tracer.html's \"Temporal upscale, learned\" view -- a live orbit, each frame half-size traced on round 32's jitter, denoised, filled and EASU'd in a worker (render/temporalLive.mjs, render/temporalLive-worker.mjs), the last eight accumulated into Bt, and U_T run on the page's WebGPU device (createDeviceTemporal) or the CPU; the single frame, Bt and U_T side by side with each step's ms. Its example is held bit for bit to round 70's temporalExample by render/temporalLive-selfcheck.mjs. Headless Chromium here: about 0.4 s a frame for the chain and 0.6 s for U_T on SwiftShader at 128 x 128 -- a CPU's numbers, not a GPU's.",
+        what: "CLOSED, THE PAGE WIRED, NOW ON U_TH (section 172): the view runs round 72's U_TH (render/upscale-net-r72.json) with round 74's coalesced down pass, labelled with its measured quality and cost; before it, round 70's U_T. Originally (unshipped): path-tracer.html's \"Temporal upscale, learned\" view -- a live orbit, each frame half-size traced on round 32's jitter, denoised, filled and EASU'd in a worker (render/temporalLive.mjs, render/temporalLive-worker.mjs), the last eight accumulated into Bt, and U_T run on the page's WebGPU device (createDeviceTemporal) or the CPU; the single frame, Bt and U_T side by side with each step's ms. Its example is held bit for bit to round 70's temporalExample by render/temporalLive-selfcheck.mjs. Headless Chromium here: about 0.4 s a frame for the chain and 0.6 s for U_T on SwiftShader at 128 x 128 -- a CPU's numbers, not a GPU's.",
         how: "Round 71's rig runs say what U_T costs on a real GPU at 1080p; the page reports its own ms.",
         why: "So the page shows the measured result, not only the measurements.",
     },

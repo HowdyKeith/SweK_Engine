@@ -88,6 +88,16 @@ console.log("1. ON THE CPU");
     ok("!! the gate times U_T on hardware at UT_TIMING.hw = 1920 x 1080, section 163's size -- the one line readH71 reads", hw === 1920 && hh === 1080 && G.readH71(hwLine).U === 40 && G.UT_TIMING.soft.join() === "240,136");
 }
 
+{
+    // round 75 (section 172): readH75 reads the chain gate's section 172 line -- the chain with its history and U_TH against without
+    const l172 = "section 172: U_TH after the history -- accumU 0.500 ms (device); ...; the half-size chain with its history and U_TH 44.000 ms, with its history 38.000 ms, ratio 1.158 x";
+    const rep = (lines, okAll = true) => ({ commit: "abcdef12 x", gates: [{ gate: "render/denoiseUpscaleGPU-selfcheck.mjs", ok: okAll, exit: { status: okAll ? 0 : 1 }, measured: lines }] });
+    const a = G.readH75(rep([l172])), b = G.readH75(rep([l172.replace("44.000", "50.000")])), c = G.readH75(rep(["section 172: U_TH after the history -- off on this adapter (win32/intel/gen-9)"])), d = G.readH75(rep([l172], false));
+    ok("!! readH75, section 172's rule: the chain with its history and U_TH against the chain with its history, off one line; at most 1.25 x holds; an adapter with U_TH off gives no ratio; a red gate does not count",
+        a.withUT === 44 && a.without === 38 && Math.abs(a.ratio - 44 / 38) < 1e-12 && G.h75([a, a]) === "holds" && G.h75([a, b]) === "fails" && c.ratio === null && G.h75([a, c]) === "no verdict" &&
+        !d.counts && G.h75([a, d]) === "no verdict" && G.H75_RATIO === 1.25);
+}
+
 console.log("\n1b. SECTION 165: THE COMMITTED RIG RUNS, READ BACK");
 {
     const read = (k) => { const rep = JSON.parse(fs.readFileSync(path.join(ENG, `render/denoise-rig-${k}.json`), "utf8")); return { ...G.readH71(rep), intel: /intel gen-9/.test(rep.verdict), pascal: /nvidia pascal/.test(rep.verdict) }; };

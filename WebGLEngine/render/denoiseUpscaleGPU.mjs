@@ -56,6 +56,7 @@
 import { EASU_WGSL } from "../fx/fsr/fsrKernels.js";
 import { cameraBasis } from "../physics/render/pathTracer.mjs";
 import { timingLadder } from "./denoiseDevice.mjs";
+import { conv2dFastWgsl, packFastUniforms, fastShape } from "../brain/conv2d.mjs";
 
 /** Rays across a pixel are COVERAGE_GRID x COVERAGE_GRID (render/denoiseMask.mjs's). */
 export const COVERAGE_GRID_WGSL = 8;
@@ -794,6 +795,83 @@ fn main(@builtin(global_invocation_id) g:vec3<u32>) {
 }
 `;
 
+// ---- U_TH AFTER THE HISTORY (rounds 72-74's network in the chain, sections 170-172) --------------------------------------
+// render/learnedUpscaleTemporal.mjs's U_TH, fed from the chain's own buffers: PACKH_WGSL builds its 17 channels already averaged
+// to half size -- Bt's clamped light and history length, its UNCLAMPED twin (a second accumulation, clamp off), the measured
+// frame's unjittered EASU, the newest eye's albedo (a per-sphere table, guideBuffers' rule), normal and depth d / (1 + d) -- each
+// full-size value computed and the four averaged in halfInput's order; four layers on brain/conv2d.mjs's fast kernel at half size;
+// then UPHOLD_COMP_WGSL upsamples the residual, holds Bt's light by 1 + 0.5 tanh(r) and composites the light sources, in the
+// FINAL pass's place. No full-size 17-channel buffer is made (141 MB at 1080p, over the default binding).
+export const UTH_CHANNELS = 17, UTH_FRAMES = 8;
+/** Each sphere's guide albedo, as guideBuffers gives it: an emitter's 1, a microfacet surface's F0 (1 if none), else its albedo -- 3 floats a sphere. */
+export function albedoTable(scene) {
+    const out = new Float32Array(scene.length * 3);
+    scene.forEach((s, k) => { let c = [1, 1, 1]; if (!s.emit) { const src = s.roughness !== undefined ? (s.F0 ?? 1) : s.albedo; c = typeof src === "number" ? [src, src, src] : src; } out.set(c, k * 3); });
+    return out;
+}
+/** PACKH_WGSL's uniform: the half and full sizes, then the newest eye and its forward axis (depth's), at W x H. */
+export function packUniform(S, eye, W, H) {
+    const B = cameraBasis({ ...S, eye }), b = new ArrayBuffer(48), u = new Uint32Array(b), f = new Float32Array(b);
+    u.set([W / 2, H / 2, W, H]); f.set([...B.eye, 0, ...B.fwd, 0], 4);
+    return new Uint8Array(b);
+}
+export const PACKH_WGSL = /* wgsl */`
+struct K { w:u32, h:u32, W:u32, H:u32, eye:vec4<f32>, fwd:vec4<f32> };
+@group(0) @binding(0) var<storage,read> histC:array<f32>;   // W x H x 4: Bt's light and n
+@group(0) @binding(1) var<storage,read> histU:array<f32>;   // W x H x 4: the same accumulation unclamped
+@group(0) @binding(2) var<storage,read> cur:array<f32>;     // W x H x 3: the measured frame's EASU, unjittered
+@group(0) @binding(3) var<storage,read> geo:array<f32>;     // W x H x ${GEO_STRIDE}: the newest eye's first hits
+@group(0) @binding(4) var<storage,read> alb:array<f32>;     // 3 a sphere
+@group(0) @binding(5) var<storage,read_write> xh:array<f32>; // w x h x ${UTH_CHANNELS}
+@group(0) @binding(6) var<uniform> u:K;
+
+fn chan(p:u32, k:u32) -> f32 {
+    if (k < 3u) { return histC[p * 4u + k]; }
+    if (k < 6u) { return histU[p * 4u + k - 3u]; }
+    if (k < 9u) { return cur[p * 3u + k - 6u]; }
+    if (k == 9u) { return histC[p * 4u + 3u] / f32(${UTH_FRAMES}u); }
+    let o = p * ${GEO_STRIDE}u; let obj = geo[o + 6u];
+    if (k < 13u) { if (obj < 0.0) { return 1.0; } return alb[u32(obj) * 3u + k - 10u]; }
+    if (k < 16u) { if (obj < 0.0) { return 0.0; } return geo[o + 3u + k - 13u]; }
+    if (obj < 0.0) { return 0.0; }
+    let d = dot(vec3<f32>(geo[o], geo[o + 1u], geo[o + 2u]) - u.eye.xyz, u.fwd.xyz);
+    if (!(d > 0.0)) { return 0.0; }
+    return d / (1.0 + d);
+}
+
+@compute @workgroup_size(8,8,1)
+fn main(@builtin(global_invocation_id) g:vec3<u32>) {
+    if (g.x >= u.w || g.y >= u.h) { return; }
+    let a = (2u * g.y) * u.W + 2u * g.x; let b = a + 1u; let c = a + u.W; let d = c + 1u;
+    let o = (g.y * u.w + g.x) * ${UTH_CHANNELS}u;
+    for (var k = 0u; k < ${UTH_CHANNELS}u; k++) { xh[o + k] = (chan(a, k) + chan(b, k) + chan(c, k) + chan(d, k)) / 4.0; }
+}
+`;
+export const UPHOLD_COMP_WGSL = /* wgsl */`
+struct P { W:u32, H:u32, w:u32, h:u32 };
+@group(0) @binding(0) var<storage,read> hist:array<f32>;     // W x H x 4: Bt's light
+@group(0) @binding(1) var<storage,read> R:array<f32>;        // w x h x 3: U_TH's residual
+@group(0) @binding(2) var<storage,read> cov:array<f32>;
+@group(0) @binding(3) var<storage,read> emis:array<f32>;
+@group(0) @binding(4) var<storage,read_write> dst:array<f32>;
+@group(0) @binding(5) var<uniform> u:P;
+
+// upHalf's bilinear taps, the hold A (1 + 0.5 tanh r) with r clamped to +-15, and compositeEmitters -- the FINAL pass's place
+@compute @workgroup_size(8,8,1)
+fn main(@builtin(global_invocation_id) g:vec3<u32>) {
+    if (g.x >= u.W || g.y >= u.H) { return; }
+    let uu = clamp((f32(g.x) + 0.5) / 2.0 - 0.5, 0.0, f32(u.w - 1u)); let vv = clamp((f32(g.y) + 0.5) / 2.0 - 0.5, 0.0, f32(u.h - 1u));
+    let x0 = u32(floor(uu)); let y0 = u32(floor(vv)); let x1 = min(u.w - 1u, x0 + 1u); let y1 = min(u.h - 1u, y0 + 1u);
+    let tx = uu - f32(x0); let ty = vv - f32(y0); let p = g.y * u.W + g.x;
+    for (var c = 0u; c < 3u; c++) {
+        let r = (1.0 - tx) * (1.0 - ty) * R[(y0 * u.w + x0) * 3u + c] + tx * (1.0 - ty) * R[(y0 * u.w + x1) * 3u + c]
+              + (1.0 - tx) * ty * R[(y1 * u.w + x0) * 3u + c] + tx * ty * R[(y1 * u.w + x1) * 3u + c];
+        let y = hist[p * 4u + c] * (1.0 + 0.5 * tanh(clamp(r, -15.0, 15.0)));
+        dst[p * 3u + c] = emis[p * 3u + c] + (1.0 - cov[p]) * y;
+    }
+}
+`;
+
 const WG = 8;
 const groups = (w, h) => [Math.ceil(w / WG), Math.ceil(h / WG)];
 
@@ -853,7 +931,8 @@ export class DenoiseUpscaleGPU {
                                   ["hits", FIRSTHITS_WGSL], ["shift", SHIFT_WGSL], ["accum", ACCUM_WGSL], ["accumT", ACCUM_TILE_WGSL], ["final", FINAL_WGSL],
                                   ["list", FILL_LIST_WGSL], ["args", FILL_ARGS_WGSL], ["lring", FILL_LISTRING_WGSL], ["lleft", FILL_LISTLEFT_WGSL],
                                   ["tinit", FILL_TILEINIT_WGSL], ["tile", FILL_TILE_WGSL], ["tleft", FILL_TILELEFT_WGSL],
-                                  ["ltinit", FILL_LTINIT_WGSL], ["ltargs", FILL_LTARGS_WGSL], ["ltile", FILL_LTILE_WGSL]]) {
+                                  ["ltinit", FILL_LTINIT_WGSL], ["ltargs", FILL_LTARGS_WGSL], ["ltile", FILL_LTILE_WGSL],
+                                  ["packH", PACKH_WGSL], ["upholdC", UPHOLD_COMP_WGSL]]) {
             const p = this.p[k] = device.compute({ wgsl });
             if (p && p.error) throw new Error(`render/denoiseUpscaleGPU: the ${k} kernel did not compile -- ${p.error}`);
         }
@@ -1079,12 +1158,40 @@ export class DenoiseUpscaleGPU {
     }
 
     /**
+     * Section 172: U_TH after the history -- `net` the half-size, 16-wide network of round 72 (render/learnedUpscaleTemporal.mjs's
+     * "half" variant), its four layers compiled once on the fast kernel. accumulate({ ut: true }) and time() then run it.
+     */
+    setUT(net) {
+        if (!net || net.layers.length !== 4 || net.layers[0].Cin !== UTH_CHANNELS || net.layers[0].Cout !== 16 || net.layers[3].Cout !== 3)
+            throw new Error("render/denoiseUpscaleGPU: setUT takes round 72's U_TH -- 17 channels in, 16 wide, a 3-channel head");
+        this.ut = net.layers.map((L) => {
+            const D = { Cin: L.Cin, Cout: L.Cout, k: L.k, act: L.act ?? "none", W: Float32Array.from(L.W), b: Float32Array.from(L.b) }, k = this.device.compute({ wgsl: conv2dFastWgsl(D), entryPoint: "k_conv_fast" });
+            if (k && k.error) throw new Error(`render/denoiseUpscaleGPU: a U_TH layer did not compile -- ${k.error}`);
+            return { L: D, k, z: fastShape(D).groups };
+        });
+        return this;
+    }
+    // U_TH's buffers at W x H and its passes after the history: pack, four layers at half size, the upsample, hold and composite
+    _utBufs(S, eye, W, H) {
+        const dev = this.device, w = W / 2, h = H / 2, mk = (k) => dev.buffer({ data: new Float32Array(k), usage: ["storage"] });
+        return { w, h, xh: mk(w * h * UTH_CHANNELS), outs: this.ut.map((u) => mk(w * h * u.L.Cout)), alb: dev.buffer({ data: albedoTable(S.scene), usage: ["storage"] }),
+                 uP: dev.buffer({ data: packUniform(S, eye, W, H), usage: "uniform" }), uU: dev.buffer({ data: u4(W, H, w, h), usage: "uniform" }),
+                 uL: this.ut.map((u) => dev.buffer({ data: new Uint8Array(packFastUniforms({ H: h, W: w, layer: u.L }).buffer), usage: "uniform" })) };
+    }
+    _utFree(b) { for (const x of [b.xh, ...b.outs, b.alb, b.uP, b.uU, ...b.uL]) x.destroy(); }
+    _utPack(pass, b, histC, histU, cur, geo) { this.p.packH.bind("histC", histC).bind("histU", histU).bind("cur", cur).bind("geo", geo).bind("alb", b.alb).bind("xh", b.xh).bind("u", b.uP); pass.dispatch(this.p.packH, groups(b.w, b.h)); }
+    _utLayer(pass, b, i) { const u = this.ut[i]; u.k.bind("Y", b.outs[i]).bind("F", b.uL[i]).bind("X", i ? b.outs[i - 1] : b.xh); pass.dispatch(u.k, [...groups(b.w, b.h), u.z]); }
+    _utHold(pass, b, histC, cov, emis, dst) { this.p.upholdC.bind("hist", histC).bind("R", b.outs[3]).bind("cov", cov).bind("emis", emis).bind("dst", dst).bind("u", b.uU); pass.dispatch(this.p.upholdC, groups(2 * b.w, 2 * b.h)); }
+
+    /**
      * render/denoiseTemporalUpscale.mjs's accumulateUpscaled on the device, and the composite after it. `frames[f]` is { y (W x H
      * rgb), shift [dx, dy] }, `eyes[f]` the frame's eye in scene S; `geo` (optional) the CPU's first hits of every frame, else the
      * device traces them. With `full` ({ cov, E } at W x H) the result is composited as section 95's Bt is. `tile` (round 48) runs
      * ACCUM_TILE_WGSL -- since round 55 by default; `{ tile: false }` runs ACCUM_WGSL, the reference. Returns { A, n, y, kernel }, kernel naming the accumulation it dispatched.
      */
-    async accumulate(S, eyes, frames, W, H, { clamp = true, geo = null, full = null, tile = true } = {}) {
+    async accumulate(S, eyes, frames, W, H, { clamp = true, geo = null, full = null, tile = true, ut = false } = {}) {
+        if (ut && !this.ut) throw new Error("render/denoiseUpscaleGPU.accumulate: { ut: true } needs setUT(net) first");
+        if (ut && (W % 2 || H % 2 || !clamp)) throw new Error("render/denoiseUpscaleGPU.accumulate: U_TH runs on Bt's clamped history at an even size");
         const acc = tile ? this.p.accumT : this.p.accum;   // round 48: the clamp read from a workgroup tile; round 55: by default
         const dev = this.device, n = W * H, F = frames.length;
         if (eyes.length !== F || (geo && geo.length !== F)) throw new Error(`denoiseUpscaleGPU.accumulate: ${F} frames against ${eyes.length} eyes and ${geo ? geo.length : 0} first-hit buffers`);
@@ -1095,30 +1202,43 @@ export class DenoiseUpscaleGPU {
         const uSh = frames.map((fr) => dev.buffer({ data: f4(W, H, fr.shift[0], fr.shift[1]), usage: "uniform" }));
         const uAc = eyes.map((eye, f) => dev.buffer({ data: accumUniform(S, eyes[Math.max(f - 1, 0)], eye, W, H, { clamp }), usage: "uniform" }));
         const H0 = mk(n * 4), H1 = mk(n * 4), dst = mk(n * 3), uF = dev.buffer({ data: u4(W, H), usage: "uniform" });
+        // section 172: U_TH's unclamped twin of the history, beside it a frame, and its buffers
+        const U0 = ut ? mk(n * 4) : null, U1 = ut ? mk(n * 4) : null, dstU = ut ? mk(n * 3) : null, uAcU = ut ? eyes.map((eye, f) => dev.buffer({ data: accumUniform(S, eyes[Math.max(f - 1, 0)], eye, W, H, { clamp: false }), usage: "uniform" })) : [];
+        const ub = ut ? this._utBufs(S, eyes[F - 1], W, H) : null;
+        let lastU = null;
         const fc = full ? dev.buffer({ data: Float32Array.from(full.cov), usage: ["storage"] }) : mk(n), fE = full ? dev.buffer({ data: Float32Array.from(full.E), usage: ["storage"] }) : mk(n * 3);
         let last = null;
         const skyG = new Float32Array(n * GEO_STRIDE); for (let p = 0; p < n; p++) skyG[p * GEO_STRIDE + 6] = -1;
         const sky = dev.buffer({ data: skyG, usage: ["storage"] });
         dev.frame(({ pass }) => {
             if (!geo) for (let f = 0; f < F; f++) { this.p.hits.bind("sph", bS).bind("geo", G[f]).bind("c", uCam[f]); pass.dispatch(this.p.hits, groups(W, H)); }
-            let a = H0, b = H1;
+            let a = H0, b = H1, ua = U0, ubb = U1;
             for (let f = 0; f < F; f++) {
                 this.p.shift.bind("src", src[f]).bind("dst", cur).bind("u", uSh[f]); pass.dispatch(this.p.shift, groups(W, H));
                 // the first frame starts every pixel at its own value: its "previous" geometry is a buffer of sky, which no tap matches
                 acc.bind("prevGeo", f ? G[f - 1] : sky).bind("curGeo", G[f]).bind("prevHist", a).bind("cur", cur).bind("outHist", b).bind("u", uAc[f]);
                 pass.dispatch(acc, groups(W, H));
                 [a, b] = [b, a];
+                if (ut) { acc.bind("prevGeo", f ? G[f - 1] : sky).bind("curGeo", G[f]).bind("prevHist", ua).bind("cur", cur).bind("outHist", ubb).bind("u", uAcU[f]); pass.dispatch(acc, groups(W, H)); [ua, ubb] = [ubb, ua]; }
             }
-            last = a;
+            last = a; lastU = ua;
             this.p.final.bind("hist", a).bind("cov", fc).bind("emis", fE).bind("dst", dst).bind("u", uF); pass.dispatch(this.p.final, groups(W, H));
+            if (ut) { this._utPack(pass, ub, a, ua, cur, G[F - 1]); for (let i = 0; i < 4; i++) this._utLayer(pass, ub, i); this._utHold(pass, ub, a, fc, fE, dstU); }
             pass.clear([0, 0, 0, 1]);
         }, { offscreen: true });
         const h = new Float32Array(await dev.read(last)), y = Float64Array.from(new Float32Array(await dev.read(dst)));
         const A = new Float64Array(n * 3), N = new Float64Array(n);
         for (let p = 0; p < n; p++) { for (let c = 0; c < 3; c++) A[p * 3 + c] = h[p * 4 + c]; N[p] = h[p * 4 + 3]; }
+        // section 172: U_TH's image, the half-size input it was fed and its residual, read back beside Bt's
+        let utOut = null;
+        if (ut) {
+            const hu = new Float32Array(await dev.read(lastU)), Au = new Float64Array(n * 3); for (let p = 0; p < n; p++) for (let c = 0; c < 3; c++) Au[p * 3 + c] = hu[p * 4 + c];
+            utOut = { y: Float64Array.from(new Float32Array(await dev.read(dstU))), xh: new Float32Array(await dev.read(ub.xh)), rh: new Float32Array(await dev.read(ub.outs[3])), Au };
+            for (const bb of [U0, U1, dstU, ...uAcU]) bb.destroy(); this._utFree(ub);
+        }
         for (const bb of [bS, ...G, ...uCam, ...src, cur, ...uSh, ...uAc, H0, H1, dst, uF, fc, fE, sky]) bb.destroy();
         // round 48: which accumulation ran, so a run asked for the tile is held to having dispatched it
-        return { A, n: N, y, kernel: acc === this.p.accumT ? "accumT" : "accum" };
+        return { A, n: N, y, kernel: acc === this.p.accumT ? "accumT" : "accum", ...(utOut ? { ut: utOut } : {}) };
     }
     /**
      * Round 31: THE CHAIN'S STEPS TIMED, apart from the denoise, on scene S's geometry with the w x h frame upscaled to W x H.
@@ -1181,7 +1301,18 @@ export class DenoiseUpscaleGPU {
             accumT: (pass) => { this.p.accumT.bind("prevGeo", geoB).bind("curGeo", geoB).bind("prevHist", hA).bind("cur", curB).bind("outHist", hB).bind("u", uAc); pass.dispatch(this.p.accumT, groups(W, H)); },
             final: (pass) => { this.p.final.bind("hist", hB).bind("cov", cF).bind("emis", eF).bind("dst", outB).bind("u", uC); pass.dispatch(this.p.final, groups(W, H)); },
         };
-        const step = { covHalf: [], covFull: [], fill: [], rest: [], whole: [], hits: [], shift: [], accum: [], final: [], fillList: [], wholeList: [], fillTile: [], wholeTile: [], fillLTile: [], wholeLTile: [], covHalfB: [], covFullB: [], restToT: [], restEasu: [], restComp: [], restToTFree: [], restEasuQ: [], restEasuComp: [], accumT: [], restF: [] }, clock = {};
+        // section 172: with setUT, U_TH's passes after the history -- the unclamped twin of the accumulation, the pack, the four layers
+        // and the upsample-hold-composite in the final pass's place -- one pass each, as the history's are
+        const utB = this.ut ? this._utBufs(S, S.eye, W, H) : null, hU = this.ut ? mk(W * H * 4) : null, hU2 = this.ut ? mk(W * H * 4) : null;
+        const uAcU = this.ut ? dev.buffer({ data: accumUniform(S, S.eye, S.eye, W, H, { clamp: false }), usage: "uniform" }) : null;
+        if (this.ut) Object.assign(histOps, {
+            accumU: (pass) => { this.p.accumT.bind("prevGeo", geoB).bind("curGeo", geoB).bind("prevHist", hU).bind("cur", curB).bind("outHist", hU2).bind("u", uAcU); pass.dispatch(this.p.accumT, groups(W, H)); },
+            packH: (pass) => this._utPack(pass, utB, hB, hU2, curB, geoB),
+            ut0: (pass) => this._utLayer(pass, utB, 0), ut1: (pass) => this._utLayer(pass, utB, 1), ut2: (pass) => this._utLayer(pass, utB, 2), ut3: (pass) => this._utLayer(pass, utB, 3),
+            upholdC: (pass) => this._utHold(pass, utB, hB, cF, eF, outB),
+        });
+        const UT_STEPS = this.ut ? ["accumU", "packH", "ut0", "ut1", "ut2", "ut3", "upholdC"] : [];
+        const step = { covHalf: [], covFull: [], fill: [], rest: [], whole: [], hits: [], shift: [], accum: [], final: [], fillList: [], wholeList: [], fillTile: [], wholeTile: [], fillLTile: [], wholeLTile: [], covHalfB: [], covFullB: [], restToT: [], restEasu: [], restComp: [], restToTFree: [], restEasuQ: [], restEasuComp: [], accumT: [], restF: [], ...Object.fromEntries(UT_STEPS.map((k) => [k, []])) }, clock = {};
         // round 42 (section 110): the rest steps record which of this runner's pipelines they dispatched, so a split step is held to its
         // one kernel -- through a thin wrapper on those steps alone, so no other step's timing changes
         const nameOf = (pipe) => Object.keys(this.p).find((n) => this.p[n] === pipe) || "?", dispatched = {};
@@ -1218,7 +1349,7 @@ export class DenoiseUpscaleGPU {
                 this.p.easuC.bind("src", filled).bind("dst", dst).bind("u", uE).bind("cov", cF).bind("emis", eF).bind("tMax", tMax); pass.dispatch(this.p.easuC, groups(w + 1, h + 1));
             }, 2);
             reset(); await run("whole", (pass) => { covOps(pass, cH, eH, uH, w, h); covOps(pass, cF, eF, uF, W, H); restOps(pass, this._fillOps(pass, bufs, w, h, maxRings)); }, 31);
-            for (const k of ["hits", "shift", "accum", "final", "accumT"]) await run(k, histOps[k], 1);
+            for (const k of ["hits", "shift", "accum", "final", "accumT", ...UT_STEPS]) await run(k, histOps[k], 1);
             // round 34: the list fill alone, and the chain's steps in one frame with it -- by the wall clock, as the fill is
             reset(); await run("fillList", (pass) => { this._fillListOps(pass, bufs, w, h, maxRings); }, 31);
             reset(); await run("wholeList", (pass) => { covOps(pass, cH, eH, uH, w, h); covOps(pass, cF, eF, uF, W, H); restOps(pass, this._fillListOps(pass, bufs, w, h, maxRings)); }, 31);
@@ -1236,6 +1367,7 @@ export class DenoiseUpscaleGPU {
         const eq = async (x, y) => { const a = new Uint32Array(await dev.read(x)), b = new Uint32Array(await dev.read(y)); return a.length === b.length && a.every((v, i) => v === b[i]); };
         const sameHalf = (await eq(cH, cHb)) && (await eq(eH, eHb)), sameFull = (await eq(cF, cFb)) && (await eq(eF, eFb));
         for (const b of [bS, cH, eH, cF, eF, uH, uF, tMax, uT, up, uE, dst, uC, geoB, curB, hA, hB, outB, uSh, uAc, cHb, eHb, cFb, eFb, bTr]) b.destroy();
+        if (utB) { this._utFree(utB); hU.destroy(); hU2.destroy(); uAcU.destroy(); }
         const th = (await this.coverage(S, w, h, { bound: true })).traced, tf = (await this.coverage(S, W, H, { bound: true })).traced;
         const boundCheck = { half: th, full: tf, ofHalf: w * h, ofFull: W * H, sameHalf, sameFull };
         // round 34: the list fill once more at this size, outside every time, read back -- its rings, the pixels it listed and left
@@ -1281,17 +1413,21 @@ export class DenoiseUpscaleGPU {
  * The ladder's cap is 5000 ms a pass, not its default 1500: the Intel gen-9's page pass at 1920 x 1080 is 1.2-1.4 s (rounds 27
  * and 28), close enough to 1500 that a prediction from the smaller size could skip the very row being compared.
  */
-export async function timeHalfChain({ device, net, newAdapter, kernels, S, w, h, W, H, maxRings, reps = 5, totalMs = 300000, capMs = 5000 }) {
+export async function timeHalfChain({ device, net, newAdapter, kernels, S, w, h, W, H, maxRings, reps = 5, totalMs = 300000, capMs = 5000, ut = null }) {
     const ladder = await timingLadder(net, newAdapter, { sizes: [[w, h], [W, H]], sets: [kernels], totalMs, capMs });
     const pick = (x) => (x.skipped ? null : { ms: x.gpu ? x.gpu.median : x.wall.median, clock: x.gpu ? "device" : "wall" });
     const [networkHalf, networkFull] = ladder.rows[kernels].map(pick);
-    const chain = await new DenoiseUpscaleGPU(device).time(S, w, h, W, H, maxRings, { reps });
+    // section 172: `ut` (round 72's U_TH) adds its passes after the history, and temporalUT -- the chain with U_TH in the final pass's place
+    const g = new DenoiseUpscaleGPU(device); if (ut) g.setUT(ut);
+    const chain = await g.time(S, w, h, W, H, maxRings, { reps });
     const st = chain.steps, sum = (parts) => (parts.every((x) => x && x.ms != null)
         ? { ms: parts.reduce((a, x) => a + x.ms, 0), clocks: [...new Set(parts.map((x) => x.clock))] } : null);
     return { ladder, chain, kernels, networkHalf, networkFull,
              fill: "listedTile", coverage: "bound", rest: "fused", accumulation: "tiled", full: sum([networkFull, st.covFullB]), half: sum([networkHalf, st.covHalfB, st.covFullB, st.fillLTile, st.restF]),
              // round 33: the chain with round 32's history -- its four passes a frame added to the half-size chain
              temporal: sum([networkHalf, st.covHalfB, st.covFullB, st.fillLTile, st.restF, st.hits, st.shift, st.accumT, st.final]),
+             // section 172: the same with U_TH after the history -- its twin accumulation, pack, four layers and upsample-hold-composite, no final
+             ...(ut ? { temporalUT: sum([networkHalf, st.covHalfB, st.covFullB, st.fillLTile, st.restF, st.hits, st.shift, st.accumT, st.accumU, st.packH, st.ut0, st.ut1, st.ut2, st.ut3, st.upholdC]) } : {}),
              // round 55: the same with the plain accumulation, the default of round 54 and the reference
              temporalUntiled: sum([networkHalf, st.covHalfB, st.covFullB, st.fillLTile, st.restF, st.hits, st.shift, st.accum, st.final]),
              // round 54: the same two with the three-pass rest, the defaults of rounds 44-53 and the reference

@@ -18,7 +18,7 @@ import { temporalInput, temporalChain } from "./learnedUpscaleTemporal.mjs";
 import { orbitEye } from "./frameGenLive.mjs";
 
 /** The view's defaults: 128 x 128 (64 x 64 traced), 4 samples, 2.5 degrees a frame (round 32's orbit steps 1.5-4), a non-dataset scene. */
-export const LIVE_T = Object.freeze({ W: 128, sppIn: 4, stepDeg: 2.5, family: "R", seed: 990990, seedBase: 4e7, net: "render/denoise-net-r11.json", ut: "render/upscale-net-r70.json" });
+export const LIVE_T = Object.freeze({ W: 128, sppIn: 4, stepDeg: 2.5, family: "R", seed: 990990, seedBase: 4e7, net: "render/denoise-net-r11.json", ut: "render/upscale-net-r72.json" });
 
 /**
  * One real frame of the chain: the scene from `eye` at half size, at `sppIn` samples with render seed `seed`, its grid shifted by

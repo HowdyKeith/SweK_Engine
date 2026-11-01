@@ -1254,6 +1254,11 @@ export const EXCLUDED = Object.freeze([
     // round 74 (section 169) -- DOWN_WGSL coalesced: one thread a value, the same sum
     Object.freeze({ id: "learnedUpscaleTemporalGPU.DOWN_FAST_WGSL", kind: "ordered multi-dispatch chain, graded against a CPU twin",
         why: "U_TH's first pass with one thread per half-size value, feeding the half-size layers after it; render/denoiseLearnedUpscaleGPU-selfcheck.mjs holds its output to DOWN_WGSL's bit for bit, and so U_TH's whole output to round 73's" }),
+    // round 75 (section 172) -- U_TH after the history in the chain (render/denoiseUpscaleGPU.mjs): its first and last passes
+    Object.freeze({ id: "denoiseUpscaleGPU.PACKH_WGSL", kind: "ordered multi-dispatch chain, graded against a CPU twin",
+        why: "U_TH's half-size 17 channels built from the history's two accumulations, the shifted frame and the first hits, which only the chain's passes before it write; render/denoiseUpscaleGPU-selfcheck.mjs holds it to halfInput(temporalInput(...)) within 1e-5" }),
+    Object.freeze({ id: "denoiseUpscaleGPU.UPHOLD_COMP_WGSL", kind: "ordered multi-dispatch chain, graded against a CPU twin",
+        why: "the upsample, the hold on Bt's light and the composite, reading U_TH's head output; held with the chain to compositeEmitters(temporalUpscale(U_TH, x)) within 1e-4" }),
     Object.freeze({ id: "learnedUpscaleTemporalGPU.UPHOLD_WGSL", kind: "ordered multi-dispatch chain, graded against a CPU twin",
         why: "U_TH's last pass, the half-size head's residual upsampled and the hold at full size, reading what the four conv passes wrote; held to holdCpu(half) on the device's own residual (within 1e-5) and the whole chain to temporalUpscale (within 1e-4)" }),
 ]);

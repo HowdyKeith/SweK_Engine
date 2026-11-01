@@ -223,6 +223,30 @@ export function readH71(rep) {
     return { commit: base.commit, counts: base.counts, T: base.T, U, clock, ratio: U !== null && base.T !== null ? U / base.T : null };
 }
 export const H71_RATIO = 0.25;
+/**
+ * Section 172: where the chain runs U_TH after its history, by adapter key -- the 1080 class, decided by section 171 (0.154 of a traced
+ * frame there); off elsewhere (the Intel measured 0.28-0.30, over budget; an unmeasured adapter is not assumed). Native keys are
+ * "platform/vendor/architecture" from node, page keys the browser's ("Windows/..."), as render/denoiseDevice.mjs's tables are.
+ */
+export const UTH_BY_ADAPTER = Object.freeze({ "win32/nvidia/pascal": "section 171", "Windows/nvidia/pascal": "section 171" });
+export const uthFor = (key, table = UTH_BY_ADAPTER) => !!key && Object.hasOwn(table, key);
+/**
+ * SECTION 172's RULE (H75) over a realGpuRun report: the chain with its history and U_TH against the chain with its history, both off
+ * the denoiseUpscaleGPU gate's section 172 line (one run, one page). A run counts as H63's: every gate green, exit 0.
+ */
+export function readH75(rep) {
+    const base = readH63(rep), g = (rep.gates || []).find((x) => x.gate === "render/denoiseUpscaleGPU-selfcheck.mjs");
+    let withUT = null, without = null;
+    for (const l of (g && g.measured) || []) { const m = l.match(/^section 172: U_TH after the history -- .*with its history and U_TH ([\d.]+) ms, with its history ([\d.]+) ms/); if (m && +m[1] > 0 && +m[2] > 0) { withUT = +m[1]; without = +m[2]; break; } }
+    return { commit: base.commit, counts: base.counts, withUT, without, ratio: withUT !== null ? withUT / without : null };
+}
+export const H75_RATIO = 1.25;
+export function h75(runs) {
+    if (!runs.length || !runs.every((r) => r.counts && r.ratio !== null)) return "no verdict";
+    return runs.every((r) => r.ratio <= H75_RATIO) ? "holds" : "fails";
+}
+/** Round 72's committed U_TH, the one the chain and the page run. */
+export const UTH_NET = "render/upscale-net-r72.json";
 /** SECTION 169's RULE (H74): round 74's line, U_TH with the coalesced down pass, against the same T. */
 export function readH74(rep) {
     const base = readH63(rep), g = (rep.gates || []).find((x) => x.gate === "render/denoiseLearnedUpscaleGPU-selfcheck.mjs");
