@@ -27,6 +27,9 @@
 //   NOT RED: H67 and H68 (the generator's bound on where a ship may START, x -200..600 and |y| <= 400): over seeds 1 to 3000, 9,037 ships, the starts range from x -10.6 to 585.4 and |y| to 376.8, so the line NEVER FIRED and was REMOVED as dead
 //   code (the gate's row now says the range is measured, not enforced); H127 (`spec.approach &&` dropped in hardTarget) is an EQUIVALENT MUTANT, left standing: the conjunct sits in the branch only the smooth arm reaches and that arm's
 //   approach flag is true; H175 is a CONTROL (a no-op by construction), 0 red as it should be.
+// ADDENDUM, THE GRID AND `at` OPTIONS (added AFTER HELD4 was flown, for the tank scene of brain/subTankNav.mjs; both default to the behaviour HELD4 was flown on, and the golden flights above pass unchanged): 12 MORE MUTANTS, ALL RED BY NAME. G01 and G02 (planShapes
+//   ignores `at`, now and predict), G03 (the `at` default), G04 and G05 (DEFAULT_GRID's size and origin), G06 (the grid's far edges from the study's region), G07 (the cell centres), G08 (the field's origin), G09 (the grid's south edge), G10 (the ladder drops the
+//   grid), G11 and G12 (a tank-sized default grid instead of the study's).
 //   ON THE FIRST RUN TWELVE WENT 0 RED and the gate grew what separated them: H93 and H96 (`<=` against `<` at the blocking distance) had no cell at EXACTLY r + 4 + margin or EXACTLY 15 m from the vessel (a disc on a cell centre whose blocking
 //   distance is eight cells, and an `own` point on a cell centre); H130 had no vessel exactly at the keel; H144 (the ladder option) and H158 (the weight error) and H163 (the margin on the record is the FIRST plan's) and H164 (the chord, with a start
 //   that is not the origin) and H168 (the blocked flag on the record) had no row that reads them. In the same pass the generator's `p.group === group` exemption turned out DEAD (the discs of the island being drawn are not in `placed` yet) and was cut.
@@ -83,6 +86,8 @@ console.log("\n3. THE PLAN");
     ok("!! 'predict': a moving ship is the capsule from where it is to where it will be in 30 s ((100, 20) to (130, 80)); a static obstacle stays a point; the order and the radii are kept", same(pred.map((s) => [s.ax, s.ay, s.bx, s.by, s.r]), [[10, 0, 10, 0, 7], [30, 0, 30, 0, 6], [70, 0, 70, 0, 5], [100, 20, 130, 80, 5]]));
     ok("!! the default mode is 'now'; an unknown mode throws, naming the modes", same(H.planShapes(sc, 10), now) && /subHardNav\.planShapes: unknown mode "later" \(now, predict\)/.test(thrown(() => { H.planShapes(sc, 0, { mode: "later" }); })));
     ok("!! no obstacles, no shapes", H.planShapes({ minDepth: 20, obstacles: [] }, 0).length === 0);
+    const lane = (o, tt) => [o.x + 2 * tt, o.y - 3 * tt], ln = H.planShapes(sc, 10, { at: lane }), lp = H.planShapes(sc, 10, { at: lane, mode: "predict" });
+    ok("!! `at` replaces the obstacle's position function: 'now' reads at(o, t) ((10, 0) at t = 10 is (30, -30)), 'predict' reads at(o, t) and at(o, t + 30) ((10, 0) to (90, -120)); with no `at` the default is posAt", same(ln.map((s) => [s.ax, s.ay, s.bx, s.by]), [[30, -30, 30, -30], [50, -30, 50, -30], [90, -30, 90, -30], [110, -30, 110, -30]]) && same(lp.map((s) => [s.ax, s.ay, s.bx, s.by]), [[30, -30, 90, -120], [50, -30, 110, -120], [90, -30, 150, -120], [110, -30, 170, -120]]) && same(H.planShapes(sc, 10, { at: H.posAt }), H.planShapes(sc, 10)));
 }
 
 console.log("\n4. THE FIELD");
@@ -117,6 +122,20 @@ console.log("\n4. THE FIELD");
     const gapSc = (w) => { for (let s = 1; s <= 60; s++) if (s % 3 === H.GAP_WIDTHS.indexOf(w)) return H.hardScenario(s, "hard-gaps"); return null; };
     const narrow = gapSc(24), wide = gapSc(40), shapesOf = (sc) => H.planShapes(sc, 0), has = (f, p) => { const c = N.cellOf(f, p.x, p.y); return !!c && f.dist[c.i] < N.BIG; };
     const lad24 = safe(() => H.buildLadderField(shapesOf(narrow), narrow.goal, narrow.start)), lad40 = safe(() => H.buildLadderField(shapesOf(wide), wide.goal, wide.start));
+    const TG = { x0: 0, y0: 0, w: 100, h: 60 }, bruteG = (shapes, margin, grid) => {
+        const inflate = 4 + margin, out = new Uint8Array(grid.w * grid.h), x1 = grid.x0 + grid.w * 5, y1 = grid.y0 + grid.h * 5;
+        for (let gy = 0; gy < grid.h; gy++) for (let gx = 0; gx < grid.w; gx++) {
+            const cx = grid.x0 + (gx + 0.5) * 5, cy = grid.y0 + (gy + 0.5) * 5, edge = cx - grid.x0 < inflate || x1 - cx < inflate || cy - grid.y0 < inflate || y1 - cy < inflate;
+            const shape = shapes.some((s) => Math.hypot(cx - s.ax, cy - s.ay) <= s.r + inflate);
+            out[gy * grid.w + gx] = edge || shape ? 1 : 0;
+        }
+        return out;
+    };
+    const tdisc = [{ ax: 250, ay: 150, bx: 250, by: 150, r: 30 }], tg = safe(() => H.buildHardField(tdisc, { x: 450, y: 150, depth: 25 }, { margin: 12, grid: TG }));
+    ok("!! DEFAULT_GRID is the study's region (96 x 56 cells of 5 m from (-40, -140)), frozen; a field built with it is the default field", same(H.DEFAULT_GRID, { x0: -40, y0: -140, w: 96, h: 56 }) && Object.isFrozen(H.DEFAULT_GRID) && eq(safe(() => H.buildHardField(disc, goal, { margin: 12, grid: H.DEFAULT_GRID }).blocked), brute(disc, 12)));
+    ok("!! a `grid` of the tank's size (100 x 60 cells from the origin, 500 x 300 m): the field has that shape (w 100, h 60, x0 0, y0 0, the waypoint (450, 150) in cell (90, 30)), the blocked cells are exactly the disc's inflated circle and the BAND ALONG THE TANK'S OWN WALLS (brute force), 3 cells deep on every side", !!tg && tg.w === 100 && tg.h === 60 && tg.x0 === 0 && tg.y0 === 0 && tg.goalCell.gx === 90 && tg.goalCell.gy === 30 && tg.blocked.length === 6000 && eq(tg.blocked, bruteG(tdisc, 12, TG)) && tg.blocked[30 * 100 + 0] === 1 && tg.blocked[30 * 100 + 99] === 1 && tg.blocked[0 * 100 + 50] === 1 && tg.blocked[59 * 100 + 50] === 1 && tg.blocked[30 * 100 + 3] === 0 && tg.blocked[3 * 100 + 50] === 0 && tg.dist.length === 6000 && tg.dist[30 * 100 + 90] === 0);
+    const tl = safe(() => H.buildLadderField(tdisc, { x: 450, y: 150, depth: 25 }, { x: 100, y: 150 }, { grid: TG }));
+    ok("!! buildLadderField takes the `grid` too: the plan comes back on the tank's grid (6,000 cells), at the 12 m rung when it has a route from (100, 150)", !!tl && tl.w === 100 && tl.h === 60 && tl.margin === 12 && has(tl, { x: 100, y: 150 }));
     ok("!! the ladder, a 24 m gap: the 12 m field has NO route from the start, the plan comes back at a lower margin (6 or 3) and HAS one", !!narrow && !has(H.buildHardField(shapesOf(narrow), narrow.goal, { margin: 12 }), narrow.start) && !!lad24 && lad24.margin < 12 && has(lad24, narrow.start));
     ok("!! the ladder, a 40 m gap: the 12 m field has a route and the plan is the 12 m field (the first margin is the widest and is kept when it works)", !!wide && !!lad40 && lad40.margin === 12 && has(lad40, wide.start) && eq(lad40.blocked, H.buildHardField(shapesOf(wide), wide.goal, { margin: 12 }).blocked));
     ok("!! the ladder is walked IN ORDER and the first margin with a route wins: an open sea with the ladder [3, 12] gives 3; with [12, 3] gives 12; and the 8 m rung is used when 12 closes and 8 opens (the 24 m gap: 8 would give a corridor of 0, so the plan is at 6 or 3, never 8)", safe(() => H.buildLadderField([], GOAL, { x: 0, y: 0 }, { ladder: [3, 12] }).margin) === 3 && safe(() => H.buildLadderField([], GOAL, { x: 0, y: 0 }, { ladder: [12, 3] }).margin) === 12 && !!lad24 && lad24.margin !== 8 && safe(() => H.buildLadderField([], GOAL, { x: 0, y: 0 }).margin) === 12);

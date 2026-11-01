@@ -28,6 +28,7 @@ export const GAP_WIDTHS = Object.freeze([24, 32, 40]), SHIP_FAST = 2, CURRENT_ST
 // THE MARGIN LADDER (Amendment 1 of FOLLOW-UP 3, made on DEV before HELD4 was read): a field arm builds its plan at the first margin of the ladder that leaves a route from the vessel's cell, 12 m first (the amended margin of follow-up 1) and smaller when the wide one closes the way
 export const MARGIN_LADDER = Object.freeze([12, 8, 6, 3]);
 export const HARD_SETS = Object.freeze({ dev: N.range(1, 30), held4: N.range(401, 460) });
+export const DEFAULT_GRID = Object.freeze({ x0: N.REGION.x0, y0: N.REGION.y0, w: N.GRID_W, h: N.GRID_H });   // the study's region: 96 x 56 cells of 5 m from (-40, -140)
 
 const mulberry = (a) => () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
 const segD = N.segmentDistance;
@@ -104,13 +105,13 @@ export function hardScenario(seed, kind) {
     });
 }
 
-/** The obstacle shapes a plan blocks, as capsules { ax, ay, bx, by, r } (a disc is a capsule of zero length). `mode` "now": each obstacle where it is at time t; "predict": a moving one as the capsule it sweeps in the next HORIZON_S at its velocity. `blind`: every iceberg blocks. */
-export function planShapes(sc, t, { mode = "now", blind = false } = {}) {
+/** The obstacle shapes a plan blocks, as capsules { ax, ay, bx, by, r } (a disc is a capsule of zero length). `mode` "now": each obstacle where it is at time t; "predict": a moving one as the capsule from where it is to where it will be HORIZON_S later. `blind`: every iceberg blocks. `at(o, t)` gives an obstacle's centre at a time (default posAt: constant velocity; the tank's ships turn at the ends of a lane, brain/subTankNav.mjs). */
+export function planShapes(sc, t, { mode = "now", blind = false, at = posAt } = {}) {
     if (mode !== "now" && mode !== "predict") throw new Error(`subHardNav.planShapes: unknown mode "${mode}" (now, predict)`);
     const out = [];
     for (const o of sc.obstacles) {
         if (!((blind && o.type === "berg") || o.keel + VMARGIN > sc.minDepth)) continue;   // (a full-depth obstacle has keel Infinity: it always blocks)
-        const [x, y] = posAt(o, t), p = mode === "predict" ? posAt(o, t + HORIZON_S) : [x, y];
+        const [x, y] = at(o, t), p = mode === "predict" ? at(o, t + HORIZON_S) : [x, y];
         out.push({ ax: x, ay: y, bx: p[0], by: p[1], r: o.r });
     }
     return out;
@@ -118,27 +119,27 @@ export function planShapes(sc, t, { mode = "now", blind = false } = {}) {
 
 /**
  * The field for a set of shapes and the waypoint at `margin` m beyond the half-hull: the same object brain/subFieldNav.mjs's buildField returns (so its aim points and headings read it), with the REGION'S EDGE BLOCKED -- a cell whose centre is within
- * half-hull + margin of the boundary -- and, when `own` ({ x, y }) is given, no cell within OWN_CLEAR of that point blocked by a SHAPE (the edge stays blocked).
+ * half-hull + margin of the boundary -- and, when `own` ({ x, y }) is given, no cell within OWN_CLEAR of that point blocked by a SHAPE (the edge stays blocked). `grid` is { x0, y0, w, h } in cells of N.CELL (default DEFAULT_GRID, the study's region; the tank passes its own).
  */
-export function buildHardField(shapes, goal, { margin = MARGIN_HARD, own = null } = {}) {
-    const inflate = N.HULL_HALF + margin, w = N.GRID_W, h = N.GRID_H, R = N.REGION, heights = new Float32Array(w * h).fill(N.FREE_H), blocked = new Uint8Array(w * h);
+export function buildHardField(shapes, goal, { margin = MARGIN_HARD, own = null, grid = DEFAULT_GRID } = {}) {
+    const inflate = N.HULL_HALF + margin, { x0, y0, w, h } = grid, x1 = x0 + w * N.CELL, y1 = y0 + h * N.CELL, heights = new Float32Array(w * h).fill(N.FREE_H), blocked = new Uint8Array(w * h);
     for (let gy = 0; gy < h; gy++) for (let gx = 0; gx < w; gx++) {
-        const cx = R.x0 + (gx + 0.5) * N.CELL, cy = R.y0 + (gy + 0.5) * N.CELL;
-        const edge = cx - R.x0 < inflate || R.x1 - cx < inflate || cy - R.y0 < inflate || R.y1 - cy < inflate;
+        const cx = x0 + (gx + 0.5) * N.CELL, cy = y0 + (gy + 0.5) * N.CELL;
+        const edge = cx - x0 < inflate || x1 - cx < inflate || cy - y0 < inflate || y1 - cy < inflate;
         const shape = shapes.some((s) => segD(cx, cy, s.ax, s.ay, s.bx, s.by) <= s.r + inflate) && !(own && Math.hypot(cx - own.x, cy - own.y) <= OWN_CLEAR);
         if (edge || shape) { heights[gy * w + gx] = N.BLOCKED_H; blocked[gy * w + gx] = 1; }
     }
-    const field = { w, h, cell: N.CELL, x0: R.x0, y0: R.y0, margin, blocked };
+    const field = { w, h, cell: N.CELL, x0, y0, margin, blocked };
     const g = N.cellOf(field, goal.x, goal.y), solver = new FlowFieldSolverCPU(null, w, h, { cell: N.CELL, impassDh: N.IMPASS_DH });
     const out = solver.solveSync(heights, [{ gx: g.gx, gy: g.gy }], { wantFlow: true, wantDist: true });
     return { ...field, fx: out.fx, fz: out.fz, dist: out.dist, goalCell: { gx: g.gx, gy: g.gy } };
 }
 
 /** The plan at the first margin of the ladder that leaves a route from `from` ({ x, y }): the field and the margin it was built at; the last margin's field (with no route) when none does. */
-export function buildLadderField(shapes, goal, from, { ladder = MARGIN_LADDER, own = null } = {}) {
+export function buildLadderField(shapes, goal, from, { ladder = MARGIN_LADDER, own = null, grid = DEFAULT_GRID } = {}) {
     let f = null;
     for (const m of ladder) {
-        f = buildHardField(shapes, goal, { margin: m, own });
+        f = buildHardField(shapes, goal, { margin: m, own, grid });
         const c = N.cellOf(f, from.x, from.y);
         if (c && f.dist[c.i] < N.BIG) return f;
     }
