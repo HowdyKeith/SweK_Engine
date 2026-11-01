@@ -165,10 +165,10 @@ export function hardTarget(arm, state, field, goal) {
     return h === null ? straight : { ...straight, heading: h };
 }
 
-/** The gap from the vessel (x, y, depth) to an obstacle at time t, less the obstacle's radius and the half-hull; Infinity when the vessel is BELOW its keel (top of the vessel at or under the keel). */
-export function gapTo(o, x, y, depth, t) {
+/** The gap from the vessel (x, y, depth) to an obstacle at time t, less the obstacle's radius and the half-hull; Infinity when the vessel is BELOW its keel (top of the vessel at or under the keel). `at(o, t)` is the obstacle's centre (default posAt). */
+export function gapTo(o, x, y, depth, t, at = posAt) {
     if (depth - VRADIUS >= o.keel) return Infinity;
-    const [ox, oy] = posAt(o, t);
+    const [ox, oy] = at(o, t);
     return Math.hypot(x - ox, y - oy) - o.r - N.HULL_HALF;
 }
 const clearAt = (obstacles, x, y, depth, t) => obstacles.reduce((m, o) => Math.min(m, gapTo(o, x, y, depth, t)), Infinity);

@@ -27,9 +27,9 @@
 //   NOT RED: H67 and H68 (the generator's bound on where a ship may START, x -200..600 and |y| <= 400): over seeds 1 to 3000, 9,037 ships, the starts range from x -10.6 to 585.4 and |y| to 376.8, so the line NEVER FIRED and was REMOVED as dead
 //   code (the gate's row now says the range is measured, not enforced); H127 (`spec.approach &&` dropped in hardTarget) is an EQUIVALENT MUTANT, left standing: the conjunct sits in the branch only the smooth arm reaches and that arm's
 //   approach flag is true; H175 is a CONTROL (a no-op by construction), 0 red as it should be.
-// ADDENDUM, THE GRID AND `at` OPTIONS (added AFTER HELD4 was flown, for the tank scene of brain/subTankNav.mjs; both default to the behaviour HELD4 was flown on, and the golden flights above pass unchanged): 12 MORE MUTANTS, ALL RED BY NAME. G01 and G02 (planShapes
+// ADDENDUM, THE GRID AND `at` OPTIONS (added AFTER HELD4 was flown, for the tank scene of brain/subTankNav.mjs; both default to the behaviour HELD4 was flown on, and the golden flights above pass unchanged): 14 MORE MUTANTS, ALL RED BY NAME. G01 and G02 (planShapes
 //   ignores `at`, now and predict), G03 (the `at` default), G04 and G05 (DEFAULT_GRID's size and origin), G06 (the grid's far edges from the study's region), G07 (the cell centres), G08 (the field's origin), G09 (the grid's south edge), G10 (the ladder drops the
-//   grid), G11 and G12 (a tank-sized default grid instead of the study's).
+//   grid), G11 and G12 (a tank-sized default grid instead of the study's), G13 and G14 (gapTo ignores `at`; gapTo's `at` default).
 //   ON THE FIRST RUN TWELVE WENT 0 RED and the gate grew what separated them: H93 and H96 (`<=` against `<` at the blocking distance) had no cell at EXACTLY r + 4 + margin or EXACTLY 15 m from the vessel (a disc on a cell centre whose blocking
 //   distance is eight cells, and an `own` point on a cell centre); H130 had no vessel exactly at the keel; H144 (the ladder option) and H158 (the weight error) and H163 (the margin on the record is the FIRST plan's) and H164 (the chord, with a start
 //   that is not the origin) and H168 (the blocked flag on the record) had no row that reads them. In the same pass the generator's `p.group === group` exemption turned out DEAD (the discs of the island being drawn are not in `placed` yet) and was cut.
@@ -72,6 +72,7 @@ console.log("\n2. THE GEOMETRY");
         H.gapTo(O({ r: 10, keel: 10 }), 0, 0, 25, 0) === Infinity && near(H.gapTo(O({ r: 10, keel: 20 }), 30, 0, 12, 0), 16) && near(H.gapTo(O({ r: 10, keel: 20 }), 30, 0, 20.3, 0), 16) && H.gapTo(O({ r: 10, keel: 20 }), 30, 0, 20.7, 0) === Infinity);
     ok("!! gapTo at the boundary: the top of the vessel exactly AT the keel (depth 20.6 with a keel of 20) is clear, a hair above (20.6 - 1e-9) is not", H.gapTo(O({ r: 10, keel: 20 }), 30, 0, 20 + H.VRADIUS, 0) === Infinity && near(H.gapTo(O({ r: 10, keel: 20 }), 30, 0, 20 + H.VRADIUS - 1e-9, 0), 16));
     ok("!! gapTo: a full-depth obstacle (keel Infinity) is never passed beneath, at any depth", near(H.gapTo(O({ r: 10 }), 30, 0, 5000, 0), 16));
+    ok("!! gapTo takes the obstacle's position from `at(o, t)` when one is given (a lane ship at (0, 40) that is at (3t, 40 - 2t): at t = 5 it is at (15, 30); a vessel at (15, 0) is 30 - 10 - 4 = 16 off)", near(H.gapTo(O({ y: 40, r: 10 }), 15, 0, 20, 5, (o, tt) => [3 * tt, o.y - 2 * tt]), 16) && near(H.gapTo(O({ y: 40, r: 10 }), 15, 0, 20, 5), Math.hypot(15, 40) - 14));
     ok("!! gapTo reads the obstacle where it is AT THE TIME (a ship at (0, 40) moving (0, -2): at t = 5 it is at (0, 30), 30 from a vessel at (0, 0); gap 30 - 10 - 4 = 16)", near(H.gapTo(O({ y: 40, vy: -2, r: 10 }), 0, 0, 20, 5), 16) && near(H.gapTo(O({ y: 40, vy: -2, r: 10 }), 0, 0, 20, 0), 26));
 }
 
