@@ -1,7 +1,7 @@
 // WebGLEngine/render/subAquariumSim.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
 // THE TANK OF sub-aquarium.html, WITHOUT A PICTURE: every submarine the aquarium holds swims in a box of water, each flown by ITS OWN pilot -- the PD autopilot (brain/autopilotSub.mjs) when it arrived with no weights, or the
-// connectome-wired network (brain/pilotSubPolicy.mjs) with the 963 weights it arrived with, or the pilot of a KIND a page has registered for the circuit its weights belong to (v4907 work: the stateful fly pilot) -- through the same vessel (physics/mechanics/subModel6dof.mjs) and the same (state, target, current) -> controls contract
+// connectome-wired network (brain/pilotSubPolicy.mjs) with the 963 weights it arrived with, or the pilot of a KIND a page has registered for the circuit its weights belong to (unnumbered work: the stateful fly pilot) -- through the same vessel (physics/mechanics/subModel6dof.mjs) and the same (state, target, current) -> controls contract
 // as every task before this one. The page draws what this module computes; this module draws nothing, so a gate can fly a tank for minutes in a few milliseconds.
 //
 // WHAT A SUB DOES IN THE TANK: it WANDERS. Every 20-45 seconds it picks a new heading, depth (14..40 m) and speed (1.5..3 m/s). The moment it crosses MARGIN metres in from a wall it is RETARGETED toward the middle
@@ -79,7 +79,7 @@ export function createTank({ hull = "nominal", length = LENGTH, width = WIDTH } 
     const insideBox = (x, y) => x >= MARGIN && x <= length - MARGIN && y >= MARGIN && y <= width - MARGIN;
     const subs = new Map();   // id -> live sub
     const estimators = new Map();   // event name -> build(inner) -> pilot, registered by a page (the estimators need the fly circuit it loads)
-    const kinds = new Map();   // circuit name -> { weightCount, build(weights, { sub }) -> pilot }, registered by a page that has loaded what the kind needs (v4907 work, brain/TANK_PILOTS_WIP.md)
+    const kinds = new Map();   // circuit name -> { weightCount, build(weights, { sub }) -> pilot }, registered by a page that has loaded what the kind needs (unnumbered work, brain/TANK_PILOTS_WIP.md)
     let clock = 0, hullName = hull, MODEL = H.model(hull);   // the vessel every sub in the tank is (physics/mechanics/subHulls.mjs); the pilots do not know which
 
     function spawn(entry, rng, atCentre = false) {
@@ -87,7 +87,7 @@ export function createTank({ hull = "nominal", length = LENGTH, width = WIDTH } 
         const depth = DEPTH_MIN + rng() * (DEPTH_MAX - DEPTH_MIN), heading = (rng() - 0.5) * 2 * Math.PI;
         return S.createState({ depth, pos: [x, y, -depth], speed: 2, heading, model: MODEL });
     }
-    // WHAT FLIES A SUB (v4907 work): an entry names its CIRCUIT (the aquarium's wire: "gfc", the fruit fly's Giant Fiber Circuit, is the default and the only one built in; the entries this tank was written for name none). With 963 weights a gfc sub flies the network of
+    // WHAT FLIES A SUB (unnumbered work): an entry names its CIRCUIT (the aquarium's wire: "gfc", the fruit fly's Giant Fiber Circuit, is the default and the only one built in; the entries this tank was written for name none). With 963 weights a gfc sub flies the network of
     // brain/pilotSubPolicy.mjs. A sub of any other circuit is flown by the KIND a page has registered for it (registerPilotKind) when its weights are exactly the kind's count, and by the PD autopilot otherwise -- no kind registered yet, a wrong count, a builder that throws.
     // A sub waiting for its kind keeps its weights (`kindWeights`), so a kind registered later seats it.
     const isGfc = (entry) => entry.circuit === undefined || entry.circuit === "gfc";
@@ -191,7 +191,7 @@ export function createTank({ hull = "nominal", length = LENGTH, width = WIDTH } 
             sub.aux = { pump: c(a.pump), repair: c(a.repair) }; return { ...sub.aux };
         },
         /**
-         * Register how the tank flies the subs of a circuit other than "gfc" (v4907 work): `kind` is { weightCount, build(weights, { sub }) -> pilot(state, target, current, aux) }. A sub of that circuit with exactly weightCount weights is flown by
+         * Register how the tank flies the subs of a circuit other than "gfc" (unnumbered work): `kind` is { weightCount, build(weights, { sub }) -> pilot(state, target, current, aux) }. A sub of that circuit with exactly weightCount weights is flown by
          * build's pilot (its `sub` is the tank's record: `sub.target` is the wandering target, replaced at every retarget, wall turn and respawn); one with another count, or whose builder throws, flies the PD autopilot and says why in its snapshot's kindError.
          * Registering SEATS the subs of that circuit already in the tank (they were waiting with their weights); one with an event running has the event ended first (it wrapped the autopilot). Registering again replaces the kind and seats them again.
          * A bad circuit ("gfc" is built in) or kind throws and changes nothing. Returns { seated }, the number of subs now flown by the kind.

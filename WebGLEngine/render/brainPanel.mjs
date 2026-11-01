@@ -31,7 +31,7 @@ export const KINDS = Object.freeze({
     fly: Object.freeze({ label: "fruit fly Giant Fiber circuit (34 neurons)", network: true, flown: true }),
     gpu: Object.freeze({ label: "GPU brain (18-32-32-4 network)", network: true, flown: true }),
     fish: Object.freeze({ label: "zebrafish circuit (Fish1)", network: true, flown: false }),
-    flycx: Object.freeze({ label: "fly heading-loop circuit with memory (148 cells)", network: false, flown: true }),   // v4907 work: the stateful fly pilot the tank seats (render/subAquariumFlyCx.mjs); its rows are the autopilot's laws it adds a residual to
+    flycx: Object.freeze({ label: "fly heading-loop circuit with memory (148 cells)", network: false, flown: true }),   // unnumbered work: the stateful fly pilot the tank seats (render/subAquariumFlyCx.mjs); its rows are the autopilot's laws it adds a residual to
     manual: Object.freeze({ label: "you, on the keyboard", network: false, flown: true }),
 });
 /** The description of a kind: { label, network, flown }; an unknown kind reads as { label: kind, network: false, flown: false }. */

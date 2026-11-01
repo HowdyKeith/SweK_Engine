@@ -6,7 +6,7 @@
 // A SUB ON THE WIRE (a JSON object; nothing in it is ever executed or evaluated -- it is DATA a page flies with code the page already has):
 //   name     1..40 characters of letters, digits, space and . _ - ( )   (anything else is dropped; a name is a label, not markup)
 //   circuit  "gfc"    the fruit fly's Giant Fiber Circuit (34 neurons, 313 synapses) -- THE STAND-IN, not a fish; the default
-//            "flycx"  (v4907 work, brain/TANK_PILOTS_WIP.md) the fly's central-complex HEADING LOOP (148 cells, 7,080 synapses) as a reservoir WITH MEMORY, brain/pilotSubCircuitState.mjs: a stateful pilot. A page flies it only after it has loaded that circuit and registered the kind
+//            "flycx"  (unnumbered work, brain/TANK_PILOTS_WIP.md) the fly's central-complex HEADING LOOP (148 cells, 7,080 synapses) as a reservoir WITH MEMORY, brain/pilotSubCircuitState.mjs: a stateful pilot. A page flies it only after it has loaded that circuit and registered the kind
 //                     (render/subAquariumSim.mjs registerPilotKind); a page that has not flies the PD autopilot, as it does for any weights it cannot fly
 //   weights  null (the PD autopilot flies it) or EXACTLY WEIGHTS[circuit] finite numbers, each |w| <= 1000: gfc 963 (brain/pilotSubPolicy.mjs: 14 x 34 + 34 + 313 + 34 x 4 + 4), flycx 1,729 (brain/pilotSubCircuitState.mjs: 15 x 88 + 148 + 1 + 4 x 64 + 4)
 //   theta    null or the twelve tactician numbers by name (brain/subTactics.mjs), each finite and |v| <= 10000; a page clamps them into their real bounds before use

@@ -20,7 +20,7 @@
 //   P17 remove posts to the wrong route 3 | P18 the speed selector ignored 1 | P20 an outside image 3 | P21 the frame loop never starts (see the run) | P22 the fish chip never polled 1 | P23 the empty message dropped 1
 //   P24 the remove buttons on the REMOTE rows instead of the local ones 3
 //   P14 (one of THREE statements that no fish circuit is vendored removed -- the header comment, the demo:desc meta and the bridge's chip detail all said it) WAS AN EQUIVALENT MUTANT, left standing and said; the page's statements changed when the fish pilot was written (see the log below), and P14 no longer exists as a mutant.
-// ADDENDUM (v4907 work, the stateful fly pilot on the page; brain/TANK_PILOTS_WIP.md): NINE MORE MUTANTS of sub-aquarium.html, each run against a copy of this gate with a real browser, ALL RED BY NAME (rows in brackets): P25 the label read off the wire's pilot field instead of what the tank flies [1] |
+// ADDENDUM (unnumbered work, the stateful fly pilot on the page; brain/TANK_PILOTS_WIP.md): NINE MORE MUTANTS of sub-aquarium.html, each run against a copy of this gate with a real browser, ALL RED BY NAME (rows in brackets): P25 the label read off the wire's pilot field instead of what the tank flies [1] |
 //   P26 the stateful sub labelled 'network' [2] | P27 the kind never registered [1] | P28 registered under gfc (the tank refuses it) [1] | P29 the failure not said [1] | P30 the module path wrong [1] | P31 the failure message reworded [1] |
 //   P32 the label read off the sub's circuit (a flycx sub whose kind did not load would say 'stateful' while it flies the autopilot) [1] | P33 the network label dropped [1]. ONE THING THE PAGE GATE CANNOT SEE, SAID: a kind built with its memory switched off
 //   (`flyCxKind(circuit, { persist: false })`) reads the same on the page -- the list says 'stateful' either way; the memory is held in render/subAquariumFlyCx-selfcheck.mjs and the tank's own gate. The list shows seven subs now (the stateful pilot is the first), the
@@ -137,7 +137,7 @@ console.log("\n3. THE LIVE PAGE");
             await pg.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
             const afterHull = await pg.$$eval("#list .row .sub", (e) => e.map((x) => x.textContent));
             ok("!! choosing the Munk x5 hull says so, resets the subs on the new vessel without a script error, and the rows keep their live stats (a depth in m and a speed in m/s)", /hull: Munk x5/.test(await pg.textContent("#msg")) && (await pg.$eval("#hullSel", (e) => e.value)) === "munk5" && errs.length === 0 && afterHull.length > 0 && afterHull.every((t) => /\d+ m · \d+\.\d m\/s · Munk x5 \(extreme\)/.test(t)), afterHull[0]);
-            // v4907 work -- THE KIND CANNOT BE LOADED (its module is refused): the stateful sub is still in the list, flies the PD autopilot, SAYS it does ("PD autopilot", never "stateful") and the page says why; nothing throws
+            // unnumbered work -- THE KIND CANNOT BE LOADED (its module is refused): the stateful sub is still in the list, flies the PD autopilot, SAYS it does ("PD autopilot", never "stateful") and the page says why; nothing throws
             const pg2 = await (await b.newContext({ viewport: { width: 1200, height: 900 } })).newPage(), errs2 = []; pg2.on("pageerror", (e) => errs2.push(String(e.message)));
             await pg2.route("**/render/subAquariumFlyCx.mjs", (r) => r.abort());
             await pg2.goto(base + "/sub-aquarium.html", { waitUntil: "load" });
