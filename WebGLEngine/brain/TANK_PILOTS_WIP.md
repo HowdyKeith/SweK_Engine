@@ -70,3 +70,16 @@ SETTLED ticks:
 ## Left for later, said
 
 The fish pilot (803 weights) is one more kind of the same shape and is not built. A peer needs the page's registration to fly a stateful sub it is sent (the wire is data; a page without the kind flies the autopilot, the rule that already stood). The 3D view draws every sub alike. A paired test of stateful against stateless on the same ids is one more column in the bench, not run.
+
+## FOLLOW-UP: DOES THE MEMORY MATTER? A PAIRED TEST OF STATEFUL AGAINST STATELESS (Keith, 2026-11-01; REGISTERED BEFORE THE TEST IS WRITTEN OR RUN)
+
+**The gap.** The result above read "the stateless arm sits between the autopilot and the stateful one" off two columns, each paired against the AUTOPILOT, and said in so many words that the stateful-against-stateless difference was "not paired-tested". This tests it. The two arms fly the same 1,729 weights; the only difference is that the stateless one has its memory wiped every tick (`flyCxKind(circuit, { persist: false })`).
+
+**The test.** NEW sub ids `pair-0` to `pair-23` (the first table used `bench-0` to `bench-23`; none of these has been flown), 240 s each, the same four-ish measures as before: the heading error to the wandering target, SETTLED ticks (at least 12 s after the target last changed). For each id and each of the two arms, once with no event and once through the tank's compass dropout. Per id the difference d = stateful minus stateless (negative = the memory helps). Three tests, each an EXACT two-sided sign-flip permutation test on the 24 differences (all 2^24 sign assignments, p = the share whose |sum| is at least the observed |sum|; no sampling), alpha 0.05:
+* **P1 (lit)**: d of the settled error with NO event.
+* **P2 (dark)**: d of the settled error in the DARK windows of the dropout run.
+* **P3 (dark beyond lit)**: d(dark) minus d(lit, in the same dropout run): does the memory help MORE when the compass is out?
+A test "holds" when its mean difference is negative AND p < 0.05. Also reported, not tested: the same differences over ALL ticks, the mean, sd and standard error of each, and the number of ids where the stateful sub was the better.
+**Verdict rule.** MEMORY HELPS MORE IN THE DARK if P3 holds. MEMORY HELPS, NOT DARK-SPECIFIC if P1 and P2 hold and P3 does not. NO MEASURABLE EFFECT OF MEMORY if neither P1 nor P2 holds. MIXED otherwise (one of P1 and P2 holds, P3 does not).
+**Expectation, written before the run (from the 24-id table, which is not one of these ids).** The first table had the stateful arm 0.053 below the stateless in the lit reading and 0.059 below in the dark: I expect P1 and P2 to hold (about 60% each) and P3 NOT to (about 80%), so MEMORY HELPS, NOT DARK-SPECIFIC is my modal guess at about 45%. It is a guess; the p-values decide.
+**What it would not say.** One champion, one hull, no current, 24 ids of 240 s. A dark advantage that is not larger than the lit one is rung 4a's finding again (a generic gain), not a compass skill, whichever way P1 and P2 fall.
