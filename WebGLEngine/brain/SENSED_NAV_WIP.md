@@ -129,3 +129,59 @@ That a longer sonar is a better sonar in a sea with occlusion, noise or false re
 ### AMENDMENT 1 TO FOLLOW-UP 2 (2026-11-01; DEV flown once for each study after the code and both gates were sabotaged, BEFORE HELD7 was flown; seeds 1 to 10 of each kind, 30 scenarios a study; DEV is not a result and nothing above was changed by it)
 
 The flights end and the maps fill; both commands run end to end. Reached of 30 (three kinds together): gap study `exact` 29, `sensed` 25, `sonar-150` 28, **`sonar-200` 29**, `sonar-wide` 25, `sonar-200-wide` 29, `sonar-omni` 29 (the narrow gaps: `sensed` 0 and 2 of 5 at 24 and 32 m, every longer sonar 2 and 4); fix study `sensed` 25, `sensed+fix` 20, **`fix+forget` 23**, `fix+filter` 24, `fix+forget+filter` 21, `sensed+drift` 22. Ten seeds are too few to read a rate from; the registration stands as written and these numbers are not used for anything.
+
+## RESULT OF FOLLOW-UP 2 (2026-11-01; HELD7 = seeds 701 to 760 of each of hard-islands, hard-gaps and hard-current, read once for each study; `node tools/ship/subSensedFollowStudy.mjs --study gap --set held7 --write` -> `brain/subSensedGapHeld7.jsonl` (1,260 flights) and `--study fix` -> `brain/subSensedFixHeld7.jsonl` (1,080 flights)). **SEE THE GAP: SUPPORTED. THE FIX SMEAR: PARTLY SUPPORTED.**
+
+Both studies were sabotaged first (the module 194 mutants, 191 red and the 3 equivalents said earlier; the follow-up study command 154, all red; logs in the gate headers), DEV was flown on 10 seeds as a sanity run (Amendment 1 above) and HELD7 was flown once for each study, as registered.
+
+### Study 1, SEE THE GAP: **SUPPORTED**
+
+Reached of 60 (position exact, sticky memory, only the sonar changes):
+
+| arm | hard-islands | hard-gaps | hard-current | three kinds | gaps by width (of 20): 24 m / 32 m / 40 m |
+|---|---|---|---|---|---|
+| exact | 60 | 56 | 56 | 172 | 16 / 20 / 20 |
+| `sensed` (100 m, +-60) | 59 | **30** | 49 | 138 | 1 / 9 / 20 |
+| `sonar-150` | 60 | 45 | 56 | 161 | 7 / 18 / 20 |
+| **`sonar-200` (designated)** | 60 | **56** | 55 | **171** | **16 / 20 / 20** |
+| `sonar-wide` (100 m, +-90) | 59 | 29 | 50 | 138 | 1 / 8 / 20 |
+| `sonar-200-wide` | 59 | 56 | 54 | 169 | 16 / 20 / 20 |
+| `sonar-omni` (1,000 m, all round) | 60 | 56 | 56 | 172 | 16 / 20 / 20 |
+
+**Bar.** `sonar-200` reaches 56 of 60 (93%) of hard-gaps against the 60% asked: HELD. No harm: it reaches 60 against `sensed`'s 59 in the islands and 55 against 49 in the current (it gains; it does not lose): HELD. Gain over `sensed` in the gaps: +26 against the +10 asked: HELD. **SUPPORTED.**
+
+**Predictions.** **D1 held** (30 <= 45 <= 56). **D2 held** (`sonar-wide` 29 against `sonar-200`'s 56: the cone is not the lever). **D3 MISSED**: `sonar-omni` reaches 56, not the 57 asked -- the floor was set from HELD6's 60 of 60, and on this set EVEN THE EXACT MAP fails four 24 m gaps (702, 711, 729, 732), so the ceiling here is 56. **D4 held** (`sonar-200` reaches all of the omniscient sonar's). **D5 held** (`sensed` reaches 10 of the 40 narrow gaps and all 20 of the 40 m ones). **D6 held** (path 1.02 of the exact map's).
+
+**Post hoc (labelled; none of it moves the verdict).** In the gaps `sonar-200` against `sensed`: **26 flights gained, 0 lost** (exact sign test p < 0.0001); against `exact`: 1 and 1; against `sonar-omni`: 0 and 0 -- **on these 60 gaps a 200 m sonar reaches exactly what the omniscient one does**. `sonar-150` against `sensed`: 17 and 2 (p 0.0007). `sonar-wide` against `sensed`: 1 and 2 (p 1.0). The longer sonar also helped in the current (`sonar-150` 7 gained and 0 lost against `sensed`, p 0.016; `sonar-200` 7 and 1, p 0.07): **the 7 flights `sensed` lost to the exact map in the current were the range too.** Of the exact map's four failed gaps `sonar-200` fails three of the same (702, 729, 732) and one other (747).
+
+### Study 2, THE FIX SMEAR: **PARTLY SUPPORTED**
+
+Reached of 60 (the incumbent's sonar and white 3 m fix; only what is done with the fix and the map changes):
+
+| arm | hard-islands | hard-gaps | hard-current | three kinds | median plans a flight |
+|---|---|---|---|---|---|
+| `sensed` (exact position: the target) | 59 | 30 | 49 | 138 | 50 |
+| `sensed+fix` (white, sticky: the incumbent) | 55 | **9** | 43 | **107** | 54.5 |
+| **`fix+forget` (designated)** | 58 | 27 | 53 | **138** | 80.5 |
+| `fix+filter` (K = 0.2) | 56 | 26 | 50 | 132 | 53 |
+| `fix+forget+filter` | 58 | 26 | 54 | 138 | 69 |
+| `sensed+drift` (control) | 58 | 28 | 50 | 136 | 52 |
+
+**Bar.** Gain: `fix+forget` reaches 138 against `sensed+fix`'s 107, **+31** against the +5 asked: HELD. Close to `sensed` in EACH kind (within 3 flights, either side): the islands 58 against 59 and the gaps 27 against 30 hold, but **the current is 53 against 49: four flights ABOVE `sensed`, and the registered test is two-sided**: MISSED. By the registered rule the verdict is **PARTLY SUPPORTED**. (Read one-sidedly -- "loses no more than 3 flights against `sensed`" -- it would be HELD in every kind and the verdict SUPPORTED. That is not the rule that was written, and it is said here so that nobody reads the first as a failure of the fix.)
+
+**Predictions.** **E1 held** (58 against 55 in the islands). **E2 held** (56 against 55). **E3 held** (138, as many as `fix+forget` and more than `fix+filter`'s 132). **E4 held** (80.5 plans a flight against 54.5: forgetting costs about half as many plans again). **E5 held** (`sensed+drift` 136, within 5 of `sensed` in every kind). **E6 held** (no fix arm reaches more than 5 above `sensed` in the gaps).
+
+**Post hoc (labelled).**
+* **Paired against `sensed+fix`** (same 180 scenarios, the same fix errors): `fix+forget` gained 36 and lost 5 (**p < 0.0001**); in the islands 4 and 1 (p 0.38), in the gaps 21 and 3 (p 0.0003), in the current 11 and 1 (p 0.006). `fix+filter` gained 31 and lost 6 (p < 0.0001). Between the two cures: `fix+forget` 10 flights ahead and `fix+filter` 4 (p 0.18) -- not told apart -- and both together against forgetting alone 6 and 6.
+* **Against the exact position:** `fix+forget` against `sensed` is 8 gained and 8 lost over the 180 scenarios (p 1.0): **a noisy fix with a map that forgets flies as well as a perfect fix**, as far as 60 scenarios a kind can say. `sensed+fix` against `sensed` was 0 and 21 in the gaps (p < 0.0001), 0 and 4 in the islands (p 0.125) and 3 and 9 in the current (p 0.15).
+* **This replicates the cost and moves it.** HELD6 found the sticky white fix cost the ISLANDS most (10 net, p 0.012) and the gaps 9 (p 0.004); here it cost the GAPS 21 and the islands 4 (p 0.125). The sign is the same in every kind both times. The guess that an occupied cell that never clears fattens an island and narrows a gap is what a map that forgets, and nothing else, cures: **the smear is real, and the gaps feel it most because a 24 or 32 m gap closes when the walls on each side grow by a few metres.**
+
+### What the two together say
+
+* **The sonar's range was the cause of the HELD6 gap failure, and it is cheap to fix on this generator**: 200 m reaches what an omniscient sonar does. That is a statement about a PERFECT sonar; a real one's range is a power, a noise and a false-return question, and a longer one is a longer perfect one here.
+* **The fix cost was the sticky union**, and forgetting recovers all of it on this set.
+* **Not tested: the two fixes together** (a 200 m sonar with a noisy fix and forgetting), which is the vessel one would actually build. Entered as `nav-sensed-combined`.
+
+### What this would not say
+
+That a real sonar behaves like this: no noise, no false returns, no occlusion, a perfect heading. That forgetting is safe with false returns (a perfect sonar never finds an occupied cell free by mistake). That 56 of 60 is the rate: it is one set of 60, on which the exact map's own rate is 93%. That the gap study's SUPPORTED means the vessel is now as good as the exact map: it is as good in the gaps, within a few flights in the islands and the current, on this set.

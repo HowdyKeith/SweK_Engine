@@ -2758,17 +2758,13 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "nav-sensed-see-the-gap",
-        blocker: "OPEN",
-        what: "With a 100 m, 60-degree sonar the vessel reaches 1 and 2 of 20 gaps of 24 and 32 m (19 of 20 at 40 m); the same cell map filled by an omniscient sonar reaches 60 of 60 (brain/SENSED_NAV_WIP.md, post hoc), and the failed flights hit the face of a wall whose cells were all in the map by then.",
-        how: "A new registration, fresh seeds: a range and cone sweep (the 100 m was derived from the turn diameter, not from the wall geometry), a slower approach or an approach angle that sees the gap before committing, an exploration rule for a wall with no gap in view; scored against the exact map and the omniscient sonar on the same seeds.",
-        why: "The gaps are where a sensed map breaks, and the cause named so far is a reading of positions, not a test.",
+        state: "CLOSED",
+        what: "CLOSED 2026-11-01 (brain/SENSED_NAV_WIP.md, RESULT OF FOLLOW-UP 2, study 1; tools/ship/subSensedFollowStudy.mjs --study gap, flights in brain/subSensedGapHeld7.jsonl): SUPPORTED. A sonar of 200 m (60 degrees a side) reaches 56 of 60 gaps against the 100 m sonar's 30, with 26 gained and none lost (p < 0.0001), and exactly what an omniscient sonar reaches on those seeds; the range is the lever and the cone is not (sonar-wide 29). The longer sonar also gains in the current and does not hurt the islands.",
     },
     {
         id: "nav-sensed-fix-smear",
-        blocker: "OPEN",
-        what: "The noisy absolute fix (3 m, white, at each ping) cost hard-islands 10 flights net against the exact position (p 0.012) while a drift of 0.3 m per root second cost none; an occupied cell never clears, which is a guess at why.",
-        how: "Test the guess: an occupancy that forgets a cell later pings find free, a fix filtered before the map is registered, and the same fix with no memory at all; same scenarios as subHardNav.mjs, new registration.",
-        why: "A real vessel's fix is noisy; this one result says the registered map handles noise worse than drift.",
+        state: "CLOSED",
+        what: "CLOSED 2026-11-01 (brain/SENSED_NAV_WIP.md, RESULT OF FOLLOW-UP 2, study 2; tools/ship/subSensedFollowStudy.mjs --study fix, flights in brain/subSensedFixHeld7.jsonl): PARTLY SUPPORTED by the registered two-sided closeness rule (fix+forget was 4 flights ABOVE the exact-position arm in the current), +31 over the sticky white fix. A map that forgets recovers the whole cost of a 3 m white fix (138 of 180 against 138 for the exact position, 107 for the sticky fix); a filter alone recovers most (132); the gaps feel the smear most.",
     },
     {
         id: "nav-reacting-traffic",
@@ -2825,6 +2821,20 @@ export const NEXT_ROUNDS = [
         what: "The tank's 3D view (render/subAquarium3d.mjs) does not draw the navigation sea or the goals; the top and depth views do.",
         how: "Islands as columns, icebergs as discs with a keel, ships as hulls, goals as buoys, from tank.sceneNow() and each sub's nav.goal.",
         why: "The 3D view is the one people look at.",
+    },
+    {
+        id: "nav-sensed-combined",
+        blocker: "OPEN",
+        what: "The two cures were tested apart (brain/SENSED_NAV_WIP.md, RESULT OF FOLLOW-UP 2): a 200 m sonar reaches what the omniscient sonar does with an exact position, and forgetting recovers the whole cost of a 3 m white fix with the 100 m sonar. The vessel one would build has both, and drift, and is not an arm.",
+        how: "sonar-200 with the noisy fix and forgetting (and the filter), on fresh seeds, scored against the exact map on the same scenarios; the three kinds of subHardNav.mjs; new registration.",
+        why: "The gap result is for an exact position and the fix result is for the 100 m sonar; whether they add is not shown.",
+    },
+    {
+        id: "nav-sensed-sonar-realism",
+        blocker: "OPEN",
+        what: "Every sensed result has a PERFECT sonar inside its sector (no noise, no false returns, no occlusion) and a perfect heading; forgetting is safe only because a perfect sonar never finds an occupied cell free by mistake, and a longer sonar is free.",
+        how: "Degrade the sonar one thing at a time -- a miss rate, false returns, an island hiding what is behind it, a heading error -- with the range, the cone and the forgetting rule of the two studies, and read what each costs; new registration, fresh seeds.",
+        why: "The sensed map's results are ceilings; the size of the gap between them and a real sonar is not known.",
     },
     {
         id: "nav-traffic-avoid-not-slow",
