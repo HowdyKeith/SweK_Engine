@@ -50,3 +50,37 @@ node tools/ship/gpuSwarm.mjs --hardware --write
 ```
 
 It prints the adapter on its first line (`hardware adapter:` or `*** SOFTWARE ADAPTER ***`), the table, the scores of W1 to W5, and appends the record to `brain/rig-results/gpuSwarm.jsonl` when the adapter is a card. A smaller look: `--sizes 1024,4096 --rounds 1 --seconds 1`.
+
+## RESULT ON THE SANDBOX'S SOFTWARE ADAPTER (2026-11-01; `node tools/ship/gpuSwarm.mjs --write`, sizes 64 to 8,192, 3 rounds, 3 s a swarm; the record is `brain/gpuSwarmSoftware.jsonl`). **THIS IS SWIFTSHADER, A CPU EMULATING A GPU: NO GPU TIME BELOW IS A GRAPHICS CARD'S. The answer to questions 2 and 3 is the rig's run of `node tools/ship/gpuSwarm.mjs --hardware --write`; what is here is question 1 and the CPU side of question 3.**
+
+The tool was gated and sabotaged first (149 mutants, 143 red, 6 equivalent or unobservable by construction, logged in `tools/ship/gpuSwarm-selfcheck.mjs`'s header). ms a tick, medians of 3 rounds:
+
+| N | ticks | decision, CPU | decision, GPU | rest of the tick (CPU run) | tick, CPU | tick, GPU | CPU's decision share | same status | within 1 m |
+|---|---|---|---|---|---|---|---|---|---|
+| 64 | 90 | 0.24 | 3.09 | 0.56 | 0.79 | 3.58 | 29.7% | 100% | 100% |
+| 256 | 90 | 1.25 | 3.78 | 2.00 | 3.25 | 5.72 | 38.6% | 100% | 100% |
+| 1,024 | 90 | 3.95 | 9.44 | 6.68 | 10.6 | 16.8 | 37.2% | 100% | 100% |
+| 2,048 | 90 | 8.79 | 17.3 | 15.1 | 23.9 | 32.9 | 36.8% | 100% | 100% |
+| 4,096 | 90 | 18.2 | 33.1 | 30.7 | 48.8 | 64.6 | 37.2% | 100% | 100% |
+| 8,192 | 90 | 37.8 | 75.9 | 64.3 | 102.2 | 140.0 | 37.0% | 100% | 100% |
+
+**Predictions scored (moving nothing).** **W1 held**: on the first tick, with the inputs shown to be identical (the two swarms' first-tick rows hash alike and unlike a control swarm's), every control of every aircraft is within 1.5e-7 of the CPU twin's at every size. **W2 held**: at every size all aircraft end in the same status and within a metre of the same altitude (100% and 100%): **the swarm flown by the GPU is the swarm flown by the CPU twin**, 8,192 aircraft for 3 s. **W3 MISSED**: the CPU's decision per row is flat from 1,024 up (3.9 to 4.6 microseconds a row), but the GPU's per row at 8,192 (9.3 microseconds) is 0.63 of what it is at 256 (14.8), not a third: a CPU emulating a GPU has no fixed submission cost to spread (about 3 ms a tick here), only a per-row cost. **W4 held for a software adapter**: the GPU decides slower than the CPU twin at every size (0.50 to 0.55 of the CPU twin's speed from 2,048 rows up; the sandbox's crossover run found 0.43 at 8,192 for this network). **W5 held**: from 1,024 rows up the decision is 37% of the CPU-decided tick (29.7% to 38.6% at every size), and the whole-tick speedup is below 1 everywhere (0.22 to 0.76) because the GPU here is slower.
+
+**The number the demo is for (question 3), from the CPU side alone.** The decision is **about 37% of a swarm tick** on this box; the other 63% is the flight model, the features and the bookkeeping. So **even a free GPU decision cannot make the swarm tick more than 1 / (1 - 0.37) = 1.6 times faster**, and the registered W5 bound (2.5) was never in danger. If the rig's pilot-network numbers (about 0.82 microseconds a row and 2.5 to 3.1 ms a call, against a twin at 3 to 5 microseconds a row) carry over, the decision at 8,192 rows falls from about 38 ms to about 9 to 10 ms and the whole tick from about 102 ms to about 73 ms: **a speedup of about 1.4 times, which is arithmetic from two other machines' numbers and not a measurement**. The largest swarm that fits a 30 Hz tick is **2,048 aircraft** with either decider on this box (23.9 ms CPU-decided; the GPU-decided tick is 32.9 ms there on the software adapter).
+
+**What this would not say.** Anything about a card's time: the table's GPU columns are a software renderer's. The flight model's cost on the rig's CPU, which sets the 63%. A trained pilot's swarm (these are the hand weights).
+
+## What the rig runs
+
+From `WebGLEngine/` on the rig, on this branch (Windows command prompt):
+
+```
+cd C:\path\to\SweK_Engine
+git fetch origin claude/sweet-lovelace-8leivh
+git checkout claude/sweet-lovelace-8leivh
+git pull origin claude/sweet-lovelace-8leivh
+cd WebGLEngine
+node tools/ship/gpuSwarm.mjs --hardware --write
+```
+
+The first line it prints names the adapter (`hardware adapter: ...`); it scores W1 to W5 (W4 on the card's half: faster at 4,096 and 8,192 rows, slower at 64) and appends the record to `brain/rig-results/gpuSwarm.jsonl`. A short look first: `node tools/ship/gpuSwarm.mjs --hardware --sizes 1024,4096 --rounds 1 --seconds 1`.

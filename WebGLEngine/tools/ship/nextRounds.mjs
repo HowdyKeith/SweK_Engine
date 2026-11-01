@@ -2753,10 +2753,22 @@ export const NEXT_ROUNDS = [
     // Checked against this file at 612f9679 (v4908): none of these ids, and no entry naming a reservoir kernel, a swarm, a propellant budget, flow-field navigation, the GPU crossover, jets or a pilot tank kind.
     {
         id: "nav-sensed-map",
+        state: "CLOSED",
+        what: "CLOSED 2026-11-01 (brain/SENSED_NAV_WIP.md, RESULT OF THE SENSED MAP; brain/subSensedNav.mjs, tools/ship/subSensedStudy.mjs, flights in brain/subSensedHeld6.jsonl): a sonar of 100 m and 60 degrees a side builds the grid as the vessel goes; the designated sensed+fix arm met the bar in 1 of 3 kinds (NOT SUPPORTED): hard-islands 47 of 60 (bar 48, 12 hits against 6), hard-gaps 13 of 60 (bar 36), hard-current 47 of 60 (bar 42). The sonar map costs nothing measurable in the islands and the current and breaks the narrow gaps (24 and 32 m: 1 and 2 of 20 against the exact map's 20 and 20); the noisy absolute fix costs the islands (p 0.012).",
+    },
+    {
+        id: "nav-sensed-see-the-gap",
         blocker: "OPEN",
-        what: "Every navigation result so far (brain/SUB_FIELD_NAV_WIP.md, follow-ups 1 to 4) has an EXACT MAP and a PERFECT POSITION FIX.",
-        how: "A vessel that has to find the obstacles: a sonar of limited range and bearing that builds the occupancy grid as it goes (the field is re-solved as cells are learned), plus a noisy position fix (a Gaussian error on the plan position, then drift). The scenarios of brain/subHardNav.mjs, a new registration with its own pass/fail written first.",
-        why: "The exact map is the largest single optimism in the navigation write-ups; a result on a known map says nothing about a sea nobody has charted.",
+        what: "With a 100 m, 60-degree sonar the vessel reaches 1 and 2 of 20 gaps of 24 and 32 m (19 of 20 at 40 m); the same cell map filled by an omniscient sonar reaches 60 of 60 (brain/SENSED_NAV_WIP.md, post hoc), and the failed flights hit the face of a wall whose cells were all in the map by then.",
+        how: "A new registration, fresh seeds: a range and cone sweep (the 100 m was derived from the turn diameter, not from the wall geometry), a slower approach or an approach angle that sees the gap before committing, an exploration rule for a wall with no gap in view; scored against the exact map and the omniscient sonar on the same seeds.",
+        why: "The gaps are where a sensed map breaks, and the cause named so far is a reading of positions, not a test.",
+    },
+    {
+        id: "nav-sensed-fix-smear",
+        blocker: "OPEN",
+        what: "The noisy absolute fix (3 m, white, at each ping) cost hard-islands 10 flights net against the exact position (p 0.012) while a drift of 0.3 m per root second cost none; an occupied cell never clears, which is a guess at why.",
+        how: "Test the guess: an occupancy that forgets a cell later pings find free, a fix filtered before the map is registered, and the same fix with no memory at all; same scenarios as subHardNav.mjs, new registration.",
+        why: "A real vessel's fix is noisy; this one result says the registered map handles noise worse than drift.",
     },
     {
         id: "nav-reacting-traffic",
@@ -2877,10 +2889,10 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "gpu-pilot-swarm-demo",
-        blocker: "OPEN",
-        what: "A swarm of pilots decided in one dispatch. UNBLOCKED 2026-11-01 by the rig's crossover: the GPU brain pays only above about 2,000 pilot decisions (500 seat decisions) in ONE call, so the demo needs a swarm of thousands, not hundreds.",
-        how: "A demo that flies several thousand pilots from one GPU Brain built with a batchCap at least the batch size (the default cap of 64 is 38 times slower at 8,192 rows), against the CPU twin for the same swarm, timing the decision call only (the simulation the decisions feed stays on the CPU).",
-        why: "The number it waited for is in: at 8,192 pilot rows the card takes 9.3 ms against the twin's 26.3 ms; at 256 rows it loses (3.1 ms against 1.1 ms).",
+        blocker: "HARDWARE",
+        what: "BUILT AND RUN ON A SOFTWARE ADAPTER 2026-11-01 (brain/GPU_SWARM_WIP.md, tools/ship/gpuSwarm.mjs, brain/gpuSwarmSoftware.jsonl): up to 8,192 aircraft flown for 3 s by flyFleet, decided by the CPU twin and by one GPU dispatch a tick, end in the same status and within a metre of the same altitude (100%); the decision is about 37% of a swarm tick, so a free GPU decision cannot speed the tick up by more than 1.6 times. The GPU times on the software adapter are a CPU emulating a GPU's.",
+        how: "Keith's rig runs `node tools/ship/gpuSwarm.mjs --hardware --write` from WebGLEngine/ on this branch (the commands are at the end of brain/GPU_SWARM_WIP.md); the record lands in brain/rig-results/gpuSwarm.jsonl and the card's W4 (faster at 4,096 and 8,192 rows, slower at 64) is the answer.",
+        why: "The number the demo exists for is the card's: the decision call at several thousand rows and the whole tick it sits in.",
     },
     {
         id: "space-needs-and-limits",
