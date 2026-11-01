@@ -89,7 +89,6 @@ export function hardScenario(seed, kind) {
             const rad = u(8, 14), speed = u(0.8, 3.0), tm = u(20, 110), side = r() < 0.5 ? -1 : 1, th = u(-1, 1) * Math.PI / 3, keel = u(18, 60);
             const along = Math.min(tm * MT.CRUISE, L), ex = start.x + dir[0] * along + dir[0] * u(-30, 30) + nrm[0] * u(-30, 30), ey = start.y + dir[1] * along + dir[1] * u(-30, 30) + nrm[1] * u(-30, 30);
             const hx = side * (nrm[0] * Math.cos(th) - nrm[1] * Math.sin(th)), hy = side * (nrm[0] * Math.sin(th) + nrm[1] * Math.cos(th)), vx = hx * speed, vy = hy * speed, x0 = ex - vx * tm, y0 = ey - vy * tm;
-            if (x0 < -200 || x0 > 600 || Math.abs(y0) > 400) continue;
             if (Math.hypot(x0 - start.x, y0 - start.y) < rad + 50) continue;
             if (segD(goal.x, goal.y, x0, y0, x0 + vx * TRACK_S, y0 + vy * TRACK_S) < rad + 40) continue;
             if (statics.some((s) => segD(s.x, s.y, x0, y0, x0 + vx * TRACK_S, y0 + vy * TRACK_S) < rad + s.r + 6)) continue;
