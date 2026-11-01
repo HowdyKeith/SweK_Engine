@@ -13,8 +13,8 @@ export function needsLine(row) {
     if (!n) return "";
     const kw = Number.isFinite(n.watts) ? (n.watts / 1000).toFixed(1) : "0.0";
     const charge = n.cls === "unlimited" ? "charge unlimited" : `charge ${pct(n.frac)}%`;
-    const trip = n.refilling ? " · REFILLING" : "", on = n.charging ? ` · charging${n.exposed ? " (exposed)" : ""}` : "";
+    const adv = n.advisor && n.advisor.on ? ` · ADVISOR (surfaces under ${pct(n.advisor.threshold)}%)` : "", trip = n.refilling ? " · REFILLING" : "", on = n.charging ? ` · charging${n.exposed ? " (exposed)" : ""}` : "";
     // v4905 -- the pump and the repair, only when they are asked for: the repair waits for the surface and a near stop, and says so
     const pump = n.pump > 0 ? ` · pump ${pct(n.pump)}%` : "", repair = n.repair > 0 ? ` · repair ${pct(n.repair)}%${n.repairing ? "" : " (waits for the surface)"}` : "";
-    return `${CLASS_NAMES[n.cls] || n.cls} · ${charge} · ${kw} kW${trip}${on} · hull ${n.strain.toFixed(2)} of ${Math.round(n.collapseDepth)} m · damage ${pct(n.damage)}% · flood ${(n.flood * 100).toFixed(1)}%${pump}${repair}`;
+    return `${CLASS_NAMES[n.cls] || n.cls} · ${charge} · ${kw} kW${adv}${trip}${on} · hull ${n.strain.toFixed(2)} of ${Math.round(n.collapseDepth)} m · damage ${pct(n.damage)}% · flood ${(n.flood * 100).toFixed(1)}%${pump}${repair}`;
 }
