@@ -46,19 +46,19 @@ export function hardScenario(seed, kind) {
     const goal = { x: u(360, 400), y: u(-80, 80), depth: u(15, 40) };
     const minDepth = Math.min(start.depth, goal.depth), obstacles = [];
     const stat = (type, x, y, rad, keel, group) => ({ type, group, x, y, r: rad, keel, vx: 0, vy: 0 });
-    // a member disc may stand if it is r + 40 from the start and the waypoint and 24 m of water from every disc of ANOTHER group
-    const fits = (d, group, placed) => Math.hypot(d.x - goal.x, d.y - goal.y) >= d.r + 40 && Math.hypot(d.x - start.x, d.y - start.y) >= d.r + 40 && placed.every((p) => p.group === group || Math.hypot(d.x - p.x, d.y - p.y) >= d.r + p.r + 24);
+    // a disc may stand if it is r + 40 from the start and the waypoint and 24 m of water from every disc already placed (the members of the island being drawn are checked against the others, not against each other)
+    const fits = (d, placed) => Math.hypot(d.x - goal.x, d.y - goal.y) >= d.r + 40 && Math.hypot(d.x - start.x, d.y - start.y) >= d.r + 40 && placed.every((p) => Math.hypot(d.x - p.x, d.y - p.y) >= d.r + p.r + 24);
     const place = (nIsland, nBerg) => {
         const placed = [];
         let g = 0;
         for (let tries = 0; tries < 3000 && g < nIsland; tries++) {
             const r1 = u(14, 24), main = { x: u(90, 310), y: u(-110, 110), r: r1 }, members = [main], nSat = 1 + Math.floor(r() * 2);
             for (let k = 0; k < nSat; k++) { const r2 = u(8, 16), ang = u(0, 2 * Math.PI), dist = (r1 + r2) * u(0.6, 0.9); members.push({ x: main.x + dist * Math.cos(ang), y: main.y + dist * Math.sin(ang), r: r2 }); }
-            if (members.every((d) => fits(d, g, placed))) { for (const d of members) placed.push({ ...d, group: g, type: "island", keel: Infinity }); g++; }
+            if (members.every((d) => fits(d, placed))) { for (const d of members) placed.push({ ...d, group: g, type: "island", keel: Infinity }); g++; }
         }
         for (let tries = 0, b = 0; tries < 3000 && b < nBerg; tries++) {
             const d = { x: u(90, 310), y: u(-110, 110), r: u(14, 28) }, keel = u(6, 36);
-            if (fits(d, 1000 + b, placed)) { placed.push({ ...d, group: 1000 + b, type: "berg", keel }); b++; }
+            if (fits(d, placed)) { placed.push({ ...d, group: 1000 + b, type: "berg", keel }); b++; }
         }
         return placed.map((p) => stat(p.type, p.x, p.y, p.r, p.keel, p.group));
     };

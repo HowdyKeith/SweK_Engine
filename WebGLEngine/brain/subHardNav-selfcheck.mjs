@@ -196,6 +196,8 @@ console.log("\n7. THE FLIGHT");
     let calls = 0, lastArgs = null;
     H.flyHard((s, t, c) => { calls++; lastArgs = [s, t, c]; return pilot(s, t, c); }, open, "straight", { seconds: 2 });
     ok("!! the pilot is called once per tick (2 s is 60 calls) with (state, target, current), the target having a heading, a depth and a speed and the current a 3-vector", calls === 60 && lastArgs[0].pos.length === 3 && Number.isFinite(lastArgs[1].heading) && lastArgs[1].depth === 25 && lastArgs[1].speed === 3 && lastArgs[2].length === 3);
+    const away = H.flyHard(pilot, mk({ start: { x: 0, y: 0, depth: 25, speed: 3, pitch: 0, bank: 0, heading: Math.PI }, obstacles: [O({ type: "island", x: 20, y: 0, r: 8, keel: Infinity })], goal: { x: -100, y: 0, depth: 25 } }), "straight", { seconds: 10 });
+    ok("!! the least clearance includes the START: a vessel that only moves away from an island 20 m off (a gap of 8 m at the start) has 8 m on the record or more, never Infinity", away.status !== "collided" && Number.isFinite(away.minClearance) && away.minClearance >= 7.9 && away.minClearance <= 8.1);
     // fields and margins on the record
     const detour = mk({ obstacles: [O({ type: "island", x: 110, y: 6, r: 20, keel: Infinity })], blocked: true, goal: { x: 250, y: 0, depth: 25 } }), d = H.flyHard(pilot, detour, "any");
     ok("!! the same kind of disc, arm `any`: REACHED by a detour (longer than the chord), the least clearance positive, the first plan's margin 12 on the record, no replans", d.status === "reached" && d.path > 250 - 10 && d.minClearance > 5 && d.margin === 12 && d.noRoute === false && d.replans === 0);
