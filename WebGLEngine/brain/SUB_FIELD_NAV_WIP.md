@@ -112,3 +112,39 @@ SECONDARY read, the registered margin of 6 m (nothing in the verdict): field-cel
 **Verdict rule.** SUPPORTED if A5 holds. PARTLY SUPPORTED if some field arm with some rule meets the success bars and no such arm meets its path bound. NOT SUPPORTED if no field arm with a rule meets the success bars. A1 to A4 are scored held or missed and move nothing. If the rule helps but the weave keeps the path ratio above 1.10, the verdict says PARTLY and the number says by how much.
 
 **What a result would not say.** The scenarios, the optimism (a perfect fix and an exact map) and the single hull and autopilot are the first registration's. A rule that works here is a rule for this capture circle (10 m) and this turning radius; it says nothing about a vessel that must also map the obstacles or find the waypoint.
+
+## RESULT OF THE ARRIVAL RULE (2026-11-01; `node tools/ship/subFieldNavStudy.mjs --set held2 --write`, HELD2 = seeds 201 to 260 of each kind, read once; every flight is in `brain/subFieldNavHeld2.jsonl`, 840 records): **PARTLY SUPPORTED** under the registered rule -- the success bars hold for three of the four arrival arms and the path bound is missed by all four
+
+Margin 12 m, the PD autopilot in every arm, 60 scenarios of each kind:
+
+| kind | arm | reached | collided | left | timed out | median path vs straight (pairs) |
+|---|---|---|---|---|---|---|
+| nav (still) | straight | 15/60 (25%) | 45 | 0 | 0 | - |
+| nav | field-cell | 52/60 (87%) | 0 | 0 | 8 | 1.149 (15) |
+| nav | field-cell +approach | 59/60 (98%) | 0 | 0 | 1 | 1.152 (15) |
+| nav | field-cell +approach+slow | 50/60 (83%) | 0 | 0 | 10 | 1.15 (13) |
+| nav | field-smooth | 57/60 (95%) | 0 | 0 | 3 | 1.135 (13) |
+| nav | **field-smooth +approach** | **60/60 (100%)** | 0 | 0 | 0 | 1.132 (15) |
+| nav | field-smooth +approach+slow | 57/60 (95%) | 0 | 0 | 3 | 1.13 (15) |
+| nav-current | straight | 15/60 (25%) | 45 | 0 | 0 | - |
+| nav-current | field-cell | 46/60 (77%) | 4 | 1 | 9 | 1.15 (12) |
+| nav-current | field-cell +approach | 49/60 (82%) | 4 | 1 | 6 | 1.15 (12) |
+| nav-current | field-cell +approach+slow | 48/60 (80%) | 4 | 1 | 7 | 1.15 (13) |
+| nav-current | field-smooth | 52/60 (87%) | 5 | 1 | 2 | 1.12 (14) |
+| nav-current | **field-smooth +approach** | **53/60 (88%)** | 5 | 1 | 1 | 1.12 (14) |
+| nav-current | field-smooth +approach+slow | 50/60 (83%) | 5 | 1 | 4 | 1.12 (14) |
+
+Predictions scored: **A1 held** (+approach reaches at least as many as its plain arm, both field arms, both kinds). **A2 held** (field-smooth+approach times out in 0 and 1 of 60). **A3 held** (collisions do not rise: they are 0 / 0 in still water and 4 / 5 in current for the plain and the +approach arms alike). **A4 MISSED**: `+approach+slow` is WORSE than `+approach`, in both families and both kinds. **A5, the claim: PARTLY SUPPORTED** -- the success bars (90% still, 80% current) hold for field-cell+approach (98% / 82%), field-smooth+approach (100% / 88%) and field-smooth+approach+slow (95% / 83%), and fail for field-cell+approach+slow (83% / 80%); the path bound (median ratio at most 1.10 for smooth, 1.15 for cell) is missed by all four: smooth at 1.13, and cell+approach at 1.1515 -- over its bound by 0.0015, the table's "1.15" is that rounded.
+
+**The effect of the rule, paired on the same scenarios (computed from the flight file after the verdict, not registered):** `+approach` turned 7 scenarios the plain field-cell missed into arrivals in still water (0 lost) and 3 the plain field-smooth missed (0 lost); in current 4 and 1 gained, 1 lost (field-cell, a timeout). So in still water it removed all but one of the near-miss timeouts (field-cell 8 to 1, field-smooth 3 to 0). In current it removed few: field-cell 9 timeouts to 6, field-smooth 2 to 1, and **the collisions (4 to 5 of 60) are exactly the plain arms'**, because the rule acts in the last 30 m and those collisions happen on the way, in a current the field does not know about.
+
+**What it says.**
+* The hypothesis holds in still water: the plain arms' failures were arrivals, and a straight final approach inside 30 m takes field-smooth from 95% to 100% and field-cell from 87% to 98% on scenarios nobody had read, with nothing lost and nothing hit.
+* **Do not read the bars alone**: on HELD2 plain field-smooth already clears the registered bars (95% / 87%, against 92% / 78% on HELD), so these 60 seeds are easier for the plain arm than the first 60 were. The paired counts above are what the rule did.
+* In a current the rule helps a little and the field arms' remaining failures are collisions and a few timeouts, which are not arrival failures. That points at the field not knowing the water's set (a crab angle, a margin that grows with the current, or the current in the cost) and not at the last 30 m.
+* **Slowing the approach does not help and often hurts** (A4): 9 of the 14 lost-by-slowing flights in still water are field-cell, and the timeout is not the 200 s limit (the plain arm reached those scenarios at 133 to 167 s, the slow arm adds a median of 4 s). Why is not diagnosed here: a vessel at 1.5 m/s has less rudder authority (the autopilot's plane gains are scheduled on V squared), which would not make its circle smaller; this is a guess, not a finding.
+* The path is as long as before (median 1.13 to 1.15 of the straight line on the scenarios both reach): the rule does not touch the weave en route or the detour round the obstacles, and a smoother heading would be the next thing to try if the path matters.
+
+**What it does not say.** That the 30 m radius is right anywhere the waypoint is not 40 m clear of every obstacle (it is derived from this generator's clearance). That the rule helps a vessel without a perfect position fix. The first registration's list (a perfect fix and an exact map, static round obstacles, one hull) stands.
+
+**Not built, said:** a smoother heading or lookahead point to cut the weave; a margin or crab angle that knows the current; the tank.
