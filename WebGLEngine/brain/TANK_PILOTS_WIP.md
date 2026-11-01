@@ -85,3 +85,23 @@ A test "holds" when its mean difference is negative AND p < 0.05. Also reported,
 **What it would not say.** One champion, one hull, no current, 24 ids of 240 s. A dark advantage that is not larger than the lit one is rung 4a's finding again (a generic gain), not a compass skill, whichever way P1 and P2 fall.
 
 **Amendment to the paired test (made before the registered run).** A smoke run of the new command (4 ids, 100 s, to see that it prints) used the ids `pair-0` to `pair-3`, so the claim above that none of the registered ids had been flown was no longer true of them; nothing from that run is used. The test ids are renamed to `mem-0` to `mem-23`, which have not been flown at all. Nothing else is changed.
+
+## RESULT OF THE PAIRED TEST (2026-11-01; `node tools/tankFlyCxBench.mjs --paired`, 15 s; new ids `mem-0` to `mem-23`, 240 s each, once, as registered): **MEMORY HELPS, NOT DARK-SPECIFIC**
+
+Stateful minus stateless on the same ids, settled heading error to the wandering target in radians (negative = the memory helps); exact two-sided sign-flip permutation test over all 2^24 sign assignments:
+
+| test | mean difference | sd | se | ids where the stateful sub was better | exact p |
+|---|---|---|---|---|---|
+| **P1** compass lit, no event | **-0.0553** | 0.0901 | 0.0184 | 20 of 24 | **0.0054** (holds) |
+| **P2** dark windows of the dropout | **-0.1368** | 0.1509 | 0.0308 | 19 of 24 | **0.0002** (holds) |
+| **P3** dark beyond lit (difference of differences) | -0.1037 | 0.2812 | 0.0574 | 16 of 24 | 0.0833 (does not hold) |
+| all ticks, lit, no event (reported) | -0.0276 | 0.0962 | 0.0196 | 17 of 24 | 0.1899 |
+| all ticks, DARK (reported) | -0.0769 | 0.1810 | 0.0370 | 20 of 24 | 0.0476 |
+
+The expectation written first was P1 and P2 holding and P3 not: that is what happened (P3 by a short margin: 0.083 against 0.05).
+
+**What it says.** Wiping the memory costs the stateful pilot real heading accuracy in this tank, and it does so with the compass lit (0.055 rad, p 0.005) and in the dark (0.137 rad, p 0.0002). The point estimate in the dark is two and a half times the lit one and P3's mean (-0.104) is not small, but its spread (sd 0.28) is, and the registered test cannot call it at 0.05: **"the memory helps more in the dark" is neither shown nor ruled out by 24 ids; "the memory helps" is shown.** A replication on fresh ids is the way to settle P3 and is not run here.
+
+**The comparator is a HANDICAP, not a retrained control, and this matters.** The stateless arm is the trained champion's own weights with the memory wiped every tick; those weights were found with the memory in place. So the test measures what removing the memory costs THIS trained policy, which is the question asked ("does the memory matter to the pilot in the tank?"), and it does not say a pilot trained without memory would do worse than one trained with it. Rung 4a's NO STATE comparator was RETRAINED without memory and was not worse than the real wiring (`brain/RUNG_4A_CLOSEOUT.md`); the two results do not conflict. Also, as said at the top of this note, the memory restarts at every new wandering target in the tank (every 20 to 45 s).
+
+**Still not said.** One champion, one hull, no current, 24 ids. The earlier table's "the stateless arm sits between the autopilot and the stateful one" is now a tested statement for the stateful-against-stateless half: the stateful arm is better than the stateless one, p 0.005 lit and 0.0002 dark.
