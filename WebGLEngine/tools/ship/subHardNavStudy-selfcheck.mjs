@@ -9,7 +9,16 @@
 //   4  THE TEXT        the table (a line a kind and arm, the splits) and the verdict block
 //   5  THE COMMAND     bad arguments (exit 2, named), a small DEV run end to end (the pilot is the PD autopilot, the scenarios are the set's), --write goes with held4 only and puts one JSON line a flight in brain/subHardNavHeld4.jsonl
 //
-// SABOTAGE LOG -- (filled in below after the mutants have been run)
+// SABOTAGE LOG -- 88 mutants of tools/ship/subHardNavStudy.mjs, each run against a copy of this gate, 2 to 3 at a time. 87 RED BY NAME, 1 DEAD CODE REMOVED:
+//   T01-T05 the five thresholds; T06 the output file; T07-T11 median (even, odd, empty, in place, numeric sort); T12 pathRatio's kind filter on B; T13-T16 pathRatio (A reached, direction, B reached, NaN for none); T18 tally; T19-T24 the cell (rate,
+//   collided, left, timeout, other, noRoute); T25-T29 the medians (clearance over all, path/chord and time over arrivals, replans over all); T30-T31 the margin rungs; T32-T34 vsAny and anyOverBlind (the exclusion, both directions); T35-T41 the
+//   splits (ship speed boundaries both sides, current boundaries both sides, gap width, the two kinds); T42 an empty cell skipped; T43-T48 the bars (islands' collision ceiling, inclusive, designated arm, the verdict rule, the other kinds); T49-T66
+//   H1 to H8 each at its boundary and each `every` against `some`; T67 a missing gap width; T68-T72 the text (percent digits, the gap heading, the collided column, the bar printed, the verdict in capitals); T73-T81 the command (the --write
+//   guard, whole seeds, the set guard, the seeds slice, the tag, the first line, all scenarios flown, the unknown-argument message); T82-T85 the summary's field names and sources; T86-T87 the output path and its line; T88 the default set.
+//   T17 (pathRatio's kind filter on arm A) is DEAD CODE and was REMOVED: the pairing key already carries the kind, so a run of another kind can never match, and only B's filter does any work (T12 is red).
+//   ON THE FIRST RUN FIFTEEN WENT 0 RED and the gate grew what separated them: T20, T21, T22 (the status counts) had one flight of each status, so swapping two counts changed nothing (the test data now has 2 collided, 3 timed out, 1 left); T29 had no flight
+//   that was not an arrival among those with replans; T36, T40, T41 and T82 died of a thrown error in a row that read a cell that was not there (those rows are guarded now); T67 had no gap width without flights; T70 had no row on the table's columns;
+//   T72 only matched the word VERDICT; T79 flew four scenarios and a four-scenario slice looked the same; T80 gave the pilot a zero current, which it ignores; T12 and T17 were redundant filters (above).
 "use strict";
 import * as St from "./subHardNavStudy.mjs";
 import * as H from "../../brain/subHardNav.mjs";
