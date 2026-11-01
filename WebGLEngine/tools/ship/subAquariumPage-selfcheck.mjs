@@ -165,6 +165,10 @@ console.log("\n3. THE LIVE PAGE");
             await pgL.goto(base + "/sub-aquarium.html?size=large", { waitUntil: "load" });
             await pgL.waitForFunction(() => document.getElementById("navSel").disabled, null, { timeout: 10000 }).catch(() => {});   // the page's module runs after its first await: wait for it, not for 'load'
             const largeNav = await pgL.evaluate(() => ({ disabled: document.getElementById("navSel").disabled, title: document.getElementById("navSel").title }));
+            await pgL.evaluate(() => { const s = document.getElementById("navSel"); s.disabled = false; s.value = "any"; s.dispatchEvent(new Event("change")); });   // forced past the disabled picker: the tank itself refuses and the page must put the picker back
+            await pgL.waitForFunction(() => /standard 500 x 300/.test(document.getElementById("msg").textContent), null, { timeout: 5000 }).catch(() => {});
+            const forced = await pgL.evaluate(() => ({ value: document.getElementById("navSel").value, msg: document.getElementById("msg").textContent, btn: document.getElementById("navSeaBtn").disabled }));
+            ok("!! forced on a large tank the TANK refuses (the message names the standard 500 x 300 m tank), the picker goes back to off and the new-sea button stays disabled", forced.value === "" && /standard 500 x 300/.test(forced.msg) && forced.btn === true && errsL.length === 0, forced.msg.slice(0, 100));
             ok("!! on a large tank the navigation picker is DISABLED and says why (the sea is for the standard 500 x 300 m tank), and the page throws nothing", largeNav.disabled === true && /standard 500 x 300/.test(largeNav.title) && errsL.length === 0);
             // unnumbered work -- THE KIND CANNOT BE LOADED (its module is refused): the stateful sub is still in the list, flies the PD autopilot, SAYS it does ("PD autopilot", never "stateful") and the page says why; nothing throws
             const pg2 = await (await b.newContext({ viewport: { width: 1200, height: 900 } })).newPage(), errs2 = []; pg2.on("pageerror", (e) => errs2.push(String(e.message)));
