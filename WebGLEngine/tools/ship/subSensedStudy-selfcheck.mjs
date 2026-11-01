@@ -9,12 +9,18 @@
 //   4  THE TEXT        the table (a block for each kind, then the three kinds pooled, a number in every column), the verdict block (each line reads its own judgement)
 //   5  THE COMMAND     bad arguments (exit 2, named), the scenarios flown by default, a short DEV run end to end, --write goes with held6 only and puts one JSON line a flight in brain/subSensedHeld6.jsonl
 //
-// SABOTAGE LOG -- (filled in below after the mutants have been run)
+// SABOTAGE LOG -- 93 mutants of tools/ship/subSensedStudy.mjs, each run against a copy of this gate, 4 at a time (the scratch-tree runner). ALL 93 RED BY NAME (none by a thrown error), none equivalent:
+//   Y01 the output path; Y02-Y04 the sets; Y05-Y09 the thresholds and their freezing; Y10-Y29 summarize (the empty cell, the rate, what counts as reached, each status count, other, the medians over arrivals or over all, the ensonified share and offset filters, the kind and arm filters, the pooled cell, absent cells);
+//   Y30-Y36 the bars (strict or not, the island hits, in which kind, which arm) and the verdict rule; Y37-Y51 N1 to N7 (each direction, each strictness, one-sided against both, the kind, the ratio and NaN); Y52-Y76 the text (the percent, two decimals, which kinds and arms are printed, each column, HELD against MISSED,
+//   the last line, which judgement each line prints, the bar count, the N lines); Y77-Y93 the command (--write with DEV, the set check, the seed checks, the slice and the default, the kinds and arms flown, the record's tag and target, the count said, the unknown flag and its exit code, the header, the pilot, the title).
+//   ON THE FIRST RUN FIVE WENT 0 RED and the gate grew what separated them: a fixture with 2 time-outs and 1 exit, so that the two counts are told apart (Y15); N5 tested with the gaps below the current's share only and below the islands' only (Y45); a pooled block with numbers of its own (Y56); a second bar pattern in the verdict text so that each of the three lines reads its own flag (Y68); and the file's flights compared with a flight made DIRECTLY with the autopilot's own `decide`
+//   on a hard-current scenario, so a pilot that ignored the scenario's current would differ (Y91: the first version of the row used the study's own pilot on both sides).
 "use strict";
 import path from "node:path";
 import * as St from "./subSensedStudy.mjs";
 import * as X from "../../brain/subSensedNav.mjs";
 import * as H from "../../brain/subHardNav.mjs";
+import * as AP from "../../brain/autopilotSub.mjs";
 
 let fails = 0;
 const ok = (l, c, n = "") => { if (!c) fails++; console.log(`  ${c ? "PASS" : "FAIL"}  ${l}${n ? "   " + n : ""}`); };
@@ -100,8 +106,8 @@ guard("5", () => {
     ok("!! a DEV run of one seed: exit 0, every kind has its block with every arm and 1 flight, the three kinds together, the verdict block follows, nothing is written, and the title names the sonar, the fix and the drift", d.code === 0 && X.SENSE_KINDS.every((k) => d.out.includes("\n" + k + "\n")) && X.STUDY_ARMS.every((a) => new RegExp("^" + a.replace(/\+/g, "\\+") + "\\s+\\| \\d\\/1 ", "m").test(d.out)) && /^VERDICT: /m.test(d.out) && d.w.length === 0 && d.err === "" && /sonar 100 m \+-60 degrees every 1 s, fix sigma 3 m, drift 0.3 m per root s/.test(d.out) && /ladder 12, 8, 6, 3 m, 260 s a flight/.test(d.out));
     const w = call(["--set", "held6", "--seeds", "1", "--write"]), lines = w.w.length ? w.w[0][1].trim().split("\n").map((l) => JSON.parse(l)) : [];
     ok("!! --write with held6 puts one JSON line a flight in brain/subSensedHeld6.jsonl (3 kinds x 5 arms = 15 for one seed), each tagged set 'held6', seed 601, kind by kind in SENSE_KINDS order and in STUDY_ARMS order within a kind, to an absolute path under the engine, and says so", w.code === 0 && w.w.length === 1 && path.isAbsolute(w.w[0][0]) && w.w[0][0].endsWith("brain/subSensedHeld6.jsonl") && lines.length === 15 && lines.every((r) => r.set === "held6" && r.seed === 601) && same(lines.map((r) => r.kind), X.SENSE_KINDS.flatMap((k) => X.STUDY_ARMS.map(() => k))) && same(lines.map((r) => r.arm), X.SENSE_KINDS.flatMap(() => X.STUDY_ARMS)) && w.out.includes("wrote 15 flights to brain/subSensedHeld6.jsonl"));
-    const direct = safe(() => X.flySensed(St.pilot, H.hardScenario(601, "hard-gaps"), "sensed+fix")), rec = lines.find((r) => r.kind === "hard-gaps" && r.arm === "sensed+fix");
-    ok("!! the flights in the file are the library's own flights of the HELD6 scenarios on the PD autopilot (seed 601, hard-gaps, sensed+fix: the same status, ticks, plans and path as a direct flySensed)", !!rec && !!direct && rec.status === direct.status && rec.ticks === direct.ticks && rec.plans === direct.plans && near(rec.path, direct.path, 1e-9));
+    const direct = safe(() => X.flySensed((s, t, c) => AP.decide(s, t, c), H.hardScenario(601, "hard-current"), "sensed+fix")), rec = lines.find((r) => r.kind === "hard-current" && r.arm === "sensed+fix");
+    ok("!! the flights in the file are the library's own flights of the HELD6 scenarios on the PD autopilot (seed 601, hard-current, sensed+fix, flown directly with the autopilot's own decide and the scenario's current: the same status, ticks, plans and path)", !!rec && !!direct && rec.status === direct.status && rec.ticks === direct.ticks && rec.plans === direct.plans && near(rec.path, direct.path, 1e-9));
 });
 
 console.log(fails ? `\n${fails} FAIL` : "\nall checks pass");
