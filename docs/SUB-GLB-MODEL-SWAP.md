@@ -1,4 +1,4 @@
-# Sub .glb model swap -- DESIGN NOTE (2026-11-01); PHASES 1 AND 2 BUILT (2026-11-01), the picker (phase 3) NOT
+# Sub .glb model swap -- DESIGN NOTE (2026-11-01); PHASES 1, 2 AND 3 BUILT (2026-11-01); a real Sketchfab file is the one thing not checked
 
 Asked for by Keith on 2026-10-30, held until after the v4906-v4908 publishes: let a submarine in the Sub Aquarium wear a free
 .glb submarine (Sketchfab or anywhere) instead of the procedural hull. This note is written BEFORE code, from reading
@@ -115,6 +115,11 @@ source, "Assign", "Clear", the attribution line, the rigid-model note and the tr
 ## 6b. STATUS (2026-11-01)
 
 Phase 1 is render/subModelsCore.mjs + its gate (25 rows, 70 mutants). Phase 2 is render/subModels3d.mjs + its gate (sections 1-6, 52 mutants, a browser section that loads a synthetic .glb AND a Draco-compressed one through the default loader into the live view) and four lines in render/subAquarium3d.mjs (`models` option, `setModels`, `getModels`, sync/release). One design change from section 5, found while building: the model is a CHILD of the procedural boat with the five procedural parts HIDDEN, not a replacement group, so `buildSub`'s contract (`userData.parts`, `poseFins`, the cues, the tint) is untouched and a revert is `visible = true`. Not built: the picker, the licence fields in the page, the attribution line on the page, the register entry (phase 3); the page does not yet create a host, so nothing changes on screen. NOT checked: a real Sketchfab file.
+
+## 6c. PHASE 3 (2026-11-01)
+
+Built: render/subModelsPanel.mjs (the form: a hull or the default, a url / an asset-list entry / a picked file, facing, up axis, name, author, a REQUIRED licence, source; live status, the fit's warnings, load failures, the attribution line; the rigid and local-only note), `mountSubModelPicker` (the whole wiring in one call), a `<details>` element and one call on sub-aquarium.html (hidden when the page has no 3D view), render/subModelsCore.mjs `statusSummary`, GPU_Assets/subs/README.md and a .gitignore rule so a downloaded model can not reach the repository by accident. Gate: render/subModelsPanel-selfcheck.mjs drives the form in headless Chromium like a person (52 mutants). DECIDED NOT TO DO: the entry in world/reachedLicences.mjs that section 4 proposed. That register is for sources the tree READ and did not vendor, with a quoted licence text, a digest and many census ratchets; a user-supplied-file policy is enforced where it bites (the store refuses an empty licence, the page shows the attribution line, git ignores the folder), and an entry there would move counters for no gain. It can be added if Keith wants the case on the register.
+The asset list is fetched the first time the url box is focused, not at page load (a server without /assets/list would log a failed request on every load).
 
 ## 7. Phases (each one shippable)
 

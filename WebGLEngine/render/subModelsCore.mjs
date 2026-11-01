@@ -146,6 +146,21 @@ export function tintRgb(rgb, hueDeg, amount = 0.3) {
     return [0, 1, 2].map((i) => rgb[i] + (h[i] - rgb[i]) * t);
 }
 
+/**
+ * One line and the lists a page shows for its boats' model states (render/subModels3d.mjs `userData.modelState`: { status, reason, warnings, triangles }): { text, warnings, failures }.
+ * `text` counts the boats by status ("2 models, 1 loading, 1 failed"; "no boats" for none; "procedural hull" when every boat is procedural); `warnings` are the distinct warnings; `failures` the distinct reasons of failed boats (at most three).
+ */
+export function statusSummary(states) {
+    const list = Array.isArray(states) ? states.filter((s) => s && typeof s === "object") : [];
+    if (!list.length) return { text: "no boats", warnings: [], failures: [] };
+    const n = (k) => list.filter((s) => s.status === k).length, parts = [];
+    if (n("model")) parts.push(`${n("model")} ${n("model") === 1 ? "model" : "models"}`);
+    if (n("loading")) parts.push(`${n("loading")} loading`);
+    if (n("failed")) parts.push(`${n("failed")} failed`);
+    const uniq = (a) => [...new Set(a.filter((x) => typeof x === "string" && x))];
+    return { text: parts.length ? parts.join(", ") : "procedural hull", warnings: uniq(list.flatMap((s) => (Array.isArray(s.warnings) ? s.warnings : []))), failures: uniq(list.filter((s) => s.status === "failed").map((s) => s.reason)).slice(0, 3) };
+}
+
 export function reportLines() {
     return [`[subModelsCore] ${SUB_MODEL_CLASSES.length} classes (${SUB_MODEL_CLASSES.length - 1} hulls + default), key ${STORE_KEY}; fit to ${HULL_LENGTH} m; triangles ok <= ${TRIANGLES.ok}, warn <= ${TRIANGLES.warn}`];
 }

@@ -95,7 +95,8 @@
     <h2>3D view <span class="hint"><label title="Click a sub in the list, then tick this: the camera follows it and comes in close enough to see its tower and tail fins"><input type="checkbox" id="followBox"> follow the selected sub</label> &nbsp; drag to orbit &middot; wheel to zoom</span></h2>
     <div class="canvasbox"><iframe id="seaFrame" title="GPU ocean (web-ocean), behind the 3D view" aria-hidden="true" tabindex="-1" style="display:none"></iframe><canvas id="view3d" width="1000" height="700" aria-label="Three-dimensional view of the tank: the physics sea above, the subs beneath it" style="cursor:grab"></canvas></div>
     <div class="tank-note" id="view3dNote">The sea is the physics surface a hull would float on (render/seaThree.mjs); subs are tinted toward the water colour by depth, and each sub&rsquo;s tail planes and rudder follow its pilot&rsquo;s command. A sub in an event shows its tank as a gauge on the hull, sheds bubbles when it blows, and a released weight falls to the floor.</div>
-  </section>
+    <details id="subModels" title="Put a downloaded .glb submarine on the tank's boats (the procedural hull stays the fallback)"><summary>sub model (.glb)</summary><div id="subModelsPanel"></div></details>
+</section>
   <div class="col">
     <section class="panel p2d" aria-label="Plan view of the tank"><h2>Top view <span class="hint">500 &times; 300 m</span></h2>
       <canvas id="plan" width="1000" height="600" aria-label="Plan view of the tank"></canvas></section>
@@ -151,6 +152,13 @@ try {   // v4895: the tank in 3D. A page without WebGL keeps its two 2D views.
     cv.addEventListener("pointerup", () => { drag = null; cv.style.cursor = "grab"; });
     cv.addEventListener("wheel", (e) => { e.preventDefault(); const v = V(); view3d.setView(v.yaw, v.pitch, v.dist * (e.deltaY < 0 ? 0.9 : 1.1)); }, { passive: false });
 } catch (e) { view3d = null; $("view3d").style.display = "none"; $("view3dNote").textContent = "3D view unavailable here (" + String((e && e.message) || e).slice(0, 80) + "); the top and depth views are unaffected."; }
+{   // v4910 -- the sub model picker (render/subModelsPanel.mjs over render/subModelsCore.mjs and render/subModels3d.mjs): a downloaded .glb on the tank's boats; nothing is assigned until the form says so
+  if (!view3d) $("subModels").style.display = "none";
+  else try {
+    const THREE = await import("/vendor/three/three.module.js"), P = await import("/render/subModelsPanel.mjs");
+    P.mountSubModelPicker(THREE, view3d, $("subModelsPanel"), { hulls: Object.keys(LABELS), labels: LABELS, getHull: () => tank.hull });
+  } catch (e) { $("subModelsPanel").textContent = "the model picker is unavailable here (" + String((e && e.message) || e).slice(0, 80) + ")"; }
+}
 {   // v4902 -- the size picker reloads with ?size= (the tank and its 3D view are built once)
   const sz = $("sizeSel"); sz.value = sizeKey; sz.addEventListener("change", () => { const u = new URL(location.href); u.searchParams.set("size", sz.value); location.href = u.toString(); });
 }
