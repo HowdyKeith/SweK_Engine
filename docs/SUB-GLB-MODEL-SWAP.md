@@ -28,8 +28,13 @@ What it does NOT do, and a submarine needs:
 4. **Moving parts.** A ship hull has none. A sub's procedural hull animates stern planes and rudder from the pilot's command.
 5. **Cues.** Nothing in the ship path puts a gauge or a ballast slab on the model.
 6. **Licence.** Nothing records who made a model or under what terms.
-7. **Draco.** The vendored loader folder has GLTFLoader, KTX2Loader and a meshopt decoder, and NO DRACOLoader: a Draco-compressed
-   .glb will fail to load (found by listing vendor/three/jsm/loaders and libs; unchecked: whether a Draco decoder exists elsewhere in the tree).
+7. **Draco -- CORRECTED the same day I wrote this.** I first wrote that the tree could not load a Draco-compressed .glb, because
+   vendor/three/jsm/loaders holds GLTFLoader, KTX2Loader and a meshopt decoder and no DRACOLoader. That was wrong: the tree has
+   `vendor/draco/DRACOLoader.js` (mrdoob/draco.js, 256 KB, decoder inside, vendored unmodified at v4416) and `gpu/gltfDraco.js`, whose
+   `parseGlb(buffer, GLTFLoaderCtor)` peeks the GLB header (gpu/glbPeek.mjs `needsDraco`) and attaches the decoder lazily ONLY for a Draco
+   file, so a plain model never fetches it. It is gated (tools/ship/dracoWeld-selfcheck.mjs, dracoEncode-selfcheck.mjs, the latter
+   including a decode in a real browser). So nothing needs vendoring; the sub path must load through `parseGlb` (fetch the bytes,
+   then parse) and not through `GLTFLoader.load`, which is what the ship path does and which dies on "No DRACOLoader instance provided".
 
 ## 2. What the sub view does today (render/subAquarium3d.mjs), as it constrains the swap
 
@@ -91,7 +96,7 @@ knows the case exists.
 - `cuePlacement(bounds, scale)`: where the gauge and the slab go for a model (above the highest point; below the lowest), as hull-relative numbers.
 - `triangleBudget(count)`: ok / warn / refuse thresholds (a warning above about 150k triangles; the ships path has none).
 
-**Three.js half, `render/subModels3d.mjs`**: load with GLTFLoader (with the meshopt decoder wired; Draco unsupported and said so),
+**Three.js half, `render/subModels3d.mjs`**: fetch the bytes and parse with gpu/gltfDraco.js `parseGlb` (Draco files get the lazy decoder, plain ones do not; meshopt files need the vendored meshopt decoder wired, unchecked end to end),
 build a template once per url+orientation, and `hullFor(hull)` returns a Group with the SAME contract as `buildSub`:
 `userData.parts` present but with `planes` and `rudder` as inert empty Object3Ds (so `poseFins` does not throw and nothing moves),
 `userData.cues` placed by `cuePlacement`, materials CLONED per boat with the depth tint applied to every one, the hue cue added, and
@@ -115,7 +120,7 @@ Phase 1-2 are about one ship of work; 3 is the user-facing part and needs Keith 
 ## 8. Unchecked, and risks
 
 - Whether a typical Sketchfab submarine .glb (many materials, transparency for glass, embedded textures, KHR extensions, an animation we ignore) loads and tints cleanly through this loader: unchecked, depends on the file.
-- Draco-compressed models fail (see 1.7); the message must say so. Meshopt models should work (decoder is vendored; unchecked end to end).
+- Draco-compressed models load through gpu/gltfDraco.js (see 1.7); a Draco file in the synthetic gate would need the tree's encoder (tools/export/dracoEncode.mjs) to produce one, which is a cheap addition. Meshopt models should work (decoder vendored; unchecked end to end).
 - Texture memory with ten boats sharing one template's textures but not its materials: the clone shares the texture objects, which is fine and cheap; unchecked under load.
 - The depth tint patches `onBeforeCompile` of MeshStandardMaterial; a glTF material of another class (MeshPhysicalMaterial for KHR_materials_*) may need the same patch tested.
 - A model whose origin is far from its hull centre: `fitScale` centres on the bounds; a sail makes the vertical centre high, so a sub may sit slightly high on its pose. A vertical-offset trim in the picker is the answer if it shows.
