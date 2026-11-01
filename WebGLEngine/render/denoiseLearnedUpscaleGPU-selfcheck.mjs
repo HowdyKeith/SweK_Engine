@@ -23,6 +23,8 @@
 // SECTION 168: V168a the s167 reports read as carrying a U_TH line, V168b the 1080's U_T typed 47.0 -> 1 red each.
 // ROUND 74 (section 169): F1 the coalesced pass's row stride the half width's -> 1 red, F2 it averaging three corners -> 2, F3 its
 // dispatch one group short -> 2, F4 readH74 reading round 73's line -> 1, F5 the "fast" option building the loop pass -> 1.
+// SECTIONS 170-171: V171a H73 on the Intel typed holds, V171b the 1080's round 74 U typed 5.0, V171c the Intel's round 74 read as
+// holding -> 1 red each. Each restored byte-identical.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -122,6 +124,23 @@ console.log("\n1d. SECTION 168: THE s167 REPORTS RAN AT cebdc006 -- NO ROUND 73 
     ok("!! *** ...but they are a clean, counting pair on the 1080 for round 71: U_T 47.840 and 47.063 ms, U / T 1.24 and 1.23 -- H71 fails on the 1080 by its own rule too ***",
         N.length === 2 && N.every((r) => r.counts && r.commit === "cebdc006") && Math.abs(N[0].U - 47.84) < 1e-9 && Math.abs(N[1].U - 47.063) < 1e-9 && G.h71(N) === "fails",
         N.map((r) => `${r.U} / ${r.T} = ${r.ratio.toFixed(3)}`).join("; "));
+}
+
+console.log("\n1e. SECTIONS 170-171: ROUNDS 73 AND 74 ON BOTH GPUs, READ BACK");
+{
+    const rd = (k) => JSON.parse(fs.readFileSync(path.join(ENG, `render/denoise-rig-${k}.json`), "utf8"));
+    const n73 = ["s168-a-gtx1080", "s168-b-gtx1080"].map((k) => G.readH73(rd(k))), i73 = ["s170-a-intel", "s170-b-intel"].map((k) => G.readH73(rd(k)));
+    ok("!! *** section 170: H73 FAILS on both GPUs -- U_TH with round 73's down pass: the 1080 0.359 / 0.357 (13.69 / 13.55 ms), the Intel 0.398 / 0.366 (203.4 / 205.7 ms) ***",
+        n73.every((r) => r.counts && r.commit === "670c28bd") && i73.every((r) => r.counts && r.commit === "c9f2a1bc") && G.h71(n73) === "fails" && G.h71(i73) === "fails" &&
+        Math.abs(n73[0].U - 13.689) < 1e-9 && Math.abs(i73[0].U - 203.398) < 1e-9 && Math.abs(i73[1].U - 205.738) < 1e-9 && i73.every((r) => r.ratio > 0.36 && r.ratio < 0.4),
+        [...n73, ...i73].map((r) => r.ratio.toFixed(3)).join(", "));
+    const n74 = ["s169-a-gtx1080", "s169-b-gtx1080"].map((k) => G.readH74(rd(k))), i74 = ["s170-a-intel", "s170-b-intel"].map((k) => G.readH74(rd(k)));
+    ok("!! *** section 171: H74 HOLDS on the 1080 (5.892 / 5.869 ms, 0.154 / 0.154) and FAILS on the Intel (153.3 / 154.4 ms, 0.300 / 0.275) -- so H74 fails overall ***",
+        n74.every((r) => r.counts && r.commit === "8cbc2808" && r.ratio < 0.16) && G.h71(n74) === "holds" && i74.every((r) => r.counts && r.commit === "c9f2a1bc") && G.h71(i74) === "fails" &&
+        Math.abs(n74[0].U - 5.892) < 1e-9 && Math.abs(n74[1].U - 5.869) < 1e-9 && Math.abs(i74[0].U - 153.268) < 1e-9 && Math.abs(i74[1].U - 154.389) < 1e-9 && G.h71([...n74, ...i74]) === "fails",
+        [...n74, ...i74].map((r) => r.ratio.toFixed(3)).join(", "));
+    ok("  ...the Intel's runs at c9f2a1bc, which differs from round 74's 8cbc2808 by five data files and no code (the s169 reports and round 72's net), so they count as round 74's",
+        i74.every((r) => r.commit === "c9f2a1bc"));
 }
 
 console.log("\n2. ON THE DEVICE: U_T held to the CPU, then timed at 1920 x 1080");

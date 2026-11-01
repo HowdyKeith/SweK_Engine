@@ -10852,3 +10852,77 @@ Either way, whether U_TH is worth running is round 72's quality question. This r
 
 **The runs.** Two `realGpuRun --only denoise` a GPU at round 74's commit, committed byte for byte before they are read. Section 170
 reads round 73's Intel pair and the 1080's together. Section 171 reads round 74's.
+
+## 170. ROUNDS 72 AND 73 -- U_TH KEEPS MOST OF THE GAIN (5.4 % BELOW Bt), BUT ROUND 73's DOWN PASS COST IT THE FRAME BUDGET
+
+**What arrived.** Every file was committed byte for byte before it was read, except as noted.
+- **Round 72's training file:** render/upscale-net-r72.json, at 670c28bd (variant half), committed at c9f2a1bc.
+- **Round 72's test:** render/denoise-results-upscale-temporal-r72.json, run at c9f2a1bc. It was shown to me on upload before its
+  commit (f17ea91c).
+- **Round 73's runs:**
+  - the 1080's s168 pair at 670c28bd (b9eec59c);
+  - the Intel's s170 pair at c9f2a1bc (f17ea91c).
+  - c9f2a1bc differs from round 74's 8cbc2808 by five data files and no code, and it carries round 73's pass beside round
+    74's.
+- An earlier Intel pair (s169, at 8cbc2808) gave nothing: the checkout had lost render/upscale-net-r70.json again, and the gate died
+  at its first line. It is committed and counted nowhere.
+
+**Round 72 (quality), as fixed.**
+- **The training:** validation 1.661e-3, 1.694e-3 and 1.715e-3; the candidate is seed 1.
+- **Controls:** C1, C3, C4, C5 held. C2 held: the shuffled U_TH lost to Bt on all 24, mean d -3.81.
+- **H72a, U_TH against Bt: SUPPORTED** -- 16 of 24, p 0.0066, mean d +0.063.
+- **The 1 % rule: met.** Mean display relMSE 1.6702e-3 against Bt's 1.7663e-3, **5.44 % below**. That is 56 % of round 70's
+  9.65 %, on another test set.
+- **H72b, U_TH against B1: supported** -- 24 of 24, p 6.0e-8.
+- **Descriptively:** C 9 of 12 at 6.4 % below Bt, R 7 of 12 at 0.18 %. The gain is C's, as round 70's mostly was. The mean
+  correction is 0.95 % of Bt.
+
+**Round 73 (cost, the loop down pass), as fixed. H73 FAILS on both GPUs.**
+
+| GPU | run | U_TH | of it, the down pass | T | U / T |
+|---|---|---|---|---|---|
+| 1080 | a, b | 13.69, 13.55 ms | 8.43, 8.29 | 38.11, 37.99 | **0.359, 0.357** |
+| Intel | a, b | 203.4, 205.7 ms | 72.0, 74.0 | 511.4, 561.7 | **0.398, 0.366** |
+
+**Section 167's predictions.**
+- **P1 held:** C1 and C3.
+- **P2 held:** H72a at 5.44 %, inside 2-8 %.
+- **P3 held:** H72b.
+- **P4 MISSED:** the 1080's U_TH at 13.6 ms, not 2.5-6. Its network and upsample, 5.2-5.3 ms, were inside the range; the down
+  pass I wrote did not coalesce and took 8.3-8.4 ms. Section 169 fixed that as round 74.
+- **P5 MISSED:** the Intel at 0.37-0.40, over 0.15-0.35.
+
+## 171. ROUND 74 -- THE COALESCED DOWN PASS: U_TH COSTS 0.15 OF A FRAME ON THE 1080 (H74 HOLDS THERE) AND 0.28-0.30 ON THE INTEL (FAILS)
+
+**What arrived.** The 1080's s169 pair at 8cbc2808 (b68d4d24) and the Intel's s170 pair at c9f2a1bc (f17ea91c), every gate green in all
+four, committed before they were read.
+
+| GPU | run | down: loop → coalesced | U_TH (coalesced) | T | **U / T** |
+|---|---|---|---|---|---|
+| 1080 | a | 8.31 → 0.61 ms | 5.892 ms | 38.38 | **0.154** |
+| 1080 | b | 8.36 → 0.61 ms | 5.869 ms | 38.15 | **0.154** |
+| Intel | a | 72.0 → 20.7 ms | 153.3 ms | 511.4 | **0.300** |
+| Intel | b | 74.0 → 20.2 ms | 154.4 ms | 561.7 | **0.275** |
+
+**H74 holds on the 1080 and fails on the Intel, so it FAILS as fixed** (both GPUs were required).
+
+**Section 169's predictions.**
+- **P1 held exactly:** the pass at 0.61 ms (0.4-1.5), U 5.87-5.89 ms (5-7), U / T 0.154 (0.13-0.19).
+- **P2 held as to the verdict and missed as to the size:** the Intel fails, at 0.275-0.300 against the predicted 0.32-0.35. The
+  coalesced pass saved it more than predicted.
+- **P3 held:** the coalesced pass's output equal to the loop's bit for bit on both GPUs, every parity row green.
+
+**What rounds 70-74 say together.**
+- **On the 1080 class, U_TH is a real-time learned temporal upscaler.** It takes 5.4 % off Bt's display error and costs 5.9 ms at
+  1920 x 1080, 0.15 of a traced frame.
+  - Round 70's U_T took 9.65 % off at 46-48 ms, 1.2 frames.
+  - U_TH keeps 56 % of the gain at 12 % of the cost.
+- **On the Intel's integrated graphics, it is not real-time.**
+  - 153 ms, 0.28-0.30 of a traced frame (and the Intel's frame is itself ~0.5 s).
+  - Its layers alone are ~110 ms there, and the upsample and hold a further 21 ms.
+  - A cheaper U_TH would need a new quality round.
+- **The gain is C's.** Both U_T and U_TH help family C's scenes far more than R's (6.4 % against 0.18 % for U_TH). Where the gain
+  would land in a real scene is not measured.
+
+**What changes.** Nothing ships by these rounds alone. The temporal page still runs round 70's U_T at 128 x 128. Whether it should run
+U_TH, and whether U_TH goes after Bt in the chain on hardware like the 1080, are Keith's calls.

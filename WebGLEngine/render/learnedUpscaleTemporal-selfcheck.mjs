@@ -17,6 +17,8 @@
 // ROUND 72 (section 167): H1 halfInput one corner -> 3 red, H2 the upsample's centres shifted -> 2, H3 the backward without the
 // transpose -> 1, H4 width 8 -> 3, S1 round 72's variant full -> 1, S2 its test seeds onto round 70's -> 1; H5 U_TH's crops at odd
 // corners and S3 the study's training without the variant -> *** 0 RED at first ***, then 1 each with the two rows added for them.
+// SECTION 170: V170a round 72's candidate typed 2, V170b H72a's count typed 15, V170c the gain typed 0.0644, V170d the test's commit
+// typed 670c28bd -> 1 red each. Each restored byte-identical.
 "use strict";
 import fs from "node:fs";
 import os from "node:os";
@@ -215,6 +217,29 @@ console.log("\n6. ROUND 72 (section 167): U_TH -- THE NETWORK AT HALF SIZE AND 1
     const ta = br("--harvest-upscale-temporal-train"), tb = br("--harvest-upscale-temporal-test");
     ok("!! both temporal commands take --round (LT.temporalRound), the training hands on the round's variant, the test its round for C2's citation",
         /RD = LT\.temporalRound\(/.test(ta) && /variant: RD\.variant/.test(ta) && /RD = LT\.temporalRound\(/.test(tb) && /round: RD\.round, harvest: true/.test(tb));
+}
+
+console.log("\n7. SECTION 170: ROUND 72's COMMITTED HARVESTS, READ BACK -- U_TH BEAT Bt BY 5.4 %");
+{
+    const R = LT.ROUND_UPSCALE_TEMPORAL_72, tr = JSON.parse(fs.readFileSync(path.join(ENG, R.net), "utf8")), res = JSON.parse(fs.readFileSync(path.join(ENG, R.results), "utf8")), Tb = res.tables;
+    const vals = tr.runs.map((r) => r.valMean), mean = (a) => a.reduce((q, v) => q + v, 0) / a.length;
+    ok("!! round 72's training file: U_TH (variant half), 512-sample targets, the candidate seed 1 with the lowest validation loss (1.661e-3), at 670c28bd",
+        tr.round === 72 && tr.config.variant === "half" && tr.config.sppRef === 512 && tr.candidate === 1 && tr.commit === "670c28bd" && tr.runs.length === 3 &&
+        tr.runs.find((r) => r.seed === 1).valMean === Math.min(...vals) && Math.abs(vals[0] - 1.6612e-3) < 5e-8 && tr.c2.seed === 1 && T.isHalfT(decodeNet(tr.runs[0].net)));
+    const { verdict } = await imp("render/denoiseStats.mjs");
+    const again = verdict({ sets: { H1: { noisy: Tb.noisy, filter: Tb.bt, net: [Tb.U], floor: Tb.floor }, H2: { noisy: Tb.noisy, filter: Tb.b1, net: [Tb.U], floor: Tb.floor } }, shuffled: null,
+        c2Prior: { round: 72, meanD: res.verdict.controls.C2.meanD, ok: res.verdict.controls.C2.ok }, determinism: res.determinism, seedsDistinct: true, test: "signflip", c1Of: "candidate", c1Min: 22 });
+    const H1 = again.hypotheses.H1, H2 = again.hypotheses.H2;
+    ok("!! *** section 170: verdict() over the committed tables gives the file's verdict -- REPORTED, every control held, H72a SUPPORTED (16 of 24, p 0.0066), H72b supported (24 of 24) ***",
+        again.run === "reported" && res.verdict.run === "reported" && H1.status === "supported" && H2.status === "supported" && H1.k === 16 && H2.k === 24 &&
+        Math.abs(H1.p - 0.0066182613372802734) < 1e-12 && H1.c1.netWins === 24 && H1.c3.nearFloor === 0 && res.verdict.controls.C2.ok === true && res.verdict.controls.C2.citedFrom === 72 &&
+        res.round === 72 && res.commit === "c9f2a1bc" && res.trained.candidate === 1 && res.trained.commit === "670c28bd", `H1 ${H1.k}/24 p ${H1.p.toFixed(4)}; H2 ${H2.k}/24`);
+    const gain = 1 - mean(Tb.U) / mean(Tb.bt), z = res.secondary.correction;
+    ok("!! *** ...and the 1 % rule is MET: U_TH's mean display relMSE 1.6702e-3 against Bt's 1.7663e-3, 5.44 % below -- inside P2's 2-8 %, 56 % of round 70's 9.65 % on another set ***",
+        gain >= R.minGain && Math.abs(gain - 0.05441) < 5e-5 && Math.abs(res.secondary.gainOverBt - gain) < 1e-15 && Math.abs(mean(z) - 0.009510) < 1e-5, `${(100 * gain).toFixed(2)} % below Bt; correction ${(100 * mean(z)).toFixed(2)} %`);
+    const d = H1.d, gR = 1 - mean(Tb.U.slice(0, 12)) / mean(Tb.bt.slice(0, 12)), gC = 1 - mean(Tb.U.slice(12)) / mean(Tb.bt.slice(12));
+    ok("  descriptively: on C 9 of 12, 6.4 % below Bt; on R 7 of 12, 0.18 % -- the gain is C's, as round 70's mostly was",
+        d.slice(12).filter((x) => x > 0).length === 9 && d.slice(0, 12).filter((x) => x > 0).length === 7 && Math.abs(gC - 0.0636) < 5e-4 && Math.abs(gR - 0.0018) < 5e-4);
 }
 
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +
