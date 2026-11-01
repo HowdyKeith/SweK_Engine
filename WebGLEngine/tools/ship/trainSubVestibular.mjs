@@ -54,16 +54,18 @@ const replStart = (family) => (isCtrl50(family) ? CTRL50_START : REPL_START[fami
  *   GEN 2 (Addendum 12) 4b-P, P/B and P/whole: qns = NO STATE on the real wiring, qer / qcl / qdg = NO STATE on a SHUFFLED wiring (ER, class-block, degree-preserving; shuffle index 20 + k, never used before), indices 0-3, audits 84001-84060.
  *   GEN 3 (Addendum 13) 4b-E, E/E and E/whole: el99 = the registered start (lambda 0.99), el50 = lambda 0.5, ens = NO STATE, all on the real wiring, indices 0-3, audits 85001-85048 (16 nominal seeds x 4 dives a block).
  *   GEN 4 (Addendum 14) 4b-P, P/B and P/whole: tns = NO STATE on the real wiring and real tuning, tt1 / tt2 / tt3 = NO STATE with the inputs' tuning angles and kinetic classes permuted (tuningControl; shuffle index 20 + shift + k, shift 0 / 4 / 8), indices 0-3, audits 86001-86060.
+ *   GEN 5 (Addendum 15) the circuit-level test: tt4 ... tt11 (eight more families of permuted-tuning NO STATE circuits, shifts 12 ... 40), 4b-P, indices 0-3, on GEN 4's audits and references (refsGen 4), ordinals 754-817; run into GEN 4's own file.
  * `shuffle` names the Stage A control builder; `start` null means NO STATE (the trace switched off). Gen 1 (Addenda 10 and 11) keeps its own constants above.
  */
 export const GENS = Object.freeze({
     2: Object.freeze({ gen: 2, task: "P", cells: Object.freeze(["P/B", "P/whole"]), families: Object.freeze({ qns: Object.freeze({ start: null, shuffle: null }), qer: Object.freeze({ start: null, shuffle: "er" }), qcl: Object.freeze({ start: null, shuffle: "class" }), qdg: Object.freeze({ start: null, shuffle: "degree" }) }), audits: Object.freeze([[84001, 84020], [84021, 84040], [84041, 84060]]), refs: "refs:PQ", firstOrdinal: 666, shuffleOffset: 20, keyword: "noStateShuffled" }),
     3: Object.freeze({ gen: 3, task: "E", cells: Object.freeze(["E/E", "E/whole"]), families: Object.freeze({ el99: Object.freeze({ start: 0.99, shuffle: null }), el50: Object.freeze({ start: 0.5, shuffle: null }), ens: Object.freeze({ start: null, shuffle: null }) }), audits: Object.freeze([[85001, 85016], [85017, 85032], [85033, 85048]]), refs: "refs:ER", firstOrdinal: 698, shuffleOffset: 0, keyword: "escapeReplicates" }),
     4: Object.freeze({ gen: 4, task: "P", cells: Object.freeze(["P/B", "P/whole"]), families: Object.freeze({ tns: Object.freeze({ start: null, shuffle: null }), tt1: Object.freeze({ start: null, shuffle: "tuning", shift: 0 }), tt2: Object.freeze({ start: null, shuffle: "tuning", shift: 4 }), tt3: Object.freeze({ start: null, shuffle: "tuning", shift: 8 }) }), audits: Object.freeze([[86001, 86020], [86021, 86040], [86041, 86060]]), refs: "refs:PT", firstOrdinal: 722, shuffleOffset: 20, keyword: "tuningShuffled" }),
+    5: Object.freeze({ gen: 5, task: "P", cells: Object.freeze(["P/B", "P/whole"]), families: Object.freeze(Object.fromEntries(Array.from({ length: 8 }, (_, i) => [`tt${i + 4}`, Object.freeze({ start: null, shuffle: "tuning", shift: 12 + 4 * i })]))), audits: Object.freeze([[86001, 86020], [86021, 86040], [86041, 86060]]), refs: "refs:PT", refsGen: 4, firstOrdinal: 754, shuffleOffset: 20, keyword: "tuningPermutations" }),
 });
 export const GEN_N = 4;
 /** Addendum number, the real-wiring family and the pooled permuted/shuffled families of a generation (the rank test of Addenda 12 and 14). */
-export const GEN_ADD = Object.freeze({ 2: 12, 3: 13, 4: 14 }), GEN_REAL = Object.freeze({ 2: "qns", 4: "tns" }), GEN_POOL = Object.freeze({ 2: Object.freeze(["qer", "qcl", "qdg"]), 4: Object.freeze(["tt1", "tt2", "tt3"]) });
+export const GEN_ADD = Object.freeze({ 2: 12, 3: 13, 4: 14, 5: 15 }), GEN_REAL = Object.freeze({ 2: "qns", 4: "tns" }), GEN_POOL = Object.freeze({ 2: Object.freeze(["qer", "qcl", "qdg"]), 4: Object.freeze(["tt1", "tt2", "tt3"]) });
 /** The generation (2 or 3) a family belongs to, or 0. */
 export const genOf = (family) => (Object.values(GENS).find((g) => family in g.families) || { gen: 0 }).gen;
 export const GEN_SPECS = Object.freeze(Object.fromEntries(Object.values(GENS).map((g) => [g.gen, Object.freeze(g.cells.flatMap((c) => Object.keys(g.families).map((f) => `${c}/${f}:0-${GEN_N - 1}`)))])));
@@ -120,7 +122,7 @@ export function parseSpecs(text) {
     const out = [], seen = new Set();
     for (const raw of String(text).split(",")) {
         const part = raw.trim(); if (!part) throw new Error(`trainSubVestibular.parseSpecs: an empty spec in ${JSON.stringify(text)}`);
-        const m = /^([A-Za-z]+)\/([A-Za-z]+)\/(cx|nostate|dcx|dnostate|cxl50|cxl90|(?:rl50|rl70|er50|cl50|dg50|qns|qer|qcl|qdg|tns|tt1|tt2|tt3|el99|el50):\d+(?:-\d+)?|[a-z]+:\d+(?:-\d+)?)$/.exec(part);
+        const m = /^([A-Za-z]+)\/([A-Za-z]+)\/(cx|nostate|dcx|dnostate|cxl50|cxl90|(?:rl50|rl70|er50|cl50|dg50|qns|qer|qcl|qdg|tns|tt(?:[1-9]|1[01])|el99|el50):\d+(?:-\d+)?|[a-z]+:\d+(?:-\d+)?)$/.exec(part);
         if (!m) throw new Error(`trainSubVestibular.parseSpecs: cannot read ${JSON.stringify(part)} (a spec is task/arm/cx, task/arm/nostate or task/arm/family:K or family:K-L)`);
         const [, task, arm, fam] = m;
         if (!TASK_NAMES.includes(task)) throw new Error(`trainSubVestibular.parseSpecs: unknown task ${JSON.stringify(task)} (${TASK_NAMES.join(", ")})`);
@@ -130,7 +132,7 @@ export function parseSpecs(text) {
             if (cell === "cross" && family !== "cx") throw new Error(`trainSubVestibular.parseSpecs: the cross cell ${task}/${arm} is cx only, not ${family}`);
             const name = specName({ task, arm, family, index }); if (seen.has(name)) throw new Error(`trainSubVestibular.parseSpecs: ${name} is named twice`); seen.add(name); out.push({ task, arm, family, index });
         };
-        const gq = /^(qns|qer|qcl|qdg|tns|tt1|tt2|tt3|el99|el50|ens):(\d+)(?:-(\d+))?$/.exec(fam);
+        const gq = /^(qns|qer|qcl|qdg|tns|tt(?:[1-9]|1[01])|el99|el50|ens):(\d+)(?:-(\d+))?$/.exec(fam);
         if (gq) {
             const G = GENS[genOf(gq[1])];
             if (!G.cells.includes(`${task}/${arm}`)) throw new Error(`trainSubVestibular.parseSpecs: ${gq[1]} (generation ${G.gen}, Addendum ${GEN_ADD[G.gen]}) exists on ${G.cells.join(" and ")} only, not ${task}/${arm}`);
@@ -348,6 +350,21 @@ export function exactRankP(real, others) {
 export const GEN_COMPARE = Object.freeze({ 2: Object.freeze([["qns", "qer"], ["qns", "qcl"], ["qns", "qdg"]]), 3: Object.freeze([["el99", "ens"], ["el50", "ens"], ["el50", "el99"]]), 4: Object.freeze([["tns", "tt1"], ["tns", "tt2"], ["tns", "tt3"]]) });
 export const RANK_ALPHA = 0.05;
 /**
+ * Addendum 15, REPORTED AND NOT JUDGED: the circuit-level rank of the real tuning among the permuted circuits, per cell. The real circuit's score is the mean of its `tns` searches (each search the mean of its three audits); each permuted circuit (families tt1 ... tt11) is one search. p = (1 + the permuted circuits at or above the real score) / (1 + the permuted circuits), the exact one-sided rank; supported iff p <= RANK_ALPHA; `complete` iff all 4 real searches and all 44 permuted circuits are in. [] with no references record of generation 4.
+ */
+export const PERM_FAMILIES = Object.freeze([...Object.keys(GENS[4].families).filter((f) => f !== "tns"), ...Object.keys(GENS[5].families)]);
+export function circuitRank(cellsRecs, refs) {
+    if (!refs) return [];
+    const out = [];
+    for (const cell of GENS[4].cells) {
+        const recs = cellsRecs[cell] || [], score = (r) => meanOf(AUDITS.map((a) => effectiveOf(r, refs)[a].score)), real = recs.filter((r) => r.family === "tns").map(score), perm = recs.filter((r) => PERM_FAMILIES.includes(r.family)).map(score);
+        if (!real.length || !perm.length) continue;
+        const r0 = meanOf(real), k = perm.filter((x) => x >= r0 - 1e-12).length, m = meanOf(perm);
+        out.push({ cell, nReal: real.length, nPerm: perm.length, complete: real.length === GEN_N && perm.length === PERM_FAMILIES.length * GEN_N, real: r0, permMean: m, permSd: sdOf(perm), permMin: Math.min(...perm), permMax: Math.max(...perm), atOrAbove: k, p: (1 + k) / (1 + perm.length), supported: (1 + k) / (1 + perm.length) <= RANK_ALPHA });
+    }
+    return out;
+}
+/**
  * Addenda 12 and 13, REPORTED AND NOT JUDGED: per cell and per family of generation `gen` the replicates' effective scores on that generation's FRESH audits (mean, sd, range), the difference from that generation's autopilot, and the registered comparisons (GEN_COMPARE: a family's mean against the other family's replicates by the margin rule, needs the larger of 0.02 and 2 sd of the OTHER family's replicates: ahead / tie / behind). Generation 2 adds, per cell, the registered rank test: the four qns searches (each scored as the mean of its three audits) against the pooled shuffled-wiring searches. { rows, cells } ; both [] with no references record of the generation.
  */
 export function groupReading(cellsRecs, refs, gen) {
@@ -394,8 +411,8 @@ export function verdictOf(records) {
     for (const [t, a] of VERDICT_CELLS) { const k = `${t}/${a}`; if (cellsRecs[k]) cells[k] = cellVerdict(cellsRecs[k], refsByTask[t]); }
     for (const [t, a] of CROSS_CELLS) { const k = `${t}/${a}`, c = (cellsRecs[k] || []).find((r) => r.family === "cx"); if (c) crossRecs[k] = c; }
     const checks = Object.fromEntries(TASK_NAMES.filter((t) => refsByTask[t]).map((t) => [t, checksOf(refsByTask[t])])), claim = pathwayClaim(cells, crossRecs, refsByTask), dense = denseReading(cellsRecs[DENSE_CELL] || [], refsByTask.P, cells[DENSE_CELL]), lambda = lambdaReading(cellsRecs, refsByTask.P);
-    const repl = replicateReading(cellsRecs, refsRepl), wiring50 = wiringAtLowStart(repl), gen2 = groupReading(cellsRecs, refsGen(2), 2), gen3 = groupReading(cellsRecs, refsGen(3), 3), gen4 = groupReading(cellsRecs, refsGen(4), 4);
-    return { checks, cells, claim, dense, lambda, repl, wiring50, gen2, gen3, gen4, passed: Object.values(cells).filter((c) => c.wiring.verdict === "PASS").length, assessed: Object.values(cells).filter((c) => c.wiring.verdict !== "NOT ASSESSED").length, refsByTask };
+    const repl = replicateReading(cellsRecs, refsRepl), wiring50 = wiringAtLowStart(repl), gen2 = groupReading(cellsRecs, refsGen(2), 2), gen3 = groupReading(cellsRecs, refsGen(3), 3), gen4 = groupReading(cellsRecs, refsGen(4), 4), perm = circuitRank(cellsRecs, refsGen(4));
+    return { checks, cells, claim, dense, lambda, repl, wiring50, gen2, gen3, gen4, perm, passed: Object.values(cells).filter((c) => c.wiring.verdict === "PASS").length, assessed: Object.values(cells).filter((c) => c.wiring.verdict !== "NOT ASSESSED").length, refsByTask };
 }
 export function reportLines(records) {
     const v = verdictOf(records), L = [], rs = records.filter((r) => r.family !== "refs");
@@ -441,6 +458,7 @@ export function reportLines(records) {
         }
         for (const c of g.cells) L.push(`  ${gk === 4 ? "TUNING WITHOUT MEMORY" : "WIRING WITHOUT MEMORY"} ${c.cell} (Addendum ${GEN_ADD[gk]}; REPORTED, NOT JUDGED): the ${c.nReal} ${gk === 4 ? "real-tuning" : "real-wiring"} NO STATE searches against the ${c.nShuffled} ${gk === 4 ? "permuted" : "shuffled"} ones, each scored as the mean of its three audits: U ${c.U} of ${c.max}, exact one-sided p ${c.p.toFixed(4)}${c.complete ? "" : " (NOT all searches are in)"}; registered line p <= ${RANK_ALPHA}: ${c.supported ? "MET" : "not met"}`);
     }
+    for (const c of v.perm) L.push(`  TUNING AT THE CIRCUIT LEVEL ${c.cell} (Addendum 15; REPORTED, NOT JUDGED): the real circuit (mean of ${c.nReal} searches) scores ${f3(c.real)}; ${c.nPerm} permuted circuit(s) score ${f3(c.permMean)} sd ${f3(c.permSd)} [${f3(c.permMin)}..${f3(c.permMax)}]; ${c.atOrAbove} at or above the real one; exact one-sided rank p ${c.p.toFixed(4)}${c.complete ? "" : " (NOT all 4 + " + PERM_FAMILIES.length * GEN_N + " circuits are in)"}; registered line p <= ${RANK_ALPHA}: ${c.supported ? "MET" : "not met"}`);
     for (const r of v.claim.rows) L.push(`  TWO-PATHWAY ${r.task}: ${r.status}${r.audits ? ` -- aligned ${r.aligned} ${r.alignedPasses ? "PASSES" : "does not pass"}; beats cross ${r.cross} on ${r.crossWins} of 3 audits (${r.audits.map((x) => `${f3(x.diff)} needs ${f3(x.needs)}`).join(" | ")})` : ` -- ${r.why}`}`);
     L.push(`RUNG 4b: ${v.passed} of ${v.assessed} assessed verdict cells PASSED (a pass in one of four is "one of four", not "the wiring works")`);
     L.push(`RUNG 4b TWO-PATHWAY CLAIM: ${v.claim.rows.length === TASK_NAMES.length && v.claim.rows.every((r) => r.status !== "NOT ASSESSED") && TASK_NAMES.every((t) => v.checks[t] && v.checks[t].ok) ? (v.claim.holds ? "HOLDS (a double dissociation)" : "DOES NOT HOLD") : "NOT ASSESSED"}`);
@@ -460,7 +478,7 @@ export function parseArgs(argv) {
     if (cmd === "report") { if (!given.in) throw new Error("report needs --in <results file>"); return { cmd, in: given.in, allowSmoke: !!given["allow-smoke"] }; }
     if (!given.one && !given.specs) throw new Error("run needs --specs <list> (the registered stage A: --specs stageA; Addendum 9: --specs lambdaStudy)");
     if (!given.one && !given.out) throw new Error("run needs --out <results file>");
-    const text = given.specs === "stageA" ? STAGE_A : given.specs === "lambdaStudy" ? LAMBDA_STUDY : given.specs === "replicate" ? REPL_STUDY : given.specs === "lowControls" ? CTRL50_STUDY : given.specs === GENS[2].keyword ? GEN_STUDY[2] : given.specs === GENS[3].keyword ? GEN_STUDY[3] : given.specs === GENS[4].keyword ? GEN_STUDY[4] : given.specs || given.one;
+    const text = given.specs === "stageA" ? STAGE_A : given.specs === "lambdaStudy" ? LAMBDA_STUDY : given.specs === "replicate" ? REPL_STUDY : given.specs === "lowControls" ? CTRL50_STUDY : given.specs === GENS[2].keyword ? GEN_STUDY[2] : given.specs === GENS[3].keyword ? GEN_STUDY[3] : given.specs === GENS[4].keyword ? GEN_STUDY[4] : given.specs === GENS[5].keyword ? GEN_STUDY[5] : given.specs || given.one;
     const o = { cmd, specs: text, one: given.one || null, out: given.out || null, workers: given.workers ?? 1, recipe: { runs: given.runs ?? RECIPE.runs, iters: given.iters ?? RECIPE.iters, sigma: given.sigma ?? RECIPE.sigma, maxK: given.maxK ?? RECIPE.maxK, pruneBudget: given["prune-budget"] ?? RECIPE.pruneBudget }, smoke: !!given.smoke, quiet: !!given.quiet };
     for (const [k, v] of [["workers", o.workers], ["runs", o.recipe.runs], ["iters", o.recipe.iters], ["maxK", o.recipe.maxK]]) if (!(Number.isInteger(v) && v >= 1)) throw new Error(`--${k} must be a whole number of 1 or more, got ${v}`);
     if (!(o.recipe.sigma > 0)) throw new Error(`--sigma must be above 0, got ${o.recipe.sigma}`);
@@ -491,7 +509,7 @@ export async function command(argv, io = {}) {
     log(`[trainSubVestibular] ${specs.length} circuits, ${specs.length - todo.length} already in ${o.out}, ${todo.length} to train; ${o.workers} worker(s); recipe ${o.recipe.runs} x ${o.recipe.iters}${o.smoke ? " (SMOKE)" : ""}`);
     const keep = (rec) => { appendFile(o.out, JSON.stringify(rec) + "\n"); records.push(rec); };
     if (specs.some((s) => isRepl(s.family)) && !done.has(REFS_REPL)) { keep((io.refsRunner || refsRecord)("P", { ...opts, replicate: true })); log("[trainSubVestibular] references for the replicate audits (Addendum 10) done"); }
-    for (const g of [2, 3, 4]) if (specs.some((s) => genOf(s.family) === g) && !done.has(GENS[g].refs)) { keep((io.refsRunner || refsRecord)(GENS[g].task, { ...opts, replicate: g })); log(`[trainSubVestibular] references for the generation ${g} audits (Addendum ${GEN_ADD[g]}) done`); }
+    for (const g of [2, 3, 4, 5]) if (specs.some((s) => genOf(s.family) === g) && !done.has(GENS[g].refs)) { keep((io.refsRunner || refsRecord)(GENS[g].task, { ...opts, replicate: GENS[g].refsGen || g })); log(`[trainSubVestibular] references for the generation ${g} audits (Addendum ${GEN_ADD[g]}) done`); }
     for (const t of tasks) if (!done.has(REFS_NAME(t))) { keep((io.refsRunner || refsRecord)(t, opts)); log(`[trainSubVestibular] references for 4b-${t} done`); }
     const spawner = io.spawner || ((spec) => runChild(spec, o)), queue = [...todo];
     const worker = async () => { while (queue.length) { const s = queue.shift(); const rec = o.workers > 1 ? await spawner(s) : (io.runner || runCircuit)(s, opts, o.quiet ? () => {} : (m) => log(m)); keep(rec); log(`[trainSubVestibular] ${specName(s)} done${rec.asStart ? " (no eligible champion)" : " (champion seed " + rec.champion + ")"}`); } };
