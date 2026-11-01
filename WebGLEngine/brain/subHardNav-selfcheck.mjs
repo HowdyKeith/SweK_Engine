@@ -14,7 +14,22 @@
 //   7  THE FLIGHT      reached / collided / left / timeout / the vessel's own word / noRoute each on a scenario built to produce it; an iceberg is passed beneath and hit when deeper; a ship that moves is hit where the same ship at rest is not;
 //                      the replan arms rebuild every 3 s and are the same flights as `any` where nothing is near; the pilot is called once per tick; GOLDEN flights; evaluate and the sets
 //
-// SABOTAGE LOG -- (filled in below after the mutants have been run)
+// SABOTAGE LOG -- 176 mutants of brain/subHardNav.mjs, each run against a copy of this gate, 3 to 4 at a time (the scratch-tree runner). 172 RED BY NAME (every one by a named row, none by a thrown error), 4 NOT RED, and said:
+//   H01 vmargin 4; H02 vradius; H03 replan 4; H04 horizon 20; H05 own clear 10; H06 seconds 200; H07 track no horizon; H08 gap widths; H09 current strong; H10 margin hard; H11 ladder last; H12 ladder order; H13 dev set; H14 held4 set; H15 kinds
+//   order; H16 arms order; H17 traffic arms; H18 designated traffic; H19 bar islands; H20 island collisions; H20b ship fast; H21 posAt y uses vx; H22 posAt ignores t; H23 seed ignores kind; H24 kind check; H25-H29 start/goal ranges and
+//   the shallower depth; H30 fits goal; H31 fits start; H32 fits gap 20; H33 fits ignores radii; H34-H44 island/iceberg counts, radii, keels, centres, island keel; H45-H48 current mean, amp, weight error, current for islands; H49-H57 gap mapping,
+//   wall x, gap centre, wall radii, wall spacing, wall stop, first offset, wall group; H58-H77 ship counts, radius, speed, meeting time, angle, keel, along, encounter offset, start/goal/static clearances, track horizon, shipSpeed, currentMean,
+//   blocked flag, frozen, ship type; H78-H86 planShapes (mode check, keel threshold strict, keel margin, blind for all types, blind ignored, predict horizon, predict inverted, shape radius, now position); H87-H90 each edge of the band;
+//   H91-H107 buildHardField (inflate without hull / margin, shape strict, no radius, capsule end, own strict, own frees the edge, own ignored, own x only, height unset, flag unset, impass, goal source, margin on the field, cell centres x/y, default
+//   margin); H108-H114 buildLadderField (first rung kept, route test from the wrong point, none, default ladder, own not passed, distance test, order reversed); H115-H120 the spec table; H121-H127 hardTarget; H128-H133 gapTo and the clearance
+//   min; H134-H174 flyHard (seconds, replan cadence / from tick 0 / never / always / mode / time / vessel position / own / blind / ladder, start depth sign, start clearance, collision, each of the four edges and left-off, reached, arrival time,
+//   vessel status, ticks, current time, weight error, path, obstacle time, noRoute, margin on the record, chord, gap, ship speed, current mean, blocked); H169-H172 hardSetOf and evaluateHard; H173 model floor.
+//   NOT RED: H67 and H68 (the generator's bound on where a ship may START, x -200..600 and |y| <= 400): over seeds 1 to 3000, 9,037 ships, the starts range from x -10.6 to 585.4 and |y| to 376.8, so the line NEVER FIRED and was REMOVED as dead
+//   code (the gate's row now says the range is measured, not enforced); H127 (`spec.approach &&` dropped in hardTarget) is an EQUIVALENT MUTANT, left standing: the conjunct sits in the branch only the smooth arm reaches and that arm's
+//   approach flag is true; H175 is a CONTROL (a no-op by construction), 0 red as it should be.
+//   ON THE FIRST RUN TWELVE WENT 0 RED and the gate grew what separated them: H93 and H96 (`<=` against `<` at the blocking distance) had no cell at EXACTLY r + 4 + margin or EXACTLY 15 m from the vessel (a disc on a cell centre whose blocking
+//   distance is eight cells, and an `own` point on a cell centre); H130 had no vessel exactly at the keel; H144 (the ladder option) and H158 (the weight error) and H163 (the margin on the record is the FIRST plan's) and H164 (the chord, with a start
+//   that is not the origin) and H168 (the blocked flag on the record) had no row that reads them. In the same pass the generator's `p.group === group` exemption turned out DEAD (the discs of the island being drawn are not in `placed` yet) and was cut.
 "use strict";
 import * as H from "./subHardNav.mjs";
 import * as N from "./subFieldNav.mjs";
