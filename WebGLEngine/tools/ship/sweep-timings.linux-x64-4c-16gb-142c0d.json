@@ -1,7 +1,7 @@
 {
  "host": "linux-x64-4c-16gb-142c0d",
  "note": "THIS BOX'S OWN gate runtimes, written by tools/ship/boxTimings.mjs. The shared sweep-timings.json is host-claimed and a foreign box cannot write it (v4647, and that refusal is right); this is how a box records what IT measured without overwriting another machine's numbers. `kinds` says which quantity each ms is, as in the shared record: `alone` is an uncontended serial reading, `capped` is a FLOOR and not a runtime. Read for COVERAGE -- has this gate ever been timed -- and NOT for the ship-time budget, which still reads the shared file. See task #87. `serialRing` holds the last three alone readings; recordReach's margin row reads it on a box that does not own the shared record, because that row asks what a gate costs HERE and nothing here can refresh another box's ring.",
- "captured": "2026-10-30T23:27:42.089Z",
+ "captured": "2026-11-01T19:56:54.573Z",
  "timings": {
   "render/denoiseDevice-selfcheck.mjs": 5461,
   "render/denoiseTiming-selfcheck.mjs": 8195,
@@ -45,7 +45,10 @@
   "tools/ship/advisorLlmAudit-selfcheck.mjs": 19072,
   "tools/ship/ensureBrowserGates-selfcheck.mjs": 71,
   "tools/ship/localModel-selfcheck.mjs": 59,
-  "tools/ship/trainSubVestibular-selfcheck.mjs": 16962
+  "tools/ship/trainSubVestibular-selfcheck.mjs": 16962,
+  "render/denoiseLearnedUpscaleGPU-selfcheck.mjs": 27179,
+  "render/learnedUpscaleTemporal-selfcheck.mjs": 29738,
+  "render/temporalLive-selfcheck.mjs": 1046
  },
  "at": {
   "render/denoiseDevice-selfcheck.mjs": "2026-10-09T21:00:45.655Z",
@@ -90,7 +93,10 @@
   "tools/ship/advisorLlmAudit-selfcheck.mjs": "2026-10-30T23:27:42.089Z",
   "tools/ship/ensureBrowserGates-selfcheck.mjs": "2026-10-30T23:27:42.089Z",
   "tools/ship/localModel-selfcheck.mjs": "2026-10-30T23:27:42.089Z",
-  "tools/ship/trainSubVestibular-selfcheck.mjs": "2026-10-30T23:27:42.089Z"
+  "tools/ship/trainSubVestibular-selfcheck.mjs": "2026-10-30T23:27:42.089Z",
+  "render/denoiseLearnedUpscaleGPU-selfcheck.mjs": "2026-11-01T19:56:54.573Z",
+  "render/learnedUpscaleTemporal-selfcheck.mjs": "2026-11-01T19:56:54.573Z",
+  "render/temporalLive-selfcheck.mjs": "2026-11-01T19:56:54.573Z"
  },
  "kinds": {
   "render/denoiseDevice-selfcheck.mjs": "alone",
@@ -135,7 +141,10 @@
   "tools/ship/advisorLlmAudit-selfcheck.mjs": "alone",
   "tools/ship/ensureBrowserGates-selfcheck.mjs": "alone",
   "tools/ship/localModel-selfcheck.mjs": "alone",
-  "tools/ship/trainSubVestibular-selfcheck.mjs": "alone"
+  "tools/ship/trainSubVestibular-selfcheck.mjs": "alone",
+  "render/denoiseLearnedUpscaleGPU-selfcheck.mjs": "alone",
+  "render/learnedUpscaleTemporal-selfcheck.mjs": "alone",
+  "render/temporalLive-selfcheck.mjs": "alone"
  },
  "codes": {
   "render/denoiseDevice-selfcheck.mjs": 0,
@@ -180,7 +189,10 @@
   "tools/ship/advisorLlmAudit-selfcheck.mjs": 0,
   "tools/ship/ensureBrowserGates-selfcheck.mjs": 0,
   "tools/ship/localModel-selfcheck.mjs": 0,
-  "tools/ship/trainSubVestibular-selfcheck.mjs": 0
+  "tools/ship/trainSubVestibular-selfcheck.mjs": 0,
+  "render/denoiseLearnedUpscaleGPU-selfcheck.mjs": 0,
+  "render/learnedUpscaleTemporal-selfcheck.mjs": 0,
+  "render/temporalLive-selfcheck.mjs": 0
  },
  "serialRing": {
   "render/denoiseDevice-selfcheck.mjs": [
@@ -392,6 +404,21 @@
    17693,
    17765,
    16962
+  ],
+  "render/denoiseLearnedUpscaleGPU-selfcheck.mjs": [
+   26145,
+   26674,
+   27179
+  ],
+  "render/learnedUpscaleTemporal-selfcheck.mjs": [
+   29051,
+   29565,
+   29738
+  ],
+  "render/temporalLive-selfcheck.mjs": [
+   1018,
+   1059,
+   1046
   ]
  }
 }

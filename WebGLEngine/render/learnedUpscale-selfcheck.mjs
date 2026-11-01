@@ -182,6 +182,18 @@ console.log("\n6. ROUND 69 (section 159): U_R, A HELD RESIDUAL ON EASU");
     let bad = null; try { U.trainUpscaler([scene(16, 16, 1)], { seed: 1, steps: 1, batch: 1, crop: 16, variant: "residual" }); } catch (e) { bad = e.message; }
     ok("  ...and U_R's training refuses examples without EASU's output", /U_R trains on examples that carry easuUp/.test(bad || ""));
 }
+{   // v4909 -- residualLoss, exercised (found unnamed by definitionGates at the ship): with the last layer zeroed r is 0, so U_R's
+    // output is EASU's and its loss is EASU's perceptual relMSE against the reference; and it refuses a call without EASU's output.
+    // SABOTAGED, restored byte-identical: L1 residualLoss's denominator 2 REL_EPS -> 1 red, this row.
+    const W = 8, H = 8, sr = seededRandom(5), rr = sr.u, x = Float64Array.from({ length: W * H * U.UP_CHANNELS }, () => rr()), eu = Float64Array.from({ length: W * H * 3 }, () => 0.1 + rr()),
+        ref = Float64Array.from({ length: W * H * 3 }, () => 0.1 + rr()), cov = new Float64Array(W * H), E = new Float64Array(W * H * 3);
+    const net = U.makeUpscalerR(9), { REL_EPS } = await imp("render/denoiseStats.mjs");
+    const got = U.residualLoss(net, x, eu, W, H, ref, cov, E);
+    let want = 0; for (let i = 0; i < W * H * 3; i++) { const a = toPerceptual(eu[i]), b = toPerceptual(ref[i]); want += (a - b) ** 2 / (b * b + REL_EPS); }
+    let bad = null; try { U.residualLoss(net, x, null, W, H, ref, cov, E); } catch (e) { bad = e.message; }
+    ok("  v4909: residualLoss at U_R's zeroed head (r = 0) is EASU's own perceptual loss, and it refuses a call without EASU's output",
+        Number.isFinite(got.loss) && got.loss > 0 && Math.abs(got.loss - want / (W * H * 3)) < 1e-9 * want && /pass easuUp/.test(bad || ""), `${got.loss} against ${want / (W * H * 3)}`);
+}
 
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +
     "\nnot closed here: whether U beats EASU on the path tracer's frames. That is round 65's harvest, section 148's.");

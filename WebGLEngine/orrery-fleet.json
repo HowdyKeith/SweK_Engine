@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "7254a09f420ef02417f792fd0ea30d6a0afa8466",
+ "head": "da17be964f86f1965a0f40a7f1b880627d2a785f",
  "bodies": {
   "box3d": [
    {
@@ -616,8 +616,8 @@
    },
    {
     "path": "tools/ship/wgslCorpus.mjs",
-    "bytes": 156018,
-    "sha": "9a1677af0b5c095a8f6ed4fd67e82dd4a451e24e"
+    "bytes": 159167,
+    "sha": "7d423e172187a6c68e46843700f01ba9de3ddb22"
    }
   ],
   "taichi-js": [
@@ -860,8 +860,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 3727584,
-    "sha": "1afcde3fb103dbed44e26f0c66f3a69cf939bb23"
+    "bytes": 3730388,
+    "sha": "612f9679dc57407f8594c390d2c75a9537c50f3f"
    },
    {
     "path": "mpm3d.html",

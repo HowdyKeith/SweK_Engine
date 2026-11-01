@@ -291,7 +291,7 @@ $("chain").onclick = async () => {
         // section 172: U_TH after the history where UTH_BY_ADAPTER says (the 1080 class), or where ?ut=1 asks; ?ut=0 refuses it
         const askUT = new URLSearchParams(location.search).get("ut"), useUT = askUT === "1" || (askUT !== "0" && uthFor(key));
         let ut = null;
-        if (useUT) { const tr = await (await fetch("/" + UTH_NET)).json(); ut = decodeNet(tr.runs.find((x) => x.seed === tr.candidate).net); }
+        if (useUT) { const ur = await fetch("/" + UTH_NET); if (!ur.ok) throw new Error(`U_TH did not load: ${ur.status} ${ur.statusText}`); const tr = await ur.json(); ut = decodeNet(tr.runs.find((x) => x.seed === tr.candidate).net); }
         const r = await timeHalfChain({ device, net, newAdapter: () => navigator.gpu.requestAdapter(), kernels, S: makeScene(...CHAIN_SCENE), w, h, W, H, maxRings: CHAIN_RINGS, ut });
         const f = (x) => (x ? `${x.ms.toFixed(2)} (${x.clock || x.clocks.join(" + ")})` : "not measured");
         const st = r.chain.steps, rows = [[`the network at ${W} x ${H}`, f(r.networkFull)], [`the network at ${w} x ${h}`, f(r.networkHalf)],

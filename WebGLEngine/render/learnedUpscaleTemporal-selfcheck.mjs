@@ -242,6 +242,17 @@ console.log("\n7. SECTION 170: ROUND 72's COMMITTED HARVESTS, READ BACK -- U_TH 
         d.slice(12).filter((x) => x > 0).length === 9 && d.slice(0, 12).filter((x) => x > 0).length === 7 && Math.abs(gC - 0.0636) < 5e-4 && Math.abs(gR - 0.0018) < 5e-4);
 }
 
+{   // v4909 -- temporalInput, UTH_WIDTH and UT_VARIANTS, exercised (found unnamed by definitionGates at the ship). SABOTAGED, each restored
+    // byte-identical: T1 temporalInput's depth d / (2 + d) -> 1 red; T2 UT_VARIANTS gaining "quarter" -> 1 red.
+    const W = 3, H = 2, n = W * H, v = (k) => Float64Array.from({ length: n * 3 }, (_, i) => k + i / 100), nn = Float64Array.from({ length: n }, (_, p) => p + 1), dep = Float64Array.from({ length: n }, (_, p) => (p === 0 ? 1e9 : p));
+    const x = T.temporalInput(v(1), v(2), v(3), nn, v(4), v(5), dep, W, H), at = (p, c) => x[p * T.UT_CHANNELS + c];
+    ok("  v4909: temporalInput lays out U_T's 17 channels -- A, Au, C, n / 8, albedo, normal, depth d / (1 + d) with a miss as 0",
+        x.length === n * 17 && at(4, 0) === 1.12 && at(4, 4) === 2.13 && at(4, 8) === 3.14 && at(4, 9) === 5 / FRAMES && at(4, 11) === 4.13 && at(4, 15) === 5.14 && at(4, 16) === 4 / 5 && at(0, 16) === 0);
+    ok("  v4909: U_TH is UTH_WIDTH (16) wide in every hidden layer and isHalfT reads it; UT_VARIANTS is full and half, and makeUpscalerT builds each",
+        T.UTH_WIDTH === 16 && T.UTH_SHAPE.slice(0, 3).every((l) => l[1] === T.UTH_WIDTH) && T.UT_VARIANTS.join() === "full,half" && Object.isFrozen(T.UT_VARIANTS) &&
+        T.UT_VARIANTS.map((vv) => T.isHalfT(T.makeUpscalerT(seededRandom(3), vv))).join() === "false,true");
+}
+
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +
     "\nnot closed here: what U_T costs on a device, or how it looks on a page. Section 162 leaves those to the next rounds.");
 process.exit(fails ? 1 : 0);

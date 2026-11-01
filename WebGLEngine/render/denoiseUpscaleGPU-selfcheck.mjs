@@ -939,6 +939,15 @@ console.log("\n6b. SECTION 172: U_TH AFTER THE HISTORY, ON THE DEVICE, AGAINST r
     const { decodeNet } = await import(pathToFileURL(path.join(ENG, "render", "denoiseDevice.mjs")).href), { guideBuffers } = await import(pathToFileURL(path.join(ENG, "render", "denoiseScenes.mjs")).href);
     const { cameraBasis } = await import(pathToFileURL(path.join(ENG, "physics", "render", "pathTracer.mjs")).href);
     const UG = await import(pathToFileURL(path.join(ENG, "render", "denoiseUpscaleGPU.mjs")).href);
+    {   // v4909 -- the U_TH chain's exports, each exercised (found unnamed by definitionGates at the ship). SABOTAGED, each restored byte-identical:
+        // G1 packUniform's W and H swapped -> 1 red; G2 UPHOLD_COMP's hold 0.6 -> 2 red (this row in its final form, which reads UT_SCALE rather than quoting WGSL, and the chain's image); G3 UTH_FRAMES 7 -> 3 red.
+        const Sx = makeScene("R", 990000), ex = cameraPath(Sx).eyes[3], pu = UG.packUniform(Sx, ex, 64, 48), u32 = new Uint32Array(pu.buffer), f32 = new Float32Array(pu.buffer), Bx = cameraBasis({ ...Sx, eye: ex });
+        ok("  v4909: packUniform is the half and full sizes then the newest eye and its forward axis, 48 bytes; UTH_CHANNELS and UTH_FRAMES are U_T's 17 channels and round 32's 8 frames",
+            pu.length === 48 && [32, 24, 64, 48].every((v, i) => u32[i] === v) && [0, 1, 2].every((i) => f32[4 + i] === Math.fround(Bx.eye[i]) && f32[8 + i] === Math.fround(Bx.fwd[i])) &&
+            UG.UTH_CHANNELS === T.UT_CHANNELS && UG.UTH_FRAMES === (await import(pathToFileURL(path.join(ENG, "render", "denoiseTemporal.mjs")).href)).FRAMES && UG.UTH_FRAMES === 8);
+        ok("  v4909: UPHOLD_COMP_WGSL validates, and its hold is U_T's own scale, UT_SCALE",
+            validateWgsl(UG.UPHOLD_COMP_WGSL).length === 0 && UG.UPHOLD_COMP_WGSL.includes(`(1.0 + ${T.UT_SCALE} * `));
+    }
     const tr = JSON.parse(fs.readFileSync(path.join(ENG, TG.UTH_NET), "utf8")), Uh = decodeNet(tr.runs.find((r) => r.seed === tr.candidate).net);
     // round 33's fixture: family R's seed 990000 at 64 x 64, its orbit, the CPU's first hits, smooth frames with grain
     const N = 64, S = makeScene("R", 990000), eyes = cameraPath(S).eyes, geo = eyes.map((e) => hitsCPU(S, e, N, N)), full = emitterRadiance(S, N, N), F = eyes.length;

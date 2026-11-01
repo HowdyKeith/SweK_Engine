@@ -639,6 +639,16 @@ console.log("\n18. ROUND 58: FAMILY P, path-tracer.html'S OWN SIX SCENES (pre-re
         ps.every((s2) => !earlier.has(s2)) && refused === 6 && new Set(rsd).size === 18, `${ps.map((s2) => makeScene("P", s2).page).join(", ")}; ${refused} of 6 refused`);
 }
 
+{   // v4909 -- the FSR4 arc's three test sets (rounds 69, 70, 72), exercised (found unnamed by definitionGates at the ship).
+    // SABOTAGED, restored byte-identical: S1 round 72's T1 reusing round 70's R seeds -> 2 red (this row, and round 72's in learnedUpscaleTemporal).
+    const sets = [D.SPLITS_UPSCALE_LEARNED_69, D.SPLITS_UPSCALE_TEMPORAL, D.SPLITS_UPSCALE_TEMPORAL_72], firsts = [71000, 73000, 75000];
+    const t1 = sets.flatMap((s) => s.T1.seeds), prior = new Set([D.SPLITS_UPSCALE_LEARNED, D.SPLITS_UPSCALE_LEARNED_67, D.SPLITS_UPSCALE_LEARNED_68].flatMap((s) => Object.values(s).flatMap((x) => x.seeds)));
+    ok("  v4909: SPLITS_UPSCALE_LEARNED_69, SPLITS_UPSCALE_TEMPORAL and SPLITS_UPSCALE_TEMPORAL_72 keep round 65's training and validation and each a new T1 of 12 R then 12 C, 72 distinct seeds no earlier upscale set used",
+        sets.every((s, k) => s.train === D.SPLITS_UPSCALE_LEARNED.train && s.val === D.SPLITS_UPSCALE_LEARNED.val && s.T1.seeds.length === 24 && s.T1.seeds[0] === firsts[k] && s.T1.seeds[12] === firsts[k] + 1000 &&
+            s.T1.families.slice(0, 12).every((f) => f === "R") && s.T1.families.slice(12).every((f) => f === "C") && Object.isFrozen(s)) &&
+        new Set(t1).size === 72 && t1.every((x) => !prior.has(x)), `${t1.length} seeds`);
+}
+
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +
     "\nnot closed here: whether these scenes are a FAIR test. That is a judgement the pre-registration made in prose; " +
     "this gate holds the code to that prose, not the prose to the world.");

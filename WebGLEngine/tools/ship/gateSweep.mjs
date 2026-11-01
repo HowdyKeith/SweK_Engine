@@ -16226,6 +16226,13 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
         widened: Object.freeze([]),
         verdict: "the advisor chip (30 mutants) and its study (48), the recorded-decision seat (42), the live adapter (101), the local-model tool (80), the browser-gates installer (54), the Round 5 audit (104, 23 of which first read 0 red and drove new rows), the vestibular extraction (48), pilot (157) and trainer (about 410 over addenda 7 to 13); each run alone and green on the final tree (0.1 to 17 s, the trainer 14.7 s and the Round 5 audit 16.8 s alone, the latter two killed at the 20 s cap when 8 run at once and green when re-run alone); the definition ratchets were PAID DOWN by naming 23 exports in their gates' rows, not raised"
     }),
+    since617: Object.freeze({
+        at: "v4909", swept: 3, green: 3, red: 0,
+        added: Object.freeze(["render/denoiseLearnedUpscaleGPU-selfcheck.mjs", "render/learnedUpscaleTemporal-selfcheck.mjs", "render/temporalLive-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "the FSR4 arc's gates (rounds 68-76): the temporal upscaler U_T and its half-size U_TH (sections 1-7 with the round 70/72 verdict rows), the device timing readers and verdict rows (sections 163-175), and the path-tracer page's temporal view; each run alone and green on the tree merged over v4908 (27.2 s, 29.7 s, 1.2 s), each sabotaged to go red by name with the results in its header; denoiseUpscaleGPU, learnedUpscale, learnedUpscaleStudy and realGpuRun grew rows and are in earlier closings",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
