@@ -1116,6 +1116,7 @@ export class OgreScenario {
         // structure near HQ-on-water; auto-launches subs that approach
         // OGRE submerged, surface to fire torpedoes, then dive.
         this.defenderSubs = [];
+        this.subBrains = null;             // v4902 -- an ogreSubBridge (setSubBrains): when set, new defender subs are flown by sub brains
         this._dock = null;
         this._lastDefenderSubT = 0;
         // Round 120 — defender drone depot + patrol drones. Small
@@ -1926,6 +1927,20 @@ export class OgreScenario {
         }
     }
 
+    // v4902 -- route two of the Sea OGRE: give the defender subs real brains. `bridge` is brain/ogreSubBridge.mjs's createBridge(...) (or null to go back to the scripted walkers). Subs already in the
+    // water keep what they were launched with; the next launches take the brain.
+    setSubBrains(bridge) { this.subBrains = bridge || null; return !!this.subBrains; }
+
+    // What the brains can hear, in the world's units: the OGRE, its escort subs and its torpedoes.
+    _brainWorld(t) {
+        return {
+            t: Number.isFinite(t) && this.subBrains && this.subBrains.cfg ? t * this.subBrains.cfg.timeScale : undefined,   // the squad's clock, in brain seconds
+            ogre: this.ogre ? { x: this.ogre.position.x, z: this.ogre.position.z } : null,
+            hostiles: (this.escortSubs || []).filter((e) => e.hp > 0).map((e) => ({ x: e.x, z: e.z })),
+            torps: (this.projectiles || []).filter((p) => p.team === "ogre" && p.torpedo).map((p) => ({ x: p.x, z: p.z })),
+        };
+    }
+
     _despawnDock() {
         if (this.router && this._dock?.entityId != null) {
             this.router.exec({ type: "entity:despawn", id: this._dock.entityId });
@@ -1974,6 +1989,11 @@ export class OgreScenario {
             phase: "approaching",
             phaseT: 0,
         });
+        if (this.subBrains) {
+            const e = this.defenderSubs[this.defenderSubs.length - 1];
+            e.maxHp = e.hp; e.ttl = this.subBrains.ttl ?? 120;
+            this.subBrains.spawn(e, this._brainWorld());
+        }
 
         // Bubble puff at launch
         if (this.particles?.spawn) {
@@ -2010,6 +2030,13 @@ export class OgreScenario {
             const dx = s.target.x - s.x;
             const dz = s.target.z - s.z;
             const dist = Math.hypot(dx, dz) || 1;
+            if (s.brain) {
+                // v4902 -- a brain flies this one: it moves where its hull goes and fires along its nose
+                const r = this.subBrains.step(s, dt, this._brainWorld(t));
+                if (!r.alive) s.hp = 0;
+                else if (r.fire) { s.phase = "firing"; s.phaseT = 0; this._defenderSubFireTorpedo(s, r.fire); s.lastFireT = t; }
+                else if (s.phase === "firing" && s.phaseT > 0.8) { s.phase = "approaching"; s.phaseT = 0; }
+            } else {
             // Approach motion (always — sub keeps closing on OGRE)
             s.x += (dx / dist) * SUB_SPEED * dt;
             s.z += (dz / dist) * SUB_SPEED * dt;
@@ -2027,6 +2054,7 @@ export class OgreScenario {
                 s.phase = "diving"; s.phaseT = 0;
             } else if (s.phase === "diving" && s.phaseT > 1.2) {
                 s.phase = "approaching"; s.phaseT = 0;
+            }
             }
             // Move periscope entity to follow sub. Periscope is just
             // above water surface; brief +0.5 lift during "firing"
@@ -2084,11 +2112,13 @@ export class OgreScenario {
     // Round 112 — defender sub torpedo. Horizontal water-line strike
     // toward OGRE. Reuses the existing torpedo projectile pattern
     // from the defender_submarine turret type (round 36).
-    _defenderSubFireTorpedo(s) {
+    _defenderSubFireTorpedo(s, dir) {
         if (!this.ogre) return;
         const tx = this.ogre.position.x;
         const tz = this.ogre.position.z;
-        const dx = tx - s.x, dz = tz - s.z;
+        // v4902 -- a brain-flown sub fires along its nose (dir, a unit vector) for the brain's range; the scripted one at the OGRE
+        const BRAIN_RANGE = 100;
+        const dx = dir ? dir.dx * BRAIN_RANGE : tx - s.x, dz = dir ? dir.dz * BRAIN_RANGE : tz - s.z;
         const horiz = Math.hypot(dx, dz) || 1;
         const TORP_SPEED = 16;
         this.projectiles.push({

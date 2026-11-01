@@ -172,6 +172,10 @@ export function mountGaugeInfo({ dialsEl, host, getStats, barMount = null, barAf
                                  // summon while doing nothing about how long it stays. TWO DELAYS, TWO JOBS. ***
                                  raiseMs = 140, returnMs = 4000, hideWith = [], dockGauges = null,
                                  fixedH = 0, dockMax = 0, stretchToRow = false,
+                                 // v4897 -- WHAT A CLICK ON [Gauges] DOES WHILE A PANEL IS STAGED. The lock (v3823) refuses every AUTOMATIC route back to the gauges, and it refused the deliberate
+                                 // one too: Keith, on the rig, with a drawer presented, clicked [Gauges] and nothing happened (only the stage's own "back to the right" worked). A click is the one route
+                                 // the lock was never meant to stop, so the page says what it means -- server.html hands the panel back, which unlocks it and shows the gauges -- and nothing else changes.
+                                 onLockedGauges = null,
                                  dockScale = 0.8 } = {}) {
     if (!dialsEl || !host) return null;
     // v4868 -- the host's own overflow, read at mount, so the gauges tab can have it back (see show()).
@@ -419,7 +423,11 @@ export function mountGaugeInfo({ dialsEl, host, getStats, barMount = null, barAf
 
     // v3622 -- the automation, and EVERY deliberate click takes ownership off it.
     const auto = makeAutoTab({ raiseMs, returnMs });
-    tGauges.addEventListener("click", () => { auto.userTook(); show("gauges"); });
+    tGauges.addEventListener("click", () => {
+        auto.userTook();
+        if (locked && typeof onLockedGauges === "function") { try { onLockedGauges(); } catch (e) {} return; }   // v4897 -- the page hands the staged panel back (it unlocks, then shows the gauges)
+        show("gauges");
+    });
     tInfo.addEventListener("click", (ev) => {
         auto.userTook();
         // the ✕ releases rather than switching tabs, so a pin can be dropped without leaving the panel

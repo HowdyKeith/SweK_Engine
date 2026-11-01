@@ -183,6 +183,13 @@ export const SEPARATOR_SITES_AT_V4647 = Object.freeze({
         // brain's out) and one from path.join(ENG, "brain", ...) in the gate, each normalised by the platform to the same separator, so a win32 run compares two backslashed paths and a posix run two slashed ones.
         Object.freeze({ at: "v4877", gate: "tools/ship/trainRotorPilot-selfcheck.mjs",
             why: "expects path.join(ENG, \"brain\", ...) against DEFAULT_OUT and the GPU brain's out, which trainRotorPilot.mjs builds with path.resolve over the same directory; both are the platform's own normalised absolute path" }),
+        // The unnumbered line's three trainer gates (the version is chosen at ship time): the same shape as v4877's, a trainer's default output built with path.resolve over brain/ and the gate's own path.join(ENG, "brain", ...) of the same file, each normalised by the platform to the same separator.
+        Object.freeze({ at: "unnumbered line", gate: "tools/ship/trainDronePilot-selfcheck.mjs",
+            why: "expects path.join(ENG, \"brain\", \"pilotDroneMlpWeightsDefault.json\") against the GPU brain's out, which trainDronePilot.mjs builds with path.resolve over the same directory; both are the platform's own normalised absolute path" }),
+        Object.freeze({ at: "unnumbered line", gate: "tools/ship/trainSubPilot-selfcheck.mjs",
+            why: "expects path.join(ENG, \"brain\", \"pilotSubWeightsFishWip.json\") against the fish circuit's out, which trainSubPilot.mjs builds with path.resolve over the same directory; both are the platform's own normalised absolute path" }),
+        Object.freeze({ at: "unnumbered line", gate: "tools/ship/trainDogfightLeague-selfcheck.mjs",
+            why: "expects path.join(ENG, \"brain\", ...) against the path loadFile hands its reader (which joins the module's brain directory, a path.resolve, with the file name) and path.join(\"/elsewhere\", file) against the path loadFile joins from a directory it is given; each pair is built by the same join over the same parts" }),
     ]),
     defects: Object.freeze([
         Object.freeze({ gate: "tools/ship/gateSweep-selfcheck.mjs", where: "cross-file",
@@ -278,7 +285,8 @@ export const POSIX_AT_V4485 = Object.freeze({
     // tools/ship/adapterRecord-selfcheck.mjs (the definitionGates naming), tools/ship/headlessGpu.mjs (round 19's core) -- four, inside the band -- and
     // THIS round's tools/ship/realGpuRun.mjs (nativeGateList's relative paths), the fifth, one past it. NOTHING WAS UN-NORMALISED: a re-take, not a tolerance.
     // v4896 -- 187 callers / 132 normalising -> 193 / 136: six more files that join a path (the TV commands and gates, the snowGpu split gates), four normalising and two not; calls 254 -> 272. Read off the gate, not typed.
-    separator: Object.freeze({ callers: 193, calls: 272, normalised: 136, never: 57 }),
+    // v4904 -- 193 callers / 136 normalising -> 198 / 137: five more files that join a path (this round's gates and tools: the needs gate, the brain panel's page rows, the compass and steer rows, the shallow-clone and ICD rows), one normalising and four not; calls 272 -> 281. Read off the gate, not typed.
+    separator: Object.freeze({ callers: 198, calls: 281, normalised: 137, never: 61 }),
     rulesTried: Object.freeze([53, 74, 90]),
     notClaimed: "that the 90 are defects. A relative path that is only printed is portable already; the ones " +
                 "that bite are compared against a stored form, and three static rules for 'compared against' " +

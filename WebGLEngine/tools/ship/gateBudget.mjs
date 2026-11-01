@@ -314,11 +314,18 @@ export const MEASURED_RUNS = Object.freeze({
     // battle to its end, so the cost fell by twenty times; appending would have kept a 65 s basis for a 3.7 s gate,
     // a budget no run of it can approach. Seven runs alone after the fix, `date +%s%3N` around the process, load
     // average 1.9 to 2.3, ALL SEVEN EXIT 0 and all seven are the rows.
+    // v4900 -- RE-TAKEN, 3700 -> 7756, BECAUSE THE SAME GATE ON THE SAME TREE NOW COSTS TWICE WHAT THE v4778 RUNS SAID. The v4900 verdict's budgetProvenance row found this entry LOWER than its observation (the 80-slot rotation filed 7,669 ms, 0.48x
+    // of it) -- the half of that row that matters for safety, a budget under the gate's real cost. Checked rather than assumed to be this round's: the gate on the v4899 tree (git worktree at adb90d91d) reads 7,132 and 7,071 ms alone and on the
+    // v4900 tree 7,189 and 7,555, so no change of this round moved it; it boots a browser and watches a fight in real time under software rendering, which is the kind of gate that follows the host's CPU, and this box reads it at 2.1x
+    // the v4778 figure (3,225-3,700) -- the v4778 runs are kept in earlierRuns. SEVEN RUNS ALONE ON THE v4900 TREE, load average 0.6 to 1.1, ALL EXIT 0, `date +%s%3N` around the process: the rows. The slowest (7,756) is the budget, as the rule says.
     "tools/ship/rigidBody6dofPage-selfcheck.mjs": Object.freeze({
-        observedHere: true, at: "v4778 (after the fight-window fix)",
-        runs: Object.freeze([{ ms: 3235, code: 0 }, { ms: 3540, code: 0 }, { ms: 3700, code: 0 },
-                             { ms: 3225, code: 0 }, { ms: 3457, code: 0 }, { ms: 3288, code: 0 },
-                             { ms: 3375, code: 0 }]),
+        observedHere: true, at: "v4900 (the same fight-window gate, a slower host)",
+        runs: Object.freeze([{ ms: 7085, code: 0 }, { ms: 7111, code: 0 }, { ms: 7213, code: 0 },
+                             { ms: 7416, code: 0 }, { ms: 7194, code: 0 }, { ms: 7321, code: 0 },
+                             { ms: 7756, code: 0 }]),
+        earlierRuns: Object.freeze([{ ms: 3235, code: 0 }, { ms: 3540, code: 0 }, { ms: 3700, code: 0 },
+                                    { ms: 3225, code: 0 }, { ms: 3457, code: 0 }, { ms: 3288, code: 0 },
+                                    { ms: 3375, code: 0 }]),   // v4778's seven
     }),
 });
 

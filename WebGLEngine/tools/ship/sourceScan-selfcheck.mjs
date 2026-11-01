@@ -293,5 +293,59 @@ console.log("\n10. v4846 -- a template ends after its own closing backtick, thro
         JSON.stringify(codeOnly(fx)));
 }
 
+// *** v4896 -- noComments STOPPED LOOKING BACK TOO, SO IT IS HELD TO THE ALGORITHM THAT DID, AS codeOnly WAS AT v4814. *** It built `out` with += and asked regexAllowedHere(out) at
+// every `/`: 632 ms on main.js against codeOnly's 80 ms, and wasmTeardown's door census reads main.js through it. It now tracks the same facts as it emits and joins chunks
+// once. The look-back algorithm is kept below as the REFERENCE. Proven byte-identical over all 5,584 .js/.mjs/.cjs/.html files in the tree at the change (1.2 s against 6.3 s).
+// SABOTAGES, RESULTS BY NAME: `<` allowed to open a regex in noComments' rule -> the fixture row RED; a string's backslash no longer taking the next character -> the fixture row RED;
+// the run scan no longer breaking at a quote -> the fixture row RED; each restored.
+console.log("\n11. noComments against the look-back algorithm it replaced (v4896)");
+{
+    const reference = (src) => {
+        let out = "", i = 0, mode = null;
+        while (i < src.length) {
+            const c = src[i], d = src[i + 1];
+            if (mode === null) {
+                if (c === "/" && d === "/") { mode = "line"; i += 2; continue; }
+                if (c === "/" && d === "*") { mode = "block"; i += 2; continue; }
+                if (c === "`") { const e = templateEnd(src, i); out += src.slice(i, e); i = e; continue; }
+                if (c === "'" || c === '"') { mode = c; out += c; i++; continue; }
+                if (c === "/" && regexAllowedHere(out)) { const r = regexBody(src, i); if (r) { out += src.slice(i, r.end); i = r.end; continue; } }
+                out += c; i++; continue;
+            }
+            if (mode === "line") { if (c === "\n") { mode = null; out += "\n"; } i++; continue; }
+            if (mode === "block") { if (c === "*" && d === "/") { mode = null; i += 2; continue; } if (c === "\n") out += "\n"; i++; continue; }
+            out += c;
+            if (c === "\\") { out += src[i + 1] || ""; i += 2; continue; }
+            if (c === mode) mode = null;
+            i++;
+        }
+        return out;
+    };
+    const FIX = [
+        'const a = b / c / d; const r = /x\\/y/g; // trailing',                     // division after an identifier, regex after `=`, a line comment
+        'return /ab"c/.test(s); typeof /q/; x = foo[1] / 2; /' + '* block *' + '/ y',      // keywords open a regex (its quote is not a string); `]` ends a value
+        'if (n) / 3; const k = 10 / 2 / 1;',                                       // `)` ends a value; a number ends a value
+        '</label><input data="/cloud/x"> <a href="/y">',                          // `<` is a closing tag, never a regex opener
+        'var w = await\n  /re/.exec(t); f(x)\n/ 2',                              // whitespace and newlines between the two
+        'a.b_$c9 /d/ e; returnx /f/ g; "str" /h/ i',                               // identifier runs, a keyword prefix, after a string
+        'const s = "a \\" // not a comment \\\\" + \'it\\\'s\'; // real\nconst t = "unterminated\nz = 1 / 2',   // escapes in strings, a string running past its line
+        'x = `a ${b / c} // kept` + /re/g; /' + '* gone *' + '/ y = z\n// also gone',      // a template kept whole, then a regex after `+`
+        'a /' + '* one\ntwo\nthree *' + '/ b // c\nd',                                    // a block comment keeps its newlines (the delimiters are joined from two strings: vba/runtimeGap's crude stripper pairs any block-comment opener with the next closer even inside a string or a comment, and swallowed an earlier line of this file)
+        'x = "<p></p>"; <p></p> // a real comment after a closing tag\nz = 1',     // `</p>` then `//`: a regex opener after `<` would eat the first slash and leave the comment in
+    ];
+    const fixBad = FIX.filter((f) => noComments(f) !== reference(f));
+    ok("!! *** noComments equals the look-back algorithm on fixtures that drive every branch of the rule ***",
+       fixBad.length === 0, fixBad.length ? "DIFFER: " + fixBad.map((f) => JSON.stringify(f)).join(" | ") : `${FIX.length} fixtures`);
+    const sample = [];
+    (function walk(d) { for (const e of fs.readdirSync(d, { withFileTypes: true })) { if (e.name === "node_modules" || e.name === ".git" || e.name === "vendor") continue; const q = path.join(d, e.name); if (e.isDirectory()) walk(q); else if (/\.(m?js|cjs|html)$/.test(e.name)) sample.push(q); } })(ENG);
+    sample.sort();
+    const picked = sample.filter((_, k) => k % 40 === 0);
+    const treeBad = picked.filter((f) => { const t = fs.readFileSync(f, "utf8"); return noComments(t) !== reference(t); });
+    ok("!! ...and on a slice of the tree: every 40th source file, compared byte for byte",
+       picked.length > 50 && treeBad.length === 0, `${picked.length} files` + (treeBad.length ? `, DIFFER: ${treeBad.slice(0, 3).map((f) => path.relative(ENG, f)).join(", ")}` : ", all equal"));
+    const big = fs.readFileSync(path.join(ENG, "main.js"), "utf8"), t0 = Date.now(); noComments(big); const ms = Date.now() - t0;
+    console.log(`  ----  noComments over main.js (${(big.length / 1e6).toFixed(1)} MB): ${ms} ms -- the look-back version read 632 ms; reported, not gated, because a box's clock is not a property of the code`);
+}
+
 if (fails) { console.log("\nsourceScan-selfcheck: " + fails + " FAILURES"); process.exit(1); }
 console.log("\nsourceScan-selfcheck: all checks pass");

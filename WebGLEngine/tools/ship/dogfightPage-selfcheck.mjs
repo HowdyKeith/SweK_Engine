@@ -18,6 +18,16 @@
 //   PG11 (the craft's own mesh left in its own cockpit view) goes 0 red AND IS AN EQUIVALENT MUTANT TODAY: the eye sits inside a HOLLOW hull (open cylinders, a cone, a thin slab) and no face seen from inside is front-facing, so hiding the mesh changes no pixel; the page hides it anyway for the day the hull has a closed canopy.
 //   TWO WENT 0 RED THE FIRST TIME AND WERE FIXED IN THE GATE: PG12 (the overview replaced by a chase camera) because the first fights it framed were ones where the chase camera behind A also saw B -- the rows now use a duel at 20 s and 30 s, after the two have passed each other, where the chase camera loses B by 4.0 and 2.0 screens;
 //   and PG21 because the sabotage's own old string was not in the file (the sabotage was fixed, not the gate). THE FIRST SCREENSHOT OF THIS PAGE SHOWED BLACK WINDOWS over a gate that read the right pixels: the window boxes had a background of their own and covered the WebGL canvas they are drawn into -- PG26 is that bug, and its row reads the boxes' computed background.
+//
+// AND TWENTY-ONE ON THE JET (the aircraft selector, `?craft=jet`, the jet's roster, mesh, cameras, fog and brain window), each applied to dogfight.html in a scratch tree, the gate run against the REAL browser, the tree discarded; every one red by name (the number is how many rows went red):
+//   PH01 the aircraft selector does nothing 10 | PH02 the jet's scenarios are the trainer's 7 | PH03 the jet's arena options are the trainer's 6 | PH04 the jet is offered the trainer's roster 4 |
+//   PH05 the jet's default pilot is the trainer's autopilot 6 | PH06 the cruise autopilot flies the fighting gains 1 | PH07 the jet's fruit fly has the trainer's hand weights 1 |
+//   PH08 the jet's GPU network has the trainer's hand weights 1 | PH09 the craft's fog is not applied 2 | PH10 the selector can only go to the jet 2 | PH11 the address's craft is ignored 1 | PH12 the jet drawn at life size 1 |
+//   PH13 the jet's cameras are the trainer's distances 1 | PH14 the jet's brain window names the trainer's features 1 | PH15 the jet's default pilot for A is the fighting autopilot 2 |
+//   PH16 a hand-flown choice is always seated as pd 2 | PH17 the jet is drawn as the trainer 1 | PH18 the jet's fog is the trainer's 2 | PH19 the trainer's fog is the jet's 1 | PH20 the trainer drawn at three times its size 1 |
+//   PH21 the jet's brain window shows the trainer's feature values 1
+//   NOT HELD, SAID PLAINLY: the jet's opening camera offset, and the airspeed the brain window assumes before the first tick (140 m/s): neither is read by a row.
+//   THE FIRST RUN OF THE JET ROWS FOUND THE GATE'S OWN FIXTURES WRONG IN THREE PLACES: switching the aircraft keeps the kind and the seed of the fight in progress (the gate had assumed duel 3), the failure-path rows had taken the GPU Brain's shipped pilot away on purpose (so the 'way back' row saw a roster with one pilot disabled -- it now loads it again first), and the duel at seed 2 has A hit 14 times and landing none, not 'trading hits'. THE SABOTAGE RUNNER HAD TO LEARN A PAGE AT THE ENGINE'S ROOT: the first run of it died on a top-level file (the tree builder assumed every mutated file lived in a folder).
 "use strict";
 import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
 import { createRequire } from "node:module";
@@ -29,6 +39,7 @@ import * as PF from "../../brain/pilotFlightPolicy.mjs";
 import * as AF from "../../brain/autopilotFlight.mjs";
 import * as D from "../../brain/dogfightTask.mjs";
 import * as A from "../../brain/dogfightArena.mjs";
+import * as JF from "../../brain/jetFight.mjs";
 import { weightsHash } from "../../brain/drivePolicy.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -114,6 +125,56 @@ else {
             // ---- a hit is logged and the cards say it ----
             D.newFight({ kind: "tail", seed: 1, a: "dogfight", b: "pd" }); D.step(1800); out.tailLog = D.state().log; out.tailCards = cards(); out.tailRes = D.resultA();
 
+            // ---- THE JET: the aircraft selector, the jet's fights (brain/jetFight.mjs), its roster, its pictures, and the way back ----
+            out.jet = {};
+            await D.roster.loadChoice("gpuDogfight");   // the failure paths above took it away on purpose
+            D.newFight({ kind: "duel", seed: 3, a: "dogfight", b: "pd" });
+            D.setCraft("jet");
+            out.jet.craft = D.craft(); out.jet.choices = D.roster.choices; out.jet.labels = D.roster.labels; out.jet.state0 = D.state(); out.jet.cards0 = cards();
+            out.jet.selects = [doc.getElementById("craft").value, doc.getElementById("kind").value, doc.getElementById("seed").value, doc.getElementById("pilotA").value, doc.getElementById("pilotB").value];
+            out.jet.kinds = {};
+            for (const kind of ["tail", "offset", "turning", "duel"]) {
+                globalThis.__swekStep = "jet fight: " + kind;
+                D.newFight({ kind, seed: 2, a: "pd", b: "pd" }); D.step(1800);
+                out.jet.kinds[kind] = { res: D.resultA(), state: D.state() };
+            }
+            globalThis.__swekStep = "jet: the networks";
+            D.newFight({ kind: "duel", seed: 3, a: "hand", b: "pd" }); D.step(1800); out.jet.hand = D.resultA(); out.jet.handIds = D.state().pilots.map((p) => p.id);
+            D.newFight({ kind: "duel", seed: 3, a: "gpuHand", b: "pd" }); D.step(1800); out.jet.gpu = D.resultA(); out.jet.gpuLabels = D.roster.labels;
+            D.newFight({ kind: "duel", seed: 3, a: "pd", b: "pd" }); D.step(1800); out.jet.pd = D.resultA();
+            D.newFight({ kind: "duel", seed: 3, a: "cruise", b: "pd" }); D.step(1800); out.jet.cruise = D.resultA();
+            globalThis.__swekStep = "jet: the pictures";
+            D.newFight({ kind: "tail", seed: 1, a: "pd", b: "pd" }); D.step(60);
+            out.jet.pix = {};
+            for (const v of ["plane", "pilot", "gunner", "brain"]) {
+                D.setView(0, v);
+                out.jet.pix[v] = { gl: D.pixels(0), ink: D.ink(0), bars: D.inkColor(0, [89, 209, 255]) + D.inkColor(0, [246, 166, 35]), pipper: D.inkColor(0, [90, 214, 255]), lead: D.inkColor(0, [246, 166, 35]), cross: D.inkColor(0, [127, 224, 160]) };
+            }
+            D.setView(0, "plane");
+            D.newFight({ kind: "duel", seed: 3, a: "pd", b: "pd" }); D.step(600); D.settleCamera(); out.jet.mainNdc = D.mainView(); out.jet.mainCam = D.mainCamera();
+            { const PJ = await import("/brain/pilotJetPolicy.mjs"), PFm = await import("/brain/pilotFlightPolicy.mjs"); D.newFight({ kind: "tail", seed: 1, a: "pd", b: "pd" }); D.step(45); D.setView(0, "brain");
+              const st = D.stateOf(0), tg = D.targetOf(0), shown = D.brainValues(0), jetX = PJ.features(st, tg), trainerX = PFm.features(st, tg); D.setView(0, "plane");
+              out.jet.brainValues = { maxDiffJet: Math.max(...shown.map((v, i) => Math.abs(v - Math.fround(jetX[i])))), maxDiffTrainer: Math.max(...shown.map((v, i) => Math.abs(v - Math.fround(trainerX[i])))), n: shown.length }; }
+            out.jet.scale = D.meshScale(0); out.jet.fog = D.fog(); out.jet.brainNames = D.brainNames(0)[0]; out.jet.pilotIds = D.state().pilots.map((p) => p.id);
+            doc.getElementById("camMode").value = "chase0"; D.newFight({ kind: "tail", seed: 1, a: "pd", b: "pd" }); D.step(30); D.settleCamera();
+            { const cam = D.mainCamera(), a = D.state().crafts[0].pos; out.jet.chase = Math.hypot(cam.pos[0] - a[0], cam.pos[1] - a[1], cam.pos[2] - a[2]); }
+            doc.getElementById("camMode").value = "overview";
+            D.newFight({ kind: "duel", seed: 3, a: "cruise", b: "pd" }); out.jet.cruiseIds = D.state().pilots.map((p) => p.id);
+            D.setCraft("trainer");
+            out.jet.scaleTrainer = D.meshScale(0); out.jet.fogTrainer = D.fog();
+            out.jet.back = { craft: D.craft(), choices: D.roster.choices, labels: D.roster.labels, state: D.state(), selects: [doc.getElementById("craft").value, doc.getElementById("pilotA").value, doc.getElementById("pilotB").value] };
+
+            // ---- the page booted with ?craft=jet: a second page, its own default fight ----
+            {
+                const f2 = document.createElement("iframe"); f2.style.width = "1100px"; f2.style.height = "720px"; f2.src = "/dogfight.html?craft=jet&kind=tail&seed=2&a=cruise&b=pd"; document.body.appendChild(f2);
+                await new Promise((res) => { f2.onload = res; });
+                const w2 = f2.contentWindow, t1 = performance.now();
+                while (performance.now() - t1 < 40000 && !w2.__dogfight) { globalThis.__swekStep = "waiting for the ?craft=jet page"; await wait(200); }
+                const D2 = w2.__dogfight; await D2.ready; D2.hold(true);
+                out.jetUrl = { craft: D2.craft(), selects: ["craft", "kind", "seed", "pilotA", "pilotB"].map((id) => w2.document.getElementById(id).value), ids: D2.state().pilots.map((p) => p.id), alt: D2.state().crafts.map((c) => c.pos[2]), fog: D2.fog() };
+                f2.remove();
+            }
+
             // ---- pause ----
             const pb = doc.getElementById("pauseBtn"); out.pause = [D.paused, pb.textContent]; pb.click(); out.pause.push(D.paused, pb.textContent); pb.click(); out.pause.push(D.paused, pb.textContent);
             return out;
@@ -190,6 +251,31 @@ else {
         // ---- 9 the log and the cards ----
         ok("!! THE LOG TELLS THE FIGHT: a tail chase by the fruit fly trained to fight lands hits, and the log has a line for the first ('A hit B' with the hit points left) and the line that the fight is over; the card shows A's hits landed and B's hit points down", r.tailLog.some((l) => /A hit B.*hit points left/.test(l)) && r.tailLog.some((l) => /^OVER/.test(l)) && r.tailRes.dealt > 0 && new RegExp(`hits landed ${r.tailRes.dealt}\\b`).test(r.tailCards[0]) && new RegExp(`hit points ${20 - r.tailRes.dealt}/20`).test(r.tailCards[1]),
             `${r.tailRes.dealt} hits; log ${JSON.stringify(r.tailLog.slice(-2))}`);
+        // ---- 10 the jet ----
+        {
+            const J = r.jet;
+            ok("!! THE AIRCRAFT SELECTOR SWITCHES THE PAGE TO THE JET'S FIGHT: the selector says jet, the page starts a new fight of its own (duel 3 with the fruit fly's jet layout against the jet fighting autopilot), at tick 0 with both jets flying, between 1,800 and 2,200 m at 120 to 160 m/s -- the trainer's 300 m and 45 m/s scaled -- each with its 300 rounds and 20 hit points",
+                J.craft === "jet" && J.selects.join() === "jet,duel,3,hand,pd" && J.state0.tick === 0 && J.state0.crafts.length === 2 && J.state0.crafts.every((c) => c.status === "airborne" && c.pos[2] > 1800 && c.pos[2] < 2200 && Math.hypot(...c.vel) > 120 && Math.hypot(...c.vel) < 160 && c.ammo === 300 && c.hp === 20), `${J.selects} ${J.state0.crafts.map((c) => c.pos[2].toFixed(0) + "m " + Math.hypot(...c.vel).toFixed(0) + "m/s")}`);
+            ok("!! THE JET'S ROSTER IS FOUR HAND-FLOWN PILOTS, all offered: the fighting autopilot, the cruise autopilot, the fruit fly's jet layout on hand weights and the GPU Brain's on hand weights (nothing has been trained to fly the jet, so there are no weight files to load or to be missing), each labelled as a jet pilot",
+                J.choices.map((c) => c.id).join() === "pd,cruise,hand,gpuHand" && J.choices.every((c) => !c.disabled) && /jet fighting/.test(J.labels[1]) && /fruit fly, jet layout/.test(J.labels[0]), J.labels.join(" | "));
+            for (const kind of ["tail", "offset", "turning", "duel"]) {
+                const d = JF.duel(AF.jetFightPilot, JF.scenario(2, kind)), k = J.kinds[kind].res;
+                ok(`!! the JET'S ${kind} fight, the fighting autopilot on both sides, seed 2, is brain/jetFight.mjs's duel() to the bit in every count it reports (hits dealt and taken, rounds by each side, first hit, kill, both statuses, ticks) and its score to 1e-12`,
+                    ["dealt", "taken", "fired", "firedB", "firstHit", "killedB", "statusA", "statusB", "ticks"].every((f) => Object.is(k[f], d[f])) && Math.abs(k.score - d.score) < 1e-12, `${kind}: score ${k.score.toFixed(4)} / ${d.score.toFixed(4)}, ${k.statusA} vs ${k.statusB}`);
+            }
+            ok("!! THE JET'S STRAIGHT FIGHTS ARE WON AND ITS DUEL IS NOT: the tail, offset and turning fights end with B destroyed and A flying with nothing taken (a score over 1), the duel (seed 2: A is hit 14 times and lands none) has no kill and both jets are still flying at the minute (the hand pilot against itself: the numbers brain/jetFight-selfcheck.mjs pins)", ["tail", "offset", "turning"].every((k) => J.kinds[k].res.statusB === "destroyed" && J.kinds[k].res.statusA === "airborne" && J.kinds[k].res.taken === 0 && J.kinds[k].res.score > 1) && J.kinds.duel.res.dealt + J.kinds.duel.res.taken > 0 && J.kinds.duel.res.statusB === "airborne" && J.kinds.duel.res.statusA === "airborne", JSON.stringify(["tail", "offset", "turning", "duel"].map((k) => J.kinds[k].res.score.toFixed(2))));
+            ok("!! THE TWO NETWORKS FLY THE JET'S FIGHT THE AUTOPILOT FLIES, hit for hit: duel 3 with the fruit fly's jet layout in seat A, then the GPU Brain's, and then the fighting autopilot itself, give the same hits, rounds, statuses and ticks, and the same score (the page labels name the network); the cruise autopilot (gentler gains) flies a different fight", J.handIds.join() === "hand,pd" && /fruit fly, jet layout/.test(J.gpuLabels[0] + "") === false && /GPU Brain network, jet layout/.test(J.gpuLabels[0]) && ["dealt", "taken", "fired", "firedB", "statusA", "statusB", "ticks"].every((f) => Object.is(J.hand[f], J.pd[f]) && Object.is(J.gpu[f], J.pd[f])) && J.hand.score === J.pd.score && J.gpu.score === J.pd.score && (J.cruise.dealt !== J.pd.dealt || J.cruise.taken !== J.pd.taken || J.cruise.ticks !== J.pd.ticks), `pd ${J.pd.dealt}/${J.pd.taken}, hand ${J.hand.dealt}/${J.hand.taken}, gpu ${J.gpu.dealt}/${J.gpu.taken}, cruise ${J.cruise.dealt}/${J.cruise.taken}`);
+            const P = J.pix;
+            ok("!! THE JET'S VIEWS ARE PICTURES OF A WORLD, AND THE SIGHT AND THE BRAIN WORK: plane, pilot and gunner each hold many colours; the gunner's sight draws the bore cross, the pipper and the lead pip on a target 700 m ahead (a tail chase 2 s in); the pilot's view has its cross; the brain window is the network's bars (the jet layout's 18 features)",
+                ["plane", "pilot", "gunner"].every((v) => P[v].gl.distinct >= 8) && P.gunner.cross > 8 && P.gunner.pipper > 15 && P.gunner.lead > 15 && P.pilot.cross > 8 && P.brain.gl.distinct <= 2 && P.brain.bars > 1000, `plane ${P.plane.gl.distinct} colours, gunner cross ${P.gunner.cross} pipper ${P.gunner.pipper} lead ${P.gunner.lead}, brain bars ${P.brain.bars}`);
+            ok("!! THE OVERVIEW KEEPS BOTH JETS IN FRAME after 20 s of a duel (they are 2 to 3 km apart; the trainer's cameras are tens of metres)", J.mainNdc.every(([x, y, z]) => Math.abs(x) <= 1.02 && Math.abs(y) <= 1.02 && z > 0 && z < 1), JSON.stringify(J.mainNdc.map((n) => n.map((v) => +v.toFixed(2)))));
+            ok("!! THE JET IS DRAWN THREE TIMES LIFE SIZE AND THE TRAINER AT LIFE SIZE; THE FOG AND THE CHASE CAMERA ARE THE JET'S: a model scale of 3 (the trainer 1), a fog from 4,000 to 24,000 m (the trainer's 1,500 to 9,000), the chase camera 114 m from the jet (110 m behind and 30 above, the trainer's 25), the brain window's first row is the JET LAYOUT's features (named bankCompScheduled and upright) and the cruise pilot is seated as 'cruise'",
+                J.scale === 3 && J.scaleTrainer === 1 && J.fog.join() === "4000,24000" && J.fogTrainer.join() === "1500,9000" && Math.abs(J.chase - Math.hypot(110, 30)) < 8 && J.brainNames.includes("bankCompScheduled") && J.brainNames.includes("upright") && J.cruiseIds.join() === "cruise,pd", `scale ${J.scale}/${J.scaleTrainer}, chase ${J.chase.toFixed(0)} m, fog ${J.fog}`);
+            ok("!! THE JET'S BRAIN WINDOW SHOWS THE JET LAYOUT'S NUMBERS, not only its names: the eighteen values in the window's first row are PJ.features of the jet's own state and target (to float32), and are not the trainer's features of the same state (which differ in the scheduled and the upright-weighted entries)", J.brainValues.n === 18 && J.brainValues.maxDiffJet < 1e-5 && J.brainValues.maxDiffTrainer > 1e-4, `jet ${J.brainValues.maxDiffJet.toExponential(1)}, trainer ${J.brainValues.maxDiffTrainer.toExponential(1)}`);
+            ok("!! A PAGE OPENED WITH ?craft=jet STARTS AS THE JET'S: the selector says jet, the fight is the one in the address (tail 2, the cruise autopilot against the fighting one), both jets between 1,800 and 2,200 m, and the jet's fog", r.jetUrl.craft === "jet" && r.jetUrl.selects.join() === "jet,tail,2,cruise,pd" && r.jetUrl.ids.join() === "cruise,pd" && r.jetUrl.alt.every((z) => z > 1800 && z < 2200) && r.jetUrl.fog.join() === "4000,24000", JSON.stringify(r.jetUrl.selects));
+            ok("!! THE WAY BACK: switching to the trainer restores its seven pilots (all enabled), its default fight (the fruit fly trained to FIGHT against the PD autopilot), and the selector says trainer", J.back.craft === "trainer" && J.back.choices.map((c) => c.id).join() === "pd,hand,flight,dogfight,gpuHand,gpuFlight,gpuDogfight" && J.back.choices.every((c) => !c.disabled) && J.back.selects.join() === "trainer,dogfight,pd" && J.back.state.tick === 0 && J.back.state.crafts.every((c) => c.pos[2] > 200 && c.pos[2] < 400), J.back.selects.join());
+        }
+
         ok("the pause button toggles: playing, then paused with the button saying Play, then playing again", r.pause[0] === false && r.pause[2] === true && /Play/.test(r.pause[3]) && r.pause[4] === false && /Pause/.test(r.pause[5]), JSON.stringify(r.pause));
     }
 }

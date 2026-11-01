@@ -505,6 +505,11 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
         "sub-aquarium.html",
         "ui/seaDepthTint-selfcheck.mjs",
         "ui/seaFrame-selfcheck.mjs",
+        // v4901 -- the Sea OGRE round: the 3D replay's gate and its page, and the sea picker's and ballast cues' gates, each importing the vendored three.js to draw a scene (named, not counted).
+        "render/seaOgre3d-selfcheck.mjs",
+        "render/seaPicker-selfcheck.mjs",
+        "render/subBallastCues-selfcheck.mjs",
+        "sea-ogre.html",
     ]),
     "three-webgpu": Object.freeze([
         // backlog #31/#49/#51 -- the AI-presence orb (krispuckett/murmur-web ported into tslSource.mjs) is a
@@ -604,6 +609,8 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
         // v4854 -- three's own textureBarrier unit test, run before and after its one-line diff through this body's r186
         // (the page imports three.webgpu.js and three.tsl.js, as threeUpstream does). One arrival.
         "tools/ship/threeTextureBarrier-selfcheck.mjs",
+        // v4901 -- the merged FSR4 branch's frame-generation cost gate.
+        "render/denoiseFrameGenCost-selfcheck.mjs",
     ]),
     // v4805 -- r185's three files, kept unchanged for the r185 drafts when vendor/three-webgpu moved to r186. Nothing in the engine
     // imports them: the patch applier reads them, and the upstream gates load them by a path they build.
@@ -640,17 +647,48 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
     // (path.join(ROOT, "vendor", "male-cns", ...)) the substring rule never saw.
     // v4875 -- 8 -> 10: ai-bridge/subAquariumBridge.js and its selfcheck name vendor/male-cns/giant-fiber-circuit.json to ask whether the fly circuit is on the disk (the FLY BRAIN chip's availability probe); the file is not read, it is
     // looked for. A dependant by the substring rule's own test, the same kind as the three citations above, and listed because the fleet counts it.
+    // UNNUMBERED (the fish round) -- 10 -> 11: tools/fishCircuit-selfcheck.mjs READS vendor/male-cns/giant-fiber-circuit.json, to hold that the vendored fish circuit has the fly circuit file's shape (the keys the baker reads); a real reader, and the only new one.
     "male-cns": Object.freeze([
         "ai-bridge/subAquariumBridge-selfcheck.mjs",
         "ai-bridge/subAquariumBridge.js",
         "brain/gunnerPolicy-selfcheck.mjs",
         "fly-connectome.html",
         "tools/bakeGfcTopology.mjs",
+        "tools/fishCircuit-selfcheck.mjs",
         "tools/maleCnsBake.mjs",
         "tools/maleCnsLoader-selfcheck.mjs",
         "tools/ship/drivePolicy-selfcheck.mjs",
         "tools/ship/flyConnectomePage-selfcheck.mjs",
         "tools/ship/pilotPolicy-selfcheck.mjs",
+    ]),
+    // UNNUMBERED (the fish round) -- vendor/zebrafish arrived (the Fish1 TEN-analysis core, baked circuit JSON) with no entry, which importPosition-selfcheck's "every vendored body has an entry" turned red on. The list is dependantsOf() over
+    // engineSources(), run, not typed: the command that writes it (tools/fishCircuit.mjs) and three files that read it (the fish circuit's gate, the fish pilot's gate, the aquarium bridge's gate, which writes a temp tree with a vendor/zebrafish/ in it).
+    // v4898 -- RE-TAKEN 4 -> 8 at the merge of the submarine branches (dependantsOf over the swept files, run): the hindbrain-integrator command (tools/fishHmi.mjs), the rung-3 trainer and its gate, and the circuit pilot's gate now read the baked circuit.
+    "zebrafish": Object.freeze([
+        "ai-bridge/subAquariumBridge-selfcheck.mjs",
+        "brain/pilotSubCircuit-selfcheck.mjs",
+        "brain/pilotSubFish-selfcheck.mjs",
+        "tools/fishCircuit-selfcheck.mjs",
+        "tools/fishCircuit.mjs",
+        "tools/fishHmi.mjs",
+        "tools/ship/trainSubCircuits-selfcheck.mjs",
+        "tools/ship/trainSubCircuits.mjs",
+    ]),
+    // v4898 -- vendor/hemibrain (the fly central-complex heading loop) arrived at the merge with no entry; its four dependants, dependantsOf run, not typed: the exporter (tools/flyCx.mjs), the rung-4a trainer and its gate, and the stateful pilot's gate.
+    "hemibrain": Object.freeze([
+        "brain/pilotSubCircuitState-selfcheck.mjs",
+        "tools/flyCx.mjs",
+        // v4905 -- the piece 4 trainer reads the vendored circuit (CIRCUIT_FILE), ARRIVED named by orreryEjecta-selfcheck.
+        "tools/ship/trainNeedsCircuit.mjs",
+        "tools/ship/trainSubState-selfcheck.mjs",
+        "tools/ship/trainSubState.mjs",
+        // v4901 -- the aquarium page loads the hemibrain-backed pilots (named by the sub-aquarium round).
+        "sub-aquarium.html",
+    ]),
+    // v4898 -- vendor/zebrafish-vestibular is a PAPER-ONLY body: the supplementary files of an article, read by no source file (dependantsOf returns []), which is a measurement and not an omission.
+    // v4906 -- ONE DEPENDANT ARRIVED: tools/fishVestibularCircuit.mjs reads the supplementary spreadsheets (the rung 4b extraction), so the body is no longer reached by nothing. It is still DATA and holds no code on disk.
+    "zebrafish-vestibular": Object.freeze([
+        "tools/fishVestibularCircuit.mjs",
     ]),
     // vendor/mikktspace is xatlas's shape: a C reference oracle, compiled on demand by its one dependant to grade
     // physics/mesh/mikktSpace.mjs. The substring rule sees NONE -- the path is built with path.join -- which is the
@@ -666,6 +704,8 @@ export const EJECTA_BASELINE = Object.freeze(Object.fromEntries(
 
 /** The three that are paperwork rather than payload, named so a rise or a fall is visible. */
 export const PAPER_ONLY_BODIES = Object.freeze(["grass", "keyhunt", "slug"]);
+/** v4898 -- bodies that hold DATA and no code, reached by no source file: zebrafish-vestibular is the supplementary tables (two spreadsheets, a zip) of an article, which a gate may read one day but no file in the tree does. They are payload, so they are not PAPER_ONLY_BODIES, and they are not code, so the "no vendored code nothing reaches" claim survives; the gate checks the second half against the disk. */
+export const DATA_ONLY_BODIES = Object.freeze(["zebrafish-vestibular"]);
 
 /**
  * Every directory named `vendor` in the tree, not just the top-level one.

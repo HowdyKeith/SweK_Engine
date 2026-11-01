@@ -39,6 +39,7 @@
   <p style="color:#7d8fa8">Redirecting there automatically&hellip;</p>
 </div></div>
 
+<div id="brainBox" style="position:fixed;left:8px;bottom:8px;width:520px;background:#0b131fcc;border:1px solid #1c2c44;border-radius:6px;padding:4px 6px;z-index:5"><div style="font:11px ui-monospace,Menlo,monospace;color:#59d1ff;display:flex;justify-content:space-between;gap:8px"><span>Selected brain activity</span><label style="color:#7c93b8">ship <select id="brainPick" style="font:inherit;background:#0c1424;color:#b9d4ff;border:1px solid #2f486c"></select></label><span id="brainWho" style="color:#7c93b8"></span></div><canvas id="brainView" width="520" height="250" style="width:520px;height:250px;display:block"></canvas></div>
 <script type="module">
 import { adapterOptions } from "/ui/webgpuProbe.mjs";
 import { STARFIELD_WGSL, OCTAVES } from "/render/starField.mjs";
@@ -46,6 +47,7 @@ import { STARFIELD_WGSL, OCTAVES } from "/render/starField.mjs";
 import { spawnEnemies, stepAI, applyDamage } from "/ev/combat.js";
 import { headingVector } from "/ev/flightModel.js";
 import { decide as tacticsDecide } from "/ev/esTactics.js";
+import { tacticsPanel, drawPanel } from "/render/brainPanel.mjs";   // the selected brain activity panel
 import { mountTacticsPanel } from "/ui/tacticsPanel.mjs";   // v4839 -- Load Tactics: brain/tacticsRoster.mjs behind two selects (the sim below reads roster.weights("A"|"B"))
 import { createESBox3D } from "/physics/esBox3d.js";
 import { box3d } from "/physics/box3d/box3dLoader.js";
@@ -114,7 +116,18 @@ function newBattle() {
 // v4839 -- LOAD TACTICS: which weights pick each side's targets (brain/tacticsRoster.mjs behind two selects). The default is what this page always ran: A scatter, B the hand weights. Start Fight commits the choice,
 // clears the tally and rebuilds the battle.
 const roster = mountTacticsPanel({ hud: document.getElementById("hud"), onStart() { wins.A = 0; wins.B = 0; newBattle(); } });
-window.__tacticsFight = { roster, get A() { return A; }, get B() { return B; }, get wins() { return wins; }, get ready() { return A.length > 0; }, get t() { return t; }, step(n = 1) { for (let i = 0; i < n; i++) stepSim(); } };   // step(): advance the sim without waiting for frames (the gate's clock; the WebGPU view can lose its device in a software harness and redirect)
+window.__tacticsFight = { drawBrain, roster, get A() { return A; }, get B() { return B; }, get wins() { return wins; }, get ready() { return A.length > 0; }, get t() { return t; }, step(n = 1) { for (let i = 0; i < n; i++) stepSim(); } };   // step(): advance the sim without waiting for frames (the gate's clock; the WebGPU view can lose its device in a software harness and redirect)
+// the selected brain (render/brainPanel.mjs tacticsPanel): the tactics weights, the features of the best targets, the flee test and the map of how attractive a target would be around the ship; five times a second
+const brainCv = document.getElementById("brainView"), brainCtx = brainCv.getContext("2d"), brainSel = document.getElementById("brainPick"); let lastBrain = 0, brainKey = "";
+function drawBrain(force = false) {
+  const now = performance.now(); if (!force && now - lastBrain < 200) return; lastBrain = now;
+  const all = A.concat(B), key = all.map((e) => e.id).join();
+  if (key !== brainKey) { brainKey = key; const keep = brainSel.value; brainSel.textContent = ""; for (const e of all) { const o = document.createElement("option"); o.value = e.id; o.textContent = e.id; brainSel.appendChild(o); } if (all.some((e) => e.id === keep)) brainSel.value = keep; }
+  const e = all.find((x) => x.id === brainSel.value && !x.dead) || A.find((x) => !x.dead && !x._player); if (!e) return;
+  const team = e.team, foes = snapshot(team === "A" ? B : A);
+  drawPanel(brainCtx, brainCv.width, brainCv.height, tacticsPanel({ self: e, foes, w: roster.weights(team), opts: { lastTargetId: e._tgtId, wasFleeing: e._fleeing, range: 1400 }, label: `${e.id} · tactics weights of side ${team}` }), { title: e.id });
+  document.getElementById("brainWho").textContent = `side ${team}`;
+}
 function stepSim() {
   const dt = 1 / 30, nowMs = t * 1000;
   const liveA = A.some((e) => !e.dead), liveB = B.some((e) => !e.dead);
@@ -485,6 +498,7 @@ function loop() {
   const now = performance.now(); const frameDt = Math.min(0.1, (now - last) / 1000); acc += frameDt; last = now;
   let steps = 0; while (acc >= 1 / 30 && steps < 4) { stepSim(); acc -= 1 / 30; steps++; }
   updateFx(frameDt);
+  drawBrain();
   render();
   const el = document.getElementById("stat"); if (el) el.textContent = "A " + A.filter((e) => !e.dead).length + " vs B " + B.filter((e) => !e.dead).length + "  \u00b7  battles A:" + wins.A + " B:" + wins.B + "  \u00b7  " + (ready ? "box3d" : "fallback") + " \u00b7 " + shots.length + " shots";
   const ps = document.getElementById("pstat"); if (ps) ps.textContent = (playerOn && player) ? (player.dead ? "  \u00b7  \uD83D\uDC80 destroyed \u2014 press R to respawn" : "  \u00b7  \uD83D\uDD79\uFE0F hull " + Math.max(0, Math.round(player.shield + player.armor)) + "  \u00b7  A/D \u2190\u2192 steer, W/\u2191 thrust, Space fire") : "";

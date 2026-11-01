@@ -1,0 +1,24 @@
+# Hand-off for another chat or a co-worker (written 2026-10-24; UNNUMBERED)
+
+Keith plans to ask another chat for help when a co-worker is available. This file says what is worth handing over, what is not, and gives briefs that can be pasted as they are. The chat that wrote it stays on the branch `claude/sweet-lovelace-8leivh` and keeps the jets, the fish rung 3 run, and the fly central-complex pilot.
+
+## What must NOT be shared between chats
+* **Branches.** `main` belongs to another chat and this branch to this one. A helper works on a branch of its own (say `claude/<name>-helper`), never pushes to `main` or to this branch, and no pull request is opened unless Keith asks in so many words.
+* **Files.** This chat owns `brain/SUBMARINE_WIP.md`, `brain/DOGFIGHT_LEAGUE_WIP.md`, `tools/ship/gateSweep.mjs`, `tools/ship/assertionShape.mjs` and everything under `tools/fish*`, `brain/pilotSub*` and `tools/ship/trainSub*`. A helper writes its own note file and leaves the census records alone (this chat registers new gates when it merges them).
+* **The four cores.** The sandbox has four cores and they are full for hours (the jets' recipe v3, then fish stage A). A helper in another sandbox has its own.
+
+## Brief 1 -- the data this chat cannot fetch (needs a machine or a chat with open internet): the larval zebrafish vestibular circuit
+This sandbox cannot reach zebrafish.link, zenodo.org, osf.io, github.com or nature.com (the proxy refuses them), so it cannot get the data for the fish "posture and pitch" circuit. Leads from one web search, NOT verified:
+* Liu et al. 2022, *Organization of the gravity-sensing system in zebrafish*, Nature Communications (the Bagnall lab): its Source Data are said to include .json files for the 3D reconstructions and an Excel file; code is said to be at github.com/bagnall-lab/EM_analysis; an earlier bioRxiv version said the images and reconstructions are hosted at zebrafish.link (a `hildebrand16` `vestibular_right` path).
+* Jia & Bagnall 2022, *Monosynaptic targets of utricular afferents in the larval zebrafish*, Frontiers in Neurology (doi 10.3389/fneur.2022.937054): look in its Data Availability statement.
+* The tangential nucleus and the vestibulospinal neurons (Bianco et al. 2012; Schoppik lab papers) are the pitch-relevant cells.
+**Bring back, without changing anything:** every file as downloaded, with for each one its URL, the date, its sha256, the licence or terms text copied word for word, and the citation; one README saying which paper each came from. Do not interpret, filter or convert. Then say, in a paragraph, the smallest circuit the files give from the tilt sensors (utricular afferents) through the central vestibular neurons to something that drives movement, with how many neurons and which have a known transmitter. The extraction tool (a gated one, like `tools/fishHmi.mjs`) is written here after the files have been seen, not before.
+
+## Brief 2 -- an independent build that does not touch any circuit: needs and limits for the submarine
+Keith's idea (parked in `brain/SUBMARINE_WIP.md`, "Parked idea"): a battery that only the surface (or snorkel depth) refills, and a hull that feels pressure and can be damaged. Two pieces that are separate from the fish work and from each other:
+1. **The energy and refill model** in the sub's physics (`physics/mechanics/subModel6dof.mjs`, `subActuators.mjs`): a charge that drains with thrust (power rises with speed cubed) and time; refilling at the surface or at a snorkel depth of a few metres; hull classes (battery only, battery plus snorkel, air-independent, no limit) in `tools/subHulls.mjs`.
+2. **The pressure and damage model**: a collapse depth that damage lowers, a leak that gets faster with depth (flooding adds weight), and a hull-strain reading as an observation. Today there is one hard crush depth (100 m) and buoyancy does not change with depth.
+**Rules that apply to everything built (the standing rules of this repository):** all new work UNNUMBERED (the version is chosen at ship time); every new gate is SABOTAGED and goes red BY NAME (a mutant that goes 0 red is a finding: fix the gate, cut the dead code, or say it is equivalent), with the sabotage log in the gate's header comment; honest "NOT CHECKED" lines; no weapons, missile, seeker or guidance content; no model identifiers in any file or commit; commits from the repository root with labelled checkpoint messages; never `rm -rf` with a glob; kill background jobs by explicit PID. Write the design and the pass/fail down before running anything.
+
+## Brief 3 -- if there is only an hour: read, do not build
+Read `brain/SUBMARINE_WIP.md` (the fish ladder, the HMI circuit, the rung 3 pre-registration) and say what is wrong with it. A second reader of a pre-registration is worth more than a second builder.

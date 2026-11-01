@@ -104,7 +104,7 @@ export function relativeAirflow(body, windWorld = [0, 0, 0]) {
  * principle (a spanwise velocity component doesn't drive a 2D section's lift/drag). Returns {force, cl, cd,
  * alpha, q} -- q is dynamic pressure, alpha in radians. force is [0,0,0] (not NaN) for near-zero OR purely
  * spanwise flow (zero planar component either way), where a 2D section has nothing to generate force from. */
-export function surfaceForce(flowBody, surface) {
+export function surfaceForce(flowBody, surface, rho = AIR_DENSITY_SEA_LEVEL) {   // `rho` (kg/m^3) is the air's density at the surface: the sea-level value unless a caller that flies high says otherwise (flightModel6dof's jet does), and then everything below is what it was to the bit
     const flowSpan = dot3(flowBody, surface.span);
     const planar = sub3(flowBody, scale3(surface.span, flowSpan));
     const speed = norm3(planar);
@@ -130,15 +130,15 @@ export function surfaceForce(flowBody, surface) {
 
     const planarDir = unit3(planar);
     const liftDir = unit3(cross3(planarDir, surface.span));
-    const q = 0.5 * AIR_DENSITY_SEA_LEVEL * speed * speed;
+    const q = 0.5 * rho * speed * speed;
     const force = add3(scale3(liftDir, cl * q * surface.area), scale3(planarDir, -cd * q * surface.area));
     return { force, cl, cd, alpha, q };
 }
 
 /** Convenience: compute surfaceForce() and apply it to `acc` via rigidBody6dof.mjs's own applyForceAtPoint(),
  * at the surface's own mount point. Returns the same {force, cl, cd, alpha, q} surfaceForce() does. */
-export function applySurfaceForce(acc, flowBody, surface) {
-    const r = surfaceForce(flowBody, surface);
+export function applySurfaceForce(acc, flowBody, surface, rho = AIR_DENSITY_SEA_LEVEL) {
+    const r = surfaceForce(flowBody, surface, rho);
     applyForceAtPoint(acc, r.force, surface.mount);
     return r;
 }

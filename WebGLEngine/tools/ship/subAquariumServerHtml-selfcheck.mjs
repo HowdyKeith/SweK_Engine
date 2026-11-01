@@ -38,7 +38,7 @@ ok("the fish chip opens /sub-aquarium.html", /onclick="window\.open\('\/sub-aqua
 const gpuI = html.indexOf('id="gpuBrainStatus"'), flyI = html.indexOf('id="flyBrainStatus"'), fishI = html.indexOf('id="fishBrainStatus"'), peersI = html.indexOf('id="paSync"');
 ok("both chips sit after the GPU chip and before the peer sync line (inside the peer header)", gpuI > 0 && gpuI < flyI && flyI < fishI && fishI < peersI);
 ok("the Arriving row links /sub-aquarium.html", /<a href="\/sub-aquarium\.html"[^>]*>[^<]*Sub Aquarium<\/a>/.test(html));
-ok("pageSections.mjs files sub-aquarium.html in UNPLACED with a reason", /\["sub-aquarium\.html", "[^"]{20,}"\]/.test(sections));
+ok("pageSections.mjs files sub-aquarium.html: in a section's pages (the Flight Simulation bucket since v4901, which put it where its link is) or in UNPLACED with a reason (where it sat while it was an Arriving row)", /\["sub-aquarium\.html", "[^"]{20,}"\]/.test(sections) || /pages: \[[^\]]*"sub-aquarium\.html"/.test(sections));
 
 // ---- 2 THE CHIPS
 console.log("2  THE CHIPS");

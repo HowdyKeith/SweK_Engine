@@ -328,7 +328,27 @@ export function mountAvatarSwitch({ host, makeSvg, width = 143, height = 210, pr
         return mode.id;
     }
 
-    btn.addEventListener("click", () => { set(nextMode(current)); });
+    // *** v4899 -- THE BUTTON SKIPS A MODE WHOSE ASSET IS MISSING, INSTEAD OF BOUNCING TO THE SVG ROBOT AND STARTING OVER. ***
+    // set() answers a missing file by falling back to the SVG robot and RECORDING svg as the current mode -- right for a mode chosen by name or restored from storage, WRONG for the corner button: from the SVG
+    // robot the button went rigged -> stickwoman, stickwoman's RobotWoman.glb was not on the box, the panel fell back to svg, and the next press began again at rigged. THE ROTATION NEVER GOT PAST THE MISSING
+    // MODE, so the orb (murmur), the blob, the talking head, krbn, ascii, heerich, the full stage, gauges3000 and the GPU blob were all still in the list and none of them could be reached. (RobotWoman.glb is
+    // not in the repository -- it is a file a box has or has not -- so this is every box without it.) Pressing the button now walks forward to the next mode that CAN be shown, names what it skipped, and
+    // comes back round to the SVG robot after the last one.
+    async function advance() {
+        const all = allModes(), skipped = [];
+        let id = current;
+        for (let n = 0; n < all.length; n++) {
+            id = nextMode(id);
+            const m = modeById(id);
+            if (m.needsWebGPU && typeof navigator !== "undefined" && !navigator.gpu) { skipped.push(m.id + " (no WebGPU)"); continue; }
+            if (m.needs && probe && !(await probe(m.needs))) { const f = m.needs.split("/").pop(); if (!skipped.includes(f + " not found")) skipped.push(f + " not found"); continue; }
+            const landed = await set(id);
+            if (skipped.length && landed === id) { note.textContent = "skipped: " + skipped.join(", "); note.style.display = "block"; }
+            return landed;
+        }
+        return set("svg");
+    }
+    btn.addEventListener("click", () => { advance(); });
     host.appendChild(btn);
     host.appendChild(note);
     set(readMode(), { announce: false });
@@ -372,7 +392,7 @@ export function mountAvatarSwitch({ host, makeSvg, width = 143, height = 210, pr
     }
     const stopObserving = () => { if (ro) { try { ro.disconnect(); } catch {} ro = null; } };
 
-    return { el: btn, set, get current() { return current; }, next: () => set(nextMode(current)),
+    return { el: btn, set, get current() { return current; }, next: () => advance(),
              teardown: () => { stopObserving(); teardown(); }, MODES,
              get size() { return { width, height }; }, remeasure: () => { const b = measure(); width = b.w; height = b.h; return { width, height }; } };
 }

@@ -102,11 +102,50 @@ fn applyAerial(
 `;
 
 /**
+ * OURS, not upstream's: applyAerial with the two evaluations that cannot show skipped (snow-beauty-pass-cost item 3). Same arithmetic; (1) an extinction under 0.002 returns the colour, since the mix would move it by under
+ * 0.2% of the distance to the sky (below one level of an 8-bit target for any colour a tone-mapper takes); (2) the crossfade weight k is 0 below extinction 0.55 and 1 above 0.995, and there only the sample that has weight
+ * is read (the exact sky read is a mip-0 trilinear fetch and the near read a mip-3 one, so a surface in the clear reads one sky sample and a hazed one reads one, where the upstream body reads both everywhere).
+ */
+export const AERIAL_LEAN_WGSL = /* wgsl */ `
+fn applyAerialLean(
+    color: vec3f,
+    camPos: vec3f,
+    worldPos: vec3f,
+    viewDir: vec3f,
+    sunDir: vec3f,
+    sunColor: vec3f,
+    density: f32,
+    heightFalloff: f32,
+    fogStart: f32,
+    strength: f32
+) -> vec3f {
+    let t = aerialTransmittance(camPos, worldPos, density, heightFalloff, fogStart);
+    let ext = clamp(1.0 - pow(t, strength), 0.0, 1.0);
+    if (ext < 0.002) { return color; }
+    let k = smoothstep(0.55, 0.995, ext);
+    var inscatter: vec3f;
+    if (k >= 1.0) {
+        inscatter = skyAtLevel(normalize(viewDir), 0.0);
+    } else {
+        let mu = dot(viewDir, sunDir);
+        let fwd = phaseMie(mu, 0.62) * 5.5;
+        let near = aerialNearSky(viewDir) + sunColor * fwd * 0.16;
+        inscatter = near;
+        if (k > 0.0) { inscatter = mix(near, skyAtLevel(normalize(viewDir), 0.0), k); }
+    }
+    return mix(color, inscatter, ext);
+}
+`;
+
+/**
  * A table of applyAerial queries as a compute kernel. Bindings: 0 out (rw f32, 3 per query), 1 skyLut (ro, the chain), 2 queries (ro f32, 24 per query: color3, cam3, world3, view3, sun3, sunColor3, density,
  * heightFalloff, fogStart, strength, pad x3 = 28 -> stride 28). Dispatch ceil(n / 64).
  */
 export const AERIAL_QSTRIDE = 28;
-export const AERIAL_KERNEL_WGSL = /* wgsl */ `
+export const AERIAL_KERNEL_WGSL = aerialKernel("applyAerial", "");
+/** the same kernel through applyAerialLean */
+export const AERIAL_LEAN_KERNEL_WGSL = aerialKernel("applyAerialLean", AERIAL_LEAN_WGSL);
+function aerialKernel(fn, extra) { return /* wgsl */ `
 @group(0) @binding(0) var<storage, read_write> outBuf: array<f32>;
 @group(0) @binding(1) var<storage, read> skyLut: array<f32>;
 @group(0) @binding(2) var<storage, read> queries: array<f32>;
@@ -115,6 +154,7 @@ const SKY_W: i32 = 64;
 const SKY_H: i32 = 32;
 const SKY_LEVELS: i32 = ${SKY_LEVELS};
 ${AERIAL_WGSL}
+${extra}
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) gid: vec3u) {
     let i = gid.x;
@@ -126,12 +166,12 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     let view = vec3f(queries[o + 9u], queries[o + 10u], queries[o + 11u]);
     let sun = vec3f(queries[o + 12u], queries[o + 13u], queries[o + 14u]);
     let sunC = vec3f(queries[o + 15u], queries[o + 16u], queries[o + 17u]);
-    let r = applyAerial(color, cam, world, view, sun, sunC, queries[o + 18u], queries[o + 19u], queries[o + 20u], queries[o + 21u]);
+    let r = ${fn}(color, cam, world, view, sun, sunC, queries[o + 18u], queries[o + 19u], queries[o + 20u], queries[o + 21u]);
     outBuf[i * 3u] = r.x;
     outBuf[i * 3u + 1u] = r.y;
     outBuf[i * 3u + 2u] = r.z;
 }
-`;
+`; }
 
 export function reportLines() {
     return ["[aerial] aerial perspective: transmittance by height-falloff extinction; the inscatter crossfades from a BLURRED, upward-tilted sky read with Mie forward lobe (g 0.62) onto the exact sky sample by smoothstep(0.55, 0.995, extinction)",

@@ -156,6 +156,16 @@ if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToP
     })();
     let sweep = {};
     try { sweep = JSON.parse(fs.readFileSync(SWEEP_PATH, "utf8")); } catch {}
+    // v4897 -- A BOX THAT DOES NOT OWN THE SHARED RECORD STILL OBSERVES. The quick sweep writes its readings to a box's own tracked record (tools/ship/sweep-timings.<box>.json, and boxTimings.mjs --record for a gate a
+    // round adds) when the shared sweep-timings.json belongs to another machine, so the nine gates this round added were seen to finish and were in no file this writer read: budgetEvidence then read nine
+    // "new since the capture" against its handful of eight. An observation made on another box is still an observation made, and the ledger's rule is that one is never erased: those records are folded in
+    // too, the shared file's entry winning where both have one.
+    try {
+        for (const f of fs.readdirSync(HERE).filter((x) => /^sweep-timings\.[a-z0-9-]+\.json$/.test(x) && x !== "sweep-timings.local.json").sort()) {
+            const box = JSON.parse(fs.readFileSync(path.join(HERE, f), "utf8"));
+            sweep = { ...sweep, timings: { ...(box.timings || {}), ...(sweep.timings || {}) }, codes: { ...(box.codes || {}), ...(sweep.codes || {}) } };
+        }
+    } catch {}
     const prev = loadObserved();
     const r = mergeObservations(prev, sweep, at);
     const out = {

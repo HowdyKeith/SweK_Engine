@@ -6,7 +6,7 @@
 // does, so that a fight of two is the same fight (the gate flies the four kinds of scenario through both and compares everything duel() reports, to the bit).
 //
 //   A CRAFT   { id, team, name, pilot (state, target, wind) -> controls, behaviour: "hunt" (the guidance of dogfightTask.pursuit(), against the NEAREST enemy still flying) | "script" (a heading/altitude/airspeed that is a function of the time),
-//               fires (does its trigger work?), spec (a flightGuns gun spec; default flightGuns.GUN), hp (default spec.hp), model (a flightModel6dof model; default the trainer), state (flightModel6dof.createState options) }
+//               fires (does its trigger work?), spec (a flightGuns gun spec; default flightGuns.GUN), hp (default spec.hp), model (a flightModel6dof model; default the trainer), guide (dogfightTask.GUIDE's numbers for the pursuit and the trigger of this craft: ranges, speeds, tolerances; default the trainer's -- the jet's are brain/jetFight.mjs's, and the arena's `collisionRange` is the guide's), state (flightModel6dof.createState options) }
 //   A TICK    each flying craft is told where to go (hunt: pursuit() of its nearest enemy from the START of the tick; script: its function), the pilot answers with controls, the trigger is read from the same pre-tick states, the guns
 //             fire, every flying craft flies one tick, every round moves and is tested against every flying craft but its owner, and then the aftermath: a hit takes `spec.damage` from the victim and credits the shooter, a flight that ends
 //             (the ground) marks the craft, two craft closer than COLLISION_RANGE have hit each other and BOTH are lost, and a craft whose hit points are gone is destroyed. A craft that is not flying takes no further part (it is not a target,
@@ -43,7 +43,7 @@ const norm = (a) => Math.hypot(a[0], a[1], a[2]);
 /**
  * A new arena. `crafts` are the definitions described above; ids must be distinct positive integers (a round's owner is an id). Returns { dt, t, i, crafts, rounds, events, closest, done, seconds } -- crafts in the order given.
  */
-export function createArena({ crafts, dt = DT, seconds = D.SECONDS, model = AF.defaultModel(), spec = G.GUN } = {}) {
+export function createArena({ crafts, dt = DT, seconds = D.SECONDS, model = AF.defaultModel(), spec = G.GUN, guide = D.GUIDE } = {}) {
     if (!Array.isArray(crafts) || crafts.length < 2) throw new Error("dogfightArena.createArena: an arena needs at least two crafts");
     const ids = new Set();
     for (const c of crafts) {
@@ -55,19 +55,19 @@ export function createArena({ crafts, dt = DT, seconds = D.SECONDS, model = AF.d
     const made = crafts.map((c) => {
         const bomber = c.bomber || null, m = c.model || (bomber ? bomber.model : model), sp = c.spec || spec, state = F.createState({ ...c.state, mass: m.mass, inertia: m.inertia });
         const seats = bomber ? bomber.seats.map((seat, k) => ({ seat, state: GS.createSeatState(seat), decide: c.gunner ? c.gunner(seat, k) : GS.handGunner({ seed: c.id * 100 + k }), last: null })) : [];
-        return { id: c.id, team: c.team ?? c.id, name: c.name || `craft ${c.id}`, pilot: bomber ? SC.scalePilot(c.pilot, bomber.scale) : c.pilot, behaviour: c.behaviour || "hunt", script: c.script || null, fires: c.fires !== false, model: m, spec: sp, hp: c.hp ?? (bomber ? bomber.hp : sp.hp),
+        return { id: c.id, team: c.team ?? c.id, name: c.name || `craft ${c.id}`, guide: c.guide || guide, pilot: bomber ? SC.scalePilot(c.pilot, bomber.scale) : c.pilot, behaviour: c.behaviour || "hunt", script: c.script || null, fires: c.fires !== false, model: m, spec: sp, hp: c.hp ?? (bomber ? bomber.hp : sp.hp),
             state, gun: G.createGun(sp), hits: 0, taken: 0, friendlyHits: 0, friendlyTaken: 0, held: 0, holdFire: c.holdFire !== false, status: "airborne", firstHitAt: null, killedAt: null, minAltitude: Infinity, maxAlpha: 0, minV: Infinity, last: null,
             bomber, seats, enginesRunning: bomber ? bomber.engines.length : 0, engineHp: new Map(bomber ? bomber.engines.map((id) => [id, bomber.parts[id].hp]) : []), aimRadius: c.aimRadius ?? (bomber ? 0.35 * bomber.span : sp.hitRadius), partHits: new Map() };
     });
-    return { dt, seconds, t: 0, i: 0, crafts: made, rounds: [], events: [], closest: Infinity, done: false, over: null };
+    return { dt, seconds, collisionRange: guide.collisionRange, t: 0, i: 0, crafts: made, rounds: [], events: [], closest: Infinity, done: false, over: null };
 }
 
 const flying = (c) => c.status === "airborne";
 /** Have two craft hit each other? Two plain craft: closer than COLLISION_RANGE. A bomber is its spheres: the other craft is inside one of them (grown by 2 m for the other's own size) -- a fighter in the bomber's wing, not 6 m from its centre. */
-function collides(A, B, range) {
-    if (!A.bomber && !B.bomber) return range < COLLISION_RANGE;
+function collides(A, B, range, limit = COLLISION_RANGE) {
+    if (!A.bomber && !B.bomber) return range < limit;
     const big = A.bomber ? A : B, other = big === A ? B : A, mine = BM.partCentres(big.bomber, big.state);
-    if (other.bomber) return range < COLLISION_RANGE;
+    if (other.bomber) return range < limit;
     return mine.some((p) => norm(sub(other.state.pos, p.center)) < p.radius + 2);
 }
 /** The nearest enemy craft still flying, from c, or null. Ties go to the lower id. */
@@ -114,11 +114,11 @@ export function stepArena(arena) {
         const foe = nearestFoe(arena, c);
         let target, fire = false;
         if (c.behaviour === "script") target = c.script(t);
-        else if (foe) target = D.pursuit(c.state, foe.state, c.spec).target;
+        else if (foe) target = D.pursuit(c.state, foe.state, c.spec, c.guide).target;
         else target = { heading: F.attitude(c.state).heading, altitude: c.state.pos[2], airspeed: F.attitude(c.state).airspeed };
         let held = false;
         if (foe && c.fires) {
-            const fc = D.fireControl(c.state, foe.state, c.gun, c.spec, foe.aimRadius); fire = fc.fire;
+            const fc = D.fireControl(c.state, foe.state, c.gun, c.spec, foe.aimRadius, c.guide); fire = fc.fire;
             if (fire && c.holdFire && friendInLine(arena, c, Math.min(c.spec.life, fc.range / c.spec.muzzleSpeed + 0.15))) { fire = false; held = true; c.held += 1; }
         }
         const controls = c.pilot(c.state, target, still);
@@ -173,7 +173,7 @@ export function stepArena(arena) {
         if (!alive.includes(A) || !alive.includes(B)) continue;
         const range = norm(sub(A.state.pos, B.state.pos));
         if (range < arena.closest) arena.closest = range;
-        if (collides(A, B, range)) {
+        if (collides(A, B, range, arena.collisionRange)) {
             for (const X of [A, B]) if (X.status !== "collided") { X.status = "collided"; events.push({ type: "collision", t: arena.t, craft: X.id, with: (X === A ? B : A).id }); }
         }
     }
@@ -208,10 +208,10 @@ export function resultOf(arena, meId) {
 /**
  * dogfightTask's scenario as an arena: craft 1 is A (team 1, flying `pilotA`), craft 2 is B (team 2, flying `pilotB`, hunting if the scenario says so, scripted straight or turning otherwise), the trainer, the standard gun.
  */
-export function arenaFromScenario(sc, pilotA, { pilotB = AF.pilot, names = ["A", "B"], seconds = D.SECONDS, dt = DT, model = AF.defaultModel(), spec = G.GUN, specB = spec } = {}) {
+export function arenaFromScenario(sc, pilotA, { pilotB = AF.pilot, names = ["A", "B"], seconds = D.SECONDS, dt = DT, model = AF.defaultModel(), spec = G.GUN, specB = spec, guide = D.GUIDE } = {}) {
     const hunt = sc.opponent.kind === "hunt";
     const script = (t) => ({ heading: sc.opponent.kind === "turn" ? sc.b.heading + sc.opponent.rate * t : sc.b.heading, altitude: sc.b.pos[2], airspeed: sc.b.speed });
-    return createArena({ dt, seconds, model, spec, crafts: [
+    return createArena({ dt, seconds, model, spec, guide, crafts: [
         { id: D.A_ID, team: 1, name: names[0], pilot: pilotA, behaviour: "hunt", fires: true, state: sc.a, spec },
         { id: D.B_ID, team: 2, name: names[1], pilot: pilotB, behaviour: hunt ? "hunt" : "script", script: hunt ? null : script, fires: sc.opponent.fires, state: sc.b, spec: specB },
     ] });

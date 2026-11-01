@@ -155,8 +155,9 @@ console.log("\n2. *** EJECTA: how far each body's material spread into the tree 
     // through path.join("vendor", name) that no substring search could ever see. ONLY slug is unreached.
     const zeros = Object.entries(measured).filter(([, v]) => v === 0).map(([k]) => k);
     ok("*** every body with NO dependant holds no code -- there is no vendored CODE nothing reaches ***",
-        zeros.every((z) => E.PAPER_ONLY_BODIES.includes(z)),
-        "zeros: " + (zeros.join(" ") || "none") + ". That is the claim worth keeping, and it survives");
+        zeros.every((z) => E.PAPER_ONLY_BODIES.includes(z) || E.DATA_ONLY_BODIES.includes(z)) &&
+        E.DATA_ONLY_BODIES.every((b) => fs.readdirSync(path.join(ROOT, "vendor", b), { recursive: true }).every((f) => !/\.(mjs|js|html|wasm|cjs|ts)$/i.test(String(f)))),
+        "zeros: " + (zeros.join(" ") || "none") + " (data-only, holding no .mjs/.js/.html/.wasm on disk: " + (E.DATA_ONLY_BODIES.join(" ") || "none") + "; v4898). That is the claim worth keeping, and it survives");
     const reachedPaper = E.PAPER_ONLY_BODIES.filter((b) => measured[b] > 0);
     ok("  ...and a PAPER-ONLY body may still be reached, which is a different fact and is now stated",
         reachedPaper.every((b) => E.DEPENDANTS_AT_V4410[b].length === measured[b]),

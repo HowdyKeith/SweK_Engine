@@ -12,6 +12,7 @@
   "constantRows-selfcheck.json",
   "conv2d-selfcheck.json",
   "denoiseDevice-selfcheck.json",
+  "denoiseFrameGenCost-selfcheck.json",
   "denoiseTiming-selfcheck.json",
   "denoiseUpscaleGPU-selfcheck.json",
   "detourScale-selfcheck.json",

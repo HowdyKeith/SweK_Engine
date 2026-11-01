@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/wasmDoors-selfcheck.mjs -- v4840
 //
-// Run: node tools/ship/wasmDoors-selfcheck.mjs   (~3.5s -- measured v4840 on the timing record's owner box: the census about 2.6 s,
+// Run: node tools/ship/wasmDoors-selfcheck.mjs   (~1.3 s since v4896 -- the census about 1.0 s: noComments no longer looks back and doorReach is one git grep. WAS ~3.5s at v4840, the census about 2.6 s,
 //   one converted member under the hook 0.3 s, the fixture tree the rest)
 //
 // GATES tools/ship/wasmTeardown.mjs's computed-door census -- wasmCompilers, wasmDoors, doorReach -- and DOORS_AT_V4840, the population

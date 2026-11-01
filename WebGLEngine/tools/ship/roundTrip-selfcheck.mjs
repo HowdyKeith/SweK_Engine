@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/roundTrip-selfcheck.mjs
 //
-// Run: node tools/ship/roundTrip-selfcheck.mjs   (~10.5s — re-measured v4804: 6.6 s-7.0 s alone, 16.1 s the sweep's serial median; it read ~4.5s MEASURED (gate-timings.json) -- MEASURED)
+// Run: node tools/ship/roundTrip-selfcheck.mjs   (~2s — re-measured v4905 on the 4-core sandbox: 2.0 s alone (the rotation returned it from over the line); v4804 read 6.6 s-7.0 s alone on another box, 16.1 s the sweep's serial median)
 // Gated by tools/ship/selfchecks.mjs (auto-discovered).
 //
 // v3243 -- KEITH'S SIX RULES FOR A ROUND-TRIP CONTROL, IN ONE PLACE.
@@ -138,7 +138,7 @@ const mod = noComments(modRaw);
     // this round. THE RIGHT FIX REMAINS THE SAME ONE THIS FILE HAS ALWAYS NAMED: convert one file at a time and
     // lower the baseline by hand, exactly as arrival/doorbell/spacedesk were -- not a scripted rewrite of 32
     // pages, which is the v3202 shape this file's whole second half already warns against.
-    const UNGUARDED_BASELINE = 86;   // v3243 measured 103 distinct / 3 guarded; v3455 arrival.html; v3670 doorbell.html; v3846 spacedesk.html; v4084 86 (drift, see above).
+    const UNGUARDED_BASELINE = 88;   // v3243 measured 103 distinct / 3 guarded; v3455 arrival.html; v3670 doorbell.html; v3846 spacedesk.html; v4084 86 (drift, see above); v4906 RAISED 86 -> 88, MEASURED: sub-aquarium.html pumpChk and repairChk (v4905 follow-up) are live simulation switches, not a saved config -- nothing loads or posts them -- and the census counts any checkbox with a handler; raised by hand, named, not computed.
     const unguarded = r.distinct - r.guarded;
 
     // THE CONVERTED FILES ARE NAMED, NOT JUST COUNTED. v3420's rule: a tally lets one file gain a guard while

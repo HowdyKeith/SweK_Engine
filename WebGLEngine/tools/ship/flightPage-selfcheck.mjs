@@ -130,8 +130,8 @@ else {
             const pitchOf = (q) => Math.asin(2 * (q[1] * q[3] - q[0] * q[2]));
             D.reset(); D.step(38); const noKey = snap();
             D.reset();
-            win.dispatchEvent(new win.KeyboardEvent("keydown", { code: "KeyS", bubbles: true })); D.step(8);
-            win.dispatchEvent(new win.KeyboardEvent("keyup", { code: "KeyS", bubbles: true })); D.step(30);
+            win.dispatchEvent(new win.KeyboardEvent("keydown", { code: "KeyS", bubbles: true })); D.step(30);
+            win.dispatchEvent(new win.KeyboardEvent("keyup", { code: "KeyS", bubbles: true })); D.step(8);
             out.pitchPull = { pull: pitchOf(snap().fleet[0].q), none: pitchOf(noKey.fleet[0].q) };
             D.setSpec(0, "scripted");
 
@@ -208,7 +208,7 @@ else {
         const mt = r.manualTrim.fleet[0];
         ok("!! THE KEYBOARD PILOT IS TRIMMED: with no key touched, 20 s on, the aircraft is flying within 25 m of its altitude and 3 m/s of its speed", mt.status === "airborne" && Math.abs(mt.pos[2] - 300) < 25 && Math.abs(speed(mt) - 45) < 3, `alt ${mt.pos[2].toFixed(1)} V ${speed(mt).toFixed(1)}`);
         const mr = r.manualRoll.fleet[0], rollOf = (q) => Math.atan2(2 * (q[0] * q[1] + q[2] * q[3]), 1 - 2 * (q[1] * q[1] + q[2] * q[2]));
-        ok("!! ...and D (stick right) held for 8 ticks (0.27 s) banks it to the RIGHT (a positive bank: right wing down, between 5 and 60 degrees), and 3 s later it is still banked and has turned right (the heading has risen)", rollOf(r.manualHeld.fleet[0].q) > 0.02 && rollOf(mr.q) > 0.09 && rollOf(mr.q) < 1.05 && hdg3(mr.q) > 0.02 && mr.status === "airborne", `bank ${(rollOf(r.manualHeld.fleet[0].q) * R2D).toFixed(1)} -> ${(rollOf(mr.q) * R2D).toFixed(1)} deg, heading ${(hdg3(mr.q) * R2D).toFixed(1)} deg`);
+        ok("!! ...and D (stick right) held for 8 ticks (0.27 s) banks it to the RIGHT (a positive bank, between 1 and 60 degrees), and WITH THE STABILITY ASSIST (the page's default, v4901) the wings are back to level 3 s later (under 3 degrees) having turned right (the heading has risen); the raw stick stayed banked and tumbled", rollOf(r.manualHeld.fleet[0].q) > 0.02 && Math.abs(rollOf(mr.q)) < 0.05 && hdg3(mr.q) > 0.02 && mr.status === "airborne", `bank ${(rollOf(r.manualHeld.fleet[0].q) * R2D).toFixed(1)} -> ${(rollOf(mr.q) * R2D).toFixed(1)} deg, heading ${(hdg3(mr.q) * R2D).toFixed(1)} deg`);
 
         const dx = r.windGround[1] - r.windGround[0], dv = r.windVel[1][0] - r.windVel[0][0];
         ok("!! WIND moves the ground track and not the airspeed: in a 12 m/s tailwind the pilot (reading AIR data) brings the airspeed back to 45, so the ground speed ends 9..13 m/s above the calm day's, the track is carried 120..250 m farther in 20 s (it started at 33 m/s of airspeed and had to accelerate), and the altitude is held to 3 m", dv > 9 && dv < 13 && dx > 120 && dx < 250 && Math.abs(r.windAlt[1] - r.windAlt[0]) < 3, `ground speed +${dv.toFixed(1)} m/s; ${dx.toFixed(1)} m farther; altitude ${r.windAlt.map((v) => v.toFixed(1)).join(" vs ")}`);
@@ -217,7 +217,7 @@ else {
         ok("!! a 12 m/s wind blowing TOWARD heading 90 degrees (to the right of the nose) pushes the ground track to the RIGHT -- world -Y, since +Y is the aircraft's left -- by 150..300 m in 20 s, and everyone is still flying (the crosswind is flown, not dodged)", dy < -150 && dy > -300 && r.windCrossStatus.every((x) => x === "airborne"), `${dy.toFixed(1)} m in y`);
         ok("!! a brain exported for ANOTHER policy is refused by name and nothing is imported; the choices do not grow", r.badImport.ok === false && /pilotAircraftPolicy/.test(r.badImport.error || "") && r.badImport.imported === false && !r.badImport.choices.includes("imported"), r.badImport.error);
         ok("!! a pilot CHOSEN BEFORE it exists falls back to the hand weights and says so, and the import ALONE (no new choice) puts the imported pilot in the seat", /hand weights/.test(r.beforeImport) && /imported pilot/.test(r.afterImport), `${r.beforeImport} -> ${r.afterImport}`);
-        ok("!! S (pull back) held for 8 ticks makes the nose HIGHER than no key does, 1.3 s on: the keyboard's pitch has the right sign (by more than 0.02 rad)", r.pitchPull.pull > r.pitchPull.none + 0.02, `${(r.pitchPull.pull * R2D).toFixed(2)} deg vs ${(r.pitchPull.none * R2D).toFixed(2)} deg`);
+        ok("!! S (pull back) held for 30 ticks (1 s) makes the nose HIGHER than no key does, 0.27 s after it is let go: the keyboard's pitch has the right sign (by more than 0.02 rad)", r.pitchPull.pull > r.pitchPull.none + 0.02, `${(r.pitchPull.pull * R2D).toFixed(2)} deg vs ${(r.pitchPull.none * R2D).toFixed(2)} deg`);
         ok("!! a good brain is accepted, 'imported pilot brain' is offered, and an aircraft assigned to it flies (airborne after 25 s, the label names it)", r.goodImport.ok && r.goodImport.imported && r.goodImport.choices.includes("imported") && /imported/.test(r.imported.labels[2]) && r.imported.state.fleet[2].status === "airborne", r.imported.labels[2]);
         ok("!! ...and the imported hand weights fly the same flight as the autopilot (within 0.5 m of altitude after 25 s)", Math.abs(r.imported.state.fleet[2].pos[2] - r.imported.state.fleet[0].pos[2]) < 0.5, `${r.imported.state.fleet[2].pos[2].toFixed(2)} vs ${r.imported.state.fleet[0].pos[2].toFixed(2)}`);
 

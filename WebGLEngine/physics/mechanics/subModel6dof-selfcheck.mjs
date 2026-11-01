@@ -13,6 +13,8 @@
 //   5  THE SURFACE    submerged() is 1 at z = -R, 0 at z = +R, 1/2 at the waterline; a hull wholly out of the water has only its weight, no drag, no thrust, no fin force
 //   6  THE ENDS       broached (the CG above the surface), grounded (the hull's underside at the seabed), crushed (past the test depth, on a spec with the seabed deeper), lost (a non-finite state); stepSub() on an ended
 //                     state returns it UNCHANGED (the same object); a step edits nothing it is handed
+//   6b THE TANK       (v4901) the OPTIONAL ballast tank and drop weight: off by default and bit-identical when off; a pump rate, finite air, an emergency blow and a one-way drop weight, each on a fixture whose answer is worked out by hand,
+//                     and the flood scenario (a leak the tank cannot trim out, which the drop weight can)
 //   7  THE FRONT DOOR the export list is pinned; the report says real numbers
 //
 // SABOTAGE LOG -- FIFTEEN, each applied to physics/mechanics/subModel6dof.mjs in place, the gate run, the file restored (cmp against the saved original); every one red by name (the number is how many rows went red):
@@ -22,6 +24,10 @@
 // S7 went 0 red the first time AND S9 never applied: the S7 row computed its expected first-tick velocity from m.vmass, the very field the sabotage edited, so the two moved together (a gate that restates the thing it
 // guards from the thing it guards) -- the pin "vmass is 7800 and the state carries it" now stands outside the field. S9's pattern was written for a function and the file has an arrow; the editor asserted the pattern
 // was present and the shell hid the assertion with 2>/dev/null, so 0 red meant "never applied", not "not caught". Re-run with the pattern that exists, and stderr visible.
+// TANK SABOTAGE LOG (v4901, section 6b) -- TWELVE, each applied in place, the gate run, the file restored; every one red by name (rows red in brackets):
+//   T1 pump-rate cap dropped 3 | T2 air never spent 3 | T3 flooding spends air 1 | T4 emergency air cost same as a normal blow 1 | T5 emergency blow honoured without emergencyRate 1 | T6 release not one-way 1
+//   T7 shed mass not applied to the weight 2 | T8 weight follows the command, not the tank level 1 | T9 stepSub does not advance the tank 1 | T10 a drop-weight-only model made dynamic 2
+//   T11 release always present in sanitize() 1 | T12 a plain model given a tank 1
 "use strict";
 import * as S from "./subModel6dof.mjs";
 
@@ -121,10 +127,65 @@ console.log("\n6. THE ENDS");
     ok("sanitize reads a NaN as 0 and clamps to [-1, 1] (thrust included: it reverses)", mad.pitch === 0 && mad.yaw === 1 && mad.thrust === 0 && mad.ballast === 0 && S.sanitize({ thrust: -5 }).thrust === -1);
 }
 
+console.log("\n6b. THE BALLAST TANK AND THE DROP WEIGHT (v4901) -- optional, off by default");
+{
+    const TK = (extra) => S.createSubModel(Object.freeze({ ...S.EXPLORER, ...extra }));
+    const base = S.createSubModel(), c4 = { pitch: 0.1, yaw: -0.2, thrust: 0.5, ballast: 0.3 };
+    const vert = (model, st, ctl, we) => S.forcesAndMoments(model, st, S.sanitize(ctl), [0, 0, 0], we).acc.force[2];   // the net vertical body force: level, so it is the world's
+    const run = (model, ctl, n = 300, we = 0) => { let st = S.createState({ model, depth: 30, speed: 2 }); for (let i = 0; i < n; i++) { const r = S.stepSub(model, st, typeof ctl === "function" ? ctl(i) : ctl, S.DT, [0, 0, 0], we); st = r.state; } return st; };
+    // --- OFF BY DEFAULT: the four-number contract, the state shape and the trajectory are exactly what they were
+    const keys = Object.keys(S.sanitize({ pitch: 2, yaw: NaN, thrust: -3, ballast: 0.5 })).join(), a0 = run(base, c4), a1 = run(TK({ dropMass: 0.06 }), c4);
+    ok("!! a pilot that sends four numbers gets back exactly four (blow and release appear only when sent), and a plain model's state has NO tank", keys === "pitch,yaw,thrust,ballast" && a0.tank === undefined &&
+        Object.keys(S.sanitize({ ...c4, blow: 2, release: -1 })).join() === "pitch,yaw,thrust,ballast,blow,release" && S.sanitize({ blow: 9, release: -1 }).blow === 1 && S.sanitize({ blow: 9, release: -1 }).release === 0, keys);
+    ok("!! a model with only a drop weight, never released, flies the SAME 300 ticks as the plain one, to the bit (its ballast stays the instant command of the header)",
+        JSON.stringify([a1.pos, a1.vel, a1.q, a1.w]) === JSON.stringify([a0.pos, a0.vel, a0.q, a0.w]) && a1.tank && a1.tank.released === false && !S.dynamicTank(TK({ dropMass: 0.06 })) && S.dynamicTank(TK({ tankRate: 1 })),
+        `z ${a1.pos[2].toFixed(6)} = ${a0.pos[2].toFixed(6)}`);
+    // --- the pump rate: 0.25 level/s floods from 0 to +1 in exactly 4 s = 120 ticks, and no tick moves it further than rate x dt
+    const slow = TK({ tankRate: 0.25 }); let tk = S.initialTank(slow), maxStep = 0, ticks = 0;
+    while (tk.level < 1 - 1e-12 && ticks < 400) { const n = S.advanceTank(slow, tk, S.sanitize({ ballast: 1 }), S.DT); maxStep = Math.max(maxStep, n.level - tk.level); tk = n; ticks++; }
+    ok("!! the pump rate bounds the tank: from neutral to full takes 4 s (120 ticks at 0.25/s), and no tick moves the level more than rate x dt", ticks === 120 && maxStep <= 0.25 * S.DT + 1e-12, `${ticks} ticks, largest step ${maxStep.toFixed(6)} (rate x dt ${(0.25 * S.DT).toFixed(6)})`);
+    // --- air: a bottle of 1.0 blows the tank from 0 to -1 once; flooding is free; with none left the tank cannot go lower
+    const air = TK({ tankRate: 100, airMax: 1 });
+    let t = S.advanceTank(air, S.initialTank(air), S.sanitize({ ballast: -1 }), S.DT);
+    const afterBlow = t; t = S.advanceTank(air, { level: 1, air: 0, released: false }, S.sanitize({ ballast: -1 }), S.DT);
+    const flood = S.advanceTank(air, { level: -0.5, air: 0.2, released: false }, S.sanitize({ ballast: 1 }), S.DT);
+    ok("!! a blow spends air one for one (0 to -1 spends 1.0 of a 1.0 bottle), flooding spends none, and a tank with no air left cannot be blown at all",
+        Math.abs(afterBlow.level + 1) < 1e-12 && Math.abs(afterBlow.air) < 1e-12 && t.level === 1 && t.air === 0 && flood.air === 0.2 && flood.level > -0.5,
+        `blow: level ${afterBlow.level}, air ${afterBlow.air}; empty bottle: level ${t.level}; flood: air ${flood.air}`);
+    const half = S.advanceTank(TK({ tankRate: 100, airMax: 0.4 }), { level: 0, air: 0.4, released: false }, S.sanitize({ ballast: -1 }), S.DT);
+    ok("  ...and a bottle that holds less than the blow asks for blows as far as the air reaches (0.4 of it: level -0.4)", Math.abs(half.level + 0.4) < 1e-12 && Math.abs(half.air) < 1e-12, `level ${half.level}, air ${half.air}`);
+    // --- the emergency blow: faster than the normal rate, twice the air per unit, and only when the model has an emergencyRate
+    const em = TK({ tankRate: 0.25, airMax: 4, emergencyRate: 1 });
+    const slowBlow = S.advanceTank(em, { level: 0, air: 4, released: false }, S.sanitize({ ballast: -1 }), 1), hardBlow = S.advanceTank(em, { level: 0, air: 4, released: false }, S.sanitize({ ballast: 1, blow: 1 }), 1);
+    const noEm = S.advanceTank(TK({ tankRate: 0.25, airMax: 4 }), { level: 0, air: 4, released: false }, S.sanitize({ ballast: 1, blow: 1 }), 1);
+    ok("!! the emergency blow drives the tank to -1 at ITS rate whatever the ballast command says (-1.0 in a second against -0.25 normally), costs twice the air per level unit, and a model with no emergencyRate ignores it",
+        Math.abs(slowBlow.level + 0.25) < 1e-12 && Math.abs(slowBlow.air - 3.75) < 1e-12 && Math.abs(hardBlow.level + 1) < 1e-12 && Math.abs(hardBlow.air - 2) < 1e-12 && noEm.level > 0,
+        `normal: level ${slowBlow.level} air ${slowBlow.air}; emergency: level ${hardBlow.level} air ${hardBlow.air}; no emergencyRate: level ${noEm.level.toFixed(2)}`);
+    // --- the drop weight: one-way, only with a dropMass, and only on release > 0.5
+    const dw = TK({ dropMass: 0.06 });
+    const r1 = S.advanceTank(dw, S.initialTank(dw), S.sanitize({ release: 1 }), S.DT), r2 = S.advanceTank(dw, r1, S.sanitize({ release: 0 }), S.DT), r3 = S.advanceTank(dw, S.initialTank(dw), S.sanitize({ release: 0.4 }), S.DT), r4 = S.advanceTank(TK({ tankRate: 1 }), S.initialTank(TK({ tankRate: 1 })), S.sanitize({ release: 1 }), S.DT);
+    ok("!! the drop weight is one-way (released stays true after the command goes off), needs release above 0.5, and a model with no dropMass ignores it", r1.released === true && r2.released === true && r3.released === false && r4.released === false);
+    // --- the weight follows the TANK, not the command, when the tank has dynamics: a pump of 0.1/s told +1 for 3 s has filled to 0.3 and the vessel weighs 1 + 0.03 x 0.3, and stepSub is what advances it
+    const pm = TK({ tankRate: 0.1 }); let ps = S.createState({ model: pm, depth: 30, speed: 0 });
+    for (let i = 0; i < 90; i++) ps = S.stepSub(pm, ps, { pitch: 0, yaw: 0, thrust: 0, ballast: 1 }, S.DT).state;
+    const nowW = vert(pm, S.createState({ model: pm, depth: 30, speed: 0 }), { ballast: 1 }, 0);
+    ok("!! with a pump rate the weight follows the TANK: after 3 s of +1 at 0.1/s the level is 0.3 (stepSub advanced it), the net vertical force is the weight at the LEVEL (-0.03 x 0.3 of it) and not at the command (-0.03 of it), and a state with no tank starts at level 0",
+        Math.abs(ps.tank.level - 0.3) < 1e-9 && Math.abs(vert(pm, { ...S.createState({ model: pm, depth: 30, speed: 0 }), tank: ps.tank }, { ballast: 1 }, 0) + 0.03 * 0.3 * pm.weight) < 1e-6 && Math.abs(nowW) < 1e-6,
+        `level ${ps.tank.level.toFixed(4)}; force at that level ${vert(pm, { ...S.createState({ model: pm, depth: 30, speed: 0 }), tank: ps.tank }, { ballast: 1 }, 0).toFixed(1)} N (instant would be ${(-0.03 * pm.weight).toFixed(1)}); fresh state ${nowW.toFixed(3)} N`);
+    // --- THE FLOOD: a leak of 5% of the weight against a tank that can only trim 3% sinks the vessel whatever the pilot does with the ballast; the drop weight (6%) turns it around
+    const fl = TK({ dropMass: 0.06 });
+    const lvl = S.createState({ model: fl, depth: 30, speed: 0 });
+    const leakBlown = vert(fl, lvl, { ballast: -1 }, 0.05), leakDropped = vert(fl, { ...lvl, tank: { level: 0, air: Infinity, released: true } }, { ballast: -1 }, 0.05);
+    ok("!! THE FLOOD: a 5% leak with the tank fully blown still pulls DOWN (net " + leakBlown.toFixed(0) + " N: 5% leak less the 3% the tank can offset, times the weight), and the same vessel with its 6% drop weight shed pulls UP (net " + leakDropped.toFixed(0) + " N)",
+        Math.abs(leakBlown - (-0.02 * fl.weight)) < 1e-6 && Math.abs(leakDropped - (0.04 * fl.weight)) < 1e-6 && leakBlown < 0 && leakDropped > 0, `weight ${fl.weight.toFixed(0)} N`);
+    const sinkEnd = run(fl, { pitch: 0, yaw: 0, thrust: 0, ballast: -1 }, 900, 0.05), riseEnd = run(fl, (i) => ({ pitch: 0, yaw: 0, thrust: 0, ballast: -1, release: 1 }), 900, 0.05);
+    ok("!! ...and flown for 30 s from 30 m: without the release the vessel is deeper than it started, with it the vessel is shallower", -sinkEnd.pos[2] > 30 && -riseEnd.pos[2] < 30, `depth after 30 s: ${(-sinkEnd.pos[2]).toFixed(1)} m (no release), ${(-riseEnd.pos[2]).toFixed(1)} m (released)`);
+}
+
 console.log("\n7. THE FRONT DOOR");
 {
     const lines = S.reportLines();
-    ok("!! the export list is pinned", Object.keys(S).sort().join(",") === "DT,EXPLORER,GRAVITY,WATER_DENSITY,attitude,attitudeQuat,classify,createState,createSubModel,forcesAndMoments,maxSpeed,rates,reportLines,sanitize,stepSub,submerged,trim", Object.keys(S).sort().join(","));
+    ok("!! the export list is pinned", Object.keys(S).sort().join(",") === "DT,EXPLORER,GRAVITY,WATER_DENSITY,advanceTank,attitude,attitudeQuat,classify,createState,createSubModel,dynamicTank,forcesAndMoments,hasTank,initialTank,maxSpeed,rates,reportLines,sanitize,stepSub,submerged,trim", Object.keys(S).sort().join(","));
     ok("the report says real numbers (no NaN, no undefined) and names the vessel: 6000 kg, a 4.5x m/s top speed", lines.length === 6 && lines.every((l) => !/NaN|undefined/.test(l)) && /6000 kg/.test(lines[0]) && /top speed 4\.5/.test(lines[5]), lines[5]);
     ok("EXPLORER is frozen all the way down in the numbers a caller could mutate", Object.isFrozen(S.EXPLORER) && Object.isFrozen(S.EXPLORER.inertia) && Object.isFrozen(S.EXPLORER.rotDamp));
 }

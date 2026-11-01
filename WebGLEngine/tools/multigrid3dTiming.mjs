@@ -42,19 +42,41 @@ export function domain(n) {
  * a discarded warm-up that is not reported is indistinguishable from no warm-up at all.
  */
 export function timeConfig(n, opts = {}, solveOpts = {}, { trials = 5, warm = 2 } = {}) {
+    return collect(n, [{ opts, solveOpts }], { trials, warm })[0];
+}
+
+/**
+ * *** v4899 -- TIME SEVERAL CONFIGS INTERLEAVED, SO THE MACHINE'S DRIFT LANDS ON ALL OF THEM ALIKE. *** timeConfig timed one config's five trials and then the next config's five, which is a fair comparison only
+ * if the machine holds one speed for the whole run. It does not: on a box running eight other gates at once (the quick sweep) or a different CPU from the one the gate was written on, the speed steps between
+ * the first config's block and the second's, two TIGHT bands land at different heights, and the null test -- the same config under two labels -- calls them SEPARATED. That is the harness reading the machine's
+ * drift as a difference between configs, which is what the null test exists to catch, and it caught it: on the rig's 12-core box under the sweep (red once, 3.6 s and green alone). The band-width refusal below cannot help,
+ * because each band is narrow; it is the BLOCKS that differ. Running trial 1 of every config, then trial 2 of every config, puts the same moment's speed in every band, so a real difference between configs survives and a
+ * step in the machine's speed does not look like one. Returns one result per spec, in order, each the shape timeConfig returns.
+ */
+export function timeConfigs(n, specs, { trials = 5, warm = 2 } = {}) { return collect(n, specs, { trials, warm }); }
+
+/** The one place trials are taken. `order` is "interleaved" (the default and the only one the tool uses) or "sequential" (one config's block, then the next's -- kept so a gate can DRIVE the old behaviour and show it fails the null test under drift). `runner(specIndex)` replaces the real solve, for the gate's drift fixtures. */
+export function collect(n, specs, { trials = 5, warm = 2, order = "interleaved", runner = null } = {}) {
     const { type, div, N } = domain(n);
     const p = new Float32Array(N);
-    const once = () => {
-        const mg = new PoissonMG3D(n, n, n, opts);
+    const once = (k) => {
+        if (runner) return runner(k);
+        const mg = new PoissonMG3D(n, n, n, specs[k].opts || {});
         const t = Date.now();
-        mg.solveCG(type, div, 1 / 60, p, Object.assign({ maxIters: 400, tol: 1e-8 }, solveOpts));
+        mg.solveCG(type, div, 1 / 60, p, Object.assign({ maxIters: 400, tol: 1e-8 }, specs[k].solveOpts || {}));
         return { ms: Date.now() - t, iters: mg.iters, res: mg.res };
     };
-    for (let i = 0; i < warm; i++) once();
-    const runs = [];
-    for (let i = 0; i < trials; i++) runs.push(once());
-    const s = stats(runs.map((r) => r.ms));
-    return { n, trials, warm, iters: runs[0].iters, res: runs[0].res, ...s, runs: runs.map((r) => r.ms) };
+    const runs = specs.map(() => []);
+    if (order === "sequential") {
+        for (let k = 0; k < specs.length; k++) { for (let i = 0; i < warm; i++) once(k); for (let i = 0; i < trials; i++) runs[k].push(once(k)); }
+    } else {
+        for (let i = 0; i < warm; i++) for (let k = 0; k < specs.length; k++) once(k);
+        for (let i = 0; i < trials; i++) for (let k = 0; k < specs.length; k++) runs[k].push(once(k));
+    }
+    return specs.map((_, k) => {
+        const s = stats(runs[k].map((r) => r.ms));
+        return { n, trials, warm, iters: runs[k][0].iters, res: runs[k][0].res, ...s, runs: runs[k].map((r) => r.ms) };
+    });
 }
 
 /**
@@ -108,7 +130,8 @@ if (process.argv[1] && process.argv[1].endsWith("multigrid3dTiming.mjs")) {
     ];
     console.log("");
     console.log("[multigrid3dTiming] 3D V-cycle configs at " + n + "^3 -- tools/multigrid3dTiming.mjs");
-    const L = cfgs.map(([label, o, s]) => ({ label, t: timeConfig(n, o, s, { trials: 5, warm: 2 }) }));
+    const T = timeConfigs(n, cfgs.map(([, o, s]) => ({ opts: o, solveOpts: s })), { trials: 5, warm: 2 });   // interleaved: the machine's drift lands on every config alike
+    const L = cfgs.map(([label], k) => ({ label, t: T[k] }));
     console.log("  " + L[0].t.warm + " warm-up runs DISCARDED, " + L[0].t.trials + " timed. Reported so a discarded warm-up is not mistaken for none.");
     console.log("");
     console.log("  config                  iters    min  median   p95");
@@ -119,8 +142,7 @@ if (process.argv[1] && process.argv[1].endsWith("multigrid3dTiming.mjs")) {
     console.log("");
     for (const p of compare(L)) console.log("  " + (p.a + " vs " + p.b).padEnd(52) + p.verdict);
     console.log("");
-    const a = timeConfig(n, { pre: 2, post: 2 }, {}, { trials: 5, warm: 2 });
-    const b = timeConfig(n, { pre: 2, post: 2 }, {}, { trials: 5, warm: 2 });
+    const [a, b] = timeConfigs(n, [{ opts: { pre: 2, post: 2 } }, { opts: { pre: 2, post: 2 } }], { trials: 5, warm: 2 });
     console.log("  NULL TEST -- the same config under two labels: " +
         (separated(a, b) ? "*** SEPARATED. THIS HARNESS IS MEASURING ITS OWN NOISE AND EVERY VERDICT ABOVE IS SUSPECT. ***"
                          : "indistinguishable, as it must be."));

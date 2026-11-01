@@ -57,7 +57,9 @@ const NO_UPSTREAM_AT_V4416 = Object.freeze([
 // have been false: the body records where it came from. So "no upstream" is now "no URL recorded", and a recorded URL
 // with no GitHub owner is its own class, named here by the same rule.
 const NON_GITHUB_UPSTREAM_AT_V4778 = Object.freeze([
+    "hemibrain", // v4898: the hemibrain v1.2 adjacency export on Google Cloud Storage (storage.googleapis.com/hemibrain), a data release and not a repository.
     "male-cns",  // PROVENANCE.md: Janelia FlyEM's male-cns connectome through the Neuprint server, not a repository.
+    "zebrafish", // v4898: the Fish1 release bucket (fish1-release.storage.googleapis.com), a data release and not a repository.
 ]);
 
 console.log("\n1. every body either records where it came from, or is named here with why");

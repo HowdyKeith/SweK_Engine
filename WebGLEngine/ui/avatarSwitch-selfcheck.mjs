@@ -215,6 +215,36 @@ const iframes = (host) => host.children.filter((c) => c.tagName === "IFRAME");
        "one missing asset must not disable the mode that does not use it");
 }
 
+// SABOTAGED (v4899): the button back on set(nextMode(current)) -> 3 red; the skip ignoring a missing asset -> 3; the note removed -> 1; the WebGPU skip removed -> 0 AT FIRST (set() itself falls back to svg, so the order came out the same), which is why the walk's note is asserted -> 1.
+// ---- 3b. *** THE BUTTON WALKS PAST A MISSING ASSET, AND REACHES EVERY MODE THAT CAN BE SHOWN (v4899). *** -----------------
+{
+    // Keith's box has no RobotWoman.glb (it is not in the repository). set("stickwoman") falls back to svg and records svg, so the corner button went rigged -> stickwoman -> svg -> rigged ... and
+    // the orb, the blob and everything after them were unreachable. next() is what the button calls.
+    const host = mk("span");
+    const sw = mountAvatarSwitch({ host, makeSvg: () => ({ el: mk("span") }), probe: async (u) => !/RobotWoman/.test(u), store: { getItem: () => null, setItem: () => {} } });
+    Object.defineProperty(globalThis, "navigator", { value: { gpu: {} }, configurable: true, writable: true });
+    const seen = [];
+    for (let i = 0; i < MODES.length + 2; i++) { seen.push(await sw.next()); }
+    const want = MODES.map((m) => m.id).filter((id) => id !== "stickwoman");
+    ok("!! with RobotWoman.glb absent, pressing the button visits every OTHER mode in order and comes back round to the SVG robot (the orb among them)",
+       JSON.stringify(seen.slice(0, want.length)) === JSON.stringify(want.slice(1).concat("svg")) && seen.includes("orb") && seen.includes("blob") && seen.includes("blobgpu") && !seen.includes("stickwoman"),
+       seen.join(" > "));
+    await sw.set("svg"); await sw.next(); await sw.next();   // rigged, then past stickwoman
+    const skipNote = host.children.find((c) => typeof c.textContent === "string" && /skipped/.test(c.textContent));
+    ok("!! ...and the note NAMES what was skipped (RobotWoman.glb not found) while the panel is showing the next mode, not the SVG robot",
+       sw.current === "robotexpressive2" && skipNote && /RobotWoman\.glb not found/.test(skipNote.textContent), skipNote ? '"' + skipNote.textContent + '"' : "no note");
+    // with WebGPU absent the GPU blob is skipped too, and the walk still closes
+    Object.defineProperty(globalThis, "navigator", { value: {}, configurable: true, writable: true });
+    const host2 = mk("span"), sw2 = mountAvatarSwitch({ host: host2, makeSvg: () => ({ el: mk("span") }), probe: async () => true, store: { getItem: () => null, setItem: () => {} } });
+    const seen2 = []; for (let i = 0; i < MODES.length - 1; i++) seen2.push(await sw2.next());   // twelve modes can be shown without WebGPU
+    const gpuNote = host2.children.find((c) => typeof c.textContent === "string" && /no WebGPU/.test(c.textContent));
+    ok("  without WebGPU the walk skips the GPU blob, SAYS so (blobgpu (no WebGPU)) and still closes on the SVG robot", !seen2.includes("blobgpu") && seen2[seen2.length - 2] === "gauges3000" && seen2[seen2.length - 1] === "svg" && !!gpuNote && /blobgpu \(no WebGPU\)/.test(gpuNote.textContent), seen2.join(" > ") + (gpuNote ? "  [" + gpuNote.textContent + "]" : ""));
+    // nothing at all can be shown but the SVG: the walk ends there instead of looping
+    const host3 = mk("span"), sw3 = mountAvatarSwitch({ host: host3, makeSvg: () => ({ el: mk("span") }), probe: async () => false, store: { getItem: () => null, setItem: () => {} } });
+    const r3 = await sw3.next();
+    ok("  and when every asset is missing the button lands on the modes that need none (blob), never in a loop", r3 === "blob", r3);
+}
+
 // ---- 4. THE SANDBOX ROTATION IS DELIBERATELY UNTOUCHED --------------------------------------------------------------
 {
     const src = fs.readFileSync(path.join(ENG, "ui/avatarSwitch.js"), "utf8");

@@ -15,12 +15,15 @@
      dogfight task, the champion picked on held-out fights, graded once on an audit nothing had flown); and the same three for the GPU Brain's 18-32-32-4 network, which RUNS HERE ON ITS CPU TWIN (the dogfight is not on the device; the flight page runs it on WebGPU).
      WHAT THE DOGFIGHT PILOTS WERE GRADED AGAINST, SAID PLAINLY: ONLY THE PD AUTOPILOT, flying the pursuit guidance, as opponent. Put one against a different pilot and nothing here says it will win.
 
+     THE JET (the aircraft selector, or ?craft=jet): the same page with a light jet in place of the trainer -- 4,500 kg, 140 m/s at 2,000 m, in the standard atmosphere (physics/mechanics/flightModel6dof.mjs's JET_TRAINER) -- fighting brain/jetFight.mjs's fights (the trainer's scenarios at 3.1 times the length and 140/45 times the speed) with a nose cannon and NO MISSILES (800 m/s rounds, a 6 m sphere, 20 hits kill), run through the same arena.
+       THE JET'S PILOTS are hand-flown: the fighting autopilot, the cruise autopilot, and the two networks (the fruit fly's circuit, the GPU Brain's perceptron) in their JET layouts with the fighting autopilot written into their weights -- they fly its fights hit for hit. NOTHING HAS BEEN TRAINED TO FLY OR FIGHT THE JET, so there are no files to load, and the only claim made here is that the networks ARE the autopilot. The jet is DRAWN THREE TIMES LIFE SIZE (it is a speck at two kilometres otherwise); the physics and the hit spheres are the real size.
+
      WHAT IS NOT HERE: wind (still air, as the task's), a falling wreck (a destroyed aircraft goes dark where it was), any damage but hit points, a human pilot (the flight page has the keyboard). -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="demo:desc" content="Dogfight: two aircraft fight under brain/dogfightTask.mjs's rules (pursuit guidance, a hand trigger, a 300 m/s gun that falls, 20 hits kill) stepped by brain/dogfightArena.mjs, each with a window down the right that a click switches between the plane from outside, the pilot's seat, the gun's sight with its lead pip, and the pilot's network thinking, live. Pilots: the PD autopilot, the fruit fly's network (hand weights, trained to fly, trained to fight) and the GPU Brain's network (the same three, on its CPU twin). Answer-key gates: dogfightArena-selfcheck, flightViews-selfcheck, dogfightTask-selfcheck, dogfightPage-selfcheck.">
+<meta name="demo:desc" content="Dogfight: two aircraft fight under brain/dogfightTask.mjs's rules (pursuit guidance, a hand trigger, a 300 m/s gun that falls, 20 hits kill) stepped by brain/dogfightArena.mjs, each with a window down the right that a click switches between the plane from outside, the pilot's seat, the gun's sight with its lead pip, and the pilot's network thinking, live. Pilots: the PD autopilot, the fruit fly's network (hand weights, trained to fly, trained to fight) and the GPU Brain's network (the same three, on its CPU twin). Aircraft: the trainer, or a light jet (140 m/s, a nose cannon and no missiles; brain/jetFight.mjs) flown by hand-written pilots and by the two networks in their jet layouts. Answer-key gates: dogfightArena-selfcheck, flightViews-selfcheck, dogfightTask-selfcheck, dogfightPage-selfcheck, jetFight-selfcheck, pilotJetPolicy-selfcheck, pilotJetMlp-selfcheck.">
 <title>SweK &middot; Dogfight</title>
 <style>
   html,body { margin:0; height:100%; background:#0a1626; color:#cfe0f5; font:12px ui-monospace,Menlo,monospace; overflow:hidden; }
@@ -47,6 +50,7 @@
 <body>
 <div id="hud">
   <b style="color:#2fd6b0">&#9876; Dogfight</b>
+  <label>aircraft <select id="craft"><option value="trainer">trainer (45 m/s)</option><option value="jet">jet (140 m/s, guns only)</option></select></label>
   <label>fight <select id="kind"><option value="duel">duel (head-on, both shoot)</option><option value="tail">tail chase</option><option value="offset">offset</option><option value="turning">turning target</option></select>
     seed <input id="seed" type="number" min="1" max="99999" value="3"></label>
   <label>A <select id="pilotA" style="max-width:200px"></select></label>
@@ -76,6 +80,9 @@ import * as PF from "/brain/pilotFlightPolicy.mjs";
 import * as MF from "/brain/pilotFlightMlp.mjs";
 import * as D from "/brain/dogfightTask.mjs";
 import * as A from "/brain/dogfightArena.mjs";
+import * as JF from "/brain/jetFight.mjs";
+import * as PJ from "/brain/pilotJetPolicy.mjs";
+import * as PJM from "/brain/pilotJetMlp.mjs";
 import * as PB from "/brain/peerBrain.mjs";
 import * as V from "/render/flightViews.mjs";
 import { weightsHash } from "/brain/drivePolicy.mjs";
@@ -93,6 +100,15 @@ const CHOICES = [
   { id: "gpuFlight", label: "GPU Brain trained to FLY (CPU twin)", policy: MF, policyId: "pilotFlightMlp", file: "/brain/pilotFlightMlpWeightsDefault.json" },
   { id: "gpuDogfight", label: "GPU Brain trained to FIGHT (CPU twin)", policy: MF, policyId: "pilotFlightMlp", file: "/brain/pilotDogfightMlpWeightsDefault.json" },
 ];
+// THE JET'S ROSTER: the hand pilots only -- nothing has been trained to fly or fight the jet yet, so there are no files to load. The fighting autopilot is the jet task's own opponent (brain/jetFight.mjs); the cruise autopilot is the same laws with gentler gains; the two networks are the jet layout of the fruit fly's circuit and the GPU Brain's perceptron with the fighting autopilot written into their weights (they fly the very fights it flies).
+const JET_CHOICES = [
+  { id: "pd", label: "jet fighting autopilot (the jet task's opponent)", policy: null },
+  { id: "cruise", label: "jet cruise autopilot (the same laws, gentler gains)", policy: null, fn: AF.jetPilot },
+  { id: "hand", label: "fruit fly, jet layout, hand weights", policy: PJ, policyId: "pilotJetPolicy", hand: () => PJ.handWeights() },
+  { id: "gpuHand", label: "GPU Brain network, jet layout, hand weights (CPU twin)", policy: PJM, policyId: "pilotJetMlp", hand: () => PJM.handWeights() },
+];
+let craftId = "trainer";
+const choicesNow = () => (craftId === "jet" ? JET_CHOICES : CHOICES);
 const loaded = new Map(), errors = new Map();   // id -> { weights, meta } | reason
 function loadChoice(c, url = c.file) {
   return fetch(url).then((r) => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); }).then((blob) => {
@@ -103,10 +119,10 @@ function loadChoice(c, url = c.file) {
 }
 const available = (c) => !c.file || loaded.has(c.id);
 function resolvePilot(id) {
-  const c = CHOICES.find((x) => x.id === id) || CHOICES[0];
-  if (!c.policy) return { id: "pd", fn: (s, t, w) => AF.pilot(s, t, w), label: c.label, policy: null, weights: null };
+  const c = choicesNow().find((x) => x.id === id) || choicesNow()[0], pd = craftId === "jet" ? AF.jetFightPilot : AF.pilot;
+  if (!c.policy) return { id: c.id, fn: c.fn ? (s, t, w) => c.fn(s, t, w) : (s, t, w) => pd(s, t, w), label: c.label, policy: null, weights: null };
   const w = c.hand ? c.hand() : loaded.get(c.id) && loaded.get(c.id).weights;
-  if (!w) return { id: "pd", fn: (s, t, w2) => AF.pilot(s, t, w2), label: `PD autopilot (${c.label}: ${errors.get(c.id) || "not loaded"})`, policy: null, weights: null };
+  if (!w) return { id: "pd", fn: (s, t, w2) => pd(s, t, w2), label: `${craftId === "jet" ? "jet fighting" : "PD"} autopilot (${c.label}: ${errors.get(c.id) || "not loaded"})`, policy: null, weights: null };
   const meta = loaded.get(c.id) && loaded.get(c.id).meta;
   return { id: c.id, fn: c.policy.pilotFor(w), label: c.label + (c.file ? ` ${weightsHash(w)}` : "") + (meta && meta.score != null ? ` (held-out ${meta.score})` : ""), policy: c.policy, weights: w };
 }
@@ -144,6 +160,26 @@ function makeAircraft(i) {
   const prop = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.1, 0.04, 20), new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 0.25 })); prop.rotation.z = Math.PI / 2; prop.position.x = 4.3; g.add(prop);
   g.userData.hull = [fus, nose, wing, tailplane, fin]; scene.add(g); return g;
 }
+const JET_VISUAL_SCALE = 3;   // DRAWN THREE TIMES LIFE SIZE: a jet that fights two kilometres from the next is a speck at its own size (the hit spheres and the physics are real; only the model is drawn large, as a chart's markers are)
+// THE JET'S MESH: eleven metres of fuselage, 6.6 m of swept wing, a tailplane and a fin (the flight model's JET_TRAINER is 4,500 kg with 9.4 m^2 of wing); nose +X, up +Z, left +Y, as the physics has it.
+function makeJet(i) {
+  const g = new THREE.Group(), mat = HULL[i % HULL.length], glass = new THREE.MeshStandardMaterial({ color: 0x1b2a3a, metalness: 0.6, roughness: 0.2 });
+  const fus = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.55, 8, 14), mat); fus.rotation.z = Math.PI / 2; fus.position.x = -0.8; g.add(fus);
+  const nose = new THREE.Mesh(new THREE.ConeGeometry(0.75, 3, 14), mat); nose.rotation.z = -Math.PI / 2; nose.position.x = 4.7; g.add(nose);
+  const canopy = new THREE.Mesh(new THREE.SphereGeometry(0.55, 12, 8), glass); canopy.scale.set(2, 0.8, 0.8); canopy.position.set(1.4, 0, 0.7); g.add(canopy);
+  const wings = [1, -1].map((side) => { const w = new THREE.Mesh(new THREE.BoxGeometry(2.6, 3.3, 0.14), mat); w.position.set(-0.5, side * 1.85, 0); w.rotation.z = side * 0.45; g.add(w); return w; });
+  const tails = [1, -1].map((side) => { const t = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.8, 0.1), mat); t.position.set(-4.5, side * 1.1, 0.1); t.rotation.z = side * 0.4; g.add(t); return t; });
+  const fin = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.1, 1.9), mat); fin.position.set(-4.2, 0, 1.2); fin.rotation.y = -0.35; g.add(fin);
+  g.scale.setScalar(JET_VISUAL_SCALE); g.userData.hull = [fus, nose, ...wings, ...tails, fin]; scene.add(g); return g;
+}
+// THE TWO AIRCRAFT THE PAGE CAN SHOW. Everything that is a number of the airframe or the fight is here: the scenarios (the jet's are the trainer's at 3.1 times the length and 140/45 times the speed, brain/jetFight.mjs), the arena's options (the jet's model, gun and guide), the cameras' distances, the fog, and the senses the brain window shows.
+const JET_DRAW = Object.freeze({ ...V.VIEW_DRAW, chaseBack: 110, chaseUp: 30, chaseAhead: 30, seat: Object.freeze([1.6, 0, 0.8]), sightAhead: 180 });
+const CRAFT = {
+  trainer: { scenario: (seed, kind) => D.scenario(seed, kind), opts: {}, features: (st, t) => PF.features(st, t), names: PF.FEATURE_NAMES, airspeed: 45, make: (i) => makeAircraft(i), draw: V.VIEW_DRAW, fog: [1500, 9000], camOffset: [-300, -200, 200], defaults: () => [available(CHOICES[3]) ? "dogfight" : "hand", "pd"] },
+  jet: { scenario: (seed, kind) => JF.scenario(seed, kind), opts: JF.JET_OPTS, features: (st, t) => PJ.features(st, t), names: PJ.FEATURE_NAMES, airspeed: 140, make: (i) => makeJet(i), draw: JET_DRAW, fog: [4000, 24000], camOffset: [-900, -600, 300], defaults: () => ["hand", "pd"] },
+};
+const craftNow = () => CRAFT[craftId];
+const applyCraft = () => { scene.fog = new THREE.Fog(0x9fc4ea, ...craftNow().fog); };
 function trailLine(i) {
   const geom = new THREE.BufferGeometry(); geom.setAttribute("position", new THREE.BufferAttribute(new Float32Array(240 * 3), 3)); geom.setDrawRange(0, 0);
   const line = new THREE.Line(geom, new THREE.LineBasicMaterial({ color: SIDE[i % SIDE.length].color })); line.frustumCulled = false; scene.add(line); return line;
@@ -161,12 +197,12 @@ const el = (id) => document.getElementById(id);
 function clearFight() { for (const m of meshes) { scene.remove(m); for (const c of m.children) if (c.geometry) c.geometry.dispose(); } for (const t of trails) { scene.remove(t); t.geometry.dispose(); } for (const f of flashes) { scene.remove(f); f.geometry.dispose(); f.material.dispose(); } flashes.length = 0; meshes = []; trails = []; }
 function newFight({ kind = el("kind").value, seed = Number(el("seed").value) || 1, a = el("pilotA").value, b = el("pilotB").value } = {}) {
   clearFight();
-  scenario = D.scenario(Math.max(1, Math.round(seed)), kind);
+  scenario = craftNow().scenario(Math.max(1, Math.round(seed)), kind);
   pilots = [resolvePilot(a), resolvePilot(b)];
-  arena = A.arenaFromScenario(scenario, pilots[0].fn, { pilotB: pilots[1].fn, names: [`A · ${pilots[0].label}`, `B · ${pilots[1].label}`] });
-  meshes = arena.crafts.map((c, i) => makeAircraft(i)); trails = arena.crafts.map((c, i) => trailLine(i)); trailN = arena.crafts.map(() => 0); deadShown = arena.crafts.map(() => false);
+  arena = A.arenaFromScenario(scenario, pilots[0].fn, { ...craftNow().opts, pilotB: pilots[1].fn, names: [`A · ${pilots[0].label}`, `B · ${pilots[1].label}`] });
+  meshes = arena.crafts.map((c, i) => craftNow().make(i)); trails = arena.crafts.map((c, i) => trailLine(i)); trailN = arena.crafts.map(() => 0); deadShown = arena.crafts.map(() => false);
   log = []; el("kind").value = kind; el("seed").value = String(scenario.seed); el("pilotA").value = pilots[0].id; el("pilotB").value = pilots[1].id;
-  buildWindows(); camPos.set(...arena.crafts[0].state.pos).add(new THREE.Vector3(-300, -200, 200)); camLook.set(...arena.crafts[0].state.pos);
+  buildWindows(); camPos.set(...arena.crafts[0].state.pos).add(new THREE.Vector3(...craftNow().camOffset)); camLook.set(...arena.crafts[0].state.pos);
   renderNote(); renderFrame(0);
 }
 function tickOnce() {
@@ -200,9 +236,9 @@ const setLabel = (w) => { w.label.textContent = V.windowLabel(w.i, `${SIDE[w.i].
 function cycle(i) { const w = wins[i]; if (!w) return; w.view = V.nextView(w.view, true); setLabel(w); renderNote(); }
 const cameraLike = (cam, W, H) => { winCam.position.set(...cam.eye); winCam.up.set(...cam.up); winCam.fov = cam.fov * R2D; winCam.aspect = W / H; winCam.updateProjectionMatrix(); winCam.lookAt(...cam.target); winCam.updateMatrixWorld(true); };
 const brainRowsOf = (c, i) => {
-  const p = pilots[i], target = (c.last && c.last.target) || { altitude: c.state.pos[2], heading: F.attitude(c.state).heading, airspeed: 45 }, x = PF.features(c.state, target);
+  const p = pilots[i], target = (c.last && c.last.target) || { altitude: c.state.pos[2], heading: F.attitude(c.state).heading, airspeed: craftNow().airspeed }, x = craftNow().features(c.state, target);
   const act = p.policy ? V.pilotActivations(p.policy, p.weights, x) : { input: Float32Array.from(x), output: Float32Array.of(c.last ? c.last.controls.pitch : 0, c.last ? c.last.controls.roll : 0, c.last ? c.last.controls.yaw : 0, c.last ? c.last.controls.throttle * 2 - 1 : 0) };
-  return V.pilotRows({ who: "pilot", act, featureNames: PF.FEATURE_NAMES, outputNames: PF.OUTPUT_NAMES });
+  return V.pilotRows({ who: "pilot", act, featureNames: craftNow().names, outputNames: PF.OUTPUT_NAMES });
 };
 function drawOverlay(w, c, W, H) {
   const ctx = w.ctx; ctx.clearRect(0, 0, W, H);
@@ -213,7 +249,7 @@ function drawOverlay(w, c, W, H) {
   const cross = (x, y, n) => { ctx.fillStyle = "#7fe0a0"; ctx.fillRect(Math.round(x) - n, Math.round(y), 2 * n + 1, 1); ctx.fillRect(Math.round(x), Math.round(y) - n, 1, 2 * n + 1); };   // whole pixels, so a cross is the same colour wherever it sits
   if (w.view === "pilot") cross(W / 2, H / 2, 6);
   if (w.view === "gunner") {
-    const cam = V.gunSightCamera(c.state, { spec: c.spec }), foe = c.last && c.last.foe ? arena.crafts.find((o) => o.id === c.last.foe) : null;
+    const cam = V.gunSightCamera(c.state, { spec: c.spec, draw: craftNow().draw }), foe = c.last && c.last.foe ? arena.crafts.find((o) => o.id === c.last.foe) : null;
     const gs = V.gunsight(cam, G.muzzleOf(c.state, c.spec), foe && foe.status === "airborne" ? { pos: foe.state.pos, vel: foe.state.vel } : null, W, H, c.spec);
     cross(gs.bore[0], gs.bore[1], 8);
     if (gs.pipper) { ctx.strokeStyle = "#5ad6ff"; ctx.beginPath(); ctx.arc(gs.pipper[0], gs.pipper[1], 7, 0, 6.2832); ctx.stroke(); }
@@ -234,7 +270,7 @@ function renderWindows() {
     renderer.setViewport(x, y, r.width, r.height); renderer.setScissor(x, y, r.width, r.height);
     if (w.view === "brain") { const bg = renderer.getClearColor(new THREE.Color()); renderer.setClearColor(0x050805, 1); renderer.clear(); renderer.setClearColor(bg, 1); }
     else {
-      const camSpec = V.cameraFor(w.view, c.state, { spec: c.spec }); cameraLike(camSpec, r.width, r.height);
+      const camSpec = V.cameraFor(w.view, c.state, { spec: c.spec, draw: craftNow().draw }); cameraLike(camSpec, r.width, r.height);
       const hide = w.view !== "plane"; if (hide) meshes[w.i].visible = false;
       renderer.render(scene, winCam);
       if (hide) meshes[w.i].visible = true;
@@ -251,7 +287,7 @@ function updateCamera(snap = false) {
   if (mode === "orbit") { const m = arena.crafts[0].state.pos; orbit.target.set(m[0], m[1], m[2]); orbit.update(); return; }
   let spec;
   if (mode === "overview") spec = V.overviewCamera(arena.crafts.map((c) => c.state), { aspect: innerWidth / innerHeight, fov: camera.fov / R2D });
-  else spec = V.planeCamera(arena.crafts[mode === "chase1" ? 1 : 0].state);
+  else spec = V.planeCamera(arena.crafts[mode === "chase1" ? 1 : 0].state, { draw: craftNow().draw });
   if (snap) { camPos.set(...spec.eye); camLook.set(...spec.target); } else { camPos.lerp(new THREE.Vector3(...spec.eye), 0.15); camLook.lerp(new THREE.Vector3(...spec.target), 0.2); }
   camera.position.copy(camPos); camera.lookAt(camLook);
 }
@@ -288,9 +324,10 @@ function updateBoard() {
 }
 
 // ---- controls ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-function fillSelect(sel) { const keep = sel.value; sel.textContent = ""; for (const c of CHOICES) { const o = document.createElement("option"); o.value = c.id; o.textContent = c.label + (available(c) ? "" : " — not available"); o.disabled = !available(c); sel.appendChild(o); } if (keep) sel.value = keep; }
+function fillSelect(sel) { const keep = sel.value; sel.textContent = ""; for (const c of choicesNow()) { const o = document.createElement("option"); o.value = c.id; o.textContent = c.label + (available(c) ? "" : " — not available"); o.disabled = !available(c); sel.appendChild(o); } if (keep) sel.value = keep; }
 function fillRosters() { fillSelect(el("pilotA")); fillSelect(el("pilotB")); }
 el("newBtn").onclick = () => newFight();
+el("craft").onchange = () => { craftId = el("craft").value === "jet" ? "jet" : "trainer"; applyCraft(); fillRosters(); const [da, db] = craftNow().defaults(); newFight({ a: da, b: db }); };
 for (const id of ["kind", "pilotA", "pilotB"]) el(id).onchange = () => newFight();
 el("seed").onchange = () => newFight();
 el("pauseBtn").onclick = () => { paused = !paused; el("pauseBtn").textContent = paused ? "▶ Play" : "❚❚ Pause"; };
@@ -313,9 +350,11 @@ function frame(now) {
 // ---- boot: the pilots' files first, then the fight ------------------------------------------------------------------------------------------------------------------------------------------------------
 const params = new URLSearchParams(location.search);
 const ready = Promise.allSettled(CHOICES.filter((c) => c.file).map((c) => loadChoice(c))).then(() => {
+  craftId = params.get("craft") === "jet" ? "jet" : "trainer"; el("craft").value = craftId; applyCraft();
   fillRosters();
-  const pick = (k, dflt) => { const v = params.get(k); return CHOICES.some((c) => c.id === v && available(c)) ? v : dflt; };
-  newFight({ kind: D.KINDS.includes(params.get("kind")) ? params.get("kind") : "duel", seed: Number(params.get("seed")) || 3, a: pick("a", available(CHOICES[3]) ? "dogfight" : "hand"), b: pick("b", "pd") });
+  const pick = (k, dflt) => { const v = params.get(k); return choicesNow().some((c) => c.id === v && available(c)) ? v : dflt; };
+  const [da, db] = craftNow().defaults();
+  newFight({ kind: D.KINDS.includes(params.get("kind")) ? params.get("kind") : "duel", seed: Number(params.get("seed")) || 3, a: pick("a", da), b: pick("b", db) });
   requestAnimationFrame(frame);
 });
 
@@ -337,11 +376,12 @@ window.__dogfight = {
     log: log.slice(), pilots: pilots.map((p) => ({ id: p.id, label: p.label })) }; },
   step(n = 1) { for (let i = 0; i < n && !arena.done; i++) tickOnce(); renderFrame(0); },
   hold(on = true) { held = !!on; }, pause(on = true) { paused = !!on; },
-  newFight, resultA: () => A.resultOf(arena, D.A_ID),
+  newFight, resultA: () => A.resultOf(arena, D.A_ID), craft: () => craftId, setCraft(id) { el("craft").value = id; el("craft").onchange(); },
   windows: () => wins.map((w) => ({ craft: w.i, view: w.view, label: w.label.textContent, bg: getComputedStyle(w.el).backgroundColor, rect: (({ x, y, width, height }) => ({ x, y, width, height }))(w.gl.getBoundingClientRect()) })),
   clickWindow(i) { wins[i].el.dispatchEvent(new MouseEvent("click", { bubbles: true })); renderFrame(0); return wins[i].view; },
   setView(i, v) { wins[i].view = v; setLabel(wins[i]); renderFrame(0); }, pixels: pixelStats, ink: overlayInk, inkColor,
   mainCamera: () => ({ pos: camera.position.toArray(), look: camLook.toArray() }),
+  stateOf: (i) => arena.crafts[i].state, targetOf: (i) => arena.crafts[i].last && arena.crafts[i].last.target, brainValues: (i) => brainRowsOf(arena.crafts[i], i)[0].values, meshScale: (i) => meshes[i].scale.x, brainNames: (i) => brainRowsOf(arena.crafts[i], i).map((r) => r.names.slice(0, 18)), fog: () => [scene.fog.near, scene.fog.far],
   settleCamera() { renderFrame(0, true); },
   mainView() { const v = new THREE.Vector3(); return arena.crafts.map((c) => { v.set(...c.state.pos).project(camera); return [v.x, v.y, v.z]; }); },
   get paused() { return paused; },

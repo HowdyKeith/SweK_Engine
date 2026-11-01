@@ -97,6 +97,11 @@ export function plan({ gates = null, read, r = null, timings = null } = {}) {
 export const NEEDS_HISTORY = Object.freeze({
     "tools/ship/orreryFleet-selfcheck.mjs": "measures which commit last touched each vendored body with `git log`; a depth-1 clone holds one commit",
     "tools/ship/budgetExile-selfcheck.mjs": "runs the 17 gates of v4425's census live, and orreryFleet-selfcheck is one of them (measured: red shallow, green deepened)",
+    // v4904 -- the three staleness gates ask `git log <recorded commit>..HEAD -- <files>`; on a shallow clone that reads the swept files as changed (the rig's clone: three REDs after an ALL GREEN verdict). Each prints NOT GRADED itself
+    // and exits 0; they are listed here so THIS command reports them NOT GRADED with exit 3 instead of reading that skip as a pass.
+    "tools/ship/mutationScore-selfcheck.mjs": "asks `git log <recorded commit>..HEAD` whether the mutated files moved; a shallow clone cannot answer",
+    "tools/ship/mechanical-selfcheck.mjs": "asks `git log <recorded commit>..HEAD` whether the swept files moved; a shallow clone cannot answer",
+    "tools/ship/operators-selfcheck.mjs": "asks `git log <recorded commit>..HEAD` whether the swept files moved; a shallow clone cannot answer",
 });
 
 /** Is the repository at `cwd` a shallow clone? `run` is injectable so the gate can drive both answers. */

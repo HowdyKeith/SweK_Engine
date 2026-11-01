@@ -861,6 +861,38 @@ sec("8f. THE FIVE EXPORTS NO GATE NAMED, CLOSED BY ASSERTION");
            "a function nothing calls would pass the two rows above and change nothing");
     }
 
+    // v4899 -- carryOverForeign: a gate THIS box has no row for, that the record's owner timed OVER the budget, is not run as "unmeasured". Found when the rig's v4898 sweep ran ten such gates (brain/jetFight 23 s,
+    // pilotDroneMlp 18 s, fishCaveExport 75 s, trainDogfightLeague 802 s ...) under the 20 s cap and killed them alone: its own record predated the merge and had no row for them, the owner's record had.
+    // SABOTAGES (each alone, restored): W1 the over-budget test removed (carry every foreign reading) -> red on the cheap gate; W2 carry even when this box has its own reading -> red; W3 `sel.run` not filtered -> red;
+    // W4 the carried reading written into this box's record -> red (the record must stay this box's own); W5 carrying when this box owns the shared record -> red.
+    {   const budget = 3000, all = ["a", "b", "c", "d", "e", "f"];
+        const shared = { host: "boxA", timings: { a: 1000, b: 20000, c: 50000, d: 2000, f: 9000 } };
+        const mineRec = { host: "boxB", timings: { a: 900, f: 400 } };
+        const mk = (rec) => ({ own: rec !== shared, rec });
+        const sel = Q.selectGates(all, mineRec.timings, budget);
+        const before = JSON.stringify(mineRec);
+        const carried = Q.carryOverForeign(sel, mk(mineRec), shared, budget);
+        ok(carried.map((c) => c.gate).join() === "b,c" && carried.find((c) => c.gate === "b").ms === 20000,
+           "!! *** a gate this box has no row for, that the record's owner timed OVER the budget, is carried over and named with the owner's reading ***",
+           `carried ${carried.map((c) => c.gate + " " + c.ms).join(", ")}`);
+        ok(!sel.run.includes("b") && !sel.run.includes("c") && sel.skipped.includes("b") && sel.skipped.includes("c") && !sel.unmeasured.includes("b") && !sel.unmeasured.includes("c"),
+           "...and they leave run and unmeasured and join skipped, so the sweep does not run them under the cap",
+           `run ${sel.run.join()}; unmeasured ${sel.unmeasured.join()}; skipped ${sel.skipped.join()}`);
+        ok(sel.run.includes("d") && sel.unmeasured.includes("d") && sel.run.includes("e") && sel.unmeasured.includes("e"),
+           "!! ...while a foreign reading UNDER the budget carries nothing (d: 2000 ms there) and a gate nobody timed (e) is still run as new: a foreign reading says a gate is expensive, never that it is cheap",
+           `d and e still unmeasured and run`);
+        ok(sel.run.includes("f") && !carried.some((c) => c.gate === "f"),
+           "...and a gate this box HAS timed (f: 400 ms here, 9000 there) is judged by this box's reading alone", `f run on its own 400 ms`);
+        ok(JSON.stringify(mineRec) === before,
+           "!! ...and the carried reading is never written into this box's record (two machines' runtimes in one set of fields is not a record)", "the record handed in is byte-identical afterwards");
+        const sel2 = Q.selectGates(all, {}, budget), c2 = Q.carryOverForeign(sel2, mk(shared), shared, budget);   // every gate unmeasured, and the record is the owner's own
+        ok(c2.length === 0 && Q.carryOverForeign(Q.selectGates(all, {}, budget), null, shared, budget).length === 0,
+           "  a box that owns the shared record, or has no record of its own, carries nothing over", `owner: ${c2.length}; no own record: 0`);
+        const src = fs.readFileSync(path.join(ENG, "tools", "ship", "quickSweep.mjs"), "utf8");
+        ok(/const carriedOver = carryOverForeign\(sel, own, shared, budgetMs\);/.test(src) && /carriedOver,/.test(src),
+           "!! ...and the sweep calls it right after selectGates and reports it", "a function nothing calls would pass every row above and change nothing");
+    }
+
     // readTimings: the reader every consumer goes through, including on a file that is not there.
     const missing = Q.readTimings("tools/ship/__no_such_timings__.json", ENG);
     ok(missing && typeof missing === "object" && Object.keys(missing.timings || {}).length === 0,

@@ -47,6 +47,12 @@
 // THREE WENT 0 RED THE FIRST TIME AND WERE FIXED IN THE GATE, NOT EXCUSED: A58 (the hold-fire reach loses its 0.15 s past the enemy's range) because no row had a team-mate just BEYOND the enemy -- a row now puts one 30 m behind it (held) and one 70 m behind it (not); A74 (the hull's sweep ends where it began) because the injected rounds
 // all arrived head-on and hit a static sphere as well -- a round standing still 2.2 m ahead of an engine, reached only by the bomber's own motion in the tick, now has to hit, and one at 3 m not; A81 (a hit on a wing puts an engine out) was an INERT SABOTAGE -- the engine's hit points for a wing are undefined and NaN <= 0 is false -- and is
 // now 'a hit on a wing counts against the first engine', which the wing row (12 hits, no engine out) catches.
+//
+// AND TEN ON THE GUIDE (a craft carries a `guide`, the arena's collision range is the arena's guide's; a fight of two with any guide is still duel()'s to the bit), each applied to brain/dogfightArena.mjs in a scratch tree, the gate run, the tree discarded; every one red by name (the number is how many rows went red):
+//   R01 a craft ignores the arena's guide 2 | R02 the arena's collision range is the trainer's 3 | R03 two plain craft collide at the trainer's range 2 | R04 two bombers collide at the trainer's range 1 |
+//   R05 the pursuit is not given the craft's guide 1 | R06 the trigger is not given the craft's guide 2 | R07 the collision test is not given the arena's range 2 | R08 arenaFromScenario drops the guide 1 |
+//   R09 the arena's default guide is a copy 1 | R10 arenaFromScenario's default guide has a 7 m collision 2
+//   R04 (two bombers colliding at the trainer's range whatever the guide says) WENT 0 RED THE FIRST TIME: no row put two bombers between 6 m and the guide's range; the row now flies two bombers 7 m apart under the trainer's guide (airborne after 3 s) and under a guide of 8 m (both lost).
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -94,6 +100,28 @@ console.log("1. A FIGHT OF TWO IS THE SAME FIGHT");
         for (const k of FIELDS) if (!Object.is(d[k], r[k])) diffs.push(`${name} ${kind}${seed}.${k}: ${d[k]} vs ${r[k]}`);
     }
     ok("!! an aircraft that is flown into the ground, and one that is not flown at all, are the same in both (A's ending is the ground's: crashed or touchdown), and A is charged its full hit points", diffs.length === 0 && (ends.has("crashed") || ends.has("touchdown")), `${diffs.slice(0, 2).join("; ")} ${[...ends]}`);
+}
+
+console.log("\n1b. THE GUIDE: A CRAFT'S PURSUIT, TRIGGER AND THE COLLISION RANGE ARE THE FIGHT'S, NOT THE TRAINER'S");
+{
+    const W = (o) => Object.freeze({ ...D.GUIDE, ...o }), G2 = W({ alphaTrim: true, leadTime: 2, standoff: 260, speedGain: 0.05, maxRange: 520, collisionRange: 7, fireTolerance: 1.3, minAltitude: 150 });
+    let diffs = [], n = 0, fired = 0;
+    for (const kind of D.KINDS) for (let seed = 1; seed <= 6; seed++) {
+        const sc = D.scenario(seed, kind), d = D.duel(AF.pilot, sc, { guide: G2 }); let r;
+        try { r = A.resultOf(A.runArena(A.arenaFromScenario(sc, AF.pilot, { guide: G2 })), D.A_ID); } catch (e) { diffs.push(`${kind}${seed} THREW ${e.message}`); continue; }
+        n++; fired += d.fired;
+        for (const k of FIELDS) if (!Object.is(d[k], r[k])) diffs.push(`${kind}${seed}.${k}: ${d[k]} vs ${r[k]}`);
+    }
+    ok("!! WITH A GUIDE THAT IS NOT THE TRAINER'S (an angle-of-attack trim, two seconds of lead, a 260 m standoff, a 0.05 speed gain, a 520 m trigger range at 1.3 radii, a 150 m floor, a 7 m collision) THE ARENA IS STILL THE SAME FIGHT AS duel(): 24 fights through both, every number identical to the bit", diffs.length === 0 && n === 24 && fired > 100, `${diffs.slice(0, 3).join("; ")} (${fired} rounds fired)`);
+    const cs = (extra = {}) => [{ id: 1, team: 1, pilot: AF.pilot, behaviour: "hunt", fires: true, state: { pos: [0, 0, 300], speed: 45, heading: 0, pitch: 0.03 }, ...extra }, { id: 2, team: 2, pilot: AF.pilot, behaviour: "script", script: () => ({ heading: 0, altitude: 300, airspeed: 45 }), fires: false, state: { pos: [250, 0, 300], speed: 45, heading: 0, pitch: 0.03 } }];
+    const plain = A.createArena({ crafts: cs() }), arenaG = A.createArena({ crafts: cs(), guide: G2 }), craftG = A.createArena({ crafts: cs({ guide: G2 }) });
+    ok("!! A CRAFT CARRIES A GUIDE (the trainer's, the very object, by default; the arena's when the arena is given one; its own when it names one) and the arena's collision range is the arena's guide's (6 by default)", plain.crafts[0].guide === D.GUIDE && plain.crafts[1].guide === D.GUIDE && plain.collisionRange === 6 && arenaG.crafts[0].guide === G2 && arenaG.crafts[1].guide === G2 && arenaG.collisionRange === 7 && craftG.crafts[0].guide === G2 && craftG.crafts[1].guide === D.GUIDE && craftG.collisionRange === 6);
+    const mute = A.runArena(A.createArena({ crafts: cs({ guide: W({ maxRange: 0 }) }), seconds: 10 })), loud = A.runArena(A.createArena({ crafts: cs(), seconds: 10 }));
+    ok("!! A CRAFT'S GUIDE IS ITS OWN: a hunter whose guide has a trigger range of 0 fires nothing in ten seconds behind a straight target and the same hunter with the default fires; the target (not firing either way) is untouched", mute.crafts[0].gun.fired === 0 && loud.crafts[0].gun.fired > 20 && mute.crafts[1].taken === 0 && loud.crafts[1].taken > 0, `${mute.crafts[0].gun.fired} rounds against ${loud.crafts[0].gun.fired}`);
+    const scr = (id, team, x) => ({ id, team, pilot: AF.pilot, behaviour: "script", script: () => ({ heading: 0, altitude: 300, airspeed: 45 }), fires: false, state: { pos: [x, 0, 300], speed: 45, heading: 0 } });
+    const close = A.createArena({ crafts: [scr(1, 1, 0), scr(2, 2, 500)], guide: W({ collisionRange: 1000 }) }); A.stepArena(close);
+    const far = A.createArena({ crafts: [scr(1, 1, 0), scr(2, 2, 500)] }); A.stepArena(far);
+    ok("!! THE ARENA'S COLLISION RANGE IS THE GUIDE'S: two craft 500 m apart are both 'collided' at the first tick with a collision range of 1,000 m and both flying with the default", close.crafts.every((c) => c.status === "collided") && close.done === true && far.crafts.every((c) => c.status === "airborne"));
 }
 
 // a small world for the arena's own arithmetic: straight and level at 45 m/s, scripted
@@ -264,6 +292,7 @@ console.log("\n4. THE BOMBER IN THE ARENA: ITS FLIGHT, ITS SEATS, ITS HULL OF SP
     const tip = col(11.6), clear = col(12.0), roof = col(0, 5, 0);
     ok("!! a fighter that is in the bomber's HULL has hit it: 3.0 m off the left wing tip's centre (inside the sphere grown by 2 m for the fighter's size, 11.6 m from the bomber's centre) both are lost on the first tick; at 3.4 m (12.0 m from the centre) they fly on to the time limit", tip.crafts.every((c) => c.status === "collided") && tip.i === 1 && tip.over === "no team left flying" && clear.crafts.every((c) => c.status === "airborne") && clear.over === "time" && clear.closest > 12 && clear.closest < 12.1, `${tip.crafts.map((c) => c.status)} / ${clear.over}`);
     ok("!! ...and the hull is NOT the plain 6 m rule: a fighter 5 m above the bomber's centre, clear of every sphere, flies alongside for 3 s without a collision (the plain rule would have lost them both); and two bombers use the plain range between centres (5 m apart vertically, both lost, where a fighter at the same place is not)", roof.crafts.every((c) => c.status === "airborne") && roof.closest < 5.1 && (() => { const ar = A.createArena({ crafts: [bomberCraft({ gunner: quiet }), { ...bomberCraft({ gunner: quiet }), id: 2, team: 2, state: { pos: [0, 0, alt + 5], speed: cv, heading: 0, pitch: 0.16 } }], seconds: 3 }); A.runArena(ar); return ar.crafts.every((c) => c.status === "collided"); })(), `${roof.closest.toFixed(2)} m`);
+    ok("!! TWO BOMBERS COLLIDE AT THE ARENA'S COLLISION RANGE, whatever it is: 7 m apart vertically they fly on for 3 s under the trainer's 6 m and are both lost under a guide whose range is 8 m", (() => { const mk = (guide) => { const ar = A.createArena({ guide, crafts: [bomberCraft({ gunner: quiet }), { ...bomberCraft({ gunner: quiet }), id: 2, team: 2, state: { pos: [0, 0, alt + 7], speed: cv, heading: 0, pitch: 0.16 } }], seconds: 3 }); A.runArena(ar); return ar; }, a = mk(D.GUIDE), b = mk(Object.freeze({ ...D.GUIDE, collisionRange: 8 })); return a.crafts.every((c) => c.status === "airborne") && b.crafts.every((c) => c.status === "collided"); })());
     // the aim radius: the fighter's trigger is as generous as the bomber is big. A fighter 150 m behind, 46 m/s, nose at the bomber's height, offset sideways: the predicted miss is the offset (D.fireControl: 5.1 m at 5, 9.1 m at 9)
     const aim = (y, extra) => { const ar = A.createArena({ crafts: [bomberCraft({ gunner: quiet, ...extra }), { id: 2, team: 2, name: "shooter", pilot: AF.pilot, behaviour: "hunt", fires: true, state: { pos: [-150, y, alt], speed: 46, heading: 0, pitch: 0.05 } }], seconds: 1 }); A.stepArena(ar); return ar.crafts[1].last.fire; };
     ok("!! the fighter's trigger uses the bomber's AIM RADIUS (0.35 of its span, 7.4 m, not the 4 m of a fighter): the same approach 5 m off the line (a 5.1 m predicted miss) fires at a bomber of the default radius and does NOT at one told its aim radius is 1.5 m, and 9 m off the line (a 9.1 m miss) does not fire even at the default", aim(5, {}) === true && aim(5, { aimRadius: 1.5 }) === false && aim(9, {}) === false && aim(0, { aimRadius: 1.5 }) === true);

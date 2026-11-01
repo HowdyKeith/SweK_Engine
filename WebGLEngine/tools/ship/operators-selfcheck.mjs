@@ -200,14 +200,17 @@ console.log("\n7. THE CLASSIFIER IS A SYNTACTIC GUESS AND THE RECORD SAYS WHERE 
 // =============================================================================================================
 console.log("\n8. THE RECORD KNOWS WHICH TREE IT IS ABOUT");
 {
+    // v4904 -- A SHALLOW CLONE CANNOT SAY WHICH FILES MOVED SINCE THE RECORDED COMMIT (the publish route the tree prints clones --depth 1): `git log <commit>..HEAD` there reads the whole tree as changed and this row went RED on a tree that
+    // had not moved. It is NOT GRADED, said so, with the one command that fixes it (afterVerdict.mjs does the same for orreryFleet and budgetExile).
+    const shallow = (() => { try { return execFileSync("git", ["rev-parse", "--is-shallow-repository"], { cwd: ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim() === "true"; } catch { return false; } })();
     let changed = null;
-    try {
+    if (!shallow) try {
         const rel = SWEEP_BY_ROLE.files.map((f) => path.join("WebGLEngine", f));
         const out = execFileSync("git", ["log", "--name-only", "--format=", `${SWEEP_BY_ROLE.commit}..HEAD`, "--", ...rel],
                                  { cwd: ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
         changed = [...new Set(out.split("\n").map((s) => s.trim()).filter(Boolean))];
     } catch { changed = null; }
-    if (changed === null) skip("git could not be asked whether the swept files moved", "no verdict, not a green one");
+    if (changed === null) skip(shallow ? "NOT GRADED: this clone is shallow, so git cannot say whether the swept files moved" : "git could not be asked whether the swept files moved", shallow ? "run git fetch --unshallow, then this gate again -- no verdict, not a green one" : "no verdict, not a green one");
     else ok("no file this sweep is ABOUT has changed since the run", changed.length === 0,
             changed.length ? "CHANGED: " + changed.join(", ") : `${SWEEP_BY_ROLE.files.length} files unchanged since ${SWEEP_BY_ROLE.commit}`);
     ok("...and every file it names exists", SWEEP_BY_ROLE.files.every((f) => existsSync(path.join(ENG, f))));

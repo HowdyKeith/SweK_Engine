@@ -55,7 +55,45 @@ export function createSubModel(spec = EXPLORER) {
 }
 
 /** The pilot's four numbers, sanitised: pitch, yaw, thrust, ballast all clamped to [-1, 1]; a NaN or an infinity is read as 0. */
-export function sanitize(c = {}) { return { pitch: clamp(num(c.pitch), -1, 1), yaw: clamp(num(c.yaw), -1, 1), thrust: clamp(num(c.thrust), -1, 1), ballast: clamp(num(c.ballast), -1, 1) }; }
+export function sanitize(c = {}) {
+    const o = { pitch: clamp(num(c.pitch), -1, 1), yaw: clamp(num(c.yaw), -1, 1), thrust: clamp(num(c.thrust), -1, 1), ballast: clamp(num(c.ballast), -1, 1) };
+    // v4901 -- TWO OPTIONAL EXTRA COMMANDS, present in the result ONLY when the caller sent them, so a pilot that sends the four numbers gets back exactly the four it always did:
+    // `blow` (0..1) the emergency blow, and `release` (0..1) the drop weight. Both are read as "on" above 0.5 and do nothing unless the model has the tank fields below.
+    if (c.blow !== undefined) o.blow = clamp(num(c.blow), 0, 1);
+    if (c.release !== undefined) o.release = clamp(num(c.release), 0, 1);
+    return o;
+}
+
+// ---- the ballast tank, when a model has one (v4901) -------------------------------------------------------------------------------------------------------------------------------------------------------
+// *** OPTIONAL, AND OFF BY DEFAULT, SO EVERY EXISTING VESSEL, PILOT AND GATE IS BIT-IDENTICAL. *** The header's ballast is a COMMAND the weight follows at once: no pump rate, no air, no emergency blow. A spec that names any of
+//   tankRate        level units per second the tank can FLOOD or be blown at its normal rate (level is the ballast number: +1 full of water, -1 blown)
+//   airMax          the air in the bottle, in level units: blowing the tank down by d spends d of it, flooding spends none, and with none left the tank cannot be blown at all
+//   emergencyRate   with the `blow` command on, the tank is driven to -1 at THIS rate, which is faster than tankRate, spending `emergencyAirCost` (default 2) times the air per level unit
+//   dropMass        the fraction of the vessel's weight a one-way DROP WEIGHT sheds when the `release` command goes on (nothing is ever taken back)
+// gets a `tank` on its state ({ level, air, released }), set up on the first tick and advanced by stepSub. A spec naming ONLY dropMass keeps the instant ballast of the header (the tank state exists, its level is not used).
+const TANK_FIELDS = ["tankRate", "airMax", "emergencyRate", "dropMass"];
+/** Does this model have any tank field? */
+export const hasTank = (model) => TANK_FIELDS.some((k) => model.spec[k] !== undefined);
+/** Does its ballast have DYNAMICS (a rate, an air supply or an emergency blow), so the weight follows the tank's level and not the command? */
+export const dynamicTank = (model) => ["tankRate", "airMax", "emergencyRate"].some((k) => model.spec[k] !== undefined);
+/** A fresh tank: level 0 (neutral), the whole bottle, nothing dropped. */
+export const initialTank = (model) => ({ level: 0, air: model.spec.airMax !== undefined ? model.spec.airMax : Infinity, released: false });
+/** One tick of the tank for the sanitised command `c`: { level, air, released }. Pure. */
+export function advanceTank(model, tank, c, dt = DT) {
+    const s = model.spec;
+    const emergency = c.blow !== undefined && c.blow > 0.5 && s.emergencyRate !== undefined;
+    const target = emergency ? -1 : c.ballast, rate = emergency ? s.emergencyRate : (s.tankRate !== undefined ? s.tankRate : Infinity);
+    let d = target - tank.level;
+    const cap = rate * dt;
+    if (d > cap) d = cap; else if (d < -cap) d = -cap;
+    let air = tank.air;
+    if (d < 0 && s.airMax !== undefined) {
+        const cost = emergency ? (s.emergencyAirCost !== undefined ? s.emergencyAirCost : 2) : 1;
+        const afford = air / cost, used = Math.min(-d, afford);   // the tank can only be blown as far as the air reaches
+        d = -used; air -= used * cost;
+    }
+    return { level: tank.level + d, air, released: tank.released || (c.release !== undefined && c.release > 0.5 && s.dropMass !== undefined && s.dropMass > 0) };
+}
 
 /** The fraction of the hull below the surface for a centre of gravity at height z (z up, the surface at 0): 1 at z <= -R, 0 at z >= +R, linear between. */
 export const submerged = (model, z) => clamp((model.spec.radius - z) / (2 * model.spec.radius), 0, 1);
@@ -75,7 +113,9 @@ export function forcesAndMoments(model, state, controls, current = [0, 0, 0], we
     const s = model.spec, c = sanitize(controls), acc = createAccumulator(), frac = submerged(model, state.pos[2]);
     const rel = [state.vel[0] - current[0], state.vel[1] - current[1], state.vel[2] - current[2]], vb = worldToBody(state.q, rel), W = model.weight, V = Math.hypot(vb[0], vb[1], vb[2]);
     // weight at the CG (the state's origin), buoyancy at the centre of buoyancy, bg above it: the righting torque
-    applyForceAtPoint(acc, worldToBody(state.q, [0, 0, -W * (1 + s.ballastRange * c.ballast + weightError)]), [0, 0, 0]);
+    // v4901 -- with a tank that has dynamics the weight follows the TANK'S level (what the pump has done so far), not the command; with a drop weight shed, the weight is less by dropMass. A model with neither is the line it always was.
+    const tk = hasTank(model) ? (state.tank || initialTank(model)) : null, ballastNow = tk && dynamicTank(model) ? tk.level : c.ballast, shed = tk && tk.released ? s.dropMass : 0;
+    applyForceAtPoint(acc, worldToBody(state.q, [0, 0, -W * (1 + s.ballastRange * ballastNow + weightError - shed)]), [0, 0, 0]);
     applyForceAtPoint(acc, worldToBody(state.q, [0, 0, W * frac]), [0, 0, s.bg]);
     if (frac > 0) {
         const k = 0.5 * WATER_DENSITY * frac;
@@ -141,6 +181,7 @@ export function stepSub(model, state, controls, dt = DT, current = [0, 0, 0], we
     const before = classify(model, state);
     if (before.status !== "submerged") return { state, ...before };
     const next = step(state, forcesAndMoments(model, state, controls, current, weightError).acc, dt);
+    if (hasTank(model)) next.tank = advanceTank(model, state.tank || initialTank(model), sanitize(controls), dt);   // v4901: the tank moves AFTER the tick it acted in, so the forces above used the level at the start of it
     return { state: next, ...classify(model, next) };
 }
 

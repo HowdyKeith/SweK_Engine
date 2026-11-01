@@ -29,11 +29,13 @@ import { KERNEL_WGSL, NOISE_WGSL, DeformField, MAX_BRUSHES, packParams } from ".
 import { DEFORM_READ_WGSL } from "./deformRead.mjs";
 import { CLIPMAP_WGSL, buildClipmap } from "./clipmapTerrain.mjs";
 import { BAKE_KERNEL_WGSL, sunFrom, bakeSky, MIP_KERNEL_WGSL, SKY_LEVELS, mipFloats } from "./skyBake.mjs";
-import { AERIAL_WGSL } from "./aerial.mjs";
+import { AERIAL_WGSL, AERIAL_LEAN_WGSL } from "./aerial.mjs";
 import { FINE_NOISE_WGSL, FINE_TERRAIN_WGSL, DETAIL_BAKE_KERNEL_WGSL, DETAIL_MIP_KERNEL_WGSL, DETAIL_RES, DETAIL_LEVELS, GRAIN_SCALE } from "./snowFine.mjs";
 import { SHADING_WGSL, projectSH } from "./snowShading.mjs";
 import { CASCADE_SHADOW_WGSL, fitCascades, CASCADE_COUNT, SPLITS } from "./cascades.mjs";
 import { TAA_WGSL, buildHalton } from "./taaResolve.mjs";
+import { ablateWgsl } from "./snowAblate.mjs";
+import { packWgsl, deformSampleWgsl, DEFORM_SAMPLER } from "./deformTexture.mjs";
 
 export const SKY_W = 64, SKY_H = 32, SHADOW_RES = 2048, FRAME_FLOATS = 188, POST_FAR = 9000;
 export const HDR_FORMAT = "rgba16float", DEPTH_FORMAT = "r32float";
@@ -101,6 +103,7 @@ struct Frame {
 @group(0) @binding(0) var<uniform> F: Frame;
 @group(0) @binding(1) var<storage, read> deformState: array<f32>;
 @group(0) @binding(2) var<storage, read> skyLut: array<f32>;
+${deformSampleWgsl(0, 8, 9)}
 const PI: f32 = 3.14159265359;
 const SKY_W: i32 = ${SKY_W};
 const SKY_H: i32 = ${SKY_H};
@@ -112,21 +115,8 @@ const SURFACE_WGSL = /* wgsl */ `
 ${NOISE_WGSL}
 ${FINE_NOISE_WGSL}
 ${FINE_TERRAIN_WGSL}
-fn stateAt(ix: i32, iy: i32) -> vec4f {
-    let r = i32(F.deform.w);
-    let x = ((ix % r) + r) % r;
-    let y = ((iy % r) + r) % r;
-    let o = u32((y * r + x) * 4);
-    return vec4f(deformState[o], deformState[o + 1u], deformState[o + 2u], deformState[o + 3u]);
-}
-fn textureSampleLevelWrap(uv: vec2f) -> vec4f {
-    let p = uv * F.deform.w - 0.5;
-    let b = floor(p);
-    let f = p - b;
-    let x0 = i32(b.x);
-    let y0 = i32(b.y);
-    return mix(mix(stateAt(x0, y0), stateAt(x0 + 1, y0), f.x), mix(stateAt(x0, y0 + 1), stateAt(x0 + 1, y0 + 1), f.x), f.y);
-}
+// v4896 -- the field is read through textureSampleLevelWrap, now a hardware bilinear over the rgba16float copy the pack pass makes each frame (render/deformTexture.mjs); it was a manual bilinear over the storage buffer,
+// four wrapped loads a tap. deformState above stays bound (the deform kernel and the pack pass read it) and the buffer path is the CPU twin's, bilinearWrapCpu.
 ${DEFORM_READ_WGSL}
 // the landform: ours (upstream bakes terrainMacro into a texture; this is a smaller field of the same kind, three octaves of the same noise)
 fn dunes(x: f32, z: f32) -> f32 {
@@ -202,7 +192,8 @@ fn skyAt(dir: vec3f) -> vec3f {
 
 /** the vertex stages and the debug dump: one placement-and-lift function for the shadow pass, the beauty pass and the dump */
 export const TERRAIN_VERTEX_WGSL = FRAME_STRUCT + TERRAIN_COMMON + /* wgsl */ `
-struct VsOut { @builtin(position) pos: vec4f, @location(0) world: vec3f, @location(1) normal: vec3f, @location(2) viewZ: f32 };
+override HOIST_FINE: bool = false;
+struct VsOut { @builtin(position) pos: vec4f, @location(0) world: vec3f, @location(1) normal: vec3f, @location(2) viewZ: f32, @location(3) fineWl: vec3f };
 @vertex fn vsMain(@location(0) v: vec3f) -> VsOut {
     let s = surfaceOf(v);
     var o: VsOut;
@@ -210,6 +201,7 @@ struct VsOut { @builtin(position) pos: vec4f, @location(0) world: vec3f, @locati
     o.world = s.world;
     o.normal = s.normal;
     o.viewZ = o.pos.w;
+    if (HOIST_FINE) { o.fineWl = vec3f(windLocal(s.world.xz), scourAt(s.world.xz)); } else { o.fineWl = vec3f(0.0); }
     return o;
 }
 override CASCADE: u32 = 0u;
@@ -234,11 +226,14 @@ override CASCADE: u32 = 0u;
 export const BEAUTY_WGSL = FRAME_STRUCT + SKY_SAMPLE_WGSL + SURFACE_WGSL + /* wgsl */ `
 ${SHADING_WGSL}
 ${AERIAL_WGSL}
+${AERIAL_LEAN_WGSL}
 ${CASCADE_SHADOW_WGSL}
+override HOIST_FINE: bool = false;
+override COARSE_FORMS: bool = false;
 @group(0) @binding(6) var detailTex: texture_2d<f32>;
 @group(0) @binding(7) var detailTexSampler: sampler;
 
-struct VsOut { @builtin(position) pos: vec4f, @location(0) world: vec3f, @location(1) normal: vec3f, @location(2) viewZ: f32 };
+struct VsOut { @builtin(position) pos: vec4f, @location(0) world: vec3f, @location(1) normal: vec3f, @location(2) viewZ: f32, @location(3) fineWl: vec3f };
 struct FsOut { @location(0) color: vec4f, @location(1) depth: f32 };
 
 fn unpackN(rg: vec2f) -> vec3f {
@@ -270,6 +265,16 @@ fn detailNormal(
     return n;
 }
 
+// COARSE_FORMS (snow-beauty-pass-cost item 3): the haze through applyAerialLean, which is the upstream arithmetic without the reads that cannot show (render/aerial.mjs)
+fn aerialPick(color: vec3f, camPos: vec3f, worldPos: vec3f, viewDir: vec3f, sunDir: vec3f, sunColor: vec3f, density: f32, heightFalloff: f32, fogStart: f32, strength: f32) -> vec3f {
+    if (COARSE_FORMS) { return applyAerialLean(color, camPos, worldPos, viewDir, sunDir, sunColor, density, heightFalloff, fogStart, strength); }
+    return applyAerial(color, camPos, worldPos, viewDir, sunDir, sunColor, density, heightFalloff, fogStart, strength);
+}
+// the fine relief: the exact windLocal and scour per pixel, or the vertex stage's two fields interpolated (HOIST_FINE; snow-beauty-pass-cost item 2)
+fn fineRelief(p: vec2f, exposure: f32, footprint: f32, wl: vec3f) -> vec3f {
+    if (HOIST_FINE) { return terrainFineFilteredWith(p, F.wind.x, exposure, F.wind.y, footprint, wl.xy, wl.z); }
+    return terrainFineFiltered(p, F.wind.x, exposure, F.wind.y, footprint);
+}
 // ---- snow.fragment.wgsl's main, statement for statement where the inputs exist here; the substitutions are listed in render/snowGpu.mjs's header
 @fragment fn fsTerrain(input: VsOut) -> FsOut {
     let world = input.world;
@@ -286,9 +291,7 @@ fn detailNormal(
     let rockMask = 0.0;
     let exposure = duneExposure(world.xz);
 
-    let fine = terrainFineFiltered(
-        world.xz, F.wind.x, exposure, F.wind.y, footprint
-    );
+    let fine = fineRelief(world.xz, exposure, footprint, input.fineWl);
     grad += fine.yz;
 
     var compression = 0.0;
@@ -340,8 +343,8 @@ fn detailNormal(
             let d = detailNormal(world, N, 1.7, steep, ddxW, ddyW);
             acc = blendNormalRNM(acc, mix(vec3f(0.0, 0.0, 1.0), d, f1 * 0.85));
         }
-        let f2 = 1.0 - smoothstep(0.1, 0.7, footprint);
-        if (f2 > 0.001) {
+        let f2 = 1.0 - smoothstep(0.1, select(0.7, 0.45, COARSE_FORMS), footprint);
+        if (f2 > select(0.001, 0.03, COARSE_FORMS)) {
             let d = detailNormal(world, N, 0.31, steep, ddxW, ddyW);
             acc = blendNormalRNM(acc, mix(vec3f(0.0, 0.0, 1.0), d, f2 * 0.6));
         }
@@ -447,7 +450,7 @@ fn detailNormal(
     let caveTint = mix(vec3f(1.0), vec3f(0.55, 0.72, 1.0), (1.0 - ao) * 0.95);
     color *= ao * caveTint;
 
-    color = applyAerial(
+    color = aerialPick(
         color, F.camPos.xyz, world, -V, L,
         sunRadiance,
         F.fog.x, F.fog.y, F.fog.z,
@@ -505,6 +508,8 @@ struct Params { prevViewProj: mat4x4f, invView: mat4x4f, projInfo: vec2f, invRes
 @group(0) @binding(2) var histTex: texture_2d<f32>;
 @group(0) @binding(3) var depthTex: texture_2d<f32>;
 @group(0) @binding(4) var outTex: texture_storage_2d<rgba16float, write>;
+@group(0) @binding(5) var histSampler: sampler;
+override HW_HIST: bool = false;
 
 const POST_FAR: f32 = ${POST_FAR}.0;
 fn lumaPost(c: vec3f) -> f32 { return dot(c, vec3f(0.2126, 0.7152, 0.0722)); }
@@ -526,6 +531,7 @@ fn sampleCur(uv: vec2f) -> vec3f {
     return mix(mix(loadCur(x0, y0), loadCur(x0 + 1, y0), f.x), mix(loadCur(x0, y0 + 1), loadCur(x0 + 1, y0 + 1), f.x), f.y);
 }
 fn sampleHist(uv: vec2f) -> vec3f {
+    if (HW_HIST) { return textureSampleLevel(histTex, histSampler, vec2f(uv.x, 1.0 - uv.y), 0.0).rgb; }
     let d = dims();
     let p = clamp(vec2f(uv.x * d.x - 0.5, rowOf(uv.y)), vec2f(0.0), d - 1.0);
     let b = floor(p);
@@ -543,6 +549,11 @@ fn sampleDepth(uv: vec2f) -> f32 {
     let y0 = i32(b.y);
     return mix(mix(loadDepth(x0, y0), loadDepth(x0 + 1, y0), f.x), mix(loadDepth(x0, y0 + 1), loadDepth(x0 + 1, y0 + 1), f.x), f.y);
 }
+// v4897 -- the pixel's own taps (taaResolve.mjs): the 3x3 neighbourhood and the depth are read at integer offsets from this pixel's centre, so each is ONE textureLoad where sampleCur and sampleDepth made four. Rows run top-down
+// here and uv.y runs up, so a +j in uv is a row - j. The pixel is found by floor of the centre's coordinate (a half texel from any edge), never by truncating a reciprocal.
+fn pixelOf(uv: vec2f) -> vec2i { let d = dims(); return vec2i(i32(floor(uv.x * d.x)), i32(floor((1.0 - uv.y) * d.y))); }
+fn tapCur(uv: vec2f, i: i32, j: i32) -> vec3f { let q = pixelOf(uv); return loadCur(q.x + i, q.y - j); }
+fn tapDepth(uv: vec2f) -> f32 { let q = pixelOf(uv); return loadDepth(q.x, q.y); }
 ${TAA_WGSL}
 @compute @workgroup_size(8, 8)
 fn main(@builtin(global_invocation_id) gid: vec3u) {
@@ -559,8 +570,19 @@ export const PRESENT_WGSL = /* wgsl */ `
 @vertex fn vs(@builtin(vertex_index) i: u32) -> @builtin(position) vec4f {
     return vec4f(array<vec2f, 3>(vec2f(-1.0, -1.0), vec2f(3.0, -1.0), vec2f(-1.0, 3.0))[i], 0.0, 1.0);
 }
+// v4896 -- RENDER SCALE: exposure.yz is the render size over the output size (1, 1 when they are equal), and the output pixel at p reads the render target BILINEARLY at p * ratio. At ratio 1 the sample position is
+// exactly the texel's centre, so the filter weights are 0 and 1 and the result is the single textureLoad it replaces, bit for bit. The four taps are clamped to the target, so the last output row and column read its edge.
 @fragment fn fs(@builtin(position) p: vec4f) -> @location(0) vec4f {
-    let c = textureLoad(src, vec2i(p.xy), 0).rgb * exposure.x;
+    let dims = vec2i(textureDimensions(src));
+    let q = p.xy * exposure.yz - vec2f(0.5);
+    let i0 = vec2i(floor(q));
+    let f = q - floor(q);
+    let hi = dims - vec2i(1);
+    let a = textureLoad(src, clamp(i0, vec2i(0), hi), 0).rgb;
+    let b = textureLoad(src, clamp(i0 + vec2i(1, 0), vec2i(0), hi), 0).rgb;
+    let d = textureLoad(src, clamp(i0 + vec2i(0, 1), vec2i(0), hi), 0).rgb;
+    let e = textureLoad(src, clamp(i0 + vec2i(1, 1), vec2i(0), hi), 0).rgb;
+    let c = mix(mix(a, b, f.x), mix(d, e, f.x), f.y) * exposure.x;
     let t = c / (1.0 + c);
     return vec4f(pow(max(t, vec3f(0.0)), vec3f(1.0 / 2.2)), 1.0);
 }
@@ -584,10 +606,15 @@ export function skyAmbient(sunDir, intensity, groundBounce) {
  * Build the whole frame graph on `device`. Options: { canvas (a canvas with a webgpu context, optional), format (the canvas format), width, height, deformRes, deformSize, gridN, levels, baseSpacing, shadowRes }.
  * Returns the driver: frame(dt, focus, cam, opts), stamp(...), setSun(elev, azim), readField(), readSky(), dumpTerrain(verts), shot(), errors, stats, and the resources the gate reads.
  */
-export async function createSnowGpu(device, { canvas = null, format = "bgra8unorm", width = 320, height = 180, deformRes = 128, deformSize = 20, gridN = 32, levels = 5, baseSpacing = 0.2, shadowRes = SHADOW_RES } = {}) {
+export async function createSnowGpu(device, { canvas = null, format = "bgra8unorm", width = 320, height = 180, deformRes = 128, deformSize = 20, gridN = 32, levels = 5, baseSpacing = 0.2, shadowRes = SHADOW_RES, passTimers = false, ablate = [], hoistFine = false, coarseForms = true, taaHwHistory = true } = {}) {   // `ablate`: terms of the beauty shader compiled OUT, for measuring (render/snowAblate.mjs); the picture is wrong on purpose
     const GU = U().GPUBufferUsage, TU = U().GPUTextureUsage, SS = U().GPUShaderStage, MM = U().GPUMapMode;
     const errors = []; device.addEventListener("uncapturederror", (e) => errors.push(String(e.error && e.error.message || e)));
     const mkBuf = (size, usage, label) => device.createBuffer({ size: Math.max(16, Math.ceil(size / 4) * 4), usage, label });
+    // v4896 -- OPT-IN PER-PASS GPU TIMERS (passTimers: true, on a device made with the "timestamp-query" feature): every pass writes a begin and an end timestamp into one query set, the frame resolves them and
+    // stats.passMs holds the last frame's milliseconds per pass. It awaits a buffer map each frame, so a frame with timers on is a measurement frame, never a throughput one. Off by default: no query set, no
+    // descriptor field, nothing different from the frame before this existed.
+    const timers = passTimers && device.features && device.features.has("timestamp-query")
+        ? { qs: device.createQuerySet({ type: "timestamp", count: 32 }), res: mkBuf(32 * 8, GU.QUERY_RESOLVE | GU.COPY_SRC, "pass timers"), rd: mkBuf(32 * 8, GU.COPY_DST | GU.MAP_READ, "pass timers read") } : null;
     const ctx = canvas ? canvas.getContext("webgpu") : null; if (ctx) ctx.configure({ device, format, alphaMode: "opaque", usage: TU.RENDER_ATTACHMENT | TU.COPY_SRC });
     const field = new DeformField({ res: deformRes, size: deformSize, windDirectionDeg: 40 });
     const clip = buildClipmap({ gridN, levels });
@@ -596,7 +623,7 @@ export async function createSnowGpu(device, { canvas = null, format = "bgra8unor
     const brushBuf = mkBuf(MAX_BRUSHES * 3 * 16, GU.STORAGE | GU.COPY_DST, "brushes"), deformU = mkBuf(48, GU.UNIFORM | GU.COPY_DST, "deform params");
     const skyBuf = mkBuf(mipFloats(SKY_W, SKY_H) * 4, GU.STORAGE | GU.COPY_SRC | GU.COPY_DST, "sky lut chain"), skyU = mkBuf(48, GU.UNIFORM | GU.COPY_DST, "sky params");
     const mipU = Array.from({ length: SKY_LEVELS - 1 }, (_, i) => { const b = mkBuf(16, GU.UNIFORM | GU.COPY_DST, "mip params " + (i + 1)); device.queue.writeBuffer(b, 0, new Float32Array([SKY_W, SKY_H, i + 1, 0])); return b; });
-    const frameBuf = mkBuf(FRAME_FLOATS * 4, GU.UNIFORM | GU.COPY_DST, "frame"), taaU = mkBuf(176, GU.UNIFORM | GU.COPY_DST, "taa"), expoU = mkBuf(16, GU.UNIFORM | GU.COPY_DST, "exposure");
+    const frameBuf = mkBuf(FRAME_FLOATS * 4, GU.UNIFORM | GU.COPY_DST, "frame"), taaU = mkBuf(176, GU.UNIFORM | GU.COPY_DST, "taa"), expoU = mkBuf(16, GU.UNIFORM | GU.COPY_DST, "exposure"), expoShotU = mkBuf(16, GU.UNIFORM | GU.COPY_DST, "exposure (shot)");
     const vbuf = mkBuf(clip.positions.byteLength, GU.VERTEX | GU.COPY_DST, "clip vertices"), ibuf = mkBuf(clip.indices.byteLength, GU.INDEX | GU.COPY_DST, "clip indices");
     device.queue.writeBuffer(vbuf, 0, clip.positions); device.queue.writeBuffer(ibuf, 0, clip.indices);
     // ---- textures
@@ -605,6 +632,8 @@ export async function createSnowGpu(device, { canvas = null, format = "bgra8unor
     const shadowTex = Array.from({ length: CASCADE_COUNT }, (_, i) => tex([shadowRes, shadowRes], "depth32float", TU.RENDER_ATTACHMENT | TU.TEXTURE_BINDING | TU.COPY_SRC, "shadow map " + i));
     const detailTex = device.createTexture({ size: [DETAIL_RES, DETAIL_RES], format: "rgba16float", mipLevelCount: DETAIL_LEVELS, usage: TU.STORAGE_BINDING | TU.TEXTURE_BINDING | TU.COPY_SRC, label: "snow detail" });
     const detailSampler = device.createSampler({ addressModeU: "repeat", addressModeV: "repeat", magFilter: "linear", minFilter: "linear", mipmapFilter: "linear" });
+    // the deformation field as a filterable texture (render/deformTexture.mjs): written by the pack pass each frame, sampled with hardware bilinear and a repeat sampler by the vertex and fragment stages
+    const deformTex = device.createTexture({ size: [deformRes, deformRes], format: "rgba16float", usage: TU.STORAGE_BINDING | TU.TEXTURE_BINDING, label: "deform field f16" }), deformSampler = device.createSampler(DEFORM_SAMPLER);
     function makeTargets() {
         for (const t of [hdr, depthCol, sceneDepth, ...(hist || [])]) t && t.destroy();
         hdr = tex([W, H], HDR_FORMAT, TU.RENDER_ATTACHMENT | TU.TEXTURE_BINDING, "hdr"); depthCol = tex([W, H], DEPTH_FORMAT, TU.RENDER_ATTACHMENT | TU.TEXTURE_BINDING, "view depth");
@@ -617,30 +646,34 @@ export async function createSnowGpu(device, { canvas = null, format = "bgra8unor
         { binding: 0, visibility: SS.VERTEX | SS.FRAGMENT | SS.COMPUTE, buffer: { type: "uniform" } },
         { binding: 1, visibility: SS.VERTEX | SS.FRAGMENT | SS.COMPUTE, buffer: { type: "read-only-storage" } },
         { binding: 2, visibility: SS.VERTEX | SS.FRAGMENT | SS.COMPUTE, buffer: { type: "read-only-storage" } },
+        { binding: 8, visibility: SS.VERTEX | SS.FRAGMENT | SS.COMPUTE, texture: { sampleType: "float" } },
+        { binding: 9, visibility: SS.VERTEX | SS.FRAGMENT | SS.COMPUTE, sampler: { type: "filtering" } },
         ...(withShadow ? [3, 4, 5].map((b) => ({ binding: b, visibility: SS.FRAGMENT, texture: { sampleType: "depth" } })).concat([{ binding: 6, visibility: SS.FRAGMENT, texture: { sampleType: "float" } }, { binding: 7, visibility: SS.FRAGMENT, sampler: { type: "filtering" } }]) : []),
     ] });
     const bglShadow = bgl0(false), bglMain = bgl0(true);
     const bglDump = device.createBindGroupLayout({ entries: [{ binding: 0, visibility: SS.COMPUTE, buffer: { type: "read-only-storage" } }, { binding: 1, visibility: SS.COMPUTE, buffer: { type: "storage" } }] });
-    const vModule = device.createShaderModule({ code: TERRAIN_VERTEX_WGSL, label: "terrain vertex" }), bModule = device.createShaderModule({ code: BEAUTY_WGSL, label: "beauty" });
+    const vModule = device.createShaderModule({ code: TERRAIN_VERTEX_WGSL, label: "terrain vertex" }), bModule = device.createShaderModule({ code: ablate.length ? ablateWgsl(BEAUTY_WGSL, ablate) : BEAUTY_WGSL, label: "beauty" });
     const vbufLayout = { arrayStride: 12, attributes: [{ shaderLocation: 0, format: "float32x3", offset: 0 }] };
     const shadowPipe = [0, 1, 2].map((c) => device.createRenderPipeline({ layout: device.createPipelineLayout({ bindGroupLayouts: [bglShadow] }), vertex: { module: vModule, entryPoint: "vsShadow", constants: { CASCADE: c }, buffers: [vbufLayout] }, primitive: { topology: "triangle-list", cullMode: "none" }, depthStencil: { format: "depth32float", depthWriteEnabled: true, depthCompare: "less" } }));
     const targets = [{ format: HDR_FORMAT }, { format: DEPTH_FORMAT }];
     const mainLayout = device.createPipelineLayout({ bindGroupLayouts: [bglMain] });
-    const terrainPipe = device.createRenderPipeline({ layout: mainLayout, vertex: { module: vModule, entryPoint: "vsMain", buffers: [vbufLayout] }, fragment: { module: bModule, entryPoint: "fsTerrain", targets }, primitive: { topology: "triangle-list", cullMode: "none" }, depthStencil: { format: "depth32float", depthWriteEnabled: true, depthCompare: "less" } });
+    const terrainPipe = device.createRenderPipeline({ layout: mainLayout, vertex: { module: vModule, entryPoint: "vsMain", constants: { HOIST_FINE: hoistFine ? 1 : 0 }, buffers: [vbufLayout] }, fragment: { module: bModule, entryPoint: "fsTerrain", constants: { HOIST_FINE: hoistFine ? 1 : 0, COARSE_FORMS: coarseForms ? 1 : 0 }, targets }, primitive: { topology: "triangle-list", cullMode: "none" }, depthStencil: { format: "depth32float", depthWriteEnabled: true, depthCompare: "less" } });
     const skyPipe = device.createRenderPipeline({ layout: mainLayout, vertex: { module: bModule, entryPoint: "vsSky" }, fragment: { module: bModule, entryPoint: "fsSky", targets }, primitive: { topology: "triangle-list" }, depthStencil: { format: "depth32float", depthWriteEnabled: false, depthCompare: "always" } });
     const dumpPipe = device.createComputePipeline({ layout: device.createPipelineLayout({ bindGroupLayouts: [bglShadow, bglDump] }), compute: { module: vModule, entryPoint: "dumpTerrain" } });
     const deformPipe = device.createComputePipeline({ layout: "auto", compute: { module: device.createShaderModule({ code: KERNEL_WGSL }), entryPoint: "main" } });
+    const packPipe = device.createComputePipeline({ layout: "auto", compute: { module: device.createShaderModule({ code: packWgsl(deformRes), label: "deform pack" }), entryPoint: "main" } });
     const bakePipe = device.createComputePipeline({ layout: "auto", compute: { module: device.createShaderModule({ code: BAKE_KERNEL_WGSL }), entryPoint: "main" } });
     const mipPipe = device.createComputePipeline({ layout: "auto", compute: { module: device.createShaderModule({ code: MIP_KERNEL_WGSL }), entryPoint: "main" } });
     const detailBakePipe = device.createComputePipeline({ layout: "auto", compute: { module: device.createShaderModule({ code: DETAIL_BAKE_KERNEL_WGSL, label: "detail bake" }), entryPoint: "main" } }), detailMipPipe = device.createComputePipeline({ layout: "auto", compute: { module: device.createShaderModule({ code: DETAIL_MIP_KERNEL_WGSL }), entryPoint: "main" } });
-    const taaPipe = device.createComputePipeline({ layout: "auto", compute: { module: device.createShaderModule({ code: TAA_GPU_WGSL, label: "taa" }), entryPoint: "main" } });
+    const taaPipe = device.createComputePipeline({ layout: "auto", compute: { module: device.createShaderModule({ code: TAA_GPU_WGSL, label: "taa" }), entryPoint: "main", constants: { HW_HIST: taaHwHistory ? 1 : 0 } } }), taaSampler = device.createSampler({ magFilter: "linear", minFilter: "linear", addressModeU: "clamp-to-edge", addressModeV: "clamp-to-edge" });
     const presentModule = device.createShaderModule({ code: PRESENT_WGSL });
     const presentPipe = (fmt) => device.createRenderPipeline({ layout: "auto", vertex: { module: presentModule, entryPoint: "vs" }, fragment: { module: presentModule, entryPoint: "fs", targets: [{ format: fmt }] }, primitive: { topology: "triangle-list" } });
     const presentCanvas = presentPipe(format), presentShot = presentPipe("rgba8unorm");
     // ---- bind groups
-    const mk0 = (i, withShadow) => device.createBindGroup({ layout: withShadow ? bglMain : bglShadow, entries: [{ binding: 0, resource: { buffer: frameBuf } }, { binding: 1, resource: { buffer: stateBuf[i] } }, { binding: 2, resource: { buffer: skyBuf } }, ...(withShadow ? [...shadowTex.map((t, i) => ({ binding: 3 + i, resource: t.createView() })), { binding: 6, resource: detailTex.createView() }, { binding: 7, resource: detailSampler }] : [])] });
+    const mk0 = (i, withShadow) => device.createBindGroup({ layout: withShadow ? bglMain : bglShadow, entries: [{ binding: 0, resource: { buffer: frameBuf } }, { binding: 1, resource: { buffer: stateBuf[i] } }, { binding: 2, resource: { buffer: skyBuf } }, { binding: 8, resource: deformTex.createView() }, { binding: 9, resource: deformSampler }, ...(withShadow ? [...shadowTex.map((t, i) => ({ binding: 3 + i, resource: t.createView() })), { binding: 6, resource: detailTex.createView() }, { binding: 7, resource: detailSampler }] : [])] });
     const mainBG = [mk0(0, true), mk0(1, true)], shadowBG = [mk0(0, false), mk0(1, false)];
     const deformBG = [0, 1].map((i) => device.createBindGroup({ layout: deformPipe.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: stateBuf[1 - i] } }, { binding: 1, resource: { buffer: deformU } }, { binding: 2, resource: { buffer: stateBuf[i] } }, { binding: 3, resource: { buffer: brushBuf } }] }));   // [i] reads state i, writes 1 - i
+    const packBG = [0, 1].map((i) => device.createBindGroup({ layout: packPipe.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: stateBuf[i] } }, { binding: 1, resource: deformTex.createView() }] }));
     const bakeBG = device.createBindGroup({ layout: bakePipe.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: skyBuf } }, { binding: 1, resource: { buffer: skyU } }] });
     const mipBG = mipU.map((u) => device.createBindGroup({ layout: mipPipe.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: skyBuf } }, { binding: 1, resource: { buffer: u } }] }));
     // the detail map: baked once on the GPU into level 0, then the box-filtered chain (trilinear in the fragment stage)
@@ -666,6 +699,7 @@ export async function createSnowGpu(device, { canvas = null, format = "bgra8unor
 
     async function frame(dt, focus, cam, opts = {}) {
         const o = { present: true, shot: false, ...opts };
+        const OW = o.outW || W, OH = o.outH || H;   // a SHOT is the render size unless outW/outH ask for the present pass to upsample it (render scale, tested without a canvas)
         // 1 the field: bookkeeping on the CPU, the pass on the GPU
         const P = field.advance(dt, focus);
         device.queue.writeBuffer(deformU, 0, new Float32Array(packParams(P)));
@@ -685,44 +719,50 @@ export async function createSnowGpu(device, { canvas = null, format = "bgra8unor
         // 3 the TAA block
         const prev = state.prevVP || vpClean;
         taaF.set(prev, 0); taaF.set(invView(b), 16); taaF.set([tanX, tanY, 1 / W, 1 / H, j[0], j[1], state.historyValid, state.taa && state.resolve ? 1 : 0, state.feedback, 0, 0, 0], 32);
-        device.queue.writeBuffer(taaU, 0, taaF); device.queue.writeBuffer(expoU, 0, new Float32Array([state.exposure, 0, 0, 0]));
+        device.queue.writeBuffer(taaU, 0, taaF); // the present pass reads the render target at (render size / output size): 1 when the page draws at full size, less when it renders at a scale and the canvas is bigger; a shot is always the render size itself
+        device.queue.writeBuffer(expoU, 0, new Float32Array([state.exposure, canvas ? W / canvas.width : 1, canvas ? H / canvas.height : 1, 0])); device.queue.writeBuffer(expoShotU, 0, new Float32Array([state.exposure, W / OW, H / OH, 0]));
         const enc = device.createCommandEncoder();
+        const slots = [], tw = (name) => { if (!timers || slots.length >= 16) return undefined; slots.push(name); const k = slots.length - 1; return { querySet: timers.qs, beginningOfPassWriteIndex: 2 * k, endOfPassWriteIndex: 2 * k + 1 }; };
         // field step (writes the other buffer), then the sky if the sun moved
-        { const cp = enc.beginComputePass(); cp.setPipeline(deformPipe); cp.setBindGroup(0, deformBG[cur]); cp.dispatchWorkgroups(deformRes / 8, deformRes / 8); cp.end(); }
+        { const cp = enc.beginComputePass({ timestampWrites: tw("deform") }); cp.setPipeline(deformPipe); cp.setBindGroup(0, deformBG[cur]); cp.dispatchWorkgroups(deformRes / 8, deformRes / 8); cp.end(); }
         cur = 1 - cur; field.endFrame();
+        // the field just stepped, copied into the texture the vertex and fragment stages sample (stateBuf[cur] now holds the latest)
+        { const pp = enc.beginComputePass({ timestampWrites: tw("deformPack") }); pp.setPipeline(packPipe); pp.setBindGroup(0, packBG[cur]); pp.dispatchWorkgroups(Math.ceil(deformRes / 8), Math.ceil(deformRes / 8)); pp.end(); }
         if (skyDirty) {
             device.queue.writeBuffer(skyU, 0, new Float32Array([sun[0], sun[1], sun[2], SUN_I, GB[0], GB[1], GB[2], SKY_W, SKY_H, 0, 0, 0]));
-            const cp = enc.beginComputePass(); cp.setPipeline(bakePipe); cp.setBindGroup(0, bakeBG); cp.dispatchWorkgroups(SKY_W / 8, SKY_H / 8); cp.end();
-            for (let l = 1; l < SKY_LEVELS; l++) { const m = enc.beginComputePass(); m.setPipeline(mipPipe); m.setBindGroup(0, mipBG[l - 1]); m.dispatchWorkgroups(Math.ceil(Math.max(1, SKY_W >> l) / 8), Math.ceil(Math.max(1, SKY_H >> l) / 8)); m.end(); }
+            const cp = enc.beginComputePass({ timestampWrites: tw("skyBake") }); cp.setPipeline(bakePipe); cp.setBindGroup(0, bakeBG); cp.dispatchWorkgroups(SKY_W / 8, SKY_H / 8); cp.end();
+            for (let l = 1; l < SKY_LEVELS; l++) { const m = enc.beginComputePass({ timestampWrites: tw("skyMip" + l) }); m.setPipeline(mipPipe); m.setBindGroup(0, mipBG[l - 1]); m.dispatchWorkgroups(Math.ceil(Math.max(1, SKY_W >> l) / 8), Math.ceil(Math.max(1, SKY_H >> l) / 8)); m.end(); }
             skyDirty = false; bakes++;
         }
         // shadow passes, one per cascade: the same vertex function as the beauty pass
-        for (let c = 0; c < CASCADE_COUNT; c++) { const p = enc.beginRenderPass({ colorAttachments: [], depthStencilAttachment: { view: shadowTex[c].createView(), depthClearValue: 1, depthLoadOp: "clear", depthStoreOp: "store" } });
+        for (let c = 0; c < CASCADE_COUNT; c++) { const p = enc.beginRenderPass({ colorAttachments: [], depthStencilAttachment: { view: shadowTex[c].createView(), depthClearValue: 1, depthLoadOp: "clear", depthStoreOp: "store" }, timestampWrites: tw("shadow" + c) });
           p.setPipeline(shadowPipe[c]); p.setBindGroup(0, shadowBG[cur]); p.setVertexBuffer(0, vbuf); p.setIndexBuffer(ibuf, "uint32"); p.drawIndexed(clip.indices.length); p.end(); }
         // beauty pass: the sky dome, then ONE indexed draw of the whole clipmap
         { const p = enc.beginRenderPass({ colorAttachments: [{ view: hdr.createView(), clearValue: [0, 0, 0, 1], loadOp: "clear", storeOp: "store" }, { view: depthCol.createView(), clearValue: [POST_FAR, 0, 0, 0], loadOp: "clear", storeOp: "store" }],
-            depthStencilAttachment: { view: sceneDepth.createView(), depthClearValue: 1, depthLoadOp: "clear", depthStoreOp: "discard" } });
+            depthStencilAttachment: { view: sceneDepth.createView(), depthClearValue: 1, depthLoadOp: "clear", depthStoreOp: "discard" }, timestampWrites: tw("beauty") });
           p.setBindGroup(0, mainBG[cur]); p.setPipeline(skyPipe); p.draw(3); p.setPipeline(terrainPipe); p.setVertexBuffer(0, vbuf); p.setIndexBuffer(ibuf, "uint32"); p.drawIndexed(clip.indices.length); p.end(); }
         // TAA: current + history -> the other history
         const hi = state.histIdx, ho = 1 - hi;
-        { const bg = device.createBindGroup({ layout: taaPipe.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: taaU } }, { binding: 1, resource: hdr.createView() }, { binding: 2, resource: hist[hi].createView() }, { binding: 3, resource: depthCol.createView() }, { binding: 4, resource: hist[ho].createView() }] });
-          const cp = enc.beginComputePass(); cp.setPipeline(taaPipe); cp.setBindGroup(0, bg); cp.dispatchWorkgroups(Math.ceil(W / 8), Math.ceil(H / 8)); cp.end(); }
+        { const bg = device.createBindGroup({ layout: taaPipe.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: taaU } }, { binding: 1, resource: hdr.createView() }, { binding: 2, resource: hist[hi].createView() }, { binding: 3, resource: depthCol.createView() }, { binding: 4, resource: hist[ho].createView() }, { binding: 5, resource: taaSampler }] });
+          const cp = enc.beginComputePass({ timestampWrites: tw("taa") }); cp.setPipeline(taaPipe); cp.setBindGroup(0, bg); cp.dispatchWorkgroups(Math.ceil(W / 8), Math.ceil(H / 8)); cp.end(); }
         // present
         let shotBuf = null, bpr = 0;
-        const draw = (pipe, view) => { const bg = device.createBindGroup({ layout: pipe.getBindGroupLayout(0), entries: [{ binding: 0, resource: hist[ho].createView() }, { binding: 1, resource: { buffer: expoU } }] });
-            const p = enc.beginRenderPass({ colorAttachments: [{ view, clearValue: [0, 0, 0, 1], loadOp: "clear", storeOp: "store" }] }); p.setPipeline(pipe); p.setBindGroup(0, bg); p.draw(3); p.end(); };
+        const draw = (pipe, view, eu = expoU) => { const bg = device.createBindGroup({ layout: pipe.getBindGroupLayout(0), entries: [{ binding: 0, resource: hist[ho].createView() }, { binding: 1, resource: { buffer: eu } }] });
+            const p = enc.beginRenderPass({ colorAttachments: [{ view, clearValue: [0, 0, 0, 1], loadOp: "clear", storeOp: "store" }], timestampWrites: tw("present") }); p.setPipeline(pipe); p.setBindGroup(0, bg); p.draw(3); p.end(); };
         if (o.present && ctx) draw(presentCanvas, ctx.getCurrentTexture().createView());
         let shotTex = null;
-        if (o.shot) { shotTex = tex([W, H], "rgba8unorm", TU.RENDER_ATTACHMENT | TU.COPY_SRC, "shot"); draw(presentShot, shotTex.createView()); bpr = Math.ceil(W * 4 / 256) * 256; shotBuf = mkBuf(bpr * H, GU.COPY_DST | GU.MAP_READ, "shot read"); enc.copyTextureToBuffer({ texture: shotTex }, { buffer: shotBuf, bytesPerRow: bpr }, [W, H]); }
+        if (o.shot) { shotTex = tex([OW, OH], "rgba8unorm", TU.RENDER_ATTACHMENT | TU.COPY_SRC, "shot"); draw(presentShot, shotTex.createView(), expoShotU); bpr = Math.ceil(OW * 4 / 256) * 256; shotBuf = mkBuf(bpr * OH, GU.COPY_DST | GU.MAP_READ, "shot read"); enc.copyTextureToBuffer({ texture: shotTex }, { buffer: shotBuf, bytesPerRow: bpr }, [OW, OH]); }
+        if (slots.length) { enc.resolveQuerySet(timers.qs, 0, slots.length * 2, timers.res, 0); enc.copyBufferToBuffer(timers.res, 0, timers.rd, 0, slots.length * 16); }
         device.queue.submit([enc.finish()]);
+        if (slots.length) { await timers.rd.mapAsync(MM.READ); const t = new BigUint64Array(timers.rd.getMappedRange().slice(0)); timers.rd.unmap(); stats.passMs = {}; slots.forEach((n, k) => { stats.passMs[n] = Number(t[2 * k + 1] - t[2 * k]) / 1e6; }); }
         state.prevVP = vpClean; state.histIdx = ho; state.historyValid = 1; state.frame++;
         stats.frames = state.frame; stats.bakes = bakes;
         if (!shotBuf) return null;
-        await shotBuf.mapAsync(MM.READ); const raw = new Uint8Array(shotBuf.getMappedRange()), out = new Uint8Array(W * H * 4);
-        for (let y = 0; y < H; y++) out.set(raw.subarray(y * bpr, y * bpr + W * 4), y * W * 4);
-        shotBuf.unmap(); shotBuf.destroy(); shotTex.destroy(); return { pixels: out, width: W, height: H };
+        await shotBuf.mapAsync(MM.READ); const raw = new Uint8Array(shotBuf.getMappedRange()), out = new Uint8Array(OW * OH * 4);
+        for (let y = 0; y < OH; y++) out.set(raw.subarray(y * bpr, y * bpr + OW * 4), y * OW * 4);
+        shotBuf.unmap(); shotBuf.destroy(); shotTex.destroy(); return { pixels: out, width: OW, height: OH };
     }
-    const stats = { frames: 0, bakes: 0, vertices: clip.vertices, triangles: clip.triangles, terrainDrawCalls: 1, cascades: CASCADE_COUNT, indices: clip.indices.length, shadowRes };
+    const stats = { hoistFine, coarseForms, taaHwHistory, passTimers: !!timers, passMs: null, frames: 0, bakes: 0, vertices: clip.vertices, triangles: clip.triangles, terrainDrawCalls: 1, cascades: CASCADE_COUNT, indices: clip.indices.length, shadowRes };
     async function readBuf(buf, bytes) { const r = mkBuf(bytes, GU.COPY_DST | GU.MAP_READ), e = device.createCommandEncoder(); e.copyBufferToBuffer(buf, 0, r, 0, bytes); device.queue.submit([e.finish()]); await r.mapAsync(MM.READ); const out = new Float32Array(r.getMappedRange().slice(0)); r.unmap(); r.destroy(); return out; }
     return {
         device, field, clip, stats, errors, state, baseSpacing, gridN, levels, deformRes,
@@ -735,6 +775,6 @@ export async function createSnowGpu(device, { canvas = null, format = "bgra8unor
             const e = device.createCommandEncoder(), cp = e.beginComputePass(); cp.setPipeline(dumpPipe); cp.setBindGroup(0, shadowBG[cur]); cp.setBindGroup(1, bg); cp.dispatchWorkgroups(Math.ceil(n / 64)); cp.end(); device.queue.submit([e.finish()]);
             const out = await readBuf(outB, n * 32); inB.destroy(); outB.destroy(); return out;
         },
-        shot: (dt, focus, cam) => frame(dt, focus, cam, { present: false, shot: true }),
+        shot: (dt, focus, cam, size = {}) => frame(dt, focus, cam, { present: false, shot: true, ...(size.outW ? { outW: size.outW, outH: size.outH } : {}) }),
     };
 }

@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<!-- channel.html -- A YOUTUBE CHANNEL AS A PAGE: the channel's own description, its videos, and the GitHub repositories the videos name. The template is https://www.youtube.com/@TheNextNewThingAI; SweK Engine's own channel
+     will use the same file format (swek-channel-v1) when it has videos, and this same page.
+
+     WHERE THE DATA COMES FROM: data/channels/<slug>.json, written by `node tools/ship/takeYoutubeChannel.mjs --handle TheNextNewThingAI` on a machine that can reach YouTube (public pages and the RSS feed, no key), and
+     data/channels/index.json, the list of channels this page offers (?c=<slug> picks one). Nothing here is fetched from YouTube by the PAGE: it renders the snapshot and links out. ui/channelFeed.mjs is the parser and the
+     repo index, shared with the command, so the two cannot disagree about what a repo link or a chapter is.
+
+     EVERYTHING FROM THE SNAPSHOT IS TEXT: titles, descriptions and channel names reach the page through textContent, never innerHTML, and every link passes ui/channelFeed.mjs's safeHref (https to YouTube or GitHub only), so a
+     video titled with markup shows the markup and a link to javascript: is not a link. ?src=/some/path.json loads a snapshot from this site's own path (the gate uses it; it must start with a single slash and end .json). -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="Channel (a YouTube channel's videos, info and the GitHub repos they name)">
+<meta name="demo:desc" content="A YouTube channel as a page: the channel's description and numbers, every video with its date, views, chapters and description, and an index of the GitHub repositories the videos mention, each with the videos that name it. Rendered from a snapshot data/channels/<slug>.json that tools/ship/takeYoutubeChannel.mjs writes; template https://www.youtube.com/@TheNextNewThingAI, the same format for SweK Engine's own channel.">
+<meta name="demo:category" content="world">
+<title>Channel &middot; videos and repos</title>
+<style>
+  :root { --bg:#0a1626; --panel:#0f1d33; --line:#2a4366; --text:#cfe0f5; --dim:#7f9bbd; --accent:#5ad6ff; --good:#2fd6b0; --warn:#f6a623; --bad:#ff7b7b; }
+  /* v4899 -- ONE GROUND, THE TREE'S DARK ONE. This page followed the viewer's OS (a light variant under prefers-color-scheme) and pageGround-selfcheck found it painting #ffffff on a light box where every other page paints dark; a page may follow the scheme only with a switcher (petfbi-board), and this has none. */
+  * { box-sizing:border-box; }
+  html,body { margin:0; background:var(--bg); color:var(--text); font:14px/1.45 system-ui,-apple-system,Segoe UI,sans-serif; }
+  a { color:var(--accent); text-decoration:none; } a:hover { text-decoration:underline; }
+  main { max-width:1100px; margin:0 auto; padding:16px; }
+  header.ch { display:flex; gap:16px; align-items:center; flex-wrap:wrap; background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:16px; }
+  header.ch img { width:88px; height:88px; border-radius:50%; background:var(--line); object-fit:cover; flex:none; }
+  header.ch h1 { margin:0; font-size:22px; } .handle { color:var(--dim); }
+  .stats { display:flex; gap:18px; flex-wrap:wrap; margin-top:6px; color:var(--dim); } .stats b { color:var(--text); font-weight:600; }
+  nav.tabs { display:flex; gap:6px; margin:14px 0 10px; flex-wrap:wrap; }
+  nav.tabs button, .bar button, .bar select, .bar input { background:var(--panel); color:var(--text); border:1px solid var(--line); border-radius:8px; padding:6px 12px; font:inherit; cursor:pointer; }
+  nav.tabs button[aria-selected="true"] { border-color:var(--accent); color:var(--accent); }
+  .bar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:12px; } .bar input[type=search] { flex:1 1 220px; cursor:text; } .bar label { color:var(--dim); display:flex; gap:6px; align-items:center; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:14px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:12px; overflow:hidden; display:flex; flex-direction:column; }
+  .thumb { position:relative; aspect-ratio:16/9; background:#000; } .thumb img, .thumb iframe { width:100%; height:100%; border:0; object-fit:cover; display:block; }
+  .thumb button { position:absolute; inset:0; width:100%; height:100%; background:transparent; border:0; cursor:pointer; }
+  .thumb .dur { position:absolute; right:6px; bottom:6px; background:#000c; color:#fff; font-size:12px; padding:1px 6px; border-radius:4px; }
+  .thumb .play { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:52px; height:36px; border-radius:10px; background:#e62117cc; } .thumb .play::after { content:""; position:absolute; left:21px; top:10px; border-left:16px solid #fff; border-top:8px solid transparent; border-bottom:8px solid transparent; }
+  .body { padding:10px 12px 12px; display:flex; flex-direction:column; gap:6px; flex:1; } .body h3 { margin:0; font-size:15px; } .meta { color:var(--dim); font-size:12px; }
+  .chips { display:flex; gap:6px; flex-wrap:wrap; } .chip { background:#16385f33; border:1px solid var(--line); border-radius:999px; padding:1px 9px; font-size:12px; color:var(--good); }
+  details > summary { cursor:pointer; color:var(--dim); font-size:12px; } .desc { white-space:pre-wrap; word-break:break-word; margin:6px 0 0; font-size:13px; color:var(--text); } ol.chap { margin:6px 0 0; padding-left:20px; font-size:13px; } ol.chap li { margin:1px 0; }
+  .repo { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin-bottom:10px; } .repo h3 { margin:0 0 4px; font-size:16px; } .repo ul { margin:6px 0 0; padding-left:18px; }
+  .empty, .err { background:var(--panel); border:1px dashed var(--line); border-radius:12px; padding:18px; } .err { border-color:var(--bad); } code { background:#16385f44; padding:1px 6px; border-radius:5px; }
+  .note { color:var(--dim); font-size:12px; margin-top:16px; }
+</style>
+</head>
+<body>
+<main>
+  <div id="root"><div class="empty">loading the channel&hellip;</div></div>
+</main>
+<script type="module">
+import { validateSnapshot, repoIndex, safeHref, clock, compactCount, githubRepo, extractLinks } from "/ui/channelFeed.mjs";
+
+const root = document.getElementById("root"), qs = new URLSearchParams(location.search);
+const el = (tagName, props = {}, ...kids) => { const n = document.createElement(tagName); for (const [k, v] of Object.entries(props)) { if (k === "class") n.className = v; else if (k === "text") n.textContent = v; else if (k.startsWith("on")) n.addEventListener(k.slice(2), v); else if (v !== null && v !== undefined && v !== false) n.setAttribute(k, v === true ? "" : v); } for (const kid of kids.flat(Infinity)) if (kid != null) n.append(kid.nodeType ? kid : document.createTextNode(String(kid))); return n; };
+const link = (url, text, extra = {}) => { const h = safeHref(url); return h ? el("a", { href: h, target: "_blank", rel: "noopener noreferrer", text, ...extra }) : el("span", { text }); };
+const fmtDate = (iso) => { const d = new Date(iso); return Number.isNaN(d.getTime()) ? "" : d.toISOString().slice(0, 10); };
+const ago = (iso) => { const d = new Date(iso); if (Number.isNaN(d.getTime())) return ""; const days = Math.floor((Date.now() - d.getTime()) / 864e5); return days < 1 ? "today" : days < 31 ? days + "d ago" : days < 365 ? Math.floor(days / 30) + "mo ago" : (days / 365).toFixed(days < 730 ? 1 : 0) + "y ago"; };
+const state = { snap: null, tab: "videos", q: "", sort: "new", onlyRepos: false };
+
+// the description with its URLs as links (safeHref decides which are links) and everything else as text
+function linkified(text) {
+    const frag = document.createDocumentFragment(); let at = 0;
+    for (const m of String(text || "").matchAll(/https?:\/\/[^\s<>"'`]+/gi)) {
+        let u = m[0]; while (/[.,;:!?)\]}>'"*]$/.test(u)) u = u.slice(0, -1);
+        frag.append(document.createTextNode(text.slice(at, m.index))); frag.append(link(u, u)); at = m.index + u.length;
+    }
+    frag.append(document.createTextNode(String(text || "").slice(at))); return frag;
+}
+const repoChip = (r) => { const a = link(r.url, r.owner + "/" + r.repo, { class: "chip", title: "GitHub repository named in this video" }); return a; };
+
+function card(v) {
+    const t = el("div", { class: "thumb" });
+    const play = () => { const f = el("iframe", { src: "https://www.youtube-nocookie.com/embed/" + encodeURIComponent(v.id) + "?autoplay=1&rel=0", allow: "autoplay; encrypted-media; picture-in-picture", allowfullscreen: true, title: v.title }); t.replaceChildren(f); };
+    const img = safeHref(v.thumbnail);
+    t.append(img ? el("img", { src: img, alt: "", loading: "lazy" }) : el("div"), el("button", { type: "button", "aria-label": "play " + v.title, onclick: play }, el("span", { class: "play" })));
+    if (v.lengthSeconds != null) t.append(el("span", { class: "dur", text: clock(v.lengthSeconds) }));
+    const meta = [fmtDate(v.published) + (ago(v.published) ? " (" + ago(v.published) + ")" : ""), v.views != null ? compactCount(v.views) + " views" : null, v.rating != null && v.ratingCount ? "★ " + v.rating.toFixed(1) + " (" + compactCount(v.ratingCount) + ")" : null].filter(Boolean).join(" · ");
+    const body = el("div", { class: "body" }, el("h3", {}, link(v.url || "https://www.youtube.com/watch?v=" + v.id, v.title)), el("div", { class: "meta", text: meta }));
+    if ((v.repos || []).length) body.append(el("div", { class: "chips" }, v.repos.map(repoChip)));
+    if (v.description) {
+        const d = el("details", {}, el("summary", { text: "description" + ((v.chapters || []).length ? " and " + v.chapters.length + " chapters" : "") }));
+        if ((v.chapters || []).length) d.append(el("ol", { class: "chap" }, v.chapters.map((c) => el("li", {}, link("https://www.youtube.com/watch?v=" + v.id + "&t=" + c.t + "s", clock(c.t)), " " + c.label))));
+        d.append(el("div", { class: "desc" }, linkified(v.description)));
+        body.append(d);
+    }
+    if ((v.keywords || []).length) body.append(el("div", { class: "meta", text: "tags: " + v.keywords.slice(0, 10).join(", ") }));
+    return el("article", { class: "card", "data-id": v.id }, t, body);
+}
+
+function videosView() {
+    const s = state.snap, q = state.q.trim().toLowerCase();
+    let list = s.videos.filter((v) => (!q || (v.title + "\n" + (v.description || "") + "\n" + (v.repos || []).map((r) => r.owner + "/" + r.repo).join(" ")).toLowerCase().includes(q)) && (!state.onlyRepos || (v.repos || []).length));
+    const by = { new: (a, b) => String(b.published).localeCompare(String(a.published)), old: (a, b) => String(a.published).localeCompare(String(b.published)), views: (a, b) => (b.views || 0) - (a.views || 0), repos: (a, b) => (b.repos || []).length - (a.repos || []).length || String(b.published).localeCompare(String(a.published)) };
+    list = list.slice().sort(by[state.sort] || by.new);
+    const bar = el("div", { class: "bar" },
+        el("input", { type: "search", id: "q", placeholder: "search titles, descriptions, repos", value: state.q, "aria-label": "search", oninput: (e) => { state.q = e.target.value; const pos = e.target.selectionStart; render(); const n = document.getElementById("q"); n.focus(); n.setSelectionRange(pos, pos); } }),
+        el("select", { id: "sort", "aria-label": "sort", onchange: (e) => { state.sort = e.target.value; render(); } }, [["new", "newest first"], ["old", "oldest first"], ["views", "most viewed"], ["repos", "most repos"]].map(([v, t]) => el("option", { value: v, selected: state.sort === v, text: t }))),
+        el("label", {}, el("input", { type: "checkbox", id: "onlyRepos", checked: state.onlyRepos, onchange: (e) => { state.onlyRepos = e.target.checked; render(); } }), "only videos naming a repo"),
+        el("span", { class: "meta", id: "count", text: list.length + " of " + s.videos.length + " videos" }));
+    return [bar, list.length ? el("div", { class: "grid", id: "grid" }, list.map(card)) : el("div", { class: "empty", text: "No video matches." })];
+}
+function reposView() {
+    const idx = repoIndex(state.snap.videos);
+    if (!idx.length) return el("div", { class: "empty", text: "No video here names a GitHub repository." });
+    return [el("p", { class: "meta", id: "count", text: idx.length + " repositories named across " + state.snap.videos.length + " videos" }), idx.map((r) => el("div", { class: "repo", "data-repo": r.owner + "/" + r.repo },
+        el("h3", {}, link(r.url, r.owner + "/" + r.repo)), el("div", { class: "meta", text: "named in " + r.count + " video" + (r.count === 1 ? "" : "s") + (r.first ? " · first " + fmtDate(r.first) + (r.last !== r.first ? ", last " + fmtDate(r.last) : "") : "") }),
+        el("ul", {}, r.videos.map((v) => el("li", {}, link("https://www.youtube.com/watch?v=" + v.id, v.title), " ", el("span", { class: "meta", text: fmtDate(v.published) }))))))];
+}
+function aboutView() {
+    const s = state.snap, c = s.channel, owners = new Map();
+    for (const v of s.videos) for (const o of v.owners || []) owners.set(o.owner.toLowerCase(), o);
+    for (const l of c.links || []) if (l.github && l.github.kind === "owner") owners.set(l.github.owner.toLowerCase(), l.github);
+    return el("div", { class: "repo" }, el("h3", { text: "About" }), el("div", { class: "desc", id: "about" }, linkified(c.description || "(the channel page gave no description)")),
+        (c.links || []).length ? el("div", {}, el("h3", { text: "Links the channel gives" }), el("ul", {}, c.links.map((l) => el("li", {}, link(l.url, l.url))))) : null,
+        owners.size ? el("div", {}, el("h3", { text: "GitHub people and organisations named" }), el("ul", {}, [...owners.values()].map((o) => el("li", {}, link(o.url, "github.com/" + o.owner))))) : null,
+        el("p", { class: "note", text: "Snapshot of " + s.videos.length + " videos taken " + (s.fetchedAt || "at an unknown time") + " from YouTube's public pages. YouTube's feed lists only a channel's 15 newest videos; the command merges each run into this file, so it grows. View counts are as of the reading, not live." }));
+}
+function render() {
+    const s = state.snap, c = s.channel, total = s.videos.reduce((n, v) => n + (v.views || 0), 0), repos = repoIndex(s.videos).length;
+    const head = el("header", { class: "ch" }, safeHref(c.avatar) ? el("img", { src: safeHref(c.avatar), alt: "" }) : el("img", { alt: "" }),
+        el("div", {}, el("h1", { id: "name", text: c.name || "(unnamed channel)" }), el("div", { class: "handle" }, s.handle ? s.handle + " · " : "", c.url ? link(c.url, "youtube.com channel") : ""),
+            el("div", { class: "stats" }, c.subscribers ? el("span", {}, el("b", { text: c.subscribers.replace(/\s*subscribers?/i, "") }), " subscribers") : null, el("span", {}, el("b", { text: s.videos.length }), " videos"), el("span", {}, el("b", { text: compactCount(total) || "0" }), " views"), el("span", {}, el("b", { text: repos }), " GitHub repos"))));
+    const tabs = el("nav", { class: "tabs", role: "tablist" }, [["videos", "Videos"], ["repos", "GitHub repos (" + repos + ")"], ["about", "About"]].map(([k, t]) => el("button", { type: "button", role: "tab", id: "tab-" + k, "aria-selected": state.tab === k ? "true" : "false", text: t, onclick: () => { state.tab = k; render(); } })));
+    const view = state.tab === "repos" ? reposView() : state.tab === "about" ? aboutView() : videosView();
+    root.replaceChildren(head, tabs, el("section", { id: "view" }, view));
+}
+function fail(msg, extra) { root.replaceChildren(el("div", { class: "err", id: "err" }, el("b", { text: msg }), extra || null)); }
+function emptyHelp(why) {
+    fail(why, el("div", {}, el("p", { text: "This page shows a snapshot of a YouTube channel. To make one, on a machine that can reach YouTube, from the engine folder:" }),
+        el("p", {}, el("code", { text: "node tools/ship/takeYoutubeChannel.mjs --handle TheNextNewThingAI" })), el("p", { class: "meta", text: "It writes data/channels/thenextnewthingai.json and data/channels/index.json. Add --details for each video's duration and tags; run it again after each upload and the file grows. SweK Engine's own channel will use the same command and this same page." })));
+}
+
+async function load() {
+    let url, label;
+    const src = qs.get("src");
+    if (src !== null) { if (!/^\/(?!\/)[\w./-]*\.json$/.test(src) || src.includes("..")) return fail("?src must be a path on this site ending .json"); url = src; }
+    else {
+        let idx; try { const r = await fetch("/data/channels/index.json", { cache: "no-store" }); if (!r.ok) throw new Error(r.status); idx = await r.json(); } catch { return emptyHelp("No channel snapshot yet (data/channels/index.json is not there)."); }
+        const list = (idx && idx.channels) || []; if (!list.length) return emptyHelp("The channel index is empty.");
+        const pick = list.find((c) => c.slug === qs.get("c")) || list[0]; url = "/data/channels/" + encodeURIComponent(pick.file); label = pick;
+        if (list.length > 1) document.title = "Channel · " + (pick.name || pick.slug);
+    }
+    let snap; try { const r = await fetch(url, { cache: "no-store" }); if (!r.ok) throw new Error("HTTP " + r.status); snap = await r.json(); } catch (e) { return emptyHelp("The snapshot " + url + " could not be read (" + e.message + ")."); }
+    const bad = validateSnapshot(snap); if (bad.length) return fail("The snapshot is not sound: " + bad.slice(0, 4).join("; "));
+    state.snap = snap; document.title = (snap.channel.name || "Channel") + " · videos and repos"; window.__channel = { snapshot: snap, state, ready: true };
+    render();
+}
+load().catch((e) => { fail("The channel page failed: " + e.message); window.__channel = { error: String(e), ready: false }; });
+</script>
+</body>
+</html>

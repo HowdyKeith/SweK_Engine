@@ -1,0 +1,126 @@
+<!doctype html>
+<!-- sub-tournament.html -- UNNUMBERED (the version is chosen at ship time): EVERY SUBMARINE SIDE AGAINST EVERY OTHER.
+
+     brain/subTournament.mjs flies subDuel's duel (sonar, four torpedoes, 100 hit points) between every pair of the sides below, each pair from BOTH seats on the same geometries, and rates them with dogfightTournament's own Bradley-Terry fit.
+     A SIDE is a tactician (a doctrine: when to ping, when to fire, how to evade) AND a motion pilot (the hand autopilot or the fruit fly's 963-weight network); the tournament cannot say which of the two earned a result, and the table says so.
+     SEAT A IS WORTH A GREAT DEAL (the default tactician against itself wins every fight from seat A), which is why every pair is flown from both seats and why the page can measure it. A duel can be WATCHED: pick two sides and a geometry.
+     Nothing here comes from the network except the JSON the repository ships (brain/*.json), fetched as data. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="Sub Tournament">
+<meta name="demo:desc" content="Every submarine side against every other, from both seats, on the same geometries: the hand doctrine, the tuned and search-ping champions, two self-play leagues, each with the autopilot or the fruit fly network. A Bradley-Terry rating, a head-to-head matrix, the seat's measured worth, and a replay of any duel.">
+<meta name="demo:category" content="science">
+<title>SweK &middot; Sub Tournament</title>
+<style>
+  :root { --bg:#050a12; --panel:#0b131f; --line:#1c2c44; --fg:#dbe7ff; --dim:#7c93b8; --cyan:#59d1ff; --amber:#f6a623; --green:#5fe08a; --red:#ff7a7a; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:13px ui-monospace, Menlo, monospace; }
+  header { padding:14px 16px 6px; } h1 { font-size:15px; letter-spacing:.13em; text-transform:uppercase; color:var(--cyan); margin:0 0 6px; }
+  .desc { color:var(--dim); max-width:980px; line-height:1.6; margin:0 0 6px; }
+  .bar { display:flex; gap:8px; align-items:center; flex-wrap:wrap; padding:6px 16px; }
+  button, select, input[type=number] { background:var(--panel); color:var(--fg); border:1px solid var(--line); border-radius:5px; padding:4px 10px; font:inherit; }
+  button { cursor:pointer; } button:hover { border-color:var(--cyan); } button:disabled { opacity:.5; cursor:default; }
+  main { display:grid; grid-template-columns:minmax(260px,1fr) minmax(0,2fr); gap:12px; padding:6px 16px 20px; }
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:8px 10px; min-width:0; }
+  .panel h2 { margin:0 0 6px; font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--cyan); font-weight:600; display:flex; justify-content:space-between; gap:8px; }
+  .panel h2 .hint { color:var(--dim); letter-spacing:0; text-transform:none; font-weight:400; }
+  label.side { display:flex; gap:6px; align-items:flex-start; padding:3px 0; line-height:1.4; } label.side small { color:var(--dim); display:block; }
+  table { border-collapse:collapse; width:100%; font-size:12px; } th, td { border:1px solid var(--line); padding:3px 5px; text-align:center; } th { color:var(--dim); font-weight:400; } td.name, th.name { text-align:left; white-space:nowrap; }
+  td.win { background:#123a26; color:var(--green); } td.loss { background:#3a1218; color:var(--red); } td.even { color:var(--dim); } td.self { background:#0a1018; }
+  .bars { display:grid; grid-template-columns:auto 1fr auto; gap:3px 8px; align-items:center; margin-top:8px; } .bars .b { height:10px; background:var(--cyan); border-radius:2px; } .bars .b.neg { background:var(--amber); }
+  .note { color:var(--dim); line-height:1.6; font-size:12px; margin:6px 0 0; } canvas { width:100%; background:#050a12; border:1px solid var(--line); border-radius:6px; display:block; }
+  .err { color:var(--red); } @media (max-width:900px) { main { grid-template-columns:minmax(0,1fr); } }
+</style>
+</head>
+<body>
+<header>
+  <h1>&#9670; Sub Tournament</h1>
+  <p class="desc">Every side against every other, each pair from <b>both seats</b> on the same geometries. A side is a <b>tactician</b> (the doctrine) and a <b>motion pilot</b> (the hand autopilot or the fruit fly network). Seat A starts with the other boat in front of its nose, and that is worth more than most of the skill in the table &mdash; so every pair is flown twice and the seat is measured.</p>
+</header>
+<div class="bar">
+  <label>geometries <input id="nGeo" type="number" min="1" max="12" value="4" style="width:64px"></label>
+  <button id="runBtn">Run the tournament</button>
+  <button id="seatBtn" title="One side against itself on every geometry: how many points a duel is worth to whoever has seat A">Measure the seat</button>
+  <span id="msg" class="note"></span>
+</div>
+<main>
+  <section class="panel"><h2>Sides <span class="hint" id="rosterNote"></span></h2><div id="roster"></div></section>
+  <div style="display:flex;flex-direction:column;gap:12px;min-width:0">
+    <section class="panel"><h2>Head to head <span class="hint">wins-draws-losses, in rating order; green and red are decisive leads</span></h2><div id="matrix" style="overflow-x:auto"></div><div id="ratings" class="bars"></div><p class="note" id="matrixNote">Press Run.</p></section>
+    <section class="panel"><h2>Watch a duel <span class="hint">replay of one fight</span></h2>
+      <div class="bar" style="padding:0 0 6px"><label>A <select id="selA"></select></label><label>B <select id="selB"></select></label><label>geometry <input id="geo" type="number" min="1" max="999" value="3" style="width:64px"></label><button id="watchBtn">Watch</button><span id="watchMsg" class="note"></span></div>
+      <canvas id="replay" width="900" height="380" aria-label="Plan view of a submarine duel"></canvas></section>
+  </div>
+</main>
+<script type="module">
+import * as T from "/brain/subTournament.mjs";
+import * as D from "/brain/subDuel.mjs";
+import { roster, matrixModel, frameAt, boundsOf, drawReplay } from "/render/subTournamentView.mjs";
+
+const $ = (id) => document.getElementById(id);
+let sides = [], busy = false, trace = null, bounds = null, clock = 0, last = 0, names = ["A", "B"];
+const fetchJson = (u) => fetch(u, { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+async function load() {
+  const [weights, theta, ping, league] = await Promise.all(["/brain/pilotSubWeightsWip.json", "/brain/subTacticsThetaWip.json", "/brain/subTacticsThetaSearchPingWip.json", "/brain/subTacticsLeagueWip.json"].map(fetchJson));
+  sides = roster({ weights, theta, ping, league });
+  const box = $("roster"); box.textContent = "";
+  for (const s of sides) { const l = document.createElement("label"); l.className = "side"; const c = document.createElement("input"); c.type = "checkbox"; c.checked = true; c.dataset.id = s.id; const t = document.createElement("span"); const nm = document.createElement("span"); nm.textContent = s.label; const sm = document.createElement("small"); sm.textContent = s.note; t.appendChild(nm); t.appendChild(sm); l.appendChild(c); l.appendChild(t); box.appendChild(l); }
+  $("rosterNote").textContent = sides.length + " sides" + (sides.length < 7 ? " (some files did not load)" : "");
+  for (const id of ["selA", "selB"]) { const el = $(id); el.textContent = ""; sides.forEach((s) => { const o = document.createElement("option"); o.value = s.id; o.textContent = s.id; el.appendChild(o); }); }
+  $("selB").value = sides[Math.min(1, sides.length - 1)].id; $("selA").value = sides[sides.length - 1].id;
+}
+const chosen = () => sides.filter((s) => document.querySelector(`#roster input[data-id="${CSS.escape(s.id)}"]`).checked);
+const tick = () => new Promise((r) => setTimeout(r, 0));
+
+async function run() {
+  if (busy) return; const pick = chosen(); if (pick.length < 2) { $("msg").textContent = "tick at least two sides"; return; }
+  busy = true; $("runBtn").disabled = true; $("seatBtn").disabled = true;
+  const n = Math.max(1, Math.min(12, Number($("nGeo").value) || 4)), set = T.geometries(n), result = { ids: pick.map((s) => s.id), scenarios: n, pairs: {} }, total = pick.length * (pick.length - 1) / 2; let done = 0;
+  const t0 = performance.now();
+  for (let i = 0; i < pick.length; i++) for (let j = i + 1; j < pick.length; j++) {
+    $("msg").textContent = `${pick[i].id} v ${pick[j].id}  (${done + 1} of ${total})`; await tick();
+    result.pairs[`${pick[i].id}|${pick[j].id}`] = T.matchup(pick[i].side, pick[j].side, set); done++;
+  }
+  show(result, pick); $("msg").textContent = `${total} pairs, ${total * n * 2} duels, ${((performance.now() - t0) / 1000).toFixed(1)} s`;
+  busy = false; $("runBtn").disabled = false; $("seatBtn").disabled = false;
+}
+function show(result, pick) {
+  const m = matrixModel(result), label = Object.fromEntries(pick.map((s) => [s.id, s.id])), tb = document.createElement("table");
+  const hr = document.createElement("tr"); hr.appendChild(document.createElement("th")); for (const id of m.order) { const th = document.createElement("th"); th.textContent = label[id]; hr.appendChild(th); } tb.appendChild(hr);
+  for (const r of m.rows) { const tr = document.createElement("tr"), th = document.createElement("td"); th.className = "name"; th.textContent = r.id; tr.appendChild(th); for (const c of r.cells) { const td = document.createElement("td"); td.className = c.tone; td.textContent = c.text; td.title = c.tone === "self" ? "" : `${c.id}: edge ${c.edge.toFixed(3)} (z ${Number.isFinite(c.z) ? c.z.toFixed(1) : c.z})`; tr.appendChild(td); } tb.appendChild(tr); }
+  $("matrix").textContent = ""; $("matrix").appendChild(tb);
+  const bars = $("ratings"); bars.textContent = ""; const lo = Math.min(...m.order.map((id) => m.fit.rating[id])), hi = Math.max(...m.order.map((id) => m.fit.rating[id])), span = Math.max(1, hi - lo);
+  for (const id of m.order) { const a = document.createElement("span"); a.textContent = id; const b = document.createElement("div"); b.className = "b" + (m.fit.rating[id] < 0 ? " neg" : ""); b.style.width = (10 + 90 * (m.fit.rating[id] - lo) / span) + "%"; const v = document.createElement("span"); v.textContent = m.fit.rating[id].toFixed(0); bars.appendChild(a); bars.appendChild(b); bars.appendChild(v); }
+  const ups = T.upsets(result, m.fit), tri = T.transitivity(result);
+  $("matrixNote").textContent = `Rating: Bradley-Terry on the Elo scale (differences are what mean something). ` + (ups.length ? `Upsets (a decisive lead against the rating): ${ups.map((u) => u.lower + " over " + u.higher).join("; ")}. ` : "No upsets. ") + (tri.length ? `Cycles: ${tri.join("; ")}.` : "No cycles.") + " A side is a tactician and a pilot together; this cannot say which earned it.";
+}
+async function seat() {
+  if (busy) return; busy = true; $("runBtn").disabled = true; $("seatBtn").disabled = true; const pick = chosen(); $("msg").textContent = "measuring the seat ..."; await tick();
+  const set = T.geometries(Math.max(2, Math.min(8, Number($("nGeo").value) || 4))), out = [];
+  for (const s of pick.slice(0, 8)) { const b = T.seatBias(s.side, set); out.push(`${s.id} ${b.mean >= 0 ? "+" : ""}${b.mean.toFixed(2)}`); await tick(); }
+  $("msg").textContent = "seat A is worth (points a duel, a side against itself): " + out.join(" · ");
+  busy = false; $("runBtn").disabled = false; $("seatBtn").disabled = false;
+}
+async function watch() {
+  const a = sides.find((s) => s.id === $("selA").value), b = sides.find((s) => s.id === $("selB").value); if (!a || !b) return;
+  const sc = D.scenario(Math.max(1, Number($("geo").value) || 3), "patrol"), tr = [];
+  $("watchMsg").textContent = "flying the duel ..."; await tick();
+  const r = D.duel(a.side.side(), sc, { opponent: b.side.side(), trace: tr });
+  trace = tr; bounds = boundsOf(tr); clock = 0; names = [a.id, b.id];
+  $("watchMsg").textContent = `${a.id} (seat A) v ${b.id}: ${r.winner === "draw" ? "no one sunk" : (r.winner === "A" ? a.id : b.id) + " won"} in ${(r.ticks / 30).toFixed(0)} s, hit points ${r.hp.join(" / ")}, score ${r.score.toFixed(2)}`;
+}
+const cv = $("replay"), g = cv.getContext("2d");
+function frame(now) {
+  const dt = last ? Math.min(0.1, (now - last) / 1000) : 0; last = now;
+  if (trace && trace.length) { clock += dt * 8; if (clock > trace.at(-1).tick / 30 + 3) clock = 0; }   // 8x real time, looping with a pause on the last frame
+  drawReplay(g, cv.width, cv.height, trace ? frameAt(trace, clock) : null, bounds || { x0: -100, x1: 100, y0: -100, y1: 100 }, { names });
+  requestAnimationFrame(frame);
+}
+$("runBtn").onclick = run; $("seatBtn").onclick = seat; $("watchBtn").onclick = watch;
+load().then(() => { requestAnimationFrame(frame); });
+window.__subTournament = { get sides() { return sides; }, run, watch, seat };
+</script>
+</body>
+</html>

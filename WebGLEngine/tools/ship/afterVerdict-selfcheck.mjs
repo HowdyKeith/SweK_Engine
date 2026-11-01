@@ -35,6 +35,7 @@ const ROOT = path.resolve(ENG, "..");
 let fails = 0;
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
 const say = (m) => console.log("  ----  " + m);
+// v4904 -- SECTION 5 now names FIVE history gates; two more sabotages: G a staleness gate's own guard removed (`if (!shallow) try` -> `try`) -> 1 RED (the own-guard row); H mutationScore dropped from NEEDS_HISTORY -> 2 RED (the count and the own-guard rows).
 // v4838 -- SECTION 5 (a shallow clone cannot grade the two gates that read git history). Six sabotages, each applied to tools/ship/afterVerdict.mjs, the gate run, the file restored (md5-identical):
 //   A  the shallow skip never fires (`false &&`)                          -> 1 RED (the not-run / not-red / named row)
 //   B  ungraded gates exit 0, which would read as a pass                   -> 1 RED (the exit-3 row)
@@ -140,8 +141,11 @@ console.log("\n5. a shallow clone cannot grade the two gates that read git histo
 {
     const names = Object.keys(AV.NEEDS_HISTORY), all = new Set(enumerateGates().map((g) => g.split(path.sep).join("/")));
     ok("!! *** the history gates are real gates in this tree, each with a stated reason, and orreryFleet-selfcheck really runs `git log` ***",
-        names.length === 2 && names.every((g) => all.has(g) && AV.NEEDS_HISTORY[g].length > 20) &&
+        names.length === 5 && names.every((g) => all.has(g) && AV.NEEDS_HISTORY[g].length > 20) &&
         /execFileSync\("git", \["log"/.test(fs.readFileSync(path.join(ENG, "tools", "ship", "orreryFleet-selfcheck.mjs"), "utf8")), names.join(", "));
+    // v4904 -- the three staleness gates that ask `git log <commit>..HEAD` carry their OWN shallow guard (they print NOT GRADED and exit 0 on a shallow clone, which this command would read as a pass if they were not also listed above)
+    const own = ["mutationScore", "mechanical", "operators"].map((g) => [g, fs.readFileSync(path.join(ENG, "tools", "ship", g + "-selfcheck.mjs"), "utf8")]);
+    ok("!! the three staleness gates are listed here AND each guards itself: a `--is-shallow-repository` probe that skips the git log and says NOT GRADED", own.every(([g, src]) => AV.NEEDS_HISTORY["tools/ship/" + g + "-selfcheck.mjs"] && /is-shallow-repository/.test(src) && /if \(!shallow\) try/.test(src) && /NOT GRADED/.test(src)), own.map(([g]) => g).join(", "));
     // a real shallow clone of a real two-commit repository, and the original: the answer is read from git, not typed
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "av-shallow-")), git = (cwd, ...a) => spawnSync("git", a, { cwd, encoding: "utf8" });
     git(tmp, "init", "-q", "src"); const src = path.join(tmp, "src");
@@ -152,10 +156,10 @@ console.log("\n5. a shallow clone cannot grade the two gates that read git histo
     fs.rmSync(tmp, { recursive: true, force: true });
     ok('...and its injected answers: "true" is shallow; "false", a failed command that still printed "true", and no answer are not', AV.isShallow({ run: () => ({ status: 0, stdout: "true\n" }) }) && !AV.isShallow({ run: () => ({ status: 0, stdout: "false\n" }) }) && !AV.isShallow({ run: () => ({ status: 128, stdout: "true\n" }) }) && !AV.isShallow({ run: () => ({ status: null, stdout: "" }) }));
     const calls = [], lines = [], fake = (g) => { calls.push(g); return { status: g.includes("fail") ? 1 : 0 }; };
-    const [H1, H2] = names, plan5 = [{ gate: "x/pass-selfcheck.mjs", why: ["f"] }, { gate: H1, why: ["f"] }, { gate: "x/fail-selfcheck.mjs", why: ["f"] }, { gate: H2, why: ["f"] }];
+    const [H1, H2] = names.slice(0, 2), plan5 = [{ gate: "x/pass-selfcheck.mjs", why: ["f"] }, { gate: H1, why: ["f"] }, { gate: "x/fail-selfcheck.mjs", why: ["f"] }, { gate: H2, why: ["f"] }];
     const ungraded = [], reds = AV.runAll(plan5, { shallow: true, ungraded, run: fake, out: (m) => lines.push(m) });
     ok("!! *** on a shallow clone the two history gates are NOT RUN and are NOT reds -- they are ungraded, named, with the command that fixes it; the other gates run and a real red is still a red ***",
-        !calls.includes(H1) && !calls.includes(H2) && calls.length === 2 && ungraded.map((u) => u.gate).join() === names.join() && reds.length === 1 && reds[0].gate === "x/fail-selfcheck.mjs" &&
+        !calls.includes(H1) && !calls.includes(H2) && calls.length === 2 && ungraded.map((u) => u.gate).join() === [H1, H2].join() && reds.length === 1 && reds[0].gate === "x/fail-selfcheck.mjs" &&
         lines.filter((l) => /SKIP/.test(l) && /git fetch --unshallow/.test(l)).length === 2, lines.join(" | ").slice(0, 300));
     calls.length = 0; const reds2 = AV.runAll(plan5, { shallow: false, ungraded: [], run: fake, out: () => {} });
     ok("...and on a full clone the same plan runs ALL FOUR gates (the skip is the shallow clone's, never a standing exemption)", calls.length === 4 && calls.includes(H1) && calls.includes(H2) && reds2.length === 1);

@@ -268,7 +268,7 @@ export const WASM_AT_V4663 = Object.freeze({
  * Measured at v4840: 21 compilers, 8 doors -- box3d's glue behind physics/box3d/box3dNode.mjs, ai-bridge/server.js,
  * tools/roundhouse/backendRotation.mjs and three gates that load it themselves, the Draco encoder behind
  * tools/export/dracoEncode.mjs, and wasmTeardown-selfcheck itself, which names both glues in its assertions and loads box3d
- * in-process -- and 58 gates reaching one. Live, candidates come from git grep (about 2.6 s here, against 4.3 s reading every
+ * in-process -- and 58 gates reaching one. Live, candidates come from git grep (about 1.0 s here since v4896 -- noComments no longer looks back and doorReach reads one grep for the whole import graph, where it was 2.6 s; reading every
  * file, with the same doors and reach); every input is injectable, so the rules are driven on fixtures as well.
  */
 const COMPILES = /WebAssembly\.(?:instantiate|compile)(?:Streaming)?\s*\(/;
@@ -284,6 +284,16 @@ function grepFiles(root, needles, { regex = false, vendor = false } = {}) {
         const out = execFileSync("git", ["grep", "-l", "--untracked", regex ? "-E" : "-F", ...needles.flatMap((n) => ["-e", n]),
             "--", "*.js", "*.mjs", "*.cjs"], { cwd: root, encoding: "utf8", maxBuffer: 64 << 20, stdio: ["ignore", "pipe", "ignore"] });
         return out.split("\n").filter(Boolean).map((r) => path.join(root, r)).filter((p) => vendor ? !/node_modules/.test(p) : !SKIP.test(p));
+    } catch (e) { return e.status === 1 ? [] : null; }
+}
+// Live only: [[rel path, line text]] for every line of a tracked-or-untracked script (treeRead's SKIP applied) that matches the extended regex; null when git is not there.
+function grepLines(root, regex) {
+    try {
+        const out = execFileSync("git", ["grep", "-I", "--untracked", "-E", regex, "--", "*.js", "*.mjs", "*.cjs"],
+            { cwd: root, encoding: "utf8", maxBuffer: 512 << 20, stdio: ["ignore", "pipe", "ignore"] });
+        const rows = [];
+        for (const row of out.split("\n")) { const k = row.indexOf(":"); if (k < 1) continue; if (SKIP.test(path.join(root, row.slice(0, k)))) continue; rows.push([row.slice(0, k), row.slice(k + 1)]); }
+        return rows;
     } catch (e) { return e.status === 1 ? [] : null; }
 }
 const textOf = (p) => { try { return fs.readFileSync(p, "utf8"); } catch { return ""; } };
@@ -354,20 +364,16 @@ export function doorReach(doors, { root = ENG, files = null, gates = null } = {}
     if (files) {
         for (const f of files.filter((x) => /\.(c?js|mjs)$/.test(x.path))) for (const r of importsOf(f.path, f.text)) link(f.path, r);
     } else {
-        // live: breadth-first from the doors, asking git which files name each module, then confirming the import by resolving it.
-        // The same edges the full index finds for these modules, without reading the files that cannot hold one.
-        const seen = new Set(), frontier = doors.map((d) => path.join(root, d.module));
-        let ok = true;
-        while (frontier.length && ok) {
-            const batch = frontier.splice(0).filter((m) => !seen.has(m)); batch.forEach((m) => seen.add(m));
-            if (!batch.length) break;
-            const names = [...new Set(batch.map((m) => path.basename(m).replace(/\.(c?js|mjs)$/, "")))];
-            const cands = grepFiles(root, names);
-            if (!cands) { ok = false; break; }
-            for (const c of cands) { const imp = importsOf(c, textOf(c));
-                for (const m of batch) if (imp.has(m)) { link(c, m); if (!seen.has(c)) frontier.push(c); } }
+        // live: ONE git grep for every line that holds a relative specifier, and the reverse graph built from those lines (v4896). It was a grep PER LEVEL of the walk out from the doors, each
+        // followed by reading and scanning every candidate file whole: 1,097 ms, against 290 ms for this, and the same 59 gates reaching a door. The four patterns are all single-line, so
+        // applying them to the matching LINES finds the edges applying them to the whole text finds (measured equal on the tree and held by wasmDoors-selfcheck's live-against-index row).
+        const lines = grepLines(root, "[\"']\\.\\.?/");
+        if (!lines) return doorReach(doors, { root, files: treeFiles(root), gates });
+        for (const [rel, text] of lines) {
+            const p = path.join(root, rel);
+            for (const rx of SPEC) for (const m of text.matchAll(rx)) { const sp = m[1]; if (!sp.startsWith("./") && !sp.startsWith("../")) continue;
+                const r = resolveSpec(p, sp); if (r) link(p, r); }
         }
-        if (!ok) return doorReach(doors, { root, files: treeFiles(root), gates });
     }
     const isGate = new Set((gates || gateFiles(root)).map((p) => path.resolve(root, p)));
     const reach = new Map();
