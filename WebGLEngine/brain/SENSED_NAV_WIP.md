@@ -185,3 +185,27 @@ Reached of 60 (the incumbent's sonar and white 3 m fix; only what is done with t
 ### What this would not say
 
 That a real sonar behaves like this: no noise, no false returns, no occlusion, a perfect heading. That forgetting is safe with false returns (a perfect sonar never finds an occupied cell free by mistake). That 56 of 60 is the rate: it is one set of 60, on which the exact map's own rate is 93%. That the gap study's SUPPORTED means the vessel is now as good as the exact map: it is as good in the gaps, within a few flights in the islands and the current, on this set.
+
+## FOLLOW-UP 3: THE TWO CURES TOGETHER (Keith, 2026-11-01: "lets do nav-sensed-combined"; REGISTERED BEFORE ANY CODE FOR IT AND BEFORE ITS SET IS FLOWN)
+
+Follow-up 2 tested the cures apart: **a 200 m sonar** with an exact position and the incumbent's sticky memory reaches what an omniscient sonar reaches (56 of 60 gaps against 30; 171 of 180 over the three kinds), and **a map that forgets** with the 100 m sonar recovers the whole cost of a 3 m white fix (138 of 180 against the sticky fix's 107, and the exact position's 138). The vessel one would build has both, and a position that is wrong. Whether the two add up is not shown: the gap result is for an exact position, the fix result is for the short sonar, and a long sonar sees more of an obstacle from more places, so a noisy fix could smear more of it.
+
+**One study, one new set, nothing else changed.** The scenarios, vessel, autopilot, margin ladder, blocked edge, optimistic plan, re-plan after a change, 260 s flight and judging on the TRUE position and obstacles are as in the registrations above. **The set is HELD8 = seeds 801 to 860 of each of `hard-islands`, `hard-gaps` and `hard-current`** (180 scenarios; 20 gaps of each width), fresh (it shares no seed with DEV, HELD4, HELD5, HELD6 or HELD7), flown ONCE.
+
+**Arms** (every "long" arm has the 200 m, +-60 degree sonar of follow-up 2 and the white 3 m fix of the incumbent, K = 1, unless it says otherwise; the filter is K = 0.2 as before):
+* `exact` (HELD4's `any`: the ceiling) and **`sonar-200`** (the long sonar with an EXACT position and sticky memory: the target the combined vessel is to match).
+* `sensed+fix` (the 100 m sonar, white fix, sticky: the incumbent of HELD6 and the thing to improve on) and `fix+forget` (the 100 m sonar with forgetting: the best of follow-up 2's cures).
+* `long+fix` (long sonar, white fix, sticky: does the cost survive a long sonar?), **`long+fix+forget` (designated: long sonar, white fix, the map forgets)**, `long+fix+filter` (long sonar, filtered fix, sticky), `long+fix+forget+filter` (both cures), and `long+drift` (long sonar, no fix, a 0.3 m per root second drift, sticky: the dead-reckoning vessel).
+
+**Bar and verdict.** The designated arm **loses no more than 3 flights against `exact` in EACH of the three kinds** -- *one-sided this time*: follow-up 2's two-sided test turned an arm that finished above its target into a miss, and "close to the ceiling" means "not below it by more than 3", so an arm above the ceiling by any amount passes -- **and reaches at least 20 more than `sensed+fix` over the three kinds together**. **SUPPORTED** if both. **PARTLY SUPPORTED** if it has the gain of 20 but loses more than 3 against `exact` in some kind. **NOT SUPPORTED** otherwise.
+
+**Predictions (scored held or missed, moving nothing).**
+* **C1** the cures add: `long+fix+forget` reaches at least as many as `fix+forget` over the three kinds.
+* **C2** the long sonar is what the gaps needed: `long+fix+forget` reaches more than `fix+forget` in hard-gaps.
+* **C3** the smear survives a long sonar: `long+fix` reaches fewer than `sonar-200` over the three kinds.
+* **C4** forgetting is the cure again: `long+fix+forget` reaches more than `long+fix` over the three kinds.
+* **C5** filtering adds nothing on top of forgetting: `long+fix+forget+filter` is within 5 flights of `long+fix+forget` over the three kinds.
+* **C6** drift still costs nothing visible: `long+drift` is within 5 flights of `sonar-200` over the three kinds.
+* **C7** the gaps are not given back: `long+fix+forget` reaches at least 45 of the 60 hard-gaps (the exact map reached 56 of 60 on HELD7; `fix+forget`, 27).
+
+**What it would not say.** Everything the two earlier lists say (a perfect sonar, a perfect heading, a white Gaussian fix, forgetting being safe because a perfect sonar never mis-finds a cell free, one hull, one autopilot); that the long sonar is affordable; that these arms are the best possible (one range, one gain, no scan, no approach rule were tried); the interaction of a longer sonar with false returns (the realism entry, `nav-sensed-sonar-realism`). A result is a statement about this generator.
