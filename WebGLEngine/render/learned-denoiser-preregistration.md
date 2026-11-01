@@ -10926,3 +10926,48 @@ four, committed before they were read.
 
 **What changes.** Nothing ships by these rounds alone. The temporal page still runs round 70's U_T at 128 x 128. Whether it should run
 U_TH, and whether U_TH goes after Bt in the chain on hardware like the 1080, are Keith's calls.
+
+## 172. ROUND 75 -- U_TH IN THE DEVICE CHAIN, AFTER Bt's HISTORY, ON THE 1080 CLASS; AND THE TEMPORAL PAGE ON U_TH. FIXED BEFORE ITS CODE RAN
+
+**Why.** Section 171 found U_TH real-time on the 1080 (0.154 of a traced frame, standalone) and not on the Intel. Keith asked for it
+after Bt in the device chain on the 1080 class, and for the temporal page to run it.
+
+**U_TH in the chain (render/denoiseUpscaleGPU.mjs).** After the history's accumulation, in the FINAL pass's place:
+- **an unclamped twin of the accumulation,** a second history a frame with the clamp off. U_TH's channels 3-5 need it, and the
+  chain did not keep it.
+- **PACKH_WGSL,** U_TH's 17 channels built straight at half size from the chain's own buffers:
+  - Bt's light and history length, the twin's light, and the measured frame's unjittered EASU;
+  - the newest eye's albedo (a per-sphere table, guideBuffers' rule), normal and depth d / (1 + d).
+
+  Each full-size value is computed and the four averaged in halfInput's order. No full-size 17-channel buffer is made, and
+  no down pass is needed.
+- **U_TH's four layers** on the fast kernel at half size.
+- **UPHOLD_COMP_WGSL:** the upsample, the hold on Bt's light, and the light sources composited.
+
+It is held to the CPU at 64 x 64 on round 33's fixture (family R's seed 990000, the CPU's first hits):
+- the packed half-size input against halfInput of temporalInput's 17 channels, within 1e-5 relative (the accumulation's own
+  bound);
+- the image against compositeEmitters(temporalUpscale(U_TH, x)) within 1e-4.
+
+**Where it runs (UTH_BY_ADAPTER, render/learnedUpscaleTemporalGPU.mjs).** On the 1080 class, by adapter key:
+- "win32/nvidia/pascal" natively and "Windows/nvidia/pascal" in the page, decided by section 171. Off elsewhere: the Intel
+  measured over budget, and an unmeasured adapter is not assumed.
+- denoise.html's chain timing runs it where the table says, or where `?ut=1` asks (the gate's pilot on SwiftShader).
+
+**What is timed, on the 1080 at 1920 x 1080 (realGpuRun's denoise selection, denoise.html's chain).** The chain with its history
+and U_TH (temporalUT) beside the chain with its history (temporal), each pass on the device's clock, in one run.
+
+**H75: temporalUT ≤ 1.25 × temporal on the 1080, in both of its runs.** U_TH in the chain adds at most a quarter of the chain's
+time. The Intel is not asked: the table leaves U_TH off there.
+
+**Predictions, fixed now, deciding nothing.**
+- **P1:** H75 holds.
+  - U_TH's added passes take 5.5-7.5 ms at 1080p: twin accumulation ~0.5, pack ~0.8, the layers 4.6, the
+    upsample-hold-composite ~0.6, less the final pass it replaces.
+  - temporalUT / temporal is 1.14-1.20.
+- **P2:** the parity rows hold on both GPUs.
+
+**The temporal page (path-tracer.html, backlog fsr4-temporal-page).** Its view switches from round 70's U_T to round 72's U_TH
+(render/upscale-net-r72.json), on the coalesced down pass, labelled as such. The page decides nothing.
+
+**The runs.** Two `realGpuRun --only denoise` on the 1080 at round 75's commit, from a fresh clone. Section 173 reads them.
