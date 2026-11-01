@@ -5,7 +5,7 @@
 //   T1 every arm arrives at least once in at least 10 of the 12 seas (the navigator works at all)
 //   T2 the total hits are ordered straight >= any >= any+replan >= any+predict (the order of the collisions in HELD4's traffic kind)
 //   T3 any+predict has at least as many arrivals as each of the other field arms
-//   node tools/ship/tankNavRun.mjs [--seeds N] [--seconds S] [--write]     (--write puts one JSON line a sub in brain/tankNavRun.jsonl)
+//   node tools/ship/tankNavRun.mjs [--seeds N] [--seconds S] [--write] [--dry]     (--write puts one JSON line a sub in brain/tankNavRun.jsonl; --dry only says what would be flown)
 // Pure apart from the file --write puts down. No clock, no Math.random.
 "use strict";
 import fs from "node:fs";
@@ -22,11 +22,11 @@ export const START = Object.freeze({ x: 100, y: 150, depth: 25, speed: 2, headin
 export const ORDER = Object.freeze(["straight", "any", "any+replan", "any+predict"]);
 
 /** One courier: the tank's own per-sub loop (a navigator's target, the PD autopilot, the nominal hull) for `seconds` from START in sea `seed`. Returns { seed, arm, arrivals, hits, replans, travel, noRoute, lost (the vessel's own status, or null) }. */
-export function flyCourier(seed, arm, { seconds = SECONDS } = {}) {
+export function flyCourier(seed, arm, { seconds = SECONDS, pilot = (st, tg, cur) => AP.decide(st, tg, cur) } = {}) {
     const scene = TN.tankScene(seed), nav = TN.createNavigator(scene, { arm, seed: NAV_SEED }), model = HL.model("nominal");
     let s = S.createState({ depth: START.depth, pos: [START.x, START.y, -START.depth], speed: START.speed, heading: START.heading, model }), t = 0, lost = null;
     for (let i = 0, n = Math.round(seconds / S.DT); i < n; i++) {
-        const tg = nav.step(s, t, S.DT), res = S.stepSub(model, s, AP.decide(s, tg, [0, 0, 0]), S.DT, [0, 0, 0], 0);
+        const tg = nav.step(s, t, S.DT), res = S.stepSub(model, s, pilot(s, tg, [0, 0, 0]), S.DT, [0, 0, 0], 0);
         s = res.state; t += S.DT;
         if (res.status !== "submerged") { lost = res.status; break; }
     }
@@ -61,16 +61,18 @@ export function verdictText(j) {
 /** The command as a function: returns the exit code (0 fine, 2 a bad argument). `io` is for the gate: { out, err, writeFile }. */
 export function command(argv, io = {}) {
     const out = io.out || ((m) => console.log(m)), err = io.err || ((m) => console.error(m)), writeFile = io.writeFile || fs.writeFileSync;
-    const o = { seeds: SEEDS, seconds: SECONDS, write: false };
+    const o = { seeds: SEEDS, seconds: SECONDS, write: false, dry: false };
     for (let i = 0; i < argv.length; i++) {
         const a = argv[i];
         if (a === "--write") o.write = true;
+        else if (a === "--dry") o.dry = true;
         else if (a === "--seeds" || a === "--seconds") { const v = Number(argv[++i]); if (!Number.isInteger(v) || v <= 0) { err(`tankNavRun: ${a} needs a positive whole number`); return 2; } o[a.slice(2)] = v; }
         else { err(`tankNavRun: unknown argument ${JSON.stringify(a)}`); return 2; }
     }
+    out(`${o.seeds} seas x ${ORDER.length} arms, ${o.seconds} tank-seconds each, one PD-autopilot sub from (${START.x}, ${START.y}) at ${START.depth} m (DESCRIPTIVE, not a test of the study)`);
+    if (o.dry) return 0;
     const runs = [];
     for (let seed = 1; seed <= o.seeds; seed++) for (const arm of ORDER) runs.push(flyCourier(seed, arm, { seconds: o.seconds }));
-    out(`${o.seeds} seas x ${ORDER.length} arms, ${o.seconds} tank-seconds each, one PD-autopilot sub from (${START.x}, ${START.y}) at ${START.depth} m (DESCRIPTIVE, not a test of the study)`);
     out(table(summarize(runs))); out(verdictText(judge(summarize(runs))));
     if (o.write) { writeFile(path.join(ENG, OUT), runs.map((r) => JSON.stringify(r)).join("\n") + "\n"); out(`wrote ${runs.length} subs to ${OUT}`); }
     return 0;
