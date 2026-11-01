@@ -116,6 +116,7 @@ sec("6. THE REST");
     ok("!! tintRgb: amount 0 returns the model's colour EXACTLY; 1 returns the hue; 0.5 is the midpoint; below 0 and above 1 are clamped; NaN reads as 0; the default is 0.3", J(C.tintRgb(c0, 0, 0)) === J(c0) && nearV(C.tintRgb(c0, 0, 1), C.hueRgb(0)) && nearV(C.tintRgb(c0, 0, 0.5), [0, 1, 2].map((i) => (c0[i] + C.hueRgb(0)[i]) / 2)) && nearV(C.tintRgb(c0, 0, -3), c0) && nearV(C.tintRgb(c0, 0, 9), C.hueRgb(0)) && nearV(C.tintRgb(c0, 0, NaN), c0) && nearV(C.tintRgb(c0, 0), C.tintRgb(c0, 0, 0.3)));
     const src = fs.readFileSync(fileURLToPath(new URL("./subModelsCore.mjs", import.meta.url)), "utf8"), code = src.split("\n").filter((l) => !/^\s*\/\//.test(l)).join("\n");
     ok("!! the module is pure: no Three.js, no DOM, no clock and no randomness in its code (comments aside), one import (the hull list), and it names the design note", !/\bTHREE\b/.test(code) && !/\b(document|window|navigator)\b/.test(code) && !/Math\.random|Date\.now|performance\.now/.test(code) && (code.match(/^import /gm) || []).length === 1 && /docs\/SUB-GLB-MODEL-SWAP\.md/.test(src));
+    ok("!! the up axes are y, z and -z, and the store key and the hull constants are the ones the design note names", J(C.UP_AXES) === J(["y", "z", "-z"]) && C.STORE_KEY === "swek.subModels.v1" && C.TRIANGLES.warn === 500000);
     ok("!! reportLines names the class count, the key and the fit length", /14 classes \(13 hulls \+ default\), key swek\.subModels\.v1; fit to 16 m/.test(C.reportLines()[0]) && C.HULL_LENGTH === 16 && C.HULL_RADIUS_FRACTION === 0.28);
 }
 

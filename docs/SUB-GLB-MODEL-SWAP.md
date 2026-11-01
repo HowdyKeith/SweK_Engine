@@ -1,4 +1,4 @@
-# Sub .glb model swap -- DESIGN NOTE (2026-11-01, nothing built)
+# Sub .glb model swap -- DESIGN NOTE (2026-11-01); PHASES 1 AND 2 BUILT (2026-11-01), the picker (phase 3) NOT
 
 Asked for by Keith on 2026-10-30, held until after the v4906-v4908 publishes: let a submarine in the Sub Aquarium wear a free
 .glb submarine (Sketchfab or anywhere) instead of the procedural hull. This note is written BEFORE code, from reading
@@ -111,6 +111,10 @@ source, "Assign", "Clear", the attribution line, the rigid-model note and the tr
 - `render/subModelsCore-selfcheck.mjs`: the store (persist/reload with a mock storage, refusals, the licence rule), `orientationOf` on all 12 yaw/up combinations against hand-written vectors, `fitScale` on bounds with a tall sail (the long axis wins), degenerate bounds refused, `cuePlacement`, `triangleBudget` edges. Mutants: each constant and each refusal.
 - `render/subModels3d-selfcheck.mjs`: a SYNTHETIC .glb built inside the gate from a few bytes of JSON and a binary buffer (a long box with a sail box), parsed by GLTFLoader.parse in Node (geometry only, no textures), then: the Group has `parts` with inert planes/rudder, `poseFins` does not throw and moves nothing, the bounds are 16 long after the fit, two boats have different material objects (a hue change on one does not change the other), the depth tint is on every material, a failed parse leaves the procedural hull. Mutants as usual, identity 0.
 - A browser check (Playwright with SwiftShader is installed in this sandbox) renders the tank with the synthetic model and compares a screenshot against a no-model render: the model is present, the right size and the right way round. **I have not run this and the real look of a Sketchfab model can only be judged once Keith supplies one**; the synthetic model proves the plumbing, not the taste.
+
+## 6b. STATUS (2026-11-01)
+
+Phase 1 is render/subModelsCore.mjs + its gate (25 rows, 70 mutants). Phase 2 is render/subModels3d.mjs + its gate (sections 1-6, 52 mutants, a browser section that loads a synthetic .glb AND a Draco-compressed one through the default loader into the live view) and four lines in render/subAquarium3d.mjs (`models` option, `setModels`, `getModels`, sync/release). One design change from section 5, found while building: the model is a CHILD of the procedural boat with the five procedural parts HIDDEN, not a replacement group, so `buildSub`'s contract (`userData.parts`, `poseFins`, the cues, the tint) is untouched and a revert is `visible = true`. Not built: the picker, the licence fields in the page, the attribution line on the page, the register entry (phase 3); the page does not yet create a host, so nothing changes on screen. NOT checked: a real Sketchfab file.
 
 ## 7. Phases (each one shippable)
 
