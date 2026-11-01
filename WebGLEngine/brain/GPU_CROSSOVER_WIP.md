@@ -68,3 +68,25 @@ Predictions scored: **G1 held** (parity). **G2 held** (N = 1 within 3x of N = 64
 node tools/ship/gpuCrossover.mjs --hardware --write
 ```
 `--hardware` asks the browser for the card (`webgpuHarness.mjs` HARDWARE_ARGS, on Windows `--enable-unsafe-webgpu --use-angle=d3d11`). **An ordinary run on Windows asks for the SwiftShader adapter on purpose** (the harness's rig-run-4 decision: the device rows were measured on it), so without `--hardware` the rig would write a software record. An earlier version of this note said to set `SWEK_LAUNCH_ARGS` to a Vulkan flag set copied from the Linux example in `docs/real-hardware-fsr.md`: that was wrong for the rig. It takes about half a minute. The first line it prints names the adapter; "SOFTWARE ADAPTER" means the browser did not reach the card and the record went to `brain/gpuCrossoverSoftware.jsonl`, not `brain/rig-results/gpuCrossover.jsonl`.
+
+## RESULT ON THE RIG (2026-11-01; `node tools/ship/gpuCrossover.mjs --hardware --write` on Keith's rig, adapter nvidia / pascal (the GTX 1080), `software: false`, launch args `--enable-unsafe-webgpu --use-angle=d3d11`; the record is `brain/rig-results/gpuCrossover.jsonl`, one line, as it stood on the rig). **THIS IS A GRAPHICS CARD'S NUMBER, and it answers the question.**
+
+ms per call, median of five rounds, CPU twin against the GPU brain with the cap at the largest N (one dispatch):
+
+| N | pilot CPU | pilot GPU | seat CPU | seat GPU |
+|---|---|---|---|---|
+| 1 | 0.0049 | 2.54 | 0.0091 | 2.73 |
+| 64 | 0.194 | 2.82 | 0.747 | 3.02 |
+| 256 | 1.10 | 3.06 | 2.85 | 3.06 |
+| 512 | 1.52 | 3.13 | 6.50 | **3.18** |
+| 1,024 | 3.31 | 3.61 | 14.9 | 3.83 |
+| 2,048 | 10.2 | **4.32** | 26.7 | 4.57 |
+| 8,192 | 26.3 | 9.33 | 90.9 | 10.5 |
+
+* **Crossovers (one dispatch): the pilot network at N = 2,048 rows, the seat network at N = 512.** Below those the CPU twin is faster: at 256 rows the pilot's twin takes 1.1 ms against the GPU's 3.1 ms. **With the default cap of 64: NEVER within 8,192 rows**; at 8,192 rows the default costs 356 ms (pilot) and 355 ms (seat) against 9.3 and 10.5 ms for one dispatch (38 and 34 times). Parity: the pilot's outputs within 4.1e-6 of the twin at every size and both configurations, the seat network's exactly (0.0).
+* **The shape of the card's cost.** About 2.5 to 3.1 ms a call whatever the size up to 256 rows (the fixed price of a submission and a read-back; the software adapter's was 2.8 ms: it is the browser's round trip, not the arithmetic), then 0.82 microseconds a row (pilot) and 0.97 (seat) on the card. The CPU twins cost 3.0 to 5.0 microseconds a row (pilot) and 11 to 14.6 (seat). At 8,192 rows the card is 2.8 times faster than the pilot's twin and 8.7 times faster than the seat's.
+* **What differs from the software adapter's run** (the pilot never crossed there, the seat crossed at 1,024): on the card the pilot crosses (2,048) and the seat crosses sooner (512). The crossover is a statement about a (twin, adapter) pair, as the software note said; the seat twin's allocating float32 mirror is why its crossover is four times lower than the pilot's.
+
+Predictions scored: **G1 held** (parity). **G2 held** (N = 1 within 3x of N = 64: 2.54 against 2.82 and 2.73 against 3.02). **G3 MISSED**, again from the pilot's twin: its per-row cost is 2.98 to 4.96 microseconds a row from N = 16 up (largest over smallest 1.67, bound 1.5; the seat's is 1.31); the twin's garbage collection shows at 2,048 rows. **G4 held** (the default cap is slower at 8,192 rows, both). **G5 MISSED**: the one-dispatch crossovers are 2,048 and 512, a factor of 4, not within 2 (the software run could not score it). **G6**, my guess for the software adapter (never), is a statement about that adapter and was missed there for the seat network; on the card the answer is the table above.
+
+**What it says.** A batch has to be big before the GPU brain pays: about **2,000 pilot decisions or 500 seat decisions in ONE call**; a fleet of three aircraft, a fight of two ships or a swarm of a few hundred is faster on the CPU twin. The batcher must be built with a cap at least as large as the batch (the default of 64 loses by a factor of 30 or more at thousands of rows). **What it does not say.** Anything about the cost of the simulation the decisions feed (it stays on the CPU, two orders of magnitude more arithmetic); pipelined throughput (many calls in flight); the cost of building a brain or of `setWeights`; another card (a Pascal card through D3D11 and ANGLE in one browser); other network sizes. The pilot-swarm demo, which waited for this number, can now be sized: it needs a swarm of thousands, in one dispatch.

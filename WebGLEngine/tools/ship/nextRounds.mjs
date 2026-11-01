@@ -2865,17 +2865,15 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "gpu-crossover-on-the-rig",
-        blocker: "HARDWARE",
-        what: "tools/ship/gpuCrossover.mjs has run only on the sandbox's software adapter (SwiftShader), where the seat network crosses at 1,024 rows with one dispatch and the pilot network never within 8,192.",
-        how: "From WebGLEngine/ on the rig: node tools/ship/gpuCrossover.mjs --hardware --write (about half a minute; the first line names the adapter; a record that says SOFTWARE ADAPTER went to brain/gpuCrossoverSoftware.jsonl and is not the answer; the real one goes to brain/rig-results/gpuCrossover.jsonl). Without --hardware an ordinary run on Windows asks for SwiftShader on purpose.",
-        why: "The crossover on a card is the only answer to the batch-size question; the software numbers are a harness check (brain/GPU_CROSSOVER_WIP.md).",
+        state: "CLOSED",
+        what: "CLOSED 2026-11-01 by Keith's rig run (adapter nvidia pascal, software false; brain/rig-results/gpuCrossover.jsonl, result in brain/GPU_CROSSOVER_WIP.md): with one dispatch the pilot network crosses at N = 2,048 rows and the seat network at N = 512; the default cap of 64 never within 8,192 (356 ms against 9.3 ms for the pilot at 8,192 rows); parity within 4.1e-6 (pilot) and exactly 0 (seat); a call costs about 2.5 to 3.1 ms up to 256 rows and then 0.82 (pilot) or 0.97 (seat) microseconds a row. G3 and G5 missed.",
     },
     {
         id: "gpu-pilot-swarm-demo",
-        blocker: "UPSTREAM",
-        what: "A swarm of pilots decided in one dispatch.",
-        how: "A demo that flies hundreds of pilots from one GPU Brain with a batchCap at least the batch size (the default cap of 64 is 7 times slower at 8,192 rows).",
-        why: "Upstream: gpu-crossover-on-the-rig (a swarm only pays above the crossover size, which is the rig's number).",
+        blocker: "OPEN",
+        what: "A swarm of pilots decided in one dispatch. UNBLOCKED 2026-11-01 by the rig's crossover: the GPU brain pays only above about 2,000 pilot decisions (500 seat decisions) in ONE call, so the demo needs a swarm of thousands, not hundreds.",
+        how: "A demo that flies several thousand pilots from one GPU Brain built with a batchCap at least the batch size (the default cap of 64 is 38 times slower at 8,192 rows), against the CPU twin for the same swarm, timing the decision call only (the simulation the decisions feed stays on the CPU).",
+        why: "The number it waited for is in: at 8,192 pilot rows the card takes 9.3 ms against the twin's 26.3 ms; at 256 rows it loses (3.1 ms against 1.1 ms).",
     },
     {
         id: "space-needs-and-limits",
