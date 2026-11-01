@@ -2,9 +2,11 @@
 //
 // THE TWO FOLLOW-UP STUDIES OF THE SENSED MAP, on the three static kinds of the harder test (hard-islands, hard-gaps, hard-current):
 //   --study gap   SEE THE GAP: the incumbent's exact position and sticky memory with another SONAR (exact, sensed, sonar-150, sonar-200 [designated], sonar-wide, sonar-200-wide, sonar-omni); bar D, verdict, predictions D1 to D6
+//   --study combined   THE TWO CURES TOGETHER (follow-up 3): exact, sonar-200, sensed+fix, fix+forget and the five long arms (the 200 m sonar with the fix, forgetting, the filter and drift); bar C, verdict, predictions C1 to C7
 //   --study fix   THE FIX SMEAR: the incumbent's sonar and white 3 m fix with the map forgetting (fix+forget [designated]) or the fix filtered (fix+filter, fix+forget+filter); sensed, sensed+fix and sensed+drift flown beside them; bar E, verdict, predictions E1 to E6
-//   node tools/ship/subSensedFollowStudy.mjs --study gap|fix --set dev [--seeds N]               DEV (seeds 1 to 30 of each kind): a sanity run, not a result
+//   node tools/ship/subSensedFollowStudy.mjs --study gap|fix|combined --set dev [--seeds N]               DEV (seeds 1 to 30 of each kind): a sanity run, not a result
 //   node tools/ship/subSensedFollowStudy.mjs --study gap|fix --set held7 [--seeds N] [--write]    HELD7 (seeds 701 to 760 of each kind), READ ONCE FOR EACH STUDY; --write puts every flight in brain/subSensedGapHeld7.jsonl or brain/subSensedFixHeld7.jsonl
+//   node tools/ship/subSensedFollowStudy.mjs --study combined --set held8 [--seeds N] [--write]     HELD8 (seeds 801 to 860 of each kind), READ ONCE; --write puts every flight in brain/subSensedCombinedHeld8.jsonl
 // Pure apart from the file --write puts down. No clock, no Math.random.
 "use strict";
 import fs from "node:fs";
@@ -16,10 +18,10 @@ import { median, pilot } from "./subSensedStudy.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url)), ENG = path.resolve(HERE, "..", "..");
 export { median, pilot };
-export const OUTS = Object.freeze({ gap: "brain/subSensedGapHeld7.jsonl", fix: "brain/subSensedFixHeld7.jsonl" });
-export const STUDIES = Object.freeze({ gap: Object.freeze({ arms: X.GAP_ARMS, designated: X.GAP_DESIGNATED }), fix: Object.freeze({ arms: X.FIX_ARMS, designated: X.FIX_DESIGNATED }) });
-export const SETS = Object.freeze({ dev: X.SENSE_SETS.dev, held7: X.SENSE_SETS.held7 });
-export const THRESH = Object.freeze({ gapBar: 0.6, harm: 3, gain10: 10, omniFloor: 57, omniShare: 0.8, pathFactor: 1.2, close: 3, gainFix: 5, control: 5, gapSlack: 5 });
+export const OUTS = Object.freeze({ gap: "brain/subSensedGapHeld7.jsonl", fix: "brain/subSensedFixHeld7.jsonl", combined: "brain/subSensedCombinedHeld8.jsonl" });
+export const STUDIES = Object.freeze({ gap: Object.freeze({ arms: X.GAP_ARMS, designated: X.GAP_DESIGNATED, held: "held7" }), fix: Object.freeze({ arms: X.FIX_ARMS, designated: X.FIX_DESIGNATED, held: "held7" }), combined: Object.freeze({ arms: X.COMBINED_ARMS, designated: X.COMBINED_DESIGNATED, held: "held8" }) });
+export const SETS = Object.freeze({ dev: X.SENSE_SETS.dev, held7: X.SENSE_SETS.held7, held8: X.SENSE_SETS.held8 });
+export const THRESH = Object.freeze({ gapBar: 0.6, harm: 3, gain10: 10, omniFloor: 57, omniShare: 0.8, pathFactor: 1.2, close: 3, gainFix: 5, control: 5, gapSlack: 5, ceiling: 3, gainCombined: 20, within: 5, gapsFloor: 45 });
 const KINDS = X.SENSE_KINDS, WIDTHS = H.GAP_WIDTHS;
 
 const cellOf = (rs) => {
@@ -66,7 +68,20 @@ export function judgeFix(sum) {
     const gs = get(sum, "hard-gaps", "sensed"), e6 = !!gs && ["sensed+fix", "fix+forget", "fix+filter", "fix+forget+filter"].every((a) => { const c = get(sum, "hard-gaps", a); return !!c && c.reached <= gs.reached + THRESH.gapSlack; });
     return { close, gain, verdict, e1, e2, e3, e4, e5, e6 };
 }
-export const judge = (sum, study) => (study === "gap" ? judgeGap(sum) : judgeFix(sum));
+/**
+ * The combined study's bar, verdict and C1 to C7 (brain/SENSED_NAV_WIP.md, "FOLLOW-UP 3"). The designated arm (X.COMBINED_DESIGNATED) loses no more than THRESH.ceiling flights against `exact` in EACH of the three kinds (CEILING, one-sided: an arm above the ceiling passes) and reaches at least THRESH.gainCombined more than `sensed+fix` over the three
+ * kinds together (GAIN). SUPPORTED if both; PARTLY SUPPORTED if it has the gain but not the ceiling in some kind; NOT SUPPORTED otherwise. C1 over the three kinds it reaches at least as many as fix+forget. C2 in hard-gaps it reaches more than fix+forget. C3 over the three kinds long+fix reaches fewer than sonar-200. C4 over the three kinds it reaches more than long+fix.
+ * C5 long+fix+forget+filter is within THRESH.within flights of it over the three kinds. C6 long+drift is within THRESH.within flights of sonar-200 over the three kinds. C7 in hard-gaps it reaches at least THRESH.gapsFloor.
+ */
+export function judgeCombined(sum) {
+    const D = X.COMBINED_DESIGNATED, p = sum.pooled, d = p[D], ceiling = KINDS.every((k) => { const e = get(sum, k, "exact"), c = get(sum, k, D); return !!e && !!c && e.reached - c.reached <= THRESH.ceiling; });
+    const gain = !!d && !!p["sensed+fix"] && d.reached - p["sensed+fix"].reached >= THRESH.gainCombined, verdict = ceiling && gain ? "SUPPORTED" : gain ? "PARTLY SUPPORTED" : "NOT SUPPORTED";
+    const c1 = !!d && !!p["fix+forget"] && d.reached >= p["fix+forget"].reached, gd = get(sum, "hard-gaps", D), gf = get(sum, "hard-gaps", "fix+forget"), c2 = !!gd && !!gf && gd.reached > gf.reached;
+    const c3 = !!p["long+fix"] && !!p["sonar-200"] && p["long+fix"].reached < p["sonar-200"].reached, c4 = !!d && !!p["long+fix"] && d.reached > p["long+fix"].reached;
+    const c5 = !!d && !!p["long+fix+forget+filter"] && Math.abs(p["long+fix+forget+filter"].reached - d.reached) <= THRESH.within, c6 = !!p["long+drift"] && !!p["sonar-200"] && Math.abs(p["long+drift"].reached - p["sonar-200"].reached) <= THRESH.within, c7 = !!gd && gd.reached >= THRESH.gapsFloor;
+    return { ceiling, gain, verdict, c1, c2, c3, c4, c5, c6, c7 };
+}
+export const judge = (sum, study) => (study === "gap" ? judgeGap(sum) : study === "fix" ? judgeFix(sum) : judgeCombined(sum));
 const pct = (v) => (Number.isFinite(v) ? (100 * v).toFixed(0) + "%" : "n/a");
 const f2s = (v) => (Number.isFinite(v) ? v.toFixed(2) : "n/a");
 const HEAD = "arm               | reached      | collided left timeout other | median time (s) | median path/chord | median min clearance (m) | grid ensonified | offset at end (m) | plans (median)";
@@ -75,7 +90,7 @@ export function table(sum, study, title) {
     const arms = STUDIES[study].arms, lines = [title], row = (arm, x) => `${arm.padEnd(17)} | ${(`${x.reached}/${x.n} ${pct(x.rate)}`).padEnd(12)} | ${String(x.collided).padStart(8)} ${String(x.left).padStart(4)} ${String(x.timeout).padStart(7)} ${String(x.other).padStart(5)} | ${f2s(x.medianTime).padEnd(15)} | ${f2s(x.medianChord).padEnd(17)} | ${f2s(x.medianClearance).padEnd(24)} | ${pct(x.medianSeen).padEnd(15)} | ${f2s(x.medianOffsetEnd).padEnd(17)} | ${f2s(x.medianPlans)}`;
     for (const kind of KINDS) { lines.push("", kind, HEAD); for (const arm of arms) { const x = sum.cells[kind][arm]; if (x) lines.push(row(arm, x)); } }
     lines.push("", "the three kinds together", HEAD); for (const arm of arms) { const x = sum.pooled[arm]; if (x) lines.push(row(arm, x)); }
-    if (study === "gap") { lines.push("", "hard-gaps reached, by the width of the gap", `arm               | ${WIDTHS.map((w) => `${w} m`.padEnd(6)).join(" | ")}`); for (const arm of arms) { const w = sum.widths[arm]; if (w) lines.push(`${arm.padEnd(17)} | ${WIDTHS.map((x) => String(w[x].reached).padEnd(6)).join(" | ")}`); } }
+    if (study !== "fix") { lines.push("", "hard-gaps reached, by the width of the gap", `arm               | ${WIDTHS.map((w) => `${w} m`.padEnd(6)).join(" | ")}`); for (const arm of arms) { const w = sum.widths[arm]; if (w) lines.push(`${arm.padEnd(17)} | ${WIDTHS.map((x) => String(w[x].reached).padEnd(6)).join(" | ")}`); } }
     return lines.join("\n");
 }
 export function verdictText(j, study) {
@@ -85,6 +100,12 @@ export function verdictText(j, study) {
         return [`${D}: reaches at least ${pct(THRESH.gapBar)} of hard-gaps (the bar): ${yn(j.bar)}; loses no more than ${THRESH.harm} flights against sensed in hard-islands or hard-current: ${yn(j.noHarm)}; reaches at least ${THRESH.gain10} more than sensed in hard-gaps: ${yn(j.gain10)}`,
             `D1 in hard-gaps sensed <= sonar-150 <= ${D}: ${yn(j.d1)}`, `D2 sonar-wide reaches fewer than ${D} in hard-gaps: ${yn(j.d2)}`, `D3 sonar-omni reaches at least ${THRESH.omniFloor} of the hard-gaps: ${yn(j.d3)}`, `D4 ${D} reaches at least ${pct(THRESH.omniShare)} of what sonar-omni reaches in hard-gaps: ${yn(j.d4)}`,
             `D5 for sensed the 24 m and 32 m gaps are reached at a lower share than the 40 m gaps: ${yn(j.d5)}`, `D6 the median path over the chord of ${D}'s arrivals in hard-gaps is at most ${THRESH.pathFactor} times exact's (it is ${f2s(j.pathRatio)}): ${yn(j.d6)}`, `VERDICT: ${j.verdict}`].join("\n");
+    }
+    if (study === "combined") {
+        const D = X.COMBINED_DESIGNATED;
+        return [`${D}: loses no more than ${THRESH.ceiling} flights against exact in each of the three kinds (the bar): ${yn(j.ceiling)}; reaches at least ${THRESH.gainCombined} more than sensed+fix over the three kinds: ${yn(j.gain)}`,
+            `C1 ${D} reaches at least as many as fix+forget over the three kinds: ${yn(j.c1)}`, `C2 ${D} reaches more than fix+forget in hard-gaps: ${yn(j.c2)}`, `C3 long+fix reaches fewer than sonar-200 over the three kinds: ${yn(j.c3)}`, `C4 ${D} reaches more than long+fix over the three kinds: ${yn(j.c4)}`,
+            `C5 long+fix+forget+filter is within ${THRESH.within} flights of ${D} over the three kinds: ${yn(j.c5)}`, `C6 long+drift is within ${THRESH.within} flights of sonar-200 over the three kinds: ${yn(j.c6)}`, `C7 ${D} reaches at least ${THRESH.gapsFloor} of the hard-gaps: ${yn(j.c7)}`, `VERDICT: ${j.verdict}`].join("\n");
     }
     const D = X.FIX_DESIGNATED;
     return [`${D}: within ${THRESH.close} flights of sensed in each of the three kinds (the bar): ${yn(j.close)}; reaches at least ${THRESH.gainFix} more than sensed+fix over the three kinds: ${yn(j.gain)}`,
@@ -104,7 +125,8 @@ export function command(argv, io = {}) {
         else { err(`subSensedFollowStudy: unknown argument ${JSON.stringify(a)}`); return 2; }
     }
     if (!o.study) { err(`subSensedFollowStudy: --study ${Object.keys(STUDIES).join("|")} is needed`); return 2; }
-    if (o.write && o.set !== "held7") { err("subSensedFollowStudy: --write goes with --set held7 only"); return 2; }
+    if (o.set !== "dev" && o.set !== STUDIES[o.study].held) { err(`subSensedFollowStudy: the ${o.study} study is flown on dev or ${STUDIES[o.study].held}, not ${o.set}`); return 2; }
+    if (o.write && o.set === "dev") { err(`subSensedFollowStudy: --write goes with --set ${STUDIES[o.study].held} only`); return 2; }
     const arms = STUDIES[o.study].arms, seeds = o.seeds ? SETS[o.set].slice(0, o.seeds) : SETS[o.set], runs = [];
     out(`${o.study.toUpperCase()} study, ${o.set.toUpperCase()} set: ${seeds.length} scenarios of each of ${KINDS.join(", ")}, ${arms.length} arms (${arms.join(", ")})`);
     for (const kind of KINDS) for (const seed of seeds) { const sc = H.hardScenario(seed, kind); for (const arm of arms) runs.push(X.flyArm(pilot, sc, arm)); }
