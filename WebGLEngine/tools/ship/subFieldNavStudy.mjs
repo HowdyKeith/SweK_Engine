@@ -202,7 +202,7 @@ export function command(argv, io = {}) {
     out(`${o.set.toUpperCase()} set: ${set.length / N.KINDS.length} scenarios of each kind, ${arms.length} arms`);
     margins.forEach((m, idx) => {
         const runs = N.evaluate(pilot, set, arms, { margin: m }), sum = summarize(runs);
-        for (const r of runs) all.push({ set: o.set, role: idx === 0 ? "primary" : "as-registered", ...r });
+        for (const r of runs) all.push({ set: o.set, role: idx === 0 ? "primary" : o.set === "held3" ? "secondary" : "as-registered", ...r });
         out(""); out(table(sum, `margin ${m} m -- ${idx === 0 ? "PRIMARY" : o.set === "held3" ? "SECONDARY (reads nothing into the verdict)" : "SECONDARY, as first registered (reads nothing into the verdict)"}`, { split: pathMode })); out(pathMode ? pathText(judgePath(sum)) : arrivalMode ? arrivalText(judgeArrival(sum)) : verdictText(judge(sum)));
     });
     if (o.write) { writeFile(path.join(ENG, file), all.map((r) => JSON.stringify(r)).join("\n") + "\n"); out(`wrote ${all.length} flights to ${file}`); }
