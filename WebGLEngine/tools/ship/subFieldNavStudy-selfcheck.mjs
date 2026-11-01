@@ -31,6 +31,15 @@
 //   path ratios whose median and mean agree, so the summary data has three that do not (1.2, 1.15, 1.5); S25 and S33 had no timeout counted 'other' and no blocked scenario the straight arm reached; S67 printed 'blocked 0/0, unblocked 1/1' which reads the same reversed; S70 had no row on the words after
 //   the verdict; S71 and S76 died of a thrown error or were masked by another refusal (every command call is wrapped now, and --write with --sweep is also tried on the held set); S78, S79, S80 and S92 flew the wrong set, the wrong arms, the wrong margin or the wrong pilot and the rows compared the command with
 //   the library under the command's OWN pilot (the gate keeps its own autopilot, evaluates the same scenarios itself and compares the sweep line for line); S89 wrote to a relative path (the row wants an absolute one).
+// ADDENDUM, THE ARRIVAL RULE (follow-up of brain/SUB_FIELD_NAV_WIP.md): 51 MORE MUTANTS of tools/ship/subFieldNavStudy.mjs (judgeArrival, arrivalText, the held2 set and --arrivals in the command), each run against a copy of this gate, 4 at a time, ALL RED BY NAME on the final run (rows in brackets):
+//   Y01 out2 [1]; Y02 summarize all arms [1]; Y03 table all arms [1]; Y04 a1 direction [1]; Y05 a1 reversed [4]; Y06 a1 any [5]; Y07 a1 kinds any [5]; Y08 a1 missing ok [1]; Y09 a3 plus one [1]; Y10 a3 strict [1]; Y11
+//   a3 slow ignored [1]; Y12 a3 approach ignored [3]; Y13 a4 direction [1]; Y14 a4 vs plain [2]; Y15 a2 limit [1]; Y16 a2 strict [1]; Y17 a2 any kind [2]; Y18 a2 arm [2]; Y19 a2 slow arm [2]; Y20 success still [1];
+//   Y21 success current [1]; Y22 success or [2]; Y23 success kinds [1]; Y24 family bound [3]; Y25 family startswith [2]; Y26 path inclusive [1]; Y27 path nan [1]; Y28 path current [3]; Y29 verdict supported [2];
+//   Y30 verdict partly [2]; Y31 full needs path [3]; Y32 arms all [4]; Y33 succ arms [4]; Y34 text a1 [1]; Y35 text a4 [1]; Y36 text arm [1]; Y37 text verdict [1]; Y38 text success list [1]; Y39 arrivals flag [1];
+//   Y40 arrivals sweep [1]; Y41 write held2 [2]; Y42 write any set [2]; Y43 arrival mode [2]; Y44 arrival mode dev [1]; Y45 arms [3]; Y46 file [1]; Y47 margins held2 [2]; Y48 verdict text mode [2]; Y49 verdict text
+//   mode b [1]; Y50 header arms [2]; Y51 bases [4]
+//   ON THE FIRST RUN FOUR WENT 0 RED and two patterns were not unique: Y02 and Y32 were red only by a THROWN ERROR (a summary that did not carry the arrival arms; a verdict looking at arms it has no cells for) and the calls are guarded now; Y34 and Y35 printed the wrong prediction's result on a line while the
+//   healthy summary made all four predictions the same, so the text rows now miss ONE prediction at a time and read each line.
 "use strict";
 import * as T from "./subFieldNavStudy.mjs";
 import * as N from "../../brain/subFieldNav.mjs";
