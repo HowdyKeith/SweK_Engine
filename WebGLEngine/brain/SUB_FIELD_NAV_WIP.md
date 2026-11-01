@@ -241,3 +241,49 @@ The DEV sanity run (30 seeds of each kind, the parameters registered above) put 
 3. **The current**: a mean of up to 1.2 m/s on each horizontal axis (was 0.8) and an unsteady part of 0.2 to 0.5 m/s (was 0.15 to 0.4). The split in the tables is now at a mean of 1.0 m/s, not 0.6.
 
 DEV after the amendment (30 seeds a kind; read for sanity, not tuned on, not a result): hard-islands `any` 30, incumbent 28; hard-gaps `any` 29, incumbent 22; hard-traffic straight 2, incumbent 12, `any` 7, `any+replan` 16, `any+predict` 19 (1 of those left the region); hard-current `any` 26 (3 collisions, 1 timeout), incumbent 23. **I expect hard-traffic to MISS its 80% bar** (DEV: 19 of 30), and hard-islands to be at or near its ceiling. The bars, the designated arms, H1 to H3 and H5 to H8 and the verdict rule stand as registered; H4 now reads: `any`'s reach rate does not fall as the gap widens (24 m <= 32 m <= 40 m) and is at least 90% at 40 m.
+
+## RESULT OF THE HARDER NAVIGATION TEST (2026-11-01; `node tools/ship/subHardNavStudy.mjs --set held4 --write`, HELD4 = seeds 401 to 460 of each of the four kinds, read once; every flight is in `brain/subHardNavHeld4.jsonl`, 960 records): **PARTLY SUPPORTED** -- the designated arm met its bar in hard-islands (97%, 2 collisions), hard-gaps (98%) and hard-current (93%), and MISSED it in hard-traffic (`any+predict` 72% against 80%)
+
+The module's gate has 176 mutants (172 red by name) and the study's has 88 (87 red by name); the amended parameters of Amendment 1 (gaps 24/32/40 m, the margin ladder 12/8/6/3 m, the current to 1.2 m/s) were flown as amended. 60 scenarios of each kind, the PD autopilot in every arm, 260 s a flight:
+
+| kind | arm | reached | collided | left | timed out | median path / chord | median least clearance |
+|---|---|---|---|---|---|---|---|
+| hard-islands | straight | 20/60 (33%) | 40 | 0 | 0 | 0.97 | -0.02 m |
+| | smooth+approach | 56/60 (93%) | 4 | 0 | 0 | 1.12 | 7.76 m |
+| | **any** (designated) | **58/60 (97%)** | 2 | 0 | 0 | 1.02 | 14.26 m |
+| | any-blind | 58/60 (97%) | 2 | 0 | 0 | 1.04 | 13.10 m |
+| hard-gaps | straight | 18/60 (30%) | 42 | 0 | 0 | 0.97 | -0.02 m |
+| | smooth+approach | 46/60 (77%) | 14 | 0 | 0 | 1.13 | 3.61 m |
+| | **any** (designated) | **59/60 (98%)** | 1 | 0 | 0 | 1.00 | 9.37 m |
+| hard-traffic | straight | 10/60 (17%) | 50 | 0 | 0 | 0.97 | -0.04 m |
+| | smooth+approach | 18/60 (30%) | 42 | 0 | 0 | 1.11 | -0.03 m |
+| | any (frozen plan) | 12/60 (20%) | 48 | 0 | 0 | 0.99 | -0.03 m |
+| | any+replan | 33/60 (55%) | 26 | 1 | 0 | 1.08 | 1.09 m |
+| | **any+predict** (designated) | **43/60 (72%)** | 9 | **8** | 0 | 1.34 | 17.52 m |
+| hard-current | straight | 19/60 (32%) | 41 | 0 | 0 | 1.03 | -0.02 m |
+| | smooth+approach | 48/60 (80%) | 9 | 0 | 3 | 1.17 | 8.63 m |
+| | **any** (designated) | **56/60 (93%)** | 4 | 0 | 0 | 1.09 | 10.46 m |
+| | any-blind | 54/60 (90%) | 5 | 0 | 1 | 1.11 | 10.11 m |
+
+No scenario had `noRoute` for any field arm: the ladder found a way from the start's cell every time (the plan was at 12 m in all 60 hard-islands scenarios; in hard-gaps at 12 m for the 40 m gaps, 8 m for the 32 m ones and 6 m (17) or 3 m (3) for the 24 m ones). By gap width (reached of 20): 24 m: straight 6, smooth+approach 6 (14 hit), **any 19** (1 hit); 32 m: 5, 20, 20; 40 m: 7, 20, 20. By the fastest ship in hard-traffic (above 2 m/s = fast, 48 scenarios; slow, 12): `any+predict` 35/48 (8 hit) fast and 8/12 (1 hit) slow; `any+replan` 23/48 (24 hit) and 10/12 (2 hit); the frozen plan 9/48 (39 hit) and 3/12. By the mean current in hard-current (above 1 m/s = strong, 26 scenarios; weak, 34): `any` 25/26 (1 hit) and 31/34 (3 hit); the incumbent 20/26 and 28/34.
+
+**Predictions scored.** **H1 MISSED**: straight reaches 33% in hard-islands and 32% in hard-current, over the 30% bound (30% in hard-gaps, exactly at it; 17% in hard-traffic): a straight line misses a layout of 4 to 8 obstacles about a third of the time. **H2 MISSED, in hard-traffic only**: `any` with a plan frozen at t = 0 reaches 12 and the incumbent 18 (it holds in the other three kinds: 58 against 56, 59 against 46, 56 against 48). **H3 HELD, at its bound by identity**: any's path over any-blind's is 1.00 and any has no more collisions (2 and 2); the median is 1.00 because 26 of the 57 paired flights are the same flight to the digit (see the post hoc line below). **H4 HELD**: 95% / 100% / 100% for 24 / 32 / 40 m. **H5 HELD**: replan beats the frozen plan by 21 scenarios (33 against 12), predict reaches more than replan (43 against 33) and hits fewer (9 against 26). **H6 HELD, narrowly**: `any` reaches 56 in a strong unmodelled current against 58 in still water. **H7 HELD**: no scenario had `noRoute`, for any field arm. **H8 MISSED**: 8 flights LEFT the region, all of them `any+predict` in hard-traffic.
+
+**What the verdict says and does not say.** The three bars that held are held with room (97%, 98%, 93%) and two of the three kinds are close to their ceiling again; the kind that discriminates is hard-traffic, where the frozen plan reaches 20%, a plan rebuilt every 3 s with the ships where they are 55%, and one built with each ship's next 30 s 72%, still short of the registered 80%.
+
+**POST HOC, not registered, computed from the flight file after the verdict (throwaway scripts):**
+* **The 8 flights that left the region** (`any+predict`, seeds 406, 410, 413, 421, 425, 437, 442, 455) all left through the NORTH or SOUTH edge (y = +/-140, at x between 96 and 360) although the edge is blocked in every field: the capsule of a ship pushed the plan into the 16 m band beside the edge and the vessel's turn radius carried it over. That is the cost of a plan that is cautious about ships: a path 25% longer than replan's on the 23 scenarios both reached (median ratio 1.137; median 172 s against 137 s for the arrivals) and 8 exits. The plan has no cost for the edge, only a wall.
+* **Predict against replan on the same 60 scenarios**: both reached 23, predict only 20, replan only 10, neither 7 (exact two-sided sign test on the 30 discordant: p 0.099). **Frozen `any` against the incumbent**: both 6, any only 6, the incumbent only 12 (p 0.24): the frozen any-angle plan being behind the incumbent in traffic is not distinguishable from a coin.
+* **Where `any+predict` fails**: 13 of its 17 failures had a ship faster than 2 m/s and 12 had the straight line blocked by a static obstacle as well (less room to dodge). By number of ships: 2 ships, predict 16 of 19 (replan 11, frozen 6); 3 ships, 8 of 15 (9, 3); 4 ships, 19 of 26 (13, 3).
+* **What the keel did (H3's 1.00)**: 47 of the 60 hard-islands scenarios had at least one iceberg the vessel can pass under; in 31 of the 57 pairs both arms reached, any-blind flew a different path, and in those 31 `any`'s path is a median 0.951 of any-blind's (0.803 at the shortest; 2 of the 31 above 1). Blind and aware both reach 58.
+* **The current**: hard-current's 4 collisions of `any` were at means of 0.70, 1.28, 0.87 and 0.88 m/s; the incumbent timed out in 3 (its median arrival is 167 s against `any`'s 145 s).
+* **The narrowest gap**: at 24 m the incumbent reaches 6 of 20 and `any` 19 of 20 (the plan at the ladder's 6 m in 17 and at 3 m in 3 of them); the aim point is what threads a gap the cell-by-cell heading cannot.
+
+**What it says.**
+* The field plus an any-angle aim point is a navigator for static obstacles of this family: islands, icebergs (with a keel used for shorter paths when it matters), a gap of 24 m, a strong unmodelled current -- 93 to 98% with 1 to 4 collisions in 60, on scenarios nobody had read, with the margin ladder doing the work a fixed 12 m could not at the narrow gap (the incumbent without the ladder's rungs is not tested here; with it, it still loses 14 of 20 at 24 m).
+* TRAFFIC is where it breaks, and the order of the arms is the finding: freezing the ships (20%) is no better than a plan made by the old arm, knowing where they are now helps a lot (55%), knowing where they will be helps more (72%) and costs a longer path and, here, 8 exits through the edge. Even the best arm misses the bar by 8 points.
+* The ceiling the last follow-up ended on is gone for traffic and still there for the other three kinds at these parameters: a harder static family (a denser sea, a gap of 16 m with a stronger current) is open, not needed to say what this one says.
+
+**What it does not say, and where it is soft.** (1) The first registration's list stands: perfect position fix, exact map, one hull, one autopilot, and for traffic known and CONSTANT ship velocities that do not react to the vessel; real traffic turns and answers. (2) The vessel flies a constant 3 m/s target: it never slows, stops or reverses to let a ship pass, which is the obvious thing a real sub would do and the reason a 3 m/s ship is a geometry problem. (3) Amendment 1 was made after seeing DEV (gaps, the ladder, the current): the family was made harder because the first draft was at a ceiling, once, and not tuned afterwards; the bars are the registered ones. (4) The margin ladder is the planner's addition; without it the 24 m gaps would be `noRoute` at 12 m. (5) The edge of the region is a wall, not a cost, which is what the exits show. (6) 60 scenarios per kind: a bar at 80% is 48; 43 is 5 short and the paired tests above say how little separates the arms in traffic (p 0.099 predict against replan). (7) The 8 exits are a failure of this plan, not of the idea of prediction: the paired counts are the same either way.
+
+**Not built, said:** slowing or stopping for a ship; an edge cost in the field; a plan that knows the current; a sensed map; ships that react; right-of-way; the tank (the next item of this round).
