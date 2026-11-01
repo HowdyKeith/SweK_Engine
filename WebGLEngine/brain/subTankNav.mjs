@@ -69,12 +69,12 @@ export const sceneNow = (scene, t) => scene.obstacles.map((o) => { const [x, y] 
 
 /**
  * A navigator for ONE sub in a scene. `step(state, t, dt)` -- the sub's state, the tank's clock and the tick -- keeps the counters, draws a goal when there is none or it has been reached, (re)plans when the arm says, and returns the target
- * { depth, heading, speed } for the sub's own pilot. `snapshot()` is { arm, goal { x, y, depth }, arrivals, hits, replans, noRoute, margin (the plan's), travel (metres on the plane), contact }; `invalidate()` drops the plan (a sub put back after a loss).
+ * { depth, heading, speed } for the sub's own pilot. `snapshot()` is { arm, goal { x, y, depth }, arrivals, hits, replans, noRoute, margin (the plan's), travel (metres on the plane), contact, t (the tank time of the last step, null before one) }; `invalidate()` drops the plan (a sub put back after a loss).
  */
 export function createNavigator(scene, { arm = DEFAULT_ARM, seed = 1 } = {}) {
     if (!TANK_ARMS.includes(arm)) throw new Error(`subTankNav.createNavigator: unknown arm "${arm}" (${TANK_ARMS.join(", ")})`);
     const rng = mulberry(((seed >>> 0) + 977) >>> 0), u = (lo, hi) => lo + (hi - lo) * rng(), spec = H.ARM_SPEC[arm], mode = spec.replan === "predict" ? "predict" : "now";
-    let goal = null, field = null, planT = -Infinity, clearFor = 0, last = null, arrivals = 0, hits = 0, replans = 0, noRoute = false, margin = null, travel = 0, contact = false;
+    let goal = null, field = null, planT = -Infinity, lastT = null, clearFor = 0, last = null, arrivals = 0, hits = 0, replans = 0, noRoute = false, margin = null, travel = 0, contact = false;
     const clearOf = (o, g) => (o.lane ? N.segmentDistance(g.x, g.y, ...laneSegment(o)) : Math.hypot(g.x - o.x, g.y - o.y)) >= o.r + GOAL_CLEAR;
     const routeFrom = (g, state, t) => {
         const f = H.buildLadderField(H.planShapes({ obstacles: scene.obstacles, minDepth: Math.min(-state.pos[2], g.depth) }, t, { mode: "now", at: sceneAt }), g, { x: state.pos[0], y: state.pos[1] }, { grid: TANK_GRID }), c = N.cellOf(f, state.pos[0], state.pos[1]);
@@ -102,6 +102,7 @@ export function createNavigator(scene, { arm = DEFAULT_ARM, seed = 1 } = {}) {
         invalidate() { field = null; },
         step(state, t, dt) {
             const x = state.pos[0], y = state.pos[1], depth = -state.pos[2];
+            lastT = t;
             if (last) travel += Math.hypot(x - last[0], y - last[1]);
             last = [x, y];
             if (!goal) drawGoal(state, t);
@@ -112,6 +113,6 @@ export function createNavigator(scene, { arm = DEFAULT_ARM, seed = 1 } = {}) {
             if (x < 0 || x > scene.length || y < 0 || y > scene.width) return { depth: goal.depth, heading: Math.atan2(-(scene.width / 2 - y), scene.length / 2 - x), speed: 2 };   // outside the tank: back to the middle, as a wanderer does
             return H.hardTarget(arm, state, field, goal);
         },
-        snapshot() { return { arm, goal: goal ? { ...goal } : null, arrivals, hits, replans, noRoute, margin, travel, contact }; },
+        snapshot() { return { arm, goal: goal ? { ...goal } : null, arrivals, hits, replans, noRoute, margin, travel, contact, t: lastT }; },
     };
 }
