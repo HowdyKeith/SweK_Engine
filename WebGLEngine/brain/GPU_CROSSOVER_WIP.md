@@ -40,7 +40,7 @@ Nothing about a graphics card until the rig runs it. Not what the whole simulati
 ```
 node tools/ship/gpuCrossover.mjs --write
 ```
-from `WebGLEngine/` on the rig, with the browser told to use the card if it falls back to software (`SWEK_LAUNCH_ARGS="--enable-unsafe-webgpu --enable-features=Vulkan"`, `docs/real-hardware-fsr.md`). The record it appends names the adapter; a record that says `software: true` is not the answer.
+(SUPERSEDED on 2026-11-01: the rig command is `node tools/ship/gpuCrossover.mjs --hardware --write`, see the end of this note.) From `WebGLEngine/` on the rig, with the browser told to use the card if it falls back to software (`SWEK_LAUNCH_ARGS="--enable-unsafe-webgpu --enable-features=Vulkan"`, `docs/real-hardware-fsr.md`). The record it appends names the adapter; a record that says `software: true` is not the answer.
 
 ## RESULT ON THE SANDBOX'S SOFTWARE ADAPTER (2026-10-31; `node tools/ship/gpuCrossover.mjs --write`, 21 s; the record is `brain/gpuCrossoverSoftware.jsonl`). **THIS IS SWIFTSHADER, A CPU EMULATING A GPU: NO ONE-DISPATCH NUMBER BELOW IS A GRAPHICS CARD'S. The answer to Keith's question is the rig's run of the same command; the file it appends to is `brain/rig-results/gpuCrossover.jsonl`.**
 
