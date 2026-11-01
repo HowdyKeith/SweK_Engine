@@ -2686,6 +2686,13 @@ export const NEXT_ROUNDS = [
         why: "Addendum 11's rank test (p about 0.004-0.007 on the whole arm) was chosen after seeing the data; this is the same hypothesis on circuits and audits not yet seen, direction fixed in advance.",
     },
     {
+        id: "fish-4b-p-no-state-on-permuted-tuning-registered-built-not-run",
+        blocker: "OPEN",
+        what: "REGISTERED 2026-10-31 (brain/FISH_VESTIBULAR_HELPER_WIP.md Addendum 14) AND BUILT, NOT RUN: does the data's TUNING matter without memory? NO STATE on the real wiring and tuning (tns) against NO STATE with the inputs' tuning angles and kinetic classes permuted (tt1, tt2, tt3 = tuningControl, shift 0 / 4 / 8), 4b-P cells P/B and P/whole, 32 circuits, fresh audits 86001-86060, refs:PT, ordinals 722-753. The registered test is Addendum 12's: the four tns searches against the twelve permuted ones by the exact one-sided rank test, p <= 0.05 per cell; expectations written first (P/whole supported 40 percent, P/B 35, both 20, neither 45). Built in tools/ship/trainSubVestibular.mjs as generation 4 (gate rows and 24 mutants, identity 0).",
+        how: "On the rig: node tools/ship/trainSubVestibularCmd.mjs run --specs tuningShuffled --out brain/fishVestibularGen4.jsonl --workers 4 (about 10 core-hours, the same shape as Addendum 12), then report --in the same file.",
+        why: "Addendum 12 found shuffled wirings keep about 88 percent of the gain and named the tuning-derived inputs among the things that might carry it; this removes exactly that, wiring intact.",
+    },
+    {
         id: "fish-4b-e-replicates-run-reported",
         blocker: "OPEN",
         what: "RUN 2026-10-30 (result in Addendum 13 and brain/rig-results/fishVestibularGen3.jsonl): on 4b-E the registered start (lambda 0.99) is BEHIND NO STATE on all three audits in both cells (by 0.5 to 1.1), lambda 0.5 TIES NO STATE, and lambda 0.5 is ahead of 0.99 on E/whole; so memory does not help escape and the registered start hurts; Stage A's single-search a2 gap was noise. Reported, not judged. REGISTERED AND BUILT: replicate searches on 4b-E cells E/E and E/whole of the registered start (el99), a lower start (el50) and NO STATE (ens), four each (24 circuits), scored on FRESH audits 85001-85048 (64 dives a block, refs:ER); reported, not judged, no controls. Stage A left the 4b-E real wiring NOT stuck (lambda 0.99 -> 0.787 / 0.771, +1.7 to +2.2 over the autopilot) with audits disagreeing in sign against NO STATE from a single search. Keyword `escapeReplicates`.",

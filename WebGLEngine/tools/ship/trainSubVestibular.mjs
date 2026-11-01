@@ -53,13 +53,17 @@ const replStart = (family) => (isCtrl50(family) ? CTRL50_START : REPL_START[fami
  * Addendum 12 and 13, REPORTED AND NOT JUDGED (the registered rules are in brain/FISH_VESTIBULAR_HELPER_WIP.md): two more generations of replicate circuits, each with its own fresh audit seeds and its own references record.
  *   GEN 2 (Addendum 12) 4b-P, P/B and P/whole: qns = NO STATE on the real wiring, qer / qcl / qdg = NO STATE on a SHUFFLED wiring (ER, class-block, degree-preserving; shuffle index 20 + k, never used before), indices 0-3, audits 84001-84060.
  *   GEN 3 (Addendum 13) 4b-E, E/E and E/whole: el99 = the registered start (lambda 0.99), el50 = lambda 0.5, ens = NO STATE, all on the real wiring, indices 0-3, audits 85001-85048 (16 nominal seeds x 4 dives a block).
+ *   GEN 4 (Addendum 14) 4b-P, P/B and P/whole: tns = NO STATE on the real wiring and real tuning, tt1 / tt2 / tt3 = NO STATE with the inputs' tuning angles and kinetic classes permuted (tuningControl; shuffle index 20 + shift + k, shift 0 / 4 / 8), indices 0-3, audits 86001-86060.
  * `shuffle` names the Stage A control builder; `start` null means NO STATE (the trace switched off). Gen 1 (Addenda 10 and 11) keeps its own constants above.
  */
 export const GENS = Object.freeze({
     2: Object.freeze({ gen: 2, task: "P", cells: Object.freeze(["P/B", "P/whole"]), families: Object.freeze({ qns: Object.freeze({ start: null, shuffle: null }), qer: Object.freeze({ start: null, shuffle: "er" }), qcl: Object.freeze({ start: null, shuffle: "class" }), qdg: Object.freeze({ start: null, shuffle: "degree" }) }), audits: Object.freeze([[84001, 84020], [84021, 84040], [84041, 84060]]), refs: "refs:PQ", firstOrdinal: 666, shuffleOffset: 20, keyword: "noStateShuffled" }),
     3: Object.freeze({ gen: 3, task: "E", cells: Object.freeze(["E/E", "E/whole"]), families: Object.freeze({ el99: Object.freeze({ start: 0.99, shuffle: null }), el50: Object.freeze({ start: 0.5, shuffle: null }), ens: Object.freeze({ start: null, shuffle: null }) }), audits: Object.freeze([[85001, 85016], [85017, 85032], [85033, 85048]]), refs: "refs:ER", firstOrdinal: 698, shuffleOffset: 0, keyword: "escapeReplicates" }),
+    4: Object.freeze({ gen: 4, task: "P", cells: Object.freeze(["P/B", "P/whole"]), families: Object.freeze({ tns: Object.freeze({ start: null, shuffle: null }), tt1: Object.freeze({ start: null, shuffle: "tuning", shift: 0 }), tt2: Object.freeze({ start: null, shuffle: "tuning", shift: 4 }), tt3: Object.freeze({ start: null, shuffle: "tuning", shift: 8 }) }), audits: Object.freeze([[86001, 86020], [86021, 86040], [86041, 86060]]), refs: "refs:PT", firstOrdinal: 722, shuffleOffset: 20, keyword: "tuningShuffled" }),
 });
 export const GEN_N = 4;
+/** Addendum number, the real-wiring family and the pooled permuted/shuffled families of a generation (the rank test of Addenda 12 and 14). */
+export const GEN_ADD = Object.freeze({ 2: 12, 3: 13, 4: 14 }), GEN_REAL = Object.freeze({ 2: "qns", 4: "tns" }), GEN_POOL = Object.freeze({ 2: Object.freeze(["qer", "qcl", "qdg"]), 4: Object.freeze(["tt1", "tt2", "tt3"]) });
 /** The generation (2 or 3) a family belongs to, or 0. */
 export const genOf = (family) => (Object.values(GENS).find((g) => family in g.families) || { gen: 0 }).gen;
 export const GEN_SPECS = Object.freeze(Object.fromEntries(Object.values(GENS).map((g) => [g.gen, Object.freeze(g.cells.flatMap((c) => Object.keys(g.families).map((f) => `${c}/${f}:0-${GEN_N - 1}`)))])));
@@ -116,7 +120,7 @@ export function parseSpecs(text) {
     const out = [], seen = new Set();
     for (const raw of String(text).split(",")) {
         const part = raw.trim(); if (!part) throw new Error(`trainSubVestibular.parseSpecs: an empty spec in ${JSON.stringify(text)}`);
-        const m = /^([A-Za-z]+)\/([A-Za-z]+)\/(cx|nostate|dcx|dnostate|cxl50|cxl90|(?:rl50|rl70|er50|cl50|dg50|qns|qer|qcl|qdg|el99|el50):\d+(?:-\d+)?|[a-z]+:\d+(?:-\d+)?)$/.exec(part);
+        const m = /^([A-Za-z]+)\/([A-Za-z]+)\/(cx|nostate|dcx|dnostate|cxl50|cxl90|(?:rl50|rl70|er50|cl50|dg50|qns|qer|qcl|qdg|tns|tt1|tt2|tt3|el99|el50):\d+(?:-\d+)?|[a-z]+:\d+(?:-\d+)?)$/.exec(part);
         if (!m) throw new Error(`trainSubVestibular.parseSpecs: cannot read ${JSON.stringify(part)} (a spec is task/arm/cx, task/arm/nostate or task/arm/family:K or family:K-L)`);
         const [, task, arm, fam] = m;
         if (!TASK_NAMES.includes(task)) throw new Error(`trainSubVestibular.parseSpecs: unknown task ${JSON.stringify(task)} (${TASK_NAMES.join(", ")})`);
@@ -126,10 +130,10 @@ export function parseSpecs(text) {
             if (cell === "cross" && family !== "cx") throw new Error(`trainSubVestibular.parseSpecs: the cross cell ${task}/${arm} is cx only, not ${family}`);
             const name = specName({ task, arm, family, index }); if (seen.has(name)) throw new Error(`trainSubVestibular.parseSpecs: ${name} is named twice`); seen.add(name); out.push({ task, arm, family, index });
         };
-        const gq = /^(qns|qer|qcl|qdg|el99|el50|ens):(\d+)(?:-(\d+))?$/.exec(fam);
+        const gq = /^(qns|qer|qcl|qdg|tns|tt1|tt2|tt3|el99|el50|ens):(\d+)(?:-(\d+))?$/.exec(fam);
         if (gq) {
             const G = GENS[genOf(gq[1])];
-            if (!G.cells.includes(`${task}/${arm}`)) throw new Error(`trainSubVestibular.parseSpecs: ${gq[1]} (generation ${G.gen}, Addendum ${G.gen === 2 ? 12 : 13}) exists on ${G.cells.join(" and ")} only, not ${task}/${arm}`);
+            if (!G.cells.includes(`${task}/${arm}`)) throw new Error(`trainSubVestibular.parseSpecs: ${gq[1]} (generation ${G.gen}, Addendum ${GEN_ADD[G.gen]}) exists on ${G.cells.join(" and ")} only, not ${task}/${arm}`);
             const lo = Number(gq[2]), hi = gq[3] === undefined ? lo : Number(gq[3]);
             if (hi < lo) throw new Error(`trainSubVestibular.parseSpecs: the range ${JSON.stringify(part)} runs backwards`);
             if (hi > GEN_N - 1) throw new Error(`trainSubVestibular.parseSpecs: ${JSON.stringify(part)} is past index ${GEN_N - 1}`);
@@ -167,7 +171,7 @@ let EXTRACTION = null;
 export const extraction = () => EXTRACTION || (EXTRACTION = F.extract());
 export const armCircuit = (arm) => V.circuitOf(extraction(), arm);
 export const circuitFor = (spec, x = extraction()) => { const base = V.circuitOf(x, spec.arm); if (isCtrl50(spec.family)) return V.CONTROLS[CTRL50[spec.family]](base, CONTROL_BASE[CTRL50[spec.family]] + spec.index);
-    if (genOf(spec.family) && GENS[genOf(spec.family)].families[spec.family].shuffle) { const g = GENS[genOf(spec.family)], sh = g.families[spec.family].shuffle; return V.CONTROLS[sh](base, CONTROL_BASE[sh] + g.shuffleOffset + spec.index); }
+    if (genOf(spec.family) && GENS[genOf(spec.family)].families[spec.family].shuffle) { const g = GENS[genOf(spec.family)], sh = g.families[spec.family].shuffle; return V.CONTROLS[sh](base, CONTROL_BASE[sh] + g.shuffleOffset + (g.families[spec.family].shift || 0) + spec.index); }
     return VERDICT_FAMILIES.includes(spec.family) || spec.family === "count" || spec.family === "tuning" ? V.CONTROLS[spec.family](base, CONTROL_BASE[spec.family] + spec.index) : base; };
 /** The policy of a spec on its task: the task's evaluator is the seam, the scales are the task's. */
 export const policyOf = (spec, scales, circuit = circuitFor(spec)) => V.createVestibularPolicy(circuit, specName(spec), { persist: spec.family !== "nostate" && spec.family !== "dnostate" && spec.family !== "rns" && !(genOf(spec.family) && GENS[genOf(spec.family)].families[spec.family].start === null), dense: DENSE_FAMILIES.includes(spec.family), scales, evaluate: (pilot, set) => evalDives(pilot, set) }, LAMBDA_FAMILIES.includes(spec.family) ? { ...V.INIT, lambda0: LAMBDA_START[spec.family] } : replStart(spec.family) ? { ...V.INIT, lambda0: replStart(spec.family) } : genOf(spec.family) && GENS[genOf(spec.family)].families[spec.family].start ? { ...V.INIT, lambda0: GENS[genOf(spec.family)].families[spec.family].start } : V.INIT);
@@ -341,7 +345,7 @@ export function exactRankP(real, others) {
     walk(0, []);
     return { U: observed, max: k * (n - k), p: hit / total, splits: total };
 }
-export const GEN_COMPARE = Object.freeze({ 2: Object.freeze([["qns", "qer"], ["qns", "qcl"], ["qns", "qdg"]]), 3: Object.freeze([["el99", "ens"], ["el50", "ens"], ["el50", "el99"]]) });
+export const GEN_COMPARE = Object.freeze({ 2: Object.freeze([["qns", "qer"], ["qns", "qcl"], ["qns", "qdg"]]), 3: Object.freeze([["el99", "ens"], ["el50", "ens"], ["el50", "el99"]]), 4: Object.freeze([["tns", "tt1"], ["tns", "tt2"], ["tns", "tt3"]]) });
 export const RANK_ALPHA = 0.05;
 /**
  * Addenda 12 and 13, REPORTED AND NOT JUDGED: per cell and per family of generation `gen` the replicates' effective scores on that generation's FRESH audits (mean, sd, range), the difference from that generation's autopilot, and the registered comparisons (GEN_COMPARE: a family's mean against the other family's replicates by the margin rule, needs the larger of 0.02 and 2 sd of the OTHER family's replicates: ahead / tie / behind). Generation 2 adds, per cell, the registered rank test: the four qns searches (each scored as the mean of its three audits) against the pooled shuffled-wiring searches. { rows, cells } ; both [] with no references record of the generation.
@@ -361,10 +365,11 @@ export function groupReading(cellsRecs, refs, gen) {
             });
             rows.push({ cell, gen, family: fam, start: G.families[fam].start, shuffle: G.families[fam].shuffle, n: rs.length, stuck: rs.filter((r) => r.asStart).length, lambdas: rs.map((r) => (r.movement ? r.movement.lambda : null)), audits });
         }
-        if (group.qns && group.qns.length) {
-            const shuffled = ["qer", "qcl", "qdg"].flatMap((f) => group[f]); if (!shuffled.length) continue;
-            const circ = (rs) => rs.map((r) => meanOf(AUDITS.map((a) => effectiveOf(r, refs)[a].score))), t = exactRankP(circ(group.qns), circ(shuffled));
-            cells.push({ cell, nReal: group.qns.length, nShuffled: shuffled.length, complete: group.qns.length === GEN_N && shuffled.length === 3 * GEN_N, U: t.U, max: t.max, p: t.p, supported: t.p <= RANK_ALPHA });
+        const real = GEN_REAL[gen];
+        if (real && group[real] && group[real].length) {
+            const shuffled = GEN_POOL[gen].flatMap((f) => group[f]); if (!shuffled.length) continue;
+            const circ = (rs) => rs.map((r) => meanOf(AUDITS.map((a) => effectiveOf(r, refs)[a].score))), t = exactRankP(circ(group[real]), circ(shuffled));
+            cells.push({ cell, nReal: group[real].length, nShuffled: shuffled.length, complete: group[real].length === GEN_N && shuffled.length === 3 * GEN_N, U: t.U, max: t.max, p: t.p, supported: t.p <= RANK_ALPHA });
         }
     }
     return { rows, cells };
@@ -389,8 +394,8 @@ export function verdictOf(records) {
     for (const [t, a] of VERDICT_CELLS) { const k = `${t}/${a}`; if (cellsRecs[k]) cells[k] = cellVerdict(cellsRecs[k], refsByTask[t]); }
     for (const [t, a] of CROSS_CELLS) { const k = `${t}/${a}`, c = (cellsRecs[k] || []).find((r) => r.family === "cx"); if (c) crossRecs[k] = c; }
     const checks = Object.fromEntries(TASK_NAMES.filter((t) => refsByTask[t]).map((t) => [t, checksOf(refsByTask[t])])), claim = pathwayClaim(cells, crossRecs, refsByTask), dense = denseReading(cellsRecs[DENSE_CELL] || [], refsByTask.P, cells[DENSE_CELL]), lambda = lambdaReading(cellsRecs, refsByTask.P);
-    const repl = replicateReading(cellsRecs, refsRepl), wiring50 = wiringAtLowStart(repl), gen2 = groupReading(cellsRecs, refsGen(2), 2), gen3 = groupReading(cellsRecs, refsGen(3), 3);
-    return { checks, cells, claim, dense, lambda, repl, wiring50, gen2, gen3, passed: Object.values(cells).filter((c) => c.wiring.verdict === "PASS").length, assessed: Object.values(cells).filter((c) => c.wiring.verdict !== "NOT ASSESSED").length, refsByTask };
+    const repl = replicateReading(cellsRecs, refsRepl), wiring50 = wiringAtLowStart(repl), gen2 = groupReading(cellsRecs, refsGen(2), 2), gen3 = groupReading(cellsRecs, refsGen(3), 3), gen4 = groupReading(cellsRecs, refsGen(4), 4);
+    return { checks, cells, claim, dense, lambda, repl, wiring50, gen2, gen3, gen4, passed: Object.values(cells).filter((c) => c.wiring.verdict === "PASS").length, assessed: Object.values(cells).filter((c) => c.wiring.verdict !== "NOT ASSESSED").length, refsByTask };
 }
 export function reportLines(records) {
     const v = verdictOf(records), L = [], rs = records.filter((r) => r.family !== "refs");
@@ -427,14 +432,14 @@ export function reportLines(records) {
         if (x.audits[0].vsNoState) L.push(`    against the ${x.cell} NO STATE replicates: ${x.audits.map((a) => `${f3(a.vsNoState.margin)} (needs ${f3(a.vsNoState.needs)}: ${a.vsNoState.reading})`).join(" | ")}`);
     }
     for (const w of v.wiring50) L.push(`  WIRING AT LAMBDA 0.5 ${w.cell} (Addendum 11; REPORTED, NOT JUDGED): the real wiring is ahead of ${Object.entries(w.families).map(([f, c]) => `${CTRL50[f]} on ${c.ahead} of 3 (tie ${c.tie}, behind ${c.behind})`).join(", ")}; ahead of ${w.aheadOfAll === null ? "(not all three families are in)" : "all three families on " + w.aheadOfAll + " of 3 audits"}`);
-    for (const [gk, g] of [[2, v.gen2], [3, v.gen3]]) {
+    for (const [gk, g] of [[2, v.gen2], [3, v.gen3], [4, v.gen4]]) {
         for (const x of g.rows) {
-            const lab = gk === 2 ? (x.shuffle ? `NO STATE on a ${x.shuffle}-shuffled wiring` : "NO STATE on the real wiring") : (x.start === null ? "NO STATE" : `lambda start ${x.start}`);
-            L.push(`  GEN ${gk} ${x.cell}/${x.family} (${lab}, Addendum ${gk === 2 ? 12 : 13}; REPORTED, NOT JUDGED, fresh audits ${GENS[gk].audits[0][0]}-${GENS[gk].audits[2][1]}): ${x.n} circuit(s), ${x.stuck} with no eligible champion${x.start === null ? "" : "; final lambdas " + x.lambdas.map((l) => (l === null ? "none" : f3(l))).join(" ")}`);
+            const lab = gk === 4 ? (x.shuffle ? `NO STATE with the inputs' tuning permuted (family ${x.family})` : "NO STATE on the real wiring and tuning") : gk === 2 ? (x.shuffle ? `NO STATE on a ${x.shuffle}-shuffled wiring` : "NO STATE on the real wiring") : (x.start === null ? "NO STATE" : `lambda start ${x.start}`);
+            L.push(`  GEN ${gk} ${x.cell}/${x.family} (${lab}, Addendum ${GEN_ADD[gk]}; REPORTED, NOT JUDGED, fresh audits ${GENS[gk].audits[0][0]}-${GENS[gk].audits[2][1]}): ${x.n} circuit(s), ${x.stuck} with no eligible champion${x.start === null ? "" : "; final lambdas " + x.lambdas.map((l) => (l === null ? "none" : f3(l))).join(" ")}`);
             L.push(`    ${x.audits.map((a) => `${a.audit} ${f3(a.mean)} sd ${f3(a.sd)} [${f3(a.min)}..${f3(a.max)}]`).join(" | ")}; against the autopilot ${x.audits.map((a) => (a.vsAutopilot >= 0 ? "+" : "") + f3(a.vsAutopilot) + (a.offAutopilot ? " (off it)" : " (not off it)")).join(" | ")}`);
             for (const other of Object.keys(x.audits[0].vs)) L.push(`    against the ${x.cell} ${other} replicates: ${x.audits.map((a) => `${f3(a.vs[other].margin)} (needs ${f3(a.vs[other].needs)}: ${a.vs[other].reading})`).join(" | ")}`);
         }
-        for (const c of g.cells) L.push(`  WIRING WITHOUT MEMORY ${c.cell} (Addendum 12; REPORTED, NOT JUDGED): the ${c.nReal} real-wiring NO STATE searches against the ${c.nShuffled} shuffled ones, each scored as the mean of its three audits: U ${c.U} of ${c.max}, exact one-sided p ${c.p.toFixed(4)}${c.complete ? "" : " (NOT all searches are in)"}; registered line p <= ${RANK_ALPHA}: ${c.supported ? "MET" : "not met"}`);
+        for (const c of g.cells) L.push(`  ${gk === 4 ? "TUNING WITHOUT MEMORY" : "WIRING WITHOUT MEMORY"} ${c.cell} (Addendum ${GEN_ADD[gk]}; REPORTED, NOT JUDGED): the ${c.nReal} ${gk === 4 ? "real-tuning" : "real-wiring"} NO STATE searches against the ${c.nShuffled} ${gk === 4 ? "permuted" : "shuffled"} ones, each scored as the mean of its three audits: U ${c.U} of ${c.max}, exact one-sided p ${c.p.toFixed(4)}${c.complete ? "" : " (NOT all searches are in)"}; registered line p <= ${RANK_ALPHA}: ${c.supported ? "MET" : "not met"}`);
     }
     for (const r of v.claim.rows) L.push(`  TWO-PATHWAY ${r.task}: ${r.status}${r.audits ? ` -- aligned ${r.aligned} ${r.alignedPasses ? "PASSES" : "does not pass"}; beats cross ${r.cross} on ${r.crossWins} of 3 audits (${r.audits.map((x) => `${f3(x.diff)} needs ${f3(x.needs)}`).join(" | ")})` : ` -- ${r.why}`}`);
     L.push(`RUNG 4b: ${v.passed} of ${v.assessed} assessed verdict cells PASSED (a pass in one of four is "one of four", not "the wiring works")`);
@@ -455,7 +460,7 @@ export function parseArgs(argv) {
     if (cmd === "report") { if (!given.in) throw new Error("report needs --in <results file>"); return { cmd, in: given.in, allowSmoke: !!given["allow-smoke"] }; }
     if (!given.one && !given.specs) throw new Error("run needs --specs <list> (the registered stage A: --specs stageA; Addendum 9: --specs lambdaStudy)");
     if (!given.one && !given.out) throw new Error("run needs --out <results file>");
-    const text = given.specs === "stageA" ? STAGE_A : given.specs === "lambdaStudy" ? LAMBDA_STUDY : given.specs === "replicate" ? REPL_STUDY : given.specs === "lowControls" ? CTRL50_STUDY : given.specs === GENS[2].keyword ? GEN_STUDY[2] : given.specs === GENS[3].keyword ? GEN_STUDY[3] : given.specs || given.one;
+    const text = given.specs === "stageA" ? STAGE_A : given.specs === "lambdaStudy" ? LAMBDA_STUDY : given.specs === "replicate" ? REPL_STUDY : given.specs === "lowControls" ? CTRL50_STUDY : given.specs === GENS[2].keyword ? GEN_STUDY[2] : given.specs === GENS[3].keyword ? GEN_STUDY[3] : given.specs === GENS[4].keyword ? GEN_STUDY[4] : given.specs || given.one;
     const o = { cmd, specs: text, one: given.one || null, out: given.out || null, workers: given.workers ?? 1, recipe: { runs: given.runs ?? RECIPE.runs, iters: given.iters ?? RECIPE.iters, sigma: given.sigma ?? RECIPE.sigma, maxK: given.maxK ?? RECIPE.maxK, pruneBudget: given["prune-budget"] ?? RECIPE.pruneBudget }, smoke: !!given.smoke, quiet: !!given.quiet };
     for (const [k, v] of [["workers", o.workers], ["runs", o.recipe.runs], ["iters", o.recipe.iters], ["maxK", o.recipe.maxK]]) if (!(Number.isInteger(v) && v >= 1)) throw new Error(`--${k} must be a whole number of 1 or more, got ${v}`);
     if (!(o.recipe.sigma > 0)) throw new Error(`--sigma must be above 0, got ${o.recipe.sigma}`);
@@ -486,7 +491,7 @@ export async function command(argv, io = {}) {
     log(`[trainSubVestibular] ${specs.length} circuits, ${specs.length - todo.length} already in ${o.out}, ${todo.length} to train; ${o.workers} worker(s); recipe ${o.recipe.runs} x ${o.recipe.iters}${o.smoke ? " (SMOKE)" : ""}`);
     const keep = (rec) => { appendFile(o.out, JSON.stringify(rec) + "\n"); records.push(rec); };
     if (specs.some((s) => isRepl(s.family)) && !done.has(REFS_REPL)) { keep((io.refsRunner || refsRecord)("P", { ...opts, replicate: true })); log("[trainSubVestibular] references for the replicate audits (Addendum 10) done"); }
-    for (const g of [2, 3]) if (specs.some((s) => genOf(s.family) === g) && !done.has(GENS[g].refs)) { keep((io.refsRunner || refsRecord)(GENS[g].task, { ...opts, replicate: g })); log(`[trainSubVestibular] references for the generation ${g} audits (Addendum ${g === 2 ? 12 : 13}) done`); }
+    for (const g of [2, 3, 4]) if (specs.some((s) => genOf(s.family) === g) && !done.has(GENS[g].refs)) { keep((io.refsRunner || refsRecord)(GENS[g].task, { ...opts, replicate: g })); log(`[trainSubVestibular] references for the generation ${g} audits (Addendum ${GEN_ADD[g]}) done`); }
     for (const t of tasks) if (!done.has(REFS_NAME(t))) { keep((io.refsRunner || refsRecord)(t, opts)); log(`[trainSubVestibular] references for 4b-${t} done`); }
     const spawner = io.spawner || ((spec) => runChild(spec, o)), queue = [...todo];
     const worker = async () => { while (queue.length) { const s = queue.shift(); const rec = o.workers > 1 ? await spawner(s) : (io.runner || runCircuit)(s, opts, o.quiet ? () => {} : (m) => log(m)); keep(rec); log(`[trainSubVestibular] ${specName(s)} done${rec.asStart ? " (no eligible champion)" : " (champion seed " + rec.champion + ")"}`); } };
