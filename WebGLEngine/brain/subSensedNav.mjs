@@ -27,9 +27,13 @@ export const ARM_SPEC = Object.freeze({ sensed: armSpec(0, 0, false, 1, 1), "sen
 export const SONAR_ARMS = Object.freeze({ "sonar-150": Object.freeze({ range: 150, half: Math.PI / 3, pingS: 1 }), "sonar-200": Object.freeze({ range: 200, half: Math.PI / 3, pingS: 1 }), "sonar-wide": Object.freeze({ range: 100, half: Math.PI / 2, pingS: 1 }), "sonar-200-wide": Object.freeze({ range: 200, half: Math.PI / 2, pingS: 1 }), "sonar-omni": Object.freeze({ range: 1000, half: Math.PI, pingS: 1 }) });
 export const GAP_ARMS = Object.freeze(["exact", "sensed", "sonar-150", "sonar-200", "sonar-wide", "sonar-200-wide", "sonar-omni"]), GAP_DESIGNATED = "sonar-200";
 export const FIX_ARMS = Object.freeze(["sensed", "sensed+fix", "fix+forget", "fix+filter", "fix+forget+filter", "sensed+drift"]), FIX_DESIGNATED = "fix+forget";
-export const FLY_ARMS = Object.freeze([...STUDY_ARMS, "fix+forget", "fix+filter", "fix+forget+filter", ...Object.keys(SONAR_ARMS)]);
+// THE COMBINED STUDY (follow-up 3): the gap study's 200 m sonar with the fix study's cures. A "long+" arm is the sensed arm it maps to, flown with the 200 m sonar (it shares that arm's fix errors, so a comparison is on the same errors).
+export const LONG_SONAR = SONAR_ARMS["sonar-200"];
+export const LONG_ARMS = Object.freeze({ "long+fix": "sensed+fix", "long+fix+forget": "fix+forget", "long+fix+filter": "fix+filter", "long+fix+forget+filter": "fix+forget+filter", "long+drift": "sensed+drift" });
+export const COMBINED_ARMS = Object.freeze(["exact", "sonar-200", "sensed+fix", "fix+forget", "long+fix", "long+fix+forget", "long+fix+filter", "long+fix+forget+filter", "long+drift"]), COMBINED_DESIGNATED = "long+fix+forget";
+export const FLY_ARMS = Object.freeze([...STUDY_ARMS, "fix+forget", "fix+filter", "fix+forget+filter", ...Object.keys(SONAR_ARMS), ...Object.keys(LONG_ARMS)]);
 export const BARS = Object.freeze({ "hard-islands": 0.8, "hard-gaps": 0.6, "hard-current": 0.7 }), ISLAND_MAX_COLLISIONS = 6;
-export const SENSE_SETS = Object.freeze({ dev: N.range(1, 30), held6: N.range(601, 660), held7: N.range(701, 760) });
+export const SENSE_SETS = Object.freeze({ dev: N.range(1, 30), held6: N.range(601, 660), held7: N.range(701, 760), held8: N.range(801, 860) });
 export const POINT_R = N.CELL / 2;   // an occupied cell is a point 2.5 m wide to the plan; a run of them in a row is the capsule between the end centres
 
 const mulberry = (a) => () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
@@ -119,11 +123,12 @@ export function flySensed(pilot, sc, armName, { seconds = H.SECONDS_HARD, dt = S
     return { arm: armName, kind: sc.kind, seed: sc.seed, gap: sc.gapWidth, currentMean: sc.currentMean, blocked: sc.blocked, status, reached: status === "reached", t, path, chord: Math.hypot(sc.goal.x - st.x, sc.goal.y - st.y), minClearance: minClear, ticks,
         margin: field0.margin, marginLast: field.margin, noRoute: !(f0 && field0.dist[f0.i] < N.BIG), plans, pings, occupied: map.nOcc, ensonified: map.nSeen / (map.w * map.h), offsetEnd: Math.hypot(off.x, off.y), offsetMax: offMax };
 }
-/** The flight for any arm the studies use: `straight` and `exact` by subHardNav's flyHard, the sensed arms (SENSED_ARMS) by flySensed, and a sonar arm (SONAR_ARMS) by flySensed under `sensed` with that sonar (the record carries the sonar arm's name). */
+/** The flight for any arm the studies use: `straight` and `exact` by subHardNav's flyHard, the sensed arms (SENSED_ARMS) by flySensed, a sonar arm (SONAR_ARMS) by flySensed under `sensed` with that sonar, and a long arm (LONG_ARMS) by flySensed under the sensed arm it maps to with the 200 m sonar (the record carries the arm's own name). */
 export function flyArm(pilot, sc, arm, opts = {}) {
     if (!FLY_ARMS.includes(arm)) throw new Error(`subSensedNav.flyArm: unknown arm "${arm}" (${FLY_ARMS.join(", ")})`);
     if (arm === "straight") return H.flyHard(pilot, sc, FLOOR_ARM, opts);
     if (arm === "exact") return { ...H.flyHard(pilot, sc, EXACT_ARM, opts), arm: "exact" };
+    if (LONG_ARMS[arm]) return { ...flySensed(pilot, sc, LONG_ARMS[arm], { ...opts, sonar: LONG_SONAR }), arm };
     return SONAR_ARMS[arm] ? { ...flySensed(pilot, sc, "sensed", { ...opts, sonar: SONAR_ARMS[arm] }), arm } : flySensed(pilot, sc, arm, opts);
 }
 /** The scenarios of a set: its seeds of each of the three kinds (SENSE_KINDS order), frozen. */
