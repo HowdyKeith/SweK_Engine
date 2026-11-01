@@ -25,6 +25,7 @@
 // dispatch one group short -> 2, F4 readH74 reading round 73's line -> 1, F5 the "fast" option building the loop pass -> 1.
 // SECTIONS 170-171: V171a H73 on the Intel typed holds, V171b the 1080's round 74 U typed 5.0, V171c the Intel's round 74 read as
 // holding -> 1 red each. Each restored byte-identical.
+// SECTION 173: V173a H75 read as holding, V173b the pack typed 0.8 -> 1 red each. Each restored byte-identical.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -96,6 +97,18 @@ console.log("1. ON THE CPU");
     ok("!! readH75, section 172's rule: the chain with its history and U_TH against the chain with its history, off one line; at most 1.25 x holds; an adapter with U_TH off gives no ratio; a red gate does not count",
         a.withUT === 44 && a.without === 38 && Math.abs(a.ratio - 44 / 38) < 1e-12 && G.h75([a, a]) === "holds" && G.h75([a, b]) === "fails" && c.ratio === null && G.h75([a, c]) === "no verdict" &&
         !d.counts && G.h75([a, d]) === "no verdict" && G.H75_RATIO === 1.25);
+}
+
+{
+    // SECTION 173: round 75's 1080 pair, from a fresh clone at 170aa856, read back
+    const R = ["a", "b"].map((k) => G.readH75(JSON.parse(fs.readFileSync(path.join(ENG, `render/denoise-rig-s172-${k}-gtx1080.json`), "utf8"))));
+    const lines = ["a", "b"].map((k) => JSON.parse(fs.readFileSync(path.join(ENG, `render/denoise-rig-s172-${k}-gtx1080.json`), "utf8")).gates.find((x) => x.gate === "render/denoiseUpscaleGPU-selfcheck.mjs").measured.find((l) => /^section 172: /.test(l)));
+    const pack = lines.map((l) => +l.match(/packH ([\d.]+) ms/)[1]);
+    ok("!! *** section 173: H75 FAILS on the 1080 -- the chain with U_TH 48.811 / 48.636 ms against 38.156 / 37.863 without, 1.279 / 1.285 x over 1.25; both runs count, at 170aa856 ***",
+        R.every((r) => r.counts && r.commit === "170aa856") && Math.abs(R[0].withUT - 48.811) < 1e-9 && Math.abs(R[1].without - 37.863) < 1e-9 && R.every((r) => r.ratio > 1.27 && r.ratio < 1.29) && G.h75(R) === "fails",
+        R.map((r) => r.ratio.toFixed(3)).join(", "));
+    ok("  ...the miss is the pack: PACKH_WGSL 5.159 / 5.283 ms against P1's ~0.8 -- a thread per half-size pixel over 17 channels and 4 pixels, round 73's shape again",
+        Math.abs(pack[0] - 5.159) < 1e-9 && Math.abs(pack[1] - 5.283) < 1e-9);
 }
 
 console.log("\n1b. SECTION 165: THE COMMITTED RIG RUNS, READ BACK");

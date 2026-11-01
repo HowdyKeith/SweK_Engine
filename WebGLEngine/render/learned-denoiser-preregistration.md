@@ -10971,3 +10971,35 @@ time. The Intel is not asked: the table leaves U_TH off there.
 (render/upscale-net-r72.json), on the coalesced down pass, labelled as such. The page decides nothing.
 
 **The runs.** Two `realGpuRun --only denoise` on the 1080 at round 75's commit, from a fresh clone. Section 173 reads them.
+
+## 173. ROUND 75's VERDICT -- H75 FAILS NARROWLY: THE CHAIN WITH U_TH IS 1.28 x THE CHAIN, AND THE PACK IS WHY
+
+**What arrived.** Two `realGpuRun --only denoise` reports on the GTX 1080, from a fresh clone at 170aa856 (round 75's commit), every
+gate green with exit 0 in both. They were committed byte for byte (da9efaff) before they were read. Both count.
+
+| run | accumU | **packH** | four layers | upholdC (final 0.36 / 0.34 out) | the chain with U_TH | the chain with its history | **ratio** |
+|---|---|---|---|---|---|---|---|
+| a | 0.790 | **5.159** | 4.646 | 0.418 | 48.811 | 38.156 | **1.279** |
+| b | 0.791 | **5.283** | 4.641 | 0.395 | 48.636 | 37.863 | **1.285** |
+
+ms, every pass on the device's clock.
+
+**H75 FAILS** on the 1080: 1.279 and 1.285 against 1.25.
+
+**The predictions.**
+- **P1 MISSED:** U_TH's passes added 10.5-10.8 ms, not 5.5-7.5; the ratio is 1.28, not 1.14-1.20.
+  - Every part but one was as predicted: the twin accumulation 0.79 (~0.5), the layers 4.64 (4.6), the upsample-hold-composite
+    0.40-0.42 (~0.6).
+  - **PACKH_WGSL took 5.16-5.28 ms against ~0.8.** It gives each thread a half-size pixel and loops over 17 channels and four
+    full-size pixels, reading the history, the twin, the frame and the first hits through a branching per-channel function. That
+    is round 73's DOWN_WGSL shape, which section 170 had already found slow on this GPU (8.3 ms). I wrote it again.
+  - With a pack near the coalesced down pass's 0.6 ms, the chain with U_TH would be about 44 ms, 1.16 x.
+- **P2 held:** every parity row green on the 1080. The standalone U_TH read 5.88 and 5.74 ms in the same runs, as section 171 found.
+
+**What it says.** U_TH in the device chain works and matches its CPU twin. As built it adds 28 % to the chain's frame on the 1080,
+over the quarter H75 allowed, and most of the excess is one pass written the wrong way. A coalesced pack would be a further
+round: one thread per half-size value, the same sums, held to PACKH_WGSL bit for bit, as round 74 was to round 73. It is not
+fixed here.
+
+**What changes.** UTH_BY_ADAPTER keeps U_TH on for the 1080 class. That is section 171's decision, and H75 did not make it. The chain
+times U_TH there and the page reports it; nothing ships.
