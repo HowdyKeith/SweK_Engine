@@ -11003,3 +11003,28 @@ fixed here.
 
 **What changes.** UTH_BY_ADAPTER keeps U_TH on for the 1080 class. That is section 171's decision, and H75 did not make it. The chain
 times U_TH there and the page reports it; nothing ships.
+
+## 174. ROUND 76 -- U_TH IN THE CHAIN WITH A COALESCED PACK: H75's QUESTION AGAIN, ONE KERNEL REWRITTEN. FIXED BEFORE ITS CODE
+
+**Why.** Section 173 found the chain with U_TH 1.28 x the chain on the 1080, over H75's 1.25. Of U_TH's 10.5-10.8 ms in the chain,
+**PACKH_WGSL took 5.2-5.3 ms against ~0.8 predicted.** It gives each thread a half-size pixel and loops over 17 channels and four
+pixels, the shape round 74 had already replaced once. Keith asked for the coalesced pack.
+
+**The change, and only it: PACKH_FAST_WGSL (render/denoiseUpscaleGPU.mjs).**
+- **One thread per half-size value,** pixel and channel, 256 to a group, a 1-D dispatch folded into two dimensions past 65535
+  groups.
+- **The same arithmetic as PACKH_WGSL:** the same per-channel function, chan(), and the same (a + b + c + d) / 4 in the same
+  order. Its output is held to PACKH_WGSL's **bit for bit** on the device.
+- The chain times both packs in one run, round 75's and this one. **temporalUTF** is the chain with U_TH and the coalesced pack,
+  beside **temporal**, on a line of its own: `section 174: the coalesced pack ...`, read by readH76.
+
+**H76: temporalUTF ≤ 1.25 × temporal on the 1080, in both of its runs** (H75's threshold and counting; the Intel not asked, U_TH being
+off there).
+
+**Predictions, fixed now, deciding nothing.**
+- **P1:** the coalesced pack takes 0.4-1.5 ms on the 1080. Its threads branch on the channel, so a 32-thread warp spans six branch
+  groups; even serialised, each is a few reads. temporalUTF / temporal is then 1.14-1.18, and **H76 holds**.
+- **P2:** the two packs agree bit for bit on the 1080, and every parity row is green.
+
+**The runs.** Two `realGpuRun --only denoise` on the 1080 from a fresh clone at round 76's commit, committed byte for byte before they
+are read. Section 175 reads them.
