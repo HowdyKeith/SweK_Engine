@@ -26,6 +26,7 @@
 // SECTIONS 170-171: V171a H73 on the Intel typed holds, V171b the 1080's round 74 U typed 5.0, V171c the Intel's round 74 read as
 // holding -> 1 red each. Each restored byte-identical.
 // SECTION 173: V173a H75 read as holding, V173b the pack typed 0.8 -> 1 red each. Each restored byte-identical.
+// SECTION 175: V175a H76 read as failing, V175b the coalesced pack typed 0.8 -> 1 red each. Each restored byte-identical.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -113,6 +114,18 @@ console.log("1. ON THE CPU");
         R.map((r) => r.ratio.toFixed(3)).join(", "));
     ok("  ...the miss is the pack: PACKH_WGSL 5.159 / 5.283 ms against P1's ~0.8 -- a thread per half-size pixel over 17 channels and 4 pixels, round 73's shape again",
         Math.abs(pack[0] - 5.159) < 1e-9 && Math.abs(pack[1] - 5.283) < 1e-9);
+}
+
+{
+    // SECTION 175: round 76's 1080 pair, from a fresh clone at 7d423e17, read back
+    const reps = ["a", "b"].map((k) => JSON.parse(fs.readFileSync(path.join(ENG, `render/denoise-rig-s174-${k}-gtx1080.json`), "utf8")));
+    const R = reps.map((r) => G.readH76(r)), L = reps.map((r) => G.readH75(r)), line = reps.map((r) => r.gates.find((x) => x.gate === "render/denoiseUpscaleGPU-selfcheck.mjs").measured.find((l) => /^section 174: /.test(l)));
+    const pk = line.map((l) => [+l.match(/packH ([\d.]+) ms/)[1], +l.match(/packHF ([\d.]+) ms/)[1]]);
+    ok("!! *** section 175: H76 HOLDS on the 1080 -- the chain with U_TH on the coalesced pack 44.579 / 44.172 ms against 38 / 37 without, 1.181 / 1.183 x within 1.25; both runs count, at 7d423e17 ***",
+        R.every((r) => r.counts && r.commit === "7d423e17") && Math.abs(R[0].withUT - 44.579) < 1e-9 && Math.abs(R[1].withUT - 44.172) < 1e-9 && R.every((r) => r.ratio > 1.18 && r.ratio < 1.19) && G.h75(R) === "holds",
+        R.map((r) => r.ratio.toFixed(3)).join(", "));
+    ok("  ...the coalesced pack 1.338 / 1.341 ms against round 75's 4.931 / 4.916 in the same runs (P1's 0.4-1.5 held), and round 75's sum in the same runs still over, 1.276 / 1.278",
+        Math.abs(pk[0][1] - 1.338) < 1e-9 && Math.abs(pk[1][1] - 1.341) < 1e-9 && Math.abs(pk[0][0] - 4.931) < 1e-9 && G.h75(L) === "fails" && L.every((r) => r.ratio > 1.27 && r.ratio < 1.28));
 }
 
 console.log("\n1b. SECTION 165: THE COMMITTED RIG RUNS, READ BACK");

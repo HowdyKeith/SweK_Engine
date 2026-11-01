@@ -11028,3 +11028,37 @@ off there).
 
 **The runs.** Two `realGpuRun --only denoise` on the 1080 from a fresh clone at round 76's commit, committed byte for byte before they
 are read. Section 175 reads them.
+
+## 175. ROUND 76's VERDICT -- H76 HOLDS: WITH THE COALESCED PACK, U_TH IN THE CHAIN COSTS THE 1080 18 % OF ITS FRAME
+
+**What arrived.** Two `realGpuRun --only denoise` reports on the GTX 1080, from a fresh clone at 7d423e17 (round 76's commit), every
+gate green with exit 0 in both. They were committed byte for byte (1e3efe83) before they were read. Both count. An upload of
+render/upscale-net-r72.json came with them; it is byte for byte the committed file, so nothing changed.
+
+| run | round 75's pack | **the coalesced pack** | chain + U_TH (coalesced) | chain with its history | **ratio** | round 75's sum, same run |
+|---|---|---|---|---|---|---|
+| a | 4.931 | **1.338** | 44.579 | 37.762 | **1.181** | 1.276 |
+| b | 4.916 | **1.341** | 44.172 | 37.347 | **1.183** | 1.278 |
+
+ms, every pass on the device's clock.
+
+**H76 HOLDS** on the 1080: 1.181 and 1.183, within 1.25.
+
+**The predictions.**
+- **P1 held as to the pack and the verdict, and missed the ratio by a hair:**
+  - the coalesced pack 1.34 ms (0.4-1.5);
+  - H76 holds;
+  - the ratio 1.181-1.183, against 1.14-1.18.
+- **P2 held:** every parity row green on the 1080, the two packs bit for bit there.
+
+**What rounds 70-76 say together.**
+- **The 1080 class has a real-time learned temporal upscaler.** U_TH after Bt's history, in the device chain, takes 5.44 % off Bt's
+  display error (section 170) for 6.8 ms at 1920 x 1080. That is 18 % more frame time than the chain with its history alone.
+- **The Intel's integrated graphics does not.** UTH_BY_ADAPTER leaves U_TH off there (section 171: 0.28-0.30 of a traced frame for
+  U_TH alone).
+- **Two of the misses on the way were the same mistake,** a pass looping over channels per pixel (round 73's down pass, round 75's
+  pack). Both were fixed by one thread per value, bit for bit, in rounds 74 and 76.
+
+**What changes.** The chain's U_TH runs the coalesced pack by default from here. accumulate's `pack` defaults to "fast", and round 75's
+loop pass is kept as the reference it is held to, as rounds 48 and 55 kept the plain accumulation. denoise.html's sum that names U_TH
+is temporalUTF. Nothing ships by this alone. Shipping the chain with U_TH on the 1080 class is a release, Keith's call.

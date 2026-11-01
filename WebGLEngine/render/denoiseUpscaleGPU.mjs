@@ -1213,7 +1213,8 @@ export class DenoiseUpscaleGPU {
      * device traces them. With `full` ({ cov, E } at W x H) the result is composited as section 95's Bt is. `tile` (round 48) runs
      * ACCUM_TILE_WGSL -- since round 55 by default; `{ tile: false }` runs ACCUM_WGSL, the reference. Returns { A, n, y, kernel }, kernel naming the accumulation it dispatched.
      */
-    async accumulate(S, eyes, frames, W, H, { clamp = true, geo = null, full = null, tile = true, ut = false, pack = "loop" } = {}) {
+    async accumulate(S, eyes, frames, W, H, { clamp = true, geo = null, full = null, tile = true, ut = false, pack = "fast" } = {}) {
+        // section 175: the coalesced pack (round 76) by default; round 75's loop pack, the reference it is held to, by name
         if (!["loop", "fast"].includes(pack)) throw new Error(`render/denoiseUpscaleGPU.accumulate: the pack is "loop" (round 75's) or "fast" (round 76's) -- got ${JSON.stringify(pack)}`);
         if (ut && !this.ut) throw new Error("render/denoiseUpscaleGPU.accumulate: { ut: true } needs setUT(net) first");
         if (ut && (W % 2 || H % 2 || !clamp)) throw new Error("render/denoiseUpscaleGPU.accumulate: U_TH runs on Bt's clamped history at an even size");
@@ -1258,7 +1259,7 @@ export class DenoiseUpscaleGPU {
         let utOut = null;
         if (ut) {
             const hu = new Float32Array(await dev.read(lastU)), Au = new Float64Array(n * 3); for (let p = 0; p < n; p++) for (let c = 0; c < 3; c++) Au[p * 3 + c] = hu[p * 4 + c];
-            utOut = { y: Float64Array.from(new Float32Array(await dev.read(dstU))), xh: new Float32Array(await dev.read(ub.xh)), rh: new Float32Array(await dev.read(ub.outs[3])), Au };
+            utOut = { y: Float64Array.from(new Float32Array(await dev.read(dstU))), xh: new Float32Array(await dev.read(ub.xh)), rh: new Float32Array(await dev.read(ub.outs[3])), Au, pack };
             for (const bb of [U0, U1, dstU, ...uAcU]) bb.destroy(); this._utFree(ub);
         }
         for (const bb of [bS, ...G, ...uCam, ...src, cur, ...uSh, ...uAc, H0, H1, dst, uF, fc, fE, sky]) bb.destroy();

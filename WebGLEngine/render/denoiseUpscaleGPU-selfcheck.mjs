@@ -188,6 +188,8 @@
 // ROUND 76 (section 174): F2 the coalesced pack's dispatch one group short -> 2 red, F3 temporalUTF summing round 75's pack, F4 readH76
 // reading section 172's line, F5 the "fast" option dispatching the loop -> 1 red each; F1 the coalesced pack's rows from the height ->
 // *** 0 RED at first *** (the fixture is square), then 1 with the 62 x 46 row added for it.
+// SECTION 175: V175c accumulate's default pack back to the loop -> 1 red (the row reads which pack each call dispatched: the two packs'
+// bits are the same, so the image alone cannot tell them apart).
 "use strict";
 import fs from "node:fs";
 import crypto from "node:crypto";
@@ -960,15 +962,16 @@ console.log("\n6b. SECTION 172: U_TH AFTER THE HISTORY, ON THE DEVICE, AGAINST r
         const geo = P.geo.map((x) => ({ pos: Float64Array.from(x.pos), nrm: Float64Array.from(x.nrm), obj: Int32Array.from(x.obj) })), full = { cov: Float64Array.from(P.full.cov), E: Float64Array.from(P.full.E) };
         let refused = null; try { await g.accumulate(P.S, P.eyes, fr, P.N, P.N, { geo, full, ut: true }); } catch (e) { refused = e.message; }
         g.setUT({ layers: P.net.map((L) => ({ ...L, W: Float64Array.from(L.W), b: Float64Array.from(L.b) })) });
-        const r = await g.accumulate(P.S, P.eyes, fr, P.N, P.N, { geo, full, ut: true }), plain = await g.accumulate(P.S, P.eyes, fr, P.N, P.N, { geo, full });
+        // section 175: the coalesced pack is the default, so round 75's loop pack is asked for by name here
+        const r = await g.accumulate(P.S, P.eyes, fr, P.N, P.N, { geo, full, ut: true, pack: "loop" }), plain = await g.accumulate(P.S, P.eyes, fr, P.N, P.N, { geo, full });
         // round 76 (section 174): the coalesced pack -- its input and image beside round 75's
-        const rf = await g.accumulate(P.S, P.eyes, fr, P.N, P.N, { geo, full, ut: true, pack: "fast" });
+        const rf = await g.accumulate(P.S, P.eyes, fr, P.N, P.N, { geo, full, ut: true }), rfAsked = await g.accumulate(P.S, P.eyes, fr, P.N, P.N, { geo, full, ut: true, pack: "fast" });
         // ...and on a frame that is not square, 62 x 46 with the device's own hits (sabotage F1 -- the coalesced pack's rows from the height --
         // went 0 red on the square fixture, where width and height are the same)
         const W2 = 62, H2 = 46, fr2 = fr.map((f, k) => ({ y: Float64Array.from({ length: W2 * H2 * 3 }, (_, i) => 0.2 + 0.5 * ((i * 7 + k * 13) % 97) / 97), shift: f.shift }));
-        const o2 = await g.accumulate(P.S, P.eyes, fr2, W2, H2, { ut: true }), o2f = await g.accumulate(P.S, P.eyes, fr2, W2, H2, { ut: true, pack: "fast" });
+        const o2 = await g.accumulate(P.S, P.eyes, fr2, W2, H2, { ut: true, pack: "loop" }), o2f = await g.accumulate(P.S, P.eyes, fr2, W2, H2, { ut: true });
         const A = (x) => Array.from(x);
-        return { y: A(r.y), plainY: A(plain.y), ut: { y: A(r.ut.y), xh: A(r.ut.xh), rh: A(r.ut.rh), Au: A(r.ut.Au) }, utF: { y: A(rf.ut.y), xh: A(rf.ut.xh) }, odd: { xh: A(o2.ut.xh), xhF: A(o2f.ut.xh), y: A(o2.ut.y), yF: A(o2f.ut.y) }, refused, errs };
+        return { y: A(r.y), plainY: A(plain.y), ut: { y: A(r.ut.y), xh: A(r.ut.xh), rh: A(r.ut.rh), Au: A(r.ut.Au) }, utF: { y: A(rf.ut.y), xh: A(rf.ut.xh), askedSame: A(rfAsked.ut.y).every((v, i) => Object.is(v, rf.ut.y[i])), packs: [r.ut.pack, rf.ut.pack, rfAsked.ut.pack] }, odd: { xh: A(o2.ut.xh), xhF: A(o2f.ut.xh), y: A(o2.ut.y), yF: A(o2f.ut.y) }, refused, errs };
     }` });
     if (q.skipped) console.log("  SKIP  " + q.reason);
     else if (!q.ok || !q.result) ok("!! section 172: the device ran U_TH after the history", false, `${q.reason || "no result"} ${JSON.stringify(q.pageErrors || []).slice(0, 300)}`);
@@ -982,7 +985,7 @@ console.log("\n6b. SECTION 172: U_TH AFTER THE HISTORY, ON THE DEVICE, AGAINST r
         const wy = rel(Q.ut.y, yCPU); let moved = 0; for (let i = 0; i < yCPU.length; i++) if (Math.abs(Q.ut.y[i] - Q.plainY[i]) > 1e-6) moved++;
         const bitsEq = (u, v) => u.length === v.length && u.every((x2, i) => Object.is(x2, v[i]));
         ok("!! round 76: PACKH_FAST_WGSL's half-size input is PACKH_WGSL's bit for bit, and so the chain's U_TH image is round 75's bit for bit",
-            !!Q.utF && bitsEq(Q.utF.xh, Q.ut.xh) && bitsEq(Q.utF.y, Q.ut.y), `${Q.utF ? Q.utF.xh.length : 0} values`);
+            !!Q.utF && bitsEq(Q.utF.xh, Q.ut.xh) && bitsEq(Q.utF.y, Q.ut.y) && Q.utF.askedSame && Q.utF.packs.join() === "loop,fast,fast", `${Q.utF ? Q.utF.xh.length : 0} values; packs dispatched ${Q.utF ? Q.utF.packs.join(", ") : "?"} -- the default the coalesced (section 175)`);
         ok("!! ...and on a frame that is not square, 62 x 46, the two packs agree bit for bit too -- their input and the image",
             !!Q.odd && Q.odd.xh.length === 31 * 23 * 17 && bitsEq(Q.odd.xhF, Q.odd.xh) && bitsEq(Q.odd.yF, Q.odd.y) && Q.odd.xh.some((v) => v !== 0), `${Q.odd ? Q.odd.xh.length : 0} values`);
         ok("!! ...and the chain's U_TH image -- four layers, the upsample, the hold, the light sources -- is compositeEmitters(temporalUpscale(U_TH, x)) within 1e-4, and it is not Bt's",
