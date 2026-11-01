@@ -2815,6 +2815,13 @@ export const NEXT_ROUNDS = [
         why: "The 3D view is the one people look at.",
     },
     {
+        id: "nav-traffic-avoid-not-slow",
+        blocker: "OPEN",
+        what: "The traffic fix (brain/SUB_FIELD_NAV_WIP.md, RESULT OF THE TRAFFIC FIX, HELD5) reached 40 of 60 (PARTLY SUPPORTED: +6 over any+predict, bar 80% and no-exit missed): the failures that remain are collisions with ships (14 of the designated arm's 16) and four exits through the edge band; slowing to 2 m/s did not change the collision count.",
+        how: "A vessel that turns away from a ship (a velocity-obstacle or a give-way heading chosen against the ship's relative velocity), a stop, or a plan whose capsule is the ship's reach rather than its track; and a look at why the vessel crosses a 36 m wall (is the plan routeless there?). New registration, fresh seeds (HELD5 is spent).",
+        why: "The incumbent's rate moved nine flights between two 60-scenario sets, so a fix is only worth reading on a new set with the paired test beside it.",
+    },
+    {
         id: "fly-pair-replication",
         blocker: "OPEN",
         what: "The paired memory test (brain/TANK_PILOTS_WIP.md) found memory helps (p 0.005 lit, 0.0002 dark) but could not say the dark effect exceeds the lit one (p 0.083).",
