@@ -6,6 +6,9 @@
 //   node tools/ship/subFieldNavStudy.mjs --set dev|held [--margin M] [--seeds N] [--write]
 //                                                                         flies the set at M* (default: the amended 12 m; PRIMARY) and, for the held set, also at the registered 6 m (SECONDARY, labelled); prints the tables and the verdict
 //                                                                         --write puts every flight (primary and secondary) in brain/subFieldNavHeld.jsonl (held only)
+//   node tools/ship/subFieldNavStudy.mjs --set held3 [--margin M] [--seeds N] [--write]
+//                                                                         THE SMOOTHER HEADING'S SET (seeds 301 to 360, read once): straight, field-smooth+approach (the incumbent), field-any and field-any+approach at the primary margin 12 and (labelled) at 18; the tables with the path ratio split by whether the straight
+//                                                                         line is clear, and the verdict of "FOLLOW-UP 2" (predictions B1 to B6); --write puts the flights in brain/subFieldNavHeld3.jsonl.  --paths adds those arms to a dev run.
 //   node tools/ship/subFieldNavStudy.mjs --set held2 [--margin M] [--seeds N] [--write]
 //                                                                         THE ARRIVAL RULE'S SET (seeds 201 to 260, read once): the seven arms (straight, and each field arm plain, +approach, +approach+slow) at the primary margin, the tables and the verdict of the
 //                                                                         follow-up in brain/SUB_FIELD_NAV_WIP.md (predictions A1 to A5); --write puts the flights in brain/subFieldNavHeld2.jsonl.  --arrivals adds the arrival arms to a dev run.
@@ -18,9 +21,10 @@ import * as N from "../../brain/subFieldNav.mjs";
 import * as AP from "../../brain/autopilotSub.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url)), ENG = path.resolve(HERE, "..", "..");
-export const OUT = "brain/subFieldNavHeld.jsonl", OUT2 = "brain/subFieldNavHeld2.jsonl";
+export const OUT = "brain/subFieldNavHeld.jsonl", OUT2 = "brain/subFieldNavHeld2.jsonl", OUT3 = "brain/subFieldNavHeld3.jsonl";
 export const PRIMARY_MARGIN = 12, REGISTERED_MARGIN = N.MARGIN;
-export const THRESH = Object.freeze({ r1BlockedMax: 0.25, r1UnblockedMin: 0.9, r2Still: 0.9, r2Current: 0.8, r3Smooth: 1.10, r3Cell: 1.15 });
+export const THRESH = Object.freeze({ r1BlockedMax: 0.25, r1UnblockedMin: 0.9, r2Still: 0.9, r2Current: 0.8, r3Smooth: 1.10, r3Cell: 1.15, pathBound: 1.10, clearLine: 1.02, anyExtraCollisions: 2 });
+export const PATH_ARMS = Object.freeze(["straight", "field-smooth+approach", "field-any", "field-any+approach"]), INCUMBENT = "field-smooth+approach", SECONDARY_PATH_MARGIN = 18;
 const FIELD_ARMS = Object.freeze(["field-cell", "field-smooth"]);
 export const pilot = (s, t, c) => AP.decide(s, t, c);
 
@@ -37,11 +41,11 @@ const rate = (rs) => rs.filter((r) => r.reached).length / rs.length;   // (a cel
  * straightBlocked: { nav: { blocked: { n, reached }, unblocked: { n, reached } } } }.
  */
 export function summarize(runs) {
-    const key = (r) => r.kind + "|" + r.seed, cells = {}, straightBy = new Map();
-    for (const r of runs) if (r.arm === "straight") straightBy.set(key(r), r);
+    const key = (r) => r.kind + "|" + r.seed, cells = {}, straightBy = new Map(), incBy = new Map();
+    for (const r of runs) { if (r.arm === "straight") straightBy.set(key(r), r); if (r.arm === INCUMBENT) incBy.set(key(r), r); }
     for (const kind of N.KINDS) {
         cells[kind] = {};
-        for (const arm of N.ALL_ARMS) {
+        for (const arm of N.EVERY_ARM) {
             const rs = runs.filter((r) => r.kind === kind && r.arm === arm);
             if (!rs.length) continue;
             const count = (s) => rs.filter((r) => r.status === s).length, pairs = arm === "straight" ? [] : rs.filter((r) => r.reached && straightBy.has(key(r)) && straightBy.get(key(r)).reached);
@@ -49,6 +53,10 @@ export function summarize(runs) {
                 n: rs.length, reached: rs.filter((r) => r.reached).length, rate: rate(rs), collided: count("collided"), left: count("left"), timeout: count("timeout"),
                 other: rs.filter((r) => !["reached", "collided", "left", "timeout"].includes(r.status)).length, noRoute: rs.filter((r) => r.noRoute).length,
                 medianClearance: median(rs.map((r) => r.minClearance)), medianPathRatio: arm === "straight" ? null : (pairs.length ? median(pairs.map((r) => r.path / straightBy.get(key(r)).path)) : NaN), pairs: pairs.length,
+                // the path split by whether the straight line is clear (the scenario's `blocked` flag), and an any-angle arm's path against the incumbent's on the scenarios both reach
+                ratioClear: arm === "straight" ? null : median(pairs.filter((r) => !r.blocked).map((r) => r.path / straightBy.get(key(r)).path)), pairsClear: arm === "straight" ? 0 : pairs.filter((r) => !r.blocked).length,
+                ratioBlocked: arm === "straight" ? null : median(pairs.filter((r) => r.blocked).map((r) => r.path / straightBy.get(key(r)).path)), pairsBlocked: arm === "straight" ? 0 : pairs.filter((r) => r.blocked).length,
+                vsIncumbent: arm.startsWith("field-any") ? median(rs.filter((r) => r.reached && incBy.has(key(r)) && incBy.get(key(r)).reached).map((r) => r.path / incBy.get(key(r)).path)) : null,
             };
         }
     }
@@ -101,6 +109,35 @@ export function arrivalText(j) {
     return lines.join("\n");
 }
 
+/**
+ * The smoother heading's predictions B1 to B6 and its verdict from a summary of PATH_ARMS (brain/SUB_FIELD_NAV_WIP.md, "FOLLOW-UP 2"). B1 (the claim): some any-angle arm meets the success bars (90% still, 80% current) AND a median path ratio of at most pathBound (1.10) in still water.
+ * B2: field-any's ratio on the clear-line scenarios is at most clearLine (1.02). B3: each any-angle arm's median per-scenario path against the incumbent's is below 1. B4: each any-angle arm collides at most anyExtraCollisions (2) more than the incumbent, in each kind.
+ * B5: each any-angle arm's median least clearance is below the incumbent's in each kind. B6: field-any+approach reaches at least as many as field-any in each kind.
+ */
+export function judgePath(sum) {
+    const c = sum.cells, cell = (kind, arm) => (c[kind] && c[kind][arm]) || null, inc = (kind) => cell(kind, INCUMBENT), arms = {};
+    for (const arm of N.ANY_ARMS) {
+        const still = cell("nav", arm), cur = cell("nav-current", arm), ratio = still ? still.medianPathRatio : NaN, vs = still ? still.vsIncumbent : NaN;
+        arms[arm] = { success: !!(still && cur && still.rate >= THRESH.r2Still && cur.rate >= THRESH.r2Current), ratio, path: Number.isFinite(ratio) && ratio <= THRESH.pathBound, vsIncumbent: vs, shorter: Number.isFinite(vs) && vs < 1 };
+    }
+    const each = (f) => N.ANY_ARMS.every((arm) => N.KINDS.every((k) => { const x = cell(k, arm), y = inc(k); return !!(x && y) && f(x, y); }));
+    const clear = cell("nav", "field-any"), b2ratio = clear ? clear.ratioClear : NaN;
+    const full = N.ANY_ARMS.filter((a) => arms[a].success && arms[a].path), succ = N.ANY_ARMS.filter((a) => arms[a].success);
+    const b6 = N.KINDS.every((k) => { const x = cell(k, "field-any"), y = cell(k, "field-any+approach"); return !!(x && y) && y.reached >= x.reached; });
+    return {
+        arms, b2ratio, b2: Number.isFinite(b2ratio) && b2ratio <= THRESH.clearLine, b3: N.ANY_ARMS.every((a) => arms[a].shorter), b4: each((x, y) => x.collided <= y.collided + THRESH.anyExtraCollisions), b5: each((x, y) => x.medianClearance < y.medianClearance), b6,
+        verdict: full.length ? "SUPPORTED" : succ.length ? "PARTLY SUPPORTED" : "NOT SUPPORTED", supportedBy: full, successBy: succ,
+    };
+}
+/** The path block: B2 to B6 held or missed, each any-angle arm against the success bars and the path bound, the verdict. */
+export function pathText(j) {
+    const yn = (v) => (v ? "HELD" : "MISSED"), lines = [`B2 field-any's median path ratio on the scenarios with a clear straight line is at most ${THRESH.clearLine} (it is ${f2(j.b2ratio)}): ${yn(j.b2)}`, `B3 each any-angle arm's path is shorter than the incumbent's (the median per-scenario ratio is below 1): ${yn(j.b3)}`,
+        `B4 each any-angle arm has at most ${THRESH.anyExtraCollisions} more collisions than the incumbent in each kind: ${yn(j.b4)}`, `B5 each any-angle arm's median least clearance is below the incumbent's in each kind: ${yn(j.b5)}`, `B6 field-any+approach reaches at least as many as field-any in each kind: ${yn(j.b6)}`];
+    for (const arm of N.ANY_ARMS) lines.push(`${arm}: success bars (>= ${pct(THRESH.r2Still)} still and >= ${pct(THRESH.r2Current)} current): ${j.arms[arm].success ? "HELD" : "MISSED"}; path bound (median ratio ${f2(j.arms[arm].ratio)} <= ${THRESH.pathBound}): ${j.arms[arm].path ? "HELD" : "MISSED"}; against the incumbent ${f2(j.arms[arm].vsIncumbent)}`);
+    lines.push(`B1 / VERDICT: ${j.verdict}${j.supportedBy.length ? " (by " + j.supportedBy.join(", ") + ")" : j.successBy.length ? " (the success bars held for " + j.successBy.join(", ") + ")" : ""}`);
+    return lines.join("\n");
+}
+
 /** The margin the DEV sweep picks: the highest mean success over the field arms and both kinds; ties go to the smaller margin. `byMargin` is { margin: runs }. Returns { margin, means: { margin: mean } }. */
 export function chooseMargin(byMargin) {
     const means = {};
@@ -113,11 +150,11 @@ export function chooseMargin(byMargin) {
 const pct = (v) => (100 * v).toFixed(0) + "%";
 const f2 = (v) => (Number.isFinite(v) ? v.toFixed(2) : "n/a");
 /** The table of a summary, one line a (kind, arm). */
-export function table(sum, title) {
-    const lines = [title, "kind         | arm          | reached      | collided left timeout noRoute | median path ratio vs straight (pairs) | median min clearance (m)"];
-    for (const kind of N.KINDS) for (const arm of N.ALL_ARMS) {
+export function table(sum, title, { split = false } = {}) {
+    const lines = [title, "kind         | arm          | reached      | collided left timeout noRoute | median path ratio vs straight (pairs) | median min clearance (m)" + (split ? " | ratio, clear line (pairs) | ratio, blocked (pairs) | path vs the incumbent" : "")];
+    for (const kind of N.KINDS) for (const arm of N.EVERY_ARM) {
         const x = sum.cells[kind] && sum.cells[kind][arm]; if (!x) continue;
-        lines.push(`${kind.padEnd(12)} | ${arm.padEnd(12)} | ${(`${x.reached}/${x.n} ${pct(x.rate)}`).padEnd(12)} | ${String(x.collided).padStart(8)} ${String(x.left).padStart(4)} ${String(x.timeout).padStart(7)} ${String(x.noRoute).padStart(7)} | ${(x.medianPathRatio === null ? "-" : `${f2(x.medianPathRatio)} (${x.pairs})`).padEnd(37)} | ${f2(x.medianClearance)}`);
+        lines.push(`${kind.padEnd(12)} | ${arm.padEnd(12)} | ${(`${x.reached}/${x.n} ${pct(x.rate)}`).padEnd(12)} | ${String(x.collided).padStart(8)} ${String(x.left).padStart(4)} ${String(x.timeout).padStart(7)} ${String(x.noRoute).padStart(7)} | ${(x.medianPathRatio === null ? "-" : `${f2(x.medianPathRatio)} (${x.pairs})`).padEnd(37)} | ${f2(x.medianClearance)}` + (split ? ` | ${(x.ratioClear === null ? "-" : `${f2(x.ratioClear)} (${x.pairsClear})`).padEnd(23)} | ${(x.ratioBlocked === null ? "-" : `${f2(x.ratioBlocked)} (${x.pairsBlocked})`).padEnd(22)} | ${x.vsIncumbent === null ? "-" : f2(x.vsIncumbent)}` : ""));
     }
     const sb = sum.straightBlocked.nav;
     lines.push(`straight in still water: blocked ${sb.blocked.reached}/${sb.blocked.n}, unblocked ${sb.unblocked.reached}/${sb.unblocked.n}`);
@@ -135,18 +172,20 @@ export function verdictText(j) {
 /** The command as a function: returns the exit code (0 fine, 2 a bad argument). `io` is for the gate: { out, err, writeFile }. */
 export function command(argv, io = {}) {
     const out = io.out || ((m) => console.log(m)), err = io.err || ((m) => console.error(m)), writeFile = io.writeFile || fs.writeFileSync;
-    const o = { sweep: false, set: "dev", margin: PRIMARY_MARGIN, seeds: null, write: false, arrivals: false };
+    const o = { sweep: false, set: "dev", margin: PRIMARY_MARGIN, seeds: null, write: false, arrivals: false, paths: false };
     for (let i = 0; i < argv.length; i++) {
         const a = argv[i];
         if (a === "--sweep") o.sweep = true;
         else if (a === "--write") o.write = true;
         else if (a === "--arrivals") o.arrivals = true;
+        else if (a === "--paths") o.paths = true;
         else if (a === "--set") { o.set = argv[++i]; if (!N.SETS[o.set]) { err(`subFieldNavStudy: --set needs one of ${Object.keys(N.SETS).join(", ")}`); return 2; } }
         else if (a === "--margin" || a === "--seeds") { const v = Number(argv[++i]); if (!Number.isFinite(v) || v <= 0 || (a === "--seeds" && !Number.isInteger(v))) { err(`subFieldNavStudy: ${a} needs a positive number${a === "--seeds" ? " (a whole one)" : ""}`); return 2; } o[a.slice(2)] = v; }
         else { err(`subFieldNavStudy: unknown argument ${JSON.stringify(a)}`); return 2; }
     }
-    if (o.write && (o.sweep || (o.set !== "held" && o.set !== "held2"))) { err("subFieldNavStudy: --write goes with --set held or --set held2 only"); return 2; }
-    if (o.arrivals && o.sweep) { err("subFieldNavStudy: --arrivals does not go with --sweep"); return 2; }
+    if (o.write && (o.sweep || (o.set !== "held" && o.set !== "held2" && o.set !== "held3"))) { err("subFieldNavStudy: --write goes with --set held, held2 or held3 only"); return 2; }
+    if ((o.arrivals || o.paths) && o.sweep) { err("subFieldNavStudy: --arrivals and --paths do not go with --sweep"); return 2; }
+    if (o.arrivals && o.paths) { err("subFieldNavStudy: --arrivals and --paths do not go together"); return 2; }
     const scenariosOf = (name) => { const seeds = o.seeds ? N.SETS[name].slice(0, o.seeds) : N.SETS[name]; return N.KINDS.flatMap((k) => seeds.map((s) => N.navScenario(s, k))); };
     if (o.sweep) {
         const set = scenariosOf("dev"), byMargin = {};
@@ -157,13 +196,14 @@ export function command(argv, io = {}) {
         out(`M* = ${pick.margin} m (the highest mean success; ties to the smaller)`);
         return 0;
     }
-    const arrivalMode = o.set === "held2" || o.arrivals, arms = arrivalMode ? N.ALL_ARMS : N.ARMS, file = o.set === "held2" ? OUT2 : OUT;
-    const set = scenariosOf(o.set), margins = o.set === "held" ? [o.margin, REGISTERED_MARGIN].filter((m, i, a) => a.indexOf(m) === i) : [o.margin], all = [];
+    const pathMode = o.set === "held3" || o.paths, arrivalMode = !pathMode && (o.set === "held2" || o.arrivals), arms = pathMode ? PATH_ARMS : arrivalMode ? N.ALL_ARMS : N.ARMS, file = o.set === "held3" ? OUT3 : o.set === "held2" ? OUT2 : OUT;
+    const second = o.set === "held" ? REGISTERED_MARGIN : o.set === "held3" ? SECONDARY_PATH_MARGIN : null;
+    const set = scenariosOf(o.set), margins = second === null ? [o.margin] : [o.margin, second].filter((m, i, a) => a.indexOf(m) === i), all = [];
     out(`${o.set.toUpperCase()} set: ${set.length / N.KINDS.length} scenarios of each kind, ${arms.length} arms`);
     margins.forEach((m, idx) => {
         const runs = N.evaluate(pilot, set, arms, { margin: m }), sum = summarize(runs);
         for (const r of runs) all.push({ set: o.set, role: idx === 0 ? "primary" : "as-registered", ...r });
-        out(""); out(table(sum, `margin ${m} m -- ${idx === 0 ? "PRIMARY" : "SECONDARY, as first registered (reads nothing into the verdict)"}`)); out(arrivalMode ? arrivalText(judgeArrival(sum)) : verdictText(judge(sum)));
+        out(""); out(table(sum, `margin ${m} m -- ${idx === 0 ? "PRIMARY" : o.set === "held3" ? "SECONDARY (reads nothing into the verdict)" : "SECONDARY, as first registered (reads nothing into the verdict)"}`, { split: pathMode })); out(pathMode ? pathText(judgePath(sum)) : arrivalMode ? arrivalText(judgeArrival(sum)) : verdictText(judge(sum)));
     });
     if (o.write) { writeFile(path.join(ENG, file), all.map((r) => JSON.stringify(r)).join("\n") + "\n"); out(`wrote ${all.length} flights to ${file}`); }
     return 0;

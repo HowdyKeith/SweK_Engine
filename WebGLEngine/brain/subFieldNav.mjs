@@ -31,9 +31,14 @@ export const BIG = 1e9;
 export const ARRIVAL_RADIUS = 30, ARRIVAL_SLOW = 1.5;
 export const ARRIVAL_ARMS = Object.freeze(["field-cell", "field-smooth"].flatMap((a) => [a + "+approach", a + "+approach+slow"]));
 export const ALL_ARMS = Object.freeze([...ARMS, ...ARRIVAL_ARMS]);
+// THE SMOOTHER HEADING (brain/SUB_FIELD_NAV_WIP.md, "FOLLOW-UP 2", registered before it was built): "field-any" steers on the bearing to an ANY-ANGLE AIM POINT -- for each reached cell the farthest point along the field's grid path that is visible in a straight line
+// through unblocked cells (Theta*'s rule, built once per field by buildAim) -- so in an open sea every cell aims at the waypoint and round an obstacle the aim point is a corner of the inflated zone. "field-any+approach" adds the arrival rule.
+export const ANY_ARMS = Object.freeze(["field-any", "field-any+approach"]);
+export const EVERY_ARM = Object.freeze([...ALL_ARMS, ...ANY_ARMS]);
+export const AIM_STEP = 2;   // metres between the samples of a line-of-sight test (the cell is 5 m)
 /** An arm name taken apart: { base ("straight" | "field-cell" | "field-smooth"), approach, slow }; throws, naming every arm, on one that is not in ALL_ARMS. */
 export function parseArm(arm, who = "subFieldNav.parseArm") {
-    if (!ALL_ARMS.includes(arm)) throw new Error(`${who}: unknown arm "${arm}" (${ALL_ARMS.join(", ")})`);
+    if (!EVERY_ARM.includes(arm)) throw new Error(`${who}: unknown arm "${arm}" (${EVERY_ARM.join(", ")})`);
     const approach = arm.includes("+approach");
     return { base: approach ? arm.slice(0, arm.indexOf("+")) : arm, approach, slow: arm.endsWith("+slow") };
 }
@@ -53,6 +58,45 @@ export const isBlocked = (start, goal, discs) => discs.some((d) => segmentDistan
 export function cellOf(field, x, y) {
     const gx = Math.floor((x - field.x0) / field.cell), gy = Math.floor((y - field.y0) / field.cell);
     return gx < 0 || gy < 0 || gx >= field.w || gy >= field.h ? null : { gx, gy, i: gy * field.w + gx };
+}
+
+/** Is the straight segment from (x0, y0) to (x1, y1) inside the grid and clear of every BLOCKED cell? Sampled every AIM_STEP m, both ends included. */
+export function lineClear(field, x0, y0, x1, y1) {
+    const len = Math.hypot(x1 - x0, y1 - y0), n = Math.max(1, Math.ceil(len / AIM_STEP));
+    for (let i = 0; i <= n; i++) { const c = cellOf(field, x0 + (x1 - x0) * i / n, y0 + (y1 - y0) * i / n); if (!c || field.blocked[c.i]) return false; }
+    return true;
+}
+/**
+ * The any-angle aim points of a field: { ax, ay } (Float64Array per cell, NaN where a cell has none). Cells are processed in increasing distance from the waypoint; the waypoint's own cell aims at the waypoint; any other reached cell takes its next cell's aim point when the straight
+ * segment from its own centre to that point is clear (lineClear), and the next cell's centre when it is not. A cell that is blocked, unreached, without a flow, or whose next cell has no aim point has none.
+ */
+export function buildAim(field, goal) {
+    const { w, h, dist, fx, fz, blocked } = field, ax = new Float64Array(w * h).fill(NaN), ay = new Float64Array(w * h).fill(NaN), order = [];
+    for (let i = 0; i < w * h; i++) if (!blocked[i] && dist[i] < BIG) order.push(i);
+    order.sort((p, q) => dist[p] - dist[q] || p - q);
+    const goalIndex = field.goalCell.gy * w + field.goalCell.gx, cx = (i) => field.x0 + ((i % w) + 0.5) * field.cell, cy = (i) => field.y0 + (((i / w) | 0) + 0.5) * field.cell;
+    const off = (v) => (v * Math.SQRT2 > 0.5 ? 1 : v * Math.SQRT2 < -0.5 ? -1 : 0);
+    for (const i of order) {
+        if (i === goalIndex) { ax[i] = goal.x; ay[i] = goal.y; continue; }
+        const sx = off(fx[i]), sy = off(fz[i]); if (sx === 0 && sy === 0) continue;
+        const nx = (i % w) + sx, ny = ((i / w) | 0) + sy; if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+        const n = ny * w + nx; if (blocked[n] || !(dist[n] < dist[i]) || Number.isNaN(ax[n])) continue;
+        if (lineClear(field, cx(i), cy(i), ax[n], ay[n])) { ax[i] = ax[n]; ay[i] = ay[n]; } else { ax[i] = cx(n); ay[i] = cy(n); }
+    }
+    return { ax, ay };
+}
+const AIMS = new WeakMap();
+/** The aim points of a field for a waypoint, built the first time and kept with the field (a different waypoint rebuilds them). */
+export function aimOf(field, goal) {
+    const hit = AIMS.get(field);
+    if (hit && hit.x === goal.x && hit.y === goal.y) return hit.aim;
+    const aim = buildAim(field, goal); AIMS.set(field, { x: goal.x, y: goal.y, aim }); return aim;
+}
+/** The heading (atan2(-dy, dx)) from (x, y) to the aim point of the cell holding it, or null when the cell has none, the point is outside the grid, or the vessel is on the aim point. */
+export function aimHeading(field, aim, x, y) {
+    const c = cellOf(field, x, y); if (!c || Number.isNaN(aim.ax[c.i])) return null;
+    const dx = aim.ax[c.i] - x, dy = aim.ay[c.i] - y;
+    return dx === 0 && dy === 0 ? null : Math.atan2(-dy, dx);
 }
 
 /** The field for a scenario's discs and waypoint at `margin` m beyond the half-hull: { w, h, cell, x0, y0, margin, fx, fz, dist, blocked (Uint8Array), goalCell }. */
@@ -120,7 +164,9 @@ export function armTarget(arm, state, field, goal) {
     const a = parseArm(arm, "subFieldNav.armTarget"), straight = MT.waypointTarget(state, goal, CRUISE);
     if (a.base === "straight") return straight;
     if (a.approach && Math.hypot(goal.x - state.pos[0], goal.y - state.pos[1]) <= ARRIVAL_RADIUS) return a.slow ? { ...straight, speed: ARRIVAL_SLOW } : straight;
-    const h = fieldHeading(field, state.pos[0], state.pos[1], a.base === "field-smooth" ? "smooth" : "cell");
+    let h;
+    if (a.base === "field-any") { h = aimHeading(field, aimOf(field, goal), state.pos[0], state.pos[1]); if (h === null) h = fieldHeading(field, state.pos[0], state.pos[1], "cell"); }
+    else h = fieldHeading(field, state.pos[0], state.pos[1], a.base === "field-smooth" ? "smooth" : "cell");
     return h === null ? straight : { ...straight, heading: h };
 }
 
@@ -157,9 +203,9 @@ export function fly(pilot, sc, arm, { seconds = SECONDS, dt = S.DT, model = navM
     return { arm, kind: sc.kind, seed: sc.seed, blocked: sc.blocked, status, reached: status === "reached", t, path, minClearance: minClear, ticks, margin: f ? f.margin : null, noRoute };
 }
 
-/** The scenarios of a set: its seeds of each kind, frozen. DEV seeds 1..30 (1..12 as first registered, widened by Amendment 1), HELD seeds 101..160 and HELD2 seeds 201..260, the arrival rule's (brain/SUB_FIELD_NAV_WIP.md). */
+/** The scenarios of a set: its seeds of each kind, frozen. DEV seeds 1..30 (1..12 as first registered, widened by Amendment 1), HELD seeds 101..160 and HELD2 seeds 201..260, the arrival rule's, and HELD3 seeds 301..360, the smoother heading's (brain/SUB_FIELD_NAV_WIP.md). */
 export const range = (a, b) => Array.from({ length: b - a + 1 }, (_, i) => a + i);
-export const SETS = Object.freeze({ dev: range(1, 30), held: range(101, 160), held2: range(201, 260) });   // held2: the arrival rule's set (the follow-up), read once
+export const SETS = Object.freeze({ dev: range(1, 30), held: range(101, 160), held2: range(201, 260), held3: range(301, 360) });   // held2: the arrival rule's set (the follow-up), read once
 export const setOf = (name) => { if (!SETS[name]) throw new Error(`subFieldNav.setOf: unknown set "${name}" (${Object.keys(SETS).join(", ")})`); return Object.freeze(KINDS.flatMap((k) => SETS[name].map((s) => navScenario(s, k)))); };
 
 /** Every arm over a set of scenarios: the list of fly() results, scenario by scenario (the field is built once per scenario). */
