@@ -12,7 +12,20 @@
 //                      open sea and not behind an island, back to the middle outside the tank)
 //   5  THE FLIGHT      the navigator flying the real vessel on the PD autopilot for five tank-minutes in the same sea: GOLDEN counts of arrivals, contacts and plans
 //
-// SABOTAGE LOG -- (filled in below after the mutants have been run)
+// SABOTAGE LOG -- 112 mutants of brain/subTankNav.mjs, each run against a copy of this gate, 4 at a time. ALL 112 RED: 107 BY A NAMED ROW and 5 BY A THROWN ERROR that the section guard reports by section (K24, K70, K82, K91, K101: each breaks a function the next
+//   rows call, so the section dies at its first call):
+//   K01 length; K02-K03 the grid; K04 arms order; K05 default arm; K06-K07 the depth range; K08-K10 the counts of islands, icebergs, ships; K11-K13 wall clearance, gap, lane clearance; K14-K19 the goal's margin, distance, clearance, tries, depth inset, the
+//   clear second; K20-K23 reflect (the period, the fold, negative coordinates, the low end); K24-K28 sceneAt and laneSegment; K29-K30 the size check (each side); K31 the seed; K32-K35 each wall of the fits test; K36 the gap; K37-K43 the island (radius,
+//   centre, satellites, their radius and distance, group, keel); K44-K46 the iceberg (radius, keel, group); K47-K61 the ships (axis, radius, speed, direction, keel, lane ends and length, fixed coordinate, first place, lane clearance, group, start, frozen lane);
+//   K62-K63 the scene's size and sceneNow; K64-K66 the navigator's arm check, seed and mode; K67-K80 the goal draw (lane distance, radius, minDepth, grid, ranges, distance, clearance, route, straight, fallback, field reset) and the plan (minDepth, own,
+//   grid, time, count, margin, noRoute, mode, at); K81-K112 the step (travel, last, the goal first, the gap's time and its `at`, the contact logic and its clear second, arrival, the plan condition and the replan cadence, the four sides of the tank, the way
+//   back, invalidate, the snapshot's copy and fields).
+//   ON THE FIRST RUN NINETEEN WENT 0 RED and the gate grew what separated them: K29 (a tank wrong in ONE side only), K46 and K59 (group ids that name one thing each), K73 (a goal depth in the tank's range but not inset), K77 (the goal of a straight sub is the
+//   first CLEAR candidate, of a field arm the first with a ROUTE: a sub shut in a ring), K80 (the plan blocks an iceberg by the SHALLOWER of the sub's depth and the goal's: a sea and a seed found for it), K85 and K86 (the plan's margin and `noRoute` in the
+//   snapshot: the ring again), K92 and K93 (contact read at the tank's clock against a ship that is elsewhere at t = 0), K96 (the clear second restarts at every renewed contact), K101 (a plan is made AT ONCE for a new goal), K105 and K106 (all four sides of the
+//   tank bring a sub back), K111 (the snapshot's goal is a copy); and five rows died of a thrown error with no section guard (K24, K70, K82, K91; the guard is there now).
+//   THE GOAL DRAW WAS A REAL DEFECT THE GATE'S FIRST RUN FOUND, not a mutant: the study's r + 40 m clearance, in a 500 x 300 m tank with seven obstacles, left almost nothing, and 18 of 25 goals fell back to the default corner (and one sub circled a goal at the
+//   edge of an island for 300 s). The clearance is r + 28 m (the plan's 16 m at the widest margin plus 12) and the draw has 200 tries; the default goal now fires only in a sea shut by one huge island (a row builds that).
 "use strict";
 import * as T from "./subTankNav.mjs";
 import * as H from "./subHardNav.mjs";
