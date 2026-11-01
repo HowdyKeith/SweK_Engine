@@ -185,6 +185,9 @@
 // ROUND 75 (section 172), U_TH after the history, by the same runner: C1 the pack reading the clamped history for the twin's channels,
 // C2 the history length not over 8, C3 the sky's albedo 0, C4 the pack from one corner, C6 the twin clamped -> 2 red each; C5 the
 // hold 0.6, C7 temporalUT keeping the final pass, C9 the adapter table adding the Intel -> 1 red each; C8 an emitter's albedo 0 -> 3.
+// ROUND 76 (section 174): F2 the coalesced pack's dispatch one group short -> 2 red, F3 temporalUTF summing round 75's pack, F4 readH76
+// reading section 172's line, F5 the "fast" option dispatching the loop -> 1 red each; F1 the coalesced pack's rows from the height ->
+// *** 0 RED at first *** (the fixture is square), then 1 with the 62 x 46 row added for it.
 "use strict";
 import fs from "node:fs";
 import crypto from "node:crypto";
@@ -652,10 +655,14 @@ console.log("\n4. THE CALLER: denoise.html's \"Time the half-size chain\", at it
                 // round 75 (section 172): U_TH after the history, its passes, and the chain with it beside the chain with its history
                 K.temporalUT ? "section 172: U_TH after the history -- " + ["accumU", "packH", "ut0", "ut1", "ut2", "ut3", "upholdC", "final"].map((k) => `${k} ${fine(ks[k]) ? ks[k].ms.toFixed(3) + " ms (" + ks[k].clock + ")" : "not measured"}`).join("; ") +
                     `; the half-size chain with its history and U_TH ${K.temporalUT.ms.toFixed(3)} ms, with its history ${K.temporal.ms.toFixed(3)} ms, ratio ${(K.temporalUT.ms / K.temporal.ms).toFixed(3)} x`
-                    : `section 172: U_TH after the history -- off on this adapter (${K.pageKey || "no key"})`];
+                    : `section 172: U_TH after the history -- off on this adapter (${K.pageKey || "no key"})`,
+                // round 76 (section 174): the coalesced pack beside round 75's, and the chain with U_TH on it
+                K.temporalUTF ? "section 174: the coalesced pack -- " + ["packH", "packHF"].map((k) => `${k} ${fine(ks[k]) ? ks[k].ms.toFixed(3) + " ms (" + ks[k].clock + ")" : "not measured"}`).join("; ") +
+                    `; the half-size chain with its history and U_TH ${K.temporalUTF.ms.toFixed(3)} ms, with its history ${K.temporal.ms.toFixed(3)} ms, ratio ${(K.temporalUTF.ms / K.temporal.ms).toFixed(3)} x`
+                    : `section 174: the coalesced pack -- U_TH off on this adapter (${K.pageKey || "no key"})`];
         };
         ok("!! the page timed every step of the chain and both networks at its pilot size -- each a positive time on a named clock, the table shown, no page error",
-            pg.ok && !!st && keys.every((k) => fine(st[k])) && fine(J.networkFull) && fine(J.networkHalf) && !!J.full && !!J.half && !!J.temporal && !!J.halfRing && !!J.temporalRing && !!J.halfTile && !!J.temporalTile && !!J.halfList && !!J.temporalList && !J.halfLTile && !J.temporalLTile && !!J.fullUnbound && !!J.halfUnbound && !!J.temporalUnbound && !J.fullBound && !J.halfBound && !J.temporalBound && J.fill === "listedTile" && J.coverage === "bound" && J.rest === "fused" && !!J.halfTwoPass && !!J.temporalTwoPass && J.accumulation === "tiled" && !!J.temporalUntiled && J.network === "shipped (asked by ?net=)" && J.params === 33329 && pg.result.shown && pg.result.rows === 33 && !pg.pageErrors.length,
+            pg.ok && !!st && keys.every((k) => fine(st[k])) && fine(J.networkFull) && fine(J.networkHalf) && !!J.full && !!J.half && !!J.temporal && !!J.halfRing && !!J.temporalRing && !!J.halfTile && !!J.temporalTile && !!J.halfList && !!J.temporalList && !J.halfLTile && !J.temporalLTile && !!J.fullUnbound && !!J.halfUnbound && !!J.temporalUnbound && !J.fullBound && !J.halfBound && !J.temporalBound && J.fill === "listedTile" && J.coverage === "bound" && J.rest === "fused" && !!J.halfTwoPass && !!J.temporalTwoPass && J.accumulation === "tiled" && !!J.temporalUntiled && J.network === "shipped (asked by ?net=)" && J.params === 33329 && pg.result.shown && pg.result.rows === 34 && !pg.pageErrors.length,
             pg.ok ? (pg.result?.status || "").slice(0, 200) : pg.reason);
         if (st) {
             // the network times are the ladder's rows, w x h then W x H (T4 went 0 RED before this held which was which); today's page
@@ -758,6 +765,12 @@ console.log("\n4. THE CALLER: denoise.html's \"Time the half-size chain\", at it
                 Math.abs(J.temporalUT.ms - (J.temporal.ms - st.final.ms + UTS.reduce((q, k) => q + st[k].ms, 0))) < 1e-9 &&
                 /^section 172: U_TH after the history -- accumU/.test(l172 || "") && n(/with its history and U_TH ([0-9.]+) ms/, l172) === at3(J.temporalUT) && n(/, with its history ([0-9.]+) ms/, l172) === at3(J.temporal),
                 l172);
+            // round 76 (section 174): temporalUTF is temporalUT with packHF in packH's place, and the rig's section 174 line carries it
+            const l174 = rigLines(J)[14];
+            ok("!! round 76: the chain with U_TH on the coalesced pack is round 75's sum with packHF in packH's place, packHF one pass on the history's clock, and the rig's section 174 line carries both packs and the sum",
+                !!J.temporalUTF && fine(st.packHF) && st.packHF.clock === st.hits.clock && Math.abs(J.temporalUTF.ms - (J.temporalUT.ms - st.packH.ms + st.packHF.ms)) < 1e-9 &&
+                /^section 174: the coalesced pack -- packH /.test(l174 || "") && n(/packHF ([0-9.]+) ms/, l174) === at3(st.packHF) && n(/with its history and U_TH ([0-9.]+) ms/, l174) === at3(J.temporalUTF) && n(/, with its history ([0-9.]+) ms/, l174) === at3(J.temporal),
+                l174);
             ok("  round 55: the chain with its history on the plain accumulation (temporalUntiled) is the default's sum with accum in accumT's place, and the rig's section 126 line carries accum, accumT and both chains",
                 !!J.temporalUntiled && Math.abs(J.temporalUntiled.ms - (J.temporal.ms - st.accumT.ms + st.accum.ms)) < 1e-9 && Math.abs(J.temporalUntiled.ms - (hb + hist.reduce((a, k) => a + st[k].ms, 0))) < 1e-9 &&
                 /^section 126: /.test(l126 || "") && n(/accum ([0-9.]+) ms/, l126) === at3(st.accum) && n(/accumT ([0-9.]+) ms/, l126) === at3(st.accumT) &&
@@ -948,8 +961,14 @@ console.log("\n6b. SECTION 172: U_TH AFTER THE HISTORY, ON THE DEVICE, AGAINST r
         let refused = null; try { await g.accumulate(P.S, P.eyes, fr, P.N, P.N, { geo, full, ut: true }); } catch (e) { refused = e.message; }
         g.setUT({ layers: P.net.map((L) => ({ ...L, W: Float64Array.from(L.W), b: Float64Array.from(L.b) })) });
         const r = await g.accumulate(P.S, P.eyes, fr, P.N, P.N, { geo, full, ut: true }), plain = await g.accumulate(P.S, P.eyes, fr, P.N, P.N, { geo, full });
+        // round 76 (section 174): the coalesced pack -- its input and image beside round 75's
+        const rf = await g.accumulate(P.S, P.eyes, fr, P.N, P.N, { geo, full, ut: true, pack: "fast" });
+        // ...and on a frame that is not square, 62 x 46 with the device's own hits (sabotage F1 -- the coalesced pack's rows from the height --
+        // went 0 red on the square fixture, where width and height are the same)
+        const W2 = 62, H2 = 46, fr2 = fr.map((f, k) => ({ y: Float64Array.from({ length: W2 * H2 * 3 }, (_, i) => 0.2 + 0.5 * ((i * 7 + k * 13) % 97) / 97), shift: f.shift }));
+        const o2 = await g.accumulate(P.S, P.eyes, fr2, W2, H2, { ut: true }), o2f = await g.accumulate(P.S, P.eyes, fr2, W2, H2, { ut: true, pack: "fast" });
         const A = (x) => Array.from(x);
-        return { y: A(r.y), plainY: A(plain.y), ut: { y: A(r.ut.y), xh: A(r.ut.xh), rh: A(r.ut.rh), Au: A(r.ut.Au) }, refused, errs };
+        return { y: A(r.y), plainY: A(plain.y), ut: { y: A(r.ut.y), xh: A(r.ut.xh), rh: A(r.ut.rh), Au: A(r.ut.Au) }, utF: { y: A(rf.ut.y), xh: A(rf.ut.xh) }, odd: { xh: A(o2.ut.xh), xhF: A(o2f.ut.xh), y: A(o2.ut.y), yF: A(o2f.ut.y) }, refused, errs };
     }` });
     if (q.skipped) console.log("  SKIP  " + q.reason);
     else if (!q.ok || !q.result) ok("!! section 172: the device ran U_TH after the history", false, `${q.reason || "no result"} ${JSON.stringify(q.pageErrors || []).slice(0, 300)}`);
@@ -961,9 +980,18 @@ console.log("\n6b. SECTION 172: U_TH AFTER THE HISTORY, ON THE DEVICE, AGAINST r
         ok("!! section 172: the unclamped twin is accumulateUpscaled unclamped (within 1e-5), and PACKH_WGSL's half-size input is halfInput of temporalInput's 17 channels -- within 1e-5",
             wAu <= 1e-5 && wx <= 1e-5 && Q.ut.xh.length === (N / 2) * (N / 2) * 17, `twin ${wAu.toExponential(2)}; packed input ${wx.toExponential(2)}`);
         const wy = rel(Q.ut.y, yCPU); let moved = 0; for (let i = 0; i < yCPU.length; i++) if (Math.abs(Q.ut.y[i] - Q.plainY[i]) > 1e-6) moved++;
+        const bitsEq = (u, v) => u.length === v.length && u.every((x2, i) => Object.is(x2, v[i]));
+        ok("!! round 76: PACKH_FAST_WGSL's half-size input is PACKH_WGSL's bit for bit, and so the chain's U_TH image is round 75's bit for bit",
+            !!Q.utF && bitsEq(Q.utF.xh, Q.ut.xh) && bitsEq(Q.utF.y, Q.ut.y), `${Q.utF ? Q.utF.xh.length : 0} values`);
+        ok("!! ...and on a frame that is not square, 62 x 46, the two packs agree bit for bit too -- their input and the image",
+            !!Q.odd && Q.odd.xh.length === 31 * 23 * 17 && bitsEq(Q.odd.xhF, Q.odd.xh) && bitsEq(Q.odd.yF, Q.odd.y) && Q.odd.xh.some((v) => v !== 0), `${Q.odd ? Q.odd.xh.length : 0} values`);
         ok("!! ...and the chain's U_TH image -- four layers, the upsample, the hold, the light sources -- is compositeEmitters(temporalUpscale(U_TH, x)) within 1e-4, and it is not Bt's",
             wy <= 1e-4 && moved > N * N, `worst ${wy.toExponential(2)}; ${moved} of ${N * N * 3} values corrected`);
     }
+    const [px, py] = UG.packFastGroups(540, 960);
+    ok("  round 76: the coalesced pack's dispatch at 960 x 540 x 17 is within 65535 groups a dimension and covers every value; its text is PACKH_WGSL's up to the entry point",
+        px <= 65535 && px * py * UG.PACKH_FAST_GROUP >= 960 * 540 * 17 && UG.PACKH_SHARED.length > 500 && UG.PACKH_FAST_WGSL.startsWith(UG.PACKH_SHARED) && UG.PACKH_WGSL.startsWith(UG.PACKH_SHARED) &&
+        /xh\[i\] = \(chan\(a, k\) \+ chan\(b, k\) \+ chan\(c, k\) \+ chan\(d, k\)\) \/ 4\.0;/.test(UG.PACKH_FAST_WGSL), `${px} x ${py} groups`);
     ok("  UTH_BY_ADAPTER: on for the 1080 class (nvidia pascal, native and page keys, section 171), off for the Intel and for an unmeasured adapter; UTH_NET round 72's file",
         TG.uthFor("win32/nvidia/pascal") && TG.uthFor("Windows/nvidia/pascal") && !TG.uthFor("win32/intel/gen-9") && !TG.uthFor("Windows/intel/gen-9") && !TG.uthFor("Linux/google/swiftshader") && !TG.uthFor(null) &&
         TG.UTH_NET === "render/upscale-net-r72.json" && Object.keys(TG.UTH_BY_ADAPTER).length === 2);

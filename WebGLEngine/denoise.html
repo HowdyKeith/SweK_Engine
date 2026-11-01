@@ -319,7 +319,9 @@ $("chain").onclick = async () => {
             ["the reference: the accumulation untiled", f(st.accum)], ["...the half-size chain with its history and it, in all", f(r.temporalUntiled)],
             // section 172: U_TH after the history, where it runs
             ...(r.temporalUT ? [["U_TH after the history: the unclamped twin, the pack, four layers, the upsample-hold-composite", ["accumU", "packH", "ut0", "ut1", "ut2", "ut3", "upholdC"].map((k) => f(st[k])).join(" / ")],
-                                ["the half-size chain with its history and U_TH, in all", f(r.temporalUT)]] : [["U_TH after the history", useUT ? "not measured" : `off on this adapter (${key || "no key"}; ?ut=1 asks for it)`]])];
+                                ["the half-size chain with its history and U_TH, in all", f(r.temporalUT)],
+                                // round 76 (section 174): the coalesced pack in round 75's pack's place
+                                ["...with the coalesced pack (round 76) in place of the pack, in all", `${f(st.packHF)} pack; ${f(r.temporalUTF)} in all`]] : [["U_TH after the history", useUT ? "not measured" : `off on this adapter (${key || "no key"}; ?ut=1 asks for it)`]])];
         $("chainTable").querySelector("thead").innerHTML = `<tr style="color:#8fc"><th style="padding:2px 10px;text-align:left">step</th><th style="padding:2px 10px;text-align:right">ms</th></tr>`;
         $("chainTable").querySelector("tbody").innerHTML = rows.map(([k, v]) => `<tr><td style="padding:2px 10px">${k}</td><td style="padding:2px 10px;text-align:right">${v}</td></tr>`).join("");
         $("chainTable").style.display = "";

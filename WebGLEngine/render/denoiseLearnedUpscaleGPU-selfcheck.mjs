@@ -97,6 +97,10 @@ console.log("1. ON THE CPU");
     ok("!! readH75, section 172's rule: the chain with its history and U_TH against the chain with its history, off one line; at most 1.25 x holds; an adapter with U_TH off gives no ratio; a red gate does not count",
         a.withUT === 44 && a.without === 38 && Math.abs(a.ratio - 44 / 38) < 1e-12 && G.h75([a, a]) === "holds" && G.h75([a, b]) === "fails" && c.ratio === null && G.h75([a, c]) === "no verdict" &&
         !d.counts && G.h75([a, d]) === "no verdict" && G.H75_RATIO === 1.25);
+    const l174 = "section 174: the coalesced pack -- packH 5.200 ms (device); packHF 0.700 ms (device); the half-size chain with its history and U_TH 44.000 ms, with its history 38.000 ms, ratio 1.158 x";
+    const e = G.readH76(rep([l172, l174])), f = G.readH76(rep([l172]));
+    ok("!! readH76, section 174's rule: the section 174 line's sum (44.000, the coalesced pack) against the chain, not section 172's; a report without it gives no ratio",
+        e.withUT === 44 && e.without === 38 && G.h75([e, e]) === "holds" && f.ratio === null && G.readH75(rep([l172.replace("44.000", "48.800"), l174])).withUT === 48.8);
 }
 
 {

@@ -847,6 +847,25 @@ fn main(@builtin(global_invocation_id) g:vec3<u32>) {
     for (var k = 0u; k < ${UTH_CHANNELS}u; k++) { xh[o + k] = (chan(a, k) + chan(b, k) + chan(c, k) + chan(d, k)) / 4.0; }
 }
 `;
+/**
+ * Round 76 (section 174): PACKH_WGSL coalesced -- one thread per half-size VALUE, 256 to a group along x, rows of groups along y past
+ * 65535; the same chan() and the same (a + b + c + d) / 4, so held to PACKH_WGSL bit for bit. Made from its text: everything up to
+ * its entry point is shared.
+ */
+export const PACKH_FAST_GROUP = 256;
+/** PACKH_WGSL's text up to its entry point -- its bindings and chan() -- which the coalesced pack shares. */
+export const PACKH_SHARED = PACKH_WGSL.slice(0, PACKH_WGSL.indexOf("@compute"));
+export const PACKH_FAST_WGSL = PACKH_SHARED + `@compute @workgroup_size(${PACKH_FAST_GROUP},1,1)
+fn main(@builtin(global_invocation_id) g:vec3<u32>, @builtin(num_workgroups) nwg:vec3<u32>) {
+    let i = g.x + g.y * nwg.x * ${PACKH_FAST_GROUP}u;
+    if (i >= u.w * u.h * ${UTH_CHANNELS}u) { return; }
+    let k = i % ${UTH_CHANNELS}u; let q = i / ${UTH_CHANNELS}u; let x = q % u.w; let y = q / u.w;
+    let a = (2u * y) * u.W + 2u * x; let b = a + 1u; let c = a + u.W; let d = c + 1u;
+    xh[i] = (chan(a, k) + chan(b, k) + chan(c, k) + chan(d, k)) / 4.0;
+}
+`;
+/** PACKH_FAST_WGSL's dispatch for an h x w half-size pack: [x, y] groups, x at most 65535. */
+export function packFastGroups(h, w) { const n = Math.ceil(h * w * UTH_CHANNELS / PACKH_FAST_GROUP), x = Math.min(n, 65535); return [x, Math.ceil(n / x)]; }
 export const UPHOLD_COMP_WGSL = /* wgsl */`
 struct P { W:u32, H:u32, w:u32, h:u32 };
 @group(0) @binding(0) var<storage,read> hist:array<f32>;     // W x H x 4: Bt's light
@@ -932,7 +951,7 @@ export class DenoiseUpscaleGPU {
                                   ["list", FILL_LIST_WGSL], ["args", FILL_ARGS_WGSL], ["lring", FILL_LISTRING_WGSL], ["lleft", FILL_LISTLEFT_WGSL],
                                   ["tinit", FILL_TILEINIT_WGSL], ["tile", FILL_TILE_WGSL], ["tleft", FILL_TILELEFT_WGSL],
                                   ["ltinit", FILL_LTINIT_WGSL], ["ltargs", FILL_LTARGS_WGSL], ["ltile", FILL_LTILE_WGSL],
-                                  ["packH", PACKH_WGSL], ["upholdC", UPHOLD_COMP_WGSL]]) {
+                                  ["packH", PACKH_WGSL], ["packHF", PACKH_FAST_WGSL], ["upholdC", UPHOLD_COMP_WGSL]]) {
             const p = this.p[k] = device.compute({ wgsl });
             if (p && p.error) throw new Error(`render/denoiseUpscaleGPU: the ${k} kernel did not compile -- ${p.error}`);
         }
@@ -1179,7 +1198,12 @@ export class DenoiseUpscaleGPU {
                  uL: this.ut.map((u) => dev.buffer({ data: new Uint8Array(packFastUniforms({ H: h, W: w, layer: u.L }).buffer), usage: "uniform" })) };
     }
     _utFree(b) { for (const x of [b.xh, ...b.outs, b.alb, b.uP, b.uU, ...b.uL]) x.destroy(); }
-    _utPack(pass, b, histC, histU, cur, geo) { this.p.packH.bind("histC", histC).bind("histU", histU).bind("cur", cur).bind("geo", geo).bind("alb", b.alb).bind("xh", b.xh).bind("u", b.uP); pass.dispatch(this.p.packH, groups(b.w, b.h)); }
+    // round 76: `fast` the coalesced pack, PACKH_FAST_WGSL; round 75's PACKH_WGSL otherwise
+    _utPack(pass, b, histC, histU, cur, geo, fast = false) {
+        const k = fast ? this.p.packHF : this.p.packH;
+        k.bind("histC", histC).bind("histU", histU).bind("cur", cur).bind("geo", geo).bind("alb", b.alb).bind("xh", b.xh).bind("u", b.uP);
+        pass.dispatch(k, fast ? packFastGroups(b.h, b.w) : groups(b.w, b.h));
+    }
     _utLayer(pass, b, i) { const u = this.ut[i]; u.k.bind("Y", b.outs[i]).bind("F", b.uL[i]).bind("X", i ? b.outs[i - 1] : b.xh); pass.dispatch(u.k, [...groups(b.w, b.h), u.z]); }
     _utHold(pass, b, histC, cov, emis, dst) { this.p.upholdC.bind("hist", histC).bind("R", b.outs[3]).bind("cov", cov).bind("emis", emis).bind("dst", dst).bind("u", b.uU); pass.dispatch(this.p.upholdC, groups(2 * b.w, 2 * b.h)); }
 
@@ -1189,7 +1213,8 @@ export class DenoiseUpscaleGPU {
      * device traces them. With `full` ({ cov, E } at W x H) the result is composited as section 95's Bt is. `tile` (round 48) runs
      * ACCUM_TILE_WGSL -- since round 55 by default; `{ tile: false }` runs ACCUM_WGSL, the reference. Returns { A, n, y, kernel }, kernel naming the accumulation it dispatched.
      */
-    async accumulate(S, eyes, frames, W, H, { clamp = true, geo = null, full = null, tile = true, ut = false } = {}) {
+    async accumulate(S, eyes, frames, W, H, { clamp = true, geo = null, full = null, tile = true, ut = false, pack = "loop" } = {}) {
+        if (!["loop", "fast"].includes(pack)) throw new Error(`render/denoiseUpscaleGPU.accumulate: the pack is "loop" (round 75's) or "fast" (round 76's) -- got ${JSON.stringify(pack)}`);
         if (ut && !this.ut) throw new Error("render/denoiseUpscaleGPU.accumulate: { ut: true } needs setUT(net) first");
         if (ut && (W % 2 || H % 2 || !clamp)) throw new Error("render/denoiseUpscaleGPU.accumulate: U_TH runs on Bt's clamped history at an even size");
         const acc = tile ? this.p.accumT : this.p.accum;   // round 48: the clamp read from a workgroup tile; round 55: by default
@@ -1223,7 +1248,7 @@ export class DenoiseUpscaleGPU {
             }
             last = a; lastU = ua;
             this.p.final.bind("hist", a).bind("cov", fc).bind("emis", fE).bind("dst", dst).bind("u", uF); pass.dispatch(this.p.final, groups(W, H));
-            if (ut) { this._utPack(pass, ub, a, ua, cur, G[F - 1]); for (let i = 0; i < 4; i++) this._utLayer(pass, ub, i); this._utHold(pass, ub, a, fc, fE, dstU); }
+            if (ut) { this._utPack(pass, ub, a, ua, cur, G[F - 1], pack === "fast"); for (let i = 0; i < 4; i++) this._utLayer(pass, ub, i); this._utHold(pass, ub, a, fc, fE, dstU); }
             pass.clear([0, 0, 0, 1]);
         }, { offscreen: true });
         const h = new Float32Array(await dev.read(last)), y = Float64Array.from(new Float32Array(await dev.read(dst)));
@@ -1308,10 +1333,11 @@ export class DenoiseUpscaleGPU {
         if (this.ut) Object.assign(histOps, {
             accumU: (pass) => { this.p.accumT.bind("prevGeo", geoB).bind("curGeo", geoB).bind("prevHist", hU).bind("cur", curB).bind("outHist", hU2).bind("u", uAcU); pass.dispatch(this.p.accumT, groups(W, H)); },
             packH: (pass) => this._utPack(pass, utB, hB, hU2, curB, geoB),
+            packHF: (pass) => this._utPack(pass, utB, hB, hU2, curB, geoB, true),
             ut0: (pass) => this._utLayer(pass, utB, 0), ut1: (pass) => this._utLayer(pass, utB, 1), ut2: (pass) => this._utLayer(pass, utB, 2), ut3: (pass) => this._utLayer(pass, utB, 3),
             upholdC: (pass) => this._utHold(pass, utB, hB, cF, eF, outB),
         });
-        const UT_STEPS = this.ut ? ["accumU", "packH", "ut0", "ut1", "ut2", "ut3", "upholdC"] : [];
+        const UT_STEPS = this.ut ? ["accumU", "packH", "packHF", "ut0", "ut1", "ut2", "ut3", "upholdC"] : [];
         const step = { covHalf: [], covFull: [], fill: [], rest: [], whole: [], hits: [], shift: [], accum: [], final: [], fillList: [], wholeList: [], fillTile: [], wholeTile: [], fillLTile: [], wholeLTile: [], covHalfB: [], covFullB: [], restToT: [], restEasu: [], restComp: [], restToTFree: [], restEasuQ: [], restEasuComp: [], accumT: [], restF: [], ...Object.fromEntries(UT_STEPS.map((k) => [k, []])) }, clock = {};
         // round 42 (section 110): the rest steps record which of this runner's pipelines they dispatched, so a split step is held to its
         // one kernel -- through a thin wrapper on those steps alone, so no other step's timing changes
@@ -1427,7 +1453,9 @@ export async function timeHalfChain({ device, net, newAdapter, kernels, S, w, h,
              // round 33: the chain with round 32's history -- its four passes a frame added to the half-size chain
              temporal: sum([networkHalf, st.covHalfB, st.covFullB, st.fillLTile, st.restF, st.hits, st.shift, st.accumT, st.final]),
              // section 172: the same with U_TH after the history -- its twin accumulation, pack, four layers and upsample-hold-composite, no final
-             ...(ut ? { temporalUT: sum([networkHalf, st.covHalfB, st.covFullB, st.fillLTile, st.restF, st.hits, st.shift, st.accumT, st.accumU, st.packH, st.ut0, st.ut1, st.ut2, st.ut3, st.upholdC]) } : {}),
+             ...(ut ? { temporalUT: sum([networkHalf, st.covHalfB, st.covFullB, st.fillLTile, st.restF, st.hits, st.shift, st.accumT, st.accumU, st.packH, st.ut0, st.ut1, st.ut2, st.ut3, st.upholdC]),
+                        // round 76 (section 174): the same with the coalesced pack in round 75's pack's place
+                        temporalUTF: sum([networkHalf, st.covHalfB, st.covFullB, st.fillLTile, st.restF, st.hits, st.shift, st.accumT, st.accumU, st.packHF, st.ut0, st.ut1, st.ut2, st.ut3, st.upholdC]) } : {}),
              // round 55: the same with the plain accumulation, the default of round 54 and the reference
              temporalUntiled: sum([networkHalf, st.covHalfB, st.covFullB, st.fillLTile, st.restF, st.hits, st.shift, st.accum, st.final]),
              // round 54: the same two with the three-pass rest, the defaults of rounds 44-53 and the reference

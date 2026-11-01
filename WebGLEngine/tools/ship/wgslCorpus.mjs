@@ -1257,6 +1257,9 @@ export const EXCLUDED = Object.freeze([
     // round 75 (section 172) -- U_TH after the history in the chain (render/denoiseUpscaleGPU.mjs): its first and last passes
     Object.freeze({ id: "denoiseUpscaleGPU.PACKH_WGSL", kind: "ordered multi-dispatch chain, graded against a CPU twin",
         why: "U_TH's half-size 17 channels built from the history's two accumulations, the shifted frame and the first hits, which only the chain's passes before it write; render/denoiseUpscaleGPU-selfcheck.mjs holds it to halfInput(temporalInput(...)) within 1e-5" }),
+    // round 76 (section 174) -- the pack coalesced: one thread a half-size value, the same chan() and sum
+    Object.freeze({ id: "denoiseUpscaleGPU.PACKH_FAST_WGSL", kind: "ordered multi-dispatch chain, graded against a CPU twin",
+        why: "PACKH_WGSL with one thread per half-size value, reading the same chain buffers; render/denoiseUpscaleGPU-selfcheck.mjs holds its output to PACKH_WGSL's bit for bit, and so U_TH's image to round 75's" }),
     Object.freeze({ id: "denoiseUpscaleGPU.UPHOLD_COMP_WGSL", kind: "ordered multi-dispatch chain, graded against a CPU twin",
         why: "the upsample, the hold on Bt's light and the composite, reading U_TH's head output; held with the chain to compositeEmitters(temporalUpscale(U_TH, x)) within 1e-4" }),
     Object.freeze({ id: "learnedUpscaleTemporalGPU.UPHOLD_WGSL", kind: "ordered multi-dispatch chain, graded against a CPU twin",

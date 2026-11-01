@@ -241,6 +241,13 @@ export function readH75(rep) {
     return { commit: base.commit, counts: base.counts, withUT, without, ratio: withUT !== null ? withUT / without : null };
 }
 export const H75_RATIO = 1.25;
+/** SECTION 174's RULE (H76): the chain with U_TH and the coalesced pack against the chain with its history, off the section 174 line; h75 is its verdict rule. */
+export function readH76(rep) {
+    const base = readH63(rep), g = (rep.gates || []).find((x) => x.gate === "render/denoiseUpscaleGPU-selfcheck.mjs");
+    let withUT = null, without = null;
+    for (const l of (g && g.measured) || []) { const m = l.match(/^section 174: the coalesced pack -- .*with its history and U_TH ([\d.]+) ms, with its history ([\d.]+) ms/); if (m && +m[1] > 0 && +m[2] > 0) { withUT = +m[1]; without = +m[2]; break; } }
+    return { commit: base.commit, counts: base.counts, withUT, without, ratio: withUT !== null ? withUT / without : null };
+}
 export function h75(runs) {
     if (!runs.length || !runs.every((r) => r.counts && r.ratio !== null)) return "no verdict";
     return runs.every((r) => r.ratio <= H75_RATIO) ? "holds" : "fails";
