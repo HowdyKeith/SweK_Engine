@@ -63,8 +63,8 @@ Predictions scored: **G1 held** (parity). **G2 held** (N = 1 within 3x of N = 64
 
 **What it says.** The harness runs and the GPU brain's outputs agree with the twins it is timed against at every batch size; the cost of a call is a fixed price plus a per-row price; and the batch size at which the GPU wins depends on how slow the twin is as well as on the adapter. **What it does not say.** Anything about a graphics card (see the top). Pipelined throughput, the cost of building a brain, `setWeights`, or the simulation the decisions feed.
 
-**The rig runs, from `WebGLEngine/`:**
+**The rig runs, from `WebGLEngine/` (corrected 2026-11-01):**
 ```
-node tools/ship/gpuCrossover.mjs --write
+node tools/ship/gpuCrossover.mjs --hardware --write
 ```
-(with `SWEK_LAUNCH_ARGS="--enable-unsafe-webgpu --enable-features=Vulkan"` if the browser falls back to software, as `docs/real-hardware-fsr.md` says). It takes about half a minute. The first line it prints names the adapter; a first line that says SOFTWARE ADAPTER means the browser did not reach the card and the record is written to the software file, not the rig's.
+`--hardware` asks the browser for the card (`webgpuHarness.mjs` HARDWARE_ARGS, on Windows `--enable-unsafe-webgpu --use-angle=d3d11`). **An ordinary run on Windows asks for the SwiftShader adapter on purpose** (the harness's rig-run-4 decision: the device rows were measured on it), so without `--hardware` the rig would write a software record. An earlier version of this note said to set `SWEK_LAUNCH_ARGS` to a Vulkan flag set copied from the Linux example in `docs/real-hardware-fsr.md`: that was wrong for the rig. It takes about half a minute. The first line it prints names the adapter; "SOFTWARE ADAPTER" means the browser did not reach the card and the record went to `brain/gpuCrossoverSoftware.jsonl`, not `brain/rig-results/gpuCrossover.jsonl`.

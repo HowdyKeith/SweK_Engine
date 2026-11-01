@@ -5,14 +5,16 @@
 //   node tools/ship/gpuCrossover.mjs                         the full sweep (N = 1 to 8192), prints the tables
 //   node tools/ship/gpuCrossover.mjs --write                 and appends the record: a SOFTWARE adapter's record to brain/gpuCrossoverSoftware.jsonl, a real adapter's to brain/rig-results/gpuCrossover.jsonl
 //   node tools/ship/gpuCrossover.mjs --sizes 1,64,512 --rounds 3 --min-ms 5      a quick look
+//   node tools/ship/gpuCrossover.mjs --hardware --write      ASKS THE BROWSER FOR THE CARD (webgpuHarness HARDWARE_ARGS: on Windows --enable-unsafe-webgpu --use-angle=d3d11). *** An ordinary run on win32 asks for the SwiftShader adapter on purpose
+//                                                            (webgpuHarness.mjs, rig run 4: the device rows were measured on it), so a rig run needs --hardware; the first line it prints names the adapter it got. ***
 // *** EVERY DEVICE THIS SANDBOX HAS IS SWIFTSHADER, A CPU RASTERISER: a crossover measured on it is a SOFTWARE ADAPTER'S and says nothing about a graphics card. The record names the adapter and the printout says SOFTWARE ADAPTER when it is one;
-// the rig's run (SWEK_LAUNCH_ARGS="--enable-unsafe-webgpu --enable-features=Vulkan" if the browser falls back to software, docs/real-hardware-fsr.md) is the answer to the question. ***
+// the rig's run (--hardware) is the answer to the question. ***
 // The Node side is pure apart from the page it launches and the file --write appends to. No Math.random; the rows and weights are seeded in the page.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { runInEngineOrigin } from "./webgpuHarness.mjs";
+import { runInEngineOrigin, HARDWARE_ARGS, LAUNCH_ARGS } from "./webgpuHarness.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url)), ENG = path.resolve(HERE, "..", "..");
 export const SIZES = Object.freeze([1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192]);
@@ -20,6 +22,8 @@ export const NETS = Object.freeze(["pilot", "seat"]);
 export const CONFIGS = Object.freeze(["capMax", "cap64"]);
 export const DEFAULTS = Object.freeze({ rounds: 5, minMs: 25, warmup: 3 });
 export const TOL = 1e-4, CAP_DEFAULT = 64;
+/** The browser flags a run uses: --hardware asks for the card (the harness's HARDWARE_ARGS); else SWEK_LAUNCH_ARGS if set, else the harness's ordinary LAUNCH_ARGS (the SwiftShader adapter on win32). */
+export const launchArgsOf = (hardware, env = process.env) => (hardware ? [...HARDWARE_ARGS] : env.SWEK_LAUNCH_ARGS ? env.SWEK_LAUNCH_ARGS.split(/\s+/).filter(Boolean) : [...LAUNCH_ARGS]);
 export const OUT_SOFTWARE = "brain/gpuCrossoverSoftware.jsonl", OUT_RIG = "brain/rig-results/gpuCrossover.jsonl";
 
 /** The median of a list (the mean of the middle two when even); NaN for none. */
@@ -128,23 +132,24 @@ export const PAGE_SCRIPT = `async (a) => {
 /**
  * Measure on the device the harness gives: { ok, skipped, reason, adapter, software, launchArgs, nets: { pilot: { rows, crossovers }, seat: ... } }. `run` is the harness (the gate hands in a stand-in); `settings` { sizes, rounds, minMs, warmup }.
  */
-export async function measure(settings, run = runInEngineOrigin) {
-    const r = await run({ engineRoot: ENG, script: PAGE_SCRIPT, args: settings, timeoutMs: 900000 });
+export async function measure(settings, run = runInEngineOrigin, { hardware = false } = {}) {
+    const launchArgs = launchArgsOf(hardware), r = await run({ engineRoot: ENG, script: PAGE_SCRIPT, args: settings, timeoutMs: 900000, ...(hardware ? { launchArgs } : {}) });
     if (r.skipped) return { ok: false, skipped: true, reason: r.reason };
     if (!r.ok || !r.result) return { ok: false, skipped: false, reason: r.reason || (r.result && r.result.error) || "the page did not answer" };
     if (r.result.noGpu !== undefined) return { ok: false, skipped: false, reason: "no GPU in the page (backend " + r.result.noGpu + ")" };
     const nets = {};
     for (const name of NETS) { const rows = rowsOf(r.result[name]); nets[name] = { rows, crossovers: crossoversOf(rows) }; }
-    return { ok: true, adapter: r.adapter || null, software: r.software === undefined ? null : r.software, launchArgs: r.launchArgs || null, nets, warm: { pilot: r.result.warm_pilot || null, seat: r.result.warm_seat || null }, pageErrors: r.pageErrors || [] };
+    return { ok: true, adapter: r.adapter || null, software: r.software === undefined ? null : r.software, launchArgs, nets, warm: { pilot: r.result.warm_pilot || null, seat: r.result.warm_seat || null }, pageErrors: r.pageErrors || [] };
 }
 
 /** The command as a function: returns the exit code (0 fine, 1 no measurement, 2 a bad argument). `io` is for the gate: { out, err, run, appendFile }. */
 export async function command(argv, io = {}) {
     const out = io.out || ((m) => console.log(m)), err = io.err || ((m) => console.error(m)), appendFile = io.appendFile || fs.appendFileSync;
-    const settings = { sizes: [...SIZES], rounds: DEFAULTS.rounds, minMs: DEFAULTS.minMs, warmup: DEFAULTS.warmup }; let write = false;
+    const settings = { sizes: [...SIZES], rounds: DEFAULTS.rounds, minMs: DEFAULTS.minMs, warmup: DEFAULTS.warmup }; let write = false, hardware = false;
     for (let i = 0; i < argv.length; i++) {
         const a = argv[i];
         if (a === "--write") write = true;
+        else if (a === "--hardware") hardware = true;
         else if (a === "--sizes") {
             const v = String(argv[++i] || "").split(",").map(Number);
             if (!v.length || v.some((x) => !Number.isInteger(x) || x < 1 || x > 8192) || new Set(v).size !== v.length) { err("gpuCrossover: --sizes needs distinct whole numbers from 1 to 8192, comma separated"); return 2; }
@@ -155,11 +160,11 @@ export async function command(argv, io = {}) {
             settings[a === "--rounds" ? "rounds" : "minMs"] = v;
         } else { err(`gpuCrossover: unknown argument ${JSON.stringify(a)}`); return 2; }
     }
-    const res = await measure(settings, io.run || runInEngineOrigin);
+    const res = await measure(settings, io.run || runInEngineOrigin, { hardware });
     if (!res.ok) { err(`gpuCrossover: ${res.skipped ? "skipped" : "no measurement"}: ${res.reason}`); return 1; }
     const a = res.adapter;
     out(`${res.software === true ? "*** SOFTWARE ADAPTER *** " : res.software === false ? "hardware adapter: " : "adapter of unknown kind: "}${a ? [a.vendor, a.architecture, a.device, a.description].filter(Boolean).join(" ") : "not described"}`);
-    if (res.software === true) out("(a CPU emulating a GPU: these are a software renderer's times and no statement about a graphics card; the rig's run is the answer)");
+    if (res.software === true) out(`(a CPU emulating a GPU: these are a software renderer's times and no statement about a graphics card; the rig's run is the answer${hardware ? "" : "; on a machine with a card, run again with --hardware to ask the browser for it"})`);
     for (const name of NETS) { out(""); out(netTable(name, res.nets[name])); }
     const rec = recordOf(res, settings);
     out(""); out(scoreText(rec.score));
