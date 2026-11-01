@@ -14,7 +14,11 @@ import * as N from "./subFieldNav.mjs";
 import { FlowFieldSolverCPU } from "./flowfieldCpu.js";
 
 export const HARD_KINDS = Object.freeze(["hard-islands", "hard-gaps", "hard-traffic", "hard-current"]);
-export const HARD_ARMS = Object.freeze(["straight", "smooth+approach", "any", "any-blind", "any+replan", "any+predict"]);
+export const HARD_ARMS = Object.freeze(["straight", "smooth+approach", "any", "any-blind", "any+replan", "any+predict", "any+predict+edge", "any+predict+yield", "any+predict+edge+yield"]);
+// THE TRAFFIC FIX (FOLLOW-UP 5 of brain/SUB_FIELD_NAV_WIP.md, registered before this code): +edge widens the field's edge band by EDGE_EXTRA m (a wall moved inward); +yield slows the vessel to YIELD_SPEED while it and a ship, each on the position function the plan uses, come within r + half-hull + YIELD_CLEAR of each other
+// in the next HORIZON_S. YIELD_SPEEDS are the candidates the DEV rule chooses from (the highest DEV reach of any+predict+yield, ties to the higher speed); YIELD_SPEED is the choice (Amendment to FOLLOW-UP 5).
+export const EDGE_EXTRA = 20, YIELD_CLEAR = 20, YIELD_SPEEDS = Object.freeze([2.0, 1.5, 1.0]), YIELD_SPEED = 2.0;
+export const FIX_ARMS = Object.freeze(["any+replan", "any+predict", "any+predict+edge", "any+predict+yield", "any+predict+edge+yield"]), FIX_DESIGNATED = "any+predict+edge+yield", HELD5 = Object.freeze(N.range(501, 560));
 /** The arms flown in each kind. Where there are no ships `any+replan` and `any+predict` are the same flights as `any`, so they are not flown; where there are no icebergs `any-blind` is the same flight as `any`. */
 export const ARMS_OF = Object.freeze({
     "hard-islands": Object.freeze(["straight", "smooth+approach", "any", "any-blind"]), "hard-gaps": Object.freeze(["straight", "smooth+approach", "any"]),
@@ -106,12 +110,12 @@ export function hardScenario(seed, kind) {
 }
 
 /** The obstacle shapes a plan blocks, as capsules { ax, ay, bx, by, r } (a disc is a capsule of zero length). `mode` "now": each obstacle where it is at time t; "predict": a moving one as the capsule from where it is to where it will be HORIZON_S later. `blind`: every iceberg blocks. `at(o, t)` gives an obstacle's centre at a time (default posAt: constant velocity; the tank's ships turn at the ends of a lane, brain/subTankNav.mjs). */
-export function planShapes(sc, t, { mode = "now", blind = false, at = posAt } = {}) {
+export function planShapes(sc, t, { mode = "now", blind = false, at = posAt, horizon = HORIZON_S } = {}) {
     if (mode !== "now" && mode !== "predict") throw new Error(`subHardNav.planShapes: unknown mode "${mode}" (now, predict)`);
     const out = [];
     for (const o of sc.obstacles) {
         if (!((blind && o.type === "berg") || o.keel + VMARGIN > sc.minDepth)) continue;   // (a full-depth obstacle has keel Infinity: it always blocks)
-        const [x, y] = at(o, t), p = mode === "predict" ? at(o, t + HORIZON_S) : [x, y];
+        const [x, y] = at(o, t), p = mode === "predict" ? at(o, t + horizon) : [x, y];
         out.push({ ax: x, ay: y, bx: p[0], by: p[1], r: o.r });
     }
     return out;
@@ -119,13 +123,13 @@ export function planShapes(sc, t, { mode = "now", blind = false, at = posAt } = 
 
 /**
  * The field for a set of shapes and the waypoint at `margin` m beyond the half-hull: the same object brain/subFieldNav.mjs's buildField returns (so its aim points and headings read it), with the REGION'S EDGE BLOCKED -- a cell whose centre is within
- * half-hull + margin of the boundary -- and, when `own` ({ x, y }) is given, no cell within OWN_CLEAR of that point blocked by a SHAPE (the edge stays blocked). `grid` is { x0, y0, w, h } in cells of N.CELL (default DEFAULT_GRID, the study's region; the tank passes its own).
+ * half-hull + margin of the boundary -- and, when `own` ({ x, y }) is given, no cell within OWN_CLEAR of that point blocked by a SHAPE (the edge stays blocked). `grid` is { x0, y0, w, h } in cells of N.CELL (default DEFAULT_GRID, the study's region; the tank passes its own). `edgeExtra` metres widen the edge band only (default 0: HELD4's).
  */
-export function buildHardField(shapes, goal, { margin = MARGIN_HARD, own = null, grid = DEFAULT_GRID } = {}) {
-    const inflate = N.HULL_HALF + margin, { x0, y0, w, h } = grid, x1 = x0 + w * N.CELL, y1 = y0 + h * N.CELL, heights = new Float32Array(w * h).fill(N.FREE_H), blocked = new Uint8Array(w * h);
+export function buildHardField(shapes, goal, { margin = MARGIN_HARD, own = null, grid = DEFAULT_GRID, edgeExtra = 0 } = {}) {
+    const inflate = N.HULL_HALF + margin, band = inflate + edgeExtra, { x0, y0, w, h } = grid, x1 = x0 + w * N.CELL, y1 = y0 + h * N.CELL, heights = new Float32Array(w * h).fill(N.FREE_H), blocked = new Uint8Array(w * h);
     for (let gy = 0; gy < h; gy++) for (let gx = 0; gx < w; gx++) {
         const cx = x0 + (gx + 0.5) * N.CELL, cy = y0 + (gy + 0.5) * N.CELL;
-        const edge = cx - x0 < inflate || x1 - cx < inflate || cy - y0 < inflate || y1 - cy < inflate;
+        const edge = cx - x0 < band || x1 - cx < band || cy - y0 < band || y1 - cy < band;
         const shape = shapes.some((s) => segD(cx, cy, s.ax, s.ay, s.bx, s.by) <= s.r + inflate) && !(own && Math.hypot(cx - own.x, cy - own.y) <= OWN_CLEAR);
         if (edge || shape) { heights[gy * w + gx] = N.BLOCKED_H; blocked[gy * w + gx] = 1; }
     }
@@ -136,33 +140,51 @@ export function buildHardField(shapes, goal, { margin = MARGIN_HARD, own = null,
 }
 
 /** The plan at the first margin of the ladder that leaves a route from `from` ({ x, y }): the field and the margin it was built at; the last margin's field (with no route) when none does. */
-export function buildLadderField(shapes, goal, from, { ladder = MARGIN_LADDER, own = null, grid = DEFAULT_GRID } = {}) {
+export function buildLadderField(shapes, goal, from, { ladder = MARGIN_LADDER, own = null, grid = DEFAULT_GRID, edgeExtra = 0 } = {}) {
     let f = null;
     for (const m of ladder) {
-        f = buildHardField(shapes, goal, { margin: m, own, grid });
+        f = buildHardField(shapes, goal, { margin: m, own, grid, edgeExtra });
         const c = N.cellOf(f, from.x, from.y);
         if (c && f.dist[c.i] < N.BIG) return f;
     }
     return f;
 }
 
-/** What each arm is: { field (is a plan built), head ("smooth" | "any"), approach, blind, replan ("none" | "now" | "predict") }. */
+/** What each arm is: { field (is a plan built), head ("smooth" | "any"), approach, blind, replan ("none" | "now" | "predict"), edge (metres added to the edge band), yield (slow for a ship) }. */
+const arm = (field, head, approach, blind, replan, edge = 0, yld = false) => Object.freeze({ field, head, approach, blind, replan, edge, yield: yld });
 export const ARM_SPEC = Object.freeze({
-    straight: Object.freeze({ field: false, head: null, approach: false, blind: false, replan: "none" }), "smooth+approach": Object.freeze({ field: true, head: "smooth", approach: true, blind: false, replan: "none" }),
-    any: Object.freeze({ field: true, head: "any", approach: false, blind: false, replan: "none" }), "any-blind": Object.freeze({ field: true, head: "any", approach: false, blind: true, replan: "none" }),
-    "any+replan": Object.freeze({ field: true, head: "any", approach: false, blind: false, replan: "now" }), "any+predict": Object.freeze({ field: true, head: "any", approach: false, blind: false, replan: "predict" }),
+    straight: arm(false, null, false, false, "none"), "smooth+approach": arm(true, "smooth", true, false, "none"), any: arm(true, "any", false, false, "none"), "any-blind": arm(true, "any", false, true, "none"),
+    "any+replan": arm(true, "any", false, false, "now"), "any+predict": arm(true, "any", false, false, "predict"), "any+predict+edge": arm(true, "any", false, false, "predict", EDGE_EXTRA), "any+predict+yield": arm(true, "any", false, false, "predict", 0, true),
+    "any+predict+edge+yield": arm(true, "any", false, false, "predict", EDGE_EXTRA, true),
 });
 const specOf = (arm, who) => { if (!HARD_ARMS.includes(arm)) throw new Error(`${who}: unknown arm "${arm}" (${HARD_ARMS.join(", ")})`); return ARM_SPEC[arm]; };
 
 /** The target (depth, heading, speed) an arm gives the autopilot at a state: the waypoint's depth and the cruise speed always; the heading by the arm (the aim point's bearing, or the smooth field's with the 30 m straight approach; the straight bearing when the plan gives none). */
-export function hardTarget(arm, state, field, goal) {
-    const spec = specOf(arm, "subHardNav.hardTarget"), straight = MT.waypointTarget(state, goal, N.CRUISE);
+function baseTarget(spec, state, field, goal) {
+    const straight = MT.waypointTarget(state, goal, N.CRUISE);
     if (!spec.field) return straight;
     const x = state.pos[0], y = state.pos[1];
     let h;
     if (spec.head === "any") { h = N.aimHeading(field, N.aimOf(field, goal), x, y); if (h === null) h = N.fieldHeading(field, x, y, "cell"); }
     else { if (spec.approach && Math.hypot(goal.x - x, goal.y - y) <= N.ARRIVAL_RADIUS) return straight; h = N.fieldHeading(field, x, y, "smooth"); }
     return h === null ? straight : { ...straight, heading: h };
+}
+/**
+ * Does a ship the plan blocks come within r + half-hull + `clear` of the vessel in the next `horizon` seconds, the vessel holding its heading and speed and the ship on `at(o, t + k)`? `obstacles` is the scenario's list; only type "ship" counts, and a ship whose keel + VMARGIN does not exceed
+ * `minDepth` (one the vessel passes beneath) does not (the default, -Infinity, filters nothing). Sampled every second.
+ */
+export function shipConflict(state, t, obstacles, { at = posAt, horizon = HORIZON_S, clear = YIELD_CLEAR, minDepth = -Infinity } = {}) {
+    const a = S.attitude(state), vx = a.speed * Math.cos(a.heading), vy = -a.speed * Math.sin(a.heading), x = state.pos[0], y = state.pos[1];
+    for (const o of obstacles) {
+        if (o.type !== "ship" || !(o.keel + VMARGIN > minDepth)) continue;
+        for (let k = 0; k <= horizon; k++) { const [ox, oy] = at(o, t + k); if (Math.hypot(x + vx * k - ox, y + vy * k - oy) < o.r + N.HULL_HALF + clear) return true; }
+    }
+    return false;
+}
+/** The arm's target. `ctx` ({ obstacles, t, at, minDepth, yieldSpeed }) is what a +yield arm needs to look for ships: with it, a conflict (shipConflict) drops the speed to ctx.yieldSpeed (default YIELD_SPEED); without it no arm yields. */
+export function hardTarget(arm, state, field, goal, ctx = null) {
+    const spec = specOf(arm, "subHardNav.hardTarget"), out = baseTarget(spec, state, field, goal);
+    return spec.yield && ctx && shipConflict(state, ctx.t, ctx.obstacles, { at: ctx.at, minDepth: ctx.minDepth }) ? { ...out, speed: ctx.yieldSpeed === undefined ? YIELD_SPEED : ctx.yieldSpeed } : out;
 }
 
 /** The gap from the vessel (x, y, depth) to an obstacle at time t, less the obstacle's radius and the half-hull; Infinity when the vessel is BELOW its keel (top of the vessel at or under the keel). `at(o, t)` is the obstacle's centre (default posAt). */
@@ -177,19 +199,19 @@ let MODEL = null;
 const navModel = () => MODEL || (MODEL = S.createSubModel(Object.freeze({ ...S.EXPLORER, seabed: 1000 })));
 
 /**
- * Fly one hard scenario with `pilot` under `arm`. Returns { arm, kind, seed, gap, shipSpeed, currentMean, blocked, status ("reached" | "collided" | "left" | "timeout" | the vessel's own), reached, t, path, chord, minClearance, ticks, margin, noRoute, replans }.
+ * Fly one hard scenario with `pilot` under `arm`. Returns { arm, kind, seed, gap, shipSpeed, currentMean, blocked, status ("reached" | "collided" | "left" | "timeout" | the vessel's own), reached, t, path, chord, minClearance, ticks, margin (the first plan's), marginLast (the plan in force at the end), noRoute, replans }.
  * A plan is built at t = 0 (ships at their t = 0 positions); the replanning arms rebuild it every REPLAN_S seconds, from the tick REPLAN_S after the start, for the shapes at that time (and, for predict, their next HORIZON_S) with the vessel's own surroundings free.
  */
-export function flyHard(pilot, sc, arm, { seconds = SECONDS_HARD, dt = S.DT, model = navModel(), ladder = MARGIN_LADDER } = {}) {
-    const spec = specOf(arm, "subHardNav.flyHard"), total = Math.round(seconds / dt), st = sc.start, every = Math.max(1, Math.round(REPLAN_S / dt));
+export function flyHard(pilot, sc, armName, { seconds = SECONDS_HARD, dt = S.DT, model = navModel(), ladder = MARGIN_LADDER, yieldSpeed = YIELD_SPEED, horizon = HORIZON_S } = {}) {
+    const arm = armName, spec = specOf(arm, "subHardNav.flyHard"), total = Math.round(seconds / dt), st = sc.start, every = Math.max(1, Math.round(REPLAN_S / dt));
     const mode = spec.replan === "predict" ? "predict" : "now";
-    let field = spec.field ? buildLadderField(planShapes(sc, 0, { mode, blind: spec.blind }), sc.goal, st, { ladder }) : null, replans = 0;
+    let field = spec.field ? buildLadderField(planShapes(sc, 0, { mode, blind: spec.blind, horizon }), sc.goal, st, { ladder, edgeExtra: spec.edge }) : null, replans = 0;
     const field0 = field, sc0 = field ? N.cellOf(field, st.x, st.y) : null, noRoute = field ? !(sc0 && field.dist[sc0.i] < N.BIG) : false;
     let s = S.createState({ pos: [st.x, st.y, -st.depth], speed: st.speed, heading: st.heading, pitch: st.pitch, bank: st.bank, gamma: 0, w: [0, 0, 0], model });
     let status = "timeout", path = 0, minClear = clearAt(sc.obstacles, st.x, st.y, st.depth, 0), ticks = 0, t = null;
     for (let i = 0; i < total; i++) {
-        if (spec.replan !== "none" && i > 0 && i % every === 0) { field = buildLadderField(planShapes(sc, i * dt, { mode, blind: spec.blind }), sc.goal, { x: s.pos[0], y: s.pos[1] }, { ladder, own: { x: s.pos[0], y: s.pos[1] } }); replans++; }
-        const target = hardTarget(arm, s, field, sc.goal), cv = ST.currentAt(sc.current, i * dt), cmd = pilot(s, target, cv), res = S.stepSub(model, s, cmd, dt, cv, sc.weightError);
+        if (spec.replan !== "none" && i > 0 && i % every === 0) { field = buildLadderField(planShapes(sc, i * dt, { mode, blind: spec.blind, horizon }), sc.goal, { x: s.pos[0], y: s.pos[1] }, { ladder, own: { x: s.pos[0], y: s.pos[1] }, edgeExtra: spec.edge }); replans++; }
+        const target = hardTarget(arm, s, field, sc.goal, { obstacles: sc.obstacles, t: i * dt, at: posAt, minDepth: sc.minDepth, yieldSpeed }), cv = ST.currentAt(sc.current, i * dt), cmd = pilot(s, target, cv), res = S.stepSub(model, s, cmd, dt, cv, sc.weightError);
         const px = s.pos[0], py = s.pos[1];
         s = res.state; ticks++;
         if (res.status !== "submerged") { status = res.status; break; }
@@ -201,7 +223,7 @@ export function flyHard(pilot, sc, arm, { seconds = SECONDS_HARD, dt = S.DT, mod
         if (x < N.REGION.x0 || x > N.REGION.x1 || y < N.REGION.y0 || y > N.REGION.y1) { status = "left"; break; }
         if (MT.reached(s, sc.goal)) { status = "reached"; t = now; break; }
     }
-    return { arm, kind: sc.kind, seed: sc.seed, gap: sc.gapWidth, shipSpeed: sc.shipSpeed, currentMean: sc.currentMean, blocked: sc.blocked, status, reached: status === "reached", t, path, chord: Math.hypot(sc.goal.x - st.x, sc.goal.y - st.y), minClearance: minClear, ticks, margin: field0 ? field0.margin : null, noRoute, replans };
+    return { arm, kind: sc.kind, seed: sc.seed, gap: sc.gapWidth, shipSpeed: sc.shipSpeed, currentMean: sc.currentMean, blocked: sc.blocked, status, reached: status === "reached", t, path, chord: Math.hypot(sc.goal.x - st.x, sc.goal.y - st.y), minClearance: minClear, ticks, margin: field0 ? field0.margin : null, marginLast: field ? field.margin : null, noRoute, replans };
 }
 
 /** The scenarios of a set: its seeds of each kind (HARD_KINDS order), frozen. */
