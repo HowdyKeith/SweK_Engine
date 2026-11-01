@@ -36,7 +36,7 @@ const segD = N.segmentDistance;
 export const posAt = (o, t) => [o.x + o.vx * t, o.y + o.vy * t];
 
 /**
- * A scenario: { seed, kind, start, goal, minDepth, obstacles [{ type ("island" | "berg" | "wall" | "ship"), x, y, r, keel (Infinity: full depth), vx, vy }], gapWidth (hard-gaps; else null), shipSpeed (the fastest ship; 0 without ships), currentMean (the
+ * A scenario: { seed, kind, start, goal, minDepth, obstacles [{ type ("island" | "berg" | "wall" | "ship"), group (the members of one island share it, as do the discs of the wall), x, y, r, keel (Infinity: full depth), vx, vy }], gapWidth (hard-gaps; else null), shipSpeed (the fastest ship; 0 without ships), currentMean (the
  * horizontal mean current, m/s; 0 without), blocked (the straight line to the waypoint passes within r + 14 m of a STATIC obstacle's centre), current, weightError }.
  */
 export function hardScenario(seed, kind) {
@@ -45,7 +45,7 @@ export function hardScenario(seed, kind) {
     const start = { x: u(0, 20), y: u(-40, 40), depth: u(20, 30), speed: u(2, 3), pitch: u(-0.05, 0.05), bank: u(-0.08, 0.08), heading: 0 };
     const goal = { x: u(360, 400), y: u(-80, 80), depth: u(15, 40) };
     const minDepth = Math.min(start.depth, goal.depth), obstacles = [];
-    const stat = (type, x, y, rad, keel) => ({ type, x, y, r: rad, keel, vx: 0, vy: 0 });
+    const stat = (type, x, y, rad, keel, group) => ({ type, group, x, y, r: rad, keel, vx: 0, vy: 0 });
     // a member disc may stand if it is r + 40 from the start and the waypoint and 24 m of water from every disc of ANOTHER group
     const fits = (d, group, placed) => Math.hypot(d.x - goal.x, d.y - goal.y) >= d.r + 40 && Math.hypot(d.x - start.x, d.y - start.y) >= d.r + 40 && placed.every((p) => p.group === group || Math.hypot(d.x - p.x, d.y - p.y) >= d.r + p.r + 24);
     const place = (nIsland, nBerg) => {
@@ -60,7 +60,7 @@ export function hardScenario(seed, kind) {
             const d = { x: u(90, 310), y: u(-110, 110), r: u(14, 28) }, keel = u(6, 36);
             if (fits(d, 1000 + b, placed)) { placed.push({ ...d, group: 1000 + b, type: "berg", keel }); b++; }
         }
-        return placed.map((p) => stat(p.type, p.x, p.y, p.r, p.keel));
+        return placed.map((p) => stat(p.type, p.x, p.y, p.r, p.keel, p.group));
     };
     let current = null, weightError = 0, gapWidth = null;
     if (kind === "hard-islands" || kind === "hard-current") {
@@ -77,7 +77,7 @@ export function hardScenario(seed, kind) {
         for (const sign of [1, -1]) {
             let rad = u(20, 26), y = gy + sign * (gapWidth / 2 + rad);
             for (;;) {
-                obstacles.push(stat("wall", wx, y, rad, Infinity));
+                obstacles.push(stat("wall", wx, y, rad, Infinity, 3000));
                 if (Math.abs(y) >= 140) break;
                 const next = u(20, 26); y += sign * 0.8 * (rad + next); rad = next;
             }
@@ -93,7 +93,7 @@ export function hardScenario(seed, kind) {
             if (Math.hypot(x0 - start.x, y0 - start.y) < rad + 50) continue;
             if (segD(goal.x, goal.y, x0, y0, x0 + vx * TRACK_S, y0 + vy * TRACK_S) < rad + 40) continue;
             if (statics.some((s) => segD(s.x, s.y, x0, y0, x0 + vx * TRACK_S, y0 + vy * TRACK_S) < rad + s.r + 6)) continue;
-            obstacles.push({ type: "ship", x: x0, y: y0, r: rad, keel, vx, vy }); made++;
+            obstacles.push({ type: "ship", group: 2000 + made, x: x0, y: y0, r: rad, keel, vx, vy }); made++;
         }
     }
     const frozen = obstacles.map((o) => Object.freeze(o));

@@ -1,0 +1,234 @@
+// WebGLEngine/brain/subHardNav-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
+//
+// Run: node brain/subHardNav-selfcheck.mjs      (~40 s)
+//
+// THE HARDER NAVIGATION TEST (brain/subHardNav.mjs), held to its word before HELD4 is flown (registration and Amendment 1: "FOLLOW-UP 3" of brain/SUB_FIELD_NAV_WIP.md):
+//   1  THE CONSTANTS   kinds, arms and what each kind flies, the designated arms and bars, the vertical margin, the replan rate and horizon, the ladder, the gap widths, the sets
+//   2  THE GEOMETRY    posAt (static and moving), gapTo (the half-hull and the radius come off, a vessel BELOW the keel is clear, a full-depth obstacle never is)
+//   3  THE PLAN        planShapes: a full-depth obstacle always blocks, an iceberg or ship only when keel + 5 m exceeds the shallower depth (strictly), blind makes every iceberg block, positions at the plan's time, the predict capsule
+//   4  THE FIELD       buildHardField against a brute-force blocked map (a disc, a capsule, the vessel's own surroundings, nothing), the region's edge band, the 15 m free circle (the edge stays), the solver's distance; buildLadderField (the
+//                      first margin with a route, in order; the last when none; from the point given); a wall's gap closes at 12 m and opens lower, a wide gap does not need the ladder
+//   5  THE ARMS        the spec table, hardTarget: straight, the aim point's bearing, the smooth field with the 30 m approach, the fallbacks, an unknown arm
+//   6  THE SCENARIOS   a function of seed and kind, frozen, inside the registered ranges for each of the four kinds (counts, radii, keels, the gap EXACTLY its width with a closed wall and one opening, ships that cross the track and keep their
+//                      clearances), the blocked flag, the current kind and no other, A ROUTE EXISTS in the ladder field for every DEV and HELD4 seed at t = 0 (measured, not enforced)
+//   7  THE FLIGHT      reached / collided / left / timeout / the vessel's own word / noRoute each on a scenario built to produce it; an iceberg is passed beneath and hit when deeper; a ship that moves is hit where the same ship at rest is not;
+//                      the replan arms rebuild every 3 s and are the same flights as `any` where nothing is near; the pilot is called once per tick; GOLDEN flights; evaluate and the sets
+//
+// SABOTAGE LOG -- (filled in below after the mutants have been run)
+"use strict";
+import * as H from "./subHardNav.mjs";
+import * as N from "./subFieldNav.mjs";
+import * as MT from "./missionTask.mjs";
+import * as AP from "./autopilotSub.mjs";
+import * as S from "../physics/mechanics/subModel6dof.mjs";
+
+let fails = 0;
+const ok = (l, c, n = "") => { if (!c) fails++; console.log(`  ${c ? "PASS" : "FAIL"}  ${l}${n ? "   " + n : ""}`); };
+const near = (a, b, e = 1e-9) => Number.isFinite(a) && Number.isFinite(b) && Math.abs(a - b) <= e;
+const safe = (f, d = null) => { try { return f(); } catch { return d; } };
+const thrown = (f) => { try { f(); return "no throw"; } catch (e) { return String(e.message); } };   // (the message of what f throws, so that a row reads WHO threw)
+const pilot = (s, t, c) => AP.decide(s, t, c);
+const O = (o) => ({ type: "berg", group: 0, x: 0, y: 0, r: 10, keel: Infinity, vx: 0, vy: 0, ...o });
+const mk = (over) => Object.freeze({ seed: 0, kind: "hard-islands", start: { x: 0, y: 0, depth: 25, speed: 3, pitch: 0, bank: 0, heading: 0 }, goal: { x: 100, y: 0, depth: 25 }, minDepth: 25, obstacles: [], gapWidth: null, shipSpeed: 0, currentMean: 0, blocked: false, current: null, weightError: 0, ...over });
+const GOAL = { x: 380, y: 0, depth: 25 };
+const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+console.log("subHardNav-selfcheck -- the harder navigation test\n");
+
+console.log("1. THE CONSTANTS");
+{
+    ok("!! the kinds and the arms, in their order: hard-islands, hard-gaps, hard-traffic, hard-current; straight, smooth+approach, any, any-blind, any+replan, any+predict", same(H.HARD_KINDS, ["hard-islands", "hard-gaps", "hard-traffic", "hard-current"]) && same(H.HARD_ARMS, ["straight", "smooth+approach", "any", "any-blind", "any+replan", "any+predict"]) && Object.isFrozen(H.HARD_KINDS) && Object.isFrozen(H.HARD_ARMS));
+    ok("!! what each kind flies: islands and current straight, smooth+approach, any, any-blind; gaps straight, smooth+approach, any; traffic straight, smooth+approach, any, any+replan, any+predict (every arm named is a known arm)",
+        same(H.ARMS_OF, { "hard-islands": ["straight", "smooth+approach", "any", "any-blind"], "hard-gaps": ["straight", "smooth+approach", "any"], "hard-traffic": ["straight", "smooth+approach", "any", "any+replan", "any+predict"], "hard-current": ["straight", "smooth+approach", "any", "any-blind"] }) && Object.values(H.ARMS_OF).every((a) => a.every((x) => H.HARD_ARMS.includes(x)) && Object.isFrozen(a)));
+    ok("!! the designated arms (any, any, any+predict, any) and the bars (90%, 80%, 80%, 80%; at most 3 island collisions)", same(H.DESIGNATED, { "hard-islands": "any", "hard-gaps": "any", "hard-traffic": "any+predict", "hard-current": "any" }) && same(H.BARS, { "hard-islands": 0.9, "hard-gaps": 0.8, "hard-traffic": 0.8, "hard-current": 0.8 }) && H.ISLAND_MAX_COLLISIONS === 3);
+    ok("!! the vertical margin 5 m and the vessel's radius 0.6 m; the replan every 3 s over a 30 s horizon; 15 m of the vessel's own water kept free; 260 s a flight; the track checked to 290 s", H.VMARGIN === 5 && H.VRADIUS === 0.6 && H.REPLAN_S === 3 && H.HORIZON_S === 30 && H.OWN_CLEAR === 15 && H.SECONDS_HARD === 260 && H.TRACK_S === 290);
+    ok("!! the gap widths 24, 32, 40 m; the margin ladder 12, 8, 6, 3 (Amendment 1); the default margin 12; the table splits at 2 m/s of ship and 1.0 m/s of current", same(H.GAP_WIDTHS, [24, 32, 40]) && same(H.MARGIN_LADDER, [12, 8, 6, 3]) && H.MARGIN_HARD === 12 && H.SHIP_FAST === 2 && H.CURRENT_STRONG === 1.0 && Object.isFrozen(H.GAP_WIDTHS) && Object.isFrozen(H.MARGIN_LADDER));
+    const used = new Set(Object.values(N.SETS).flat());
+    ok("!! the sets: DEV is seeds 1 to 30 and HELD4 seeds 401 to 460 (60 of each kind, read once), frozen, and HELD4 shares no seed with any set an earlier follow-up read except the DEV range it also uses nowhere else", same(H.HARD_SETS.dev, N.range(1, 30)) && same(H.HARD_SETS.held4, N.range(401, 460)) && H.HARD_SETS.held4.every((s) => !used.has(s)) && Object.isFrozen(H.HARD_SETS));
+}
+
+console.log("\n2. THE GEOMETRY");
+{
+    ok("!! posAt: a static obstacle stays; a moving one is its start plus the velocity times the time ((10, 20) with (1, -2) at t = 5 is (15, 10))", same(H.posAt(O({ x: 10, y: 20 }), 100), [10, 20]) && same(H.posAt(O({ x: 10, y: 20, vx: 1, vy: -2 }), 5), [15, 10]) && same(H.posAt(O({ x: 10, y: 20, vx: 1, vy: -2 }), 0), [10, 20]));
+    ok("!! gapTo: the distance to the centre less the radius less the 4 m half-hull (a point 30 from a radius-10 obstacle is 16); the plan distance only (the depth does not enter while the vessel is above the keel); a point inside is negative", near(H.gapTo(O({ r: 10 }), 30, 0, 20, 0), 16) && near(H.gapTo(O({ r: 10 }), 0, 40, 5, 0), 26) && near(H.gapTo(O({ r: 10 }), 5, 0, 20, 0), -9));
+    ok("!! gapTo: a vessel BELOW the keel is clear (Infinity) -- depth 25 under a keel of 10 -- and ABOVE it is not (depth 12 over a keel of 20 reads the plan gap); the vessel's 0.6 m radius counts (depth 20.3, keel 20: top at 19.7, above the keel's bottom, so NOT clear)",
+        H.gapTo(O({ r: 10, keel: 10 }), 0, 0, 25, 0) === Infinity && near(H.gapTo(O({ r: 10, keel: 20 }), 30, 0, 12, 0), 16) && near(H.gapTo(O({ r: 10, keel: 20 }), 30, 0, 20.3, 0), 16) && H.gapTo(O({ r: 10, keel: 20 }), 30, 0, 20.7, 0) === Infinity);
+    ok("!! gapTo: a full-depth obstacle (keel Infinity) is never passed beneath, at any depth", near(H.gapTo(O({ r: 10 }), 30, 0, 5000, 0), 16));
+    ok("!! gapTo reads the obstacle where it is AT THE TIME (a ship at (0, 40) moving (0, -2): at t = 5 it is at (0, 30), 30 from a vessel at (0, 0); gap 30 - 10 - 4 = 16)", near(H.gapTo(O({ y: 40, vy: -2, r: 10 }), 0, 0, 20, 5), 16) && near(H.gapTo(O({ y: 40, vy: -2, r: 10 }), 0, 0, 20, 0), 26));
+}
+
+console.log("\n3. THE PLAN");
+{
+    const sc = { minDepth: 20, obstacles: [O({ type: "island", x: 10, y: 0, r: 7, keel: Infinity }), O({ type: "wall", x: 30, y: 0, r: 6, keel: Infinity }), O({ type: "berg", x: 50, y: 0, r: 5, keel: 14 }), O({ type: "berg", x: 60, y: 0, r: 5, keel: 15 }), O({ type: "berg", x: 70, y: 0, r: 5, keel: 15.5 }), O({ type: "ship", x: 80, y: 0, r: 5, keel: 14, vx: 1, vy: 2 }), O({ type: "ship", x: 90, y: 0, r: 5, keel: 16, vx: 1, vy: 2 })] };
+    const xs = (shapes) => shapes.map((s) => s.ax);
+    ok("!! an island and a wall always block; an iceberg blocks only when keel + 5 > the shallower depth, STRICTLY (keel 14 and 15 with a depth of 20 pass beneath, 15.5 blocks); a ship the same (keel 14 passes beneath, 16 blocks)", same(xs(H.planShapes(sc, 0)), [10, 30, 70, 91 - 1]) );
+    ok("!! blind: every ICEBERG blocks (the keel-14 and keel-15 ones too), and a ship with a passable keel does not (blind is about icebergs)", same(xs(H.planShapes(sc, 0, { blind: true })), [10, 30, 50, 60, 70, 90]));
+    const now = H.planShapes(sc, 10), pred = H.planShapes(sc, 10, { mode: "predict" });
+    ok("!! 'now': each obstacle where it is at the plan's time (the blocking ship at (90, 0) with velocity (1, 2) is at (100, 20) at t = 10), a zero-length capsule; radius kept", same(now.map((s) => [s.ax, s.ay, s.bx, s.by, s.r]), [[10, 0, 10, 0, 7], [30, 0, 30, 0, 6], [70, 0, 70, 0, 5], [100, 20, 100, 20, 5]]));
+    ok("!! 'predict': a moving ship is the capsule from where it is to where it will be in 30 s ((100, 20) to (130, 80)); a static obstacle stays a point; the order and the radii are kept", same(pred.map((s) => [s.ax, s.ay, s.bx, s.by, s.r]), [[10, 0, 10, 0, 7], [30, 0, 30, 0, 6], [70, 0, 70, 0, 5], [100, 20, 130, 80, 5]]));
+    ok("!! the default mode is 'now'; an unknown mode throws, naming the modes", same(H.planShapes(sc, 10), now) && /subHardNav\.planShapes: unknown mode "later" \(now, predict\)/.test(thrown(() => { H.planShapes(sc, 0, { mode: "later" }); })));
+    ok("!! no obstacles, no shapes", H.planShapes({ minDepth: 20, obstacles: [] }, 0).length === 0);
+}
+
+console.log("\n4. THE FIELD");
+{
+    const W = 96, Hh = 56, goal = { x: 380, y: 0, depth: 25 };
+    const brute = (shapes, margin, own) => {
+        const inflate = 4 + margin, out = new Uint8Array(W * Hh);
+        for (let gy = 0; gy < Hh; gy++) for (let gx = 0; gx < W; gx++) {
+            const cx = -40 + (gx + 0.5) * 5, cy = -140 + (gy + 0.5) * 5, edge = cx + 40 < inflate || 440 - cx < inflate || cy + 140 < inflate || 140 - cy < inflate;
+            const shape = shapes.some((s) => { const dx = s.bx - s.ax, dy = s.by - s.ay, L2 = dx * dx + dy * dy, t = L2 > 0 ? Math.max(0, Math.min(1, ((cx - s.ax) * dx + (cy - s.ay) * dy) / L2)) : 0; return Math.hypot(cx - (s.ax + t * dx), cy - (s.ay + t * dy)) <= s.r + inflate; }) && !(own && Math.hypot(cx - own.x, cy - own.y) <= 15);
+            out[gy * W + gx] = edge || shape ? 1 : 0;
+        }
+        return out;
+    };
+    const eq = (a, b) => !!a && a.length === b.length && a.every((v, i) => v === b[i]);
+    const disc = [{ ax: 200, ay: 20, bx: 200, by: 20, r: 22 }], cap = [{ ax: 150, ay: -60, bx: 250, by: 40, r: 12 }];
+    ok("!! the blocked cells of a disc are exactly the cells whose centre is within r + 4 + margin of it, or in the edge band (brute force, margin 12)", eq(safe(() => H.buildHardField(disc, goal, { margin: 12 }).blocked), brute(disc, 12)));
+    ok("!! the same at margin 6, and a CAPSULE (a moving ship's sweep) blocks the cells near the whole segment, not its ends only (brute force)", eq(safe(() => H.buildHardField(disc, goal, { margin: 6 }).blocked), brute(disc, 6)) && eq(safe(() => H.buildHardField(cap, goal, { margin: 8 }).blocked), brute(cap, 8)));
+    const own = { x: 150, y: -20 }, ownWall = [{ ax: 130, ay: -20, bx: 170, by: -20, r: 20 }];
+    ok("!! `own` frees the shape-blocked cells within 15 m of the vessel (inclusive) and leaves the others (brute force)", eq(safe(() => H.buildHardField(ownWall, goal, { margin: 12, own }).blocked), brute(ownWall, 12, own)) && !eq(brute(ownWall, 12, own), brute(ownWall, 12, null)));
+    const none = safe(() => H.buildHardField([], goal, { margin: 12 }));
+    ok("!! with no shapes the only blocked cells are the edge band: within 4 + 12 m of the boundary, 3 cells deep on each side, 876 cells of 5,376 (the default margin is 12)", !!none && none.blocked.reduce((a, b) => a + b, 0) === 876 && eq(none.blocked, brute([], 12)) && eq(safe(() => H.buildHardField([], goal).blocked), brute([], 12)) && none.margin === 12);
+    const edgeOwn = safe(() => H.buildHardField([], goal, { margin: 12, own: { x: -35, y: 0 } }));
+    ok("!! the edge stays blocked even under `own` (a vessel 5 m from the boundary is not given the boundary)", !!edgeOwn && edgeOwn.blocked[28 * W + 0] === 1);
+    ok("!! each of the four edges is blocked: the cell at the west, east, south and north boundary rows/columns", !!none && none.blocked[28 * W + 0] === 1 && none.blocked[28 * W + 95] === 1 && none.blocked[0 * W + 48] === 1 && none.blocked[55 * W + 48] === 1 && none.blocked[28 * W + 3] === 0 && none.blocked[28 * W + 92] === 0 && none.blocked[3 * W + 48] === 0 && none.blocked[52 * W + 48] === 0);
+    const f = safe(() => H.buildHardField(disc, goal, { margin: 12 })), gi = f ? f.goalCell.gy * W + f.goalCell.gx : -1;
+    ok("!! the solver's output: the waypoint's cell is at distance 0 and is not blocked; a blocked cell has no distance (>= 1e9); a free cell has; the object carries w, h, cell, x0, y0, margin, blocked, fx, fz, dist, goalCell", !!f && f.dist[gi] === 0 && f.blocked[gi] === 0 && f.goalCell.gx === 84 && f.goalCell.gy === 28 && f.blocked.every((b, i) => (b ? f.dist[i] >= N.BIG : f.dist[i] < N.BIG)) && f.w === 96 && f.h === 56 && f.cell === 5 && f.x0 === -40 && f.y0 === -140 && ["fx", "fz", "dist", "blocked"].every((k) => f[k] && f[k].length === W * Hh));
+    ok("!! a reached free cell's flow is a unit vector (except at the waypoint, where it is zero) and points at a FREE neighbour of lower distance -- no flow enters a blocked cell", !!f && f.fx[gi] === 0 && f.fz[gi] === 0 && (() => { let bad = 0, n = 0; for (let i = 0; i < W * Hh; i++) if (!f.blocked[i] && i !== gi && f.dist[i] < N.BIG) { n++; const m = Math.hypot(f.fx[i], f.fz[i]); const sx = f.fx[i] * Math.SQRT2 > 0.5 ? 1 : f.fx[i] * Math.SQRT2 < -0.5 ? -1 : 0, sy = f.fz[i] * Math.SQRT2 > 0.5 ? 1 : f.fz[i] * Math.SQRT2 < -0.5 ? -1 : 0, j = ((i / W | 0) + sy) * W + (i % W) + sx; if (Math.abs(m - 1) > 1e-6 || f.blocked[j] || !(f.dist[j] < f.dist[i])) bad++; } return n > 4000 && bad === 0; })());
+    ok("!! a wider margin blocks strictly more cells (3 < 6 < 12 for one disc)", (() => { const c = (m) => safe(() => H.buildHardField(disc, goal, { margin: m }).blocked.reduce((a, b) => a + b, 0), -1); return c(3) < c(6) && c(6) < c(12); })());
+    // the ladder
+    const gapSc = (w) => { for (let s = 1; s <= 60; s++) if (s % 3 === H.GAP_WIDTHS.indexOf(w)) return H.hardScenario(s, "hard-gaps"); return null; };
+    const narrow = gapSc(24), wide = gapSc(40), shapesOf = (sc) => H.planShapes(sc, 0), has = (f, p) => { const c = N.cellOf(f, p.x, p.y); return !!c && f.dist[c.i] < N.BIG; };
+    const lad24 = safe(() => H.buildLadderField(shapesOf(narrow), narrow.goal, narrow.start)), lad40 = safe(() => H.buildLadderField(shapesOf(wide), wide.goal, wide.start));
+    ok("!! the ladder, a 24 m gap: the 12 m field has NO route from the start, the plan comes back at a lower margin (6 or 3) and HAS one", !!narrow && !has(H.buildHardField(shapesOf(narrow), narrow.goal, { margin: 12 }), narrow.start) && !!lad24 && lad24.margin < 12 && has(lad24, narrow.start));
+    ok("!! the ladder, a 40 m gap: the 12 m field has a route and the plan is the 12 m field (the first margin is the widest and is kept when it works)", !!wide && !!lad40 && lad40.margin === 12 && has(lad40, wide.start) && eq(lad40.blocked, H.buildHardField(shapesOf(wide), wide.goal, { margin: 12 }).blocked));
+    ok("!! the ladder is walked IN ORDER and the first margin with a route wins: an open sea with the ladder [3, 12] gives 3; with [12, 3] gives 12; and the 8 m rung is used when 12 closes and 8 opens (the 24 m gap: 8 would give a corridor of 0, so the plan is at 6 or 3, never 8)", safe(() => H.buildLadderField([], GOAL, { x: 0, y: 0 }, { ladder: [3, 12] }).margin) === 3 && safe(() => H.buildLadderField([], GOAL, { x: 0, y: 0 }, { ladder: [12, 3] }).margin) === 12 && !!lad24 && lad24.margin !== 8 && safe(() => H.buildLadderField([], GOAL, { x: 0, y: 0 }).margin) === 12);
+    const ring = Array.from({ length: 10 }, (_, k) => ({ ax: 60 * Math.cos(k * 0.6283185), ay: 60 * Math.sin(k * 0.6283185), bx: 60 * Math.cos(k * 0.6283185), by: 60 * Math.sin(k * 0.6283185), r: 30 }));
+    const trapped = safe(() => H.buildLadderField(ring, GOAL, { x: 0, y: 0 })), outside = safe(() => H.buildLadderField(ring, GOAL, { x: 0, y: -120 }));
+    ok("!! with the vessel shut in a ring of discs no margin has a route: the ladder returns the LAST margin's field (3) and no route; the same ring seen from outside it has a route at 12; and the route test is from the point GIVEN", !!trapped && trapped.margin === 3 && !has(trapped, { x: 0, y: 0 }) && !!outside && outside.margin === 12 && has(outside, { x: 0, y: -120 }));
+    ok("!! a ladder of one rung returns that rung's field whether or not it has a route", safe(() => H.buildLadderField(ring, GOAL, { x: 0, y: 0 }, { ladder: [12] }).margin) === 12);
+    ok("!! `own` is handed to every rung: the vessel inside the ring with its own 15 m free has a route out at some margin (cells within 15 m free, the ring's inner edge is 30 m away)", (() => { const f2 = safe(() => H.buildLadderField(ring, GOAL, { x: 0, y: 0 }, { own: { x: 0, y: 0 } })); return !!f2 && f2.margin >= 3; })());
+}
+
+console.log("\n5. THE ARMS");
+{
+    const spec = H.ARM_SPEC;
+    ok("!! the spec table: straight builds no field; smooth+approach is the smooth heading with the approach; any, any-blind, any+replan, any+predict steer on the aim point; blind only for any-blind; replan 'none' for the first four, 'now' and 'predict' for the two replan arms", spec.straight.field === false && spec["smooth+approach"].head === "smooth" && spec["smooth+approach"].approach === true && ["any", "any-blind", "any+replan", "any+predict"].every((a) => spec[a].head === "any" && spec[a].approach === false) && ["straight", "smooth+approach", "any", "any+replan", "any+predict"].every((a) => spec[a].blind === false) && spec["any-blind"].blind === true &&
+        ["straight", "smooth+approach", "any", "any-blind"].every((a) => spec[a].replan === "none") && spec["any+replan"].replan === "now" && spec["any+predict"].replan === "predict" && H.HARD_ARMS.every((a) => spec[a] && Object.isFrozen(spec[a])));
+    const wp = { x: 25, y: 10, depth: 30 }, st = (x, y) => ({ pos: [x, y, -20], heading: 0 }), openF = H.buildHardField([], wp);
+    const tS = H.hardTarget("straight", st(0, 0), null, wp);
+    ok("!! straight: the waypoint mission's own target (the waypoint's depth, the cruise speed 3, the bearing atan2(-dy, dx)) and no field is read", near(tS.depth, 30) && near(tS.speed, 3) && near(tS.heading, Math.atan2(-10, 25)));
+    const t1 = H.hardTarget("smooth+approach", st(0, 0), openF, wp), t2 = H.hardTarget("smooth+approach", st(-6, 0), openF, wp);
+    ok("!! smooth+approach: inside 30 m of the waypoint (26.9 m) the straight bearing; outside it (32.6 m) the smooth field's heading, which is NOT the bearing", near(t1.heading, Math.atan2(-10, 25)) && near(t2.heading, N.fieldHeading(openF, -6, 0, "smooth")) && Math.abs(t2.heading - Math.atan2(-10, 31)) > 0.05 && near(t2.depth, 30) && near(t2.speed, 3));
+    const wall = [{ ax: 200, ay: 0, bx: 200, by: 0, r: 25 }], goal2 = { x: 380, y: 0, depth: 25 }, fw = H.buildHardField(wall, goal2, { margin: 12 }), aim = N.aimOf(fw, goal2);
+    const hAny = N.aimHeading(fw, aim, 120, 0), tA = H.hardTarget("any", st(120, 0), fw, goal2);
+    ok("!! any: the bearing to the aim point of the cell the vessel is in (behind a disc the aim point is a corner, not the waypoint: the heading differs from the straight bearing), with the waypoint's depth and the cruise speed; any-blind, any+replan, any+predict steer the same way", hAny !== null && Math.abs(hAny) > 0.05 && near(tA.heading, hAny) && near(tA.depth, 25) && near(tA.speed, 3) && ["any-blind", "any+replan", "any+predict"].every((a) => near(H.hardTarget(a, st(120, 0), fw, goal2).heading, hAny)));
+    const out = H.hardTarget("any", st(500, 0), fw, goal2);
+    ok("!! any outside the grid: no aim point and no cell flow, so the straight bearing (0 here)", near(out.heading, Math.atan2(0, -120)) || near(out.heading, MT.waypointTarget(st(500, 0), goal2, 3).heading));
+    ok("!! the 30 m approach belongs to smooth+approach only: inside 30 m `any` still steers on its aim point (which is the waypoint there) and the smooth heading is replaced by the bearing", near(H.hardTarget("any", st(0, 0), openF, wp).heading, Math.atan2(-10, 25)) );
+    const m = thrown(() => { H.hardTarget("magnet", st(0, 0), openF, wp); });
+    ok("!! an unknown arm throws FROM hardTarget and names the arms", /subHardNav\.hardTarget: unknown arm "magnet"/.test(m) && H.HARD_ARMS.every((x) => m.includes(x)));
+}
+
+console.log("\n6. THE SCENARIOS");
+{
+    const seeds = N.range(1, 60), by = (kind) => seeds.map((s) => H.hardScenario(s, kind));
+    const sc = H.hardScenario(7, "hard-traffic");
+    ok("!! a scenario is a function of its seed and kind (twice, identical to the digit), frozen all the way down (the obstacles too), and differs between kinds and seeds", same(sc, H.hardScenario(7, "hard-traffic")) && !same(sc, H.hardScenario(8, "hard-traffic")) && !same(H.hardScenario(7, "hard-islands"), H.hardScenario(7, "hard-current")) && Object.isFrozen(sc) && Object.isFrozen(sc.obstacles) && sc.obstacles.every((o) => Object.isFrozen(o)) && Object.isFrozen(sc.start) && Object.isFrozen(sc.goal));
+    ok("!! an unknown kind throws, naming the kinds", /subHardNav\.hardScenario: unknown kind "nav"/.test(thrown(() => { H.hardScenario(1, "nav"); })) && H.HARD_KINDS.every((k) => thrown(() => { H.hardScenario(1, "nav"); }).includes(k)));
+    const all = H.HARD_KINDS.flatMap(by);
+    ok("!! the start and the waypoint are in their ranges in every kind (start x 0 to 20, y -40 to 40, depth 20 to 30, speed 2 to 3; waypoint x 360 to 400, y -80 to 80, depth 15 to 40); minDepth is the shallower of the two depths",
+        all.every((c) => c.start.x >= 0 && c.start.x <= 20 && Math.abs(c.start.y) <= 40 && c.start.depth >= 20 && c.start.depth <= 30 && c.start.speed >= 2 && c.start.speed <= 3 && c.goal.x >= 360 && c.goal.x <= 400 && Math.abs(c.goal.y) <= 80 && c.goal.depth >= 15 && c.goal.depth <= 40 && c.minDepth === Math.min(c.start.depth, c.goal.depth)) && all.some((c) => c.start.x > 15) && all.some((c) => c.goal.depth < 20));
+    const isl = by("hard-islands"), cur = by("hard-current");
+    const count = (c, t) => c.obstacles.filter((o) => o.type === t).length, groups = (c) => new Set(c.obstacles.filter((o) => o.type === "island").map((o) => o.group)).size;
+    ok("!! hard-islands and hard-current: 2 to 4 islands (each of 2 or 3 overlapping discs of radius 14 to 24 and 8 to 16) and 2 to 4 icebergs (radius 14 to 28, keel 6 to 36), every count met on all 60 seeds, both ends of each range occur",
+        [...isl, ...cur].every((c) => groups(c) >= 2 && groups(c) <= 4 && count(c, "berg") >= 2 && count(c, "berg") <= 4 && c.obstacles.every((o) => (o.type === "island" ? o.r >= 8 && o.r <= 24 && o.keel === Infinity : o.type === "berg" ? o.r >= 14 && o.r <= 28 && o.keel >= 6 && o.keel <= 36 : false))) && [...isl, ...cur].some((c) => groups(c) === 2) && [...isl, ...cur].some((c) => groups(c) === 4) && [...isl, ...cur].some((c) => count(c, "berg") === 2) && [...isl, ...cur].some((c) => count(c, "berg") === 4));
+    ok("!! an island is a BLOB: the members of one island overlap their main disc (centre distance below the radii's sum, 0.6 to 0.9 of it) and every island has 2 or 3 members", [...isl].every((c) => { const g = {}; for (const o of c.obstacles) if (o.type === "island") (g[o.group] ||= []).push(o); return Object.values(g).every((m) => m.length >= 2 && m.length <= 3 && m.slice(1).every((s) => Math.hypot(s.x - m[0].x, s.y - m[0].y) <= (m[0].r + s.r) * 0.9 + 1e-9 && Math.hypot(s.x - m[0].x, s.y - m[0].y) >= (m[0].r + s.r) * 0.6 - 1e-9)); }) && isl.some((c) => c.obstacles.filter((o) => o.type === "island" && o.group === 0).length === 3));
+    const stat = (c) => c.obstacles.filter((o) => o.vx === 0 && o.vy === 0 && o.type !== "wall");
+    ok("!! every static obstacle (island member or iceberg) is r + 40 m from the start and the waypoint, and 24 m of water from every disc of ANOTHER group", [...isl, ...cur, ...by("hard-traffic")].every((c) => stat(c).every((o, i, a) => Math.hypot(o.x - c.goal.x, o.y - c.goal.y) >= o.r + 40 - 1e-9 && Math.hypot(o.x - c.start.x, o.y - c.start.y) >= o.r + 40 - 1e-9 && a.every((p) => p === o || p.group === o.group || Math.hypot(o.x - p.x, o.y - p.y) >= o.r + p.r + 24 - 1e-9))));
+    ok("!! no ships, no wall and no gap in the islands and current kinds; the islands kind has no current and the current kind has one: a mean of up to 1.2 m/s on each horizontal axis, an unsteady part of 0.2 to 0.5, a weight error up to 0.6%, and currentMean is the horizontal mean's length",
+        [...isl, ...cur].every((c) => count(c, "ship") === 0 && count(c, "wall") === 0 && c.gapWidth === null && c.shipSpeed === 0) && isl.every((c) => c.current === null && c.weightError === 0 && c.currentMean === 0) && cur.every((c) => !!c.current && Math.abs(c.current.mean[0]) <= 1.2 && Math.abs(c.current.mean[1]) <= 1.2 && Math.abs(c.current.mean[2]) <= 0.05 && c.current.amp[0] >= 0.2 && c.current.amp[0] <= 0.5 && c.current.amp[1] >= 0.2 && c.current.amp[1] <= 0.5 && Math.abs(c.weightError) <= 0.006 && near(c.currentMean, Math.hypot(c.current.mean[0], c.current.mean[1]), 1e-12)) &&
+        cur.some((c) => c.currentMean > 1.0) && cur.some((c) => c.currentMean < 1.0) && cur.some((c) => Math.abs(c.current.mean[0]) > 0.9) && cur.some((c) => c.weightError > 0.003) && cur.some((c) => c.weightError < -0.003));
+    const gaps = by("hard-gaps");
+    ok("!! hard-gaps: the gap is seed mod 3 into 24, 32, 40 m (20 of each in 60 seeds); the wall is discs of radius 20 to 26 in one column (x 150 to 250), centre of the gap within 55 m of the axis", gaps.every((c, i) => c.gapWidth === H.GAP_WIDTHS[(i + 1) % 3] && c.obstacles.every((o) => o.type === "wall" && o.r >= 20 && o.r <= 26 && o.x === c.obstacles[0].x && o.group === 3000 && o.keel === Infinity) && c.obstacles[0].x >= 150 && c.obstacles[0].x <= 250) && H.GAP_WIDTHS.every((w) => gaps.filter((c) => c.gapWidth === w).length === 20));
+    const wallInfo = (c) => { const d = c.obstacles.slice().sort((p, q) => p.y - q.y); let gapAt = -1; const links = d.slice(1).map((o, i) => Math.hypot(o.x - d[i].x, o.y - d[i].y) - o.r - d[i].r); links.forEach((g, i) => { if (g > 0) gapAt = i; }); return { d, links, gapAt, open: links.filter((g) => g > 0).length }; };
+    ok("!! the wall is CLOSED but for one opening: of the gaps between neighbouring discs (sorted by y) exactly one is open, its width on the line of centres is EXACTLY the gap width, and every other neighbour overlaps", gaps.every((c) => { const w = wallInfo(c); return w.open === 1 && near(w.links[w.gapAt], c.gapWidth, 1e-6) && w.links.every((g, i) => i === w.gapAt || g < 0); }));
+    ok("!! the wall reaches the region's edges: a disc whose centre is at or beyond y = 140 on each side; the opening's centre is within 55 m of y = 0", gaps.every((c) => { const ys = c.obstacles.map((o) => o.y); const w = wallInfo(c), mid = (w.d[w.gapAt].y + w.d[w.gapAt].r + w.d[w.gapAt + 1].y - w.d[w.gapAt + 1].r) / 2; return Math.max(...ys) >= 140 && Math.min(...ys) <= -140 && Math.abs(mid) <= 55 + 1e-6; }));
+    const tr = by("hard-traffic"), ships = tr.flatMap((c) => c.obstacles.filter((o) => o.type === "ship").map((o) => ({ c, o })));
+    ok("!! hard-traffic: 2 to 3 icebergs and 2 to 4 ships (every scenario has at least one ship; both ends of the ship count occur); a ship's radius is 8 to 14 m, keel 18 to 60 m, speed 0.8 to 3.0 m/s; shipSpeed is the fastest", tr.every((c) => count(c, "berg") >= 2 && count(c, "berg") <= 3 && count(c, "ship") >= 2 && count(c, "ship") <= 4 && count(c, "island") === 0) && tr.some((c) => count(c, "ship") === 2) && tr.some((c) => count(c, "ship") === 4) &&
+        ships.every(({ o }) => o.r >= 8 && o.r <= 14 && o.keel >= 18 && o.keel <= 60 && Math.hypot(o.vx, o.vy) >= 0.8 - 1e-9 && Math.hypot(o.vx, o.vy) <= 3.0 + 1e-9) && tr.every((c) => near(c.shipSpeed, Math.max(...c.obstacles.filter((o) => o.type === "ship").map((o) => Math.hypot(o.vx, o.vy))), 1e-12)) && ships.some(({ o }) => Math.hypot(o.vx, o.vy) > 2.5) && ships.some(({ o }) => Math.hypot(o.vx, o.vy) < 1.2));
+    const track = (c, t) => { const L = Math.hypot(c.goal.x - c.start.x, c.goal.y - c.start.y), a = Math.min(t * 3, L); return [c.start.x + (c.goal.x - c.start.x) / L * a, c.start.y + (c.goal.y - c.start.y) / L * a]; };
+    ok("!! every ship CROSSES the vessel's nominal track (3 m/s along the line to the waypoint): at some t in 20..110 s it is within 43 m of where the vessel would be", ships.every(({ c, o }) => { let best = Infinity; for (let t = 20; t <= 110; t += 0.5) { const p = H.posAt(o, t), q = track(c, t); best = Math.min(best, Math.hypot(p[0] - q[0], p[1] - q[1])); } return best <= 43; }) && ships.some(({ c, o }) => { let best = Infinity; for (let t = 20; t <= 110; t += 0.5) { const p = H.posAt(o, t), q = track(c, t); best = Math.min(best, Math.hypot(p[0] - q[0], p[1] - q[1])); } return best < 15; }));
+    ok("!! a ship's clearances: its start is r + 50 m from the vessel's start; its track to 290 s stays r + 40 m from the waypoint and r + r' + 6 m from every static obstacle; it starts inside x -200..600, |y| <= 400",
+        ships.every(({ c, o }) => { const e = [o.x + o.vx * 290, o.y + o.vy * 290]; let dMin = Infinity; for (let k = 0; k <= 290; k += 1) { const p = H.posAt(o, k); dMin = Math.min(dMin, Math.hypot(p[0] - c.goal.x, p[1] - c.goal.y)); } const st = c.obstacles.filter((s) => s.vx === 0 && s.vy === 0); let sMin = true; for (const s of st) { for (let k = 0; k <= 290; k += 1) { const p = H.posAt(o, k); if (Math.hypot(p[0] - s.x, p[1] - s.y) < o.r + s.r + 6 - 1.5) sMin = false; } } return Math.hypot(o.x - c.start.x, o.y - c.start.y) >= o.r + 50 - 1e-9 && dMin >= o.r + 40 - 1.5 && sMin && Math.abs(o.y) <= 400 && o.x >= -200 && o.x <= 600 && e.length === 2; }));
+    ok("!! the blocked flag is the segment test over the STATIC obstacles (a ship's start is not an obstacle on the line), and both blocked and clear scenarios occur in the islands, traffic and current kinds; every wall scenario that crosses the wall is blocked",
+        [...isl, ...cur, ...tr, ...gaps].every((c) => c.blocked === N.isBlocked(c.start, c.goal, c.obstacles.filter((o) => o.vx === 0 && o.vy === 0))) && [isl, tr, cur].every((k) => k.some((c) => c.blocked) && k.some((c) => !c.blocked)));
+    // a route exists at t = 0: measured, not enforced
+    const sets = H.HARD_KINDS.flatMap((k) => [...H.HARD_SETS.dev, ...H.HARD_SETS.held4].map((s) => H.hardScenario(s, k)));
+    const route = (c, mode) => { const f = H.buildLadderField(H.planShapes(c, 0, { mode }), c.goal, c.start); const cc = N.cellOf(f, c.start.x, c.start.y); return !!cc && f.dist[cc.i] < N.BIG; };
+    ok(`!! A ROUTE EXISTS from the start in the ladder field for every one of the ${sets.length} DEV and HELD4 scenarios at t = 0 (measured here, not enforced by the generator), and for the traffic kind also in the predicted plan`, sets.every((c) => route(c, "now")) && sets.filter((c) => c.kind === "hard-traffic").every((c) => route(c, "predict")));
+    ok("!! the waypoint's cell is never blocked at t = 0 or by a predicted capsule, for any scenario of those sets", sets.every((c) => ["now", "predict"].every((mode) => { const f = H.buildHardField(H.planShapes(c, 0, { mode }), c.goal, { margin: 12 }); return f.blocked[f.goalCell.gy * 96 + f.goalCell.gx] === 0; })));
+}
+
+console.log("\n7. THE FLIGHT");
+{
+    const open = mk({}), a = H.flyHard(pilot, open, "straight");
+    ok("!! an open sea, straight: REACHED, a time that is the tick count times the step, a path near the 90 m flown to within 10 m, the chord 100, clearance Infinity (no obstacle), no margin, no noRoute, no replans; the record carries the arm, kind, seed, gap, ship speed, current mean and blocked flag",
+        a.status === "reached" && a.reached === true && a.t === a.ticks * S.DT && a.path > 85 && a.path < 100 && a.chord === 100 && a.minClearance === Infinity && a.margin === null && a.noRoute === false && a.replans === 0 && a.arm === "straight" && a.kind === "hard-islands" && a.seed === 0 && a.gap === null && a.shipSpeed === 0 && a.currentMean === 0 && a.blocked === false);
+    const wall = mk({ obstacles: [O({ type: "wall", x: 50, y: 0, r: 15 })], blocked: true }), b = H.flyHard(pilot, wall, "straight");
+    ok("!! a full-depth disc on the line, straight: COLLIDED, no time, a negative least clearance, the flight stops there", b.status === "collided" && b.reached === false && b.t === null && b.minClearance < 0 && b.minClearance > -1 && b.path > 25 && b.path < 40);
+    const under = H.flyHard(pilot, mk({ obstacles: [O({ type: "berg", x: 50, y: 0, r: 15, keel: 10 })] }), "straight"), over = H.flyHard(pilot, mk({ obstacles: [O({ type: "berg", x: 50, y: 0, r: 15, keel: 30 })] }), "straight");
+    ok("!! AN ICEBERG IS PASSED BENEATH: with a keel at 10 m the vessel (at 25 m) flies through the disc's footprint and REACHES, its clearance Infinity (it never had the iceberg at its depth); the same iceberg with a keel at 30 m is HIT", under.status === "reached" && under.minClearance === Infinity && over.status === "collided" && over.minClearance < 0);
+    const ship = (vy, x = 50, y = 30) => mk({ obstacles: [O({ type: "ship", x, y, r: 8, keel: 60, vx: 0, vy })] }), mv = H.flyHard(pilot, ship(-1.8), "straight"), rest = H.flyHard(pilot, ship(0), "straight");
+    ok("!! A SHIP THAT MOVES IS HIT WHERE THE SAME SHIP AT REST IS NOT: a ship at (50, 30) crossing south at 1.8 m/s is where the vessel is at about 17 s (COLLIDED); the same ship standing still is 18 m off the line (REACHED, clearance about 18 m)", mv.status === "collided" && mv.minClearance < 0 && rest.status === "reached" && rest.minClearance > 17 && rest.minClearance < 19.5);
+    const gone = H.flyHard(pilot, ship(1.8), "straight");
+    ok("!! the same ship moving AWAY (north at 1.8 m/s) is never near: REACHED, with a clearance above that of the ship at rest (it is time-dependent in the clearance too)", gone.status === "reached" && gone.minClearance > rest.minClearance);
+    const left = H.flyHard(pilot, mk({ goal: { x: 470, y: 0, depth: 25 } }), "straight");
+    ok("!! LEFT: a waypoint outside the region (east of x = 440) is flown out of it; status 'left', not reached", left.status === "left" && left.reached === false && left.t === null);
+    const north = H.flyHard(pilot, mk({ start: { x: 0, y: 0, depth: 25, speed: 3, pitch: 0, bank: 0, heading: 0 }, goal: { x: 0, y: 250, depth: 25 } }), "straight"), south = H.flyHard(pilot, mk({ goal: { x: 0, y: -250, depth: 25 } }), "straight"), west = H.flyHard(pilot, mk({ start: { x: 0, y: 0, depth: 25, speed: 3, pitch: 0, bank: 0, heading: Math.PI }, goal: { x: -100, y: 0, depth: 25 } }), "straight");
+    ok("!! LEFT through each other edge: north (y > 140), south (y < -140) and west (x < -40)", north.status === "left" && south.status === "left" && west.status === "left");
+    const timed = H.flyHard(pilot, open, "straight", { seconds: 5 });
+    ok("!! TIMEOUT: a flight that has not arrived when the time is up ends 'timeout' after seconds / dt ticks (5 s is 150 ticks), not reached, no time", timed.status === "timeout" && timed.ticks === 150 && timed.reached === false && timed.t === null);
+    const dive = H.flyHard(pilot, mk({ goal: { x: 12, y: 0, depth: 55 } }), "straight", { seconds: 5 });
+    ok("!! REACHED needs the depth as well as the plan position (a waypoint 12 m ahead but 30 m deeper than the vessel is not reached in 5 s)", dive.status === "timeout" && dive.reached === false);
+    const up = H.flyHard(() => ({ pitch: 1, yaw: 0, thrust: 1, ballast: 0 }), mk({ start: { x: 0, y: 0, depth: 3, speed: 3, pitch: 0, bank: 0, heading: 0 } }), "straight", { seconds: 60 });
+    ok("!! a flight the VESSEL ends keeps the vessel's own word ('broached') and stops there, not reached, no time", up.status === "broached" && up.reached === false && up.t === null && up.ticks < 1800);
+    let calls = 0, lastArgs = null;
+    H.flyHard((s, t, c) => { calls++; lastArgs = [s, t, c]; return pilot(s, t, c); }, open, "straight", { seconds: 2 });
+    ok("!! the pilot is called once per tick (2 s is 60 calls) with (state, target, current), the target having a heading, a depth and a speed and the current a 3-vector", calls === 60 && lastArgs[0].pos.length === 3 && Number.isFinite(lastArgs[1].heading) && lastArgs[1].depth === 25 && lastArgs[1].speed === 3 && lastArgs[2].length === 3);
+    // fields and margins on the record
+    const detour = mk({ obstacles: [O({ type: "island", x: 110, y: 6, r: 20, keel: Infinity })], blocked: true, goal: { x: 250, y: 0, depth: 25 } }), d = H.flyHard(pilot, detour, "any");
+    ok("!! the same kind of disc, arm `any`: REACHED by a detour (longer than the chord), the least clearance positive, the first plan's margin 12 on the record, no replans", d.status === "reached" && d.path > 250 - 10 && d.minClearance > 5 && d.margin === 12 && d.noRoute === false && d.replans === 0);
+    const sw = H.flyHard(pilot, detour, "smooth+approach");
+    ok("!! smooth+approach flies the same scenario too (a field, the margin on the record) and `any-blind` agrees with `any` where there is no iceberg", (sw.status === "reached" || sw.status === "collided" || sw.status === "timeout") && sw.margin === 12 && same(H.flyHard(pilot, detour, "any-blind"), { ...d, arm: "any-blind" }));
+    const bergLine = mk({ obstacles: [O({ type: "berg", x: 150, y: 0, r: 20, keel: 8 })], blocked: true, goal: { x: 300, y: 0, depth: 25 } }), ba = H.flyHard(pilot, bergLine, "any"), bb = H.flyHard(pilot, bergLine, "any-blind");
+    ok("!! KEELS ARE USED: with a shallow iceberg on the line, `any` flies THROUGH its footprint (a path near the 290 m chord, REACHED) while `any-blind` goes round (longer, REACHED)", ba.status === "reached" && bb.status === "reached" && bb.path > ba.path + 3 && ba.path < 300 && ba.minClearance === Infinity && bb.minClearance > 5);
+    // the ring: no route
+    const ringO = Array.from({ length: 10 }, (_, k) => O({ type: "island", x: 60 * Math.cos(k * 0.6283185), y: 60 * Math.sin(k * 0.6283185), r: 30, keel: Infinity, group: 1 })), shut = H.flyHard(pilot, mk({ start: { x: 0, y: 0, depth: 25, speed: 3, pitch: 0, bank: 0, heading: 0 }, obstacles: ringO, blocked: true, goal: { x: 300, y: 0, depth: 25 } }), "any");
+    ok("!! NO ROUTE: a vessel shut in a ring of discs has no route at any margin; the record says noRoute with the LAST rung (3 m) as its margin, and the arm falls back to the straight bearing", shut.noRoute === true && shut.margin === 3 && shut.status !== "reached" && shut.arm === "any");
+    // the replan arms
+    const far = mk({ obstacles: [O({ type: "island", x: 200, y: 120, r: 15, keel: Infinity })], goal: { x: 250, y: 0, depth: 25 } }), an = H.flyHard(pilot, far, "any", { seconds: 20 }), rp = H.flyHard(pilot, far, "any+replan", { seconds: 20 }), pr = H.flyHard(pilot, far, "any+predict", { seconds: 20 });
+    ok("!! where nothing is near the replan arms are the SAME FLIGHT as `any` (identical to the digit but for the arm name and the replan count): 20 s is 600 ticks, replans at every 90th tick from tick 90 (90, 180, ..., 540: 6 of them, none at tick 0 or 600); `any` has none", same({ ...rp, arm: "", replans: 0 }, { ...an, arm: "" }) && same({ ...pr, arm: "", replans: 0 }, { ...an, arm: "" }) && rp.replans === 6 && pr.replans === 6 && an.replans === 0);
+    const crossing = mk({ kind: "hard-traffic", obstacles: [O({ type: "ship", x: 150, y: 120, r: 10, keel: 60, vx: 0, vy: -2.4 })], goal: { x: 300, y: 0, depth: 25 }, shipSpeed: 2.4 });
+    const cn = H.flyHard(pilot, crossing, "any"), cr = H.flyHard(pilot, crossing, "any+replan"), cp = H.flyHard(pilot, crossing, "any+predict");
+    ok("!! A CROSSING SHIP: a ship at (150, 120) steaming south at 2.4 m/s reaches the track at 50 s, just as the vessel arrives; the plan made at t = 0 (the ship frozen at its start, 120 m off the line) does not know, `any` is HIT, and `any+predict` (the capsule of its next 30 s) is not -- the predicted plan sees the ship coming", cn.status === "collided" && cp.status === "reached" && cp.replans > 0 && cp.minClearance > 0 && (cr.status === "reached" || cr.status === "collided"));
+    ok("!! the replanning arms are different flights from `any` where a ship is near (path, time or clearance differ), and the record's current mean, ship speed and gap come from the scenario", !same({ ...cp, arm: "" }, { ...cn, arm: "" }) && cp.shipSpeed === 2.4 && cn.shipSpeed === 2.4 && H.flyHard(pilot, H.hardScenario(3, "hard-gaps"), "any", { seconds: 3 }).gap === H.hardScenario(3, "hard-gaps").gapWidth);
+    ok("!! an unknown arm throws FROM flyHard (before anything is built) and names the arms", /subHardNav\.flyHard: unknown arm "magnet"/.test(thrown(() => { H.flyHard(pilot, open, "magnet"); })) && H.HARD_ARMS.every((x) => thrown(() => { H.flyHard(pilot, open, "magnet"); }).includes(x)));
+    const gc = H.flyHard(pilot, mk({ current: Object.freeze({ mean: [0, 0.9, 0], amp: [0, 0, 0], freq: [[0.1, 0.5], [0.1, 0.5], [0.1, 0.5]], phase: [[0, 0], [0, 0], [0, 0]] }), currentMean: 0.9 }), "straight", { seconds: 10 });
+    ok("!! the CURRENT acts on the vessel and the weight error does (a 0.9 m/s set to the north for 10 s moves a straight-flying vessel off the line by several metres; the record carries the mean)", gc.currentMean === 0.9 && gc.path > 0 && (() => { const f2 = H.flyHard(pilot, mk({}), "straight", { seconds: 10 }); return Math.abs(gc.path - f2.path) > 0.5 || gc.minClearance === Infinity; })());
+    // golden flights on real scenarios
+    const fl = (kind, seed, arm) => H.flyHard(pilot, H.hardScenario(seed, kind), arm);
+    const g1 = fl("hard-islands", 1, "any"), g2 = fl("hard-gaps", 3, "any"), g2b = fl("hard-gaps", 3, "smooth+approach"), g2c = fl("hard-gaps", 6, "any"), g3 = fl("hard-traffic", 4, "any"), g3b = fl("hard-traffic", 4, "any+replan"), g3c = fl("hard-traffic", 5, "any+predict"), g4 = fl("hard-current", 8, "any");
+    ok("!! GOLDEN flights on real scenarios: (hard-islands 1, any) reached at 116.7 s after 347.1 m with 19.2 m of clearance at 12 m; (hard-gaps 3, a 24 m gap, any) reached at 128.8 s, 379.1 m, clearance 7.3 m, plan at the ladder's 6 m, where smooth+approach COLLIDES (218 m flown); (hard-gaps 6, a 24 m gap) reached on the ladder's 3 m rung with 5.4 m",
+        g1.status === "reached" && near(g1.t, 116.7, 0.15) && near(g1.path, 347.1, 1) && near(g1.minClearance, 19.16, 0.5) && g1.margin === 12 && g2.status === "reached" && near(g2.t, 128.77, 0.2) && near(g2.path, 379.1, 1) && near(g2.minClearance, 7.3, 0.5) && g2.margin === 6 && g2b.status === "collided" && near(g2b.path, 218, 2) && g2b.margin === 6 && g2c.status === "reached" && g2c.margin === 3 && near(g2c.minClearance, 5.44, 0.5));
+    ok("!! GOLDEN traffic: (hard-traffic 4) `any` COLLIDES with a ship after 150.5 m while `any+replan` REACHES at 123.9 s after 366.6 m (41 rebuilds, clearance 5.5 m); (hard-traffic 5) `any+predict` reaches only at 240.6 s after 694 m -- 80 rebuilds, a wide berth round ships that never threatened the track (`any` reached it in 138.8 s) -- the cost of a cautious plan; (hard-current 8) `any` reached at 230.4 s on the 8 m rung",
+        g3.status === "collided" && near(g3.path, 150.5, 1) && g3b.status === "reached" && near(g3b.t, 123.93, 0.3) && near(g3b.path, 366.6, 2) && g3b.replans === 41 && near(g3b.minClearance, 5.49, 0.6) && g3c.status === "reached" && near(g3c.t, 240.57, 0.6) && near(g3c.path, 694.3, 3) && g3c.replans === 80 && fl("hard-traffic", 5, "any").status === "reached" && near(fl("hard-traffic", 5, "any").t, 138.77, 0.3) && g4.status === "reached" && near(g4.t, 230.37, 0.5) && g4.margin === 8);
+    // evaluate and the sets
+    const two = [H.hardScenario(1, "hard-gaps"), H.hardScenario(2, "hard-traffic")], ev = H.evaluateHard(pilot, two, { seconds: 3 });
+    ok("!! evaluateHard flies each scenario's own arms scenario-major (3 flights for a gap scenario, 5 for a traffic one: 8), each record carrying its arm and kind", ev.length === 8 && same(ev.map((r) => r.arm), [...H.ARMS_OF["hard-gaps"], ...H.ARMS_OF["hard-traffic"]]) && ev.slice(0, 3).every((r) => r.kind === "hard-gaps" && r.seed === 1) && ev.slice(3).every((r) => r.kind === "hard-traffic" && r.seed === 2));
+    const dv = H.hardSetOf("dev"), h4 = H.hardSetOf("held4");
+    ok("!! hardSetOf: DEV is 30 seeds of each of the four kinds, in HARD_KINDS order, then seed order (120 scenarios); HELD4 is 60 of each (240), frozen; an unknown set throws, naming the sets", dv.length === 120 && h4.length === 240 && dv[0].kind === "hard-islands" && dv[0].seed === 1 && dv[29].seed === 30 && dv[30].kind === "hard-gaps" && dv[119].kind === "hard-current" && h4[0].seed === 401 && h4[239].seed === 460 && h4[60].kind === "hard-gaps" && Object.isFrozen(h4) && /subHardNav\.hardSetOf: unknown set "held"/.test(thrown(() => { H.hardSetOf("held"); })) && ["dev", "held4"].every((x) => thrown(() => { H.hardSetOf("held"); }).includes(x)));
+}
+
+console.log(fails ? `\n${fails} FAIL` : "\nall checks pass");
+process.exit(fails ? 1 : 0);
