@@ -2686,6 +2686,13 @@ export const NEXT_ROUNDS = [
         why: "Addendum 11's rank test (p about 0.004-0.007 on the whole arm) was chosen after seeing the data; this is the same hypothesis on circuits and audits not yet seen, direction fixed in advance.",
     },
     {
+        id: "advisor-toggle-on-the-aquarium-page",
+        blocker: "OPEN",
+        what: "BUILT 2026-11-01 (Keith asked for it): an advisor box on sub-aquarium.html. brain/needsAdvisor.mjs seats the Round 4 rule (GUARDED-OBS: surface under a charge threshold that is high near the surface and falls with depth, pump when flooded, repair when hurt at the surface; the threshold is brain/needsTask.mjs's own obsThreshold) in place of the fixed refill trip on a sub of the needs event; tank.setAdvisor(id, on) switches it; the list line says ADVISOR (surfaces under N%); with it on, the pump and repair boxes are disabled and follow the advice. Gate: render/subAquariumEvents-selfcheck.mjs section 13, 29 mutants. It is the RULE, not a language model: Round 5 found two local models add nothing beyond a fixed depth cap and lose to this rule.",
+        how: "Open the Sub Aquarium, give a sub battery needs (the needs menu), tick 'advisor': a sub at low charge surfaces earlier near the surface and later at depth than the fixed trip, and bails a flood and mends itself without the boxes. NOT DONE: a view of the advice over time; the survey task's stations, noisy gauge and filter (GUARDED-FILTER) are not in the aquarium; a model seat (the Round 5 recordings could be replayed in it but would show what the audit already says).",
+        why: "Asked for. The advisor chip had no face; this lets the registered rule be watched on the same boats the page already flies.",
+    },
+    {
         id: "fish-4b-p-no-state-on-permuted-tuning-registered-built-not-run",
         blocker: "OPEN",
         what: "REGISTERED 2026-10-31 (brain/FISH_VESTIBULAR_HELPER_WIP.md Addendum 14) AND BUILT, NOT RUN: does the data's TUNING matter without memory? NO STATE on the real wiring and tuning (tns) against NO STATE with the inputs' tuning angles and kinetic classes permuted (tt1, tt2, tt3 = tuningControl, shift 0 / 4 / 8), 4b-P cells P/B and P/whole, 32 circuits, fresh audits 86001-86060, refs:PT, ordinals 722-753. The registered test is Addendum 12's: the four tns searches against the twelve permuted ones by the exact one-sided rank test, p <= 0.05 per cell; expectations written first (P/whole supported 40 percent, P/B 35, both 20, neither 45). Built in tools/ship/trainSubVestibular.mjs as generation 4 (gate rows and 24 mutants, identity 0).",
