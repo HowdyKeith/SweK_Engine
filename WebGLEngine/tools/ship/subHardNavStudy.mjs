@@ -27,7 +27,7 @@ const key = (r) => r.kind + "|" + r.seed;
 /** The median of arm A's path over arm B's, on the scenarios of a kind that both reached: { ratio, pairs }. */
 export function pathRatio(runs, kind, armA, armB) {
     const b = new Map(runs.filter((r) => r.kind === kind && r.arm === armB && r.reached).map((r) => [key(r), r]));
-    const pairs = runs.filter((r) => r.kind === kind && r.arm === armA && r.reached && b.has(key(r)));
+    const pairs = runs.filter((r) => r.arm === armA && r.reached && b.has(key(r)));   // (the key carries the kind, so only B is filtered by it)
     return { ratio: pairs.length ? median(pairs.map((r) => r.path / b.get(key(r)).path)) : NaN, pairs: pairs.length };
 }
 const tally = (rs) => ({ n: rs.length, reached: rs.filter((r) => r.reached).length, collided: rs.filter((r) => r.status === "collided").length });
