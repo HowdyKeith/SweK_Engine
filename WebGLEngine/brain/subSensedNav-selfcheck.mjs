@@ -1,0 +1,197 @@
+// WebGLEngine/brain/subSensedNav-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
+//
+// Run: node brain/subSensedNav-selfcheck.mjs      (~20 s)
+//
+// THE SENSED MAP (brain/subSensedNav.mjs), held to its word before HELD6 is flown (registration: brain/SENSED_NAV_WIP.md):
+//   1  THE CONSTANTS   the three static kinds, the arms (the three sensed ones, the study's five, the designated), the sonar (100 m, 60 degrees a side, a ping a second), the two sigmas, the bars, the sets (HELD6 shares no seed with any set read before)
+//   2  THE NORMAL      gauss: the Box-Muller draw on known uniforms, finite at both ends, mean 0 and spread 1 over many draws
+//   3  THE MAP         an empty map; blockingOf (full depth always, a keel only when keel + 5 m exceeds the shallower depth, strictly); ping: the sector (range and bearing, both inclusive), the heading convention (positive heading turns towards -y), occupied cells against a brute
+//                      force, the believed offset shifting where an obstacle lands, occupied is sticky and a second ping adds nothing, the counts, a pose off the grid
+//   4  THE SHAPES      mapShapes: the occupied cells as the capsules of their runs along a row (one cell, a run, two runs, the ends of the row, the order), and planFromMap against subHardNav's field builder on those shapes (an empty map is the edge band only; one wall; the vessel's own
+//                      surroundings free; the ladder falls through a closing gap and returns no route when nothing leaves one)
+//   5  THE FLIGHT      the arms (an unknown one throws, naming them), an open sea (one plan, a ping a second), an island on the line (seen, planned round, REACHED; with a sonar too short COLLIDED; one behind the vessel is never seen), the believed offset (none for `sensed`; a new
+//                      error each ping for `sensed+fix`; a growing walk for `sensed+drift`; the pilot and the physics see the TRUE state), determinism and a different stream for each arm, the status paths, GOLDEN flights, the study flight (`straight` and `exact` are subHardNav's), the sets
+//
+// SABOTAGE LOG -- 138 mutants of brain/subSensedNav.mjs, each run against a copy of this gate, 4 at a time (the scratch-tree runner). 135 RED BY NAME, 3 NOT RED and said:
+//   K01-K24 the constants (kinds, arms, the sonar's three numbers, both sigmas, the arm table, the bars, the sets, the point radius, frozen or not); K25-K29 gauss and the angle wrap; K30 the arm check; K31-K34 createMap; K35-K36 blockingOf; K37-K61 ping (the bounding box and its four clamps, the cell centres, both limits
+//   inclusive, the bearing and the heading signs, seen and occupied counted once and sticky, the radius test, the believed offset in both axes and its default, the sonar default, the added count); K62-K68 mapShapes; K69-K72 planFromMap; K73-K120 flySensed (the length, the ping cadence, the stream's three seeds, the believed position, what the sonar and the plan are given,
+//   when a plan is built and from where, the believed state handed to the target and the true state to the pilot and the physics, the drift step and its square root, each exit and the vessel's own status, the clearance, the arrival time, the start clearance); K121-K129 the record; K130-K133 flyArm; K134-K136 senseSetOf; K137-K138 the clearance depth and the sonar option.
+//   NOT RED (all EQUIVALENT): K38 (the ping's bounding box centred with round instead of floor: the box has a cell of slack, and it only prunes cells the sector test would reject); K91 (the first plan frees the vessel's own 15 m: the map is empty at t = 0, so there is nothing to free); K112 (a collision at a clearance of
+//   exactly zero is the same as one below: a measure-zero event).
+//   ON THE FIRST RUN EIGHTEEN WENT 0 RED and the gate grew what separated them: a ping from a pose on the grid's edge must ensonify exactly the sector's cells on the grid, none wrapped round the row (K42); a run of occupied cells that reaches the last column (K62); a map of another size planning on its own grid (K71); the `ladder` option (K95); the PILOT is handed the true state, checked with a fix that has already moved the belief (K100); the vessel's own status, a vessel diving past a keel its start depth would hit, the west and south edges, the
+//   start counted in the least clearance, a first plan with no route, the chord from the START and the gap width on the record, `opts` reaching the exact arm (K109, K113, K114, K116, K120, K123, K128, K129, K133); and the plan made from the BELIEVED position (K92: over 24 seeds a vessel 9 m inside the west edge takes the 3 m rung from where it is and the 8 m rung from where a fix puts it). While building the gate, a hand-made island dead on the vessel's line made the plan flip sides at every ping and the vessel dither into it
+//   (the optimistic re-plan has no memory of the side it chose); the gate's island is 12 m off the line, and the finding is in brain/SENSED_NAV_WIP.md.
+"use strict";
+import * as X from "./subSensedNav.mjs";
+import * as H from "./subHardNav.mjs";
+import * as N from "./subFieldNav.mjs";
+import * as AP from "./autopilotSub.mjs";
+import * as S from "../physics/mechanics/subModel6dof.mjs";
+
+let fails = 0;
+const ok = (l, c, n = "") => { if (!c) fails++; console.log(`  ${c ? "PASS" : "FAIL"}  ${l}${n ? "   " + n : ""}`); };
+const near = (a, b, e = 1e-9) => Number.isFinite(a) && Number.isFinite(b) && Math.abs(a - b) <= e;
+const safe = (f, d = null) => { try { return f(); } catch { return d; } };
+const thrown = (f) => { try { f(); return "no throw"; } catch (e) { return String(e.message); } };
+const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+const guard = (n, f) => { try { f(); } catch (e) { fails++; console.log(`  FAIL  !! section ${n} ran to the end (THE GATE THREW: ${String((e && e.message) || e).slice(0, 160)})`); } };   // a mutant that breaks a function the rows call fails the section by name instead of killing the gate
+const pilot = (s, t, c) => AP.decide(s, t, c);
+const O = (o) => ({ type: "island", group: 0, x: 0, y: 0, r: 10, keel: Infinity, vx: 0, vy: 0, ...o });
+const mk = (over) => Object.freeze({ seed: 0, kind: "hard-islands", start: { x: 0, y: 0, depth: 25, speed: 3, pitch: 0, bank: 0, heading: 0 }, goal: { x: 100, y: 0, depth: 25 }, minDepth: 25, obstacles: [], gapWidth: null, shipSpeed: 0, currentMean: 0, blocked: false, current: null, weightError: 0, ...over });
+const segD = (px, py, ax, ay, bx, by) => { const dx = bx - ax, dy = by - ay, l2 = dx * dx + dy * dy, t = l2 ? Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / l2)) : 0; return Math.hypot(px - ax - t * dx, py - ay - t * dy); };
+const lcg = (seed) => { let a = seed >>> 0; return () => { a = (Math.imul(a, 1664525) + 1013904223) >>> 0; return a / 4294967296; }; };
+console.log("subSensedNav-selfcheck -- the sensed map\n");
+
+guard("1", () => {
+    console.log("1. THE CONSTANTS");
+    ok("!! the kinds are the three static ones (no traffic: a moving ship needs a velocity estimate) in the order islands, gaps, current; the sensed arms are sensed, sensed+fix, sensed+drift; the study flies straight, exact, sensed, sensed+fix, sensed+drift, designated sensed+fix; all frozen", same(X.SENSE_KINDS, ["hard-islands", "hard-gaps", "hard-current"]) && same(X.SENSED_ARMS, ["sensed", "sensed+fix", "sensed+drift"]) && same(X.STUDY_ARMS, ["straight", "exact", "sensed", "sensed+fix", "sensed+drift"]) && X.DESIGNATED === "sensed+fix" && X.EXACT_ARM === "any" && X.FLOOR_ARM === "straight" && [X.SENSE_KINDS, X.SENSED_ARMS, X.STUDY_ARMS].every(Object.isFrozen) && X.SENSE_KINDS.every((k) => H.HARD_KINDS.includes(k)) && !X.SENSE_KINDS.includes("hard-traffic"));
+    ok("!! the sonar is 100 m, 60 degrees a side, a ping a second (frozen); the fix error is 3 m and the drift 0.3 m per root second (the arms' table: sensed has neither, +fix the first, +drift the second); the plan sees a cell as a point 2.5 m wide", X.SONAR.range === 100 && near(X.SONAR.half, Math.PI / 3) && X.SONAR.pingS === 1 && Object.isFrozen(X.SONAR) && X.FIX_SIGMA === 3 && X.DRIFT_SIGMA === 0.3 && same(X.ARM_SPEC, { sensed: { fix: 0, drift: 0 }, "sensed+fix": { fix: 3, drift: 0 }, "sensed+drift": { fix: 0, drift: 0.3 } }) && Object.isFrozen(X.ARM_SPEC) && Object.values(X.ARM_SPEC).every(Object.isFrozen) && X.POINT_R === 2.5);
+    ok("!! the bars: islands 80%, gaps 60%, current 70% and at most 6 island collisions (frozen)", same(X.BARS, { "hard-islands": 0.8, "hard-gaps": 0.6, "hard-current": 0.7 }) && Object.isFrozen(X.BARS) && X.ISLAND_MAX_COLLISIONS === 6);
+    const used = new Set([...Object.values(N.SETS).flat(), ...H.HARD_SETS.dev, ...H.HARD_SETS.held4, ...H.HELD5]);
+    ok("!! the sets: DEV is seeds 1 to 30 and HELD6 is seeds 601 to 660 (60 of each kind, read once), frozen, and HELD6 shares no seed with any set read before (including HELD4's 401 to 460 and HELD5's 501 to 560)", same(X.SENSE_SETS.dev, N.range(1, 30)) && same(X.SENSE_SETS.held6, N.range(601, 660)) && X.SENSE_SETS.held6.every((s) => !used.has(s)) && Object.isFrozen(X.SENSE_SETS));
+});
+
+guard("2", () => {
+    console.log("\n2. THE NORMAL");
+    const seq = (...v) => { let i = 0; return () => v[i++ % v.length]; };
+    ok("!! gauss takes two uniforms: (0.5, 0) is sqrt(2 ln 2) = 1.17741 (the cosine of 0 is 1); (0.5, 0.5) is minus that (the cosine of pi); (0, anything) is 0 (the logarithm of 1), finite", near(X.gauss(seq(0.5, 0)), Math.sqrt(2 * Math.LN2), 1e-12) && near(X.gauss(seq(0.5, 0.5)), -Math.sqrt(2 * Math.LN2), 1e-12) && X.gauss(seq(0, 0.3)) === 0 && Number.isFinite(X.gauss(seq(0.9999999999, 0.1))));
+    ok("!! gauss draws the angle from the SECOND uniform (0.5, 0.25 is about 0: the cosine of a quarter turn) and the radius from the first (0.75, 0 is sqrt(-2 ln 0.25) = 1.6651)", Math.abs(X.gauss(seq(0.5, 0.25))) < 1e-12 && near(X.gauss(seq(0.75, 0)), Math.sqrt(-2 * Math.log(0.25)), 1e-12));
+    const u = lcg(7), xs = Array.from({ length: 40000 }, () => X.gauss(u)), mean = xs.reduce((a, b) => a + b, 0) / xs.length, sd = Math.sqrt(xs.reduce((a, b) => a + (b - mean) ** 2, 0) / xs.length), within = xs.filter((v) => Math.abs(v) <= 1).length / xs.length;
+    ok("!! over 40,000 draws the mean is within 0.03 of 0, the spread within 0.03 of 1, and 68% (within 2 points) fall within one spread", Math.abs(mean) < 0.03 && Math.abs(sd - 1) < 0.03 && Math.abs(within - 0.6827) < 0.02, `mean ${mean.toFixed(3)} sd ${sd.toFixed(3)} within ${within.toFixed(3)}`);
+});
+
+guard("3", () => {
+    console.log("\n3. THE MAP");
+    const m0 = X.createMap();
+    ok("!! an empty map is the study's region: 96 x 56 cells of 5 m from (-40, -140), nothing seen, nothing occupied, both counts 0; a grid can be given", m0.w === 96 && m0.h === 56 && m0.cell === 5 && m0.x0 === -40 && m0.y0 === -140 && m0.seen.length === 5376 && m0.occ.length === 5376 && m0.seen.every((v) => v === 0) && m0.occ.every((v) => v === 0) && m0.nSeen === 0 && m0.nOcc === 0 && (() => { const g = X.createMap({ x0: 0, y0: 10, w: 20, h: 30 }); return g.w === 20 && g.h === 30 && g.x0 === 0 && g.y0 === 10 && g.occ.length === 600; })());
+    const obs = [{ keel: Infinity, id: "island" }, { keel: 30, id: "deep" }, { keel: 20, id: "edge" }, { keel: 19.9, id: "shallow" }];
+    ok("!! blockingOf: a full-depth obstacle always blocks; a keel blocks only when keel + 5 m EXCEEDS the shallower depth (20: keel 30 blocks, keel 20 blocks, keel 15 does NOT: 20 is not above 20), and the order is kept", same(X.blockingOf(obs, 25).map((o) => o.id), ["island", "deep"]) && same(X.blockingOf(obs, 20).map((o) => o.id), ["island", "deep", "edge", "shallow"]) && same(X.blockingOf([{ keel: 15 }, { keel: 15.5 }], 20).map((o) => o.keel), [15.5]) && X.blockingOf([], 20).length === 0);
+    // a vessel at the centre of a cell: (-37.5, -137.5) + 5 k
+    const at = (gx, gy) => ({ x: -37.5 + 5 * gx, y: -137.5 + 5 * gy }), idx = (gx, gy) => gy * 96 + gx;
+    const ring = (p, heading, sonar) => { const out = []; for (let gy = 0; gy < 56; gy++) for (let gx = 0; gx < 96; gx++) { const c = at(gx, gy), dx = c.x - p.x, dy = c.y - p.y, d = Math.hypot(dx, dy), b = Math.atan2(-dy, dx); let diff = b - heading; diff = Math.atan2(Math.sin(diff), Math.cos(diff)); if (d <= sonar.range && Math.abs(diff) <= sonar.half) out.push(idx(gx, gy)); } return out; };
+    const p0 = at(30, 28), m1 = X.createMap();
+    X.ping(m1, [], p0, 0, undefined, X.SONAR);
+    const want = ring(p0, 0, X.SONAR), got = []; m1.seen.forEach((v, i) => { if (v) got.push(i); });
+    ok("!! the SECTOR: a ping with nothing to find ensonifies exactly the cells whose centres are within 100 m and within 60 degrees of the heading (heading 0, from the middle of the grid), counted in nSeen; nothing is occupied", same(got, want) && m1.nSeen === want.length && want.length > 400 && m1.nOcc === 0 && m1.occ.every((v) => v === 0));
+    const m2 = X.createMap(), q = at(60, 28);
+    X.ping(m2, [], q, 1.2, undefined, X.SONAR);
+    const got2 = []; m2.seen.forEach((v, i) => { if (v) got2.push(i); });
+    ok("!! the sector follows the heading, in the convention of the whole tree (a positive heading turns towards -y: direction (cos h, -sin h)): heading 1.2 rad from (150, 2.5) sees the cells to the north-east side (y below the vessel's) and the brute force agrees", same(got2, ring(q, 1.2, X.SONAR)) && m2.seen[idx(65, 18)] === 1 && m2.seen[idx(65, 38)] === 0 && m2.seen[idx(60, 15)] === 1);
+    const m3 = X.createMap(), r3 = X.ping(m3, [], at(10, 28), 0, undefined, { range: 100, half: 0, pingS: 1 }), row = []; m3.seen.forEach((v, i) => { if (v) row.push(i); });
+    ok("!! both limits are INCLUSIVE: with a half-angle of 0 only the cells exactly on the heading (the vessel's own and the 20 cells to 100 m ahead: 21, the last at EXACTLY the range) are ensonified; the cell 105 m ahead and the row above are not", row.length === 21 && row[0] === idx(10, 28) && row[20] === idx(30, 28) && m3.seen[idx(31, 28)] === 0 && m3.seen[idx(20, 27)] === 0 && r3 === 0);
+    // the occupied cells against a brute force
+    const isl = { x: 40, y: -20, r: 18, keel: Infinity }, bergs = [{ x: 60, y: 25, r: 12, keel: 30 }, { x: 85, y: -40, r: 9, keel: 40 }], world = [isl, ...bergs];
+    const pose = at(5, 28), m4 = X.createMap(), added4 = X.ping(m4, world, pose, 0, { x: 0, y: 0 }, X.SONAR);
+    const inSector = new Set(ring(pose, 0, X.SONAR)), brute = []; for (let gy = 0; gy < 56; gy++) for (let gx = 0; gx < 96; gx++) { const c = at(gx, gy); if (inSector.has(idx(gx, gy)) && world.some((o) => Math.hypot(c.x - o.x, c.y - o.y) <= o.r)) brute.push(idx(gx, gy)); }
+    const occ4 = []; m4.occ.forEach((v, i) => { if (v) occ4.push(i); });
+    ok("!! OCCUPIED: a cell in the sector whose centre is within an obstacle's radius (inclusive) is occupied, and nothing else is (the island and two icebergs at once against a brute force); ping returns how many were newly occupied and nOcc counts them", same(occ4, brute) && added4 === brute.length && m4.nOcc === brute.length && brute.length > 40);
+    const m5 = X.createMap(), tri = { x: -37.5 + 5 * 12, y: -137.5 + 5 * 8, r: 5, keel: Infinity };
+    X.ping(m5, [tri], at(5, 8), 0, undefined, X.SONAR);
+    ok("!! the radius test is inclusive: an obstacle of radius 5 on a cell centre marks that cell and its four neighbours at EXACTLY 5 m (5 cells), not the diagonals (7.07 m)", m5.nOcc === 5 && m5.occ[idx(12, 8)] === 1 && m5.occ[idx(11, 8)] === 1 && m5.occ[idx(13, 8)] === 1 && m5.occ[idx(12, 7)] === 1 && m5.occ[idx(12, 9)] === 1 && m5.occ[idx(13, 9)] === 0);
+    const wall = { x: 40, y: 0, r: 10, keel: Infinity }, mA = X.createMap(), mB = X.createMap(), mC = X.createMap();
+    X.ping(mA, [wall], at(5, 28), 0, { x: 0, y: 0 });
+    X.ping(mB, [wall], at(5, 28), 0, { x: 10, y: 0 });
+    X.ping(mC, [wall], at(5, 28), 0, { x: 0, y: -10 });
+    const cx = (m) => { let sx = 0, sy = 0, n = 0; m.occ.forEach((v, i) => { if (v) { sx += -37.5 + 5 * (i % 96); sy += -137.5 + 5 * Math.floor(i / 96); n++; } }); return [sx / n, sy / n]; };
+    ok("!! the BELIEVED offset (believed minus true) moves where the obstacle lands in the map: with the vessel believing itself 10 m east of where it is, the island at (40, 0) is mapped at about (50, 0); 10 m north (y -10), at about (40, -10); with no offset at (40, 0) (the offset defaults to none)", near(cx(mA)[0], 40, 2) && near(cx(mA)[1], 0, 2) && near(cx(mB)[0], 50, 2) && near(cx(mB)[1], 0, 2) && near(cx(mC)[0], 40, 2) && near(cx(mC)[1], -10, 2) && (() => { const mD = X.createMap(); X.ping(mD, [wall], at(5, 28), 0); return same(Array.from(mD.occ), Array.from(mA.occ)); })());
+    const before = Array.from(m4.occ), again = X.ping(m4, world, pose, 0, { x: 0, y: 0 }, X.SONAR), more = X.ping(m4, world, at(20, 26), 0, { x: 0, y: 0 }, X.SONAR);
+    ok("!! occupied is STICKY and counted once: the same ping again adds nothing (returns 0, nOcc unchanged, the cells the same); a ping from further on adds only the cells not yet marked, and nOcc always equals the number of marked cells (and nSeen the number seen)", again === 0 && before.every((v, i) => !v || m4.occ[i] === 1) && more > 0 && m4.nOcc === Array.from(m4.occ).filter(Boolean).length && m4.nSeen === Array.from(m4.seen).filter(Boolean).length);
+    const mE = X.createMap(), outside = X.ping(mE, [isl], { x: 900, y: 900 }, 0), mF = X.createMap(), epose = { x: -20, y: -137.5 }, edge = X.ping(mF, [{ x: -38, y: -138, r: 4, keel: Infinity }], epose, Math.PI), seenF = []; mF.seen.forEach((v, i) => { if (v) seenF.push(i); });
+    ok("!! a pose far off the grid ensonifies nothing and does not fail; a pose on the grid's edge looking out of it marks the cells inside (the obstacle at the corner) and ensonifies exactly the cells of the sector that are on the grid (none wrapped round from the other side of the row)", outside === 0 && mE.nSeen === 0 && mE.nOcc === 0 && edge > 0 && mF.occ[idx(0, 0)] === 1 && same(seenF, ring(epose, Math.PI, X.SONAR)) && seenF.length > 10);
+});
+
+guard("4", () => {
+    console.log("\n4. THE SHAPES AND THE PLAN");
+    const m = X.createMap(), set = (gx, gy) => { if (!m.occ[gy * 96 + gx]) { m.occ[gy * 96 + gx] = 1; m.nOcc++; } }, cxy = (gx, gy) => [-37.5 + 5 * gx, -137.5 + 5 * gy];
+    ok("!! an empty map has no shapes", X.mapShapes(X.createMap()).length === 0);
+    set(10, 5);
+    const one = X.mapShapes(m);
+    ok("!! one occupied cell is one zero-length capsule at its centre, 2.5 m wide ({ ax, ay, bx, by, r })", one.length === 1 && same(one[0], { ax: cxy(10, 5)[0], ay: cxy(10, 5)[1], bx: cxy(10, 5)[0], by: cxy(10, 5)[1], r: 2.5 }));
+    set(11, 5); set(12, 5); set(20, 5); set(0, 5); set(95, 5); set(95, 6); set(3, 40);
+    set(93, 9); set(94, 9); set(95, 9);
+    const sh = X.mapShapes(m).map((s) => [s.ax, s.ay, s.bx, s.by]);
+    ok("!! a RUN of occupied cells along a row is one capsule from the first centre to the last (10 to 12), a gap of one free cell starts a new run (20), a run at the first column and one that reaches the LAST column (95 alone, and 93 to 95) are kept, a cell in the next row is another shape, and they come row by row, left to right", same(sh, [[cxy(0, 5)[0], cxy(0, 5)[1], cxy(0, 5)[0], cxy(0, 5)[1]], [cxy(10, 5)[0], cxy(10, 5)[1], cxy(12, 5)[0], cxy(12, 5)[1]], [cxy(20, 5)[0], cxy(20, 5)[1], cxy(20, 5)[0], cxy(20, 5)[1]], [cxy(95, 5)[0], cxy(95, 5)[1], cxy(95, 5)[0], cxy(95, 5)[1]], [cxy(95, 6)[0], cxy(95, 6)[1], cxy(95, 6)[0], cxy(95, 6)[1]], [cxy(93, 9)[0], cxy(93, 9)[1], cxy(95, 9)[0], cxy(95, 9)[1]], [cxy(3, 40)[0], cxy(3, 40)[1], cxy(3, 40)[0], cxy(3, 40)[1]]]) && X.mapShapes(m).every((s) => s.r === 2.5));
+    const goal = { x: 360, y: 0, depth: 25 }, empty = X.planFromMap(X.createMap(), goal, { x: 0, y: 0 }), ref = H.buildLadderField([], goal, { x: 0, y: 0 });
+    ok("!! an EMPTY map's plan is the edge band alone, the first rung of the ladder (margin 12): the same blocked cells as subHardNav's field with no shapes (876 of them), the same distances, a route from the start", empty.margin === 12 && same(Array.from(empty.blocked), Array.from(ref.blocked)) && empty.blocked.reduce((a, b) => a + b, 0) === 876 && same(Array.from(empty.dist.slice(0, 200)), Array.from(ref.dist.slice(0, 200))) && empty.dist[N.cellOf(empty, 0, 0).i] < N.BIG);
+    const mw = X.createMap(); for (let gy = 10; gy < 46; gy++) { mw.occ[gy * 96 + 40] = 1; mw.nOcc++; mw.occ[gy * 96 + 41] = 1; mw.nOcc++; }
+    const pw = X.planFromMap(mw, goal, { x: 0, y: 0 }), want = H.buildLadderField(X.mapShapes(mw), goal, { x: 0, y: 0 });
+    ok("!! the plan is subHardNav's field on the map's shapes (a two-cell-thick wall from row 10 to 45: the same blocked cells, the same margin, the same distances), and the cells around the wall are blocked out to the inflation (4 + 12 m plus 2.5 m from the nearest wall centre: 15 m off is blocked, 20 m off is not)", same(Array.from(pw.blocked), Array.from(want.blocked)) && pw.margin === want.margin && same(Array.from(pw.dist.slice(2000, 2300)), Array.from(want.dist.slice(2000, 2300))) && pw.blocked[28 * 96 + 37] === 1 && pw.blocked[28 * 96 + 44] === 1 && pw.blocked[28 * 96 + 36] === 0 && pw.blocked[28 * 96 + 45] === 0 && pw.blocked[28 * 96 + 30] === 0);
+    // brute force over the shapes
+    const brute = (shapes, margin) => { const inf = 4 + margin, out = []; for (let gy = 0; gy < 56; gy++) for (let gx = 0; gx < 96; gx++) { const c = cxy(gx, gy), edge = c[0] - -40 < inf || 440 - c[0] < inf || c[1] - -140 < inf || 140 - c[1] < inf; out.push(edge || shapes.some((s) => segD(c[0], c[1], s.ax, s.ay, s.bx, s.by) <= s.r + inf) ? 1 : 0); } return out; };
+    ok("!! against a brute force: a cell is blocked iff it is within the edge band or within half-hull + margin + 2.5 m of a shape (the wall above, margin 12)", same(Array.from(pw.blocked), brute(X.mapShapes(mw), 12)));
+    const own = { x: -37.5 + 5 * 40, y: -137.5 + 5 * 28 }, pOwn = X.planFromMap(mw, goal, { x: 0, y: 0 }, { own });
+    ok("!! the vessel's own surroundings are free: with `own` on the wall's centre line every cell within 15 m of that point (inclusive: 15 m off is freed) that the wall blocks is unblocked, the wall's cells farther off stay blocked, and the edge stays", pw.blocked[28 * 96 + 38] === 1 && pOwn.blocked[28 * 96 + 38] === 0 && pOwn.blocked[28 * 96 + 40] === 0 && pOwn.blocked[28 * 96 + 42] === 0 && pw.blocked[28 * 96 + 37] === 1 && pOwn.blocked[28 * 96 + 37] === 0 && pOwn.blocked[40 * 96 + 40] === 1 && pOwn.blocked[10 * 96 + 40] === 1 && pOwn.blocked[0] === 1);
+    // a wall with a gap: the ladder
+    const mg = X.createMap(); for (let gy = 0; gy < 56; gy++) { if (gy >= 27 && gy <= 31) continue; for (const gx of [40, 41, 42]) { mg.occ[gy * 96 + gx] = 1; mg.nOcc++; } }
+    const pg = X.planFromMap(mg, goal, { x: 0, y: 0 }), rungs = X.planFromMap(mg, goal, { x: 0, y: 0 }, { ladder: [12] });
+    ok("!! a gap that closes at the widest margin opens lower: the wall with a five-cell (25 m) gap has no route at margin 12 (the field with the ladder [12] has none) and the default ladder finds one at a smaller margin, 8 or 6, with the start's cell reaching the waypoint", rungs.dist[N.cellOf(rungs, 0, 0).i] >= N.BIG && pg.margin < 12 && pg.margin >= 3 && pg.dist[N.cellOf(pg, 0, 0).i] < N.BIG);
+    const mc = X.createMap(); for (let gy = 0; gy < 56; gy++) for (const gx of [40, 41, 42]) { mc.occ[gy * 96 + gx] = 1; mc.nOcc++; }
+    const closed = X.planFromMap(mc, goal, { x: 0, y: 0 });
+    ok("!! a wall with NO gap leaves no route at any margin: the ladder returns the LAST rung's field (3 m) and the start's cell does not reach the waypoint", closed.margin === 3 && closed.dist[N.cellOf(closed, 0, 0).i] >= N.BIG);
+    const small = X.createMap({ x0: 0, y0: 0, w: 40, h: 30 }); small.occ[15 * 40 + 20] = 1; small.nOcc++;
+    const ps = X.planFromMap(small, { x: 150, y: 70, depth: 25 }, { x: 60, y: 60 }, { ladder: [12] });
+    ok("!! a map of ANOTHER SIZE plans on its own grid (a 40 x 30 map from the origin: the field is 40 x 30 cells from (0, 0), its lone occupied cell blocked, the edge band blocked, a route from (60, 60) to the waypoint)", ps.w === 40 && ps.h === 30 && ps.x0 === 0 && ps.y0 === 0 && ps.blocked.length === 1200 && ps.blocked[15 * 40 + 20] === 1 && ps.blocked[0] === 1 && ps.dist[N.cellOf(ps, 60, 60).i] < N.BIG);
+    const sm = X.createMap(); sm.occ[28 * 96 + 40] = 1; sm.nOcc++;
+    const pGrid = X.planFromMap(sm, goal, { x: 0, y: 0 }, { ladder: [12] });
+    ok("!! the map's own grid is the plan's grid (96 x 56 from (-40, -140)) and the field answers to the map's cell (a lone cell at (162.5, 2.5) with a 16 + 2.5 m inflation: blocked at its centre, free 25 m away)", pGrid.w === 96 && pGrid.h === 56 && pGrid.x0 === -40 && pGrid.y0 === -140 && pGrid.blocked[28 * 96 + 40] === 1 && pGrid.blocked[28 * 96 + 45] === 0);
+});
+
+guard("5", () => {
+    console.log("\n5. THE FLIGHT");
+    const m = thrown(() => { X.flySensed(pilot, mk({}), "magnet"); }), m2 = thrown(() => { X.flyArm(pilot, mk({}), "magnet"); });
+    ok("!! an unknown arm throws FROM flySensed and from flyArm, naming the arms", /subSensedNav\.flySensed: unknown arm "magnet"/.test(m) && X.SENSED_ARMS.every((x) => m.includes(x)) && /subSensedNav\.flyArm: unknown arm "magnet"/.test(m2) && X.STUDY_ARMS.every((x) => m2.includes(x)));
+    const open = mk({ goal: { x: 300, y: 0, depth: 25 } }), a = X.flySensed(pilot, open, "sensed");
+    ok("!! an open sea: REACHED with ONE plan (nothing is ever found, so it is never rebuilt), a ping every second from t = 0 (the ticks over 30, rounded up), no obstacle ever occupied, the grid partly ensonified (more than 5%, less than 60%), no believed offset, the first plan at the 12 m rung with a route, the record carrying its fields", a.status === "reached" && a.reached === true && a.plans === 1 && a.pings === Math.ceil(a.ticks / 30) && a.occupied === 0 && a.ensonified > 0.05 && a.ensonified < 0.6 && a.offsetEnd === 0 && a.offsetMax === 0 && a.margin === 12 && a.marginLast === 12 && a.noRoute === false && a.minClearance === Infinity && a.arm === "sensed" && a.kind === "hard-islands" && a.chord === 300 && a.t === a.ticks * S.DT && a.path > 270 && a.path < 320);
+    const isle = mk({ goal: { x: 300, y: 0, depth: 25 }, obstacles: [O({ x: 150, y: 12, r: 30, group: 1 })], blocked: true }), b = X.flySensed(pilot, isle, "sensed"), straight = H.flyHard(pilot, isle, "straight");
+    ok("!! AN ISLAND NEARLY ON THE LINE (12 m off it; a dead-centre island makes the plan flip sides at every ping and the vessel dithers into it, found while building this gate) is found and flown round: straight COLLIDES; `sensed` REACHES with more than one plan (it re-plans after the pings that find the island), cells occupied, a clearance above zero and below the straight run's (it passed the island), a path longer than the chord", straight.status === "collided" && b.status === "reached" && b.plans > 1 && b.occupied > 20 && b.minClearance > 5 && b.minClearance < 60 && b.path > b.chord && b.path < b.chord * 1.2 && b.marginLast <= 12);
+    const blind = X.flySensed(pilot, isle, "sensed", { sonar: { range: 12, half: Math.PI / 3, pingS: 1 } });
+    ok("!! the SONAR is what finds it: with a range of 12 m the island is not seen until it is too late (a handful of plans against the sonar's 29, COLLIDED); the `sonar` option reaches the flight", blind.status === "collided" && blind.plans < b.plans && blind.plans <= 6);
+    const behind = mk({ goal: { x: 300, y: 0, depth: 25 }, start: { x: 200, y: 0, depth: 25, speed: 3, pitch: 0, bank: 0, heading: 0 }, obstacles: [O({ x: 150, y: 0, r: 30, group: 1 })] }), c = X.flySensed(pilot, behind, "sensed", { seconds: 40 });
+    ok("!! an island BEHIND the vessel is never ensonified (the sector is ahead): no cell occupied, one plan, and the vessel flies on", c.occupied === 0 && c.plans === 1);
+    const under = mk({ goal: { x: 300, y: 0, depth: 25 }, obstacles: [O({ type: "berg", x: 150, y: 0, r: 30, keel: 10, group: 1 })] }), d = X.flySensed(pilot, under, "sensed");
+    ok("!! an iceberg the vessel passes BENEATH (keel 10 + 5 m under the 25 m it flies) is never marked: nothing occupied, one plan, REACHED straight through its footprint", d.occupied === 0 && d.plans === 1 && d.status === "reached" && d.path < 320);
+    const fx = X.flySensed(pilot, open, "sensed+fix"), dr = X.flySensed(pilot, open, "sensed+drift");
+    ok("!! `sensed+fix` has a believed offset of a few metres (its largest over the flight above 3 m and below 20), a new error at each ping; `sensed` has none; the pilot and the physics see the TRUE state, so the true path is still near the 300 m chord (within 15%) and the vessel REACHES", fx.offsetMax > 3 && fx.offsetMax < 20 && fx.status === "reached" && fx.path > 270 && fx.path < 345 && fx.pings === Math.ceil(fx.ticks / 30));
+    ok("!! `sensed+drift` starts with no error and drifts: the offset at the end equals its largest-or-less (a walk), is above 1 m and below 30 m after the flight, and the true path is again near the chord; it is a different stream from `sensed+fix`", dr.offsetEnd > 1 && dr.offsetEnd < 30 && dr.offsetMax >= dr.offsetEnd && dr.status === "reached" && dr.path > 270 && dr.path < 345 && Math.abs(dr.offsetMax - fx.offsetMax) > 1e-6);
+    const e1 = X.flySensed(pilot, open, "sensed+drift", { seconds: 30 }), e2 = X.flySensed(pilot, open, "sensed+drift", { seconds: 120 });
+    ok("!! drift GROWS: the largest offset over 30 s is smaller than over 120 s (the walk spreads as the square root of time: about 1.6 m and 3.3 m in each axis), and the 30 s offset is below 12 m", e1.offsetMax < e2.offsetMax && e1.offsetMax < 12);
+    const again = X.flySensed(pilot, open, "sensed+fix");
+    ok("!! a flight is a function of the scenario and the arm: the same flight twice is identical (every field), and the same scenario under a different seed is a different stream (different errors)", same(again, fx) && X.flySensed(pilot, mk({ seed: 5, goal: { x: 300, y: 0, depth: 25 } }), "sensed+fix").offsetMax !== fx.offsetMax && X.flySensed(pilot, mk({ kind: "hard-current", goal: { x: 300, y: 0, depth: 25 } }), "sensed+fix").offsetMax !== fx.offsetMax);
+    const seen = []; X.flySensed((s, tg, cv) => { seen.push([s.pos[0], tg.heading]); return pilot(s, tg, cv); }, open, "sensed+fix", { seconds: 20 });
+    ok("!! the PILOT is handed the TRUE state: its position is the vessel's own (the flight starts at the scenario's start x = 0), not the believed one (the first fix has already put the belief several metres off), and the pilot is called once a tick (20 s is 600 calls)", seen.length === 600 && seen[0][0] === 0);
+    const timed = X.flySensed(pilot, open, "sensed", { seconds: 5 }), left = X.flySensed(pilot, mk({ start: { x: 430, y: 0, depth: 25, speed: 3, pitch: 0, bank: 0, heading: 0 }, goal: { x: 200, y: 0, depth: 25 } }), "sensed"), crash = X.flySensed(pilot, mk({ goal: { x: 100, y: 0, depth: 25 }, obstacles: [O({ x: 50, y: 0, r: 15 })] }), "sensed", { sonar: { range: 5, half: 0.1, pingS: 1 } });
+    ok("!! the status paths: TIMEOUT after seconds / dt ticks (5 s is 150), not reached, no time; LEFT: a vessel 10 m from the east edge heading for it flies out within 4 s; COLLIDED with the clearance below zero and no arrival time", timed.status === "timeout" && timed.ticks === 150 && timed.reached === false && timed.t === null && left.status === "left" && left.t === null && left.ticks < 150 && crash.status === "collided" && crash.minClearance < 0 && crash.t === null);
+    const lad = X.flySensed(pilot, open, "sensed", { ladder: [3] }), starts = (x, y, h, goal, over = {}) => mk({ start: { x, y, depth: 25, speed: 3, pitch: 0, bank: 0, heading: h }, goal, ...over });
+    ok("!! the `ladder` option reaches the plan: a ladder of [3] makes the first and the last plan the 3 m rung", lad.margin === 3 && lad.marginLast === 3 && lad.status === "reached");
+    const west = X.flySensed(pilot, starts(-30, 0, Math.PI, { x: 200, y: 0, depth: 25 }), "sensed"), south = X.flySensed(pilot, starts(100, -130, Math.PI / 2, { x: 200, y: 0, depth: 25 }), "sensed");
+    ok("!! LEFT through the west edge (a vessel 10 m inside it heading west) and through the south edge (y below -140: heading pi / 2 is towards -y, from 10 m inside it)", west.status === "left" && west.ticks < 150 && south.status === "left" && south.ticks < 150);
+    const up = X.flySensed(() => ({ pitch: 1, yaw: 0, thrust: 1, ballast: 0 }), mk({ start: { x: 0, y: 0, depth: 3, speed: 3, pitch: 0, bank: 0, heading: 0 } }), "sensed", { seconds: 60 });
+    ok("!! a flight the VESSEL ends keeps the vessel's own word ('broached') and stops there, not reached, no time", up.status === "broached" && up.reached === false && up.t === null && up.ticks < 1800);
+    const away = X.flySensed(pilot, starts(0, 0, 0, { x: 200, y: 0, depth: 25 }, { obstacles: [O({ x: -25, y: 0, r: 10 })] }), "sensed");
+    ok("!! the least clearance includes the START: an island 25 m behind a vessel that sails away from it (r 10 and the 4 m half-hull: 11 m) leaves a least clearance of exactly 11", away.status === "reached" && away.minClearance === 11);
+    const band = X.flySensed(pilot, starts(-37, 0, 0, { x: 200, y: 0, depth: 25 }), "sensed", { seconds: 5 }), shallowBerg = mk({ goal: { x: 200, y: 0, depth: 60 }, minDepth: 60, obstacles: [O({ type: "berg", x: 70, y: 0, r: 12, keel: 30 })] }), dived = X.flySensed(pilot, shallowBerg, "sensed");
+    ok("!! NO ROUTE is reported for the first plan: a vessel 2.5 m inside the edge band has none at any rung (noRoute, the 3 m rung); the collision test uses the vessel's depth AT THE TIME (a vessel diving to a 60 m waypoint passes beneath an iceberg with a 30 m keel that a vessel held at the start depth of 25 m would hit: REACHED, a least clearance above 20)", band.noRoute === true && band.margin === 3 && dived.status === "reached" && dived.minClearance > 20 && open && a.noRoute === false);
+    const nearEdge = (seed, arm) => X.flySensed(pilot, mk({ seed, start: { x: -31, y: 0, depth: 25, speed: 3, pitch: 0, bank: 0, heading: 0 }, goal: { x: 200, y: 0, depth: 25 } }), arm, { seconds: 0.1 }).margin;
+    const rungs = Array.from({ length: 24 }, (_, k) => nearEdge(k, "sensed+fix"));
+    ok("!! the plan is made from where the vessel BELIEVES it is: a vessel 9 m inside the west edge has its first plan at the 3 m rung from the true position (all 24 seeds of `sensed`) and, when the fix puts it more than 2.5 m east of that, at the 8 m rung -- with the fix, some of 24 seeds take the 3 m rung and some the 8 m", Array.from({ length: 24 }, (_, k) => nearEdge(k, "sensed")).every((m) => m === 3) && rungs.includes(3) && rungs.includes(8) && rungs.every((m) => m === 3 || m === 8 || m === 6 || m === 12));
+    const gsc = H.hardScenario(1, "hard-gaps"), gr = X.flySensed(pilot, gsc, "sensed", { seconds: 10 }), isc = H.hardScenario(2, "hard-islands"), ir = X.flySensed(pilot, isc, "sensed", { seconds: 10 });
+    ok("!! the record carries the scenario's own numbers: the gap width (32 m for hard-gaps seed 1; null in the islands), the chord from the START to the waypoint (not from the origin) and the current mean", gr.gap === gsc.gapWidth && gr.gap === 32 && ir.gap === null && near(ir.chord, Math.hypot(isc.goal.x - isc.start.x, isc.goal.y - isc.start.y)) && Math.abs(ir.chord - Math.hypot(isc.goal.x, isc.goal.y)) > 1 && ir.currentMean === isc.currentMean && ir.blocked === isc.blocked && ir.seed === 2);
+    const slow = X.flySensed(pilot, open, "sensed", { sonar: { range: 100, half: Math.PI / 3, pingS: 2 } });
+    ok("!! the ping rate is the sonar's: a ping every 2 s makes half as many pings (ticks over 60, rounded up)", slow.pings === Math.ceil(slow.ticks / 60));
+    // golden flights on the generator's own scenarios
+    const g = (seed, kind, arm) => { const r = X.flyArm(pilot, H.hardScenario(seed, kind), arm); return [r.status, r.t === null ? null : +r.t.toFixed(3), r.ticks, r.plans, r.pings, r.occupied, +r.ensonified.toFixed(4), +r.offsetEnd.toFixed(3), +r.offsetMax.toFixed(3), +r.path.toFixed(3), +r.minClearance.toFixed(3), r.margin, r.marginLast]; };
+    ok("!! GOLDEN: hard-islands seed 2 `sensed` (reached 155.267 s, 23 plans, 156 pings, 85 cells), `sensed+fix` (156.433 s, 6.285 m at the end); hard-islands seed 3 `sensed+drift` (147.4 s, 51 plans, 6.991 m drifted); hard-gaps seed 1 `sensed` (collided, clearance -0.002); hard-gaps seed 2 `sensed+drift` (137.467 s); hard-current seed 3 `sensed+fix` (LEFT after 3174 ticks, last plan at the 3 m rung); hard-current seed 1 `sensed` (201.867 s, 63 plans)",
+        same(g(2, "hard-islands", "sensed"), ["reached", 155.267, 4658, 23, 156, 85, 0.5718, 0, 0, 453.123, 10.015, 12, 12]) && same(g(2, "hard-islands", "sensed+fix"), ["reached", 156.433, 4693, 23, 157, 159, 0.5867, 6.285, 9.773, 455.86, 8.463, 12, 12]) && same(g(3, "hard-islands", "sensed+drift"), ["reached", 147.4, 4422, 51, 148, 257, 0.5017, 6.991, 8.555, 433.49, 14.858, 12, 12]) &&
+        same(g(1, "hard-gaps", "sensed"), ["collided", null, 2589, 49, 87, 311, 0.4023, 0, 0, 250.9, -0.002, 12, 12]) && same(g(2, "hard-gaps", "sensed+drift"), ["reached", 137.467, 4124, 48, 138, 264, 0.5683, 3.747, 5.947, 405.675, 7.638, 12, 12]) && same(g(3, "hard-current", "sensed+fix"), ["left", null, 3174, 50, 106, 267, 0.3597, 4.465, 9.186, 331.758, 17.5, 12, 3]) && same(g(1, "hard-current", "sensed"), ["reached", 201.867, 6056, 63, 202, 174, 0.5445, 0, 0, 385.428, 11.736, 12, 12]));
+});
+
+guard("6", () => {
+    console.log("\n6. THE STUDY'S FLIGHT AND THE SETS");
+    const sc = H.hardScenario(2, "hard-islands"), ex = X.flyArm(pilot, sc, "exact"), any = H.flyHard(pilot, sc, "any"), st = X.flyArm(pilot, sc, "straight");
+    ok("!! `exact` is subHardNav's `any` under the name exact (every other field the same), `straight` is its straight flight, `sensed` arms are flySensed's", same(ex, { ...any, arm: "exact" }) && same(st, H.flyHard(pilot, sc, "straight")) && same(X.flyArm(pilot, sc, "sensed"), X.flySensed(pilot, sc, "sensed")) && X.flyArm(pilot, sc, "exact", { seconds: 5 }).ticks === 150 && X.flyArm(pilot, sc, "straight", { seconds: 5 }).ticks === 150 && X.flyArm(pilot, sc, "sensed", { seconds: 5 }).ticks === 150 && same(X.flyArm(pilot, sc, "sensed+fix"), X.flySensed(pilot, sc, "sensed+fix")));
+    const dev = X.senseSetOf("dev");
+    ok("!! senseSetOf: DEV is 90 scenarios (30 seeds of each of the three kinds, kind by kind in SENSE_KINDS order, frozen), each the generator's own; an unknown set throws, naming the sets", dev.length === 90 && Object.isFrozen(dev) && dev[0].kind === "hard-islands" && dev[0].seed === 1 && dev[30].kind === "hard-gaps" && dev[60].kind === "hard-current" && dev[89].seed === 30 && same(dev[31], H.hardScenario(2, "hard-gaps")) && /subSensedNav\.senseSetOf: unknown set "x" \(dev, held6\)/.test(thrown(() => { X.senseSetOf("x"); })) && X.senseSetOf("held6").length === 180);
+});
+
+console.log(fails ? `\n${fails} FAIL` : "\nall checks pass");
+process.exit(fails ? 1 : 0);
