@@ -115,5 +115,5 @@ else {
 }
 
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +
-    "\nnot closed here, as registered: how this pilot does in the page's own fight (three a side, fleet targeting, collisions and ram damage on) -- never measured for it.");
+    "\nnot closed here, as registered: how this pilot does in the page's own fight -- measured since by brain/SIXDOF_PAGE_FIGHT_WIP.md (it ties the PD autopilot and loses to the fruit fly's Default 76-123).");
 process.exit(fails ? 1 : 0);

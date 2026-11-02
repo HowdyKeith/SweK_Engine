@@ -300,3 +300,7 @@ Keith: "put the pilot on the page". The verdict above said to ask first, and he 
   - In the roster: offered when not held 7; `teamPilot()` ignoring the choice's network 3; resolved without its
     network 1; resolved to the fruit fly's weights 4.
   - The counts by gate are in both gates' headers.
+
+**Measured since (2026-11-02, `brain/SIXDOF_PAGE_FIGHT_WIP.md`, its own registered round):** in the page's own fight, the
+GPU Brain's pilot ties the PD autopilot (it lost 107 and won 92 of 200, no difference shown) and loses to the fruit fly's
+Default, W76 against 123. The close-quarters pilot ranks first there.

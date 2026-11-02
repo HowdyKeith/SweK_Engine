@@ -140,3 +140,105 @@ scratch battles, seeds 990101 and 990102, the PD autopilot on side A against the
 both. They are scratch seeds and decide nothing. The gate now prints a count instead of rows.
 
 **The registered run:** `node tools/ship/sixdofPageFightCmd.mjs`.
+
+## The verdict, 2026-11-02 (read from the committed file, after it was committed)
+
+The registered run wrote `brain/sixdofPageFightResults.json` at head 28664671. It was committed byte for byte at
+37c14c8b before anyone read it. It flew the registered seeds and says so (`registeredSeeds: true`). Every number below
+is re-derived from that file by the library's `verdictOf()` in section 6 of `tools/ship/sixdofPageFight-selfcheck.mjs`,
+and a sample of its battles is flown again there.
+
+**The controls held.**
+- **C-pilots, in both browsers:** every brain on the page was its registered file, its team flew it, and the page's own
+  pilot function flew Node's fingerprints on duel seeds 99401-99402.
+- **C-determinism:** `shipped` on side A against `gpu`, flown again on its 100 seeds, gave the same battles, 100 of 100.
+- **Every matchup's lineup was the pair asked for.** That is 25 matchups of 100 battles.
+
+**Every pairing**, from both sides (200 battles), from x's point of view:
+
+| pairing (x vs y) | x: W/L/D | LEAD | p | reading | timeouts |
+|---|---|---|---|---|---|
+| `scripted` vs `shipped` | W117/L83/D0 | +34 | 0.019 | no difference shown | 23 |
+| `scripted` vs `league` | W155/L44/D1 | +111 | 1.1e-15 | scripted better | 41 |
+| `scripted` vs `close` | W1/L199/D0 | -198 | 2.5e-58 | close better | 4 |
+| `scripted` vs `gpu` | W107/L92/D1 | +15 | 0.32 | no difference shown | 15 |
+| `shipped` vs `league` | W159/L41/D0 | +118 | 1.3e-17 | shipped better | 102 |
+| `shipped` vs `close` | W27/L171/D2 | -144 | 8.6e-27 | close better | 10 |
+| `shipped` vs `gpu` | W123/L76/D1 | +47 | 0.0011 | shipped better | 42 |
+| `league` vs `close` | W26/L164/D10 | -138 | 1.1e-25 | close better | 19 |
+| `league` vs `gpu` | W63/L137/D0 | -74 | 1.8e-7 | gpu better | 79 |
+| `close` vs `gpu` | W196/L4/D0 | +192 | 8.2e-53 | close better | 6 |
+
+**H1 is met: the duel's head-to-head carries over, much narrower.** On the page the fruit fly's Default beats the GPU
+pilot W123/L76/D1 (p 0.0011). In the duel it was 70 to none.
+
+**H2: only the close-quarters pilot beats the autopilot on the page.**
+- `close` beats it: the autopilot won 1 of 200 (W1/L199/D0 from its side).
+- `league` LOSES to it: the autopilot won W155/L44/D1.
+- `shipped` and `gpu` show no difference. The autopilot leads both, by 34 (p 0.019) and by 15 (p 0.32). Beside the
+  test, the duel's floor of 8 would have called both "scripted better".
+
+**H3 is met: the close-quarters pilot ranks first, far ahead.** The totals over each pilot's 800 battles:
+
+| pilot | W/L/D over its 800 | LEAD |
+|---|---|---|
+| `close` | W730/L58/D12 | +672 |
+| `shipped` | W392/L405/D3 | -13 |
+| `scripted` | W380/L418/D2 | -38 |
+| `gpu` | W309/L489/D2 | -180 |
+| `league` | W174/L615/D11 | -441 |
+
+**Reported, testing nothing:**
+- **The mirrors** (each pilot against itself on the same 100 seeds):
+
+  | mirror | side A won | side B won | draws | timeouts |
+  |---|---|---|---|---|
+  | `scripted` | 47 | 53 | 0 | 0 |
+  | `shipped` | 47 | 51 | 2 | 33 |
+  | `league` | 41 | 47 | 12 | 42 |
+  | `close` | 45 | 54 | 1 | 0 |
+  | `gpu` | 46 | 53 | 1 | 15 |
+
+  Side B won more in all five mirrors, 258 to 226 over the 500 (p 0.16 by the same sign test). The duel favours side A,
+  and this does not show the page favouring either side.
+- **The fights are long:** 431 of the 2,500 battles timed out (17.2%), and the median battle ran 561 ticks (18.7 s).
+  The timeouts gather where neither side closes. The Default against the League pilot timed out in 102 of 200, while
+  the close-quarters pilot's own mirror and the autopilot's timed out in none.
+
+**The predictions:**
+- **P1: right.** H1 is met; I gave that 70%.
+- **P2: wrong.** One of the four trained pilots beats the autopilot on the page, not all four. One loses to it.
+- **P3: right.** H3 is met; I gave that 40%.
+- **P4: wrong.** 431 of 2,500 battles timed out, 17.2%, not under 10%.
+
+**What this says, and what it does not.**
+- **It says:** in the fight the page shows, the only pilot better than the PD autopilot is the one trained with
+  collisions on and in the joust start, and it beats every other pilot by a wide margin.
+  - The three pilots trained in the standoff duel, a shooting contest at 84 m with no collisions, carry little of their
+    duel advantage over the autopilot into the page. The Default and the GPU pilot are level with it.
+  - The League pilot is the page's worst. It is the pilot trained to beat the Default in the standoff duel (it beat it
+    20-4 on its audit), and on the page it loses to everyone.
+- **It does not say why.** A guess, named as one: the page's fights last 18.7 s at the median, with collisions and ram
+  damage on and three-a-side targeting. The standoff pilots were trained on fights of a few seconds at long range and
+  never practised closing; the close-quarters pilot was. The file does not record rams, so this is untested, and it
+  would be a round of its own.
+- **It does not test** the hand, zero or noise choices, and no pilot was retrained by this round.
+
+**What follows.**
+- The page's default lineup is both teams on the PD autopilot. The close-quarters pilot is the candidate for a page
+  default: a separate decision, asked first.
+- The capability map's 6-DOF cells cite this verdict.
+- For the GPU Brain's league round (Round 2, next): this says a pilot trained in the duel may not carry its result to
+  the page. Round 2 asks a duel question, as chosen. The page question for its champion would be a check of its own.
+
+**The verdict, as code.** Section 6 of `tools/ship/sixdofPageFight-selfcheck.mjs` re-derives every reading above from the
+committed file. It ties this section's tables and numbers to the file, and it flies a sample of 12 battles again in the
+page's browser, which came back the file's to the last tick and hull point.
+- **Sabotaged with the byte-safe runner: 11 designs, each red by name.** They edit the committed file, this note, the
+  page or the library. The counts are in the gate's header.
+- **Found by the registered run's own data:** section 6's first draft went red on a correct file.
+  - Its legality rule said a battle timed out exactly when it ran 900 ticks. One battle (the Default's mirror, seed
+    80084) is a kill landed on the 900th tick, which is not a timeout.
+  - The rule is now the page's own: a timeout has both fleets alive and goes to the fleet with more hull; any other
+    battle ends with a fleet at zero hull. All 2,500 battles are legal by it. The miniature had the same latent bug.
+  - No reading changes: the readings use the winner alone.

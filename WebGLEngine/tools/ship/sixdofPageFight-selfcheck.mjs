@@ -3,8 +3,10 @@
 // Run: node tools/ship/sixdofPageFight-selfcheck.mjs      (a browser; ~15 s)
 //
 // THE GATE OF tools/ship/sixdofPageFight.mjs (and its command, tools/ship/sixdofPageFightCmd.mjs): the five pilots in es-box3d-6dof.html's own fight, as brain/SIXDOF_PAGE_FIGHT_WIP.md registers it.
-// *** NOTHING HERE FLIES A REGISTERED BATTLE SEED, AND NOTHING HERE EXECUTES THE COMMAND. *** The miniature flies scratch battle seeds (990101-990102); the command's guards are held as the library functions they
+// *** NOTHING HERE EXECUTES THE COMMAND, AND SECTIONS 1-5 FLY NO REGISTERED BATTLE SEED. *** The miniature flies scratch battle seeds (990101-990102); the command's guards are held as the library functions they
 // are, plus the order the command calls them in -- so no single sabotage of a guard can start the registered round (the GPU Brain round's gate once did, by running its command with the guard sabotaged away).
+// Section 6 was written after the registered run's file was committed and read: it flies a sample of 12 registered battles again, to hold the file to the page's code. Those seeds are spent; flying them
+// again chooses nothing.
 //
 //   1  THE REGISTRATION, AS CODE: the five pilots in their order, each brain held to its file's hash; the battle seeds fresh and apart from every block a page run had flown; the plan (every pair from both
 //      sides on the same seeds, then the mirrors); the sign test against an exact BigInt reference at every split of 100; the readings at their edges; the duel's floor beside them
@@ -14,6 +16,8 @@
 //   4  THE ROUND ON A MINIATURE, in the page's own browser: all five pilots on two scratch seeds through the command's own script -- C-pilots holds, every matchup's lineup is the plan's, every battle a
 //      legal row, C-determinism holds, the verdict reads the result, and the result says it did not use the registered seeds
 //   5  THE COMMAND: it parses before it refuses, refuses before it runs, never overwrites, and prints no score
+//   6  THE VERDICT, AS CODE, FROM THE COMMITTED FILE: the file is the registered run (every battle legal by the page's own rule); C-pilots and C-determinism held; a sample of 12 battles flown again is the
+//      file's; H1 met, H2's four readings and H3 met by verdictOf(); the four predictions as the file decides them; the note's tables tied to the file
 //
 // SABOTAGE LOG (2026-11-02) -- each applied with the byte-safe runner, this gate run, the file restored byte-identical (sha256); the number is the rows that went red, by name:
 //   F1 the plan from one side only 3 (the plan row, and sections 2 and 4 throwing: each section turns an exception into a named FAIL, so a crash is never read as 0 red) | F2 the sign test one-sided 2
@@ -23,6 +27,12 @@
 //   FOUND BEFORE THE SABOTAGES: (1) this gate's own BigInt reference for the sign test scaled by 10^18 and truncated every p under 1e-18 to zero, so the agreement row went red on a correct library; the
 //   reference now shifts n + 64 bits first. (2) F11 and F12 would have gone 0 red against the first draft -- a page that flies what it is asked cannot tell an echo from a reading -- so the probe that asks
 //   for a choice the page does not hold ('imported') was added before they were run; they went 1 red each.
+// SABOTAGE LOG, SECTION 6 (2026-11-02, after the verdict) -- the same runner, with the committed results file, the note, the page or the library edited; every file restored byte-identical:
+//   W1 the file not flagged as the registered seeds 1 | W2 the first close-gpu battle's winner flipped 4 (the legality, the flown-again sample, H3's totals and the note) | W3 C-determinism 99 of 100 1
+//   W4 C-pilots not ok 1 | W5 a page fingerprint in the file changed 1 | W7 the note's H1 numbers drifted 1 | W8 a note totals row drifted 1 | W9 the note saying P4 right 1 | W10 the note's timeouts drifted 1
+//   W11 the page's shot damage at 7 1 (the flown-again sample: the file is held to the page's code) | W12 the level at 0.05 3 (the edges, H2, the note). (No W6: a reading cannot be flipped by one string.)
+//   FOUND BY THE REGISTERED RUN'S OWN DATA, before these sabotages: section 6's first draft went red on a correct file. Its legality rule said "a timeout exactly when the battle ran 900 ticks", and one
+//   battle (the Default's mirror, seed 80084) is a kill landed ON the 900th tick. The rule is now the page's own (legalRow above); section 4's miniature had the same latent bug. No reading changes.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -37,6 +47,11 @@ const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "
 const report = (m) => console.log("  ----  " + m);
 const t0 = Date.now();
 const J = JSON.stringify;
+// A battle row [winner, timeout, ticks, hull A, hull B] is LEGAL by the page's own rule: a timeout ran the 900 ticks with both fleets alive and went to the fleet with more hull (equal: a draw); any other battle
+// ended with at least one fleet at zero hull, its winner the side that still has some (both at zero: a draw). A first draft said "a timeout exactly when the battle ran 900 ticks", and the registered run
+// holds a kill landed ON the 900th tick (the Default's mirror, seed 80084), which is not a timeout: the rule was wrong, the row was right.
+const byHull = (a, b) => (a > b ? "A" : b > a ? "B" : "draw");
+const legalRow = (x) => (x[1] === 1 ? x[2] === 900 && x[3] > 0 && x[4] > 0 && x[0] === byHull(x[3], x[4]) : x[1] === 0 && x[2] > 0 && x[2] <= 900 && (x[3] === 0 || x[4] === 0) && x[0] === byHull(x[3], x[4]));
 
 console.log("1. THE REGISTRATION, AS CODE");
 try {
@@ -127,8 +142,7 @@ try {
             const pl = F.plan(F.PILOT_IDS, seeds);
             ok("!! every matchup is the plan's, in its order, and the page's lineup for it is the pair asked for (side A, side B)",
                 r.matchups.length === pl.length && r.matchups.every((m, i) => m.a === pl[i].a && m.b === pl[i].b && !!m.mirror === !!pl[i].mirror && J(m.lineup) === J([m.a, m.b])), `${r.matchups.length} matchups`);
-            const legal = (x) => ["A", "B", "draw"].includes(x[0]) && (x[1] === 0 || x[1] === 1) && x[2] > 0 && x[2] <= 900 && x[3] >= 0 && x[4] >= 0 && (x[1] === 1) === (x[2] === 900);
-            ok("!! every battle is a legal row: a winner, a timeout flag that is set exactly when the battle ran the page's 900 ticks, both fleets' hull", r.matchups.every((m) => m.out.length === 2 && m.out.every(legal)), `${r.matchups.reduce((n, m) => n + m.out.length, 0)} battles`);
+            ok("!! every battle is a legal row by the page's own rule: a timeout ran the 900 ticks with both fleets alive and went to the fleet with more hull; any other battle ended with a fleet at zero hull, won by the side that still has some", r.matchups.every((m) => m.out.length === 2 && m.out.every(legalRow)), `${r.matchups.reduce((n, m) => n + m.out.length, 0)} battles`);
             ok("!! C-determinism held: the determinism matchup flown again gave the same battles", r.cDeterminism && r.cDeterminism.ok && r.cDeterminism.same === 2, J(r.cDeterminism));
             ok("  the page's own C-pilots report is kept in the result as evidence: each brain's hash, lineup and fingerprints", F.BRAINS.every((id) => r.cPilotsPage[id] && r.cPilotsPage[id].lineup === id && r.cPilotsPage[id].fps.length === 2));
             // C-pilots must read the PAGE's lineup, not echo the id it asked for: a choice the page does not hold has to come back as the hand pilot it falls back to
@@ -157,6 +171,43 @@ try {
         !/verdictOf|readingOf|pairTally|signTest|JSON\.stringify\(result, null/.test(code) && /commit it before reading it/.test(code) && (code.match(/console\.log\(/g) || []).length === 1);
 } catch (e) { ok("section 5 ran without throwing", false, String(e && e.stack || e).split("\n").slice(0, 2).join(" ").slice(0, 240)); }
 
+console.log("\n6. THE VERDICT, AS CODE, FROM THE COMMITTED FILE (brain/sixdofPageFightResults.json, committed unread at 37c14c8b)");
+try {
+    // Written AFTER the file was read. Every reading is re-derived here by verdictOf() from the file, the note's tables are tied to it, and a sample of its battles is flown again in the page's browser,
+    // so the file is held to the page's code at this head. The registered seeds were read once, by the registered run, and are spent: flying a sample again chooses nothing.
+    const R = JSON.parse(fs.readFileSync(F.DEFAULT_RESULTS, "utf8")), v = F.verdictOf(R), node = F.nodeControls(), pl = F.plan();
+    ok("!! the file is the registered run: the registration, seeds 80001-80100 and flagged so, the five pilots, not stopped, and the 25 matchups of the plan in its order, 100 legal battles each, each lineup the pair asked for",
+        R.registration === F.REGISTRATION && J(R.seeds) === J([80001, 80100, 100]) && R.registeredSeeds === true && J(R.pilots) === J(F.PILOT_IDS) && !R.stopped && R.maxTicks === F.MAX_TICKS &&
+        R.matchups.length === 25 && R.matchups.every((m, i) => m.a === pl[i].a && m.b === pl[i].b && !!m.mirror === !!pl[i].mirror && J(m.lineup) === J([m.a, m.b]) && m.out.length === 100 && m.out.every(legalRow)));
+    ok("!! C-pilots held in both browsers, and the page's own report in the file is the registered files flying Node's fingerprints at this head",
+        R.cPilots.ok && R.cPilotsAgain.ok && F.BRAINS.every((id) => R.cPilotsPage[id].hash === F.PILOTS.find((p) => p.id === id).hash && R.cPilotsPage[id].lineup === id && R.cPilotsPage[id].fps.join() === node[id].fps.join()));
+    ok("!! C-determinism held: the shipped-against-gpu matchup flown again gave the same battles, 100 of 100", R.cDeterminism.ok === true && R.cDeterminism.a === "shipped" && R.cDeterminism.b === "gpu" && R.cDeterminism.same === 100 && R.cDeterminism.of === 100);
+    const idx = [0, 36, 67, 99], sample = [{ a: "close", b: "gpu" }, { a: "scripted", b: "league" }, { a: "gpu", b: "shipped" }].map((m) => ({ ...m, seeds: idx.map((i) => F.SEEDS[i]) }));
+    const want = sample.map((m) => { const fm = R.matchups.find((x) => !x.mirror && x.a === m.a && x.b === m.b); return idx.map((i) => fm.out[i]); });
+    const re = await runInEngineOrigin({ engineRoot: F.ENG, timeoutMs: 240000, script: F.BROWSER_SCRIPT, args: { controlDuelSeeds: [...F.CONTROL_DUEL_SEEDS], run: true, plan: sample, determinism: null, maxTicks: F.MAX_TICKS } });
+    ok("!! the page at this head flies the file's battles: a sample of 12 (three matchups, four seeds each, both orders of side), flown again in the page's browser, is the file's to the last tick and hull point",
+        re.ok && re.result.matchups.every((m, k) => J(m.out) === J(want[k]) && J(m.lineup) === J([sample[k].a, sample[k].b])), re.ok ? `${re.result.matchups.reduce((n, m, k) => n + m.out.filter((r, i) => J(r) === J(want[k][i])).length, 0)} of 12` : String(re.reason));
+    const h1 = v.h1.pair;
+    ok(`!! H1 IS MET by the registered rule applied to the file: the fruit fly's Default against the GPU pilot, W${h1.wins}/L${h1.losses}/D${h1.draws} from both sides, p ${h1.p.toPrecision(2)} under 0.01: carries over`,
+        v.h1.met === true && v.h1.reading === "carries over" && h1.games === 200 && h1.p < F.ALPHA && h1.wins > h1.losses);
+    ok("!! H2 by the rule: the close-quarters pilot beats the autopilot, the League pilot LOSES to it, the Default and the GPU pilot show no difference",
+        J(v.h2.map((h) => [h.pilot, h.reading])) === J([["shipped", "no difference shown"], ["league", "loses to the autopilot"], ["close", "beats the autopilot"], ["gpu", "no difference shown"]]), v.h2.map((h) => h.pilot + ": " + h.reading).join("; "));
+    ok("!! H3 IS MET: the close-quarters pilot's total is strictly the highest; the order is close, the Default, the autopilot, the GPU pilot, the League pilot",
+        v.h3.met === true && J(v.h3.totals.map((t) => t.id)) === J(["close", "shipped", "scripted", "gpu", "league"]) && J(v.h3.totals.map((t) => t.lead)) === J([672, -13, -38, -180, -441]), v.h3.totals.map((t) => `${t.id} ${t.lead}`).join(", "));
+    const pred = { P1: v.h1.met, P2: v.h2.every((h) => h.reading === "beats the autopilot"), P3: v.h3.met, P4: v.timeouts / v.battles < 0.1 };
+    ok(`!! the four predictions, read off the file: P1 right (H1 met), P2 wrong (one of four beats the autopilot), P3 right (H3 met), P4 wrong (${v.timeouts} of ${v.battles} timed out)`,
+        pred.P1 === true && pred.P2 === false && pred.P3 === true && pred.P4 === false, J(pred));
+    const note = fs.readFileSync(path.join(F.ENG, F.REGISTRATION), "utf8"), at = note.indexOf("\n## The verdict"), vt = at >= 0 ? note.slice(at) : "";
+    const esc = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), stands = (x) => new RegExp("(?<![0-9])" + esc(x) + "(?![0-9])").test(vt), sg = (n) => (n > 0 ? "+" + n : String(n));
+    const mA = v.mirrors.reduce((n, m) => n + m.aWins, 0), mB = v.mirrors.reduce((n, m) => n + m.bWins, 0);
+    const frags = [...v.pairs.map((p) => `| \`${p.x}\` vs \`${p.y}\` | W${p.wins}/L${p.losses}/D${p.draws} | ${sg(p.lead)} | ${p.p.toPrecision(2)} | ${p.reading} | ${p.timeouts} |`),
+                   ...v.h3.totals.map((t) => `| \`${t.id}\` | W${t.wins}/L${t.losses}/D${t.draws} | ${sg(t.lead)} |`), ...v.mirrors.map((m) => `| \`${m.id}\` | ${m.aWins} | ${m.bWins} | ${m.draws} | ${m.timeouts} |`),
+                   `W${h1.wins}/L${h1.losses}/D${h1.draws} (p ${h1.p.toPrecision(2)})`, `${mB} to ${mA} over the 500 (p ${F.signTest(mA, mB).toPrecision(2)}`, `${v.timeouts} of the ${v.battles.toLocaleString("en-US")} battles timed out (${(100 * v.timeouts / v.battles).toFixed(1)}%)`,
+                   `${v.medianTicks} ticks (${(v.medianTicks / 30).toFixed(1)} s)`, "H1 is met", "H3 is met", ...Object.keys(pred).map((k) => `**${k}: ${pred[k] ? "right" : "wrong"}.**`)];
+    const missing = frags.filter((x) => !stands(x));
+    ok("!! the note's verdict carries the file's tables and numbers and each prediction's outcome as the file decides it (no digit may touch a fragment's ends)", at > 0 && missing.length === 0, missing.length ? "missing: " + missing.join(" || ").slice(0, 300) : `${frags.length} fragments`);
+} catch (e) { ok("section 6 ran without throwing", false, String(e && e.stack || e).split("\n").slice(0, 2).join(" ").slice(0, 240)); }
+
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +
-    "\nnot closed here: the registered round itself -- node tools/ship/sixdofPageFightCmd.mjs -- whose results file is committed before it is read.");
+    "\nnot closed here: why the standoff pilots do not carry their duel result to the page (a guess is named in the note), and whether the page's default lineup should change (asked first).");
 process.exit(fails ? 1 : 0);

@@ -193,5 +193,5 @@ console.log("\n5. THE VERDICT, AS CODE, FROM THE COMMITTED FILE (brain/sixdofGpu
 }
 
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +
-    "\nnot closed here: the page round (Keith asked, 2026-11-02) -- graded by brain/pilot6dofMlpPage-selfcheck.mjs -- and how this pilot does in the page's own fight, which was never measured.");
+    "\nnot closed here: the page round (Keith asked, 2026-11-02) -- graded by brain/pilot6dofMlpPage-selfcheck.mjs -- and how this pilot does in the page's own fight, measured since by brain/SIXDOF_PAGE_FIGHT_WIP.md.");
 process.exit(fails ? 1 : 0);
