@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/gaugeClip-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node tools/ship/gaugeClip-selfcheck.mjs      (about 8 s: a few 100-second dives)
+// Run: node tools/ship/gaugeClip-selfcheck.mjs      (about 2 s: a few 100-second dives and twenty 600-second ones)
 //
 // THE GATE OF tools/ship/gaugeClip.mjs (Round 18 of brain/NEEDS_AND_LIMITS.md, registered first, one amendment before any seed was flown).
 //   1 SETS      1801-1900, 1901-2000 and 2001-2100 of far and both (200 dives each, 600 per arm), disjoint from every seed of Rounds 1-17; 9 arms in the registered order.
@@ -13,6 +13,7 @@
 //   8 FLIGHT    real 100-second dives: the own-built clipped arm equals the shipped arm dive for dive at both sds, the bias is small and the unclipped one is not clipped, the shift arms are other dives.
 //   9 SOURCE    the seeds appear in one place; no clock, random or file.
 // NOT CHECKED, said plainly: why the tuned rule improves with noise (that is the experiment).
+// SABOTAGE LOG (53 mutants of tools/ship/gaugeClip.mjs, run against a copy of this gate): 7 went 0 red on the first pass and all 7 got rows -- the bias of a set being the mean of its dives' (the pair of single dives), the crushed and stranded counts (the result's aggregation was pulled into an exported `aggregate` so a synthetic list of runs with a crushed and two stranded dives can test it: the tuned rule never crushes or strands on this task, which is why no real flight reached them), a small fall read as SAME, the artefact rule needing the unclipped arms NOT to rise (a case where FREE-0.3 rises by half as much as CLIP-0.3), FREE DIFFERS needing only one set to differ, and the arms' mean scores. One mutant (the stream's kind term) did not apply to the source and is covered by its sibling. All 52 that applied are red.
 "use strict";
 import fs from "node:fs";
 let fails = 0, finished = false;
@@ -84,6 +85,10 @@ sec("4. READINGS");
     ok("!! the difference is a minus b (swap the arguments, the sign flips and UP becomes DOWN)", d("CLIP-0.1", "CLIP-0.3").dir === "DOWN" && d("CLIP-0.1", "CLIP-0.3").mean < 0);
     const tiny = synth({ "LOW-0.04": [0.002, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] });
     ok("!! a rise under 2 se is SAME (one dive in twelve up by 0.002)", X.diffOf(tiny, "LOW-0.04", "CLIP-0.1").dir === "SAME");
+    const small = synth({ "LOW-0.04": [-0.003, 0.003, -0.003, 0.003, -0.003, 0.003, -0.003, 0.003, -0.003, 0.003, -0.003, 0.002] });
+    ok("!! a small fall under 2 se is SAME, not DOWN", X.diffOf(small, "LOW-0.04", "CLIP-0.1").mean < 0 && X.diffOf(small, "LOW-0.04", "CLIP-0.1").dir === "SAME");
+    const agg = X.aggregate([{ score: 0.5, crushed: true, stranded: false }, { score: 1, crushed: false, stranded: true }, { score: 0.9, crushed: false, stranded: true }, { score: 0.6, crushed: false, stranded: false }], [0.01, 0.03, 0.05, 0.07]);
+    ok("!! aggregate: the mean score (0.75), one crushed, two stranded, the mean of the four biases (0.04), the runs handed back as they were", Math.abs(agg.score - 0.75) < 1e-12 && agg.crashed === 1 && agg.stranded === 2 && Math.abs(agg.bias - 0.04) < 1e-12 && agg.runs.length === 4);
     ok("!! the mean reading bias averages the sets, and is null for an arm that builds no reading of its own", Math.abs(X.biasOf(au, "OWN-CLIP-0.3") - 0.004) < 1e-12 && Math.abs(X.biasOf(au, "FREE-0.3") - 0.0001) < 1e-12 && X.biasOf(au, "CLIP-0.1") === null && X.biasOf(au, "LOW-0.04") === null);
 }
 sec("5. LINES");
@@ -93,12 +98,15 @@ sec("5. LINES");
     ok("!! clipping artefact: it replicates, the unclipped arms do not rise, and the clip lifts CLIP-0.3 over FREE-0.3", L({ "CLIP-0.3": UP })[0] === "THE IMPROVEMENT WITH NOISE IS A CLIPPING ARTEFACT");
     ok("!! not a clipping artefact: it replicates and the unclipped arms rise too (even when the clip adds nothing or something)", L({ "CLIP-0.3": UP, "FREE-0.3": UP })[0] === "THE IMPROVEMENT WITH NOISE IS NOT A CLIPPING ARTEFACT" && L({ "CLIP-0.3": UP, "FREE-0.3": UP.map((x) => x + 0.04) })[0] === "THE IMPROVEMENT WITH NOISE IS NOT A CLIPPING ARTEFACT");
     ok("!! unexplained: it replicates, FREE-0.3 does not rise over FREE-0.1 (both as high as CLIP-0.3) and the clip adds nothing over FREE-0.3", (() => { const a = synth({ "CLIP-0.3": UP, "FREE-0.3": UP.map((x) => x + 0.0), "FREE-0.1": UP }); return X.bottomLines(a)[0]; })() === "THE IMPROVEMENT WITH NOISE IS UNEXPLAINED BY CLIPPING EITHER WAY");
+    ok("!! it replicates and FREE-0.3 rises too, even by less than CLIP-0.3 (the clip still lifts CLIP-0.3 over it): not a clipping artefact", L({ "CLIP-0.3": UP, "FREE-0.3": UP.map((x) => x / 2) })[0] === "THE IMPROVEMENT WITH NOISE IS NOT A CLIPPING ARTEFACT");
     ok("!! second line: a BETTER charge constant (LOW or HIGH) names the arms in order; a BETTER CAP alone says the depth cap is too shallow; none says the constants stand; a WORSE or SAME shift counts for nothing", L({ "LOW-0.04": UP, "HIGH-0.04": UP })[1] === "THE ROUND 8 TRIP POINTS ARE TOO CAUTIOUS: LOW-0.04, HIGH-0.04" && L({ "HIGH-0.04": UP, "CAP-0.04": UP })[1] === "THE ROUND 8 TRIP POINTS ARE TOO CAUTIOUS: HIGH-0.04" && L({ "CAP-0.04": UP })[1] === "THE ROUND 8 DEPTH CAP IS TOO SHALLOW: CAP-0.04" && L({})[1] === "NO SHIFT HELPS: THE ROUND 8 CONSTANTS STAND" && L({ "LOW-0.04": DOWN, "HIGH-0.04": ZERO })[1] === "NO SHIFT HELPS: THE ROUND 8 CONSTANTS STAND");
 }
 sec("6. CHECKS");
 {
     const eff = { "FREE-0.1": UP, "LOW-0.04": UP, "HIGH-0.04": DOWN, "CAP-0.04": ZERO }, rows = (au) => X.checksOf(au);
     ok("!! six check rows on a clean audit, in order: the two own-gauge rows, FREE DIFFERS, the three shifts; all pass", J(rows(synth(eff)).map((c) => c.name)) === J(["OWN GAUGE OWN-CLIP-0.1", "OWN GAUGE OWN-CLIP-0.3", "FREE DIFFERS", "SHIFT LOW-0.04", "SHIFT HIGH-0.04", "SHIFT CAP-0.04"]) && rows(synth(eff)).every((c) => c.ok));
+    const some = synth(eff); for (const n of ["V1", "V2"]) some[n]["FREE-0.1"].runs.forEach((r, i) => (r.fingerprint = some[n]["CLIP-0.1"].runs[i].fingerprint));
+    ok("!! FREE DIFFERS needs only ONE set where the unclipped dives differ (identical on V1 and V2 still passes)", rows(some).every((c) => c.ok));
     const bad = synth(eff); bad.V2["OWN-CLIP-0.3"].runs[4].fingerprint = "x";
     ok("!! one own-built dive that differs from the shipped one breaks OWN GAUGE OWN-CLIP-0.3 only", J(rows(bad).filter((c) => !c.ok).map((c) => c.name)) === J(["OWN GAUGE OWN-CLIP-0.3"]));
     const bad1 = synth(eff); bad1.V3["OWN-CLIP-0.1"].runs[0].fingerprint = "x";
@@ -113,6 +121,7 @@ sec("7. REPORT");
     const L = X.report(synth({ "CLIP-0.3": UP, "FREE-0.1": UP, "LOW-0.04": UP })), txt = L.join("\n");
     ok("!! the head names the three sets; the six checks pass first", /^ROUND 18/.test(L[0]) && L[0].includes("V1 1801-1900") && L[0].includes("V3 2001-2100") && L.slice(1, 7).every((l) => /^  PASS /.test(l)));
     ok("!! one row per arm (nine) with its mean score and, for the own-built readings, the bias (CLIP and shift arms say n/a)", (txt.match(/^  (CLIP|OWN-CLIP|FREE|LOW|HIGH|CAP)-[0-9.]+ +0\.[0-9]{4} +crushed/gm) || []).length === 9 && /OWN-CLIP-0\.3 +0\.[0-9]+ +crushed 0 +stranded 0 +bias \+0\.0040/.test(txt) && /CLIP-0\.3 +0\.[0-9]+ +crushed 0 +stranded 0 +bias n\/a/.test(txt) && /LOW-0\.04 +0\.[0-9]+ +crushed 0 +stranded 0 +bias n\/a/.test(txt));
+    ok("!! the means are each arm's own (CLIP-0.1 0.6000, CLIP-0.3 0.6500, FREE-0.1 0.7000 with the +0.1 effect of the second synthetic)", /CLIP-0\.1 +0\.6000 /.test(txt) && /CLIP-0\.3 +0\.6500 /.test(txt) && /FREE-0\.1 +0\.6500 /.test(txt) && /LOW-0\.04 +0\.6500 /.test(txt) && /HIGH-0\.04 +0\.6000 /.test(txt));
     ok("!! the replication, no-clip and clip-effect lines, then one line per shift arm with BETTER / WORSE / SAME, each reading its own pair", /CLIP-0\.3 minus CLIP-0\.1 \(replication\): \+0\.05.* UP/.test(txt) && /FREE-0\.3 minus FREE-0\.1 \(no clip\): -0\.05.* DOWN/.test(txt) && /CLIP-0\.3 minus FREE-0\.3 \(the clip at sd 0\.3\): \+0\.05.* UP/.test(txt) && /LOW-0\.04 minus CLIP-0\.1: \+0\.05.* BETTER/.test(txt) && /HIGH-0\.04 minus CLIP-0\.1: [+-]0\.0000.* SAME/.test(txt) && /CAP-0\.04 minus CLIP-0\.1: [+-]0\.0000.* SAME/.test(txt));
     ok("!! the two bottom lines come last, each prefixed BOTTOM LINE:", L[L.length - 2].startsWith("BOTTOM LINE: THE IMPROVEMENT WITH NOISE") && L[L.length - 1] === "BOTTOM LINE: THE ROUND 8 TRIP POINTS ARE TOO CAUTIOUS: LOW-0.04");
     const bad = synth(); bad.V1["OWN-CLIP-0.1"].runs[0].fingerprint = "x"; const Lb = X.report(bad);
@@ -126,6 +135,8 @@ sec("8. FLIGHT");
     ok("!! the own-built clipped arm equals the shipped arm dive for dive at sd 0.1 and at sd 0.3 on six real 100-second dives", c1.runs.every((r, i) => r.fingerprint === o1.runs[i].fingerprint && r.score === o1.runs[i].score) && c3.runs.every((r, i) => r.fingerprint === o3.runs[i].fingerprint));
     ok("!! the unclipped reading at sd 0.3 is another set of dives, and its mean bias is near 0 (|bias| < 0.02) where the clipped one is positive", f3.runs.some((r, i) => r.fingerprint !== o3.runs[i].fingerprint) && Math.abs(f3.bias) < 0.02 && o3.bias > f3.bias, `clipped ${o3.bias.toFixed(4)} free ${f3.bias.toFixed(4)}`);
     ok("!! a shipped-gauge arm carries no bias; an own-built arm does; the scores are in [0, 1]", c1.bias === undefined && typeof o1.bias === "number" && [c1, o1, c3, o3, f3].every((r) => r.runs.every((x) => x.score >= 0 && x.score <= 1)));
+    const one = X.flyArm("FREE-0.3", R8, T.setOf(["far"], 1801, 1801)), two = X.flyArm("FREE-0.3", R8, T.setOf(["far"], 1802, 1802)), pair = X.flyArm("FREE-0.3", R8, T.setOf(["far"], 1801, 1802));
+    ok("!! the bias of a set is the MEAN of its dives' biases: the pair's bias is the average of the two single dives' (and they differ)", one.bias !== two.bias && Math.abs(pair.bias - (one.bias + two.bias) / 2) < 1e-12);
     const lo = fly("LOW-0.04"), hi = fly("HIGH-0.04"), cp = fly("CAP-0.04");
     ok("!! the shift arms fly on the shipped gauge at sd 0.1 (no bias of their own), six dives each, scores in [0, 1]", [lo, hi, cp].every((r) => r.runs.length === 6 && r.bias === undefined && r.runs.every((x) => x.score >= 0 && x.score <= 1)));
     ok("!! a shift moves the dive: on the full 600-second dives LOW-0.04 and HIGH-0.04 each differ from the reference on at least one of 20", (() => { X.setFlight({}); const set20 = T.setOf(X.HARD, 1801, 1810), r = X.flyArm("CLIP-0.1", R8, set20), l = X.flyArm("LOW-0.04", R8, set20), h = X.flyArm("HIGH-0.04", R8, set20); X.setFlight({ seconds: 100 }); return l.runs.some((x, i) => x.fingerprint !== r.runs[i].fingerprint) && h.runs.some((x, i) => x.fingerprint !== r.runs[i].fingerprint); })());

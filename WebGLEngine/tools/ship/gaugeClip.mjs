@@ -33,6 +33,11 @@ export function parseArm(arm, r8) {
 let FLIGHT = {};
 /** Flight options for every flight this library makes (the gate shortens dives; the real run never calls this). */
 export const setFlight = (o) => { FLIGHT = { ...o }; };
+/** The result of a set of dives flown one by one: the means and counts of needsTask.evaluate, plus the mean of the per-dive reading biases. */
+export function aggregate(runs, biases) {
+    const n = runs.length;
+    return { score: runs.reduce((s, r) => s + r.score, 0) / n, runs, crashed: runs.filter((r) => r.crushed).length, stranded: runs.filter((r) => r.stranded).length, bias: biases.reduce((s, b) => s + b, 0) / n };
+}
 /** One arm on one set. An own-gauge arm flies each scenario with the true charge replaced by its own reading and returns `bias`, the mean over dives of the mean (reading - true charge). */
 export function flyArm(arm, r8, set) {
     const a = parseArm(arm, r8), tuned = (p) => T.flyDecision(U.tunedSeat(p, U.WIDE_BOUNDS));
@@ -44,8 +49,7 @@ export function flyArm(arm, r8, set) {
         runs.push(T.evaluate(factory, [sc], { gauge: null, ...FLIGHT }).runs[0]);
         biases.push(acc.n ? acc.sum / acc.n : 0);
     }
-    const n = runs.length;
-    return { score: runs.reduce((s, r) => s + r.score, 0) / n, runs, crashed: runs.filter((r) => r.crushed).length, stranded: runs.filter((r) => r.stranded).length, bias: biases.reduce((s, b) => s + b, 0) / n };
+    return aggregate(runs, biases);
 }
 export function flySets(arm, r8, { ranges = SET_RANGES, kinds = HARD } = {}) { return Object.fromEntries(SET_NAMES.map((s) => [s, flyArm(arm, r8, T.setOf(kinds, ranges[s][0], ranges[s][1]))])); }
 export const assemble = (byArm) => Object.fromEntries(SET_NAMES.map((s) => [s, Object.fromEntries(Object.keys(byArm).map((a) => [a, byArm[a][s]]))]));
