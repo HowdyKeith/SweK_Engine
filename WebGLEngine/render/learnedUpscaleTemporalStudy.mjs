@@ -5,7 +5,7 @@
 // sequences. runTemporalTest: the 24 test sequences, U_T's chain against Bt (H1) and against the single-frame chain B1 (H2), graded
 // in display space, with each scene's mean correction (P4).
 "use strict";
-import { SPLITS_UPSCALE_TEMPORAL, SPLITS_UPSCALE_TEMPORAL_72, SPLITS_UPSCALE_MOVING, familyOf, makeScene } from "./denoiseScenes.mjs";
+import { SPLITS_UPSCALE_TEMPORAL, SPLITS_UPSCALE_TEMPORAL_72, SPLITS_UPSCALE_MOVING, SPLITS_UPSCALE_MOVING_78, familyOf, makeScene } from "./denoiseScenes.mjs";
 import { sceneMotion } from "./movingScenes.mjs";
 import { temporalExample, temporalChain, trainTemporal, temporalCorrection, UT_SHAPE, UTH_SHAPE, UT_CHANNELS } from "./learnedUpscaleTemporal.mjs";
 import { FRAMES } from "./denoiseTemporal.mjs";
@@ -23,8 +23,11 @@ export const ROUND_UPSCALE_TEMPORAL_72 = Object.freeze({ ...ROUND_UPSCALE_TEMPOR
 /** Section 176, ROUND 77: a test only, of round 72's U_TH (its net file is the one read) on 24 new scenes whose objects move, each beside its still twin. */
 export const ROUND_UPSCALE_MOVING = Object.freeze({ ...ROUND_UPSCALE_TEMPORAL_72, splits: SPLITS_UPSCALE_MOVING, round: 77, moving: true,
     results: "render/denoise-results-upscale-moving-r77.json" });
-/** The temporal round a harvest runs: 70 (section 161) unless --round 72 (section 167) or --round 77 (section 176, a test only). */
-export const temporalRound = (n) => (n === 77 ? ROUND_UPSCALE_MOVING : n === 72 ? ROUND_UPSCALE_TEMPORAL_72 : n === 70 || n == null ? ROUND_UPSCALE_TEMPORAL : (() => { throw new Error(`learnedUpscaleTemporalStudy: no temporal round ${n} -- 70, 72 or 77`); })());
+/** Section 178, ROUND 78: U_THM, U_TH's shape trained on round 65's scenes still AND moving, tested on new moving scenes against round 72's U_TH (`baseline`). */
+export const ROUND_UPSCALE_MOVING_78 = Object.freeze({ ...ROUND_UPSCALE_TEMPORAL_72, splits: SPLITS_UPSCALE_MOVING_78, round: 78, moving: true, trainMoving: true,
+    net: "render/upscale-net-r78.json", baseline: "render/upscale-net-r72.json", results: "render/denoise-results-upscale-moving-r78.json" });
+/** The temporal round a harvest runs: 70 (section 161) unless --round 72 (section 167), 77 (section 176, a test only) or 78 (section 178). */
+export const temporalRound = (n) => (n === 78 ? ROUND_UPSCALE_MOVING_78 : n === 77 ? ROUND_UPSCALE_MOVING : n === 72 ? ROUND_UPSCALE_TEMPORAL_72 : n === 70 || n == null ? ROUND_UPSCALE_TEMPORAL : (() => { throw new Error(`learnedUpscaleTemporalStudy: no temporal round ${n} -- 70, 72, 77 or 78`); })());
 /** A sequence's cache key: everything it depends on. */
 export const temporalKey = (family, seed, { W, sppIn, sppRef, ref2 = false, harvest = false }) => `upscale-temporal-${family}-${seed}-${W}-${sppIn}-${sppRef}-${ref2 ? "ref2" : "ref1"}-${harvest ? "harvest" : "gate"}`;
 const cachedSeq = (cache, family, seed, net, o) => cached(cache, temporalKey(family, seed, o), () => temporalExample(family, seed, net, o));
@@ -32,10 +35,23 @@ const cachedSeq = (cache, family, seed, net, o) => cached(cache, temporalKey(fam
 export const movingKey = (family, seed, o) => temporalKey(family, seed, o) + "-moving";
 const toD = (y) => Float64Array.from(y, toPerceptual), mean = (a) => a.reduce((q, v) => q + v, 0) / a.length;
 
-export function runTemporalTraining({ splits = SPLITS_UPSCALE_TEMPORAL, net, harvest = false, W = 256, sppIn = 4, sppRef = 512, seeds = UPSCALE_SEEDS, train = UP_TRAIN, variant = "full", cache = null, log = () => {} } = {}) {
-    if (!net) throw new Error("learnedUpscaleTemporalStudy: training needs the shipped denoiser, decoded by its caller");
-    const t0 = Date.now(), ex = (split) => split.seeds.map((sd, i) => { const e = cachedSeq(cache, familyOf(split, i), sd, net, { harvest, W, sppIn, sppRef });
+/**
+ * A split's sequences for training or validation. Round 78 (section 178): `moving` takes each scene twice, still and then moving (sceneMotion,
+ * its twin's reference shared) -- the still ones first, so the first half is round 72's examples exactly.
+ */
+export function sequenceSet(split, net, { harvest = false, W = 256, sppIn = 4, sppRef = 512, moving = false, cache = null, log = () => {}, t0 = Date.now() } = {}) {
+    const o = { harvest, W, sppIn, sppRef }, still = split.seeds.map((sd, i) => { const e = cachedSeq(cache, familyOf(split, i), sd, net, o);
         if ((i + 1) % 20 === 0) log(`rendered ${i + 1} of ${split.seeds.length} at ${((Date.now() - t0) / 1000).toFixed(0)} s`); return e; });
+    if (!moving) return still;
+    const mv = split.seeds.map((sd, i) => { const fam = familyOf(split, i), motion = sceneMotion(makeScene(fam, sd));
+        const e = cached(cache, movingKey(fam, sd, o), () => temporalExample(fam, sd, net, { ...o, motion, refs: { ref: still[i].ref } }));
+        if ((i + 1) % 20 === 0) log(`moved ${i + 1} of ${split.seeds.length} at ${((Date.now() - t0) / 1000).toFixed(0)} s`); return e; });
+    return still.concat(mv);
+}
+
+export function runTemporalTraining({ splits = SPLITS_UPSCALE_TEMPORAL, net, harvest = false, W = 256, sppIn = 4, sppRef = 512, seeds = UPSCALE_SEEDS, train = UP_TRAIN, variant = "full", moving = false, cache = null, log = () => {} } = {}) {
+    if (!net) throw new Error("learnedUpscaleTemporalStudy: training needs the shipped denoiser, decoded by its caller");
+    const t0 = Date.now(), ex = (split) => sequenceSet(split, net, { harvest, W, sppIn, sppRef, moving, cache, log, t0 });
     const trainEx = ex(splits.train), valEx = ex(splits.val);
     const runs = seeds.map((seed) => { const r = trainTemporal(trainEx, { seed, ...train, variant }), val = valEx.map((e) => gradeDisplay(temporalChain(r.net, e), e));
         log(`seed ${seed} trained at ${((Date.now() - t0) / 1000).toFixed(0)} s, validation ${mean(val).toExponential(4)}`);
@@ -45,7 +61,7 @@ export function runTemporalTraining({ splits = SPLITS_UPSCALE_TEMPORAL, net, har
     const c2 = trainTemporal(shuffled, { seed: best.seed, ...train, variant });
     log(`C2's U_T trained at ${((Date.now() - t0) / 1000).toFixed(0)} s`);
     return { candidate: best.seed, runs: runs.map((r) => ({ seed: r.seed, valMean: r.valMean, val: r.val, losses: r.losses, net: r.net })), c2: { seed: best.seed, shuffle: SHUFFLE_SEED, net: c2.net, losses: c2.losses },
-             config: { W, sppIn, sppRef, train, variant, shape: variant === "half" ? UTH_SHAPE : UT_SHAPE, splits: { train: splits.train.seeds.length, val: splits.val.seeds.length } }, ms: Date.now() - t0 };
+             config: { W, sppIn, sppRef, train, variant, moving, shape: variant === "half" ? UTH_SHAPE : UT_SHAPE, splits: { train: trainEx.length, val: valEx.length } }, ms: Date.now() - t0 };
 }
 
 export function runTemporalTest({ splits = SPLITS_UPSCALE_TEMPORAL, net, U, Uc2, round = 70, harvest = false, W = 256, sppIn = 4, sppRef = 2048, test = "signflip", c1Min = 22, cache = null, log = () => {} } = {}) {
@@ -82,10 +98,11 @@ export function meanHistory(ex) { let s = 0; const n = ex.W * ex.H; for (let p =
  * (H77a: U_TH against Bt; H77b: against B1) is on the moving scenes; the still ones, history lengths and mover pixels are
  * descriptive.
  */
-export function runMovingTest({ splits = SPLITS_UPSCALE_MOVING, net, U, Uc2, round = 77, harvest = false, W = 256, sppIn = 4, sppRef = 2048, test = "signflip", c1Min = 22, cache = null, log = () => {} } = {}) {
+export function runMovingTest({ splits = SPLITS_UPSCALE_MOVING, net, U, Uc2, U0 = null, round = 77, harvest = false, W = 256, sppIn = 4, sppRef = 2048, test = "signflip", c1Min = 22, cache = null, log = () => {} } = {}) {
     if (!net || !U || !Uc2) throw new Error("learnedUpscaleTemporalStudy: the moving test needs the shipped denoiser, the candidate U_TH and C2's");
-    const t0 = Date.now(), T = { U: [], bt: [], b1: [], noisy: [], c2: [], floor: [] }, still = { U: [], bt: [] }, correction = [];
-    const hist = { moving: [], still: [] }, mover = { U: [], bt: [], share: [] }, rest = { U: [], bt: [] }, speeds = [];
+    // round 78 (section 178): U0 is round 72's U_TH, graded beside U (U_THM) on every arm, and H1 is U against U0 rather than against Bt
+    const t0 = Date.now(), T = { U: [], bt: [], b1: [], noisy: [], c2: [], floor: [], ...(U0 ? { U0: [] } : {}) }, still = { U: [], bt: [], ...(U0 ? { U0: [] } : {}) }, correction = [];
+    const hist = { moving: [], still: [] }, mover = { U: [], bt: [], share: [], ...(U0 ? { U0: [] } : {}) }, rest = { U: [], bt: [], ...(U0 ? { U0: [] } : {}) }, speeds = [];
     let determinism = true;
     splits.T1.seeds.forEach((sd, i) => {
         const fam = familyOf(splits.T1, i), o = { harvest, W, sppIn, sppRef, ref2: true }, s = cachedSeq(cache, fam, sd, net, o), motion = sceneMotion(makeScene(fam, sd));
@@ -97,16 +114,21 @@ export function runMovingTest({ splits = SPLITS_UPSCALE_MOVING, net, U, Uc2, rou
         const inv = Uint8Array.from(e.mover, (m) => 1 - m);
         mover.U.push(maskedDisplay(y, e.ref, e.mover)); mover.bt.push(maskedDisplay(e.bt, e.ref, e.mover)); mover.share.push(e.mover.reduce((q, m) => q + m, 0) / e.mover.length);
         rest.U.push(maskedDisplay(y, e.ref, inv)); rest.bt.push(maskedDisplay(e.bt, e.ref, inv));
+        if (U0) { const y0 = temporalChain(U0, e); T.U0.push(gradeDisplay(y0, e)); still.U0.push(gradeDisplay(temporalChain(U0, s), s));
+                  mover.U0.push(maskedDisplay(y0, e.ref, e.mover)); rest.U0.push(maskedDisplay(y0, e.ref, inv)); }
         speeds.push(motion.map((m) => Math.hypot(m.v[0], m.v[2])));
         if (i === 0) determinism = temporalChain(U, e).every((v, j) => Object.is(v, y[j]));
         log(`sequence ${i + 1} of ${splits.T1.seeds.length} at ${((Date.now() - t0) / 1000).toFixed(1)} s`);
     });
     const c2meanD = mean(effects(T.bt, T.c2)), gain = (u, b) => { const k = u.map((v, i) => (v === null || b[i] === null ? null : i)).filter((i) => i !== null); return k.length ? 1 - mean(k.map((i) => u[i])) / mean(k.map((i) => b[i])) : null; };
-    const sets = { H1: { noisy: T.noisy, filter: T.bt, net: [T.U], floor: T.floor }, H2: { noisy: T.noisy, filter: T.b1, net: [T.U], floor: T.floor } };
+    const sets = U0 ? { H1: { noisy: T.noisy, filter: T.U0, net: [T.U], floor: T.floor }, H2: { noisy: T.noisy, filter: T.bt, net: [T.U], floor: T.floor } }
+                    : { H1: { noisy: T.noisy, filter: T.bt, net: [T.U], floor: T.floor }, H2: { noisy: T.noisy, filter: T.b1, net: [T.U], floor: T.floor } };
     const V = verdict({ sets, shuffled: null, c2Prior: { round, meanD: c2meanD, ok: c2meanD <= 0 }, determinism, seedsDistinct: new Set(splits.T1.seeds).size === splits.T1.seeds.length, test, c1Of: "candidate", c1Min });
     const gm = gain(T.U, T.bt), gs = gain(still.U, still.bt);
+    const vsU0 = U0 ? { moving: gain(T.U, T.U0), still: gain(still.U, still.U0), mover: gain(mover.U, mover.U0), rest: gain(rest.U, rest.U0),
+                        u0OverBt: { moving: gain(T.U0, T.bt), still: gain(still.U0, still.bt), mover: gain(mover.U0, mover.bt) } } : null;
     return { verdict: V, tables: T, still, determinism, ms: Date.now() - t0,
              secondary: { c2: effects(T.bt, T.c2), correction, gainOverBt: gm, stillGainOverBt: gs, drop: gs - gm,
                           dropByScene: T.U.map((u, i) => (1 - still.U[i] / still.bt[i]) - (1 - u / T.bt[i])),
-                          history: hist, mover: { ...mover, gain: gain(mover.U, mover.bt) }, rest: { ...rest, gain: gain(rest.U, rest.bt) }, speeds } };
+                          history: hist, mover: { ...mover, gain: gain(mover.U, mover.bt) }, rest: { ...rest, gain: gain(rest.U, rest.bt) }, speeds, ...(vsU0 ? { vsU0 } : {}) } };
 }

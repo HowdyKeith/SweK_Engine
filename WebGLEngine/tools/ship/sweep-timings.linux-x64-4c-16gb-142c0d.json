@@ -1,7 +1,7 @@
 {
  "host": "linux-x64-4c-16gb-142c0d",
  "note": "THIS BOX'S OWN gate runtimes, written by tools/ship/boxTimings.mjs. The shared sweep-timings.json is host-claimed and a foreign box cannot write it (v4647, and that refusal is right); this is how a box records what IT measured without overwriting another machine's numbers. `kinds` says which quantity each ms is, as in the shared record: `alone` is an uncontended serial reading, `capped` is a FLOOR and not a runtime. Read for COVERAGE -- has this gate ever been timed -- and NOT for the ship-time budget, which still reads the shared file. See task #87. `serialRing` holds the last three alone readings; recordReach's margin row reads it on a box that does not own the shared record, because that row asks what a gate costs HERE and nothing here can refresh another box's ring.",
- "captured": "2026-11-02T02:29:10.660Z",
+ "captured": "2026-11-02T15:45:37.895Z",
  "timings": {
   "render/denoiseDevice-selfcheck.mjs": 5461,
   "render/denoiseTiming-selfcheck.mjs": 8195,
@@ -49,7 +49,7 @@
   "render/denoiseLearnedUpscaleGPU-selfcheck.mjs": 27179,
   "render/learnedUpscaleTemporal-selfcheck.mjs": 29738,
   "render/temporalLive-selfcheck.mjs": 1046,
-  "render/movingScenes-selfcheck.mjs": 4341
+  "render/movingScenes-selfcheck.mjs": 11981
  },
  "at": {
   "render/denoiseDevice-selfcheck.mjs": "2026-10-09T21:00:45.655Z",
@@ -98,7 +98,7 @@
   "render/denoiseLearnedUpscaleGPU-selfcheck.mjs": "2026-11-01T19:56:54.573Z",
   "render/learnedUpscaleTemporal-selfcheck.mjs": "2026-11-01T19:56:54.573Z",
   "render/temporalLive-selfcheck.mjs": "2026-11-01T19:56:54.573Z",
-  "render/movingScenes-selfcheck.mjs": "2026-11-02T02:29:10.660Z"
+  "render/movingScenes-selfcheck.mjs": "2026-11-02T15:45:37.895Z"
  },
  "kinds": {
   "render/denoiseDevice-selfcheck.mjs": "alone",
@@ -425,9 +425,9 @@
    1046
   ],
   "render/movingScenes-selfcheck.mjs": [
-   4397,
-   4414,
-   4341
+   14131,
+   13878,
+   11981
   ]
  }
 }

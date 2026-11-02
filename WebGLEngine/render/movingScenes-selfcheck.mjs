@@ -23,6 +23,11 @@
 //   H77b's p typed 0.0405, V8 the slowest mover typed 0.0904, V9 section 177 calling P6 held, V10 it dropping the sentence that the file
 //   was seen before it was committed -> 1 red each; V4 Bt's first still grade typed 9.27e-4 -> 2 red; V3 U_TH's first moving grade
 //   typed 7.79e-4 -> 4 red.
+// ROUND 78 (section 178), against this gate and denoiseScenes-selfcheck, each restored byte-identical: R1 the moving twins without their
+//   motion, R2 the moving twins first, R3 training ignoring `moving`, R4 the config's `moving` dropped, R5 H1 against Bt with a baseline,
+//   R6 U_TH's still arm graded with U_THM, R7 vsU0.still inverted, R8 the baseline round 70's, R9 temporalRound(78) round 77's, R10 the
+//   training refusing round 78, R11 the training not told to move, R12 the baseline not recorded, R13 round 78's R seeds round 77's,
+//   R14 round 78's seeds not reserved -> 1 red each.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -115,7 +120,7 @@ console.log("\n3. ROUND 77's STUDY CODE");
         R.image === 256 && R.sppIn === 4 && R.sppRefTest === 2048 && R.c1Min === 22 && R.minGain === 0.01 && R.test === "signflip" &&
         R.results === "render/denoise-results-upscale-moving-r77.json" && LT.temporalRound(77) === R && LT.temporalRound(72) === R72);
     let bad = null; try { LT.temporalRound(73); } catch (e) { bad = e.message; }
-    ok("  ...and temporalRound refuses any other round, naming 77", /70, 72 or 77/.test(bad || ""));
+    ok("  ...and temporalRound refuses any other round, naming 77 (and, since section 178, 78)", /70, 72, 77 or 78/.test(bad || ""));
     const o = { W: 256, sppIn: 4, sppRef: 2048, ref2: true, harvest: true };
     ok("  movingKey is the still sequence's key marked moving, so the two never share a cache entry", LT.movingKey("R", 77000, o) === LT.temporalKey("R", 77000, o) + "-moving");
     const y = Float64Array.from({ length: 12 }, (_, i) => 0.1 + i / 20), r = Float64Array.from({ length: 12 }, (_, i) => 0.12 + i / 21), m = Uint8Array.of(1, 0, 1, 0);
@@ -145,7 +150,7 @@ console.log("\n3. ROUND 77's STUDY CODE");
     ok("  ...and it refuses a call without C2's U_TH", /the candidate U_TH and C2's/.test(refused || ""));
 
     const cli = fs.readFileSync(path.join(ENG, "tools", "denoiseStudy.mjs"), "utf8");
-    ok("  the test command runs runMovingTest for a moving round and runTemporalTest otherwise", /\(RD\.moving \? LT\.runMovingTest : LT\.runTemporalTest\)\(\{ splits: RD\.splits,/.test(cli));
+    ok("  the test command runs runMovingTest for a moving round and runTemporalTest otherwise", /\(RD\.moving \? LT\.runMovingTest : LT\.runTemporalTest\)\(\{ U0, splits: RD\.splits,/.test(cli));
     const resFile = path.join(ENG, R.results), before = fs.existsSync(resFile) ? fs.readFileSync(resFile, "utf8") : null;   // since section 177 the results are committed
     let code = 0, said = ""; try { said = execFileSync(process.execPath, [path.join(ENG, "tools", "denoiseStudy.mjs"), "--harvest-upscale-temporal-train", "--round", "77"], { cwd: ENG, encoding: "utf8" }); } catch (e) { code = e.status; said = String(e.stdout); }
     ok("!! the training command refuses round 77 by name, exit 2, and writes nothing", code === 2 && /round 77 is a test only \(section 176\) -- it trains nothing/.test(said) && (fs.existsSync(resFile) ? fs.readFileSync(resFile, "utf8") : null) === before);
@@ -189,6 +194,51 @@ console.log("\n4. SECTION 177: ROUND 77's VERDICT, RE-DERIVED FROM ITS COMMITTED
         reg.includes("## 177.") && /H77a SUPPORTED/.test(s177) && /4\.49 % below Bt/.test(s177) && /P6 MISSED/.test(s177) && /shown to me when it was uploaded, before it was committed/.test(s177));
 }
 
+console.log("\n5. ROUND 78 (section 178): U_THM, TRAINED STILL AND MOVING, AGAINST ROUND 72's U_TH");
+{
+    const R = LT.ROUND_UPSCALE_MOVING_78, R72 = LT.ROUND_UPSCALE_TEMPORAL_72, Sp = D.SPLITS_UPSCALE_MOVING_78;
+    ok("!! ROUND_UPSCALE_MOVING_78: round 78, trained on moving sequences and tested on moving ones, its own net and results, round 72's U_TH the baseline, round 72's network shape and settings",
+        R.round === 78 && R.moving === true && R.trainMoving === true && R.net === "render/upscale-net-r78.json" && R.baseline === R72.net && R.results === "render/denoise-results-upscale-moving-r78.json" &&
+        R.variant === "half" && R.image === 256 && R.sppRef === 512 && R.sppRefTest === 2048 && R.train === R72.train && R.seeds === R72.seeds && R.minGain === 0.01 && R.splits === Sp && LT.temporalRound(78) === R);
+    const seen = new Set([D.SPLITS_UPSCALE_LEARNED_67, D.SPLITS_UPSCALE_LEARNED_68, D.SPLITS_UPSCALE_LEARNED_69, D.SPLITS_UPSCALE_TEMPORAL, D.SPLITS_UPSCALE_TEMPORAL_72, D.SPLITS_UPSCALE_MOVING].flatMap((s) => s.T1.seeds));
+    ok("  SPLITS_UPSCALE_MOVING_78: round 65's training and validation, a new test set of 12 R at 79000-79011 and 12 C at 80000-80011, reserved, no earlier test seed",
+        Sp.train === D.SPLITS_UPSCALE_LEARNED.train && Sp.val === D.SPLITS_UPSCALE_LEARNED.val && Sp.T1.seeds.length === 24 && Sp.T1.seeds[0] === 79000 && Sp.T1.seeds[12] === 80000 &&
+        Sp.T1.families.slice(0, 12).every((f) => f === "R") && Sp.T1.families.slice(12).every((f) => f === "C") && Sp.T1.seeds.every((x) => D.isDatasetSeed(x) && !seen.has(x)));
+
+    const split = { family: "R", seeds: [990950, 990952] }, so = { W: 32, sppIn: 1, sppRef: 2 };
+    const still = LT.sequenceSet(split, net, so), both = LT.sequenceSet(split, net, { ...so, moving: true });
+    const mvx = split.seeds.map((sd) => T.temporalExample("R", sd, net, { ...so, motion: M.sceneMotion(D.makeScene("R", sd)) }));
+    ok("!! sequenceSet with `moving`: each scene twice -- the still sequences first, exactly as without it, then each moving twin (sceneMotion's motion, sharing its twin's reference)",
+        still.length === 2 && both.length === 4 && [0, 1].every((i) => same(both[i].x, still[i].x) && same(both[i].bt, still[i].bt)) &&
+        [0, 1].every((i) => same(both[2 + i].x, mvx[i].x) && same(both[2 + i].bt, mvx[i].bt) && both[2 + i].ref === both[i].ref && !same(both[2 + i].bt, both[i].bt)));
+    const tr = LT.runTemporalTraining({ splits: { train: split, val: { family: "R", seeds: [990954] } }, net, ...so, seeds: [1], train: { steps: 2, batch: 1, crop: 16 }, variant: "half", moving: true });
+    const vset = LT.sequenceSet({ family: "R", seeds: [990954] }, net, { ...so, moving: true });
+    ok("!! runTemporalTraining with `moving` trains and validates on the twins: 4 training and 2 validation sequences, its validation the candidate's grade of the still and the moving twin, and the config says so",
+        tr.config.moving === true && tr.config.splits.train === 4 && tr.config.splits.val === 2 && tr.runs[0].val.length === 2 &&
+        same(tr.runs[0].val, vset.map((e) => gradeDisplay(T.temporalChain(tr.runs[0].net, e), e))));
+
+    const t72 = JSON.parse(fs.readFileSync(path.join(ENG, R72.net), "utf8")), U72 = decodeNet(t72.runs.find((x) => x.seed === t72.candidate).net), Uc = decodeNet(t72.c2.net);
+    const Um = tr.runs[0].net, sp1 = { T1: { family: "R+C", families: ["R", "C"], seeds: FIX.map((x) => x[1]) } };
+    const out = LT.runMovingTest({ splits: sp1, net, U: Um, Uc2: Uc, U0: U72, round: 78, W, sppIn: 2, sppRef: 4 }), mean = (a) => a.reduce((q, v) => q + v, 0) / a.length;
+    const g0 = pairs.map(({ mv }) => gradeDisplay(T.temporalChain(U72, mv), mv)), gm = pairs.map(({ mv }) => gradeDisplay(T.temporalChain(Um, mv), mv));
+    ok("!! *** with a baseline, H1 is U_THM AGAINST U_TH on the moving scenes and H2 against Bt; U_TH is graded on every arm beside it ***",
+        same(out.tables.U0, g0) && same(out.tables.U, gm) && same(out.verdict.hypotheses.H1.d, effects(g0, gm)) && same(out.verdict.hypotheses.H2.d, effects(out.tables.bt, gm)) &&
+        same(out.still.U0, pairs.map(({ st }) => gradeDisplay(T.temporalChain(U72, st), st))) &&
+        same(out.secondary.mover.U0, pairs.map(({ mv }) => LT.maskedDisplay(T.temporalChain(U72, mv), mv.ref, mv.mover))));
+    ok("  ...and its vsU0 figures are U_THM's gain over U_TH, moving and still, and U_TH's own over Bt",
+        out.secondary.vsU0.moving === 1 - mean(gm) / mean(g0) && out.secondary.vsU0.still === 1 - mean(out.still.U) / mean(out.still.U0) && out.secondary.vsU0.u0OverBt.moving === 1 - mean(g0) / mean(out.tables.bt));
+    const plain = LT.runMovingTest({ splits: sp1, net, U: U72, Uc2: Uc, W, sppIn: 2, sppRef: 4 });
+    ok("  without a baseline the moving test is round 77's: no U_TH arm, H1 against Bt", !("U0" in plain.tables) && !("vsU0" in plain.secondary) && same(plain.verdict.hypotheses.H1.d, effects(plain.tables.bt, plain.tables.U)));
+
+    const cli = fs.readFileSync(path.join(ENG, "tools", "denoiseStudy.mjs"), "utf8");
+    ok("!! the commands: training refuses only a TEST-ONLY moving round and passes `moving` for round 78; the test reads round 72's candidate from RD.baseline as U0 and records it",
+        /if \(RD\.moving && !RD\.trainMoving\) \{/.test(cli) && /variant: RD\.variant, moving: !!RD\.trainMoving,/.test(cli) &&
+        /U0 = b0 \? decodeNet\(b0\.runs\.find\(\(x\) => x\.seed === b0\.candidate\)\.net\) : null;/.test(cli) && /if \(b0\) out\.baseline = \{ file: RD\.baseline, candidate: b0\.candidate, commit: b0\.commit \};/.test(cli));
+    const reg = fs.readFileSync(path.join(ENG, "render", "learned-denoiser-preregistration.md"), "utf8"), s178 = reg.slice(reg.indexOf("## 178."), reg.indexOf("## 179.") > 0 ? reg.indexOf("## 179.") : undefined);
+    ok("  section 178 states what the code does: each scene twice, still and moving; 79000-79011 and 80000-80011; U_THM against U_TH on the moving scenes; both files",
+        /each TWICE, still and moving/.test(s178) && /79000-79011/.test(s178) && /80000-80011/.test(s178) && /\*\*H78a:\*\* on the MOVING scenes U_THM's chain beats U_TH's/.test(s178) && s178.includes(R.net) && s178.includes(R.results));
+}
+
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +
-    "\nnot closed here: U_TH trained on moving sequences, or object motion vectors for Bt -- section 177's next round.");
+    "\nnot closed here: whether U_THM beats U_TH on moving scenes. That is round 78's two harvests, section 179's.");
 process.exit(fails ? 1 : 0);

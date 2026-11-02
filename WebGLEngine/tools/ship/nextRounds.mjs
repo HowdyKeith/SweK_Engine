@@ -2554,6 +2554,13 @@ export const NEXT_ROUNDS = [
         why: "So the page shows what the arc measured -- generation between the chain's frames -- not only the generator.",
     },
     {
+        id: "fsr4-moving-training",
+        blocker: "OPEN",
+        what: "Round 78 (section 178), set up and awaiting its two harvests: U_THM, round 72's U_TH shape trained on round 65's 200 + 20 scenes each still AND moving (400 + 40 sequences, the twins sharing references), tested on 24 new scenes (12 R 79000-79011, 12 C 80000-80011) moving and still. H78a: U_THM beats round 72's U_TH on the moving scenes by the 1 % rule; H78b: it beats Bt there. Code: sequenceSet and runTemporalTraining's `moving`, runMovingTest's U0 baseline; rows in render/movingScenes-selfcheck.mjs section 5.",
+        how: "On the rig at round 78's commit: --harvest-upscale-temporal-train --round 78 (~15 h), render/upscale-net-r78.json committed byte for byte; then at that commit --harvest-upscale-temporal-test --round 78 (~11 h), render/denoise-results-upscale-moving-r78.json committed the same way. Section 179 reads them.",
+        why: "Section 177: on the mover pixels, where Bt's error is 5.8 x the rest's, round 72's U_TH is only 3.60 % below Bt; it was never trained on a moving object's history.",
+    },
+    {
         id: "fsr4-moving-scenes",
         blocker: "CLOSED",
         what: "CLOSED, SUPPORTED (section 177): H77a HOLDS -- on 24 scenes whose objects move (0.01-0.08 units a frame, no motion vectors) round 72's U_TH is 4.49 % below Bt (17 of 24, sign-flip p 0.00037), against 5.71 % on the same scenes still; H77b holds against B1 (p 0.031). Bt's history is shorter moving on all 24. P6 MISSED: on the mover pixels, where Bt's error is 5.8 x the rest's, U_TH is only 3.60 % below Bt (13 of 24 scenes) against 9.39 % on the rest. The results file was shown before it was committed, said in section 177.",
