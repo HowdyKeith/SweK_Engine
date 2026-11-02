@@ -13,6 +13,8 @@
 //   3  THE ROUND ON A MINIATURE (two searches of 40 iterations on 2 scratch train seeds, scratch held-out, audit and check seeds): C-files first, the searches and the determinism twin in one call, the champion
 //      the best held-out (a planted pair whose orders disagree), pruned toward the START, the audit read, the verdict qualifies() of the champion, H2 from the same games, C-determinism able to fail
 //   4  THE COMMAND: it never overwrites, refuses an option it does not know, prints no score, and writes the weight file only from a results file whose champion qualified
+//   5  THE VERDICT, AS CODE, FROM THE COMMITTED FILE: the registered run, C-files and C-determinism, the champion the rule's pick, its tallies re-flown from its weights, H1 not met and H2 met by the rules,
+//      the predictions as the file decides them, the note tied to the file, and nothing written (--write-from refuses the file). Section 5 flies the registered seeds again: they are spent.
 //
 // SABOTAGE LOG (2026-11-02) -- each applied with the byte-safe runner, this gate run, the file restored byte-identical (sha256); the number is the rows that went red, by name:
 //   G1 the recipe at 600 iterations 1 | G2 the audit on a used block 1 | G3 the league without the Default 1 | G4 pruned toward the hand weights 2 | G5 the pick on train score 1
@@ -23,6 +25,10 @@
 //   were 0 = 0 -- now 40 iterations, and a row that says a search kept weights; (2) the planted pick's two searches agreed in both orders (the first round's T3 again) -- now a pilot of zeros with the
 //   higher train score against the start; (3) the audit could have been read against the wrong opponent unseen, since the verdict row recomputed from the same object -- now recomputed independently;
 //   (4) the start's hash check was never exercised -- now a good file with other weights.
+// SABOTAGE LOG, SECTION 5 (2026-11-02, after the verdict) -- the same runner, with the committed results file, the note or the command edited; every file restored byte-identical:
+//   V1 the file not flagged as the registered seeds 1 | V2 the verdict ok 4 (H1, the predictions, the note, and --write-from then writing) | V3 search 7100's held-out score past the champion's 2
+//   V4 H2's gain 36 1 | V5 the champion's audit at 10 wins 4 | V6 the twin's hash different 2 | V7 a champion weight changed 2 | V8 the note's audit numbers drifted 1 | V9 the note saying P3 wrong 1
+//   V10 --write-from writing whatever the verdict 3
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -132,6 +138,49 @@ try {
     fs.rmSync(tmp, { recursive: true, force: true });
 } catch (e) { guard(4, e); }
 
+console.log("\n5. THE VERDICT, AS CODE, FROM THE COMMITTED FILE (brain/sixdofGpuLeagueResults.json, committed unread at 7425ba66)");
+try {
+    // Written AFTER the file was read. Every number the note's Round 2 verdict states is re-derived here from the file, and the champion's tallies are re-flown from its weights at this head. The registered
+    // held-out, audit and check seeds were read once, by the registered run, and are spent: flying them again chooses nothing.
+    const R = JSON.parse(fs.readFileSync(L.DEFAULT_RESULTS, "utf8")), c = R.champion, cw = Float32Array.from(c.weights), start = L.startWeights(), fly = T.flyDefault(), lg = L.leagueOf(fly);
+    const cp = (x) => ({ score: x.score, wins: x.wins, losses: x.losses, draws: x.draws, hits: x.hits, hitsTaken: x.hitsTaken }), lead = (x) => x.wins - x.losses, d = P6.describeEval;
+    ok("!! the file is the registered run: the recipe, the held-out (301, 24), audit (6301, 40) and check (6101, 20) seeds and flagged so, four searches on 7100-7103, not stopped",
+        R.registration === L.REGISTRATION && ["runs", "iters", "seed", "sigma", "maxK", "train"].every((k) => R.recipe[k] === L.RECIPE[k]) && J(R.seeds) === J({ held: [301, 24], audit: [6301, 40], auto: [6101, 20] }) &&
+        R.registeredSeeds === true && !R.stopped && J(R.searches.map((x) => x.seed)) === J([7100, 7101, 7102, 7103]), J(R.recipe));
+    const twin = R.searches.find((x) => x.seed === 7100);
+    ok("!! C-files held (the start 0ffd8554, the Default 215e26d9), and C-determinism held: search 7100 run twice gave the same weights (95b8cbc2 both times)",
+        J(R.cFiles) === J({ ok: true, start: "0ffd8554", fly: "215e26d9" }) && R.cDeterminism.ok === true && R.cDeterminism.seed === 7100 && R.cDeterminism.first === twin.hash && R.cDeterminism.again === twin.hash && twin.hash === "95b8cbc2");
+    const pick = [...R.searches].sort((a, b) => b.held.score - a.held.score || a.seed - b.seed)[0], differ = c.weights.filter((v, i) => Math.abs(v - start[i]) > 1e-6).length;
+    ok("!! the champion is the rule's pick from the file's four (best held-out league score): 7102, its hash 6934d951 is the weights', and they differ from the start at exactly the 97 kept",
+        c.seed === pick.seed && c.seed === 7102 && c.hash === pick.hash && weightsHash(cw) === c.hash && c.hash === "6934d951" && differ === c.kept && c.kept === 97 && c.differsFromStart === 97, `${differ} differ`);
+    const re = { held: cp(M.evaluate(cw, L.HELD_SEEDS, { opponent: lg })), vsPrev: cp(M.evaluate(cw, L.AUDIT_SEEDS, { opponent: [fly] })), mirror: cp(P6.evaluate(fly, L.AUDIT_SEEDS, { opponent: [fly] })),
+                 start: cp(M.evaluate(start, L.AUDIT_SEEDS, { opponent: [fly] })), heldVs: cp(M.evaluate(cw, L.HELD_SEEDS, { opponent: [fly] })), autoC: cp(M.evaluate(cw, L.AUTO_SEEDS, { opponent: ["autopilot"] })), autoS: cp(M.evaluate(start, L.AUTO_SEEDS, { opponent: ["autopilot"] })) };
+    ok("!! the code at this head flies the file's numbers: the champion's held-out league score, its audit against the Default, the Default's mirror, the start against the Default, the held-out record and both checks against the PD autopilot, re-flown, equal the file's to the last digit",
+        J(re.held) === J(c.held) && J(re.vsPrev) === J(c.audit.vsPrev) && J(re.mirror) === J(c.audit.mirror) && J(re.start) === J(c.audit.start) && J(re.heldVs) === J(c.heldOut.vsPrev) && J(re.autoC) === J(c.auto.champ) && J(re.autoS) === J(c.auto.prev),
+        `audit ${d(re.vsPrev)}`);
+    const v = L.qualifies(c, LG.PROFILES.league);
+    ok("!! H1 IS NOT MET, by train6dofLeague.qualifies() applied to the file with the Default as the pilot to beat: it fails the audit lead (-37 against 8), the score against the mirror, and the held-out lead -- and passes both autopilot checks -- as the file's verdict says",
+        v.ok === false && J(v) === J(R.verdict) && v.reasons.length === 3 && /leads the shipped pilot by -37 games/.test(v.reasons[0]) && /does not beat the shipped pilot's own 18\.35/.test(v.reasons[1]) && /held-out: 5 won and 24 lost/.test(v.reasons[2]), v.reasons.join(" | ").slice(0, 200));
+    const h2 = L.h2Of(lead(c.audit.vsPrev), lead(c.audit.start));
+    ok("!! H2 IS MET: on the same 80 audit games the start's lead over the Default is -74 and the champion's -37, a gain of 37 against the floor of 8, as the file's h2 says", J(h2) === J(R.h2) && h2.met && h2.gain === 37 && h2.startLead === -74, J(h2));
+    const pred = { P1: R.verdict.ok === false, P2: R.h2.met === true, P3: R.h2.startLead <= -50, P4: c.kept >= 10 && c.kept <= 150 };
+    ok("!! the four predictions, read off the file: all four right (H1 not met, H2 met, the start at -74, 97 weights kept)", Object.values(pred).every(Boolean), J(pred));
+    const note = fs.readFileSync(path.join(HERE, "..", "..", "brain", "SIXDOF_GPU_BRAIN_WIP.md"), "utf8"), at = note.indexOf("\n### Round 2: the verdict"), vt = at >= 0 ? note.slice(at) : "";
+    const esc = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), stands = (x) => new RegExp("(?<![0-9])" + esc(x) + "(?![0-9])").test(vt), wl = (x) => `W${x.wins}/L${x.losses}/D${x.draws}`;
+    const rowOf = (x) => { const b = x.seed === c.seed ? "**" : ""; return `| ${b}${x.seed}${b} | ${x.trainScore.toFixed(2)} | ${b}${d(x.held)}${b} | ${x.improved} | ${x.neutral} | ${x.moved} | ${x.kept} |`; };
+    const mins = R.searches.map((x) => Math.round(x.ms / 60000));
+    const frags = [...R.searches.map(rowOf), `hash ${c.hash}, ${c.kept} weights`, `${wl(c.audit.vsPrev)} against the Default`, `a lead of ${lead(c.audit.vsPrev)}`, `${c.audit.vsPrev.score.toFixed(2)} against the Default`,
+                   `own ${c.audit.mirror.score.toFixed(2)} against itself (${wl(c.audit.mirror)})`, `${wl(c.heldOut.vsPrev)} against the Default`, `${wl(c.auto.champ)} against the start's`, wl(c.auto.prev),
+                   `start went ${wl(c.audit.start)}`, `a gain of ${h2.gain}`, R.cDeterminism.again, `${Math.min(...mins)} to ${Math.max(...mins)} minutes`, "H1 is not met", "H2 is met", ...Object.keys(pred).map((k) => `**${k}: ${pred[k] ? "right" : "wrong"}.**`)];
+    const missing = frags.filter((x) => !stands(x));
+    ok("!! the note's Round 2 verdict carries the file's numbers and each prediction's outcome as the file decides it (no digit may touch a fragment's ends)", at > 0 && missing.length === 0, missing.length ? "missing: " + missing.join(" || ").slice(0, 300) : `${frags.length} fragments`);
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "mlpleague-v-")), outF = path.join(tmp, "w.json");
+    let said = ""; try { execFileSync(process.execPath, [path.join(HERE, "trainMlp6dofLeague.mjs"), "--write-from", L.DEFAULT_RESULTS, "--out", outF], { encoding: "utf8", stdio: "pipe" }); } catch (e) { said = String(e.stdout); }
+    ok("!! H1 was not met, so NOTHING IS WRITTEN: brain/pilot6dofMlpWeightsLeague.json does not exist, and --write-from refuses the committed file with its verdict's first reason",
+        !fs.existsSync(L.DEFAULT_OUT) && !fs.existsSync(outF) && /not written: the champion did not qualify -- audit: leads the shipped pilot by -37 games/.test(said), said.trim().slice(0, 160));
+    fs.rmSync(tmp, { recursive: true, force: true });
+} catch (e) { guard(5, e); }
+
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +
-    "\nnot closed here: the registered round itself -- node tools/ship/trainMlp6dofLeague.mjs --workers 5 -- whose results file is committed before it is read.");
+    "\nnot closed here: whether more iterations, more searches or another network would close the rest of the gap, and how this champion does on the page -- none of it registered.");
 process.exit(fails ? 1 : 0);

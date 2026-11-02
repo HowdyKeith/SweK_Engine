@@ -416,3 +416,63 @@ were found unable to go red before the sabotages ran, and each was fixed:
 - **The start's hash check was never exercised.** A good file with other weights now exercises it.
 
 **The registered run:** `node tools/ship/trainMlp6dofLeague.mjs --workers 5`.
+
+### Round 2: the verdict, 2026-11-02 (read from the committed file, after it was committed)
+
+The registered run wrote `brain/sixdofGpuLeagueResults.json` at head c465c6b3. It was committed byte for byte at
+7425ba66 before anyone read it. It flew the registered seeds and says so (`registeredSeeds: true`).
+The searches took 40 to 47 minutes each. Every number below is re-derived from that file in section 5 of
+`tools/ship/train6dofMlpLeague-selfcheck.mjs`, and the champion's tallies are re-flown there from its weights.
+
+**The controls held.**
+- **C-files:** the start was 0ffd8554 and the Default 215e26d9.
+- **C-determinism:** search 7100, run twice in two processes at once, gave 95b8cbc2 both times.
+
+**The four searches:**
+
+| search | train | held-out league score | improvements | neutral | moved | kept |
+|---|---|---|---|---|---|---|
+| 7100 | 17.94 | 18.24 (W47/L35/D14, hits 1586, taken 1531) | 35 | 350 | 610 | 46 |
+| 7101 | 18.68 | 17.25 (W46/L30/D20, hits 1469, taken 1530) | 51 | 407 | 674 | 60 |
+| **7102** | 18.72 | **18.91 (W51/L24/D21, hits 1601, taken 1521)** | 58 | 404 | 714 | 97 |
+| 7103 | 18.05 | 17.83 (W45/L37/D14, hits 1569, taken 1553) | 42 | 357 | 612 | 57 |
+
+"Kept" counts the weights that still differ from the start after pruning toward it.
+
+**H1 is not met.** The champion is search 7102 (hash 6934d951, 97 weights different from the start). By
+`train6dofLeague.qualifies()`, with the Default as the pilot to beat, it fails three of the five conditions:
+- **the audit:** W9/L46/D25 against the Default on 6301-6340, a lead of -37 against the floor of 8;
+- **the score:** 16.35 against the Default, not above the Default's own 18.35 against itself (W11/L11/D58);
+- **the held-out seeds:** W5/L24/D19 against the Default, which is not a lead.
+
+It passes the check against the PD autopilot. On 6101-6120 from both sides it went W32/L0/D8 against the start's
+W20/L0/D20: no more losses, and a higher score. So **no weight file is written**, and the champion is not offered
+anywhere.
+
+**H2 is met: the gap narrowed by 37 games.** On the same 80 audit games, the start went W0/L74/D6 against the Default
+(a lead of -74), and the champion went W9/L46/D25 (-37): a gain of 37 against the floor of 8.
+
+**The predictions:**
+- **P1: right.** H1 is not met; I gave that 75%.
+- **P2: right.** H2 is met; I gave that 60%.
+- **P3: right.** The start's audit lead against the Default is -74, at or below -50.
+- **P4: right.** The champion keeps 97 weights different from the start, inside 10-150.
+
+**What this says, and what it does not.**
+- **It says:** trained directly against the Default by the fly's league recipe, the GPU Brain's MLP closes half the gap.
+  Its losses to the Default fall from 74 to 46 of 80, and it wins 9. It also gets better against the autopilot.
+- **It also says:** it still loses to the Default clearly, on the audit and on the held-out seeds. It does not reach the
+  rule the fly's League pilot met.
+- **It does not say** whether more iterations, more searches or another network would close the rest, or how this
+  champion does on the page. None of that was tested.
+  - Round 1 found that a duel win barely carries to the page's own fight.
+
+**What follows.**
+- Nothing is written, so the page and the capability map's TRAINED cell keep the first round's pilot. The cell cites
+  this round's result beside it.
+- This note authorises no third recipe.
+
+**Round 2's verdict, as code:** section 5 of `tools/ship/train6dofMlpLeague-selfcheck.mjs` re-derives every number above
+from the committed file and re-flies the champion's tallies from its weights. It also holds that nothing was written:
+`--write-from` refuses the file. Sabotaged with the byte-safe runner: 10 designs, each red by name. They edit the
+committed file, this note or the command, and the counts are in the gate's header.
