@@ -332,3 +332,26 @@ Three searches (train 0.8875 / 0.8875 / 0.8937 on the 24 training dives); champi
 **What the registered rule says and what the numbers say, kept apart.** The rule's wording makes the bottom line NO GAIN because the content control ties. The numbers also say the champion's boat is better than the rule's by 0.11 on 144 fresh dives and crushes none. **POST HOC, not a verdict:** the champion's cut output is 0 on the sampled situations and its shift is a nearly constant +0.07 to +0.12 (its output bias is +0.45 on the shift, -0.11 on the cut; 24 of its 24 output weights moved), so what it has learned looks like **a retuned surfacing threshold, a constant offset, not a reading of the situation.** The shuffled control keeps that bias, which is why it ties. That is a hypothesis about the champion, not a result; it is exactly what Round 7 should test.
 **WHAT THIS MEANS and does not.** The hand-written rule's threshold was not at its best on this task and gauge, and a small search finds a better one; the gain is large (0.75 to 0.85). It does NOT show that a network reading the situation helps, and it does not show that a retuned constant does as well: neither was tested. **UNCHECKED:** a constant-shift arm (one parameter); a larger or other-output residual (station choice); whether the gain holds on a different gauge noise.
 **Round 7 (to be registered before it is built):** constant-shift arms (shift 0.05, 0.10, 0.15, cap cut 0) and a one-parameter ES, flown on fresh seeds, against RESIDUAL and RULE-GF. If a constant matches RESIDUAL, the lesson is "tune the rule"; if RESIDUAL beats every constant, the residual reads something.
+
+# Round 7 -- is the Round 6 residual just a retuned threshold? (REGISTERED 2026-11-02, before any code or any fresh seed was read)
+
+## 1. The question, and what a result would and would not mean
+Round 6's champion beat its start by 0.11 on every audit and tied its shuffled control; its cut output was about 0 and its threshold shift a near-constant +0.07 to +0.12 (a post-hoc reading). **THE QUESTION.** Does a CONSTANT shift of the surfacing threshold (one parameter, no network, cut 0) do as well as the champion on fresh seeds? **WHAT A RESULT WOULD MEAN:** this task, this gauge, this champion (frozen, `brain/rig-results/residual-champion.json`, iteration 210 of search 62000), these constants. **WHAT IT WOULD NOT MEAN:** that no network could beat a constant; that tuning is all a sub needs on other tasks.
+
+## 2. The arms (all flown on the same dives, paired, noisy gauge, brain `GUARDED-OBS`, VETO)
+**ALONE; RULE-GF** (shift 0); **RESIDUAL** (the frozen champion); **CONST-0.05, CONST-0.10, CONST-0.14** (a constant threshold shift of that size, cap cut 0; 0.14 and not 0.15 because the residual's bound 0.15 is reached only in the limit); **CONST-TUNED**: the shift in {0.00, 0.01, ..., 0.14} with the best mean on the 48 VALIDATION dives (271-282, already used as Round 6's validation; not an audit), chosen BEFORE the audits are flown, ties to the smaller shift. A constant is built as the residual seat with zero hidden effect and output bias atanh(shift / 0.15), so every arm runs through the same seat code.
+
+## 3. The sets
+Audits **S1 421-432, S2 441-452, S3 461-472**, four kinds, 48 dives each, read once; no seed of Rounds 1-6 is used.
+
+## 4. Checks (first lines of the report; a failure and the verdicts are NOT WEIGHED)
+CONST-0.00 equals RULE-GF dive for dive; the rule is not trivial (RULE-GF beats ALONE on far and both); the tuned shift is printed with its whole validation curve (so a plateau or a cliff is on the record).
+
+## 5. The verdicts (margin max(0.02, 2 se), paired)
+* **A CONSTANT BEATS THE RULE** iff CONST-TUNED beats RULE-GF on all three audits. * **RESIDUAL READS SOMETHING** iff RESIDUAL beats CONST-TUNED on all three. * **TUNING EXPLAINS IT** iff RESIDUAL beats CONST-TUNED on none and CONST-TUNED beats RULE-GF on all three. Anything else is MIXED (signs printed). Reported, not in the verdicts: the other constants, crushed and stranded counts, per-kind means.
+
+## 6. Expectations, recorded BEFORE any run
+CONST-TUNED beats RULE-GF on all three audits: about 85 percent. **TUNING EXPLAINS IT: about 55 percent**; RESIDUAL READS SOMETHING: about 15; MIXED: 30. The tuned shift lands between 0.06 and 0.12: about 70 percent.
+
+## 7. What will be built (nothing existing edited)
+`tools/ship/constShift.mjs` (library: the constant weights, the grid, the tuning, the audits, the verdicts, the report), `constShiftCmd.mjs` (export-free), its gate with a mutation pass; then one run (about 25 minutes), the result written as section 8. **NOT IN THIS ROUND:** retraining the residual; cut or station outputs; another gauge; any change to `residualAdvisor.mjs`, `trainResidual.mjs` or `needsTask.mjs`.
