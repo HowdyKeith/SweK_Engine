@@ -820,3 +820,25 @@ TWIN-FULL REAL on these seeds: about 92 percent. CAP-5 BETTER than CAP-4: about 
 
 ## 6. What will be built
 The `maxStations` option in `brain/plannerPerturbed.mjs`, `tools/ship/plannerCap.mjs` (library built on plannerEnsemble's reading and plannerStations' generator), `plannerCapCmd.mjs` (export-free: `run`, parallel by arm) and its gate with a mutation pass; then the run (CAP-5 costs 121 rollouts a plan: about 35 seconds a dive over 384 dives: about an hour on four cores for that arm alone), after the queued rounds have finished, and the result as section 7. **NOT IN THIS ROUND:** six stations (720 orders), a cap that depends on the situation, any other change to the planner.
+
+# Round 25 -- how much headroom is left above the twin, and does it grow with the number of stations? (REGISTERED 2026-11-02, before any code and before any of its seeds was flown)
+
+## 1. Why
+Every verdict of Rounds 11-24 compares the planner with the tuned rule it sits on. The question that decides whether more work on the planner is worth doing is the other one: how far is the twin from the best a visiting order could do? The hindsight oracle (`stationRound.oracleRun`: every fixed order of all the stations tried, the best flown run kept) answers it, with the caveat Round 11 Amendment 1 recorded: the oracle sees the noise stream, so part of its advantage over any honest planner is luck. Round 16 found the twin's gain over the tuned rule grows with the station count; Round 25 asks whether the room above the twin grows too (a planner that keeps closing a constant share of a growing gap has more to gain from better search, a planner that closes more of a shrinking gap does not).
+
+## 2. The arms
+At each station count n in {3, 4, 5} (the Round 16 generator, `tools/ship/plannerStations.scenarioN`): **TUNED-R8**, **TWIN** (the default planner, cap 4: `brain/plannerPerturbed.mjs` with no options) and **ORACLE** (all n! fixed orders, the best run kept; 6, 24 and 120 flights a dive). Nine arms. Six stations (720 orders a dive) is not flown.
+
+## 3. The sets and the checks
+**H1 4201-4248 and H2 4301-4348**, far and both, 48 seeds per kind per set, **192 dives per arm per n**, read once, no seed used by any earlier round. Checks (a failure and the verdicts are NOT WEIGHED): the oracle is at least TUNED-R8 on every dive (its search includes nearest-first's own run); the generator at n = 3 equals `needsTask.scenario` on the dives of the set (the checks of Round 16 again, on these seeds); and the twin's gain over the tuned rule is positive at every n (else the headroom reading is about a planner that does not plan).
+
+## 4. The verdicts (pooled paired differences at each n over the 192 dives)
+* **Headroom** = oracle minus twin, with its se. `THERE IS HEADROOM ABOVE THE TWIN AT N = <list>` names the counts at which it is real-and-positive (above 2 se); `THERE IS NO MEASURABLE HEADROOM ABOVE THE TWIN` if none.
+* **Growth** = headroom(5) minus headroom(3), against the se of two independent means (the sets of different n are different tasks): `THE HEADROOM GROWS WITH THE NUMBER OF STATIONS` iff above 2 se, `... SHRINKS ...` iff below minus 2, `THE HEADROOM IS FLAT IN THE NUMBER OF STATIONS` otherwise.
+* **Reported, not in the verdict:** the gain (twin minus tuned) and the oracle gap (oracle minus tuned) at each n, the share of the gap the twin closes (gain over gap, a ratio of two pooled means, with no interval), the number of dives on which the twin beats the oracle (possible, because the twin replans and the oracle's orders are fixed), the oracle's mean score.
+
+## 5. Expectations, recorded BEFORE any seed is flown
+The twin's gain is positive at every n (the check): about 93 percent. Headroom is real at n = 3: about 80; at n = 4: about 85; at n = 5: about 92. Headroom(5) exceeds headroom(3): about 78; GROWS by the registered rule: about 45; FLAT: about 52. The share of the gap closed by the twin is between 0.4 and 0.8 at n = 3: about 60 percent, and lower at n = 5 than at n = 3: about 62. The twin beats the oracle on at least one dive at some n: about 70.
+
+## 6. What will be built
+`tools/ship/plannerHeadroom.mjs` (library built on plannerStations' generator and stationRound's oracle), `plannerHeadroomCmd.mjs` (export-free: `run`, parallel by arm) and its gate with a mutation pass; then the run (the oracle at n = 5 is 120 flights a dive: about 25 seconds a dive over 192 dives; the twin at n = 5 about 10: about 40 minutes on four cores), after the queued rounds have finished, and the result as section 7. **NOT IN THIS ROUND:** six stations, an oracle that replans, any change to the planner.
