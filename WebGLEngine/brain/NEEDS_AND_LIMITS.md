@@ -751,3 +751,26 @@ The fitted rule beats always planning on the training dives by at least 0.002 (a
 
 ## 6. What will be built
 `tools/ship/plannerGate.mjs` (library: features, rows, candidates, the fit, the judgement, the report; no file reads), `plannerGateCmd.mjs` (export-free: `run`, reads the arm files of Rounds 13-17 and 20 and rebuilds the scenarios) and its gate with a mutation pass; then the run, after Round 20's run has finished, and the result as section 7. **NOT IN THIS ROUND:** a rule with two features, a learned rule, any new dive.
+
+# Round 22 -- the confirmatory run: how big is the twin's gain, measured once, on 2,000 fresh dives? (REGISTERED 2026-11-02, before any code and before any of its seeds was flown)
+
+## 1. Why
+The full twin's gain over the tuned rule has been measured on 192- or 288-dive blocks with estimates from +0.0078 to +0.0258 (Rounds 12-17) and an unresolved question about whether those blocks differ more than chance allows (Round 19). Every one of those was a side measurement inside a round that asked something else. Round 22 is the round that asks only this, with enough dives that the answer has a standard error of about a tenth of a point: ten times the dives of the earlier blocks means a third of their standard error.
+
+## 2. The data
+**C1 2401-2650, C2 2651-2900, C3 2901-3150, C4 3151-3400**: 250 seeds each of far and both, **500 dives a block, 2,000 dives in all**, read once, no seed used by any earlier round, flown at the shipped conditions (gauge sd 0.10, three stations, 600-second dives). Arms: **TUNED-R8**, **TWIN-FULL** (`brain/plannerPerturbed.mjs`, no error, replan 120 s, unlimited look-ahead), **TWIN-ROUND11** (the identity check).
+
+## 3. The checks
+TWIN-FULL equals the Round 11 twin dive for dive on every block; the dives of TUNED-R8 and the twin are the same scenarios in the same order (kinds aligned); 500 dives per block.
+
+## 4. The verdicts (pooled paired difference twin minus TUNED-R8)
+* **CONFIRMED** iff the pooled difference over all 2,000 dives is REAL (above 2 se and positive). The line gives the estimate and its se: `THE TWIN'S GAIN IS CONFIRMED AT +<mean> (se <se>; 2000 DIVES)` or `THE TWIN'S GAIN IS NOT CONFIRMED (+<mean>, se <se>)`.
+* **SIZE:** `THE GAIN EXCEEDS ONE POINT OF THE SCORE` iff the lower bound (mean minus 2 se) is above 0.01; `THE GAIN IS NOT SHOWN TO EXCEED ONE POINT OF THE SCORE` otherwise. (A floor of 0.01, set here before the data; Round 12's was 0.02, which was a margin for a per-audit decision on 48 dives and is not the floor of interest on 2,000.)
+* **BLOCKS:** `THE FOUR BLOCKS AGREE` iff Cochran's Q over the four block estimates (Round 19's statistic) has p at or above 0.05; `THE FOUR BLOCKS DISAGREE BEYOND CHANCE` otherwise.
+* **REPORTED, NOT IN THE VERDICT:** each block's estimate and se, the estimate by kind (far, both), better/worse/same counts, the share of dives on which the twin differs from the tuned rule, the mean score of each arm, the twin's mean gain on the dives where it differs.
+
+## 5. Expectations, recorded BEFORE any seed is flown
+The pooled estimate lies between +0.012 and +0.022: about 75 percent. CONFIRMED (REAL): about 97. EXCEEDS ONE POINT (lower bound above 0.01): about 55. The four blocks AGREE: about 70 (each block's se is about 0.0025; Rounds 12-17 spread by more than that, which Round 19 will quantify, but four blocks of 500 are a coarser test). The share of dives on which the twin differs from the tuned rule: between 8 and 18 percent: about 75. Far's estimate exceeds both's: about 80.
+
+## 6. What will be built
+`tools/ship/plannerConfirm.mjs` (library built on plannerMeta's heterogeneity statistics and plannerReplicate's pooled reading), `plannerConfirmCmd.mjs` (export-free: `run`, parallel by arm and block: 12 jobs) and its gate with a mutation pass; then the run (the twin takes about 2.5 seconds a dive: 4,000 twin dives plus 2,000 identity dives, about 25 minutes on four cores), after the queued rounds have finished, and the result as section 7. **NOT IN THIS ROUND:** any variant of the twin; any other gauge, station count or kind.
