@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/plannerStations-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node tools/ship/plannerStations-selfcheck.mjs      (about 12 s: a few 100-second dives)
+// Run: node tools/ship/plannerStations-selfcheck.mjs      (about 14 s: a few 100-second dives)
 //
 // THE GATE OF tools/ship/plannerStations.mjs (Round 16 of brain/NEEDS_AND_LIMITS.md, registered first).
 //   1 SETS       1461-1508 and 1521-1568 of far and both (96 dives each per count), disjoint from every seed of Rounds 1-15; the counts 3, 4, 5, 6; 9 arms in the registered order.
@@ -13,6 +13,7 @@
 //   8 FLIGHT     real 100-second dives: the five-station task is a different dive from the three-station one and flies without throwing, the full twin at 3 stations equals the Round 11 twin.
 //   9 SOURCE     the seeds appear in one place; no clock, random or file.
 // NOT CHECKED, said plainly: whether the gain grows (that is the experiment).
+// SABOTAGE LOG (50 mutants of tools/ship/plannerStations.mjs, run against a copy of this gate): 8 went 0 red on the first pass and all 8 got rows -- the first station's reach clip in the generator (three deep scenarios, 3, 6 and 13, where it binds, now in the equality row), the pilot kind (tuned and twin swapped) and the noisy gauge on a real flight (seeds 1344-1350 where the twin's dive differs from the tuned rule's), the assembly over both sets, the gain being read against the tuned rule OF THE SAME COUNT (a tuned-rule shift of 0.2 at 5 stations), the growth rule (1.5 se is FLAT; a tiny negative growth is FLAT), and the GENERATOR check reading the generator it is given (checksOf takes an injectable generator). None is equivalent. All 50 are red.
 "use strict";
 import fs from "node:fs";
 let fails = 0, finished = false;
@@ -23,6 +24,7 @@ const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "
 const sec = (t) => console.log("\n" + t);
 const J = JSON.stringify;
 import * as T from "../../brain/needsTask.mjs";
+import * as U from "../../brain/tunedRule.mjs";
 import * as X from "./plannerStations.mjs";
 console.log("plannerStations-selfcheck -- the Round 16 station-count sweep\n");
 const code = fs.readFileSync(new URL("./plannerStations.mjs", import.meta.url), "utf8").split("\n").filter((l) => !/^\s*\/\//.test(l)).join("\n");
@@ -39,8 +41,8 @@ sec("1. SETS");
 }
 sec("2. SCENARIOS");
 {
-    const same = [[1, "far"], [2, "both"], [7, "plain"], [9, "deep"], [1461, "far"], [1530, "both"], [271, "far"]].every(([s, k]) => J(X.scenarioN(s, k, 3)) === J(T.scenario(s, k)));
-    ok("!! at 3 stations the generator equals needsTask.scenario, field for field, on seven scenarios of all four kinds", same);
+    const same = [[1, "far"], [2, "both"], [7, "plain"], [9, "deep"], [1461, "far"], [1530, "both"], [271, "far"], [3, "deep"], [6, "deep"], [13, "deep"]].every(([s, k]) => J(X.scenarioN(s, k, 3)) === J(T.scenario(s, k)));
+    ok("!! at 3 stations the generator equals needsTask.scenario, field for field, on ten scenarios of all four kinds (three of them deep ones where the first station's reach clip binds)", same);
     const a = X.scenarioN(1461, "far", 3), b = X.scenarioN(1461, "far", 6);
     ok("!! with 6 stations the first three are the 3-station ones exactly, there are six, and the rest are other stations", b.stations.length === 6 && J(b.stations.slice(0, 3)) === J(a.stations) && J(b.stations[3]) !== J(b.stations[0]) && b.seed === 1461 && b.kind === "far");
     ok("!! the fields drawn BEFORE the stations (damage, charge) do not depend on the count, and the starting depth, drawn after, does", b.damage0 === a.damage0 && b.frac0 === a.frac0 && b.depth0 !== a.depth0);
@@ -82,6 +84,10 @@ sec("4. READINGS");
     const gr = X.growth(au);
     ok("!! growth is the gain at 6 minus the gain at 3 (about +0.2) with the standard error of two independent means (sqrt(se6^2 + se3^2)), and reads GROWS", Math.abs(gr.mean - (g(6).mean - g(3).mean)) < 1e-12 && Math.abs(gr.se - Math.sqrt(g(6).se ** 2 + g(3).se ** 2)) < 1e-12 && gr.verdict === "GROWS");
     ok("!! FLAT when the two gains are alike and SHRINKS when the gain at 6 is lower by more than 2 se", X.growth(synth()).verdict === "FLAT" && X.growth(synth({ gain: { 3: BIG } })).verdict === "SHRINKS");
+    const tsh = synth({ shift: { 5: 0.2 } });
+    ok("!! the gain at 5 stations is the twin minus the tuned rule OF 5 STATIONS: a tuned rule 0.2 better at 5 stations leaves the gain at +0.1 (against the tuned rule of 3 stations it would read about -0.1)", Math.abs(X.gainAt(tsh, 5).mean - 0.1) < 0.01 && X.gainAt(tsh, 5).verdict === "KEEPS");
+    const mid = X.growth(synth({ gain: { 6: KEEP.map((x) => x + 0.0065) } })), dn = X.growth(synth({ gain: { 6: KEEP.map((x) => x - 0.0002) } }));
+    ok("!! a growth of 1.5 se is FLAT (the factor is 2, not 1) and a tiny negative growth is FLAT (not SHRINKS)", mid.mean > 1 * mid.se && mid.mean < 2 * mid.se && mid.verdict === "FLAT" && dn.mean < 0 && dn.mean > -2 * dn.se && dn.verdict === "FLAT");
     const edge = (() => { const a = synth({ gain: { 6: KEEP.map((x, i) => x + 0.0002) } }); return X.growth(a); })();
     ok("!! a growth under 2 se is FLAT (+0.0002 against an se of about 0.004)", edge.verdict === "FLAT" && edge.mean > 0 && edge.mean < 2 * edge.se);
 }
@@ -99,6 +105,7 @@ sec("6. CHECKS");
     ok("!! a Round 11 dive that differs from the full twin at 3 stations breaks IDENTITY T2 only", J(rows(bad).filter((c) => !c.ok).map((c) => c.name)) === J(["IDENTITY T2"]));
     const sw = synth(); for (const s of X.SET_NAMES) sw[s]["TWIN-FULL@3"].runs[0].fingerprint = "z";
     ok("!! the identity compares the FULL twin (a differing tuned-rule dive does not break it)", (() => { const t = synth(); t.T1["TUNED-R8@3"].runs[0].fingerprint = "q"; return rows(t).every((c) => c.ok); })() && J(rows(sw).filter((c) => !c.ok).map((c) => c.name)) === J(["IDENTITY T1", "IDENTITY T2"]));
+    ok("!! the generator check reads the generator it is given: one that drops the first station's clip, or adds a station, breaks GENERATOR only", J(X.checksOf(synth(), { gen: (s, k, c) => ({ ...X.scenarioN(s, k, c), depth0: 0 }) }).filter((c) => !c.ok).map((c) => c.name)) === J(["GENERATOR"]) && X.checksOf(synth(), { gen: X.scenarioN }).every((c) => c.ok));
     ok("!! no real gain at 3 stations breaks REFERENCE GAIN IS REAL only (a gain at another count does not stand in)", J(rows(synth({ gain: { 3: LOSE } })).filter((c) => !c.ok).map((c) => c.name)) === J(["REFERENCE GAIN IS REAL"]));
 }
 sec("7. REPORT");
@@ -115,9 +122,12 @@ sec("8. FLIGHT");
 {
     X.setFlight({ seconds: 100 });
     const ranges = { T1: [1344, 1345], T2: [1349, 1350] }, fly = (a) => X.flySets(a, R8, { ranges });
+    const directTuned = T.evaluate(T.flyDecision(U.tunedSeat(R8, U.WIDE_BOUNDS)), X.setN(X.HARD, 1344, 1345, 3), { gauge: T.GAUGE, seconds: 100 }), free3 = T.evaluate(T.flyDecision(U.tunedSeat(R8, U.WIDE_BOUNDS)), X.setN(X.HARD, 1344, 1345, 3), { gauge: null, seconds: 100 });
     const t3 = fly("TUNED-R8@3"), t5 = fly("TUNED-R8@5"), w3 = fly("TWIN-FULL@3"), r11 = fly("TWIN-ROUND11");
     ok("!! flySets returns T1 and T2, four dives each (two seeds of far and both)", J(Object.keys(t3)) === J(["T1", "T2"]) && t3.T1.runs.length === 4 && t3.T2.runs.length === 4);
     ok("!! the full twin at 3 stations equals the Round 11 twin dive for dive", ["T1", "T2"].every((s) => w3[s].runs.every((r, i) => r.fingerprint === r11[s].runs[i].fingerprint)));
+    ok("!! the tuned rule at 3 stations is T.evaluate with T.GAUGE, dive for dive, and not the noise-free dive; the twin is a different pilot on far 1344", t3.T1.runs.every((r, i) => r.fingerprint === directTuned.runs[i].fingerprint) && t3.T1.runs.some((r, i) => r.fingerprint !== free3.runs[i].fingerprint) && w3.T1.runs[0].fingerprint !== t3.T1.runs[0].fingerprint);
+    ok("!! assemble keys sets then arms: assemble({A: {T1, T2}}) is {T1: {A}, T2: {A}}", J(Object.keys(X.assemble({ A: t3, B: w3 }).T2)) === J(["A", "B"]) && X.assemble({ A: t3 }).T1.A === t3.T1 && X.assemble({ A: t3 }).T2.A === t3.T2);
     ok("!! five stations is a different task: at least one tuned dive differs from the three-station one", ["T1", "T2"].some((s) => t5[s].runs.some((r, i) => r.fingerprint !== t3[s].runs[i].fingerprint)));
     const w5 = fly("TWIN-FULL@5");
     ok("!! the twin flies five stations (four-nearest cap) without throwing, scores in [0, 1], and is a different pilot from the tuned rule on at least one dive", ["T1", "T2"].every((s) => w5[s].runs.every((r) => r.score >= 0 && r.score <= 1)) && ["T1", "T2"].some((s) => w5[s].runs.some((r, i) => r.fingerprint !== t5[s].runs[i].fingerprint)));

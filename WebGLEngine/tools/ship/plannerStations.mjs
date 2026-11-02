@@ -70,10 +70,10 @@ export function bottomLines(au) {
         `THE GAIN KEEPS AT N = ${keeps.length ? keeps.join(", ") : "NONE"}`,
     ];
 }
-export function checksOf(au) {
-    const rows = [], sample = [[1, "far"], [2, "both"], [7, "plain"], [9, "deep"], [271, "far"], [33, "both"]];
-    const same = sample.every(([s, k]) => JSON.stringify(scenarioN(s, k, 3)) === JSON.stringify(T.scenario(s, k)));
-    rows.push({ name: "GENERATOR", ok: same, text: `the generator at 3 stations equals needsTask.scenario on six sample scenarios: ${same}` });
+export function checksOf(au, { gen = scenarioN } = {}) {
+    const rows = [], sample = [[1, "far"], [2, "both"], [7, "plain"], [9, "deep"], [271, "far"], [33, "both"], [3, "deep"], [6, "deep"]];
+    const same = sample.every(([s, k]) => JSON.stringify(gen(s, k, 3)) === JSON.stringify(T.scenario(s, k)));
+    rows.push({ name: "GENERATOR", ok: same, text: `the generator at 3 stations equals needsTask.scenario on eight sample scenarios (two of them deep ones where the first station's reach clip binds): ${same}` });
     for (const s of SET_NAMES) {
         const x = au[s], id = x["TWIN-FULL@3"].runs.every((r, i) => r.fingerprint === x["TWIN-ROUND11"].runs[i].fingerprint);
         rows.push({ name: `IDENTITY ${s}`, ok: id, text: `the full twin at 3 stations equals the Round 11 twin dive for dive on ${s}: ${id}` });
