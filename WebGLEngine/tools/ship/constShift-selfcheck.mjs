@@ -84,6 +84,21 @@ sec("6. REPORT (small audit ranges)");
     const LB = X.report(bad, tuning);
     ok("!! a FAILED check (the rule not beating ALONE) prints FAIL, says NOT WEIGHED, and the bottom line says so", LB.some((l) => /FAIL RULE NOT TRIVIAL S2/.test(l)) && LB.some((l) => /NOT WEIGHED\./.test(l)) && /NOT WEIGHED/.test(LB[LB.length - 1]));
 }
+sec("6b. SYNTHETIC AUDITS");
+{
+    const mk = (f) => ({ runs: [0, 1, 2].flatMap(() => ["plain", "deep", "far", "both"].map((kind, i) => ({ kind, score: f(kind), fingerprint: "f" }))), score: 0, crashed: 0, stranded: 0 });
+    const arms = (rule, constant, resid) => ({ ALONE: mk(() => 0.3), "RULE-GF": mk(rule), RESIDUAL: mk(resid), "CONST-0.05": mk(() => 0.5), "CONST-0.10": mk(() => 0.5), "CONST-0.14": mk(() => 0.5), "CONST-TUNED": mk(constant) });
+    const A = (rule, constant, resid) => ({ S1: arms(rule, constant, resid), S2: arms(rule, constant, resid), S3: arms(rule, constant, resid) });
+    const tuning = { shift: 0.08, curve: X.GRID.map((g) => ({ shift: g, score: 0.5 })) };
+    const au = A(() => 0.5, () => 0.6, () => 0.7), L = X.report(au, tuning);
+    ok("!! the verdict lines compare the right arms: CONST-TUNED against RULE-GF +0.100, RESIDUAL against CONST-TUNED +0.100, RESIDUAL against RULE-GF +0.200", L.some((l) => /^CONST-TUNED against RULE-GF: \+0\.100 WINS \| \+0\.100 WINS \| \+0\.100 WINS = BEATS/.test(l)) && L.some((l) => /^RESIDUAL against CONST-TUNED: \+0\.100 WINS/.test(l) && /wins on 3 of 3/.test(l)) && L.some((l) => /^RESIDUAL against RULE-GF.*\+0\.200 WINS/.test(l)) && /RESIDUAL READS SOMETHING/.test(L[L.length - 1]));
+    const L2 = X.report(A(() => 0.5, () => 0.6, () => 0.6), tuning);
+    ok("!! a residual no better than a constant that beats the rule reads TUNING EXPLAINS IT", /BOTTOM LINE: TUNING EXPLAINS IT/.test(L2[L2.length - 1]));
+    const hard = (kind) => (kind === "both" ? 0.9 : 0.3), c1 = X.checksOf(A(hard, hard, hard), tuning), c2 = X.checksOf(A((k) => (k === "plain" ? 0.9 : 0.3), hard, hard), tuning);
+    ok("!! the rule-not-trivial check reads far AND both: a rule that wins on both only passes, one that wins on plain only fails", c1.filter((c) => /RULE NOT TRIVIAL/.test(c.name)).every((c) => c.ok) && c2.filter((c) => /RULE NOT TRIVIAL/.test(c.name)).every((c) => !c.ok));
+    ok("!! the identity check goes FAIL when a non-zero shift is run in its place", X.checksOf(au, tuning).find((c) => c.name === "IDENTITY").ok === true && X.checksOf(au, tuning, { identityShift: 0.08 }).find((c) => c.name === "IDENTITY").ok === false);
+    ok("!! the tuning-curve check fails on a curve that is not the whole grid", X.checksOf(au, { shift: 0, curve: [{ shift: 0, score: 0.5 }] }).find((c) => c.name === "TUNING CURVE").ok === false && X.checksOf(au, tuning).find((c) => c.name === "TUNING CURVE").ok === true);
+}
 sec("7. THE SOURCE");
 {
     const code = fs.readFileSync(new URL("./constShift.mjs", import.meta.url), "utf8").split("\n").filter((l) => !/^\s*\/\//.test(l)).join("\n");

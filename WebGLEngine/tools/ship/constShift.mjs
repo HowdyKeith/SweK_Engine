@@ -52,13 +52,13 @@ export function lineOf(constVsRule, residualWins) {
     return "MIXED";
 }
 
-export function checksOf(au, tuning) {
+export function checksOf(au, tuning, { identityShift = 0 } = {}) {
     const rows = [];
     for (const n of AUDIT_NAMES) {
         const a = au[n], idx = a.ALONE.runs.map((r, i) => (r.kind === "far" || r.kind === "both" ? i : -1)).filter((i) => i >= 0), sub = (res) => ({ runs: idx.map((i) => res.runs[i]) }), j = judge(sub(a["RULE-GF"]), sub(a.ALONE));
         rows.push({ name: `RULE NOT TRIVIAL ${n}`, ok: j.wins, text: `RULE-GF beats ALONE on far and both on ${n} by ${j.diff.toFixed(3)} (margin ${j.margin.toFixed(3)})` });
     }
-    const z = scoreOf("CONST-TUNED", { tuned: 0 }, [T.scenario(241, "far"), T.scenario(241, "both")]), g = scoreOf("RULE-GF", {}, [T.scenario(241, "far"), T.scenario(241, "both")]);
+    const z = scoreOf("CONST-TUNED", { tuned: identityShift }, [T.scenario(241, "far"), T.scenario(241, "both")]), g = scoreOf("RULE-GF", {}, [T.scenario(241, "far"), T.scenario(241, "both")]);
     rows.unshift({ name: "IDENTITY", ok: z.runs.every((r, i) => r.fingerprint === g.runs[i].fingerprint), text: "a constant shift of 0 equals RULE-GF dive for dive" });
     rows.push({ name: "TUNING CURVE", ok: tuning.curve.length === GRID.length, text: tuning.curve.map((c) => `${c.shift.toFixed(2)}:${c.score.toFixed(3)}`).join(" ") });
     return rows;
