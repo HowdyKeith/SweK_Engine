@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/plannerTolerance-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node tools/ship/plannerTolerance-selfcheck.mjs      (about 6 s: a handful of 100-second dives)
+// Run: node tools/ship/plannerTolerance-selfcheck.mjs      (about 13 s: a handful of 100-second dives)
 //
 // THE GATE OF tools/ship/plannerTolerance.mjs (Round 13 of brain/NEEDS_AND_LIMITS.md, registered first).
 //   1 SETS        1101-1148 and 1161-1208 of far and both (96 dives each, 192 in all), disjoint from every seed of Rounds 1-12; 32 arms in the registered order: TUNED-R8, TWIN-ROUND11, TWIN-EXACT, 24 single arms, 4 combined, the oracle.
