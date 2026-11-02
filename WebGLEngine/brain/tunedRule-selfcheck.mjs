@@ -33,6 +33,13 @@ sec("1. PARAMETERS");
     const thr = (f) => { try { f(); return null; } catch (e) { return e.message; } };
     ok("!! unknown names and non-numbers are refused", /unknown parameter/.test(thr(() => U.normalise({ speed: 1 }))) && /finite number/.test(thr(() => U.normalise({ low: "a" }))) && /finite number/.test(thr(() => U.normalise({ low: NaN }))) && /finite number/.test(thr(() => U.normalise({ low: Infinity }))));
 }
+sec("1b. WIDE BOUNDS (Round 9)");
+{
+    ok("!! WIDE_BOUNDS are the registered ones: only alpha (0.0001-0.02) and ramp (2-60) differ from BOUNDS", J(U.WIDE_BOUNDS) === J({ alpha: [0.0001, 0.02], low: [0.15, 0.6], high: [0.35, 0.95], ramp: [2, 60], cap: [0.6, 0.9] }) && ["low", "high", "cap"].every((k) => J(U.WIDE_BOUNDS[k]) === J(U.BOUNDS[k])));
+    ok("!! normalise with the wide bounds lets alpha fall to 0.0001 and ramp rise to 60; with no bounds argument the old limits still bind", U.normalise({ alpha: 0, ramp: 99 }, U.WIDE_BOUNDS).alpha === 0.0001 && U.normalise({ alpha: 0, ramp: 99 }, U.WIDE_BOUNDS).ramp === 60 && U.normalise({ alpha: 0, ramp: 99 }).alpha === 0.001 && U.normalise({ alpha: 0, ramp: 99 }).ramp === 20);
+    const sc2 = T.scenario(241, "both"), f = (seat) => T.fly(T.flyDecision(seat), sc2, { gauge: T.GAUGE }).fingerprint;
+    ok("!! a seat built with the wide bounds uses them (alpha 0.0003 flies differently from the clamped 0.001) and at the defaults equals the narrow seat", f(U.tunedSeat({ alpha: 0.0003 }, U.WIDE_BOUNDS)) !== f(U.tunedSeat({ alpha: 0.0003 })) && f(U.tunedSeat({}, U.WIDE_BOUNDS)) === f(U.tunedSeat({})));
+}
 sec("2. THRESHOLD");
 {
     const q = U.normalise({ low: 0.2, high: 0.8, ramp: 10 });

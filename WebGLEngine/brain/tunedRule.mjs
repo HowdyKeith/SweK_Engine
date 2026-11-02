@@ -8,16 +8,18 @@ import * as T from "./needsTask.mjs";
 
 export const DEFAULTS = Object.freeze({ alpha: T.FILTER_ALPHA, low: T.OBS_RULE.low, high: T.OBS_RULE.high, ramp: T.OBS_RULE.ramp, cap: T.HULL_DEPTH });
 export const BOUNDS = Object.freeze({ alpha: [0.001, 0.02], low: [0.15, 0.6], high: [0.35, 0.95], ramp: [2, 20], cap: [0.6, 0.9] });
+/** Round 9 (registered): alpha and ramp widened, the rest as in Round 8. */
+export const WIDE_BOUNDS = Object.freeze({ alpha: [0.0001, 0.02], low: [0.15, 0.6], high: [0.35, 0.95], ramp: [2, 60], cap: [0.6, 0.9] });
 export const NAMES = Object.freeze(["alpha", "low", "high", "ramp", "cap"]);
 const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
 
 /** A parameter set inside the bounds, with high held at or above low. Unknown names and non-numbers are refused. */
-export function normalise(p) {
+export function normalise(p, bounds = BOUNDS) {
     const out = { ...DEFAULTS };
     for (const [k, v] of Object.entries(p || {})) {
         if (!NAMES.includes(k)) throw new Error(`tunedRule.normalise: unknown parameter ${JSON.stringify(k)} (${NAMES.join(", ")})`);
         if (typeof v !== "number" || !Number.isFinite(v)) throw new Error(`tunedRule.normalise: ${k} must be a finite number, got ${v}`);
-        out[k] = clamp(v, BOUNDS[k][0], BOUNDS[k][1]);
+        out[k] = clamp(v, bounds[k][0], bounds[k][1]);
     }
     out.high = Math.max(out.high, out.low);
     return out;
@@ -25,8 +27,8 @@ export function normalise(p) {
 /** The surfacing charge at a depth under parameters q. */
 export const thresholdAt = (q, depth) => q.low + (q.high - q.low) * Math.max(0, Math.min(1, 1 - depth / q.ramp));
 
-export function tunedSeat(params) {
-    const q = normalise(params);
+export function tunedSeat(params, bounds = BOUNDS) {
+    const q = normalise(params, bounds);
     return (ctx) => {
         let ema = null;
         return (st, obs) => {
