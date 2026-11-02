@@ -46,7 +46,7 @@ sec("2. ARMS");
     ok("!! an unknown kind, an unregistered count (2, 6) and a bare name are refused", thr("TWIN-FULL@3") && thr("ORACLE@6") && thr("TUNED-R8@2") && thr("TWIN") && thr("ORACLE@"));
 }
 // synthetic: 8 dives a set; per count effects
-const BASE = [0.5, 0.6, 0.7, 0.5, 0.6, 0.7, 0.5, 0.6], mk = (d, tag = "") => ({ runs: BASE.map((b, i) => ({ kind: i % 2 ? "both" : "far", score: b + d[i % d.length], fingerprint: tag + "f" + i })), score: 0, crashed: 0, stranded: 0 });
+const BASE = [0.5, 0.6, 0.7, 0.5, 0.6, 0.7, 0.5, 0.6], mk = (d, tag = "") => { const runs = BASE.map((b, i) => ({ kind: i % 2 ? "both" : "far", score: b + d[i % d.length], fingerprint: tag + "f" + i })); return { runs, score: runs.reduce((x, r) => x + r.score, 0) / runs.length, crashed: 0, stranded: 0 }; };
 const G4 = [0.03, 0.05], H6 = [0.05, 0.07], Z = [0];
 const synth = (spec = {}) => {
     const au = {};
