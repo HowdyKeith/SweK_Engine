@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/subSensedFollowStudy-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node tools/ship/subSensedFollowStudy-selfcheck.mjs      (~30 s)
+// Run: node tools/ship/subSensedFollowStudy-selfcheck.mjs      (~100 s)
 //
 // THE TWO FOLLOW-UP STUDIES OF THE SENSED MAP (tools/ship/subSensedFollowStudy.mjs), held to the registration ("FOLLOW-UP 2" of brain/SENSED_NAV_WIP.md) before HELD7 is flown:
 //   1  THE CONSTANTS   the two output files, the arms of each study and its designated arm, the sets, the thresholds
@@ -8,7 +8,7 @@
 //   3  THE GAP STUDY   the bar (36 of 60), no harm (3 flights, islands and current each), the gain of 10, the verdict over their combinations, D1 to D6 each at its boundary, a missing arm is a miss
 //   4  THE FIX STUDY   closeness (3 flights of `sensed` in each kind, either side), the gain of 5 over sensed+fix, the verdict, E1 to E6 each at its boundary, a missing arm is a miss
 //   5  THE TEXT        the table of each study (kind blocks, the pooled block, the width table for the gap study only), each line of each verdict block reads its own judgement
-//   (follow-up 3 adds the combined study to 1, 2, 5 and 6, and section 4b: its bar, verdict and C1 to C7)
+//   (follow-up 3 adds the combined study to 1, 2, 5 and 6, and section 4b: its bar, verdict and C1 to C7; follow-up 4 adds the realism study to 1, 5 and 6, and section 4c: its bar, verdict and R1 to R8)
 //   6  THE COMMAND     bad arguments (exit 2, named), the scenarios flown by default, a short DEV run of each study end to end, --write goes with held7 only and puts one JSON line a flight, tagged with the study, in that study's file
 //
 // SABOTAGE LOG -- 154 mutants of tools/ship/subSensedFollowStudy.mjs, each run against a copy of this gate, 4 at a time (the scratch-tree runner). ALL 154 RED BY NAME (none by a thrown error), none equivalent:
@@ -21,6 +21,10 @@
 //   the gain (strict, the reference) and the verdict rule; A20-A31 C1 to C7 (each strictness, direction and kind); A32-A42 the dispatch and each line of the combined verdict block; A43-A47 the per-study set check and its messages. (The sabotage run was cut off once by a container restart at 140 of 201 and the remaining 61 were re-run.)
 //   ON THE FIRST RUN ELEVEN WENT 0 RED and the gate grew what separated them: a broached flight counted as `other` and a time-out not (Z25); a cell whose flights carry no ensonified share, offset or plans says NaN (Z30 to Z32); the bar with a harm and a gain of only 6 is NOT SUPPORTED (Z53); a share of exactly 80% of the omniscient sonar's holds (44 of 55: Z60); D5 weighed by FLIGHTS, with unequal numbers of flights per width (Z65), and a width with no flights
 //   read as unreadable even when the other two could be (Z66); a width table whose cells are what was REACHED and not what was flown (Z104); a third bar pattern in the gap verdict text (Z116); and the verdict block printed by --write compared with the judgement of the flights it wrote (Z152: the fix study was being judged by the gap study's rules and nothing noticed).
+// ADDENDUM 2, FOLLOW-UP 4 (the realism study, added AFTER HELD8 was read and BEFORE HELD9 was flown: --study realism, judgeRealism and its section 4c, the realism verdict block and table, the set held9 and the per-study held-set check on it, the realism entries of OUTS, STUDIES, SETS and THRESH; every older row passes unchanged except three regexes that name the study and set lists, which now name realism and held9): 69 NEW MUTANTS Y01-Y69 and the three older ones whose lines moved (Z96, A06, A10) rewritten, with the older mutants on the lines this change touched re-run -- the constants Z01-Z18, A01-A10, the dispatch Z96, the command Z133-Z154 and
+//   A32-A47: 136 IN ALL. 130 RED BY NAME and 6 TIMED OUT -- Z138, A04, A43, A44, A47 and Y04 each let a `--write` or a set the study is not flown on THROUGH, so the gate's call flies a whole HELD set instead of refusing in a few milliseconds and the 900 s limit stops it: caught by NOT FINISHING, counted apart, as in the first addendum. ONE WENT 0 RED ON THE FIRST RUN and the gate grew what separated it: Y15 (the bar written two-sided, within 20% of exact either way) -- the row for a designated arm above exact sat EXACTLY on the 1.2 boundary (50 against 60); it is now 40 against 60. Y01-Y05 the output,
+//   the arms, the designated arm, the held set and the set list; Y06-Y12 the thresholds and the freezing; Y13-Y22 the bar (strict, by product, two-sided, the arm, the reference, a missing exact) and the verdict (two kinds, three, the names, the count); Y23-Y50 R1 to R8 (each strictness, direction, arm and reference, the kind of R5, a missing arm read as zero, the pooled source); Y51-Y52 the dispatch and the text branch; Y53-Y68 each line of the realism verdict block (the kinds, the count, the percent, which judgement each line prints, the thresholds named, the designated arm); Y69 the width block for the realism table.
+//   NOT RE-RUN, and said: the other 134 of the 201 older mutants (the summary, the gap, fix and combined judgements, the table's cells, the older verdict blocks, Z19-Z95, Z97-Z132, A11-A31): their code did not move and rows were only added, so a mutant red before is red now; the gate as a whole passes.
 "use strict";
 import path from "node:path";
 import * as St from "./subSensedFollowStudy.mjs";
