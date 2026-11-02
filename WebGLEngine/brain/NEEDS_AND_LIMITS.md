@@ -710,3 +710,24 @@ Heterogeneity beyond chance across the 12 blocks: about 55 percent (four known b
 
 ## 6. What will be built
 `tools/ship/plannerMeta.mjs` (library: the statistics, the chi-square tail, the block estimates and the report, no file reads), `plannerMetaCmd.mjs` (export-free: `run`, reads the arm files of Rounds 13-17 and Round 12's reported block) and its gate with a mutation pass (the chi-square tail against known values, Q and tau on hand fixtures); then the run once Rounds 16 and 17 have finished, and the result as section 7. **NOT IN THIS ROUND:** any new dive. If the analysis finds heterogeneity, finding its source (the seeds, the kinds, the gauge stream) is a later round, registered separately.
+
+# Round 20 -- does the twin do HARM on the easy kinds? A non-inferiority test on plain and deep (REGISTERED 2026-11-02, before any code and before any of its seeds was flown)
+
+## 1. Why
+Every round from 11 to 19 flew the HARD kinds (far and both), because that is where a planner has something to choose. The survey task has four kinds (plain, deep, far, both). The planner's gain is about +0.01 to +0.02 on the hard two, which makes it worth having only if it costs nothing elsewhere: a fielded seat flies every kind. Round 20 asks the safety question the series skipped: on plain and deep, does the full twin score as well as the tuned rule it sits on? An earlier measurement (Round 11's checks) showed the twin equal to nearest-first dive for dive when it plans nothing different; on the easy kinds it might still pick a different order (damage on the deep kind makes some stations hard to reach, which the planner's feasibility test handles, and a mistake there costs the hull).
+
+## 2. The arms and the sets
+**TUNED-R8** and **TWIN-FULL** (`brain/plannerPerturbed.mjs`, no error, replan 120 s, unlimited look-ahead, gauge sd 0.10, three stations), plus **TWIN-ROUND11** as the identity. **R1 2201-2248 and R2 2261-2308**, all four kinds (plain, deep, far, both), 48 seeds each: 192 dives per set, **384 dives per arm, 96 per kind**, read once, no seed used by any earlier round. (The far and both dives re-measure the gain on yet other seeds; they are part of the meta-analysis of Round 19 only if it is rerun, which this round does not do.)
+
+## 3. The checks
+TWIN-FULL equals the Round 11 twin dive for dive on every set; **the gain on the hard kinds (far and both together) is not NEGATIVE beyond 2 se** (else the twin is broken on these seeds and the easy-kind reading means nothing; it need not be REAL here).
+
+## 4. The verdicts (pooled paired difference twin minus TUNED-R8, per kind, 96 dives each)
+* Per kind: **HURTS** iff the difference is negative by more than 2 se; **NON-INFERIOR** iff its lower bound (mean minus 2 se) is above **-0.01** (a margin of one percent of the score, set before the data); **UNDECIDED** otherwise (neither hurts nor is shown harmless). Also reported: the mean, se, better/worse/same.
+* **BOTTOM LINE:** `THE TWIN DOES NO HARM ON THE EASY KINDS` iff plain and deep are both NON-INFERIOR; `THE TWIN HURTS ON <kinds>` iff any easy kind HURTS (naming them); `THE TWIN IS NOT SHOWN HARMLESS ON <kinds>` otherwise. A second line gives the same reading for far and both.
+
+## 5. Expectations, recorded BEFORE any seed is flown
+Plain: the twin and the tuned rule fly the same dive on almost every one (95 percent or more identical): about 85; NON-INFERIOR: about 95. Deep: NON-INFERIOR about 80, HURTS about 6, UNDECIDED about 14 (damage makes the order matter; the twin sees it). The gain on deep is real and positive: about 20. Far and both are NON-INFERIOR, and the gain on far-and-both together is positive: about 85. Bottom line: NO HARM about 78, HURTS about 6, NOT SHOWN HARMLESS about 16.
+
+## 6. What will be built
+`tools/ship/plannerEasy.mjs` (library built on plannerReplicate's pooled reading), `plannerEasyCmd.mjs` (export-free: `run`, parallel by arm) and its gate with a mutation pass; then the run (3 arms x 384 dives: the twin about 3 s a dive: about 20 minutes on four cores), after the queued rounds have finished, and the result as section 7. **NOT IN THIS ROUND:** a different margin (the 0.01 is fixed), retuning, the oracle.
