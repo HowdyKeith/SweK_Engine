@@ -40,7 +40,7 @@ export function stationSeat(params, choice = null) {
     const q = U.normalise(params, U.WIDE_BOUNDS), w = choice && choice.w ? choice.w : null, lin = choice && choice.lin ? choice.lin : null;
     if (w && w.length !== N_WEIGHTS) throw new Error(`stationResidual.stationSeat: ${N_WEIGHTS} weights expected, got ${w.length}`);
     return (ctx) => {
-        let ema = null, current = null;
+        let ema = null, current = -1;   // the index in obs.stations of last tick's choice (the station objects are rebuilt every tick, so identity would never match)
         const stats = { ticks: 0, switches: 0 };
         const seat = (st, obs) => {
             ema = ema === null ? obs.r.frac : ema + q.alpha * (obs.r.frac - ema);
@@ -53,12 +53,13 @@ export function stationSeat(params, choice = null) {
                 let bestScore = -Infinity;
                 for (const s of open) {
                     let extra = 0;
-                    if (w || lin) { const f = features(st, obs, ema, s, open, dmin, s === current); extra = w ? netExtra(w, f) : linExtra(lin, f); }
+                    if (w || lin) { const f = features(st, obs, ema, s, open, dmin, obs.stations.indexOf(s) === current); extra = w ? netExtra(w, f) : linExtra(lin, f); }
                     const score = -dist(st, s) + SCALE * extra;
                     if (score > bestScore) { bestScore = score; station = s; }
                 }
             }
-            stats.ticks++; if (station !== current) { if (current !== null && station !== null) stats.switches++; current = station; }
+            const now = station ? obs.stations.indexOf(station) : -1;
+            stats.ticks++; if (now !== current) { if (current >= 0 && now >= 0) stats.switches++; current = now; }
             const surface = T.lastCall(obs) || !station || ema < U.thresholdAt(q, r.depth);
             return { surface, station, cap: q.cap, pump, repair };
         };

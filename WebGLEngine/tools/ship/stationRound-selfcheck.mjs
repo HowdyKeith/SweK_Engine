@@ -46,8 +46,8 @@ sec("2. ARMS");
     const seed271 = [T.scenario(271, "far"), T.scenario(272, "far")];
     ok("!! STATION-ZERO is TUNED-R8 dive for dive; a champion with non-zero output weights is not", fp("STATION-ZERO", {}, seed271) === fp("TUNED-R8", {}, seed271) && fp("STATION-RESIDUAL", { weights: Array.from(w) }, seed271) !== fp("TUNED-R8", {}, seed271));
     ok("!! the arms say what they need and unknown arms (and the oracle) are refused", /parameters \(r8\)/.test(thr(() => X.pilotOf("TUNED-R8"))) && /champion weights/.test(thr(() => X.pilotOf("STATION-RESIDUAL", { r8: R8 }))) && /champion weights/.test(thr(() => X.pilotOf("STATION-SHUFFLED", { r8: R8 }))) && /preference/.test(thr(() => X.pilotOf("CONST-LINEAR", { r8: R8 }))) && /unknown arm/.test(thr(() => X.pilotOf("NOPE", { r8: R8 }))) && /oracleRuns/.test(thr(() => X.pilotOf("ORACLE-ORDER", { r8: R8 }))));
-    const sh = X.shuffled(w);
-    ok("!! the shuffle keeps the multiset of weights and the whole output layer, moves hidden unit 0's row and bias to unit 1", J(Array.from(sh).sort()) === J(Array.from(w).sort()) && Array.from(sh.slice(S.OUT_START)).every((x, i) => x === w[S.OUT_START + i]) && Array.from({ length: S.N_IN }, (_, i) => sh[S.N_IN + i] === w[i]).every(Boolean) && sh[S.N_W1 + 1] === w[S.N_W1] && sh[S.N_W1] === w[S.N_W1 + 7]);
+    const wb = Float64Array.from(w); for (let j = 0; j < S.N_HID; j++) wb[S.N_W1 + j] = 0.1 * (j + 1); const sh = X.shuffled(w), shb = X.shuffled(wb);
+    ok("!! the shuffle keeps the multiset of weights and the whole output layer, moves hidden unit 0's row and bias to unit 1", J(Array.from(sh).sort()) === J(Array.from(w).sort()) && Array.from(sh.slice(S.OUT_START)).every((x, i) => x === w[S.OUT_START + i]) && Array.from({ length: S.N_IN }, (_, i) => sh[S.N_IN + i] === w[i]).every(Boolean) && sh[S.N_W1 + 1] === w[S.N_W1] && sh[S.N_W1] === w[S.N_W1 + 7] && shb[S.N_W1 + 1] === 0.1 && shb[S.N_W1] === 0.8 && shb[S.N_W1 + 2] === 0.2);
     ok("!! the shuffled net decides differently from the champion (on some dive of a few) and CONST-LINEAR runs its preference", [271, 272, 273, 274, 275, 276].some((sd) => fp("STATION-SHUFFLED", { weights: Array.from(w) }, [T.scenario(sd, "far")]) !== fp("STATION-RESIDUAL", { weights: Array.from(w) }, [T.scenario(sd, "far")])) && fp("CONST-LINEAR", { lin: { a: 1, b: -1 } }, [T.scenario(272, "far")]) !== fp("TUNED-R8", {}, [T.scenario(272, "far")]));
 }
 sec("3. ORACLE");
@@ -55,7 +55,7 @@ sec("3. ORACLE");
     const o = X.oracleRun(R8, T.scenario(271, "far")), n = X.scoreOf("TUNED-R8", { r8: R8 }, gainDive).score;
     ok("!! on a dive known to gain from another order the oracle is above nearest-first (far 271: 0.70 to 0.85)", n < 0.71 && o.score > 0.84 && o.kind === "far", n.toFixed(3) + " -> " + o.score.toFixed(3));
     const plain = T.scenario(241, "plain");
-    ok("!! on a dive where nearest-first is already perfect the oracle is the same (never below nearest-first)", X.oracleRun(R8, plain).score >= X.scoreOf("TUNED-R8", { r8: R8 }, [plain]).score && X.oracleRun(R8, plain).score === 1);
+    ok("!! on a dive where nearest-first is already perfect the oracle is the same (never below nearest-first)", X.oracleRun(R8, plain).score >= X.scoreOf("TUNED-R8", { r8: R8 }, [plain]).score && X.oracleRun(R8, plain).score === 1 && X.oracleRun(R8, plain).fingerprint === X.scoreOf("TUNED-R8", { r8: R8 }, [plain]).runs[0].fingerprint);
     const set = [T.scenario(271, "far"), T.scenario(272, "far")], os = X.oracleRuns(R8, set);
     ok("!! oracleRuns is the per-dive oracle: runs in set order, the mean score, crushed and stranded counted", os.runs.length === 2 && Math.abs(os.score - (os.runs[0].score + os.runs[1].score) / 2) < 1e-12 && os.runs[0].score === o.score && os.crashed === 0 && os.stranded === 0 && os.runs.every((r) => r.fingerprint));
 }
@@ -65,6 +65,8 @@ sec("4. SEARCH");
     ok("!! a search is deterministic, checkpoint 0 is the zero weights, checkpoints every 2nd, trace has iters + 1 entries", J(Array.from(a.best)) === J(Array.from(b.best)) && J(a.trace) === J(b.trace) && J(a.checkpoints.map((x) => x.iter)) === J([0, 2, 4]) && J(Array.from(a.checkpoints[0].weights)) === J(Array.from(S.startWeights())) && a.trace.length === 5);
     const hard = X.search(11, R8, { ...X.RECIPE, sigma: 5, maxK: 20, iters: 6, checkpointEvery: 6 }, gainDive);
     ok("!! with a violent sigma the held score never falls", hard.trace.every((x, i) => i === 0 || x >= hard.trace[i - 1]) && hard.bestScore >= hard.trace[0] && hard.trace.length === 7);
+    const mixed = [T.scenario(281, "far"), T.scenario(273, "both"), T.scenario(272, "far"), T.scenario(275, "both")], wild = X.search(15, R8, { ...X.RECIPE, sigma: 5, maxK: 20, iters: 8, checkpointEvery: 8 }, mixed);
+    ok("!! on a set where changes help and hurt, the held score is the running maximum (never lower than an earlier one), equals the best weights' own score, and ends above the start", wild.trace.every((x, i) => x >= Math.max(...wild.trace.slice(0, i + 1)) - 1e-12) && Math.abs(T.evaluate(T.flyDecision(S.stationSeat(R8, { w: wild.best })), mixed, { gauge: T.GAUGE }).score - wild.trace[wild.trace.length - 1]) < 1e-12 && wild.trace[8] > wild.trace[0], wild.trace.map((x) => x.toFixed(3)).join(" "));
     const drift = X.search(12, R8, { ...X.RECIPE, iters: 24, checkpointEvery: 24 }, flat), moved = Array.from(drift.best).filter((x, i) => x !== S.startWeights()[i]).length;
     ok("!! children come from the CURRENT best: on a flat objective (every child accepted) more than maxK weights have moved after 24 iterations", moved > X.RECIPE.maxK, "moved " + moved);
 }
@@ -76,6 +78,8 @@ sec("5. CHAMPION AND CONTROL");
     ok("!! the start stands unless a checkpoint beats it on VALIDATION, whatever its train score", sc(other) > sc(start) ? ch.iter === 30 && ch.validation === sc(other) : ch.from === "start" && ch.iter === 0, J([sc(start), sc(other)]));
     const tie = X.champion([{ seed: 1, checkpoints: [{ iter: 30, weights: Array.from(start), trainScore: 9 }] }], R8, val);
     ok("!! a checkpoint that only TIES the start does not displace it; the start's validation score is reported", tie.from === "start" && tie.iter === 0 && tie.startValidation === sc(start));
+    const g281 = [T.scenario(281, "far")], tl = X.tuneLinear(R8, g281, [{ a: 0, b: 0 }, { a: 0, b: 1 }, { a: 1, b: 0 }, { a: -1, b: 0 }]);
+    ok("!! the preference control picks the best entry (a = 1 and a = -1 both reach 0.85 on far 281, the others 0.70), ties to the EARLIER one, and a = 0 b = 0 is nearest-first (0.70)", tl.validation > 0.84 && J(tl.lin) === J({ a: 1, b: 0 }) && tl.curve[0].score < 0.71 && tl.curve[3].score > 0.84);
     const lt = X.tuneLinear(R8, val, [{ a: 0, b: 0 }, { a: 1, b: -1 }, { a: -1, b: 1 }]), scs = lt.curve.map((c) => c.score);
     ok("!! the preference control takes the best validation mean on the grid it was given (ties to the earlier entry) and lists the whole curve", lt.curve.length === 3 && lt.validation === Math.max(...scs) && J(lt.lin) === J({ a: lt.curve[scs.indexOf(Math.max(...scs))].a, b: lt.curve[scs.indexOf(Math.max(...scs))].b }) && lt.curve[0].score === sc(start));
 }
@@ -91,11 +95,11 @@ sec("7. REPORT (synthetic audits)");
 {
     const mk = (f, fpr = "f") => ({ runs: [0, 1, 2].flatMap(() => X.HARD.map((kind) => ({ kind, score: f, fingerprint: fpr }))), score: f, crashed: 0, stranded: 0 });
     const au1 = (s) => Object.fromEntries(X.ARMS.map((a) => [a, mk(s[a])])), aud = (s) => Object.fromEntries(X.AUDIT_NAMES.map((n) => [n, au1(s)]));
-    const sc = { "TUNED-R8": 0.8, "STATION-RESIDUAL": 0.85, "STATION-ZERO": 0.8, "STATION-SHUFFLED": 0.8, "CONST-LINEAR": 0.8, "ORACLE-ORDER": 0.9 };
+    const sc = { "TUNED-R8": 0.8, "STATION-RESIDUAL": 0.85, "STATION-ZERO": 0.78, "STATION-SHUFFLED": 0.82, "CONST-LINEAR": 0.81, "ORACLE-ORDER": 0.9 };
     const champ = { from: "search 65001", iter: 90, validation: 0.9, startValidation: 0.8 }, lin = { lin: { a: 0.5, b: -1 }, validation: 0.82 };
     const L = X.report(aud(sc), champ, lin, [{}, {}, {}], { switches: 1.25 });
     ok("!! the champion line names the validation scores, the constant preference and BEFORE the audits", /champion: search 65001 at iteration 90, validation 0\.9000 against the start's 0\.8000; 3 searches; constant preference a 0\.5, b -1 \(validation 0\.8200\); both chosen BEFORE the audits/.test(L[1]));
-    ok("!! the verdict lines compare the right arms: RESIDUAL +0.050 against TUNED-R8, +0.050 against SHUFFLED, +0.050 against CONST-LINEAR, the oracle +0.100 against TUNED-R8", L.some((l) => /^RESIDUAL against TUNED-R8: \+0\.050 WINS \| \+0\.050 WINS \| \+0\.050 WINS = BEATS/.test(l)) && L.some((l) => /^RESIDUAL against SHUFFLED.*\+0\.050 WINS.* = BEATS/.test(l)) && L.some((l) => /^RESIDUAL against CONST-LINEAR.*\+0\.050 WINS.* = BEATS/.test(l)) && L.some((l) => /^ORACLE-ORDER against TUNED-R8.*\+0\.100 WINS/.test(l)) && L.some((l) => /^CONST-LINEAR against TUNED-R8 \(reported\): \+0\.000 tie/.test(l)));
+    ok("!! the verdict lines compare the right arms: RESIDUAL +0.050 against TUNED-R8, +0.030 against SHUFFLED, +0.040 against CONST-LINEAR, CONST-LINEAR +0.010 against TUNED-R8, the oracle +0.100 against TUNED-R8", L.some((l) => /^RESIDUAL against TUNED-R8: \+0\.050 WINS \| \+0\.050 WINS \| \+0\.050 WINS = BEATS/.test(l)) && L.some((l) => /^RESIDUAL against SHUFFLED.*\+0\.030 WINS.* = BEATS/.test(l)) && L.some((l) => /^RESIDUAL against CONST-LINEAR.*\+0\.040 WINS.* = BEATS/.test(l)) && L.some((l) => /^ORACLE-ORDER against TUNED-R8.*\+0\.100 WINS/.test(l)) && L.some((l) => /^CONST-LINEAR against TUNED-R8 \(reported\): \+0\.010 tie/.test(l)));
     ok("!! the share of the oracle gap closed (0.50 each audit), the switches line, and a generated BOTTOM LINE", L.some((l) => /^share of the oracle gap closed by RESIDUAL: 0\.50 \| 0\.50 \| 0\.50/.test(l)) && L.some((l) => /^station switches per dive \(champion\): 1\.25/.test(l)) && /^BOTTOM LINE: A SITUATION-DEPENDENT RESIDUAL IMPROVES THE TUNED RULE/.test(L[L.length - 1]));
     const L2 = X.report(aud({ ...sc, "CONST-LINEAR": 0.85 }), champ, lin, [], {});
     ok("!! a fixed preference as good as the residual reads A SIMPLE PREFERENCE EXPLAINS IT, and the switches line is absent when not given", /BOTTOM LINE: A SIMPLE PREFERENCE EXPLAINS IT/.test(L2[L2.length - 1]) && !L2.some((l) => /^station switches/.test(l)));

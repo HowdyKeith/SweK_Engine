@@ -64,6 +64,20 @@ sec("3. CHOICE");
     ok("!! a hand-wired net reading the depth feature (one hidden unit, positive output weight) prefers the deeper station like the linear preference", pick(R8, { w }, [near, deep]).station.x === 80, J(pick(R8, { w }, [near, deep]).station));
     ok("!! a wrong weight count is refused", (() => { try { S.stationSeat(R8, { w: new Float64Array(5) }); return false; } catch (e) { return /81 weights/.test(e.message); } })());
 }
+{
+    const near = { x: 50, y: 0, depth: 12 }, far2 = { x: 400, y: 0, depth: 12 };
+    const two = S.stationSeat(R8, null)({}); two(st0, obsOf([near], { frac: 0.9, flood: 0.01, damage: 0.2 })); const d2 = two(st0, obsOf([near], { frac: 0.05, flood: 0.01, damage: 0.2 }));
+    ok("!! pump follows the FILTERED charge: after a 0.9 reading a raw 0.05 gauge does not switch the pump off (the average is still above 0.1)", d2.pump === true);
+    const dive = S.stationSeat(R8, null)({})({ pos: [0, 0, -12] }, obsOf([near], { frac: 0.9, flood: 0.01, damage: 0.2 })), top = S.stationSeat(R8, null)({})({ pos: [0, 0, -1] }, obsOf([near], { frac: 0.9, flood: 0.01, damage: 0.2 }));
+    ok("!! repair only at the surface (depth under RETURN_DEPTH) with damage and charge; the pump needs flooding", dive.repair === false && top.repair === true && dive.pump === true && S.stationSeat(R8, null)({})(st0, obsOf([near], { frac: 0.9, flood: 0, damage: 0 })).pump === false);
+    const w = S.startWeights(); w.fill(0, 0, S.OUT_START); w[5] = 1; w[S.OUT_START] = 1;   // hidden 0 reads the is-current feature; output 1: +100 x tanh(tanh(1)) = about +64 m for the current choice
+    const A2 = { x: 50, y: 0, depth: 12 }, B2 = { x: 60, y: 0, depth: 12 }, keep = S.stationSeat(R8, { w })({}), plain2 = S.stationSeat(R8, null)({});
+    keep(st0, obsOf([A2, B2])); plain2(st0, obsOf([A2, B2]));
+    const stNear = { pos: [56, 0, -12] };
+    ok("!! the is-current feature gives the net a memory of its choice: a +64 m bonus keeps station A when B becomes 2 m nearer, where nearest-first switches", keep(stNear, obsOf([A2, B2])).station.x === 50 && plain2(stNear, obsOf([A2, B2])).station.x === 60);
+    const sw = S.stationSeat(R8, null)({}); sw(st0, obsOf([A2, B2])); const first = sw.stats.switches; sw(stNear, obsOf([A2, B2]));
+    ok("!! stats.switches counts changes from one chosen station to another: 0 after the first choice, 1 after a switch", first === 0 && sw.stats.switches === 1 && sw.stats.ticks === 2);
+}
 sec("4. DIVES");
 {
     const sc = T.scenario(272, "far"), rule = T.fly(T.flyDecision(U.tunedSeat(R8, U.WIDE_BOUNDS)), sc, { gauge: T.GAUGE });
