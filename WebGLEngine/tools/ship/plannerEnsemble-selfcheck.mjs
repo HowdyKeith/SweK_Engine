@@ -24,6 +24,8 @@ const J = JSON.stringify;
 import * as T from "../../brain/needsTask.mjs";
 import * as U from "../../brain/tunedRule.mjs";
 import * as Q from "../../brain/plannerPerturbed.mjs";
+import * as N from "../../physics/mechanics/subNeeds.mjs";
+import { startOf } from "./plannerRound.mjs";
 import * as X from "./plannerEnsemble.mjs";
 console.log("plannerEnsemble-selfcheck -- the Round 23 risk-aware twin\n");
 const code = fs.readFileSync(new URL("./plannerEnsemble.mjs", import.meta.url), "utf8").split("\n").filter((l) => !/^\s*\/\//.test(l)).join("\n");
@@ -67,7 +69,7 @@ sec("4. LINES");
 {
     const L = (spec) => X.bottomLines(synth(spec));
     ok("!! equal to the twin: DOES NOT BEAT and DOES NOT HURT", J(L({})) === J(["RISK-AWARE PLANNING DOES NOT BEAT THE POINT-ESTIMATE TWIN", "RISK-AWARE PLANNING DOES NOT HURT"]));
-    ok("!! a better arm is named (several in order); a worse arm is named in the second line; both can hold", L({ "ENS-0.05": { d: MORE } })[0] === "RISK-AWARE PLANNING BEATS THE POINT-ESTIMATE TWIN (ENS-0.05)" && L({ "ENS-0.05": { d: MORE }, "ENS-0.20": { d: MORE } })[0] === "RISK-AWARE PLANNING BEATS THE POINT-ESTIMATE TWIN (ENS-0.05, ENS-0.20)" && L({ "ENS-0.20": { d: HURT } })[1] === "RISK-AWARE PLANNING HURTS (ENS-0.20)" && J(L({ "ENS-0.05": { d: MORE }, "ENS-0.10": { d: HURT } })) === J(["RISK-AWARE PLANNING BEATS THE POINT-ESTIMATE TWIN (ENS-0.05)", "RISK-AWARE PLANNING HURTS (ENS-0.10)"]));
+    ok("!! a better arm is named (several in order); a worse arm is named in the second line; both can hold", L({ "ENS-0.05": { d: MORE } })[0] === "RISK-AWARE PLANNING BEATS THE POINT-ESTIMATE TWIN (ENS-0.05)" && L({ "ENS-0.05": { d: MORE }, "ENS-0.20": { d: MORE } })[0] === "RISK-AWARE PLANNING BEATS THE POINT-ESTIMATE TWIN (ENS-0.05, ENS-0.20)" && L({ "ENS-0.20": { d: HURT } })[1] === "RISK-AWARE PLANNING HURTS (ENS-0.20)" && J(L({ "ENS-0.05": { d: MORE }, "ENS-0.10": { d: HURT } })) === J(["RISK-AWARE PLANNING BEATS THE POINT-ESTIMATE TWIN (ENS-0.05)", "RISK-AWARE PLANNING HURTS (ENS-0.10)"]) && L({ "ENS-0.10": { d: HURT }, "ENS-0.20": { d: HURT } })[1] === "RISK-AWARE PLANNING HURTS (ENS-0.10, ENS-0.20)");
 }
 sec("5. CHECKS");
 {
@@ -85,6 +87,8 @@ sec("6. REPORT");
     const L = X.report(synth({ "ENS-0.05": { d: MORE }, "ENS-0.20": { d: HURT } })), txt = L.join("\n");
     ok("!! the head names both sets; the three checks pass first; the twin's line carries its gain and cost (1050)", /^ROUND 23/.test(L[0]) && L[0].includes("E1 3501-3650") && L[0].includes("E2 3701-3850") && L.slice(1, 4).every((l) => /^  PASS /.test(l)) && /TWIN-FULL minus TUNED-R8: \+0\.10.*cost 1050 rollout seconds per dive/.test(txt));
     ok("!! one row per ensemble arm with its verdict, its relation to the twin (value and se) and its cost: ENS-0.05 KEEPS BETTER at +0.05 over the twin, ENS-0.20 HURTS WORSE", /ENS-0\.05 .*KEEPS +BETTER +vs the twin \+0\.0500 \(se 0\.0[0-9]+\) +cost 3150/.test(txt) && /ENS-0\.10 .*KEEPS +SAME +vs the twin [+-]0\.0000/.test(txt) && /ENS-0\.20 .*HURTS +WORSE +vs the twin -0\.2/.test(txt));
+    const lower = X.report(synth({ "ENS-0.05": { d: KEEP.map((x) => x / 2) } })).join("\n");
+    ok("!! an arm that keeps a gain over the tuned rule but is BELOW the twin prints the negative difference from the twin (-0.0500), not a plus sign from its own gain", /ENS-0\.05 .*KEEPS +WORSE +vs the twin -0\.0500/.test(lower) && !/vs the twin \+-/.test(lower));
     ok("!! the two bottom lines come last", L[L.length - 2] === "BOTTOM LINE: RISK-AWARE PLANNING BEATS THE POINT-ESTIMATE TWIN (ENS-0.05)" && L[L.length - 1] === "BOTTOM LINE: RISK-AWARE PLANNING HURTS (ENS-0.20)");
     const bad = synth(); bad.E1["TWIN-ROUND11"].runs[0].fingerprint = "x"; const Lb = X.report(bad);
     ok("!! a failed check puts FAIL on its row, says the verdicts are NOT WEIGHED and puts that on a single bottom line", Lb.some((l) => /^  FAIL IDENTITY E1/.test(l)) && Lb.includes("A CHECK FAILED: the verdicts below are NOT WEIGHED.") && Lb[Lb.length - 1] === "BOTTOM LINE: NOT WEIGHED (a check failed)" && Lb.filter((l) => l.startsWith("BOTTOM LINE")).length === 1);
@@ -104,8 +108,23 @@ sec("7. FLIGHT");
     const full = fl("TWIN-FULL"), r11 = fl("TWIN-ROUND11"), tuned = fl("TUNED-R8"), e1 = fl("ENS-0.10");
     ok("!! flySets returns E1 and E2, four dives each; a twin arm carries cost and plans, the tuned rule neither; the ensemble costs more than the twin", J(Object.keys(full)) === J(["E1", "E2"]) && full.E1.runs.length === 4 && tuned.E1.cost === undefined && e1.E1.cost > full.E1.cost * 2);
     ok("!! the point-estimate twin equals the Round 11 twin dive for dive on 100-second dives; the tuned rule is T.evaluate's with the noisy gauge", ["E1", "E2"].every((n) => full[n].runs.every((r, i) => r.fingerprint === r11[n].runs[i].fingerprint)) && tuned.E1.runs.every((r, i) => r.fingerprint === T.evaluate(T.flyDecision(U.tunedSeat(R8, U.WIDE_BOUNDS)), T.setOf(X.HARD, 1344, 1345), { gauge: T.GAUGE, seconds: 100 }).runs[i].fingerprint));
+    const one = X.flyArm("TWIN-FULL", R8, T.setOf(["far"], 1344, 1344)), two = X.flyArm("TWIN-FULL", R8, T.setOf(["far"], 1345, 1345)), pair = X.flyArm("TWIN-FULL", R8, T.setOf(["far"], 1344, 1345));
+    ok("!! a set's cost and plan count are the MEAN over its dives, exactly: far 1344 and far 1345 over 100 s schedule 782 and 726.5 rollout seconds (2 plans each), so the pair is 754.25 and 2", one.cost === 782 && two.cost === 726.5 && pair.cost === 754.25 && one.plans === 2 && pair.plans === 2);
     X.setFlight({});
     ok("!! assemble keys sets then arms", J(Object.keys(X.assemble({ A: full, B: tuned }).E2)) === J(["A", "B"]) && X.assemble({ A: full }).E1.A === full.E1 && X.assemble({ A: full }).E2.A === full.E2);
+}
+sec("7b. THE ENSEMBLE'S ARITHMETIC");
+{
+    const sc = T.scenario(3501, "both"), x = startOf(sc), stations = sc.stations.map((q) => ({ x: q.x, y: q.y, depth: q.depth, visited: false })), obs = { t: 0, stations, r: N.readings(x.model, x.nd, x.st) };
+    const q = U.normalise(R8, U.WIDE_BOUNDS), cap = N.CLASSES[T.CLASS].capacityJ, ema = sc.frac0, clamp01 = (v) => Math.max(0, Math.min(1, v));
+    const nd = (o) => ({ ...N.initialNeeds(T.CLASS, { crushDepth: T.CRUSH }), energy: clamp01(ema * (1 + o)) * cap, damage: obs.r.damage, flood: obs.r.flood || 0 });
+    const roll = (o, order) => Q.rollout(x.model, x.st, nd(o), stations, 0, order, q, Q.errOf({}), 600);
+    const plan = (ens) => Q.twinPlan(x.model, x.st, obs, ema, q, Q.errOf({}), -1, 600, ens);
+    const single = plan([0]), triple = plan([-0.5, 0, 0.5]), same3 = plan([0, 0, 0]), same2 = plan([0, 0]);
+    ok("!! an ensemble is the MEAN of the rollouts, not the sum and not a fixed divisor: [0, 0] and [0, 0, 0] give exactly the single plan's values, and the single plan's nearest value is the manual rollout plus the 1e-6 tie bonus (both 3501, 600 s: 0.775 at the point estimate)", Object.keys(single.values).every((k) => Math.abs(same2.values[k] - single.values[k]) < 1e-12 && Math.abs(same3.values[k] - single.values[k]) < 1e-12) && Object.keys(same3.values).length === Object.keys(single.values).length && Math.abs(single.values.nearest - (roll(0, null) + 1e-6)) < 1e-12);
+    const manual = (order) => ([-0.5, 0, 0.5].reduce((a, o) => a + roll(o, order), 0) / 3);
+    ok("!! with the offsets -0.5, 0, +0.5 the value of nearest-first is the mean of THREE rollouts (each at its own starting energy, the first not standing in for the others) and so is every order's (two open stations here: 1>0 and 0>1 besides nearest-first)", Math.abs(triple.values.nearest - (manual(null) + 1e-6)) < 1e-12 && Object.keys(triple.values).filter((k) => k !== "nearest").every((k) => Math.abs(triple.values[k] - manual(k.split(">").map(Number))) < 1e-12) && Object.keys(triple.values).length === 3);
+    ok("!! the offsets matter: the three rollouts of nearest-first differ (the starting energies -0.5, 0, +0.5 give different scores), so the mean is not the first one's (both 3501: 0.550, 0.775 and 1.000; the mean 0.775)", new Set([-0.5, 0, 0.5].map((o) => roll(o, null))).size >= 2 && Math.abs(manual(null) - roll(-0.5, null)) > 1e-6);
 }
 sec("8. SOURCE");
 {
