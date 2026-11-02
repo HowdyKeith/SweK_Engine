@@ -47,6 +47,8 @@ sec("2. ARMS");
     ok("!! the champion's dives differ from the start's for a non-zero weight vector", score("RESIDUAL") !== score("RESIDUAL-ZERO"));
     const sh = X.shuffled(w);
     ok("!! the shuffled control keeps the multiset of weights, moves the hidden units and changes the dives", J(Array.from(sh).sort()) === J(Array.from(w).sort()) && J(Array.from(sh)) !== J(Array.from(w)) && Array.from(sh.slice(R.OUT_START)).every((x, i) => x === w[R.OUT_START + i]) && score("SHUFFLED-RESIDUAL") !== score("RESIDUAL"));
+    const wb = Float64Array.from(w); wb[R.N_W1 + 0] = 0.7; const sb = X.shuffled(wb);
+    ok("!! the shuffle moves each hidden unit's BIAS with its row (unit 0's bias lands where its row did)", sb[R.N_W1 + 1] === 0.7 && sb[R.N_W1] !== 0.7);
     ok("!! an unknown arm is refused", (() => { try { X.pilotOf("NOPE"); return false; } catch (e) { return /unknown arm/.test(e.message); } })());
 }
 sec("3. SEARCH");
@@ -89,6 +91,12 @@ sec("6. REPORT (small audit ranges)");
     const small = { R1: [301, 301], R2: [321, 321], R3: [341, 341] }, w = Float64Array.from(R.startWeights()); w[R.OUT_START + R.N_W2 + 1] = 1;
     const au = X.audits(w, { ranges: small });
     ok("!! the audits fly every arm on the three ranges asked for (4 dives each here)", J(Object.keys(au)) === J(["R1", "R2", "R3"]) && Object.values(au).every((a) => J(Object.keys(a)) === J(X.ARMS) && a.ALONE.runs.length === 4) && au.R2.ALONE.runs.every((r, i) => T.setOf(T.KINDS, 321, 321)[i].kind === r.kind));
+    {
+        const mk = (scores) => ({ runs: [0, 1, 2].flatMap(() => ["plain", "deep", "far", "both"].map((kind, i) => ({ kind, score: scores[i], fingerprint: "f" }))), score: 0, crashed: 0, stranded: 0 });
+        const syn = { ALONE: mk([0.5, 0.5, 0.5, 0.1]), "RULE-GF": mk([0.5, 0.5, 0.5, 0.9]), "RESIDUAL-ZERO": mk([0.5, 0.5, 0.5, 0.9]) };
+        const row = X.checksOf({ R1: syn, R2: syn, R3: syn }).find((c) => c.name === "RULE NOT TRIVIAL R1");
+        ok("!! the rule-not-trivial check reads far AND both (a rule that wins only on both still passes; one that wins on neither fails)", row.ok && !X.checksOf({ R1: { ...syn, "RULE-GF": mk([0.9, 0.9, 0.5, 0.1]) }, R2: syn, R3: syn }).find((c) => c.name === "RULE NOT TRIVIAL R1").ok);
+    }
     const champ = { from: "start", iter: 0, validation: 0.8, startValidation: 0.8 }, L = X.report(au, champ, []);
     ok("!! the checks come before the means and the verdicts and the identity check passes on every audit", L.findIndex((l) => /IDENTITY R1/.test(l)) < L.findIndex((l) => /^means/.test(l)) && L.filter((l) => /PASS IDENTITY/.test(l)).length === 3);
     ok("!! the report names the champion and says it was chosen before the audits", /champion: start/.test(L[1]) && /BEFORE the audits/.test(L[1]));

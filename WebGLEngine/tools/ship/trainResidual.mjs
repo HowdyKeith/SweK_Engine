@@ -62,7 +62,6 @@ export function champion(searches, validation = VALIDATION) {
     const start = R.startWeights(), startScore = scoreOn("RESIDUAL", start, validation).score;
     let best = { weights: start, validation: startScore, from: "start", iter: 0 };
     for (const s of searches) for (const c of s.checkpoints) {
-        if (c.iter === 0) continue;
         const v = scoreOn("RESIDUAL", c.weights, validation).score;
         if (v > best.validation) best = { weights: c.weights, validation: v, from: `search ${s.seed}`, iter: c.iter };
     }
