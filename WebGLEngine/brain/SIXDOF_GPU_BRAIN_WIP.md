@@ -108,3 +108,45 @@ chat owns: none of the active branches changes a 6-DOF, jet or GPU Brain file (c
 
 About 13 ms a duel, so a search is about 18,000 duels (4 minutes) plus its prune passes. Five searches take about 15 to 25
 minutes on four workers.
+
+## Built, 2026-11-02, before the registered run (nothing of the registration above is changed)
+
+**What exists:**
+- `brain/pilot6dofMlp.mjs` and its gate, `brain/pilot6dofMlp-selfcheck.mjs`.
+- `tools/ship/train6dofMlp.mjs` (the library), with `tools/ship/trainMlp6dof.mjs` (the command) and the gate
+  `tools/ship/train6dofMlp-selfcheck.mjs`.
+- In `brain/pilot6dofPolicy.mjs`: `duel()` takes a pilot function, and `featuresFrom()` is exported. Its gate has a new
+  section for both, and its fingerprints did not move.
+- The backlog entry `sixdof-gpu-brain-pilot`.
+
+**C-twin holds in the gate.** Over 300 random states the hand MLP's five outputs equal the fruit fly's hand pilot's to the
+bit, and on all 20 train and held-out seeds the duel fingerprints are the same. The hand MLP's held-out tally is the
+fruit fly's: 18.60 (W0/L0/D8).
+
+**How the run is shaped.**
+- The command writes `brain/sixdofGpuBrainResults.json` and prints no score. That file is committed before it is read.
+- The weight file is a separate, later step, `--write-from` that committed file, and only if the champion qualified.
+- `run()` takes substitute audit and H2 seeds, so the gates and the smoke test never fly the registered ones.
+
+**Sabotaged 28 ways with the byte-safe runner, each file restored byte-identical.** The counts are in the three gates'
+headers. Two went 0 red on the first draft, and both are findings:
+- **S7, a search that accepts every child.** The row checked the score the search reports, which a worse child never
+  lowers. It now re-scores the weights the search returns.
+- **T3, the champion picked on train score.** The miniature's two searches tied on held-out, so either order picked the
+  same one. A planted pair whose orders disagree now holds the pick.
+
+**An incident, said in full.**
+- The first draft of the trainer's gate ran the command against an existing results file to watch it refuse. With the
+  guard sabotaged away (C1) it did not refuse: the child began the registered round.
+- Before the runner's 900 s timeout killed the gate, it flew the **hand twin** on the **registered audit seeds**
+  (6101-6120). Its output went to a pipe nobody read, and the command prints no score anyway.
+- Its process was found still running afterwards and killed before it wrote anything: its results file was still the
+  planted 3 bytes, and was deleted unread.
+- **No number from it was printed, stored or seen, and no choice was made on it.** The hand twin's audit is deterministic,
+  and the registered run computes it again. No search reached the audit seeds; a search had barely started.
+- Since then the guard is a library function the gate holds directly, the gate never starts a run, and the runner kills
+  a timed-out gate's whole process group.
+
+**The registered run:** `node tools/ship/trainMlp6dof.mjs --workers 4`. By the smoke test, 30 iterations and their prune
+take 4-6 s a search, so expect about 10 minutes a search at 1,500, and six searches in all (five plus the determinism
+re-run) on four workers.

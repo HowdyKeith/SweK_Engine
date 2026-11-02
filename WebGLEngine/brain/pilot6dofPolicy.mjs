@@ -86,7 +86,8 @@ export function geometry(body, target, opts = {}) {
     return { spec, range, eBody, facingCos, closing, thrustOk: facingCos > Math.cos(spec.thrustAngle) && range > spec.standoff, aligned: facingCos > Math.cos(spec.fireAngle) && range < spec.fireRange };
 }
 
-const featuresFrom = (g, body) => [1, g.eBody[0] / Math.PI, g.eBody[1] / Math.PI, g.eBody[2] / Math.PI, clamp(body.w[0] / 2, -3, 3), clamp(body.w[1] / 2, -3, 3), clamp(body.w[2] / 2, -3, 3),
+/** The twelve features from a geometry() result and the body: exported so another network reads the same senses from one geometry (brain/pilot6dofMlp.mjs). */
+export const featuresFrom = (g, body) => [1, g.eBody[0] / Math.PI, g.eBody[1] / Math.PI, g.eBody[2] / Math.PI, clamp(body.w[0] / 2, -3, 3), clamp(body.w[1] / 2, -3, 3), clamp(body.w[2] / 2, -3, 3),
     g.facingCos, clamp(g.range / g.spec.fireRange, 0, 3), clamp(g.closing / 20, -3, 3), g.thrustOk ? 1 : 0, g.aligned ? 1 : 0];
 
 /** The twelve features, in FEATURE_NAMES order. */
@@ -127,14 +128,15 @@ export const PAGE_AUTOPILOT = { thrustForce: 16, standoff: 85 };
 const makeRng = (seed) => { let s = (seed >>> 0) || 1; return () => { s = (s * 1103515245 + 12345) & 0x7fffffff; return s / 0x7fffffff; }; };
 
 /**
- * `a` and `b` are each "autopilot" (autopilot6dof.decide, with the page's own thrust and standoff), "hand", "zero", or a weight vector. Returns { hits, shotsFired, hitsTaken, aHp, bHp, aDead, bDead,
+ * `a` and `b` are each "autopilot" (autopilot6dof.decide, with the page's own thrust and standoff), "hand", "zero", a weight vector, or a pilot function with decide()'s contract. Returns { hits, shotsFired, hitsTaken, aHp, bHp, aDead, bDead,
  * ticks, seed, fingerprint } from A's side, plus (v4848) rams (impacts: ticks a contact began), ramTicks (ticks in contact), ramHp (hit points EACH ship lost to rams), minRange (the closest the two centres came, metres; the hulls touch under about 3.2), aLost / bLost (a ship whose state went non-finite from its own spin: destroyed on the spot). Deterministic for a seed.
  * `scenario` "standoff" (the default, every number before v4848) starts the ships 84 m apart at rest; "joust" (v4848) starts them 14-40 m apart, each already closing on the other at 3-12 m/s with a lateral offset of up to 2 m / 3 m,
  * which is the only start in which touching is possible at all (measured: in standoff duels the centres never came nearer than 55 m and a fight lasts 1.6-3.9 s; the hulls touch under 3.2 m).
  * `collisions` (default off, see the header) resolves ship-ship contact; `ramPenalty` is a score cost per hit point lost to rams, charged to both sides (0 = the ram is only as costly as the hit points it takes).
  */
 export function duel(a = "autopilot", b = "autopilot", { seed = 1, seconds = 30, collisions = false, ramPenalty = 0, scenario = "standoff" } = {}) {
-    const pilotOf = (x) => x === "autopilot" ? (body, tgt, o) => AP.decide(body, tgt, o) : pilotFor(x === "hand" ? handWeights() : x === "zero" ? zeroWeights() : x);
+    // a FUNCTION is a pilot already, with decide()'s contract: how another brain flies this duel (brain/pilot6dofMlp.mjs, the GPU Brain's), the scoring and the tally unchanged
+    const pilotOf = (x) => typeof x === "function" ? x : x === "autopilot" ? (body, tgt, o) => AP.decide(body, tgt, o) : pilotFor(x === "hand" ? handWeights() : x === "zero" ? zeroWeights() : x);
     const pa = pilotOf(a), pb = pilotOf(b), rng = makeRng(seed), I = RB.boxInertia({ m: SHIP_MASS, hx: HALF[0], hy: HALF[1], hz: HALF[2] });
     const joust = scenario === "joust", gap = joust ? 14 + rng() * 26 : 2 * SPAWN_X, closing = joust ? 3 + rng() * 9 : 0, spreadY = joust ? 4 : 4, spreadZ = joust ? 6 : 18;   // the joust draws first, so a standoff's draws are the ones they always were
     const mk = (id, team, x, q, vx) => ({ id, team, hp: HP_MAX, cool: 0, dead: false, body: RB.createBody({ mass: SHIP_MASS, I, pos: [x, (rng() - 0.5) * spreadY, (rng() - 0.5) * spreadZ], q, vel: [vx, 0, 0], w: [0, 0, 0] }) });

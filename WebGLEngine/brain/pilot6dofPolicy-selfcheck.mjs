@@ -476,5 +476,18 @@ sec("10. the close-quarters pilots (v4848): what each file says about itself is 
     }
 }
 
+// ---- ANOTHER BRAIN IN THE SAME DUEL (brain/SIXDOF_GPU_BRAIN_WIP.md): duel() takes a pilot FUNCTION, and featuresFrom() is exported so a second network reads the same senses from one geometry -------------------------
+// SABOTAGED 2026-11-02 with the byte-safe runner, each file restored byte-identical: duel() reading a function as a weight vector (the `typeof x === "function"` clause removed) -> 1 RED, this section's first row
+// (it throws); featuresFrom() with the x spin unclamped -> 2 RED, this section's second row and the close file's `by` row (the close pilot's recomputed audit moves with its senses).
+console.log("\nANOTHER BRAIN IN THE SAME DUEL");
+{
+    const hand = P6.pilotFor(P6.handWeights()), seeds = [1, 5, 21, 26];
+    let threw = null, same = 0; try { for (const seed of seeds) { const a = P6.duel(hand, "autopilot", { seed }), b = P6.duel("hand", "autopilot", { seed }), c = P6.duel("autopilot", hand, { seed }), d = P6.duel("autopilot", "hand", { seed }); if (a.fingerprint === b.fingerprint && a.score === b.score && c.fingerprint === d.fingerprint) same++; } } catch (e) { threw = e.message; }
+    ok("!! duel() takes a pilot FUNCTION (decide()'s contract) on either side, and the fruit fly's hand pilot handed in as one flies the fight its weights fly, to the fingerprint", !threw && same === seeds.length, threw || `${same} of ${seeds.length} seeds, both sides`);
+    const I = RB.boxInertia({ m: P6.SHIP_MASS, hx: P6.HALF[0], hy: P6.HALF[1], hz: P6.HALF[2] }), body = RB.createBody({ mass: P6.SHIP_MASS, I, pos: [3, -2, 1], q: [0.9, 0.1, 0.3, 0.2].map((v, _, q) => v / Math.hypot(...q)), vel: [4, 1, 0], w: [7, -0.5, 0.2] });
+    const tgt = { pos: [120, 10, -5], vel: [-3, 0, 1] }, o = { weaponSpeed: 260, ...P6.PAGE_AUTOPILOT }, via = P6.featuresFrom(P6.geometry(body, tgt, o), body), direct = P6.features(body, tgt, o);
+    ok("  featuresFrom(geometry(...)) IS features(...): one geometry, the same twelve senses (here with a spin past the clamp)", via.length === 12 && via.every((v, i) => Object.is(v, direct[i])) && via[4] === 3);
+}
+
 console.log(fails ? `\npilot6dofPolicy-selfcheck: ${fails} FAILED` : "\npilot6dofPolicy-selfcheck: all checks pass");
 process.exit(fails ? 1 : 0);
