@@ -78,9 +78,9 @@ export function jointLine(tunedVsConst, tunedVsRule) {
 }
 export const noneOrMore = (js) => { const w = js.filter((j) => j.wins).length; return w === js.length ? "BEATS" : w === 0 ? "NONE" : "MIXED"; };
 
-export function checksOf(au) {
+export function checksOf(au, { identityParams = {} } = {}) {
     const rows = [], one = [T.scenario(241, "far"), T.scenario(241, "both")];
-    const a = scoreOf("TUNED-RULE", { params: {} }, one), b = scoreOf("RULE-GF", {}, one);
+    const a = scoreOf("TUNED-RULE", { params: identityParams }, one), b = scoreOf("RULE-GF", {}, one);
     rows.push({ name: "IDENTITY", ok: a.runs.every((r, i) => r.fingerprint === b.runs[i].fingerprint), text: "the defaults equal RULE-GF dive for dive" });
     for (const n of AUDIT_NAMES) {
         const x = au[n], idx = x.ALONE.runs.map((r, i) => (r.kind === "far" || r.kind === "both" ? i : -1)).filter((i) => i >= 0), sub = (res) => ({ runs: idx.map((i) => res.runs[i]) }), j = judge(sub(x["RULE-GF"]), sub(x.ALONE));

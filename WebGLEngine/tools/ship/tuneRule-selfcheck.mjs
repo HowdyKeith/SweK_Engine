@@ -106,6 +106,19 @@ sec("6b. SYNTHETIC AUDITS");
     ok("!! a tuned rule that only ties the original is NOT ASSESSED for question (a)", L3.some((l) => /^QUESTION \(a\): NOT ASSESSED/.test(l)));
     ok("!! the champion line is first after the title and the QUESTION lines are the last two", /^champion: defaults: alpha 0\.00500/.test(L[1]) && /^QUESTION \(a\)/.test(L[L.length - 2]) && /^QUESTION \(b\)/.test(L[L.length - 1]));
 }
+sec("6c. CHECKS AND TIES");
+{
+    const mk = (f) => ({ runs: [0, 1, 2].flatMap(() => ["plain", "deep", "far", "both"].map((kind) => ({ kind, score: f(kind), fingerprint: "f" }))), score: 0, crashed: 0, stranded: 0 });
+    const aud = (rule) => Object.fromEntries(X.AUDIT_NAMES.map((n) => [n, { ALONE: mk(() => 0.3), "RULE-GF": mk(rule) }])), hard = (k) => (k === "both" ? 0.9 : 0.3);
+    const c1 = X.checksOf(aud(hard)), c2 = X.checksOf(aud((k) => (k === "plain" ? 0.9 : 0.3)));
+    ok("!! the rule-not-trivial check reads far AND both: a rule that wins on both only passes, one that wins on plain only fails", c1.filter((c) => /RULE NOT TRIVIAL/.test(c.name)).every((c) => c.ok) && c2.filter((c) => /RULE NOT TRIVIAL/.test(c.name)).every((c) => !c.ok));
+    ok("!! the identity check goes FAIL when other parameters are run in its place", X.checksOf(aud(hard)).find((c) => c.name === "IDENTITY").ok === true && X.checksOf(aud(hard), { identityParams: { low: 0.45, high: 0.8 } }).find((c) => c.name === "IDENTITY").ok === false);
+    const val = [T.scenario(271, "far"), T.scenario(271, "both")], ch = X.champion([{ seed: 1, checkpoints: [{ iter: 30, params: U.normalise({}), trainScore: 0 }] }], val);
+    ok("!! a checkpoint that only TIES the defaults on validation does not displace them", ch.from === "defaults" && ch.iter === 0);
+    const small = { U1: [481, 481], U2: [521, 521], U3: [541, 541] }, opts = { params: {}, champion: Array.from(C.constWeights(0.07)) };
+    const at = X.audits(opts, { ranges: small }), rb = X.robustness(opts, { ranges: small, noises: [0.05] }), rb2 = X.robustness(opts, { ranges: small, noises: [0.2] });
+    ok("!! the robustness runs fly at THEIR noise: the same arm on the same set differs from the audit's and between the two noises", rb["0.05"].U1["RULE-GF"].runs.map((r) => r.fingerprint).join() !== at.U1["RULE-GF"].runs.map((r) => r.fingerprint).join() && rb["0.05"].U1["RULE-GF"].runs.map((r) => r.fingerprint).join() !== rb2["0.2"].U1["RULE-GF"].runs.map((r) => r.fingerprint).join());
+}
 sec("7. THE SOURCE");
 {
     const code = fs.readFileSync(new URL("./tuneRule.mjs", import.meta.url), "utf8").split("\n").filter((l) => !/^\s*\/\//.test(l)).join("\n"), re = /\b(?:4[89][0-9]|5[2-5][0-9])\b/g;
