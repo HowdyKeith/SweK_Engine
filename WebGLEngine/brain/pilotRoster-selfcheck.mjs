@@ -44,6 +44,11 @@
 //   AC pilotRoster.mjs: 'close' never offered                                                     1 red (the offered-only-when-held, in-order row)
 //   AD pilotRoster.mjs: 'close' resolves to the league pilot's weights                            1 red (the flies-THAT-vector row)
 //   (AE and AF were for a 'careful' choice that did not qualify and was taken out before the ship; the same two failure shapes, 1 red each.)
+//   2026-11-02 -- THE GPU BRAIN'S CHOICE, ANOTHER NETWORK (section 2's five new rows, read on the 6-DOF substrate), with the byte-safe runner, this gate and brain/pilot6dofMlpPage-selfcheck.mjs run:
+//   AG pilotRoster.mjs: 'gpu' offered when none is held                                          7 red (the not-offered rows and every row that counts the choices a page holds, node and page)
+//   AH pilotRoster.mjs: teamPilot() ignores the choice's own network                              1 red here (the THROUGH-ITS-OWN-NETWORK row), and 2 on the page (the measured-pilot and fight rows)
+//   AI pilotRoster.mjs: 'gpu' resolved without its network                                        1 red (the never-through-another-network row)
+//   AJ pilotRoster.mjs: 'gpu' resolves to the shipped fruit-fly pilot's weights                   1 red here (the THROUGH-ITS-OWN-NETWORK row), and 3 on the page
 "use strict";
 import path from "node:path";
 import { fileURLToPath } from "node:url";

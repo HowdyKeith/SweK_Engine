@@ -13,6 +13,13 @@
 //   5  a SAVED choice of it survives the next load (made before the file arrives, it falls back to the hand pilot, and becomes the GPU pilot when the file lands)
 //   6  the GPU file offered to the page's importer (the fruit fly's network) is REFUSED, with the reason on the line, and nothing is imported
 // NOT CLAIMED, as the registration says: anything about how this pilot does in the page's own fight (three a side, fleet targeting, collisions and ram damage on), which was never measured for it.
+//
+// SABOTAGE LOG (2026-11-02) -- the byte-safe runner, this gate and brain/pilotRoster-selfcheck.mjs run, each file restored byte-identical (sha256); the number is the rows that went red HERE, by name:
+//   PG1 the page never offers 'gpu' 4 (1, 2, the meeting, 3) | PG2 the page hands the roster no network for it 4 (2, the meeting, 3, 5) | PG3 its file read with the fruit fly's descriptor 5 (1, 2, the meeting, 3, 5)
+//   PG4 the pilot line leaves it out 1 (1) | PG5 the page's importer takes its file as a fruit-fly pilot 1 (6)
+//   and the roster's four (brain/pilotRoster-selfcheck.mjs's AG-AJ): 'gpu' offered when none is held 0 here (7 there) | teamPilot() ignoring the choice's own network 2 (3, 4) | 'gpu' resolved without its
+//   network 0 here (1 there: the page always hands both) | 'gpu' resolved to the shipped fruit-fly pilot's weights 3 (2, 3, 4)
+//   PG1 leaves row 5 green, and rightly: a saved 'gpu' still resolves through the roster's context; row 1 is the one that says the select never offers it.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";

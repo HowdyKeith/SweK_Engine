@@ -282,3 +282,21 @@ Keith: "put the pilot on the page". The verdict above said to ask first, and he 
 - That it runs on a GPU.
 
 **No measurement, so nothing is committed unread.**
+
+**Built, 2026-11-02 (nothing of the page round's registration above is changed).**
+- **What exists:**
+  - `brain/pilotRoster.mjs`'s `gpu` choice;
+  - in `es-box3d-6dof.html`, the file's fetch, the choice, and the GPU pilot named on the pilot line;
+  - five rows in `brain/pilotRoster-selfcheck.mjs`;
+  - the new gate `brain/pilot6dofMlpPage-selfcheck.mjs` (a browser, about 8 s).
+  - `brain/pilot6dofPolicy-selfcheck.mjs` counts `gpu` among the pilots that arrive by fetch.
+- **The check that matters held on the first run:** the page's own pilot function, flown through the headless duel in
+  the page's browser, gave the committed held-out tally 20.02 (W4/L0/D4) and 8 of 8 of Node's fingerprints.
+- **The fourteen gates around the page and the roster stayed green.** That includes the fruit fly's page rows, the
+  aircraft's, the flight page's and the browser-safety guards.
+- **Sabotaged with the byte-safe runner: nine designs, each red by name.**
+  - On the page: never offered 4; no network handed to the roster 4; the file read with the fruit fly's descriptor 5;
+    left off the pilot line 1; the importer taking it as a fruit-fly pilot 1.
+  - In the roster: offered when not held 7; `teamPilot()` ignoring the choice's network 3; resolved without its
+    network 1; resolved to the fruit fly's weights 4.
+  - The counts by gate are in both gates' headers.
