@@ -43,9 +43,12 @@ export const PERSIST = Object.freeze({ bias: Object.freeze({ biasSigma: 2 * Math
 // "<condition>+sticky" is long+fix with that condition, "<condition>+forget" is long+fix+forget with it.
 export const PERSIST_ARM_SPEC = Object.freeze(Object.fromEntries([["bias", "sticky"], ["bias", "forget"], ["cellp", "forget"], ["objp", "sticky"], ["objp", "forget"], ["range", "forget"], ["pall", "sticky"], ["pall", "forget"]].map(([c, m]) => [`${c}+${m}`, Object.freeze({ base: m === "sticky" ? "long+fix" : "long+fix+forget", cond: c })])));
 export const PERSIST_ARMS = Object.freeze(["exact", "long+fix", "long+fix+forget", "head+sticky", "head+forget", "all+forget", ...Object.keys(PERSIST_ARM_SPEC)]), PERSIST_DESIGNATED = "pall+forget";
-export const FLY_ARMS = Object.freeze([...STUDY_ARMS, "fix+forget", "fix+filter", "fix+forget+filter", ...Object.keys(SONAR_ARMS), ...Object.keys(LONG_ARMS), ...Object.keys(REAL_ARMS), ...Object.keys(PERSIST_ARM_SPEC)]);
+// THE FALSE-RATE STUDY (follow-up 6): follow-up 4's four white faults with the false-return rate set per arm, for the map that forgets (0.001, 0.003, 0.01, 0.03) and for the filtered fix with the sticky map (0.0001, 0.0003, 0.001). "all@<rate>+forget" is long+fix+forget, "all@<rate>+filter" is long+fix+filter.
+export const FALSE_ARM_SPEC = Object.freeze(Object.fromEntries([["0.001", "forget"], ["0.003", "forget"], ["0.01", "forget"], ["0.03", "forget"], ["0.0001", "filter"], ["0.0003", "filter"], ["0.001", "filter"]].map(([r, m]) => [`all@${r}+${m}`, Object.freeze({ base: m === "forget" ? "long+fix+forget" : "long+fix+filter", rate: Number(r), realism: Object.freeze({ ...REALISM.all, falseRate: Number(r) }) })])));
+export const FALSE_ARMS = Object.freeze(["exact", "long+fix+forget", "long+fix+filter", ...Object.keys(FALSE_ARM_SPEC)]), FALSE_DESIGNATED = "all@0.01+forget";
+export const FLY_ARMS = Object.freeze([...STUDY_ARMS, "fix+forget", "fix+filter", "fix+forget+filter", ...Object.keys(SONAR_ARMS), ...Object.keys(LONG_ARMS), ...Object.keys(REAL_ARMS), ...Object.keys(PERSIST_ARM_SPEC), ...Object.keys(FALSE_ARM_SPEC)]);
 export const BARS = Object.freeze({ "hard-islands": 0.8, "hard-gaps": 0.6, "hard-current": 0.7 }), ISLAND_MAX_COLLISIONS = 6;
-export const SENSE_SETS = Object.freeze({ dev: N.range(1, 30), held6: N.range(601, 660), held7: N.range(701, 760), held8: N.range(801, 860), held9: N.range(901, 960), held10: N.range(1001, 1060) });
+export const SENSE_SETS = Object.freeze({ dev: N.range(1, 30), held6: N.range(601, 660), held7: N.range(701, 760), held8: N.range(801, 860), held9: N.range(901, 960), held10: N.range(1001, 1060), held11: N.range(1101, 1160) });
 export const POINT_R = N.CELL / 2;   // an occupied cell is a point 2.5 m wide to the plan; a run of them in a row is the capsule between the end centres
 
 const mulberry = (a) => () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
@@ -201,6 +204,7 @@ export function flyArm(pilot, sc, arm, opts = {}) {
     if (!FLY_ARMS.includes(arm)) throw new Error(`subSensedNav.flyArm: unknown arm "${arm}" (${FLY_ARMS.join(", ")})`);
     if (arm === "straight") return H.flyHard(pilot, sc, FLOOR_ARM, opts);
     if (arm === "exact") return { ...H.flyHard(pilot, sc, EXACT_ARM, opts), arm: "exact" };
+    if (FALSE_ARM_SPEC[arm]) return { ...flySensed(pilot, sc, LONG_ARMS[FALSE_ARM_SPEC[arm].base], { ...opts, sonar: LONG_SONAR, realism: FALSE_ARM_SPEC[arm].realism }), arm };
     if (PERSIST_ARM_SPEC[arm]) return { ...flySensed(pilot, sc, LONG_ARMS[PERSIST_ARM_SPEC[arm].base], { ...opts, sonar: LONG_SONAR, realism: PERSIST[PERSIST_ARM_SPEC[arm].cond] }), arm };
     if (REAL_ARMS[arm]) return { ...flySensed(pilot, sc, LONG_ARMS[REAL_ARMS[arm].base], { ...opts, sonar: LONG_SONAR, realism: REALISM[REAL_ARMS[arm].cond] }), arm };
     if (LONG_ARMS[arm]) return { ...flySensed(pilot, sc, LONG_ARMS[arm], { ...opts, sonar: LONG_SONAR }), arm };
