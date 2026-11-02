@@ -31,9 +31,14 @@ export const FIX_ARMS = Object.freeze(["sensed", "sensed+fix", "fix+forget", "fi
 export const LONG_SONAR = SONAR_ARMS["sonar-200"];
 export const LONG_ARMS = Object.freeze({ "long+fix": "sensed+fix", "long+fix+forget": "fix+forget", "long+fix+filter": "fix+filter", "long+fix+forget+filter": "fix+forget+filter", "long+drift": "sensed+drift" });
 export const COMBINED_ARMS = Object.freeze(["exact", "sonar-200", "sensed+fix", "fix+forget", "long+fix", "long+fix+forget", "long+fix+filter", "long+fix+forget+filter", "long+drift"]), COMBINED_DESIGNATED = "long+fix+forget";
-export const FLY_ARMS = Object.freeze([...STUDY_ARMS, "fix+forget", "fix+filter", "fix+forget+filter", ...Object.keys(SONAR_ARMS), ...Object.keys(LONG_ARMS)]);
+// THE REALISM STUDY (follow-up 4): the combined vessel's 200 m sonar with the perfection taken off, one thing at a time and then all four. `miss` an occupied cell reads free with probability 0.2 at a ping; `falseRate` a free cell reads occupied with probability 0.001; `occlude` first surfaces only; `headingSigma` the sonar's pointing error, 2 degrees, white.
+export const REALISM = Object.freeze({ miss: Object.freeze({ miss: 0.2 }), false: Object.freeze({ falseRate: 0.001 }), occl: Object.freeze({ occlude: true }), head: Object.freeze({ headingSigma: 2 * Math.PI / 180 }), all: Object.freeze({ miss: 0.2, falseRate: 0.001, occlude: true, headingSigma: 2 * Math.PI / 180 }) });
+// "<condition>+sticky" is long+fix with that condition, "<condition>+forget" is long+fix+forget with it.
+export const REAL_ARMS = Object.freeze(Object.fromEntries(Object.keys(REALISM).flatMap((c) => [[`${c}+sticky`, Object.freeze({ base: "long+fix", cond: c })], [`${c}+forget`, Object.freeze({ base: "long+fix+forget", cond: c })]])));
+export const REALISM_ARMS = Object.freeze(["exact", "long+fix", "long+fix+forget", "long+fix+filter", ...Object.keys(REAL_ARMS)]), REALISM_DESIGNATED = "all+forget";
+export const FLY_ARMS = Object.freeze([...STUDY_ARMS, "fix+forget", "fix+filter", "fix+forget+filter", ...Object.keys(SONAR_ARMS), ...Object.keys(LONG_ARMS), ...Object.keys(REAL_ARMS)]);
 export const BARS = Object.freeze({ "hard-islands": 0.8, "hard-gaps": 0.6, "hard-current": 0.7 }), ISLAND_MAX_COLLISIONS = 6;
-export const SENSE_SETS = Object.freeze({ dev: N.range(1, 30), held6: N.range(601, 660), held7: N.range(701, 760), held8: N.range(801, 860) });
+export const SENSE_SETS = Object.freeze({ dev: N.range(1, 30), held6: N.range(601, 660), held7: N.range(701, 760), held8: N.range(801, 860), held9: N.range(901, 960) });
 export const POINT_R = N.CELL / 2;   // an occupied cell is a point 2.5 m wide to the plan; a run of them in a row is the capsule between the end centres
 
 const mulberry = (a) => () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
@@ -50,21 +55,52 @@ export function createMap(grid = H.DEFAULT_GRID) {
 /** The obstacles a plan blocks and a sonar therefore marks: full depth, or a keel (plus VMARGIN) deeper than the shallower of the start and waypoint depths (planShapes' rule). */
 export const blockingOf = (obstacles, minDepth) => obstacles.filter((o) => o.keel + H.VMARGIN > minDepth);
 /**
+ * Does the sonar at `pos` see the cell centred (cx, cy), and what? FIRST SURFACES ONLY (follow-up 4): `world` is the obstacles as { x, y, r } in the map's frame. null: the cell is shadowed (an obstacle is between it and the vessel, or it is deeper than one `cell` inside the front face) and is not ensonified; true: it is
+ * inside an obstacle within one `cell` of where the line from the vessel enters the earliest obstacle on it (the front face of the union); false: it is free and in view.
+ */
+export function view(world, pos, cx, cy, cell) {
+    const dx = cx - pos.x, dy = cy - pos.y, d = Math.hypot(dx, dy);
+    if (d === 0) return world.some((o) => Math.hypot(cx - o.x, cy - o.y) <= o.r);
+    const ux = dx / d, uy = dy / d;
+    let front = Infinity, inAny = false;
+    for (const o of world) {
+        const wx = o.x - pos.x, wy = o.y - pos.y, tp = wx * ux + wy * uy, h2 = o.r * o.r - (wx * wx + wy * wy - tp * tp);
+        if (h2 < 0) continue;
+        const h = Math.sqrt(h2), tin = tp - h;
+        if (tp + h < 0 || tin > d) continue;
+        front = Math.min(front, Math.max(tin, 0));
+        if (Math.hypot(cx - o.x, cy - o.y) <= o.r) inAny = true;
+    }
+    if (front === Infinity) return false;
+    return inAny && d - front <= cell ? true : null;
+}
+/**
  * One ping from the BELIEVED position `pos` ({ x, y }) with the true `heading`: every cell whose centre is within sonar.range of pos and within sonar.half of the heading (both inclusive) is ensonified; one whose centre lies within an obstacle's radius (inclusive) is occupied. `blocking`
  * is the list blockingOf gives, in TRUE coordinates; `off` ({ x, y }) is believed minus true, so the obstacles land in the map's frame where the vessel thinks they are. Returns the number of cells newly occupied. With `forget` a cell in the sector takes the occupancy this ping finds, occupied or
  * free (so an occupied cell can clear), and the return is the number of cells whose occupancy CHANGED.
+ * `real` (follow-up 4; null is the perfect sonar, and then nothing below changes): { delta (the sonar's pointing error, radians: the sector and everything sensed are turned by it, in bearing, about the vessel, together), occlude (first surfaces only: see `view`; a shadowed cell is not ensonified), miss (the probability an occupied
+ * cell reads free), falseRate (the probability a free cell reads occupied), rng (the uniform generator the last two draw from, one draw a cell) }.
  */
-export function ping(map, blocking, pos, heading, off = { x: 0, y: 0 }, sonar = SONAR, forget = false) {
+export function ping(map, blocking, pos, heading, off = { x: 0, y: 0 }, sonar = SONAR, forget = false, real = null) {
     const r = Math.ceil(sonar.range / map.cell) + 1, g0 = Math.floor((pos.x - map.x0) / map.cell), h0 = Math.floor((pos.y - map.y0) / map.cell);
+    const delta = (real && real.delta) || 0, occl = !!(real && real.occlude), miss = (real && real.miss) || 0, falseRate = (real && real.falseRate) || 0, noisy = miss > 0 || falseRate > 0, eff = heading + delta;
+    const world = blocking.map((o) => {
+        if (delta === 0) return { x: o.x + off.x, y: o.y + off.y, r: o.r };
+        const vx = o.x + off.x - pos.x, vy = o.y + off.y - pos.y;
+        return { x: pos.x + vx * Math.cos(delta) + vy * Math.sin(delta), y: pos.y - vx * Math.sin(delta) + vy * Math.cos(delta), r: o.r };   // the bearing (atan2(-dy, dx), the tree's heading convention) GROWS by delta, as the sector's axis does: the picture turns as one
+    });
     let added = 0;
     for (let gy = Math.max(0, h0 - r); gy <= Math.min(map.h - 1, h0 + r); gy++) for (let gx = Math.max(0, g0 - r); gx <= Math.min(map.w - 1, g0 + r); gx++) {
         const cx = map.x0 + (gx + 0.5) * map.cell, cy = map.y0 + (gy + 0.5) * map.cell, dx = cx - pos.x, dy = cy - pos.y;
-        if (Math.hypot(dx, dy) > sonar.range || Math.abs(wrap(Math.atan2(-dy, dx) - heading)) > sonar.half) continue;
-        const i = gy * map.w + gx;
+        if (Math.hypot(dx, dy) > sonar.range || Math.abs(wrap(Math.atan2(-dy, dx) - eff)) > sonar.half) continue;
+        const i = gy * map.w + gx, inside = (o) => Math.hypot(cx - o.x, cy - o.y) <= o.r;
+        let hit;
+        if (occl) { hit = view(world, pos, cx, cy, map.cell); if (hit === null) continue; }
         if (!map.seen[i]) { map.seen[i] = 1; map.nSeen++; }
-        const inside = (o) => Math.hypot(cx - (o.x + off.x), cy - (o.y + off.y)) <= o.r;
-        if (forget) { const now = blocking.some(inside) ? 1 : 0; if (map.occ[i] !== now) { map.occ[i] = now; map.nOcc += now ? 1 : -1; added++; } }
-        else if (!map.occ[i] && blocking.some(inside)) { map.occ[i] = 1; map.nOcc++; added++; }
+        if (!occl && (forget || !map.occ[i])) hit = world.some(inside);
+        if (noisy && hit !== undefined) { const u = real.rng(); hit = hit ? u >= miss : u < falseRate; }
+        if (forget) { const now = hit ? 1 : 0; if (map.occ[i] !== now) { map.occ[i] = now; map.nOcc += now ? 1 : -1; added++; } }
+        else if (!map.occ[i] && hit) { map.occ[i] = 1; map.nOcc++; added++; }
     }
     return added;
 }
@@ -92,17 +128,17 @@ const navModel = () => MODEL || (MODEL = S.createSubModel(Object.freeze({ ...S.E
  * (the first plan: always false on an empty map), plans (builds, the first included), pings, occupied (cells at the end), ensonified (the share of the grid ensonified at least once), offsetEnd (believed minus true, metres, at the end), offsetMax }.
  * A ping every sonar.pingS seconds from t = 0; the plan is built at t = 0 and again after every ping that adds an occupied cell, from the believed position, with the vessel's own 15 m free. `sensed+fix` draws a new error at each ping; `sensed+drift` adds a Wiener step each tick.
  */
-export function flySensed(pilot, sc, armName, { seconds = H.SECONDS_HARD, dt = S.DT, model = navModel(), ladder = H.MARGIN_LADDER, sonar = SONAR } = {}) {
+export function flySensed(pilot, sc, armName, { seconds = H.SECONDS_HARD, dt = S.DT, model = navModel(), ladder = H.MARGIN_LADDER, sonar = SONAR, realism = null } = {}) {
     const spec = specOf(armName, "subSensedNav.flySensed"), total = Math.round(seconds / dt), st = sc.start, every = Math.max(1, Math.round(sonar.pingS / dt));
     const rng = mulberry(((sc.seed * 7919 + H.HARD_KINDS.indexOf(sc.kind) * 104729 + 31337) >>> 0) ^ spec.stream * 2654435761), blocking = blockingOf(sc.obstacles, sc.minDepth);
-    const map = createMap();
+    const rngR = mulberry(((sc.seed * 7919 + H.HARD_KINDS.indexOf(sc.kind) * 104729 + 77777) >>> 0) ^ spec.stream * 2654435761), map = createMap();
     let s = S.createState({ pos: [st.x, st.y, -st.depth], speed: st.speed, heading: st.heading, pitch: st.pitch, bank: st.bank, gamma: 0, w: [0, 0, 0], model });
     let off = { x: 0, y: 0 }, field = null, field0 = null, plans = 0, pings = 0, offMax = 0;
     let status = "timeout", path = 0, minClear = clearAt(sc.obstacles, st.x, st.y, st.depth), ticks = 0, t = null;
     for (let i = 0; i < total; i++) {
         if (i % every === 0) {
             if (spec.fix > 0) { const e = { x: spec.fix * gauss(rng), y: spec.fix * gauss(rng) }, k = i === 0 ? 1 : spec.gain; off = { x: (1 - k) * off.x + k * e.x, y: (1 - k) * off.y + k * e.y }; }
-            const bp = { x: s.pos[0] + off.x, y: s.pos[1] + off.y }, added = ping(map, blocking, bp, S.attitude(s).heading, off, sonar, spec.forget); pings++;
+            const bp = { x: s.pos[0] + off.x, y: s.pos[1] + off.y }, added = ping(map, blocking, bp, S.attitude(s).heading, off, sonar, spec.forget, realism && { ...realism, delta: realism.headingSigma ? realism.headingSigma * gauss(rngR) : 0, rng: rngR }); pings++;
             if (i === 0 || added > 0) { field = planFromMap(map, sc.goal, bp, { ladder, own: i === 0 ? null : bp }); plans++; if (!field0) field0 = field; }
         }
         const bs = { ...s, pos: [s.pos[0] + off.x, s.pos[1] + off.y, s.pos[2]] }, target = H.hardTarget("any", bs, field, sc.goal), cv = ST.currentAt(sc.current, i * dt), cmd = pilot(s, target, cv), res = S.stepSub(model, s, cmd, dt, cv, sc.weightError);
@@ -128,6 +164,7 @@ export function flyArm(pilot, sc, arm, opts = {}) {
     if (!FLY_ARMS.includes(arm)) throw new Error(`subSensedNav.flyArm: unknown arm "${arm}" (${FLY_ARMS.join(", ")})`);
     if (arm === "straight") return H.flyHard(pilot, sc, FLOOR_ARM, opts);
     if (arm === "exact") return { ...H.flyHard(pilot, sc, EXACT_ARM, opts), arm: "exact" };
+    if (REAL_ARMS[arm]) return { ...flySensed(pilot, sc, LONG_ARMS[REAL_ARMS[arm].base], { ...opts, sonar: LONG_SONAR, realism: REALISM[REAL_ARMS[arm].cond] }), arm };
     if (LONG_ARMS[arm]) return { ...flySensed(pilot, sc, LONG_ARMS[arm], { ...opts, sonar: LONG_SONAR }), arm };
     return SONAR_ARMS[arm] ? { ...flySensed(pilot, sc, "sensed", { ...opts, sonar: SONAR_ARMS[arm] }), arm } : flySensed(pilot, sc, arm, opts);
 }
