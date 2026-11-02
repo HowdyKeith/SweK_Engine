@@ -66,12 +66,12 @@ export function twinPlan(model, st, obs, ema, params, e, prefer = -1, seconds = 
 }
 const nearestOf = (open, x, y) => { let best = null, bd = Infinity; for (const q of open) { const d = hyp(x, y, q.x, q.y); if (d < bd) { bd = d; best = q; } } return best; };
 
-/** The seat: plannerSeat's twin with the errors `err` in its planning model. `plan` { replanS, seconds }. Carries `stats` { ticks, switches, plans }. */
+/** The seat: plannerSeat's twin with the errors `err` in its planning model. `plan` { replanS, seconds, horizon }: `horizon` is the look-ahead in seconds RELATIVE to each plan's time (default unlimited; Round 14), `seconds` the absolute end. Carries `stats` { ticks, switches, plans, rolloutSeconds }: the rollout seconds SCHEDULED (the rollouts planned times the time each was asked to simulate; a rollout that ends early in a crush is counted in full). */
 export function perturbedSeat(params, err = {}, plan = {}) {
-    const q = U.normalise(params, U.WIDE_BOUNDS), p = { replanS: REPLAN_S, seconds: T.SECONDS, ...plan }, e = errOf(err);
+    const q = U.normalise(params, U.WIDE_BOUNDS), p = { replanS: REPLAN_S, seconds: T.SECONDS, horizon: Infinity, ...plan }, e = errOf(err);
     return (ctx) => {
         let ema = null, current = -1, plan_ = null, lastPlanT = -Infinity, openKey = "";
-        const stats = { ticks: 0, switches: 0, plans: 0 };
+        const stats = { ticks: 0, switches: 0, plans: 0, rolloutSeconds: 0 };
         const seat = (st, obs) => {
             ema = ema === null ? obs.r.frac : ema + q.alpha * (obs.r.frac - ema);
             const r = obs.r, atSurface = -st.pos[2] < T.RETURN_DEPTH;
@@ -83,7 +83,9 @@ export function perturbedSeat(params, err = {}, plan = {}) {
                 const key = open.map((s2) => obs.stations.indexOf(s2)).join(",");
                 if (!plan_ || obs.t - lastPlanT >= p.replanS || (plan_.order && !next(plan_)) || key !== openKey) {
                     const keep = next(plan_);
-                    plan_ = twinPlan(ctx.model, st, obs, ema, q, e, keep ? obs.stations.indexOf(keep) : -1, p.seconds); lastPlanT = obs.t; openKey = key; stats.plans++;
+                    const end = Math.min(p.seconds, obs.t + p.horizon);
+                    plan_ = twinPlan(ctx.model, st, obs, ema, q, e, keep ? obs.stations.indexOf(keep) : -1, end); lastPlanT = obs.t; openKey = key; stats.plans++;
+                    stats.rolloutSeconds += Object.keys(plan_.values).length * Math.max(0, end - obs.t);
                 }
                 station = next(plan_) || nearestOf(open, st.pos[0], st.pos[1]);
             }
