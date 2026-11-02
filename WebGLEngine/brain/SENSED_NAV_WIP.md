@@ -243,3 +243,33 @@ Reached of 60:
 * **The two failures of the designated vessel in the gaps are 24 m gaps (804 and 810) that the exact map also fails one of (810; the exact map's other failure is 855).**
 
 **What it would not say.** That a real sonar behaves like this (a perfect sonar inside its sector, a perfect heading, a white Gaussian fix: `nav-sensed-sonar-realism`); that 94% is the vessel's rate (one set of 60 a kind); that the filter is better than forgetting (+8 / +5); that the arms are the best possible (one range, one gain, one forgetting rule).
+
+## FOLLOW-UP 4: THE SONAR GETS REAL (Keith, 2026-11-02: "lets do nav-sensed-sonar-realism"; REGISTERED BEFORE ANY CODE FOR IT AND BEFORE ITS SET IS FLOWN)
+
+Every sensed result so far (follow-ups 1 to 3 above) has a PERFECT sonar inside its sector: it sees every cell, never sees one that is not there, sees through an island and has a perfect heading. The combined vessel of follow-up 3 (the 200 m sonar, a white 3 m fix, a map that forgets) reached 169 of 180 on those terms, and the notes there say two things that were not tested: forgetting is safe ONLY because a perfect sonar never finds an occupied cell free by mistake, and a longer sonar is free. This round takes the perfection off, **one thing at a time and then all four together**, and asks two questions: **what does each cost the vessel, and does forgetting survive the one that is its enemy (false returns)?**
+
+**Four degradations** (each applies at every ping to the cells the sonar ensonifies; the numbers are plausible, not tuned, and none was swept):
+* **Misses** (`miss` = 0.2): an occupied cell in the sector reads FREE with probability 0.2 at a ping, independently each ping.
+* **False returns** (`falseRate` = 0.001): a FREE cell in the sector reads OCCUPIED with probability 0.001 at a ping, independently (about 1.7 spurious cells a ping in the 200 m sector).
+* **Occlusion** (`occlude`): first surfaces only. A cell is ensonified only if the straight line from the vessel to it passes through no obstacle first; a cell inside an obstacle is marked occupied only if it lies within one cell (5 m) of where that line enters the obstacle (the front face); cells deeper inside, and every cell behind an obstacle, are not ensonified at all (unknown, not free). An island has to be walked round before its back is known.
+* **Heading error** (`headingSigma` = 2 degrees): the sonar's pointing is wrong by a white Gaussian error of 2 degrees at each ping, so everything it senses lands in the map rotated by that error about the vessel (at 200 m: 7 m, one sigma). The vessel's own steering is unaffected; only the sonar's registration is.
+
+**One study, one new set, nothing else changed.** The scenarios, vessel, autopilot, margin ladder, blocked edge, optimistic plan, re-plan after a change, 260 s flight, the 200 m sonar, the white 3 m fix and judging on the TRUE position and obstacles are as in the registrations above. **The set is HELD9 = seeds 901 to 960 of each of `hard-islands`, `hard-gaps` and `hard-current`** (180 scenarios), fresh (it shares no seed with DEV or HELD4 to HELD8), flown ONCE. The misses, false returns and heading errors come from a stream of their own (seeded by the scenario and the arm), so they never change the fix errors: the arms that share a fix still share its errors.
+
+**Arms** (every arm but `exact` is the combined vessel's 200 m sonar with the white 3 m fix; "sticky" is the map that never clears, "forget" the map of follow-up 2):
+* `exact` (HELD4's `any`: the ceiling); the three CLEAN arms `long+fix` (sticky), **`long+fix+forget`** and `long+fix+filter` (K = 0.2, sticky), re-flown on fresh seeds.
+* For each condition in {`miss`, `false`, `occl`, `head`, `all`} (`all` is the four together) a sticky arm and a forgetting arm: `miss+sticky`, `miss+forget`, `false+sticky`, `false+forget`, `occl+sticky`, `occl+forget`, `head+sticky`, `head+forget`, **`all+sticky`**, **`all+forget` (designated: the realistic vessel)**.
+
+**Bar and verdict.** The designated arm reaches **at least 80% of what `exact` reaches in EACH kind** (the count, not the 60). **SUPPORTED** if it does in all three kinds. **PARTLY SUPPORTED** if in at least two. **NOT SUPPORTED** otherwise.
+
+**Predictions (scored held or missed, moving nothing).** All over the three kinds together unless a kind is named.
+* **R1** misses are cheap: `miss+sticky` reaches within 5 flights of the clean `long+fix` (a sticky map ensonifies every cell every ping; a miss that is not repeated costs nothing).
+* **R2** false returns break a sticky map: `false+sticky` reaches at least 15 fewer than the clean `long+fix` (a spurious cell never clears and blocks 16 m round it).
+* **R3** forgetting survives them: `false+forget` reaches at least 15 more than `false+sticky`.
+* **R4** and nearly completely: `false+forget` reaches within 10 flights of the clean `long+fix+forget`.
+* **R5** occlusion costs the islands: in hard-islands `occl+sticky` reaches fewer than the clean `long+fix`.
+* **R6** a heading error hurts a long sonar: `head+sticky` reaches at least 10 fewer than the clean `long+fix`.
+* **R7** forgetting helps there too: `head+forget` reaches more than `head+sticky`.
+* **R8** the four together are worse than any one: `all+forget` reaches fewer than each of `miss+forget`, `false+forget`, `occl+forget` and `head+forget`.
+
+**What it would not say.** That these four are the real sonar's faults, or the numbers its values: a real sonar has beam patterns, a range-dependent noise, multipath, a ping that takes time, a range that depends on the water; the misses and false returns here are independent between cells and between pings, which real ones are not (a reef that is missed once is missed again); the heading error is white, a real compass has a bias; there is no filter on the sonar. That forgetting is the better cure in general (the filter, which needs no memory rule, is flown only clean). A result is a statement about this generator and these four models.
