@@ -11062,3 +11062,63 @@ ms, every pass on the device's clock.
 **What changes.** The chain's U_TH runs the coalesced pack by default from here. accumulate's `pack` defaults to "fast", and round 75's
 loop pass is kept as the reference it is held to, as rounds 48 and 55 kept the plain accumulation. denoise.html's sum that names U_TH
 is temporalUTF. Nothing ships by this alone. Shipping the chain with U_TH on the 1080 class is a release, Keith's call.
+
+## 176. ROUND 77 -- MOVING SCENES: DOES U_TH's GAIN OVER Bt HOLD WHEN THE OBJECTS MOVE? FIXED BEFORE ITS CODE
+
+**Why.** Every scene rounds 32-76 tested moved only the camera. Bt's history (sections 95, 161) is matched by world position: a
+pixel takes its previous frame's sample when the previous first hit is the same object, within POS_TOL (3) pixel footprints of the
+same point and facing within NORMAL_DOT. There are no object motion vectors. So an object that moves breaks Bt's history in two
+ways, and U_TH (round 72's network, section 170) has seen neither:
+- **rejected history:** a surface that moved more than the tolerance in a frame restarts at n = 1, so Bt there is close to one
+  noisy frame;
+- **stale history:** a surface that moved less than the tolerance, and every static surface whose LIGHTING changed (the moving
+  objects' shadows and reflections on the ground and on each other), keeps a history that is wrong. Only Bt's clamp stands
+  against it.
+This is the case temporal upscalers are known to fail on, and the one section 175's result says nothing about.
+
+**The motion (render/movingScenes.mjs).**
+- Every sphere that is neither the ground (index 0) nor a light moves in a straight line in the ground plane at its own constant
+  velocity: a direction uniform on the circle and a speed uniform in **0.01-0.08 world units a frame**, from a stream seeded by the
+  scene's seed and kept apart from every stream the scene already draws. The lights and the ground do not move; the camera moves
+  as before (cameraPath).
+- **The motion runs backwards from the measured frame.** Frame f puts each mover at its centre + v (f - 7), so the LAST frame is
+  the scene exactly as makeScene draws it. The measured frame, its guides, its light sources and its two references are therefore
+  the static example's, bit for bit; only the seven history frames differ.
+- The range straddles the tolerance on purpose. At 256 x 256, 40 degrees and the ring's ~4.5 units, a pixel is ~0.013 units and
+  POS_TOL's three footprints ~0.04 units head-on: speeds under ~0.04 a frame keep a stale history, faster ones are rejected.
+
+**ROUND 77, a test only.** No network is trained. The network is round 72's U_TH candidate (render/upscale-net-r72.json), and C2 is
+round 72's.
+- **Test:** 24 new scenes, 12 R (77000-77011) and 12 C (78000-78011), at round 72's settings (256 x 256, 4 samples in, two 2048-sample
+  references), **each rendered twice: moving and still.** The still example is temporalExample exactly as rounds 70 and 72 ran it.
+  The moving one shares its references.
+- **H77a:** on the MOVING scenes, U_TH's chain beats Bt's, by section 159's rule: a mean display relMSE at least 1 % below Bt's,
+  through verdict() as H1 was in rounds 70 and 72 (the sign-flip test, Holm with H77b, C1-C5).
+- **H77b:** on the moving scenes, U_TH's chain beats B1's, as H2.
+- **Descriptive, deciding nothing:**
+  - the still scenes' gain over Bt, and the drop from it to the moving gain, scene by scene;
+  - Bt's mean history length (n) moving and still;
+  - the gain over Bt on the MOVER pixels alone (the measured frame's pixels whose first hit is a moving sphere) and on the rest;
+  - each scene's mean correction, as P4 of section 161.
+- Files: render/denoise-results-upscale-moving-r77.json.
+
+**Predictions, fixed now, deciding nothing.**
+- **P1:** C1 and C3 hold.
+- **P2:** H77a is supported, at a gain of 2-5 %, below the still scenes' gain on the same 24. U_TH trained with disocclusions in
+  its data, where n = 1, and it reads A against the current frame C, so a rejected history is a case it has met. A stale one it
+  has not.
+- **P3:** H77b is supported.
+- **P4:** the still scenes' gain is 3-8 %, round 72's 5.44 % within the spread of a new set.
+- **P5:** Bt's mean n is lower moving than still on every scene.
+- **P6:** on the mover pixels U_TH's gain over Bt is positive, and larger than on the rest: where Bt has restarted, it is close to
+  one noisy frame, and U_TH's correction has the most to take.
+
+**What each outcome means, fixed now.**
+- **H77a holds:** U_TH's gain survives moving objects without motion vectors, and the chain with U_TH (section 175) stands for
+  scenes that move.
+- **H77a fails, the still gain holding:** the gain is a static-scene result. That is said wherever U_TH is, and the next round is
+  object motion vectors for Bt's history, or U_TH trained on moving sequences.
+- **Both fail:** the set, not the motion, is the question first; it is reported as it lands.
+
+**The run, on Keith's rig, at round 77's commit:** `--harvest-upscale-temporal-test --round 77`, its file committed byte for byte
+before it is read. One GPU is enough: it is a CPU harvest. Section 177 reads it.
