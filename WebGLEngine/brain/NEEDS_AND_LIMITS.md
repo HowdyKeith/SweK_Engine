@@ -285,3 +285,38 @@ Recorded on the rig (1080 box), one recording per model, temperature 0: gemma2:9
 **Against the expectations of section 8, which were written first:** llama NO EFFECT (about 55 percent): consistent (the registered wording allows MIXED). gemma HELPS (about 45 percent): WRONG, it did not help. qwen HURTS (about 75 percent): NOT TESTED. Any model beats a fixed cap (about 10 percent): did not happen (ties on all three audits for both, one audit-level win by gemma). RULE-GF beats every model on all three audits (about 80 percent): HELD, for both. Strongest cap 0.65 (about 50 percent): it was the strongest on one audit of three, so that call was poor.
 **WHAT THIS MEANS and does not.** These two local models, at temperature 0 with this prompt (schema 1), this brain and this socket, do not add content beyond a fixed depth cap, and the hand-written rule beats them by 0.18 to 0.32 on every audit. It does not mean a language model cannot advise a submarine: a larger model, a different prompt, the API models or advice at another cadence are untested (section 9 puts them out of this round). It also does not say the rule is good in general: it was written against this task and gauge.
 **UNCHECKED:** whether the models' advice carries information the cap does not (the per-tick overlap with a lower cap was not measured here); qwen; a third seat for a mixed rule-plus-model advisor.
+
+# Round 6 -- a rule plus a LEARNED RESIDUAL in the advisor seat (REGISTERED 2026-11-02, before any code, any training run or any fresh seed was read)
+
+*Keith's goal (2026-11-02): an actually smarter sub, with the bet on STRUCTURE (rules plus a learned residual, seats, a search budget), not on biological wiring. Rounds 3-5 and the vestibular rungs found where gains came from: the hand-written rule (a filter and a depth-dependent trip) and a trained readout, not wiring or memory. Round 6 tests the structure directly.*
+
+## 1. The question, and what a result would and would not mean
+**THE QUESTION.** Take `GUARDED-FILTER` (the rule that beats every fixed cap and both language models) and add a small LEARNED RESIDUAL to the decisions it makes. Does the rule-plus-residual beat the rule it starts as, on seeds nobody has read? The residual can only nudge two things: the charge level at which the seat asks to surface (a shift of at most +-0.15 on top of `obsThreshold(depth)`), and a depth cap (it can lower the rule's cap by at most 40 percent, never raise it). Station choice, pump and repair stay the rule's. **WHAT A RESULT WOULD MEAN:** this residual, this feature set, this training budget, this task and gauge. **WHAT IT WOULD NOT MEAN:** that learning cannot improve a sub; that a larger residual, other outputs (station choice, tactics) or other tasks would not; and a win says nothing about biology.
+
+## 2. The seat and the socket
+The advisor `RESIDUAL(w)`: a seat `(ctx) -> (st, obs) -> decision` in the Round 4 socket. Features (all from `obs` and `st`, no second channel): the filtered charge fraction (alpha 0.005), the raw gauge, depth over the current collapse depth, flooding, damage, time fraction, the number of unvisited feasible stations over 4, the nearest feasible station's depth over the collapse depth. A plain MLP, 8 inputs, 12 tanh hidden, 2 outputs (threshold shift, cap cut); **the output weights and biases start at ZERO, so `RESIDUAL(0)` is `GUARDED-FILTER` exactly** (a gate holds this, as a decision-for-decision and score-for-score identity). Trained by the (1+1)-ES of `trainNeedsCircuit` (sigma 0.3, sparse children, the same prune toward the start), fitness the mean survey-run score on the training dives, noisy gauge, 24 training dives = seeds 241-246 x four kinds.
+
+## 3. The arms (all flown on the same dives, paired, noisy gauge, brain `GUARDED-OBS`, VETO)
+* **ALONE**; **CAP-0.50, CAP-0.65, CAP-0.75** (STRONGEST FIXED CAP per audit); **RULE-GF** (the START of the residual); **RULE-G**; **RESIDUAL** (the champion); **RESIDUAL-ZERO** (the start, held equal to RULE-GF); **SHUFFLED-RESIDUAL** (the champion's weights with the hidden layer's rows permuted: a content control -- it must lose to RESIDUAL if the residual reads its features; the output weights are permuted instead if rows are symmetric). No other arm is in the verdicts.
+
+## 4. The sets: fresh, never read
+**Train** 241-246 (24 dives); **validation** 271-282 (48 dives; picks the champion among the checkpoints, so it is not an audit); **audits R1 301-312, R2 321-332, R3 341-352**, four kinds each, 48 dives each, read ONCE for the champion. **No seed of Rounds 1-5 is used.** Training never touches 301-352.
+
+## 5. Checks, run first and recorded; a failure is the first line of the report and the verdicts are then not weighed
+IDENTITY (RESIDUAL-ZERO equals RULE-GF dive for dive); BOUNDS (the shift stays in +-0.15, the cap never rises above the rule's, for any weights); PURE (same weights, same dives, same fingerprints twice); THE RULE IS NOT TRIVIAL (RULE-GF beats ALONE by the margin on far and both on these audits); the champion is chosen on validation BEFORE the audits are flown (the report prints the order).
+
+## 6. The verdicts (the margin rule: A beats B on an audit iff the paired mean difference exceeds max(0.02, 2 se))
+* **RESIDUAL BEATS ITS START** iff it beats RULE-GF on all three audits; **LOSES TO ITS START** iff RULE-GF beats it on all three; otherwise **TIES** (signs printed).
+* **RESIDUAL BEATS A FIXED CAP** and **BEATS ALONE**, by the same rule. **READS ITS FEATURES** iff RESIDUAL beats SHUFFLED-RESIDUAL on all three audits.
+* **THE BOTTOM LINE:** `A LEARNED RESIDUAL IMPROVES THE RULE` iff BEATS ITS START on all three AND READS ITS FEATURES; `NO GAIN OVER THE RULE` otherwise; `HURTS` iff it loses on all three.
+* **REPORTED, NOT IN THE VERDICTS:** crushed and stranded counts, per kind means, the mean shift and cap cut it applies, how many weights moved from the start.
+
+## 7. Expectations, recorded BEFORE any run
+* RULE-GF is already near the ceiling the residual can reach with these two outputs (its misses are far and both dives at 0.75-0.81, mostly time and station choice, which the residual cannot touch). **BEATS ITS START on all three audits: about 20 percent.** TIES: 60. LOSES: 20 (over-fitting 24 dives).
+* READS ITS FEATURES, given it beats its start: about 70 percent.
+* BEATS A FIXED CAP: about 90 percent (the rule already does). BEATS ALONE: about 97 percent.
+* The most probable bottom line: `NO GAIN OVER THE RULE`, and the report then says by how much the audits' means differ from the start, so the size of the unused headroom is on the record.
+
+## 8. What will be built, in this order, each gated and sabotaged before the training run (nothing existing is edited)
+1. `brain/residualAdvisor.mjs` (the seat, the features, the MLP, the zero start, the bounds) and its gate. 2. `tools/ship/trainResidual.mjs` (library: the ES, the arms, the checks, the verdicts, the report) with its export-free command `trainResidualCmd.mjs` and gate. 3. A mutation pass, every mutant red BY NAME. 4. Training on the box (about 40 minutes), the audits read once, the report written as section 9.
+**NOT IN THIS ROUND:** station choice or tactics as outputs; a bigger network or more search; the language models; the circuits; training on any audit seed; a change to `needsTask.mjs`, `advisorChip.mjs` or the gauge.
