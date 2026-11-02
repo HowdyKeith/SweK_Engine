@@ -213,3 +213,33 @@ Follow-up 2 tested the cures apart: **a 200 m sonar** with an exact position and
 ### AMENDMENT 1 TO FOLLOW-UP 3 (2026-11-02; DEV flown once after the code and both gates were sabotaged, BEFORE HELD8 was flown; seeds 1 to 10 of each kind, 30 scenarios; DEV is not a result and nothing above was changed by it)
 
 The command runs end to end. Reached of 30 (three kinds together): `exact` 29, `sonar-200` 29, `sensed+fix` 20, `fix+forget` 23, `long+fix` 25, **`long+fix+forget` 28**, `long+fix+filter` 28, `long+fix+forget+filter` 29, `long+drift` 29. Two of the printed judgements are arithmetic of the sample and not findings: a gain of 20 over `sensed+fix` and a floor of 45 of the gaps cannot be met by a study of 30 scenarios with 10 gaps, so DEV prints MISSED for them whatever the arms do; HELD8 has 180 scenarios and 60 gaps. The registration stands as written.
+
+## RESULT OF FOLLOW-UP 3 (2026-11-02; `node tools/ship/subSensedFollowStudy.mjs --study combined --set held8 --write`, HELD8 = seeds 801 to 860 of each of hard-islands, hard-gaps and hard-current, read once; every flight is in `brain/subSensedCombinedHeld8.jsonl`, 1,620 records): **SUPPORTED** -- the designated vessel (the 200 m sonar, a white 3 m fix, a map that forgets) loses no more than 3 flights against the exact map in any kind and reaches 65 more than the incumbent (`sensed+fix`, 104 of 180). **All seven predictions C1 to C7 held.**
+
+The study command and its gate were sabotaged first (201 mutants: 197 red, 4 caught only by not finishing, said in the gate header; the module's 18 new mutants all red), DEV was flown on 10 seeds as a sanity run (Amendment 1 above) and HELD8 was flown once, as registered.
+
+Reached of 60:
+
+| arm | hard-islands | hard-gaps | hard-current | three kinds | gaps by width (of 20): 24 / 32 / 40 m | median plans a flight |
+|---|---|---|---|---|---|---|
+| `exact` (the ceiling) | 59 | 58 | 57 | 174 | 18 / 20 / 20 | - |
+| `sonar-200` (long sonar, exact position) | 58 | 57 | 55 | 170 | 17 / 20 / 20 | 33 |
+| `sensed+fix` (the HELD6 incumbent) | 45 | 8 | 51 | 104 | 0 / 1 / 7 | 55 |
+| `fix+forget` (follow-up 2's best, 100 m) | 53 | 27 | 50 | 130 | 0 / 9 / 18 | 75.5 |
+| `long+fix` (long, white fix, sticky) | 54 | 51 | 54 | 159 | 11 / 20 / 20 | 42 |
+| **`long+fix+forget` (designated)** | **57** | **58** | **54** | **169** | **18 / 20 / 20** | 88 |
+| `long+fix+filter` (K = 0.2, sticky) | 56 | **60** | 56 | **172** | 20 / 20 / 20 | 42 |
+| `long+fix+forget+filter` | 58 | 58 | 57 | 173 | 18 / 20 / 20 | 83 |
+| `long+drift` (no fix, drift) | 56 | 58 | 55 | 169 | 18 / 20 / 20 | 45 |
+
+**Bar.** `long+fix+forget` against `exact`: 57 against 59 in the islands (loses 2), 58 against 58 in the gaps (0), 54 against 57 in the current (loses 3): never more than 3, one-sided as registered: HELD. Gain over `sensed+fix`: 169 against 104, **+65** against the +20 asked: HELD. **SUPPORTED.**
+
+**Predictions.** **C1 held** (169 against `fix+forget`'s 130). **C2 held** (58 against 27 gaps). **C3 held** (`long+fix` 159 against `sonar-200`'s 170: the smear survives a long sonar). **C4 held** (169 against `long+fix`'s 159). **C5 held** (`long+fix+forget+filter` 173, within 4). **C6 held** (`long+drift` 169 against 170). **C7 held** (58 of the 60 gaps against the floor of 45).
+
+**Post hoc (labelled; none of it moves the verdict).**
+* **Paired, three kinds, flights gained and lost against the other arm, exact sign test:** `long+fix+forget` against `sensed+fix` +69 / +4 (p < 0.0001); against `fix+forget` +43 / +4 (p < 0.0001); against `long+fix` +17 / +7 (**p 0.064**); against `exact` +2 / +7 (p 0.18); **against `sonar-200` +3 / +4 (p 1.0)**. So the noisy fix with forgetting flies as well as the exact position does with the same sonar, and the two cures add: the long sonar's gain over the short one and forgetting's gain over a sticky fix are both there in the one vessel.
+* **The long sonar leaves the smear cost smaller, but there.** `long+fix` against `sonar-200`: +5 / +16 (p 0.027); the gaps feel it (11 of 20 of the 24 m gaps against 17). Forgetting against sticky with the long sonar is +17 / +7 (p 0.064), weaker than with the short sonar in follow-up 2 (+36 / +5).
+* **The filter did at least as well as forgetting here, for half the planning.** `long+fix+filter` reached 172 (60 of 60 gaps) against `long+fix+forget`'s 169: +8 / +5 (p 0.58), not told apart; against `long+fix` +15 / +2 (p 0.002). It makes a median of 42 plans a flight, forgetting 88 (`long+fix` 42): forgetting re-plans after any ping that changes any cell, a filter changes nothing about the map. With the short sonar in follow-up 2 the order was the other way (forgetting 138, filter 132); with false returns, which a perfect sonar does not have, forgetting may be a different matter.
+* **The two failures of the designated vessel in the gaps are 24 m gaps (804 and 810) that the exact map also fails one of (810; the exact map's other failure is 855).**
+
+**What it would not say.** That a real sonar behaves like this (a perfect sonar inside its sector, a perfect heading, a white Gaussian fix: `nav-sensed-sonar-realism`); that 94% is the vessel's rate (one set of 60 a kind); that the filter is better than forgetting (+8 / +5); that the arms are the best possible (one range, one gain, one forgetting rule).

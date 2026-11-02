@@ -2824,16 +2824,14 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "nav-sensed-combined",
-        blocker: "OPEN",
-        what: "The two cures were tested apart (brain/SENSED_NAV_WIP.md, RESULT OF FOLLOW-UP 2): a 200 m sonar reaches what the omniscient sonar does with an exact position, and forgetting recovers the whole cost of a 3 m white fix with the 100 m sonar. The vessel one would build has both, and drift, and is not an arm.",
-        how: "sonar-200 with the noisy fix and forgetting (and the filter), on fresh seeds, scored against the exact map on the same scenarios; the three kinds of subHardNav.mjs; new registration.",
-        why: "The gap result is for an exact position and the fix result is for the 100 m sonar; whether they add is not shown.",
+        state: "CLOSED",
+        what: "CLOSED 2026-11-02 (brain/SENSED_NAV_WIP.md, RESULT OF FOLLOW-UP 3; tools/ship/subSensedFollowStudy.mjs --study combined, flights in brain/subSensedCombinedHeld8.jsonl): SUPPORTED. The vessel with the 200 m sonar, a white 3 m fix and a map that forgets reaches 169 of 180 (the exact map 174; the HELD6 incumbent 104), loses at most 3 flights against the exact map in any kind, and is indistinguishable from the same sonar with an exact position (+3 / +4). A filtered fix with a sticky map did as well (172) for half the planning.",
     },
     {
         id: "nav-sensed-sonar-realism",
         blocker: "OPEN",
         what: "Every sensed result has a PERFECT sonar inside its sector (no noise, no false returns, no occlusion) and a perfect heading; forgetting is safe only because a perfect sonar never finds an occupied cell free by mistake, and a longer sonar is free.",
-        how: "Degrade the sonar one thing at a time -- a miss rate, false returns, an island hiding what is behind it, a heading error -- with the range, the cone and the forgetting rule of the two studies, and read what each costs; new registration, fresh seeds.",
+        how: "Degrade the sonar one thing at a time -- a miss rate, false returns, an island hiding what is behind it, a heading error -- with the range, the cone and the forgetting rule of the two studies, and read what each costs, with the combined vessel of brain/SENSED_NAV_WIP.md follow-up 3 and with its two cures apart (forgetting and a filtered fix tied there; forgetting may not survive false returns); new registration, fresh seeds.",
         why: "The sensed map's results are ceilings; the size of the gap between them and a real sonar is not known.",
     },
     {
