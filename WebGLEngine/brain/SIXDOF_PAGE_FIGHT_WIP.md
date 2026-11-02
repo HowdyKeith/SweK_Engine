@@ -105,3 +105,38 @@ The hand, zero and noise choices are not pilots anyone trained, so they are left
   - a browser miniature on scratch battle seeds through the command's own script;
   - the command never overwriting and printing no score, held without ever starting the registered round (the GPU
     Brain round's incident is why).
+
+## Built, 2026-11-02, before the registered run (nothing of the registration above is changed)
+
+**What exists:**
+- `tools/ship/sixdofPageFight.mjs` (the library), `tools/ship/sixdofPageFightCmd.mjs` (the command) and the gate
+  `tools/ship/sixdofPageFight-selfcheck.mjs` (a browser, about 7 s, 27 rows).
+- The page is untouched by this round: it is measured through `window.__sixdof.runBattles()`, which it already had.
+
+**How the run is shaped.**
+- **The controls come first, in one browser.** C-pilots needs every brain on the page to be the registered file, its
+  team to have flown it, and the page's own pilot function to fly Node's fingerprints on duel seeds 99401-99402.
+  Nothing is flown on a battle seed unless C-pilots holds.
+- **Then the plan, in a second browser:** 25 matchups of 100 battles, and the determinism matchup again. The second
+  browser's C-pilots is recorded too.
+- **Raw battles go to the file.** The command writes `brain/sixdofPageFightResults.json` and prints only where it is.
+  The readings are made by the library's `verdictOf()` from the committed file.
+
+**The gate never executes the command, and never flies a registered seed.**
+- The command's guards are held as the library functions they are, together with the order the command calls them
+  in. So no single sabotage of a guard can start the registered round, as the GPU Brain round's gate once did.
+- The miniature flies all five pilots on scratch battle seeds 990101-990102, and a probe flies 990301.
+
+**Sabotaged with the byte-safe runner: 15 designs, each red by name** (the counts are in the gate's header). Two findings
+came before the sabotages:
+- **The gate's own reference was wrong.** Its BigInt reference for the sign test truncated every p under 1e-18 to
+  zero, so the agreement row went red on a correct library. It now shifts n + 64 bits first.
+- **Two sabotages would have gone 0 red.** C-pilots echoing the asked id, and a matchup echoing the plan's lineup, could
+  not be told from a correct reading by a page that flies what it is asked. A probe that asks for a choice the page does
+  not hold was added before they were run, and they went 1 red each.
+
+**Seen after the registration was committed, and said here:** the gate's first run printed its first matchup's two
+scratch battles, seeds 990101 and 990102, the PD autopilot on side A against the Default on side B. The Default won
+both. They are scratch seeds and decide nothing. The gate now prints a count instead of rows.
+
+**The registered run:** `node tools/ship/sixdofPageFightCmd.mjs`.
