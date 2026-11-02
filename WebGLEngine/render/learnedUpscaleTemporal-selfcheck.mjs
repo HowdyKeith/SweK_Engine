@@ -131,12 +131,14 @@ console.log("\n4. THE STUDY");
          LT.temporalKey("R", 1, { ...base, ref2: true }), LT.temporalKey("R", 1, { ...base, harvest: true })].every((k, i, all) => k !== k0 && all.indexOf(k) === i) && k0.startsWith("upscale-temporal-"));
     const cli = fs.readFileSync(path.join(ENG, "tools/denoiseStudy.mjs"), "utf8"), br = (flag) => { const b0 = cli.indexOf(`} else if (args.includes("${flag}")) {`); return b0 >= 0 ? cli.slice(b0, cli.indexOf("} else if (", b0 + 10)).replace(/\/\/.*$/gm, "") : ""; };
     const a = br("--harvest-upscale-temporal-train"), b = br("--harvest-upscale-temporal-test");
+    // round 77 (section 176): the test's call is (RD.moving ? LT.runMovingTest : LT.runTemporalTest)(...) since that round, so the order
+    // row reads that call site; the start commit still has to come first. movingScenes-selfcheck holds the dispatch itself.
     ok("!! --harvest-upscale-temporal-train: the round's splits and samples under harvest, the start commit read before it runs, its own file never overwritten, every seed's net and C2's, the shipped sha-256",
         /LT\.runTemporalTraining\(\{ splits: RD\.splits, W: RD\.image, sppIn: RD\.sppIn, sppRef: RD\.sppRef, net: decodeNet\(shipped\.net\), harvest: true, cache,/.test(a) && /path\.join\(ENG, RD\.net\)/.test(a) &&
         /existsSync\(file\)/.test(a) && a.indexOf("startCommit = git(") >= 0 && a.indexOf("startCommit = git(") < a.indexOf("LT.runTemporalTraining(") && /commit: startCommit/.test(a) && /c2: \{/.test(a) && /sha256/.test(a) && !/verdict/.test(a));
     ok("!! --harvest-upscale-temporal-test: the committed training file's candidate and C2, the test's 2048-sample truth under harvest, its own file never overwritten, both commits",
         /tr\.runs\.find\(\(x\) => x\.seed === tr\.candidate\)/.test(b) && /Uc2: decodeNet\(tr\.c2\.net\)/.test(b) && /sppRef: RD\.sppRefTest/.test(b) && /harvest: true/.test(b) && /path\.join\(ENG, RD\.results\)/.test(b) &&
-        /existsSync\(file\)/.test(b) && b.indexOf("startCommit = git(") < b.indexOf("LT.runTemporalTest(") && /out\.commit = startCommit;/.test(b) && /commit: tr\.commit/.test(b));
+        /existsSync\(file\)/.test(b) && b.indexOf("startCommit = git(") >= 0 && b.indexOf("startCommit = git(") < b.indexOf("LT.runTemporalTest)(") && /out\.commit = startCommit;/.test(b) && /commit: tr\.commit/.test(b));
 }
 
 console.log("\n5. SECTION 162: ROUND 70's COMMITTED HARVESTS, READ BACK -- U_T BEAT Bt");
@@ -251,6 +253,16 @@ console.log("\n7. SECTION 170: ROUND 72's COMMITTED HARVESTS, READ BACK -- U_TH 
     ok("  v4909: U_TH is UTH_WIDTH (16) wide in every hidden layer and isHalfT reads it; UT_VARIANTS is full and half, and makeUpscalerT builds each",
         T.UTH_WIDTH === 16 && T.UTH_SHAPE.slice(0, 3).every((l) => l[1] === T.UTH_WIDTH) && T.UT_VARIANTS.join() === "full,half" && Object.isFrozen(T.UT_VARIANTS) &&
         T.UT_VARIANTS.map((vv) => T.isHalfT(T.makeUpscalerT(seededRandom(3), vv))).join() === "false,true");
+}
+
+{   // round 77 (section 176): exampleFrames, the eight frames temporalExample takes (moved out of it so a moving frame can be held to sceneAt)
+    // SABOTAGED, restored byte-identical: X1 each frame's shift the unscaled jitter -> 2 red (this row, and section 1's channels 6-8);
+    // O1 the test's start commit dropped from the command -> 1 red (the order row in section 4, re-pointed at round 77's call site).
+    const TU = await imp("render/denoiseTemporalUpscale.mjs"), net0 = decodeNet(JSON.parse(fs.readFileSync(path.join(ENG, "render", "denoise-net-r11.json"), "utf8")).net);
+    const S = D.makeScene("R", 990950), fr = T.exampleFrames(S, net0, { W: 16, sppIn: 1 }), ex = T.temporalExample("R", 990950, net0, { W: 16, sppIn: 1, sppRef: 2 });
+    const C = TU.shiftResample(fr[FRAMES - 1].y, 16, 16, ...fr[FRAMES - 1].shift), c6 = []; for (let p = 0; p < 256; p++) for (let c = 0; c < 3; c++) c6.push(ex.x[p * T.UT_CHANNELS + 6 + c]);
+    ok("  exampleFrames: eight frames, each W x W after EASU with its jitter's full-size shift, and the last one, re-sampled, is the example's C (channels 6-8) bit for bit",
+        fr.length === FRAMES && fr.every((f, k) => f.y.length === 768 && f.input.length === 192 && f.shift.join() === TU.halfShift(TU.JITTER[k]).join()) && c6.every((v, i) => Object.is(v, C[i])));
 }
 
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +

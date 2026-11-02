@@ -649,6 +649,13 @@ console.log("\n18. ROUND 58: FAMILY P, path-tracer.html'S OWN SIX SCENES (pre-re
         new Set(t1).size === 72 && t1.every((x) => !prior.has(x)), `${t1.length} seeds`);
 }
 
+{   // round 77 (section 176): the moving scenes' test set
+    const T1 = D.SPLITS_UPSCALE_MOVING.T1, seen = new Set([D.SPLITS_UPSCALE_LEARNED, D.SPLITS_UPSCALE_LEARNED_67, D.SPLITS_UPSCALE_LEARNED_68, D.SPLITS_UPSCALE_LEARNED_69, D.SPLITS_UPSCALE_TEMPORAL, D.SPLITS_UPSCALE_TEMPORAL_72].flatMap((s) => Object.values(s).flatMap((x) => x.seeds)));
+    ok("  SPLITS_UPSCALE_MOVING: a test set only, 12 R at 77000-77011 then 12 C at 78000-78011, frozen, no seed an earlier upscale set used, each reserved",
+        Object.keys(D.SPLITS_UPSCALE_MOVING).join() === "T1" && Object.isFrozen(D.SPLITS_UPSCALE_MOVING) && T1.seeds.length === 24 && T1.seeds[0] === 77000 && T1.seeds[11] === 77011 && T1.seeds[12] === 78000 && T1.seeds[23] === 78011 &&
+        T1.families.slice(0, 12).every((f) => f === "R") && T1.families.slice(12).every((f) => f === "C") && T1.seeds.every((x) => !seen.has(x) && D.isDatasetSeed(x)));
+}
+
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +
     "\nnot closed here: whether these scenes are a FAIR test. That is a judgement the pre-registration made in prose; " +
     "this gate holds the code to that prose, not the prose to the world.");
