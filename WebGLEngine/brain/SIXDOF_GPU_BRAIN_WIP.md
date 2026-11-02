@@ -128,8 +128,9 @@ fruit fly's: 18.60 (W0/L0/D8).
 - The weight file is a separate, later step, `--write-from` that committed file, and only if the champion qualified.
 - `run()` takes substitute audit and H2 seeds, so the gates and the smoke test never fly the registered ones.
 
-**Sabotaged 28 ways with the byte-safe runner, each file restored byte-identical.** The counts are in the three gates'
-headers. Two went 0 red on the first draft, and both are findings:
+**Sabotaged with the byte-safe runner: 26 runs of 24 designs, each file restored byte-identical.** S7 and T3 ran twice,
+and the first C1 is the incident below, replaced by C1 and C1b. Every other design went red by name; the counts are in
+the three gates' headers. Two went 0 red on the first draft, and both are findings:
 - **S7, a search that accepts every child.** The row checked the score the search reports, which a worse child never
   lowers. It now re-scores the weights the search returns.
 - **T3, the champion picked on train score.** The miniature's two searches tied on held-out, so either order picked the
