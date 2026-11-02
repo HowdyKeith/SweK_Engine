@@ -1,0 +1,86 @@
+{
+ "tuned": 0.07,
+ "curve": [
+  {
+   "shift": 0,
+   "score": 0.7093750000000001
+  },
+  {
+   "shift": 0.01,
+   "score": 0.7468750000000001
+  },
+  {
+   "shift": 0.02,
+   "score": 0.7937500000000003
+  },
+  {
+   "shift": 0.03,
+   "score": 0.8031250000000002
+  },
+  {
+   "shift": 0.04,
+   "score": 0.8124186866917326
+  },
+  {
+   "shift": 0.05,
+   "score": 0.8123976312708489
+  },
+  {
+   "shift": 0.06,
+   "score": 0.8405224194520627
+  },
+  {
+   "shift": 0.07,
+   "score": 0.8514585026630853
+  },
+  {
+   "shift": 0.08,
+   "score": 0.8484374999999998
+  },
+  {
+   "shift": 0.09,
+   "score": 0.8359374999999999
+  },
+  {
+   "shift": 0.1,
+   "score": 0.8374999999999999
+  },
+  {
+   "shift": 0.11,
+   "score": 0.8328125000000001
+  },
+  {
+   "shift": 0.12,
+   "score": 0.8234374999999999
+  },
+  {
+   "shift": 0.13,
+   "score": 0.8453124999999999
+  },
+  {
+   "shift": 0.14,
+   "score": 0.8453124999999999
+  }
+ ],
+ "report": [
+  "ROUND 7: is the residual a retuned threshold? noisy gauge, brain GUARDED-OBS, VETO; audits S1 421-432, S2 441-452, S3 461-472 (48 dives each, read once)",
+  "tuned shift 0.07 (best validation mean 0.8515), chosen BEFORE the audits were flown; champion = search 62000 iteration 210",
+  "  PASS IDENTITY: a constant shift of 0 equals RULE-GF dive for dive",
+  "  PASS RULE NOT TRIVIAL S1: RULE-GF beats ALONE on far and both on S1 by 0.152 (margin 0.111)",
+  "  PASS RULE NOT TRIVIAL S2: RULE-GF beats ALONE on far and both on S2 by 0.264 (margin 0.113)",
+  "  PASS RULE NOT TRIVIAL S3: RULE-GF beats ALONE on far and both on S3 by 0.254 (margin 0.100)",
+  "  PASS TUNING CURVE: 0.00:0.709 0.01:0.747 0.02:0.794 0.03:0.803 0.04:0.812 0.05:0.812 0.06:0.841 0.07:0.851 0.08:0.848 0.09:0.836 0.10:0.837 0.11:0.833 0.12:0.823 0.13:0.845 0.14:0.845",
+  "means S1 | S2 | S3",
+  "  ALONE        0.620 | 0.614 | 0.591   crushed 3/5/5  stranded 3/2/2",
+  "  RULE-GF      0.711 | 0.764 | 0.718   crushed 0/0/1  stranded 0/0/0",
+  "  RESIDUAL     0.842 | 0.853 | 0.817   crushed 0/0/0  stranded 0/0/0",
+  "  CONST-0.05   0.808 | 0.843 | 0.839   crushed 0/0/0  stranded 0/0/0",
+  "  CONST-0.10   0.823 | 0.856 | 0.817   crushed 0/0/0  stranded 0/0/0",
+  "  CONST-0.14   0.820 | 0.838 | 0.829   crushed 0/0/0  stranded 0/0/0",
+  "  CONST-TUNED  0.811 | 0.859 | 0.811   crushed 0/0/0  stranded 0/0/0",
+  "CONST-TUNED against RULE-GF: +0.100 WINS | +0.095 WINS | +0.093 WINS = BEATS",
+  "RESIDUAL against CONST-TUNED: +0.031 tie | -0.006 tie | +0.006 tie = TIES (wins on 0 of 3)",
+  "RESIDUAL against RULE-GF (Round 6 again, fresh seeds): +0.131 WINS | +0.089 WINS | +0.100 WINS = BEATS",
+  "BOTTOM LINE: TUNING EXPLAINS IT"
+ ]
+}
