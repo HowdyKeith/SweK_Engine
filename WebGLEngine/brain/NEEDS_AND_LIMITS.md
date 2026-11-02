@@ -576,3 +576,26 @@ The first plan carries most of the gain: REPLAN-480 and ONCE both KEEP and MATCH
 
 ## 6. What will be built
 The two options in `brain/plannerPerturbed.mjs` (existing behaviour unchanged at the defaults; gate rows and a mutation pass), `tools/ship/plannerBudget.mjs` (library, built on plannerTolerance's pooled reading), `plannerBudgetCmd.mjs` (export-free: `run`, parallel by arm) and its gate with a mutation pass; then the run (13 arms x 192 dives of 2-3 s each: about 30 minutes on four cores) and the result as section 7. **NOT IN THIS ROUND:** a learned planner, changes to the number of stations considered (every scenario of this task has exactly three), and model error (Round 13).
+
+# Round 15 -- how bad a GAUGE can the planner stand? Sensor noise against the gain (REGISTERED 2026-11-02, before any code and before any of its seeds was flown)
+
+## 1. Why
+Every round since Round 4 has flown with one gauge: the charge reading is the true fraction plus seeded Gaussian noise of sd 0.1, refreshed once a second (`needsTask.GAUGE`). Both the tuned rule (a 0.001 low-pass filter, a depth-ramped trip, cap 0.886) and the twin (which seeds its rollouts from that filtered charge) live on that reading. Round 13 said the twin tolerates a 10-20 percent error in the energy it starts from; the filter's own error at sd 0.1 is far smaller. Round 15 asks how the whole stack, the tuned constants and the planner on top, degrades when the gauge gets worse (and better), and whether the planner's gain survives a bad gauge. Nothing is retuned: the Round 8 constants are used as they are at every noise level, which is the honest question for a fielded sensor.
+
+## 2. The arms
+Gauge standard deviation **sd in {0, 0.05, 0.10, 0.20, 0.30}** (the same 1 Hz refresh, the same seeded noise stream per scenario, so a larger sd is the same noise scaled up and the levels are paired on every dive). At each sd: **TUNED-R8** and **TWIN-FULL** (brain/plannerPerturbed.mjs with no error, replan 120 s, unlimited look-ahead: Round 12's twin). Ten arms, plus **TWIN-ROUND11** at sd 0.10 as the identity check.
+
+## 3. The sets and the checks
+**U1 1341-1388, U2 1401-1448**, far and both, 96 dives each, 192 in all, read once, no seed used by any earlier round. Checks (a failure and the verdicts are NOT WEIGHED): TWIN-FULL at sd 0.10 equals the Round 11 twin dive for dive on every set; **the gain at sd 0.10 is REAL on these seeds** (twin minus TUNED-R8 more than 2 se and positive: else the sweep has no reference gain).
+
+## 4. The verdicts (pooled paired differences over the 192 dives)
+* **Gain at each sd** = TWIN-FULL minus TUNED-R8 at that sd. **KEEPS** iff REAL (above 2 se and positive), **HURTS** iff negative by more than 2 se, **LOSES** otherwise.
+* **Degradation of the tuned rule** = TUNED-R8 at sd minus TUNED-R8 at sd 0.10, pooled, with its se; reported at every level; **HURTS BY NOISE** at a level iff the difference is negative by more than 2 se.
+* **BOTTOM LINE (the planner):** `THE GAIN SURVIVES A GAUGE UP TO SD <s>` with s the largest sd such that it and every smaller sd KEEP; `THE GAIN NEEDS A BETTER GAUGE THAN SD 0.10` iff sd 0.10 itself does not keep it cannot occur after the check passes, so is not used; the line also says `(NO LIMIT TESTED: EVERY LEVEL KEEPS IT)` if all five keep. **The tuned rule's line:** `THE TUNED RULE LOSES <a> FROM SD 0 TO SD 0.30` with a the pooled difference, and `(DEGRADES GRACEFULLY)` iff that loss is under 0.05, `(DEGRADES BADLY)` otherwise.
+* **REPORTED, NOT IN THE VERDICT:** each arm's mean score, crushed and stranded counts, the pooled better/worse/same of each difference.
+
+## 5. Expectations, recorded BEFORE any seed is flown
+The gain at sd 0 KEEPS about 60 percent (a clean gauge helps the tuned rule most, and the twin's headroom shrinks). The gain at sd 0.20 KEEPS about 80 and at 0.30 about 65. The planner never HURTS at any level: about 90. The tuned rule's score falls monotonically with sd (each level no better than the one below by more than 1 se): about 85. Its loss from sd 0 to 0.30 is between 0.03 and 0.12: about 70; under 0.05 (GRACEFULLY): about 40. Bottom line: NO LIMIT TESTED about 50; SURVIVES up to 0.20 about 25; up to 0.10 or 0.05 or 0 about 25.
+
+## 6. What will be built
+`tools/ship/plannerNoise.mjs` (library built on plannerBudget's and plannerTolerance's pooled reading), `plannerNoiseCmd.mjs` (export-free: `run`, parallel by arm) and its gate with a mutation pass; then the run (10 arms: the tuned rule is cheap, the twin about 8 minutes per arm: about 20 minutes on four cores), after Round 14's run has finished, and the result as section 7. **NOT IN THIS ROUND:** retuning at each noise level, a different refresh rate (1 Hz throughout), noise on anything but the charge, a learned filter.
