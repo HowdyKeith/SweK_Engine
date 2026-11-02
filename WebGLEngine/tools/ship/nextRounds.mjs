@@ -2909,10 +2909,8 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "gpu-pilot-swarm-demo",
-        blocker: "HARDWARE",
-        what: "BUILT AND RUN ON A SOFTWARE ADAPTER 2026-11-01 (brain/GPU_SWARM_WIP.md, tools/ship/gpuSwarm.mjs, brain/gpuSwarmSoftware.jsonl): up to 8,192 aircraft flown for 3 s by flyFleet, decided by the CPU twin and by one GPU dispatch a tick, end in the same status and within a metre of the same altitude (100%); the decision is about 37% of a swarm tick, so a free GPU decision cannot speed the tick up by more than 1.6 times. The GPU times on the software adapter are a CPU emulating a GPU's.",
-        how: "Keith's rig runs `node tools/ship/gpuSwarm.mjs --hardware --write` from WebGLEngine/ on this branch (the commands are at the end of brain/GPU_SWARM_WIP.md); the record lands in brain/rig-results/gpuSwarm.jsonl and the card's W4 (faster at 4,096 and 8,192 rows, slower at 64) is the answer.",
-        why: "The number the demo exists for is the card's: the decision call at several thousand rows and the whole tick it sits in.",
+        state: "CLOSED",
+        what: "CLOSED 2026-11-02 (brain/GPU_SWARM_WIP.md, RESULT ON THE RIG'S CARD; tools/ship/gpuSwarm.mjs; the record is brain/rig-results/gpuSwarm.jsonl, a GTX 1080 / nvidia pascal, software false): all five predictions held. Up to 8,192 aircraft flown 3 s by the GPU brain (one dispatch a tick) end in the same status and within a metre of the same altitude as the CPU twin's (100%); the decision call is 3.9 times faster at 8,192 rows and slower below about 1,000; the whole tick is 1.37 times faster at 8,192 rows because the decision is 36% of it, and the largest swarm that fits a 30 Hz tick is 2,048 aircraft with either decider: the flight model, on the CPU, sets it.",
     },
     {
         id: "space-needs-and-limits",
