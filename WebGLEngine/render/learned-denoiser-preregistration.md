@@ -10306,3 +10306,759 @@ harvest no longer misattributes its results. A gate row reads it off the command
 - **P4:** the trained U_E puts between 20 % and 80 % of its weight on EASU's tap on the mean (the pilot: 36-47 %).
 
 Section 158 is the verdict.
+
+## 158. FSR4 ROUND 68'S VERDICT -- REPORTED; BOTH HYPOTHESES SUPPORTED AS THE TEST READS THEM, AND U_E IS EASU
+
+**Where it ran, and one breach of the order.** Both harvests ran on Keith's rig at fe2f443a, the training and then the test, so
+the test read the training file before it was committed (rounds 65 and 67 ran the test at a later commit carrying it). The test
+file names the candidate and commit it read (seed 1, fe2f443a), and the committed training file says the same. **The results file
+was shown to me when it was uploaded, before it was committed** (8d68c6e4, byte for byte, sha-256 5a7a65d8...). Nothing below was
+changed after that: every number is section 157's test, re-derived by render/learnedUpscaleStudy-selfcheck.mjs section 8.
+
+**The training.** All three seeds ended in one place: validation 1.9073e-3 for each, the same to 3e-11. The candidate is seed 1.
+
+**The test, as fixed.**
+- C1, C3, C4, C5 held; C2 held (the shuffled U_E lost to EASU on all 24, mean d -1.64).
+- **H1, U_E against EASU: supported** -- 16 of 24, sign-flip p 0.0111 against Holm's 0.05.
+- **H2, U_E against round 67's U: supported** -- 19 of 24, p 0.00063 against 0.025, mean d +0.098.
+
+**What that means: nothing was learned.** U_E's chain equals EASU's to 4.2e-10 relative on every scene. H1's mean d is
+**3.6e-11**. The softmax puts at least 99.99994 % of every scene's weight on EASU's tap. The committed candidate, run on a
+scene of no split, does the same (99.999 %). H1's "support" is the sign of a residual 1e-8 of weight left on the sixteen taps,
+consistently that way and far below anything visible. Section 157 fixed no smallest effect worth reporting. I add none after the
+fact; I record instead that this support is not an improvement. H2 is the same comparison as EASU against round 67's U:
+EASU beats it on the same 19 of 24, each scene's d the same to 1e-9. On these scenes round 67's U lost to EASU (2.60e-3 against
+2.35e-3). On round 67's own it had tied (2.254e-3 against 2.252e-3).
+
+**The predictions.**
+- **P1 (C1 and C3 hold): held.**
+- **P2 (H1 supported, mean d under 0.05): held as worded, vacuously.** The d is 3.6e-11.
+- **P3 (H2 supported): held,** by EASU's margin, not by anything U_E learned.
+- **P4 (20-80 % of the weight on EASU's tap): MISSED.** It is over 99.9999 %. The pilot had shown the attractor and moved the
+  start to -8 to avoid it. At full scale (1500 steps, batch 4, 32-pixel crops of 220 path-traced scenes) training reached it
+  anyway, from all three seeds.
+
+**What follows.** EASU stays the chain's upscale. Three rounds have now tried to learn past it, and none did:
+- round 65: not reported;
+- round 67: a tie;
+- round 68: a collapse onto it.
+
+Offering EASU as a softmax choice cannot work as built: the per-pixel gradient on EASU's logit wins wherever EASU beats the
+current mix, and that holds early everywhere. A further design would have to keep EASU out of the competition. For example, a
+residual added to EASU with its scale held, or a loss on where EASU is wrong. That would be a new round, and none is fixed
+here.
+
+## 159. FSR4 ROUND 69 -- A HELD RESIDUAL ON EASU: FIXED BEFORE ITS SCENES
+
+**Why.** Keith asked for section 158's residual design. Round 68's U_E could only choose between EASU and the half-size frame,
+and the choice collapsed onto EASU. U_R does not choose; it corrects. Its pixel is EASU's own, scaled per channel:
+
+**y = EASU · (1 + 0.5 tanh(r))**, r the network's 3-channel output.
+
+- **No attractor to fall into.** There is no softmax. At r = 0 the gradient on r is the loss's gradient times 0.5 · EASU, at full
+  strength. EASU is the start, not a choice that can win.
+- **Held.** The correction is at most half of EASU either way on each channel. It cannot run away, go negative, or add light where
+  EASU has none.
+- **It sees what it corrects.** Its input is U's twelve channels and EASU's three (UPR_CHANNELS 15).
+
+**The code was written before this section, and this section is fixed before any scene of round 69.** The order differs from
+earlier rounds because a Bash fault left me unable to run anything for a time and I wrote the code then. Its gate rows, in
+render/learnedUpscale-selfcheck.mjs section 6, hold:
+- an untrained U_R is EASU bit for bit;
+- any U_R stays within 0.5-1.5 times EASU;
+- its gradient matches central differences (worst 7.5e-8);
+- a crop gives the whole frame's loss and gradients;
+- 300 steps on synthetic frames beat EASU.
+
+**The network, U_R (render/learnedUpscale.mjs).** Three 3 x 3 layers of 32, then a 1 x 1 head of 3, its weights and biases zero.
+
+**A pilot (synthetic discs, textured, 300 steps, seeds 1-3).**
+- U_R beat EASU on every seed: 8.02e-3, 8.16e-3 and 7.85e-3 against EASU's 2.11e-2.
+- It beat round 67's box U on every seed (1.35e-2, 1.31e-2, 2.31e-2).
+- Its mean correction was 5.4-6.1 % of EASU.
+
+Round 68's pilot also looked good and full scale collapsed, so the pilot decides nothing.
+
+**Training, as round 68's.**
+- The same 200 + 20 scenes at 512 samples, seeds 1-3, the candidate chosen by validation, and C2's U_R on shuffled targets.
+- The results go to render/upscale-net-r69.json.
+
+**The test.**
+- **24 new scenes:** 12 R (71000-71011) and 12 C (72000-72011), against two 2048-sample references.
+- **H1:** U_R's chain beats EASU's.
+- **H2:** U_R's chain beats round 67's U.
+- Display space, the sign-flip test, Holm, and C1-C5 as before.
+- The results go to render/denoise-results-upscale-learned-r69.json, with each scene's mean |0.5 tanh r| (`residualSize`).
+
+**New, after round 68: the smallest effect worth reporting, fixed now.** H1's support counts as an improvement only if U_R's mean
+display relMSE is **at least 1 % below EASU's**. Round 68 was supported by a mean d of 3.6e-11, and section 158 had no rule to
+call that nothing. If the test supports H1 by less, the verdict says so and EASU stays.
+
+**Predictions, fixed now, deciding nothing.**
+- **P1:** C1 and C3 hold.
+- **P2:** H1 is supported, and the mean relMSE is 1-10 % below EASU's.
+  - The pilot's margin was far larger, but the path tracer's frames have far less for EASU to get wrong.
+  - Round 67's U came within 0.1 % of EASU.
+- **P3:** H2 is supported.
+- **P4:** the mean correction on the test scenes is between 0.5 % and 20 % of EASU. It must not be at zero (a collapse) and
+  not near the hold (saturating).
+
+**The run.** On Keith's rig, as round 68's:
+- `--harvest-upscale-train --round 69`;
+- commit the training file;
+- `--harvest-upscale-test --round 69` at that commit.
+
+Section 160 is the verdict.
+
+## 160. FSR4 ROUND 69'S VERDICT -- REPORTED; H1 NOT SUPPORTED: U_R MOVED OFF EASU AND DID NOT BEAT IT
+
+**How it ran.** On Keith's rig, in section 159's order:
+- the training at 7a85a917;
+- its file committed unread (735cd305);
+- the test at 735cd305.
+
+The results file was shown to me when it was uploaded, before its commit (fff15384, byte for byte). Every number below is section
+159's test, re-derived by render/learnedUpscaleStudy-selfcheck.mjs section 10.
+
+**The training.** The seeds ended apart this time: validation 1.845e-3, 1.876e-3 and 1.837e-3. Round 68's three were the same
+to 3e-11. The candidate is seed 3.
+
+**The test, as fixed.**
+- C1, C3, C4, C5 held; C2 held (the shuffled U_R lost to EASU on all 24, mean d -3.18).
+- **H1, U_R against EASU: NOT SUPPORTED** -- 14 of 24, mean d +0.0067, sign-flip p 0.201.
+- **H2, U_R against round 67's U: supported** -- 15 of 24, p 0.0092 against Holm's 0.025, mean d +0.063.
+- **Section 159's 1 % rule:** U_R's mean display relMSE is 2.3120e-3 against EASU's 2.3107e-3, 0.06 % *above* it. The rule
+  is not met, and would not have been had H1 passed.
+
+**What it means.** The residual did what round 68 could not, and moved:
+- its mean correction is 0.92 % of EASU, from 0.19 % to 2.50 % by scene;
+- the seeds learned different corrections.
+
+On the test scenes those corrections helped as often as they hurt. Descriptively, U_R did a little better on C (8 of 12, mean d
++0.020) and a little worse on R (6 of 12, mean d -0.007); no hypothesis was fixed on that split. H2's edge over round 67's U is
+0.87 % of mean relMSE. On these scenes EASU itself beats round 67's U on 16 of 24.
+
+**The predictions.**
+- **P1 (C1 and C3 hold): held.**
+- **P2 (H1 supported, 1-10 % below EASU): MISSED.** It is 0.06 % above.
+- **P3 (H2 supported): held.**
+- **P4 (mean correction 0.5-20 %): held,** at 0.92 %.
+
+**What follows.** EASU stays the chain's upscale. Four FSR4 rounds have now been run on these 200 training scenes, each on new
+test scenes:
+
+| round | design | result |
+|---|---|---|
+| 65 | box start | not reported |
+| 67 | box start, a cleaner truth | a tie |
+| 68 | EASU offered | a collapse onto EASU |
+| 69 | a held residual | a learned correction that does not generalise past EASU |
+
+The validation loss fell below round 68's (1.837e-3 against 1.907e-3), and the test did not follow. A residual that fits the
+200 training scenes better than EASU, and the test scenes no better, points at the data more than the design. These scenes give
+EASU little to get wrong at a 2048-sample truth. More scenes, temporal input (FSR4's real input is a jittered history), or
+another loss would each be a new round. None is fixed here.
+
+## 161. FSR4 ROUND 70 -- A LEARNED CORRECTION OF THE TEMPORAL UPSCALE: FIXED BEFORE ITS CODE AND ITS SCENES
+
+**Why.** Section 160 found four single-frame designs no better than EASU, and pointed at the input. Keith asked for the temporal
+design. FSR2-4's real input is a jittered history, and the arc has one: round 32's Bt
+(render/denoiseTemporalUpscale.mjs's accumulateUpscaled).
+- Eight jittered half-size frames, each through the shipped denoiser, the emitter fill and EASU.
+- Reprojected at full size, the history clamped to the current frame's 3 x 3 range, a running average.
+- It beat the single-frame chain on 12 of 12 (section 96, mean d +0.259).
+
+So a temporal FSR4's bar is **Bt, not EASU**. Bt's weak points are a learned upscaler's chance: the clamp's ghosting and
+over-clamping, and the disocclusions that restart at one frame.
+
+**The network, U_T (render/learnedUpscaleTemporal.mjs).** It uses section 159's held residual, put on the temporal frame instead of
+EASU's:
+
+**y = A · (1 + 0.5 tanh(r))**, A the light-free accumulation (Bt before its composite), r the network's 3-channel output.
+
+- **Its input, 17 channels a full-size pixel:**
+  - A, the clamped accumulation (0-2);
+  - the same accumulation unclamped (3-5), so it can see where the clamp acted;
+  - the current frame's EASU on the unjittered grid (6-8);
+  - the history length n / 8 (9);
+  - albedo (10-12) and normal (13-15);
+  - depth as d / (1 + d) (16).
+- Three 3 x 3 layers of 32, a 1 x 1 head of 3, its weights and biases zero, so an untrained U_T is Bt exactly.
+- Trained as rounds 67-69 were: display-space relMSE of the composite, Adam, 1500 steps of 4 crops of 32, seeds 1-3, the
+  candidate by validation, and C2's U_T on targets shuffled across the training sequences.
+
+**The data.** Every example is a sequence: round 32's camera path (8 frames orbiting to the scene's eye), the frames at half
+size at 4 samples on round 32's JITTER, references at the scene's eye.
+- **Training and validation:** round 65's 200 + 20 scenes (61000-61199, 62000-62019), their sequences rendered here, the
+  references at 512 samples.
+- **Test:** 24 new scenes, 12 R (73000-73011) and 12 C (74000-74011), against two 2048-sample references.
+- 256 x 256, as every FSR4 round.
+
+**The test.**
+- **H1:** U_T's chain beats Bt's -- the learned temporal upscale against the hand-written one.
+- **H2:** U_T's chain beats B1's, the single-frame chain (EASU on the measured frame alone). This is expected from round 32. It
+  says whether U_T keeps the history's lead.
+- Display space, the sign-flip test, Holm, and C1-C5 as before (C1 at 22 of 24, the noisy floor the last frame's half-size input,
+  bilinear and composited).
+- **Section 159's rule, again:** H1 counts as an improvement only at a mean display relMSE at least 1 % below Bt's.
+- The results go to render/denoise-results-upscale-temporal-r70.json, the nets to render/upscale-net-r70.json. Each scene's mean
+  correction is recorded (P4).
+
+**Predictions, fixed now, deciding nothing.**
+- **P1:** C1 and C3 hold.
+- **P2:** H1 is supported, 1-10 % below Bt. Bt has errors a learner can see (the clamp, the restarts), which EASU did not.
+- **P3:** H2 is supported.
+- **P4:** the mean correction is between 0.5 % and 20 % of Bt.
+
+**The run.** On Keith's rig:
+- `--harvest-upscale-temporal-train`;
+- the training file committed unread;
+- `--harvest-upscale-temporal-test` at that commit.
+
+**A pilot, run after this section was fixed and before any scene of the round.** It changed nothing above.
+- **Setup:** 16 training and 8 test sequences of non-dataset scenes at 64 x 64, references at 256 samples, 400 steps.
+- **Result:** U_T beat Bt on 8, 7 and 7 of 8 for seeds 1-3. Mean relMSE 5.82e-3, 6.24e-3 and 5.84e-3, against Bt's 7.24e-3 (14-20 %
+  below). Mean corrections 6.6-8.1 %.
+- **Caveat:** at 64 x 64 the half-size frames are 32 x 32, and the denoiser does badly there. The noisy floor (6.64e-3) was BELOW
+  Bt, which a 256 x 256 round 32 never saw.
+
+Rounds 68 and 69 had good pilots too, so this decides nothing. Section 162 is the verdict.
+
+## 162. FSR4 ROUND 70'S VERDICT -- REPORTED, BOTH SUPPORTED: THE LEARNED CORRECTION OF THE TEMPORAL UPSCALE BEATS IT BY 9.7 %
+
+**How it ran.** On Keith's rig, in section 161's order:
+- the training at 2daaa618;
+- its file committed unread (a621735c);
+- the test at a621735c.
+
+The results file was shown to me when it was uploaded, before its commit (87127416, byte for byte). Every number below is section
+161's test, re-derived by render/learnedUpscaleTemporal-selfcheck.mjs section 5.
+
+**The training.** Validation 1.637e-3, 1.667e-3 and 1.658e-3 for seeds 1-3; the candidate is seed 1.
+
+**The test, as fixed.**
+- C1, C3, C4, C5 held; C2 held (the shuffled U_T lost to Bt on all 24, mean d -3.70).
+- **H1, U_T against Bt: SUPPORTED** -- 20 of 24, sign-flip p 7.0e-6 against Holm's 0.05, mean d +0.099.
+- **H2, U_T against the single-frame chain B1: supported** -- 22 of 24, p 4.8e-7, mean d +0.262.
+- **Section 161's 1 % rule: met.** U_T's mean display relMSE is 1.7503e-3 against Bt's 1.9373e-3, **9.65 % below**. B1 is
+  2.3226e-3.
+
+**This is the first FSR4 round to beat its hand-written baseline.**
+
+| round | input | result |
+|---|---|---|
+| 65 | one frame (box start) | not reported |
+| 67 | one frame (box start, cleaner truth) | a tie |
+| 68 | one frame, EASU offered | a collapse onto EASU |
+| 69 | one frame, held residual | a tie |
+| **70** | **the jittered history** | **9.7 % below the temporal upscale** |
+
+The head is round 69's, and only the input changed. Section 160 read round 69 as pointing at the data, and this agrees: the
+history gives the network errors it can see, which a single EASU'd frame did not.
+
+**Descriptively, decided by nothing:**
+- U_T won all 12 C scenes (11.5 % below Bt) and 8 of 12 R (3.2 %).
+- Its four losses are R 73003, 73004, 73007 and 73011, each by under 2 %.
+- The mean correction is 0.66 % of Bt (0.11-1.95 % by scene), largest on C. It is a small, consistent correction, not a
+  reconstruction.
+
+**The predictions.** All four held:
+- **P1:** C1 and C3 held.
+- **P2:** H1 supported, 1-10 % below Bt. 9.65 %, near the top of the range.
+- **P3:** H2 supported.
+- **P4:** the mean correction 0.5-20 %. 0.66 %, near the bottom.
+
+**What it does not say.**
+- **Nothing is timed.** U_T is three 3 x 3 layers of 32 at full size a frame, on top of Bt's own pass. Its cost on a GPU is a
+  device round's to measure, as round 33 measured Bt's.
+- **One camera move, from a cold start.** Round 32's eight-frame orbit, nothing in the scene moving. Disocclusion is only what
+  the orbit uncovers.
+- **One resolution, 256 x 256, 2x.** Nothing about 1080p, or about other ratios.
+- **The shipped denoiser and EASU stay as they are.** U_T sits after Bt in the chain. Nothing on the page changes in this round.
+
+**What follows.** Two backlog entries:
+- `fsr4-temporal-device`: U_T as a compute pass after Bt's, timed on the rig;
+- `fsr4-temporal-page`: path-tracer.html's view through it.
+
+## 163. ROUND 71 -- U_T ON THE DEVICE: WHAT THE LEARNED TEMPORAL CORRECTION COSTS A FRAME. FIXED BEFORE ITS CODE
+
+**Why.** Section 162 found U_T 9.65 % better than Bt and left it untimed. Keith asked for its device round. A correction is worth
+running only if it costs less than the frame it corrects.
+
+**U_T on the device (render/learnedUpscaleTemporalGPU.mjs).** Five compute passes at full size:
+- U_T's four layers, each on brain/conv2d.mjs's fast kernel (r15's, the page's default): 17 -> 32, 32 -> 32 and 32 -> 32 at
+  3 x 3 with ReLU, then 32 -> 3 at 1 x 1;
+- the hold, y = A (1 + 0.5 tanh r), A read from the input's channels 0-2.
+
+It is held to the CPU at 64 x 64 on a sequence of family R's seed 990914, outside every split (*corrected before the code
+first ran: this line said 64 x 48, and temporalExample makes square frames*):
+- each layer within 1e-5 relative of conv2dCpu (f32, the fast kernel's order) on the device's own input to it;
+- the image within 1e-5 relative of the hold applied in f64 to the device's own r;
+- the whole chain within 1e-4 relative of temporalUpscale in f64.
+
+**What is timed, on each rig GPU, at 1920 x 1080.**
+- **U** is the five passes, on the device's clock where it has timestamps, median of the timed passes.
+- **T** is section 103's chain with its history, read off the same run's denoiseUpscaleGPU line, as rounds 63-64 read it.
+- The gate is render/denoiseLearnedUpscaleGPU-selfcheck.mjs, in realGpuRun's denoise selection. readH71 reads a report.
+
+**H71: U ≤ 0.25 x T on both GPUs, in both of each GPU's runs.** That is rounds 63-64's threshold: a quarter of a traced frame.
+A run counts as there: every `--only denoise` gate green with exit 0, at one commit.
+
+**Predictions, fixed now, deciding nothing.** The arc already has the numbers to predict this. On the 1080 at 1920 x 1080, r15's
+fast kernel takes 17.7-18.3 ms for a 32 -> 32 3 x 3 layer and 5.85 ms for 10 -> 32 (section 141's runs, the denoiseTiming
+lines). U_T has two 32 -> 32 layers, a 17 -> 32 one and a small head, at full size.
+- **P1: H71 FAILS on the 1080.** U is about 45 ms (40-50): two layers at ~18, the first at ~10, the head and the hold ~1. U / T
+  is about 1.2 (1.0-1.4): U_T costs MORE than the traced frame it corrects.
+- **P2: H71 fails on the Intel too,** by a similar ratio.
+- **P3:** every parity row is green on both GPUs.
+
+**If H71 fails, what follows is fixed now.** U_T as trained is a quality result without a real-time place. A next round would cut its
+cost by 4x or more, and each cut is a NEW network needing its own quality round (section 161's test again):
+- U_T at half size (the correction's input and output at 960 x 540, upsampled), a quarter of the pixels;
+- or 16 wide instead of 32, a quarter of the multiply-adds in the middle layers.
+None of those is fixed here.
+
+**The page (backlog fsr4-temporal-page), alongside and outside the hypothesis.** path-tracer.html gains a view of the temporal chain:
+- the path-traced half-size frames on round 32's jitter through the shipped denoiser and EASU, in a worker;
+- accumulated over the last 8 frames into Bt;
+- U_T run on WebGPU where the page has it, else on the CPU;
+- shown beside the single-frame chain and Bt, with each step's ms.
+
+Its gate holds its sequence to temporalExample's construction and its U_T to temporalChain. It decides nothing in this round.
+
+**The runs.** Two `realGpuRun --only denoise` on each GPU at round 71's commit, committed byte for byte before they are read.
+Section 164 reads them.
+
+## 164. ROUND 71's FIRST RIG RUNS -- NO VERDICT: MY GATE FAILED ON BOTH GPUs, FOR TWO DIFFERENT REASONS. FIXED; RUN AGAIN
+
+**What arrived.** Four `realGpuRun --only denoise` reports at 4c111f6b, two a GPU, committed byte for byte (9b61434d) before they
+were read. In each, five of the six denoise gates are green and render/denoiseLearnedUpscaleGPU-selfcheck.mjs is red. No run
+counts, so **H71 has no verdict.** T read as usual: 37.629 and 37.403 ms on the 1080, 504.5 and 503.8 ms on the Intel.
+
+**On the 1080: the default storage binding.**
+- U_T's 32-channel layer outputs at 1920 x 1080 are 265,420,800 bytes each.
+- That is over WebGPU's default maxStorageBufferBindingSize of 128 MiB, and the gate made its device with the defaults. Every
+  pass failed with "Binding size ... is larger than the maximum storage buffer binding size".
+- The gate then printed `U_T at 1920 x 1080 0.000 ms (device)` from passes that had not run.
+- **readH71 read that 0.000 as U, and a ratio of 0.** Only the red gate kept those runs from counting.
+- The denoiser's own timing never met the default limit: render/denoiseDevice.mjs's timingDevice raises it. On SwiftShader at
+  240 x 136 nothing reached the limit, so the gate was green here.
+
+**On the Intel: the checkout.** The gate died at its first line: `ENOENT ... C:\v4902\WebGLEngine\render\upscale-net-r70.json`.
+- That file is tracked, committed at a621735c, an ancestor of 4c111f6b, and the 1080's checkout had it.
+- Why the Intel box's tree lacked it is not known here; Keith is asked to check.
+
+**The fixes (this commit).**
+- **temporalDevice:** a device made with its storage limits raised to fit U_T, and timestamp queries where offered, as
+  timingDevice does. The gate and the page use it.
+- **A named refusal:** createDeviceTemporal refuses, by name, a device whose limit is below U_T's largest buffer.
+- **The line only from a clean run:** the gate prints U_T's timing only when the run had no uncaptured error and a time above
+  zero.
+- **readH71:** it never reads a time of zero as U.
+
+Each has a row in the gate, and each row's sabotage goes red.
+
+**H71, P1-P3 and the threshold are unchanged.** Section 163's predictions stand as made. The runs are owed again at this commit,
+two a GPU, and section 165 reads them.
+
+## 165. ROUND 71, THE INTEL's HALF -- H71 FAILS THERE: U_T COSTS 2.9-3.0 TRACED FRAMES. THE 1080's RUNS ARE OWED AGAIN
+
+**What arrived.** Four `realGpuRun --only denoise` reports, committed byte for byte (e638bd7f) before they were read.
+- **The Intel's pair, `s164-a-intel-gen9` and `s164-b-intel-gen9`:** at cebdc006, section 164's fix, with every gate green and exit 0.
+  Its checkout had lost three committed files to working-tree deletions; `git restore` brought them back before the runs.
+- **The 1080's pair, named `s164-a-GTX` and `s164-b-GTX`:** at **4c111f6b**, the commit BEFORE the fix. That box did not move to
+  cebdc006, so the gate failed as in section 164. readH71, now fixed, reads no U from their 0.000 lines. They give no verdict.
+
+**The Intel (ms, every part on the device's clock).**
+
+| run | layer 0 | layer 1 | layer 2 | layer 3 (head) | hold | **U** | **T** | **U / T** |
+|---|---|---|---|---|---|---|---|---|
+| a | 315.5 | 614.2 | 618.4 | 50.4 | 27.4 | **1614.7** | 549.3 | **2.94** |
+| b | 297.9 | 572.0 | 548.7 | 43.3 | 21.9 | **1484.3** | 498.5 | **2.98** |
+
+**H71 FAILS on the Intel.** Both runs count, and U / T is 2.94 and 2.98 against 0.25. U_T at 1920 x 1080 costs about three traced
+frames there.
+
+**The predictions, so far.**
+- **P2 held as to the verdict, missed as to the size.** H71 fails on the Intel, but by 2.9-3.0, not the "similar ratio" (~1.2)
+  P1 put on the 1080.
+  - The Intel's T is about 13 x the 1080's, and its U about 33 x P1's estimate. Full-size 32-channel layers cost the Intel
+    more than the half-size chain does.
+  - Its two 32 -> 32 layers alone are 1.1-1.2 s.
+- **P3 held on the Intel:** every parity row green.
+- **P1 waits on the 1080's runs at cebdc006.**
+
+**What already follows.** H71 needs both GPUs to hold, and it has failed on one. So **H71 fails whatever the 1080 shows**, and section 163's
+follow-ups stand: U_T at half size, or 16 wide, each a new quality round. The 1080's runs are still owed, for P1 and for the
+number. They must be at cebdc006 (or later): `git checkout cebdc006` first, then `git log -1` to see it.
+
+## 166. ROUND 71, THE 1080's HALF -- U_T COSTS 1.16 TRACED FRAMES THERE, AS PREDICTED. ROUND 71 IS CLOSED: H71 FAILS
+
+**What arrived.** Two `realGpuRun --only denoise` reports on the GTX 1080, both at cebdc006, committed byte for byte (fb87b4f1)
+before they were read.
+- **Run b counts:** every gate green, exit 0.
+- **Run a does not.** Two OTHER denoise gates, denoiseDevice and denoiseFrameGenCost, died opening committed rig reports that
+  the checkout (`C:\v4904`) had lost to working-tree deletions, as the Intel's had in section 165. U_T's own gate was green there.
+  Its line is reported below and counted nowhere.
+
+**The 1080 (ms, on the device's clock).**
+
+| run | layer 0 | layer 1 | layer 2 | layer 3 (head) | hold | **U** | **T** | **U / T** | counts |
+|---|---|---|---|---|---|---|---|---|---|
+| b | 9.570 | 17.463 | 17.468 | 1.370 | 0.569 | **46.475** | 40.026 | **1.16** | yes |
+| a | 10.236 | 18.406 | 18.015 | 1.365 | 0.569 | 48.834 | 38.286 | 1.28 | no (two other gates red) |
+
+**Round 71's verdict.**
+- **H71 FAILS.** On the Intel both runs count, at 2.94 and 2.98 (section 165).
+- On the 1080 the one counting run is 1.16, over 0.25 by more than 4 x. The 1080's pair gives no verdict by the counting rule,
+  and none is needed: H71 needed both GPUs to hold.
+
+**The predictions, all read.**
+- **P1 held:** U on the 1080 is 46.5 ms, inside 40-50, and U / T 1.16, inside 1.0-1.4. The estimate came from the arc's own
+  r15 layer timings. Each 32 -> 32 layer is 17.5 ms against r15's 17.7-18.3 for the denoiser's layers at the same size, and the
+  first 9.6 against the estimate's ~10.
+- **P2 held as to the verdict, missed as to the size** (section 165): 2.9-3.0 on the Intel, not ~1.2.
+- **P3 held:** every parity row green on both GPUs, in every run where U_T's gate ran.
+
+**What it says.**
+- U_T is a quality result without a real-time place on either GPU.
+  - It takes 9.65 % off Bt's display error (section 162), at 1.16 traced frames on the 1080 and ~3 on the Intel.
+  - Running it every frame would cut the 1080's frame rate by more than half and the Intel's by three quarters.
+- The cost is where section 163 said: two 32 -> 32 layers at full size, 75 % of U on both GPUs.
+- Section 163's follow-ups stand, each a NEW network needing its own quality round (section 161's test) before any timing:
+  - U_T at half size: a quarter of the pixels, so roughly 12 ms on the 1080;
+  - U_T 16 wide: about a quarter of the middle layers' multiply-adds;
+  - both together, roughly 1/16.
+
+None is fixed here. They are Keith's call.
+
+**What changes.** Nothing ships. The temporal page (section 163) keeps U_T as a view at 128 x 128, where it costs what the page
+shows.
+
+## 167. ROUNDS 72 AND 73 -- U_T AT HALF SIZE AND 16 WIDE: DOES A SIXTEENTH OF THE COST KEEP THE GAIN? FIXED BEFORE THE CODE
+
+**Why.** Section 166 closed round 71: U_T costs 1.16 traced frames on the 1080 and ~3 on the Intel. Section 163 named two cuts,
+each roughly a quarter of the cost, and Keith asked for both together. That is **U_TH**: section 161's design with its network
+at half size and 16 wide.
+
+**U_TH (render/learnedUpscaleTemporal.mjs, the "half" variant).**
+- **Its input:** U_T's 17 channels, each averaged over 2 x 2 to half size (960 x 540 at 1080p).
+- **Its network:** three 3 x 3 layers of **16** with ReLU, then a 1 x 1 head of 3, its weights and biases zero, at half size.
+- **Its correction:** the head's r, upsampled to full size bilinearly (pixel centres, edges clamped, as U's bilinear channel is
+  made), then section 159's hold on Bt's light at FULL size:
+
+  **y = A · (1 + 0.5 tanh(up(r)))**
+
+  So the correction is half-size and smooth, and the image it corrects keeps Bt's full-size detail. An untrained U_TH is Bt
+  exactly.
+- **Its cost, estimated from the arc's numbers:** 7.1 k multiply-adds a half-size pixel against U_T's 23.4 k a full-size one,
+  about 1/13 of U_T.
+
+**ROUND 72, the quality, as round 70's (section 161) in every way but the network.**
+- **Training and validation:** round 65's 200 + 20 scenes as sequences, 512 samples, seeds 1-3, the candidate by validation, and
+  C2 on shuffled targets.
+- **Test:** 24 new scenes, 12 R (75000-75011) and 12 C (76000-76011), against two 2048-sample references.
+- **H72a:** U_TH's chain beats Bt's -- with section 159's rule, a mean display relMSE at least 1 % below Bt's.
+- **H72b:** U_TH's chain beats B1's, as round 70's H2.
+- Files: render/upscale-net-r72.json and render/denoise-results-upscale-temporal-r72.json. The test also records each scene's
+  mean correction, and U_TH's gain over Bt as a fraction of round 70's 9.65 % (descriptive: a different test set, so not a
+  hypothesis).
+
+**ROUND 73, the cost, as round 71's (section 163) in every way but the network.**
+- **The passes on the device (render/learnedUpscaleTemporalGPU.mjs):**
+  - the 2 x 2 average of the input to half size;
+  - four layers on the fast kernel at half size;
+  - the upsample and the hold at full size.
+- **Held to the CPU** at 64 x 64 on family R's seed 990914, as round 71's was. The weights are a seeded U_TH with its head made
+  non-zero: the cost does not depend on the weights, so round 73 does not wait for round 72's training.
+- **Timed at 1920 x 1080** on the device's clock, against T read off the same run.
+- **H73: U ≤ 0.25 × T on both GPUs, in both of each GPU's runs.** That is H71's threshold and counting rule.
+
+**Predictions, fixed now, deciding nothing.**
+- **P1:** C1 and C3 hold in round 72.
+- **P2:** H72a is supported, at a gain over Bt of 2-8 %. Half the pixels' worth of correction keeps much of U_T's, since U_T's
+  corrections were small and smooth (0.66 % on the mean, section 162).
+- **P3:** H72b is supported.
+- **P4:** on the 1080, U is 2.5-6 ms and U / T 0.06-0.15, so H73 holds there. The two 16 -> 16 layers at 960 x 540 take about
+  1 ms each by the fast kernel's 32-wide rate, at a quarter of the channels squared and a quarter of the pixels; 16-wide
+  vec4 groups are less efficient, so allow 2 x.
+- **P5:** on the Intel, U / T is 0.15-0.35. Its 32-wide ratio was 2.95, and 1/13 of that is 0.23. **H73 on the Intel is a coin
+  toss**, so H73 overall is too.
+
+**What each outcome means, fixed now.**
+- **Both hold:** U_TH is a real-time temporal FSR4 on the 1080 (and on the Intel if P5 lands low), and the page and the chain
+  can take it.
+- **H72a fails:** the cut threw away the gain, and U_T stays a quality-only result.
+- **H73 fails on the Intel only:** U_TH is real-time on the 1080 class alone, and that is said.
+
+**The runs, on Keith's rig, at round 72's commit.**
+- The device: two `realGpuRun --only denoise` a GPU, which include round 73's gate.
+- The training: `--harvest-upscale-temporal-train --round 72`, its file committed unread.
+- The test: `--harvest-upscale-temporal-test --round 72` at that commit.
+
+All are committed byte for byte before they are read. Section 168 reads them.
+
+## 168. THE s167 RIG REPORTS -- RUN AT THE OLD COMMIT: NO ROUND 73 VERDICT, BUT ROUND 71 GETS ITS 1080 PAIR
+
+**What arrived.** Four `realGpuRun --only denoise` reports, `s167-{a,b}-{gtx1080,intel}`, committed byte for byte (07df01a8) before
+they were read. All four ran at **cebdc006**, round 71's commit. Round 73's code is 670c28bd, so none carries a U_TH line:
+**H73 has no verdict, and its runs are owed at 670c28bd.** Every gate is green in all four.
+
+**What they do give: round 71's 1080 pair, clean.** U_T at 1920 x 1080 on the 1080:
+- run a: **47.840 ms** against T 38.512, **1.24**;
+- run b: **47.063 ms** against T 38.345, **1.23**.
+
+Both count, so **H71 fails on the 1080 by its own rule**, not only by the Intel's (section 166 had one counting run there, at
+1.16). On the Intel, U_T read 1361.5 and 1412.1 ms against T 494.2 and 495.3: 2.76 and 2.85, as section 165 found.
+
+**Round 72's training, now running on the rig, must be at 670c28bd too.** At cebdc006 the training command has no `--round`, so
+it would retrain round 70's U_T, not U_TH. The training file's own `commit` field will say which ran, and it is checked before
+anything is read.
+
+## 169. ROUND 74 -- U_TH WITH A COALESCED DOWN PASS: THE SAME COST QUESTION, ONE KERNEL REWRITTEN. FIXED BEFORE ITS CODE
+
+**Why.** Round 73's 1080 pair (s168, both counting at 670c28bd, read in full in section 170 with the Intel's) put U_TH at 13.69 and
+13.55 ms, U / T 0.36, so H73 fails. Of that, **8.29-8.43 ms is DOWN_WGSL**, the 2 x 2 average of the 17 input channels. That pass
+reads ~141 MB and writes ~35 MB, about 0.6 ms at the 1080's ~320 GB/s. The four layers took 4.6 ms and the upsample and hold
+0.6, inside P4's 2.5-6 ms. DOWN_WGSL gives each thread one half-size pixel and loops over its 17 channels, so neighbouring
+threads read 17 floats apart and the reads do not coalesce. Keith asked for the faster pass.
+
+**The change, and only it: DOWN_FAST_WGSL (render/learnedUpscaleTemporalGPU.mjs).**
+- **One thread per value:** one per half-size pixel and channel, a 1-D dispatch of 256-thread groups.
+- **Coalesced:** neighbouring threads read neighbouring floats, and write the output in order.
+- **The same arithmetic in the same order:** (a + b + c + d) / 4. Its output is held to DOWN_WGSL's **bit for bit** on the device,
+  and to halfInput within 1e-6.
+- Everything else in U_TH's six passes is round 73's. Round 73's line (section 167, the loop pass) is still printed beside the
+  new one, so one run compares the two.
+
+**Timed as round 73:** at 1920 x 1080 on the device's clock, against T off the same run, in realGpuRun's denoise selection. The new
+line is `section 169: U_TH at 1920 x 1080 ... ms`, read by readH74.
+
+**H74: U ≤ 0.25 × T on both GPUs, in both of each GPU's runs** (H73's threshold and counting).
+
+**Predictions, fixed now, deciding nothing.**
+- **P1:** on the 1080, DOWN_FAST_WGSL takes 0.4-1.5 ms, U 5-7 ms, U / T 0.13-0.19. **H74 holds on the 1080.**
+- **P2:** on the Intel, H74 fails. Round 71's U_T cost 30-33 x the 1080's there. U_TH's layers and upsample (5.3 ms on the
+  1080) at that factor are 160-175 ms against T ~500, which is 0.32-0.35 before the down pass. The Intel's own round 73 pair,
+  still owed, may move this; P2 stands as made.
+- **P3:** the down passes agree bit for bit on both GPUs.
+
+**What each outcome means.**
+- **P1 and P2 as predicted:** U_TH is real-time on the 1080 class and not on the Intel's integrated graphics, which is then
+  said plainly.
+- **H74 holds on both:** U_TH fits a quarter of a frame everywhere tested.
+
+Either way, whether U_TH is worth running is round 72's quality question. This round leaves it alone.
+
+**The runs.** Two `realGpuRun --only denoise` a GPU at round 74's commit, committed byte for byte before they are read. Section 170
+reads round 73's Intel pair and the 1080's together. Section 171 reads round 74's.
+
+## 170. ROUNDS 72 AND 73 -- U_TH KEEPS MOST OF THE GAIN (5.4 % BELOW Bt), BUT ROUND 73's DOWN PASS COST IT THE FRAME BUDGET
+
+**What arrived.** Every file was committed byte for byte before it was read, except as noted.
+- **Round 72's training file:** render/upscale-net-r72.json, at 670c28bd (variant half), committed at c9f2a1bc.
+- **Round 72's test:** render/denoise-results-upscale-temporal-r72.json, run at c9f2a1bc. It was shown to me on upload before its
+  commit (f17ea91c).
+- **Round 73's runs:**
+  - the 1080's s168 pair at 670c28bd (b9eec59c);
+  - the Intel's s170 pair at c9f2a1bc (f17ea91c).
+  - c9f2a1bc differs from round 74's 8cbc2808 by five data files and no code, and it carries round 73's pass beside round
+    74's.
+- An earlier Intel pair (s169, at 8cbc2808) gave nothing: the checkout had lost render/upscale-net-r70.json again, and the gate died
+  at its first line. It is committed and counted nowhere.
+
+**Round 72 (quality), as fixed.**
+- **The training:** validation 1.661e-3, 1.694e-3 and 1.715e-3; the candidate is seed 1.
+- **Controls:** C1, C3, C4, C5 held. C2 held: the shuffled U_TH lost to Bt on all 24, mean d -3.81.
+- **H72a, U_TH against Bt: SUPPORTED** -- 16 of 24, p 0.0066, mean d +0.063.
+- **The 1 % rule: met.** Mean display relMSE 1.6702e-3 against Bt's 1.7663e-3, **5.44 % below**. That is 56 % of round 70's
+  9.65 %, on another test set.
+- **H72b, U_TH against B1: supported** -- 24 of 24, p 6.0e-8.
+- **Descriptively:** C 9 of 12 at 6.4 % below Bt, R 7 of 12 at 0.18 %. The gain is C's, as round 70's mostly was. The mean
+  correction is 0.95 % of Bt.
+
+**Round 73 (cost, the loop down pass), as fixed. H73 FAILS on both GPUs.**
+
+| GPU | run | U_TH | of it, the down pass | T | U / T |
+|---|---|---|---|---|---|
+| 1080 | a, b | 13.69, 13.55 ms | 8.43, 8.29 | 38.11, 37.99 | **0.359, 0.357** |
+| Intel | a, b | 203.4, 205.7 ms | 72.0, 74.0 | 511.4, 561.7 | **0.398, 0.366** |
+
+**Section 167's predictions.**
+- **P1 held:** C1 and C3.
+- **P2 held:** H72a at 5.44 %, inside 2-8 %.
+- **P3 held:** H72b.
+- **P4 MISSED:** the 1080's U_TH at 13.6 ms, not 2.5-6. Its network and upsample, 5.2-5.3 ms, were inside the range; the down
+  pass I wrote did not coalesce and took 8.3-8.4 ms. Section 169 fixed that as round 74.
+- **P5 MISSED:** the Intel at 0.37-0.40, over 0.15-0.35.
+
+## 171. ROUND 74 -- THE COALESCED DOWN PASS: U_TH COSTS 0.15 OF A FRAME ON THE 1080 (H74 HOLDS THERE) AND 0.28-0.30 ON THE INTEL (FAILS)
+
+**What arrived.** The 1080's s169 pair at 8cbc2808 (b68d4d24) and the Intel's s170 pair at c9f2a1bc (f17ea91c), every gate green in all
+four, committed before they were read.
+
+| GPU | run | down: loop → coalesced | U_TH (coalesced) | T | **U / T** |
+|---|---|---|---|---|---|
+| 1080 | a | 8.31 → 0.61 ms | 5.892 ms | 38.38 | **0.154** |
+| 1080 | b | 8.36 → 0.61 ms | 5.869 ms | 38.15 | **0.154** |
+| Intel | a | 72.0 → 20.7 ms | 153.3 ms | 511.4 | **0.300** |
+| Intel | b | 74.0 → 20.2 ms | 154.4 ms | 561.7 | **0.275** |
+
+**H74 holds on the 1080 and fails on the Intel, so it FAILS as fixed** (both GPUs were required).
+
+**Section 169's predictions.**
+- **P1 held exactly:** the pass at 0.61 ms (0.4-1.5), U 5.87-5.89 ms (5-7), U / T 0.154 (0.13-0.19).
+- **P2 held as to the verdict and missed as to the size:** the Intel fails, at 0.275-0.300 against the predicted 0.32-0.35. The
+  coalesced pass saved it more than predicted.
+- **P3 held:** the coalesced pass's output equal to the loop's bit for bit on both GPUs, every parity row green.
+
+**What rounds 70-74 say together.**
+- **On the 1080 class, U_TH is a real-time learned temporal upscaler.** It takes 5.4 % off Bt's display error and costs 5.9 ms at
+  1920 x 1080, 0.15 of a traced frame.
+  - Round 70's U_T took 9.65 % off at 46-48 ms, 1.2 frames.
+  - U_TH keeps 56 % of the gain at 12 % of the cost.
+- **On the Intel's integrated graphics, it is not real-time.**
+  - 153 ms, 0.28-0.30 of a traced frame (and the Intel's frame is itself ~0.5 s).
+  - Its layers alone are ~110 ms there, and the upsample and hold a further 21 ms.
+  - A cheaper U_TH would need a new quality round.
+- **The gain is C's.** Both U_T and U_TH help family C's scenes far more than R's (6.4 % against 0.18 % for U_TH). Where the gain
+  would land in a real scene is not measured.
+
+**What changes.** Nothing ships by these rounds alone. The temporal page still runs round 70's U_T at 128 x 128. Whether it should run
+U_TH, and whether U_TH goes after Bt in the chain on hardware like the 1080, are Keith's calls.
+
+## 172. ROUND 75 -- U_TH IN THE DEVICE CHAIN, AFTER Bt's HISTORY, ON THE 1080 CLASS; AND THE TEMPORAL PAGE ON U_TH. FIXED BEFORE ITS CODE RAN
+
+**Why.** Section 171 found U_TH real-time on the 1080 (0.154 of a traced frame, standalone) and not on the Intel. Keith asked for it
+after Bt in the device chain on the 1080 class, and for the temporal page to run it.
+
+**U_TH in the chain (render/denoiseUpscaleGPU.mjs).** After the history's accumulation, in the FINAL pass's place:
+- **an unclamped twin of the accumulation,** a second history a frame with the clamp off. U_TH's channels 3-5 need it, and the
+  chain did not keep it.
+- **PACKH_WGSL,** U_TH's 17 channels built straight at half size from the chain's own buffers:
+  - Bt's light and history length, the twin's light, and the measured frame's unjittered EASU;
+  - the newest eye's albedo (a per-sphere table, guideBuffers' rule), normal and depth d / (1 + d).
+
+  Each full-size value is computed and the four averaged in halfInput's order. No full-size 17-channel buffer is made, and
+  no down pass is needed.
+- **U_TH's four layers** on the fast kernel at half size.
+- **UPHOLD_COMP_WGSL:** the upsample, the hold on Bt's light, and the light sources composited.
+
+It is held to the CPU at 64 x 64 on round 33's fixture (family R's seed 990000, the CPU's first hits):
+- the packed half-size input against halfInput of temporalInput's 17 channels, within 1e-5 relative (the accumulation's own
+  bound);
+- the image against compositeEmitters(temporalUpscale(U_TH, x)) within 1e-4.
+
+**Where it runs (UTH_BY_ADAPTER, render/learnedUpscaleTemporalGPU.mjs).** On the 1080 class, by adapter key:
+- "win32/nvidia/pascal" natively and "Windows/nvidia/pascal" in the page, decided by section 171. Off elsewhere: the Intel
+  measured over budget, and an unmeasured adapter is not assumed.
+- denoise.html's chain timing runs it where the table says, or where `?ut=1` asks (the gate's pilot on SwiftShader).
+
+**What is timed, on the 1080 at 1920 x 1080 (realGpuRun's denoise selection, denoise.html's chain).** The chain with its history
+and U_TH (temporalUT) beside the chain with its history (temporal), each pass on the device's clock, in one run.
+
+**H75: temporalUT ≤ 1.25 × temporal on the 1080, in both of its runs.** U_TH in the chain adds at most a quarter of the chain's
+time. The Intel is not asked: the table leaves U_TH off there.
+
+**Predictions, fixed now, deciding nothing.**
+- **P1:** H75 holds.
+  - U_TH's added passes take 5.5-7.5 ms at 1080p: twin accumulation ~0.5, pack ~0.8, the layers 4.6, the
+    upsample-hold-composite ~0.6, less the final pass it replaces.
+  - temporalUT / temporal is 1.14-1.20.
+- **P2:** the parity rows hold on both GPUs.
+
+**The temporal page (path-tracer.html, backlog fsr4-temporal-page).** Its view switches from round 70's U_T to round 72's U_TH
+(render/upscale-net-r72.json), on the coalesced down pass, labelled as such. The page decides nothing.
+
+**The runs.** Two `realGpuRun --only denoise` on the 1080 at round 75's commit, from a fresh clone. Section 173 reads them.
+
+## 173. ROUND 75's VERDICT -- H75 FAILS NARROWLY: THE CHAIN WITH U_TH IS 1.28 x THE CHAIN, AND THE PACK IS WHY
+
+**What arrived.** Two `realGpuRun --only denoise` reports on the GTX 1080, from a fresh clone at 170aa856 (round 75's commit), every
+gate green with exit 0 in both. They were committed byte for byte (da9efaff) before they were read. Both count.
+
+| run | accumU | **packH** | four layers | upholdC (final 0.36 / 0.34 out) | the chain with U_TH | the chain with its history | **ratio** |
+|---|---|---|---|---|---|---|---|
+| a | 0.790 | **5.159** | 4.646 | 0.418 | 48.811 | 38.156 | **1.279** |
+| b | 0.791 | **5.283** | 4.641 | 0.395 | 48.636 | 37.863 | **1.285** |
+
+ms, every pass on the device's clock.
+
+**H75 FAILS** on the 1080: 1.279 and 1.285 against 1.25.
+
+**The predictions.**
+- **P1 MISSED:** U_TH's passes added 10.5-10.8 ms, not 5.5-7.5; the ratio is 1.28, not 1.14-1.20.
+  - Every part but one was as predicted: the twin accumulation 0.79 (~0.5), the layers 4.64 (4.6), the upsample-hold-composite
+    0.40-0.42 (~0.6).
+  - **PACKH_WGSL took 5.16-5.28 ms against ~0.8.** It gives each thread a half-size pixel and loops over 17 channels and four
+    full-size pixels, reading the history, the twin, the frame and the first hits through a branching per-channel function. That
+    is round 73's DOWN_WGSL shape, which section 170 had already found slow on this GPU (8.3 ms). I wrote it again.
+  - With a pack near the coalesced down pass's 0.6 ms, the chain with U_TH would be about 44 ms, 1.16 x.
+- **P2 held:** every parity row green on the 1080. The standalone U_TH read 5.88 and 5.74 ms in the same runs, as section 171 found.
+
+**What it says.** U_TH in the device chain works and matches its CPU twin. As built it adds 28 % to the chain's frame on the 1080,
+over the quarter H75 allowed, and most of the excess is one pass written the wrong way. A coalesced pack would be a further
+round: one thread per half-size value, the same sums, held to PACKH_WGSL bit for bit, as round 74 was to round 73. It is not
+fixed here.
+
+**What changes.** UTH_BY_ADAPTER keeps U_TH on for the 1080 class. That is section 171's decision, and H75 did not make it. The chain
+times U_TH there and the page reports it; nothing ships.
+
+## 174. ROUND 76 -- U_TH IN THE CHAIN WITH A COALESCED PACK: H75's QUESTION AGAIN, ONE KERNEL REWRITTEN. FIXED BEFORE ITS CODE
+
+**Why.** Section 173 found the chain with U_TH 1.28 x the chain on the 1080, over H75's 1.25. Of U_TH's 10.5-10.8 ms in the chain,
+**PACKH_WGSL took 5.2-5.3 ms against ~0.8 predicted.** It gives each thread a half-size pixel and loops over 17 channels and four
+pixels, the shape round 74 had already replaced once. Keith asked for the coalesced pack.
+
+**The change, and only it: PACKH_FAST_WGSL (render/denoiseUpscaleGPU.mjs).**
+- **One thread per half-size value,** pixel and channel, 256 to a group, a 1-D dispatch folded into two dimensions past 65535
+  groups.
+- **The same arithmetic as PACKH_WGSL:** the same per-channel function, chan(), and the same (a + b + c + d) / 4 in the same
+  order. Its output is held to PACKH_WGSL's **bit for bit** on the device.
+- The chain times both packs in one run, round 75's and this one. **temporalUTF** is the chain with U_TH and the coalesced pack,
+  beside **temporal**, on a line of its own: `section 174: the coalesced pack ...`, read by readH76.
+
+**H76: temporalUTF ≤ 1.25 × temporal on the 1080, in both of its runs** (H75's threshold and counting; the Intel not asked, U_TH being
+off there).
+
+**Predictions, fixed now, deciding nothing.**
+- **P1:** the coalesced pack takes 0.4-1.5 ms on the 1080. Its threads branch on the channel, so a 32-thread warp spans six branch
+  groups; even serialised, each is a few reads. temporalUTF / temporal is then 1.14-1.18, and **H76 holds**.
+- **P2:** the two packs agree bit for bit on the 1080, and every parity row is green.
+
+**The runs.** Two `realGpuRun --only denoise` on the 1080 from a fresh clone at round 76's commit, committed byte for byte before they
+are read. Section 175 reads them.
+
+## 175. ROUND 76's VERDICT -- H76 HOLDS: WITH THE COALESCED PACK, U_TH IN THE CHAIN COSTS THE 1080 18 % OF ITS FRAME
+
+**What arrived.** Two `realGpuRun --only denoise` reports on the GTX 1080, from a fresh clone at 7d423e17 (round 76's commit), every
+gate green with exit 0 in both. They were committed byte for byte (1e3efe83) before they were read. Both count. An upload of
+render/upscale-net-r72.json came with them; it is byte for byte the committed file, so nothing changed.
+
+| run | round 75's pack | **the coalesced pack** | chain + U_TH (coalesced) | chain with its history | **ratio** | round 75's sum, same run |
+|---|---|---|---|---|---|---|
+| a | 4.931 | **1.338** | 44.579 | 37.762 | **1.181** | 1.276 |
+| b | 4.916 | **1.341** | 44.172 | 37.347 | **1.183** | 1.278 |
+
+ms, every pass on the device's clock.
+
+**H76 HOLDS** on the 1080: 1.181 and 1.183, within 1.25.
+
+**The predictions.**
+- **P1 held as to the pack and the verdict, and missed the ratio by a hair:**
+  - the coalesced pack 1.34 ms (0.4-1.5);
+  - H76 holds;
+  - the ratio 1.181-1.183, against 1.14-1.18.
+- **P2 held:** every parity row green on the 1080, the two packs bit for bit there.
+
+**What rounds 70-76 say together.**
+- **The 1080 class has a real-time learned temporal upscaler.** U_TH after Bt's history, in the device chain, takes 5.44 % off Bt's
+  display error (section 170) for 6.8 ms at 1920 x 1080. That is 18 % more frame time than the chain with its history alone.
+- **The Intel's integrated graphics does not.** UTH_BY_ADAPTER leaves U_TH off there (section 171: 0.28-0.30 of a traced frame for
+  U_TH alone).
+- **Two of the misses on the way were the same mistake,** a pass looping over channels per pixel (round 73's down pass, round 75's
+  pack). Both were fixed by one thread per value, bit for bit, in rounds 74 and 76.
+
+**What changes.** The chain's U_TH runs the coalesced pack by default from here. accumulate's `pack` defaults to "fast", and round 75's
+loop pass is kept as the reference it is held to, as rounds 48 and 55 kept the plain accumulation. denoise.html's sum that names U_TH
+is temporalUTF. Nothing ships by this alone. Shipping the chain with U_TH on the 1080 class is a release, Keith's call.

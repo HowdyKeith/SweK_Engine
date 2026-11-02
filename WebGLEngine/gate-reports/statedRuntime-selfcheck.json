@@ -1,6 +1,6 @@
 {
  "gate": "tools/ship/statedRuntime-selfcheck.mjs",
- "at": "2026-10-28",
+ "at": "2026-11-01",
  "tables": [
   {
    "title": "stated runtimes against the record and a run",
@@ -16,25 +16,25 @@
      "tools/ship/authTrust-selfcheck.mjs",
      200,
      710,
-     145,
+     156,
      "header agrees"
     ],
     [
      "tools/ship/controlDossier-selfcheck.mjs",
-     935,
+     850,
      4006,
-     935,
+     850,
      "header agrees"
     ],
     [
      "tools/ship/roundTrip-selfcheck.mjs",
      2000,
      6216,
-     2026,
+     1909,
      "header agrees"
     ]
    ],
-   "note": "this box is 1.1857142857142857x the headers' box"
+   "note": "this box is 1x the headers' box"
   }
  ],
  "notes": [],

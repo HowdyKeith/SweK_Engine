@@ -1256,6 +1256,25 @@ export const EXCLUDED = Object.freeze([
     ...["GEN_CLEAR_WGSL", "GEN_SPLAT_WGSL", "GEN_WIN_WGSL", "GEN_FILL_WGSL", "GEN_GATHER_WGSL"].map((k) => Object.freeze({ id: `denoiseFrameGenGPU.${k}`,
         kind: "ordered multi-dispatch chain, graded against a CPU twin",
         why: "one of the generator's five passes -- clear, the depth splat, the winner, the fill, the gather -- each reading the last's buffers (atomic keys, winners, the filled field); one dispatch grades nothing. render/denoiseFrameGenCost-selfcheck.mjs holds the chain to interpolateFrameCPU: the mask and every vector bit for bit, the frame within 1e-5" })),
+    // round 71 (section 163) -- U_T on the device (render/learnedUpscaleTemporalGPU.mjs): the last of five passes, after four fast-kernel layers
+    Object.freeze({ id: "learnedUpscaleTemporalGPU.HOLD_WGSL", kind: "ordered multi-dispatch chain, graded against a CPU twin",
+        why: "U_T's hold, y = A (1 + 0.5 tanh r), reads the input and the head layer's residual, which only the four conv passes before it write; render/denoiseLearnedUpscaleGPU-selfcheck.mjs holds it to holdCpu on the device's own residual (within 1e-5) and the whole chain to temporalUpscale in f64 (within 1e-4)" }),
+    // round 73 (section 167) -- U_TH's own two passes, first and last of its six
+    Object.freeze({ id: "learnedUpscaleTemporalGPU.DOWN_WGSL", kind: "ordered multi-dispatch chain, graded against a CPU twin",
+        why: "U_TH's first pass, the 17 channels averaged over 2 x 2 for the half-size layers after it; render/denoiseLearnedUpscaleGPU-selfcheck.mjs reads it back and holds it to halfInput (within 1e-6)" }),
+    // round 74 (section 169) -- DOWN_WGSL coalesced: one thread a value, the same sum
+    Object.freeze({ id: "learnedUpscaleTemporalGPU.DOWN_FAST_WGSL", kind: "ordered multi-dispatch chain, graded against a CPU twin",
+        why: "U_TH's first pass with one thread per half-size value, feeding the half-size layers after it; render/denoiseLearnedUpscaleGPU-selfcheck.mjs holds its output to DOWN_WGSL's bit for bit, and so U_TH's whole output to round 73's" }),
+    // round 75 (section 172) -- U_TH after the history in the chain (render/denoiseUpscaleGPU.mjs): its first and last passes
+    Object.freeze({ id: "denoiseUpscaleGPU.PACKH_WGSL", kind: "ordered multi-dispatch chain, graded against a CPU twin",
+        why: "U_TH's half-size 17 channels built from the history's two accumulations, the shifted frame and the first hits, which only the chain's passes before it write; render/denoiseUpscaleGPU-selfcheck.mjs holds it to halfInput(temporalInput(...)) within 1e-5" }),
+    // round 76 (section 174) -- the pack coalesced: one thread a half-size value, the same chan() and sum
+    Object.freeze({ id: "denoiseUpscaleGPU.PACKH_FAST_WGSL", kind: "ordered multi-dispatch chain, graded against a CPU twin",
+        why: "PACKH_WGSL with one thread per half-size value, reading the same chain buffers; render/denoiseUpscaleGPU-selfcheck.mjs holds its output to PACKH_WGSL's bit for bit, and so U_TH's image to round 75's" }),
+    Object.freeze({ id: "denoiseUpscaleGPU.UPHOLD_COMP_WGSL", kind: "ordered multi-dispatch chain, graded against a CPU twin",
+        why: "the upsample, the hold on Bt's light and the composite, reading U_TH's head output; held with the chain to compositeEmitters(temporalUpscale(U_TH, x)) within 1e-4" }),
+    Object.freeze({ id: "learnedUpscaleTemporalGPU.UPHOLD_WGSL", kind: "ordered multi-dispatch chain, graded against a CPU twin",
+        why: "U_TH's last pass, the half-size head's residual upsampled and the hold at full size, reading what the four conv passes wrote; held to holdCpu(half) on the device's own residual (within 1e-5) and the whole chain to temporalUpscale (within 1e-4)" }),
 ]);
 
 /**

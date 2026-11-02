@@ -1,6 +1,6 @@
 {
  "gate": "tools/ship/reportDoors-selfcheck.mjs",
- "at": "2026-10-28",
+ "at": "2026-11-01",
  "tables": [
   {
    "title": "the reportLines convention, by kind",
@@ -12,7 +12,7 @@
    "rows": [
     [
      "members",
-     "216",
+     "219",
      "modules exporting reportLines"
     ],
     [
@@ -22,12 +22,12 @@
     ],
     [
      "formatters",
-     "19",
+     "22",
      "REQUIRE an argument (Function.length)"
     ],
     [
      "  of those, refuse a bare call",
-     "17",
+     "20",
      "an honest throw a consumer can catch"
     ],
     [

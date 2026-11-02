@@ -146,7 +146,11 @@ const WGSL_FILES = [...walk(ENG)].filter((f) => f.endsWith(".wgsl") && !path.rel
     // v4838 -- and tools/denoiseBuildProbe.mjs (the denoiser arc, round 17): its devices hold a 32-channel layer at 1024 x
     // 1024, storage limits only. Its first form passed them through a helper, which this row read as "may" and went red on
     // at the arc's merge; the object is spelled out now, and the site named.
-    const STORAGE_LIMIT_SITES = ["fluid-webgpu-3d.html", "render/denoiseDevice.mjs", "tools/denoiseBuildProbe.mjs"]   /* v4880: fluid-webgpu-3d.html asks for 12 storage buffers per stage (its kernels bind up to 12; the default is 8) */;
+    // v4909 -- and render/learnedUpscaleTemporalGPU.mjs (the FSR4 arc, round 71): temporalDevice holds U_T's 32-channel
+    // layers at 1920 x 1080 (265 MB, past the 128 MiB default binding), storage limits only. Found by this row at the ship.
+    // W4: it left out of STORAGE_LIMIT_SITES -> 1 red, this row ("UNNAMED: render/learnedUpscaleTemporalGPU.mjs"), the
+    // verdict's own reading before the name was added. Restored.
+    const STORAGE_LIMIT_SITES = ["fluid-webgpu-3d.html", "render/denoiseDevice.mjs", "tools/denoiseBuildProbe.mjs", "render/learnedUpscaleTemporalGPU.mjs"]   /* v4880: fluid-webgpu-3d.html asks for 12 storage buffers per stage (its kernels bind up to 12; the default is 8) */;
     const WORKGROUP_LIMIT = /maxComputeInvocationsPerWorkgroup|maxComputeWorkgroupSize[XYZ]|maxComputeWorkgroupStorageSize|maxComputeWorkgroupsPerDimension/;
     let workgroupRaises = 0; const storageSites = [];
     for (const f of walk(ENG)) {
