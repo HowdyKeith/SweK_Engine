@@ -101,7 +101,7 @@ const report = (m) => console.log("  ----  " + m);
 const sec = (t) => console.log("\n" + t);
 const mkRng = (seed) => { let a = seed >>> 0; return () => { a = (Math.imul(a, 1664525) + 1013904223) >>> 0; return a / 4294967296; }; };
 const same = (a, b) => a.length === b.length && a.every((v, i) => Object.is(v, b[i]));
-const ASYNC_PILOTS = ["shipped", "league", "close"];   // the roster choices that exist only once their file has been fetched
+const ASYNC_PILOTS = ["shipped", "league", "close", "gpu"];   // the roster choices that exist only once their file has been fetched ("gpu", 2026-11-02: the GPU Brain's pilot, graded in brain/pilot6dofMlpPage-selfcheck.mjs)
 
 // 60 seeded states of a ship against a target: any orientation, a small spin, the target 30-200 units away and moving, the ship moving a little
 const I = RB.boxInertia({ m: 8, hx: 1.6, hy: 0.7, hz: 0.7 });

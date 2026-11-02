@@ -49,6 +49,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as PP from "./pilotPolicy.mjs";
 import * as R from "./pilotRoster.mjs";
+import * as P6 from "./pilot6dofPolicy.mjs";   // 2026-11-02 -- the 6-DOF page's network, and the GPU Brain's beside it: the one choice that carries its own network
+import * as M6 from "./pilot6dofMlp.mjs";
 import { planarFallbackWorld } from "../physics/planarFallbackWorld.js";
 import { runInEngineOrigin, webgpuSkipReason } from "../tools/ship/webgpuHarness.mjs";
 
@@ -116,6 +118,24 @@ sec("2. EVERY CHOICE THE PANEL CAN OFFER");
         const ctx4 = ctxOf({ shipped: shippedW, league: leagueW, close: closeW }), cl = R.resolveTeam("A", "close", ctx4, 3), none = R.resolveRoster({ A: "close", B: "league" }, ctxOf({ shipped: shippedW, league: leagueW }), 3);
         ok("!! choosing it flies THAT vector on every ship (not the league's, not the shipped pilot's), under its own label; a saved 'close' on a page that does not hold one falls back to the hand pilot BY NAME", cl.id === "close" && cl.weights.length === 3 && cl.weights.every((w) => w === closeW) && /close-quarters/.test(cl.label) && cl.problems.length === 0 && none.problems.length === 1 && /team A.*"close"/.test(none.problems[0]) && none.A.weights.every((w) => same(w, PP.handWeights())) && none.B.weights.every((w) => w === leagueW), cl.label);
         ok("the Brain panel's pilot ignores it (a choice made in the roster, not a new default)", R.resolveTeam("A", "brain", ctx4, 2).weights[0] === shippedW);
+    }
+    {   // 2026-11-02 -- the GPU Brain's pilot (es-box3d-6dof.html): ANOTHER NETWORK, carried by the choice itself (ctx.gpu the weights, ctx.gpuPP the module). Read on the 6-DOF substrate, the page it is for.
+        const rngOf = (seed) => { let a = seed; return () => { a = (Math.imul(a, 1664525) + 1013904223) >>> 0; return a / 4294967296; }; };
+        const flyW = P6.perturb(P6.handWeights(), 0.2, rngOf(61)), gpuW = M6.perturb(M6.handWeights(), 0.2, rngOf(67)), seeds = [99301, 99302, 99303];
+        const all5 = R.choices({ shipped: true, league: true, close: true, gpu: true, imported: true }).map((c) => c.id), noGpu = { shipped: true, league: true, close: true, imported: true };
+        ok("!! 'gpu' is offered only when the page holds it, after 'close' and before 'imported', and a page that holds none offers the same choices it did before",
+            all5.indexOf("gpu") === all5.indexOf("close") + 1 && all5.indexOf("imported") === all5.indexOf("gpu") + 1 && !R.choices(noGpu).some((c) => c.id === "gpu") &&
+            JSON.stringify(R.choices(noGpu)) === JSON.stringify(R.choices({ ...noGpu, gpu: null })), all5.join(","));
+        const ctx6 = { PP: P6, shipped: flyW, imported: null, brainPilotOn: false, gpu: gpuW, gpuPP: M6 }, g = R.resolveTeam("A", "gpu", ctx6, 3), sh = R.resolveTeam("B", "shipped", ctx6, 3);
+        const fp = (f, seed) => P6.duel(f, "autopilot", { seed }).fingerprint, fg = R.teamPilot(g, P6), fs = R.teamPilot(sh, P6);
+        ok("!! choosing it flies THAT vector on every ship, under its own label, THROUGH ITS OWN NETWORK: the team's pilot flies the headless duel to the fingerprint of pilot6dofMlp.pilotFor() on those weights, seed for seed",
+            g.id === "gpu" && /GPU Brain/.test(g.label) && g.weights.length === 3 && g.weights.every((w) => w === gpuW) && g.PP === M6 && g.problems.length === 0 && seeds.every((s) => fp(fg, s) === fp(M6.pilotFor(gpuW), s)),
+            `${g.label}: ${seeds.map((s) => fp(fg, s)).join(" ")}`);
+        ok("!! ...and the fly's choices still fly the fly's network: 'shipped' carries no network of its own, and its pilot flies pilot6dofPolicy.pilotFor()'s duel to the bit", sh.PP === undefined && seeds.every((s) => fp(fs, s) === fp(P6.pilotFor(flyW), s)));
+        const noNet = R.resolveTeam("A", "gpu", { ...ctx6, gpuPP: undefined }, 3), noW = R.resolveTeam("A", "gpu", { ...ctx6, gpu: null }, 3);
+        ok("!! the MLP's weights are never flown through another network: a saved 'gpu' on a page that holds the weights but not the network, or the network but no weights, falls back to the hand pilot BY NAME",
+            [noNet, noW].every((r) => r.id === "hand" && r.PP === undefined && r.weights[0].length === P6.WEIGHT_COUNT && r.problems.length === 1 && /"gpu"/.test(r.problems[0])), noNet.problems.join("; "));
+        ok("the Brain panel's pilot ignores it (a choice made in the roster, not a new default)", R.resolveTeam("A", "brain", ctx6, 2).weights[0] === flyW);
     }
     const brainOrder = [R.resolveTeam("A", "brain", ctxOf({ imported: importedW, shipped: shippedW }), 2), R.resolveTeam("A", "brain", ctxOf({ shipped: shippedW }), 2), R.resolveTeam("A", "brain", ctxOf(), 2)];
     ok("the Brain panel's pilot is the imported one, else the shipped default, else the hand weights (what Brain pilot has always flown), and each is the vector itself, not a copy that drifts", brainOrder[0].weights[0] === importedW && brainOrder[1].weights[0] === shippedW && same(brainOrder[2].weights[0], PP.handWeights()));

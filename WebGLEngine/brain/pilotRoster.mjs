@@ -9,6 +9,10 @@
 // one imported from a file or pulled from a peer). "Scripted" is not a brain at all: it is ev/flightModel3d.js's stepAI3d, and it is on the list because it is what team B has
 // always been, so a fight of brain against scripted -- the demo as it was -- is one choice on each side and a fight of brain against brain is two.
 //
+// *** ONE CHOICE IS ANOTHER NETWORK: "gpu" (2026-11-02, es-box3d-6dof.html). *** The GPU Brain's pilot (brain/pilot6dofMlp.mjs, an MLP) is not a weight vector for the page's network, so it carries
+// its own: the page hands the weights as ctx.gpu and the network module as ctx.gpuPP, the resolved team carries that module as `PP`, and teamPilot() flies it through that instead of the page's.
+// It is offered only when the page holds both, and a saved "gpu" the page cannot fly falls back to the hand pilot by name -- so the MLP's weights are never run through another network.
+//
 // Pure: no DOM, no storage, no clock. The page hands it what it holds (ctx) and gets pilot functions back. Noise is drawn from a seeded stream in SHIP order, so the same
 // lineup flies the same pilots every battle.
 "use strict";
@@ -30,7 +34,7 @@ export function sanitizeSpecs(raw) {
 }
 
 /**
- * What can be chosen RIGHT NOW. ctx: { shipped, league, close, imported } -- whether this page holds the shipped default pilot, the league-trained one (v4846), the close-quarters one (v4848) and an imported one. A source that needs something the page
+ * What can be chosen RIGHT NOW. ctx: { shipped, league, close, gpu, imported } -- whether this page holds the shipped default pilot, the league-trained one (v4846), the close-quarters one (v4848), the GPU Brain's (2026-11-02) and an imported one. A source that needs something the page
  * does not hold is not offered. "brain" is the Brain panel's own pilot: the imported one, else the shipped default, else the hand weights (what Brain pilot has always flown).
  */
 export function choices(ctx) {
@@ -40,6 +44,7 @@ export function choices(ctx) {
     if (ctx.shipped) out.push({ id: "shipped", label: "shipped pilot brain" });
     if (ctx.league) out.push({ id: "league", label: "league-trained pilot brain" });   // v4846 -- the second generation: the shipped pilot, trained against itself and the PD autopilot (es-box3d-6dof.html)
     if (ctx.close) out.push({ id: "close", label: "close-quarters pilot brain (trained with collisions on)" });   // v4848 -- the shipped pilot trained in standoff AND joust starts, with the page's own ram damage
+    if (ctx.gpu) out.push({ id: "gpu", label: "GPU Brain pilot (an MLP, not the fly circuit)" });   // 2026-11-02 -- the GPU Brain's network, trained by the fruit fly's Default recipe (brain/SIXDOF_GPU_BRAIN_WIP.md)
     if (ctx.imported) out.push({ id: "imported", label: "imported pilot brain" });
     out.push({ id: "hand", label: "hand weights" }, { id: "noise05", label: "hand + noise 0.05 (each ship its own)" }, { id: "noise10", label: "hand + noise 0.1 (each ship its own)" }, { id: "zero", label: "zero (never turns, thrusts or fires)" });
     return out;
@@ -52,7 +57,8 @@ export const autoChoice = (team, ctx) => (team === "A" && ctx.brainPilotOn ? "br
 function brainWeights(ctx) { return ctx.imported || ctx.shipped || ctx.PP.handWeights(); }
 
 /**
- * Resolve one team. ctx: { PP, shipped, league, close, imported, brainPilotOn }; n = ships on the team. Returns { team, id, label, scripted, weights (one vector per ship, or null when scripted), problems }.
+ * Resolve one team. ctx: { PP, shipped, league, close, gpu, gpuPP, imported, brainPilotOn }; n = ships on the team. Returns { team, id, label, scripted, weights (one vector per ship, or null when scripted), problems },
+ * plus PP (the network to fly those weights through) for a choice that carries its own ("gpu").
  * An id nothing holds falls back to the hand weights AND SAYS SO in `problems`; it never throws and never silently substitutes.
  */
 export function resolveTeam(team, spec, ctx, n) {
@@ -65,6 +71,7 @@ export function resolveTeam(team, spec, ctx, n) {
     else if (id === "shipped" && ctx.shipped) r = same(ctx.shipped, "shipped pilot brain");
     else if (id === "league" && ctx.league) r = same(ctx.league, "league-trained pilot brain");
     else if (id === "close" && ctx.close) r = same(ctx.close, "close-quarters pilot brain");
+    else if (id === "gpu" && ctx.gpu && ctx.gpuPP) r = { ...same(ctx.gpu, "GPU Brain pilot"), PP: ctx.gpuPP };   // its OWN network: teamPilot() flies resolved.PP, never the page's
     else if (id === "imported" && ctx.imported) r = same(ctx.imported, "imported pilot brain");
     else if (id === "hand") r = same(PP.handWeights(), "hand weights");
     else if (id === "zero") r = same(PP.zeroWeights(), "zero pilot");
@@ -86,7 +93,8 @@ export function resolveTeam(team, spec, ctx, n) {
  */
 export function teamPilot(resolved, PP) {
     if (resolved.scripted) return null;
-    const fns = new Map(), fnFor = (w) => { let f = fns.get(w); if (!f) fns.set(w, f = PP.pilotFor(w)); return f; };
+    const net = resolved.PP || PP;   // a choice that carries its own network ("gpu") flies through it; every other choice through the page's
+    const fns = new Map(), fnFor = (w) => { let f = fns.get(w); if (!f) fns.set(w, f = net.pilotFor(w)); return f; };
     return (ship, target, opts) => {
         const m = /#(\d+)$/.exec(String(ship && ship.id)), i = m ? Math.min(+m[1], resolved.weights.length - 1) : 0;
         return fnFor(resolved.weights[i])(ship, target, opts);
