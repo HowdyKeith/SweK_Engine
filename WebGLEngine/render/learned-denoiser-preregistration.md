@@ -11170,3 +11170,45 @@ static surfaces', and on the moving objects themselves -- where Bt is worst -- U
 there is the one section 176 named for H77a failing, now aimed at the mover pixels:** U_TH trained on moving sequences (the motion is
 already in temporalExample), or object motion vectors for Bt's history. The first is a training round on the existing code; the second
 changes Bt itself, and the chain on the device with it.
+
+## 178. ROUND 78 -- U_TH TRAINED ON MOVING SEQUENCES: CAN IT LEARN THE MOVERS? FIXED BEFORE ITS CODE
+
+**Why.** Section 177: round 72's U_TH, trained on still scenes only, keeps 4.49 % over Bt when the objects move, but on the mover pixels
+-- where Bt's error is 5.8 x the rest's -- only 3.60 %, and on 13 of 24 scenes. U_TH has never seen a stale or rejected history on a
+moving object. Section 177 named two next rounds; this is the cheaper one: the same network, trained on sequences that move.
+
+**U_THM (the network).** Section 167's U_TH exactly: its 17 channels averaged to half size, three 3 x 3 layers of 16 and a zeroed 1 x 1
+head, the residual upsampled and held on Bt's light by 1 + 0.5 tanh(r). Only its training data differ.
+
+**ROUND 78.**
+- **Training and validation:** round 65's 200 + 20 scenes, as round 72's -- **each TWICE, still and moving** (section 176's motion,
+  drawn by sceneMotion from each scene's seed), the moving twin sharing its still twin's 512-sample reference. So 400 training and 40
+  validation sequences, half of them moving. Seeds 1-3 at UP_TRAIN (1500 steps, batches of 4 crops of 32), the candidate the lowest mean
+  validation loss over all 40, and C2 on targets shuffled across all 400.
+- **Test:** 24 new scenes, 12 R (79000-79011) and 12 C (80000-80011), each moving and still, against two 2048-sample references shared
+  by the twins. Graded on each: U_THM (round 78's candidate), U_TH (round 72's candidate), Bt and B1.
+- **H78a:** on the MOVING scenes U_THM's chain beats U_TH's, by section 159's rule: a mean display relMSE at least 1 % below U_TH's,
+  through verdict() (the sign-flip test, Holm with H78b, C1-C5).
+- **H78b:** on the moving scenes U_THM's chain beats Bt's, as H77a.
+- **Descriptive, deciding nothing:** on the STILL scenes, U_THM against U_TH and against Bt; on the mover pixels and the rest, U_THM,
+  U_TH and Bt; the validation losses; each scene's mean correction.
+- Files: render/upscale-net-r78.json and render/denoise-results-upscale-moving-r78.json.
+
+**Predictions, fixed now, deciding nothing.**
+- **P1:** C1 and C3 hold.
+- **P2:** H78a is supported, at 1-4 % below U_TH on the moving scenes.
+- **P3:** H78b is supported, at 5-9 % below Bt on the moving scenes.
+- **P4:** on the mover pixels U_THM is 5-12 % below Bt, against U_TH's 3.60 % on round 77's set.
+- **P5:** on the still scenes U_THM is within 1 % of U_TH either way: half of its training is still, and the network is the same size.
+
+**What each outcome means, fixed now.**
+- **H78a holds:** training on motion is what the movers lacked. U_THM replaces U_TH in the device chain and on the page (the same
+  network shape, so the same cost, section 175), if P5 holds too.
+- **H78a fails, P4 holding:** the movers improved but not the image enough to pass the rule; reported as it lands, U_TH kept.
+- **H78a fails and P4 fails:** U_TH's 16 channels cannot learn a moving object's history from these inputs. The next round is object
+  motion vectors for Bt's history (section 177's second).
+
+**The runs, on Keith's rig, at round 78's commit, one after the other (CPU harvests, either machine):**
+- `--harvest-upscale-temporal-train --round 78`, about 15 hours, its file committed byte for byte before it is read;
+- then, at the commit that holds that file, `--harvest-upscale-temporal-test --round 78`, about 11 hours, committed the same way.
+Section 179 reads them.
