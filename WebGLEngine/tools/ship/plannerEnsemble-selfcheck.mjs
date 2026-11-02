@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/plannerEnsemble-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node tools/ship/plannerEnsemble-selfcheck.mjs      (about 20 s: four full-length dives with the ensemble and a few 100-second ones)
+// Run: node tools/ship/plannerEnsemble-selfcheck.mjs      (about 40 s: four full-length dives with the ensemble, the 600-second rollouts of the arithmetic rows and a few 100-second dives)
 //
 // THE GATE OF tools/ship/plannerEnsemble.mjs (Round 23 of brain/NEEDS_AND_LIMITS.md, registered first) AND OF THE `ensemble` OPTION IT ADDED TO brain/plannerPerturbed.mjs.
 //   1 SETS      3501-3650 and 3701-3850 of far and both (300 dives a set, 600 an arm), disjoint from every seed of Rounds 1-22; six arms in the registered order.
@@ -12,6 +12,7 @@
 //   7 FLIGHT    the option on real dives: the default ensemble [0] is the old behaviour, an ensemble triples the scheduled rollout seconds on a fixed dive and changes far 3506 from 0.70 to 0.85.
 //   8 SOURCE    the seeds appear in one place; no clock, random or file.
 // NOT CHECKED, said plainly: whether planning under uncertainty helps (that is the experiment).
+// SABOTAGE LOG (46 mutants of tools/ship/plannerEnsemble.mjs and of the `ensemble` option in brain/plannerPerturbed.mjs, run against a copy of this gate): 6 went 0 red on the first pass and all 6 got rows -- the cost and plan count as the MEAN over a set's dives (pinned 782, 726.5 and 754.25), the separator in the list of worse arms, the printed difference from the twin (its own sign: -0.0500, not a plus sign from the arm's gain), and three about the option's arithmetic (the value of an order is the MEAN of its rollouts over the offsets, not their sum and not a fixed divisor, and nearest-first's value is that mean too: pinned on both 3501 at 600 s, where the three rollouts score 0.550, 0.775 and 1.000). None is equivalent. All 46 are red. (The gate takes about 40 s: the arithmetic rows fly 600-second rollouts.)
 "use strict";
 import fs from "node:fs";
 let fails = 0, finished = false;
