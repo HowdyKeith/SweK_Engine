@@ -389,3 +389,30 @@ cores take about 45 minutes.
   only if the champion qualified.
 - `tools/ship/train6dofMlpLeague-selfcheck.mjs`, the gate: the registration as code; the rule at its edges on made-up
   numbers; a miniature on scratch seeds; and the command held, never executed.
+
+### Round 2: built, 2026-11-02, before the registered run (nothing of the registration above is changed)
+
+**What exists:** `tools/ship/train6dofMlpLeague.mjs` (the library), `tools/ship/trainMlp6dofLeague.mjs` (the command) and
+the gate `tools/ship/train6dofMlpLeague-selfcheck.mjs` (about 17 s, 23 rows).
+
+**How the run is shaped.**
+- **C-files come first.** The start and the Default must be the registered files, or nothing is searched.
+- **The four searches and the determinism twin of the first run in five processes at once.**
+- **Then the finish,** in `train6dofLeague.finish()`'s order: each search's held-out league score, the champion picked
+  on it alone, the audit read once, and the verdict by `qualifies()`. Then H2, from the same audit games.
+- **The command writes `brain/sixdofGpuLeagueResults.json` and prints only where it is.** The weight file is a later
+  step, `--write-from` that committed file, and only if the champion qualified.
+
+**The gate never starts the command's round and flies only scratch seeds** (99600-99661).
+
+**Sabotaged with the byte-safe runner: 15 designs, each red by name** (the counts are in the gate's header). Four rows
+were found unable to go red before the sabotages ran, and each was fixed:
+- **The miniature was empty.** Its first searches (6 iterations) pruned back to the start, so "pruned toward the start"
+  and the determinism twin were 0 = 0. It now runs 40 iterations, with a row that says a search kept weights.
+- **The planted pick's two searches agreed in both orders** (the first round's T3 again). It is now a pilot of zeros
+  with the higher train score, against the start.
+- **The audit could have been read against the wrong opponent unseen,** since the verdict row recomputed from the same
+  object. It is now recomputed independently.
+- **The start's hash check was never exercised.** A good file with other weights now exercises it.
+
+**The registered run:** `node tools/ship/trainMlp6dofLeague.mjs --workers 5`.
