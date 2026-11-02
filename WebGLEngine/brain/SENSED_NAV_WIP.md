@@ -444,3 +444,35 @@ The study command was gated and sabotaged first (81 mutants: 76 red by name, 5 c
 **What this would not say.** That 0.01 or 0.03 is the real sonar's rate (the sweep has four rates in steps of about three, coarse, and one value of the other three faults); that false returns are white (follow-up 5 made them last ten pings at 0.001 with the range law and the forgetting map lost about 6 flights to them alone; they also cluster in space on a thermocline or a school of fish); that the sticky map's cliff is below 0.0001 and not somewhere I did not look (the lowest rate flown is the one it fails at); or that hard-gaps's near-immunity is anything but what was measured. Not a different pilot, a different generator or the moving ships. A result is a statement about this generator and these models.
 
 **What it leaves, registered in `tools/ship/nextRounds.mjs`:** `nav-sensed-confirm-returns` (mark a cell only after k consecutive occupied readings, k = 2, 3, with the forgetting map and, with `nav-sensed-dropout-cure`'s clearing rule, as one detector, against the white false returns of this round and the persistent faults of follow-up 5).
+
+## FOLLOW-UP 7: A DETECTOR FOR THE MAP (Keith, 2026-11-02: "lets do nav-sensed-dropout-cure and nav-sensed-confirm-returns"; REGISTERED BEFORE ANY CODE FOR IT AND BEFORE ITS SET IS FLOWN)
+
+The two backlog entries are the two halves of one thing. Follow-up 5 found the forgetting map's weakness in **dropouts**: an obstacle that reads free for ten pings is taken at its word and the vessel steers into it (`objp+forget` 12 flights behind the clean map). Follow-up 6 found it in **false returns**: a cell is marked on the first ping that reads it occupied, and at a false rate of 0.01 the map reaches 68% of the exact map, the bar lost between 0.003 and 0.01. The map's rule is the same at both ends, **one reading decides**: a cell is marked after ONE occupied reading and cleared after ONE free one. This round replaces it with a **detector** with a rule at each end, tested **separately and together**:
+* **Confirm (`km`)**: a free cell is marked occupied only when it has read occupied at `km` consecutive pings (the cell ensonified each time). A white false return has to repeat, at about the rate to the power `km`: 0.0001 for a rate of 0.01 and `km` = 2.
+* **Hold (`kc`)**: a marked cell is cleared only when it has read free at `kc` consecutive pings. A dropout of ten pings is covered by a hold of twelve.
+`(1, 1)` is the map that forgets (every earlier result's best map) and `(1, infinity)` the sticky map.
+
+**The tension, said before the data.** A long hold is what the sticky map did, and what the sticky map costs is the fix smear (follow-up 2: the union of every ping's placements of a wall, each shifted by a different fix error, thickens it); the map forgets to cure that. A hold of twelve brings a twelve-ping union of placements back. A confirmation delays the marking of a real obstacle by a ping or two, and with the sonar's 20% misses a cell needs two hits in a row (64%). And **the hold of twelve is chosen because the dropout is ten pings: it is the cure tuned to the disease**, flown as a possibility, not as a robust design; a real dropout's length is not known.
+
+**Two conditions, the two that broke the map** (everything else as follow-ups 3 to 6: the 200 m sonar, the white 3 m fix, the margin ladder):
+* **`W`**: follow-up 4's four white faults (misses 0.2, first surfaces only, a white 2 degree heading error) at a false-return rate of **0.01**, the rate at which the forgetting map failed (122 of 180 in follow-up 6).
+* **`P`**: follow-up 5's `pall`, the five persistent faults together (a bias, whole-obstacle dropouts of ten pings, persistent false returns, the range law, first surfaces only).
+
+**Arms** (every arm but `exact` is the 200 m sonar with the white 3 m fix and a map with a detector): `exact`; the clean `long+fix+forget`; the designated detector **`d2-12`** (`km` = 2, `kc` = 12) on a sea with NO faults (`d2-12@clean`); and under each condition the six detectors `d1-1` (the incumbent, flown through the detector code to check it is the map that forgets), `d2-1` (confirm only), `d1-12` (hold only), `d2-3`, **`d2-12`** and `d3-12`: `d1-1@W`, `d2-1@W`, `d1-12@W`, `d2-3@W`, `d2-12@W`, `d3-12@W` and the same six `@P`. Fifteen arms, 2,700 flights.
+
+**One study, one new set, nothing else changed. The set is HELD12 = seeds 1201 to 1260 of each of `hard-islands`, `hard-gaps` and `hard-current`** (180 scenarios), fresh, flown ONCE.
+
+**Bar and verdict.** The designated detector `d2-12` reaches **at least 80% of what `exact` reaches in EACH kind under EACH condition**: six cells, three kinds under `W` and three under `P`. **SUPPORTED** if all six, **PARTLY SUPPORTED** if at least four, **NOT SUPPORTED** otherwise. (The incumbent already holds the three `P` cells in follow-up 5 and fails two of the three `W` cells in follow-up 6: a detector has to repair `W` without breaking `P`.)
+
+**Predictions (scored held or missed, moving nothing; pooled over the three kinds unless said; each with its reason).**
+* **G1** confirmation repairs white false returns: `d2-1@W` reaches at least 20 more than `d1-1@W`. (A false return has to repeat: 17 phantom cells a ping become about 0.2.)
+* **G2** and does nothing for dropouts: `d2-1@P` is within 10 of `d1-1@P`. (A dropout makes cells read free, which a confirmation rule does not look at.)
+* **G3** a hold alone makes white false returns far worse: `d1-12@W` reaches at least 20 fewer than `d1-1@W`. (Each phantom now lasts twelve pings instead of one: some two hundred on the map at once, against fifty at a rate of 0.03.)
+* **G4** a hold alone helps with dropouts: `d1-12@P` reaches more than `d1-1@P`. (The hold covers the ten pings; against it the fix smear a hold brings back.)
+* **G5** together they repair the white false returns: `d2-12` holds the bar in all three kinds under `W`.
+* **G6** and keep the dropout cure: `d2-12` holds the bar in all three kinds under `P`.
+* **G7** and cost little on a sea with no faults: `d2-12@clean` is within 8 of the clean `long+fix+forget`. (A marking delayed by a ping; against it the twelve-ping union of the fix's placements.)
+* **G8** the two rules are better together than either alone: summed over the two conditions, `d2-12` reaches more than `d2-1` and more than `d1-12`.
+`d2-3` and `d3-12` are flown and reported and not predicted.
+
+**What it would not say.** That these are the right numbers: `km` of 2 and 3 and `kc` of 3 and 12 are six points on a plane (an M-of-N rule, a range-gated clear or a median over the last pings are untried), and the hold is tuned to the dropout the study throws at it. The faults are the two sets that broke the map and not a sample of faults; a detector tuned on them is tested on them. The persistent false returns of `P` are single cells; real ones cluster. Not a different pilot, a different generator or the moving ships. A result is a statement about this generator and these models.
