@@ -2834,10 +2834,15 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "nav-sensed-sonar-persistent",
+        state: "CLOSED",
+        what: "CLOSED 2026-11-02 (brain/SENSED_NAV_WIP.md, RESULT OF FOLLOW-UP 5; tools/ship/subSensedFollowStudy.mjs --study persistent, flights in brain/subSensedPersistentHeld10.jsonl): SUPPORTED. The vessel with persistent sonar faults (a heading bias, whole obstacles that drop out for ten pings, persistent false returns, rates that grow with range, first surfaces only) and a map that forgets reaches 151 of 180 (the exact map 170, the clean vessel 168) and at least 80% of the exact map in every kind; five of eight predictions held (P4, P5, P7 missed in the registered direction and short of the size). A bias costs nothing to either map (the white error of the same size breaks a sticky one); the cost that remains is the obstacle that drops out (12 flights, most in the 24 m gaps).",
+    },
+    {
+        id: "nav-sensed-dropout-cure",
         blocker: "OPEN",
-        what: "The realism round's faults were white (independent between cells and pings) and its sizes untried either side; a real sonar's faults persist: a compass has a bias, a reef missed once is missed again, noise grows with range.",
-        how: "The same vessel (the 200 m sonar, a white 3 m fix, a map that forgets) with a heading BIAS, then misses that persist for several pings (a cell that misses stays missed for N pings), then a range-dependent miss and false rate, one at a time and together; the sticky map and the forgetting map; new registration, fresh seeds (HELD9 is spent).",
-        why: "Forgetting cured a fault that is not repeated; whether it cures one that is repeated, or whether a consistent bias is harmless to the plan, is not known.",
+        what: "A map that forgets takes a whole obstacle's dropout at its word for the ten pings it lasts (objp+forget 156 of 180 against the clean 168; the 24 m gaps 11 of 20 against 16), and the vessel in a narrow gap has no room to turn back.",
+        how: "Forget a cell only after k consecutive free readings (hysteresis, k = 2, 3, 5), or keep an obstacle that was seen within some range as occupied until it is seen free again from nearer; read the persistent faults of brain/SENSED_NAV_WIP.md follow-up 5 (objp and pall) and the white faults of follow-up 4 (a cure that costs the false-return cure is no cure); new registration, fresh seeds (HELD10 is spent).",
+        why: "Forgetting is what makes the long sonar usable; the one fault it does not survive is the one that repeats.",
     },
     {
         id: "nav-sensed-false-rate",
