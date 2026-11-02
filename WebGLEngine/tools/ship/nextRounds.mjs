@@ -2846,13 +2846,18 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "nav-sensed-false-rate",
-        blocker: "OPEN",
-        what: "At a false-return rate of 0.001 a sticky map collapses (49 of 180) and a forgetting map does not (169); the rate at which the forgetting map gives out, and how the filtered-fix sticky map of follow-up 3 fares with the faults on, are not known.",
-        how: "Sweep the false rate (0.001, 0.003, 0.01, 0.03) for the forgetting arm and for the filtered-fix sticky arm with the faults on, and read where each falls below 80% of the exact map; new registration, fresh seeds.",
-        why: "The realism round fixed one size for each fault; the margin to the cliff is not known.",
+        state: "CLOSED",
+        what: "CLOSED 2026-11-02 (brain/SENSED_NAV_WIP.md, RESULT OF FOLLOW-UP 6; tools/ship/subSensedFollowStudy.mjs --study falserate, flights in brain/subSensedFalseRateHeld11.jsonl): NOT SUPPORTED (the registered tenfold margin). With follow-up 4's four faults on, the forgetting map holds 80% of the exact map in every kind at false rates of 0.001 and 0.003 (92% and 86% of exact; 80.4% in hard-current at 0.003), loses it between 0.003 and 0.01 (68%; held in hard-gaps only) and keeps falling at 0.03; the filtered-fix sticky map reaches 59% of exact already at 0.0001, 36% at 0.0003 and 25% at 0.001. Seven of eight predictions held (F6, that the sticky map survives at 0.0001, missed). The follow-up 4 rate costs the forgetting map 3 to 10 flights.",
     },
     {
-                id: "nav-traffic-avoid-not-slow",
+        id: "nav-sensed-confirm-returns",
+        blocker: "OPEN",
+        what: "A white false return at a rate of 0.01 takes the forgetting map from 92% to 68% of the exact map (brain/SENSED_NAV_WIP.md, RESULT OF FOLLOW-UP 6) and the map marks a cell on the first ping that reads it occupied.",
+        how: "Mark a cell only after it reads occupied at k consecutive pings (k = 2, 3), alone and together with nav-sensed-dropout-cure's clearing rule as one detector (a cell cleared only after several free readings), against the white false returns of follow-up 6 (0.003, 0.01, 0.03) and the persistent faults of follow-up 5; new registration, fresh seeds (HELD11 is spent).",
+        why: "A white false return has to repeat to be confirmed, at the rate squared; the price is a ping or two of delay in marking a real obstacle, which the 200 m sonar can spare.",
+    },
+    {
+        id: "nav-traffic-avoid-not-slow",
         blocker: "OPEN",
         what: "The traffic fix (brain/SUB_FIELD_NAV_WIP.md, RESULT OF THE TRAFFIC FIX, HELD5) reached 40 of 60 (PARTLY SUPPORTED: +6 over any+predict, bar 80% and no-exit missed): the failures that remain are collisions with ships (14 of the designated arm's 16) and four exits through the edge band; slowing to 2 m/s did not change the collision count.",
         how: "A vessel that turns away from a ship (a velocity-obstacle or a give-way heading chosen against the ship's relative velocity), a stop, or a plan whose capsule is the ship's reach rather than its track; and a look at why the vessel crosses a 36 m wall (is the plan routeless there?). New registration, fresh seeds (HELD5 is spent).",
