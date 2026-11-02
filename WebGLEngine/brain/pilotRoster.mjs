@@ -39,7 +39,7 @@ export function sanitizeSpecs(raw) {
  */
 export function choices(ctx) {
     // v4829 -- a page with its own scripted pilot and no Brain panel (es-box3d-6dof.html: the PD autopilot) says so: ctx.scriptedLabel names the scripted choice and ctx.brainPanel === false leaves "brain" out
-    const out = [{ id: AUTO, label: "default for this team" }, { id: SCRIPTED, label: ctx.scriptedLabel || "scripted AI (stepAI3d)" }];
+    const out = [{ id: AUTO, label: ctx.defaultLabel || "default for this team" }, { id: SCRIPTED, label: ctx.scriptedLabel || "scripted AI (stepAI3d)" }];   // 2026-11-02 -- a page that names its own default may say what it flies
     if (ctx.brainPanel !== false) out.push({ id: "brain", label: "the Brain panel's pilot" });
     if (ctx.shipped) out.push({ id: "shipped", label: "shipped pilot brain" });
     if (ctx.league) out.push({ id: "league", label: "league-trained pilot brain" });   // v4846 -- the second generation: the shipped pilot, trained against itself and the PD autopilot (es-box3d-6dof.html)
@@ -50,8 +50,12 @@ export function choices(ctx) {
     return out;
 }
 
-/** What "default for this team" meant before the panel: team A flew the Brain panel's pilot when Brain pilot was on and the scripted AI otherwise; team B was always scripted. */
-export const autoChoice = (team, ctx) => (team === "A" && ctx.brainPilotOn ? "brain" : SCRIPTED);
+/**
+ * What "default for this team" means. A page may name its OWN default pilot (ctx.defaultChoice -- 2026-11-02, es-box3d-6dof.html's close-quarters pilot, Keith's call on the page fight's ranking), and it is used once
+ * the page holds it (ctx[defaultChoice]). Until then, and on every page that names none, the old demo's rule: team A flew the Brain panel's pilot when Brain pilot was on and the scripted AI otherwise; team B
+ * was always scripted.
+ */
+export const autoChoice = (team, ctx) => (ctx.defaultChoice && ctx[ctx.defaultChoice] ? ctx.defaultChoice : team === "A" && ctx.brainPilotOn ? "brain" : SCRIPTED);
 
 /** The weights the Brain panel's pilot flies: imported, else the shipped default, else the hand weights. */
 function brainWeights(ctx) { return ctx.imported || ctx.shipped || ctx.PP.handWeights(); }

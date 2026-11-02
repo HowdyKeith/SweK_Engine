@@ -15,7 +15,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="demo:desc" content="Newtonian 6DOF space combat: two small fleets under REAL force and torque (F=ma, tau=I*alpha, orientation a genuine quaternion, angular velocity a free vector) -- physics/mechanics/rigidBody6dof.mjs, not the engine's kinematic flight model. brain/autopilot6dof.mjs flies them (a PD attitude controller that has to WIN the turn with torque, not just set a heading), physics/mechanics/rigidBody6dofWeapon.mjs arms them with straight-line projectiles hit-tested against an oriented bounding box, and physics/mechanics/rigidBody6dofCollision.mjs resolves ship-ship hits with a real impulse response (momentum and angular momentum conserved, energy never created) that can spin a ship up on an off-centre hit. Every module is independently gated before this page wires them together. Answer-key gates: rigidBody6dof-selfcheck, rigidBody6dofCollision-selfcheck, rigidBody6dofWeapon-selfcheck, autopilot6dof-selfcheck.">
+<meta name="demo:desc" content="Newtonian 6DOF space combat: two small fleets under REAL force and torque (F=ma, tau=I*alpha, orientation a genuine quaternion, angular velocity a free vector) -- physics/mechanics/rigidBody6dof.mjs, not the engine's kinematic flight model. by default the fruit fly's close-quarters pilot flies both fleets (first by far in the page's own fight; Load Pilots picks others), measured against brain/autopilot6dof.mjs (a PD attitude controller that has to WIN the turn with torque, not just set a heading), physics/mechanics/rigidBody6dofWeapon.mjs arms them with straight-line projectiles hit-tested against an oriented bounding box, and physics/mechanics/rigidBody6dofCollision.mjs resolves ship-ship hits with a real impulse response (momentum and angular momentum conserved, energy never created) that can spin a ship up on an off-centre hit. Every module is independently gated before this page wires them together. Answer-key gates: rigidBody6dof-selfcheck, rigidBody6dofCollision-selfcheck, rigidBody6dofWeapon-selfcheck, autopilot6dof-selfcheck.">
 <title>SweK &middot; Newtonian 6DOF space combat</title>
 <style>
   html,body { margin:0; height:100%; background:#03060d; color:#cfe0f5; font:12px ui-monospace,Menlo,monospace; overflow:hidden; }
@@ -34,7 +34,7 @@
   <span id="stat"></span>
   <button id="resetBtn" title="restart the fight now">&#8635; Reset battle</button>
   <button id="backdropBtn" title="Backdrop: the baked nebula-and-stars sky and a sun disc where the key light is (render/spaceBackdrop.js, the same sky es-box3d-fly3d.html wears). Off by default: the flat fill. The first press bakes it (about half a second). The sun is a picture, not a light: the fighters are lit as they always were.">Backdrop: off</button>
-  <button id="rosterBtn" title="Load Pilots (v4829): choose who flies EACH side -- the PD autopilot this page has always flown, or a brain (hand weights, zero, noise) -- then Start Fight. The brain is the same fly-wired network for every choice but one, and a choice is a choice of weights; the one is 'GPU Brain pilot', the GPU Brain's own network (an MLP) trained by the same recipe. The hand brain IS the PD autopilot written through the network">&#127899; Load Pilots</button>
+  <button id="rosterBtn" title="Load Pilots (v4829): choose who flies EACH side -- the PD autopilot this page has always flown, or a brain (hand weights, zero, noise) -- then Start Fight. The brain is the same fly-wired network for every choice but one, and a choice is a choice of weights; the one is 'GPU Brain pilot', the GPU Brain's own network (an MLP) trained by the same recipe. By default both sides fly the close-quarters pilot (first by far in this page's own fight: brain/SIXDOF_PAGE_FIGHT_WIP.md), and Default pilots puts them back on it. The hand brain IS the PD autopilot written through the network">&#127899; Load Pilots</button>
   <a id="battleshipLink" href="/space-battleship.html" title="Space battleship: a Yamato-like capital ship with thirteen gun seats against these fighters, in the same Newtonian arena (brain/spaceArena.mjs) -- a window per craft and per seat. Linked here from the page this fight was built on.">&#9733; Space battleship</a>
   <span id="tick" style="display:none"></span>
 </div>
@@ -301,8 +301,8 @@ function frame() {
   requestAnimationFrame(frame);
 }
 // ---- v4829 -- LOAD PILOTS: brain/pilotRoster.mjs behind two selects ------------------------------------------------------------------------------------------------------------
-// `specs` is the choice per team (ids, kept in this browser); a team's pilot function is rebuilt when its choice, the fleet, or what is available changes. "default for this team" is the PD autopilot for both: this page has
-// no Brain pilot toggle, so the roster's "brain" is not offered; "shipped" and "imported" are, once the shipped pilot has loaded / one has been imported (v4832).
+// `specs` is the choice per team (ids, kept in this browser); a team's pilot function is rebuilt when its choice, the fleet, or what is available changes. "default for this team" is the close-quarters pilot for both since 2026-11-02 (the PD autopilot until
+// its file has loaded; see rosterCtx below), and this page has no Brain pilot toggle, so the roster's "brain" is not offered; "shipped" and "imported" are, once the shipped pilot has loaded / one has been imported (v4832).
 const ROSTER_KEY = "swek.sixdofRoster.v1", ROSTER_NAMES = { scriptedLabel: "PD autopilot (autopilot6dof.mjs)", scriptedName: "PD autopilot" };
 let specs = (() => { try { return PR.sanitizeSpecs(JSON.parse(localStorage.getItem(ROSTER_KEY) || "null")); } catch { return PR.defaultSpecs(); } })();
 let lineup = {}; const pilotCache = {};
@@ -312,7 +312,9 @@ const DESC = PB.describePolicy("pilot6dofPolicy", P6);
 const DESC_MLP = PB.describePolicy("pilot6dofMlp", M6);   // 2026-11-02 -- the GPU Brain's pilot is another network, so its file is read with its own descriptor
 let shippedW = null, shippedMeta = null, shippedErr = null, leagueW = null, leagueMeta = null, leagueErr = null, closeW = null, closeMeta = null, closeErr = null, importedW = null, importedMeta = null, importErr = null, avail = 0;
 let gpuW = null, gpuMeta = null, gpuErr = null;
-const rosterCtx = () => ({ PP: P6, shipped: shippedW, league: leagueW, close: closeW, gpu: gpuW, gpuPP: M6, imported: importedW, brainPilotOn: false, ...ROSTER_NAMES });
+// 2026-11-02 -- THE PAGE'S DEFAULT IS THE CLOSE-QUARTERS PILOT (Keith's call on brain/SIXDOF_PAGE_FIGHT_WIP.md's ranking: first by far in this page's own fight, the only pilot better than the PD autopilot). "default for this
+// team" flies it on both teams once its file has loaded; until then, and if it never does, the PD autopilot (brain/pilotRoster.mjs's autoChoice).
+const rosterCtx = () => ({ PP: P6, shipped: shippedW, league: leagueW, close: closeW, gpu: gpuW, gpuPP: M6, imported: importedW, brainPilotOn: false, defaultChoice: "close", ...ROSTER_NAMES });
 function saveSpecs() { try { localStorage.setItem(ROSTER_KEY, JSON.stringify(specs)); } catch {} }
 function pilotAi(team) {
   const fleet = team === "A" ? A : B, key = specs[team] + "|" + fleet.length + "|" + avail;
@@ -330,7 +332,7 @@ function rosterNote() {
   el.textContent = PR.describe(lineup, A.length) + (probs.length ? "  --  " + probs.join("; ") : "");
 }
 function renderRoster() {
-  const ch = PR.choices({ shipped: !!shippedW, league: !!leagueW, close: !!closeW, gpu: !!gpuW, imported: !!importedW, brainPanel: false, scriptedLabel: ROSTER_NAMES.scriptedLabel });
+  const ch = PR.choices({ shipped: !!shippedW, league: !!leagueW, close: !!closeW, gpu: !!gpuW, imported: !!importedW, brainPanel: false, scriptedLabel: ROSTER_NAMES.scriptedLabel, defaultLabel: closeW ? "default for this team (close-quarters)" : "default for this team" });
   for (const t of PR.TEAMS) {
     const sel = document.getElementById("pilot" + t), keep = specs[t];
     sel.textContent = "";
@@ -349,7 +351,7 @@ function pilotLine() {
   const el = document.getElementById("pilotLine"); if (!el) return;
   const one = (label, w, meta) => w ? `${label} ${weightsHash(w)}` + (meta && meta.score != null ? `: held-out score ${meta.score}` : "") : null;
   const parts = [one("shipped pilot", shippedW, shippedMeta), one("league pilot", leagueW, leagueMeta), one("close-quarters pilot", closeW, closeMeta), one("GPU Brain pilot", gpuW, gpuMeta), one("imported pilot", importedW, importedMeta)].filter(Boolean);
-  el.textContent = (parts.length ? parts.join("  |  ") : shippedErr ? `the shipped pilot did not load (${shippedErr})` : "loading the shipped pilot ...") + (leagueErr && shippedW ? `  --  the league pilot did not load (${leagueErr})` : "") + (closeErr && shippedW ? `  --  the close-quarters pilot did not load (${closeErr})` : "") + (gpuErr && shippedW ? `  --  the GPU Brain pilot did not load (${gpuErr})` : "") + (importErr ? `  --  import refused: ${importErr}` : "");
+  el.textContent = (parts.length ? parts.join("  |  ") : shippedErr ? `the shipped pilot did not load (${shippedErr})` : "loading the shipped pilot ...") + (leagueErr && shippedW ? `  --  the league pilot did not load (${leagueErr})` : "") + (closeErr && shippedW ? `  --  the close-quarters pilot did not load (${closeErr}), so the default is the PD autopilot` : "") + (gpuErr && shippedW ? `  --  the GPU Brain pilot did not load (${gpuErr})` : "") + (importErr ? `  --  import refused: ${importErr}` : "");
   document.getElementById("clearPilot").disabled = !importedW;
 }
 function availChanged() { avail++; renderRoster(); pilotLine(); if (lineup.A) { pilotAi("A"); pilotAi("B"); } }

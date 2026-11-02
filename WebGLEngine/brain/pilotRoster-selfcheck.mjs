@@ -142,6 +142,17 @@ sec("2. EVERY CHOICE THE PANEL CAN OFFER");
             [noNet, noW].every((r) => r.id === "hand" && r.PP === undefined && r.weights[0].length === P6.WEIGHT_COUNT && r.problems.length === 1 && /"gpu"/.test(r.problems[0])), noNet.problems.join("; "));
         ok("the Brain panel's pilot ignores it (a choice made in the roster, not a new default)", R.resolveTeam("A", "brain", ctx6, 2).weights[0] === flyW);
     }
+    {   // 2026-11-02 -- A PAGE'S OWN DEFAULT (ctx.defaultChoice): es-box3d-6dof.html names the close-quarters pilot, Keith's call on the page fight's ranking
+        const rngOf = (seed) => { let a = seed; return () => { a = (Math.imul(a, 1664525) + 1013904223) >>> 0; return a / 4294967296; }; };
+        const closeW = P6.perturb(P6.handWeights(), 0.2, rngOf(71)), held = { PP: P6, close: closeW, imported: null, brainPilotOn: false, defaultChoice: "close" }, notYet = { ...held, close: null };
+        const both = (ctx) => ["A", "B"].map((t) => R.resolveTeam(t, "auto", ctx, 3));
+        const [hA, hB] = both(held), [nA, nB] = both(notYet), [oA, oB] = both({ ...held, defaultChoice: undefined });
+        ok("!! a page that names its own default flies it on BOTH teams once it holds it: 'default for this team' is the close-quarters pilot, on the very vector, every ship, under its own label, with nothing to report",
+            [hA, hB].every((r) => r.id === "close" && r.weights.length === 3 && r.weights.every((w) => w === closeW) && /close-quarters/.test(r.label) && r.problems.length === 0), `${hA.label} | ${hB.label}`);
+        ok("!! ...and until it holds it (the file has not loaded, or never does), the old rule: both teams on the scripted pilot, which is not a fallback and reports nothing -- as a page that names no default does",
+            [nA, nB, oA, oB].every((r) => r.id === "scripted" && r.scripted && r.problems.length === 0) && R.autoChoice("A", { ...notYet, brainPilotOn: true }) === "brain" && R.autoChoice("A", { brainPilotOn: true }) === "brain");
+        ok("  the select's default entry carries the page's own label when it gives one, and the plain one otherwise", R.choices({ defaultLabel: "default for this team (close-quarters)" })[0].label === "default for this team (close-quarters)" && R.choices({})[0].label === "default for this team");
+    }
     const brainOrder = [R.resolveTeam("A", "brain", ctxOf({ imported: importedW, shipped: shippedW }), 2), R.resolveTeam("A", "brain", ctxOf({ shipped: shippedW }), 2), R.resolveTeam("A", "brain", ctxOf(), 2)];
     ok("the Brain panel's pilot is the imported one, else the shipped default, else the hand weights (what Brain pilot has always flown), and each is the vector itself, not a copy that drifts", brainOrder[0].weights[0] === importedW && brainOrder[1].weights[0] === shippedW && same(brainOrder[2].weights[0], PP.handWeights()));
     const n6 = R.resolveTeam("A", "noise10", ctxOf(), 6), n4 = R.resolveTeam("A", "noise10", ctxOf(), 4), nB = R.resolveTeam("B", "noise10", ctxOf(), 6);

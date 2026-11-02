@@ -11,7 +11,7 @@
 // Section 3, THE HAND WEIGHTS ARE THE PD AUTOPILOT: thrust and fire identical to decide() on all 60 states, torque within 2% wherever the pointing error is under a radian (measured worst 1.13%: tanh(x) is x
 // less x^3/3, which at the page's gains is 0.74% at one radian of error alone) and within the tanh's saturation (measured, bounded) at the largest errors. Section 4, THE DUELS: a hand brain against the PD autopilot flies the same fight to the bit; hand against zero wins without a scratch and
 // zero against hand loses; the same pairing twice is the same fingerprint, swapped is another; a noisy brain is another fight; and brain/pilotRoster.mjs's resolved weights reach the ship.
-// Section 5, THE PAGE: es-box3d-6dof.html in its own browser -- the panel is there, the default lineup is the PD autopilot against the PD autopilot, a choice made in a select is the pilot that flies
+// Section 5, THE PAGE: es-box3d-6dof.html in its own browser -- the panel is there, the default lineup is the close-quarters pilot on both teams once its file has loaded (2026-11-02; the PD autopilot against the PD autopilot before that), a choice made in a select is the pilot that flies
 // after Start Fight (a zero team holds still and takes the damage; a hand team moves and deals it), Start Fight clears the tally, and the choices survive a reload.
 //
 // SABOTAGE LOG -- v4829, sixteen, each applied to the file named, the gate run, the file restored. Reds are rows (`grep -c '^  FAIL'`).
@@ -225,7 +225,11 @@ sec("5. THE PAGE: es-box3d-6dof.html in its own browser");
             byId("rosterBtn").click(); out.panelShown = byId("rosterPanel").style.display === "block";
             out.opts = Array.from(byId("pilotA").options).map((o) => o.value); out.defaults = [byId("pilotA").value, byId("pilotB").value];
             await waitFor(() => S.roster.lineup.A && S.roster.lineup.B, 5000);
-            out.lineup0 = { A: S.roster.lineup.A.id, B: S.roster.lineup.B.id, label: S.roster.lineup.A.label, note: byId("rosterNote").textContent };
+            // 2026-11-02 -- THE DEFAULT IS THE CLOSE-QUARTERS PILOT once its file has loaded (the PD autopilot until then): wait for the file, then for both teams to be re-resolved onto it
+            await waitFor(() => S.roster.close || S.roster.closeError, 30000);
+            await waitFor(() => S.roster.lineup.A && S.roster.lineup.A.id === "close" && S.roster.lineup.B && S.roster.lineup.B.id === "close", 5000);
+            { const A = S.roster.lineup.A, B = S.roster.lineup.B; out.lineup0 = { A: A.id, B: B.id, label: A.label, note: byId("rosterNote").textContent, ships: A.weights ? A.weights.length : 0, closeErr: S.roster.closeError,
+              sameA: !!(A.weights && A.weights.every((w) => w === S.roster.close)), sameB: !!(B.weights && B.weights.every((w) => w === S.roster.close)), optLabel: byId("pilotA").options[0].textContent, specs: JSON.stringify(S.roster.specs) }; }
             const hurt = (fl) => fl.some((s) => s.hp < 100), moved = (fl) => fl.some((s) => Math.hypot(...s.body.vel) > 0.5), spun = (fl) => fl.some((s) => Math.hypot(...s.body.w) > 0.01);
             // a fight ends in seconds (a wiped fleet resets the battle), so the page is SAMPLED every 30 ms and the evidence is OR-ed: has a team been hurt, has it moved, has it spun -- until the tally ticks or the time is up
             const observe = async (ms) => {
@@ -286,7 +290,9 @@ sec("5. THE PAGE: es-box3d-6dof.html in its own browser");
             ok("!! the panel is there: a Load Pilots button opens it, a select for each team; both start on 'default for this team'; six choices (the PD autopilot, hand, zero, two noise levels, and default) and no 'Brain panel' choice, since this page has none", p.panelShown && p.defaults.join() === "auto,auto" && p.opts.filter((o) => !ASYNC_PILOTS.includes(o)).length === 6 && !p.opts.includes("brain") && !p.opts.includes("imported"), p.opts.join(","));
             // *** THE PILOTS THAT ARRIVE BY FETCH ARE NOT PART OF THIS ROW. *** It used to demand exactly six choices and no "shipped", which held only because the page's fetches had not finished when the select was read; under load (v4848: a
             // training run on the same four cores) the league pilot had arrived and the row went red with nothing wrong. The six scripted choices are counted, and the fetched ones have rows of their own (the loads-and-is-offered rows).
-            ok("!! the default lineup is the old page: the PD autopilot against the PD autopilot, named as such", p.lineup0.A === "scripted" && p.lineup0.B === "scripted" && p.lineup0.label === "PD autopilot" && /PD autopilot/.test(p.lineup0.note), p.lineup0.note);
+            ok("!! the default lineup is the close-quarters pilot on BOTH teams (Keith's call, 2026-11-02, on the page fight's ranking): once its file has loaded, 'default for this team' flies it on every ship of both teams, on the very weights the file carries, and the panel and the roster note name it",
+                p.lineup0.A === "close" && p.lineup0.B === "close" && p.lineup0.sameA && p.lineup0.sameB && p.lineup0.ships === 3 && /close-quarters pilot brain/.test(p.lineup0.note) && /default for this team \(close-quarters\)/.test(p.lineup0.optLabel) && !p.lineup0.closeErr && p.lineup0.specs === JSON.stringify({ A: "auto", B: "auto" }),
+                JSON.stringify(p.lineup0).slice(0, 260));
             ok("!! a choice made in a select is the pilot that flies after Start Fight: team A hand, team B zero is the lineup, three ships a side", p.afterStart.A === "hand" && p.afterStart.B === "zero" && p.afterStart.ships === 3 && p.afterStart.alive === 6, JSON.stringify(p.afterStart));
             ok("!! a ZERO team holds still and takes the damage, a HAND team moves and deals it: team B is hurt and never moved or spun, team A is not hurt and did move", p.hz.bHurt && !p.hz.aHurt && p.hz.aMoved && !p.hz.bMoved && !p.hz.bSpun, JSON.stringify(p.hz));
             ok("!! ...and swapped, team A (zero) is the one hurt, motionless and not spinning, and team B (hand) is moving", p.zh.aHurt && !p.zh.bHurt && p.zh.bMoved && !p.zh.aMoved && !p.zh.aSpun, JSON.stringify(p.zh));

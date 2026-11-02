@@ -94,6 +94,9 @@ else {
             // is deliberately NOT read as an end, so the never-healing row below still sees a heal) or, for a
             // longer battle, once it is 150 ticks in with hp down. "mid" is always the last sample of the SAME
             // battle "initial" opened. The real-time ceiling is only a backstop for a stalled page.
+            // 2026-11-02 -- the page's DEFAULT is the close-quarters pilot since Keith's call on brain/SIXDOF_PAGE_FIGHT_WIP.md's ranking. This gate measures what it always measured -- the page's physics and
+            // its balance UNDER THE PD AUTOPILOT -- so it chooses the autopilot explicitly, before the first battle, and records the lineup it measured under
+            win.__sixdof.roster.setSpecs({ A: "scripted", B: "scripted" });
             win.__sixdof.newBattle();
             const initial = win.__sixdof.state();
             let mid = initial, battleEnded = false, endWins = initial.wins, finiteThroughout = allFinite(initial), samples = 1;
@@ -128,8 +131,10 @@ else {
             // v4895: THE BALANCE, measured the way the page re-tuned it -- 120 battles run headless from seed 1 (no drawing), after everything above has been read
             const w0 = win.__sixdof.state().wins, rb = win.__sixdof.runBattles(120, 1, 4000), w1 = win.__sixdof.state().wins, tk = rb.map((x) => x.ticks).sort((a, b) => a - b);
             const bal = { A: rb.filter((x) => x.w === "A").length, B: rb.filter((x) => x.w === "B").length, draw: rb.filter((x) => x.w === "draw").length, timeout: rb.filter((x) => x.timeout).length, counted: [w1.A - w0.A, w1.B - w0.B, w1.draws - w0.draws, w1.timeouts - w0.timeouts], medianTicks: tk[tk.length >> 1], n: rb.length };
+            const lineupMeasured = [win.__sixdof.roster.lineup.A && win.__sixdof.roster.lineup.A.id, win.__sixdof.roster.lineup.B && win.__sixdof.roster.lineup.B.id];
+            win.__sixdof.roster.setSpecs({ A: "auto", B: "auto" });   // the page's own default again, as a fresh page finds it
             return {
-                booted: true, bal,
+                booted: true, bal, lineupMeasured,
                 initialTick: initial.tick, midTick: mid.tick,
                 initialA0: initial.A[0], midA0: mid.A[0],
                 initialHpSum: hpSum(initial), midHpSum: hpSum(mid),
@@ -148,6 +153,8 @@ else {
     ok("!! no page errors were logged during the whole run", !run.pageErrors || run.pageErrors.length === 0, (run.pageErrors || []).join(" | ").slice(0, 300));
 
     if (run.ok && run.result && run.result.booted) {
+        ok("!! the page's physics and balance below are measured under the PD AUTOPILOT, chosen explicitly: the page's default has been the close-quarters pilot since 2026-11-02, and this gate measures what it always measured",
+            JSON.stringify(run.result.lineupMeasured) === JSON.stringify(["scripted", "scripted"]), JSON.stringify(run.result.lineupMeasured));
         const r = run.result;
         report("initial tick / last tick of that battle", `${r.initialTick} -> ${r.midTick}   (${r.battleEnded ? "the battle ended" : "no end seen"}, ${r.samples} samples in ${r.fightMs} ms)`);
         report("hp sum (600 max) initial / last sample", `${r.initialHpSum} -> ${r.midHpSum}`);
