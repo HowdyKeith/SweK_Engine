@@ -235,3 +235,50 @@ champion went W0/L70/D10 (hits 1,239, taken 1,360). LEAD is -70, well past the -
   built. Worth saying when it is asked: on this evidence the pilot would lose every game to the fly's Default.
 - **This note authorises nothing further.** Retraining the GPU Brain, against the fly's Default or with more searches, is
   a new registration.
+
+## The page round, 2026-11-02 (Keith asked for it; written before its code)
+
+Keith: "put the pilot on the page". The verdict above said to ask first, and he did.
+
+**What is built.**
+- **The choice.** The GPU Brain's pilot (`brain/pilot6dofMlpWeightsDefault.json`, hash 0ffd8554) becomes a choice on
+  `es-box3d-6dof.html`'s Load Pilots panel, for either team, beside the fruit fly's three (shipped, league,
+  close-quarters).
+- **The roster.** `brain/pilotRoster.mjs` gains one choice, `gpu`, that carries its own network.
+  - Until now every brain choice was a choice of weights through one network, and the roster's header says so. This one
+    is the MLP, so the resolved team carries the MLP module and `teamPilot()` flies it through that.
+  - It is offered only when the page holds both the weights and the network. A saved `gpu` the page cannot fly falls
+    back to the hand pilot and says so, as every other choice does.
+  - The MLP's weights can never be flown through the fly's network.
+- **The file.** The page fetches it once, through `brain/peerBrain.mjs` with the MLP's own descriptor. A missing or
+  refused file is said on the pilot line, and the choice is not offered.
+- **It runs on the CPU,** in float32 through `render/brainTsl.mjs`'s `mlpLayerCpu`: the arithmetic it was trained and
+  measured in.
+  - Not on a GPU device: for six ships a dispatch is no faster (the flight MLP's round, v4870).
+  - And only this arithmetic flies the measured pilot to the bit.
+
+**How it is checked (gates, before it is committed).**
+- **In `brain/pilotRoster-selfcheck.mjs`:**
+  - `gpu` is offered only when held, after the close-quarters pilot;
+  - it flies its own network on every ship (its decisions are `pilot6dofMlp.pilotFor()`'s to the bit);
+  - the fly's choices still fly the fly's network;
+  - a saved `gpu` with no weights or no network falls back to the hand pilot by name.
+- **In a new gate, `brain/pilot6dofMlpPage-selfcheck.mjs`, in the page's own browser:**
+  - the file loads, `gpu` is offered after `close`, and the pilot line names its hash and held-out score;
+  - choosing it flies it: every ship of the team on the file's vector, under its own label;
+  - **the page's own pilot function, flown through the headless duel inside the page's browser, reproduces the measured
+    held-out tally (20.02, W4/L0/D4) and Node's duel fingerprints seed for seed.** The pilot on the page is the pilot
+    that was measured;
+  - a fight on the page shows it: a GPU team moves and deals damage, and a zero team holds still and is hurt;
+  - a saved choice of it survives the next load;
+  - the GPU file offered to the page's importer is refused (another network), with the reason on the line.
+- **The fly's page rows** (`brain/pilot6dofPolicy-selfcheck.mjs` section 5) stay green, with `gpu` added to the pilots that
+  arrive by fetch.
+- **Each new row is sabotaged** with the byte-safe runner, red by name, and logged.
+
+**Not claimed.**
+- Anything about how it does in the page's own fight: three ships a side, fleet targeting, collisions and ram damage on.
+  That fight was not measured for this pilot. The duel evidence says the fly's Default beats it every time.
+- That it runs on a GPU.
+
+**No measurement, so nothing is committed unread.**
