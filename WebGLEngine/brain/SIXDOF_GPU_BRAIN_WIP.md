@@ -151,3 +151,87 @@ the three gates' headers. Two went 0 red on the first draft, and both are findin
 **The registered run:** `node tools/ship/trainMlp6dof.mjs --workers 4`. By the smoke test, 30 iterations and their prune
 take 4-6 s a search, so expect about 10 minutes a search at 1,500, and six searches in all (five plus the determinism
 re-run) on four workers.
+
+## The verdict, 2026-11-02 (read from the committed file, after it was committed)
+
+The registered run wrote `brain/sixdofGpuBrainResults.json` at head 920540f7. It was committed byte for byte at 42e8a0c1
+before anyone read it. It flew the registered seeds and says so (`registeredSeeds: true`). The searches took 172 to 181 s
+each, not the ten minutes this note expected. Every number below is re-derived from that file in section 5 of
+`tools/ship/train6dofMlp-selfcheck.mjs`, and the tallies are re-flown there from the weights in it.
+
+**The controls held.**
+- **C-twin:** the hand MLP flew the fruit fly's hand pilot to the bit on all 20 train and held-out seeds.
+- **C-determinism:** the champion's search, run a second time, gave the same weights (hash 0ffd8554 both times).
+
+**The hand twin draws every game.** Train 18.58 (W0/L0/D12), held-out 18.60 (W0/L0/D8), audit 6101-6120 18.59
+(W0/L0/D20, hits 340, taken 340): a mutual kill each time.
+
+**The five searches** (train score, the held-out result, and what pruning left):
+
+| search | train | held-out | improvements | neutral | moved | kept |
+|---|---|---|---|---|---|---|
+| 7000 | 20.15 | 17.84 (W1/L2/D5, hits 134, taken 134) | 12 | 946 | 1,141 | 29 |
+| 7001 | 20.31 | 19.46 (W3/L0/D5, hits 136, taken 132) | 18 | 959 | 1,150 | 40 |
+| **7002** | 19.94 | **20.02 (W4/L0/D4, hits 136, taken 126)** | 14 | 977 | 1,161 | 29 |
+| 7003 | 20.82 | 14.41 (W2/L2/D4, hits 102, taken 131) | 27 | 942 | 1,124 | 31 |
+| 7004 | 20.11 | 17.85 (W1/L2/D5, hits 134, taken 134) | 21 | 933 | 1,157 | 74 |
+
+"Moved" is how many weights differed from the hand weights before pruning; "kept" is how many still differ after it.
+
+**H1 is met.** The champion is search 7002, hash 0ffd8554, with 29 of the 1,637 weights kept. It qualifies by
+`train6dofPilot.qualifies()` against its hand twin on all four counts:
+- held-out 20.02 (W4/L0/D4) against 18.60;
+- audit 19.94 (W10/L0/D10, hits 340, taken 319) against 18.59 (W0/L0/D20);
+- audit wins minus losses 10 against 0;
+- held-out wins minus losses 4 against 0.
+
+**H2 reads fly better.** Against the fruit fly's shipped Default (215e26d9), on duel seeds 6201-6240 from both sides, the
+champion went W0/L70/D10 (hits 1,239, taken 1,360). LEAD is -70, well past the -8 floor.
+
+**Reported, testing nothing:**
+- **Against the PD autopilot,** from both sides on the audit seeds, the champion went 19.93 (W20/L0/D20). Counting
+  the train and held-out games too, it lost none of 60 games against the autopilot and won 30.
+- **Against the Default, the games were close in hits.** Re-flown game by game (the file keeps only the totals):
+  - the champion was killed in all 80, and no game went past 17 hits on either ship (17 hits kill);
+  - it killed the Default back in the 10 draws;
+  - in the 70 it lost it had landed 1,069 hits, 12 to 16 a game, against the 17 a kill needs.
+  The Default got to 17 first every time.
+- **The Default against its own mirror** on the same 80 games: W9/L9/D62.
+- **The train score did not predict the held-out.**
+  - The search with the best train score (7003, 20.82, the most improvements at 27) had the worst held-out result,
+    14.41, landing 102 hits against 131 taken.
+  - The champion had the lowest train score of the five.
+  - Three of the five searches ended below the hand twin on held-out.
+  - Picking on held-out, as the fly's recipe does, is what kept those from being the champion.
+
+**The predictions:**
+- **P1: right.** H1 is met; I gave that about 70%.
+- **P2: wrong.** The champion won 10 of the 20 audit games, not at least 15. The other 10 were draws, with no losses.
+  (The fly's Default won 20 of 20 on its own audit, seeds 41-60. Those are different seeds, so that comparison is not
+  H2.)
+- **P3: wrong.** H2 reads fly better, the outcome I gave 30%, and not narrowly: LEAD -70 against a floor of -8.
+- **P4: wrong.** The champion kept 29 weights, one under the 30-150 range, and its search found 14 improvements, not
+  20-45.
+  - The direction held: fewer improvements than the fly's 42, with 977 of its 1,500 children neutral.
+  - The ranges were what was registered, and both missed.
+  - The reason I gave, that more of the MLP's moves would be neutral, cannot be checked: the fly's neutral count is not
+    in its record.
+
+**What this says, and what it does not.**
+- **It says:** started as the PD autopilot and trained by the fly's recipe, the GPU Brain's MLP learns a pilot that beats
+  its hand twin by the rule the fly had to meet. It lost none of its 60 games against the autopilot.
+- **It also says:** the MLP's pilot does not fly as well as the fly's. Head to head on 40 fresh seeds from both sides,
+  it won none of 80.
+- **It does not say that the network is the reason.** Each brain had one recipe run of five searches, and the spread
+  across search seeds is wide (held-out 14.41 to 20.02). This round compares one champion with one champion, so it does
+  not separate the network from the luck of the search.
+
+**What follows, as registered.**
+- **The weight file is written** from the committed file:
+  `node tools/ship/trainMlp6dof.mjs --write-from brain/sixdofGpuBrainResults.json` wrote
+  `brain/pilot6dofMlpWeightsDefault.json` (hash 0ffd8554). The gate holds it to be `blobOf()` of the committed file.
+- **The capability map's cell** for the GPU Brain on the 6-DOF duel is TRAINED, quoting this note.
+- **The page round is not built.** Offering this pilot on `es-box3d-6dof.html` beside the fly's is asked before it is
+  built. Worth saying when it is asked: on this evidence the pilot would lose every game to the fly's Default.
+- **This note authorises nothing further.** Retraining the GPU Brain, against the fly's Default or with more searches, is
+  a new registration.

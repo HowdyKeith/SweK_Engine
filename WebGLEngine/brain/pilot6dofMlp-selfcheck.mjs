@@ -126,5 +126,5 @@ console.log("\n6. THE FRONT DOOR");
 }
 
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +
-    "\nnot closed here: whether a search makes this network a better pilot than its hand weights. That is brain/SIXDOF_GPU_BRAIN_WIP.md's question, asked by tools/ship/train6dofMlp.mjs.");
+    "\nnot closed here: whether a search makes this network a better pilot than its hand weights. brain/SIXDOF_GPU_BRAIN_WIP.md's registered round answered it (H1 met), held by tools/ship/train6dofMlp-selfcheck.mjs section 5.");
 process.exit(fails ? 1 : 0);

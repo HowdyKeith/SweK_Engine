@@ -21,7 +21,7 @@ Which brain can do what at each simulation level, and what the record says about
 
 Brains: **Hand rule / PD autopilot**, **Fly circuit**, **GPU Brain (MLP)**, **Fish circuits**, **Language model**. An 'amoeba brain' does not exist in the tree.
 
-15 tasks x 5 brains = 75 cells: 10 TRAINED, 1 HAND-WIRED, 2 NO CHAMPION, 4 TUNED, 1 SCRIPTED, 1 NO EFFECT, 1 NOT CONCLUDED, 11 EXISTS, UNREAD, 42 -, 2 n/a.
+15 tasks x 5 brains = 75 cells: 11 TRAINED, 1 HAND-WIRED, 2 NO CHAMPION, 4 TUNED, 1 SCRIPTED, 1 NO EFFECT, 1 NOT CONCLUDED, 11 EXISTS, UNREAD, 41 -, 2 n/a.
 
 ## Submarine
 
@@ -107,7 +107,7 @@ Brains: **Hand rule / PD autopilot**, **Fly circuit**, **GPU Brain (MLP)**, **Fi
 
 | task | shoots | Hand rule / PD autopilot | Fly circuit | GPU Brain (MLP) | Fish circuits | Language model |
 |---|---|---|---|---|---|---|
-| Newtonian 6-DOF ship duel (es-box3d-6dof.html): turn, thrust, fire, and not ram | yes | EXISTS, UNREAD | TRAINED | - | - | - |
+| Newtonian 6-DOF ship duel (es-box3d-6dof.html): turn, thrust, fire, and not ram | yes | EXISTS, UNREAD | TRAINED | TRAINED | - | - |
 | Navigation around black holes and anomalies (field navigation, probes as emitters) | no | TUNED | - | - | - | - |
 | Fuel, heat and hull as limits, with advisor seats (the submarine's needs-and-limits idea) | no | - | - | - | - | - |
 
@@ -115,7 +115,7 @@ Brains: **Hand rule / PD autopilot**, **Fly circuit**, **GPU Brain (MLP)**, **Fi
 
 - **Hand rule / PD autopilot: EXISTS, UNREAD.** the PD attitude controller is the opponent and the baseline. Sources: brain/autopilot6dof.mjs.
 - **Fly circuit: TRAINED.** a league-trained pilot (85 of 930 weights moved) -- but its 42-3 was one start's corridor; from a close joust start it lost all 80 games to the PD autopilot; a close-quarters pilot then beat the shipped one 106-12 and nothing learned to ram less; retrained at damage 6 at v4896. Sources: changelog v4846 ("85 of the 930 weights"); changelog v4848 ("loses all 80 games to the PD autopilot"); changelog v4848 ("106-12"); changelog v4896 ("retrained at damage 6").
-- **GPU Brain (MLP): -.** pilot6dofPolicy.mjs is the fly circuit only.
+- **GPU Brain (MLP): TRAINED.** the fly's Default recipe on the MLP, 29 of 1,637 weights kept: it beats its hand twin by the fly's rule (audit W10/L0/D10, where the twin draws all 20), but head to head with the fly's Default it won none of 80 (W0/L70/D10: fly better); written, not offered on the page. Sources: brain/SIXDOF_GPU_BRAIN_WIP.md ("29 of the 1,637"); brain/SIXDOF_GPU_BRAIN_WIP.md ("W10/L0/D10"); brain/SIXDOF_GPU_BRAIN_WIP.md ("W0/L70/D10"); brain/pilot6dofMlpWeightsDefault.json.
 
 ### Navigation around black holes and anomalies (field navigation, probes as emitters)
 

@@ -1,9 +1,11 @@
 // WebGLEngine/tools/ship/train6dofMlp-selfcheck.mjs
 //
-// Run: node tools/ship/train6dofMlp-selfcheck.mjs      (~30 s)
+// Run: node tools/ship/train6dofMlp-selfcheck.mjs      (~20 s)
 //
 // THE GATE OF tools/ship/train6dofMlp.mjs (and its command, tools/ship/trainMlp6dof.mjs): the GPU Brain's space-duel pilot trained by the fruit fly's Default recipe, as brain/SIXDOF_GPU_BRAIN_WIP.md registers it.
-// *** NOTHING HERE FLIES A REGISTERED AUDIT OR H2 SEED. *** Every run below is handed seeds from 99000 up, outside every block, so the registered sets are read once, by the registered run.
+// *** SECTIONS 1-4 FLY NO REGISTERED AUDIT OR H2 SEED. *** Every run there is handed seeds from 99000 up, outside every block, so the registered sets were read once, by the registered run. Section 5 was written after
+// that run's file was committed and read: it flies those seeds again, from the committed weights, to hold the file to the code. They are spent, and flying them again chooses nothing (the fruit fly's gate holds its
+// Default the same way).
 //
 //   1  THE REGISTRATION, AS CODE: the recipe is the fruit fly's with only the search seeds changed; the audit (6101-6120) and H2 (6201-6240) seeds are fresh, apart, and clear of every block a 6-DOF tool or gate had flown;
 //      qualifies() IS train6dofPilot's, LEAD_FLOOR IS train6dofLeague's, and H2's reading is the registered rule at its edges
@@ -11,6 +13,9 @@
 //      H2 not read when H1 is not met, and the registered-seeds flag false; the head-to-head on scratch seeds: both sides, LEAD = wins - losses, the fruit fly's mirror beside it
 //   3  the fruit fly's Default is the registered one (hash 215e26d9) through the page's importer; the brain file round-trips and the fruit fly's importer refuses it
 //   4  THE COMMAND: it never overwrites a results file, prints no score, writes the weight file only from a results file whose champion qualified, and refuses an option it does not know
+//   5  THE VERDICT, AS CODE, FROM THE COMMITTED FILE (brain/sixdofGpuBrainResults.json, committed unread at 42e8a0c1): the file is the registered run; C-twin and C-determinism held; the champion is the rule's pick
+//      and its weights are the champion; the champion's and the hand twin's tallies, H2 and the reported head-to-heads re-flown from the weights to the last digit, and H2 again game by game; H1 met and H2 fly
+//      better by the registered rules; the four predictions as the file decides them; the note's verdict tied to the file; the weight file is blobOf(the file)
 //
 // SABOTAGE LOG (2026-11-02) -- each applied with the byte-safe runner, this gate, brain/pilot6dofMlp-selfcheck.mjs and brain/pilot6dofPolicy-selfcheck.mjs run, the file restored byte-identical (sha256); the
 // number is the rows that went red, by name:
@@ -23,6 +28,15 @@
 //   the registered round: it flew the hand twin on the registered audit seeds (6101-6120) before the runner's 900 s timeout killed this gate. Its output went to a pipe nobody read, the command prints no score, and its
 //   grandchild was found still running and killed before it wrote anything (its results file was still the planted 3 bytes, deleted unread). Nothing of it was printed, stored or seen; the hand twin's audit is
 //   deterministic and is what the registered run computes again. The guard is now a library function held here directly, and this gate never starts a run; the runner kills a timed-out gate's process group.
+//
+// SABOTAGE LOG, SECTION 5 (2026-11-02, after the verdict) -- the same runner, with the committed results file, the note, the weight file or the library edited and this gate run; every file restored byte-identical:
+//   V1 the file not flagged as the registered seeds 1 | V2 the recipe at 1499 iterations 2 | V3 C-twin 19 of 20 1 | V4 the champion named as seed 7001 3 | V5 a kept champion weight put back to its hand value 7
+//   V6 the verdict not ok 3 | V7 C-determinism a different hash 1 | V8 H2 read as no difference 4 | V10 the champion's audit at 15 wins 4 | V11 the hand twin's audit score 18.6 2 | V12 the Default's mirror at 61 draws 2
+//   V13 the champion against the autopilot at 19 wins 2 | V14 the champion's search at 24 improvements 2 | V15 the champion kept 30 5 | V20 the weight file's score changed 1 | V21 h2Reading's fly-better floor ten times wider 3
+//   V9 H2's LEAD at -7: *** 2 RED ON THE FIRST RUN, NOT THE 3 PREDICTED -- A FINDING ***: the note-tie row found "LEAD is -7" inside the note's "LEAD is -70". A fragment must now stand alone, with no digit touching
+//      either end: re-run, 3 red. V16 the note saying P2 right, V17 the note's H2 tally drifted, V18 a cell of the note's table drifted and V19 the note's game-by-game hits drifted went 1 red each before the fix and
+//      after it; V22 (a digit after the note's LEAD: -700) and V23 (a digit before its kept count: 129) hold the two ends, 1 red each.
+//   And the capability map's new cell (brain/capabilityMap-selfcheck.mjs): M1 its quote not in the note 3 | M2 the cell back to not built 3.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -117,6 +131,67 @@ console.log("\n4. THE COMMAND");
     fs.rmSync(tmp, { recursive: true, force: true });
 }
 
+console.log("\n5. THE VERDICT, AS CODE, FROM THE COMMITTED FILE (brain/sixdofGpuBrainResults.json, committed unread at 42e8a0c1)");
+{
+    // Written AFTER the file was read. Every number the note's verdict states is re-derived here from the file -- and the tallies are re-flown from the weights in it, so the file is held to the code at this head.
+    // The registered audit and H2 seeds are flown again below: they were read once, by the registered run, and are spent; flying them again chooses nothing (the fruit fly's gate holds its Default the same way).
+    const R = JSON.parse(fs.readFileSync(T.DEFAULT_RESULTS, "utf8")), c = R.champion, cw = Float32Array.from(c.weights), hand = M.handWeights(), h = R.h2;
+    const tally = (r) => ({ score: r.score, wins: r.wins, losses: r.losses, draws: r.draws, hits: r.hits, hitsTaken: r.hitsTaken }), same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+    const wl = (r) => `W${r.wins}/L${r.losses}/D${r.draws}`;
+    ok("!! the file is the registered run: the registered recipe, the registered audit (6101-6120) and H2 (6201-6240) seeds and flagged so, five searches on seeds 7000-7004 in order, not stopped",
+        R.registration === "brain/SIXDOF_GPU_BRAIN_WIP.md" && ["runs", "iters", "seed", "sigma", "maxK"].every((k) => R.recipe[k] === T.RECIPE[k]) && R.registeredSeeds === true &&
+        R.auditSeeds.join() === "6101,6120,20" && R.h2Seeds.join() === "6201,6240,40" && R.searches.map((s) => s.seed).join() === "7000,7001,7002,7003,7004" && !R.stopped, JSON.stringify(R.recipe));
+    ok("!! C-twin held: the hand MLP flew the fruit fly's hand pilot to the bit on all 20 train and held-out seeds", R.cTwin.ok === true && R.cTwin.same === 20 && R.cTwin.of === 20 && R.cTwin.first === null);
+    const pick = [...R.searches].sort((a, b) => b.heldOut.score - a.heldOut.score || (b.heldOut.wins - b.heldOut.losses) - (a.heldOut.wins - a.heldOut.losses))[0];
+    ok("!! the champion is the search the rule picks from the file's own five (best held-out score, then held-out wins minus losses): seed 7002, and it IS that search -- its hash, held-out tally, weights moved and kept",
+        c.seed === pick.seed && c.seed === 7002 && c.hash === pick.hash && same(c.heldOut, pick.heldOut) && c.kept === pick.kept && c.moved === pick.moved, `picked ${pick.seed} (${pick.hash})`);
+    const differ = c.weights.filter((v, i) => Math.abs(v - hand[i]) > 1e-6).length;
+    ok("!! the champion's weights are the champion: 1637 of them, hash 0ffd8554, differing from the hand weights at exactly the 29 the file says were kept",
+        c.weights.length === M.WEIGHT_COUNT && weightsHash(cw) === c.hash && c.hash === "0ffd8554" && differ === c.kept && c.kept === 29, `${differ} differ`);
+    const fresh = { train: tally(M.evaluate(cw, P6.TRAIN_SEEDS)), heldOut: tally(M.evaluate(cw, P6.HELD_OUT_SEEDS)), audit: tally(M.evaluate(cw, T.AUDIT_SEEDS)) };
+    const handFresh = { train: tally(M.evaluate(hand, P6.TRAIN_SEEDS)), heldOut: tally(M.evaluate(hand, P6.HELD_OUT_SEEDS)), audit: tally(M.evaluate(hand, T.AUDIT_SEEDS)) };
+    ok("!! the code at this head flies the file's numbers: the champion's and the hand twin's train, held-out and audit tallies, re-flown from their weights, equal the file's to the last digit",
+        same(fresh, { train: c.train, heldOut: c.heldOut, audit: c.audit }) && same(handFresh, R.hand), `champion audit ${wl(fresh.audit)}, hand ${wl(handFresh.audit)}`);
+    const v = T.qualifies(c, R.hand);
+    ok(`!! H1 IS MET, by the registered rule applied to the file's numbers: held-out ${c.heldOut.score.toFixed(2)} against ${R.hand.heldOut.score.toFixed(2)}, audit ${c.audit.score.toFixed(2)} against ${R.hand.audit.score.toFixed(2)}, ` +
+        `audit wins minus losses ${c.audit.wins - c.audit.losses} against ${R.hand.audit.wins - R.hand.audit.losses}, held-out ${c.heldOut.wins - c.heldOut.losses} against ${R.hand.heldOut.wins - R.hand.heldOut.losses} -- and the file's verdict says the same`,
+        v.ok === true && v.reasons.length === 0 && same(v, R.verdict), v.reasons.join("; "));
+    ok("!! C-determinism held: the champion's search, run a second time, gave the same weights to the bit (0ffd8554 twice)", R.cDeterminism.ok === true && R.cDeterminism.first === c.hash && R.cDeterminism.again === c.hash);
+    ok(`!! H2 READS FLY BETTER, by the registered rule applied to the file: 80 games (40 seeds, both sides), ${wl(h.vsFly)}, LEAD = wins - losses = ${h.lead}, at or past -${T.LEAD_FLOOR}`,
+        h.games === 80 && h.games === 2 * T.H2_SEEDS.length && h.vsFly.wins + h.vsFly.losses + h.vsFly.draws === 80 && h.lead === h.vsFly.wins - h.vsFly.losses && h.lead === -70 && T.h2Reading(h.lead) === h.reading && h.reading === "fly better");
+    const h2Again = T.headToHead(cw, T.H2_SEEDS);
+    ok("!! ...and the head-to-head re-flown from the champion's weights and the fruit fly's shipped Default gives the file's H2 to the last digit (both tallies, LEAD, the reading, and the Default's own mirror beside it)",
+        same(h2Again, h), `re-flown ${wl(h2Again.vsFly)}, mirror ${wl(h2Again.flyMirror)}`);
+    const vsAuto = tally(M.evaluate(cw, T.AUDIT_SEEDS, { opponent: ["autopilot"] }));
+    ok("  reported, testing nothing, and re-flown too: the champion against the PD autopilot from both sides on the audit seeds", same(vsAuto, R.championVsAutopilotBothSides), wl(vsAuto));
+    const vsAP = [c.train, c.heldOut, R.championVsAutopilotBothSides], apGames = vsAP.reduce((n, r) => n + r.wins + r.losses + r.draws, 0), apLost = vsAP.reduce((n, r) => n + r.losses, 0), apWon = vsAP.reduce((n, r) => n + r.wins, 0);
+    // the head-to-head GAME BY GAME: the file keeps only totals, and "killed in all 80" cannot be read off 1,360 hits taken alone (two hits can land in one tick, so a game can in principle pass 17)
+    const kill = Math.ceil(P6.HP_MAX / P6.SHOT_DAMAGE), games = M.evaluate(cw, T.H2_SEEDS, { opponent: [T.flyDefault()] }).runs, lost = games.filter((r) => r.aDead && !r.bDead), lh = lost.map((r) => r.hits);
+    const lostHits = lh.reduce((a, b) => a + b, 0), lo = Math.min(...lh), hi = Math.max(...lh);
+    ok(`  reported, testing nothing, re-flown GAME BY GAME: the champion was killed in all 80, no game went past ${kill} hits on either ship, the draws are mutual kills, and its losses carry ${lostHits} of its hits, ${lo} to ${hi} a game`,
+        kill === 17 && games.length === 80 && games.every((r) => r.aDead && r.hitsTaken <= kill && r.hits <= kill) && games.filter((r) => r.aDead && r.bDead).length === h.vsFly.draws && lost.length === h.vsFly.losses &&
+        lostHits === h.vsFly.hits - kill * h.vsFly.draws, `${games.filter((r) => r.aDead).length} dead, ${lost.length} losses`);
+    const cs = R.searches.find((s) => s.seed === c.seed), p4kept = c.kept >= 30 && c.kept <= 150, p4impr = cs.improved >= 20 && cs.improved <= 45;
+    const pred = { P1: R.verdict.ok === true, P2: c.audit.wins >= 15, P3: h.reading === "no difference shown", P4: p4kept && p4impr };
+    ok(`!! the four predictions, read off the file: P1 right (H1 met); P2 wrong (${c.audit.wins} audit wins, not 15); P3 wrong (${h.reading}, not no difference); P4 wrong on BOTH halves, as the note says (${c.kept} kept, not 30-150; ${cs.improved} improvements, not 20-45)`,
+        pred.P1 === true && pred.P2 === false && pred.P3 === false && pred.P4 === false && !p4kept && !p4impr, JSON.stringify({ ...pred, p4kept, p4impr }));
+    const note = fs.readFileSync(path.join(HERE, "..", "..", "brain", "SIXDOF_GPU_BRAIN_WIP.md"), "utf8"), at = note.indexOf("\n## The verdict"), vt = at >= 0 ? note.slice(at) : "";
+    const n0 = (x) => x.toLocaleString("en-US"), secs = R.searches.map((s) => Math.round(s.ms / 1000));
+    const rowOf = (s) => { const b = s.seed === c.seed ? "**" : ""; return `| ${b}${s.seed}${b} | ${s.train.toFixed(2)} | ${b}${P6.describeEval(s.heldOut)}${b} | ${s.improved} | ${s.neutral} | ${n0(s.moved)} | ${s.kept} |`; };
+    const frags = [`hash ${c.hash}`, `${c.kept} of the 1,637`, wl(c.heldOut), wl(c.audit), wl(R.hand.audit), wl(h.vsFly), `LEAD is ${h.lead}`, wl(h.flyMirror), wl(vsAuto), "H1 is met", `H2 reads ${h.reading}`,
+                   `took ${Math.min(...secs)} to ${Math.max(...secs)} s`, ...R.searches.map(rowOf), `found ${cs.improved} improvements`, `${cs.neutral} of its 1,500 children neutral`,
+                   `lost ${apLost === 0 ? "none" : apLost} of ${apGames} games against the autopilot and won ${apWon}`, `killed in all ${games.filter((r) => r.aDead).length}`, `landed ${n0(lostHits)} hits, ${lo} to ${hi} a game`,
+                   ...Object.keys(pred).map((k) => `**${k}: ${pred[k] ? "right" : "wrong"}.**`)];
+    // A FRAGMENT MUST STAND ALONE: no digit may touch either end. A plain includes() found "LEAD is -7" inside the note's "LEAD is -70", so a file whose LEAD had drifted to -7 passed this row (sabotage V9's first run).
+    const esc = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), stands = (x) => new RegExp("(?<![0-9])" + esc(x) + "(?![0-9])").test(vt);
+    const missing = frags.filter((x) => !stands(x));
+    ok("!! the note's verdict carries the file's numbers and each prediction's outcome as the file decides it (a note that drifted from the file goes red here)", at > 0 && missing.length === 0, missing.length ? "missing: " + missing.join(" | ") : `${frags.length} fragments`);
+    const wf = JSON.parse(fs.readFileSync(T.DEFAULT_OUT, "utf8")), expect = T.blobOf(R), strip = ({ exportedAt, ...rest }) => JSON.stringify(rest);
+    const imp = PB.importBrain(PB.describePolicy(T.POLICY_ID, M), wf), flyImp = PB.importBrain(PB.describePolicy("pilot6dofPolicy", P6), wf);
+    ok("!! H1 was met, so the weight file is written -- from the committed file, by --write-from: brain/pilot6dofMlpWeightsDefault.json is blobOf(that file) bar its export time, imports as the GPU Brain's pilot with hash 0ffd8554, and the fruit fly's importer refuses it",
+        strip(wf) === strip(expect) && imp.ok && weightsHash(imp.weights) === c.hash && !flyImp.ok && /^\d{4}-\d\d-\d\dT/.test(wf.exportedAt || ""), flyImp.reason);
+}
+
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +
-    "\nnot closed here: the registered run itself -- node tools/ship/trainMlp6dof.mjs --workers 4 -- whose results file is committed before it is read.");
+    "\nnot closed here: the page round -- offering this pilot on es-box3d-6dof.html beside the fruit fly's -- which the registration says is asked before it is built.");
 process.exit(fails ? 1 : 0);
