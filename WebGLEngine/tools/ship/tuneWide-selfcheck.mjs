@@ -56,6 +56,8 @@ sec("3. SEARCH");
     ok("!! every parameter stays inside the WIDE bounds (not the narrow ones: alpha may be below 0.001 or ramp above 20)", flat.checkpoints.every((cp) => U.NAMES.every((k) => cp.params[k] >= U.WIDE_BOUNDS[k][0] && cp.params[k] <= U.WIDE_BOUNDS[k][1])) && hard.best.high >= hard.best.low);
     const many = X.search(13, { ...R8, alpha: 0.0005 }, { ...X.RECIPE, iters: 30, maxChange: 5, checkpointEvery: 30 }, [T.scenario(241, "plain")]);
     ok("!! alpha moves multiplicatively: on a flat objective it leaves the start by a factor (not by the linear 0.15 x 0.02 = 0.003 of the old step) and stays within 0.0001-0.02", many.best.alpha !== 0.0005 && many.best.alpha >= 0.0001 && many.best.alpha <= 0.02 && many.trace.length === 31, "alpha " + many.best.alpha);
+    const steps = [13, 14, 15].map((sd) => X.search(sd, { ...R8, alpha: 0.0005 }, { ...X.RECIPE, iters: 30, maxChange: 1, checkpointEvery: 1 }, [T.scenario(241, "plain")]).checkpoints.map((c) => c.params.alpha));
+    ok("!! alpha steps are small FACTORS: over 30 single-parameter steps from 0.0005 it never passes 0.003 (a linear step of 0.15 of the range would reach 0.005-0.01)", steps.every((al) => Math.max(...al) < 0.003), steps.map((al) => Math.max(...al).toFixed(5)).join(" "));
     ok("!! a search that starts BELOW the old alpha floor keeps it (the start 0.0005 is not clipped to 0.001)", many.checkpoints[0].params.alpha === 0.0005);
 }
 sec("4. CHAMPION");
@@ -94,6 +96,13 @@ sec("6. REPORT (synthetic audits)");
     ok("!! the identity check goes FAIL when other parameters are run in its place", X.checksOf(setR(hard), { r8: R8, identityParams: { ...R8, low: 0.5, high: 0.9 } }).find((c) => c.name === "IDENTITY").ok === false);
     const bad = aud(sc); bad.W2["RULE-GF"] = mk(() => 0.2); const LB = X.report(bad, rob(0.8, 0.7), champ, [], { r8: R8 });
     ok("!! a FAILED check prints FAIL, says NOT WEIGHED, and the bottom line says so", LB.some((l) => /FAIL RULE NOT TRIVIAL W2/.test(l)) && LB.some((l) => /NOT WEIGHED\./.test(l)) && /BOTTOM LINE: NOT WEIGHED/.test(LB[LB.length - 1]));
+}
+sec("6b. ROBUSTNESS NOISE");
+{
+    const small = { W1: [561, 561], W2: [581, 581], W3: [601, 601] }, opts = { r8: R8, wide: R8 };
+    const at = X.audits(opts, { ranges: small }), rb = X.robustness(opts, { ranges: small, noises: [0.05] }), rb2 = X.robustness(opts, { ranges: small, noises: [0.2] });
+    const f = (res) => res.runs.map((r) => r.fingerprint).join();
+    ok("!! the robustness runs fly at THEIR noise: the same arm on the same set differs from the audit's and between the two noises", f(rb["0.05"].W1["RULE-GF"]) !== f(at.W1["RULE-GF"]) && f(rb["0.05"].W1["RULE-GF"]) !== f(rb2["0.2"].W1["RULE-GF"]));
 }
 sec("7. THE SOURCE");
 {
