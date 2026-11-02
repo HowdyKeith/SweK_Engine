@@ -242,3 +242,34 @@ page's browser, which came back the file's to the last tick and hull point.
   - The rule is now the page's own: a timeout has both fleets alive and goes to the fleet with more hull; any other
     battle ends with a fleet at zero hull. All 2,500 battles are legal by it. The miniature had the same latent bug.
   - No reading changes: the readings use the winner alone.
+
+## The page default (Keith asked, 2026-11-02; written before its code)
+
+Keith: "Make the close-quarters pilot the page default." The verdict above named it the candidate and said to ask first,
+and he did.
+
+**What changes.**
+- **The default.** On `es-box3d-6dof.html`, "default for this team" becomes the fruit fly's close-quarters pilot
+  (360580a7), for both teams. That is the close-quarters pilot's own mirror, which in this round's run was decided in
+  99 of 100 battles and never timed out.
+- **The roster.** `brain/pilotRoster.mjs` gains `ctx.defaultChoice`: a page may name its own default pilot, used once
+  the page holds it.
+  - Until its file has loaded, and if it never does, the default is the PD autopilot as before, and the pilot line says
+    why.
+  - A page that names none (`es-box3d-fly3d.html`, `es-aircraft.html`, `es-flight6dof.html`) is unchanged.
+- **The panel.** The select's default entry names what it flies. "Default pilots" puts both teams back on it, and a
+  choice saved in the browser is kept.
+- **The words.** The page's description and the Load Pilots tooltip say so, and `page-index.json` is rebuilt from the
+  description.
+
+**How it is checked.**
+- **`brain/pilotRoster-selfcheck.mjs`:** `defaultChoice` is honoured only when the page holds it, and the old rule holds
+  otherwise and on every page that names none.
+- **`brain/pilot6dofPolicy-selfcheck.mjs` section 5 (the page):** the default-lineup row becomes this. Once the
+  close-quarters file has loaded, both teams on "default for this team" fly it, on the very weights the file carries,
+  and the roster note names it.
+- **`tools/ship/rigidBody6dofPage-selfcheck.mjs`** keeps measuring what it always measured, the page's physics and
+  balance under the PD autopilot, by choosing it explicitly. A row says so.
+- **Each new row is sabotaged** with the byte-safe runner, red by name.
+
+**Not claimed:** nothing new is measured. The default is chosen on this round's numbers.
