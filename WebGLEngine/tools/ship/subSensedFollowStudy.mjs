@@ -5,12 +5,14 @@
 //   --study combined   THE TWO CURES TOGETHER (follow-up 3): exact, sonar-200, sensed+fix, fix+forget and the five long arms (the 200 m sonar with the fix, forgetting, the filter and drift); bar C, verdict, predictions C1 to C7
 //   --study realism   THE SONAR GETS REAL (follow-up 4): exact, the three clean long arms (long+fix, long+fix+forget, long+fix+filter) and, for each of miss, false, occl, head and all, a sticky and a forgetting arm (the 200 m sonar with a misses, false returns, first surfaces or a heading error); bar R (all+forget reaches 80% of exact's count in each kind), verdict, predictions R1 to R8
 //   --study persistent   THE FAULTS PERSIST (follow-up 5): exact, the clean long+fix and long+fix+forget, the white head+sticky, head+forget and all+forget, and the sonar's faults made to last -- a heading bias, persistent cell faults, whole obstacles that drop out, rates that grow with range, all together -- each with the sticky map or the map that forgets (pall+forget designated); bar P (80% of exact's count in each kind), verdict, predictions P1 to P8
+//   --study falserate   HOW MANY FALSE RETURNS (follow-up 6): exact, the clean long+fix+forget and long+fix+filter, the forgetting map with follow-up 4's four faults at false rates 0.001, 0.003, 0.01 [designated] and 0.03, and the filtered-fix sticky map at 0.0001, 0.0003 and 0.001; bar F (all@0.01+forget reaches 80% of exact's count in each kind), verdict, predictions F1 to F8
 //   --study fix   THE FIX SMEAR: the incumbent's sonar and white 3 m fix with the map forgetting (fix+forget [designated]) or the fix filtered (fix+filter, fix+forget+filter); sensed, sensed+fix and sensed+drift flown beside them; bar E, verdict, predictions E1 to E6
-//   node tools/ship/subSensedFollowStudy.mjs --study gap|fix|combined|realism|persistent --set dev [--seeds N]               DEV (seeds 1 to 30 of each kind): a sanity run, not a result
+//   node tools/ship/subSensedFollowStudy.mjs --study gap|fix|combined|realism|persistent|falserate --set dev [--seeds N]               DEV (seeds 1 to 30 of each kind): a sanity run, not a result
 //   node tools/ship/subSensedFollowStudy.mjs --study gap|fix --set held7 [--seeds N] [--write]    HELD7 (seeds 701 to 760 of each kind), READ ONCE FOR EACH STUDY; --write puts every flight in brain/subSensedGapHeld7.jsonl or brain/subSensedFixHeld7.jsonl
 //   node tools/ship/subSensedFollowStudy.mjs --study combined --set held8 [--seeds N] [--write]     HELD8 (seeds 801 to 860 of each kind), READ ONCE; --write puts every flight in brain/subSensedCombinedHeld8.jsonl
 //   node tools/ship/subSensedFollowStudy.mjs --study realism --set held9 [--seeds N] [--write]     HELD9 (seeds 901 to 960 of each kind), READ ONCE; --write puts every flight in brain/subSensedRealismHeld9.jsonl
 //   node tools/ship/subSensedFollowStudy.mjs --study persistent --set held10 [--seeds N] [--write]     HELD10 (seeds 1001 to 1060 of each kind), READ ONCE; --write puts every flight in brain/subSensedPersistentHeld10.jsonl
+//   node tools/ship/subSensedFollowStudy.mjs --study falserate --set held11 [--seeds N] [--write]     HELD11 (seeds 1101 to 1160 of each kind), READ ONCE; --write puts every flight in brain/subSensedFalseRateHeld11.jsonl
 // Pure apart from the file --write puts down. No clock, no Math.random.
 "use strict";
 import fs from "node:fs";
@@ -22,10 +24,10 @@ import { median, pilot } from "./subSensedStudy.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url)), ENG = path.resolve(HERE, "..", "..");
 export { median, pilot };
-export const OUTS = Object.freeze({ gap: "brain/subSensedGapHeld7.jsonl", fix: "brain/subSensedFixHeld7.jsonl", combined: "brain/subSensedCombinedHeld8.jsonl", realism: "brain/subSensedRealismHeld9.jsonl", persistent: "brain/subSensedPersistentHeld10.jsonl" });
-export const STUDIES = Object.freeze({ gap: Object.freeze({ arms: X.GAP_ARMS, designated: X.GAP_DESIGNATED, held: "held7" }), fix: Object.freeze({ arms: X.FIX_ARMS, designated: X.FIX_DESIGNATED, held: "held7" }), combined: Object.freeze({ arms: X.COMBINED_ARMS, designated: X.COMBINED_DESIGNATED, held: "held8" }), realism: Object.freeze({ arms: X.REALISM_ARMS, designated: X.REALISM_DESIGNATED, held: "held9" }), persistent: Object.freeze({ arms: X.PERSIST_ARMS, designated: X.PERSIST_DESIGNATED, held: "held10" }) });
-export const SETS = Object.freeze({ dev: X.SENSE_SETS.dev, held7: X.SENSE_SETS.held7, held8: X.SENSE_SETS.held8, held9: X.SENSE_SETS.held9, held10: X.SENSE_SETS.held10 });
-export const THRESH = Object.freeze({ gapBar: 0.6, harm: 3, gain10: 10, omniFloor: 57, omniShare: 0.8, pathFactor: 1.2, close: 3, gainFix: 5, control: 5, gapSlack: 5, ceiling: 3, gainCombined: 20, within: 5, gapsFloor: 45, realBar: 0.8, missClose: 5, falseDrop: 15, forgetGain: 15, forgetClose: 10, headDrop: 10, biasGain: 15, persistClose: 10, objDrop: 15, stickyGain: 10, stickyDrop: 30 });
+export const OUTS = Object.freeze({ gap: "brain/subSensedGapHeld7.jsonl", fix: "brain/subSensedFixHeld7.jsonl", combined: "brain/subSensedCombinedHeld8.jsonl", realism: "brain/subSensedRealismHeld9.jsonl", persistent: "brain/subSensedPersistentHeld10.jsonl", falserate: "brain/subSensedFalseRateHeld11.jsonl" });
+export const STUDIES = Object.freeze({ gap: Object.freeze({ arms: X.GAP_ARMS, designated: X.GAP_DESIGNATED, held: "held7" }), fix: Object.freeze({ arms: X.FIX_ARMS, designated: X.FIX_DESIGNATED, held: "held7" }), combined: Object.freeze({ arms: X.COMBINED_ARMS, designated: X.COMBINED_DESIGNATED, held: "held8" }), realism: Object.freeze({ arms: X.REALISM_ARMS, designated: X.REALISM_DESIGNATED, held: "held9" }), persistent: Object.freeze({ arms: X.PERSIST_ARMS, designated: X.PERSIST_DESIGNATED, held: "held10" }), falserate: Object.freeze({ arms: X.FALSE_ARMS, designated: X.FALSE_DESIGNATED, held: "held11" }) });
+export const SETS = Object.freeze({ dev: X.SENSE_SETS.dev, held7: X.SENSE_SETS.held7, held8: X.SENSE_SETS.held8, held9: X.SENSE_SETS.held9, held10: X.SENSE_SETS.held10, held11: X.SENSE_SETS.held11 });
+export const THRESH = Object.freeze({ gapBar: 0.6, harm: 3, gain10: 10, omniFloor: 57, omniShare: 0.8, pathFactor: 1.2, close: 3, gainFix: 5, control: 5, gapSlack: 5, ceiling: 3, gainCombined: 20, within: 5, gapsFloor: 45, realBar: 0.8, missClose: 5, falseDrop: 15, forgetGain: 15, forgetClose: 10, headDrop: 10, biasGain: 15, persistClose: 10, objDrop: 15, stickyGain: 10, stickyDrop: 30, fMono: 3, fFilterGap: 60, fCliff: 15 });
 const KINDS = X.SENSE_KINDS, WIDTHS = H.GAP_WIDTHS;
 
 const cellOf = (rs) => {
@@ -110,7 +112,22 @@ export function judgePersistent(sum) {
     return { perKind, kindsHeld, verdict, p1: r("bias+sticky") - r("head+sticky") >= THRESH.biasGain, p2: Math.abs(r("bias+forget") - clean) <= THRESH.persistClose, p3: Math.abs(r("cellp+forget") - clean) <= THRESH.persistClose, p4: clean - r("objp+forget") >= THRESH.objDrop,
         p5: r("objp+sticky") - r("objp+forget") >= THRESH.stickyGain, p6: Math.abs(r("range+forget") - clean) <= THRESH.persistClose, p7: r(D) - r("pall+sticky") >= THRESH.stickyDrop, p8: Math.abs(r(D) - r("all+forget")) <= THRESH.persistClose };
 }
-export const judge = (sum, study) => (study === "gap" ? judgeGap(sum) : study === "fix" ? judgeFix(sum) : study === "realism" ? judgeRealism(sum) : study === "persistent" ? judgePersistent(sum) : judgeCombined(sum));
+/**
+ * The false-rate study's bar, verdict and F1 to F8 (brain/SENSED_NAV_WIP.md, "FOLLOW-UP 6"). The designated arm (X.FALSE_DESIGNATED, the forgetting map at a false rate of 0.01) reaches at least THRESH.realBar of what `exact` reaches (the count) in EACH kind (perKind); SUPPORTED if it does in all three, PARTLY SUPPORTED if in two, NOT SUPPORTED otherwise. Pooled over the three kinds unless a kind is named:
+ * F1 the forgetting map at 0.001 holds that bar in every kind. F2 at 0.003 it does. F3 at 0.03 it misses it in at least one kind (every kind must have both arms). F4 the forgetting map's pooled count never rises by more than THRESH.fMono flights from 0.001 to 0.003 to 0.01 to 0.03. F5 all@0.001+filter reaches at least THRESH.fFilterGap fewer than all@0.001+forget.
+ * F6 all@0.0001+filter reaches at least THRESH.realBar of what exact reaches over the three kinds together. F7 all@0.0003+filter reaches at least THRESH.fCliff fewer than all@0.0001+filter. F8 all@0.001+forget reaches more than all@0.001+filter in each of the three kinds. A missing arm is a miss (NaN fails every comparison).
+ */
+export function judgeFalseRate(sum) {
+    const D = X.FALSE_DESIGNATED, p = sum.pooled, r = (arm) => (p[arm] ? p[arm].reached : NaN), perKind = {};
+    const ratioOf = (arm, k) => { const e = get(sum, k, "exact"), c = get(sum, k, arm); return e && c ? c.reached / e.reached : NaN; };
+    const holds = (arm) => KINDS.every((k) => ratioOf(arm, k) >= THRESH.realBar), missesAny = (arm) => KINDS.every((k) => Number.isFinite(ratioOf(arm, k))) && KINDS.some((k) => ratioOf(arm, k) < THRESH.realBar);
+    for (const k of KINDS) perKind[k] = ratioOf(D, k) >= THRESH.realBar;
+    const kindsHeld = KINDS.filter((k) => perKind[k]).length, verdict = kindsHeld === 3 ? "SUPPORTED" : kindsHeld >= 2 ? "PARTLY SUPPORTED" : "NOT SUPPORTED", f = (rate) => r(`all@${rate}+forget`);
+    return { perKind, kindsHeld, verdict, f1: holds("all@0.001+forget"), f2: holds("all@0.003+forget"), f3: missesAny("all@0.03+forget"), f4: f("0.003") - f("0.001") <= THRESH.fMono && f("0.01") - f("0.003") <= THRESH.fMono && f("0.03") - f("0.01") <= THRESH.fMono,
+        f5: r("all@0.001+forget") - r("all@0.001+filter") >= THRESH.fFilterGap, f6: r("all@0.0001+filter") / r("exact") >= THRESH.realBar, f7: r("all@0.0001+filter") - r("all@0.0003+filter") >= THRESH.fCliff,
+        f8: KINDS.every((k) => { const a = get(sum, k, "all@0.001+forget"), b = get(sum, k, "all@0.001+filter"); return !!a && !!b && a.reached > b.reached; }) };
+}
+export const judge = (sum, study) => (study === "gap" ? judgeGap(sum) : study === "fix" ? judgeFix(sum) : study === "realism" ? judgeRealism(sum) : study === "persistent" ? judgePersistent(sum) : study === "falserate" ? judgeFalseRate(sum) : judgeCombined(sum));
 const pct = (v) => (Number.isFinite(v) ? (100 * v).toFixed(0) + "%" : "n/a");
 const f2s = (v) => (Number.isFinite(v) ? v.toFixed(2) : "n/a");
 const HEAD = "arm               | reached      | collided left timeout other | median time (s) | median path/chord | median min clearance (m) | grid ensonified | offset at end (m) | plans (median)";
@@ -135,6 +152,12 @@ export function verdictText(j, study) {
         return [`${D} (the realistic vessel) reaches at least ${pct(THRESH.realBar)} of what exact reaches in each kind (the bar): ${KINDS.map((k) => `${k} ${yn(j.perKind[k])}`).join(", ")} (${j.kindsHeld} of 3)`,
             `R1 miss+sticky is within ${THRESH.missClose} flights of the clean long+fix over the three kinds: ${yn(j.r1)}`, `R2 false+sticky reaches at least ${THRESH.falseDrop} fewer than long+fix: ${yn(j.r2)}`, `R3 false+forget reaches at least ${THRESH.forgetGain} more than false+sticky: ${yn(j.r3)}`, `R4 false+forget is within ${THRESH.forgetClose} flights of the clean long+fix+forget: ${yn(j.r4)}`,
             `R5 in hard-islands occl+sticky reaches fewer than long+fix: ${yn(j.r5)}`, `R6 head+sticky reaches at least ${THRESH.headDrop} fewer than long+fix: ${yn(j.r6)}`, `R7 head+forget reaches more than head+sticky: ${yn(j.r7)}`, `R8 ${D} reaches fewer than each of miss+forget, false+forget, occl+forget and head+forget: ${yn(j.r8)}`, `VERDICT: ${j.verdict}`].join("\n");
+    }
+    if (study === "falserate") {
+        const D = X.FALSE_DESIGNATED;
+        return [`${D} (the forgetting map at a false rate ten times follow-up 4's) reaches at least ${pct(THRESH.realBar)} of what exact reaches in each kind (the bar): ${KINDS.map((k) => `${k} ${yn(j.perKind[k])}`).join(", ")} (${j.kindsHeld} of 3)`,
+            `F1 the forgetting map at 0.001 holds the bar in every kind: ${yn(j.f1)}`, `F2 the forgetting map at 0.003 holds the bar in every kind: ${yn(j.f2)}`, `F3 the forgetting map at 0.03 misses the bar in at least one kind: ${yn(j.f3)}`, `F4 the forgetting map's pooled count never rises by more than ${THRESH.fMono} flights from 0.001 to 0.003 to 0.01 to 0.03: ${yn(j.f4)}`,
+            `F5 all@0.001+filter reaches at least ${THRESH.fFilterGap} fewer than all@0.001+forget: ${yn(j.f5)}`, `F6 all@0.0001+filter reaches at least ${pct(THRESH.realBar)} of what exact reaches over the three kinds: ${yn(j.f6)}`, `F7 all@0.0003+filter reaches at least ${THRESH.fCliff} fewer than all@0.0001+filter: ${yn(j.f7)}`, `F8 all@0.001+forget reaches more than all@0.001+filter in each of the three kinds: ${yn(j.f8)}`, `VERDICT: ${j.verdict}`].join("\n");
     }
     if (study === "persistent") {
         const D = X.PERSIST_DESIGNATED;
