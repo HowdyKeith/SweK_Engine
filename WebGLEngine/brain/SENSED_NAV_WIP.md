@@ -209,3 +209,7 @@ Follow-up 2 tested the cures apart: **a 200 m sonar** with an exact position and
 * **C7** the gaps are not given back: `long+fix+forget` reaches at least 45 of the 60 hard-gaps (the exact map reached 56 of 60 on HELD7; `fix+forget`, 27).
 
 **What it would not say.** Everything the two earlier lists say (a perfect sonar, a perfect heading, a white Gaussian fix, forgetting being safe because a perfect sonar never mis-finds a cell free, one hull, one autopilot); that the long sonar is affordable; that these arms are the best possible (one range, one gain, no scan, no approach rule were tried); the interaction of a longer sonar with false returns (the realism entry, `nav-sensed-sonar-realism`). A result is a statement about this generator.
+
+### AMENDMENT 1 TO FOLLOW-UP 3 (2026-11-02; DEV flown once after the code and both gates were sabotaged, BEFORE HELD8 was flown; seeds 1 to 10 of each kind, 30 scenarios; DEV is not a result and nothing above was changed by it)
+
+The command runs end to end. Reached of 30 (three kinds together): `exact` 29, `sonar-200` 29, `sensed+fix` 20, `fix+forget` 23, `long+fix` 25, **`long+fix+forget` 28**, `long+fix+filter` 28, `long+fix+forget+filter` 29, `long+drift` 29. Two of the printed judgements are arithmetic of the sample and not findings: a gain of 20 over `sensed+fix` and a floor of 45 of the gaps cannot be met by a study of 30 scenarios with 10 gaps, so DEV prints MISSED for them whatever the arms do; HELD8 has 180 scenarios and 60 gaps. The registration stands as written.
