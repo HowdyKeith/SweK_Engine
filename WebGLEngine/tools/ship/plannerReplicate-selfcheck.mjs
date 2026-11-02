@@ -53,6 +53,9 @@ sec("3. READING");
     ok("!! hurts needs a negative mean past 2 se", rd(-0.03, 0.01).hurts === true && rd(-0.02, 0.01).hurts === false && rd(0.03, 0.01).hurts === false);
     ok("!! the four bottom lines: replicates and practical, replicates below the floor, does not replicate, hurts", X.bottomLine(rd(0.03, 0.005)) === "THE TWIN'S GAIN REPLICATES AND IS PRACTICAL" && X.bottomLine(rd(0.0187, 0.0046)) === "THE TWIN'S GAIN REPLICATES BUT IS BELOW THE 0.02 FLOOR" && X.bottomLine(rd(0.01, 0.01)) === "THE TWIN'S GAIN DOES NOT REPLICATE" && X.bottomLine(rd(-0.04, 0.01)) === "THE TWIN HURTS");
 }
+{
+    ok("!! gapShare is the share of the oracle's gap a score closes: (0.8 - 0.7) / (0.9 - 0.7) = 0.5, and null when the oracle has no gap; plansOf is the replan counter re-exported from plannerRound", Math.abs(X.gapShare(0.8, 0.7, 0.9) - 0.5) < 1e-12 && X.gapShare(0.8, 0.7, 0.7) === null && typeof X.plansOf === "function");
+}
 sec("4. REPORT");
 {
     const mk = (f, kinds, fpr = "f") => ({ runs: kinds.map((kind, i) => ({ kind, score: f(kind, i), fingerprint: fpr })), score: 0.8, crashed: 0, stranded: 0 });

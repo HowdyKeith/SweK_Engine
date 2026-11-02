@@ -1,7 +1,7 @@
 {
  "host": "linux-x64-4c-16gb-142c0d",
  "note": "THIS BOX'S OWN gate runtimes, written by tools/ship/boxTimings.mjs. The shared sweep-timings.json is host-claimed and a foreign box cannot write it (v4647, and that refusal is right); this is how a box records what IT measured without overwriting another machine's numbers. `kinds` says which quantity each ms is, as in the shared record: `alone` is an uncontended serial reading, `capped` is a FLOOR and not a runtime. Read for COVERAGE -- has this gate ever been timed -- and NOT for the ship-time budget, which still reads the shared file. See task #87. `serialRing` holds the last three alone readings; recordReach's margin row reads it on a box that does not own the shared record, because that row asks what a gate costs HERE and nothing here can refresh another box's ring.",
- "captured": "2026-11-02T14:36:59.078Z",
+ "captured": "2026-11-02T20:40:38.053Z",
  "timings": {
   "render/denoiseDevice-selfcheck.mjs": 5461,
   "render/denoiseTiming-selfcheck.mjs": 8195,
@@ -60,7 +60,12 @@
   "tools/ship/tuneRule-selfcheck.mjs": 8021,
   "tools/ship/tuneWide-selfcheck.mjs": 6790,
   "brain/stationResidual-selfcheck.mjs": 1469,
-  "tools/ship/stationRound-selfcheck.mjs": 9621
+  "tools/ship/stationRound-selfcheck.mjs": 9621,
+  "brain/plannerSeat-selfcheck.mjs": 11222,
+  "brain/plannerPerturbed-selfcheck.mjs": 17297,
+  "tools/ship/plannerRound-selfcheck.mjs": 14103,
+  "tools/ship/plannerReplicate-selfcheck.mjs": 4284,
+  "tools/ship/plannerTolerance-selfcheck.mjs": 13638
  },
  "at": {
   "render/denoiseDevice-selfcheck.mjs": "2026-10-09T21:00:45.655Z",
@@ -120,7 +125,12 @@
   "tools/ship/tuneRule-selfcheck.mjs": "2026-11-02T13:54:33.438Z",
   "tools/ship/tuneWide-selfcheck.mjs": "2026-11-02T13:54:33.438Z",
   "brain/stationResidual-selfcheck.mjs": "2026-11-02T13:54:33.438Z",
-  "tools/ship/stationRound-selfcheck.mjs": "2026-11-02T13:54:33.438Z"
+  "tools/ship/stationRound-selfcheck.mjs": "2026-11-02T13:54:33.438Z",
+  "brain/plannerSeat-selfcheck.mjs": "2026-11-02T20:13:52.417Z",
+  "brain/plannerPerturbed-selfcheck.mjs": "2026-11-02T20:40:38.053Z",
+  "tools/ship/plannerRound-selfcheck.mjs": "2026-11-02T20:40:38.053Z",
+  "tools/ship/plannerReplicate-selfcheck.mjs": "2026-11-02T20:40:38.053Z",
+  "tools/ship/plannerTolerance-selfcheck.mjs": "2026-11-02T20:40:38.053Z"
  },
  "kinds": {
   "render/denoiseDevice-selfcheck.mjs": "alone",
@@ -180,7 +190,12 @@
   "tools/ship/tuneRule-selfcheck.mjs": "alone",
   "tools/ship/tuneWide-selfcheck.mjs": "alone",
   "brain/stationResidual-selfcheck.mjs": "alone",
-  "tools/ship/stationRound-selfcheck.mjs": "alone"
+  "tools/ship/stationRound-selfcheck.mjs": "alone",
+  "brain/plannerSeat-selfcheck.mjs": "alone",
+  "brain/plannerPerturbed-selfcheck.mjs": "alone",
+  "tools/ship/plannerRound-selfcheck.mjs": "alone",
+  "tools/ship/plannerReplicate-selfcheck.mjs": "alone",
+  "tools/ship/plannerTolerance-selfcheck.mjs": "alone"
  },
  "codes": {
   "render/denoiseDevice-selfcheck.mjs": 0,
@@ -240,7 +255,12 @@
   "tools/ship/tuneRule-selfcheck.mjs": 0,
   "tools/ship/tuneWide-selfcheck.mjs": 0,
   "brain/stationResidual-selfcheck.mjs": 0,
-  "tools/ship/stationRound-selfcheck.mjs": 0
+  "tools/ship/stationRound-selfcheck.mjs": 0,
+  "brain/plannerSeat-selfcheck.mjs": 0,
+  "brain/plannerPerturbed-selfcheck.mjs": 0,
+  "tools/ship/plannerRound-selfcheck.mjs": 0,
+  "tools/ship/plannerReplicate-selfcheck.mjs": 0,
+  "tools/ship/plannerTolerance-selfcheck.mjs": 0
  },
  "serialRing": {
   "render/denoiseDevice-selfcheck.mjs": [
@@ -527,6 +547,31 @@
    9533,
    9490,
    9621
+  ],
+  "brain/plannerSeat-selfcheck.mjs": [
+   12203,
+   12312,
+   11222
+  ],
+  "brain/plannerPerturbed-selfcheck.mjs": [
+   18975,
+   16425,
+   17297
+  ],
+  "tools/ship/plannerRound-selfcheck.mjs": [
+   14014,
+   13859,
+   14103
+  ],
+  "tools/ship/plannerReplicate-selfcheck.mjs": [
+   5028,
+   4213,
+   4284
+  ],
+  "tools/ship/plannerTolerance-selfcheck.mjs": [
+   14284,
+   12987,
+   13638
   ]
  }
 }

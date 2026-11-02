@@ -16240,6 +16240,13 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
         widened: Object.freeze([]),
         verdict: "the brain capability map (36 mutants), the sub .glb model swap's core, host and picker (70, 52, 52), and the needs-and-limits Rounds 6-10 (the residual advisor and its trainer 46, the constant shift 29, the tuned rule 45 with Round 9's wide bounds 36, the station seat and its round 64): each run alone and green, every mutant red by name except the equivalent ones said in the gate headers, 0-red ones having driven new rows (the station seat's object-identity defect among them); five of the Round 6-10 gates were cut from 24-48 s to 7-11 s by flying 100-second dives in the rows that do not depend on a dive's length, so a slower box does not cap them.",
     }),
+    since619: Object.freeze({
+        at: "v4911", swept: 5, green: 5, red: 0,
+        added: Object.freeze(["brain/plannerSeat-selfcheck.mjs", "tools/ship/plannerRound-selfcheck.mjs", "tools/ship/plannerReplicate-selfcheck.mjs", "brain/plannerPerturbed-selfcheck.mjs", "tools/ship/plannerTolerance-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "needs-and-limits Rounds 11-13 (the twin planner's seat 54 mutants and its audit library, the replication 30, the perturbed twin 27, the tolerance sweep 49): each run alone and green, every mutant red by name except the equivalent ones said in the gate headers (the energy clamp after a scaled step, the start-energy clamp and the four-station cap in plannerPerturbed; two orderings of exclusive tests in plannerTolerance), 0-red ones having driven new rows.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

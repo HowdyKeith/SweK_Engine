@@ -46,6 +46,10 @@ sec("3. SIMULATOR");
     const rows = [["plain", 241], ["far", 272], ["both", 273], ["deep", 242], ["far", 271], ["far", 279]].map(([k, s]) => { const r = X.rolloutIdentity(R8, T.scenario(s, k)); return [k + s, r.rollout, r.real]; });
     ok("!! the twin's rollout from the start is the real noise-free dive, to 1e-9, on six dives (two with unreachable stations; far 279 scores 0.85 clean and 0.70 with the noisy gauge, so a rollout checked against the noisy dive would fail)", rows.every(([, a, b]) => Math.abs(a - b) < 1e-9), rows.map(([n, a]) => n + " " + a.toFixed(3)).join("; "));
 }
+{
+    const s = X.startOf(T.scenario(271, "far")), cap = 3.0e6;
+    ok("!! startOf rebuilds the run's start from a scenario: the model, the state at the scenario's depth and the needs with the scenario's starting charge times the capacity and its damage", s.model && s.st && Math.abs(s.nd.energy - T.scenario(271, "far").frac0 * cap) < 1e-6 && s.nd.damage === T.scenario(271, "far").damage0 && -s.st.pos[2] > 0);
+}
 sec("4. AUDITS");
 {
     X.setFlight({ seconds: 100 });   // the rows from here on do not depend on how long a dive runs
