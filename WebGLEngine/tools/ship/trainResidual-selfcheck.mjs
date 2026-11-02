@@ -60,8 +60,8 @@ sec("3. SEARCH");
     ok("!! the search moves weights, and the children change the output layer at least once over 20 tries", X.search(9, { ...X.RECIPE, iters: 20, checkpointEvery: 20 }, cheap).best.slice(R.OUT_START).some((x) => x !== 0) && a.moved >= 0);
 }
 {
-    const hard = X.search(11, { ...X.RECIPE, sigma: 5, iters: 12, checkpointEvery: 12 }, cheap), drift = X.search(12, { ...X.RECIPE, iters: 20, checkpointEvery: 20 }, cheap);
-    ok("!! with a violent sigma (most children hurt) the search still never ends below the start on its train score", hard.bestScore >= sp(R.startWeights(), cheap) && sp(hard.best, cheap) >= sp(R.startWeights(), cheap));
+    const hard = X.search(11, { ...X.RECIPE, sigma: 5, maxK: 134, iters: 6, checkpointEvery: 6 }, cheap), drift = X.search(12, { ...X.RECIPE, iters: 20, checkpointEvery: 20 }, cheap);
+    ok("!! with a violent sigma (most children hurt) the search still never ends below the start on its train score", hard.bestScore >= sp(R.startWeights(), cheap) && hard.trace.length === 7 && hard.trace.every((x, i) => i === 0 || x >= hard.trace[i - 1]) && sp(hard.best, cheap) >= sp(R.startWeights(), cheap));
     ok("!! children are made from the CURRENT best, not the start: after 20 iterations more than maxK weights have moved", drift.moved > X.RECIPE.maxK, "moved " + drift.moved);
 }
 sec("4. CHAMPION");

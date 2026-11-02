@@ -44,16 +44,17 @@ export const scoreOn = (arm, w, set) => T.evaluate(pilotOf(arm, w), set, { gauge
 export function search(seed, recipe = RECIPE, trainSet = TRAIN) {
     const rng = mulberry(seed), ev = (w) => scoreOn("RESIDUAL", w, trainSet).score;
     let best = R.startWeights(), bestScore = ev(best);
-    const checkpoints = [{ iter: 0, weights: Float64Array.from(best), trainScore: bestScore }];
+    let held = bestScore; const trace = [bestScore], checkpoints = [{ iter: 0, weights: Float64Array.from(best), trainScore: bestScore }];
     for (let it = 1; it <= recipe.iters; it++) {
         const child = Float64Array.from(best), k = 1 + Math.floor(rng() * recipe.maxK);
         for (let j = 0; j < k; j++) { const idx = Math.floor(rng() * R.N_WEIGHTS); child[idx] += recipe.sigma * gauss(rng); }
         const s = ev(child);
-        if (s >= bestScore) { if (s > bestScore) bestScore = s; best = child; }   // equal moves are kept (neutral drift), as in the other ES trainers
+        if (s >= bestScore) { if (s > bestScore) bestScore = s; best = child; held = s; }   // equal moves are kept (neutral drift), as in the other ES trainers
+        trace.push(held);
         if (it % recipe.checkpointEvery === 0) checkpoints.push({ iter: it, weights: Float64Array.from(best), trainScore: bestScore });
     }
     const moved = best.reduce((a, x, i) => a + (x !== R.startWeights()[i] ? 1 : 0), 0);
-    return { seed, best, bestScore, checkpoints, moved };
+    return { seed, best, bestScore, trace, checkpoints, moved };
 }
 const gauss = (rng) => { let s = 0; for (let i = 0; i < 6; i++) s += rng(); return (s - 3) * Math.SQRT2; };
 
