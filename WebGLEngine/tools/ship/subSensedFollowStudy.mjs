@@ -4,11 +4,13 @@
 //   --study gap   SEE THE GAP: the incumbent's exact position and sticky memory with another SONAR (exact, sensed, sonar-150, sonar-200 [designated], sonar-wide, sonar-200-wide, sonar-omni); bar D, verdict, predictions D1 to D6
 //   --study combined   THE TWO CURES TOGETHER (follow-up 3): exact, sonar-200, sensed+fix, fix+forget and the five long arms (the 200 m sonar with the fix, forgetting, the filter and drift); bar C, verdict, predictions C1 to C7
 //   --study realism   THE SONAR GETS REAL (follow-up 4): exact, the three clean long arms (long+fix, long+fix+forget, long+fix+filter) and, for each of miss, false, occl, head and all, a sticky and a forgetting arm (the 200 m sonar with a misses, false returns, first surfaces or a heading error); bar R (all+forget reaches 80% of exact's count in each kind), verdict, predictions R1 to R8
+//   --study persistent   THE FAULTS PERSIST (follow-up 5): exact, the clean long+fix and long+fix+forget, the white head+sticky, head+forget and all+forget, and the sonar's faults made to last -- a heading bias, persistent cell faults, whole obstacles that drop out, rates that grow with range, all together -- each with the sticky map or the map that forgets (pall+forget designated); bar P (80% of exact's count in each kind), verdict, predictions P1 to P8
 //   --study fix   THE FIX SMEAR: the incumbent's sonar and white 3 m fix with the map forgetting (fix+forget [designated]) or the fix filtered (fix+filter, fix+forget+filter); sensed, sensed+fix and sensed+drift flown beside them; bar E, verdict, predictions E1 to E6
-//   node tools/ship/subSensedFollowStudy.mjs --study gap|fix|combined|realism --set dev [--seeds N]               DEV (seeds 1 to 30 of each kind): a sanity run, not a result
+//   node tools/ship/subSensedFollowStudy.mjs --study gap|fix|combined|realism|persistent --set dev [--seeds N]               DEV (seeds 1 to 30 of each kind): a sanity run, not a result
 //   node tools/ship/subSensedFollowStudy.mjs --study gap|fix --set held7 [--seeds N] [--write]    HELD7 (seeds 701 to 760 of each kind), READ ONCE FOR EACH STUDY; --write puts every flight in brain/subSensedGapHeld7.jsonl or brain/subSensedFixHeld7.jsonl
 //   node tools/ship/subSensedFollowStudy.mjs --study combined --set held8 [--seeds N] [--write]     HELD8 (seeds 801 to 860 of each kind), READ ONCE; --write puts every flight in brain/subSensedCombinedHeld8.jsonl
 //   node tools/ship/subSensedFollowStudy.mjs --study realism --set held9 [--seeds N] [--write]     HELD9 (seeds 901 to 960 of each kind), READ ONCE; --write puts every flight in brain/subSensedRealismHeld9.jsonl
+//   node tools/ship/subSensedFollowStudy.mjs --study persistent --set held10 [--seeds N] [--write]     HELD10 (seeds 1001 to 1060 of each kind), READ ONCE; --write puts every flight in brain/subSensedPersistentHeld10.jsonl
 // Pure apart from the file --write puts down. No clock, no Math.random.
 "use strict";
 import fs from "node:fs";
@@ -20,10 +22,10 @@ import { median, pilot } from "./subSensedStudy.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url)), ENG = path.resolve(HERE, "..", "..");
 export { median, pilot };
-export const OUTS = Object.freeze({ gap: "brain/subSensedGapHeld7.jsonl", fix: "brain/subSensedFixHeld7.jsonl", combined: "brain/subSensedCombinedHeld8.jsonl", realism: "brain/subSensedRealismHeld9.jsonl" });
-export const STUDIES = Object.freeze({ gap: Object.freeze({ arms: X.GAP_ARMS, designated: X.GAP_DESIGNATED, held: "held7" }), fix: Object.freeze({ arms: X.FIX_ARMS, designated: X.FIX_DESIGNATED, held: "held7" }), combined: Object.freeze({ arms: X.COMBINED_ARMS, designated: X.COMBINED_DESIGNATED, held: "held8" }), realism: Object.freeze({ arms: X.REALISM_ARMS, designated: X.REALISM_DESIGNATED, held: "held9" }) });
-export const SETS = Object.freeze({ dev: X.SENSE_SETS.dev, held7: X.SENSE_SETS.held7, held8: X.SENSE_SETS.held8, held9: X.SENSE_SETS.held9 });
-export const THRESH = Object.freeze({ gapBar: 0.6, harm: 3, gain10: 10, omniFloor: 57, omniShare: 0.8, pathFactor: 1.2, close: 3, gainFix: 5, control: 5, gapSlack: 5, ceiling: 3, gainCombined: 20, within: 5, gapsFloor: 45, realBar: 0.8, missClose: 5, falseDrop: 15, forgetGain: 15, forgetClose: 10, headDrop: 10 });
+export const OUTS = Object.freeze({ gap: "brain/subSensedGapHeld7.jsonl", fix: "brain/subSensedFixHeld7.jsonl", combined: "brain/subSensedCombinedHeld8.jsonl", realism: "brain/subSensedRealismHeld9.jsonl", persistent: "brain/subSensedPersistentHeld10.jsonl" });
+export const STUDIES = Object.freeze({ gap: Object.freeze({ arms: X.GAP_ARMS, designated: X.GAP_DESIGNATED, held: "held7" }), fix: Object.freeze({ arms: X.FIX_ARMS, designated: X.FIX_DESIGNATED, held: "held7" }), combined: Object.freeze({ arms: X.COMBINED_ARMS, designated: X.COMBINED_DESIGNATED, held: "held8" }), realism: Object.freeze({ arms: X.REALISM_ARMS, designated: X.REALISM_DESIGNATED, held: "held9" }), persistent: Object.freeze({ arms: X.PERSIST_ARMS, designated: X.PERSIST_DESIGNATED, held: "held10" }) });
+export const SETS = Object.freeze({ dev: X.SENSE_SETS.dev, held7: X.SENSE_SETS.held7, held8: X.SENSE_SETS.held8, held9: X.SENSE_SETS.held9, held10: X.SENSE_SETS.held10 });
+export const THRESH = Object.freeze({ gapBar: 0.6, harm: 3, gain10: 10, omniFloor: 57, omniShare: 0.8, pathFactor: 1.2, close: 3, gainFix: 5, control: 5, gapSlack: 5, ceiling: 3, gainCombined: 20, within: 5, gapsFloor: 45, realBar: 0.8, missClose: 5, falseDrop: 15, forgetGain: 15, forgetClose: 10, headDrop: 10, biasGain: 15, persistClose: 10, objDrop: 15, stickyGain: 10, stickyDrop: 30 });
 const KINDS = X.SENSE_KINDS, WIDTHS = H.GAP_WIDTHS;
 
 const cellOf = (rs) => {
@@ -96,7 +98,19 @@ export function judgeRealism(sum) {
     return { perKind, kindsHeld, verdict, r1: Math.abs(r("miss+sticky") - r("long+fix")) <= THRESH.missClose, r2: r("long+fix") - r("false+sticky") >= THRESH.falseDrop, r3: r("false+forget") - r("false+sticky") >= THRESH.forgetGain, r4: Math.abs(r("false+forget") - r("long+fix+forget")) <= THRESH.forgetClose, r5: !!oi && !!li && oi.reached < li.reached,
         r6: r("long+fix") - r("head+sticky") >= THRESH.headDrop, r7: r("head+forget") > r("head+sticky"), r8: ["miss+forget", "false+forget", "occl+forget", "head+forget"].every((a) => r(D) < r(a)) };
 }
-export const judge = (sum, study) => (study === "gap" ? judgeGap(sum) : study === "fix" ? judgeFix(sum) : study === "realism" ? judgeRealism(sum) : judgeCombined(sum));
+/**
+ * The persistent-faults study's bar, verdict and P1 to P8 (brain/SENSED_NAV_WIP.md, "FOLLOW-UP 5"). The designated arm (X.PERSIST_DESIGNATED, pall+forget) reaches at least THRESH.realBar of what `exact` reaches (the count) in EACH kind (perKind); SUPPORTED if it does in all three, PARTLY SUPPORTED if in two, NOT SUPPORTED otherwise (kindsHeld counts them). Over the three kinds together: P1 bias+sticky reaches at
+ * least THRESH.biasGain more than head+sticky. P2 bias+forget is within THRESH.persistClose flights of long+fix+forget (either side). P3 cellp+forget is. P4 objp+forget reaches at least THRESH.objDrop fewer than long+fix+forget. P5 objp+sticky reaches at least THRESH.stickyGain more than objp+forget. P6 range+forget is within THRESH.persistClose of long+fix+forget.
+ * P7 pall+sticky reaches at least THRESH.stickyDrop fewer than pall+forget. P8 pall+forget is within THRESH.persistClose of all+forget (either side). A missing arm is a miss (NaN fails every comparison).
+ */
+export function judgePersistent(sum) {
+    const D = X.PERSIST_DESIGNATED, p = sum.pooled, r = (arm) => (p[arm] ? p[arm].reached : NaN), perKind = {};
+    for (const k of KINDS) { const e = get(sum, k, "exact"), c = get(sum, k, D); perKind[k] = !!e && !!c && c.reached / e.reached >= THRESH.realBar; }
+    const kindsHeld = KINDS.filter((k) => perKind[k]).length, verdict = kindsHeld === 3 ? "SUPPORTED" : kindsHeld >= 2 ? "PARTLY SUPPORTED" : "NOT SUPPORTED", clean = r("long+fix+forget");
+    return { perKind, kindsHeld, verdict, p1: r("bias+sticky") - r("head+sticky") >= THRESH.biasGain, p2: Math.abs(r("bias+forget") - clean) <= THRESH.persistClose, p3: Math.abs(r("cellp+forget") - clean) <= THRESH.persistClose, p4: clean - r("objp+forget") >= THRESH.objDrop,
+        p5: r("objp+sticky") - r("objp+forget") >= THRESH.stickyGain, p6: Math.abs(r("range+forget") - clean) <= THRESH.persistClose, p7: r(D) - r("pall+sticky") >= THRESH.stickyDrop, p8: Math.abs(r(D) - r("all+forget")) <= THRESH.persistClose };
+}
+export const judge = (sum, study) => (study === "gap" ? judgeGap(sum) : study === "fix" ? judgeFix(sum) : study === "realism" ? judgeRealism(sum) : study === "persistent" ? judgePersistent(sum) : judgeCombined(sum));
 const pct = (v) => (Number.isFinite(v) ? (100 * v).toFixed(0) + "%" : "n/a");
 const f2s = (v) => (Number.isFinite(v) ? v.toFixed(2) : "n/a");
 const HEAD = "arm               | reached      | collided left timeout other | median time (s) | median path/chord | median min clearance (m) | grid ensonified | offset at end (m) | plans (median)";
@@ -121,6 +135,12 @@ export function verdictText(j, study) {
         return [`${D} (the realistic vessel) reaches at least ${pct(THRESH.realBar)} of what exact reaches in each kind (the bar): ${KINDS.map((k) => `${k} ${yn(j.perKind[k])}`).join(", ")} (${j.kindsHeld} of 3)`,
             `R1 miss+sticky is within ${THRESH.missClose} flights of the clean long+fix over the three kinds: ${yn(j.r1)}`, `R2 false+sticky reaches at least ${THRESH.falseDrop} fewer than long+fix: ${yn(j.r2)}`, `R3 false+forget reaches at least ${THRESH.forgetGain} more than false+sticky: ${yn(j.r3)}`, `R4 false+forget is within ${THRESH.forgetClose} flights of the clean long+fix+forget: ${yn(j.r4)}`,
             `R5 in hard-islands occl+sticky reaches fewer than long+fix: ${yn(j.r5)}`, `R6 head+sticky reaches at least ${THRESH.headDrop} fewer than long+fix: ${yn(j.r6)}`, `R7 head+forget reaches more than head+sticky: ${yn(j.r7)}`, `R8 ${D} reaches fewer than each of miss+forget, false+forget, occl+forget and head+forget: ${yn(j.r8)}`, `VERDICT: ${j.verdict}`].join("\n");
+    }
+    if (study === "persistent") {
+        const D = X.PERSIST_DESIGNATED;
+        return [`${D} (the vessel with persistent faults) reaches at least ${pct(THRESH.realBar)} of what exact reaches in each kind (the bar): ${KINDS.map((k) => `${k} ${yn(j.perKind[k])}`).join(", ")} (${j.kindsHeld} of 3)`,
+            `P1 bias+sticky reaches at least ${THRESH.biasGain} more than head+sticky over the three kinds: ${yn(j.p1)}`, `P2 bias+forget is within ${THRESH.persistClose} flights of the clean long+fix+forget: ${yn(j.p2)}`, `P3 cellp+forget is within ${THRESH.persistClose} flights of long+fix+forget: ${yn(j.p3)}`, `P4 objp+forget reaches at least ${THRESH.objDrop} fewer than long+fix+forget: ${yn(j.p4)}`,
+            `P5 objp+sticky reaches at least ${THRESH.stickyGain} more than objp+forget: ${yn(j.p5)}`, `P6 range+forget is within ${THRESH.persistClose} flights of long+fix+forget: ${yn(j.p6)}`, `P7 pall+sticky reaches at least ${THRESH.stickyDrop} fewer than ${D}: ${yn(j.p7)}`, `P8 ${D} is within ${THRESH.persistClose} flights of the white all+forget: ${yn(j.p8)}`, `VERDICT: ${j.verdict}`].join("\n");
     }
     if (study === "combined") {
         const D = X.COMBINED_DESIGNATED;
