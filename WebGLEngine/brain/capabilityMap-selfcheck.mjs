@@ -1,6 +1,6 @@
 // WebGLEngine/brain/capabilityMap-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node brain/capabilityMap-selfcheck.mjs      (~0.12 s)
+// Run: node brain/capabilityMap-selfcheck.mjs      (~0.1-0.6 s; a slower box reads up to ~0.5 s)
 //
 // THE GATE OF brain/capabilityMap.mjs, the map of which brain can do what at each simulation level (docs/BRAIN-CAPABILITY-MAP.md). A map like this goes stale the day a result changes, so the gate does not trust it: it OPENS every file and every changelog entry the
 // map cites and looks for the quoted number, and it holds the Markdown to what the data renders.

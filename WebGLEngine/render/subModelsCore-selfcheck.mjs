@@ -1,6 +1,6 @@
 // WebGLEngine/render/subModelsCore-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node render/subModelsCore-selfcheck.mjs      (~0.05 s)
+// Run: node render/subModelsCore-selfcheck.mjs      (~0.05-0.4 s; a slower box reads up to ~0.3 s)
 //
 // THE GATE OF render/subModelsCore.mjs, phase 1 of docs/SUB-GLB-MODEL-SWAP.md: the pure half of "a submarine wears a downloaded .glb". Nothing is loaded and nothing is drawn; every number is checked against an answer written by hand.
 //   1  CLASSES      the hulls the tank knows (physics/mechanics/subHulls.mjs) plus "default"; an unknown hull reads as default

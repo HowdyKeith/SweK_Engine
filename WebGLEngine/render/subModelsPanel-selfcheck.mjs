@@ -1,6 +1,6 @@
 // WebGLEngine/render/subModelsPanel-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node render/subModelsPanel-selfcheck.mjs      (~0.7 s with a browser; the source rows alone ~0.1 s)
+// Run: node render/subModelsPanel-selfcheck.mjs      (~0.7-3 s with a browser; the source rows alone ~0.1 s)
 //
 // THE PICKER OF A DOWNLOADED SUBMARINE MODEL (phase 3 of docs/SUB-GLB-MODEL-SWAP.md), DRIVEN LIKE A PERSON WOULD: in headless Chromium through the engine's own origin the form is mounted over a real store, a real host and two real boats (a fake view holds them), and its
 // inputs are filled and its buttons clicked. (needs a browser; SKIPPED, and said, without one.)
