@@ -73,6 +73,7 @@ sec("4. LINES");
     ok("!! EVENT better than ONCE (real pooled difference) says ADD, EVENT equal to ONCE says DO NOT ADD", L({ "ONCE": { d: HALF } })[0] === "EVENTS ADD TO A PLAN MADE ONCE" && L({})[0] === "EVENTS DO NOT ADD TO A PLAN MADE ONCE" && L({ "ONCE": { d: LOSE } })[0] === "EVENTS ADD TO A PLAN MADE ONCE");
     ok("!! the clock line: an event arm that keeps, matches and costs 50 percent says MATCH AT 50 PERCENT with its name; EVENT-240 named when it is the better", L({})[1] === "EVENTS MATCH THE CLOCK AT 50 PERCENT OF ITS COST (EVENT)" && L({ "EVENT": { d: HALF }, "EVENT-240": { cost: 700 } })[1] === "EVENTS MATCH THE CLOCK AT 70 PERCENT OF ITS COST (EVENT-240)");
     ok("!! no match when the better event arm LOSES, is WORSE than the full twin, or costs the full twin's cost or more", L({ "EVENT": { d: LOSE }, "EVENT-240": { d: LOSE } })[1] === "EVENTS DO NOT MATCH THE CLOCK" && L({ "EVENT": { d: HALF }, "EVENT-240": { d: HALF } })[1] === "EVENTS DO NOT MATCH THE CLOCK" && L({ "EVENT": { cost: 1000 }, "EVENT-240": { cost: 1200 } })[1] === "EVENTS DO NOT MATCH THE CLOCK" && L({ "EVENT": { cost: 999 } })[1].includes("100 PERCENT"));
+    ok("!! an event arm that MATCHES the full twin but does not KEEP the gain (the full twin and the event arms all LOSE) is not a match for the clock", (() => { const a = synth({ "EVENT": { d: LOSE }, "EVENT-240": { d: LOSE } }); for (const n of X.SET_NAMES) a[n]["TWIN-FULL"] = { ...runs(LOSE), cost: 1000, plans: 6 }; const e = X.betterEvent(a); return e.verdict === "LOSES" && e.match === "MATCHES" && X.bottomLines(a)[1] === "EVENTS DO NOT MATCH THE CLOCK"; })());
     ok("!! the share is rounded, not cut: a cost of 296 against 1000 says 30 PERCENT", /AT 30 PERCENT OF ITS COST \(EVENT\)$/.test(L({ "EVENT": { cost: 296 } })[1]));
 }
 sec("5. CHECKS");
@@ -86,9 +87,9 @@ sec("5. CHECKS");
 }
 sec("6. REPORT");
 {
-    const L = X.report(synth({ "ONCE": { d: HALF, cost: 200, plans: 2 }, "EVENT-240": { cost: 330, plans: 5 } })), txt = L.join("\n");
+    const L = X.report(synth({ "ONCE": { d: HALF, cost: 200, plans: 2 }, "EVENT-240": { cost: 330, plans: 5 }, "REPLAN-30": { d: HALF } })), txt = L.join("\n");
     ok("!! the head names the three sets; the four checks pass first; the full twin's line carries its gain, cost and plans", /^ROUND 17/.test(L[0]) && L[0].includes("S1 1601-1648") && L[0].includes("S3 1721-1768") && L.slice(1, 5).every((l) => /^  PASS /.test(l)) && /TWIN-FULL minus TUNED-R8: \+0\.10.*cost 1100 rollout seconds per dive, 6\.00 plans/.test(txt));
-    ok("!! one row per search arm (five) with verdict, match, cost and share: ONCE KEEPS WORSE at 20%, EVENT-240 KEEPS MATCHES at 33% with 5.00 plans", (txt.match(/^  (REPLAN|ONCE|EVENT)[-A-Z0-9]* /gm) || []).length === 5 && /ONCE +.*KEEPS +WORSE .*cost 220 \(20%\), 2\.00 plans/.test(txt) && /EVENT-240 .*KEEPS +MATCHES .*\(33%\), 5\.00 plans/.test(txt));
+    ok("!! one row per search arm (five) with verdict, match, cost and share: ONCE KEEPS WORSE at 20%, EVENT-240 KEEPS MATCHES at 33% with 5.00 plans", (txt.match(/^  (REPLAN|ONCE|EVENT)[-A-Z0-9]* /gm) || []).length === 5 && /ONCE +.*KEEPS +WORSE .*cost 220 \(20%\), 2\.00 plans +share of full gain 0\.60/.test(txt) && /EVENT-240 .*KEEPS +MATCHES .*\(33%\), 5\.00 plans/.test(txt));
     ok("!! the two difference lines, then the two bottom lines last", /EVENT minus ONCE: /.test(txt) && /EVENT-240 minus REPLAN-60: /.test(txt) && L[L.length - 2].startsWith("BOTTOM LINE: EVENTS ") && L[L.length - 1].startsWith("BOTTOM LINE: EVENTS "));
     ok("!! the difference lines read the right arms: EVENT minus ONCE is +0.0 something (a half gain against a full one, about +0.04) and EVENT-240 minus REPLAN-60 is 0", /EVENT minus ONCE: \+0\.04/.test(txt) && /EVENT-240 minus REPLAN-60: [+-]0\.0000/.test(txt));
     const bad = synth(); bad.S1["TWIN-FULL"].runs[0].fingerprint = "x"; const Lb = X.report(bad);
@@ -107,6 +108,8 @@ sec("7. FLIGHT");
     const full = fly("TWIN-FULL"), r11 = fly("TWIN-ROUND11"), tuned = fly("TUNED-R8"), evA = fly("EVENT");
     ok("!! flySets returns S1, S2 and S3, four dives each; a twin arm carries cost and plans, the tuned rule neither", J(Object.keys(full)) === J(["S1", "S2", "S3"]) && full.S1.runs.length === 4 && full.S1.cost > 0 && full.S1.plans >= 1 && tuned.S1.cost === undefined && tuned.S1.plans === undefined && evA.S2.cost > 0);
     ok("!! the full twin equals the Round 11 twin dive for dive on 100-second dives", ["S1", "S2", "S3"].every((n) => full[n].runs.every((r, i) => r.fingerprint === r11[n].runs[i].fingerprint)));
+    const one = X.flyArm("TWIN-FULL", R8, T.setOf(["far"], 1344, 1344)), two = X.flyArm("TWIN-FULL", R8, T.setOf(["far"], 1345, 1345)), pair = X.flyArm("TWIN-FULL", R8, T.setOf(["far"], 1344, 1345));
+    ok("!! the cost and the plan count of a set are the MEAN over its dives, exactly: far 1344 and far 1345 over 100 s schedule 782 and 726.5 rollout seconds (2 plans each), so the pair is 754.25 and 2", one.cost === 782 && two.cost === 726.5 && pair.cost === 754.25 && one.plans === 2 && pair.plans === 2);
     const direct = T.evaluate(T.flyDecision(U.tunedSeat(R8, U.WIDE_BOUNDS)), T.setOf(X.HARD, 1344, 1345), { gauge: T.GAUGE, seconds: 100 });
     ok("!! the tuned rule is T.evaluate's tuned dive with the noisy gauge, and the twin is another pilot on far 1344", tuned.S1.runs.every((r, i) => r.fingerprint === direct.runs[i].fingerprint) && full.S1.runs[0].fingerprint !== tuned.S1.runs[0].fingerprint);
     X.setFlight({});
