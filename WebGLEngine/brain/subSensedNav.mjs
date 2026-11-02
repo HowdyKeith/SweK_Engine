@@ -67,7 +67,7 @@ export function view(world, pos, cx, cy, cell) {
         const wx = o.x - pos.x, wy = o.y - pos.y, tp = wx * ux + wy * uy, h2 = o.r * o.r - (wx * wx + wy * wy - tp * tp);
         if (h2 < 0) continue;
         const h = Math.sqrt(h2), tin = tp - h;
-        if (tp + h < 0 || tin > d) continue;
+        if (tp + h <= 0 || tin > d) continue;
         front = Math.min(front, Math.max(tin, 0));
         if (Math.hypot(cx - o.x, cy - o.y) <= o.r) inAny = true;
     }
