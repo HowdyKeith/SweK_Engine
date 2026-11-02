@@ -18,7 +18,7 @@ const hyp = (ax, ay, bx, by) => Math.hypot(ax - bx, ay - by);
 const perms = (a) => (a.length <= 1 ? [a] : a.flatMap((x, i) => perms([...a.slice(0, i), ...a.slice(i + 1)]).map((p) => [x, ...p])));
 
 /** The tuned rule with its next station forced to the first still-open feasible station of `order` (indices into obs.stations); unchanged when the order is exhausted or null (nearest-first). */
-function orderedTuned(params, order) {
+export function orderedTuned(params, order) {
     const base = U.tunedSeat(params, U.WIDE_BOUNDS);
     return (ctx) => { const s = base(ctx); return (st, obs) => { const d = s(st, obs); if (!d.station || !order) return d; const pick = order.map((i) => obs.stations[i]).find((q) => q && !q.visited && A.feasible(q, obs.r)); return pick ? { ...d, station: pick } : d; }; };
 }

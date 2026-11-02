@@ -35,6 +35,7 @@ sec("2. ARMS");
 {
     const fp = (arm, sc) => T.evaluate(X.pilotOf(arm, { r8: R8 }), [sc], { gauge: T.GAUGE }).runs[0].fingerprint, thr = (f) => { try { f(); return null; } catch (e) { return e.message; } };
     const f272 = T.scenario(272, "far"), f271 = T.scenario(271, "far");
+    ok("!! PLANNER-NEAREST is TUNED-R8 on far 271 too (the dive where the twin differs), so it is not the twin", fp("PLANNER-NEAREST", f271) === fp("TUNED-R8", f271));
     ok("!! PLANNER-NEAREST is TUNED-R8 dive for dive", fp("PLANNER-NEAREST", f272) === fp("TUNED-R8", f272));
     const twinRun = X.scoreOf("PLANNER-TWIN", { r8: R8 }, [f271]).runs[0];
     ok("!! the twin differs from nearest-first on a dive known to gain (far 271: 0.70 to 0.85) and scores 0.85 there", twinRun.fingerprint !== fp("TUNED-R8", f271) && Math.abs(twinRun.score - 0.85) < 1e-9);
@@ -42,8 +43,8 @@ sec("2. ARMS");
 }
 sec("3. SIMULATOR");
 {
-    const rows = [["plain", 241], ["far", 272], ["both", 273], ["deep", 242], ["far", 271]].map(([k, s]) => { const r = X.rolloutIdentity(R8, T.scenario(s, k)); return [k + s, r.rollout, r.real]; });
-    ok("!! the twin's rollout from the start is the real noise-free dive, to 1e-9, on five dives (two with unreachable stations)", rows.every(([, a, b]) => Math.abs(a - b) < 1e-9), rows.map(([n, a]) => n + " " + a.toFixed(3)).join("; "));
+    const rows = [["plain", 241], ["far", 272], ["both", 273], ["deep", 242], ["far", 271], ["far", 279]].map(([k, s]) => { const r = X.rolloutIdentity(R8, T.scenario(s, k)); return [k + s, r.rollout, r.real]; });
+    ok("!! the twin's rollout from the start is the real noise-free dive, to 1e-9, on six dives (two with unreachable stations; far 279 scores 0.85 clean and 0.70 with the noisy gauge, so a rollout checked against the noisy dive would fail)", rows.every(([, a, b]) => Math.abs(a - b) < 1e-9), rows.map(([n, a]) => n + " " + a.toFixed(3)).join("; "));
 }
 sec("4. AUDITS");
 {
@@ -52,7 +53,7 @@ sec("4. AUDITS");
     ok("!! the audits fly every arm on the three ranges asked for (1 dive each here), the oracle among them", J(Object.keys(au)) === J(["Y1", "Y2", "Y3"]) && Object.values(au).every((a) => J(Object.keys(a)) === J(X.ARMS) && a["TUNED-R8"].runs.length === 1 && a["ORACLE-ORDER"].runs.length === 1));
     const mk = (f, fpr = "f") => ({ runs: [0, 1, 2].flatMap(() => X.HARD.map((kind) => ({ kind, score: f, fingerprint: fpr }))), score: f, crashed: 0, stranded: 0 });
     const aud = (s) => Object.fromEntries(X.AUDIT_NAMES.map((n) => [n, Object.fromEntries(X.ARMS.map((a) => [a, mk(s[a])]))]));
-    const sc = { "TUNED-R8": 0.8, "PLANNER-NEAREST": 0.8, "PLANNER-TWIN": 0.85, "ORACLE-ORDER": 0.9 }, L = X.report(aud(sc), { plans: 7.5 });
+    const sc = { "TUNED-R8": 0.8, "PLANNER-NEAREST": 0.79, "PLANNER-TWIN": 0.85, "ORACLE-ORDER": 0.9 }, L = X.report(aud(sc), { plans: 7.5 });
     ok("!! the verdict line compares the twin with TUNED-R8 (+0.050 on all three audits = BEATS) and the oracle (+0.100) is reported", L.some((l) => /^PLANNER-TWIN against TUNED-R8: \+0\.050 WINS \| \+0\.050 WINS \| \+0\.050 WINS = BEATS/.test(l)) && L.some((l) => /^ORACLE-ORDER against TUNED-R8 .*\+0\.100 WINS/.test(l)));
     ok("!! the share of the oracle gap (0.50 each), the replans line, and a generated BOTTOM LINE", L.some((l) => /^share of the oracle gap closed by the twin: 0\.50 \| 0\.50 \| 0\.50/.test(l)) && L.some((l) => /^replans per dive \(twin\): 7\.50/.test(l)) && /^BOTTOM LINE: A PLANNED ORDER \(WITH A PERFECT MODEL OF THE BOAT\) IMPROVES THE TUNED RULE/.test(L[L.length - 1]) && !X.report(aud(sc), {}).some((l) => /^replans/.test(l)));
     ok("!! a twin no better than the rule reads NO GAIN; a worse one reads HURTS", /BOTTOM LINE: NO GAIN OVER THE TUNED RULE/.test(X.report(aud({ ...sc, "PLANNER-TWIN": 0.8 }), {}).at(-1)) && /BOTTOM LINE: HURTS/.test(X.report(aud({ ...sc, "PLANNER-TWIN": 0.7 }), {}).at(-1)));
@@ -62,7 +63,7 @@ sec("4. AUDITS");
     const badOr = aud(sc); badOr.Y3["ORACLE-ORDER"] = mk(0.7);
     ok("!! an oracle below the tuned rule on a dive fails its check; clean audits pass every check", X.checksOf(badOr).find((c) => c.name === "ORACLE Y3").ok === false && X.checksOf(aud(sc)).every((c) => c.ok));
     ok("!! gapShare is (a - base) / (oracle - base), null when the oracle gains nothing", Math.abs(X.gapShare(0.85, 0.8, 0.9) - 0.5) < 1e-12 && X.gapShare(0.8, 0.8, 0.8) === null);
-    ok("!! plansOf counts the twin's replans per dive on a set (a whole-number mean on one dive, at least 1)", (() => { const v = X.plansOf({ r8: R8 }, [T.scenario(241, "plain")]); return Number.isInteger(v) && v >= 1; })());
+    ok("!! plansOf counts the twin's replans per dive on a set: 3 on plain 241 (the start, one station visited, one more), the mean of 3 and 3 over two copies", X.plansOf({ r8: R8 }, [T.scenario(241, "plain")]) === 3 && X.plansOf({ r8: R8 }, [T.scenario(241, "plain"), T.scenario(241, "plain")]) === 3);
     X.setFlight({});
 }
 sec("5. SOURCE");
