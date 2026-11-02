@@ -192,10 +192,10 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "cross-backend-envelope",
-        blocker: "HARDWARE",
-        what: "Record the box3d-vs-Jolt drift, pixel and perceptual envelope.",
-        how: "On a rig where box3d's WASM builds: `node physics/backend-qa-check.mjs --update`. One command.",
-        why: "backend-baseline.json has carried \"pairs\": {} since 2026-07-13 because box3d has never loaded wherever --update was run. v3338 made a missing envelope fail as UNMEASURED instead of passing silently, so the first run where box3d loads goes RED and names the command rather than measuring the pair and discarding it.",
+        blocker: "CLOSED",
+        what: "CLOSED 2026-11-02, found stale (UNNUMBERED; the work itself was v4400). Record the box3d-vs-Jolt drift, pixel and perceptual envelope. DONE AT v4400 (commit 8c009e25, 2026-09-03), and this entry was never told. The blocker was not hardware: physics/box3d/box3dLoader.js loaded its artifact by a browser-absolute URL that cannot resolve in Node, so box3d did not load wherever --update ran, and backend-qa-check.mjs also called createWorld without init(). v4400 fixed both and re-recorded tools/render-qa/backend-baseline.json with the Jolt|box3d pair. Re-run 2026-11-02 in a cloud container, with box3d's clang-built WASM loading in Node (77 swk_* functions): GATE GREEN in 1.3 s. Both engines are deterministic (trajectory and render identical twice); drift 3.72 u against the envelope 1.2..7.6; visual 6.0% against 2%..14%; silhouette IoU 0.588, SSIM 0.685, edge overlap 0.222, pHash 14 bits under a ceiling of 25.",
+        how: "Nothing left. The gate's own limit stands (its header): the envelope is recorded from the code under test, so it detects a CHANGE in the divergence, never WRONGNESS. Correctness is tools/ship/rigidSuite.mjs's, held against mathematics.",
+        why: "Filed under HARDWARE because backend-baseline.json had carried \"pairs\": {} since 2026-07-13 and box3d had not loaded wherever --update was run. v3338 made a missing envelope fail as UNMEASURED instead of passing silently. Found stale on 2026-11-02, answering a question about box3d and Jolt in the 6-DOF sim.",
     },
     {
         id: "device-verdicts",
