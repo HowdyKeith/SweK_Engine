@@ -510,6 +510,10 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
         "render/seaPicker-selfcheck.mjs",
         "render/subBallastCues-selfcheck.mjs",
         "sea-ogre.html",
+        // v4910 -- the sub .glb model swap (render/subModels3d.mjs, its picker and the host's gate): the host builds a boat's model as three.js objects, the picker takes THREE as a parameter and its gate drives the form in a browser. Three arrivals, each by name.
+        "render/subModels3d-selfcheck.mjs",
+        "render/subModels3d.mjs",
+        "render/subModelsPanel-selfcheck.mjs",
     ]),
     "three-webgpu": Object.freeze([
         // backlog #31/#49/#51 -- the AI-presence orb (krispuckett/murmur-web ported into tslSource.mjs) is a

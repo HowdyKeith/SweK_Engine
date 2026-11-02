@@ -12,6 +12,8 @@
 //   7 REPORT    synthetic audits: checks first (identity, oracle), a failed check says NOT WEIGHED, the verdict lines compare the right arms, the share of the gap, the switches line.
 //   8 SOURCE    the audit seeds appear in one place; no clock, random or file.
 // NOT CHECKED, said plainly: that any learned station choice scores better (that is the experiment).
+// SABOTAGE LOG (33 mutants of tools/ship/stationRound.mjs): 10 went 0 red on the first pass and got rows -- the shuffle's hidden bias (the fixture had zero biases), the oracle taking ties, a search that accepts anything, the preference control's worst or ties, the gap formula (the first mutant hit a comment, retargeted), and the report comparing the wrong arms (the synthetic audits gave equal scores; now distinct). ONE equivalent mutant, said plainly: the oracle's feasibility filter (an order that chases an infeasible station scores worse and the max discards it) and one dead start (nearest-first as the oracle's first candidate: 60 hard dives scanned, no dive where nearest-first beats every fixed order, kept as the registered definition). All others red BY NAME.
+// RUNTIME (added at the v4910 ship): the first versions of this gate took 24 to 48 s, over the 20 s cap a slower box applies to a gate it has never timed; the rows that do not depend on how long a dive runs now fly 100-second dives through the library's setFlight (the identity, oracle and full-length rows stay at 600 s), and the audits in the report rows fly one kind. All mutants of the whole file were run again after the change: every one red BY NAME except the equivalent ones named above (the last two went 0 red once -- a search that accepts anything in two gates -- and got a mixed-set row each).
 "use strict";
 import fs from "node:fs";
 let fails = 0, finished = false;
@@ -20,7 +22,7 @@ process.on("uncaughtException", died); process.on("unhandledRejection", died);
 process.on("exit", () => { if (!finished) { console.log("  FAIL  !! THE GATE ENDED BEFORE IT FINISHED"); process.exitCode = 1; } });
 const ok = (n, c, d) => { let v; try { v = typeof c === "function" ? c() : c; } catch (e) { v = false; d = "threw: " + e.message; } console.log((v ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!v) fails++; };
 const sec = (t) => console.log("\n" + t);
-const J = JSON.stringify;
+const J = JSON.stringify, SHORT = 100;
 import * as T from "../../brain/needsTask.mjs";
 import * as S from "../../brain/stationResidual.mjs";
 import * as X from "./stationRound.mjs";
@@ -59,30 +61,34 @@ sec("3. ORACLE");
     const set = [T.scenario(271, "far"), T.scenario(272, "far")], os = X.oracleRuns(R8, set);
     ok("!! oracleRuns is the per-dive oracle: runs in set order, the mean score, crushed and stranded counted", os.runs.length === 2 && Math.abs(os.score - (os.runs[0].score + os.runs[1].score) / 2) < 1e-12 && os.runs[0].score === o.score && os.crashed === 0 && os.stranded === 0 && os.runs.every((r) => r.fingerprint));
 }
+X.setFlight({ seconds: SHORT });   // the SEARCH and CHAMPION rows do not depend on how long a dive runs; the control row below needs full dives and resets it
 sec("4. SEARCH");
 {
     const r = { ...X.RECIPE, iters: 4, checkpointEvery: 2 }, a = X.search(7, R8, r, gainDive), b = X.search(7, R8, r, gainDive);
     ok("!! a search is deterministic, checkpoint 0 is the zero weights, checkpoints every 2nd, trace has iters + 1 entries", J(Array.from(a.best)) === J(Array.from(b.best)) && J(a.trace) === J(b.trace) && J(a.checkpoints.map((x) => x.iter)) === J([0, 2, 4]) && J(Array.from(a.checkpoints[0].weights)) === J(Array.from(S.startWeights())) && a.trace.length === 5);
     const hard = X.search(11, R8, { ...X.RECIPE, sigma: 5, maxK: 20, iters: 6, checkpointEvery: 6 }, gainDive);
     ok("!! with a violent sigma the held score never falls", hard.trace.every((x, i) => i === 0 || x >= hard.trace[i - 1]) && hard.bestScore >= hard.trace[0] && hard.trace.length === 7);
-    const mixed = [T.scenario(281, "far"), T.scenario(273, "both"), T.scenario(272, "far"), T.scenario(275, "both")], wild = X.search(15, R8, { ...X.RECIPE, sigma: 5, maxK: 20, iters: 8, checkpointEvery: 8 }, mixed);
-    ok("!! on a set where changes help and hurt, the held score is the running maximum (never lower than an earlier one), equals the best weights' own score, and ends above the start", wild.trace.every((x, i) => x >= Math.max(...wild.trace.slice(0, i + 1)) - 1e-12) && Math.abs(T.evaluate(T.flyDecision(S.stationSeat(R8, { w: wild.best })), mixed, { gauge: T.GAUGE }).score - wild.trace[wild.trace.length - 1]) < 1e-12 && wild.trace[8] > wild.trace[0], wild.trace.map((x) => x.toFixed(3)).join(" "));
+    const mixed = [T.scenario(281, "far"), T.scenario(273, "both"), T.scenario(272, "far"), T.scenario(275, "both")], wild = X.search(16, R8, { ...X.RECIPE, sigma: 5, maxK: 20, iters: 8, checkpointEvery: 8 }, mixed);
+    ok("!! on a set where changes help and hurt, the held score is the running maximum (never lower than an earlier one), equals the best weights' own score, and ends above the start", wild.trace.every((x, i) => x >= Math.max(...wild.trace.slice(0, i + 1)) - 1e-12) && Math.abs(T.evaluate(T.flyDecision(S.stationSeat(R8, { w: wild.best })), mixed, { gauge: T.GAUGE, seconds: SHORT }).score - wild.trace[wild.trace.length - 1]) < 1e-12 && wild.trace[8] > wild.trace[0], wild.trace.map((x) => x.toFixed(3)).join(" "));
     const drift = X.search(12, R8, { ...X.RECIPE, iters: 24, checkpointEvery: 24 }, flat), moved = Array.from(drift.best).filter((x, i) => x !== S.startWeights()[i]).length;
     ok("!! children come from the CURRENT best: on a flat objective (every child accepted) more than maxK weights have moved after 24 iterations", moved > X.RECIPE.maxK, "moved " + moved);
 }
 sec("5. CHAMPION AND CONTROL");
 {
-    const val = [T.scenario(271, "far"), T.scenario(273, "both")], sc = (w) => T.evaluate(T.flyDecision(S.stationSeat(R8, { w })), val, { gauge: T.GAUGE }).score;
+    const val = [T.scenario(271, "far"), T.scenario(273, "both")], sc = (w) => T.evaluate(T.flyDecision(S.stationSeat(R8, { w })), val, { gauge: T.GAUGE, seconds: SHORT }).score;
     const start = S.startWeights(), other = Float64Array.from(start); for (let i = S.OUT_START; i < S.N_WEIGHTS; i++) other[i] = 0.9 * Math.sin(3 + i);
     const ch = X.champion([{ seed: 1, checkpoints: [{ iter: 0, weights: start }, { iter: 30, weights: Array.from(other), trainScore: 9 }] }], R8, val);
     ok("!! the start stands unless a checkpoint beats it on VALIDATION, whatever its train score", sc(other) > sc(start) ? ch.iter === 30 && ch.validation === sc(other) : ch.from === "start" && ch.iter === 0, J([sc(start), sc(other)]));
     const tie = X.champion([{ seed: 1, checkpoints: [{ iter: 30, weights: Array.from(start), trainScore: 9 }] }], R8, val);
     ok("!! a checkpoint that only TIES the start does not displace it; the start's validation score is reported", tie.from === "start" && tie.iter === 0 && tie.startValidation === sc(start));
+    X.setFlight({});
     const g281 = [T.scenario(281, "far")], tl = X.tuneLinear(R8, g281, [{ a: 0, b: 0 }, { a: 0, b: 1 }, { a: 1, b: 0 }, { a: -1, b: 0 }]);
     ok("!! the preference control picks the best entry (a = 1 and a = -1 both reach 0.85 on far 281, the others 0.70), ties to the EARLIER one, and a = 0 b = 0 is nearest-first (0.70)", tl.validation > 0.84 && J(tl.lin) === J({ a: 1, b: 0 }) && tl.curve[0].score < 0.71 && tl.curve[3].score > 0.84);
+    X.setFlight({ seconds: SHORT });
     const lt = X.tuneLinear(R8, val, [{ a: 0, b: 0 }, { a: 1, b: -1 }, { a: -1, b: 1 }]), scs = lt.curve.map((c) => c.score);
     ok("!! the preference control takes the best validation mean on the grid it was given (ties to the earlier entry) and lists the whole curve", lt.curve.length === 3 && lt.validation === Math.max(...scs) && J(lt.lin) === J({ a: lt.curve[scs.indexOf(Math.max(...scs))].a, b: lt.curve[scs.indexOf(Math.max(...scs))].b }) && lt.curve[0].score === sc(start));
 }
+{ const v = X.switchesOf({ r8: R8, weights: Array.from(S.startWeights()) }, [T.scenario(272, "far")]); ok("!! switchesOf: the mean station switches per dive of the champion, a non-negative whole number on one dive (the zero start only ever changes to the nearest)", Number.isInteger(v) && v >= 0, "switches " + v); }
 sec("6. VERDICTS");
 {
     ok("!! HURTS iff it loses to the tuned rule", X.bottomLine("LOSES", "BEATS", "BEATS") === "HURTS" && X.bottomLine("LOSES", "TIES", "TIES") === "HURTS");

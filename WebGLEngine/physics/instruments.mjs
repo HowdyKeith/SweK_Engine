@@ -2604,6 +2604,23 @@ export const INSTRUMENTS = [
       measures: "RUNG 4b: THE TRAINER AND THE VERDICTS, AS REGISTERED IN brain/FISH_VESTIBULAR_HELPER_WIP.md (Addenda 1, 2, 5 and 7, all written before any training): it trains the pilots of brain/pilotSubVestibular.mjs on the two tasks of tools/subVestibularTasks.mjs and grades each (task, arm) cell by rung 3's rule; addenda 9 to 13 add the reported, not judged, lower-lambda, replicate, wiring and escape studies on their own fresh audits. (lifted from the module's own header)",
       key: "Rung 3's rule: F beats a control family on an audit iff mean(F) - mean(family) > max(0.02, 2 sd of the family); a verdict cell PASSES iff cx beats ER, class-block and degree controls on all three audits. (lifted from the module's own header)",
       gate: "tools/ship/trainSubVestibular-selfcheck.mjs" },
+    // v4910 -- the four modules written to be read as well as checked that this round added (the registry gate found them by their reportLines()).
+    { id: "brain-capability-map", page: "instrument-bench.html", name: "WHICH BRAIN CAN DO WHAT AT EACH LEVEL (docs/BRAIN-CAPABILITY-MAP.md)", area: "brain",
+      measures: "A table of 15 tasks (submarine, sky, space, other) by brain kind (hand/PD, fly circuit, GPU Brain, fish circuits, language model), every cell one of a closed vocabulary of statuses (TRAINED, HAND_WIRED, NO_CHAMPION, TUNED, SCRIPTED, NO_EFFECT, NOT_CONCLUDED, EXISTS_UNREAD, NOT_BUILT, NOT_APPLICABLE), each result cell with a source file and a quote the gate finds in that file or in the cited changelog entry; docs/BRAIN-CAPABILITY-MAP.md is rendered from the data and held equal to it.",
+      key: "A claim without a source, a result without a quote the gate can find, or a NOT_BUILT cell that cites one, fails the gate; 36 mutants of the validator and the document check are red by name.",
+      gate: "brain/capabilityMap-selfcheck.mjs" },
+    { id: "sub-models-core", page: "sub-aquarium.html", name: "SUBMARINE .GLB MODEL SWAP: THE STORE AND THE FITTING (pure)", area: "brain",
+      measures: "The pure half of putting a free .glb submarine on a hull in the Sub Aquarium: a store that refuses a model without a licence, the model's own up axis and yaw to the hull's +Y, the scale and centering that fit it to the hull, where the cues (tower, planes, rudder) go, the triangle budget, the attribution line and the depth tint.",
+      key: "All twelve (up, yaw) combinations take the model's up axis to the hull's +Y as rotations of determinant +1; a model with no licence is refused; 70 mutants red by name.",
+      gate: "render/subModelsCore-selfcheck.mjs" },
+    { id: "sub-models-3d", page: "sub-aquarium.html", name: "SUBMARINE .GLB MODEL SWAP: THE THREE.JS HOST", area: "brain",
+      measures: "The three.js half: the model as a child of the procedural boat with its five parts hidden, per-boat cloned and depth-tinted materials, a cache per URL that does not keep failed loads and drops stale ones, loaded through gpu/gltfDraco so Draco-compressed models work.",
+      key: "52 mutants red by name, including a browser section run in the engine origin.",
+      gate: "render/subModels3d-selfcheck.mjs" },
+    { id: "sub-models-panel", page: "sub-aquarium.html", name: "SUBMARINE .GLB MODEL SWAP: THE PICKER", area: "brain",
+      measures: "The picker on sub-aquarium.html (one call, mountSubModelPicker): choose a .glb from GPU_Assets/subs per hull with its licence and attribution, with the asset list fetched lazily on first focus.",
+      key: "The gate drives the form in a browser; 52 mutants red by name.",
+      gate: "render/subModelsPanel-selfcheck.mjs" },
 ];
 
 export const AREAS = [...new Set(INSTRUMENTS.map((i) => i.area))];

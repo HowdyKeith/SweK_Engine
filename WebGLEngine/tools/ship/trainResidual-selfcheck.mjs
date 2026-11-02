@@ -10,6 +10,8 @@
 //   5 VERDICTS  the margin rule max(0.02, 2 se); BEATS / LOSES / TIES need all three audits; the bottom line: HURTS iff it loses to its start, IMPROVES iff it beats its start AND its shuffled control, else NO GAIN.
 //   6 REPORT    (on small audit ranges) the checks come first, a FAILED check says the verdicts are NOT WEIGHED, and the bottom line is generated from the verdicts.
 // NOT CHECKED, said plainly: that a trained residual scores better (that is the experiment).
+// SABOTAGE LOG (29 mutants of tools/ship/trainResidual.mjs): 5 went 0 red on the first pass -- a search that accepts anything (the trace row), children made from the start, a champion that takes ties, the start-checkpoint skip (dead code, deleted), the shuffle's hidden bias, the far-and-both reading of the rule-not-trivial check -- and each got a row or was cut. After them every mutant was red BY NAME: recipe, the three set ranges, the audit ranges, strict improvement, margin without se, beats/loses on any, shuffle ignored, hurts eager, shuffle identity, the zero arm taking the champion, the rule advisors swapped, the cap value, the identity check, the not-weighed line.
+// RUNTIME (added at the v4910 ship): the first versions of this gate took 24 to 48 s, over the 20 s cap a slower box applies to a gate it has never timed; the rows that do not depend on how long a dive runs now fly 100-second dives through the library's setFlight (the identity, oracle and full-length rows stay at 600 s), and the audits in the report rows fly one kind. All mutants of the whole file were run again after the change: every one red BY NAME except the equivalent ones named above (the last two went 0 red once -- a search that accepts anything in two gates -- and got a mixed-set row each).
 "use strict";
 import fs from "node:fs";
 let fails = 0, finished = false;
@@ -18,7 +20,7 @@ process.on("uncaughtException", died); process.on("unhandledRejection", died);
 process.on("exit", () => { if (!finished) { console.log("  FAIL  !! THE GATE ENDED BEFORE IT FINISHED"); process.exitCode = 1; } });
 const ok = (n, c, d) => { let v; try { v = typeof c === "function" ? c() : c; } catch (e) { v = false; d = "threw: " + e.message; } console.log((v ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!v) fails++; };
 const sec = (t) => console.log("\n" + t);
-const J = JSON.stringify;
+const J = JSON.stringify, SHORT = 100;
 import * as T from "../../brain/needsTask.mjs";
 import * as R from "../../brain/residualAdvisor.mjs";
 import * as X from "./trainResidual.mjs";
@@ -51,6 +53,7 @@ sec("2. ARMS");
     ok("!! the shuffle moves each hidden unit's BIAS with its row (unit 0's bias lands where its row did)", sb[R.N_W1 + 1] === 0.7 && sb[R.N_W1] !== 0.7);
     ok("!! an unknown arm is refused", (() => { try { X.pilotOf("NOPE"); return false; } catch (e) { return /unknown arm/.test(e.message); } })());
 }
+X.setFlight({ seconds: SHORT });   // the rows from here on do not depend on how long a dive runs: shorter dives keep this gate under the sweep cap on a slower box
 sec("3. SEARCH");
 {
     const r = { ...X.RECIPE, iters: 4, checkpointEvery: 2 }, a = X.search(7, r, cheap), b = X.search(7, r, cheap), c = X.search(8, r, cheap);
@@ -63,6 +66,10 @@ sec("3. SEARCH");
     const hard = X.search(11, { ...X.RECIPE, sigma: 5, maxK: 134, iters: 6, checkpointEvery: 6 }, cheap), drift = X.search(12, { ...X.RECIPE, iters: 20, checkpointEvery: 20 }, cheap);
     ok("!! with a violent sigma (most children hurt) the search still never ends below the start on its train score", hard.bestScore >= sp(R.startWeights(), cheap) && hard.trace.length === 7 && hard.trace.every((x, i) => i === 0 || x >= hard.trace[i - 1]) && sp(hard.best, cheap) >= sp(R.startWeights(), cheap));
     ok("!! children are made from the CURRENT best, not the start: after 20 iterations more than maxK weights have moved", drift.moved > X.RECIPE.maxK, "moved " + drift.moved);
+}
+{
+    const mixed = [T.scenario(281, "far"), T.scenario(273, "both"), T.scenario(272, "far"), T.scenario(275, "both")], wild = X.search(12, { ...X.RECIPE, sigma: 5, maxK: 134, iters: 8, checkpointEvery: 8 }, mixed);
+    ok("!! on a set where changes help and hurt, the held score is the running maximum, equals the best weights' own score, and ends above the start", wild.trace.every((x, i) => x >= Math.max(...wild.trace.slice(0, i + 1)) - 1e-12) && Math.abs(X.scoreOn("RESIDUAL", wild.best, mixed).score - wild.trace[wild.trace.length - 1]) < 1e-12 && wild.trace[8] > wild.trace[0], wild.trace.map((x) => x.toFixed(2)).join(" "));
 }
 sec("4. CHAMPION");
 {
@@ -89,8 +96,8 @@ sec("5. VERDICTS");
 sec("6. REPORT (small audit ranges)");
 {
     const small = { R1: [301, 301], R2: [321, 321], R3: [341, 341] }, w = Float64Array.from(R.startWeights()); w[R.OUT_START + R.N_W2 + 1] = 1;
-    const au = X.audits(w, { ranges: small });
-    ok("!! the audits fly every arm on the three ranges asked for (4 dives each here)", J(Object.keys(au)) === J(["R1", "R2", "R3"]) && Object.values(au).every((a) => J(Object.keys(a)) === J(X.ARMS) && a.ALONE.runs.length === 4) && au.R2.ALONE.runs.every((r, i) => T.setOf(T.KINDS, 321, 321)[i].kind === r.kind));
+    const au = X.audits(w, { ranges: small, kinds: ["far"] });
+    ok("!! the audits fly every arm on the three ranges asked for (1 dive each here)", J(Object.keys(au)) === J(["R1", "R2", "R3"]) && Object.values(au).every((a) => J(Object.keys(a)) === J(X.ARMS) && a.ALONE.runs.length === 1) && au.R2.ALONE.runs.every((r, i) => r.kind === "far"));
     {
         const mk = (scores) => ({ runs: [0, 1, 2].flatMap(() => ["plain", "deep", "far", "both"].map((kind, i) => ({ kind, score: scores[i], fingerprint: "f" }))), score: 0, crashed: 0, stranded: 0 });
         const syn = { ALONE: mk([0.5, 0.5, 0.5, 0.1]), "RULE-GF": mk([0.5, 0.5, 0.5, 0.9]), "RESIDUAL-ZERO": mk([0.5, 0.5, 0.5, 0.9]) };
@@ -106,6 +113,7 @@ sec("6. REPORT (small audit ranges)");
     ok("!! a FAILED check is reported as FAIL, says the verdicts are NOT WEIGHED, and the bottom line says so", LB.some((l) => /FAIL IDENTITY R1/.test(l)) && LB.some((l) => /NOT WEIGHED\./.test(l)) && /NOT WEIGHED/.test(LB[LB.length - 1]) && broken.x === 1);
     ok("!! strongestCap picks the highest of the three caps per audit", X.strongestCap({ "CAP-0.50": { score: 0.1 }, "CAP-0.65": { score: 0.5 }, "CAP-0.75": { score: 0.3 } }) === "CAP-0.65");
 }
+ok("!! SEARCH_BASE is 62000 (the search seeds 62000-62002 of Round 6) and setFlight is the only way a gate shortens a dive", X.SEARCH_BASE === 62000 && typeof X.setFlight === "function");
 sec("7. THE SOURCE");
 {
     const code = fs.readFileSync(new URL("./trainResidual.mjs", import.meta.url), "utf8").split("\n").filter((l) => !/^\s*\/\//.test(l)).join("\n");

@@ -11,6 +11,8 @@
 //   6 REPORT   synthetic audits: the verdict lines compare the right arms, per-audit robustness verdicts are printed for each noise, the bottom line is generated, a failed check says NOT WEIGHED; the checks (identity, rule not trivial on far AND both) are held with fixtures.
 //   7 SOURCE   the audit seeds appear in one place; no clock, random or file.
 // NOT CHECKED, said plainly: that a wider search finds a better rule (that is the experiment).
+// SABOTAGE LOG (36 mutants of tools/ship/tuneWide.mjs and the wide bounds of tunedRule.mjs): 2 went 0 red on the first pass -- alpha stepped linearly instead of by a factor (a row now holds the factor steps from 0.0005: never above 0.003 where a linear step reaches 0.005-0.01), and the robustness noise ignored (a row) -- and after them all 36 were red BY NAME.
+// RUNTIME (added at the v4910 ship): the first versions of this gate took 24 to 48 s, over the 20 s cap a slower box applies to a gate it has never timed; the rows that do not depend on how long a dive runs now fly 100-second dives through the library's setFlight (the identity, oracle and full-length rows stay at 600 s), and the audits in the report rows fly one kind. All mutants of the whole file were run again after the change: every one red BY NAME except the equivalent ones named above (the last two went 0 red once -- a search that accepts anything in two gates -- and got a mixed-set row each).
 "use strict";
 import fs from "node:fs";
 let fails = 0, finished = false;
@@ -19,7 +21,7 @@ process.on("uncaughtException", died); process.on("unhandledRejection", died);
 process.on("exit", () => { if (!finished) { console.log("  FAIL  !! THE GATE ENDED BEFORE IT FINISHED"); process.exitCode = 1; } });
 const ok = (n, c, d) => { let v; try { v = typeof c === "function" ? c() : c; } catch (e) { v = false; d = "threw: " + e.message; } console.log((v ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!v) fails++; };
 const sec = (t) => console.log("\n" + t);
-const J = JSON.stringify;
+const J = JSON.stringify, SHORT = 100;
 import * as T from "../../brain/needsTask.mjs";
 import * as U from "../../brain/tunedRule.mjs";
 import * as C from "./constShift.mjs";
@@ -45,6 +47,7 @@ sec("2. ARMS");
     ok("!! ALONE is GUARDED-OBS; the parametrised arms say what they need; unknown arms are refused", X.scoreOf("ALONE", {}, two).score === T.evaluate(T.GUARDED_OBS, two, { gauge: T.GAUGE }).score && /Round 8 parameters/.test(thr(() => X.pilotOf("TUNED-R8"))) && /needs the parameters/.test(thr(() => X.pilotOf("TUNED-WIDE"))) && /unknown arm/.test(thr(() => X.pilotOf("NOPE"))));
     ok("!! the gauge noise argument reaches the flight", X.scoreOf("RULE-GF", {}, two, { ...T.GAUGE, sd: 0.2 }).runs.map((r) => r.fingerprint).join() !== X.scoreOf("RULE-GF", {}, two, { ...T.GAUGE, sd: 0.05 }).runs.map((r) => r.fingerprint).join());
 }
+X.setFlight({ seconds: SHORT });   // the rows from here on do not depend on how long a dive runs: shorter dives keep this gate under the sweep cap on a slower box
 sec("3. SEARCH");
 {
     const r = { ...X.RECIPE, iters: 4, checkpointEvery: 2 }, a = X.search(7, R8, r, far), b = X.search(7, R8, r, far);
@@ -62,7 +65,7 @@ sec("3. SEARCH");
 }
 sec("4. CHAMPION");
 {
-    const val = [T.scenario(271, "far"), T.scenario(271, "both")], sc = (p) => T.evaluate(X.pilotOf("TUNED-WIDE", { wide: p }), val, { gauge: T.GAUGE }).score, bad = { ...R8, low: 0.15, high: 0.35, cap: 0.6 }, good = { ...R8, alpha: 0.0003, low: 0.5, high: 0.8 };
+    const val = [T.scenario(271, "far"), T.scenario(271, "both")], sc = (p) => T.evaluate(X.pilotOf("TUNED-WIDE", { wide: p }), val, { gauge: T.GAUGE, seconds: SHORT }).score, bad = { ...R8, low: 0.15, high: 0.35, cap: 0.6 }, good = { ...R8, alpha: 0.0003, low: 0.5, high: 0.8 };
     const ch = X.champion([{ seed: 1, checkpoints: [{ iter: 0, params: R8 }, { iter: 30, params: bad }] }], R8, val);
     ok("!! when no checkpoint beats the Round 8 champion on validation it STANDS", sc(bad) <= sc(R8) ? ch.from === "Round 8 champion" && ch.iter === 0 : ch.iter === 30, J([sc(R8), sc(bad)]));
     const ch2 = X.champion([{ seed: 1, checkpoints: [{ iter: 30, params: bad }, { iter: 60, params: good }] }], R8, val);
@@ -100,7 +103,7 @@ sec("6. REPORT (synthetic audits)");
 sec("6b. ROBUSTNESS NOISE");
 {
     const small = { W1: [561, 561], W2: [581, 581], W3: [601, 601] }, opts = { r8: R8, wide: R8 };
-    const at = X.audits(opts, { ranges: small }), rb = X.robustness(opts, { ranges: small, noises: [0.05] }), rb2 = X.robustness(opts, { ranges: small, noises: [0.2] });
+    const at = X.audits(opts, { ranges: small, kinds: ["far"] }), rb = X.robustness(opts, { ranges: small, noises: [0.05], kinds: ["far"] }), rb2 = X.robustness(opts, { ranges: small, noises: [0.2], kinds: ["far"] });
     const f = (res) => res.runs.map((r) => r.fingerprint).join();
     ok("!! the robustness runs fly at THEIR noise: the same arm on the same set differs from the audit's and between the two noises", f(rb["0.05"].W1["RULE-GF"]) !== f(at.W1["RULE-GF"]) && f(rb["0.05"].W1["RULE-GF"]) !== f(rb2["0.2"].W1["RULE-GF"]));
 }

@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "da17be964f86f1965a0f40a7f1b880627d2a785f",
+ "head": "7872ba27d0ab0e1761dd362847caef93e4647110",
  "bodies": {
   "box3d": [
    {
@@ -330,8 +330,8 @@
    },
    {
     "path": "sub-aquarium.html",
-    "bytes": 41530,
-    "sha": "07bbe0da544ae2fd88ae5e6c30e9a01a7fc43d26"
+    "bytes": 42403,
+    "sha": "91fd744f63531e7b3a7f2038ecf665173ed71c64"
    },
    {
     "path": "tools/flyCx.mjs",
@@ -472,7 +472,7 @@
    },
    {
     "path": "tools/ship/orphanSets.mjs",
-    "bytes": 39179,
+    "bytes": 39328,
     "sha": "a987a4714e8969cce831583f07dd85dec5c267b1"
    }
   ],
@@ -606,7 +606,7 @@
    },
    {
     "path": "tools/ship/orphanSets.mjs",
-    "bytes": 39179,
+    "bytes": 39328,
     "sha": "a987a4714e8969cce831583f07dd85dec5c267b1"
    },
    {
@@ -860,8 +860,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 3730388,
-    "sha": "612f9679dc57407f8594c390d2c75a9537c50f3f"
+    "bytes": 3734473,
+    "sha": "6a1b215b78fc033a5933eb26c8c155d3607c3bfc"
    },
    {
     "path": "mpm3d.html",
@@ -912,6 +912,21 @@
     "path": "render/subBallastCues-selfcheck.mjs",
     "bytes": 19999,
     "sha": "2bb69fd1bc7136951dfd1131ce6b6bfe22d80cef"
+   },
+   {
+    "path": "render/subModels3d-selfcheck.mjs",
+    "bytes": 35551,
+    "sha": "558b95e21e6b7e15f196c081cd7d6c0b825db182"
+   },
+   {
+    "path": "render/subModels3d.mjs",
+    "bytes": 11147,
+    "sha": "558b95e21e6b7e15f196c081cd7d6c0b825db182"
+   },
+   {
+    "path": "render/subModelsPanel-selfcheck.mjs",
+    "bytes": 18024,
+    "sha": "91fd744f63531e7b3a7f2038ecf665173ed71c64"
    },
    {
     "path": "render/svgExtrude.js",
@@ -975,8 +990,8 @@
    },
    {
     "path": "sub-aquarium.html",
-    "bytes": 41530,
-    "sha": "07bbe0da544ae2fd88ae5e6c30e9a01a7fc43d26"
+    "bytes": 42403,
+    "sha": "91fd744f63531e7b3a7f2038ecf665173ed71c64"
    },
    {
     "path": "svg-forge.html",
@@ -1030,7 +1045,7 @@
    },
    {
     "path": "tools/ship/orphanSets.mjs",
-    "bytes": 39179,
+    "bytes": 39328,
     "sha": "a987a4714e8969cce831583f07dd85dec5c267b1"
    },
    {
@@ -1504,7 +1519,7 @@
    },
    {
     "path": "tools/ship/orphanSets.mjs",
-    "bytes": 39179,
+    "bytes": 39328,
     "sha": "a987a4714e8969cce831583f07dd85dec5c267b1"
    },
    {
@@ -1563,7 +1578,7 @@
    },
    {
     "path": "tools/ship/orphanSets.mjs",
-    "bytes": 39179,
+    "bytes": 39328,
     "sha": "a987a4714e8969cce831583f07dd85dec5c267b1"
    },
    {

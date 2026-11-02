@@ -11,6 +11,8 @@
 //   6 REPORT     (small ranges) checks first, a failed check says NOT WEIGHED, the bottom line is generated from the verdicts.
 //   7 SOURCE     the audit seeds appear in one place; no clock, no random, no file.
 // NOT CHECKED, said plainly: that a constant matches the residual (that is the experiment).
+// SABOTAGE LOG (29 mutants of tools/ship/constShift.mjs): 5 went 0 red on the first pass (hard kinds, identity always ok, the curve check, the verdict lines comparing the wrong arms twice) and each got a synthetic-audit row (6b); after them all 29 were red BY NAME: grid step and length, the audit ranges, validation, the constant's scale, negatives and the bound allowed, a fixed value, ALONE swapped, unchecked champion or shift, champion or tuned ignored, ties to the larger, the worst picked, winsOf any or none, the reading eager or ignoring the rule, the identity shift.
+// RUNTIME (added at the v4910 ship): the first versions of this gate took 24 to 48 s, over the 20 s cap a slower box applies to a gate it has never timed; the rows that do not depend on how long a dive runs now fly 100-second dives through the library's setFlight (the identity, oracle and full-length rows stay at 600 s), and the audits in the report rows fly one kind. All mutants of the whole file were run again after the change: every one red BY NAME except the equivalent ones named above (the last two went 0 red once -- a search that accepts anything in two gates -- and got a mixed-set row each).
 "use strict";
 import fs from "node:fs";
 let fails = 0, finished = false;
@@ -19,7 +21,7 @@ process.on("uncaughtException", died); process.on("unhandledRejection", died);
 process.on("exit", () => { if (!finished) { console.log("  FAIL  !! THE GATE ENDED BEFORE IT FINISHED"); process.exitCode = 1; } });
 const ok = (n, c, d) => { let v; try { v = typeof c === "function" ? c() : c; } catch (e) { v = false; d = "threw: " + e.message; } console.log((v ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!v) fails++; };
 const sec = (t) => console.log("\n" + t);
-const J = JSON.stringify;
+const J = JSON.stringify, SHORT = 100;
 import * as T from "../../brain/needsTask.mjs";
 import * as R from "../../brain/residualAdvisor.mjs";
 import * as X from "./constShift.mjs";
@@ -56,6 +58,7 @@ sec("3. ARMS");
     const thr = (f) => { try { f(); return null; } catch (e) { return e.message; } };
     ok("!! RESIDUAL needs the champion, CONST-TUNED needs a shift, unknown arms are refused", /champion/.test(thr(() => X.pilotOf("RESIDUAL"))) && /tuned shift/.test(thr(() => X.pilotOf("CONST-TUNED"))) && /unknown arm/.test(thr(() => X.pilotOf("NOPE"))));
 }
+X.setFlight({ seconds: SHORT });   // the rows from here on do not depend on how long a dive runs: shorter dives keep this gate under the sweep cap on a slower box
 sec("4. TUNING");
 {
     const t = X.tune(one, [0, 0.05, 0.1, 0.14]);
@@ -75,8 +78,8 @@ sec("5. VERDICTS");
 sec("6. REPORT (small audit ranges)");
 {
     const small = { S1: [421, 421], S2: [441, 441], S3: [461, 461] }, tuning = { shift: 0.08, curve: X.GRID.map((g) => ({ shift: g, score: 0.5 + g })) };
-    const au = X.audits({ champion: Array.from(X.constWeights(0.1)), tuned: 0.08 }, { ranges: small });
-    ok("!! the audits fly every arm on the three ranges (4 dives each here)", J(Object.keys(au)) === J(["S1", "S2", "S3"]) && Object.values(au).every((a) => J(Object.keys(a)) === J(X.ARMS) && a.ALONE.runs.length === 4));
+    const au = X.audits({ champion: Array.from(X.constWeights(0.1)), tuned: 0.08 }, { ranges: small, kinds: ["far"] });
+    ok("!! the audits fly every arm on the three ranges (1 dive each here)", J(Object.keys(au)) === J(["S1", "S2", "S3"]) && Object.values(au).every((a) => J(Object.keys(a)) === J(X.ARMS) && a.ALONE.runs.length === 1));
     const L = X.report(au, tuning, "champion = test");
     ok("!! the checks come before the means, the identity check passes, and the tuned curve is printed whole", L.findIndex((l) => /IDENTITY/.test(l)) < L.findIndex((l) => /^means/.test(l)) && L.some((l) => /PASS IDENTITY/.test(l)) && L.some((l) => /TUNING CURVE: 0\.00:0\.500 .*0\.14:0\.640/.test(l)));
     ok("!! the report says the shift was chosen BEFORE the audits and ends in a BOTTOM LINE generated from the verdicts", /tuned shift 0\.08 .*BEFORE the audits/.test(L[1]) && /^BOTTOM LINE: (RESIDUAL READS SOMETHING|TUNING EXPLAINS IT|MIXED|NOT WEIGHED)/.test(L[L.length - 1]) && ["CONST-TUNED against RULE-GF", "RESIDUAL against CONST-TUNED", "RESIDUAL against RULE-GF"].every((s) => L.some((l) => l.includes(s))));

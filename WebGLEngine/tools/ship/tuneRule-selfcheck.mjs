@@ -11,6 +11,8 @@
 //   6 REPORT    (small ranges) checks first, a failed check says NOT WEIGHED for both questions, the robustness lines per noise.
 //   7 SOURCE    the audit seeds appear in one place; no clock, random or file.
 // NOT CHECKED, said plainly: that tuned parameters score better, or hold under other noise (that is the experiment).
+// SABOTAGE LOG (27 mutants of tools/ship/tuneRule.mjs): 4 went 0 red on the first pass (the champion taking ties, the robustness noise ignored, hard kinds, the identity check) and each got a row (6c); after them all were red BY NAME: recipe, the three set ranges, the constant, the noises, accept anything, strict improvement, children from the defaults, no clipping, the champion on train, parameters unchecked or ignored, holds-some and breaks-all, the joint reading eager or ignoring the rule, the trivial check, the not-weighed line, the wrong robustness arm, the wrong comparison arms.
+// RUNTIME (added at the v4910 ship): the first versions of this gate took 24 to 48 s, over the 20 s cap a slower box applies to a gate it has never timed; the rows that do not depend on how long a dive runs now fly 100-second dives through the library's setFlight (the identity, oracle and full-length rows stay at 600 s), and the audits in the report rows fly one kind. All mutants of the whole file were run again after the change: every one red BY NAME except the equivalent ones named above (the last two went 0 red once -- a search that accepts anything in two gates -- and got a mixed-set row each).
 "use strict";
 import fs from "node:fs";
 let fails = 0, finished = false;
@@ -19,7 +21,7 @@ process.on("uncaughtException", died); process.on("unhandledRejection", died);
 process.on("exit", () => { if (!finished) { console.log("  FAIL  !! THE GATE ENDED BEFORE IT FINISHED"); process.exitCode = 1; } });
 const ok = (n, c, d) => { let v; try { v = typeof c === "function" ? c() : c; } catch (e) { v = false; d = "threw: " + e.message; } console.log((v ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!v) fails++; };
 const sec = (t) => console.log("\n" + t);
-const J = JSON.stringify;
+const J = JSON.stringify, SHORT = 100;
 import * as T from "../../brain/needsTask.mjs";
 import * as U from "../../brain/tunedRule.mjs";
 import * as C from "./constShift.mjs";
@@ -47,6 +49,7 @@ sec("2. ARMS");
     ok("!! TUNED-RULE needs parameters, RESIDUAL the weights, unknown arms are refused", /parameters/.test(thr(() => X.pilotOf("TUNED-RULE"))) && /champion weights/.test(thr(() => X.pilotOf("RESIDUAL"))) && /unknown arm/.test(thr(() => X.pilotOf("NOPE"))));
     ok("!! the gauge noise argument reaches the flight (sd 0.2 flies a different dive than sd 0.05)", X.scoreOf("RULE-GF", {}, two, { ...T.GAUGE, sd: 0.2 }).runs.map((r) => r.fingerprint).join() !== X.scoreOf("RULE-GF", {}, two, { ...T.GAUGE, sd: 0.05 }).runs.map((r) => r.fingerprint).join());
 }
+X.setFlight({ seconds: SHORT });   // the rows from here on do not depend on how long a dive runs: shorter dives keep this gate under the sweep cap on a slower box
 sec("3. SEARCH");
 {
     const r = { ...X.RECIPE, iters: 4, checkpointEvery: 2 }, a = X.search(7, r, far), b = X.search(7, r, far), c = X.search(8, r, far);
@@ -58,9 +61,13 @@ sec("3. SEARCH");
     ok("!! children are made from the CURRENT best: on a flat objective (every child accepted) 3 or more of 5 parameters have left the defaults after 24 iterations", U.NAMES.filter((k) => flat.best[k] !== U.DEFAULTS[k]).length >= 3, J(flat.best));
     ok("!! every parameter of every child stays inside its bounds", flat.checkpoints.every((cp) => U.NAMES.every((k) => cp.params[k] >= U.BOUNDS[k][0] && cp.params[k] <= U.BOUNDS[k][1])) && hard.best.high >= hard.best.low);
 }
+{
+    const mixed = [T.scenario(281, "far"), T.scenario(273, "both"), T.scenario(272, "far"), T.scenario(275, "both")], wild = X.search(11, { ...X.RECIPE, sigma: 3, maxChange: 5, iters: 8, checkpointEvery: 8 }, mixed);
+    ok("!! on a set where changes help and hurt, the held score is the running maximum, equals the best parameters' own score, and ends above the start", wild.trace.every((x, i) => x >= Math.max(...wild.trace.slice(0, i + 1)) - 1e-12) && Math.abs(X.scoreOf("TUNED-RULE", { params: wild.best }, mixed).score - wild.trace[wild.trace.length - 1]) < 1e-12 && wild.trace[8] > wild.trace[0], wild.trace.map((x) => x.toFixed(2)).join(" "));
+}
 sec("4. CHAMPION");
 {
-    const val = [T.scenario(271, "far"), T.scenario(271, "both")], sc = (p) => T.evaluate(X.pilotOf("TUNED-RULE", { params: p }), val, { gauge: T.GAUGE }).score;
+    const val = [T.scenario(271, "far"), T.scenario(271, "both")], sc = (p) => T.evaluate(X.pilotOf("TUNED-RULE", { params: p }), val, { gauge: T.GAUGE, seconds: SHORT }).score;
     const bad = { low: 0.15, high: 0.35, cap: 0.6 }, good = { low: 0.4, high: 0.7 };
     const ch = X.champion([{ seed: 1, checkpoints: [{ iter: 0, params: U.normalise({}) }, { iter: 30, params: bad }] }], val);
     ok("!! when no checkpoint beats the defaults on validation the DEFAULTS stand", sc(bad) <= sc({}) ? ch.from === "defaults" && ch.iter === 0 && J(ch.params) === J(U.normalise({})) : ch.iter === 30, J([sc({}), sc(bad)]));
@@ -81,8 +88,8 @@ sec("5. VERDICTS");
 sec("6. REPORT (small ranges)");
 {
     const small = { U1: [481, 481], U2: [521, 521], U3: [541, 541] }, opts = { params: { low: 0.4, high: 0.7 }, champion: Array.from(C.constWeights(0.07)) };
-    const au = X.audits(opts, { ranges: small }), rob = X.robustness(opts, { ranges: small, noises: [0.05] }), champ = { from: "search 1", iter: 60, params: U.normalise({ low: 0.4, high: 0.7 }), validation: 0.8, startValidation: 0.7 };
-    ok("!! the audits fly every arm on the three ranges asked for, the robustness every robustness arm at each noise asked for", J(Object.keys(au)) === J(["U1", "U2", "U3"]) && Object.values(au).every((a) => J(Object.keys(a)) === J(X.ARMS) && a.ALONE.runs.length === 4) && J(Object.keys(rob)) === J(["0.05"]) && J(Object.keys(rob["0.05"].U2)) === J(X.ROBUST_ARMS) && rob["0.05"].U3["TUNED-RULE"].runs.length === 4);
+    const au = X.audits(opts, { ranges: small, kinds: ["far"] }), rob = X.robustness(opts, { ranges: small, noises: [0.05], kinds: ["far"] }), champ = { from: "search 1", iter: 60, params: U.normalise({ low: 0.4, high: 0.7 }), validation: 0.8, startValidation: 0.7 };
+    ok("!! the audits fly every arm on the three ranges asked for, the robustness every robustness arm at each noise asked for", J(Object.keys(au)) === J(["U1", "U2", "U3"]) && Object.values(au).every((a) => J(Object.keys(a)) === J(X.ARMS) && a.ALONE.runs.length === 1) && J(Object.keys(rob)) === J(["0.05"]) && J(Object.keys(rob["0.05"].U2)) === J(X.ROBUST_ARMS) && rob["0.05"].U3["TUNED-RULE"].runs.length === 1);
     const L = X.report(au, rob, champ, [{}, {}, {}]);
     ok("!! the champion line names the parameters, the validation scores and says it was chosen before the audits", /champion: search 1 at iteration 60: alpha 0\.00500, low 0\.400, high 0\.700, ramp 6\.00, cap 0\.900; validation 0\.8000 against the defaults' 0\.7000; 3 searches; chosen BEFORE the audits/.test(L[1]));
     ok("!! the checks come first and the identity check passes; the robustness lines are printed per noise", L.findIndex((l) => /PASS IDENTITY/.test(l)) > 0 && L.findIndex((l) => /PASS IDENTITY/.test(l)) < L.findIndex((l) => /^means/.test(l)) && L.some((l) => /^robustness, gauge noise sd 0\.05/.test(l)));
@@ -116,9 +123,10 @@ sec("6c. CHECKS AND TIES");
     const val = [T.scenario(271, "far"), T.scenario(271, "both")], ch = X.champion([{ seed: 1, checkpoints: [{ iter: 30, params: U.normalise({}), trainScore: 0 }] }], val);
     ok("!! a checkpoint that only TIES the defaults on validation does not displace them", ch.from === "defaults" && ch.iter === 0);
     const small = { U1: [481, 481], U2: [521, 521], U3: [541, 541] }, opts = { params: {}, champion: Array.from(C.constWeights(0.07)) };
-    const at = X.audits(opts, { ranges: small }), rb = X.robustness(opts, { ranges: small, noises: [0.05] }), rb2 = X.robustness(opts, { ranges: small, noises: [0.2] });
+    const at = X.audits(opts, { ranges: small, kinds: ["far"] }), rb = X.robustness(opts, { ranges: small, noises: [0.05], kinds: ["far"] }), rb2 = X.robustness(opts, { ranges: small, noises: [0.2], kinds: ["far"] });
     ok("!! the robustness runs fly at THEIR noise: the same arm on the same set differs from the audit's and between the two noises", rb["0.05"].U1["RULE-GF"].runs.map((r) => r.fingerprint).join() !== at.U1["RULE-GF"].runs.map((r) => r.fingerprint).join() && rb["0.05"].U1["RULE-GF"].runs.map((r) => r.fingerprint).join() !== rb2["0.2"].U1["RULE-GF"].runs.map((r) => r.fingerprint).join());
 }
+ok("!! the search seeds start at 63000 (Round 8) and the library offers setFlight for the rows that do not depend on a dive's length", X.SEARCH_BASE === 63000 && typeof X.setFlight === "function");
 sec("7. THE SOURCE");
 {
     const code = fs.readFileSync(new URL("./tuneRule.mjs", import.meta.url), "utf8").split("\n").filter((l) => !/^\s*\/\//.test(l)).join("\n"), re = /\b(?:4[89][0-9]|5[2-5][0-9])\b/g;

@@ -9,6 +9,9 @@ import * as U from "../../brain/tunedRule.mjs";
 import * as S from "../../brain/stationResidual.mjs";
 import { mulberry } from "../../brain/pilotSubPolicy.mjs";
 import { judge, verdictOf } from "./trainResidual.mjs";
+/** Flight options for every flight this library makes (the gate shortens the dives with { seconds } for the rows that do not depend on their length; the real runs never call this). */
+let FLIGHT = {};
+export const setFlight = (o) => { FLIGHT = { ...o }; };
 
 export const HARD = Object.freeze(["far", "both"]);
 export const RECIPE = Object.freeze({ runs: 3, iters: 300, sigma: 0.3, maxK: 4, checkpointEvery: 30 });
@@ -36,14 +39,14 @@ export function pilotOf(arm, { r8 = null, weights = null, lin = null } = {}) {
     if (arm === "CONST-LINEAR") { if (!lin) throw new Error("stationRound.pilotOf: CONST-LINEAR needs its preference {a, b}"); return fly({ lin }); }
     throw new Error(`stationRound.pilotOf: unknown arm ${JSON.stringify(arm)} (${ARMS.join(", ")}; the oracle is oracleRuns)`);
 }
-export const scoreOf = (arm, opts, set) => T.evaluate(pilotOf(arm, opts), set, { gauge: GAUGE });
+export const scoreOf = (arm, opts, set) => T.evaluate(pilotOf(arm, opts), set, { gauge: GAUGE, ...FLIGHT });
 
 const perms = (a) => (a.length <= 1 ? [a] : a.flatMap((x, i) => perms([...a.slice(0, i), ...a.slice(i + 1)]).map((p) => [x, ...p])));
 /** The hindsight oracle for one dive: the tuned rule with its next station taken from a fixed visiting order (the first unvisited feasible one in the order), every order tried, nearest-first's own result included; the best run is kept. */
 export function oracleRun(r8, sc) {
     const base = U.tunedSeat(r8, U.WIDE_BOUNDS), ordered = (order) => (ctx) => { const s = base(ctx); return (st, obs) => { const d = s(st, obs); if (!d.station) return d; const pick = order.map((i) => obs.stations[i]).find((q) => !q.visited && A.feasible(q, obs.r)); return { ...d, station: pick || null }; }; };
-    let best = { kind: sc.kind, ...T.fly(T.flyDecision(base), sc, { gauge: GAUGE }) };
-    for (const p of perms(sc.stations.map((_, i) => i))) { const r = T.fly(T.flyDecision(ordered(p)), sc, { gauge: GAUGE }); if (r.score > best.score) best = { kind: sc.kind, ...r }; }
+    let best = { kind: sc.kind, ...T.fly(T.flyDecision(base), sc, { gauge: GAUGE, ...FLIGHT }) };
+    for (const p of perms(sc.stations.map((_, i) => i))) { const r = T.fly(T.flyDecision(ordered(p)), sc, { gauge: GAUGE, ...FLIGHT }); if (r.score > best.score) best = { kind: sc.kind, ...r }; }
     return best;
 }
 export function oracleRuns(r8, set) { const runs = set.map((sc) => oracleRun(r8, sc)); return { runs, score: runs.reduce((a, x) => a + x.score, 0) / runs.length, crashed: runs.filter((x) => x.crushed).length, stranded: runs.filter((x) => x.stranded).length }; }
@@ -51,7 +54,7 @@ export function oracleRuns(r8, set) { const runs = set.map((sc) => oracleRun(r8,
 const gauss = (rng) => { let s = 0; for (let i = 0; i < 6; i++) s += rng(); return (s - 3) * Math.SQRT2; };
 /** One search from the zero start; returns { seed, best, bestScore, trace, checkpoints: [{ iter, weights, trainScore }] }. */
 export function search(seed, r8, recipe = RECIPE, trainSet = TRAIN) {
-    const rng = mulberry(seed), ev = (w) => T.evaluate(T.flyDecision(S.stationSeat(r8, { w })), trainSet, { gauge: GAUGE }).score;
+    const rng = mulberry(seed), ev = (w) => T.evaluate(T.flyDecision(S.stationSeat(r8, { w })), trainSet, { gauge: GAUGE, ...FLIGHT }).score;
     let best = S.startWeights(), bestScore = ev(best), held = bestScore;
     const trace = [bestScore], checkpoints = [{ iter: 0, weights: Float64Array.from(best), trainScore: bestScore }];
     for (let it = 1; it <= recipe.iters; it++) {
@@ -66,14 +69,14 @@ export function search(seed, r8, recipe = RECIPE, trainSet = TRAIN) {
 }
 /** The champion on VALIDATION: the start stands unless a checkpoint beats it there. */
 export function champion(searches, r8, validation = VALIDATION) {
-    const sc = (w) => T.evaluate(T.flyDecision(S.stationSeat(r8, { w })), validation, { gauge: GAUGE }).score, start = S.startWeights(), startScore = sc(start);
+    const sc = (w) => T.evaluate(T.flyDecision(S.stationSeat(r8, { w })), validation, { gauge: GAUGE, ...FLIGHT }).score, start = S.startWeights(), startScore = sc(start);
     let best = { weights: start, validation: startScore, from: "start", iter: 0 };
     for (const s of searches) for (const c of s.checkpoints) { if (c.iter === 0) continue; const v = sc(Float64Array.from(c.weights)); if (v > best.validation) best = { weights: Float64Array.from(c.weights), validation: v, from: `search ${s.seed}`, iter: c.iter }; }
     return { ...best, startValidation: startScore };
 }
 /** The fixed-preference control: the {a, b} of the grid with the best VALIDATION mean, ties to the earlier grid entry. */
 export function tuneLinear(r8, validation = VALIDATION, grid = LIN_GRID) {
-    const curve = grid.map((lin) => ({ ...lin, score: T.evaluate(T.flyDecision(S.stationSeat(r8, { lin })), validation, { gauge: GAUGE }).score }));
+    const curve = grid.map((lin) => ({ ...lin, score: T.evaluate(T.flyDecision(S.stationSeat(r8, { lin })), validation, { gauge: GAUGE, ...FLIGHT }).score }));
     let best = curve[0]; for (const c of curve) if (c.score > best.score) best = c;
     return { lin: { a: best.a, b: best.b }, validation: best.score, curve };
 }
@@ -86,7 +89,7 @@ export function audits(opts, { ranges = AUDIT_RANGES } = {}) {
 /** Mean station switches per dive of the champion on `set` (reported). */
 export function switchesOf(opts, set) {
     let total = 0;
-    for (const sc of set) { let seat = null; T.fly((ctx) => T.flyDecision((c) => (seat = S.stationSeat(opts.r8, { w: Float64Array.from(opts.weights) })(c)))(ctx), sc, { gauge: GAUGE }); total += seat.stats.switches; }
+    for (const sc of set) { let seat = null; T.fly((ctx) => T.flyDecision((c) => (seat = S.stationSeat(opts.r8, { w: Float64Array.from(opts.weights) })(c)))(ctx), sc, { gauge: GAUGE, ...FLIGHT }); total += seat.stats.switches; }
     return total / set.length;
 }
 export function bottomLine(vsStart, vsShuffled, vsConst) {

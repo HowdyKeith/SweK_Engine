@@ -108,11 +108,11 @@ sec("3. ORIENTATION");
     const ni = new THREE.Group(), geo = new THREE.BoxGeometry(8, 1.2, 1.2).toNonIndexed(); ni.add(new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: 0x336699 })));
     const gi = boat(), ri = M3.applyModel(THREE, gi, ni, entry, {});
     ok("!! a model with no index (36 positions, 12 triangles) is counted from its positions and fitted the same", ri.triangles === 12 && ri.fit.scale === 2 && M3.sceneInfo(THREE, ni).triangles === 12);
-    ok("!! a mesh with an ARRAY of materials gets an array of clones, each depth-tinted and none the template's", () => {
+    ok("!! a mesh with an ARRAY of materials gets an array of clones, each depth-tinted and none the template's", (() => {
         const mm = new THREE.Group(), bg = new THREE.BoxGeometry(8, 1.2, 1.2), ma = new THREE.MeshStandardMaterial({ color: 0xaa3333 }), mb = new THREE.MeshStandardMaterial({ color: 0x33aa33 }); bg.clearGroups(); bg.addGroup(0, 18, 0); bg.addGroup(18, 18, 1); mm.add(new THREE.Mesh(bg, [ma, mb]));
         const gm = boat(); M3.applyModel(THREE, gm, mm, entry, { hue: 0 }); const cloned = matsOf(gm.userData.model.wrap);
         return cloned.length === 2 && !cloned.includes(ma) && !cloned.includes(mb) && cloned.every((x) => x.userData.sea) && gm.userData.model.mats.length === 2;
-    });
+    })());
 }
 
 sec("4. THE HOST");

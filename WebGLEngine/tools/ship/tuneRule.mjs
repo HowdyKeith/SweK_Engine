@@ -10,6 +10,9 @@ import * as U from "../../brain/tunedRule.mjs";
 import { mulberry } from "../../brain/pilotSubPolicy.mjs";
 import { judge, verdictOf } from "./trainResidual.mjs";
 import { constWeights } from "./constShift.mjs";
+/** Flight options for every flight this library makes (the gate shortens the dives with { seconds } for the rows that do not depend on their length; the real runs never call this). */
+let FLIGHT = {};
+export const setFlight = (o) => { FLIGHT = { ...o }; };
 
 export const RECIPE = Object.freeze({ runs: 3, iters: 300, sigma: 0.15, maxChange: 2, checkpointEvery: 30 });
 export const SEARCH_BASE = 63000, CONST_SHIFT = 0.07, NOISES = Object.freeze([0.05, 0.2]);
@@ -27,12 +30,12 @@ export function pilotOf(arm, { params = null, champion = null } = {}) {
     if (arm === "RESIDUAL") { if (!champion) throw new Error("tuneRule.pilotOf: RESIDUAL needs the champion weights"); return vet(R.residualSeat(Float64Array.from(champion))); }
     throw new Error(`tuneRule.pilotOf: unknown arm ${JSON.stringify(arm)} (${ARMS.join(", ")})`);
 }
-export const scoreOf = (arm, opts, set, gauge = T.GAUGE) => T.evaluate(pilotOf(arm, opts), set, { gauge });
+export const scoreOf = (arm, opts, set, gauge = T.GAUGE) => T.evaluate(pilotOf(arm, opts), set, { gauge, ...FLIGHT });
 
 const gauss = (rng) => { let s = 0; for (let i = 0; i < 6; i++) s += rng(); return (s - 3) * Math.SQRT2; };
 /** One search from the defaults; returns { seed, best, bestScore, trace, checkpoints: [{ iter, params, trainScore }] }. */
 export function search(seed, recipe = RECIPE, trainSet = TRAIN) {
-    const rng = mulberry(seed), ev = (p) => T.evaluate(vet(U.tunedSeat(p)), trainSet, { gauge: T.GAUGE }).score;
+    const rng = mulberry(seed), ev = (p) => T.evaluate(vet(U.tunedSeat(p)), trainSet, { gauge: T.GAUGE, ...FLIGHT }).score;
     let best = U.normalise({}), bestScore = ev(best), held = bestScore;
     const trace = [bestScore], checkpoints = [{ iter: 0, params: { ...best }, trainScore: bestScore }];
     for (let it = 1; it <= recipe.iters; it++) {
@@ -47,21 +50,21 @@ export function search(seed, recipe = RECIPE, trainSet = TRAIN) {
 }
 /** The champion: over every checkpoint of every search the best VALIDATION score; the defaults stand unless a checkpoint beats them there. */
 export function champion(searches, validation = VALIDATION) {
-    const sc = (p) => T.evaluate(vet(U.tunedSeat(p)), validation, { gauge: T.GAUGE }).score, start = U.normalise({}), startScore = sc(start);
+    const sc = (p) => T.evaluate(vet(U.tunedSeat(p)), validation, { gauge: T.GAUGE, ...FLIGHT }).score, start = U.normalise({}), startScore = sc(start);
     let best = { params: start, validation: startScore, from: "defaults", iter: 0 };
     for (const s of searches) for (const c of s.checkpoints) { if (c.iter === 0) continue; const v = sc(c.params); if (v > best.validation) best = { params: U.normalise(c.params), validation: v, from: `search ${s.seed}`, iter: c.iter }; }
     return { ...best, startValidation: startScore };
 }
 /** THE AUDITS: every arm once on the three fresh sets at the training noise. */
-export function audits(opts, { ranges = AUDIT_RANGES } = {}) {
+export function audits(opts, { ranges = AUDIT_RANGES, kinds = T.KINDS } = {}) {
     const out = {};
-    for (const n of AUDIT_NAMES) { const set = T.setOf(T.KINDS, ranges[n][0], ranges[n][1]); out[n] = Object.fromEntries(ARMS.map((a) => [a, scoreOf(a, opts, set)])); }
+    for (const n of AUDIT_NAMES) { const set = T.setOf(kinds, ranges[n][0], ranges[n][1]); out[n] = Object.fromEntries(ARMS.map((a) => [a, scoreOf(a, opts, set)])); }
     return out;
 }
 /** ROBUSTNESS: ROBUST_ARMS on the same three sets at each other noise (nothing re-tuned). Returns { [sd]: { U1: { arm: result } } }. */
-export function robustness(opts, { ranges = AUDIT_RANGES, noises = NOISES } = {}) {
+export function robustness(opts, { ranges = AUDIT_RANGES, noises = NOISES, kinds = T.KINDS } = {}) {
     const out = {};
-    for (const sd of noises) { out[sd] = {}; for (const n of AUDIT_NAMES) { const set = T.setOf(T.KINDS, ranges[n][0], ranges[n][1]); out[sd][n] = Object.fromEntries(ROBUST_ARMS.map((a) => [a, scoreOf(a, opts, set, { ...T.GAUGE, sd })])); } }
+    for (const sd of noises) { out[sd] = {}; for (const n of AUDIT_NAMES) { const set = T.setOf(kinds, ranges[n][0], ranges[n][1]); out[sd][n] = Object.fromEntries(ROBUST_ARMS.map((a) => [a, scoreOf(a, opts, set, { ...T.GAUGE, sd })])); } }
     return out;
 }
 /** HOLDS iff the arm beats RULE-GF on all three audits at EVERY noise; BREAKS iff RULE-GF beats it on all three at ANY noise; else PARTLY. `rob` is robustness()'s result. */

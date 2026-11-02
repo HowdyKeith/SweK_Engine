@@ -7,6 +7,9 @@ import * as T from "../../brain/needsTask.mjs";
 import * as A from "../../brain/advisorChip.mjs";
 import * as R from "../../brain/residualAdvisor.mjs";
 import { judge, verdictOf } from "./trainResidual.mjs";
+/** Flight options for every flight this library makes (the gate shortens the dives with { seconds } for the rows that do not depend on their length; the real runs never call this). */
+let FLIGHT = {};
+export const setFlight = (o) => { FLIGHT = { ...o }; };
 
 export const GRID = Object.freeze(Array.from({ length: 15 }, (_, i) => i / 100));   // 0.00 .. 0.14
 export const FIXED = Object.freeze({ "CONST-0.05": 0.05, "CONST-0.10": 0.1, "CONST-0.14": 0.14 });
@@ -30,18 +33,18 @@ export function pilotOf(arm, { champion = null, tuned = null } = {}) {
     if (arm === "CONST-TUNED") { if (tuned === null) throw new Error("constShift.pilotOf: CONST-TUNED needs the tuned shift"); return vet(constWeights(tuned)); }
     throw new Error(`constShift.pilotOf: unknown arm ${JSON.stringify(arm)} (${ARMS.join(", ")})`);
 }
-export const scoreOf = (arm, opts, set) => T.evaluate(pilotOf(arm, opts), set, { gauge: GAUGE });
+export const scoreOf = (arm, opts, set) => T.evaluate(pilotOf(arm, opts), set, { gauge: GAUGE, ...FLIGHT });
 
 /** The tuning: the shift in GRID with the best mean on `validation`, ties to the smaller. Returns { shift, curve: [{ shift, score }] }. */
 export function tune(validation = VALIDATION, grid = GRID) {
-    const curve = grid.map((s) => ({ shift: s, score: T.evaluate(A.advisedPilot(brainSeat, R.residualSeat(constWeights(s)), "VETO"), validation, { gauge: GAUGE }).score }));
+    const curve = grid.map((s) => ({ shift: s, score: T.evaluate(A.advisedPilot(brainSeat, R.residualSeat(constWeights(s)), "VETO"), validation, { gauge: GAUGE, ...FLIGHT }).score }));
     let best = curve[0]; for (const c of curve) if (c.score > best.score) best = c;
     return { shift: best.shift, curve };
 }
 /** THE AUDITS: every arm once on the three sets. */
-export function audits(opts, { ranges = AUDIT_RANGES } = {}) {
+export function audits(opts, { ranges = AUDIT_RANGES, kinds = T.KINDS } = {}) {
     const out = {};
-    for (const n of AUDIT_NAMES) { const set = T.setOf(T.KINDS, ranges[n][0], ranges[n][1]); out[n] = Object.fromEntries(ARMS.map((a) => [a, scoreOf(a, opts, set)])); }
+    for (const n of AUDIT_NAMES) { const set = T.setOf(kinds, ranges[n][0], ranges[n][1]); out[n] = Object.fromEntries(ARMS.map((a) => [a, scoreOf(a, opts, set)])); }
     return out;
 }
 /** RESIDUAL against CONST-TUNED per audit -> "BEATS" (all three), "NONE" (it beats on none), "MIXED" (some). */

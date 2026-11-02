@@ -8,6 +8,9 @@ import * as T from "../../brain/needsTask.mjs";
 import * as A from "../../brain/advisorChip.mjs";
 import * as R from "../../brain/residualAdvisor.mjs";
 import { mulberry } from "../../brain/pilotSubPolicy.mjs";
+/** Flight options for every flight this library makes (the gate shortens the dives with { seconds } for the rows that do not depend on their length; the real runs never call this). */
+let FLIGHT = {};
+export const setFlight = (o) => { FLIGHT = { ...o }; };
 
 export const RECIPE = Object.freeze({ runs: 3, iters: 300, sigma: 0.3, maxK: 4, checkpointEvery: 30 });
 export const SEARCH_BASE = 62000, MARGIN_MIN = 0.02, SD_FACTOR = 2;
@@ -38,7 +41,7 @@ export function shuffled(w) {
     for (let j = 0; j < n; j++) { for (let i = 0; i < R.N_IN; i++) out[perm[j] * R.N_IN + i] = w[j * R.N_IN + i]; out[R.N_W1 + perm[j]] = w[R.N_W1 + j]; }
     return out;
 }
-export const scoreOn = (arm, w, set) => T.evaluate(pilotOf(arm, w), set, { gauge: GAUGE });
+export const scoreOn = (arm, w, set) => T.evaluate(pilotOf(arm, w), set, { gauge: GAUGE, ...FLIGHT });
 
 /** One search from the start weights; returns { seed, best, bestScore, checkpoints: [{ iter, weights, trainScore }], moved }. */
 export function search(seed, recipe = RECIPE, trainSet = TRAIN) {
@@ -80,9 +83,9 @@ export function bottomLine(vsStart, vsShuffled) {
 }
 
 /** THE AUDITS: flies every arm once on the three fresh sets. Only the champion's weights `w` reach them. */
-export function audits(w, { ranges = AUDIT_RANGES } = {}) {
+export function audits(w, { ranges = AUDIT_RANGES, kinds = T.KINDS } = {}) {
     const out = {};
-    for (const name of AUDIT_NAMES) { const set = T.setOf(T.KINDS, ranges[name][0], ranges[name][1]); out[name] = Object.fromEntries(ARMS.map((arm) => [arm, scoreOn(arm, w, set)])); }
+    for (const name of AUDIT_NAMES) { const set = T.setOf(kinds, ranges[name][0], ranges[name][1]); out[name] = Object.fromEntries(ARMS.map((arm) => [arm, scoreOn(arm, w, set)])); }
     return out;
 }
 export const strongestCap = (au) => Object.keys(CAPS).reduce((b, a) => (au[a].score > au[b].score ? a : b));

@@ -8,6 +8,7 @@
 //   3 THE SEAT    at the defaults the decision equals GUARDED-FILTER's tick for tick on real dives and the dive is bit-identical; each parameter changes the dive: a higher low/high surfaces on more ticks, a lower cap lowers the decision's cap, a different alpha or ramp changes the fingerprint; station, pump and repair are the rule's.
 //   4 PURE        the same parameters on the same dive twice give the same fingerprint; no clock, random or file.
 // NOT CHECKED, said plainly: that tuned values score better (that is the experiment).
+// SABOTAGE LOG (the 18 mutants of brain/tunedRule.mjs of Round 8 and the 7 of Round 9's wide bounds, run with tuneRule-selfcheck and tuneWide-selfcheck): all red BY NAME -- the defaults, every bound, high held at or above low, unknown names, non-finite numbers, the threshold unclamped, no filter, the cap ignored, last call, the threshold offset, pump on the raw gauge, repair anywhere; and the wide bounds (alpha, ramp, low), the default bounds argument, bounds ignored in normalise and in the seat.
 "use strict";
 import fs from "node:fs";
 let fails = 0, finished = false;

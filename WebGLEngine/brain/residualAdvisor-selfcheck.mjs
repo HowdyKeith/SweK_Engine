@@ -8,6 +8,7 @@
 //   3 THE SEAT    at the zero start the decision equals GUARDED-FILTER's, tick for tick, on real dives, and the dives fingerprint the same; a positive shift surfaces earlier, a cut lowers the cap and never raises it; station, pump and repair are the rule's for any weights; the wrong weight length is refused.
 //   4 PURE        the same weights on the same dive twice give the same fingerprint; the file reads no clock, random number or file.
 // NOT CHECKED, said plainly: that a trained residual scores better (that is the experiment).
+// SABOTAGE LOG (17 mutants of brain/residualAdvisor.mjs, run against a copy of this gate and of trainResidual-selfcheck, 4 at a time): 4 went 0 red on the first pass and each led to rows -- the shift bound (0.15 to 0.3), the cut bound (0.4 to 0.8), a hidden bias dropped, the time feature zeroed -- now named rows (bounds, hidden bias, the feature fixture). After them every mutant was red BY NAME: hidden spread zeroed, cut allowed negative, shift unbounded, output bias ignored, output weight index, shift sign, cap raised, no filter, pump on the raw gauge, repair anywhere, last call dropped, hidden size, length unchecked.
 "use strict";
 import fs from "node:fs";
 let fails = 0, finished = false;

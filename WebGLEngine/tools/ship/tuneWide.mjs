@@ -11,6 +11,9 @@ import { mulberry } from "../../brain/pilotSubPolicy.mjs";
 import { judge, verdictOf } from "./trainResidual.mjs";
 import { constWeights } from "./constShift.mjs";
 import { RECIPE, TRAIN, VALIDATION, CONST_SHIFT, NOISES } from "./tuneRule.mjs";
+/** Flight options for every flight this library makes (the gate shortens the dives with { seconds } for the rows that do not depend on their length; the real runs never call this). */
+let FLIGHT = {};
+export const setFlight = (o) => { FLIGHT = { ...o }; };
 
 export { RECIPE, TRAIN, VALIDATION, NOISES };
 export const SEARCH_BASE = 64000, ALPHA_SIGMA = 0.5;
@@ -27,12 +30,12 @@ export function pilotOf(arm, { r8 = null, wide = null } = {}) {
     if (arm === "TUNED-WIDE") { if (!wide) throw new Error("tuneWide.pilotOf: TUNED-WIDE needs the parameters"); return vet(U.tunedSeat(wide, U.WIDE_BOUNDS)); }
     throw new Error(`tuneWide.pilotOf: unknown arm ${JSON.stringify(arm)} (${ARMS.join(", ")})`);
 }
-export const scoreOf = (arm, opts, set, gauge = T.GAUGE) => T.evaluate(pilotOf(arm, opts), set, { gauge });
+export const scoreOf = (arm, opts, set, gauge = T.GAUGE) => T.evaluate(pilotOf(arm, opts), set, { gauge, ...FLIGHT });
 
 const gauss = (rng) => { let s = 0; for (let i = 0; i < 6; i++) s += rng(); return (s - 3) * Math.SQRT2; };
 /** One search from `start` (the Round 8 champion) under the wide bounds; alpha moves multiplicatively (x exp(ALPHA_SIGMA g)), the others by sigma of their range. */
 export function search(seed, start, recipe = RECIPE, trainSet = TRAIN) {
-    const rng = mulberry(seed), ev = (p) => T.evaluate(vet(U.tunedSeat(p, U.WIDE_BOUNDS)), trainSet, { gauge: T.GAUGE }).score;
+    const rng = mulberry(seed), ev = (p) => T.evaluate(vet(U.tunedSeat(p, U.WIDE_BOUNDS)), trainSet, { gauge: T.GAUGE, ...FLIGHT }).score;
     let best = U.normalise(start, U.WIDE_BOUNDS), bestScore = ev(best), held = bestScore;
     const trace = [bestScore], checkpoints = [{ iter: 0, params: { ...best }, trainScore: bestScore }];
     for (let it = 1; it <= recipe.iters; it++) {
@@ -50,19 +53,19 @@ export function search(seed, start, recipe = RECIPE, trainSet = TRAIN) {
 }
 /** The champion on VALIDATION; `start` (the Round 8 champion) stands unless a checkpoint beats it there. */
 export function champion(searches, start, validation = VALIDATION) {
-    const sc = (p) => T.evaluate(vet(U.tunedSeat(p, U.WIDE_BOUNDS)), validation, { gauge: T.GAUGE }).score, s0 = U.normalise(start, U.WIDE_BOUNDS), startScore = sc(s0);
+    const sc = (p) => T.evaluate(vet(U.tunedSeat(p, U.WIDE_BOUNDS)), validation, { gauge: T.GAUGE, ...FLIGHT }).score, s0 = U.normalise(start, U.WIDE_BOUNDS), startScore = sc(s0);
     let best = { params: s0, validation: startScore, from: "Round 8 champion", iter: 0 };
     for (const s of searches) for (const c of s.checkpoints) { if (c.iter === 0) continue; const v = sc(c.params); if (v > best.validation) best = { params: U.normalise(c.params, U.WIDE_BOUNDS), validation: v, from: `search ${s.seed}`, iter: c.iter }; }
     return { ...best, startValidation: startScore };
 }
-export function audits(opts, { ranges = AUDIT_RANGES } = {}) {
+export function audits(opts, { ranges = AUDIT_RANGES, kinds = T.KINDS } = {}) {
     const out = {};
-    for (const n of AUDIT_NAMES) { const set = T.setOf(T.KINDS, ranges[n][0], ranges[n][1]); out[n] = Object.fromEntries(ARMS.map((a) => [a, scoreOf(a, opts, set)])); }
+    for (const n of AUDIT_NAMES) { const set = T.setOf(kinds, ranges[n][0], ranges[n][1]); out[n] = Object.fromEntries(ARMS.map((a) => [a, scoreOf(a, opts, set)])); }
     return out;
 }
-export function robustness(opts, { ranges = AUDIT_RANGES, noises = NOISES } = {}) {
+export function robustness(opts, { ranges = AUDIT_RANGES, noises = NOISES, kinds = T.KINDS } = {}) {
     const out = {};
-    for (const sd of noises) { out[sd] = {}; for (const n of AUDIT_NAMES) { const set = T.setOf(T.KINDS, ranges[n][0], ranges[n][1]); out[sd][n] = Object.fromEntries(ROBUST_ARMS.map((a) => [a, scoreOf(a, opts, set, { ...T.GAUGE, sd })])); } }
+    for (const sd of noises) { out[sd] = {}; for (const n of AUDIT_NAMES) { const set = T.setOf(kinds, ranges[n][0], ranges[n][1]); out[sd][n] = Object.fromEntries(ROBUST_ARMS.map((a) => [a, scoreOf(a, opts, set, { ...T.GAUGE, sd })])); } }
     return out;
 }
 /** The reading of section 4 from the three paired judgements of TUNED-WIDE against TUNED-R8. */
@@ -80,7 +83,7 @@ export function onBounds(params, bounds = U.WIDE_BOUNDS) {
 }
 export function checksOf(au, { r8 = {}, identityParams = r8 } = {}) {
     const rows = [], one = [T.scenario(241, "far"), T.scenario(241, "both")];
-    const a = scoreOf("TUNED-R8", { r8: identityParams }, one), b = T.evaluate(vet(U.tunedSeat(r8)), one, { gauge: T.GAUGE });
+    const a = scoreOf("TUNED-R8", { r8: identityParams }, one), b = T.evaluate(vet(U.tunedSeat(r8)), one, { gauge: T.GAUGE, ...FLIGHT });
     rows.push({ name: "IDENTITY", ok: a.runs.every((r, i) => r.fingerprint === b.runs[i].fingerprint), text: "TUNED-R8 under the wide bounds equals the Round 8 seat (narrow bounds) dive for dive" });
     for (const n of AUDIT_NAMES) {
         const x = au[n], idx = x.ALONE.runs.map((r, i) => (r.kind === "far" || r.kind === "both" ? i : -1)).filter((i) => i >= 0), sub = (res) => ({ runs: idx.map((i) => res.runs[i]) }), j = judge(sub(x["RULE-GF"]), sub(x.ALONE));

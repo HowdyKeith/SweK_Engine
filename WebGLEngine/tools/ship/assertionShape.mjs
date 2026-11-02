@@ -968,8 +968,9 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4905 -- seven more, the survey run, the piece 4 pilot, the rung 4a v4 and v5 libraries and the piece 4 trainer, each defining ok(name, cond, detail) once and naming first: gates 2171 -> 2178, usesOk 2150 -> 2157, definesOk 2142 -> 2149, nameFirst 2040 -> 2047, read off the code's own report.
     // v4906 -- ten more, the advisor chip, its study, the recorded-decision seat, the live adapter, the local-model tool, the browser-gates installer, the language-model audit, the vestibular extraction, pilot and trainer, each defining ok(name, cond, detail) once and naming first: gates 2178 -> 2188, usesOk 2157 -> 2167, definesOk 2149 -> 2159, nameFirst 2047 -> 2057, read off the code's own report.
     // the FSR4 branch's rounds 70-76 merged over v4908 -- three gates main did not have (render/learnedUpscaleTemporal-selfcheck.mjs, render/denoiseLearnedUpscaleGPU-selfcheck.mjs, render/temporalLive-selfcheck.mjs), each ok(n, c, d) or ok(label, cond, detail): gates 2188 -> 2191, usesOk 2167 -> 2170, definesOk 2159 -> 2162, nameFirst 2057 -> 2060, read off the code.
-    gates: 2191, usesOk: 2170, definesOk: 2162, importsOk: 0,
-    distinctDefinitions: 47, nameFirst: 2060, condFirst: 99, unknownSignature: 11,
+    // v4910 -- twelve gates (the sub-model swap's three, the capability map, the Round 6-10 pair each: residualAdvisor, trainResidual, constShift, tunedRule, tuneRule, tuneWide, stationResidual, stationRound), each defining ok(n, c, d) or ok(name, cond, detail) once: gates 2191 -> 2203, usesOk 2170 -> 2182, definesOk 2162 -> 2174, distinctDefinitions 47 -> 49, nameFirst 2060 -> 2064, unknownSignature 11 -> 19, read off the code's own report. ELEVEN rows of render/subModelsCore-selfcheck.mjs and one of subModels3d-selfcheck.mjs had passed ok(name, () => ...) (a function in the condition slot, which the tool reads as always truthy even though that file's ok() invoked it): written as invoked IIFEs now, suspects held at 0.
+    gates: 2203, usesOk: 2182, definesOk: 2174, importsOk: 0,
+    distinctDefinitions: 49, nameFirst: 2064, condFirst: 99, unknownSignature: 19,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

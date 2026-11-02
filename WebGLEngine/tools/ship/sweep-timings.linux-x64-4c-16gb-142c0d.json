@@ -1,7 +1,7 @@
 {
  "host": "linux-x64-4c-16gb-142c0d",
  "note": "THIS BOX'S OWN gate runtimes, written by tools/ship/boxTimings.mjs. The shared sweep-timings.json is host-claimed and a foreign box cannot write it (v4647, and that refusal is right); this is how a box records what IT measured without overwriting another machine's numbers. `kinds` says which quantity each ms is, as in the shared record: `alone` is an uncontended serial reading, `capped` is a FLOOR and not a runtime. Read for COVERAGE -- has this gate ever been timed -- and NOT for the ship-time budget, which still reads the shared file. See task #87. `serialRing` holds the last three alone readings; recordReach's margin row reads it on a box that does not own the shared record, because that row asks what a gate costs HERE and nothing here can refresh another box's ring.",
- "captured": "2026-11-01T19:56:54.573Z",
+ "captured": "2026-11-02T14:36:59.078Z",
  "timings": {
   "render/denoiseDevice-selfcheck.mjs": 5461,
   "render/denoiseTiming-selfcheck.mjs": 8195,
@@ -46,9 +46,21 @@
   "tools/ship/ensureBrowserGates-selfcheck.mjs": 71,
   "tools/ship/localModel-selfcheck.mjs": 59,
   "tools/ship/trainSubVestibular-selfcheck.mjs": 16962,
-  "render/denoiseLearnedUpscaleGPU-selfcheck.mjs": 27179,
-  "render/learnedUpscaleTemporal-selfcheck.mjs": 29738,
-  "render/temporalLive-selfcheck.mjs": 1046
+  "render/denoiseLearnedUpscaleGPU-selfcheck.mjs": 27506,
+  "render/learnedUpscaleTemporal-selfcheck.mjs": 27725,
+  "render/temporalLive-selfcheck.mjs": 1046,
+  "brain/capabilityMap-selfcheck.mjs": 117,
+  "render/subModelsCore-selfcheck.mjs": 50,
+  "render/subModels3d-selfcheck.mjs": 1626,
+  "render/subModelsPanel-selfcheck.mjs": 634,
+  "brain/residualAdvisor-selfcheck.mjs": 1309,
+  "tools/ship/trainResidual-selfcheck.mjs": 10670,
+  "tools/ship/constShift-selfcheck.mjs": 6837,
+  "brain/tunedRule-selfcheck.mjs": 2594,
+  "tools/ship/tuneRule-selfcheck.mjs": 8021,
+  "tools/ship/tuneWide-selfcheck.mjs": 6790,
+  "brain/stationResidual-selfcheck.mjs": 1469,
+  "tools/ship/stationRound-selfcheck.mjs": 9621
  },
  "at": {
   "render/denoiseDevice-selfcheck.mjs": "2026-10-09T21:00:45.655Z",
@@ -94,9 +106,21 @@
   "tools/ship/ensureBrowserGates-selfcheck.mjs": "2026-10-30T23:27:42.089Z",
   "tools/ship/localModel-selfcheck.mjs": "2026-10-30T23:27:42.089Z",
   "tools/ship/trainSubVestibular-selfcheck.mjs": "2026-10-30T23:27:42.089Z",
-  "render/denoiseLearnedUpscaleGPU-selfcheck.mjs": "2026-11-01T19:56:54.573Z",
-  "render/learnedUpscaleTemporal-selfcheck.mjs": "2026-11-01T19:56:54.573Z",
-  "render/temporalLive-selfcheck.mjs": "2026-11-01T19:56:54.573Z"
+  "render/denoiseLearnedUpscaleGPU-selfcheck.mjs": "2026-11-02T14:36:59.078Z",
+  "render/learnedUpscaleTemporal-selfcheck.mjs": "2026-11-02T14:36:59.078Z",
+  "render/temporalLive-selfcheck.mjs": "2026-11-01T19:56:54.573Z",
+  "brain/capabilityMap-selfcheck.mjs": "2026-11-02T13:54:33.438Z",
+  "render/subModelsCore-selfcheck.mjs": "2026-11-02T13:54:33.438Z",
+  "render/subModels3d-selfcheck.mjs": "2026-11-02T13:54:33.438Z",
+  "render/subModelsPanel-selfcheck.mjs": "2026-11-02T13:54:33.438Z",
+  "brain/residualAdvisor-selfcheck.mjs": "2026-11-02T13:54:33.438Z",
+  "tools/ship/trainResidual-selfcheck.mjs": "2026-11-02T13:54:33.438Z",
+  "tools/ship/constShift-selfcheck.mjs": "2026-11-02T13:54:33.438Z",
+  "brain/tunedRule-selfcheck.mjs": "2026-11-02T13:54:33.438Z",
+  "tools/ship/tuneRule-selfcheck.mjs": "2026-11-02T13:54:33.438Z",
+  "tools/ship/tuneWide-selfcheck.mjs": "2026-11-02T13:54:33.438Z",
+  "brain/stationResidual-selfcheck.mjs": "2026-11-02T13:54:33.438Z",
+  "tools/ship/stationRound-selfcheck.mjs": "2026-11-02T13:54:33.438Z"
  },
  "kinds": {
   "render/denoiseDevice-selfcheck.mjs": "alone",
@@ -144,7 +168,19 @@
   "tools/ship/trainSubVestibular-selfcheck.mjs": "alone",
   "render/denoiseLearnedUpscaleGPU-selfcheck.mjs": "alone",
   "render/learnedUpscaleTemporal-selfcheck.mjs": "alone",
-  "render/temporalLive-selfcheck.mjs": "alone"
+  "render/temporalLive-selfcheck.mjs": "alone",
+  "brain/capabilityMap-selfcheck.mjs": "alone",
+  "render/subModelsCore-selfcheck.mjs": "alone",
+  "render/subModels3d-selfcheck.mjs": "alone",
+  "render/subModelsPanel-selfcheck.mjs": "alone",
+  "brain/residualAdvisor-selfcheck.mjs": "alone",
+  "tools/ship/trainResidual-selfcheck.mjs": "alone",
+  "tools/ship/constShift-selfcheck.mjs": "alone",
+  "brain/tunedRule-selfcheck.mjs": "alone",
+  "tools/ship/tuneRule-selfcheck.mjs": "alone",
+  "tools/ship/tuneWide-selfcheck.mjs": "alone",
+  "brain/stationResidual-selfcheck.mjs": "alone",
+  "tools/ship/stationRound-selfcheck.mjs": "alone"
  },
  "codes": {
   "render/denoiseDevice-selfcheck.mjs": 0,
@@ -192,7 +228,19 @@
   "tools/ship/trainSubVestibular-selfcheck.mjs": 0,
   "render/denoiseLearnedUpscaleGPU-selfcheck.mjs": 0,
   "render/learnedUpscaleTemporal-selfcheck.mjs": 0,
-  "render/temporalLive-selfcheck.mjs": 0
+  "render/temporalLive-selfcheck.mjs": 0,
+  "brain/capabilityMap-selfcheck.mjs": 0,
+  "render/subModelsCore-selfcheck.mjs": 0,
+  "render/subModels3d-selfcheck.mjs": 0,
+  "render/subModelsPanel-selfcheck.mjs": 0,
+  "brain/residualAdvisor-selfcheck.mjs": 0,
+  "tools/ship/trainResidual-selfcheck.mjs": 0,
+  "tools/ship/constShift-selfcheck.mjs": 0,
+  "brain/tunedRule-selfcheck.mjs": 0,
+  "tools/ship/tuneRule-selfcheck.mjs": 0,
+  "tools/ship/tuneWide-selfcheck.mjs": 0,
+  "brain/stationResidual-selfcheck.mjs": 0,
+  "tools/ship/stationRound-selfcheck.mjs": 0
  },
  "serialRing": {
   "render/denoiseDevice-selfcheck.mjs": [
@@ -406,19 +454,79 @@
    16962
   ],
   "render/denoiseLearnedUpscaleGPU-selfcheck.mjs": [
-   26145,
-   26674,
-   27179
+   28305,
+   29200,
+   27506
   ],
   "render/learnedUpscaleTemporal-selfcheck.mjs": [
-   29051,
-   29565,
-   29738
+   27012,
+   29002,
+   27725
   ],
   "render/temporalLive-selfcheck.mjs": [
    1018,
    1059,
    1046
+  ],
+  "brain/capabilityMap-selfcheck.mjs": [
+   118,
+   132,
+   117
+  ],
+  "render/subModelsCore-selfcheck.mjs": [
+   42,
+   46,
+   50
+  ],
+  "render/subModels3d-selfcheck.mjs": [
+   1804,
+   1709,
+   1626
+  ],
+  "render/subModelsPanel-selfcheck.mjs": [
+   744,
+   684,
+   634
+  ],
+  "brain/residualAdvisor-selfcheck.mjs": [
+   1706,
+   1282,
+   1309
+  ],
+  "tools/ship/trainResidual-selfcheck.mjs": [
+   10743,
+   10309,
+   10670
+  ],
+  "tools/ship/constShift-selfcheck.mjs": [
+   6860,
+   5534,
+   6837
+  ],
+  "brain/tunedRule-selfcheck.mjs": [
+   2392,
+   2745,
+   2594
+  ],
+  "tools/ship/tuneRule-selfcheck.mjs": [
+   8768,
+   9733,
+   8021
+  ],
+  "tools/ship/tuneWide-selfcheck.mjs": [
+   8007,
+   7363,
+   6790
+  ],
+  "brain/stationResidual-selfcheck.mjs": [
+   1625,
+   1522,
+   1469
+  ],
+  "tools/ship/stationRound-selfcheck.mjs": [
+   9533,
+   9490,
+   9621
   ]
  }
 }

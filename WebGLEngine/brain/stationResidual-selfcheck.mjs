@@ -9,6 +9,7 @@
 //   4 DIVES     nearest-first and the net at its zero start equal the tuned rule dive for dive on real dives; a trained-looking net changes a dive; stats count switches; pump, repair, cap and surfacing are the tuned rule's.
 //   5 PURE      same inputs, same dive; the wrong weight count is refused; no clock, random or file.
 // NOT CHECKED, said plainly: that any learned preference scores better (that is the experiment).
+// SABOTAGE LOG (31 mutants of brain/stationResidual.mjs, run with stationRound-selfcheck): the mutation pass found a REAL DEFECT -- 'current never' went 0 red because the seat compared stations by object identity and the flight loop rebuilds the station objects every tick, so the is-current feature and the switch count were wrong on every real tick; the seat now compares indices and rows hold both. Also 0 red at first and now rows: pump on the raw gauge, repair anywhere, the switch count. All 31 red BY NAME after.
 "use strict";
 import fs from "node:fs";
 let fails = 0, finished = false;
@@ -35,6 +36,7 @@ sec("1. LAYOUT");
     ok("!! 8 inputs, 8 hidden, 1 output, 8*8+8+8+1 = 81 weights, SCALE 100 m", S.N_IN === 8 && S.N_HID === 8 && S.N_WEIGHTS === 81 && w.length === 81 && S.SCALE === 100);
     ok("!! the output weights and bias (indices 72-80) start EXACTLY zero and the hidden layer does not", S.OUT_START === 72 && Array.from(w.slice(S.OUT_START)).every((x) => x === 0) && Array.from(w.slice(0, S.OUT_START - S.N_B1)).some((x) => x !== 0));
 }
+ok("!! N_W1 is 64 (8 hidden x 8 inputs) and the hidden biases follow it, then the output weights at OUT_START", S.N_W1 === 64 && S.N_B1 === 8 && S.OUT_START === S.N_W1 + S.N_B1 && S.N_W2 === 8 && S.N_B2 === 1);
 sec("2. FEATURES");
 {
     const A = { x: 60, y: 80, depth: 20 }, B = { x: 200, y: 0, depth: 50 }, open = [A, B];
