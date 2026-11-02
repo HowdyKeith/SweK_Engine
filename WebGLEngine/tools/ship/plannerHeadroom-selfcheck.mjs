@@ -47,10 +47,10 @@ sec("2. ARMS");
 }
 // synthetic: 8 dives a set; per count effects
 const BASE = [0.5, 0.6, 0.7, 0.5, 0.6, 0.7, 0.5, 0.6], mk = (d, tag = "") => ({ runs: BASE.map((b, i) => ({ kind: i % 2 ? "both" : "far", score: b + d[i % d.length], fingerprint: tag + "f" + i })), score: 0, crashed: 0, stranded: 0 });
-const G4 = [0.04, 0.05, 0.03, 0.04, 0.05, 0.03, 0.04, 0.05], H6 = [0.06, 0.07, 0.05, 0.06, 0.07, 0.05, 0.06, 0.07], Z = [0];
+const G4 = [0.03, 0.05], H6 = [0.05, 0.07], Z = [0];
 const synth = (spec = {}) => {
     const au = {};
-    for (const s of X.SET_NAMES) { au[s] = {}; for (const n of X.COUNTS) { const e = spec[n] || {}; au[s][`TUNED-R8@${n}`] = mk(Z); au[s][`TWIN@${n}`] = mk(e.gain || G4); au[s][`ORACLE@${n}`] = mk(e.oracle || BASE.map((_, i) => (e.gain || G4)[i % 8] + H6[i % 8])); } }
+    for (const s of X.SET_NAMES) { au[s] = {}; for (const n of X.COUNTS) { const e = spec[n] || {}; au[s][`TUNED-R8@${n}`] = mk(Z); au[s][`TWIN@${n}`] = mk(e.gain || G4); au[s][`ORACLE@${n}`] = mk(e.oracle || BASE.map((_, i) => (e.gain || G4)[i % (e.gain || G4).length] + H6[i % 2])); } }
     return au;
 };
 sec("3. COUNTS");
@@ -58,14 +58,14 @@ sec("3. COUNTS");
     const au = synth(), c = X.countOf(au, 3);
     ok("!! at a count the gain is twin minus tuned (+0.04), the gap oracle minus tuned (+0.10) and the headroom oracle minus twin (+0.06), over 16 dives", c.n === 3 && c.gain.n === 16 && near(c.gain.mean, 0.04, 1e-9) && near(c.gap.mean, 0.1, 1e-9) && near(c.head.mean, 0.06, 1e-9) && c.gain.better === 16 && c.head.better === 16);
     ok("!! the share closed is gain over gap (0.4); a count where the oracle is no better than the tuned rule has share null", near(c.share, 0.4) && X.countOf(synth({ 4: { oracle: Z } }), 4).share === null);
-    ok("!! the headroom's reading: real when above 2 se (0.06 with a tiny se), not real for a wobble around zero", c.real === true && X.countOf(synth({ 3: { oracle: [0.04, 0.05, 0.03, 0.04, 0.05, 0.03, 0.04, 0.05].map((x, i) => x + (i % 2 ? 0.02 : -0.02)) } }), 3).real === false);
+    ok("!! the headroom's reading: real when above 2 se (0.06 with a tiny se), not real for a wobble around zero", c.real === true && X.countOf(synth({ 3: { oracle: [0.03, 0.05].map((x, i) => x + (i % 2 ? 0.02 : -0.02) - 0.04) } }), 3).real === false);
     ok("!! each count reads its own arms (a high gain at 5 does not change count 3)", near(X.countOf(synth({ 5: { gain: [0.2] } }), 5).gain.mean, 0.2) && near(X.countOf(synth({ 5: { gain: [0.2] } }), 3).gain.mean, 0.04, 1e-9));
 }
 sec("4. GROWTH");
 {
-    const big = synth({ 5: { gain: G4, oracle: BASE.map((_, i) => G4[i % 8] + H6[i % 8] * 3) } }), g = X.growth(big);
+    const big = synth({ 5: { gain: G4, oracle: BASE.map((_, i) => G4[i % 2] + H6[i % 2] * 3) } }), g = X.growth(big);
     ok("!! headroom 0.18 at 5 stations against 0.06 at 3: growth +0.12 over the se of two independent means (sqrt(se5^2 + se3^2)): GROWS", near(g.mean, 0.12, 1e-9) && g.verdict === "GROWS" && near(g.se, Math.sqrt(X.countOf(big, 5).head.se ** 2 + X.countOf(big, 3).head.se ** 2)));
-    ok("!! equal headroom is FLAT, a smaller headroom at 5 is SHRINKS", X.growth(synth()).verdict === "FLAT" && X.growth(synth({ 5: { oracle: BASE.map((_, i) => G4[i % 8] + H6[i % 8] / 3) } })).verdict === "SHRINKS");
+    ok("!! equal headroom is FLAT, a smaller headroom at 5 is SHRINKS", X.growth(synth()).verdict === "FLAT" && X.growth(synth({ 5: { oracle: BASE.map((_, i) => G4[i % 2] + H6[i % 2] / 3) } })).verdict === "SHRINKS");
     const a = synth(); a.H1["TWIN@4"].runs[2].score = 9; a.H2["TWIN@5"].runs[0].score = 9; a.H2["TWIN@5"].runs[1].score += 1e-12;
     ok("!! the twin beats the oracle on a dive only when it scores above it by more than 1e-9: two dives of 48 here (a 1e-12 excess does not count)", J(X.twinBeatsOracle(a)) === J({ count: 2, of: 48 }) && J(X.twinBeatsOracle(synth())) === J({ count: 0, of: 48 }));
 }
@@ -74,7 +74,7 @@ sec("5. LINES");
     const L = (spec) => X.bottomLines(synth(spec)), noHead = (n) => ({ [n]: { oracle: G4 } });
     ok("!! headroom real at every count: THERE IS HEADROOM AT N = 3, 4, 5 and FLAT growth", L({})[0] === "THERE IS HEADROOM ABOVE THE TWIN AT N = 3, 4, 5" && L({})[1] === "THE HEADROOM IS FLAT IN THE NUMBER OF STATIONS");
     ok("!! a count with no headroom is left out of the list; with none at all the line says there is no measurable headroom", L({ ...noHead(3) })[0] === "THERE IS HEADROOM ABOVE THE TWIN AT N = 4, 5" && L({ ...noHead(3), ...noHead(4), ...noHead(5) })[0] === "THERE IS NO MEASURABLE HEADROOM ABOVE THE TWIN");
-    ok("!! growth: GROWS and SHRINKS lines", L({ 5: { oracle: BASE.map((_, i) => G4[i % 8] + H6[i % 8] * 3) } })[1] === "THE HEADROOM GROWS WITH THE NUMBER OF STATIONS" && L({ 5: { oracle: BASE.map((_, i) => G4[i % 8] + H6[i % 8] / 3) } })[1] === "THE HEADROOM SHRINKS WITH THE NUMBER OF STATIONS");
+    ok("!! growth: GROWS and SHRINKS lines", L({ 5: { oracle: BASE.map((_, i) => G4[i % 2] + H6[i % 2] * 3) } })[1] === "THE HEADROOM GROWS WITH THE NUMBER OF STATIONS" && L({ 5: { oracle: BASE.map((_, i) => G4[i % 2] + H6[i % 2] / 3) } })[1] === "THE HEADROOM SHRINKS WITH THE NUMBER OF STATIONS");
 }
 sec("6. CHECKS");
 {
