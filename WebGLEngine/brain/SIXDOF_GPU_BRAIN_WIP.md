@@ -304,3 +304,88 @@ Keith: "put the pilot on the page". The verdict above said to ask first, and he 
 **Measured since (2026-11-02, `brain/SIXDOF_PAGE_FIGHT_WIP.md`, its own registered round):** in the page's own fight, the
 GPU Brain's pilot ties the PD autopilot (it lost 107 and won 92 of 200, no difference shown) and loses to the fruit fly's
 Default, W76 against 123. The close-quarters pilot ranks first there.
+
+## Round 2: the GPU Brain's league round against the fruit fly's Default -- registered before any code (2026-11-02)
+
+Keith chose it ("Do 1, then 2").
+
+> **Started from the GPU Brain's champion (0ffd8554) and trained by the recipe that made the fruit fly's League pilot --
+> but against a league of the fruit fly's Default and the PD autopilot -- does the MLP learn to beat the Default?**
+
+**Why it is a question.**
+- The champion lost 70 of 80 to the Default in the duel (this note's H2, seeds 6201-6240).
+- The fruit fly's League pilot was made from the Default by this recipe, against a league of itself and the autopilot.
+  It beat the Default W20/L4/D56 on its audit.
+- Round 1 (`brain/SIXDOF_PAGE_FIGHT_WIP.md`) found that the duel's results barely carry to the page's own fight. This
+  round asks a duel question, as chosen. Its champion's record on the page would be a check of its own.
+
+**The trainee and the league.**
+- **The network** is `brain/pilot6dofMlp.mjs`, unchanged. **The start** is `brain/pilot6dofMlpWeightsDefault.json`
+  (0ffd8554), imported the way the page imports it.
+- **The league** is the PD autopilot and the fruit fly's Default (215e26d9), every seed from both sides
+  (`pilot6dofPolicy.evaluate()` with an opponent array). In the fly's league the second opponent was the pilot being
+  trained from; here it is the pilot to beat.
+- **Each search is pruned toward the start**, as the fly's league prunes toward its own start, so what is kept is the
+  start's delta.
+
+**The recipe: `tools/ship/train6dofLeague.mjs`'s `RECIPE`, with only the search seeds changed.**
+- 4 searches of 800 iterations of the sparse (1+1)-ES: 1 to 4 weights a child, sigma 0.3.
+- **48 train seeds:** the fly league's own `LEAGUE_TRAIN_SEEDS` (201-248).
+- **Search seeds 7100-7103.** The fly's were 4000-4003, and the GPU round's 7000-7004.
+- **The champion is picked on the league score** over the fly league's 24 held-out seeds (301-324), and on nothing
+  else.
+- **The standoff start, no collisions:** the profile the fly's League pilot was trained in.
+
+**The audit is fresh: duel seeds 6301-6340** (40), read once. No 6-DOF tool or gate has flown them. On them:
+- the champion against the Default, from both sides (80 games);
+- the Default against its own mirror, on the same games;
+- the start against the Default, on the same games (H2's baseline).
+
+**The check against the PD autopilot** uses the first round's audit seeds, 6101-6120, from both sides. They are spent
+there, and are used here as a check (no regression), not as a test.
+
+**H1, the champion beats the Default.** It qualifies by the fruit fly's league rule, `train6dofLeague.qualifies()`
+word for word, with the Default as the pilot to beat:
+- it leads the Default by at least 8 (`LEAD_FLOOR`) over the 80 audit games, and its audit score against the Default is
+  above the Default's own score against itself on the same games;
+- it leads the Default on the held-out seeds: more wins than losses over the 48 games;
+- it has not regressed against the PD autopilot: on 6101-6120 from both sides, no more losses than the start, and a
+  score no more than 0.5 below the start's.
+
+If it qualifies, `brain/pilot6dofMlpWeightsLeague.json` is written from the committed file. Offering it on the page is
+asked first.
+
+**H2, the gap narrows** (read whatever H1 says). The champion's audit LEAD against the Default exceeds the start's
+LEAD against the Default on the same 80 games by at least 8.
+
+**Controls.**
+- **C-files:** the start is 0ffd8554 and the Default 215e26d9, both through the page's importers.
+- **C-determinism:** search 7100 is run a second time, in its own process alongside the four, and must give the same
+  weights to the bit.
+
+**Reported, testing nothing:**
+- per search: the train score, improvements and neutral moves, weights moved and kept, and the held-out league score;
+- the champion's audit against the Default and against the PD autopilot (both sides), and its held-out record against
+  the Default;
+- the Default's mirror, and the start's audit against the Default.
+
+**Predictions, fixed now, deciding nothing.**
+- **P1: H1 is not met** (75%). The start lost 70 of 80, and the fly's League pilot closed a smaller gap, from a level
+  start against itself.
+- **P2: H2 is met** (60%): training directly against the Default gains at least 8 games.
+- **P3: the start's audit LEAD against the Default is -50 or worse.** It was -70 on 6201-6240.
+- **P4: the champion keeps 10 to 150 weights different from the start.**
+
+**What was seen first.** Timing only: one league evaluation on scratch seeds 99501-99548 took 1.2 s (192 duels). No
+score was read.
+
+**Cost.** 800 iterations at 1.2 s is 16 minutes a search, and the prune about as much again. Five processes on four
+cores take about 45 minutes.
+
+**To be built.**
+- `tools/ship/train6dofMlpLeague.mjs`, the library.
+- `tools/ship/trainMlp6dofLeague.mjs`, the command. It refuses to overwrite, runs the five searches in five processes,
+  writes `brain/sixdofGpuLeagueResults.json`, and prints only where the file is. `--write-from` writes the weight file
+  only if the champion qualified.
+- `tools/ship/train6dofMlpLeague-selfcheck.mjs`, the gate: the registration as code; the rule at its edges on made-up
+  numbers; a miniature on scratch seeds; and the command held, never executed.
