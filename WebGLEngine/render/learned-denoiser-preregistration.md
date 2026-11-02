@@ -11122,3 +11122,51 @@ round 72's.
 
 **The run, on Keith's rig, at round 77's commit:** `--harvest-upscale-temporal-test --round 77`, its file committed byte for byte
 before it is read. One GPU is enough: it is a CPU harvest. Section 177 reads it.
+
+## 177. ROUND 77's VERDICT -- H77a HOLDS: U_TH KEEPS 4.5 % OVER Bt WHEN THE OBJECTS MOVE, AGAINST 5.7 % STILL; BUT ITS GAIN ON THE MOVERS THEMSELVES IS THE SMALL PART
+
+**The run.** render/denoise-results-upscale-moving-r77.json, run on Keith's rig at round 77's commit 4eb0c2e5 in 10.2 hours, with round
+72's candidate (seed 1, trained at 670c28bd) and the shipped denoiser. 48 sequences, 24 moving and their 24 still twins, none from a cache.
+**Said first: this file was shown to me when it was uploaded, before it was committed (54348d35, byte for byte, sha-256 ba61d6c7...).** The
+order the method asks for, commit then read, did not hold this time. Nothing in it was edited, and the analysis below was written after the
+commit; but the file was not committed unread.
+
+**The verdict, on the moving scenes.** C1, C3, C4 and C5 hold; C2 (round 72's U_TH trained on shuffled targets) is far worse than Bt (mean
+d -3.43), as it should be.
+
+| | mean display relMSE | against U_TH |
+|---|---|---|
+| U_TH | 1.9950e-3 | |
+| Bt | 2.0887e-3 | **H77a SUPPORTED**: 17 of 24, mean d 0.0648, sign-flip p 0.00037 (Holm's 0.025) |
+| B1 | 2.1119e-3 | **H77b SUPPORTED**: 16 of 24, p 0.031 (Holm's 0.05) |
+
+U_TH's mean is **4.49 % below Bt's**, past section 159's 1 %.
+
+**The still twins and the drop.** On the same 24 scenes still, U_TH is 5.71 % below Bt (18 of 24), round 72's 5.44 % within a new set's
+spread. **Motion takes 1.2 points off the gain**: 4.49 against 5.71. It took them on 16 of the 24 scenes and gave some back on the other 8.
+By family: R 5.51 % moving against 5.99 % still, C 4.28 % against 5.65 %. C, the darker interiors, lost more.
+
+**History.** Bt's mean history length fell on every scene, 5.04 still to 4.57 moving, mean over the 24. 56 of the 113 movers moved under
+0.04 a frame (the stale side of the tolerance), 57 over it.
+
+**Where the gain is.** The mover pixels are 24 % of the frame on average, and Bt's error there is 5.8 x its error on the rest.
+- **On the mover pixels** U_TH is 3.60 % below Bt, and better on only 13 of the 24 scenes.
+- **On the rest** it is 9.39 % below Bt, and better on 22 of 24.
+The image's 4.49 % is the two mixed: a large gain where the error is small, a small one where it is large.
+
+**The predictions.**
+- **P1 held:** C1 and C3.
+- **P2 held:** H77a supported at 4.49 %, inside 2-5 % and below the still gain.
+- **P3 held:** H77b supported.
+- **P4 held:** the still gain is 5.71 %, inside 3-8 %.
+- **P5 held:** Bt's history is shorter moving than still on all 24 scenes.
+- **P6 MISSED as to its size, held as to its sign.** I predicted the mover pixels would carry the larger gain, because Bt has restarted
+  there and U_TH's correction has the most to take. They carry the SMALLER one, 3.60 % against 9.39 %, and it is a coin toss scene by
+  scene (13 of 24). Where the history broke, U_TH, which was trained on still scenes, adds little to Bt.
+
+**What it means, as section 176 fixed it.** H77a holds, so U_TH's gain survives moving objects without motion vectors, and the chain with
+U_TH (section 175) stands for scenes that move. What this round adds is where the gain comes from: the image-wide 4.5 % is mostly the
+static surfaces', and on the moving objects themselves -- where Bt is worst -- U_TH's help is small and unreliable. **The next round
+there is the one section 176 named for H77a failing, now aimed at the mover pixels:** U_TH trained on moving sequences (the motion is
+already in temporalExample), or object motion vectors for Bt's history. The first is a training round on the existing code; the second
+changes Bt itself, and the chain on the device with it.

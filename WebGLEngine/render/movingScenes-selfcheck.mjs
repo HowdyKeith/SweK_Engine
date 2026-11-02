@@ -18,6 +18,11 @@
 //   masked grade in linear light, S5 the history times 7, S6 the drop's sign, S7 the moving test without its motion -> 1 red each;
 //   the commands: C1 the test never dispatching runMovingTest, C2 the training refusal gone, C3 round 77 reading its own net -> 1 red
 //   each; D1 the moving seeds left out of the reserved set -> 1 red (denoiseScenes-selfcheck).
+// SECTION 177 (the verdict rows, sabotaged in the committed results file and the registration, each restored byte-identical): V1 the
+//   run's commit typed 4eb0c2e6, V2 H77a's count typed 16, V5 the first moving history typed 5.95, V6 the mover gain typed 0.036, V7
+//   H77b's p typed 0.0405, V8 the slowest mover typed 0.0904, V9 section 177 calling P6 held, V10 it dropping the sentence that the file
+//   was seen before it was committed -> 1 red each; V4 Bt's first still grade typed 9.27e-4 -> 2 red; V3 U_TH's first moving grade
+//   typed 7.79e-4 -> 4 red.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -141,14 +146,49 @@ console.log("\n3. ROUND 77's STUDY CODE");
 
     const cli = fs.readFileSync(path.join(ENG, "tools", "denoiseStudy.mjs"), "utf8");
     ok("  the test command runs runMovingTest for a moving round and runTemporalTest otherwise", /\(RD\.moving \? LT\.runMovingTest : LT\.runTemporalTest\)\(\{ splits: RD\.splits,/.test(cli));
+    const resFile = path.join(ENG, R.results), before = fs.existsSync(resFile) ? fs.readFileSync(resFile, "utf8") : null;   // since section 177 the results are committed
     let code = 0, said = ""; try { said = execFileSync(process.execPath, [path.join(ENG, "tools", "denoiseStudy.mjs"), "--harvest-upscale-temporal-train", "--round", "77"], { cwd: ENG, encoding: "utf8" }); } catch (e) { code = e.status; said = String(e.stdout); }
-    ok("!! the training command refuses round 77 by name, exit 2, and writes nothing", code === 2 && /round 77 is a test only \(section 176\) -- it trains nothing/.test(said) && !fs.existsSync(path.join(ENG, R.results)));
+    ok("!! the training command refuses round 77 by name, exit 2, and writes nothing", code === 2 && /round 77 is a test only \(section 176\) -- it trains nothing/.test(said) && (fs.existsSync(resFile) ? fs.readFileSync(resFile, "utf8") : null) === before);
     const reg = fs.readFileSync(path.join(ENG, "render", "learned-denoiser-preregistration.md"), "utf8"), s176 = reg.slice(reg.indexOf("## 176."));
     ok("  the registration (section 176) states what the code does: 0.01-0.08 a frame, centre + v (f - 7), 77000-77011 and 78000-78011, round 72's net, the results file",
         reg.includes("## 176.") && /0\.01-0\.08 world units a frame/.test(s176) && /centre \+ v \(f - 7\)/.test(s176) && /77000-77011/.test(s176) && /78000-78011/.test(s176) &&
         s176.includes("render/upscale-net-r72.json") && s176.includes(R.results));
 }
 
+console.log("\n4. SECTION 177: ROUND 77's VERDICT, RE-DERIVED FROM ITS COMMITTED FILE");
+{
+    const R = LT.ROUND_UPSCALE_MOVING, r = JSON.parse(fs.readFileSync(path.join(ENG, R.results), "utf8")), H = r.verdict.hypotheses, T = r.tables, St = r.still, sec = r.secondary;
+    const mean = (a) => a.reduce((q, v) => q + v, 0) / a.length, { effects } = await imp("render/denoiseStats.mjs");
+    const sameD = (a, b) => a.length === b.length && a.every((v, i) => Math.abs(v - b[i]) < 1e-15);
+    ok("!! the run is round 77's: its commit 4eb0c2e5 (round 77's setup), round 72's candidate (seed 1, trained at 670c28bd), the shipped denoiser, 24 scenes, 48 sequences rendered and none cached",
+        r.round === 77 && r.commit === "4eb0c2e5" && r.trained.file === R.net && r.trained.candidate === 1 && r.trained.commit === "670c28bd" && r.shipped.file === "render/denoise-net-r11.json" &&
+        T.U.length === 24 && St.U.length === 24 && r.cache.misses === 48 && r.cache.hits === 0 && r.determinism === true);
+    ok("!! *** H77a SUPPORTED: on the moving scenes U_TH beats Bt -- 17 of 24, sign-flip p 0.00037 under Holm's 0.025, C1-C5 held -- its d re-derived from the file's own tables ***",
+        H.H1.status === "supported" && H.H1.k === 17 && H.H1.n === 24 && H.H1.p < H.H1.threshold && H.H1.threshold === 0.025 && Math.abs(H.H1.p - 0.000371) < 1e-6 &&
+        sameD(H.H1.d, effects(T.bt, T.U)) && r.verdict.run === "reported" && r.verdict.controls.C1 && r.verdict.controls.C4 && r.verdict.controls.C5 && r.verdict.controls.C2.ok && H.H1.c3.resolvable,
+        `p ${H.H1.p.toFixed(5)}, ${H.H1.k} of ${H.H1.n}`);
+    ok("  H77b SUPPORTED: against B1, 16 of 24, p 0.031 under 0.05", H.H2.status === "supported" && H.H2.k === 16 && Math.abs(H.H2.p - 0.0305) < 1e-4 && H.H2.p < H.H2.threshold && sameD(H.H2.d, effects(T.b1, T.U)));
+    const gm = 1 - mean(T.U) / mean(T.bt), gs = 1 - mean(St.U) / mean(St.bt);
+    ok("!! *** the gain: 4.49 % below Bt moving, 5.71 % still -- motion takes 1.2 points -- past the 1 % rule, and the file's own figures agree ***",
+        Math.abs(gm - 0.04487) < 5e-5 && Math.abs(gs - 0.05712) < 5e-5 && gm >= R.minGain && Math.abs(sec.gainOverBt - gm) < 1e-15 && Math.abs(sec.stillGainOverBt - gs) < 1e-15 && Math.abs(sec.drop - (gs - gm)) < 1e-15,
+        `${(100 * gm).toFixed(2)} % moving, ${(100 * gs).toFixed(2)} % still`);
+    const fam = (a, k) => (k === "R" ? a.slice(0, 12) : a.slice(12)), g = (u, b) => 1 - mean(u) / mean(b);
+    ok("  ...by family: R 5.51 % moving against 5.99 % still, C 4.28 % against 5.65 % -- C lost more; the drop is positive on 16 of 24 scenes",
+        Math.abs(g(fam(T.U, "R"), fam(T.bt, "R")) - 0.0551) < 5e-5 && Math.abs(g(fam(St.U, "R"), fam(St.bt, "R")) - 0.0599) < 5e-5 && Math.abs(g(fam(T.U, "C"), fam(T.bt, "C")) - 0.0428) < 5e-5 &&
+        Math.abs(g(fam(St.U, "C"), fam(St.bt, "C")) - 0.0565) < 5e-5 && sec.dropByScene.filter((v) => v > 0).length === 16);
+    ok("!! P5 HELD: Bt's history is shorter moving than still on all 24 scenes, 5.04 still to 4.57 moving; 56 of the 113 movers under 0.04 a frame",
+        sec.history.moving.every((v, i) => v < sec.history.still[i]) && Math.abs(mean(sec.history.still) - 5.037) < 1e-3 && Math.abs(mean(sec.history.moving) - 4.566) < 1e-3 &&
+        sec.speeds.flat().length === 113 && sec.speeds.flat().filter((v) => v < 0.04).length === 56 && sec.speeds.flat().every((v) => v >= 0.01 && v <= 0.08));
+    const mv = sec.mover, rs = sec.rest;
+    ok("!! *** P6 MISSED: on the mover pixels U_TH is only 3.60 % below Bt (13 of 24 scenes), on the rest 9.39 % (22 of 24) -- the smaller gain is where Bt's error is 5.8 x larger ***",
+        Math.abs(g(mv.U, mv.bt) - 0.0360) < 5e-5 && Math.abs(mv.gain - g(mv.U, mv.bt)) < 1e-15 && Math.abs(g(rs.U, rs.bt) - 0.0939) < 5e-5 && mv.U.filter((v, i) => v < mv.bt[i]).length === 13 &&
+        rs.U.filter((v, i) => v < rs.bt[i]).length === 22 && g(mv.U, mv.bt) < g(rs.U, rs.bt) && Math.abs(mean(mv.bt) / mean(rs.bt) - 5.84) < 0.005 && Math.abs(mean(mv.share) - 0.2408) < 1e-4,
+        `mover ${(100 * g(mv.U, mv.bt)).toFixed(2)} %, rest ${(100 * g(rs.U, rs.bt)).toFixed(2)} %`);
+    const reg = fs.readFileSync(path.join(ENG, "render", "learned-denoiser-preregistration.md"), "utf8"), s177 = reg.slice(reg.indexOf("## 177."));
+    ok("  section 177 says each of these, and says the file was seen before it was committed",
+        reg.includes("## 177.") && /H77a SUPPORTED/.test(s177) && /4\.49 % below Bt/.test(s177) && /P6 MISSED/.test(s177) && /shown to me when it was uploaded, before it was committed/.test(s177));
+}
+
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +
-    "\nnot closed here: whether U_TH's gain holds on moving scenes. That is round 77's harvest, section 177's.");
+    "\nnot closed here: U_TH trained on moving sequences, or object motion vectors for Bt -- section 177's next round.");
 process.exit(fails ? 1 : 0);

@@ -2555,9 +2555,9 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "fsr4-moving-scenes",
-        blocker: "OPEN",
-        what: "Round 77 (section 176), set up and awaiting its harvest: round 72's U_TH against Bt on 24 new scenes (12 R 77000-77011, 12 C 78000-78011) whose objects move 0.01-0.08 units a frame over the history, the motion running backwards so the measured frame and its two 2048-sample references are the still twin's. H77a (U_TH beats Bt by the 1 % rule on the moving scenes) and H77b (against B1); the still twins, Bt's history length and the mover pixels descriptive. Code: render/movingScenes.mjs, temporalExample's motion, runMovingTest; gate render/movingScenes-selfcheck.mjs.",
-        how: "node tools/denoiseStudy.mjs --harvest-upscale-temporal-test --round 77 on the rig at round 77's commit (a CPU harvest, ~11 hours), render/denoise-results-upscale-moving-r77.json committed byte for byte before it is read; section 177 reads it.",
+        blocker: "CLOSED",
+        what: "CLOSED, SUPPORTED (section 177): H77a HOLDS -- on 24 scenes whose objects move (0.01-0.08 units a frame, no motion vectors) round 72's U_TH is 4.49 % below Bt (17 of 24, sign-flip p 0.00037), against 5.71 % on the same scenes still; H77b holds against B1 (p 0.031). Bt's history is shorter moving on all 24. P6 MISSED: on the mover pixels, where Bt's error is 5.8 x the rest's, U_TH is only 3.60 % below Bt (13 of 24 scenes) against 9.39 % on the rest. The results file was shown before it was committed, said in section 177.",
+        how: "render/denoise-results-upscale-moving-r77.json, re-derived by render/movingScenes-selfcheck.mjs section 4. Next, named in section 177: U_TH trained on moving sequences, or object motion vectors for Bt's history.",
         why: "Every scene rounds 32-76 tested moved only the camera; Bt's history has no object motion vectors, so moving objects are the case its gain was never measured on.",
     },
     {
