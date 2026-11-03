@@ -2862,6 +2862,13 @@ export const NEXT_ROUNDS = [
         why: "The far end of the long sonar is the end the range-aware confirmation thins; a memory is the cheap way to keep it.",
     },
     {
+        id: "nav-sensed-detector-confirm-hold-range",
+        blocker: "OPEN",
+        what: "Follow-up 20 (brain/SENSED_NAV_WIP.md) asks which M-of-N mark to use with the evidence hold in place, the same rule at every range; follow-up 14 compared the range-aware family with a clear of one. Registered as FOLLOW-UP 26 of that note (the name was Keith's; no entry existed, and it is follow-up 20's name with range on the end: follow-up 20's question asked of the range-aware mark). The build waits for the sets of follow-ups 8 to 24: four registry rows, the set HELD31 and a spec are added then.",
+        how: "After the sets of follow-ups 8 to 24 are flown: a mark of one reading within 80 m and a run of 2, a run of 3, 2-of-3, 2-of-4 or 3-of-4 beyond it, each with the evidence hold of cap 30 at every range, against a mark of one everywhere and the same rules at every range, under range-law false returns of mean 0.03 with dropouts of 30 pings, the uniform false rate of 0.01 with the same dropouts, and a clean sea; HELD31 = seeds 3101 to 3160; the registration is in the note.",
+        why: "A strict far rule is cheapest where the false returns are and the vessel has time; whether the hold changes the order of the far rules is not known.",
+    },
+    {
         id: "nav-sensed-detector-range-confirm-hold-confirm",
         blocker: "OPEN",
         what: "Follow-up 17's whole detector (brain/SENSED_NAV_WIP.md: a range-aware mark and a range-gated evidence hold, a run) and follow-up 24's pairing of the gated hold with the confirmed clear leave the combination of follow-up 14's mark with the confirmed clear unflown. Registered as FOLLOW-UP 25 of that note (the name was Keith's; no entry existed, and it is follow-up 19's name with the confirmation of follow-up 24 on the end: follow-up 17 with the clear confirmed). The build waits for the sets of follow-ups 8 to 24: two detectors, a registry row each, their mutants and the set HELD30 are added then.",
