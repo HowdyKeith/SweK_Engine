@@ -2839,10 +2839,8 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "nav-sensed-dropout-cure",
-        blocker: "OPEN",
-        what: "A map that forgets takes a whole obstacle's dropout at its word for the ten pings it lasts (objp+forget 156 of 180 against the clean 168; the 24 m gaps 11 of 20 against 16), and the vessel in a narrow gap has no room to turn back.",
-        how: "Forget a cell only after k consecutive free readings (hysteresis, k = 2, 3, 5), or keep an obstacle that was seen within some range as occupied until it is seen free again from nearer; read the persistent faults of brain/SENSED_NAV_WIP.md follow-up 5 (objp and pall) and the white faults of follow-up 4 (a cure that costs the false-return cure is no cure); new registration, fresh seeds (HELD10 is spent).",
-        why: "Forgetting is what makes the long sonar usable; the one fault it does not survive is the one that repeats.",
+        state: "CLOSED",
+        what: "CLOSED 2026-11-03 (brain/SENSED_NAV_WIP.md, RESULT OF FOLLOW-UP 7; tools/ship/subSensedFollowStudy.mjs --study detector, flights in brain/subSensedDetectorHeld12.jsonl): PARTLY SUPPORTED, 4 of 6 cells; six of eight predictions held (G5 and G8 missed). The hold (clear after 12 free readings) is a cure for the narrowest gaps under dropouts and nothing else: under the persistent mix in the 24 m gaps 18 of 20 against the forgetting map's 10 (exact 18), pooled 162 of 180 against 159; a hold of twelve alone makes white false returns ruinous (56 of 180, 118 collided: a sea of phantoms leaves no route) and, behind a run of two, costs 14 flights against the confirmation alone under white false returns (149 against 163, 8 timeouts). A confirmation alone is worse than forgetting at 24 m under dropouts (7 against 10).",
     },
     {
         id: "nav-sensed-false-rate",
@@ -2963,10 +2961,8 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "nav-sensed-confirm-returns",
-        blocker: "OPEN",
-        what: "A white false return at a rate of 0.01 takes the forgetting map from 92% to 68% of the exact map (brain/SENSED_NAV_WIP.md, RESULT OF FOLLOW-UP 6) and the map marks a cell on the first ping that reads it occupied.",
-        how: "Mark a cell only after it reads occupied at k consecutive pings (k = 2, 3), alone and together with nav-sensed-dropout-cure's clearing rule as one detector (a cell cleared only after several free readings), against the white false returns of follow-up 6 (0.003, 0.01, 0.03) and the persistent faults of follow-up 5; new registration, fresh seeds (HELD11 is spent).",
-        why: "A white false return has to repeat to be confirmed, at the rate squared; the price is a ping or two of delay in marking a real obstacle, which the 200 m sonar can spare.",
+        state: "CLOSED",
+        what: "CLOSED 2026-11-03 (brain/SENSED_NAV_WIP.md, RESULT OF FOLLOW-UP 7; tools/ship/subSensedFollowStudy.mjs --study detector, flights in brain/subSensedDetectorHeld12.jsonl): PARTLY SUPPORTED, 4 of 6 cells; six of eight predictions held (G5 and G8 missed). A white false return has to repeat: confirmation alone (a run of two, or 2 of 3) takes the forgetting map from 71% to 91% of 180 at a false rate of 0.01 (128 to 163 flights, post hoc sign test +42 / +7, p < 0.0001), and holds the 80% bar in all three kinds under white false returns; the pair with the hold of twelve is the designated and holds the bar in one of three kinds there. Post hoc and flagged as a selection: a run of three with the same hold holds all six cells.",
     },
     {
         id: "nav-traffic-avoid-not-slow",
