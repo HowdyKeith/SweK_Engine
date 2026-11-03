@@ -2956,6 +2956,13 @@ export const NEXT_ROUNDS = [
         why: "The confirmed clear cleans the smear and clears a leaking dropout sooner; whether it helps the plain-run detector as it is registered to help the memory one, and whether the run and the memory are one rule behind it, is not known.",
     },
     {
+        id: "nav-sensed-detector-hold-range-hold-confirm",
+        blocker: "OPEN",
+        what: "Follow-up 32 (brain/SENSED_NAV_WIP.md) registers a carried evidence on follow-up 15's ramp hold, and follow-up 21 registers a confirmed clear. Registered as FOLLOW-UP 45 of that note (the name was Keith's; no entry existed, and it is follow-up 32's name with confirm on the end, the move follow-ups 24, 25, 27 and 39 made: the clear confirmed; the mark stays one reading, so it is not follow-up 34). The note says before the data that for a mark of one the confirmed clear changes nothing until a cell has earned five occupied readings, and the carry restores four. It was written after the results of follow-ups 7 to 18 and 20 were read, rests on follow-ups 21 and 32, which are unread or unbuilt, and says so. One new module field (ghost.carry, follow-up 32's): the build waits for the sets of follow-ups 8 to 24, then adds it, two registry rows, the set HELD50 and a spec.",
+        how: "After the sets of follow-ups 8 to 24 are flown: the ramp hold on the nearest range with a mark of one, cleared by a run and confirmed at 0.8, each with and without the carried evidence, against the map that forgets, under dropouts of 30 pings, the uniform false rate of 0.01 with leaking dropouts, the persistent mix and a clean sea; HELD50 = seeds 5001 to 5060; the registration is in the note.",
+        why: "The confirmed clear and the carry are nearly orthogonal for a mark of one by the arithmetic of the window; how far nearly goes, and whether the leak shows either, is not known.",
+    },
+    {
         id: "nav-sensed-detector-confirm-hold-range-hold",
         blocker: "OPEN",
         what: "Follow-up 26 (brain/SENSED_NAV_WIP.md) asks which range-aware mark to use with the evidence hold at every range; a strict far rule is slow to re-mark a cell the hold has let go (a dropout of 30 pings clears every cell watched for fewer than thirty readings). Registered as FOLLOW-UP 30 of that note (the name was Keith's; no entry existed, and it is follow-up 26's name with a hold on the end, the move follow-ups 18 and 29 made: a second hold on what has been confirmed, the ghost). The build waits for the sets of follow-ups 8 to 24: one registry row, the set HELD35 and a spec are added then.",
