@@ -23,6 +23,7 @@ const sec = (t) => console.log("\n" + t);
 const J = JSON.stringify, near = (a, b, t = 1e-9) => Math.abs(a - b) < t;
 import * as T from "../../brain/needsTask.mjs";
 import * as Q_ from "../../brain/plannerPerturbed.mjs";
+import * as U_ from "../../brain/tunedRule.mjs";
 import * as X from "./plannerEnsConfirm.mjs";
 console.log("plannerEnsConfirm-selfcheck -- the Round 27 ensemble replication\n");
 const code = fs.readFileSync(new URL("./plannerEnsConfirm.mjs", import.meta.url), "utf8").split("\n").filter((l) => !/^\s*\/\//.test(l)).join("\n");
@@ -84,6 +85,7 @@ sec("5. REPORT");
     ok("!! the head names the three blocks and 600 dives per arm; the five checks pass first", /^ROUND 27: does the small start-energy ensemble replicate\? pooled over F1 4801-4900, F2 4901-5000, F3 5001-5100 \(far and both, 600 dives per arm; read once\)$/.test(L[0]) && L.slice(1, 6).every((l) => /^  PASS /.test(l)));
     ok("!! the primary and the reported differences, each with se and better/worse/same", /ENS-0\.05 minus TWIN-FULL \(primary\): \+0\.0100 \(se [0-9.]+; better [0-9]+, worse [0-9]+, same [0-9]+\)/.test(txt) && /ENS-0\.05 minus TUNED-R8: \+0\.0600/.test(txt) && /ENS-0\.10 minus TWIN-FULL \(reported\): -0\.0100/.test(txt) && /TWIN-FULL minus TUNED-R8 \(reported; the twin's usual gain, on these seeds\): \+0\.0500/.test(txt));
     ok("!! with Round 23's prior the pooled line is there and combined (the fixed-effect estimate lies between the two); without it the line is absent", /pooled over Round 23 and this round \(reported, fixed-effect\): ENS-0\.05 minus TWIN-FULL \+0\.0[0-9]{3} \(se 0\.00[0-9]{2}; Round 23 \+0\.0057, se 0\.0016\)/.test(txt) && !/pooled over Round 23/.test(X.report(au).join("\n")));
+    { const c = X.combine({ mean: 0.0057, se: 0.0016 }, X.differences(au).ens); ok("!! the pooled line carries the fixed-effect combination of Round 23's estimate and THIS round's primary difference (not of this round with itself)", txt.includes(`ENS-0.05 minus TWIN-FULL ${c.mean >= 0 ? "+" : ""}${c.mean.toFixed(4)} (se ${c.se.toFixed(4)};`) && !near(c.mean, X.differences(au).ens.mean, 1e-4)); }
     ok("!! the means and the scheduled rollout seconds per dive (8000, 24000, 24500) are reported", /scheduled rollout seconds per dive: twin 8000, ENS-0\.05 24000, ENS-0\.10 24500/.test(txt));
     ok("!! the two bottom lines come last, each prefixed BOTTOM LINE:", L.slice(-2).every((l) => l.startsWith("BOTTOM LINE: ")) && /REPLICATES|DOES NOT REPLICATE/.test(L[L.length - 2]) && /OVER THE TUNED RULE/.test(L[L.length - 1]));
     const bad = synth({ twin: every(4, 0.2), e5: every(2, 0.12), e10: every(5, 0.2) }); bad.F1["TWIN-ROUND11"].runs[0].fingerprint = "x"; const Lb = X.report(bad);
@@ -93,17 +95,21 @@ sec("6. FLIGHT");
 {
     X.setFlight({ seconds: 100 });
     const ranges = { F1: [1344, 1345], F2: [1349, 1350], F3: [1351, 1352] }, fly = (a, b) => X.flyBlock(a, R8, b, { ranges });
+    const fly1 = (a) => X.flyBlock(a, R8, "F1", { ranges: { F1: [1349, 1350] } });
     const tw = fly("TWIN-FULL", "F2"), r11 = fly("TWIN-ROUND11", "F2"), tu = fly("TUNED-R8", "F2");
     ok("!! a block of real 100-second dives returns the dives of seeds a..b of far then both (kind-major: far, far, both, both)", J(tw.runs.map((r) => r.kind)) === J(["far", "far", "both", "both"]));
     ok("!! the twin equals the Round 11 twin dive for dive, and differs from the tuned rule on far 1350", tw.runs.every((r, i) => r.fingerprint === r11.runs[i].fingerprint) && tw.runs[1].fingerprint !== tu.runs[1].fingerprint);
+    const directT = T.evaluate(T.flyDecision(U_.tunedSeat(R8, U_.WIDE_BOUNDS)), T.setOf(X.HARD, 1349, 1350), { gauge: T.GAUGE, seconds: 100 });
+    ok("!! the tuned rule is T.evaluate's tuned dive with the noisy gauge, dive for dive", tu.runs.every((r, i) => r.fingerprint === directT.runs[i].fingerprint));
     const direct5 = T.evaluate(T.flyDecision(Q_.perturbedSeat(R8, {}, { ensemble: [-0.05, 0, 0.05], seconds: 100 })), T.setOf(X.HARD, 1349, 1350), { gauge: T.GAUGE, seconds: 100 }), e5 = fly("ENS-0.05", "F2");
     ok("!! ENS-0.05 is the perturbed twin with the offsets -0.05, 0 and +0.05, dive for dive", e5.runs.every((r, i) => r.fingerprint === direct5.runs[i].fingerprint));
     const direct10 = T.evaluate(T.flyDecision(Q_.perturbedSeat(R8, {}, { ensemble: [-0.1, 0, 0.1], seconds: 100 })), T.setOf(X.HARD, 1349, 1350), { gauge: T.GAUGE, seconds: 100 }), e10 = fly("ENS-0.10", "F2");
     ok("!! ENS-0.10 is the perturbed twin with the offsets -0.1, 0 and +0.1, dive for dive", e10.runs.every((r, i) => r.fingerprint === direct10.runs[i].fingerprint));
     ok("!! an ensemble arm reports its cost (scheduled rollout seconds per dive), three times the twin's for the three offsets, and the tuned rule reports none", e5.cost > 0 && near(e5.cost / tw.cost, 3, 0.05) && tu.cost === undefined, `${tw.cost} ${e5.cost}`);
+    ok("!! the cost is the MEAN over the dives (pinned: far 1349-1350 at 100 s, 735.025 for the twin, 2205.075 for ENS-0.05 -- not the sum over the dives)", near(fly1("TWIN-FULL").cost, 735.025, 1e-6) && near(fly1("ENS-0.05").cost, 2205.075, 1e-6));
     X.setFlight({});
     const msg = (f) => { try { f(); return ""; } catch (e) { return String(e.message); } };
-    ok("!! an unknown arm and an unknown block are each refused with their own message (not a TypeError)", /unknown arm "ENS-0.99"/.test(msg(() => X.flyBlock("ENS-0.99", R8, "F1", { ranges }))) && /unknown block "F9" \(F1, F2, F3\)/.test(msg(() => X.flyBlock("TWIN-FULL", R8, "F9", { ranges }))));
+    ok("!! an unknown arm and an unknown block are each refused with their own message (not a TypeError)", /plannerEnsConfirm\.flyArm: unknown arm "ENS-0\.99" \(TUNED-R8, TWIN-FULL/.test(msg(() => X.flyBlock("ENS-0.99", R8, "F1", { ranges }))) && /unknown block "F9" \(F1, F2, F3\)/.test(msg(() => X.flyBlock("TWIN-FULL", R8, "F9", { ranges }))));
     ok("!! assemble keys blocks then arms and leaves an arm out of a block it was not flown on", J(Object.keys(X.assemble({ A: { F1: 1, F2: 2, F3: 3 }, B: { F1: 4 } }).F1)) === J(["A", "B"]) && J(Object.keys(X.assemble({ A: { F1: 1, F2: 2, F3: 3 }, B: { F1: 4 } }).F2)) === J(["A"]));
 }
 sec("7. SOURCE");
