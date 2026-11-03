@@ -29,6 +29,11 @@ export const STABLE = Object.freeze({ T: 30, dt: 1 / 60, eps: SB.SPIN.eps, lost:
 /** M2's ship: addShip()'s cube, half-size 0.5 and density 1, spun at 2 rad/s about (1, 2, 3). */
 export const CUBE = Object.freeze({ half: 0.5, density: 1, W: 2, axis: Object.freeze([1, 2, 3]) });
 /** M3's configurations, in order. `flag` "default" passes no key at all -- the wrapper's default is what is measured. */
+// 2026-11-03 (unnumbered) -- THE DEFAULT THIS ROUND MEASURED, NOW PASSED. This round registered "the loader's default" when that
+// default was Jolt's own explicit force (`gyroscopic: true`). The same day the note's third round made the loader's default its
+// implicit step, so the three places this library leaned on the default -- the "default" spinner, the ship and C-flag's default
+// body -- now pass REGISTERED_DEFAULT, and the committed results fly again unchanged. "default" here means the default as it was.
+export const REGISTERED_DEFAULT = true;
 export const CONFIGS = Object.freeze([
     Object.freeze({ id: "J", engine: "jolt", flag: "default", substeps: 1, label: "Jolt with the force on (the new default), one substep" }),
     Object.freeze({ id: "OWN", engine: "own", flag: null, substeps: null, label: "the engine's own physics, rigidBody6dof.step()" }),
@@ -83,10 +88,10 @@ export async function jolt() {
 export async function joltSpinner({ w0, dt = STABLE.dt, substeps = 1, flag = "default", half = null, density = SB.FIXTURE.density, ship = false, makeWorld = null } = {}) {
     const world = makeWorld ? makeWorld() : (await jolt()).createWorld({ gravity: [0, 0, 0] });
     let i;
-    if (ship) i = world.addShip({ x: 0, z: 0, half: CUBE.half, density: CUBE.density });
+    if (ship) i = world.addShip({ x: 0, z: 0, half: CUBE.half, density: CUBE.density, gyroscopic: REGISTERED_DEFAULT });
     else {
         const opts = { type: "dynamic", pos: [0, 0, 0], half: half || [SB.FIXTURE.hx, SB.FIXTURE.hy, SB.FIXTURE.hz], density, damping: 0 };
-        if (flag !== "default") opts.gyroscopic = flag;
+        opts.gyroscopic = flag === "default" ? REGISTERED_DEFAULT : flag;
         i = world.addBox(opts);
     }
     if (!world.setDamping(i, 0, 0)) throw new Error("jolt: the damping could not be set");
@@ -119,7 +124,7 @@ export async function flagControl({ makeWorld = null } = {}) {
     const world = makeWorld ? makeWorld() : (await jolt()).createWorld({ gravity: [0, 0, 0] });
     const box = { type: "dynamic", pos: [0, 0, 0], half: [SB.FIXTURE.hx, SB.FIXTURE.hy, SB.FIXTURE.hz], density: 1 };
     const of = (i) => world.raw().bodyOf(i).GetApplyGyroscopicForce();
-    const got = { default: of(world.addBox(box)), false: of(world.addBox({ ...box, gyroscopic: false })), true: of(world.addBox({ ...box, gyroscopic: true })),
+    const got = { default: of(world.addBox({ ...box, gyroscopic: REGISTERED_DEFAULT })), false: of(world.addBox({ ...box, gyroscopic: false })), true: of(world.addBox({ ...box, gyroscopic: true })),
                   static: of(world.addBox({ ...box, type: "static", pos: [0, -10, 0] })) };
     world.destroy();
     return { ok: got.default === true && got.false === false && got.true === true && got.static === false, got };

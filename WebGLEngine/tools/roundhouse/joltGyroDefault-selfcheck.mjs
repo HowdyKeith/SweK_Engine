@@ -77,8 +77,11 @@ try {
         L.eulerBound(F, 0) === 1 && L.eulerBound(F, 2).toFixed(4) === "1.4422" && near(L.eulerBound(F, 2), own(F, 2), 1e-12) && L.eulerBound(F, 1) === Infinity &&
         L.eulerBound(M, 0) === 1 && near(L.eulerBound(M, 2), Math.sqrt(3), 1e-12) && near(L.eulerBound(M, 2), own(M, 2), 1e-12) && L.eulerBound(M, 1) === Infinity, `${L.eulerBound(F, 2)}`);
     const shipLine = (loader.match(/^\s*addShip\(.*$/m) || [""])[0];
-    ok("!! the cube: half-size 0.5, density 1, 2 rad/s about (1, 2, 3), frozen -- and addShip() hands addBox no gyroscopic key, so a ship takes the default",
-        J(L.CUBE) === J({ half: 0.5, density: 1, W: 2, axis: [1, 2, 3] }) && Object.isFrozen(L.CUBE) && /this\.addBox\(/.test(shipLine) && !/gyroscopic/.test(shipLine));
+    // 2026-11-03 (unnumbered) -- RESTATED after the third round turned this row red (M4 saw it): addShip() now hands addBox a
+    // gyroscopic setting when it is given one, and this round's ship is given the default as registered.
+    ok("!! the cube: half-size 0.5, density 1, 2 rad/s about (1, 2, 3), frozen -- addShip() hands addBox a gyroscopic setting only when given one, and this round's ship is given the default as registered",
+        J(L.CUBE) === J({ half: 0.5, density: 1, W: 2, axis: [1, 2, 3] }) && Object.isFrozen(L.CUBE) && /this\.addBox\(/.test(shipLine) && /density = 1, gyroscopic \} = \{\}\)/.test(shipLine) &&
+        /damping: 0, gyroscopic \}\); \}/.test(shipLine) && /world\.addShip\(\{ x: 0, z: 0, half: CUBE\.half, density: CUBE\.density, gyroscopic: REGISTERED_DEFAULT \}\)/.test(lib));
     ok("!! the four configurations, in order: Jolt with the default at one substep; the engine's own physics; reported, Jolt with the default at four and with the force passed off",
         J(L.CONFIGS.map((c) => [c.id, c.engine, c.flag, c.substeps])) === J([["J", "jolt", "default", 1], ["OWN", "own", null, null], ["J4", "jolt", "default", 4], ["J0", "jolt", false, 1]]) && Object.isFrozen(L.CONFIGS));
     ok("!! M1 is the spinning body's own spin: about the intermediate axis by default, for its 30 s at its 1/60 s, read by its rule against C3 (the flag passed true)",
@@ -110,10 +113,13 @@ try {
 console.log("\n3. THE PLUMBING");
 try {
     const sig = (loader.match(/^\s*addBox\(\{[^)]*\}\s*=\s*\{\}\)\s*\{/m) || [""])[0];
-    ok("!! THE DEFAULT IS ON, in the loader's own source: addBox's `gyroscopic` defaults to true, and only a dynamic body takes it",
-        /gyroscopic = true \}/.test(sig) && /if \(dyn && gyroscopic\) cs\.mApplyGyroscopicForce = true;/.test(loader), sig.trim().slice(0, 120));
+    // 2026-11-03 (unnumbered) -- RESTATED after the third round turned these rows red (M4 saw them): the loader's default is now its
+    // implicit step (joltGyroImplicit-selfcheck holds that), and the default THIS round measured -- Jolt's own force -- is what `true`
+    // still gives, passed by this library as REGISTERED_DEFAULT.
+    ok("!! THE DEFAULT THIS ROUND MEASURED is Jolt's own force: `true` still gives it, only a dynamic body takes it, and this library passes it as its registered default",
+        L.REGISTERED_DEFAULT === true && /const mode = !dyn \? false : gyroscopic === true \|\| gyroscopic === "jolt" \? "jolt"/.test(loader) && /if \(mode === "jolt"\) cs\.mApplyGyroscopicForce = true;/.test(loader), sig.trim().slice(0, 120));
     const flag = await L.flagControl();
-    ok("!! ...and on Jolt's own body (C-flag): a body made with no flag has the force, false turns it off, true on, and a static body never has it", flag.ok, J(flag.got));
+    ok("!! ...and on Jolt's own body (C-flag): a body made as this round's default (the flag passed as registered) has the force, false turns it off, true on, and a static body never has it", flag.ok, J(flag.got));
     const real = (await L.jolt()).createWorld({ gravity: [0, 0, 0] }), seen = [], subs = [];
     const spy = new Proxy(real, { get(t, k) {
         if (k === "addBox") return (o) => { seen.push({ ...o }); return t.addBox(o); };
@@ -121,11 +127,13 @@ try {
         const v = t[k]; return typeof v === "function" ? v.bind(t) : v; } });
     const a = await L.joltSpinner({ w0: [1, 0, 0], makeWorld: () => spy }), b = await L.joltSpinner({ w0: [1, 0, 0], flag: false, makeWorld: () => spy }), c = await L.joltSpinner({ w0: [1, 0, 0], flag: true, substeps: 4, makeWorld: () => spy });
     c.step();
-    ok("!! the spinner passes NO gyroscopic key for the default -- so the wrapper's own default is what is measured -- and the flag itself otherwise; and the substeps reach the world's step",
-        seen.length === 3 && !("gyroscopic" in seen[0]) && seen[1].gyroscopic === false && seen[2].gyroscopic === true && a.flag === true && b.flag === false && c.flag === true && J(subs) === J([4]), J(seen.map((s) => s.gyroscopic)));
+    // 2026-11-03 (unnumbered) -- RESTATED: this row asserted the spinner passed NO key for the default; since the third round it passes
+    // the default as registered, so the body is the one this round measured whatever the loader's default has become
+    ok("!! the spinner passes the registered default (true) for this round's default -- the loader's own default has moved on -- and the flag itself otherwise; and the substeps reach the world's step",
+        seen.length === 3 && seen[0].gyroscopic === true && seen[1].gyroscopic === false && seen[2].gyroscopic === true && a.flag === true && b.flag === false && c.flag === true && J(subs) === J([4]), J(seen.map((s) => s.gyroscopic)));
     real.destroy();
     const ship = await L.joltSpinner({ w0: [0, 0, 1], ship: true }), m = ship.inertia.diag; ship.destroy();
-    ok("!! addShip()'s cube has the force on, and its three moments are equal -- so its gyroscopic torque is exactly zero", ship.flag === true && near(m[0], m[1], 1e-6) && near(m[1], m[2], 1e-6) && near(m[0], 1 / 6, 1e-6), J(m));
+    ok("!! addShip()'s cube, given the registered default, has the force on, and its three moments are equal -- so its gyroscopic torque is exactly zero", ship.flag === true && near(m[0], m[1], 1e-6) && near(m[1], m[2], 1e-6) && near(m[0], 1 / 6, 1e-6), J(m));
     const sp = await L.joltSpinner({ w0: [0.4, 1e-3, 0] }); for (let k = 0; k < 30; k++) sp.step(); const r = sp.read(); sp.destroy();
     ok("!! the spinner reads the BODY frame: Jolt's world-frame angular velocity turned by the body's own quaternion, exactly, and after a turn the two differ",
         J(r.w) === J(RB.worldToBody(r.q, r.wWorld)) && J(r.w) !== J(r.wWorld) && near(r.w[0], 0.4, 1e-4));
@@ -150,12 +158,15 @@ try {
     ok("!! M1 reports the default body's flag and reads it by the spinning body's rule, and its trace is C3's to the bit on this stable spin; M2 reports the cube's flags -- on from addShip, off when passed off",
         m1.flag === true && m1.c3Flag === true && m1.axis === 0 && !!m1.fit && m1.reading === SB.readingOf(m1.fit) && m1.sameAsC3 === true &&
         m2.flagOn === true && m2.flagOff === false && m2.steps === 6 && ["changeOn", "changeOff", "apart"].every((k) => Number.isFinite(m2[k])));
-    // C-FLAG CAN FAIL: a world whose body made with no flag comes back without the force -- the wrapper as it was -- stops the round before anything is read
+    // C-FLAG CAN FAIL: a world that takes the force off every body it makes stops the round before anything is read.
+    // 2026-11-03 (unnumbered) -- RESTATED: the fake used to take it off only bodies made with NO flag (the wrapper as it was); once this
+    // library passed its registered default explicitly (the third round) it made no such body, the fake changed nothing, and the row
+    // went red. Taking the flag off every body is what "a default body that comes back off" means now.
     const offWorld = async () => { const w = (await L.jolt()).createWorld({ gravity: [0, 0, 0] }); return new Proxy(w, { get(t, k) {
-        if (k === "addBox") return (o) => t.addBox("gyroscopic" in o ? o : { ...o, gyroscopic: false });
+        if (k === "addBox") return (o) => t.addBox({ ...o, gyroscopic: false });
         const v = t[k]; return typeof v === "function" ? v.bind(t) : v; } }); };
     const ow = await offWorld(), stopped = await L.run({ rates: [1], T: 0.1, m1Axis: 0, flagWorld: () => ow });
-    ok("!! C-flag can fail: handed a world whose default body comes back off, the round says so and stops before any measurement",
+    ok("!! C-flag can fail: handed a world whose bodies come back without the force, the round says so and stops before any measurement",
         stopped.flag.ok === false && stopped.flag.got.default === false && /C-flag failed/.test(stopped.stopped || "") && !stopped.m1 && !stopped.m2 && !stopped.m3);
     const bad = await L.keyControl({ bounds: { 0: 1.1, 2: 1.1 * L.eulerBound(SB.fixtureBody().I, 2) } }), good = await L.keyControl();
     ok("!! C-key can fail: handed bounds a tenth too large it refuses, and with Euler's own the engine's physics meets them to 1e-3 -- over the whole window, 1,800 steps (G20 found a 2 s window passing)",

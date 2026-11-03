@@ -164,7 +164,12 @@ try {
     // 2026-11-03 (unnumbered) -- RESTATED, NOT WIDENED: this row said "and stays an opt-in: off by default" and asserted deflt === false. The same
     // day Keith turned the default ON (the note's second round), and the row went red on exactly that, which is what it was for. It now holds the
     // new default, and still holds both explicit settings.
-    ok("!! the gyroscopic force reaches Jolt's body: ON by default since 2026-11-03 (Keith's decision; an opt-in until then), off when asked off, on when asked on", deflt === true && flag(false) === false && flag(true) === true, `${deflt} ${flag(false)} ${flag(true)}`);
+    // 2026-11-03 (unnumbered), AGAIN -- RESTATED a second time, after the note's third round turned this row red (its M4 saw it): the
+    // loader's default became the wrapper's own implicit step, so a body made with no flag has Jolt's own force OFF and the setting
+    // "implicit"; `true` is still Jolt's own force, which is what C3 passes, so C3 and its committed results are unchanged.
+    const setting = (() => { const w = worlds.jolt(), i = w.addBox({ type: "dynamic", pos: [0, 0, 0], half, density: 1 }), v = w.gyroscopicOf(i); w.destroy(); return v; })();
+    ok("!! the gyroscopic setting reaches Jolt's body: by default the wrapper's implicit step, with Jolt's own force OFF (since the third round); off when asked off; Jolt's own force when asked true",
+        deflt === false && setting === "implicit" && flag(false) === false && flag(true) === true, `${deflt} ${setting} ${flag(false)} ${flag(true)}`);
     // the spinner's body-frame reading, against the engine's own world-frame numbers turned by hand, after half a second of a
     // stable spin about x with a wobble on y: by then the body has turned 0.2 rad, so the two frames' wobbles differ
     const frameOf = async (c) => { const sp = await L.spinner(c, { w0: [0.4, 1e-3, 0], dt: 1 / 60 }); for (let k = 0; k < 30; k++) sp.step(); const r = sp.read(), raw = sp.raw(); sp.destroy(); return { r, raw }; };

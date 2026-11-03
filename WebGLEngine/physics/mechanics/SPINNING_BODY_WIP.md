@@ -654,3 +654,60 @@ Seconds.
 - `tools/roundhouse/joltGyroImplicit.mjs` (the library), `tools/roundhouse/joltGyroImplicitRun.mjs` (the command) and
   `tools/roundhouse/joltGyroImplicit-selfcheck.mjs` (the gate).
 - The results go to `physics/mechanics/joltGyroImplicitResults.json`, committed before it is read.
+
+### Built, 2026-11-03, before the registered run (nothing of the registration above is changed)
+
+- **The step:** `physics/mechanics/implicitGyro.mjs` is box3d's step, term for term, in double precision.
+  - Its Jacobian is I + h (skew(w) I - skew(I w)) to the last digit, against plain products in the gate.
+  - On made-up cases, one step divides a stable wobble's invariant by exactly 1 + (Omega h)^2, which is backward
+    Euler's; an explicit step multiplies it by the same. One step runs the unstable wobble at 1 / (1 - sigma h).
+  - **C-box3d, held in the gate:** one box3d substep from (1, 2, 3) rad/s lands on the module's step to 3.1e-8. An
+    explicit step is 3.2e-5 away.
+- **The loader:**
+  - `addBox()`'s default is "implicit", and `true` is still Jolt's own force.
+  - The step is taken before Jolt's, once a step, through each body's own orientation. On a body turned
+    0.5 rad about (1, 1, 1) it lands on the module's step to 3.3e-8.
+  - An equal-moment body is skipped, and flies bit for bit as one with neither.
+  - `gyroscopicOf()` reports each body's setting, and `addShip()` passes a setting through.
+- **M4, run after the change and before any row was restated:** the 73 gates that reach Jolt, and the second
+  round's. 70 of 74 were green, and no physics gate moved. The reds:
+  - the second round's gate, 9 rows: every one reads the loader's default or a body made with no flag, and one is its
+    fly-again row;
+  - the spinning body's default row;
+  - orreryFleet, on the loader's size (13,555 bytes to 16,080) and on the baseline's commit belt;
+  - recordDrift, on the ship-time records, as before.
+  That is P7's list. P7 is read here, in the build record.
+- **Restated, with dated notes:**
+  - The second round's library passes its registered default (`true`) in the three places it leaned on the
+    loader's, and its committed results fly again unchanged (worst 0).
+  - That gate's rows that read the default now read what the library passes.
+  - One more row there went red only after the library changed: the C-flag can-fail fixture. It took the force off
+    only bodies made with no flag, and the library no longer makes any. It now takes the force off every body.
+  - The spinning body's default row holds the new default.
+  - `orrery-fleet.json` was re-baked for the loader's size.
+  - After them, the 74 and the new gate ran again: 73 of 75 green. The only reds are recordDrift and the commit belt,
+    both the ship's.
+- **The round:** `tools/roundhouse/joltGyroImplicit.mjs` (the library), `joltGyroImplicitRun.mjs` (the command) and
+  `joltGyroImplicit-selfcheck.mjs` (the gate: 34 rows, under a second).
+  - The gate never flies a registered spin. Its miniature spins at 1 rad/s for a tenth of a second, with M1 about a
+    stable axis.
+  - **Disclosed:** its plumbing row flies a ship with the default for 600 steps (10 s) of a tilted spin and finds it
+    bit for bit the ship with neither. That is P5's question over a third of the window, answered by construction:
+    the skip.
+- **Found while designing the sabotages, before them:** five rows that could not have gone red.
+  - Every check started from the identity orientation, where a step that ignored the body's orientation, or read its
+    quaternion in the wrong order, would pass. Two rows now turn the body: a quarter-turn about y in the module, and
+    0.5 rad about (1, 1, 1) on real Jolt (G12 below says why that one changed).
+  - The new spinner's body-frame reading was not held.
+  - M1's and M3's twins were never shown to be second spins.
+  - The end-over-start measure was not held on made-up traces.
+
+**Sabotaged with the byte-safe runner: 31 designs, each red by name** (the counts are in the gate's header).
+None went 0 red, but one went red elsewhere than on the row written for it:
+- **G12, the wrapper reading its quaternion in the wrong order.** The source row and C-undamped in the miniature caught
+  it, not the wrapper row meant to. That row turned its body a quarter-turn about y. Read in the wrong order, that
+  turn is the right one composed with a half-turn about the body's z, which is a symmetry of the box, so the step came
+  out the same. The row now turns the body 0.5 rad about (1, 1, 1), which no symmetry of the box undoes, and it goes red
+  for G12 and G4. The whole series was run again after the change.
+
+**The registered run:** `node tools/roundhouse/joltGyroImplicitRun.mjs`.
