@@ -2554,10 +2554,17 @@ export const NEXT_ROUNDS = [
         why: "So the page shows what the arc measured -- generation between the chain's frames -- not only the generator.",
     },
     {
-        id: "fsr4-object-motion",
+        id: "fsr4-mover-history-check",
         blocker: "OPEN",
-        what: "Round 79 (section 180), set up and awaiting its harvest: Bt_MV, Bt's history with the movers' exact motion vectors (reproject matches a mover's pixel at P - v in the previous frame), against Bt on 24 new moving scenes (12 R 81000-81011, 12 C 82000-82011), each rendered once and accumulated both ways. H79a: Bt_MV beats Bt by the 1 % rule; H79b: round 72's U_TH on Bt_MV beats Bt_MV. Bt_MV is Bt bit for bit off the movers and on still scenes (gated). CPU only; the device chain's cost is round 80 if H79a holds.",
-        how: "node tools/denoiseStudy.mjs --harvest-upscale-temporal-test --round 79 on the rig at round 79's commit (~10.5 h), render/denoise-results-upscale-vectors-r79.json committed byte for byte before it is read; section 181 reads it.",
+        what: "The round section 181 names and does not set up: exact vectors plus a test of each mover pixel's history against the current frame's own shading -- a per-pixel rejection, or a tighter clamp where the object moved -- so the longer history the vectors give is kept only where it agrees. A change to Bt's accumulation, pre-registered on its own.",
+        how: "Pre-register first: the check (what it compares, its threshold fixed before the run), Bt_MV with it against Bt and Bt_MV on a new moving set, then U_TH on it; Bt bit for bit off the movers as round 79's was.",
+        why: "Section 181: the vectors lengthened every mover's history but helped only 13 of 24 scenes; where they hurt, the history they kept carried shading that had changed.",
+    },
+    {
+        id: "fsr4-object-motion",
+        blocker: "CLOSED",
+        what: "CLOSED, NOT SUPPORTED (section 181): H79a FAILS -- Bt_MV (Bt's history with the movers' exact vectors) is 4.12 % below Bt on the mean of 24 new moving scenes but better on only 13 of 24 (sign-flip p 0.145); on the mover pixels 5.38 % (13 of 24), against P3's 8-25 %. Its history is longer on every scene (5.11 against 4.37), and on a mover a longer history sometimes keeps stale shading. H79b holds: round 72's U_TH on Bt_MV is 5.50 % below Bt_MV (p 0.00018), and 4.55 % below U_TH on the old Bt (descriptive). Round 80 (the device chain's vectors) is not opened. The file was shown before it was committed, said in section 181.",
+        how: "render/denoise-results-upscale-vectors-r79.json, re-derived by render/movingScenes-selfcheck.mjs section 8.",
         why: "Section 179: training U_TH on motion did not help (H78a failed, P4 missed badly) -- nothing in its inputs says where an object went, so the history itself has to.",
     },
     {

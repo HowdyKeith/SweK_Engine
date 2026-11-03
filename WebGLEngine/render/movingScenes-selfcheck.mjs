@@ -39,6 +39,10 @@
 //   dropping vel, Q6 Bt_MV accumulated without its vectors, Q10 U_TH on Bt_MV given the old input, Q15 round 79's R seeds round 78's, Q16 its
 //   seeds not reserved -> 2 red each; Q3 the projection of P not P - v -> 3 red; Q5 the ground given a velocity -> 4 red; Q11 C2 graded on
 //   the old Bt -> *** 0 RED at first ***, then 1 with the C2 row added.
+// SECTION 181 (the verdict rows, sabotaged in the committed file and the registration, each restored byte-identical): Y1 the run's commit
+//   typed 2f0c10c6, Y2 H79a typed supported, Y3 its count typed 14, Y5 U_TH-on-Bt's first grade typed 3.98e-4, Y6 the first mover Bt_MV grade
+//   typed 2.04e-3, Y7 the first Bt_MV history typed 4.01, Y8 H79b's p typed 0.0277, Y9 section 181 opening round 80, Y10 its Bt_MV mean typed
+//   1.9926e-3 -> 1 red each; Y4 Bt_MV's first grade typed 2.43e-4 -> 4 red.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -345,6 +349,34 @@ console.log("\n7. ROUND 79 (section 180): OBJECT MOTION VECTORS FOR Bt's HISTORY
         code === 2 && /round 79 is a test only/.test(said) && /\*\*P - v\*\*/.test(s180) && /Bt_MV is Bt exactly off the mover pixels, and on every still scene/.test(s180) && /81000-81011/.test(s180) && /82000-82011/.test(s180) && s180.includes(R.results));
 }
 
+console.log("\n8. SECTION 181: ROUND 79's VERDICT, RE-DERIVED FROM ITS COMMITTED FILE");
+{
+    const R = LT.ROUND_UPSCALE_VECTORS, r = JSON.parse(fs.readFileSync(path.join(ENG, R.results), "utf8")), H = r.verdict.hypotheses, T = r.tables, sec = r.secondary;
+    const mean = (a) => a.reduce((q, v) => q + v, 0) / a.length, g = (u, b) => 1 - mean(u) / mean(b), near = (a, b, e = 5e-5) => Math.abs(a - b) < e;
+    ok("!! the run is round 79's: its commit 2f0c10c5, round 72's candidate (seed 1, trained at 670c28bd), the shipped denoiser, 24 moving sequences rendered and none cached",
+        r.round === 79 && r.commit === "2f0c10c5" && r.trained.file === R.net && r.trained.candidate === 1 && r.trained.commit === "670c28bd" && r.shipped.file === "render/denoise-net-r11.json" &&
+        T.bt.length === 24 && r.cache.misses === 24 && r.cache.hits === 0 && r.determinism === true);
+    ok("!! *** H79a NOT SUPPORTED: Bt_MV is 4.12 % below Bt on the mean -- past the 1 % rule -- but better on only 13 of 24 scenes, sign-flip p 0.145; its d re-derived from the file's own tables ***",
+        H.H1.status === "not supported" && H.H1.k === 13 && near(H.H1.p, 0.1453, 1e-4) && !(H.H1.p < H.H1.threshold) && same(H.H1.d, effects(T.bt, T.btMV)) && near(g(T.btMV, T.bt), 0.0412) && g(T.btMV, T.bt) >= R.minGain &&
+        near(Math.max(...H.H1.d), 0.1687, 1e-4) && near(Math.min(...H.H1.d), -0.1279, 1e-4) && r.verdict.run === "reported" && r.verdict.controls.C1 && r.verdict.controls.C4 && r.verdict.controls.C5 && r.verdict.controls.C2.ok,
+        `p ${H.H1.p.toFixed(3)}, ${H.H1.k} of 24, mean ${(100 * g(T.btMV, T.bt)).toFixed(2)} %`);
+    ok("!! H79b SUPPORTED: U_TH on Bt_MV is 5.50 % below Bt_MV, 18 of 24, p 0.00018 under Holm's 0.025",
+        H.H2.status === "supported" && H.H2.k === 18 && near(H.H2.p, 0.000177, 1e-6) && H.H2.p < H.H2.threshold && same(H.H2.d, effects(T.btMV, T.uMV)) && near(g(T.uMV, T.btMV), 0.0550));
+    ok("!! *** the chain, descriptively: means Bt 2.0573e-3, Bt_MV 1.9726e-3, U_TH on Bt_MV 1.8641e-3, U_TH on Bt 1.9529e-3, B1 1.8652e-3 -- U_TH on Bt_MV 4.55 % below U_TH on Bt (15 of 24), 9.39 % below Bt ***",
+        near(mean(T.bt), 2.0573e-3, 5e-8) && near(mean(T.btMV), 1.9726e-3, 5e-8) && near(mean(T.uMV), 1.8641e-3, 5e-8) && near(mean(T.u), 1.9529e-3, 5e-8) && near(mean(T.b1), 1.8652e-3, 5e-8) &&
+        near(g(T.uMV, T.u), 0.0455) && T.uMV.filter((v, i) => v < T.u[i]).length === 15 && near(g(T.uMV, T.bt), 0.0939) && near(g(T.u, T.bt), 0.0507) && sec.gains.uMVoverU === g(T.uMV, T.u));
+    const M = sec.mover;
+    ok("!! P3 MISSED: on the mover pixels (28 % of the frame) Bt_MV is only 5.38 % below Bt, better on 13 of 24, against a predicted 8-25 %; U_TH on Bt_MV is 6.37 % below U_TH on Bt there",
+        near(g(M.btMV, M.bt), 0.0538) && M.btMV.filter((v, i) => v < M.bt[i]).length === 13 && near(mean(M.share), 0.2780, 1e-4) && near(g(M.uMV, M.u), 0.0637) && M.gains.btMVoverBt === g(M.btMV, M.bt));
+    ok("  P5's first half HELD: Bt_MV's history is longer than Bt's on all 24 scenes, 5.11 against 4.37; by family the vectors took 0.98 % off on R and 4.76 % on C",
+        sec.history.mv.every((v, i) => v > sec.history.bt[i]) && near(mean(sec.history.mv), 5.105, 1e-3) && near(mean(sec.history.bt), 4.370, 1e-3) &&
+        near(g(T.btMV.slice(0, 12), T.bt.slice(0, 12)), 0.0098) && near(g(T.btMV.slice(12), T.bt.slice(12)), 0.0476));
+    const reg = fs.readFileSync(path.join(ENG, "render", "learned-denoiser-preregistration.md"), "utf8"), s181 = reg.slice(reg.indexOf("## 181."));
+    ok("  section 181 says each of these, that round 80 is not opened, and that the file was seen before it was committed",
+        reg.includes("## 181.") && /H79a NOT SUPPORTED/.test(s181) && /Round 80 \(the\s+device chain's vectors\) is not opened on this result/.test(s181) && /\*\*P3 MISSED:\*\*/.test(s181) &&
+        /shown to me when it was uploaded, before it was committed/.test(s181) && s181.includes("| Bt_MV | 1.9726e-3 |"));
+}
+
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +
-    "\nnot closed here: whether Bt_MV beats Bt on moving scenes. That is round 79's harvest, section 181's.");
+    "\nnot closed here: a mover history checked against its own current shading -- section 181's open question.");
 process.exit(fails ? 1 : 0);

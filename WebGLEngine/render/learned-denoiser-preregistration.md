@@ -11306,3 +11306,51 @@ it runs on Bt_MV).
 
 **The run, on Keith's rig, at round 79's commit:** `--harvest-upscale-temporal-test --round 79`, one CPU harvest (~10.5 hours), its file
 committed byte for byte before it is read. Section 181 reads it.
+
+## 181. ROUND 79's VERDICT -- H79a NOT SUPPORTED: THE VECTORS TAKE 4.1 % OFF Bt ON THE MEAN, BUT ON ONLY 13 OF 24 SCENES; U_TH ON THEM HOLDS (H79b)
+
+**The run.** render/denoise-results-upscale-vectors-r79.json, run on Keith's rig at round 79's commit 2f0c10c5 in 4.1 hours, with round 72's
+U_TH (seed 1, trained at 670c28bd) and the shipped denoiser. 24 moving sequences, each accumulated without and with the vectors, none from a
+cache. **Said first, as in sections 177 and 179: the file was shown to me when it was uploaded, before it was committed** (8645e0b1, byte
+for byte, sha-256 0776642e...). Nothing in it was edited, and what follows was written after the commit.
+
+**The verdict.** C1, C3, C4 and C5 hold; C2 (round 72's shuffled-target U_TH on Bt_MV) is far worse than Bt_MV (mean d -3.45).
+
+| | mean display relMSE | |
+|---|---|---|
+| Bt | 2.0573e-3 | |
+| Bt_MV | 1.9726e-3 | **H79a NOT SUPPORTED**: 4.12 % below Bt on the mean, but better on only 13 of 24 scenes, sign-flip p 0.145 (Holm's 0.05) |
+| U_TH on Bt_MV | 1.8641e-3 | **H79b SUPPORTED**: 5.50 % below Bt_MV, better on 18 of 24, p 0.00018 (Holm's 0.025) |
+
+**Why it is not supported, though the mean passes the 1 % rule.** The rule is the second of two conditions. The first is the test, and it
+fails. The vectors help some scenes a lot (up to 17 % lower d) and make others worse (up to 13 % higher), and over 24 scenes that is
+indistinguishable from no change. By family they took 0.98 % off on R and 4.76 % on C.
+
+**Where it acts, as built: only on the movers** (the rest is Bt bit for bit, section 180).
+- **On the mover pixels,** 28 % of the frame here, Bt_MV is 5.38 % below Bt, and better on only 13 of 24 scenes.
+- **The history did follow the objects.** Bt_MV's mean history length is longer than Bt's on all 24 scenes (5.11 against 4.37).
+- **A longer history on a mover is not always a better one.** The mover's shading changes as it moves relative to the lights, and its
+  history now keeps that stale shading where before it was thrown away. On the scenes where Bt_MV is worse, that is the history section
+  180 said the vectors cannot fix, now kept for longer.
+
+**The chain, descriptively.** U_TH on Bt_MV is 9.39 % below Bt, and **4.55 % below U_TH on the old Bt** (better on 15 of 24; 6.37 % on the
+mover pixels). U_TH on the old Bt is 5.07 % below Bt on this set. One more figure: B1, the measured frame alone (1.8652e-3), is as good as
+U_TH on Bt_MV on this set and better than Bt or Bt_MV. With objects moving at these speeds, eight frames of history buy little over one.
+
+**The predictions.**
+- **P1 held:** C1 and C3.
+- **P2 MISSED:** H79a not supported. The mean landed at 4.12 %, inside the predicted 4-12 %, but the test did not pass.
+- **P3 MISSED:** on the mover pixels Bt_MV is 5.38 % below Bt, against a predicted 8-25 %.
+- **P4 held:** H79b supported, at 5.50 %, inside 3-7 %.
+- **P5 held as to its first half:** Bt_MV's history is longer than Bt's on every scene. Its second half, below the still twin's, cannot be
+  read here: this round rendered no still twins. Its mean, 5.11, is above round 77's still mean of 5.04, on another set.
+
+**What it means, as section 180 fixed it.** H79a fails, so this round does not show that the vectors fix the movers. **Round 80 (the
+device chain's vectors) is not opened on this result.** Section 180's reading for a failed H79a was that the movers' error is their changing
+shading, not their lost history. This result supports that only partly. The vectors do lower the mean and do lengthen every mover's history,
+but what the longer history carries is sometimes stale shading, and on a mover that costs as much as it saves.
+
+**What would decide it.** Exact vectors plus a test of the history against the current frame's own shading on the mover pixels: a
+per-pixel rejection or a tighter clamp where the object moved, so the longer history is kept only when it agrees. That is a change to Bt's
+accumulation, and its own pre-registered round, not this one. Until then the chain stays as section 175 left it: Bt's history without
+vectors, then round 72's U_TH.
