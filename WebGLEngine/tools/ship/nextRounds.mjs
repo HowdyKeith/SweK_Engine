@@ -2864,6 +2864,13 @@ export const NEXT_ROUNDS = [
         why: "The far end of the long sonar is the end the range-aware confirmation thins; a memory is the cheap way to keep it.",
     },
     {
+        id: "nav-sensed-detector-hold-confirm-range",
+        blocker: "OPEN",
+        what: "Follow-ups 13 and 14 (brain/SENSED_NAV_WIP.md) each end by pointing at a detector with both ends range-aware and with the improved rules at each (a memory in the mark, evidence in the hold); follow-up 10 builds the range-aware detector on the plain rules and follow-up 16 the improved rules without range. Registered as FOLLOW-UP 17 of that note (the name was Keith's; no entry existed, and it is taken as follow-up 16 with range, the table 13 and 14 point at).",
+        how: "After follow-up 7's set is flown: a 2-of-3 mark beyond 80 m and a first-reading mark within, an evidence hold of cap 30 within 80 m and one free reading beyond, against follow-up 16's uniform pair, follow-up 10's range-aware detector, each range-aware half alone and the map that forgets, under range-law false returns of mean 0.03 with dropouts of 30 pings, the uniform false rate of 0.01, the persistent mix and a clean sea; HELD22 = seeds 2201 to 2260; the registration is in the note.",
+        why: "A dropout that begins far away clears the cell before the near hold can keep it; whether the range-aware pair earns its place against the uniform pair is not known.",
+    },
+    {
         id: "nav-sensed-detector-hold-confirm",
         blocker: "OPEN",
         what: "The detector's marking and clearing rules have each been improved on their own in the registered notes (brain/SENSED_NAV_WIP.md, FOLLOW-UP 11, an M-of-N mark, and FOLLOW-UP 12, an evidence hold), and follow-up 7 pairs only their plainest forms (a run of k to mark, a plain hold to clear). Registered as FOLLOW-UP 16 of that note (the name was Keith's; no entry existed, and it is taken as the pairing of the two improved rules; confirming the clear with a K-of-N free rule is left out on purpose).",
