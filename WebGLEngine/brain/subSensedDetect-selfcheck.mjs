@@ -31,7 +31,7 @@ console.log("subSensedDetect-selfcheck -- the general detector\n");
 
 // ---- driving one cell ----
 const W0 = X.createMap().w, CELL = 5 * W0 + 20;   // cell (20, 5): index 500 on the 96-wide map
-const mkSpec = (mark, clear, o = {}) => ({ mark, markNear: o.markNear || null, near: 80, clear: { cap: 30, capNear: 30, evidence: false, f: 1, shape: "step", range: "ping", ...clear }, ghost: o.ghost || null });
+const mkSpec = (mark, clear, o = {}) => ({ mark, markNear: o.markNear || null, near: 80, clear: { cap: 30, capNear: 30, evidence: false, f: 1, shape: "step", range: "ping", ...clear }, ghost: o.ghost || null, ...(o.lock ? { lock: o.lock } : {}) });
 const NEVER = { cap: 30, capNear: 30 };   // a clear that no short test reaches: 30 free readings in a row
 /** Drive cell 500 with readings [hit, d] (or a bare 0 / 1 at distance `d0`); returns the occupancy after each reading as a string, the map and the detector. */
 function drive(spec, readings, d0 = 100, map = X.createMap()) {
@@ -170,7 +170,7 @@ guard("4", () => {
     const gnn = g1("111101");
     ok("!! a ghost re-mark without the neighbour test is counted (ghostMarks 1) and returns 1 from apply; the map holds the cell; a marking by the ordinary rule after a ghost cleared with the window kept starts the evidence at the occupied readings of the WHOLE window ([2, 4] rule, 1,1,1,1,1 then a free reading then a hit: three of the last four, evidence 3, and not 2)", gnn.det.stats(gnn.map).ghostMarks === 1 && gnn.map.nOcc === 1 && (() => { const d = drive(mkSpec([2, 4], { cap: 1, capNear: 1 }, { ghost: G() }), bits("1111101")); return d.map.dt.ev[CELL] === 3 && d.out.endsWith("1"); })());
     const st = alone.det.stats(alone.map);
-    ok("!! stats: marks (every marking, ghost ones included), clears, ghostMarks and ghostRefused are counted (the ghost cell: marked once, cleared once, refused once; with the neighbour: marked twice (the second by the ghost), cleared once, ghost-marked once)", same(st, { marks: 1, clears: 1, ghostMarks: 0, ghostRefused: 1 }) && same(withNb.det.stats(withNb.map), { marks: 2, clears: 1, ghostMarks: 1, ghostRefused: 0 }));
+    ok("!! stats: marks (every marking, ghost ones included), clears, ghostMarks and ghostRefused are counted (the ghost cell: marked once, cleared once, refused once; with the neighbour: marked twice (the second by the ghost), cleared once, ghost-marked once)", same(st, { marks: 1, clears: 1, ghostMarks: 0, ghostRefused: 1, lockRefused: 0 }) && same(withNb.det.stats(withNb.map), { marks: 2, clears: 1, ghostMarks: 1, ghostRefused: 0, lockRefused: 0 }));
 });
 
 guard("5", () => {
@@ -198,6 +198,77 @@ guard("6", () => {
     const full = nw(scA, "full@WD30L");
     ok("!! the record carries detStats for a detector with stats (full@WD30L: numbers, marks above the clears, ghost marks counted) and none for the exact flight, the map that forgets or follow-up 7's runs; the arm of a detector flight is its name", full.detStats && Object.values(full.detStats).every(Number.isFinite) && full.detStats.marks >= full.detStats.clears && full.detStats.ghostMarks > 0 && full.arm === "full@WD30L" && X.flyArm(pilot, scA, "exact").detStats === undefined && fg.detStats === undefined && old(scA, "d2-12@W").detStats === undefined);
     ok("!! the dispatch: flyArm sends exact and long+fix+forget to the library (the same flights as X.flyArm), any other name to flyDetArm, and an unknown arm throws naming the choices; flights are deterministic (the same arm twice gives the same record)", sameF(D.flyArm(pilot, scA, "exact"), X.flyArm(pilot, scA, "exact")) && sameF(D.flyArm(pilot, scA, "long+fix+forget"), fg) && sameF(D.flyArm(pilot, scB, "inc@D10"), viaDrop) && /not <detector>@<condition>/.test(thrown(() => D.flyArm(pilot, scA, "nonesuch"))) && same(nw(scA, "full@WD30L"), full));
+});
+
+guard("7", () => {
+    console.log("\n7. THE FIELDS OF FOLLOW-UPS 25 TO 58 (clear.fNear, ghost.carry, ghost.zone, ghost.at, lock)");
+    const rep = (n, x) => Array.from({ length: n }, () => x);
+    /** hits at dHit, then free readings at dFree until the cell is clear: the number of free readings it took (0 if never within 40). */
+    const clearsAfter = (spec, hits, dHit, dFree) => { const r = drive(spec, [...rep(hits, [1, dHit]), ...rep(40, [0, dFree])]).out, k = r.indexOf("0", hits); return k < 0 ? 0 : k - hits + 1; };
+    const F = (c) => mkSpec([1, 1], { evidence: true, ...c });
+    ok("!! clear.fNear is the fraction within 80 m of the sonar at the ping (inclusive) and clear.f beyond: ten hits then free readings, fNear 0.8 and f 1 clears at the 8th free reading at 50 m and at exactly 80 m and at the 10th at 80.01 m and 100 m; fNear 1 and f 0.8 the other way round",
+        clearsAfter(F({ f: 1, fNear: 0.8 }), 10, 50, 50) === 8 && clearsAfter(F({ f: 1, fNear: 0.8 }), 10, 80, 80) === 8 && clearsAfter(F({ f: 1, fNear: 0.8 }), 10, 80.01, 80.01) === 10 && clearsAfter(F({ f: 1, fNear: 0.8 }), 10, 100, 100) === 10
+        && clearsAfter(F({ f: 0.8, fNear: 1 }), 10, 50, 50) === 10 && clearsAfter(F({ f: 0.8, fNear: 1 }), 10, 80, 80) === 10 && clearsAfter(F({ f: 0.8, fNear: 1 }), 10, 80.01, 80.01) === 8 && clearsAfter(F({ f: 0.8, fNear: 1 }), 10, 100, 100) === 8);
+    ok("!! without fNear the fraction is f at every range (the detectors of follow-ups 8 to 24): f 0.8 clears at the 8th free reading at 50 m and at 100 m, f 1 at the 10th at both",
+        clearsAfter(F({ f: 0.8 }), 10, 50, 50) === 8 && clearsAfter(F({ f: 0.8 }), 10, 100, 100) === 8 && clearsAfter(F({ f: 1 }), 10, 50, 50) === 10 && clearsAfter(F({ f: 1 }), 10, 100, 100) === 10);
+    ok("!! fNear works with a window of any length and is ceil, not floor: nine hits and fNear 0.8 need K = ceil(7.2) = 8 of 9 free (the 8th free reading clears at 50 m), and a window of 3 needs all 3 (ceil 2.4)",
+        clearsAfter(F({ f: 1, fNear: 0.8 }), 9, 50, 50) === 8 && clearsAfter(F({ f: 1, fNear: 0.8 }), 3, 50, 50) === 3);
+    const CG = (o) => ({ min: 4, life: 60, nbr: false, ...o });
+    const seq = (hits, dh, frees, df, tail) => [...rep(hits, [1, dh]), ...rep(frees, [0, df]), ...tail];
+    const cm = (carry) => mkSpec([1, 1], { evidence: true }, { ghost: CG({ carry }) });
+    const second = (spec, tailBefore, hitD = 40) => { const r = drive(spec, [...seq(6, 40, 6, 40, tailBefore), [1, hitD], ...rep(10, [0, 40])]); const k = 6 + 6 + tailBefore.length; const z = r.out.indexOf("0", k + 1); return { frees: z < 0 ? 0 : z - k, marked: r.out[k], st: r.det.stats(r.map) }; };
+    const noGhostLong = second(cm(false), []), withCarry = second(cm(true), []);
+    ok("!! ghost.carry puts the evidence back to `min` when the ghost cell is marked by the ORDINARY rule (a mark of one, which never reaches the ghost's own branch): six hits (evidence 6), six free readings (cleared), one hit marks it again and with the carry it is cleared by the FOURTH free reading (evidence 4), without the carry by the first (evidence 1)",
+        withCarry.marked === "1" && withCarry.frees === 4 && noGhostLong.marked === "1" && noGhostLong.frees === 1);
+    ok("!! a carried re-mark is counted in ghostMarks (1) and an uncarried one is not (0); the marks count both",
+        withCarry.st.ghostMarks === 1 && noGhostLong.st.ghostMarks === 0 && withCarry.st.marks === 2 && noGhostLong.st.marks === 2);
+    const three = drive(cm(true), [...seq(3, 40, 3, 40, []), [1, 40], ...rep(5, [0, 40])]);
+    ok("!! a cell cleared with fewer than `min` occupied readings is no ghost, so there is nothing to carry: three hits, three free readings, one hit marks it with evidence 1 (cleared by the first free reading) even with ghost.carry, and nothing is counted",
+        three.out === "111110100000" && three.det.stats(three.map).ghostMarks === 0);
+    ok("!! the ghost's life bounds the carry: the 60th reading after the clearing is still a ghost (59 free readings then a hit: carried, cleared by the 4th free reading) and the 61st is not (60 free readings then a hit: evidence 1, cleared by the first)",
+        second(cm(true), rep(59, [0, 40])).frees === 4 && second(cm(true), rep(60, [0, 40])).frees === 1);
+    const zc = (zone, at, extra = {}) => mkSpec([1, 1], { evidence: true }, { ghost: CG({ carry: true, zone, at, ...extra }) });
+    ok("!! the carry follows ghost.zone at the ping that re-marks the cell (at \"mark\"): far carries from 120 m and not from 40 m or from exactly 80 m, near carries from 40 m and from exactly 80 m and not from 120 m or 80.01 m, all from every range (a cell not carried is marked at once with evidence 1: cleared by the first free reading)",
+        second(zc("far", "mark"), [], 120).frees === 4 && second(zc("far", "mark"), [], 40).frees === 1 && second(zc("far", "mark"), [], 80).frees === 1 && second(zc("far", "mark"), [], 80.01).frees === 4
+        && second(zc("near", "mark"), [], 40).frees === 4 && second(zc("near", "mark"), [], 80).frees === 4 && second(zc("near", "mark"), [], 120).frees === 1 && second(zc("near", "mark"), [], 80.01).frees === 1
+        && second(zc("all", "mark"), [], 40).frees === 4 && second(zc("all", "mark"), [], 120).frees === 4);
+    // the ghost's own branch (a 2-of-3 mark: one hit marks a ghost cell that the ordinary rule would not)
+    const g23 = (zone, at, nbr = false) => mkSpec([2, 3], { evidence: true }, { ghost: CG({ zone, at, nbr }) });
+    const remark = (spec, dClear, dHit) => { const r = drive(spec, [...rep(6, [1, 100]), ...rep(6, [0, dClear]), [1, dHit]]); return { marked: r.out[12], st: r.det.stats(r.map) }; };
+    ok("!! at \"mark\" the zone is the range of the RE-marking ping and the clearing ping does not matter: with a 2-of-3 mark a ghost (six hits, six free readings) is marked by one hit from 120 m for zone far and not from 40 m, from 40 m and 80 m for zone near and not from 120 m, from any range for zone all, whichever range cleared it",
+        remark(g23("far", "mark"), 100, 120).marked === "1" && remark(g23("far", "mark"), 100, 40).marked === "0" && remark(g23("far", "mark"), 40, 120).marked === "1" && remark(g23("far", "mark"), 120, 80).marked === "0"
+        && remark(g23("near", "mark"), 100, 40).marked === "1" && remark(g23("near", "mark"), 100, 80).marked === "1" && remark(g23("near", "mark"), 100, 80.01).marked === "0" && remark(g23("near", "mark"), 40, 120).marked === "0"
+        && remark(g23("all", "mark"), 100, 40).marked === "1" && remark(g23("all", "mark"), 100, 120).marked === "1");
+    ok("!! at \"clear\" the zone is the range of the CLEARING ping and the re-marking range does not matter: zone far makes a ghost of a cell cleared from 120 m (marked by one hit from 40 m or from 120 m) and nothing of one cleared from 40 m or from exactly 80 m (not marked by one hit, the cell is emptied); zone near makes a ghost of a cell cleared from 80 m and not from 80.01 m",
+        remark(g23("far", "clear"), 120, 40).marked === "1" && remark(g23("far", "clear"), 120, 120).marked === "1" && remark(g23("far", "clear"), 40, 120).marked === "0" && remark(g23("far", "clear"), 40, 40).marked === "0" && remark(g23("far", "clear"), 80, 120).marked === "0"
+        && remark(g23("near", "clear"), 80, 120).marked === "1" && remark(g23("near", "clear"), 80.01, 120).marked === "0" && remark(g23("near", "clear"), 40, 40).marked === "1" && remark(g23("all", "clear"), 40, 40).marked === "1" && remark(g23("all", "clear"), 120, 120).marked === "1");
+    ok("!! the zone is judged before the neighbour test: a ghost with a neighbour test and zone far, read occupied alone from 40 m, is not pending and not refused (ghostRefused 0, not marked), and alone from 120 m is refused (ghostRefused 1); at \"clear\" a cell cleared from the other zone is not a ghost and nothing is pending",
+        remark(g23("far", "mark", true), 100, 40).st.ghostRefused === 0 && remark(g23("far", "mark", true), 100, 40).marked === "0" && remark(g23("far", "mark", true), 100, 120).st.ghostRefused === 1 && remark(g23("far", "clear", true), 40, 120).st.ghostRefused === 0);
+    // the lock
+    const L = (life, below, ghost = null, mark = [1, 1]) => mkSpec(mark, { evidence: true }, { ghost, lock: { life, below } });
+    const afterClear = (spec, hits, nAfter, d = 40) => { const r = drive(spec, [...rep(hits, [1, d]), ...rep(hits, [0, d]), ...rep(nAfter, [1, d])]); return { tail: r.out.slice(2 * hits), st: r.det.stats(r.map) }; };
+    const l1 = afterClear(L(8, 4), 1, 9), l0 = afterClear(mkSpec([1, 1], { evidence: true }), 1, 9);
+    ok("!! a cell cleared with fewer than `below` occupied readings is locked free for `life` readings of that cell: one hit and one free reading (evidence 1: cleared) then nine hits leave the cell clear for the first EIGHT and marked by the ninth (000000001), counting eight refusals; without a lock the first marks it (111111111)",
+        l1.tail === "000000001" && l1.st.lockRefused === 8 && l0.tail === "111111111" && l0.st.lockRefused === 0);
+    ok("!! `below` is exclusive: evidence 3 is locked below 4 and evidence 4 is not (four hits and four free readings, then a hit marks at once); below 5 locks evidence 4; and a lock of life 1 refuses exactly one reading",
+        afterClear(L(8, 4), 3, 2).tail === "00" && afterClear(L(8, 4), 4, 1).tail === "1" && afterClear(L(8, 5), 4, 2).tail === "00" && afterClear(L(1, 4), 1, 2).tail === "01");
+    ok("!! the lock counts readings of the cell, free ones included: after the clearing, five free readings and then hits leave three locked (000, then 1: 4th hit marks) when the life is 8",
+        (() => { const r = drive(L(8, 4), [[1, 40], ...rep(1, [0, 40]), ...rep(5, [0, 40]), ...rep(4, [1, 40])]); return r.out.slice(7) === "0001" && r.det.stats(r.map).lockRefused === 3; })());
+    ok("!! a cell that becomes a ghost is not locked, and the two are exclusive: with the ghost (min 4) and the lock (below 4) four hits, four free readings and a hit mark at once (the ghost's re-mark: the ordinary rule marks with evidence 1, none refused) while three hits (no ghost) lock; with the lock below 6 and the ghost min 4, evidence 5 is a ghost and NOT locked",
+        afterClear(L(8, 4, CG({})), 4, 1).tail === "1" && afterClear(L(8, 4, CG({})), 4, 1).st.lockRefused === 0 && afterClear(L(8, 4, CG({})), 3, 2).tail === "00" && afterClear(L(8, 6, CG({})), 5, 1).tail === "1");
+    ok("!! a locked cell's readings are RECORDED: with a [2, 3] mark and a lock of 2: a hit, a hit (marked, evidence 2), two free readings (cleared, locked 2), a hit (locked, one of the last three: no mark), a hit (locked: two of the last three would mark it and it is REFUSED, counted once) and a free reading (the lock has run out) marks the cell from the recorded window (0110001)",
+        (() => { const r = drive(L(2, 4, null, [2, 3]), [[1, 40], [1, 40], [0, 40], [0, 40], [1, 40], [1, 40], [0, 40]]); return r.out === "0110001" && r.det.stats(r.map).lockRefused === 1; })());
+    ok("!! the lock does not touch a marked cell or a cell with no lock in the spec, and a spec with no `lock` key has none (null): the old detectors' specs carry no lock key",
+        D.makeDetector(mkSpec([1, 1], { evidence: true })).spec.lock === undefined && Object.keys(D.ARM_DEFS.inc).join() === "mark,markNear,near,clear,ghost" && Object.keys(D.ARM_DEFS.inc.clear).join() === "cap,capNear,evidence,f,shape,range");
+    // the specs
+    const t7 = (patch) => thrown(() => D.makeDetector({ ...mkSpec([2, 3], {}), ...patch })), c7 = (patch) => thrown(() => D.makeDetector(mkSpec([2, 3], patch)));
+    ok("!! the new fields are validated and the message names the field: fNear (0, above 1, a string, NaN), ghost.carry (a number), ghost.zone and ghost.at (not in their sets), lock (a number, no life, life 0 or 256 or fractional, below 0 or missing)",
+        /clear\.fNear/.test(c7({ fNear: 0 })) && /clear\.fNear/.test(c7({ fNear: 1.5 })) && /clear\.fNear/.test(c7({ fNear: "a" })) && /clear\.fNear/.test(c7({ fNear: NaN }))
+        && /ghost\.carry/.test(t7({ ghost: CG({ carry: 1 }) })) && /ghost\.zone/.test(t7({ ghost: CG({ zone: "mid" }) })) && /ghost\.at/.test(t7({ ghost: CG({ at: "later" }) }))
+        && /lock is/.test(t7({ lock: 5 })) && /lock is/.test(t7({ lock: { below: 4 } })) && /lock is/.test(t7({ lock: { life: 0, below: 4 } })) && /lock is/.test(t7({ lock: { life: 256, below: 4 } })) && /lock is/.test(t7({ lock: { life: 8.5, below: 4 } })) && /lock is/.test(t7({ lock: { life: 8, below: 0 } })) && /lock is/.test(t7({ lock: { life: 8 } })));
+    ok("!! well-formed edges are accepted: fNear 1 and 0.01, carry true and false, zone all, far and near, at mark and clear, lock life 1 and 255 with below 1, a null lock and no lock",
+        [1, 0.01].every((v) => c7({ fNear: v }) === "no throw") && [true, false].every((v) => t7({ ghost: CG({ carry: v }) }) === "no throw") && ["all", "far", "near"].every((v) => t7({ ghost: CG({ zone: v }) }) === "no throw") && ["mark", "clear"].every((v) => t7({ ghost: CG({ at: v }) }) === "no throw")
+        && t7({ lock: { life: 1, below: 1 } }) === "no throw" && t7({ lock: { life: 255, below: 1 } }) === "no throw" && t7({ lock: null }) === "no throw" && t7({}) === "no throw");
 });
 
 console.log(fails ? `\n${fails} FAIL` : "\nall checks pass");

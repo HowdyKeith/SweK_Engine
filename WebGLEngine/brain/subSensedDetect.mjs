@@ -1,10 +1,11 @@
 // WebGLEngine/brain/subSensedDetect.mjs -- UNNUMBERED (the version is chosen at ship time; the registrations are "FOLLOW-UP 8" to "FOLLOW-UP 24" of brain/SENSED_NAV_WIP.md, the gate is brain/subSensedDetect-selfcheck.mjs)
 //
-// THE GENERAL DETECTOR OF THE SENSED MAP: one cell rule for follow-ups 8 to 24, built once so that no later study edits it.
+// THE GENERAL DETECTOR OF THE SENSED MAP: one cell rule for follow-ups 8 to 58, built twice (follow-ups 8 to 24, then the five optional fields of follow-ups 25 to 58) so that no study edits it.
 //   A cell keeps `win` (the last 32 readings as bits, newest lowest; a reading is counted at each ping that ensonifies the cell), `nread` (readings since it was emptied), `ev` (EVIDENCE: the occupied readings since it was last cleared, kept while marked), and, for the gates and the ghost, `rmark` / `rmin` (its range at the ping that marked it / the least range it has read occupied from since it was emptied) and `ghost` (readings of life left).
 //   MARK: a free cell is marked when at least m of its last n readings were occupied; `mark` [m, n] beyond `near` metres of the sonar at the ping, `markNear` [m, n] within it (inclusive; null: `mark`). [k, k] is a run of k readings; [1, 1] marks at the first.
 //   CLEAR: a marked cell is cleared when at least K = ceil(f L) of its last L readings were free (and it has L readings): L is the HOLD at the cell's range r, `cap` beyond `near` and `capNear` within it (a STEP), or max(1, round(cap (1 - r / sonar range))) (a RAMP); with `evidence` L is min(L, ev), so a cell watched once is held once. f = 1 is L free readings in a row. r is the range `range` says: "ping" (now), "mark" (at the marking) or "min" (the nearest it has read occupied).
 //   GHOST: a cell cleared with ev at least `ghost.min` keeps its window and evidence for `ghost.life` readings; in that time a reading of it as occupied marks it again (ev back to ghost.min), at once, or with `nbr` only if one of its eight neighbours was also read occupied at the same ping or was marked when the ping began (so the order the cells are visited in does not matter). A cell cleared without a ghost, or whose ghost ran out, is emptied.
+//   FOLLOW-UPS 25 TO 58 add five OPTIONAL fields (a spec without them is the detector of follow-ups 8 to 24, flight for flight): `clear.fNear` (the fraction f within `near` of the sonar at the ping, `clear.f` beyond), `ghost.carry` (a ghost cell marked again by the ORDINARY rule takes its evidence back to ghost.min, so a ghost does something behind a mark of one), `ghost.zone` ("all", "far" or "near": the ghost acts only from that side of `near`) and `ghost.at` ("mark": the zone is the range at the ping that re-marks the cell; "clear": the range at the ping that clears it, a cell cleared from the other zone being emptied), and `lock` { life, below } (a cell cleared with fewer than `below` occupied readings is locked FREE for `life` readings of that cell: an occupied reading in that time is recorded and cannot mark it; a cell that becomes a ghost is not locked).
 //   COND: the faults the studies fly under (clean, W, V, R1, R3, D3, D10, D30, WD30, VD30, WD30L, R3D30, P); ARM_DEFS: the detectors by name; an arm is "<detector>@<condition>". flyDetArm flies one.
 // Pure. No clock, no Math.random. Imports the flight and the constants from subSensedNav.mjs, which is not edited by a study.
 "use strict";
@@ -39,16 +40,25 @@ export function makeDetector(spec, sonarRange = X.LONG_SONAR.range) {
     const c = spec.clear;
     need(c && Number.isInteger(c.cap) && c.cap >= 1 && c.cap <= 30 && Number.isInteger(c.capNear) && c.capNear >= 1 && c.capNear <= 30, "clear.cap and clear.capNear are whole numbers from 1 to 30");
     need(Number.isFinite(c.f) && c.f > 0 && c.f <= 1, "clear.f is in (0, 1]");
+    need(c.fNear === undefined || (Number.isFinite(c.fNear) && c.fNear > 0 && c.fNear <= 1), "clear.fNear is in (0, 1] when given");
     need(c.shape === "step" || c.shape === "ramp", "clear.shape is step or ramp");
     need(["ping", "mark", "min"].includes(c.range), "clear.range is ping, mark or min");
     need(typeof c.evidence === "boolean", "clear.evidence is true or false");
     const g = spec.ghost;
     need(g === null || (!!g && Number.isInteger(g.min) && g.min >= 1 && Number.isInteger(g.life) && g.life >= 1 && g.life <= 255 && typeof g.nbr === "boolean"), "ghost is null or { min, life, nbr }");
+    need(!g || g.carry === undefined || typeof g.carry === "boolean", "ghost.carry is true or false when given");
+    need(!g || g.zone === undefined || ["all", "far", "near"].includes(g.zone), "ghost.zone is all, far or near when given");
+    need(!g || g.at === undefined || ["mark", "clear"].includes(g.at), "ghost.at is mark or clear when given");
+    const lk = spec.lock === undefined ? null : spec.lock;
+    need(lk === null || (!!lk && Number.isInteger(lk.life) && lk.life >= 1 && lk.life <= 255 && Number.isInteger(lk.below) && lk.below >= 1), "lock is null or { life, below }");
+    const zone = g && g.zone ? g.zone : "all", at = g && g.at ? g.at : "mark", carry = !!(g && g.carry);
+    const inZone = (d) => zone === "all" || (zone === "far" ? d > spec.near : d <= spec.near);
+    const okMark = (d) => at === "clear" || inZone(d), okClear = (d) => at === "mark" || inZone(d);
     const holdAt = (r) => (c.shape === "ramp" ? Math.max(1, Math.round(c.cap * (1 - Math.min(r, sonarRange) / sonarRange))) : r <= spec.near ? c.capNear : c.cap);
     const state = (map) => {
         if (map.dt) return map.dt;
         const n = map.occ.length;
-        return (map.dt = { occ0: new Uint8Array(n), win: new Uint32Array(n), nread: new Uint8Array(n), ev: new Uint8Array(n), rmark: new Float32Array(n), rmin: new Float32Array(n).fill(Infinity), ghost: new Uint8Array(n), hitAt: new Uint32Array(n), pid: 0, pend: [], marks: 0, clears: 0, ghostMarks: 0, ghostRefused: 0 });
+        return (map.dt = { occ0: new Uint8Array(n), win: new Uint32Array(n), nread: new Uint8Array(n), ev: new Uint8Array(n), rmark: new Float32Array(n), rmin: new Float32Array(n).fill(Infinity), ghost: new Uint8Array(n), lock: new Uint8Array(n), hitAt: new Uint32Array(n), pid: 0, pend: [], marks: 0, clears: 0, ghostMarks: 0, ghostRefused: 0, lockRefused: 0 });
     };
     const empty = (S, i) => { S.win[i] = 0; S.nread[i] = 0; S.ev[i] = 0; S.rmark[i] = 0; S.rmin[i] = Infinity; S.ghost[i] = 0; };
     const mark = (map, S, i, ev, d) => { map.occ[i] = 1; map.nOcc++; S.ev[i] = ev; S.rmark[i] = d; S.ghost[i] = 0; S.marks++; };
@@ -56,15 +66,24 @@ export function makeDetector(spec, sonarRange = X.LONG_SONAR.range) {
         spec,
         begin(map) { const S = state(map); S.pid++; S.pend.length = 0; if (g && g.nbr) S.occ0.set(map.occ); },
         apply(map, ctx) {
-            const S = state(map), i = ctx.i, hit = !!ctx.hit, d = ctx.d, wasGhost = S.ghost[i] > 0;
+            const S = state(map), i = ctx.i, hit = !!ctx.hit, d = ctx.d, wasGhost = S.ghost[i] > 0, locked = S.lock[i] > 0;
             if (wasGhost) S.ghost[i]--;
+            if (locked) S.lock[i]--;
             S.win[i] = ((S.win[i] << 1) | (hit ? 1 : 0)) >>> 0;
             if (S.nread[i] < 255) S.nread[i]++;
             if (hit) { S.hitAt[i] = S.pid; if (d < S.rmin[i]) S.rmin[i] = d; }
             if (!map.occ[i]) {
                 const rule = spec.markNear && d <= spec.near ? spec.markNear : spec.mark, cnt = popcnt(S.win[i] & maskOf(rule[1]));
-                if (cnt >= rule[0]) { mark(map, S, i, cnt, d); return 1; }
-                if (wasGhost && hit) {
+                if (cnt >= rule[0]) {
+                    if (locked) S.lockRefused++;
+                    else {
+                        const carried = carry && wasGhost && okMark(d) && cnt < g.min;
+                        mark(map, S, i, carried ? g.min : cnt, d);
+                        if (carried) S.ghostMarks++;
+                        return 1;
+                    }
+                }
+                if (wasGhost && hit && okMark(d)) {
                     if (!g.nbr) { mark(map, S, i, g.min, d); S.ghostMarks++; return 1; }
                     S.pend.push(i, ctx.gx, ctx.gy, d);
                     return 0;
@@ -77,10 +96,11 @@ export function makeDetector(spec, sonarRange = X.LONG_SONAR.range) {
             let L = holdAt(r);
             if (c.evidence) L = Math.min(L, Math.max(1, S.ev[i]));
             if (S.nread[i] < L) return 0;
-            const K = c.f >= 1 ? L : Math.ceil(c.f * L - 1e-9);
+            const fx = c.fNear !== undefined && d <= spec.near ? c.fNear : c.f, K = fx >= 1 ? L : Math.ceil(fx * L - 1e-9);
             if (L - popcnt(S.win[i] & maskOf(L)) < K) return 0;
             map.occ[i] = 0; map.nOcc--; S.clears++;
-            if (g && S.ev[i] >= g.min) S.ghost[i] = g.life; else empty(S, i);
+            if (g && S.ev[i] >= g.min && okClear(d)) S.ghost[i] = g.life;
+            else { const ev = S.ev[i]; empty(S, i); if (lk && ev < lk.below) S.lock[i] = lk.life; }
             return 1;
         },
         end(map) {
@@ -108,13 +128,13 @@ export function makeDetector(spec, sonarRange = X.LONG_SONAR.range) {
             p.length = 0;
             return changed;
         },
-        stats(map) { const S = state(map); return { marks: S.marks, clears: S.clears, ghostMarks: S.ghostMarks, ghostRefused: S.ghostRefused }; },
+        stats(map) { const S = state(map); return { marks: S.marks, clears: S.clears, ghostMarks: S.ghostMarks, ghostRefused: S.ghostRefused, lockRefused: S.lockRefused }; },
     });
 }
 
 // ---- the detectors of follow-ups 8 to 24, by the names the registrations use ----
-const clearOf = (cap, capNear = cap, { evidence = false, f = 1, shape = "step", range = "ping" } = {}) => ({ cap, capNear, evidence, f, shape, range });
-const spec = (mark, clear, { markNear = null, ghost = null } = {}) => Object.freeze({ mark: Object.freeze(mark), markNear: markNear && Object.freeze(markNear), near: NEAR, clear: Object.freeze(clear), ghost: ghost && Object.freeze(ghost) });
+const clearOf = (cap, capNear = cap, { evidence = false, f = 1, shape = "step", range = "ping", fNear } = {}) => ({ cap, capNear, evidence, f, shape, range, ...(fNear !== undefined ? { fNear } : {}) });
+const spec = (mark, clear, { markNear = null, ghost = null, lock } = {}) => Object.freeze({ mark: Object.freeze(mark), markNear: markNear && Object.freeze(markNear), near: NEAR, clear: Object.freeze(clear), ghost: ghost && Object.freeze(ghost), ...(lock ? { lock: Object.freeze(lock) } : {}) });
 const ONE = clearOf(1), RUN = (k) => [k, k], GH = Object.freeze({ min: 4, life: 60, nbr: false }), GHN = Object.freeze({ min: 4, life: 60, nbr: true });
 const EV = (cap = CAP, o = {}) => clearOf(cap, cap, { evidence: true, ...o }), EVR = (o = {}) => clearOf(1, CAP, { evidence: true, ...o });   // the evidence hold at every range / within `near` only
 export const ARM_DEFS = Object.freeze({
@@ -163,7 +183,7 @@ export function describe(name) {
     const s = ARM_DEFS[name]; if (!s) throw new Error(`subSensedDetect.describe: unknown detector "${name}"`);
     const m = (r) => `${r[0]}/${r[1]}`, c = s.clear;
     const hold = c.shape === "ramp" ? `ramp ${c.cap}` : c.cap === c.capNear ? `${c.cap}` : `${c.cap} beyond ${s.near} m, ${c.capNear} within`;
-    return `mark ${s.markNear ? `${m(s.mark)} beyond ${s.near} m, ${m(s.markNear)} within` : m(s.mark)}; clear ${hold}${c.evidence ? " by evidence" : ""}${c.f < 1 ? ` f ${c.f}` : ""} by range ${c.range}${s.ghost ? `; ghost ${s.ghost.min}/${s.ghost.life}${s.ghost.nbr ? " with a neighbour" : ""}` : ""}`;
+    return `mark ${s.markNear ? `${m(s.mark)} beyond ${s.near} m, ${m(s.markNear)} within` : m(s.mark)}; clear ${hold}${c.evidence ? " by evidence" : ""}${c.f < 1 || c.fNear !== undefined ? ` f ${c.f}` : ""}${c.fNear !== undefined ? ` (${c.fNear} within ${s.near} m)` : ""} by range ${c.range}${s.ghost ? `; ghost ${s.ghost.min}/${s.ghost.life}${s.ghost.nbr ? " with a neighbour" : ""}${s.ghost.carry ? " carrying" : ""}${s.ghost.zone && s.ghost.zone !== "all" ? ` ${s.ghost.zone} zone at the ${s.ghost.at || "mark"}` : ""}` : ""}${s.lock ? `; lock ${s.lock.life} below ${s.lock.below}` : ""}`;
 }
 /** Fly one scenario with a detector arm ("<detector>@<condition>"): the 200 m sonar, the white 3 m fix, the map that forgets as the base, the detector's rule on the cells. The record carries the arm's name. */
 export function flyDetArm(pilot, sc, arm, opts = {}) {
