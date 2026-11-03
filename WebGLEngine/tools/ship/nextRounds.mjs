@@ -2857,6 +2857,13 @@ export const NEXT_ROUNDS = [
         why: "A hold tuned to a dropout of ten pings is a cure tuned to the disease; a range-aware hold is the cheap way to make it longer where it matters.",
     },
     {
+        id: "nav-sensed-detector-range",
+        blocker: "OPEN",
+        what: "Follow-up 8 gives the detector's hold a range and follow-up 9 gives its confirmation one; neither tries both (brain/SENSED_NAV_WIP.md, FOLLOW-UP 10). Registered as FOLLOW-UP 10 of that note (the name was Keith's; no entry existed): trust near readings (mark at once, hold long) and doubt far ones (confirm, forget freely).",
+        how: "After follow-up 7's set is flown: the detector with a near and a far threshold for both marking and clearing, against the uniform detector of follow-up 7 and the map that forgets, under dropouts of 30 pings with the range law, range-law false returns of mean 0.03, the uniform false rate and the persistent mix; HELD15 = seeds 1501 to 1560; the registration is in the note.",
+        why: "If the two rules cover each other the range-aware detector is the cure for both of the forgetting map's weaknesses at once; the stress conditions say what the bet on the range law costs when it fails.",
+    },
+    {
         id: "nav-sensed-confirm-range",
         blocker: "OPEN",
         what: "Follow-up 7's confirmation asks for the same number of occupied readings everywhere (brain/SENSED_NAV_WIP.md, FOLLOW-UP 7), and the false returns it guards against are far likelier far from the vessel where noise grows with range, while a delay in marking costs most near it. Registered as FOLLOW-UP 9 of that note (the name was Keith's; no entry existed, and it is taken in both senses of range: how far the threshold reaches, and how wide a range of false rates, with and without the range law).",

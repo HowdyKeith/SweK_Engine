@@ -532,3 +532,35 @@ The two backlog entries are the two halves of one thing. Follow-up 5 found the f
 * **K8** summed over `R1` and `R3`, `cr` reaches more than `inc` and more than `c3`.
 
 **What it would not say.** That 80 m, a far confirmation of three and a near one of one are the right numbers; that false returns follow a square law (the law is the lever the whole idea pulls); that a real sonar's noise falls near the vessel (it does for a spreading loss, but not for a reverberation floor). Only the confirmation is varied: the hold of follow-up 7 and the near lock of follow-up 8 are not combined with it, and a detector that has both a range-dependent mark and a range-dependent clear is the obvious next table. Not a different pilot, a different generator or the moving ships. A result is a statement about this generator and these models.
+
+## FOLLOW-UP 10: THE DETECTOR THAT KNOWS HOW FAR, BOTH WAYS (Keith, 2026-11-03: "lets also do nav-sensed-detector-range"; REGISTERED BEFORE ANY CODE FOR IT AND BEFORE ITS SET IS FLOWN, and registered while follow-ups 7 to 9 were unflown, so nothing below was shaped by their results)
+
+**What the name was taken to mean, said first.** No backlog entry had that name. It is the table follow-up 9 ended on: *a detector that has both a range-dependent mark and a range-dependent clear*. Follow-up 8 gives the HOLD a range, follow-up 9 gives the CONFIRMATION one; this round gives the one detector both, and puts it against the uniform detector of follow-up 7 across the conditions each of them was made for and the two that try them. If it meant something else, say so before the build, which waits for follow-up 7's set to be flown.
+
+**The idea, in one line.** Near the vessel a reading is reliable (the range law: noise grows with the square of the range) and a mistake is deadly, so **trust it: mark at once and keep what was marked** for a long hold; far from the vessel a reading is unreliable and a mistake is cheap, so **be a sceptic: ask for repeats before marking and forget freely**.
+
+**The rule** (the detector of follow-up 7 with two thresholds for each end): a cell **farther than `near`** from the sonar at the ping is marked after `mark` consecutive occupied readings and cleared after `clear` free ones; a cell **within `near`** (inclusive; believed position to the cell's centre, at that ping) is marked after `markNear` and cleared after `clearNear`. With the near values equal to the far ones it is follow-up 7's detector.
+
+**Conditions** (everything else as follow-ups 3 to 9):
+* **`D30`** (follow-up 8): whole-obstacle dropouts of 30 pings with the range law (the chance one starts is 0.2 x 2 x (range / 200 m) squared of the follow-up 5 rate).
+* **`R3`** (follow-up 9): follow-up 4's four white faults with the false-return and miss rates following the range law, the false rate **0.03** at its mean (0.06 at 200 m).
+* **`W`** (follow-up 7): the same faults with the false rate **uniform** at 0.01, the law NOT holding.
+* **`P`** (follow-up 5): the persistent faults together (`pall`: a bias, dropouts of ten pings, persistent false returns, the range law, first surfaces only).
+* And a sea with no faults.
+
+**Arms** (every arm but `exact` is the 200 m sonar with the white 3 m fix): `exact`; the clean `long+fix+forget`; and under each of the four conditions the three detectors **`inc`** (1, 1: the map that forgets), **`uni`** (mark 2, clear 12 everywhere: follow-up 7's designated) and **`rd`** (**mark 3, markNear 1, clear 1, clearNear 30, near 80 m**: the designated) -- 12 arms -- and `rd@clean`. Fifteen arms, 2,700 flights. **The set is HELD15 = seeds 1501 to 1560 of each of `hard-islands`, `hard-gaps` and `hard-current`** (180 scenarios), fresh, flown ONCE.
+
+**Bar and verdict.** The designated `rd` reaches **at least 80% of what `exact` reaches in EACH kind under `D30` and under `R3`**: six cells, the two conditions the range-aware rules were made for. **SUPPORTED** if all six, **PARTLY SUPPORTED** if at least four, **NOT SUPPORTED** otherwise. (`W` and `P` are the stress: they are in the predictions, not in the verdict, because they ask what the bet on the law costs, not whether the detector works where the law holds.)
+
+**The tensions, said before the data.** Everything that was said of the two halves holds at once. A near hold of thirty is a near sticky map and brings back the fix smear that closes a 24 m gap (follow-up 8's risk); a far confirmation of three thins the long sonar's far reach against its own misses (follow-up 9's); and the near zone is unprotected from false returns if the law fails (`W`). The question is whether the two rules cover each other: the far scepticism does what the near trust cannot (kill the far phantoms), the near hold does what the far forgetting cannot (keep the near wall through a dropout).
+
+**Predictions (scored held or missed, moving nothing; pooled over the three kinds unless said; each with its reason).**
+* **M1** range-awareness pays where the law holds: summed over `D30` and `R3`, `rd` reaches at least 10 more than `uni`. (A hold of thirty near against twelve, a confirmation of three far against two, no delay near.)
+* **M2** `rd` holds the bar (80% of exact) in every kind under `D30`.
+* **M3** and under `R3`.
+* **M4** the bet on the law has a price: under `W`, `rd` reaches at least 10 fewer than `uni`. (The near zone marks a false return at the first reading, the place the vessel hits them.)
+* **M5** under the persistent mix `P`, `rd` is within 10 of `uni` (either side). (A dropout of ten is covered by both; false returns are rarer near.)
+* **M6** on a sea with no faults `rd@clean` is within 8 of the clean `long+fix+forget`.
+* **M7** `rd` reaches more than `inc` under each of the four conditions (`D30`, `R3`, `W`, `P`, each on its own).
+
+**What it would not say.** That 80 m, 3 and 1, 1 and 30 are the right numbers, or that the thresholds should depend on range in a step (a smooth function of range is untried); that the law is true of a real sonar; that the detector is better than any other (a median over the last pings, an M-of-N rule, or the filtered fix, are untried here). Four conditions and one designated detector are a sample of the plane. Not a different pilot, a different generator or the moving ships. A result is a statement about this generator and these models.
