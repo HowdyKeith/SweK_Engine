@@ -1,0 +1,18 @@
+{
+ "report": [
+  "ROUND 20: does the twin do harm on the easy kinds? pooled over R1 2201-2248, R2 2261-2308, all four kinds (read once)",
+  "  PASS IDENTITY R1: the full twin equals the Round 11 twin dive for dive on R1: true",
+  "  PASS IDENTITY R2: the full twin equals the Round 11 twin dive for dive on R2: true",
+  "  PASS HARD KINDS NOT HURT: the twin does not HURT on far and both together on these seeds (else the twin is broken here): true",
+  "twin minus tuned per kind (non-inferior iff the lower bound, mean minus 2 se, is above -0.01):",
+  "  plain +0.0281 (se 0.0112; better 6, worse 0, same 90)  lower bound 0.0058  NON-INFERIOR",
+  "  deep  +0.0164 (se 0.0055; better 9, worse 0, same 87)  lower bound 0.0055  NON-INFERIOR",
+  "  far   +0.0406 (se 0.0093; better 26, worse 4, same 66)  lower bound 0.0221  NON-INFERIOR",
+  "  both  +0.0094 (se 0.0047; better 4, worse 0, same 92)  lower bound -0.0001  NON-INFERIOR",
+  "  easy (plain and deep)  +0.0223 (se 0.0062; better 15, worse 0, same 177)  NON-INFERIOR",
+  "  hard (far and both)    +0.0250 (se 0.0053; better 30, worse 4, same 158)  NON-INFERIOR",
+  "means (tuned | twin): 0.881 | 0.905; crushed 0/0, stranded 0/0",
+  "BOTTOM LINE: THE TWIN DOES NO HARM ON THE EASY KINDS",
+  "BOTTOM LINE: THE TWIN DOES NO HARM ON THE HARD KINDS"
+ ]
+}
