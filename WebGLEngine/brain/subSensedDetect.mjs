@@ -154,7 +154,8 @@ export const DETECTORS = Object.freeze(Object.fromEntries(Object.entries(ARM_DEF
 /** "<detector>@<condition>" -> { name, cond }. */
 export function splitArm(arm) {
     const k = arm.lastIndexOf("@"), name = arm.slice(0, k), cond = arm.slice(k + 1);
-    if (k < 1 || !DETECTORS[name] || !Object.prototype.hasOwnProperty.call(COND, cond)) throw new Error(`subSensedDetect.splitArm: "${arm}" is not <detector>@<condition> (detectors ${Object.keys(ARM_DEFS).join(", ")}; conditions ${Object.keys(COND).join(", ")})`);
+    const own = (o, key) => Object.prototype.hasOwnProperty.call(o, key);
+    if (k < 1 || !own(DETECTORS, name) || !own(COND, cond)) throw new Error(`subSensedDetect.splitArm: "${arm}" is not <detector>@<condition> (detectors ${Object.keys(ARM_DEFS).join(", ")}; conditions ${Object.keys(COND).join(", ")})`);
     return { name, cond };
 }
 /** The text of a detector's rule, for the gate to compare with the registration's words. */
