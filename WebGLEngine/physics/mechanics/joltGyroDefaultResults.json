@@ -1,0 +1,465 @@
+{
+ "registration": "physics/mechanics/SPINNING_BODY_WIP.md (Jolt's gyroscopic force on by default)",
+ "rates": [2,5,10,20],
+ "axes": [0,2],
+ "stable": {
+  "T": 30,
+  "dt": 0.016666666666666666,
+  "eps": 0.00001,
+  "lost": 0.1,
+  "kept": 2
+ },
+ "cube": {
+  "half": 0.5,
+  "density": 1,
+  "W": 2,
+  "axis": [1,2,3]
+ },
+ "configs": [
+  {
+   "id": "J",
+   "engine": "jolt",
+   "flag": "default",
+   "substeps": 1,
+   "label": "Jolt with the force on (the new default), one substep"
+  },
+  {
+   "id": "OWN",
+   "engine": "own",
+   "flag": null,
+   "substeps": null,
+   "label": "the engine's own physics, rigidBody6dof.step()"
+  },
+  {
+   "id": "J4",
+   "engine": "jolt",
+   "flag": "default",
+   "substeps": 4,
+   "label": "reported: Jolt with the force on, four substeps"
+  },
+  {
+   "id": "J0",
+   "engine": "jolt",
+   "flag": false,
+   "substeps": 1,
+   "label": "reported: Jolt with the force passed off, one substep"
+  }
+ ],
+ "at": "2026-11-03T13:52:32.765Z",
+ "registered": true,
+ "T": 30,
+ "dt": 0.016666666666666666,
+ "m1Axis": 1,
+ "flag": {
+  "ok": true,
+  "got": {
+   "default": true,
+   "false": false,
+   "true": true,
+   "static": false
+  }
+ },
+ "key": {
+  "ok": true,
+  "got": [
+   {
+    "axis": 0,
+    "factor": 1,
+    "bound": 1,
+    "steps": 1800,
+    "ok": true
+   },
+   {
+    "axis": 2,
+    "factor": 1.4422203957027826,
+    "bound": 1.4422205101855958,
+    "steps": 1800,
+    "ok": true
+   }
+  ]
+ },
+ "joltControls": [
+  {
+   "config": "J",
+   "inertia": {
+    "ok": true,
+    "diag": [6.500000476837158,4.999999523162842,2.499999761581421],
+    "off": [0,0,0]
+   },
+   "undamped": {
+    "ok": true,
+    "worst": 0
+   }
+  },
+  {
+   "config": "J4",
+   "inertia": {
+    "ok": true,
+    "diag": [6.500000476837158,4.999999523162842,2.499999761581421],
+    "off": [0,0,0]
+   },
+   "undamped": {
+    "ok": true,
+    "worst": 0
+   }
+  },
+  {
+   "config": "J0",
+   "inertia": {
+    "ok": true,
+    "diag": [6.500000476837158,4.999999523162842,2.499999761581421],
+    "off": [0,0,0]
+   },
+   "undamped": {
+    "ok": true,
+    "worst": 0
+   }
+  }
+ ],
+ "m1": {
+  "axis": 1,
+  "flag": true,
+  "fit": {
+   "p0": 0.000019999999494757503,
+   "sigma": 0.953073948614102,
+   "r2": 0.9999999956346399,
+   "points": 392,
+   "crossed": 9.416666666666666,
+   "factor": 110937.27000275212
+  },
+  "reading": "Euler's equations",
+  "sameAsC3": true,
+  "c3Flag": true
+ },
+ "m2": {
+  "flagOn": true,
+  "flagOff": false,
+  "moments": [0.1666666865348816,0.1666666865348816,0.1666666865348816],
+  "changeOn": 0.000026190934739526926,
+  "changeOff": 0,
+  "apart": 0.000026190934739526926,
+  "steps": 1800
+ },
+ "m3": [
+  {
+   "config": "J",
+   "W": 2,
+   "axis": 0,
+   "bound": 1,
+   "factor": 1.6031862502518686,
+   "lostAt": null,
+   "reading": "kept",
+   "twin": true
+  },
+  {
+   "config": "J",
+   "W": 2,
+   "axis": 2,
+   "bound": 1.4422205101855958,
+   "factor": 1.956595775539934,
+   "lostAt": null,
+   "reading": "kept",
+   "twin": true
+  },
+  {
+   "config": "J",
+   "W": 5,
+   "axis": 0,
+   "bound": 1,
+   "factor": 19.943741630054515,
+   "lostAt": null,
+   "reading": "drifting",
+   "twin": true
+  },
+  {
+   "config": "J",
+   "W": 5,
+   "axis": 2,
+   "bound": 1.4422205101855958,
+   "factor": 9.81881006716994,
+   "lostAt": null,
+   "reading": "drifting",
+   "twin": true
+  },
+  {
+   "config": "J",
+   "W": 10,
+   "axis": 0,
+   "bound": 1,
+   "factor": 94128.08466105167,
+   "lostAt": 23.216666666666665,
+   "reading": "lost",
+   "twin": true
+  },
+  {
+   "config": "J",
+   "W": 10,
+   "axis": 2,
+   "bound": 1.4422205101855958,
+   "factor": 2919.186069514561,
+   "lostAt": null,
+   "reading": "drifting",
+   "twin": true
+  },
+  {
+   "config": "J",
+   "W": 20,
+   "axis": 0,
+   "bound": 1,
+   "factor": 130022.09843743865,
+   "lostAt": 5.95,
+   "reading": "lost",
+   "twin": true
+  },
+  {
+   "config": "J",
+   "W": 20,
+   "axis": 2,
+   "bound": 1.4422205101855958,
+   "factor": 50001.26264698911,
+   "lostAt": 8.966666666666667,
+   "reading": "lost",
+   "twin": true
+  },
+  {
+   "config": "OWN",
+   "W": 2,
+   "axis": 0,
+   "bound": 1,
+   "factor": 1,
+   "lostAt": null,
+   "reading": "kept",
+   "twin": true
+  },
+  {
+   "config": "OWN",
+   "W": 2,
+   "axis": 2,
+   "bound": 1.4422205101855958,
+   "factor": 1.4422203957027826,
+   "lostAt": null,
+   "reading": "kept",
+   "twin": true
+  },
+  {
+   "config": "OWN",
+   "W": 5,
+   "axis": 0,
+   "bound": 1,
+   "factor": 1,
+   "lostAt": null,
+   "reading": "kept",
+   "twin": true
+  },
+  {
+   "config": "OWN",
+   "W": 5,
+   "axis": 2,
+   "bound": 1.4422205101855958,
+   "factor": 1.4422202336837038,
+   "lostAt": null,
+   "reading": "kept",
+   "twin": true
+  },
+  {
+   "config": "OWN",
+   "W": 10,
+   "axis": 0,
+   "bound": 1,
+   "factor": 1,
+   "lostAt": null,
+   "reading": "kept",
+   "twin": true
+  },
+  {
+   "config": "OWN",
+   "W": 10,
+   "axis": 2,
+   "bound": 1.4422205101855958,
+   "factor": 1.4422201313834249,
+   "lostAt": null,
+   "reading": "kept",
+   "twin": true
+  },
+  {
+   "config": "OWN",
+   "W": 20,
+   "axis": 0,
+   "bound": 1,
+   "factor": 1,
+   "lostAt": null,
+   "reading": "kept",
+   "twin": true
+  },
+  {
+   "config": "OWN",
+   "W": 20,
+   "axis": 2,
+   "bound": 1.4422205101855958,
+   "factor": 1.4418582913918978,
+   "lostAt": null,
+   "reading": "kept",
+   "twin": true
+  },
+  {
+   "config": "J4",
+   "W": 2,
+   "axis": 0,
+   "bound": 1,
+   "factor": 1.1257480471793577,
+   "lostAt": null,
+   "reading": "kept",
+   "twin": true
+  },
+  {
+   "config": "J4",
+   "W": 2,
+   "axis": 2,
+   "bound": 1.4422205101855958,
+   "factor": 1.5566211150345317,
+   "lostAt": null,
+   "reading": "kept",
+   "twin": true
+  },
+  {
+   "config": "J4",
+   "W": 5,
+   "axis": 0,
+   "bound": 1,
+   "factor": 2.1149122899440336,
+   "lostAt": null,
+   "reading": "drifting",
+   "twin": true
+  },
+  {
+   "config": "J4",
+   "W": 5,
+   "axis": 2,
+   "bound": 1.4422205101855958,
+   "factor": 2.330836846756135,
+   "lostAt": null,
+   "reading": "kept",
+   "twin": true
+  },
+  {
+   "config": "J4",
+   "W": 10,
+   "axis": 0,
+   "bound": 1,
+   "factor": 19.949155751365797,
+   "lostAt": null,
+   "reading": "drifting",
+   "twin": true
+  },
+  {
+   "config": "J4",
+   "W": 10,
+   "axis": 2,
+   "bound": 1.4422205101855958,
+   "factor": 9.697389911693044,
+   "lostAt": null,
+   "reading": "drifting",
+   "twin": true
+  },
+  {
+   "config": "J4",
+   "W": 20,
+   "axis": 0,
+   "bound": 1,
+   "factor": 94835.40495090876,
+   "lostAt": 23.133333333333333,
+   "reading": "lost",
+   "twin": true
+  },
+  {
+   "config": "J4",
+   "W": 20,
+   "axis": 2,
+   "bound": 1.4422205101855958,
+   "factor": 3045.438857344754,
+   "lostAt": null,
+   "reading": "drifting",
+   "twin": true
+  },
+  {
+   "config": "J0",
+   "W": 2,
+   "axis": 0,
+   "bound": 1,
+   "factor": 1.0000092912625649,
+   "lostAt": null,
+   "reading": "kept",
+   "twin": true
+  },
+  {
+   "config": "J0",
+   "W": 2,
+   "axis": 2,
+   "bound": 1.4422205101855958,
+   "factor": 1.0000092912625649,
+   "lostAt": null,
+   "reading": "kept",
+   "twin": true
+  },
+  {
+   "config": "J0",
+   "W": 5,
+   "axis": 0,
+   "bound": 1,
+   "factor": 1.0000056617665054,
+   "lostAt": null,
+   "reading": "kept",
+   "twin": true
+  },
+  {
+   "config": "J0",
+   "W": 5,
+   "axis": 2,
+   "bound": 1.4422205101855958,
+   "factor": 1.0000056617665054,
+   "lostAt": null,
+   "reading": "kept",
+   "twin": true
+  },
+  {
+   "config": "J0",
+   "W": 10,
+   "axis": 0,
+   "bound": 1,
+   "factor": 1.0000146800676026,
+   "lostAt": null,
+   "reading": "kept",
+   "twin": true
+  },
+  {
+   "config": "J0",
+   "W": 10,
+   "axis": 2,
+   "bound": 1.4422205101855958,
+   "factor": 1.0000146800676026,
+   "lostAt": null,
+   "reading": "kept",
+   "twin": true
+  },
+  {
+   "config": "J0",
+   "W": 20,
+   "axis": 0,
+   "bound": 1,
+   "factor": 1.000008283700666,
+   "lostAt": null,
+   "reading": "kept",
+   "twin": true
+  },
+  {
+   "config": "J0",
+   "W": 20,
+   "axis": 2,
+   "bound": 1.4422205101855958,
+   "factor": 1.000008283700666,
+   "lostAt": null,
+   "reading": "kept",
+   "twin": true
+  }
+ ]
+}
