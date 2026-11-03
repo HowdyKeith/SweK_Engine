@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/plannerReplicate-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node tools/ship/plannerReplicate-selfcheck.mjs      (~0.7-3 s)
+// Run: node tools/ship/plannerReplicate-selfcheck.mjs      (~3-15 s)
 //
 // THE GATE OF tools/ship/plannerReplicate.mjs (Round 12 of brain/NEEDS_AND_LIMITS.md, registered first).
 //   1 SETS      881-928, 941-988, 1001-1048 of far and both (96 dives each, 288 in all), disjoint from every seed of Rounds 1-11; the arms; the floor 0.02 and the factor 2.
