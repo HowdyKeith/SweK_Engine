@@ -3069,10 +3069,8 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "nav-sensed-detector-hold-confirm-hold",
-        blocker: "OPEN",
-        what: "The detector's evidence hold clears a cell only after a run of free readings (brain/SENSED_NAV_WIP.md, FOLLOW-UP 12 and after), so a cell that flickers occupied, the fix smear's edge cells above all, is never cleared; follow-ups 12, 16 and 18 each name a K-of-N free clear untried. Registered as FOLLOW-UP 21 of that note (the name was Keith's; no entry existed, and it is taken as the clear given the confirmation's treatment: a hold, a confirmation and a hold that is itself confirmed).",
-        how: "After follow-up 7's set is flown: the 2-of-3 mark with the evidence hold of cap 30 cleared when K of the last min(30, occ) readings were free, K = 1.0, 0.9, 0.8 and 0.6 of the window, against a clear of one and the map that forgets, under white false returns of 0.01 with dropouts of 30 pings, the same with the dropouts leaking (a made-up flicker of 0.15), and a clean sea; HELD26 = seeds 2601 to 2660; the registration is in the note.",
-        why: "If the smear is what a long hold costs, a clear that tolerates an occupied reading in five thins it; the price is a shorter hold against the fault the hold is for.",
+        state: "CLOSED",
+        what: "CLOSED 2026-11-03 (brain/SENSED_NAV_WIP.md, RESULT OF FOLLOW-UP 21; tools/ship/subSensedDetStudy.mjs --study detector-hold-confirm-hold, flights in brain/subSensedDetDetectorHoldConfirmHoldHeld26.jsonl): PARTLY SUPPORTED (5 of 6 cells: the gaps kind under the uniform false rate with dropouts, 36 against 46.4, missed); four of eight predictions held (A3, A4, A7, A8). The designated confirmed clear (0.8 of the last min(30, occ) readings free, behind a 2-of-3 mark and the evidence hold) reaches 142 of 180 under white false returns with dropouts and 163 with leaking dropouts, against 147 and 168 for the run clear: the predicted smear cure is not seen (6 fewer in the gaps kind, 5 fewer pooled) and the predicted leak price is exactly the 5 asked; the order run > 0.9 > 0.8 > 0.6 is monotone in the tolerance. Every arm does better with the leak (the run clear 168 against 147). POST HOC, labelled: 0.8 against the run clear +7 / +12 (p 0.36) and +4 / +9 (p 0.27); no gain over the mark alone (+25 / +21, p 0.66).",
     },
     {
         id: "nav-sensed-detector-confirm-hold",
