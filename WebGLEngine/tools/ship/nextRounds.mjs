@@ -2864,10 +2864,8 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "nav-sensed-detector-hold-range-hold",
-        blocker: "OPEN",
-        what: "Follow-up 15's evidence hold (a mark of one, a ramp to 200 m on the nearest range read) clears a far cell after a few free readings and brings it back as a cell of one reading (brain/SENSED_NAV_WIP.md). Registered as FOLLOW-UP 32 of that note (the name was Keith's; no entry existed, and it is follow-up 15's name with hold on the end, taken as a second hold on the evidence: a cell that had earned four occupied readings and is cleared comes back with four). The ghost of follow-up 18 does nothing under a mark of one (checked by a read-only run of the module), so the build waits for the sets of follow-ups 8 to 24 and then adds a new field in the module (ghost.carry), two registry rows, the set HELD37 and a spec.",
-        how: "After the sets of follow-ups 8 to 24 are flown: the ramp hold on the nearest range and on the range at the ping, each with and without the carried evidence, against the map that forgets, under dropouts of 30 pings, the uniform false rate of 0.01 with leaking dropouts, the persistent mix and a clean sea; HELD37 = seeds 3701 to 3760; the registration is in the note, and says that it was written after the results of follow-ups 7 to 17 and 20 were read.",
-        why: "A wall that was held and cleared comes back as one reading; whether remembering that it was a wall is worth the persistent phantoms it also restores is not known.",
+        state: "CLOSED",
+        what: "CLOSED 2026-11-03 (brain/SENSED_NAV_WIP.md, RESULT OF FOLLOW-UP 32; tools/ship/subSensedDetStudy.mjs --study detector-hold-range-hold, flights in brain/subSensedDetDetectorHoldRangeHoldHeld37.jsonl): PARTLY SUPPORTED (2 of 3 cells); six of eight predictions held (AG1, AG2, AG4, AG6, AG7, AG8). The designated rn30c (mark of one, ramp hold on the nearest range, the carry) holds islands and current under the 30-ping dropouts and misses the gaps kind by one flight (46 against 46.4). The carry fires (14 to 64 re-marks a flight) and changes no count by more than 2 (148 against 146, 125 against 123, 145 against 147); under the dropout alone the whole family is 146 to 149 and the hold is 1 above the map that forgets; under the leaking dropouts the hold is 11 to 13 below it. Not isolated: whether a longer dropout or a repeated one would show the carry.",
     },
     {
         id: "nav-sensed-detector-range-hold-range",
