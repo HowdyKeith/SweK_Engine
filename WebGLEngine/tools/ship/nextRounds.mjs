@@ -2862,6 +2862,13 @@ export const NEXT_ROUNDS = [
         why: "The far end of the long sonar is the end the range-aware confirmation thins; a memory is the cheap way to keep it.",
     },
     {
+        id: "nav-sensed-detector-hold-confirm-range-confirm",
+        blocker: "OPEN",
+        what: "Every range-aware mark in the notes (brain/SENSED_NAV_WIP.md, follow-ups 9, 10, 14, 17, 18, 19, 26) marks within 80 m at the first reading, and the price of that bet is registered each time: a uniform false return enters the plan at once. Registered as FOLLOW-UP 28 of that note (the name was Keith's; no entry existed, and it is follow-up 17's name with a confirmation on the end, taken as a second confirmation in the other zone, since the hold's confirmed clear is follow-up 25). The build waits for the sets of follow-ups 8 to 24: two registry rows, the set HELD33 and a spec are added then.",
+        how: "After the sets of follow-ups 8 to 24 are flown: 3-of-4 beyond 80 m with one reading, two in a row or 2-of-3 within it, each with the evidence hold of cap 30 at every range, against a mark of one everywhere and 2-of-3 and 3-of-4 at every range, under range-law false returns of mean 0.03 and under the uniform 0.01, each with dropouts of 30 pings, and a clean sea; HELD33 = seeds 3301 to 3360; the registration is in the note.",
+        why: "The near zone is where a delay costs a collision and where a false return is dearest; whether a light confirmation there repairs the uniform sea without costing the range-law sea is not known.",
+    },
+    {
         id: "nav-sensed-detector-hold-range-confirm",
         blocker: "OPEN",
         what: "Follow-up 15 (brain/SENSED_NAV_WIP.md) asks which range the evidence hold goes by and whether its gate is a step or a ramp, for a hold that is a run of free readings; follow-up 24 pairs the gated hold with the confirmed clear. Registered as FOLLOW-UP 27 of that note (the name was Keith's; no entry existed, and it is follow-up 15's name with the confirmation of follow-up 24 on the end: follow-up 15's question asked of the confirmed hold). The build waits for the sets of follow-ups 8 to 24: four registry rows, the set HELD32 and a spec are added then.",

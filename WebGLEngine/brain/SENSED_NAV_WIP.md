@@ -1122,3 +1122,34 @@ So the round asks two things the other two cannot: **what the memory is worth in
 **What it would not say.** That 80 m, 200 m, 30, 0.8 and 2-of-3 are the right numbers; that a step and a linear ramp are the only shapes or that the minimum since the last clear is the right memory (follow-up 15's caveats stand); that the leak is a measured flicker. Not a different pilot, a different generator or the moving ships. A result is a statement about this generator and these models.
 
 **The build waits.** The module and the study engine of follow-ups 8 to 24 are frozen until their sets are flown; this round needs four detectors the registry does not have (`m23mk30k`, `m23mn30k`, `m23rp30k`, `m23rn30k`, each a registry row), the set HELD32 and a spec, added **after** the sets of follow-ups 8 to 24 are flown and **before** HELD32 is (as follow-ups 25 and 26's are).
+
+## FOLLOW-UP 28: THE NEAR ZONE CONFIRMED TOO, GRADED BY RANGE (Keith, 2026-11-03: "lets also do nav-sensed-detector-hold-confirm-range-confirm", asked while the DEV runs of follow-ups 8 to 24 were being flown; REGISTERED BEFORE ANY CODE FOR IT AND BEFORE ANY SET OF 8 TO 28 IS FLOWN, so nothing below was shaped by a result)
+
+**What the name was taken to mean, said first.** No backlog entry had that name. It is follow-up 17's name (`detector-hold-confirm-range`: the whole detector, every end knowing how far) with `-confirm` on the end. The trailing confirmation is **not** taken as the hold's confirmed clear: that is follow-up 25 (`range-confirm-hold-confirm`), whose words say it. It is taken as **a second confirmation, in the other zone**: every range-aware mark in the notes (follow-ups 9, 10, 14, 17, 18, 19, 26) marks within 80 m at the **first** reading, and the price of that bet is registered each time (follow-up 9's K4, 14's S5, 17's Q5, 26's AA6: the near zone takes a uniform false return into the plan at once). This round **confirms the near zone as well**, with a rule lighter than the far one, so the confirmation is graded by range: strict far, light near. If it meant the hold's confirmed clear, that is follow-up 25; if it meant something else, say so before the build.
+
+**The question.** A false return marked within 80 m is the dearest kind (the vessel meets it), and it is the kind the range-aware mark lets through when the false rate does not fall near the vessel (follow-up 7's `W`, a uniform 0.01). A near rule of two readings of three costs a ping or two of delay on a real wall and cuts a uniform false return to its square. Does the near confirmation repair the uniform sea without costing the range-law sea?
+
+**The rule** (follow-up 26's detector with a near rule other than one reading): a free cell **beyond `near` = 80 m** of the sonar at the ping is marked when at least `M` of its last `N` readings were occupied, one **within `near`** (inclusive) when at least `Mn` of its last `Nn` were; a marked cell is cleared after `min(30, occ)` free readings in a row at every range (the evidence hold of follow-up 12, as in follow-up 26).
+
+**Conditions** (everything else as follow-ups 3 to 27): **`R3D30`** (follow-up 17's: the white faults with the range law and the false rate 0.03 at its mean, with whole-obstacle dropouts of 30 pings and the range law) and **`WD30`** (follow-up 16's: the false rate **uniform** at 0.01 with the same dropouts): the sea where the law holds and the sea where it does not; and a sea with no faults.
+
+**Arms** (every arm but `exact` is the 200 m sonar with the white 3 m fix and the evidence hold of cap 30 at every range): `exact`; the clean `long+fix+forget`; under each of `R3D30` and `WD30` the six detectors **`m11e30`** (a mark of one everywhere: the hold alone), **`m23e30`** (2-of-3 everywhere: follow-up 16's), **`m34e30`** (3-of-4 everywhere: follow-up 20's), **`rm34e30`** (3-of-4 beyond 80 m, one reading within: follow-up 26's designated), **`n22f34e30`** (3-of-4 beyond, 2 in a row within) and **`n23f34e30`** (**the designated: 3-of-4 beyond 80 m, 2-of-3 within**) (12 arms); and `n23f34e30` on a sea with no faults. Fifteen arms, 2,700 flights. **The set is HELD33 = seeds 3301 to 3360 of each of `hard-islands`, `hard-gaps` and `hard-current`** (180 scenarios), fresh, flown ONCE.
+
+**Bar and verdict.** The designated `n23f34e30` reaches **at least 80% of what `exact` reaches in EACH kind under `R3D30` and under `WD30`**: six cells, both seas. **SUPPORTED** if all six, **PARTLY SUPPORTED** if at least four, **NOT SUPPORTED** otherwise.
+
+**The tension, said before the data.** The near zone is where a delay costs a collision, and a dropout that begins before the near confirmation hides the obstacle from the hold altogether (follow-up 16's tension); the light rule is bought against the uniform sea and paid for in the range-law sea, where near false returns are rare and the delay buys little.
+
+**Predictions (scored held or missed, moving nothing; pooled over the three kinds unless said; each with its reason; the ids carry the letters AC).**
+* **AC1** a near confirmation repairs the uniform sea the range-aware mark could not: under `WD30`, `n23f34e30` reaches at least 10 more than `rm34e30`. (Follow-up 26's AA6 is the price it removes.)
+* **AC2** and costs little where the law holds: under `R3D30`, `n23f34e30` is within 8 of `rm34e30` (either side).
+* **AC3** graded beats uniform strictness where the law holds: under `R3D30`, `n23f34e30` reaches at least 5 more than `m34e30`. (No strictness near.)
+* **AC4** and beats a uniform light rule: under `R3D30`, `n23f34e30` reaches at least 5 more than `m23e30`. (A strict rule far, where the false returns are.)
+* **AC5** `n23f34e30` holds the bar (80% of exact) in every kind under `R3D30`.
+* **AC6** and under `WD30`.
+* **AC7** the memory in the near rule is worth little: under `R3D30`, `n22f34e30` is within 8 of `n23f34e30` (either side). (The near zone is a sixth of the sector's area.)
+* **AC8** on a sea with no faults `n23f34e30` is within 8 of the clean `long+fix+forget`.
+`m11e30` against `m34e30` under each sea, the per-kind and per-gap counts are flown and reported and not predicted.
+
+**What it would not say.** That 80 m, 3-of-4 far and 2-of-3 near are the right numbers or that the grading should be a step and not a smooth function of range; that the hold at every range and a run-clear are the right hold (follow-ups 13 to 25 are that table); that the range law is true of a real sonar. Not a different pilot, a different generator or the moving ships. A result is a statement about this generator and these models.
+
+**The build waits.** The module and the study engine of follow-ups 8 to 24 are frozen until their sets are flown; this round needs two detectors the registry does not have (`n22f34e30` and `n23f34e30`, each a registry row; `rm34e30` is follow-up 26's row), the set HELD33 and a spec, added **after** the sets of follow-ups 8 to 24 are flown and **before** HELD33 is.
