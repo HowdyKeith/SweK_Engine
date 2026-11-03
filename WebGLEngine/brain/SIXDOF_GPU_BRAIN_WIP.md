@@ -673,3 +673,84 @@ committed file, this note or the command, and the counts are in the gate's heade
   this note. Once this verdict sat below theirs, its own "**P1: right.**" answered for both: this note saying Round 1's
   P1 wrong, or Round 2's, went 0 red. Each now reads its own section alone, and the same edits go 1 red. This round's
   gate reads its own section alone from the start.
+
+## Round 4: network or luck -- registered before any code (2026-11-03)
+
+Keith chose it ("Network or luck").
+
+> **The first round's verdict compared one champion with one champion: the fruit fly's Default beat the GPU Brain's
+> champion 70-0. Trained by that same recipe twenty times each, do the fruit fly's searches beat the GPU Brain's as a
+> rule (the network), or did it depend on which searches won (luck)?**
+
+**Why it is a question.**
+- The first round's H2 put the best of five fruit fly searches against the best of five MLP searches. Each brain had one
+  draw.
+- A 70-0 can come from the networks, or from a strong fruit fly draw meeting a weak MLP draw. One pairing cannot tell
+  them apart.
+- Twenty searches a side, every one against every other, shows the spread within each brain beside the gap between them.
+
+**The searches: the first round's recipe, unchanged, twenty times for each brain.**
+- `train6dofPilot.mjs`'s `RECIPE`: 1,500 iterations of the sparse (1+1)-ES, 1 to 4 weights a child, sigma 0.3, from
+  the hand weights, against the PD autopilot, on train seeds 1-12. Each search is pruned toward the hand weights.
+- **The fruit fly's network (930 weights) on search seeds 7300-7319; the GPU Brain's MLP (1,637) on 7400-7419.** Both
+  fresh. Two blocks, so the two brains' mutation streams are not the same stream.
+- **Nothing is picked.** Every search's pruned pilot enters the round robin.
+- Each search's held-out score against the PD autopilot (seeds 21-28) is recorded, as the recipe does. It is reported
+  and tests nothing.
+
+**The round robin: fresh duel seeds 6501-6520** (20), clear of every block flown before.
+- The 40 pilots each play every other pilot on each seed, from both sides: 780 pairings of 40 games, 31,200 games.
+- Each pairing is `pilot6dofPolicy.evaluate()` with the other pilot as the league's one opponent, the way the first
+  round's H2 was read. The duel is the recipe's: the standoff start, no collisions, damage 6.
+- **A pilot's score is its wins minus losses** over its 1,560 games.
+
+**H1, the network decides it.** The fruit fly's 20 scores and the GPU Brain's 20 differ by an exact two-sided rank-sum
+test at p < 0.01 (Wilcoxon-Mann-Whitney on the 40 scores, mid-ranks for ties, p from the exact permutation distribution).
+- **"The fruit fly's network"** if the fruit fly's ranks are the higher, **"the GPU Brain's network"** if they are the
+  lower, and **"not shown"** if p is 0.01 or more.
+- "Not shown" would not prove luck. It would say that twenty searches a side cannot tell the two networks apart.
+- The permutation test is valid although the 40 scores come from games among the same pilots: if the network made no
+  difference, the 40 pilots would be exchangeable, and so would their scores.
+
+**Reported, testing nothing:**
+- per search: the train score, improvements, neutral moves, weights moved and kept, the held-out score against the PD
+  autopilot, and its round-robin record;
+- **the cross-play:** the 400 pairings of a fruit fly search with a GPU Brain search. How many each side leads, and how
+  many are at least as lopsided as the first round's 70-0: a lead of 35 or more over the 40 games;
+- **the two shipped pilots against the field:** the fruit fly's Default (215e26d9) and the GPU Brain's champion
+  (0ffd8554) each play the 40, and each other, on the same seeds. This shows where each would place, and whether the
+  first round's pairing was an ordinary draw.
+
+**Controls.**
+- **C-twin:** the hand MLP flies the fruit fly's hand pilot to the bit on the train and held-out seeds
+  (`train6dofMlp.mjs`'s `twinCheck()`), or nothing is searched. The two brains must start from the same pilot.
+- **C-files:** the two shipped pilots are the registered files (215e26d9 and 0ffd8554), or nothing is searched.
+- **C-determinism:** the first search of each brain (7300 and 7400) is run a second time, in its own process.
+
+**Predictions, fixed now, deciding nothing.**
+- **P1: H1 reads "the fruit fly's network"** (65%). The 70-0 margin was wide, and the MLP's champion kept 29 weights to
+  the fruit fly's 84.
+- **P2: the fruit fly's search leads in at least 300 of the 400 cross-play pairings** (50%).
+- **P3: the fruit fly's Default scores above at least 15 of the 20 fruit fly searches** against the field (55%). It was
+  the best of five on held-out.
+- **P4: the GPU Brain's searches keep fewer weights than the fruit fly's,** by the median (75%). The first round's five
+  MLP searches kept 29 to 74.
+
+**What was seen first.** Timing only, on scratch train seeds 99962-99973 with the hand weights, and no score was read:
+one train evaluation (12 duels) took 74 ms for the fruit fly's network and 38 ms for the MLP, and one duel of the two
+hand pilots 7.5 ms. The first round's committed results file says its MLP searches took 3 minutes each.
+
+**Cost.** A search is about 6 minutes for the fruit fly and 3 for the MLP, with its prune. The 42 searches (the 40 and
+the two determinism re-runs) take about 50 minutes on four workers, and the round robin and the shipped pilots' games
+(34,440 games) about 5 to 10 more.
+
+**What each outcome buys.** Nothing is written, whatever H1 reads: no pilot file and no page change. The capability
+map's GPU cell cites the result.
+- **"The fruit fly's network":** the first round's gap is the networks. More searches of the same recipe would not be
+  expected to close it; another network or another recipe might.
+- **"Not shown":** the 70-0 says little on its own, and the MLP's best draws may fly level with the fruit fly's.
+- This note authorises no further round.
+
+**To be built.** `tools/ship/train6dofMlpLuck.mjs` (the library), `tools/ship/trainMlp6dofLuck.mjs` (the command) and
+`tools/ship/train6dofMlpLuck-selfcheck.mjs` (the gate), on Round 3's pattern. The results go to
+`brain/sixdofGpuLuckResults.json`, committed before it is read.
