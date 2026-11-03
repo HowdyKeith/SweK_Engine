@@ -3074,10 +3074,8 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "nav-sensed-detector-hold-range-confirm",
-        blocker: "OPEN",
-        what: "Follow-up 15 (brain/SENSED_NAV_WIP.md) asks which range the evidence hold goes by and whether its gate is a step or a ramp, for a hold that is a run of free readings; follow-up 24 pairs the gated hold with the confirmed clear. Registered as FOLLOW-UP 27 of that note (the name was Keith's; no entry existed, and it is follow-up 15's name with the confirmation of follow-up 24 on the end: follow-up 15's question asked of the confirmed hold). The build waits for the sets of follow-ups 8 to 24: four registry rows, the set HELD32 and a spec are added then.",
-        how: "After the sets of follow-ups 8 to 24 are flown: a 2-of-3 mark with the evidence hold of cap 30 cleared by 0.8 of the window free, gated by the range at the ping, at the marking or the nearest read, as a step at 80 m or a ramp to 200 m, against the hold at every range and the map that forgets, under range-law false returns of mean 0.03 with dropouts of 30 pings, the uniform false rate of 0.01 with leaking dropouts and a clean sea; HELD32 = seeds 3201 to 3260; the registration is in the note.",
-        why: "A confirmed clear cleans the smear the ramp and the range choice were meant to; whether the range still matters is not known.",
+        state: "CLOSED",
+        what: "CLOSED 2026-11-03 (brain/SENSED_NAV_WIP.md, RESULT OF FOLLOW-UP 27; tools/ship/subSensedDetStudy.mjs --study detector-hold-range-confirm, flights in brain/subSensedDetDetectorHoldRangeConfirmHeld32.jsonl): PARTLY SUPPORTED (5 of 6 cells); four of eight predictions held (AB2, AB4, AB6, AB8). The designated m23rn30k (a ramp gate on the nearest range, 2-of-3 mark, evidence hold, confirmed clear) holds all three kinds under the leaking dropouts and two of three under range-law false returns plus dropouts (gaps 45 against 46.4). What matters is the shape of the gate, not the range it goes by: the step at 80 m costs 12 to 17 flights (131, 128, 128 against 145 and 143 for the ramps, the hold at every range 141) and thins the map by about 30%; the range at marking, at the ping and the nearest range are within 3 of each other; the ramp is level with the hold at every range. Not isolated: whether other step thresholds or ramp shapes change this.",
     },
     {
         id: "nav-sensed-detector-confirm-hold-range",
