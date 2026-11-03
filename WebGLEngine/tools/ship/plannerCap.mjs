@@ -31,6 +31,18 @@ export function flyArm(arm, r8, set) {
     const mean = (f) => (seats.length ? seats.reduce((a, s) => a + f(s.stats), 0) / seats.length : 0);
     return { ...r, cost: mean((s) => s.rolloutSeconds), plans: mean((s) => s.plans) };
 }
+/** One arm on one kind of one set: the half of flySets' result a worker flies (the dives of a set are independent, so the halves put back together are the set). */
+export function flyChunk(arm, r8, set, kind, { ranges = SET_RANGES, count = STATIONS } = {}) {
+    if (!ranges[set]) throw new Error(`plannerCap.flyChunk: unknown set ${JSON.stringify(set)} (${Object.keys(ranges).join(", ")})`);
+    return flyArm(arm, r8, setN([kind], ranges[set][0], ranges[set][1], count));
+}
+/** The parts of one set in kind order [far, both] put back together exactly as flySets would have returned them: the runs in order, the means weighted by dives. */
+export function mergeKinds(parts) {
+    const runs = parts.flatMap((p) => p.runs), n = runs.length, w = (f) => parts.reduce((a, p) => a + f(p) * p.runs.length, 0) / n;
+    const out = { score: w((p) => p.score), runs, crashed: parts.reduce((a, p) => a + p.crashed, 0), stranded: parts.reduce((a, p) => a + p.stranded, 0), byKind: Object.assign({}, ...parts.map((p) => p.byKind)) };
+    if (parts[0].cost !== undefined) { out.cost = w((p) => p.cost); out.plans = w((p) => p.plans); }
+    return out;
+}
 export function flySets(arm, r8, { ranges = SET_RANGES, kinds = HARD, count = STATIONS } = {}) { return Object.fromEntries(SET_NAMES.map((n) => [n, flyArm(arm, r8, setN(kinds, ranges[n][0], ranges[n][1], count))])); }
 export const assemble = (byArm) => Object.fromEntries(SET_NAMES.map((n) => [n, Object.fromEntries(Object.keys(byArm).map((a) => [a, byArm[a][n]]))]));
 const meanOf = (a) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0);

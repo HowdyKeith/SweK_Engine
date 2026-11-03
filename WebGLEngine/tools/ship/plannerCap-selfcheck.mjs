@@ -21,7 +21,7 @@ process.on("uncaughtException", died); process.on("unhandledRejection", died);
 process.on("exit", () => { if (!finished) { console.log("  FAIL  !! THE GATE ENDED BEFORE IT FINISHED"); process.exitCode = 1; } });
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
 const sec = (t) => console.log("\n" + t);
-const J = JSON.stringify;
+const J = JSON.stringify, near2 = (a, b) => Math.abs(a - b) < 1e-9;
 import * as T from "../../brain/needsTask.mjs";
 import * as U from "../../brain/tunedRule.mjs";
 import * as X from "./plannerCap.mjs";
@@ -113,6 +113,14 @@ sec("7. FLIGHT");
     ok("!! cost pinned (mean scheduled rollout seconds per dive on M1 = seeds 1344-1345 far and both, 100 s): the default 3070.633, CAP-2 424.15, CAP-5 10039.383 -- the cap sets the work per plan, 3, 25 or 121 values", Math.abs(full.M1.cost - 3070.633333333333) < 1e-6 && Math.abs(c2.M1.cost - 424.15) < 1e-6 && Math.abs(c5.M1.cost - 10039.383333333333) < 1e-6 && tuned.M1.cost === undefined);
     const direct = T.evaluate(T.flyDecision(U.tunedSeat(R8, U.WIDE_BOUNDS)), tuned.M1 && X.flySets("TUNED-R8", R8, { ranges }) && require_set(1344, 1345), { gauge: T.GAUGE, seconds: 100 });
     ok("!! the tuned rule is T.evaluate's tuned dive on the five-station set with the noisy gauge, dive for dive", tuned.M1.runs.every((r, i) => r.fingerprint === direct.runs[i].fingerprint));
+    {   // the parallel split: a kind of a set is flown on its own, and the halves put back together are the set
+        const ch = (a, k) => X.flyChunk(a, R8, "M2", k, { ranges }), parts = [ch("CAP-4", "far"), ch("CAP-4", "both")], m = X.mergeKinds(parts), one = c4.M2;
+        ok("!! the far half and the both half of a set, merged, are the set flown in one go: the runs (kind, score, fingerprint), the mean score, the counts and the by-kind figures", J(m.runs) === J(one.runs) && near2(m.score, one.score) && m.crashed === one.crashed && m.stranded === one.stranded && J(m.byKind) === J(one.byKind), `${m.score} ${one.score}`);
+        ok("!! the merged cost and plan count are the means over all the set's dives (the two halves have 2 dives each: the mean of their costs), equal to the one-go figures", near2(m.cost, one.cost) && near2(m.plans, one.plans) && near2(m.cost, (parts[0].cost + parts[1].cost) / 2) && m.cost > 0);
+        const t = [X.flyChunk("TUNED-R8", R8, "M2", "far", { ranges }), X.flyChunk("TUNED-R8", R8, "M2", "both", { ranges })], tm = X.mergeKinds(t);
+        ok("!! the tuned rule's halves merge without a cost (it reports none), and unequal halves are weighted by dives, not averaged flat", tm.cost === undefined && tm.runs.length === 4 && near2(X.mergeKinds([{ score: 1, runs: [{}], crashed: 0, stranded: 0, byKind: {}, cost: 10, plans: 1 }, { score: 0, runs: [{}, {}, {}], crashed: 1, stranded: 2, byKind: {}, cost: 20, plans: 3 }]).cost, 17.5) && X.mergeKinds([{ score: 1, runs: [{}], crashed: 0, stranded: 0, byKind: {} }, { score: 0, runs: [{}, {}, {}], crashed: 1, stranded: 2, byKind: {} }]).score === 0.25);
+        ok("!! an unknown set is refused with this library's message", /plannerCap\.flyChunk: unknown set "M9" \(M1, M2\)/.test((() => { try { X.flyChunk("CAP-4", R8, "M9", "far", { ranges }); return ""; } catch (e) { return String(e.message); } })()));
+    }
     X.setFlight({});
     const msg = (f) => { try { f(); return ""; } catch (e) { return String(e.message); } };
     ok("!! an unknown arm is refused with this library's message before flying", /plannerCap\.planOf: unknown arm "CAP-9"/.test(msg(() => X.flyArm("CAP-9", R8, []))));
