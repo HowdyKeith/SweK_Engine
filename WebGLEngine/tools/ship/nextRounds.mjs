@@ -2864,6 +2864,13 @@ export const NEXT_ROUNDS = [
         why: "The far end of the long sonar is the end the range-aware confirmation thins; a memory is the cheap way to keep it.",
     },
     {
+        id: "nav-sensed-detector-hold-confirm-range-hold",
+        blocker: "OPEN",
+        what: "Follow-up 17's registration (brain/SENSED_NAV_WIP.md) ends on a problem it cannot answer: a range-gated hold lets a dropout that begins far away take the cell at once, and a confirmed cell cleared by one miss far away must be confirmed again. Registered as FOLLOW-UP 18 of that note (the name was Keith's; no entry existed, and it is follow-up 17's name with a second hold on the end, taken as a second hold on what has been confirmed: the hold at every range, and a ghost that re-marks a cleared cell at one reading).",
+        how: "After follow-up 7's set is flown: the range-aware 2-of-3 mark with the evidence hold at every range and a ghost (a cell cleared after at least 4 occupied readings is re-marked at one reading for 60 readings), against the range-gated hold, each switch alone, follow-up 16's uniform pair and the map that forgets, under range-law false returns of mean 0.03 with dropouts of 30 pings, the uniform false rate of 0.01, the persistent mix and a clean sea; HELD23 = seeds 2301 to 2360; the registration is in the note.",
+        why: "If the second hold is what the joint stress needs, the range gate on the hold was the mistake; if the persistent phantoms take the ghost's one-reading re-mark, it was a bet the mix calls.",
+    },
+    {
         id: "nav-sensed-detector-hold-confirm-range",
         blocker: "OPEN",
         what: "Follow-ups 13 and 14 (brain/SENSED_NAV_WIP.md) each end by pointing at a detector with both ends range-aware and with the improved rules at each (a memory in the mark, evidence in the hold); follow-up 10 builds the range-aware detector on the plain rules and follow-up 16 the improved rules without range. Registered as FOLLOW-UP 17 of that note (the name was Keith's; no entry existed, and it is taken as follow-up 16 with range, the table 13 and 14 point at).",
