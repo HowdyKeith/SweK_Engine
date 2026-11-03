@@ -77,6 +77,7 @@ sec("2. DECIDE: the thresholded mapping");
     const a0 = answers(), c = J(a0), o0 = J(obs); D.decide(a0, obs, 0.5);
     ok("the answers and the observation are not mutated", J(a0) === c && J(obs) === o0);
     ok("a null answer set is all neutral, five questions invalid", D.decide(null, obs, 0.5).invalid === 5);
+    ok("!! invalidQuestions counts exactly the questions with no valid answer, on the questions as a prompt carries them", D.invalidQuestions(answers(), D.questionsOf(obs)) === 0 && D.invalidQuestions(answers({ surface: null, cap: {} }), D.questionsOf(obs)) === 2 && D.invalidQuestions(null, D.questionsOf(obs)) === 5);
 }
 
 sec("3. THE STATE: what the model sees");

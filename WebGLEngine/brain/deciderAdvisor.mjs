@@ -62,6 +62,8 @@ function probsOf(a, q) {
     if (q.type === "noul" && !("yes" in probs)) return null;
     return probs;
 }
+/** How many of `questions` (as they stand in a prompt) have no valid answer in `answers`. 0 means the ask was fully answered. The audit's ANSWER RATE is the share of asks with 0. */
+export const invalidQuestions = (answers, questions) => questions.filter((q) => !probsOf(answers && answers[q.id], q)).length;
 const best = (probs) => { let k = null; for (const key of Object.keys(probs)) if (k === null || probs[key] > probs[k]) k = key; return k; };
 
 /**
