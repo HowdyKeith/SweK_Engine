@@ -335,7 +335,8 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
         // from RD.baseline graded beside it
         const b0 = RD.baseline ? JSON.parse(fs.readFileSync(path.join(ENG, RD.baseline), "utf8")) : null, U0 = b0 ? decodeNet(b0.runs.find((x) => x.seed === b0.candidate).net) : null;
         // round 79 (section 180): the vectors test, round 72's U_TH read from RD.net
-        const out = (RD.vectors ? LT.runVectorTest : RD.moving ? LT.runMovingTest : LT.runTemporalTest)({ U0, splits: RD.splits, W: RD.image, sppIn: RD.sppIn, sppRef: RD.sppRefTest, net: decodeNet(shipped.net), U: decodeNet(cand.net), Uc2: decodeNet(tr.c2.net), c1Min: RD.c1Min, round: RD.round, harvest: true, cache, log: (m) => console.log("[denoiseStudy] " + m) });
+        // round 80 (section 182): the check test, its gamma the round's
+        const out = (RD.check ? LT.runCheckTest : RD.vectors ? LT.runVectorTest : RD.moving ? LT.runMovingTest : LT.runTemporalTest)({ U0, gamma: RD.moverGamma, splits: RD.splits, W: RD.image, sppIn: RD.sppIn, sppRef: RD.sppRefTest, net: decodeNet(shipped.net), U: decodeNet(cand.net), Uc2: decodeNet(tr.c2.net), c1Min: RD.c1Min, round: RD.round, harvest: true, cache, log: (m) => console.log("[denoiseStudy] " + m) });
         out.trained = { file: RD.net, candidate: tr.candidate, commit: tr.commit };
         if (b0) out.baseline = { file: RD.baseline, candidate: b0.candidate, commit: b0.commit };
         out.round = RD.round;

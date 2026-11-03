@@ -2556,8 +2556,8 @@ export const NEXT_ROUNDS = [
     {
         id: "fsr4-mover-history-check",
         blocker: "OPEN",
-        what: "The round section 181 names and does not set up: exact vectors plus a test of each mover pixel's history against the current frame's own shading -- a per-pixel rejection, or a tighter clamp where the object moved -- so the longer history the vectors give is kept only where it agrees. A change to Bt's accumulation, pre-registered on its own.",
-        how: "Pre-register first: the check (what it compares, its threshold fixed before the run), Bt_MV with it against Bt and Bt_MV on a new moving set, then U_TH on it; Bt bit for bit off the movers as round 79's was.",
+        what: "Round 80 (section 182), set up and awaiting its harvest: Bt_MVC, Bt_MV with the mover pixels' history clipped again to the 3 x 3 neighbourhood's mean +- 1.0 sigma (gamma fixed, not tuned), against Bt and Bt_MV on 24 new moving scenes (12 R 83000-83011, 12 C 84000-84011), each rendered once and accumulated three ways. H80a: Bt_MVC beats Bt by the 1 % rule; H80b: it beats Bt_MV. Bt_MVC is Bt bit for bit off the movers (gated).",
+        how: "node tools/denoiseStudy.mjs --harvest-upscale-temporal-test --round 80 on the rig at round 80's commit (~4-10 h), render/denoise-results-upscale-check-r80.json committed byte for byte before it is read; section 183 reads it.",
         why: "Section 181: the vectors lengthened every mover's history but helped only 13 of 24 scenes; where they hurt, the history they kept carried shading that had changed.",
     },
     {

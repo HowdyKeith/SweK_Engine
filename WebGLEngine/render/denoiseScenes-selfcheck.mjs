@@ -655,6 +655,13 @@ console.log("\n18. ROUND 58: FAMILY P, path-tracer.html'S OWN SIX SCENES (pre-re
         Object.keys(D.SPLITS_UPSCALE_MOVING).join() === "T1" && Object.isFrozen(D.SPLITS_UPSCALE_MOVING) && T1.seeds.length === 24 && T1.seeds[0] === 77000 && T1.seeds[11] === 77011 && T1.seeds[12] === 78000 && T1.seeds[23] === 78011 &&
         T1.families.slice(0, 12).every((f) => f === "R") && T1.families.slice(12).every((f) => f === "C") && T1.seeds.every((x) => !seen.has(x) && D.isDatasetSeed(x)));
 }
+{   // round 80 (section 182): the mover history check's test set
+    // SABOTAGED, restored byte-identical: Z3 its C seeds onto round 79's 82000 -> 2 red (this row, and movingScenes-selfcheck's round 80 row).
+    const T1 = D.SPLITS_UPSCALE_CHECK.T1, seen = new Set([...D.SPLITS_UPSCALE_VECTORS.T1.seeds, ...D.SPLITS_UPSCALE_MOVING.T1.seeds, ...D.SPLITS_UPSCALE_MOVING_78.T1.seeds]);
+    ok("  SPLITS_UPSCALE_CHECK: a test set only, 12 R at 83000-83011 then 12 C at 84000-84011, frozen, reserved, none an earlier moving test seed",
+        Object.keys(D.SPLITS_UPSCALE_CHECK).join() === "T1" && Object.isFrozen(D.SPLITS_UPSCALE_CHECK) && T1.seeds.length === 24 && T1.seeds[0] === 83000 && T1.seeds[11] === 83011 && T1.seeds[12] === 84000 && T1.seeds[23] === 84011 &&
+        T1.families.slice(0, 12).every((f) => f === "R") && T1.families.slice(12).every((f) => f === "C") && T1.seeds.every((x) => !seen.has(x) && D.isDatasetSeed(x)));
+}
 {   // round 79 (section 180): the object motion vectors' test set
     // SABOTAGED, restored byte-identical: Z2 its R seeds onto round 78's 79000 -> 1 red, this row.
     const T1 = D.SPLITS_UPSCALE_VECTORS.T1, seen = new Set([...D.SPLITS_UPSCALE_MOVING.T1.seeds, ...D.SPLITS_UPSCALE_MOVING_78.T1.seeds, ...D.SPLITS_UPSCALE_TEMPORAL_72.T1.seeds]);

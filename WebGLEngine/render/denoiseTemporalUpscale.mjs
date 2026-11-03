@@ -78,9 +78,10 @@ export function shiftResample(img3, W, H, dx, dy) {
  * THE ACCUMULATION. `frames[f]` is { y (W x H rgb, on its jittered grid), shift [dx, dy] in full-size pixels } and `geo[f]` that
  * frame's unjittered first hits (render/denoiseTemporal.mjs's firstHits, W x H). Returns { A, n } on the last frame's
  * unjittered grid. `clamp` (on) holds the reprojected history inside the current frame's 3 x 3 per-channel range. Round 79 (section 180):
- * `vel` (by scene object, each mover's motion a frame) gives reproject the objects' own motion.
+ * `vel` (by scene object, each mover's motion a frame) gives reproject the objects' own motion. Round 80 (section 182): `moverGamma`, at a pixel
+ * whose current hit is a mover (and only there), clips the history again to the 3 x 3 neighbourhood's per-channel mean +- moverGamma sigma.
  */
-export function accumulateUpscaled(frames, geo, W, H, { clamp = true, vel = null } = {}) {
+export function accumulateUpscaled(frames, geo, W, H, { clamp = true, vel = null, moverGamma = null } = {}) {
     if (frames.length !== geo.length || !frames.length) throw new Error(`denoiseTemporalUpscale: ${frames.length} frames against ${geo.length} first-hit buffers`);
     const N = W * H;
     let A = shiftResample(frames[0].y, W, H, frames[0].shift[0], frames[0].shift[1]), n = new Float64Array(N).fill(1);
@@ -100,6 +101,16 @@ export function accumulateUpscaled(frames, geo, W, H, { clamp = true, vel = null
                     const v = cur[(qy * W + qx) * 3 + c]; if (v < lo) lo = v; if (v > hi) hi = v;
                 }
                 hist[c] = Math.min(Math.max(hist[c], lo), hi);
+            }
+            if (clamp && moverGamma !== null && vel && vel[geo[f].obj[p]]) for (let c = 0; c < 3; c++) {
+                let s1 = 0, s2 = 0, k = 0;
+                for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+                    const qx = px + dx, qy = py + dy;
+                    if (qx < 0 || qy < 0 || qx >= W || qy >= H) continue;
+                    const v = cur[(qy * W + qx) * 3 + c]; s1 += v; s2 += v * v; k++;
+                }
+                const mu = s1 / k, sd = Math.sqrt(Math.max(0, s2 / k - mu * mu));
+                hist[c] = Math.min(Math.max(hist[c], mu - moverGamma * sd), mu + moverGamma * sd);
             }
             const nn = Math.min(np + 1, FRAMES);
             n2[p] = nn;

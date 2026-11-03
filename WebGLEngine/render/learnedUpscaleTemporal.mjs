@@ -170,10 +170,11 @@ export function exampleFrames(S, net, { W, sppIn, motion = null }) {
  * Round 77 (section 176): `motion` (movingScenes.sceneMotion) moves the scene's objects over the history, the measured frame
  * unchanged, and adds `mover`, the measured frame's mover pixels; `refs` hands in the still twin's references instead of
  * rendering them again. Round 79 (section 180): `vectors` (with a motion) adds `mv`, the same frames accumulated with the movers' exact
- * velocities -- Bt_MV's input `x` and its composited light `bt`.
+ * velocities -- Bt_MV's input `x` and its composited light `bt`. Round 80 (section 182): `moverGamma` with them adds `mvc`, Bt_MVC's.
  * *** THROWS FOR A DATASET SEED WITHOUT { harvest: true }. ***
  */
-export function temporalExample(family, seed, net, { harvest = false, W = 256, sppIn = 4, sppRef = 32, ref2 = false, motion = null, refs = null, vectors = false } = {}) {
+export function temporalExample(family, seed, net, { harvest = false, W = 256, sppIn = 4, sppRef = 32, ref2 = false, motion = null, refs = null, vectors = false, moverGamma = null } = {}) {
+    if (moverGamma !== null && !vectors) throw new Error("learnedUpscaleTemporal: the mover clip runs on the vectors' history (section 182)");
     if (vectors && !motion) throw new Error("learnedUpscaleTemporal: object motion vectors need a motion (section 180)");
     if (isDatasetSeed(seed) && !harvest) throw new Error(`learnedUpscaleTemporal: seed ${seed} is a dataset seed -- rendering it needs { harvest: true }`);
     if (W % 2) throw new Error(`learnedUpscaleTemporal: a ${W} x ${W} frame has no half size`);
@@ -191,7 +192,10 @@ export function temporalExample(family, seed, net, { harvest = false, W = 256, s
              ...(motion ? { mover: moverMask(motion, geo[FRAMES - 1]) } : {}),
              // round 79 (section 180): the same frames and hits accumulated again with the movers' exact velocities -- Bt_MV and U_TH's input on it
              ...(vectors ? (() => { const vel = velocities(S, motion), am = accumulateUpscaled(frames, geo, W, H, { vel }), aum = accumulateUpscaled(frames, geo, W, H, { clamp: false, vel }).A;
-                 return { mv: { x: temporalInput(am.A, aum, C, am.n, g.albedo, g.normal, depth, W, H), bt: compositeEmitters(am.A, full) } }; })() : {}),
+                 // round 80 (section 182): Bt_MVC, the vectors' history clipped on the movers; its unclamped twin is Bt_MV's
+                 const mc = moverGamma === null ? null : accumulateUpscaled(frames, geo, W, H, { vel, moverGamma });
+                 return { mv: { x: temporalInput(am.A, aum, C, am.n, g.albedo, g.normal, depth, W, H), bt: compositeEmitters(am.A, full) },
+                          ...(mc ? { mvc: { x: temporalInput(mc.A, aum, C, mc.n, g.albedo, g.normal, depth, W, H), bt: compositeEmitters(mc.A, full) } } : {}) }; })() : {}),
              bt: compositeEmitters(acc.A, full), b1: compositeEmitters(C, full),
              noisy: compositeEmitters(shiftResample(upscale(noisyHalf, w, h, W, H, "bilinear"), W, H, ...last.shift), full) };
 }
