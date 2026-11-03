@@ -1,7 +1,7 @@
 {
  "version": 1,
  "generated": "derived by tools/ship/buildPageIndex.mjs -- DO NOT HAND-EDIT, the group comes from tools/ship/pageSections.mjs",
- "count": 495,
+ "count": 496,
  "pages": [
   {
    "f": "AudioLab.html",
@@ -2031,6 +2031,13 @@
    "t": "Nebula",
    "d": "A parallax volumetric nebula for the EV flight view: domain-warped colored gas, a starfield, and depth from a drifting camera -- with ships flying through it so combat happens INSIDE the cloud. WebGPU, WebGL2 fallback, Canvas2D fallback. Drag to steer the camera.",
    "g": "webgpu",
+   "p": 0
+  },
+  {
+   "f": "nectarlink.html",
+   "t": "Nectarlink",
+   "d": "",
+   "g": "nearshare",
    "p": 0
   },
   {

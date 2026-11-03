@@ -532,7 +532,8 @@ export const SECTIONS = [
       // honest placement today.
       pages: ["android-invite.html", "remote-desktop.html", "lan.html", "sync-probe.html", "pairlane.html",
               // v4211 -- the two BitTorrent front doors, which belonged to no panel before this round.
-              "torrents.html", "webtorrent.html"] },
+              "torrents.html", "webtorrent.html",
+              "nectarlink.html"] },
     // v3434 -- the one-page "Terrain WASM" panel is GONE and biome-map-demo.html joined Voxel & Render.
     // Procedural terrain generation is meshing and rendering; a panel holding ONE page was a heading, not a group.
 
