@@ -1,0 +1,29 @@
+{
+ "report": [
+  "ROUND 18: why does the tuned rule score higher with a noisier gauge? pooled over V1 1801-1900, V2 1901-2000, V3 2001-2100 (far and both; read once)",
+  "  PASS OWN GAUGE OWN-CLIP-0.1: OWN-CLIP-0.1 equals CLIP-0.1 dive for dive on every set (the arm's own reading is the shipped one): true",
+  "  PASS OWN GAUGE OWN-CLIP-0.3: OWN-CLIP-0.3 equals CLIP-0.3 dive for dive on every set (the arm's own reading is the shipped one): true",
+  "  PASS FREE DIFFERS: FREE-0.1 differs from CLIP-0.1 on at least one dive (else the clip never binds and the arm tests nothing): true",
+  "  PASS SHIFT LOW-0.04: LOW-0.04 differs from CLIP-0.1 on at least one dive: true",
+  "  PASS SHIFT HIGH-0.04: HIGH-0.04 differs from CLIP-0.1 on at least one dive: true",
+  "  PASS SHIFT CAP-0.04: CAP-0.04 differs from CLIP-0.1 on at least one dive: true",
+  "arm means, crushed and stranded, mean reading bias (own-built readings only)",
+  "  CLIP-0.1      0.7937   crushed 0  stranded 0   bias n/a",
+  "  CLIP-0.3      0.8124   crushed 0  stranded 0   bias n/a",
+  "  OWN-CLIP-0.1  0.7937   crushed 0  stranded 0   bias -0.0000",
+  "  OWN-CLIP-0.3  0.8124   crushed 0  stranded 0   bias +0.0016",
+  "  FREE-0.1      0.7937   crushed 0  stranded 0   bias -0.0001",
+  "  FREE-0.3      0.7996   crushed 0  stranded 0   bias -0.0002",
+  "  LOW-0.04      0.8045   crushed 0  stranded 0   bias n/a",
+  "  HIGH-0.04     0.7902   crushed 0  stranded 0   bias n/a",
+  "  CAP-0.04      0.7887   crushed 0  stranded 0   bias n/a",
+  "CLIP-0.3 minus CLIP-0.1 (replication): +0.0187 (se 0.0034; better 99, worse 41, same 460) UP",
+  "FREE-0.3 minus FREE-0.1 (no clip): +0.0059 (se 0.0034; better 73, worse 53, same 474) SAME",
+  "CLIP-0.3 minus FREE-0.3 (the clip at sd 0.3): +0.0128 (se 0.0028; better 56, worse 17, same 527) UP",
+  "LOW-0.04 minus CLIP-0.1: +0.0107 (se 0.0028; better 72, worse 34, same 494) BETTER",
+  "HIGH-0.04 minus CLIP-0.1: -0.0035 (se 0.0022; better 18, worse 33, same 549) SAME",
+  "CAP-0.04 minus CLIP-0.1: -0.0050 (se 0.0013; better 1, worse 18, same 581) WORSE",
+  "BOTTOM LINE: THE IMPROVEMENT WITH NOISE IS A CLIPPING ARTEFACT",
+  "BOTTOM LINE: THE ROUND 8 TRIP POINTS ARE TOO CAUTIOUS: LOW-0.04"
+ ]
+}

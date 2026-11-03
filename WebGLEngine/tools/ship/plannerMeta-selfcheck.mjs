@@ -13,6 +13,7 @@
 //   8 SOURCE     no clock, random or file.
 // NOT CHECKED, said plainly: whether the twin's gain varies between seed blocks (that is the analysis).
 // SABOTAGE LOG (63 mutants of tools/ship/plannerMeta.mjs, run against a copy of this gate): 7 went 0 red on the first pass; 3 got rows -- a length mismatch refused with its own message, the fixed-effect se using the fixed weights when tau is not 0, and a far or both list of one block being skipped (a one-block analysis is refused). FOUR are EQUIVALENT and said so: `x <= 0` against `x < 0` in the incomplete gamma (at x = 0 the series branch also returns 1), the switch between the series and the continued fraction at a against a + 1 (the two agree where they overlap), `m.p <= P_LEVEL` against `<` and `inflation >= 1.2` against `>` (float boundaries that no data reaches exactly; the rows pin the cases either side). All 63 are red or said above.
+//   ROUND 19 AMENDMENT (4 mutants, 4 red by name): a per-kind block with no spread made the real run throw, so the per-kind line names and leaves it out; mutants: no filter (gate threw), no one-block guard (gate threw), no note in the line (both new rows red), guard at < 1 (gate threw).
 "use strict";
 import fs from "node:fs";
 let fails = 0, finished = false;
@@ -103,6 +104,12 @@ sec("7. REPORT");
     const bad = X.report(blocks.slice(1));
     ok("!! a failed check puts FAIL on its row, says the verdicts are NOT WEIGHED and puts that on a single bottom line", /^  FAIL BLOCK COUNT/m.test(bad.join("\n")) && bad.includes("A CHECK FAILED: the verdicts below are NOT WEIGHED.") && bad[bad.length - 1] === "BOTTOM LINE: NOT WEIGHED (a check failed)" && bad.filter((l) => l.startsWith("BOTTOM LINE")).length === 1);
     ok("!! a far or both list with ONE block is skipped, not analysed (a meta-analysis of one block is refused, so the report must not try)", !/alone/.test(X.report(blocks, { far: blocks.slice(0, 1), both: blocks.slice(0, 1) }).join("\n")));
+    {   // Round 19 found this on the real data: Round 13's V2 had 48 'both' dives where twin and tuned scored the same on every one (se 0), and the per-kind line threw.
+        const zero = blocks.map((b, i) => (i === 1 ? { ...b, mean: 0, se: 0 } : b)), Lz = X.report(blocks, { far: blocks.slice(0, 4), both: zero.slice(0, 4) }).join("\n");
+        ok("!! a per-kind block with NO spread (se 0) is named and left out of that kind's line, and the report does not throw", /both alone \(3 blocks\)/.test(Lz) && new RegExp(`left out \\(no spread`).test(Lz) && Lz.includes(blocks[1].name + " left out"), Lz.split("\n").filter((l) => /both alone/.test(l)).join(" | "));
+        const one = X.report(blocks, { far: blocks.slice(0, 4), both: [blocks[0], zero[1]] }).join("\n");
+        ok("!! when only one block of a kind has spread that kind is reported as not analysed, naming the block left out", /both alone: not analysed \(1 block\(s\) with spread of 2\)/.test(one) && one.includes(blocks[1].name + " left out"));
+    }
     ok("!! with no far or both blocks handed in the two lines are absent", !/alone/.test(X.report(blocks).join("\n")));
 }
 sec("8. SOURCE");

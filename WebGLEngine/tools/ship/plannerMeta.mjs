@@ -93,7 +93,13 @@ export function report(blocks, { far = null, both = null } = {}) {
     blocks.forEach((b, i) => L.push(`  ${b.name.padEnd(11)} n ${String(b.n).padStart(3)}  ${fmt(b.mean)} (se ${b.se.toFixed(4)})  weight ${(100 * m.w[i] / wsum).toFixed(1)}%`));
     L.push(`fixed-effect mean ${fmt(m.xbar)} (se ${m.fixedSe.toFixed(4)})`, `Q ${m.Q.toFixed(2)} on ${m.df} df, p ${m.p.toFixed(4)}; I-squared ${(100 * m.i2).toFixed(0)}%; tau ${Math.sqrt(m.tau2).toFixed(4)}`);
     L.push(`random-effects mean ${fmt(m.re)} (se ${m.reSe.toFixed(4)}); leave-one-block-out range ${fmt(m.looMin)} to ${fmt(m.looMax)}; inflation factor ${m.inflation.toFixed(2)}`);
-    for (const [name, kb] of [["far", far], ["both", both]]) if (kb && kb.length >= 2) { const k = meta(kb); L.push(`${name} alone (${kb.length} blocks): random-effects ${fmt(k.re)} (se ${k.reSe.toFixed(4)}); Q ${k.Q.toFixed(2)} on ${k.df} df, p ${k.p.toFixed(4)}`); }
+    for (const [name, kbAll] of [["far", far], ["both", both]]) if (kbAll && kbAll.length >= 2) {
+        // A block whose per-kind differences are ALL equal (every one 0.0000, say) has a standard error of 0 and an infinite weight: it cannot enter an inverse-variance analysis. It is named and left out of this REPORTED line (never out of the verdict, which reads the blocks of both kinds together).
+        const kb = kbAll.filter((b) => b.se > 0), dropped = kbAll.filter((b) => !(b.se > 0));
+        const note = dropped.length ? `; ${dropped.map((b) => b.name).join(", ")} left out (no spread: every difference equal)` : "";
+        if (kb.length < 2) { L.push(`${name} alone: not analysed (${kb.length} block(s) with spread of ${kbAll.length})${note}`); continue; }
+        const k = meta(kb); L.push(`${name} alone (${kb.length} blocks): random-effects ${fmt(k.re)} (se ${k.reSe.toFixed(4)}); Q ${k.Q.toFixed(2)} on ${k.df} df, p ${k.p.toFixed(4)}${note}`);
+    }
     if (bad.length) L.push("BOTTOM LINE: NOT WEIGHED (a check failed)");
     else for (const l of bottomLines(m)) L.push(`BOTTOM LINE: ${l}`);
     return L;

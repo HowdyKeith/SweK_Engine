@@ -1,0 +1,103 @@
+{
+ "blocks": [
+  {
+   "name": "R12:Z1-Z3",
+   "n": 288,
+   "mean": 0.0214,
+   "se": 0.004
+  },
+  {
+   "name": "R13:V1",
+   "n": 96,
+   "mean": 0.021093749999999998,
+   "se": 0.006728687571207407
+  },
+  {
+   "name": "R13:V2",
+   "n": 96,
+   "mean": 0.024999999999999994,
+   "se": 0.006906328143163523
+  },
+  {
+   "name": "R14:W1",
+   "n": 96,
+   "mean": 0.0070312499999999984,
+   "se": 0.006091219110055939
+  },
+  {
+   "name": "R14:W2",
+   "n": 96,
+   "mean": 0.00859375,
+   "se": 0.003826488304792077
+  },
+  {
+   "name": "R15:U1",
+   "n": 96,
+   "mean": 0.015625,
+   "se": 0.004701186160511991
+  },
+  {
+   "name": "R15:U2",
+   "n": 96,
+   "mean": 0.0265625,
+   "se": 0.007930036897604478
+  },
+  {
+   "name": "R16:T1",
+   "n": 96,
+   "mean": 0.01875,
+   "se": 0.00508965669403723
+  },
+  {
+   "name": "R16:T2",
+   "n": 96,
+   "mean": 0.0203125,
+   "se": 0.006889562925369917
+  },
+  {
+   "name": "R17:S1",
+   "n": 96,
+   "mean": 0.028906249999999998,
+   "se": 0.007314295635360059
+  },
+  {
+   "name": "R17:S2",
+   "n": 96,
+   "mean": 0.014843750000000003,
+   "se": 0.007902036270506157
+  },
+  {
+   "name": "R17:S3",
+   "n": 96,
+   "mean": 0.021093750000000005,
+   "se": 0.006253596826869022
+  }
+ ],
+ "report": [
+  "ROUND 19: is the twin's gain a constant? 12 blocks of fresh far-and-both dives (Rounds 12-17, gauge sd 0.10, three stations); NO NEW DIVE",
+  "  PASS BLOCK COUNT: 12 blocks, 12 expected: true",
+  "  PASS BLOCK SIZE: every per-dive block has 96 dives: true",
+  "  PASS STANDARD ERRORS: every block has a positive standard error: true",
+  "block, dives, twin minus tuned (se), share of the weight",
+  "  R12:Z1-Z3   n 288  +0.0214 (se 0.0040)  weight 16.4%",
+  "  R13:V1      n  96  +0.0211 (se 0.0067)  weight 5.8%",
+  "  R13:V2      n  96  +0.0250 (se 0.0069)  weight 5.5%",
+  "  R14:W1      n  96  +0.0070 (se 0.0061)  weight 7.1%",
+  "  R14:W2      n  96  +0.0086 (se 0.0038)  weight 17.9%",
+  "  R15:U1      n  96  +0.0156 (se 0.0047)  weight 11.8%",
+  "  R15:U2      n  96  +0.0266 (se 0.0079)  weight 4.2%",
+  "  R16:T1      n  96  +0.0187 (se 0.0051)  weight 10.1%",
+  "  R16:T2      n  96  +0.0203 (se 0.0069)  weight 5.5%",
+  "  R17:S1      n  96  +0.0289 (se 0.0073)  weight 4.9%",
+  "  R17:S2      n  96  +0.0148 (se 0.0079)  weight 4.2%",
+  "  R17:S3      n  96  +0.0211 (se 0.0063)  weight 6.7%",
+  "fixed-effect mean +0.0176 (se 0.0016)",
+  "Q 15.35 on 11 df, p 0.1669; I-squared 28%; tau 0.0036",
+  "random-effects mean +0.0180 (se 0.0020); leave-one-block-out range +0.0173 to +0.0195; inflation factor 1.18",
+  "far alone (12 blocks): random-effects +0.0299 (se 0.0045); Q 27.05 on 11 df, p 0.0045",
+  "both alone (10 blocks): random-effects +0.0068 (se 0.0016); Q 4.78 on 9 df, p 0.8530; R13:V2, R16:T2 left out (no spread: every difference equal)",
+  "BOTTOM LINE: THE TWIN'S GAIN IS CONSISTENT ACROSS SEED BLOCKS",
+  "BOTTOM LINE: THE BEST ESTIMATE OF THE GAIN IS +0.0180 (se 0.0020; 12 BLOCKS), IT IS REAL",
+  "BOTTOM LINE: THE STATED STANDARD ERRORS ARE ABOUT RIGHT"
+ ]
+}
