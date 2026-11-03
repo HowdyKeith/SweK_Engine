@@ -803,6 +803,30 @@ The two backlog entries are the two halves of one thing. Follow-up 5 found the f
 
 **Unchanged.** The arms, the designated detector `e30`, the bar, the verdict rule, the predictions with their reasons, the set (HELD17 = seeds 1701 to 1760 of each of the three kinds) and its single reading are as registered above. Any post hoc test is labelled post hoc.
 
+### RESULT OF FOLLOW-UP 12 (2026-11-03; HELD17 flown ONCE, 2,700 flights, `brain/subSensedDetDetectorHoldHeld17.jsonl`; the verdict below is the one the study command printed; every number under "POST HOC" was computed after it was read and is labelled)
+
+**VERDICT: SUPPORTED (3 of 3 cells).** The designated `e30` against 80% of exact's count: D30: islands HELD, gaps HELD, current HELD. **6 of 8 predictions held; O5, O6 missed.**
+
+**Flown (reached of 180; islands / gaps / current):** `exact` 176 (60/60/56); `long+fix+forget` 175 (59/60/56); `inc@D30` 146 (53/43/50); `h12@D30` 153 (59/47/47); `h30@D30` 156 (57/49/50); `e12@D30` 155 (54/50/51); `e30@D30` 157 (56/50/51); `inc@W` 132 (36/60/36); `h12@W` 49 (15/14/20); `h30@W` 53 (18/14/21); `e12@W` 128 (41/60/27); `e30@W` 128 (41/60/27); `inc@P` 157 (57/48/52); `e30@P` 157 (53/58/46); `e30@clean` 174 (60/60/54).
+
+**The predictions (each scored as registered):**
+* **O1 HELD**: a plain long hold makes false returns far worse: h30@W reaches at least 20 fewer than inc@W. inc@W 132, h30@W 53: +79 against the 20 asked.
+* **O2 HELD**: the evidence hold does not: e30@W is within 10 of inc@W. e30@W 128, inc@W 132: 4 apart, within 10 asked.
+* **O3 HELD**: the evidence hold covers the long dropout: e30@D30 reaches at least 10 more than inc@D30. e30@D30 157, inc@D30 146: +11 against the 10 asked.
+* **O4 HELD**: at little cost against the plain hold of the same cap: e30@D30 is within 10 of h30@D30. e30@D30 157, h30@D30 156: 1 apart, within 10 asked.
+* **O5 MISSED**: the cap matters: e12@D30 reaches at least 5 fewer than e30@D30. e30@D30 157, e12@D30 155: +2 against the 5 asked.
+* **O6 MISSED**: under the persistent mix, the evidence hold is better than the incumbent: e30@P reaches more than inc@P. e30@P 157 against inc@P 157.
+* **O7 HELD**: on a sea with no faults e30@clean is within 8 of the clean long+fix+forget. e30@clean 174, long+fix+forget 175: 1 apart, within 8 asked.
+* **O8 HELD**: a plain hold of twelve already helps with the long dropout: h12@D30 reaches more than inc@D30. h12@D30 153 against inc@D30 146.
+
+**What was found (the registered measures; the reading of them is post hoc where said).**
+* **The evidence hold does what it was registered to do: a plain hold's dropout cure, without its false-return ruin.** The designated `e30` (a mark of one reading, a clear after as many free readings in a row as it was read occupied, up to 30) holds **all three bar cells** under D30: **SUPPORTED**; six of eight predictions held (O1 to O4, O7, O8; O5 and O6 missed). Under dropouts of 30 pings `e30` reaches 157, the plain hold of thirty 156, the evidence hold of twelve 155, the plain hold of twelve 153 and the map that forgets 146 (O3 held: +11 over `inc` against the 10 asked; POST HOC `e30` against `inc` +20 / +9, p 0.061). Under white false returns `e30` is level with `inc` (128 against 132, O2 held; POST HOC +19 / +23, p 0.64) while the **plain holds are ruinous: `h12@W` 49 and `h30@W` 53** (127 collided each, median minimum clearance -0.01 m, 50% of the grid ensonified; O1 held by 79 flights where 20 were asked; POST HOC `e30` against `h12` +94 / +15 and against `h30` +90 / +15, both p < 0.0001).
+* **The cap hardly matters; the evidence does the work.** O5 missed: `e12@D30` 155, `e30@D30` 157 (POST HOC +5 / +3, p 0.73); `e12` and `e30` fly the same flight in all but 2 of 180 scenarios under W and in 90 of 180 under D30. Any of the four holds clears the bar's islands and current cells under D30; the plain hold of twelve misses the gaps (47 against 48.0 needed), as does `inc` (43).
+* **The 24 m gaps are where the holds differ.** Under D30, 24 m / 32 m gaps reached: `inc` 8 / 15, `h12` 10 / 17, `h30` 9 / 20, `e12` 13 / 17, `e30` 13 / 17 (exact 20 / 20). The plain hold of thirty fills the map (median 485 occupied cells at the end against `e30`'s 360 and `inc`'s 283) and replans 53 times a flight against 85 to 87: it is cheap in plans and dear when there are false returns.
+* **Under the persistent mix and on a sea with no faults it costs nothing.** O6 missed on equality (`e30@P` 157, `inc@P` 157, POST HOC +13 / +13, p 1.0); O7 held: `e30@clean` 174 against the clean map's 175.
+
+**What it does not say.** That one-for-one is the right ratio between occupied and free readings or that the hold is complete: it is shown against a dropout of thirty pings, a made-up fault; follow-ups 13, 15 to 31 put it with a range, a confirmation, a ghost and a confirmed clear. That the evidence hold beats the map that forgets by a margin the sign test can see (p 0.061 under D30, 1.0 under P). Not a different pilot, a different generator or the moving ships. A result is a statement about this generator and these models.
+
 ## FOLLOW-UP 13: THE HOLD THAT KNOWS BOTH (Keith, 2026-11-03: "lets also do nav-sensed-detector-range-hold"; REGISTERED BEFORE ANY CODE FOR IT AND BEFORE ITS SET IS FLOWN, and registered while follow-ups 7 to 12 were unflown, so nothing below was shaped by their results)
 
 **What the name was taken to mean, said first.** No backlog entry had that name. It is the junction of two registrations: follow-up 8 gives the hold a **range** (a long hold only within `near` of the sonar, one free reading beyond), follow-up 12 gives it **evidence** (a marked cell is cleared after as many free readings in a row as it was read occupied since marking, up to a cap). This round puts them in one hold, and against each alone. If it meant something else, say so before the build, which waits for follow-up 7's set to be flown.

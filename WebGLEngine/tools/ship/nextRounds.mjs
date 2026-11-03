@@ -2981,10 +2981,8 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "nav-sensed-detector-hold",
-        blocker: "OPEN",
-        what: "The detector holds every marked cell for the same number of free readings in a row (brain/SENSED_NAV_WIP.md, FOLLOW-UP 7 and after), so a long hold keeps every false return as long as a real obstacle and a short one lets a long dropout through. Registered as FOLLOW-UP 12 of that note (the name was Keith's; no entry existed, and it is taken as the hold rule itself, the mirror of detector-confirm).",
-        how: "After follow-up 7's set is flown: a hold in proportion to the evidence (a marked cell cleared after as many free readings in a row as it was read occupied since marking, up to a cap) against the plain hold and the map that forgets, under dropouts of 30 pings, the uniform false rate of 0.01 and the persistent mix; HELD17 = seeds 1701 to 1760; the registration is in the note.",
-        why: "The cheap way out of the choice between keeping phantoms and losing obstacles is to hold only what has been watched; whether it works against this generator is not known.",
+        state: "CLOSED",
+        what: "CLOSED 2026-11-03 (brain/SENSED_NAV_WIP.md, RESULT OF FOLLOW-UP 12; tools/ship/subSensedDetStudy.mjs --study detector-hold, flights in brain/subSensedDetDetectorHoldHeld17.jsonl): SUPPORTED (3 of 3 cells); six of eight predictions held (O5 and O6 missed). The evidence hold (cleared after as many free readings in a row as occupied readings, up to a cap of 30) gives a plain hold's dropout cure without its false-return ruin: 157 of 180 under dropouts of 30 pings against 156 for the plain hold of thirty and 146 for the map that forgets, and 128 against 132 under white false returns where the plain holds reach 49 and 53 (127 collided each). The cap hardly matters (12 against 30: 155 and 157).",
     },
     {
         id: "nav-sensed-detector-confirm",
