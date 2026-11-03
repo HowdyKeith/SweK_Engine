@@ -2857,6 +2857,13 @@ export const NEXT_ROUNDS = [
         why: "A hold tuned to a dropout of ten pings is a cure tuned to the disease; a range-aware hold is the cheap way to make it longer where it matters.",
     },
     {
+        id: "nav-sensed-detector-hold",
+        blocker: "OPEN",
+        what: "The detector holds every marked cell for the same number of free readings in a row (brain/SENSED_NAV_WIP.md, FOLLOW-UP 7 and after), so a long hold keeps every false return as long as a real obstacle and a short one lets a long dropout through. Registered as FOLLOW-UP 12 of that note (the name was Keith's; no entry existed, and it is taken as the hold rule itself, the mirror of detector-confirm).",
+        how: "After follow-up 7's set is flown: a hold in proportion to the evidence (a marked cell cleared after as many free readings in a row as it was read occupied since marking, up to a cap) against the plain hold and the map that forgets, under dropouts of 30 pings, the uniform false rate of 0.01 and the persistent mix; HELD17 = seeds 1701 to 1760; the registration is in the note.",
+        why: "The cheap way out of the choice between keeping phantoms and losing obstacles is to hold only what has been watched; whether it works against this generator is not known.",
+    },
+    {
         id: "nav-sensed-detector-confirm",
         blocker: "OPEN",
         what: "The detector marks a cell after `k` occupied readings in a row (brain/SENSED_NAV_WIP.md, FOLLOW-UP 7 and after), which is brittle against the sonar's misses and re-marks a cell a miss has cleared only after another run; follow-ups 7 and 10 list an M-of-N rule as untried. Registered as FOLLOW-UP 11 of that note (the name was Keith's; no entry existed, and it is taken as the confirmation rule itself).",
