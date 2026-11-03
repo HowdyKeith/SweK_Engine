@@ -283,8 +283,16 @@ export const KEY_DRIFT_V4460 = Object.freeze({
             cause: "vendor/zebrafish-vestibular, the paper-only supplementary files, gained the article's Source Data workbook: its `files` list grew by one entry (86,497 bytes) and PROVENANCE.md grew from 13,054 to 14,279 bytes. " +
                    "v4416's mechanism a fifth time, from an ordinary vendoring commit. Its top-level `bytes` moved too (2,491,929 to 2,579,651) and reaches nothing, as recorded",
             control: "on today's tree, dropping ONLY the workbook's entry from `files` gives d4d55077 -- exactly the previous key -- and putting back only `bytes` or only PROVENANCE.md's size leaves d10dceab" }),
+        // 2026-11-03 (unnumbered) -- ONE REBUILT FILE IN ONE BODY: the spinning body's build (5fed473f) rebuilt vendor/box3d/box3d.wasm with four new shim exports, 829,117 to 830,021
+        // bytes, and its cargo at max(1, round(bytes/4096)) went from 202 to 203 -- v4416's mechanism, for one body. The bake was left behind at that commit (orrerySeed and orreryView
+        // went red, unseen until a baseline run two rounds later) and is made here. MEASURED (world/orrery.mjs through makeGitEconomy, seed 7, 400 ticks), not read off the diff.
+        Object.freeze({ version: "unnumbered, 2026-11-03", commit: "5fed473f", hash: "f51215a5", file: "orrery.json",
+            field: "files", bodiesTouched: 1,
+            cause: "vendor/box3d/box3d.wasm rebuilt from box3d v0.1.0 with four new exports (angular velocity, damping, inertia), 829,117 to 830,021 bytes, so its cargo went from 202 to 203; " +
+                   "PROVENANCE.md grew from 2,106 to 3,414 bytes and stays at one ton. Its top-level `bytes` moved too (1,082,363 to 1,084,575) and reaches nothing, as recorded",
+            control: "on today's tree, putting back ONLY box3d.wasm's size gives d10dceab -- exactly the previous key -- and putting back only PROVENANCE.md's size or only `bytes` leaves f51215a5" }),
     ]),
-    current: "d10dceab",
+    current: "f51215a5",
     // *** MEASURED AND NEGATIVE, AND IT CORRECTS MY OWN FIRST WRITING OF THE ENTRY ABOVE. *** The re-bake's
     // diff moved TWO fields on 16 bodies each, `arrived` and `sha`, and I wrote "arrived + sha" into this
     // record straight off that diff -- the exact mistake bytesDoNotReachTheEconomy exists to record, made

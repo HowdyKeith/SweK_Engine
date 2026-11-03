@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "eb0d10662f4defc32407603c3c2ffa675c00d906",
+ "head": "75002a982caee21856418c2ed2255874eb028b09",
  "bodies": {
   "box3d": [
    {
@@ -22,12 +22,12 @@
    {
     "path": "physics/box3d/box3dConformance-selfcheck.mjs",
     "bytes": 14163,
-    "sha": "5638cbe47b9844b08c29dab76eba4337cd917427"
+    "sha": "5fed473f3d3aa7f9680f5ca7fb5532480324fc36"
    },
    {
     "path": "physics/box3d/box3dLoader.js",
     "bytes": 29671,
-    "sha": "8c009e25970f6129173801315a93ce2a4cc7291c"
+    "sha": "5fed473f3d3aa7f9680f5ca7fb5532480324fc36"
    },
    {
     "path": "physics/box3d/box3dNode.mjs",
@@ -390,7 +390,7 @@
    {
     "path": "physics/jolt/joltLoader.js",
     "bytes": 13363,
-    "sha": "713679f4c6fb11350bbccba6756ddcc70eac84d6"
+    "sha": "5fed473f3d3aa7f9680f5ca7fb5532480324fc36"
    },
    {
     "path": "tools/ship/artifactWeight.mjs",

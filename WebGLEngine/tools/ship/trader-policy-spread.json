@@ -1,8 +1,8 @@
 {
  "shapeAt": "v4316",
- "changedAt": "v4819",
+ "changedAt": "v4910",
  "days": 60,
- "greedy": 62297.666666666664,
+ "greedy": 31691.666666666668,
  "runs": [
   {
    "name": "narrow, 14 iterations, seed 3 (Level 16's)",
@@ -13,8 +13,8 @@
    "iters": 14,
    "pop": 8,
    "seed": 3,
-   "ratio": 0.8381854858127378,
-   "heldReturn": 52217,
+   "ratio": 2.5081356823560346,
+   "heldReturn": 79487,
    "params": 145
   },
   {
@@ -26,8 +26,8 @@
    "iters": 30,
    "pop": 12,
    "seed": 5,
-   "ratio": 0.7607882585222561,
-   "heldReturn": 47395.333333333336,
+   "ratio": 2.43676045227452,
+   "heldReturn": 77225,
    "params": 145
   },
   {
@@ -39,10 +39,10 @@
    "iters": 30,
    "pop": 12,
    "seed": 5,
-   "ratio": 0.8197043227943261,
-   "heldReturn": 51065.666666666664,
+   "ratio": 2.4315540362871415,
+   "heldReturn": 77060,
    "params": 417
   }
  ],
- "verdict": "NO training beats greedy"
+ "verdict": "EVERY training beats greedy"
 }

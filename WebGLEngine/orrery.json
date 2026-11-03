@@ -6,7 +6,7 @@
    "name": "box3d",
    "arrived": "2026-08-19",
    "sha": "66db97c45b5286d98d1c018506effca552f05a23",
-   "bytes": 1082363,
+   "bytes": 1084575,
    "files": [
     {
      "path": "box3d.js",
@@ -14,7 +14,7 @@
     },
     {
      "path": "box3d.wasm",
-     "bytes": 829117
+     "bytes": 830021
     },
     {
      "path": "include/box3d/base.h",
@@ -54,7 +54,7 @@
     },
     {
      "path": "PROVENANCE.md",
-     "bytes": 2106
+     "bytes": 3414
     }
    ]
   },
