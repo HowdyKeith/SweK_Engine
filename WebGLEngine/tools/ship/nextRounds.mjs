@@ -2857,6 +2857,13 @@ export const NEXT_ROUNDS = [
         why: "A hold tuned to a dropout of ten pings is a cure tuned to the disease; a range-aware hold is the cheap way to make it longer where it matters.",
     },
     {
+        id: "nav-sensed-detector-range-confirm",
+        blocker: "OPEN",
+        what: "The range-aware confirmation (brain/SENSED_NAV_WIP.md, FOLLOW-UP 9) asks for a run of three readings far from the vessel, which where the range law holds is read 22% of the time for a real obstacle at the sonar's edge, and the M-of-N rule (FOLLOW-UP 11) is uniform in range. Registered as FOLLOW-UP 14 of that note (the name was Keith's; no entry existed, and it is taken as the two put together: one reading near, M of N far).",
+        how: "After follow-up 7's set is flown: the confirmation with a single reading within a range and an M-of-N rule beyond it (2-of-3, 2-of-4, 3-of-4), against a run of three beyond, a uniform run of two, a uniform 2-of-3 and the map that forgets, under range-law false returns of mean 0.03 and 0.01, the uniform false rate of 0.01 and a clean sea; HELD19 = seeds 1901 to 1960; the registration is in the note.",
+        why: "The far end of the long sonar is the end the range-aware confirmation thins; a memory is the cheap way to keep it.",
+    },
+    {
         id: "nav-sensed-detector-range-hold",
         blocker: "OPEN",
         what: "The evidence hold (brain/SENSED_NAV_WIP.md, FOLLOW-UP 12) holds a watched cell at any range, and its one real cost is far from the vessel, where a hold brings back the fix smear and a dropout is harmless; the range-aware hold (FOLLOW-UP 8) holds a near cell by count, not by evidence. Registered as FOLLOW-UP 13 of that note (the name was Keith's; no entry existed, and it is taken as the two put together).",

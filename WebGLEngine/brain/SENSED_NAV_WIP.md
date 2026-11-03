@@ -648,3 +648,31 @@ The two backlog entries are the two halves of one thing. Follow-up 5 found the f
 * **L8** summed over `D30` and `P`, `re30` reaches more than `e30` and more than `n30`.
 
 **What it would not say.** That 80 m, a cap of thirty and one-for-one are the right numbers; that a cell's range at the ping (as against the nearest range it has ever been read from) is the right gate; that the gate should be a step and not a smooth weight. Only the hold is varied: the confirmation of follow-ups 7, 9 and 11 is not combined with it, and a detector with both ends range-aware and evidence-based is a follow-up on this one. Not a different pilot, a different generator or the moving ships. A result is a statement about this generator and these models.
+
+## FOLLOW-UP 14: THE CONFIRMATION THAT KNOWS HOW FAR, WITH A MEMORY (Keith, 2026-11-03: "lets also do nav-sensed-detector-range-confirm"; REGISTERED BEFORE ANY CODE FOR IT AND BEFORE ITS SET IS FLOWN, and registered while follow-ups 7 to 13 were unflown, so nothing below was shaped by their results)
+
+**What the name was taken to mean, said first.** No backlog entry had that name. It is the junction of the two registrations on the marking side: follow-up 9 gives the confirmation a **range** (a run of three readings beyond `near`, one reading within), follow-up 11 gives it a **memory** (`M` occupied readings among the last `N`, not `k` in a row). This round puts the memory into the range-aware confirmation. If it meant something else, say so before the build, which waits for follow-up 7's set to be flown.
+
+**The idea.** Follow-up 9's far confirmation is a run of three, and where the range law holds the misses grow with the range as well as the false returns (0.4 at 200 m): a run of three is read about a fifth of the time for a real obstacle at the sonar's edge (0.6 cubed), so the far end of the long sonar is thinned, the very range it was bought for. A rule with a memory (2 of the last 3) is met about two thirds of the time at the same miss chance and passes a false return with chance three times the rate squared, which at the far end's 0.06 is 0.011 a cell a ping against 0.0036... but the point is the real obstacle: **seen early, marked early, re-marked at once after a miss**. So: **near, one reading; far, `M` of `N`**.
+
+**The rule** (the detector of follow-up 11 with a second rule for cells within `near`): a free cell **farther than `near`** from the sonar at the ping (inclusive; believed position to the cell's centre) is marked when at least `M` of its last `N` readings were occupied; a cell **within `near`** when at least `Mn` of its last `Nn` were (here 1 of 1). The clear is a single free reading (`clear` 1), so the confirmation is the only thing that varies.
+
+**Conditions** (follow-up 4's four white faults, everything else as follow-ups 3 to 13): **`R3`** and **`R1`** (follow-up 9's: the misses and the false returns following the range law, the false rate **0.03** or **0.01** at its mean); **`W`** (follow-up 7's: the false rate uniform at 0.01, the law NOT holding); and a sea with no faults.
+
+**Arms** (every arm but `exact` is the 200 m sonar with the white 3 m fix and a clear of 1): `exact`; the clean `long+fix+forget`; under `R3` the seven rules **`inc`** (1-of-1: the map that forgets), **`c2`** (2 in a row everywhere), **`m23`** (2-of-3 everywhere: follow-up 11's designated), **`cr`** (3 in a row beyond 80 m, 1 within: follow-up 9's designated), **`rm23`** (**2-of-3 beyond 80 m, 1 within: the designated**), **`rm24`** (2-of-4 beyond, 1 within) and **`rm34`** (3-of-4 beyond, 1 within) (7 arms); `inc`, `m23` and `rm23` under `W` (3); `m23` and `rm23` under `R1` (2); and `rm23@clean`. Fifteen arms, 2,700 flights. **The set is HELD19 = seeds 1901 to 1960 of each of `hard-islands`, `hard-gaps` and `hard-current`** (180 scenarios), fresh, flown ONCE.
+
+**Bar and verdict.** The designated `rm23` reaches **at least 80% of what `exact` reaches in EACH kind under `R3` and under `R1`**: six cells, the two conditions where the range law holds. **SUPPORTED** if all six, **PARTLY SUPPORTED** if at least four, **NOT SUPPORTED** otherwise. (`W` is in the predictions, not the bar: it asks what the bet on the law costs.)
+
+**The tension, said before the data.** A window of three ages the readings of a cell the vessel has been moving past: a reading two pings back was taken from 6 m farther away, and the far readings it keeps are the noisiest. And a near zone marked at the first reading has, under the range law at `R3`, some one and a third phantom cells a ping inside 80 m against about a fiftieth for a 2-of-3 rule there: the bet is the same as follow-up 9's.
+
+**Predictions (scored held or missed, moving nothing; pooled over the three kinds unless said; each with its reason).**
+* **S1** a memory pays far away: under `R3`, `rm23` reaches at least 5 more than `cr`. (A run of three far away is read 22% of the time for a real obstacle at 200 m, a 2-of-3 rule 65%.)
+* **S2** and is no worse than the same rule everywhere: under `R3`, `rm23` is within 10 of `m23` (either side). (No delay near, 60 times the near phantoms.)
+* **S3** a longer window buys nothing: under `R3`, `rm24` is within 8 of `rm23` (either side).
+* **S4** a stricter rule pays where the misses are many: under `R3`, `rm34` reaches at least 5 fewer than `rm23`.
+* **S5** the bet on the law has a price: under `W`, `rm23` reaches at least 10 fewer than `m23`.
+* **S6** `rm23` holds the bar (80% of exact) in every kind under `R3`.
+* **S7** and under `R1`.
+* **S8** on a sea with no faults `rm23@clean` is within 8 of the clean `long+fix+forget`.
+
+**What it would not say.** That 80 m, 2-of-3 and 1-of-1 are the right numbers; that the window should be a step in range and not a smooth function; that the readings of a cell are independent (the vessel moves between them); that the range law is true of a real sonar. Only the confirmation is varied: the hold of follow-ups 7, 8, 12 and 13 is not combined with it, and a detector with both ends range-aware and with a memory at each is the table this and follow-up 13 point at. Not a different pilot, a different generator or the moving ships. A result is a statement about this generator and these models.
