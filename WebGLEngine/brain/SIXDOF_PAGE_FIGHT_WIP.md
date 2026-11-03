@@ -273,3 +273,19 @@ and he did.
 - **Each new row is sabotaged** with the byte-safe runner, red by name.
 
 **Not claimed:** nothing new is measured. The default is chosen on this round's numbers.
+
+**The page default, built (2026-11-02/03; nothing of the section above is changed).**
+- **What exists:** `brain/pilotRoster.mjs`'s `ctx.defaultChoice` and `ctx.defaultLabel`; on `es-box3d-6dof.html`,
+  `defaultChoice: "close"`, the label, the fallback note, the tooltip and the description; `page-index.json` rebuilt
+  (one line); three rows in `brain/pilotRoster-selfcheck.mjs`; the page row in `brain/pilot6dofPolicy-selfcheck.mjs`.
+  `tools/ship/rigidBody6dofPage-selfcheck.mjs` chooses the PD autopilot explicitly.
+- **Sixteen gates around the page and the roster were green.** Six sabotages went red by name.
+- **The same runs found a flaky row, older than this change.** The fly gate's shipped-against-zero fight row read "a
+  zero team holds still" on velocity, and the page's live battles are seeded from the clock.
+  - A ship that flies into a zero ship pushes it, and in space the push never decays.
+  - Measured on 30 of the page's random battles, 2 failed that way, each with the zero ship's first motion at
+    3.3-3.4 m from an A ship: hull contact. The gate itself had gone red that way in 2 of 11 runs.
+  - The fix keeps the claim, that the zero pilot never steers, thrusts or fires. It reads motion, spin and the
+    attacker's hurt until the teams first touch.
+  - Two sabotages show it still bites: team B flown by team A's pilot (3 red) and the zero pilot as the hand weights
+    (4 red).
