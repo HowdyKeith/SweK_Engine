@@ -304,3 +304,107 @@ One design missed its target and was replaced:
 - **V21** edited freeRotation's RK4, meaning to break the engine's own spin. But `rigidBody6dof.step()` carries its own
   RK4, so V21 broke C-key's answer key instead, and C-key went red, rightly.
 - **V22** edits the engine's own, and the study's fourth-order row goes red by name.
+
+## Jolt's gyroscopic force on by default -- Keith's decision, registered before any code (2026-11-03)
+
+Keith, 2026-11-03: "Let's have gyro opt in on by default." The verdict above asked it separately. This is the answer,
+and the round that makes the change.
+
+> **Every Jolt body the engine makes gets Jolt's gyroscopic force unless its caller says otherwise. What changes, and
+> what does it cost?**
+
+### The change
+
+- **`physics/jolt/joltLoader.js`'s `addBox()` defaults `gyroscopic` to true.** It is the wrapper's only way to make a
+  body, and nothing else in the engine makes a Jolt body, so every dynamic Jolt body gets Jolt's
+  `mApplyGyroscopicForce`. A caller that passes `gyroscopic: false` still gets it off. Static bodies never have it.
+- **`addShip()` passes nothing, so ships get it too.** A ship is a cube, whose three moments are equal, so the term is
+  exactly zero for it. The flag can only add Jolt's single-precision round trip.
+- **The spinning body's library keeps C2 as it was registered,** with the flag passed false, so its committed results
+  and its section 6 still describe what they measured. The comments that call the force "an opt-in, and it stays one"
+  are rewritten.
+
+### What is measured, in one registered run
+
+Everything on Jolt is reached through its own loader, at the pages' 1/60 s with one substep unless stated, with zero
+damping and zero gravity.
+
+- **M1, the default body.** The fixture (1 x 2 x 3, moments 6.5 / 5 / 2.5) made with no flag:
+  - the flag Jolt reports;
+  - the spinning body's spin on it (2 rad/s about the intermediate axis, wobble 1e-5, 30 s), read by the spinning
+    body's rule;
+  - its trace against C3's, the same spin with the flag passed true.
+- **M2, the ship.** A cube made by `addShip()` (half-size 0.5, density 1), spun at 2 rad/s about the axis (1, 2, 3)
+  for 30 s. Also the same cube made by `addBox()` with the flag passed false. For each, the largest relative change of
+  its angular velocity; and the largest difference between the two traces' angular velocities.
+- **M3, the cost: stable spins at higher rates.** The fixture spun about its largest and its smallest axes at 2, 5, 10
+  and 20 rad/s, with the spinning body's wobble (1e-5 of the spin, on the next axis), for 30 s:
+  - on Jolt with the force on (the new default), at one substep;
+  - on the engine's own physics, as the reference;
+  - reported, testing nothing: Jolt with the force on at 4 substeps, and Jolt with it off.
+  - Each spin gives its wobble's largest growth and the time the wobble first passed 10% of the spin.
+  - **The reading of each spin:**
+    - "lost" if the wobble passes 10% of the spin inside the 30 s;
+    - otherwise "kept" if its largest growth is at most twice Euler's bound for this wobble (its start about the
+      largest axis, 1.4422 of it about the smallest);
+    - otherwise "drifting".
+- **M4, the rest of the engine.** Not part of the run. The 73 gates that reach Jolt are run again after the change.
+  Every row that goes red is named in the build record, and is either restated with a dated note (it recorded the old
+  default) or fixed.
+
+### Controls
+
+- **C-flag:** before any spin, a body made with no flag reports the force on, one passed false off, one passed true
+  on, and a static body off. Otherwise nothing is read.
+- **C-key:** the engine's own physics at 2 rad/s holds the stable wobbles at Euler's bounds, as the spinning body
+  measured: 1 about the largest axis and 1.4422 about the smallest, each to 1e-3.
+- **C-undamped and C-inertia,** as in the spinning body.
+- **C-determinism:** every spin flown twice, to the bit.
+
+### Predictions, fixed now, deciding nothing
+
+They come from the explicit step's growth the spinning body measured, sqrt(1 + (Omega h)^2) a step, where Omega is the
+wobble's own frequency and grows with the spin.
+
+- **P1:** M1's default body reads Euler's equations, and its trace is C3's to the bit (97%).
+- **P2:** M2's cube with the force on keeps its angular velocity to 1e-5 over the 30 s (75%); with it off, exactly
+  (95%).
+- **P3:** about the largest axis, Jolt with the force on keeps the spin at 2 rad/s, lets it drift at 5, and loses it
+  at 10 (near 23 s) and at 20 (near 6 s) (70%).
+- **P4:** about the smallest axis, it keeps the spin at 2 rad/s, lets it drift at 5 and at 10, and loses it at 20
+  (near 9 s) (55%). The 10 rad/s call is the fragile one: the model puts the wobble at 3% of the spin, against the
+  10% line.
+- **P5:** the engine's own physics keeps every spin (95%).
+- **P6:** in M4, the only rows that go red are rows that state the old default and the derived records that hold the
+  wrapper's size (70%).
+
+### What was seen first
+
+- **The spinning body's results:** Jolt with the force on at 2 rad/s grew the stable wobbles to 1.6032 and 1.9566.
+  The explicit step's growth gives 1.62 and 1.96, and the predictions above extrapolate it. Nothing has been flown at
+  any other rate.
+- **The baseline:** the 73 gates that reach Jolt, run at 75002a98 before any code. 68 were green.
+  - Four were red on records the spinning body's build had left stale: orrerySeed, orreryView, orreryFleet and
+    wasmSupport.
+  - One, recordDrift, was red on records only a ship refreshes.
+  - d4551eb9 fixed all but two: orreryFleet's commit belt for box3d and recordDrift. Both wait for the ship, because
+    their records are named for its version.
+
+### What each outcome buys
+
+- Nothing in it decides the default: it is on, by Keith's decision.
+- If P3 or P4 holds, a fast stable spin on Jolt drifts or is lost within the 30 s at the pages' step. The verdict says
+  so. Whether to take more substeps (a quarter of the step shrinks (Omega h)^2 sixteen times) or to keep the default
+  as it is goes back to Keith.
+- This note authorises no further round.
+
+### Cost
+
+Seconds.
+
+### To be built
+
+- The default and its comments, in `joltLoader.js`; the rows that state the old default, restated with dated notes.
+- `tools/roundhouse/joltGyroDefault.mjs` (the library), `tools/roundhouse/joltGyroDefaultRun.mjs` (the command) and
+  `tools/roundhouse/joltGyroDefault-selfcheck.mjs` (the gate).
+- The results go to `physics/mechanics/joltGyroDefaultResults.json`, committed before it is read.
