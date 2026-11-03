@@ -3006,10 +3006,8 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "nav-sensed-confirm-range",
-        blocker: "OPEN",
-        what: "Follow-up 7's confirmation asks for the same number of occupied readings everywhere (brain/SENSED_NAV_WIP.md, FOLLOW-UP 7), and the false returns it guards against are far likelier far from the vessel where noise grows with range, while a delay in marking costs most near it. Registered as FOLLOW-UP 9 of that note (the name was Keith's; no entry existed, and it is taken in both senses of range: how far the threshold reaches, and how wide a range of false rates, with and without the range law).",
-        how: "After follow-up 7's set is flown: the detector with a second mark threshold for cells within a range (`markNear` within `near`), against range-law false returns of mean 0.01 and 0.03 and follow-up 7's uniform 0.01; HELD14 = seeds 1401 to 1460; the registration is in the note.",
-        why: "A confirmation that costs nothing near the vessel and everything to a phantom far from it is the cheap way to buy the cure; it is a bet on the range law and the study says what the bet costs when the law fails.",
+        state: "CLOSED",
+        what: "CLOSED 2026-11-03 (brain/SENSED_NAV_WIP.md, RESULT OF FOLLOW-UP 9; tools/ship/subSensedDetStudy.mjs --study confirm-range, flights in brain/subSensedDetConfirmRangeHeld14.jsonl): NOT SUPPORTED (2 of 6 cells); four of eight predictions held (K3, K4, K6, K7). The range-aware confirmation (a run of three beyond 80 m, one reading within) is the WORST arm of every sea: 136, 123 and 80 flights of 180 under range-law false returns of 0.01 and 0.03 and the uniform 0.01, against 161, 151 and 135 for the map that forgets and 157, 161 and 159 for a uniform run of two; under the uniform rate it collides in 84 of 180 flights and reaches 1 of 20 of the 24 m gaps. A mixed rule worse than both of its uniform parents is not explained by the registered reasoning and no arm isolates it. The uniform run of two is the best of the family flown and holds all six bar cells.",
     },
     {
         id: "nav-sensed-confirm-returns",
