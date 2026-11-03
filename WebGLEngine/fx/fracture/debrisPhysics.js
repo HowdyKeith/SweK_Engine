@@ -30,9 +30,16 @@ function makePhysicsDebris(world, fragments, impact, opts = {}) {
 }
 
 // A floor for them to land on (and walls, if you want them to pile rather than scatter).
+// 2026-11-03 (unnumbered): `rim` is those walls -- four static walls of that height along the floor's edge -- because the
+// spinning body's fourth round (physics/mechanics/SPINNING_BODY_WIP.md) found blob-herd.html's debris could slide off its floor:
+// on one seed of forty a fragment went over the edge at 4.4 s and fell for good. No rim unless asked, so a caller that passes
+// none builds exactly the floor it built before. Returns the floor's handle, as it always has.
 function addGround(world, opts = {}) {
-    const y = opts.y == null ? -1.5 : opts.y, extent = opts.extent || 8;
-    return world.addBox({ type: "static", pos: [0, y - 0.25, 0], half: [extent, 0.25, extent] });
+    const y = opts.y == null ? -1.5 : opts.y, extent = opts.extent || 8, rim = opts.rim || 0;
+    const floor = world.addBox({ type: "static", pos: [0, y - 0.25, 0], half: [extent, 0.25, extent] });
+    if (rim > 0) for (const [x, z, hx, hz] of [[extent + 0.25, 0, 0.25, extent + 0.5], [-extent - 0.25, 0, 0.25, extent + 0.5], [0, extent + 0.25, extent, 0.25], [0, -extent - 0.25, extent, 0.25]])
+        world.addBox({ type: "static", pos: [x, y + rim / 2, z], half: [hx, rim / 2, hz] });
+    return floor;
 }
 
 // Read the solver's transforms back for rendering: each fragment's verts are world-space around its own center, so

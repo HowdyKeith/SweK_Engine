@@ -29,8 +29,10 @@
 <canvas id="c"></canvas>
 <script type="module">
 import { createJoltBackend } from "./physics/jolt/joltLoader.js";
-import { createStructures } from "./physics/jolt/joltStructures.js";
-import { createRagdoll } from "./physics/jolt/joltRagdoll.js";
+// 2026-11-03 (unnumbered): the scene -- ground, panes, wall, crew and the fling -- is physics/jolt/joltArena.js, so this page and its gate
+// (tools/ship/joltArena-selfcheck.mjs) build the same thing. Its header names the three fixes: the crew spawned inside the wall, flung
+// at hundreds of metres a second, and fell off an arena 1 m deep.
+import { buildArena, addCrew as addCrewTo, flingCrew as flingCrewAt } from "./physics/jolt/joltArena.js";
 
 const cvs = document.getElementById("c"), ctx = cvs.getContext("2d");
 function resize() { cvs.width = innerWidth; cvs.height = innerHeight; } addEventListener("resize", resize); resize();
@@ -52,9 +54,8 @@ function rebuild() {
   if (!backend) return;
   if (world && world.destroy) world.destroy();
   world = backend.createWorld({ gravity: [0, -9.8, 0] });
-  world.addBox({ type: "static", pos: [0, -0.5, 0], half: [40, 0.5, 0.5] });   // ground
-  S = createStructures(world);
-  const wall = S.addWall({ x: 0, y: 0, z: 0, cols: 7, rows: 6, half: 0.5 });
+  const arena = buildArena(world), wall = arena.wall;   // the ground, the panes and end caps, the wall
+  S = arena.S;
   wallIdx = wall.idxs; boulders = []; shots = 0; ragdolls = [];
 }
 // v3982 -- addCrew/flingCrew both did this (line 64/68 below); rebuild() never had, so its own onclick="rebuild()"
@@ -64,11 +65,11 @@ function rebuild() {
 window.rebuild = rebuild;
 function addCrew() {
   if (!world) return;
-  for (let k = 0; k < 3; k++) ragdolls.push(createRagdoll(world, { x: 3.5 + k * 1.4, y: 1.6, z: 0, scale: 0.85 }));
+  addCrewTo(world, ragdolls);   // three more, each on the first free spot past the wall
 }
 window.addCrew = addCrew;
 function flingCrew() {
-  for (const rag of ragdolls) { const c = rag.center(); const dir = c[0] >= 0 ? -1 : 1; rag.fling(dir * 30, 7, 0, 5); }
+  flingCrewAt(ragdolls);   // every crew member thrown at the wall at 30 m/s
 }
 window.flingCrew = flingCrew;
 const hud = document.getElementById("hud");

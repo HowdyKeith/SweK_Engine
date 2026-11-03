@@ -1090,3 +1090,21 @@ the committed file, except the step times. It recomputes every sign test from th
 flies a sample again, and flies again the two facts that came after the commit. Sabotaged with the byte-safe runner:
 21 designs, each red by name, and every row of section 6 went red under at least one. They edit the committed file,
 this note or the code, and the counts are in the gate's header.
+
+### The page issues, fixed afterwards (2026-11-03, Keith: "Let's fix all the page issues")
+
+Not part of the round, and nothing above is changed by it. The round measured the pages as they stood when it ran;
+its gate now reads them so, and holds the six lines the fixes changed.
+- **The arena** (`jolt-arena.html`), now built from `physics/jolt/joltArena.js`, which its gate builds too:
+  - Add Crew puts each crew member on the first free spot past the wall, tested against Jolt's own bounds of every
+    body already there. Three presses spawn nobody inside anything.
+  - Fling Crew throws the crew with `launch()`, a velocity of 30 m/s for the whole figure, not an impulse. The crew
+    weigh about 4.4 kg each (density 25, by a new option of `createRagdoll()` whose default is the old 1), so a throw
+    still craters the wall. The fastest part stays near 31 m/s, where it reached Jolt's 500 m/s cap.
+  - The arena is a slab 1.5 m deep between two invisible panes, with end caps, on a ground as deep. In the gate's
+    flights no part leaves it; with the old 1 m-deep ground, all 21 did.
+- **The blob debris** (`blob-avatar.html`, `blob-herd.html`): `addGround()` has an optional rim, and both pages pass a
+  2 m one. Over 40 seeds of each blob no fragment is lost, and none of 60 hard throws at the edge goes over it; off the
+  bare floor, 50 of 60 do.
+- **Gated:** section 6 of `tools/ship/joltArena-selfcheck.mjs` and a new `fx/fracture/debrisPhysics-selfcheck.mjs`,
+  each fix with a row that reproduces the old bug. Sabotaged with the byte-safe runner: 21 designs, each red by name.

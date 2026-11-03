@@ -68,6 +68,23 @@ const spyWorld = async (seen) => { const w = (await L.jolt()).createWorld({ grav
     if (k === "addBox") return (o) => { seen.push({ ...o }); return t.addBox(o); };
     const v = t[k]; return typeof v === "function" ? v.bind(t) : v; } }); };
 
+// 2026-11-03 (unnumbered) -- THE PAGES WERE FIXED AFTER THIS ROUND (the three issues its verdict names: physics/jolt/joltArena.js,
+// fx/fracture/debrisPhysics.js's rim). The round measured them as they stood when it ran, and its committed results file records
+// C-page passing then, all 25. Six of those lines have since changed, and here they are as they stood, from the commit the round
+// was run at (52373cd1). THE PAGES AS REGISTERED are the live pages with these lines put back; the rows below that read the pages
+// read them so, and one row holds that the live pages differ in exactly these six.
+const REGISTERED_LINES = {
+    "jolt-arena.html": ['  world.addBox({ type: "static", pos: [0, -0.5, 0], half: [40, 0.5, 0.5] });   // ground', "  const wall = S.addWall({ x: 0, y: 0, z: 0, cols: 7, rows: 6, half: 0.5 });",
+        "  for (let k = 0; k < 3; k++) ragdolls.push(createRagdoll(world, { x: 3.5 + k * 1.4, y: 1.6, z: 0, scale: 0.85 }));",
+        "  for (const rag of ragdolls) { const c = rag.center(); const dir = c[0] >= 0 ? -1 : 1; rag.fling(dir * 30, 7, 0, 5); }"],
+    "blob-avatar.html": ["    pWorld = physics.createWorld({ gravity: [0, -9.8, 0] }); addGround(pWorld, { y: -1.6, extent: 9 });"],
+    "blob-herd.html": ["  pWorld = physics.createWorld({ gravity: [0, -9.8, 0] }); addGround(pWorld, { y: -2.2, extent: 12 });"],
+};
+// Sabotaged with the page fixes' series (logged in tools/ship/joltArena-selfcheck.mjs): the two rows that read these went red under
+// C2 (the herd's bias moved) and C3 (the arena's update dropped), and the six-lines row under A10, A11, B5 and C1 as well.
+const PAGE_FIXES = ["jolt-arena.html#0", "jolt-arena.html#1", "jolt-arena.html#2", "jolt-arena.html#3", "blob-avatar.html#1", "blob-herd.html#2"];
+const livePage = (f) => fs.readFileSync(path.join(ENG, f), "utf8"), registeredPage = (f) => livePage(f) + "\n" + (REGISTERED_LINES[f] || []).join("\n") + "\n";
+
 console.log("1. THE REGISTRATION, AS CODE");
 try {
     ok("!! the three settings, in order: D the new default (no key), F false on every body, F' false nudged by 1e-5 m -- frozen",
@@ -139,10 +156,13 @@ try {
 
 console.log("\n3. THE PLUMBING (real Jolt; seeds 501 to 503, nothing stepped past a second)");
 try {
-    const pg = L.pageControl(), real = (f) => fs.readFileSync(path.join(ENG, f), "utf8");
-    const edited = L.pageControl({ read: (f) => (f === "blob-herd.html" ? real(f).replace("bias: 0.5 }", "bias: 0.4 }") : real(f)) });
-    ok("!! C-page: the scenes' 25 numbers are the pages' own, read from their source -- and a page with one number changed is refused, by name",
+    // 2026-11-03 (unnumbered) -- RESTATED after the page fixes: this row read the live pages; it reads the pages as registered now (above)
+    const pg = L.pageControl({ read: registeredPage }), live = L.pageControl();
+    const edited = L.pageControl({ read: (f) => (f === "blob-herd.html" ? registeredPage(f).replace("bias: 0.5 }", "bias: 0.4 }") : registeredPage(f)) });
+    ok("!! C-page: the scenes' 25 numbers are the pages' own as the round registered them -- and a page with one number changed is refused, by name",
         pg.ok && pg.checked === 25 && edited.ok === false && J(edited.missing) === J(["blob-herd.html#1"]), J(pg));
+    ok("!! ...and the live pages differ from them in exactly the six lines the page fixes changed (the arena's ground, wall, crew and fling; the two blob grounds), and nowhere else",
+        live.ok === false && J(live.missing) === J(PAGE_FIXES) && Object.values(REGISTERED_LINES).flat().every((l) => !Object.keys(REGISTERED_LINES).some((f) => livePage(f).includes(l))), J(live.missing));
     const [D, F, Fn] = L.SETTINGS, seenD = [], seenF = [];
     const sd = await spyWorld(seenD), ad = L.buildArena(await L.worldOf(D, { makeWorld: () => sd }), 501, D), dd = L.buildDebris(await L.worldOf(D, { makeWorld: () => sd }), L.DEBRIS[0], 501, D);
     const sf = await spyWorld(seenF), af = L.buildArena(await L.worldOf(F, { makeWorld: () => sf }), 501, F), df = L.buildDebris(await L.worldOf(F, { makeWorld: () => sf }), L.DEBRIS[0], 501, F);
@@ -185,7 +205,8 @@ try {
 
 console.log("\n4. THE ROUND ON A MINIATURE (seeds 1001 and 1002, half a second of each window)");
 try {
-    const mini = { seeds: [1001, 1002], addedT: 0.5, flungT: 0.5, debrisT: 0.5 }, r = await L.run(mini), tests = r.tests || {};
+    // 2026-11-03 (unnumbered) -- RESTATED after the page fixes: the miniature hands C-page the pages as registered (above)
+    const mini = { seeds: [1001, 1002], addedT: 0.5, flungT: 0.5, debrisT: 0.5, page: registeredPage }, r = await L.run(mini), tests = r.tests || {};
     ok("!! the round runs C-page and C-setting, every scene with each setting on every seed, then C-determinism on its first seed and the readings -- and says it is not the registered run",
         r.registered === false && !r.stopped && r.page.ok && r.setting.ok && !!r.flights && ["A", "D1", "D2"].every((s) => r.flights[s].length === 2 && r.flights[s].every((row) => L.SETTINGS.every((st) => !!row[st.id]))) &&
         r.determinism.ok === true && r.determinism.seed === 1001 && r.determinism.flights === 9, r.stopped || "");
@@ -197,7 +218,7 @@ try {
     ok("!! the readings are the flights': the sign test on A2's broken joints and the rest-time medians, recomputed here from the miniature's own flights",
         sameOf(tests.A2.stats.broken.default, L.signTest(r.flights.A.map((x) => x.D.A2.broken), r.flights.A.map((x) => x.F.A2.broken))) &&
         tests.D1.stats.restTime.median.F === L.median(r.flights.D1.map((x) => x.F.restTime)) && tests.A1.nudged === r.flights.A.filter((x) => x["F'"].A1.end !== x.F.A1.end).length && !!A.D.A2);
-    const stopped = await L.run({ ...mini, page: (f) => fs.readFileSync(path.join(ENG, f), "utf8").replace("fling(dir * 30, 7, 0, 5)", "fling(dir * 20, 7, 0, 5)") });
+    const stopped = await L.run({ ...mini, page: (f) => registeredPage(f).replace("fling(dir * 30, 7, 0, 5)", "fling(dir * 20, 7, 0, 5)") });
     ok("!! C-page can stop the round: handed an arena page whose fling changed, it says so and flies nothing", stopped.page.ok === false && /C-page failed/.test(stopped.stopped || "") && !stopped.flights && !stopped.setting);
     const J0 = await L.jolt(), trueWorld = () => { const w = J0.createWorld({ gravity: [0, -9.8, 0] }); return new Proxy(w, { get(t, k) {
         if (k === "addBox") return (o) => t.addBox({ ...o, gyroscopic: o.gyroscopic === false ? false : true }); const v = t[k]; return typeof v === "function" ? v.bind(t) : v; } }); };
