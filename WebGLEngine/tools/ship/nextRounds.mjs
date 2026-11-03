@@ -2864,6 +2864,13 @@ export const NEXT_ROUNDS = [
         why: "The far end of the long sonar is the end the range-aware confirmation thins; a memory is the cheap way to keep it.",
     },
     {
+        id: "nav-sensed-detector-hold-confirm",
+        blocker: "OPEN",
+        what: "The detector's marking and clearing rules have each been improved on their own in the registered notes (brain/SENSED_NAV_WIP.md, FOLLOW-UP 11, an M-of-N mark, and FOLLOW-UP 12, an evidence hold), and follow-up 7 pairs only their plainest forms (a run of k to mark, a plain hold to clear). Registered as FOLLOW-UP 16 of that note (the name was Keith's; no entry existed, and it is taken as the pairing of the two improved rules; confirming the clear with a K-of-N free rule is left out on purpose).",
+        how: "After follow-up 7's set is flown: a 2-of-3 mark with the evidence hold of cap 30, against each alone, a plain hold of 30 after the same mark, follow-up 7's plain pair and the map that forgets, under white false returns of 0.01, dropouts of 30 pings, both at once and a clean sea; HELD21 = seeds 2101 to 2160; the registration is in the note.",
+        why: "The memory answers false returns and misses, the evidence answers dropouts; whether a mark that waits for two hits leaves the hold anything to hold when a dropout begins early is not known.",
+    },
+    {
         id: "nav-sensed-detector-hold-range",
         blocker: "OPEN",
         what: "The range-gated evidence hold (brain/SENSED_NAV_WIP.md, FOLLOW-UP 13) assumes the range its gate goes by (the cell's range from the vessel at the ping that reads it free) and its shape (a step at 80 m); the note names both as untried. Registered as FOLLOW-UP 15 of that note (the name was Keith's; no entry existed, and it is follow-up 13's name with the words the other way round, taken as the hold's range being the subject: which range, and step or ramp).",
