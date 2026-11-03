@@ -2872,6 +2872,13 @@ export const NEXT_ROUNDS = [
         why: "A wall that was held and cleared comes back as one reading; whether remembering that it was a wall is worth the persistent phantoms it also restores is not known.",
     },
     {
+        id: "nav-sensed-detector-range-hold-range",
+        blocker: "OPEN",
+        what: "Follow-up 13 (brain/SENSED_NAV_WIP.md) ends by pointing at a detector with both ends range-aware and evidence-based, and follow-up 10's range-aware detector (a run of three far, a first reading near) collapsed on a plain lock. Registered as FOLLOW-UP 33 of that note (the name was Keith's; no entry existed, and it is follow-up 13's name with range on the end, taken as follow-up 10's detector with its plain lock replaced by follow-up 13's evidence hold; follow-up 17 took the pointer with the 2-of-3 memory in the mark). It was written after the results of follow-ups 7 to 18 and 20 were read, and says so. No new module field: the build waits for the sets of follow-ups 8 to 24, then adds two registry rows, the set HELD38 and a spec.",
+        how: "After the sets of follow-ups 8 to 24 are flown: a run of three far and a first reading near with the gated evidence hold, and with the hold at every range, against follow-up 13's, follow-up 10's and follow-up 17's designated and the map that forgets, under range-law false returns of mean 0.03 with dropouts of 30 pings, the uniform false rate of 0.01, the persistent mix and a clean sea; HELD38 = seeds 3801 to 3860; the registration is in the note.",
+        why: "The plain lock is why follow-up 10 collapsed; whether the evidence hold repairs it, and whether a run of three in front of it is any different from the 2-of-3 of follow-up 17, is not known.",
+    },
+    {
         id: "nav-sensed-detector-confirm-hold-range-hold",
         blocker: "OPEN",
         what: "Follow-up 26 (brain/SENSED_NAV_WIP.md) asks which range-aware mark to use with the evidence hold at every range; a strict far rule is slow to re-mark a cell the hold has let go (a dropout of 30 pings clears every cell watched for fewer than thirty readings). Registered as FOLLOW-UP 30 of that note (the name was Keith's; no entry existed, and it is follow-up 26's name with a hold on the end, the move follow-ups 18 and 29 made: a second hold on what has been confirmed, the ghost). The build waits for the sets of follow-ups 8 to 24: one registry row, the set HELD35 and a spec are added then.",
