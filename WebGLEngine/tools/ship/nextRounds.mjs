@@ -2857,6 +2857,13 @@ export const NEXT_ROUNDS = [
         why: "A hold tuned to a dropout of ten pings is a cure tuned to the disease; a range-aware hold is the cheap way to make it longer where it matters.",
     },
     {
+        id: "nav-sensed-confirm-range",
+        blocker: "OPEN",
+        what: "Follow-up 7's confirmation asks for the same number of occupied readings everywhere (brain/SENSED_NAV_WIP.md, FOLLOW-UP 7), and the false returns it guards against are far likelier far from the vessel where noise grows with range, while a delay in marking costs most near it. Registered as FOLLOW-UP 9 of that note (the name was Keith's; no entry existed, and it is taken in both senses of range: how far the threshold reaches, and how wide a range of false rates, with and without the range law).",
+        how: "After follow-up 7's set is flown: the detector with a second mark threshold for cells within a range (`markNear` within `near`), against range-law false returns of mean 0.01 and 0.03 and follow-up 7's uniform 0.01; HELD14 = seeds 1401 to 1460; the registration is in the note.",
+        why: "A confirmation that costs nothing near the vessel and everything to a phantom far from it is the cheap way to buy the cure; it is a bet on the range law and the study says what the bet costs when the law fails.",
+    },
+    {
         id: "nav-sensed-confirm-returns",
         blocker: "OPEN",
         what: "A white false return at a rate of 0.01 takes the forgetting map from 92% to 68% of the exact map (brain/SENSED_NAV_WIP.md, RESULT OF FOLLOW-UP 6) and the map marks a cell on the first ping that reads it occupied.",
