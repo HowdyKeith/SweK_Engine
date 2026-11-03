@@ -2857,6 +2857,13 @@ export const NEXT_ROUNDS = [
         why: "A hold tuned to a dropout of ten pings is a cure tuned to the disease; a range-aware hold is the cheap way to make it longer where it matters.",
     },
     {
+        id: "nav-sensed-detector-range-hold",
+        blocker: "OPEN",
+        what: "The evidence hold (brain/SENSED_NAV_WIP.md, FOLLOW-UP 12) holds a watched cell at any range, and its one real cost is far from the vessel, where a hold brings back the fix smear and a dropout is harmless; the range-aware hold (FOLLOW-UP 8) holds a near cell by count, not by evidence. Registered as FOLLOW-UP 13 of that note (the name was Keith's; no entry existed, and it is taken as the two put together).",
+        how: "After follow-up 7's set is flown: the evidence hold within a range and one free reading beyond, against the plain near hold, the evidence hold at any range and the map that forgets, under dropouts of 30 pings, the uniform false rate of 0.01, the persistent mix and a clean sea; HELD18 = seeds 1801 to 1860; the registration is in the note.",
+        why: "If the range gate removes the evidence hold's clean-sea cost without costing it the dropout cure, the hold is done; if the near hold is what closes the gaps, the range gate does nothing.",
+    },
+    {
         id: "nav-sensed-detector-hold",
         blocker: "OPEN",
         what: "The detector holds every marked cell for the same number of free readings in a row (brain/SENSED_NAV_WIP.md, FOLLOW-UP 7 and after), so a long hold keeps every false return as long as a real obstacle and a short one lets a long dropout through. Registered as FOLLOW-UP 12 of that note (the name was Keith's; no entry existed, and it is taken as the hold rule itself, the mirror of detector-confirm).",
