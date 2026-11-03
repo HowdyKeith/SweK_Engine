@@ -3097,10 +3097,8 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "nav-sensed-detector-range-hold-confirm",
-        blocker: "OPEN",
-        what: "The range-gated evidence hold (brain/SENSED_NAV_WIP.md, FOLLOW-UP 13) and the confirmed clear (FOLLOW-UP 21) are both cures for the fix smear a long hold brings back, one by where the hold applies and one by how a cell is cleared. Registered as FOLLOW-UP 24 of that note (the name was Keith's; no entry existed, and it is follow-up 13's name with a confirmation on the end, taken as the hold's: the confirmed clear), asked together with follow-ups 8 to 23.",
-        how: "The 2-of-3 mark with the evidence hold of cap 30 cleared by a run or by 0.8 of the window free, within 80 m of the sonar only or at every range, against a clear of one and the map that forgets, under white false returns of 0.01 with leaking dropouts of 30 pings, range-law false returns of mean 0.03 with dropouts of 30 pings and a clean sea; HELD29 = seeds 2901 to 2960; the registration is in the note.",
-        why: "If the two cures do the same job the gated confirmed clear is a hold with two switches and one effect; if they add, the smear was two costs.",
+        state: "CLOSED",
+        what: "CLOSED 2026-11-03 (brain/SENSED_NAV_WIP.md, RESULT OF FOLLOW-UP 24; tools/ship/subSensedDetStudy.mjs --study detector-range-hold-confirm, flights in brain/subSensedDetDetectorRangeHoldConfirmHeld29.jsonl): PARTLY SUPPORTED (5 of 6 cells: the gaps kind under range-law false returns with dropouts, 35 against 47.2, missed); five of eight predictions held (I1, I2, I4, I5, I8). The designated (2-of-3 mark, the evidence hold within 80 m and one free reading beyond, the clear confirmed at 0.8) reaches 153 of 180 under white false returns with leaking dropouts and 130 under range-law false returns with dropouts, the lowest of the five 2-of-3 detectors in both. Taking the gate off the hold pays about ten (166 against 155 and 141 against 132; follow-up 18 measured +10); the confirmed clear is 2 to 4 below its run clear in all four pairs, as in follow-up 21; the hold is worth having only without the gate (the ungated run hold 141 against the mark alone's 140, the designated 130). POST HOC, labelled: against the ungated run hold under WD30L +4 / +17, p 0.0072; the confirmed clear against its run clear p 0.5 and 0.63.",
     },
     {
         id: "nav-sensed-detector-hold-confirm-hold-confirm",
