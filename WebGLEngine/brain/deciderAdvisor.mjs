@@ -38,15 +38,17 @@ export function stateOf(st, obs) {
         }),
     };
 }
-/** The typed questions for this situation (schema 1). Station options are the unvisited stations by index, and "none". */
+/** The typed questions for this situation (schema 1). Station options are the unvisited stations by index, and "none"; with none unvisited there is no station question. */
 export function questionsOf(obs) {
     const open = obs.stations.map((q, i) => (q.visited ? null : String(i))).filter((x) => x !== null);
+    // Decider's Choice needs 2..255 options (measured: "choice criteria: a map of 2..255 options"); with every station visited the only option is "none", so the station question is NOT ASKED (Round 14 Amendment 2). The decision's station stays null, which is the brain's own then.
+    const station = open.length ? [{ id: "station", type: "choice", text: "Which unvisited station should the boat go to next?", options: [...open, "none"] }] : [];
     return [
         { id: "surface", type: "noul", text: "Should the submarine go up to the surface and stay there to recharge now?" },
         { id: "pump", type: "noul", text: "Is the bilge pump needed now (is the boat flooding)?" },
         { id: "repair", type: "noul", text: "Should the hull be repaired now (at the surface, with damage)?" },
         { id: "cap", type: "choice", text: "How deep may the boat go, as a fraction of its hull collapse depth?", options: CAP_LEVELS.map(String) },
-        { id: "station", type: "choice", text: "Which unvisited station should the boat go to next?", options: [...open, "none"] },
+        ...station,
     ];
 }
 /** The text a model is asked, and the transcript key is made of. */

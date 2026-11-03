@@ -166,7 +166,7 @@ export function modelFnFromUrl({ url, timeoutMs = DEFAULT_TIMEOUT_MS, spawn = sp
     return (prompt) => {
         const r = spawn("curl", ["-sS", "--fail-with-body", "-m", String(Math.ceil(timeoutMs / 1000)), "-H", "Content-Type: application/json", "--data-binary", "@-", url], { input: prompt, encoding: "utf8", maxBuffer: 16 * 1024 * 1024, windowsHide: true });
         if (r.error) throw new Error(`cannot call curl: ${r.error.message}`);
-        if (r.status !== 0) throw new Error(`the model server at ${url} failed (curl exit ${r.status}): ${String(r.stderr || r.stdout).trim().slice(0, 300)}`);
+        if (r.status !== 0) throw new Error(`the model server at ${url} failed (curl exit ${r.status}): ${[String(r.stderr || "").trim(), String(r.stdout || "").trim()].filter(Boolean).join(" | ").slice(0, 600)}`);   // BOTH: curl's stderr names the status, the body (--fail-with-body) names the server's reason
         return String(r.stdout);
     };
 }

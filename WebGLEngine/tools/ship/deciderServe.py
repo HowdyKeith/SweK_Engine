@@ -14,6 +14,7 @@ No temperature, sampling or tau is involved: the answers are the model's own pro
 import argparse
 import json
 import sys
+import traceback
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 
@@ -104,8 +105,11 @@ def main():
                 return self._send(404, {"error": "not found"})
             try:
                 n = int(self.headers.get("Content-Length", "0"))
-                self._send(200, ask(decider, json.loads(self.rfile.read(n))))
-            except Exception as e:   # reported to the caller, which stops the recording and keeps what it paid for
+                body = self.rfile.read(n).decode("utf-8", "replace")
+                self._send(200, ask(decider, json.loads(body)))
+            except Exception as e:   # reported to the caller, which stops the recording and keeps what it paid for; printed here too, with the traceback and the request
+                traceback.print_exc()
+                print("deciderServe: the failing request was: " + (body[:1500] if "body" in dir() else "(unread)"), file=sys.stderr, flush=True)
                 self._send(500, {"error": "%s: %s" % (type(e).__name__, e)})
 
         def log_message(self, *args):

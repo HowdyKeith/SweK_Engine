@@ -73,7 +73,7 @@ const stub = () => (prompt) => {
     const a = { surface: { probs: { yes: u(1), no: 1 - u(1) } }, pump: { probs: { yes: u(3), no: 1 - u(3) } }, repair: { probs: { yes: u(5), no: 1 - u(5) } } };
     const cap = p.questions.find((q) => q.id === "cap"), st = p.questions.find((q) => q.id === "station");
     a.cap = { probs: Object.fromEntries(cap.options.map((o, i) => [o, i === (h >>> 9) % cap.options.length ? 0.9 : 0.1 / (cap.options.length - 1)])) };
-    a.station = { probs: Object.fromEntries(st.options.map((o, i) => [o, i === (h >>> 11) % st.options.length ? 0.85 : 0.15 / (st.options.length - 1)])) };
+    if (st) a.station = { probs: Object.fromEntries(st.options.map((o, i) => [o, i === (h >>> 11) % st.options.length ? 0.85 : 0.15 / (st.options.length - 1)])) };   // no station question once every station is visited
     return JSON.stringify(a);
 };
 const tiny = [T.scenario(1301, "plain"), T.scenario(1321, "far"), T.scenario(1341, "both")].map((sc) => [sc]);
