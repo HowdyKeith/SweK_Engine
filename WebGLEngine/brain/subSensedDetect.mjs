@@ -136,6 +136,9 @@ export function makeDetector(spec, sonarRange = X.LONG_SONAR.range) {
 const clearOf = (cap, capNear = cap, { evidence = false, f = 1, shape = "step", range = "ping", fNear } = {}) => ({ cap, capNear, evidence, f, shape, range, ...(fNear !== undefined ? { fNear } : {}) });
 const spec = (mark, clear, { markNear = null, ghost = null, lock } = {}) => Object.freeze({ mark: Object.freeze(mark), markNear: markNear && Object.freeze(markNear), near: NEAR, clear: Object.freeze(clear), ghost: ghost && Object.freeze(ghost), ...(lock ? { lock: Object.freeze(lock) } : {}) });
 const ONE = clearOf(1), RUN = (k) => [k, k], GH = Object.freeze({ min: 4, life: 60, nbr: false }), GHN = Object.freeze({ min: 4, life: 60, nbr: true });
+const GHC = Object.freeze({ min: 4, life: 60, nbr: false, carry: true }), LK = Object.freeze({ life: 8, below: 4 });   // follow-ups 25 to 58: the carry, the lock
+const GHZ = (zone, at) => Object.freeze({ min: 4, life: 60, nbr: false, zone, at }), GHCZ = (zone) => Object.freeze({ min: 4, life: 60, nbr: false, carry: true, zone, at: "mark" }), GHNZ = (zone) => Object.freeze({ min: 4, life: 60, nbr: true, zone, at: "mark" });
+const RN = (o = {}) => clearOf(CAP, CAP, { evidence: true, shape: "ramp", range: "min", ...o }), RP = (o = {}) => clearOf(CAP, CAP, { evidence: true, shape: "ramp", range: "ping", ...o });   // the ramp hold on the nearest range / on the range now
 const EV = (cap = CAP, o = {}) => clearOf(cap, cap, { evidence: true, ...o }), EVR = (o = {}) => clearOf(1, CAP, { evidence: true, ...o });   // the evidence hold at every range / within `near` only
 export const ARM_DEFS = Object.freeze({
     // follow-up 7's: a run to mark, a plain hold to clear
@@ -168,6 +171,39 @@ export const ARM_DEFS = Object.freeze({
     full: spec([2, 3], EV(CAP, { f: 0.8 }), { ghost: GHN }), noG: spec([2, 3], EV(CAP, { f: 0.8 })), gU: spec([2, 3], EV(CAP, { f: 0.8 }), { ghost: GH }), noK: spec([2, 3], EV(CAP, { f: 1 }), { ghost: GHN }), noM: spec(RUN(1), EV(CAP, { f: 0.8 }), { ghost: GHN }), noE: spec([2, 3], clearOf(CAP, CAP, { f: 0.8 }), { ghost: GHN }),
     // follow-up 24: the range-gated hold with the clear confirmed
     m23e30k: spec([2, 3], EV(CAP, { f: 0.8 })), m23re30: spec([2, 3], EVR()), m23re30k: spec([2, 3], EVR({ f: 0.8 })),
+    // follow-ups 25 to 58 (the registrations are in brain/SENSED_NAV_WIP.md; a name appears once here however many studies use it)
+    // 25, 26, 28, 30: the range-aware mark with the evidence hold at every range, and the clear confirmed
+    rm23f80: spec([2, 3], EV(CAP, { f: 0.8 }), { markNear: RUN(1) }), rm23re30k: spec([2, 3], EVR({ f: 0.8 }), { markNear: RUN(1) }),
+    rm22e30: spec(RUN(2), EV(), { markNear: RUN(1) }), rm33e30: spec(RUN(3), EV(), { markNear: RUN(1) }), rm24e30: spec([2, 4], EV(), { markNear: RUN(1) }), rm34e30: spec([3, 4], EV(), { markNear: RUN(1) }),
+    n22f34e30: spec([3, 4], EV(), { markNear: RUN(2) }), n23f34e30: spec([3, 4], EV(), { markNear: [2, 3] }), rm34e30g: spec([3, 4], EV(), { markNear: RUN(1), ghost: GH }),
+    // 27, 34, 43, 48, 52: the confirmed hold by range and shape (mk / mn: the step on the range at the marking / the nearest; rp / rn: the ramp on the range now / the nearest), with the ghost and its zone
+    m23mk30k: spec([2, 3], EVR({ f: 0.8, range: "mark" })), m23mn30k: spec([2, 3], EVR({ f: 0.8, range: "min" })), m23rp30k: spec([2, 3], RP({ f: 0.8 })), m23rn30k: spec([2, 3], RN({ f: 0.8 })),
+    m23rn30kg: spec([2, 3], RN({ f: 0.8 }), { ghost: GH }), m23rp30kg: spec([2, 3], RP({ f: 0.8 }), { ghost: GH }), m23rn30kgf: spec([2, 3], RN({ f: 0.8 }), { ghost: GHZ("far", "mark") }), m23rn30kgn: spec([2, 3], RN({ f: 0.8 }), { ghost: GHZ("near", "mark") }), m23rn30kgc: spec([2, 3], RN({ f: 0.8 }), { ghost: GHN }),
+    m23rn30: spec([2, 3], RN()), m23rn30kn: spec([2, 3], RN({ f: 0.8, fNear: 1 })), m23rn30kf: spec([2, 3], RN({ f: 1, fNear: 0.8 })),
+    // 29, 35, 38, 40, 49, 53: the ghost on the confirmed hold (gated / at every range), its zone, its neighbour test, the mark rules
+    m23re30kg: spec([2, 3], EVR({ f: 0.8 }), { ghost: GH }), m23e30kg: spec([2, 3], EV(CAP, { f: 0.8 }), { ghost: GH }), m23re30kgf: spec([2, 3], EVR({ f: 0.8 }), { ghost: GHZ("far", "mark") }), m23re30kgn: spec([2, 3], EVR({ f: 0.8 }), { ghost: GHZ("near", "mark") }),
+    m23re30kgfc: spec([2, 3], EVR({ f: 0.8 }), { ghost: GHNZ("far") }), m23re30kgc: spec([2, 3], EVR({ f: 0.8 }), { ghost: GHN }),
+    m23f80g: spec([2, 3], EV(CAP, { f: 0.8 }), { ghost: GH }), m33f80g: spec(RUN(3), EV(CAP, { f: 0.8 }), { ghost: GH }), m34f80g: spec([3, 4], EV(CAP, { f: 0.8 }), { ghost: GH }), f80g: spec([2, 3], EV(CAP, { f: 0.8 }), { ghost: GH }),
+    // 31, 40, 43, 50: the confirmed clear's fraction by range (fn<near>f<far>: 100 is a run, 80 is 0.8)
+    fn100f80: spec([2, 3], EV(CAP, { f: 0.8, fNear: 1 })), fn80f100: spec([2, 3], EV(CAP, { f: 1, fNear: 0.8 })), fn100f80g: spec([2, 3], EV(CAP, { f: 0.8, fNear: 1 }), { ghost: GH }), fn80f100g: spec([2, 3], EV(CAP, { f: 1, fNear: 0.8 }), { ghost: GH }),
+    // 32, 37, 45, 50, 56, 58: the ramp hold on the nearest range with a mark of one, the carry (c), its zone (cf / cn), the clear confirmed (k), the fraction by range, the lock (l)
+    rn30c: spec(RUN(1), RN(), { ghost: GHC }), rp30c: spec(RUN(1), RP(), { ghost: GHC }), rn30cf: spec(RUN(1), RN(), { ghost: GHCZ("far") }), rn30cn: spec(RUN(1), RN(), { ghost: GHCZ("near") }),
+    rn30k: spec(RUN(1), RN({ f: 0.8 })), rn30ck: spec(RUN(1), RN({ f: 0.8 }), { ghost: GHC }), rn30cfn100f80: spec(RUN(1), RN({ f: 0.8, fNear: 1 }), { ghost: GHC }), rn30cfn80f100: spec(RUN(1), RN({ f: 1, fNear: 0.8 }), { ghost: GHC }),
+    rn30cl: spec(RUN(1), RN(), { ghost: GHC, lock: LK }), rn30cfn100f80l: spec(RUN(1), RN({ f: 0.8, fNear: 1 }), { ghost: GHC, lock: LK }), rn30l: spec(RUN(1), RN(), { lock: LK }), rn30cfl: spec(RUN(1), RN(), { ghost: GHCZ("far"), lock: LK }),
+    // (r3e30 and r3re30 are follow-up 33's names for cre30 and follow-up 19's crre30)
+    // 33, 44, 47, 51, 55, 57: the plain run (three in a row beyond 80 m, a first reading within) with the evidence hold at every range (cre30) or gated (crre30), the clear confirmed (k), the ghost (g), its zone, the lock (l)
+    cre30: spec(RUN(3), EV(), { markNear: RUN(1) }), r3e30: spec(RUN(3), EV(), { markNear: RUN(1) }), r3re30: spec(RUN(3), EVR(), { markNear: RUN(1) }), crre30k: spec(RUN(3), EVR({ f: 0.8 }), { markNear: RUN(1) }), crre30g: spec(RUN(3), EVR(), { markNear: RUN(1), ghost: GH }), cre30g: spec(RUN(3), EV(), { markNear: RUN(1), ghost: GH }),
+    crre30kg: spec(RUN(3), EVR({ f: 0.8 }), { markNear: RUN(1), ghost: GH }), cre30kg: spec(RUN(3), EV(CAP, { f: 0.8 }), { markNear: RUN(1), ghost: GH }), rm23re30kg: spec([2, 3], EVR({ f: 0.8 }), { markNear: RUN(1), ghost: GH }),
+    crre30gf: spec(RUN(3), EVR(), { markNear: RUN(1), ghost: GHZ("far", "clear") }), crre30gn: spec(RUN(3), EVR(), { markNear: RUN(1), ghost: GHZ("near", "clear") }), rm23re30gf: spec([2, 3], EVR(), { markNear: RUN(1), ghost: GHZ("far", "clear") }),
+    crre30kl: spec(RUN(3), EVR({ f: 0.8 }), { markNear: RUN(1), lock: LK }), crre30kgl: spec(RUN(3), EVR({ f: 0.8 }), { markNear: RUN(1), ghost: GH, lock: LK }), rm23re30kgl: spec([2, 3], EVR({ f: 0.8 }), { markNear: RUN(1), ghost: GH, lock: LK }),
+    // 36: the range-aware 2-of-3 mark with the plain lock by range and shape (mn: the step on the nearest range; rp / rn: the ramp on the range now / the nearest)
+    rm23lkmn: spec([2, 3], clearOf(1, CAP, { range: "min" }), { markNear: RUN(1) }), rm23lkrp: spec([2, 3], clearOf(CAP, CAP, { shape: "ramp", range: "ping" }), { markNear: RUN(1) }), rm23lkrn: spec([2, 3], clearOf(CAP, CAP, { shape: "ramp", range: "min" }), { markNear: RUN(1) }),
+    // 39, 42, 46, 41, 54: the range-aware mark rules with the clear confirmed, the ghost, its zone judged at the clearing ping, the lock
+    rm22f80: spec(RUN(2), EV(CAP, { f: 0.8 }), { markNear: RUN(1) }), rm33f80: spec(RUN(3), EV(CAP, { f: 0.8 }), { markNear: RUN(1) }), rm34f80: spec([3, 4], EV(CAP, { f: 0.8 }), { markNear: RUN(1) }),
+    rm34f80g: spec([3, 4], EV(CAP, { f: 0.8 }), { markNear: RUN(1), ghost: GH }), rm23f80g: spec([2, 3], EV(CAP, { f: 0.8 }), { markNear: RUN(1), ghost: GH }),
+    rm34f80l: spec([3, 4], EV(CAP, { f: 0.8 }), { markNear: RUN(1), lock: LK }), rm34f80gl: spec([3, 4], EV(CAP, { f: 0.8 }), { markNear: RUN(1), ghost: GH, lock: LK }), rm23f80gl: spec([2, 3], EV(CAP, { f: 0.8 }), { markNear: RUN(1), ghost: GH, lock: LK }),
+    rm23e30gf: spec([2, 3], EV(), { markNear: RUN(1), ghost: GHZ("far", "clear") }), rm23e30gn: spec([2, 3], EV(), { markNear: RUN(1), ghost: GHZ("near", "clear") }),
+    rm34e30gf: spec([3, 4], EV(), { markNear: RUN(1), ghost: GHZ("far", "clear") }), rm34e30gn: spec([3, 4], EV(), { markNear: RUN(1), ghost: GHZ("near", "clear") }),
 });
 export const DETECTORS = Object.freeze(Object.fromEntries(Object.entries(ARM_DEFS).map(([k, v]) => [k, makeDetector(v)])));
 
