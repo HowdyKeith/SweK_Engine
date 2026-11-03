@@ -2914,6 +2914,13 @@ export const NEXT_ROUNDS = [
         why: "The gate leaves a far cell to a dropout and the ghost restores it at one reading, but the far zone is also where the range law puts its false returns; whether a ghost that applies only far keeps the gain and the price is not known.",
     },
     {
+        id: "nav-sensed-detector-confirm-hold-range-confirm",
+        blocker: "OPEN",
+        what: "Follow-up 26 (brain/SENSED_NAV_WIP.md) asks which mark rule beyond 80 m suits the evidence hold when a first reading marks within it, and ends by saying that whether a confirmed clear changes the order of the rules is untested. Registered as FOLLOW-UP 39 of that note (the name was Keith's; no entry existed, and it is follow-up 26's name with confirm on the end, the move follow-ups 24, 25 and 27 made: follow-up 22's question, the mark rule when the clear is confirmed, asked of the range-aware mark). It was written after the results of follow-ups 7 to 18 and 20 were read, rests on follow-ups 21 and 22, which are unread, and says so. No new module field: the build waits for the sets of follow-ups 8 to 24, then adds three registry rows, the set HELD44 and a spec.",
+        how: "After the sets of follow-ups 8 to 24 are flown: a 2-of-2, 3-of-3, 2-of-3 and 3-of-4 far mark with a first reading near, the evidence hold at every range and the clear confirmed at 0.8, against a mark of one and the same rules at every range, under range-law false returns of mean 0.03 with dropouts of 30 pings, the uniform false rate of 0.01 with leaking dropouts and a clean sea; HELD44 = seeds 4401 to 4460; the registration is in the note.",
+        why: "The confirmed clear cleans the smear and clears a leaking dropout sooner, and the far zone is where a strict rule is cheap; whether it changes which range-aware mark is best, or the family is one rule again, is not known.",
+    },
+    {
         id: "nav-sensed-detector-confirm-hold-range-hold",
         blocker: "OPEN",
         what: "Follow-up 26 (brain/SENSED_NAV_WIP.md) asks which range-aware mark to use with the evidence hold at every range; a strict far rule is slow to re-mark a cell the hold has let go (a dropout of 30 pings clears every cell watched for fewer than thirty readings). Registered as FOLLOW-UP 30 of that note (the name was Keith's; no entry existed, and it is follow-up 26's name with a hold on the end, the move follow-ups 18 and 29 made: a second hold on what has been confirmed, the ghost). The build waits for the sets of follow-ups 8 to 24: one registry row, the set HELD35 and a spec are added then.",
