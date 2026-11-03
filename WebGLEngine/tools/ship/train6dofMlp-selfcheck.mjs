@@ -37,6 +37,9 @@
 //      either end: re-run, 3 red. V16 the note saying P2 right, V17 the note's H2 tally drifted, V18 a cell of the note's table drifted and V19 the note's game-by-game hits drifted went 1 red each before the fix and
 //      after it; V22 (a digit after the note's LEAD: -700) and V23 (a digit before its kept count: 129) hold the two ends, 1 red each.
 //   And the capability map's new cell (brain/capabilityMap-selfcheck.mjs): M1 its quote not in the note 3 | M2 the cell back to not built 3.
+//   FOUND 2026-11-03, writing Round 3's verdict (tools/ship/train6dofMlpClose-selfcheck.mjs): the note-tie row read from "## The verdict" to the END of the note, so the verdicts of the rounds
+//   after it answered for its fragments -- S1, the note saying this round's P1 wrong, went 0 red, Rounds 2 and 3 each saying "**P1: right.**" below it. The row now reads its own section alone
+//   (up to the next "## " heading): S1 again, 1 red, by the row's name.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -175,7 +178,7 @@ console.log("\n5. THE VERDICT, AS CODE, FROM THE COMMITTED FILE (brain/sixdofGpu
     const pred = { P1: R.verdict.ok === true, P2: c.audit.wins >= 15, P3: h.reading === "no difference shown", P4: p4kept && p4impr };
     ok(`!! the four predictions, read off the file: P1 right (H1 met); P2 wrong (${c.audit.wins} audit wins, not 15); P3 wrong (${h.reading}, not no difference); P4 wrong on BOTH halves, as the note says (${c.kept} kept, not 30-150; ${cs.improved} improvements, not 20-45)`,
         pred.P1 === true && pred.P2 === false && pred.P3 === false && pred.P4 === false && !p4kept && !p4impr, JSON.stringify({ ...pred, p4kept, p4impr }));
-    const note = fs.readFileSync(path.join(HERE, "..", "..", "brain", "SIXDOF_GPU_BRAIN_WIP.md"), "utf8"), at = note.indexOf("\n## The verdict"), vt = at >= 0 ? note.slice(at) : "";
+    const note = fs.readFileSync(path.join(HERE, "..", "..", "brain", "SIXDOF_GPU_BRAIN_WIP.md"), "utf8"), at = note.indexOf("\n## The verdict"), end = at >= 0 ? note.indexOf("\n## ", at + 1) : -1, vt = at >= 0 ? note.slice(at, end > 0 ? end : undefined) : "";   // that section alone: the later rounds' verdicts say "**P1: right.**" too
     const n0 = (x) => x.toLocaleString("en-US"), secs = R.searches.map((s) => Math.round(s.ms / 1000));
     const rowOf = (s) => { const b = s.seed === c.seed ? "**" : ""; return `| ${b}${s.seed}${b} | ${s.train.toFixed(2)} | ${b}${P6.describeEval(s.heldOut)}${b} | ${s.improved} | ${s.neutral} | ${n0(s.moved)} | ${s.kept} |`; };
     const frags = [`hash ${c.hash}`, `${c.kept} of the 1,637`, wl(c.heldOut), wl(c.audit), wl(R.hand.audit), wl(h.vsFly), `LEAD is ${h.lead}`, wl(h.flyMirror), wl(vsAuto), "H1 is met", `H2 reads ${h.reading}`,

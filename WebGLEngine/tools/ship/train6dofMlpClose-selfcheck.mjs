@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/train6dofMlpClose-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node tools/ship/train6dofMlpClose-selfcheck.mjs      (~35 s)
+// Run: node tools/ship/train6dofMlpClose-selfcheck.mjs      (~40 s)
 //
 // THE GATE OF tools/ship/train6dofMlpClose.mjs (and its command, tools/ship/trainMlp6dofClose.mjs): Round 3 of the GPU Brain's 6-DOF arc, the close-quarters recipe, as brain/SIXDOF_GPU_BRAIN_WIP.md registers it.
 // *** NOTHING HERE FLIES A REGISTERED HELD-OUT, AUDIT OR CHECK SEED, AND NOTHING HERE STARTS THE COMMAND'S ROUND. *** The miniature is handed scratch seeds (99900 up), and the command's guards are held as the
@@ -16,6 +16,9 @@
 //      held-out under the close duel (a planted pair whose orders disagree), the audit keeping every game with its start, read against the right opponents (recomputed independently), the verdict
 //      qualifies() with the close profile, H2 from the same games, C-files and C-determinism able to fail
 //   4  THE COMMAND: it never overwrites, refuses an option it does not know, prints no score, and writes the weight file only from a results file whose champion qualified
+//   5  THE VERDICT, AS CODE, FROM THE COMMITTED FILE: the registered run, C-files and C-determinism, the champion the rule's pick, its tallies re-flown from its weights under the close duel (the audit
+//      game by game, every tally start by start), H1 not met by qualifies() with the close profile (two conditions failed, the two the profile adds for its two starts) and H2 met, how the games
+//      ended, the predictions as the file decides them, the note's verdict tied to the file, and nothing written (--write-from refuses the file). Section 5 flies the registered seeds again: they are spent.
 //
 // SABOTAGE LOG (2026-11-03) -- each applied with the byte-safe runner, this gate run, the file restored byte-identical (sha256); the number is the rows that went red, by name:
 //   G1 the duel without collisions 6 | G2 the duel in the standoff alone 9 | G3 the recipe at 600 iterations 1 | G4 the audit on a used block (6301) 1 | G5 the league's train seeds 1
@@ -31,6 +34,16 @@
 //   itself; (2) the trained-and-pruned row carries its contrast (the same search without the close duel comes out different); (3) a row holds that every audit game keeps its start -- a game without
 //   one falls out of both per-start subsets, each start then reads 0-0, and the rule's per-start check passes on nothing (G13); (4) each crossed edge on made-up numbers must carry exactly one reason:
 //   a first draft's lead of 15 also put the score under the mirror's, so that row would have gone red for the wrong cause -- the mirror now sits 0.01 under each case's own audit score.
+// SABOTAGE LOG, SECTION 5 (2026-11-03, after the verdict) -- the same runner, with the committed results file, the note or the command edited; every file restored byte-identical:
+//   V1 the file not flagged as the registered seeds 1 | V2 the verdict ok 4 (H1, the predictions, the note, and --write-from then writing) | V3 search 7200's held-out score past the champion's 2
+//   V4 H2's gain 78 1 | V5 the champion's audit at 80 wins 4 | V6 the twin's hash different 2 | V7 a kept weight put back to the start's 2 (the pick, and the re-flown tallies moved with it)
+//   V8 the note's audit numbers drifted 1 | V9 the note saying P3 right 1 | V10 --write-from refusing only a file without a verdict 2 | V11 the note's verdict heading renamed 1
+//   V12 one standoff loss in the file's games turned into a win 4 | V13 the report's losses to the close-quarters pilot at 107 3 | V14 the joust's rams at 38 in the report 2
+//   V15 the note's search table drifted 1 | V16 the mirror's joust wins at 18 2 | V17 the file's recipe at 600 iterations 1 | V18 the file's duel without collisions 1
+//   V19 the close-quarters pilot's hash in C-files 1
+//   DESIGNED IN BEFORE THEM: the re-fly takes the close duel from train6dofLeague.mjs and the seeds the FILE says it flew, and H2 is recomputed from the games rather than by the library's h2Of;
+//   the note's fragments are read from Round 3's verdict section ALONE, its line breaks read as spaces. Rounds 1 and 2 read theirs from their heading to the end of the note, so once this
+//   round's verdict sat below them its "**P1: right.**" answered for theirs -- see their gates' headers, fixed in the same commit.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -197,6 +210,85 @@ try {
     fs.rmSync(tmp, { recursive: true, force: true });
 } catch (e) { guard(4, e); }
 
+console.log("\n5. THE VERDICT, AS CODE, FROM THE COMMITTED FILE (brain/sixdofGpuCloseResults.json, committed unread at 86674dae)");
+try {
+    // Written AFTER the file was read. Every number the note's Round 3 verdict states is re-derived here from the file, and the champion's tallies are re-flown from its weights at this head -- under the
+    // close duel from train6dofLeague.mjs, on the seeds the FILE says it flew, with the rule and H2's floor from train6dofLeague.mjs: nothing below leans on the library under test except the start, the
+    // league and the close-quarters pilot, which sections 1 and 3 hold to their hashes. The registered held-out, audit and check seeds were read once, by the registered run, and are spent: flying them
+    // again chooses nothing.
+    const file = path.join(BRAIN, "sixdofGpuCloseResults.json"), R = JSON.parse(fs.readFileSync(file, "utf8")), c = R.champion, cw = Float32Array.from(c.weights);
+    const start = L.startWeights(), fly = T.flyDefault(), lg = L.leagueOf(fly), close = L.closePilot(), seedsOf = (k) => range(R.seeds[k][0], R.seeds[k][1]);
+    const lead = (x) => x.wins - x.losses, d = P6.describeEval, wl = (x) => `W${x.wins}/L${x.losses}/D${x.draws}`, floor = LG.LEAD_FLOOR * LG.PROFILES.close.scenarios.length;
+    ok("!! the file is the registered run: the close profile and its duel, the recipe, the held-out (701, 24), audit (6401, 40) and check (6101, 20) seeds and flagged so, four searches on 7200-7203, not stopped",
+        R.registration === "brain/SIXDOF_GPU_BRAIN_WIP.md (Round 3)" && R.profile === "close" && J(R.duel) === J(CLOSE) && J(R.recipe) === J({ runs: 4, iters: 500, seed: 7200, sigma: 0.3, maxK: 4, train: 32 }) &&
+        J(R.seeds) === J({ held: [701, 24], audit: [6401, 40], auto: [6101, 20] }) && R.registeredSeeds === true && !R.stopped && J(R.searches.map((x) => x.seed)) === J([7200, 7201, 7202, 7203]), J(R.recipe));
+    const twin = R.searches.find((x) => x.seed === 7200);
+    ok("!! C-files held (the start 0ffd8554, the Default 215e26d9, the close-quarters pilot 360580a7), and C-determinism held: search 7200 run twice gave the same weights (9477bfac both times)",
+        J(R.cFiles) === J({ ok: true, start: "0ffd8554", fly: "215e26d9", close: "360580a7" }) && R.cDeterminism.ok === true && R.cDeterminism.seed === 7200 && R.cDeterminism.first === twin.hash &&
+        R.cDeterminism.again === twin.hash && twin.hash === "9477bfac");
+    const pick = [...R.searches].sort((a, b) => b.held.score - a.held.score || a.seed - b.seed)[0], differ = c.weights.filter((v, i) => Math.abs(v - start[i]) > 1e-6).length;
+    ok("!! the champion is the rule's pick from the file's four (best held-out league score, over 192 games): 7203, its hash 23ab24c1 is the weights', and they differ from the start at exactly the 68 kept",
+        c.seed === pick.seed && c.seed === 7203 && c.hash === pick.hash && J(c.held) === J(pick.held) && games(c.held) === 192 && weightsHash(cw) === c.hash && c.hash === "23ab24c1" && differ === c.kept &&
+        c.kept === 68 && c.differsFromStart === 68, `${differ} differ`);
+    const fl = (w, seeds, opponent, net = M) => net.evaluate(w, seeds, { opponent, ...CLOSE });
+    const re = { held: fl(cw, seedsOf("held"), lg), vsPrev: fl(cw, seedsOf("audit"), [fly]), mirror: fl(fly, seedsOf("audit"), [fly], P6), start: fl(start, seedsOf("audit"), [fly]),
+                 heldVs: fl(cw, seedsOf("held"), [fly]), autoC: fl(cw, seedsOf("auto"), ["autopilot"]), autoS: fl(start, seedsOf("auto"), ["autopilot"]), vsClose: fl(cw, seedsOf("audit"), [close]) };
+    const keep = (x) => ({ side: x.side, seed: x.seed, scenario: x.scenario, score: x.score, win: x.win, aDead: x.aDead, bDead: x.bDead, hits: x.hits, hitsTaken: x.hitsTaken, rams: x.rams, ramHp: x.ramHp });
+    const bs = (b) => Object.fromEntries(Object.entries(b || {}).map(([k, v]) => [k, cp(v)])), sub = (res) => Object.fromEntries(["standoff", "joust"].map((sc) => [sc, cp(P6.subset(res, (x) => x.scenario === sc))]));
+    const pairs = [["the champion's held-out league score", c.held, re.held], ["the champion against the Default", c.audit.vsPrev, re.vsPrev], ["the Default against itself", c.audit.mirror, re.mirror],
+                   ["the start against the Default", c.audit.start, re.start], ["the held-out record", c.heldOut.vsPrev, re.heldVs], ["the champion against the autopilot", c.auto.champ, re.autoC],
+                   ["the start against the autopilot", c.auto.prev, re.autoS], ["the champion against the close-quarters pilot", R.report.vsClose, re.vsClose]];
+    const off = pairs.filter(([, mine, theirs]) => J(cp(mine)) !== J(cp(theirs))).map(([n]) => n);
+    if (J(c.audit.vsPrev.runs.map(keep)) !== J(re.vsPrev.runs.map(keep))) off.push("the audit's games one by one");
+    for (const [n, mine, theirs] of [["the mirror", c.audit.mirror.byStart, re.mirror], ["the start", c.audit.start.byStart, re.start], ["the champion", R.report.vsPrevByStart, re.vsPrev], ["the close-quarters report", R.report.vsClose.byStart, re.vsClose]])
+        if (J(bs(mine)) !== J(sub(theirs))) off.push(`${n}, start by start`);
+    ok("!! the code at this head flies the file's numbers: the champion's held-out league score, its audit against the Default game by game, the Default's mirror, the start against the Default, the held-out record, both checks against the PD autopilot and the report against the close-quarters pilot, re-flown under the close duel, equal the file's to the last digit, start by start",
+        off.length === 0 && c.audit.vsPrev.runs.length === 160 && games(re.vsPrev) === 160, off.length ? "off: " + off.join(", ") : `audit ${d(re.vsPrev)}`);
+    const v = LG.qualifies(c, LG.PROFILES.close), by = (sc) => P6.subset(c.audit.vsPrev, (x) => x.scenario === sc), so = by("standoff"), jo = by("joust");
+    ok("!! H1 IS NOT MET, by train6dofLeague.qualifies() applied to the file with PROFILES.close and the Default as the pilot to beat: it fails exactly two conditions -- the audit lead (12 against 16) and the standoff start (0 won, 66 lost) -- and passes the score against the mirror (17.39 against 14.46), the joust (79 won, 1 lost), the held-out lead (48 to 36) and both autopilot checks, as the file's verdict says",
+        v.ok === false && J(v) === J(R.verdict) && v.reasons.length === 2 && /^audit: leads the shipped pilot by 12 games \(79 won, 67 lost\), under the floor of 16$/.test(v.reasons[0]) &&
+        /^audit, standoff start: 0 won and 66 lost against the shipped pilot is behind it$/.test(v.reasons[1]) && c.audit.vsPrev.score > c.audit.mirror.score && lead(jo) >= 0 && lead(c.heldOut.vsPrev) > 0 &&
+        c.auto.champ.losses <= c.auto.prev.losses && c.auto.champ.score >= c.auto.prev.score - LG.REGRESSION_SLACK && wl(so) === "W0/L66/D14" && wl(jo) === "W79/L1/D0", v.reasons.join(" | ").slice(0, 200));
+    ok("  ...and the two it fails are the two the close profile adds for its two starts (the floor counted per start, and no start behind): the league profile's rule, a floor of 8 and no start checked, passes the same numbers",
+        LG.qualifies(c, LG.PROFILES.league).ok === true && floor === 16);
+    const h2 = { champLead: lead(c.audit.vsPrev), startLead: lead(c.audit.start), gain: lead(c.audit.vsPrev) - lead(c.audit.start), met: lead(c.audit.vsPrev) - lead(c.audit.start) >= floor };
+    ok("!! H2 IS MET: on the same 160 audit games the start's lead over the Default is -67 and the champion's 12, a gain of 79 against the floor of 16, as the file's h2 says",
+        J(h2) === J(R.h2) && h2.met && h2.gain === 79 && h2.startLead === -67 && h2.champLead === 12, J(h2));
+    const ends = (sc) => { const g = c.audit.vsPrev.runs.filter((x) => x.scenario === sc); return { n: g.length, died: g.filter((x) => x.aDead).length, killed: g.filter((x) => x.bDead).length, both: g.filter((x) => x.aDead && x.bDead).length }; };
+    const eS = ends("standoff"), eJ = ends("joust");
+    ok("  reported, testing nothing: in the standoff the champion died in all 80 games (the Default too in 14 of them, the draws); in the joust it killed the Default in 79 of the 80 and died once; its 39 rams were all in the joust",
+        J(eS) === J({ n: 80, died: 80, killed: 14, both: 14 }) && J(eJ) === J({ n: 80, died: 1, killed: 79, both: 0 }) && R.report.vsPrevByStart.standoff.rams === 0 && R.report.vsPrevByStart.joust.rams === c.audit.vsPrev.rams &&
+        c.audit.vsPrev.rams === 39, `standoff ${J(eS)}, joust ${J(eJ)}`);
+    const vc = R.report.vsClose, pred = { P1: R.verdict.ok === false, P2: R.h2.met === true, P3: R.h2.startLead <= -80, P4: vc.losses > vc.wins };
+    ok("!! the four predictions, read off the file: P1, P2 and P4 right (H1 not met, H2 met, 35 won and 108 lost against the close-quarters pilot), and P3 wrong (the start's lead is -67, not -80 or worse)",
+        pred.P1 && pred.P2 && !pred.P3 && pred.P4 && vc.wins === 35 && vc.losses === 108, J(pred));
+    const note = fs.readFileSync(path.join(BRAIN, "SIXDOF_GPU_BRAIN_WIP.md"), "utf8"), at = note.indexOf("\n### Round 3: the verdict"), end = at >= 0 ? note.indexOf("\n## ", at + 1) : -1;
+    const vt = at >= 0 ? note.slice(at, end > 0 ? end : undefined).replace(/\s+/g, " ") : "";   // this section alone (a later one cannot carry a fragment for it), its line breaks read as spaces
+    const esc = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), stands = (x) => new RegExp("(?<![0-9])" + esc(x) + "(?![0-9])").test(vt);
+    const rowOf = (x) => { const b = x.seed === c.seed ? "**" : ""; return `| ${b}${x.seed}${b} | ${x.trainScore.toFixed(2)} | ${b}${d(x.held)}${b} | ${x.improved} | ${x.neutral} | ${x.moved} | ${x.kept} |`; };
+    const startRow = (sc) => `| ${sc} | ${wl(c.audit.start.byStart[sc])} | ${wl(R.report.vsPrevByStart[sc])} | ${wl(c.audit.mirror.byStart[sc])} |`, mins = R.searches.map((x) => Math.round(x.ms / 60000));
+    const frags = [...R.searches.map(rowOf), `over ${games(c.held)} games`, `search ${c.seed} (hash ${c.hash}, ${c.kept} weights`, `fails ${["no", "one", "two", "three", "four", "five", "six"][v.reasons.length]} of the six conditions`,
+                   `${wl(c.audit.vsPrev)} against the Default on 6401-6440, a lead of ${h2.champLead} against the floor of ${floor}`, `**the standoff start:** ${wl(so)} there`,
+                   `${c.audit.vsPrev.score.toFixed(2)} against the Default`, `own ${c.audit.mirror.score.toFixed(2)} against itself (${wl(c.audit.mirror)})`, `${wl(c.heldOut.vsPrev)} against the Default, a lead`,
+                   `${wl(c.auto.champ)} against the start's ${wl(c.auto.prev)}`, `(${c.auto.champ.score.toFixed(2)} against ${c.auto.prev.score.toFixed(2)})`,
+                   `narrowed by ${h2.gain} games`, `start went ${wl(c.audit.start)} against the Default (a lead of ${h2.startLead})`, `(a lead of ${h2.champLead}): a gain of ${h2.gain} against the floor of ${floor}`,
+                   startRow("standoff"), startRow("joust"), `killed the Default in ${eJ.killed} of the ${eJ.n} games and died once`, `died in all ${eS.died} standoff games. In ${eS.both} of them`,
+                   `**Rams:** ${c.audit.vsPrev.rams} in the champion's ${games(c.audit.vsPrev)} games against the Default (${c.audit.vsPrev.ramHp.toFixed(0)} hit points)`,
+                   `had ${c.audit.start.rams} (${c.audit.start.ramHp.toFixed(0)}), and the Default's against itself ${c.audit.mirror.rams} (${c.audit.mirror.ramHp.toFixed(0)})`,
+                   `on the same audit seeds: ${wl(vc)}`, `(${wl(vc.byStart.standoff)})`, `(${wl(vc.byStart.joust)})`, `from ${wl(c.audit.start.byStart.joust)} to ${wl(R.report.vsPrevByStart.joust)}`,
+                   `lead against the Default is ${R.h2.startLead}, not -80 or worse`, `lost ${vc.losses} and won ${vc.wins} against the close-quarters pilot`,
+                   R.cDeterminism.again, `${Math.min(...mins)} to ${Math.max(...mins)} minutes`, "**H1 is not met.**", "**H2 is met:", "**no weight file is written**",
+                   ...Object.keys(pred).map((k) => `**${k}: ${pred[k] ? "right" : "wrong"}.**`)];
+    const missing = frags.filter((x) => !stands(x));
+    ok("!! the note's Round 3 verdict carries the file's numbers and each prediction's outcome as the file decides it (no digit may touch a fragment's ends; read from that section alone)",
+        at > 0 && missing.length === 0, missing.length ? "missing: " + missing.join(" || ").slice(0, 300) : `${frags.length} fragments`);
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "mlpclose-v-")), outF = path.join(tmp, "w.json");
+    let said = ""; try { execFileSync(process.execPath, [path.join(HERE, "trainMlp6dofClose.mjs"), "--write-from", file, "--out", outF], { encoding: "utf8", stdio: "pipe" }); } catch (e) { said = String(e.stdout); }
+    ok("!! H1 was not met, so NOTHING IS WRITTEN: brain/pilot6dofMlpWeightsClose.json does not exist, and --write-from refuses the committed file with its verdict's first reason",
+        !fs.existsSync(path.join(BRAIN, "pilot6dofMlpWeightsClose.json")) && !fs.existsSync(outF) && /not written: the champion did not qualify -- audit: leads the shipped pilot by 12 games/.test(said), said.trim().slice(0, 160));
+    fs.rmSync(tmp, { recursive: true, force: true });
+} catch (e) { guard(5, e); }
+
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +
-    "\nnot closed here: the round itself -- the registered run writes brain/sixdofGpuCloseResults.json, committed before it is read, and its verdict becomes section 5.");
+    "\nnot closed here: why the standoff did not move, whether more iterations, more searches, another network or a recipe that weighs the two starts differently would move it, and how this champion does on the page -- none of it registered.");
 process.exit(fails ? 1 : 0);

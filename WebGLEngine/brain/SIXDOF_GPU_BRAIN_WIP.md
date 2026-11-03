@@ -582,3 +582,94 @@ the gate `tools/ship/train6dofMlpClose-selfcheck.mjs` (about 27 s, 28 rows).
     under the mirror's, so that row would have gone red for the wrong cause.
 
 **The registered run:** `node tools/ship/trainMlp6dofClose.mjs --workers 5`.
+
+### Round 3: the verdict, 2026-11-03 (read from the committed file, after it was committed)
+
+The registered run wrote `brain/sixdofGpuCloseResults.json` at head 91e8a90f. It was committed byte for byte at
+86674dae before anyone read it. It flew the registered seeds and says so (`registeredSeeds: true`).
+The searches took 37 to 44 minutes each, in five processes at once. Every number below is re-derived from that file in
+section 5 of `tools/ship/train6dofMlpClose-selfcheck.mjs`, and the champion's tallies are re-flown there from its
+weights.
+
+**The controls held.**
+- **C-files:** the start was 0ffd8554, the Default 215e26d9 and the close-quarters pilot 360580a7.
+- **C-determinism:** search 7200, run twice in two processes at once, gave 9477bfac both times.
+
+**The four searches:**
+
+| search | train | held-out league score | improvements | neutral | moved | kept |
+|---|---|---|---|---|---|---|
+| 7200 | 19.19 | 19.25 (W118/L36/D38, hits 3138, taken 2262) | 65 | 153 | 395 | 104 |
+| 7201 | 18.65 | 18.58 (W110/L43/D39, hits 3149, taken 2373) | 38 | 185 | 408 | 11 |
+| 7202 | 19.62 | 19.13 (W116/L42/D34, hits 3146, taken 2228) | 47 | 185 | 400 | 53 |
+| **7203** | 19.84 | **19.34 (W114/L43/D35, hits 3143, taken 2224)** | 69 | 167 | 415 | 68 |
+
+"Kept" counts the weights that still differ from the start after pruning toward it. The held-out league score is over
+192 games: 24 seeds, both starts, both sides, against the PD autopilot and the Default.
+
+**H1 is not met.** The champion is search 7203 (hash 23ab24c1, 68 weights different from the start). By
+`train6dofLeague.qualifies()` with `PROFILES.close`, the Default the pilot to beat, it fails two of the six conditions:
+- **the audit lead:** W79/L67/D14 against the Default on 6401-6440, a lead of 12 against the floor of 16;
+- **the standoff start:** W0/L66/D14 there, behind the Default.
+
+It passes the other four:
+- its audit score, 17.39 against the Default, is above the Default's own 14.46 against itself (W25/L25/D110);
+- the held-out seeds: W48/L36/D12 against the Default, a lead;
+- the check against the PD autopilot, on 6101-6120 in both starts and from both sides: W60/L7/D13 against the start's
+  W26/L31/D23. That is fewer losses and a higher score (20.69 against 14.08).
+
+So **no weight file is written**, and the champion is not offered anywhere.
+
+**The two conditions it fails are the two the close profile adds for its two starts:** the floor counted per start (8
+each, so 16), and no start behind. The league profile's rule (a floor of 8, no start checked) passes the same numbers.
+A pilot that wins one start and loses the other is what the per-start check refuses, and this is one.
+
+**H2 is met: the gap narrowed by 79 games.** On the same 160 audit games the start went W30/L97/D33 against the Default
+(a lead of -67), and the champion W79/L67/D14 (a lead of 12): a gain of 79 against the floor of 16.
+
+**Start by start, against the Default on the audit games** (reported, testing nothing):
+
+| start | 0ffd8554 (the start) | 23ab24c1 (the champion) | the Default against itself |
+|---|---|---|---|
+| standoff | W1/L70/D9 | W0/L66/D14 | W8/L8/D64 |
+| joust | W29/L27/D24 | W79/L1/D0 | W17/L17/D46 |
+
+- **All of the gain is in the joust.** There the champion killed the Default in 79 of the 80 games and died once.
+- **In the standoff it barely moved.** The champion died in all 80 standoff games. In 14 of them the Default died too,
+  which count as draws.
+- **Rams:** 39 in the champion's 160 games against the Default (559 hit points), all in the joust. The start's games had
+  37 (546), and the Default's against itself 38 (584).
+
+**Against the fruit fly's close-quarters pilot** (the page's default), on the same audit seeds: W35/L108/D17. Every
+decided standoff game went to the fruit fly's pilot (W0/L68/D12), and the joust was close (W35/L40/D5). The page's best
+is still well ahead.
+
+**The predictions:**
+- **P1: right.** H1 is not met; I gave that 80%.
+- **P2: right.** H2 is met; I gave that 55%.
+- **P3: wrong.** The start's audit lead against the Default is -67, not -80 or worse.
+- **P4: right.** The champion lost 108 and won 35 against the close-quarters pilot; I gave that 90%.
+
+**What this says, and what it does not.**
+- **It says:** trained by the close-quarters recipe, the GPU Brain's MLP learned the joust against the Default almost
+  completely, from W29/L27/D24 to W79/L1/D0. It also got much better against the PD autopilot.
+- **It also says:** in the standoff it did not learn to survive, so it does not qualify. Over the 160 games it leads the
+  Default by 12, short of the floor of 16, and it is behind in the standoff.
+- **It does not say** why the standoff did not move, or whether more iterations, more searches, another network or a
+  recipe that weighs the two starts differently would move it. It also does not say how this champion does on the page.
+  None of that was tested.
+  - Round 1 found that only the close-quarters pilot's training carried to the page's own fight.
+
+**What follows.**
+- Nothing is written, so the page and the capability map's TRAINED cell keep the first round's pilot. The cell cites
+  this round's result beside Round 2's.
+- This note authorises no fourth recipe.
+
+**Round 3's verdict, as code:** section 5 of `tools/ship/train6dofMlpClose-selfcheck.mjs` re-derives every number above
+from the committed file and re-flies the champion's tallies from its weights. It also holds that nothing was written:
+`--write-from` refuses the file. Sabotaged with the byte-safe runner: 19 designs, each red by name. They edit the
+committed file, this note or the command, and the counts are in the gate's header.
+- **Found while writing it:** the first two rounds' gates read their verdict's fragments from its heading to the end of
+  this note. Once this verdict sat below theirs, its own "**P1: right.**" answered for both: this note saying Round 1's
+  P1 wrong, or Round 2's, went 0 red. Each now reads its own section alone, and the same edits go 1 red. This round's
+  gate reads its own section alone from the start.

@@ -29,6 +29,9 @@
 //   V1 the file not flagged as the registered seeds 1 | V2 the verdict ok 4 (H1, the predictions, the note, and --write-from then writing) | V3 search 7100's held-out score past the champion's 2
 //   V4 H2's gain 36 1 | V5 the champion's audit at 10 wins 4 | V6 the twin's hash different 2 | V7 a champion weight changed 2 | V8 the note's audit numbers drifted 1 | V9 the note saying P3 wrong 1
 //   V10 --write-from writing whatever the verdict 3
+//   FOUND 2026-11-03, writing Round 3's verdict (tools/ship/train6dofMlpClose-selfcheck.mjs): the note-tie row read from its heading to the END of the note, so Round 3's verdict below it
+//   answered for its fragments -- S2, the note saying this round's P1 wrong, went 0 red, Round 3 saying "**P1: right.**". The row now reads its own section alone (up to the next "## "
+//   heading): S2 again, 1 red, by the row's name.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -165,7 +168,7 @@ try {
     ok("!! H2 IS MET: on the same 80 audit games the start's lead over the Default is -74 and the champion's -37, a gain of 37 against the floor of 8, as the file's h2 says", J(h2) === J(R.h2) && h2.met && h2.gain === 37 && h2.startLead === -74, J(h2));
     const pred = { P1: R.verdict.ok === false, P2: R.h2.met === true, P3: R.h2.startLead <= -50, P4: c.kept >= 10 && c.kept <= 150 };
     ok("!! the four predictions, read off the file: all four right (H1 not met, H2 met, the start at -74, 97 weights kept)", Object.values(pred).every(Boolean), J(pred));
-    const note = fs.readFileSync(path.join(HERE, "..", "..", "brain", "SIXDOF_GPU_BRAIN_WIP.md"), "utf8"), at = note.indexOf("\n### Round 2: the verdict"), vt = at >= 0 ? note.slice(at) : "";
+    const note = fs.readFileSync(path.join(HERE, "..", "..", "brain", "SIXDOF_GPU_BRAIN_WIP.md"), "utf8"), at = note.indexOf("\n### Round 2: the verdict"), end = at >= 0 ? note.indexOf("\n## ", at + 1) : -1, vt = at >= 0 ? note.slice(at, end > 0 ? end : undefined) : "";   // that section alone: Round 3's verdict says "**P1: right.**" too
     const esc = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), stands = (x) => new RegExp("(?<![0-9])" + esc(x) + "(?![0-9])").test(vt), wl = (x) => `W${x.wins}/L${x.losses}/D${x.draws}`;
     const rowOf = (x) => { const b = x.seed === c.seed ? "**" : ""; return `| ${b}${x.seed}${b} | ${x.trainScore.toFixed(2)} | ${b}${d(x.held)}${b} | ${x.improved} | ${x.neutral} | ${x.moved} | ${x.kept} |`; };
     const mins = R.searches.map((x) => Math.round(x.ms / 60000));
