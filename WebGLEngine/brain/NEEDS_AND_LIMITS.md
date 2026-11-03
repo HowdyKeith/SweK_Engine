@@ -892,3 +892,48 @@ Files: `brain/rig-results/planner-ensemble-report.json`, the 6 arm files in `bra
 Both registered bottom lines: `RISK-AWARE PLANNING BEATS THE POINT-ESTIMATE TWIN (ENS-0.05, ENS-0.10)` and `RISK-AWARE PLANNING HURTS (ENS-0.20)`.
 **Against the expectations of section 5 (written first).** TWIN-FULL REAL, about 90: held. **Some ensemble arm BETTER than the twin, about 18: it happened (two). Some arm WORSE, about 12: it happened (one).** **ENS-0.05 is SAME, about 75: it did not hold: ENS-0.05 is the best arm.** ENS-0.20 the most likely to differ, and in the WORSE direction, about 60: held. Bottom line `DOES NOT BEAT` and `DOES NOT HURT` together, about 72: **not the outcome; BEATS (about 18) and HURTS (about 12) both came out.**
 **WHAT THIS MEANS and does not.** Planning against a small spread of starting energies (plus and minus 5 or 10 percent) beats planning against the one filtered estimate by 0.004 to 0.006, about a quarter to a third of the twin's own gain over the tuned rule (+0.0198 in Round 22), at three times the rollouts. Plus and minus 20 percent hurts: it spends the ensemble's caution on orders that were fine. This lines up with Round 13's finding that the START-energy error is the one the twin is least tolerant of (10 percent kept the gain, 20 percent lost it): a planner that does not trust its start estimate is insured against it. **What would temper it:** three ensemble arms were compared with the twin (six verdicts in all), and ENS-0.10's 2.7 se and ENS-0.20's 2.3 se would not survive a correction for three comparisons (about 2.4 se), while ENS-0.05's 3.6 se would; the two sets E1 and E2 are not separately reported here; and the ensemble offsets were chosen by me before the run, not tuned. **Not shown:** that the ensemble helps at more stations (Round 16 found the gain rises with them; the rollouts rise factorially), that a different offset set (asymmetric, or a drain or drag ensemble) does better, or that the gain survives a confirmatory run on fresh seeds. That confirmation is the round this one earns and it is not registered.
+
+# Round 26 -- does the twin's gain survive a better baseline? (REGISTERED 2026-11-03, before any code and before any of its seeds was flown)
+
+## 1. Why
+Round 18 found that moving the tuned rule's low trip point down by 0.04 gains +0.0107 at the shipped gauge (3.8 se, one shift of three tried, 600 dives), about 60 percent of the twin's pooled gain. Every round of the twin series (11-23) measured the twin against TUNED-R8, and the twin is built on the Round 8 constants. If a better rule is already worth most of the twin's gain, the planner's value is smaller than +0.02 and the series has been comparing it with a weak opponent. Round 26 asks the question Round 18 raised and did not answer, on fresh seeds: (a) is the lower trip point a better baseline (replication, because it was one of three shifts tried), (b) does the twin still gain over THAT baseline, and (c) is the twin built on the better constants the best pilot.
+
+## 2. The arms
+**TUNED-R8** (the reference); **TUNED-LOW** (the tuned rule with `low` moved from 0.3804 to 0.3404, the others untouched: Round 18's LOW-0.04); **TWIN-R8** (the full twin, `brain/plannerPerturbed.mjs`, no error, replan 120 s, built on the Round 8 constants: Round 22's TWIN-FULL); **TWIN-LOW** (the same twin built on the shifted constants: its rollouts' fallback behaviour and its filter use the shifted `low`). The shift is applied to the parameters handed to the seat, nothing else changes. Four arms.
+
+## 3. The sets and the checks
+**G1 4401-4500, G2 4501-4600, G3 4601-4700**, 100 seeds each of far and both, **200 dives a block, 600 per arm**, read once, no seed used by any earlier round. Checks (a failure and the verdicts are NOT WEIGHED): TWIN-R8 equals the Round 11 twin dive for dive (Round 22's identity check, one block); TUNED-LOW differs from TUNED-R8 on at least one dive and TWIN-LOW from TWIN-R8 on at least one (else the shift never reaches the seat); the dives of every arm are the same scenarios in the same order.
+
+## 4. The verdicts (pooled paired differences over the 600 dives; REAL = above 2 se and positive)
+* **Line 1:** TUNED-LOW minus TUNED-R8: `THE LOWER TRIP POINT IS A BETTER BASELINE (+<mean>)` iff REAL; `THE LOWER TRIP POINT IS NOT SHOWN TO BE A BETTER BASELINE` otherwise.
+* **Line 2:** TWIN-LOW minus TUNED-LOW: `THE TWIN'S GAIN SURVIVES THE BETTER BASELINE (+<mean>, se <se>)` iff REAL; `THE TWIN'S GAIN DOES NOT SURVIVE THE BETTER BASELINE` otherwise.
+* **Line 3:** TWIN-LOW minus TWIN-R8: `THE TWIN ON THE BETTER CONSTANTS BEATS THE TWIN ON ROUND 8` iff REAL; `THE TWIN ON THE BETTER CONSTANTS IS NOT SHOWN TO BEAT THE TWIN ON ROUND 8` otherwise.
+* **REPORTED, NOT IN THE VERDICT:** TWIN-R8 minus TUNED-R8 (the series' usual gain, on these seeds), each arm's mean and the better/worse/same counts, the gain over the better baseline as a share of the gain over Round 8 (when the latter is positive).
+
+## 5. Expectations, recorded BEFORE any seed is flown
+TUNED-LOW is a BETTER baseline (replicates): about 60 percent (a selected one of three shifts; winners are partly lucky). TWIN-R8 minus TUNED-R8 is REAL on these seeds: about 90. The twin's gain SURVIVES the better baseline: about 75; its point estimate is smaller than the gain over Round 8: about 70; the share of the gain kept is between 40 and 90 percent: about 60. TWIN-LOW beats TWIN-R8 (REAL): about 30 (the twin's own choice already corrects some of what the low trip point corrects). Bottom lines, joint: `BETTER BASELINE` + `SURVIVES` + `NOT SHOWN TO BEAT` about 35; `NOT SHOWN BETTER BASELINE` + `SURVIVES` + `NOT SHOWN TO BEAT` about 30.
+
+## 6. What will be built
+`tools/ship/plannerBaseline.mjs` (library on plannerConfirm's flight and plannerReplicate's pooled reading), `plannerBaselineCmd.mjs` (export-free: `run`, 12 jobs: arm x block), its gate with a mutation pass; then the run (twin dives 2.5 s: 2 twin arms x 600 dives, about 25 minutes on four cores) and the result as section 7. **NOT IN THIS ROUND:** a retune of any other constant, a search over the low trip point (one shift, the one Round 18 tried), the ensemble, other gauges or station counts.
+
+# Round 27 -- does the small start-energy ensemble replicate on fresh seeds? (REGISTERED 2026-11-03, before any code and before any of its seeds was flown)
+
+## 1. Why
+Round 23 found that planning against a small spread of starting energies beats the point-estimate twin: ENS-0.05 by +0.0057 (3.6 se) and ENS-0.10 by +0.0040 (2.7 se), while ENS-0.20 hurts. Three ensemble arms were compared with the twin and one was chosen by the data; the winner of such a comparison is partly lucky, and ENS-0.10's margin would not survive a correction for three comparisons. Round 27 flies the two small ensembles again on fresh seeds, to see whether the effect is real and how big it is when nothing has been selected.
+
+## 2. The arms
+**TUNED-R8**, **TWIN-FULL** (the point-estimate twin), **ENS-0.05** and **ENS-0.10** (Round 23's: start-energy offsets plus and minus the fraction, and zero, mean score), all on the Round 8 constants, no error. ENS-0.05 is the PRIMARY arm (it alone survived the multiple-comparison correction in Round 23); ENS-0.10 is reported. ENS-0.20 is not flown again.
+
+## 3. The sets and the checks
+**F1 4801-4900, F2 4901-5000, F3 5001-5100**, 100 seeds each of far and both, **200 dives a block, 600 per arm**, read once, no seed used by any earlier round. Checks (a failure and the verdicts are NOT WEIGHED): the point-estimate twin equals the Round 11 twin on one block; the ensemble arms differ from the twin on at least one dive; the dives of every arm are the same scenarios in the same order.
+
+## 4. The verdicts (pooled paired differences over the 600 dives)
+* **Line 1 (primary):** ENS-0.05 minus TWIN-FULL: `THE ENSEMBLE EFFECT REPLICATES (ENS-0.05: +<mean>, se <se>)` iff REAL (above 2 se and positive); `THE ENSEMBLE EFFECT DOES NOT REPLICATE (ENS-0.05: <mean>, se <se>)` otherwise.
+* **Line 2:** ENS-0.05 minus TUNED-R8: `THE ENSEMBLE GAIN OVER THE TUNED RULE IS +<mean> (se <se>)`, and `IT EXCEEDS THE POINT-ESTIMATE TWIN'S` iff the line-1 difference is positive, `IT DOES NOT EXCEED THE POINT-ESTIMATE TWIN'S` otherwise.
+* **REPORTED, NOT IN THE VERDICT:** ENS-0.10 minus TWIN-FULL, the pooled estimate over Rounds 23 and 27 for ENS-0.05 minus the twin (fixed-effect, two blocks of 600), each arm's mean and better/worse/same counts, the scheduled rollout seconds per dive.
+
+## 5. Expectations, recorded BEFORE any seed is flown
+ENS-0.05 minus the twin is positive on these seeds: about 80 percent; REAL (replicates): about 50; its point estimate is smaller than Round 23's +0.0057: about 70 (the winner's curse); it lies between +0.002 and +0.008: about 60. ENS-0.10 minus the twin is positive: about 70. Twin gain over the tuned rule REAL on these seeds: about 90. Joint bottom line: `REPLICATES` + `EXCEEDS` about 50; `DOES NOT REPLICATE` + `EXCEEDS` (positive but not 2 se) about 30; `DOES NOT REPLICATE` + `DOES NOT EXCEED` about 20.
+
+## 6. What will be built
+`tools/ship/plannerEnsConfirm.mjs` (library on plannerEnsemble's ensemble arms and plannerConfirm's block jobs), `plannerEnsConfirmCmd.mjs` (export-free: `run`, 12 jobs: arm x block), its gate with a mutation pass; then the run (the two ensemble arms cost three times the twin: about 60 to 75 minutes on four cores) and the result as section 7. **NOT IN THIS ROUND:** other offsets, a drain or drag ensemble, more stations.
