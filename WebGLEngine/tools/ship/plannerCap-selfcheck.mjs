@@ -12,7 +12,7 @@
 //   7 FLIGHT    real five-station 100-second dives: CAP-4 equals TWIN-FULL dive for dive, CAP-5 changes a dive and costs about three times as much, CAP-2 about an eighth as much; the tuned rule is T.evaluate's.
 //   8 SOURCE    the seeds appear in one place; no clock, random or file.
 // NOT CHECKED, said plainly: whether the cap costs gain at five stations (that is the experiment).
-// SABOTAGE LOG: (filled in below after the mutation pass)
+// SABOTAGE LOG (30 mutants of tools/ship/plannerCap.mjs, run against a copy of this gate, each applied alone): 22 went red by name on the first pass; 6 went 0 red and got rows -- the reference of the BETTER/WORSE reading (the fixture had the default planner equal to CAP-4, so reading against it was invisible: a fixture where it is better), the 2 se threshold on both sides (the old rows sat at 0.7 se and 5 se: now 1.5 and 2.5 se), line 2 naming CAP-5 (a worse CAP-5 must leave line 2 alone), the twin's line pooled over one set only, and assemble keeping the first set's results for every set (the row checked M1 only); all 6 then red. 2 more (the plan dropped from the seat, the flight's seconds ignored) make every dive a full 600 seconds and the gate does not finish inside the harness's 200 s: counted as caught by the gate not finishing, not as a row. The maxStations option itself (brain/plannerPerturbed.mjs) is covered by its own gate, brain/plannerPerturbed-selfcheck.mjs, whose log carries its mutants.
 "use strict";
 import fs from "node:fs";
 let fails = 0, finished = false;
@@ -63,13 +63,20 @@ sec("3. VERDICTS");
     ok("!! against CAP-4 (the shipped cap): +0.05 over it is BETTER, the wobble and the loss are WORSE, the same gain is SAME", v("CAP-5").rel === "BETTER" && v("CAP-3").rel === "WORSE" && v("CAP-2").rel === "WORSE" && v("CAP-4").rel === "SAME");
     const w = (d) => X.verdictOf(synth({ "CAP-5": { d } }), "CAP-5").rel, wob = (c) => KEEP.map((x, i) => x + (i % 2 ? 0.03 : -0.03) + c);
     ok("!! a deficit inside 2 se is SAME (mean -0.005, se about 0.0075), one past 2 se is WORSE; an excess inside 2 se is SAME too", w(wob(-0.005)) === "SAME" && w(KEEP.map((x) => x - 0.05)) === "WORSE" && w(wob(0.005)) === "SAME");
+    {   // the threshold is 2 se on both sides, and the reference is CAP-4, not the default planner
+        const amp = 0.03, c15 = 0.3873 * amp, c25 = 0.6455 * amp, w2 = (c) => X.verdictOf(synth({ "CAP-5": { d: KEEP.map((x, i) => x + (i % 2 ? amp : -amp) + c) } }), "CAP-5");
+        const hi = w2(c15), up = w2(c25), lo = w2(-c15), dn = w2(-c25);
+        ok("!! 1.5 se above CAP-4 (and 1.5 se below it) is SAME, 2.5 se above is BETTER, 2.5 se below is WORSE -- both sides at 2 se", Math.abs(hi.vsFull.mean / hi.vsFull.se - 1.5) < 0.05 && hi.rel === "SAME" && lo.rel === "SAME" && up.rel === "BETTER" && dn.rel === "WORSE", `${(hi.vsFull.mean / hi.vsFull.se).toFixed(2)} ${(up.vsFull.mean / up.vsFull.se).toFixed(2)}`);
+        const au2 = synth({ "CAP-5": { d: KEEP } }); for (const n of X.SET_NAMES) au2[n]["TWIN-FULL"] = { ...runs(MORE), cost: 1000, plans: 6 };
+        ok("!! the reference is CAP-4: with the default planner better than CAP-4 in the fixture, CAP-5 (equal to CAP-4) is still SAME against CAP-4", X.verdictOf(au2, "CAP-5").rel === "SAME" && X.verdictOf(au2, "CAP-4").vsFull.mean === 0);
+    }
     ok("!! the pooled n is 16 (two sets of eight), the counts are the arm's against TUNED-R8, the cost is the mean over both sets (1000 and 1100: 1050; the twin 1050)", v("CAP-5").n === 16 && v("CAP-5").better === 16 && Math.abs(v("CAP-5").cost - 1050) < 1e-9 && Math.abs(X.costOf(au, "TWIN-FULL") - 1050) < 1e-9 && X.costOf(au, "TUNED-R8") === null);
 }
 sec("4. LINES");
 {
     const L = (spec) => X.bottomLines(synth(spec));
     ok("!! all equal: the cap COSTS NOTHING and a smaller cap KEEPS THE GAIN", J(L({})) === J(["THE FOUR-STATION CAP COSTS NOTHING MEASURABLE AT FIVE STATIONS", "A SMALLER CAP KEEPS THE GAIN"]));
-    ok("!! a better CAP-5 makes line 1 name a larger cap; a worse CAP-2 or CAP-3 is named in line 2 (both in order); a better SMALLER arm does not change line 2, a worse CAP-5 does not change line 1", L({ "CAP-5": { d: MORE } })[0] === "A LARGER CAP BEATS THE FOUR-STATION CAP" && L({ "CAP-2": { d: HURT }, "CAP-3": { d: HURT } })[1] === "A SMALLER CAP LOSES GAIN (CAP-2, CAP-3)" && L({ "CAP-3": { d: HURT } })[1] === "A SMALLER CAP LOSES GAIN (CAP-3)" && L({ "CAP-2": { d: MORE } })[1] === "A SMALLER CAP KEEPS THE GAIN" && L({ "CAP-5": { d: HURT } })[0] === "THE FOUR-STATION CAP COSTS NOTHING MEASURABLE AT FIVE STATIONS");
+    ok("!! a better CAP-5 makes line 1 name a larger cap; a worse CAP-2 or CAP-3 is named in line 2 (both in order); a better SMALLER arm does not change line 2, a worse CAP-5 does not change line 1", L({ "CAP-5": { d: MORE } })[0] === "A LARGER CAP BEATS THE FOUR-STATION CAP" && L({ "CAP-2": { d: HURT }, "CAP-3": { d: HURT } })[1] === "A SMALLER CAP LOSES GAIN (CAP-2, CAP-3)" && L({ "CAP-3": { d: HURT } })[1] === "A SMALLER CAP LOSES GAIN (CAP-3)" && L({ "CAP-2": { d: MORE } })[1] === "A SMALLER CAP KEEPS THE GAIN" && L({ "CAP-5": { d: HURT } })[0] === "THE FOUR-STATION CAP COSTS NOTHING MEASURABLE AT FIVE STATIONS" && L({ "CAP-5": { d: HURT } })[1] === "A SMALLER CAP KEEPS THE GAIN");
 }
 sec("5. CHECKS");
 {
@@ -86,6 +93,8 @@ sec("6. REPORT");
 {
     const L = X.report(synth({ "CAP-5": { d: MORE }, "CAP-2": { d: HURT } })), txt = L.join("\n");
     ok("!! the head names both sets and five stations; the three checks pass first; the twin's line carries its gain and cost (1050)", /^ROUND 24/.test(L[0]) && L[0].includes("M1 3901-3996") && L[0].includes("M2 4001-4096") && L[0].includes("5 stations") && L.slice(1, 4).every((l) => /^  PASS /.test(l)) && /TWIN-FULL minus TUNED-R8: \+0\.10.*cost 1050 rollout seconds per dive/.test(txt));
+    { const a2 = synth({}); a2.M1["TWIN-FULL"] = { ...runs([0]), cost: 1000, plans: 6 }; a2.M2["TWIN-FULL"] = { ...runs(KEEP.map((x) => x * 2)), cost: 1100, plans: 6 }; const t2 = X.report(a2).join("\n");
+      ok("!! the twin's line pools BOTH sets: no gain on M1 and +0.2 on M2 is +0.1 pooled (not the first set's +0.0000)", /TWIN-FULL minus TUNED-R8: \+0\.10[0-9]{2} /.test(t2)); }
     ok("!! one row per cap arm with its verdict, its relation to CAP-4 (value and se) and its cost: CAP-5 KEEPS BETTER at +0.0500, CAP-2 HURTS WORSE", /CAP-5 .*KEEPS +BETTER +vs CAP-4 \+0\.0500 \(se 0\.0[0-9]+\)/.test(txt) && /CAP-2 .*HURTS +WORSE/.test(txt) && /CAP-4 .*KEEPS +SAME +vs CAP-4 [+-]0\.0000/.test(txt));
     const lower = X.report(synth({ "CAP-5": { d: KEEP.map((x) => x / 2) } })).join("\n");
     ok("!! an arm that keeps a gain over the tuned rule but is BELOW CAP-4 prints the negative difference (-0.0500), not a plus sign from its own gain", /CAP-5 .*KEEPS +WORSE +vs CAP-4 -0\.0500/.test(lower) && !/vs CAP-4 \+-/.test(lower));
@@ -107,7 +116,7 @@ sec("7. FLIGHT");
     X.setFlight({});
     const msg = (f) => { try { f(); return ""; } catch (e) { return String(e.message); } };
     ok("!! an unknown arm is refused with this library's message before flying", /plannerCap\.planOf: unknown arm "CAP-9"/.test(msg(() => X.flyArm("CAP-9", R8, []))));
-    ok("!! assemble keys sets then arms", J(Object.keys(X.assemble({ A: full, B: tuned }).M2)) === J(["A", "B"]) && X.assemble({ A: full }).M1.A === full.M1);
+    ok("!! assemble keys sets then arms", J(Object.keys(X.assemble({ A: full, B: tuned }).M2)) === J(["A", "B"]) && X.assemble({ A: full }).M1.A === full.M1 && X.assemble({ A: full }).M2.A === full.M2);
 }
 import { setN } from "./plannerStations.mjs";
 function require_set(a, b) { return setN(X.HARD, a, b, X.STATIONS); }
