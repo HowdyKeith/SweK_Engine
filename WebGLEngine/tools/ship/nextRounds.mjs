@@ -2862,6 +2862,13 @@ export const NEXT_ROUNDS = [
         why: "The far end of the long sonar is the end the range-aware confirmation thins; a memory is the cheap way to keep it.",
     },
     {
+        id: "nav-sensed-detector-range-hold-confirm-hold",
+        blocker: "OPEN",
+        what: "Follow-up 24 (brain/SENSED_NAV_WIP.md) pairs the range-gated evidence hold with the confirmed clear; its tensions are registered: the gate lets a dropout that begins far away take the cell, and the confirmed clear clears a leaking dropout sooner. Registered as FOLLOW-UP 29 of that note (the name was Keith's; no entry existed, and it is follow-up 24's name with a hold on the end, the move follow-up 18 made on follow-up 17: a second hold on what has been confirmed, the hold at every range and a ghost that re-marks a cleared cell at one reading). The build waits for the sets of follow-ups 8 to 24: two registry rows, the set HELD34 and a spec are added then.",
+        how: "After the sets of follow-ups 8 to 24 are flown: the 2-of-3 mark with the evidence hold of cap 30 cleared by 0.8 of the window free, gated to 80 m or at every range, each with and without a ghost (a cell cleared after at least 4 occupied readings is re-marked at one reading for 60 readings), against the map that forgets, under range-law false returns of mean 0.03 with dropouts of 30 pings, the uniform false rate of 0.01 with leaking dropouts, the persistent mix and a clean sea; HELD34 = seeds 3401 to 3460; the registration is in the note.",
+        why: "The ghost is the stage that can undo the confirmed clear's price and the one that brings back a persistent phantom; which of the two shows is not known.",
+    },
+    {
         id: "nav-sensed-detector-hold-confirm-range-confirm",
         blocker: "OPEN",
         what: "Every range-aware mark in the notes (brain/SENSED_NAV_WIP.md, follow-ups 9, 10, 14, 17, 18, 19, 26) marks within 80 m at the first reading, and the price of that bet is registered each time: a uniform false return enters the plan at once. Registered as FOLLOW-UP 28 of that note (the name was Keith's; no entry existed, and it is follow-up 17's name with a confirmation on the end, taken as a second confirmation in the other zone, since the hold's confirmed clear is follow-up 25). The build waits for the sets of follow-ups 8 to 24: two registry rows, the set HELD33 and a spec are added then.",
