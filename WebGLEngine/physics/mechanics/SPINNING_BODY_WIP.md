@@ -1108,3 +1108,9 @@ its gate now reads them so, and holds the six lines the fixes changed.
   bare floor, 50 of 60 do.
 - **Gated:** section 6 of `tools/ship/joltArena-selfcheck.mjs` and a new `fx/fracture/debrisPhysics-selfcheck.mjs`,
   each fix with a row that reproduces the old bug. Sabotaged with the byte-safe runner: 21 designs, each red by name.
+
+### Decided (2026-11-03)
+
+Keith, after the verdict: "I agree with keeping the change, so the wrapper's implicit step stays as Jolt's default."
+The question the registration left open is closed: Jolt's wrapper ships with its implicit gyroscopic step as the
+default. `true` still gives Jolt's own force, and `false` neither.
