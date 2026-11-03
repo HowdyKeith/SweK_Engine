@@ -10,6 +10,7 @@
 //   5 THE SEAT   with no error the seat equals plannerSeat's twin dive for dive; a heavy error changes dives (seeds 2-3 far); the seat counts plans.
 //   6 PURE       no clock, random or file.
 // NOT CHECKED, said plainly: that a wrong model costs the twin its gain (that is the experiment).
+// ROUND 24 ADDENDUM (6 mutants of the `maxStations` option, all red by name on the first pass): the planner's slice using the constant, the default of twinPlan and of the seat at 3, the seat not passing the option, the slice one too long, the seat passing a constant.
 // SABOTAGE LOG (27 mutants of brain/plannerPerturbed.mjs, run against a copy of this gate): 7 went 0 red on the first pass. Four got rows -- the nearest-first rollout and the order rollouts both using the error (a drag error must change both values at seed 3 far), the tie bonus (plain 241: nearest-first wins a tie, a planned next station wins it over nearest-first), the 120 s replan (plan and tick counts equal plannerSeat's twin on seed 3 far, at least 3 plans). Three are EQUIVALENT and said so: the energy clamp after the scaled step (stepNeeds clamps the next step; 24 starts x 4 errors, up to charge +50 and drain +50, gave identical rollouts), the start-energy clamp (the same), and the four-station cap (every scenario of this task has exactly three stations, so the cap never binds here). The 'rollout skips the scaling when both errors are zero' mutant is equivalent too (scaling by 1 is the identity). All 27 are red or said above.
 "use strict";
 import fs from "node:fs";
