@@ -16635,6 +16635,29 @@ ${text.replace(/'/g, "''")}
         return;
     }
 
+    // --- app installs: Nectarlink (thtbee/nectarlink) and DuoDesk (0xCodez/DuoDesk), pinned binary installers ---
+    // Keith 2026-11-03: "let's also do the DuoDesk and Nectarlink installs." Both ship unsigned binaries, so this is voxtral's shape (pin the BYTES: size and SHA-256
+    // per asset) rather than galaxy-profile's (pin a commit). /apps/status is information and open; /apps/download writes to disk and /apps/launch RUNS A FILE ON
+    // THIS MACHINE, so both are the host's alone: _isLocalReq alone is not enough, because cloudflared connects from loopback and a Public-tunnel viewer would
+    // pass it -- hence the _isRemoteReq refusal as well (the same pair line ~8143 uses for remote POSTs).
+    if (req.url.split("?")[0] === "/apps/status" && req.method === "GET") {
+        try { sendJson({ ...require("./appInstallBridge.js").status(), local: _isLocalReq(req) && !_isRemoteReq(req) }); }
+        catch (e) { sendJson({ ok: false, error: "app install bridge unavailable: " + String(e && e.message || e) }); }
+        return;
+    }
+    if ((req.url === "/apps/download" || req.url === "/apps/launch") && req.method === "POST") {
+        if (!_isLocalReq(req) || _isRemoteReq(req)) { sendJson({ ok: false, error: "installing is done from the machine that runs the engine, not from a remote session" }, 403); return; }
+        readJson(d => {
+            d = d || {};
+            try {
+                const ab = require("./appInstallBridge.js");
+                if (req.url === "/apps/download") sendJson(ab.download(String(d.id || ""), String(d.name || "")));
+                else ab.launch(String(d.id || ""), String(d.name || ""), { confirm: d.confirm === true }).then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) }));
+            } catch (e) { sendJson({ ok: false, error: "app install bridge unavailable: " + String(e && e.message || e) }); }
+        });
+        return;
+    }
+
     // --- grdpwasm: install button for nakagami/grdpwasm (GPL-3.0), never vendored ---------------------
     // v4138 -- an RDP client that runs in the browser. Same non-vendoring reasoning as /galaxy above, and the
     // same commit pin. THE DIFFERENCE IS THE BIND ADDRESS: their proxy defaults to :8080, accepts any origin,

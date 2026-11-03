@@ -1,7 +1,7 @@
 <!doctype html>
 <!-- nectarlink.html
-     An install page for Nectarlink (github.com/thtbee/nectarlink), a separate project. This page links to ITS releases and
-     installs nothing itself. It states plainly what Nectarlink is and what it is not to SweK: it does not touch the GPU
+     An install page for Nectarlink (github.com/thtbee/nectarlink), a separate project. This page links to ITS releases, and its
+     install panel (ui/appInstallPanel.js, ai-bridge/appInstallBridge.js) fetches the pinned release file on the host's request. It states plainly what Nectarlink is and what it is not to SweK: it does not touch the GPU
      Brain Peer or any SweK protocol today. -->
 <html lang="en">
 <head>
@@ -31,13 +31,29 @@
 <div class="sub">Latest builds and notes: <a href="https://github.com/thtbee/nectarlink/releases" rel="noopener">github.com/thtbee/nectarlink/releases</a> &mdash; these links pin v0.1.4, the version this page was written against.</div>
 </div>
 
+<div class="card" id="swekInstall">
+<h2>install with SweK</h2>
+<div id="swekInstallBody" class="sub">checking the install bridge...</div>
+<div class="sub">Downloads the vendor&rsquo;s own release file from github.com onto this machine and checks its size and SHA-256 against a pin made on 2026-11-03 (trust on first use: the files were hashed, not audited). Running the installer is a separate step behind a confirmation.</div>
+</div>
+<script type="module">
+import { mountAppInstall } from "/ui/appInstallPanel.js";
+mountAppInstall(document.getElementById("swekInstallBody"), "nectarlink");
+</script>
+
+<details class="sub"><summary>pinned files (size and SHA-256, taken 2026-11-03 &mdash; check yours with <code>sha256sum</code>)</summary>
+<table style="font-size:11px;border-collapse:collapse"><tr><th align="left">file</th><th align="left">bytes</th><th align="left">sha256</th></tr>
+<tr><td>Nectarlink-0.1.4-x64-setup.exe</td><td>38536301</td><td><code>afdf6d9c1b94647a7888735193cfab24f6bb3236c98b8da51533ee0ffb516528</code></td></tr>
+<tr><td>Nectarlink-0.1.4-android.apk</td><td>51754002</td><td><code>26f5dc05460d1cc8390129569665a224cfbe4127b4cd12cd63ceeeaa7ab9d6de</code></td></tr>
+</table></details>
+
 <h2>what it does</h2>
 <div>Phone notifications, SMS and calls on the PC &middot; clipboard and file transfer &middot; screen mirroring and phone apps in windows &middot; phone as touchpad, keyboard, remote or webcam.</div>
 
 <h2>what it is to SweK today</h2>
 <div class="card">
 <div><span class="no">&#183;</span> <b>Not connected to the GPU Brain Peer.</b> Nectarlink moves notifications, files and input between a phone and a PC; it does not schedule compute or carry SweK traffic.</div>
-<div><span class="no">&#183;</span> Nothing in the engine calls it. This page is a link, so you can install it alongside SweK.</div>
+<div><span class="no">&#183;</span> Nothing in the engine calls it. The install panel above only fetches and starts the vendor&rsquo;s own installer, so you can run it alongside SweK.</div>
 <div><span class="yes">&#10003;</span> Possibly useful later: it publishes a protocol spec (length-prefixed CBOR over QUIC, with a capability registry) and Rust crates under GPL/MPL. A peer link could borrow the idea, but that is not evaluated or built here.</div>
 </div>
 

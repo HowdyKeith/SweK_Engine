@@ -1,7 +1,7 @@
 <!doctype html>
 <!-- duodesk.html
      An install page for DuoDesk (github.com/0xCodez/DuoDesk, a GPL-3.0 fork of TwinDesk), a separate project. This page
-     links to ITS releases and installs nothing itself. It states what DuoDesk is and that nothing in SweK calls it. -->
+     links to ITS releases, and its install panel (ui/appInstallPanel.js, ai-bridge/appInstallBridge.js) fetches the pinned release file on the host's request. It states what DuoDesk is and that nothing in SweK calls it. -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -35,13 +35,34 @@
 <div class="sub">The apps are not code-signed. macOS: Privacy &amp; Security &rarr; Open Anyway (or <code>xattr -dr com.apple.quarantine /Applications/DuoDesk.app</code>). Windows: SmartScreen &rarr; More info &rarr; Run anyway; Smart App Control on Windows 11 can block unsigned apps outright. Android: allow unknown apps, then More details &rarr; Install anyway if Play Protect objects; the full APK is easiest installed from the computer over wireless debugging.</div>
 </div>
 
+<div class="card" id="swekInstall">
+<h2>install with SweK</h2>
+<div id="swekInstallBody" class="sub">checking the install bridge...</div>
+<div class="sub">Downloads the vendor&rsquo;s own release file from github.com onto this machine and checks its size and SHA-256 against a pin made on 2026-11-03 (trust on first use: the files were hashed, not audited). Running the installer is a separate step behind a confirmation.</div>
+</div>
+<script type="module">
+import { mountAppInstall } from "/ui/appInstallPanel.js";
+mountAppInstall(document.getElementById("swekInstallBody"), "duodesk");
+</script>
+
+<details class="sub"><summary>pinned files (size and SHA-256, taken 2026-11-03 &mdash; check yours with <code>sha256sum</code>)</summary>
+<table style="font-size:11px;border-collapse:collapse"><tr><th align="left">file</th><th align="left">bytes</th><th align="left">sha256</th></tr>
+<tr><td>DuoDesk-Setup-2.5.0.exe</td><td>101596829</td><td><code>800ac37d84d4d22c6ba2373284593c043dc0ebb6bea823d608c2005628cfecfb</code></td></tr>
+<tr><td>DuoDesk-Setup-2.5.0-arm64.exe</td><td>103745923</td><td><code>db1bb5e523baf122e18301d1da1cd76d5e3e2f72d9adefaa8e461b6ff698bb0e</code></td></tr>
+<tr><td>DuoDesk-2.5.0-arm64.dmg</td><td>151162578</td><td><code>47aab4238f21c9f62a21407fc8b02bdc7ea9c8f309ac636769037d8dfb4b8b61</code></td></tr>
+<tr><td>DuoDesk-2.5.0-x86_64.AppImage</td><td>123490115</td><td><code>51d4aa672d89faca0fbbf638a799ab9419b0a06bee554269371930fb4424e75e</code></td></tr>
+<tr><td>DuoDesk-2.5.0-amd64.deb</td><td>85470496</td><td><code>a24d7a8eaad838b445339825b944d479607ccbe63bdaee40cefc5c1f151755ce</code></td></tr>
+<tr><td>DuoDesk-2.5.0.apk</td><td>27764613</td><td><code>e7c3a00b22529d25867b32af01da3e4a53594590f9b637454c86361b7a872de5</code></td></tr>
+<tr><td>DuoDesk-2.5.0-full.apk</td><td>27764905</td><td><code>68fe55d2ad2db434b6bf8c0c8e3fd9d03d616ff3a73d150dbb1a3a4b9eacec41</code></td></tr>
+</table></details>
+
 <h2>what it does</h2>
 <div>One keyboard and mouse across machines &middot; extended or mirrored displays &middot; the other computer&rsquo;s apps in their own windows &middot; shared clipboard and files &middot; phone calls, texts and camera on the computer &middot; Wi-Fi, USB, Bluetooth or Wi-Fi Direct. Per its README the only internet request is an update check against GitHub releases, which can be turned off.</div>
 
 <h2>what it is to SweK today</h2>
 <div class="card">
 <div><span class="no">&#183;</span> <b>Not connected to the GPU Brain Peer</b> or anything else in the engine. It shares input, screens and files between your own devices; it runs no compute.</div>
-<div><span class="no">&#183;</span> It overlaps with <a href="/remote-desktop.html">Remote Desktop</a> and <a href="/nectarlink.html">Nectarlink</a>. This page is a link so you can install it alongside SweK, not a SweK feature.</div>
+<div><span class="no">&#183;</span> It overlaps with <a href="/remote-desktop.html">Remote Desktop</a> and <a href="/nectarlink.html">Nectarlink</a>. The install panel above only fetches and starts the vendor&rsquo;s own installer; it is not a SweK feature.</div>
 </div>
 </body>
 </html>
