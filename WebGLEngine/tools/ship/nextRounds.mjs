@@ -3033,6 +3033,13 @@ export const NEXT_ROUNDS = [
         why: "The plain run is the slowest mark to re-enter a far cell, so a far ghost should matter most behind it; whether the zone adds anything to the ghost at every range is not known, and the effect is expected to be small.",
     },
     {
+        id: "nav-sensed-detector-hold-range-hold-confirm-range-hold",
+        blocker: "OPEN",
+        what: "Follow-up 50 (brain/SENSED_NAV_WIP.md) registers the ramp hold with the carried evidence and the confirmed clear whose fraction depends on range, with a mark of one. Registered as FOLLOW-UP 56 of that note (the name was Keith's; no entry existed, and it is follow-up 50's name with hold on the end; the name already has a second hold, the carry, so the word is read as follow-up 54 read its trailing hold: a lock on the free state, a cell cleared with fewer than four occupied readings waits eight readings before it can be re-marked, and it shares that reading's doubt). The note says the lock and the carry act on disjoint sets of cleared cells. It was written after the results of follow-ups 7 to 18 and 20 to 22 were read, rests on follow-ups 32, 45, 50 and 54, which are unread, unflown or unbuilt, and says so. Three new module fields (clear.fNear, ghost.carry, the lock, each shared): the build waits for the sets of follow-ups 8 to 24, then adds them, two registry rows, the set HELD61 and a spec.",
+        how: "After the sets of follow-ups 8 to 24 are flown: the ramp hold on the nearest range with a mark of one and the carry, cleared by a run and by a run within 80 m and 0.8 beyond it, each with and without the lock, against the map that forgets, under dropouts of 30 pings, the uniform false rate of 0.01 with leaking dropouts, the persistent mix and a clean sea; HELD61 = seeds 6101 to 6160; the registration is in the note.",
+        why: "A mark of one takes every false return at its first reading, so the lock keeps out exactly the repeats the persistent mix is made of; whether it pays for the cells a dropout clears unearned is not known.",
+    },
+    {
         id: "nav-sensed-detector-confirm-hold-range-hold",
         blocker: "OPEN",
         what: "Follow-up 26 (brain/SENSED_NAV_WIP.md) asks which range-aware mark to use with the evidence hold at every range; a strict far rule is slow to re-mark a cell the hold has let go (a dropout of 30 pings clears every cell watched for fewer than thirty readings). Registered as FOLLOW-UP 30 of that note (the name was Keith's; no entry existed, and it is follow-up 26's name with a hold on the end, the move follow-ups 18 and 29 made: a second hold on what has been confirmed, the ghost). The build waits for the sets of follow-ups 8 to 24: one registry row, the set HELD35 and a spec are added then.",
