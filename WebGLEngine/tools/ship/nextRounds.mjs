@@ -2547,6 +2547,13 @@ export const NEXT_ROUNDS = [
         why: "Both halves are supported on the path tracer: quality (section 145, display space, narrowly against the cross-fade) and cost (section 150, 1.6-1.8 x the frames). The traced midpoint is still better (16 of 24), so generation is the cheaper substitute.",
     },
     {
+        id: "render-upscaler-switch",
+        blocker: "CLOSED",
+        what: "CLOSED, BUILT (Keith's ask): one upscaler switch for every render page, ui/upscalerSwitch.mjs. One list of modes (native, bilinear, FSR1, FSR2, FSR3, Anime4K, the learned U, the denoiser chain, U_TH) with what each needs; each page declares the modes it runs and what choosing one does; the rest show greyed with the reason -- 'not on this page', 'needs WebGPU' with the localhost link on a LAN address, 'off on this GPU class'. Four ways in, one state: the on-page Upscaler button and its pop-up, ?upscaler=<mode>, swek.upscaler.set(<mode>) in the console, and the Settings Hub's 'Upscaler default (render pages)'; stored per page over the global default. Mounted on fsr-three.html (drives its mode select), fsr.html and anime4k.html (feature the chosen pane), nebula-live.html (bilinear only), path-tracer.html (its three live views) and denoise.html (the chain with or without U_TH; ?ut= kept). Gated by ui/upscalerSwitch-selfcheck.mjs, every page loaded and driven in a browser.",
+        how: "Done. A new render page mounts it with its own modes and onChange.",
+        why: "Before it each render page chose its upscaler its own way and nothing was shared.",
+    },
+    {
         id: "denoise-framegen-page-chain",
         blocker: "CLOSED",
         what: "CLOSED, BUILT: path-tracer.html's chain frame-generation view. Each real frame is the arc's chain (render/frameGenChainLive.mjs: the half-size trace through the shipped denoiser, the fill, EASU, and Bt's history over the last eight), and the half-way frame is generated from two real frames' light-free histories with the scene's motion field at FRAMEGEN_FILL, the holes cross-faded, lit at the half-way eye -- on WebGPU by render/denoiseFrameGenGPU.mjs's createDeviceGenerator, the CPU reference otherwise. Gated by render/frameGenChainLive-selfcheck.mjs: the chain bit for bit with the arc's pieces, the device generator within section 147's 1e-5 of the CPU (4.7e-7 measured on SwiftShader), and the page driven in a browser.",

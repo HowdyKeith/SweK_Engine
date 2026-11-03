@@ -1120,5 +1120,16 @@ $("tlgo").onclick = async () => {
 };
 </script>
 <script type="module" src="/ui/originNotice.js"></script>
+<script type="module">
+// ui/upscalerSwitch.mjs: the shared upscaler switch -- this page's three live views: FSR3 frame generation on raw traces, frame generation on
+// the denoiser chain, and round 72's U_TH on Bt's history. Opening the page only marks the view; choosing one starts it (and stops the others)
+import { mountUpscalerSwitch } from "/ui/upscalerSwitch.mjs";
+const VIEW = { fsr3: ["fggo", "fgstop"], chain: ["fcgo", "fcstop"], uth: ["tlgo", "tlstop"] };
+const mark = (id) => { for (const [m, [go]] of Object.entries(VIEW)) { const b = document.getElementById(go); if (b) b.style.outline = m === id ? "3px solid #7fb4ff" : ""; } };
+mountUpscalerSwitch({ page: "path-tracer", pageDefault: "chain", modes: { fsr3: {}, chain: {}, uth: { needs: ["history"] } },
+    onChange: (id, { from }) => { mark(id); if (from !== "set" && from !== "console") return;
+        for (const [m, [, stop]] of Object.entries(VIEW)) if (m !== id) document.getElementById(stop).click();
+        const go = document.getElementById(VIEW[id][0]); go.scrollIntoView({ block: "center", behavior: "smooth" }); go.click(); } });
+</script>
 </body>
 </html>

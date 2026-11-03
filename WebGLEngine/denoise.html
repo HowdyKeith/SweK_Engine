@@ -289,7 +289,7 @@ $("chain").onclick = async () => {
         const cv = document.createElement("canvas"); cv.width = 8; cv.height = 8;
         const device = await requestDevice(cv, { backend: "webgpu", offscreen: true });
         // section 172: U_TH after the history where UTH_BY_ADAPTER says (the 1080 class), or where ?ut=1 asks; ?ut=0 refuses it
-        const askUT = new URLSearchParams(location.search).get("ut"), useUT = askUT === "1" || (askUT !== "0" && uthFor(key));
+        const sw = window.__swekUpscaler, askUT = sw === "uth" ? "1" : sw === "chain" ? "0" : new URLSearchParams(location.search).get("ut"), useUT = askUT === "1" || (askUT !== "0" && uthFor(key));   // the shared upscaler switch (ui/upscalerSwitch.mjs), else ?ut=
         let ut = null;
         if (useUT) { const ur = await fetch("/" + UTH_NET); if (!ur.ok) throw new Error(`U_TH did not load: ${ur.status} ${ur.statusText}`); const tr = await ur.json(); ut = decodeNet(tr.runs.find((x) => x.seed === tr.candidate).net); }
         const r = await timeHalfChain({ device, net, newAdapter: () => navigator.gpu.requestAdapter(), kernels, S: makeScene(...CHAIN_SCENE), w, h, W, H, maxRings: CHAIN_RINGS, ut });
@@ -335,5 +335,16 @@ $("chain").onclick = async () => {
 };
 </script>
 <script type="module" src="/ui/originNotice.js"></script>
+<script type="module">
+// ui/upscalerSwitch.mjs: the shared upscaler switch -- the device chain with Bt's history alone, or with round 72's U_TH after it. The default
+// is UTH_BY_ADAPTER's for this GPU (section 172), and ?ut=1 / ?ut=0 still choose, as the URL's choice
+import { mountUpscalerSwitch } from "/ui/upscalerSwitch.mjs";
+import { pageAdapterKey } from "/render/denoiseDevice.mjs";
+import { uthFor } from "/render/learnedUpscaleTemporalGPU.mjs";
+const a = navigator.gpu ? await navigator.gpu.requestAdapter().catch(() => null) : null, onClass = !!(a && uthFor(pageAdapterKey(a.info, navigator.userAgentData)));
+const ut = new URLSearchParams(location.search).get("ut"), search = location.search + (ut === "1" ? "&upscaler=uth" : ut === "0" ? "&upscaler=chain" : "");
+mountUpscalerSwitch({ page: "denoise", pageDefault: onClass ? "uth" : "chain", search, modes: { chain: { needs: ["webgpu"] }, uth: { needs: ["webgpu"] } },
+    onChange: (id) => { window.__swekUpscaler = id; } });
+</script>
 </body>
 </html>

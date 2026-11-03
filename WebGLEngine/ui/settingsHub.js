@@ -10,6 +10,7 @@
 // The SCHEMA is the audit: every controllable feature is listed here with
 // a default + a get/set binding. If a feature isn't in this list, it's a
 // gap. buildSettingsSchema() is pure (no DOM) so it can be unit-tested.
+import { settingsControl as upscalerSetting } from "./upscalerSwitch.mjs";   // the render pages' shared upscaler default
 
 // v1806 — reusable timeout-guarded fetch for Settings panels. Every custom panel
 // in this file does its own independent fetch() to populate itself, and several
@@ -155,6 +156,7 @@ export function buildSettingsSchema(ctx) {    const gfx = (key, label, hint) => 
     });
     return [
         { id: "graphics", label: "Graphics", icon: "🎨", controls: [
+            upscalerSetting(),   // ui/upscalerSwitch.mjs: the default mode every render page's Upscaler button starts from
             gfx("shadows",          "Sun shadows",       "Directional shadow map (heaviest)"),
             gfx("godrays",          "God rays",          "Volumetric sun scatter"),
             gfx("particles",        "Particles",         "Smoke, sparks, debris"),
