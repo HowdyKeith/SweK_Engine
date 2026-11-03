@@ -2996,10 +2996,8 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "nav-sensed-detector-confirm",
-        blocker: "OPEN",
-        what: "The detector marks a cell after `k` occupied readings in a row (brain/SENSED_NAV_WIP.md, FOLLOW-UP 7 and after), which is brittle against the sonar's misses and re-marks a cell a miss has cleared only after another run; follow-ups 7 and 10 list an M-of-N rule as untried. Registered as FOLLOW-UP 11 of that note (the name was Keith's; no entry existed, and it is taken as the confirmation rule itself).",
-        how: "After follow-up 7's set is flown: the detector with a cell marked when M of its last N readings were occupied (rules 1-of-1, 2-of-2, 3-of-3, 2-of-3, 2-of-4, 3-of-4), against follow-up 7's white false returns at miss chances of 0.2 and 0.4; HELD16 = seeds 1601 to 1660; the registration is in the note.",
-        why: "A radar's track-initiation rule is M-of-N for the reason a run of k is brittle; whether the map gains from the same is not known.",
+        state: "CLOSED",
+        what: "CLOSED 2026-11-03 (brain/SENSED_NAV_WIP.md, RESULT OF FOLLOW-UP 11; tools/ship/subSensedDetStudy.mjs --study detector-confirm, flights in brain/subSensedDetDetectorConfirmHeld16.jsonl): SUPPORTED (6 of 6 cells); four of eight predictions held (N5 to N8). The M-of-N family collapses at two readings: 2-of-2, 2-of-3 and 2-of-4 reach 314, 309 and 315 of 360 summed over white false returns of 0.01 and the same with the sonar missing 40%, the memory buys nothing measurable (2-of-3 against a run of two under heavy misses +14 / +10, p 0.54), and a third reading is the price (3-of-3 254, 3-of-4 279; 72 of 180 collided for 3-of-3 under heavy misses, median clearance 3.0 m). The map that forgets reaches 264.",
     },
     {
         id: "nav-sensed-detector-range",

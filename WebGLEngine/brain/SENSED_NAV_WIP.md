@@ -667,6 +667,31 @@ The two backlog entries are the two halves of one thing. Follow-up 5 found the f
 
 **Unchanged.** The arms, the designated detector `m2-3`, the bar, the verdict rule, the predictions with their reasons, the set (HELD16 = seeds 1601 to 1660 of each of the three kinds) and its single reading are as registered above. Any post hoc test is labelled post hoc.
 
+### RESULT OF FOLLOW-UP 11 (2026-11-03; HELD16 flown ONCE, 2,700 flights, `brain/subSensedDetDetectorConfirmHeld16.jsonl`; the verdict below is the one the study command printed; every number under "POST HOC" was computed after it was read and is labelled)
+
+**VERDICT: SUPPORTED (6 of 6 cells).** The designated `m2-3` against 80% of exact's count: W: islands HELD, gaps HELD, current HELD; V: islands HELD, gaps HELD, current HELD. **4 of 8 predictions held; N1, N2, N3, N4 missed.**
+
+**Flown (reached of 180; islands / gaps / current):** `exact` 172 (59/58/55); `long+fix+forget` 171 (59/57/55); `m1-1@W` 139 (39/58/42); `m2-2@W` 166 (56/59/51); `m3-3@W` 148 (51/55/42); `m2-3@W` 157 (53/56/48); `m2-4@W` 163 (55/58/50); `m3-4@W` 156 (53/55/48); `m1-1@V` 125 (35/52/38); `m2-2@V` 148 (55/51/42); `m3-3@V` 106 (35/39/32); `m2-3@V` 152 (50/54/48); `m2-4@V` 152 (51/54/47); `m3-4@V` 123 (39/46/38); `m2-3@clean` 174 (57/60/57).
+
+**The predictions (each scored as registered):**
+* **N1 MISSED**: an M-of-N rule is kinder to misses than a run: under V, m2-3 reaches at least 5 more than m2-2. m2-3@V 152, m2-2@V 148: +4 against the 5 asked.
+* **N2 MISSED**: and no worse where the misses are mild: under W, m2-3 is within 8 of m2-2. m2-3@W 157, m2-2@W 166: 9 apart, within 8 asked.
+* **N3 MISSED**: a third reading buys little: under W, m3-3 is within 8 of m2-2. m3-3@W 148, m2-2@W 166: 18 apart, within 8 asked.
+* **N4 MISSED**: every confirmation rule repairs the white false returns: under W each of m2-2, m3-3, m2-3, m2-4 and m3-4 reaches at least 20 more than m1-1. m2-2 166, m3-3 148, m2-3 157, m2-4 163, m3-4 156 against m1-1@W 139 (20 asked).
+* **N5 HELD**: m2-3 holds the bar in every kind under W. m2-3@W: 53/47.2 56/46.4 48/44.0 (reached / needed of 0.8 exact, islands gaps current).
+* **N6 HELD**: and under V. m2-3@V: 50/47.2 54/46.4 48/44.0 (reached / needed of 0.8 exact, islands gaps current).
+* **N7 HELD**: on a sea with no faults m2-3@clean is within 8 of the clean long+fix+forget. m2-3@clean 174, long+fix+forget 171: 3 apart, within 8 asked.
+* **N8 HELD**: a stricter rule is slower and pays where misses are many: under V, m3-4 reaches at least 5 fewer than m2-3. m2-3@V 152, m3-4@V 123: +29 against the 5 asked.
+
+**What was found (the registered measures; the reading of them is post hoc where said).**
+* **The designated rule holds both seas, and so do others.** `m2-3` holds all six cells (white false returns at 0.01 and the same with the sonar missing 40%), as `m2-4` does; POST HOC, the six-cell tally of every rule flown is `m2-3` 6, `m2-4` 6, `m2-2` 5 (missing the current kind under V by two flights: 42 of the 44 needed), `m3-4` 3, `m3-3` 2 and `m1-1` (the map that forgets) 2. Four of eight predictions held (N5 to N8).
+* **The family collapses at two readings; a third costs, and the memory buys nothing measurable.** Summed over the two seas, `m2-2` reaches 314, `m2-4` 315, `m2-3` 309, `m3-4` 279, `m1-1` 264 and `m3-3` 254 of 360. POST HOC sign tests (3 kinds pooled, 180 paired scenarios): `m2-3` against `m2-2` under V +14 / +10 (p 0.54) and under W +4 / +13 (p 0.049: the run of two is the better under mild misses); `m2-3` against `m2-4` +7 / +13 under W (p 0.26) and +13 / +13 under V (p 1.0). N1 (the memory pays under heavy misses) missed by one flight (+4 against 5), N2 (no worse under mild misses) missed by one (9 apart against 8).
+* **A third reading is the price.** N3 missed: `m3-3` is 18 below `m2-2` under W and 42 below it under V, and N8 held by a margin: `m3-4` is 29 below `m2-3` under V. The cost shows as collisions, not timeouts: `m3-3@V` collided in 72 of 180 flights with a median minimum clearance of 3.0 m (the other rules 5.8 to 8.7 m, `m3-4` lowest), because a real obstacle is marked late; 8 of its 24 m gaps were reached against 12 for `m2-2`.
+* **Every confirmation repairs the white false returns, but by less than the 20 asked for the strictest.** Against `m1-1@W` 139: `m2-2` +27, `m2-4` +24, `m2-3` +18, `m3-4` +17, `m3-3` +9 (N4 missed on `m2-3`, `m3-4` and `m3-3`). POST HOC sign tests: `m2-3@W` +29 / `m1-1@W` +11 (p 0.0064); `m2-3@V` +40 / `m1-1@V` +13 (p 0.0003).
+* **Nothing is lost on a sea with no faults.** `m2-3@clean` 174 against the clean map's 171 (N7 held; POST HOC +7 / +4, p 0.55). In this set `exact` reached 172 (7 collided), a harder set than HELD12's 177, and every bar is against the exact count of the set it is flown on.
+
+**What it does not say.** That a window of three or four is not better under some other fault (the faults are two points, and the readings of a cell are not independent: the vessel moves between them); that a rule that is no better here would be no better with a hold or a range (those are follow-ups 12 to 31, flown on their own sets). Not a different pilot, a different generator or the moving ships. A result is a statement about this generator and these models.
+
 ## FOLLOW-UP 12: THE HOLD RULE ITSELF (Keith, 2026-11-03: "lets also do nav-sensed-detector-hold"; REGISTERED BEFORE ANY CODE FOR IT AND BEFORE ITS SET IS FLOWN, and registered while follow-ups 7 to 11 were unflown, so nothing below was shaped by their results)
 
 **What the name was taken to mean, said first.** No backlog entry had that name. It is the mirror of follow-up 11: there the detector's *marking* rule was the subject, here its *clearing* rule is. Follow-up 7's hold is a count of free readings IN A ROW, the same for every cell, and its registration already names the cost: a hold of twelve on a mark of one makes each false return last twelve pings (G3), and a hold shorter than a dropout does not cover it. The rule tried here is a hold that **scales with the evidence**; a K-of-N free rule and a leaky counter are untried. If it meant something else, say so before the build, which waits for follow-up 7's set to be flown.
