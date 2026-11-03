@@ -59,7 +59,7 @@ class JoltWorld {
         if (gravity) this.ps.SetGravity(new Jolt.Vec3(gravity[0], gravity[1], gravity[2]));
         this.bodies = [];   // { body, id, dynamic }
     }
-    addBox({ type = "dynamic", pos = [0, 0, 0], half = [0.5, 0.5, 0.5], density = 1, damping = LINEAR_DAMPING, gyroscopic = "implicit" } = {}) {
+    addBox({ type = "dynamic", pos = [0, 0, 0], half = [0.5, 0.5, 0.5], density = 1, damping = LINEAR_DAMPING, plane2d = false, gyroscopic = "implicit" } = {}) {
         const Jolt = this.Jolt, dyn = type !== "static";
         const shape = new Jolt.BoxShapeSettings(new Jolt.Vec3(half[0], half[1], half[2])).Create().Get();
         const cs = new Jolt.BodyCreationSettings(shape, new Jolt.RVec3(pos[0], pos[1], pos[2]), new Jolt.Quat(0, 0, 0, 1), dyn ? Jolt.EMotionType_Dynamic : Jolt.EMotionType_Static, dyn ? LAYER_M : LAYER_NM);
@@ -81,9 +81,14 @@ class JoltWorld {
         // step: its gyroscopic torque is exactly zero.
         const mode = !dyn ? false : gyroscopic === true || gyroscopic === "jolt" ? "jolt" : gyroscopic === "implicit" ? "implicit" : false;
         if (mode === "jolt") cs.mApplyGyroscopicForce = true;
+        // 2026-11-03 (unnumbered) -- `plane2d`: a dynamic body LOCKED TO THE XY-PLANE (Jolt's EAllowedDOFs_Plane2D): it moves in x and y and
+        // turns about z alone, for a page that draws a side view (jolt-arena.html). With one axis of turning there is no gyroscopic torque,
+        // so the implicit step skips it, as it skips an equal-moment body -- and Jolt holds a zero inverse inertia on the locked axes, which
+        // has no inverse to read. Off unless asked, so every other body is built as it was.
+        if (dyn && plane2d) cs.mAllowedDOFs = Jolt.EAllowedDOFs_Plane2D;
         const b = this.bi.CreateBody(cs); Jolt.destroy(cs); this.bi.AddBody(b.GetID(), dyn ? Jolt.EActivation_Activate : Jolt.EActivation_DontActivate);
-        const rec = { body: b, id: b.GetID(), dynamic: dyn, gyro: mode, I: null };
-        if (mode === "implicit") {
+        const rec = { body: b, id: b.GetID(), dynamic: dyn, gyro: mode, I: null, plane2d: dyn && !!plane2d };
+        if (mode === "implicit" && !rec.plane2d) {
             // the body's local inertia, as Jolt holds it, row-major from its three columns -- read once: a rigid body's does not change
             const m = b.GetMotionProperties().GetLocalSpaceInverseInertia().Inversed(), c = (v) => [v.GetX(), v.GetY(), v.GetZ()];
             const x = c(m.GetAxisX()), y = c(m.GetAxisY()), z = c(m.GetAxisZ()), I = [x[0], y[0], z[0], x[1], y[1], z[1], x[2], y[2], z[2]];
@@ -93,6 +98,8 @@ class JoltWorld {
     }
     /** Which gyroscopic term body `idx` has: "implicit" (the wrapper's step), "jolt" (Jolt's own force) or false. */
     gyroscopicOf(idx) { return this.bodies[idx].gyro; }
+    /** Whether body `idx` is locked to the xy-plane (addBox's `plane2d`). */
+    plane2dOf(idx) { return this.bodies[idx].plane2d; }
     // THE IMPLICIT STEP, taken before every Jolt step over its whole dt -- box3d's step exactly at the pages' one substep (box3d
     // takes it once a substep; at more substeps this still takes it once). Only awake dynamic bodies with the "implicit" setting
     // and unequal moments, and only when they turn.

@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "92d91a84a624d650d3488ab202126b3536a0d1d1",
+ "head": "80b282be1a4b6ee1844f62f963ee5f7b39e9804b",
  "bodies": {
   "box3d": [
    {
@@ -389,8 +389,8 @@
   "jolt": [
    {
     "path": "physics/jolt/joltLoader.js",
-    "bytes": 16080,
-    "sha": "fc183172140b76eb6f9aecba1b9b990068b54301"
+    "bytes": 16865,
+    "sha": "2195d8555ee1da5057cd674f5a1337f11c57fb07"
    },
    {
     "path": "tools/ship/artifactWeight.mjs",

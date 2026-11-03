@@ -14,6 +14,9 @@
 //      (density 25), so that throw carries about a boulder's momentum and still craters the wall.
 //   3. THE ARENA WAS ONLY 1 M DEEP. Any drift in z dropped a body off the ground strip, even a ragdoll merely dropped. The arena is
 //      now a slab 1.5 m deep between two invisible panes, with end caps, on a ground as deep as the slab.
+//   4. (later the same day, Keith's pick) THE ARENA IS LOCKED TO 2-D. The page draws x, y and the turn about z, and nothing else; its
+//      wall, its crew and its boulders are now locked to the xy-plane (the Jolt wrapper's `plane2d`, Jolt's EAllowedDOFs_Plane2D), so
+//      the physics is the picture. The panes and caps stay, for anything a page adds without the lock.
 "use strict";
 import { createStructures } from "./joltStructures.js";
 import { createRagdoll } from "./joltRagdoll.js";
@@ -44,7 +47,7 @@ export function buildArena(world) {
     world.addBox({ type: "static", pos: [...A.ground.pos], half: [...A.ground.half] });
     for (const z of [A.slab + 0.25, -A.slab - 0.25]) world.addBox({ type: "static", pos: [0, 10, z], half: [L + 0.5, 10.5, 0.25] });
     for (const x of [L + 0.25, -L - 0.25]) world.addBox({ type: "static", pos: [x, 10, 0], half: [0.25, 10.5, A.slab] });
-    const S = createStructures(world), wall = S.addWall({ ...A.wall });
+    const S = createStructures(world), wall = S.addWall({ ...A.wall, plane2d: true });
     return { S, wall };
 }
 /** Is spot n clear of every dynamic body now in the world? Each body is taken at Jolt's own world-space bounds, the crew at its box. */
@@ -62,10 +65,12 @@ export function addCrew(world, crew, count = 3) {
     for (let k = 0; k < count; k++) {
         let n = 0; while (n < ARENA.crew.spots && !spotIsFree(world, n)) n++;
         const at = n < ARENA.crew.spots ? { x: crewSpot(n), y: ARENA.crew.y } : { x: crewSpot(0), y: ARENA.crew.y + 6 };
-        crew.push(createRagdoll(world, { ...at, z: 0, scale: ARENA.crew.scale, density: ARENA.crew.density }));
+        crew.push(createRagdoll(world, { ...at, z: 0, scale: ARENA.crew.scale, density: ARENA.crew.density, plane2d: true }));
     }
     return crew;
 }
+/** A BOULDER, as the page lobs one: a cube of half-size 0.55 and density 5, locked to the plane, thrown at `v`. */
+export function addBoulder(world, pos, v) { const i = world.addBox({ type: "dynamic", pos: [pos[0], pos[1], 0], half: [0.55, 0.55, 0.55], density: 5, plane2d: true }); world.setVelocity(i, [v[0], v[1], 0]); return i; }
 /** FLING CREW: every ragdoll thrown toward the wall at the fling's speed, as a velocity (joltRagdoll's launch()). */
 export function flingCrew(crew) {
     for (const rag of crew) { const c = rag.center(), dir = c[0] >= 0 ? -1 : 1; rag.launch([dir * ARENA.fling.speed, ARENA.fling.up, 0], ARENA.fling.spin); }

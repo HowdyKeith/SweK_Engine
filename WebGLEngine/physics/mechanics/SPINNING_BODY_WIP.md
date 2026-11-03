@@ -1106,6 +1106,11 @@ its gate now reads them so, and holds the six lines the fixes changed.
 - **The blob debris** (`blob-avatar.html`, `blob-herd.html`): `addGround()` has an optional rim, and both pages pass a
   2 m one. Over 40 seeds of each blob no fragment is lost, and none of 60 hard throws at the edge goes over it; off the
   bare floor, 50 of 60 do.
+- **The arena locked to 2-D** (Keith's pick, the same day): the Jolt wrapper's `addBox()` takes `plane2d` (Jolt's
+  `EAllowedDOFs_Plane2D`), off unless asked, and the arena's wall, crew and boulders take it. The page draws x, y and
+  the turn about z, and now nothing else moves: after a throw every body is at z = 0 with no tilt, where unlocked crew
+  drift 0.58 m and tilt. A locked body is skipped by the implicit step, as an equal-moment one is. Section 7 of the
+  arena gate holds it, sabotaged 11 ways.
 - **Gated:** section 6 of `tools/ship/joltArena-selfcheck.mjs` and a new `fx/fracture/debrisPhysics-selfcheck.mjs`,
   each fix with a row that reproduces the old bug. Sabotaged with the byte-safe runner: 21 designs, each red by name.
 

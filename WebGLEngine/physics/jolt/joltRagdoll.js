@@ -12,12 +12,13 @@ function createRagdoll(world, opts = {}) {
     const { Jolt, ps, bodyOf } = world.raw();
     // 2026-11-03 (unnumbered): `density` is new, and its default is the 1 every ragdoll had, so a caller that passes none
     // builds exactly what it built before. jolt-arena.html passes a heavier crew (physics/jolt/joltArena.js says why).
-    const s = opts.scale || 1, bx = opts.x || 0, by = opts.y || 0, bz = opts.z || 0, density = opts.density || 1;
+    // `plane2d` (also 2026-11-03) locks every part to the xy-plane, through the Jolt wrapper's addBox option; off unless asked.
+    const s = opts.scale || 1, bx = opts.x || 0, by = opts.y || 0, bz = opts.z || 0, density = opts.density || 1, flat = opts.plane2d ? { plane2d: true } : {};
     const parts = [];       // body indices, in a fixed order
     const joints = [];      // { con, a, b }
 
     function part(name, px, py, pz, hx, hy, hz) {
-        const i = world.addBox({ type: "dynamic", pos: [bx + px * s, by + py * s, bz + pz * s], half: [hx * s, hy * s, hz * s], density });
+        const i = world.addBox({ type: "dynamic", pos: [bx + px * s, by + py * s, bz + pz * s], half: [hx * s, hy * s, hz * s], density, ...flat });
         parts.push({ name, idx: i }); return i;
     }
     // ball joint at a world-space point between two parts

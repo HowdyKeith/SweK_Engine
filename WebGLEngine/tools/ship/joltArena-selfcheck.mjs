@@ -33,6 +33,11 @@
 //   spawned below the ground top (y = -0.2) 2
 //   D1 was added after the series, for the one row no design had turned red (the nine at rest); it went red with the fling row.
 //   Every row of section 6 went red under at least one design.
+// SABOTAGE LOG, THE 2-D LOCK (2026-11-03, later the same day) -- the byte-safe runner against this gate, every file restored byte-identical:
+//   L1 the wrapper never setting the lock 2 | L2 the lock giving every axis back 2 | L3 the implicit step reading a locked body's inertia 1 | L4 the wall
+//   not locked 2 | L5 the crew not locked 3 | L6 the boulder not locked 2 | L7 addWall ignoring plane2d 2 | L8 createRagdoll ignoring plane2d 3 | L9 the
+//   page lobbing its own boulder again 2 | L10 plane2dOf saying no 1 | L11 createRagdoll locking every ragdoll, asked or not 2 (added after the series,
+//   for the one row of section 7 no design had turned red: the lock can fail). Every row of section 7 went red under at least one design.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -81,7 +86,9 @@ console.log("\n2. *** THE PAGE-WIDE POINTERDOWN LISTENER IGNORES CLICKS INSIDE #
     // sits BEFORE the boulder-spawn code, not after it (a check that only asked "does #hud appear anywhere in
     // the function" would pass a guard written in the wrong order, which guards nothing)
     const guardIdx = body.search(/contains\(e\.target\)/);
-    const spawnIdx = src.indexOf('world.addBox({ type: "dynamic"', src.indexOf("pointerdown"));
+    // 2026-11-03 (unnumbered) -- RESTATED: the boulder is spawned by physics/jolt/joltArena.js's addBoulder() now (locked to the plane),
+    // not by an addBox() written in the listener, so the spawn is found by that call
+    const spawnIdx = src.indexOf("addBoulder(world", src.indexOf("pointerdown"));
     ok("...and the guard runs BEFORE the boulder is spawned, not after",
         guardIdx >= 0 && spawnIdx > 0 && (src.indexOf("contains(e.target)") < spawnIdx));
 }
@@ -217,8 +224,9 @@ console.log("\n5. *** SABOTAGE: EACH FINDING MUST BE ABLE TO FAIL ***");
 console.log("\n6. *** THE PAGE FIXES: THE CREW SPAWN CLEAR, ARE THROWN AT 30 M/S, AND STAY IN THE ARENA ***");
 {
     const near = (a, b, tol) => Math.abs(a - b) <= tol, code = noComments(raw);
-    ok("!! the page builds its scene from physics/jolt/joltArena.js -- the arena, Add Crew and Fling Crew -- and no longer makes or throws a ragdoll itself",
-        /import \{ buildArena, addCrew as addCrewTo, flingCrew as flingCrewAt \} from "\.\/physics\/jolt\/joltArena\.js";/.test(code) && /const arena = buildArena\(world\), wall = arena\.wall;/.test(code) &&
+    // 2026-11-03 (unnumbered) -- RESTATED for the 2-D lock, the same day: the page takes its boulder from the module too (addBoulder)
+    ok("!! the page builds its scene from physics/jolt/joltArena.js -- the arena, Add Crew, Fling Crew and the boulder -- and no longer makes or throws a ragdoll itself",
+        /import \{ buildArena, addCrew as addCrewTo, flingCrew as flingCrewAt, addBoulder \} from "\.\/physics\/jolt\/joltArena\.js";/.test(code) && /addBoulder\(world, \[px, py\], /.test(code) && /const arena = buildArena\(world\), wall = arena\.wall;/.test(code) &&
         /addCrewTo\(world, ragdolls\);/.test(code) && /flingCrewAt\(ragdolls\);/.test(code) && !/createRagdoll\(|\.fling\(|createStructures\(/.test(code));
     let mod;
     try { mod = await import(pathToFileURL(path.join(ENG, "physics", "jolt", "joltLoader.js")).href); } catch (e) { report("Jolt WASM unavailable here -- section 6 SKIPPED, not passed"); }
@@ -266,10 +274,54 @@ console.log("\n6. *** THE PAGE FIXES: THE CREW SPAWN CLEAR, ARE THROWN AT 30 M/S
         const w3 = world(); w3.addBox({ type: "static", pos: [0, -0.5, 0], half: [40, 0.5, 0.5] }); const r3 = createRagdoll(w3, { x: 6, y: 1.6, z: 0, scale: 0.85 }); r3.fling(-30, 7, 0, 5);
         let peak3 = 0; for (let n = 0; n < 30; n++) { w3.step(1 / 60, 2); const v = w3.readVelocities(); for (const i of r3.idxs()) peak3 = Math.max(peak3, Math.hypot(v[i * 3], v[i * 3 + 1], v[i * 3 + 2])); } w3.destroy();
         const w4 = world(); w4.addBox({ type: "static", pos: [0, -0.5, 0], half: [40, 0.5, 0.5] }); const S4 = (await import(pathToFileURL(path.join(ENG, "physics", "jolt", "joltStructures.js")).href)).createStructures(w4);
-        S4.addWall({ ...A.ARENA.wall }); const c4 = []; A.addCrew(w4, c4); for (let n = 0; n < 60; n++) { w4.step(1 / 60, 2); S4.update(); } A.flingCrew(c4);
+        // 2026-11-03 (unnumbered) -- RESTATED for the 2-D lock: locked crew cannot drift off even a 1 m-deep arena, so the old arena's failure
+        // is shown with crew made as they were, unlocked, on the spots the module would give them
+        S4.addWall({ ...A.ARENA.wall }); const c4 = [0, 1, 2].map((k) => createRagdoll(w4, { x: A.crewSpot(k), y: A.ARENA.crew.y, z: 0, scale: A.ARENA.crew.scale, density: A.ARENA.crew.density }));
+        for (let n = 0; n < 60; n++) { w4.step(1 / 60, 2); S4.update(); } A.flingCrew(c4);
         for (let n = 0; n < 480; n++) { w4.step(1 / 60, 2); S4.update(); } const x4 = w4.readTransforms(), out4 = c4.flatMap((g) => g.idxs()).filter((i) => x4[i * 7 + 1] < -1).length; w4.destroy();
         ok("!! each fix can fail: the old spawn (x = 3.5) puts the first crew member inside the wall; the old throw (fling, an impulse, at density 1) sends parts past 100 m/s; and the old 1 m-deep arena loses flung crew",
             inWall >= 5 && before2 > 0 && peak3 > 100 && out4 > 0, `${inWall} parts in the wall, ${peak3.toFixed(0)} m/s, ${out4} parts lost`);
+    }
+}
+
+// 2026-11-03 (unnumbered) -- THE 2-D LOCK (Keith's pick, the same day): the page draws x, y and the turn about z, so its wall, crew and boulders
+// are locked to the xy-plane through the Jolt wrapper's `plane2d` (Jolt's EAllowedDOFs_Plane2D), and the physics is the picture.
+console.log("\n7. *** THE 2-D LOCK: EVERYTHING THE ARENA MOVES STAYS IN THE PLANE THE PAGE DRAWS ***");
+{
+    let mod;
+    try { mod = await import(pathToFileURL(path.join(ENG, "physics", "jolt", "joltLoader.js")).href); } catch (e) { report("Jolt WASM unavailable here -- section 7 SKIPPED, not passed"); }
+    if (mod) {
+        const backend = await mod.createJoltBackend(), A = await import(pathToFileURL(path.join(ENG, "physics", "jolt", "joltArena.js")).href);
+        const { createRagdoll } = await import(pathToFileURL(path.join(ENG, "physics", "jolt", "joltRagdoll.js")).href);
+        const loader = fs.readFileSync(path.join(ENG, "physics", "jolt", "joltLoader.js"), "utf8");
+        ok("!! the Jolt wrapper's addBox takes `plane2d`, off unless asked, and gives a dynamic body Jolt's own lock to the xy-plane",
+            /damping = LINEAR_DAMPING, plane2d = false, gyroscopic = "implicit" \} = \{\}\) \{/.test(loader) && /if \(dyn && plane2d\) cs\.mAllowedDOFs = Jolt\.EAllowedDOFs_Plane2D;/.test(loader));
+        // a whole arena, crew added and flung, a boulder lobbed: every moving body locked, and after the throw every one exactly in the plane
+        const w = backend.createWorld({ gravity: [0, -9.8, 0] }), a = A.buildArena(w), crew = []; A.addCrew(w, crew);
+        for (let n = 0; n < 120; n++) { w.step(1 / 60, 2); a.S.update(); }
+        const boulder = A.addBoulder(w, [-9, 1.2], [20, 8]); A.flingCrew(crew);
+        const movers = w.bodies.map((b, i) => i).filter((i) => w.bodies[i].dynamic), statics = w.bodies.map((b, i) => i).filter((i) => !w.bodies[i].dynamic);
+        let zMax = 0, tilt = 0, drawn = 0;
+        for (let n = 0; n < 300; n++) { w.step(1 / 60, 2); a.S.update(); const x = w.readTransforms();
+            for (const i of movers) { zMax = Math.max(zMax, Math.abs(x[i * 7 + 2])); tilt = Math.max(tilt, Math.abs(x[i * 7 + 3]), Math.abs(x[i * 7 + 4]));
+                // the page's own drawing angle against the body's whole turn: equal when the turn is about z alone
+                const qz = x[i * 7 + 5], qw = x[i * 7 + 6], ang = Math.atan2(2 * qz * qw, 1 - 2 * qz * qz), whole = 2 * Math.atan2(qz, qw);
+                drawn = Math.max(drawn, Math.abs(Math.atan2(Math.sin(ang - whole), Math.cos(ang - whole)))); } }
+        const I = movers.map((i) => w.bodies[i].I), setting = movers.map((i) => w.gyroscopicOf(i)), broken = a.S.brokenCount();
+        const locked = movers.map((i) => w.plane2dOf(i)), staticLocked = statics.map((i) => w.plane2dOf(i)); w.destroy();
+        ok("!! every body the arena moves -- the wall's 42 cubes, the crew's parts and the boulder -- is locked to the plane, and the grounds, panes and caps are static",
+            movers.length === 42 + 21 + 1 && locked.every((x) => x === true) && staticLocked.every((x) => x === false) && statics.length === 5 && boulder === movers[movers.length - 1],
+            `${locked.filter(Boolean).length} of ${movers.length} locked`);
+        ok("!! ...and after a throw and a boulder, every one of them is exactly in the plane: z stays 0 and every turn is about z alone, so the page's drawing angle IS the body's turn",
+            zMax === 0 && tilt === 0 && drawn < 1e-5 && broken > 0, `|z| ${zMax}, tilt ${tilt}, drawing off by ${drawn.toExponential(1)} rad, ${broken} wall joints broken`);
+        ok("!! a locked body keeps the setting the default gives it (\"implicit\") but holds no inertia for the step: one axis of turning has no gyroscopic torque",
+            setting.every((g) => g === "implicit") && I.every((x) => x === null));
+        // CAN FAIL: the same crew made without the lock leave the plane and tilt after the same throw
+        const v = backend.createWorld({ gravity: [0, -9.8, 0] }), b = A.buildArena(v), free = [0, 1, 2].map((k) => createRagdoll(v, { x: A.crewSpot(k), y: A.ARENA.crew.y, z: 0, scale: A.ARENA.crew.scale, density: A.ARENA.crew.density }));
+        for (let n = 0; n < 120; n++) { v.step(1 / 60, 2); b.S.update(); } A.flingCrew(free); let zFree = 0, tiltFree = 0;
+        for (let n = 0; n < 300; n++) { v.step(1 / 60, 2); b.S.update(); const x = v.readTransforms(); for (const g of free) for (const i of g.idxs()) { zFree = Math.max(zFree, Math.abs(x[i * 7 + 2])); tiltFree = Math.max(tiltFree, Math.abs(x[i * 7 + 3]), Math.abs(x[i * 7 + 4])); } }
+        v.destroy();
+        ok("!! ...and the lock can fail: the same crew made without it leave the plane and tilt after the same throw", zFree > 0.01 && tiltFree > 0.01, `|z| ${zFree.toFixed(3)}, tilt ${tiltFree.toFixed(3)}`);
     }
 }
 

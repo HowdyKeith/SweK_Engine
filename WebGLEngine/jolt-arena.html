@@ -32,7 +32,7 @@ import { createJoltBackend } from "./physics/jolt/joltLoader.js";
 // 2026-11-03 (unnumbered): the scene -- ground, panes, wall, crew and the fling -- is physics/jolt/joltArena.js, so this page and its gate
 // (tools/ship/joltArena-selfcheck.mjs) build the same thing. Its header names the three fixes: the crew spawned inside the wall, flung
 // at hundreds of metres a second, and fell off an arena 1 m deep.
-import { buildArena, addCrew as addCrewTo, flingCrew as flingCrewAt } from "./physics/jolt/joltArena.js";
+import { buildArena, addCrew as addCrewTo, flingCrew as flingCrewAt, addBoulder } from "./physics/jolt/joltArena.js";
 
 const cvs = document.getElementById("c"), ctx = cvs.getContext("2d");
 function resize() { cvs.width = innerWidth; cvs.height = innerHeight; } addEventListener("resize", resize); resize();
@@ -84,8 +84,7 @@ addEventListener("pointerdown", (e) => {
   // launch a boulder from the lower-left toward the click, fast enough to arc in
   const px = -9, py = 1.2, dx = tx - px, dy = ty - py, d = Math.hypot(dx, dy) || 1;
   const speed = 22;
-  const i = world.addBox({ type: "dynamic", pos: [px, py, 0], half: [0.55, 0.55, 0.55], density: 5 });
-  world.setVelocity(i, [dx / d * speed, dy / d * speed + 3, 0]);
+  const i = addBoulder(world, [px, py], [dx / d * speed, dy / d * speed + 3]);   // locked to the plane, like everything here
   boulders.push(i); shots++;
 });
 
