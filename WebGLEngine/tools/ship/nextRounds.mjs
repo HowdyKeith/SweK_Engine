@@ -2955,10 +2955,8 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "nav-sensed-detector-hold-confirm-range",
-        blocker: "OPEN",
-        what: "Follow-ups 13 and 14 (brain/SENSED_NAV_WIP.md) each end by pointing at a detector with both ends range-aware and with the improved rules at each (a memory in the mark, evidence in the hold); follow-up 10 builds the range-aware detector on the plain rules and follow-up 16 the improved rules without range. Registered as FOLLOW-UP 17 of that note (the name was Keith's; no entry existed, and it is taken as follow-up 16 with range, the table 13 and 14 point at).",
-        how: "After follow-up 7's set is flown: a 2-of-3 mark beyond 80 m and a first-reading mark within, an evidence hold of cap 30 within 80 m and one free reading beyond, against follow-up 16's uniform pair, follow-up 10's range-aware detector, each range-aware half alone and the map that forgets, under range-law false returns of mean 0.03 with dropouts of 30 pings, the uniform false rate of 0.01, the persistent mix and a clean sea; HELD22 = seeds 2201 to 2260; the registration is in the note.",
-        why: "A dropout that begins far away clears the cell before the near hold can keep it; whether the range-aware pair earns its place against the uniform pair is not known.",
+        state: "CLOSED",
+        what: "CLOSED 2026-11-03 (brain/SENSED_NAV_WIP.md, RESULT OF FOLLOW-UP 17; tools/ship/subSensedDetStudy.mjs --study detector-hold-confirm-range, flights in brain/subSensedDetDetectorHoldConfirmRangeHeld22.jsonl): NOT SUPPORTED (0 of 3 cells); three of eight predictions held (Q2, Q5, Q8). The range-aware pair (a 2-of-3 mark beyond 80 m and a first-reading mark within, an evidence hold of cap 30 within 80 m and one free reading beyond) reaches 118 of 180 under range-law false returns with 30-ping dropouts, against 145 for the same rules at every range (follow-up 16's pair) and 125 for the map that forgets; under the uniform false rate of 0.01 it reaches 97 against 163 and 128 (70 collisions of 180). Follow-up 10's designated collapses (14 of 180), as the DEV set had foreseen. POST HOC, labelled: the uniform pair would have held 2 of the 3 cells; the pair against the uniform pair under R3D30 is +12 / +39 paired scenarios, p 0.0002.",
     },
     {
         id: "nav-sensed-detector-hold-confirm",
