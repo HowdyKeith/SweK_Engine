@@ -53,7 +53,7 @@ export const DETECT_ARM_SPEC = Object.freeze(Object.fromEntries([...["W", "P"].f
 export const DETECT_ARMS = Object.freeze(["exact", "long+fix+forget", "d2-12@clean", ...DETECTORS.map(([mk, cl]) => `d${mk}-${cl}@W`), ...DETECTORS.map(([mk, cl]) => `d${mk}-${cl}@P`)]), DETECT_DESIGNATED = "d2-12";
 export const FLY_ARMS = Object.freeze([...STUDY_ARMS, "fix+forget", "fix+filter", "fix+forget+filter", ...Object.keys(SONAR_ARMS), ...Object.keys(LONG_ARMS), ...Object.keys(REAL_ARMS), ...Object.keys(PERSIST_ARM_SPEC), ...Object.keys(FALSE_ARM_SPEC), ...Object.keys(DETECT_ARM_SPEC)]);
 export const BARS = Object.freeze({ "hard-islands": 0.8, "hard-gaps": 0.6, "hard-current": 0.7 }), ISLAND_MAX_COLLISIONS = 6;
-export const SENSE_SETS = Object.freeze({ dev: N.range(1, 30), held6: N.range(601, 660), held7: N.range(701, 760), held8: N.range(801, 860), held9: N.range(901, 960), held10: N.range(1001, 1060), held11: N.range(1101, 1160), held12: N.range(1201, 1260) });
+export const SENSE_SETS = Object.freeze({ dev: N.range(1, 30), held6: N.range(601, 660), held7: N.range(701, 760), held8: N.range(801, 860), held9: N.range(901, 960), held10: N.range(1001, 1060), held11: N.range(1101, 1160), held12: N.range(1201, 1260), held13: N.range(1301, 1360), held14: N.range(1401, 1460), held15: N.range(1501, 1560), held16: N.range(1601, 1660), held17: N.range(1701, 1760), held18: N.range(1801, 1860), held19: N.range(1901, 1960), held20: N.range(2001, 2060), held21: N.range(2101, 2160), held22: N.range(2201, 2260), held23: N.range(2301, 2360), held24: N.range(2401, 2460), held25: N.range(2501, 2560), held26: N.range(2601, 2660), held27: N.range(2701, 2760), held28: N.range(2801, 2860), held29: N.range(2901, 2960) });
 export const POINT_R = N.CELL / 2;   // an occupied cell is a point 2.5 m wide to the plan; a run of them in a row is the capsule between the end centres
 
 const mulberry = (a) => () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
@@ -105,31 +105,37 @@ export function pointingError(real, st, rng) {
  * cell reads free), falseRate (the probability a free cell reads occupied), rng (the uniform generator the last two draw from, one draw a cell) }. Follow-up 5 adds to `real`: persist (a miss or false return that starts lasts that many pings, from `state`; the chance one starts is rate / (persist (1 - rate)) so the long-run share is the rate), objects (the misses are of a whole obstacle: it is missing from the ping, and does not occlude, while the fault lasts; drawn for each obstacle at each ping at the range of its centre),
  * rangeDep (the miss and false rates are multiplied by 2 (r / sonar.range) squared, r capped at the range), state (the object persist needs: { bias, objLeft, cellLeft, cellKind }, filled in as needed).
  * `det` (follow-up 7; null: `forget` decides): a DETECTOR { mark, clear } -- a free cell is marked occupied only after it has read occupied at `mark` consecutive pings, a marked cell is cleared only after it has read free at `clear` consecutive pings (the counters are kept on the map, one per cell, a cell counted at every ping it is ensonified). { mark: 1, clear: 1 } is the map that forgets. The return is the number of cells that CHANGED.
+ * A detector with an `apply` function (follow-ups 8 to 24, brain/subSensedDetect.mjs) replaces that rule: `det.begin(map)` once before the cells of a ping, `det.apply(map, { i, gx, gy, hit, d })` for every cell the ping ensonifies (hit: the reading, d: the cell's distance from the believed position; it returns the number of cells it changed, 0 or 1), `det.end(map)` once after them (it returns the number it changed).
+ * `real.drop` (follow-up 8 onward): { rate, persist, rangeDep, leak } -- the WHOLE-OBSTACLE dropout as `objects` makes it (an obstacle is missing from the ping, and does not occlude, with chance `rate` (times 2 (r / range) squared with `rangeDep`; with `persist` pings a start lasts that many, from `state`)), but separate from the cell faults, which stay white; `leak` is the chance a reading of a cell inside a dropped obstacle still comes back occupied, drawn only when it is above 0. `objects` is `drop` with the rate `miss` and the fault flags of the preset.
  */
 export function ping(map, blocking, pos, heading, off = { x: 0, y: 0 }, sonar = SONAR, forget = false, real = null, det = null) {
     const r = Math.ceil(sonar.range / map.cell) + 1, g0 = Math.floor((pos.x - map.x0) / map.cell), h0 = Math.floor((pos.y - map.y0) / map.cell);
     const delta = (real && real.delta) || 0, occl = !!(real && real.occlude), miss = (real && real.miss) || 0, falseRate = (real && real.falseRate) || 0, objects = !!(real && real.objects), noisy = (miss > 0 && !objects) || falseRate > 0, eff = heading + delta;
     const persist = real && real.persist > 1 ? real.persist : 0, rangeDep = !!(real && real.rangeDep), st = real && real.state, scale = (d) => (rangeDep ? 2 * (Math.min(d, sonar.range) / sonar.range) ** 2 : 1);
     if (persist && !st) throw new Error("subSensedNav.ping: a persistent fault needs real.state");
+    const drop = real && real.drop ? real.drop : null, od = drop ? { rate: drop.rate, persist: drop.persist > 1 ? drop.persist : 0, range: !!drop.rangeDep } : objects ? { rate: miss, persist, range: rangeDep } : null, leak = drop && drop.leak > 0 ? drop.leak : 0;
+    if (od && od.persist && !st) throw new Error("subSensedNav.ping: a dropout that lasts needs real.state");
     const world = blocking.map((o) => {
         if (delta === 0) return { x: o.x + off.x, y: o.y + off.y, r: o.r };
         const vx = o.x + off.x - pos.x, vy = o.y + off.y - pos.y;
         return { x: pos.x + vx * Math.cos(delta) + vy * Math.sin(delta), y: pos.y - vx * Math.sin(delta) + vy * Math.cos(delta), r: o.r };   // the bearing (atan2(-dy, dx), the tree's heading convention) GROWS by delta, as the sector's axis does: the picture turns as one
     });
     let live = world;
-    if (objects) {
-        if (persist && !st.objLeft) st.objLeft = new Uint8Array(blocking.length);
+    const gone = [];
+    if (od) {
+        if (od.persist && !st.objLeft) st.objLeft = new Uint8Array(blocking.length);
         live = world.filter((o, k) => {
-            if (persist && st.objLeft[k] > 0) { st.objLeft[k]--; return false; }
-            const rate = miss * scale(Math.hypot(o.x - pos.x, o.y - pos.y)), p = persist ? rate / (persist * (1 - rate)) : rate;
-            if (p > 0 && real.rng() < p) { if (persist) st.objLeft[k] = persist - 1; return false; }
+            if (od.persist && st.objLeft[k] > 0) { st.objLeft[k]--; gone.push(o); return false; }
+            const rate = od.rate * (od.range ? 2 * (Math.min(Math.hypot(o.x - pos.x, o.y - pos.y), sonar.range) / sonar.range) ** 2 : 1), p = od.persist ? rate / (od.persist * (1 - rate)) : rate;
+            if (p > 0 && real.rng() < p) { if (od.persist) st.objLeft[k] = od.persist - 1; gone.push(o); return false; }
             return true;
         });
     }
+    if (det && det.begin) det.begin(map);
     let added = 0;
     for (let gy = Math.max(0, h0 - r); gy <= Math.min(map.h - 1, h0 + r); gy++) for (let gx = Math.max(0, g0 - r); gx <= Math.min(map.w - 1, g0 + r); gx++) {
-        const cx = map.x0 + (gx + 0.5) * map.cell, cy = map.y0 + (gy + 0.5) * map.cell, dx = cx - pos.x, dy = cy - pos.y;
-        if (Math.hypot(dx, dy) > sonar.range || Math.abs(wrap(Math.atan2(-dy, dx) - eff)) > sonar.half) continue;
+        const cx = map.x0 + (gx + 0.5) * map.cell, cy = map.y0 + (gy + 0.5) * map.cell, dx = cx - pos.x, dy = cy - pos.y, dist = Math.hypot(dx, dy);
+        if (dist > sonar.range || Math.abs(wrap(Math.atan2(-dy, dx) - eff)) > sonar.half) continue;
         const i = gy * map.w + gx, inside = (o) => Math.hypot(cx - o.x, cy - o.y) <= o.r;
         let hit;
         if (occl) { hit = view(live, pos, cx, cy, map.cell); if (hit === null) continue; }
@@ -145,7 +151,9 @@ export function ping(map, blocking, pos, heading, off = { x: 0, y: 0 }, sonar = 
                 else if (u < f / (persist * (1 - f))) { st.cellLeft[i] = persist - 1; st.cellKind[i] = 2; hit = true; }
             }
         } else if (noisy && hit !== undefined) { const sc = scale(Math.hypot(dx, dy)), u = real.rng(); hit = hit ? u >= (objects ? 0 : miss * sc) : u < falseRate * sc; }
-        if (det) {
+        if (leak && hit === false && gone.length && gone.some(inside) && real.rng() < leak) hit = true;
+        if (det && det.apply) added += det.apply(map, { i, gx, gy, hit, d: dist });
+        else if (det) {
             if (!map.hits) { map.hits = new Uint8Array(map.occ.length); map.frees = new Uint8Array(map.occ.length); }
             if (hit) { if (map.hits[i] < 255) map.hits[i]++; map.frees[i] = 0; } else { if (map.frees[i] < 255) map.frees[i]++; map.hits[i] = 0; }
             if (!map.occ[i] && map.hits[i] >= det.mark) { map.occ[i] = 1; map.nOcc++; added++; }
@@ -153,6 +161,7 @@ export function ping(map, blocking, pos, heading, off = { x: 0, y: 0 }, sonar = 
         } else if (forget) { const now = hit ? 1 : 0; if (map.occ[i] !== now) { map.occ[i] = now; map.nOcc += now ? 1 : -1; added++; } }
         else if (!map.occ[i] && hit) { map.occ[i] = 1; map.nOcc++; added++; }
     }
+    if (det && det.end) added += det.end(map);
     return added;
 }
 /** The occupied cells as the plan's shapes: each maximal run of occupied cells along a row is the capsule between the first and last centres, POINT_R wide ({ ax, ay, bx, by, r }, row by row, left to right). */
@@ -208,7 +217,7 @@ export function flySensed(pilot, sc, armName, { seconds = H.SECONDS_HARD, dt = S
     }
     const f0 = N.cellOf(field0, st.x, st.y);
     return { arm: armName, kind: sc.kind, seed: sc.seed, gap: sc.gapWidth, currentMean: sc.currentMean, blocked: sc.blocked, status, reached: status === "reached", t, path, chord: Math.hypot(sc.goal.x - st.x, sc.goal.y - st.y), minClearance: minClear, ticks,
-        margin: field0.margin, marginLast: field.margin, noRoute: !(f0 && field0.dist[f0.i] < N.BIG), plans, pings, occupied: map.nOcc, ensonified: map.nSeen / (map.w * map.h), offsetEnd: Math.hypot(off.x, off.y), offsetMax: offMax, bias: rstate.bias || 0 };
+        margin: field0.margin, marginLast: field.margin, noRoute: !(f0 && field0.dist[f0.i] < N.BIG), plans, pings, occupied: map.nOcc, ensonified: map.nSeen / (map.w * map.h), offsetEnd: Math.hypot(off.x, off.y), offsetMax: offMax, bias: rstate.bias || 0, detStats: det && det.stats ? det.stats(map) : undefined };
 }
 /** The flight for any arm the studies use: `straight` and `exact` by subHardNav's flyHard, the sensed arms (SENSED_ARMS) by flySensed, a sonar arm (SONAR_ARMS) by flySensed under `sensed` with that sonar, and a long arm (LONG_ARMS) by flySensed under the sensed arm it maps to with the 200 m sonar (the record carries the arm's own name). */
 export function flyArm(pilot, sc, arm, opts = {}) {
