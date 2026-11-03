@@ -3055,10 +3055,8 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "nav-sensed-detector-confirm-hold-range-hold",
-        blocker: "OPEN",
-        what: "Follow-up 26 (brain/SENSED_NAV_WIP.md) asks which range-aware mark to use with the evidence hold at every range; a strict far rule is slow to re-mark a cell the hold has let go (a dropout of 30 pings clears every cell watched for fewer than thirty readings). Registered as FOLLOW-UP 30 of that note (the name was Keith's; no entry existed, and it is follow-up 26's name with a hold on the end, the move follow-ups 18 and 29 made: a second hold on what has been confirmed, the ghost). The build waits for the sets of follow-ups 8 to 24: one registry row, the set HELD35 and a spec are added then.",
-        how: "After the sets of follow-ups 8 to 24 are flown: 3-of-4 beyond 80 m and one reading within, and 2-of-3 beyond, each with the evidence hold of cap 30 at every range, with and without a ghost (a cell cleared after at least 4 occupied readings is re-marked at one reading for 60 readings), against the hold alone and 3-of-4 everywhere, under range-law false returns of mean 0.03 with dropouts of 30 pings, the uniform false rate of 0.01 with the same dropouts, the persistent mix and a clean sea; HELD35 = seeds 3501 to 3560; the registration is in the note.",
-        why: "The strict far rule is the slowest to confirm again after a dropout, and the ghost is the cheap way to confirm at one reading; whether the persistent phantoms it brings back are the price is not known.",
+        state: "CLOSED",
+        what: "CLOSED 2026-11-03 (brain/SENSED_NAV_WIP.md, RESULT OF FOLLOW-UP 30; tools/ship/subSensedDetStudy.mjs --study detector-confirm-hold-range-hold, flights in brain/subSensedDetDetectorConfirmHoldRangeHoldHeld35.jsonl): NOT SUPPORTED (0 of 3 cells); two of eight predictions held (AE6, AE8). The designated rm34e30g (3-of-4 beyond 80 m, one reading within, evidence hold, the ghost) reaches 45, 39 and 43 under range-law false returns against 48.0, 47.2 and 46.4. The ghost is idle on the strict rule and on the light one (127 and 125, 135 and 135, within 2 under the uniform false rate and the persistent mix), and the strict far rule is level with the hold alone (127, 126); under the uniform false rate it collapses (79 against 135 for 3-of-4 at every range). Not isolated: the near zone's first reading, the neighbour test.",
     },
     {
         id: "nav-sensed-detector-range-hold-confirm-hold",
