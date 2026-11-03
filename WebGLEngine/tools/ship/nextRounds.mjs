@@ -2859,10 +2859,8 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "nav-sensed-detector-range-hold-confirm-range",
-        blocker: "OPEN",
-        what: "Follow-up 21's confirmed clear clears a marked cell when 0.8 of its window was free at every range; it cures the fix smear and clears a leaking dropout sooner (brain/SENSED_NAV_WIP.md), and the two matter in different places. Registered as FOLLOW-UP 31 of that note (the name was Keith's; no entry existed, and it is follow-up 24's name with range on the end, taken as the confirmation itself knowing how far: the fraction depends on the cell's range; the range-aware mark is follow-up 25's). The build waits for the sets of follow-ups 8 to 24: a new field in the module (clear.fNear), two registry rows, the set HELD36 and a spec are added then.",
-        how: "After the sets of follow-ups 8 to 24 are flown: the 2-of-3 mark with the evidence hold of cap 30 at every range cleared by a run within 80 m and 0.8 of the window beyond it, and the opposite, against a run and 0.8 at every range, a clear of one and the map that forgets, under the uniform false rate of 0.01 with leaking dropouts of 30 pings, range-law false returns of mean 0.03 with dropouts of 30 pings and a clean sea; HELD36 = seeds 3601 to 3660; the registration is in the note.",
-        why: "The leak is paid near and the smear is cheap far; whether a strict fraction near and a tolerant one far keeps both is not known.",
+        state: "CLOSED",
+        what: "CLOSED 2026-11-03 (brain/SENSED_NAV_WIP.md, RESULT OF FOLLOW-UP 31; tools/ship/subSensedDetStudy.mjs --study detector-range-hold-confirm-range, flights in brain/subSensedDetDetectorRangeHoldConfirmRangeHeld36.jsonl): PARTLY SUPPORTED (5 of 6 cells); five of eight predictions held (AF1, AF4, AF6, AF7, AF8). The designated fn100f80 (a run clear within 80 m, 0.8 beyond) holds all three kinds under the leaking dropouts and islands and current under range-law false returns (gaps 42 against 46.4). The run clear at every range is as good or better in both seas (166 and 150 against 164 and 145); the confirmed clear costs 5 to 7 at every range, and a run near wins back about two thirds of it under the leak; which side gets the strictness does not matter (143 against 145). Not isolated: why the smear cure of follow-up 21 is not seen.",
     },
     {
         id: "nav-sensed-detector-hold-range-hold",
