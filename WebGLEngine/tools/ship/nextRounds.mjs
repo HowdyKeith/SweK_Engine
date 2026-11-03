@@ -3084,10 +3084,8 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "nav-sensed-detector-range-confirm-hold-confirm",
-        blocker: "OPEN",
-        what: "Follow-up 17's whole detector (brain/SENSED_NAV_WIP.md: a range-aware mark and a range-gated evidence hold, a run) and follow-up 24's pairing of the gated hold with the confirmed clear leave the combination of follow-up 14's mark with the confirmed clear unflown. Registered as FOLLOW-UP 25 of that note (the name was Keith's; no entry existed, and it is follow-up 19's name with the confirmation of follow-up 24 on the end: follow-up 17 with the clear confirmed). The build waits for the sets of follow-ups 8 to 24: two detectors, a registry row each, their mutants and the set HELD30 are added then.",
-        how: "After the sets of follow-ups 8 to 24 are flown: the range-aware 2-of-3 mark with the evidence hold of cap 30 cleared by 0.8 of the window free, gated to 80 m or at every range, against follow-up 17's run, follow-up 14's mark alone, follow-up 24's uniform-mark detector and the map that forgets, under range-law false returns of mean 0.03 with dropouts of 30 pings, the uniform false rate of 0.01 with leaking dropouts, the uniform false rate alone and a clean sea; HELD30 = seeds 3001 to 3060; the registration is in the note.",
-        why: "If the range gate and the confirmed clear do one job, the whole detector has a switch too many; if the range-aware mark is what pays, it pays through them.",
+        state: "CLOSED",
+        what: "CLOSED 2026-11-03 (brain/SENSED_NAV_WIP.md, RESULT OF FOLLOW-UP 25; tools/ship/subSensedDetStudy.mjs --study detector-range-confirm-hold-confirm, flights in brain/subSensedDetDetectorRangeConfirmHoldConfirmHeld30.jsonl): NOT SUPPORTED (1 of 6 cells); three of eight predictions held (V3, V4, V8). The designated rm23re30k (range-aware 2-of-3, range-gated evidence hold, confirmed clear) holds islands under range-law false returns and nothing else. The confirmed clear is idle (119 against 118 for the run clear), the gated hold is where the range-aware mark loses (the gaps kind: 23 of 59), and under the uniform false rate with leaking dropouts the detector collapses with or without the gate (87 and 82 against 126 for the map that forgets; 27 below it under the uniform false rate alone). Not isolated: the near zone's first reading (follow-up 28 registers the near confirmation).",
     },
     {
         id: "nav-sensed-detector-range-hold-confirm",
