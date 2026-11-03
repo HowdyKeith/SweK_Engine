@@ -754,3 +754,49 @@ map's GPU cell cites the result.
 **To be built.** `tools/ship/train6dofMlpLuck.mjs` (the library), `tools/ship/trainMlp6dofLuck.mjs` (the command) and
 `tools/ship/train6dofMlpLuck-selfcheck.mjs` (the gate), on Round 3's pattern. The results go to
 `brain/sixdofGpuLuckResults.json`, committed before it is read.
+
+### Round 4: built, 2026-11-03, before the registered run (nothing of the registration above is changed)
+
+**What exists:** `tools/ship/train6dofMlpLuck.mjs` (the library), `tools/ship/trainMlp6dofLuck.mjs` (the command) and
+the gate `tools/ship/train6dofMlpLuck-selfcheck.mjs` (about 20 s, 34 rows).
+
+**How the run is shaped.**
+- **C-twin, then C-files, come first.** The hand MLP must fly the fruit fly's hand pilot to the bit, and the two shipped
+  pilots must be the registered files, or nothing is searched.
+- **The 42 searches run in four processes at a time:** each brain's twenty, then each brain's determinism re-run. Every
+  job carries the recipe as well as its brain and seed, and the searches must come back in the order asked.
+- **Then the finish:** the 40 pilots in the round robin, H1's test on their scores (the fruit fly's twenty first), the
+  cross-play, and the two shipped pilots against the field.
+- **The shipped pilots are placed on common opponents.** Set against search k, a shipped pilot's lead over the other 39
+  is compared with k's own score over those 39.
+- **Each pilot travels as its difference from its brain's hand weights,** exactly, so the results file holds all 40.
+  It is JSON with every array of numbers on one line.
+- **The command writes `brain/sixdofGpuLuckResults.json` and prints only where it is.** Nothing else is written.
+
+**The gate never starts the command's round and flies no round-robin seed.**
+- Its miniature flies scratch duel seeds 99974-99978.
+- The command runs only as a worker: one search, on the recipe's own train and held-out seeds. Every such run names a
+  planted results file that exists, so a worker whose search branch broke would stop at the refusal (G33 is that
+  sabotage).
+
+**The test is checked against brute force** over every relabelling of small samples, with and without ties. On twenty
+against twenty completely apart it gives exactly 2 in C(40, 20).
+
+**Found while building, before the sabotages:**
+- **The miniature's searches ran at the recipe's 1,500 iterations, not the 80 asked.** `run()` handed the searcher each
+  job's brain and seed but not the recipe, so an in-process searcher took the defaults. The row that re-runs each search
+  independently went red on it. Every job now carries the recipe; G25 puts the bug back.
+- **Two rows could not have gone red.** The brute-force check took its mid-ranks from the library under test (it now
+  computes its own), and no made-up lead sat at the 70-0 threshold's edge (a lead of 34 now does).
+- **As first drafted, two of the gate's runs of the command could have started the registered round under a
+  sabotage.** One ran it against an existing results file to watch it refuse; it is gone, and the refusal is held as a
+  library function. The other is the worker run, which now names the planted file.
+
+**Sabotaged with the byte-safe runner: 33 designs, each red by name** (the counts are in the gate's header).
+- **One went 0 red on the first run: G18,** the shipped pilots placed on their whole total rather than on common
+  opponents. The miniature's shipped pilots sat so far above every search that the two rules agreed. The rule is now
+  `placesAbove()`, held on made-up numbers where they disagree; G18 was run again and went 1 red.
+- **G33 inverts the command's search branch.** The worker fell through to the refusal on the planted file and stopped,
+  with nothing flown.
+
+**The registered run:** `node tools/ship/trainMlp6dofLuck.mjs --workers 4`.
