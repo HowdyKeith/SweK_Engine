@@ -2864,6 +2864,13 @@ export const NEXT_ROUNDS = [
         why: "The far end of the long sonar is the end the range-aware confirmation thins; a memory is the cheap way to keep it.",
     },
     {
+        id: "nav-sensed-detector-range-confirm-hold",
+        blocker: "OPEN",
+        what: "Follow-up 14's range-aware 2-of-3 confirmation (brain/SENSED_NAV_WIP.md) stops at the mark, follow-up 17 adds the evidence hold and follow-up 10 the plain lock on a run of three; the table of mark by hold has an empty cell. Registered as FOLLOW-UP 19 of that note (the name was Keith's; no entry existed, and it is follow-up 14's name with a hold on the end, taken as the plain range-gated lock on the memory confirmation, which fills the empty cell).",
+        how: "After follow-up 7's set is flown: a 2-of-3 mark beyond 80 m and a first-reading mark within, with the plain lock (thirty free readings within 80 m, one beyond), against follow-up 14's mark alone, follow-up 10's detector, follow-up 17's evidence hold, a run of three with the evidence hold and the map that forgets, under range-law false returns of mean 0.03 with dropouts of 30 pings, the uniform false rate of 0.01, the persistent mix and a clean sea; HELD24 = seeds 2401 to 2460; the registration is in the note.",
+        why: "A confirmation removes most of the phantoms an evidence hold exists to keep light; whether the plain lock then does as well, and where the law fails whether it does not, is not known.",
+    },
+    {
         id: "nav-sensed-detector-hold-confirm-range-hold",
         blocker: "OPEN",
         what: "Follow-up 17's registration (brain/SENSED_NAV_WIP.md) ends on a problem it cannot answer: a range-gated hold lets a dropout that begins far away take the cell at once, and a confirmed cell cleared by one miss far away must be confirmed again. Registered as FOLLOW-UP 18 of that note (the name was Keith's; no entry existed, and it is follow-up 17's name with a second hold on the end, taken as a second hold on what has been confirmed: the hold at every range, and a ghost that re-marks a cleared cell at one reading).",

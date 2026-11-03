@@ -805,3 +805,37 @@ If it meant only one of these, or something else (a hold on the unmarked candida
 `rm23e30g` against `rm23re30` under `P` and `R3D30`, the per-kind and per-gap counts, and the number of re-marks by ghosts are flown and reported and not predicted.
 
 **What it would not say.** That 4 occupied readings and a life of 60 are the right numbers for the ghost, or that it should be a count of readings and not a length of time; that a ghost re-marked at one reading is safe against persistent phantoms (`P` is where it is called); that the hold at every range and the ghost are the only second holds (a decayed `occ`, a hold on the nearest range read — follow-up 15 — and a K-of-N clear are untried); that 80 m, 2-of-3 and 30 are the right numbers. Not a different pilot, a different generator or the moving ships. A result is a statement about this generator and these models.
+
+## FOLLOW-UP 19: THE MEMORY CONFIRMATION WITH THE PLAIN LOCK (Keith, 2026-11-03: "lets also do nav-sensed-detector-range-confirm-hold"; REGISTERED BEFORE ANY CODE FOR IT AND BEFORE ITS SET IS FLOWN, and registered while follow-ups 7 to 18 were unflown, so nothing below was shaped by their results)
+
+**What the name was taken to mean, said first.** No backlog entry had that name. It is follow-up 14's name (`detector-range-confirm`, the range-aware confirmation with a memory) with `-hold` on the end, and follow-up 18 did the same for follow-up 17. Follow-up 14 stops at the mark (a clear of one free reading); follow-up 17 adds the *evidence* hold. Taken here as **the same range-aware, 2-of-3 confirmation with the other hold already in the notes, the plain range-gated lock of follow-up 8** (thirty free readings within 80 m, one beyond), which fills the one cell of the table the registered rounds leave empty:
+
+| mark \ hold | none (clear 1) | plain lock (30 near, 1 far) | evidence hold (30 near, 1 far) |
+|---|---|---|---|
+| run of 3 far, 1 near | follow-up 9 (`cr`) | follow-up 10 (`rd`) | *not registered* (flown here, `crre30`) |
+| 2-of-3 far, 1 near | follow-up 14 (`rm23`) | **this round (`rm23lk`)** | follow-up 17 (`rm23re30`) |
+
+So the round asks two things the other two cannot: **what the memory is worth in follow-up 10's range-aware detector**, and **whether the evidence hold's extra machinery earns its place against the plain lock once a confirmation has done its work** (follow-up 16's U3, asked of the range-aware pair). If it meant something else, say so before the build, which waits for follow-up 7's set to be flown.
+
+**The rule** (follow-up 17's detector without the hold at every range and without the ghost). Each cell keeps a window of its last `N` readings and `occ`. Mark: at least `M` of the window beyond `near`, `Mn` within (designated 2-of-3 and 1-of-1, `near` 80 m). Clear: after `clear` consecutive free readings beyond `near`, `clearNear` within; **the plain lock** `lk` is `clear` 1, `clearNear` 30; **the evidence hold** is `min(30, occ)` within `near` and 1 beyond (follow-up 13's). `rd` is follow-up 10's: a run of 3 beyond and 1 within to mark, the plain lock to clear.
+
+**Conditions** (exactly follow-ups 17 and 18's, everything else as follow-ups 3 to 18): **`R3D30`** (follow-up 4's four white faults with the range law and the false rate 0.03 at its mean, with whole-obstacle dropouts of 30 pings and the range law: the bar's), **`W`** (the uniform false rate of 0.01, the law NOT holding), **`P`** (follow-up 5's `pall`) and a sea with no faults.
+
+**Arms** (every arm but `exact` is the 200 m sonar with the white 3 m fix): `exact`; the clean `long+fix+forget`; under `R3D30` the six detectors **`inc`** (the map that forgets), **`rm23`** (follow-up 14's designated, no hold), **`rd`** (follow-up 10's designated: a run of 3 far, the plain lock), **`rm23lk`** (**the designated: 2-of-3 far, the plain lock**), **`rm23re30`** (follow-up 17's designated: 2-of-3 far, the evidence hold) and **`crre30`** (a run of 3 far, the evidence hold); `inc`, `rm23lk` and `rm23re30` under `W` (3) and under `P` (3); `rm23lk` on a sea with no faults. Fifteen arms, 2,700 flights. **The set is HELD24 = seeds 2401 to 2460 of each of `hard-islands`, `hard-gaps` and `hard-current`** (180 scenarios), fresh, flown ONCE.
+
+**Bar and verdict.** The designated `rm23lk` reaches **at least 80% of what `exact` reaches in EACH kind under `R3D30`**: three cells, as follow-ups 17 and 18's. **SUPPORTED** if all three, **PARTLY SUPPORTED** if two, **NOT SUPPORTED** otherwise. (`W`, `P` and the clean sea are in the predictions, not the bar.)
+
+**The tension, said before the data.** The plain lock is the hold the evidence hold was made to improve on: **it keeps every near phantom thirty readings**. Under `W` (the law NOT holding: 0.01 a cell a ping everywhere) a near cell is marked at its first false return and held thirty pings, some forty phantoms inside 80 m at once, against the evidence hold's one reading per phantom. The round's bet is the opposite of follow-up 16's U3: that the plain lock is as good as the evidence hold *where the law holds* (R3D30) and **worse where it does not** (`W`), which is the price of simplicity and the reason the evidence hold exists.
+
+**Predictions (scored held or missed, moving nothing; pooled over the three kinds unless said; each with its reason).**
+* **B1** the memory pays in follow-up 10's detector: under `R3D30`, `rm23lk` reaches at least 5 more than `rd`. (A 2-of-3 rule against a run of 3 beyond 80 m, the lock the same.)
+* **B2** the evidence hold does not beat the plain lock where the law holds: under `R3D30`, `rm23re30` is within 10 of `rm23lk` (either side). (Follow-up 16's U3: a confirmation removes nearly all the phantoms the evidence hold exists to keep light.)
+* **B3** a lock on top of the range-aware memory pays against dropouts: under `R3D30`, `rm23lk` reaches at least 10 more than `rm23`.
+* **B4** `rm23lk` holds the bar (80% of exact) in every kind under `R3D30`.
+* **B5** where the law does not hold the plain lock is the worse hold: under `W`, `rm23lk` reaches at least 10 fewer than `rm23re30`. (Near phantoms are marked at their first reading and held thirty.)
+* **B6** under the persistent mix `P`, `rm23lk` reaches more than `inc`.
+* **B7** on a sea with no faults `rm23lk` is within 8 of the clean `long+fix+forget`.
+* **B8** the kind of hold matters little with a run of 3 to mark: under `R3D30`, `crre30` is within 10 of `rd` (either side).
+`rm23lk` against `inc` under `R3D30` and `W`, `rm23re30` against `inc`, the per-kind and per-gap counts, and the near-phantom counts are flown and reported and not predicted.
+
+**What it would not say.** That 80 m, 2-of-3, 1-of-1 and 30 are the right numbers; that the table's two empty cells are the whole of what is missing (a hold of 12, an evidence hold of another cap, a smooth range gate, follow-up 15's other ranges, follow-up 18's ghost); that the range at the ping is the right gate. Not a different pilot, a different generator or the moving ships. A result is a statement about this generator and these models.
