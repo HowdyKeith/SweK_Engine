@@ -61,6 +61,7 @@ export function holds(sum, p) {
         case "within": return Math.abs(a() - b()) <= p.n;
         case "bar": return allKinds(sum, p.a);
         case "notBar": return KINDS.every((k) => !!(sum.cells[k] && sum.cells[k][p.a])) && !allKinds(sum, p.a);
+        case "noBar": return KINDS.every((k) => !!(sum.cells[k] && sum.cells[k].exact && sum.cells[k][p.a]) && !barKinds(sum, p.a)[k]);
         case "eachGe": return p.arms.every((x) => value(sum, x) - value(sum, p.b) >= p.n);
         case "spread": { const v = p.arms.map((x) => value(sum, x)); return Math.max(...v) - Math.min(...v) <= p.n; }
         case "spreadGt": { const v = p.arms.map((x) => value(sum, x)); return Math.max(...v) - Math.min(...v) > p.n; }
