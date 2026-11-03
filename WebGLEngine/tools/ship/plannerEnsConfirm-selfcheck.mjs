@@ -11,7 +11,7 @@
 //   6 FLIGHT    real 100-second dives: the twin equals the Round 11 twin, the ensembles are the perturbed seat with their offsets and report a cost, an unknown arm or block is refused.
 //   7 SOURCE    the seeds appear in one place; no clock, random or file.
 // NOT CHECKED, said plainly: how big the ensemble effect is (that is the experiment).
-// SABOTAGE LOG: (filled in below after the mutation pass)
+// SABOTAGE LOG (32 mutants of tools/ship/plannerEnsConfirm.mjs, run against a copy of this gate, each applied alone): 28 went red by name on the first pass, 4 went 0 red and got rows -- the cost summed instead of meaned (the ratio row could not see it: both costs scale together, so the values are pinned), the tuned arm's gauge dropped (a direct comparison with T.evaluate), the unknown-arm refusal (another library's message matched the old regex; the row now names this library's), and the pooled line built from this round against itself (the row recomputes the combination and requires it); all 4 then red. The others: the primary swapped, the three differences' operands and reversals, the combination unweighted and its se, a 1 se and a sign-blind reading, the exceeds line inverted, the second line reading the twin's gain, the identity and both differs checks forced true, alignment, block size, the identity arm on every block, the pooled sets, a moved range, wrong offsets, the cost dropped, the Round 11 twin given other constants, the unknown block refusal, assemble keeping a missing arm, the prior line made unconditional, the head's round number and a job list without ENS-0.10.
 "use strict";
 import fs from "node:fs";
 let fails = 0, finished = false;
