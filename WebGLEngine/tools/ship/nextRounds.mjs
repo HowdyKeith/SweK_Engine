@@ -2864,6 +2864,13 @@ export const NEXT_ROUNDS = [
         why: "The far end of the long sonar is the end the range-aware confirmation thins; a memory is the cheap way to keep it.",
     },
     {
+        id: "nav-sensed-detector-confirm-hold-confirm",
+        blocker: "OPEN",
+        what: "Follow-up 20 (brain/SENSED_NAV_WIP.md) asks which M-of-N mark to use with an evidence hold that is a run; follow-up 21 gives the hold a K-of-N clear that tolerates a flickering cell, which makes the mark decide how fast the smear's edge cells come back. Registered as FOLLOW-UP 22 of that note (the name was Keith's; no entry existed, and it is follow-up 21's name with the first word moved, taken as follow-up 20's question asked of follow-up 21's detector).",
+        how: "After follow-up 7's set is flown: the six mark rules of follow-up 11 each with the evidence hold of cap 30 cleared when 0.8 of the window was free, under white false returns of 0.01 with dropouts of 30 pings, the same with the dropouts leaking, and a clean sea; HELD27 = seeds 2701 to 2760; the registration is in the note.",
+        why: "A run of three separates a steady wall from a flickering edge cell best and is the slowest to mark a real one; whether the clear that cleans the smear makes that the right trade is not known.",
+    },
+    {
         id: "nav-sensed-detector-hold-confirm-hold",
         blocker: "OPEN",
         what: "The detector's evidence hold clears a cell only after a run of free readings (brain/SENSED_NAV_WIP.md, FOLLOW-UP 12 and after), so a cell that flickers occupied, the fix smear's edge cells above all, is never cleared; follow-ups 12, 16 and 18 each name a K-of-N free clear untried. Registered as FOLLOW-UP 21 of that note (the name was Keith's; no entry existed, and it is taken as the clear given the confirmation's treatment: a hold, a confirmation and a hold that is itself confirmed).",
