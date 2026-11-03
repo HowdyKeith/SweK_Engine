@@ -476,3 +476,75 @@ anywhere.
 from the committed file and re-flies the champion's tallies from its weights. It also holds that nothing was written:
 `--write-from` refuses the file. Sabotaged with the byte-safe runner: 10 designs, each red by name. They edit the
 committed file, this note or the command, and the counts are in the gate's header.
+
+## Round 3: the GPU Brain trained by the close-quarters recipe -- registered before any code (2026-11-03)
+
+Keith chose it ("Let's do item 3, train gpu brain").
+
+> **Started from the GPU Brain's champion (0ffd8554) and trained by the recipe that made the fruit fly's close-quarters
+> pilot -- collisions on with the page's ram damage, every game in both the standoff and the joust start, against a
+> league of the fruit fly's Default and the PD autopilot -- does the MLP learn to beat the Default in close quarters?**
+
+**Why it is a question.**
+- Round 1 (`brain/SIXDOF_PAGE_FIGHT_WIP.md`) found the close-quarters pilot the only one whose training carried to the
+  page's own fight. It is the page's default now.
+- Round 2 trained the MLP in the standoff duel against the Default. It halved the gap and did not qualify.
+- **This round changes the profile and nothing else:** the same start and the same league, under
+  `train6dofLeague.mjs`'s `PROFILES.close`.
+
+**The recipe: the close profile's own, with only the search seeds changed.**
+- 4 searches of 500 iterations of the sparse (1+1)-ES: 1 to 4 weights a child, sigma 0.3.
+- **32 train seeds:** the close profile's own (601-632). Every game is played in both starts, from both sides, with
+  collisions on.
+- **Search seeds 7200-7203.** The fly's were 5000-5003.
+- **The champion is picked on the league score** over the close profile's held-out seeds (701-724), and on nothing
+  else.
+- **Each search is pruned toward the start.**
+
+**The audit is fresh: duel seeds 6401-6440** (40), read once: in both starts and from both sides, 160 games against the
+Default. On the same games: the Default against its own mirror, and the start against the Default (H2's baseline).
+
+**The check against the PD autopilot:** the first round's audit seeds 6101-6120 (spent), in both starts and from both
+sides, used as a check and not a test.
+
+**H1, the champion beats the Default in close quarters.** It qualifies by `train6dofLeague.qualifies()` with
+`PROFILES.close`, word for word, with the Default as the pilot to beat:
+- it leads the Default by at least 16 (`LEAD_FLOOR` per start) over the 160 audit games, and its audit score is above
+  the Default's own mirror score;
+- it is behind the Default in neither start;
+- it leads the Default on the held-out seeds;
+- it has not regressed against the PD autopilot: no more losses than the start, and a score no more than 0.5 below.
+
+If it qualifies, `brain/pilot6dofMlpWeightsClose.json` is written from the committed file. Offering it on the page is
+asked first.
+
+**H2, the gap narrows** (read whatever H1 says). The champion's audit lead against the Default exceeds the start's on
+the same 160 games by at least 16.
+
+**Controls.**
+- **C-files:** the start (0ffd8554), the Default (215e26d9) and the fruit fly's close-quarters pilot (360580a7) are the
+  registered files.
+- **C-determinism:** search 7200 is run twice, in its own process alongside the four.
+
+**Reported, testing nothing:**
+- per search: the train score, improvements, neutral moves, weights moved and kept, and the held-out league score;
+- the champion and the start against the Default, start by start;
+- **the champion against the fruit fly's close-quarters pilot** on the audit (160 games): how far it is from the page's
+  best;
+- the rams in the champion's audit games against the Default, and its check against the autopilot.
+
+**Predictions, fixed now, deciding nothing.**
+- **P1: H1 is not met** (80%). The MLP lost 70 to 74 of every 80 standoff games to the Default, and the joust is new to
+  it.
+- **P2: H2 is met** (55%).
+- **P3: the start's audit lead against the Default is -80 or worse** over the 160 games.
+- **P4: the champion loses more than it wins against the fruit fly's close-quarters pilot** (90%).
+
+**What was seen first.** Timing only: one close-profile league evaluation on scratch seeds 99801-99832 took 3.6 s (256
+duels). No score was read.
+
+**Cost.** 500 iterations at 3.6 s is 30 minutes a search, and the prune about as much again. Five processes on four
+cores take about 75 minutes.
+
+**To be built.** `tools/ship/train6dofMlpClose.mjs` (the library), `tools/ship/trainMlp6dofClose.mjs` (the command) and
+`tools/ship/train6dofMlpClose-selfcheck.mjs` (the gate), on Round 2's pattern.
