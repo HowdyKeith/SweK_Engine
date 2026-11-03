@@ -2864,6 +2864,13 @@ export const NEXT_ROUNDS = [
         why: "The far end of the long sonar is the end the range-aware confirmation thins; a memory is the cheap way to keep it.",
     },
     {
+        id: "nav-sensed-detector-hold-range",
+        blocker: "OPEN",
+        what: "The range-gated evidence hold (brain/SENSED_NAV_WIP.md, FOLLOW-UP 13) assumes the range its gate goes by (the cell's range from the vessel at the ping that reads it free) and its shape (a step at 80 m); the note names both as untried. Registered as FOLLOW-UP 15 of that note (the name was Keith's; no entry existed, and it is follow-up 13's name with the words the other way round, taken as the hold's range being the subject: which range, and step or ramp).",
+        how: "After follow-up 7's set is flown: the evidence hold of cap 30 gated by the range at the ping, the range at marking or the nearest range ever read, as a step at 80 m or a ramp to 200 m, against the map that forgets, under dropouts of 30 pings, the uniform false rate of 0.01, the persistent mix and a clean sea; HELD20 = seeds 2001 to 2060; the registration is in the note.",
+        why: "A hold that goes by the wrong range keeps the cell the vessel is leaving and forgets the one it is approaching; which of the three ranges is the right one is not known.",
+    },
+    {
         id: "nav-sensed-detector-range-hold",
         blocker: "OPEN",
         what: "The evidence hold (brain/SENSED_NAV_WIP.md, FOLLOW-UP 12) holds a watched cell at any range, and its one real cost is far from the vessel, where a hold brings back the fix smear and a dropout is harmless; the range-aware hold (FOLLOW-UP 8) holds a near cell by count, not by evidence. Registered as FOLLOW-UP 13 of that note (the name was Keith's; no entry existed, and it is taken as the two put together).",
