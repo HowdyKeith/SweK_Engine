@@ -548,3 +548,37 @@ cores take about 75 minutes.
 
 **To be built.** `tools/ship/train6dofMlpClose.mjs` (the library), `tools/ship/trainMlp6dofClose.mjs` (the command) and
 `tools/ship/train6dofMlpClose-selfcheck.mjs` (the gate), on Round 2's pattern.
+
+### Round 3: built, 2026-11-03, before the registered run (nothing of the registration above is changed)
+
+**What exists:** `tools/ship/train6dofMlpClose.mjs` (the library), `tools/ship/trainMlp6dofClose.mjs` (the command) and
+the gate `tools/ship/train6dofMlpClose-selfcheck.mjs` (about 27 s, 28 rows).
+
+**How the run is shaped.** Round 2's design, with the duel changed and nothing else.
+- **C-files come first.** The start, the Default and the close-quarters pilot must be the registered files, or nothing
+  is searched.
+- **Every duel is the close profile's,** from `train6dofLeague.mjs`'s own `duelOf(PROFILES.close)`. That covers the
+  searches, the prune, the held-out pick, the audit, the mirror, the start's baseline, the autopilot check and the
+  report.
+- **The four searches and the determinism twin of the first run in five processes at once.**
+- **Then the finish:** each search's held-out league score, the champion picked on it alone, the audit read once, and
+  the verdict by `qualifies(champion, PROFILES.close)`. Then H2, from the same audit games.
+- **The champion's audit against the Default keeps every game with its start.** The rule reads each start from them.
+- **The command writes `brain/sixdofGpuCloseResults.json` and prints only where it is.** The weight file is a later
+  step, `--write-from` that committed file, and only if the champion qualified.
+
+**The gate never starts the command's round and flies only scratch seeds** (99900-99961).
+
+**Sabotaged with the byte-safe runner: 28 designs, each red by name** (the counts are in the gate's header).
+- **Two went red only through a section's guard at first.** G20 (C-files ignoring the close file given) and G21 (the
+  close pilot's hash not checked) let a planted run reach its searches, which threw and ended the section before the
+  C-files row. The row now catches the throw itself. Both were run again: 1 and 2 red, by the rows' own names.
+- **Designed in before the sabotages, so the rows could go red:**
+  - every independent recomputation takes the close duel from `train6dofLeague.mjs`, not from the library under test;
+  - the trained-and-pruned row carries its contrast: the same search without the close duel comes out different;
+  - a row holds that every audit game keeps its start. A game without one falls out of both per-start subsets, each
+    start then reads 0-0, and the rule's per-start check passes on nothing (G13 is that sabotage);
+  - each crossed edge on made-up numbers must carry exactly one reason. A first draft's lead of 15 also put the score
+    under the mirror's, so that row would have gone red for the wrong cause.
+
+**The registered run:** `node tools/ship/trainMlp6dofClose.mjs --workers 5`.
