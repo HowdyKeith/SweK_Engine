@@ -91,9 +91,9 @@ export function verdictText(j, spec) {
     return [`${spec.designated} (the designated detector of follow-up ${spec.followUp}) reaches at least ${pct(BAR_RATE)} of what exact reaches in each kind under each condition (the bar): ${spec.bar.conds.map(cond).join("; ")} (${j.cellsHeld} of ${j.total})`,
         ...spec.preds.map((p) => `${p.id} ${p.text}: ${yn(j.preds[p.id])}`), `VERDICT: ${j.verdict}`].join("\n");
 }
-/** The command as a function: returns the exit code (0 fine, 2 a bad argument). `io` is for the gate: { out, err, writeFile, fly }. */
+/** The command as a function: returns the exit code (0 fine, 2 a bad argument). `io` is for the gate: { out, err, writeFile, fly, root (the folder --write puts the file under: the engine folder) }. */
 export function command(argv, io = {}) {
-    const out = io.out || ((m) => console.log(m)), err = io.err || ((m) => console.error(m)), writeFile = io.writeFile || fs.writeFileSync, fly = io.fly || D.flyArm;
+    const out = io.out || ((m) => console.log(m)), err = io.err || ((m) => console.error(m)), writeFile = io.writeFile || fs.writeFileSync, fly = io.fly || D.flyArm, root = io.root || ENG;
     const o = { study: null, set: "dev", seeds: null, write: false };
     for (let i = 0; i < argv.length; i++) {
         const a = argv[i];
@@ -112,7 +112,7 @@ export function command(argv, io = {}) {
     for (const kind of KINDS) for (const seed of seeds) { const sc = H.hardScenario(seed, kind); for (const arm of spec.arms) runs.push(fly(pilot, sc, arm)); }
     const sum = summarize(runs, spec);
     out(""); out(table(sum, spec, `margin ladder ${H.MARGIN_LADDER.join(", ")} m, ${H.SECONDS_HARD} s a flight, fix sigma ${X.FIX_SIGMA} m, drift ${X.DRIFT_SIGMA} m per root s, fix gain ${X.FIX_GAIN}`)); out(""); out(verdictText(judge(sum, spec), spec));
-    if (o.write) { writeFile(path.join(ENG, spec.out), runs.map((r) => JSON.stringify({ study: o.study, set: o.set, ...r })).join("\n") + "\n"); out(`wrote ${runs.length} flights to ${spec.out}`); }
+    if (o.write) { writeFile(path.join(root, spec.out), runs.map((r) => JSON.stringify({ study: o.study, set: o.set, ...r })).join("\n") + "\n"); out(`wrote ${runs.length} flights to ${spec.out}`); }
     return 0;
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) process.exitCode = command(process.argv.slice(2));
