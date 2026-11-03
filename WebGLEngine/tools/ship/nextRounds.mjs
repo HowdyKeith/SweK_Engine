@@ -2554,10 +2554,17 @@ export const NEXT_ROUNDS = [
         why: "So the page shows what the arc measured -- generation between the chain's frames -- not only the generator.",
     },
     {
-        id: "fsr4-moving-training",
+        id: "fsr4-object-motion",
         blocker: "OPEN",
-        what: "Round 78 (section 178), set up and awaiting its two harvests: U_THM, round 72's U_TH shape trained on round 65's 200 + 20 scenes each still AND moving (400 + 40 sequences, the twins sharing references), tested on 24 new scenes (12 R 79000-79011, 12 C 80000-80011) moving and still. H78a: U_THM beats round 72's U_TH on the moving scenes by the 1 % rule; H78b: it beats Bt there. Code: sequenceSet and runTemporalTraining's `moving`, runMovingTest's U0 baseline; rows in render/movingScenes-selfcheck.mjs section 5.",
-        how: "On the rig at round 78's commit: --harvest-upscale-temporal-train --round 78 (~15 h), render/upscale-net-r78.json committed byte for byte; then at that commit --harvest-upscale-temporal-test --round 78 (~11 h), render/denoise-results-upscale-moving-r78.json committed the same way. Section 179 reads them.",
+        what: "Object motion vectors for Bt's history, the round sections 177 and 179 name: each pixel's previous position from its object's own motion as well as the camera's, so a moving surface keeps its history instead of losing it (moved past POS_TOL) or keeping a wrong one. Not set up: it changes Bt itself (render/denoiseTemporal.mjs's reproject, render/denoiseTemporalUpscale.mjs's accumulateUpscaled and the device chain's accumulation), so every U_TH result is re-measured against the new Bt.",
+        how: "Pre-register first: the motion vectors (exact, from sceneMotion, as the arc's scenes know their motion), Bt with them against Bt without on round 77's or a new moving set, then U_TH on the new Bt; the device chain's cost of the vectors.",
+        why: "Section 179: training U_TH on motion did not help (H78a failed, P4 missed badly) -- nothing in its inputs says where an object went, so the history itself has to.",
+    },
+    {
+        id: "fsr4-moving-training",
+        blocker: "CLOSED",
+        what: "CLOSED AS A MEASURED NEGATIVE (section 179): H78a FAILS -- U_THM, U_TH's shape trained on round 65's scenes still and moving, is 1.26 % WORSE than round 72's U_TH on 24 new moving scenes (better on 8 of 24, p 0.93), 3.66 % worse still, and on the mover pixels 0.90 % below Bt against U_TH's 1.58 % (P4's 5-12 % missed badly). H78b holds (4.82 % below Bt). Validation showed the still cost first. U_TH (round 72) stays. The test file was shown before it was committed, said in section 179.",
+        how: "render/upscale-net-r78.json and render/denoise-results-upscale-moving-r78.json, re-derived by render/movingScenes-selfcheck.mjs section 6.",
         why: "Section 177: on the mover pixels, where Bt's error is 5.8 x the rest's, round 72's U_TH is only 3.60 % below Bt; it was never trained on a moving object's history.",
     },
     {

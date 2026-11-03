@@ -11212,3 +11212,51 @@ head, the residual upsampled and held on Bt's light by 1 + 0.5 tanh(r). Only its
 - `--harvest-upscale-temporal-train --round 78`, about 15 hours, its file committed byte for byte before it is read;
 - then, at the commit that holds that file, `--harvest-upscale-temporal-test --round 78`, about 11 hours, committed the same way.
 Section 179 reads them.
+
+## 179. ROUND 78's VERDICT -- H78a FAILS: TRAINING ON MOTION DID NOT HELP. U_THM IS 1.3 % WORSE THAN U_TH MOVING, 3.7 % WORSE STILL, AND NO BETTER ON THE MOVERS
+
+**The runs.**
+- **The training:** render/upscale-net-r78.json, run on Keith's rig at round 78's commit 4da3371a, candidate seed 3. It was committed byte for byte
+  and unread (a2cf6595); before the test I read only its structure: the round, the commit, three runs, C2, and 400 + 40 sequences with
+  motion on.
+- **The test:** render/denoise-results-upscale-moving-r78.json at a2cf6595, in 4.1 hours, 48 sequences.
+- **Said first, as in section 177: the test file was shown to me when it was uploaded, before it was committed** (daad0c52, byte for byte,
+  sha-256 25531467...). Nothing in it was edited, and the analysis below was written after the commit.
+
+**The verdict, on the moving scenes.** C1, C3, C4 and C5 hold. C2 (round 78's U_THM on shuffled targets) is far worse than Bt (mean d -3.28).
+
+| | mean display relMSE | |
+|---|---|---|
+| U_THM (round 78) | 2.1012e-3 | |
+| U_TH (round 72) | 2.0751e-3 | **H78a NOT SUPPORTED**: U_THM better on 8 of 24, mean d -0.0196, p 0.93 |
+| Bt | 2.2076e-3 | **H78b SUPPORTED**: U_THM better on 17 of 24, p 0.0015 (Holm's 0.025) |
+
+U_THM is **1.26 % above U_TH** on the moving scenes: the wrong side of section 159's rule. It is 4.82 % below Bt, and U_TH 6.00 %.
+
+**Everywhere else it is the same story.**
+- **Still:** U_THM is 4.52 % below Bt, U_TH 7.89 %, so U_THM is 3.66 % worse than U_TH (better on 4 of 24).
+- **Mover pixels:** U_THM is 0.90 % below Bt (better on 11 of 24 scenes), U_TH 1.58 % (13 of 24), so U_THM is 0.69 % worse than U_TH.
+- **The rest of the frame:** U_THM 13.8 % below Bt, U_TH 16.1 %.
+- **By family:** on the moving scenes, U_THM is 5.07 % worse than U_TH on R and 0.17 % worse on C.
+- **Validation already said so.** On the 20 still validation scenes, round 78's candidate is 2.0 % worse than round 72's candidate on the same
+  scenes (1.694e-3 against 1.661e-3).
+- **This set's movers are harder for both:** Bt's error there is 6.3 x the rest's (5.8 x in round 77), and U_TH's mover gain is 1.58 %
+  here against 3.60 % on round 77's set.
+
+**The predictions.**
+- **P1 held:** C1 and C3.
+- **P2 MISSED:** H78a not supported. U_THM is 1.26 % worse than U_TH, against a predicted 1-4 % better.
+- **P3 MISSED as to its size, held as to its sign:** H78b supported, at 4.82 %, just under the predicted 5-9 %.
+- **P4 MISSED, and badly:** on the mover pixels U_THM is 0.90 % below Bt, against a predicted 5-12 % (U_TH 1.58 %).
+- **P5 MISSED:** on the still scenes U_THM is 3.66 % worse than U_TH, outside the predicted 1 % either way. Half the training being moving cost
+  the still case, and validation showed it before the test did.
+
+**What it means, as section 178 fixed it.** H78a fails and P4 fails. In section 178's words: U_TH's 16 channels cannot learn a moving object's
+history from these inputs. Said with its limit: this is ONE training configuration (round 72's size, steps and crops, half the data moving).
+A wider network, more steps or a moving-only fine-tune are untried. But the inputs are what section 177 already pointed at. Bt's history on a
+moving object is rejected or stale, and nothing in U_TH's 17 channels says where an object went. **So U_TH (round 72) stays** in the device
+chain and on the page.
+
+**The next round, as fixed:** object motion vectors for Bt's history. Each pixel's previous position would come from the object's own
+motion, not the camera's alone, so a moving surface keeps its history instead of losing it or keeping a wrong one. That changes Bt itself, on
+the CPU and in the device chain, and every U_TH result is re-measured against it.

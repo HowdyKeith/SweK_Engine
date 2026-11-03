@@ -28,6 +28,11 @@
 //   R6 U_TH's still arm graded with U_THM, R7 vsU0.still inverted, R8 the baseline round 70's, R9 temporalRound(78) round 77's, R10 the
 //   training refusing round 78, R11 the training not told to move, R12 the baseline not recorded, R13 round 78's R seeds round 77's,
 //   R14 round 78's seeds not reserved -> 1 red each.
+// SECTION 179 (the verdict rows, sabotaged in the committed files and the registration, each restored byte-identical): W1 the test's commit
+//   typed a2cf6596, W2 H78a's count typed 9, W3 H78a typed supported, W5 U_TH's first still grade typed 1.54e-3, W6 the first mover U_THM
+//   grade typed 2.11e-3, W7 the baseline's candidate typed 2, W8 the training's commit typed 4da3371b, W9 section 179 keeping U_THM, W10 its
+//   table's U_THM mean typed 2.1678e-3 (the figure I first wrote there, before checking it) -> 1 red each; W4 U_THM's first moving grade
+//   typed 1.46e-3 -> 4 red.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -239,6 +244,39 @@ console.log("\n5. ROUND 78 (section 178): U_THM, TRAINED STILL AND MOVING, AGAIN
         /each TWICE, still and moving/.test(s178) && /79000-79011/.test(s178) && /80000-80011/.test(s178) && /\*\*H78a:\*\* on the MOVING scenes U_THM's chain beats U_TH's/.test(s178) && s178.includes(R.net) && s178.includes(R.results));
 }
 
+console.log("\n6. SECTION 179: ROUND 78's VERDICT, RE-DERIVED FROM ITS COMMITTED FILES");
+{
+    const R = LT.ROUND_UPSCALE_MOVING_78, r = JSON.parse(fs.readFileSync(path.join(ENG, R.results), "utf8")), tr = JSON.parse(fs.readFileSync(path.join(ENG, R.net), "utf8"));
+    const t72 = JSON.parse(fs.readFileSync(path.join(ENG, R.baseline), "utf8")), H = r.verdict.hypotheses, T = r.tables, St = r.still, sec = r.secondary;
+    const mean = (a) => a.reduce((q, v) => q + v, 0) / a.length, g = (u, b) => 1 - mean(u) / mean(b), near = (a, b, e = 5e-5) => Math.abs(a - b) < e;
+    ok("!! the runs are round 78's: the training at 4da3371a (seed 3 the candidate, 400 + 40 sequences with motion), the test at a2cf6595 (the commit holding that file), round 72's candidate as the baseline, 48 sequences rendered",
+        tr.round === 78 && tr.commit === "4da3371a" && tr.candidate === 3 && tr.config.moving === true && tr.config.splits.train === 400 && tr.config.splits.val === 40 &&
+        r.round === 78 && r.commit === "a2cf6595" && r.trained.file === R.net && r.trained.candidate === 3 && r.trained.commit === "4da3371a" &&
+        r.baseline.file === R.baseline && r.baseline.candidate === t72.candidate && r.baseline.commit === t72.commit && r.cache.misses === 48 && r.determinism === true && T.U.length === 24);
+    ok("!! *** H78a NOT SUPPORTED: on the moving scenes U_THM is better than U_TH on only 8 of 24, p 0.93 -- its d re-derived from the file's own U_THM and U_TH tables ***",
+        H.H1.status === "not supported" && H.H1.k === 8 && near(H.H1.p, 0.9288, 1e-4) && same(H.H1.d, effects(T.U0, T.U)) && r.verdict.run === "reported" &&
+        r.verdict.controls.C1 && r.verdict.controls.C4 && r.verdict.controls.C5 && r.verdict.controls.C2.ok && near(r.verdict.controls.C2.meanD, -3.2804, 1e-4), `p ${H.H1.p.toFixed(3)}, ${H.H1.k} of 24`);
+    ok("  H78b SUPPORTED: against Bt, 17 of 24, p 0.0015 under Holm's 0.025", H.H2.status === "supported" && H.H2.k === 17 && near(H.H2.p, 0.00147, 1e-5) && H.H2.p < H.H2.threshold && same(H.H2.d, effects(T.bt, T.U)));
+    ok("!! *** the means: U_THM 2.1012e-3, U_TH 2.0751e-3, Bt 2.2076e-3 -- U_THM 1.26 % ABOVE U_TH moving, 4.82 % below Bt, U_TH 6.00 % below Bt ***",
+        near(mean(T.U), 2.1012e-3, 5e-8) && near(mean(T.U0), 2.0751e-3, 5e-8) && near(mean(T.bt), 2.2076e-3, 5e-8) && near(g(T.U, T.U0), -0.0126) && near(g(T.U, T.bt), 0.0482) && near(g(T.U0, T.bt), 0.0600) &&
+        sec.vsU0.moving === g(T.U, T.U0) && sec.gainOverBt === g(T.U, T.bt));
+    ok("!! P5 MISSED: still, U_THM is 3.66 % WORSE than U_TH (better on 4 of 24) -- 4.52 % below Bt against U_TH's 7.89 %",
+        near(g(St.U, St.U0), -0.0366) && St.U.filter((v, i) => v < St.U0[i]).length === 4 && near(g(St.U, St.bt), 0.0452) && near(g(St.U0, St.bt), 0.0789) && sec.vsU0.still === g(St.U, St.U0));
+    const mv = sec.mover, rs = sec.rest;
+    ok("!! *** P4 MISSED: on the mover pixels U_THM is only 0.90 % below Bt (11 of 24), against a predicted 5-12 % -- and U_TH 1.58 % (13 of 24) ***",
+        near(g(mv.U, mv.bt), 0.0090) && near(g(mv.U0, mv.bt), 0.0158) && mv.U.filter((v, i) => v < mv.bt[i]).length === 11 && mv.U0.filter((v, i) => v < mv.bt[i]).length === 13 &&
+        near(g(mv.U, mv.U0), -0.0069) && near(g(rs.U, rs.bt), 0.1384) && near(g(rs.U0, rs.bt), 0.1611) && near(mean(mv.bt) / mean(rs.bt), 6.32, 0.005));
+    ok("  ...by family U_THM is 5.07 % worse than U_TH on R moving and 0.17 % on C; Bt's history is shorter moving on all 24",
+        near(g(T.U.slice(0, 12), T.U0.slice(0, 12)), -0.0507) && near(g(T.U.slice(12), T.U0.slice(12)), -0.0017) && sec.history.moving.every((v, i) => v < sec.history.still[i]));
+    const c = tr.runs.find((x) => x.seed === tr.candidate), c72 = t72.runs.find((x) => x.seed === t72.candidate);
+    ok("  validation said so first: on the 20 still validation scenes round 78's candidate is 2.0 % worse than round 72's on the same scenes",
+        c.val.length === 40 && c72.val.length === 20 && near(mean(c.val.slice(0, 20)), 1.6944e-3, 5e-8) && near(mean(c72.val), 1.6612e-3, 5e-8) && near(g(c.val.slice(0, 20), c72.val), -0.0200, 5e-4));
+    const reg = fs.readFileSync(path.join(ENG, "render", "learned-denoiser-preregistration.md"), "utf8"), s179 = reg.slice(reg.indexOf("## 179."));
+    ok("  section 179 says each of these, that U_TH stays, and that the test file was seen before it was committed",
+        reg.includes("## 179.") && /H78a NOT SUPPORTED/.test(s179) && /\*\*P4 MISSED, and badly:\*\*/.test(s179) && /\*\*P5 MISSED:\*\*/.test(s179) && /So U_TH \(round 72\) stays\*\*/.test(s179) &&
+        /the test file was shown to me when it was uploaded, before it was committed/.test(s179) && s179.includes("| U_THM (round 78) | 2.1012e-3 |"));
+}
+
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +
-    "\nnot closed here: whether U_THM beats U_TH on moving scenes. That is round 78's two harvests, section 179's.");
+    "\nnot closed here: object motion vectors for Bt's history -- section 179's next round.");
 process.exit(fails ? 1 : 0);
