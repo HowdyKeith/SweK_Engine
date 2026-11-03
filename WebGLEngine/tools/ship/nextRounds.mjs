@@ -3104,10 +3104,8 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "nav-sensed-detector-hold-confirm-hold-confirm",
-        blocker: "OPEN",
-        what: "Follow-up 18 (brain/SENSED_NAV_WIP.md) flagged the ghost's risk, that it re-marks a persistent phantom at its first reading, and follow-up 21 gives the detector a confirmed clear; the name has one stage more than follow-up 21's. Registered as FOLLOW-UP 23 of that note (the name was Keith's; no entry existed, and it is taken as the fourth stage, the ghost's re-mark confirmed by a neighbour read occupied at the same ping: hold, confirm, hold, confirm).",
-        how: "After follow-up 7's set is flown: the four-stage detector (2-of-3 mark, evidence hold cap 30 at every range, clear when 0.8 of the window was free, ghost re-marked at one reading only with a neighbouring cell also read occupied at the ping) against each stage taken out in turn and the map that forgets, under white false returns of 0.01 with leaking dropouts of 30 pings, the persistent mix and a clean sea; HELD28 = seeds 2801 to 2860; the registration is in the note.",
-        why: "Four stages stack four prices; an ablation shows which stage earns its place, and whether a neighbour test makes the ghost safe without defeating it after a whole-obstacle dropout.",
+        state: "CLOSED",
+        what: "CLOSED 2026-11-03 (brain/SENSED_NAV_WIP.md, RESULT OF FOLLOW-UP 23; tools/ship/subSensedDetStudy.mjs --study detector-hold-confirm-hold-confirm, flights in brain/subSensedDetDetectorHoldConfirmHoldConfirmHeld28.jsonl): PARTLY SUPPORTED (5 of 6 cells: the gaps kind under the persistent mix, 44 against 47.2, missed); four of eight predictions held (Z1, Z3, Z7, Z8). Of the four stages (the evidence hold, the confirmed mark, the confirmed clear, the ghost with its neighbour test) only the confirmed mark does anything measurable: under white false returns with leaking dropouts the detector reaches 160 of 180 against 135 with a mark of one (which is level with the map that forgets at 134), while taking out the hold, the confirmed clear, the ghost or the neighbour test leaves it within 3 flights (157 to 163). The neighbour test almost never refuses (about 1 re-mark in 30) and the detector with and without it differs by 1 flight under the leak and 0 under the persistent mix, where nothing beats the map that forgets (149 against 151). POST HOC, labelled: confirmed mark +36 / +11, p 0.0003; every other stage p above 0.5.",
     },
     {
         id: "nav-sensed-detector-confirm-hold-confirm",
