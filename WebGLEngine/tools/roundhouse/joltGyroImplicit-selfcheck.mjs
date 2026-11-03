@@ -1,13 +1,14 @@
 // WebGLEngine/tools/roundhouse/joltGyroImplicit-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node tools/roundhouse/joltGyroImplicit-selfcheck.mjs      (~2 s)
+// Run: node tools/roundhouse/joltGyroImplicit-selfcheck.mjs      (~4 s)
 //
 // THE GATE OF tools/roundhouse/joltGyroImplicit.mjs (and its command, joltGyroImplicitRun.mjs): the implicit gyroscopic step
 // in Jolt's wrapper, as physics/mechanics/SPINNING_BODY_WIP.md registers its third round -- and of the step itself
 // (physics/mechanics/implicitGyro.mjs) and the wrapper that takes it (physics/jolt/joltLoader.js).
-// *** NOTHING HERE FLIES A REGISTERED SPIN, AND NOTHING HERE STARTS THE COMMAND. *** The miniature spins at 1 rad/s, a rate
+// *** NOTHING HERE STARTS THE COMMAND, AND SECTIONS 1 TO 5 FLY NO REGISTERED SPIN. *** Their miniature spins at 1 rad/s, a rate
 // nobody registered, for a tenth of a second, and M1 about a STABLE axis. The command's guards are held as library functions
-// and as the order of its source.
+// and as the order of its source. Section 6 was written after the results file was committed unread and then read: it flies
+// the registered round again through the library and holds it against the file.
 //
 //   1  THE REGISTRATION, AS CODE: the configurations; the second round's spins, window, lines and cube; C-box3d's spin; M1
 //      the spinning body's own spin; C-repeat against the second round's committed J; what makes a run the registered one
@@ -20,6 +21,9 @@
 //   4  THE ROUND ON A MINIATURE: every control and measurement in order; the readings the rule's; C-flag, C-box3d,
 //      C-repeat and C-determinism able to fail; the results file's format
 //   5  THE COMMAND: it never overwrites, refuses an option it does not know, and prints no score
+//   6  THE VERDICT, AS CODE, FROM THE COMMITTED FILE: the file is the registered run; the controls, C-repeat against the second
+//      round's committed file and C-determinism; M1, M2 and M3 by the rules written out again; backward Euler's shrinkage
+//      against every end of JI's and box3d's, and where it fails; the predictions; the round flown again; the note's numbers
 //
 // SABOTAGE LOG (2026-11-03) -- each applied with the byte-safe runner against this gate, every file restored byte-identical (sha256); the
 // number is the rows that went red, by name:
@@ -37,9 +41,25 @@
 //   row could not see it; the source row and C-undamped in the miniature caught it instead. The row now turns the body 0.5 rad about (1, 1, 1),
 //   which no symmetry of the box undoes, and goes red for G12 and G4; the whole series was run again, and the counts above are that run's.
 //   FOUND BEFORE THEM, while designing them: five rows that could not have gone red (see the note).
+// SABOTAGE LOG, SECTION 6 (2026-11-03, after the verdict) -- the same runner against this gate, joltGyroDefault-selfcheck and spinningBody-selfcheck,
+// with the committed results file, the note, the second round's or the spinning body's committed results, the second round's library, the loader or
+// the step edited; every file restored byte-identical (sha256):
+//   V1 the file's bytes moved past double precision (a trailing zero on JI's 5 rad/s end) 2 (the file's sha256 and serialize(), and the note's: the
+//   number itself never moved) | V2 the file not flagged as the registered run 3 | V3 the file reading M1 as something else 5 | V4 the file's JI spin at
+//   20 rad/s about the largest axis lost 6 | V5 the file's ship trace not the force-off one 5 | V6 the file's C-box3d off by 3.1e-6, past its tolerance 4
+//   V7 the file's JE growth at 10 rad/s moved in its last digit 3 | V8 the file's last spin not flown twice alike 4 | V9 the file's JI end at 10 rad/s
+//   about the largest axis twice backward Euler's 4 | V10 the file's JI end at 20 rad/s about the largest axis backward Euler's own 4 | V11 the file's M1
+//   energy down 12.7% (P4 then wrong) 5 | V12 the file's box3d end at 5 rad/s about the largest axis moved 5 | V13 the note saying P3 wrong 1 | V14 the
+//   note's ends table cell mistyped 1 | V15 the note's third verdict heading renamed 2 (the note's row and the predictions', which read the build record
+//   up to it) | V16 the note's backward Euler numbers rounded 1 | V17 the build record not saying P7's list 1 | V18 the second round's committed J moved
+//   in its last digit 4 (C-repeat and the round flown again here, that file's hash and the second round's note row) | V19 the spinning body's committed
+//   box3d energy moved 6 (this gate's M1 and note rows, and four in spinningBody-selfcheck) | V20 the second round's kept line at three times the bound
+//   8 | V21 the loader's default Jolt's own force again 11 | V22 the step's Newton correction added, not taken away 8
+//   Every row of section 6 went red under at least one design, and none went 0 red.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
+import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import * as L from "./joltGyroImplicit.mjs";
 import * as GD from "./joltGyroDefault.mjs";
@@ -226,6 +246,117 @@ try {
         !/\.reading|\.factor|\.m1\b|\.m2\b|\.m3\b|\.key\b|\.flag\b|\.box3d\b|\.repeat\b/.test(code) && /fs\.writeFileSync\(results, serialize\(result\)\)/.test(code) && /commit it before reading it/.test(code) && (code.match(/console\.log\(/g) || []).length === 1);
 } catch (e) { guard(5, e); }
 
+console.log("\n6. THE VERDICT, AS CODE, FROM THE COMMITTED FILE (physics/mechanics/joltGyroImplicitResults.json, committed unread at 6f2063d3)");
+try {
+    // Written AFTER the file was committed and read. Every number the note's verdict states from the file is re-derived here, every reading by
+    // this gate's own statement of the rules; the whole registered round is flown again through the library (never the command) and held
+    // against the file; and backward Euler's shrinkage -- the registration's own model -- is held against every end of JI's and box3d's.
+    const text = fs.readFileSync(L.DEFAULT_RESULTS, "utf8"), R = JSON.parse(text), M3 = R.m3 || [], { I } = SB.fixtureBody();
+    const sha = createHash("sha256").update(text).digest("hex"), th = (x) => x.toLocaleString("en-US"), e1 = (x) => x.toExponential(1), f4 = (x) => x.toFixed(4);
+    const at = (c, W, a) => M3.find((e) => e.config === c && e.W === W && e.axis === a) || {};
+    ok("!! the file is the registered run, committed unread at 6f2063d3 (sha256 1b3aea52, written at 15:08:03): the rates, axes, window, lines, cube and configurations the library's, flagged registered and not stopped, M1 about the intermediate axis, and its text serialize()'s",
+        sha === "1b3aea526d8d02f8afa3ad3fe3f7f1436221f266f786d9fd1a360694cef515c1" && R.at.startsWith("2026-11-03T15:08:03") && R.registration === L.REGISTRATION && J(R.rates) === J(L.RATES) &&
+        J(R.axes) === J(L.AXES) && J(R.stable) === J(L.STABLE) && J(R.cube) === J({ ...L.CUBE, axis: [...L.CUBE.axis] }) && J(R.configs) === J(L.CONFIGS.map((c) => ({ ...c }))) && R.registered === true &&
+        R.T === 30 && R.dt === 1 / 60 && R.m1Axis === 1 && !("stopped" in R) && L.serialize(R) === text, sha.slice(0, 8) + " " + R.at);
+    const key = await GD.keyControl(), jc = R.joltControls || [], off = (d) => d.map((v, k) => Math.abs(v / I[k] - 1));
+    ok("!! the controls held, as the file records them and re-derived here: C-flag (no flag the implicit step with Jolt's force off, true Jolt's own, false and a static body neither); C-box3d 3.1e-8, an explicit step 3.2e-5 away; C-key 1.0000 and 1.4422 against Euler's bounds over 1,800 steps, the same measured again; C-inertia to 1e-7 and C-undamped exact on JI, JE and J0",
+        R.flag.ok === true && J(R.flag.got) === J({ default: ["implicit", false], true: ["jolt", true], false: [false, false], static: [false, false] }) &&
+        R.box3d.ok === true && R.box3d.off <= L.BOX3D_CHECK.tol && e1(R.box3d.off) === "3.1e-8" && e1(R.box3d.offExplicit) === "3.2e-5" &&
+        R.key.ok === true && J(R.key.got.map((x) => [x.axis, x.steps])) === J([[0, 1800], [2, 1800]]) && R.key.got.every((x) => x.bound === GD.eulerBound(I, x.axis) && Math.abs(x.factor / x.bound - 1) <= 1e-3) && key.ok &&
+        key.got.every((x, k) => near(x.factor, R.key.got[k].factor, 1e-12) && x.steps === R.key.got[k].steps && x.bound === R.key.got[k].bound && x.ok === R.key.got[k].ok) &&
+        J(jc.map((x) => x.config)) === J(["JI", "JE", "J0"]) && jc.every((x) => x.inertia.ok && Math.max(...off(x.inertia.diag)) < 1e-7 && x.inertia.off.every((v) => v === 0) && x.undamped.ok && x.undamped.worst === 0),
+        `box3d ${e1(R.box3d.off)}, Jolt's moments off by ${e1(Math.max(...off(jc[0].inertia.diag)))}`);
+    // C-REPEAT, re-derived from the second round's committed file by this gate, on more of each spin than the library's own pick
+    const gdR = JSON.parse(fs.readFileSync(GD.DEFAULT_RESULTS, "utf8")), was = gdR.m3.filter((e) => e.config === "J"), je = M3.filter((e) => e.config === "JE");
+    const spin = (e) => J([e.W, e.axis, e.bound, e.factor, e.lostAt, e.reading, e.twin]);
+    ok("!! C-repeat, as the file records it and re-derived here from the second round's committed file: JE's eight spins are its J -- rate, axis, bound, growth, loss time, reading and twin, number for number",
+        R.repeat.ok === true && R.repeat.spins === 8 && J(R.repeat.off) === "[]" && je.length === 8 && was.length === 8 && je.every((e, k) => spin(e) === spin(was[k])), `${je.length} against ${was.length}`);
+    ok("!! C-determinism: all 40 spins flew twice to the bit, and so did M1", M3.length === 40 && M3.every((e) => e.twin === true) && R.m1.twin === true);
+    // the spinning body's rule, written out again from its registration; the second round's M1 and the spinning body's box3d, from their committed files
+    const P = 2 * Math.sqrt(((5 - 2.5) * (6.5 - 5)) / (2.5 * 6.5)), m1 = R.m1 || {}, euler = (f) => f.crossed !== null && f.points >= 20 && f.r2 >= 0.999 && Math.abs(f.sigma / P - 1) <= 0.10;
+    const pct = (s) => (s / P - 1) * 100, c1 = JSON.parse(fs.readFileSync(SB.DEFAULT_RESULTS, "utf8")).configs.find((c) => c.id === "C1"), inv = m1.invariants || {};
+    const E = (-inv.energyChange * 100).toFixed(2), Lp = (inv.driftL * 100).toFixed(2), E1 = (-c1.invariants.energyChange * 100).toFixed(2), L1 = (c1.invariants.driftL * 100).toFixed(2);
+    ok("!! M1: the default body has the implicit step (Jolt's force off) and reads Euler's equations by the spinning body's rule (written out here) and by readingOf(), +0.800% where the second round's Jolt force read -0.801%; its energy ended 5.72% down and its momentum's length strayed 2.90%, box3d's 1.30% and 0.65%; it flipped twice, as box3d did",
+        m1.axis === 1 && m1.setting === "implicit" && m1.joltFlag === false && euler(m1.fit) && m1.reading === "Euler's equations" && SB.readingOf(m1.fit) === m1.reading &&
+        pct(m1.fit.sigma).toFixed(3) === "0.800" && pct(gdR.m1.fit.sigma).toFixed(3) === "-0.801" && E === "5.72" && Lp === "2.90" && E1 === "1.30" && L1 === "0.65" && inv.flips === 2 && c1.invariants.flips === 2,
+        `${m1.fit.sigma.toFixed(6)} (${pct(m1.fit.sigma).toFixed(3)}%)`);
+    const m2 = R.m2 || {};
+    ok("!! M2: the cube from addShip() has the setting \"implicit\" but equal moments, so the step skips it -- over 1,800 steps its angular velocity did not move at all, and its trace is the trace with the force off, to the bit; the second round's Jolt force moved it by 2.6e-5",
+        m2.setting === "implicit" && m2.settingOff === false && m2.same === true && m2.change === 0 && m2.changeOff === 0 && m2.apart === 0 && m2.steps === 1800 && e1(gdR.m2.changeOn) === "2.6e-5");
+    // M3's rule written out again: past 10% of the spin inside the window is lost; otherwise within twice Euler's bound is kept; otherwise drifting
+    const rule = (e) => (e.lostAt !== null && e.lostAt <= 30 ? "lost" : e.factor <= 2 * e.bound ? "kept" : "drifting");
+    const order = []; for (const c of ["JI", "JE", "OWN", "B3", "J0"]) for (const W of [2, 5, 10, 20]) for (const a of [0, 2]) order.push(c + W + "/" + a);
+    const pat = (c) => M3.filter((e) => e.config === c).map((e) => e.reading).join(","), eight = Array(8).fill("kept").join();
+    ok("!! M3's readings, re-derived by this gate's own statement of the rule and by stableReading(), are the file's, each against Euler's bound in closed form: JI kept all eight, and so did the engine's own physics, box3d and Jolt with neither; JE kept, kept, drifting, drifting, LOST, drifting, LOST, LOST, as in the second round",
+        J(M3.map((e) => e.config + e.W + "/" + e.axis)) === J(order) && M3.every((e) => e.bound === GD.eulerBound(I, e.axis) && rule(e) === e.reading && GD.stableReading(e, e.bound) === e.reading) &&
+        pat("JI") === eight && pat("OWN") === eight && pat("B3") === eight && pat("J0") === eight && pat("JE") === "kept,kept,drifting,drifting,lost,drifting,lost,lost" &&
+        M3.filter((e) => e.config === "J0").every((e) => e.factor < 1.0001), ["JI", "JE"].map((c) => c + ": " + pat(c)).join(" | "));
+    ok("!! the losses, from the file: only Jolt's own force loses a spin -- at 10 rad/s about the largest axis after 23.22 s, at 20 rad/s after 5.95 s (largest) and 8.97 s (smallest)",
+        J(M3.filter((e) => e.lostAt !== null).map((e) => [e.config, e.W, e.axis, e.lostAt.toFixed(2)])) === J([["JE", 10, 0, "23.22"], ["JE", 20, 0, "5.95"], ["JE", 20, 2, "8.97"]]));
+    // BACKWARD EULER'S SHRINKAGE: the step divides the wobble's size by sqrt(1 + (Omega h)^2) a step, Omega the wobble's own frequency. Over the window
+    // the size is that times the wobble's own swing -- its start is the larger semi-axis about x (between sqrt(3)/2 and 1 of it) and the smaller about z
+    // (between 1 and Euler's bound). The engine's own physics, which keeps the size, must sit in the swing alone.
+    const omega = (a, W) => { const b = (a + 1) % 3, c = (a + 2) % 3; return W * Math.sqrt(Math.abs(((I[c] - I[a]) / I[b]) * ((I[a] - I[b]) / I[c]))); };
+    const swing = (a) => { const b = (a + 1) % 3, c = (a + 2) % 3; return Math.sqrt(Math.abs(I[b] * (I[a] - I[b])) / Math.abs(I[c] * (I[a] - I[c]))); };
+    const shrink = (e, sub) => { const h = 1 / 60 / sub, n = Math.round(30 / h); return Math.exp(-(n / 2) * Math.log(1 + (omega(e.axis, e.W) * h) ** 2)); };
+    const inBand = (e, A) => { const [lo, hi] = e.axis === 0 ? [A * swing(0), A] : [A, A * swing(2)]; return e.end >= lo * (1 - 1e-6) && e.end <= hi * (1 + 1e-6); };
+    const ji = M3.filter((e) => e.config === "JI"), own = M3.filter((e) => e.config === "OWN");
+    const held = M3.filter((e) => (e.config === "JI" && e.W <= 10) || e.config === "B3").map((e) => ({ e, A: shrink(e, e.config === "B3" ? 4 : 1) })), past = ji.filter((e) => e.W === 20).map((e) => ({ e, A: shrink(e, 1) }));
+    ok("!! backward Euler's shrinkage, (1 + (Omega h)^2)^(-1/2) a step, times the wobble's own swing, holds every end of JI's at 2, 5 and 10 rad/s and all eight of box3d's at its four substeps; the engine's own physics ends every spin inside the swing alone, its size kept",
+        held.length === 14 && held.every(({ e, A }) => inBand(e, A)) && own.length === 8 && own.every((e) => inBand(e, 1)) && near(swing(0), Math.sqrt(3) / 2, 1e-12) && near(swing(2), GD.eulerBound(I, 2), 1e-12),
+        held.map(({ e, A }) => `${e.config}${e.W}/${e.axis} ${(e.end / A).toFixed(3)}`).join(" "));
+    ok("!! ...but not at 20 rad/s on Jolt: the wobble ended at 7.0e-7 and 1.8e-6 of its start, 1.4e-10 and 3.6e-10 rad/s, where backward Euler gives 4.9e-21 and 7.3e-14 -- held at a size the model does not explain",
+        past.length === 2 && past.every(({ e, A }) => e.end > 1e6 * A) && J(past.map(({ e }) => e1(e.end))) === J(["7.0e-7", "1.8e-6"]) &&
+        J(past.map(({ e }) => e1(e.end * L.STABLE.eps * e.W))) === J(["1.4e-10", "3.6e-10"]) && J(past.map(({ A }) => e1(A))) === J(["4.9e-21", "7.3e-14"]));
+    const r5 = Math.log(at("JI", 5, 0).end) / Math.log(at("B3", 5, 0).end);
+    ok("!! on Jolt the step damps about four times as fast as box3d's, which takes it at four substeps of a quarter of the step: at 5 rad/s about the largest axis the wobble ended at 0.0499 of its start on Jolt and 0.4694 on box3d",
+        near(r5, 4, 0.1) && f4(at("JI", 5, 0).end) === "0.0499" && f4(at("B3", 5, 0).end) === "0.4694", `the logarithms ${r5.toFixed(3)} apart`);
+    const note = fs.readFileSync(path.join(ENG, "physics/mechanics/SPINNING_BODY_WIP.md"), "utf8"), sAt = note.indexOf("\n## The implicit gyroscopic step in Jolt's wrapper");
+    const vAt = sAt >= 0 ? note.indexOf("\n### The verdict, 2026-11-03", sAt) : -1, bAt = sAt >= 0 ? note.indexOf("\n### Built, 2026-11-03", sAt) : -1;
+    const built = bAt > 0 && vAt > bAt ? note.slice(bAt, vAt).replace(/\s+/g, " ") : "";
+    const jiEnds = ji.filter((e) => e.W >= 5), worstEnd = jiEnds.reduce((m, e) => (e.end > m.end ? e : m), { end: -1 });
+    const pred = { P1: m1.reading === "Euler's equations" && Math.abs(pct(m1.fit.sigma) - 0.80) <= 0.05, P2: pat("JI") === eight, P3: jiEnds.length === 6 && jiEnds.every((e) => e.end < 0.5),
+        P4: -inv.energyChange >= 0.01 && -inv.energyChange <= 0.10, P5: m2.same === true, P6: pat("B3") === eight };
+    ok("!! the predictions, read off the file: P1 to P6 right -- and P7 is the build record's, which says so (M4's reds were P7's list)",
+        Object.values(pred).every(Boolean) && /That is P7's list\./.test(built) && /no physics gate moved/.test(built), J(pred));
+    let worst = 0, where = "";
+    const same = (a, b, p) => {
+        if (typeof a === "number" && typeof b === "number") {
+            if (Number.isInteger(a) && Number.isInteger(b)) return a === b;
+            const d = Math.abs(a - b) / Math.max(1, Math.abs(a), Math.abs(b)); if (d > worst) { worst = d; where = p; } return d <= 1e-9;
+        }
+        if (Array.isArray(a) || Array.isArray(b)) return Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((x, k) => same(x, b[k], `${p}[${k}]`));
+        if (a && b && typeof a === "object" && typeof b === "object") { const ka = Object.keys(a).sort(), kb = Object.keys(b).sort(); return J(ka) === J(kb) && ka.every((k) => same(a[k], b[k], `${p}.${k}`)); }
+        return a === b;
+    };
+    const again = await L.run(), { at: atA, ...flown } = again, { at: atR, ...filed } = R;
+    ok("!! the registered round flown again at this head, through the library: run() gives back the file -- every reading, flag and count exactly, every number to 1e-9 (only the time it was written differs)",
+        again.registered === true && typeof atA === "string" && typeof atR === "string" && same(flown, filed, "R"), `worst ${worst.toExponential(1)}${where ? " at " + where : ""}`);
+    // THE NOTE: the third round's verdict, that section alone (the second round's carries the same heading, earlier), its line breaks read as spaces
+    const rest = vAt >= 0 ? note.slice(vAt + 1) : "", nextHead = rest.search(/\n#{2,3} /), vt = vAt >= 0 ? (nextHead > 0 ? rest.slice(0, nextHead) : rest).replace(/\s+/g, " ") : "";
+    const esc = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), stands = (x) => new RegExp("(?<![0-9])" + esc(x) + "(?![0-9])").test(vt);
+    const name = { JI: "JI", JE: "JE", OWN: "own physics", B3: "B3", J0: "J0" }, axn = { 0: "largest axis", 2: "smallest axis" }, words = { 1: "once", 2: "twice", 8: "eight" };
+    const fmt = (f) => (f >= 100 ? th(Math.round(f)) : f4(f)), cell = (e) => (e.lostAt !== null ? `lost at ${e.lostAt.toFixed(2)} s` : `${fmt(e.factor)}, ${e.reading}`), endF = (x) => (x >= 0.01 ? f4(x) : e1(x));
+    const rows = [];
+    for (const c of ["JI", "JE", "OWN", "B3", "J0"]) for (const a of [0, 2]) rows.push(`| ${name[c]}, ${axn[a]} | ${[2, 5, 10, 20].map((W) => cell(at(c, W, a))).join(" | ")} |`);
+    for (const c of ["JI", "OWN", "B3"]) for (const a of [0, 2]) rows.push(`| ${name[c]}, ${axn[a]} | ${[2, 5, 10, 20].map((W) => endF(at(c, W, a).end)).join(" | ")} |`);
+    const frags = [...rows, `(${th(text.length)} bytes, sha256 ${sha.slice(0, 8)})`, `to ${e1(R.box3d.off)} of the spin; an explicit step is ${e1(R.box3d.offExplicit)} away`,
+        `at ${f4(R.key.got[0].factor)} and ${f4(R.key.got[1].factor)} of their start`, `over all ${th(R.key.got[0].steps)} steps`, `JE's ${words[R.repeat.spins]} spins are the second round's committed J`,
+        `all ${M3.length} spins flew twice to the bit${R.m1.twin ? ", and so did M1" : ""}`, `grew at ${m1.fit.sigma.toFixed(6)}/s (+${pct(m1.fit.sigma).toFixed(3)}%)`,
+        `read ${gdR.m1.fit.sigma.toFixed(6)}/s (${pct(gdR.m1.fit.sigma).toFixed(3)}%)`, `its rotational energy ended ${E}% below its start, and its angular momentum's length strayed by at most ${Lp}%`,
+        `ended ${E1}% below and strayed by at most ${L1}%`, `the tumble flipped ${words[inv.flips]}, as box3d's did`, `moved it by ${e1(gdR.m2.changeOn)} of its spin`,
+        `from ${f4(at("JI", 2, 2).factor)} at 2 rad/s to ${f4(at("JI", 20, 2).factor)} at 20, always under Euler's ${f4(GD.eulerBound(I, 2))}`,
+        `between ${swing(0).toFixed(3)} and 1 of its start about the largest axis, and between 1 and ${f4(swing(2))} about the smallest`,
+        `It ended at ${e1(past[0].e.end)} and ${e1(past[1].e.end)} of its start (${e1(past[0].e.end * L.STABLE.eps * 20)} and ${e1(past[1].e.end * L.STABLE.eps * 20)} rad/s), where backward Euler gives ${e1(past[0].A)} and ${e1(past[1].A)}`,
+        `the wobble ended at ${f4(at("JI", 5, 0).end)} of its start on Jolt, and at ${f4(at("B3", 5, 0).end)} on box3d`,
+        `M1 reads Euler's equations at +${pct(m1.fit.sigma).toFixed(3)}%`, `The largest end was ${f4(worstEnd.end)}, at ${worstEnd.W} rad/s about the ${axn[worstEnd.axis].replace(" axis", "")} axis`,
+        `M1's rotational energy ended ${E}% below its start`, `to ${e1(at("JI", 10, 0).end)} of its start about the largest axis and ${e1(at("JI", 10, 2).end)} about the smallest`,
+        `loses rotational energy, ${E}% in 30 s at 2 rad/s`, ...Object.keys(pred).map((k) => `**${k}: ${pred[k] ? "right" : "wrong"}.**`), "**P7: right, read from the build record, not from this file.**"];
+    const missing = frags.filter((x) => !stands(x));
+    ok("!! the note's verdict carries the file's numbers, both tables row by row, backward Euler's numbers as this section computes them, and each prediction's outcome as the file decides it (no digit may touch a fragment's ends; read from the third round's verdict alone)",
+        sAt > 0 && vAt > sAt && missing.length === 0, missing.length ? "missing: " + missing.join(" || ").slice(0, 300) : `${frags.length} fragments`);
+} catch (e) { guard(6, e); }
+
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +
-    "\nnot closed here: the round itself -- the registered run writes physics/mechanics/joltGyroImplicitResults.json, committed before it is read, and its verdict becomes section 6.");
+    "\nnot closed here: what holds a 20 rad/s wobble near 1e-10 rad/s, how fast a larger wobble dies, contact, joints and damping, the step at more substeps, and its time in a scene whose bodies touch -- none of it registered.");
 process.exitCode = fails ? 1 : 0;

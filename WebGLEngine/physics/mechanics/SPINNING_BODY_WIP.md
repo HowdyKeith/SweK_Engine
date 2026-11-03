@@ -711,3 +711,135 @@ None went 0 red, but one went red elsewhere than on the row written for it:
   for G12 and G4. The whole series was run again after the change.
 
 **The registered run:** `node tools/roundhouse/joltGyroImplicitRun.mjs`.
+
+### The verdict, 2026-11-03 (read from the committed file, after it was committed)
+
+The registered run wrote `physics/mechanics/joltGyroImplicitResults.json` at head 2195d855 in about a second and a
+half. It was committed byte for byte at 6f2063d3 before anyone read it (10,900 bytes, sha256 1b3aea52). It flew the
+registered spins and says so (`registered: true`). Every number below that comes from that file is re-derived from it
+in section 6 of `tools/roundhouse/joltGyroImplicit-selfcheck.mjs`, and the whole round is flown again there and held
+against the file. The step times are not in the file, as the registration said, and nothing holds them.
+
+**The controls held.**
+- **C-flag:** a body made with no flag has the setting "implicit" with Jolt's own flag off. `true` gives "jolt" with
+  the flag on, `false` gives neither, and a static body has neither.
+- **C-box3d:** one box3d substep from (1, 2, 3) rad/s landed on the module's step to 3.1e-8 of the spin; an explicit
+  step is 3.2e-5 away.
+  The step is box3d's.
+- **C-key:** the engine's own physics at 2 rad/s held the wobbles at 1.0000 and 1.4422 of their start, Euler's bounds,
+  over all 1,800 steps.
+- **C-inertia and C-undamped,** on all three Jolt configurations: the moments to 1e-7, and a spin exactly about the
+  largest axis kept exactly.
+- **C-repeat:** JE's eight spins are the second round's committed J, number for number. The instrument has not moved.
+- **C-determinism:** all 40 spins flew twice to the bit, and so did M1.
+
+**M1, the default body: Euler's equations, as far off on the other side.** The fixture made with no flag has the
+implicit step. Spun about its middle axis, its wobble grew at 0.968456/s (+0.800%), so it reads "Euler's equations" by
+the spinning body's rule. Jolt's own force read 0.953074/s (-0.801%) in the second round: the explicit step is as slow
+as
+the implicit one is fast. The step costs energy:
+- over the 30 s its rotational energy ended 5.72% below its start, and its angular momentum's length strayed by at most
+  2.90%;
+- box3d, which takes the same step at each of its four substeps, ended 1.30% below and strayed by at most 0.65% in the
+  spinning body's run;
+- the tumble flipped twice, as box3d's did.
+
+**M2, the ship: untouched.** The cube from `addShip()` has the setting "implicit", but its three moments are equal, so
+the step skips it. Over the 30 s its angular velocity did not move at all, and its trace is the trace with the force
+passed off, to the bit. In the second round, Jolt's own force moved it by 2.6e-5 of its spin, from rounding.
+
+**M3: every stable spin kept.** Each cell is the wobble's largest growth over its start and the reading, or when the
+wobble passed 10% of the spin. JI is Jolt with the new default, and JE is Jolt's own force, the second round's J. B3
+(box3d at its four substeps) and J0 (Jolt with neither) are reported.
+
+| | 2 rad/s | 5 rad/s | 10 rad/s | 20 rad/s |
+|---|---|---|---|---|
+| JI, largest axis | 1.0000, kept | 1.0000, kept | 1.0000, kept | 1.0000, kept |
+| JI, smallest axis | 1.4215, kept | 1.3915, kept | 1.3441, kept | 1.2569, kept |
+| JE, largest axis | 1.6032, kept | 19.9437, drifting | lost at 23.22 s | lost at 5.95 s |
+| JE, smallest axis | 1.9566, kept | 9.8188, drifting | 2,919, drifting | lost at 8.97 s |
+| own physics, largest axis | 1.0000, kept | 1.0000, kept | 1.0000, kept | 1.0000, kept |
+| own physics, smallest axis | 1.4422, kept | 1.4422, kept | 1.4422, kept | 1.4419, kept |
+| B3, largest axis | 1.0000, kept | 1.0000, kept | 1.0000, kept | 1.0000, kept |
+| B3, smallest axis | 1.4370, kept | 1.4292, kept | 1.4163, kept | 1.3907, kept |
+| J0, largest axis | 1.0000, kept | 1.0000, kept | 1.0000, kept | 1.0000, kept |
+| J0, smallest axis | 1.0000, kept | 1.0000, kept | 1.0000, kept | 1.0000, kept |
+
+- **Jolt with the implicit step keeps every stable spin, at every rate and about both axes.** So do box3d and the
+  engine's own physics. Jolt's own force loses three of them, exactly as in the second round.
+- **About the smallest axis, its largest growth falls as the spin rises:** from 1.4215 at 2 rad/s to 1.2569 at 20,
+  always under Euler's 1.4422.
+  The wobble shrinks before it reaches its first peak.
+
+**And the stable wobble dies away.** Real physics keeps a stable wobble's size; the step shrinks it. Each cell is the
+wobble at the end of the 30 s over its start.
+
+| | 2 rad/s | 5 rad/s | 10 rad/s | 20 rad/s |
+|---|---|---|---|---|
+| JI, largest axis | 0.5843 | 0.0499 | 6.2e-6 | 7.0e-7 |
+| JI, smallest axis | 1.0373 | 0.2106 | 5.4e-4 | 1.8e-6 |
+| own physics, largest axis | 0.9430 | 0.9923 | 0.9707 | 0.9064 |
+| own physics, smallest axis | 1.4102 | 1.4414 | 1.0048 | 1.0189 |
+| B3, largest axis | 0.8369 | 0.4694 | 0.0487 | 6.1e-6 |
+| B3, smallest axis | 1.3057 | 0.8910 | 0.1474 | 5.1e-4 |
+
+- **The engine's own physics ends every spin inside the wobble's own swing:** between 0.866 and 1 of its start about the
+  largest axis, and between 1 and 1.4422 about the smallest.
+  The size is kept, and only the phase moves.
+- **Backward Euler's shrinkage predicted the ends of JI and box3d, except at 20 rad/s on Jolt.** The step divides the
+  wobble's size by sqrt(1 + (Omega h)^2) a step. Over the window, and times the wobble's own swing, that holds every
+  end of JI's at 2, 5 and 10 rad/s, and all eight of box3d's.
+- **At 20 rad/s on Jolt the wobble stopped short of that.** It ended at 7.0e-7 and 1.8e-6 of its start (1.4e-10 and
+  3.6e-10 rad/s), where backward Euler gives 4.9e-21 and 7.3e-14.
+  What holds it there is not measured. My guess is the single precision Jolt keeps a body in.
+- **On Jolt the step damps about four times as fast as on box3d.** It is taken once a 1/60 s step, where box3d takes
+  it at each of four substeps of 1/240 s. At 5 rad/s about the largest axis the wobble ended at 0.0499 of its start on
+  Jolt, and at 0.4694 on box3d.
+
+**The step's time (reported, testing nothing, and not in the results file).** For 200 awake boxes of the fixture that
+touch nothing, the wrapper's step took 322 microseconds with the implicit step and 146 with neither.
+- Those are medians of seven runs of 600 steps for each setting, alternating, in this sandbox, on the built code. The
+  boxes sat 6 m apart, spun at about (0.3, 2, 0.2) rad/s, with zero gravity and damping and 60 steps to warm up.
+- That is about 0.9 microseconds a body a step: 2.2 times the step, for bodies that touch nothing, and about 1% of a
+  60 Hz frame for 200 bodies.
+
+**The predictions:**
+- **P1: right.** M1 reads Euler's equations at +0.800%, within 0.05 of a point of the +0.80% I gave 80%.
+- **P2: right.** JI kept every stable spin, at every rate, about both axes; 90%.
+- **P3: right.** At 5 rad/s and above, every JI wobble ended below half its start. The largest end was 0.2106, at 5
+  rad/s about the smallest axis; 75%.
+- **P4: right.** M1's rotational energy ended 5.72% below its start, between the 1% and 10% I gave 60%.
+- **P5: right.** The ship's trace with the default is its trace with the force off, to the bit; 95%.
+- **P6: right.** box3d kept every stable spin too; 85%.
+- **P7: right, read from the build record, not from this file.** In M4 the rows the change turned red were those that
+  read the loader's default or a body made with no flag, and the record of the loader's size. No physics gate moved.
+  60%.
+
+**What this says, and what it does not.**
+- **It says:** with the implicit step as the default, a free body on Jolt still turns by Euler's equations, within 0.8%
+  of the rate at the pages' step. A fast stable spin stays stable at every rate measured, up to 20 rad/s, at one
+  substep. Ships are untouched.
+- **It says:** the price is damping, and it grows with the spin. A stable wobble that real physics keeps dies away: at
+  10 rad/s, in 30 s, to 6.2e-6 of its start about the largest axis and 5.4e-4 about the smallest. A tumbling body loses
+  rotational energy, 5.72% in 30 s at 2 rad/s.
+- **It says:** the step costs time, about 0.9 microseconds a body a step in this sandbox.
+- **It does not say:**
+  - what holds the wobble near 1e-10 rad/s at 20 rad/s;
+  - how fast a larger wobble dies, or what that does to a body meant to wobble;
+  - anything about contact, joints or damping. The wrapper's default angular damping (0.05/s) comes on top of the
+    step's own;
+  - what the step does at more substeps, where it is still taken once a step;
+  - what it costs in a scene whose bodies touch, or against Jolt's own force.
+
+**What follows.**
+- P2 held, so the default stays the implicit step, as the registration said.
+- Both of the second round's questions for Keith are answered. Question 2, Jolt's flag off and an implicit step in the
+  wrapper, is this round. Question 1, more substeps, was about the explicit force's cost, and one substep now keeps
+  every stable spin measured.
+- This note authorises no further round.
+
+**The verdict, as code:** section 6 of `tools/roundhouse/joltGyroImplicit-selfcheck.mjs` re-derives every number above
+from the committed file, except the step times. It flies the whole round again and holds it against the file, and it
+holds backward Euler's shrinkage against every end of JI's and box3d's. Sabotaged with the byte-safe runner: 22
+designs, each red by name, and every row of section 6 went red under at least one. They edit the committed file, this
+note or the code, and the counts are in the gate's header.
