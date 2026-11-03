@@ -1,7 +1,7 @@
 {
  "host": "linux-x64-4c-16gb-420793",
  "note": "THIS BOX'S OWN gate runtimes, written by tools/ship/boxTimings.mjs. The shared sweep-timings.json is host-claimed and a foreign box cannot write it (v4647, and that refusal is right); this is how a box records what IT measured without overwriting another machine's numbers. `kinds` says which quantity each ms is, as in the shared record: `alone` is an uncontended serial reading, `capped` is a FLOOR and not a runtime. Read for COVERAGE -- has this gate ever been timed -- and NOT for the ship-time budget, which still reads the shared file. See task #87. `serialRing` holds the last three alone readings; recordReach's margin row reads it on a box that does not own the shared record, because that row asks what a gate costs HERE and nothing here can refresh another box's ring.",
- "captured": "2026-11-03T20:05:45.905Z",
+ "captured": "2026-11-03T23:07:42.741Z",
  "timings": {
   "tools/ship/cloneProvision-selfcheck.mjs": 7171,
   "tools/ship/exitBusy-selfcheck.mjs": 15284,
@@ -115,7 +115,8 @@
   "tools/subReservoirV4-selfcheck.mjs": 11876,
   "tools/subReservoirV5-selfcheck.mjs": 10706,
   "tools/ship/trainNeedsCircuit-selfcheck.mjs": 9014,
-  "render/movingScenes-selfcheck.mjs": 20982
+  "render/movingScenes-selfcheck.mjs": 20982,
+  "render/frameGenChainLive-selfcheck.mjs": 5935
  },
  "at": {
   "tools/ship/cloneProvision-selfcheck.mjs": "2026-09-25T03:35:16.858Z",
@@ -230,7 +231,8 @@
   "tools/subReservoirV4-selfcheck.mjs": "2026-10-28T00:58:35.866Z",
   "tools/subReservoirV5-selfcheck.mjs": "2026-10-28T00:58:35.866Z",
   "tools/ship/trainNeedsCircuit-selfcheck.mjs": "2026-10-28T00:58:35.866Z",
-  "render/movingScenes-selfcheck.mjs": "2026-11-03T20:05:45.905Z"
+  "render/movingScenes-selfcheck.mjs": "2026-11-03T20:05:45.905Z",
+  "render/frameGenChainLive-selfcheck.mjs": "2026-11-03T23:07:42.741Z"
  },
  "kinds": {
   "tools/ship/cloneProvision-selfcheck.mjs": "alone",
@@ -345,7 +347,8 @@
   "tools/subReservoirV4-selfcheck.mjs": "alone",
   "tools/subReservoirV5-selfcheck.mjs": "alone",
   "tools/ship/trainNeedsCircuit-selfcheck.mjs": "alone",
-  "render/movingScenes-selfcheck.mjs": "alone"
+  "render/movingScenes-selfcheck.mjs": "alone",
+  "render/frameGenChainLive-selfcheck.mjs": "alone"
  },
  "codes": {
   "tools/ship/cloneProvision-selfcheck.mjs": 0,
@@ -460,7 +463,8 @@
   "tools/subReservoirV4-selfcheck.mjs": 0,
   "tools/subReservoirV5-selfcheck.mjs": 0,
   "tools/ship/trainNeedsCircuit-selfcheck.mjs": 0,
-  "render/movingScenes-selfcheck.mjs": 0
+  "render/movingScenes-selfcheck.mjs": 0,
+  "render/frameGenChainLive-selfcheck.mjs": 0
  },
  "serialRing": {
   "tools/ship/frozenRecords-selfcheck.mjs": [
@@ -1004,6 +1008,11 @@
    23359,
    23180,
    20982
+  ],
+  "render/frameGenChainLive-selfcheck.mjs": [
+   5976,
+   6211,
+   5935
   ]
  }
 }

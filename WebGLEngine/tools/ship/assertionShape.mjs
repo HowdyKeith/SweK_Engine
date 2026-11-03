@@ -971,8 +971,9 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // v4910 -- twelve gates (the sub-model swap's three, the capability map, the Round 6-10 pair each: residualAdvisor, trainResidual, constShift, tunedRule, tuneRule, tuneWide, stationResidual, stationRound), each defining ok(n, c, d) or ok(name, cond, detail) once: gates 2191 -> 2203, usesOk 2170 -> 2182, definesOk 2162 -> 2174, distinctDefinitions 47 -> 49, nameFirst 2060 -> 2064, unknownSignature 11 -> 19, read off the code's own report. ELEVEN rows of render/subModelsCore-selfcheck.mjs and one of subModels3d-selfcheck.mjs had passed ok(name, () => ...) (a function in the condition slot, which the tool reads as always truthy even though that file's ok() invoked it): written as invoked IIFEs now, suspects held at 0.
     // v4911 -- five more, the planner seat, its audit library, the replication, the perturbed twin and the tolerance sweep, each defining ok(n, c, d) once and naming first: gates 2203 -> 2208, usesOk 2182 -> 2187, definesOk 2174 -> 2179, nameFirst 2064 -> 2069.
     // rounds 77-78 (sections 176-179) merged over v4911 -- one gate main did not have, render/movingScenes-selfcheck.mjs, defining ok(n, c, d) once and naming first: gates 2208 -> 2209, usesOk 2187 -> 2188, definesOk 2179 -> 2180, nameFirst 2069 -> 2070, read off the code's own report.
-    gates: 2209, usesOk: 2188, definesOk: 2180, importsOk: 0,
-    distinctDefinitions: 49, nameFirst: 2070, condFirst: 99, unknownSignature: 19,
+    // backlog denoise-framegen-page-chain -- one more, render/frameGenChainLive-selfcheck.mjs, defining ok(n, c, d) once and naming first: gates 2209 -> 2210, usesOk 2188 -> 2189, definesOk 2180 -> 2181, nameFirst 2070 -> 2071, read off the code's own report.
+    gates: 2210, usesOk: 2189, definesOk: 2181, importsOk: 0,
+    distinctDefinitions: 49, nameFirst: 2071, condFirst: 99, unknownSignature: 19,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

@@ -2548,9 +2548,9 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "denoise-framegen-page-chain",
-        blocker: "OPEN",
-        what: "The live view on the arc's whole chain and the device: each real frame the half-size trace through the shipped denoiser, the emitter fill, EASU and the history (render/denoiseFrameGen.mjs's L7), and the half-way frame made by render/denoiseFrameGenGPU.mjs's compute generator on WebGPU rather than the CPU reference. Today's view (denoise-framegen-page) generates between raw 2-spp traces on the CPU.",
-        how: "The worker would run frameGenFrames' chain per frame (the denoiser at 64 x 64 half size is the cost to measure first); the page would hand the pair to the compute generator where navigator.gpu exists, the CPU reference otherwise, with a gate row holding the two to K0p's bound.",
+        blocker: "CLOSED",
+        what: "CLOSED, BUILT: path-tracer.html's chain frame-generation view. Each real frame is the arc's chain (render/frameGenChainLive.mjs: the half-size trace through the shipped denoiser, the fill, EASU, and Bt's history over the last eight), and the half-way frame is generated from two real frames' light-free histories with the scene's motion field at FRAMEGEN_FILL, the holes cross-faded, lit at the half-way eye -- on WebGPU by render/denoiseFrameGenGPU.mjs's createDeviceGenerator, the CPU reference otherwise. Gated by render/frameGenChainLive-selfcheck.mjs: the chain bit for bit with the arc's pieces, the device generator within section 147's 1e-5 of the CPU (4.7e-7 measured on SwiftShader), and the page driven in a browser.",
+        how: "Done; what it costs per frame on a real GPU the page prints itself.",
         why: "So the page shows what the arc measured -- generation between the chain's frames -- not only the generator.",
     },
     {

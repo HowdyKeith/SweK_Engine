@@ -248,3 +248,48 @@ export function readH64(rep) {
     const G = all ? Object.values(parts).reduce((a, v) => a + v, 0) : null;
     return { ...r, parts, G, ratio: all ? G / r.T : null, clocks: { ...r.clocks, generator: clock }, threeJs: r.parts.generator };
 }
+
+/**
+ * Backlog denoise-framegen-page-chain: a CPU motion field (motionField's flow, NaN where there is no vector, and its depth) as the
+ * generator's motion buffer, MOT_STRIDE floats a pixel -- the flow, the depth, and 1 where there is a vector, 0 (and a zero flow) where not.
+ */
+export function motionBuffer(flow, depth, w, h) {
+    const m = new Float32Array(w * h * MOT_STRIDE);
+    for (let p = 0; p < w * h; p++) { const fx = flow[p * 2], fy = flow[p * 2 + 1], v = Number.isFinite(fx) && Number.isFinite(fy);
+        m[p * MOT_STRIDE] = v ? fx : 0; m[p * MOT_STRIDE + 1] = v ? fy : 0; m[p * MOT_STRIDE + 2] = depth[p]; m[p * MOT_STRIDE + 3] = v ? 1 : 0; }
+    return m;
+}
+
+/**
+ * The compute generator as one call, for a page: createDeviceGenerator(dev, w, h) on a gfx/device.js WebGPU device compiles the five
+ * passes and sizes their buffers once; generate({ prev, cur, flow, depth }) (two w x h x 4 frames and a CPU motion field) runs them in
+ * one submission and reads back { frame (w x h x 4), holes (the pixels the fill left, cross-faded) } -- interpolateFrameCPU at
+ * FRAMEGEN_FILL with cross-faded holes, as section 147 holds it. The cost gate's own dispatch, lifted.
+ */
+export function createDeviceGenerator(dev, w, h) {
+    const K = Object.fromEntries(["CLEAR", "SPLAT", "WIN", "FILL", "GATHER"].map((k) => [k, dev.compute({ wgsl: { CLEAR: GEN_CLEAR_WGSL, SPLAT: GEN_SPLAT_WGSL, WIN: GEN_WIN_WGSL, FILL: GEN_FILL_WGSL, GATHER: GEN_GATHER_WGSL }[k] })]));
+    const bad = Object.entries(K).filter(([, k]) => k.error);
+    if (bad.length) throw new Error("denoiseFrameGenGPU: the generator did not compile -- " + bad.map(([n, k]) => n + ": " + String(k.error).slice(0, 200)).join("; "));
+    const n = w * h, S2 = genGroups(w, h), uG = dev.buffer({ data: genUniform(w, h), usage: "uniform" });
+    const zk = dev.buffer({ data: new Uint32Array(n), usage: ["storage"] }), wn = dev.buffer({ data: new Uint32Array(n), usage: ["storage"] });
+    const vc = dev.buffer({ data: new Float32Array(n * 4), usage: ["storage"] }), ds = dev.buffer({ data: new Float32Array(n * 4), usage: ["storage"] });
+    const mot = dev.buffer({ data: new Float32Array(n * MOT_STRIDE), usage: ["storage"] }), pv = dev.buffer({ data: new Float32Array(n * 4), usage: ["storage"] }), cu = dev.buffer({ data: new Float32Array(n * 4), usage: ["storage"] });
+    return {
+        w, h,
+        async generate({ prev, cur, flow, depth }) {
+            if (prev.length !== n * 4 || cur.length !== n * 4) throw new Error(`denoiseFrameGenGPU: two ${w} x ${h} x 4 frames -- got ${prev.length} and ${cur.length}`);
+            mot.write(motionBuffer(flow, depth, w, h)); pv.write(Float32Array.from(prev)); cu.write(Float32Array.from(cur));
+            dev.frame(({ pass }) => {
+                K.CLEAR.bind("u", uG).bind("zkey", zk).bind("win", wn); pass.dispatch(K.CLEAR, S2.line);
+                K.SPLAT.bind("u", uG).bind("mot", mot).bind("zkey", zk); pass.dispatch(K.SPLAT, S2.line);
+                K.WIN.bind("u", uG).bind("mot", mot).bind("zkey", zk).bind("win", wn); pass.dispatch(K.WIN, S2.line);
+                K.FILL.bind("u", uG).bind("mot", mot).bind("zkey", zk).bind("win", wn).bind("vec", vc); pass.dispatch(K.FILL, S2.tile);
+                K.GATHER.bind("u", uG).bind("vec", vc).bind("prev", pv).bind("cur", cu).bind("dst", ds); pass.dispatch(K.GATHER, S2.tile);
+                pass.clear([0, 0, 0, 1]);
+            }, { offscreen: true });
+            const frame = new Float32Array(await dev.read(ds)), vec = new Float32Array(await dev.read(vc));
+            let holes = 0; for (let p = 0; p < n; p++) if (vec[p * 4 + 2] !== 0) holes++;
+            return { frame, holes };
+        },
+    };
+}
