@@ -957,3 +957,35 @@ Minutes.
 - `tools/roundhouse/joltScenes.mjs` (the library: the four scenes, the statistics, the sign test and the controls),
   `tools/roundhouse/joltScenesRun.mjs` (the command) and `tools/roundhouse/joltScenes-selfcheck.mjs` (the gate).
 - The results go to `physics/mechanics/joltScenesResults.json`, committed before it is read.
+
+### Built, 2026-11-03, before the registered run (nothing of the registration above is changed)
+
+- **The round:** `tools/roundhouse/joltScenes.mjs` (the library), `joltScenesRun.mjs` (the command) and
+  `joltScenes-selfcheck.mjs` (the gate: 34 rows, about 3 s).
+  - The scenes are built from the pages' own modules: `createRagdoll()`, `createStructures()`, `fractureMesh()`,
+    `makePhysicsDebris()`, `addGround()`, `makeAvatar()`, `makeHerd()`, `metaField()` and `marchScalarField()`.
+    C-page holds 25 of the pages' numbers against their source.
+  - D hands `addBox()` no key. F and F' hand it `false` for every body, the modules' bodies too.
+  - C-setting on seed 1: the default reaches the 21 ragdoll parts and every fragment (16 for the avatar, 19 for the
+    herd). The wall's 42 cubes have the setting but no inertia, so the step skips them, and the grounds have none.
+  - The gate never flies a registered seed. Its plumbing flies seeds 501 to 503, and its miniature seeds 1001 and 1002,
+    for half a second of each window.
+- **A count in the registration is wrong, and the slip is mine.** It says "There are six primary statistics", but it
+  lists seven: A1's rest time, A2's broken joints and cohesion, and D1's and D2's rest time and spread. The round reads
+  the seven it lists, and the gate holds seven. Its first run found the slip.
+- **The meshes:** the avatar's rest pose marches to 2,020 triangles, and the avatar with its herd to 1,752. The avatar
+  page also marches its tentacle and its pet. Both are left out, as registered ("the avatar's rest pose").
+- **Found while designing the sabotages, before them:** three things no row could catch.
+  - The nudge count would have passed counting D against F, because on the miniature both differ from F on both seeds.
+    A row on made-up flights now holds it.
+  - Nothing held how a statistic is taken: over which bodies, and after which update. A row now holds the source.
+  - The short flight never showed the fling reaching the wall. It now requires broken joints.
+
+**Sabotaged with the byte-safe runner: 35 designs, each red by name** (the counts are in the gate's header).
+None went 0 red on the run whose counts are logged, but one did on the first run:
+- **G7, the nudge entering the fracture.** The row compared F's and F''s fragments and their places. A nudge of 1e-5 m
+  moves the fracture's sites too little to move any triangle to another site, so the fragments came out the same.
+  `buildDebris()` now returns its fracture, and the row compares the sites themselves, F's and F''s, against the
+  seed's own unnudged fracture. The whole series was run again after the change.
+
+**The registered run:** `node tools/roundhouse/joltScenesRun.mjs`.
