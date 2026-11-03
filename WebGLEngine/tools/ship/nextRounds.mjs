@@ -2864,6 +2864,13 @@ export const NEXT_ROUNDS = [
         why: "The far end of the long sonar is the end the range-aware confirmation thins; a memory is the cheap way to keep it.",
     },
     {
+        id: "nav-sensed-detector-confirm-hold",
+        blocker: "OPEN",
+        what: "Follow-up 11's M-of-N family (brain/SENSED_NAV_WIP.md) was argued on re-marking a cell a miss had cleared, which a hold removes; follow-up 16 asks whether the pair beats each alone, not which confirmation to choose with the hold present. Registered as FOLLOW-UP 20 of that note (the name was Keith's; no entry existed, and it is follow-up 16's name the other way round, taken as which confirmation rule when the hold is there).",
+        how: "After follow-up 7's set is flown: the six confirmation rules of follow-up 11 (a mark of one, runs of two and three, 2-of-3, 2-of-4, 3-of-4) each with the evidence hold of cap 30 at every range, under white false returns of 0.01 with dropouts of 30 pings at miss chances of 0.2 and 0.4, and a clean sea; HELD25 = seeds 2501 to 2560; the registration is in the note.",
+        why: "If the hold makes the memory worthless the family collapses and the cheapest rule will do; if it makes strictness affordable the stricter rules win; the delay at first marking decides which.",
+    },
+    {
         id: "nav-sensed-detector-range-confirm-hold",
         blocker: "OPEN",
         what: "Follow-up 14's range-aware 2-of-3 confirmation (brain/SENSED_NAV_WIP.md) stops at the mark, follow-up 17 adds the evidence hold and follow-up 10 the plain lock on a run of three; the table of mark by hold has an empty cell. Registered as FOLLOW-UP 19 of that note (the name was Keith's; no entry existed, and it is follow-up 14's name with a hold on the end, taken as the plain range-gated lock on the memory confirmation, which fills the empty cell).",
