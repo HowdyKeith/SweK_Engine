@@ -45,6 +45,8 @@
 // real seconds here", which tools/ship/aircraftPage-selfcheck.mjs still cites as headless running below real time.
 // It is kept as that host's reading; this box does not reproduce it: three runs alone at the review, battles of
 // 93-109 ticks in 1556-1884 ms, about 57-60 ticks per real second.
+// 2026-11-02 -- THE PAGE'S DEFAULT IS THE CLOSE-QUARTERS PILOT, so this gate chooses the PD autopilot explicitly and says so in a row. Sabotaged with the byte-safe runner: the explicit choice removed,
+// 1 red (the measured-under-the-PD-autopilot row: the lineup it measured was the close-quarters pilot's).
 "use strict";
 import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
 import { createRequire } from "node:module";

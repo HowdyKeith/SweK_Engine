@@ -49,6 +49,10 @@
 //   AH pilotRoster.mjs: teamPilot() ignores the choice's own network                              1 red here (the THROUGH-ITS-OWN-NETWORK row), and 2 on the page (the measured-pilot and fight rows)
 //   AI pilotRoster.mjs: 'gpu' resolved without its network                                        1 red (the never-through-another-network row)
 //   AJ pilotRoster.mjs: 'gpu' resolves to the shipped fruit-fly pilot's weights                   1 red here (the THROUGH-ITS-OWN-NETWORK row), and 3 on the page
+//   2026-11-02 -- A PAGE'S OWN DEFAULT (section 2's three new rows), with the byte-safe runner, this gate, brain/pilot6dofPolicy-selfcheck.mjs and tools/ship/rigidBody6dofPage-selfcheck.mjs run:
+//   AK pilotRoster.mjs: a page's own default ignored                                            1 red here (the flies-it-once-held row), and 1 on the page (the default-lineup row)
+//   AL pilotRoster.mjs: the default used before the page holds it                               1 red (the until-it-holds-it row)
+//   AM pilotRoster.mjs: the default's label ignored                                             1 red here (the label row), and 1 on the page
 "use strict";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
