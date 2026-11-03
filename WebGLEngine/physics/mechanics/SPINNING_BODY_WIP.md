@@ -408,3 +408,45 @@ Seconds.
 - `tools/roundhouse/joltGyroDefault.mjs` (the library), `tools/roundhouse/joltGyroDefaultRun.mjs` (the command) and
   `tools/roundhouse/joltGyroDefault-selfcheck.mjs` (the gate).
 - The results go to `physics/mechanics/joltGyroDefaultResults.json`, committed before it is read.
+
+### Built, 2026-11-03, before the registered run (nothing of the registration above is changed)
+
+- **The default:** `addBox()`'s `gyroscopic` now defaults to true, and its comment says so and why. `addShip()`
+  passes nothing, so a ship takes it. A static body never does.
+- **Restated, not widened:**
+  - The spinning body's row that asserted "off by default" now asserts on, with a dated note.
+  - Its configuration row's text and its closing line follow.
+  - C2 still passes the flag false, as registered, and a dated note on its configurations says so.
+- **The round:** `tools/roundhouse/joltGyroDefault.mjs` (the library), `joltGyroDefaultRun.mjs` (the command) and
+  `joltGyroDefault-selfcheck.mjs` (the gate: 28 rows, under a second).
+  - Jolt is reached through its own loader.
+  - The default is measured by passing no key at all. A spy in the gate shows the spinner handing `addBox()` no
+    `gyroscopic` for the default, and the flag itself otherwise.
+  - The gate never flies a registered spin. Its miniature spins at 1 rad/s for a tenth of a second, with M1 about a
+    stable axis.
+- **M4, the 73 gates that reach Jolt, run again after the change:** 72 of 74 green, counting the new gate.
+  - No physics gate moved: the ragdolls, the structures, the vehicle, the arena, the conformance checker, the blobs
+    and the spinning body all held.
+  - recordDrift is red on the same ship-time records as in the baseline.
+  - orreryFleet is red twice:
+    - on the baseline's commit belt;
+    - on `orrery-fleet.json`'s size for `joltLoader.js` (13,363 bytes to 13,555), which is re-baked here.
+  - **P6 cannot be read cleanly from M4.** A search for the old default found the spinning body's row and restated it
+    before M4 ran, so M4 could not watch that row go red. G31 puts the old row back, and it goes red by name.
+- **Found while designing the sabotages, before them:** three rows that could not have gone red.
+  - M3's twin was compared, but never shown to be a second spin. A source check now holds it.
+  - M1's comparison with C3 was asked only to be a boolean. On the miniature's stable spin it is now asserted true:
+    the default and the flag passed true make one body.
+  - M2's two measures were asked only to be numbers. They are now exported and held on made-up traces, so the gate
+    reads none of M2's real numbers.
+
+**Sabotaged with the byte-safe runner: 31 designs, each red by name** (the counts are in the gate's header).
+One went 0 red on the first run, and one kind of red hid the rows after it. Each was fixed, and the whole series was
+run again:
+- **G20, C-key flown for 2 s instead of the window.** About the smallest axis the wobble reaches its bound a
+  quarter-turn in (1.42 s), so any window past that reads the same bound. C-key now counts its steps and fails short
+  of 1,800.
+- **G28 and G29, a round the sabotage stopped.** Section 4 threw at its second row, because a stopped round has no
+  measurements, and the rows after it never ran. The rows now read through defaults, so each one fails by name.
+
+**The registered run:** `node tools/roundhouse/joltGyroDefaultRun.mjs`.

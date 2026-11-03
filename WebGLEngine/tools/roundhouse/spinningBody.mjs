@@ -39,6 +39,9 @@ export const SPIN = Object.freeze({ W: 2, eps: 1e-5, T: 30, dt: 1 / 60, fineDt: 
 export const RULE = Object.freeze({ tol: 0.10, r2: 0.999, minPoints: 20, skip: 10, cap: 0.05, noGrowth: 10 });
 /** The substeps each engine's pages step with: box3dLoader's step() default and Jolt's one collision step. */
 export const SUBSTEPS = Object.freeze({ box3d: 4, jolt: 1 });
+// 2026-11-03 (unnumbered) -- C2's label is the registered one, written when the wrapper's default was off. The same day Keith turned the
+// default ON (physics/jolt/joltLoader.js; the note's second round). C2 still passes the flag false, as registered, so it still measures the
+// body it was registered to and its committed results still describe it; "as the engine's wrapper makes a body" now means "as it made one".
 export const CONFIGS = Object.freeze([
     Object.freeze({ id: "C1", engine: "box3d", gyroscopic: null, label: "box3d, undamped" }),
     Object.freeze({ id: "C2", engine: "jolt", gyroscopic: false, label: "Jolt as the engine's wrapper makes a body (gyroscopic force off), undamped" }),

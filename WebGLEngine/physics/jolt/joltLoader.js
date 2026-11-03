@@ -58,7 +58,7 @@ class JoltWorld {
         if (gravity) this.ps.SetGravity(new Jolt.Vec3(gravity[0], gravity[1], gravity[2]));
         this.bodies = [];   // { body, id, dynamic }
     }
-    addBox({ type = "dynamic", pos = [0, 0, 0], half = [0.5, 0.5, 0.5], density = 1, damping = LINEAR_DAMPING, gyroscopic = false } = {}) {
+    addBox({ type = "dynamic", pos = [0, 0, 0], half = [0.5, 0.5, 0.5], density = 1, damping = LINEAR_DAMPING, gyroscopic = true } = {}) {
         const Jolt = this.Jolt, dyn = type !== "static";
         const shape = new Jolt.BoxShapeSettings(new Jolt.Vec3(half[0], half[1], half[2])).Create().Get();
         const cs = new Jolt.BodyCreationSettings(shape, new Jolt.RVec3(pos[0], pos[1], pos[2]), new Jolt.Quat(0, 0, 0, 1), dyn ? Jolt.EMotionType_Dynamic : Jolt.EMotionType_Static, dyn ? LAYER_M : LAYER_NM);
@@ -67,10 +67,12 @@ class JoltWorld {
         // behaviour changes; what changes is that the ENGINE now chooses it, and box3d is held to the same number.
         cs.mLinearDamping = damping;
         cs.mAngularDamping = damping === 0 ? 0 : ANGULAR_DAMPING;
-        // 2026-11-03 (unnumbered) -- THE GYROSCOPIC FORCE, AN OPT-IN, AND IT STAYS ONE. Jolt leaves it off by default
-        // (mApplyGyroscopicForce = false), so a body's angular velocity is held constant between torques and a spinning
-        // brick never flips. Set only when asked for, so every existing caller's body is created exactly as before.
-        // physics/mechanics/SPINNING_BODY_WIP.md measures both settings against Euler's equations.
+        // 2026-11-03 (unnumbered) -- THE GYROSCOPIC FORCE, ON BY DEFAULT (Keith's decision, the same day the opt-in was
+        // added). Jolt leaves it off (mApplyGyroscopicForce = false), and then a body's angular velocity is held constant
+        // between torques: a spinning brick never wobbles, precesses or flips. physics/mechanics/SPINNING_BODY_WIP.md
+        // measured both settings against Euler's equations -- off, no gyroscopic term at all; on, Euler's rate to 0.8% --
+        // and its second round measures what the default costs. Pass `gyroscopic: false` to keep a body as Jolt makes it.
+        // A static body never takes it.
         if (dyn && gyroscopic) cs.mApplyGyroscopicForce = true;
         const b = this.bi.CreateBody(cs); Jolt.destroy(cs); this.bi.AddBody(b.GetID(), dyn ? Jolt.EActivation_Activate : Jolt.EActivation_DontActivate);
         this.bodies.push({ body: b, id: b.GetID(), dynamic: dyn }); return this.bodies.length - 1;

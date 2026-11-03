@@ -93,7 +93,7 @@ try {
     const b3 = fs.readFileSync(path.join(ENG, "physics/box3d/box3dLoader.js"), "utf8"), jo = fs.readFileSync(path.join(ENG, "physics/jolt/joltLoader.js"), "utf8");
     ok("!! the substeps ARE the loaders' own: box3dLoader's step(dt = 1 / 60, substeps = 4) and Jolt's step(dt = 1 / 60, substeps = 1)",
         L.SUBSTEPS.box3d === 4 && L.SUBSTEPS.jolt === 1 && /step\(dt = 1 \/ 60, substeps = 4\)/.test(b3) && /step\(dt = 1 \/ 60, substeps = 1\)/.test(jo));
-    ok("!! the four configurations, in order: box3d; Jolt with the gyroscopic force off (its default); Jolt with the opt-in; the engine's own rigidBody6dof",
+    ok("!! the four configurations, in order: box3d; Jolt with the gyroscopic force passed off (Jolt's own default, and the wrapper's until 2026-11-03); Jolt with it passed on; the engine's own rigidBody6dof",
         J(L.CONFIGS.map((c) => [c.id, c.engine, c.gyroscopic])) === J([["C1", "box3d", null], ["C2", "jolt", false], ["C3", "jolt", true], ["C4", "own", null]]) && Object.isFrozen(L.CONFIGS));
 } catch (e) { guard(1, e); }
 
@@ -161,7 +161,10 @@ try {
         Object.values(fr).every((f) => near(f.got[0], 0.4, 1e-6) && near(f.got[1], 0, 1e-6) && near(f.got[2], 0, 1e-6) && f.world < 1e-4 && f.body > 0.02), J(Object.fromEntries(Object.entries(fr).map(([k, v]) => [k, [v.world.toExponential(1), v.body.toFixed(3)]]))));
     const flag = (gyro) => { const w = worlds.jolt(), i = w.addBox({ type: "dynamic", pos: [0, 0, 0], half, density: 1, damping: 0, gyroscopic: gyro }), v = w.raw().bodyOf(i).GetApplyGyroscopicForce(); w.destroy(); return v; };
     const deflt = (() => { const w = worlds.jolt(), i = w.addBox({ type: "dynamic", pos: [0, 0, 0], half, density: 1 }), v = w.raw().bodyOf(i).GetApplyGyroscopicForce(); w.destroy(); return v; })();
-    ok("!! the gyroscopic opt-in reaches Jolt's body, and stays an opt-in: off by default, off when asked off, on when asked on", deflt === false && flag(false) === false && flag(true) === true, `${deflt} ${flag(false)} ${flag(true)}`);
+    // 2026-11-03 (unnumbered) -- RESTATED, NOT WIDENED: this row said "and stays an opt-in: off by default" and asserted deflt === false. The same
+    // day Keith turned the default ON (the note's second round), and the row went red on exactly that, which is what it was for. It now holds the
+    // new default, and still holds both explicit settings.
+    ok("!! the gyroscopic force reaches Jolt's body: ON by default since 2026-11-03 (Keith's decision; an opt-in until then), off when asked off, on when asked on", deflt === true && flag(false) === false && flag(true) === true, `${deflt} ${flag(false)} ${flag(true)}`);
     // the spinner's body-frame reading, against the engine's own world-frame numbers turned by hand, after half a second of a
     // stable spin about x with a wobble on y: by then the body has turned 0.2 rad, so the two frames' wobbles differ
     const frameOf = async (c) => { const sp = await L.spinner(c, { w0: [0.4, 1e-3, 0], dt: 1 / 60 }); for (let k = 0; k < 30; k++) sp.step(); const r = sp.read(), raw = sp.raw(); sp.destroy(); return { r, raw }; };
@@ -320,5 +323,5 @@ try {
 } catch (e) { guard(6, e); }
 
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +
-    "\nnot closed here: whether Jolt's wrapper should turn the gyroscopic opt-in on by default (asked separately), the engine's own first-order orientation step, and what moves box3d's energy below the pages' step -- none of it registered.");
+    "\nnot closed here: what Jolt's gyroscopic default costs (turned on 2026-11-03; the note's second round measures it), the engine's own first-order orientation step, and what moves box3d's energy below the pages' step.");
 process.exitCode = fails ? 1 : 0;
