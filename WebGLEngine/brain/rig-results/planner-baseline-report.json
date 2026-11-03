@@ -1,0 +1,19 @@
+{
+ "report": [
+  "ROUND 26: does the twin's gain survive a better baseline? pooled over G1 4401-4500, G2 4501-4600, G3 4601-4700 (far and both, 600 dives per arm; read once)",
+  "  PASS IDENTITY G1: the full twin on the Round 8 constants equals the Round 11 twin dive for dive on G1: true",
+  "  PASS SHIFT REACHES THE RULE: TUNED-LOW differs from TUNED-R8 on at least one dive: true",
+  "  PASS SHIFT REACHES THE TWIN: TWIN-LOW differs from TWIN-R8 on at least one dive: true",
+  "  PASS KINDS ALIGNED: every arm's dives are the same scenarios in the same order: true",
+  "  PASS BLOCK SIZE: every block has 200 dives per arm: true",
+  "TUNED-LOW minus TUNED-R8: +0.0121 (se 0.0028; better 80, worse 36, same 484)",
+  "TWIN-LOW minus TUNED-LOW (the twin over the better baseline): +0.0151 (se 0.0023; better 64, worse 10, same 526)",
+  "TWIN-LOW minus TWIN-R8: +0.0107 (se 0.0031; better 89, worse 49, same 462)",
+  "TWIN-R8 minus TUNED-R8 (reported; the series' usual gain, on these seeds): +0.0165 (se 0.0023; better 61, worse 4, same 535)",
+  "gain over the better baseline as a share of the gain over Round 8: 92%",
+  "means: TUNED-R8 0.7947, TUNED-LOW 0.8069, TWIN-R8 0.8112, TWIN-LOW 0.8220; crushed 0/0/0/0, stranded 0/0/0/0",
+  "BOTTOM LINE: THE LOWER TRIP POINT IS A BETTER BASELINE (+0.0121)",
+  "BOTTOM LINE: THE TWIN'S GAIN SURVIVES THE BETTER BASELINE (+0.0151, se 0.0023)",
+  "BOTTOM LINE: THE TWIN ON THE BETTER CONSTANTS BEATS THE TWIN ON ROUND 8"
+ ]
+}
