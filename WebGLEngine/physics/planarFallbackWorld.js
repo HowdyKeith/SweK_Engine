@@ -62,6 +62,7 @@ export function planarFallbackWorld() {
         // other axis. Now the answer is part of the contract and the checker makes worlds prove it.
         dimensionality() { return "planar"; },
         supportsJoints() { return false; },
+        supportsAngular() { return false; },   // 2026-11-03: the contract's fourteenth call -- this stand-in reports no angular velocity, and says so
         jointSpherical() { return -1; },
         jointRevolute() { return -1; },
         jointWeld() { return -1; },

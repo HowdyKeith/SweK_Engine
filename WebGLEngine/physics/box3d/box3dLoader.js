@@ -35,6 +35,8 @@ class Box3DWorldHandle {
         this._xfCap = 0;
         this._vPtr = 0;
         this._vCap = 0;
+        this._wPtr = 0;   // the angular-velocity buffer (readAngularVelocities)
+        this._wCap = 0;
     }
     addBox({ type = "dynamic", pos = [0, 0, 0], half = [0.5, 0.5, 0.5], density = 1 } = {}) {
         const t = type === "dynamic" ? 1 : type === "kinematic" ? 2 : 0;   // 0 static, 1 dynamic, 2 kinematic
@@ -73,6 +75,32 @@ class Box3DWorldHandle {
         if (bytes > this._vCap) { if (this._vPtr) this._m._free(this._vPtr); this._vPtr = this._m._malloc(bytes); this._vCap = bytes; }
         this._m._swk_velocities(this._vPtr);
         return new Float32Array(this._m.HEAPF32.buffer, this._vPtr, n * 3);
+    }
+    // 2026-11-03 (unnumbered) -- ANGULAR VELOCITY, AND THE TWO THINGS A TORQUE-FREE BODY NEEDS WITH IT: damping it can
+    // set to zero, and its moments read back as box3d computed them. physics/mechanics/SPINNING_BODY_WIP.md registers the
+    // round. Each answers HONESTLY on an artifact that predates it, as setFriction does: supportsAngular() says false and
+    // the calls return null or false rather than throwing.
+    supportsAngular() { return ["ang_velocities", "body_set_ang_velocity", "body_set_damping", "body_inertia"].every((n) => this.supports(n)); }
+    // [wx,wy,wz] per body, WORLD frame, rad/s -- readVelocities' layout and lifetime (valid until the next box3d call).
+    readAngularVelocities() {
+        if (!this.supports("ang_velocities")) return null;
+        const n = this._m._swk_body_count(), bytes = n * 3 * 4;
+        if (bytes > this._wCap) { if (this._wPtr) this._m._free(this._wPtr); this._wPtr = this._m._malloc(bytes); this._wCap = bytes; }
+        this._m._swk_ang_velocities(this._wPtr);
+        return new Float32Array(this._m.HEAPF32.buffer, this._wPtr, n * 3);
+    }
+    setAngularVelocity(idx, w) { if (!this.supports("body_set_ang_velocity")) return false; this._m._swk_body_set_ang_velocity(idx, w[0], w[1], w[2]); return true; }
+    // linear and angular damping, 1/s. addBox keeps the engine's 0.05/0.05 (v2468); a torque-free body says 0, 0.
+    setDamping(idx, linear, angular) { if (!this.supports("body_set_damping")) return false; this._m._swk_body_set_damping(idx, linear, angular); return true; }
+    // the body's rotational inertia in its own frame: { diag: [Ixx, Iyy, Izz], off: [Ixy, Ixz, Iyz] }, or null.
+    inertia(idx) {
+        if (!this.supports("body_inertia")) return null;
+        const p = this._m._malloc(9 * 4);
+        try {
+            if (!this._m._swk_body_inertia(idx, p)) return null;
+            const f = new Float32Array(this._m.HEAPF32.buffer, p, 9);   // column by column: cx, cy, cz
+            return { diag: [f[0], f[4], f[8]], off: [f[3], f[6], f[7]] };
+        } finally { this._m._free(p); }
     }
     bodyCount() { return this._m._swk_body_count(); }
     // Float32Array view: [x,y,z, qx,qy,qz,qw] per body. Valid until next call.
@@ -250,6 +278,7 @@ class Box3DWorldHandle {
         try { this._m._swk_world_destroy(); } catch {}
         if (this._xfPtr) { try { this._m._free(this._xfPtr); } catch {} this._xfPtr = 0; this._xfCap = 0; }
         if (this._vPtr) { try { this._m._free(this._vPtr); } catch {} this._vPtr = 0; this._vCap = 0; }
+        if (this._wPtr) { try { this._m._free(this._wPtr); } catch {} this._wPtr = 0; this._wCap = 0; }
     }
 }
 

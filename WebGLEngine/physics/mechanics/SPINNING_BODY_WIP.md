@@ -127,3 +127,70 @@ Nothing is changed by the reading: no page, no default, no ship.
 - `tools/roundhouse/spinningBody.mjs` (the library), `tools/roundhouse/spinningBodyRun.mjs` (the command) and
   `tools/roundhouse/spinningBody-selfcheck.mjs` (the gate).
 - The results go to `physics/mechanics/spinningBodyResults.json`, committed before it is read.
+
+## Built, 2026-11-03, before the registered run (nothing of the registration above is changed)
+
+**Angular velocity, for both backends.**
+- **box3d:** four shim exports (`swk_ang_velocities`, `swk_body_set_ang_velocity`, `swk_body_set_damping`,
+  `swk_body_inertia`), and `vendor/box3d/box3d.wasm` rebuilt by `build-box3d-wasm-clang.sh` from v0.1.0 in this
+  container.
+  - The new artifact is 830,021 bytes with 81 `swk_*` exports, against the old one's 829,117 and 77. The four new
+    names are the only difference in the export surface.
+  - **C-rebuild holds:** a battery of five scenes flies to the same state hashes on both artifacts.
+  - The emcc script's hand-kept export list gained the four names (`box3dFilter-selfcheck` went red naming them), and
+    `vendor/box3d/PROVENANCE.md` records the rebuild.
+- **box3d's loader:** `supportsAngular()`, `readAngularVelocities()`, `setAngularVelocity()`, `setDamping()` and
+  `inertia()`. Each answers honestly on an artifact that predates it.
+- **Jolt's wrapper:** the same five, through calls its binding already had, and `gyroscopic` on `addBox`. It is off
+  by default, so every existing caller's body is created exactly as before.
+- **The conformance contract's fourteenth call, `supportsAngular()`.** The two stand-ins answer false. A world that
+  answers true must report the angular velocity it was given and turn the body about it. Two new lying worlds show the
+  checker catching both, and real box3d conforms on all 18 checks.
+- **Both engines report angular velocity in the world frame,** told apart in the gate by how the orientation turns.
+
+**Rows that recorded the gap, updated in the same commit.** Each went red when the gap closed, which is what it was
+for; each now says so in a dated note.
+- `freeRotation-selfcheck` (2): the contract has no angular call; neither backend reports w.
+- `backendRotation-selfcheck`: no export can turn box3d's damping off.
+- `rigidCouple-selfcheck`: box3d exports no inertia. It now does, and the row became a direct cross-check: the
+  solid-box formula's moments are box3d's own, to 1e-7.
+- `blobSpace-selfcheck` and `backendConformance-selfcheck`: the contract is fourteen calls, not thirteen.
+- `box3dConformance-selfcheck`: its adapter mirrors the loader's new calls.
+- `orrery-fleet.json` was re-baked: three of box3d's and Jolt's importers grew.
+
+**The round:** `tools/roundhouse/spinningBody.mjs` (the library), `tools/roundhouse/spinningBodyRun.mjs` (the
+command) and `tools/roundhouse/spinningBody-selfcheck.mjs` (the gate: 31 rows, under a second).
+- Each engine is reached through its own loader, never `selectBackend()`'s silent fallback, and its `backendId()` is
+  checked.
+- The gate never spins a backend about the intermediate axis. Its miniature of the whole round spins about the stable
+  largest axis.
+- **Disclosed:** while building the miniature, its 2-second stable spins showed the wobble about the smallest axis
+  oscillating in C1, C3 and C4 and staying constant in C2. That is gyroscopic coupling present or absent, which the
+  registration already expected from the source. Nothing of the rate was seen.
+
+**Found while building, before the sabotages:**
+- **A detached view.** In box3d a first `readTransforms()` mallocs its buffer, and a malloc that grows the memory
+  detaches every heap view taken before it. The angular velocity is copied out first.
+- **The first frame test broke the gate's own rule.** It turned the body so world x lay along its intermediate axis.
+  It now lies along the smallest.
+- **Rows that could not have gone red,** found while designing the sabotages and fixed before them:
+  - the opt-in dropped on C3's body: the results now carry the flag Jolt reports;
+  - the body-frame turning skipped: held against the engine's raw reading after a turn where the two frames differ;
+  - C-key's tolerance: the control is now handed a mismatched prediction;
+  - C-determinism: the comparison is `sameTrace()`, held directly;
+  - the results file's format: it checks the arrays sit on one line;
+  - the real loaders' `supportsAngular()`: now asked.
+- **Two made-up edges sat exactly on the boundary.** A fit of 1.1 times the prediction is 0.10000000000000009 off, and
+  float32's 0.4 is 0.40000000596.
+
+**Sabotaged with the byte-safe runner: 34 designs, each red by name** (the counts are in the gate's header). Three went
+0 red on the first run, and each was fixed and run again:
+- **G25, the command accepting any option.** The row looked for an exit within 200 characters of the option check, and
+  the refusal's own exit two lines down stood in for the deleted one. It now demands each exit directly after its refusal.
+- **G32, the checker's angular readback blinded.** Both lying worlds were planar, so the turning check caught them
+  anyway. `box3dConformance-selfcheck` now hands the checker real box3d turning a body while it reports zeros.
+- **G34, the planar stand-in claiming angular velocity.** The checker crashed on a world claiming the calls without
+  having them, and a crash prints no FAIL line, so nothing was counted. It now reports the missing calls as a failed
+  check and survives a throw.
+
+**The registered run:** `node tools/roundhouse/spinningBodyRun.mjs`.

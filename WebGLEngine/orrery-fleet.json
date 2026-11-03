@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "7872ba27d0ab0e1761dd362847caef93e4647110",
+ "head": "eb0d10662f4defc32407603c3c2ffa675c00d906",
  "bodies": {
   "box3d": [
    {
@@ -21,12 +21,12 @@
    },
    {
     "path": "physics/box3d/box3dConformance-selfcheck.mjs",
-    "bytes": 12269,
+    "bytes": 14163,
     "sha": "5638cbe47b9844b08c29dab76eba4337cd917427"
    },
    {
     "path": "physics/box3d/box3dLoader.js",
-    "bytes": 27374,
+    "bytes": 29671,
     "sha": "8c009e25970f6129173801315a93ce2a4cc7291c"
    },
    {
@@ -389,7 +389,7 @@
   "jolt": [
    {
     "path": "physics/jolt/joltLoader.js",
-    "bytes": 11150,
+    "bytes": 13363,
     "sha": "713679f4c6fb11350bbccba6756ddcc70eac84d6"
    },
    {
@@ -473,7 +473,7 @@
    {
     "path": "tools/ship/orphanSets.mjs",
     "bytes": 39328,
-    "sha": "a987a4714e8969cce831583f07dd85dec5c267b1"
+    "sha": "c5ffe2df5153227d12a9b16be40ae84d0226ccb0"
    }
   ],
   "male-cns": [
@@ -607,7 +607,7 @@
    {
     "path": "tools/ship/orphanSets.mjs",
     "bytes": 39328,
-    "sha": "a987a4714e8969cce831583f07dd85dec5c267b1"
+    "sha": "c5ffe2df5153227d12a9b16be40ae84d0226ccb0"
    },
    {
     "path": "tools/ship/snowflowVendor-selfcheck.mjs",
@@ -745,8 +745,8 @@
    },
    {
     "path": "es-box3d-6dof.html",
-    "bytes": 38196,
-    "sha": "d13237b453a095bcc6ddf81cbbfb79916081efe2"
+    "bytes": 40767,
+    "sha": "0e461f4686e91bd4726a4490bd141db4baec5458"
    },
    {
     "path": "es-box3d-fly3d.html",
@@ -861,7 +861,7 @@
    {
     "path": "main.js",
     "bytes": 3734473,
-    "sha": "6a1b215b78fc033a5933eb26c8c155d3607c3bfc"
+    "sha": "c5ffe2df5153227d12a9b16be40ae84d0226ccb0"
    },
    {
     "path": "mpm3d.html",
@@ -916,7 +916,7 @@
    {
     "path": "render/subModels3d-selfcheck.mjs",
     "bytes": 35551,
-    "sha": "558b95e21e6b7e15f196c081cd7d6c0b825db182"
+    "sha": "c5ffe2df5153227d12a9b16be40ae84d0226ccb0"
    },
    {
     "path": "render/subModels3d.mjs",
@@ -926,7 +926,7 @@
    {
     "path": "render/subModelsPanel-selfcheck.mjs",
     "bytes": 18024,
-    "sha": "91fd744f63531e7b3a7f2038ecf665173ed71c64"
+    "sha": "c5ffe2df5153227d12a9b16be40ae84d0226ccb0"
    },
    {
     "path": "render/svgExtrude.js",
@@ -1046,7 +1046,7 @@
    {
     "path": "tools/ship/orphanSets.mjs",
     "bytes": 39328,
-    "sha": "a987a4714e8969cce831583f07dd85dec5c267b1"
+    "sha": "c5ffe2df5153227d12a9b16be40ae84d0226ccb0"
    },
    {
     "path": "tools/ship/pipboyWireframe-selfcheck.mjs",
@@ -1520,7 +1520,7 @@
    {
     "path": "tools/ship/orphanSets.mjs",
     "bytes": 39328,
-    "sha": "a987a4714e8969cce831583f07dd85dec5c267b1"
+    "sha": "c5ffe2df5153227d12a9b16be40ae84d0226ccb0"
    },
    {
     "path": "tools/ship/threePatch.mjs",
@@ -1579,7 +1579,7 @@
    {
     "path": "tools/ship/orphanSets.mjs",
     "bytes": 39328,
-    "sha": "a987a4714e8969cce831583f07dd85dec5c267b1"
+    "sha": "c5ffe2df5153227d12a9b16be40ae84d0226ccb0"
    },
    {
     "path": "tools/ship/seaPatch-selfcheck.mjs",

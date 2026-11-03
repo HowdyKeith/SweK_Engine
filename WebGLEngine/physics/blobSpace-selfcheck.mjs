@@ -20,9 +20,11 @@ const blobs = makeBlobs(7, 20260715);
 
 // ---- 1. WHY IT CANNOT BE A BACKEND -- read off the real contract, not asserted --------------------------------
 {
-    ok("!! THE CONTRACT IS " + CONTRACT.length + " CALLS, AND EVERY ONE IS ABOUT A BODY", CONTRACT.length === 13,
+    // 2026-11-03: 13 became 14 when supportsAngular joined (physics/mechanics/SPINNING_BODY_WIP.md) -- a question about how a
+    // BODY turns, so the point below stands: not one call asks what shape the universe is.
+    ok("!! THE CONTRACT IS " + CONTRACT.length + " CALLS, AND EVERY ONE IS ABOUT A BODY", CONTRACT.length === 14,
        CONTRACT.join(", ") + ". NOT ONE ASKS WHAT SHAPE THE UNIVERSE IS. So the blobulator cannot be a backend -- NOT BECAUSE IT IS TOO WEAK, BUT BECAUSE IT IS A DIFFERENT CATEGORY. box3d and Jolt answer 'how do bodies move'. The blob answers 'where is there anything'. THE INTERFACE HAS A SLOT FOR THE SOLVER AND NO SLOT FOR THE SPACE. Keith did not ask a physics question; HE FOUND A MISSING ABSTRACTION.");
-    ok("...and NOT ONE of the thirteen is a question about space", !CONTRACT.some((c) => /space|field|inside|terrain|world(?!\W)/i.test(c)),
+    ok("...and NOT ONE of the fourteen is a question about space", !CONTRACT.some((c) => /space|field|inside|terrain|world(?!\W)/i.test(c)),
        "no insideAt, no normalAt, no sample. A backend is handed an EMPTY UNIVERSE and asked to move things in it.");
     ok("...and the check guarding those 13 is named 'answers all ten calls'", CONTRACT.length !== 10,
        "A NAME IS A CLAIM, and that one has been wrong since the eleventh was added (impulse was the thirteenth, v2567). It is prose, so nothing ever failed -- THE SAME SHAPE AS EVERY OTHER NAME THAT LIED THIS SESSION.");

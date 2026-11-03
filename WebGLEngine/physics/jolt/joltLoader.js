@@ -58,7 +58,7 @@ class JoltWorld {
         if (gravity) this.ps.SetGravity(new Jolt.Vec3(gravity[0], gravity[1], gravity[2]));
         this.bodies = [];   // { body, id, dynamic }
     }
-    addBox({ type = "dynamic", pos = [0, 0, 0], half = [0.5, 0.5, 0.5], density = 1, damping = LINEAR_DAMPING } = {}) {
+    addBox({ type = "dynamic", pos = [0, 0, 0], half = [0.5, 0.5, 0.5], density = 1, damping = LINEAR_DAMPING, gyroscopic = false } = {}) {
         const Jolt = this.Jolt, dyn = type !== "static";
         const shape = new Jolt.BoxShapeSettings(new Jolt.Vec3(half[0], half[1], half[2])).Create().Get();
         const cs = new Jolt.BodyCreationSettings(shape, new Jolt.RVec3(pos[0], pos[1], pos[2]), new Jolt.Quat(0, 0, 0, 1), dyn ? Jolt.EMotionType_Dynamic : Jolt.EMotionType_Static, dyn ? LAYER_M : LAYER_NM);
@@ -67,6 +67,11 @@ class JoltWorld {
         // behaviour changes; what changes is that the ENGINE now chooses it, and box3d is held to the same number.
         cs.mLinearDamping = damping;
         cs.mAngularDamping = damping === 0 ? 0 : ANGULAR_DAMPING;
+        // 2026-11-03 (unnumbered) -- THE GYROSCOPIC FORCE, AN OPT-IN, AND IT STAYS ONE. Jolt leaves it off by default
+        // (mApplyGyroscopicForce = false), so a body's angular velocity is held constant between torques and a spinning
+        // brick never flips. Set only when asked for, so every existing caller's body is created exactly as before.
+        // physics/mechanics/SPINNING_BODY_WIP.md measures both settings against Euler's equations.
+        if (dyn && gyroscopic) cs.mApplyGyroscopicForce = true;
         const b = this.bi.CreateBody(cs); Jolt.destroy(cs); this.bi.AddBody(b.GetID(), dyn ? Jolt.EActivation_Activate : Jolt.EActivation_DontActivate);
         this.bodies.push({ body: b, id: b.GetID(), dynamic: dyn }); return this.bodies.length - 1;
     }
@@ -97,6 +102,24 @@ class JoltWorld {
         const out = new Float32Array(this.bodies.length * 3);
         for (let i = 0; i < this.bodies.length; i++) { const b = this.bodies[i]; if (!b.dynamic) continue; const v = this.bi.GetLinearVelocity(b.id), o = i * 3; out[o] = v.GetX(); out[o + 1] = v.GetY(); out[o + 2] = v.GetZ(); }
         return out;
+    }
+    // 2026-11-03 (unnumbered) -- ANGULAR VELOCITY, box3dLoader's angular calls with the same shapes: [wx,wy,wz] per body in
+    // the WORLD frame (rad/s, Jolt's own convention), setting it, damping settable to zero, and the body's inertia in its
+    // own frame as Jolt computed it. All through calls the vendored binding already had: no rebuild.
+    supportsAngular() { return true; }
+    readAngularVelocities() {
+        const out = new Float32Array(this.bodies.length * 3);
+        for (let i = 0; i < this.bodies.length; i++) { const b = this.bodies[i]; if (!b.dynamic) continue; const w = this.bi.GetAngularVelocity(b.id), o = i * 3; out[o] = w.GetX(); out[o + 1] = w.GetY(); out[o + 2] = w.GetZ(); }
+        return out;
+    }
+    setAngularVelocity(idx, w) { const J = this.Jolt, ww = new J.Vec3(w[0], w[1], w[2]); this.bi.SetAngularVelocity(this._id(idx), ww); J.destroy(ww); this.bi.ActivateBody(this._id(idx)); return true; }
+    setDamping(idx, linear, angular) { if (!this.bodies[idx].dynamic) return false; const mp = this.bodies[idx].body.GetMotionProperties(); mp.SetLinearDamping(linear); mp.SetAngularDamping(angular); return true; }
+    // { diag: [Ixx, Iyy, Izz], off: [Ixy, Ixz, Iyz] } -- the inverse of the local-space inverse inertia, each axis read as it is returned
+    inertia(idx) {
+        if (!this.bodies[idx].dynamic) return null;
+        const m = this.bodies[idx].body.GetMotionProperties().GetLocalSpaceInverseInertia().Inversed(), col = (v) => [v.GetX(), v.GetY(), v.GetZ()];
+        const x = col(m.GetAxisX()), y = col(m.GetAxisY()), z = col(m.GetAxisZ());
+        return { diag: [x[0], y[1], z[2]], off: [y[0], z[0], z[1]] };
     }
     // quantized position hash for cross-peer desync detection, same spirit + width as box3d's stateHash (uint32)
     // v2509 -- THE RECORDING API, HONESTLY REFUSED.

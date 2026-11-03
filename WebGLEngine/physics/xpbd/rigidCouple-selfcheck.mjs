@@ -139,7 +139,7 @@ console.log("1. THE GAP, READ OUT OF THE TREE RATHER THAN ASSERTED");
 }
 
 // =============================================================================================================
-console.log("\n2. *** THE MASS PROPERTIES ARE DERIVED HERE AND CONFIRMED AGAINST box3d, WHICH EXPORTS NEITHER ***");
+console.log("\n2. *** THE MASS PROPERTIES ARE DERIVED HERE AND CONFIRMED AGAINST box3d -- AND, SINCE 2026-11-03, AGAINST ITS OWN INERTIA ***");
 let box3dReady = false, m = null, Fn = null;
 {
     let why = "";
@@ -150,16 +150,25 @@ let box3dReady = false, m = null, Fn = null;
 }
 const props = RC.boxMassProperties(HE[0], HE[1], HE[2], RHO);
 if (box3dReady) {
-    // *** NONE of the 45 built exports returns a mass, an inertia or an angular velocity. *** swk_velocities is
-    // linear only. So the properties come from the solid-box formula -- and a formula agreeing with itself is
-    // not evidence, so the body is PROBED: a known impulse, the velocity read BEFORE stepping (box3d's
-    // ApplyLinearImpulseToCenter changes it immediately), and m = J/dv.
+    // When this was written NONE of the 45 built exports returned a mass, an inertia or an angular velocity, so the
+    // properties come from the solid-box formula -- and a formula agreeing with itself is not evidence, so the body
+    // is PROBED: a known impulse, the velocity read BEFORE stepping (box3d's ApplyLinearImpulseToCenter changes it
+    // immediately), and m = J/dv.
+    //
+    // 2026-11-03 -- THE ROW THAT SAID "IT EXPORTS NO ACCESSOR" WENT RED, AND THAT WAS THE GATE WORKING. The spinning-body
+    // round (physics/mechanics/SPINNING_BODY_WIP.md) gave the shim swk_body_inertia and swk_ang_velocities. The probes
+    // stay -- they grade box3d's DYNAMICS against the formula, which an accessor cannot -- and the accessor adds a second,
+    // independent route to the inertia: the formula's three moments against box3d's own, read directly.
     const built = new Set(Object.keys(m).filter((k) => k.startsWith("_swk_")).map((k) => k.slice(1)));
-    ok("...and it exports no accessor for any of them, which is WHY they are derived",
-       !built.has("swk_body_mass") && !built.has("swk_body_inertia") && !built.has("swk_body_ang_velocity"),
-       `${built.size} swk_* exports and not one of swk_body_mass / swk_body_inertia / swk_body_ang_velocity`);
     Fn("swk_world_create")(0, 0, 0);
     const b = Fn("swk_body_box")(1, 0, 0, 0, HE[0], HE[1], HE[2], RHO);
+    if (built.has("swk_body_inertia")) {
+        const ip = Fn("malloc")(9 * 4); Fn("swk_body_inertia")(b, ip);
+        const own = [m.HEAPF32[ip / 4], m.HEAPF32[ip / 4 + 4], m.HEAPF32[ip / 4 + 8]], offd = [m.HEAPF32[ip / 4 + 3], m.HEAPF32[ip / 4 + 6], m.HEAPF32[ip / 4 + 7]]; Fn("free")(ip);
+        const worstI = Math.max(...own.map((v, k) => Math.abs(v - props.inertia[k]) / props.inertia[k]));
+        ok("...and box3d now EXPORTS its inertia: the solid-box formula's three moments ARE box3d's own, read directly, with nothing off the diagonal",
+           worstI < 1e-6 && offd.every((v) => v === 0), `box3d ${own.map((v) => v.toPrecision(8)).join(" / ")} against the formula's ${props.inertia.map((v) => v.toPrecision(8)).join(" / ")} -- worst ${worstI.toExponential(2)}`);
+    } else ok("...and box3d now EXPORTS its inertia (swk_body_inertia, 2026-11-03)", false, `${built.size} swk_* exports and no swk_body_inertia -- the artifact predates the spinning-body round's rebuild`);
     const vp = Fn("malloc")(3 * 4);
     const J = 5.0;
     Fn("swk_body_impulse")(b, J, 0, 0);
