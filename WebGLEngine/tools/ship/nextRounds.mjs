@@ -2862,6 +2862,13 @@ export const NEXT_ROUNDS = [
         why: "The far end of the long sonar is the end the range-aware confirmation thins; a memory is the cheap way to keep it.",
     },
     {
+        id: "nav-sensed-detector-confirm-hold-range-hold",
+        blocker: "OPEN",
+        what: "Follow-up 26 (brain/SENSED_NAV_WIP.md) asks which range-aware mark to use with the evidence hold at every range; a strict far rule is slow to re-mark a cell the hold has let go (a dropout of 30 pings clears every cell watched for fewer than thirty readings). Registered as FOLLOW-UP 30 of that note (the name was Keith's; no entry existed, and it is follow-up 26's name with a hold on the end, the move follow-ups 18 and 29 made: a second hold on what has been confirmed, the ghost). The build waits for the sets of follow-ups 8 to 24: one registry row, the set HELD35 and a spec are added then.",
+        how: "After the sets of follow-ups 8 to 24 are flown: 3-of-4 beyond 80 m and one reading within, and 2-of-3 beyond, each with the evidence hold of cap 30 at every range, with and without a ghost (a cell cleared after at least 4 occupied readings is re-marked at one reading for 60 readings), against the hold alone and 3-of-4 everywhere, under range-law false returns of mean 0.03 with dropouts of 30 pings, the uniform false rate of 0.01 with the same dropouts, the persistent mix and a clean sea; HELD35 = seeds 3501 to 3560; the registration is in the note.",
+        why: "The strict far rule is the slowest to confirm again after a dropout, and the ghost is the cheap way to confirm at one reading; whether the persistent phantoms it brings back are the price is not known.",
+    },
+    {
         id: "nav-sensed-detector-range-hold-confirm-hold",
         blocker: "OPEN",
         what: "Follow-up 24 (brain/SENSED_NAV_WIP.md) pairs the range-gated evidence hold with the confirmed clear; its tensions are registered: the gate lets a dropout that begins far away take the cell, and the confirmed clear clears a leaking dropout sooner. Registered as FOLLOW-UP 29 of that note (the name was Keith's; no entry existed, and it is follow-up 24's name with a hold on the end, the move follow-up 18 made on follow-up 17: a second hold on what has been confirmed, the hold at every range and a ghost that re-marks a cleared cell at one reading). The build waits for the sets of follow-ups 8 to 24: two registry rows, the set HELD34 and a spec are added then.",
