@@ -2862,6 +2862,13 @@ export const NEXT_ROUNDS = [
         why: "The far end of the long sonar is the end the range-aware confirmation thins; a memory is the cheap way to keep it.",
     },
     {
+        id: "nav-sensed-detector-range-hold-confirm",
+        blocker: "OPEN",
+        what: "The range-gated evidence hold (brain/SENSED_NAV_WIP.md, FOLLOW-UP 13) and the confirmed clear (FOLLOW-UP 21) are both cures for the fix smear a long hold brings back, one by where the hold applies and one by how a cell is cleared. Registered as FOLLOW-UP 24 of that note (the name was Keith's; no entry existed, and it is follow-up 13's name with a confirmation on the end, taken as the hold's: the confirmed clear), asked together with follow-ups 8 to 23.",
+        how: "The 2-of-3 mark with the evidence hold of cap 30 cleared by a run or by 0.8 of the window free, within 80 m of the sonar only or at every range, against a clear of one and the map that forgets, under white false returns of 0.01 with leaking dropouts of 30 pings, range-law false returns of mean 0.03 with dropouts of 30 pings and a clean sea; HELD29 = seeds 2901 to 2960; the registration is in the note.",
+        why: "If the two cures do the same job the gated confirmed clear is a hold with two switches and one effect; if they add, the smear was two costs.",
+    },
+    {
         id: "nav-sensed-detector-hold-confirm-hold-confirm",
         blocker: "OPEN",
         what: "Follow-up 18 (brain/SENSED_NAV_WIP.md) flagged the ghost's risk, that it re-marks a persistent phantom at its first reading, and follow-up 21 gives the detector a confirmed clear; the name has one stage more than follow-up 21's. Registered as FOLLOW-UP 23 of that note (the name was Keith's; no entry existed, and it is taken as the fourth stage, the ghost's re-mark confirmed by a neighbour read occupied at the same ping: hold, confirm, hold, confirm).",
