@@ -1,0 +1,41 @@
+{
+ "params": {
+  "alpha": 0.001,
+  "low": 0.3803560726214647,
+  "high": 0.68938489754682,
+  "ramp": 20,
+  "cap": 0.8861494767879255
+ },
+ "from": "search 63000",
+ "iter": 240,
+ "validation": 0.8953125000000002,
+ "startValidation": 0.7093750000000001,
+ "report": [
+  "ROUND 8: tune the rule's five parameters; noisy gauge sd 0.1, brain GUARDED-OBS, VETO; audits U1 481-492, U2 521-532, U3 541-552 (48 dives each, read once)",
+  "champion: search 63000 at iteration 240: alpha 0.00100, low 0.380, high 0.689, ramp 20.0, cap 0.886; validation 0.8953 against the defaults' 0.7094; 3 searches; chosen BEFORE the audits were flown",
+  "  PASS IDENTITY: the defaults equal RULE-GF dive for dive",
+  "  PASS RULE NOT TRIVIAL U1: RULE-GF beats ALONE on far and both on U1 by 0.351 (margin 0.119)",
+  "  PASS RULE NOT TRIVIAL U2: RULE-GF beats ALONE on far and both on U2 by 0.227 (margin 0.139)",
+  "  PASS RULE NOT TRIVIAL U3: RULE-GF beats ALONE on far and both on U3 by 0.307 (margin 0.102)",
+  "means U1 | U2 | U3",
+  "  ALONE        0.551 | 0.541 | 0.595   crushed 6/9/6  stranded 1/1/2",
+  "  RULE-GF      0.775 | 0.710 | 0.760   crushed 0/2/1  stranded 0/0/0",
+  "  CONST-TUNED  0.825 | 0.811 | 0.858   crushed 0/0/0  stranded 0/0/0",
+  "  TUNED-RULE   0.873 | 0.856 | 0.884   crushed 0/0/0  stranded 0/0/0",
+  "  RESIDUAL     0.853 | 0.828 | 0.833   crushed 0/0/0  stranded 0/0/0",
+  "robustness, gauge noise sd 0.05 (nothing re-tuned):",
+  "  RULE-GF      0.852 | 0.841 | 0.848",
+  "  CONST-TUNED  0.863 | 0.850 | 0.867",
+  "  TUNED-RULE   0.881 | 0.875 | 0.878",
+  "robustness, gauge noise sd 0.2 (nothing re-tuned):",
+  "  RULE-GF      0.580 | 0.619 | 0.593",
+  "  CONST-TUNED  0.663 | 0.656 | 0.592",
+  "  TUNED-RULE   0.856 | 0.827 | 0.838",
+  "TUNED-RULE against RULE-GF: +0.099 WINS | +0.146 WINS | +0.124 WINS = BEATS",
+  "TUNED-RULE against CONST-TUNED: +0.048 WINS | +0.045 WINS | +0.027 tie = TIES (wins on 2 of 3)",
+  "CONST-TUNED against RULE-GF: +0.050 WINS | +0.101 WINS | +0.098 WINS = BEATS",
+  "TUNED-RULE against RESIDUAL (reported): +0.020 WINS | +0.028 WINS | +0.052 WINS",
+  "QUESTION (a): MIXED",
+  "QUESTION (b): TUNED-RULE PARTLY under other gauge noise; CONST-TUNED PARTLY"
+ ]
+}

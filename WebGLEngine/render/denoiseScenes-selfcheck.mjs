@@ -655,6 +655,13 @@ console.log("\n18. ROUND 58: FAMILY P, path-tracer.html'S OWN SIX SCENES (pre-re
         Object.keys(D.SPLITS_UPSCALE_MOVING).join() === "T1" && Object.isFrozen(D.SPLITS_UPSCALE_MOVING) && T1.seeds.length === 24 && T1.seeds[0] === 77000 && T1.seeds[11] === 77011 && T1.seeds[12] === 78000 && T1.seeds[23] === 78011 &&
         T1.families.slice(0, 12).every((f) => f === "R") && T1.families.slice(12).every((f) => f === "C") && T1.seeds.every((x) => !seen.has(x) && D.isDatasetSeed(x)));
 }
+{   // round 78 (section 178): U_THM's split -- round 65's training and validation, and its own test set
+    // SABOTAGED, restored byte-identical: Z1 its C seeds onto round 77's 78000 -> 2 red (this row, and movingScenes-selfcheck's round 78 split row).
+    const S78 = D.SPLITS_UPSCALE_MOVING_78, T1 = S78.T1, seen = new Set([...D.SPLITS_UPSCALE_MOVING.T1.seeds, ...D.SPLITS_UPSCALE_TEMPORAL_72.T1.seeds, ...D.SPLITS_UPSCALE_TEMPORAL.T1.seeds]);
+    ok("  SPLITS_UPSCALE_MOVING_78: round 65's training and validation themselves, and 12 R at 79000-79011 then 12 C at 80000-80011, reserved, none an earlier moving or temporal test seed",
+        S78.train === D.SPLITS_UPSCALE_LEARNED.train && S78.val === D.SPLITS_UPSCALE_LEARNED.val && Object.isFrozen(S78) && T1.seeds.length === 24 && T1.seeds[0] === 79000 && T1.seeds[11] === 79011 &&
+        T1.seeds[12] === 80000 && T1.seeds[23] === 80011 && T1.families.slice(0, 12).every((f) => f === "R") && T1.families.slice(12).every((f) => f === "C") && T1.seeds.every((x) => !seen.has(x) && D.isDatasetSeed(x)));
+}
 
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +
     "\nnot closed here: whether these scenes are a FAIR test. That is a judgement the pre-registration made in prose; " +

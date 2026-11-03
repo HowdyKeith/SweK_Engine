@@ -1,0 +1,43 @@
+{
+ "params": {
+  "alpha": 0.0009825307742555211,
+  "low": 0.3548750510088208,
+  "high": 0.68938489754682,
+  "ramp": 20,
+  "cap": 0.8959425181473967
+ },
+ "from": "search 64001",
+ "iter": 60,
+ "validation": 0.9046875000000004,
+ "startValidation": 0.8953125000000002,
+ "report": [
+  "ROUND 9: the walls; noisy gauge sd 0.1, brain GUARDED-OBS, VETO; audits W1 561-572, W2 581-592, W3 601-612 (48 dives each, read once)",
+  "champion: search 64001 at iteration 60: alpha 0.000983, low 0.355, high 0.689, ramp 20.0, cap 0.896; validation 0.9047 against the Round 8 champion's 0.8953; 3 searches; chosen BEFORE the audits were flown",
+  "on a bound: none",
+  "  PASS IDENTITY: TUNED-R8 under the wide bounds equals the Round 8 seat (narrow bounds) dive for dive",
+  "  PASS RULE NOT TRIVIAL W1: RULE-GF beats ALONE on far and both on W1 by 0.295 (margin 0.090)",
+  "  PASS RULE NOT TRIVIAL W2: RULE-GF beats ALONE on far and both on W2 by 0.280 (margin 0.123)",
+  "  PASS RULE NOT TRIVIAL W3: RULE-GF beats ALONE on far and both on W3 by 0.370 (margin 0.104)",
+  "means W1 | W2 | W3",
+  "  ALONE        0.604 | 0.606 | 0.571   crushed 5/6/6  stranded 0/0/0",
+  "  RULE-GF      0.777 | 0.756 | 0.804   crushed 0/1/0  stranded 0/0/0",
+  "  CONST-TUNED  0.852 | 0.852 | 0.851   crushed 0/0/0  stranded 0/0/0",
+  "  TUNED-R8     0.897 | 0.881 | 0.861   crushed 0/0/0  stranded 0/0/0",
+  "  TUNED-WIDE   0.884 | 0.881 | 0.860   crushed 0/0/0  stranded 0/0/0",
+  "TUNED-WIDE against TUNED-R8: -0.012 tie | +0.000 tie | -0.000 tie",
+  "TUNED-WIDE against RULE-GF: +0.108 WINS | +0.126 WINS | +0.056 WINS = BEATS",
+  "robustness, gauge noise sd 0.05 (nothing re-tuned):",
+  "  RULE-GF      0.883 | 0.867 | 0.868",
+  "  TUNED-R8     0.884 | 0.880 | 0.864",
+  "  TUNED-WIDE   0.883 | 0.880 | 0.874",
+  "  TUNED-WIDE against TUNED-R8: -0.002 tie | +0.000 tie | +0.010 tie",
+  "  TUNED-WIDE against RULE-GF: -0.000 tie | +0.012 tie | +0.006 tie",
+  "robustness, gauge noise sd 0.2 (nothing re-tuned):",
+  "  RULE-GF      0.607 | 0.643 | 0.592",
+  "  TUNED-R8     0.863 | 0.848 | 0.834",
+  "  TUNED-WIDE   0.831 | 0.820 | 0.812",
+  "  TUNED-WIDE against TUNED-R8: -0.031 tie | -0.028 tie | -0.022 tie",
+  "  TUNED-WIDE against RULE-GF: +0.224 WINS | +0.178 WINS | +0.220 WINS",
+  "BOTTOM LINE: THE WALLS DID NOT MATTER"
+ ]
+}

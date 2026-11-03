@@ -79,7 +79,7 @@ export function followStep(centre, target, k = 0.18) {
 /**
  * @returns { render(snapshot, t, pov), setView(yaw, pitch, dist), resize(w, h), sea, subs: Map, dispose() }
  */
-export function createView3d(THREE, canvas, { length = 500, width = 300, depthMax = 50, seed = 1, subScale = 1 } = {}) {
+export function createView3d(THREE, canvas, { length = 500, width = 300, depthMax = 50, seed = 1, subScale = 1, models = null } = {}) {
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
     renderer.setPixelRatio(1); renderer.setClearColor(0x03121c, 1);   // the vendored three.js makes the drawing buffer's alpha either way (measured: getContextAttributes().alpha is true with `alpha: false`), so the backdrop needs only a transparent CLEAR; it stays opaque until setBackdrop
     const scene = new THREE.Scene(); scene.background = new THREE.Color(0x03121c);
@@ -95,6 +95,7 @@ export function createView3d(THREE, canvas, { length = 500, width = 300, depthMa
     const camera = new THREE.PerspectiveCamera(50, canvas.width / canvas.height, 1, 4000);
     const view = { yaw: 0.6, pitch: 0.55, dist: 430 };   // v4899: closer, so the tank fills its panel
     const subs = new Map(), geo = {};
+    let modelHost = models;   // v4909: a render/subModels3d.mjs host (or null): when a hull has a model assigned it is put on the boat, the procedural hull staying as the fallback
     // v4901 -- the ballast: bubbles while a tank is blown, a drop weight that falls (render/subBallastCues.mjs holds the arithmetic)
     let bubbles = { list: [], counter: 0 }, weights = [], lastT = null; const wasReleased = new Map();
     const bubbleGeo = new THREE.BufferGeometry(); bubbleGeo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(BUBBLE_MAX * 3), 3)); bubbleGeo.setDrawRange(0, 0);
@@ -129,6 +130,9 @@ export function createView3d(THREE, canvas, { length = 500, width = 300, depthMa
             return follow;
         },
         getFollow: () => follow,
+        /** v4909 -- a render/subModels3d.mjs host (or null to take every model off at the next frame's sync): the boats wear the models the host's store assigns to the tank's hull. Answers the host now in use. */
+        setModels(host) { if (!host && modelHost) for (const m of subs.values()) modelHost.release(m); modelHost = host || null; return modelHost; },
+        getModels: () => modelHost,
         /** Orbit a scene point [X, Y, Z] (or null to stop): the centre eases to it like a follow. */
         setFocus(p) { focus = p ? { x: p[0], y: p[1], z: p[2] } : null; return focus; },
         getCentre: () => ({ ...centre }),
@@ -147,8 +151,9 @@ export function createView3d(THREE, canvas, { length = 500, width = 300, depthMa
                     m = buildSub(THREE, mat, geo); attachCues(THREE, m, geo, HULL_LENGTH); m.scale.setScalar(subScale); m.userData.mat = mat; scene.add(m); subs.set(s.id, m);
                 }
                 const p = subPose(s); m.position.set(p.x, p.y, p.z); m.rotation.set(0, p.rotY, p.rotZ); poseFins(m, s.cmd); poseCues(m, s);
+                if (modelHost) modelHost.sync(m, s);
             }
-            for (const [id, m] of subs) if (!live.has(id)) { scene.remove(m); m.userData.mat.dispose(); subs.delete(id); wasReleased.delete(id); }
+            for (const [id, m] of subs) if (!live.has(id)) { if (modelHost) modelHost.release(m); scene.remove(m); m.userData.mat.dispose(); subs.delete(id); wasReleased.delete(id); }
             // the ballast cues that live in the world, not on the hull: the bubbles of a tank being blown, and a weight that has just been released
             const dt = lastT === null ? 0 : Math.max(0, Math.min(0.25, t - lastT)); lastT = t;
             const emits = snapshot.filter((s) => s.tank && s.tank.blowing).map((s) => [s.x, -s.depth, s.y]);

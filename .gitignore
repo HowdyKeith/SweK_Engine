@@ -64,6 +64,9 @@ EngineProject_*/
 # **/*.onnx
 # **/*.vox
 # (the small sample GLBs in GPU_Assets are ~200KB each and fine to commit)
+# v4910 -- downloaded submarine models stay on the machine that has them: a Sketchfab file carries its OWN licence, and a model must not reach the repository or the release zip by accident
+WebGLEngine/GPU_Assets/subs/*
+!WebGLEngine/GPU_Assets/subs/README.md
 
 # OS / editor junk
 .DS_Store

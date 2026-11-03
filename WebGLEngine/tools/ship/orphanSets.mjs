@@ -321,6 +321,7 @@ export const RECORDED = Object.freeze({
         "ai-bridge/krbnRoutes.js",
         "ai-bridge/ntfsMounterBridge.js",
         "anim/reachIK.mjs",
+        "brain/fieldSpace.mjs",   // v4910: ARRIVED as a prose-rescued module -- brain/capabilityMap.mjs cites it as the source of the flow-field row (a mention, not a wire); the capability map is a document, and the module has been an orphan since the v3845 mirror
         "brain/agent/dispatch.js",
         "brain/agent/fleetFingerprint.js",
         "brain/capsuleHazard.js",
@@ -623,7 +624,6 @@ export const RECORDED = Object.freeze({
         "tools/ship/shadowedHelper.mjs",
         "tools/ship/ship.mjs",
         "tools/ship/shipRitual.mjs",
-        "tools/ship/shipVerdict.mjs",
         "tools/ship/slowCensus.mjs",
         "tools/ship/spellCost.mjs",
         "tools/ship/spriteSheetImport.mjs",
@@ -674,7 +674,6 @@ export const RECORDED = Object.freeze({
         "vendor/snowflow/src/terrain/heightfield.js",
         "vendor/web-ocean/js/main.js",
         // v4901 -- ARRIVED through the two merges (the FSR4 branch's render/denoiseFrameGenGPU.mjs, and the submarine chat's tools/selfPlaySubTactics.mjs); each is named in prose by its own gate and header and by nothing that calls it.
-        "render/denoiseFrameGenGPU.mjs",
         "tools/selfPlaySubTactics.mjs",
     ]),
     // referenceKind-selfcheck: the subset of proseRescued whose rescuers include tools/ship/gateSweep.mjs --
@@ -737,7 +736,6 @@ export const RECORDED = Object.freeze({
         "tools/ship/reportDoors.mjs",
         "tools/ship/ship.mjs",
         "tools/ship/shipRitual.mjs",
-        "tools/ship/shipVerdict.mjs",
         "tools/ship/strandCensus.mjs",
         "tools/ship/textureBytes.mjs",
         "tools/ship/threePatch.mjs",

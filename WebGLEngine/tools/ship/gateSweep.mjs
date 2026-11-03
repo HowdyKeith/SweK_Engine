@@ -16233,6 +16233,20 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
         widened: Object.freeze([]),
         verdict: "the FSR4 arc's gates (rounds 68-76): the temporal upscaler U_T and its half-size U_TH (sections 1-7 with the round 70/72 verdict rows), the device timing readers and verdict rows (sections 163-175), and the path-tracer page's temporal view; each run alone and green on the tree merged over v4908 (27.2 s, 29.7 s, 1.2 s), each sabotaged to go red by name with the results in its header; denoiseUpscaleGPU, learnedUpscale, learnedUpscaleStudy and realGpuRun grew rows and are in earlier closings",
     }),
+    since618: Object.freeze({
+        at: "v4910", swept: 12, green: 12, red: 0,
+        added: Object.freeze(["brain/capabilityMap-selfcheck.mjs", "render/subModelsCore-selfcheck.mjs", "render/subModels3d-selfcheck.mjs", "render/subModelsPanel-selfcheck.mjs", "brain/residualAdvisor-selfcheck.mjs", "tools/ship/trainResidual-selfcheck.mjs", "tools/ship/constShift-selfcheck.mjs", "brain/tunedRule-selfcheck.mjs", "tools/ship/tuneRule-selfcheck.mjs", "tools/ship/tuneWide-selfcheck.mjs", "brain/stationResidual-selfcheck.mjs", "tools/ship/stationRound-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "the brain capability map (36 mutants), the sub .glb model swap's core, host and picker (70, 52, 52), and the needs-and-limits Rounds 6-10 (the residual advisor and its trainer 46, the constant shift 29, the tuned rule 45 with Round 9's wide bounds 36, the station seat and its round 64): each run alone and green, every mutant red by name except the equivalent ones said in the gate headers, 0-red ones having driven new rows (the station seat's object-identity defect among them); five of the Round 6-10 gates were cut from 24-48 s to 7-11 s by flying 100-second dives in the rows that do not depend on a dive's length, so a slower box does not cap them.",
+    }),
+    since619: Object.freeze({
+        at: "v4911", swept: 5, green: 5, red: 0,
+        added: Object.freeze(["brain/plannerSeat-selfcheck.mjs", "tools/ship/plannerRound-selfcheck.mjs", "tools/ship/plannerReplicate-selfcheck.mjs", "brain/plannerPerturbed-selfcheck.mjs", "tools/ship/plannerTolerance-selfcheck.mjs"]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "needs-and-limits Rounds 11-13 (the twin planner's seat 54 mutants and its audit library, the replication 30, the perturbed twin 27, the tolerance sweep 49): each run alone and green, every mutant red by name except the equivalent ones said in the gate headers (the energy clamp after a scaled step, the start-energy clamp and the four-station cap in plannerPerturbed; two orderings of exclusive tests in plannerTolerance), 0-red ones having driven new rows.",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

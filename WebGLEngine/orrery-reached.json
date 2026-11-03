@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "models named as whole string literals by non-gate files that import gpu/khronosSamples.mjs",
- "head": "da17be964f86f1965a0f40a7f1b880627d2a785f",
+ "head": "7b85f4300cb44424498f79dee77b076ed39aa499",
  "catalogue": 150,
  "coverage": {
   "total": 150,
@@ -49,7 +49,7 @@
   },
   {
    "name": "Triangle",
-   "hits": 20
+   "hits": 21
   },
   {
    "name": "BrainStem",
