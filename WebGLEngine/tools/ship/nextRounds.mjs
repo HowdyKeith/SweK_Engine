@@ -2854,10 +2854,8 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "nav-sensed-detector-range-confirm",
-        blocker: "OPEN",
-        what: "The range-aware confirmation (brain/SENSED_NAV_WIP.md, FOLLOW-UP 9) asks for a run of three readings far from the vessel, which where the range law holds is read 22% of the time for a real obstacle at the sonar's edge, and the M-of-N rule (FOLLOW-UP 11) is uniform in range. Registered as FOLLOW-UP 14 of that note (the name was Keith's; no entry existed, and it is taken as the two put together: one reading near, M of N far).",
-        how: "After follow-up 7's set is flown: the confirmation with a single reading within a range and an M-of-N rule beyond it (2-of-3, 2-of-4, 3-of-4), against a run of three beyond, a uniform run of two, a uniform 2-of-3 and the map that forgets, under range-law false returns of mean 0.03 and 0.01, the uniform false rate of 0.01 and a clean sea; HELD19 = seeds 1901 to 1960; the registration is in the note.",
-        why: "The far end of the long sonar is the end the range-aware confirmation thins; a memory is the cheap way to keep it.",
+        state: "CLOSED",
+        what: "CLOSED 2026-11-03 (brain/SENSED_NAV_WIP.md, RESULT OF FOLLOW-UP 14; tools/ship/subSensedDetStudy.mjs --study detector-range-confirm, flights in brain/subSensedDetDetectorRangeConfirmHeld19.jsonl): PARTLY SUPPORTED (5 of 6 cells); seven of eight predictions held (S6 missed: the current kind under range-law false returns of 0.03 by two flights). The memory (2-of-3 beyond 80 m, one reading within) rescues the range-aware confirmation from follow-up 9's collapse (154 against 131 for a run of three) and brings it level with the same rule at every range (154 against 159), not above it; under the uniform false rate it is 47 flights below (109 against 156). A third reading far away collapses the narrow gaps again (24 m gaps 6 and 7 of 20 for 3-of-4 and a run of three).",
     },
     {
         id: "nav-sensed-detector-range-hold-confirm-range",
