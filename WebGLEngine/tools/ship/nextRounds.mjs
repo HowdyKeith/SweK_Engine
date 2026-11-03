@@ -2849,10 +2849,8 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "nav-sensed-dropout-range",
-        blocker: "OPEN",
-        what: "Follow-up 7's detector holds a marked cell for the same number of free readings everywhere (brain/SENSED_NAV_WIP.md, FOLLOW-UP 7), and a dropout is dangerous near the vessel, where its rate is lowest, and costly to guard against far from it, where a long hold keeps the fix smear and any phantom the longest. Registered as FOLLOW-UP 8 of that note (the name was Keith's; no entry existed, and it is taken in both senses of range: how far the hold reaches, and how long the dropout lasts).",
-        how: "After follow-up 7's set is flown: the detector with a second hold for cells within a range (`clearNear` within `near`), against whole-obstacle dropouts of 3, 10 and 30 pings with the range law and against follow-up 7's white false returns; HELD13 = seeds 1301 to 1360; the registration is in the note.",
-        why: "A hold tuned to a dropout of ten pings is a cure tuned to the disease; a range-aware hold is the cheap way to make it longer where it matters.",
+        state: "CLOSED",
+        what: "CLOSED 2026-11-03 (brain/SENSED_NAV_WIP.md, RESULT OF FOLLOW-UP 8; tools/ship/subSensedDetStudy.mjs --study dropout-range, flights in brain/subSensedDetDropoutRangeHeld13.jsonl): NOT SUPPORTED (2 of 6 cells); four of eight predictions held (H1, H2, H3, H7). The near lock (thirty free readings within 80 m, one beyond) does not cover the dropout: it is below the map that forgets at every dropout length (154, 145 and 134 against 161, 157 and 145) and below follow-up 7's uniform hold of twelve (168, 169, 148), with the 24 m gaps worst (7 of 20 at 30 pings against 10 and 14). The uniform hold of twelve covers a dropout of ten (169 against 157) and not one of thirty (148).",
     },
     {
         id: "nav-sensed-detector-range-confirm",
