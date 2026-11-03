@@ -2971,10 +2971,8 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "nav-sensed-detector-hold-range",
-        blocker: "OPEN",
-        what: "The range-gated evidence hold (brain/SENSED_NAV_WIP.md, FOLLOW-UP 13) assumes the range its gate goes by (the cell's range from the vessel at the ping that reads it free) and its shape (a step at 80 m); the note names both as untried. Registered as FOLLOW-UP 15 of that note (the name was Keith's; no entry existed, and it is follow-up 13's name with the words the other way round, taken as the hold's range being the subject: which range, and step or ramp).",
-        how: "After follow-up 7's set is flown: the evidence hold of cap 30 gated by the range at the ping, the range at marking or the nearest range ever read, as a step at 80 m or a ramp to 200 m, against the map that forgets, under dropouts of 30 pings, the uniform false rate of 0.01, the persistent mix and a clean sea; HELD20 = seeds 2001 to 2060; the registration is in the note.",
-        why: "A hold that goes by the wrong range keeps the cell the vessel is leaving and forgets the one it is approaching; which of the three ranges is the right one is not known.",
+        state: "CLOSED",
+        what: "CLOSED 2026-11-03 (brain/SENSED_NAV_WIP.md, RESULT OF FOLLOW-UP 15; tools/ship/subSensedDetStudy.mjs --study detector-hold-range, flights in brain/subSensedDetDetectorHoldRangeHeld20.jsonl): SUPPORTED (3 of 3 cells); four of eight predictions held (T2, T5, T6, T7). The designated hold (the evidence hold of cap 30, a ramp to 200 m, gated by the nearest range read) holds the bar under dropouts of 30 pings (164 of 180), carried by the ramp and not the range: the ramp on the range now reaches 167, every step gate (the range now, at marking or the nearest read) 153 to 155, below the map that forgets (160), and only the ramps reach the 24 m gaps (14 and 11 of 20 against 7 to 8). Which range the gate goes by does not matter (153, 153, 155); the margin over the map that forgets is the gaps kind alone (+12 / +8 on the sign test, p 0.50).",
     },
     {
         id: "nav-sensed-detector-range-hold",
