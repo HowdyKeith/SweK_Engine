@@ -11260,3 +11260,49 @@ chain and on the page.
 **The next round, as fixed:** object motion vectors for Bt's history. Each pixel's previous position would come from the object's own
 motion, not the camera's alone, so a moving surface keeps its history instead of losing it or keeping a wrong one. That changes Bt itself, on
 the CPU and in the device chain, and every U_TH result is re-measured against it.
+
+## 180. ROUND 79 -- OBJECT MOTION VECTORS FOR Bt's HISTORY: DOES A HISTORY THAT FOLLOWS THE OBJECT FIX THE MOVERS? FIXED BEFORE ITS CODE
+
+**Why.** Sections 177 and 179: on moving scenes Bt's error on the mover pixels is ~6 x the rest's, and U_TH barely touches it (1.6-3.6 %).
+Training on motion did not help (H78a failed), because nothing in U_TH's inputs says where an object went. So the history itself has to
+know. This round gives Bt's reprojection the objects' own motion.
+
+**Bt_MV (render/denoiseTemporal.mjs's reproject, threaded through render/denoiseTemporalUpscale.mjs's accumulateUpscaled).**
+- reproject takes the movers' velocities, indexed by scene object. A pixel whose current first hit P is on a mover with velocity v was at
+  **P - v** in the previous frame (section 176's motion advances each mover by v a frame).
+- That point is projected into the previous camera, and the position test compares the previous hit with P - v instead of P. Everything
+  else is as it was: the same object, the same normal test (a translation keeps normals), POS_TOL, the clamp and the running average.
+- **The vectors are exact,** from sceneMotion, as a renderer that knows its objects' motion has them. Estimated vectors are not this round.
+- **What it cannot change, and the gate holds it to bit for bit:** a pixel whose current hit is not a mover has a history made of static
+  hits all the way back, so **Bt_MV is Bt exactly off the mover pixels, and on every still scene.** Any difference is on the movers.
+- **What it does not fix:** a mover's own shading changes as it moves relative to the lights, and the static surfaces' shadows and
+  reflections of the movers change too. Those histories are still stale, and only the clamp stands against them.
+
+**ROUND 79, a test only, on the CPU.** No network is trained; U_TH is round 72's candidate, unchanged (its input is Bt_MV's history where
+it runs on Bt_MV).
+- **Test:** 24 new scenes, 12 R (81000-81011) and 12 C (82000-82011), moving as section 176's, at round 72's settings (256 x 256, 4
+  samples in, two 2048-sample references). Each is rendered once; its frames are accumulated twice, without and with the vectors.
+- **H79a:** Bt_MV beats Bt on the moving scenes, by section 159's rule (a mean display relMSE at least 1 % below Bt's), through verdict()
+  (the sign-flip test, Holm with H79b, C1-C5).
+- **H79b:** U_TH on Bt_MV beats Bt_MV, by the same rule: U_TH's gain survives the better history.
+- **Descriptive, deciding nothing:** U_TH on Bt_MV against U_TH on Bt (the whole chain's change); Bt_MV and Bt on the mover pixels (the rest
+  is equal by construction); Bt's and Bt_MV's mean history lengths; each scene's mean correction.
+- File: render/denoise-results-upscale-vectors-r79.json.
+
+**Predictions, fixed now, deciding nothing.**
+- **P1:** C1 and C3 hold.
+- **P2:** H79a is supported, at 4-12 % below Bt. The movers carry ~60 % of Bt's error (23 % of the pixels at ~6 x), and a history that
+  follows them should take 8-25 % off theirs.
+- **P3:** on the mover pixels Bt_MV is 8-25 % below Bt.
+- **P4:** H79b is supported, at 3-7 % below Bt_MV, about U_TH's gain on still scenes.
+- **P5:** Bt_MV's mean history length is between Bt's on the same moving scene and its still twin's (~5.0, section 177).
+
+**What each outcome means, fixed now.**
+- **H79a holds:** object motion vectors are what Bt's history lacked. Round 80 is their cost in the device chain: the velocity buffer, and
+  the reprojection reading it. Then the chain ships with them, Keith's call.
+- **H79a fails:** the movers' error is their changing shading, not their lost history. A history cannot fix it, and the movers are a
+  denoiser question, not an upscaler one.
+- **H79b fails, H79a holding:** U_TH was tuned to the old history's errors. The next step is retraining U_TH on Bt_MV's inputs.
+
+**The run, on Keith's rig, at round 79's commit:** `--harvest-upscale-temporal-test --round 79`, one CPU harvest (~10.5 hours), its file
+committed byte for byte before it is read. Section 181 reads it.
