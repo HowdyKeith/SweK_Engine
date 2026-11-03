@@ -2883,10 +2883,8 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "nav-sensed-detector-confirm-hold-confirm-hold",
-        blocker: "OPEN",
-        what: "Follow-up 22 (brain/SENSED_NAV_WIP.md) asks which mark rule suits the evidence hold with a confirmed clear; follow-up 18 found the ghost, a cleared cell re-marked at one reading, adds a little to a hold, and follow-up 30 registers it for the strict far mark. Registered as FOLLOW-UP 35 of that note (the name was Keith's; no entry existed, and it is follow-up 22's name with hold on the end, the move follow-ups 18, 29, 30, 32 and 34 made: the ghost behind the mark rule with the clear confirmed; it is also follow-up 23's four stages in another order, which takes each stage out of one detector with the neighbour test). It was written after the results of follow-ups 7 to 18 and 20 were read, and says so. No new module field: the build waits for the sets of follow-ups 8 to 24, then adds three registry rows, the set HELD40 and a spec.",
-        how: "After the sets of follow-ups 8 to 24 are flown: the confirmed evidence hold with a 2-of-3 mark, a run of three and a 3-of-4, with and without the ghost, against a mark of one, under the uniform false rate of 0.01 with dropouts of 30 pings, the same with the dropouts leaking, the persistent mix and a clean sea; HELD40 = seeds 4001 to 4060; the registration is in the note.",
-        why: "The ghost re-marks at one reading whatever the mark rule says, so with it the strict rules' slowness should cost less; whether it also brings back the smear the run of three and the confirmed clear keep out is not known.",
+        state: "CLOSED",
+        what: "CLOSED 2026-11-03 (brain/SENSED_NAV_WIP.md, RESULT OF FOLLOW-UP 35; tools/ship/subSensedDetStudy.mjs --study detector-confirm-hold-confirm-hold, flights in brain/subSensedDetDetectorConfirmHoldConfirmHoldHeld40.jsonl): PARTLY SUPPORTED (5 of 6 cells); five of eight predictions held (AJ3, AJ4, AJ5, AJ7, AJ8). The designated m33f80g (a run of three, evidence hold, confirmed clear, the ghost) holds all three kinds under the leaking dropouts and islands and current under the uniform false rate (gaps 40 against 45.6). The ghost earns 1 to 4 flights on the run of three (4 under the leak, 5 asked) and 7 on the light rule; under the leak the run of three is 17 below the light rule with the same ghost; with a ghost the mark rule is one rule (136 to 139). Not isolated: the neighbour test, other ghost lives.",
     },
     {
         id: "nav-sensed-detector-range-confirm-hold-range",
