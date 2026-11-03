@@ -2936,10 +2936,8 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "nav-sensed-detector-confirm-hold",
-        blocker: "OPEN",
-        what: "Follow-up 11's M-of-N family (brain/SENSED_NAV_WIP.md) was argued on re-marking a cell a miss had cleared, which a hold removes; follow-up 16 asks whether the pair beats each alone, not which confirmation to choose with the hold present. Registered as FOLLOW-UP 20 of that note (the name was Keith's; no entry existed, and it is follow-up 16's name the other way round, taken as which confirmation rule when the hold is there).",
-        how: "After follow-up 7's set is flown: the six confirmation rules of follow-up 11 (a mark of one, runs of two and three, 2-of-3, 2-of-4, 3-of-4) each with the evidence hold of cap 30 at every range, under white false returns of 0.01 with dropouts of 30 pings at miss chances of 0.2 and 0.4, and a clean sea; HELD25 = seeds 2501 to 2560; the registration is in the note.",
-        why: "If the hold makes the memory worthless the family collapses and the cheapest rule will do; if it makes strictness affordable the stricter rules win; the delay at first marking decides which.",
+        state: "CLOSED",
+        what: "CLOSED 2026-11-03 (brain/SENSED_NAV_WIP.md, RESULT OF FOLLOW-UP 20; tools/ship/subSensedDetStudy.mjs --study detector-confirm-hold, flights in brain/subSensedDetDetectorConfirmHoldHeld25.jsonl): NOT SUPPORTED (2 of 6 cells); five of eight predictions held (Y1, Y2, Y3, Y5, Y8). With the evidence hold of cap 30 in place the confirmation family is one rule: under white false returns and 30-ping dropouts the five confirming rules (2-of-2, 3-of-3, 2-of-3, 2-of-4, 3-of-4) reach 134 to 140 of 180 (a spread of 6) against 106 for a mark of one, and under 0.4 misses the memory buys nothing (2-of-3 139, a run of two 143); strictness costs where the misses are many (3-of-4 128 against 2-of-3 139). No arm held the gaps kind under either condition (32 to 42 of 60 against 47.2 needed); the 3-of-4 designated loses the 24 m gaps (1 and 2 of 20). POST HOC, labelled: 2-of-3 and a run of two would each have held 4 of the 6 cells.",
     },
     {
         id: "nav-sensed-detector-range-confirm-hold",
