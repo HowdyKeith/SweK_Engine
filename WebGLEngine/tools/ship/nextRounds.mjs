@@ -2862,6 +2862,13 @@ export const NEXT_ROUNDS = [
         why: "The far end of the long sonar is the end the range-aware confirmation thins; a memory is the cheap way to keep it.",
     },
     {
+        id: "nav-sensed-detector-range-hold-confirm-range",
+        blocker: "OPEN",
+        what: "Follow-up 21's confirmed clear clears a marked cell when 0.8 of its window was free at every range; it cures the fix smear and clears a leaking dropout sooner (brain/SENSED_NAV_WIP.md), and the two matter in different places. Registered as FOLLOW-UP 31 of that note (the name was Keith's; no entry existed, and it is follow-up 24's name with range on the end, taken as the confirmation itself knowing how far: the fraction depends on the cell's range; the range-aware mark is follow-up 25's). The build waits for the sets of follow-ups 8 to 24: a new field in the module (clear.fNear), two registry rows, the set HELD36 and a spec are added then.",
+        how: "After the sets of follow-ups 8 to 24 are flown: the 2-of-3 mark with the evidence hold of cap 30 at every range cleared by a run within 80 m and 0.8 of the window beyond it, and the opposite, against a run and 0.8 at every range, a clear of one and the map that forgets, under the uniform false rate of 0.01 with leaking dropouts of 30 pings, range-law false returns of mean 0.03 with dropouts of 30 pings and a clean sea; HELD36 = seeds 3601 to 3660; the registration is in the note.",
+        why: "The leak is paid near and the smear is cheap far; whether a strict fraction near and a tolerant one far keeps both is not known.",
+    },
+    {
         id: "nav-sensed-detector-confirm-hold-range-hold",
         blocker: "OPEN",
         what: "Follow-up 26 (brain/SENSED_NAV_WIP.md) asks which range-aware mark to use with the evidence hold at every range; a strict far rule is slow to re-mark a cell the hold has let go (a dropout of 30 pings clears every cell watched for fewer than thirty readings). Registered as FOLLOW-UP 30 of that note (the name was Keith's; no entry existed, and it is follow-up 26's name with a hold on the end, the move follow-ups 18 and 29 made: a second hold on what has been confirmed, the ghost). The build waits for the sets of follow-ups 8 to 24: one registry row, the set HELD35 and a spec are added then.",
