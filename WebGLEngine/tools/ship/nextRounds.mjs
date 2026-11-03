@@ -3062,10 +3062,8 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "nav-sensed-detector-range-hold-confirm-hold",
-        blocker: "OPEN",
-        what: "Follow-up 24 (brain/SENSED_NAV_WIP.md) pairs the range-gated evidence hold with the confirmed clear; its tensions are registered: the gate lets a dropout that begins far away take the cell, and the confirmed clear clears a leaking dropout sooner. Registered as FOLLOW-UP 29 of that note (the name was Keith's; no entry existed, and it is follow-up 24's name with a hold on the end, the move follow-up 18 made on follow-up 17: a second hold on what has been confirmed, the hold at every range and a ghost that re-marks a cleared cell at one reading). The build waits for the sets of follow-ups 8 to 24: two registry rows, the set HELD34 and a spec are added then.",
-        how: "After the sets of follow-ups 8 to 24 are flown: the 2-of-3 mark with the evidence hold of cap 30 cleared by 0.8 of the window free, gated to 80 m or at every range, each with and without a ghost (a cell cleared after at least 4 occupied readings is re-marked at one reading for 60 readings), against the map that forgets, under range-law false returns of mean 0.03 with dropouts of 30 pings, the uniform false rate of 0.01 with leaking dropouts, the persistent mix and a clean sea; HELD34 = seeds 3401 to 3460; the registration is in the note.",
-        why: "The ghost is the stage that can undo the confirmed clear's price and the one that brings back a persistent phantom; which of the two shows is not known.",
+        state: "CLOSED",
+        what: "CLOSED 2026-11-03 (brain/SENSED_NAV_WIP.md, RESULT OF FOLLOW-UP 29; tools/ship/subSensedDetStudy.mjs --study detector-range-hold-confirm-hold, flights in brain/subSensedDetDetectorRangeHoldConfirmHoldHeld34.jsonl): PARTLY SUPPORTED (5 of 6 cells); four of eight predictions held (AD1, AD3, AD7, AD8). The designated m23e30kg (2-of-3 mark, evidence hold at every range, confirmed clear, the ghost) holds all three kinds under the leaking dropouts and islands and current under range-law false returns (gaps 34 against 48.0). The ghost is active (19 to 67 re-marks a flight) and idle: five comparisons within 1 flight (139 and 139, 165 and 164, 133 and 134, 156 and 155, 145 and 146). The gate costs 5 under range-law false returns and 9 under the leak. Not isolated: the neighbour test, other ghost lives.",
     },
     {
         id: "nav-sensed-detector-hold-confirm-range-confirm",
