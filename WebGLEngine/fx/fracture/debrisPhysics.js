@@ -13,7 +13,33 @@ function fragBounds(frag) {
     return { lo, hi, half, center: [(lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, (lo[2] + hi[2]) / 2] };
 }
 
-// Give every fragment a real body, thrown away from the impact (closer = harder), with a tumble.
+// 2026-11-03 (unnumbered) -- A SPIN CAP, BECAUSE box3d PUTS NONE ON AN ANGULAR IMPULSE AND JOLT DOES. The tumble below is an IMPULSE,
+// and a fragment's moments are tiny (a 6 x 18 x 12 cm sliver of density 1 weighs 1.3 g), so one impulse spins a sliver enormously.
+// Jolt's AddAngularImpulse clamps the result at its default max angular velocity, 15 pi rad/s; box3d's ApplyAngularImpulse does not --
+// a free sliver is brought to the same 15 pi only inside box3d's next step, and the debris does not wait for it. Measured on the blob
+// pages' fallback (they ask for Jolt and take box3d when Jolt will not load), 40 seeds of each blob: slivers spun to 2.6 million rad/s
+// at the throw, fragments thrown at up to 249 m/s, and 12 of the 1,410 fragments lost through the floor or over the rim. Capped at the
+// throw, as Jolt caps it: none lost, the fastest 9.0 m/s.
+// A spin is capped only above the cap by SPIN_SLACK, so Jolt's own spins -- at its cap or under it, in float32 -- are never touched,
+// and the pages on Jolt, and the spinning body's fourth round that flew this module on Jolt, are byte for byte what they were.
+// Gated in fx/fracture/debrisPhysics-selfcheck.mjs, sections 4 to 6.
+const MAX_SPIN = 15 * Math.PI;   // rad/s: Jolt's default max angular velocity, a quarter turn per 1/60 s step
+const SPIN_SLACK = 1.001;        // capped only above MAX_SPIN * SPIN_SLACK
+
+/** Cap the spin of bodies `idxs` at `cap` rad/s, keeping each one's axis; returns the bodies it capped. A world that cannot read and set
+ *  spin (neither backend here lacks it) is left as it is, and [] returned. */
+function capSpin(world, idxs, cap = MAX_SPIN) {
+    if (!(cap < Infinity) || typeof world.readAngularVelocities !== "function" || typeof world.setAngularVelocity !== "function") return [];
+    const W = world.readAngularVelocities();
+    if (!W) return [];
+    const over = [];
+    for (const i of idxs) { const w = [W[i * 3], W[i * 3 + 1], W[i * 3 + 2]], s = Math.hypot(w[0], w[1], w[2]); if (s > cap * SPIN_SLACK) over.push([i, w.map((c) => c * cap / s)]); }
+    for (const [i, w] of over) world.setAngularVelocity(i, w);   // after the read is done with: box3d's view lasts only until its next call
+    return over.map(([i]) => i);
+}
+
+// Give every fragment a real body, thrown away from the impact (closer = harder), with a tumble -- capped as above (`maxSpin`, rad/s;
+// Infinity turns the cap off, which the gate uses to reproduce what box3d did without it). Each body says whether its spin was capped.
 function makePhysicsDebris(world, fragments, impact, opts = {}) {
     const force = opts.force == null ? 2.6 : opts.force, spin = opts.spin == null ? 0.5 : opts.spin, rng = opts.rng || Math.random;
     const bodies = [];
@@ -26,6 +52,8 @@ function makePhysicsDebris(world, fragments, impact, opts = {}) {
         world.angularImpulse(idx, [(rng() - 0.5) * spin, (rng() - 0.5) * spin, (rng() - 0.5) * spin]);
         bodies.push({ frag: f, idx, center: b.center });
     }
+    const capped = new Set(capSpin(world, bodies.map((b) => b.idx), opts.maxSpin == null ? MAX_SPIN : opts.maxSpin));
+    for (const b of bodies) b.spinCapped = capped.has(b.idx);
     return bodies;
 }
 
@@ -55,4 +83,4 @@ function applyXf(d, v) {
     const ix = qw * x + qy * z - qz * y, iy = qw * y + qz * x - qx * z, iz = qw * z + qx * y - qy * x, iw = -qx * x - qy * y - qz * z;
     return [ix * qw + iw * -qx + iy * -qz - iz * -qy + d.p[0], iy * qw + iw * -qy + iz * -qx - ix * -qz + d.p[1], iz * qw + iw * -qz + ix * -qy - iy * -qx + d.p[2]];
 }
-export { makePhysicsDebris, addGround, readDebris, applyXf, fragBounds };
+export { makePhysicsDebris, addGround, readDebris, applyXf, fragBounds, capSpin, MAX_SPIN, SPIN_SLACK };

@@ -1111,6 +1111,18 @@ its gate now reads them so, and holds the six lines the fixes changed.
   the turn about z, and now nothing else moves: after a throw every body is at z = 0 with no tilt, where unlocked crew
   drift 0.58 m and tilt. A locked body is skipped by the implicit step, as an equal-moment one is. Section 7 of the
   arena gate holds it, sabotaged 11 ways.
+- **The blob debris on box3d** (Keith's pick, the same day): the blob pages ask for Jolt and fall back to box3d, and
+  the debris gate flew Jolt only. On box3d the debris lost 12 of 1,410 fragments in the 80 flights, through the floor
+  or over the rim. The tumble is an angular impulse on bodies of a gram or two. Jolt caps the spin it gives at 15 pi rad/s
+  at once; box3d brings a free sliver to the same 15 pi only inside its next step. So slivers left the throw at up to
+  2.6 million rad/s, and fragments flew at up to 249 m/s.
+  - `makePhysicsDebris()` now caps each fragment's spin at the throw at Jolt's 15 pi, keeping its axis. On box3d 61 of
+    1,410 fragments are capped, none is lost and the fastest goes 9.0 m/s.
+  - On Jolt the cap never engages (0 of 1,410), so this round's Jolt flights are unchanged: its gate's flown-again
+    sample still matches the committed file to the bit.
+  - At the pages' longest frame, 1/30 s, neither backend loses any; without the cap box3d lost 15.
+  - Sections 4 to 6 of `fx/fracture/debrisPhysics-selfcheck.mjs` hold it, each with the bug reproduced, sabotaged 15
+    ways. The facade's other callers of box3d's `angularImpulse()` are a backlog entry (`box3d-angular-impulse-cap`).
 - **Gated:** section 6 of `tools/ship/joltArena-selfcheck.mjs` and a new `fx/fracture/debrisPhysics-selfcheck.mjs`,
   each fix with a row that reproduces the old bug. Sabotaged with the byte-safe runner: 21 designs, each red by name.
 
