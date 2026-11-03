@@ -17,7 +17,7 @@ export const ARMS = Object.freeze(["TUNED-R8", "TWIN-FULL", ...CAP_ARMS]);
 /** The planning options an arm stands for ({} for the default planner, which is cap 4; throws on a name that is not a twin arm). */
 export function planOf(arm) {
     const table = { "TWIN-FULL": {}, "CAP-2": { maxStations: 2 }, "CAP-3": { maxStations: 3 }, "CAP-4": { maxStations: 4 }, "CAP-5": { maxStations: 5 } };
-    if (!Object.prototype.hasOwnProperty.call(table, arm)) throw new Error(`plannerEnsemble.planOf: unknown arm ${JSON.stringify(arm)}`);
+    if (!Object.prototype.hasOwnProperty.call(table, arm)) throw new Error(`plannerCap.planOf: unknown arm ${JSON.stringify(arm)}`);
     return table[arm];
 }
 let FLIGHT = {};
