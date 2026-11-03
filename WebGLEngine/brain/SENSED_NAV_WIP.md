@@ -564,3 +564,31 @@ The two backlog entries are the two halves of one thing. Follow-up 5 found the f
 * **M7** `rd` reaches more than `inc` under each of the four conditions (`D30`, `R3`, `W`, `P`, each on its own).
 
 **What it would not say.** That 80 m, 3 and 1, 1 and 30 are the right numbers, or that the thresholds should depend on range in a step (a smooth function of range is untried); that the law is true of a real sonar; that the detector is better than any other (a median over the last pings, an M-of-N rule, or the filtered fix, are untried here). Four conditions and one designated detector are a sample of the plane. Not a different pilot, a different generator or the moving ships. A result is a statement about this generator and these models.
+
+## FOLLOW-UP 11: THE CONFIRMATION RULE ITSELF (Keith, 2026-11-03: "lets also do nav-sensed-detector-confirm"; REGISTERED BEFORE ANY CODE FOR IT AND BEFORE ITS SET IS FLOWN, and registered while follow-ups 7 to 10 were unflown, so nothing below was shaped by their results)
+
+**What the name was taken to mean, said first.** No backlog entry had that name. Follow-ups 7 and 10 both end by listing "an M-of-N rule" as untried, and "confirm" is the word the detector's marking half has carried since `nav-sensed-confirm-returns`. It is taken here as **the confirmation rule itself**: the detector of follow-ups 7 to 10 marks a cell after `k` occupied readings IN A ROW; this round asks whether `M` occupied readings among the last `N` do better, the track-initiation rule of a radar. If it meant a replication of the detector's result on fresh seeds, say so before the build, which waits for follow-up 7's set to be flown.
+
+**The question.** A run of `k` in a row is brittle against the sonar's misses: with a miss chance `m` a real cell is read occupied twice running with chance (1 - m) squared (0.64 at `m` = 0.2, 0.36 at 0.4), and a marked cell that one miss clears has to start its run again (the map that forgets clears on the first free reading). An `M`-of-`N` rule keeps a short memory of the readings, so a cell cleared by a miss is marked again at the next hit if one of the two before it was a hit: a real cell is marked about half the time at `m` = 0.4 against 0.36 for a run of two, and, which is the point, **re-marks at once**. The price is false returns: a false return passes a 2-of-3 rule with chance about three times the rate squared, against once for a run of two, and a 2-of-4 six times.
+
+**The rule.** A free cell is marked when, among its last `N` readings (a reading counted at each ping that ensonifies it), at least `M` were occupied; `N` readings back is the cell's own history, not the last `N` pings. `(M, M)` is a run of `M` and `(1, 1)` is the map that forgets. The clear is a single free reading (`clear` 1), so the confirmation is the only thing that varies.
+
+**Conditions** (follow-up 4's white faults, everything else as follows-ups 3 to 10): **`W`**: misses 0.2, first surfaces only, a white 2 degree heading error and the false rate **0.01** uniform (follow-up 7's `W`); **`V`**: the same with the misses at **0.4** (the sonar misses most of what it should see); and a sea with no faults.
+
+**Arms** (every arm but `exact` is the 200 m sonar with the white 3 m fix): `exact`; the clean `long+fix+forget`; the six rules **`m1-1`** (the map that forgets), **`m2-2`** and **`m3-3`** (runs of two and three), **`m2-3`** (the designated), **`m2-4`** and **`m3-4`** under `W` and under `V` (12 arms); and `m2-3@clean`. Fifteen arms, 2,700 flights. **The set is HELD16 = seeds 1601 to 1660 of each of `hard-islands`, `hard-gaps` and `hard-current`** (180 scenarios), fresh, flown ONCE.
+
+**Bar and verdict.** The designated `m2-3` reaches **at least 80% of what `exact` reaches in EACH kind under `W` and under `V`**: six cells. **SUPPORTED** if all six, **PARTLY SUPPORTED** if at least four, **NOT SUPPORTED** otherwise.
+
+**The tension, said before the data.** Inflation by the plan (18 m round each occupied cell) already covers a hole of one cell in a wall, so a flickering real cell may cost little, and then the `M`-of-`N` rule buys nothing; and a window of four ages the readings of a cell the vessel has been moving past (a reading three pings ago was taken from 9 m back).
+
+**Predictions (scored held or missed, moving nothing; pooled over the three kinds unless said; each with its reason).**
+* **N1** an `M`-of-`N` rule is kinder to misses than a run: under `V`, `m2-3` reaches at least 5 more than `m2-2`. (A run of two is marked 36% of the time at a miss chance of 0.4, a 2-of-3 rule about half.)
+* **N2** and no worse where the misses are mild: under `W`, `m2-3` is within 8 of `m2-2` (either side). (Three times the false-return chance of a run of two is still 0.0003 a cell a ping.)
+* **N3** a third reading buys little: under `W`, `m3-3` is within 8 of `m2-2` (either side).
+* **N4** every confirmation rule repairs the white false returns: under `W` each of `m2-2`, `m3-3`, `m2-3`, `m2-4` and `m3-4` reaches at least 20 more than `m1-1`.
+* **N5** `m2-3` holds the bar (80% of exact) in every kind under `W`.
+* **N6** and under `V`.
+* **N7** on a sea with no faults `m2-3@clean` is within 8 of the clean `long+fix+forget`.
+* **N8** a stricter rule is slower and pays for it where misses are many: under `V`, `m3-4` reaches at least 5 fewer than `m2-3`. (A 3-of-4 rule at a hit chance of 0.6 is met 48% of the time, a 2-of-3 rule 65%.)
+
+**What it would not say.** That 2-of-3 is the best of the family (six rules are a sample; a leaky counter, a median or a log-likelihood sum are untried); that the readings of a cell are independent of one another (the vessel moves between pings: they are not, and the persistent faults of follow-up 5 would break the independence on purpose); that the numbers carry to the range-aware or held detectors of follow-ups 8 to 10 (only the mark is varied, the clear is a single free reading). Not a different pilot, a different generator or the moving ships. A result is a statement about this generator and these models.

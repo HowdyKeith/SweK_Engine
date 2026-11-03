@@ -2857,6 +2857,13 @@ export const NEXT_ROUNDS = [
         why: "A hold tuned to a dropout of ten pings is a cure tuned to the disease; a range-aware hold is the cheap way to make it longer where it matters.",
     },
     {
+        id: "nav-sensed-detector-confirm",
+        blocker: "OPEN",
+        what: "The detector marks a cell after `k` occupied readings in a row (brain/SENSED_NAV_WIP.md, FOLLOW-UP 7 and after), which is brittle against the sonar's misses and re-marks a cell a miss has cleared only after another run; follow-ups 7 and 10 list an M-of-N rule as untried. Registered as FOLLOW-UP 11 of that note (the name was Keith's; no entry existed, and it is taken as the confirmation rule itself).",
+        how: "After follow-up 7's set is flown: the detector with a cell marked when M of its last N readings were occupied (rules 1-of-1, 2-of-2, 3-of-3, 2-of-3, 2-of-4, 3-of-4), against follow-up 7's white false returns at miss chances of 0.2 and 0.4; HELD16 = seeds 1601 to 1660; the registration is in the note.",
+        why: "A radar's track-initiation rule is M-of-N for the reason a run of k is brittle; whether the map gains from the same is not known.",
+    },
+    {
         id: "nav-sensed-detector-range",
         blocker: "OPEN",
         what: "Follow-up 8 gives the detector's hold a range and follow-up 9 gives its confirmation one; neither tries both (brain/SENSED_NAV_WIP.md, FOLLOW-UP 10). Registered as FOLLOW-UP 10 of that note (the name was Keith's; no entry existed): trust near readings (mark at once, hold long) and doubt far ones (confirm, forget freely).",
