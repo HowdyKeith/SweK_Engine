@@ -85,12 +85,21 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--model", default="Mapika/decider-2b")
     ap.add_argument("--port", type=int, default=8765)
+    ap.add_argument("--device", default=None, help="cuda, cuda:0, cpu or mps (default: decider-ai chooses)")
+    ap.add_argument("--dtype", default=None, choices=["bfloat16", "float16", "float32"], help="default: decider-ai chooses (bf16 on CUDA, fp16 on MPS, fp32 on CPU). A GTX 1080 has no bf16 hardware and a crippled fp16 rate: try float32 only if it fits in 8 GB (it does not for the 2B model), otherwise leave the default")
     ap.add_argument("--selftest", action="store_true")
     a = ap.parse_args()
     if a.selftest:
         return selftest()
     from decider.infer import Decider   # imported late: --selftest needs neither torch nor the weights
-    decider = Decider(a.model)
+    import torch   # imported late with decider: --selftest needs neither
+    kw = {}
+    if a.device:
+        kw["device"] = a.device
+    if a.dtype:
+        kw["dtype"] = getattr(torch, a.dtype)
+    decider = Decider(a.model, **kw)
+    print("deciderServe: device=%s dtype=%s cuda=%s" % (a.device or "auto", a.dtype or "auto", torch.cuda.is_available()), flush=True)
 
     class H(BaseHTTPRequestHandler):
         def _send(self, code, obj):
