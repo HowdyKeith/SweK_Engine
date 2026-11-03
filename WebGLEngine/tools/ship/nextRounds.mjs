@@ -2978,10 +2978,8 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "nav-sensed-detector-range-hold",
-        blocker: "OPEN",
-        what: "The evidence hold (brain/SENSED_NAV_WIP.md, FOLLOW-UP 12) holds a watched cell at any range, and its one real cost is far from the vessel, where a hold brings back the fix smear and a dropout is harmless; the range-aware hold (FOLLOW-UP 8) holds a near cell by count, not by evidence. Registered as FOLLOW-UP 13 of that note (the name was Keith's; no entry existed, and it is taken as the two put together).",
-        how: "After follow-up 7's set is flown: the evidence hold within a range and one free reading beyond, against the plain near hold, the evidence hold at any range and the map that forgets, under dropouts of 30 pings, the uniform false rate of 0.01, the persistent mix and a clean sea; HELD18 = seeds 1801 to 1860; the registration is in the note.",
-        why: "If the range gate removes the evidence hold's clean-sea cost without costing it the dropout cure, the hold is done; if the near hold is what closes the gaps, the range gate does nothing.",
+        state: "CLOSED",
+        what: "CLOSED 2026-11-03 (brain/SENSED_NAV_WIP.md, RESULT OF FOLLOW-UP 13; tools/ship/subSensedDetStudy.mjs --study detector-range-hold, flights in brain/subSensedDetDetectorRangeHoldHeld18.jsonl): PARTLY SUPPORTED (2 of 3 cells, the gaps by one flight); three of eight predictions held (L2, L5, L6). The range-gated evidence hold (cap 30 within 80 m, one free reading beyond) is level with the map that forgets under dropouts of 30 pings (153 against 155) while the same hold at every range reaches 162 and holds all three bar cells; the plain near hold is the worst arm of every sea (35 of 180 under the uniform false rate, 127 collided); every long hold costs a little on a clean sea (173, 167 and 154 against 179) and the range gate adds to the cost. The registration's arm list lacked n30@W and n30@P, which L6 and L8 name: added before the set was flown (17 arms, 3,060 flights).",
     },
     {
         id: "nav-sensed-detector-hold",
