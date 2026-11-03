@@ -2850,6 +2850,13 @@ export const NEXT_ROUNDS = [
         what: "CLOSED 2026-11-02 (brain/SENSED_NAV_WIP.md, RESULT OF FOLLOW-UP 6; tools/ship/subSensedFollowStudy.mjs --study falserate, flights in brain/subSensedFalseRateHeld11.jsonl): NOT SUPPORTED (the registered tenfold margin). With follow-up 4's four faults on, the forgetting map holds 80% of the exact map in every kind at false rates of 0.001 and 0.003 (92% and 86% of exact; 80.4% in hard-current at 0.003), loses it between 0.003 and 0.01 (68%; held in hard-gaps only) and keeps falling at 0.03; the filtered-fix sticky map reaches 59% of exact already at 0.0001, 36% at 0.0003 and 25% at 0.001. Seven of eight predictions held (F6, that the sticky map survives at 0.0001, missed). The follow-up 4 rate costs the forgetting map 3 to 10 flights.",
     },
     {
+        id: "nav-sensed-dropout-range",
+        blocker: "OPEN",
+        what: "Follow-up 7's detector holds a marked cell for the same number of free readings everywhere (brain/SENSED_NAV_WIP.md, FOLLOW-UP 7), and a dropout is dangerous near the vessel, where its rate is lowest, and costly to guard against far from it, where a long hold keeps the fix smear and any phantom the longest. Registered as FOLLOW-UP 8 of that note (the name was Keith's; no entry existed, and it is taken in both senses of range: how far the hold reaches, and how long the dropout lasts).",
+        how: "After follow-up 7's set is flown: the detector with a second hold for cells within a range (`clearNear` within `near`), against whole-obstacle dropouts of 3, 10 and 30 pings with the range law and against follow-up 7's white false returns; HELD13 = seeds 1301 to 1360; the registration is in the note.",
+        why: "A hold tuned to a dropout of ten pings is a cure tuned to the disease; a range-aware hold is the cheap way to make it longer where it matters.",
+    },
+    {
         id: "nav-sensed-confirm-returns",
         blocker: "OPEN",
         what: "A white false return at a rate of 0.01 takes the forgetting map from 92% to 68% of the exact map (brain/SENSED_NAV_WIP.md, RESULT OF FOLLOW-UP 6) and the map marks a cell on the first ping that reads it occupied.",
