@@ -11354,3 +11354,48 @@ but what the longer history carries is sometimes stale shading, and on a mover t
 per-pixel rejection or a tighter clamp where the object moved, so the longer history is kept only when it agrees. That is a change to Bt's
 accumulation, and its own pre-registered round, not this one. Until then the chain stays as section 175 left it: Bt's history without
 vectors, then round 72's U_TH.
+
+## 182. ROUND 80 -- THE MOVER HISTORY CHECKED AGAINST THE CURRENT FRAME: VECTORS, AND A TIGHTER CLAMP WHERE THE OBJECT MOVED. FIXED BEFORE ITS CODE
+
+**Why.** Section 181: the exact vectors made every mover's history longer, but the gain was unreliable (13 of 24 scenes, p 0.145). Where they
+hurt, the longer history carried shading that had changed as the object moved past the lights. Bt's clamp (each history held inside the
+current frame's 3 x 3 min-max box) is too loose to catch that. Section 181 named the fix: check the mover's history against the current
+frame's own shading. Round 80 was held for the device chain's vectors (section 180); that round was not opened, so this takes the number.
+
+**Bt_MVC (render/denoiseTemporalUpscale.mjs's accumulateUpscaled, its `moverGamma`).** Bt_MV (section 180), plus one change on the mover
+pixels only:
+- At a pixel whose current hit is a mover, after the min-max box, the history is clamped again to the 3 x 3 neighbourhood's per-channel
+  **mean ± γσ**, its standard deviation over the same taps.
+- **γ = 1.0, fixed now and not tuned:** the usual temporal anti-aliasing value for variance clipping.
+- Everything else is Bt_MV's. **Off the movers Bt_MVC is Bt (and Bt_MV) bit for bit,** held by the gate as section 180's was.
+- U_TH's input on Bt_MVC is the clipped history A with its n; the unclamped twin Au is Bt_MV's.
+
+**ROUND 80, a test only, on the CPU.** U_TH is round 72's candidate, unchanged.
+- **Test:** 24 new scenes, 12 R (83000-83011) and 12 C (84000-84011), moving as section 176's, at round 72's settings. Each is rendered once and
+  accumulated three ways: Bt, Bt_MV and Bt_MVC.
+- **H80a:** Bt_MVC beats Bt on the moving scenes, by section 159's rule, through verdict() (the sign-flip test, Holm with H80b, C1-C5).
+- **H80b:** Bt_MVC beats Bt_MV, by the same rule: the check is what the vectors lacked.
+- **Descriptive, deciding nothing:**
+  - U_TH on Bt_MVC against Bt_MVC, and against U_TH on Bt;
+  - Bt_MV against Bt again, round 79's question on a new set;
+  - the mover pixels for each;
+  - the three mean history lengths.
+- File: render/denoise-results-upscale-check-r80.json.
+
+**Predictions, fixed now, deciding nothing.**
+- **P1:** C1 and C3 hold.
+- **P2:** H80b is supported, 2-6 % below Bt_MV.
+- **P3:** H80a is supported, 5-10 % below Bt, on at least 17 of the 24 scenes.
+- **P4:** on the mover pixels Bt_MVC is 8-15 % below Bt.
+- **P5:** Bt_MVC's mean history length is below Bt_MV's and above Bt's. The clip shortens nothing: n is not reset, only the history it
+  carries is pulled toward the current frame. So P5 may only hold through n's dependence on validity. It is written down to be checked,
+  not because I expect it to move.
+
+**What each outcome means, fixed now.**
+- **Both hold:** the vectors with a mover check are what the moving objects lacked. The device chain's vectors and clip are the next round
+  (its cost), and then the chain ships with them, Keith's call.
+- **H80b holds, H80a not:** the check helps the vectors, but Bt's own history is as good. Report it, chain unchanged.
+- **Neither:** the movers' error is not in the history, and the arc's moving-object work closes there.
+
+**The run, on Keith's rig, at round 80's commit:** `--harvest-upscale-temporal-test --round 80`, one CPU harvest (~4-10 hours), its file
+committed byte for byte before it is read. Section 183 reads it.
