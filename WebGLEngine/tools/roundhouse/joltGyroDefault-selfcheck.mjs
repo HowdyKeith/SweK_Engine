@@ -34,9 +34,22 @@
 //   stopped round has no measurements -- hiding the rows after it; the rows now read through defaults, so each fails by name. The whole series was run
 //   again after both fixes, and the counts above are that second run's.
 //   FOUND BEFORE THEM, while designing them: three rows that could not have gone red -- M3's twin, M1's comparison with C3, M2's two measures (see the note).
+// SABOTAGE LOG, SECTION 6 (2026-11-03, after the verdict) -- the same runner against this gate and spinningBody-selfcheck, with the committed results
+// file, the note, the library, the loader or the spinning body's committed results edited; every file restored byte-identical:
+//   V1 the file's bytes moved in the last digit of the cube's drift 2 (the file's sha256 and the note's: the digit is past double precision, so the number
+//   itself never moved, and the hash is the only thing that sees it) | V2 the file not flagged as the registered run 3 | V3 the file reading M1 as
+//   something else 5 | V4 the file's 10 rad/s spin about the largest axis not lost 7 | V5 the file's cube drift within 1e-5 (P2 then right) 5 | V6 the
+//   file's C-key failed 4 | V7 the file's own physics drifting at 20 rad/s 5 | V8 the file's M1 fit off the spinning body's C3 in its last digit 3 | V9 the
+//   file's last spin not flown twice alike 4 | V10 the file's four-substep loss a second early 5 | V11 the file's four-substep growth at 10 rad/s 10% off
+//   the explicit step 4 | V12 the file's gap between the cubes not the drift 4 | V13 the note saying P4 wrong 1 | V14 the note's table cell mistyped 1
+//   V15 the note's verdict heading renamed 1 | V16 the note's loss time rounded 1 | V17 the note's model loss times rounded 1 | V18 the library's kept line
+//   at three times the bound 3 | V19 the loader's default off again 9 | V20 the spinning body's committed C3 fit moved in its last digit 3 (this gate's M1
+//   row, and that file's own hash in spinningBody-selfcheck)
+//   Every row of section 6 went red under at least one design, and none went 0 red.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
+import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import * as L from "./joltGyroDefault.mjs";
 import * as SB from "./spinningBody.mjs";
@@ -165,6 +178,87 @@ try {
         !/\.reading|\.factor|\.m1\b|\.m2\b|\.m3\b|\.key\b|\.flag\b/.test(code) && /fs\.writeFileSync\(results, serialize\(result\)\)/.test(code) && /commit it before reading it/.test(code) && (code.match(/console\.log\(/g) || []).length === 1);
 } catch (e) { guard(5, e); }
 
+console.log("\n6. THE VERDICT, AS CODE, FROM THE COMMITTED FILE (physics/mechanics/joltGyroDefaultResults.json, committed unread at e661c0b7)");
+try {
+    // Written AFTER the file was committed and read. Every number the note's verdict states is re-derived here from the file, every reading by
+    // this gate's own statement of the rules; the whole registered round is flown again through the library (never the command) and held
+    // against the file; and the explicit step's growth -- where the predictions came from -- is held against every Jolt reading.
+    const text = fs.readFileSync(L.DEFAULT_RESULTS, "utf8"), R = JSON.parse(text), M3 = R.m3 || [], { I } = SB.fixtureBody();
+    const sha = createHash("sha256").update(text).digest("hex"), th = (x) => x.toLocaleString("en-US"), e1 = (x) => x.toExponential(1);
+    const at = (c, W, a) => M3.find((e) => e.config === c && e.W === W && e.axis === a) || {};
+    ok("!! the file is the registered run, committed unread at e661c0b7 (sha256 eec1d252, written at 13:52:32): the rates, axes, window, lines, cube and configurations the library's, flagged registered and not stopped, M1 about the intermediate axis, and its text serialize()'s",
+        sha === "eec1d2527c4421874685fed634faa1dfa399caf4fd19de5a12d6b20e5855dd84" && R.at.startsWith("2026-11-03T13:52:32") && R.registration === L.REGISTRATION && J(R.rates) === J(L.RATES) &&
+        J(R.axes) === J(L.AXES) && J(R.stable) === J(L.STABLE) && J(R.cube) === J({ ...L.CUBE, axis: [...L.CUBE.axis] }) && J(R.configs) === J(L.CONFIGS.map((c) => ({ ...c }))) && R.registered === true &&
+        R.T === 30 && R.dt === 1 / 60 && R.m1Axis === 1 && !("stopped" in R) && L.serialize(R) === text, sha.slice(0, 8) + " " + R.at);
+    const key = await L.keyControl(), jc = R.joltControls || [], off = (d) => d.map((v, k) => Math.abs(v / I[k] - 1));
+    ok("!! the controls held, as the file records them and re-derived here: C-flag (default on, false off, true on, static off); C-key 1.0000 and 1.4422 against Euler's bounds over 1,800 steps, the same when measured again; C-inertia to 1e-7 and C-undamped exact on J, J4 and J0; all 32 spins twice to the bit",
+        R.flag.ok === true && J(R.flag.got) === J({ default: true, false: false, true: true, static: false }) && R.key.ok === true && J(R.key.got.map((x) => [x.axis, x.steps])) === J([[0, 1800], [2, 1800]]) &&
+        R.key.got.every((x) => x.bound === L.eulerBound(I, x.axis) && Math.abs(x.factor / x.bound - 1) <= 1e-3) && key.ok &&
+        key.got.every((x, k) => near(x.factor, R.key.got[k].factor, 1e-12) && x.steps === R.key.got[k].steps && x.bound === R.key.got[k].bound && x.ok === R.key.got[k].ok) &&
+        J(jc.map((x) => x.config)) === J(["J", "J4", "J0"]) && jc.every((x) => x.inertia.ok && Math.max(...off(x.inertia.diag)) < 1e-7 && x.inertia.off.every((v) => v === 0) && x.undamped.ok && x.undamped.worst === 0) &&
+        M3.length === 32 && M3.every((e) => e.twin === true), `Jolt's moments off by ${e1(Math.max(...off(jc[0].inertia.diag)))}`);
+    // the spinning body's rule, written out again from its registration, and that round's committed C3 fit
+    const P = 2 * Math.sqrt(((5 - 2.5) * (6.5 - 5)) / (2.5 * 6.5)), m1 = R.m1 || {}, euler = (f) => f.crossed !== null && f.points >= 20 && f.r2 >= 0.999 && Math.abs(f.sigma / P - 1) <= 0.10;
+    const sbR = JSON.parse(fs.readFileSync(SB.DEFAULT_RESULTS, "utf8")), c3 = sbR.configs.find((c) => c.id === "C3");
+    ok("!! M1: the default body has the force on, reads Euler's equations by the spinning body's rule (written out here) and by readingOf(), flew C3's trace to the bit, and its fit IS the spinning body's committed C3 fit",
+        m1.axis === 1 && m1.flag === true && m1.c3Flag === true && m1.sameAsC3 === true && euler(m1.fit) && m1.reading === "Euler's equations" && SB.readingOf(m1.fit) === m1.reading && J(m1.fit) === J(c3.fit),
+        `${m1.fit.sigma.toFixed(6)} (${((m1.fit.sigma / P - 1) * 100).toFixed(3)}%)`);
+    const m2 = R.m2 || {};
+    ok("!! M2: the cube from addShip() has the force on and three equal moments (1/6); with it on its angular velocity moved by 2.6e-5 of its spin over 1,800 steps, with it passed off not at all -- so the gap between the two is the first exactly",
+        m2.flagOn === true && m2.flagOff === false && m2.moments.every((v) => near(v, 1 / 6, 1e-6)) && m2.changeOff === 0 && m2.changeOn > 0 && m2.changeOn < 1e-4 && e1(m2.changeOn) === "2.6e-5" &&
+        m2.apart === m2.changeOn && m2.steps === 1800, `${e1(m2.changeOn)}, ${e1(m2.changeOn / m2.steps)} a step`);
+    // M3's rule written out again: past 10% of the spin inside the window is lost; otherwise within twice Euler's bound is kept; otherwise drifting
+    const rule = (e) => (e.lostAt !== null && e.lostAt <= 30 ? "lost" : e.factor <= 2 * e.bound ? "kept" : "drifting");
+    const order = []; for (const c of ["J", "OWN", "J4", "J0"]) for (const W of [2, 5, 10, 20]) for (const a of [0, 2]) order.push(c + W + "/" + a);
+    const pat = (c) => M3.filter((e) => e.config === c).map((e) => e.reading).join(",");
+    ok("!! M3's readings, re-derived by this gate's own statement of the rule and by stableReading(), are the file's, each against Euler's bound in closed form: J kept, kept, drifting, drifting, LOST, drifting, LOST, LOST; the engine's own physics kept all eight; J0 kept all eight with no growth",
+        J(M3.map((e) => e.config + e.W + "/" + e.axis)) === J(order) && M3.every((e) => e.bound === L.eulerBound(I, e.axis) && rule(e) === e.reading && L.stableReading(e, e.bound) === e.reading) &&
+        pat("J") === "kept,kept,drifting,drifting,lost,drifting,lost,lost" && pat("OWN") === Array(8).fill("kept").join() && pat("J4") === "kept,kept,drifting,kept,drifting,drifting,lost,drifting" &&
+        M3.filter((e) => e.config === "J0").every((e) => e.reading === "kept" && e.factor < 1.0001), ["J", "J4"].map((c) => c + ": " + pat(c)).join(" | "));
+    ok("!! the losses, from the file: J at 10 rad/s about the largest axis after 23.22 s, at 20 rad/s after 5.95 s (largest) and 8.97 s (smallest); J4 at 20 rad/s about the largest after 23.13 s",
+        J(M3.filter((e) => e.lostAt !== null).map((e) => [e.config, e.W, e.axis, e.lostAt.toFixed(2)])) === J([["J", 10, 0, "23.22"], ["J", 20, 0, "5.95"], ["J", 20, 2, "8.97"], ["J4", 20, 0, "23.13"]]));
+    // THE EXPLICIT STEP'S GROWTH, where the predictions came from: sqrt(1 + (Omega h)^2) a step, Omega the wobble's own frequency
+    const omega = (a, W) => { const b = (a + 1) % 3, c = (a + 2) % 3; return W * Math.sqrt(Math.abs(((I[c] - I[a]) / I[b]) * ((I[a] - I[b]) / I[c]))); };
+    const model = (e, sub) => { const h = 1 / 60 / sub, perS = (0.5 * Math.log(1 + (omega(e.axis, e.W) * h) ** 2)) / h, growth = e.bound * Math.exp(perS * 30), tLost = Math.log(0.1 / (1e-5 * e.bound)) / perS;
+        return { growth, tLost, reading: tLost <= 30 ? "lost" : growth <= 2 * e.bound ? "kept" : "drifting" }; };
+    const js = M3.filter((e) => e.config === "J" || e.config === "J4").map((e) => ({ e, m: model(e, e.config === "J4" ? 4 : 1) }));
+    const lostT = js.filter((x) => x.e.lostAt !== null).map((x) => x.m.tLost.toFixed(2));
+    ok("  the explicit step's growth predicted every Jolt reading with the force on, at one substep and four; its loss times within 0.25 s of the measured (23.18, 5.91, 8.77 and 23.06 s), and its growth within 5% wherever nothing was lost",
+        js.length === 16 && js.every(({ e, m }) => m.reading === e.reading && (e.lostAt !== null ? Math.abs(m.tLost - e.lostAt) <= 0.25 : Math.abs(e.factor / m.growth - 1) <= 0.05)) &&
+        J(lostT) === J(["23.18", "5.91", "8.77", "23.06"]), lostT.join(", "));
+    const J_ = (W, a) => at("J", W, a).reading, pred = { P1: m1.reading === "Euler's equations" && m1.sameAsC3 === true, P2on: m2.changeOn <= 1e-5, P2off: m2.changeOff === 0,
+        P3: [2, 5, 10, 20].map((W) => J_(W, 0)).join() === "kept,drifting,lost,lost", P4: [2, 5, 10, 20].map((W) => J_(W, 2)).join() === "kept,drifting,drifting,lost", P5: pat("OWN") === Array(8).fill("kept").join() };
+    ok("!! the predictions, read off the file: P1, P3, P4 and P5 right; P2 half wrong -- with the force on the cube moved by 2.6e-5, past the 1e-5 I gave, and with it off not at all (P6 is the build record's, not the file's)",
+        pred.P1 && !pred.P2on && pred.P2off && pred.P3 && pred.P4 && pred.P5, J(pred));
+    let worst = 0, where = "";
+    const same = (a, b, p) => {
+        if (typeof a === "number" && typeof b === "number") {
+            if (Number.isInteger(a) && Number.isInteger(b)) return a === b;
+            const d = Math.abs(a - b) / Math.max(1, Math.abs(a), Math.abs(b)); if (d > worst) { worst = d; where = p; } return d <= 1e-9;
+        }
+        if (Array.isArray(a) || Array.isArray(b)) return Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((x, k) => same(x, b[k], `${p}[${k}]`));
+        if (a && b && typeof a === "object" && typeof b === "object") { const ka = Object.keys(a).sort(), kb = Object.keys(b).sort(); return J(ka) === J(kb) && ka.every((k) => same(a[k], b[k], `${p}.${k}`)); }
+        return a === b;
+    };
+    const again = await L.run(), { at: atA, ...flown } = again, { at: atR, ...filed } = R;
+    ok("!! the registered round flown again at this head, through the library: run() gives back the file -- every reading, flag and count exactly, every number to 1e-9 (only the time it was written differs)",
+        again.registered === true && typeof atA === "string" && typeof atR === "string" && same(flown, filed, "R"), `worst ${worst.toExponential(1)}${where ? " at " + where : ""}`);
+    const note = fs.readFileSync(path.join(ENG, "physics/mechanics/SPINNING_BODY_WIP.md"), "utf8"), vAt = note.indexOf("\n### The verdict, 2026-11-03"), rest = vAt >= 0 ? note.slice(vAt + 1) : "";
+    const nextHead = rest.search(/\n#{2,3} /), vt = vAt >= 0 ? (nextHead > 0 ? rest.slice(0, nextHead) : rest).replace(/\s+/g, " ") : "";   // that section alone, its line breaks read as spaces
+    const esc = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), stands = (x) => new RegExp("(?<![0-9])" + esc(x) + "(?![0-9])").test(vt);
+    const fmt = (f) => (f >= 100 ? th(Math.round(f)) : f.toFixed(4)), cell = (e) => (e.lostAt !== null ? `lost at ${e.lostAt.toFixed(2)} s` : `${fmt(e.factor)}, ${e.reading}`);
+    const rows = [2, 5, 10, 20].map((W) => `| ${W} rad/s | ${["J", "OWN", "J4", "J0"].map((c) => [0, 2].map((a) => cell(at(c, W, a))).join(" | ")).join(" | ")} |`);
+    const lost = M3.filter((e) => e.config === "J" && e.lostAt !== null).map((e) => e.lostAt.toFixed(2));
+    const frags = [...rows, `(${th(text.length)} bytes, sha256 ${sha.slice(0, 8)})`, `at ${R.key.got[0].factor.toFixed(4)} and ${R.key.got[1].factor.toFixed(4)} of their start`, `over all ${th(R.key.got[0].steps)} steps`,
+                   `all ${M3.length} spins flew twice`, `grew at ${m1.fit.sigma.toFixed(6)}/s (${((m1.fit.sigma / P - 1) * 100).toFixed(3)}%)`, `moved by ${e1(m2.changeOn)} of its spin over the 30 s, about ${e1(m2.changeOn / m2.steps)} a step`,
+                   `after ${lost[0]} s`, `after ${lost[1]} s about the largest axis and ${lost[2]} s about the smallest`, `Its three loss times were ${lostT[0]}, ${lostT[1]} and ${lostT[2]} s, against the ${lost[0]}, ${lost[1]} and ${lost[2]} s measured`,
+                   `it is lost at ${at("J4", 20, 0).lostAt.toFixed(2)} s`, `reached ${th(Math.round(at("J", 10, 2).factor))} of its start, ${(at("J", 10, 2).factor * 1e-5 * 100).toFixed(1)}% of the spin`,
+                   ...["P1", "P3", "P4", "P5"].map((k) => `**${k}: ${pred[k] ? "right" : "wrong"}.**`), `**P2: ${pred.P2on ? "right" : "half wrong"}.**`];
+    const missing = frags.filter((x) => !stands(x));
+    ok("!! the note's verdict carries the file's numbers, its table row by row, the explicit step's loss times as this section computes them, and each prediction's outcome as the file decides it (no digit may touch a fragment's ends; read from that section alone)",
+        vAt > 0 && missing.length === 0, missing.length ? "missing: " + missing.join(" || ").slice(0, 300) : `${frags.length} fragments`);
+} catch (e) { guard(6, e); }
+
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +
-    "\nnot closed here: the round itself -- the registered run writes physics/mechanics/joltGyroDefaultResults.json, committed before it is read, and its verdict becomes section 6.");
+    "\nnot closed here: how soon a larger wobble tumbles, what damping and contact do to the cost, and what four substeps cost in time -- none of it registered; whether to substep is Keith's.");
 process.exitCode = fails ? 1 : 0;

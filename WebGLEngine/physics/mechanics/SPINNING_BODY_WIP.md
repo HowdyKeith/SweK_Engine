@@ -450,3 +450,89 @@ run again:
   measurements, and the rows after it never ran. The rows now read through defaults, so each one fails by name.
 
 **The registered run:** `node tools/roundhouse/joltGyroDefaultRun.mjs`.
+
+### The verdict, 2026-11-03 (read from the committed file, after it was committed)
+
+The registered run wrote `physics/mechanics/joltGyroDefaultResults.json` at head fc183172 in about two seconds. It was
+committed byte for byte at e661c0b7 before anyone read it (7,943 bytes, sha256 eec1d252). It flew the registered spins
+and says so (`registered: true`). Every number below is re-derived from that file in section 6 of
+`tools/roundhouse/joltGyroDefault-selfcheck.mjs`, and the whole round is flown again there and held against the file.
+
+**The controls held.**
+- **C-flag:** a body made with no flag has the force, false turns it off, true on, and a static body never has it.
+- **C-key:** the engine's own physics at 2 rad/s held the wobbles at 1.0000 and 1.4422 of their start, Euler's
+  bounds, over all 1,800 steps.
+- **C-inertia and C-undamped,** on all three Jolt configurations: the moments to 1e-7, and a spin exactly about the
+  largest axis kept exactly.
+- **C-determinism:** all 32 spins flew twice to the bit.
+
+**M1, the default body: Euler's equations.** The fixture made with no flag has the force on. Spun about its middle
+axis, its wobble grew at 0.953074/s (-0.801%), so it reads "Euler's equations" by the spinning body's rule. It flew
+C3's trace to the bit, and its fit is the spinning body's committed C3 fit, number for number.
+
+**M2, the ship: nothing physical, only rounding.** The cube from `addShip()` has the force on and three equal moments.
+- With the force on, its angular velocity moved by 2.6e-5 of its spin over the 30 s, about 1.5e-8 a step: Jolt's
+  single-precision round trip.
+- With the force passed off, it did not move at all.
+
+**M3, the cost: Jolt's step loses fast stable spins.** Each cell is the wobble's largest growth over its start and the
+reading, or when the wobble passed 10% of the spin. J is Jolt with the new default at one substep; J4 and J0 are
+reported, at four substeps and with the force off.
+
+| spin | J, largest axis | J, smallest axis | own physics, largest | own physics, smallest | J4, largest | J4, smallest | J0, largest | J0, smallest |
+|---|---|---|---|---|---|---|---|---|
+| 2 rad/s | 1.6032, kept | 1.9566, kept | 1.0000, kept | 1.4422, kept | 1.1257, kept | 1.5566, kept | 1.0000, kept | 1.0000, kept |
+| 5 rad/s | 19.9437, drifting | 9.8188, drifting | 1.0000, kept | 1.4422, kept | 2.1149, drifting | 2.3308, kept | 1.0000, kept | 1.0000, kept |
+| 10 rad/s | lost at 23.22 s | 2,919, drifting | 1.0000, kept | 1.4422, kept | 19.9492, drifting | 9.6974, drifting | 1.0000, kept | 1.0000, kept |
+| 20 rad/s | lost at 5.95 s | lost at 8.97 s | 1.0000, kept | 1.4419, kept | lost at 23.13 s | 3,045, drifting | 1.0000, kept | 1.0000, kept |
+
+- **At the pages' step, Jolt with the force on:**
+  - keeps a spin of 2 rad/s and lets one of 5 rad/s drift;
+  - loses a spin of 10 rad/s about the largest axis after 23.22 s;
+  - loses a spin of 20 rad/s after 5.95 s about the largest axis and 8.97 s about the smallest.
+  Euler's equations keep all of them, and so does the engine's own physics.
+- **The explicit step's growth predicted every reading.** Its three loss times were 23.18, 5.91 and 8.77 s, against
+  the 23.22, 5.95 and 8.97 s measured. Where nothing was lost, its growth is within 5% of the measured.
+- **Four substeps move the cost up by a factor of two in spin.** At 10 rad/s the spin drifts instead of being lost, and
+  at 20 rad/s about the largest axis it is lost at 23.13 s, as one substep loses 10 rad/s.
+- **With the force off nothing grows** (1.0000 everywhere). That is the spinning body's C2: no gyroscopic term at all.
+
+**The predictions:**
+- **P1: right.** The default body reads Euler's equations, with C3's trace to the bit; I gave it 97%.
+- **P2: half wrong.** With the force on, the cube's angular velocity moved by 2.6e-5 of its spin, not within the 1e-5
+  I gave 75%. With it off it did not move, which I gave 95%.
+- **P3: right.** About the largest axis the spin was kept at 2 rad/s, drifted at 5, and was lost at 10 (23.22 s) and
+  at 20 (5.95 s); 70%.
+- **P4: right.** About the smallest axis it was kept at 2, drifted at 5 and at 10, and was lost at 20 (8.97 s); 55%.
+  At 10 rad/s the wobble reached 2,919 of its start, 2.9% of the spin, under the 10% line.
+- **P5: right.** The engine's own physics kept every spin; 95%.
+- **P6: right, read from the build record, not from this file.** In M4 the only row the change turned red was the
+  record that holds the wrapper's size. The row that stated the old default had been restated before M4 ran; G31 shows
+  it would have gone red. 70%.
+
+**What this says, and what it does not.**
+- **It says:** with the default on, a free body on Jolt turns by Euler's equations, within 0.8% of the rate at the
+  pages' step. Ships, which are cubes, are unchanged except for a rounding drift.
+- **It says:** the default has a cost, and the cost grows fast with the spin. At the pages' 1/60 s, a body spun about
+  a stable axis at 10 rad/s or more starts to tumble within the half-minute. From a wobble of 1e-5 of the spin, a
+  20 rad/s spin tumbles within 6 to 9 s. Without the default it would never have tumbled, but it would never have
+  wobbled or precessed either.
+- **It does not say:**
+  - how soon a larger wobble tumbles. The explicit step's growth says sooner, but that is not measured.
+  - anything about contact, joints or damping. The wrapper's default angular damping (0.05/s) slows a spin and so the
+    growth, and that is not measured either.
+  - what four substeps cost in time.
+
+**What follows.**
+- The default stays on, by Keith's decision.
+- **Back to Keith, as the registration said:** take more substeps (four move the cost from about 10 rad/s to about 20),
+  or keep the default as it is.
+- **Not registered, and a round of its own if wanted:** Jolt's flag off and an implicit gyroscopic step in the wrapper,
+  the kind box3d's solver takes. At 2 rad/s that kept both of box3d's stable wobbles inside Euler's bounds (1.0000 and
+  1.4370); at higher rates it is not measured.
+
+**The verdict, as code:** section 6 of `tools/roundhouse/joltGyroDefault-selfcheck.mjs` re-derives every number above
+from the committed file. It flies the whole round again and holds it against the file, and it holds the explicit step's
+growth against every Jolt reading. Sabotaged with the byte-safe runner: 20 designs, each red by name, and every row of
+section 6 went red under at least one. They edit the committed file, this note or the code, and the counts are in the
+gate's header.
