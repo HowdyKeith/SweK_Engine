@@ -2998,6 +2998,13 @@ export const NEXT_ROUNDS = [
         why: "By the arithmetic of the window a fraction only matters for a cell with five or more occupied readings, which under the ramp is near the vessel; whether a strict fraction near answers the leak and the far fraction is worth anything is not known.",
     },
     {
+        id: "nav-sensed-detector-range-hold-range-hold-confirm",
+        blocker: "OPEN",
+        what: "Follow-up 47 (brain/SENSED_NAV_WIP.md) registers the plain range-aware run with the evidence hold and the ghost, and follow-up 44 puts the confirmed clear of follow-up 21 on the plain run. Registered as FOLLOW-UP 51 of that note (the name was Keith's; no entry existed, and it is follow-up 47's name with confirm on the end; the rule for a trailing confirm is kept: the first one added to a name that has none is the confirmed clear, a second is the ghost's neighbour test, which follow-up 49 took). It was written after the results of follow-ups 7 to 18 and 20 were read, rests on follow-ups 19, 21, 33, 44 and 47, which are unread or unbuilt, and says so. No new module field: the build waits for the sets of follow-ups 8 to 24, then adds three registry rows, the set HELD56 and a spec.",
+        how: "After the sets of follow-ups 8 to 24 are flown: a run of three far and a first reading near with the evidence hold gated and at every range, the clear confirmed at 0.8 and the ghost, against the same without the confirmation, without the ghost and with the 2-of-3 mark, under range-law false returns of mean 0.03 with dropouts of 30 pings, the uniform false rate of 0.01 with leaking dropouts, the uniform false rate alone and a clean sea; HELD56 = seeds 5601 to 5660; the registration is in the note.",
+        why: "The confirmed clear is registered to clear a leaking dropout sooner and the ghost to restore it; whether the pair behind a run of three, which is slow to mark and has no memory, is more than either alone is not known.",
+    },
+    {
         id: "nav-sensed-detector-confirm-hold-range-hold",
         blocker: "OPEN",
         what: "Follow-up 26 (brain/SENSED_NAV_WIP.md) asks which range-aware mark to use with the evidence hold at every range; a strict far rule is slow to re-mark a cell the hold has let go (a dropout of 30 pings clears every cell watched for fewer than thirty readings). Registered as FOLLOW-UP 30 of that note (the name was Keith's; no entry existed, and it is follow-up 26's name with a hold on the end, the move follow-ups 18 and 29 made: a second hold on what has been confirmed, the ghost). The build waits for the sets of follow-ups 8 to 24: one registry row, the set HELD35 and a spec are added then.",
