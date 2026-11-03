@@ -989,3 +989,104 @@ None went 0 red on the run whose counts are logged, but one did on the first run
   seed's own unnudged fracture. The whole series was run again after the change.
 
 **The registered run:** `node tools/roundhouse/joltScenesRun.mjs`.
+
+### The verdict, 2026-11-03 (read from the committed file, after it was committed)
+
+The registered run wrote `physics/mechanics/joltScenesResults.json` at head 52373cd1 in 267 s. It was committed byte
+for byte at 1606c0c6 before anyone read it (127,002 bytes, sha256 527d80fc). It flew the registered seeds and windows
+and says so (`registered: true`). Every number below from that file is re-derived from it in section 6 of
+`tools/roundhouse/joltScenes-selfcheck.mjs`, which also flies a sample of the round again. Two facts come from flights
+flown again after the commit, and the gate flies those too: where seed 17's lost fragment went, and where the first crew
+member is spawned. The step times are not in the file, and nothing holds them.
+
+**The controls held.**
+- **C-page:** all 25 of the scenes' numbers are the pages' own.
+- **C-setting:** with the default, the 21 ragdoll parts and every fragment (16 for the avatar, 19 for the herd on seed
+  1) take the step, and the wall's 42 cubes are skipped. With `false`, no body has a setting.
+- **C-determinism:** seed 1 of every scene, flown again with each setting, is the same to the bit: 9 flights.
+- **C-chaos:** the nudge changed every flight of every scene, and it changed no primary statistic. Its smallest p on
+  one was 0.0576, D2's rest time.
+
+**The reading: the default changes nothing a sign test over 40 seeds can see.** None of the seven primary statistics,
+and none of the 11 reported, crossed p < 0.01, D against F. "D higher" counts the seeds where the default's value was
+the larger.
+
+| scene | statistic | D higher | D lower | ties | p | reading | median, D | median, F |
+|---|---|---|---|---|---|---|---|---|
+| A1, the crew added | rest time | 19 | 16 | 5 | 0.736 | no change | 3.42 s | 3.91 s |
+| A2, the crew flung | the wall's broken joints | 12 | 14 | 14 | 0.845 | no change | 43 | 44 |
+| A2, the crew flung | cohesion | 16 | 24 | 0 | 0.268 | no change | 1.711 | 1.705 |
+| D1, the avatar shattered | rest time | 15 | 21 | 4 | 0.405 | no change | 3.76 s | 3.77 s |
+| D1, the avatar shattered | spread | 27 | 13 | 0 | 0.0385 | no change | 2.584 m | 2.557 m |
+| D2, the herd shattered | rest time | 12 | 26 | 2 | 0.0336 | no change | 3.87 s | 3.79 s |
+| D2, the herd shattered | spread | 16 | 24 | 0 | 0.268 | no change | 3.836 m | 3.860 m |
+
+- **The closest calls are the debris's.**
+  - D1's spread came out larger with the default on 27 of 40 seeds (p = 0.0385), by about 1% at the median.
+  - D2's rest time came out shorter on 26 of 38 (p = 0.0336). The nudge alone, with `false`, leaned the same way, on
+    23 of 34 (p = 0.0576).
+- **The nudge changed one reported statistic: A1's cohesion, lower on 35 of 40 seeds (p = 1.38e-6), by 4.2 micrometres
+  at the median.** The reason is the page's layout. Its first crew member is spawned inside the wall's last column: on
+  seed 1 six of its seven parts overlap that column's cubes, by 0.12 to 0.39 m, and Jolt pushes them out. The nudge
+  moves that member 1e-5 m away from the wall, so the push is a hair gentler. The default's own A1 cohesion did not move
+  (p = 0.627).
+
+**What the scenes do, with either setting.**
+- **A1, the crew added:** every flight with D and with F came to rest within 10 s. With the nudge, two did not (seeds
+  18 and 34), and on seed 34 a whole crew member fell off the 1 m-deep ground strip.
+- **A2, the crew flung:** the crew leave the arena.
+  - 770 of the 840 parts were below y = -5 at the end with D, and 756 with F.
+  - The median peaks were 345 and 342 m/s, and the spin reached Jolt's cap of 47.12 rad/s.
+  - The cohesion passed 2 in 5 flights with D and 6 with F. Seeds 7, 26 and 31 did so in all three settings.
+- **D1, the avatar shattered:** every flight came to rest within 15 s, in every setting, and nothing left.
+- **D2, the herd shattered:**
+  - Seed 22 did not come to rest within 15 s in any setting.
+  - On seed 17, with the default, one fragment slid off the ground's edge. It left at 4.40 s, 12.47 m out; the
+    ground reaches 12 m. With `false`, that seed's farthest fragment stopped at 11.84 m.
+
+**The step's time (reported, testing nothing, and not in the results file).** The wrapper's step was timed alone, as
+the mean over each flight, then the median of five flights (seeds 1 to 5):
+- the arena: 1,012 microseconds a step with the default and 983 with `false`, the same within this sandbox's noise;
+- the debris: 83 against 62 microseconds for the avatar, and 58 against 45 for the herd.
+- Single flights varied by up to twice in this sandbox.
+
+**The predictions:**
+- **P1: right.** The default did not change A1's rest time (p = 0.736), and every A1 flight with D and with F came to
+  rest within its 10 s; 85%.
+- **P2: wrong.** Neither the rest time nor the spread changed in D1 or D2. But not every D2 flight came to rest within
+  its 15 s: seed 22 did not with either setting, and seed 17 did not with the default; 80%.
+- **P3: wrong.** The joints held in every A1 flight, but the cohesion passed 2 in 5 A2 flights with the default. With
+  `false`, 6 did; 90%.
+- **P4: right.** In A2 the default changed neither the wall's broken joints (p = 0.845) nor the cohesion (p = 0.268);
+  70%.
+- **P5: wrong.** No number was non-finite, and nothing left in A1 or D1. But in D2, on seed 17, one fragment slid off
+  the ground's edge with the default; 95%.
+- **P6: wrong.** D1's and D2's median rest times were within 10% of `false`'s. A1's was 12% below it (3.42 against
+  3.91 s), where the nudge alone moved it 8%; 60%.
+
+**What this says, and what it does not.**
+- **It says:** in the two shipped Jolt scenes the default reaches, the implicit step changes nothing a sign test over
+  40 seeds can see: not the rest, the piles, the wall's damage, the joints or the speeds.
+- **It says:** my predictions that every flight settles, that the joints always hold and that nothing leaves were
+  wrong. All but one of those failures happened with `false` as well. The one, seed 17's fragment, left a pile whose
+  farthest fragment with `false` stopped 0.16 m from the same edge.
+- **It does not say:**
+  - that there is no effect at all: a sign test over 40 seeds can miss a small one, and D1's spread came closest;
+  - anything about Jolt content made later with unequal boxes;
+  - what the step costs in a browser.
+
+**What follows.**
+- **The registration does not decide this case, so it goes back to Keith.** It said the default ships as it is if P1
+  to P5 hold, and that a primary statistic moving sends it back. P2, P3 and P5 did not hold, and no primary statistic
+  moved. My reading: ship with the default.
+- **Seen on the way, and not this round's to fix:**
+  - the arena's Add Crew spawns its first crew member inside the wall's last column;
+  - its Fling Crew sends most of the crew off the ground strip, at hundreds of metres a second;
+  - the herd's debris can slide off the edge of its ground.
+- This note authorises no further round.
+
+**The verdict, as code:** section 6 of `tools/roundhouse/joltScenes-selfcheck.mjs` re-derives every number above from
+the committed file, except the step times. It recomputes every sign test from the flights with its own exact binomial,
+flies a sample again, and flies again the two facts that came after the commit. Sabotaged with the byte-safe runner:
+21 designs, each red by name, and every row of section 6 went red under at least one. They edit the committed file,
+this note or the code, and the counts are in the gate's header.
