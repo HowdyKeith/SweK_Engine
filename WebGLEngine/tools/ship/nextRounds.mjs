@@ -3126,10 +3126,8 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "nav-sensed-detector-range-confirm-hold",
-        blocker: "OPEN",
-        what: "Follow-up 14's range-aware 2-of-3 confirmation (brain/SENSED_NAV_WIP.md) stops at the mark, follow-up 17 adds the evidence hold and follow-up 10 the plain lock on a run of three; the table of mark by hold has an empty cell. Registered as FOLLOW-UP 19 of that note (the name was Keith's; no entry existed, and it is follow-up 14's name with a hold on the end, taken as the plain range-gated lock on the memory confirmation, which fills the empty cell).",
-        how: "After follow-up 7's set is flown: a 2-of-3 mark beyond 80 m and a first-reading mark within, with the plain lock (thirty free readings within 80 m, one beyond), against follow-up 14's mark alone, follow-up 10's detector, follow-up 17's evidence hold, a run of three with the evidence hold and the map that forgets, under range-law false returns of mean 0.03 with dropouts of 30 pings, the uniform false rate of 0.01, the persistent mix and a clean sea; HELD24 = seeds 2401 to 2460; the registration is in the note.",
-        why: "A confirmation removes most of the phantoms an evidence hold exists to keep light; whether the plain lock then does as well, and where the law fails whether it does not, is not known.",
+        state: "CLOSED",
+        what: "CLOSED 2026-11-03 (brain/SENSED_NAV_WIP.md, RESULT OF FOLLOW-UP 19; tools/ship/subSensedDetStudy.mjs --study detector-range-confirm-hold, flights in brain/subSensedDetDetectorRangeConfirmHoldHeld24.jsonl): NOT SUPPORTED (0 of 3 cells); one of eight predictions held (B5). The designated range-aware 2-of-3 mark with the plain lock (thirty readings within 80 m, one beyond) reaches 10 of 180 under range-law false returns with dropouts (follow-up 10's run-of-three version 11), against 131 for the same mark with the evidence hold, 135 for the mark alone and 127 for the map that forgets: 78 collisions, 51 timeouts and 41 flights that left the arena, a median of 195 occupied cells against 72 to 134; the memory is worth nothing behind the lock. Under the uniform false rate 38 against 109, under the persistent mix 113 against 151 for the map that forgets, and 161 against 171 on a clean sea. The run of three with the evidence hold reaches 118, so the evidence hold is the repair. POST HOC, labelled: the lock against every other detector p below 0.0001 except follow-up 10's (p 1.0); clean sea +3 / +13, p 0.021.",
     },
     {
         id: "nav-sensed-detector-hold-confirm-range-hold",
