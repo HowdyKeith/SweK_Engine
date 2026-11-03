@@ -194,3 +194,113 @@ command) and `tools/roundhouse/spinningBody-selfcheck.mjs` (the gate: 31 rows, u
   check and survives a throw.
 
 **The registered run:** `node tools/roundhouse/spinningBodyRun.mjs`.
+
+## The verdict, 2026-11-03 (read from the committed file, after it was committed)
+
+The registered run wrote `physics/mechanics/spinningBodyResults.json` at head 5fed473f in about a second. It was
+committed byte for byte at a1f0c4b5 before anyone read it (5,868 bytes, sha256 d0a873a8). It flew the registered spin
+and says so (`registered: true`). Every number below is re-derived from that file in section 6 of
+`tools/roundhouse/spinningBody-selfcheck.mjs`, and the whole round is flown again there and held against the file.
+
+**The controls held.**
+- **C-key:** freeRotation's own fit measured 0.960757/s against the predicted 0.960769 (-1.2e-5, inside 1e-4), with
+  r^2 0.9999999994 over 719 points.
+- **C-rebuild:** the battery's 5 scenes flew to the old artifact's state hashes.
+- **C-inertia:** box3d reported the moments 6.5 / 5 / 2.5 exactly, and Jolt the same to 1e-7, with nothing off the
+  diagonal.
+- **C-undamped:** a spin exactly about the largest axis kept its rate exactly over the 30 s, in C1 to C3.
+- **C-determinism:** each configuration flew twice to the bit, 1,800 steps.
+
+**The reading: box3d, Jolt with the opt-in and the engine's own physics grow the wobble at Euler's rate. Jolt, as the
+engine's wrapper makes a body, does not grow it at all.**
+
+| configuration | the engine's gyroscopic flag | rate at 1/60 s | off the prediction | r^2 | points | 5% reached | largest growth | rate at 1/240 s | reading |
+|---|---|---|---|---|---|---|---|---|---|
+| C1 box3d | no flag | 0.962626 | +0.193% | 0.999999995 | 387 | 9.32 s | 110,723 | 0.961280 (+0.053%) | Euler's equations |
+| C2 Jolt as wrapped | off | -- | -- | -- | 0 | never | 1.0000093 | -- (largest 1.0000297) | No gyroscopic term |
+| C3 Jolt with the opt-in | on | 0.953074 | -0.801% | 0.999999996 | 392 | 9.42 s | 110,937 | 0.958769 (-0.208%) | Euler's equations |
+| C4 the engine's own | no flag | 0.960681 | -0.009% | 0.999999995 | 388 | 9.33 s | 110,937 | 0.960681 (-0.009%) | Euler's equations |
+
+- **Every reading is the same at 1/240 s.** There box3d's rate and Jolt's with the opt-in move toward the
+  prediction, and the engine's own stays where it was, to 1e-7.
+- **C2 is the dropped term, exactly as freeRotation described it.** Its wobble never grew: the largest was 1.0000093
+  of its start. Its spin never flipped, and its energy and body-frame angular momentum held to 1e-14. The three that
+  read Euler's equations flipped 2, 1 and 1 times.
+
+**Reported, testing nothing** (drifts are the largest relative change over the 30 s; the stable spins give the
+largest growth of the same wobble about the other two axes):
+
+| configuration | flips | energy change | energy drift | body-frame momentum drift | world-frame momentum drift | stable spin, largest axis | stable spin, smallest axis |
+|---|---|---|---|---|---|---|---|
+| C1 box3d | 2 | -1.3e-2 | 1.3e-2 | 6.5e-3 | 6.9e-3 | 1.0000 | 1.4370 |
+| C2 Jolt as wrapped | 0 | -7.1e-16 | 1.2e-15 | 8.9e-16 | 1.0e-5 | 1.0000 | 1.0000 |
+| C3 Jolt with the opt-in | 1 | 3.5e-4 | 3.5e-4 | 1.8e-4 | 8.0e-3 | 1.6032 | 1.9566 |
+| C4 the engine's own | 1 | -3.5e-11 | 3.8e-10 | 1.9e-10 | 8.0e-3 | 1.0000 | 1.4422 |
+
+- **The world-frame momentum cannot show whether the term is there, at this wobble.** Dropping the term moves it by
+  1.0e-5, the size of the wobble itself. The three that keep the term move it by 6.9e-3 to 8.0e-3.
+- **The stable spins.** In Euler's equations this wobble never grows past its start about the largest axis, and
+  reaches at most 1.4422 of it about the smallest. Box3d and the engine's own physics stay inside both. Jolt with the
+  opt-in goes past them, to 1.6032 and 1.9566. Jolt as wrapped holds both at 1.0000.
+
+**The predictions:**
+- **P1: right.** C1 (box3d) reads Euler's equations; I gave it 85%.
+- **P2: right.** C2 (Jolt as wrapped) reads No gyroscopic term; 90%.
+- **P3: right.** C3 (Jolt with the opt-in) reads Euler's equations; 70%.
+- **P4: right.** C4 (the engine's own physics) reads Euler's equations; 97%.
+- **P5: right.** Box3d's rotational energy fell 1.30% over the 30 s, more than the 1% I gave even odds.
+
+**After the read: what the step does.** This is not registered and tests nothing; section 6 holds it. The three
+configurations that keep the term were flown again at 1/240 s, for their invariants, and at 1/960 s:
+
+| configuration | rate off the prediction at 1/60, 1/240 and 1/960 s | energy change | energy drift | world-frame momentum drift |
+|---|---|---|---|---|
+| C1 box3d | +0.193%, +0.053%, +0.057% | -1.3e-2, 8.2e-3, 5.6e-2 | 1.3e-2, 9.2e-3, 5.6e-2 | 6.9e-3, 4.6e-3, 2.8e-2 |
+| C3 Jolt with the opt-in | -0.801%, -0.208%, -0.054% | 3.5e-4, 1.3e-3, 4.3e-3 | 3.5e-4, 1.3e-3, 4.3e-3 | 8.0e-3, 3.0e-3, 2.3e-3 |
+| C4 the engine's own | -0.009%, -0.009%, -0.009% | -3.5e-11, -3.9e-14, 2.8e-15 | 3.8e-10, 1.4e-12, 1.5e-14 | 8.0e-3, 2.0e-3, 5.0e-4 |
+
+- **The engine's own physics: its spin is right to fourth order, its orientation to first.**
+  - Its rate is the same at every step, so the -0.009% left over is the fit's, not the step's.
+  - Its energy error falls as the fourth power of the step until rounding stops it. It is RK4 on the angular
+    velocity.
+  - Its world-frame momentum's drift falls only as the first power. `freeRotation.stepQuat()`, which
+    `rigidBody6dof.step()` reuses, moves the orientation by one forward step.
+- **Jolt's opt-in behaves as an explicit step.**
+  - Against the engine's own physics at the same step, which takes the fit's share off, its rate is off by -0.792%,
+    -0.199% and -0.045%. An explicit step's ln(1 + sigma h)/(sigma h) - 1 is -0.792%, -0.200% and -0.050%.
+  - On the stable axes, an explicit step grows the wobble by (1 + (Omega h)^2)^(N/2). Over the 1,800 steps that gives
+    1.62 and 1.96, against the 1.60 and 1.96 measured.
+- **Box3d matches backward Euler only at the pages' step.**
+  - Against the engine's own physics, its rate is off by +0.203% at 1/60 s. Backward Euler on its 1/240 s substep
+    gives +0.201%.
+  - Then it stops shrinking: +0.062% at 1/240 s and +0.066% at 1/960 s, where that term gives +0.050% and +0.013%.
+  - Its energy, which fell at the pages' step, rises at the finer ones: +0.825% at 1/240 s and +5.602% at 1/960 s.
+    P5 held at the pages' step and not below it. The cause is not measured.
+- **Jolt's energy change grows as the step shrinks:** 3.5e-4, 1.3e-3 and 4.3e-3, roughly in proportion to the
+  number of steps. The cause is not measured.
+
+**What this says, and what it does not.**
+- **It says:** box3d integrates a free body by Euler's equations, within 0.2% of the rate at the pages' step. A ship
+  flown on box3d would turn as it does in the engine's own physics. Running the 6-DOF ships on box3d is a round of
+  its own.
+- **It says:** Jolt, as the engine's wrapper makes a body, has no gyroscopic term. A free body there keeps the
+  angular velocity it was given: it never precesses or flips. With the opt-in, Jolt follows Euler's equations to
+  within 0.8% of the rate.
+- **It does not say** anything about contact, joints, damping or applied torque: the body was free, undamped and
+  torque-free. Nor does it cover other shapes, spins or wobbles, or how any page's bodies move: none was flown.
+
+**What follows.**
+- Nothing is changed: no page, no default.
+- **Asked separately, as the registration said:** whether Jolt's wrapper should turn the opt-in on by default. That
+  changes every Jolt body in the engine, and the opt-in's explicit step grows a stable spin's wobble.
+- The engine's own orientation step is first order. That is a candidate for a round of its own; this note authorises
+  none.
+
+**The verdict, as code:** section 6 of `tools/roundhouse/spinningBody-selfcheck.mjs` re-derives every number above
+from the committed file. It flies the whole round again and holds it against the file, and it holds the study made
+after the read. Sabotaged with the byte-safe runner: 22 designs, each red by name. They edit the committed file,
+this note or the code, and the counts are in the gate's header. Every row of section 6 went red under at least one.
+One design missed its target and was replaced:
+- **V21** edited freeRotation's RK4, meaning to break the engine's own spin. But `rigidBody6dof.step()` carries its own
+  RK4, so V21 broke C-key's answer key instead, and C-key went red, rightly.
+- **V22** edits the engine's own, and the study's fourth-order row goes red by name.
