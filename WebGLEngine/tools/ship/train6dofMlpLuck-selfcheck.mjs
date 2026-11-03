@@ -18,6 +18,9 @@
 //      recomputed independently; the records; H1's test on the fruit fly's scores first (a planted field holds the order); the cross-play; the shipped pilots against the field on common opponents;
 //      C-determinism, C-twin and C-files able to fail; the searches refused out of order; the results file's format
 //   4  THE COMMAND: it never overwrites, refuses an option it does not know, holds a worker to one search of one brain, prints no score, and a worker's search is the library's to the bit
+//   5  THE VERDICT, AS CODE, FROM THE COMMITTED FILE: the registered run, the controls, every pilot's weights, the round robin whole and its records re-derived, twelve pairings flown again, H1 not shown
+//      by the test on the re-derived scores, the cross-play, the shipped pilots placed again (four of their pairings and their head-to-head flown again), the predictions, the note tied to the file,
+//      and nothing else written. Section 5 flies the round-robin seeds again: they are spent.
 //
 // SABOTAGE LOG (2026-11-03) -- each applied with the byte-safe runner, this gate run, the file restored byte-identical (sha256); the number is the rows that went red, by name:
 //   G1 the recipe at 1,000 iterations 1 | G2 fifteen searches a brain 1 | G3 the MLP on the fruit fly's search seeds 1 | G4 the round robin on a used block 1 | G5 ten round-robin seeds 2
@@ -34,6 +37,12 @@
 //   each job's brain and seed but not the recipe (the independent re-run row went red; G25 puts the bug back); (2) the brute-force check took its mid-ranks from the library under test -- now its own;
 //   (3) no made-up lead sat at the 70-0 threshold's edge -- a lead of 34 now does (G8); (4) a row ran the command against an existing results file to watch it refuse, which a sabotaged refusal
 //   would have turned into the registered round -- removed, the refusal held as a library function -- and every worker run now names a planted results file that exists (G33).
+// SABOTAGE LOG, SECTION 5 (2026-11-03, after the verdict) -- the same runner, with the committed results file or the note edited; every file restored byte-identical:
+//   V1 the file not flagged as the registered seeds 1 | V2 the file reading the fruit fly's network 3 (H1, the predictions, the note) | V3 a sampled pairing's games moved 2 (the records, the re-fly)
+//   V4 an unsampled cross pairing's games moved 3 (the records, the cross-play, the note's game counts) | V5 the twin's hash different 1 | V6 a stored weight moved 3 (the weights, the re-fly, the
+//   shipped pilots' re-flown games) | V7 the Default placed above 19 2 | V8 the shipped head-to-head at 31 wins 1 | V9 the file's p under 0.01 1 | V10 the note's median drifted 1
+//   V11 the note saying P2 right 1 | V12 the note's search table drifted 1 | V13 the note's verdict heading renamed 1 | V14 the file's recipe at 1,000 iterations 1 | V15 the Default's hash in C-files 1
+//   V16 a search's kept count drifted 2 | V17 the file's cross-play at 300 fruit fly leads 3 (the cross-play, P2 then right, the note)
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -232,6 +241,82 @@ try {
     fs.rmSync(tmp, { recursive: true, force: true });
 } catch (e) { guard(4, e); }
 
+console.log("\n5. THE VERDICT, AS CODE, FROM THE COMMITTED FILE (brain/sixdofGpuLuckResults.json, committed unread at f17701ed)");
+try {
+    // Written AFTER the file was read. Every number the note's Round 4 verdict states is re-derived here from the file -- the records, the test, the cross-play and the shipped pilots' places from its 780
+    // pairings and their leads, with this gate's own arithmetic -- and twelve pairings spread through the list, four of the shipped pilots' games and their head-to-head are flown again from the stored
+    // weights, under the recipe's duel from train6dofLeague.mjs. The round-robin seeds were read once, by the registered run, and are spent: flying them again chooses nothing.
+    const file = path.join(BRAIN, "sixdofGpuLuckResults.json"), R = JSON.parse(fs.readFileSync(file, "utf8")), S = R.searches, fly = L.flyDefault(), gpu = L.gpuChampion();
+    const rr = range(R.seeds.rr[0], R.seeds.rr[1]), brains = S.map((s) => s.brain), n = S.length, wl = (x) => `W${x.wins}/L${x.losses}/D${x.draws}`, th = (x) => x.toLocaleString("en-US");
+    const med = (xs) => { const t = [...xs].sort((a, b) => a - b), k = t.length; return k % 2 ? t[(k - 1) / 2] : (t[k / 2 - 1] + t[k / 2]) / 2; }, of = (b, f) => S.filter((s) => s.brain === b).map(f);
+    ok("!! the file is the registered run: the recipe (twenty a brain, 1,500 iterations, sigma 0.3, 1-4 weights a child, search seeds 7300.. and 7400..), the recipe's duel, the round robin on 6501-6520 and flagged so, the 40 searches in order, not stopped",
+        R.registration === "brain/SIXDOF_GPU_BRAIN_WIP.md (Round 4)" && J(R.recipe) === J({ runs: 20, iters: 1500, sigma: 0.3, maxK: 4, flySeed: 7300, mlpSeed: 7400 }) && J(R.duel) === J(DUEL) &&
+        J(R.seeds) === J({ rr: [6501, 20] }) && R.registeredSeeds === true && !R.stopped && J(S.map((s) => s.brain + s.seed)) === J([...range(7300, 20).map((x) => "fly" + x), ...range(7400, 20).map((x) => "mlp" + x)]), J(R.recipe));
+    ok("!! the controls held: C-twin 20 of 20, C-files the Default 215e26d9 and the GPU Brain's champion 0ffd8554, and C-determinism -- search 7300 gave 932674a9 both times and search 7400 ea5b9403",
+        J(R.cTwin) === J({ ok: true, same: 20, of: 20, first: null }) && J(R.cFiles) === J({ ok: true, fly: "215e26d9", gpu: "0ffd8554" }) && R.cDeterminism.ok === true &&
+        J(R.cDeterminism.twins.map((t) => [t.brain, t.seed, t.first, t.again])) === J([["fly", 7300, "932674a9", "932674a9"], ["mlp", 7400, "ea5b9403", "ea5b9403"]]) && S[0].hash === "932674a9" && S[20].hash === "ea5b9403");
+    const field = S.map((s) => ({ brain: s.brain, w: L.expand(s.brain, s.weights) })), hand = { fly: P6.handWeights(), mlp: M.handWeights() };
+    const badW = S.filter((s, k) => weightsHash(field[k].w) !== s.hash || field[k].w.length !== NET[s.brain].WEIGHT_COUNT || s.weights.i.length !== s.kept || field[k].w.filter((v, i) => Math.abs(v - hand[s.brain][i]) > 1e-6).length !== s.kept);
+    ok("!! every search's weights are in the file: each delta expands on its own network to the search's hash, and holds exactly the weights the search kept", badW.length === 0, badW.length ? "off: " + badW.map((s) => s.brain + s.seed).join(", ") : "40 of 40");
+    const pairs = []; for (let a = 0; a < n; a++) for (let b = a + 1; b < n; b++) pairs.push([a, b]);
+    const rec = S.map(() => ({ wins: 0, losses: 0, draws: 0 }));
+    for (const [a, b, w, l, d] of R.pairings) { rec[a].wins += w; rec[a].losses += l; rec[a].draws += d; rec[b].wins += l; rec[b].losses += w; rec[b].draws += d; }
+    const recs = rec.map((x) => ({ ...x, score: x.wins - x.losses }));
+    ok("!! the round robin is whole: 780 pairings, every pair once in order, 40 games each (20 seeds from both sides); each search's record re-derived here from them is the file's, and the scores sum to zero",
+        R.pairings.length === 780 && J(R.pairings.map(([a, b]) => [a, b])) === J(pairs) && R.pairings.every(([, , w, l, d]) => w + l + d === 2 * rr.length) && J(S.map((s) => s.rr)) === J(recs) && recs.reduce((a, x) => a + x.score, 0) === 0);
+    const sample = range(0, 12).map((k) => R.pairings[k * 65]), pil = field.map((e) => NET[e.brain].pilotFor(e.w)), kinds = sample.map(([a, b]) => brains[a] + "-" + brains[b]);
+    const reflown = sample.map(([a, b]) => { const x = P6.evaluate(pil[a], rr, { opponent: [pil[b]], ...DUEL }); return [a, b, x.wins, x.losses, x.draws]; });
+    ok("!! twelve pairings spread through the list (every 65th), flown again from the stored weights under the recipe's duel, give the file's games to the last one -- fruit fly against fruit fly, against the MLP, and MLP against MLP among them",
+        J(reflown) === J(sample) && ["fly-fly", "fly-mlp", "mlp-mlp"].every((k) => kinds.includes(k)), kinds.join(" "));
+    const fs20 = of("fly", (s) => s.rr.score), ms20 = of("mlp", (s) => s.rr.score), test = L.rankSumTest(recs.filter((_, k) => brains[k] === "fly").map((x) => x.score), recs.filter((_, k) => brains[k] === "mlp").map((x) => x.score));
+    ok("!! H1 IS NOT SHOWN: the rank-sum test of the fruit fly's 20 scores against the MLP's, from the records re-derived here, gives p 0.265 (rank sum 452 against the 410 expected, over C(40, 20) relabellings) -- not under 0.01 -- as the file says",
+        J(test) === J(R.test) && test.count === choose(40, 20) && test.rankSum === 452 && test.expected === 410 && test.p.toFixed(3) === "0.265" && !(test.p < 0.01) && L.readingOf(test) === "not shown" && R.reading === "not shown", `p ${test.p}`);
+    const cross = { pairings: 0, flyLeads: 0, mlpLeads: 0, level: 0, flyLopsided: 0, mlpLopsided: 0, flyWins: 0, mlpWins: 0, draws: 0 };
+    for (const [a, b, w, l, d] of R.pairings) {
+        if (brains[a] === brains[b]) continue; const fw = brains[a] === "fly" ? w : l, mw = brains[a] === "fly" ? l : w, lead = fw - mw;
+        cross.pairings++; cross.flyWins += fw; cross.mlpWins += mw; cross.draws += d; cross[lead > 0 ? "flyLeads" : lead < 0 ? "mlpLeads" : "level"]++; if (lead >= 35) cross.flyLopsided++; if (lead <= -35) cross.mlpLopsided++;
+    }
+    ok("!! the cross-play, re-derived from the pairings: 400, the fruit fly's search leading in 236, the MLP's in 154, 10 level; 6 as lopsided as 70-0, all for the fruit fly; 6,189 games won to 4,722, with 5,089 drawn",
+        J(cross) === J(R.cross) && J(cross) === J({ pairings: 400, flyLeads: 236, mlpLeads: 154, level: 10, flyLopsided: 6, mlpLopsided: 0, flyWins: 6189, mlpWins: 4722, draws: 5089 }), J(cross));
+    const sf = R.shipped.fly, sg = R.shipped.gpu, place = (lead, b) => { const tot = lead.reduce((x, y) => x + y, 0); return S.filter((s, k) => s.brain === b && tot - lead[k] > recs[k].score).length; };
+    const again = [[fly, P6, 0], [fly, P6, 39], [gpu, M, 0], [gpu, M, 39]].map(([w, net, k]) => { const x = P6.evaluate(net.pilotFor(w), rr, { opponent: [pil[k]], ...DUEL }); return x.wins - x.losses; });
+    const hh = P6.evaluate(P6.pilotFor(fly), rr, { opponent: [M.pilotFor(gpu)], ...DUEL });
+    ok("!! the shipped pilots, re-derived from their leads: the Default W1205/L24/D371, ahead of every entrant (by 9 to 40), above all 20 searches of each network on common opponents; the GPU Brain's champion W442/L527/D631, above 8 and 9 -- and four of their pairings and their own head-to-head (W32/L0/D8) flown again",
+        sf.lead.length === 40 && sg.lead.length === 40 && sf.score === sf.lead.reduce((x, y) => x + y, 0) && sg.score === sg.lead.reduce((x, y) => x + y, 0) && wl(sf) === "W1205/L24/D371" && wl(sg) === "W442/L527/D631" &&
+        sf.wins + sf.losses + sf.draws === 1600 && Math.min(...sf.lead) === 9 && Math.max(...sf.lead) === 40 && place(sf.lead, "fly") === 20 && place(sf.lead, "mlp") === 20 && J(sf.above) === J({ fly: 20, mlp: 20 }) &&
+        place(sg.lead, "fly") === 8 && place(sg.lead, "mlp") === 9 && J(sg.above) === J({ fly: 8, mlp: 9 }) && J(again) === J([sf.lead[0], sf.lead[39], sg.lead[0], sg.lead[39]]) &&
+        J(cp(hh)) === J(R.shipped.flyVsGpu) && wl(hh) === "W32/L0/D8", `re-flown leads ${again.join(", ")}`);
+    const fk = of("fly", (s) => s.kept), mk = of("mlp", (s) => s.kept), A = test.u / (test.n1 * test.n2), bestHeld = Math.max(...S.map((s) => s.held.score));
+    ok("  reported, testing nothing: the medians 165.5 and -43.5, the ranges -906 to 871 and -743 to 612, a fruit fly search outranking an MLP search with probability 0.605, the fruit fly leading 59% of the cross pairings, and the best fresh held-out score 20.43",
+        med(fs20) === 165.5 && med(ms20) === -43.5 && Math.min(...fs20) === -906 && Math.max(...fs20) === 871 && Math.min(...ms20) === -743 && Math.max(...ms20) === 612 && A.toFixed(3) === "0.605" &&
+        Math.round((100 * cross.flyLeads) / cross.pairings) === 59 && bestHeld.toFixed(2) === "20.43");
+    const pred = { P1: R.reading === "the fruit fly's network", P2: R.cross.flyLeads >= 300, P3: R.shipped.fly.above.fly >= 15, P4: med(mk) < med(fk) };
+    ok("!! the four predictions, read off the file: P1 and P2 wrong (not shown; the fruit fly led in 236 of 400, not 300), P3 and P4 right (the Default above all 20 of its brain's searches; a median of 38.5 weights kept against 55.5)",
+        !pred.P1 && !pred.P2 && pred.P3 && pred.P4 && med(mk) === 38.5 && med(fk) === 55.5, J(pred));
+    const note = fs.readFileSync(path.join(BRAIN, "SIXDOF_GPU_BRAIN_WIP.md"), "utf8"), at = note.indexOf("\n### Round 4: the verdict"), end = at >= 0 ? note.indexOf("\n## ", at + 1) : -1;
+    const vt = at >= 0 ? note.slice(at, end > 0 ? end : undefined).replace(/\s+/g, " ") : "";   // that section alone, its line breaks read as spaces
+    const esc = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), stands = (x) => new RegExp("(?<![0-9])" + esc(x) + "(?![0-9])").test(vt);
+    const rowOf = (s) => `| ${s.seed} | ${s.trainScore.toFixed(2)} | ${s.improved} | ${s.neutral} | ${s.moved} | ${s.kept} | ${s.held.score.toFixed(2)} (${wl(s.held)}) | ${wl(s.rr)} | ${s.rr.score} |`;
+    const mins = (b) => of(b, (s) => s.ms / 60000), f1 = (x) => x.toFixed(1), crossGames = cross.flyWins + cross.mlpWins + cross.draws;
+    const frags = [...S.map(rowOf), `${f1(Math.min(...mins("fly")))} to ${f1(Math.max(...mins("fly")))} minutes each and the MLP's ${f1(Math.min(...mins("mlp")))} to ${f1(Math.max(...mins("mlp")))}`,
+                   `on all ${R.cTwin.same} train and held-out seeds`, `search 7300 gave ${S[0].hash} both times, and search 7400 gave ${S[20].hash} both times`,
+                   `p = ${test.p.toFixed(3)} (a rank sum of ${test.rankSum} against the ${test.expected} expected)`, `a median score of ${med(fs20)} against ${med(ms20)}, over ${th((n - 1) * 2 * rr.length)} games each`,
+                   `with probability ${A.toFixed(3)}`, `run from ${Math.min(...fs20)} to ${Math.max(...fs20)}, the MLP's from ${Math.min(...ms20)} to ${Math.max(...ms20)}`,
+                   `leads in ${cross.flyLeads} of the ${cross.pairings} pairings, the MLP's in ${cross.mlpLeads}, and ${cross.level} are level`,
+                   `Over their ${th(crossGames)} games the fruit fly won ${th(cross.flyWins)} and the MLP ${th(cross.mlpWins)}, with ${th(cross.draws)} draws`,
+                   `${cross.flyLopsided} of the ${cross.pairings} fresh cross pairings were as lopsided`, ...(cross.mlpLopsided === 0 ? ["and none for the MLP"] : []),
+                   `${wl(sf)} over ${th(sf.wins + sf.losses + sf.draws)} games, a lead of between ${Math.min(...sf.lead)} and ${Math.max(...sf.lead)}`,
+                   `above all ${sf.above.fly} fruit fly searches and all ${sf.above.mlp} MLP searches`, `${wl(sg)}, above ${sg.above.fly} of the 20 fruit fly searches and ${sg.above.mlp} of the 20 MLP searches`,
+                   `the Default beat the GPU Brain's champion ${wl(hh)}`, `the best of the 40 scored ${bestHeld.toFixed(2)}`, `led in ${cross.flyLeads} of the ${cross.pairings} cross pairings, not 300 or more`,
+                   `placed above all ${sf.above.fly} of the fruit fly's searches`, `a median of ${med(mk)} against the fruit fly's ${med(fk)}`, `it led in ${Math.round((100 * cross.flyLeads) / cross.pairings)}% of the cross pairings`,
+                   "**H1 is not shown.**", ...Object.keys(pred).map((k) => `**${k}: ${pred[k] ? "right" : "wrong"}.**`)];
+    const missing = frags.filter((x) => !stands(x));
+    ok("!! the note's Round 4 verdict carries the file's numbers, its forty searches row by row, and each prediction's outcome as the file decides it (no digit may touch a fragment's ends; read from that section alone)",
+        at > 0 && missing.length === 0, missing.length ? "missing: " + missing.join(" || ").slice(0, 300) : `${frags.length} fragments`);
+    const other = fs.readdirSync(BRAIN).filter((f) => /luck/i.test(f) && f !== "sixdofGpuLuckResults.json");
+    ok("  and nothing else is written: no other file under brain/ names the round, the results file its one output", other.length === 0, other.join(", "));
+} catch (e) { guard(5, e); }
+
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +
-    "\nnot closed here: the round itself -- the registered run writes brain/sixdofGpuLuckResults.json, committed before it is read, and its verdict becomes section 5.");
+    "\nnot closed here: whether a modest edge for either network hides under the spread (more searches a side would say), how these pilots fly on the page, and the recipe's other draws -- none of it registered.");
 process.exit(fails ? 1 : 0);

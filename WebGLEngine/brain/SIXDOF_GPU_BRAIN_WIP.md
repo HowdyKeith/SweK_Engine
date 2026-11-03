@@ -800,3 +800,114 @@ against twenty completely apart it gives exactly 2 in C(40, 20).
   with nothing flown.
 
 **The registered run:** `node tools/ship/trainMlp6dofLuck.mjs --workers 4`.
+
+### Round 4: the verdict, 2026-11-03 (read from the committed file, after it was committed)
+
+The registered run wrote `brain/sixdofGpuLuckResults.json` at head eaa0dc7d. It was committed byte for byte at
+f17701ed before anyone read it. It flew the registered seeds and says so (`registeredSeeds: true`). The fruit fly's
+searches took 2.3 to 3.2 minutes each and the MLP's 1.7 to 2.1, four at a time. Every number below is re-derived from
+that file in section 5 of `tools/ship/train6dofMlpLuck-selfcheck.mjs`, and a sample of its games is flown again there
+from the pilots' weights.
+
+**The controls held.**
+- **C-twin:** the hand MLP flew the fruit fly's hand pilot to the bit on all 20 train and held-out seeds.
+- **C-files:** the Default was 215e26d9 and the GPU Brain's champion 0ffd8554.
+- **C-determinism:** search 7300 gave 932674a9 both times, and search 7400 gave ea5b9403 both times.
+
+**H1 is not shown.** The rank-sum test of the fruit fly's 20 round-robin scores against the MLP's gives p = 0.265 (a
+rank sum of 452 against the 410 expected), not under 0.01. Twenty searches a side cannot tell the two networks apart.
+- **The fruit fly's searches are ahead in the middle:** a median score of 165.5 against -43.5, over 1,560 games each.
+  A fruit fly search outranks an MLP search with probability 0.605.
+- **The spreads overlap almost entirely:** the fruit fly's scores run from -906 to 871, the MLP's from -743 to 612.
+- **The cross-play:** the fruit fly's search leads in 236 of the 400 pairings, the MLP's in 154, and 10 are level. Over
+  their 16,000 games the fruit fly won 6,189 and the MLP 4,722, with 5,089 draws.
+
+**The first round's 70-0 was the fruit fly's draw.**
+- **It was rare:** 6 of the 400 fresh cross pairings were as lopsided (a lead of 35 or more over 40 games), all six for
+  the fruit fly and none for the MLP.
+- **The fruit fly's Default beat every one of the 40 fresh searches, of both networks:** W1205/L24/D371 over 1,600 games,
+  a lead of between 9 and 40 in each 40-game pairing. On common opponents it places above all 20 fruit fly searches and
+  all 20 MLP searches.
+- **The GPU Brain's champion sits in the middle:** W442/L527/D631, above 8 of the 20 fruit fly searches and 9 of the 20
+  MLP searches.
+- **The first round's pairing, replayed on these seeds,** went the same way: the Default beat the GPU Brain's champion
+  W32/L0/D8.
+- **The Default is a draw of this same recipe.** Re-trained from its search seed 2000 under today's code, after the
+  file was read, it came out 215e26d9 to the bit: 42 improvements, 698 moved weights pruned to 84, held-out 20.57. That
+  check is not registered, tests nothing, and no gate holds it (it takes 2.7 minutes). Its held-out score is above every
+  fresh search's; the best of the 40 scored 20.43.
+
+**The fruit fly's twenty searches** (round robin: W/L/D over 1,560 games, and the score, wins minus losses):
+
+| search | train | improvements | neutral | moved | kept | held-out against the PD autopilot | round robin | score |
+|---|---|---|---|---|---|---|---|---|
+| 7300 | 21.13 | 21 | 728 | 667 | 46 | 20.30 (W5/L0/D3) | W934/L220/D406 | 714 |
+| 7301 | 19.93 | 20 | 741 | 673 | 62 | 18.39 (W1/L1/D6) | W123/L1029/D408 | -906 |
+| 7302 | 20.93 | 22 | 847 | 719 | 27 | 20.19 (W5/L0/D3) | W697/L359/D504 | 338 |
+| 7303 | 21.34 | 23 | 692 | 669 | 58 | 17.82 (W2/L2/D4) | W1024/L228/D308 | 796 |
+| 7304 | 20.58 | 23 | 654 | 669 | 72 | 20.20 (W5/L0/D3) | W361/L591/D608 | -230 |
+| 7305 | 20.73 | 22 | 745 | 700 | 36 | 20.22 (W5/L0/D3) | W537/L526/D497 | 11 |
+| 7306 | 20.40 | 15 | 783 | 697 | 19 | 19.51 (W3/L0/D5) | W207/L947/D406 | -740 |
+| 7307 | 21.13 | 29 | 607 | 622 | 47 | 20.25 (W5/L0/D3) | W727/L319/D514 | 408 |
+| 7308 | 20.83 | 34 | 600 | 597 | 61 | 20.27 (W5/L0/D3) | W698/L359/D503 | 339 |
+| 7309 | 20.14 | 16 | 675 | 660 | 42 | 19.97 (W4/L0/D4) | W350/L589/D621 | -239 |
+| 7310 | 21.05 | 13 | 821 | 736 | 53 | 20.24 (W5/L0/D3) | W659/L330/D571 | 329 |
+| 7311 | 21.26 | 37 | 764 | 717 | 110 | 20.43 (W5/L0/D3) | W1030/L159/D371 | 871 |
+| 7312 | 20.98 | 29 | 633 | 640 | 126 | 20.11 (W5/L0/D3) | W538/L462/D560 | 76 |
+| 7313 | 19.99 | 19 | 709 | 687 | 69 | 18.22 (W2/L2/D4) | W308/L717/D535 | -409 |
+| 7314 | 20.82 | 13 | 718 | 682 | 15 | 20.32 (W5/L0/D3) | W666/L411/D483 | 255 |
+| 7315 | 20.50 | 14 | 748 | 672 | 25 | 19.79 (W4/L0/D4) | W301/L824/D435 | -523 |
+| 7316 | 21.01 | 30 | 773 | 717 | 64 | 14.78 (W3/L2/D3) | W734/L412/D414 | 322 |
+| 7317 | 20.06 | 16 | 827 | 720 | 38 | 17.87 (W1/L2/D5) | W345/L862/D353 | -517 |
+| 7318 | 21.17 | 25 | 692 | 674 | 63 | 20.35 (W5/L0/D3) | W883/L222/D455 | 661 |
+| 7319 | 20.63 | 34 | 626 | 647 | 61 | 19.81 (W4/L0/D4) | W461/L550/D549 | -89 |
+
+**The GPU Brain's twenty searches:**
+
+| search | train | improvements | neutral | moved | kept | held-out against the PD autopilot | round robin | score |
+|---|---|---|---|---|---|---|---|---|
+| 7400 | 20.37 | 26 | 929 | 1148 | 22 | 20.22 (W5/L0/D3) | W369/L547/D644 | -178 |
+| 7401 | 20.63 | 12 | 1081 | 1239 | 16 | 19.84 (W4/L0/D4) | W656/L358/D546 | 298 |
+| 7402 | 20.92 | 29 | 843 | 1062 | 74 | 20.22 (W5/L0/D3) | W690/L341/D529 | 349 |
+| 7403 | 20.60 | 18 | 872 | 1071 | 38 | 20.27 (W5/L0/D3) | W501/L432/D627 | 69 |
+| 7404 | 21.00 | 21 | 915 | 1109 | 47 | 19.93 (W4/L0/D4) | W480/L537/D543 | -57 |
+| 7405 | 20.81 | 29 | 873 | 1100 | 109 | 19.03 (W3/L1/D4) | W596/L415/D549 | 181 |
+| 7406 | 20.06 | 16 | 853 | 1044 | 38 | 17.86 (W1/L2/D5) | W257/L777/D526 | -520 |
+| 7407 | 21.15 | 26 | 961 | 1139 | 68 | 20.41 (W5/L0/D3) | W897/L285/D378 | 612 |
+| 7408 | 20.28 | 18 | 822 | 1037 | 102 | 17.36 (W1/L2/D5) | W144/L887/D529 | -743 |
+| 7409 | 20.81 | 20 | 1002 | 1183 | 29 | 20.11 (W5/L0/D3) | W634/L426/D500 | 208 |
+| 7410 | 20.86 | 21 | 1000 | 1168 | 39 | 19.99 (W4/L0/D4) | W594/L399/D567 | 195 |
+| 7411 | 20.28 | 16 | 876 | 1082 | 75 | 19.51 (W3/L0/D5) | W312/L730/D518 | -418 |
+| 7412 | 20.62 | 17 | 1026 | 1197 | 41 | 13.92 (W1/L2/D5) | W432/L694/D434 | -262 |
+| 7413 | 20.83 | 21 | 758 | 987 | 55 | 18.63 (W2/L1/D5) | W498/L528/D534 | -30 |
+| 7414 | 20.75 | 19 | 834 | 1069 | 53 | 17.37 (W2/L3/D3) | W452/L668/D440 | -216 |
+| 7415 | 20.83 | 11 | 970 | 1163 | 15 | 20.00 (W4/L0/D4) | W659/L324/D577 | 335 |
+| 7416 | 20.35 | 17 | 895 | 1106 | 33 | 13.85 (W2/L3/D3) | W229/L907/D424 | -678 |
+| 7417 | 19.90 | 11 | 1067 | 1222 | 13 | 19.48 (W3/L0/D5) | W309/L773/D478 | -464 |
+| 7418 | 20.72 | 19 | 957 | 1149 | 24 | 18.47 (W1/L1/D6) | W330/L709/D521 | -379 |
+| 7419 | 20.98 | 21 | 963 | 1158 | 30 | 19.55 (W3/L0/D5) | W644/L413/D503 | 231 |
+
+**The predictions:**
+- **P1: wrong.** H1 is not shown; I gave "the fruit fly's network" 65%.
+- **P2: wrong.** The fruit fly's search led in 236 of the 400 cross pairings, not 300 or more.
+- **P3: right.** The Default placed above all 20 of the fruit fly's searches; I said at least 15.
+- **P4: right.** The MLP's searches kept fewer weights: a median of 38.5 against the fruit fly's 55.5.
+
+**What this says, and what it does not.**
+- **It says:** trained by the same recipe, the two networks make pilots whose spread is far wider than the gap between
+  the networks. Twenty searches a side could not separate them. The first round's 70-0 put the strongest pilot measured
+  here against an ordinary MLP draw.
+- **It also says:** Rounds 2 and 3 set the MLP to beat that draw, a pilot that beat every fresh pilot of either network
+  here.
+- **It does not say** that the networks are equal. "Not shown" leaves room for a modest edge to the fruit fly: its
+  median is ahead, and it led in 59% of the cross pairings. Nor does it say how these pilots fly on the page or under
+  another recipe. None of that was tested.
+
+**What follows.**
+- Nothing is written, and the page is unchanged. The capability map's GPU cell cites the result.
+- This note authorises no further round.
+
+**Round 4's verdict, as code:** section 5 of `tools/ship/train6dofMlpLuck-selfcheck.mjs` re-derives every number above
+from the committed file and flies a sample of its games again from the pilots' weights. Sabotaged with the byte-safe
+runner: 17 designs, each red by name. They edit the committed file or this note, and the counts are in the gate's
+header.
