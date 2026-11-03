@@ -536,3 +536,121 @@ from the committed file. It flies the whole round again and holds it against the
 growth against every Jolt reading. Sabotaged with the byte-safe runner: 20 designs, each red by name, and every row of
 section 6 went red under at least one. They edit the committed file, this note or the code, and the counts are in the
 gate's header.
+
+## The implicit gyroscopic step in Jolt's wrapper -- Keith's pick, registered before any code (2026-11-03)
+
+Keith, 2026-11-03: "Do the implicit gyroscopic step in the wrapper." The second round's verdict offered it: Jolt's flag
+off, and the wrapper takes the gyroscopic step itself, implicitly, the way box3d's solver does.
+
+> **With the wrapper's own implicit step in place of Jolt's explicit one, does a free Jolt body still follow Euler's
+> equations, and do fast stable spins stay stable? What does it cost instead?**
+
+### The change
+
+- **The step is box3d's.** `b3IntegrateVelocitiesTask` in box3d v0.1.0's `solver.c` solves
+  I (w2 - w1) + h w2 x (I w2) = 0 in body coordinates, by one Newton step from w1, with the Jacobian
+  J = I + h (skew(w) I - skew(I w)). It does this once a substep, after damping, and does not renormalise. A new
+  module, `physics/mechanics/implicitGyro.mjs`, does the same in double precision.
+- **The wrapper takes it before every `step()`.** For each awake dynamic body that has the step:
+  - it reads the body's angular velocity and orientation;
+  - it takes the step over the whole `dt`;
+  - it writes the result back, and then Jolt steps.
+  At the pages' one substep that is box3d's step exactly. At more substeps it is still taken once, over the whole
+  step, and Jolt's own substepping is left as it is.
+- **The default becomes the implicit step.** `addBox()`'s `gyroscopic` takes three values:
+  - `"implicit"` is the new default. Jolt's own flag is off, and the wrapper takes the step.
+  - `true` (or `"jolt"`) is Jolt's own explicit force, as before. Every caller that passed `true` keeps exactly what
+    it had.
+  - `false` means neither.
+- **A body whose three moments are equal is skipped.** Its gyroscopic torque is exactly zero, so a ship (a cube) is
+  left untouched: not even the rounding the second round measured.
+- **`addShip()` passes a `gyroscopic` setting through when it is given one**, and otherwise takes the default.
+- **A world reports each body's setting** as `gyroscopicOf(i)`: `"implicit"`, `"jolt"` or false.
+- **The two earlier rounds keep what they measured.**
+  - The spinning body's C3 passes `true`, which is still Jolt's own force.
+  - The second round's library relied on the loader's default in three places: its "default" body, its ship and
+    C-flag. It now passes the default as it was registered (`true`), with a dated note, so its committed results fly
+    again unchanged.
+
+### What is measured, in one registered run
+
+Everything is at the pages' 1/60 s, at one substep unless stated, with zero damping and zero gravity. Jolt and box3d
+are each reached through their own loader.
+
+- **M1, the default body, about the intermediate axis.** The spinning body's spin (2 rad/s, wobble 1e-5, 30 s) on the
+  fixture made with no flag:
+  - its reading by the spinning body's rule, and its rate;
+  - the change of its rotational energy and of its angular momentum's length over the 30 s;
+  - its flips.
+- **M2, the ship.** The second round's cube from `addShip()`, spun at 2 rad/s about (1, 2, 3) for 30 s with the
+  default, against the same cube with the force passed off. The largest change of its angular velocity, and whether
+  the two traces are one.
+- **M3, the stable spins.** The fixture about its largest and smallest axes at 2, 5, 10 and 20 rad/s, with the
+  wobble of 1e-5 of the spin, for 30 s. Each spin gives its largest growth, the time it first passed 10% of the spin,
+  and its size at the end of the window over its start. The reading is the second round's rule. The configurations:
+  - JI: Jolt with the new default, the wrapper's implicit step;
+  - JE: Jolt's own explicit force (`true`), the second round's J;
+  - OWN: the engine's own physics;
+  - reported, testing nothing: B3, box3d's own implicit step at its four substeps; and J0, Jolt with neither.
+- **M4, the rest of the engine.** Not part of the run. The 73 gates that reach Jolt are run after the change and
+  BEFORE any row is restated, so every row the change turns red is seen red. They are named in the build record, and
+  each is then restated with a dated note (it recorded the old default) or fixed.
+- **Reported, testing nothing, and not in the results file** (a time does not repeat from one machine to the next): the
+  wrapper's step time for 200 awake bodies with the implicit step and with neither.
+
+### Controls
+
+- **C-flag:** a body made with no flag reports "implicit" with Jolt's own flag off; `true` reports "jolt" with Jolt's
+  flag on; `false` reports neither; a static body neither. Otherwise nothing is read.
+- **C-box3d:** one box3d substep (h = 1/240) from a wobbling spin, against the new module's step from the same angular
+  velocity. They agree to 1e-6, single precision, so the step is box3d's.
+- **C-repeat:** JE's sixteen spins are the second round's committed J, number for number. The instrument has not moved.
+- **C-key, C-inertia, C-undamped and C-determinism,** as in the second round.
+
+### Predictions, fixed now, deciding nothing
+
+Backward Euler on a step h shrinks an oscillating wobble by 1 / sqrt(1 + (Omega h)^2) a step, and runs an unstable
+one at sigma (1 + sigma h / 2).
+
+- **P1:** M1 reads "Euler's equations", its rate +0.80% off the prediction (backward Euler's +0.807% at h = 1/60, less
+  the fit's 0.009%), to within 0.05 of a point (80%).
+- **P2:** JI keeps every stable spin, at every rate, about both axes (90%).
+- **P3:** JI shrinks the stable wobbles. At 5 rad/s and above, each ends the window below half its start (75%).
+- **P4:** M1's tumble on JI loses between 1% and 10% of its rotational energy over the 30 s (60%).
+- **P5:** the ship's trace with the default is its trace with the force off, to the bit (95%).
+- **P6:** box3d (reported) keeps every stable spin too (85%).
+- **P7:** in M4, the only rows that go red are those that read the loader's default or rely on a body made with no
+  flag (the spinning body's default row, and the second round's rows that read the default), plus the record that
+  holds the loader's size. No physics gate goes red (60%).
+
+### What was seen first
+
+- **The second round's results:**
+  - Jolt's explicit step loses fast stable spins.
+  - The engine's own physics, RK4, keeps every one.
+  - Box3d's implicit step kept both stable wobbles inside Euler's bounds at 2 rad/s, at its four substeps (the
+    spinning body: 1.0000 and 1.4370). That is the only rate box3d has been flown at.
+- **The step itself:** box3d's code was read (above). Nothing of the new step has been run.
+
+### What each outcome buys
+
+- If P2 holds, the default is the implicit step:
+  - a fast stable spin on Jolt stays stable;
+  - its wobble shrinks where real physics keeps it, which is the step's price;
+  - the intermediate-axis tumble still runs at Euler's rate to within about 1%.
+- If P2 fails, the verdict says how, and whether the default stays goes back to Keith.
+- This note authorises no further round.
+
+### Cost
+
+Seconds.
+
+### To be built
+
+- `physics/mechanics/implicitGyro.mjs` (the step).
+- The loader's step, its default and `gyroscopicOf()`.
+- The second round's library passing its registered default explicitly.
+- The rows that state the old default, restated with dated notes after M4 has seen them red.
+- `tools/roundhouse/joltGyroImplicit.mjs` (the library), `tools/roundhouse/joltGyroImplicitRun.mjs` (the command) and
+  `tools/roundhouse/joltGyroImplicit-selfcheck.mjs` (the gate).
+- The results go to `physics/mechanics/joltGyroImplicitResults.json`, committed before it is read.
