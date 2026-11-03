@@ -2928,6 +2928,13 @@ export const NEXT_ROUNDS = [
         why: "The confirmed clear clears a leaking dropout sooner and the ghost restores the cell at one reading, but it also restores a smear edge the strict near clear would have kept; whether the fraction by range still matters behind a ghost is not known.",
     },
     {
+        id: "nav-sensed-detector-hold-confirm-range-hold-range",
+        blocker: "OPEN",
+        what: "Follow-up 18 (brain/SENSED_NAV_WIP.md, read) found the ghost, a cleared cell re-marked at one reading, adds a little to the range-aware detector with the evidence hold, and its designated had the highest count of the six. Registered as FOLLOW-UP 41 of that note (the name was Keith's; no entry existed, and it is follow-up 18's name with range on the end, the move follow-ups 37 and 38 made: the ghost knowing how far). The zone is judged at the ping that clears the cell, not at the one that re-marks it, because a ghost re-marked within 80 m is a no-op under a first-reading near mark (read from the module with a scratch script). Rests on follow-up 18, which is read, and says so. Two new fields in the module (ghost.zone, shared with follow-ups 37 and 38, and ghost.at): the build waits for the sets of follow-ups 8 to 24, then adds them, two registry rows, the set HELD46 and a spec.",
+        how: "After the sets of follow-ups 8 to 24 are flown: the range-aware 2-of-3 mark with the evidence hold at every range, with no ghost, the ghost for cells cleared beyond 80 m, within 80 m and at any range, against the uniform pair and the map that forgets, under range-law false returns of mean 0.03 with dropouts of 30 pings, the uniform false rate of 0.01, the persistent mix and a clean sea; HELD46 = seeds 4601 to 4660; the registration is in the note.",
+        why: "A ghost within 80 m cannot act on a cell marked at one reading, so the far ghost should be the whole effect; whether the near-cleared ghost, which acts when the vessel has moved on, adds or costs anything is not known, and the effect is expected to be small.",
+    },
+    {
         id: "nav-sensed-detector-confirm-hold-range-hold",
         blocker: "OPEN",
         what: "Follow-up 26 (brain/SENSED_NAV_WIP.md) asks which range-aware mark to use with the evidence hold at every range; a strict far rule is slow to re-mark a cell the hold has let go (a dropout of 30 pings clears every cell watched for fewer than thirty readings). Registered as FOLLOW-UP 30 of that note (the name was Keith's; no entry existed, and it is follow-up 26's name with a hold on the end, the move follow-ups 18 and 29 made: a second hold on what has been confirmed, the ghost). The build waits for the sets of follow-ups 8 to 24: one registry row, the set HELD35 and a spec are added then.",
