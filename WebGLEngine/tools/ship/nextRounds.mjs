@@ -2862,6 +2862,13 @@ export const NEXT_ROUNDS = [
         why: "The far end of the long sonar is the end the range-aware confirmation thins; a memory is the cheap way to keep it.",
     },
     {
+        id: "nav-sensed-detector-hold-range-confirm",
+        blocker: "OPEN",
+        what: "Follow-up 15 (brain/SENSED_NAV_WIP.md) asks which range the evidence hold goes by and whether its gate is a step or a ramp, for a hold that is a run of free readings; follow-up 24 pairs the gated hold with the confirmed clear. Registered as FOLLOW-UP 27 of that note (the name was Keith's; no entry existed, and it is follow-up 15's name with the confirmation of follow-up 24 on the end: follow-up 15's question asked of the confirmed hold). The build waits for the sets of follow-ups 8 to 24: four registry rows, the set HELD32 and a spec are added then.",
+        how: "After the sets of follow-ups 8 to 24 are flown: a 2-of-3 mark with the evidence hold of cap 30 cleared by 0.8 of the window free, gated by the range at the ping, at the marking or the nearest read, as a step at 80 m or a ramp to 200 m, against the hold at every range and the map that forgets, under range-law false returns of mean 0.03 with dropouts of 30 pings, the uniform false rate of 0.01 with leaking dropouts and a clean sea; HELD32 = seeds 3201 to 3260; the registration is in the note.",
+        why: "A confirmed clear cleans the smear the ramp and the range choice were meant to; whether the range still matters is not known.",
+    },
+    {
         id: "nav-sensed-detector-confirm-hold-range",
         blocker: "OPEN",
         what: "Follow-up 20 (brain/SENSED_NAV_WIP.md) asks which M-of-N mark to use with the evidence hold in place, the same rule at every range; follow-up 14 compared the range-aware family with a clear of one. Registered as FOLLOW-UP 26 of that note (the name was Keith's; no entry existed, and it is follow-up 20's name with range on the end: follow-up 20's question asked of the range-aware mark). The build waits for the sets of follow-ups 8 to 24: four registry rows, the set HELD31 and a spec are added then.",

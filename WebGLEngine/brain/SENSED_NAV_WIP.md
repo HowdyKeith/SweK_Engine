@@ -1091,3 +1091,34 @@ So the round asks two things the other two cannot: **what the memory is worth in
 **What it would not say.** That 80 m and 3-of-4 are the right numbers or that the far rule should be a step and not a smooth function of range; that the readings of a cell are independent; that the range law is true of a real sonar; that a gated hold (follow-up 24) or a confirmed clear (follow-up 21) changes the order of the rules. Not a different pilot, a different generator or the moving ships. A result is a statement about this generator and these models.
 
 **The build waits.** The module and the study engine of follow-ups 8 to 24 are frozen until their sets are flown; this round needs four detectors the registry does not have (`rm22e30`, `rm33e30`, `rm24e30`, `rm34e30`, each a registry row), the set HELD31 and a spec, added **after** the sets of follow-ups 8 to 24 are flown and **before** HELD31 is (as follow-up 25's are).
+
+## FOLLOW-UP 27: WHICH RANGE THE CONFIRMED HOLD GOES BY (Keith, 2026-11-03: "lets also do nav-sensed-detector-hold-range-confirm", asked while the DEV runs of follow-ups 8 to 24 were being flown; REGISTERED BEFORE ANY CODE FOR IT AND BEFORE ANY SET OF 8 TO 27 IS FLOWN, so nothing below was shaped by a result)
+
+**What the name was taken to mean, said first.** No backlog entry had that name. It is follow-up 15's name (`detector-hold-range`: which range the hold goes by, and whether the gate is a step or a ramp) with `-confirm` on the end, and follow-up 24's name (`detector-range-hold-confirm`) with the emphasis moved the way follow-up 15 moved follow-up 13's. The confirmation is the hold's, as in follow-up 24: **the confirmed clear of follow-up 21**. Taken as **follow-up 15's question asked of the confirmed hold**: the clear is `K` = 0.8 of the last `min(30, occ)` readings free, the hold's length is gated by a range, and the range is the cell's range **at the ping**, **at its marking** or **the nearest it has read occupied from**, as a **step** at 80 m or a **ramp** to 200 m. The mark is follow-up 24's (2-of-3 at every range), so the hold is the only thing that varies. If it meant something else, say so before the build.
+
+**The question.** Follow-up 15 asked which range suits a hold that is a run of free readings. A confirmed clear is not a run: it clears a cell that flickers occupied, and it clears a leaking dropout sooner. Whether the choice of range still matters when the clear tolerates an occupied reading in five is the question, and it is asked under the two conditions that carry the two prices (far dropouts, a leaking dropout).
+
+**The rule** (follow-up 24's detector with the gate's range and shape chosen): a free cell is marked when at least 2 of its last 3 readings were occupied, at every range; a marked cell is cleared when at least `K = ceil(0.8 x L)` of its last `L` readings were free, where `L = min(g(r), occ)` and `g(r)` is **step**: 30 if `r` <= 80 m, else 1; or **ramp**: `max(1, round(30 (1 - r / 200 m)))`; `r` is the cell's range **`ping`** (now), **`mark`** (at its marking) or **`min`** (the least range it has read occupied from since it was last cleared).
+
+**Conditions** (everything else as follows-ups 3 to 26): **`R3D30`** (follow-up 17's: the white faults with the range law and the false rate 0.03 at its mean, with dropouts of 30 pings and the range law), **`WD30L`** (follow-up 21's: the false rate 0.01 uniform, dropouts of 30 pings leaking at 0.15) and a sea with no faults.
+
+**Arms** (every arm but `exact` is the 200 m sonar with the white 3 m fix and the 2-of-3 mark): `exact`; the clean `long+fix+forget`; under `R3D30` the seven detectors **`inc`** (the map that forgets), **`m23e30k`** (the hold at every range), **`m23re30k`** (follow-up 24's designated: step, `ping`), **`m23mk30k`** (step, `mark`), **`m23mn30k`** (step, `min`), **`m23rp30k`** (ramp, `ping`) and **`m23rn30k`** (**the designated: ramp, `min`**, as follow-up 15's); under `WD30L` `inc`, `m23e30k`, `m23re30k` and `m23rn30k` (4); and `m23re30k` and `m23rn30k` on a sea with no faults (2). Fifteen arms, 2,700 flights. **The set is HELD32 = seeds 3201 to 3260 of each of `hard-islands`, `hard-gaps` and `hard-current`** (180 scenarios), fresh, flown ONCE.
+
+**Bar and verdict.** The designated `m23rn30k` reaches **at least 80% of what `exact` reaches in EACH kind under `R3D30` and under `WD30L`**: six cells. **SUPPORTED** if all six, **PARTLY SUPPORTED** if at least four, **NOT SUPPORTED** otherwise.
+
+**The tension, said before the data.** The ramp is shorter than the step inside 80 m and longer outside it, so it gives up some near hold for the 80 to 160 m band, where the fix smear is dearest; the confirmed clear already cleans that smear (follow-up 21), so the ramp may buy nothing the clear does not; and `min` keeps a wall held after the vessel has passed it, which costs only if the plan uses the cells behind.
+
+**Predictions (scored held or missed, moving nothing; pooled over the three kinds unless said; each with its reason; the ids carry the letters AB).**
+* **AB1** the range at marking is the wrong range: under `R3D30`, `m23mk30k` reaches at least 10 fewer than `m23re30k`. (Follow-up 15's T1: a cell marked from 150 m is a far cell for ever.)
+* **AB2** the nearest range ever read does as well as the range now: under `R3D30`, `m23mn30k` is within 10 of `m23re30k` (either side). (Follow-up 15's T2.)
+* **AB3** the ramp does as well as the step: under `R3D30`, `m23rp30k` is within 10 of `m23re30k` (either side). (Follow-up 15's T3.)
+* **AB4** the designated covers the long dropout: under `R3D30`, `m23rn30k` reaches at least 10 more than `inc`.
+* **AB5** `m23rn30k` holds the bar (80% of exact) in every kind under `R3D30`.
+* **AB6** and under `WD30L`.
+* **AB7** the gate costs against a hold at every range under the joint stress: under `R3D30`, `m23e30k` reaches at least 5 more than `m23rn30k`. (Follow-up 18's J1 and follow-up 24's I1.)
+* **AB8** on a sea with no faults `m23rn30k` is within 8 of the clean `long+fix+forget`.
+`m23re30k` against `m23rn30k` under `WD30L`, the per-kind and per-gap counts are flown and reported and not predicted.
+
+**What it would not say.** That 80 m, 200 m, 30, 0.8 and 2-of-3 are the right numbers; that a step and a linear ramp are the only shapes or that the minimum since the last clear is the right memory (follow-up 15's caveats stand); that the leak is a measured flicker. Not a different pilot, a different generator or the moving ships. A result is a statement about this generator and these models.
+
+**The build waits.** The module and the study engine of follow-ups 8 to 24 are frozen until their sets are flown; this round needs four detectors the registry does not have (`m23mk30k`, `m23mn30k`, `m23rp30k`, `m23rn30k`, each a registry row), the set HELD32 and a spec, added **after** the sets of follow-ups 8 to 24 are flown and **before** HELD32 is (as follow-ups 25 and 26's are).
