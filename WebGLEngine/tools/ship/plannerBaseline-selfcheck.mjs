@@ -12,7 +12,7 @@
 //   7 FLIGHT    real 100-second dives: the Round 8 twin equals the Round 11 twin, the LOW arms use the shifted constant, an unknown arm or block is refused.
 //   8 SOURCE    the seeds appear in one place; no clock, random or file.
 // NOT CHECKED, said plainly: how big the gains are (that is the experiment).
-// SABOTAGE LOG: (filled in below after the mutation pass)
+// SABOTAGE LOG (31 mutants of tools/ship/plannerBaseline.mjs, run against a copy of this gate, each applied alone): all 31 went red by name on the first pass, none 0-red -- the shift's sign, size, target constant and scope (all arms, no arm, high instead of low), the LOW rule and the LOW twin handed the unshifted constants, each bottom line reading another difference, the three differences' operands, the identity, shift-reaches and alignment checks forced true, the block size, the identity arm flown on every block, the pooled sets, the share formula and its n/a case, a 1 se reading, a moved block range, the unknown block and arm refusals, the Round 11 twin given the shifted constants, a dropped gauge, assemble keeping a missing arm, the head's round number and a job list without TWIN-LOW.
 "use strict";
 import fs from "node:fs";
 let fails = 0, finished = false;
