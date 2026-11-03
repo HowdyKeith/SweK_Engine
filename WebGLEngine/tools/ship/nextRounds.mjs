@@ -3079,10 +3079,8 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "nav-sensed-detector-confirm-hold-range",
-        blocker: "OPEN",
-        what: "Follow-up 20 (brain/SENSED_NAV_WIP.md) asks which M-of-N mark to use with the evidence hold in place, the same rule at every range; follow-up 14 compared the range-aware family with a clear of one. Registered as FOLLOW-UP 26 of that note (the name was Keith's; no entry existed, and it is follow-up 20's name with range on the end: follow-up 20's question asked of the range-aware mark). The build waits for the sets of follow-ups 8 to 24: four registry rows, the set HELD31 and a spec are added then.",
-        how: "After the sets of follow-ups 8 to 24 are flown: a mark of one reading within 80 m and a run of 2, a run of 3, 2-of-3, 2-of-4 or 3-of-4 beyond it, each with the evidence hold of cap 30 at every range, against a mark of one everywhere and the same rules at every range, under range-law false returns of mean 0.03 with dropouts of 30 pings, the uniform false rate of 0.01 with the same dropouts, and a clean sea; HELD31 = seeds 3101 to 3160; the registration is in the note.",
-        why: "A strict far rule is cheapest where the false returns are and the vessel has time; whether the hold changes the order of the far rules is not known.",
+        state: "CLOSED",
+        what: "CLOSED 2026-11-03 (brain/SENSED_NAV_WIP.md, RESULT OF FOLLOW-UP 26; tools/ship/subSensedDetStudy.mjs --study detector-confirm-hold-range, flights in brain/subSensedDetDetectorConfirmHoldRangeHeld31.jsonl): NOT SUPPORTED (1 of 3 cells); four of eight predictions held (AA1, AA4, AA6, AA8). The designated rm34e30 (3-of-4 beyond 80 m, one reading within, evidence hold of cap 30) holds islands under range-law false returns and misses gaps (33) and current (43 against 44.0). It is the lowest of the five far confirmations (126 against 131 to 144), 6 below the same strictness at every range and 18 below the uniform 2-of-3; the mark of one (130) is level with them and keeps the gaps kind. The bet on the law has a large price under the uniform false rate: 82 against 127 for 3-of-4 at every range, 83 collisions. Not isolated: the near zone's first reading (follow-up 28 registers the near confirmation).",
     },
     {
         id: "nav-sensed-detector-range-confirm-hold-confirm",
