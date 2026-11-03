@@ -3076,10 +3076,8 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "nav-sensed-detector-confirm-hold-confirm",
-        blocker: "OPEN",
-        what: "Follow-up 20 (brain/SENSED_NAV_WIP.md) asks which M-of-N mark to use with an evidence hold that is a run; follow-up 21 gives the hold a K-of-N clear that tolerates a flickering cell, which makes the mark decide how fast the smear's edge cells come back. Registered as FOLLOW-UP 22 of that note (the name was Keith's; no entry existed, and it is follow-up 21's name with the first word moved, taken as follow-up 20's question asked of follow-up 21's detector).",
-        how: "After follow-up 7's set is flown: the six mark rules of follow-up 11 each with the evidence hold of cap 30 cleared when 0.8 of the window was free, under white false returns of 0.01 with dropouts of 30 pings, the same with the dropouts leaking, and a clean sea; HELD27 = seeds 2701 to 2760; the registration is in the note.",
-        why: "A run of three separates a steady wall from a flickering edge cell best and is the slowest to mark a real one; whether the clear that cleans the smear makes that the right trade is not known.",
+        state: "CLOSED",
+        what: "CLOSED 2026-11-03 (brain/SENSED_NAV_WIP.md, RESULT OF FOLLOW-UP 22; tools/ship/subSensedDetStudy.mjs --study detector-confirm-hold-confirm, flights in brain/subSensedDetDetectorConfirmHoldConfirmHeld27.jsonl): PARTLY SUPPORTED (4 of 6 cells: the gaps kind missed under both seas, 41 and 44 against 47.2); four of eight predictions held (X1, X2, X4, X8). With the evidence hold and the clear confirmed at 0.8, the five mark rules (2-of-2, 3-of-3, 2-of-3, 2-of-4, 3-of-4) reach 133 to 140 of 180 under white false returns with dropouts, a spread of 9 where more than 10 was registered, so follow-up 20's result (one rule under a hold) holds with the clear confirmed; the designated run of three is the top by count there (142) and the lowest under leaking dropouts (146 against 152 to 160), where it loses the 24 m gaps (7 of 20 against 13 to 18). The memory is not worth anything (156 against 160 for a run of two). One arm moves 7 to 9 flights between two sets of scenarios (follow-up 21's f80 against this set's m23f80). POST HOC, labelled: the run of three against the others under WD30 is p above 0.25 each; under WD30L against a run of two and a 2-of-4, p 0.024 and 0.039 unadjusted.",
     },
     {
         id: "nav-sensed-detector-hold-confirm-hold",
