@@ -33,6 +33,12 @@
 //   grade typed 2.11e-3, W7 the baseline's candidate typed 2, W8 the training's commit typed 4da3371b, W9 section 179 keeping U_THM, W10 its
 //   table's U_THM mean typed 2.1678e-3 (the figure I first wrote there, before checking it) -> 1 red each; W4 U_THM's first moving grade
 //   typed 1.46e-3 -> 4 red.
+// ROUND 79 (section 180), against this gate and denoiseScenes-selfcheck, each restored byte-identical: Q1 the vector's sign flipped, Q2 the
+//   position test against P not P - v, Q7 Bt_MV's input with the old unclamped history, Q8 H1 reversed, Q9 H2 against Bt, Q12 vectorsKey
+//   unmarked, Q13 the test command running the moving test for round 79, Q14 round 79 without vectors -> 1 red each; Q4 accumulateUpscaled
+//   dropping vel, Q6 Bt_MV accumulated without its vectors, Q10 U_TH on Bt_MV given the old input, Q15 round 79's R seeds round 78's, Q16 its
+//   seeds not reserved -> 2 red each; Q3 the projection of P not P - v -> 3 red; Q5 the ground given a velocity -> 4 red; Q11 C2 graded on
+//   the old Bt -> *** 0 RED at first ***, then 1 with the C2 row added.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -125,7 +131,7 @@ console.log("\n3. ROUND 77's STUDY CODE");
         R.image === 256 && R.sppIn === 4 && R.sppRefTest === 2048 && R.c1Min === 22 && R.minGain === 0.01 && R.test === "signflip" &&
         R.results === "render/denoise-results-upscale-moving-r77.json" && LT.temporalRound(77) === R && LT.temporalRound(72) === R72);
     let bad = null; try { LT.temporalRound(73); } catch (e) { bad = e.message; }
-    ok("  ...and temporalRound refuses any other round, naming 77 (and, since section 178, 78)", /70, 72, 77 or 78/.test(bad || ""));
+    ok("  ...and temporalRound refuses any other round, naming 77 (and, since sections 178 and 180, 78 and 79)", /70, 72, 77, 78 or 79/.test(bad || ""));
     const o = { W: 256, sppIn: 4, sppRef: 2048, ref2: true, harvest: true };
     ok("  movingKey is the still sequence's key marked moving, so the two never share a cache entry", LT.movingKey("R", 77000, o) === LT.temporalKey("R", 77000, o) + "-moving");
     const y = Float64Array.from({ length: 12 }, (_, i) => 0.1 + i / 20), r = Float64Array.from({ length: 12 }, (_, i) => 0.12 + i / 21), m = Uint8Array.of(1, 0, 1, 0);
@@ -155,7 +161,7 @@ console.log("\n3. ROUND 77's STUDY CODE");
     ok("  ...and it refuses a call without C2's U_TH", /the candidate U_TH and C2's/.test(refused || ""));
 
     const cli = fs.readFileSync(path.join(ENG, "tools", "denoiseStudy.mjs"), "utf8");
-    ok("  the test command runs runMovingTest for a moving round and runTemporalTest otherwise", /\(RD\.moving \? LT\.runMovingTest : LT\.runTemporalTest\)\(\{ U0, splits: RD\.splits,/.test(cli));
+    ok("  the test command runs runMovingTest for a moving round and runTemporalTest otherwise", /RD\.moving \? LT\.runMovingTest : LT\.runTemporalTest\)\(\{ U0, splits: RD\.splits,/.test(cli));
     const resFile = path.join(ENG, R.results), before = fs.existsSync(resFile) ? fs.readFileSync(resFile, "utf8") : null;   // since section 177 the results are committed
     let code = 0, said = ""; try { said = execFileSync(process.execPath, [path.join(ENG, "tools", "denoiseStudy.mjs"), "--harvest-upscale-temporal-train", "--round", "77"], { cwd: ENG, encoding: "utf8" }); } catch (e) { code = e.status; said = String(e.stdout); }
     ok("!! the training command refuses round 77 by name, exit 2, and writes nothing", code === 2 && /round 77 is a test only \(section 176\) -- it trains nothing/.test(said) && (fs.existsSync(resFile) ? fs.readFileSync(resFile, "utf8") : null) === before);
@@ -277,6 +283,68 @@ console.log("\n6. SECTION 179: ROUND 78's VERDICT, RE-DERIVED FROM ITS COMMITTED
         /the test file was shown to me when it was uploaded, before it was committed/.test(s179) && s179.includes("| U_THM (round 78) | 2.1012e-3 |"));
 }
 
+console.log("\n7. ROUND 79 (section 180): OBJECT MOTION VECTORS FOR Bt's HISTORY");
+{
+    const Tm = await imp("render/denoiseTemporal.mjs"), TU = await imp("render/denoiseTemporalUpscale.mjs");
+    const S = D.makeScene("R", 990950), mo = M.sceneMotion(S), vel = M.velocities(S, mo);
+    ok("  velocities: one entry per scene object, each mover's own v, every other entry empty, frozen",
+        vel.length === S.scene.length && Object.isFrozen(vel) && mo.every((m) => vel[m.index] === m.v) && vel.every((v, i) => v === null || mo.some((m) => m.index === i)));
+    const eyes = cameraPath(S).eyes, W1 = 128, g6 = firstHits({ ...S, scene: M.sceneAt(S, mo, 6) }, eyes[6], W1, W1), g7 = firstHits(S, eyes[7], W1, W1), mm = M.moverMask(mo, g7);
+    const r0 = Tm.reproject(g6, g7, W1, W1), rN = Tm.reproject(g6, g7, W1, W1, null), rE = Tm.reproject(g6, g7, W1, W1, new Array(S.scene.length).fill(null)), rV = Tm.reproject(g6, g7, W1, W1, vel);
+    const rW = Tm.reproject(g6, g7, W1, W1, vel.map((v) => v && v.map((x) => -x)));
+    ok("!! reproject: no vectors, or an empty table, is the old reprojection bit for bit; with the vectors only the mover pixels can change",
+        same(rN.taps, r0.taps) && same(rN.wts, r0.wts) && same(rE.wts, r0.wts) && same(rE.valid, r0.valid) &&
+        Array.from(mm).every((m, p) => m || ([0, 1, 2, 3].every((k) => rV.taps[4 * p + k] === r0.taps[4 * p + k] && Object.is(rV.wts[4 * p + k], r0.wts[4 * p + k])) && rV.valid[p] === r0.valid[p])));
+    const off = (r) => { let s0 = 0, n = 0, kept = 0, m = 0; for (let p = 0; p < W1 * W1; p++) { if (!mm[p]) continue; m++; if (!r.valid[p]) continue; kept++; const v = vel[g7.obj[p]];
+        for (let k = 0; k < 4; k++) { const q = r.taps[4 * p + k]; if (q >= 0) s0 += r.wts[4 * p + k] * Math.hypot(g6.pos[q * 3] - g7.pos[p * 3] + v[0], g6.pos[q * 3 + 1] - g7.pos[p * 3 + 1] + v[1], g6.pos[q * 3 + 2] - g7.pos[p * 3 + 2] + v[2]); } n++; }
+        return { d: s0 / n, kept: kept / m }; };
+    const o0 = off(r0), oV = off(rV), oW = off(rW);
+    ok("!! *** the vectors point the right way: with P - v the movers keep more history, and what they keep is where the surface point really was -- under half the distance without vectors, and with the sign flipped they keep less ***",
+        oV.kept > o0.kept && oV.kept > oW.kept && oV.d < 0.5 * o0.d && oV.d < oW.d, `kept ${(100 * o0.kept).toFixed(1)} / ${(100 * oV.kept).toFixed(1)} / ${(100 * oW.kept).toFixed(1)} %, off by ${o0.d.toFixed(4)} / ${oV.d.toFixed(4)} / ${oW.d.toFixed(4)} units (none / P - v / P + v)`);
+
+    const W = 32, so = { W, sppIn: 2, sppRef: 4 }, e = T.temporalExample("R", 990950, net, { ...so, motion: mo, vectors: true });
+    const fr = T.exampleFrames(S, net, { W, sppIn: 2, motion: mo }), geo = eyes.map((eye, f) => firstHits({ ...S, scene: M.sceneAt(S, mo, f) }, eye, W, W));
+    const am = TU.accumulateUpscaled(fr, geo, W, W, { vel }), aum = TU.accumulateUpscaled(fr, geo, W, W, { clamp: false, vel }).A, plain = TU.accumulateUpscaled(fr, geo, W, W);
+    const ch = (x, c) => Array.from({ length: W * W }, (_, p) => x[p * T.UT_CHANNELS + c]);
+    ok("!! temporalExample `vectors`: mv's input is the same frames and hits accumulated with the velocities -- A, the unclamped history and n rebuilt by hand -- and every other channel is the example's own",
+        [0, 1, 2].every((c) => same(ch(e.mv.x, c), Array.from({ length: W * W }, (_, p) => am.A[p * 3 + c])) && same(ch(e.mv.x, 3 + c), Array.from({ length: W * W }, (_, p) => aum[p * 3 + c]))) &&
+        same(ch(e.mv.x, 9), Array.from(am.n, (v) => v / FRAMES)) && [6, 7, 8, 10, 11, 12, 13, 14, 15, 16].every((c) => same(ch(e.mv.x, c), ch(e.x, c))) && !same(Array.from(am.A), Array.from(plain.A)));
+    ok("!! *** Bt_MV is Bt bit for bit off the mover pixels, and differs on them -- section 180's 'any difference is on the movers' ***",
+        Array.from(e.mover).every((m, p) => m || [0, 1, 2].every((c) => Object.is(e.mv.bt[p * 3 + c], e.bt[p * 3 + c]))) && Array.from(e.mover).some((m, p) => m && !Object.is(e.mv.bt[p * 3], e.bt[p * 3])));
+    const zero = mo.map((m) => ({ ...m, v: [0, 0, 0] })), ez = T.temporalExample("R", 990950, net, { ...so, motion: zero, vectors: true });
+    ok("  ...and on a still scene (every mover at zero speed) Bt_MV is Bt exactly", same(ez.mv.bt, ez.bt) && same(ez.mv.x, ez.x));
+    let bad = null; try { T.temporalExample("R", 990950, net, { ...so, vectors: true }); } catch (err) { bad = err.message; }
+    ok("  vectors without a motion are refused", /object motion vectors need a motion/.test(bad || ""));
+
+    const R = LT.ROUND_UPSCALE_VECTORS, R72 = LT.ROUND_UPSCALE_TEMPORAL_72, Sp = D.SPLITS_UPSCALE_VECTORS;
+    ok("!! ROUND_UPSCALE_VECTORS: round 79, a test only, of round 72's U_TH on Bt and Bt_MV, on SPLITS_UPSCALE_VECTORS (12 R at 81000, 12 C at 82000, reserved) at round 72's settings",
+        R.round === 79 && R.vectors === true && R.moving === true && !R.trainMoving && R.net === R72.net && R.results === "render/denoise-results-upscale-vectors-r79.json" && R.splits === Sp &&
+        R.sppRefTest === 2048 && R.image === 256 && R.minGain === 0.01 && LT.temporalRound(79) === R && Sp.T1.seeds.length === 24 && Sp.T1.seeds[0] === 81000 && Sp.T1.seeds[12] === 82000 &&
+        Sp.T1.seeds.every((x) => D.isDatasetSeed(x)) && LT.vectorsKey("R", 81000, { W: 256 }) === LT.temporalKey("R", 81000, { W: 256 }) + "-moving-vectors");
+    const t72 = JSON.parse(fs.readFileSync(path.join(ENG, R72.net), "utf8")), U = decodeNet(t72.runs.find((x) => x.seed === t72.candidate).net), Uc = decodeNet(t72.c2.net);
+    const sp1 = { T1: { family: "R+C", families: ["R", "C"], seeds: FIX.map((x) => x[1]) } }, out = LT.runVectorTest({ splits: sp1, net, U, Uc2: Uc, W, sppIn: 2, sppRef: 4 });
+    const ex = FIX.map(([f, sd]) => T.temporalExample(f, sd, net, { W, sppIn: 2, sppRef: 4, ref2: true, motion: M.sceneMotion(D.makeScene(f, sd)), vectors: true }));
+    const gB = ex.map((x) => gradeDisplay(x.bt, x)), gM = ex.map((x) => gradeDisplay(x.mv.bt, x)), gUM = ex.map((x) => gradeDisplay(T.temporalChain(U, { ...x, x: x.mv.x }), x)), gU = ex.map((x) => gradeDisplay(T.temporalChain(U, x), x));
+    ok("!! *** runVectorTest: H1 is Bt_MV against Bt, H2 U_TH-on-Bt_MV against Bt_MV, each arm gradeDisplay of that image against the example's own reference ***",
+        same(out.tables.bt, gB) && same(out.tables.btMV, gM) && same(out.tables.uMV, gUM) && same(out.tables.u, gU) && same(out.verdict.hypotheses.H1.d, effects(gB, gM)) &&
+        same(out.verdict.hypotheses.H2.d, effects(gM, gUM)) && out.determinism === true, `Bt ${gB.map((v) => v.toExponential(3)).join(", ")}; Bt_MV ${gM.map((v) => v.toExponential(3)).join(", ")}`);
+    const mean = (a) => a.reduce((q, v) => q + v, 0) / a.length;
+    ok("  ...its gains, history lengths and mover grades are what they say",
+        out.secondary.gains.btMVoverBt === 1 - mean(gM) / mean(gB) && out.secondary.gains.uMVoverBtMV === 1 - mean(gUM) / mean(gM) && out.secondary.gains.uMVoverU === 1 - mean(gUM) / mean(gU) &&
+        same(out.secondary.history.mv, ex.map((x) => LT.meanHistory({ ...x, x: x.mv.x }))) && same(out.secondary.history.bt, ex.map((x) => LT.meanHistory(x))) &&
+        same(out.secondary.mover.btMV, ex.map((x) => LT.maskedDisplay(x.mv.bt, x.ref, x.mover))));
+    const gC = ex.map((x) => gradeDisplay(T.temporalChain(Uc, { ...x, x: x.mv.x }), x));
+    ok("  ...and its control C2 is round 72's shuffled-target U_TH on Bt_MV's input, its effects against Bt_MV", same(out.tables.c2, gC) && same(out.secondary.c2, effects(gM, gC)));
+    let refused = null; try { LT.runVectorTest({ splits: sp1, net, U }); } catch (err) { refused = err.message; }
+    const cli = fs.readFileSync(path.join(ENG, "tools", "denoiseStudy.mjs"), "utf8");
+    ok("  ...it refuses a call without C2; the test command dispatches it for a vectors round", /round 72's U_TH and its C2/.test(refused || "") &&
+        /\(RD\.vectors \? LT\.runVectorTest : RD\.moving \? LT\.runMovingTest : LT\.runTemporalTest\)\(\{ U0, splits: RD\.splits,/.test(cli));
+    let code = 0, said = ""; try { said = execFileSync(process.execPath, [path.join(ENG, "tools", "denoiseStudy.mjs"), "--harvest-upscale-temporal-train", "--round", "79"], { cwd: ENG, encoding: "utf8" }); } catch (err) { code = err.status; said = String(err.stdout); }
+    const reg = fs.readFileSync(path.join(ENG, "render", "learned-denoiser-preregistration.md"), "utf8"), s180 = reg.slice(reg.indexOf("## 180."), reg.indexOf("## 181.") > 0 ? reg.indexOf("## 181.") : undefined);
+    ok("  the training command refuses round 79; section 180 states P - v, the bit-for-bit claim, 81000-81011 and 82000-82011, and the results file",
+        code === 2 && /round 79 is a test only/.test(said) && /\*\*P - v\*\*/.test(s180) && /Bt_MV is Bt exactly off the mover pixels, and on every still scene/.test(s180) && /81000-81011/.test(s180) && /82000-82011/.test(s180) && s180.includes(R.results));
+}
+
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +
-    "\nnot closed here: object motion vectors for Bt's history -- section 179's next round.");
+    "\nnot closed here: whether Bt_MV beats Bt on moving scenes. That is round 79's harvest, section 181's.");
 process.exit(fails ? 1 : 0);

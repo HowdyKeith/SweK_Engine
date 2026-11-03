@@ -2556,8 +2556,8 @@ export const NEXT_ROUNDS = [
     {
         id: "fsr4-object-motion",
         blocker: "OPEN",
-        what: "Object motion vectors for Bt's history, the round sections 177 and 179 name: each pixel's previous position from its object's own motion as well as the camera's, so a moving surface keeps its history instead of losing it (moved past POS_TOL) or keeping a wrong one. Not set up: it changes Bt itself (render/denoiseTemporal.mjs's reproject, render/denoiseTemporalUpscale.mjs's accumulateUpscaled and the device chain's accumulation), so every U_TH result is re-measured against the new Bt.",
-        how: "Pre-register first: the motion vectors (exact, from sceneMotion, as the arc's scenes know their motion), Bt with them against Bt without on round 77's or a new moving set, then U_TH on the new Bt; the device chain's cost of the vectors.",
+        what: "Round 79 (section 180), set up and awaiting its harvest: Bt_MV, Bt's history with the movers' exact motion vectors (reproject matches a mover's pixel at P - v in the previous frame), against Bt on 24 new moving scenes (12 R 81000-81011, 12 C 82000-82011), each rendered once and accumulated both ways. H79a: Bt_MV beats Bt by the 1 % rule; H79b: round 72's U_TH on Bt_MV beats Bt_MV. Bt_MV is Bt bit for bit off the movers and on still scenes (gated). CPU only; the device chain's cost is round 80 if H79a holds.",
+        how: "node tools/denoiseStudy.mjs --harvest-upscale-temporal-test --round 79 on the rig at round 79's commit (~10.5 h), render/denoise-results-upscale-vectors-r79.json committed byte for byte before it is read; section 181 reads it.",
         why: "Section 179: training U_TH on motion did not help (H78a failed, P4 missed badly) -- nothing in its inputs says where an object went, so the history itself has to.",
     },
     {

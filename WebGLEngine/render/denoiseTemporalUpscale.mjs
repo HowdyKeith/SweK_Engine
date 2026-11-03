@@ -77,15 +77,16 @@ export function shiftResample(img3, W, H, dx, dy) {
 /**
  * THE ACCUMULATION. `frames[f]` is { y (W x H rgb, on its jittered grid), shift [dx, dy] in full-size pixels } and `geo[f]` that
  * frame's unjittered first hits (render/denoiseTemporal.mjs's firstHits, W x H). Returns { A, n } on the last frame's
- * unjittered grid. `clamp` (on) holds the reprojected history inside the current frame's 3 x 3 per-channel range.
+ * unjittered grid. `clamp` (on) holds the reprojected history inside the current frame's 3 x 3 per-channel range. Round 79 (section 180):
+ * `vel` (by scene object, each mover's motion a frame) gives reproject the objects' own motion.
  */
-export function accumulateUpscaled(frames, geo, W, H, { clamp = true } = {}) {
+export function accumulateUpscaled(frames, geo, W, H, { clamp = true, vel = null } = {}) {
     if (frames.length !== geo.length || !frames.length) throw new Error(`denoiseTemporalUpscale: ${frames.length} frames against ${geo.length} first-hit buffers`);
     const N = W * H;
     let A = shiftResample(frames[0].y, W, H, frames[0].shift[0], frames[0].shift[1]), n = new Float64Array(N).fill(1);
     for (let f = 1; f < frames.length; f++) {
         const cur = shiftResample(frames[f].y, W, H, frames[f].shift[0], frames[f].shift[1]);
-        const { taps, wts, valid } = reproject(geo[f - 1], geo[f], W, H), A2 = new Float64Array(N * 3), n2 = new Float64Array(N);
+        const { taps, wts, valid } = reproject(geo[f - 1], geo[f], W, H, vel), A2 = new Float64Array(N * 3), n2 = new Float64Array(N);
         for (let py = 0; py < H; py++) for (let px = 0; px < W; px++) {
             const p = py * W + px;
             if (!valid[p]) { n2[p] = 1; for (let c = 0; c < 3; c++) A2[p * 3 + c] = cur[p * 3 + c]; continue; }

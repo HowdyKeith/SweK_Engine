@@ -21,7 +21,7 @@ import { makeScene, guideBuffers, inputChannels, isDatasetSeed } from "./denoise
 import { emitterCoverage, emitterRadiance, withMask } from "./denoiseMask.mjs";
 import { FRAMES, cameraPath, firstHits } from "./denoiseTemporal.mjs";
 import { JITTER, temporalUpscaleSeeds, accumulateUpscaled, shiftResample, halfShift } from "./denoiseTemporalUpscale.mjs";
-import { sceneAt, moverMask } from "./movingScenes.mjs";
+import { sceneAt, moverMask, velocities } from "./movingScenes.mjs";
 import { denoise } from "./denoiseNet.mjs";
 import { UP_TRAIN } from "./learnedUpscale.mjs";
 
@@ -169,10 +169,12 @@ export function exampleFrames(S, net, { W, sppIn, motion = null }) {
  * `bt` (Bt, A composited), `b1` (the measured frame alone, C composited) and `noisy` (its half-size input, bilinear, composited).
  * Round 77 (section 176): `motion` (movingScenes.sceneMotion) moves the scene's objects over the history, the measured frame
  * unchanged, and adds `mover`, the measured frame's mover pixels; `refs` hands in the still twin's references instead of
- * rendering them again.
+ * rendering them again. Round 79 (section 180): `vectors` (with a motion) adds `mv`, the same frames accumulated with the movers' exact
+ * velocities -- Bt_MV's input `x` and its composited light `bt`.
  * *** THROWS FOR A DATASET SEED WITHOUT { harvest: true }. ***
  */
-export function temporalExample(family, seed, net, { harvest = false, W = 256, sppIn = 4, sppRef = 32, ref2 = false, motion = null, refs = null } = {}) {
+export function temporalExample(family, seed, net, { harvest = false, W = 256, sppIn = 4, sppRef = 32, ref2 = false, motion = null, refs = null, vectors = false } = {}) {
+    if (vectors && !motion) throw new Error("learnedUpscaleTemporal: object motion vectors need a motion (section 180)");
     if (isDatasetSeed(seed) && !harvest) throw new Error(`learnedUpscaleTemporal: seed ${seed} is a dataset seed -- rendering it needs { harvest: true }`);
     if (W % 2) throw new Error(`learnedUpscaleTemporal: a ${W} x ${W} frame has no half size`);
     const H = W, w = W / 2, h = H / 2, S = makeScene(family, seed), rs = temporalUpscaleSeeds(seed), path = cameraPath(S);
@@ -187,6 +189,9 @@ export function temporalExample(family, seed, net, { harvest = false, W = 256, s
              // round 77: a moving example's measured frame is its still twin's, so it may take the twin's references rather than render them again
              ref: refs ? refs.ref : render(S.scene, opts(W, H, sppRef, rs.ref, S.eye, null)), ...(ref2 ? { ref2: refs ? refs.ref2 : render(S.scene, opts(W, H, sppRef, rs.ref2, S.eye, null)) } : {}),
              ...(motion ? { mover: moverMask(motion, geo[FRAMES - 1]) } : {}),
+             // round 79 (section 180): the same frames and hits accumulated again with the movers' exact velocities -- Bt_MV and U_TH's input on it
+             ...(vectors ? (() => { const vel = velocities(S, motion), am = accumulateUpscaled(frames, geo, W, H, { vel }), aum = accumulateUpscaled(frames, geo, W, H, { clamp: false, vel }).A;
+                 return { mv: { x: temporalInput(am.A, aum, C, am.n, g.albedo, g.normal, depth, W, H), bt: compositeEmitters(am.A, full) } }; })() : {}),
              bt: compositeEmitters(acc.A, full), b1: compositeEmitters(C, full),
              noisy: compositeEmitters(shiftResample(upscale(noisyHalf, w, h, W, H, "bilinear"), W, H, ...last.shift), full) };
 }

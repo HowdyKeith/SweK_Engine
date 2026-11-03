@@ -43,3 +43,10 @@ export function moverMask(motion, hits) {
     for (let p = 0; p < mask.length; p++) if (movers.has(hits.obj[p])) mask[p] = 1;
     return mask;
 }
+
+/** Round 79 (section 180): the movers' velocities indexed by scene object -- what reproject and accumulateUpscaled take as `vel`. Every other index is empty. */
+export function velocities(S, motion) {
+    const vel = new Array(S.scene.length).fill(null);
+    for (const m of motion) vel[m.index] = m.v;
+    return Object.freeze(vel);
+}
