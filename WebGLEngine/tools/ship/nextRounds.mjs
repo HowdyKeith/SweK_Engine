@@ -2964,10 +2964,8 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "nav-sensed-detector-hold-confirm",
-        blocker: "OPEN",
-        what: "The detector's marking and clearing rules have each been improved on their own in the registered notes (brain/SENSED_NAV_WIP.md, FOLLOW-UP 11, an M-of-N mark, and FOLLOW-UP 12, an evidence hold), and follow-up 7 pairs only their plainest forms (a run of k to mark, a plain hold to clear). Registered as FOLLOW-UP 16 of that note (the name was Keith's; no entry existed, and it is taken as the pairing of the two improved rules; confirming the clear with a K-of-N free rule is left out on purpose).",
-        how: "After follow-up 7's set is flown: a 2-of-3 mark with the evidence hold of cap 30, against each alone, a plain hold of 30 after the same mark, follow-up 7's plain pair and the map that forgets, under white false returns of 0.01, dropouts of 30 pings, both at once and a clean sea; HELD21 = seeds 2101 to 2160; the registration is in the note.",
-        why: "The memory answers false returns and misses, the evidence answers dropouts; whether a mark that waits for two hits leaves the hold anything to hold when a dropout begins early is not known.",
+        state: "CLOSED",
+        what: "CLOSED 2026-11-03 (brain/SENSED_NAV_WIP.md, RESULT OF FOLLOW-UP 16; tools/ship/subSensedDetStudy.mjs --study detector-hold-confirm, flights in brain/subSensedDetDetectorHoldConfirmHeld21.jsonl): PARTLY SUPPORTED (2 of 3 cells under WD30: islands 52 and current 49 held, gaps 29 against 47.2 needed missed); four of eight predictions held (U4, U5, U7, U8). The pair (a 2-of-3 mark with the evidence hold of cap 30) has both cures when the faults come singly (D30 160, W 162, against 147 and 124 for the map that forgets) and does not add them when they come together (WD30 130, level with the 2-of-3 mark alone at 135 and with follow-up 7's plain pair at 129); the narrow 24 m and 32 m gaps are where it loses (3 and 8 reached against 8 and 15 for the mark alone, exact 19 and 20). POST HOC, labelled: the pair beats the evidence hold alone and the plain hold after the same mark by sign tests of p 0.0013 and 0.0041, and is level with the mark alone (p 0.58).",
     },
     {
         id: "nav-sensed-detector-hold-range",
