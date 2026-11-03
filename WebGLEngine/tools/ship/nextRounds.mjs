@@ -2864,6 +2864,13 @@ export const NEXT_ROUNDS = [
         why: "The far end of the long sonar is the end the range-aware confirmation thins; a memory is the cheap way to keep it.",
     },
     {
+        id: "nav-sensed-detector-hold-confirm-hold",
+        blocker: "OPEN",
+        what: "The detector's evidence hold clears a cell only after a run of free readings (brain/SENSED_NAV_WIP.md, FOLLOW-UP 12 and after), so a cell that flickers occupied, the fix smear's edge cells above all, is never cleared; follow-ups 12, 16 and 18 each name a K-of-N free clear untried. Registered as FOLLOW-UP 21 of that note (the name was Keith's; no entry existed, and it is taken as the clear given the confirmation's treatment: a hold, a confirmation and a hold that is itself confirmed).",
+        how: "After follow-up 7's set is flown: the 2-of-3 mark with the evidence hold of cap 30 cleared when K of the last min(30, occ) readings were free, K = 1.0, 0.9, 0.8 and 0.6 of the window, against a clear of one and the map that forgets, under white false returns of 0.01 with dropouts of 30 pings, the same with the dropouts leaking (a made-up flicker of 0.15), and a clean sea; HELD26 = seeds 2601 to 2660; the registration is in the note.",
+        why: "If the smear is what a long hold costs, a clear that tolerates an occupied reading in five thins it; the price is a shorter hold against the fault the hold is for.",
+    },
+    {
         id: "nav-sensed-detector-confirm-hold",
         blocker: "OPEN",
         what: "Follow-up 11's M-of-N family (brain/SENSED_NAV_WIP.md) was argued on re-marking a cell a miss had cleared, which a hold removes; follow-up 16 asks whether the pair beats each alone, not which confirmation to choose with the hold present. Registered as FOLLOW-UP 20 of that note (the name was Keith's; no entry existed, and it is follow-up 16's name the other way round, taken as which confirmation rule when the hold is there).",
