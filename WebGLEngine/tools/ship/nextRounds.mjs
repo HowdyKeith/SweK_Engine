@@ -2864,6 +2864,13 @@ export const NEXT_ROUNDS = [
         why: "The far end of the long sonar is the end the range-aware confirmation thins; a memory is the cheap way to keep it.",
     },
     {
+        id: "nav-sensed-detector-hold-confirm-hold-confirm",
+        blocker: "OPEN",
+        what: "Follow-up 18 (brain/SENSED_NAV_WIP.md) flagged the ghost's risk, that it re-marks a persistent phantom at its first reading, and follow-up 21 gives the detector a confirmed clear; the name has one stage more than follow-up 21's. Registered as FOLLOW-UP 23 of that note (the name was Keith's; no entry existed, and it is taken as the fourth stage, the ghost's re-mark confirmed by a neighbour read occupied at the same ping: hold, confirm, hold, confirm).",
+        how: "After follow-up 7's set is flown: the four-stage detector (2-of-3 mark, evidence hold cap 30 at every range, clear when 0.8 of the window was free, ghost re-marked at one reading only with a neighbouring cell also read occupied at the ping) against each stage taken out in turn and the map that forgets, under white false returns of 0.01 with leaking dropouts of 30 pings, the persistent mix and a clean sea; HELD28 = seeds 2801 to 2860; the registration is in the note.",
+        why: "Four stages stack four prices; an ablation shows which stage earns its place, and whether a neighbour test makes the ghost safe without defeating it after a whole-obstacle dropout.",
+    },
+    {
         id: "nav-sensed-detector-confirm-hold-confirm",
         blocker: "OPEN",
         what: "Follow-up 20 (brain/SENSED_NAV_WIP.md) asks which M-of-N mark to use with an evidence hold that is a run; follow-up 21 gives the hold a K-of-N clear that tolerates a flickering cell, which makes the mark decide how fast the smear's edge cells come back. Registered as FOLLOW-UP 22 of that note (the name was Keith's; no entry existed, and it is follow-up 21's name with the first word moved, taken as follow-up 20's question asked of follow-up 21's detector).",
