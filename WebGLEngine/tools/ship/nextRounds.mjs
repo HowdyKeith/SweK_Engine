@@ -3069,10 +3069,8 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "nav-sensed-detector-hold-confirm-range-confirm",
-        blocker: "OPEN",
-        what: "Every range-aware mark in the notes (brain/SENSED_NAV_WIP.md, follow-ups 9, 10, 14, 17, 18, 19, 26) marks within 80 m at the first reading, and the price of that bet is registered each time: a uniform false return enters the plan at once. Registered as FOLLOW-UP 28 of that note (the name was Keith's; no entry existed, and it is follow-up 17's name with a confirmation on the end, taken as a second confirmation in the other zone, since the hold's confirmed clear is follow-up 25). The build waits for the sets of follow-ups 8 to 24: two registry rows, the set HELD33 and a spec are added then.",
-        how: "After the sets of follow-ups 8 to 24 are flown: 3-of-4 beyond 80 m with one reading, two in a row or 2-of-3 within it, each with the evidence hold of cap 30 at every range, against a mark of one everywhere and 2-of-3 and 3-of-4 at every range, under range-law false returns of mean 0.03 and under the uniform 0.01, each with dropouts of 30 pings, and a clean sea; HELD33 = seeds 3301 to 3360; the registration is in the note.",
-        why: "The near zone is where a delay costs a collision and where a false return is dearest; whether a light confirmation there repairs the uniform sea without costing the range-law sea is not known.",
+        state: "CLOSED",
+        what: "CLOSED 2026-11-03 (brain/SENSED_NAV_WIP.md, RESULT OF FOLLOW-UP 28; tools/ship/subSensedDetStudy.mjs --study detector-hold-confirm-range-confirm, flights in brain/subSensedDetDetectorHoldConfirmRangeConfirmHeld33.jsonl): NOT SUPPORTED (3 of 6 cells); three of eight predictions held (AC1, AC7, AC8). The designated n23f34e30 (3-of-4 beyond 80 m, 2-of-3 within, the evidence hold of cap 30) holds islands and current under range-law false returns and islands under the uniform sea, and misses the gaps kind in both (34 and 38 against 47.2). A near confirmation repairs the uniform sea the range-aware mark could not (131 against 80), and it is level with every uniform rule where the law holds (132 against 136 and 129; the five arms within 8 of each other). The mark of one keeps the gaps kind (49) and loses the current kind (37); confirming trades one for the other. Not isolated: which of the near rule or the far rule sinks rm34e30 under the uniform sea.",
     },
     {
         id: "nav-sensed-detector-hold-range-confirm",
