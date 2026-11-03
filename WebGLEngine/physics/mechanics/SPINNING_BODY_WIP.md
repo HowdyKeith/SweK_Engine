@@ -843,3 +843,117 @@ from the committed file, except the step times. It flies the whole round again a
 holds backward Euler's shrinkage against every end of JI's and box3d's. Sabotaged with the byte-safe runner: 22
 designs, each red by name, and every row of section 6 went red under at least one. They edit the committed file, this
 note or the code, and the counts are in the gate's header.
+
+## The new default in the engine's own Jolt scenes -- Keith's pick, registered before any code (2026-11-03)
+
+Keith, 2026-11-03: "Yes, register the scenes round", a round to run before shipping. The published engine runs main,
+whose Jolt wrapper has no gyroscopic term at all. Shipping this branch therefore moves its Jolt bodies straight to the
+implicit step, and the third round's verdict names contact and joints as unmeasured.
+
+> **In the engine's own Jolt scenes, does the new default change anything that a sign test over 40 seeds can see,
+> against `false`, which is what ships today?**
+
+### The scenes
+
+Most Jolt content makes cubes (ships, arena blocks, voxels), and the step skips those. The race pages and the physics
+lab run on box3d. A search of every `addBox()` caller found two shipped scenes whose dynamic Jolt bodies have unequal
+moments:
+- **The arena's crew** (`jolt-arena.html`): three ragdolls of seven boxes each on ball joints
+  (`physics/jolt/joltRagdoll.js`), beside the page's 7 x 6 wall of cubes on breakable joints
+  (`physics/jolt/joltStructures.js`), on its ground strip, stepped at 1/60 s with two substeps.
+- **The blobs' debris** (`blob-avatar.html` and `blob-herd.html`, which prefer Jolt): the blob's mesh shattered into
+  Voronoi fragments (`fx/fracture/cellFracture.js`), each a box of its own bounds, thrown from the impact with a tumble
+  (`fx/fracture/debrisPhysics.js`). No gate runs this path on Jolt.
+
+Each scene is flown headless, with the page's own modules and numbers (C-page holds them):
+- **A1, the crew added:** the page's three ragdolls at x = 3.5, 4.9 and 6.3 and y = 1.6, scale 0.85, each moved by
+  the seed by up to 0.2 m in x and raised by up to 0.4 m. They drop onto the ground strip beside the wall, for 10 s,
+  with the wall's `update()` every step.
+- **A2, the crew flung:** from A1's end, each ragdoll flung as the page flings it (`fling(dir * 30, 7, 0, 5)`, toward
+  the wall), for 20 s.
+- **D1, the avatar shattered** (`blob-avatar.html`): the avatar's rest pose (`makeAvatar()` at time 0), marched as the
+  page marches it (38 cells across, from -3.35 to 3.35, at 1.0). Its 16 sites are biased 0.6 toward the page's impact
+  (1.2, 0.6, 0), and it is thrown with force 2.6 onto the page's ground (y = -1.6, extent 9), for 15 s.
+- **D2, the herd shattered** (`blob-herd.html`): the avatar and a five-member herd (`makeHerd()` with the page's
+  settings, its layout from a fixed seed), marched as that page marches it (32 cells, from -4.4 to 4.4). Its 22 sites
+  are biased 0.5 toward (0, 0.4, 0), and it is thrown with force 3.0 onto its ground (y = -2.2, extent 12), for 15 s.
+- The debris pages step at their frame time, capped at 1/30 s, with one substep; here they step at 1/60 s. The seed
+  sets the fracture sites and the tumble, and the meshes are the same for every seed.
+
+### What is measured, in one registered run
+
+Every scene is flown on 40 seeds (1 to 40), each three times:
+- **D**, the new default (no `gyroscopic` key);
+- **F**, `false` on every body: what ships today;
+- **F'**, `false` with a nudge of 1e-5 m: A1's first ragdoll moved by that in x, or the debris thrown from an impact
+  moved by that in x (the fracture itself unchanged). F' is the chaos control, below.
+
+"Asleep" is Jolt's own `IsActive()` false. A scene's **rest time** is the time from which every one of its ragdoll
+parts or fragments stays asleep to the end of its window; it is none if they are not all asleep at the end, and none
+counts as later than any time. Per flight:
+- **A1:** the rest time (primary); the parts' mean height at the end; the largest distance between jointed parts'
+  centres over the window, the ragdoll gate's cohesion (under 2 is "the joints hold").
+- **A2:** the wall's broken joints at the end (primary); the largest cohesion over the window (primary); the parts
+  that left the arena (below y = -5 at the end); the peak linear and angular speeds of any part.
+- **D1 and D2:** the rest time (primary); the spread (primary), which is the fragments' RMS horizontal distance from
+  their centroid at the end; their mean height at the end; the fragments that left (more than 1 m below the ground at
+  the end); the peak speed.
+
+**The reading:** for each statistic, D against F seed by seed, by an exact two-sided sign test with ties set aside. At
+p < 0.01 the default **changes it**, and the direction is named; otherwise it **changes nothing a sign test can see**.
+There are six primary statistics; the rest are reported, testing nothing. A sign test can find a systematic shift. It
+cannot prove there is none, and the medians of D and F are reported beside it.
+
+**Reported, testing nothing, and not in the results file:** the wrapper's step time in each scene with D and with F.
+
+### Controls
+
+- **C-page:** the scenes' numbers are the pages' own, read from their source: positions, scale, fling, step and
+  substeps, wall, sites, bias, impact, force and ground.
+- **C-setting:** with D, every ragdoll part and every fragment has the setting "implicit" and an inertia for the step;
+  the wall's cubes have the setting but no inertia, so they are skipped; the ground has none. With F and F', no body
+  has a setting. It reports how many bodies take the step in each scene.
+- **C-chaos:** F' against F, by the same sign test, changes no primary statistic. A nudge changes the flights but
+  shifts nothing, so the test is not seeing chaos as an effect. It also reports how many seeds the nudge changed at all.
+- **C-determinism:** seed 1 of every scene, flown twice with each setting, is the same to the bit.
+
+### Predictions, fixed now, deciding nothing
+
+- **P1:** in A1 the default does not change the rest time, and every A1 flight comes to rest within its 10 s under
+  both settings (85%).
+- **P2:** in D1 and D2 the default changes neither the rest time nor the spread, and every flight comes to rest within
+  its 15 s under both settings (80%).
+- **P3:** the joints hold in every A1 and A2 flight with the default (90%).
+- **P4:** in A2 the default changes neither the wall's broken joints nor the largest cohesion (70%).
+- **P5:** in A1, D1 and D2, with the default, nothing leaves and no number is non-finite (95%).
+- **P6:** with the default, the median rest time in A1, D1 and D2 is within 10% of its median with `false` (60%).
+
+### What was seen first
+
+- **The third round's results:** the step keeps stable spins, damps the wobble, and costs about 0.9 microseconds a
+  body a step.
+- **One probe, with `false` only (what ships today), before this was written.** It flew two seeds of each scene to see
+  whether they come to rest at all. The new default was not flown.
+  - The crew added came to rest in 5.83 and 4.70 s.
+  - The crew flung left the 1 m-deep ground strip at up to 478 m/s and fell without end. They broke 31 and 45 of the
+    wall's 71 joints, and the cohesion stayed at 0.45.
+  - The avatar broke into 16 fragments and the herd into 19 and 22, every one with unequal moments. They came to rest
+    within 3.43 to 4.73 s, on the ground.
+  - That is why A2 is read by the wall and the joints, not by a rest time.
+
+### What each outcome buys
+
+- If P1 to P5 hold, the default ships as it is: in the scenes it reaches, a sign test over 40 seeds sees no change.
+- If a primary statistic moves, the verdict says which and by how much, and the default to ship goes back to Keith:
+  the implicit step, or `false` until the scene is understood.
+- This note authorises no further round.
+
+### Cost
+
+Minutes.
+
+### To be built
+
+- `tools/roundhouse/joltScenes.mjs` (the library: the four scenes, the statistics, the sign test and the controls),
+  `tools/roundhouse/joltScenesRun.mjs` (the command) and `tools/roundhouse/joltScenes-selfcheck.mjs` (the gate).
+- The results go to `physics/mechanics/joltScenesResults.json`, committed before it is read.
