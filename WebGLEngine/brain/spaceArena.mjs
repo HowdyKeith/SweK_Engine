@@ -48,7 +48,9 @@ import * as AP from "./autopilot6dof.mjs";
 import * as SC from "./shipCollision6dof.mjs";
 
 export const DT = 1 / 30;
-/** The page's fighter, in this arena's numbers (es-box3d-6dof.html's HALF, SHIP_MASS, ENGINE_MOUNT, HP_MAX, SHOT_DAMAGE and RBW.WEAPON): `radius` is the hit sphere. */
+/** The page's fighter, in this arena's numbers (es-box3d-6dof.html's HALF, SHIP_MASS, ENGINE_MOUNT, HP_MAX, SHOT_DAMAGE and RBW.WEAPON): `radius` is the hit sphere.
+ *  2026-11-04: the duel moved to SHOT_DAMAGE 6 and standoff 85 on 2026-10-22 and this arena did not -- it keeps 18 and 50, and the battleship
+ *  world flies the pilots trained for them (brain/pilot6dofWeights*-d18.json), not the duel's retrained ones. */
 export const FIGHTER = Object.freeze({ half: Object.freeze([1.6, 0.7, 0.7]), mass: 8, engineMount: Object.freeze([-1.4, 0, 0]), muzzle: Object.freeze([1.4, 0, 0]), hp: 100, radius: 1.5 });
 export const FIGHTER_GUN = Object.freeze({ ...G.GUN, muzzleSpeed: 900, rate: 1000 / 300, magazine: 1e6, life: 2.5, damage: 18 });
 /** The autopilot's numbers on the page (PAGE_AUTOPILOT): thrust 16, standoff 50, the weapon's speed for the lead. */

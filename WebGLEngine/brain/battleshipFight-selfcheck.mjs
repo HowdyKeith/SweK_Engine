@@ -4,6 +4,8 @@
 //
 // THE CAPITAL SHIP'S FIGHT, HELD TO ITS OWN ARITHMETIC AND PINNED TO THE NUMBERS IT GIVES. brain/battleshipFight.mjs places a capital ship and the fighters that attack it for a seed and a kind of attack, seats the gunners at one of four settings, and sums a fight up. Five things hold it:
 //
+//   0  THE PILOTS THIS WORLD FLIES   (2026-11-04) the three -d18 files are the Default, League and close-quarters weights from before the 6-DOF duel retrained them for damage 6 and standoff 85 (sha256 pinned), and each differs from the one the duel ships now;
+//                                     the page's pilot list and both battleship gates load them; and this arena still fights at damage 18 and standoff 50, the numbers they were trained for
 //   1  THE SCENARIO IS THE SEED'S     the same seed is the same scenario to the bit and another seed is another; every fighter of every kind, over 40 seeds, is inside the stated box (bow, stern and beam within 0.5 rad of the nose, the tail and the beam in azimuth and 0.5 rad above or below the deck; swarm
 //                                     anywhere in azimuth and 0.6 rad above or below; 350-500 units out) AND REACHES the edges of it; both sides occur in the beam attack; every fighter starts at rest with its nose on the ship to 1e-9 (the shortest-arc quaternion, checked in closed
 //                                     form for the six axes); the first three fighters of a flight of five are the three of a flight of three; a bad kind and a bad count are refused
@@ -83,9 +85,16 @@
 //   K19 the attackers include the escorts 2 | K20 friendly hits leave out the escorts' 1 | K21 the ships option is not passed to the scenario 1 | K22 the second ship is never built 2
 //   K23 the escorts' stream is the attackers' 1 | K25 one escort too many in the scenario 10
 // TWO WENT 0 RED THE FIRST TIME AND WERE GAPS IN THE GATE: K10 (the second ship's gunners the first's twins -- the ships are in different places, so their seats fire differently whatever their seeds; the row that can tell gives the same seat of each the same target for the same ticks and compares what it aims at) and K23 (the escorts' stream the attackers' -- nothing but the sweeps pinned the escorts' draws; the row that does reproduces them from Mulberry32 written out in the gate); a row was added for each and each re-run red.
+// AND SEVEN MORE, 2026-11-04, ONCE THIS WORLD FLEW THE PILOTS IT WAS BUILT WITH (section 0; the gate whole, through a byte-safe runner that restores every file and checks its sha256):
+//   B1 the gate's shipped pilot the duel's retrained one 7 | B2 the page's shipped pilot the duel's retrained one 1 | B3' a frozen League weight altered (the first, 0 to 0.5) 3
+//   B4 the arena's fighters at damage 6 28 | B5 the page gate's pilots the duel's retrained ones 1 | B1' B1 again once section 0's second row read this gate too 8
+// TWO WERE FINDINGS. B1 went red only in the pinned fights: section 0's second row said "both battleship gates" and read the page's gate alone, so it now reads this one's
+// load line too, and B1' is the same change red by name. B3's first form wrote "[01" for the first weight, which is not JSON, so the gate threw on loading the file
+// before any row ran and the runner, which counts FAIL lines, read 0; B3' alters the weight to another number and is red by name, the sha256 row first.
 "use strict";
 import "../physics/mechanics/rigidBody6dofEuler.mjs";   // 2026-11-04 -- the 6-DOF numbers this gate holds were measured under the first-order orientation step, so it flies that step (see that file)
 import fs from "node:fs";
+import nodeCrypto from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as BS from "./battleshipFight.mjs";
@@ -104,12 +113,32 @@ function ok(name, cond, detail) { console.log(`  ${cond ? "PASS" : "FAIL"}  ${na
 const throws = (fn) => { try { fn(); return null; } catch (e) { return String(e.message); } };
 const section = (fn) => { try { fn(); } catch (e) { ok(`!! the section THREW instead of answering: ${e.message}`, false, String(e.stack).split("\n")[1]); } };
 const W = (f) => Float32Array.from(JSON.parse(fs.readFileSync(path.join(ENG, "brain", f), "utf8")).weights);
-const SHIPPED = P6.pilotFor(W("pilot6dofWeightsDefault.json")), LEAGUE = P6.pilotFor(W("pilot6dofWeightsLeague.json")), CLOSE = P6.pilotFor(W("pilot6dofWeightsClose.json"));
+// 2026-11-04 -- THE PILOTS THIS WORLD WAS BUILT AND MEASURED WITH, frozen as the -d18 files: the Default, League and close-quarters weights as they
+// were trained, for damage 18 and standoff 50 -- this arena's own numbers (brain/spaceArena.mjs). The 6-DOF duel retrained all three on
+// 2026-10-22/23 for damage 6 and standoff 85 (d13237b4, 4058baef, 977fe289), and with those weights in the old files every number below went
+// stale: nine rows red, in no register, and the shipped pilot's eight putting 0 damage on the ship where they had put 14,796. See section 0.
+const SHIPPED = P6.pilotFor(W("pilot6dofWeightsDefault-d18.json")), LEAGUE = P6.pilotFor(W("pilot6dofWeightsLeague-d18.json")), CLOSE = P6.pilotFor(W("pilot6dofWeightsClose-d18.json"));
 const norm = (a) => Math.hypot(a[0], a[1], a[2]);
 
 console.log("battleshipFight-selfcheck -- a capital ship and the fighters that attack it\n");
 
-console.log("1. THE SCENARIO IS THE SEED'S");
+console.log("0. THE PILOTS THIS WORLD FLIES (2026-11-04: frozen, the ones it was built and measured with)");
+section(() => {
+    const sha = (f) => nodeCrypto.createHash("sha256").update(fs.readFileSync(path.join(ENG, "brain", f))).digest("hex");
+    const page = fs.readFileSync(path.join(ENG, "space-battleship.html"), "utf8"), gate = fs.readFileSync(path.join(ENG, "tools", "ship", "battleshipPage-selfcheck.mjs"), "utf8"), self = fs.readFileSync(fileURLToPath(import.meta.url), "utf8");
+    const FROZEN = { "pilot6dofWeightsDefault-d18.json": "ee937dd493801683", "pilot6dofWeightsLeague-d18.json": "d7a3a3850d02b4e4", "pilot6dofWeightsClose-d18.json": "435d68cbffc1f684" };
+    ok("!! the battleship world flies the pilots it was built and measured with: the three -d18 files are, byte for byte, the Default, League and close-quarters weights before the duel retrained them (sha256 pinned), and each differs from the file the duel now ships",
+        Object.entries(FROZEN).every(([f, h]) => sha(f).startsWith(h)) && Object.keys(FROZEN).every((f) => sha(f) !== sha(f.replace("-d18", ""))), Object.keys(FROZEN).map((f) => `${f} ${sha(f).slice(0, 16)}`).join(", "));
+    ok("!! ...the page's pilot list and both battleship gates load the -d18 files, and none of them the duel's retrained ones",
+        ["Default", "League", "Close"].every((k) => page.includes(`file: "/brain/pilot6dofWeights${k}-d18.json"`) && !page.includes(`file: "/brain/pilot6dofWeights${k}.json"`)) &&
+        /weightsOf\("pilot6dofWeightsDefault-d18\.json"\), WL = weightsOf\("pilot6dofWeightsLeague-d18\.json"\), WC = weightsOf\("pilot6dofWeightsClose-d18\.json"\)/.test(gate) &&
+        /blobOf\("pilot6dofWeightsDefault-d18\.json"\)/.test(gate) && /path\.join\(ENG, "brain", "pilot6dofWeightsDefault-d18\.json"\)/.test(gate) &&
+        /const SHIPPED = P6\.pilotFor\(W\("pilot6dofWeightsDefault-d18\.json"\)\), LEAGUE = P6\.pilotFor\(W\("pilot6dofWeightsLeague-d18\.json"\)\), CLOSE = P6\.pilotFor\(W\("pilot6dofWeightsClose-d18\.json"\)\);/.test(self));
+    ok("!! ...because this arena still fights at the numbers those pilots were trained for -- damage 18, standoff 50 -- where the duel has moved to 6 and 85 since 2026-10-22",
+        SA.FIGHTER_GUN.damage === 18 && SA.AUTOPILOT.standoff === 50 && P6.SHOT_DAMAGE === 6 && P6.PAGE_AUTOPILOT.standoff === 85, `arena ${SA.FIGHTER_GUN.damage}/${SA.AUTOPILOT.standoff}, duel ${P6.SHOT_DAMAGE}/${P6.PAGE_AUTOPILOT.standoff}`);
+});
+
+console.log("\n1. THE SCENARIO IS THE SEED'S");
 section(() => {
     ok("!! the same seed and kind are the same scenario to the bit, another seed is another, and the same seed with another kind is another", JSON.stringify(BS.scenario(5, "bow")) === JSON.stringify(BS.scenario(5, "bow")) && JSON.stringify(BS.scenario(5, "bow")) !== JSON.stringify(BS.scenario(6, "bow")) && JSON.stringify(BS.scenario(5, "bow")) !== JSON.stringify(BS.scenario(5, "stern")));
     const sc0 = BS.scenario(1, "bow");
