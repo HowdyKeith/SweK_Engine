@@ -23,6 +23,7 @@ const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "
 const sec = (t) => console.log("\n" + t);
 const J = JSON.stringify, near = (a, b, t = 1e-9) => Math.abs(a - b) < t;
 import * as T from "../../brain/needsTask.mjs";
+import * as Q_ from "../../brain/plannerPerturbed.mjs";
 import * as U from "../../brain/tunedRule.mjs";
 import * as X from "./plannerHeadroom.mjs";
 import { setN } from "./plannerStations.mjs";
@@ -59,6 +60,12 @@ sec("3. COUNTS");
     ok("!! at a count the gain is twin minus tuned (+0.04), the gap oracle minus tuned (+0.10) and the headroom oracle minus twin (+0.06), over 16 dives", c.n === 3 && c.gain.n === 16 && near(c.gain.mean, 0.04, 1e-9) && near(c.gap.mean, 0.1, 1e-9) && near(c.head.mean, 0.06, 1e-9) && c.gain.better === 16 && c.head.better === 16);
     ok("!! the share closed is gain over gap (0.4); a count where the oracle is no better than the tuned rule has share null", near(c.share, 0.4) && X.countOf(synth({ 4: { oracle: Z } }), 4).share === null);
     ok("!! the headroom's reading: real when above 2 se (0.06 with a tiny se), not real for a wobble around zero", c.real === true && X.countOf(synth({ 3: { oracle: [0.03, 0.05].map((x, i) => x + (i % 2 ? 0.02 : -0.02) - 0.04) } }), 3).real === false);
+    {   // the threshold is 2 se: headroom at 1.5 se is not real, at 2.5 se it is (wobble amplitude 0.03 over 16 dives: se = amp * 1.0328 / 4)
+        const amp = 0.03, se1 = amp * 1.0328 / 4, hd = (m) => X.countOf(synth({ 3: { oracle: [0.03, 0.05].map((x, i) => x + H6[i % 2] + (i % 2 ? amp : -amp) + 0 * m) } }), 3);
+        const withHead = (k) => X.countOf(synth({ 3: { oracle: BASE.map((_, i) => G4[i % 2] + (i % 2 ? amp : -amp) + k * se1) } }), 3);
+        const lo = withHead(1.5), hi = withHead(2.5);
+        ok("!! the headroom is REAL above 2 se and not at 1.5 se (headroom 1.5 and 2.5 times its se)", Math.abs(lo.head.mean / lo.head.se - 1.5) < 0.1 && lo.real === false && Math.abs(hi.head.mean / hi.head.se - 2.5) < 0.1 && hi.real === true, `${(lo.head.mean / lo.head.se).toFixed(2)} ${(hi.head.mean / hi.head.se).toFixed(2)}`);
+    }
     ok("!! each count reads its own arms (a high gain at 5 does not change count 3)", near(X.countOf(synth({ 5: { gain: [0.2] } }), 5).gain.mean, 0.2) && near(X.countOf(synth({ 5: { gain: [0.2] } }), 3).gain.mean, 0.04, 1e-9));
 }
 sec("4. GROWTH");
@@ -66,7 +73,12 @@ sec("4. GROWTH");
     const big = synth({ 5: { gain: G4, oracle: BASE.map((_, i) => G4[i % 2] + H6[i % 2] * 3) } }), g = X.growth(big);
     ok("!! headroom 0.18 at 5 stations against 0.06 at 3: growth +0.12 over the se of two independent means (sqrt(se5^2 + se3^2)): GROWS", near(g.mean, 0.12, 1e-9) && g.verdict === "GROWS" && near(g.se, Math.sqrt(X.countOf(big, 5).head.se ** 2 + X.countOf(big, 3).head.se ** 2)));
     ok("!! equal headroom is FLAT, a smaller headroom at 5 is SHRINKS", X.growth(synth()).verdict === "FLAT" && X.growth(synth({ 5: { oracle: BASE.map((_, i) => G4[i % 2] + H6[i % 2] / 3) } })).verdict === "SHRINKS");
-    const a = synth(); a.H1["TWIN@4"].runs[2].score = 9; a.H2["TWIN@5"].runs[0].score = 9; a.H2["TWIN@5"].runs[1].score += 1e-12;
+    {   // growth is read against 2 se of two independent means: 1.5 se is FLAT either way, 2.5 se is GROWS / SHRINKS
+        const amp = 0.03, seH = (n) => X.countOf(synth(), n).head.se, mk5 = (k) => synth({ 5: { oracle: BASE.map((_, i) => G4[i % 2] + H6[i % 2] + (i % 2 ? amp : -amp) + k) }, 3: { oracle: BASE.map((_, i) => G4[i % 2] + H6[i % 2] + (i % 2 ? amp : -amp)) } });
+        const base = X.growth(mk5(0)), seG = base.se, at = (k) => X.growth(mk5(k * seG));
+        ok("!! growth at 1.5 se is FLAT in both directions, at 2.5 se GROWS or SHRINKS", at(1.5).verdict === "FLAT" && at(-1.5).verdict === "FLAT" && at(2.5).verdict === "GROWS" && at(-2.5).verdict === "SHRINKS" && Math.abs(at(1.5).mean / at(1.5).se - 1.5) < 0.1, `${(at(1.5).mean / at(1.5).se).toFixed(2)} ${(at(2.5).mean / at(2.5).se).toFixed(2)}`);
+    }
+    const a = synth(); a.H1["TWIN@4"].runs[2].score = 9; a.H2["TWIN@5"].runs[0].score = 9; a.H2["TWIN@5"].runs[1].score += 1e-12; a.H2["TWIN@3"].runs[2].score = a.H2["ORACLE@3"].runs[2].score;
     ok("!! the twin beats the oracle on a dive only when it scores above it by more than 1e-9: two dives of 48 here (a 1e-12 excess does not count)", J(X.twinBeatsOracle(a)) === J({ count: 2, of: 48 }) && J(X.twinBeatsOracle(synth())) === J({ count: 0, of: 48 }));
 }
 sec("5. LINES");
@@ -106,6 +118,7 @@ sec("8. FLIGHT");
     ok("!! the oracle is at least the tuned rule on every dive at 3 and at 5 stations", ["H1", "H2"].every((s) => o3[s].runs.every((r, i) => r.score >= t3[s].runs[i].score - 1e-12) && o5[s].runs.every((r, i) => r.score >= t5[s].runs[i].score - 1e-12)));
     ok("!! the oracle arm IS stationRound.oracleRuns on the same scenarios, dive for dive", (() => { const set = setN(X.HARD, 1344, 1345, 3), d = oracleRuns(R8, set); return o3.H1.runs.every((r, i) => r.score === d.runs[i].score && r.fingerprint === d.runs[i].fingerprint); })());
     ok("!! the tuned rule is T.evaluate's tuned dive with the noisy gauge and the twin is another pilot on at least one dive", t3.H1.runs.every((r, i) => r.fingerprint === T.evaluate(T.flyDecision(U.tunedSeat(R8, U.WIDE_BOUNDS)), setN(X.HARD, 1344, 1345, 3), { gauge: T.GAUGE, seconds: 100 }).runs[i].fingerprint) && ["H1", "H2"].some((s) => w3[s].runs.some((r, i) => r.fingerprint !== t3[s].runs[i].fingerprint)));
+    ok("!! the twin arm is the perturbed seat planning with the flight's seconds (a 100-second flight plans a 100-second horizon): dive for dive equal to a direct flight, and different from one planning 600 seconds", (() => { const set = setN(X.HARD, 1344, 1345, 3), direct = T.evaluate(T.flyDecision(Q_.perturbedSeat(R8, {}, { seconds: 100 })), set, { gauge: T.GAUGE, seconds: 100 }), long = T.evaluate(T.flyDecision(Q_.perturbedSeat(R8, {}, {})), set, { gauge: T.GAUGE, seconds: 100 }); return w3.H1.runs.every((r, i) => r.fingerprint === direct.runs[i].fingerprint) && direct.runs.some((r, i) => r.fingerprint !== long.runs[i].fingerprint); })());
     ok("!! the twin flies four stations; a 4-station scenario differs from the 3-station one", w4.H1.runs.length === 4 && w4.H1.runs.some((r, i) => r.fingerprint !== w3.H1.runs[i].fingerprint));
     X.setFlight({});
     const thr = (a) => { try { X.flySets(a, R8, { ranges: { H1: [1, 1], H2: [2, 2] } }); return false; } catch { return true; } };
