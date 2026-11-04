@@ -278,4 +278,6 @@ await section(() => {
 });
 
 console.log(`\nbox3dHybridShips-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILED"}`);
-process.exit(fails === 0 ? 0 : 1);
+// the verdict travels by exitCode, not process.exit(): this gate reaches box3d's wasm (tools/ship/wasmDoors-selfcheck.mjs; sabotaged 2026-11-04, W2:
+// the exit put back turns that gate red, 1 row)
+process.exitCode = fails === 0 ? 0 : 1;

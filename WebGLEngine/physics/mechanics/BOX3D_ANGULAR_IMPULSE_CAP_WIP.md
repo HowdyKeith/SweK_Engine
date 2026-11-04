@@ -370,6 +370,23 @@ Sixteen gates that spin a box3d body, or read what the facade does, were run bef
 - **Section 11's raw-export grep** now leaves out the census's own files, as section 2's grep does. It counts their two calls
   beside it, both inside C-reads.
 
+### The wide run
+
+After the fix, 289 gates were run two at a time: the census's corpus, every gate that imports the loader, and every gate whose
+text names box3d. Thirteen were red, and the cap reddened none of them:
+
+- **Eight were red in the census run, before the cap,** and none of them loads box3d at all (no instance, no call):
+  `pilotFlightTrain`, `subDropoutView`, `dogfightPage`, `tournamentDogfightShipped`, `trainDogfightPilotShipped`,
+  `trainDronePilot`, `trainFlightPilotGpu` and `trainSubPilot`.
+- **Two are the ship-time records:**
+  - `gateReach`'s population, 588 gates against its recorded 579;
+  - `orreryFleet`'s commit belt. box3d moved at 5fed473f, the spinning body's wasm rebuild, and the belt still reads v4905's.
+- **One stands the same at the commit before the cap:** `runtimeGap`'s tree census, 5,180 files recorded against 5,237.
+- **Two were this session's own, from earlier commits,** and were fixed here. Each fix was sabotaged red, W1 to W4:
+  - `wasmDoors`: the hybrid gate (e30f8c21) and the census gate (e1a56d0d) reach box3d's wasm and ended with
+    `process.exit()`. Their verdicts now travel by `process.exitCode`, and both still end by themselves.
+  - `wasmSupport`: the census's library and gate name `box3d.wasm` in code. The count is restated 128 to 130, naming them.
+
 ### Gated
 
 In `tools/roundhouse/angularImpulseCensus-selfcheck.mjs`, section 12, nine rows:
