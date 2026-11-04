@@ -257,3 +257,72 @@ registered seeds or the four registered scenes.
   - that a contact's impulse is the momentum moved;
   - that H moves joust flights in the miniature;
   - that the readings mirror the cells.
+
+## The run and its verdict (2026-11-04)
+
+The registered run was flown at e30f8c21. Its results, `physics/mechanics/box3dHybridShipsResults.json` (842,849 bytes,
+sha256 e0f0d8e86e536512), were committed unread at 72be798d and then read. Every reading below is re-derived from the
+file by the gate's section 8.
+
+**Every control held.**
+
+- C-unchanged held on eleven anchors.
+- C-free held over 1,000 flights, 185 of them with a contact tick: the engine's own resolver through the hook is E to the
+  bit, and every first contact tick is the same under E and H.
+- C-box3d, C-scenes, C-momentum, C-chaos and C-determinism held.
+
+### The round's answer
+
+**In all ten cells, box3d's contacts change nothing a sign test can see.**
+
+| Cell | Better for A under H | Worse | p |
+|---|---|---|---|
+| PD autopilot, joust | 1 | 10 | 0.0117 |
+| GPU Brain, joust | 4 | 1 | 0.375 |
+| close-quarters, joust | 2 | 3 | 1 |
+| Default, joust | 0 | 1 | 1 |
+| League, joust | 0 | 1 | 1 |
+| every standoff | 0 | 0 | 1 |
+
+The PD autopilot's joust is the nearest to the line, leaning worse for A under H, at p 0.0117 against 0.01. By the
+registered line it is not a change.
+
+Keith's decision, ships on the engine's own step with box3d for their contacts, costs no pilot anything a sign test can
+see in these fights.
+
+### The predictions
+
+- **P1 right.** In the standoff no contact came, and all 500 flights under H are E's to the bit.
+- **P2 right.** No cell's reading sees a change.
+- **P3 right.** H moved every joust flight with a contact tick, 185 of 185, and none of the 315 without one.
+- **P4 wrong.** H's rams cost **more** hit points than E's, in all five joust cells, by 9 to 24%. They do not cost less
+  in three of them.
+  - The reason is in the contact ticks. box3d meets a contact a tick late, from overlap, so its contacts last longer.
+  - Of H's 490 contact ticks in the joust, box3d reported the contact on 312. The rest are first ticks it could not
+    see, 0.02 m being its margin.
+- **P5 right.** The pair's linear momentum held through every scene: exactly under E, and under H to float32's last
+  place (1.2e-7 in S4, the only scene with momentum to keep).
+
+### What the scenes found
+
+| Scene | Depth under H against E | Normal impulse, H against E | Angular momentum change, E | Angular momentum change, H |
+|---|---|---|---|---|
+| S1 | 2.43 times | 0.986 | 0 to 0.386 | 0.004 |
+| S2 | 2.43 times | 1.022 | +1.8% | -2.0% |
+| S3 | 2.24 times | 1.011 | +3.1% | -1.9% |
+| S4 | 2.65 times | 1.119 | -7.2% | -1.1% |
+
+- **Deeper, about the same impulse.** box3d lets the ships go 2.2 to 2.7 times as deep into each other as the engine's
+  model does, and it moves about the same momentum, within 12%.
+- **Angular momentum.** box3d's contact changes the pair's angular momentum by 2% at most. The engine's own model gives
+  the symmetric head-on S1 an angular momentum of 0.39 from none, and takes 7% of S4's. That is a fact about
+  `resolveShipCollisions`, which solves its manifold point by point and corrects position at the deepest point, and it
+  is left as it is.
+
+### What this leaves
+
+Nothing for this round. The backlog entry `box3d-hybrid-ship-stepper` is closed by it.
+
+Two things are recorded beside it for Keith, not as rounds:
+- box3d's rams cost 9 to 24% more hit points than the engine's, because box3d resolves from overlap.
+- The engine's own contact model does not keep the pair's angular momentum.

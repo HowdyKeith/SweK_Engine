@@ -17,6 +17,8 @@
 //   5  THE CONTROLS' LOGIC           C-free, C-scenes and C-momentum shown failing on hand-made rows; C-chaos's line
 //   6  THE MINIATURE                 run() itself: every control holds and everything the registration names is there, in its order
 //   7  THE RESULTS FILE              written once; the command prints no reading
+//   8  THE VERDICT                   from the committed results (72be798d): the round's answer re-derived from every cell's flights, the five predictions scored
+//                                    (four right, P4 wrong), and the scenes' two findings
 // SABOTAGE LOG -- THIRTY-ONE, AND TWO OF THEM AGAIN, 2026-11-04, each applied to the duel's hook, the contact tick, the library or the command through a byte-safe
 // runner (one at a time, every file restored and its sha256 checked), the gate run whole (the number is how many rows went red):
 //   G1 the duel never calls the resolver 5 | G2 the resolver is handed the states after the step, not before 1 | G3 the resolver is handed empty accumulators 1
@@ -37,10 +39,16 @@
 // check made always true) only loosens a control that holds; both are equivalent at this level. Four gaps were closed before the first sabotage ran, seen in
 // the gate's first draft: the replay's force and torque, a contact's impulse being the momentum moved, H moving joust flights in the miniature, and the
 // readings mirroring the cells.
+// AND THIRTEEN FOR THE VERDICT (section 8), each applied to the gate's own verdict rows through the same runner, every one red by name, none 0 red:
+//   V1 the results' hash pinned one digit off 1 | V2 the answer expected to be a change 1 | V3 the readings re-derived from E' instead of H 2
+//   V4 the PD autopilot's joust said to be 9 worse 1 | V5 its p said to be under the line 1 | V6 the standoff said to be 499 flights 1 | V7 one joust flight without a contact said to move 1
+//   V8 P4 scored the way it was predicted 1 | V9 box3d said to see every contact tick 1 | V10 E's momentum said to move 1 | V11 box3d's depth said to be 2.5 to 2.7 times 1
+//   V12 the engine's model said to keep S1's angular momentum 1 | V13 the verdict reads the both-ships round's results 3
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import * as L from "./box3dHybridShips.mjs";
 import * as OS from "./orientationStep.mjs";
@@ -227,6 +235,46 @@ await section(() => {
     ok("!! the command prints where it wrote and nothing it read: no reading, no cell, no scene", logs.length === 3 && logs.every((l) => !/result\.|readings|cells|scenes|controls/.test(l)) && /refuseExisting\(results\)/.test(cmd) && /await run\(\)/.test(cmd));
     let refusedUnknown = false; try { execFileSync(process.execPath, [path.join(HERE, "box3dHybridShipsRun.mjs"), "--nope"], { cwd: ENG, stdio: "pipe" }); } catch (e) { refusedUnknown = e.status === 2 && /unknown option/.test(String(e.stderr)); }
     ok("...and refuses an option it does not know, before running anything", refusedUnknown);
+});
+
+console.log("\n8. THE VERDICT, FROM THE COMMITTED RESULTS (72be798d)");
+await section(() => {
+    const bytes = fs.readFileSync(L.DEFAULT_RESULTS), sha = createHash("sha256").update(bytes).digest("hex"), R = JSON.parse(bytes.toString("utf8"));
+    ok("the results are the registered run's as committed, unread, at 72be798d: 842,849 bytes, sha256 e0f0d8e86e536512", bytes.length === 842849 && sha.startsWith("e0f0d8e86e536512"), sha.slice(0, 16));
+    ok("!! every control held: C-unchanged, C-free (1,000 flights, 185 of them with a contact tick), C-box3d, C-scenes, C-momentum, C-chaos and C-determinism",
+        J(Object.keys(R.controls)) === J(["unchanged", "free", "box3d", "scenes", "momentum", "chaos", "determinism"]) && Object.values(R.controls).every((c) => c.ok) && R.controls.free.flights === 1000 && R.controls.free.withContact === 185);
+    // every reading re-derived from the cell's own flights, by the orientation round's own functions
+    const derived = R.cells.map((c) => { const h = OS.compare(c.flights.E, c.flights.H); return { pilot: c.pilot, scenario: c.scenario, reading: OS.readingOf(h), better: h.better, worse: h.worse, p: h.p }; });
+    ok("!! *** THE ROUND'S ANSWER: IN ALL TEN CELLS box3d'S CONTACTS CHANGE NOTHING A SIGN TEST CAN SEE *** -- every reading re-derived from its cell's own flights, and the same as the file's",
+        derived.length === 10 && derived.every((d, i) => J(d) === J(R.readings[i])) && derived.every((d) => d.reading === "changes nothing a sign test can see"), J(derived.filter((d) => d.better + d.worse > 0).map((d) => [d.pilot, d.scenario, d.better, d.worse, d.p])));
+    const pd = derived.find((d) => d.pilot === "scripted" && d.scenario === "joust");
+    ok("!! ...the nearest to the line is the PD autopilot's joust: 1 better and 10 worse for A under H, p 0.0117, over 0.01", pd.better === 1 && pd.worse === 10 && pd.p === 0.01171875 && pd.p >= L.ALPHA);
+    const stand = R.cells.filter((c) => c.scenario === "standoff"), joust = R.cells.filter((c) => c.scenario === "joust");
+    ok("!! P1 RIGHT: in the standoff no contact came, and all 500 flights under H are E's to the bit",
+        stand.reduce((n, c) => n + c.flights.H.length, 0) === 500 && stand.every((c) => c.contact.flightsWithContact === 0 && c.flights.H.every((f, i) => f.fingerprint === c.flights.E[i].fingerprint)));
+    ok("!! P2 RIGHT: no cell's reading sees a change (the row above, which is the round's answer)", derived.every((d) => d.p >= L.ALPHA));
+    const touched = (c) => c.flights["E~"].map((f) => f.firstContact !== null), nTouched = joust.reduce((n, c) => n + touched(c).filter(Boolean).length, 0);
+    const movedT = joust.reduce((n, c) => n + c.flights.H.filter((f, i) => touched(c)[i] && f.fingerprint !== c.flights.E[i].fingerprint).length, 0);
+    const movedU = joust.reduce((n, c) => n + c.flights.H.filter((f, i) => !touched(c)[i] && f.fingerprint !== c.flights.E[i].fingerprint).length, 0);
+    ok("!! P3 RIGHT: H moved every joust flight with a contact tick -- 185 of 185 -- and none of the 315 without one", nTouched === 185 && movedT === 185 && movedU === 0, `${movedT} of ${nTouched}; ${movedU} of ${500 - nTouched}`);
+    const hp = (c, w) => c.flights[w].reduce((n, f) => n + f.ramHp, 0), ratios = joust.map((c) => hp(c, "H") / hp(c, "E"));
+    ok("!! P4 WRONG: H's rams cost MORE hit points than E's in all five joust cells -- 9 to 24 per cent more -- not less in three of them",
+        ratios.every((x) => x > 1.09 && x < 1.25) && joust.filter((c) => hp(c, "H") < hp(c, "E")).length === 0, ratios.map((x) => x.toFixed(3)).join(", "));
+    const ticksH = joust.reduce((n, c) => n + c.contact.hContactTicks, 0), seen = joust.reduce((n, c) => n + c.contact.hBox3dReported, 0);
+    ok("!! ...because box3d meets a contact a tick late, from overlap: of H's 490 contact ticks in the joust, box3d reported the contact on 312; the others are first ticks it could not see, 0.02 m being its margin",
+        ticksH === 490 && seen === 312 && joust.every((c) => c.contact.hContactTicks >= c.ram.E.ramTicks * 0.9), `${seen} of ${ticksH}`);
+    const mrow = R.controls.momentum.rows;
+    ok("!! P5 RIGHT: the pair's linear momentum held through every scene under both models -- exactly under E, and under H to float32's last place (1.2e-7 of it in S4, the only scene with momentum to keep)",
+        R.scenes.length === 8 && mrow.length === 8 && mrow.filter((r) => r.way === "E").every((r) => r.rel === 0) && mrow.filter((r) => r.way === "H").every((r) => r.rel <= 1.2e-7) &&
+        mrow.find((r) => r.id === "S4" && r.way === "H").rel > 0, J(mrow.filter((r) => r.rel > 0)));
+    const sc = (id, w) => R.scenes.find((x) => x.id === id && x.way === w), ids = ["S1", "S2", "S3", "S4"], mag = (v) => Math.hypot(v[0], v[1], v[2]);
+    ok("!! THE SCENES: box3d lets the ships go 2.2 to 2.7 times as deep into each other as the engine's model does, and moves about the same momentum (within 12 per cent)",
+        ids.every((id) => { const d = sc(id, "H").deepest / sc(id, "E").deepest, j = sc(id, "H").impulse / sc(id, "E").impulse; return d > 2.2 && d < 2.7 && Math.abs(j - 1) < 0.12; }),
+        ids.map((id) => `${id} ${(sc(id, "H").deepest / sc(id, "E").deepest).toFixed(2)}x deep, ${(sc(id, "H").impulse / sc(id, "E").impulse).toFixed(3)} impulse`).join("; "));
+    const dL = (id, w) => { const x = sc(id, w); return mag(x.after.L) - mag(x.before.L); };
+    ok("!! ...and box3d's contact changes the pair's angular momentum by 2 per cent at most, where the engine's gives the symmetric head-on (S1) 0.39 from none and takes 7 per cent of S4's",
+        ids.every((id) => Math.abs(dL(id, "H")) <= 0.02 * Math.max(1, mag(sc(id, "H").before.L))) && dL("S1", "E") > 0.38 && dL("S1", "E") < 0.40 && dL("S4", "E") / mag(sc("S4", "E").before.L) < -0.07,
+        ids.map((id) => `${id} E ${dL(id, "E").toFixed(3)} H ${dL(id, "H").toFixed(3)}`).join("; "));
 });
 
 console.log(`\nbox3dHybridShips-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILED"}`);
