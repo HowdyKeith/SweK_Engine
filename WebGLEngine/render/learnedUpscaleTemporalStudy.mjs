@@ -5,8 +5,8 @@
 // sequences. runTemporalTest: the 24 test sequences, U_T's chain against Bt (H1) and against the single-frame chain B1 (H2), graded
 // in display space, with each scene's mean correction (P4).
 "use strict";
-import { SPLITS_UPSCALE_TEMPORAL, SPLITS_UPSCALE_TEMPORAL_72, SPLITS_UPSCALE_MOVING, SPLITS_UPSCALE_MOVING_78, SPLITS_UPSCALE_VECTORS, SPLITS_UPSCALE_CHECK, SPLITS_UPSCALE_SPEED, SPLITS_UPSCALE_SAMPLING, familyOf, makeScene } from "./denoiseScenes.mjs";
-import { sceneMotion, scaleMotion, SPEED_LEVELS } from "./movingScenes.mjs";
+import { SPLITS_UPSCALE_TEMPORAL, SPLITS_UPSCALE_TEMPORAL_72, SPLITS_UPSCALE_MOVING, SPLITS_UPSCALE_MOVING_78, SPLITS_UPSCALE_VECTORS, SPLITS_UPSCALE_CHECK, SPLITS_UPSCALE_SPEED, SPLITS_UPSCALE_SAMPLING, SPLITS_UPSCALE_LIGHTS, familyOf, makeScene } from "./denoiseScenes.mjs";
+import { sceneMotion, scaleMotion, SPEED_LEVELS, lightMotion } from "./movingScenes.mjs";
 import { samplingFrames, rejectedMask, SAMPLING } from "./adaptiveSampling.mjs";
 import { temporalExample, temporalChain, trainTemporal, temporalCorrection, UT_SHAPE, UTH_SHAPE, UT_CHANNELS } from "./learnedUpscaleTemporal.mjs";
 import { FRAMES } from "./denoiseTemporal.mjs";
@@ -40,8 +40,10 @@ export const ROUND_UPSCALE_SPEED = Object.freeze({ ...ROUND_UPSCALE_TEMPORAL_72,
 /** Section 186, ROUND 82: the same samples shared by where the history will be rejected -- adaptive against uniform, a test only. */
 export const ROUND_UPSCALE_SAMPLING = Object.freeze({ ...ROUND_UPSCALE_TEMPORAL_72, splits: SPLITS_UPSCALE_SAMPLING, round: 82, moving: true, sampling: SAMPLING,
     results: "render/denoise-results-upscale-sampling-r82.json" });
-/** The temporal round a harvest runs: 70 (section 161) unless --round 72 (section 167), 77 (176, a test only), 78 (178), 79 (180), 80 (182), 81 (184) or 82 (186), the last four tests only. */
-export const temporalRound = (n) => (n === 82 ? ROUND_UPSCALE_SAMPLING : n === 81 ? ROUND_UPSCALE_SPEED : n === 80 ? ROUND_UPSCALE_CHECK : n === 79 ? ROUND_UPSCALE_VECTORS : n === 78 ? ROUND_UPSCALE_MOVING_78 : n === 77 ? ROUND_UPSCALE_MOVING : n === 72 ? ROUND_UPSCALE_TEMPORAL_72 : n === 70 || n == null ? ROUND_UPSCALE_TEMPORAL : (() => { throw new Error(`learnedUpscaleTemporalStudy: no temporal round ${n} -- 70, 72, 77, 78, 79, 80, 81 or 82`); })());
+/** Section 188, ROUND 83: moving lights -- round 77's test with the lights moving instead of the objects, H83b Bt against B1. */
+export const ROUND_UPSCALE_LIGHTS = Object.freeze({ ...ROUND_UPSCALE_MOVING, splits: SPLITS_UPSCALE_LIGHTS, round: 83, lights: true, results: "render/denoise-results-upscale-lights-r83.json" });
+/** The temporal round a harvest runs: 70 (section 161) unless --round 72 (section 167), 77 (176, a test only), 78 (178), 79 (180), 80 (182), 81 (184), 82 (186) or 83 (188), the last five tests only. */
+export const temporalRound = (n) => (n === 83 ? ROUND_UPSCALE_LIGHTS : n === 82 ? ROUND_UPSCALE_SAMPLING : n === 81 ? ROUND_UPSCALE_SPEED : n === 80 ? ROUND_UPSCALE_CHECK : n === 79 ? ROUND_UPSCALE_VECTORS : n === 78 ? ROUND_UPSCALE_MOVING_78 : n === 77 ? ROUND_UPSCALE_MOVING : n === 72 ? ROUND_UPSCALE_TEMPORAL_72 : n === 70 || n == null ? ROUND_UPSCALE_TEMPORAL : (() => { throw new Error(`learnedUpscaleTemporalStudy: no temporal round ${n} -- 70, 72, 77, 78, 79, 80, 81, 82 or 83`); })());
 /** A sequence's cache key: everything it depends on. */
 export const temporalKey = (family, seed, { W, sppIn, sppRef, ref2 = false, harvest = false }) => `upscale-temporal-${family}-${seed}-${W}-${sppIn}-${sppRef}-${ref2 ? "ref2" : "ref1"}-${harvest ? "harvest" : "gate"}`;
 const cachedSeq = (cache, family, seed, net, o) => cached(cache, temporalKey(family, seed, o), () => temporalExample(family, seed, net, o));
@@ -112,15 +114,16 @@ export function meanHistory(ex) { let s = 0; const n = ex.W * ex.H; for (let p =
  * (H77a: U_TH against Bt; H77b: against B1) is on the moving scenes; the still ones, history lengths and mover pixels are
  * descriptive.
  */
-export function runMovingTest({ splits = SPLITS_UPSCALE_MOVING, net, U, Uc2, U0 = null, round = 77, harvest = false, W = 256, sppIn = 4, sppRef = 2048, test = "signflip", c1Min = 22, cache = null, log = () => {} } = {}) {
+export function runMovingTest({ splits = SPLITS_UPSCALE_MOVING, net, U, Uc2, U0 = null, lights = false, round = 77, harvest = false, W = 256, sppIn = 4, sppRef = 2048, test = "signflip", c1Min = 22, cache = null, log = () => {} } = {}) {
     if (!net || !U || !Uc2) throw new Error("learnedUpscaleTemporalStudy: the moving test needs the shipped denoiser, the candidate U_TH and C2's");
     // round 78 (section 178): U0 is round 72's U_TH, graded beside U (U_THM) on every arm, and H1 is U against U0 rather than against Bt
     const t0 = Date.now(), T = { U: [], bt: [], b1: [], noisy: [], c2: [], floor: [], ...(U0 ? { U0: [] } : {}) }, still = { U: [], bt: [], ...(U0 ? { U0: [] } : {}) }, correction = [];
     const hist = { moving: [], still: [] }, mover = { U: [], bt: [], share: [], ...(U0 ? { U0: [] } : {}) }, rest = { U: [], bt: [], ...(U0 ? { U0: [] } : {}) }, speeds = [];
     let determinism = true;
     splits.T1.seeds.forEach((sd, i) => {
-        const fam = familyOf(splits.T1, i), o = { harvest, W, sppIn, sppRef, ref2: true }, s = cachedSeq(cache, fam, sd, net, o), motion = sceneMotion(makeScene(fam, sd));
-        const e = cached(cache, movingKey(fam, sd, o), () => temporalExample(fam, sd, net, { ...o, motion, refs: { ref: s.ref, ref2: s.ref2 } })), y = temporalChain(U, e);
+        // round 83 (section 188): `lights` moves the lights instead of the objects, its own cache entry
+        const fam = familyOf(splits.T1, i), o = { harvest, W, sppIn, sppRef, ref2: true }, s = cachedSeq(cache, fam, sd, net, o), motion = (lights ? lightMotion : sceneMotion)(makeScene(fam, sd));
+        const e = cached(cache, movingKey(fam, sd, o) + (lights ? "-lights" : ""), () => temporalExample(fam, sd, net, { ...o, motion, refs: { ref: s.ref, ref2: s.ref2 } })), y = temporalChain(U, e);
         T.U.push(gradeDisplay(y, e)); T.bt.push(gradeDisplay(e.bt, e)); T.b1.push(gradeDisplay(e.b1, e)); T.noisy.push(gradeDisplay(e.noisy, e));
         T.c2.push(gradeDisplay(temporalChain(Uc2, e), e)); T.floor.push(relMSE(toD(e.ref2), toD(e.ref))); correction.push(temporalCorrection(U, e));
         still.U.push(gradeDisplay(temporalChain(U, s), s)); still.bt.push(gradeDisplay(s.bt, s));
@@ -135,7 +138,9 @@ export function runMovingTest({ splits = SPLITS_UPSCALE_MOVING, net, U, Uc2, U0 
         log(`sequence ${i + 1} of ${splits.T1.seeds.length} at ${((Date.now() - t0) / 1000).toFixed(1)} s`);
     });
     const c2meanD = mean(effects(T.bt, T.c2)), gain = (u, b) => { const k = u.map((v, i) => (v === null || b[i] === null ? null : i)).filter((i) => i !== null); return k.length ? 1 - mean(k.map((i) => u[i])) / mean(k.map((i) => b[i])) : null; };
+    // round 83: with `lights`, H2 is Bt against B1 (does the history still pay when the light moves?) rather than U_TH against B1
     const sets = U0 ? { H1: { noisy: T.noisy, filter: T.U0, net: [T.U], floor: T.floor }, H2: { noisy: T.noisy, filter: T.bt, net: [T.U], floor: T.floor } }
+               : lights ? { H1: { noisy: T.noisy, filter: T.bt, net: [T.U], floor: T.floor }, H2: { noisy: T.noisy, filter: T.b1, net: [T.bt], floor: T.floor } }
                     : { H1: { noisy: T.noisy, filter: T.bt, net: [T.U], floor: T.floor }, H2: { noisy: T.noisy, filter: T.b1, net: [T.U], floor: T.floor } };
     const V = verdict({ sets, shuffled: null, c2Prior: { round, meanD: c2meanD, ok: c2meanD <= 0 }, determinism, seedsDistinct: new Set(splits.T1.seeds).size === splits.T1.seeds.length, test, c1Of: "candidate", c1Min });
     const gm = gain(T.U, T.bt), gs = gain(still.U, still.bt);
@@ -144,7 +149,8 @@ export function runMovingTest({ splits = SPLITS_UPSCALE_MOVING, net, U, Uc2, U0 
     return { verdict: V, tables: T, still, determinism, ms: Date.now() - t0,
              secondary: { c2: effects(T.bt, T.c2), correction, gainOverBt: gm, stillGainOverBt: gs, drop: gs - gm,
                           dropByScene: T.U.map((u, i) => (1 - still.U[i] / still.bt[i]) - (1 - u / T.bt[i])),
-                          history: hist, mover: { ...mover, gain: gain(mover.U, mover.bt) }, rest: { ...rest, gain: gain(rest.U, rest.bt) }, speeds, ...(vsU0 ? { vsU0 } : {}) } };
+                          history: hist, mover: { ...mover, gain: gain(mover.U, mover.bt) }, rest: { ...rest, gain: gain(rest.U, rest.bt) }, speeds, ...(vsU0 ? { vsU0 } : {}),
+                          ...(lights ? { lights: true, btOverB1: { moving: gain(T.bt, T.b1), still: gain(still.bt, T.b1) } } : {}) } };
 }
 
 /** Round 79: a vectors sequence's cache key -- the still one's, marked moving with vectors (it holds both accumulations). */

@@ -58,3 +58,16 @@ export function scaleMotion(motion, k) {
     if (!(Number.isFinite(k) && k >= 0)) throw new Error(`movingScenes: a speed scale is a finite k >= 0 -- got ${k}`);
     return Object.freeze(motion.map((m) => Object.freeze({ index: m.index, v: Object.freeze(m.v.map((x) => x * k)) })));
 }
+
+/** Round 83 (section 188): the lights' own stream's salt, apart from sceneMotion's. */
+export const LIGHT_SALT = 78;
+/** A scene's LIGHTS and their velocities, sceneMotion's shape: every light (and nothing else) moves in its own horizontal plane at a speed in MOVE_SPEED. */
+export function lightMotion(S) {
+    const r = rng((((S.seed >>> 0) * 3266489917) + LIGHT_SALT) >>> 0), out = [];
+    S.scene.forEach((s, i) => {
+        if (i === 0 || !s.emit) return;
+        const a = 2 * Math.PI * r(), sp = MOVE_SPEED[0] + (MOVE_SPEED[1] - MOVE_SPEED[0]) * r();
+        out.push(Object.freeze({ index: i, v: Object.freeze([sp * Math.cos(a), 0, sp * Math.sin(a)]) }));
+    });
+    return Object.freeze(out);
+}

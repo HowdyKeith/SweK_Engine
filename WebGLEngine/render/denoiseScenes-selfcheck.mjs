@@ -655,6 +655,13 @@ console.log("\n18. ROUND 58: FAMILY P, path-tracer.html'S OWN SIX SCENES (pre-re
         Object.keys(D.SPLITS_UPSCALE_MOVING).join() === "T1" && Object.isFrozen(D.SPLITS_UPSCALE_MOVING) && T1.seeds.length === 24 && T1.seeds[0] === 77000 && T1.seeds[11] === 77011 && T1.seeds[12] === 78000 && T1.seeds[23] === 78011 &&
         T1.families.slice(0, 12).every((f) => f === "R") && T1.families.slice(12).every((f) => f === "C") && T1.seeds.every((x) => !seen.has(x) && D.isDatasetSeed(x)));
 }
+{   // round 83 (section 188): the moving-light test set
+    // SABOTAGED, restored byte-identical: Z6 its R seeds onto round 82's 87000 -> 2 red (this row, and movingScenes-selfcheck's round 83 row).
+    const T1 = D.SPLITS_UPSCALE_LIGHTS.T1, seen = new Set([...D.SPLITS_UPSCALE_SAMPLING.T1.seeds, ...D.SPLITS_UPSCALE_SPEED.T1.seeds, ...D.SPLITS_UPSCALE_CHECK.T1.seeds, ...D.SPLITS_UPSCALE_VECTORS.T1.seeds, ...D.SPLITS_UPSCALE_MOVING.T1.seeds, ...D.SPLITS_UPSCALE_MOVING_78.T1.seeds]);
+    ok("  SPLITS_UPSCALE_LIGHTS: a test set only, 12 R at 89000-89011 then 12 C at 90000-90011, frozen, reserved, none an earlier moving test seed",
+        Object.keys(D.SPLITS_UPSCALE_LIGHTS).join() === "T1" && Object.isFrozen(D.SPLITS_UPSCALE_LIGHTS) && T1.seeds.length === 24 && T1.seeds[0] === 89000 && T1.seeds[11] === 89011 && T1.seeds[12] === 90000 && T1.seeds[23] === 90011 &&
+        T1.families.slice(0, 12).every((f) => f === "R") && T1.families.slice(12).every((f) => f === "C") && T1.seeds.every((x) => !seen.has(x) && D.isDatasetSeed(x)));
+}
 {   // round 82 (section 186): the adaptive-sampling test set
     // SABOTAGED, restored byte-identical: Z5 its C seeds onto round 81's 86000 -> 2 red (this row, and movingScenes-selfcheck's round 82 row).
     const T1 = D.SPLITS_UPSCALE_SAMPLING.T1, seen = new Set([...D.SPLITS_UPSCALE_SPEED.T1.seeds, ...D.SPLITS_UPSCALE_CHECK.T1.seeds, ...D.SPLITS_UPSCALE_VECTORS.T1.seeds, ...D.SPLITS_UPSCALE_MOVING.T1.seeds, ...D.SPLITS_UPSCALE_MOVING_78.T1.seeds]);

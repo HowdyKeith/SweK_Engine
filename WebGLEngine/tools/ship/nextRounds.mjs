@@ -2561,6 +2561,13 @@ export const NEXT_ROUNDS = [
         why: "So the page shows what the arc measured -- generation between the chain's frames -- not only the generator.",
     },
     {
+        id: "fsr4-moving-lights",
+        blocker: "OPEN",
+        what: "Round 83 (section 188), set up and awaiting its harvest: only the lights move (section 176's speeds, their own stream, backwards from the measured frame so each still twin shares its references), on 24 new scenes (12 R 89000-89011, 12 C 90000-90011). H83a: U_TH beats Bt by the 1 % rule; H83b: Bt beats B1 -- does the history still pay when the light moves? Code: movingScenes.lightMotion, runMovingTest's `lights`.",
+        how: "node tools/denoiseStudy.mjs --harvest-upscale-temporal-test --round 83 on the rig, render/denoise-results-upscale-lights-r83.json committed byte for byte before it is read; section 189 reads it.",
+        why: "Every scene in rounds 32-82 kept its lights still; a moving light leaves every history valid and wrong, the case that should hurt the history most.",
+    },
+    {
         id: "fsr4-history-sampling",
         blocker: "OPEN",
         what: "Round 82 (section 186), set up and awaiting its harvest: the same 4-sample budget shared by each half-size pixel's predicted history rejection (reproject on geometry before the trace; weight 1 + 2s, 1-12 samples, the total exact), both arms from the same 12 one-sample passes, on 24 new moving scenes (12 R 87000-87011, 12 C 88000-88011). H82a: the adaptive Bt beats the uniform Bt by the 1 % rule; H82b: round 72's U_TH on each. Code: render/adaptiveSampling.mjs, temporalExample's `frames`, runSamplingTest.",

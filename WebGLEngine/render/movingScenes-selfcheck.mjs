@@ -63,6 +63,10 @@
 //   last four passes, A8 rejectedMask counting sky, A9 H82a reversed, A10 C2 on the uniform history, A11 temporalExample ignoring the given
 //   frames, A12 the test command running the speed test -> 1 red each; A1 the weight 1 + 3s, A7 the passes sharing one seed and A13 the seeds
 //   not reserved -> 2 red each.
+// ROUND 83 (section 188), against this gate and denoiseScenes-selfcheck, each restored byte-identical: L1 the lights' salt sceneMotion's, L3
+//   the lights rising, L4 the test moving the objects anyway, L5 H83b U_TH against B1, L6 the still Bt-over-B1 from the moving Bt, L7 the
+//   light sequence sharing the object one's cache entry, L9 round 83 without lights -> 1 red each; L2 the objects moving with the lights and
+//   L10 the seeds not reserved -> 2 red each; L8 the test command dropping `lights` -> 4 red.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -155,7 +159,7 @@ console.log("\n3. ROUND 77's STUDY CODE");
         R.image === 256 && R.sppIn === 4 && R.sppRefTest === 2048 && R.c1Min === 22 && R.minGain === 0.01 && R.test === "signflip" &&
         R.results === "render/denoise-results-upscale-moving-r77.json" && LT.temporalRound(77) === R && LT.temporalRound(72) === R72);
     let bad = null; try { LT.temporalRound(73); } catch (e) { bad = e.message; }
-    ok("  ...and temporalRound refuses any other round, naming 77 (and, since sections 178 and 180, 78 and 79)", /70, 72, 77, 78, 79, 80, 81 or 82/.test(bad || ""));
+    ok("  ...and temporalRound refuses any other round, naming 77 (and, since sections 178 and 180, 78 and 79)", /70, 72, 77, 78, 79, 80, 81, 82 or 83/.test(bad || ""));
     const o = { W: 256, sppIn: 4, sppRef: 2048, ref2: true, harvest: true };
     ok("  movingKey is the still sequence's key marked moving, so the two never share a cache entry", LT.movingKey("R", 77000, o) === LT.temporalKey("R", 77000, o) + "-moving");
     const y = Float64Array.from({ length: 12 }, (_, i) => 0.1 + i / 20), r = Float64Array.from({ length: 12 }, (_, i) => 0.12 + i / 21), m = Uint8Array.of(1, 0, 1, 0);
@@ -185,7 +189,7 @@ console.log("\n3. ROUND 77's STUDY CODE");
     ok("  ...and it refuses a call without C2's U_TH", /the candidate U_TH and C2's/.test(refused || ""));
 
     const cli = fs.readFileSync(path.join(ENG, "tools", "denoiseStudy.mjs"), "utf8");
-    ok("  the test command runs runMovingTest for a moving round and runTemporalTest otherwise", /RD\.moving \? LT\.runMovingTest : LT\.runTemporalTest\)\(\{ U0, gamma: RD\.moverGamma, splits: RD\.splits,/.test(cli));
+    ok("  the test command runs runMovingTest for a moving round and runTemporalTest otherwise", /RD\.moving \? LT\.runMovingTest : LT\.runTemporalTest\)\(\{ U0, gamma: RD\.moverGamma, lights: !!RD\.lights, splits: RD\.splits,/.test(cli));
     const resFile = path.join(ENG, R.results), before = fs.existsSync(resFile) ? fs.readFileSync(resFile, "utf8") : null;   // since section 177 the results are committed
     let code = 0, said = ""; try { said = execFileSync(process.execPath, [path.join(ENG, "tools", "denoiseStudy.mjs"), "--harvest-upscale-temporal-train", "--round", "77"], { cwd: ENG, encoding: "utf8" }); } catch (e) { code = e.status; said = String(e.stdout); }
     ok("!! the training command refuses round 77 by name, exit 2, and writes nothing", code === 2 && /round 77 is a test only \(section 176\) -- it trains nothing/.test(said) && (fs.existsSync(resFile) ? fs.readFileSync(resFile, "utf8") : null) === before);
@@ -362,7 +366,7 @@ console.log("\n7. ROUND 79 (section 180): OBJECT MOTION VECTORS FOR Bt's HISTORY
     let refused = null; try { LT.runVectorTest({ splits: sp1, net, U }); } catch (err) { refused = err.message; }
     const cli = fs.readFileSync(path.join(ENG, "tools", "denoiseStudy.mjs"), "utf8");
     ok("  ...it refuses a call without C2; the test command dispatches it for a vectors round", /round 72's U_TH and its C2/.test(refused || "") &&
-        /RD\.vectors \? LT\.runVectorTest : RD\.moving \? LT\.runMovingTest : LT\.runTemporalTest\)\(\{ U0, gamma: RD\.moverGamma, splits: RD\.splits,/.test(cli));
+        /RD\.vectors \? LT\.runVectorTest : RD\.moving \? LT\.runMovingTest : LT\.runTemporalTest\)\(\{ U0, gamma: RD\.moverGamma, lights: !!RD\.lights, splits: RD\.splits,/.test(cli));
     let code = 0, said = ""; try { said = execFileSync(process.execPath, [path.join(ENG, "tools", "denoiseStudy.mjs"), "--harvest-upscale-temporal-train", "--round", "79"], { cwd: ENG, encoding: "utf8" }); } catch (err) { code = err.status; said = String(err.stdout); }
     const reg = fs.readFileSync(path.join(ENG, "render", "learned-denoiser-preregistration.md"), "utf8"), s180 = reg.slice(reg.indexOf("## 180."), reg.indexOf("## 181.") > 0 ? reg.indexOf("## 181.") : undefined);
     ok("  the training command refuses round 79; section 180 states P - v, the bit-for-bit claim, 81000-81011 and 82000-82011, and the results file",
@@ -448,7 +452,7 @@ console.log("\n9. ROUND 80 (section 182): THE MOVER HISTORY CLIPPED TO MEAN +- G
     let code = 0, said = ""; try { said = execFileSync(process.execPath, [path.join(ENG, "tools", "denoiseStudy.mjs"), "--harvest-upscale-temporal-train", "--round", "80"], { cwd: ENG, encoding: "utf8" }); } catch (err) { code = err.status; said = String(err.stdout); }
     const reg = fs.readFileSync(path.join(ENG, "render", "learned-denoiser-preregistration.md"), "utf8"), s182 = reg.slice(reg.indexOf("## 182."), reg.indexOf("## 183.") > 0 ? reg.indexOf("## 183.") : undefined);
     ok("  the commands and the registration: it refuses a call without C2; the test dispatches it with the round's gamma; training refuses round 80; section 182 states mean +- gamma sigma, gamma 1.0, the bit-for-bit claim and the seeds",
-        /round 72's U_TH and its C2/.test(refused || "") && /RD\.check \? LT\.runCheckTest : RD\.vectors \? LT\.runVectorTest :/.test(cli) && /\(\{ U0, gamma: RD\.moverGamma, splits: RD\.splits,/.test(cli) &&
+        /round 72's U_TH and its C2/.test(refused || "") && /RD\.check \? LT\.runCheckTest : RD\.vectors \? LT\.runVectorTest :/.test(cli) && /\(\{ U0, gamma: RD\.moverGamma, lights: !!RD\.lights, splits: RD\.splits,/.test(cli) &&
         code === 2 && /round 80 is a test only/.test(said) && /\*\*mean ± γσ\*\*/.test(s182) && /\*\*γ = 1\.0, fixed now and not tuned:\*\*/.test(s182) && /Off the movers Bt_MVC is Bt \(and Bt_MV\) bit for bit/.test(s182) &&
         /83000-83011/.test(s182) && /84000-84011/.test(s182) && s182.includes(R.results));
 }
@@ -573,6 +577,38 @@ console.log("\n12. ROUND 82 (section 186): SAMPLES WHERE THE HISTORY IS SHORT");
         /\*\*The weight:\*\* 1 \+ 2s/.test(s186) && /\*\*4 samples a half-size pixel\*\*/.test(s186) && /each pixel 1 to 12/.test(s186) && /12 one-sample passes/.test(s186) && /87000-87011/.test(s186) && /88000-88011/.test(s186) && s186.includes(R.results));
 }
 
+console.log("\n13. ROUND 83 (section 188): MOVING LIGHTS");
+{
+    const S = D.makeScene("R", 990950), lm = M.lightMotion(S), sm = M.sceneMotion(S), lights = S.scene.map((x, i) => (i > 0 && x.emit ? i : -1)).filter((i) => i >= 0);
+    const rr = (await imp("physics/render/furnace.mjs")).rng((((990950 >>> 0) * 3266489917) + 78) >>> 0), a0 = 2 * Math.PI * rr(), sp0 = 0.01 + 0.07 * rr();
+    ok("!! lightMotion: exactly the scene's lights move, each once, in its own horizontal plane at a MOVE_SPEED speed, from its own stream (LIGHT_SALT 78, the first light's direction and speed its first two draws), none of sceneMotion's movers",
+        M.LIGHT_SALT === 78 && lm.map((m) => m.index).join() === lights.join() && lights.length > 0 && lm.every((m) => m.v[1] === 0 && Math.hypot(m.v[0], m.v[2]) >= 0.01 && Math.hypot(m.v[0], m.v[2]) <= 0.08) &&
+        lm[0].v[0] === sp0 * Math.cos(a0) && lm[0].v[2] === sp0 * Math.sin(a0) && lm.every((m) => !sm.some((q) => q.index === m.index)) && Object.isFrozen(lm) && JSON.stringify(M.lightMotion(D.makeScene("R", 990950))) === JSON.stringify(lm));
+    const so = { W: 32, sppIn: 2, sppRef: 4, ref2: true }, st = T.temporalExample("R", 990950, net, so), ml = T.temporalExample("R", 990950, net, { ...so, motion: lm, refs: { ref: st.ref, ref2: st.ref2 } });
+    const f3 = M.sceneAt(S, lm, 3);
+    ok("!! the moving-light sequence: the lights at centre + v (f - 7), every other sphere the scene's own; the measured frame, B1 and the light sources are the still twin's, and Bt is not",
+        lm.every((m) => f3[m.index].centre[0] === S.scene[m.index].centre[0] - 4 * m.v[0] && f3[m.index].centre[1] === S.scene[m.index].centre[1]) && S.scene.every((x, i) => lights.includes(i) || f3[i] === x) &&
+        same(ml.b1, st.b1) && same(ml.cov, st.cov) && same(ml.E, st.E) && ml.ref === st.ref && !same(ml.bt, st.bt));
+    const R = LT.ROUND_UPSCALE_LIGHTS, Sp = D.SPLITS_UPSCALE_LIGHTS;
+    ok("!! ROUND_UPSCALE_LIGHTS: round 83, round 77's moving test with `lights`, round 72's U_TH, SPLITS_UPSCALE_LIGHTS (12 R at 89000, 12 C at 90000, reserved), its own results file",
+        R.round === 83 && R.lights === true && R.moving === true && !R.vectors && !R.check && !R.speeds && !R.sampling && R.net === LT.ROUND_UPSCALE_TEMPORAL_72.net && R.results === "render/denoise-results-upscale-lights-r83.json" &&
+        R.splits === Sp && LT.temporalRound(83) === R && Sp.T1.seeds[0] === 89000 && Sp.T1.seeds[12] === 90000 && Sp.T1.seeds.length === 24 && Sp.T1.seeds.every((x) => D.isDatasetSeed(x)));
+    const t72 = JSON.parse(fs.readFileSync(path.join(ENG, LT.ROUND_UPSCALE_TEMPORAL_72.net), "utf8")), U = decodeNet(t72.runs.find((x) => x.seed === t72.candidate).net), Uc = decodeNet(t72.c2.net);
+    const sp1 = { T1: { family: "R+C", families: ["R", "C"], seeds: FIX.map((x) => x[1]) } }, out = LT.runMovingTest({ splits: sp1, net, U, Uc2: Uc, lights: true, round: 83, W: 32, sppIn: 2, sppRef: 4 });
+    const ex = FIX.map(([f, sd]) => { const s0 = T.temporalExample(f, sd, net, so); return { s0, m: T.temporalExample(f, sd, net, { ...so, motion: M.lightMotion(D.makeScene(f, sd)), refs: { ref: s0.ref, ref2: s0.ref2 } }) }; });
+    const gB = ex.map(({ m }) => gradeDisplay(m.bt, m)), gU = ex.map(({ m }) => gradeDisplay(T.temporalChain(U, m), m)), gB1 = ex.map(({ s0 }) => gradeDisplay(s0.b1, s0)), gBs = ex.map(({ s0 }) => gradeDisplay(s0.bt, s0));
+    const mean = (a) => a.reduce((q, v) => q + v, 0) / a.length;
+    ok("!! *** with `lights` the moving test moves the lights: H83a U_TH against Bt, H83b Bt against B1, each graded on the moving-light sequence; the still twins beside them ***",
+        same(out.tables.bt, gB) && same(out.tables.U, gU) && same(out.tables.b1, gB1) && same(out.still.bt, gBs) && same(out.verdict.hypotheses.H1.d, effects(gB, gU)) && same(out.verdict.hypotheses.H2.d, effects(gB1, gB)) &&
+        out.secondary.lights === true && out.secondary.btOverB1.moving === 1 - mean(gB) / mean(gB1) && out.secondary.btOverB1.still === 1 - mean(gBs) / mean(gB1),
+        `Bt ${gB.map((v) => v.toExponential(3)).join(", ")} with the lights moving, ${gBs.map((v) => v.toExponential(3)).join(", ")} still`);
+    const study = fs.readFileSync(path.join(ENG, "render", "learnedUpscaleTemporalStudy.mjs"), "utf8"), cli = fs.readFileSync(path.join(ENG, "tools", "denoiseStudy.mjs"), "utf8");
+    const reg = fs.readFileSync(path.join(ENG, "render", "learned-denoiser-preregistration.md"), "utf8"), s188 = reg.slice(reg.indexOf("## 188."), reg.indexOf("## 189.") > 0 ? reg.indexOf("## 189.") : undefined);
+    ok("  a moving-light sequence has its own cache entry, the test command passes the round's `lights`, and section 188 states the motion, H83a/H83b and the seeds",
+        /movingKey\(fam, sd, o\) \+ \(lights \? "-lights" : ""\)/.test(study) && /\(\{ U0, gamma: RD\.moverGamma, lights: !!RD\.lights, splits: RD\.splits,/.test(cli) &&
+        /Every light, and nothing else, moves/.test(s188) && /\*\*H83a:\*\* with moving lights, U_TH's chain beats Bt's/.test(s188) && /\*\*H83b:\*\* with moving lights, Bt beats B1/.test(s188) && /89000-89011/.test(s188) && /90000-90011/.test(s188) && s188.includes(R.results));
+}
+
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +
-    "\nnot closed here: whether samples where the history is short buy a better history. That is round 82's harvest, section 187's.");
+    "\nnot closed here: whether the history pays when the lights move. That is round 83's harvest, section 189's.");
 process.exit(fails ? 1 : 0);
