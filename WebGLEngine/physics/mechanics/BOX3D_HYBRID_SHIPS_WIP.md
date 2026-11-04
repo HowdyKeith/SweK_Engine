@@ -206,3 +206,54 @@ readings were printed:
 E's 15-tick scenes begin with that same first tick, so their readings are partly seen. H's are not.
 
 No duel cell's flight on the registered seeds has been flown. The miniature's seeds were 86001 to 86004.
+
+## Build record (2026-11-04)
+
+Built as listed above, with both corrections.
+
+- **`brain/pilot6dofPolicy.mjs`:** `duel()` takes `contacts`.
+  - C-unchanged holds: the ten anchors and the ramming one, to the bit.
+  - Three gates read the duel's signature from its source: `tools/roundhouse/box3dBothShips-selfcheck.mjs`,
+    `orientationStep-selfcheck.mjs` and `sixdofBox3d-selfcheck.mjs`. Each row went red once `contacts` was added (its regex
+    tried on the new source). Each was restated to allow `contacts` after `stepB`, and each row's name now says so.
+- **`physics/mechanics/shipContactBox3d.mjs`:** `flyPair()` (the contact tick on box3d), `contactImpulse()` (the momentum
+  moved, as the first correction says) and `box3dContacts()` (the resolver).
+- **`tools/roundhouse/box3dHybridShips.mjs`**, with its command and its gate.
+
+### Added beyond the note, none of it a measurement
+
+- **A fourth way, E~:** E through the hook, with the engine's own resolver.
+  - It is flown in every cell, for C-free's first contact ticks, since the plain duel does not report the tick of its
+    first contact.
+  - C-free holds it to E to the bit, flight for flight.
+- **`readingsOf()`** is its own function, and `cUnchanged()` takes the duel, so that the gate can show each failing (see
+  the sabotages).
+
+### Flown while building
+
+None of this is a registered measurement, except the one-tick scenes the second correction lists as seen.
+
+- **Duels on unregistered seeds:**
+  - With no contact (the standoff at 86001, the joust at 86002), H is E to the bit.
+  - At 86010, E's one ram took 3 ticks and 21.465 hit points (fingerprint f314ba5f, 160 ticks). H's took 1 tick and
+    20.756 (0686c5b5, 124 ticks).
+  - box3d's own report was 1.74 and 2.1 times the momentum its contact moved, on 86010 and 86001. That is the first
+    correction's reason, seen again.
+- **The miniature:** seeds 86001 to 86004, a 1e-3 m nudge, and the gate's own scenes M1 and M2.
+  - Every control holds.
+  - In M1, H's contact lasts 4 ticks and goes 0.76 m deep, against E's 2 ticks and 0.36 m.
+
+### The gate
+
+`tools/roundhouse/box3dHybridShips-selfcheck.mjs`: 36 rows in seven sections, about two seconds. It never flies the
+registered seeds or the four registered scenes.
+
+- **Sabotaged 31 times,** and two of those again, through the byte-safe runner. The log is in its header.
+- **Two went 0 red and were gaps,** both fixed and run again red:
+  - G29, the readings taken from the chaos control;
+  - G33, C-unchanged's ram anchor short-circuited.
+- **Four more gaps were closed before the first sabotage**, seen in the gate's first draft:
+  - that the replay gives the tick's force and torque;
+  - that a contact's impulse is the momentum moved;
+  - that H moves joust flights in the miniature;
+  - that the readings mirror the cells.
