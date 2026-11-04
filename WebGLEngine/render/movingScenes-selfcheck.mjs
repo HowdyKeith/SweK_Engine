@@ -49,6 +49,11 @@
 //   not the mean, K5 a 5-tap cross, K15 round 80's C seeds round 79's, K16 its seeds not reserved -> 2 red each; K11 gamma 1.5 and K12 the
 //   test's gamma not passed -> 3 red each; K7 Bt_MVC's image from the vectors' own history -> *** 0 RED at first ***, then 1 with the
 //   rebuilt-image row added.
+// SECTION 183 (the verdict rows, sabotaged in the committed file and the registration, each restored byte-identical): X1 the run's commit typed
+//   1e40a6be, X2 H80a typed supported, X5 U_TH-on-Bt_MVC's first grade typed 6.82e-4, X6 the first mover Bt_MVC grade typed 2.01e-3, X7 Bt's
+//   first history typed 5.95, X8 H80b's p typed 0.0307, X9 the gamma typed 1.5, X10 section 183 keeping the vectors, X11 its P4 range typed
+//   8-25 (round 79's, which I first wrote there) -> 1 red each; X4 Bt_MV's first grade typed 8.25e-4 -> 2 red; X3 Bt_MVC's first grade
+//   typed 8.24e-4 -> 4 red.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -439,6 +444,35 @@ console.log("\n9. ROUND 80 (section 182): THE MOVER HISTORY CLIPPED TO MEAN +- G
         /83000-83011/.test(s182) && /84000-84011/.test(s182) && s182.includes(R.results));
 }
 
+console.log("\n10. SECTION 183: ROUND 80's VERDICT, RE-DERIVED FROM ITS COMMITTED FILE");
+{
+    const R = LT.ROUND_UPSCALE_CHECK, r = JSON.parse(fs.readFileSync(path.join(ENG, R.results), "utf8")), H = r.verdict.hypotheses, T = r.tables, sec = r.secondary, M = sec.mover;
+    const mean = (a) => a.reduce((q, v) => q + v, 0) / a.length, g = (u, b) => 1 - mean(u) / mean(b), near = (a, b, e = 5e-5) => Math.abs(a - b) < e, fewer = (u, b) => u.filter((v, i) => v < b[i]).length;
+    ok("!! the run is round 80's: its commit 1e40a6bd, gamma 1.0, round 72's candidate (seed 1, 670c28bd), the shipped denoiser, 24 moving sequences rendered and none cached",
+        r.round === 80 && r.commit === "1e40a6bd" && r.gamma === 1 && r.trained.file === R.net && r.trained.candidate === 1 && r.trained.commit === "670c28bd" &&
+        r.shipped.file === "render/denoise-net-r11.json" && T.bt.length === 24 && r.cache.misses === 24 && r.cache.hits === 0 && r.determinism === true);
+    ok("!! *** H80a NOT SUPPORTED: Bt_MVC is 0.79 % below Bt -- short of the 1 % rule -- 16 of 24, p 0.46; its d re-derived from the file's own tables ***",
+        H.H1.status === "not supported" && H.H1.k === 16 && near(H.H1.p, 0.4599, 1e-4) && same(H.H1.d, effects(T.bt, T.btMVC)) && near(g(T.btMVC, T.bt), 0.0079) && g(T.btMVC, T.bt) < R.minGain &&
+        r.verdict.run === "reported" && r.verdict.controls.C1 && r.verdict.controls.C4 && r.verdict.controls.C5 && r.verdict.controls.C2.ok && near(r.verdict.controls.C2.meanD, -3.3230, 1e-4) && H.H1.c3.resolvable,
+        `p ${H.H1.p.toFixed(3)}, ${H.H1.k} of 24, ${(100 * g(T.btMVC, T.bt)).toFixed(2)} %`);
+    ok("!! *** H80b SUPPORTED: Bt_MVC is 3.98 % below Bt_MV, 16 of 24, p 0.011 under Holm's 0.025 ***",
+        H.H2.status === "supported" && H.H2.k === 16 && near(H.H2.p, 0.01071, 1e-5) && H.H2.p < H.H2.threshold && same(H.H2.d, effects(T.btMV, T.btMVC)) && near(g(T.btMVC, T.btMV), 0.0398));
+    ok("!! the means: Bt 2.1209e-3, Bt_MV 2.1914e-3, Bt_MVC 2.1041e-3 -- the vectors alone 3.32 % ABOVE Bt here (12 of 24), where round 79's set had them 4.12 % below",
+        near(mean(T.bt), 2.1209e-3, 5e-8) && near(mean(T.btMV), 2.1914e-3, 5e-8) && near(mean(T.btMVC), 2.1041e-3, 5e-8) && near(g(T.btMV, T.bt), -0.0332) && fewer(T.btMV, T.bt) === 12 &&
+        sec.gains.btMVoverBt === g(T.btMV, T.bt) && sec.gains.btMVCoverBt === g(T.btMVC, T.bt));
+    ok("!! P4 MISSED: on the mover pixels (28 % of the frame) the vectors add 6.89 %, the clip takes 7.27 % back off them, and Bt_MVC lands 0.88 % below Bt (16 of 24), against section 182's predicted 8-15 %",
+        near(g(M.btMV, M.bt), -0.0689) && near(g(M.btMVC, M.btMV), 0.0727) && near(g(M.btMVC, M.bt), 0.0088) && fewer(M.btMVC, M.bt) === 16 && fewer(M.btMV, M.bt) === 12 && near(mean(M.share), 0.2824, 1e-4));
+    ok("  P5's first half MISSED: Bt_MVC's history is EQUAL to Bt_MV's on all 24 scenes (5.12; the clip never resets n), and above Bt's (4.39) on all 24",
+        sec.history.mvc.every((v, i) => v === sec.history.mv[i] && v > sec.history.bt[i]) && near(mean(sec.history.mvc), 5.117, 1e-3) && near(mean(sec.history.bt), 4.392, 1e-3));
+    ok("  the chain, descriptively: U_TH on Bt_MVC 5.09 % below Bt_MVC, 5.84 % below Bt, 2.64 % below U_TH on Bt (16 of 24); U_TH on Bt_MV 0.50 % ABOVE U_TH on Bt here (14 of 24)",
+        near(g(T.uMVC, T.btMVC), 0.0509) && near(g(T.uMVC, T.bt), 0.0584) && near(g(T.uMVC, T.u), 0.0264) && fewer(T.uMVC, T.u) === 16 && near(g(T.uMV, T.u), -0.0050) && fewer(T.uMV, T.u) === 14 && near(g(T.u, T.bt), 0.0329));
+    const reg = fs.readFileSync(path.join(ENG, "render", "learned-denoiser-preregistration.md"), "utf8"), s183 = reg.slice(reg.indexOf("## 183."));
+    ok("  section 183 says each of these, that the chain stays, that estimated vectors are not opened, and that this file was committed unread",
+        /\*\*P4:\*\* on the mover pixels Bt_MVC is 8-15 % below Bt/.test(reg.slice(reg.indexOf("## 182."), reg.indexOf("## 183."))) && /P4 MISSED:\*\* on the mover pixels Bt_MVC is 0\.88 % below Bt, against a predicted 8-15 %/.test(s183) &&
+        reg.includes("## 183.") && /H80a NOT SUPPORTED/.test(s183) && /\*\*The chain stays as section 175 left it\.\*\*/.test(s183) && /Estimated motion vectors .* are not opened/.test(s183) &&
+        /committed unread/.test(s183) && s183.includes("| Bt_MVC (vectors + clip) | 2.1041e-3 |"));
+}
+
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +
-    "\nnot closed here: whether Bt_MVC beats Bt and Bt_MV on moving scenes. That is round 80's harvest, section 183's.");
+    "\nnot closed here: the movers' error at the current frame -- a denoiser question, section 183 says, not a history one.");
 process.exit(fails ? 1 : 0);

@@ -2562,9 +2562,9 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "fsr4-mover-history-check",
-        blocker: "OPEN",
-        what: "Round 80 (section 182), set up and awaiting its harvest: Bt_MVC, Bt_MV with the mover pixels' history clipped again to the 3 x 3 neighbourhood's mean +- 1.0 sigma (gamma fixed, not tuned), against Bt and Bt_MV on 24 new moving scenes (12 R 83000-83011, 12 C 84000-84011), each rendered once and accumulated three ways. H80a: Bt_MVC beats Bt by the 1 % rule; H80b: it beats Bt_MV. Bt_MVC is Bt bit for bit off the movers (gated).",
-        how: "node tools/denoiseStudy.mjs --harvest-upscale-temporal-test --round 80 on the rig at round 80's commit (~4-10 h), render/denoise-results-upscale-check-r80.json committed byte for byte before it is read; section 183 reads it.",
+        blocker: "CLOSED",
+        what: "CLOSED, NOT SUPPORTED (section 183): H80a FAILS -- Bt_MVC (the vectors plus a mean +- 1.0 sigma clip on the movers) is 0.79 % below Bt on 24 new moving scenes, short of the 1 % rule (16 of 24, p 0.46); H80b holds -- it is 3.98 % below Bt_MV (p 0.011), because on this set the vectors alone are 3.32 % ABOVE Bt (6.89 % on the movers), the opposite sign from round 79's. The clip takes back what the vectors break and no more. The chain stays as section 175 left it, and the moving-object history work (rounds 77-80) closes; estimated motion vectors are not opened. The file came zipped and was committed unread.",
+        how: "render/denoise-results-upscale-check-r80.json, re-derived by render/movingScenes-selfcheck.mjs section 10.",
         why: "Section 181: the vectors lengthened every mover's history but helped only 13 of 24 scenes; where they hurt, the history they kept carried shading that had changed.",
     },
     {

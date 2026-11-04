@@ -11399,3 +11399,54 @@ pixels only:
 
 **The run, on Keith's rig, at round 80's commit:** `--harvest-upscale-temporal-test --round 80`, one CPU harvest (~4-10 hours), its file
 committed byte for byte before it is read. Section 183 reads it.
+
+## 183. ROUND 80's VERDICT -- H80a NOT SUPPORTED, H80b SUPPORTED: THE CLIP UNDOES WHAT THE VECTORS BREAK, AND NO MORE. THE MOVING-OBJECT HISTORY WORK CLOSES
+
+**The run.** render/denoise-results-upscale-check-r80.json, run on Keith's rig at round 80's commit 1e40a6bd in 4.9 hours, gamma 1.0, round 72's
+U_TH (seed 1, 670c28bd). 24 moving sequences, each accumulated three ways, none from a cache. **This time the file came zipped and was
+committed unread** (f2a3b9ce, sha-256 7e81339c...) before anything below was read: the order the method asks for held.
+
+**The verdict.** C1, C3, C4 and C5 hold; C2 (round 72's shuffled-target U_TH on Bt_MVC) is far worse than Bt_MVC (mean d -3.32).
+
+| | mean display relMSE | |
+|---|---|---|
+| Bt | 2.1209e-3 | |
+| Bt_MV (vectors) | 2.1914e-3 | 3.32 % ABOVE Bt (better on only 12 of 24) |
+| Bt_MVC (vectors + clip) | 2.1041e-3 | **H80a NOT SUPPORTED**: 0.79 % below Bt, short of the 1 % rule; 16 of 24, p 0.46 |
+| | | **H80b SUPPORTED**: 3.98 % below Bt_MV, 16 of 24, p 0.011 (Holm's 0.025) |
+
+**What it says, with round 79 beside it.**
+- **The vectors alone are not a reliable change to Bt.** On round 79's set they took 4.12 % off on the mean (13 of 24). On this one they ADD 3.32 %
+  (12 of 24), and 6.89 % on the mover pixels (better on 12 of 24). The sign moves with the set.
+- **The clip takes back what the vectors break.** Bt_MVC is 3.98 % below Bt_MV, and 7.27 % on the mover pixels. That lands it 0.79 % below
+  Bt -- 0.88 % on the movers, 16 of 24 -- which is no change.
+- **The clip shortened nothing.** Bt_MVC's mean history length equals Bt_MV's on all 24 scenes (5.12, against Bt's 4.39). The clip
+  pulls the history toward the current frame; it never resets n.
+- **So the error on the movers is not the history being lost.** It is the history being wrong: the mover's own shading changes as it moves,
+  and the vectors keep that changed shading for longer. A tighter check against the current frame discards about as much as the vectors
+  kept. Section 180 named this reading for a failed H79a, and rounds 79 and 80 together now support it.
+
+**The chain, descriptively.** U_TH on Bt_MVC is 5.09 % below Bt_MVC, 5.84 % below Bt, and 2.64 % below U_TH on the old Bt (16 of 24). U_TH
+on the old Bt is 3.29 % below Bt on this set. U_TH on Bt_MV is 0.50 % above U_TH on Bt here (14 of 24), where on round 79's set it was
+4.55 % below. The same sign moving with the set again.
+
+**The predictions.**
+- **P1 held:** C1 and C3.
+- **P2 held:** H80b supported, at 3.98 %, inside 2-6 %.
+- **P3 MISSED:** H80a not supported. 0.79 % below Bt against a predicted 5-10 %, on 16 scenes against at least 17.
+- **P4 MISSED:** on the mover pixels Bt_MVC is 0.88 % below Bt, against a predicted 8-15 %.
+- **P5 MISSED as to its first half, held as to its second:** Bt_MVC's history is not below Bt_MV's but equal to it on every scene (the clip
+  never resets n, as section 182 itself said it might be). It is above Bt's on every scene.
+
+**What it means, as section 182 fixed it.** H80b holds and H80a does not: the check helps the vectors, but Bt's own history is as good.
+**The chain stays as section 175 left it.** Bt's history without vectors, then round 72's U_TH.
+
+**And the moving-object history work closes.** Rounds 77-80 asked four ways whether the history can be made to serve the moving objects:
+- U_TH as it was (round 77): it keeps its gain on the image, little on the movers;
+- U_TH trained on motion (round 78): worse;
+- exact vectors (round 79): unreliable;
+- exact vectors with a clip (round 80): no change.
+
+**Estimated motion vectors (the "item 4" that waited on this round) are not opened.** They can only do as well as the exact ones, and the
+exact ones bought nothing reliable. The movers' error is their changing shading, a question for the denoiser at the current frame,
+not for the history.
