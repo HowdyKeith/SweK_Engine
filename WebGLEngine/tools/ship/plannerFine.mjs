@@ -78,7 +78,7 @@ export function checksOf(sel, au) {
 }
 const fmt = (p) => `${sgn(p.mean)} (se ${p.se.toFixed(4)}; better ${p.better}, worse ${p.worse}, same ${p.same})`;
 export function report(sel, au, winner) {
-    const L = [`ROUND 30: a search for the low trip point below -0.12. Selection N1 ${SEL_RANGE[0]}-${SEL_RANGE[1]} (four arms, ${SEL_DIVES} dives each); confirmation ${CONF_NAMES.map((n) => `${n} ${CONF_RANGES[n][0]}-${CONF_RANGES[n][1]}`).join(", ")} (${CONF_NAMES.length * BLOCK_DIVES} dives per arm; read once)`];
+    const L = [`ROUND 30: a finer grid around the low trip point's optimum. Selection N1 ${SEL_RANGE[0]}-${SEL_RANGE[1]} (four arms, ${SEL_DIVES} dives each); confirmation ${CONF_NAMES.map((n) => `${n} ${CONF_RANGES[n][0]}-${CONF_RANGES[n][1]}`).join(", ")} (${CONF_NAMES.length * BLOCK_DIVES} dives per arm; read once)`];
     const checks = checksOf(sel, au), bad = checks.filter((c) => !c.ok);
     for (const c of checks) L.push(`  ${c.ok ? "PASS" : "FAIL"} ${c.name}: ${c.text}`);
     if (bad.length) L.push("A CHECK FAILED: the verdicts below are NOT WEIGHED.");
