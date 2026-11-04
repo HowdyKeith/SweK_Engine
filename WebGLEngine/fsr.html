@@ -1668,5 +1668,15 @@ $("sharp").oninput = () => { $("sv").textContent = parseFloat($("sharp").value).
 await initGPU();
 await reset();
 </script>
+<script type="module">
+// ui/upscalerSwitch.mjs: the shared upscaler switch -- on this comparison page, choosing a mode features its pane
+import { mountUpscalerSwitch } from "/ui/upscalerSwitch.mjs";
+const feature = (id, map) => { for (const [m, el] of Object.entries(map)) { const c = document.getElementById(el); if (!c) continue; const pane = c.closest(".pane") || c;
+    pane.style.outline = m === id ? "3px solid #7fb4ff" : ""; pane.style.outlineOffset = m === id ? "3px" : ""; } };
+const PANES = { bilinear: "cBil", fsr1: "cFsr", fsr2: "cTmp" };
+mountUpscalerSwitch({ page: "fsr", pageDefault: "fsr1", modes: { bilinear: {}, fsr1: {}, fsr2: {} },
+    onChange: (id, { from }) => { feature(id, PANES); if (from === "set" || from === "console") document.getElementById(PANES[id]).scrollIntoView({ block: "center", behavior: "smooth" }); } });
+</script>
+<script type="module" src="/ui/originNotice.js"></script>
 </body>
 </html>

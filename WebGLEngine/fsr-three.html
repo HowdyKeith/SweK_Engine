@@ -505,5 +505,14 @@ try {
 }
 </script>
 <script type="module" src="/ui/originNotice.js"></script>
+<script type="module">
+// ui/upscalerSwitch.mjs: the shared upscaler switch -- this page's <select id="mode">, in the universal button, ?upscaler= and swek.upscaler
+import { mountUpscalerSwitch } from "/ui/upscalerSwitch.mjs";
+const sel = document.getElementById("mode"), TO = { native: "native", bilinear: "bilinear", fsr1: "fsr", fsr2: "fsr2", fsr3: "gen" };
+const FROM = Object.fromEntries(Object.entries(TO).map(([k, v]) => [v, k]));
+const sw = mountUpscalerSwitch({ page: "fsr-three", pageDefault: FROM[sel.value] || "fsr1", modes: { native: {}, bilinear: {}, fsr1: {}, fsr2: {}, fsr3: {} },
+    onChange: (id) => { if (sel.value !== TO[id]) { sel.value = TO[id]; sel.dispatchEvent(new Event("change")); } } });
+sel.addEventListener("change", () => { const id = FROM[sel.value]; if (id && id !== sw.get()) sw.set(id); });
+</script>
 </body>
 </html>

@@ -30,6 +30,7 @@
 //                                                  (either with --round 67, 68 or 69 for sections 155, 157 and 159, and --cache <dir> to resume)
 //       node tools/denoiseStudy.mjs --harvest-upscale-temporal-train   FSR4 round 70: U_T on sequences (section 161) -> render/upscale-net-r70.json
 //       node tools/denoiseStudy.mjs --harvest-upscale-temporal-test    FSR4 round 70: the 24 test sequences -> render/denoise-results-upscale-temporal-r70.json
+//                                       ... --round 77                 FSR4 round 77 (section 176): round 72's U_TH on 24 moving scenes -> render/denoise-results-upscale-moving-r77.json
 //                                                  (either with --round 72 for section 167's U_TH, half size and 16 wide)
 //       node tools/denoiseStudy.mjs --harvest-r47  round 11 with the network 16 channels wide, the 32-channel one beside it (section 116) -> render/denoise-results-r47.json
 //       node tools/denoiseStudy.mjs --harvest-r11  one large network trained on families R and C together (section 32) -> render/denoise-results-r11.json
@@ -308,12 +309,13 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
         // FSR4, round 70 (section 161): U_T trained on three seeds over the training sequences, the candidate by validation, and C2's U_T
         // section 167: --round 72 trains U_TH (half size, 16 wide); round 70's U_T otherwise
         const LT = await import("../render/learnedUpscaleTemporalStudy.mjs"), { encodeNet: enc } = await import("../render/denoiseDevice.mjs"), ri = args.indexOf("--round"), RD = LT.temporalRound(ri >= 0 ? +args[ri + 1] : null);
+        if (RD.moving && !RD.trainMoving) { console.log(`[denoiseStudy] round ${RD.round} is a test only (section 176) -- it trains nothing; run --harvest-upscale-temporal-test --round ${RD.round}`); process.exit(2); }
         const file = path.join(ENG, RD.net);
         if (fs.existsSync(file)) { console.log(`[denoiseStudy] ${RD.net} exists -- a harvest's results are never overwritten`); process.exit(2); }
         const bytes = fs.readFileSync(path.join(ENG, SHIPPED_NET)), shipped = JSON.parse(bytes.toString("utf8"));
         const git = (...a) => execFileSync("git", a, { cwd: ENG, encoding: "utf8", maxBuffer: 1 << 28 });
         const startCommit = git("rev-parse", "--short=8", "HEAD").trim(), cache = upscaleCache(args, git, RD.net);
-        const r = LT.runTemporalTraining({ splits: RD.splits, W: RD.image, sppIn: RD.sppIn, sppRef: RD.sppRef, net: decodeNet(shipped.net), harvest: true, cache, variant: RD.variant, log: (m) => console.log("[denoiseStudy] " + m) });
+        const r = LT.runTemporalTraining({ splits: RD.splits, W: RD.image, sppIn: RD.sppIn, sppRef: RD.sppRef, net: decodeNet(shipped.net), harvest: true, cache, variant: RD.variant, moving: !!RD.trainMoving, log: (m) => console.log("[denoiseStudy] " + m) });
         const out = { candidate: r.candidate, runs: r.runs.map((x) => ({ seed: x.seed, valMean: x.valMean, val: x.val, losses: x.losses, net: enc(x.net) })),
                       c2: { seed: r.c2.seed, shuffle: r.c2.shuffle, losses: r.c2.losses, net: enc(r.c2.net) }, config: r.config, ms: r.ms,
                       shipped: { file: SHIPPED_NET, sha256: crypto.createHash("sha256").update(bytes).digest("hex") }, commit: startCommit,
@@ -329,8 +331,14 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
         const bytes = fs.readFileSync(path.join(ENG, SHIPPED_NET)), shipped = JSON.parse(bytes.toString("utf8"));
         const git = (...a) => execFileSync("git", a, { cwd: ENG, encoding: "utf8", maxBuffer: 1 << 28 });
         const startCommit = git("rev-parse", "--short=8", "HEAD").trim(), cache = upscaleCache(args, git, RD.results);
-        const out = LT.runTemporalTest({ splits: RD.splits, W: RD.image, sppIn: RD.sppIn, sppRef: RD.sppRefTest, net: decodeNet(shipped.net), U: decodeNet(cand.net), Uc2: decodeNet(tr.c2.net), c1Min: RD.c1Min, round: RD.round, harvest: true, cache, log: (m) => console.log("[denoiseStudy] " + m) });
+        // round 77 (section 176): the moving test, round 72's U_TH read from RD.net; round 78 (section 178): U_THM from RD.net, and round 72's U_TH
+        // from RD.baseline graded beside it
+        const b0 = RD.baseline ? JSON.parse(fs.readFileSync(path.join(ENG, RD.baseline), "utf8")) : null, U0 = b0 ? decodeNet(b0.runs.find((x) => x.seed === b0.candidate).net) : null;
+        // round 79 (section 180): the vectors test, round 72's U_TH read from RD.net
+        // round 80 (section 182): the check test, its gamma the round's
+        const out = (RD.sampling ? LT.runSamplingTest : RD.speeds ? LT.runSpeedTest : RD.check ? LT.runCheckTest : RD.vectors ? LT.runVectorTest : RD.moving ? LT.runMovingTest : LT.runTemporalTest)({ U0, gamma: RD.moverGamma, lights: !!RD.lights, splits: RD.splits, W: RD.image, sppIn: RD.sppIn, sppRef: RD.sppRefTest, net: decodeNet(shipped.net), U: decodeNet(cand.net), Uc2: decodeNet(tr.c2.net), c1Min: RD.c1Min, round: RD.round, harvest: true, cache, log: (m) => console.log("[denoiseStudy] " + m) });
         out.trained = { file: RD.net, candidate: tr.candidate, commit: tr.commit };
+        if (b0) out.baseline = { file: RD.baseline, candidate: b0.candidate, commit: b0.commit };
         out.round = RD.round;
         out.shipped = { file: SHIPPED_NET, sha256: crypto.createHash("sha256").update(bytes).digest("hex") };
         out.commit = startCommit;

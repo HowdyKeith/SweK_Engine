@@ -11062,3 +11062,561 @@ ms, every pass on the device's clock.
 **What changes.** The chain's U_TH runs the coalesced pack by default from here. accumulate's `pack` defaults to "fast", and round 75's
 loop pass is kept as the reference it is held to, as rounds 48 and 55 kept the plain accumulation. denoise.html's sum that names U_TH
 is temporalUTF. Nothing ships by this alone. Shipping the chain with U_TH on the 1080 class is a release, Keith's call.
+
+## 176. ROUND 77 -- MOVING SCENES: DOES U_TH's GAIN OVER Bt HOLD WHEN THE OBJECTS MOVE? FIXED BEFORE ITS CODE
+
+**Why.** Every scene rounds 32-76 tested moved only the camera. Bt's history (sections 95, 161) is matched by world position: a
+pixel takes its previous frame's sample when the previous first hit is the same object, within POS_TOL (3) pixel footprints of the
+same point and facing within NORMAL_DOT. There are no object motion vectors. So an object that moves breaks Bt's history in two
+ways, and U_TH (round 72's network, section 170) has seen neither:
+- **rejected history:** a surface that moved more than the tolerance in a frame restarts at n = 1, so Bt there is close to one
+  noisy frame;
+- **stale history:** a surface that moved less than the tolerance, and every static surface whose LIGHTING changed (the moving
+  objects' shadows and reflections on the ground and on each other), keeps a history that is wrong. Only Bt's clamp stands
+  against it.
+This is the case temporal upscalers are known to fail on, and the one section 175's result says nothing about.
+
+**The motion (render/movingScenes.mjs).**
+- Every sphere that is neither the ground (index 0) nor a light moves in a straight line in the ground plane at its own constant
+  velocity: a direction uniform on the circle and a speed uniform in **0.01-0.08 world units a frame**, from a stream seeded by the
+  scene's seed and kept apart from every stream the scene already draws. The lights and the ground do not move; the camera moves
+  as before (cameraPath).
+- **The motion runs backwards from the measured frame.** Frame f puts each mover at its centre + v (f - 7), so the LAST frame is
+  the scene exactly as makeScene draws it. The measured frame, its guides, its light sources and its two references are therefore
+  the static example's, bit for bit; only the seven history frames differ.
+- The range straddles the tolerance on purpose. At 256 x 256, 40 degrees and the ring's ~4.5 units, a pixel is ~0.013 units and
+  POS_TOL's three footprints ~0.04 units head-on: speeds under ~0.04 a frame keep a stale history, faster ones are rejected.
+
+**ROUND 77, a test only.** No network is trained. The network is round 72's U_TH candidate (render/upscale-net-r72.json), and C2 is
+round 72's.
+- **Test:** 24 new scenes, 12 R (77000-77011) and 12 C (78000-78011), at round 72's settings (256 x 256, 4 samples in, two 2048-sample
+  references), **each rendered twice: moving and still.** The still example is temporalExample exactly as rounds 70 and 72 ran it.
+  The moving one shares its references.
+- **H77a:** on the MOVING scenes, U_TH's chain beats Bt's, by section 159's rule: a mean display relMSE at least 1 % below Bt's,
+  through verdict() as H1 was in rounds 70 and 72 (the sign-flip test, Holm with H77b, C1-C5).
+- **H77b:** on the moving scenes, U_TH's chain beats B1's, as H2.
+- **Descriptive, deciding nothing:**
+  - the still scenes' gain over Bt, and the drop from it to the moving gain, scene by scene;
+  - Bt's mean history length (n) moving and still;
+  - the gain over Bt on the MOVER pixels alone (the measured frame's pixels whose first hit is a moving sphere) and on the rest;
+  - each scene's mean correction, as P4 of section 161.
+- Files: render/denoise-results-upscale-moving-r77.json.
+
+**Predictions, fixed now, deciding nothing.**
+- **P1:** C1 and C3 hold.
+- **P2:** H77a is supported, at a gain of 2-5 %, below the still scenes' gain on the same 24. U_TH trained with disocclusions in
+  its data, where n = 1, and it reads A against the current frame C, so a rejected history is a case it has met. A stale one it
+  has not.
+- **P3:** H77b is supported.
+- **P4:** the still scenes' gain is 3-8 %, round 72's 5.44 % within the spread of a new set.
+- **P5:** Bt's mean n is lower moving than still on every scene.
+- **P6:** on the mover pixels U_TH's gain over Bt is positive, and larger than on the rest: where Bt has restarted, it is close to
+  one noisy frame, and U_TH's correction has the most to take.
+
+**What each outcome means, fixed now.**
+- **H77a holds:** U_TH's gain survives moving objects without motion vectors, and the chain with U_TH (section 175) stands for
+  scenes that move.
+- **H77a fails, the still gain holding:** the gain is a static-scene result. That is said wherever U_TH is, and the next round is
+  object motion vectors for Bt's history, or U_TH trained on moving sequences.
+- **Both fail:** the set, not the motion, is the question first; it is reported as it lands.
+
+**The run, on Keith's rig, at round 77's commit:** `--harvest-upscale-temporal-test --round 77`, its file committed byte for byte
+before it is read. One GPU is enough: it is a CPU harvest. Section 177 reads it.
+
+## 177. ROUND 77's VERDICT -- H77a HOLDS: U_TH KEEPS 4.5 % OVER Bt WHEN THE OBJECTS MOVE, AGAINST 5.7 % STILL; BUT ITS GAIN ON THE MOVERS THEMSELVES IS THE SMALL PART
+
+**The run.** render/denoise-results-upscale-moving-r77.json, run on Keith's rig at round 77's commit 4eb0c2e5 in 10.2 hours, with round
+72's candidate (seed 1, trained at 670c28bd) and the shipped denoiser. 48 sequences, 24 moving and their 24 still twins, none from a cache.
+**Said first: this file was shown to me when it was uploaded, before it was committed (54348d35, byte for byte, sha-256 ba61d6c7...).** The
+order the method asks for, commit then read, did not hold this time. Nothing in it was edited, and the analysis below was written after the
+commit; but the file was not committed unread.
+
+**The verdict, on the moving scenes.** C1, C3, C4 and C5 hold; C2 (round 72's U_TH trained on shuffled targets) is far worse than Bt (mean
+d -3.43), as it should be.
+
+| | mean display relMSE | against U_TH |
+|---|---|---|
+| U_TH | 1.9950e-3 | |
+| Bt | 2.0887e-3 | **H77a SUPPORTED**: 17 of 24, mean d 0.0648, sign-flip p 0.00037 (Holm's 0.025) |
+| B1 | 2.1119e-3 | **H77b SUPPORTED**: 16 of 24, p 0.031 (Holm's 0.05) |
+
+U_TH's mean is **4.49 % below Bt's**, past section 159's 1 %.
+
+**The still twins and the drop.** On the same 24 scenes still, U_TH is 5.71 % below Bt (18 of 24), round 72's 5.44 % within a new set's
+spread. **Motion takes 1.2 points off the gain**: 4.49 against 5.71. It took them on 16 of the 24 scenes and gave some back on the other 8.
+By family: R 5.51 % moving against 5.99 % still, C 4.28 % against 5.65 %. C, the darker interiors, lost more.
+
+**History.** Bt's mean history length fell on every scene, 5.04 still to 4.57 moving, mean over the 24. 56 of the 113 movers moved under
+0.04 a frame (the stale side of the tolerance), 57 over it.
+
+**Where the gain is.** The mover pixels are 24 % of the frame on average, and Bt's error there is 5.8 x its error on the rest.
+- **On the mover pixels** U_TH is 3.60 % below Bt, and better on only 13 of the 24 scenes.
+- **On the rest** it is 9.39 % below Bt, and better on 22 of 24.
+The image's 4.49 % is the two mixed: a large gain where the error is small, a small one where it is large.
+
+**The predictions.**
+- **P1 held:** C1 and C3.
+- **P2 held:** H77a supported at 4.49 %, inside 2-5 % and below the still gain.
+- **P3 held:** H77b supported.
+- **P4 held:** the still gain is 5.71 %, inside 3-8 %.
+- **P5 held:** Bt's history is shorter moving than still on all 24 scenes.
+- **P6 MISSED as to its size, held as to its sign.** I predicted the mover pixels would carry the larger gain, because Bt has restarted
+  there and U_TH's correction has the most to take. They carry the SMALLER one, 3.60 % against 9.39 %, and it is a coin toss scene by
+  scene (13 of 24). Where the history broke, U_TH, which was trained on still scenes, adds little to Bt.
+
+**What it means, as section 176 fixed it.** H77a holds, so U_TH's gain survives moving objects without motion vectors, and the chain with
+U_TH (section 175) stands for scenes that move. What this round adds is where the gain comes from: the image-wide 4.5 % is mostly the
+static surfaces', and on the moving objects themselves -- where Bt is worst -- U_TH's help is small and unreliable. **The next round
+there is the one section 176 named for H77a failing, now aimed at the mover pixels:** U_TH trained on moving sequences (the motion is
+already in temporalExample), or object motion vectors for Bt's history. The first is a training round on the existing code; the second
+changes Bt itself, and the chain on the device with it.
+
+## 178. ROUND 78 -- U_TH TRAINED ON MOVING SEQUENCES: CAN IT LEARN THE MOVERS? FIXED BEFORE ITS CODE
+
+**Why.** Section 177: round 72's U_TH, trained on still scenes only, keeps 4.49 % over Bt when the objects move, but on the mover pixels
+-- where Bt's error is 5.8 x the rest's -- only 3.60 %, and on 13 of 24 scenes. U_TH has never seen a stale or rejected history on a
+moving object. Section 177 named two next rounds; this is the cheaper one: the same network, trained on sequences that move.
+
+**U_THM (the network).** Section 167's U_TH exactly: its 17 channels averaged to half size, three 3 x 3 layers of 16 and a zeroed 1 x 1
+head, the residual upsampled and held on Bt's light by 1 + 0.5 tanh(r). Only its training data differ.
+
+**ROUND 78.**
+- **Training and validation:** round 65's 200 + 20 scenes, as round 72's -- **each TWICE, still and moving** (section 176's motion,
+  drawn by sceneMotion from each scene's seed), the moving twin sharing its still twin's 512-sample reference. So 400 training and 40
+  validation sequences, half of them moving. Seeds 1-3 at UP_TRAIN (1500 steps, batches of 4 crops of 32), the candidate the lowest mean
+  validation loss over all 40, and C2 on targets shuffled across all 400.
+- **Test:** 24 new scenes, 12 R (79000-79011) and 12 C (80000-80011), each moving and still, against two 2048-sample references shared
+  by the twins. Graded on each: U_THM (round 78's candidate), U_TH (round 72's candidate), Bt and B1.
+- **H78a:** on the MOVING scenes U_THM's chain beats U_TH's, by section 159's rule: a mean display relMSE at least 1 % below U_TH's,
+  through verdict() (the sign-flip test, Holm with H78b, C1-C5).
+- **H78b:** on the moving scenes U_THM's chain beats Bt's, as H77a.
+- **Descriptive, deciding nothing:** on the STILL scenes, U_THM against U_TH and against Bt; on the mover pixels and the rest, U_THM,
+  U_TH and Bt; the validation losses; each scene's mean correction.
+- Files: render/upscale-net-r78.json and render/denoise-results-upscale-moving-r78.json.
+
+**Predictions, fixed now, deciding nothing.**
+- **P1:** C1 and C3 hold.
+- **P2:** H78a is supported, at 1-4 % below U_TH on the moving scenes.
+- **P3:** H78b is supported, at 5-9 % below Bt on the moving scenes.
+- **P4:** on the mover pixels U_THM is 5-12 % below Bt, against U_TH's 3.60 % on round 77's set.
+- **P5:** on the still scenes U_THM is within 1 % of U_TH either way: half of its training is still, and the network is the same size.
+
+**What each outcome means, fixed now.**
+- **H78a holds:** training on motion is what the movers lacked. U_THM replaces U_TH in the device chain and on the page (the same
+  network shape, so the same cost, section 175), if P5 holds too.
+- **H78a fails, P4 holding:** the movers improved but not the image enough to pass the rule; reported as it lands, U_TH kept.
+- **H78a fails and P4 fails:** U_TH's 16 channels cannot learn a moving object's history from these inputs. The next round is object
+  motion vectors for Bt's history (section 177's second).
+
+**The runs, on Keith's rig, at round 78's commit, one after the other (CPU harvests, either machine):**
+- `--harvest-upscale-temporal-train --round 78`, about 15 hours, its file committed byte for byte before it is read;
+- then, at the commit that holds that file, `--harvest-upscale-temporal-test --round 78`, about 11 hours, committed the same way.
+Section 179 reads them.
+
+## 179. ROUND 78's VERDICT -- H78a FAILS: TRAINING ON MOTION DID NOT HELP. U_THM IS 1.3 % WORSE THAN U_TH MOVING, 3.7 % WORSE STILL, AND NO BETTER ON THE MOVERS
+
+**The runs.**
+- **The training:** render/upscale-net-r78.json, run on Keith's rig at round 78's commit 4da3371a, candidate seed 3. It was committed byte for byte
+  and unread (a2cf6595); before the test I read only its structure: the round, the commit, three runs, C2, and 400 + 40 sequences with
+  motion on.
+- **The test:** render/denoise-results-upscale-moving-r78.json at a2cf6595, in 4.1 hours, 48 sequences.
+- **Said first, as in section 177: the test file was shown to me when it was uploaded, before it was committed** (daad0c52, byte for byte,
+  sha-256 25531467...). Nothing in it was edited, and the analysis below was written after the commit.
+
+**The verdict, on the moving scenes.** C1, C3, C4 and C5 hold. C2 (round 78's U_THM on shuffled targets) is far worse than Bt (mean d -3.28).
+
+| | mean display relMSE | |
+|---|---|---|
+| U_THM (round 78) | 2.1012e-3 | |
+| U_TH (round 72) | 2.0751e-3 | **H78a NOT SUPPORTED**: U_THM better on 8 of 24, mean d -0.0196, p 0.93 |
+| Bt | 2.2076e-3 | **H78b SUPPORTED**: U_THM better on 17 of 24, p 0.0015 (Holm's 0.025) |
+
+U_THM is **1.26 % above U_TH** on the moving scenes: the wrong side of section 159's rule. It is 4.82 % below Bt, and U_TH 6.00 %.
+
+**Everywhere else it is the same story.**
+- **Still:** U_THM is 4.52 % below Bt, U_TH 7.89 %, so U_THM is 3.66 % worse than U_TH (better on 4 of 24).
+- **Mover pixels:** U_THM is 0.90 % below Bt (better on 11 of 24 scenes), U_TH 1.58 % (13 of 24), so U_THM is 0.69 % worse than U_TH.
+- **The rest of the frame:** U_THM 13.8 % below Bt, U_TH 16.1 %.
+- **By family:** on the moving scenes, U_THM is 5.07 % worse than U_TH on R and 0.17 % worse on C.
+- **Validation already said so.** On the 20 still validation scenes, round 78's candidate is 2.0 % worse than round 72's candidate on the same
+  scenes (1.694e-3 against 1.661e-3).
+- **This set's movers are harder for both:** Bt's error there is 6.3 x the rest's (5.8 x in round 77), and U_TH's mover gain is 1.58 %
+  here against 3.60 % on round 77's set.
+
+**The predictions.**
+- **P1 held:** C1 and C3.
+- **P2 MISSED:** H78a not supported. U_THM is 1.26 % worse than U_TH, against a predicted 1-4 % better.
+- **P3 MISSED as to its size, held as to its sign:** H78b supported, at 4.82 %, just under the predicted 5-9 %.
+- **P4 MISSED, and badly:** on the mover pixels U_THM is 0.90 % below Bt, against a predicted 5-12 % (U_TH 1.58 %).
+- **P5 MISSED:** on the still scenes U_THM is 3.66 % worse than U_TH, outside the predicted 1 % either way. Half the training being moving cost
+  the still case, and validation showed it before the test did.
+
+**What it means, as section 178 fixed it.** H78a fails and P4 fails. In section 178's words: U_TH's 16 channels cannot learn a moving object's
+history from these inputs. Said with its limit: this is ONE training configuration (round 72's size, steps and crops, half the data moving).
+A wider network, more steps or a moving-only fine-tune are untried. But the inputs are what section 177 already pointed at. Bt's history on a
+moving object is rejected or stale, and nothing in U_TH's 17 channels says where an object went. **So U_TH (round 72) stays** in the device
+chain and on the page.
+
+**The next round, as fixed:** object motion vectors for Bt's history. Each pixel's previous position would come from the object's own
+motion, not the camera's alone, so a moving surface keeps its history instead of losing it or keeping a wrong one. That changes Bt itself, on
+the CPU and in the device chain, and every U_TH result is re-measured against it.
+
+## 180. ROUND 79 -- OBJECT MOTION VECTORS FOR Bt's HISTORY: DOES A HISTORY THAT FOLLOWS THE OBJECT FIX THE MOVERS? FIXED BEFORE ITS CODE
+
+**Why.** Sections 177 and 179: on moving scenes Bt's error on the mover pixels is ~6 x the rest's, and U_TH barely touches it (1.6-3.6 %).
+Training on motion did not help (H78a failed), because nothing in U_TH's inputs says where an object went. So the history itself has to
+know. This round gives Bt's reprojection the objects' own motion.
+
+**Bt_MV (render/denoiseTemporal.mjs's reproject, threaded through render/denoiseTemporalUpscale.mjs's accumulateUpscaled).**
+- reproject takes the movers' velocities, indexed by scene object. A pixel whose current first hit P is on a mover with velocity v was at
+  **P - v** in the previous frame (section 176's motion advances each mover by v a frame).
+- That point is projected into the previous camera, and the position test compares the previous hit with P - v instead of P. Everything
+  else is as it was: the same object, the same normal test (a translation keeps normals), POS_TOL, the clamp and the running average.
+- **The vectors are exact,** from sceneMotion, as a renderer that knows its objects' motion has them. Estimated vectors are not this round.
+- **What it cannot change, and the gate holds it to bit for bit:** a pixel whose current hit is not a mover has a history made of static
+  hits all the way back, so **Bt_MV is Bt exactly off the mover pixels, and on every still scene.** Any difference is on the movers.
+- **What it does not fix:** a mover's own shading changes as it moves relative to the lights, and the static surfaces' shadows and
+  reflections of the movers change too. Those histories are still stale, and only the clamp stands against them.
+
+**ROUND 79, a test only, on the CPU.** No network is trained; U_TH is round 72's candidate, unchanged (its input is Bt_MV's history where
+it runs on Bt_MV).
+- **Test:** 24 new scenes, 12 R (81000-81011) and 12 C (82000-82011), moving as section 176's, at round 72's settings (256 x 256, 4
+  samples in, two 2048-sample references). Each is rendered once; its frames are accumulated twice, without and with the vectors.
+- **H79a:** Bt_MV beats Bt on the moving scenes, by section 159's rule (a mean display relMSE at least 1 % below Bt's), through verdict()
+  (the sign-flip test, Holm with H79b, C1-C5).
+- **H79b:** U_TH on Bt_MV beats Bt_MV, by the same rule: U_TH's gain survives the better history.
+- **Descriptive, deciding nothing:** U_TH on Bt_MV against U_TH on Bt (the whole chain's change); Bt_MV and Bt on the mover pixels (the rest
+  is equal by construction); Bt's and Bt_MV's mean history lengths; each scene's mean correction.
+- File: render/denoise-results-upscale-vectors-r79.json.
+
+**Predictions, fixed now, deciding nothing.**
+- **P1:** C1 and C3 hold.
+- **P2:** H79a is supported, at 4-12 % below Bt. The movers carry ~60 % of Bt's error (23 % of the pixels at ~6 x), and a history that
+  follows them should take 8-25 % off theirs.
+- **P3:** on the mover pixels Bt_MV is 8-25 % below Bt.
+- **P4:** H79b is supported, at 3-7 % below Bt_MV, about U_TH's gain on still scenes.
+- **P5:** Bt_MV's mean history length is between Bt's on the same moving scene and its still twin's (~5.0, section 177).
+
+**What each outcome means, fixed now.**
+- **H79a holds:** object motion vectors are what Bt's history lacked. Round 80 is their cost in the device chain: the velocity buffer, and
+  the reprojection reading it. Then the chain ships with them, Keith's call.
+- **H79a fails:** the movers' error is their changing shading, not their lost history. A history cannot fix it, and the movers are a
+  denoiser question, not an upscaler one.
+- **H79b fails, H79a holding:** U_TH was tuned to the old history's errors. The next step is retraining U_TH on Bt_MV's inputs.
+
+**The run, on Keith's rig, at round 79's commit:** `--harvest-upscale-temporal-test --round 79`, one CPU harvest (~10.5 hours), its file
+committed byte for byte before it is read. Section 181 reads it.
+
+## 181. ROUND 79's VERDICT -- H79a NOT SUPPORTED: THE VECTORS TAKE 4.1 % OFF Bt ON THE MEAN, BUT ON ONLY 13 OF 24 SCENES; U_TH ON THEM HOLDS (H79b)
+
+**The run.** render/denoise-results-upscale-vectors-r79.json, run on Keith's rig at round 79's commit 2f0c10c5 in 4.1 hours, with round 72's
+U_TH (seed 1, trained at 670c28bd) and the shipped denoiser. 24 moving sequences, each accumulated without and with the vectors, none from a
+cache. **Said first, as in sections 177 and 179: the file was shown to me when it was uploaded, before it was committed** (8645e0b1, byte
+for byte, sha-256 0776642e...). Nothing in it was edited, and what follows was written after the commit.
+
+**The verdict.** C1, C3, C4 and C5 hold; C2 (round 72's shuffled-target U_TH on Bt_MV) is far worse than Bt_MV (mean d -3.45).
+
+| | mean display relMSE | |
+|---|---|---|
+| Bt | 2.0573e-3 | |
+| Bt_MV | 1.9726e-3 | **H79a NOT SUPPORTED**: 4.12 % below Bt on the mean, but better on only 13 of 24 scenes, sign-flip p 0.145 (Holm's 0.05) |
+| U_TH on Bt_MV | 1.8641e-3 | **H79b SUPPORTED**: 5.50 % below Bt_MV, better on 18 of 24, p 0.00018 (Holm's 0.025) |
+
+**Why it is not supported, though the mean passes the 1 % rule.** The rule is the second of two conditions. The first is the test, and it
+fails. The vectors help some scenes a lot (up to 17 % lower d) and make others worse (up to 13 % higher), and over 24 scenes that is
+indistinguishable from no change. By family they took 0.98 % off on R and 4.76 % on C.
+
+**Where it acts, as built: only on the movers** (the rest is Bt bit for bit, section 180).
+- **On the mover pixels,** 28 % of the frame here, Bt_MV is 5.38 % below Bt, and better on only 13 of 24 scenes.
+- **The history did follow the objects.** Bt_MV's mean history length is longer than Bt's on all 24 scenes (5.11 against 4.37).
+- **A longer history on a mover is not always a better one.** The mover's shading changes as it moves relative to the lights, and its
+  history now keeps that stale shading where before it was thrown away. On the scenes where Bt_MV is worse, that is the history section
+  180 said the vectors cannot fix, now kept for longer.
+
+**The chain, descriptively.** U_TH on Bt_MV is 9.39 % below Bt, and **4.55 % below U_TH on the old Bt** (better on 15 of 24; 6.37 % on the
+mover pixels). U_TH on the old Bt is 5.07 % below Bt on this set. One more figure: B1, the measured frame alone (1.8652e-3), is as good as
+U_TH on Bt_MV on this set and better than Bt or Bt_MV. With objects moving at these speeds, eight frames of history buy little over one.
+
+**The predictions.**
+- **P1 held:** C1 and C3.
+- **P2 MISSED:** H79a not supported. The mean landed at 4.12 %, inside the predicted 4-12 %, but the test did not pass.
+- **P3 MISSED:** on the mover pixels Bt_MV is 5.38 % below Bt, against a predicted 8-25 %.
+- **P4 held:** H79b supported, at 5.50 %, inside 3-7 %.
+- **P5 held as to its first half:** Bt_MV's history is longer than Bt's on every scene. Its second half, below the still twin's, cannot be
+  read here: this round rendered no still twins. Its mean, 5.11, is above round 77's still mean of 5.04, on another set.
+
+**What it means, as section 180 fixed it.** H79a fails, so this round does not show that the vectors fix the movers. **Round 80 (the
+device chain's vectors) is not opened on this result.** Section 180's reading for a failed H79a was that the movers' error is their changing
+shading, not their lost history. This result supports that only partly. The vectors do lower the mean and do lengthen every mover's history,
+but what the longer history carries is sometimes stale shading, and on a mover that costs as much as it saves.
+
+**What would decide it.** Exact vectors plus a test of the history against the current frame's own shading on the mover pixels: a
+per-pixel rejection or a tighter clamp where the object moved, so the longer history is kept only when it agrees. That is a change to Bt's
+accumulation, and its own pre-registered round, not this one. Until then the chain stays as section 175 left it: Bt's history without
+vectors, then round 72's U_TH.
+
+## 182. ROUND 80 -- THE MOVER HISTORY CHECKED AGAINST THE CURRENT FRAME: VECTORS, AND A TIGHTER CLAMP WHERE THE OBJECT MOVED. FIXED BEFORE ITS CODE
+
+**Why.** Section 181: the exact vectors made every mover's history longer, but the gain was unreliable (13 of 24 scenes, p 0.145). Where they
+hurt, the longer history carried shading that had changed as the object moved past the lights. Bt's clamp (each history held inside the
+current frame's 3 x 3 min-max box) is too loose to catch that. Section 181 named the fix: check the mover's history against the current
+frame's own shading. Round 80 was held for the device chain's vectors (section 180); that round was not opened, so this takes the number.
+
+**Bt_MVC (render/denoiseTemporalUpscale.mjs's accumulateUpscaled, its `moverGamma`).** Bt_MV (section 180), plus one change on the mover
+pixels only:
+- At a pixel whose current hit is a mover, after the min-max box, the history is clamped again to the 3 x 3 neighbourhood's per-channel
+  **mean ± γσ**, its standard deviation over the same taps.
+- **γ = 1.0, fixed now and not tuned:** the usual temporal anti-aliasing value for variance clipping.
+- Everything else is Bt_MV's. **Off the movers Bt_MVC is Bt (and Bt_MV) bit for bit,** held by the gate as section 180's was.
+- U_TH's input on Bt_MVC is the clipped history A with its n; the unclamped twin Au is Bt_MV's.
+
+**ROUND 80, a test only, on the CPU.** U_TH is round 72's candidate, unchanged.
+- **Test:** 24 new scenes, 12 R (83000-83011) and 12 C (84000-84011), moving as section 176's, at round 72's settings. Each is rendered once and
+  accumulated three ways: Bt, Bt_MV and Bt_MVC.
+- **H80a:** Bt_MVC beats Bt on the moving scenes, by section 159's rule, through verdict() (the sign-flip test, Holm with H80b, C1-C5).
+- **H80b:** Bt_MVC beats Bt_MV, by the same rule: the check is what the vectors lacked.
+- **Descriptive, deciding nothing:**
+  - U_TH on Bt_MVC against Bt_MVC, and against U_TH on Bt;
+  - Bt_MV against Bt again, round 79's question on a new set;
+  - the mover pixels for each;
+  - the three mean history lengths.
+- File: render/denoise-results-upscale-check-r80.json.
+
+**Predictions, fixed now, deciding nothing.**
+- **P1:** C1 and C3 hold.
+- **P2:** H80b is supported, 2-6 % below Bt_MV.
+- **P3:** H80a is supported, 5-10 % below Bt, on at least 17 of the 24 scenes.
+- **P4:** on the mover pixels Bt_MVC is 8-15 % below Bt.
+- **P5:** Bt_MVC's mean history length is below Bt_MV's and above Bt's. The clip shortens nothing: n is not reset, only the history it
+  carries is pulled toward the current frame. So P5 may only hold through n's dependence on validity. It is written down to be checked,
+  not because I expect it to move.
+
+**What each outcome means, fixed now.**
+- **Both hold:** the vectors with a mover check are what the moving objects lacked. The device chain's vectors and clip are the next round
+  (its cost), and then the chain ships with them, Keith's call.
+- **H80b holds, H80a not:** the check helps the vectors, but Bt's own history is as good. Report it, chain unchanged.
+- **Neither:** the movers' error is not in the history, and the arc's moving-object work closes there.
+
+**The run, on Keith's rig, at round 80's commit:** `--harvest-upscale-temporal-test --round 80`, one CPU harvest (~4-10 hours), its file
+committed byte for byte before it is read. Section 183 reads it.
+
+## 183. ROUND 80's VERDICT -- H80a NOT SUPPORTED, H80b SUPPORTED: THE CLIP UNDOES WHAT THE VECTORS BREAK, AND NO MORE. THE MOVING-OBJECT HISTORY WORK CLOSES
+
+**The run.** render/denoise-results-upscale-check-r80.json, run on Keith's rig at round 80's commit 1e40a6bd in 4.9 hours, gamma 1.0, round 72's
+U_TH (seed 1, 670c28bd). 24 moving sequences, each accumulated three ways, none from a cache. **This time the file came zipped and was
+committed unread** (f2a3b9ce, sha-256 7e81339c...) before anything below was read: the order the method asks for held.
+
+**The verdict.** C1, C3, C4 and C5 hold; C2 (round 72's shuffled-target U_TH on Bt_MVC) is far worse than Bt_MVC (mean d -3.32).
+
+| | mean display relMSE | |
+|---|---|---|
+| Bt | 2.1209e-3 | |
+| Bt_MV (vectors) | 2.1914e-3 | 3.32 % ABOVE Bt (better on only 12 of 24) |
+| Bt_MVC (vectors + clip) | 2.1041e-3 | **H80a NOT SUPPORTED**: 0.79 % below Bt, short of the 1 % rule; 16 of 24, p 0.46 |
+| | | **H80b SUPPORTED**: 3.98 % below Bt_MV, 16 of 24, p 0.011 (Holm's 0.025) |
+
+**What it says, with round 79 beside it.**
+- **The vectors alone are not a reliable change to Bt.** On round 79's set they took 4.12 % off on the mean (13 of 24). On this one they ADD 3.32 %
+  (12 of 24), and 6.89 % on the mover pixels (better on 12 of 24). The sign moves with the set.
+- **The clip takes back what the vectors break.** Bt_MVC is 3.98 % below Bt_MV, and 7.27 % on the mover pixels. That lands it 0.79 % below
+  Bt -- 0.88 % on the movers, 16 of 24 -- which is no change.
+- **The clip shortened nothing.** Bt_MVC's mean history length equals Bt_MV's on all 24 scenes (5.12, against Bt's 4.39). The clip
+  pulls the history toward the current frame; it never resets n.
+- **So the error on the movers is not the history being lost.** It is the history being wrong: the mover's own shading changes as it moves,
+  and the vectors keep that changed shading for longer. A tighter check against the current frame discards about as much as the vectors
+  kept. Section 180 named this reading for a failed H79a, and rounds 79 and 80 together now support it.
+
+**The chain, descriptively.** U_TH on Bt_MVC is 5.09 % below Bt_MVC, 5.84 % below Bt, and 2.64 % below U_TH on the old Bt (16 of 24). U_TH
+on the old Bt is 3.29 % below Bt on this set. U_TH on Bt_MV is 0.50 % above U_TH on Bt here (14 of 24), where on round 79's set it was
+4.55 % below. The same sign moving with the set again.
+
+**The predictions.**
+- **P1 held:** C1 and C3.
+- **P2 held:** H80b supported, at 3.98 %, inside 2-6 %.
+- **P3 MISSED:** H80a not supported. 0.79 % below Bt against a predicted 5-10 %, on 16 scenes against at least 17.
+- **P4 MISSED:** on the mover pixels Bt_MVC is 0.88 % below Bt, against a predicted 8-15 %.
+- **P5 MISSED as to its first half, held as to its second:** Bt_MVC's history is not below Bt_MV's but equal to it on every scene (the clip
+  never resets n, as section 182 itself said it might be). It is above Bt's on every scene.
+
+**What it means, as section 182 fixed it.** H80b holds and H80a does not: the check helps the vectors, but Bt's own history is as good.
+**The chain stays as section 175 left it.** Bt's history without vectors, then round 72's U_TH.
+
+**And the moving-object history work closes.** Rounds 77-80 asked four ways whether the history can be made to serve the moving objects:
+- U_TH as it was (round 77): it keeps its gain on the image, little on the movers;
+- U_TH trained on motion (round 78): worse;
+- exact vectors (round 79): unreliable;
+- exact vectors with a clip (round 80): no change.
+
+**Estimated motion vectors (the "item 4" that waited on this round) are not opened.** They can only do as well as the exact ones, and the
+exact ones bought nothing reliable. The movers' error is their changing shading, a question for the denoiser at the current frame,
+not for the history.
+
+## 184. ROUND 81 -- HOW FAST CAN THE OBJECTS MOVE BEFORE THE HISTORY STOPS PAYING? A SPEED SWEEP. FIXED BEFORE ITS CODE
+
+**Why.** Rounds 77-80 found the single measured frame, B1, close to Bt on moving scenes, and better than it on two of the four sets (rounds 79
+and 80). So somewhere between still and section 176's speeds, eight frames of history stop beating one. This round finds where, on one set,
+at several speeds. Nothing in the chain changes. It tells the chain when the history is worth keeping.
+
+**The sweep (render/movingScenes.mjs's scaleMotion).**
+- Section 176's motion, each mover's velocity multiplied by **k in SPEED_LEVELS = 0, 0.5, 1, 2**. At k = 0 the scene is still (the still
+  example, bit for bit); at k = 2 a mover goes 0.02-0.16 units a frame, past POS_TOL's ~0.04 nearly always.
+- The motion still runs backwards from the measured frame, so all four levels share one measured frame, B1, and the references. Only the seven
+  history frames differ.
+
+**ROUND 81, a test only, on the CPU.** U_TH is round 72's candidate, unchanged.
+- **Test:** 24 new scenes, 12 R (85000-85011) and 12 C (86000-86011), at round 72's settings, each at the four levels. Graded at each level: Bt
+  and U_TH on Bt; B1 once (it is the same at every level).
+- **H81a:** at k = 2, B1 beats Bt, by section 159's rule (a mean display relMSE at least 1 % below Bt's), through verdict() (the sign-flip
+  test, Holm with H81b, C1-C5).
+- **H81b:** at k = 0, Bt beats B1, by the same rule: the history pays when nothing moves.
+- **Descriptive, deciding nothing:**
+  - Bt's gain over B1 at each level, and the speed where it crosses zero (linear between the levels that bracket it);
+  - the same for U_TH on Bt;
+  - per family;
+  - Bt's mean history length at each level.
+- File: render/denoise-results-upscale-speed-r81.json.
+
+**Predictions, fixed now, deciding nothing.**
+- **P1:** C1 and C3 hold.
+- **P2:** H81a is supported: at k = 2, B1 is 2-8 % below Bt.
+- **P3:** H81b is supported: still, Bt is 3-10 % below B1.
+- **P4:** Bt's gain over B1 crosses zero between k = 0.5 and k = 1.5.
+- **P5:** U_TH on Bt stays below B1 at every level up to k = 1, and not at k = 2.
+- **P6:** Bt's mean history length falls with k at every step, on the mean over the 24.
+
+**What each outcome means, fixed now.**
+- **Both hold:** the history has a speed limit, and the crossover says where. A chain that knows its scene's motion (an engine does) can fall
+  back to B1, or to U_TH on a short history, above it. That is a candidate round, not a change made here.
+- **H81a fails:** the history does not lose to one frame even at twice section 176's speeds, and rounds 79-80's B1 results were those sets'.
+- **H81b fails:** the history does not beat one frame even still at these settings. That would undercut round 32's premise on this set, and is
+  reported as it lands.
+
+**The run, on Keith's rig, at round 81's commit:** `--harvest-upscale-temporal-test --round 81`, one CPU harvest (~5-11 hours), its file
+committed byte for byte before it is read. Section 185 reads it.
+
+## 186. ROUND 82 -- SPEND THE SAMPLES WHERE THE HISTORY IS SHORT: THE SAME BUDGET, SHARED BY WHERE THE HISTORY WILL BE REJECTED. FIXED BEFORE ITS CODE
+
+**Why.** Section 183 closed the moving-object history work: the movers' error is their changing shading at the current frame, not a lost
+history. Where the history is rejected, Bt is close to one noisy frame. So give those pixels more samples, and the rest fewer, at the same
+total. The history is not changed at all; the trace is.
+
+**The rule (render/adaptiveSampling.mjs), fixed now.**
+- **The prediction:** before frame f is traced, its first hits are reprojected against frame f - 1's. That is reproject(), as Bt does, on
+  geometry that costs no samples. Each half-size pixel's **share** s is the fraction of its 2 x 2 full-size pixels with no valid history.
+- **The weight:** 1 + 2s, so a pixel whose history will be wholly rejected weighs 3.
+- **The allocation:** the frame's budget, **4 samples a half-size pixel**, shared in proportion to the weights. Integers by the largest
+  remainder, each pixel 1 to 12, the total exact. Frame 0 has no history to lose, so its allocation is uniform.
+- **The traces:** each frame is traced as 12 one-sample passes from its own seeds. The **uniform arm** averages the first 4 at every pixel. The
+  **adaptive arm** averages each pixel's first m. Both arms come from the same passes, so they are paired sample for sample and spend the
+  same total.
+- Everything after the trace is the chain as it is: the shipped denoiser, the fill, EASU, Bt's history (no vectors), round 72's U_TH.
+
+**ROUND 82, a test only, on the CPU.**
+- **Test:** 24 new scenes, 12 R (87000-87011) and 12 C (88000-88011), moving as section 176's (k = 1), at round 72's settings. The two arms share
+  the references.
+- **H82a:** Bt with adaptive sampling beats Bt with uniform sampling, by section 159's rule, through verdict() (the sign-flip test, Holm with
+  H82b, C1-C5).
+- **H82b:** U_TH on the adaptive Bt beats U_TH on the uniform Bt, by the same rule.
+- **Descriptive, deciding nothing:**
+  - both arms on the mover pixels, and on the measured frame's rejected pixels;
+  - B1 for each arm;
+  - the samples the adaptive arm spent on rejected pixels against the uniform 4.
+- File: render/denoise-results-upscale-sampling-r82.json.
+
+**Predictions, fixed now, deciding nothing.**
+- **P1:** C1 and C3 hold.
+- **P2:** H82a is supported, 1-5 % below the uniform Bt. The rejected pixels' noise falls by up to 3 x; the rest's rises by ~20 %, but their
+  history averages it down.
+- **P3:** H82b is supported, 1-4 %.
+- **P4:** on the rejected pixels the adaptive Bt is 5-15 % below the uniform one.
+- **P5:** B1 (one frame, no history) is WORSE adaptive than uniform. Its non-rejected pixels lose samples with nothing to average them.
+
+**What each outcome means, fixed now.**
+- **H82a holds:** sampling by history is worth a device round. The device trace would allocate per pixel, and the cost of the prediction pass
+  would be measured.
+- **H82a fails:** at these settings the denoiser, trained at a uniform 4 samples, does not turn uneven samples into a better history. A
+  denoiser trained on uneven samples would be the next question.
+
+**The run, on Keith's rig, at round 82's commit:** `--harvest-upscale-temporal-test --round 82`, one CPU harvest (the traces are 3 x round 77's
+history cost; the references dominate, ~5-11 hours). Its file is committed byte for byte before it is read. Section 187 reads it.
+
+## 188. ROUND 83 -- MOVING LIGHTS: THE HISTORY EVERYWHERE VALID AND EVERYWHERE STALE. FIXED BEFORE ITS CODE
+
+**Why.** Every scene from round 32 to round 82 kept its lights still. A moving light changes the shading of every surface it reaches while no
+surface moves, so reproject() keeps nearly every pixel's history and that history is wrong. Only Bt's clamp stands against it. It is the
+case that should hurt the history most, and none of rounds 77-82 measured it.
+
+**The motion (render/movingScenes.mjs's lightMotion).**
+- Every light, and nothing else, moves in a straight line in its own horizontal plane at constant velocity: a direction uniform on the circle
+  and a speed uniform in section 176's MOVE_SPEED, 0.01-0.08 units a frame. It comes from a stream seeded by the scene's seed and salted apart
+  from sceneMotion's (LIGHT_SALT).
+- The motion runs backwards from the measured frame (sceneAt, as section 176), so the measured frame, its light sources and its references are
+  the still twin's, bit for bit.
+- No vectors and no clip: the chain as section 175 left it.
+
+**ROUND 83, a test only, on the CPU.** U_TH is round 72's candidate, unchanged.
+- **Test:** 24 new scenes, 12 R (89000-89011) and 12 C (90000-90011), each with moving lights and still, at round 72's settings, the twins sharing
+  their references.
+- **H83a:** with moving lights, U_TH's chain beats Bt's, by section 159's rule, through verdict() (the sign-flip test, Holm with H83b, C1-C5).
+- **H83b:** with moving lights, Bt beats B1 (the measured frame alone), by the same rule: the history still pays when the light moves.
+- **Descriptive, deciding nothing:**
+  - the still twins' U_TH-over-Bt and Bt-over-B1 gains, and the drops;
+  - Bt's mean history length, moving and still;
+  - each scene's mean correction.
+- File: render/denoise-results-upscale-lights-r83.json.
+
+**Predictions, fixed now, deciding nothing.**
+- **P1:** C1 and C3 hold.
+- **P2:** H83a is supported, at 1-4 %, below the still twins' gain.
+- **P3:** H83b is NOT supported: with the lights moving, Bt is within 1 % of B1 or worse. Its history is long and wrong.
+- **P4:** Bt's mean history length is within 0.3 of the still twins' (the geometry does not move, so almost nothing is rejected).
+- **P5:** on the still twins, Bt beats B1 by more than 1 %.
+
+**What each outcome means, fixed now.**
+- **H83a holds and H83b fails, as predicted:** moving lights are where the history costs, and U_TH softens it. A history check on the
+  shading itself (a luminance-change rejection) is the next round.
+- **Both hold:** Bt's clamp handles moving lights, and the history keeps paying.
+- **H83a fails:** U_TH's gain is a static-lighting result, and that is said wherever U_TH is.
+
+**The run, on Keith's rig, at round 83's commit:** `--harvest-upscale-temporal-test --round 83`, one CPU harvest (~5-11 hours), its file
+committed byte for byte before it is read. Section 189 reads it.
+
+## 185. ROUND 81's VERDICT -- BOTH HOLD: THE HISTORY HAS A SPEED LIMIT, AT ~1.4 x SECTION 176's SPEEDS. U_TH STAYS AHEAD OF ONE FRAME TO TWICE THEM
+
+**The run.** render/denoise-results-upscale-speed-r81.json, run on Keith's rig at commit 203c1403 (which holds round 81's code) in 5.1 hours,
+round 72's U_TH (seed 1, 670c28bd). 24 scenes at four speeds, 96 sequences, none from a cache. **It came zipped and was committed unread**
+(4ce3841d, sha-256 34353944...) before anything below was read.
+
+**The verdict.** C1, C3, C4 and C5 hold; C2 (round 72's shuffled-target U_TH on the k = 1 history) is far worse than Bt (mean d -3.27).
+- **H81a SUPPORTED:** at k = 2, B1 is 2.93 % below Bt (Bt 3.02 % above B1). B1 is better on 17 of 24, sign-flip p 0.023 under Holm's 0.05.
+- **H81b SUPPORTED:** still, Bt is 14.85 % below B1, better on 21 of 24, p 0.000095 under Holm's 0.025.
+
+| k (x section 176's speeds) | Bt against B1 | U_TH on Bt against B1 | Bt's mean history |
+|---|---|---|---|
+| 0 (still) | 14.85 % below (21 of 24) | 23.50 % below (22 of 24) | 5.19 |
+| 0.5 | 5.04 % below (15) | 14.00 % below (18) | 5.05 |
+| 1 | 1.69 % below (14) | 10.14 % below (17) | 4.58 |
+| 2 | 3.02 % ABOVE (7) | 5.30 % below (13) | 3.99 |
+
+B1's mean is 2.3452e-3 at every level (the measured frame is the same).
+
+**Where the history stops paying.** Bt's gain over B1 crosses zero at **k = 1.36**, linear between k = 1 and k = 2. That is a mover at about 1.4 x
+section 176's 0.01-0.08 units a frame, around 0.06 units on the mean. By family: C crosses between k = 1 and 2 (0.79 % at 1, -3.78 % at 2); R
+barely reaches it at k = 2 (still 0.16 % below B1).
+
+**And U_TH does not stop paying.** Its gain over B1 falls with speed, 23.5 % to 5.3 %, but stays positive at every level. It beats Bt itself at every
+level (20-21 of 24 scenes). So the chain as section 175 left it -- Bt, then U_TH -- is ahead of the single frame across the whole sweep. Where
+the history alone has gone negative (k = 2), U_TH's correction still turns it 5.3 % positive.
+
+**The predictions.**
+- **P1 held:** C1 and C3.
+- **P2 held:** H81a supported, B1 2.93 % below Bt at k = 2, inside 2-8 %.
+- **P3 held as to its sign, MISSED as to its size:** H81b supported, but the still gain is 14.85 %, past the predicted 3-10 %.
+- **P4 held:** the crossover at k = 1.36, inside 0.5-1.5.
+- **P5 MISSED:** I predicted U_TH would fall behind B1 at k = 2. It is still 5.30 % ahead there (13 of 24 scenes); it never crosses.
+- **P6 held:** Bt's mean history falls at every step, 5.19 to 3.99.
+
+**What it means, as section 184 fixed it.** Both hold, so the history has a speed limit, and it sits at about 1.4 x section 176's speeds. A
+chain that knows its scene's motion could fall back to B1 above it. **But with U_TH after Bt there is no need inside this range:** U_TH stays
+ahead of B1 even at twice section 176's speeds. The fallback is a candidate only for a chain WITHOUT U_TH, or for speeds past those tested.
+Nothing changes in the chain.

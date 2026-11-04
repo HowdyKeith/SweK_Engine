@@ -348,6 +348,28 @@
     </div>
   </div>
 
+  <h2 style="margin-top:34px">Frame generation on the whole chain, live &mdash; the half-way frame between two denoised, upscaled, accumulated ones</h2>
+  <p class="sub" style="max-width:760px">
+    The view above generates between raw traces. This one generates between what the denoiser arc measured: each <b>real</b> frame
+    is the chain &mdash; traced at half size, through the shipped denoiser, the emitter fill and EASU, then Bt's history over the last
+    eight frames (<code>render/frameGenChainLive.mjs</code>). The half-way frame is made from the two real frames' light-free
+    histories with the scene's own motion field (round 66's fill, the holes cross-faded) and lit at the half-way eye &mdash; on
+    WebGPU by <code>render/denoiseFrameGenGPU.mjs</code>'s compute generator, on the CPU where there is none or the box is ticked.
+    The line below says which ran, and how long each part took.
+  </p>
+  <div class="wrap">
+    <div><canvas id="fccv" width="128" height="128" style="width:100%;max-width:384px;height:auto"></canvas>
+      <div id="fcprog" class="sub" style="margin-top:6px">idle</div></div>
+    <div class="panel">
+      <label><input id="fcgen" type="checkbox" checked /> generate the half-way frame (off: the real frames alone)</label>
+      <label><input id="fccpu" type="checkbox" /> generate on the CPU even with WebGPU</label>
+      <p><button id="fcgo">Start</button> <button id="fcstop">Stop</button></p>
+      <div id="fcout" class="sub" style="margin-top:10px;white-space:pre;font-family:ui-monospace,monospace"></div>
+      <div class="note">Graded by render/frameGenChainLive-selfcheck.mjs: the chain is the arc's, and the compute generator is the CPU
+        reference within section 147's bound.</div>
+    </div>
+  </div>
+
 <script type="module">
 import { render, coverage } from "/physics/render/pathTracer.mjs";
 import { buildTable as mkT } from "/physics/render/energyCompensation.mjs";
@@ -989,6 +1011,71 @@ $("fggo").onclick = () => {
 };
 </script>
 <script type="module">
+// backlog denoise-framegen-page-chain: frame generation between the chain's frames -- the chain in a worker, the generator on WebGPU or the CPU
+import { LIVE_C, composeMid, generateChainCPU } from "/render/frameGenChainLive.mjs";
+import { makeLiveFrameGen, toBytes } from "/render/frameGenLive.mjs";
+import { makeLivePacing, refreshFromStamps } from "/render/framePacer.mjs";
+import { createDeviceGenerator } from "/render/denoiseFrameGenGPU.mjs";
+import { requestDevice } from "/gfx/device.js";
+const $ = (id) => document.getElementById(id);
+const fcctx = $("fccv").getContext("2d"), fcImg = fcctx.createImageData(LIVE_C.W, LIVE_C.W);
+let fc = null;
+function fcStop() { if (!fc) return; fc.stop = true; fc.worker.terminate(); $("fcprog").textContent = "stopped"; fc = null; }
+$("fcstop").onclick = fcStop;
+$("fcgo").onclick = async () => {
+  fcStop();
+  const run = fc = { stop: false, stamps: [], view: null, live: makeLivePacing(), k: 0, sent: 0, chainMs: 0, genMs: 0, prev: null, gpu: null, where: "the CPU",
+                     worker: new Worker("/render/frameGenChainLive-worker.mjs", { type: "module" }), generate: $("fcgen").checked };
+  if (!$("fccpu").checked && navigator.gpu) try {
+    const cv = document.createElement("canvas"); cv.width = 8; cv.height = 8;
+    run.gpu = createDeviceGenerator(await requestDevice(cv, { backend: "webgpu", offscreen: true }), LIVE_C.W, LIVE_C.W); run.where = "WebGPU";
+  } catch (err) { run.gpu = null; run.where = "the CPU (WebGPU failed: " + String(err && err.message || err).slice(0, 80) + ")"; }
+  const ask = () => { run.sent = performance.now(); run.worker.postMessage({ type: "step", k: run.k }); };
+  run.worker.onmessage = async (e) => {
+    if (run.stop) return;
+    const m = e.data;
+    if (m.type === "error") { $("fcprog").textContent = "the chain failed: " + m.message; return; }
+    if (m.type === "ready") { $("fcprog").textContent = "measuring the refresh..."; requestAnimationFrame(fcTick); return; }
+    run.chainMs = m.ms;
+    // the half-way frame is made when its newer frame arrives, so it is ready when the pacer shows it
+    if (run.generate && run.prev) {
+      const g0 = performance.now();
+      if (run.gpu) { const g = await run.gpu.generate({ prev: run.prev.A, cur: m.A, flow: m.flow, depth: m.depth }); m.gen = { frame: composeMid(g.frame, m), holes: g.holes }; }
+      else { const g = generateChainCPU(run.prev, m); m.gen = { frame: g.frame, holes: g.holes }; }
+      run.genMs = performance.now() - g0;
+    }
+    if (run.stop) return;
+    const ready = performance.now();
+    run.view.real(m, run.sent, ready); run.live.real(m.k, run.sent, ready); run.prev = m; run.k++;
+    ask();
+  };
+  run.worker.postMessage({ type: "init" });
+  $("fcprog").textContent = "loading the denoiser...";
+  let lastOut = 0;
+  function fcTick(stamp) {
+    if (run.stop) return;
+    if (!run.view) {
+      run.stamps.push(stamp);
+      if (run.stamps.length === 20) { run.view = makeLiveFrameGen({ refresh: refreshFromStamps(run.stamps), generate: run.generate, genOf: (a, b) => b.gen }); ask(); $("fcprog").textContent = "running"; }
+      requestAnimationFrame(fcTick); return;
+    }
+    const s = run.view.at(stamp);
+    if (s.frame) { toBytes(s.frame, LIVE_C.W, LIVE_C.W, fcImg.data); fcctx.putImageData(fcImg, 0, 0); }
+    run.live.tick(stamp, s.kind === "hold" && s.k < 0 ? null : s);
+    if (stamp - lastOut > 500) {
+      lastOut = stamp;
+      let line = `refresh ${run.view.pacer.refresh.toFixed(2)} ms; a real frame's chain ${run.chainMs.toFixed(0)} ms (${LIVE_C.W} x ${LIVE_C.W}, traced at ${LIVE_C.W / 2}, ${LIVE_C.sppIn} spp)` +
+                 (run.generate ? `\nthe half-way frame generated on ${run.where} in ${run.genMs.toFixed(1)} ms` : "\nno generation (the real frames alone)") +
+                 `\nreal frames ${run.k}, generated ${run.view.generated}`;
+      try { const q = run.live.metrics(2000); line += `\nover 2 s: ${q.newPerSecond.toFixed(1)} new images/s, judder ${q.judder.toFixed(1)} ms, latency ${q.meanLatency.toFixed(0)} ms` +
+                (s.kind === "gen" ? `\nthis refresh: generated, ${s.holes} holes cross-faded` : ""); } catch { line += "\n(collecting two seconds of refreshes)"; }
+      $("fcout").textContent = line;
+    }
+    requestAnimationFrame(fcTick);
+  }
+};
+</script>
+<script type="module">
 // backlog fsr4-temporal-page (sections 163, 172): round 70's temporal chain and round 72's U_TH, live -- the chain in a worker, U_TH on WebGPU or the CPU
 import { decodeNet } from "/render/denoiseDevice.mjs";
 import { createDeviceTemporal, temporalDevice } from "/render/learnedUpscaleTemporalGPU.mjs";
@@ -1033,5 +1120,16 @@ $("tlgo").onclick = async () => {
 };
 </script>
 <script type="module" src="/ui/originNotice.js"></script>
+<script type="module">
+// ui/upscalerSwitch.mjs: the shared upscaler switch -- this page's three live views: FSR3 frame generation on raw traces, frame generation on
+// the denoiser chain, and round 72's U_TH on Bt's history. Opening the page only marks the view; choosing one starts it (and stops the others)
+import { mountUpscalerSwitch } from "/ui/upscalerSwitch.mjs";
+const VIEW = { fsr3: ["fggo", "fgstop"], chain: ["fcgo", "fcstop"], uth: ["tlgo", "tlstop"] };
+const mark = (id) => { for (const [m, [go]] of Object.entries(VIEW)) { const b = document.getElementById(go); if (b) b.style.outline = m === id ? "3px solid #7fb4ff" : ""; } };
+mountUpscalerSwitch({ page: "path-tracer", pageDefault: "chain", modes: { fsr3: {}, chain: {}, uth: { needs: ["history"] } },
+    onChange: (id, { from }) => { mark(id); if (from !== "set" && from !== "console") return;
+        for (const [m, [, stop]] of Object.entries(VIEW)) if (m !== id) document.getElementById(stop).click();
+        const go = document.getElementById(VIEW[id][0]); go.scrollIntoView({ block: "center", behavior: "smooth" }); go.click(); } });
+</script>
 </body>
 </html>

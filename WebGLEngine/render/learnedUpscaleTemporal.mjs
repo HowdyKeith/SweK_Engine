@@ -21,6 +21,7 @@ import { makeScene, guideBuffers, inputChannels, isDatasetSeed } from "./denoise
 import { emitterCoverage, emitterRadiance, withMask } from "./denoiseMask.mjs";
 import { FRAMES, cameraPath, firstHits } from "./denoiseTemporal.mjs";
 import { JITTER, temporalUpscaleSeeds, accumulateUpscaled, shiftResample, halfShift } from "./denoiseTemporalUpscale.mjs";
+import { sceneAt, moverMask, velocities } from "./movingScenes.mjs";
 import { denoise } from "./denoiseNet.mjs";
 import { UP_TRAIN } from "./learnedUpscale.mjs";
 
@@ -147,29 +148,56 @@ export function trainTemporal(examples, { seed, steps = UP_TRAIN.steps, batch = 
 }
 
 /**
+ * A sequence's eight frames as round 70's example takes them: each at half size at sppIn, at its eye and jitter, through the
+ * shipped network (`net`) with its guides and light-source mask, the emitter fill, and EASU to W x W; `shift` is its jitter at full
+ * size. Round 77 (section 176): with `motion`, frame f renders, guides and masks sceneAt(S, motion, f) -- the last frame is S.scene.
+ */
+export function exampleFrames(S, net, { W, sppIn, motion = null }) {
+    const H = W, w = W / 2, h = H / 2, rs = temporalUpscaleSeeds(S.seed), path = cameraPath(S);
+    const opts = (ww, hh, spp, sd, eye, off) => ({ w: ww, h: hh, spp, seed: sd, rgb: true, eye, look: S.look, up: S.up, fovDeg: S.fovDeg, sky: S.sky, pixelOffset: off });
+    return path.eyes.map((eye, f) => {
+        const Sf = { ...S, scene: sceneAt(S, motion, f), eye }, input = render(Sf.scene, opts(w, h, sppIn, rs.half[f], eye, JITTER[f])), g = guideBuffers(Sf, w, h, JITTER[f]), cov = emitterCoverage(Sf, w, h, JITTER[f]);
+        const den = denoise(net, withMask(inputChannels(input, g.albedo, g.normal, w, h), cov), h, w).y, filled = fillEmitters(den, cov, w, h);
+        return { input, cov, y: upscale(filled, w, h, W, H, "easu"), shift: halfShift(JITTER[f]) };
+    });
+}
+
+/**
  * One example of round 70: scene `family`/`seed`'s sequence at W x W -- round 32's path and jitter, each frame at half size at
  * sppIn through the shipped network (`net`), the emitter fill and EASU -- accumulated clamped (A, Bt's light) and unclamped, the
  * measured frame's EASU unjittered (C), the guides, the light sources, and the references at the measured eye. The arms:
  * `bt` (Bt, A composited), `b1` (the measured frame alone, C composited) and `noisy` (its half-size input, bilinear, composited).
+ * Round 77 (section 176): `motion` (movingScenes.sceneMotion) moves the scene's objects over the history, the measured frame
+ * unchanged, and adds `mover`, the measured frame's mover pixels; `refs` hands in the still twin's references instead of
+ * rendering them again. Round 79 (section 180): `vectors` (with a motion) adds `mv`, the same frames accumulated with the movers' exact
+ * velocities -- Bt_MV's input `x` and its composited light `bt`. Round 80 (section 182): `moverGamma` with them adds `mvc`, Bt_MVC's.
  * *** THROWS FOR A DATASET SEED WITHOUT { harvest: true }. ***
  */
-export function temporalExample(family, seed, net, { harvest = false, W = 256, sppIn = 4, sppRef = 32, ref2 = false } = {}) {
+export function temporalExample(family, seed, net, { harvest = false, W = 256, sppIn = 4, sppRef = 32, ref2 = false, motion = null, refs = null, vectors = false, moverGamma = null, frames: given = null } = {}) {
+    if (moverGamma !== null && !vectors) throw new Error("learnedUpscaleTemporal: the mover clip runs on the vectors' history (section 182)");
+    if (vectors && !motion) throw new Error("learnedUpscaleTemporal: object motion vectors need a motion (section 180)");
     if (isDatasetSeed(seed) && !harvest) throw new Error(`learnedUpscaleTemporal: seed ${seed} is a dataset seed -- rendering it needs { harvest: true }`);
     if (W % 2) throw new Error(`learnedUpscaleTemporal: a ${W} x ${W} frame has no half size`);
     const H = W, w = W / 2, h = H / 2, S = makeScene(family, seed), rs = temporalUpscaleSeeds(seed), path = cameraPath(S);
     const opts = (ww, hh, spp, sd, eye, off) => ({ w: ww, h: hh, spp, seed: sd, rgb: true, eye, look: S.look, up: S.up, fovDeg: S.fovDeg, sky: S.sky, pixelOffset: off });
-    const frames = path.eyes.map((eye, f) => {
-        const Sf = { ...S, eye }, input = render(S.scene, opts(w, h, sppIn, rs.half[f], eye, JITTER[f])), g = guideBuffers(Sf, w, h, JITTER[f]), cov = emitterCoverage(Sf, w, h, JITTER[f]);
-        const den = denoise(net, withMask(inputChannels(input, g.albedo, g.normal, w, h), cov), h, w).y, filled = fillEmitters(den, cov, w, h);
-        return { input, cov, y: upscale(filled, w, h, W, H, "easu"), shift: halfShift(JITTER[f]) };
-    });
-    const geo = path.eyes.map((eye) => firstHits(S, eye, W, H)), acc = accumulateUpscaled(frames, geo, W, H), Au = accumulateUpscaled(frames, geo, W, H, { clamp: false }).A;
+    // round 82 (section 186): `frames` hands in frames traced elsewhere (adaptiveSampling's two arms), exampleFrames' shape
+    if (given && given.length !== FRAMES) throw new Error(`learnedUpscaleTemporal: an example is ${FRAMES} frames -- got ${given.length}`);
+    const frames = given || exampleFrames(S, net, { W, sppIn, motion });
+    const geo = path.eyes.map((eye, f) => firstHits({ ...S, scene: sceneAt(S, motion, f) }, eye, W, H)), acc = accumulateUpscaled(frames, geo, W, H), Au = accumulateUpscaled(frames, geo, W, H, { clamp: false }).A;
     const last = frames[FRAMES - 1], C = shiftResample(last.y, W, H, ...last.shift);
     const g = guideBuffers(S, W, H), B = cameraBasis(S), hits = geo[FRAMES - 1], depth = new Float64Array(W * H).fill(1e9);
     for (let p = 0; p < W * H; p++) if (hits.obj[p] >= 0) depth[p] = (hits.pos[p * 3] - S.eye[0]) * B.fwd[0] + (hits.pos[p * 3 + 1] - S.eye[1]) * B.fwd[1] + (hits.pos[p * 3 + 2] - S.eye[2]) * B.fwd[2];
     const full = emitterRadiance(S, W, H), noisyHalf = fillEmitters(Float64Array.from(last.input), last.cov, w, h);
     return { family, seed, W, H, x: temporalInput(acc.A, Au, C, acc.n, g.albedo, g.normal, depth, W, H), cov: full.cov, E: full.E,
-             ref: render(S.scene, opts(W, H, sppRef, rs.ref, S.eye, null)), ...(ref2 ? { ref2: render(S.scene, opts(W, H, sppRef, rs.ref2, S.eye, null)) } : {}),
+             // round 77: a moving example's measured frame is its still twin's, so it may take the twin's references rather than render them again
+             ref: refs ? refs.ref : render(S.scene, opts(W, H, sppRef, rs.ref, S.eye, null)), ...(ref2 ? { ref2: refs ? refs.ref2 : render(S.scene, opts(W, H, sppRef, rs.ref2, S.eye, null)) } : {}),
+             ...(motion ? { mover: moverMask(motion, geo[FRAMES - 1]) } : {}),
+             // round 79 (section 180): the same frames and hits accumulated again with the movers' exact velocities -- Bt_MV and U_TH's input on it
+             ...(vectors ? (() => { const vel = velocities(S, motion), am = accumulateUpscaled(frames, geo, W, H, { vel }), aum = accumulateUpscaled(frames, geo, W, H, { clamp: false, vel }).A;
+                 // round 80 (section 182): Bt_MVC, the vectors' history clipped on the movers; its unclamped twin is Bt_MV's
+                 const mc = moverGamma === null ? null : accumulateUpscaled(frames, geo, W, H, { vel, moverGamma });
+                 return { mv: { x: temporalInput(am.A, aum, C, am.n, g.albedo, g.normal, depth, W, H), bt: compositeEmitters(am.A, full) },
+                          ...(mc ? { mvc: { x: temporalInput(mc.A, aum, C, mc.n, g.albedo, g.normal, depth, W, H), bt: compositeEmitters(mc.A, full) } } : {}) }; })() : {}),
              bt: compositeEmitters(acc.A, full), b1: compositeEmitters(C, full),
              noisy: compositeEmitters(shiftResample(upscale(noisyHalf, w, h, W, H, "bilinear"), W, H, ...last.shift), full) };
 }

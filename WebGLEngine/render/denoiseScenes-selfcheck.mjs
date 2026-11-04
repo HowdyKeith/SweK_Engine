@@ -649,6 +649,55 @@ console.log("\n18. ROUND 58: FAMILY P, path-tracer.html'S OWN SIX SCENES (pre-re
         new Set(t1).size === 72 && t1.every((x) => !prior.has(x)), `${t1.length} seeds`);
 }
 
+{   // round 77 (section 176): the moving scenes' test set
+    const T1 = D.SPLITS_UPSCALE_MOVING.T1, seen = new Set([D.SPLITS_UPSCALE_LEARNED, D.SPLITS_UPSCALE_LEARNED_67, D.SPLITS_UPSCALE_LEARNED_68, D.SPLITS_UPSCALE_LEARNED_69, D.SPLITS_UPSCALE_TEMPORAL, D.SPLITS_UPSCALE_TEMPORAL_72].flatMap((s) => Object.values(s).flatMap((x) => x.seeds)));
+    ok("  SPLITS_UPSCALE_MOVING: a test set only, 12 R at 77000-77011 then 12 C at 78000-78011, frozen, no seed an earlier upscale set used, each reserved",
+        Object.keys(D.SPLITS_UPSCALE_MOVING).join() === "T1" && Object.isFrozen(D.SPLITS_UPSCALE_MOVING) && T1.seeds.length === 24 && T1.seeds[0] === 77000 && T1.seeds[11] === 77011 && T1.seeds[12] === 78000 && T1.seeds[23] === 78011 &&
+        T1.families.slice(0, 12).every((f) => f === "R") && T1.families.slice(12).every((f) => f === "C") && T1.seeds.every((x) => !seen.has(x) && D.isDatasetSeed(x)));
+}
+{   // round 83 (section 188): the moving-light test set
+    // SABOTAGED, restored byte-identical: Z6 its R seeds onto round 82's 87000 -> 2 red (this row, and movingScenes-selfcheck's round 83 row).
+    const T1 = D.SPLITS_UPSCALE_LIGHTS.T1, seen = new Set([...D.SPLITS_UPSCALE_SAMPLING.T1.seeds, ...D.SPLITS_UPSCALE_SPEED.T1.seeds, ...D.SPLITS_UPSCALE_CHECK.T1.seeds, ...D.SPLITS_UPSCALE_VECTORS.T1.seeds, ...D.SPLITS_UPSCALE_MOVING.T1.seeds, ...D.SPLITS_UPSCALE_MOVING_78.T1.seeds]);
+    ok("  SPLITS_UPSCALE_LIGHTS: a test set only, 12 R at 89000-89011 then 12 C at 90000-90011, frozen, reserved, none an earlier moving test seed",
+        Object.keys(D.SPLITS_UPSCALE_LIGHTS).join() === "T1" && Object.isFrozen(D.SPLITS_UPSCALE_LIGHTS) && T1.seeds.length === 24 && T1.seeds[0] === 89000 && T1.seeds[11] === 89011 && T1.seeds[12] === 90000 && T1.seeds[23] === 90011 &&
+        T1.families.slice(0, 12).every((f) => f === "R") && T1.families.slice(12).every((f) => f === "C") && T1.seeds.every((x) => !seen.has(x) && D.isDatasetSeed(x)));
+}
+{   // round 82 (section 186): the adaptive-sampling test set
+    // SABOTAGED, restored byte-identical: Z5 its C seeds onto round 81's 86000 -> 2 red (this row, and movingScenes-selfcheck's round 82 row).
+    const T1 = D.SPLITS_UPSCALE_SAMPLING.T1, seen = new Set([...D.SPLITS_UPSCALE_SPEED.T1.seeds, ...D.SPLITS_UPSCALE_CHECK.T1.seeds, ...D.SPLITS_UPSCALE_VECTORS.T1.seeds, ...D.SPLITS_UPSCALE_MOVING.T1.seeds, ...D.SPLITS_UPSCALE_MOVING_78.T1.seeds]);
+    ok("  SPLITS_UPSCALE_SAMPLING: a test set only, 12 R at 87000-87011 then 12 C at 88000-88011, frozen, reserved, none an earlier moving test seed",
+        Object.keys(D.SPLITS_UPSCALE_SAMPLING).join() === "T1" && Object.isFrozen(D.SPLITS_UPSCALE_SAMPLING) && T1.seeds.length === 24 && T1.seeds[0] === 87000 && T1.seeds[11] === 87011 && T1.seeds[12] === 88000 && T1.seeds[23] === 88011 &&
+        T1.families.slice(0, 12).every((f) => f === "R") && T1.families.slice(12).every((f) => f === "C") && T1.seeds.every((x) => !seen.has(x) && D.isDatasetSeed(x)));
+}
+{   // round 81 (section 184): the speed sweep's test set
+    // SABOTAGED, restored byte-identical: Z4 its R seeds onto round 80's 83000 -> 2 red (this row, and movingScenes-selfcheck's round 81 row).
+    const T1 = D.SPLITS_UPSCALE_SPEED.T1, seen = new Set([...D.SPLITS_UPSCALE_CHECK.T1.seeds, ...D.SPLITS_UPSCALE_VECTORS.T1.seeds, ...D.SPLITS_UPSCALE_MOVING.T1.seeds, ...D.SPLITS_UPSCALE_MOVING_78.T1.seeds]);
+    ok("  SPLITS_UPSCALE_SPEED: a test set only, 12 R at 85000-85011 then 12 C at 86000-86011, frozen, reserved, none an earlier moving test seed",
+        Object.keys(D.SPLITS_UPSCALE_SPEED).join() === "T1" && Object.isFrozen(D.SPLITS_UPSCALE_SPEED) && T1.seeds.length === 24 && T1.seeds[0] === 85000 && T1.seeds[11] === 85011 && T1.seeds[12] === 86000 && T1.seeds[23] === 86011 &&
+        T1.families.slice(0, 12).every((f) => f === "R") && T1.families.slice(12).every((f) => f === "C") && T1.seeds.every((x) => !seen.has(x) && D.isDatasetSeed(x)));
+}
+{   // round 80 (section 182): the mover history check's test set
+    // SABOTAGED, restored byte-identical: Z3 its C seeds onto round 79's 82000 -> 2 red (this row, and movingScenes-selfcheck's round 80 row).
+    const T1 = D.SPLITS_UPSCALE_CHECK.T1, seen = new Set([...D.SPLITS_UPSCALE_VECTORS.T1.seeds, ...D.SPLITS_UPSCALE_MOVING.T1.seeds, ...D.SPLITS_UPSCALE_MOVING_78.T1.seeds]);
+    ok("  SPLITS_UPSCALE_CHECK: a test set only, 12 R at 83000-83011 then 12 C at 84000-84011, frozen, reserved, none an earlier moving test seed",
+        Object.keys(D.SPLITS_UPSCALE_CHECK).join() === "T1" && Object.isFrozen(D.SPLITS_UPSCALE_CHECK) && T1.seeds.length === 24 && T1.seeds[0] === 83000 && T1.seeds[11] === 83011 && T1.seeds[12] === 84000 && T1.seeds[23] === 84011 &&
+        T1.families.slice(0, 12).every((f) => f === "R") && T1.families.slice(12).every((f) => f === "C") && T1.seeds.every((x) => !seen.has(x) && D.isDatasetSeed(x)));
+}
+{   // round 79 (section 180): the object motion vectors' test set
+    // SABOTAGED, restored byte-identical: Z2 its R seeds onto round 78's 79000 -> 1 red, this row.
+    const T1 = D.SPLITS_UPSCALE_VECTORS.T1, seen = new Set([...D.SPLITS_UPSCALE_MOVING.T1.seeds, ...D.SPLITS_UPSCALE_MOVING_78.T1.seeds, ...D.SPLITS_UPSCALE_TEMPORAL_72.T1.seeds]);
+    ok("  SPLITS_UPSCALE_VECTORS: a test set only, 12 R at 81000-81011 then 12 C at 82000-82011, frozen, reserved, none an earlier moving or temporal test seed",
+        Object.keys(D.SPLITS_UPSCALE_VECTORS).join() === "T1" && Object.isFrozen(D.SPLITS_UPSCALE_VECTORS) && T1.seeds.length === 24 && T1.seeds[0] === 81000 && T1.seeds[11] === 81011 && T1.seeds[12] === 82000 && T1.seeds[23] === 82011 &&
+        T1.families.slice(0, 12).every((f) => f === "R") && T1.families.slice(12).every((f) => f === "C") && T1.seeds.every((x) => !seen.has(x) && D.isDatasetSeed(x)));
+}
+{   // round 78 (section 178): U_THM's split -- round 65's training and validation, and its own test set
+    // SABOTAGED, restored byte-identical: Z1 its C seeds onto round 77's 78000 -> 2 red (this row, and movingScenes-selfcheck's round 78 split row).
+    const S78 = D.SPLITS_UPSCALE_MOVING_78, T1 = S78.T1, seen = new Set([...D.SPLITS_UPSCALE_MOVING.T1.seeds, ...D.SPLITS_UPSCALE_TEMPORAL_72.T1.seeds, ...D.SPLITS_UPSCALE_TEMPORAL.T1.seeds]);
+    ok("  SPLITS_UPSCALE_MOVING_78: round 65's training and validation themselves, and 12 R at 79000-79011 then 12 C at 80000-80011, reserved, none an earlier moving or temporal test seed",
+        S78.train === D.SPLITS_UPSCALE_LEARNED.train && S78.val === D.SPLITS_UPSCALE_LEARNED.val && Object.isFrozen(S78) && T1.seeds.length === 24 && T1.seeds[0] === 79000 && T1.seeds[11] === 79011 &&
+        T1.seeds[12] === 80000 && T1.seeds[23] === 80011 && T1.families.slice(0, 12).every((f) => f === "R") && T1.families.slice(12).every((f) => f === "C") && T1.seeds.every((x) => !seen.has(x) && D.isDatasetSeed(x)));
+}
+
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +
     "\nnot closed here: whether these scenes are a FAIR test. That is a judgement the pre-registration made in prose; " +
     "this gate holds the code to that prose, not the prose to the world.");

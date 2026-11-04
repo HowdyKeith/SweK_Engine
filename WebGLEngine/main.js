@@ -7101,7 +7101,8 @@ import * as BTCADDR from "./physics/crypto/bitcoinAddress.mjs";   // v4172
 import { ShadowPass } from "./render/shadowPass.js";   // round 43k
 import { TurretRenderer } from "./render/turretRenderer.js";   // round 43r
 import { GraphicsSettings } from "./ui/graphicsSettings.js";   // round 43l
-import { SettingsHub, buildSettingsSchema, describeSettingsSchema, applySettingsValue } from "./ui/settingsHub.js";  // v433 + v850
+import { SettingsHub, buildSettingsSchema, describeSettingsSchema, applySettingsValue } from "./ui/settingsHub.js";
+import { mountUpscalerSwitch, renderScaleFor } from "./ui/upscalerSwitch.mjs";   // the render pages' shared upscaler switch, here a render scale  // v433 + v850
 import { mountLocalMlxPanel } from "./ui/localMlxPanel.js";  // v4036 -- pulled out of this file's own schema so server.html can host the same control
 import { CloudLayer } from "./render/cloudLayer.js";  // v438
 import { UnderwaterCaustics } from "./render/underwaterCaustics.js";  // v453
@@ -7399,17 +7400,20 @@ function _wowBloomPulse(amount) {
     }, 16);
 }
 
+// The shared upscaler switch (ui/upscalerSwitch.mjs): the main engine has no upscaler pass, so its modes are a render scale on the canvas's
+// backing store -- native 1, bilinear 2/3 (the browser stretches the canvas to its CSS size). Everything sized from canvas.width follows.
+let _renderScale = 1;
 function resize() {
     // High-DPI rendering: framebuffer is sized at device pixel ratio so
     // crisp on retina/4K. Capped at 2x because the cost is quadratic and
     // 4x retina screens (3840 × 2160 logical → 7680 × 4320 framebuffer)
     // can drop FPS hard on low-end GPUs. CSS sizing is unchanged so the
     // canvas still fills the same screen area.
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const dpr = Math.min(window.devicePixelRatio || 1, 2) * _renderScale;
     const cssW = canvas.clientWidth;
     const cssH = canvas.clientHeight;
-    canvas.width  = Math.floor(cssW * dpr);
-    canvas.height = Math.floor(cssH * dpr);
+    canvas.width  = Math.max(1, Math.floor(cssW * dpr));
+    canvas.height = Math.max(1, Math.floor(cssH * dpr));
 
     if (tvWall) tvWall.onResize();
     if (tvOverlay) tvOverlay.resize(canvas.width, canvas.height, dpr);
@@ -7422,6 +7426,11 @@ function resize() {
 }
 resize();
 window.addEventListener("resize", resize);
+try {
+    window.__swekEngineUpscaler = mountUpscalerSwitch({ page: "engine", pageDefault: "native", corner: "bottom-right",
+        modes: { native: {}, bilinear: {}, fsr1: { why: "the main engine has no FSR1 pass yet: it needs a GLSL EASU + RCAS between a lower-resolution scene buffer and the canvas" } },
+        onChange: (id) => { _renderScale = renderScaleFor(id); resize(); } });
+} catch (e) { console.warn("[upscaler switch]", e); }
 
 // ----------------------------------------------------------------------
 // CORE — their original wiring, preserved
@@ -29611,6 +29620,8 @@ try {
             window.qualityAuto = autoCtl;   // console access
             const qualityHooks = {
                 setBloom: setBloomHook,
+                // the preset's upscaler mode moves the engine's own Upscaler switch (ui/upscalerSwitch.mjs) -- one setting, two ways in
+                setUpscaler: (mode) => { if (window.__swekEngineUpscaler) window.__swekEngineUpscaler.set(mode, { from: "quality-preset" }); },
                 startAuto:  () => autoCtl.start(),
                 stopAuto:   () => autoCtl.stop(),
                 getAutoState: () => autoCtl.state(),
@@ -29620,6 +29631,7 @@ try {
             // setPreset(name, hooks) and (set|get)AutoTargetFps directly.
             _settingsCtx._qualityModule = qpMod;
             _settingsCtx._qualityHooks  = qualityHooks;
+            window.swekQuality = { set: (name) => qpMod.setPreset(name, qualityHooks), get: () => qpMod.getCurrentPreset(), presets: Object.keys(qpMod.PRESETS) };   // console access, as window.qualityAuto
             // Apply current preset's bloom + start AUTO if persisted as such.
             const startupCfg = qpMod.getPresetConfig();
             if (bloomPass) bloomPass._enabled = !!startupCfg.bloom;
