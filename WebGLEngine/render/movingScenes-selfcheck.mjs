@@ -70,6 +70,10 @@
 // SECTION 185 (round 81's verdict rows, sabotaged in the committed file and the registration, each restored byte-identical): V1 the commit
 //   typed 203c1404, V2 H81a's count typed 16, V6 the crossover typed 1.2, V8 section 185 changing the chain, V9 it calling P5 held -> 1 red
 //   each; V3 Bt's, V4 U_TH's and V5 B1's first grade nudged, V7 the levels typed 0,0.5,1,3 -> 2 red each.
+// SECTION 187 (round 82's verdict rows, each restored byte-identical): W1 the commit typed 203c1404, W2 the run typed reported, W3 C1's count
+//   typed 22, W7 the first rejected spp typed 9, W8 section 187 opening the device round, W9 it calling P4 missed -> 1 red each; W5 U_TH-on-
+//   adaptive's first grade nudged -> 2; W4 the adaptive Bt's -> 3; W6 the first rejected-pixel grade nudged -> *** 0 RED at first *** (the row
+//   read the file's own stored gain), then 1 with the gain re-derived from the per-scene grades.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -634,6 +638,29 @@ console.log("\n14. SECTION 185: ROUND 81's VERDICT, RE-DERIVED FROM ITS COMMITTE
     const reg = fs.readFileSync(path.join(ENG, "render", "learned-denoiser-preregistration.md"), "utf8"), i185 = reg.indexOf("## 185."), s185 = reg.slice(i185, reg.indexOf("\n## ", i185 + 1) > 0 ? reg.indexOf("\n## ", i185 + 1) : undefined);   // sections land in the order they are written: 185 follows 188
     ok("  section 185 says each of these, that the chain does not change, and that the file was committed unread",
         reg.indexOf("## 185.") > 0 && /H81a SUPPORTED/.test(s185) && /H81b SUPPORTED/.test(s185) && /\*\*k = 1\.36\*\*/.test(s185) && /\*\*P5 MISSED:\*\*/.test(s185) && /Nothing changes in the chain\./.test(s185) && /committed unread/.test(s185));
+}
+
+console.log("\n15. SECTION 187: ROUND 82's VERDICT, RE-DERIVED FROM ITS COMMITTED FILE");
+{
+    const R = LT.ROUND_UPSCALE_SAMPLING, r = JSON.parse(fs.readFileSync(path.join(ENG, R.results), "utf8")), H = r.verdict.hypotheses, T = r.tables, sec = r.secondary;
+    const mean = (a) => a.reduce((q, v) => q + v, 0) / a.length, g = (u, b) => 1 - mean(u) / mean(b), near = (a, b, e = 5e-5) => Math.abs(a - b) < e, fewer = (u, b) => u.filter((v, i) => v < b[i]).length;
+    ok("!! the run is round 82's: commit 203c1403, section 186's rule (4, 12, weight 2), round 72's candidate (seed 1, 670c28bd), 24 sequences rendered and none cached",
+        r.round === 82 && r.commit === "203c1403" && r.sampling.budget === 4 && r.sampling.maxSpp === 12 && r.sampling.weight === 2 && r.trained.file === R.net && r.trained.candidate === 1 &&
+        r.trained.commit === "670c28bd" && r.cache.misses === 24 && r.cache.hits === 0 && r.determinism === true && T.btA.length === 24);
+    ok("!! *** NOT REPORTED: C1 failed on H1 -- the adaptive Bt beat the noisy input on 20 and the filter on 21 of 24, the control needs 22 -- so neither H82a nor H82b is graded ***",
+        r.verdict.run === "not reported" && r.verdict.controls.C1 === false && H.H1.status === "not reported" && H.H2.status === "not reported" && H.H1.c1.netWins === 20 && H.H1.c1.filterWins === 21 && H.H1.c1.ok === false &&
+        /needs 22/.test(r.verdict.reasons.join(" ")) && r.verdict.controls.C4 && r.verdict.controls.C5 && r.verdict.controls.C2.ok && H.H1.c3.resolvable && same(H.H1.d, effects(T.btU, T.btA)) && same(H.H2.d, effects(T.uU, T.uA)));
+    ok("!! *** the description: the adaptive Bt 9.28 % WORSE than the uniform (better on 4 of 24), U_TH on it 11.26 % worse (4), B1 18.00 % worse (2) ***",
+        near(mean(T.btU), 2.1576e-3, 5e-8) && near(mean(T.btA), 2.3577e-3, 5e-8) && near(g(T.btA, T.btU), -0.0928) && fewer(T.btA, T.btU) === 4 && near(g(T.uA, T.uU), -0.1126) && fewer(T.uA, T.uU) === 4 &&
+        near(g(T.b1A, T.b1U), -0.1800) && fewer(T.b1A, T.b1U) === 2 && near(sec.gains.bt, g(T.btA, T.btU), 1e-15));
+    const rj = sec.rejected, sh = mean(rj.share), sp = mean(rj.sppA);
+    ok("!! P4 HELD: on the rejected pixels (13.7 % of the frame) the adaptive arm spent 6.21 samples against 4 and its Bt is 6.77 % better (20 of 24); the rest dropped to ~3.65 and the mover pixels are 10.66 % worse",
+        near(rj.gain, 0.0677) && Math.abs(rj.gain - g(rj.btA, rj.btU)) < 1e-15 && fewer(rj.btA, rj.btU) === 20 && near(sh, 0.1375, 1e-4) && near(sp, 6.214, 1e-3) && Math.abs((4 - sh * sp) / (1 - sh) - 3.65) < 0.01 && near(sec.mover.gains.bt, -0.1066));
+    ok("  by family R 14.30 % worse and C 7.90 %; on this set the uniform B1 beats the uniform Bt (Bt 7.85 % above B1, a fast set by round 81's measure)",
+        near(g(T.btA.slice(0, 12), T.btU.slice(0, 12)), -0.1430) && near(g(T.btA.slice(12), T.btU.slice(12)), -0.0790) && near(g(T.btU, T.b1U), -0.0785));
+    const reg = fs.readFileSync(path.join(ENG, "render", "learned-denoiser-preregistration.md"), "utf8"), i187 = reg.indexOf("## 187."), s187 = reg.slice(i187, reg.indexOf("\n## ", i187 + 1) > 0 ? reg.indexOf("\n## ", i187 + 1) : undefined);
+    ok("  section 187 says it is not reported and why, each figure, that no device round is opened, and that the file was committed unread",
+        i187 > 0 && /NOT REPORTED \(C1 FAILED\)/.test(s187) && /the candidate needs 22/.test(s187) && /\*\*P4 HELD:\*\*/.test(s187) && /\*\*P2 MISSED:\*\*/.test(s187) && /Sampling by history is not opened as a device round\./.test(s187) && /committed unread/.test(s187));
 }
 
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +
