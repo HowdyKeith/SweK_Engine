@@ -14,7 +14,8 @@
 //                                    gate's own (the call goes through, the body's own spin is read, past is above the cap and not at it);
 //                                    tallies merged; the loader hook's stand-in given for box3d.js and nothing else
 //   4  THE HOOK IN NODE              scratch scripts under the hook: a process, its child and its worker all watched; a run stopped at its
-//                                    limit keeps what it saw and its whole group is stopped; a script that never touches box3d sees nothing
+//                                    limit keeps what it saw and its whole group is stopped; no run or probe leaves its directory behind;
+//                                    a script that never touches box3d sees nothing
 //   5  THE CONTROLS                  C-transparent, C-reads, C-jolt and C-site, flown
 //   6  THE CORPUS                    N is the gates that reach a module site's file, this gate left out, and a pass-through's file alone is
 //                                    not enough; the corpus runner, on two scratch scripts
@@ -75,6 +76,8 @@
 //   A FINDING ON THE WAY: C3, C-reads' library check of the facade's box dropped, went 0 red -- the facade still capped, and this gate's own C-reads row repeats
 //   the check, so nothing could fail. A sabotage that removes a check while what it checks still holds cannot go red; the series ran C3' instead, which breaks
 //   what the check guards (the facade's box flown on box3d's own export, the facade never asked), and it goes red.
+// AND THREE FOR ITS TEMP DIRECTORIES (section 4's last row but one, 2026-11-04: the hooked run and the probe each left one behind, 1,219 in all):
+//   T1 a hooked run leaves its directory behind again 1 | T2 a probe leaves its directory behind again 1 | T3 a hooked run removes the directory its caller gave it 1
 "use strict";
 import fs from "node:fs";
 import os from "node:os";
@@ -246,6 +249,23 @@ await section(async () => {
     ok("!! a gate that ends leaving a child of its own running -- one that holds its output open -- is ended with it at once, not at the limit", !lo.timedOut && lo.code === 0 && lo.ms < 10000 && !left, `${(lo.ms / 1000).toFixed(1)} s, the child ${left ? "STILL RUNNING" : "stopped"}`);
     const none = script("none.mjs", `console.log("no box3d here");\n`), three = script("three.mjs", `process.exit(3);\n`);
     const n = await C.runHooked(none, { run: "gate-none", limitMs: 30000 }), t = await C.runHooked(three, { run: "gate-three", limitMs: 30000 });
+    // 2026-11-04: the hooked run and the probe each made a directory in the system's temp dir and never removed it -- 732 runs' and 487 probes'
+    // were found in /tmp after the census, this gate's runs and the sabotage series. Each now removes its own once read; a caller's own dir is kept.
+    // Measured under a TMPDIR of this gate's own, so no other process's directories can be counted.
+    const tmpWas = process.env.TMPDIR, ownTmp = path.join(TMP, "tmpdir"), passed = path.join(TMP, "passed");
+    fs.mkdirSync(ownTmp, { recursive: true }); fs.mkdirSync(passed, { recursive: true });
+    let leftovers = null, kept = false;
+    try {
+        process.env.TMPDIR = ownTmp;
+        const tidy = script("tidy.mjs", `console.log("tidy");\n`);
+        await C.runHooked(tidy, { run: "gate-tidy", limitMs: 30000 });
+        await C.runHooked(tidy, { run: "gate-kept", limitMs: 30000, dir: passed });
+        kept = fs.existsSync(passed);
+        C.cSite();
+        leftovers = fs.readdirSync(ownTmp).filter((f) => /^ang(census|probe)-/.test(f));
+    } finally { if (tmpWas === undefined) delete process.env.TMPDIR; else process.env.TMPDIR = tmpWas; }
+    ok("!! a hooked run and a probe leave no directory of their own behind, and a directory the caller gave is kept -- before 2026-11-04 every one was left",
+        !!leftovers && leftovers.length === 0 && kept, leftovers ? `${leftovers.length} left: ${leftovers.join(", ")}` : "not measured");
     ok("a script that never touches box3d sees nothing and ends as it ends; an exit code is kept", n.code === 0 && n.tally.calls === 0 && n.tally.instances === 0 && n.processes === 1 && t.code === 3 && t.tally.calls === 0 && /no box3d here/.test(n.tail));
 });
 

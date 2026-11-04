@@ -96,6 +96,9 @@ export function runHooked(script, { args = [], run = script, limitMs = LIMIT_MS,
         child.on("close", () => {
             clearTimeout(timer);
             const tallies = H.readTallies(out);
+            // 2026-11-04: the directory this made is removed once its tallies are read (a caller's own `dir` is left to it). Before, every run left
+            // one behind: 732 of these were found in the system's temp dir after the census, its gate's runs and the sabotage series.
+            if (!dir) fs.rmSync(out, { recursive: true, force: true });
             resolve({ run, code, signal, timedOut, ms: Date.now() - t0, processes: tallies.length, tally: W.mergeTallies(tallies), broken: tallies.filter((t) => t.broken).length, tail: tail.slice(-600) });
         });
     });
@@ -168,9 +171,11 @@ function probe(body, { hooked = true, root = ENG } = {}) {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "angprobe-"));
     const env = { ...process.env, NODE_OPTIONS: [process.env.NODE_OPTIONS || "", hooked ? `--import ${H.HOOK_PATH}` : ""].filter(Boolean).join(" "), [H.ENV_DIR]: hooked ? dir : "", [H.ENV_RUN]: "probe" };
     if (!hooked) delete env[H.ENV_DIR];
-    const text = execFileSync(process.execPath, ["--input-type=module", "-e", PROBE_HEAD + body], { cwd: root, env, encoding: "utf8", maxBuffer: 1 << 26 });
-    const line = text.split("\n").filter((l) => l.startsWith("{")).pop();
-    return { out: JSON.parse(line), tally: W.mergeTallies(H.readTallies(dir)) };
+    try {
+        const text = execFileSync(process.execPath, ["--input-type=module", "-e", PROBE_HEAD + body], { cwd: root, env, encoding: "utf8", maxBuffer: 1 << 26 });
+        const line = text.split("\n").filter((l) => l.startsWith("{")).pop();
+        return { out: JSON.parse(line), tally: W.mergeTallies(H.readTallies(dir)) };
+    } finally { fs.rmSync(dir, { recursive: true, force: true }); }   // 2026-11-04: removed once read; 487 probes' were found left behind
 }
 /** C-transparent: backendDivergence's scene, 14 boxes for 120 steps, gives the same state hash at every step hooked and unhooked. */
 export function cTransparent() {
