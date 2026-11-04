@@ -122,8 +122,9 @@ try {
     ok("!! `record` holds A's start, one input per step A took and A's end -- and the inputs replayed open loop with Q0 land on A's own end, to the bit",
         rec.inputs.length === rec.ticks && rec.inputs.length > 0 && J(back.end) === J(rec.end) && J(rec.start) === J(r0.start), `${rec.inputs.length} ticks`);
     const duelSrc = src("brain/pilot6dofPolicy.mjs");
-    ok("the duel's tick is the library's (1/30 s, read from the duel's source), and the duel takes the three options with defaults that are off",
-        /dt = 1 \/ 30, steps = Math\.round\(seconds \/ dt\)/.test(duelSrc) && L.DUEL_DT === 1 / 30 && /orientation = null, nudge = 0, record = null \} = \{\}\) \{/.test(duelSrc));
+    // 2026-11-04: the 6-DOF-on-box3d round (physics/mechanics/SIXDOF_BOX3D_WIP.md) added `stepA` after these three, also off; that round's gate holds it
+    ok("the duel's tick is the library's (1/30 s, read from the duel's source), and the duel takes the three options with defaults that are off (and the box3d round's stepA after them, off too)",
+        /dt = 1 \/ 30, steps = Math\.round\(seconds \/ dt\)/.test(duelSrc) && L.DUEL_DT === 1 / 30 && /orientation = null, nudge = 0, record = null(?:, stepA = null)? \} = \{\}\) \{/.test(duelSrc));
 } catch (e) { guard(2, e); }
 
 console.log("\n3. THE LIBRARY HOLDS THE REGISTRATION");

@@ -115,3 +115,83 @@ Minutes.
 - `tools/roundhouse/sixdofBox3d.mjs` (the library), `sixdofBox3dRun.mjs` (the command) and `sixdofBox3d-selfcheck.mjs`
   (the gate).
 - The results go to `physics/mechanics/sixdofBox3dResults.json`, committed before it is read.
+
+## Build record (2026-11-04)
+
+Built as listed above. Three things depart from the registration's wording. Each was found while building, by the
+registration's own controls, and each is held by the gate.
+
+### Departures from the registration
+
+- **The stepper builds the ship's world for each tick.** C-awake, flown while building, failed on the first stepper,
+  which kept one world: box3d put the coasting ship to sleep and zeroed its velocity. The gate holds the finding: in a
+  kept world, a ship coasting at 0.01 m/s is zeroed at 0.5 s, and one at 0.06 m/s never is. The shim has no way to
+  turn sleep off.
+  - Every tick sets the whole state anyway, so the stepper builds the world for the tick and destroys it after. Over
+    300 ticks of a thrusting, tumbling ship, that is the same as a kept world to the bit.
+  - The ship is still alone in its world, as registered. `keepWorld: true` keeps one world, sleep and all.
+  - It costs time: about 22 us a tick, against 12 us for a kept world, measured while building. That is B3's step
+    time, which the registration reports outside the results file; the command prints it again.
+- **C-box3d reads the damping by its effect.** The shim has no damping getter. Over 1 s the ship keeps its 1 m/s and
+  its 1 rad/s about its nose exactly, where a body left at the shim's default keeps 0.9512 of each.
+  - The first version read the linear damping alone. The angular half was added while the sabotages were being
+    written, because a box3d that kept only its angular damping would have passed it.
+- **C-impulse gives one tick of torque about each body axis in turn.** The registration says "one tick of a
+  body-frame torque". With the torque (0.3, -0.2, 0.5) on all three axes at once, the spin missed I^-1 torque x 1/30 s
+  by 2.2e-4 relative, over the 1e-4 tolerance.
+  - That miss is the gyroscopic term: inside the tick, the ship's unequal moments couple the axes. It is physics, not
+    the impulse's frame or scale.
+  - About one axis at a time, the worst miss is 2.7e-7. The force half is as registered: 1.6e-7.
+
+Beyond the registration, the gate makes **each control fail on a box3d made to tell the lie it guards against**:
+
+| Control | Fails on a box3d that... |
+|---|---|
+| C-box3d | keeps its linear damping; keeps its angular damping; says it is Jolt; cannot spin |
+| C-free | keeps its linear damping (by its speed half); keeps its angular damping (by its spin half) |
+| C-inertia | has moments 0.1% off |
+| C-impulse | gives an angular impulse 1% short; gives a linear one 1% short |
+| C-awake | puts a slow body to sleep at once |
+| C-determinism | adds noise to each tick |
+
+C-chaos's predicate is tested on made-up cells. None of this changes a measurement.
+
+### Also changed
+
+- **`brain/pilot6dofPolicy.mjs`:** `duel()` takes `stepA`, off unless given. C-unchanged holds its ten anchors and
+  the digest.
+  - The comment above `duel()` still called "euler" the step's default, which it stopped being at 42845879. It now
+    says what the default is.
+- **`tools/roundhouse/orientationStep-selfcheck.mjs`:** one row read the duel's signature from its source. It went red
+  once `stepA` followed the orientation round's three options, and was restated to accept `stepA` after them.
+
+### Flown while building, none of it on a registered seed
+
+- **The controls**, which the registration fixes:
+  - C-inertia: 2.613333, 8.133333, 8.133333.
+  - C-impulse: 2.7e-7 and 1.6e-7.
+  - C-free: 0 and 0.
+  - C-awake: 0.0100000 m/s.
+  - C-box3d: as above.
+  - C-unchanged: its anchors hold.
+- **The key.** From rest, a constant torque about the symmetry axis for 1 s spins the ship at alpha t, and turns it
+  0.098852 rad, against the exact 0.095663.
+  - The lead, 0.003189, is alpha h t / 2: the first-order lead of giving each tick's change at its start.
+  - That is the mechanism P1 names. The registered M1 measures it on driven ships.
+- **The spin's frame.** A ship turned 90 degrees about z and spinning about its nose lands, after one free tick,
+  1.5e-6 rad from the exact turn about world y. With 1 substep instead of 4, a tumbling ship's 30 ticks end
+  6.52e-4 rad away.
+- **The miniature:** two pilots, seeds 94001 and 94002, a 1e-3 m nudge.
+  - Its M1 angles for seed 94001 were printed. Standoff: E 4.6e-15, Q0 5.407e-4, **B3 5.407e-4**. Joust: E 2.7e-8 and
+    Q0 0.041.
+  - B3's joust angle was not printed. No M2 outcome or tally was printed.
+- **A duel on box3d.** With box3d as A's stepper, a duel of the PD autopilot against itself (seed 94003, joust) has
+  the fingerprint 96c190bd, against ac4a1c46 on the engine's own.
+
+### The gate
+
+`tools/roundhouse/sixdofBox3d-selfcheck.mjs` has 36 rows and takes about 2 s. The 48 sabotages logged in its header
+each went red by name.
+
+Before they ran, the gate's first version was read against the list. None of its rows could see 21 of them (G18 only
+by its source row). Rows or checks were written for those 21 first.
