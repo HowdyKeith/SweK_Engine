@@ -174,3 +174,75 @@ Two hours or so for N, two at a time, and a few minutes for P.
 - `angularImpulseCensusRun.mjs`: the command.
 - `angularImpulseCensus-selfcheck.mjs`: the gate.
 - The results go to `physics/mechanics/box3dAngularImpulseCapResults.json`, committed before they are read.
+
+## Build record (2026-11-04)
+
+Built as listed above, plus one file the list did not name: `tools/roundhouse/angularImpulseWatch.mjs`. It is the part
+of the hook that node and a page share, and a page imports it as it is.
+
+### A correction to the note: N is 156 gates, not 163
+
+The note's rule is every gate that reaches the file of a module site. At this commit that is 156 gates.
+
+The 163 the note gives also counted `render/slugTicker.mjs`, which is a pass-through, not a site's file. Seven gates
+reach it and no site's file: `kenneyKit`, `raceTrack`, `slugNapalm`, `slugTicker`, `voxelBodies`, `voxelDamage` and
+`voxelSave`. A call through the ticker's raw world belongs to whoever made it, and the only such site, `slugShatter.mjs`,
+is reached by gates of its own.
+
+**The census follows the rule.**
+
+### How the parts were built
+
+- **The hook in node** is a loader hook registered from `angularImpulseHook.mjs` when `SWK_ANG_CENSUS_DIR` is set.
+  - It wraps every box3d instance a process makes.
+  - Each process, and each worker thread, writes its own tally. It writes once at start, every two seconds while it
+    runs, and when it exits, so a run killed at its limit keeps what it saw.
+  - A run that ends leaving a child of its own running has its whole process group stopped. Its output pipes then
+    close at once, instead of the census waiting out the 1,800 s limit.
+- **The pages** are served from the tree by the census's own server. The stand-in is served for
+  `/vendor/box3d/box3d.js`, and the real file for `?census-real`.
+  - On `box3d-replay.html` the run waits, up to 60 s, for the page's own "recorded" mark after pressing Record. That is
+    how it knows the recording ran.
+  - A page is given 10 s to start box3d. One that does not is still run through its steps, and is recorded as not having
+    started box3d.
+- **The routes** are a request handler, `treeHandler()`. The gate asks it directly, without a socket, so the gate fetches
+  nothing itself, and `tools/ship/gateAxioms-selfcheck.mjs`'s count of gates that call `fetch` is unchanged.
+- **The table's check** compares the number of calls in each file, not their lines. An edit that only moves a line
+  leaves it green, and a new call anywhere turns it red.
+
+### Flown while building, none of it a census reading
+
+- **The controls:**
+  - **C-transparent:** 120 steps, the same state hash and harness hash at every step, with the hooked run seeing its 14
+    calls.
+  - **C-reads:**
+    - The lone box read 112.494489 rad/s, against 112.494489 for |I^-1 J|, a relative difference of 1e-9.
+    - Blob-avatar's debris at seed 1, flown with its cap off: 16 fragments, the largest at 215.96 rad/s, one of them past
+      the cap.
+  - **C-jolt:** 47.12389 rad/s.
+  - **C-site:** all three routes put to the probe's own lines.
+- **The page machinery** ran on pages of the gate's own, served beside the tree. None of the four registered pages was
+  opened.
+- **`run()` itself** ran on a miniature: two scratch scripts and a page of the gate's own.
+
+### The gate
+
+`tools/roundhouse/angularImpulseCensus-selfcheck.mjs`, 50 rows in ten sections. It never runs the census.
+
+- **Sabotaged:** 57 times through the byte-safe runner. Every one went red by name and none went 0 red. The log is in
+  the gate's header.
+  - The first 52 are G1-G56; four numbers were dropped before the run.
+  - Five more came after the server's routes moved into a handler the gate asks directly: G29', G30', G57, G58 and
+    G57'.
+  - G57 was a finding. The row for a page that never starts box3d passed with its page not served at all, because a
+    404 page never starts box3d either. That row now waits for the page's own word that the loader refused it.
+- **Three gaps closed before any sabotage:** in the gate's first draft, nothing held the run to stopping a gate's leftover
+  child, nothing measured that the corpus runs two at a time, and nothing flew `run()` itself. A row was added for each.
+
+### To run it
+
+From a scratch worktree of the commit that carries this record, with the tree's `ai-bridge/node_modules` linked in:
+
+    node tools/roundhouse/angularImpulseCensusRun.mjs
+
+The results file is then copied into this tree byte for byte, and committed before it is read.
