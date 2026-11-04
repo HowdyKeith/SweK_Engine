@@ -246,3 +246,80 @@ From a scratch worktree of the commit that carries this record, with the tree's 
     node tools/roundhouse/angularImpulseCensusRun.mjs
 
 The results file is then copied into this tree byte for byte, and committed before it is read.
+
+## The run and its verdict (2026-11-04)
+
+**The run.**
+
+- It was flown from a scratch worktree of e1a56d0d, with its 156 gates under the hook two at a time, and then the four
+  pages in Chromium. It took 35.3 minutes.
+- Its results, `physics/mechanics/box3dAngularImpulseCapResults.json` (196,524 bytes, sha256 12d58bbb4f2d3807), were
+  copied into this tree byte for byte, committed unread at 5a14976d, and then read.
+- Every reading below is re-derived from the 160 runs' own tallies by the gate's section 11.
+- A first start of the same run was killed at gate 133 of 156 by a restart of the session's machine. It had written
+  nothing and none of it was read. The run was started again from the beginning, at the same commit.
+
+### The decision rule, applied: the cap goes in
+
+Two sites besides the debris have a call past 15 pi x 1.001 rad/s: `ragdoll.html:283` and `flesh.html:305`. Each is
+the page's shove, one call each, on the pelvis.
+
+| Site | Calls | Largest spin, rad/s | Past the cap |
+|---|---|---|---|
+| ragdoll.html:283 | 1 | 538.52 | 1 |
+| flesh.html:305 | 1 | 531.73 | 1 |
+| fx/fracture/debrisPhysics.js:52 | 4,942 | 2,574,172 | 217 |
+| physics/mechanics/rigidBody6dofBox3d.mjs:59 | 79,399 | 40.00 | 0 |
+| world/buildingTopple.mjs:305 | 21 | 36.00 | 0 |
+| physics/raceCar.mjs:243 | 1,739,627 | 19.04 | 0 |
+| render/slugShatter.mjs:103 | 36 | 3.57 | 0 |
+| box3d-replay.html:162 | 10 | 3.23 | 0 |
+| six more | 0 | not reached | |
+
+### The predictions
+
+- **P1 right.** Both pages are past the cap, at 538.52 and 531.73 rad/s, near the lone box's 531.62.
+- **P2 right.** The debris is past it, with its readings taken before its own cap acts: 217 of 4,942 calls, the largest
+  2,574,172 rad/s, which is blob-pages-box3d's own number.
+- **P3 not tested.** No gate flies `joltRagdoll.js`'s fling on box3d, and that was the prediction's own condition. Its
+  gates fly Jolt.
+- **P4 right, for the module sites that were reached, and only those.** None of the four reached is past the cap. Five
+  were not reached.
+- **P5 right.** `box3d-replay.html` stays under the cap, at 3.23 rad/s at most, as its arithmetic says.
+- **P6 right.** `box3d-vs-jolt.html` was not reached. The page ran its five seconds and never started box3d.
+- **P7 right.** The cap goes in.
+
+### The controls
+
+- C-transparent, C-reads, C-jolt, C-site and C-complete held. No gate of the 156 timed out or was stopped, and every
+  page completed its steps.
+- **C-reach failed,** as it is meant to when a site goes unreached. It names six sites, and the census says nothing
+  about them. Each one's reason was read from its gates:
+  - `physics/kaijuBox3d.js:84`, `physics/esHullCombat.js:92` and `physics/fluidBox3d.js:62`: their gates fly a mock
+    world.
+  - `physics/backendDivergence.mjs:24` and `physics/jolt/joltRagdoll.js:73`: their gates fly Jolt.
+  - `box3d-vs-jolt.html:49`: the page never starts box3d.
+
+### Found outside the table, said plainly
+
+The hook found two calls the table did not list: `tools/roundhouse/spinningBody.mjs`, lines 209 and 212, at 2.00 and
+4.16 rad/s, under the cap. They call box3d's raw export, `_swk_body_ang_impulse`. The table was a grep for the facade's
+`angularImpulse()`, so a call spelled the other way was missed.
+
+A grep for the raw export finds two more files whose calls no gate of the corpus made, so they were not measured:
+`physics/mechanics/rigidKeys.mjs` and `tools/roundhouse/backendRotation.mjs`. Every raw call skips the facade, so the
+cap will not reach any of them.
+
+**Since the census,** one more facade call has been made: the hybrid round's contact tick,
+`physics/mechanics/shipContactBox3d.mjs` (e30f8c21). It gives a ship the tick's torque as an impulse, as
+`rigidBody6dofBox3d.mjs:59` does, which reached 40 rad/s at most here. It goes through the facade, so the cap will reach
+it.
+
+### What the decision builds next
+
+This is an engineering fix, as the decision rule says. `box3dLoader.js`'s `angularImpulse()` caps the spin it leaves at
+15 pi, its axis kept, as Jolt does.
+
+- No pass-through needs the cap. No site past it goes through the slug ticker's raw world.
+- The pages' sites are reached by no gate. But the cap acts on every box3d caller above 15 pi, so the gates that read
+  box3d spins above it are run before and after the fix, and restated with the reason where they move.

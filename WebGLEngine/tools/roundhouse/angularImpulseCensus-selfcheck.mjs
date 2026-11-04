@@ -23,6 +23,8 @@
 //   8  THE READINGS AND THE RULE     readings merged over runs; the decision rule; C-reach and C-complete -- on hand-made tallies
 //   9  THE RESULTS FILE              written once; the command prints no reading
 //  10  THE RUN, A MINIATURE          run() itself, on two scratch scripts and a page of the gate's own: everything the registration names, in its order
+//  11  THE VERDICT                   from the committed results (5a14976d): every reading re-derived from the runs, the decision by the rule (the cap goes in),
+//                                    the predictions scored, the six sites not reached and why, and the raw-export calls the table missed
 // SABOTAGE LOG -- FIFTY-TWO, 2026-11-04, each applied to the census's library, hook, watcher or command through a byte-safe runner (one at a time, every file restored and its sha256
 // checked), the gate run whole; every one red by name, none 0 red (the number is how many rows went red):
 //   G1 the past line is the cap without its slack 1 | G2 past is counted above 15 pi, the slack forgotten in the comparison 1 | G3 the wrapper reads body 0's spin, not the given body's 4
@@ -50,11 +52,19 @@
 // that calls fetch, and this one's fetch went only to its own loopback server): G29' the stand-in not served 4 | G30' the wasm served as octet-stream 4 | G57 a page's extra
 // path not served 4 | G58 a missing file served as 200 1 | G57' G57 again 5. G57 WAS A FINDING: the never-starts row passed with its page not served at all, because a 404 page
 // never starts box3d either; that row now waits for the page's own word that the loader refused it, and G57' is red there too.
+// AND FOURTEEN FOR THE VERDICT (section 11, and section 2's table row restated after the run to name the call made since), each applied to the gate's own rows
+// through the same runner, every one red by name, none 0 red:
+//   V1 the results' hash pinned one digit off 1 | V2 the readings re-derived from the gates alone, the pages left out 3 | V3 the decision said to rest on ragdoll.html alone 1
+//   V4 the ragdoll page's spin said to be the lone box's 1 | V5 the debris said to be past the cap 216 times 1 | V6 P3 said to have been tested 1
+//   V7 raceCar said not to have been reached 1 | V8 the replay page's bound said to be 3.2 rad/s 1 | V9 box3d-vs-jolt.html said to have started box3d 1
+//   V10 C-reach's list said to lack the fluid 1 | V11 the kaiju's gates said to fly Jolt 1 | V12 the found site said to be line 210 1
+//   V13 the raw-export grep said not to find rigidKeys.mjs 1 | V14 the calls since the census said to be two 1
 "use strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import * as C from "./angularImpulseCensus.mjs";
 import * as H from "./angularImpulseHook.mjs";
@@ -107,8 +117,14 @@ await section(() => {
 
 console.log("\n2. THE TABLE IS THE TREE'S");
 await section(() => {
-    const calls = C.grepCalls(), tree = C.treeCounts(calls), table = C.tableCounts();
-    ok("!! every call of angularImpulse() in the tree -- gates, vendored code and notes left out -- is in the census's table: the same files, the same number in each", sorted(tree) === sorted(table), `${Object.keys(tree).length} files, ${calls.length} lines found`);
+    // 2026-11-04, after the run: calls of angularImpulse() made since the census's commit (e1a56d0d), each named with its reason. The census
+    // measured none of them; a new one anywhere else still turns the row red.
+    //   physics/mechanics/shipContactBox3d.mjs -- the hybrid round's contact tick (e30f8c21) gives the tick's torque as an angular impulse,
+    //   as rigidBody6dofBox3d.mjs:59 does (40 rad/s at most in the census); it goes through the facade, so the cap reaches it.
+    const SINCE = Object.freeze({ "physics/mechanics/shipContactBox3d.mjs": 1 });
+    const calls = C.grepCalls(), tree = C.treeCounts(calls), table = { ...C.tableCounts() };
+    for (const [f, n] of Object.entries(SINCE)) table[f] = (table[f] || 0) + n;
+    ok("!! every call of angularImpulse() in the tree -- gates, vendored code and notes left out -- is in the census's table, or named as made since it: the same files, the same number in each", sorted(tree) === sorted(table), `${Object.keys(tree).length} files, ${calls.length} lines found`);
     const left = calls.filter(([f]) => C.NOT_CALLS.includes(f));
     const isDef = ([, , t]) => /angularImpulse\((idx|i), v\) \{/.test(t), isText = ([, , t]) => /(\/\/|\/\*|\*|["'`]).*angularImpulse\s*\(/.test(t);
     const own = (f) => /^tools\/roundhouse\/angularImpulse/.test(f);
@@ -335,6 +351,48 @@ await section(async () => {
         n0.code === 0 && n0.calls === 1 && n0.instances === 1 && !("tally" in n0) && n1.code === 2 && n1.calls === 0 && p0.completed && p0.box3dStarted && p0.calls === 1 &&
         !!mini && mini.kind === "found" && mini.past === 1 && mini.where === "__census_mini.html" && back.decision.capGoesIn && J(back.decision.past) === J(["__census_mini.html:6"]) &&
         back.controls.complete.ok && !back.controls.reach.ok && back.controls.reach.notReached.length === 14, `${text.length} bytes`);
+});
+
+console.log("\n11. THE VERDICT, FROM THE COMMITTED RESULTS (5a14976d)");
+await section(() => {
+    const bytes = fs.readFileSync(C.DEFAULT_RESULTS), sha = createHash("sha256").update(bytes).digest("hex"), R = JSON.parse(bytes.toString("utf8"));
+    ok("the results are the registered run's as committed, unread, at 5a14976d: 196,524 bytes, sha256 12d58bbb4f2d3807, run at e1a56d0d over 156 gates and the four pages",
+        bytes.length === 196524 && sha.startsWith("12d58bbb4f2d3807") && R.commit === "e1a56d0d620eb6cbfcb4eebf77ae8b2e57e510f0" && R.corpus.n.length === 156 && J(R.corpus.p) === J(C.PAGES.map((x) => x.page)), sha.slice(0, 16));
+    // every site's readings re-derived from the 160 runs' own tallies, and the decision from them by the registered rule
+    const runs = [...R.runs.n, ...R.runs.p].map((r) => ({ run: r.run, tally: { run: r.run, instances: r.instances, calls: r.calls, unread: 0, sites: r.sites } }));
+    const again = C.readingsOf(runs), strip = (x) => ({ sites: x.sites.map(({ maxAt, ...y }) => y), others: x.others.map(({ maxAt, ...y }) => y), calls: x.calls });
+    ok("!! every site's readings, re-derived from the 160 runs' own tallies, are the file's: calls, the largest spin, the calls past the cap, where it was seen", J(strip(again)) === J(strip(R.readings)) && again.calls === 1825058, `${again.calls} calls`);
+    const d = C.decide(again);
+    ok("!! *** THE DECISION RULE, APPLIED: THE CAP GOES IN *** -- two sites besides the debris have calls past 15 pi x 1.001: ragdoll.html:283 and flesh.html:305", d.capGoesIn && J(d.past) === J(["ragdoll.html:283", "flesh.html:305"]) && J(R.decision) === J(d));
+    const site = (x) => again.sites.find((y) => y.site === x);
+    ok("!! P1 RIGHT: both pages' shove is past the cap -- the pelvis at 538.52 and 531.73 rad/s, one call each, near the lone box's 531.62", site("ragdoll.html:283").past === 1 && site("flesh.html:305").past === 1 &&
+        Math.abs(site("ragdoll.html:283").max - 538.52) < 0.01 && Math.abs(site("flesh.html:305").max - 531.73) < 0.01, `${site("ragdoll.html:283").max.toFixed(2)}, ${site("flesh.html:305").max.toFixed(2)}`);
+    const deb = site(C.DEBRIS_SITE);
+    ok("!! P2 RIGHT: the debris is past it, its readings taken before its own cap acts -- 217 of 4,942 calls, the largest 2,574,172 rad/s (blob-pages-box3d's own number)", deb.calls === 4942 && deb.past === 217 && Math.round(deb.max) === 2574172);
+    ok("P3 NOT TESTED: no gate flies joltRagdoll.js's fling on box3d (its gates fly Jolt), which was the prediction's own condition", site("physics/jolt/joltRagdoll.js:73").calls === 0);
+    const reachedModules = C.SITES.filter((x) => x.kind === "module" && x.site !== C.DEBRIS_SITE).map((x) => site(x.site)).filter((x) => x.calls > 0);
+    ok("!! P4 RIGHT FOR THE MODULE SITES THAT WERE REACHED, AND ONLY THOSE: none of the four is past the cap -- the 6-DOF stepper's largest 40.00, buildingTopple's 36.00, raceCar's 19.04 over 1.74 million calls, slugShatter's 3.57 -- and five module sites were not reached",
+        J(reachedModules.map((x) => x.site)) === J(["world/buildingTopple.mjs:305", "physics/raceCar.mjs:243", "render/slugShatter.mjs:103", "physics/mechanics/rigidBody6dofBox3d.mjs:59"]) && reachedModules.every((x) => x.past === 0 && x.max < C.PAST) &&
+        site("physics/raceCar.mjs:243").calls === 1739627, reachedModules.map((x) => `${x.site} ${x.max.toFixed(2)}`).join("; "));
+    ok("!! P5 RIGHT: box3d-replay.html's recording is under the cap, 3.23 rad/s at most, as its arithmetic says (0.539 / (1/6))", site("box3d-replay.html:162").calls === 10 && site("box3d-replay.html:162").max < 3.24 && site("box3d-replay.html:162").past === 0);
+    const vs = R.runs.p.find((x) => x.page === "box3d-vs-jolt.html");
+    ok("!! P6 RIGHT: box3d-vs-jolt.html was not reached -- the page ran its five seconds and never started box3d", site("box3d-vs-jolt.html:49").calls === 0 && vs.completed && !vs.box3dStarted && vs.instances === 0);
+    ok("!! P7 RIGHT: the cap goes in", d.capGoesIn);
+    ok("!! C-transparent, C-reads, C-jolt, C-site and C-complete held: no gate of the 156 timed out or was stopped, and every page completed its steps",
+        ["transparent", "reads", "jolt", "site", "complete"].every((k) => R.controls[k].ok) && R.controls.complete.timedOut.length === 0 && R.controls.complete.crashed.length === 0 && R.runs.p.every((x) => x.completed));
+    const notReached = ["physics/kaijuBox3d.js:84", "physics/esHullCombat.js:92", "physics/backendDivergence.mjs:24", "physics/fluidBox3d.js:62", "physics/jolt/joltRagdoll.js:73", "box3d-vs-jolt.html:49"];
+    const gsrc = (f) => fs.readFileSync(path.join(ENG, f), "utf8");
+    ok("!! C-REACH FAILED, AS IT IS MEANT TO WHEN A SITE GOES UNREACHED, and names six; the census says nothing about them. Each one's reason, read from its gates: the kaiju's, the hull combat's and the fluid's gates fly a mock world, backendDivergence's and the fling's fly Jolt, and the page never starts box3d",
+        !R.controls.reach.ok && J(R.controls.reach.notReached) === J(notReached) &&
+        /mockWorld/.test(gsrc("physics/kaiju-box3d-selfcheck.mjs")) && /mockWorld/.test(gsrc("physics/es-hull-combat-selfcheck.mjs")) && /mockWorld/.test(gsrc("physics/fluidBox3d-selfcheck.mjs")) &&
+        /createJoltBackend/.test(gsrc("render/perceptual-selfcheck.mjs")) && /createJoltBackend/.test(gsrc("physics/jolt/jolt-ragdoll-selfcheck.mjs")) && /createWorld\(/.test(gsrc("box3d-vs-jolt.html")) && !/box3d\.init\(\)/.test(gsrc("box3d-vs-jolt.html")));
+    const found = again.others.filter((x) => x.kind === "found");
+    ok("!! FOUND OUTSIDE THE TABLE: two calls of box3d's raw export in tools/roundhouse/spinningBody.mjs (lines 209 and 212), 2.00 and 4.16 rad/s, under the cap. The table was a grep for the facade's angularImpulse(); a call of _swk_body_ang_impulse is spelled otherwise",
+        J(found.map((x) => x.site)) === J(["tools/roundhouse/spinningBody.mjs:209", "tools/roundhouse/spinningBody.mjs:212"]) && found.every((x) => x.past === 0 && x.max < 4.2) && C.decide(again).past.every((x) => !x.startsWith("tools/")));
+    const raw = C.grepCalls().length >= 0 && execFileSync("git", ["grep", "-l", "_swk_body_ang_impulse\\s*(", "--", "*.mjs", "*.js", ":!vendor/**", ":!*selfcheck*"], { cwd: ENG, encoding: "utf8" }).split("\n").filter(Boolean).sort();
+    ok("...and a grep for the raw export finds two more files whose calls no gate of the corpus made, so they were not measured: physics/mechanics/rigidKeys.mjs and tools/roundhouse/backendRotation.mjs (beside spinningBody.mjs and the two pass-throughs). Each skips the facade, so the cap will not reach them",
+        J(raw) === J(["physics/box3d/box3dLoader.js", "physics/mechanics/rigidKeys.mjs", "render/slugTicker.mjs", "tools/roundhouse/backendRotation.mjs", "tools/roundhouse/spinningBody.mjs"]) &&
+        !again.others.some((x) => /rigidKeys|backendRotation/.test(x.site)), raw.join(", "));
 });
 
 fs.rmSync(TMP, { recursive: true, force: true });
