@@ -162,3 +162,47 @@ C-unchanged's anchors, recorded from the unchanged `duel()`, and one extra ancho
 **One extra anchor for C-unchanged.** None of the ten at seed 86005 rams, so none of them exercises the contact path. One
 more anchor is added: the PD autopilot against itself, joust, seed 86010, which rams once over 3 ticks for 21.465 hit
 points (fingerprint f314ba5f, 160 ticks). It too was recorded from the unchanged `duel()`.
+
+## A second correction, before the gate and before the run (2026-11-04): the scenes, and C-box3d
+
+**Found while building.** box3d begins a contact only when two bodies are within `B3_SPECULATIVE_DISTANCE` of touching
+at the start of its step. That is 4 times its linear slop of 0.005 m, so 0.02 m.
+
+Ships 0.1 m apart and closing at 10 m/s end the tick 0.23 m into each other, and box3d did not see the contact within
+it. Two things showed this:
+- C-box3d, which found no contact reported in the first tick of S1.
+- The scenes under H, where box3d's tick moved no momentum in any of the four.
+
+**What it means for the hybrid, which is unchanged.** The first contact tick of an episode is flown on box3d without a
+contact. box3d resolves the contact at the next tick, from overlap. That is how box3d resolves a contact in a world of
+its own, for two dynamic bodies at these speeds, so it is box3d's contact, which is what Keith's decision asks for.
+C-free's first contact tick is still the engine's test, the same under E and H.
+
+**What changes.**
+
+1. **The scenes are flown for 15 ticks, not one.** Each scene is flown tick by tick, with no force or torque, for 15 ticks
+   (0.5 s), under each model:
+   - **E:** `rigidBody6dof.step()`, then `resolveShipCollisions`, each tick.
+   - **H:** `rigidBody6dof.step()` each tick, a contact tick flown on box3d.
+
+   The readings are taken after the 15 ticks, as registered, with four more:
+   - the normal impulse and the damage summed over the 15 ticks;
+   - the ticks on which the engine's test found the ships touching;
+   - the deepest overlap reached, as the engine's own test measures it;
+   - the tick on which the ships were first apart again.
+2. **C-box3d asks for its contact report on a pair that already overlaps at the tick's start**, which is S1 one engine step
+   on.
+
+**Seen first, said plainly.** The one-tick scenes were flown while building, through `run()` on a miniature, and their
+readings were printed:
+
+| Scene | E: normal impulse | E: damage | E: relative normal speed after | E: kinetic energy | H |
+|---|---|---|---|---|---|
+| S1 | 56.92 | 17.08 | 4.23 m/s | 200 to 49.98 J | moved nothing |
+| S2 | 53.54 | 16.06 | 3.39 m/s | 200 to 35.53 J | moved nothing |
+| S3 | 53.95 | 16.19 | 3.49 m/s | 200 to 37.34 J | moved nothing |
+| S4 | 26.32 | 7.89 | 1.58 m/s | 136.60 to 89.12 J | moved nothing |
+
+E's 15-tick scenes begin with that same first tick, so their readings are partly seen. H's are not.
+
+No duel cell's flight on the registered seeds has been flown. The miniature's seeds were 86001 to 86004.
