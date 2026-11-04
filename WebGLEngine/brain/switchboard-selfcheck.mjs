@@ -11,6 +11,7 @@
 //   5b ASYNC    runAsync flies one seed at a time with progress and yields, returns board.run's shape, refuses a bad range.
 //   6 SOURCE    no clock, random number or file; the header names the backlog item.
 // NOT CHECKED, said plainly: which brain is better (that is the experiment); the page; any arm that is not built in.
+// ROUND H1 FOUND A BUG IN readingOf: two arms that were the same pilot in two number formats differed by about 1e-10 with se 0, and a zero-spread list reads by its sign, so "the hand weights ARE BELOW the autopilot" was printed for a difference of 1e-10. The reading now calls |mean| <= 1e-9 a TIE (the tolerance paired counts as the same); one row; mutants "tolerance dropped" and "tolerance 1e-6" red.
 // SABOTAGE LOG (49 mutants of brain/switchboard.mjs, each alone in its own worktree copy): 39 went red by name on the first pass; 10 went 0 red and each got a row: the twin arm's profile ignored, badOf without the crushed or the stranded half, the age clock never reset on a new target, the settle test dropped, one-scenario se (NaN), the same-difference tolerance (1e-9 against 0), a lost sub not marked bad, the angle wrap dropped (badOf and wrap became exports so they can be tested directly; the dropout task gained a `settle` option for the same reason). All ten then red by name.
 //   ONE DECLARED EQUIVALENT: "better with no positive-mean test" (mean > 2 se without mean > 0): se is never negative, so mean > 2 se already implies mean > 0.
 //   First draft of the twin-profile row used seeds 1344-1346: at 200 s every profile flies the same six dives there, so the row could not see the profile; it uses 1400-1405 now, where the ensemble differs.
@@ -44,6 +45,7 @@ sec("1. PAIRED");
     const r = (mean, se) => B.readingOf({ mean, se });
     ok("!! the reading is 2 se on both sides: +2.5 se BETTER, +1.5 se TIES, -2.5 se WORSE, -1.5 se TIES, exactly 2 se TIES (strict)", r(0.025, 0.01) === "BETTER" && r(0.015, 0.01) === "TIES" && r(-0.025, 0.01) === "WORSE" && r(-0.015, 0.01) === "TIES" && r(0.02, 0.01) === "TIES" && r(-0.02, 0.01) === "TIES");
     ok("!! no difference TIES; a difference with no spread (se 0) is decisive by its sign: +0.1 BETTER, -0.1 WORSE", r(0, 0) === "TIES" && r(0.1, 0) === "BETTER" && r(-0.1, 0) === "WORSE" && r(0, 0.5) === "TIES");
+    ok("!! float noise is a tie, not a verdict: a mean of +-1e-12 with se 0 (two arms that are the same pilot in two number formats, found in Round H1) TIES, +-1e-8 with se 0 does not", r(1e-12, 0) === "TIES" && r(-1e-12, 0) === "TIES" && r(-1e-8, 0) === "WORSE" && r(1e-8, 0) === "BETTER");
 }
 
 sec("2. BOARD");

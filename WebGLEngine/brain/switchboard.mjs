@@ -33,8 +33,8 @@ export function paired(ra, rb) {
     const d = ra.map((r, i) => r.score - rb[i].score);
     return { n: d.length, mean: meanOf(d), se: seOf(d), better: d.filter((x) => x > 1e-9).length, worse: d.filter((x) => x < -1e-9).length, same: d.filter((x) => Math.abs(x) <= 1e-9).length, badA: ra.reduce((s, r) => s + (r.bad ? 1 : 0), 0), badB: rb.reduce((s, r) => s + (r.bad ? 1 : 0), 0) };
 }
-/** "BETTER" iff the mean is positive and above SE_FACTOR se, "WORSE" iff negative and below -SE_FACTOR se, else "TIES" (a one-scenario or a zero-spread list that is not exactly equal reads by its sign alone: se 0 and mean not 0 is decisive). */
-export const readingOf = (p) => (p.mean > 0 && p.mean > SE_FACTOR * p.se ? "BETTER" : p.mean < 0 && -p.mean > SE_FACTOR * p.se ? "WORSE" : "TIES");
+/** "BETTER" iff the mean is positive and above SE_FACTOR se, "WORSE" iff negative and below -SE_FACTOR se, else "TIES" (a mean within 1e-9 of 0 is a TIE whatever the se, the tolerance `paired` counts as the same; a zero-spread list with a real mean reads by its sign: se 0 and mean +0.1 is decisive). */
+export const readingOf = (p) => (Math.abs(p.mean) <= 1e-9 ? "TIES" : p.mean > 0 && p.mean > SE_FACTOR * p.se ? "BETTER" : p.mean < 0 && -p.mean > SE_FACTOR * p.se ? "WORSE" : "TIES");
 const sgn = (x) => (x >= 0 ? "+" : "") + x.toFixed(4);
 
 /** The board: tasks and arms by name. */
