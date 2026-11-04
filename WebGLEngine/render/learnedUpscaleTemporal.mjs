@@ -173,14 +173,16 @@ export function exampleFrames(S, net, { W, sppIn, motion = null }) {
  * velocities -- Bt_MV's input `x` and its composited light `bt`. Round 80 (section 182): `moverGamma` with them adds `mvc`, Bt_MVC's.
  * *** THROWS FOR A DATASET SEED WITHOUT { harvest: true }. ***
  */
-export function temporalExample(family, seed, net, { harvest = false, W = 256, sppIn = 4, sppRef = 32, ref2 = false, motion = null, refs = null, vectors = false, moverGamma = null } = {}) {
+export function temporalExample(family, seed, net, { harvest = false, W = 256, sppIn = 4, sppRef = 32, ref2 = false, motion = null, refs = null, vectors = false, moverGamma = null, frames: given = null } = {}) {
     if (moverGamma !== null && !vectors) throw new Error("learnedUpscaleTemporal: the mover clip runs on the vectors' history (section 182)");
     if (vectors && !motion) throw new Error("learnedUpscaleTemporal: object motion vectors need a motion (section 180)");
     if (isDatasetSeed(seed) && !harvest) throw new Error(`learnedUpscaleTemporal: seed ${seed} is a dataset seed -- rendering it needs { harvest: true }`);
     if (W % 2) throw new Error(`learnedUpscaleTemporal: a ${W} x ${W} frame has no half size`);
     const H = W, w = W / 2, h = H / 2, S = makeScene(family, seed), rs = temporalUpscaleSeeds(seed), path = cameraPath(S);
     const opts = (ww, hh, spp, sd, eye, off) => ({ w: ww, h: hh, spp, seed: sd, rgb: true, eye, look: S.look, up: S.up, fovDeg: S.fovDeg, sky: S.sky, pixelOffset: off });
-    const frames = exampleFrames(S, net, { W, sppIn, motion });
+    // round 82 (section 186): `frames` hands in frames traced elsewhere (adaptiveSampling's two arms), exampleFrames' shape
+    if (given && given.length !== FRAMES) throw new Error(`learnedUpscaleTemporal: an example is ${FRAMES} frames -- got ${given.length}`);
+    const frames = given || exampleFrames(S, net, { W, sppIn, motion });
     const geo = path.eyes.map((eye, f) => firstHits({ ...S, scene: sceneAt(S, motion, f) }, eye, W, H)), acc = accumulateUpscaled(frames, geo, W, H), Au = accumulateUpscaled(frames, geo, W, H, { clamp: false }).A;
     const last = frames[FRAMES - 1], C = shiftResample(last.y, W, H, ...last.shift);
     const g = guideBuffers(S, W, H), B = cameraBasis(S), hits = geo[FRAMES - 1], depth = new Float64Array(W * H).fill(1e9);

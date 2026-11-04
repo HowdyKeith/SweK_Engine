@@ -2561,6 +2561,13 @@ export const NEXT_ROUNDS = [
         why: "So the page shows what the arc measured -- generation between the chain's frames -- not only the generator.",
     },
     {
+        id: "fsr4-history-sampling",
+        blocker: "OPEN",
+        what: "Round 82 (section 186), set up and awaiting its harvest: the same 4-sample budget shared by each half-size pixel's predicted history rejection (reproject on geometry before the trace; weight 1 + 2s, 1-12 samples, the total exact), both arms from the same 12 one-sample passes, on 24 new moving scenes (12 R 87000-87011, 12 C 88000-88011). H82a: the adaptive Bt beats the uniform Bt by the 1 % rule; H82b: round 72's U_TH on each. Code: render/adaptiveSampling.mjs, temporalExample's `frames`, runSamplingTest.",
+        how: "node tools/denoiseStudy.mjs --harvest-upscale-temporal-test --round 82 on the rig at round 82's commit, render/denoise-results-upscale-sampling-r82.json committed byte for byte before it is read; section 187 reads it.",
+        why: "Section 183: the movers' error is at the current frame, not in the history -- so give the pixels whose history will be rejected more samples, at the same total.",
+    },
+    {
         id: "fsr4-speed-sweep",
         blocker: "OPEN",
         what: "Round 81 (section 184), set up and awaiting its harvest: section 176's motion scaled by k = 0, 0.5, 1, 2 on 24 new scenes (12 R 85000-85011, 12 C 86000-86011), every level sharing the measured frame and references. H81a: at k = 2 the single measured frame B1 beats Bt by the 1 % rule; H81b: still, Bt beats B1. Bt's and U_TH's gains over B1 at each level, and where each crosses zero, descriptive.",

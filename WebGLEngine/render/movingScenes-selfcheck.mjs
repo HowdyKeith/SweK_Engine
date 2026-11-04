@@ -58,6 +58,11 @@
 //   the levels without 0.5, Q3 H81a at k = 1, Q4 H81b at the top speed, Q5 the crossover interpolated the wrong way, Q7 C2 on the top level,
 //   Q8 the history lengths the still sequence's, Q9 the test command running the check test, Q10 a moving level keyed as the still one -> 1
 //   red each; Q6 U_TH graded on the still history at every level and Q11 the seeds not reserved -> 2 red each.
+// ROUND 82 (section 186), against this gate and denoiseScenes-selfcheck, each restored byte-identical: A2 the remainder to the smallest
+//   fractions, A3 no cap, A4 any rejected child taken as the whole pixel, A5 frame 0 allocated adaptively too, A6 the uniform arm from the
+//   last four passes, A8 rejectedMask counting sky, A9 H82a reversed, A10 C2 on the uniform history, A11 temporalExample ignoring the given
+//   frames, A12 the test command running the speed test -> 1 red each; A1 the weight 1 + 3s, A7 the passes sharing one seed and A13 the seeds
+//   not reserved -> 2 red each.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -150,7 +155,7 @@ console.log("\n3. ROUND 77's STUDY CODE");
         R.image === 256 && R.sppIn === 4 && R.sppRefTest === 2048 && R.c1Min === 22 && R.minGain === 0.01 && R.test === "signflip" &&
         R.results === "render/denoise-results-upscale-moving-r77.json" && LT.temporalRound(77) === R && LT.temporalRound(72) === R72);
     let bad = null; try { LT.temporalRound(73); } catch (e) { bad = e.message; }
-    ok("  ...and temporalRound refuses any other round, naming 77 (and, since sections 178 and 180, 78 and 79)", /70, 72, 77, 78, 79, 80 or 81/.test(bad || ""));
+    ok("  ...and temporalRound refuses any other round, naming 77 (and, since sections 178 and 180, 78 and 79)", /70, 72, 77, 78, 79, 80, 81 or 82/.test(bad || ""));
     const o = { W: 256, sppIn: 4, sppRef: 2048, ref2: true, harvest: true };
     ok("  movingKey is the still sequence's key marked moving, so the two never share a cache entry", LT.movingKey("R", 77000, o) === LT.temporalKey("R", 77000, o) + "-moving");
     const y = Float64Array.from({ length: 12 }, (_, i) => 0.1 + i / 20), r = Float64Array.from({ length: 12 }, (_, i) => 0.12 + i / 21), m = Uint8Array.of(1, 0, 1, 0);
@@ -512,10 +517,62 @@ console.log("\n11. ROUND 81 (section 184): THE SPEED SWEEP");
     const s184 = reg.slice(reg.indexOf("## 184."), reg.indexOf("## 185.") > 0 ? reg.indexOf("## 185.") : undefined);
     let code = 0, said = ""; try { said = execFileSync(process.execPath, [path.join(ENG, "tools", "denoiseStudy.mjs"), "--harvest-upscale-temporal-train", "--round", "81"], { cwd: ENG, encoding: "utf8" }); } catch (err) { code = err.status; said = String(err.stdout); }
     ok("  it refuses a call without C2 and a sweep without k = 0; the test dispatches it, training refuses round 81; section 184 states the levels, H81a/H81b and the seeds",
-        /round 72's U_TH and its C2/.test(r1 || "") && /starts still \(k = 0\)/.test(r2 || "") && /\(RD\.speeds \? LT\.runSpeedTest : RD\.check \? LT\.runCheckTest :/.test(cli) && code === 2 && /round 81 is a test only/.test(said) &&
+        /round 72's U_TH and its C2/.test(r1 || "") && /starts still \(k = 0\)/.test(r2 || "") && /RD\.speeds \? LT\.runSpeedTest : RD\.check \? LT\.runCheckTest :/.test(cli) && code === 2 && /round 81 is a test only/.test(said) &&
         /SPEED_LEVELS = 0, 0\.5, 1, 2/.test(s184) && /\*\*H81a:\*\* at k = 2, B1 beats Bt/.test(s184) && /\*\*H81b:\*\* at k = 0, Bt beats B1/.test(s184) && /85000-85011/.test(s184) && /86000-86011/.test(s184) && s184.includes(R.results));
 }
 
+console.log("\n12. ROUND 82 (section 186): SAMPLES WHERE THE HISTORY IS SHORT");
+{
+    const A = await imp("render/adaptiveSampling.mjs"), Tm = await imp("render/denoiseTemporal.mjs"), TU = await imp("render/denoiseTemporalUpscale.mjs"), { render } = await imp("physics/render/pathTracer.mjs");
+    const seeds = new Set(); for (let f = 0; f < FRAMES; f++) for (let j = 0; j < 12; j++) seeds.add(A.samplingSeed(990950, f, j));
+    const tus = TU.temporalUpscaleSeeds(990950), others = new Set([...tus.half, ...tus.full1]);
+    ok("  SAMPLING is section 186's 4 a pixel, 1-12, weight 2, frozen; each frame's twelve pass seeds are its own, distinct, and none a seed the temporal examples use",
+        A.SAMPLING.budget === 4 && A.SAMPLING.maxSpp === 12 && A.SAMPLING.weight === 2 && Object.isFrozen(A.SAMPLING) && seeds.size === 96 && [...seeds].every((x) => !others.has(x)) &&
+        A.samplingSeed(990951, 0, 0) - A.samplingSeed(990950, 7, 11) > 0);
+    const sum = (m) => m.reduce((q, v) => q + v, 0), a1 = A.allocate([1, 1, 3, 3, 1, 1.5]), a2 = A.allocate(Array(10).fill(1)), a3 = A.allocate([100, 1, 1, 1, 1, 1, 1, 1]);
+    let bad = null; try { A.allocate([1, 1], { budget: 13 }); } catch (e) { bad = e.message; }
+    ok("!! allocate: the budget shared in proportion to the weights in integers, summing exactly; equal weights give the budget everywhere; a pixel is capped at 12 and the others take the rest; an impossible budget refused",
+        sum(a1) === 24 && Array.from(a1).join() === "2,2,7,7,2,4" && Array.from(a2).every((v) => v === 4) && a3[0] === 12 && sum(a3) === 32 && Array.from(a3).every((v) => v >= 1 && v <= 12) && /13 a pixel is outside 1-12/.test(bad || ""));
+    const S = D.makeScene("C", 990951), mo = M.sceneMotion(S), eyes = cameraPath(S).eyes, W = 32, w = 16;
+    const h = eyes.map((eye, f) => firstHits({ ...S, scene: M.sceneAt(S, mo, f) }, eye, W, W)), sh = A.rejectedShare(h[2], h[3], W), { valid } = Tm.reproject(h[2], h[3], W, W);
+    ok("  rejectedShare: each half-size pixel's fraction of its 2 x 2 full-size pixels with no valid history, from reproject's own mask",
+        sh.length === w * w && Array.from(sh).every((v, p) => { const x = p % w, y = (p / w) | 0; return v === [[0, 0], [1, 0], [0, 1], [1, 1]].filter(([dx, dy]) => !valid[(2 * y + dy) * W + 2 * x + dx]).length / 4; }) && sh.some((v) => v > 0));
+    const sf = A.samplingFrames(S, net, { W, motion: mo }), k = 3, S3 = { ...S, scene: M.sceneAt(S, mo, k), eye: eyes[k] };
+    const passes = Array.from({ length: 12 }, (_, j) => render(S3.scene, { w, h: w, spp: 1, seed: A.samplingSeed(990951, k, j), rgb: true, eye: eyes[k], look: S.look, up: S.up, fovDeg: S.fovDeg, sky: S.sky, pixelOffset: TU.JITTER[k] }));
+    const m3 = A.allocate(Array.from(sh, (v) => 1 + 2 * v)), mean = (cnt) => { const o = new Float64Array(w * w * 3); for (let p = 0; p < w * w; p++) { const c0 = cnt(p); for (let j = 0; j < c0; j++) for (let c = 0; c < 3; c++) o[p * 3 + c] += passes[j][p * 3 + c]; for (let c = 0; c < 3; c++) o[p * 3 + c] /= c0; } return o; };
+    ok("!! *** samplingFrames: frame 3's twelve one-sample passes rebuilt by hand -- the uniform arm the mean of the first 4 at every pixel, the adaptive arm each pixel's first m, m allocate(1 + 2 x share), both arms exact on the budget ***",
+        same(sf.uniform[k].input, mean(() => 4)) && same(sf.adaptive[k].input, mean((p) => m3[p])) && same(sf.spp[k], m3) && same(sf.share[k], sh) &&
+        sf.spp.every((m) => sum(m) === 4 * w * w) && Array.from(sf.spp[0]).every((v) => v === 4) && same(sf.adaptive[0].input, sf.uniform[0].input) && same(sf.adaptive[0].y, sf.uniform[0].y));
+    const eu = T.temporalExample("C", 990951, net, { W, sppIn: 4, sppRef: 4, motion: mo, frames: sf.uniform }), ea = T.temporalExample("C", 990951, net, { W, sppIn: 4, sppRef: 4, motion: mo, frames: sf.adaptive, refs: { ref: eu.ref } });
+    let short = null; try { T.temporalExample("C", 990951, net, { W, sppIn: 4, sppRef: 4, motion: mo, frames: sf.uniform.slice(1) }); } catch (e) { short = e.message; }
+    const rm = A.rejectedMask(sf.hits), v7 = Tm.reproject(sf.hits[6], sf.hits[7], W, W).valid;
+    ok("  temporalExample takes the arms as its frames (the measured frame's EASU is the given last frame's), refusing fewer than eight; rejectedMask is the measured frame's surfaces with no valid history",
+        same(eu.b1, T.temporalExample("C", 990951, net, { W, sppIn: 4, sppRef: 4, motion: mo, frames: sf.uniform, refs: { ref: eu.ref } }).b1) && !same(ea.b1, eu.b1) && /an example is 8 frames -- got 7/.test(short || "") &&
+        Array.from(rm).every((v, p) => v === (sf.hits[7].obj[p] >= 0 && !v7[p] ? 1 : 0)) && rm.some((v) => v));
+    const R = LT.ROUND_UPSCALE_SAMPLING, Sp = D.SPLITS_UPSCALE_SAMPLING;
+    ok("!! ROUND_UPSCALE_SAMPLING: round 82, a test only on moving scenes, SAMPLING's rule, round 72's U_TH, SPLITS_UPSCALE_SAMPLING (12 R at 87000, 12 C at 88000, reserved), its own results file",
+        R.round === 82 && R.moving && !R.trainMoving && R.sampling === A.SAMPLING && R.net === LT.ROUND_UPSCALE_TEMPORAL_72.net && R.results === "render/denoise-results-upscale-sampling-r82.json" && R.splits === Sp &&
+        LT.temporalRound(82) === R && Sp.T1.seeds[0] === 87000 && Sp.T1.seeds[12] === 88000 && Sp.T1.seeds.every((x) => D.isDatasetSeed(x)) && LT.samplingKey("R", 87000, { W: 256 }, "pair") === LT.temporalKey("R", 87000, { W: 256 }) + "-moving-sampling-pair");
+    const t72 = JSON.parse(fs.readFileSync(path.join(ENG, LT.ROUND_UPSCALE_TEMPORAL_72.net), "utf8")), U = decodeNet(t72.runs.find((x) => x.seed === t72.candidate).net), Uc = decodeNet(t72.c2.net);
+    const sp1 = { T1: { family: "C", seeds: [990951] } }, out = LT.runSamplingTest({ splits: sp1, net, U, Uc2: Uc, W, sppIn: 4, sppRef: 4 });
+    const e2u = T.temporalExample("C", 990951, net, { W, sppIn: 4, sppRef: 4, ref2: true, motion: mo, frames: sf.uniform }), e2a = T.temporalExample("C", 990951, net, { W, sppIn: 4, sppRef: 4, ref2: true, motion: mo, frames: sf.adaptive, refs: { ref: e2u.ref, ref2: e2u.ref2 } });
+    const gBU = gradeDisplay(e2u.bt, e2u), gBA = gradeDisplay(e2a.bt, e2a), gUU = gradeDisplay(T.temporalChain(U, e2u), e2u), gUA = gradeDisplay(T.temporalChain(U, e2a), e2a);
+    ok("!! *** runSamplingTest: H82a is the adaptive Bt against the uniform Bt, H82b U_TH on each, each graded against the shared reference; C2 on the adaptive history ***",
+        out.tables.btU[0] === gBU && out.tables.btA[0] === gBA && out.tables.uU[0] === gUU && out.tables.uA[0] === gUA && same(out.verdict.hypotheses.H1.d, effects([gBU], [gBA])) &&
+        same(out.verdict.hypotheses.H2.d, effects([gUU], [gUA])) && out.tables.c2[0] === gradeDisplay(T.temporalChain(Uc, e2a), e2a) && out.determinism === true && out.sampling === A.SAMPLING,
+        `Bt ${gBU.toExponential(3)} uniform, ${gBA.toExponential(3)} adaptive`);
+    let k7 = 0, s7 = 0; for (let y = 0; y < w; y++) for (let x = 0; x < w; x++) if (rm[(2 * y) * W + 2 * x]) { s7 += sf.spp[7][y * w + x]; k7++; }
+    ok("  ...its rejected-pixel grades and the samples the adaptive arm spent there are what they say, and those pixels got more than the uniform 4",
+        out.secondary.rejected.btA[0] === LT.maskedDisplay(e2a.bt, e2a.ref, rm) && out.secondary.rejected.sppA[0] === s7 / k7 && s7 / k7 > 4 && out.secondary.gains.bt === 1 - gBA / gBU);
+    let r1 = null; try { LT.runSamplingTest({ splits: sp1, net, U }); } catch (e) { r1 = e.message; }
+    const cli = fs.readFileSync(path.join(ENG, "tools", "denoiseStudy.mjs"), "utf8"), reg = fs.readFileSync(path.join(ENG, "render", "learned-denoiser-preregistration.md"), "utf8");
+    const s186 = reg.slice(reg.indexOf("## 186."), reg.indexOf("## 187.") > 0 ? reg.indexOf("## 187.") : undefined);
+    let code = 0, said = ""; try { said = execFileSync(process.execPath, [path.join(ENG, "tools", "denoiseStudy.mjs"), "--harvest-upscale-temporal-train", "--round", "82"], { cwd: ENG, encoding: "utf8" }); } catch (err) { code = err.status; said = String(err.stdout); }
+    ok("  it refuses a call without C2; the test dispatches it, training refuses round 82; section 186 states the rule (1 + 2s, 4 a pixel, 1-12), the paired passes and the seeds",
+        /round 72's U_TH and its C2/.test(r1 || "") && /\(RD\.sampling \? LT\.runSamplingTest : RD\.speeds \? LT\.runSpeedTest :/.test(cli) && code === 2 && /round 82 is a test only/.test(said) &&
+        /\*\*The weight:\*\* 1 \+ 2s/.test(s186) && /\*\*4 samples a half-size pixel\*\*/.test(s186) && /each pixel 1 to 12/.test(s186) && /12 one-sample passes/.test(s186) && /87000-87011/.test(s186) && /88000-88011/.test(s186) && s186.includes(R.results));
+}
+
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +
-    "\nnot closed here: where the history stops paying on the rig's set. That is round 81's harvest, section 185's.");
+    "\nnot closed here: whether samples where the history is short buy a better history. That is round 82's harvest, section 187's.");
 process.exit(fails ? 1 : 0);

@@ -5,8 +5,9 @@
 // sequences. runTemporalTest: the 24 test sequences, U_T's chain against Bt (H1) and against the single-frame chain B1 (H2), graded
 // in display space, with each scene's mean correction (P4).
 "use strict";
-import { SPLITS_UPSCALE_TEMPORAL, SPLITS_UPSCALE_TEMPORAL_72, SPLITS_UPSCALE_MOVING, SPLITS_UPSCALE_MOVING_78, SPLITS_UPSCALE_VECTORS, SPLITS_UPSCALE_CHECK, SPLITS_UPSCALE_SPEED, familyOf, makeScene } from "./denoiseScenes.mjs";
+import { SPLITS_UPSCALE_TEMPORAL, SPLITS_UPSCALE_TEMPORAL_72, SPLITS_UPSCALE_MOVING, SPLITS_UPSCALE_MOVING_78, SPLITS_UPSCALE_VECTORS, SPLITS_UPSCALE_CHECK, SPLITS_UPSCALE_SPEED, SPLITS_UPSCALE_SAMPLING, familyOf, makeScene } from "./denoiseScenes.mjs";
 import { sceneMotion, scaleMotion, SPEED_LEVELS } from "./movingScenes.mjs";
+import { samplingFrames, rejectedMask, SAMPLING } from "./adaptiveSampling.mjs";
 import { temporalExample, temporalChain, trainTemporal, temporalCorrection, UT_SHAPE, UTH_SHAPE, UT_CHANNELS } from "./learnedUpscaleTemporal.mjs";
 import { FRAMES } from "./denoiseTemporal.mjs";
 import { UP_TRAIN } from "./learnedUpscale.mjs";
@@ -36,8 +37,11 @@ export const ROUND_UPSCALE_CHECK = Object.freeze({ ...ROUND_UPSCALE_TEMPORAL_72,
 /** Section 184, ROUND 81: the speed sweep -- Bt, U_TH on Bt and B1 at each of SPEED_LEVELS, a test only. */
 export const ROUND_UPSCALE_SPEED = Object.freeze({ ...ROUND_UPSCALE_TEMPORAL_72, splits: SPLITS_UPSCALE_SPEED, round: 81, moving: true, speeds: SPEED_LEVELS,
     results: "render/denoise-results-upscale-speed-r81.json" });
-/** The temporal round a harvest runs: 70 (section 161) unless --round 72 (section 167), 77 (section 176, a test only), 78 (section 178), 79 (section 180, a test only), 80 (section 182, a test only) or 81 (section 184, a test only). */
-export const temporalRound = (n) => (n === 81 ? ROUND_UPSCALE_SPEED : n === 80 ? ROUND_UPSCALE_CHECK : n === 79 ? ROUND_UPSCALE_VECTORS : n === 78 ? ROUND_UPSCALE_MOVING_78 : n === 77 ? ROUND_UPSCALE_MOVING : n === 72 ? ROUND_UPSCALE_TEMPORAL_72 : n === 70 || n == null ? ROUND_UPSCALE_TEMPORAL : (() => { throw new Error(`learnedUpscaleTemporalStudy: no temporal round ${n} -- 70, 72, 77, 78, 79, 80 or 81`); })());
+/** Section 186, ROUND 82: the same samples shared by where the history will be rejected -- adaptive against uniform, a test only. */
+export const ROUND_UPSCALE_SAMPLING = Object.freeze({ ...ROUND_UPSCALE_TEMPORAL_72, splits: SPLITS_UPSCALE_SAMPLING, round: 82, moving: true, sampling: SAMPLING,
+    results: "render/denoise-results-upscale-sampling-r82.json" });
+/** The temporal round a harvest runs: 70 (section 161) unless --round 72 (section 167), 77 (176, a test only), 78 (178), 79 (180), 80 (182), 81 (184) or 82 (186), the last four tests only. */
+export const temporalRound = (n) => (n === 82 ? ROUND_UPSCALE_SAMPLING : n === 81 ? ROUND_UPSCALE_SPEED : n === 80 ? ROUND_UPSCALE_CHECK : n === 79 ? ROUND_UPSCALE_VECTORS : n === 78 ? ROUND_UPSCALE_MOVING_78 : n === 77 ? ROUND_UPSCALE_MOVING : n === 72 ? ROUND_UPSCALE_TEMPORAL_72 : n === 70 || n == null ? ROUND_UPSCALE_TEMPORAL : (() => { throw new Error(`learnedUpscaleTemporalStudy: no temporal round ${n} -- 70, 72, 77, 78, 79, 80, 81 or 82`); })());
 /** A sequence's cache key: everything it depends on. */
 export const temporalKey = (family, seed, { W, sppIn, sppRef, ref2 = false, harvest = false }) => `upscale-temporal-${family}-${seed}-${W}-${sppIn}-${sppRef}-${ref2 ? "ref2" : "ref1"}-${harvest ? "harvest" : "gate"}`;
 const cachedSeq = (cache, family, seed, net, o) => cached(cache, temporalKey(family, seed, o), () => temporalExample(family, seed, net, o));
@@ -252,4 +256,40 @@ export function runSpeedTest({ splits = SPLITS_UPSCALE_SPEED, net, U, Uc2, level
              secondary: { c2: effects(T.bt[one], T.c2), correction, btOverB1, uOverB1, crossBt: crossover(levels, btOverB1), crossU: crossover(levels, uOverB1),
                           byFamily: Object.fromEntries(["R", "C"].map((f) => [f, { btOverB1: T.bt.map((b) => gain(fam(b, f), fam(T.b1, f))), uOverB1: T.u.map((u) => gain(fam(u, f), fam(T.b1, f))) }])),
                           history: T.hist.map((h) => mean(h)) } };
+}
+
+/** Round 82: a sampling sequence's cache key -- the still one's, marked moving with the arm. */
+export const samplingKey = (family, seed, o, arm) => temporalKey(family, seed, o) + `-moving-sampling-${arm}`;
+
+/**
+ * Round 82 (section 186): the 24 moving test scenes (section 176's motion), each traced once as one-sample passes and built two ways -- the
+ * uniform arm and the adaptive one (render/adaptiveSampling.mjs) -- sharing the references. H82a is the adaptive Bt against the uniform Bt,
+ * H82b round 72's U_TH on each; B1, the mover pixels, the measured frame's rejected pixels and the samples spent there are descriptive.
+ * C2 is round 72's on the adaptive history.
+ */
+export function runSamplingTest({ splits = SPLITS_UPSCALE_SAMPLING, net, U, Uc2, round = 82, harvest = false, W = 256, sppIn = 4, sppRef = 2048, test = "signflip", c1Min = 22, cache = null, log = () => {} } = {}) {
+    if (!net || !U || !Uc2) throw new Error("learnedUpscaleTemporalStudy: the sampling test needs the shipped denoiser, round 72's U_TH and its C2");
+    const t0 = Date.now(), T = { btA: [], btU: [], uA: [], uU: [], b1A: [], b1U: [], noisy: [], c2: [], floor: [] }, correction = [];
+    const mover = { btA: [], btU: [], uA: [], uU: [] }, rej = { btA: [], btU: [], share: [], sppA: [] };
+    let determinism = true;
+    splits.T1.seeds.forEach((sd, i) => {
+        const fam = familyOf(splits.T1, i), S = makeScene(fam, sd), motion = sceneMotion(S), o = { harvest, W, sppIn, sppRef, ref2: true };
+        const pair = cached(cache, samplingKey(fam, sd, o, "pair"), () => { const sf = samplingFrames(S, net, { W, motion }), eu = temporalExample(fam, sd, net, { ...o, motion, frames: sf.uniform });
+            return { eu, ea: temporalExample(fam, sd, net, { ...o, motion, frames: sf.adaptive, refs: { ref: eu.ref, ref2: eu.ref2 } }), rmask: rejectedMask(sf.hits), spp: sf.spp[FRAMES - 1] }; });
+        const { eu, ea, rmask } = pair, yA = temporalChain(U, ea), yU = temporalChain(U, eu);
+        T.btA.push(gradeDisplay(ea.bt, ea)); T.btU.push(gradeDisplay(eu.bt, eu)); T.uA.push(gradeDisplay(yA, ea)); T.uU.push(gradeDisplay(yU, eu));
+        T.b1A.push(gradeDisplay(ea.b1, ea)); T.b1U.push(gradeDisplay(eu.b1, eu)); T.noisy.push(gradeDisplay(eu.noisy, eu)); T.c2.push(gradeDisplay(temporalChain(Uc2, ea), ea));
+        T.floor.push(relMSE(toD(eu.ref2), toD(eu.ref))); correction.push(temporalCorrection(U, ea));
+        mover.btA.push(maskedDisplay(ea.bt, ea.ref, ea.mover)); mover.btU.push(maskedDisplay(eu.bt, eu.ref, eu.mover)); mover.uA.push(maskedDisplay(yA, ea.ref, ea.mover)); mover.uU.push(maskedDisplay(yU, eu.ref, eu.mover));
+        rej.btA.push(maskedDisplay(ea.bt, ea.ref, rmask)); rej.btU.push(maskedDisplay(eu.bt, eu.ref, rmask)); rej.share.push(rmask.reduce((q, m) => q + m, 0) / rmask.length);
+        { const w = W / 2; let s = 0, k = 0; for (let y = 0; y < w; y++) for (let x = 0; x < w; x++) if (rmask[(2 * y) * W + 2 * x]) { s += pair.spp[y * w + x]; k++; } rej.sppA.push(k ? s / k : null); }
+        if (i === 0) determinism = temporalChain(U, ea).every((v, j) => Object.is(v, yA[j]));
+        log(`sequence ${i + 1} of ${splits.T1.seeds.length} at ${((Date.now() - t0) / 1000).toFixed(1)} s`);
+    });
+    const c2meanD = mean(effects(T.btA, T.c2)), gain = (u, b) => { const k = u.map((v, i) => (v === null || b[i] === null ? null : i)).filter((i) => i !== null); return k.length ? 1 - mean(k.map((i) => u[i])) / mean(k.map((i) => b[i])) : null; };
+    const sets = { H1: { noisy: T.noisy, filter: T.btU, net: [T.btA], floor: T.floor }, H2: { noisy: T.noisy, filter: T.uU, net: [T.uA], floor: T.floor } };
+    const V = verdict({ sets, shuffled: null, c2Prior: { round, meanD: c2meanD, ok: c2meanD <= 0 }, determinism, seedsDistinct: new Set(splits.T1.seeds).size === splits.T1.seeds.length, test, c1Of: "candidate", c1Min });
+    return { verdict: V, tables: T, determinism, sampling: SAMPLING, ms: Date.now() - t0,
+             secondary: { c2: effects(T.btA, T.c2), correction, gains: { bt: gain(T.btA, T.btU), u: gain(T.uA, T.uU), b1: gain(T.b1A, T.b1U) },
+                          mover: { ...mover, gains: { bt: gain(mover.btA, mover.btU), u: gain(mover.uA, mover.uU) } }, rejected: { ...rej, gain: gain(rej.btA, rej.btU) } } };
 }
