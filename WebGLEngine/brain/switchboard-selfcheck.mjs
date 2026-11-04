@@ -10,6 +10,9 @@
 //   5 DROPOUT   the built-in flying task on real tank flights: deterministic, the same spawn for every arm, scores in (0, 1), an arm without an entry refused, the event option changes the bucket, a network differs from the autopilot.
 //   6 SOURCE    no clock, random number or file; the header names the backlog item.
 // NOT CHECKED, said plainly: which brain is better (that is the experiment); the page; any arm that is not built in.
+// SABOTAGE LOG (49 mutants of brain/switchboard.mjs, each alone in its own worktree copy): 39 went red by name on the first pass; 10 went 0 red and each got a row: the twin arm's profile ignored, badOf without the crushed or the stranded half, the age clock never reset on a new target, the settle test dropped, one-scenario se (NaN), the same-difference tolerance (1e-9 against 0), a lost sub not marked bad, the angle wrap dropped (badOf and wrap became exports so they can be tested directly; the dropout task gained a `settle` option for the same reason). All ten then red by name.
+//   ONE DECLARED EQUIVALENT: "better with no positive-mean test" (mean > 2 se without mean > 0): se is never negative, so mean > 2 se already implies mean > 0.
+//   First draft of the twin-profile row used seeds 1344-1346: at 200 s every profile flies the same six dives there, so the row could not see the profile; it uses 1400-1405 now, where the ensemble differs.
 "use strict";
 import fs from "node:fs";
 let fails = 0, finished = false;
