@@ -273,15 +273,19 @@ box3d does not turn a driven ship another way.
 - C-chaos: every cell's p is 1.
 - C-determinism: 20 flights, each the same twice.
 
-**Why the PD autopilot loses is not measured here.** B3 differs from E in three ways a pilot could feel:
+**Why the PD autopilot loses is not measured here.** B3 differs from E in two ways a pilot could feel:
 
-- the orientation's first-order lead, which M1 measures;
-- the same lead in position, since box3d gives a tick's change of velocity at its start too (not measured here);
+- the angular scheme: box3d turns the ship first-order, by the spin after the tick's torque, which M1 measures;
 - float32 state.
+
+*Corrected the same day.* This paragraph first listed three ways, the second "the same lead in position". There is
+none. E also turns the tick's force by the start orientation, gives the whole change of velocity at once, and advances
+the position by the new velocity, as the stepper has box3d do. The round that asks which of the two costs the PD
+autopilot is registered as `physics/mechanics/BOX3D_PD_JOUST_WIP.md`.
 
 For comparison, the orientation round changed both ships' step at once (Q0 to Q4, seeds 91001 to 91040). There the PD
 autopilot's joust moved both ways: 8 better and 7 worse, p = 1.00. Here only A changes, and the change runs one way.
-Which of the three costs A its killing hit is a round of its own.
+Which of the two costs A its killing hit is a round of its own.
 
 **What this buys.** P3 did not hold, so the engine's ships cannot fly on box3d without changing how they fight: the
 PD autopilot loses its mirror jousts. The four trained pilots fight the same. Nothing is changed: no page flies its
