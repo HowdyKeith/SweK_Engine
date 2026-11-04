@@ -80,6 +80,7 @@
 //   P13 the helm's label has no hash 1 | P14 a good import is reported as bad 1 | P15 the note does not say where it went 1 | P16 the import button does nothing 1 (0 red until the gate counted the click: the file was dropped on the input and never through the button).
 // A THING THE GATE FOUND IN ITSELF: the first "not chosen for you" check read the lists after fights of its own had left their controls on the imported choices (a fight writes its options back to the controls); it now starts a plain fight before the helm file is dropped and reads the lists straight after.
 "use strict";
+import "../../physics/mechanics/rigidBody6dofEuler.mjs";   // 2026-11-04 -- the 6-DOF numbers this gate holds were measured under the first-order orientation step, so it flies that step (see that file)
 import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
 import { createRequire } from "node:module";
 import fs from "node:fs";
@@ -129,6 +130,7 @@ else {
     const run = await runInEngineOrigin({
         engineRoot: ENG, timeoutMs: 560000,
         script: `async () => {
+            await import("/physics/mechanics/rigidBody6dofEuler.mjs");   // 2026-11-04 -- the page flies the step this gate's 6-DOF numbers were measured under (sessionStorage carries it into the iframe)
             globalThis.__swekStep = "booting space-battleship.html in an iframe";
             const f = document.createElement("iframe");
             f.style.width = "1100px"; f.style.height = "1250px";

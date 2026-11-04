@@ -178,8 +178,13 @@ try {
         Object.values(bf).every(({ r, raw }) => J(r.w) === J(RB.worldToBody(raw.q, raw.wWorld)) && J(r.q) === J(raw.q) && J(r.w) !== J(raw.wWorld) && near(r.w[0], 0.4, 1e-5)),
         Object.entries(bf).map(([k, v]) => `${k} body (${v.r.w.map((x) => x.toFixed(5)).join(", ")}) world (${v.raw.wWorld.map((x) => x.toFixed(5)).join(", ")})`).join("; "));
     const own = await L.spinner(L.CONFIGS[3], { w0: [0.4, 1e-3, 0], dt: 1 / 60 }); for (let k = 0; k < 30; k++) own.step(); const r4 = own.read();
-    let s = RB.createBody({ mass: 6, I: [6.5, 5, 2.5], w: [0.4, 1e-3, 0] }); for (let k = 0; k < 30; k++) s = RB.step(s, RB.createAccumulator(), 1 / 60);
-    ok("!! ...and the engine's own physics is rigidBody6dof.step() driven directly, to the bit", J(r4.w) === J(s.w) && J(r4.q) === J(s.q));
+    // 2026-11-04 (unnumbered) -- RESTATED: C4 names the first-order step it was registered with, since RK4 became the default (the
+    // library's own-physics spinner says why), so it is held to rigidBody6dof.step() driven with that step; with the default, RK4, the
+    // angular velocity is the same to the bit and only the orientation moves.
+    let s = RB.createBody({ mass: 6, I: [6.5, 5, 2.5], w: [0.4, 1e-3, 0] }); for (let k = 0; k < 30; k++) s = RB.step(s, RB.createAccumulator(), 1 / 60, { orientation: "euler" });
+    let d = RB.createBody({ mass: 6, I: [6.5, 5, 2.5], w: [0.4, 1e-3, 0] }); for (let k = 0; k < 30; k++) d = RB.step(d, RB.createAccumulator(), 1 / 60);
+    ok("!! ...and the engine's own physics is rigidBody6dof.step() driven directly with the step C4 was registered with, to the bit -- and under the default (RK4) only the orientation differs",
+        J(r4.w) === J(s.w) && J(r4.q) === J(s.q) && J(d.w) === J(s.w) && J(d.q) !== J(s.q));
     const now = L.battery(m);
     ok("!! C-rebuild's battery on the rebuilt box3d.wasm gives the state hashes the artifact it replaced gave, scene by scene (stack, tumble, joint, ships, bounce)",
         J(now) === J(L.BATTERY_BEFORE) && now.length === 5 && now.every(([, h]) => h.length >= 4), now.map(([n, h]) => n + " " + h[h.length - 1]).join(", "));

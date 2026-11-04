@@ -278,3 +278,30 @@ the duel, the spinning body or freeRotation (this round's gate aside), then rest
     (`render/subDropoutScene`, `tools/subDropout`), and the spinning body's own C4 (`tools/roundhouse/spinningBody`).
 - So adopting Q4 is a change to every 6-DOF craft's recorded behaviour, aircraft, rotorcraft, drones and the sub among
   them. None of those was flown in this round, and some of those records belong to other work in this tree.
+
+### Decided (2026-11-04)
+
+Keith, after the verdict: "make the fourth-order step the default". So `rigidBody6dof.step()` now moves the
+orientation by RK4 when it is given no `orientation`, and "euler" is still the first-order step, by name.
+- **What changed:** every 6-DOF craft in the engine and on its pages turns by RK4: the ships, the aircraft, the sub,
+  the multirotor and the rotorcraft. Flown under both steps, each family's baseline moved by 0.004% to 0.33%, and the
+  same flights fell or were lost (section 7 of the round's gate).
+- **What was kept:** every 6-DOF number recorded before this day was measured under the first-order step. That covers
+  the trained pilots and the rounds that made them, the tasks' pinned baselines they were measured against, and the
+  fights pinned hit for hit. They quote one another, so they are kept together, under the step they were measured
+  with:
+  - The 36 gates that hold them import `physics/mechanics/rigidBody6dofEuler.mjs` first. It sets the first-order step
+    for that gate's process, its worker processes and the pages its scripts open. None of their numbers changed.
+  - As the spinning body's C2 and C3 still fly the Jolt settings they were registered with, its C4 now names the
+    first-order step, and so does this round's Q0.
+- **How the setting travels:** `setOrientationDefault()` changes what no option means and carries it as
+  SWEK_6DOF_ORIENTATION: an environment variable in node, a sessionStorage entry in a browser.
+- **What it does not do:** no record was re-pinned to RK4. A gate that holds first-order numbers tests the first-order
+  step, and section 7 of the round's gate holds the new default. Pins taken under RK4 would be measured afresh.
+- **Two gates were left as they were:** `render/brainPanel-selfcheck.mjs`, whose time-out in the measurement above
+  came from four heavy gates running at once (alone, under RK4, it passes in 41 s), and nothing else in it moved. And
+  the two battleship gates, red on main, are exactly as red as on main.
+- **Gated:** section 7 of `tools/roundhouse/orientationStep-selfcheck.mjs` holds the default, the setter and its carrier,
+  the first-order module and who imports it, and the craft families under both steps. Sabotaged with the byte-safe
+  runner: 12 designs (D1 to D10b), against that gate and the gates the default reaches, each red by name; the counts
+  are in the gate's header.

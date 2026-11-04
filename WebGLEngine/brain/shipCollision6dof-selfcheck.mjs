@@ -37,6 +37,7 @@
 //                                                                                          is 0, deterministically). The spin-out game's fingerprint is now PINNED (a3e7e059): 1 red
 //   S5 pilot6dofPolicy.mjs: aLost / bLost never reported                                    2 red (the lost-and-dead row; the collisions-off row)
 "use strict";
+import "../physics/mechanics/rigidBody6dofEuler.mjs";   // 2026-11-04 -- the 6-DOF numbers this gate holds were measured under the first-order orientation step, so it flies that step (see that file)
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";

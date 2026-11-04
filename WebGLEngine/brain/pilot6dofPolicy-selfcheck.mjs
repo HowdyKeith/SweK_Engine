@@ -88,6 +88,7 @@
 //   TEAMS FIRST TOUCH (5 m); being attacked is read over the whole fight. It still bites: R1 es-box3d-6dof.html: team B flying team A's pilot 3 red (all three fight rows) | R2 pilotRoster.mjs: the zero
 //   pilot resolving to the hand weights 4 red (the three fight rows and the resolver's own fight row).
 "use strict";
+import "../physics/mechanics/rigidBody6dofEuler.mjs";   // 2026-11-04 -- the 6-DOF numbers this gate holds were measured under the first-order orientation step, so it flies that step (see that file)
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";

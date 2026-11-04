@@ -20,6 +20,7 @@
 //   A12 handWeights ignores its gains 1 | A13 the pilot ignores the wind 2 | A14 perturb spread doubled 1 | A15 the features are not the fruit fly's (feature 11 zeroed) 3 | A16 layer width 31 4.
 //   mutate, train and prune of this network are the same functions as the fruit fly's and are held, for both, by brain/pilotFlightTrain-selfcheck.mjs.
 "use strict";
+import "../physics/mechanics/rigidBody6dofEuler.mjs";   // 2026-11-04 -- the 6-DOF numbers this gate holds were measured under the first-order orientation step, so it flies that step (see that file)
 import * as M from "./pilotFlightMlp.mjs";
 import * as PF from "./pilotFlightPolicy.mjs";
 import * as AF from "./autopilotFlight.mjs";

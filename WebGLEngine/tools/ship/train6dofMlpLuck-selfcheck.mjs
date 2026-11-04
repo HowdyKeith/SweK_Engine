@@ -44,6 +44,7 @@
 //   V11 the note saying P2 right 1 | V12 the note's search table drifted 1 | V13 the note's verdict heading renamed 1 | V14 the file's recipe at 1,000 iterations 1 | V15 the Default's hash in C-files 1
 //   V16 a search's kept count drifted 2 | V17 the file's cross-play at 300 fruit fly leads 3 (the cross-play, P2 then right, the note)
 "use strict";
+import "../../physics/mechanics/rigidBody6dofEuler.mjs";   // 2026-11-04 -- the 6-DOF numbers this gate holds were measured under the first-order orientation step, so it flies that step (see that file)
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";

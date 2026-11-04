@@ -45,6 +45,7 @@
 //   the note's fragments are read from Round 3's verdict section ALONE, its line breaks read as spaces. Rounds 1 and 2 read theirs from their heading to the end of the note, so once this
 //   round's verdict sat below them its "**P1: right.**" answered for theirs -- see their gates' headers, fixed in the same commit.
 "use strict";
+import "../../physics/mechanics/rigidBody6dofEuler.mjs";   // 2026-11-04 -- the 6-DOF numbers this gate holds were measured under the first-order orientation step, so it flies that step (see that file)
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";

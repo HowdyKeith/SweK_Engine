@@ -47,6 +47,7 @@
 //   H06 the fighting gains not frozen 1 | H07 the fighting pilot flies the cruise gains 4 | H08 the fighting pilot flies the trainer's airframe model 4 | H09 the fighting pilot drops the gains 4
 //   (The gain schedule was moved out of lawsFrom into an exported gainSchedule(record, gains) after the seventy-three above were run, for the networks' feature layout to read; A27-A31 apply unchanged to the moved line (A31's old pattern `const sc = g.vRef ? clamp(` now reads `(g.vRef ? clamp(`) and a row holds the exported function at 1, 3, 0.49 and 0.3 and the trainer's gains at 1.)
 "use strict";
+import "../physics/mechanics/rigidBody6dofEuler.mjs";   // 2026-11-04 -- the 6-DOF numbers this gate holds were measured under the first-order orientation step, so it flies that step (see that file)
 import * as F from "../physics/mechanics/flightModel6dof.mjs";
 import { atmosphere } from "../physics/mechanics/atmosphereISA.mjs";
 import * as AF from "./autopilotFlight.mjs";

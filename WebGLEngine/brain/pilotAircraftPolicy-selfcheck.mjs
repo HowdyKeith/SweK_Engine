@@ -47,6 +47,7 @@
 // FOUND BEFORE THE SABOTAGES, BY THE GATE: my own comment in pilotAircraftPolicy.mjs said no angle repeats across the train, held-out and audit sets. 90 degrees does (a seeded axis in training, the vertical in the audit); the
 // comment and the row now say so. The sets were not changed, because the audit had already been read for the champion.
 "use strict";
+import "../physics/mechanics/rigidBody6dofEuler.mjs";   // 2026-11-04 -- the 6-DOF numbers this gate holds were measured under the first-order orientation step, so it flies that step (see that file)
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";

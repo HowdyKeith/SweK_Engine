@@ -19,8 +19,11 @@ const HERE = path.dirname(fileURLToPath(import.meta.url)), ENG = path.resolve(HE
 const range = (a, n) => Object.freeze(Array.from({ length: n }, (_, i) => a + i));
 export const REGISTRATION = "physics/mechanics/ORIENTATION_STEP_WIP.md";
 export const DEFAULT_RESULTS = path.join(ENG, "physics", "mechanics", "orientationStepResults.json");
-/** The two steps: Q0 is the step given no option (the engine's own, as it is); Q4 is `orientation: "rk4"`. */
-export const STEPS = Object.freeze({ Q0: null, Q4: "rk4" });
+/** The two steps: Q0 the first-order step, Q4 `orientation: "rk4"`.
+ *  2026-11-04 (unnumbered) -- RESTATED, NOT WIDENED: the registration's Q0 was "the step given no option", which was the first-order
+ *  step when the round ran. Since Keith made RK4 the default the same day, "no option" is Q4; so Q0 is named, "euler", and the round
+ *  still flies what it registered -- its committed results still describe it. */
+export const STEPS = Object.freeze({ Q0: "euler", Q4: "rk4" });
 export const STEP_IDS = Object.freeze(Object.keys(STEPS));
 /** M1: the spinning body's fixture and spin, 30 s at four steps; the order fitted over 1/60 to 1/240 s. */
 export const FREE = Object.freeze({ dts: Object.freeze([1 / 30, 1 / 60, 1 / 240, 1 / 960]), fit: Object.freeze([1 / 60, 1 / 240]), T: 30 });
@@ -54,7 +57,7 @@ export const KEY = Object.freeze({ W: 2, dt: 1 / 30, T: 30, q4Within: 1e-5, q0Be
 /** C-reference: the reference within `ratio` of Q0's own error, wherever that error is above `floor` rad. */
 export const REFERENCE = Object.freeze({ ratio: 1 / 30, floor: 1e-9 });
 
-export const optOf = (stepId) => { if (!(stepId in STEPS)) throw new Error(`no step ${stepId}`); return STEPS[stepId] == null ? undefined : { orientation: STEPS[stepId] }; };
+export const optOf = (stepId) => { if (!(stepId in STEPS)) throw new Error(`no step ${stepId}`); return { orientation: STEPS[stepId] }; };
 const hex = (s) => crypto.createHash("sha256").update(s).digest("hex");
 
 // ---- the pilots ---------------------------------------------------------------------------------------------------------
@@ -104,7 +107,7 @@ export function m1({ dts = FREE.dts, fit = FREE.fit, T = FREE.T } = {}) {
 
 // ---- M2, a ship's turn ----------------------------------------------------------------------------------------------------
 /** A's start and inputs from a duel of the PD autopilot against itself under Q0, through the duel's own `record`. */
-export function recordOf(seed, scenario) { const record = {}; const r = P6.duel("autopilot", "autopilot", { seed, scenario, record }); return { ...record, ticks: r.ticks }; }
+export function recordOf(seed, scenario) { const record = {}; const r = P6.duel("autopilot", "autopilot", { seed, scenario, record, orientation: STEPS.Q0 }); return { ...record, ticks: r.ticks }; }
 /** The record replayed open loop with `stepId`, each input held for its tick, `sub` steps a tick: the orientation and angular velocity at every tick's end. */
 export function replay(rec, stepId, sub = 1) {
     const opt = optOf(stepId), h = DUEL_DT / sub; let b = rec.start; const qs = [], ws = [];
@@ -129,7 +132,7 @@ export const RANK = Object.freeze({ loss: 0, draw: 1, win: 2 });
 export const outcomeOf = (r) => (r.bDead && !r.aDead ? "win" : r.aDead && !r.bDead ? "loss" : "draw");
 /** One duel of `pilot` as A against the PD autopilot, with a step or the nudge: its outcome and fingerprint. */
 export function fight(pilot, seed, scenario, { stepId = "Q0", nudge = 0 } = {}) {
-    const o = optOf(stepId), r = P6.duel(pilot, "autopilot", { seed, scenario, ...(o ? { orientation: o.orientation } : {}), ...(nudge ? { nudge } : {}) });
+    const r = P6.duel(pilot, "autopilot", { seed, scenario, orientation: STEPS[stepId], ...(nudge ? { nudge } : {}) });
     return { outcome: outcomeOf(r), fingerprint: r.fingerprint, ticks: r.ticks };
 }
 /** The exact two-sided sign test on `up` against `down` (ties already set aside). */
@@ -160,7 +163,8 @@ export function m3(pilots = loadPilots(), seeds = FIGHT.seeds, { nudge = FIGHT.n
 }
 
 // ---- the controls ---------------------------------------------------------------------------------------------------------
-/** The 1,000 steps of C-unchanged, exactly as the registration prints them; `opt` is handed to each step (none, for the anchor). */
+/** The 1,000 steps of C-unchanged, exactly as the registration prints them; `opt` is handed to each step. The anchor was taken with no
+ *  option when that meant the first-order step: since 2026-11-04 it is held with { orientation: "euler" }. */
 export const stepDigest = (opt) => hex(stepOutputs(opt).map((nx) => [...nx.pos, ...nx.vel, ...nx.q, ...nx.w].map(String).join(",")).join("\n")).slice(0, 16);
 /** ...and the outputs themselves, so a gate can hold each part of them apart. */
 export function stepOutputs(opt) {
@@ -174,10 +178,12 @@ export function stepOutputs(opt) {
     }
     return out;
 }
+// 2026-11-04 (unnumbered) -- RESTATED: the anchors were taken given no option, which meant the first-order step; they are now held with
+// it named (Q0's "euler"), since no option is RK4.
 export function cUnchanged(pilots = loadPilots()) {
     const fingerprints = {}; let ok = true;
-    for (const scenario of SCENARIOS) { fingerprints[scenario] = {}; for (const p of pilots) { const f = P6.duel(p.pilot, "autopilot", { seed: ANCHOR.seed, scenario }).fingerprint; fingerprints[scenario][p.id] = f; if (f !== ANCHOR.fingerprints[scenario][p.id]) ok = false; } }
-    const digest = stepDigest();
+    for (const scenario of SCENARIOS) { fingerprints[scenario] = {}; for (const p of pilots) { const f = P6.duel(p.pilot, "autopilot", { seed: ANCHOR.seed, scenario, orientation: STEPS.Q0 }).fingerprint; fingerprints[scenario][p.id] = f; if (f !== ANCHOR.fingerprints[scenario][p.id]) ok = false; } }
+    const digest = stepDigest(optOf("Q0"));
     return { ok: ok && digest === ANCHOR.stepDigest, fingerprints, digest };
 }
 /** The fixture spinning steadily at KEY.W about its largest axis: each step's angle from the exact turn of w t. */

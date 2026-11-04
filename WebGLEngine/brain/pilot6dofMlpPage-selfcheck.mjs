@@ -21,6 +21,7 @@
 //   network 0 here (1 there: the page always hands both) | 'gpu' resolved to the shipped fruit-fly pilot's weights 3 (2, 3, 4)
 //   PG1 leaves row 5 green, and rightly: a saved 'gpu' still resolves through the roster's context; row 1 is the one that says the select never offers it.
 "use strict";
+import "../physics/mechanics/rigidBody6dofEuler.mjs";   // 2026-11-04 -- the 6-DOF numbers this gate holds were measured under the first-order orientation step, so it flies that step (see that file)
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -50,6 +51,7 @@ const skip = webgpuSkipReason();
 if (skip) { console.log(`  SKIP  ${skip}`); report("*** NOT A PASS. ***"); fails++; }
 else {
     const r = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 240000, script: `async () => {
+        await import("/physics/mechanics/rigidBody6dofEuler.mjs");   // 2026-11-04 -- the page flies the step this gate's 6-DOF numbers were measured under (sessionStorage carries it into the iframe)
         const boot = async () => {
             const f = document.createElement("iframe"); f.style.cssText = "width:900px;height:600px;border:0"; f.src = "/es-box3d-6dof.html"; document.body.appendChild(f);
             const t = performance.now(); while (performance.now() - t < 60000) { await new Promise((r) => setTimeout(r, 250)); const w = f.contentWindow; if (w && w.__sixdof && w.__sixdof.roster) break; }

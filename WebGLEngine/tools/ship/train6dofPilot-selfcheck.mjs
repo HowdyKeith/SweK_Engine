@@ -20,6 +20,7 @@
 //   H  run(): the pruning step skipped                                          -> 1 RED (the pruned row)
 //   I  RECIPE: 1500 iterations -> 1400                                          -> 2 RED (the recorded-recipe row, the RECIPE row)
 "use strict";
+import "../../physics/mechanics/rigidBody6dofEuler.mjs";   // 2026-11-04 -- the 6-DOF numbers this gate holds were measured under the first-order orientation step, so it flies that step (see that file)
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";

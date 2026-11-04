@@ -39,6 +39,7 @@
 // THE `objective` OPTION OF train() AND prune() (the second recipe's guarded search; the rows after "A BLOCK THAT FAILS IS HALVED"), 5 MUTANTS, each applied the same way: O1 train ignores the objective 2; O2 train judges its start by the plain
 //   score 1; O3 train inverts the objective 2; O4 prune ignores the objective 1; O5 an objective of exactly zero treated as none -- 0 RED until a row asked for an objective of zero (a falsy value must not fall back to the plain score), then 1.
 "use strict";
+import "../physics/mechanics/rigidBody6dofEuler.mjs";   // 2026-11-04 -- the 6-DOF numbers this gate holds were measured under the first-order orientation step, so it flies that step (see that file)
 import * as PP from "./pilotDronePolicy.mjs";
 import * as AD from "./autopilotDrone.mjs";
 import * as DT from "./droneTask.mjs";

@@ -84,8 +84,12 @@ export async function spinner(config, { w0, dt, f = FIXTURE, damping = 0 } = {})
     if (config.engine === "own") {
         if (damping !== 0) throw new Error("rigidBody6dof has no damping to set");
         let s = RB.createBody({ mass: m, I, w: w0 });
-        const acc = RB.createAccumulator();
-        return { backendId: "own", gyroscopic: null, inertia: { diag: [...I], off: [0, 0, 0] }, step() { s = RB.step(s, acc, dt); }, read() { return { w: [...s.w], q: [...s.q] }; },
+        // 2026-11-04 (unnumbered) -- RESTATED, NOT WIDENED: C4 was registered as "the engine's own physics, rigidBody6dof.step()", and
+        // that step moved the orientation by its first-order step. Keith made RK4 the default (physics/mechanics/ORIENTATION_STEP_WIP.md,
+        // whose round measured C4's own drift), so C4 names the step it was registered with, as C2 names `false`: it still measures the
+        // body it was registered to, and its committed results still describe it.
+        const acc = RB.createAccumulator(), OWN_STEP = Object.freeze({ orientation: "euler" });
+        return { backendId: "own", gyroscopic: null, inertia: { diag: [...I], off: [0, 0, 0] }, step() { s = RB.step(s, acc, dt, OWN_STEP); }, read() { return { w: [...s.w], q: [...s.q] }; },
                  raw() { return { wWorld: rotateByQuat(s.q, s.w), q: [...s.q] }; }, destroy() {} };
     }
     const E = await engines(), half = [f.hx, f.hy, f.hz], opts = { type: "dynamic", pos: [0, 0, 0], half, density: f.density };

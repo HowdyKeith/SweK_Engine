@@ -34,6 +34,7 @@
 //   FOUND BY THE REGISTERED RUN'S OWN DATA, before these sabotages: section 6's first draft went red on a correct file. Its legality rule said "a timeout exactly when the battle ran 900 ticks", and one
 //   battle (the Default's mirror, seed 80084) is a kill landed ON the 900th tick. The rule is now the page's own (legalRow above); section 4's miniature had the same latent bug. No reading changes.
 "use strict";
+import "../../physics/mechanics/rigidBody6dofEuler.mjs";   // 2026-11-04 -- the 6-DOF numbers this gate holds were measured under the first-order orientation step, so it flies that step (see that file)
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";

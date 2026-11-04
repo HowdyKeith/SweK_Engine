@@ -25,6 +25,7 @@
 // NOT TRIED: passing the current to S.attitude when the heading is read (equivalent: the heading is the nose's, and does not depend on the water).
 //
 "use strict";
+import "../physics/mechanics/rigidBody6dofEuler.mjs";   // 2026-11-04 -- the 6-DOF numbers this gate holds were measured under the first-order orientation step, so it flies that step (see that file)
 import * as S from "../physics/mechanics/subModel6dof.mjs";
 import * as A from "../brain/autopilotSub.mjs";
 import * as T from "../brain/subTask.mjs";

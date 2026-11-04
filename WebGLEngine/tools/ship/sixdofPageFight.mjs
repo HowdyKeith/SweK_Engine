@@ -150,7 +150,11 @@ export function determinismCheck(matchups, again) {
  * THE PAGE'S HALF, run by runInEngineOrigin (serialised into the browser; browser globals only). args: { controlDuelSeeds, run, plan, determinism, maxTicks }. It boots the page, waits for every brain's file,
  * reports C-pilots' page half, and -- only when `run` -- plays the plan through runBattles, one seed at a time, then the determinism matchup again. It returns raw battles; it reads nothing.
  */
+// 2026-11-04 (unnumbered) -- the script's first act: the page flies the first-order orientation step this round was registered and run
+// under, since RK4 became rigidBody6dof's default (physics/mechanics/rigidBody6dofEuler.mjs says why). In the browser only: this library
+// sets nothing in node, so a gate importing it for its pilots is not switched.
 export const BROWSER_SCRIPT = `async (args) => {
+    await import("/physics/mechanics/rigidBody6dofEuler.mjs");   // 2026-11-04 -- the page flies the step this round's 6-DOF numbers were measured under (sessionStorage carries it into the iframe)
     const f = document.createElement("iframe"); f.style.cssText = "width:900px;height:600px;border:0"; f.src = "/es-box3d-6dof.html"; document.body.appendChild(f);
     const t0 = performance.now(), held = (R) => ["shipped", "league", "close", "gpu"].every((k) => R[k] || R[k + "Error"]);
     while (performance.now() - t0 < 90000) { await new Promise((r) => setTimeout(r, 250)); const w = f.contentWindow; if (w && w.__sixdof && w.__sixdof.roster && held(w.__sixdof.roster)) break; }

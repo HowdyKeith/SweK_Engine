@@ -33,6 +33,7 @@
 //   answered for its fragments -- S2, the note saying this round's P1 wrong, went 0 red, Round 3 saying "**P1: right.**". The row now reads its own section alone (up to the next "## "
 //   heading): S2 again, 1 red, by the row's name.
 "use strict";
+import "../../physics/mechanics/rigidBody6dofEuler.mjs";   // 2026-11-04 -- the 6-DOF numbers this gate holds were measured under the first-order orientation step, so it flies that step (see that file)
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
