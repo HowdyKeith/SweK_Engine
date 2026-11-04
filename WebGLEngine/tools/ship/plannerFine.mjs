@@ -38,7 +38,7 @@ export function winnerOf(sel) {
     if (names.length !== GRID.length) throw new Error(`plannerFine.winnerOf: the selection must hold all ${GRID.length} grid arms, got ${names.length}`);
     const clean = names.filter((n) => sel[n].crashed + sel[n].stranded === 0);
     if (!clean.length) return REF;
-    const dist = (n) => { const s = shiftsOf(n); return Math.abs(s.dl + 0.12) + Math.abs(s.dh); };
+    const dist = (n) => { const s = shiftsOf(n); return Math.round((Math.abs(s.dl + 0.12) + Math.abs(s.dh)) * 1e9) / 1e9; };   // rounded: -0.10 and -0.14 are both 0.02 from the reference, and floating point must not decide that tie
     return clean.slice().sort((a, b) => sel[b].score - sel[a].score || dist(a) - dist(b) || shiftsOf(b).dl - shiftsOf(a).dl)[0];
 }
 export const CONF_ARMS = Object.freeze(["TWIN-WIN", "TWIN-REF", "TUNED-WIN", "TUNED-REF"]);

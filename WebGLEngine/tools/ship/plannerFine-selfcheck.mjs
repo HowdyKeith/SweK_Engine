@@ -53,7 +53,7 @@ sec("3. WINNER");
     ok("!! an arm with a crushed dive cannot win however high it scores (the cliff is a hull cost the score can hide): L-0.14H0 at 0.9 with 1 crushed loses to the best clean arm", X.winnerOf(sel((n) => (n === "L-0.14H0" ? 0.9 : n === "L-0.10H0" ? 0.85 : 0.8), (n) => (n === "L-0.14H0" ? 1 : 0))) === "L-0.10H0");
     ok("!! a stranded dive disqualifies too; and when no arm is clean the reference wins", X.winnerOf(Object.fromEntries(X.GRID.map((n) => [n, { score: n === "L-0.08H0" ? 0.9 : 0.8, crashed: 0, stranded: n === "L-0.08H0" ? 2 : 0 }]))) === "L-0.12H0" && X.winnerOf(sel((n) => (n === "L-0.08H0" ? 0.9 : 0.8), () => 1)) === "L-0.12H0");
     ok("!! an exact tie goes to the reference over every other arm", X.winnerOf(sel(() => 0.8)) === "L-0.12H0");
-    ok("!! at equal distance from the reference (L-0.10H0 and L-0.14H0 are both 0.02 away) the smaller, less negative, low shift wins: L-0.10H0", X.winnerOf(sel((n) => (n === "L-0.10H0" || n === "L-0.14H0" ? 0.9 : 0.8))) === "L-0.10H0");
+    ok("!! at equal distance from the reference (L-0.10H0 and L-0.14H0 are both 0.02 away, and the distance is rounded so floating point does not break that tie) the smaller, less negative, low shift wins: L-0.10H0", X.winnerOf(sel((n) => (n === "L-0.10H0" || n === "L-0.14H0" ? 0.9 : 0.8))) === "L-0.10H0");
     ok("!! at unequal distance the nearer wins a tie: L-0.14H0 (0.02) over L-0.08H0 (0.04)", X.winnerOf(sel((n) => (n === "L-0.14H0" || n === "L-0.08H0" ? 0.9 : 0.8))) === "L-0.14H0");
     const thr = (s) => { try { X.winnerOf(s); return false; } catch (e) { return /must hold all 4 grid arms, got 3/.test(e.message); } };
     const part = sel(() => 0.8); delete part["L-0.10H0"];
