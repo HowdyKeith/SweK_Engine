@@ -2999,10 +2999,8 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "nav-sensed-large-set",
-        blocker: "OPEN",
-        what: "Registered as a PLAN, FOLLOW-UP 60 of brain/SENSED_NAV_WIP.md (Keith, 2026-11-04: \"Fly one larger set, around 600 scenarios, of the half-dozen detectors that actually differ.\", after follow-up 59). Taken as 540 scenarios: three fresh sets of 60 seeds of each kind (HELD64 to HELD66), the same arms on all three, read once together. At most six detectors: `inc`, `m23e30` and up to four chosen by a rule fixed in the note from follow-up 59's table (one per mechanism family that follow-up 59 calls seen), under R3D30, WD30L and P.",
-        how: "After follow-up 59 is read: a SECOND REGISTRATION (arms, designated detector, pooled bar, eight predictions scaled to 540, reasons) is committed first; then the table of sets, three specs from one table, the study gate's literal copy and its sabotage; then the three sets are flown once and read together.",
-        why: "At 180 scenarios an arm's count is uncertain by more than most of the effects registered; 540 reduces the binomial part of that by a factor of 1.7 and the between-set part is pooled.",
+        state: "CLOSED",
+        what: "CLOSED 2026-11-04 (brain/SENSED_NAV_WIP.md, RESULT OF FOLLOW-UP 60; tools/ship/subSensedDetStudy.mjs --study large-set-a|b|c, read together by tools/ship/subSensedDetLarge.mjs, flights in brain/subSensedDetLargeSetAHeld64.jsonl, ...BHeld65.jsonl, ...CHeld66.jsonl, table brain/subSensedDetLarge.txt): PARTLY SUPPORTED (5 of 6 cells); seven of eight predictions held (BH6 missed, 24 of the 30 asked). Six detectors on 540 scenarios: the base m23e30 (a 2-of-3 mark and the evidence hold at every range) is the best of the six under every sea and misses one bar cell (R3D30 gaps, 127 of 180 against 140.0); the effects of follow-up 59 reproduce in sign on fresh scenarios and to within about a factor of two: the gate costs 30 (R3D30), 27 (WD30L) and 46 (P), the first-reading near mark 120 under the leak (and 14 under R3D30, where the three sets disagree), the run of three 35 and 24, the confirmed clear nothing (5 or 6 of 540), the evidence hold gains 34 under dropouts, 39 under R3D30 and 88 under the leak, where follow-up 59's pooled row (every hold shape together) had not seen it.",
     },
     {
         id: "nav-sensed-constants-sweep",
