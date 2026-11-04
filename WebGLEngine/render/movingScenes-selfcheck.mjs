@@ -67,6 +67,9 @@
 //   the lights rising, L4 the test moving the objects anyway, L5 H83b U_TH against B1, L6 the still Bt-over-B1 from the moving Bt, L7 the
 //   light sequence sharing the object one's cache entry, L9 round 83 without lights -> 1 red each; L2 the objects moving with the lights and
 //   L10 the seeds not reserved -> 2 red each; L8 the test command dropping `lights` -> 4 red.
+// SECTION 185 (round 81's verdict rows, sabotaged in the committed file and the registration, each restored byte-identical): V1 the commit
+//   typed 203c1404, V2 H81a's count typed 16, V6 the crossover typed 1.2, V8 section 185 changing the chain, V9 it calling P5 held -> 1 red
+//   each; V3 Bt's, V4 U_TH's and V5 B1's first grade nudged, V7 the levels typed 0,0.5,1,3 -> 2 red each.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -607,6 +610,30 @@ console.log("\n13. ROUND 83 (section 188): MOVING LIGHTS");
     ok("  a moving-light sequence has its own cache entry, the test command passes the round's `lights`, and section 188 states the motion, H83a/H83b and the seeds",
         /movingKey\(fam, sd, o\) \+ \(lights \? "-lights" : ""\)/.test(study) && /\(\{ U0, gamma: RD\.moverGamma, lights: !!RD\.lights, splits: RD\.splits,/.test(cli) &&
         /Every light, and nothing else, moves/.test(s188) && /\*\*H83a:\*\* with moving lights, U_TH's chain beats Bt's/.test(s188) && /\*\*H83b:\*\* with moving lights, Bt beats B1/.test(s188) && /89000-89011/.test(s188) && /90000-90011/.test(s188) && s188.includes(R.results));
+}
+
+console.log("\n14. SECTION 185: ROUND 81's VERDICT, RE-DERIVED FROM ITS COMMITTED FILE");
+{
+    const R = LT.ROUND_UPSCALE_SPEED, r = JSON.parse(fs.readFileSync(path.join(ENG, R.results), "utf8")), H = r.verdict.hypotheses, T = r.tables, sec = r.secondary;
+    const mean = (a) => a.reduce((q, v) => q + v, 0) / a.length, g = (u, b) => 1 - mean(u) / mean(b), near = (a, b, e = 5e-5) => Math.abs(a - b) < e, fewer = (u, b) => u.filter((v, i) => v < b[i]).length;
+    ok("!! the run is round 81's: commit 203c1403 (which holds its code), the four levels, round 72's candidate (seed 1, 670c28bd), 96 sequences rendered and none cached",
+        r.round === 81 && r.commit === "203c1403" && r.levels.join() === "0,0.5,1,2" && r.trained.file === R.net && r.trained.candidate === 1 && r.trained.commit === "670c28bd" &&
+        r.cache.misses === 96 && r.cache.hits === 0 && r.determinism === true && T.b1.length === 24 && T.bt.every((x) => x.length === 24));
+    ok("!! *** H81a SUPPORTED: at k = 2 B1 is 2.93 % below Bt, better on 17 of 24, sign-flip p 0.023 under Holm's 0.05; H81b SUPPORTED: still, Bt 14.85 % below B1, 21 of 24, p 0.000095 ***",
+        H.H1.status === "supported" && H.H1.k === 17 && near(H.H1.p, 0.02252, 1e-5) && same(H.H1.d, effects(T.bt[3], T.b1)) && near(g(T.b1, T.bt[3]), 0.0293) &&
+        H.H2.status === "supported" && H.H2.k === 21 && near(H.H2.p, 0.0000952, 1e-7) && same(H.H2.d, effects(T.b1, T.bt[0])) && near(g(T.bt[0], T.b1), 0.1485) &&
+        r.verdict.run === "reported" && r.verdict.controls.C1 && r.verdict.controls.C4 && r.verdict.controls.C5 && r.verdict.controls.C2.ok && near(r.verdict.controls.C2.meanD, -3.2723, 1e-4));
+    const btG = [0.1485, 0.0504, 0.0169, -0.0302], uG = [0.2350, 0.1400, 0.1014, 0.0530], hist = [5.192, 5.053, 4.578, 3.989];
+    ok("!! the curve: Bt over B1 14.85, 5.04, 1.69, -3.02 %; U_TH over B1 23.50, 14.00, 10.14, 5.30 %; Bt's history 5.19, 5.05, 4.58, 3.99 -- each falling at every step (P6)",
+        T.bt.every((b, j) => near(g(b, T.b1), btG[j]) && near(sec.btOverB1[j], g(b, T.b1), 1e-15)) && T.u.every((u, j) => near(g(u, T.b1), uG[j])) && sec.history.every((h, j) => near(h, hist[j], 1e-3)) &&
+        [1, 2, 3].every((j) => sec.btOverB1[j] < sec.btOverB1[j - 1] && sec.uOverB1[j] < sec.uOverB1[j - 1] && sec.history[j] < sec.history[j - 1]) && near(mean(T.b1), 2.3452e-3, 5e-8));
+    ok("!! *** Bt's gain crosses zero at k = 1.36 (P4 held); U_TH's never does -- P5 MISSED: still 5.30 % below B1 at k = 2 (13 of 24), and below Bt at every level ***",
+        near(sec.crossBt, 1.3594, 1e-4) && sec.crossBt === LT.crossover(r.levels, sec.btOverB1) && sec.crossU === null && fewer(T.u[3], T.b1) === 13 && T.u.every((u, j) => fewer(u, T.bt[j]) >= 20));
+    ok("  by family: C crosses between k = 1 and 2 (0.79 % then -3.78 %), R barely (0.16 % still at k = 2)",
+        near(sec.byFamily.C.btOverB1[2], 0.0079) && near(sec.byFamily.C.btOverB1[3], -0.0378) && near(sec.byFamily.R.btOverB1[3], 0.0016));
+    const reg = fs.readFileSync(path.join(ENG, "render", "learned-denoiser-preregistration.md"), "utf8"), i185 = reg.indexOf("## 185."), s185 = reg.slice(i185, reg.indexOf("\n## ", i185 + 1) > 0 ? reg.indexOf("\n## ", i185 + 1) : undefined);   // sections land in the order they are written: 185 follows 188
+    ok("  section 185 says each of these, that the chain does not change, and that the file was committed unread",
+        reg.indexOf("## 185.") > 0 && /H81a SUPPORTED/.test(s185) && /H81b SUPPORTED/.test(s185) && /\*\*k = 1\.36\*\*/.test(s185) && /\*\*P5 MISSED:\*\*/.test(s185) && /Nothing changes in the chain\./.test(s185) && /committed unread/.test(s185));
 }
 
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +

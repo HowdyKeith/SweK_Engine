@@ -2576,9 +2576,9 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "fsr4-speed-sweep",
-        blocker: "OPEN",
-        what: "Round 81 (section 184), set up and awaiting its harvest: section 176's motion scaled by k = 0, 0.5, 1, 2 on 24 new scenes (12 R 85000-85011, 12 C 86000-86011), every level sharing the measured frame and references. H81a: at k = 2 the single measured frame B1 beats Bt by the 1 % rule; H81b: still, Bt beats B1. Bt's and U_TH's gains over B1 at each level, and where each crosses zero, descriptive.",
-        how: "node tools/denoiseStudy.mjs --harvest-upscale-temporal-test --round 81 on the rig at round 81's commit, render/denoise-results-upscale-speed-r81.json committed byte for byte before it is read; section 185 reads it.",
+        blocker: "CLOSED",
+        what: "CLOSED, BOTH SUPPORTED (section 185): the history has a speed limit. Still, Bt is 14.85 % below the single measured frame B1 (21 of 24, p 0.000095); at twice section 176's speeds B1 is 2.93 % below Bt (17 of 24, p 0.023). Bt's gain over B1 falls 14.85, 5.04, 1.69, -3.02 % at k = 0, 0.5, 1, 2 and crosses zero at k = 1.36. U_TH after Bt never crosses: 23.5 % to 5.3 % below B1 across the sweep, and below Bt at every level -- so the chain as section 175 left it needs no fallback in this range. The file came zipped and was committed unread.",
+        how: "render/denoise-results-upscale-speed-r81.json, re-derived by render/movingScenes-selfcheck.mjs section 14.",
         why: "Rounds 77-80 found B1 close to Bt on moving scenes and better on two of four sets: the history has a speed limit, and the chain should know where it is.",
     },
     {

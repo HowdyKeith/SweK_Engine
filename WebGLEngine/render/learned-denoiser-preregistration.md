@@ -11580,3 +11580,43 @@ case that should hurt the history most, and none of rounds 77-82 measured it.
 
 **The run, on Keith's rig, at round 83's commit:** `--harvest-upscale-temporal-test --round 83`, one CPU harvest (~5-11 hours), its file
 committed byte for byte before it is read. Section 189 reads it.
+
+## 185. ROUND 81's VERDICT -- BOTH HOLD: THE HISTORY HAS A SPEED LIMIT, AT ~1.4 x SECTION 176's SPEEDS. U_TH STAYS AHEAD OF ONE FRAME TO TWICE THEM
+
+**The run.** render/denoise-results-upscale-speed-r81.json, run on Keith's rig at commit 203c1403 (which holds round 81's code) in 5.1 hours,
+round 72's U_TH (seed 1, 670c28bd). 24 scenes at four speeds, 96 sequences, none from a cache. **It came zipped and was committed unread**
+(4ce3841d, sha-256 34353944...) before anything below was read.
+
+**The verdict.** C1, C3, C4 and C5 hold; C2 (round 72's shuffled-target U_TH on the k = 1 history) is far worse than Bt (mean d -3.27).
+- **H81a SUPPORTED:** at k = 2, B1 is 2.93 % below Bt (Bt 3.02 % above B1). B1 is better on 17 of 24, sign-flip p 0.023 under Holm's 0.05.
+- **H81b SUPPORTED:** still, Bt is 14.85 % below B1, better on 21 of 24, p 0.000095 under Holm's 0.025.
+
+| k (x section 176's speeds) | Bt against B1 | U_TH on Bt against B1 | Bt's mean history |
+|---|---|---|---|
+| 0 (still) | 14.85 % below (21 of 24) | 23.50 % below (22 of 24) | 5.19 |
+| 0.5 | 5.04 % below (15) | 14.00 % below (18) | 5.05 |
+| 1 | 1.69 % below (14) | 10.14 % below (17) | 4.58 |
+| 2 | 3.02 % ABOVE (7) | 5.30 % below (13) | 3.99 |
+
+B1's mean is 2.3452e-3 at every level (the measured frame is the same).
+
+**Where the history stops paying.** Bt's gain over B1 crosses zero at **k = 1.36**, linear between k = 1 and k = 2. That is a mover at about 1.4 x
+section 176's 0.01-0.08 units a frame, around 0.06 units on the mean. By family: C crosses between k = 1 and 2 (0.79 % at 1, -3.78 % at 2); R
+barely reaches it at k = 2 (still 0.16 % below B1).
+
+**And U_TH does not stop paying.** Its gain over B1 falls with speed, 23.5 % to 5.3 %, but stays positive at every level. It beats Bt itself at every
+level (20-21 of 24 scenes). So the chain as section 175 left it -- Bt, then U_TH -- is ahead of the single frame across the whole sweep. Where
+the history alone has gone negative (k = 2), U_TH's correction still turns it 5.3 % positive.
+
+**The predictions.**
+- **P1 held:** C1 and C3.
+- **P2 held:** H81a supported, B1 2.93 % below Bt at k = 2, inside 2-8 %.
+- **P3 held as to its sign, MISSED as to its size:** H81b supported, but the still gain is 14.85 %, past the predicted 3-10 %.
+- **P4 held:** the crossover at k = 1.36, inside 0.5-1.5.
+- **P5 MISSED:** I predicted U_TH would fall behind B1 at k = 2. It is still 5.30 % ahead there (13 of 24 scenes); it never crosses.
+- **P6 held:** Bt's mean history falls at every step, 5.19 to 3.99.
+
+**What it means, as section 184 fixed it.** Both hold, so the history has a speed limit, and it sits at about 1.4 x section 176's speeds. A
+chain that knows its scene's motion could fall back to B1 above it. **But with U_TH after Bt there is no need inside this range:** U_TH stays
+ahead of B1 even at twice section 176's speeds. The fallback is a candidate only for a chain WITHOUT U_TH, or for speeds past those tested.
+Nothing changes in the chain.
