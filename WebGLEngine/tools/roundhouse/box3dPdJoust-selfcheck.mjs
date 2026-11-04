@@ -14,6 +14,9 @@
 //   4  the controls, flown where the registration fixes them (C-unchanged on sixdof-box3d's 40 committed seeds), and each able to fail
 //   5  the command: refuses an existing results file, writes it once, prints no reading
 //   6  a miniature on other seeds: every part the registration names, its controls, and M1, M2 and M3 re-derived by the gate's own code
+//   7  THE VERDICT (2026-11-04), from the committed results file: the file byte for byte; M2's table and its seed-by-seed story; M1's
+//      table; M3; the rule read both ways (as registered: nothing is named; with the one-tick tumble: box3d's scheme); the predictions;
+//      the controls; the note's verdict holding every number; and a sample of the round flown again
 //
 // SABOTAGED (2026-11-04, through the byte-safe runner, each restored byte for byte): 48 sabotages, every one red by name in the end.
 //   Reading the gate against the list before any ran found three that no row could see -- isF32 blind to one vector (G20), the watch
@@ -42,8 +45,18 @@
 //     G40 M1's spin not over box3d's peak 1 | G41 M1's angle against itself 2 | G42 C-chaos unable to fail 1 | G43 the run's nudge 1e-6 1
 //   The command (tools/roundhouse/box3dPdJoustRun.mjs): G44 no refusal of an existing file 1 | G45 the readings printed 1 | G46 the file
 //   written twice 1
+//
+// SABOTAGE LOG, THE VERDICT (2026-11-04) -- section 7, the same runner, every file restored byte-identical (sha256): 19 designs, every one red
+// by name, and every row of section 7 red under at least one.
+//   V1 the file: a D flight a draw, not a loss 5 | V2 the file: an M1 angle a hundred times larger 4 | V3 the file: the tumble's spin gap
+//   5e-5 3 | V4 the file: C-model holding 5 | V5 the file: E32's better 3 4 | V6 the file: the caps' top speed 401 3 | V7 the file: a nudged
+//   flight moved 4 | V8 the file: M3's B3 changed 21 3 | V9 the note: D's tallies 1 | V10 the note: P4 called right 1 | V11 the note: the
+//   registered reading turned round 1 | V12 the note: M1's D range 1 | V13 the note: a transition 1 | V14 the note: the caps' top speed 1 |
+//   V15 the code: better and worse swapped 3 | V16 the code: D's gyroscopic step skipped 5 | V17 the code: toF32 leaving the spin 4 |
+//   V18 the code: the duel ignoring stepA 5 | V19 the code: the rule's veto removed 4
 "use strict";
 import fs from "node:fs";
+import crypto from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as RB from "../../physics/mechanics/rigidBody6dof.mjs";
@@ -254,6 +267,82 @@ try {
     const back = JSON.parse(L.serialize(r));
     ok("the results serialize to one JSON file that parses back to the same result", J(back) === J(JSON.parse(JSON.stringify(r))) && L.serialize(r).endsWith("\n"));
 } catch (e) { guard(6, e); }
+
+console.log("\n7. THE VERDICT (2026-11-04, read from the committed results file; a sample of the round flown again)");
+try {
+    const text = fs.readFileSync(L.DEFAULT_RESULTS, "utf8"), R = JSON.parse(text), sha = crypto.createHash("sha256").update(text).digest("hex");
+    ok("!! the results file is the registered run's, byte for byte as it was committed: 82,203 bytes, sha256 30ea91fb8760a5ee, naming the registration, the PD autopilot's joust, box3d's four substeps and the registered seeds",
+        Buffer.byteLength(text) === 82203 && sha.startsWith("30ea91fb8760a5ee") && R.registration === L.REGISTRATION && R.pilot === "autopilot" && R.scenario === "joust" && R.substeps === 4 &&
+        J(R.m2.seeds) === J(L.FIGHT.seeds) && J(R.m1.duels.map((d) => d.seed)) === J(L.TURN.seeds) && J(R.m3.seeds) === J(L.FOUND.seeds), `${Buffer.byteLength(text)} bytes, ${sha.slice(0, 16)}`);
+    const e2 = (x) => x.toExponential(2), fp = (x) => (x < 1e-3 ? x.toExponential(2) : x.toPrecision(3)), F = R.m2.flights, tal = (x) => `${x.win}-${x.loss}-${x.draw}`;
+    const tallyOf = (rs) => ({ win: rs.filter((x) => x.outcome === "win").length, loss: rs.filter((x) => x.outcome === "loss").length, draw: rs.filter((x) => x.outcome === "draw").length });
+    const cmp = (id) => OS.compare(F.E, F[id]), rowOf = (id) => { if (id === "E") return `| E | ${tal(tallyOf(F.E))} | | | | | |`; const c = cmp(id); return `| ${id} | ${tal(tallyOf(F[id]))} | ${c.better} | ${c.worse} | ${c.worse - c.better} | ${fp(c.p)} | ${OS.readingOf(c, L.ALPHA)} |`; };
+    const M2ROWS = ["| E | 3-27-70 | | | | | |", "| D | 1-67-32 | 2 | 42 | 40 | 1.13e-10 | changes it: worse for A |", "| E32 | 3-27-70 | 0 | 0 | 0 | 1.00 | changes nothing a sign test can see |",
+        "| D32 | 1-67-32 | 2 | 42 | 40 | 1.13e-10 | changes it: worse for A |", "| B3 | 1-67-32 | 2 | 42 | 40 | 1.13e-10 | changes it: worse for A |", "| E' | 3-27-70 | 0 | 0 | 0 | 1.00 | changes nothing a sign test can see |"];
+    const ids = ["E", "D", "E32", "D32", "B3", "E'"], m2rows = ids.map(rowOf);
+    const stored = R.m2.readings.every((x) => { const c = cmp(x.id); return x.better === c.better && x.worse === c.worse && x.p === c.p && x.net === c.worse - c.better && x.reading === OS.readingOf(c, L.ALPHA); }) &&
+        ids.every((k) => J(tallyOf(F[k])) === J(R.m2.tally[k]) && F[k].length === 100);
+    ok("!! M2: every reading and tally re-derived from the file's 600 flights by the orientation round's comparison, and the verdict's table row by row", stored && J(m2rows) === J(M2ROWS), m2rows.find((r, i) => r !== M2ROWS[i]) || "");
+    const sameOut = (a, b) => F[a].filter((f, i) => f.outcome === F[b][i].outcome).length, sameFp = (a, b) => F[a].filter((f, i) => f.fingerprint === F[b][i].fingerprint).length;
+    const tr = {}; F.E.forEach((f, i) => { if (f.outcome !== F.B3[i].outcome) { const k = `${f.outcome}->${F.B3[i].outcome}`; tr[k] = (tr[k] || 0) + 1; } });
+    const pairs = F.E.map((f, i) => ({ e: f, b: F.B3[i] })), draws = pairs.filter((x) => x.e.outcome === "draw"), lost = draws.filter((x) => x.b.outcome === "loss");
+    ok("!! seed by seed: D's and D32's outcomes are box3d's on all 100 seeds, D32's whole duel on 68; E32's are E's on all 100 though float32 moved 97 of its flights, and the nudge moved none; E's 70 draws are all mutual kills (249 to 443 ticks), 39 of them A's losses on box3d, every one in the very tick; the 42 worse and the 2 better, by kind",
+        sameOut("D", "B3") === 100 && sameOut("D32", "B3") === 100 && sameFp("D32", "B3") === 68 && sameOut("E32", "E") === 100 && 100 - sameFp("E32", "E") === 97 && sameFp("E'", "E") === 100 &&
+        draws.length === 70 && draws.every((x) => x.e.ticks < 900) && Math.min(...draws.map((x) => x.e.ticks)) === 249 && Math.max(...draws.map((x) => x.e.ticks)) === 443 && lost.length === 39 && lost.every((x) => x.b.ticks === x.e.ticks) &&
+        J(tr) === J({ "draw->loss": 39, "win->loss": 2, "draw->win": 1, "win->draw": 1, "loss->draw": 1 }), J(tr));
+    const D1 = R.m1.duels, span = (f, unit = "") => `${e2(Math.min(...D1.map(f)))} to ${e2(Math.max(...D1.map(f)))}${unit}`;
+    const m1rows = ["E", "D", "E32", "D32"].map((k) => `| ${k} | ${span((d) => d.angle[k], " rad")} | ${span((d) => d.dist[k], " m")} | ${span((d) => d.spinOff[k])} |`);
+    const M1ROWS = ["| E | 1.93e-2 to 4.01e-2 rad | 1.78e-5 to 5.49e-3 m | 1.39e-7 to 8.87e-7 |", "| D | 9.71e-7 to 6.18e-6 rad | 1.78e-5 to 1.02e-4 m | 1.39e-7 to 8.87e-7 |",
+        "| E32 | 1.93e-2 to 4.01e-2 rad | 1.19e-7 to 5.58e-3 m | 1.16e-7 to 7.91e-7 |", "| D32 | 7.43e-7 to 7.12e-6 rad | 1.19e-7 to 1.57e-4 m | 1.16e-7 to 7.91e-7 |"];
+    const worst = Math.max(...D1.map((d) => d.angle.D / d.angle.E)), m1span = `${Math.min(...D1.map((d) => d.ticks))} to ${Math.max(...D1.map((d) => d.ticks))} ticks each, with box3d's peak spin ${Math.min(...D1.map((d) => d.peakSpin)).toFixed(3)} to ${Math.max(...D1.map((d) => d.peakSpin)).toFixed(3)} rad/s`;
+    ok("!! M1: ten joust replays (310 to 443 ticks, box3d's peak spin 1.157 to 2.407 rad/s) and the verdict's table row by row; D within a hundredth of E's distance from box3d in every one, the worst ratio 3.16e-4",
+        D1.length === 10 && J(m1rows) === J(M1ROWS) && e2(worst) === "3.16e-4" && D1.every((d) => d.angle.D <= 0.01 * d.angle.E) && m1span === "310 to 443 ticks each, with box3d's peak spin 1.157 to 2.407 rad/s", m1rows.find((r, i) => r !== M1ROWS[i]) || m1span);
+    const M3 = R.m3, chg = M3.seeds.map((x, i) => M3.flights.B3[i].outcome !== M3.flights.E[i].outcome), V3 = M3.variants;
+    const m3ok = ["D", "E32", "D32"].every((k) => { const c = OS.compare(M3.flights.E, M3.flights[k]); return V3[k].better === c.better && V3[k].worse === c.worse && V3[k].p === c.p && V3[k].toB3 === M3.seeds.filter((x, i) => chg[i] && M3.flights[k][i].outcome === M3.flights.B3[i].outcome).length; });
+    ok("!! M3: box3d changed 22 outcomes at the finding's seeds; D and D32 change all 22 to box3d's and read there as box3d did (1 better, 21 worse, p 1.10e-5); E32 changes none -- re-derived from M3's flights",
+        m3ok && M3.b3Changed === 22 && chg.filter(Boolean).length === 22 && ["D", "D32"].every((k) => V3[k].toB3 === 22 && V3[k].better === 1 && V3[k].worse === 21 && fp(V3[k].p) === "1.10e-5") &&
+        V3.E32.toB3 === 0 && V3.E32.better === 0 && V3.E32.worse === 0 && fp(V3.E32.p) === "1.00");
+    const C = R.controls, M = C.model, asReg = L.nameThePart(R.m2.readings, M.ok), oneTick = L.nameThePart(R.m2.readings, M.okPerTick);
+    ok("!! the rule, from the file: B3 replicates; D and D32 reproduce it and E32 does not, so before C-model is asked the rule names box3d's scheme -- and as registered C-model fails on its tumble alone (ratio 3.16e-4 and key 1.48e-8 held; 2.15e-4 and 1.63e-4), so nothing is named; with the one-tick tumble (1.29e-6, 1.78e-7) it holds and the rule names box3d's scheme",
+        asReg.replicated && asReg.raw === "box3d's scheme" && J(asReg.reproduces) === J({ D: true, E32: false, D32: true }) && asReg.label === "nothing is named" && oneTick.label === "box3d's scheme" &&
+        !M.ok && M.ratio.ok && M.key.ok && !M.tumble.ok && M.perTick.ok && M.okPerTick && e2(M.ratio.worst) === "3.16e-4" && e2(M.key.off) === "1.48e-8" && e2(M.tumble.spinGap) === "2.15e-4" && e2(M.tumble.angleGap) === "1.63e-4" &&
+        e2(M.perTick.spinGap) === "1.29e-6" && e2(M.perTick.angleGap) === "1.78e-7", `${asReg.label} / ${oneTick.label}`);
+    const rd = Object.fromEntries(R.m2.readings.map((x) => [x.id, x]));
+    const P = { P1: asReg.replicated, P2: asReg.reproduces.D, P3: rd.E32.reading === "changes nothing a sign test can see", P4: asReg.label === "box3d's scheme", P5: M.ok, P6: V3.D.toB3 >= 15 };
+    ok("!! the predictions, each by its registered rule from the file: P1 right, P2 right, P3 right, P4 wrong (the rule as registered names nothing), P5 wrong (the tumble), P6 right (22 of 22)",
+        P.P1 && P.P2 && P.P3 && !P.P4 && !P.P5 && P.P6, J(P));
+    ok("!! the controls as the verdict gives them: C-unchanged (the anchors, the digest and the 80 committed flights), C-box3d, C-float32, C-caps (11.95 m/s and 2.73 rad/s over 33,628 ticks), C-chaos (p 1.00), C-determinism (12 flights); C-model alone not held",
+        C.unchanged.ok && C.unchanged.anchors.ok && C.unchanged.sameSeeds && C.unchanged.sameE && C.unchanged.sameB3 && C.box3d.ok && C.float32.ok && C.caps.ok && C.caps.maxSpeed.toFixed(2) === "11.95" &&
+        C.caps.maxSpin.toFixed(2) === "2.73" && C.caps.ticks === 33628 && C.chaos.ok && fp(C.chaos.p) === "1.00" && C.determinism.ok && C.determinism.flights === 12 && !C.model.ok &&
+        J(R.readings) === J(R.m2.readings.map(({ id, better, worse, p, net, reading }) => ({ id, better, worse, p, net, reading }))));
+    // THE NOTE: the verdict section alone, its line breaks read as spaces
+    const note = src(L.REGISTRATION), vAt = note.indexOf("\n## The verdict, 2026-11-04"), rest = vAt >= 0 ? note.slice(vAt + 1) : "", nextAt = rest.slice(1).search(/\n#{2,3} /);
+    const vt = (nextAt >= 0 ? rest.slice(0, nextAt + 1) : rest).replace(/\s+/g, " ");
+    const nT = Math.round(L.MODEL.tumbleT / h), mom = (st) => RB.rotateByQuat(st.q, [I[0] * st.w[0], I[1] * st.w[1], I[2] * st.w[2]]);
+    const driftB3 = SB3.withStepper(b3, (stp) => { let b = body({ w: [...L.MODEL.tumbleW] }); const L0 = mom(b); for (let k = 0; k < nT; k++) b = stp.step(b, zero(), h); return gap(mom(b), L0) / hyp(L0); });
+    const frags = [`${Buffer.byteLength(text).toLocaleString("en-US")} bytes, sha256 ${sha.slice(0, 16)}`, ...m2rows, ...m1rows, m1span, `The worst ratio is ${e2(worst)}`,
+        `D's outcome is box3d's on all ${sameOut("D", "B3")} seeds, and so is D32's`, `(the same fingerprint) on ${sameFp("D32", "B3")} of them`, `E32's outcome is E's on all ${sameOut("E32", "E")} seeds`,
+        `though float32 moved ${100 - sameFp("E32", "E")} of its 100 flights. The nudge moved ${sameFp("E'", "E") === 100 ? "none" : 100 - sameFp("E'", "E")}`,
+        `E's ${draws.length} draws are all mutual kills, ${Math.min(...draws.map((x) => x.e.ticks))} to ${Math.max(...draws.map((x) => x.e.ticks))} ticks in. On box3d, ${lost.length} of them become A's losses`,
+        `The ${rd.B3.worse} worse: those ${tr["draw->loss"]}, ${tr["win->loss"]} wins that became losses, and ${tr["win->draw"]} win that became a draw.`, `The ${rd.B3.better} better: ${tr["draw->win"]} draw that became a win, and ${tr["loss->draw"]} loss that became a draw.`,
+        `box3d changed ${M3.b3Changed} outcomes at seeds 93001 to 93040. D and D32 each change all ${V3.D.toB3} to box3d's outcome, and read there exactly as box3d did: ${V3.D.better} better, ${V3.D.worse} worse, p = ${fp(V3.D.p)}. E32 changes none.`,
+        `B3 replicates: worse for A, p = ${fp(rd.B3.p)}.`, `with a net of ${rd.D.net}, all of B3's`, `Its ratio (${e2(M.ratio.worst)}) and its key (${e2(M.key.off)} rad) held; its tumble did not (${e2(M.tumble.spinGap)} and ${e2(M.tumble.angleGap)} rad, against 1e-4)`,
+        asReg.label === "nothing is named" ? "**So by the rule as registered, nothing is named.**" : `**So by the rule as registered, ${asReg.label}.**`,
+        `That tumble holds (${e2(M.perTick.spinGap)} and ${e2(M.perTick.angleGap)} rad), so with it C-model holds, and **the rule names ${oneTick.label}.**`, `by ${e2(driftB3)} of it over the 10 s on box3d`,
+        ...Object.keys(P).map((k) => `**${k}: ${P[k] ? "right" : "wrong"}.**`), `B3's ship reached at most ${C.caps.maxSpeed.toFixed(2)} m/s and ${C.caps.maxSpin.toFixed(2)} rad/s over ${C.caps.ticks.toLocaleString("en-US")} ticks`,
+        `C-chaos: E' against E has p = ${fp(C.chaos.p)}.`, `C-determinism: ${C.determinism.flights} flights, each the same twice.`, `Its 80 committed flights of the PD autopilot's joust`,
+        oneTick.label === "box3d's scheme" ? "the PD autopilot loses its jousts on box3d because of box3d's integration scheme" : "the PD autopilot's jousts on box3d"];
+    const missing = frags.filter((f) => !vt.includes(f));
+    ok("!! the note's verdict carries the file's numbers: both tables row by row, the seed-by-seed story, M3, the rule read both ways, each prediction as the file reads it, the controls, and what the one-tick reading buys",
+        vAt >= 0 && missing.length === 0, missing.slice(0, 3).join(" || ") || `${frags.length} fragments`);
+    // A SAMPLE OF THE ROUND, flown again at this head through the library, against the file to the bit
+    const off = [], s1 = L.FIGHT.seeds[0], f1 = L.FOUND.seeds[0];
+    for (const id of ["E", "D", "E32", "D32", "B3"]) if (J(L.fight(b3, s1, id)) !== J(F[id][0])) off.push(`M2/${id}`);
+    if (J(L.fight(b3, s1, "E", { nudge: L.FIGHT.nudge })) !== J(F["E'"][0])) off.push("M2/E'");
+    if (J(L.m1(b3, [s1]).duels[0]) !== J(D1[0])) off.push("M1");
+    for (const id of ["D", "E32", "D32"]) if (J(L.fight(b3, f1, id)) !== J(M3.flights[id][0])) off.push(`M3/${id}`);
+    ok("!! a sample of the round flown again at this head, through the library, is the file's to the bit: M2's seed 95001 six ways, M1's replay of it, and M3's seed 93001 with D, E32 and D32", off.length === 0, off.join(" ") || "10 flights and a replay");
+} catch (e) { guard(7, e); }
 
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)`);
 process.exitCode = fails ? 1 : 0;

@@ -203,3 +203,98 @@ by name in the end.
 - Then G3 and G26 went 0 red. Both are findings, and both rows were fixed and re-sabotaged red:
   - G3: on the ship, one component's gyroscopic term is zero, because two of its moments are equal.
   - G26: the reading string already carries p < 0.01.
+
+## The verdict, 2026-11-04
+
+Read from `physics/mechanics/box3dPdJoustResults.json` (82,203 bytes, sha256 30ea91fb8760a5ee), committed at 380e5731
+before anyone read it. The run took 3 s.
+
+**box3d's scheme costs the PD autopilot its jousts, and float32 costs it nothing. But the registered rule names
+nothing, because C-model failed on its tumble, as the build record said before the run that it would. Read with the
+one-tick form of the tumble, the rule names box3d's scheme. Which reading stands is Keith's decision.**
+
+**M2, the fights.** The PD autopilot flies as A against itself, in the joust, over the 100 fresh seeds. Each variant
+is read against E:
+
+| A on | wins-losses-draws | better | worse | net | p | reading |
+|---|---|---|---|---|---|---|
+| E | 3-27-70 | | | | | |
+| D | 1-67-32 | 2 | 42 | 40 | 1.13e-10 | changes it: worse for A |
+| E32 | 3-27-70 | 0 | 0 | 0 | 1.00 | changes nothing a sign test can see |
+| D32 | 1-67-32 | 2 | 42 | 40 | 1.13e-10 | changes it: worse for A |
+| B3 | 1-67-32 | 2 | 42 | 40 | 1.13e-10 | changes it: worse for A |
+| E' | 3-27-70 | 0 | 0 | 0 | 1.00 | changes nothing a sign test can see |
+
+- **Seed by seed,** D's outcome is box3d's on all 100 seeds, and so is D32's. D32's whole duel is box3d's to the bit
+  (the same fingerprint) on 68 of them.
+- **E32's outcome is E's on all 100 seeds,** though float32 moved 97 of its 100 flights. The nudge moved none.
+- **What changed.** E's 70 draws are all mutual kills, 249 to 443 ticks in. On box3d, 39 of them become A's losses,
+  every one in the very tick it ended in on E.
+  - The 42 worse: those 39, 2 wins that became losses, and 1 win that became a draw.
+  - The 2 better: 1 draw that became a win, and 1 loss that became a draw.
+
+**M1, the model, open loop.** Ten joust replays, 310 to 443 ticks each, with box3d's peak spin 1.157 to 2.407 rad/s.
+Each variant is measured against box3d:
+
+| A on | orientation off box3d's | position off box3d's | spin off box3d's, over its peak |
+|---|---|---|---|
+| E | 1.93e-2 to 4.01e-2 rad | 1.78e-5 to 5.49e-3 m | 1.39e-7 to 8.87e-7 |
+| D | 9.71e-7 to 6.18e-6 rad | 1.78e-5 to 1.02e-4 m | 1.39e-7 to 8.87e-7 |
+| E32 | 1.93e-2 to 4.01e-2 rad | 1.19e-7 to 5.58e-3 m | 1.16e-7 to 7.91e-7 |
+| D32 | 7.43e-7 to 7.12e-6 rad | 1.19e-7 to 1.57e-4 m | 1.16e-7 to 7.91e-7 |
+
+- D's orientation stays within a hundredth of E's distance from box3d in every replay. The worst ratio is 3.16e-4.
+- Every variant's spin is box3d's to float32's precision. What separates them is the orientation.
+
+**M3, the seeds of the finding, testing nothing.** box3d changed 22 outcomes at seeds 93001 to 93040. D and D32 each
+change all 22 to box3d's outcome, and read there exactly as box3d did: 1 better, 21 worse, p = 1.10e-5. E32 changes
+none.
+
+**The rule:**
+
+- B3 replicates: worse for A, p = 1.13e-10.
+- D reproduces B3: worse for A at p < 0.01, with a net of 40, all of B3's. E32 does not: it changes nothing. So
+  before C-model is asked, the rule names box3d's scheme.
+- C-model, as registered, did not hold. Its ratio (3.16e-4) and its key (1.48e-8 rad) held; its tumble did not
+  (2.15e-4 and 1.63e-4 rad, against 1e-4). **So by the rule as registered, nothing is named.**
+- The build record set the one-tick tumble beside it before the run, testing nothing. That tumble holds (1.29e-6 and
+  1.78e-7 rad), so with it C-model holds, and **the rule names box3d's scheme.**
+
+**Why the two readings differ,** from the build record written before the run: the registered tumble cannot tell
+box3d's scheme in double from box3d's scheme in float32. The scheme drifts the ship's angular momentum, by 2.27e-3 of
+it over the 10 s on box3d, and the two precisions drift apart along it. Everything that bears on the fights says D is
+box3d's scheme: M1's orientations, M2's 100 outcomes, and M3's 22.
+
+**The predictions:**
+
+- **P1: right.** B3 replicates on the fresh seeds.
+- **P2: right.** D reproduces B3.
+- **P3: right.** E32 changes nothing a sign test can see. It changes no outcome at all.
+- **P4: wrong.** By the rule as registered, the verdict names nothing. With the one-tick form it would be right.
+- **P5: wrong.** C-model's tumble did not hold.
+- **P6: right.** D changes all 22 of B3's outcomes to B3's.
+
+**The controls:**
+
+- C-unchanged: sixdof-box3d's ten anchors and its step digest hold. Its 80 committed flights of the PD autopilot's
+  joust, on E and on box3d, fly again to the bit.
+- C-box3d held.
+- C-model did not hold, as above.
+- C-float32: E32's and D32's states are float32 in every replay and every flight. E's and D's are not.
+- C-caps: B3's ship reached at most 11.95 m/s and 2.73 rad/s over 33,628 ticks, far under box3d's caps.
+- C-chaos: E' against E has p = 1.00.
+- C-determinism: 12 flights, each the same twice.
+
+**What this buys:**
+
+- **If the rule is read with the one-tick form,** the PD autopilot loses its jousts on box3d because of box3d's
+  integration scheme. The scheme gives the tick's torque at the start of the tick and turns the ship first-order.
+  Float32 has nothing to do with it.
+  - A ship on box3d therefore answers its torque differently from the ship the PD autopilot was tuned on.
+  - There are two ways out, each a decision of its own: tune the autopilot for box3d, or step box3d's ships as E
+    steps them.
+- **If the rule is read as registered,** nothing is named, and the same evidence stands as reported.
+- Nothing is changed. No page flies its ships on box3d, and this note authorises no further round.
+
+**Gated.** Section 7 of `tools/roundhouse/box3dPdJoust-selfcheck.mjs` re-derives every number above from the committed
+file, holds this verdict to them, and flies a sample of the round again.
