@@ -11,6 +11,8 @@
 //   6 FLIGHT    one real short audit (seeds 15001-15002, far and both, 200 s): every arm flies, rule-obs is T.GUARDED_OBS, a circuit is its recorded weights through trainNeedsCircuit's policy, the step is first-order.
 //   7 SOURCE    the first-order import is first; the seeds appear once; no clock, random or file.
 // NOT CHECKED, said plainly: which arm is best (that is the experiment).
+// SABOTAGE LOG (46 mutants of tools/ship/needsHead.mjs, each alone in its own worktree copy): 40 went red by name on the first pass, 1 pattern was not found and was rewritten. 5 went 0 red and got rows, then red: the circuits' reading against rule-r8 instead of rule-obs (the fixture had rule-r8 equal to rule-obs), line 2 built from the start's readings, the family test without the controls' spread, the hull line's rule (the pattern).
+//   ONE DECLARED EQUIVALENT: "check finite" (dropping Number.isFinite from the score check): NaN fails `r.score >= 0` anyway, so the range test alone catches it.
 "use strict";
 import fs from "node:fs";
 let fails = 0, finished = false;
@@ -73,6 +75,14 @@ sec("3. LINES");
     ok("!! a circuit below its start and the rule is named after the semicolon in lines 1 and 2: '; cx ARE BELOW IT'; the best circuit below the twin says IS BELOW when every circuit is poorer", bl[0] === "1 OF 12 CIRCUITS BEAT THEIR START (RULE-OBS) (er:1); cx ARE BELOW IT" && bl[1] === "1 OF 12 CIRCUITS BEAT THE TUNED RULE AT THE SEAT'S CONSTANTS (er:1); cx ARE BELOW IT" && /IS BELOW THE TWIN SEAT/.test(X.bottomLines(mkAu({ "twin-low06": { f: () => 0.3 } }))[2]));
     const h = X.bottomLines(mkAu({ "rule-low06": { lost: 3 }, "twin-low06": { lost: 1 }, "circ-cx": { lost: 2 }, "circ-er0": { lost: 5 } }))[4];
     ok("!! the hull line counts the rule's, the twin's and the circuits' bad dives (3, 1, circuits 7 with 5 in the worst)", h === "HULL: crushed or stranded dives: rule-low06 3, twin 1, circuits 7 (5 in the worst)");
+}
+{
+    const r = X.bottomLines(mkAu({ "circ-cx": { f: (i) => 0.1 + wob(i, 0.02) }, "rule-r8": { f: () => 0.3 }, "rule-low06": { f: () => 0.2 } }));
+    ok("!! the start and the rule are different arms: with rule-low06 raised by 0.2 and rule-r8 by 0.3 (rule-obs left), cx is +0.1 over its start (line 1 names it) and BELOW the rule (line 2 says 0 OF 12 and names cx among those below), whichever of the rules is raised", r[0] === "1 OF 12 CIRCUITS BEAT THEIR START (RULE-OBS) (cx)" && /^0 OF 12 CIRCUITS BEAT THE TUNED RULE AT THE SEAT'S CONSTANTS \(none\); cx,.* ARE BELOW IT$/.test(r[1]) && X.readingsOf(mkAu({ "circ-cx": { f: (i) => 0.1 + wob(i, 0.02) }, "rule-r8": { f: () => 0.3 } }), "cx").vsObs.reading === "BETTER");
+    const ctl = { "circ-er0": 0.3, "circ-er1": -0.3, "circ-er2": 0.3, "circ-layer0": -0.3, "circ-layer1": 0.3, "circ-layer2": -0.3, "circ-degree0": 0.3, "circ-degree1": -0.3, "circ-degree2": 0 }, sp = { "circ-cx": { f: () => 0.1 }, "circ-nostate": { f: () => 0.1 }, "circ-withheld": { f: () => 0.1 } };
+    for (const [k, v] of Object.entries(ctl)) sp[k] = { f: () => v };
+    const fm = X.familyOf(mkAu(sp));
+    ok("!! the controls' spread counts in the family test: three real wirings at +0.1 (no spread) against nine controls swinging +-0.3 around 0: the difference +0.1 is inside 2 se (about 0.2), NOT ABOVE", near(fm.diff, 0.1, 2e-3) && near(fm.se, 0.1, 5e-3) && fm.above === false);
 }
 sec("4. CHECKS");
 {
