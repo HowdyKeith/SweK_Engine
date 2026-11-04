@@ -74,6 +74,7 @@ sec("4. LINES");
         const hull = (mut) => { const au = synthAu(); mut(au); return X.bottomLines(au, "L-0.16H0")[3]; };
         ok("!! the hull line: UNHARMED when no confirmation arm has a crushed or stranded dive", hull(() => {}) === "THE HULL IS UNHARMED (0 CRUSHED, 0 STRANDED)");
         ok("!! a crushed dive in any block or arm makes the hull PAY, counted over all arms and blocks and naming only the arms that paid (2 crushed in TWIN-WIN, 3 stranded in TUNED-REF)", hull((au) => { au.K2a["TWIN-WIN"].crashed = 1; au.K2c["TWIN-WIN"].crashed = 1; au.K2b["TUNED-REF"].stranded = 3; }) === "THE HULL PAYS: 2 CRUSHED, 3 STRANDED (TWIN-WIN, TUNED-REF)");
+        ok("!! crushed alone pays too (1 crushed in TWIN-REF, nothing stranded)", hull((au) => { au.K2b["TWIN-REF"].crashed = 1; }) === "THE HULL PAYS: 1 CRUSHED, 0 STRANDED (TWIN-REF)");
         ok("!! stranded alone pays too; the count adds over the three blocks (1 + 1 + 1)", hull((au) => { for (const n of X.CONF_NAMES) au[n]["TUNED-WIN"].stranded = 1; }) === "THE HULL PAYS: 0 CRUSHED, 3 STRANDED (TUNED-WIN)");
     }
     ok("!! exactly 2 se is not real: a fixture whose retune mean is below 2 se does not pass", (() => { const au = synthAu({ win: (b, i) => (i === 7 ? 0.5 : 0) }); const d = X.differences(au).retune; return d.mean < 2 * d.se && X.bottomLines(au, "L-0.16H0")[0].startsWith("THE OPTIMUM"); })());
@@ -109,10 +110,12 @@ sec("7. FLIGHT");
     { const a2 = X.flySelection("L-0.23H0", R8, { range: rng }), ref2 = X.flySelection("L-0.12H0", R8, { range: rng });
       ok("!! and over 200 seconds (a 100-second dive never gets low enough to meet the trip point) it differs from the reference's dives on three of the four (the shift reaches the seat)", a2.runs.filter((r, i) => r.fingerprint !== ref2.runs[i].fingerprint).length === 3); }
     X.setFlight({ seconds: 100 });
+    X.setFlight({ seconds: 200 });
+    const a200 = X.flySelection("L-0.23H0", R8, { range: rng }), ref200 = X.flySelection("L-0.12H0", R8, { range: rng });
     const ranges = { K2a: rng, K2b: rng, K2c: rng }, cf = (arm, w) => X.flyConfirm(arm, w, R8, "K2b", { ranges });
     const win = cf("TWIN-WIN", "L-0.23H0"), tref = cf("TWIN-REF", "L-0.23H0"), tw1 = cf("TUNED-WIN", "L-0.23H0"), tr1 = cf("TUNED-REF", "L-0.23H0");
-    ok("!! TWIN-WIN is the twin on the winner's constants and TWIN-REF the twin on the reference's, whatever the winner is", win.runs.every((r, i) => r.fingerprint === a.runs[i].fingerprint) && tref.runs.every((r, i) => r.fingerprint === ref.runs[i].fingerprint));
-    const bare = (p) => T.evaluate(T.flyDecision(U.tunedSeat(p, U.WIDE_BOUNDS)), T.setOf(X.HARD, rng[0], rng[1]), { gauge: T.GAUGE, seconds: 100 });
+    ok("!! TWIN-WIN is the twin on the winner's constants and TWIN-REF the twin on the reference's, whatever the winner is", win.runs.every((r, i) => r.fingerprint === a200.runs[i].fingerprint) && tref.runs.every((r, i) => r.fingerprint === ref200.runs[i].fingerprint) && win.runs.some((r, i) => r.fingerprint !== tref.runs[i].fingerprint));
+    const bare = (p) => T.evaluate(T.flyDecision(U.tunedSeat(p, U.WIDE_BOUNDS)), T.setOf(X.HARD, rng[0], rng[1]), { gauge: T.GAUGE, seconds: 200 });
     ok("!! TUNED-WIN and TUNED-REF are the bare rule on the winner's and the reference's constants with the noisy gauge, dive for dive (and differ from the twin arms)", tw1.runs.every((r, i) => r.fingerprint === bare({ ...R8, low: R8.low - 0.23 }).runs[i].fingerprint) && tr1.runs.every((r, i) => r.fingerprint === bare({ ...R8, low: R8.low - 0.12 }).runs[i].fingerprint) && tw1.runs.some((r, i) => r.fingerprint !== win.runs[i].fingerprint));
     X.setFlight({});
     const msg = (f) => { try { f(); return ""; } catch (e) { return String(e.message); } };
