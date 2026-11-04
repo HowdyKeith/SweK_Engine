@@ -1,7 +1,7 @@
 {
  "host": "win32-x64-12c-32gb-b70b27",
  "note": "THIS BOX'S OWN gate runtimes, written by tools/ship/boxTimings.mjs. The shared sweep-timings.json is host-claimed and a foreign box cannot write it (v4647, and that refusal is right); this is how a box records what IT measured without overwriting another machine's numbers. `kinds` says which quantity each ms is, as in the shared record: `alone` is an uncontended serial reading, `capped` is a FLOOR and not a runtime. Read for COVERAGE -- has this gate ever been timed -- and NOT for the ship-time budget, which still reads the shared file. See task #87. `serialRing` holds the last three alone readings; recordReach's margin row reads it on a box that does not own the shared record, because that row asks what a gate costs HERE and nothing here can refresh another box's ring.",
- "captured": "2026-11-04T22:12:41.427Z",
+ "captured": "2026-11-04T22:34:49.206Z",
  "timings": {
   "brain/surveySeat-selfcheck.mjs": 54786,
   "brain/plannerPerturbed-selfcheck.mjs": 51025,
@@ -17,7 +17,11 @@
   "tools/ship/plannerMeta-selfcheck.mjs": 100,
   "tools/ship/plannerRetune-selfcheck.mjs": 9428,
   "tools/ship/plannerRobust-selfcheck.mjs": 43703,
-  "tools/ship/plannerTolerate-selfcheck.mjs": 15944
+  "tools/ship/plannerTolerate-selfcheck.mjs": 15944,
+  "brain/switchboard-selfcheck.mjs": 74418,
+  "render/switchboardView-selfcheck.mjs": 209,
+  "tools/ship/headToHead-selfcheck.mjs": 3192,
+  "tools/ship/needsHead-selfcheck.mjs": 7755
  },
  "at": {
   "brain/surveySeat-selfcheck.mjs": "2026-11-04T22:12:41.427Z",
@@ -34,7 +38,11 @@
   "tools/ship/plannerMeta-selfcheck.mjs": "2026-11-04T22:12:41.427Z",
   "tools/ship/plannerRetune-selfcheck.mjs": "2026-11-04T22:12:41.427Z",
   "tools/ship/plannerRobust-selfcheck.mjs": "2026-11-04T22:12:41.427Z",
-  "tools/ship/plannerTolerate-selfcheck.mjs": "2026-11-04T22:12:41.427Z"
+  "tools/ship/plannerTolerate-selfcheck.mjs": "2026-11-04T22:12:41.427Z",
+  "brain/switchboard-selfcheck.mjs": "2026-11-04T22:34:49.206Z",
+  "render/switchboardView-selfcheck.mjs": "2026-11-04T22:34:49.206Z",
+  "tools/ship/headToHead-selfcheck.mjs": "2026-11-04T22:34:49.206Z",
+  "tools/ship/needsHead-selfcheck.mjs": "2026-11-04T22:34:49.206Z"
  },
  "kinds": {
   "brain/surveySeat-selfcheck.mjs": "alone",
@@ -51,7 +59,11 @@
   "tools/ship/plannerMeta-selfcheck.mjs": "alone",
   "tools/ship/plannerRetune-selfcheck.mjs": "alone",
   "tools/ship/plannerRobust-selfcheck.mjs": "alone",
-  "tools/ship/plannerTolerate-selfcheck.mjs": "alone"
+  "tools/ship/plannerTolerate-selfcheck.mjs": "alone",
+  "brain/switchboard-selfcheck.mjs": "alone",
+  "render/switchboardView-selfcheck.mjs": "alone",
+  "tools/ship/headToHead-selfcheck.mjs": "alone",
+  "tools/ship/needsHead-selfcheck.mjs": "alone"
  },
  "codes": {
   "brain/surveySeat-selfcheck.mjs": 0,
@@ -68,7 +80,11 @@
   "tools/ship/plannerMeta-selfcheck.mjs": 0,
   "tools/ship/plannerRetune-selfcheck.mjs": 0,
   "tools/ship/plannerRobust-selfcheck.mjs": 0,
-  "tools/ship/plannerTolerate-selfcheck.mjs": 0
+  "tools/ship/plannerTolerate-selfcheck.mjs": 0,
+  "brain/switchboard-selfcheck.mjs": 0,
+  "render/switchboardView-selfcheck.mjs": 0,
+  "tools/ship/headToHead-selfcheck.mjs": 0,
+  "tools/ship/needsHead-selfcheck.mjs": 0
  },
  "serialRing": {
   "brain/surveySeat-selfcheck.mjs": [
@@ -140,6 +156,26 @@
    16887,
    15605,
    15944
+  ],
+  "brain/switchboard-selfcheck.mjs": [
+   75164,
+   74000,
+   74418
+  ],
+  "render/switchboardView-selfcheck.mjs": [
+   196,
+   187,
+   209
+  ],
+  "tools/ship/headToHead-selfcheck.mjs": [
+   2981,
+   3052,
+   3192
+  ],
+  "tools/ship/needsHead-selfcheck.mjs": [
+   7236,
+   7643,
+   7755
   ]
  }
 }
