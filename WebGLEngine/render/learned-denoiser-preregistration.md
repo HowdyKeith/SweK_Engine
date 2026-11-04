@@ -11450,3 +11450,46 @@ on the old Bt is 3.29 % below Bt on this set. U_TH on Bt_MV is 0.50 % above U_TH
 **Estimated motion vectors (the "item 4" that waited on this round) are not opened.** They can only do as well as the exact ones, and the
 exact ones bought nothing reliable. The movers' error is their changing shading, a question for the denoiser at the current frame,
 not for the history.
+
+## 184. ROUND 81 -- HOW FAST CAN THE OBJECTS MOVE BEFORE THE HISTORY STOPS PAYING? A SPEED SWEEP. FIXED BEFORE ITS CODE
+
+**Why.** Rounds 77-80 found the single measured frame, B1, close to Bt on moving scenes, and better than it on two of the four sets (rounds 79
+and 80). So somewhere between still and section 176's speeds, eight frames of history stop beating one. This round finds where, on one set,
+at several speeds. Nothing in the chain changes. It tells the chain when the history is worth keeping.
+
+**The sweep (render/movingScenes.mjs's scaleMotion).**
+- Section 176's motion, each mover's velocity multiplied by **k in SPEED_LEVELS = 0, 0.5, 1, 2**. At k = 0 the scene is still (the still
+  example, bit for bit); at k = 2 a mover goes 0.02-0.16 units a frame, past POS_TOL's ~0.04 nearly always.
+- The motion still runs backwards from the measured frame, so all four levels share one measured frame, B1, and the references. Only the seven
+  history frames differ.
+
+**ROUND 81, a test only, on the CPU.** U_TH is round 72's candidate, unchanged.
+- **Test:** 24 new scenes, 12 R (85000-85011) and 12 C (86000-86011), at round 72's settings, each at the four levels. Graded at each level: Bt
+  and U_TH on Bt; B1 once (it is the same at every level).
+- **H81a:** at k = 2, B1 beats Bt, by section 159's rule (a mean display relMSE at least 1 % below Bt's), through verdict() (the sign-flip
+  test, Holm with H81b, C1-C5).
+- **H81b:** at k = 0, Bt beats B1, by the same rule: the history pays when nothing moves.
+- **Descriptive, deciding nothing:**
+  - Bt's gain over B1 at each level, and the speed where it crosses zero (linear between the levels that bracket it);
+  - the same for U_TH on Bt;
+  - per family;
+  - Bt's mean history length at each level.
+- File: render/denoise-results-upscale-speed-r81.json.
+
+**Predictions, fixed now, deciding nothing.**
+- **P1:** C1 and C3 hold.
+- **P2:** H81a is supported: at k = 2, B1 is 2-8 % below Bt.
+- **P3:** H81b is supported: still, Bt is 3-10 % below B1.
+- **P4:** Bt's gain over B1 crosses zero between k = 0.5 and k = 1.5.
+- **P5:** U_TH on Bt stays below B1 at every level up to k = 1, and not at k = 2.
+- **P6:** Bt's mean history length falls with k at every step, on the mean over the 24.
+
+**What each outcome means, fixed now.**
+- **Both hold:** the history has a speed limit, and the crossover says where. A chain that knows its scene's motion (an engine does) can fall
+  back to B1, or to U_TH on a short history, above it. That is a candidate round, not a change made here.
+- **H81a fails:** the history does not lose to one frame even at twice section 176's speeds, and rounds 79-80's B1 results were those sets'.
+- **H81b fails:** the history does not beat one frame even still at these settings. That would undercut round 32's premise on this set, and is
+  reported as it lands.
+
+**The run, on Keith's rig, at round 81's commit:** `--harvest-upscale-temporal-test --round 81`, one CPU harvest (~5-11 hours), its file
+committed byte for byte before it is read. Section 185 reads it.
