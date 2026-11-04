@@ -175,3 +175,106 @@ Minutes.
     the merge-base. That record is re-baked at a ship.
   - `render/compassView-selfcheck.mjs`, a browser gate: red once with four gates running at a time, green alone, and
     green at the registration's commit.
+
+### The verdict, 2026-11-04 (read from the committed file, after it was committed)
+
+The registered run wrote `physics/mechanics/orientationStepResults.json` at d2c157ad: 136,030 bytes, sha256
+2226e37ff9989ed1. It was committed unread at a40508e9, then read.
+
+**M1, the free body:** the world-frame angular momentum's largest drift over the 30 s.
+
+| step | Q0 | Q4 |
+|---|---|---|
+| 1/30 s | 1.61e-2 | 9.84e-8 |
+| 1/60 s | 8.02e-3 | 6.15e-9 |
+| 1/240 s | 2.00e-3 | 2.40e-11 |
+| 1/960 s | 5.00e-4 | 1.03e-13 |
+
+- Over 1/60 to 1/240 s, Q4's drift falls as the 4.00th power of the step, and Q0's as the 1.00th.
+- The energy's drift and the flips are the same under both steps, at every step. The angular velocity is the same to
+  the bit (C-omega): only the orientation moved.
+
+**M2, a ship's turn:** the largest angle from the reference over each duel (174 to 397 ticks).
+- In the standoffs, where the ship's spin reached at most 0.110 rad/s, Q0 was 3.59e-4 to 1.84e-3 rad off (0.02 to 0.11
+  degree). Q4 was at most 2.47e-14 rad off, which is rounding.
+- In the jousts, with spins of 1.58 to 2.55 rad/s, Q0 was 2.65e-2 to 4.27e-2 rad off (1.52 to 2.45 degrees). Q4 was
+  4.29e-9 to 3.32e-8 rad off.
+- Q4 was under a hundredth of Q0 in every duel. The largest ratio was 7.76e-7.
+
+**M3, the fights:** each pilot as A against the PD autopilot, 40 seeds, as wins-losses-draws.
+
+| pilot | scenario | Q0 | Q4 | better | worse | p | outcomes the nudge changed | flights the nudge moved |
+|---|---|---|---|---|---|---|---|---|
+| the PD autopilot | standoff | 0-0-40 | 0-0-40 | 0 | 0 | 1.00 | 0 | 0 |
+| the PD autopilot | joust | 3-9-28 | 0-5-35 | 8 | 7 | 1.00 | 0 | 0 |
+| the Default | standoff | 40-0-0 | 40-0-0 | 0 | 0 | 1.00 | 0 | 0 |
+| the Default | joust | 0-39-1 | 0-38-2 | 1 | 0 | 1.00 | 0 | 4 |
+| the League pilot | standoff | 39-0-1 | 39-0-1 | 0 | 0 | 1.00 | 0 | 0 |
+| the League pilot | joust | 0-40-0 | 0-40-0 | 0 | 0 | 1.00 | 0 | 18 |
+| the close-quarters pilot | standoff | 40-0-0 | 40-0-0 | 0 | 0 | 1.00 | 0 | 0 |
+| the close-quarters pilot | joust | 17-8-15 | 19-12-9 | 7 | 7 | 1.00 | 0 | 15 |
+| the GPU Brain's pilot | standoff | 30-0-10 | 31-0-9 | 2 | 1 | 1.00 | 0 | 0 |
+| the GPU Brain's pilot | joust | 9-28-3 | 10-25-5 | 4 | 1 | 0.375 | 0 | 0 |
+
+- In no cell does the sign test see a change. The smallest p is 0.375, in the GPU Brain's jousts (4 better, 1 worse).
+- Q4 changed 38 of the 400 outcomes: 3 in the standoffs, all the GPU Brain's (2 better, 1 worse), and 35 in the jousts
+  (20 better, 15 worse).
+- The nudge changed no outcome. It moved 37 flights, all jousts (the Default's 4, the League pilot's 18 and the
+  close-quarters pilot's 15), and none of them ended differently.
+
+**The predictions:**
+- **P1: right.** Q4's order is 4.00, and its drift at 1/30 s is 9.84e-8.
+- **P2: right.** The largest ratio of Q4's angle to Q0's is 7.76e-7.
+- **P3: right.** No pilot's fight changes, in either scenario.
+- **P4: right.** Q4 changed 3 outcomes to the nudge's 0 in the standoffs, and 35 to 0 in the jousts.
+
+**The controls,** all held:
+- C-unchanged: the step digest 29216a6bf1de97d3 and the ten anchor fingerprints.
+- C-omega: the angular velocity the same to the bit in M1 and M2, and every replay landed on the duel's own A.
+- C-key: Q0 0.0222 rad off the exact turn, Q4 6.17e-7 rad.
+- C-reference: all 20 duels checked, the worst ratio 1/64.0.
+- C-chaos: no cell; every p is 1.
+- C-determinism: 40 flights, each the same twice.
+
+**What this says, and what it does not.**
+- **It says:** Q4 removes the drift. At the ships' step it brings the orientation of a ship in a joust from up to 2.45
+  degrees off to 3.3e-8 rad, for about 0.2 microseconds more a step (0.485 and 0.690 microseconds, reported outside the
+  file).
+- **It says:** Q4 changes individual jousts, 35 of 200, and in no cell in a direction a sign test can see.
+- **It does not say** how the aircraft, the sub, the multirotor or the rotorcraft change, or the page's three-a-side
+  battle, or fights with collisions on: none was flown. Nor whether a pilot trained under Q4 would fight differently.
+- **It does not say** the nudge measured the fights' chaos. It changed no outcome, so it bounds nothing: a 1e-9 m
+  nudge does not grow enough in these fights to change one, and Q4's change is larger than that from the first tick.
+
+**What follows, as the registration said.** P1 and P3 hold, so the verdict recommends Q4 as the engine's default, and
+the decision is Keith's. Adopting it changes every 6-DOF craft's trajectory, so every gate that flies a committed
+6-DOF round again to the bit would have its record restated, with the reason. This verdict changes nothing.
+
+**The verdict, as code:** section 6 of `tools/roundhouse/orientationStep-selfcheck.mjs` re-derives every number above
+from the committed file. It re-derives each M3 cell from its 40 flights by the library's own rules, and each prediction
+by its registered rule. It holds this section's text to the file's numbers, and it flies a sample of the round again
+(34 flights) against the file, to the bit. Sabotaged with the byte-safe runner: 16 designs (V1 to V16), each red by
+name. They edit the committed file, this note or the code, and the counts are in the gate's header. Every row of
+section 6 went red under at least one.
+- **Two of my own numbers were wrong in the first draft of this section, and are corrected above.** I wrote Q0's drift
+  at 1/960 s as 5.01e-4; it is 5.0047e-4, which is 5.00e-4. And I wrote that the standoffs' spin "stayed under 0.11
+  rad/s"; the largest was 0.1102 rad/s. Section 6's M2 row went red on the second, before anything was committed.
+
+### Seen after the verdict (2026-11-04): what making Q4 the default would turn red
+
+Not part of the round, and it decides nothing. It measures the cost the verdict names, for Keith's decision. With the
+byte-safe runner, `rigidBody6dof.step()`'s default was set to "rk4" for one run of the 102 gates that reach the step,
+the duel, the spinning body or freeRotation (this round's gate aside), then restored, sha256 identical.
+- **39 gates went red, 150 rows.** One of them, `tools/ship/gateReach-selfcheck.mjs`, is red the same either way (its
+  census). Two were red already and went redder: `brain/battleshipFight-selfcheck.mjs` from 9 rows to 30, and
+  `tools/ship/battleshipPage-selfcheck.mjs` from 1 to 5. `render/brainPanel-selfcheck.mjs` timed out at 900 s.
+- **That leaves 35 green gates that would go red.** Every one pins a 6-DOF flight or fight to a recorded number:
+  - the trained pilots' committed rounds (`tools/ship/train6dofMlp*`, `train6dofPilot`, `train6dofLeague`,
+    `trainFlightPilot`, `trainRotorPilot`, `trainSeatGunner`, `trainDogfightLeague`, `sixdofPageFight`);
+  - the pilots' own pinned scores (`brain/pilot6dof*`, `pilotAircraft*`, `pilotDrone*`, `pilotFlight*`, `pilotJet*`,
+    `pilotRotor*`, `autopilotJet`);
+  - the tasks and fights (`brain/droneTask`, `rotorTask`, `flightTask`, `dogfightTask`, `jetFight`, `bomberFight`,
+    `shipCollision6dof`), the craft (`physics/mechanics/flightModel6dof`, `capitalShip`), the sub's dropout
+    (`render/subDropoutScene`, `tools/subDropout`), and the spinning body's own C4 (`tools/roundhouse/spinningBody`).
+- So adopting Q4 is a change to every 6-DOF craft's recorded behaviour, aircraft, rotorcraft, drones and the sub among
+  them. None of those was flown in this round, and some of those records belong to other work in this tree.

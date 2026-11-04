@@ -13,6 +13,9 @@
 //      steps, the nudge, the reference, the sign test and the reading, the outcome, the angle
 //   4  the command: refuses an existing results file, writes it once, and prints no reading
 //   5  a miniature on other seeds: every part the registration names, in the shape the verdict will read, determinism, and a file that parses back
+//   6  (2026-11-04) THE VERDICT, read from the committed results file: its bytes; M1's table and orders; M2's ranges; M3's table, every cell
+//      re-derived by the library's own rules from its flights; the predictions by their registered rules; the controls; the outcome the
+//      registration fixed; the note's verdict carrying the file's numbers; and a sample of the round flown again, to the bit
 //
 // SABOTAGE LOG (2026-11-03) -- the byte-safe runner against this gate, every file restored byte-identical (sha256); the number is the rows that went red:
 //   G1 Q4's second stage at the start's angular velocity 2 | G2 Q4's stage weights wrong 4 | G3 Q4 not renormalised 1 | G4 the default made rk4 11 |
@@ -30,13 +33,22 @@
 //   with a ratio of 0; an order fitted over the first two steps could not show while the miniature's fit WAS its first two steps; and a dropped
 //   nudge could not show in a fingerprint that rounds to a millimetre. The miniature now fits over a later pair, flies a 1e-3 m nudge, and has a
 //   row for each (G21, G22, G23).
+// SABOTAGE LOG, THE VERDICT (2026-11-04) -- section 6, the same runner, every file restored byte-identical (sha256):
+//   V1 the file: Q4's drift at 1/30 s 4 | V2 the file: a joust's Q4 angle a hundred times larger 3 | V3 the file: one of the GPU Brain's joust flights under
+//   Q4 a win 4 | V4 the file: the GPU Brain's joust counts 5 better 4 | V5 the file: C-key's Q0 angle 3 | V6 the note: a table row's p 1 | V7 the note: P2
+//   called wrong 1 | V8 the note: the recommendation turned round 1 | V9 the note: M1's table 1 | V10 the note: the nudge's moved flights 1 | V11 the code:
+//   better and worse swapped 2 | V12 the code: Q4's stage weights 5 | V13 the code: the nudge moves A in x 2 | V14 the code: the momentum's drift halved 1 |
+//   V15 the code: the sign test's line at 0.5 4 | V16 the file: Q4 of the third order, not the fourth 4
+//   Every row of section 6 went red under at least one design. V16 was added after V1-V15 left the predictions row the one no design had reddened.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
+import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import * as RB from "../../physics/mechanics/rigidBody6dof.mjs";
 import * as P6 from "../../brain/pilot6dofPolicy.mjs";
 import * as L from "./orientationStep.mjs";
+import * as SB from "./spinningBody.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url)), ENG = path.resolve(HERE, "..", "..");
 let fails = 0;
@@ -152,6 +164,76 @@ try {
     const again = JSON.parse(L.serialize(r));
     ok("the results serialize to one JSON file that parses back to the same result", J(again) === J(JSON.parse(JSON.stringify(r))) && L.serialize(r).endsWith("\n"));
 } catch (e) { guard(5, e); }
+
+console.log("\n6. THE VERDICT (2026-11-04, read from the committed results file; a sample of the round flown again)");
+try {
+    const text = fs.readFileSync(L.DEFAULT_RESULTS, "utf8"), R = JSON.parse(text), sha = crypto.createHash("sha256").update(text).digest("hex");
+    ok("!! the results file is the registered run's, byte for byte as it was committed: 136,030 bytes, sha256 2226e37ff9989ed1, naming the registration",
+        Buffer.byteLength(text) === 136030 && sha.startsWith("2226e37ff9989ed1") && R.registration === L.REGISTRATION, `${Buffer.byteLength(text)} bytes, ${sha.slice(0, 16)}`);
+    const e2 = (x) => x.toExponential(2), F = R.m1.flights, M1 = [["1/30", "1.61e-2", "9.84e-8"], ["1/60", "8.02e-3", "6.15e-9"], ["1/240", "2.00e-3", "2.40e-11"], ["1/960", "5.00e-4", "1.03e-13"]];
+    ok("!! M1: the free body's drift is the verdict's table at every step, Q4's order 4.00 and Q0's 1.00, and the energy's drift and the flips are the same under both steps",
+        J(Object.keys(F)) === J(M1.map((r) => r[0])) && M1.every(([k, a, b]) => e2(F[k].Q0.driftWorldL) === a && e2(F[k].Q4.driftWorldL) === b && F[k].Q0.driftE === F[k].Q4.driftE && F[k].Q0.flips === F[k].Q4.flips) &&
+        R.m1.order.Q4.toFixed(2) === "4.00" && R.m1.order.Q0.toFixed(2) === "1.00", M1.map(([k]) => `${k}: ${e2(F[k].Q0.driftWorldL)} / ${e2(F[k].Q4.driftWorldL)}`).join(", "));
+    const D = R.m2.duels, of = (sc) => D.filter((d) => d.scenario === sc), lo = (a, k) => Math.min(...a.map((d) => d[k])), hi = (a, k) => Math.max(...a.map((d) => d[k])), deg = (r) => (r * 180 / Math.PI).toFixed(2);
+    const st = of("standoff"), jo = of("joust"), ratio = Math.max(...D.map((d) => d.q4 / d.q0));
+    const m2s = { stQ0: `${e2(lo(st, "q0"))} to ${e2(hi(st, "q0"))} rad off (${deg(lo(st, "q0"))} to ${deg(hi(st, "q0"))} degree)`, stQ4: `at most ${e2(hi(st, "q4"))} rad off`,
+        stSpin: `spin reached at most ${hi(st, "peakSpin").toFixed(3)} rad/s`, joQ0: `${e2(lo(jo, "q0"))} to ${e2(hi(jo, "q0"))} rad off (${deg(lo(jo, "q0"))} to ${deg(hi(jo, "q0"))} degrees)`, joQ4: `${e2(lo(jo, "q4"))} to ${e2(hi(jo, "q4"))} rad off`,
+        spins: `spins of ${lo(jo, "peakSpin").toFixed(2)} to ${hi(jo, "peakSpin").toFixed(2)} rad/s`, ratio: `The largest ratio was ${e2(ratio)}`, ticks: `(${lo(D, "ticks")} to ${hi(D, "ticks")} ticks)` };
+    ok("!! M2: 10 duels of each scenario; the standoffs Q0 3.59e-4 to 1.84e-3 rad off (the spin at most 0.110 rad/s) and Q4 at most 2.47e-14; the jousts Q0 2.65e-2 to 4.27e-2 (1.52 to 2.45 degrees) and Q4 4.29e-9 to 3.32e-8; the largest ratio 7.76e-7",
+        st.length === 10 && jo.length === 10 && m2s.stQ0 === "3.59e-4 to 1.84e-3 rad off (0.02 to 0.11 degree)" && m2s.stQ4 === "at most 2.47e-14 rad off" && m2s.stSpin === "spin reached at most 0.110 rad/s" &&
+        m2s.joQ0 === "2.65e-2 to 4.27e-2 rad off (1.52 to 2.45 degrees)" && m2s.joQ4 === "4.29e-9 to 3.32e-8 rad off" && m2s.spins === "spins of 1.58 to 2.55 rad/s" && e2(ratio) === "7.76e-7" && m2s.ticks === "(174 to 397 ticks)", J(m2s));
+    const NAME = { scripted: "the PD autopilot", shipped: "the Default", league: "the League pilot", close: "the close-quarters pilot", gpu: "the GPU Brain's pilot" };
+    const tal = (x) => `${x.win}-${x.loss}-${x.draw}`, moved = (c) => c.flights["Q0'"].filter((f, i) => f.fingerprint !== c.flights.Q0[i].fingerprint).length, cells = R.m3.cells;
+    const rowOf = (c) => `| ${NAME[c.pilot]} | ${c.scenario} | ${tal(c.tally.Q0)} | ${tal(c.tally.Q4)} | ${c.q4.better} | ${c.q4.worse} | ${c.q4.p.toPrecision(3)} | ${c.chaos.changed} | ${moved(c)} |`;
+    const ROWS = ["| the PD autopilot | standoff | 0-0-40 | 0-0-40 | 0 | 0 | 1.00 | 0 | 0 |", "| the PD autopilot | joust | 3-9-28 | 0-5-35 | 8 | 7 | 1.00 | 0 | 0 |",
+        "| the Default | standoff | 40-0-0 | 40-0-0 | 0 | 0 | 1.00 | 0 | 0 |", "| the Default | joust | 0-39-1 | 0-38-2 | 1 | 0 | 1.00 | 0 | 4 |",
+        "| the League pilot | standoff | 39-0-1 | 39-0-1 | 0 | 0 | 1.00 | 0 | 0 |", "| the League pilot | joust | 0-40-0 | 0-40-0 | 0 | 0 | 1.00 | 0 | 18 |",
+        "| the close-quarters pilot | standoff | 40-0-0 | 40-0-0 | 0 | 0 | 1.00 | 0 | 0 |", "| the close-quarters pilot | joust | 17-8-15 | 19-12-9 | 7 | 7 | 1.00 | 0 | 15 |",
+        "| the GPU Brain's pilot | standoff | 30-0-10 | 31-0-9 | 2 | 1 | 1.00 | 0 | 0 |", "| the GPU Brain's pilot | joust | 9-28-3 | 10-25-5 | 4 | 1 | 0.375 | 0 | 0 |"];
+    const tallyOf = (rs) => ({ win: rs.filter((r) => r.outcome === "win").length, loss: rs.filter((r) => r.outcome === "loss").length, draw: rs.filter((r) => r.outcome === "draw").length });
+    const rederived = cells.every((c) => J(L.compare(c.flights.Q0, c.flights.Q4)) === J(c.q4) && J(L.compare(c.flights.Q0, c.flights["Q0'"])) === J(c.chaos) && L.readingOf(c.q4) === c.reading &&
+        J(tallyOf(c.flights.Q0)) === J(c.tally.Q0) && J(tallyOf(c.flights.Q4)) === J(c.tally.Q4) && J(c.seeds) === J(L.FIGHT.seeds) && c.flights.Q0.length === 40);
+    const sum = (sc, k, part) => cells.filter((c) => !sc || c.scenario === sc).reduce((a, c) => a + c[part][k], 0), movedAll = cells.reduce((a, c) => a + moved(c), 0), minP = Math.min(...cells.map((c) => c.q4.p));
+    ok("!! M3: every cell re-derived from its 40 flights by the library's own rules (better, worse, p, the reading, the tallies), and the table is the verdict's row by row",
+        rederived && cells.length === 10 && J(cells.map(rowOf)) === J(ROWS) && J(R.readings.map((r) => r.reading)) === J(cells.map((c) => c.reading)), rederived ? "" : "a cell does not re-derive");
+    ok("!! ...no cell reaches p < 0.01 (the smallest 0.375); Q4 changed 38 of the 400 outcomes, 3 in the standoffs (2 better, 1 worse) and 35 in the jousts (20 better, 15 worse); the nudge changed none and moved 37 flights",
+        minP.toPrecision(3) === "0.375" && cells.every((c) => c.q4.p >= L.ALPHA) && sum(null, "changed", "q4") === 38 && sum("standoff", "changed", "q4") === 3 && sum("standoff", "better", "q4") === 2 && sum("standoff", "worse", "q4") === 1 &&
+        sum("joust", "changed", "q4") === 35 && sum("joust", "better", "q4") === 20 && sum("joust", "worse", "q4") === 15 && sum(null, "changed", "chaos") === 0 && movedAll === 37 && cells.length * 40 === 400,
+        `smallest p ${minP.toPrecision(3)}, ${sum(null, "changed", "q4")} changed, the nudge ${sum(null, "changed", "chaos")}, ${movedAll} moved`);
+    const P = { P1: R.m1.order.Q4 >= 3 && F["1/30"].Q4.driftWorldL < 1e-4, P2: D.every((d) => d.q4 < d.q0 / 100), P3: cells.every((c) => c.reading === "changes nothing a sign test can see"),
+        P4: L.SCENARIOS.every((sc) => sum(sc, "changed", "q4") > sum(sc, "changed", "chaos")) };
+    ok("!! the predictions, each by its registered rule from the file: P1 right (order 4.00, 9.84e-8 at 1/30 s), P2 right, P3 right, P4 right (3 to 0 and 35 to 0)", Object.values(P).every(Boolean), J(P));
+    const C = R.controls;
+    ok("!! the controls all held, as the verdict gives them: C-unchanged (the digest and the ten fingerprints), C-omega, C-key (0.0222 and 6.17e-7 rad), C-reference (20 duels, the worst ratio 1/64.0), C-chaos (every p 1), C-determinism (40 flights)",
+        C.unchanged.ok && C.unchanged.digest === "29216a6bf1de97d3" && J(C.unchanged.fingerprints) === J(L.ANCHOR.fingerprints) && C.omega.free && C.omega.turn && C.omega.replayIsDuel && C.key.ok && C.key.off.Q0.toFixed(4) === "0.0222" &&
+        e2(C.key.off.Q4) === "6.17e-7" && C.reference.ok && C.reference.checked === 20 && (1 / C.reference.worstRatio).toFixed(1) === "64.0" && C.chaos.ok && C.chaos.cells.every((c) => c.p === 1) && C.determinism.ok && C.determinism.flights === 40);
+    const recommend = P.P1 && P.P3;
+    // THE NOTE: the verdict section alone, from its heading to the next, its line breaks read as spaces
+    const note = src(L.REGISTRATION), vAt = note.indexOf("\n### The verdict, 2026-11-04"), rest = vAt >= 0 ? note.slice(vAt + 1) : "", nextAt = rest.slice(1).search(/\n#{2,3} /);
+    const vt = (nextAt >= 0 ? rest.slice(0, nextAt + 1) : rest).replace(/\s+/g, " ");
+    const frags = [`${Buffer.byteLength(text).toLocaleString("en-US")} bytes, sha256 ${sha.slice(0, 16)}`, ...M1.map(([k]) => `| ${k} s | ${e2(F[k].Q0.driftWorldL)} | ${e2(F[k].Q4.driftWorldL)} |`),
+        `as the ${R.m1.order.Q4.toFixed(2)}th power of the step, and Q0's as the ${R.m1.order.Q0.toFixed(2)}th`, m2s.ticks, m2s.stSpin, m2s.stQ0, m2s.stQ4, m2s.joQ0, m2s.joQ4, m2s.spins, m2s.ratio, ...cells.map(rowOf),
+        `The smallest p is ${minP.toPrecision(3)}`, `Q4 changed ${sum(null, "changed", "q4")} of the 400 outcomes`, `(${sum("standoff", "better", "q4")} better, ${sum("standoff", "worse", "q4")} worse)`,
+        `(${sum("joust", "better", "q4")} better, ${sum("joust", "worse", "q4")} worse)`, `It moved ${movedAll} flights`, ...Object.keys(P).map((k) => `**${k}: ${P[k] ? "right" : "wrong"}.**`),
+        `its drift at 1/30 s is ${e2(F["1/30"].Q4.driftWorldL)}`, `The largest ratio of Q4's angle to Q0's is ${e2(ratio)}`, `the step digest ${C.unchanged.digest}`, `Q0 ${C.key.off.Q0.toFixed(4)} rad off the exact turn, Q4 ${e2(C.key.off.Q4)} rad`,
+        `all ${C.reference.checked} duels checked, the worst ratio 1/${(1 / C.reference.worstRatio).toFixed(1)}`, `${C.determinism.flights} flights, each the same twice`,
+        recommend ? "the verdict recommends Q4 as the engine's default, and the decision is Keith's" : "Nothing is recommended"];
+    const missing = frags.filter((f) => !vt.includes(f));
+    ok("!! the note's verdict carries the file's numbers: its tables row by row, M2's ranges, the counts, each prediction as the file reads it, the controls, and the outcome the registration fixed (recommend Q4; the decision Keith's)",
+        vAt >= 0 && missing.length === 0 && recommend, missing.slice(0, 3).join(" || ") || `${frags.length} fragments`);
+    // A SAMPLE OF THE ROUND, flown again at this head through the library, against the file to the bit
+    const off = [];
+    for (const id of L.STEP_IDS) { const fl = L.freeFlight(id, 1 / 30); if (SB.invariants(fl.trace, fl.I, fl.mid).driftWorldL !== F["1/30"][id].driftWorldL) off.push(`M1/1/30/${id}`); }
+    const again = L.m2({ seeds: [91001] });
+    for (const d of again.duels) { const f = D.find((x) => x.scenario === d.scenario && x.seed === d.seed); if (J(d) !== J(f)) off.push(`M2/${d.scenario}/${d.seed}`); }
+    const pilots = L.loadPilots();
+    for (const p of pilots) for (const sc of L.SCENARIOS) { const c = cells.find((x) => x.pilot === p.id && x.scenario === sc), s = L.FIGHT.seeds[0];
+        if (J(L.fight(p.pilot, s, sc)) !== J(c.flights.Q0[0])) off.push(`M3/${p.id}/${sc}/Q0`);
+        if (J(L.fight(p.pilot, s, sc, { stepId: "Q4" })) !== J(c.flights.Q4[0])) off.push(`M3/${p.id}/${sc}/Q4`);
+        if (J(L.fight(p.pilot, s, sc, { nudge: L.FIGHT.nudge })) !== J(c.flights["Q0'"][0])) off.push(`M3/${p.id}/${sc}/Q0'`); }
+    ok("!! a sample of the round flown again at this head, through the library, is the file's to the bit: M1 at 1/30 s with both steps, M2's seed 91001 in both scenarios, and each pilot's seed 91001 in both scenarios with Q0, Q4 and the nudge",
+        off.length === 0, off.join(" ") || "34 flights");
+} catch (e) { guard(6, e); }
 
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)`);
 process.exitCode = fails ? 1 : 0;
