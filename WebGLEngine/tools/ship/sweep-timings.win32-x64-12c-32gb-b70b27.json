@@ -1,0 +1,145 @@
+{
+ "host": "win32-x64-12c-32gb-b70b27",
+ "note": "THIS BOX'S OWN gate runtimes, written by tools/ship/boxTimings.mjs. The shared sweep-timings.json is host-claimed and a foreign box cannot write it (v4647, and that refusal is right); this is how a box records what IT measured without overwriting another machine's numbers. `kinds` says which quantity each ms is, as in the shared record: `alone` is an uncontended serial reading, `capped` is a FLOOR and not a runtime. Read for COVERAGE -- has this gate ever been timed -- and NOT for the ship-time budget, which still reads the shared file. See task #87. `serialRing` holds the last three alone readings; recordReach's margin row reads it on a box that does not own the shared record, because that row asks what a gate costs HERE and nothing here can refresh another box's ring.",
+ "captured": "2026-11-04T22:12:41.427Z",
+ "timings": {
+  "brain/surveySeat-selfcheck.mjs": 54786,
+  "brain/plannerPerturbed-selfcheck.mjs": 51025,
+  "render/subAquariumEvents-selfcheck.mjs": 40160,
+  "render/subAquariumSim-selfcheck.mjs": 11949,
+  "tools/ship/plannerBaseline-selfcheck.mjs": 7012,
+  "tools/ship/plannerCap-selfcheck.mjs": 54165,
+  "tools/ship/plannerChoose-selfcheck.mjs": 15760,
+  "tools/ship/plannerDescend-selfcheck.mjs": 22018,
+  "tools/ship/plannerEnsConfirm-selfcheck.mjs": 18607,
+  "tools/ship/plannerFine-selfcheck.mjs": 21945,
+  "tools/ship/plannerHeadroom-selfcheck.mjs": 200022,
+  "tools/ship/plannerMeta-selfcheck.mjs": 100,
+  "tools/ship/plannerRetune-selfcheck.mjs": 9428,
+  "tools/ship/plannerRobust-selfcheck.mjs": 43703,
+  "tools/ship/plannerTolerate-selfcheck.mjs": 15944
+ },
+ "at": {
+  "brain/surveySeat-selfcheck.mjs": "2026-11-04T22:12:41.427Z",
+  "brain/plannerPerturbed-selfcheck.mjs": "2026-11-04T22:12:41.427Z",
+  "render/subAquariumEvents-selfcheck.mjs": "2026-11-04T22:12:41.427Z",
+  "render/subAquariumSim-selfcheck.mjs": "2026-11-04T22:12:41.427Z",
+  "tools/ship/plannerBaseline-selfcheck.mjs": "2026-11-04T22:12:41.427Z",
+  "tools/ship/plannerCap-selfcheck.mjs": "2026-11-04T22:12:41.427Z",
+  "tools/ship/plannerChoose-selfcheck.mjs": "2026-11-04T22:12:41.427Z",
+  "tools/ship/plannerDescend-selfcheck.mjs": "2026-11-04T22:12:41.427Z",
+  "tools/ship/plannerEnsConfirm-selfcheck.mjs": "2026-11-04T22:12:41.427Z",
+  "tools/ship/plannerFine-selfcheck.mjs": "2026-11-04T22:12:41.427Z",
+  "tools/ship/plannerHeadroom-selfcheck.mjs": "2026-11-04T22:12:41.427Z",
+  "tools/ship/plannerMeta-selfcheck.mjs": "2026-11-04T22:12:41.427Z",
+  "tools/ship/plannerRetune-selfcheck.mjs": "2026-11-04T22:12:41.427Z",
+  "tools/ship/plannerRobust-selfcheck.mjs": "2026-11-04T22:12:41.427Z",
+  "tools/ship/plannerTolerate-selfcheck.mjs": "2026-11-04T22:12:41.427Z"
+ },
+ "kinds": {
+  "brain/surveySeat-selfcheck.mjs": "alone",
+  "brain/plannerPerturbed-selfcheck.mjs": "alone",
+  "render/subAquariumEvents-selfcheck.mjs": "alone",
+  "render/subAquariumSim-selfcheck.mjs": "alone",
+  "tools/ship/plannerBaseline-selfcheck.mjs": "alone",
+  "tools/ship/plannerCap-selfcheck.mjs": "alone",
+  "tools/ship/plannerChoose-selfcheck.mjs": "alone",
+  "tools/ship/plannerDescend-selfcheck.mjs": "alone",
+  "tools/ship/plannerEnsConfirm-selfcheck.mjs": "alone",
+  "tools/ship/plannerFine-selfcheck.mjs": "alone",
+  "tools/ship/plannerHeadroom-selfcheck.mjs": "capped",
+  "tools/ship/plannerMeta-selfcheck.mjs": "alone",
+  "tools/ship/plannerRetune-selfcheck.mjs": "alone",
+  "tools/ship/plannerRobust-selfcheck.mjs": "alone",
+  "tools/ship/plannerTolerate-selfcheck.mjs": "alone"
+ },
+ "codes": {
+  "brain/surveySeat-selfcheck.mjs": 0,
+  "brain/plannerPerturbed-selfcheck.mjs": 0,
+  "render/subAquariumEvents-selfcheck.mjs": 0,
+  "render/subAquariumSim-selfcheck.mjs": 0,
+  "tools/ship/plannerBaseline-selfcheck.mjs": 0,
+  "tools/ship/plannerCap-selfcheck.mjs": 0,
+  "tools/ship/plannerChoose-selfcheck.mjs": 0,
+  "tools/ship/plannerDescend-selfcheck.mjs": 0,
+  "tools/ship/plannerEnsConfirm-selfcheck.mjs": 0,
+  "tools/ship/plannerFine-selfcheck.mjs": 0,
+  "tools/ship/plannerHeadroom-selfcheck.mjs": null,
+  "tools/ship/plannerMeta-selfcheck.mjs": 0,
+  "tools/ship/plannerRetune-selfcheck.mjs": 0,
+  "tools/ship/plannerRobust-selfcheck.mjs": 0,
+  "tools/ship/plannerTolerate-selfcheck.mjs": 0
+ },
+ "serialRing": {
+  "brain/surveySeat-selfcheck.mjs": [
+   57076,
+   52756,
+   54786
+  ],
+  "brain/plannerPerturbed-selfcheck.mjs": [
+   52547,
+   49444,
+   51025
+  ],
+  "render/subAquariumEvents-selfcheck.mjs": [
+   39734,
+   38120,
+   40160
+  ],
+  "render/subAquariumSim-selfcheck.mjs": [
+   11914,
+   11394,
+   11949
+  ],
+  "tools/ship/plannerBaseline-selfcheck.mjs": [
+   6306,
+   6350,
+   7012
+  ],
+  "tools/ship/plannerCap-selfcheck.mjs": [
+   67056,
+   67779,
+   54165
+  ],
+  "tools/ship/plannerChoose-selfcheck.mjs": [
+   15857,
+   17384,
+   15760
+  ],
+  "tools/ship/plannerDescend-selfcheck.mjs": [
+   22287,
+   22009,
+   22018
+  ],
+  "tools/ship/plannerEnsConfirm-selfcheck.mjs": [
+   19074,
+   17499,
+   18607
+  ],
+  "tools/ship/plannerFine-selfcheck.mjs": [
+   27438,
+   21475,
+   21945
+  ],
+  "tools/ship/plannerMeta-selfcheck.mjs": [
+   111,
+   98,
+   100
+  ],
+  "tools/ship/plannerRetune-selfcheck.mjs": [
+   7567,
+   8128,
+   9428
+  ],
+  "tools/ship/plannerRobust-selfcheck.mjs": [
+   43859,
+   42077,
+   43703
+  ],
+  "tools/ship/plannerTolerate-selfcheck.mjs": [
+   16887,
+   15605,
+   15944
+  ]
+ }
+}
