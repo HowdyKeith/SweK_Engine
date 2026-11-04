@@ -135,3 +135,30 @@ About a minute.
 - **`box3dHybridShipsRun.mjs`:** the command.
 - **`box3dHybridShips-selfcheck.mjs`:** the gate.
 - The results go to `physics/mechanics/box3dHybridShipsResults.json`, committed before they are read.
+
+## Correction, committed before any code (2026-11-04)
+
+**Step 4 of the hybrid is wrong as written, and is corrected here, before any code.** It charges ram damage on "the
+normal impulse summed over the pair's manifold points". That is the impulse box3d reports per point, and it is not a
+momentum budget. `physics/box3d/box3dLoader.js` says so in its v3586 note, with v3580's measurement: the reported total
+was 1.742 times the momentum the contact actually changed at impact, 14 to 30 times while settling, and exactly 2 only
+at rest. It sums box3d's solve and relax passes. Charging the engine's rule on it would make H's rams cost more by
+bookkeeping, not by physics, and P4 and every cell's ram readings would measure that.
+
+**So, under H, a contact tick's normal impulse is the momentum box3d's contact moved.**
+
+- Take ship A's change of linear momentum over the tick, m (v_after - v_before), less the tick's thrust impulse.
+- Take its component along box3d's contact normal, the normal of the manifold box3d reports in that tick's world. If
+  box3d reports none, use the engine's own contact normal from the test that made the tick a contact tick.
+- Damage is that component's size, times 0.3, at most 25, taken by both ships.
+
+The engine's own model charges the sum of its solver's normal impulses, so the two are the same quantity: the
+contact's momentum along its normal.
+
+Nothing else in the registration changes. The correction was found while reading `readContacts()` before writing the
+hybrid, after the registration's commit (ffa3623d) and before any of its code. The only things flown in between were
+C-unchanged's anchors, recorded from the unchanged `duel()`, and one extra anchor (below).
+
+**One extra anchor for C-unchanged.** None of the ten at seed 86005 rams, so none of them exercises the contact path. One
+more anchor is added: the PD autopilot against itself, joust, seed 86010, which rams once over 3 ticks for 21.465 hit
+points (fingerprint f314ba5f, 160 ticks). It too was recorded from the unchanged `duel()`.
