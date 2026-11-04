@@ -3,7 +3,7 @@
 // THE POOLED READING: every flight already in the repository (the 51 sets HELD13 to HELD63 of follow-ups 8 to 58, `brain/subSensedDet*Held*.jsonl`, found through the specs of tools/ship/subSensedDetSpecs.mjs), read together. No flight is made. It is a post hoc analysis of data already read; the rules below were fixed before it was run.
 //   THE UNIT. A SET is 180 fresh scenarios. Two arms flown in one set share its scenarios (they are paired); two sets share nothing, so a set is the unit of independence.
 //   THE ARM. "<detector>@<sea>". Two registry rows whose specs are equal once written in the CANONICAL form below are ONE detector (an alias: "inc" and "m1-1"), flight for flight; their flights in one set are one arm, and an arm of two aliases whose counts differ is an error, not a choice.
-//   CANONICAL FORM (what the registration's "every field of their specs is equal" is read as, fixed before the run): markNear null when it equals mark; clear.fNear = clear.f when absent; clear.range "ping" when the hold cannot depend on it (a step with capNear = cap); clear.capNear = clear.cap for a ramp (a ramp does not read it); ghost.carry false, zone "all", at "mark" when absent; lock null when absent.
+//   CANONICAL FORM (what the registration's "every field of their specs is equal" is read as, fixed before the run; `near`, the radius in metres, is a field too, added with follow-up 61's rows, which differ from their bases in nothing else): markNear null when it equals mark; clear.fNear = clear.f when absent; clear.range "ping" when the hold cannot depend on it (a step with capNear = cap); clear.capNear = clear.cap for a ramp (a ramp does not read it); ghost.carry false, zone "all", at "mark" when absent; lock null when absent.
 //   (A) BETWEEN-SET NOISE. For every arm flown in at least 3 sets: its count in each set, the mean, the standard deviation across sets (n - 1), the binomial one sqrt(n p (1 - p)) with p the arm's mean rate, and their ratio (not defined where the binomial one is 0, and the arm is then left out of the median). Reported: the median ratio, the largest range (maximum minus minimum across sets), the arms with a range over 12. `exact` and the clean `long+fix+forget` are controls, reported apart.
 //   (B) THE EFFECT OF ONE FEATURE. Two canonical specs are MATCHED on feature F when all their fields are equal except F (the tests are FEATURES below; a field a feature leaves free is said there). For each feature (the ghost's variants counted apart, the ramp against the hold at every range and against the step as two rows), each sea of SEAS and each set in which at least one matched pair of that feature was flown together under that sea: the set's effect is the mean over its matched pairs of (reached of the arm WITH the feature minus reached of the arm without). The pooled effect is the mean of the set effects, with a 95% t-interval across sets (tCrit; the table's next lower df for a df it does not list), the number of sets, and the number of sets with each sign.
 //   THE READING RULE: SEEN when at least 5 sets contribute, the interval excludes 0 (|mean| > half-width) and at least 80% of the sets with a nonzero effect share the sign (integer arithmetic: 5 max >= 4 nonzero); SUGGESTED when the interval excludes 0 and SEEN is not met; NOT SEPARABLE otherwise (one set has no interval). The tests are unadjusted for the number of rows; the count of rows called seen is reported beside the number of rows.
@@ -44,7 +44,7 @@ export function canon(spec) {
     const clear = { cap: c.cap, capNear: ramp ? c.cap : c.capNear, evidence: c.evidence, f: c.f, fNear: c.fNear === undefined ? c.f : c.fNear, shape: c.shape, range: uniform ? "ping" : c.range };
     const g = spec.ghost, ghost = g ? { min: g.min, life: g.life, nbr: g.nbr, carry: !!g.carry, zone: g.zone || "all", at: g.at || "mark" } : null;
     const lock = spec.lock ? { life: spec.lock.life, below: spec.lock.below } : null;
-    return { mark: [...spec.mark], markNear, clear, ghost, lock };
+    return { mark: [...spec.mark], markNear, near: spec.near, clear, ghost, lock };
 }
 export const specKey = (cs) => J(cs);
 
@@ -60,7 +60,7 @@ export function detectorsOf(defs = D.ARM_DEFS) {
 }
 
 // ---- THE FEATURES: test(a, b) -> null, or the variant label ("" for none) when b has the feature and a does not, all else equal ----
-const restEq = (a, b, left) => ["mark", "markNear", "clear", "ghost", "lock"].filter((f) => !left.includes(f)).every((f) => sameJ(a[f], b[f]));
+const restEq = (a, b, left) => ["mark", "markNear", "near", "clear", "ghost", "lock"].filter((f) => !left.includes(f)).every((f) => sameJ(a[f], b[f]));
 const clearEq = (x, y, free) => Object.keys(x).filter((f) => !free.includes(f)).every((f) => x[f] === y[f]);
 export const FEATURES = Object.freeze([
     { id: "F1", name: "the ghost (any ghost against none; a variant is its zone, at, neighbour test, carry, min and life)", test: (a, b) => (a.ghost === null && b.ghost !== null && restEq(a, b, ["ghost"]) ? `zone ${b.ghost.zone} at ${b.ghost.at} nbr ${b.ghost.nbr} carry ${b.ghost.carry} min ${b.ghost.min} life ${b.ghost.life}` : null) },

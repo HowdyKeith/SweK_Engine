@@ -11,7 +11,7 @@
 "use strict";
 import * as X from "./subSensedNav.mjs";
 
-export const NEAR = 80, CAP = 30, WINDOW = 32;
+export const NEAR = 80, CAP = 30, WINDOW = 32, HOLD_MAX = 64;   // WINDOW: the readings a MARK rule may look at; HOLD_MAX: the longest hold, which looks at a second word of 32 older readings (follow-up 61)
 const popcnt = (v) => { let c = 0; v >>>= 0; while (v) { v &= v - 1; c++; } return c; };
 const maskOf = (n) => (n >= 32 ? 0xffffffff : ((1 << n) - 1) >>> 0);
 
@@ -38,7 +38,7 @@ export function makeDetector(spec, sonarRange = X.LONG_SONAR.range) {
     need(spec.markNear === null || ruleOk(spec.markNear), "markNear is null or [m, n]");
     need(Number.isFinite(spec.near) && spec.near >= 0, "near is a distance in metres");
     const c = spec.clear;
-    need(c && Number.isInteger(c.cap) && c.cap >= 1 && c.cap <= 30 && Number.isInteger(c.capNear) && c.capNear >= 1 && c.capNear <= 30, "clear.cap and clear.capNear are whole numbers from 1 to 30");
+    need(c && Number.isInteger(c.cap) && c.cap >= 1 && c.cap <= HOLD_MAX && Number.isInteger(c.capNear) && c.capNear >= 1 && c.capNear <= HOLD_MAX, "clear.cap and clear.capNear are whole numbers from 1 to 64");
     need(Number.isFinite(c.f) && c.f > 0 && c.f <= 1, "clear.f is in (0, 1]");
     need(c.fNear === undefined || (Number.isFinite(c.fNear) && c.fNear > 0 && c.fNear <= 1), "clear.fNear is in (0, 1] when given");
     need(c.shape === "step" || c.shape === "ramp", "clear.shape is step or ramp");
@@ -58,9 +58,9 @@ export function makeDetector(spec, sonarRange = X.LONG_SONAR.range) {
     const state = (map) => {
         if (map.dt) return map.dt;
         const n = map.occ.length;
-        return (map.dt = { occ0: new Uint8Array(n), win: new Uint32Array(n), nread: new Uint8Array(n), ev: new Uint8Array(n), rmark: new Float32Array(n), rmin: new Float32Array(n).fill(Infinity), ghost: new Uint8Array(n), lock: new Uint8Array(n), hitAt: new Uint32Array(n), pid: 0, pend: [], marks: 0, clears: 0, ghostMarks: 0, ghostRefused: 0, lockRefused: 0 });
+        return (map.dt = { occ0: new Uint8Array(n), win: new Uint32Array(n), win2: new Uint32Array(n), nread: new Uint8Array(n), ev: new Uint8Array(n), rmark: new Float32Array(n), rmin: new Float32Array(n).fill(Infinity), ghost: new Uint8Array(n), lock: new Uint8Array(n), hitAt: new Uint32Array(n), pid: 0, pend: [], marks: 0, clears: 0, ghostMarks: 0, ghostRefused: 0, lockRefused: 0 });
     };
-    const empty = (S, i) => { S.win[i] = 0; S.nread[i] = 0; S.ev[i] = 0; S.rmark[i] = 0; S.rmin[i] = Infinity; S.ghost[i] = 0; };
+    const empty = (S, i) => { S.win[i] = 0; S.win2[i] = 0; S.nread[i] = 0; S.ev[i] = 0; S.rmark[i] = 0; S.rmin[i] = Infinity; S.ghost[i] = 0; };
     const mark = (map, S, i, ev, d) => { map.occ[i] = 1; map.nOcc++; S.ev[i] = ev; S.rmark[i] = d; S.ghost[i] = 0; S.marks++; };
     return Object.freeze({
         spec,
@@ -69,6 +69,7 @@ export function makeDetector(spec, sonarRange = X.LONG_SONAR.range) {
             const S = state(map), i = ctx.i, hit = !!ctx.hit, d = ctx.d, wasGhost = S.ghost[i] > 0, locked = S.lock[i] > 0;
             if (wasGhost) S.ghost[i]--;
             if (locked) S.lock[i]--;
+            S.win2[i] = ((S.win2[i] << 1) | (S.win[i] >>> 31)) >>> 0;   // the reading that leaves the first word (the 33rd newest) enters the second
             S.win[i] = ((S.win[i] << 1) | (hit ? 1 : 0)) >>> 0;
             if (S.nread[i] < 255) S.nread[i]++;
             if (hit) { S.hitAt[i] = S.pid; if (d < S.rmin[i]) S.rmin[i] = d; }
@@ -97,7 +98,7 @@ export function makeDetector(spec, sonarRange = X.LONG_SONAR.range) {
             if (c.evidence) L = Math.min(L, Math.max(1, S.ev[i]));
             if (S.nread[i] < L) return 0;
             const fx = c.fNear !== undefined && d <= spec.near ? c.fNear : c.f, K = fx >= 1 ? L : Math.ceil(fx * L - 1e-9);
-            if (L - popcnt(S.win[i] & maskOf(L)) < K) return 0;
+            if (L - popcnt(S.win[i] & maskOf(L)) - (L > WINDOW ? popcnt(S.win2[i] & maskOf(L - WINDOW)) : 0) < K) return 0;
             map.occ[i] = 0; map.nOcc--; S.clears++;
             if (g && S.ev[i] >= g.min && okClear(d)) S.ghost[i] = g.life;
             else { const ev = S.ev[i]; empty(S, i); if (lk && ev < lk.below) S.lock[i] = lk.life; }
@@ -134,7 +135,7 @@ export function makeDetector(spec, sonarRange = X.LONG_SONAR.range) {
 
 // ---- the detectors of follow-ups 8 to 24, by the names the registrations use ----
 const clearOf = (cap, capNear = cap, { evidence = false, f = 1, shape = "step", range = "ping", fNear } = {}) => ({ cap, capNear, evidence, f, shape, range, ...(fNear !== undefined ? { fNear } : {}) });
-const spec = (mark, clear, { markNear = null, ghost = null, lock } = {}) => Object.freeze({ mark: Object.freeze(mark), markNear: markNear && Object.freeze(markNear), near: NEAR, clear: Object.freeze(clear), ghost: ghost && Object.freeze(ghost), ...(lock ? { lock: Object.freeze(lock) } : {}) });
+const spec = (mark, clear, { markNear = null, ghost = null, lock, near = NEAR } = {}) => Object.freeze({ mark: Object.freeze(mark), markNear: markNear && Object.freeze(markNear), near, clear: Object.freeze(clear), ghost: ghost && Object.freeze(ghost), ...(lock ? { lock: Object.freeze(lock) } : {}) });
 const ONE = clearOf(1), RUN = (k) => [k, k], GH = Object.freeze({ min: 4, life: 60, nbr: false }), GHN = Object.freeze({ min: 4, life: 60, nbr: true });
 const GHC = Object.freeze({ min: 4, life: 60, nbr: false, carry: true }), LK = Object.freeze({ life: 8, below: 4 });   // follow-ups 25 to 58: the carry, the lock
 const GHZ = (zone, at) => Object.freeze({ min: 4, life: 60, nbr: false, zone, at }), GHCZ = (zone) => Object.freeze({ min: 4, life: 60, nbr: false, carry: true, zone, at: "mark" }), GHNZ = (zone) => Object.freeze({ min: 4, life: 60, nbr: true, zone, at: "mark" });
@@ -204,6 +205,12 @@ export const ARM_DEFS = Object.freeze({
     rm34f80l: spec([3, 4], EV(CAP, { f: 0.8 }), { markNear: RUN(1), lock: LK }), rm34f80gl: spec([3, 4], EV(CAP, { f: 0.8 }), { markNear: RUN(1), ghost: GH, lock: LK }), rm23f80gl: spec([2, 3], EV(CAP, { f: 0.8 }), { markNear: RUN(1), ghost: GH, lock: LK }),
     rm23e30gf: spec([2, 3], EV(), { markNear: RUN(1), ghost: GHZ("far", "clear") }), rm23e30gn: spec([2, 3], EV(), { markNear: RUN(1), ghost: GHZ("near", "clear") }),
     rm34e30gf: spec([3, 4], EV(), { markNear: RUN(1), ghost: GHZ("far", "clear") }), rm34e30gn: spec([3, 4], EV(), { markNear: RUN(1), ghost: GHZ("near", "clear") }),
+    // 61: the sensitivity sweep around two bases, one constant at a time (n: the near radius in metres, c: the cap, f: the fraction beyond the near radius, l: the ghost's life)
+    "fn100f80g-n40": spec([2, 3], EV(CAP, { f: 0.8, fNear: 1 }), { ghost: GH, near: 40 }), "fn100f80g-n120": spec([2, 3], EV(CAP, { f: 0.8, fNear: 1 }), { ghost: GH, near: 120 }),
+    "fn100f80g-c15": spec([2, 3], EV(15, { f: 0.8, fNear: 1 }), { ghost: GH }), "fn100f80g-c60": spec([2, 3], EV(60, { f: 0.8, fNear: 1 }), { ghost: GH }),
+    "fn100f80g-f70": spec([2, 3], EV(CAP, { f: 0.7, fNear: 1 }), { ghost: GH }), "fn100f80g-f90": spec([2, 3], EV(CAP, { f: 0.9, fNear: 1 }), { ghost: GH }),
+    "fn100f80g-l20": spec([2, 3], EV(CAP, { f: 0.8, fNear: 1 }), { ghost: Object.freeze({ min: 4, life: 20, nbr: false }) }), "fn100f80g-l180": spec([2, 3], EV(CAP, { f: 0.8, fNear: 1 }), { ghost: Object.freeze({ min: 4, life: 180, nbr: false }) }),
+    "m23re30-n40": spec([2, 3], EVR(), { near: 40 }), "m23re30-n120": spec([2, 3], EVR(), { near: 120 }),
 });
 export const DETECTORS = Object.freeze(Object.fromEntries(Object.entries(ARM_DEFS).map(([k, v]) => [k, makeDetector(v)])));
 

@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/subSensedDetSpecs.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// THE REGISTRATIONS OF FOLLOW-UPS 8 TO 58 AND 60 AS DATA (brain/SENSED_NAV_WIP.md, "FOLLOW-UP 8" to "FOLLOW-UP 58", and the second registration of "FOLLOW-UP 60", three specs), one spec for each: the arms flown, the designated detector, the bar's cells, the verdict rule and the predictions, each as an operation on the pooled counts of arms.
+// THE REGISTRATIONS OF FOLLOW-UPS 8 TO 58, 60 AND 61 AS DATA (brain/SENSED_NAV_WIP.md, "FOLLOW-UP 8" to "FOLLOW-UP 58", and the second registrations of "FOLLOW-UP 60" and "FOLLOW-UP 61", three specs each), one spec for each: the arms flown, the designated detector, the bar's cells, the verdict rule and the predictions, each as an operation on the pooled counts of arms.
 // A study is named by its backlog id without the "nav-sensed-" ("dropout-range", "detector-hold-confirm", ...). The engine is tools/ship/subSensedDetStudy.mjs; the detectors and faults are brain/subSensedDetect.mjs. Every spec carries the number of its follow-up, its set (HELD13 for follow-up 8 up to HELD29 for follow-up 24) and the file its flights go to.
 // A TERM is an arm name "<detector>@<condition>" (the three kinds pooled) or "long+fix+forget" or "exact"; { k: kind, a: arm } is one kind; { sum: [terms] } and { max: [terms] } combine.
 // OPERATIONS (n is a number of flights): ge   a - b >= n;  gt   a > b;  le   a - b <= n;  within   |a - b| <= n;  bar   the arm in `a` reaches at least 80% of exact's count in EACH kind;  notBar   it misses that in at least one kind;  noBar   it misses that in EVERY kind (follow-up 36's AK4);  eachGe   every arm of `arms` reaches at least n more than `b`;  spread / spreadGt   the largest minus the smallest count of `arms` is at most / more than n;  and   every prediction of `of` holds.
@@ -884,6 +884,56 @@ study("large-set-c", {
         ge("BH6", "and under the leak: under WD30L, m23e30 reaches at least 30 more than m33e30", "m23e30@WD30L", "m33e30@WD30L", 30),
         and("BH7", "the confirmed clear on the base does nothing: m23e30k is within 15 of m23e30 under R3D30 and under WD30L", [within("", "", "m23e30k@R3D30", "m23e30@R3D30", 15), within("", "", "m23e30k@WD30L", "m23e30@WD30L", 15)]),
         within("BH8", "and the hold does nothing under the persistent mix: under P, m23e30 is within 15 of inc", "m23e30@P", "inc@P", 15),
+    ],
+});
+
+// ---- FOLLOW-UP 61 (the second registration of the sensitivity sweep: THREE sets, HELD67 to HELD69, one spec each from one table, READ TOGETHER by tools/ship/subSensedDetSweep.mjs; each prediction is on the counts of 540 scenarios)
+// FOLLOW-UP 61: THE SENSITIVITY SWEEP, SET A OF THREE (READ TOGETHER)
+study("sweep-a", {
+    followUp: 61, held: "held67", out: outOf("SweepA", "held67"), title: "THE SENSITIVITY SWEEP, SET A OF THREE (READ TOGETHER)", designated: "fn100f80g",
+    arms: ["exact", LF, "fn100f80g@R3D30", "fn100f80g-n40@R3D30", "fn100f80g-n120@R3D30", "fn100f80g-c15@R3D30", "fn100f80g-c60@R3D30", "fn100f80g-f70@R3D30", "fn100f80g-f90@R3D30", "fn100f80g-l20@R3D30", "fn100f80g-l180@R3D30", "m23re30@R3D30", "m23re30-n40@R3D30", "m23re30-n120@R3D30", "fn100f80g@WD30L", "fn100f80g-n40@WD30L", "fn100f80g-n120@WD30L", "fn100f80g-c15@WD30L", "fn100f80g-c60@WD30L", "fn100f80g-f70@WD30L", "fn100f80g-f90@WD30L", "fn100f80g-l20@WD30L", "fn100f80g-l180@WD30L", "m23re30@WD30L", "m23re30-n40@WD30L", "m23re30-n120@WD30L"],
+    bar: { arm: "fn100f80g", conds: ["R3D30", "WD30L"] }, verdict: { full: 6, partly: 4 },
+    preds: [
+        and("BI1", "the near radius is flat on the base that barely uses it: fn100f80g with a near of 40 m and of 120 m is within 15 of fn100f80g under R3D30 and under WD30L", [within("", "", "fn100f80g-n40@R3D30", "fn100f80g@R3D30", 15), within("", "", "fn100f80g-n120@R3D30", "fn100f80g@R3D30", 15), within("", "", "fn100f80g-n40@WD30L", "fn100f80g@WD30L", 15), within("", "", "fn100f80g-n120@WD30L", "fn100f80g@WD30L", 15)]),
+        and("BI2", "where the near radius is the feature it is monotone under the leak: under WD30L, m23re30-n120 reaches at least 9 more than m23re30 and m23re30 at least 9 more than m23re30-n40", [ge("", "", "m23re30-n120@WD30L", "m23re30@WD30L", 9), ge("", "", "m23re30@WD30L", "m23re30-n40@WD30L", 9)]),
+        and("BI3", "and under range-law false returns with smaller steps: under R3D30, m23re30-n120 reaches at least 6 more than m23re30 and m23re30 at least 3 more than m23re30-n40", [ge("", "", "m23re30-n120@R3D30", "m23re30@R3D30", 6), ge("", "", "m23re30@R3D30", "m23re30-n40@R3D30", 3)]),
+        ge("BI4", "a cap of 15 is under the dropout and loses the hold's gain: under WD30L, fn100f80g reaches at least 24 more than fn100f80g-c15", "fn100f80g@WD30L", "fn100f80g-c15@WD30L", 24),
+        ge("BI5", "and under R3D30: at least 12 more", "fn100f80g@R3D30", "fn100f80g-c15@R3D30", 12),
+        and("BI6", "a cap of 60 is flat above the dropout: fn100f80g-c60 is within 15 of fn100f80g under R3D30 and under WD30L", [within("", "", "fn100f80g-c60@R3D30", "fn100f80g@R3D30", 15), within("", "", "fn100f80g-c60@WD30L", "fn100f80g@WD30L", 15)]),
+        and("BI7", "the fraction is flat: fn100f80g with a fraction of 0.7 and of 0.9 is within 15 of fn100f80g under both seas", [within("", "", "fn100f80g-f70@R3D30", "fn100f80g@R3D30", 15), within("", "", "fn100f80g-f90@R3D30", "fn100f80g@R3D30", 15), within("", "", "fn100f80g-f70@WD30L", "fn100f80g@WD30L", 15), within("", "", "fn100f80g-f90@WD30L", "fn100f80g@WD30L", 15)]),
+        and("BI8", "the ghost's life is flat: fn100f80g with a life of 20 and of 180 is within 15 of fn100f80g under both seas", [within("", "", "fn100f80g-l20@R3D30", "fn100f80g@R3D30", 15), within("", "", "fn100f80g-l180@R3D30", "fn100f80g@R3D30", 15), within("", "", "fn100f80g-l20@WD30L", "fn100f80g@WD30L", 15), within("", "", "fn100f80g-l180@WD30L", "fn100f80g@WD30L", 15)]),
+    ],
+});
+// FOLLOW-UP 61: THE SENSITIVITY SWEEP, SET B OF THREE (READ TOGETHER)
+study("sweep-b", {
+    followUp: 61, held: "held68", out: outOf("SweepB", "held68"), title: "THE SENSITIVITY SWEEP, SET B OF THREE (READ TOGETHER)", designated: "fn100f80g",
+    arms: ["exact", LF, "fn100f80g@R3D30", "fn100f80g-n40@R3D30", "fn100f80g-n120@R3D30", "fn100f80g-c15@R3D30", "fn100f80g-c60@R3D30", "fn100f80g-f70@R3D30", "fn100f80g-f90@R3D30", "fn100f80g-l20@R3D30", "fn100f80g-l180@R3D30", "m23re30@R3D30", "m23re30-n40@R3D30", "m23re30-n120@R3D30", "fn100f80g@WD30L", "fn100f80g-n40@WD30L", "fn100f80g-n120@WD30L", "fn100f80g-c15@WD30L", "fn100f80g-c60@WD30L", "fn100f80g-f70@WD30L", "fn100f80g-f90@WD30L", "fn100f80g-l20@WD30L", "fn100f80g-l180@WD30L", "m23re30@WD30L", "m23re30-n40@WD30L", "m23re30-n120@WD30L"],
+    bar: { arm: "fn100f80g", conds: ["R3D30", "WD30L"] }, verdict: { full: 6, partly: 4 },
+    preds: [
+        and("BI1", "the near radius is flat on the base that barely uses it: fn100f80g with a near of 40 m and of 120 m is within 15 of fn100f80g under R3D30 and under WD30L", [within("", "", "fn100f80g-n40@R3D30", "fn100f80g@R3D30", 15), within("", "", "fn100f80g-n120@R3D30", "fn100f80g@R3D30", 15), within("", "", "fn100f80g-n40@WD30L", "fn100f80g@WD30L", 15), within("", "", "fn100f80g-n120@WD30L", "fn100f80g@WD30L", 15)]),
+        and("BI2", "where the near radius is the feature it is monotone under the leak: under WD30L, m23re30-n120 reaches at least 9 more than m23re30 and m23re30 at least 9 more than m23re30-n40", [ge("", "", "m23re30-n120@WD30L", "m23re30@WD30L", 9), ge("", "", "m23re30@WD30L", "m23re30-n40@WD30L", 9)]),
+        and("BI3", "and under range-law false returns with smaller steps: under R3D30, m23re30-n120 reaches at least 6 more than m23re30 and m23re30 at least 3 more than m23re30-n40", [ge("", "", "m23re30-n120@R3D30", "m23re30@R3D30", 6), ge("", "", "m23re30@R3D30", "m23re30-n40@R3D30", 3)]),
+        ge("BI4", "a cap of 15 is under the dropout and loses the hold's gain: under WD30L, fn100f80g reaches at least 24 more than fn100f80g-c15", "fn100f80g@WD30L", "fn100f80g-c15@WD30L", 24),
+        ge("BI5", "and under R3D30: at least 12 more", "fn100f80g@R3D30", "fn100f80g-c15@R3D30", 12),
+        and("BI6", "a cap of 60 is flat above the dropout: fn100f80g-c60 is within 15 of fn100f80g under R3D30 and under WD30L", [within("", "", "fn100f80g-c60@R3D30", "fn100f80g@R3D30", 15), within("", "", "fn100f80g-c60@WD30L", "fn100f80g@WD30L", 15)]),
+        and("BI7", "the fraction is flat: fn100f80g with a fraction of 0.7 and of 0.9 is within 15 of fn100f80g under both seas", [within("", "", "fn100f80g-f70@R3D30", "fn100f80g@R3D30", 15), within("", "", "fn100f80g-f90@R3D30", "fn100f80g@R3D30", 15), within("", "", "fn100f80g-f70@WD30L", "fn100f80g@WD30L", 15), within("", "", "fn100f80g-f90@WD30L", "fn100f80g@WD30L", 15)]),
+        and("BI8", "the ghost's life is flat: fn100f80g with a life of 20 and of 180 is within 15 of fn100f80g under both seas", [within("", "", "fn100f80g-l20@R3D30", "fn100f80g@R3D30", 15), within("", "", "fn100f80g-l180@R3D30", "fn100f80g@R3D30", 15), within("", "", "fn100f80g-l20@WD30L", "fn100f80g@WD30L", 15), within("", "", "fn100f80g-l180@WD30L", "fn100f80g@WD30L", 15)]),
+    ],
+});
+// FOLLOW-UP 61: THE SENSITIVITY SWEEP, SET C OF THREE (READ TOGETHER)
+study("sweep-c", {
+    followUp: 61, held: "held69", out: outOf("SweepC", "held69"), title: "THE SENSITIVITY SWEEP, SET C OF THREE (READ TOGETHER)", designated: "fn100f80g",
+    arms: ["exact", LF, "fn100f80g@R3D30", "fn100f80g-n40@R3D30", "fn100f80g-n120@R3D30", "fn100f80g-c15@R3D30", "fn100f80g-c60@R3D30", "fn100f80g-f70@R3D30", "fn100f80g-f90@R3D30", "fn100f80g-l20@R3D30", "fn100f80g-l180@R3D30", "m23re30@R3D30", "m23re30-n40@R3D30", "m23re30-n120@R3D30", "fn100f80g@WD30L", "fn100f80g-n40@WD30L", "fn100f80g-n120@WD30L", "fn100f80g-c15@WD30L", "fn100f80g-c60@WD30L", "fn100f80g-f70@WD30L", "fn100f80g-f90@WD30L", "fn100f80g-l20@WD30L", "fn100f80g-l180@WD30L", "m23re30@WD30L", "m23re30-n40@WD30L", "m23re30-n120@WD30L"],
+    bar: { arm: "fn100f80g", conds: ["R3D30", "WD30L"] }, verdict: { full: 6, partly: 4 },
+    preds: [
+        and("BI1", "the near radius is flat on the base that barely uses it: fn100f80g with a near of 40 m and of 120 m is within 15 of fn100f80g under R3D30 and under WD30L", [within("", "", "fn100f80g-n40@R3D30", "fn100f80g@R3D30", 15), within("", "", "fn100f80g-n120@R3D30", "fn100f80g@R3D30", 15), within("", "", "fn100f80g-n40@WD30L", "fn100f80g@WD30L", 15), within("", "", "fn100f80g-n120@WD30L", "fn100f80g@WD30L", 15)]),
+        and("BI2", "where the near radius is the feature it is monotone under the leak: under WD30L, m23re30-n120 reaches at least 9 more than m23re30 and m23re30 at least 9 more than m23re30-n40", [ge("", "", "m23re30-n120@WD30L", "m23re30@WD30L", 9), ge("", "", "m23re30@WD30L", "m23re30-n40@WD30L", 9)]),
+        and("BI3", "and under range-law false returns with smaller steps: under R3D30, m23re30-n120 reaches at least 6 more than m23re30 and m23re30 at least 3 more than m23re30-n40", [ge("", "", "m23re30-n120@R3D30", "m23re30@R3D30", 6), ge("", "", "m23re30@R3D30", "m23re30-n40@R3D30", 3)]),
+        ge("BI4", "a cap of 15 is under the dropout and loses the hold's gain: under WD30L, fn100f80g reaches at least 24 more than fn100f80g-c15", "fn100f80g@WD30L", "fn100f80g-c15@WD30L", 24),
+        ge("BI5", "and under R3D30: at least 12 more", "fn100f80g@R3D30", "fn100f80g-c15@R3D30", 12),
+        and("BI6", "a cap of 60 is flat above the dropout: fn100f80g-c60 is within 15 of fn100f80g under R3D30 and under WD30L", [within("", "", "fn100f80g-c60@R3D30", "fn100f80g@R3D30", 15), within("", "", "fn100f80g-c60@WD30L", "fn100f80g@WD30L", 15)]),
+        and("BI7", "the fraction is flat: fn100f80g with a fraction of 0.7 and of 0.9 is within 15 of fn100f80g under both seas", [within("", "", "fn100f80g-f70@R3D30", "fn100f80g@R3D30", 15), within("", "", "fn100f80g-f90@R3D30", "fn100f80g@R3D30", 15), within("", "", "fn100f80g-f70@WD30L", "fn100f80g@WD30L", 15), within("", "", "fn100f80g-f90@WD30L", "fn100f80g@WD30L", 15)]),
+        and("BI8", "the ghost's life is flat: fn100f80g with a life of 20 and of 180 is within 15 of fn100f80g under both seas", [within("", "", "fn100f80g-l20@R3D30", "fn100f80g@R3D30", 15), within("", "", "fn100f80g-l180@R3D30", "fn100f80g@R3D30", 15), within("", "", "fn100f80g-l20@WD30L", "fn100f80g@WD30L", 15), within("", "", "fn100f80g-l180@WD30L", "fn100f80g@WD30L", 15)]),
     ],
 });
 
