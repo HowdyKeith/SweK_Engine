@@ -17,6 +17,7 @@
 //   7  THE VERDICT (2026-11-04), from the committed results file: the file byte for byte; M2's table and its seed-by-seed story; M1's
 //      table; M3; the rule read both ways (as registered: nothing is named; with the one-tick tumble: box3d's scheme); the predictions;
 //      the controls; the note's verdict holding every number; and a sample of the round flown again
+//   8  DECIDED (2026-11-04): Keith's decision recorded in the note and the backlog, and holding against the committed file
 //
 // SABOTAGED (2026-11-04, through the byte-safe runner, each restored byte for byte): 48 sabotages, every one red by name in the end.
 //   Reading the gate against the list before any ran found three that no row could see -- isF32 blind to one vector (G20), the watch
@@ -54,6 +55,10 @@
 //   registered reading turned round 1 | V12 the note: M1's D range 1 | V13 the note: a transition 1 | V14 the note: the caps' top speed 1 |
 //   V15 the code: better and worse swapped 3 | V16 the code: D's gyroscopic step skipped 5 | V17 the code: toF32 leaving the spin 4 |
 //   V18 the code: the duel ignoring stepA 5 | V19 the code: the rule's veto removed 4
+//
+// SABOTAGE LOG, THE DECISION (2026-11-04) -- section 8, the same runner, every file restored byte-identical: 6 designs, every one red by name.
+//   D1 the note: Keith's words altered 1 | D2 the note: the one-tick reading naming nothing 1 | D3 the file: the one-tick form failing 4 |
+//   D4 the note: the PD autopilot retuned 1 | D5 the backlog: the decision not recorded 1 | D6 the backlog: the hybrid stepper not named 1
 "use strict";
 import fs from "node:fs";
 import crypto from "node:crypto";
@@ -343,6 +348,20 @@ try {
     for (const id of ["D", "E32", "D32"]) if (J(L.fight(b3, f1, id)) !== J(M3.flights[id][0])) off.push(`M3/${id}`);
     ok("!! a sample of the round flown again at this head, through the library, is the file's to the bit: M2's seed 95001 six ways, M1's replay of it, and M3's seed 93001 with D, E32 and D32", off.length === 0, off.join(" ") || "10 flights and a replay");
 } catch (e) { guard(7, e); }
+
+console.log("\n8. DECIDED (2026-11-04, Keith, after the verdict)");
+try {
+    const R = JSON.parse(fs.readFileSync(L.DEFAULT_RESULTS, "utf8")), oneTick = L.nameThePart(R.m2.readings, R.controls.model.okPerTick), asReg = L.nameThePart(R.m2.readings, R.controls.model.ok);
+    const note = src(L.REGISTRATION), dAt = note.indexOf("\n## Decided (2026-11-04)"), dt = (dAt >= 0 ? note.slice(dAt + 1) : "").replace(/\s+/g, " ");
+    const said = "Keith, after the verdict: \"Accept one tick reading. and Step box3d's ships with the engine's own physics and use box3d only for contacts.\"";
+    ok("!! the decision is recorded and holds: the note's Decided section quotes Keith, the one-tick reading stands, and the rule read that way from the committed file names box3d's scheme (as registered it names nothing)",
+        dAt > note.indexOf("\n## The verdict, 2026-11-04") && dt.includes(said) && dt.includes("**The one-tick reading stands.**") && dt.includes("So the verdict names **box3d's scheme** as what costs the PD autopilot its jousts.") &&
+        oneTick.label === "box3d's scheme" && asReg.label === "nothing is named" && R.controls.model.okPerTick === true, `${oneTick.label} / ${asReg.label}`);
+    const nr = src("tools/ship/nextRounds.mjs");
+    ok("!! ...and so is the second: box3d's ships to be stepped by the engine's own physics with box3d only for contacts, the PD autopilot not retuned, and the backlog says so where the round closed",
+        dt.includes("**box3d's ships will be stepped with the engine's own physics, and box3d used only for contacts.**") && dt.includes("The PD autopilot is not retuned for box3d.") &&
+        /DECIDED 2026-11-04 \(Keith: 'Accept one tick reading\. and Step box3d's ships with the engine's own physics and use box3d only for contacts'\)/.test(nr) && /box3d-hybrid-ship-stepper/.test(nr));
+} catch (e) { guard(8, e); }
 
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)`);
 process.exitCode = fails ? 1 : 0;

@@ -298,3 +298,19 @@ box3d's scheme: M1's orientations, M2's 100 outcomes, and M3's 22.
 
 **Gated.** Section 7 of `tools/roundhouse/box3dPdJoust-selfcheck.mjs` re-derives every number above from the committed
 file, holds this verdict to them, and flies a sample of the round again.
+
+## Decided (2026-11-04)
+
+Keith, after the verdict: "Accept one tick reading. and Step box3d's ships with the engine's own physics and use box3d
+only for contacts."
+
+- **The one-tick reading stands.** The rule is read with C-model's tumble taken one tick at a time, which the build
+  record set before the run. So the verdict names **box3d's scheme** as what costs the PD autopilot its jousts.
+  Float32 costs it nothing.
+- **box3d's ships will be stepped with the engine's own physics, and box3d used only for contacts.** The PD autopilot
+  is not retuned for box3d. Every 6-DOF number in the tree was measured on the engine's own physics, and this keeps
+  them all true for ships in a box3d world. The engine's step is also the more accurate of the two.
+  - Nothing flies ships on box3d yet. The stepper that does it is built as a round of its own: the backlog's
+    `box3d-hybrid-ship-stepper`.
+- **Gated.** Section 8 of `tools/roundhouse/box3dPdJoust-selfcheck.mjs` holds the decision: this section quotes it, and
+  the rule, read from the committed file with the one-tick form, names box3d's scheme.
