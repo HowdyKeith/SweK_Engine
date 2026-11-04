@@ -75,12 +75,20 @@ export function resolveMode(pageModes, { pageDefault, search = "", stored = null
 const safe = (f, d = null) => { try { return f(); } catch { return d; } };
 
 /**
+ * The main engine (main.js, index.html) has no upscaler pass: it renders straight to its canvas, whose backing store is the CSS size times the
+ * device pixel ratio. So its two modes are a RENDER SCALE on that store -- native at 1, bilinear at 2/3, the browser stretching the canvas to its
+ * CSS size with bilinear filtering. Any other mode is not on that page.
+ */
+export const ENGINE_RENDER_SCALE = Object.freeze({ native: 1, bilinear: 2 / 3 });
+export function renderScaleFor(id) { if (!(id in ENGINE_RENDER_SCALE)) throw new Error(`upscalerSwitch: the main engine has no "${id}" mode -- native or bilinear`); return ENGINE_RENDER_SCALE[id]; }
+
+/**
  * Mount the switch on a page: a button (top right, "Upscaler: <label>") whose pop-up lists EVERY mode -- the page's available ones to
  * choose, the rest greyed with the reason and, where it is WebGPU on a LAN address, the localhost link -- and the console API. `modes` is
  * the page's { id: { needs?, why? } }; `onChange(id, { from })` does what choosing a mode means on this page; `env` may be refreshed later
  * (refresh(env), e.g. once the adapter is known). Returns { get, set(id), list(), refresh(env), el }.
  */
-export function mountUpscalerSwitch({ page, modes, onChange, pageDefault = null, env = null, search = null, doc = globalThis.document, win = globalThis.window }) {
+export function mountUpscalerSwitch({ page, modes, onChange, pageDefault = null, env = null, search = null, corner = "top-right", doc = globalThis.document, win = globalThis.window }) {
     if (!page || !modes || typeof onChange !== "function") throw new Error("upscalerSwitch: a page name, its modes and an onChange");
     const bad = Object.keys(modes).filter((id) => !MODE[id]);
     if (bad.length) throw new Error(`upscalerSwitch: ${page} declares modes that are not upscaler modes: ${bad.join(", ")}`);
@@ -90,9 +98,12 @@ export function mountUpscalerSwitch({ page, modes, onChange, pageDefault = null,
     let cur = r.id;
     const btn = doc.createElement("button"), pop = doc.createElement("div");
     btn.id = "swek-upscaler-button"; btn.type = "button";
-    btn.style.cssText = "position:fixed;top:8px;right:8px;z-index:9999;font:12px system-ui,sans-serif;padding:5px 10px;border-radius:6px;border:1px solid #556;background:#1d2230;color:#e6e9f0;cursor:pointer";
+    // `corner` places the button (and its pop-up beside it), for a page whose own chrome holds the top right
+    const [vy, hx] = corner.split("-"), pos = (dv, dh) => `${vy}:${dv}px;${hx}:${dh}px;`;
+    if (!["top", "bottom"].includes(vy) || !["left", "right"].includes(hx)) throw new Error(`upscalerSwitch: corner is top|bottom-left|right -- got ${corner}`);
+    btn.style.cssText = "position:fixed;" + pos(8, 8) + "z-index:9999;font:12px system-ui,sans-serif;padding:5px 10px;border-radius:6px;border:1px solid #556;background:#1d2230;color:#e6e9f0;cursor:pointer";
     pop.id = "swek-upscaler-popup"; pop.hidden = true;
-    pop.style.cssText = "position:fixed;top:38px;right:8px;z-index:9999;width:340px;max-height:70vh;overflow:auto;font:12px system-ui,sans-serif;background:#161a24;color:#e6e9f0;border:1px solid #556;border-radius:8px;padding:6px;box-shadow:0 6px 24px rgba(0,0,0,.4)";
+    pop.style.cssText = "position:fixed;" + pos(38, 8) + "z-index:9999;width:340px;max-height:70vh;overflow:auto;font:12px system-ui,sans-serif;background:#161a24;color:#e6e9f0;border:1px solid #556;border-radius:8px;padding:6px;box-shadow:0 6px 24px rgba(0,0,0,.4)";
     const label = () => { btn.textContent = "Upscaler: " + (cur ? MODE[cur].label : "none available") + " ▾"; };
     const list = () => UPSCALER_MODES.map((m) => ({ id: m.id, label: m.label, current: m.id === cur, ...availability(m.id, modes, E) }));
     const draw = () => {

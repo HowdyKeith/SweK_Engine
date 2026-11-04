@@ -8,6 +8,8 @@
 //   stored choice over the URL, U9 fsr-three.html's FSR2 mapped to its FSR1, U11 the Settings Hub entry removed, U12 path-tracer.html without
 //   the chain view -> 2 red each; U5 a choice not stored -> 4; U8 the global default's key renamed -> 5; U6 an unavailable mode accepted and
 //   U7 the pop-up listing only the available modes -> 6 each; U1 a mode the page lacks taken as available -> 8.
+// SECTION 5 (the main engine): E1 resize() ignoring the scale, E2 bilinear at a half, E3 the engine's button top right, E4 the scale never
+//   applied -> 2 red each (the wiring row and the engine driven).
 "use strict";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -133,6 +135,33 @@ console.log("\n4. EVERY RENDER PAGE, LOADED AND DRIVEN");
         const SWIZZLE = /^TypeError: Failed to execute 'createView' on 'GPUTexture': Failed to read the 'swizzle' property from 'GPUTextureViewDescriptor'/;
         const errs = (r.pageErrors || []).filter((e) => !SWIZZLE.test(e));
         ok("  no page error on any of them (bar the sandbox's documented three.js swizzle refusal)", !errs.length, JSON.stringify(errs).slice(0, 400));
+    }
+}
+
+console.log("\n5. THE MAIN ENGINE: A RENDER SCALE");
+{
+    const fs = await import("node:fs"), main = fs.readFileSync(path.join(ENG, "main.js"), "utf8");
+    let bad = null; try { U.renderScaleFor("fsr1"); } catch (e) { bad = e.message; }
+    ok("  ENGINE_RENDER_SCALE: native 1, bilinear 2/3, frozen; anything else is refused by name", U.renderScaleFor("native") === 1 && U.renderScaleFor("bilinear") === 2 / 3 && Object.isFrozen(U.ENGINE_RENDER_SCALE) && /no "fsr1" mode -- native or bilinear/.test(bad || ""));
+    ok("!! main.js mounts the switch as page 'engine' (bottom right, clear of its own chrome) with native and bilinear, FSR1 refused with its reason, and resize() multiplies the device pixel ratio by the scale",
+        main.includes('import { mountUpscalerSwitch, renderScaleFor } from "./ui/upscalerSwitch.mjs";') && /mountUpscalerSwitch\(\{ page: "engine", pageDefault: "native", corner: "bottom-right",/.test(main) &&
+        /modes: \{ native: \{\}, bilinear: \{\}, fsr1: \{ why: "the main engine has no FSR1 pass yet/.test(main) && /onChange: \(id\) => \{ _renderScale = renderScaleFor\(id\); resize\(\); \}/.test(main) &&
+        /const dpr = Math\.min\(window\.devicePixelRatio \|\| 1, 2\) \* _renderScale;/.test(main));
+    const r = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 300000, script: `async () => {
+        const f = document.createElement("iframe"); f.style.width = "1200px"; f.style.height = "800px"; f.src = "/index.html"; document.body.appendChild(f);
+        await new Promise((r) => f.onload = r); const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+        for (let i = 0; i < 300 && !f.contentWindow.swek?.upscaler; i++) await sleep(100);
+        const api = f.contentWindow.swek && f.contentWindow.swek.upscaler; if (!api) return { mounted: false };
+        const cv = f.contentDocument.getElementById("glCanvas"), before = [cv.width, cv.height, cv.clientWidth, cv.clientHeight];
+        api.set("bilinear"); await sleep(200); const after = [cv.width, cv.height, cv.clientWidth, cv.clientHeight]; api.set("native"); await sleep(200);
+        return { mounted: true, before, after, back: [cv.width, cv.height], list: api.list().map((m) => [m.id, m.ok]), btn: f.contentDocument.getElementById("swek-upscaler-button").style.bottom };
+    }` });
+    if (r.skipped) ok("  the engine ran (no browser here: NOT A PASS)", false, r.reason);
+    else {
+        const R = r.result || {}, avail = (R.list || []).filter((m) => m[1]).map((m) => m[0]);
+        ok("!! *** the main engine, loaded (index.html): bilinear renders its canvas at 2/3 -- 1200 x 800 to 800 x 533 at the same CSS size -- and native puts it back; only native and bilinear are available ***",
+            r.ok && R.mounted && R.before[0] === 1200 && R.before[1] === 800 && R.after[0] === 800 && R.after[1] === 533 && R.after[2] === R.before[2] && R.after[3] === R.before[3] &&
+            R.back[0] === 1200 && R.back[1] === 800 && avail.join() === "native,bilinear" && R.btn === "8px", JSON.stringify({ before: R.before, after: R.after, back: R.back }));
     }
 }
 
