@@ -13,7 +13,7 @@
 //   8 FLIGHT    real short dives: an arm is the pilot it names on the constants it names; a condition's gauge noise and damage reach the flight; unknown arm or condition refused.
 //   9 SOURCE    the seeds appear in one place; no clock, random or file.
 // NOT CHECKED, said plainly: whether the constants hold up (that is the experiment).
-// SABOTAGE LOG: (filled in below after the mutation pass)
+// SABOTAGE LOG (54 mutants of tools/ship/plannerRobust.mjs, run against a copy of this gate, each applied alone): 49 went red by name on the first pass. 3 went 0 red and got rows (all then red): the twin gain's 2 se threshold (the rule gain's had fixtures at 1.5 and 2.5 se, the twin's did not), a chunk flown at the reference noise instead of its condition's (the row now compares NOISE far with the sd 0.3 and the sd 0.1 flights of its seeds), and the hull line ignoring stranded dives (a stranded-only fixture). 2 are EQUIVALENT: the GENERATOR and DAMAGE SCALE checks forced true -- both recompute the live generator and are true today, so only a broken generator could turn them red, which the generator rows of section 2 guard directly. The others: the conditions' seeds, scale, noise and count, the shift's size and sign and scope, the cap and the sizes, the scale applied after the cap or without it, the station count ignored, the three refusals, the set's count and scale ignored, the arms' pilots, the noise and seconds ignored, the unknown arm and condition refusals, the rule and twin operands, HURTS dropped, 1 se readings, readings pooled over all conditions, the hull from the wrong arm, the Round 8 arm counted in the rule's hull, crushed summed over the first arm only, the comparison with the Round 8 hull on the twin or with >=, the bottom lines' none, lose and hurt texts, the checks forced true or not aligned, the head's round, the early return on a failed check and assemble.
 "use strict";
 import fs from "node:fs";
 let fails = 0, finished = false;
@@ -74,6 +74,8 @@ sec("4. VERDICTS");
     const hu = synth2({ DMG: { hl12: { c: 3, s: 1 }, hr8: { c: 1 }, ht: { c: 2 } } }), h = X.conditionOf(hu, "DMG").hull;
     ok("!! the hull counts are the arm's own crushed and stranded in that condition", h["TUNED-R8"].crushed === 1 && h["TUNED-L12"].crushed === 3 && h["TUNED-L12"].stranded === 1 && h["TWIN-L12"].crushed === 2 && X.conditionOf(hu, "REF").hull["TUNED-L12"].crushed === 0);
     const wob = (i, a) => (i % 2 ? a : -a), amp = 0.03, se = amp * 1.0013 / Math.sqrt(300), g = (k) => synth2({ REF: { rule: (i) => wob(i, amp) + k * se } });
+    { const gt = (k) => synth2({ REF: { twin: (i) => wob(i, amp) + k * se } });
+      ok("!! the twin gain's threshold is 2 se too: +1.5 se LOSES, +2.5 se KEEPS (the twin gain has no HURTS: a negative one LOSES)", X.conditionOf(gt(1.5), "REF").twinVerdict === "LOSES" && X.conditionOf(gt(2.5), "REF").twinVerdict === "KEEPS" && X.conditionOf(gt(-2.5), "REF").twinVerdict === "LOSES"); }
     ok("!! the threshold is 2 se on both sides: +1.5 se LOSES, +2.5 se KEEPS, -1.5 se LOSES, -2.5 se HURTS", X.conditionOf(g(1.5), "REF").ruleVerdict === "LOSES" && X.conditionOf(g(2.5), "REF").ruleVerdict === "KEEPS" && X.conditionOf(g(-1.5), "REF").ruleVerdict === "LOSES" && X.conditionOf(g(-2.5), "REF").ruleVerdict === "HURTS", `${(X.conditionOf(g(1.5), "REF").rule.mean / X.conditionOf(g(1.5), "REF").rule.se).toFixed(2)}`);
 }
 sec("5. LINES");
@@ -85,6 +87,7 @@ sec("5. LINES");
     ok("!! none keeps: the list is 'none' and the line still reads", L({})[0] === "THE -0.12 CONSTANTS KEEP THEIR GAIN IN 0 OF 4 CONDITIONS (none); THEY LOSE IT IN (REF, DMG, NOISE, STN5)" && L({})[1] === "THE TWIN KEEPS ITS GAIN ON THEM IN 0 OF 4 CONDITIONS (none)");
     const hp = L({ DMG: { hl12: { c: 2 }, ht: { s: 1 } }, NOISE: { ht: { c: 1 } } });
     ok("!! the hull line counts the TUNED-L12 and TWIN-L12 arms only, names the conditions where they paid in order, and adds crushed and stranded over them (DMG 2 + 0 crushed, 0 + 1 stranded; NOISE 1 crushed)", hp[2] === "THE HULL PAYS AT -0.12 IN DMG, NOISE: 3 CRUSHED, 1 STRANDED" && L({ REF: { hr8: { c: 5 } } })[2] === "THE HULL IS UNHARMED AT -0.12 IN EVERY CONDITION");
+    ok("!! a stranded dive alone makes the hull pay (TWIN-L12, NOISE: 0 crushed, 1 stranded)", L({ NOISE: { ht: { s: 1 } } })[2] === "THE HULL PAYS AT -0.12 IN NOISE: 0 CRUSHED, 1 STRANDED" && L({ STN5: { hl12: { s: 2 } } })[2] === "THE HULL PAYS AT -0.12 IN STN5: 0 CRUSHED, 2 STRANDED");
     ok("!! line 4 compares the rule's own hull cost with the Round 8 rule's: more crushed or stranded than R8 names the condition (DMG 2 against 1); equal or fewer does not (NOISE 1 against 3)", L({ DMG: { hl12: { c: 2 }, hr8: { c: 1 } }, NOISE: { hl12: { c: 1 }, hr8: { c: 3 } } })[3] === "-0.12 CRUSHES MORE THAN THE ROUND 8 CONSTANTS IN DMG" && L({ STN5: { hl12: { s: 2 }, hr8: {} }, REF: { hl12: { c: 1 }, hr8: { c: 1 } } })[3] === "-0.12 CRUSHES MORE THAN THE ROUND 8 CONSTANTS IN STN5");
 }
 sec("6. CHECKS");
@@ -120,6 +123,8 @@ sec("8. FLIGHT");
     X.setFlight({ seconds: 100 });
     const ch = X.flyChunk("TUNED-R8", R8, "REF", "far"), chD = X.flyChunk("TUNED-R8", R8, "DMG", "far");
     ok("!! a chunk is one kind of one condition: 150 dives of the condition's seeds in order (REF far 7001-7150), and DMG flies other dives than REF (the damage reaches the flight: a far dive is undamaged by kind, so the seeds differ)", ch.runs.length === 150 && ch.runs.every((r) => r.kind === "far") && chD.runs.length === 150 && ch.runs[0].fingerprint !== chD.runs[0].fingerprint);
+    { const nz = X.flyChunk("TUNED-R8", R8, "NOISE", "far"), set = X.setOfCondition("NOISE", "far"), at3 = X.flyArm("TUNED-R8", R8, set, 0.3), at1 = X.flyArm("TUNED-R8", R8, set, 0.1);
+      ok("!! a chunk flies its condition's own gauge noise: NOISE far equals the sd 0.3 flight of its seeds dive for dive and differs from the sd 0.1 flight", nz.runs.length === 150 && nz.runs.every((r, i) => r.fingerprint === at3.runs[i].fingerprint) && nz.runs.some((r, i) => r.fingerprint !== at1.runs[i].fingerprint)); }
     const dmgBoth = X.flyChunk("TUNED-R8", R8, "DMG", "both"), refBoth = X.flyChunk("TUNED-R8", R8, "REF", "both");
     ok("!! the merged halves of a condition are the condition: far then both, 300 dives, kind-major", (() => { const m = X.mergeKinds([ch, refBoth]); return m.runs.length === 300 && m.runs[0].kind === "far" && m.runs[299].kind === "both" && dmgBoth.runs.length === 150; })());
     X.setFlight({});
