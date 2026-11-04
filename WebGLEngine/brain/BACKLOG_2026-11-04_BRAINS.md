@@ -1,0 +1,70 @@
+# Brains backlog and the switchboard (2026-11-04; UNNUMBERED; writing only -- no code was run for this note)
+
+Keith, 2026-11-04: "look at the fish and fly branches before choosing ... add all these things you can see, gaps you can see, and the idea items to the current backlog, and identify what another chat would be able to help work on simultaneously."
+This is a markdown file for the reason `brain/BACKLOG_2026-11-01.md` (on `claude/sweet-lovelace-8leivh`) gives: `tools/ship/nextRounds.mjs` is edited by every branch, and an edit here now would conflict at the merge. At merge the entries below go into `nextRounds.mjs` in its `{ id, blocker, what, how, why }` form; ids that already exist on the other branch are marked SAME and not repeated.
+
+## What reading the fish and fly branches changed (read: `brain/RUNG_4A_CLOSEOUT.md`, `brain/PLAIN_NET_CONTROL_WIP.md`, `brain/TANK_PILOTS_WIP.md`, `brain/FISH_VESTIBULAR_HELPER_WIP.md`, `brain/BACKLOG_2026-11-01.md`, the head of `tools/tankFlyCxBench.mjs`; I did not read the code of the circuits or run any of it)
+
+* **The measured answer on both brains is mostly negative, and the earlier suggestion of "silence the circuit and watch the behaviour break" demos is NOT supported by it.** Rung 4a: the fly's heading loop (148 cells) is an ordinary reservoir under five designs; a single leaky unit integrates a heading (skill 0.89-0.92) where no reservoir of any wiring does. Rung 4b: shuffled fish wirings keep about 88 percent of the gain over the autopilot, and a plain net with the same senses, readout and weight count kept 100 to 116 percent of the real wiring's gain. What pays is the autopilot-plus-residual structure, the tuned inputs and the optimizer, not the connectome. A demo that claims "the connectome does this" would say what the notes say is not shown.
+* **The two brains are a different layer from the needs planner.** The fish and fly pilots are FLYING-layer pilots (a heading or a pitch, tracking a target through the tank). The needs-and-limits seats (rule, twin planner, trained needs circuit `pilotNeedsCircuit`) are DECISION-layer seats (which station next, when to surface). They are not interchangeable seats in one task, so "put the fish and fly circuits in the survey task as seats" is not a round; two menus on one page is.
+* **What the tank already has:** a pilot-kind registry (`tank.registerPilotKind`, `render/subAquariumFlyCx.mjs` registers the stateful fly), a paired bench (`tools/tankFlyCxBench.mjs`: autopilot, network, stateful, stateless), the dropout event, and a brain panel. What it lacks: an 803-weight fish kind, a plain-net kind, a leaky-unit baseline, and any page that puts the arms side by side on the same seeds.
+
+## THE SWITCHBOARD (the choice stands, with a changed shape)
+
+One page, one task, the same seeds, two menus and a lesion toggle:
+* **Flying layer (the sub's pilot):** PD autopilot | gfc network (963) | stateful fly (1,729) | stateless fly | fish (803, when its kind is registered) | plain net (control) | single leaky unit (control, for the dropout task).
+* **Decision layer (the survey):** tuned rule (Round 8 constants) | rule at low -0.06 | twin planner (the survey seat, four profiles) | trained needs circuit.
+* **Tasks:** the survey (score, hull), the compass dropout (heading error lit and dark), a gust or tilt disturbance (the 4b-P/4b-E tasks).
+* **Reading:** per-arm score with paired difference and se on the same seeds (the series' conventions), the lesion toggle for a named neuron class, and an honest line when an arm ties its control ("the plain net does as well").
+* **Why this and not a score race or a connectome-ablation demo:** it is the one page where each brain is shown where it is better AND where it is not, against the controls the notes already say matter. It is also the harness any later brain needs.
+Build order: (1) a headless library and gate that runs a flying-layer arm and a decision-layer arm on the same seeds and returns paired readings (new files only); (2) the page; (3) the fish and plain-net kinds registered; (4) the lesion toggle. Step 1 does not need the other branch.
+
+## Backlog (OPEN unless stated; "parallel" = another chat can take it without touching a file this chat or the other chat is editing)
+
+### A. The switchboard and its parts
+| id | what | parallel? |
+|---|---|---|
+| `switchboard-core` | Headless library + gate: flying-layer arm x decision-layer arm x task, same seeds, paired readings; no UI. | THIS CHAT (new files; needs `brain/surveySeat.mjs`, `brain/needsTask.mjs`, the tank's pilot interface) |
+| `switchboard-page` | The page with the two menus, per-arm score and paired difference, a "ties its control" line. | after core; touches `sub-aquarium.html` or a new page (a NEW page avoids the shared file) |
+| `leaky-unit-baseline` | A single leaky integrator as a registered flying-layer arm for the dropout task (the rung 4a close-out's cheapest memory, skill 0.89-0.92), gated, with the tank's compass event. | YES: a new module `brain/pilotLeakyHeading.mjs` + gate, no shared files. Needs read access to `tools/subNavigator.mjs` and the 4a notes (on the other branch) |
+| `fish-pilot-tank-kind` | SAME as the other branch: register the 803-weight fish pilot with `registerPilotKind`. | other chat (it owns `brain/pilotSub*`, `tools/fish*`) |
+| `plain-net-tank-kind` | Register the plain-net control (`brain/pilotSubPlainNet.mjs`) as a tank kind so the page can fly it. | other chat or after merge (same files) |
+| `lesion-toggle` | A named-class lesion on a circuit pilot, shown in the brain panel and flown in the tank, with the control "lesion a random class of the same size". | after core; uses the brain panel's neuron selection |
+
+### B. Gaps in how the brains are used
+| id | what | parallel? |
+|---|---|---|
+| `brains-head-to-head-round` | One registered round: every flying-layer arm on the same dives and noise, in the series' format (pooled paired differences, Cochran Q, expectations written first). The finding is whether any brain beats its plain-net or leaky-unit control on the tank tasks. | after `switchboard-core`; this chat (rounds are numbered in `brain/NEEDS_AND_LIMITS.md`) |
+| `decision-circuit-vs-twin` | The trained needs circuit (`pilotNeedsCircuit`, Piece 4) against the twin seat on the survey task at the Round 33 constants, on fresh seeds. | THIS CHAT (it has the harness); a second chat could draft the registration |
+| `circuit-seat-in-aquarium-survey` | The aquarium survey event takes a decision seat by profile name; add the trained circuit as a profile so the survey page can show it. | after `decision-circuit-vs-twin` (shared file `render/subAquariumSim.mjs`) |
+| `fly-pair-replication`, `fly-plain-net-variants`, `fly-kind-peer-registration`, `fly-dark-sub-3d`, `fish-wiring-vs-shuffle-fresh` | SAME as the other branch's backlog (entries not repeated here). | other chat (its files) |
+| `circuits-next-from-open-data`, `liu-2022-licence-text`, `cave-derived-circuits` | SAME; they wait on Keith's licence and CAVE terms decisions. | blocked on Keith |
+
+### C. Demo ideas, each with the evidence it can honestly carry
+| id | demo | honest claim | needs |
+|---|---|---|---|
+| `demo-fish-righting` | Tilt or gust on the fish-vestibular pilot, beside the autopilot, and the plain net. | "the pilot rights itself faster than the autopilot", NOT "because of the connectome" (the plain net keeps 100-116 percent). | `fish-pilot-tank-kind`, `plain-net-tank-kind` |
+| `demo-fish-escape` | A flood or collision event; the Mauthner-class response, against the PD autopilot's latency, as one number. | a latency, and only if the pilot has an escape output (not checked: I do not know that it has) | read the pilot's outputs first |
+| `demo-fly-heading-dropout` | The compass dropout with the stateful fly, the stateless fly, the leaky unit and dead reckoning side by side. | rung 4a says the leaky unit and the navigator integrate and the reservoir does not; this demo SHOWS that, which is the true and interesting result | `leaky-unit-baseline` |
+| `demo-brain-lesion` | Lesion a named class and a random class of the same size and show the score. | only if the lesion of the real class costs more than the random one, which is the wiring-versus-shuffle question (88 percent kept) in picture form | `lesion-toggle`, and the fresh-shuffle replicate |
+| `demo-switchboard` | The page above. | per-arm, per-task, with ties shown as ties | `switchboard-core`, `switchboard-page` |
+
+### D. The needs-and-limits side (this chat) carried into the same list
+| id | what | blocker |
+|---|---|---|
+| `seat-shipped-at-low-minus-0.06` | The survey seat now flies low -0.06 (Round 33); not yet shipped as a version. | the v4912 ship: rig timings for about 25 new gates (the 15 changed since v4911 are listed in the last message) |
+| `hull-cost-of-a-crushed-boat` | Round 33's test is statistical; what a crushed boat costs beyond a 0 score is a judgement. | Keith's call (a cost, then a re-run of the choice with it) |
+| `dmg-condition-power` | The damaged-hull condition decides the choice (49 against 40 bad dives of 800) and 800 dives cannot rule out a real extra 1 percent. | OPEN: a larger selection on DMG only, registered first |
+| `noise-between-0.20-and-0.30` | The -0.12 constants cross over somewhere in this range; the -0.06 choice has not been flown there. | OPEN |
+| `survey-3d-markers` | The aquarium's 3D view has no station markers (the plan and side views do). | OPEN; touches `render/subAquarium3d.mjs` (the other branch lists `tank-nav-3d` for the same file) |
+| `ship-v4912` | Version bump, changelog, derived files, verdict for the needs rounds 17-33, the survey seat and the survey event. | rig timings first (waiting on the denoise study to finish) |
+
+## What another chat can do at the same time, in one list
+
+Take now, no shared files: `leaky-unit-baseline` (new module and gate), a draft registration for `decision-circuit-vs-twin` (a document), the `demo-fish-escape` pre-read (read the pilot's outputs and say whether an escape output exists), and `plain-net-tank-kind` if it keeps to the files it already owns.
+Keep in this chat: `switchboard-core`, `brains-head-to-head-round`, `decision-circuit-vs-twin`, the v4912 ship.
+Must wait for a merge or a decision: anything in `render/subAquariumSim.mjs`, `sub-aquarium.html`, `tools/ship/nextRounds.mjs` and the gate census (every branch edits them); the three UPSTREAM entries on Keith's licence decisions.
+Rule for a helper: its own branch (say `claude/<name>-helper`), its own note, no pull request unless Keith asks, no edits to the other chat's files (`brain/SUBMARINE_WIP.md`, `tools/fish*`, `brain/pilotSub*`) and none to this chat's (`brain/NEEDS_AND_LIMITS.md`, `tools/ship/planner*`, `brain/surveySeat.mjs`).
+
+## What this note does NOT say
+It does not rank these. It does not say any fish or fly demo will work: the notes say the connectome is not what pays, and a demo that implies otherwise would contradict them. It does not say the fish pilot has an escape output. It was written from the other branch's notes, not its code.
