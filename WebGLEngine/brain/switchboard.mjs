@@ -17,9 +17,12 @@ import * as U from "./tunedRule.mjs";
 import * as S from "./surveySeat.mjs";
 import * as A from "../render/subAquariumSim.mjs";
 
+/** A dive is BAD when it was crushed or stranded. */
+export const badOf = (x) => !!(x.crushed || x.stranded);
 export const SE_FACTOR = 2, LAYERS = Object.freeze(["decision", "flying"]);
 const TWO_PI = 2 * Math.PI;
-const wrap = (a) => { let x = a % TWO_PI; if (x > Math.PI) x -= TWO_PI; if (x <= -Math.PI) x += TWO_PI; return x; };
+/** An angle wrapped into (-pi, pi]. */
+export const wrap = (a) => { let x = a % TWO_PI; if (x > Math.PI) x -= TWO_PI; if (x <= -Math.PI) x += TWO_PI; return x; };
 const meanOf = (a) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0);
 const seOf = (a) => { if (a.length < 2) return 0; const m = meanOf(a); return Math.sqrt(a.reduce((x, y) => x + (y - m) * (y - m), 0) / (a.length - 1) / a.length); };
 
@@ -95,7 +98,7 @@ export const surveyTask = Object.freeze({
         if (typeof arm.pilot !== "function") throw new Error(`switchboard.survey: arm ${arm.id} has no pilot()`);
         const kinds = opts.kinds || ["far", "both"], set = T.setOf(kinds, range.from, range.to);
         const r = T.evaluate(arm.pilot({ seconds: opts.seconds }), set, { gauge: { sd: opts.sd ?? T.GAUGE.sd, hz: T.GAUGE.hz }, ...(opts.seconds ? { seconds: opts.seconds } : {}) });
-        return r.runs.map((x, i) => ({ key: `${set[i].kind}:${set[i].seed}`, score: x.score, bad: !!(x.crushed || x.stranded || x.status === "crushed" || x.status === "stranded") }));
+        return r.runs.map((x, i) => ({ key: `${set[i].kind}:${set[i].seed}`, score: x.score, bad: badOf(x) }));
     },
 });
 /** The survey arms: the tuned rule at the Round 8 constants (the baseline), the rule at the seat's constants (low -0.06), and the twin planner in each profile (each must beat the rule at the same constants). */
@@ -111,12 +114,12 @@ export function surveyArms() {
 
 // ---- the DROPOUT task (flying layer): the tank's compass dropout, heading error in the dark ------------------------------------------------------------------------------------------------------
 export const TICK = 1 / 30, SETTLE = 12;
-/** The dropout task: range { from, to } is a list of integer ids "sb-<n>" (each a one-sub tank, the same spawn for every arm); opts { seconds (default 160), event ("dropout", or null for the lit control) }. Score = 1 - (mean SETTLED dark heading error)/pi (the lit error when the event is null); bad = a lost sub. */
+/** The dropout task: range { from, to } is a list of integer ids "sb-<n>" (each a one-sub tank, the same spawn for every arm); opts { seconds (default 160), event ("dropout", or null for the lit control), settle (seconds after a new target before a tick is scored, default 12; a bucket with no settled tick falls back to all ticks) }. Score = 1 - (mean SETTLED dark heading error)/pi (the lit error when the event is null); bad = a lost sub. */
 export const dropoutTask = Object.freeze({
     name: "dropout", layer: "flying",
     run(arm, range, opts = {}) {
         if (typeof arm.entry !== "function") throw new Error(`switchboard.dropout: arm ${arm.id} has no entry()`);
-        const seconds = opts.seconds ?? 160, event = opts.event === undefined ? "dropout" : opts.event, out = [];
+        const seconds = opts.seconds ?? 160, settle = opts.settle ?? SETTLE, event = opts.event === undefined ? "dropout" : opts.event, out = [];
         for (let n = range.from; n <= range.to; n++) {
             const id = "sb-" + n, q = A.createTank();
             if (arm.register) arm.register(q);
@@ -127,7 +130,7 @@ export const dropoutTask = Object.freeze({
                 q.step(TICK); const s = q.snapshot()[0];
                 if (s.target !== target) { target = s.target; age = 0; } else age += TICK;
                 const dark = !!(s.compass && s.compass.valid === false), e = Math.abs(wrap(s.target.heading - s.heading));
-                if ((event ? dark : true)) { sumAll += e; cntAll++; if (age >= SETTLE) { sum += e; cnt++; } }
+                if ((event ? dark : true)) { sumAll += e; cntAll++; if (age >= settle) { sum += e; cnt++; } }
             }
             const last = q.snapshot()[0], err = cnt ? sum / cnt : cntAll ? sumAll / cntAll : NaN;
             if (!Number.isFinite(err)) throw new Error(`switchboard.dropout: arm ${arm.id} id ${id} has no ticks in the bucket it is scored on`);

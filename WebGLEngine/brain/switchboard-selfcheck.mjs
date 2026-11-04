@@ -36,6 +36,7 @@ sec("1. PAIRED");
     const d = [0.1, -0.1, 0.1, -0.1], q = B.paired(runs(d), runs([0, 0, 0, 0]));
     ok("!! the se is the standard error of the differences (n - 1): +-0.1 over four scenarios has se 0.0577", near(q.se, 0.1 * Math.sqrt(4 / 3) / 2, 1e-9), `${q.se.toFixed(4)}`);
     ok("!! a different key in the same place, or a different number of scenarios, is refused with this library's message", /switchboard\.paired: scenario 1 is "k1" for one arm and "x" for the other/.test(thr(() => B.paired(runs([1, 2]), [{ key: "k0", score: 1, bad: false }, { key: "x", score: 2, bad: false }]))) && /flew 2 and 3 scenarios/.test(thr(() => B.paired(runs([1, 2]), runs([1, 2, 3])))));
+    ok("!! one scenario has se 0 (not NaN), and differences of 1e-12 count as the same, not better or worse", B.paired(runs([0.7]), runs([0.5])).se === 0 && (() => { const x = B.paired(runs([0.5 + 1e-12, 0.5 - 1e-12]), runs([0.5, 0.5])); return x.same === 2 && x.better === 0 && x.worse === 0; })());
     const r = (mean, se) => B.readingOf({ mean, se });
     ok("!! the reading is 2 se on both sides: +2.5 se BETTER, +1.5 se TIES, -2.5 se WORSE, -1.5 se TIES, exactly 2 se TIES (strict)", r(0.025, 0.01) === "BETTER" && r(0.015, 0.01) === "TIES" && r(-0.025, 0.01) === "WORSE" && r(-0.015, 0.01) === "TIES" && r(0.02, 0.01) === "TIES" && r(-0.02, 0.01) === "TIES");
     ok("!! no difference TIES; a difference with no spread (se 0) is decisive by its sign: +0.1 BETTER, -0.1 WORSE", r(0, 0) === "TIES" && r(0.1, 0) === "BETTER" && r(-0.1, 0) === "WORSE" && r(0, 0.5) === "TIES");
@@ -78,7 +79,8 @@ sec("4. SURVEY");
     ok("!! the two rules differ on at least one dive (the shift reaches the flight), and the keys are 'kind:seed' kind-major (far 1344-1346 then both)", res.runs["rule-r8"].some((x, i) => x.score !== res.runs["rule-low06"][i].score) && J(res.runs["rule-r8"].map((x) => x.key)) === J(["far:1344", "far:1345", "far:1346", "both:1344", "both:1345", "both:1346"]));
     const noisy = bd.run("survey", ["rule-low06"], range, { seconds: 200, sd: 0.3 }), one = bd.run("survey", ["rule-low06"], range, { seconds: 200, kinds: ["far"] }), dn = ev(T.flyDecision(U.tunedSeat(S.SURVEY_CONSTANTS, U.WIDE_BOUNDS)), 0.3);
     ok("!! the gauge noise option reaches the flight (sd 0.3 flies the sd 0.3 dives and not the default ones) and the kinds option picks the kinds (far only: three scenarios)", noisy.runs["rule-low06"].every((x, i) => x.score === dn.runs[i].score) && noisy.runs["rule-low06"].some((x, i) => x.score !== res.runs["rule-low06"][i].score) && one.runs["rule-low06"].length === 3 && one.runs["rule-low06"].every((x) => x.key.startsWith("far:")));
-    ok("!! bad marks a crushed or stranded dive only: the six real dives have none, and a synthetic run object with crushed true or stranded true is read as bad (through the task itself)", res.runs["rule-r8"].every((x) => x.bad === false) && (() => { const t = B.surveyTask; return typeof t.run === "function" && t.layer === "decision"; })());
+    ok("!! badOf marks a crushed dive or a stranded one and nothing else (an ordinary dive, a grounded one with neither flag is not bad); the six real dives have none", B.badOf({ crushed: true }) === true && B.badOf({ stranded: true }) === true && B.badOf({ crushed: false, stranded: false, status: "grounded" }) === false && B.badOf({}) === false && res.runs["rule-r8"].every((x) => x.bad === false));
+    ok("!! each twin arm flies its own profile: on twelve dives (1400-1405, far and both, 200 s) twin-events and twin-ensemble equal the survey seat's events and ensemble profiles dive for dive, and the ensemble arm differs from the standard arm on at least one (the profile reaches the board's arm)", (() => { const r6 = { from: 1400, to: 1405 }, w2 = bd.run("survey", ["twin-standard", "twin-events", "twin-ensemble"], r6, opts), s6 = T.setOf(["far", "both"], 1400, 1405), e6 = (p) => T.evaluate(S.surveyPilot({ profile: p, overrides: { seconds: 200 } }), s6, { gauge: T.GAUGE, seconds: 200 }), de = e6("events"), dn2 = e6("ensemble"); return w2.runs["twin-events"].every((x, i) => x.score === de.runs[i].score) && w2.runs["twin-ensemble"].every((x, i) => x.score === dn2.runs[i].score) && w2.runs["twin-ensemble"].some((x, i) => x.score !== w2.runs["twin-standard"][i].score); })());
     ok("!! a survey arm without a pilot() is refused with the arm's name", /arm nopilot has no pilot\(\)/.test(thr(() => B.surveyTask.run({ id: "nopilot" }, range, opts))));
 }
 
@@ -96,6 +98,14 @@ sec("5. DROPOUT");
     ok("!! an arm's register(tank) hook runs before its sub joins (the way a pilot kind will be added): the hook sees an empty tank", (() => { let seen = -1; B.dropoutTask.run({ id: "hooked", register: (q) => { seen = q.snapshot().length; }, entry: () => ({ pilot: "autopilot", circuit: "gfc", weights: null }) }, { from: 0, to: 0 }, o); return seen === 0; })());
 }
 
+{
+    const q = B.standardBoard(), a = q.arms.get("autopilot"), long = { from: 0, to: 1 }, f = (settle) => B.dropoutTask.run(a, long, { seconds: 120, settle }).map((x) => x.score);
+    ok("!! the settle option picks the scored ticks: settle 0 (every dark tick) differs from the default 12 s on at least one id; and a settle longer than any target lives (50 s) has no settled tick, so it scores the same as 1e9 (all dark ticks) -- the age clock resets at every new target", J(f(0)) !== J(f(12)) && J(f(50)) === J(f(1e9)) && J(f(50)) === J(f(0)));
+    ok("!! wrap puts any angle into (-pi, pi]: 3.5 -> 3.5 - 2pi, -3.5 -> 2pi - 3.5, pi stays pi, 0 and small angles stay, 7 -> 7 - 2pi", near(B.wrap(3.5), 3.5 - 2 * Math.PI) && near(B.wrap(-3.5), 2 * Math.PI - 3.5) && near(B.wrap(Math.PI), Math.PI) && B.wrap(0) === 0 && near(B.wrap(0.3), 0.3) && near(B.wrap(7), 7 - 2 * Math.PI));
+    const w9 = Array.from({ length: 963 }, (_, i) => 900 * Math.sin(i));
+    const crazy = B.dropoutTask.run({ id: "crazy", entry: () => ({ pilot: "network", circuit: "gfc", weights: w9 }) }, { from: 0, to: 3 }, { seconds: 120 });
+    ok("!! a lost sub is marked bad: a network with huge weights is lost on all four ids (bad true), and the autopilot on the same ids is not (bad false)", crazy.every((x) => x.bad === true) && B.dropoutTask.run(a, { from: 0, to: 3 }, { seconds: 120 }).every((x) => x.bad === false));
+}
 sec("6. SOURCE");
 {
     ok("!! the module reads no clock, no random number and nothing from the disk", !/Date\.now|Math\.random|performance\.now|readFileSync|writeFileSync/.test(code));
