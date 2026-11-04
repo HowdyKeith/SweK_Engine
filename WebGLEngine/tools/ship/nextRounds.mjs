@@ -2274,6 +2274,13 @@ export const NEXT_ROUNDS = [
         why: "Keith, 2026-11-04: item 2 of five, after the PD-joust round's verdict ('the battleship gates red on main').",
     },
     {
+        id: "sixdof-page-read-by-ticks",
+        blocker: "CLOSED",
+        what: "CLOSED 2026-11-04, UNNUMBERED. An engineering fix, not a round: Keith's item 5 of five. tools/ship/rigidBody6dofPage-selfcheck.mjs went red under a loaded sweep on one row alone -- ship A#0's position the same at both ends of its read, every other row green, the tick row (more than 30 ticks in) among them -- and green alone. The page's own headless stepper (runBattles) says how: in 2 of 200 seeds, 4 and 148, ship A#0 turns from tick 2 and holds its place until tick 37 or 47, and the read had a 90 s ceiling, which on a slow page could end it inside that span. FIXED: the read waits for the battle's end, or 150 ticks with hit points down; the clock only says whether the page has STOPPED (no new tick in 30 s, 600 s in all as the last guard, the harness allowing 900 s), and says so in a row of its own.",
+        how: "Nothing left in this entry. Two rows hold it: where the battle was read, and the misreading reproduced through the page's stepper (seeds 4 and 148 turn for 20 ticks or more, and every one of the 120 measured battles lasts longer than that). Sabotaged R1-R5 with the byte-safe runner, every one red by name; R2 stops the page's tick and the read row says 'STOPPED: no new tick in 30 s'.",
+        why: "Keith, 2026-11-04: item 5 of five, after the PD-joust round's verdict.",
+    },
+    {
         id: "sixdof-page-fight-measured",
         blocker: "CLOSED",
         what: "CLOSED 2026-11-02, UNNUMBERED. Registered before any code (brain/SIXDOF_PAGE_FIGHT_WIP.md), built, gated and sabotaged, run, its results file committed unread (37c14c8b), then read. The five pilots on es-box3d-6dof.html's Load Pilots panel in the page's OWN fight (three a side, collisions and ram damage on, window.__sixdof.runBattles), every pair from both sides on fresh battle seeds 80001-80100, each pairing read by an exact two-sided sign test at p < 0.01. H1 MET: the fruit fly's Default beats the GPU pilot W123/L76/D1, the duel's 70-0 much narrower. H2: only the close-quarters pilot beats the PD autopilot (199-1); the League pilot LOSES to it (44-155); the Default and the GPU pilot show no difference. H3 MET: the close-quarters pilot ranks first, W730/L58/D12 over its 800, then the Default -13, the autopilot -38, the GPU pilot -180, the League pilot -441. 431 of 2,500 battles timed out (17.2%). Predictions: P1 and P3 right, P2 and P4 wrong. The verdict is gate rows (tools/ship/sixdofPageFight-selfcheck.mjs section 6), with a sample of 12 battles flown again.",
