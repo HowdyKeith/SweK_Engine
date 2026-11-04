@@ -109,10 +109,25 @@ sec("5. DROPOUT");
     const crazy = B.dropoutTask.run({ id: "crazy", entry: () => ({ pilot: "network", circuit: "gfc", weights: w9 }) }, { from: 0, to: 3 }, { seconds: 120 });
     ok("!! a lost sub is marked bad: a network with huge weights is lost on all four ids (bad true), and the autopilot on the same ids is not (bad false)", crazy.every((x) => x.bad === true) && B.dropoutTask.run(a, { from: 0, to: 3 }, { seconds: 120 }).every((x) => x.bad === false));
 }
+sec("5b. RUN ASYNC");
+{
+    const bd = B.createBoard().addTask({ name: "t", layer: "decision", run: (arm, r) => Array.from({ length: r.to - r.from + 1 }, (_, i) => ({ key: "s" + (r.from + i), score: arm.base + 0.01 * (r.from + i), bad: false })) })
+        .addArm({ id: "a", layer: "decision", base: 0.5 }).addArm({ id: "b", layer: "decision", base: 0.6, controls: ["a"] });
+    const prog = [], yields = [];
+    const p = B.runAsync(bd, "t", ["a", "b"], { from: 3, to: 6 }, { x: 1 }, { yieldTo: async () => { yields.push(prog.length); }, onProgress: (d, n) => prog.push([d, n]) });
+    p.then((res) => {
+        ok("!! runAsync flies one seed at a time: progress is (1,4) (2,4) (3,4) (4,4), it yields once after each seed (after each progress call), and the result has board.run's shape (task, layer, range, options, each arm's runs seed-major, the same keys for every arm)", J(prog) === "[[1,4],[2,4],[3,4],[4,4]]" && J(yields) === "[1,2,3,4]" && res.task === "t" && res.layer === "decision" && J(res.range) === J({ from: 3, to: 6 }) && J(res.opts) === J({ x: 1 }) && J(res.runs.a.map((r) => r.key)) === '["s3","s4","s5","s6"]' && J(res.runs.b.map((r) => r.key)) === J(res.runs.a.map((r) => r.key)) && near(res.runs.b[2].score, 0.6 + 0.05) && bd.read(res).pairs[0].reading === "BETTER");
+    });
+    const bad = (r) => B.runAsync(bd, "t", ["a"], r).then(() => "", (e) => e.message);
+    Promise.all([bad({ from: 2, to: 1 }), bad({ from: 1.5, to: 3 }), bad(null), bad({ from: "1", to: 2 }), B.runAsync(bd, "nope", ["a"], { from: 1, to: 1 }).then(() => "", (e) => e.message), B.runAsync(bd, "t", ["zz"], { from: 1, to: 1 }).then(() => "", (e) => e.message)]).then((m) => {
+        ok("!! runAsync refuses a range that is reversed, fractional, missing or text, with its own message, and an unknown task or arm with the board's (nothing flown first)", m.slice(0, 4).every((x) => /switchboard\.runAsync: range must be \{ from, to \} integers with from <= to/.test(x)) && /unknown task "nope"/.test(m[4]) && /unknown arm "zz"/.test(m[5]));
+    });
+}
 sec("6. SOURCE");
 {
     ok("!! the module reads no clock, no random number and nothing from the disk", !/Date\.now|Math\.random|performance\.now|readFileSync|writeFileSync/.test(code));
     ok("!! the header names the backlog item, the two layers, the control lines and the two built-in tasks", /switchboard-core/.test(head) && /DECISION layer/.test(head) && /FLYING layer/.test(head) && /TIES its control/.test(head) && /SURVEY/.test(head) && /DROPOUT/.test(head));
 }
+await new Promise((r) => setTimeout(r, 50));
 console.log(fails ? `\n${fails} FAIL` : "\nall checks pass");
 finished = true;

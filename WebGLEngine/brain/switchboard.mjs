@@ -90,6 +90,23 @@ function readBoard(board, res) {
     return { per, pairs, lines };
 }
 
+/**
+ * The same as board.run, one seed at a time so that a page can show progress and keep responding: `range` is { from, to } integers; for each seed in turn it flies every arm on that seed alone and then awaits `yieldTo()`;
+ * `onProgress(done, total)` is called after each seed. The result has the shape of board.run's (the runs are seed-major here, the same order for every arm, so they pair exactly as board.run's do).
+ * A refusal (unknown task or arm, wrong layer) comes from the first seed's board.run, before anything is flown. The range must be integers with from <= to.
+ */
+export async function runAsync(board, taskName, armIds, range, opts = {}, { yieldTo = async () => {}, onProgress = () => {} } = {}) {
+    if (!range || !Number.isInteger(range.from) || !Number.isInteger(range.to) || range.to < range.from) throw new Error(`switchboard.runAsync: range must be { from, to } integers with from <= to, got ${JSON.stringify(range)}`);
+    const total = range.to - range.from + 1; let acc = null;
+    for (let s = range.from; s <= range.to; s++) {
+        const one = board.run(taskName, armIds, { from: s, to: s }, opts);
+        if (!acc) acc = { task: taskName, layer: one.layer, range, opts, runs: Object.fromEntries(armIds.map((id) => [id, []])) };
+        for (const id of armIds) acc.runs[id].push(...one.runs[id]);
+        onProgress(s - range.from + 1, total); await yieldTo();
+    }
+    return acc;
+}
+
 // ---- the SURVEY task (decision layer): the needs task of brain/needsTask.mjs, scenarios kind-major ------------------------------------------------------------------------------------------------
 /** The survey task: range { from, to } seeds of each of `opts.kinds` (default far and both); opts { seconds (a shorter dive for the gate), sd (the gauge noise, default the task's) }. bad = a crushed or stranded dive. */
 export const surveyTask = Object.freeze({
