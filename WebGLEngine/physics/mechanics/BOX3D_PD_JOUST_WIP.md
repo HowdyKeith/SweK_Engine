@@ -138,3 +138,68 @@ Seconds.
 - `tools/roundhouse/box3dPdJoust.mjs` (the library), `box3dPdJoustRun.mjs` (the command) and
   `box3dPdJoust-selfcheck.mjs` (the gate).
 - The results go to `physics/mechanics/box3dPdJoustResults.json`, committed before it is read.
+
+## Build record (2026-11-04)
+
+Built as listed above. D ports box3d v0.1.0's own integrator for a lone body: the stepper's calls into box3d, then four
+substeps of the gyroscopic Newton step, the speed caps, the position and the first-order rotation, then finalisation.
+The tree vendors box3d's headers and not its sources, so the gate tests the port against box3d's behaviour rather than
+its text.
+
+### C-model's tumble, as registered, does not hold; the rule is left as registered
+
+Flown while building, since it is a control the registration fixes: over the 10 s tumble at (0.3, 0.2, 0.1) rad/s,
+D's spin is 2.15e-4 of its size off box3d's, and its orientation 1.63e-4 rad off. Both are over the 1e-4 tolerance.
+E is 1.0e-3 and 2.6e-3 off.
+
+As far as this sandbox can show, that is not a porting error:
+
+- **One tick at a time,** from box3d's own states along that tumble, D is box3d to 1.3e-6 of the spin and 1.8e-7 rad.
+- **At high spin** (5 to 9 rad/s, with a torque and a thrust), one tick from the same state lands within about 1e-6
+  of box3d's spin, which is float32's level, and within 1.3e-7 rad and 8e-9 m.
+- **The key** agrees to 1.5e-8 rad. On an unregistered joust replay (seed 97001), D is 5e-7 rad from box3d where E is
+  3.6e-2.
+- **The gap grows faster than linearly:** 6e-8 after one tick, 2.3e-6 after 100, 2.15e-4 after 300.
+- **The mechanism:** box3d's scheme does not hold the ship's angular momentum. Over the 10 s, box3d drifts it by
+  2.27e-3 of itself and D by 2.43e-3, where E holds it to 1.2e-10. Each copy of the scheme drifts along its own path,
+  and the differences between float32 and double grow along it.
+  - Rounding D's state to float32 after each tick (D32) does not close the gap (2.11e-4). box3d's float32 is in its
+    arithmetic, not only in its state.
+
+So the registered tumble cannot tell box3d's scheme in double from box3d's scheme in float32. **The registration's rule
+is not changed:** C-model, as registered, decides whether D counts as box3d's scheme, and it is expected to fail.
+Beside it, the run records the tumble taken one tick at a time (`okPerTick`), testing nothing. The verdict will report
+what the rule gives with C-model as registered, and, separately, what it would give with the one-tick form.
+
+### Also built, beyond the registration
+
+- **Gate rows that test the port,** which are not registered controls:
+  - the pieces, each checked as box3d has it: the rotations, the first-order rotation update, Cramer's rule, and the
+    Newton step, on the ship and on two bodies with three different moments;
+  - the high-spin tick, which also shows that one substep instead of four misses by 1e-2 rad;
+  - the caps: a ship set at 500 m/s and 40 rad/s comes out of one tick at 400 m/s and 23.5619 rad/s on both D and box3d.
+- **Tolerances.** The high-spin row allows the spin 1e-5, float32's level over a tick's arithmetic (3.9e-7 to 1.0e-6
+  was seen on two sets of states). Its orientation and position tolerances are 1e-6.
+
+### Flown while building, none of it a registered measurement
+
+- **The controls:**
+  - C-model's key (1.5e-8 rad), its tumble as registered (failing, above), and the one-tick tumble.
+  - C-unchanged: the anchors, and sixdof-box3d's 80 committed flights of the PD autopilot's joust on E and on box3d,
+    all of which fly again to the bit. No variant other than E and B3 was flown on those seeds.
+  - C-box3d, C-float32, C-caps, C-chaos and C-determinism.
+- **The miniature:** seeds 97001 to 97006, with a 1e-3 m nudge.
+  - Printed: its M1 ratios of D's angle to E's (1.37e-5 and 7.42e-5), its caps (9.3 m/s, 2.5 rad/s), and that box3d
+    changed none of its two M3 outcomes.
+  - No M2 outcome, tally or reading was printed.
+
+### The gate
+
+`tools/roundhouse/box3dPdJoust-selfcheck.mjs` has 34 rows and takes about 2 s. Its header logs 48 sabotages, each red
+by name in the end.
+
+- Reading the gate against the list before any ran found three that no row could see, and rows were written for them
+  first.
+- Then G3 and G26 went 0 red. Both are findings, and both rows were fixed and re-sabotaged red:
+  - G3: on the ship, one component's gyroscopic term is zero, because two of its moments are equal.
+  - G26: the reading string already carries p < 0.01.
