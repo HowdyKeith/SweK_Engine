@@ -2,11 +2,11 @@
 <!-- sub-aquarium.html -- UNNUMBERED (the version is chosen at ship time): A TANK OF SUBMARINES, AND PEERS CAN SEND THEIRS.
 
      Every submarine in the tank swims with ITS OWN pilot, through the same vessel and the same pilot contract as the rest of the submarine work (render/subAquariumSim.mjs: physics/mechanics/subModel6dof.mjs, the PD autopilot, and the
-     connectome-wired network flying the 963 weights the sub arrived with). It wanders: a new heading, depth and speed every 20-45 s, and back to the middle of the tank near a wall. A boat that is lost (the floor, the surface) is put
+     connectome-wired network flying the 963 weights the sub arrived with, or the stateful fly pilot -- the autopilot plus a residual read from the fly's heading loop run with a memory, 1,729 weights). It wanders: a new heading, depth and speed every 20-45 s, and back to the middle of the tank near a wall. A boat that is lost (the floor, the surface) is put
      back and the count is shown -- a pilot that keeps failing is a pilot you can SEE failing.
 
      WHERE THE SUBS COME FROM: "Offer my subs" puts this box's own champions in the tank (ai-bridge/subAquariumBridge.js /subaquarium/seed). server.html's peer list has a "send sub" button per detected peer: it asks THIS box to
-     send the chosen sub to that peer's /subaquarium/arrive, and it appears in THEIR tank here. Subs from peers are marked with the address that sent them. WHAT A SUB IS: a name, 963 numbers and twelve more -- data, never code;
+     send the chosen sub to that peer's /subaquarium/arrive, and it appears in THEIR tank here. Subs from peers are marked with the address that sent them. WHAT A SUB IS: a name, a circuit, 963 (gfc) or 1,729 (flycx) numbers and twelve more -- data, never code;
      this page flies it with code it already has.
 
      THE STAND-IN, SAID PLAINLY: the network in every sub THIS PAGE FLIES is wired like the fruit fly's Giant Fiber Circuit (34 neurons, 313 synapses). A real zebrafish circuit IS vendored now -- the densest 34-neuron, 153-synapse core of the
@@ -88,6 +88,7 @@
     <label title="Give the selected sub a charge that its thrust drains and only the surface (a battery boat) or a snorkel depth refills, and a hull that feels the pressure: it takes the refill trip by itself when the charge is low. Tank-scale numbers (minutes, not days) and a 60 m hull."><span>needs</span> <select id="needsSel"><option value="">off</option><option value="battery">battery</option><option value="snorkel">battery + snorkel</option><option value="airIndependent">air-independent</option><option value="unlimited">unlimited</option></select></label> <button id="injureBtn" title="Hurt the selected sub's hull by 20% of its life: its collapse depth falls and it leaks more the deeper it goes">injure +20%</button> <label title="Work the flood pump on the selected sub (needs on): it draws 1.5 kW and bails the flood, less the deeper the boat is, and does nothing below 90 m. It draws power even with nothing to bail."><input type="checkbox" id="pumpChk" disabled> pump</label> <label title="Work the hull repair on the selected sub (needs on): it draws 0.8 kW and mends the hull, but ONLY within a metre of the surface and nearly stopped. The sub's own refill trip takes it up when its charge is low; the line under the sub says when the repair is waiting."><input type="checkbox" id="repairChk" disabled> repair</label> <label title="Seat the rule advisor of Round 4 (GUARDED-OBS) on the selected sub (needs on): it surfaces when the charge is under a threshold that is high near the surface and falls with depth, and works the pump and the repair by itself, in place of the fixed refill trip and the two boxes beside. Two small local language models were tried in the same seat and added nothing beyond a fixed depth cap (brain/NEEDS_AND_LIMITS.md, Round 5); this is the rule, not a model."><input type="checkbox" id="advChk" disabled> advisor</label>
     <span title="v4912 -- the SURVEY: the selected sub is made a battery boat with a charge, given three stations in the tank and the survey seat (the twin planner of the needs-and-limits series) chooses the order it visits them in, rises to recharge and comes home by the end of 600 s. The profile is the planner's trade: standard (replan every 120 s), events (plan when it leaves the surface: the same gain for three quarters of the work), wide (five stations tried at a time), ensemble (plan against a charge a little high and a little low). The stations are drawn amber, green once visited; the list line gives the score at the end. Press restore to end it."><button id="surveyBtn">survey</button> <select id="surveyProf" title="the planner's profile"><option value="standard">standard</option><option value="events">events</option><option value="wide">wide</option><option value="ensemble">ensemble</option></select></span>
     <button id="flyEstBtn" disabled title="The fly's heading-loop circuit as an estimator behind the autopilot, flown through the compass dropout (available once the page has loaded the circuit)">fly estimator</button> <button id="erEstBtn" disabled title="The best random wiring of the same size, fitted the same way, behind the autopilot (available once the page has loaded the circuit)">random-wiring estimator</button></span>
+  <label title="Put a sea of islands, icebergs (with a keel: a sub passes beneath one that is shallower than it swims) and patrolling ships in the tank and send the subs to goals through it. The sub's own pilot flies; the guidance only replaces the wandering. Contact is counted, not punished. Standard 500 x 300 m tank only. 'plan ahead' is the arm that did best in the harder navigation test (brain/SUB_FIELD_NAV_WIP.md); 'straight' ignores the sea."><span>navigation</span> <select id="navSel"><option value="">off (wander)</option><option value="any+predict">plan ahead</option><option value="any+replan">re-plan</option><option value="any">plan once</option><option value="straight">straight at the goal</option></select></label> <button id="navSeaBtn" disabled title="Draw a new sea (the counters start again)">new sea</button>
   <span class="chip"><span class="dot" id="fishDot"></span><b>FISH BRAIN</b> <span id="fishWord">checking&hellip;</span></span>
   <span id="msg" class="sub"></span>
 </div>
@@ -213,6 +214,22 @@ $("compassBtn").onclick = () => {
   tank.setEvent(ids[0], "dropout"); if (ids[1]) tank.setEvent(ids[1], "navigator"); compassOn = true;
   $("msg").textContent = ids[1] ? "compass test: " + tank.subs.get(ids[0]).name + " on the plain autopilot, " + tank.subs.get(ids[1]).name + " on the navigator" : "compass test: only one sub, on the plain autopilot (a second sub is needed for the navigator)";
 };
+// UNNUMBERED (brain/SUB_FIELD_NAV_WIP.md FOLLOW-UP 4): navigation in the tank. The sea and the guidance live in render/subAquariumSim.mjs; the page only asks for them and draws what the snapshot says.
+let navSeed = 1;
+const NAV_NAMES = { "any+predict": "plan ahead", "any+replan": "re-plan", any: "plan once", straight: "straight at the goal" };
+function applyNav() {
+  const arm = $("navSel").value;
+  try {
+    if (!arm) { tank.setScene(null); $("navSeaBtn").disabled = true; $("msg").textContent = "navigation off: the subs wander"; return; }
+    if (!tank.scene) tank.setScene(navSeed);
+    let n = 0; for (const s of tank.snapshot()) { tank.setNav(s.id, arm); n++; }
+    $("navSeaBtn").disabled = false;
+    $("msg").textContent = `navigation (${NAV_NAMES[arm] || arm}): sea ${tank.scene.seed}, ${n} sub${n === 1 ? "" : "s"} sent to goals`;
+  } catch (e) { $("navSel").value = ""; $("navSeaBtn").disabled = true; $("msg").textContent = String((e && e.message) || e).slice(0, 110); }
+}
+$("navSel").onchange = applyNav;
+$("navSeaBtn").onclick = () => { navSeed++; try { tank.setScene(navSeed); $("msg").textContent = "a new sea (" + navSeed + "): counters start again"; } catch (e) { $("msg").textContent = String((e && e.message) || e).slice(0, 110); } };
+if (sizeKey !== "standard") { $("navSel").disabled = true; $("navSel").title = "The navigation sea is for the standard 500 x 300 m tank (larger tanks make the plan too costly to rebuild)."; }
 $("flyEstBtn").onclick = () => setEvent("fly-estimator"); $("erEstBtn").onclick = () => setEvent("er-estimator");   // v4904: the study's two estimators as events on the selected sub; their builders are registered below once the circuit is loaded
 $("needsSel").onchange = () => { if (!selected) { $("msg").textContent = "pick a sub in the list first"; $("needsSel").value = ""; return; } try { const v = $("needsSel").value; if (v !== "" && !Object.prototype.hasOwnProperty.call(NEEDS_CLASSES, v)) throw new Error("no such needs class: " + v); if (v === "") { tank.setEvent(selected, null); $("msg").textContent = "needs off: restored"; } else { tank.setNeeds(selected, v); $("msg").textContent = v + " needs on the selected sub (a 60 m hull, tank-scale charge)"; } } catch (e) { $("msg").textContent = String((e && e.message) || e).slice(0, 90); $("needsSel").value = ""; } };
 $("injureBtn").onclick = () => { if (!selected) { $("msg").textContent = "pick a sub in the list first"; return; } try { const d = tank.injure(selected, 0.2); $("msg").textContent = d === null ? "no such sub" : "hull damage " + Math.round(d * 100) + "%"; } catch (e) { $("msg").textContent = "turn the needs on first (the needs menu)"; } };
@@ -227,7 +244,7 @@ const DOT = { live: "#4ade80", standin: "#f6a623", offline: "#ff5a5a", err: "#55
 async function refresh() {
   try {
     const j = await fetch("/subaquarium/list", { cache: "no-store" }).then((r) => r.json());
-    if (j && j.ok) { tank.sync(j.subs); listErr = false; } else listErr = true;
+    if (j && j.ok) { tank.sync(j.subs); listErr = false; const arm = $("navSel").value; if (arm && tank.scene) for (const s of tank.snapshot()) if (!s.nav) tank.setNav(s.id, arm); } else listErr = true;
   } catch (e) { listErr = true; }
   renderList();
 }
@@ -269,7 +286,7 @@ function updateStats(snap) {
     if (cm && s.cmd) { const f = (v, w) => (v >= 0 ? "+" : "") + v.toFixed(w); cm.textContent = `pitch ${f(s.cmd.pitch, 2)} · yaw ${f(s.cmd.yaw, 2)} · thrust ${f(s.cmd.thrust, 2)} · ballast ${f(s.cmd.ballast, 2)}`; }
     const tk = document.getElementById("t_" + s.id); if (tk) tk.textContent = needsLine(s) || readout(s) || lineFor(s);
     const m = document.getElementById("m_" + s.id); if (!m) continue;
-    m.textContent = `${s.pilot === "network" ? "network" : "PD autopilot"} · ${s.local ? "this box" : "from " + s.from} · ${s.depth.toFixed(0)} m · ${s.speed.toFixed(1)} m/s` + (s.hull && s.hull !== "nominal" ? ` · ${LABELS[s.hull] || s.hull}` : "") + (s.lost ? ` · lost ${s.lost}×` : "");
+    m.textContent = `${s.kind === "flycx" ? "stateful" : s.pilot === "network" ? "network" : "PD autopilot"} · ${s.local ? "this box" : "from " + s.from} · ${s.depth.toFixed(0)} m · ${s.speed.toFixed(1)} m/s` + (s.hull && s.hull !== "nominal" ? ` · ${LABELS[s.hull] || s.hull}` : "") + (s.nav ? ` · ${NAV_NAMES[s.nav.arm] || s.nav.arm}: ${s.nav.arrivals} arrival${s.nav.arrivals === 1 ? "" : "s"}, ${s.nav.hits} hit${s.nav.hits === 1 ? "" : "s"}` : "") + (s.lost ? ` · lost ${s.lost}×` : "");
   }
 }
 
@@ -337,8 +354,21 @@ function render() {
   const dx = side.width / tank.length, dz = side.height / 50;
   sg.fillStyle = "#07243a"; sg.fillRect(0, DEPTH_MIN * dz, side.width, (DEPTH_MAX - DEPTH_MIN) * dz); sg.strokeStyle = "#1c2c44"; sg.strokeRect(0, 0, side.width, side.height);
   sg.fillStyle = "#7c93b8"; sg.font = "16px monospace"; sg.fillText("surface", 6, 12); sg.fillText("depth " + DEPTH_MIN + "–" + DEPTH_MAX + " m", 6, DEPTH_MIN * dz - 4); sg.fillText("floor 50 m", 6, side.height - 6);
+  for (const o of tank.sceneNow()) {   // the sea (UNNUMBERED, FOLLOW-UP 4): islands are land to the floor, icebergs hang to their keel, ships to theirs
+    const col = o.type === "island" ? "#3d6b3a" : o.type === "berg" ? "#bfe3ff" : "#f6a623";
+    pg.fillStyle = col + "66"; pg.strokeStyle = col; pg.lineWidth = o.type === "berg" ? 1 : 2; pg.setLineDash(o.type === "berg" ? [6, 4] : []);
+    pg.beginPath(); pg.arc(o.x * sx, o.y * sy, o.r * sx, 0, Math.PI * 2); pg.fill(); pg.stroke(); pg.setLineDash([]);
+    if (o.type !== "island") { pg.fillStyle = col; pg.font = "14px monospace"; pg.fillText((o.type === "ship" ? "ship " : "berg ") + Math.round(o.keel) + " m", o.x * sx - o.r * sx, o.y * sy - o.r * sx - 4); }
+    const bottom = o.type === "island" ? 50 : o.keel; sg.fillStyle = col + "55"; sg.fillRect((o.x - o.r) * dx, 0, 2 * o.r * dx, bottom * dz); sg.strokeStyle = col; sg.lineWidth = 1; sg.strokeRect((o.x - o.r) * dx, 0, 2 * o.r * dx, bottom * dz);
+  }
   for (const s of snap) {
     const sel = s.id === selected;
+    if (s.nav && s.nav.goal) {   // the goal: a diamond in the sub's colour, a thin line to it, and the same point in the side view
+      const gx = s.nav.goal.x * sx, gy = s.nav.goal.y * sy; pg.strokeStyle = `hsl(${s.hue} 80% 65% / .5)`; pg.lineWidth = 1; pg.setLineDash([4, 6]); pg.beginPath(); pg.moveTo(s.x * sx, s.y * sy); pg.lineTo(gx, gy); pg.stroke(); pg.setLineDash([]);
+      pg.fillStyle = `hsl(${s.hue} 80% 65%)`; pg.beginPath(); pg.moveTo(gx, gy - 9); pg.lineTo(gx + 9, gy); pg.lineTo(gx, gy + 9); pg.lineTo(gx - 9, gy); pg.closePath(); pg.fill();
+      sg.fillStyle = `hsl(${s.hue} 80% 65%)`; sg.beginPath(); sg.arc(s.nav.goal.x * dx, s.nav.goal.depth * dz, 5, 0, Math.PI * 2); sg.fill();
+    }
+    if (s.nav && s.nav.contact) { pg.strokeStyle = "#ff5a5a"; pg.lineWidth = 3; pg.beginPath(); pg.arc(s.x * sx, s.y * sy, 26, 0, Math.PI * 2); pg.stroke(); }   // a contact is on: a red ring
     pg.strokeStyle = `hsl(${s.hue} 70% 55% / .35)`; pg.lineWidth = 1.5; pg.beginPath(); s.trail.forEach((p, i) => { i ? pg.lineTo(p[0] * sx, p[1] * sy) : pg.moveTo(p[0] * sx, p[1] * sy); }); pg.stroke();
     sg.strokeStyle = `hsl(${s.hue} 70% 55% / .35)`; sg.beginPath(); s.trail.forEach((p, i) => { i ? sg.lineTo(p[0] * dx, p[2] * dz) : sg.moveTo(p[0] * dx, p[2] * dz); }); sg.stroke();
     drawSub(pg, s.x * sx, s.y * sy, s.heading, s.hue, 22, sel); drawSub(sg, s.x * dx, s.depth * dz, -s.pitch, s.hue, 16, sel);
@@ -375,6 +405,10 @@ refresh(); fishHealth(); setInterval(refresh, 3000); setInterval(fishHealth, 500
                 tank.registerEstimator(ev, def.build); $(btn).disabled = false;
             }
         } catch (e) { $("msg").textContent = "the estimator events are not available here"; }
+        try {   // UNNUMBERED (brain/TANK_PILOTS_WIP.md): the stateful fly pilot as a kind of sub the tank can fly -- the autopilot's laws plus a residual read from this circuit run with a memory (1,729 weights); registering re-seats any such sub already in the tank
+            const fx = await import("/render/subAquariumFlyCx.mjs");
+            tank.registerPilotKind(fx.CIRCUIT, fx.flyCxKind(circuit));
+        } catch (e) { $("msg").textContent = "the stateful fly pilot is not available here: its subs fly the autopilot"; }
     } catch (e) { host.textContent = "The compass-dropout view is unavailable here (" + String((e && e.message) || e).slice(0, 100) + "). The tank above is not affected."; }
 })();
 </script>

@@ -128,9 +128,9 @@ console.log("\n5. THE SEED");
     const d = await call(b, "POST", "/subaquarium/seed", undefined, { trusted: false });
     ok("!! an untrusted seed is 403", d.status === 403 && b.registry.counts().total === 0);
     const s = await call(b, "POST", "/subaquarium/seed"), s2 = await call(b, "POST", "/subaquarium/seed");
-    ok("!! a trusted seed offers THIS tree's six champions as LOCAL subs (from 'this-box'); seeding again replaces them, it does not duplicate (still six)", s.json.added === 6 && s.json.skipped.length === 0 && s.json.counts.local === 6 && s2.json.counts.total === 6 && b.registry.list().every((x) => x.local && x.from === "this-box"), b.registry.list().map((x) => x.from).join());
+    ok("!! a trusted seed offers THIS tree's seven subs (six champions and the stateful fly pilot) as LOCAL subs (from 'this-box'); seeding again replaces them, it does not duplicate (still seven)", s.json.added === 7 && s.json.skipped.length === 0 && s.json.counts.local === 7 && s2.json.counts.total === 7 && b.registry.list().every((x) => x.local && x.from === "this-box"), b.registry.list().map((x) => x.from).join());
     const e = mkBridge({ root: tmpRoot() }), es = await call(e, "POST", "/subaquarium/seed");
-    ok("!! a tree with no champion files offers ONLY the PD autopilot and names the five it skipped", es.json.added === 1 && es.json.skipped.length === 5 && es.json.counts.total === 1);
+    ok("!! a tree with no champion files offers ONLY the PD autopilot and names the six it skipped", es.json.added === 1 && es.json.skipped.length === 6 && es.json.counts.total === 1);
 }
 
 console.log("\n6. SENDING");
@@ -182,7 +182,7 @@ console.log("\n8. TWO BOXES OVER REAL HTTP");
         const seeded = await post(a.url + "/subaquarium/seed", {}), mine = (await fetch(a.url + "/subaquarium/list").then((r) => r.json())).subs.find((x) => x.name === "Explorer actuator champion");
         const sent = await post(a.url + "/subaquarium/send", { peer: b.url, id: mine.id });
         const there = (await fetch(b.url + "/subaquarium/list").then((r) => r.json())).subs, got = there.find((x) => x.name === "Explorer actuator champion");
-        ok("!! box A seeds its six champions, SENDS one to box B over real HTTP (loopback is LAN), and B's tank holds it: stored REMOTE, from 127.0.0.1, with all 963 weights and the twelve theta numbers intact (bit for bit the numbers A sent)", seeded.added === 6 && sent.ok && sent.peer === b.url && there.length === 1 && got && got.local === false && got.from === "127.0.0.1" && got.weights.length === 963 && got.weights.every((v, i) => v === mine.weights[i]) && C.THETA_NAMES.every((k) => got.theta[k] === mine.theta[k]) && got.id === mine.id, `${there.length} sub on B, id ${got && got.id}`);
+        ok("!! box A seeds its seven subs, SENDS one to box B over real HTTP (loopback is LAN), and B's tank holds it: stored REMOTE, from 127.0.0.1, with all 963 weights and the twelve theta numbers intact (bit for bit the numbers A sent)", seeded.added === 7 && sent.ok && sent.peer === b.url && there.length === 1 && got && got.local === false && got.from === "127.0.0.1" && got.weights.length === 963 && got.weights.every((v, i) => v === mine.weights[i]) && C.THETA_NAMES.every((k) => got.theta[k] === mine.theta[k]) && got.id === mine.id, `${there.length} sub on B, id ${got && got.id}`);
         const again = await post(a.url + "/subaquarium/send", { peer: b.url, id: mine.id }), after = (await fetch(b.url + "/subaquarium/list").then((r) => r.json())).subs;
         ok("!! sending it AGAIN replaces it on B (replaced: true, still one sub), the id is the same on both boxes (the id is the content)", again.ok && again.reply.replaced === true && after.length === 1);
         const refused = await post(a.url + "/subaquarium/send", { peer: c.url, id: mine.id });

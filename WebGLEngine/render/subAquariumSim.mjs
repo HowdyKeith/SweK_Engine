@@ -1,7 +1,7 @@
 // WebGLEngine/render/subAquariumSim.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
 // THE TANK OF sub-aquarium.html, WITHOUT A PICTURE: every submarine the aquarium holds swims in a box of water, each flown by ITS OWN pilot -- the PD autopilot (brain/autopilotSub.mjs) when it arrived with no weights, or the
-// connectome-wired network (brain/pilotSubPolicy.mjs) with the 963 weights it arrived with -- through the same vessel (physics/mechanics/subModel6dof.mjs) and the same (state, target, current) -> controls contract
+// connectome-wired network (brain/pilotSubPolicy.mjs) with the 963 weights it arrived with, or the pilot of a KIND a page has registered for the circuit its weights belong to (unnumbered work: the stateful fly pilot) -- through the same vessel (physics/mechanics/subModel6dof.mjs) and the same (state, target, current) -> controls contract
 // as every task before this one. The page draws what this module computes; this module draws nothing, so a gate can fly a tank for minutes in a few milliseconds.
 //
 // WHAT A SUB DOES IN THE TANK: it WANDERS. Every 20-45 seconds it picks a new heading, depth (14..40 m) and speed (1.5..3 m/s). The moment it crosses MARGIN metres in from a wall it is RETARGETED toward the middle
@@ -28,6 +28,7 @@ import * as NP from "../brain/needsPilot.mjs";
 import * as AV from "../brain/needsAdvisor.mjs";
 import * as T from "../brain/needsTask.mjs";
 import * as SS from "../brain/surveySeat.mjs";
+import * as TN from "../brain/subTankNav.mjs";
 
 export const LENGTH = 500, WIDTH = 300, MARGIN = 60, DEPTH_MIN = 14, DEPTH_MAX = 40, TRAIL = 80, TRAIL_EVERY = 0.5, MAX_STEP = 0.1;
 const DT = S.DT, wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
@@ -92,6 +93,8 @@ export function createTank({ hull = "nominal", length = LENGTH, width = WIDTH } 
     const insideBox = (x, y) => x >= MARGIN && x <= length - MARGIN && y >= MARGIN && y <= width - MARGIN;
     const subs = new Map();   // id -> live sub
     const estimators = new Map();   // event name -> build(inner) -> pilot, registered by a page (the estimators need the fly circuit it loads)
+    const kinds = new Map();   // circuit name -> { weightCount, build(weights, { sub }) -> pilot }, registered by a page that has loaded what the kind needs (unnumbered work, brain/TANK_PILOTS_WIP.md)
+    let scene = null;   // the sea of obstacles (brain/subTankNav.mjs tankScene) or null; the subs that have a navigator (sub.nav) are flown to goals through it
     let clock = 0, hullName = hull, MODEL = H.model(hull);   // the vessel every sub in the tank is (physics/mechanics/subHulls.mjs); the pilots do not know which
 
     function spawn(entry, rng, atCentre = false) {
@@ -99,9 +102,22 @@ export function createTank({ hull = "nominal", length = LENGTH, width = WIDTH } 
         const depth = DEPTH_MIN + rng() * (DEPTH_MAX - DEPTH_MIN), heading = (rng() - 0.5) * 2 * Math.PI;
         return S.createState({ depth, pos: [x, y, -depth], speed: 2, heading, model: MODEL });
     }
-    function pilotFor(entry) {
-        if (entry.weights && entry.weights.length === PS.WEIGHT_COUNT) return PS.pilotFor(Float32Array.from(entry.weights));
-        return AS.pilot();
+    // WHAT FLIES A SUB (unnumbered work): an entry names its CIRCUIT (the aquarium's wire: "gfc", the fruit fly's Giant Fiber Circuit, is the default and the only one built in; the entries this tank was written for name none). With 963 weights a gfc sub flies the network of
+    // brain/pilotSubPolicy.mjs. A sub of any other circuit is flown by the KIND a page has registered for it (registerPilotKind) when its weights are exactly the kind's count, and by the PD autopilot otherwise -- no kind registered yet, a wrong count, a builder that throws.
+    // A sub waiting for its kind keeps its weights (`kindWeights`), so a kind registered later seats it.
+    const isGfc = (entry) => entry.circuit === undefined || entry.circuit === "gfc";
+    function seat(sub, entry) {
+        const w = entry.weights; sub.weights = null; sub.kindInfo = null; sub.kindError = null; sub.kindWeights = null; sub.pilot = AS.pilot();
+        if (w && isGfc(entry)) { if (w.length === PS.WEIGHT_COUNT) { sub.weights = Float32Array.from(w); sub.pilot = PS.pilotFor(Float32Array.from(w)); } return; }
+        if (!w) return;
+        sub.kindWeights = Float32Array.from(w);
+        const kind = kinds.get(entry.circuit);
+        if (!kind || w.length !== kind.weightCount) return;
+        try {
+            const p = kind.build(Float32Array.from(w), { sub });
+            if (typeof p !== "function") throw new Error("the kind's build did not return a pilot");
+            sub.pilot = p; sub.kindInfo = { circuit: entry.circuit };
+        } catch (e) { sub.kindError = String((e && e.message) || e).slice(0, 160); }
     }
     function retarget(sub) {
         const r = sub.rng(), q = sub.rng(), z = sub.rng();
@@ -163,6 +179,9 @@ export function createTank({ hull = "nominal", length = LENGTH, width = WIDTH } 
         for (const q of sv.stations) if (!q.visited && Math.hypot(s.pos[0] - q.x, s.pos[1] - q.y) <= T.CAPTURE.across && Math.abs(-s.pos[2] - q.depth) <= T.CAPTURE.depth) q.visited = true;
         if (!sv.done && sub.eventT >= sv.seconds) finishSurvey(sub, "submerged");
     }
+    // NAVIGATION (UNNUMBERED, brain/SUB_FIELD_NAV_WIP.md FOLLOW-UP 4): a sub with a navigator takes its TARGET from it instead of wandering; its own pilot flies the target as ever. Ending the navigation sends it wandering again with a fresh target.
+    function startNav(sub, arm) { sub.nav = TN.createNavigator(scene, { arm, seed: (hash(sub.id) ^ scene.seed) >>> 0 }); }
+    function endNav(sub) { if (!sub.nav) return; sub.nav = null; sub.wasInside = true; retarget(sub); }
     function clearEvent(sub) {
         if (!sub.event) return;
         if (sub.state && sub.state.tank) { const { tank, ...rest } = sub.state; sub.state = rest; }
@@ -170,8 +189,8 @@ export function createTank({ hull = "nominal", length = LENGTH, width = WIDTH } 
     }
     function add(entry) {
         const rng = mulberry(hash(entry.id));
-        const sub = { id: entry.id, name: entry.name, hue: entry.hue, pilotKind: entry.pilot, from: entry.from, local: !!entry.local, rng, pilot: pilotFor(entry), weights: entry.weights && entry.weights.length === PS.WEIGHT_COUNT ? Float32Array.from(entry.weights) : null, tgt: null, state: null, target: null, nextTarget: 0, age: 0, lost: 0, wasInside: true, status: "swimming", trail: [], trailT: 0, event: null, eventT: 0, eventModel: null, eventPilot: null, holdDepth: 0, compass: null };
-        sub.state = spawn(entry, rng); retarget(sub);
+        const sub = { id: entry.id, name: entry.name, hue: entry.hue, pilotKind: entry.pilot, from: entry.from, local: !!entry.local, circuit: entry.circuit === undefined ? "gfc" : entry.circuit, rng, pilot: null, weights: null, kindInfo: null, kindError: null, kindWeights: null, tgt: null, state: null, target: null, nextTarget: 0, age: 0, lost: 0, nav: null, wasInside: true, status: "swimming", trail: [], trailT: 0, event: null, eventT: 0, eventModel: null, eventPilot: null, holdDepth: 0, compass: null };
+        sub.state = spawn(entry, rng); retarget(sub); seat(sub, entry);
         subs.set(entry.id, sub);
         return sub;
     }
@@ -182,7 +201,7 @@ export function createTank({ hull = "nominal", length = LENGTH, width = WIDTH } 
         /** Change the vessel of the whole tank (a name from physics/mechanics/subHulls.mjs; an unknown name throws and changes nothing). Every sub is put back in the water on the new hull, at a fresh start, with its trail cleared. */
         setHull(name) {
             const m = H.model(name); MODEL = m; hullName = name;
-            for (const sub of subs.values()) { clearEvent(sub); sub.state = spawn(sub, sub.rng, true); sub.trail.length = 0; sub.wasInside = true; sub.status = "swimming"; retarget(sub); }
+            for (const sub of subs.values()) { clearEvent(sub); sub.state = spawn(sub, sub.rng, true); sub.trail.length = 0; sub.wasInside = true; sub.status = "swimming"; retarget(sub); if (sub.nav) sub.nav.invalidate(); }
             return name;
         },
         /**
@@ -245,11 +264,52 @@ export function createTank({ hull = "nominal", length = LENGTH, width = WIDTH } 
             const c = (v) => (Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 0), a = aux || {};
             sub.aux = { pump: c(a.pump), repair: c(a.repair) }; return { ...sub.aux };
         },
+        /**
+         * Register how the tank flies the subs of a circuit other than "gfc" (unnumbered work): `kind` is { weightCount, build(weights, { sub }) -> pilot(state, target, current, aux) }. A sub of that circuit with exactly weightCount weights is flown by
+         * build's pilot (its `sub` is the tank's record: `sub.target` is the wandering target, replaced at every retarget, wall turn and respawn); one with another count, or whose builder throws, flies the PD autopilot and says why in its snapshot's kindError.
+         * Registering SEATS the subs of that circuit already in the tank (they were waiting with their weights); one with an event running has the event ended first (it wrapped the autopilot). Registering again replaces the kind and seats them again.
+         * A bad circuit ("gfc" is built in) or kind throws and changes nothing. Returns { seated }, the number of subs now flown by the kind.
+         */
+        registerPilotKind(circuit, kind) {
+            if (typeof circuit !== "string" || !circuit || circuit === "gfc") throw new Error(`subAquariumSim.registerPilotKind: a circuit name other than "gfc" (the built-in network), got ${JSON.stringify(circuit)}`);
+            if (!kind || typeof kind.build !== "function" || !Number.isInteger(kind.weightCount) || kind.weightCount < 1) throw new Error("subAquariumSim.registerPilotKind: a kind is { weightCount (a whole number of 1 or more), build(weights, ctx) }");
+            kinds.set(circuit, kind);
+            let seated = 0;
+            for (const sub of subs.values()) if (sub.circuit === circuit && sub.kindWeights) { clearEvent(sub); seat(sub, { circuit, weights: sub.kindWeights }); if (sub.kindInfo) seated++; }
+            return { seated };
+        },
         /** v4908 -- switch the rule advisor (brain/needsAdvisor.mjs) on or off for a sub that has needs: on, it takes the refill decision from the Round 4 rule (surface under a charge threshold that falls with depth) and works the pump and the repair itself; off, the fixed refill trip and the page's own pump and repair boxes. Answers the state now; an unknown id answers null; a sub with no needs throws (start them with setNeeds). Starting or ending any event switches it off. */
         setAdvisor(id, on) {
             const sub = subs.get(id); if (!sub) return null;
             if (!sub.needs) throw new Error("subAquariumSim.setAdvisor: the sub has no needs (start them with setNeeds)");
             sub.advisor = !!on; if (!sub.advisor) { sub.advice = null; sub.aux = null; } return sub.advisor;
+        },
+        /**
+         * NAVIGATION (UNNUMBERED, brain/SUB_FIELD_NAV_WIP.md FOLLOW-UP 4). setScene(seed) puts a seeded sea of obstacles in the tank (brain/subTankNav.mjs tankScene: islands, icebergs with a keel, ships on lanes) and returns { seed, obstacles }; setScene(null) takes it away and every
+         * sub goes back to wandering. Only the STANDARD tank has a sea (any other size throws and changes nothing). Setting a new seed while subs are navigating gives each a new navigator in the new sea (counters from zero, a new goal).
+         */
+        setScene(seed) {
+            if (seed === null || seed === undefined) { scene = null; for (const sub of subs.values()) endNav(sub); return null; }
+            if (!Number.isInteger(seed)) throw new Error(`subAquariumSim.setScene: a whole-number seed (or null), got ${JSON.stringify(seed)}`);
+            const next = TN.tankScene(seed, { length, width });   // throws for a tank that is not the standard size, before anything changes
+            scene = next;
+            for (const sub of subs.values()) if (sub.nav) startNav(sub, sub.nav.arm);
+            return { seed, obstacles: scene.obstacles.length };
+        },
+        /** The sea as it is now ([{ type, group, x, y, r, keel }], ships where they are at the tank's clock), or [] with none; `scene` is its seed or null. */
+        sceneNow() { return scene ? TN.sceneNow(scene, clock) : []; },
+        get scene() { return scene ? { seed: scene.seed, length: scene.length, width: scene.width } : null; },
+        /**
+         * Make one sub a COURIER (arm: one of subTankNav.TANK_ARMS: straight, any, any+replan, any+predict) or, with null, send it wandering again. The sub's own pilot flies the navigator's target; contact with an obstacle is counted (`hits`), not punished; a goal reached is counted (`arrivals`)
+         * and another is drawn. An unknown arm throws and changes nothing (before the id is looked up); an unknown id answers null; no sea throws ("start a sea first"). Returns the arm now running, or null.
+         */
+        setNav(id, arm) {
+            const off = arm === null || arm === undefined || arm === "";
+            if (!off && !TN.TANK_ARMS.includes(arm)) throw new Error(`subAquariumSim.setNav: unknown arm "${arm}" (${TN.TANK_ARMS.join(", ")})`);
+            const sub = subs.get(id); if (!sub) return null;
+            if (off) { endNav(sub); return null; }
+            if (!scene) throw new Error("subAquariumSim.setNav: start a sea first (setScene)");
+            startNav(sub, arm); return arm;
         },
         /** A page's estimator pilot for an estimator event (fly-estimator, er-estimator): build(inner) -> pilot(state, target, current, aux), `inner` the sub's own pilot seen through a spy. Applies to events started AFTER the call. A bad name or builder throws and changes nothing. */
         registerEstimator(event, build) {
@@ -293,11 +353,15 @@ export function createTank({ hull = "nominal", length = LENGTH, width = WIDTH } 
                 for (const sub of subs.values()) {
                     sub.age += dt;
                     const s = sub.state, x = s.pos[0], y = s.pos[1];
-                    if (sub.age >= sub.nextTarget) retarget(sub);
-                    const inside = insideBox(x, y);
-                    if (!inside && sub.wasInside) { sub.target = { depth: sub.target.depth, heading: wrap(headingTo(x, y, length / 2, width / 2) + (sub.rng() - 0.5) * 0.8), speed: Math.min(sub.target.speed, 2.5) }; sub.nextTarget = sub.age + 15 + sub.rng() * 15; }
-                    sub.wasInside = inside;
-                    const t = sub.tgt = inside ? sub.target : { depth: sub.target.depth, heading: headingTo(x, y, length / 2, width / 2), speed: Math.min(sub.target.speed, 2) };
+                    let t;
+                    if (sub.nav) t = sub.tgt = sub.target = sub.nav.step(s, clock, dt);   // a courier: the navigator's target (it brings a sub in from outside the tank by itself)
+                    else {
+                        if (sub.age >= sub.nextTarget) retarget(sub);
+                        const inside = insideBox(x, y);
+                        if (!inside && sub.wasInside) { sub.target = { depth: sub.target.depth, heading: wrap(headingTo(x, y, length / 2, width / 2) + (sub.rng() - 0.5) * 0.8), speed: Math.min(sub.target.speed, 2.5) }; sub.nextTarget = sub.age + 15 + sub.rng() * 15; }
+                        sub.wasInside = inside;
+                        t = sub.tgt = inside ? sub.target : { depth: sub.target.depth, heading: headingTo(x, y, length / 2, width / 2), speed: Math.min(sub.target.speed, 2) };
+                    }
                     sub.tickDt = dt;   // the navigator integrates over THIS tick, which is shorter than DT when a frame ends mid-tick
                     const ev = sub.event, model = ev ? sub.eventModel : MODEL;
                     const tg = ev === "surface" ? { ...t, surface: true } : ev === "flood" || ev === "sink" ? { ...t, depth: sub.holdDepth } : t;   // a flooded boat holds the depth it was at; a surfacing one is asked to surface
@@ -311,7 +375,7 @@ export function createTank({ hull = "nominal", length = LENGTH, width = WIDTH } 
                     sub.cmd = { pitch: cmd.pitch, yaw: cmd.yaw, thrust: cmd.thrust, ballast: cmd.ballast };   // what the pilot asked for this tick: the page draws the fins from it
                     if (cmd.blow !== undefined) sub.cmd.blow = cmd.blow; if (cmd.release !== undefined) sub.cmd.release = cmd.release;
                     sub.state = res.state;
-                    if (res.status !== "submerged" || !Number.isFinite(res.state.pos[0])) { if (ev === "survey") finishSurvey(sub, res.status); sub.lost++; sub.status = res.status; clearEvent(sub); sub.state = spawn(sub, sub.rng, true); sub.trail.length = 0; sub.wasInside = true; retarget(sub); continue; }
+                    if (res.status !== "submerged" || !Number.isFinite(res.state.pos[0])) { if (ev === "survey") finishSurvey(sub, res.status); sub.lost++; sub.status = res.status; clearEvent(sub); sub.state = spawn(sub, sub.rng, true); sub.trail.length = 0; sub.wasInside = true; retarget(sub); if (sub.nav) sub.nav.invalidate(); continue; }
                     sub.status = "swimming";
                     if (ev === "survey") surveyTick(sub);
                     sub.trailT += dt;
@@ -320,10 +384,10 @@ export function createTank({ hull = "nominal", length = LENGTH, width = WIDTH } 
             }
         },
         /** What a brain panel needs of one sub (render/brainPanel.mjs subPanel): { id, name, kind ("fly" when it was given the 963 weights, else "autopilot"), weights, state, target (the one it was flown to last tick) }, or null for an unknown id. The state is the live one: read it, do not keep it. */
-        probe(id) { const sub = subs.get(id); return sub ? { id: sub.id, name: sub.name, kind: sub.weights ? "fly" : "autopilot", weights: sub.steerW || sub.weights, steer: sub.steer ? { ...sub.steer } : null, state: sub.state, target: sub.tgt || sub.target } : null; },
+        probe(id) { const sub = subs.get(id); return sub ? { id: sub.id, name: sub.name, kind: sub.weights ? "fly" : sub.kindInfo ? sub.kindInfo.circuit : "autopilot", weights: sub.steerW || sub.weights, steer: sub.steer ? { ...sub.steer } : null, state: sub.state, target: sub.tgt || sub.target } : null; },
         /** What a page draws: one plain record per sub. */
         snapshot() {
-            return [...subs.values()].map((sub) => { const a = S.attitude(sub.state); return { hull: hullName, id: sub.id, name: sub.name, hue: sub.hue, pilot: sub.pilotKind, from: sub.from, local: sub.local, x: sub.state.pos[0], y: sub.state.pos[1], depth: a.depth, heading: a.heading, pitch: a.pitch, speed: a.speed, cmd: sub.cmd ? { ...sub.cmd } : { pitch: 0, yaw: 0, thrust: 0, ballast: 0 }, event: sub.event, steer: sub.steer ? { ...sub.steer } : null, needs: sub.needs ? { ...N.readings(sub.eventModel, sub.needs, sub.state), pump: sub.aux ? sub.aux.pump : 0, repair: sub.aux ? sub.aux.repair : 0, repairing: !!(sub.aux && sub.aux.repair > 0 && -sub.state.pos[2] <= N.REPAIR.maxDepth && Math.hypot(sub.state.vel[0], sub.state.vel[1], sub.state.vel[2]) <= N.REPAIR.maxSpeed), refilling: !!(sub.eventPilot && sub.eventPilot.refilling), advisor: sub.advisor ? { on: true, ...(sub.advice || { surface: false, pump: false, repair: false, threshold: 0 }) } : { on: false }, watts: sub.needsInfo ? sub.needsInfo.watts : 0, charging: !!(sub.needsInfo && sub.needsInfo.charging) } : null, survey: sub.survey ? surveyRecord(sub.survey, sub.eventT) : sub.surveyResult ? { ...sub.surveyResult, finished: true } : null, compass: sub.compass ? { ...sub.compass } : null, tank: sub.state.tank ? { level: sub.state.tank.level, air: sub.state.tank.air, airMax: sub.eventModel ? sub.eventModel.spec.airMax : null, released: sub.state.tank.released, blowing: !!(sub.cmd && sub.cmd.blow > 0.5) } : null, target: sub.target, lost: sub.lost, status: sub.status, trail: sub.trail.slice() }; });
+            return [...subs.values()].map((sub) => { const a = S.attitude(sub.state); return { hull: hullName, id: sub.id, name: sub.name, hue: sub.hue, pilot: sub.pilotKind, circuit: sub.circuit, kind: sub.kindInfo ? sub.kindInfo.circuit : null, kindError: sub.kindError, from: sub.from, local: sub.local, x: sub.state.pos[0], y: sub.state.pos[1], depth: a.depth, heading: a.heading, pitch: a.pitch, speed: a.speed, cmd: sub.cmd ? { ...sub.cmd } : { pitch: 0, yaw: 0, thrust: 0, ballast: 0 }, event: sub.event, steer: sub.steer ? { ...sub.steer } : null, needs: sub.needs ? { ...N.readings(sub.eventModel, sub.needs, sub.state), pump: sub.aux ? sub.aux.pump : 0, repair: sub.aux ? sub.aux.repair : 0, repairing: !!(sub.aux && sub.aux.repair > 0 && -sub.state.pos[2] <= N.REPAIR.maxDepth && Math.hypot(sub.state.vel[0], sub.state.vel[1], sub.state.vel[2]) <= N.REPAIR.maxSpeed), refilling: !!(sub.eventPilot && sub.eventPilot.refilling), advisor: sub.advisor ? { on: true, ...(sub.advice || { surface: false, pump: false, repair: false, threshold: 0 }) } : { on: false }, watts: sub.needsInfo ? sub.needsInfo.watts : 0, charging: !!(sub.needsInfo && sub.needsInfo.charging) } : null, survey: sub.survey ? surveyRecord(sub.survey, sub.eventT) : sub.surveyResult ? { ...sub.surveyResult, finished: true } : null, compass: sub.compass ? { ...sub.compass } : null, tank: sub.state.tank ? { level: sub.state.tank.level, air: sub.state.tank.air, airMax: sub.eventModel ? sub.eventModel.spec.airMax : null, released: sub.state.tank.released, blowing: !!(sub.cmd && sub.cmd.blow > 0.5) } : null, target: sub.target, nav: sub.nav ? sub.nav.snapshot() : null, lost: sub.lost, status: sub.status, trail: sub.trail.slice() }; });
         },
     };
 }

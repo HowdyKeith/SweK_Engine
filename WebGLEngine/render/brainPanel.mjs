@@ -31,6 +31,7 @@ export const KINDS = Object.freeze({
     fly: Object.freeze({ label: "fruit fly Giant Fiber circuit (34 neurons)", network: true, flown: true }),
     gpu: Object.freeze({ label: "GPU brain (18-32-32-4 network)", network: true, flown: true }),
     fish: Object.freeze({ label: "zebrafish circuit (Fish1)", network: true, flown: false }),
+    flycx: Object.freeze({ label: "fly heading-loop circuit with memory (148 cells)", network: false, flown: true }),   // unnumbered work: the stateful fly pilot the tank seats (render/subAquariumFlyCx.mjs); its rows are the autopilot's laws it adds a residual to
     manual: Object.freeze({ label: "you, on the keyboard", network: false, flown: true }),
 });
 /** The description of a kind: { label, network, flown }; an unknown kind reads as { label: kind, network: false, flown: false }. */
@@ -147,6 +148,7 @@ export function subPanel(probe, ui = {}) {
         const x = PS.features(probe.state, probe.target, current), act = activations(PS, probe.weights, x, PS.OUTPUT_NAMES);
         return { kind: "fly", label: d.label, note: "features, the 34 hidden neurons (after three recurrent steps) and the four outputs; the map is what this brain would command off target", ...netOf(act, PS, probe.weights, x, PS.FEATURE_NAMES, PS.OUTPUT_NAMES, ui), rows: pilotRows({ who: "fly", act, featureNames: PS.FEATURE_NAMES, outputNames: PS.OUTPUT_NAMES }), map: policyMap((s, t, c) => PS.forward(probe.weights, PS.features(s, t, c)), probe.state, probe.target, SUB_MAP, { env: current }) };
     }
+    if (probe.kind === "flycx") return { kind: "flycx", label: d.label, note: "this pilot is the autopilot's six laws plus a learned residual read from the fly heading-loop circuit's 64 output cells, which carries a memory from tick to tick: these are the laws' intermediate numbers and the four outputs of the LAWS ALONE; the circuit's own activity is NOT drawn here; the map is what the laws alone would command off target", rows: subAutopilotRows(probe.state, probe.target, current), map: policyMap((s, t, c) => AS.decide(s, t, c), probe.state, probe.target, SUB_MAP, { env: current }) };
     return { kind: "autopilot", label: d.label, note: "no network: the intermediate numbers of its six laws and its four outputs; the map is what its laws command off target", rows: subAutopilotRows(probe.state, probe.target, current), map: policyMap((s, t, c) => AS.decide(s, t, c), probe.state, probe.target, SUB_MAP, { env: current }) };
 }
 
