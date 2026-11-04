@@ -21,7 +21,7 @@
   }
  },
  "counts": {
-  "page": 496,
+  "page": 498,
   "demo": 49,
   "builtin": 38
  },
@@ -1152,6 +1152,14 @@
    "display": "Drive Brain",
    "href": "/drive-brain.html",
    "section": "GPU Brain",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "duodesk.html",
+   "display": "Duodesk",
+   "href": "/duodesk.html",
+   "section": "Peer 2 Peer",
    "collision": false
   },
   {
@@ -2344,6 +2352,14 @@
    "display": "Nebula",
    "href": "/nebula.html",
    "section": "WebGPU",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "nectarlink.html",
+   "display": "Nectarlink",
+   "href": "/nectarlink.html",
+   "section": "Peer 2 Peer",
    "collision": false
   },
   {

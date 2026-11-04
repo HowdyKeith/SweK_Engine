@@ -1,0 +1,62 @@
+<!doctype html>
+<!-- nectarlink.html
+     An install page for Nectarlink (github.com/thtbee/nectarlink), a separate project. This page links to ITS releases, and its
+     install panel (ui/appInstallPanel.js, ai-bridge/appInstallBridge.js) fetches the pinned release file on the host's request. It states plainly what Nectarlink is and what it is not to SweK: it does not touch the GPU
+     Brain Peer or any SweK protocol today. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nectarlink</title>
+<style>
+  :root { --bg:#0a0e0c; --ink:#cfe9d8; --dim:#7fa78e; --line:#224a36; --go:#6fe39a; --warn:#ffd166; }
+  body { font: 15px/1.55 ui-monospace, Menlo, Consolas, monospace; background: var(--bg); color: var(--ink); margin: 0; padding: 18px; max-width: 760px; }
+  h1 { font-size: 19px; margin: 0 0 4px; } h2 { font-size: 14px; color: var(--go); margin: 22px 0 8px; }
+  .sub { color: var(--dim); font-size: 12px; } code, pre { background: #0f1712; border: 1px solid var(--line); border-radius: 5px; }
+  code { padding: 1px 5px; } pre { padding: 10px 12px; overflow-x: auto; font-size: 13px; }
+  .card { border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; margin: 12px 0; }
+  .btn { display: inline-block; background: #17402a; color: var(--ink); border: 1px solid #2c6a45; border-radius: 6px; padding: 10px 16px; margin: 4px 8px 4px 0; text-decoration: none; }
+  .yes { color: var(--go); } .no { color: var(--warn); } a { color: var(--go); }
+</style>
+</head>
+<body>
+<h1>&#128279; Nectarlink</h1>
+<div class="sub">your Android phone and Windows PC working as one &mdash; local-first, end-to-end encrypted, no account. A separate project (<a href="https://github.com/thtbee/nectarlink" rel="noopener">thtbee/nectarlink</a>), linked here for convenience.</div>
+
+<div class="card">
+<h2>install (v0.1.4)</h2>
+<a class="btn" href="https://github.com/thtbee/nectarlink/releases/download/v0.1.4/Nectarlink-0.1.4-x64-setup.exe" rel="noopener">&#128187; Windows 10/11 x64 installer</a>
+<a class="btn" href="https://github.com/thtbee/nectarlink/releases/download/v0.1.4/Nectarlink-0.1.4-android.apk" rel="noopener">&#128241; Android 8+ APK</a>
+<div class="sub">The Windows installer is not code-signed yet, so SmartScreen may warn on first run. Play Protect may block the APK in some countries &mdash; see the project README for workarounds. Linux (x86_64) and Windows ARM64 are planned for the next release; macOS is a limited preview.</div>
+<div class="sub">Latest builds and notes: <a href="https://github.com/thtbee/nectarlink/releases" rel="noopener">github.com/thtbee/nectarlink/releases</a> &mdash; these links pin v0.1.4, the version this page was written against.</div>
+</div>
+
+<div class="card" id="swekInstall">
+<h2>install with SweK</h2>
+<div id="swekInstallBody" class="sub">checking the install bridge...</div>
+<div class="sub">Downloads the vendor&rsquo;s own release file from github.com onto this machine and checks its size and SHA-256 against a pin made on 2026-11-03 (trust on first use: the files were hashed, not audited). Running the installer is a separate step behind a confirmation.</div>
+</div>
+<script type="module">
+import { mountAppInstall } from "/ui/appInstallPanel.js";
+mountAppInstall(document.getElementById("swekInstallBody"), "nectarlink");
+</script>
+
+<details class="sub"><summary>pinned files (size and SHA-256, taken 2026-11-03 &mdash; check yours with <code>sha256sum</code>)</summary>
+<table style="font-size:11px;border-collapse:collapse"><tr><th align="left">file</th><th align="left">bytes</th><th align="left">sha256</th></tr>
+<tr><td>Nectarlink-0.1.4-x64-setup.exe</td><td>38536301</td><td><code>afdf6d9c1b94647a7888735193cfab24f6bb3236c98b8da51533ee0ffb516528</code></td></tr>
+<tr><td>Nectarlink-0.1.4-android.apk</td><td>51754002</td><td><code>26f5dc05460d1cc8390129569665a224cfbe4127b4cd12cd63ceeeaa7ab9d6de</code></td></tr>
+</table></details>
+
+<h2>what it does</h2>
+<div>Phone notifications, SMS and calls on the PC &middot; clipboard and file transfer &middot; screen mirroring and phone apps in windows &middot; phone as touchpad, keyboard, remote or webcam.</div>
+
+<h2>what it is to SweK today</h2>
+<div class="card">
+<div><span class="no">&#183;</span> <b>Not connected to the GPU Brain Peer.</b> Nectarlink moves notifications, files and input between a phone and a PC; it does not schedule compute or carry SweK traffic.</div>
+<div><span class="no">&#183;</span> Nothing in the engine calls it. The install panel above only fetches and starts the vendor&rsquo;s own installer, so you can run it alongside SweK.</div>
+<div><span class="yes">&#10003;</span> Possibly useful later: it publishes a protocol spec (length-prefixed CBOR over QUIC, with a capability registry) and Rust crates under GPL/MPL. A peer link could borrow the idea, but that is not evaluated or built here.</div>
+</div>
+
+<div class="sub">The <a href="/android-invite.html">Android Invite</a> page is the SweK way to put a phone to work as a compute peer.</div>
+</body>
+</html>
