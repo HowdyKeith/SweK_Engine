@@ -17,6 +17,7 @@
 // the first station not clamped into reach [1 / 1] | `stranded` never true [0 / 1] | RISE_RATE 0.4 -> 4 [1 / 4] | the plain kind not on a full charge [2 / 0] | TRIP back to needsPilot's 0.9 [0 / 1] | GUARDED farthest first [4 / 2] | DIRECT taking the stations last-first [1 / 0] | the hull term ignored [1 / 0].
 // FIRST RUNS WENT 0 RED for three, and the rows were written because of them: `returned` at 30 m (nothing tested the 3 m line: the order / returned rows), DIRECT's station order (the means did not care: the order row), and the hull term (SPIN repairs to full so hull was 1 whatever the formula: the no-repair row). A fourth 0 was a mutant that never applied (the string was not in the file) and was re-run.
 "use strict";
+import "../physics/mechanics/rigidBody6dofEuler.mjs";   // 2026-11-04 -- the 6-DOF numbers this gate holds were measured under the first-order orientation step; RK4 is the default now (merge of the box3d line), so this gate says euler out loud
 import fs from "node:fs";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";

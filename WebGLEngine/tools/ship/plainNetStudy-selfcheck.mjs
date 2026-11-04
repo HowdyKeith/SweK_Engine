@@ -33,6 +33,7 @@
 //   AMENDMENT 2 (the reproduction limit became 1e-4 and the report began to judge from the stored difference): the gate was edited, so ALL mutants were run again, 275 now (6 added for the new `state` rule, 4 patterns moved): 272 red by name (677 red rows), the same 2 equivalents (R13, D40) and the same timeout (R01).
 // NOT SABOTAGED: the wording of the progress lines beyond what rows quote; the message text of the refusals that no row quotes; a full-size run (nothing has been trained at full size by the gate; the smoke run and the cost timing are in brain/PLAIN_NET_CONTROL_WIP.md).
 "use strict";
+import "../../physics/mechanics/rigidBody6dofEuler.mjs";   // 2026-11-04 -- the 6-DOF numbers this gate holds were measured under the first-order orientation step; RK4 is the default now (merge of the box3d line), so this gate says euler out loud
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";

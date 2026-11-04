@@ -23,6 +23,7 @@
 //   THE FINAL FULL RUN over the finished gate (all 78 + 17) found a ninth: W37 (the plan's background not painted) went 0-red because an edit of the gate had cut its row (the 'first cleared and painted' row) along with the lines around it; the row is back and W37 is red by name. A gate edited after its sabotage is run again in full.
 //   NOT CHECKED here: that the CSS lays the section out well (a screenshot is written for a person to look at).
 "use strict";
+import "../physics/mechanics/rigidBody6dofEuler.mjs";   // 2026-11-04 -- the 6-DOF numbers this gate holds were measured under the first-order orientation step; RK4 is the default now (box3d merge), so the gate says euler out loud
 import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
@@ -235,6 +236,7 @@ console.log("\n3. THE LIVE PAGE");
         try {
             const pg = await (await b.newContext({ viewport: { width: 1200, height: 1400 } })).newPage();
             const errs = [], cerrs = []; pg.on("pageerror", (e) => errs.push(String(e.message))); pg.on("console", (m) => { if (m.type() === "error") cerrs.push(m.text()); });
+            await pg.addInitScript(() => { try { sessionStorage.setItem("SWEK_6DOF_ORIENTATION", "euler"); } catch (e) {} });   // the page flies the step this gate's numbers were measured under
             await pg.goto(base + "/sub-aquarium.html", { waitUntil: "load" });
             await pg.waitForFunction(() => { const h = document.getElementById("dropoutHost"); return h.dataset.ready === "1" || /unavailable/.test(h.textContent); }, null, { timeout: 30000 }).catch(() => {});
             ok("!! the page loads with no script error and no console error (the vendored circuit is imported as JSON, the view's modules all load)", errs.length === 0 && cerrs.length === 0, errs.concat(cerrs).join(" | ").slice(0, 300));
@@ -257,8 +259,8 @@ console.log("\n3. THE LIVE PAGE");
             await pg.waitForFunction(() => /PD autopilot: score -0\.794/.test(document.getElementById("dropLegend").textContent), null, { timeout: 15000 }).catch(() => {});
             ok("!! choosing the recovery dive in a real browser shows its results (PD autopilot -0.794, the clean autopilot -0.426) and the clock back at 0", /PD autopilot: score -0\.794 \(the clean autopilot -0\.426\)/.test(await pg.textContent("#dropLegend")) && /^t = 0\.0 s/.test(await pg.textContent("#dropClock")));
             const tank = await pg.evaluate(() => { const c = document.getElementById("plan"), d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i] > 0) n++; return n; });
-            await pg.click("#seedBtn"); await pg.waitForFunction(() => document.querySelectorAll("#list .row").length === 6, null, { timeout: 8000 }).catch(() => {});
-            ok("!! the tank above the view still works: its plan is painted and 'Offer my subs' puts six subs in the list, with no error from either", tank > 2000 && (await pg.$$eval("#list .row", (r) => r.length)) === 6 && errs.length === 0 && cerrs.length === 0, `plan pixels ${tank}`);
+            await pg.click("#seedBtn"); await pg.waitForFunction(() => document.querySelectorAll("#list .row").length === 7, null, { timeout: 8000 }).catch(() => {});
+            ok("!! the tank above the view still works: its plan is painted and 'Offer my subs' puts seven subs (six of this box plus the fly heading-loop pilot the rung 4a work added) in the list, with no error from either", tank > 2000 && (await pg.$$eval("#list .row", (r) => r.length)) === 7 && errs.length === 0 && cerrs.length === 0, `plan pixels ${tank}`);
             try { await pg.screenshot({ path: process.env.DROPOUT_SHOT || "/tmp/sub-aquarium-dropout.png", fullPage: true }); report("screenshot at " + (process.env.DROPOUT_SHOT || "/tmp/sub-aquarium-dropout.png")); } catch {}
         } finally { await b.close(); server.close(); }
     }
