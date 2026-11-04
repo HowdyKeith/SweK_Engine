@@ -2561,6 +2561,13 @@ export const NEXT_ROUNDS = [
         why: "So the page shows what the arc measured -- generation between the chain's frames -- not only the generator.",
     },
     {
+        id: "fsr4-speed-sweep",
+        blocker: "OPEN",
+        what: "Round 81 (section 184), set up and awaiting its harvest: section 176's motion scaled by k = 0, 0.5, 1, 2 on 24 new scenes (12 R 85000-85011, 12 C 86000-86011), every level sharing the measured frame and references. H81a: at k = 2 the single measured frame B1 beats Bt by the 1 % rule; H81b: still, Bt beats B1. Bt's and U_TH's gains over B1 at each level, and where each crosses zero, descriptive.",
+        how: "node tools/denoiseStudy.mjs --harvest-upscale-temporal-test --round 81 on the rig at round 81's commit, render/denoise-results-upscale-speed-r81.json committed byte for byte before it is read; section 185 reads it.",
+        why: "Rounds 77-80 found B1 close to Bt on moving scenes and better on two of four sets: the history has a speed limit, and the chain should know where it is.",
+    },
+    {
         id: "fsr4-mover-history-check",
         blocker: "CLOSED",
         what: "CLOSED, NOT SUPPORTED (section 183): H80a FAILS -- Bt_MVC (the vectors plus a mean +- 1.0 sigma clip on the movers) is 0.79 % below Bt on 24 new moving scenes, short of the 1 % rule (16 of 24, p 0.46); H80b holds -- it is 3.98 % below Bt_MV (p 0.011), because on this set the vectors alone are 3.32 % ABOVE Bt (6.89 % on the movers), the opposite sign from round 79's. The clip takes back what the vectors break and no more. The chain stays as section 175 left it, and the moving-object history work (rounds 77-80) closes; estimated motion vectors are not opened. The file came zipped and was committed unread.",

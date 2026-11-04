@@ -50,3 +50,11 @@ export function velocities(S, motion) {
     for (const m of motion) vel[m.index] = m.v;
     return Object.freeze(vel);
 }
+
+/** Round 81 (section 184): the speed sweep's levels -- section 176's velocities times k. k = 0 is the still scene. */
+export const SPEED_LEVELS = Object.freeze([0, 0.5, 1, 2]);
+/** A motion with every mover's velocity multiplied by k (the same movers, the same directions). */
+export function scaleMotion(motion, k) {
+    if (!(Number.isFinite(k) && k >= 0)) throw new Error(`movingScenes: a speed scale is a finite k >= 0 -- got ${k}`);
+    return Object.freeze(motion.map((m) => Object.freeze({ index: m.index, v: Object.freeze(m.v.map((x) => x * k)) })));
+}

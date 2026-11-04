@@ -54,6 +54,10 @@
 //   first history typed 5.95, X8 H80b's p typed 0.0307, X9 the gamma typed 1.5, X10 section 183 keeping the vectors, X11 its P4 range typed
 //   8-25 (round 79's, which I first wrote there) -> 1 red each; X4 Bt_MV's first grade typed 8.25e-4 -> 2 red; X3 Bt_MVC's first grade
 //   typed 8.24e-4 -> 4 red.
+// ROUND 81 (section 184), against this gate and denoiseScenes-selfcheck, each restored byte-identical: Q1 the speed scaled by k squared, Q2
+//   the levels without 0.5, Q3 H81a at k = 1, Q4 H81b at the top speed, Q5 the crossover interpolated the wrong way, Q7 C2 on the top level,
+//   Q8 the history lengths the still sequence's, Q9 the test command running the check test, Q10 a moving level keyed as the still one -> 1
+//   red each; Q6 U_TH graded on the still history at every level and Q11 the seeds not reserved -> 2 red each.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -146,7 +150,7 @@ console.log("\n3. ROUND 77's STUDY CODE");
         R.image === 256 && R.sppIn === 4 && R.sppRefTest === 2048 && R.c1Min === 22 && R.minGain === 0.01 && R.test === "signflip" &&
         R.results === "render/denoise-results-upscale-moving-r77.json" && LT.temporalRound(77) === R && LT.temporalRound(72) === R72);
     let bad = null; try { LT.temporalRound(73); } catch (e) { bad = e.message; }
-    ok("  ...and temporalRound refuses any other round, naming 77 (and, since sections 178 and 180, 78 and 79)", /70, 72, 77, 78, 79 or 80/.test(bad || ""));
+    ok("  ...and temporalRound refuses any other round, naming 77 (and, since sections 178 and 180, 78 and 79)", /70, 72, 77, 78, 79, 80 or 81/.test(bad || ""));
     const o = { W: 256, sppIn: 4, sppRef: 2048, ref2: true, harvest: true };
     ok("  movingKey is the still sequence's key marked moving, so the two never share a cache entry", LT.movingKey("R", 77000, o) === LT.temporalKey("R", 77000, o) + "-moving");
     const y = Float64Array.from({ length: 12 }, (_, i) => 0.1 + i / 20), r = Float64Array.from({ length: 12 }, (_, i) => 0.12 + i / 21), m = Uint8Array.of(1, 0, 1, 0);
@@ -439,7 +443,7 @@ console.log("\n9. ROUND 80 (section 182): THE MOVER HISTORY CLIPPED TO MEAN +- G
     let code = 0, said = ""; try { said = execFileSync(process.execPath, [path.join(ENG, "tools", "denoiseStudy.mjs"), "--harvest-upscale-temporal-train", "--round", "80"], { cwd: ENG, encoding: "utf8" }); } catch (err) { code = err.status; said = String(err.stdout); }
     const reg = fs.readFileSync(path.join(ENG, "render", "learned-denoiser-preregistration.md"), "utf8"), s182 = reg.slice(reg.indexOf("## 182."), reg.indexOf("## 183.") > 0 ? reg.indexOf("## 183.") : undefined);
     ok("  the commands and the registration: it refuses a call without C2; the test dispatches it with the round's gamma; training refuses round 80; section 182 states mean +- gamma sigma, gamma 1.0, the bit-for-bit claim and the seeds",
-        /round 72's U_TH and its C2/.test(refused || "") && /\(RD\.check \? LT\.runCheckTest : RD\.vectors \? LT\.runVectorTest :/.test(cli) && /\(\{ U0, gamma: RD\.moverGamma, splits: RD\.splits,/.test(cli) &&
+        /round 72's U_TH and its C2/.test(refused || "") && /RD\.check \? LT\.runCheckTest : RD\.vectors \? LT\.runVectorTest :/.test(cli) && /\(\{ U0, gamma: RD\.moverGamma, splits: RD\.splits,/.test(cli) &&
         code === 2 && /round 80 is a test only/.test(said) && /\*\*mean ± γσ\*\*/.test(s182) && /\*\*γ = 1\.0, fixed now and not tuned:\*\*/.test(s182) && /Off the movers Bt_MVC is Bt \(and Bt_MV\) bit for bit/.test(s182) &&
         /83000-83011/.test(s182) && /84000-84011/.test(s182) && s182.includes(R.results));
 }
@@ -473,6 +477,45 @@ console.log("\n10. SECTION 183: ROUND 80's VERDICT, RE-DERIVED FROM ITS COMMITTE
         /committed unread/.test(s183) && s183.includes("| Bt_MVC (vectors + clip) | 2.1041e-3 |"));
 }
 
+console.log("\n11. ROUND 81 (section 184): THE SPEED SWEEP");
+{
+    const S = D.makeScene("C", 990951), mo = M.sceneMotion(S), s2 = M.scaleMotion(mo, 2), s0 = M.scaleMotion(mo, 0);
+    let bad = 0; for (const k of [-1, NaN, Infinity]) { try { M.scaleMotion(mo, k); } catch (e) { if (/a finite k >= 0/.test(e.message)) bad++; } }
+    ok("  SPEED_LEVELS 0, 0.5, 1, 2, frozen; scaleMotion keeps each mover and its direction and multiplies its speed by k, refusing a k that is negative or not finite",
+        M.SPEED_LEVELS.join() === "0,0.5,1,2" && Object.isFrozen(M.SPEED_LEVELS) && s2.length === mo.length && s2.every((m, i) => m.index === mo[i].index && m.v.every((x, c) => x === 2 * mo[i].v[c])) &&
+        s0.every((m) => m.v.every((x) => x === 0)) && Object.isFrozen(s2) && bad === 3);
+    const so = { W: 32, sppIn: 2, sppRef: 4 }, still = T.temporalExample("C", 990951, net, so), z = T.temporalExample("C", 990951, net, { ...so, motion: s0, refs: { ref: still.ref } });
+    ok("!! the sweep's k = 0 level is the still sequence bit for bit (Bt and U_TH's input), so the levels differ by the motion alone", same(z.bt, still.bt) && same(z.x, still.x) && same(z.b1, still.b1));
+    const R = LT.ROUND_UPSCALE_SPEED, Sp = D.SPLITS_UPSCALE_SPEED, o = { W: 256, ref2: true };
+    ok("!! ROUND_UPSCALE_SPEED: round 81, a test only, of round 72's U_TH over SPEED_LEVELS, on SPLITS_UPSCALE_SPEED (12 R at 85000, 12 C at 86000, reserved), its own results file",
+        R.round === 81 && R.moving && !R.trainMoving && R.speeds === M.SPEED_LEVELS && R.net === LT.ROUND_UPSCALE_TEMPORAL_72.net && R.results === "render/denoise-results-upscale-speed-r81.json" && R.splits === Sp &&
+        LT.temporalRound(81) === R && Sp.T1.seeds[0] === 85000 && Sp.T1.seeds[12] === 86000 && Sp.T1.seeds.length === 24 && Sp.T1.seeds.every((x) => D.isDatasetSeed(x)) &&
+        LT.speedKey("R", 85000, o, 0) === LT.temporalKey("R", 85000, o) && LT.speedKey("R", 85000, o, 2) === LT.temporalKey("R", 85000, o) + "-moving-speed2");
+    ok("  crossover: linear between the two levels that bracket zero (0.02 at 0.5 and -0.01 at 1 cross at 0.833...), a level that is zero itself, and null when the curve never crosses",
+        Math.abs(LT.crossover([0, 0.5, 1, 2], [0.05, 0.02, -0.01, -0.04]) - (0.5 + 0.5 * 0.02 / 0.03)) < 1e-12 && LT.crossover([0, 1, 2], [0.1, 0, -0.1]) === 1 && LT.crossover([0, 1, 2], [0.1, 0.05, 0.01]) === null);
+    const t72 = JSON.parse(fs.readFileSync(path.join(ENG, LT.ROUND_UPSCALE_TEMPORAL_72.net), "utf8")), U = decodeNet(t72.runs.find((x) => x.seed === t72.candidate).net), Uc = decodeNet(t72.c2.net);
+    const sp1 = { T1: { family: "R+C", families: ["R", "C"], seeds: FIX.map((x) => x[1]) } }, out = LT.runSpeedTest({ splits: sp1, net, U, Uc2: Uc, W: 32, sppIn: 2, sppRef: 4 });
+    const ex = FIX.map(([f, sd]) => { const st0 = T.temporalExample(f, sd, net, { W: 32, sppIn: 2, sppRef: 4, ref2: true }), m0 = M.sceneMotion(D.makeScene(f, sd));
+        return { st0, lv: M.SPEED_LEVELS.map((k) => (k === 0 ? st0 : T.temporalExample(f, sd, net, { W: 32, sppIn: 2, sppRef: 4, ref2: true, motion: M.scaleMotion(m0, k), refs: { ref: st0.ref, ref2: st0.ref2 } }))) }; });
+    const gBt = M.SPEED_LEVELS.map((_, j) => ex.map((x) => gradeDisplay(x.lv[j].bt, x.lv[j]))), gB1 = ex.map((x) => gradeDisplay(x.st0.b1, x.st0)), gU = M.SPEED_LEVELS.map((_, j) => ex.map((x) => gradeDisplay(T.temporalChain(U, x.lv[j]), x.lv[j])));
+    const mean = (a) => a.reduce((q, v) => q + v, 0) / a.length, gain = (u, b) => 1 - mean(u) / mean(b);
+    ok("!! *** runSpeedTest: at every level Bt and U_TH are graded on that level's own history, B1 once; H81a is B1 against Bt at k = 2, H81b Bt at k = 0 against B1 ***",
+        M.SPEED_LEVELS.every((_, j) => same(out.tables.bt[j], gBt[j]) && same(out.tables.u[j], gU[j])) && same(out.tables.b1, gB1) &&
+        same(out.verdict.hypotheses.H1.d, effects(gBt[3], gB1)) && same(out.verdict.hypotheses.H2.d, effects(gB1, gBt[0])) && out.determinism === true && out.levels.join() === "0,0.5,1,2",
+        `Bt over B1 by level: ${gBt.map((b) => (100 * gain(b, gB1)).toFixed(1)).join(", ")} %`);
+    ok("  ...its gains over B1 at each level, their crossovers, the history lengths and C2 (round 72's on the k = 1 history) are what they say",
+        same(out.secondary.btOverB1, gBt.map((b) => gain(b, gB1))) && same(out.secondary.uOverB1, gU.map((u) => gain(u, gB1))) && out.secondary.crossBt === LT.crossover(M.SPEED_LEVELS, out.secondary.btOverB1) &&
+        out.secondary.crossU === LT.crossover(M.SPEED_LEVELS, out.secondary.uOverB1) && same(out.secondary.history, M.SPEED_LEVELS.map((_, j) => mean(ex.map((x) => LT.meanHistory(x.lv[j]))))) &&
+        same(out.tables.c2, ex.map((x) => gradeDisplay(T.temporalChain(Uc, x.lv[2]), x.lv[2]))));
+    let r1 = null, r2 = null; try { LT.runSpeedTest({ splits: sp1, net, U }); } catch (e) { r1 = e.message; } try { LT.runSpeedTest({ splits: sp1, net, U, Uc2: Uc, levels: [0.5, 1] }); } catch (e) { r2 = e.message; }
+    const cli = fs.readFileSync(path.join(ENG, "tools", "denoiseStudy.mjs"), "utf8"), reg = fs.readFileSync(path.join(ENG, "render", "learned-denoiser-preregistration.md"), "utf8");
+    const s184 = reg.slice(reg.indexOf("## 184."), reg.indexOf("## 185.") > 0 ? reg.indexOf("## 185.") : undefined);
+    let code = 0, said = ""; try { said = execFileSync(process.execPath, [path.join(ENG, "tools", "denoiseStudy.mjs"), "--harvest-upscale-temporal-train", "--round", "81"], { cwd: ENG, encoding: "utf8" }); } catch (err) { code = err.status; said = String(err.stdout); }
+    ok("  it refuses a call without C2 and a sweep without k = 0; the test dispatches it, training refuses round 81; section 184 states the levels, H81a/H81b and the seeds",
+        /round 72's U_TH and its C2/.test(r1 || "") && /starts still \(k = 0\)/.test(r2 || "") && /\(RD\.speeds \? LT\.runSpeedTest : RD\.check \? LT\.runCheckTest :/.test(cli) && code === 2 && /round 81 is a test only/.test(said) &&
+        /SPEED_LEVELS = 0, 0\.5, 1, 2/.test(s184) && /\*\*H81a:\*\* at k = 2, B1 beats Bt/.test(s184) && /\*\*H81b:\*\* at k = 0, Bt beats B1/.test(s184) && /85000-85011/.test(s184) && /86000-86011/.test(s184) && s184.includes(R.results));
+}
+
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +
-    "\nnot closed here: the movers' error at the current frame -- a denoiser question, section 183 says, not a history one.");
+    "\nnot closed here: where the history stops paying on the rig's set. That is round 81's harvest, section 185's.");
 process.exit(fails ? 1 : 0);
