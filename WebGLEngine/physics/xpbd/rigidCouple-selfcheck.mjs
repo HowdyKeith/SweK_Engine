@@ -207,7 +207,7 @@ if (box3dReady) {
              ["quantity", "measured from box3d", "derived formula", "relative difference"],
              [["mass (kg)", measuredMass, props.mass, relM],
               ["omega after L=2 about z (rad/s)", omega, pred, relI]],
-             "neither is readable through the 45 built exports, so both are derived and then probed");
+             "both are derived and then probed through box3d's dynamics; no export returns the mass, and since 2026-11-03 swk_body_inertia returns the inertia, which section 2 also reads directly");
     Fn("swk_world_destroy")();
 } else {
     say("box3d did not load, so sections 2 and 7 are UNMEASURED here rather than passed. The derivation is " +
