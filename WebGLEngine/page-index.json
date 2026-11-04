@@ -1,7 +1,7 @@
 {
  "version": 1,
  "generated": "derived by tools/ship/buildPageIndex.mjs -- DO NOT HAND-EDIT, the group comes from tools/ship/pageSections.mjs",
- "count": 495,
+ "count": 496,
  "pages": [
   {
    "f": "AudioLab.html",
@@ -3024,6 +3024,13 @@
    "f": "svg-forge.html",
    "t": "SweK &middot; SVG forge",
    "d": "Paste an SVG and forge it into a 3D metal medal/badge: its paths are parsed and bevel-extruded, holes and inner points preserved (the vector counterpart to the raster sprite-loft). Controls for thickness, bevel, color and metalness; orbit to inspect. Parsing is pinned by svgExtrudeCore-selfcheck. For faction insignia, achievement medals, and 3D UI ornaments.",
+   "g": "",
+   "p": 0
+  },
+  {
+   "f": "switchboard.html",
+   "t": "SweK &middot; Switchboard",
+   "d": "One task, the same seeds, every brain side by side: paired differences against each arm's control, with a TIE shown as a result. Survey (decision layer) and compass dropout (flying layer).",
    "g": "",
    "p": 0
   },

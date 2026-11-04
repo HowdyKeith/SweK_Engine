@@ -8,6 +8,7 @@
 //   3 READ      the per-arm table and the control lines on synthetic tasks: BEATS, TIES, IS BELOW, and "was not flown" for a missing control.
 //   4 SURVEY    the built-in decision arms: ids and controls, each arm IS the pilot it names (dive for dive on real 200 s dives), keys, the gauge noise and the kinds options reach the flight.
 //   5 DROPOUT   the built-in flying task on real tank flights: deterministic, the same spawn for every arm, scores in (0, 1), an arm without an entry refused, the event option changes the bucket, a network differs from the autopilot.
+//   5b ASYNC    runAsync flies one seed at a time with progress and yields, returns board.run's shape, refuses a bad range.
 //   6 SOURCE    no clock, random number or file; the header names the backlog item.
 // NOT CHECKED, said plainly: which brain is better (that is the experiment); the page; any arm that is not built in.
 // SABOTAGE LOG (49 mutants of brain/switchboard.mjs, each alone in its own worktree copy): 39 went red by name on the first pass; 10 went 0 red and each got a row: the twin arm's profile ignored, badOf without the crushed or the stranded half, the age clock never reset on a new target, the settle test dropped, one-scenario se (NaN), the same-difference tolerance (1e-9 against 0), a lost sub not marked bad, the angle wrap dropped (badOf and wrap became exports so they can be tested directly; the dropout task gained a `settle` option for the same reason). All ten then red by name.

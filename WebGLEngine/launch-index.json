@@ -21,7 +21,7 @@
   }
  },
  "counts": {
-  "page": 495,
+  "page": 496,
   "demo": 49,
   "builtin": 38
  },
@@ -3479,6 +3479,14 @@
    "id": "svg-forge.html",
    "display": "Svg Forge",
    "href": "/svg-forge.html",
+   "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "switchboard.html",
+   "display": "Switchboard",
+   "href": "/switchboard.html",
    "section": null,
    "collision": false
   },
