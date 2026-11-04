@@ -11,6 +11,8 @@
 //   4  the command: refuses an existing results file, writes it once, prints no reading
 //   5  a miniature on other seeds: every part the registration names, its controls -- C-caps failing as the build found, on the League
 //      pilot's joust -- and its cells re-derived and re-flown by the gate
+//   6  THE VERDICT (2026-11-04), from the committed results file: the file byte for byte; the table re-derived from its 4,000 flights; the
+//      readings; the nudge; the caps; the predictions; the controls; the note's verdict holding every number; and a sample flown again
 //
 // SABOTAGED (2026-11-04, through the byte-safe runner, each restored byte for byte): 23 sabotages, every one red by name in the end.
 //   Reading the gate before any ran found one no row could see -- C-stepB without its B-start test (G16), which the real duel always
@@ -24,8 +26,19 @@
 //   G19 the run's nudge 1e-6 1 | G20 at the cap within 1e-9 1
 //   The command (tools/roundhouse/box3dBothShipsRun.mjs): G21 no refusal of an existing file 1 | G22 the readings printed 1 | G23 the file
 //   written twice 1
+//
+// SABOTAGE LOG, THE VERDICT (2026-11-04) -- section 6, the same runner, every file restored byte-identical: 16 designs, every one red by
+// name, and every row of section 6 red under at least one. V14-V16 were added after V1-V13 left three rows that read stored values (the
+// readings, the nudge, the predictions) reddened by no design.
+//   V1 the file: a PD joust BB flight a loss, not a draw 4 | V2 the file: the League joust's BB flights at the cap 99 3 | V3 the file: a
+//   nudged flight's outcome changed 3 | V4 the file: C-stepB's calls 296 3 | V5 the note: a table row's tally 1 | V6 the note: P3 called
+//   wrong 1 | V7 the note: the PD joust's A3 p 1 | V8 the note: the highest spin elsewhere 1 | V9 the note: what it buys turned round 1 |
+//   V10 the code: better and worse swapped 2 | V11 the code: the duel ignoring stepB 8 | V12 the code: box3d stepped once a tick 3 |
+//   V13 the code: E' without its nudge 2 | V14 the file: the PD joust's stored BB better 18 4 | V15 the file: the League joust's nudged
+//   flights moved 37 3 | V16 the file: the PD joust's BB reading worse for A 5
 "use strict";
 import fs from "node:fs";
+import crypto from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as RB from "../../physics/mechanics/rigidBody6dof.mjs";
@@ -150,6 +163,62 @@ try {
     const back = JSON.parse(L.serialize(r));
     ok("the results serialize to one JSON file that parses back to the same result", J(back) === J(JSON.parse(JSON.stringify(r))) && L.serialize(r).endsWith("\n"));
 } catch (e) { guard(5, e); }
+
+console.log("\n6. THE VERDICT (2026-11-04, read from the committed results file; a sample of the round flown again)");
+try {
+    const text = fs.readFileSync(L.DEFAULT_RESULTS, "utf8"), R = JSON.parse(text), sha = crypto.createHash("sha256").update(text).digest("hex"), cells = R.cells, C = R.controls;
+    ok("!! the results file is the registered run's, byte for byte as it was committed: 388,630 bytes, sha256 f69fdef31acb8ba6, naming the registration, the five pilots by their hashes, the four ways and the 100 seeds",
+        Buffer.byteLength(text) === 388630 && sha.startsWith("f69fdef31acb8ba6") && R.registration === L.REGISTRATION && J(R.pilots.map((p) => p.hash)) === J([null, "215e26d9", "32789ff9", "360580a7", "0ffd8554"]) &&
+        J(R.ways) === J(L.WAYS) && cells.length === 10 && cells.every((c) => J(c.seeds) === J(L.FIGHT.seeds)), `${Buffer.byteLength(text)} bytes, ${sha.slice(0, 16)}`);
+    const NAME = { scripted: "the PD autopilot", shipped: "the Default", league: "the League pilot", close: "the close-quarters pilot", gpu: "the GPU Brain's pilot" };
+    const fp = (x) => (x < 1e-3 ? x.toExponential(2) : x.toPrecision(3)), tal = (x) => `${x.win}-${x.loss}-${x.draw}`;
+    const tallyOf = (rs) => ({ win: rs.filter((x) => x.outcome === "win").length, loss: rs.filter((x) => x.outcome === "loss").length, draw: rs.filter((x) => x.outcome === "draw").length });
+    const rowOf = (c) => { const bb = OS.compare(c.flights.E, c.flights.BB), a3 = OS.compare(c.flights.E, c.flights.A3);
+        return `| ${NAME[c.pilot]} | ${c.scenario} | ${tal(tallyOf(c.flights.E))} | ${tal(tallyOf(c.flights.BB))} | ${bb.better} | ${bb.worse} | ${fp(bb.p)} | ${tal(tallyOf(c.flights.A3))} | ${a3.better} | ${a3.worse} | ${fp(a3.p)} |`; };
+    const ROWS = ["| the PD autopilot | standoff | 0-1-99 | 0-0-100 | 1 | 0 | 1.00 | 5-15-80 | 5 | 14 | 0.0636 |", "| the PD autopilot | joust | 2-25-73 | 2-22-76 | 19 | 15 | 0.608 | 1-73-26 | 0 | 48 | 7.11e-15 |",
+        "| the Default | standoff | 98-0-2 | 97-0-3 | 0 | 1 | 1.00 | 98-0-2 | 0 | 0 | 1.00 |", "| the Default | joust | 0-93-7 | 0-93-7 | 3 | 3 | 1.00 | 0-94-6 | 3 | 4 | 1.00 |",
+        "| the League pilot | standoff | 97-0-3 | 97-0-3 | 0 | 0 | 1.00 | 97-0-3 | 0 | 0 | 1.00 |", "| the League pilot | joust | 0-100-0 | 0-100-0 | 0 | 0 | 1.00 | 0-100-0 | 0 | 0 | 1.00 |",
+        "| the close-quarters pilot | standoff | 96-0-4 | 96-0-4 | 0 | 0 | 1.00 | 96-0-4 | 0 | 0 | 1.00 |", "| the close-quarters pilot | joust | 63-19-18 | 69-18-13 | 13 | 8 | 0.383 | 67-19-14 | 13 | 10 | 0.678 |",
+        "| the GPU Brain's pilot | standoff | 73-0-27 | 73-0-27 | 2 | 2 | 1.00 | 73-0-27 | 1 | 1 | 1.00 |", "| the GPU Brain's pilot | joust | 19-67-14 | 20-63-17 | 7 | 3 | 0.344 | 20-67-13 | 3 | 3 | 1.00 |"];
+    const stored = cells.every((c) => J(c.bb) === J(OS.compare(c.flights.E, c.flights.BB)) && J(c.a3) === J(OS.compare(c.flights.E, c.flights.A3)) && J(c.chaos) === J(OS.compare(c.flights.E, c.flights["E'"])) &&
+        c.reading === OS.readingOf(c.bb) && c.a3Reading === OS.readingOf(c.a3) && L.WAYS.every((w) => J(c.tally[w]) === J(tallyOf(c.flights[w])) && c.flights[w].length === 100));
+    const rows = cells.map(rowOf);
+    ok("!! the table re-derived from the file's 4,000 flights by the orientation round's comparison, every stored comparison, reading and tally with it, and the verdict's table row by row",
+        stored && J(rows) === J(ROWS) && J(R.readings) === J(cells.map((c) => ({ pilot: c.pilot, scenario: c.scenario, reading: c.reading, better: c.bb.better, worse: c.bb.worse, p: c.bb.p }))), rows.find((x, i) => x !== ROWS[i]) || "");
+    const pdj = cells.find((c) => c.pilot === "scripted" && c.scenario === "joust"), pds = cells.find((c) => c.pilot === "scripted" && c.scenario === "standoff"), minBB = Math.min(...cells.map((c) => c.bb.p));
+    const a3seen = cells.filter((c) => c.a3.p < L.ALPHA);
+    ok("!! the readings: all ten BB cells change nothing (the smallest p 0.344); in the PD autopilot's joust BB changes 34 (19 better, 15 worse) and A3 48, every one worse (p 7.11e-15), A3's only reading below 0.01; its standoff under A3 5 better, 14 worse, p 0.0636",
+        cells.every((c) => c.reading === "changes nothing a sign test can see") && fp(minBB) === "0.344" && pdj.bb.changed === 34 && pdj.bb.better === 19 && pdj.bb.worse === 15 && fp(pdj.bb.p) === "0.608" &&
+        pdj.a3.changed === 48 && pdj.a3.worse === 48 && pdj.a3.better === 0 && fp(pdj.a3.p) === "7.11e-15" && a3seen.length === 1 && a3seen[0] === pdj && pdj.a3Reading === "changes it: worse for A" &&
+        pds.a3.better === 5 && pds.a3.worse === 14 && fp(pds.a3.p) === "0.0636");
+    const jo = cells.filter((c) => c.scenario === "joust"), so = cells.filter((c) => c.scenario === "standoff");
+    ok("!! the nudge changed no outcome in any cell, and moved 91 flights in the jousts and none in the standoffs; BB and A3 each moved all 1,000 of their flights",
+        cells.every((c) => c.chaos.changed === 0) && jo.reduce((a, c) => a + c.moved["E'"], 0) === 91 && so.every((c) => c.moved["E'"] === 0) && cells.reduce((a, c) => a + c.moved.BB, 0) === 1000 && cells.reduce((a, c) => a + c.moved.A3, 0) === 1000);
+    const lj = cells.find((c) => c.pilot === "league" && c.scenario === "joust"), others = cells.filter((c) => c !== lj), hi = Math.max(...others.map((c) => Math.max(c.caps.BB.maxSpin, c.caps.A3.maxSpin)));
+    ok("!! the caps: C-caps fails, as the build said it would -- every one of the League pilot's 100 BB and 100 A3 jousts reached the spin cap, no other cell came near it (the highest elsewhere the Default's joust, 15.57 rad/s), the top speed 21.69 m/s; the League pilot loses all 100 jousts all four ways",
+        !C.caps.ok && C.caps.maxSpin >= L.CAPS.spin - L.AT_CAP && C.caps.maxSpeed.toFixed(2) === "21.69" && lj.caps.BB.atCap === 100 && lj.caps.A3.atCap === 100 && others.every((c) => c.caps.BB.atCap === 0 && c.caps.A3.atCap === 0) &&
+        hi.toFixed(2) === "15.57" && others.find((c) => Math.max(c.caps.BB.maxSpin, c.caps.A3.maxSpin) === hi).pilot === "shipped" && L.WAYS.every((w) => tal(lj.tally[w]) === "0-100-0"));
+    const P = { P1: pdj.reading === "changes nothing a sign test can see", P2: cells.every((c) => c.reading === "changes nothing a sign test can see"), P3: pdj.a3.p < L.ALPHA && pdj.a3Reading === "changes it: worse for A", P4: pdj.bb.changed < pdj.a3.changed };
+    ok("!! the predictions, each by its registered rule from the file: P1, P2, P3 and P4 all right", Object.values(P).every(Boolean), J(P));
+    ok("!! the controls as the verdict gives them: C-unchanged, C-stepB (297 calls in 297 ticks, B's start), C-replicates (seed 93001), C-box3d, C-chaos, C-determinism (20 flights) held; C-caps did not",
+        C.unchanged.ok && C.stepB.ok && C.stepB.calls === 297 && C.stepB.ticks === 297 && C.stepB.isB && C.replicates.ok && C.replicates.seed === 93001 && C.box3d.ok && C.chaos.ok && C.determinism.ok && C.determinism.flights === 20 && !C.caps.ok);
+    // THE NOTE: the verdict section alone, its line breaks read as spaces
+    const note = src(L.REGISTRATION), vAt = note.indexOf("\n## The verdict, 2026-11-04"), rest = vAt >= 0 ? note.slice(vAt + 1) : "", nextAt = rest.slice(1).search(/\n#{2,3} /);
+    const vt = (nextAt >= 0 ? rest.slice(0, nextAt + 1) : rest).replace(/\s+/g, " ");
+    const frags = [`${Buffer.byteLength(text).toLocaleString("en-US")} bytes, sha256 ${sha.slice(0, 16)}`, ...rows, `The smallest p is ${fp(minBB)}`,
+        `BB changes ${pdj.bb.changed} outcomes, ${pdj.bb.better} better and ${pdj.bb.worse} worse. A3 changes ${pdj.a3.changed}, and every one is worse (p = ${fp(pdj.a3.p)})`,
+        `The PD autopilot's standoff under A3 reads ${pds.a3.better} better and ${pds.a3.worse} worse, p = ${fp(pds.a3.p)}`, `It moved ${jo.reduce((a, c) => a + c.moved["E'"], 0)} flights in the jousts and none in the standoffs`,
+        `Every one of the League pilot's ${lj.caps.BB.atCap} BB jousts and ${lj.caps.A3.atCap} A3 jousts reached box3d's spin cap`, `The highest top spin elsewhere is the Default's joust, at ${hi.toFixed(2)} rad/s. The top speed was ${C.caps.maxSpeed.toFixed(2)} m/s`,
+        ...Object.keys(P).map((k) => `**${k}: ${P[k] ? "right" : "wrong"}.**`), `${C.stepB.calls} calls in ${C.stepB.ticks} ticks`, `${C.determinism.flights} flights, each the same twice`,
+        P.P2 ? "box3d's scheme costs a pilot nothing when every ship flies it, in all ten cells" : "box3d's scheme changes how a pilot fights"];
+    const missing = frags.filter((f) => !vt.includes(f));
+    ok("!! the note's verdict carries the file's numbers: the table row by row, the readings, the nudge, the caps, each prediction as the file reads it, the controls, and what it buys", vAt >= 0 && missing.length === 0, missing.slice(0, 3).join(" || ") || `${frags.length} fragments`);
+    // A SAMPLE OF THE ROUND, flown again at this head through the library, against the file to the bit
+    const off = [], s0 = L.FIGHT.seeds[0];
+    for (const p of OS.loadPilots()) for (const sc of L.SCENARIOS) { const c = cells.find((x) => x.pilot === p.id && x.scenario === sc);
+        for (const w of L.WAYS) if (J(L.fight(b3, p.pilot, s0, sc, w)) !== J(c.flights[w][0])) off.push(`${p.id}/${sc}/${w}`); }
+    ok("!! a sample of the round flown again at this head, through the library, is the file's to the bit: every pilot's seed 96001 in both scenarios, four ways each", off.length === 0, off.join(" ") || "40 flights");
+} catch (e) { guard(6, e); }
 
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)`);
 process.exitCode = fails ? 1 : 0;

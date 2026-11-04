@@ -146,3 +146,70 @@ red by name in the end.
 - G16 had a row written for it before any sabotage ran.
 - G13's first design did not parse, so the gate died before printing a row. It was redone as code that runs, and it is
   red.
+
+## The verdict, 2026-11-04
+
+Read from `physics/mechanics/box3dBothShipsResults.json` (388,630 bytes, sha256 f69fdef31acb8ba6), committed at 10bd34ac
+before anyone read it. The run took 40 s.
+
+**With both ships on box3d, no pilot fights differently by a sign test, in either scenario. The PD autopilot's mirror
+joust stays even. With A alone on box3d, the PD autopilot loses its joust again, for the third time. So box3d's scheme
+costs a pilot nothing when every ship flies it. The cost the earlier rounds found is the mismatch between a ship on
+box3d and a ship on the engine's own.**
+
+Each pilot flies as A against the PD autopilot, over 100 seeds of each scenario. Outcomes are from A's side as
+wins-losses-draws, and BB and A3 are each read against E:
+
+| A | scenario | E | BB | better | worse | p | A3 | better | worse | p |
+|---|---|---|---|---|---|---|---|---|---|---|
+| the PD autopilot | standoff | 0-1-99 | 0-0-100 | 1 | 0 | 1.00 | 5-15-80 | 5 | 14 | 0.0636 |
+| the PD autopilot | joust | 2-25-73 | 2-22-76 | 19 | 15 | 0.608 | 1-73-26 | 0 | 48 | 7.11e-15 |
+| the Default | standoff | 98-0-2 | 97-0-3 | 0 | 1 | 1.00 | 98-0-2 | 0 | 0 | 1.00 |
+| the Default | joust | 0-93-7 | 0-93-7 | 3 | 3 | 1.00 | 0-94-6 | 3 | 4 | 1.00 |
+| the League pilot | standoff | 97-0-3 | 97-0-3 | 0 | 0 | 1.00 | 97-0-3 | 0 | 0 | 1.00 |
+| the League pilot | joust | 0-100-0 | 0-100-0 | 0 | 0 | 1.00 | 0-100-0 | 0 | 0 | 1.00 |
+| the close-quarters pilot | standoff | 96-0-4 | 96-0-4 | 0 | 0 | 1.00 | 96-0-4 | 0 | 0 | 1.00 |
+| the close-quarters pilot | joust | 63-19-18 | 69-18-13 | 13 | 8 | 0.383 | 67-19-14 | 13 | 10 | 0.678 |
+| the GPU Brain's pilot | standoff | 73-0-27 | 73-0-27 | 2 | 2 | 1.00 | 73-0-27 | 1 | 1 | 1.00 |
+| the GPU Brain's pilot | joust | 19-67-14 | 20-63-17 | 7 | 3 | 0.344 | 20-67-13 | 3 | 3 | 1.00 |
+
+- **All ten BB readings change nothing a sign test can see.** The smallest p is 0.344.
+- **The PD autopilot's joust:** BB changes 34 outcomes, 19 better and 15 worse. A3 changes 48, and every one is worse
+  (p = 7.11e-15). It is A3's only reading below 0.01. The PD autopilot's standoff under A3 reads 5 better and 14 worse,
+  p = 0.0636.
+- **The nudge** changed no outcome in any cell. It moved 91 flights in the jousts and none in the standoffs. BB and A3
+  each moved all 1,000 of their flights.
+- **box3d's caps, and C-caps.** C-caps failed, as the build record said before the run that it would.
+  - Every one of the League pilot's 100 BB jousts and 100 A3 jousts reached box3d's spin cap of 23.56 rad/s.
+  - No other cell came near the cap. The highest top spin elsewhere is the Default's joust, at 15.57 rad/s. The top
+    speed was 21.69 m/s.
+  - The League pilot loses all 100 of its jousts in all four ways, so the cap changed no outcome there.
+
+**The predictions:**
+
+- **P1: right.** With both ships on box3d, the PD autopilot's joust changes nothing a sign test can see (p = 0.608).
+- **P2: right.** No cell's BB reading sees a change.
+- **P3: right.** A3 makes the PD autopilot's joust worse for A, p = 7.11e-15.
+- **P4: right.** In the PD autopilot's joust, BB changes 34 outcomes against A3's 48.
+
+**The controls:**
+
+- C-unchanged held: the ten anchors and the step digest.
+- C-stepB held: 297 calls in 297 ticks, the first handed B's start.
+- C-replicates held: sixdof-box3d's seed 93001, on E and on A3.
+- C-box3d held.
+- C-caps did not hold, as above.
+- C-chaos held: no nudge changed an outcome.
+- C-determinism held: 20 flights, each the same twice.
+
+**What this buys:**
+
+- box3d's scheme costs a pilot nothing when every ship flies it, in all ten cells.
+- Keith's decision, to step box3d's ships with the engine's own physics and use box3d only for contacts, therefore
+  guards two things:
+  - worlds that mix ships on box3d with ships on the engine's own, where the PD autopilot loses its jousts;
+  - every number recorded on the engine's own.
+- Nothing is changed, and this note authorises no further round.
+
+**Gated.** Section 6 of `tools/roundhouse/box3dBothShips-selfcheck.mjs` re-derives every number above from the
+committed file, holds this verdict to them, and flies a sample of the round again.

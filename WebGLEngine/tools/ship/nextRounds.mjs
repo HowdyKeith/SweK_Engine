@@ -2253,6 +2253,20 @@ export const NEXT_ROUNDS = [
         why: "The only change sixdof-box3d's sign test saw, and the reason its P3 failed. Keith, 2026-11-04: 'Let's do the sixdof-box3d-pd-joust backlog tests'.",
     },
     {
+        id: "box3d-both-ships",
+        blocker: "CLOSED",
+        what: "CLOSED 2026-11-04, UNNUMBERED. Keith's item 1 of five after the PD-joust verdict ('Both ships on box3d'), registered before any code (physics/mechanics/BOX3D_BOTH_SHIPS_WIP.md, 0689eadc), built, gated and sabotaged (ef438b6c), run, its results file committed unread (10bd34ac), then read. Each of the five pilots as A against the PD autopilot, 100 fresh seeds of each scenario, every duel flown four ways: both ships on the engine's own (E), both on box3d (BB), A alone on box3d (A3), E nudged. With both ships on box3d no cell changes by a sign test (the smallest p 0.344); the PD autopilot's mirror joust stays even (19 better, 15 worse, p 0.608). With A alone on box3d the PD autopilot loses its joust a third time (0 better, 48 worse, p = 7.11e-15). So box3d's scheme costs a pilot nothing when every ship flies it; the cost is the mismatch between a ship on box3d and one on the engine's own. P1-P4 all right. C-caps failed, as the build found: the League pilot's joust reaches box3d's spin cap in all 100 flights each way, and loses all 100 jousts every way.",
+        how: "Nothing left in this entry. It bears on Keith's decision (box3d-hybrid-ship-stepper): stepping box3d's ships with the engine's own physics guards worlds that mix ships on box3d with ships on the engine's own, and every number recorded on the engine's own.",
+        why: "Keith, 2026-11-04: item 1 of five ('Both ships on box3d'), after the PD-joust round's verdict.",
+    },
+    {
+        id: "box3d-hybrid-ship-stepper",
+        blocker: "OPEN",
+        what: "DECIDED 2026-11-04 (Keith, after the PD-joust verdict): ships in a box3d world are to be stepped by the engine's own physics, rigidBody6dof.step(), with box3d used only for contacts -- not the PD autopilot retuned for box3d. Every 6-DOF number in the tree was measured on the engine's own physics. The PD-joust round named box3d's integration scheme as what costs the PD autopilot its mirror jousts against a ship on the engine's own, and box3d-both-ships found nothing changes when every ship flies box3d.",
+        how: "Keith's item 4 of five: register a stepper that moves a ship by rigidBody6dof.step() in free flight and lets box3d resolve its contacts, then build it and test it with collisions on, against the engine's own contact model.",
+        why: "Keith, 2026-11-04: 'Step box3d's ships with the engine's own physics and use box3d only for contacts.'",
+    },
+    {
         id: "sixdof-page-fight-measured",
         blocker: "CLOSED",
         what: "CLOSED 2026-11-02, UNNUMBERED. Registered before any code (brain/SIXDOF_PAGE_FIGHT_WIP.md), built, gated and sabotaged, run, its results file committed unread (37c14c8b), then read. The five pilots on es-box3d-6dof.html's Load Pilots panel in the page's OWN fight (three a side, collisions and ram damage on, window.__sixdof.runBattles), every pair from both sides on fresh battle seeds 80001-80100, each pairing read by an exact two-sided sign test at p < 0.01. H1 MET: the fruit fly's Default beats the GPU pilot W123/L76/D1, the duel's 70-0 much narrower. H2: only the close-quarters pilot beats the PD autopilot (199-1); the League pilot LOSES to it (44-155); the Default and the GPU pilot show no difference. H3 MET: the close-quarters pilot ranks first, W730/L58/D12 over its 800, then the Default -13, the autopilot -38, the GPU pilot -180, the League pilot -441. 431 of 2,500 battles timed out (17.2%). Predictions: P1 and P3 right, P2 and P4 wrong. The verdict is gate rows (tools/ship/sixdofPageFight-selfcheck.mjs section 6), with a sample of 12 battles flown again.",
