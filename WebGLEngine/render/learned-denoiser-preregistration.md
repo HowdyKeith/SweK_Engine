@@ -11493,3 +11493,49 @@ at several speeds. Nothing in the chain changes. It tells the chain when the his
 
 **The run, on Keith's rig, at round 81's commit:** `--harvest-upscale-temporal-test --round 81`, one CPU harvest (~5-11 hours), its file
 committed byte for byte before it is read. Section 185 reads it.
+
+## 186. ROUND 82 -- SPEND THE SAMPLES WHERE THE HISTORY IS SHORT: THE SAME BUDGET, SHARED BY WHERE THE HISTORY WILL BE REJECTED. FIXED BEFORE ITS CODE
+
+**Why.** Section 183 closed the moving-object history work: the movers' error is their changing shading at the current frame, not a lost
+history. Where the history is rejected, Bt is close to one noisy frame. So give those pixels more samples, and the rest fewer, at the same
+total. The history is not changed at all; the trace is.
+
+**The rule (render/adaptiveSampling.mjs), fixed now.**
+- **The prediction:** before frame f is traced, its first hits are reprojected against frame f - 1's. That is reproject(), as Bt does, on
+  geometry that costs no samples. Each half-size pixel's **share** s is the fraction of its 2 x 2 full-size pixels with no valid history.
+- **The weight:** 1 + 2s, so a pixel whose history will be wholly rejected weighs 3.
+- **The allocation:** the frame's budget, **4 samples a half-size pixel**, shared in proportion to the weights. Integers by the largest
+  remainder, each pixel 1 to 12, the total exact. Frame 0 has no history to lose, so its allocation is uniform.
+- **The traces:** each frame is traced as 12 one-sample passes from its own seeds. The **uniform arm** averages the first 4 at every pixel. The
+  **adaptive arm** averages each pixel's first m. Both arms come from the same passes, so they are paired sample for sample and spend the
+  same total.
+- Everything after the trace is the chain as it is: the shipped denoiser, the fill, EASU, Bt's history (no vectors), round 72's U_TH.
+
+**ROUND 82, a test only, on the CPU.**
+- **Test:** 24 new scenes, 12 R (87000-87011) and 12 C (88000-88011), moving as section 176's (k = 1), at round 72's settings. The two arms share
+  the references.
+- **H82a:** Bt with adaptive sampling beats Bt with uniform sampling, by section 159's rule, through verdict() (the sign-flip test, Holm with
+  H82b, C1-C5).
+- **H82b:** U_TH on the adaptive Bt beats U_TH on the uniform Bt, by the same rule.
+- **Descriptive, deciding nothing:**
+  - both arms on the mover pixels, and on the measured frame's rejected pixels;
+  - B1 for each arm;
+  - the samples the adaptive arm spent on rejected pixels against the uniform 4.
+- File: render/denoise-results-upscale-sampling-r82.json.
+
+**Predictions, fixed now, deciding nothing.**
+- **P1:** C1 and C3 hold.
+- **P2:** H82a is supported, 1-5 % below the uniform Bt. The rejected pixels' noise falls by up to 3 x; the rest's rises by ~20 %, but their
+  history averages it down.
+- **P3:** H82b is supported, 1-4 %.
+- **P4:** on the rejected pixels the adaptive Bt is 5-15 % below the uniform one.
+- **P5:** B1 (one frame, no history) is WORSE adaptive than uniform. Its non-rejected pixels lose samples with nothing to average them.
+
+**What each outcome means, fixed now.**
+- **H82a holds:** sampling by history is worth a device round. The device trace would allocate per pixel, and the cost of the prediction pass
+  would be measured.
+- **H82a fails:** at these settings the denoiser, trained at a uniform 4 samples, does not turn uneven samples into a better history. A
+  denoiser trained on uneven samples would be the next question.
+
+**The run, on Keith's rig, at round 82's commit:** `--harvest-upscale-temporal-test --round 82`, one CPU harvest (the traces are 3 x round 77's
+history cost; the references dominate, ~5-11 hours). Its file is committed byte for byte before it is read. Section 187 reads it.
