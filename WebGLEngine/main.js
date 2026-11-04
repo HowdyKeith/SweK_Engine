@@ -7427,7 +7427,7 @@ function resize() {
 resize();
 window.addEventListener("resize", resize);
 try {
-    mountUpscalerSwitch({ page: "engine", pageDefault: "native", corner: "bottom-right",
+    window.__swekEngineUpscaler = mountUpscalerSwitch({ page: "engine", pageDefault: "native", corner: "bottom-right",
         modes: { native: {}, bilinear: {}, fsr1: { why: "the main engine has no FSR1 pass yet: it needs a GLSL EASU + RCAS between a lower-resolution scene buffer and the canvas" } },
         onChange: (id) => { _renderScale = renderScaleFor(id); resize(); } });
 } catch (e) { console.warn("[upscaler switch]", e); }
@@ -29620,6 +29620,8 @@ try {
             window.qualityAuto = autoCtl;   // console access
             const qualityHooks = {
                 setBloom: setBloomHook,
+                // the preset's upscaler mode moves the engine's own Upscaler switch (ui/upscalerSwitch.mjs) -- one setting, two ways in
+                setUpscaler: (mode) => { if (window.__swekEngineUpscaler) window.__swekEngineUpscaler.set(mode, { from: "quality-preset" }); },
                 startAuto:  () => autoCtl.start(),
                 stopAuto:   () => autoCtl.stop(),
                 getAutoState: () => autoCtl.state(),
@@ -29629,6 +29631,7 @@ try {
             // setPreset(name, hooks) and (set|get)AutoTargetFps directly.
             _settingsCtx._qualityModule = qpMod;
             _settingsCtx._qualityHooks  = qualityHooks;
+            window.swekQuality = { set: (name) => qpMod.setPreset(name, qualityHooks), get: () => qpMod.getCurrentPreset(), presets: Object.keys(qpMod.PRESETS) };   // console access, as window.qualityAuto
             // Apply current preset's bloom + start AUTO if persisted as such.
             const startupCfg = qpMod.getPresetConfig();
             if (bloomPass) bloomPass._enabled = !!startupCfg.bloom;

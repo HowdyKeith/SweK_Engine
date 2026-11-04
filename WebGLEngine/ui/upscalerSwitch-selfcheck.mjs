@@ -10,6 +10,8 @@
 //   U7 the pop-up listing only the available modes -> 6 each; U1 a mode the page lacks taken as available -> 8.
 // SECTION 5 (the main engine): E1 resize() ignoring the scale, E2 bilinear at a half, E3 the engine's button top right, E4 the scale never
 //   applied -> 2 red each (the wiring row and the engine driven).
+// SECTION 6 (the quality presets): Q1 FAST at native, Q2 setPreset never calling the hook, Q3 the hook unwired in main.js, Q4 startup applying
+//   the preset's upscaler (a hand-set switch overridden on reload) -> 2 red each.
 "use strict";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -162,6 +164,43 @@ console.log("\n5. THE MAIN ENGINE: A RENDER SCALE");
         ok("!! *** the main engine, loaded (index.html): bilinear renders its canvas at 2/3 -- 1200 x 800 to 800 x 533 at the same CSS size -- and native puts it back; only native and bilinear are available ***",
             r.ok && R.mounted && R.before[0] === 1200 && R.before[1] === 800 && R.after[0] === 800 && R.after[1] === 533 && R.after[2] === R.before[2] && R.after[3] === R.before[3] &&
             R.back[0] === 1200 && R.back[1] === 800 && avail.join() === "native,bilinear" && R.btn === "8px", JSON.stringify({ before: R.before, after: R.after, back: R.back }));
+    }
+}
+
+console.log("\n6. THE QUALITY PRESETS AND THE ENGINE's SWITCH: ONE SETTING");
+{
+    const fs = await import("node:fs"), mem = new Map(), was = globalThis.localStorage;
+    globalThis.localStorage = { getItem: (k) => (mem.has(k) ? mem.get(k) : null), setItem: (k, v) => mem.set(k, String(v)) };
+    const Q = await imp("ui/QualityPresetPanel.js"), calls = [];
+    const r1 = Q.setPreset("fast", { setBloom: () => {}, setUpscaler: (m) => calls.push(m) }), r2 = Q.setPreset("quality", { setBloom: () => {}, setUpscaler: (m) => calls.push(m) });
+    const r3 = Q.setPreset("quality", { setBloom: () => {} });
+    globalThis.localStorage = was;
+    ok("!! each quality preset names a main-engine upscaler mode -- FAST bilinear (2/3), BALANCED, QUALITY and AUTO native -- and setPreset applies it through hooks.setUpscaler at once",
+        Q.PRESETS.fast.upscaler === "bilinear" && ["balanced", "quality", "auto"].every((k) => Q.PRESETS[k].upscaler === "native") && Object.values(Q.PRESETS).every((p) => p.upscaler in U.ENGINE_RENDER_SCALE) &&
+        calls.join() === "bilinear,native" && r1.applied.includes("upscaler") && r2.applied.includes("upscaler") && Q.PRESETS.fast.description.includes("2/3"));
+    ok("  ...and with no hook the upscaler is reported pending, as bloom is, without asking for a reload", r3.pending.includes("upscaler (no hook registered)") && !r3.applied.includes("upscaler") && r3.requiresReload === false);
+    const main = fs.readFileSync(path.join(ENG, "main.js"), "utf8"), boot = main.slice(main.indexOf("const startupCfg = qpMod.getPresetConfig();"), main.indexOf("const startupCfg = qpMod.getPresetConfig();") + 400);
+    ok("  main.js: the preset hook moves the engine's switch (window.__swekEngineUpscaler); swekQuality is the console's way in; and startup applies the preset's bloom but NOT its upscaler, so a hand-set switch survives a reload",
+        /window\.__swekEngineUpscaler = mountUpscalerSwitch\(\{ page: "engine"/.test(main) && /setUpscaler: \(mode\) => \{ if \(window\.__swekEngineUpscaler\) window\.__swekEngineUpscaler\.set\(mode, \{ from: "quality-preset" \}\); \}/.test(main) &&
+        /window\.swekQuality = \{ set: \(name\) => qpMod\.setPreset\(name, qualityHooks\)/.test(main) && boot.length > 100 && !/setUpscaler|__swekEngineUpscaler/.test(boot));
+    const r = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 300000, script: `async () => {
+        const sleep = (ms) => new Promise((r) => setTimeout(r, ms)); localStorage.clear();
+        const open = async () => { const f = document.createElement("iframe"); f.style.width = "1200px"; f.style.height = "800px"; f.src = "/index.html"; document.body.appendChild(f);
+            await new Promise((r) => f.onload = r); for (let i = 0; i < 600 && !(f.contentWindow.swekQuality && f.contentWindow.swek?.upscaler); i++) await sleep(100); return f; };
+        const f = await open(), w = f.contentWindow, cv = f.contentDocument.getElementById("glCanvas");
+        if (!w.swekQuality) return { quality: false, upscaler: !!w.swek?.upscaler };
+        const out = { quality: true }; w.swekQuality.set("fast"); await sleep(200); out.fast = [w.swek.upscaler.get(), cv.width, cv.height];
+        w.swekQuality.set("quality"); await sleep(200); out.qual = [w.swek.upscaler.get(), cv.width, cv.height];
+        w.swek.upscaler.set("bilinear"); await sleep(200); out.hand = [w.swek.upscaler.get(), w.swekQuality.get(), cv.width];
+        f.remove(); const g = await open(); out.reload = [g.contentWindow.swek.upscaler.get(), g.contentWindow.swekQuality && g.contentWindow.swekQuality.get(), g.contentDocument.getElementById("glCanvas").width];
+        return out;
+    }` });
+    if (r.skipped) ok("  the engine ran (no browser here: NOT A PASS)", false, r.reason);
+    else {
+        const R = r.result || {};
+        ok("!! *** the engine, driven: FAST moves its switch to bilinear (the canvas 800 x 533), QUALITY back to native (1200 x 800); the switch moved by hand stays, the preset unchanged; and after a reload the hand-set switch is still there ***",
+            r.ok && R.quality && JSON.stringify(R.fast) === JSON.stringify(["bilinear", 800, 533]) && JSON.stringify(R.qual) === JSON.stringify(["native", 1200, 800]) &&
+            JSON.stringify(R.hand) === JSON.stringify(["bilinear", "quality", 800]) && JSON.stringify(R.reload) === JSON.stringify(["bilinear", "quality", 800]), JSON.stringify(R));
     }
 }
 

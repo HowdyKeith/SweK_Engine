@@ -1562,7 +1562,7 @@ export function buildSettingsSchema(ctx) {    const gfx = (key, label, hint) => 
             // setAutoTargetFps() helpers, just rendered through the schema
             // settings hub. The old standalone panel is no longer mounted.
             { id: "qualityPreset", label: "Quality preset",
-              hint: "FAST shadow 256 / bloom off / grid 5  ·  BALANCED shadow 512 / bloom on / grid 7  ·  QUALITY shadow 1024 / bloom on / grid 10  ·  AUTO modulates by FPS",
+              hint: "FAST shadow 256 / bloom off / grid 5 / rendered at 2/3, bilinear  ·  BALANCED shadow 512 / bloom on / grid 7 / native  ·  QUALITY shadow 1024 / bloom on / grid 10 / native  ·  AUTO modulates by FPS. The resolution is the Upscaler switch's (bottom right): a preset sets it, and it can still be changed by hand.",
               type: "select",
               options: ["fast", "balanced", "quality", "auto"],
               get: () => {
