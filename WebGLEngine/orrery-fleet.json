@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "80b282be1a4b6ee1844f62f963ee5f7b39e9804b",
+ "head": "cadec1017e649a31f6d226dd531e645f0e604f8a",
  "bodies": {
   "box3d": [
    {
@@ -26,7 +26,7 @@
    },
    {
     "path": "physics/box3d/box3dLoader.js",
-    "bytes": 29671,
+    "bytes": 33933,
     "sha": "5fed473f3d3aa7f9680f5ca7fb5532480324fc36"
    },
    {
@@ -88,6 +88,16 @@
     "path": "tools/macSession.mjs",
     "bytes": 16554,
     "sha": "359cf163ca4803c8c42c1efebfcdb88201c9e373"
+   },
+   {
+    "path": "tools/roundhouse/angularImpulseCensus-selfcheck.mjs",
+    "bytes": 64795,
+    "sha": "cadec1017e649a31f6d226dd531e645f0e604f8a"
+   },
+   {
+    "path": "tools/roundhouse/angularImpulseCensus.mjs",
+    "bytes": 25344,
+    "sha": "e1a56d0d620eb6cbfcb4eebf77ae8b2e57e510f0"
    },
    {
     "path": "tools/roundhouse/backendRotation.mjs",
@@ -390,7 +400,7 @@
    {
     "path": "physics/jolt/joltLoader.js",
     "bytes": 16865,
-    "sha": "2195d8555ee1da5057cd674f5a1337f11c57fb07"
+    "sha": "8e5e02298b4172cc8b1c93b7403bea951b6b8c41"
    },
    {
     "path": "tools/ship/artifactWeight.mjs",
@@ -980,8 +990,8 @@
    },
    {
     "path": "space-battleship.html",
-    "bytes": 85600,
-    "sha": "73438b01ab028bba866158a39da6998016ed18ab"
+    "bytes": 85612,
+    "sha": "dc45bed917a8026025d60dc34473ab0c717bde6e"
    },
    {
     "path": "splat_viewer.html",

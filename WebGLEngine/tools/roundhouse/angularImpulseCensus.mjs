@@ -180,21 +180,35 @@ export function cTransparent() {
     const steps = a.out.h.length, same = J(a.out.h) === J(b.out.h);
     return { ok: same && steps === 120 && a.tally.calls === 14, steps, same, callsSeen: a.tally.calls, last: a.out.h[steps - 1] };
 }
-/** C-reads: a lone light box given a known impulse reads |I^-1 J| from the inertia box3d reports, to float32; the debris with its cap off reads past the cap. */
+/**
+ * C-reads: a lone light box given a known impulse reads |I^-1 J| from the inertia box3d reports, to float32; the debris with its cap off reads past
+ * the cap. 2026-11-04, RESTATED AFTER THE CAP the census decided on (box3dLoader.js, SPIN CAP): the facade now leaves 15 pi at most, so what box3d's
+ * own impulse leaves -- what the hook reads -- is read back from box3d's raw export, and the facade's call is flown beside it, where the hook still
+ * reads box3d's own spin (the cap acts after the call it wraps) and the facade leaves 15 pi.
+ */
 export const LONE = freeze({ half: freeze([0.03, 0.09, 0.06]), density: 1, impulse: freeze([1.3e-4, -2.1e-4, 0.7e-4]) });
 export function cReads() {
-    const lone = probe(`const w = box3d.createWorld({ gravity: [0, 0, 0] }), b = w.addBox({ type: "dynamic", pos: [0, 0, 0], half: ${J(LONE.half)}, density: ${LONE.density} });\n` +
-        `const I = w.inertia(b); w.angularImpulse(b, ${J(LONE.impulse)});\nconst A = w.readAngularVelocities();\nconsole.log(JSON.stringify({ I, read: Math.hypot(A[b * 3], A[b * 3 + 1], A[b * 3 + 2]) }));`);
+    const box = `{ type: "dynamic", pos: [0, 0, 0], half: ${J(LONE.half)}, density: ${LONE.density} }`, far = `{ type: "dynamic", pos: [3, 0, 0], half: ${J(LONE.half)}, density: ${LONE.density} }`;
+    const lone = probe(`const w = box3d.createWorld({ gravity: [0, 0, 0] }), b = w.addBox(${box}), f = w.addBox(${far}), I = w.inertia(b), j = ${J(LONE.impulse)};\n` +
+        `w._m._swk_body_ang_impulse(b, j[0], j[1], j[2]);\nw.angularImpulse(f, j);\nconst A = w.readAngularVelocities(), at = (k) => [A[k * 3], A[k * 3 + 1], A[k * 3 + 2]];\n` +
+        `console.log(JSON.stringify({ I, read: Math.hypot(...at(b)), raw: at(b), facade: Math.hypot(...at(f)), facadeW: at(f) }));`);
     const I = lone.out.I.diag, j = LONE.impulse, expect = Math.hypot(j[0] / I[0], j[1] / I[1], j[2] / I[2]);
-    const sites = Object.entries(lone.tally.sites), seen = sites.length === 1 ? sites[0][1].max : null;
-    const loneOk = seen != null && Math.abs(seen - expect) <= 1e-6 * expect && seen === lone.out.read && lone.out.I.off.every((v) => v === 0);
-    const debris = probe(`import * as D from ${J(path.join(ENG, "fx", "fracture", "debrisPhysics.js"))};\nimport * as L from ${J(path.join(ENG, "tools", "roundhouse", "joltScenes.mjs"))};\n` +
-        `const sc = L.DEBRIS[0], w = box3d.createWorld({ gravity: [0, -9.8, 0] }); D.addGround(w, { ...sc.ground });\n` +
-        `const bodies = D.makePhysicsDebris(w, L.fragmentsOf(sc, 1), [...sc.impact], { force: sc.force, rng: L.rng(201), maxSpin: Infinity });\n` +
-        `const A = w.readAngularVelocities(); console.log(JSON.stringify({ n: bodies.length, top: Math.max(...bodies.map((b) => Math.hypot(A[b.idx * 3], A[b.idx * 3 + 1], A[b.idx * 3 + 2]))) }));`);
+    const sites = Object.values(lone.tally.sites), rawSite = sites.filter((e) => J(e.maxAt.via) === "[]"), facSite = sites.filter((e) => J(e.maxAt.via) === J(["physics/box3d/box3dLoader.js:51"]));
+    const seen = sites.length === 2 && rawSite.length === 1 ? rawSite[0].max : null, facadeSeen = facSite.length === 1 ? facSite[0].max : null;
+    const cos = (a, b) => (a[0] * b[0] + a[1] * b[1] + a[2] * b[2]) / (Math.hypot(...a) * Math.hypot(...b));
+    const loneOk = seen != null && Math.abs(seen - expect) <= 1e-6 * expect && seen === lone.out.read && lone.out.I.off.every((v) => v === 0) &&
+        facadeSeen === seen && Math.abs(lone.out.facade - MAX_SPIN) <= 1e-6 * MAX_SPIN && cos(lone.out.raw, lone.out.facadeW) > 1 - 1e-6;
+    const fly = (spin) => `{ const w = box3d.createWorld({ gravity: [0, -9.8, 0] });${spin}\n  D.addGround(w, { ...sc.ground });\n` +
+        `  const bodies = D.makePhysicsDebris(w, L.fragmentsOf(sc, 1), [...sc.impact], { force: sc.force, rng: L.rng(201), maxSpin: Infinity });\n` +
+        `  const A = w.readAngularVelocities(), top = Math.max(...bodies.map((b) => Math.hypot(A[b.idx * 3], A[b.idx * 3 + 1], A[b.idx * 3 + 2]))); w.destroy(); return { n: bodies.length, top }; }`;
+    const debris = probe(`import * as D from ${J(path.join(ENG, "fx", "fracture", "debrisPhysics.js"))};\nimport * as L from ${J(path.join(ENG, "tools", "roundhouse", "joltScenes.mjs"))};\nconst sc = L.DEBRIS[0];\n` +
+        `const facade = (() => ${fly("")})();\n` +
+        `const raw = (() => ${fly(" w.angularImpulse = (i, v) => w._m._swk_body_ang_impulse(i, v[0], v[1], v[2]);")})();\n` +
+        `console.log(JSON.stringify({ n: facade.n, top: raw.top, facadeTop: facade.top, rawN: raw.n }));`);
     const d = debris.tally.sites[DEBRIS_SITE] || null;
-    const debrisOk = !!d && d.calls === debris.out.n && d.max > PAST && d.max === debris.out.top;
-    return { ok: loneOk && debrisOk, lone: { expect, seen, read: lone.out.read, inertia: lone.out.I, ok: loneOk }, debris: { fragments: debris.out.n, seen: d && d.max, top: debris.out.top, past: d && d.past, ok: debrisOk } };
+    const debrisOk = !!d && d.calls === debris.out.n && debris.out.rawN === debris.out.n && d.max > PAST && d.max === debris.out.top && debris.out.facadeTop <= MAX_SPIN * (1 + 1e-6);
+    return { ok: loneOk && debrisOk, lone: { expect, seen, read: lone.out.read, facadeSeen, facade: lone.out.facade, inertia: lone.out.I, ok: loneOk },
+        debris: { fragments: debris.out.n, seen: d && d.max, top: debris.out.top, facadeTop: debris.out.facadeTop, past: d && d.past, ok: debrisOk } };
 }
 /** C-jolt: the same lone box on Jolt reads 15 pi right after the same impulse (the claim the census rests on). */
 export async function cJolt() {

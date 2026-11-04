@@ -234,6 +234,9 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
         "tools/ship/snowflowVendor-selfcheck.mjs",
         "tools/ship/wgslCorpus.mjs",
     ]),
+    // UNNUMBERED (2026-11-04) -- TWO ARRIVALS IN box3d, BY NAME: tools/roundhouse/angularImpulseCensus.mjs and its gate, the angular-impulse census
+    // (physics/mechanics/BOX3D_ANGULAR_IMPULSE_CAP_WIP.md, built at e1a56d0d). The census serves its hook's stand-in at /vendor/box3d/box3d.js with the real
+    // file behind it, and the gate reads that file to check the stand-in serves it byte for byte -- a real dependency: a move of the vendored box3d.js turns both red.
     "box3d": Object.freeze([
         "ai-bridge/doctorBridge.js",
         "ai-bridge/server.js",
@@ -252,6 +255,8 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
         "tools/crossarch-box3d.mjs",
         "tools/crossarchBox3d-selfcheck.mjs",
         "tools/macSession.mjs",
+        "tools/roundhouse/angularImpulseCensus-selfcheck.mjs",
+        "tools/roundhouse/angularImpulseCensus.mjs",
         "tools/roundhouse/backendRotation.mjs",
         "tools/roundhouse/box3dBind-selfcheck.mjs",
         "tools/roundhouse/box3dBind.mjs",

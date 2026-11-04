@@ -323,3 +323,77 @@ This is an engineering fix, as the decision rule says. `box3dLoader.js`'s `angul
 - No pass-through needs the cap. No site past it goes through the slug ticker's raw world.
 - The pages' sites are reached by no gate. But the cap acts on every box3d caller above 15 pi, so the gates that read
   box3d spins above it are run before and after the fix, and restated with the reason where they move.
+
+## The cap, built (2026-11-04)
+
+This is the decision rule's fix, as registered. `physics/box3d/box3dLoader.js`'s angularImpulse now leaves no spin above
+15 pi, with the body's axis kept. It is an engineering fix: built, gated, sabotaged and run over the gates that reach it.
+
+### What it does
+
+- After box3d's own impulse, it reads the body's spin. If the spin stands above 15 pi x 1.001, it scales it to 15 pi along
+  the same axis.
+  - That is `debrisPhysics.js`'s own expression, so the debris flies byte for byte as it did.
+  - A spin at or under the slack is left bit for bit.
+- The cap is on the spin the call leaves, as Jolt's is. A body already spinning past it is brought to it by any impulse.
+- box3d's raw export is left alone, so the callers that skip the facade skip the cap: the slug ticker's raw world,
+  `spinningBody.mjs`, `rigidKeys.mjs` and `backendRotation.mjs`. None of them was past the cap where the census could see.
+- It reads the spin through `_swk_ang_velocities`, the shim's only reader of it, which writes every body's. That is one call
+  per impulse, and its cost grows with the world's bodies.
+- Its buffer is the module's own, made once at the module's first world and sized for the shim's 4,096 bodies.
+  - So angularImpulse never allocates, and a view a caller holds across it stays attached.
+  - `physics/fluidBox3d.js` holds one across its loop.
+- An artifact without the spin exports gets the impulse and no cap, as before.
+- The raw call stays on line 51, where the census's site control and the hook's pass-through expect it.
+
+### Before and after
+
+Sixteen gates that spin a box3d body, or read what the facade does, were run before the fix and after it.
+
+- **Fourteen came out identical,** line for line, details included.
+- **Two moved, both as the census said they would,** and were restated with the reason.
+  - **The debris gate.** Its section 5 reproduced the old facade by flying the facade with the module's cap off. The
+    facade now caps, so the old facade is flown on box3d's raw export instead. Every flight is pinned to the bytes this gate's
+    own run gave before the fix:
+
+    | Flights | Bytes | What they show |
+    |---|---|---|
+    | box3d's own impulse, no cap | `c0603c4edc712ec1` | the facade as it was: 2,574,172 rad/s, 249.4 m/s, 12 of 1,410 lost |
+    | the module's cap on box3d's own impulse | `cc43625e2ae639be` | 61 of 1,410 capped, none lost |
+    | the facade's cap alone | `cc43625e2ae639be` | the same flights |
+    | both caps, as the pages are now | `cc43625e2ae639be` | the same flights; the module's cap finds nothing left |
+    | section 6, box3d at 1/30 s | `76e802054ae62d0c` | as before |
+
+  - **The census gate's C-reads control.** It compared the hook's reading with the facade's read-back, and the read-back is
+    now capped. It reads box3d's own impulse through the raw export, with the facade's call flown beside it. The hook reads
+    box3d's own spin at both, because the cap acts after the call the hook wraps.
+- **Section 11's raw-export grep** now leaves out the census's own files, as section 2's grep does. It counts their two calls
+  beside it, both inside C-reads.
+
+### Gated
+
+In `tools/roundhouse/angularImpulseCensus-selfcheck.mjs`, section 12, nine rows:
+
+- the old bug reproduced on box3d's own export (112.49 and 531.62 rad/s);
+- the facade leaving 15 pi about the same axis;
+- only a spin past the slack touched;
+- the cap on the spin the call leaves;
+- Jolt's spin vector, to float32;
+- no allocation in 1,000 calls;
+- the constants;
+- an old artifact left uncapped;
+- every site the census saw past the cap reached through the facade.
+
+### Sabotaged
+
+- **K1-K15** break the cap, **C1, C2, C3' and G1** break C-reads and the raw-export grep's restatement, **D1-D5** break the
+  debris gate's restated rows, and **F1'-F14'** are the debris gate's own earlier series run again over its restated section 5.
+  Every one went red by name, and every file was restored byte-identical. Each gate's header logs its own.
+- **A finding on the way.** C3 dropped C-reads' library check of the facade's box and went 0 red. The facade still capped,
+  and the gate's own row repeats the check, so nothing could fail. A sabotage that removes a check while what it checks still
+  holds cannot go red. C3' breaks what the check guards instead, by flying the facade's box on box3d's own export, and it goes red.
+
+### Seen on the way
+
+Jolt's setAngularVelocity clamps at 15 pi too, and box3d's facade's does not: a body set to 30 pi reads 15 pi on Jolt and
+30 pi on box3d. The registration covers the impulse only, so this is left as it is and named here.

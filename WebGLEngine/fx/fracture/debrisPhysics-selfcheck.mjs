@@ -16,6 +16,10 @@
 //      reproduced with the cap off (slivers spun to millions of rad/s, fragments thrown at hundreds of m/s, fragments lost); and the
 //      cap, as the pages have it: nothing lost, each sliver's tumble kept about its own axis
 //   6  the pages' longest frame: they step at the frame's time, capped at 1/30 s; the 80 flights at 1/30 s on both backends
+//   (2026-11-04) SECTION 5 RESTATED AFTER box3d's FACADE GREW A CAP of its own (physics/box3d/box3dLoader.js, SPIN CAP, which the census of
+//      its callers decided on: physics/mechanics/BOX3D_ANGULAR_IMPULSE_CAP_WIP.md). The world as it was is box3d's raw export; the module's cap, the
+//      facade's alone and both together each fly the 80 flights byte for byte as the module's cap did before, pinned from this gate's own run at
+//      cadec101 -- as are section 6's box3d flights.
 //
 // SABOTAGE LOG (2026-11-03) -- the byte-safe runner against this gate, tools/ship/joltArena-selfcheck.mjs and joltScenes-selfcheck.mjs, every
 // file restored byte-identical (sha256); the number is the rows that went red across the three:
@@ -31,10 +35,21 @@
 //   Every new row went red under at least one design. A FINDING ON THE WAY: the first run was stopped after F4, because F3 showed section 5's cap rows
 //   using the module's own SPIN_SLACK as their tolerance -- so a slack loosened tenfold would have loosened the gate with it. The gate took its own (OVER,
 //   1.001), and the series was run again from F1 with F14 added; F14 is that loosened slack, and it goes red.
+// SABOTAGE LOG, THE FACADE'S CAP (2026-11-04) -- section 5 restated around box3d's raw export, and section 6 pinned; the same runner, every file restored
+// byte-identical (sha256), every one red by name. D against this gate's own rows, and F' -- the series above again, over the restated section 5:
+//   D1 the module's pinned bytes one digit off 3 | D2 the uncapped flights' pinned bytes one digit off 1 | D3 section 6's box3d bytes one digit off 1
+//   D4 the world as it was flown on the facade (no raw export) 3 | D5 the throw-by-throw row compares the module's cap, not no cap at all 1 | F1' the cap never applied 1
+//   F2' the cap a hundred times Jolt's 2 | F3' the slack under one (the cap reaches Jolt's own spins) 5 | F4' the cap's scale upside down 1 | F5' the cap stops the tumble dead 1
+//   F6' maxSpin ignored (the cap cannot be turned off) 2 | F7' only the first fragment capped 1 | F8' every body says it was not capped 1 | F9' the facade asked for box3d hands back Jolt 3
+//   F10' the pages' fallback dropped (Jolt or nothing) 1 | F11' blob-herd asks for box3d first 1 | F12' Jolt's angular impulse ten thousand times weaker 2
+//   F13' box3d never adopted in node (the facade falls back to Jolt silently) 3 | F14' the slack ten times (the cap engages only past 150 pi) 1
+//   Of box3dLoader.js's cap (K1-K15, logged in tools/roundhouse/angularImpulseCensus-selfcheck.mjs, which they were run against with this gate), the rows red
+//   here: K1 4 | K2 5 | K4 3 | K5 4 | K6 5 | K7 5 | K8 3 | K10 4 | K12 3 | K14 4 | K15 4; K3, K9, K11 and K13 red there and not here: none changes a spin the debris throws (no fragment's lies inside the slack, and the other three change neither the cap's arithmetic nor a world this small).
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { createHash } from "node:crypto";
 import * as D from "./debrisPhysics.js";
 import * as L from "../../tools/roundhouse/joltScenes.mjs";
 
@@ -50,6 +65,7 @@ const JOLT_CAP = 15 * Math.PI;        // Jolt's default max angular velocity (a 
 const OVER = 1.001;                   // the most a spin at the throw may stand above Jolt's cap -- the gate's own, never the module's slack
 const SEEDS = Array.from({ length: 40 }, (_, k) => k + 1), sum = (rs, k) => rs.reduce((a, r) => a + r[k], 0), most = (rs, k) => Math.max(...rs.map((r) => r[k]));
 const spinOf = (W, i) => Math.hypot(W[i * 3], W[i * 3 + 1], W[i * 3 + 2]);
+const bytesOf = (rs) => createHash("sha256").update(rs.map((r) => r.bytes).join("|")).digest("hex").slice(0, 16);   // the flights' end transforms, all of them
 
 // One flight of a blob's debris on a world from `mk`, as the pages make it: its floor (the pages' rim unless `rim` says otherwise), the
 // throw, then 15 s at `dt`. Returns the fragments lost below the floor, how many had their spin capped, the fastest spin at the throw,
@@ -136,31 +152,44 @@ try {
         ["blob-avatar.html", "blob-herd.html"].every((f) => /selectBackend\(\{ prefer: "jolt" \}\)/.test(src(f))) && /else if \(prefer === "jolt"\) order = \["jolt", "box3d"\];/.test(src("physics/backend.js")) &&
         !!(st && st.ready) && be.name === "box3d" && id === "box3d" && angular === true, `${be.name}, ${st && st.via}`);
     const mkB = () => be.createWorld({ gravity: [0, -9.8, 0] }), mkJ = () => J0.createWorld({ gravity: [0, -9.8, 0] });
+    // 2026-11-04 -- RESTATED AFTER box3d's FACADE GREW A CAP OF ITS OWN (physics/box3d/box3dLoader.js, SPIN CAP; the census of its callers,
+    // physics/mechanics/BOX3D_ANGULAR_IMPULSE_CAP_WIP.md, decided it). angularImpulse() on box3d now leaves 15 pi at most, as Jolt's does, so the
+    // world the pages had before it -- box3d's own impulse, no cap at the impulse -- is that world with angularImpulse() on box3d's raw export
+    // (mkR). The bytes pinned below are these rows' own, from this gate's run at cadec101, before the facade's cap was written.
+    const mkR = () => { const w = mkB(); w.angularImpulse = (i, v) => w._m._swk_body_ang_impulse(i, v[0], v[1], v[2]); return w; };
+    const BYTES = Object.freeze({ off: "c0603c4edc712ec1", module: "cc43625e2ae639be" });
     const sliver = (mk) => { const w = mk(), i = w.addBox({ type: "dynamic", pos: [0, 0, 0], half: [0.03, 0.09, 0.06], density: 1 }); w.angularImpulse(i, [0.2, 0.1, -0.15]);
         const at = spinOf(w.readAngularVelocities(), i); w.step(1 / 60, 1); const after = spinOf(w.readAngularVelocities(), i); w.destroy(); return { at, after }; };
-    const sj = sliver(() => J0.createWorld({ gravity: [0, 0, 0] })), sb = sliver(() => be.createWorld({ gravity: [0, 0, 0] }));
-    ok("!! the cap is Jolt's own: a 6 x 18 x 12 cm sliver given a hard angular impulse reads back at once at 15 pi rad/s on Jolt -- the module's MAX_SPIN -- and far above it on box3d, which brings it down to the same 15 pi only inside the next step",
-        near(sj.at, JOLT_CAP, 1e-4) && D.MAX_SPIN === JOLT_CAP && sb.at > 100 * JOLT_CAP && sb.after <= JOLT_CAP * OVER && sb.after > 0.9 * JOLT_CAP,
-        `Jolt ${sj.at.toFixed(4)} rad/s at once; box3d ${sb.at.toFixed(0)} at once, ${sb.after.toFixed(4)} after one step`);
-    const off = [...SEEDS.map((s) => flight(mkB, D2, s, { maxSpin: Infinity, track: true })), ...SEEDS.map((s) => flight(mkB, D1, s, { maxSpin: Infinity, track: true }))];
-    ok("!! the bug, reproduced -- the cap off, as the module was: box3d's 80 flights throw slivers spinning at millions of rad/s, fling fragments at hundreds of m/s, and lose fragments through the floor or over the rim",
-        most(off, "spin") > 100 * JOLT_CAP && most(off, "fastest") > 50 && sum(off, "lost") >= 5 && sum(off, "capped") === 0,
-        `spun to ${most(off, "spin").toFixed(0)} rad/s, the fastest ${most(off, "fastest").toFixed(1)} m/s, ${sum(off, "lost")} of ${sum(off, "n")} lost`);
-    const on = [...SEEDS.map((s) => flight(mkB, D2, s, { track: true })), ...SEEDS.map((s) => flight(mkB, D1, s, { track: true }))];
-    ok("!! the fix -- the cap on, as the pages have it: the same 80 flights throw nothing faster than Jolt's cap, the fastest fragment stays under 20 m/s, and not one is lost",
-        most(on, "spin") <= JOLT_CAP * OVER && sum(on, "capped") > 0 && most(on, "fastest") < 20 && sum(on, "lost") === 0 && sum(on, "n") === sum(off, "n"),
-        `${sum(on, "capped")} of ${sum(on, "n")} capped, spun to ${most(on, "spin").toFixed(3)} rad/s at most, the fastest ${most(on, "fastest").toFixed(1)} m/s, ${sum(on, "lost")} lost`);
-    // the cap's own work, throw by throw: the same seeded throws with the cap off and on
-    let pairs = 0, kept = 0, cappedN = 0, atCapOk = 0, axisOk = 0;
+    const sj = sliver(() => J0.createWorld({ gravity: [0, 0, 0] })), sb = sliver(() => be.createWorld({ gravity: [0, 0, 0] })), sr = sliver(() => { const w = be.createWorld({ gravity: [0, 0, 0] }); w.angularImpulse = (i, v) => w._m._swk_body_ang_impulse(i, v[0], v[1], v[2]); return w; });
+    ok("!! the cap is Jolt's own, and now box3d's facade's: a 6 x 18 x 12 cm sliver given a hard angular impulse reads back at once at 15 pi rad/s on Jolt -- the module's MAX_SPIN -- and on box3d's facade; on box3d's raw export, as the facade was, it reads far above it, and box3d brings it down to the same 15 pi only inside the next step",
+        near(sj.at, JOLT_CAP, 1e-4) && D.MAX_SPIN === JOLT_CAP && near(sb.at, JOLT_CAP, 1e-4) && sr.at > 100 * JOLT_CAP && sr.after <= JOLT_CAP * OVER && sr.after > 0.9 * JOLT_CAP,
+        `Jolt ${sj.at.toFixed(4)} rad/s at once; box3d's facade ${sb.at.toFixed(4)}; box3d's own ${sr.at.toFixed(0)} at once, ${sr.after.toFixed(4)} after one step`);
+    const fly80 = (mk, o = {}) => [...SEEDS.map((s) => flight(mk, D2, s, { ...o, track: true })), ...SEEDS.map((s) => flight(mk, D1, s, { ...o, track: true }))];
+    const off = fly80(mkR, { maxSpin: Infinity });
+    ok("!! the bug, reproduced -- box3d's own impulse and the module's cap off, as both were: box3d's 80 flights throw slivers spinning at millions of rad/s, fling fragments at hundreds of m/s, and lose fragments through the floor or over the rim -- byte for byte the flights the facade flew before its cap",
+        most(off, "spin") > 100 * JOLT_CAP && most(off, "fastest") > 50 && sum(off, "lost") >= 5 && sum(off, "capped") === 0 && bytesOf(off) === BYTES.off,
+        `spun to ${most(off, "spin").toFixed(0)} rad/s, the fastest ${most(off, "fastest").toFixed(1)} m/s, ${sum(off, "lost")} of ${sum(off, "n")} lost, bytes ${bytesOf(off)}`);
+    const mod = fly80(mkR);
+    ok("!! the module's cap, as the pages had it before the facade's: on box3d's own impulse the same 80 flights throw nothing faster than Jolt's cap, the fastest fragment stays under 20 m/s, and not one is lost -- byte for byte as they were",
+        most(mod, "spin") <= JOLT_CAP * OVER && sum(mod, "capped") > 0 && most(mod, "fastest") < 20 && sum(mod, "lost") === 0 && sum(mod, "n") === sum(off, "n") && bytesOf(mod) === BYTES.module,
+        `${sum(mod, "capped")} of ${sum(mod, "n")} capped, spun to ${most(mod, "spin").toFixed(3)} rad/s at most, the fastest ${most(mod, "fastest").toFixed(1)} m/s, ${sum(mod, "lost")} lost, bytes ${bytesOf(mod)}`);
+    const fac = fly80(mkB, { maxSpin: Infinity }), on = fly80(mkB);
+    ok("!! the facade's cap alone (the module's off) flies the same 80 flights byte for byte as the module's cap did -- the same spins at the throw, by the same expression",
+        most(fac, "spin") <= JOLT_CAP * OVER && sum(fac, "capped") === 0 && sum(fac, "lost") === 0 && bytesOf(fac) === BYTES.module, `spun to ${most(fac, "spin").toFixed(3)} rad/s at most, ${sum(fac, "lost")} lost, bytes ${bytesOf(fac)}`);
+    ok("!! and the pages as they are now, both caps on: byte for byte the same again, the module's cap finding nothing above Jolt's left to cap, as on Jolt",
+        sum(on, "capped") === 0 && most(on, "fastest") < 20 && sum(on, "lost") === 0 && sum(on, "n") === sum(off, "n") && bytesOf(on) === BYTES.module,
+        `${sum(on, "capped")} of ${sum(on, "n")} capped by the module, the fastest ${most(on, "fastest").toFixed(1)} m/s, ${sum(on, "lost")} lost, bytes ${bytesOf(on)}`);
+    // the cap's work, throw by throw: the same seeded throws on box3d's own impulse with no cap at all, and as the pages make them now
+    let pairs = 0, kept = 0, over = 0, atCapOk = 0, axisOk = 0, flagged = 0;
     for (const sc of [D1, D2]) for (const s of SEEDS.slice(0, 10)) {
-        const a = throwOf(mkB, sc, s, Infinity), b = throwOf(mkB, sc, s);
-        a.forEach((f, k) => { const g = b[k], sa = Math.hypot(...f.w), sg = Math.hypot(...g.w); pairs++;
-            if (!g.capped) { if (sa <= JOLT_CAP * OVER && J(f.w) === J(g.w)) kept++; return; }
-            cappedN++; if (sa > JOLT_CAP && near(sg, JOLT_CAP, 1e-3 * JOLT_CAP)) atCapOk++;
+        const a = throwOf(mkR, sc, s, Infinity), b = throwOf(mkB, sc, s);
+        a.forEach((f, k) => { const g = b[k], sa = Math.hypot(...f.w), sg = Math.hypot(...g.w); pairs++; if (g.capped) flagged++;
+            if (sa <= JOLT_CAP * OVER) { if (J(f.w) === J(g.w)) kept++; return; }
+            over++; if (near(sg, JOLT_CAP, 1e-3 * JOLT_CAP)) atCapOk++;
             if ((f.w[0] * g.w[0] + f.w[1] * g.w[1] + f.w[2] * g.w[2]) / (sa * sg) > 0.99999) axisOk++; });
     }
-    ok("!! the cap keeps each sliver's tumble: on 20 throws, a capped fragment spins at Jolt's cap about the axis the throw gave it, and every other fragment is left exactly as it was thrown",
-        cappedN > 0 && atCapOk === cappedN && axisOk === cappedN && kept === pairs - cappedN, `${cappedN} of ${pairs} capped (${atCapOk} at the cap, ${axisOk} on their axis), ${kept} left as thrown`);
+    ok("!! the cap keeps each sliver's tumble: on 20 throws, a fragment box3d's own impulse spins past the cap spins at Jolt's cap about the axis the throw gave it, and every other fragment is left exactly as it was thrown",
+        over > 0 && atCapOk === over && axisOk === over && kept === pairs - over && flagged === 0, `${over} of ${pairs} past the cap (${atCapOk} at it now, ${axisOk} on their axis), ${kept} left as thrown`);
 } catch (e) { guard(5, e); }
 
 console.log("\n6. THE PAGES' LONGEST FRAME (they step at the frame's time, capped at 1/30 s)");
@@ -169,11 +198,12 @@ try {
     await adoptBox3dInNode(); const be = await selectBackend({ prefer: "box3d" }), J0 = await L.jolt(), [D1, D2] = L.DEBRIS;
     const fly30 = (mk) => [...SEEDS.map((s) => flight(mk, D2, s, { dt: 1 / 30 })), ...SEEDS.map((s) => flight(mk, D1, s, { dt: 1 / 30 }))];
     const b30 = be.name === "box3d" ? fly30(() => be.createWorld({ gravity: [0, -9.8, 0] })) : [], j30 = fly30(() => J0.createWorld({ gravity: [0, -9.8, 0] }));
-    ok("!! at 1/30 s a step, the 80 flights lose nothing on box3d, and nothing on Jolt",
-        b30.length === 80 && sum(b30, "lost") === 0 && j30.length === 80 && sum(j30, "lost") === 0, `box3d ${sum(b30, "lost")} of ${sum(b30, "n")} lost, Jolt ${sum(j30, "lost")} of ${sum(j30, "n")}`);
+    // 2026-11-04: box3d's flights pinned to the bytes this row's own run gave at cadec101, before the facade's cap (section 5)
+    ok("!! at 1/30 s a step, the 80 flights lose nothing on box3d, and nothing on Jolt -- box3d's byte for byte as they were before the facade's cap",
+        b30.length === 80 && sum(b30, "lost") === 0 && j30.length === 80 && sum(j30, "lost") === 0 && bytesOf(b30) === "76e802054ae62d0c", `box3d ${sum(b30, "lost")} of ${sum(b30, "n")} lost, Jolt ${sum(j30, "lost")} of ${sum(j30, "n")}, box3d bytes ${bytesOf(b30)}`);
 } catch (e) { guard(6, e); }
 
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +
-    "\nnot closed here: the pages' frame times between 1/60 and 1/30 s (only the two ends are flown), and the facade's other callers of box3d's angularImpulse" +
-    " -- it has no cap at the impulse, and this module caps only its own debris (tools/ship/nextRounds.mjs, box3d-angular-impulse-cap).");
+    "\nnot closed here: the pages' frame times between 1/60 and 1/30 s (only the two ends are flown). box3d's facade caps every caller's angular impulse" +
+    " since 2026-11-04 (physics/box3d/box3dLoader.js, SPIN CAP); this module's own cap stays, for a world that does not.");
 process.exitCode = fails ? 1 : 0;

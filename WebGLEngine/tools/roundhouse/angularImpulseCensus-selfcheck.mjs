@@ -25,6 +25,9 @@
 //  10  THE RUN, A MINIATURE          run() itself, on two scratch scripts and a page of the gate's own: everything the registration names, in its order
 //  11  THE VERDICT                   from the committed results (5a14976d): every reading re-derived from the runs, the decision by the rule (the cap goes in),
 //                                    the predictions scored, the six sites not reached and why, and the raw-export calls the table missed
+//  12  THE CAP, BUILT                the decision's fix in box3dLoader.js: box3d's own export as it was; the facade leaving 15 pi about the same axis, only past
+//                                    the slack, on the spin the call leaves; Jolt's vector; no allocation; an old artifact uncapped; every site past it reached
+//   (2026-11-04, after the cap: section 5's C-reads restated -- the facade now leaves 15 pi, so box3d's own impulse is read through its raw export)
 // SABOTAGE LOG -- FIFTY-TWO, 2026-11-04, each applied to the census's library, hook, watcher or command through a byte-safe runner (one at a time, every file restored and its sha256
 // checked), the gate run whole; every one red by name, none 0 red (the number is how many rows went red):
 //   G1 the past line is the cap without its slack 1 | G2 past is counted above 15 pi, the slack forgotten in the comparison 1 | G3 the wrapper reads body 0's spin, not the given body's 4
@@ -59,6 +62,19 @@
 //   V7 raceCar said not to have been reached 1 | V8 the replay page's bound said to be 3.2 rad/s 1 | V9 box3d-vs-jolt.html said to have started box3d 1
 //   V10 C-reach's list said to lack the fluid 1 | V11 the kaiju's gates said to fly Jolt 1 | V12 the found site said to be line 210 1
 //   V13 the raw-export grep said not to find rigidKeys.mjs 1 | V14 the calls since the census said to be two 1
+// AND NINETEEN FOR THE CAP (section 12, with C-reads and section 11's raw-export grep restated for it), 2026-11-04, through the same runner, K against
+// this gate and fx/fracture/debrisPhysics-selfcheck.mjs (the number is the rows red across both), C and G against this gate; every file restored byte-identical
+// (sha256), every one red by name:
+//   K1 the cap never applied 13 | K2 the cap a hundred times Jolt's 14 | K3 the slack forgotten (a spin at the cap is touched) 1 | K4 the slack ten times 5
+//   K5 the axis lost (every capped spin about x) 9 | K6 the scale upside down 13 | K7 the cap stops the spin dead 12 | K8 the cap reads body 0's spin 6
+//   K9 the cap allocates on every call 1 | K10 the buffer never made with the world 12 | K11 an old artifact's missing exports not asked about 1
+//   K12 the cap only in worlds of four bodies or fewer 6 | K13 the buffer sized for half the shim's bodies 1 | K14 the cap put on box3d's raw export instead of the facade 17
+//   K15 the facade's cap left to the debris module (only debris capped: capSpinAt a no-op) 12 | C1 C-reads flies the lone box through the facade, not box3d's own export 4
+//   C2 C-reads' raw twin of the debris throw flies the facade 3 | G1 a third raw call in the census's own file, outside C-reads 1
+//   C3' C-reads' facade box flown on box3d's own export (the facade never asked) 3
+//   A FINDING ON THE WAY: C3, C-reads' library check of the facade's box dropped, went 0 red -- the facade still capped, and this gate's own C-reads row repeats
+//   the check, so nothing could fail. A sabotage that removes a check while what it checks still holds cannot go red; the series ran C3' instead, which breaks
+//   what the check guards (the facade's box flown on box3d's own export, the facade never asked), and it goes red.
 "use strict";
 import fs from "node:fs";
 import os from "node:os";
@@ -239,8 +255,12 @@ await section(async () => {
     ok("!! C-transparent: backendDivergence's scene, 14 boxes for 120 steps, gives the same state hash and the same harness hash at every step, hooked and unhooked, in two processes; the hooked one saw its 14 calls",
         tr.ok && tr.steps === 120 && tr.same && tr.callsSeen === 14, J(tr));
     const rd = C.cReads();
-    ok("!! C-reads: a lone light box given a known impulse reads |I^-1 J| from the inertia box3d reports, to float32, and reads what box3d itself reads back", rd.lone.ok && Math.abs(rd.lone.seen - rd.lone.expect) <= 1e-6 * rd.lone.expect, J(rd.lone));
-    ok("!! ...and the debris flown on box3d with its cap off reads past the cap, the largest spin the hook saw being the largest box3d holds after the throw", rd.debris.ok && rd.debris.seen > C.PAST && rd.debris.seen === rd.debris.top && rd.debris.past >= 1, J(rd.debris));
+    // 2026-11-04, RESTATED AFTER THE CAP the census decided on (section 12): the facade now leaves 15 pi at most, so box3d's own impulse is read back
+    // through its raw export, and the facade's call is flown beside it -- the hook reading box3d's own spin there, the cap acting after the call it wraps.
+    ok("!! C-reads: a lone light box given a known impulse through box3d's own export reads |I^-1 J| from the inertia box3d reports, to float32, and reads what box3d itself reads back; given it through the facade, the hook reads the same, and the facade leaves 15 pi about the same axis",
+        rd.lone.ok && Math.abs(rd.lone.seen - rd.lone.expect) <= 1e-6 * rd.lone.expect && rd.lone.facadeSeen === rd.lone.seen && Math.abs(rd.lone.facade - C.MAX_SPIN) <= 1e-6 * C.MAX_SPIN, J(rd.lone));
+    ok("!! ...and the debris flown on box3d with its cap off reads past the cap, the largest spin the hook saw being the largest box3d's own impulses leave on the same throw; through the facade, none is left above the cap",
+        rd.debris.ok && rd.debris.seen > C.PAST && rd.debris.seen === rd.debris.top && rd.debris.past >= 1 && rd.debris.facadeTop <= C.MAX_SPIN * (1 + 1e-6), J(rd.debris));
     const jo = await C.cJolt();
     ok("!! C-jolt: the same lone box on Jolt reads 15 pi right after the same impulse -- the claim the census rests on", jo.ok && Math.abs(jo.read - 15 * Math.PI) < 1e-5 * 15 * Math.PI && rd.lone.seen > jo.read, `Jolt ${jo.read}, box3d ${rd.lone.seen}`);
     const si = C.cSite();
@@ -389,10 +409,75 @@ await section(() => {
     const found = again.others.filter((x) => x.kind === "found");
     ok("!! FOUND OUTSIDE THE TABLE: two calls of box3d's raw export in tools/roundhouse/spinningBody.mjs (lines 209 and 212), 2.00 and 4.16 rad/s, under the cap. The table was a grep for the facade's angularImpulse(); a call of _swk_body_ang_impulse is spelled otherwise",
         J(found.map((x) => x.site)) === J(["tools/roundhouse/spinningBody.mjs:209", "tools/roundhouse/spinningBody.mjs:212"]) && found.every((x) => x.past === 0 && x.max < 4.2) && C.decide(again).past.every((x) => !x.startsWith("tools/")));
-    const raw = C.grepCalls().length >= 0 && execFileSync("git", ["grep", "-l", "_swk_body_ang_impulse\\s*(", "--", "*.mjs", "*.js", ":!vendor/**", ":!*selfcheck*"], { cwd: ENG, encoding: "utf8" }).split("\n").filter(Boolean).sort();
+    // 2026-11-04, after the cap (section 12): the census's own C-reads now calls the raw export twice, to read what box3d's own impulse leaves while the
+    // facade caps it (section 5). The census's own files are left out of this grep as section 2's grep leaves them out, and those two calls are counted beside it.
+    const raw = C.grepCalls().length >= 0 && execFileSync("git", ["grep", "-l", "_swk_body_ang_impulse\\s*(", "--", "*.mjs", "*.js", ":!vendor/**", ":!*selfcheck*", ":!tools/roundhouse/angularImpulse*"], { cwd: ENG, encoding: "utf8" }).split("\n").filter(Boolean).sort();
+    const ownRaw = execFileSync("git", ["grep", "-n", "_swk_body_ang_impulse\\s*(", "--", "tools/roundhouse/angularImpulse*", ":!*selfcheck*"], { cwd: ENG, encoding: "utf8" }).split("\n").filter(Boolean).map((l) => l.split(":"));
+    const libLines = fs.readFileSync(path.join(ENG, "tools", "roundhouse", "angularImpulseCensus.mjs"), "utf8").split("\n"), readsAt = libLines.findIndex((l) => l.startsWith("export function cReads()")) + 1;
+    const readsEnd = libLines.findIndex((l, k) => k >= readsAt && /^(export )?(async )?function |^\/\*\*/.test(l)) + 1;
     ok("...and a grep for the raw export finds two more files whose calls no gate of the corpus made, so they were not measured: physics/mechanics/rigidKeys.mjs and tools/roundhouse/backendRotation.mjs (beside spinningBody.mjs and the two pass-throughs). Each skips the facade, so the cap will not reach them",
         J(raw) === J(["physics/box3d/box3dLoader.js", "physics/mechanics/rigidKeys.mjs", "render/slugTicker.mjs", "tools/roundhouse/backendRotation.mjs", "tools/roundhouse/spinningBody.mjs"]) &&
-        !again.others.some((x) => /rigidKeys|backendRotation/.test(x.site)), raw.join(", "));
+        !again.others.some((x) => /rigidKeys|backendRotation/.test(x.site)) &&
+        ownRaw.length === 2 && ownRaw.every(([f, n]) => f === "tools/roundhouse/angularImpulseCensus.mjs" && +n > readsAt && +n < readsEnd), `${raw.join(", ")}; the census's own: ${ownRaw.length} in C-reads`);
+});
+
+console.log("\n12. THE CAP, BUILT (the decision's engineering fix: physics/box3d/box3dLoader.js, SPIN CAP)");
+await section(async () => {
+    const { adoptBox3dInNode } = await import("../../physics/backendNode.mjs"), { createJoltBackend } = await import("../../physics/jolt/joltLoader.js");
+    const Lo = await import("../../physics/box3d/box3dLoader.js"), st = await adoptBox3dInNode(), m = Lo.box3d.mod(), JB = await createJoltBackend(), cap = Lo.MAX_ANGULAR_VELOCITY;
+    const len = (v) => Math.hypot(v[0], v[1], v[2]), cos = (a, b) => (a[0] * b[0] + a[1] * b[1] + a[2] * b[2]) / (len(a) * len(b)), atCap = (v) => Math.abs(len(v) - cap) <= 1e-6 * cap;
+    const LONE_SPIN = 112.49448927480303;   // the census's lone box under its impulse, as C-reads reads it (section 5)
+    // one box given one impulse -- through box3d's raw export, through the facade, or on Jolt -- after an optional spin set outright; its spin after
+    const spun = (how, half, imp, pre = null) => {
+        const w = how === "jolt" ? JB.createWorld({ gravity: [0, 0, 0] }) : Lo.box3d.createWorld({ gravity: [0, 0, 0] }), b = w.addBox({ type: "dynamic", pos: [0, 0, 0], half: [...half], density: 1 });
+        if (pre) w.setAngularVelocity(b, pre);
+        if (how === "raw") w._m._swk_body_ang_impulse(b, imp[0], imp[1], imp[2]); else w.angularImpulse(b, [...imp]);
+        const A = w.readAngularVelocities(), v = [A[b * 3], A[b * 3 + 1], A[b * 3 + 2]]; if (w.destroy) w.destroy(); return v;
+    };
+    const lr = spun("raw", C.LONE.half, C.LONE.impulse), pr = spun("raw", PELVIS.half, PELVIS.impulse);
+    ok("!! THE OLD BUG, REPRODUCED: box3d's own export is left as box3d has it -- the census's lone box given its impulse spins at 112.49 rad/s, the pelvis' stand-in at 531.62, as the census read them",
+        st.ready && len(lr) === LONE_SPIN && len(pr) === PELVIS.spin, `${len(lr).toFixed(4)} and ${len(pr).toFixed(4)} rad/s`);
+    const lf = spun("box3d", C.LONE.half, C.LONE.impulse), pf = spun("box3d", PELVIS.half, PELVIS.impulse);
+    ok("!! THE FIX: through the facade the same two impulses leave 15 pi, to float32, each about the axis box3d's own impulse gave it",
+        atCap(lf) && atCap(pf) && cos(lr, lf) > 1 - 1e-6 && cos(pr, pf) > 1 - 1e-6, `${len(lf).toFixed(5)} and ${len(pf).toFixed(5)} rad/s`);
+    const scaled = (t) => C.LONE.impulse.map((x) => x * t / LONE_SPIN);
+    const under = [40, cap, cap * 1.0005].map((t) => [spun("raw", C.LONE.half, scaled(t)), spun("box3d", C.LONE.half, scaled(t))]);
+    const past = [spun("raw", C.LONE.half, scaled(cap * 1.0015)), spun("box3d", C.LONE.half, scaled(cap * 1.0015))];
+    ok("!! only a spin past the cap's slack is touched: 40 rad/s, 15 pi and 15 pi x 1.0005 are left bit for bit as box3d's own impulse leaves them, and 15 pi x 1.0015 is brought to 15 pi",
+        under.every(([a, b]) => J(a) === J(b)) && len(under[2][0]) > cap && len(under[2][0]) < C.PAST && len(past[0]) > C.PAST && atCap(past[1]) && cos(past[0], past[1]) > 1 - 1e-6,
+        under.map(([a]) => len(a).toFixed(4)).concat(`${len(past[0]).toFixed(4)} -> ${len(past[1]).toFixed(4)}`).join(", "));
+    const big = [0.5, 0.5, 0.5], slow = spun("box3d", big, [0, 0, -1e-3], [0, 0, 30 * Math.PI]), slowRaw = spun("raw", big, [0, 0, -1e-3], [0, 0, 30 * Math.PI]);
+    const pushed = ["box3d", "jolt"].map((h) => spun(h, big, [0, 0, 1], [0, 0, 14 * Math.PI]));
+    ok("!! the cap is on the spin the call LEAVES, as Jolt's is: a body box3d lets spin at 30 pi is left at 15 pi by the next impulse however small (box3d's own leaves it near 30 pi), and one pushed past the cap from 14 pi is left at 15 pi on the facade and on Jolt alike",
+        atCap(slow) && len(slowRaw) > 29.9 * Math.PI && pushed.every(atCap), `${len(slow).toFixed(4)} (raw ${len(slowRaw).toFixed(2)}); pushed ${pushed.map((v) => len(v).toFixed(4)).join(" and ")}`);
+    const jl = spun("jolt", C.LONE.half, C.LONE.impulse), jp = spun("jolt", PELVIS.half, PELVIS.impulse), gap = (a, b) => len([a[0] - b[0], a[1] - b[1], a[2] - b[2]]);
+    ok("!! JOLT PARITY: Jolt, given the same two impulses, leaves the same spin vector the facade now leaves, to float32",
+        gap(jl, lf) <= 1e-6 * cap && gap(jp, pf) <= 1e-6 * cap && atCap(jl), `the lone box ${gap(jl, lf).toExponential(2)} rad/s apart, the pelvis ${gap(jp, pf).toExponential(2)}`);
+    const w = Lo.box3d.createWorld({ gravity: [0, 0, 0] }), ids = Array.from({ length: 64 }, (_, k) => w.addBox({ type: "dynamic", pos: [k * 2, 0, 0], half: [...C.LONE.half], density: 1 }));
+    ids.forEach((b, k) => w.setVelocity(b, [k, 0, -k]));
+    const V = w.readVelocities(), before = Array.from(V), m0 = m._malloc, a0 = m._swk_ang_velocities;
+    let mallocs = 0, reads = 0, capped = 0;
+    m._malloc = (...a) => (mallocs++, m0(...a)); m._swk_ang_velocities = (...a) => (reads++, a0(...a));
+    try { for (let r = 0; r < 1000; r++) w.angularImpulse(ids[r % 64], C.LONE.impulse); } finally { m._malloc = m0; m._swk_ang_velocities = a0; }
+    const A = w.readAngularVelocities(); capped = ids.filter((b) => atCap([A[b * 3], A[b * 3 + 1], A[b * 3 + 2]])).length; w.destroy();
+    ok("!! it never allocates, so a view held across it stays: 1,000 impulses on a 64-body world make no call of _malloc, and readVelocities()' view taken before them is still attached and reads what it read; its cost is one _swk_ang_velocities a call",
+        mallocs === 0 && reads === 1000 && V.length === 192 && J(Array.from(V)) === J(before) && capped === 64, `${mallocs} allocations, ${reads} reads, ${capped} of 64 at the cap`);
+    const shim = fs.readFileSync(path.join(ENG, "physics", "box3d", "box3d_shim.c"), "utf8");
+    ok("its constants are Jolt's and the census's: 15 pi and a slack of 1.001, debrisPhysics.js's and the watcher's own, and its buffer holds box3d_shim.c's MAX_BODIES",
+        cap === 15 * Math.PI && cap === D.MAX_SPIN && cap === W.MAX_SPIN && Lo.SPIN_SLACK === 1.001 && Lo.SPIN_SLACK === D.SPIN_SLACK && Lo.SPIN_SLACK === W.SPIN_SLACK &&
+        Lo.SHIM_MAX_BODIES === 4096 && new RegExp(`#define MAX_BODIES ${Lo.SHIM_MAX_BODIES}\\n`).test(shim));
+    const bare = new Proxy(m, { get: (t, k) => (k === "_swk_ang_velocities" || k === "_swk_body_set_ang_velocity" ? undefined : t[k]) });
+    const old = new Lo.Box3DLoader(); old.adopt(bare, "a module without the spin exports");
+    const ow = old.createWorld({ gravity: [0, 0, 0] }), ob = ow.addBox({ type: "dynamic", pos: [0, 0, 0], half: [...C.LONE.half], density: 1 });
+    let threw = null; try { ow.angularImpulse(ob, [...C.LONE.impulse]); } catch (e) { threw = e; }
+    const sa = ow.supportsAngular(), buf = m._malloc(12 * m._swk_body_count()); m._swk_ang_velocities(buf);
+    const H = new Float32Array(m.HEAPF32.buffer, buf + ob * 12, 3), ov = [H[0], H[1], H[2]]; m._free(buf); ow.destroy();
+    ok("an artifact without the spin exports gets the impulse and no cap, rather than an error, as it did: supportsAngular() says false and the lone box spins at box3d's own 112.49",
+        !threw && sa === false && len(ov) === LONE_SPIN, threw ? String(threw.message) : `${len(ov).toFixed(4)} rad/s`);
+    const R = JSON.parse(fs.readFileSync(C.DEFAULT_RESULTS, "utf8")), viaOf = (site) => { const e = R.readings.sites.find((x) => x.site === site); return e && e.maxAt ? J(e.maxAt.via) : null; };
+    ok("!! and it reaches every site the census saw past the cap: ragdoll.html's and flesh.html's shove and the debris' throw each went through the facade (box3dLoader.js:51), none through a raw world",
+        ["ragdoll.html:283", "flesh.html:305", C.DEBRIS_SITE].every((x) => viaOf(x) === J(["physics/box3d/box3dLoader.js:51"])) &&
+        /angularImpulse\(idx, v\) \{ this\._m\._swk_body_ang_impulse\(idx, v\[0\], v\[1\], v\[2\]\); capSpinAt\(this\._m, idx\); \}/.test(fs.readFileSync(path.join(ENG, "physics", "box3d", "box3dLoader.js"), "utf8").split("\n")[50]));
 });
 
 fs.rmSync(TMP, { recursive: true, force: true });
