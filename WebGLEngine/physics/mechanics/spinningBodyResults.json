@@ -1,0 +1,286 @@
+{
+ "registration": "physics/mechanics/SPINNING_BODY_WIP.md",
+ "fixture": {
+  "hx": 0.5,
+  "hy": 1,
+  "hz": 1.5,
+  "density": 1
+ },
+ "spin": {
+  "W": 2,
+  "eps": 0.00001,
+  "T": 30,
+  "dt": 0.016666666666666666,
+  "fineDt": 0.004166666666666667
+ },
+ "rule": {
+  "tol": 0.1,
+  "r2": 0.999,
+  "minPoints": 20,
+  "skip": 10,
+  "cap": 0.05,
+  "noGrowth": 10
+ },
+ "substeps": {
+  "box3d": 4,
+  "jolt": 1
+ },
+ "predicted": 0.9607689228305228,
+ "at": "2026-11-03T06:30:37.282Z",
+ "registered": true,
+ "axis": 1,
+ "T": 30,
+ "dt": 0.016666666666666666,
+ "fineDt": 0.004166666666666667,
+ "key": {
+  "ok": true,
+  "sigma": 0.9607569745959914,
+  "predicted": 0.9607689228305228,
+  "r2": 0.9999999994275591,
+  "points": 719
+ },
+ "rebuild": {
+  "ok": true,
+  "scenes": 5,
+  "off": []
+ },
+ "configs": [
+  {
+   "id": "C1",
+   "engine": "box3d",
+   "label": "box3d, undamped",
+   "backendId": "box3d",
+   "gyroscopic": null,
+   "inertia": {
+    "ok": true,
+    "diag": [6.5,5,2.5],
+    "off": [0,0,0]
+   },
+   "undamped": {
+    "ok": true,
+    "worst": 0,
+    "axis": 0
+   },
+   "determinism": {
+    "ok": true,
+    "steps": 1800
+   },
+   "fit": {
+    "p0": 0.000019999999494757503,
+    "sigma": 0.962626193398346,
+    "r2": 0.9999999953853864,
+    "points": 387,
+    "crossed": 9.316666666666666,
+    "factor": 110722.57036022241
+   },
+   "reading": "Euler's equations",
+   "invariants": {
+    "energyChange": -0.012987158165823664,
+    "driftE": 0.012987158165823664,
+    "driftL": 0.006516791976668731,
+    "driftWorldL": 0.00687707044111111,
+    "flips": 2
+   },
+   "end": [0.3459332847950676,1.9233061242551566,-0.432143798171117],
+   "fine": {
+    "fit": {
+     "p0": 0.000019999999494757503,
+     "sigma": 0.9612795195618076,
+     "r2": 0.9999999947679922,
+     "points": 1552,
+     "crossed": 9.325,
+     "factor": 111432.48926209891
+    },
+    "reading": "Euler's equations"
+   },
+   "stable": [
+    {
+     "axis": 0,
+     "factor": 1
+    },
+    {
+     "axis": 2,
+     "factor": 1.4369942943567862
+    }
+   ]
+  },
+  {
+   "id": "C2",
+   "engine": "jolt",
+   "label": "Jolt as the engine's wrapper makes a body (gyroscopic force off), undamped",
+   "backendId": "jolt",
+   "gyroscopic": false,
+   "inertia": {
+    "ok": true,
+    "diag": [6.500000476837158,4.999999523162842,2.499999761581421],
+    "off": [0,0,0]
+   },
+   "undamped": {
+    "ok": true,
+    "worst": 0,
+    "axis": 0
+   },
+   "determinism": {
+    "ok": true,
+    "steps": 1800
+   },
+   "fit": {
+    "p0": 0.000019999999494757503,
+    "sigma": 0,
+    "r2": 0,
+    "points": 0,
+    "crossed": null,
+    "factor": 1.0000092912625649
+   },
+   "reading": "No gyroscopic term",
+   "invariants": {
+    "energyChange": -7.105427357245731e-16,
+    "driftE": 1.2434497875180028e-15,
+    "driftL": 8.88178419689023e-16,
+    "driftWorldL": 0.000009999973336566312,
+    "flips": 0
+   },
+   "end": [-5.70400496812459e-11,1.9999999999999984,0.000020000143745783632],
+   "fine": {
+    "fit": {
+     "p0": 0.000019999999494757503,
+     "sigma": 0,
+     "r2": 0,
+     "points": 0,
+     "crossed": null,
+     "factor": 1.0000297405535143
+    },
+    "reading": "No gyroscopic term"
+   },
+   "stable": [
+    {
+     "axis": 0,
+     "factor": 1.0000092912625649
+    },
+    {
+     "axis": 2,
+     "factor": 1.0000092912625649
+    }
+   ]
+  },
+  {
+   "id": "C3",
+   "engine": "jolt",
+   "label": "Jolt with the gyroscopic opt-in, undamped",
+   "backendId": "jolt",
+   "gyroscopic": true,
+   "inertia": {
+    "ok": true,
+    "diag": [6.500000476837158,4.999999523162842,2.499999761581421],
+    "off": [0,0,0]
+   },
+   "undamped": {
+    "ok": true,
+    "worst": 0,
+    "axis": 0
+   },
+   "determinism": {
+    "ok": true,
+    "steps": 1800
+   },
+   "fit": {
+    "p0": 0.000019999999494757503,
+    "sigma": 0.953073948614102,
+    "r2": 0.9999999956346399,
+    "points": 392,
+    "crossed": 9.416666666666666,
+    "factor": 110937.27000275212
+   },
+   "reading": "Euler's equations",
+   "invariants": {
+    "energyChange": 0.00035437705237488824,
+    "driftE": 0.00035439824170180247,
+    "driftL": 0.0001773369497146719,
+    "driftWorldL": 0.007979400145135271,
+    "flips": 1
+   },
+   "end": [-1.1011767684367055,-1.2162369575969225,1.3753674515829102],
+   "fine": {
+    "fit": {
+     "p0": 0.000019999999494757503,
+     "sigma": 0.9587691319902594,
+     "r2": 0.9999999955327215,
+     "points": 1556,
+     "crossed": 9.35,
+     "factor": 111008.47802431328
+    },
+    "reading": "Euler's equations"
+   },
+   "stable": [
+    {
+     "axis": 0,
+     "factor": 1.6031862502518686
+    },
+    {
+     "axis": 2,
+     "factor": 1.956595775539934
+    }
+   ]
+  },
+  {
+   "id": "C4",
+   "engine": "own",
+   "label": "the engine's own physics, rigidBody6dof.step()",
+   "backendId": "own",
+   "gyroscopic": null,
+   "inertia": {
+    "ok": true,
+    "diag": [6.5,5,2.5],
+    "off": [0,0,0]
+   },
+   "undamped": {
+    "ok": true,
+    "worst": 0,
+    "axis": 0,
+    "note": "no damping in rigidBody6dof"
+   },
+   "determinism": {
+    "ok": true,
+    "steps": 1800
+   },
+   "fit": {
+    "p0": 0.00002,
+    "sigma": 0.9606806393476786,
+    "r2": 0.9999999953231515,
+    "points": 388,
+    "crossed": 9.333333333333334,
+    "factor": 110937.4478465363
+   },
+   "reading": "Euler's equations",
+   "invariants": {
+    "energyChange": -3.508588974734369e-11,
+    "driftE": 3.7603360423584246e-10,
+    "driftL": 1.8801706857849776e-10,
+    "driftWorldL": 0.008024170558310685,
+    "flips": 1
+   },
+   "end": [-0.00021947349883538593,-1.9999999749172328,0.0002748509504992476],
+   "fine": {
+    "fit": {
+     "p0": 0.00002,
+     "sigma": 0.9606805844331048,
+     "r2": 0.9999999953464006,
+     "points": 1553,
+     "crossed": 9.333333333333334,
+     "factor": 110939.96314279377
+    },
+    "reading": "Euler's equations"
+   },
+   "stable": [
+    {
+     "axis": 0,
+     "factor": 1
+    },
+    {
+     "axis": 2,
+     "factor": 1.4422203957027826
+    }
+   ]
+  }
+ ]
+}

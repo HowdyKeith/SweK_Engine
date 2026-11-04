@@ -231,6 +231,10 @@ export function measureGrowth({ I, axis, Omega = 1, eps = 1e-9, skipBelow = 1e-7
 /**
  * THE GAP, MEASURED FROM THE TREE RATHER THAN ASSERTED -- so the follow-on round starts from a reading.
  * Reports what the two backends can and cannot be asked about rotation today.
+ *
+ * 2026-11-03 -- THE FOLLOW-ON ROUND HAPPENED (physics/mechanics/SPINNING_BODY_WIP.md): both loaders gained
+ * readAngularVelocities() and the contract supportsAngular(), so this reads velIsLinear false and contractAngular
+ * true now. It still reads the tree, so it says so without being told.
  */
 export async function contractGap() {
     const fs = (await import("node:fs")).default;

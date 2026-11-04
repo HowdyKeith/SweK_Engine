@@ -58,6 +58,7 @@
 //   (a spool for every state, written with a missing variable): rewritten to give every state a spool of 0.5, and the trainer's state-keys row catches it. THE FIRST RUN OF THE ROWS ALSO FOUND, in the module and not in the rows: the atmosphere's gas constant (287.05287, the textbook value) gave a sea-level density of
 //   1.2250000181 and a jet's static thrust 2e-4 N off its own 16,900: the constant is now derived from the standard's sea-level pair, and the density is 1.225 to the last bit.
 "use strict";
+import "./rigidBody6dofEuler.mjs";   // 2026-11-04 -- the 6-DOF numbers this gate holds were measured under the first-order orientation step, so it flies that step (see that file)
 import { createBody, rotateByQuat, worldToBody, cross3 } from "./rigidBody6dof.mjs";
 import * as A from "./aeroSurface.mjs";
 import * as F from "./flightModel6dof.mjs";

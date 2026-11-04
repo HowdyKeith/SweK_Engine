@@ -97,6 +97,12 @@ const adapter = (e, gravity = [0, -9.8, 0]) => {
         jointSpherical(a, b, p) { return e.swk_joint_spherical(a, b, p[0], p[1], p[2]); },
         jointRevolute() {}, jointWeld() {},
         dimensionality() { return "spatial"; },   // must match box3dLoader.js (check 4). SPATIAL as of v2565: addBox joined the contract, so the claim is now cashable.
+        // 2026-11-03 -- the 14th call and the two it vouches for, mirroring box3dLoader.js's supportsAngular(),
+        // readAngularVelocities() and setAngularVelocity() (check 4). The wasm gained their exports in the same commit
+        // (physics/mechanics/SPINNING_BODY_WIP.md), so "yes" is asked of the artifact rather than assumed.
+        supportsAngular() { return ["swk_ang_velocities", "swk_body_set_ang_velocity", "swk_body_set_damping", "swk_body_inertia"].every((n) => typeof e[n] === "function"); },
+        readAngularVelocities() { const n = e.swk_body_count(); return new Float32Array(e.memory.buffer, e.swk_ang_velocities(), n * 3).slice(); },
+        setAngularVelocity(i, w) { e.swk_body_set_ang_velocity(i, w[0], w[1], w[2]); return true; },
     };
 };
 
@@ -104,7 +110,7 @@ const adapter = (e, gravity = [0, -9.8, 0]) => {
 {
     const e = await load();
     const w = adapter(e);
-    ok("REAL box3d answers all THIRTEEN contract calls", CONTRACT.every((c) => typeof w[c] === "function"),
+    ok("REAL box3d answers all FOURTEEN contract calls", CONTRACT.every((c) => typeof w[c] === "function"),
        "missing: " + (CONTRACT.filter((c) => typeof w[c] !== "function").join(", ") || "none") +
        " -- ON ITS FIRST EVER RUN IT FAILED ON `dimensionality`. v2557 added an 11th call and taught it to the FAKES and the FALLBACK, never to the backend that ships. A CHECK THAT CANNOT REACH THE REAL THING IS GRADING A REHEARSAL.");
     const r = conform(w, "REAL box3d");
@@ -160,6 +166,19 @@ const adapter = (e, gravity = [0, -9.8, 0]) => {
               ". Caught in BOTH directions now: v2557 proved a planar world claiming spatial fails; this proves a spatial world claiming planar fails too.");
 }
 
+// ---- 3b. A WORLD THAT TURNS AND LIES ABOUT HOW FAST ------------------------------------------------------------
+// 2026-11-03 -- the contract's angular section asks two things of a world that says yes: report the angular velocity it was
+// given, and turn the body. A planar liar fails the SECOND, so it cannot show the FIRST working -- a sabotage that blinded
+// the readback check went 0 red for exactly that reason. Real box3d turns the body; this one reports zeros while it does.
+{
+    const e = await load();
+    const liar = adapter(e);
+    liar.readAngularVelocities = () => new Float32Array(e.swk_body_count() * 3);
+    const r = conform(liar, "box3d turning while it reports no angular velocity");
+    ok("CAUGHT: box3d turning a body while it reports no angular velocity", !r.ok && r.checks.filter((c) => !c.ok).length === 1 && /reports the angular velocity it was given/.test(r.checks.find((c) => !c.ok).name),
+       r.ok ? "*** PASSED: the readback check is blind ***" : "-> " + r.checks.filter((c) => !c.ok).map((c) => c.name).join(" | "));
+}
+
 // ---- 4. the adapter is not a ghost ----------------------------------------------------------------------------
 // This file stands in for box3dLoader.js because the browser loader fetches its glue over HTTP and the bridge
 // will not boot here. If the two drift, this check is testing something that does not ship.
@@ -167,7 +186,7 @@ const adapter = (e, gravity = [0, -9.8, 0]) => {
     const src = fs.readFileSync(path.join(here, "box3dLoader.js"), "utf8");
     ok("box3dLoader.js DECLARES dimensionality -- and NOW declares SPATIAL", /dimensionality\(\) \{ return "spatial"; \}/.test(src),
        "v2564 made this say planar and WAS RIGHT TO: addShip was the only body the contract could make, and ships lock Y, so spatial was a claim no caller could cash. v2565 added addBox -- A METHOD THIS FILE HAS HAD ALL ALONG -- and the same unchanged engine now lifts a box to 4.8765. v2564 ANSWER WENT STALE; v2564 REASONING DID NOT. dimensionality ANSWERS FOR THE CONTRACT, AND THE CONTRACT GREW.");
-    for (const call of ["addShip", "addBox", "setVelocity", "impulse", "readTransforms", "supportsJoints", "dimensionality"]) {
+    for (const call of ["addShip", "addBox", "setVelocity", "impulse", "readTransforms", "supportsJoints", "dimensionality", "supportsAngular", "readAngularVelocities", "setAngularVelocity"]) {
         ok("...and the loader really has " + call + "()", new RegExp("\\b" + call + "\\s*\\(").test(src));
     }
 }

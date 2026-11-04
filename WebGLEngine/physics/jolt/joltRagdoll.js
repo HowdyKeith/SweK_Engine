@@ -10,12 +10,15 @@
 
 function createRagdoll(world, opts = {}) {
     const { Jolt, ps, bodyOf } = world.raw();
-    const s = opts.scale || 1, bx = opts.x || 0, by = opts.y || 0, bz = opts.z || 0;
+    // 2026-11-03 (unnumbered): `density` is new, and its default is the 1 every ragdoll had, so a caller that passes none
+    // builds exactly what it built before. jolt-arena.html passes a heavier crew (physics/jolt/joltArena.js says why).
+    // `plane2d` (also 2026-11-03) locks every part to the xy-plane, through the Jolt wrapper's addBox option; off unless asked.
+    const s = opts.scale || 1, bx = opts.x || 0, by = opts.y || 0, bz = opts.z || 0, density = opts.density || 1, flat = opts.plane2d ? { plane2d: true } : {};
     const parts = [];       // body indices, in a fixed order
     const joints = [];      // { con, a, b }
 
     function part(name, px, py, pz, hx, hy, hz) {
-        const i = world.addBox({ type: "dynamic", pos: [bx + px * s, by + py * s, bz + pz * s], half: [hx * s, hy * s, hz * s], density: 1 });
+        const i = world.addBox({ type: "dynamic", pos: [bx + px * s, by + py * s, bz + pz * s], half: [hx * s, hy * s, hz * s], density, ...flat });
         parts.push({ name, idx: i }); return i;
     }
     // ball joint at a world-space point between two parts
@@ -62,9 +65,20 @@ function createRagdoll(world, opts = {}) {
     return {
         parts, joints,
         idxs: () => parts.map((p) => p.idx),
-        // launch the whole ragdoll: shared linear impulse + a per-part spin so it tumbles
+        // launch the whole ragdoll: shared linear impulse + a per-part spin so it tumbles.
+        // 2026-11-03 (unnumbered): kept exactly as it was -- two gates and the spinning body's fourth round fly it -- but an IMPULSE
+        // on parts this light is a velocity of J / m: at density 1 a part weighs 0.01 to 0.06 kg, so fling(30, ...) sends it at
+        // hundreds of m/s (Jolt caps it at 500) and its spin to Jolt's cap. launch() below is the same throw as a velocity.
         fling(vx, vy, vz, spin = 3) {
             for (let k = 0; k < parts.length; k++) { const i = parts[k].idx; world.impulse(i, [vx, vy, vz]); if (world.angularImpulse) world.angularImpulse(i, [(k - 3) * spin * 0.2, spin * 0.3, (k % 2 ? 1 : -1) * spin * 0.2]); }
+        },
+        // 2026-11-03 (unnumbered): THE SAME THROW AS A VELOCITY, whatever the parts weigh: every part gets `v` added to its velocity and
+        // fling()'s per-part spin added to its angular velocity (as rad/s, not as an angular impulse), so the figure flies as one.
+        launch(v, spin = 3) {
+            const lv = world.readVelocities(), av = world.readAngularVelocities();
+            for (let k = 0; k < parts.length; k++) { const i = parts[k].idx;
+                world.setVelocity(i, [lv[i * 3] + v[0], lv[i * 3 + 1] + v[1], lv[i * 3 + 2] + v[2]]);
+                world.setAngularVelocity(i, [av[i * 3] + (k - 3) * spin * 0.2, av[i * 3 + 1] + spin * 0.3, av[i * 3 + 2] + (k % 2 ? 1 : -1) * spin * 0.2]); }
         },
         // max distance any two connected parts have drifted from their joint (0 = perfectly held)
         cohesion() { const xf = world.readTransforms(); let m = 0; for (const j of joints) { const dx = xf[j.a * 7] - xf[j.b * 7], dy = xf[j.a * 7 + 1] - xf[j.b * 7 + 1], dz = xf[j.a * 7 + 2] - xf[j.b * 7 + 2]; m = Math.max(m, Math.hypot(dx, dy, dz)); } return m; },

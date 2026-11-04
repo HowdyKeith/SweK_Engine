@@ -180,12 +180,16 @@ console.log("\n6. THE BACKEND GAP IS REPORTED, AND NOTHING IN box3d OR jolt IS T
         "b3MakeBoxHull(half, half, half): three EQUAL principal moments. THE CONFORMANCE FIXTURE EXCLUDES THE " +
         "PHENOMENON BY CONSTRUCTION -- v3453's marching-tets check that could not fail the property it tested, " +
         "and v3452's bounds gate that proved the shape the page did not read. THIRD COLLECTION.");
-    ok("!! ...and the contract has NO angular call, so it cannot ask a rotational question at all",
-        !g.contractAngular && g.angularDrive,
+    // 2026-11-03 -- THESE TWO ROWS ASSERTED THE GAP AND WENT RED WHEN IT CLOSED, WHICH IS WHAT THEY WERE FOR. The
+    // spinning-body round (physics/mechanics/SPINNING_BODY_WIP.md) gave both loaders readAngularVelocities() and the
+    // contract its fourteenth call, supportsAngular(). contractGap() reads the tree, so it now reports the gap closed;
+    // the rows say so instead of the opposite. The text beside the first is v3562's, kept as the reason the round existed.
+    ok("!! ...and the contract NOW has an angular call (supportsAngular, 2026-11-03), and both loaders can spin a body",
+        g.contractAngular && g.angularDrive,
         "both loaders already expose angularImpulse() and readTransforms() (pos + quat), so the flip is " +
         "drivable AND observable in both TODAY -- and the ten-call contract names neither. The comparison is " +
         "a round, not a line.");
-    ok("!! ...and neither backend will report w", g.velIsLinear,
+    ok("!! ...and both backends now report w (readAngularVelocities, 2026-11-03; v3562 found neither would)", !g.velIsLinear,
         "readVelocities() is three floats, LINEAR ONLY. w recovered by differencing the quaternion stream " +
         "would SHARE NO CODE with either solver's internal w, so that absence is closer to an asset than a " +
         "blocker -- but it is a decision, and this round does not make it.");

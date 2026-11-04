@@ -11,7 +11,7 @@
 // Section 3, THE HAND WEIGHTS ARE THE PD AUTOPILOT: thrust and fire identical to decide() on all 60 states, torque within 2% wherever the pointing error is under a radian (measured worst 1.13%: tanh(x) is x
 // less x^3/3, which at the page's gains is 0.74% at one radian of error alone) and within the tanh's saturation (measured, bounded) at the largest errors. Section 4, THE DUELS: a hand brain against the PD autopilot flies the same fight to the bit; hand against zero wins without a scratch and
 // zero against hand loses; the same pairing twice is the same fingerprint, swapped is another; a noisy brain is another fight; and brain/pilotRoster.mjs's resolved weights reach the ship.
-// Section 5, THE PAGE: es-box3d-6dof.html in its own browser -- the panel is there, the default lineup is the PD autopilot against the PD autopilot, a choice made in a select is the pilot that flies
+// Section 5, THE PAGE: es-box3d-6dof.html in its own browser -- the panel is there, the default lineup is the close-quarters pilot on both teams once its file has loaded (2026-11-02; the PD autopilot against the PD autopilot before that), a choice made in a select is the pilot that flies
 // after Start Fight (a zero team holds still and takes the damage; a hand team moves and deals it), Start Fight clears the tally, and the choices survive a reload.
 //
 // SABOTAGE LOG -- v4829, sixteen, each applied to the file named, the gate run, the file restored. Reds are rows (`grep -c '^  FAIL'`).
@@ -78,7 +78,17 @@
 //   pilot had arrived and the row went red with nothing wrong. A v4846 race, surfaced here. The six scripted choices are counted and the fetched pilots (shipped, league, close) have rows of their own.
 //   FOUND BEFORE THE SABOTAGES: the first league file stored the AUDIT score against the shipped pilot as its `score`, and the page prints a pilot's `score` as "held-out score" -- 8.873 under that label was wrong; the file's score is the
 //   held-out league score the champion was picked on (9.812), the trainer and this gate say so, and the file was regenerated from the same weights. And the first mirror row used the hand pilot (all draws: its symmetry holds vacuously).
+//   2026-11-02 -- THE PAGE'S DEFAULT IS THE CLOSE-QUARTERS PILOT (Keith's call on brain/SIXDOF_PAGE_FIGHT_WIP.md's ranking): the default-lineup row now reads it on both teams once its file has loaded. With the
+//   byte-safe runner, this gate, brain/pilotRoster-selfcheck.mjs and tools/ship/rigidBody6dofPage-selfcheck.mjs run, the number the rows red HERE:
+//   D1 pilotRoster.mjs ignoring a page's own default 1 | D3 pilotRoster.mjs ignoring its label 1 | D4 the page naming no default 1 | D5 the page's default the League pilot 1 (each the default-lineup row)
+//   *** AND THE SAME RUNS FOUND A FLAKY ROW, OLDER THAN THIS CHANGE. *** The shipped-against-zero fight row went red under D2 and under D6 -- and D6 touches a file this gate never reads, so it went red with
+//   every input byte-identical to a passing run. The page's live battles are seeded from the clock, and the row read "a zero team holds still" on velocity: a ship that flies INTO a zero ship pushes it,
+//   and in space the push never decays. Measured 2026-11-03 in a probe of the row's own observation on 30 of the page's random battles: 2 failed, each with the zero ship's first motion at 3.3-3.4 m from
+//   an A ship, hull contact (and in 2 of 11 runs of this gate). The fix keeps the row's claim -- the zero pilot never steers, thrusts or fires -- and reads motion, spin and the attacker's hurt UNTIL THE
+//   TEAMS FIRST TOUCH (5 m); being attacked is read over the whole fight. It still bites: R1 es-box3d-6dof.html: team B flying team A's pilot 3 red (all three fight rows) | R2 pilotRoster.mjs: the zero
+//   pilot resolving to the hand weights 4 red (the three fight rows and the resolver's own fight row).
 "use strict";
+import "../physics/mechanics/rigidBody6dofEuler.mjs";   // 2026-11-04 -- the 6-DOF numbers this gate holds were measured under the first-order orientation step, so it flies that step (see that file)
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -101,7 +111,7 @@ const report = (m) => console.log("  ----  " + m);
 const sec = (t) => console.log("\n" + t);
 const mkRng = (seed) => { let a = seed >>> 0; return () => { a = (Math.imul(a, 1664525) + 1013904223) >>> 0; return a / 4294967296; }; };
 const same = (a, b) => a.length === b.length && a.every((v, i) => Object.is(v, b[i]));
-const ASYNC_PILOTS = ["shipped", "league", "close"];   // the roster choices that exist only once their file has been fetched
+const ASYNC_PILOTS = ["shipped", "league", "close", "gpu"];   // the roster choices that exist only once their file has been fetched ("gpu", 2026-11-02: the GPU Brain's pilot, graded in brain/pilot6dofMlpPage-selfcheck.mjs)
 
 // 60 seeded states of a ship against a target: any orientation, a small spin, the target 30-200 units away and moving, the ship moving a little
 const I = RB.boxInertia({ m: 8, hx: 1.6, hy: 0.7, hz: 0.7 });
@@ -225,13 +235,23 @@ sec("5. THE PAGE: es-box3d-6dof.html in its own browser");
             byId("rosterBtn").click(); out.panelShown = byId("rosterPanel").style.display === "block";
             out.opts = Array.from(byId("pilotA").options).map((o) => o.value); out.defaults = [byId("pilotA").value, byId("pilotB").value];
             await waitFor(() => S.roster.lineup.A && S.roster.lineup.B, 5000);
-            out.lineup0 = { A: S.roster.lineup.A.id, B: S.roster.lineup.B.id, label: S.roster.lineup.A.label, note: byId("rosterNote").textContent };
+            // 2026-11-02 -- THE DEFAULT IS THE CLOSE-QUARTERS PILOT once its file has loaded (the PD autopilot until then): wait for the file, then for both teams to be re-resolved onto it
+            await waitFor(() => S.roster.close || S.roster.closeError, 30000);
+            await waitFor(() => S.roster.lineup.A && S.roster.lineup.A.id === "close" && S.roster.lineup.B && S.roster.lineup.B.id === "close", 5000);
+            { const A = S.roster.lineup.A, B = S.roster.lineup.B; out.lineup0 = { A: A.id, B: B.id, label: A.label, note: byId("rosterNote").textContent, ships: A.weights ? A.weights.length : 0, closeErr: S.roster.closeError,
+              sameA: !!(A.weights && A.weights.every((w) => w === S.roster.close)), sameB: !!(B.weights && B.weights.every((w) => w === S.roster.close)), optLabel: byId("pilotA").options[0].textContent, specs: JSON.stringify(S.roster.specs) }; }
             const hurt = (fl) => fl.some((s) => s.hp < 100), moved = (fl) => fl.some((s) => Math.hypot(...s.body.vel) > 0.5), spun = (fl) => fl.some((s) => Math.hypot(...s.body.w) > 0.01);
             // a fight ends in seconds (a wiped fleet resets the battle), so the page is SAMPLED every 30 ms and the evidence is OR-ed: has a team been hurt, has it moved, has it spun -- until the tally ticks or the time is up
+            // 2026-11-03 -- *** MOTION, SPIN AND THE ATTACKER'S HURT ARE READ UNTIL THE TWO TEAMS FIRST TOUCH. *** The page has collisions on (v4848): a ship that flies INTO a zero ship pushes it, spins it and
+            // hurts both, and in space the push never decays -- so "a zero team holds still" read on velocity alone failed on a ram, in 2 of 30 of the page's random battles (measured 2026-11-03: the zero ship
+            // first moved with an A ship 3.3-3.4 m away, hull contact; this gate went red that way in 2 of 11 runs). A zero pilot that steered, thrust or fired would show it long before any contact (the fleets
+            // start 84 m apart), so aMoved/bMoved/aSpun/bSpun and aHurtPre/bHurtPre stop at the first contact (any two ships of the two teams within 5 m); aHurt/bHurt (being attacked) cover the whole fight.
+            const touching = (F) => F.A.some((a) => !a.dead && F.B.some((b) => !b.dead && Math.hypot(a.body.pos[0] - b.body.pos[0], a.body.pos[1] - b.body.pos[1], a.body.pos[2] - b.body.pos[2]) < 5));
             const observe = async (ms) => {
-                const o = { aHurt: false, bHurt: false, aMoved: false, bMoved: false, aSpun: false, bSpun: false, ended: false }, w0 = S.state().wins, t = performance.now();
+                const o = { aHurt: false, bHurt: false, aHurtPre: false, bHurtPre: false, aMoved: false, bMoved: false, aSpun: false, bSpun: false, touched: false, ended: false }, w0 = S.state().wins, t = performance.now();
                 while (performance.now() - t < ms) {
-                    const F = S.fleets; o.aHurt ||= hurt(F.A); o.bHurt ||= hurt(F.B); o.aMoved ||= moved(F.A); o.bMoved ||= moved(F.B); o.aSpun ||= spun(F.A); o.bSpun ||= spun(F.B);
+                    const F = S.fleets; o.touched ||= touching(F); o.aHurt ||= hurt(F.A); o.bHurt ||= hurt(F.B);
+                    if (!o.touched) { o.aHurtPre ||= hurt(F.A); o.bHurtPre ||= hurt(F.B); o.aMoved ||= moved(F.A); o.bMoved ||= moved(F.B); o.aSpun ||= spun(F.A); o.bSpun ||= spun(F.B); }
                     const w = S.state().wins; if (w.A + w.B > w0.A + w0.B) { o.ended = true; break; }
                     await new Promise((r) => setTimeout(r, 30));
                 }
@@ -286,16 +306,18 @@ sec("5. THE PAGE: es-box3d-6dof.html in its own browser");
             ok("!! the panel is there: a Load Pilots button opens it, a select for each team; both start on 'default for this team'; six choices (the PD autopilot, hand, zero, two noise levels, and default) and no 'Brain panel' choice, since this page has none", p.panelShown && p.defaults.join() === "auto,auto" && p.opts.filter((o) => !ASYNC_PILOTS.includes(o)).length === 6 && !p.opts.includes("brain") && !p.opts.includes("imported"), p.opts.join(","));
             // *** THE PILOTS THAT ARRIVE BY FETCH ARE NOT PART OF THIS ROW. *** It used to demand exactly six choices and no "shipped", which held only because the page's fetches had not finished when the select was read; under load (v4848: a
             // training run on the same four cores) the league pilot had arrived and the row went red with nothing wrong. The six scripted choices are counted, and the fetched ones have rows of their own (the loads-and-is-offered rows).
-            ok("!! the default lineup is the old page: the PD autopilot against the PD autopilot, named as such", p.lineup0.A === "scripted" && p.lineup0.B === "scripted" && p.lineup0.label === "PD autopilot" && /PD autopilot/.test(p.lineup0.note), p.lineup0.note);
+            ok("!! the default lineup is the close-quarters pilot on BOTH teams (Keith's call, 2026-11-02, on the page fight's ranking): once its file has loaded, 'default for this team' flies it on every ship of both teams, on the very weights the file carries, and the panel and the roster note name it",
+                p.lineup0.A === "close" && p.lineup0.B === "close" && p.lineup0.sameA && p.lineup0.sameB && p.lineup0.ships === 3 && /close-quarters pilot brain/.test(p.lineup0.note) && /default for this team \(close-quarters\)/.test(p.lineup0.optLabel) && !p.lineup0.closeErr && p.lineup0.specs === JSON.stringify({ A: "auto", B: "auto" }),
+                JSON.stringify(p.lineup0).slice(0, 260));
             ok("!! a choice made in a select is the pilot that flies after Start Fight: team A hand, team B zero is the lineup, three ships a side", p.afterStart.A === "hand" && p.afterStart.B === "zero" && p.afterStart.ships === 3 && p.afterStart.alive === 6, JSON.stringify(p.afterStart));
-            ok("!! a ZERO team holds still and takes the damage, a HAND team moves and deals it: team B is hurt and never moved or spun, team A is not hurt and did move", p.hz.bHurt && !p.hz.aHurt && p.hz.aMoved && !p.hz.bMoved && !p.hz.bSpun, JSON.stringify(p.hz));
-            ok("!! ...and swapped, team A (zero) is the one hurt, motionless and not spinning, and team B (hand) is moving", p.zh.aHurt && !p.zh.bHurt && p.zh.bMoved && !p.zh.aMoved && !p.zh.aSpun, JSON.stringify(p.zh));
+            ok("!! a ZERO team holds still and takes the damage, a HAND team moves and deals it: team B is hurt and never moved or spun, team A is not hurt and did move (motion, spin and A's hurt read until the teams first touch: a ram pushes, it does not steer)", p.hz.bHurt && !p.hz.aHurtPre && p.hz.aMoved && !p.hz.bMoved && !p.hz.bSpun, JSON.stringify(p.hz));
+            ok("!! ...and swapped, team A (zero) is the one hurt, motionless and not spinning, and team B (hand) is moving (read until the teams first touch, the same way)", p.zh.aHurt && !p.zh.bHurtPre && p.zh.bMoved && !p.zh.aMoved && !p.zh.aSpun, JSON.stringify(p.zh));
             ok("'hand + noise' gives each ship of its team its own pilot (three distinct), and Start Fight clears the tally", /noise 0.1/.test(p.noise.A) && /noise 0.05/.test(p.noise.B) && p.noise.distinct === 3 && p.tallyCleared, `${p.noise.A} against ${p.noise.B}`);
             ok("!! the choices survive a reload (noise on both sides), and Default pilots puts both selects back on 'default for this team'", p.reload.join() === "noise10,noise05" && p.afterReset.join() === "auto,auto", `${p.reload.join()} then ${p.afterReset.join()}`);
             ok("!! a SAVED choice of the shipped pilot survives the next load: it is made before the file has arrived, falls back to the hand pilot for a moment, and becomes the shipped pilot when the file lands", p.shippedReload.A === "shipped" && p.shippedReload.selected === "shipped" && /shipped pilot/.test(p.shippedReload.label), JSON.stringify(p.shippedReload));
             const sh = p.shipped;
             ok("!! the shipped pilot LOADS and is offered: the file arrives, 'shipped' is in the select, and the line names its hash and held-out score", sh.loaded && !sh.error && sh.choices.includes("shipped") && !sh.choices.includes("imported") && /shipped pilot [0-9a-f]{8}: held-out score/.test(sh.line), JSON.stringify(sh).slice(0, 260));
-            ok("!! choosing it flies it: team A is the shipped pilot, all three ships on the very weights the file carries, and the fight shows it (a SHIPPED team moves and deals damage; a ZERO team holds still and is hurt)", p.shippedFight.A === "shipped" && /shipped pilot/.test(p.shippedFight.label) && p.shippedFight.ships === 3 && p.shippedFight.sameWeights && p.shippedFight.obs.bHurt && p.shippedFight.obs.aMoved && !p.shippedFight.obs.bMoved, JSON.stringify(p.shippedFight));
+            ok("!! choosing it flies it: team A is the shipped pilot, all three ships on the very weights the file carries, and the fight shows it (a SHIPPED team moves and deals damage; a ZERO team holds still until the teams first touch, and is hurt)", p.shippedFight.A === "shipped" && /shipped pilot/.test(p.shippedFight.label) && p.shippedFight.ships === 3 && p.shippedFight.sameWeights && p.shippedFight.obs.bHurt && p.shippedFight.obs.aMoved && !p.shippedFight.obs.bMoved, JSON.stringify(p.shippedFight));
             const lg = p.league;
             ok("!! the league pilot LOADS and is offered: the file arrives, 'league' is in the select between 'shipped' and the hand weights, and the line names its hash and its score against the shipped pilot", lg.loaded && !lg.error && lg.choices.includes("league") && lg.choices.indexOf("league") === lg.choices.indexOf("shipped") + 1 && /league pilot [0-9a-f]{8}: held-out score/.test(lg.line), JSON.stringify(lg).slice(0, 260));
             ok("!! choosing it flies it: team A is the league pilot on the very weights its file carries (all three ships), team B the shipped pilot on ITS, and they are two different vectors -- the two generations meet on the page", p.leagueFight.A === "league" && p.leagueFight.B === "shipped" && /league-trained/.test(p.leagueFight.labelA) && p.leagueFight.ships === 3 && p.leagueFight.sameA && p.leagueFight.sameB && p.leagueFight.differ && /league-trained pilot brain/.test(p.leagueFight.note) && /shipped pilot brain/.test(p.leagueFight.note), p.leagueFight.note);
@@ -474,6 +496,19 @@ sec("10. the close-quarters pilots (v4848): what each file says about itself is 
         const jr = (w) => P6.evaluate(w, P6.CLOSE_AUDIT_SEEDS, { opponent: [prev], collisions: true, scenarios: ["joust"] }), cl = jr(loaded.close.w), sh = P6.evaluate(prev, P6.CLOSE_AUDIT_SEEDS, { opponent: [prev], collisions: true, scenarios: ["joust"] });
         report(`rams in the 80 audit joust games against the shipped pilot: the shipped pilot's own mirror ${sh.rams} impacts / ${sh.ramHp.toFixed(0)} hp; the close pilot ${cl.rams} impacts / ${cl.ramHp.toFixed(0)} hp -- it wins by shooting better, not by avoiding`);
     }
+}
+
+// ---- ANOTHER BRAIN IN THE SAME DUEL (brain/SIXDOF_GPU_BRAIN_WIP.md): duel() takes a pilot FUNCTION, and featuresFrom() is exported so a second network reads the same senses from one geometry -------------------------
+// SABOTAGED 2026-11-02 with the byte-safe runner, each file restored byte-identical: duel() reading a function as a weight vector (the `typeof x === "function"` clause removed) -> 1 RED, this section's first row
+// (it throws); featuresFrom() with the x spin unclamped -> 2 RED, this section's second row and the close file's `by` row (the close pilot's recomputed audit moves with its senses).
+console.log("\nANOTHER BRAIN IN THE SAME DUEL");
+{
+    const hand = P6.pilotFor(P6.handWeights()), seeds = [1, 5, 21, 26];
+    let threw = null, same = 0; try { for (const seed of seeds) { const a = P6.duel(hand, "autopilot", { seed }), b = P6.duel("hand", "autopilot", { seed }), c = P6.duel("autopilot", hand, { seed }), d = P6.duel("autopilot", "hand", { seed }); if (a.fingerprint === b.fingerprint && a.score === b.score && c.fingerprint === d.fingerprint) same++; } } catch (e) { threw = e.message; }
+    ok("!! duel() takes a pilot FUNCTION (decide()'s contract) on either side, and the fruit fly's hand pilot handed in as one flies the fight its weights fly, to the fingerprint", !threw && same === seeds.length, threw || `${same} of ${seeds.length} seeds, both sides`);
+    const I = RB.boxInertia({ m: P6.SHIP_MASS, hx: P6.HALF[0], hy: P6.HALF[1], hz: P6.HALF[2] }), body = RB.createBody({ mass: P6.SHIP_MASS, I, pos: [3, -2, 1], q: [0.9, 0.1, 0.3, 0.2].map((v, _, q) => v / Math.hypot(...q)), vel: [4, 1, 0], w: [7, -0.5, 0.2] });
+    const tgt = { pos: [120, 10, -5], vel: [-3, 0, 1] }, o = { weaponSpeed: 260, ...P6.PAGE_AUTOPILOT }, via = P6.featuresFrom(P6.geometry(body, tgt, o), body), direct = P6.features(body, tgt, o);
+    ok("  featuresFrom(geometry(...)) IS features(...): one geometry, the same twelve senses (here with a spin past the clamp)", via.length === 12 && via.every((v, i) => Object.is(v, direct[i])) && via[4] === 3);
 }
 
 console.log(fails ? `\npilot6dofPolicy-selfcheck: ${fails} FAILED` : "\npilot6dofPolicy-selfcheck: all checks pass");

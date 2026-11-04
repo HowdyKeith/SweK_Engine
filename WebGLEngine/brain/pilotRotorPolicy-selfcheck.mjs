@@ -41,6 +41,7 @@
 //   never accepts a block 2; G03 group phase drops the second half 2; G04 group phase drops the first half 1; G05 a failed block is not restored 2; G06 group phase is skipped 2; G07 group phase does not update the best
 //   score 1; G08 group phase restores the wrong values 2.
 "use strict";
+import "../physics/mechanics/rigidBody6dofEuler.mjs";   // 2026-11-04 -- the 6-DOF numbers this gate holds were measured under the first-order orientation step, so it flies that step (see that file)
 import * as PP from "./pilotRotorPolicy.mjs";
 import * as AR from "./autopilotRotor.mjs";
 import * as RT from "./rotorTask.mjs";

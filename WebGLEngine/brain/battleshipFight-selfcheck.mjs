@@ -84,6 +84,7 @@
 //   K23 the escorts' stream is the attackers' 1 | K25 one escort too many in the scenario 10
 // TWO WENT 0 RED THE FIRST TIME AND WERE GAPS IN THE GATE: K10 (the second ship's gunners the first's twins -- the ships are in different places, so their seats fire differently whatever their seeds; the row that can tell gives the same seat of each the same target for the same ticks and compares what it aims at) and K23 (the escorts' stream the attackers' -- nothing but the sweeps pinned the escorts' draws; the row that does reproduces them from Mulberry32 written out in the gate); a row was added for each and each re-run red.
 "use strict";
+import "../physics/mechanics/rigidBody6dofEuler.mjs";   // 2026-11-04 -- the 6-DOF numbers this gate holds were measured under the first-order orientation step, so it flies that step (see that file)
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";

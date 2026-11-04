@@ -21,6 +21,7 @@
 //   WHAT THE FIRST RUNS FOUND, in the rows and in the module: (1) THE TRAINER'S CLAMPS ARE WRONG FOR A JET: the first random-state row (1,500 states) found 0.52 of throttle wrong in a climb of 86 m/s -- the trainer's climb-rate feature is clamped at 60 m/s of climb and its speed-error feature at 60 m/s of error, far outside what a 45 m/s aircraft does and inside what a jet does -- so features 10 and 11 carry wider clamps (24 and 40) and the steep-climb row exists because of it
 //   (JP04, JP05 and JP26 are its mutants); (2) the pitch rate of the state is MINUS the body y rate, which the limiter row had backwards on its first run; (3) the cruise-gains flight ends 5e-2 m from the hand pilot's after 40 s (float32 weights, integrated), not 1e-3; (4) the climb-pull row first asked a state with no climb error for a scheduled climb error (a factor of 3 on zero); (5) a NaN is read as 0 but an infinity is CLAMPED to the feature's bound (12 for the pitch rate), as the trainer's features do.
 "use strict";
+import "../physics/mechanics/rigidBody6dofEuler.mjs";   // 2026-11-04 -- the 6-DOF numbers this gate holds were measured under the first-order orientation step, so it flies that step (see that file)
 import * as PJ from "./pilotJetPolicy.mjs";
 import * as PF from "./pilotFlightPolicy.mjs";
 import * as AF from "./autopilotFlight.mjs";

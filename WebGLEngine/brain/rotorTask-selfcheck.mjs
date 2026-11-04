@@ -39,6 +39,7 @@
 //   AUDIT one engine seed short 1; T81 spent AUDIT2 terrain one short 1; T82 spent SAFETY_AUDIT2 dropped 1; T83 ground-speed term is not monotone 13; T84 spent sets overlap a live set (SPENT BASELINE terrain is TRAIN's)
 //   1; T85 TRAIN recovery seeds 61..66 run into AUDIT2's 51..58 2; T86 TRAIN recovery has only the first six 2; T87 TRAIN recovery extra seeds are HELD_OUT's 2.
 "use strict";
+import "../physics/mechanics/rigidBody6dofEuler.mjs";   // 2026-11-04 -- the 6-DOF numbers this gate holds were measured under the first-order orientation step, so it flies that step (see that file)
 import * as RT from "./rotorTask.mjs";
 import * as AR from "./autopilotRotor.mjs";
 import * as H from "../physics/mechanics/rotorcraftModel6dof.mjs";

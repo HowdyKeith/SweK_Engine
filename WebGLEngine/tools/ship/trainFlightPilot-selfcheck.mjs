@@ -24,6 +24,7 @@
 //   v4870, FIVE MORE (the brain table, section 1b: the four symbols this gate names so the GPU Brain's choice cannot change the fruit fly's tool), every one red by name (the ids are BT1-BT5 here; the sabotage files called them V1-V5):
 //   BT1 brainOf() defaults to the GPU Brain 5 | BT2 setsOf() always returns the fruit fly's sets 1 | BT3 SETS_GPU's audit is the fruit fly's AUDIT3 1 | BT4 SETS_GPU's training set is not the fruit fly's 1 | BT5 BRAINS is not frozen 1.
 "use strict";
+import "../../physics/mechanics/rigidBody6dofEuler.mjs";   // 2026-11-04 -- the 6-DOF numbers this gate holds were measured under the first-order orientation step, so it flies that step (see that file)
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";

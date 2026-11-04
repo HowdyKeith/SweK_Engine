@@ -129,9 +129,69 @@ export function step(state, acc, dt, opt) {
     const forceWorld = rotateByQuat(state.q, acc.force);
     const vel = add3(state.vel, scale3(forceWorld, dt / state.mass));
     const pos = add3(state.pos, scale3(vel, dt));
-    const q = stepQuat(state.q, state.w, dt);
+    const how = orientationOf(opt);
+    const q = how === "rk4" ? stepQuatRk4(state.I, state.q, state.w, acc.torque, dt, opt) : stepQuat(state.q, state.w, dt);
     const w = stepOmegaWithTorque(state.I, state.w, acc.torque, dt, opt);
     return { mass: state.mass, I: [...state.I], pos, vel, q, w };
+}
+
+// 2026-11-03 (unnumbered) -- `opt.orientation`, registered as a round before it was built (physics/mechanics/ORIENTATION_STEP_WIP.md).
+// "euler" moves the orientation by freeRotation.mjs's stepQuat(): one forward step from the angular velocity at the start of the
+// tick, which is first order (the spinning body measured it). "rk4" moves it by RK4 alongside the angular velocity's own RK4,
+// each of its four stages with that stage's angular velocity -- the same w1..w4 stepOmegaWithTorque() forms, by the same
+// formulas. The angular velocity is stepOmegaWithTorque()'s either way, and the torque is held for the tick either way, so the
+// option changes the orientation and nothing else. Anything else is refused rather than read as the default.
+//
+// *** 2026-11-04 (unnumbered) -- "rk4" IS THE DEFAULT. *** Keith's decision ("make the fourth-order step the default"), after the
+// round's verdict: RK4 took a free body's momentum drift from first order to fourth (9.84e-8 at the ships' 1/30 s, where the
+// first-order step's is 1.61e-2) and a jousting ship's orientation from up to 2.45 degrees off to 3.3e-8 rad, and moved no
+// pilot's fights by a sign test. So a step given no `orientation` is now RK4, for every 6-DOF craft in the engine.
+//   orientationDefault() says which step "no option" means, and setOrientationDefault() changes it for this module -- in a page,
+//   in a process. It is for what was MEASURED under the first-order step: every 6-DOF record made before this day (the trained
+//   pilots, their rounds, the tasks' pinned baselines) holds numbers flown with "euler", and a gate that holds such numbers flies
+//   them with "euler" said out loud, as the spinning body's C2 and C3 still fly the Jolt settings they were registered with. The
+//   setting travels under the name SWEK_6DOF_ORIENTATION, which the default is read from on first use: in node it is an environment
+//   variable, so a gate's worker processes fly what the gate does; in a browser it is a sessionStorage entry, which a same-origin
+//   iframe shares and which ends with the session, so a gate's script can set it before the page it opens has stepped anything.
+const ORIENTATIONS = Object.freeze(["euler", "rk4"]);
+export const ORIENTATION_DEFAULT = "rk4";
+export const ORIENTATION_ENV = "SWEK_6DOF_ORIENTATION";
+const checkOrientation = (how) => { if (!ORIENTATIONS.includes(how)) throw new Error(`rigidBody6dof.step: orientation ${JSON.stringify(how)} is neither "euler" nor "rk4"`); return how; };
+const envOf = () => (typeof process !== "undefined" && process && process.env ? process.env : null);
+const sessionOf = () => { try { return typeof sessionStorage !== "undefined" ? sessionStorage : null; } catch (e) { return null; } };   // a sandbox may refuse it
+const carried = () => { const e = envOf(); if (e) return e[ORIENTATION_ENV] || null; const s = sessionOf(); try { return s ? s.getItem(ORIENTATION_ENV) : null; } catch (e2) { return null; } };
+let defaultOrientation = null;   // read on first use: SWEK_6DOF_ORIENTATION if it is carried (the environment, or sessionStorage), else ORIENTATION_DEFAULT
+/** The step that "no option" means, here and now. */
+export function orientationDefault() {
+    if (defaultOrientation === null) { const v = carried(); defaultOrientation = checkOrientation(v ? v : ORIENTATION_DEFAULT); }
+    return defaultOrientation;
+}
+/** Make `how` what "no option" means in this module -- and where it is carried from, so a node process or a same-origin page started
+ *  after this reads it too; returns what it meant before. */
+export function setOrientationDefault(how) {
+    const was = orientationDefault(); defaultOrientation = checkOrientation(how);
+    const e = envOf(); if (e) e[ORIENTATION_ENV] = how; else { const s = sessionOf(); try { if (s) s.setItem(ORIENTATION_ENV, how); } catch (e2) { /* a sandbox: this module only */ } }
+    return was;
+}
+export function orientationOf(opt) {
+    return opt && opt.orientation != null ? checkOrientation(opt.orientation) : orientationDefault();
+}
+/** 1/2 q (x) (0, w): stepQuat()'s own derivative, term for term. */
+const quatRate = (q, w) => [
+    0.5 * (-q[1] * w[0] - q[2] * w[1] - q[3] * w[2]),
+    0.5 * (q[0] * w[0] + q[2] * w[2] - q[3] * w[1]),
+    0.5 * (q[0] * w[1] + q[3] * w[0] - q[1] * w[2]),
+    0.5 * (q[0] * w[2] + q[1] * w[1] - q[2] * w[0]),
+];
+const add4 = (a, b, s) => [a[0] + b[0] * s, a[1] + b[1] * s, a[2] + b[2] * s, a[3] + b[3] * s];
+/** The orientation after one tick by RK4, its stages at stepOmegaWithTorque()'s stage angular velocities; renormalised. */
+export function stepQuatRk4(I, q, w, torqueBody, dt, opt) {
+    const d = (ww) => derivWithTorque(I, ww, torqueBody, opt);
+    const w1 = w, a1 = d(w1), w2 = add3(w, a1, dt / 2), a2 = d(w2), w3 = add3(w, a2, dt / 2), a3 = d(w3), w4 = add3(w, a3, dt);
+    const k1 = quatRate(q, w1), k2 = quatRate(add4(q, k1, dt / 2), w2), k3 = quatRate(add4(q, k2, dt / 2), w3), k4 = quatRate(add4(q, k3, dt), w4);
+    const o = [0, 1, 2, 3].map((n) => q[n] + dt / 6 * (k1[n] + 2 * k2[n] + 2 * k3[n] + k4[n]));
+    const n = Math.hypot(o[0], o[1], o[2], o[3]);
+    return o.map((c) => c / n);
 }
 
 // ---- FRONT DOOR -------------------------------------------------------------------------------------------------

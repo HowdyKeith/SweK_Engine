@@ -30,6 +30,7 @@
 //   input weight moved by 0.5 6; FM03 the audit number in `by` edited 3; FM04 the limits paragraph renamed 3; FM05 the count of differing weights edited 3; FM06 the file's score edited 3; FM07 the policy named for the
 //   other network 3; FM08 the weight count wrong 3; FM09 the recipe in `by` edited 3; FM10 the hand weights shipped as the trained pilot 8; FM11 the safety audit count in `by` edited 3; FM12 the citation edited 3.
 "use strict";
+import "../../physics/mechanics/rigidBody6dofEuler.mjs";   // 2026-11-04 -- the 6-DOF numbers this gate holds were measured under the first-order orientation step, so it flies that step (see that file)
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
