@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/subSensedDetSpecs.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// THE REGISTRATIONS OF FOLLOW-UPS 8 TO 58 AS DATA (brain/SENSED_NAV_WIP.md, "FOLLOW-UP 8" to "FOLLOW-UP 58"), one spec for each: the arms flown, the designated detector, the bar's cells, the verdict rule and the predictions, each as an operation on the pooled counts of arms.
+// THE REGISTRATIONS OF FOLLOW-UPS 8 TO 58 AND 60 AS DATA (brain/SENSED_NAV_WIP.md, "FOLLOW-UP 8" to "FOLLOW-UP 58", and the second registration of "FOLLOW-UP 60", three specs), one spec for each: the arms flown, the designated detector, the bar's cells, the verdict rule and the predictions, each as an operation on the pooled counts of arms.
 // A study is named by its backlog id without the "nav-sensed-" ("dropout-range", "detector-hold-confirm", ...). The engine is tools/ship/subSensedDetStudy.mjs; the detectors and faults are brain/subSensedDetect.mjs. Every spec carries the number of its follow-up, its set (HELD13 for follow-up 8 up to HELD29 for follow-up 24) and the file its flights go to.
 // A TERM is an arm name "<detector>@<condition>" (the three kinds pooled) or "long+fix+forget" or "exact"; { k: kind, a: arm } is one kind; { sum: [terms] } and { max: [terms] } combine.
 // OPERATIONS (n is a number of flights): ge   a - b >= n;  gt   a > b;  le   a - b <= n;  within   |a - b| <= n;  bar   the arm in `a` reaches at least 80% of exact's count in EACH kind;  notBar   it misses that in at least one kind;  noBar   it misses that in EVERY kind (follow-up 36's AK4);  eachGe   every arm of `arms` reaches at least n more than `b`;  spread / spreadGt   the largest minus the smallest count of `arms` is at most / more than n;  and   every prediction of `of` holds.
@@ -834,6 +834,56 @@ study("detector-hold-range-hold-range-hold", {
         bar("BG6", "rn30cfl holds the bar (80% of exact) in every kind under D30", "rn30cfl@D30"),
         gt("BG7", "the designated beats the map that forgets under the dropout: under D30, rn30cfl reaches more than inc", "rn30cfl@D30", "inc@D30"),
         within("BG8", "on a sea with no faults rn30cfl is within 8 of the clean long+fix+forget", "rn30cfl@clean", "long+fix+forget", 8),
+    ],
+});
+
+// ---- FOLLOW-UP 60 (the second registration of the larger set: THREE sets, HELD64 to HELD66, one spec each from one table, READ TOGETHER by tools/ship/subSensedDetLarge.mjs; each prediction is on the counts of 540 scenarios, so the one-set tables the command prints for a set are not read)
+// FOLLOW-UP 60: THE LARGER SET, THE SIX DETECTORS THAT DIFFER, SET A OF THREE (READ TOGETHER)
+study("large-set-a", {
+    followUp: 60, held: "held64", out: outOf("LargeSetA", "held64"), title: "THE LARGER SET, THE SIX DETECTORS THAT DIFFER, SET A OF THREE (READ TOGETHER)", designated: "m23e30",
+    arms: ["exact", LF, "inc@R3D30", "m23e30@R3D30", "m23re30@R3D30", "rm23e30@R3D30", "m33e30@R3D30", "m23e30k@R3D30", "inc@WD30L", "m23e30@WD30L", "m23re30@WD30L", "rm23e30@WD30L", "m33e30@WD30L", "m23e30k@WD30L", "inc@P", "m23e30@P", "m23re30@P", "rm23e30@P", "m33e30@P", "m23e30k@P", "inc@D30", "m23e30@D30"],
+    bar: { arm: "m23e30", conds: ["R3D30", "WD30L"] }, verdict: { full: 6, partly: 4 },
+    preds: [
+        ge("BH1", "the hold gains under dropouts: under D30, m23e30 reaches at least 9 more than inc", "m23e30@D30", "inc@D30", 9),
+        ge("BH2", "the gate costs under range-law false returns: under R3D30, m23e30 reaches at least 18 more than m23re30", "m23e30@R3D30", "m23re30@R3D30", 18),
+        ge("BH3", "and under the leak: under WD30L, m23e30 reaches at least 21 more than m23re30", "m23e30@WD30L", "m23re30@WD30L", 21),
+        and("BH4", "the first-reading near mark costs: m23e30 reaches at least 12 more than rm23e30 under R3D30 and at least 30 more under WD30L", [ge("", "", "m23e30@R3D30", "rm23e30@R3D30", 12), ge("", "", "m23e30@WD30L", "rm23e30@WD30L", 30)]),
+        ge("BH5", "the run of three costs under range-law false returns: under R3D30, m23e30 reaches at least 12 more than m33e30", "m23e30@R3D30", "m33e30@R3D30", 12),
+        ge("BH6", "and under the leak: under WD30L, m23e30 reaches at least 30 more than m33e30", "m23e30@WD30L", "m33e30@WD30L", 30),
+        and("BH7", "the confirmed clear on the base does nothing: m23e30k is within 15 of m23e30 under R3D30 and under WD30L", [within("", "", "m23e30k@R3D30", "m23e30@R3D30", 15), within("", "", "m23e30k@WD30L", "m23e30@WD30L", 15)]),
+        within("BH8", "and the hold does nothing under the persistent mix: under P, m23e30 is within 15 of inc", "m23e30@P", "inc@P", 15),
+    ],
+});
+// FOLLOW-UP 60: THE LARGER SET, THE SIX DETECTORS THAT DIFFER, SET B OF THREE (READ TOGETHER)
+study("large-set-b", {
+    followUp: 60, held: "held65", out: outOf("LargeSetB", "held65"), title: "THE LARGER SET, THE SIX DETECTORS THAT DIFFER, SET B OF THREE (READ TOGETHER)", designated: "m23e30",
+    arms: ["exact", LF, "inc@R3D30", "m23e30@R3D30", "m23re30@R3D30", "rm23e30@R3D30", "m33e30@R3D30", "m23e30k@R3D30", "inc@WD30L", "m23e30@WD30L", "m23re30@WD30L", "rm23e30@WD30L", "m33e30@WD30L", "m23e30k@WD30L", "inc@P", "m23e30@P", "m23re30@P", "rm23e30@P", "m33e30@P", "m23e30k@P", "inc@D30", "m23e30@D30"],
+    bar: { arm: "m23e30", conds: ["R3D30", "WD30L"] }, verdict: { full: 6, partly: 4 },
+    preds: [
+        ge("BH1", "the hold gains under dropouts: under D30, m23e30 reaches at least 9 more than inc", "m23e30@D30", "inc@D30", 9),
+        ge("BH2", "the gate costs under range-law false returns: under R3D30, m23e30 reaches at least 18 more than m23re30", "m23e30@R3D30", "m23re30@R3D30", 18),
+        ge("BH3", "and under the leak: under WD30L, m23e30 reaches at least 21 more than m23re30", "m23e30@WD30L", "m23re30@WD30L", 21),
+        and("BH4", "the first-reading near mark costs: m23e30 reaches at least 12 more than rm23e30 under R3D30 and at least 30 more under WD30L", [ge("", "", "m23e30@R3D30", "rm23e30@R3D30", 12), ge("", "", "m23e30@WD30L", "rm23e30@WD30L", 30)]),
+        ge("BH5", "the run of three costs under range-law false returns: under R3D30, m23e30 reaches at least 12 more than m33e30", "m23e30@R3D30", "m33e30@R3D30", 12),
+        ge("BH6", "and under the leak: under WD30L, m23e30 reaches at least 30 more than m33e30", "m23e30@WD30L", "m33e30@WD30L", 30),
+        and("BH7", "the confirmed clear on the base does nothing: m23e30k is within 15 of m23e30 under R3D30 and under WD30L", [within("", "", "m23e30k@R3D30", "m23e30@R3D30", 15), within("", "", "m23e30k@WD30L", "m23e30@WD30L", 15)]),
+        within("BH8", "and the hold does nothing under the persistent mix: under P, m23e30 is within 15 of inc", "m23e30@P", "inc@P", 15),
+    ],
+});
+// FOLLOW-UP 60: THE LARGER SET, THE SIX DETECTORS THAT DIFFER, SET C OF THREE (READ TOGETHER)
+study("large-set-c", {
+    followUp: 60, held: "held66", out: outOf("LargeSetC", "held66"), title: "THE LARGER SET, THE SIX DETECTORS THAT DIFFER, SET C OF THREE (READ TOGETHER)", designated: "m23e30",
+    arms: ["exact", LF, "inc@R3D30", "m23e30@R3D30", "m23re30@R3D30", "rm23e30@R3D30", "m33e30@R3D30", "m23e30k@R3D30", "inc@WD30L", "m23e30@WD30L", "m23re30@WD30L", "rm23e30@WD30L", "m33e30@WD30L", "m23e30k@WD30L", "inc@P", "m23e30@P", "m23re30@P", "rm23e30@P", "m33e30@P", "m23e30k@P", "inc@D30", "m23e30@D30"],
+    bar: { arm: "m23e30", conds: ["R3D30", "WD30L"] }, verdict: { full: 6, partly: 4 },
+    preds: [
+        ge("BH1", "the hold gains under dropouts: under D30, m23e30 reaches at least 9 more than inc", "m23e30@D30", "inc@D30", 9),
+        ge("BH2", "the gate costs under range-law false returns: under R3D30, m23e30 reaches at least 18 more than m23re30", "m23e30@R3D30", "m23re30@R3D30", 18),
+        ge("BH3", "and under the leak: under WD30L, m23e30 reaches at least 21 more than m23re30", "m23e30@WD30L", "m23re30@WD30L", 21),
+        and("BH4", "the first-reading near mark costs: m23e30 reaches at least 12 more than rm23e30 under R3D30 and at least 30 more under WD30L", [ge("", "", "m23e30@R3D30", "rm23e30@R3D30", 12), ge("", "", "m23e30@WD30L", "rm23e30@WD30L", 30)]),
+        ge("BH5", "the run of three costs under range-law false returns: under R3D30, m23e30 reaches at least 12 more than m33e30", "m23e30@R3D30", "m33e30@R3D30", 12),
+        ge("BH6", "and under the leak: under WD30L, m23e30 reaches at least 30 more than m33e30", "m23e30@WD30L", "m33e30@WD30L", 30),
+        and("BH7", "the confirmed clear on the base does nothing: m23e30k is within 15 of m23e30 under R3D30 and under WD30L", [within("", "", "m23e30k@R3D30", "m23e30@R3D30", 15), within("", "", "m23e30k@WD30L", "m23e30@WD30L", 15)]),
+        within("BH8", "and the hold does nothing under the persistent mix: under P, m23e30 is within 15 of inc", "m23e30@P", "inc@P", 15),
     ],
 });
 

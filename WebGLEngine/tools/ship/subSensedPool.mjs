@@ -19,6 +19,9 @@ import * as Sp from "./subSensedDetSpecs.mjs";
 export const SEAS = Object.freeze(["R3D30", "WD30L", "WD30", "W", "P", "D30"]);
 export const MIN_SETS_NOISE = 3, MIN_SETS_SEEN = 5, RANGE_OVER = 12;
 export const CONTROLS = Object.freeze(["exact", "long+fix+forget"]);
+/** The sets pooled: the specs of follow-ups 8 to 58 (HELD13 to HELD63), the 51 sets the registration names; the larger set of follow-up 60 and the sweep of 61 come after and are not part of it. */
+export const pooledOf = (specs) => Object.freeze(Object.fromEntries(Object.entries(specs).filter(([, spec]) => spec.followUp >= 8 && spec.followUp <= 58)));
+export const POOLED = pooledOf(Sp.SPECS);
 
 /** Student's t, 0.975 quantile, by degrees of freedom (the standard table; df between listed values takes the next lower one, which is wider). */
 export const T975 = Object.freeze({ 1: 12.706, 2: 4.303, 3: 3.182, 4: 2.776, 5: 2.571, 6: 2.447, 7: 2.365, 8: 2.306, 9: 2.262, 10: 2.228, 11: 2.201, 12: 2.179, 13: 2.160, 14: 2.145, 15: 2.131, 16: 2.120, 17: 2.110, 18: 2.101, 19: 2.093, 20: 2.086, 21: 2.080, 22: 2.074, 23: 2.069, 24: 2.064, 25: 2.060, 26: 2.056, 27: 2.052, 28: 2.048, 29: 2.045, 30: 2.042, 40: 2.021, 60: 2.000, 120: 1.980 });
@@ -183,7 +186,7 @@ export function scorePredictions(noise, rows) {
 
 // ---- the repository ----
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
-export function loadRows(specs = Sp.SPECS, root = REPO, read = (p) => fs.readFileSync(p, "utf8")) {
+export function loadRows(specs = POOLED, root = REPO, read = (p) => fs.readFileSync(p, "utf8")) {
     const rows = [], sets = [];
     for (const name of Object.keys(specs)) {
         const s = specs[name];
