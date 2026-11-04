@@ -10,7 +10,7 @@
 //   4 PILOT     surveyPilot is T.flyDecision of the seat, dive for dive.
 //   5 SOURCE    no clock, random or file; the header names the measurements it stands on.
 // NOT CHECKED, said plainly: how much the seat is worth (Rounds 22 and 32 measured that); that it travels to another boat (Round 13: it needs a model within 10 percent).
-// SABOTAGE LOG: (filled in below after the mutation pass)
+// SABOTAGE LOG (27 mutants of brain/surveySeat.mjs, run against a copy of this gate, each applied alone): 26 went red by name on the first pass, none 0-red but one EQUIVALENT: the cap's last digit changed from ...255 to ...256, which parses to the same double. The mutants covered each of the five constants, the constants unfrozen, the standard profile gaining an option, the events, wide and ensemble options (each one's value and key), the ensemble list and the profiles unfrozen, the profile order, the unknown-profile refusal and its prototype-name case, the overrides ignored, the profile ignored and an override losing to the profile, the default profile, an error handed to the planner, shifted constants, the seat ignoring the profile or the overrides, and the pilot losing its wrapper or its options.
 "use strict";
 import fs from "node:fs";
 let fails = 0, finished = false;
