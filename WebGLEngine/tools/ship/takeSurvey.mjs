@@ -1,6 +1,6 @@
 // tools/ship/takeSurvey.mjs -- the command for brain/surveySeat.mjs (export-free on purpose): fly the survey seat on the needs-and-limits task and print what it scores against the tuned rule it sits on.
 //   node tools/ship/takeSurvey.mjs [--from 1] [--to 20] [--kinds far,both] [--profile standard] [--seconds 600] [--sd 0.1]
-// flies seeds from..to of each kind with the survey seat (profile) and with the tuned rule on the Round 8 constants, on the same dives with the same noisy gauge, and prints each arm's mean score, the paired
+// flies seeds from..to of each kind with the survey seat (profile) and with the tuned rule on the same constants (the Round 33 ones, low -0.06), on the same dives with the same noisy gauge, and prints each arm's mean score, the paired
 // difference with its standard error, the better / worse / same counts, the crushed and stranded dives and the seat's scheduled rollout seconds a dive. Reads nothing but its arguments. About 3 s a dive.
 "use strict";
 import * as T from "../../brain/needsTask.mjs";
