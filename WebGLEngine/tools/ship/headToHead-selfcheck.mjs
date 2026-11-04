@@ -11,6 +11,8 @@
 //   6 FLIGHT    one real short audit (ids 0-1, 60 s): the arms are the pilots they name (the autopilot, the hand weights, a trained file), deterministic.
 //   7 SOURCE    the ids appear once; no clock, random or file.
 // NOT CHECKED, said plainly: which network is best (that is the experiment).
+// SABOTAGE LOG (43 mutants of tools/ship/headToHead.mjs, each alone in its own worktree copy): 37 went red by name on the first pass. 6 went 0 red and each got a row, then red: the start read against the autopilot instead of the hand weights (line 2's "beat" and "below" lists), the dark-specific list read from the dark gain, the dark-specific difference taken against the hand weights, a score of exactly 0 passing SCORES INSIDE, the means table printing the first run's score.
+//   The fixture lesson, as it happened: the first synthetic audit gave every arm a tiny offset so the arms would be distinct, and the offsets made some of them BETTER at se ~0 by chance; the offsets are now exact zero-mean pairs. And a real finding the gate is built around: the hand weights fly as a network indistinguishable from the autopilot (scores equal to four places), so `network-hand` as a control is, in this tree, the autopilot's own twin.
 "use strict";
 import fs from "node:fs";
 let fails = 0, finished = false;
@@ -74,12 +76,20 @@ sec("3. LINES");
     const l = L({ autopilot: { lost: ["dark", "lit"] }, "network-hand": { lost: ["lit"] }, "network-Wip": { lost: ["dark"] }, "network-Robust": { lost: ["dark", "lit"] } })[4];
     ok("!! lost subs: autopilot 4 (two ids, dark and lit), hand 2, networks 6 in total (Wip 2, Robust 4), 4 in the worst", l === "LOST SUBS: autopilot 4, hand 2, networks 6 (4 in the worst)");
 }
+{
+    const hi = L2 => X.bottomLines(mkAu(L2));
+    const L = hi({ "network-Wip": { dark: (i) => 0.1 + wob(i, 0.02), lit: (i) => 0.1 + wob(i, 0.02) }, "network-hand": { dark: (i) => 0.2 + wob(i, 0.02), lit: () => 0 } });
+    ok("!! the start is the hand weights, not the autopilot: Wip gains +0.1 over the autopilot but the hand weights gain +0.2, so line 1 names Wip, line 2 says 0 OF 8 and names all eight BELOW their start (the level ones too: the start moved), line 3 says the hand weights BEAT the autopilot", L[0] === "1 OF 8 NETWORKS BEAT THE AUTOPILOT IN THE DARK (Wip)" && L[1] === "0 OF 8 NETWORKS BEAT THEIR UNTRAINED START IN THE DARK (none); Wip, Actuators, Robust, RobustLong, RobustTail, RobustTail2, RobustWide, RobustNoisy ARE BELOW IT" && L[2] === "THE UNTRAINED HAND WEIGHTS BEAT THE AUTOPILOT IN THE DARK");
+    ok("!! a gain that is the same in the dark and lit is NOT dark-specific (line 4 says 0 OF 8) even where it beats the autopilot, and the dark-specific difference is read against the autopilot, not the hand weights (Wip's stays level with the hand weights raised in the dark only)", L[3] === "THE GAIN IS DARK-SPECIFIC IN 0 OF 8 (none)" && X.readingsOf(mkAu({ "network-Wip": { dark: (i) => 0.1 + wob(i, 0.02), lit: (i) => 0.1 + wob(i, 0.02) }, "network-hand": { dark: (i) => 0.2 + wob(i, 0.02), lit: () => 0 } }), "Wip").specific.reading === "TIES");
+}
 sec("4. CHECKS");
 {
     const names = (au) => X.checksOf(au).filter((c) => !c.ok).map((c) => c.name), good = () => mkAu({ "network-Wip": { dark: () => 0.05, lit: () => 0.01 } });
     ok("!! five check rows on a clean audit, all passing", J(X.checksOf(good()).map((c) => c.name)) === J(["SIZES", "IDS ALIGNED", "SCORES INSIDE (0, 1)", "EVENT REACHES THE FLIGHT", "ARMS DISTINCT"]) && names(good()).length === 0);
     const a1 = good(); a1.lit["network-Robust"].pop(); const a2 = good(); a2.dark["network-Wip"][3].key = "x"; const a3 = good(); a3.dark.autopilot[0].score = 1.0; const a4 = good(); a4.lit.autopilot = a4.dark.autopilot.map((r) => ({ ...r })); const a5 = good(); a5.dark["network-Robust"] = a5.dark["network-Wip"].map((r) => ({ ...r }));
     ok("!! a short arm breaks SIZES, a different id IDS ALIGNED, a score of 1 SCORES INSIDE, an autopilot with the same dark and lit scores EVENT REACHES THE FLIGHT, two identical arms ARMS DISTINCT", names(a1).includes("SIZES") && names(a2).includes("IDS ALIGNED") && names(a3).includes("SCORES INSIDE (0, 1)") && names(a4).includes("EVENT REACHES THE FLIGHT") && names(a5).includes("ARMS DISTINCT"));
+    const a7 = good(); a7.dark["network-Actuators"][5].score = 0;
+    ok("!! a score of exactly 0 breaks SCORES INSIDE (0, 1) as a score of 1 does", names(a7).includes("SCORES INSIDE (0, 1)"));
     const a6 = good(); a6.range = { from: 1, to: 41 };
     ok("!! the expected size is the range's: a 41-id range with 40 runs breaks SIZES", names(a6).includes("SIZES"));
 }
@@ -89,6 +99,8 @@ sec("5. REPORT");
     ok("!! the head names the ids, the seconds and 'read once'; the five checks pass first", /^ROUND H1: .* Ids 1-40 \(40\), 60 s, dark and lit; read once$/.test(L[0]) && L.slice(1, 6).every((l) => /^  PASS /.test(l)));
     ok("!! a means table with all ten arms (dark / lit), the hand-minus-autopilot line, one block per network with four readings each, the spread line", /means \(dark \/ lit\):/.test(t) && X.ARM_IDS.every((a) => t.includes("  " + a.padEnd(20))) && /hand minus autopilot, dark: /.test(t) && X.NETWORK_NAMES.every((n) => new RegExp(`^${n}:\\n   dark vs autopilot .*\\n   dark vs hand .*\\n   lit  vs autopilot .*\\n   dark-specific `, "m").test(t)) && /spread of the eight dark gains over the autopilot: [-+]0\.0\d+ to \+0\.1/.test(t));
     ok("!! the five bottom lines come last, each prefixed BOTTOM LINE:", L.slice(-5).every((l) => l.startsWith("BOTTOM LINE: ")) && /OF 8 NETWORKS BEAT THE AUTOPILOT/.test(L[L.length - 5]) && /LOST SUBS/.test(L[L.length - 1]));
+    { const m = (runs) => runs.reduce((q, r) => q + r.score, 0) / runs.length, row = (a) => t.split("\n").find((l) => l.startsWith("  " + a.padEnd(20)));
+      ok("!! the means table prints each arm's own dark and lit mean to four places (the autopilot's, Wip's, RobustNoisy's)", ["autopilot", "network-Wip", "network-RobustNoisy"].every((a) => row(a) === `  ${a.padEnd(20)} ${m(au.dark[a]).toFixed(4)} / ${m(au.lit[a]).toFixed(4)}`) && m(au.dark["network-Wip"]) > m(au.dark.autopilot) + 0.09); }
     const bad = mkAu({}); bad.dark.autopilot.pop(); const Lb = X.report(bad);
     ok("!! a failed check says the verdicts are NOT WEIGHED, with one bottom line and no table", Lb.some((l) => /^  FAIL SIZES/.test(l)) && Lb.includes("A CHECK FAILED: the verdicts below are NOT WEIGHED.") && Lb[Lb.length - 1] === "BOTTOM LINE: NOT WEIGHED (a check failed)" && Lb.filter((l) => l.startsWith("BOTTOM LINE")).length === 1 && !Lb.some((l) => /means \(dark/.test(l)));
 }
