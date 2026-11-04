@@ -11539,3 +11539,44 @@ total. The history is not changed at all; the trace is.
 
 **The run, on Keith's rig, at round 82's commit:** `--harvest-upscale-temporal-test --round 82`, one CPU harvest (the traces are 3 x round 77's
 history cost; the references dominate, ~5-11 hours). Its file is committed byte for byte before it is read. Section 187 reads it.
+
+## 188. ROUND 83 -- MOVING LIGHTS: THE HISTORY EVERYWHERE VALID AND EVERYWHERE STALE. FIXED BEFORE ITS CODE
+
+**Why.** Every scene from round 32 to round 82 kept its lights still. A moving light changes the shading of every surface it reaches while no
+surface moves, so reproject() keeps nearly every pixel's history and that history is wrong. Only Bt's clamp stands against it. It is the
+case that should hurt the history most, and none of rounds 77-82 measured it.
+
+**The motion (render/movingScenes.mjs's lightMotion).**
+- Every light, and nothing else, moves in a straight line in its own horizontal plane at constant velocity: a direction uniform on the circle
+  and a speed uniform in section 176's MOVE_SPEED, 0.01-0.08 units a frame. It comes from a stream seeded by the scene's seed and salted apart
+  from sceneMotion's (LIGHT_SALT).
+- The motion runs backwards from the measured frame (sceneAt, as section 176), so the measured frame, its light sources and its references are
+  the still twin's, bit for bit.
+- No vectors and no clip: the chain as section 175 left it.
+
+**ROUND 83, a test only, on the CPU.** U_TH is round 72's candidate, unchanged.
+- **Test:** 24 new scenes, 12 R (89000-89011) and 12 C (90000-90011), each with moving lights and still, at round 72's settings, the twins sharing
+  their references.
+- **H83a:** with moving lights, U_TH's chain beats Bt's, by section 159's rule, through verdict() (the sign-flip test, Holm with H83b, C1-C5).
+- **H83b:** with moving lights, Bt beats B1 (the measured frame alone), by the same rule: the history still pays when the light moves.
+- **Descriptive, deciding nothing:**
+  - the still twins' U_TH-over-Bt and Bt-over-B1 gains, and the drops;
+  - Bt's mean history length, moving and still;
+  - each scene's mean correction.
+- File: render/denoise-results-upscale-lights-r83.json.
+
+**Predictions, fixed now, deciding nothing.**
+- **P1:** C1 and C3 hold.
+- **P2:** H83a is supported, at 1-4 %, below the still twins' gain.
+- **P3:** H83b is NOT supported: with the lights moving, Bt is within 1 % of B1 or worse. Its history is long and wrong.
+- **P4:** Bt's mean history length is within 0.3 of the still twins' (the geometry does not move, so almost nothing is rejected).
+- **P5:** on the still twins, Bt beats B1 by more than 1 %.
+
+**What each outcome means, fixed now.**
+- **H83a holds and H83b fails, as predicted:** moving lights are where the history costs, and U_TH softens it. A history check on the
+  shading itself (a luminance-change rejection) is the next round.
+- **Both hold:** Bt's clamp handles moving lights, and the history keeps paying.
+- **H83a fails:** U_TH's gain is a static-lighting result, and that is said wherever U_TH is.
+
+**The run, on Keith's rig, at round 83's commit:** `--harvest-upscale-temporal-test --round 83`, one CPU harvest (~5-11 hours), its file
+committed byte for byte before it is read. Section 189 reads it.
