@@ -195,3 +195,98 @@ each went red by name.
 
 Before they ran, the gate's first version was read against the list. None of its rows could see 21 of them (G18 only
 by its source row). Rows or checks were written for those 21 first.
+
+## The verdict, 2026-11-04
+
+Read from `physics/mechanics/sixdofBox3dResults.json` (138,145 bytes, sha256 0df4a8305ebbcf5c), committed at
+5e30b3bb before anyone read it. The run took 10 s, and B3's step time was 8.13 microseconds.
+
+**A ship flown on box3d spins as it does in the engine's own physics, and turns as the engine's old first-order step
+did. Four of the five pilots fight the same. The PD autopilot fights worse in the joust.**
+
+**M1, the turn.** Twenty open-loop replays, each against the reference, E at 1/1920 s:
+
+| | the standoffs (10) | the jousts (10) |
+|---|---|---|
+| ticks | 165 to 207 | 255 to 415 |
+| the reference's peak spin | 0.0176 to 0.1536 rad/s | 1.4670 to 2.7595 rad/s |
+| E, the engine's own, off the reference | 1.42e-15 to 6.51e-14 rad | 3.13e-9 to 4.71e-8 rad |
+| Q0, the first-order step | 2.94e-4 to 2.56e-3 rad | 2.46e-2 to 4.64e-2 rad (1.41 to 2.66 degrees) |
+| B3, box3d | 2.94e-4 to 2.56e-3 rad | 2.44e-2 to 4.60e-2 rad (1.40 to 2.63 degrees) |
+| B3's angle over Q0's | 1.000 in every duel | 0.991 to 0.995 |
+| B3's spin off the reference, over the peak | 8.62e-8 to 1.99e-7 | 9.02e-8 to 8.62e-7 |
+
+- B3's spin is the reference's, to float32's precision.
+- B3's orientation is as far off as the first-order step's. box3d gives each tick's change of spin at its start: the
+  lead the gate's key measures, alpha h t / 2.
+- E's and Q0's spins are the same to the bit, at most 3.64e-14 of the peak, because Q0 changes only the orientation
+  step.
+
+**M2, the fights.** Each pilot flies as A against the PD autopilot, over 40 seeds of each scenario. Outcomes are from
+A's side, as wins-losses-draws:
+
+| A | scenario | E | B3 | better | worse | p | outcomes the nudge changed | flights the nudge moved |
+|---|---|---|---|---|---|---|---|---|
+| the PD autopilot | standoff | 0-0-40 | 2-3-35 | 2 | 3 | 1.00 | 0 | 0 |
+| the PD autopilot | joust | 1-8-31 | 2-29-9 | 1 | 21 | 1.10e-5 | 0 | 0 |
+| the Default | standoff | 40-0-0 | 40-0-0 | 0 | 0 | 1.00 | 0 | 0 |
+| the Default | joust | 0-37-3 | 1-37-2 | 1 | 1 | 1.00 | 0 | 4 |
+| the League pilot | standoff | 39-0-1 | 39-0-1 | 0 | 0 | 1.00 | 0 | 0 |
+| the League pilot | joust | 0-40-0 | 0-40-0 | 0 | 0 | 1.00 | 0 | 20 |
+| the close-quarters pilot | standoff | 39-0-1 | 39-0-1 | 0 | 0 | 1.00 | 0 | 0 |
+| the close-quarters pilot | joust | 21-11-8 | 26-8-6 | 7 | 2 | 0.180 | 0 | 15 |
+| the GPU Brain's pilot | standoff | 27-0-13 | 25-1-14 | 0 | 3 | 0.250 | 0 | 0 |
+| the GPU Brain's pilot | joust | 3-31-6 | 3-31-6 | 0 | 0 | 1.00 | 0 | 0 |
+
+- **One of the ten readings sees a change. B3 changes how the PD autopilot fights in the joust: worse for A,** with 1
+  better and 21 worse, p = 1.10e-5. The other nine change nothing a sign test can see. The smallest p among them is
+  0.180.
+- **What changed.** On the engine's own, 31 of the PD autopilot's 40 mirror jousts are draws. Every one is a mutual
+  kill: both ships die in the same tick, 250 to 421 ticks in.
+  - On box3d, 21 of those 31 are losses for A. In 20 of them the duel ends in the very tick it ended in on E: A still
+    dies in that tick, and B does not. A's killing hit has not landed.
+  - One becomes a win, and 9 stay draws.
+- **B3 changed 41 of the 400 outcomes:** 8 in the standoffs (2 better, 6 worse) and 33 in the jousts (9 better, 24
+  worse). It moved all 400 flights. The nudge changed none, and moved 39.
+
+**The predictions:**
+
+- **P1: right.** In every joust, B3 is farther from the reference than E, and within a factor of 3 of Q0: 0.991 to
+  0.995 of it.
+- **P2: right.** B3's spin stays within 8.62e-7 of the peak in every duel.
+- **P3: wrong.** The PD autopilot's joust changes.
+- **P4: right.** B3 changed 8 outcomes in the standoffs to the nudge's 0, and 33 to 0 in the jousts.
+
+**The registration's alarm did not ring.** B3 is at most 4.60e-2 rad (2.63 degrees) off the reference, under 10
+degrees. Its spin is at most 8.62e-7 of the peak, under 10%. By the registration's rule the stepper is not wrong, and
+box3d does not turn a driven ship another way.
+
+**The controls all held:**
+
+- C-unchanged: the step digest 5ba918e7cde707f7 and the ten fingerprints.
+- C-box3d: the ship kept 1 m/s and 1 rad/s over 1 s; the default body kept 0.9512 of each.
+- C-inertia: 1.33e-7 relative.
+- C-impulse: 2.70e-7 and 1.64e-7.
+- C-free: 0 and 0.
+- C-awake: 2.24e-8.
+- C-replay: all 20 records.
+- C-chaos: every cell's p is 1.
+- C-determinism: 20 flights, each the same twice.
+
+**Why the PD autopilot loses is not measured here.** B3 differs from E in three ways a pilot could feel:
+
+- the orientation's first-order lead, which M1 measures;
+- the same lead in position, since box3d gives a tick's change of velocity at its start too (not measured here);
+- float32 state.
+
+For comparison, the orientation round changed both ships' step at once (Q0 to Q4, seeds 91001 to 91040). There the PD
+autopilot's joust moved both ways: 8 better and 7 worse, p = 1.00. Here only A changes, and the change runs one way.
+Which of the three costs A its killing hit is a round of its own.
+
+**What this buys.** P3 did not hold, so the engine's ships cannot fly on box3d without changing how they fight: the
+PD autopilot loses its mirror jousts. The four trained pilots fight the same. Nothing is changed: no page flies its
+ships on box3d, and this note authorises no such page and no further round.
+
+**Gated.** Section 6 of `tools/roundhouse/sixdofBox3d-selfcheck.mjs` re-derives every number above from the committed
+file, holds this verdict to them, and flies a sample of the round again. Its 18 sabotages each went red by name. The
+question the verdict leaves is in the backlog as `sixdof-box3d-pd-joust`.

@@ -16,6 +16,9 @@
 //   4  the command: refuses an existing results file, writes it once, prints no reading
 //   5  a miniature on other seeds: every part the registration names, its controls, M1 re-derived and M2 re-flown here by the gate's own code,
 //      each reading re-derived from its flights, and a file that parses back
+//   6  THE VERDICT (2026-11-04), from the committed results file: the file byte for byte; M1's and M2's tables re-derived; the one change (the
+//      PD autopilot's joust, worse for A) and what it is; the counts; each prediction by its registered rule; the alarm; the controls; the
+//      note's verdict holding every number; its comparison with the orientation round's own file; and a sample of the round flown again
 //
 // SABOTAGED (2026-11-04, through the byte-safe runner, each restored byte for byte): 48 sabotages, every one red by name. Before they were run,
 // reading the gate's first version against this list found 21 that none of its rows could see (G18 only its source row), and rows or checks
@@ -76,8 +79,18 @@
 //     G46 no refusal of an existing file ................ 1 red
 //     G47 the readings printed .......................... 1 red
 //     G48 the file written twice ........................ 1 red
+//
+// SABOTAGE LOG, THE VERDICT (2026-11-04) -- section 6, the same runner, every file restored byte-identical (sha256): 18 designs, every one red
+// by name, and every row of section 6 red under at least one.
+//   V1 the file: a PD joust flight on box3d a draw, not a loss 5 | V2 the file: a joust's B3 angle a hundred times larger 6 | V3 the file:
+//   C-awake's miss 2.2e-2 3 | V4 the file: the PD joust's p 0.02 4 | V5 the file: a nudged flight moved 5 | V6 the note: a table row's p 1 |
+//   V7 the note: P3 called right 1 | V8 the note: the direction turned round 1 | V9 the note: M1's joust range for B3 1 | V10 the note: the
+//   nudge's moved flights 1 | V11 the note: the outcome turned round 1 | V12 the note: the orientation round's comparison 1 | V13 the code:
+//   better and worse swapped 1 | V14 the code: box3d stepped once a tick 3 | V15 the code: the duel ignores stepA 7 | V16 the code: the sign
+//   test's line at 0.5 1 | V17 the file: a B3 spin 2% of the peak off 6 | V18 the file: a mutual kill at the time limit 4
 "use strict";
 import fs from "node:fs";
+import crypto from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as RB from "../../physics/mechanics/rigidBody6dof.mjs";
@@ -258,6 +271,103 @@ try {
     const again = JSON.parse(L.serialize(r));
     ok("the results serialize to one JSON file that parses back to the same result", J(again) === J(JSON.parse(JSON.stringify(r))) && L.serialize(r).endsWith("\n"));
 } catch (e) { guard(5, e); }
+
+console.log("\n6. THE VERDICT (2026-11-04, read from the committed results file; a sample of the round flown again)");
+try {
+    const text = fs.readFileSync(L.DEFAULT_RESULTS, "utf8"), R = JSON.parse(text), sha = crypto.createHash("sha256").update(text).digest("hex");
+    ok("!! the results file is the registered run's, byte for byte as it was committed: 138,145 bytes, sha256 0df4a8305ebbcf5c, naming the registration, box3d's four substeps and the five pilots by their hashes",
+        Buffer.byteLength(text) === 138145 && sha.startsWith("0df4a8305ebbcf5c") && R.registration === L.REGISTRATION && R.substeps === 4 &&
+        J(R.pilots) === J(L.PILOTS.map((x) => ({ id: x.id, hash: x.hash }))) && J(R.pilots.map((x) => x.hash)) === J([null, "215e26d9", "32789ff9", "360580a7", "0ffd8554"]), `${Buffer.byteLength(text)} bytes, ${sha.slice(0, 16)}`);
+    const e2 = (x) => x.toExponential(2), fp = (x) => (x < 1e-3 ? x.toExponential(2) : x.toPrecision(3)), deg = (x) => (x * 180 / Math.PI).toFixed(2);
+    // M1: the verdict's table, re-derived from the file's twenty duels
+    const D = R.m1.duels, ofM1 = (sc) => D.filter((d) => d.scenario === sc), st = ofM1("standoff"), jo = ofM1("joust");
+    const span = (a, f, fmt, unit = "") => `${fmt(Math.min(...a.map(f)))} to ${fmt(Math.max(...a.map(f)))}${unit}`;
+    const angleCell = (a, k, withDeg) => `${span(a, (d) => d.angle[k], e2, " rad")}${withDeg ? ` (${span(a, (d) => d.angle[k], deg)} degrees)` : ""}`;
+    const ratioCell = (a) => { const lo = Math.min(...a.map((d) => d.angle.B3 / d.angle.Q0)).toFixed(3), hi = Math.max(...a.map((d) => d.angle.B3 / d.angle.Q0)).toFixed(3); return lo === hi ? `${lo} in every duel` : `${lo} to ${hi}`; };
+    const m1rows = [`| ticks | ${span(st, (d) => d.ticks, String)} | ${span(jo, (d) => d.ticks, String)} |`,
+        `| the reference's peak spin | ${span(st, (d) => d.peakSpin, (v) => v.toFixed(4), " rad/s")} | ${span(jo, (d) => d.peakSpin, (v) => v.toFixed(4), " rad/s")} |`,
+        `| E, the engine's own, off the reference | ${angleCell(st, "E")} | ${angleCell(jo, "E")} |`, `| Q0, the first-order step | ${angleCell(st, "Q0")} | ${angleCell(jo, "Q0", true)} |`,
+        `| B3, box3d | ${angleCell(st, "B3")} | ${angleCell(jo, "B3", true)} |`, `| B3's angle over Q0's | ${ratioCell(st)} | ${ratioCell(jo)} |`,
+        `| B3's spin off the reference, over the peak | ${span(st, (d) => d.spinOff.B3, e2)} | ${span(jo, (d) => d.spinOff.B3, e2)} |`];
+    const M1ROWS = ["| ticks | 165 to 207 | 255 to 415 |", "| the reference's peak spin | 0.0176 to 0.1536 rad/s | 1.4670 to 2.7595 rad/s |",
+        "| E, the engine's own, off the reference | 1.42e-15 to 6.51e-14 rad | 3.13e-9 to 4.71e-8 rad |", "| Q0, the first-order step | 2.94e-4 to 2.56e-3 rad | 2.46e-2 to 4.64e-2 rad (1.41 to 2.66 degrees) |",
+        "| B3, box3d | 2.94e-4 to 2.56e-3 rad | 2.44e-2 to 4.60e-2 rad (1.40 to 2.63 degrees) |", "| B3's angle over Q0's | 1.000 in every duel | 0.991 to 0.995 |",
+        "| B3's spin off the reference, over the peak | 8.62e-8 to 1.99e-7 | 9.02e-8 to 8.62e-7 |"];
+    const eqSpin = D.every((d) => d.spinOff.E === d.spinOff.Q0), maxSpinE = Math.max(...D.map((d) => d.spinOff.E));
+    ok("!! M1: ten duels of each scenario, the registration's seeds, every record replayed onto its duel -- and the verdict's table row by row; E's and Q0's spins the same to the bit, at most 3.64e-14 of the peak",
+        st.length === 10 && jo.length === 10 && J(st.map((d) => d.seed)) === J(L.TURN.seeds) && J(jo.map((d) => d.seed)) === J(L.TURN.seeds) && D.every((d) => d.replayIsDuel) &&
+        J(m1rows) === J(M1ROWS) && eqSpin && e2(maxSpinE) === "3.64e-14", m1rows.find((r, i) => r !== M1ROWS[i]) || `${D.length} duels`);
+    // M2: every cell re-derived from its 40 flights, and the verdict's table row by row
+    const NAME = { scripted: "the PD autopilot", shipped: "the Default", league: "the League pilot", close: "the close-quarters pilot", gpu: "the GPU Brain's pilot" };
+    const cells = R.m2.cells, tal = (x) => `${x.win}-${x.loss}-${x.draw}`, movedBy = (c, k) => c.flights[k].filter((f, i) => f.fingerprint !== c.flights.E[i].fingerprint).length;
+    const tallyOf = (rs) => ({ win: rs.filter((x) => x.outcome === "win").length, loss: rs.filter((x) => x.outcome === "loss").length, draw: rs.filter((x) => x.outcome === "draw").length });
+    const rowOf = (c) => `| ${NAME[c.pilot]} | ${c.scenario} | ${tal(c.tally.E)} | ${tal(c.tally.B3)} | ${c.b3.better} | ${c.b3.worse} | ${fp(c.b3.p)} | ${c.chaos.changed} | ${movedBy(c, "E'")} |`;
+    const ROWS = ["| the PD autopilot | standoff | 0-0-40 | 2-3-35 | 2 | 3 | 1.00 | 0 | 0 |", "| the PD autopilot | joust | 1-8-31 | 2-29-9 | 1 | 21 | 1.10e-5 | 0 | 0 |",
+        "| the Default | standoff | 40-0-0 | 40-0-0 | 0 | 0 | 1.00 | 0 | 0 |", "| the Default | joust | 0-37-3 | 1-37-2 | 1 | 1 | 1.00 | 0 | 4 |",
+        "| the League pilot | standoff | 39-0-1 | 39-0-1 | 0 | 0 | 1.00 | 0 | 0 |", "| the League pilot | joust | 0-40-0 | 0-40-0 | 0 | 0 | 1.00 | 0 | 20 |",
+        "| the close-quarters pilot | standoff | 39-0-1 | 39-0-1 | 0 | 0 | 1.00 | 0 | 0 |", "| the close-quarters pilot | joust | 21-11-8 | 26-8-6 | 7 | 2 | 0.180 | 0 | 15 |",
+        "| the GPU Brain's pilot | standoff | 27-0-13 | 25-1-14 | 0 | 3 | 0.250 | 0 | 0 |", "| the GPU Brain's pilot | joust | 3-31-6 | 3-31-6 | 0 | 0 | 1.00 | 0 | 0 |"];
+    const rederived = cells.every((c) => J(OS.compare(c.flights.E, c.flights.B3)) === J(c.b3) && J(OS.compare(c.flights.E, c.flights["E'"])) === J(c.chaos) && OS.readingOf(c.b3) === c.reading &&
+        ["E", "B3", "E'"].every((k) => J(tallyOf(c.flights[k])) === J(c.tally[k]) && c.flights[k].length === 40) && J(c.seeds) === J(L.FIGHT.seeds));
+    ok("!! M2: every cell re-derived from its 40 flights by the library's own rules (better, worse, p, the reading, the tallies), and the verdict's table row by row",
+        rederived && cells.length === 10 && J(cells.map(rowOf)) === J(ROWS) && J(R.readings.map((x) => x.reading)) === J(cells.map((c) => c.reading)), rederived ? cells.map(rowOf).find((r, i) => r !== ROWS[i]) || "" : "a cell does not re-derive");
+    // THE ONE CHANGE, and what it is: the PD autopilot's mirror jousts, mutual kills that become A's losses in the very tick
+    const pd = cells.find((c) => c.pilot === "scripted" && c.scenario === "joust"), others = cells.filter((c) => c !== pd), seen = cells.filter((c) => c.reading !== "changes nothing a sign test can see");
+    const pairs = pd.flights.E.map((f, i) => ({ e: f, b: pd.flights.B3[i] })), draws = pairs.filter((x) => x.e.outcome === "draw"), steps = Math.round(30 / L.DUEL_DT);
+    const toLoss = draws.filter((x) => x.b.outcome === "loss"), sameTick = toLoss.filter((x) => x.b.ticks === x.e.ticks), toWin = draws.filter((x) => x.b.outcome === "win"), kept = draws.filter((x) => x.b.outcome === "draw");
+    const minOther = Math.min(...others.map((c) => c.b3.p));
+    ok("!! the one change: only the PD autopilot's joust reads below 0.01 -- worse for A, 1 better and 21 worse, p 1.10e-5, the next smallest 0.180 -- and its 31 draws on E are all mutual kills (250 to 421 ticks, none at the 900-tick limit); on box3d 21 are A's losses, 20 in the very tick, 1 a win, 9 still draws",
+        seen.length === 1 && seen[0] === pd && pd.reading === "changes it: worse for A" && pd.b3.better === 1 && pd.b3.worse === 21 && fp(pd.b3.p) === "1.10e-5" && fp(minOther) === "0.180" &&
+        draws.length === 31 && draws.every((x) => x.e.ticks < steps) && Math.min(...draws.map((x) => x.e.ticks)) === 250 && Math.max(...draws.map((x) => x.e.ticks)) === 421 && steps === 900 &&
+        toLoss.length === 21 && sameTick.length === 20 && toWin.length === 1 && kept.length === 9, `${pd.b3.better}/${pd.b3.worse}, p ${fp(pd.b3.p)}; ${draws.length} draws, ${toLoss.length} losses (${sameTick.length} same tick), ${toWin.length} win, ${kept.length} kept`);
+    const sum = (sc, k, part) => cells.filter((c) => !sc || c.scenario === sc).reduce((a, c) => a + c[part][k], 0), movedB3 = cells.reduce((a, c) => a + movedBy(c, "B3"), 0), movedN = cells.reduce((a, c) => a + movedBy(c, "E'"), 0);
+    ok("!! B3 changed 41 of the 400 outcomes, 8 in the standoffs (2 better, 6 worse) and 33 in the jousts (9 better, 24 worse), and moved all 400 flights; the nudge changed none and moved 39",
+        sum(null, "changed", "b3") === 41 && sum("standoff", "changed", "b3") === 8 && sum("standoff", "better", "b3") === 2 && sum("standoff", "worse", "b3") === 6 && sum("joust", "changed", "b3") === 33 &&
+        sum("joust", "better", "b3") === 9 && sum("joust", "worse", "b3") === 24 && movedB3 === 400 && sum(null, "changed", "chaos") === 0 && movedN === 39, `${sum(null, "changed", "b3")} changed, ${movedB3} moved; the nudge ${sum(null, "changed", "chaos")}, ${movedN}`);
+    const P = { P1: jo.every((d) => d.angle.B3 > d.angle.E && d.angle.B3 <= 3 * d.angle.Q0 && d.angle.B3 >= d.angle.Q0 / 3), P2: D.every((d) => d.spinOff.B3 < 0.01),
+        P3: cells.every((c) => c.reading === "changes nothing a sign test can see"), P4: L.SCENARIOS.every((sc) => sum(sc, "changed", "b3") > sum(sc, "changed", "chaos")) };
+    ok("!! the predictions, each by its registered rule from the file: P1 right, P2 right, P3 wrong (the PD autopilot's joust), P4 right (8 to 0 and 33 to 0)", P.P1 && P.P2 && !P.P3 && P.P4, J(P));
+    const worstAngle = Math.max(...D.map((d) => d.angle.B3)), worstSpin = Math.max(...D.map((d) => d.spinOff.B3)), alarm = worstAngle > 10 * Math.PI / 180 || worstSpin > 0.1;
+    ok("!! the registration's alarm did not ring: B3 is at most 4.60e-2 rad (2.63 degrees) off the reference, under 10 degrees, and its spin at most 8.62e-7 of the peak, under 10%",
+        !alarm && e2(worstAngle) === "4.60e-2" && deg(worstAngle) === "2.63" && e2(worstSpin) === "8.62e-7", `${e2(worstAngle)} rad, ${e2(worstSpin)}`);
+    const C = R.controls;
+    ok("!! the controls all held, as the verdict gives them: C-unchanged (the digest and the ten fingerprints), C-box3d (1 m/s and 1 rad/s kept, the default 0.9512), C-inertia 1.33e-7, C-impulse 2.70e-7 and 1.64e-7, C-free 0 and 0, C-awake 2.24e-8, C-replay, C-chaos (every p 1), C-determinism (20 flights)",
+        C.unchanged.ok && C.unchanged.digest === "5ba918e7cde707f7" && J(C.unchanged.fingerprints) === J(L.ANCHOR.fingerprints) && C.box3d.ok && C.box3d.shipSpeed === 1 && C.box3d.shipSpin === 1 &&
+        C.box3d.defaultSpeed.toFixed(4) === "0.9512" && C.box3d.defaultSpin.toFixed(4) === "0.9512" && C.inertia.ok && e2(C.inertia.rel) === "1.33e-7" && C.impulse.ok && e2(C.impulse.relW) === "2.70e-7" && e2(C.impulse.offV) === "1.64e-7" &&
+        C.free.ok && C.free.spinOff === 0 && C.free.speedOff === 0 && C.awake.ok && e2(C.awake.off) === "2.24e-8" && C.replay.ok && C.chaos.ok && C.chaos.cells.length === 10 && C.chaos.cells.every((c) => c.p === 1) &&
+        C.determinism.ok && C.determinism.flights === 20 && C.determinism.off.length === 0);
+    // THE NOTE: the verdict section alone, from its heading to the next, its line breaks read as spaces
+    const note = src(L.REGISTRATION), vAt = note.indexOf("\n## The verdict, 2026-11-04"), rest = vAt >= 0 ? note.slice(vAt + 1) : "", nextAt = rest.slice(1).search(/\n#{2,3} /);
+    const vt = (nextAt >= 0 ? rest.slice(0, nextAt + 1) : rest).replace(/\s+/g, " ");
+    const changedReadings = seen.length, words = ["none", "One", "Two", "Three"];
+    const frags = [`${Buffer.byteLength(text).toLocaleString("en-US")} bytes, sha256 ${sha.slice(0, 16)}`, ...m1rows, ...cells.map(rowOf), `at most ${e2(maxSpinE)} of the peak`,
+        `${words[changedReadings] || changedReadings} of the ten readings sees a change`, `B3 changes how the PD autopilot fights in the joust: ${pd.reading.replace("changes it: ", "")}`,
+        `with ${pd.b3.better} better and ${pd.b3.worse} worse, p = ${fp(pd.b3.p)}`, `The smallest p among them is ${fp(minOther)}`, `${draws.length} of the PD autopilot's 40 mirror jousts are draws`,
+        `${Math.min(...draws.map((x) => x.e.ticks))} to ${Math.max(...draws.map((x) => x.e.ticks))} ticks in`, `${toLoss.length} of those ${draws.length} are losses for A. In ${sameTick.length} of them`, `and ${kept.length} stay draws`,
+        `B3 changed ${sum(null, "changed", "b3")} of the 400 outcomes`, `${sum("standoff", "changed", "b3")} in the standoffs (${sum("standoff", "better", "b3")} better, ${sum("standoff", "worse", "b3")} worse) and ${sum("joust", "changed", "b3")} in the jousts (${sum("joust", "better", "b3")} better, ${sum("joust", "worse", "b3")} worse)`,
+        `It moved all ${movedB3} flights. The nudge changed ${sum(null, "changed", "chaos") === 0 ? "none" : sum(null, "changed", "chaos")}, and moved ${movedN}`, ...Object.keys(P).map((k) => `**${k}: ${P[k] ? "right" : "wrong"}.**`),
+        `B3 is at most ${e2(worstAngle)} rad (${deg(worstAngle)} degrees) off the reference`, `Its spin is at most ${e2(worstSpin)} of the peak`, `the step digest ${C.unchanged.digest}`,
+        `the default body kept ${C.box3d.defaultSpeed.toFixed(4)} of each`, `C-inertia: ${e2(C.inertia.rel)} relative`, `C-impulse: ${e2(C.impulse.relW)} and ${e2(C.impulse.offV)}`, `C-awake: ${e2(C.awake.off)}`,
+        `C-replay: all ${D.length} records`, `C-determinism: ${C.determinism.flights} flights, each the same twice`,
+        P.P3 ? "the engine's ships could fly on box3d without changing how they fight" : "the engine's ships cannot fly on box3d without changing how they fight"];
+    const missing = frags.filter((f) => !vt.includes(f));
+    ok("!! the note's verdict carries the file's numbers: both tables row by row, the one change and what it is, the counts, each prediction as the file reads it, the alarm, the controls, and the outcome the registration fixed",
+        vAt >= 0 && missing.length === 0, missing.slice(0, 3).join(" || ") || `${frags.length} fragments`);
+    // THE COMPARISON WITH THE ORIENTATION ROUND, read from that round's own committed file
+    const OR = JSON.parse(fs.readFileSync(OS.DEFAULT_RESULTS, "utf8")), opd = OR.m3.cells.find((c) => c.pilot === "scripted" && c.scenario === "joust"), oseeds = OS.FIGHT.seeds;
+    const ofrag = `(Q0 to Q4, seeds ${oseeds[0]} to ${oseeds[oseeds.length - 1]}). There the PD autopilot's joust moved both ways: ${opd.q4.better} better and ${opd.q4.worse} worse, p = ${fp(opd.q4.p)}`;
+    ok("!! the note's comparison is the orientation round's own committed file: when both ships changed step (Q0 to Q4, seeds 91001 to 91040), the PD autopilot's joust moved 8 better and 7 worse, p 1.00",
+        opd.q4.better === 8 && opd.q4.worse === 7 && fp(opd.q4.p) === "1.00" && J(opd.seeds) === J(oseeds) && oseeds[0] === 91001 && oseeds.length === 40 && vt.includes(ofrag), vt.includes(ofrag) ? "" : ofrag);
+    // A SAMPLE OF THE ROUND, flown again at this head through the library, against the file to the bit
+    const off = [], s1 = L.FIGHT.seeds[0];
+    for (const d of L.m1(b3, { seeds: [s1] }).duels) { const f = D.find((x) => x.scenario === d.scenario && x.seed === d.seed); if (J(d) !== J(f)) off.push(`M1/${d.scenario}/${d.seed}`); }
+    for (const pl of OS.loadPilots()) for (const sc of L.SCENARIOS) { const c = cells.find((x) => x.pilot === pl.id && x.scenario === sc);
+        if (J(L.fight(b3, pl.pilot, s1, sc)) !== J(c.flights.E[0])) off.push(`M2/${pl.id}/${sc}/E`);
+        if (J(L.fight(b3, pl.pilot, s1, sc, { on: "B3" })) !== J(c.flights.B3[0])) off.push(`M2/${pl.id}/${sc}/B3`);
+        if (J(L.fight(b3, pl.pilot, s1, sc, { nudge: L.FIGHT.nudge })) !== J(c.flights["E'"][0])) off.push(`M2/${pl.id}/${sc}/E'`); }
+    ok("!! a sample of the round flown again at this head, through the library, is the file's to the bit: M1's seed 93001 in both scenarios, and each pilot's seed 93001 in both scenarios with A on E, on box3d and nudged (the PD autopilot's joust among them, a mutual kill that box3d makes A's loss)",
+        off.length === 0 && pairs[0].e.outcome === "draw" && pairs[0].b.outcome === "loss", off.join(" ") || "32 flights");
+} catch (e) { guard(6, e); }
 
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)`);
 process.exitCode = fails ? 1 : 0;
