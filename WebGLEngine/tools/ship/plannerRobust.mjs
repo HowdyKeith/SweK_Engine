@@ -93,13 +93,12 @@ export function report(au) {
     const L = [`ROUND 31: do the -0.12 constants hold up outside the conditions they were chosen in? ${COND_NAMES.map((c) => `${c} ${CONDITIONS[c].seeds[0]}-${CONDITIONS[c].seeds[1]}`).join(", ")} (far and both, ${DIVES} dives per arm and condition; read once)`];
     const checks = checksOf(au), bad = checks.filter((c) => !c.ok);
     for (const c of checks) L.push(`  ${c.ok ? "PASS" : "FAIL"} ${c.name}: ${c.text}`);
-    if (bad.length) L.push("A CHECK FAILED: the verdicts below are NOT WEIGHED.");
+    if (bad.length) { L.push("A CHECK FAILED: the verdicts below are NOT WEIGHED.", "BOTTOM LINE: NOT WEIGHED (a check failed)"); return L; }   // the differences of arms that do not line up are not computed
     for (const c of COND_NAMES) {
         const x = conditionOf(au, c), cd = CONDITIONS[c], mean = (a) => au[c][a].score.toFixed(4);
         L.push(`${c} (${cd.count} stations, damage x${cd.damageScale}, gauge sd ${cd.sd}): means R8 ${mean("TUNED-R8")}, L12 ${mean("TUNED-L12")}, twin ${mean("TWIN-L12")}`, `   rule gain (L12 minus R8) ${fmt(x.rule)}  ${x.ruleVerdict}`, `   twin gain (twin L12 minus L12) ${fmt(x.twin)}  ${x.twinVerdict}`, `   crushed/stranded: ${ARMS.map((a) => `${a} ${x.hull[a].crushed}/${x.hull[a].stranded}`).join(", ")}`);
     }
-    if (bad.length) L.push("BOTTOM LINE: NOT WEIGHED (a check failed)");
-    else for (const l of bottomLines(au)) L.push(`BOTTOM LINE: ${l}`);
+    for (const l of bottomLines(au)) L.push(`BOTTOM LINE: ${l}`);
     return L;
 }
 export { SE_FACTOR };
