@@ -9,12 +9,14 @@ const pct = (v) => (Number.isFinite(v) ? Math.round(v * 100) : 0);
 
 /** The line for a snapshot row, or "" for a row with no needs. */
 export function needsLine(row) {
-    const n = row && row.needs;
-    if (!n) return "";
+    const n = row && row.needs, sv = row && row.survey;
+    // v4912 -- the survey (brain/surveySeat.mjs in the tank): how many stations, how long, which profile, and the score when it is over (a lost boat keeps its result: the row has a survey and no needs)
+    const survey = sv ? `SURVEY ${sv.visited}/${sv.total} stations · ${Math.round(sv.t)}/${sv.seconds} s · ${sv.profile}${sv.done ? ` · DONE score ${sv.score.toFixed(2)}${sv.status !== "submerged" ? ` (${sv.status})` : ""}` : ""}` : "";
+    if (!n) return survey;
     const kw = Number.isFinite(n.watts) ? (n.watts / 1000).toFixed(1) : "0.0";
     const charge = n.cls === "unlimited" ? "charge unlimited" : `charge ${pct(n.frac)}%`;
     const adv = n.advisor && n.advisor.on ? ` · ADVISOR (surfaces under ${pct(n.advisor.threshold)}%)` : "", trip = n.refilling ? " · REFILLING" : "", on = n.charging ? ` · charging${n.exposed ? " (exposed)" : ""}` : "";
     // v4905 -- the pump and the repair, only when they are asked for: the repair waits for the surface and a near stop, and says so
     const pump = n.pump > 0 ? ` · pump ${pct(n.pump)}%` : "", repair = n.repair > 0 ? ` · repair ${pct(n.repair)}%${n.repairing ? "" : " (waits for the surface)"}` : "";
-    return `${CLASS_NAMES[n.cls] || n.cls} · ${charge} · ${kw} kW${adv}${trip}${on} · hull ${n.strain.toFixed(2)} of ${Math.round(n.collapseDepth)} m · damage ${pct(n.damage)}% · flood ${(n.flood * 100).toFixed(1)}%${pump}${repair}`;
+    return `${CLASS_NAMES[n.cls] || n.cls} · ${charge} · ${kw} kW${adv}${trip}${on} · hull ${n.strain.toFixed(2)} of ${Math.round(n.collapseDepth)} m · damage ${pct(n.damage)}% · flood ${(n.flood * 100).toFixed(1)}%${pump}${repair}${survey ? ` · ${survey}` : ""}`;
 }
