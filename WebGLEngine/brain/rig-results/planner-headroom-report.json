@@ -1,0 +1,28 @@
+{
+ "report": [
+  "ROUND 25: how much headroom above the twin? pooled over H1 4201-4248, H2 4301-4348 (far and both, 3 to 5 stations; read once)",
+  "  PASS GENERATOR: the generator at 3 stations equals needsTask.scenario on five sample scenarios: true",
+  "  PASS ORACLE 3: the oracle is at least TUNED-R8 on every dive at 3 stations: true",
+  "  PASS ORACLE 4: the oracle is at least TUNED-R8 on every dive at 4 stations: true",
+  "  PASS ORACLE 5: the oracle is at least TUNED-R8 on every dive at 5 stations: true",
+  "  PASS GAIN 3: the twin's gain over the tuned rule at 3 stations is positive (0.0176): true",
+  "  PASS GAIN 4: the twin's gain over the tuned rule at 4 stations is positive (0.0283): true",
+  "  PASS GAIN 5: the twin's gain over the tuned rule at 5 stations is positive (0.0345): true",
+  "n 3: means (tuned | twin | oracle) 0.794 | 0.811 | 0.832",
+  "   gain (twin - tuned) +0.0176 (se 0.0045; better 23, worse 4, same 165)",
+  "   gap (oracle - tuned) +0.0379 (se 0.0052; better 44, worse 0, same 148)",
+  "   headroom (oracle - twin) +0.0203 (se 0.0044; better 29, worse 4, same 159)  REAL; the twin closes 0.46 of the gap",
+  "n 4: means (tuned | twin | oracle) 0.784 | 0.812 | 0.840",
+  "   gain (twin - tuned) +0.0283 (se 0.0047; better 41, worse 2, same 149)",
+  "   gap (oracle - tuned) +0.0561 (se 0.0053; better 78, worse 0, same 114)",
+  "   headroom (oracle - twin) +0.0277 (se 0.0040; better 41, worse 0, same 151)  REAL; the twin closes 0.51 of the gap",
+  "n 5: means (tuned | twin | oracle) 0.751 | 0.786 | 0.817",
+  "   gain (twin - tuned) +0.0345 (se 0.0054; better 54, worse 5, same 133)",
+  "   gap (oracle - tuned) +0.0653 (se 0.0055; better 97, worse 0, same 95)",
+  "   headroom (oracle - twin) +0.0308 (se 0.0045; better 56, worse 5, same 131)  REAL; the twin closes 0.53 of the gap",
+  "headroom growth from 3 to 5 stations: +0.0105 (se of two independent means 0.0063) FLAT",
+  "the twin scores above the oracle on 9 of 576 dives",
+  "BOTTOM LINE: THERE IS HEADROOM ABOVE THE TWIN AT N = 3, 4, 5",
+  "BOTTOM LINE: THE HEADROOM IS FLAT IN THE NUMBER OF STATIONS"
+ ]
+}
