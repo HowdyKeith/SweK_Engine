@@ -178,7 +178,9 @@ try {
     const onB3 = () => L.withStepper(b3, (st) => P6.duel("autopilot", "autopilot", { seed: 94003, scenario: "joust", stepA: st.step }));
     const x = onB3(), y = onB3();
     ok("!! with box3d as A's stepper the duel is another duel, and the same one twice", x.fingerprint !== plain.fingerprint && J(x) === J(y), `${plain.fingerprint} / ${x.fingerprint}`);
-    ok("the duel takes stepA with a default that is off, and uses it for A only", /record = null, stepA = null \} = \{\}\) \{/.test(src("brain/pilot6dofPolicy.mjs")) && /stepA && s === A \? stepA\(s\.body, acc, dt\) : RB\.step\(s\.body, acc, dt, stepOpt\)/.test(src("brain/pilot6dofPolicy.mjs")));
+    // 2026-11-04: the both-ships round (physics/mechanics/BOX3D_BOTH_SHIPS_WIP.md) added `stepB` after `stepA`, used for B only; that round's gate holds it
+    ok("the duel takes stepA with a default that is off, and uses it for A only (the both-ships round's stepB, after it, for B)", /record = null, stepA = null(?:, stepB = null)? \} = \{\}\) \{/.test(src("brain/pilot6dofPolicy.mjs")) &&
+        /stepA && s === A \? stepA\(s\.body, acc, dt\) : (?:stepB && s === B \? stepB\(s\.body, acc, dt\) : )?RB\.step\(s\.body, acc, dt, stepOpt\)/.test(src("brain/pilot6dofPolicy.mjs")));
 } catch (e) { guard(2, e); }
 
 console.log("\n3. THE LIBRARY HOLDS THE REGISTRATION");

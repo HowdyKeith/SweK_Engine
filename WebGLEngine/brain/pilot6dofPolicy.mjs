@@ -142,7 +142,9 @@ const makeRng = (seed) => { let s = (seed >>> 0) || 1; return () => { s = (s * 1
 // 2026-11-04 (unnumbered) -- AND `stepA`, also off unless given, for the 6-DOF-on-box3d round (physics/mechanics/SIXDOF_BOX3D_WIP.md, registered
 // before it was built): a stepper with rigidBody6dof.step()'s contract that moves ship A in its place (physics/mechanics/rigidBody6dofBox3d.mjs's
 // box3dStepper(), say). B is moved by rigidBody6dof.step() as ever, and `orientation` then reaches B's steps only.
-export function duel(a = "autopilot", b = "autopilot", { seed = 1, seconds = 30, collisions = false, ramPenalty = 0, scenario = "standoff", orientation = null, nudge = 0, record = null, stepA = null } = {}) {
+// 2026-11-04 (unnumbered) -- AND `stepB`, also off unless given, for the both-ships round (physics/mechanics/BOX3D_BOTH_SHIPS_WIP.md, registered
+// before it was built): B's stepper, as `stepA` is A's. Given both, each ship is moved by its own, and `orientation` reaches neither.
+export function duel(a = "autopilot", b = "autopilot", { seed = 1, seconds = 30, collisions = false, ramPenalty = 0, scenario = "standoff", orientation = null, nudge = 0, record = null, stepA = null, stepB = null } = {}) {
     // a FUNCTION is a pilot already, with decide()'s contract: how another brain flies this duel (brain/pilot6dofMlp.mjs, the GPU Brain's), the scoring and the tally unchanged
     const pilotOf = (x) => typeof x === "function" ? x : x === "autopilot" ? (body, tgt, o) => AP.decide(body, tgt, o) : pilotFor(x === "hand" ? handWeights() : x === "zero" ? zeroWeights() : x);
     const pa = pilotOf(a), pb = pilotOf(b), rng = makeRng(seed), I = RB.boxInertia({ m: SHIP_MASS, hx: HALF[0], hy: HALF[1], hz: HALF[2] });
@@ -160,7 +162,7 @@ export function duel(a = "autopilot", b = "autopilot", { seed = 1, seconds = 30,
             const d = p(s.body, { pos: foe.body.pos, vel: foe.body.vel }, { weaponSpeed: RBW.WEAPON.speed, ...PAGE_AUTOPILOT });
             const acc = RB.createAccumulator(); RB.applyForceAtPoint(acc, [d.thrust, 0, 0], ENGINE_MOUNT); acc.torque = d.torqueBody;
             if (record && s === A) record.inputs.push({ force: [...acc.force], torque: [...acc.torque] });
-            const before = s.body; s.body = stepA && s === A ? stepA(s.body, acc, dt) : RB.step(s.body, acc, dt, stepOpt);
+            const before = s.body; s.body = stepA && s === A ? stepA(s.body, acc, dt) : stepB && s === B ? stepB(s.body, acc, dt) : RB.step(s.body, acc, dt, stepOpt);
             // *** A SHIP THAT SPINS ITSELF TO NON-FINITE STATE IS DESTROYED, NOT SIMULATED ON. *** A pilot that holds a torque for ~800 ticks drives its angular velocity to 1e304 -- the integrator's gyroscopic term is unstable at
             // extreme spin -- and then to NaN. Before v4848 that was invisible: a NaN ship cannot be hit, fires nothing, and the duel ran to the time limit as a draw, scored by what the OTHER ship did. With collisions on,
             // the contact test reads NaN as a hit with no normal and the duel threw (it killed two training runs, at iteration 376 of search 0). The ship is put back where it last was, marked dead and marked `lost`.

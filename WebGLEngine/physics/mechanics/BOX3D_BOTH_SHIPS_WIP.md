@@ -94,3 +94,55 @@ About a minute.
 - `tools/roundhouse/box3dBothShips.mjs` (the library), `box3dBothShipsRun.mjs` (the command) and
   `box3dBothShips-selfcheck.mjs` (the gate).
 - The results go to `physics/mechanics/box3dBothShipsResults.json`, committed before it is read.
+
+## Build record (2026-11-04)
+
+Built as listed above.
+
+- `duel()` takes `stepB`. Given no stepper, the duel is byte for byte what it was (C-unchanged).
+- Two earlier gates read the duel's signature from its source. Each went red once `stepB` was added, and each was
+  restated to allow it after `stepA`:
+  - `tools/roundhouse/orientationStep-selfcheck.mjs`;
+  - `tools/roundhouse/sixdofBox3d-selfcheck.mjs`.
+
+### Found while building: box3d's spin cap acts in one cell, so C-caps will fail
+
+On the miniature's seeds (98001 to 98004, unregistered), the League pilot spins its ship to box3d's spin cap in the
+joust. The cap is 0.25 pi rad a step, so 23.56 rad/s at 1/30 s. It is reached on every one of those seeds, both with
+both ships on box3d and with A alone.
+
+Every other cell's top spin stays under 10 rad/s. The highest is the close-quarters pilot's joust, at 9.43 rad/s. The
+PD autopilot's highest is 2.72 rad/s.
+
+So in that one cell, box3d's cap acts as well as its scheme. **C-caps is left as registered, and it will fail.**
+
+Each cell now also reports, testing nothing:
+
+- the top speed and spin of its BB and A3 flights;
+- how many of those flights reached the cap, which is counted as coming within 1e-3 rad/s of it, since box3d reads
+  back in float32.
+
+The verdict will name the cells the cap touched. sixdof-box3d did not watch box3d's caps.
+
+### Flown while building, none of it a registered measurement
+
+- **The controls:**
+  - C-unchanged.
+  - C-stepB, which now takes the duel as a parameter, so it can also be shown failing on a duel that moves A with
+    `stepB` and on one that ignores it.
+  - C-replicates, at seed 93001.
+  - C-box3d.
+  - C-chaos and C-determinism, on the miniature.
+- **The miniature:** three pilots, seeds 98001 to 98004, a 1e-3 m nudge.
+  - Printed: its caps (11.9 m/s and 23.562 rad/s over 11,192 ticks), every cell's top spin with both ships on box3d,
+    the flights each way moved, and one seed's four fingerprints.
+  - No reading, tally or outcome was printed.
+
+### The gate
+
+`tools/roundhouse/box3dBothShips-selfcheck.mjs` has 24 rows and takes about 1.5 s. Its header logs 23 sabotages, each
+red by name in the end.
+
+- G16 had a row written for it before any sabotage ran.
+- G13's first design did not parse, so the gate died before printing a row. It was redone as code that runs, and it is
+  red.
