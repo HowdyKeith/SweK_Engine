@@ -140,3 +140,38 @@ Minutes.
 - `tools/roundhouse/orientationStep.mjs` (the library), `orientationStepRun.mjs` (the command) and
   `orientationStep-selfcheck.mjs` (the gate).
 - The results go to `physics/mechanics/orientationStepResults.json`, committed before it is read.
+
+### Built, 2026-11-03, before the registered run (nothing of the registration above is changed)
+
+- **The step:** `rigidBody6dof.step()` takes `orientation`: "euler", the default, or "rk4", which is the new
+  `stepQuatRk4()`. Anything else is refused by name. Given no option, the registration's 1,000 steps hash to its anchor
+  (29216a6bf1de97d3), and so do the same steps given "euler".
+- **The duel:** `duel()` takes `orientation`, `nudge` and `record`, all off unless given. Given none, the ten anchor duels
+  have the registration's fingerprints.
+  - `record` also keeps A's body at the end, which the registration did not list. With it, the gate holds a replay of
+    the inputs to the duel's own A, to the bit.
+- **The round:** `tools/roundhouse/orientationStep.mjs` (the library), `orientationStepRun.mjs` (the command) and
+  `orientationStep-selfcheck.mjs` (the gate, about 1 s). The command refuses an existing results file and prints only
+  where it wrote it and the step's time.
+- **What the gate flies, and what it does not.** It never runs the registered round or the command. It flies:
+  - C-unchanged's anchors and C-key, both fixed exactly by the registration;
+  - a convergence check on a body and steps the round does not use (moments 1, 2, 3, under a torque, 6 s at 1/20 to
+    1/80 s);
+  - a miniature: two pilots, seeds 92001 and 92002, M1 at 1/20 to 1/80 s for 2 s, and a nudge of 1e-3 m.
+- **Seen on the way, and said here:** C-key came out as its arithmetic said (Q0 0.0222 rad off, Q4 6.17e-7 rad). In the
+  convergence check and the miniature, Q4's error fell as the fourth power of the step and Q0's as the first. None of
+  these is a registered measurement, and the registered run has not been flown.
+- **Sabotaged** with the byte-safe runner: 34 designs (G1 to G34), each red by name; the counts are in the gate's header.
+  Three would have gone 0 red against the first draft, and the gate was fixed before the series:
+  - a reference that was Q0's own passed C-reference, with a ratio of 0;
+  - an order fitted over the first two steps could not show while the miniature's fit was its first two steps;
+  - a dropped nudge could not show in a fingerprint that rounds to a millimetre.
+- **The engine's own gates:** all 103 that reach the 6-DOF step, the duel, the spinning body or freeRotation were run.
+  Four were red:
+  - `brain/battleshipFight-selfcheck.mjs` (9 rows) and `tools/ship/battleshipPage-selfcheck.mjs` (1): red the same at the
+    registration's commit, at this branch's merge-base and at main's head (v4911), and in no red register. They are not
+    this round's, and they are reported.
+  - `tools/ship/gateReach-selfcheck.mjs`: its recorded census says 579 gates; there are 584, three of them already at
+    the merge-base. That record is re-baked at a ship.
+  - `render/compassView-selfcheck.mjs`, a browser gate: red once with four gates running at a time, green alone, and
+    green at the registration's commit.

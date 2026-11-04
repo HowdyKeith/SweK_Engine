@@ -129,9 +129,41 @@ export function step(state, acc, dt, opt) {
     const forceWorld = rotateByQuat(state.q, acc.force);
     const vel = add3(state.vel, scale3(forceWorld, dt / state.mass));
     const pos = add3(state.pos, scale3(vel, dt));
-    const q = stepQuat(state.q, state.w, dt);
+    const how = orientationOf(opt);
+    const q = how === "rk4" ? stepQuatRk4(state.I, state.q, state.w, acc.torque, dt, opt) : stepQuat(state.q, state.w, dt);
     const w = stepOmegaWithTorque(state.I, state.w, acc.torque, dt, opt);
     return { mass: state.mass, I: [...state.I], pos, vel, q, w };
+}
+
+// 2026-11-03 (unnumbered) -- `opt.orientation`, AN OPTION OFF UNLESS ASKED, registered as a round before it was built
+// (physics/mechanics/ORIENTATION_STEP_WIP.md). "euler", the default and what no option means, moves the orientation by
+// freeRotation.mjs's stepQuat(): one forward step from the angular velocity at the start of the tick, which is first
+// order (the spinning body measured it). "rk4" moves it by RK4 alongside the angular velocity's own RK4, each of its four
+// stages with that stage's angular velocity -- the same w1..w4 stepOmegaWithTorque() forms, by the same formulas. The
+// angular velocity is stepOmegaWithTorque()'s either way, and the torque is held for the tick either way, so the option
+// changes the orientation and nothing else. Anything else is refused rather than read as the default.
+const ORIENTATIONS = Object.freeze(["euler", "rk4"]);
+export function orientationOf(opt) {
+    const how = opt && opt.orientation != null ? opt.orientation : "euler";
+    if (!ORIENTATIONS.includes(how)) throw new Error(`rigidBody6dof.step: orientation ${JSON.stringify(how)} is neither "euler" nor "rk4"`);
+    return how;
+}
+/** 1/2 q (x) (0, w): stepQuat()'s own derivative, term for term. */
+const quatRate = (q, w) => [
+    0.5 * (-q[1] * w[0] - q[2] * w[1] - q[3] * w[2]),
+    0.5 * (q[0] * w[0] + q[2] * w[2] - q[3] * w[1]),
+    0.5 * (q[0] * w[1] + q[3] * w[0] - q[1] * w[2]),
+    0.5 * (q[0] * w[2] + q[1] * w[1] - q[2] * w[0]),
+];
+const add4 = (a, b, s) => [a[0] + b[0] * s, a[1] + b[1] * s, a[2] + b[2] * s, a[3] + b[3] * s];
+/** The orientation after one tick by RK4, its stages at stepOmegaWithTorque()'s stage angular velocities; renormalised. */
+export function stepQuatRk4(I, q, w, torqueBody, dt, opt) {
+    const d = (ww) => derivWithTorque(I, ww, torqueBody, opt);
+    const w1 = w, a1 = d(w1), w2 = add3(w, a1, dt / 2), a2 = d(w2), w3 = add3(w, a2, dt / 2), a3 = d(w3), w4 = add3(w, a3, dt);
+    const k1 = quatRate(q, w1), k2 = quatRate(add4(q, k1, dt / 2), w2), k3 = quatRate(add4(q, k2, dt / 2), w3), k4 = quatRate(add4(q, k3, dt), w4);
+    const o = [0, 1, 2, 3].map((n) => q[n] + dt / 6 * (k1[n] + 2 * k2[n] + 2 * k3[n] + k4[n]));
+    const n = Math.hypot(o[0], o[1], o[2], o[3]);
+    return o.map((c) => c / n);
 }
 
 // ---- FRONT DOOR -------------------------------------------------------------------------------------------------
