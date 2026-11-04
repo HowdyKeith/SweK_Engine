@@ -29,18 +29,18 @@ export function shiftOf(name) { const i = GRID.indexOf(name); if (i < 0) throw n
 /** The Round 8 constants with low moved by the arm's shift, nothing else. */
 export const paramsOf = (name, r8) => ({ ...r8, low: r8.low + shiftOf(name) });
 /** The scenarios of the given kinds of one condition and stage ("sel" or "conf"), kind-major as needsTask.setOf. */
-export function setFor(cond, stage, kinds = HARD) {
+export function setFor(cond, stage, kinds = HARD, range = null) {
     const c = CONDITIONS[cond]; if (!c) throw new Error(`plannerChoose.setFor: unknown condition ${JSON.stringify(cond)} (${COND_NAMES.join(", ")})`);
     if (stage !== "sel" && stage !== "conf") throw new Error(`plannerChoose.setFor: unknown stage ${JSON.stringify(stage)} (sel, conf)`);
-    const [a, b] = c[stage];
+    const [a, b] = range || c[stage];   // `range` is for the gate; the real run never passes it
     return Object.freeze(kinds.flatMap((k) => Array.from({ length: b - a + 1 }, (_, i) => scenarioX(a + i, k, c.count, c.damageScale))));
 }
 let FLIGHT = {};
 /** Flight options for every flight this library makes (the gate shortens dives; the real run never calls this). */
 export const setFlight = (o) => { FLIGHT = { ...o }; };
 /** One selection arm (the bare rule at a shift) on one condition's selection set. `kinds` is for the gate. */
-export function flySelection(name, r8, cond, { kinds = HARD } = {}) {
-    return T.evaluate(T.flyDecision(U.tunedSeat(paramsOf(name, r8), U.WIDE_BOUNDS)), setFor(cond, "sel", kinds), { ...FLIGHT, gauge: { sd: CONDITIONS[cond].sd, hz: T.GAUGE.hz } });
+export function flySelection(name, r8, cond, { kinds = HARD, range = null } = {}) {
+    return T.evaluate(T.flyDecision(U.tunedSeat(paramsOf(name, r8), U.WIDE_BOUNDS)), setFor(cond, "sel", kinds, range), { ...FLIGHT, gauge: { sd: CONDITIONS[cond].sd, hz: T.GAUGE.hz } });
 }
 export const SEL_JOBS = Object.freeze(GRID.flatMap((n) => COND_NAMES.map((c) => [n, c])));
 /** The selection table from sel[name][cond] = evaluate result: per shift and condition the mean score, the gain over L0, the crushed plus stranded dives and whether the hull allowance holds; per shift whether it is eligible and its value (the worst gain). */
@@ -62,11 +62,11 @@ export function winnerOf(sel) {
 export const CONF_ARMS = Object.freeze(["TUNED-R8", "TUNED-WIN", "TWIN-WIN"]);
 export const CONF_JOBS = Object.freeze(CONF_ARMS.flatMap((a) => COND_NAMES.flatMap((c) => HARD.map((k) => [a, c, k]))));
 /** One confirmation arm on one kind of one condition, given the winner's name. `stage` and the sets are the real ones. */
-export function flyConfirm(arm, winner, r8, cond, kind) {
+export function flyConfirm(arm, winner, r8, cond, kind, { range = null } = {}) {
     if (!CONF_ARMS.includes(arm)) throw new Error(`plannerChoose.flyConfirm: unknown arm ${JSON.stringify(arm)} (${CONF_ARMS.join(", ")})`);
     const p = paramsOf(arm === "TUNED-R8" ? GRID[0] : winner, r8), sec = FLIGHT.seconds ? { seconds: FLIGHT.seconds } : {};
     const pilot = arm === "TWIN-WIN" ? T.flyDecision(Q.perturbedSeat(p, {}, sec)) : T.flyDecision(U.tunedSeat(p, U.WIDE_BOUNDS));
-    return T.evaluate(pilot, setFor(cond, "conf", [kind]), { ...FLIGHT, gauge: { sd: CONDITIONS[cond].sd, hz: T.GAUGE.hz } });
+    return T.evaluate(pilot, setFor(cond, "conf", [kind], range), { ...FLIGHT, gauge: { sd: CONDITIONS[cond].sd, hz: T.GAUGE.hz } });
 }
 export const assemble = (byArm) => Object.fromEntries(COND_NAMES.map((c) => [c, Object.fromEntries(Object.keys(byArm).map((a) => [a, byArm[a][c]]))]));
 const diff = (au, c, a, b) => pooled(au, a, b, { sets: [c] });
@@ -92,7 +92,7 @@ export function checksOf(sel, au) {
     rows.push({ name: "GENERATOR", ok: gen, text: `the generator at 3 stations and damage scale 1 equals needsTask.scenario on ${sample.length} sample scenarios: ${gen}` });
     const sizes = GRID.every((n) => COND_NAMES.every((c) => sel[n][c].runs.length === SEL_DIVES)) && COND_NAMES.every((c) => CONF_ARMS.every((a) => au[c][a].runs.length === CONF_DIVES));
     rows.push({ name: "SIZES", ok: sizes, text: `every selection arm has ${SEL_DIVES} dives and every confirmation arm ${CONF_DIVES} in every condition: ${sizes}` });
-    const aligned = COND_NAMES.every((c) => GRID.every((n) => sel[n][c].runs.every((r, i) => r.kind === sel[GRID[0]][c].runs[i].kind)) && CONF_ARMS.every((a) => au[c][a].runs.every((r, i) => r.kind === au[c]["TUNED-R8"].runs[i].kind)));
+    const aligned = COND_NAMES.every((c) => GRID.every((n) => sel[n][c].runs.length === sel[GRID[0]][c].runs.length && sel[n][c].runs.every((r, i) => r.kind === sel[GRID[0]][c].runs[i].kind)) && CONF_ARMS.every((a) => au[c][a].runs.length === au[c]["TUNED-R8"].runs.length && au[c][a].runs.every((r, i) => r.kind === au[c]["TUNED-R8"].runs[i].kind)));
     rows.push({ name: "KINDS ALIGNED", ok: aligned, text: `within a condition every arm's dives are the same scenarios in the same order: ${aligned}` });
     const distinct = new Set(GRID.map((n) => sel[n].REF.runs.map((r) => r.fingerprint).join("|"))).size === GRID.length;
     rows.push({ name: "SHIFTS DISTINCT", ok: distinct, text: `the ${GRID.length} shifts are pairwise different on at least one REF dive: ${distinct}` });
