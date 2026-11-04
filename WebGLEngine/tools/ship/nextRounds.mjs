@@ -3017,6 +3017,27 @@ export const NEXT_ROUNDS = [
         why: "The lock keeps repeats out and delays every unearned cell a dropout clears, which behind a run of three that has only just earned a cell at its marking is most of the far cells; whether it pays is not known.",
     },
     {
+        id: "nav-sensed-pooled-reading",
+        blocker: "OPEN",
+        what: "Registered as FOLLOW-UP 59 of brain/SENSED_NAV_WIP.md (Keith, 2026-11-04: \"Pool the arms flown in several sets. That needs no new flights.\", after the queue of follow-ups 25 to 58). The same detector under the same sea has been flown in many of the 51 studies on disjoint scenarios; arms were found to move 11 to 17 flights of 180 between sets, more than the 7 to 9 the first measure gave. Nine features (the ghost, the carry, the confirmed clear, the step gate, the ramp, the first-reading near mark, the run of three, the evidence hold, the lock) are read as the mean over sets of the matched pairs' difference, per sea, with a 95% interval across sets and a fixed reading rule (seen / suggested / not separable); the between-set noise of every arm flown in three sets or more is reported against the binomial one.",
+        how: "After the queue of follow-ups 25 to 58 is finished and read: tools/ship/subSensedPool.mjs with a gate (made-up flights with known set effects, the reading rule at its edges, the matching of registry rows) and its sabotage logged in the header; run once on brain/subSensedDet*Held*.jsonl; the table read once; the RESULT written in the note. The predictions PA1 to PA8 are registered before anything is computed.",
+        why: "The per-set differences of 3 to 6 flights that most of the results turn on are inside the set-to-set movement; pooling is the only way to say which features have an effect at all without flying again, and it chooses the detectors for follow-up 60.",
+    },
+    {
+        id: "nav-sensed-large-set",
+        blocker: "OPEN",
+        what: "Registered as a PLAN, FOLLOW-UP 60 of brain/SENSED_NAV_WIP.md (Keith, 2026-11-04: \"Fly one larger set, around 600 scenarios, of the half-dozen detectors that actually differ.\", after follow-up 59). Taken as 540 scenarios: three fresh sets of 60 seeds of each kind (HELD64 to HELD66), the same arms on all three, read once together. At most six detectors: `inc`, `m23e30` and up to four chosen by a rule fixed in the note from follow-up 59's table (one per mechanism family that follow-up 59 calls seen), under R3D30, WD30L and P.",
+        how: "After follow-up 59 is read: a SECOND REGISTRATION (arms, designated detector, pooled bar, eight predictions scaled to 540, reasons) is committed first; then the table of sets, three specs from one table, the study gate's literal copy and its sabotage; then the three sets are flown once and read together.",
+        why: "At 180 scenarios an arm's count is uncertain by more than most of the effects registered; 540 reduces the binomial part of that by a factor of 1.7 and the between-set part is pooled.",
+    },
+    {
+        id: "nav-sensed-constants-sweep",
+        blocker: "OPEN",
+        what: "Registered as a PLAN, FOLLOW-UP 61 of brain/SENSED_NAV_WIP.md (Keith, 2026-11-04: \"Run a sensitivity sweep on 80 m, the cap, the fraction and the ghost's life.\", after follow-up 60). One at a time around a base detector (range-aware, gated, confirmed, ghost-bearing, chosen after follow-up 60): the near radius 40 / 80 / 120 m, the cap 15 / 30 / 60, the fraction 0.7 / 0.8 / 0.9, the ghost's life 20 / 60 / 180; 9 detectors under R3D30 and WD30L, 20 arms with exact and the clean map, three fresh sets (HELD67 to HELD69) read once together.",
+        how: "After follow-up 60 is read: a SECOND REGISTRATION (the base, the bar, a predicted shape for each factor with the reason); registry rows only if the detector module accepts the levels (otherwise one gated and sabotaged change first), each row with its hand-written description and mechanical mutants; the study gate's copy and sabotage; three sets flown once and read together.",
+        why: "Every result in the note says 80 m, 30, 0.8 and 60 are not known to be the right numbers; this is the one place they are varied.",
+    },
+    {
         id: "nav-sensed-detector-hold-range-hold-range-hold",
         blocker: "OPEN",
         what: "Follow-up 37 (brain/SENSED_NAV_WIP.md) registers follow-up 32's carried evidence on the ramp hold applied beyond 80 m only, within it only or at every range. Registered as FOLLOW-UP 58 of that note (the name was Keith's; no entry existed, and it is follow-up 37's name with hold on the end; the name already has a second hold, the carry, so the word is read as follow-ups 54, 56 and 57 read theirs: a lock on the free state, a cell cleared with fewer than four occupied readings waits eight readings before it can be re-marked, sharing that reading's doubt). The note says the lock and the carry act on disjoint sets of cleared cells. It was written after the results of follow-ups 7 to 18 and 20 to 22 were read, rests on follow-ups 32, 37 and 54, which are unread, unflown or unbuilt, expects a small effect, and says so. Three new module fields (ghost.carry, ghost.zone, the lock, each shared): the build waits for the sets of follow-ups 8 to 24, then adds them, two registry rows, the set HELD63 and a spec.",
