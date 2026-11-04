@@ -25,7 +25,7 @@ for %b in (record-v4888-release record-v4889-release record-v4890-release record
 * `claude/vigilant-feynman-r315c9` -- the Decider audit (Round 14 Decider, 7 commits; probably finished, delete once its chat confirms).
 
 ## 3. NOT merged, and why
-* `claude/round22-guardian-names` (2026-10-02, one commit, 7 files): a round stacked on v4675 whose files (`frozenRecords`, `recordProbe`, `recordReach`, `vba/runtimeGap`) have moved far since; merging it conflicts in 5 files. NOT taken. Decide: abandon (delete) or ask for a rebase. `git cherry` says its one patch is not in the publish branch.
+* `claude/round22-guardian-names`: RESOLVED, see section 5. (It was listed here as unmerged; it was not.)
 * `record-v4874-release`, `record-v4879-release` (2026-10-19 and 10-20, one commit each): old release-record commits; `git cherry` says each patch's content is already in the publish branch (the records were re-written later), their `releases.json` conflicts. Safe to delete:
 
 ```
@@ -34,3 +34,11 @@ for %b in (record-v4874-release record-v4879-release) do git push origin --delet
 
 ## 4. Left for the box3d chat, found while merging
 `brain/battleshipFight-selfcheck.mjs` (9 reds) and `tools/ship/battleshipPage-selfcheck.mjs` (1 red) are red at the TIP of `claude/tier-2-keys-patch-4lwhzk` itself (checked in a worktree of that tip), not because of the merge: the pinned fights and the shipped pilot's label (`held-out 20.569` against a pinned `9.934`) disagree with the 6-DOF pilot weights file that line carries (`brain/pilot6dofMlpWeightsDefault.json`).
+
+## 5. `claude/round22-guardian-names` -- already in, now recorded as merged (2026-11-04)
+Its one commit (f2eb9e82d, 2026-10-02, "Round 22 (#39)") was ported by hand into the publish line on 2026-10-21 as `4fba4b464 "Merge round22-guardian-names: a guardian USES the record in code"`, which is a SINGLE-PARENT commit: the content is in (`frozenRecords.codeMask` and `usesInCode`, `PROBE_AT_V4675_R22`, the readSites rule, `recordProbe` section 10), but git never saw the branch as an ancestor, so `git rev-list HEAD..origin/<branch>` said 1 and `git cherry` said the patch was missing. A real merge of it conflicts in 5 files because the tree has moved on from it (the cheap-reject and name-table work of v4715 and v4776 sits in the same lines). So it was recorded with `git merge -s ours` (no content taken, ancestry made true): the branch is now an ancestor of the publish branch and `git push origin --delete claude/round22-guardian-names` loses nothing.
+No rename was needed or done: the branch's name is not in the tree after a delete. If "rename" meant the round's number (it calls itself "Round 22 (#39)", the guardian line's own count, unrelated to the needs-and-limits Round 22), nothing in the tree uses it for anything but the comments it already carries.
+
+```
+git push origin --delete claude/round22-guardian-names
+```
