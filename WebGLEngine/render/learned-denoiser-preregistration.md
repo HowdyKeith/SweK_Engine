@@ -11620,3 +11620,40 @@ the history alone has gone negative (k = 2), U_TH's correction still turns it 5.
 chain that knows its scene's motion could fall back to B1 above it. **But with U_TH after Bt there is no need inside this range:** U_TH stays
 ahead of B1 even at twice section 176's speeds. The fallback is a candidate only for a chain WITHOUT U_TH, or for speeds past those tested.
 Nothing changes in the chain.
+
+## 187. ROUND 82's VERDICT -- NOT REPORTED (C1 FAILED), AND THE DESCRIPTION IS PLAIN: SAMPLES MOVED TO THE SHORT-HISTORY PIXELS HELP THERE AND COST MORE EVERYWHERE ELSE
+
+**The run.** render/denoise-results-upscale-sampling-r82.json, run on Keith's rig at commit 203c1403 (which holds round 82's code) in 4.5 hours,
+section 186's rule (4 a pixel, 1-12, weight 1 + 2s), round 72's U_TH (seed 1, 670c28bd). 24 moving scenes, none from a cache. **It came zipped and
+was committed unread** (a7b662e7, sha-256 082db5f7...) before anything below was read.
+
+**The verdict: NOT REPORTED.** verdict() refused to grade either hypothesis. **C1 failed on H1**, in its own words: "the network beat the
+noisy input on 20 and the filter on 21 of 24; the candidate needs 22". The "network" here is the adaptive Bt. C3, C4 and C5 hold; C2 (round 72's
+shuffled-target U_TH on the adaptive history) is far worse (mean d -3.32). By the method, H82a and H82b are neither supported nor refused.
+
+**The description, deciding nothing, and it is one-sided.**
+
+| | uniform | adaptive | adaptive against uniform |
+|---|---|---|---|
+| Bt | 2.1576e-3 | 2.3577e-3 | 9.28 % WORSE, better on 4 of 24 |
+| U_TH on Bt | 2.0503e-3 | 2.2812e-3 | 11.26 % worse, 4 of 24 |
+| B1 (one frame) | 2.0006e-3 | 2.3607e-3 | 18.00 % worse, 2 of 24 |
+
+- **Where the samples went, they helped.** On the measured frame's rejected pixels (13.7 % of the frame) the adaptive arm spent 6.21
+  samples a pixel against 4, and its Bt there is 6.77 % below the uniform one (20 of 24).
+- **Everywhere else they were missed by more.** The other ~86 % of pixels dropped to ~3.65 samples. That is ~10 % more noise variance into a
+  denoiser trained at a uniform 4, and every other measure moved the wrong way. The mover pixels are 10.66 % worse.
+- **By family:** R 14.30 % worse, C 7.90 % worse.
+- **And on this set the uniform B1 beats the uniform Bt** (Bt 7.85 % above B1): a fast-moving set, as round 81's k > 1.36.
+
+**The predictions.**
+- **P1 MISSED:** C1 failed on H1 (C3 held).
+- **P2 MISSED:** no verdict, and the adaptive Bt is 9.28 % worse, not 1-5 % better.
+- **P3 MISSED:** no verdict; U_TH is 11.26 % worse on the adaptive Bt.
+- **P4 HELD:** on the rejected pixels the adaptive Bt is 6.77 % better, inside 5-15 %.
+- **P5 HELD:** B1 is worse adaptive (18.00 %).
+
+**What it means, as section 186 fixed it** (its "H82a fails" reading, here with no verdict at all). At these settings the denoiser, trained at
+a uniform 4 samples, does not turn uneven samples into a better image. The few pixels given more gain less than the many given fewer
+lose. Sampling by history is not opened as a device round. A denoiser trained on uneven samples is the question section 186 named next; it
+is not set up.

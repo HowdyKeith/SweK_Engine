@@ -2681,9 +2681,9 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "fsr4-history-sampling",
-        blocker: "OPEN",
-        what: "Round 82 (section 186), set up and awaiting its harvest: the same 4-sample budget shared by each half-size pixel's predicted history rejection (reproject on geometry before the trace; weight 1 + 2s, 1-12 samples, the total exact), both arms from the same 12 one-sample passes, on 24 new moving scenes (12 R 87000-87011, 12 C 88000-88011). H82a: the adaptive Bt beats the uniform Bt by the 1 % rule; H82b: round 72's U_TH on each. Code: render/adaptiveSampling.mjs, temporalExample's `frames`, runSamplingTest.",
-        how: "node tools/denoiseStudy.mjs --harvest-upscale-temporal-test --round 82 on the rig at round 82's commit, render/denoise-results-upscale-sampling-r82.json committed byte for byte before it is read; section 187 reads it.",
+        blocker: "CLOSED",
+        what: "CLOSED, NOT REPORTED (section 187): C1 failed on H1 (the adaptive Bt beat the noisy input on 20 of 24, the control needs 22), so neither H82a nor H82b is graded. Descriptively one-sided: moving the 4-sample budget toward the predicted short-history pixels made the adaptive Bt 9.28 % WORSE than the uniform (better on 4 of 24), U_TH on it 11.26 % worse, B1 18.00 % worse. Where the samples went they helped (the rejected pixels, 13.7 % of the frame, at 6.21 samples: 6.77 % better, 20 of 24); the other ~86 % at ~3.65 samples lost more. No device round; a denoiser trained on uneven samples is the named next question, not set up. The file came zipped and was committed unread.",
+        how: "render/denoise-results-upscale-sampling-r82.json, re-derived by render/movingScenes-selfcheck.mjs section 15.",
         why: "Section 183: the movers' error is at the current frame, not in the history -- so give the pixels whose history will be rejected more samples, at the same total.",
     },
     {
