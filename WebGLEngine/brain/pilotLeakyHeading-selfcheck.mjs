@@ -19,7 +19,8 @@
 //                   acceptance rules (id, layer, entry) applied to it.
 //   8 IN THE TANK   flown the way the board flies the dropout task (a fresh one-sub tank per id, arm.register, sync, setEvent "dropout", 160 s, the settled dark heading error to the wandering target): the sub is seated by the kind; its dark windows are the navigator's; its
 //                   estimate of the heading change is off by 0.01 to 0.06 rad rms and at most 0.15 (measured 0.028 to 0.040 and 0.061 to 0.111 on six ids), the navigator's by under 0.005 -- the leak is real, this is not the navigator; over twelve ids its settled dark heading
-//                   error is at least 0.03 below the dropout autopilot's (measured 0.647 against 0.702) and within 0.02 of the navigator's (0.644); the lesion arm (gain 0) equals the dropout autopilot exactly on every id.
+//                   error is within 0.02 of the navigator's on average and 0.05 on each id (measured +0.003 and 0.014); the lesion arm (gain 0) equals the dropout autopilot exactly on every id. NOT a row, said here because it limits what the arm can show: the settled-heading metric does not separate the navigator, the unit or the plain nets from the dropout autopilot on twelve ids
+//                   (navigator -0.058 rad, se 0.044; unit -0.055, se 0.042), nor on sixty (tools/ship/takeTankDropout.mjs --from 9001 --ids 60: -0.017, se 0.020; -0.014, se 0.021): it measures how fast a sub turns onto a new target, not what it knows of its heading.
 //   9 THE SOURCE    pure; the four imports.
 // NOT CHECKED, said plainly: that the unit is a good model of anything a brain does (it is the cheapest memory: a ceiling with an exact gyro); the page; the switchboard itself (not in this tree: the board is the other chat's); a real gyro's drift; the unit at any sigma the
 // registered grid did not try beyond what sections 2 and 3 compute by hand.
@@ -288,8 +289,7 @@ sec("8. IN THE TANK, FLOWN AS THE BOARD FLIES THE DROPOUT TASK");
     const ids12 = Array.from({ length: 12 }, (_, i) => i + 1);
     const eAuto = ids12.map((n) => flight(AUTO, n, "dropout").err), eNav = ids12.map((n) => flight(AUTO, n, "navigator").err), eLeaky = ids12.map((n) => flight(arm, n, "dropout").err), eOff = ids12.map((n) => flight(off, n, "dropout").err);
     ok("!! the lesion arm (gain 0) equals the dropout autopilot exactly on every one of twelve ids (the settled dark heading error identical)", eOff.every((v, i) => v === eAuto[i]), J(eOff.map((v) => +v.toFixed(4))));
-    ok("!! over twelve ids the unit's settled dark heading error is at least 0.03 rad below the dropout autopilot's (measured 0.647 against 0.702)", mean(eAuto) - mean(eLeaky) >= 0.03, `${mean(eLeaky).toFixed(4)} against ${mean(eAuto).toFixed(4)}`);
-    ok("!! and within 0.02 rad of the dead-reckoning navigator's on average (0.644), and within 0.05 on every id (largest measured 0.014)", Math.abs(mean(eLeaky) - mean(eNav)) <= 0.02 && eLeaky.every((v, i) => Math.abs(v - eNav[i]) <= 0.05), `${mean(eNav).toFixed(4)}, largest ${Math.max(...eLeaky.map((v, i) => Math.abs(v - eNav[i]))).toFixed(4)}`);
+    ok("!! over twelve ids the unit's settled dark heading error is within 0.02 rad of the dead-reckoning navigator's on average (0.647 against 0.644) and within 0.05 on every id (largest measured 0.014): it flies the way the navigator does", Math.abs(mean(eLeaky) - mean(eNav)) <= 0.02 && eLeaky.every((v, i) => Math.abs(v - eNav[i]) <= 0.05), `${mean(eLeaky).toFixed(4)} against ${mean(eNav).toFixed(4)}, largest ${Math.max(...eLeaky.map((v, i) => Math.abs(v - eNav[i]))).toFixed(4)}; the dropout autopilot ${mean(eAuto).toFixed(4)} (not a row: it does not separate, see the header)`);
 }
 
 sec("9. THE SOURCE");

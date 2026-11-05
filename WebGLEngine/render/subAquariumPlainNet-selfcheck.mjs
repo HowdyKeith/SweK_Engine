@@ -11,7 +11,7 @@
 //   4 THE RECORD    checkRecord takes every one of the 48 champion records and refuses what is not one (a reference record, a comparator, no spec, bad widths or scales, a wrong weight count, a non-finite weight); kindOfRecord and entryOfRecord name the circuit plainnet:<spec>.
 //   5 THE ARM       the object brain/switchboard.mjs (claude/wizardly-einstein-wr30pd, f4b55956) takes with addArm: keys, values, entry(), register(tank) seating the kind, every bad option refused.
 //   6 IN THE TANK   flown as the board flies the dropout task (a fresh one-sub tank per id, arm.register, sync, setEvent "dropout", 160 s): the sub is seated by the kind and never lost; the untrained net's settled dark heading error equals the autopilot's on every id (1e-9); the champion's is not the
-//                   autopilot's (the residual is live in the tank) and, over twelve ids, lower by at least 0.03 rad (measured 0.064 for P/B/mn:3: 0.638 against 0.702; NOT a paired test, NOT a finding: the notes' "generic gain" of every residual pilot over the autopilot, in the tank).
+//                   autopilot's (the residual is live in the tank: it differs by over 0.05 rad on an id). NOT a row, said here: how much better than the autopilot it is on that metric (P/B/mn:3: 0.638 against 0.702 on twelve ids, -0.063 rad, se 0.035 on sixty: a tie) -- that is the board's to read, and tools/ship/takeTankDropout.mjs prints it.
 //   7 THE SOURCE    pure; the one import.
 // NOT CHECKED, said plainly: that the champions fly WELL (the study scored them on the 4b disturbances; brain/PLAIN_NET_CONTROL_WIP.md); that the study's scores reproduce through this kind (the study's own gate holds the rebuild of a champion from its record to 1e-4); the page; the switchboard (not in this tree);
 // any tilt, gust or hazard in the tank (it has none).
@@ -156,7 +156,6 @@ sec("6. IN THE TANK, FLOWN AS THE BOARD FLIES THE DROPOUT TASK");
         }
         return { err: cnt ? sum / cnt : all / cntAll, snap, dark: cntAll };
     }
-    const mean = (a) => a.reduce((x, y) => x + y, 0) / a.length;
     {
         const q = A.createTank(), r0 = arm.register(q); q.sync([{ id: "x", name: "x", hue: 1, from: "board", local: true, theta: null, ...arm.entry("x") }]);
         const w = q.snapshot()[0], q2 = A.createTank(); q2.sync([{ id: "y", name: "y", hue: 1, from: "board", local: true, theta: null, ...arm.entry("y") }]); const waiting = q2.snapshot()[0], r1 = arm.register(q2), seated = q2.snapshot()[0];
@@ -164,10 +163,9 @@ sec("6. IN THE TANK, FLOWN AS THE BOARD FLIES THE DROPOUT TASK");
     }
     const ids4 = [1, 2, 3, 4], f0 = ids4.map((n) => flight(arm0, n)), fA = ids4.map((n) => flight(AUTO, n));
     ok("!! the untrained net's settled dark heading error equals the autopilot's on every one of four ids (1e-9): seated, flying, and the autopilot", f0.every((f, i) => f.snap.kind !== null && near(f.err, fA[i].err, 1e-9) && f.dark === 1919), J(f0.map((f) => +f.err.toFixed(4))));
-    const ids12 = Array.from({ length: 12 }, (_, i) => i + 1), fC = ids12.map((n) => flight(arm, n)), fB = ids12.map((n) => flight(AUTO, n)), d = fC.map((f, i) => f.err - fB[i].err);
+    const ids12 = Array.from({ length: 12 }, (_, i) => i + 1), fC = ids12.map((n) => flight(arm, n)), fB = ids12.map((n) => flight(AUTO, n)), d = fC.map((f, i) => f.err - fB[i].err);   // 0.638 against 0.702 on these twelve ids; a tie on sixty (see the header)
     ok("!! the champion is seated, never lost, finite, with the dropout's 1919 dark ticks on all twelve ids", fC.every((f) => f.snap.kind !== null && f.snap.kindError === null && !f.snap.lost && Number.isFinite(f.err) && f.dark === 1919));
     ok("!! the champion is not the autopilot in the tank (the residual is live): the settled dark heading error differs by over 0.05 rad on at least one id", Math.max(...d.map(Math.abs)) > 0.05, "largest " + Math.max(...d.map(Math.abs)).toFixed(4));
-    ok("!! over twelve ids it is at least 0.03 rad below the autopilot's (measured 0.638 against 0.702); NOT a paired test and not a finding -- the notes' generic gain of a residual pilot, seen in the tank", mean(fB.map((f) => f.err)) - mean(fC.map((f) => f.err)) >= 0.03, `${mean(fC.map((f) => f.err)).toFixed(4)} against ${mean(fB.map((f) => f.err)).toFixed(4)}`);
 }
 
 sec("7. THE SOURCE");
