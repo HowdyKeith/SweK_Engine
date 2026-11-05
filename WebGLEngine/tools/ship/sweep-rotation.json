@@ -1,7 +1,7 @@
 {
  "generatedFrom": "tools/ship/sweepRotation.mjs",
  "note": "The over-budget gates this rotation re-timed SERIALLY, with the reading that had evicted each. Written only by tools/ship/sweepRotation.mjs -- sweep-timings.json has a different owner. MERGED BY GATE (v4535): `at` on the file is the LAST run, `at` on a row is the run that measured that row, and a row survives until its own gate is re-timed. `poolAt` (v4725) is the last UNFILTERED stalest-first run -- --gate, --band and --killed do not move it. `poolHorizon` (v4816) is the stamp of the first pool entry that run did NOT take: it reached every entry stamped earlier and none stamped at or after it.",
- "at": "2026-11-05T15:04:18.881Z",
+ "at": "2026-11-05T15:16:05.391Z",
  "poolAt": "2026-11-05T14:15:53.334Z",
  "poolHorizon": "2026-10-25T14:16:54.592Z",
  "budgetMs": 3000,
@@ -310,6 +310,13 @@
    "at": "2026-10-26T00:40:34.828Z"
   },
   {
+   "gate": "brain/plannerPerturbed-selfcheck.mjs",
+   "ms": 29333,
+   "code": 0,
+   "priorMs": 20012,
+   "at": "2026-11-05T15:05:07.326Z"
+  },
+  {
    "gate": "brain/raceLockstep-selfcheck.mjs",
    "ms": 4061,
    "code": 0,
@@ -430,6 +437,34 @@
    "code": 0,
    "priorMs": 5588,
    "at": "2026-10-26T00:40:34.828Z"
+  },
+  {
+   "gate": "brain/subSensedDetect-selfcheck.mjs",
+   "ms": 41459,
+   "code": 0,
+   "priorMs": 20021,
+   "at": "2026-11-05T15:05:48.904Z"
+  },
+  {
+   "gate": "brain/subSensedNav-selfcheck.mjs",
+   "ms": 130466,
+   "code": 0,
+   "priorMs": 20018,
+   "at": "2026-11-05T15:07:59.487Z"
+  },
+  {
+   "gate": "brain/surveySeat-selfcheck.mjs",
+   "ms": 30500,
+   "code": 0,
+   "priorMs": 20013,
+   "at": "2026-11-05T15:08:30.109Z"
+  },
+  {
+   "gate": "brain/switchboard-selfcheck.mjs",
+   "ms": 43359,
+   "code": 0,
+   "priorMs": 20019,
+   "at": "2026-11-05T15:09:13.595Z"
   },
   {
    "gate": "brain/tacticsRoster-selfcheck.mjs",
@@ -1769,11 +1804,25 @@
    "at": "2026-10-27T03:27:33.790Z"
   },
   {
+   "gate": "render/learnedUpscaleTemporal-selfcheck.mjs",
+   "ms": 21350,
+   "code": 0,
+   "priorMs": 20013,
+   "at": "2026-11-05T15:09:35.066Z"
+  },
+  {
    "gate": "render/mossField-selfcheck.mjs",
    "ms": 29149,
    "code": 0,
    "priorMs": 20211,
    "at": "2026-09-09T17:59:42.840Z"
+  },
+  {
+   "gate": "render/movingScenes-selfcheck.mjs",
+   "ms": 20320,
+   "code": 0,
+   "priorMs": 20016,
+   "at": "2026-11-05T15:09:55.500Z"
   },
   {
    "gate": "render/opticalFlowTsl-selfcheck.mjs",
@@ -2258,6 +2307,13 @@
    "code": 0,
    "priorMs": 6117,
    "at": "2026-10-27T15:35:55.277Z"
+  },
+  {
+   "gate": "tools/roundhouse/angularImpulseCensus-selfcheck.mjs",
+   "ms": 36183,
+   "code": 0,
+   "priorMs": 20018,
+   "at": "2026-11-05T15:10:31.831Z"
   },
   {
    "gate": "tools/roundhouse/assumptionMap-selfcheck.mjs",
@@ -5064,6 +5120,41 @@
    "at": "2026-09-20T20:58:37.435Z"
   },
   {
+   "gate": "tools/ship/plainNetStudy-selfcheck.mjs",
+   "ms": 25238,
+   "code": 0,
+   "priorMs": 20013,
+   "at": "2026-11-05T15:10:57.200Z"
+  },
+  {
+   "gate": "tools/ship/plannerCap-selfcheck.mjs",
+   "ms": 33641,
+   "code": 0,
+   "priorMs": 20019,
+   "at": "2026-11-05T15:11:30.964Z"
+  },
+  {
+   "gate": "tools/ship/plannerEnsemble-selfcheck.mjs",
+   "ms": 33766,
+   "code": 0,
+   "priorMs": 20010,
+   "at": "2026-11-05T15:12:04.862Z"
+  },
+  {
+   "gate": "tools/ship/plannerHeadroom-selfcheck.mjs",
+   "ms": 134151,
+   "code": 0,
+   "priorMs": 20021,
+   "at": "2026-11-05T15:14:19.126Z"
+  },
+  {
+   "gate": "tools/ship/plannerRobust-selfcheck.mjs",
+   "ms": 25942,
+   "code": 0,
+   "priorMs": 20011,
+   "at": "2026-11-05T15:14:45.183Z"
+  },
+  {
    "gate": "tools/ship/platformRequires-selfcheck.mjs",
    "ms": 2915,
    "code": 0,
@@ -5700,6 +5791,13 @@
    "at": "2026-10-26T00:40:34.828Z"
   },
   {
+   "gate": "tools/ship/subSensedDetStudy-selfcheck.mjs",
+   "ms": 46275,
+   "code": 0,
+   "priorMs": 20020,
+   "at": "2026-11-05T15:15:31.582Z"
+  },
+  {
    "gate": "tools/ship/subSensedFollowStudy-selfcheck.mjs",
    "ms": 284449,
    "code": 0,
@@ -5798,6 +5896,13 @@
    "code": 0,
    "priorMs": 55471,
    "at": "2026-10-13T01:18:48.855Z"
+  },
+  {
+   "gate": "tools/ship/train6dofMlpClose-selfcheck.mjs",
+   "ms": 33693,
+   "code": 0,
+   "priorMs": 20012,
+   "at": "2026-11-05T15:16:05.391Z"
   },
   {
    "gate": "tools/ship/train6dofPilot-selfcheck.mjs",
