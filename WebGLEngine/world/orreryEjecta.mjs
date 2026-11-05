@@ -693,6 +693,14 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
         "tools/ship/trainSubState.mjs",
         // v4901 -- the aquarium page loads the hemibrain-backed pilots (named by the sub-aquarium round).
         "sub-aquarium.html",
+        // v4912 -- ARRIVED with the merge of the sub-aquarium, needs and plain-net lines (named by orreryEjecta-selfcheck): the aquarium core and sim gates, the brain panel gate, the stateful pilot's file library, its gate, and the tank fly bench.
+        "ai-bridge/subAquariumCore-selfcheck.mjs",
+        "render/brainPanel-selfcheck.mjs",
+        "render/subAquariumFlyCx-selfcheck.mjs",
+        "render/subAquariumSim-selfcheck.mjs",
+        "tools/ship/flyCxPilotFile-selfcheck.mjs",
+        "tools/ship/flyCxPilotFile.mjs",
+        "tools/tankFlyCxBench.mjs",
     ]),
     // v4898 -- vendor/zebrafish-vestibular is a PAPER-ONLY body: the supplementary files of an article, read by no source file (dependantsOf returns []), which is a measurement and not an omission.
     // v4906 -- ONE DEPENDANT ARRIVED: tools/fishVestibularCircuit.mjs reads the supplementary spreadsheets (the rung 4b extraction), so the body is no longer reached by nothing. It is still DATA and holds no code on disk.
