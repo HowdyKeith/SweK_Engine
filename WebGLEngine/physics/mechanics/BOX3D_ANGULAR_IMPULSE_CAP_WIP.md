@@ -414,3 +414,64 @@ In `tools/roundhouse/angularImpulseCensus-selfcheck.mjs`, section 12, nine rows:
 
 Jolt's setAngularVelocity clamps at 15 pi too, and box3d's facade's does not: a body set to 30 pi reads 15 pi on Jolt and
 30 pi on box3d. The registration covers the impulse only, so this is left as it is and named here.
+
+## Seen on the way, fixed (2026-11-05)
+
+Keith: "Let's fix those items you noticed." The report on the five items named four. Each is now fixed, gated and sabotaged.
+
+### The figure pages shoved the wrong bodies
+
+`ragdoll.html` and `flesh.html` build the ground first, so each bone's body is one past its place in `BONES`. Their shove's
+typed 1 and 4 were the pelvis and the left upper arm. `ragdoll.html`'s comments name the chest and the left lower arm.
+
+- Both pages now shove by name, through the map `build()` already fills.
+- In Chromium each shove now spins body 2, the chest: 143.42 and 163.04 rad/s as box3d's own impulse leaves it, which the
+  facade then caps.
+
+### `box3d-vs-jolt.html` never started box3d
+
+It called `createWorld()` without the loader's `init()`. The call threw, and the page said box3d's WASM was not built.
+
+- It now awaits `init()` and, if box3d is not ready, shows the loader's own reason.
+- In Chromium it starts box3d, gives its scene's twelve impulses, and its readout compares the two engines (a pixel diff of
+  7.1%).
+- Both page fixes are gated in a new gate, `tools/ship/box3dPages-selfcheck.mjs`. It holds the bugs as the census's committed
+  results saw them, and the pages now. Every edit is on the line it fixes, so the census's sites still name the pages' calls.
+- Section 11's C-reach row read this page's current source for its reason. It now reads the page as it stood where the census
+  ran (the results' commit), and also that the page calls `init()` now.
+
+### box3d's `setAngularVelocity` had no cap, and Jolt's has one
+
+A body set spinning at 30 pi read 15 pi on Jolt and 30 pi on box3d.
+
+- The facade's setter now caps a spin set outright the same way: only above 15 pi x 1.001, and by the same expression.
+- box3d's raw setter is left alone.
+- **Before and after.** Seventeen gates that reach a box3d setter's caller were run on both sides of the change.
+  - Sixteen came out identical line for line, details included.
+  - The census gate changed only by its own new and restated rows.
+- **Restated.** Section 12's row on the spin the call leaves put its body past the cap through the facade's setter, which now
+  caps. It does so through box3d's own setter instead.
+- **Gated** in section 12, two rows:
+  - a spin set at twice the cap, off every axis, is left at 15 pi about its axis, as on Jolt;
+  - a spin at or under the slack is set bit for bit.
+
+### The raw-export callers no gate had reached, measured
+
+`rigidKeys.mjs` and `backendRotation.mjs` call box3d's raw export, which skips the cap. Neither file is a site of the table, so
+their gates were not in the corpus. Run under the hook, as the census measures:
+
+| Caller | Calls | Largest spin, rad/s |
+|---|---|---|
+| rigidKeys.mjs, the flip | 6 | 6.0002 |
+| rigidKeys.mjs, the pendulum | 6 | 1.9851 |
+| backendRotation.mjs, the spinner | 4 | 2.0004 |
+
+Every call is far under the cap. Gated in section 13.
+
+### Sabotaged
+
+P1-P9 break the pages, S1-S6 the setter, and M1-M3 section 13 and the restated C-reach. Every one went red by name, and every
+file was restored byte-identical.
+
+**A finding on the way:** P4 left the bone map unfilled and first went red partly by making section 3 throw. The rows now answer
+false on a missing reading, and P4' goes red by name.

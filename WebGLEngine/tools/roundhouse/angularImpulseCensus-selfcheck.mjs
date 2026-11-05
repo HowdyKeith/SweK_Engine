@@ -28,6 +28,9 @@
 //                                    the predictions scored, the six sites not reached and why, and the raw-export calls the table missed
 //  12  THE CAP, BUILT                the decision's fix in box3dLoader.js: box3d's own export as it was; the facade leaving 15 pi about the same axis, only past
 //                                    the slack, on the spin the call leaves; Jolt's vector; no allocation; an old artifact uncapped; every site past it reached
+//                                    (2026-11-05) and the setter, as Jolt's: a spin set past the cap left at 15 pi about its axis, one under it set as given
+//  13  THE RAW-EXPORT CALLERS       (2026-11-05) rigidKeys.mjs's and backendRotation.mjs's, which no gate of the corpus reached: their gates under the
+//                                    hook, every call far under the cap
 //   (2026-11-04, after the cap: section 5's C-reads restated -- the facade now leaves 15 pi, so box3d's own impulse is read through its raw export)
 // SABOTAGE LOG -- FIFTY-TWO, 2026-11-04, each applied to the census's library, hook, watcher or command through a byte-safe runner (one at a time, every file restored and its sha256
 // checked), the gate run whole; every one red by name, none 0 red (the number is how many rows went red):
@@ -78,6 +81,11 @@
 //   what the check guards (the facade's box flown on box3d's own export, the facade never asked), and it goes red.
 // AND THREE FOR ITS TEMP DIRECTORIES (section 4's last row but one, 2026-11-04: the hooked run and the probe each left one behind, 1,219 in all):
 //   T1 a hooked run leaves its directory behind again 1 | T2 a probe leaves its directory behind again 1 | T3 a hooked run removes the directory its caller gave it 1
+// AND NINE FOR THE ITEMS SEEN ON THE WAY (2026-11-05: the setter's cap in section 12, section 13, and C-reach's page reason restated), S against this
+// gate and fx/fracture/debrisPhysics-selfcheck.mjs, M against this gate; every file restored byte-identical (sha256), every one red by name:
+//   S1 the setter's cap dropped 1 | S2 the setter's slack forgotten 1 | S3 the setter's scale upside down 1 | S4 the setter brings every spin to the cap 1
+//   S5 the setter's capped spin about x 1 | S6 section 12's pre-spin set through the facade again 1 | M1 section 13 runs rigidKeys' gate alone 1 | M2 a fourth raw call in rigidKeys.mjs 2
+//   M3 C-reach reads box3d-vs-jolt.html as it is now, not where the census ran 1
 "use strict";
 import fs from "node:fs";
 import os from "node:os";
@@ -422,10 +430,13 @@ await section(() => {
         ["transparent", "reads", "jolt", "site", "complete"].every((k) => R.controls[k].ok) && R.controls.complete.timedOut.length === 0 && R.controls.complete.crashed.length === 0 && R.runs.p.every((x) => x.completed));
     const notReached = ["physics/kaijuBox3d.js:84", "physics/esHullCombat.js:92", "physics/backendDivergence.mjs:24", "physics/fluidBox3d.js:62", "physics/jolt/joltRagdoll.js:73", "box3d-vs-jolt.html:49"];
     const gsrc = (f) => fs.readFileSync(path.join(ENG, f), "utf8");
-    ok("!! C-REACH FAILED, AS IT IS MEANT TO WHEN A SITE GOES UNREACHED, and names six; the census says nothing about them. Each one's reason, read from its gates: the kaiju's, the hull combat's and the fluid's gates fly a mock world, backendDivergence's and the fling's fly Jolt, and the page never starts box3d",
+    // 2026-11-05: the page's reason is read as the page stood where the census ran (the results' commit), since box3d-vs-jolt.html has called init() since
+    // its fix (tools/ship/box3dPages-selfcheck.mjs) -- and that it calls it now is read too, so the row says both
+    const atRun = (f) => execFileSync("git", ["show", `${R.commit}:./${f}`], { cwd: ENG, encoding: "utf8", maxBuffer: 1 << 26 });
+    ok("!! C-REACH FAILED, AS IT IS MEANT TO WHEN A SITE GOES UNREACHED, and names six; the census says nothing about them. Each one's reason, read from its gates: the kaiju's, the hull combat's and the fluid's gates fly a mock world, backendDivergence's and the fling's fly Jolt, and the page, as it stood where the census ran, never started box3d (it calls init() since its fix)",
         !R.controls.reach.ok && J(R.controls.reach.notReached) === J(notReached) &&
         /mockWorld/.test(gsrc("physics/kaiju-box3d-selfcheck.mjs")) && /mockWorld/.test(gsrc("physics/es-hull-combat-selfcheck.mjs")) && /mockWorld/.test(gsrc("physics/fluidBox3d-selfcheck.mjs")) &&
-        /createJoltBackend/.test(gsrc("render/perceptual-selfcheck.mjs")) && /createJoltBackend/.test(gsrc("physics/jolt/jolt-ragdoll-selfcheck.mjs")) && /createWorld\(/.test(gsrc("box3d-vs-jolt.html")) && !/box3d\.init\(\)/.test(gsrc("box3d-vs-jolt.html")));
+        /createJoltBackend/.test(gsrc("render/perceptual-selfcheck.mjs")) && /createJoltBackend/.test(gsrc("physics/jolt/jolt-ragdoll-selfcheck.mjs")) && /createWorld\(/.test(atRun("box3d-vs-jolt.html")) && !/box3d\.init\(\)/.test(atRun("box3d-vs-jolt.html")) && /box3d\.init\(\)/.test(gsrc("box3d-vs-jolt.html")));
     const found = again.others.filter((x) => x.kind === "found");
     ok("!! FOUND OUTSIDE THE TABLE: two calls of box3d's raw export in tools/roundhouse/spinningBody.mjs (lines 209 and 212), 2.00 and 4.16 rad/s, under the cap. The table was a grep for the facade's angularImpulse(); a call of _swk_body_ang_impulse is spelled otherwise",
         J(found.map((x) => x.site)) === J(["tools/roundhouse/spinningBody.mjs:209", "tools/roundhouse/spinningBody.mjs:212"]) && found.every((x) => x.past === 0 && x.max < 4.2) && C.decide(again).past.every((x) => !x.startsWith("tools/")));
@@ -450,7 +461,8 @@ await section(async () => {
     // one box given one impulse -- through box3d's raw export, through the facade, or on Jolt -- after an optional spin set outright; its spin after
     const spun = (how, half, imp, pre = null) => {
         const w = how === "jolt" ? JB.createWorld({ gravity: [0, 0, 0] }) : Lo.box3d.createWorld({ gravity: [0, 0, 0] }), b = w.addBox({ type: "dynamic", pos: [0, 0, 0], half: [...half], density: 1 });
-        if (pre) w.setAngularVelocity(b, pre);
+        // 2026-11-05: a box3d body is put past the cap through box3d's own setter, since the facade's setter caps too (the setter's rows, below)
+        if (pre) { if (how === "jolt") w.setAngularVelocity(b, pre); else w._m._swk_body_set_ang_velocity(b, pre[0], pre[1], pre[2]); }
         if (how === "raw") w._m._swk_body_ang_impulse(b, imp[0], imp[1], imp[2]); else w.angularImpulse(b, [...imp]);
         const A = w.readAngularVelocities(), v = [A[b * 3], A[b * 3 + 1], A[b * 3 + 2]]; if (w.destroy) w.destroy(); return v;
     };
@@ -494,10 +506,42 @@ await section(async () => {
     const H = new Float32Array(m.HEAPF32.buffer, buf + ob * 12, 3), ov = [H[0], H[1], H[2]]; m._free(buf); ow.destroy();
     ok("an artifact without the spin exports gets the impulse and no cap, rather than an error, as it did: supportsAngular() says false and the lone box spins at box3d's own 112.49",
         !threw && sa === false && len(ov) === LONE_SPIN, threw ? String(threw.message) : `${len(ov).toFixed(4)} rad/s`);
+    // 2026-11-05 -- THE SETTER, AS JOLT'S (Keith: "Let's fix those items you noticed"). Jolt's facade clamps a spin set outright at 15 pi, as its
+    // AddAngularImpulse does, and box3d's facade set whatever it was given. It now caps a set spin the same way (box3dLoader.js, cappedSpin).
+    const setOn = (how, v) => {
+        const w = how === "jolt" ? JB.createWorld({ gravity: [0, 0, 0] }) : Lo.box3d.createWorld({ gravity: [0, 0, 0] }), b = w.addBox({ type: "dynamic", pos: [0, 0, 0], half: [0.5, 0.5, 0.5], density: 1 });
+        if (how === "raw") w._m._swk_body_set_ang_velocity(b, v[0], v[1], v[2]); else w.setAngularVelocity(b, v);
+        const A = w.readAngularVelocities(), r = [A[b * 3], A[b * 3 + 1], A[b * 3 + 2]]; if (w.destroy) w.destroy(); return r;
+    };
+    const fast = [10, -20, 30].map((x) => x * 2 * cap / Math.hypot(10, 20, 30)), sf = setOn("box3d", fast), sj = setOn("jolt", fast), sr = setOn("raw", fast);
+    ok("!! THE SETTER, AS JOLT'S: a spin set outright at twice the cap, off every axis, is left at 15 pi about the axis it was given -- through the facade as on Jolt, to float32 -- and box3d's own setter still sets it as given",
+        atCap(sf) && atCap(sj) && cos(fast, sf) > 1 - 1e-6 && gap(sf, sj) <= 1e-5 * cap && Math.abs(len(sr) - 2 * cap) <= 1e-5 * cap,
+        `the facade ${len(sf).toFixed(4)}, Jolt ${len(sj).toFixed(4)}, box3d's own ${len(sr).toFixed(4)} rad/s; facade and Jolt ${gap(sf, sj).toExponential(2)} apart`);
+    const setUnder = [40, cap, cap * 1.0005].map((x) => [setOn("raw", [0, x, 0]), setOn("box3d", [0, x, 0])]);
+    ok("!! ...and a spin set at or under the slack -- 40 rad/s, 15 pi, 15 pi x 1.0005 -- is set bit for bit as box3d's own setter sets it",
+        setUnder.every(([a, b]) => J(a) === J(b)) && len(setUnder[2][0]) > cap, setUnder.map(([a]) => len(a).toFixed(4)).join(", "));
     const R = JSON.parse(fs.readFileSync(C.DEFAULT_RESULTS, "utf8")), viaOf = (site) => { const e = R.readings.sites.find((x) => x.site === site); return e && e.maxAt ? J(e.maxAt.via) : null; };
     ok("!! and it reaches every site the census saw past the cap: ragdoll.html's and flesh.html's shove and the debris' throw each went through the facade (box3dLoader.js:51), none through a raw world",
         ["ragdoll.html:283", "flesh.html:305", C.DEBRIS_SITE].every((x) => viaOf(x) === J(["physics/box3d/box3dLoader.js:51"])) &&
         /angularImpulse\(idx, v\) \{ this\._m\._swk_body_ang_impulse\(idx, v\[0\], v\[1\], v\[2\]\); capSpinAt\(this\._m, idx\); \}/.test(fs.readFileSync(path.join(ENG, "physics", "box3d", "box3dLoader.js"), "utf8").split("\n")[50]));
+});
+
+console.log("\n13. THE RAW-EXPORT CALLERS THE CENSUS DID NOT REACH, MEASURED (2026-11-05)");
+await section(async () => {
+    // Keith: "Let's fix those items you noticed". Section 11 found physics/mechanics/rigidKeys.mjs and tools/roundhouse/backendRotation.mjs calling
+    // box3d's raw export, which skips the facade's cap, where no gate of the corpus had reached them. Measured here as the census measures: their
+    // own gates, under the hook. Neither file is a site of the table, so neither gate was in N.
+    const own = ["physics/mechanics/rigidKeys-selfcheck.mjs", "tools/roundhouse/backendRotation-selfcheck.mjs"], runs = [];
+    for (const gate of own) runs.push(await C.runHooked(gate, { run: gate, limitMs: 300000 }));
+    const all = W.mergeTallies(runs.map((r) => r.tally && { ...r.tally, run: r.run })), at = (s) => all.sites[s];
+    const RAW = ["physics/mechanics/rigidKeys.mjs:207", "physics/mechanics/rigidKeys.mjs:244", "tools/roundhouse/backendRotation.mjs:133"];
+    ok("!! measured, every one of their raw calls is far under the cap -- rigidKeys.mjs's flip and pendulum, backendRotation.mjs's spinner -- so the cap they skip would not have touched them",
+        runs.every((r) => !r.timedOut && r.code === 0) && RAW.every((s) => !!at(s) && at(s).calls > 0 && at(s).past === 0 && at(s).max < 10 && J(at(s).maxAt.via) === "[]"),
+        RAW.map((s) => at(s) ? `${s} ${at(s).calls} calls, ${at(s).max.toFixed(4)} rad/s at most` : `${s} not reached`).join("; "));
+    const lines = execFileSync("git", ["grep", "-n", "_swk_body_ang_impulse\\s*(", "--", "physics/mechanics/rigidKeys.mjs", "tools/roundhouse/backendRotation.mjs"], { cwd: ENG, encoding: "utf8" })
+        .split("\n").filter(Boolean).map((l) => l.split(":").slice(0, 2).join(":"));
+    ok("...and those three are every raw call the two files make, and why the census could not see them: neither gate is in its corpus N",
+        J(lines) === J(RAW) && own.every((gate) => !C.corpusN().includes(gate)), lines.join(", "));
 });
 
 fs.rmSync(TMP, { recursive: true, force: true });
