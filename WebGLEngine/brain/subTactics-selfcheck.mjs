@@ -1,6 +1,6 @@
 // WebGLEngine/brain/subTactics-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node brain/subTactics-selfcheck.mjs      (~0.1 s)
+// Run: node brain/subTactics-selfcheck.mjs      (~0.05-0.1 s)
 //
 // THE TACTICIAN HELD TO ITS OWN STATE MACHINE. brain/subTactics.mjs decides, from sonar alone, where to go, when to ping and when to fire; this gate feeds it synthetic observations and holds each answer to the closed form:
 //   1  THETA      the defaults are frozen and inside their bounds; clampTheta fills a missing or NaN name with the default, clips to the bounds and rounds pingAfter; the vector round-trips in name order
