@@ -586,7 +586,7 @@
   "physics/render/splitSumWgsl-selfcheck.mjs": 478,
   "physics/render/stratified-selfcheck.mjs": 236,
   "physics/render/subsurface-selfcheck.mjs": 345,
-  "physics/render/transmission-selfcheck.mjs": 20105,
+  "physics/render/transmission-selfcheck.mjs": 14054,
   "physics/render/wgslArc-selfcheck.mjs": 91,
   "physics/scoreDirection-selfcheck.mjs": 7452,
   "physics/seismic/rays-selfcheck.mjs": 100,
@@ -850,7 +850,7 @@
   "simulation/tomo/gridVsClosedForm-selfcheck.mjs": 1159,
   "simulation/tomo/honest-error-selfcheck.mjs": 113,
   "simulation/tomo/nullspace-selfcheck.mjs": 23352,
-  "text/slug-selfcheck.mjs": 10480,
+  "text/slug-selfcheck.mjs": 11170,
   "tools/autoExtremity-selfcheck.mjs": 55,
   "tools/bench/fleetBench-selfcheck.mjs": 6141,
   "tools/caseStudy-selfcheck.mjs": 1496,
@@ -1416,7 +1416,7 @@
   "tools/ship/ensureDxc-selfcheck.mjs": 108,
   "tools/ship/erosionMeasure-selfcheck.mjs": 457,
   "tools/ship/esShipLabelsDevice-selfcheck.mjs": 2135,
-  "tools/ship/eulerGpu-selfcheck.mjs": 6855,
+  "tools/ship/eulerGpu-selfcheck.mjs": 6948,
   "tools/ship/exactHash-selfcheck.mjs": 2911,
   "tools/ship/exitBanner-selfcheck.mjs": 192,
   "tools/ship/exitBusy-selfcheck.mjs": 5317,
@@ -1494,7 +1494,7 @@
   "tools/ship/gateQuality-selfcheck.mjs": 1528,
   "tools/ship/gateReach-selfcheck.mjs": 20157,
   "tools/ship/gateReport-selfcheck.mjs": 16885,
-  "tools/ship/gateSelection-selfcheck.mjs": 14353,
+  "tools/ship/gateSelection-selfcheck.mjs": 10139,
   "tools/ship/gateSweep-selfcheck.mjs": 1460,
   "tools/ship/gateWalk-selfcheck.mjs": 702,
   "tools/ship/gatesBridge-selfcheck.mjs": 1428,
@@ -1597,7 +1597,7 @@
   "tools/ship/loopScope-selfcheck.mjs": 90,
   "tools/ship/loopSearch-selfcheck.mjs": 49525,
   "tools/ship/loopTarget-selfcheck.mjs": 18502,
-  "tools/ship/loopTrace-selfcheck.mjs": 10569,
+  "tools/ship/loopTrace-selfcheck.mjs": 10755,
   "tools/ship/macSession-selfcheck.mjs": 1788,
   "tools/ship/markerSingleSource-selfcheck.mjs": 3136,
   "tools/ship/mechanical-selfcheck.mjs": 1306,
@@ -1691,7 +1691,7 @@
   "tools/ship/pageSections-selfcheck.mjs": 340,
   "tools/ship/pageSectionsReport-selfcheck.mjs": 2594,
   "tools/ship/pageShot-selfcheck.mjs": 14419,
-  "tools/ship/paintFields-selfcheck.mjs": 20874,
+  "tools/ship/paintFields-selfcheck.mjs": 10663,
   "tools/ship/paintFloor-selfcheck.mjs": 4348,
   "tools/ship/paintTransfer-selfcheck.mjs": 20032,
   "tools/ship/paintTransforms-selfcheck.mjs": 15962,
@@ -5164,7 +5164,7 @@
   "physics/render/splitSumWgsl-selfcheck.mjs": "2026-11-05T14:55:36.491Z",
   "physics/render/stratified-selfcheck.mjs": "2026-11-05T14:55:36.491Z",
   "physics/render/subsurface-selfcheck.mjs": "2026-11-05T14:55:36.491Z",
-  "physics/render/transmission-selfcheck.mjs": "2026-10-10T16:37:56.871Z",
+  "physics/render/transmission-selfcheck.mjs": "2026-11-05T15:04:18.881Z",
   "physics/render/wgslArc-selfcheck.mjs": "2026-11-05T14:55:36.491Z",
   "physics/scoreDirection-selfcheck.mjs": "2026-10-27T15:35:55.277Z",
   "physics/seismic/rays-selfcheck.mjs": "2026-11-05T14:55:36.491Z",
@@ -5428,7 +5428,7 @@
   "simulation/tomo/gridVsClosedForm-selfcheck.mjs": "2026-11-05T14:55:36.491Z",
   "simulation/tomo/honest-error-selfcheck.mjs": "2026-11-05T14:55:36.491Z",
   "simulation/tomo/nullspace-selfcheck.mjs": "2026-09-09T17:59:42.840Z",
-  "text/slug-selfcheck.mjs": "2026-11-05T15:01:22.692Z",
+  "text/slug-selfcheck.mjs": "2026-11-05T15:01:34.034Z",
   "tools/autoExtremity-selfcheck.mjs": "2026-11-05T14:55:36.491Z",
   "tools/bench/fleetBench-selfcheck.mjs": "2026-10-27T03:04:57.146Z",
   "tools/caseStudy-selfcheck.mjs": "2026-11-05T14:55:36.491Z",
@@ -5994,7 +5994,7 @@
   "tools/ship/ensureDxc-selfcheck.mjs": "2026-11-05T14:55:36.491Z",
   "tools/ship/erosionMeasure-selfcheck.mjs": "2026-11-05T14:55:36.491Z",
   "tools/ship/esShipLabelsDevice-selfcheck.mjs": "2026-11-05T14:55:36.491Z",
-  "tools/ship/eulerGpu-selfcheck.mjs": "2026-11-05T14:15:53.334Z",
+  "tools/ship/eulerGpu-selfcheck.mjs": "2026-11-05T15:01:55.099Z",
   "tools/ship/exactHash-selfcheck.mjs": "2026-11-05T14:55:36.491Z",
   "tools/ship/exitBanner-selfcheck.mjs": "2026-11-05T14:55:36.491Z",
   "tools/ship/exitBusy-selfcheck.mjs": "2026-10-27T03:04:57.146Z",
@@ -6072,7 +6072,7 @@
   "tools/ship/gateQuality-selfcheck.mjs": "2026-11-05T14:55:36.491Z",
   "tools/ship/gateReach-selfcheck.mjs": "unknown -- before v4408",
   "tools/ship/gateReport-selfcheck.mjs": "2026-10-26T03:59:26.912Z",
-  "tools/ship/gateSelection-selfcheck.mjs": "2026-10-26T01:02:50.396Z",
+  "tools/ship/gateSelection-selfcheck.mjs": "2026-11-05T15:03:31.014Z",
   "tools/ship/gateSweep-selfcheck.mjs": "2026-11-05T14:55:36.491Z",
   "tools/ship/gateWalk-selfcheck.mjs": "2026-11-05T14:55:36.491Z",
   "tools/ship/gatesBridge-selfcheck.mjs": "2026-11-05T14:55:36.491Z",
@@ -6175,7 +6175,7 @@
   "tools/ship/loopScope-selfcheck.mjs": "2026-11-05T14:55:36.491Z",
   "tools/ship/loopSearch-selfcheck.mjs": "2026-09-09T17:59:42.840Z",
   "tools/ship/loopTarget-selfcheck.mjs": "2026-10-25T17:52:49.979Z",
-  "tools/ship/loopTrace-selfcheck.mjs": "2026-11-05T14:15:53.334Z",
+  "tools/ship/loopTrace-selfcheck.mjs": "2026-11-05T15:02:28.001Z",
   "tools/ship/macSession-selfcheck.mjs": "2026-11-05T14:55:36.491Z",
   "tools/ship/markerSingleSource-selfcheck.mjs": "2026-10-26T00:40:34.828Z",
   "tools/ship/mechanical-selfcheck.mjs": "2026-11-05T14:55:36.491Z",
@@ -6269,7 +6269,7 @@
   "tools/ship/pageSections-selfcheck.mjs": "2026-11-05T14:55:36.491Z",
   "tools/ship/pageSectionsReport-selfcheck.mjs": "2026-11-05T14:55:36.491Z",
   "tools/ship/pageShot-selfcheck.mjs": "2026-10-25T17:52:49.979Z",
-  "tools/ship/paintFields-selfcheck.mjs": "2026-10-19T20:49:06.598Z",
+  "tools/ship/paintFields-selfcheck.mjs": "2026-11-05T15:03:00.461Z",
   "tools/ship/paintFloor-selfcheck.mjs": "2026-10-26T03:59:26.912Z",
   "tools/ship/paintTransfer-selfcheck.mjs": "2026-09-14T13:01:04.645Z",
   "tools/ship/paintTransforms-selfcheck.mjs": "2026-10-25T17:52:49.979Z",
@@ -8269,7 +8269,7 @@
   "tools/ship/ensureDxc-selfcheck.mjs": 20000,
   "tools/ship/erosionMeasure-selfcheck.mjs": 20000,
   "tools/ship/esShipLabelsDevice-selfcheck.mjs": 20000,
-  "tools/ship/eulerGpu-selfcheck.mjs": 20000,
+  "tools/ship/eulerGpu-selfcheck.mjs": 300000,
   "tools/ship/exactHash-selfcheck.mjs": 20000,
   "tools/ship/exitBanner-selfcheck.mjs": 20000,
   "tools/ship/exitBusy-selfcheck.mjs": 20000,
@@ -8446,7 +8446,7 @@
   "tools/ship/loopScope-selfcheck.mjs": 20000,
   "tools/ship/loopSearch-selfcheck.mjs": 90000,
   "tools/ship/loopTarget-selfcheck.mjs": 20000,
-  "tools/ship/loopTrace-selfcheck.mjs": 20000,
+  "tools/ship/loopTrace-selfcheck.mjs": 300000,
   "tools/ship/macSession-selfcheck.mjs": 20000,
   "tools/ship/markerSingleSource-selfcheck.mjs": 20000,
   "tools/ship/mechanical-selfcheck.mjs": 20000,
@@ -12299,7 +12299,7 @@
   "physics/render/splitSumWgsl-selfcheck.mjs": 303,
   "physics/render/stratified-selfcheck.mjs": 226,
   "physics/render/subsurface-selfcheck.mjs": 202,
-  "physics/render/transmission-selfcheck.mjs": 20105,
+  "physics/render/transmission-selfcheck.mjs": 14054,
   "physics/render/wgslArc-selfcheck.mjs": 67,
   "physics/scoreDirection-selfcheck.mjs": 7452,
   "physics/seismic/rays-selfcheck.mjs": 68,
@@ -12545,7 +12545,7 @@
   "simulation/tomo/blobXrayGif-selfcheck.mjs": 158,
   "simulation/tomo/gridVsClosedForm-selfcheck.mjs": 854,
   "simulation/tomo/honest-error-selfcheck.mjs": 84,
-  "text/slug-selfcheck.mjs": 10480,
+  "text/slug-selfcheck.mjs": 11170,
   "tools/autoExtremity-selfcheck.mjs": 52,
   "tools/bench/fleetBench-selfcheck.mjs": 6141,
   "tools/caseStudy-selfcheck.mjs": 860,
@@ -13052,7 +13052,7 @@
   "tools/ship/ensureDxc-selfcheck.mjs": 49,
   "tools/ship/erosionMeasure-selfcheck.mjs": 378,
   "tools/ship/esShipLabelsDevice-selfcheck.mjs": 1342,
-  "tools/ship/eulerGpu-selfcheck.mjs": 6855,
+  "tools/ship/eulerGpu-selfcheck.mjs": 6948,
   "tools/ship/exactHash-selfcheck.mjs": 2154,
   "tools/ship/exitBanner-selfcheck.mjs": 106,
   "tools/ship/exitBusy-selfcheck.mjs": 5317,
@@ -13128,7 +13128,7 @@
   "tools/ship/gateQuality-selfcheck.mjs": 1010,
   "tools/ship/gateReach-selfcheck.mjs": 10711,
   "tools/ship/gateReport-selfcheck.mjs": 16885,
-  "tools/ship/gateSelection-selfcheck.mjs": 14353,
+  "tools/ship/gateSelection-selfcheck.mjs": 10139,
   "tools/ship/gateSweep-selfcheck.mjs": 1201,
   "tools/ship/gateWalk-selfcheck.mjs": 408,
   "tools/ship/gatesBridge-selfcheck.mjs": 800,
@@ -13226,7 +13226,7 @@
   "tools/ship/loopNoise-selfcheck.mjs": 21568,
   "tools/ship/loopScope-selfcheck.mjs": 82,
   "tools/ship/loopTarget-selfcheck.mjs": 18502,
-  "tools/ship/loopTrace-selfcheck.mjs": 10569,
+  "tools/ship/loopTrace-selfcheck.mjs": 10755,
   "tools/ship/macSession-selfcheck.mjs": 1788,
   "tools/ship/markerSingleSource-selfcheck.mjs": 3136,
   "tools/ship/mechanical-selfcheck.mjs": 1306,
@@ -13316,7 +13316,7 @@
   "tools/ship/pageSections-selfcheck.mjs": 188,
   "tools/ship/pageSectionsReport-selfcheck.mjs": 1600,
   "tools/ship/pageShot-selfcheck.mjs": 14419,
-  "tools/ship/paintFields-selfcheck.mjs": 20874,
+  "tools/ship/paintFields-selfcheck.mjs": 10663,
   "tools/ship/paintFloor-selfcheck.mjs": 4348,
   "tools/ship/paintTransforms-selfcheck.mjs": 15962,
   "tools/ship/pairedStats-selfcheck.mjs": 55,
@@ -14479,7 +14479,7 @@
   "physics/render/splitSumWgsl-selfcheck.mjs": "2026-10-27T04:08:22.221Z",
   "physics/render/stratified-selfcheck.mjs": "2026-10-27T04:08:22.221Z",
   "physics/render/subsurface-selfcheck.mjs": "2026-10-27T04:08:22.221Z",
-  "physics/render/transmission-selfcheck.mjs": "2026-10-10T16:37:56.871Z",
+  "physics/render/transmission-selfcheck.mjs": "2026-11-05T15:04:18.881Z",
   "physics/render/wgslArc-selfcheck.mjs": "2026-10-27T04:08:22.221Z",
   "physics/scoreDirection-selfcheck.mjs": "2026-10-27T15:35:55.277Z",
   "physics/seismic/rays-selfcheck.mjs": "2026-10-27T04:08:22.221Z",
@@ -14725,7 +14725,7 @@
   "simulation/tomo/blobXrayGif-selfcheck.mjs": "2026-10-28T01:56:31.344Z",
   "simulation/tomo/gridVsClosedForm-selfcheck.mjs": "2026-10-26T01:39:03.650Z",
   "simulation/tomo/honest-error-selfcheck.mjs": "2026-10-28T01:56:31.344Z",
-  "text/slug-selfcheck.mjs": "2026-11-05T15:01:22.692Z",
+  "text/slug-selfcheck.mjs": "2026-11-05T15:01:34.034Z",
   "tools/autoExtremity-selfcheck.mjs": "2026-10-28T02:12:26.010Z",
   "tools/bench/fleetBench-selfcheck.mjs": "2026-10-27T03:04:57.146Z",
   "tools/caseStudy-selfcheck.mjs": "2026-10-28T03:12:12.730Z",
@@ -15232,7 +15232,7 @@
   "tools/ship/ensureDxc-selfcheck.mjs": "2026-10-28T02:12:26.010Z",
   "tools/ship/erosionMeasure-selfcheck.mjs": "2026-10-26T01:39:03.650Z",
   "tools/ship/esShipLabelsDevice-selfcheck.mjs": "2026-10-28T03:28:55.555Z",
-  "tools/ship/eulerGpu-selfcheck.mjs": "2026-11-05T14:15:53.334Z",
+  "tools/ship/eulerGpu-selfcheck.mjs": "2026-11-05T15:01:55.099Z",
   "tools/ship/exactHash-selfcheck.mjs": "2026-10-28T03:28:55.555Z",
   "tools/ship/exitBanner-selfcheck.mjs": "2026-10-27T03:22:15.203Z",
   "tools/ship/exitBusy-selfcheck.mjs": "2026-10-27T03:04:57.146Z",
@@ -15308,7 +15308,7 @@
   "tools/ship/gateQuality-selfcheck.mjs": "2026-10-26T04:53:27.800Z",
   "tools/ship/gateReach-selfcheck.mjs": "2026-09-16T02:27:02.423Z",
   "tools/ship/gateReport-selfcheck.mjs": "2026-10-26T03:59:26.912Z",
-  "tools/ship/gateSelection-selfcheck.mjs": "2026-10-26T01:02:50.396Z",
+  "tools/ship/gateSelection-selfcheck.mjs": "2026-11-05T15:03:31.014Z",
   "tools/ship/gateSweep-selfcheck.mjs": "2026-10-27T15:53:09.305Z",
   "tools/ship/gateWalk-selfcheck.mjs": "2026-10-26T01:39:03.650Z",
   "tools/ship/gatesBridge-selfcheck.mjs": "2026-10-28T03:28:55.555Z",
@@ -15406,7 +15406,7 @@
   "tools/ship/loopNoise-selfcheck.mjs": "2026-10-10T16:22:12.806Z",
   "tools/ship/loopScope-selfcheck.mjs": "2026-10-28T02:27:20.004Z",
   "tools/ship/loopTarget-selfcheck.mjs": "2026-10-25T17:52:49.979Z",
-  "tools/ship/loopTrace-selfcheck.mjs": "2026-11-05T14:15:53.334Z",
+  "tools/ship/loopTrace-selfcheck.mjs": "2026-11-05T15:02:28.001Z",
   "tools/ship/macSession-selfcheck.mjs": "2026-11-05T14:55:21.405Z",
   "tools/ship/markerSingleSource-selfcheck.mjs": "2026-10-26T00:40:34.828Z",
   "tools/ship/mechanical-selfcheck.mjs": "2026-11-05T14:55:21.405Z",
@@ -15496,7 +15496,7 @@
   "tools/ship/pageSections-selfcheck.mjs": "2026-10-27T16:36:28.841Z",
   "tools/ship/pageSectionsReport-selfcheck.mjs": "2026-10-28T03:28:55.555Z",
   "tools/ship/pageShot-selfcheck.mjs": "2026-10-25T17:52:49.979Z",
-  "tools/ship/paintFields-selfcheck.mjs": "2026-10-19T20:49:06.598Z",
+  "tools/ship/paintFields-selfcheck.mjs": "2026-11-05T15:03:00.461Z",
   "tools/ship/paintFloor-selfcheck.mjs": "2026-10-26T03:59:26.912Z",
   "tools/ship/paintTransforms-selfcheck.mjs": "2026-10-25T17:52:49.979Z",
   "tools/ship/pairedStats-selfcheck.mjs": "2026-10-27T16:16:07.076Z",
@@ -18457,9 +18457,9 @@
    202
   ],
   "physics/render/transmission-selfcheck.mjs": [
-   20905,
-   19161,
-   20105
+   13692,
+   14116,
+   14054
   ],
   "physics/render/wgslArc-selfcheck.mjs": [
    98,
@@ -19676,9 +19676,9 @@
    84
   ],
   "text/slug-selfcheck.mjs": [
-   22162,
    10491,
-   10480
+   10480,
+   11170
   ],
   "tools/autoExtremity-selfcheck.mjs": [
    63,
@@ -22189,9 +22189,9 @@
    1342
   ],
   "tools/ship/eulerGpu-selfcheck.mjs": [
-   10936,
-   9794,
-   6855
+   6746,
+   6914,
+   6948
   ],
   "tools/ship/exactHash-selfcheck.mjs": [
    2121,
@@ -22564,9 +22564,9 @@
    16885
   ],
   "tools/ship/gateSelection-selfcheck.mjs": [
-   13955,
-   13812,
-   14353
+   10098,
+   9790,
+   10139
   ],
   "tools/ship/gateSweep-selfcheck.mjs": [
    1052,
@@ -23053,9 +23053,9 @@
    18502
   ],
   "tools/ship/loopTrace-selfcheck.mjs": [
-   14313,
-   14218,
-   10569
+   11004,
+   10691,
+   10755
   ],
   "tools/ship/macSession-selfcheck.mjs": [
    2511,
@@ -23496,9 +23496,9 @@
    14419
   ],
   "tools/ship/paintFields-selfcheck.mjs": [
-   19701,
-   19341,
-   20874
+   10478,
+   10462,
+   10663
   ],
   "tools/ship/paintFloor-selfcheck.mjs": [
    5505,

@@ -1,7 +1,7 @@
 {
  "generatedFrom": "tools/ship/sweepRotation.mjs",
  "note": "The over-budget gates this rotation re-timed SERIALLY, with the reading that had evicted each. Written only by tools/ship/sweepRotation.mjs -- sweep-timings.json has a different owner. MERGED BY GATE (v4535): `at` on the file is the LAST run, `at` on a row is the run that measured that row, and a row survives until its own gate is re-timed. `poolAt` (v4725) is the last UNFILTERED stalest-first run -- --gate, --band and --killed do not move it. `poolHorizon` (v4816) is the stamp of the first pool entry that run did NOT take: it reached every entry stamped earlier and none stamped at or after it.",
- "at": "2026-11-05T15:01:22.692Z",
+ "at": "2026-11-05T15:04:18.881Z",
  "poolAt": "2026-11-05T14:15:53.334Z",
  "poolHorizon": "2026-10-25T14:16:54.592Z",
  "budgetMs": 3000,
@@ -1329,10 +1329,10 @@
   },
   {
    "gate": "physics/render/transmission-selfcheck.mjs",
-   "ms": 20105,
+   "ms": 14054,
    "code": 0,
-   "priorMs": 19161,
-   "at": "2026-10-10T16:37:56.871Z"
+   "priorMs": 14116,
+   "at": "2026-11-05T15:04:18.881Z"
   },
   {
    "gate": "physics/scoreDirection-selfcheck.mjs",
@@ -2084,10 +2084,10 @@
   },
   {
    "gate": "text/slug-selfcheck.mjs",
-   "ms": 10480,
+   "ms": 11170,
    "code": 0,
-   "priorMs": 10491,
-   "at": "2026-11-05T15:01:22.692Z"
+   "priorMs": 10480,
+   "at": "2026-11-05T15:01:34.034Z"
   },
   {
    "gate": "tools/bench/fleetBench-selfcheck.mjs",
@@ -3850,10 +3850,10 @@
   },
   {
    "gate": "tools/ship/eulerGpu-selfcheck.mjs",
-   "ms": 6855,
+   "ms": 6948,
    "code": 0,
-   "priorMs": 9794,
-   "at": "2026-11-05T14:15:53.334Z"
+   "priorMs": 6914,
+   "at": "2026-11-05T15:01:55.099Z"
   },
   {
    "gate": "tools/ship/exitBanner-selfcheck.mjs",
@@ -4198,10 +4198,10 @@
   },
   {
    "gate": "tools/ship/gateSelection-selfcheck.mjs",
-   "ms": 14353,
+   "ms": 10139,
    "code": 0,
-   "priorMs": 13812,
-   "at": "2026-10-26T01:02:50.396Z"
+   "priorMs": 9790,
+   "at": "2026-11-05T15:03:31.014Z"
   },
   {
    "gate": "tools/ship/gateSweep-selfcheck.mjs",
@@ -4520,10 +4520,10 @@
   },
   {
    "gate": "tools/ship/loopTrace-selfcheck.mjs",
-   "ms": 10569,
+   "ms": 10755,
    "code": 0,
-   "priorMs": 14218,
-   "at": "2026-11-05T14:15:53.334Z"
+   "priorMs": 10691,
+   "at": "2026-11-05T15:02:28.001Z"
   },
   {
    "gate": "tools/ship/macSession-selfcheck.mjs",
@@ -4960,10 +4960,10 @@
   },
   {
    "gate": "tools/ship/paintFields-selfcheck.mjs",
-   "ms": 20874,
+   "ms": 10663,
    "code": 0,
-   "priorMs": 19341,
-   "at": "2026-10-19T20:49:06.598Z"
+   "priorMs": 10462,
+   "at": "2026-11-05T15:03:00.461Z"
   },
   {
    "gate": "tools/ship/paintFloor-selfcheck.mjs",
