@@ -545,6 +545,7 @@ await section(async () => {
 });
 
 fs.rmSync(TMP, { recursive: true, force: true });
+ok("the census declares its own hook limit with a reason (budgetIsOwn, read by tools/ship/runnerBudget-selfcheck): a sentence naming the limit it picks and why the gateBudget table is the wrong source for it", typeof C.budgetIsOwn === "string" && C.budgetIsOwn.length > 80 && /LIMIT_MS/.test(C.budgetIsOwn) && C.LIMIT_MS === 1800e3);
 console.log(`\nangularImpulseCensus-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILED"}`);
 // the verdict travels by exitCode, not process.exit(): this gate reaches box3d's wasm (tools/ship/wasmDoors-selfcheck.mjs; sabotaged 2026-11-04, W1:
 // the exit put back turns that gate red, 1 row)
