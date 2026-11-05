@@ -8,6 +8,8 @@ import { fileURLToPath } from "node:url";
 import * as X from "./needsHead.mjs";
 import * as C from "./trainNeedsCircuit.mjs";
 import * as B from "../../brain/switchboard.mjs";
+import { setOrientationDefault } from "../../physics/mechanics/rigidBody6dof.mjs";
+setOrientationDefault("euler");   // 2026-11-04 -- every needs-and-limits number was measured under the first-order orientation step; RK4 is the engine default now, so this command says euler out loud (said by name, not by importing rigidBody6dofEuler: a command is not one of the gates that module is for)
 const args = process.argv.slice(2), val = (k, d) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : d; };
 const eng = fileURLToPath(new URL("../../", import.meta.url));
 const records = fs.readFileSync(eng + "brain/rig-results/needsCircuitStageA.rerun-amendment3.jsonl", "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l));

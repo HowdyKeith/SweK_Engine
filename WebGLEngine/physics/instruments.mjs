@@ -2621,6 +2621,23 @@ export const INSTRUMENTS = [
       measures: "The picker on sub-aquarium.html (one call, mountSubModelPicker): choose a .glb from GPU_Assets/subs per hull with its licence and attribution, with the asset list fetched lazily on first focus.",
       key: "The gate drives the form in a browser; 52 mutants red by name.",
       gate: "render/subModelsPanel-selfcheck.mjs" },
+    // 2026-11-05 -- the four modules written to be read as well as checked that the merge of the four lines brought (the registry gate found them by their reportLines()).
+    { id: "pilot-6dof-mlp", page: "instrument-bench.html", name: "THE GPU BRAIN'S PILOT FOR THE NEWTONIAN SPACE DUEL (12 -> 32 -> 32 -> 5, 1,637 weights)", area: "brain",
+      measures: "brain/autopilot6dof.mjs's contract from a plain multilayer perceptron, the shape the GPU Brain runs: the fruit fly's twelve features, the same five tanh outputs, registered before it was built in brain/SIXDOF_GPU_BRAIN_WIP.md.",
+      key: "The pilot is the same senses and the same outputs as the fruit fly's pilot with a different body of weights, so a difference in a duel is the body of weights and not the interface.",
+      gate: "brain/pilot6dofMlp-selfcheck.mjs" },
+    { id: "decider-audit", page: "instrument-bench.html", name: "THE AUDIT OF ROUND 14: THE DECIDER CHIP READ AGAINST THE TUNED RULE", area: "brain",
+      measures: "The arms, the sets, the checks, the verdicts and the record/report commands for the Decider chip (brain/deciderAdvisor.mjs), built on advisorLlmAudit's brain, socket, noisy gauge and margin rule max(0.02, 2 se); the model is called only by `record`, once, and the dives are flown from its recorded answers.",
+      key: "A chip must beat the best fixed cap and the rule, per audit, by max(0.02, 2 se) to be credited; the model is never called at replay.",
+      gate: "tools/ship/deciderAudit-selfcheck.mjs" },
+    { id: "plain-net-study", page: "instrument-bench.html", name: "RUNG 4b'S PLAIN-NET CONTROL: DOES THE FISH CIRCUIT GIVE THE PILOT ANYTHING A PLAIN NET DOES NOT", area: "brain",
+      measures: "On the four verdict cells of rung 4b, whether the extracted fish circuit gives the autopilot-plus-residual pilot anything that a plain relu net with the same four senses, the same mirrored readout and the same number of trained weights does not: 48 pilots, each the 4b recipe unchanged.",
+      key: "The registered comparison is the plain net's champions against the circuit's own recorded champions on fresh audits, each flown once; a comparator that does not reproduce its recorded audit scores is named and the comparison is not read.",
+      gate: "tools/ship/plainNetStudy-selfcheck.mjs" },
+    { id: "take-tank-dropout", page: "instrument-bench.html", name: "THE COMPASS DROPOUT IN THE TANK OVER THE MEMORY ARMS", area: "brain",
+      measures: "The PD autopilot, the dead-reckoning navigator, one leaky unit and its no-memory lesion, and the plain-net champions of rung 4b, flown through the tank's compass dropout and read as paired differences of the settled dark heading error.",
+      key: "A memory arm is credited only by a paired difference against the arm without it on the same ids; the loop is the switchboard's dropout task copied, and said so.",
+      gate: "tools/ship/takeTankDropout-selfcheck.mjs" },
 ];
 
 export const AREAS = [...new Set(INSTRUMENTS.map((i) => i.area))];

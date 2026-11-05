@@ -14,6 +14,7 @@
 // SABOTAGE LOG (46 mutants of tools/ship/needsHead.mjs, each alone in its own worktree copy): 40 went red by name on the first pass, 1 pattern was not found and was rewritten. 5 went 0 red and got rows, then red: the circuits' reading against rule-r8 instead of rule-obs (the fixture had rule-r8 equal to rule-obs), line 2 built from the start's readings, the family test without the controls' spread, the hull line's rule (the pattern).
 //   ONE DECLARED EQUIVALENT: "check finite" (dropping Number.isFinite from the score check): NaN fails `r.score >= 0` anyway, so the range test alone catches it.
 "use strict";
+import "../../physics/mechanics/rigidBody6dofEuler.mjs";   // 2026-11-04 -- every needs-and-limits number was measured under the first-order orientation step; RK4 is the engine default now, so this gate says euler out loud
 import fs from "node:fs";
 let fails = 0, finished = false;
 const died = (e) => { console.log("  FAIL  !! THE GATE THREW before it finished: " + String((e && e.stack) || e).split("\n").slice(0, 3).join(" | ").slice(0, 400)); process.exitCode = 1; };
@@ -115,8 +116,9 @@ sec("6. FLIGHT");
 }
 sec("7. SOURCE");
 {
-    const first = raw.split("\n").find((l) => /^import /.test(l));
-    ok("!! the first import is the first-order orientation step; the seeds 15001 and 15060 appear once each; no clock, no random number, nothing read from the disk", /rigidBody6dofEuler/.test(first) && code.split("15001").length === 2 && code.split("15060").length === 2 && !/Date\.now|Math\.random|performance\.now|readFileSync|writeFileSync/.test(code));
+    const cmd = fs.readFileSync(new URL("./needsHeadCmd.mjs", import.meta.url), "utf8"), gate = fs.readFileSync(new URL("./needsHead-selfcheck.mjs", import.meta.url), "utf8");
+    const firstImport = (t) => t.split("\n").find((l) => /^import /.test(l));
+    ok("!! the LIBRARY does not import the first-order step (a library never does: the command and the gate say it); the command sets euler by name (setOrientationDefault) and the gate's FIRST import is the Euler module; the seeds 15001 and 15060 appear once each in the library; no clock, no random number, nothing read from the disk", !/rigidBody6dofEuler/.test(code) && /setOrientationDefault\("euler"\)/.test(cmd) && /rigidBody6dofEuler/.test(firstImport(gate)) && code.split("15001").length === 2 && code.split("15060").length === 2 && !/Date\.now|Math\.random|performance\.now|readFileSync|writeFileSync/.test(code));
 }
 console.log(fails ? `\n${fails} FAIL` : "\nall checks pass");
 finished = true;

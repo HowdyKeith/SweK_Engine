@@ -3,10 +3,9 @@
 // ROUND H3 of brain/HEAD_TO_HEAD.md (registered before this file existed): the survey task flown, through the switchboard (brain/switchboard.mjs), by sixteen decision-layer arms -- the rule the circuits started from
 // (GUARDED_OBS), the tuned rule at the Round 8 constants and at low -0.06, the twin seat, and the twelve trained needs circuits of Piece 4 rebuilt from their recorded weights -- on fresh seeds of all four kinds, and read as
 // paired differences, with the real wirings (cx, nostate, withheld) set against the nine shuffled controls.
-// THE FIRST-ORDER ORIENTATION STEP, SAID OUT LOUD: every number of Rounds 8-33 was measured under it, the box3d line made RK4 the engine's default on 2026-11-04, and this round keeps the numbers comparable.
+// THE FIRST-ORDER ORIENTATION STEP: every number of Rounds 8-33 was measured under it, the box3d line made RK4 the engine's default on 2026-11-04, and this round keeps the numbers comparable. A LIBRARY DOES NOT IMPORT rigidBody6dofEuler (tools/roundhouse/orientationStep-selfcheck holds that); the command and the gate do, as their first import.
 // Reads nothing from disk (the command hands the circuit and the records in). THE SEEDS ARE READ ONLY BY audit(). No clock, no Math.random, no file.
 "use strict";
-import "../../physics/mechanics/rigidBody6dofEuler.mjs";   // 2026-11-04 -- every needs-and-limits number was measured under the first-order orientation step; RK4 is the default now
 import * as T from "../../brain/needsTask.mjs";
 import * as B from "../../brain/switchboard.mjs";
 import * as C from "./trainNeedsCircuit.mjs";

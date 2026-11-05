@@ -75,6 +75,8 @@ export function corpusN(graph = buildGraph(), files = MODULE_FILES) {
     return out.sort();
 }
 
+/** 2026-11-05 (the merge, tools/ship/runnerBudget-selfcheck): the limit this census stops a hooked run at is its own: a gate flown under the angular-impulse hook runs slower than bare and is killed with its whole process group at LIMIT_MS, so the table's per-gate budget (which assumes no hook) is the wrong number for it. */
+export const budgetIsOwn = "angularImpulseCensus hooks a gate through NODE_OPTIONS and stops its whole process group at LIMIT_MS; a hooked run is slower than a bare one and the census must outlast the slowest gate it hooks, so the gateBudget table (measured bare) is the wrong source for this limit";
 /**
  * Run `script` (a path from the tree's root, with `args`) under the hook: its tallies go to a fresh directory, its child processes are
  * hooked through NODE_OPTIONS, and it is stopped -- its whole process group -- at `limitMs`. Resolves to how it ended and what it saw.

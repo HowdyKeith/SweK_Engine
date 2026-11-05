@@ -16,13 +16,16 @@ import fs from "node:fs";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { parseOrExit } from "./cliArgs.mjs";
 import { parseArgs, run, searchOne, blobOf, refuseExisting } from "./train6dofMlp.mjs";
 import { weightsHash } from "../../brain/drivePolicy.mjs";
 
 const SELF = fileURLToPath(import.meta.url);
-const argv = process.argv.slice(2), wf = argv.indexOf("--write-from");
-if (wf >= 0) {
-    const file = argv[wf + 1], outAt = argv.indexOf("--out"), out = outAt >= 0 ? argv[outAt + 1] : path.resolve(path.dirname(SELF), "..", "..", "brain", "pilot6dofMlpWeightsDefault.json");
+const argv = process.argv.slice(2);
+if (argv.includes("--write-from")) {
+    // 2026-11-05 -- the --write-from mode reads its two options through cliArgs (an unknown or misspelt option is refused, never a silent default), as the rest of the tools do since v4826
+    const cli = parseOrExit("trainMlp6dof", { values: { "--write-from": "string", "--out": "string" }, flags: [] }, argv);
+    const file = cli.values["--write-from"], out = cli.values["--out"] || path.resolve(path.dirname(SELF), "..", "..", "brain", "pilot6dofMlpWeightsDefault.json");
     if (!file || !fs.existsSync(file)) { console.error("trainMlp6dof: --write-from needs a results file"); process.exit(2); }
     const result = JSON.parse(fs.readFileSync(file, "utf8"));
     if (!result.verdict || !result.verdict.ok) { console.log("not written: the champion did not qualify -- " + ((result.verdict && result.verdict.reasons) || ["no verdict in the file"]).join("; ")); process.exit(1); }
@@ -31,6 +34,7 @@ if (wf >= 0) {
     process.exit(0);
 }
 
+parseOrExit("trainMlp6dof", { values: { "--runs": "number", "--iters": "number", "--seed": "number", "--sigma": "number", "--workers": "number", "--search": "number", "--out": "string", "--results": "string" }, flags: ["--write", "--quiet"] }, argv);   // 2026-11-05 -- the command line is checked by cliArgs first (an option nobody has spelled is refused with the options this tool takes, never a default); the library parser then reads the values
 let opts; try { opts = parseArgs(argv); } catch (e) { console.error("trainMlp6dof: " + e.message); process.exit(2); }
 if (opts.search != null) { process.stdout.write(JSON.stringify(searchOne({ seed: opts.search, iters: opts.iters, sigma: opts.sigma, maxK: opts.maxK })) + "\n"); process.exit(0); }
 const refused = refuseExisting(opts.results); if (refused) { console.error("trainMlp6dof: " + refused); process.exit(2); }

@@ -129,7 +129,7 @@ console.log("\n4. THE COMMAND");
     const notOk = path.join(tmp, "n.json"); fs.writeFileSync(notOk, JSON.stringify({ verdict: { ok: false, reasons: ["planted"] } }));
     let wrote = ""; try { execFileSync(process.execPath, [cmd, "--write-from", notOk, "--out", path.join(tmp, "w.json")], { encoding: "utf8", stdio: "pipe" }); } catch (e) { wrote = String(e.stdout); }
     ok("!! the command never overwrites a results file, refuses an option it does not know, and writes no weight file from a results file whose champion did not qualify",
-        /never overwritten/.test(refused || "") && passes === null && order > 0 && runAt > order && /process\.exit\(2\)/.test(code.slice(order, order + 120)) && /unknown option "--iter"/.test(typo) && /not written: the champion did not qualify -- planted/.test(wrote) && !fs.existsSync(path.join(tmp, "w.json")));
+        /never overwritten/.test(refused || "") && passes === null && order > 0 && runAt > order && /process\.exit\(2\)/.test(code.slice(order, order + 120)) && /unknown option "?--iter"?/.test(typo) && /not written: the champion did not qualify -- planted/.test(wrote) && !fs.existsSync(path.join(tmp, "w.json")));
     ok("  ...and it prints no score: the results go to the file, and the console says only where (the registration reads the committed file)",
         !/describeEval|\.score|heldOut\.|verdict\.ok \?/.test(code.replace(/result\.verdict && result\.verdict\.reasons|!result\.verdict \|\| !result\.verdict\.ok/g, "")) && /commit it before reading it/.test(code));
     fs.rmSync(tmp, { recursive: true, force: true });

@@ -303,10 +303,12 @@ try {
     // trainers' shipped pilots, the dogfight tournament and trainer, the fruit fly's trainer, and two pages (trainSubPilot's is in the other chat's area, changed at
     // Keith's word, "Fix them"). dogfightPage's page script imports it first in the browser, as the others do; subDropoutView opens sub-aquarium.html itself, so it
     // sets the step in sessionStorage before any of the page's scripts runs, which is where the page reads it from.
+    // 2026-11-05 -- 44 -> 51, at the merge of the needs-and-limits, fish/fly and denoise lines into the box3d line: seven more gates hold first-order numbers and now say so, as the first import:
+    // brain/needsTask, brain/subFieldNav, brain/subSensedNav, tools/ship/plainNetStudy, tools/ship/needsHead (a gate for the survey round H3), tools/ship/takeTankDropout (the board's dropout loop) and tools/tankFlyCxBench. The COMMAND of a round (needsHeadCmd) sets it by name with setOrientationDefault("euler"), not by importing this module.
     const MISSED = ["brain/pilotFlightTrain-selfcheck.mjs", "render/subDropoutView-selfcheck.mjs", "tools/ship/dogfightPage-selfcheck.mjs", "tools/ship/tournamentDogfightShipped-selfcheck.mjs",
         "tools/ship/trainDogfightPilotShipped-selfcheck.mjs", "tools/ship/trainDronePilot-selfcheck.mjs", "tools/ship/trainFlightPilotGpu-selfcheck.mjs", "tools/ship/trainSubPilot-selfcheck.mjs"];
-    ok("!! the gates that hold first-order numbers say so: 44 of them import rigidBody6dofEuler.mjs as their FIRST import (before any module that steps a body), no library or page does, the four page scripts import it first in the browser, and the one page a gate opens itself is given the step before it loads",
-        restated.length === 44 && notFirst.length === 0 && others.length === 0 && pageScript && MISSED.every((f) => restated.includes(f)),
+    ok("!! the gates that hold first-order numbers say so: 51 of them import rigidBody6dofEuler.mjs as their FIRST import (before any module that steps a body), no library or page does, the four page scripts import it first in the browser, and the one page a gate opens itself is given the step before it loads",
+        restated.length === 51 && notFirst.length === 0 && others.length === 0 && pageScript && MISSED.every((f) => restated.includes(f)),
         `${restated.length} gates${notFirst.length ? "; not first in " + notFirst.join(", ") : ""}${others.length ? "; imported by " + others.join(", ") : ""}${pageScript ? "" : "; a page script does not import it first"}`);
     // every 6-DOF craft family, under both steps: the baseline each task pins, flown here with each step named
     const FT = await import("../../brain/flightTask.mjs"), AF = await import("../../brain/autopilotFlight.mjs"), DTk = await import("../../brain/droneTask.mjs"), AD = await import("../../brain/autopilotDrone.mjs");

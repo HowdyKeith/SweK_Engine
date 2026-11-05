@@ -161,6 +161,10 @@ export const FORMATTERS = Object.freeze([
     "tools/ship/advisorChipStudy.mjs",
     "tools/ship/advisorLlmAudit.mjs",
     "tools/ship/trainSubVestibular.mjs",
+    // 2026-11-05 -- THREE ARRIVALS AT THE MERGE OF THE FOUR LINES, found by this gate reading 25 formatters against 22 registered and each confirmed by CALLING it bare: the Decider audit (round 14), the plain-net control study and the tank dropout over the memory arms; each refuses a bare call.
+    "tools/ship/deciderAudit.mjs",
+    "tools/ship/plainNetStudy.mjs",
+    "tools/ship/takeTankDropout.mjs",
 ]);
 
 // *** AND Function.length CANNOT TELL THE LAST TWO FROM THE FIRST FOUR EITHER, WHICH IS THE THIRD INSTRUMENT
@@ -223,6 +227,10 @@ export const STRICT_FORMATTERS = Object.freeze([
     "tools/ship/advisorChipStudy.mjs",
     "tools/ship/advisorLlmAudit.mjs",
     "tools/ship/trainSubVestibular.mjs",
+    // 2026-11-05 -- THREE ARRIVALS AT THE MERGE OF THE FOUR LINES, found by this gate reading 25 formatters against 22 registered and each confirmed by CALLING it bare: the Decider audit (round 14), the plain-net control study and the tank dropout over the memory arms; each refuses a bare call.
+    "tools/ship/deciderAudit.mjs",
+    "tools/ship/plainNetStudy.mjs",
+    "tools/ship/takeTankDropout.mjs",
 ]);
 export const TOLERANT_FORMATTERS = Object.freeze([
     "tools/roundhouse/curriculum.mjs",

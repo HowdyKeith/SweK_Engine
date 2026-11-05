@@ -22,6 +22,7 @@
 //   entry (the tank only draws with them: no flight reads them); the first value of `age` (a retarget on the first tick sets it); `age >= 12` to `age > 12` (360 ticks of 1/30 sum to 11.999999999999968 in doubles, so no tick lands on 12).
 // NOT CHECKED, said plainly: the numbers a default run prints (they are the flights', pinned for four ids above, and brain/BACKLOG_PICKUPS_2026-11-05.md quotes them); that the board's own loop is the same (it is not in this tree: the loop is a copy of f4b55956's dropoutTask).
 "use strict";
+import "../../physics/mechanics/rigidBody6dofEuler.mjs";   // 2026-11-05 -- the 6-DOF numbers this gate holds were measured under the first-order orientation step; RK4 is the default now (the box3d merge), so the gate says euler out loud
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
