@@ -1,11 +1,11 @@
 {
  "generatedFrom": "tools/ship/sweepRotation.mjs",
  "note": "The over-budget gates this rotation re-timed SERIALLY, with the reading that had evicted each. Written only by tools/ship/sweepRotation.mjs -- sweep-timings.json has a different owner. MERGED BY GATE (v4535): `at` on the file is the LAST run, `at` on a row is the run that measured that row, and a row survives until its own gate is re-timed. `poolAt` (v4725) is the last UNFILTERED stalest-first run -- --gate, --band and --killed do not move it. `poolHorizon` (v4816) is the stamp of the first pool entry that run did NOT take: it reached every entry stamped earlier and none stamped at or after it.",
- "at": "2026-10-28T01:24:27.184Z",
- "poolAt": "2026-10-28T00:51:39.303Z",
- "poolHorizon": "2026-10-23T12:10:31.195Z",
+ "at": "2026-11-05T14:15:53.334Z",
+ "poolAt": "2026-11-05T14:15:53.334Z",
+ "poolHorizon": "2026-10-25T14:16:54.592Z",
  "budgetMs": 3000,
- "lastRun": 1,
+ "lastRun": 31,
  "rotated": [
   {
    "gate": "ai-bridge/assetSync-perf-selfcheck.mjs",
@@ -467,10 +467,10 @@
   },
   {
    "gate": "ev/esFleetSize-selfcheck.mjs",
-   "ms": 10166,
+   "ms": 7820,
    "code": 0,
-   "priorMs": 9552,
-   "at": "2026-10-25T14:16:54.592Z"
+   "priorMs": 10166,
+   "at": "2026-11-05T14:15:53.334Z"
   },
   {
    "gate": "ev/tools/es-arena-selfcheck.mjs",
@@ -628,10 +628,10 @@
   },
   {
    "gate": "fx/fsr/fsrFrameGenReach-selfcheck.mjs",
-   "ms": 10352,
+   "ms": 7392,
    "code": 0,
-   "priorMs": 9823,
-   "at": "2026-10-25T14:16:54.592Z"
+   "priorMs": 10352,
+   "at": "2026-11-05T14:15:53.334Z"
   },
   {
    "gate": "fx/fsr/fsrFrameGenScene-selfcheck.mjs",
@@ -663,10 +663,10 @@
   },
   {
    "gate": "fx/fsr/fsrGPU-selfcheck.mjs",
-   "ms": 3611,
+   "ms": 2080,
    "code": 0,
-   "priorMs": 3492,
-   "at": "2026-10-25T14:16:54.592Z"
+   "priorMs": 3611,
+   "at": "2026-11-05T14:15:53.334Z"
   },
   {
    "gate": "fx/fsr/fsrTemporalHalf-selfcheck.mjs",
@@ -809,10 +809,10 @@
   },
   {
    "gate": "physics/diffusionKnob-selfcheck.mjs",
-   "ms": 10781,
+   "ms": 6653,
    "code": 0,
-   "priorMs": 9017,
-   "at": "2026-10-25T14:16:54.592Z"
+   "priorMs": 10781,
+   "at": "2026-11-05T14:15:53.334Z"
   },
   {
    "gate": "physics/em/hall-selfcheck.mjs",
@@ -1070,10 +1070,10 @@
   },
   {
    "gate": "physics/mesh/uvLscm-selfcheck.mjs",
-   "ms": 3768,
+   "ms": 1939,
    "code": 0,
-   "priorMs": 3763,
-   "at": "2026-10-25T14:16:54.592Z"
+   "priorMs": 3768,
+   "at": "2026-11-05T14:15:53.334Z"
   },
   {
    "gate": "physics/mesh/uvUnwrap-selfcheck.mjs",
@@ -1126,10 +1126,10 @@
   },
   {
    "gate": "physics/percolation/percolation-selfcheck.mjs",
-   "ms": 3262,
+   "ms": 2309,
    "code": 0,
-   "priorMs": 3011,
-   "at": "2026-10-25T14:16:54.592Z"
+   "priorMs": 3262,
+   "at": "2026-11-05T14:15:53.334Z"
   },
   {
    "gate": "physics/pileKnob-selfcheck.mjs",
@@ -1203,10 +1203,10 @@
   },
   {
    "gate": "physics/render/energyCompensation-selfcheck.mjs",
-   "ms": 10102,
+   "ms": 6307,
    "code": 0,
-   "priorMs": 9014,
-   "at": "2026-10-25T14:16:54.592Z"
+   "priorMs": 10102,
+   "at": "2026-11-05T14:15:53.334Z"
   },
   {
    "gate": "physics/render/fresnelWgsl-selfcheck.mjs",
@@ -1784,16 +1784,17 @@
   },
   {
    "gate": "render/presentScale-selfcheck.mjs",
-   "ms": 7555,
+   "ms": 4424,
    "code": 0,
-   "at": "2026-10-25T14:03:13.587Z"
+   "priorMs": 7555,
+   "at": "2026-11-05T14:15:53.334Z"
   },
   {
    "gate": "render/reactiveTsl-selfcheck.mjs",
-   "ms": 4005,
+   "ms": 2183,
    "code": 0,
-   "priorMs": 3113,
-   "at": "2026-10-25T14:16:54.592Z"
+   "priorMs": 4005,
+   "at": "2026-11-05T14:15:53.334Z"
   },
   {
    "gate": "render/renderNow-selfcheck.mjs",
@@ -1817,21 +1818,24 @@
   },
   {
    "gate": "render/snowAblate-selfcheck.mjs",
-   "ms": 10014,
+   "ms": 5822,
    "code": 0,
-   "at": "2026-10-25T14:03:23.772Z"
+   "priorMs": 10014,
+   "at": "2026-11-05T14:15:53.334Z"
   },
   {
    "gate": "render/snowCoarse-selfcheck.mjs",
-   "ms": 12869,
+   "ms": 7632,
    "code": 0,
-   "at": "2026-10-25T14:03:36.823Z"
+   "priorMs": 12869,
+   "at": "2026-11-05T14:15:53.334Z"
   },
   {
    "gate": "render/snowFrameTiming-selfcheck.mjs",
-   "ms": 8723,
+   "ms": 4500,
    "code": 0,
-   "at": "2026-10-25T14:03:45.738Z"
+   "priorMs": 8723,
+   "at": "2026-11-05T14:15:53.334Z"
   },
   {
    "gate": "render/snowGpu-selfcheck.mjs",
@@ -1841,16 +1845,53 @@
    "at": "2026-10-22T02:41:32.698Z"
   },
   {
-   "gate": "render/snowGpuScale-selfcheck.mjs",
-   "ms": 12449,
+   "gate": "render/snowGpuField-selfcheck.mjs",
+   "ms": 7001,
    "code": 0,
-   "at": "2026-10-25T14:03:58.378Z"
+   "priorMs": 11808,
+   "at": "2026-11-05T14:15:53.334Z"
+  },
+  {
+   "gate": "render/snowGpuLive-selfcheck.mjs",
+   "ms": 4431,
+   "code": 0,
+   "priorMs": 9613,
+   "at": "2026-11-05T14:15:53.334Z"
+  },
+  {
+   "gate": "render/snowGpuLookA-selfcheck.mjs",
+   "ms": 8758,
+   "code": 0,
+   "priorMs": 14202,
+   "at": "2026-11-05T14:15:53.334Z"
+  },
+  {
+   "gate": "render/snowGpuLookB-selfcheck.mjs",
+   "ms": 7098,
+   "code": 0,
+   "priorMs": 13007,
+   "at": "2026-11-05T14:15:53.334Z"
+  },
+  {
+   "gate": "render/snowGpuScale-selfcheck.mjs",
+   "ms": 6858,
+   "code": 0,
+   "priorMs": 12449,
+   "at": "2026-11-05T14:15:53.334Z"
+  },
+  {
+   "gate": "render/snowGpuTaa-selfcheck.mjs",
+   "ms": 8509,
+   "code": 0,
+   "priorMs": 13091,
+   "at": "2026-11-05T14:15:53.334Z"
   },
   {
    "gate": "render/snowHoist-selfcheck.mjs",
-   "ms": 13847,
+   "ms": 7879,
    "code": 0,
-   "at": "2026-10-25T14:04:12.401Z"
+   "priorMs": 13847,
+   "at": "2026-11-05T14:15:53.334Z"
   },
   {
    "gate": "render/subAquariumSim-selfcheck.mjs",
@@ -1896,10 +1937,10 @@
   },
   {
    "gate": "render/temporalLockSumsTsl-selfcheck.mjs",
-   "ms": 15961,
+   "ms": 11483,
    "code": 0,
-   "priorMs": 18020,
-   "at": "2026-10-23T12:10:31.195Z"
+   "priorMs": 15961,
+   "at": "2026-11-05T14:15:53.334Z"
   },
   {
    "gate": "render/temporalLockTsl-selfcheck.mjs",
@@ -3439,10 +3480,10 @@
   },
   {
    "gate": "tools/ship/conflictMarkers-selfcheck.mjs",
-   "ms": 6072,
+   "ms": 4654,
    "code": 0,
-   "priorMs": 6217,
-   "at": "2026-10-25T14:16:54.592Z"
+   "priorMs": 6072,
+   "at": "2026-11-05T14:15:53.334Z"
   },
   {
    "gate": "tools/ship/consoleOrder-selfcheck.mjs",
@@ -3767,10 +3808,10 @@
   },
   {
    "gate": "tools/ship/economyLockstep-selfcheck.mjs",
-   "ms": 9871,
+   "ms": 9242,
    "code": 0,
-   "priorMs": 9789,
-   "at": "2026-10-25T14:16:54.592Z"
+   "priorMs": 9871,
+   "at": "2026-11-05T14:15:53.334Z"
   },
   {
    "gate": "tools/ship/effectLegibility-selfcheck.mjs",
@@ -3802,10 +3843,10 @@
   },
   {
    "gate": "tools/ship/eulerGpu-selfcheck.mjs",
-   "ms": 9794,
+   "ms": 6855,
    "code": 0,
-   "priorMs": 10936,
-   "at": "2026-10-23T12:32:55.186Z"
+   "priorMs": 9794,
+   "at": "2026-11-05T14:15:53.334Z"
   },
   {
    "gate": "tools/ship/exitBanner-selfcheck.mjs",
@@ -3872,10 +3913,10 @@
   },
   {
    "gate": "tools/ship/firewallBanner-selfcheck.mjs",
-   "ms": 10253,
+   "ms": 6626,
    "code": 0,
-   "priorMs": 8530,
-   "at": "2026-10-25T14:16:54.592Z"
+   "priorMs": 10253,
+   "at": "2026-11-05T14:15:53.334Z"
   },
   {
    "gate": "tools/ship/fleetMask-selfcheck.mjs",
@@ -4472,10 +4513,10 @@
   },
   {
    "gate": "tools/ship/loopTrace-selfcheck.mjs",
-   "ms": 14218,
+   "ms": 10569,
    "code": 0,
-   "priorMs": 14313,
-   "at": "2026-10-23T12:33:38.966Z"
+   "priorMs": 14218,
+   "at": "2026-11-05T14:15:53.334Z"
   },
   {
    "gate": "tools/ship/macSession-selfcheck.mjs",
@@ -4605,10 +4646,10 @@
   },
   {
    "gate": "tools/ship/murmurIgniteFour-selfcheck.mjs",
-   "ms": 3432,
+   "ms": 2085,
    "code": 0,
-   "priorMs": 3403,
-   "at": "2026-10-25T14:16:54.592Z"
+   "priorMs": 3432,
+   "at": "2026-11-05T14:15:53.334Z"
   },
   {
    "gate": "tools/ship/murmurKit-selfcheck.mjs",
@@ -4947,10 +4988,10 @@
   },
   {
    "gate": "tools/ship/passFootprint-selfcheck.mjs",
-   "ms": 10076,
+   "ms": 6443,
    "code": 0,
-   "priorMs": 9684,
-   "at": "2026-10-25T14:16:54.592Z"
+   "priorMs": 10076,
+   "at": "2026-11-05T14:15:53.334Z"
   },
   {
    "gate": "tools/ship/peerBrain-selfcheck.mjs",
@@ -4989,10 +5030,10 @@
   },
   {
    "gate": "tools/ship/phoneQR-selfcheck.mjs",
-   "ms": 10875,
+   "ms": 10335,
    "code": 0,
-   "priorMs": 10762,
-   "at": "2026-10-25T14:16:54.592Z"
+   "priorMs": 10875,
+   "at": "2026-11-05T14:15:53.334Z"
   },
   {
    "gate": "tools/ship/physicsShaders-selfcheck.mjs",
@@ -6011,10 +6052,10 @@
   },
   {
    "gate": "tools/ship/water2d-selfcheck.mjs",
-   "ms": 4047,
+   "ms": 1862,
    "code": 0,
-   "priorMs": 3494,
-   "at": "2026-10-25T14:16:54.592Z"
+   "priorMs": 4047,
+   "at": "2026-11-05T14:15:53.334Z"
   },
   {
    "gate": "tools/ship/webcodecsFramesToMp4-selfcheck.mjs",
@@ -6131,17 +6172,17 @@
   },
   {
    "gate": "ui/stageInfo-selfcheck.mjs",
-   "ms": 7215,
+   "ms": 6322,
    "code": 0,
-   "priorMs": 7234,
-   "at": "2026-10-25T14:16:54.592Z"
+   "priorMs": 7215,
+   "at": "2026-11-05T14:15:53.334Z"
   },
   {
    "gate": "world/buildingTopple-selfcheck.mjs",
-   "ms": 9746,
+   "ms": 6322,
    "code": 0,
-   "priorMs": 9907,
-   "at": "2026-10-25T14:16:54.592Z"
+   "priorMs": 9746,
+   "at": "2026-11-05T14:15:53.334Z"
   },
   {
    "gate": "world/oceanWater-selfcheck.mjs",
