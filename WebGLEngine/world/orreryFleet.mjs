@@ -733,3 +733,20 @@ export const COMMIT_BELT_DRIFT_V4905 = Object.freeze({
     }),
     bodiesNow: 28,
 });
+
+/**
+ * v4912 -- box3d MOVED ONCE MORE: the spinning-body round (5fed473f) rebuilt vendor/box3d/box3d.wasm and wrote its PROVENANCE, so the body
+ * has a fourth commit in front of the three v4535 recorded. Everything else is v4905's own object.
+ */
+export const COMMIT_BELT_DRIFT_V4912 = Object.freeze({
+    ...COMMIT_BELT_DRIFT_V4905,
+    at: "v4912",
+    movedSince4475: Object.freeze({
+        ...COMMIT_BELT_DRIFT_V4905.movedSince4475,
+        box3d: Object.freeze({
+            recorded: COMMIT_BELT_DRIFT_V4905.movedSince4475.box3d.recorded,
+            now: Object.freeze(["5fed473f", ...COMMIT_BELT_DRIFT_V4905.movedSince4475.box3d.now]),
+            why: COMMIT_BELT_DRIFT_V4905.movedSince4475.box3d.why + "; v4912 then merged the spinning-body round, which rebuilt box3d.wasm with the angular-impulse exports and wrote vendor/box3d/PROVENANCE.md",
+        }),
+    }),
+});
