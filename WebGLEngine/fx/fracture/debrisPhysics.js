@@ -22,7 +22,7 @@ function fragBounds(frag) {
 // throw, as Jolt caps it: none lost, the fastest 9.0 m/s.
 // A spin is capped only above the cap by SPIN_SLACK, so Jolt's own spins -- at its cap or under it, in float32 -- are never touched,
 // and the pages on Jolt, and the spinning body's fourth round that flew this module on Jolt, are byte for byte what they were.
-// Gated in fx/fracture/debrisPhysics-selfcheck.mjs, sections 4 to 6.
+// Gated in fx/fracture/debrisPhysics-selfcheck.mjs, sections 4 to 6. SINCE 2026-11-04 box3d's facade caps every angular impulse this same way first (physics/box3d/box3dLoader.js, SPIN CAP), so on box3d, as on Jolt, this finds nothing left to cap and the flights are byte for byte what they were; it stays for a world that does not.
 const MAX_SPIN = 15 * Math.PI;   // rad/s: Jolt's default max angular velocity, a quarter turn per 1/60 s step
 const SPIN_SLACK = 1.001;        // capped only above MAX_SPIN * SPIN_SLACK
 

@@ -82,8 +82,8 @@ try {
     ok("!! with both ships on box3d the duel is another duel than E's and than A's alone on box3d, and the same one twice", J(x) === J(y) && x.fingerprint !== plain.fingerprint && x.fingerprint !== a3.fingerprint,
         `E ${plain.fingerprint}, A3 ${a3.fingerprint}, BB ${x.fingerprint}`);
     const duel = src("brain/pilot6dofPolicy.mjs");
-    ok("the duel takes stepB with a default that is off, after stepA, and uses each for its own ship only",
-        /record = null, stepA = null, stepB = null \} = \{\}\) \{/.test(duel) && /s\.body = stepA && s === A \? stepA\(s\.body, acc, dt\) : stepB && s === B \? stepB\(s\.body, acc, dt\) : RB\.step\(s\.body, acc, dt, stepOpt\);/.test(duel));
+    ok("the duel takes stepB with a default that is off, after stepA, and uses each for its own ship only (the hybrid round's contacts resolver may follow it, off unless given)",
+        /record = null, stepA = null, stepB = null(?:, contacts = null)? \} = \{\}\) \{/.test(duel) && /s\.body = stepA && s === A \? stepA\(s\.body, acc, dt\) : stepB && s === B \? stepB\(s\.body, acc, dt\) : RB\.step\(s\.body, acc, dt, stepOpt\);/.test(duel));
 } catch (e) { guard(1, e); }
 
 console.log("\n2. THE LIBRARY HOLDS THE REGISTRATION");

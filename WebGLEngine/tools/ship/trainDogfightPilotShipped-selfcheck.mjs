@@ -25,6 +25,7 @@
 // AN EQUIVALENT MUTANT, SAID PLAINLY: KEEP_OUT_RANGE 30 -> 31 and 30 -> 90 in brain/dogfightTask.mjs go 0 red. The keep-out rule is DORMANT in the fruit fly's shipped fights: the guidance asks for less airspeed than the opponent flies inside 220 m, so nothing closes inside 90 m. The rule exists for pilots that ignore the airspeed they are asked for
 //   (the first training run's champion did, and collided), and brain/dogfightTask-selfcheck.mjs holds it on a pilot that does.
 "use strict";
+import "../../physics/mechanics/rigidBody6dofEuler.mjs";   // 2026-11-05 -- the 6-DOF numbers this gate holds were measured under the first-order orientation step, so it flies that step (see that file); RK4's default (42845879) turned it red and missed it
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";

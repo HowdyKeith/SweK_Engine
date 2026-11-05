@@ -144,7 +144,7 @@ const makeRng = (seed) => { let s = (seed >>> 0) || 1; return () => { s = (s * 1
 // box3dStepper(), say). B is moved by rigidBody6dof.step() as ever, and `orientation` then reaches B's steps only.
 // 2026-11-04 (unnumbered) -- AND `stepB`, also off unless given, for the both-ships round (physics/mechanics/BOX3D_BOTH_SHIPS_WIP.md, registered
 // before it was built): B's stepper, as `stepA` is A's. Given both, each ship is moved by its own, and `orientation` reaches neither.
-export function duel(a = "autopilot", b = "autopilot", { seed = 1, seconds = 30, collisions = false, ramPenalty = 0, scenario = "standoff", orientation = null, nudge = 0, record = null, stepA = null, stepB = null } = {}) {
+export function duel(a = "autopilot", b = "autopilot", { seed = 1, seconds = 30, collisions = false, ramPenalty = 0, scenario = "standoff", orientation = null, nudge = 0, record = null, stepA = null, stepB = null, contacts = null } = {}) {
     // a FUNCTION is a pilot already, with decide()'s contract: how another brain flies this duel (brain/pilot6dofMlp.mjs, the GPU Brain's), the scoring and the tally unchanged
     const pilotOf = (x) => typeof x === "function" ? x : x === "autopilot" ? (body, tgt, o) => AP.decide(body, tgt, o) : pilotFor(x === "hand" ? handWeights() : x === "zero" ? zeroWeights() : x);
     const pa = pilotOf(a), pb = pilotOf(b), rng = makeRng(seed), I = RB.boxInertia({ m: SHIP_MASS, hx: HALF[0], hy: HALF[1], hz: HALF[2] });
@@ -156,6 +156,7 @@ export function duel(a = "autopilot", b = "autopilot", { seed = 1, seconds = 30,
     if (record) { record.start = copyBody(A.body); record.inputs = []; }
     let shots = [], h = 0x811c9dc5, t = 0, bShots = 0, rams = 0, ramTicks = 0, ramHp = 0, inContact = false, minRange = Infinity; const tally = { hits: 0, shotsFired: 0, hitsTaken: 0 };
     const landed = [], taken = [];   // the tick of each hit A landed and each hit A took: the dense signal a mutual kill hides (see REWARD.tempo)
+    const tickStart = [null, null], tickAcc = [null, null];   // the contact resolver's: each ship's state and accumulator at the tick's start (only filled when one is given)
     for (; t < steps && !A.dead && !B.dead; t++) {
         const nowMs = t * dt * 1000;
         for (const [s, foe, p] of [[A, B, pa], [B, A, pb]]) {
@@ -163,6 +164,7 @@ export function duel(a = "autopilot", b = "autopilot", { seed = 1, seconds = 30,
             const acc = RB.createAccumulator(); RB.applyForceAtPoint(acc, [d.thrust, 0, 0], ENGINE_MOUNT); acc.torque = d.torqueBody;
             if (record && s === A) record.inputs.push({ force: [...acc.force], torque: [...acc.torque] });
             const before = s.body; s.body = stepA && s === A ? stepA(s.body, acc, dt) : stepB && s === B ? stepB(s.body, acc, dt) : RB.step(s.body, acc, dt, stepOpt);
+            if (contacts) { tickStart[s === A ? 0 : 1] = before; tickAcc[s === A ? 0 : 1] = acc; }
             // *** A SHIP THAT SPINS ITSELF TO NON-FINITE STATE IS DESTROYED, NOT SIMULATED ON. *** A pilot that holds a torque for ~800 ticks drives its angular velocity to 1e304 -- the integrator's gyroscopic term is unstable at
             // extreme spin -- and then to NaN. Before v4848 that was invisible: a NaN ship cannot be hit, fires nothing, and the duel ran to the time limit as a draw, scored by what the OTHER ship did. With collisions on,
             // the contact test reads NaN as a hit with no normal and the duel threw (it killed two training runs, at iteration 376 of search 0). The ship is put back where it last was, marked dead and marked `lost`.
@@ -171,8 +173,10 @@ export function duel(a = "autopilot", b = "autopilot", { seed = 1, seconds = 30,
         }
         minRange = Math.min(minRange, Math.hypot(A.body.pos[0] - B.body.pos[0], A.body.pos[1] - B.body.pos[1], A.body.pos[2] - B.body.pos[2]));
         if (collisions) {   // the page's order: both ships move, THEN contact is resolved, THEN shots; death is marked after the tick's shots
-            const contacts = SC.resolveShipCollisions([A, B], HALF), touching = contacts.length > 0;
-            if (touching) { ramTicks++; if (!inContact) rams++; for (const c of contacts) ramHp += c.dmg; }
+            // 2026-11-04 -- `contacts`, a resolver of the pair's contact in place of the engine's own (physics/mechanics/BOX3D_HYBRID_SHIPS_WIP.md): handed the ships after the
+            // step, their states and accumulators at the tick's start, dt and the tick, it returns the tick's contacts as resolveShipCollisions does. Off unless given.
+            const events = contacts ? contacts([A, B], HALF, { start: tickStart, acc: tickAcc, dt, tick: t }) : SC.resolveShipCollisions([A, B], HALF), touching = events.length > 0;
+            if (touching) { ramTicks++; if (!inContact) rams++; for (const c of events) ramHp += c.dmg; }
             inContact = touching;
         }
         const targets = [A, B].filter((s) => !s.dead).map((s) => ({ id: s.id, team: s.team, body: s.body, half: HALF }));

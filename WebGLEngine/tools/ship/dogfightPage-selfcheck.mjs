@@ -29,6 +29,7 @@
 //   NOT HELD, SAID PLAINLY: the jet's opening camera offset, and the airspeed the brain window assumes before the first tick (140 m/s): neither is read by a row.
 //   THE FIRST RUN OF THE JET ROWS FOUND THE GATE'S OWN FIXTURES WRONG IN THREE PLACES: switching the aircraft keeps the kind and the seed of the fight in progress (the gate had assumed duel 3), the failure-path rows had taken the GPU Brain's shipped pilot away on purpose (so the 'way back' row saw a roster with one pilot disabled -- it now loads it again first), and the duel at seed 2 has A hit 14 times and landing none, not 'trading hits'. THE SABOTAGE RUNNER HAD TO LEARN A PAGE AT THE ENGINE'S ROOT: the first run of it died on a top-level file (the tree builder assumed every mutated file lived in a folder).
 "use strict";
+import "../../physics/mechanics/rigidBody6dofEuler.mjs";   // 2026-11-05 -- the 6-DOF numbers this gate holds were measured under the first-order orientation step, so it flies that step (see that file); RK4's default (42845879) turned it red and missed it
 import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
 import { createRequire } from "node:module";
 import fs from "node:fs";
@@ -55,6 +56,7 @@ else {
     const run = await runInEngineOrigin({
         engineRoot: ENG, timeoutMs: 280000,
         script: `async () => {
+            await import("/physics/mechanics/rigidBody6dofEuler.mjs");   // 2026-11-05 -- the page flies the step this gate's 6-DOF numbers were measured under (sessionStorage carries it into the iframe)
             globalThis.__swekStep = "booting dogfight.html in an iframe";
             const f = document.createElement("iframe");
             f.style.width = "1100px"; f.style.height = "720px";

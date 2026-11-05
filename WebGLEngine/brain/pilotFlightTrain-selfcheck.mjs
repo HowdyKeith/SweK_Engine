@@ -22,6 +22,7 @@
 //   TWO WENT 0 RED THE FIRST TIME AND THE ROWS WERE STRENGTHENED: M7 (the 'fixed point' row held for a search whose first pass was already a fixed point, so a single pass passed: it now also takes a search that needs three passes -- seed 7, 30
 //   iterations, 54 moved and 15 kept -- and asks for exactly three) and M11 (no row ran train() or prune() on their DEFAULT set: the start score at zero iterations now has to be the autopilot's on the 40 scenarios, -0.4655, not on the 12, -0.4529).
 "use strict";
+import "../physics/mechanics/rigidBody6dofEuler.mjs";   // 2026-11-05 -- the 6-DOF numbers this gate holds were measured under the first-order orientation step, so it flies that step (see that file); RK4's default (42845879) turned it red and missed it
 import * as PF from "./pilotFlightPolicy.mjs";
 import * as MF from "./pilotFlightMlp.mjs";
 import * as T from "./flightTask.mjs";

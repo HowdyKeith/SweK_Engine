@@ -80,7 +80,7 @@ import { box3d } from "./physics/box3d/box3dLoader.js";
 
 const $ = (id) => document.getElementById(id);
 const cv = $("cv"), ctx = cv.getContext("2d");
-let world = null, tick = 0, running = false, shoveAt = -1;
+let world = null, tick = 0, running = false, shoveAt = -1, bone = {};   // bone: build()'s bone name -> body index, which the shove reads (2026-11-05)
 let jointHandles = [], severed = [];   // v3234 -- see the note in build()
 // v3235 -- THE POLICY UNDER TEST, and it is a POLICY rather than a mechanism. The kaiju sim has TWO severance
 // implementations that differ in exactly one decision: round 306 (LIVE) severs only on the KILLING BLOW, round
@@ -159,7 +159,7 @@ function build() {
   world = box3d.createWorld({ gravity: [0, -9.8, 0] });
   world.addBox({ type: "static", pos: [0, -0.5, 0], half: [30, 0.5, 30] });
 
-  const idx = {};
+  const idx = bone = {};   // the ground above is body 0, so each bone's body is one past its place in BONES: the shove asks this map, by name
   for (const [name, pos, half] of BONES) idx[name] = world.addBox({ type: "dynamic", pos, half, density: 1 });
 
   const rows = [];
@@ -279,8 +279,8 @@ function frame() {
   // TICK-INDEXED, not time-indexed. A shove fired on a wall-clock timer would land on a different tick on a
   // different machine, and two peers would disagree about the rig forever after. This is the whole discipline.
   if (tick === shoveAt) {
-    world.impulse(4, [14, 6, 0]);        // lowerArmL
-    world.angularImpulse(1, [0, 0, 3]);  // chest
+    world.impulse(bone.lowerArmL, [14, 6, 0]);    // lowerArmL -- by name since 2026-11-05: the typed 4 was upperArmL, the ground being body 0
+    world.angularImpulse(bone.chest, [0, 0, 3]);  // chest -- by name: the typed 1 was the pelvis
   }
   world.step(1 / 60, 4);
   tick++;

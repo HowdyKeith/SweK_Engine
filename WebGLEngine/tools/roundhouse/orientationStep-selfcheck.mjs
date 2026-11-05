@@ -56,6 +56,13 @@
 //   the default 4 (tools/roundhouse/spinningBody-selfcheck.mjs) | D3b the setter carries nothing, to worker processes 2
 //   (tools/ship/trainDogfightLeague-selfcheck.mjs, whose --workers row is what the environment carrier is for)
 //   Every row of section 7 went red under at least one design.
+// AND SIX FOR THE EIGHT GATES THE DEFAULT MISSED (2026-11-05; section 7's register, 36 -> 44), each against the gate it breaks and this one, every file
+// restored byte-identical (sha256), every one red by name:
+//   E1 trainSubPilot's first-order import dropped 3 | E2 pilotFlightTrain's first-order import dropped 2 | E3 trainDronePilot's first-order import moved second 1
+//   E4 dogfightPage's page script no longer imports it first in the browser 8 | E5 subDropoutView's page set no step before it loads 3
+//   E6 subDropoutView's page set to RK4 before it loads 3
+//   E3 reddens only the register: a gate whose import comes second still flies the first-order step, the default being read at a body's first step, and
+//   the register is what holds the convention that it come first.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -124,8 +131,8 @@ try {
     const duelSrc = src("brain/pilot6dofPolicy.mjs");
     // 2026-11-04: the 6-DOF-on-box3d round (physics/mechanics/SIXDOF_BOX3D_WIP.md) added `stepA` after these three, also off, and the both-ships
     // round (physics/mechanics/BOX3D_BOTH_SHIPS_WIP.md) `stepB` after it; those rounds' gates hold them
-    ok("the duel's tick is the library's (1/30 s, read from the duel's source), and the duel takes the three options with defaults that are off (and the box3d rounds' stepA and stepB after them, off too)",
-        /dt = 1 \/ 30, steps = Math\.round\(seconds \/ dt\)/.test(duelSrc) && L.DUEL_DT === 1 / 30 && /orientation = null, nudge = 0, record = null(?:, stepA = null(?:, stepB = null)?)? \} = \{\}\) \{/.test(duelSrc));
+    ok("the duel's tick is the library's (1/30 s, read from the duel's source), and the duel takes the three options with defaults that are off (and the box3d rounds' stepA and stepB after them, and the hybrid round's contacts after those, off too)",
+        /dt = 1 \/ 30, steps = Math\.round\(seconds \/ dt\)/.test(duelSrc) && L.DUEL_DT === 1 / 30 && /orientation = null, nudge = 0, record = null(?:, stepA = null(?:, stepB = null(?:, contacts = null)?)?)? \} = \{\}\) \{/.test(duelSrc));
 } catch (e) { guard(2, e); }
 
 console.log("\n3. THE LIBRARY HOLDS THE REGISTRATION");
@@ -289,9 +296,17 @@ try {
     const notFirst = gates.filter((f) => !/rigidBody6dofEuler\.mjs/.test(firstImport(f)));
     const restated = gates, pageLine = 'await import("/physics/mechanics/rigidBody6dofEuler.mjs");';
     const pageScript = /BROWSER_SCRIPT = `async \(args\) => \{\n {4}await import\("\/physics\/mechanics\/rigidBody6dofEuler\.mjs"\);/.test(src("tools/ship/sixdofPageFight.mjs")) &&
-        ["brain/pilot6dofMlpPage-selfcheck.mjs", "tools/ship/battleshipPage-selfcheck.mjs"].every((f) => new RegExp("script: `async \\(\\) => \\{\\n\\s*" + pageLine.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&")).test(src(f)));
-    ok("!! the gates that hold first-order numbers say so: 36 of them import rigidBody6dofEuler.mjs as their FIRST import (before any module that steps a body), no library or page does, and the three page scripts import it first in the browser",
-        restated.length === 36 && notFirst.length === 0 && others.length === 0 && pageScript,
+        ["brain/pilot6dofMlpPage-selfcheck.mjs", "tools/ship/battleshipPage-selfcheck.mjs", "tools/ship/dogfightPage-selfcheck.mjs"].every((f) => new RegExp("script: `async \\(\\) => \\{\\n\\s*" + pageLine.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&")).test(src(f))) &&
+        /await pg\.addInitScript\(\(\) => \{ try \{ sessionStorage\.setItem\("SWEK_6DOF_ORIENTATION", "euler"\); \}[^\n]*\n\s*await pg\.goto\(base \+ "\/sub-aquarium\.html"/.test(src("render/subDropoutView-selfcheck.mjs"));
+    // 2026-11-05 -- 36 -> 44, AND THE PAGE SCRIPTS 3 -> 4 WITH ONE PAGE SET BEFORE IT LOADS. Eight gates holding first-order numbers were missed when RK4 became the
+    // default (42845879): every one green at c2ce4537, red at 42845879 on the very rows red since, and green under the first-order step -- the flight, drone and sub
+    // trainers' shipped pilots, the dogfight tournament and trainer, the fruit fly's trainer, and two pages (trainSubPilot's is in the other chat's area, changed at
+    // Keith's word, "Fix them"). dogfightPage's page script imports it first in the browser, as the others do; subDropoutView opens sub-aquarium.html itself, so it
+    // sets the step in sessionStorage before any of the page's scripts runs, which is where the page reads it from.
+    const MISSED = ["brain/pilotFlightTrain-selfcheck.mjs", "render/subDropoutView-selfcheck.mjs", "tools/ship/dogfightPage-selfcheck.mjs", "tools/ship/tournamentDogfightShipped-selfcheck.mjs",
+        "tools/ship/trainDogfightPilotShipped-selfcheck.mjs", "tools/ship/trainDronePilot-selfcheck.mjs", "tools/ship/trainFlightPilotGpu-selfcheck.mjs", "tools/ship/trainSubPilot-selfcheck.mjs"];
+    ok("!! the gates that hold first-order numbers say so: 44 of them import rigidBody6dofEuler.mjs as their FIRST import (before any module that steps a body), no library or page does, the four page scripts import it first in the browser, and the one page a gate opens itself is given the step before it loads",
+        restated.length === 44 && notFirst.length === 0 && others.length === 0 && pageScript && MISSED.every((f) => restated.includes(f)),
         `${restated.length} gates${notFirst.length ? "; not first in " + notFirst.join(", ") : ""}${others.length ? "; imported by " + others.join(", ") : ""}${pageScript ? "" : "; a page script does not import it first"}`);
     // every 6-DOF craft family, under both steps: the baseline each task pins, flown here with each step named
     const FT = await import("../../brain/flightTask.mjs"), AF = await import("../../brain/autopilotFlight.mjs"), DTk = await import("../../brain/droneTask.mjs"), AD = await import("../../brain/autopilotDrone.mjs");

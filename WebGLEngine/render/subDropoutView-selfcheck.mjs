@@ -23,7 +23,7 @@
 //   THE FINAL FULL RUN over the finished gate (all 78 + 17) found a ninth: W37 (the plan's background not painted) went 0-red because an edit of the gate had cut its row (the 'first cleared and painted' row) along with the lines around it; the row is back and W37 is red by name. A gate edited after its sabotage is run again in full.
 //   NOT CHECKED here: that the CSS lays the section out well (a screenshot is written for a person to look at).
 "use strict";
-import "../physics/mechanics/rigidBody6dofEuler.mjs";   // 2026-11-04 -- the 6-DOF numbers this gate holds were measured under the first-order orientation step; RK4 is the default now (box3d merge), so the gate says euler out loud
+import "../physics/mechanics/rigidBody6dofEuler.mjs";   // 2026-11-05 -- the 6-DOF numbers this gate holds were measured under the first-order orientation step, so it flies that step (see that file); RK4's default (42845879) turned it red and missed it
 import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
@@ -236,7 +236,7 @@ console.log("\n3. THE LIVE PAGE");
         try {
             const pg = await (await b.newContext({ viewport: { width: 1200, height: 1400 } })).newPage();
             const errs = [], cerrs = []; pg.on("pageerror", (e) => errs.push(String(e.message))); pg.on("console", (m) => { if (m.type() === "error") cerrs.push(m.text()); });
-            await pg.addInitScript(() => { try { sessionStorage.setItem("SWEK_6DOF_ORIENTATION", "euler"); } catch (e) {} });   // the page flies the step this gate's numbers were measured under
+            await pg.addInitScript(() => { try { sessionStorage.setItem("SWEK_6DOF_ORIENTATION", "euler"); } catch (e) { /* a sandbox: the page keeps its default */ } });   // 2026-11-05 -- the page flies the step this gate's 6-DOF numbers were measured under, set before any of its scripts runs
             await pg.goto(base + "/sub-aquarium.html", { waitUntil: "load" });
             await pg.waitForFunction(() => { const h = document.getElementById("dropoutHost"); return h.dataset.ready === "1" || /unavailable/.test(h.textContent); }, null, { timeout: 30000 }).catch(() => {});
             ok("!! the page loads with no script error and no console error (the vendored circuit is imported as JSON, the view's modules all load)", errs.length === 0 && cerrs.length === 0, errs.concat(cerrs).join(" | ").slice(0, 300));

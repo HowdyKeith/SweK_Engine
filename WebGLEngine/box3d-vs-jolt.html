@@ -62,11 +62,11 @@ function diff() {
   cD.putImageData(d, 0, 0); return n / (W * H);
 }
 
-let backend = null, box3d = null, wA = null, wB = null, idxA = [], idxB = [];
+let backend = null, box3d = null, box3dWhy = "", wA = null, wB = null, idxA = [], idxB = [];
 async function init() {
   try { backend = await createJoltBackend(); } catch (e) {}
-  try { const mod = await import("./physics/box3d/box3dLoader.js"); const t = mod.box3d.createWorld({ gravity: [0, -9.8, 0] }); t.destroy && t.destroy(); box3d = mod.box3d; } catch { box3d = null; }
-  if (!box3d) { document.getElementById("t1").innerHTML = 'box3d <span class="miss">(build its WASM to compare)</span>'; }
+  try { const mod = await import("./physics/box3d/box3dLoader.js"), st = await mod.box3d.init(); if (st.ready) { const t = mod.box3d.createWorld({ gravity: [0, -9.8, 0] }); t.destroy && t.destroy(); box3d = mod.box3d; } else box3dWhy = st.reason; } catch (e) { box3d = null; box3dWhy = String((e && e.message) || e); }   // 2026-11-05: init() first -- without it createWorld() threw "call init() first" and this page said the WASM was not built
+  if (!box3d) { const t1 = document.getElementById("t1"), why = document.createElement("span"); why.className = "miss"; why.textContent = "(not loaded here: " + (box3dWhy || "no reason given") + ")"; t1.textContent = "box3d "; t1.appendChild(why); }
   restart();
 }
 function restart() {

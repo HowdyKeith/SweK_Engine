@@ -48,7 +48,7 @@ class Box3DWorldHandle {
     step(dt = 1 / 60, substeps = 4) { this._m._swk_world_step(dt, substeps); }
     // v2258 -- interaction primitives: let the kaiju CAUSE the physics.
     impulse(idx, v) { this._m._swk_body_impulse(idx, v[0], v[1], v[2]); }                          // linear impulse at COM (kick/blast)
-    angularImpulse(idx, v) { this._m._swk_body_ang_impulse(idx, v[0], v[1], v[2]); }               // spin (tumbling throw)
+    angularImpulse(idx, v) { this._m._swk_body_ang_impulse(idx, v[0], v[1], v[2]); capSpinAt(this._m, idx); }   // spin (tumbling throw), left at 15 pi rad/s at most as Jolt leaves it: SPIN CAP below
     setVelocity(idx, v) { this._m._swk_body_set_velocity(idx, v[0], v[1], v[2]); }                 // launch at a chosen speed
     setTransform(idx, p, q) { this._m._swk_body_set_transform(idx, p[0], p[1], p[2], q[0], q[1], q[2], q[3]); }  // drive a kinematic body
     setType(idx, type) { this._m._swk_body_set_type(idx, type === "kinematic" ? 2 : type === "dynamic" ? 1 : 0); } // wall -> debris on impact
@@ -89,7 +89,7 @@ class Box3DWorldHandle {
         this._m._swk_ang_velocities(this._wPtr);
         return new Float32Array(this._m.HEAPF32.buffer, this._wPtr, n * 3);
     }
-    setAngularVelocity(idx, w) { if (!this.supports("body_set_ang_velocity")) return false; this._m._swk_body_set_ang_velocity(idx, w[0], w[1], w[2]); return true; }
+    setAngularVelocity(idx, w) { if (!this.supports("body_set_ang_velocity")) return false; const c = cappedSpin(w); this._m._swk_body_set_ang_velocity(idx, c[0], c[1], c[2]); return true; }   // capped at 15 pi, as Jolt's is: SPIN CAP below
     // linear and angular damping, 1/s. addBox keeps the engine's 0.05/0.05 (v2468); a torque-free body says 0, 0.
     setDamping(idx, linear, angular) { if (!this.supports("body_set_damping")) return false; this._m._swk_body_set_damping(idx, linear, angular); return true; }
     // the body's rotational inertia in its own frame: { diag: [Ixx, Iyy, Izz], off: [Ixy, Ixz, Iyz] }, or null.
@@ -282,6 +282,60 @@ class Box3DWorldHandle {
     }
 }
 
+// =============================================================================
+// 2026-11-04 (unnumbered) -- THE SPIN CAP AT THE IMPULSE, AS JOLT HAS IT. box3d's ApplyAngularImpulse leaves whatever spin the impulse
+// gives; Jolt's AddAngularImpulse clamps the spin it leaves at the body's max angular velocity, 15 pi rad/s by default. A light body
+// given a hard impulse is where the two part: the debris' 6 x 18 x 12 cm slivers spun at up to 2.6 million rad/s here and at 15 pi on
+// Jolt. physics/mechanics/BOX3D_ANGULAR_IMPULSE_CAP_WIP.md registered a census of every caller of the facade's angularImpulse before any code
+// (7d5cd4a5), with the rule it would decide by; the census (results 5a14976d, verdict cadec101) found two callers besides the debris
+// past the cap -- ragdoll.html's and flesh.html's shove, 538.52 and 531.73 rad/s on the pelvis -- so, as the rule says, the facade's
+// angularImpulse now leaves no spin above 15 pi, the body's axis kept:
+//   - only a spin ABOVE the cap by SPIN_SLACK (1.001) is touched, and by fx/fracture/debrisPhysics.js's own expression (each component
+//     times cap / |w|): a spin box3d leaves at or under it is left bit for bit, and the debris -- which capped its throws the same way
+//     after the impulse, and still does -- flies byte for byte as it did;
+//   - the cap is on the spin the call LEAVES, as Jolt's is, so a body already spinning past it is brought to it by any impulse;
+//   - box3d's raw export, _swk_body_ang_impulse, is left as box3d has it: a caller that skips this facade skips the cap
+//     (render/slugTicker.mjs's raw world, tools/roundhouse/spinningBody.mjs, physics/mechanics/rigidKeys.mjs,
+//     tools/roundhouse/backendRotation.mjs -- none of them past the cap where the census could see);
+//   - the spin is read through _swk_ang_velocities, the shim's only reader of it, which writes every body's: one call of that per
+//     impulse, its cost growing with the world's bodies. It writes into a buffer of the module's own, made once for the shim's
+//     MAX_BODIES when the module's first world is made, so the facade's angularImpulse never allocates: a view a caller holds across it
+//     (physics/fluidBox3d.js holds readVelocities()' across its loop of setVelocity and angularImpulse) stays attached, as before;
+//   - an artifact without the spin exports gets the impulse and no cap, as it did.
+//   - 2026-11-05: setAngularVelocity caps a spin SET OUTRIGHT the same way (cappedSpin below), because Jolt's does too: a body set spinning at
+//     30 pi reads back 15 pi on Jolt's facade and read 30 pi here. box3d's raw setter, _swk_body_set_ang_velocity, is left as box3d has it.
+// Gated in tools/roundhouse/angularImpulseCensus-selfcheck.mjs, section 12.
+// =============================================================================
+/** Jolt's default max angular velocity, rad/s (a quarter turn per 1/60 s step), and how far above it a spin may stand untouched. */
+export const MAX_ANGULAR_VELOCITY = 15 * Math.PI, SPIN_SLACK = 1.001;
+/** physics/box3d/box3d_shim.c's MAX_BODIES: the most bodies a world holds, so the most spins _swk_ang_velocities writes. */
+export const SHIM_MAX_BODIES = 4096;
+const SPIN_SCRATCH = new WeakMap();   // module -> its spin buffer, SHIM_MAX_BODIES * 3 floats, kept as long as the module is
+function spinScratch(m) {
+    if (typeof m._swk_ang_velocities !== "function" || typeof m._swk_body_set_ang_velocity !== "function" || typeof m._swk_body_count !== "function") return 0;
+    let p = SPIN_SCRATCH.get(m);
+    if (!p) { p = m._malloc(SHIM_MAX_BODIES * 3 * 4); if (p) SPIN_SCRATCH.set(m, p); }
+    return p || 0;
+}
+/** A spin set outright, at no more than MAX_ANGULAR_VELOCITY with its axis kept, by the same expression; at or under the slack it is `w` itself. */
+function cappedSpin(w) {
+    const s = Math.hypot(w[0], w[1], w[2]);
+    return s > MAX_ANGULAR_VELOCITY * SPIN_SLACK ? [w[0], w[1], w[2]].map((x) => x * MAX_ANGULAR_VELOCITY / s) : w;
+}
+/** Leave body `idx` of module `m`'s world spinning at no more than MAX_ANGULAR_VELOCITY, its axis kept; true if it was capped. */
+function capSpinAt(m, idx) {
+    const p = SPIN_SCRATCH.get(m);
+    if (!p) return false;
+    const n = m._swk_body_count();
+    if (!(idx >= 0 && idx < n && n <= SHIM_MAX_BODIES)) return false;
+    m._swk_ang_velocities(p);
+    const F = new Float32Array(m.HEAPF32.buffer, p + idx * 12, 3), w = [F[0], F[1], F[2]], s = Math.hypot(w[0], w[1], w[2]);
+    if (!(s > MAX_ANGULAR_VELOCITY * SPIN_SLACK)) return false;
+    const c = w.map((x) => x * MAX_ANGULAR_VELOCITY / s);
+    m._swk_body_set_ang_velocity(idx, c[0], c[1], c[2]);
+    return true;
+}
+
 export class Box3DLoader {
     constructor() { this._mod = null; this._status = null; }
 
@@ -363,6 +417,7 @@ export class Box3DLoader {
 
     createWorld({ gravity = [0, -9.8, 0] } = {}) {
         if (!this._mod) throw new Error("box3d: call init() first (and check .ready)");
+        spinScratch(this._mod);   // the spin cap's buffer, made with the module's first world (SPIN CAP above) so the cap never allocates
         this._mod._swk_world_create(gravity[0], gravity[1], gravity[2]);
         return new Box3DWorldHandle(this._mod);
     }
