@@ -1,6 +1,6 @@
 // WebGLEngine/brain/subSensedNav-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node brain/subSensedNav-selfcheck.mjs      (~170 s)
+// Run: node brain/subSensedNav-selfcheck.mjs      (~40-200 s -- alone 130-200 s; the sweep's 20 s readings are cap kills)
 //
 // THE SENSED MAP (brain/subSensedNav.mjs), held to its word before HELD6 is flown (registration: brain/SENSED_NAV_WIP.md):
 //   1  THE CONSTANTS   the three static kinds, the arms (the three sensed ones, the study's five, the designated), the sonar (100 m, 60 degrees a side, a ping a second), the two sigmas, the bars, the sets (HELD6 shares no seed with any set read before)

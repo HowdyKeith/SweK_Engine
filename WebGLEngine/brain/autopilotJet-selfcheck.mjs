@@ -1,6 +1,6 @@
 // WebGLEngine/brain/autopilotJet-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node brain/autopilotJet-selfcheck.mjs      (~3 s)
+// Run: node brain/autopilotJet-selfcheck.mjs      (~1.3-2.8 s)
 //
 // THE JET'S HAND PILOT, HELD TO WHAT A JET PILOT IS EXAMINED ON. brain/autopilotFlight.mjs flies physics/mechanics/flightModel6dof.mjs's JET_TRAINER with AUTOPILOT_JET's gains (the trainer's laws with six things scheduled or re-set for an aircraft three times as fast). Its sibling gate
 // (brain/autopilotFlight-selfcheck.mjs) holds the trainer's pilot; this one holds the jet's, in the same way: a number the laws were not tuned to, a sign proved against the geometry, or a thing an examiner checks. And it holds the other half of the change -- THAT THE TRAINER'S PILOT IS UNCHANGED, to the bit.

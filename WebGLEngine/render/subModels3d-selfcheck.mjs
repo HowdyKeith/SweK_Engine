@@ -1,6 +1,6 @@
 // WebGLEngine/render/subModels3d-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node render/subModels3d-selfcheck.mjs      (~3 s with a browser; sections 1-3 alone ~0.3 s)
+// Run: node render/subModels3d-selfcheck.mjs      (~1.3-2.5 s with a browser; sections 1-3 alone ~0.3 s)
 //
 // THE THREE.JS HALF OF A DOWNLOADED SUBMARINE MODEL (phase 2 of docs/SUB-GLB-MODEL-SWAP.md), HELD WITH THE REAL three.js:
 //   1  APPLY      a template (a long hull and a sail, built here) on a boat built by render/subAquarium3d.mjs buildSub + attachCues: the five procedural parts hidden but still there, the model 16 long and centred, rigid (poseFins turns the hidden fins and

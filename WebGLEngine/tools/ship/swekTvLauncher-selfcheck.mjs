@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/swekTvLauncher-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time).
 //
-// Run: node tools/ship/swekTvLauncher-selfcheck.mjs      (~3 s with a JDK; sections 3-4 SKIP, and say so, without one)
+// Run: node tools/ship/swekTvLauncher-selfcheck.mjs      (~1.4-2.5 s with a JDK; sections 3-4 SKIP, and say so, without one)
 //
 // GRADES SweK HOME, the second launcher activity in android/swek-webview: the manifest around it, the pure logic behind it
 // (Shelf.java, compiled and driven here by a plain javac), and the activity itself compiled against an API-16 android.jar when one is
