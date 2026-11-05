@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "7b85f4300cb44424498f79dee77b076ed39aa499",
+ "head": "31207729df16fdce7af0e0f733c6387361591850",
  "bodies": {
   "box3d": [
    {
@@ -11,8 +11,8 @@
    },
    {
     "path": "ai-bridge/server.js",
-    "bytes": 1495617,
-    "sha": "25e50da9267c4d3fcd6fcd180b9d53c56b590f02"
+    "bytes": 1497554,
+    "sha": "b2c698a60703f141db411e301740223b86398b2d"
    },
    {
     "path": "physics/backendRouting-selfcheck.mjs",
@@ -21,13 +21,13 @@
    },
    {
     "path": "physics/box3d/box3dConformance-selfcheck.mjs",
-    "bytes": 12269,
-    "sha": "5638cbe47b9844b08c29dab76eba4337cd917427"
+    "bytes": 14163,
+    "sha": "5fed473f3d3aa7f9680f5ca7fb5532480324fc36"
    },
    {
     "path": "physics/box3d/box3dLoader.js",
-    "bytes": 27374,
-    "sha": "8c009e25970f6129173801315a93ce2a4cc7291c"
+    "bytes": 34630,
+    "sha": "abf46b65e45d70cc16d01c06a3e29a250dcceead"
    },
    {
     "path": "physics/box3d/box3dNode.mjs",
@@ -88,6 +88,16 @@
     "path": "tools/macSession.mjs",
     "bytes": 16554,
     "sha": "359cf163ca4803c8c42c1efebfcdb88201c9e373"
+   },
+   {
+    "path": "tools/roundhouse/angularImpulseCensus-selfcheck.mjs",
+    "bytes": 72576,
+    "sha": "abf46b65e45d70cc16d01c06a3e29a250dcceead"
+   },
+   {
+    "path": "tools/roundhouse/angularImpulseCensus.mjs",
+    "bytes": 25861,
+    "sha": "139922d8747ac469dc302d092da82480c0d55f10"
    },
    {
     "path": "tools/roundhouse/backendRotation.mjs",
@@ -324,19 +334,49 @@
   ],
   "hemibrain": [
    {
+    "path": "ai-bridge/subAquariumCore-selfcheck.mjs",
+    "bytes": 28463,
+    "sha": "f09ba231411d443dca6bd265b95df6364732bea1"
+   },
+   {
     "path": "brain/pilotSubCircuitState-selfcheck.mjs",
     "bytes": 29802,
     "sha": "d4cc23c4ec8beb962f40866504b88fc497abc964"
    },
    {
+    "path": "render/brainPanel-selfcheck.mjs",
+    "bytes": 84874,
+    "sha": "f09ba231411d443dca6bd265b95df6364732bea1"
+   },
+   {
+    "path": "render/subAquariumFlyCx-selfcheck.mjs",
+    "bytes": 17409,
+    "sha": "bcf534a7c51b4806fa9c98749b53d144f78cc35e"
+   },
+   {
+    "path": "render/subAquariumSim-selfcheck.mjs",
+    "bytes": 56268,
+    "sha": "977d5396421eb059857bfe8c297db19eff716981"
+   },
+   {
     "path": "sub-aquarium.html",
-    "bytes": 42403,
-    "sha": "91fd744f63531e7b3a7f2038ecf665173ed71c64"
+    "bytes": 49430,
+    "sha": "977d5396421eb059857bfe8c297db19eff716981"
    },
    {
     "path": "tools/flyCx.mjs",
     "bytes": 6499,
     "sha": "2418774882837c1702bb36d34f7536be4a043a3b"
+   },
+   {
+    "path": "tools/ship/flyCxPilotFile-selfcheck.mjs",
+    "bytes": 21206,
+    "sha": "b9dda10b134013ec06bdf9ccdaa26026871e3e72"
+   },
+   {
+    "path": "tools/ship/flyCxPilotFile.mjs",
+    "bytes": 9654,
+    "sha": "b9dda10b134013ec06bdf9ccdaa26026871e3e72"
    },
    {
     "path": "tools/ship/trainNeedsCircuit.mjs",
@@ -352,6 +392,11 @@
     "path": "tools/ship/trainSubState.mjs",
     "bytes": 25084,
     "sha": "d66beb17f067dff0e9bc21ff7ccb44e7d7f1576d"
+   },
+   {
+    "path": "tools/tankFlyCxBench.mjs",
+    "bytes": 16011,
+    "sha": "70d12d8be420fd1c89f0fa014a4deb1668303400"
    }
   ],
   "htmx": [
@@ -362,8 +407,8 @@
    },
    {
     "path": "ai-bridge/server.js",
-    "bytes": 1495617,
-    "sha": "25e50da9267c4d3fcd6fcd180b9d53c56b590f02"
+    "bytes": 1497554,
+    "sha": "b2c698a60703f141db411e301740223b86398b2d"
    },
    {
     "path": "clients.html",
@@ -372,8 +417,8 @@
    },
    {
     "path": "server.html",
-    "bytes": 901321,
-    "sha": "c74b3f3cbee29d7c7927d8b2f22b08f04b41fccc"
+    "bytes": 902032,
+    "sha": "314f4fc19e09926a5e4e901d29f49c75d03a8e6b"
    },
    {
     "path": "tools/ship/artifactWeight.mjs",
@@ -389,8 +434,8 @@
   "jolt": [
    {
     "path": "physics/jolt/joltLoader.js",
-    "bytes": 11150,
-    "sha": "713679f4c6fb11350bbccba6756ddcc70eac84d6"
+    "bytes": 16865,
+    "sha": "8e5e02298b4172cc8b1c93b7403bea951b6b8c41"
    },
    {
     "path": "tools/ship/artifactWeight.mjs",
@@ -479,8 +524,8 @@
   "male-cns": [
    {
     "path": "ai-bridge/subAquariumBridge-selfcheck.mjs",
-    "bytes": 29852,
-    "sha": "ab2a94c0451801e19f9c025a966a1f0557c471a8"
+    "bytes": 29890,
+    "sha": "bcf534a7c51b4806fa9c98749b53d144f78cc35e"
    },
    {
     "path": "ai-bridge/subAquariumBridge.js",
@@ -650,8 +695,8 @@
    },
    {
     "path": "ai-bridge/server.js",
-    "bytes": 1495617,
-    "sha": "25e50da9267c4d3fcd6fcd180b9d53c56b590f02"
+    "bytes": 1497554,
+    "sha": "b2c698a60703f141db411e301740223b86398b2d"
    },
    {
     "path": "aquarelle.html",
@@ -745,8 +790,8 @@
    },
    {
     "path": "es-box3d-6dof.html",
-    "bytes": 38196,
-    "sha": "d13237b453a095bcc6ddf81cbbfb79916081efe2"
+    "bytes": 40767,
+    "sha": "0e461f4686e91bd4726a4490bd141db4baec5458"
    },
    {
     "path": "es-box3d-fly3d.html",
@@ -860,8 +905,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 3737059,
-    "sha": "c5ffe2df5153227d12a9b16be40ae84d0226ccb0"
+    "bytes": 3742392,
+    "sha": "837cb18e16e9dbaeb8b3780c9a31f7c6d0929470"
    },
    {
     "path": "mpm3d.html",
@@ -955,8 +1000,8 @@
    },
    {
     "path": "server.html",
-    "bytes": 901321,
-    "sha": "c74b3f3cbee29d7c7927d8b2f22b08f04b41fccc"
+    "bytes": 902032,
+    "sha": "314f4fc19e09926a5e4e901d29f49c75d03a8e6b"
    },
    {
     "path": "shipavatar.html",
@@ -980,8 +1025,8 @@
    },
    {
     "path": "space-battleship.html",
-    "bytes": 85600,
-    "sha": "73438b01ab028bba866158a39da6998016ed18ab"
+    "bytes": 85612,
+    "sha": "dc45bed917a8026025d60dc34473ab0c717bde6e"
    },
    {
     "path": "splat_viewer.html",
@@ -990,8 +1035,8 @@
    },
    {
     "path": "sub-aquarium.html",
-    "bytes": 42403,
-    "sha": "91fd744f63531e7b3a7f2038ecf665173ed71c64"
+    "bytes": 49430,
+    "sha": "977d5396421eb059857bfe8c297db19eff716981"
    },
    {
     "path": "svg-forge.html",
@@ -1147,8 +1192,8 @@
    },
    {
     "path": "fsr-three.html",
-    "bytes": 48796,
-    "sha": "e42a281a36cd5d4c329b3eba073186d2bc029fb2"
+    "bytes": 49633,
+    "sha": "0c17879c83278c8b1567257df294ec2801fefabf"
    },
    {
     "path": "fx/fsr/fsr3Hold-selfcheck.mjs",
@@ -1637,8 +1682,8 @@
   "zebrafish": [
    {
     "path": "ai-bridge/subAquariumBridge-selfcheck.mjs",
-    "bytes": 29852,
-    "sha": "ab2a94c0451801e19f9c025a966a1f0557c471a8"
+    "bytes": 29890,
+    "sha": "bcf534a7c51b4806fa9c98749b53d144f78cc35e"
    },
    {
     "path": "brain/pilotSubCircuit-selfcheck.mjs",
