@@ -198,7 +198,7 @@ export async function command(argv, io = {}) {
     log(`[plainNetVariants] ${specs.length} jobs, ${specs.length - todo.length} already in ${o.out}, ${todo.length} to run; ${o.workers} worker(s); recipe ${o.recipe.runs} x ${o.recipe.iters}${o.smoke ? " (SMOKE)" : ""}`);
     const spawner = io.spawner || ((spec) => runChild(spec, o)), queue = [...todo];
     const worker = async () => { while (queue.length) { const s = queue.shift(), rec = o.workers > 1 ? await spawner(s) : runJob(s, o.quiet ? () => {} : (m) => log(m)); appendFile(o.out, JSON.stringify(rec) + "\n"); records.push(rec); log(`[plainNetVariants] ${specName(s)} done${rec.asStart ? " (no eligible champion)" : " (champion seed " + rec.champion + ")"}`); } };
-    try { await Promise.all(Array.from({ length: Math.max(1, Math.min(o.workers, queue.length || 1)) }, worker)); } catch (e) { err("plainNetVariants: " + e.message + " (the records finished so far are in " + o.out + "; run the same command again to resume)"); return 1; }
+    try { await Promise.all(Array.from({ length: Math.min(o.workers, queue.length) }, worker)); } catch (e) { err("plainNetVariants: " + e.message + " (the records finished so far are in " + o.out + "; run the same command again to resume)"); return 1; }
     let first; try { first = readRecords(readFile(STUDY_FILE)); } catch (e) { err("plainNetVariants: the first round's file " + STUDY_FILE + " cannot be read, so there is no report: " + e.message); return 1; }
     for (const l of reportLines(records, first)) out(l);
     return 0;
