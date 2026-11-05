@@ -28,7 +28,7 @@ export const CELL_NAMES = PS.CELL_NAMES, CELLS = PS.CELLS, AUDITS = PS.AUDITS, R
 export const FAMILIES = Object.freeze({ mc: Object.freeze({ id: "mc", n: 8, offset: 0, activation: "relu" }), mt: Object.freeze({ id: "mt", n: 8, offset: 8, activation: "tanh" }) });
 export const CELL_UNITS = Object.freeze({ "P/B": 42, "P/whole": 47, "E/E": 5, "E/whole": 47 });
 export const PER_CELL = 16, SEARCH_BASE = 80000, INIT_BASE = 4811, START_PROBE = 4, KEEP_SHARE = 0.9;
-const f3 = (v) => (v === null || v === undefined || !Number.isFinite(v) ? "n/a" : v.toFixed(3));
+const f3 = (v) => (Number.isFinite(v) ? v.toFixed(3) : "n/a");
 
 // ---- jobs -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 /** The name of a job: `P/B/mc:3`. */
@@ -143,7 +143,7 @@ export function reportLines(records, firstRecords) {
         for (const c of readings[f]) {
             L.push(`${f.toUpperCase()} CELL ${c.cell}: ${c.status} (${c.n} of ${FAMILIES[f].n} pilots${c.stuck ? `, ${c.stuck} with no eligible champion` : ""})`);
             if (!c.audits.length) continue;
-            for (const x of c.audits) L.push(`  ${x.audit}: autopilot ${f3(x.autopilot)} | REAL ${f3(x.real.mean)} | ${f.toUpperCase()} ${f3(x.plain.mean)} (sd ${f3(x.plain.sd)})${x.plainOffAutopilot ? "" : " (NOT off the autopilot)"} | REAL against it: ${x.margin.reading} (${f3(x.margin.margin)} against ${f3(x.margin.needs)}) | keeps ${x.kept === null ? "n/a" : Math.round(100 * x.kept) + " percent"} of REAL's gain`);
+            for (const x of c.audits) L.push(`  ${x.audit}: autopilot ${f3(x.autopilot)} | REAL ${f3(x.real.mean)} | ${f.toUpperCase()} ${f3(x.plain.mean)} (sd ${f3(x.plain.sd)})${x.plainOffAutopilot ? "" : " (NOT off the autopilot)"} | REAL against it: ${x.margin.reading} (${f3(x.margin.margin)} against ${f3(x.margin.needs)}) | keeps ${Number.isFinite(x.kept) ? Math.round(100 * x.kept) + " percent" : "n/a"} of REAL's gain`);
             L.push(`  REGISTERED TEST: REAL above ${f.toUpperCase()}, U ${c.test.U} of ${c.test.max}, exact one-sided p ${c.test.p.toFixed(4)} over ${c.test.splits} splits -> ${c.test.supported ? "SUPPORTED" : "not supported"}${c.validity.learned ? "" : "; THE VARIANT DID NOT LEARN"}`);
             if (c.againstMN) L.push(`  ${f.toUpperCase()} against MN, the first round's plain net (reported; needs the larger of 0.02 and 2 sd of the variant): ${c.againstMN.map((m) => `${m.audit} ${m.reading} (${f3(m.margin)} against ${f3(m.needs)})`).join(" | ")}`);
         }

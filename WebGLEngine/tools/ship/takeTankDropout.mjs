@@ -1,15 +1,15 @@
 // WebGLEngine/tools/ship/takeTankDropout.mjs -- UNNUMBERED (the version is chosen at ship time; the gate is tools/ship/takeTankDropout-selfcheck.mjs)
 //
 // THE COMPASS DROPOUT IN THE TANK, FLOWN OVER THE MEMORY ARMS AND READ AS PAIRED DIFFERENCES: the PD autopilot, the dead-reckoning navigator (the tank's own `navigator` event), the cheapest memory (brain/pilotLeakyHeading.mjs: one leaky unit, and its no-memory lesion, gain 0) and any of the
-// plain-net champions of rung 4b (render/subAquariumPlainNet.mjs, brain/rig-results/plainNetStudy.jsonl) and, with --fish, the 803-weight fish champion (render/subAquariumFish.mjs, brain/pilotSubWeightsFishWip.json). It is the loop of `dropoutTask` in brain/switchboard.mjs (branch claude/wizardly-einstein-wr30pd, f4b55956: a fresh one-sub tank per id, the arm's register hook, sync, setEvent, 160 s, the settled
+// plain-net champions of rung 4b (render/subAquariumPlainNet.mjs, brain/rig-results/plainNetStudy.jsonl) and, with --fish and --plain14, the 803-weight fish champion (render/subAquariumFish.mjs, brain/pilotSubWeightsFishWip.json) and the 954-weight plain control of the 963-weight tank networks (render/subAquariumPlain14.mjs, brain/pilotSubPlain14Wip.json). It is the loop of `dropoutTask` in brain/switchboard.mjs (branch claude/wizardly-einstein-wr30pd, f4b55956: a fresh one-sub tank per id, the arm's register hook, sync, setEvent, 160 s, the settled
 // dark heading error to the wandering target) COPIED and not imported (the board is not in this tree), so that the arms of this branch can be read before the board is merged and the numbers in brain/BACKLOG_PICKUPS_2026-11-05.md can be reproduced.
-//   node tools/ship/takeTankDropout.mjs [--ids 12] [--from 1] [--seconds 160] [--plain P/B/mn:3,E/E/mn:0] [--cost] [--fish]      (--plain none for no plain net; default P/B/mn:3; --fish adds the fish champion as an arm beside them; --from is the first id: the tank ids are sb-<from> .. sb-<from + ids - 1>, and a round that means to keep its ids unread flies others)
+//   node tools/ship/takeTankDropout.mjs [--ids 12] [--from 1] [--seconds 160] [--plain P/B/mn:3,E/E/mn:0] [--cost] [--fish] [--plain14]      (--plain none for no plain net; default P/B/mn:3; --fish and --plain14 add the fish champion and the 14-feature plain net as arms beside them; --from is the first id: the tank ids are sb-<from> .. sb-<from + ids - 1>, and a round that means to keep its ids unread flies others)
 // TWO SCORES. The SETTLED ERROR is the board's (the heading error to the wandering target on the dark ticks at least 12 s after a retarget); it measures how fast a pilot turns onto a target far more than what it knows of its heading: the navigator TIES the autopilot on it (brain/BACKLOG_PICKUPS_2026-11-05.md).
 // The DARK COST (--cost) is built to isolate the compass: each arm and id is flown twice, under the event and with no event (the compass always valid), and the cost is the mean over every tick of the FIRST dark window of (the error under the event) minus (the error at the same tick with the compass lit). The two
 // flights are the same flight until that window starts, so the difference is what the window does and nothing else. A pilot that does not need the compass has a cost near 0 (the navigator's is 0.0000 to the fourth place); the dropout autopilot's is what the lost heading costs it. It is small beside the error itself
 // (the sub is mostly turning onto a target: about 1 rad), so a single cost is noisy and the reading is the paired difference over many ids (the autopilot's is about +0.02 rad: 2 se on 30 ids, 4 on 100).
 // THE READING is the board's, turned for an error that is lower-is-better: arm minus control over the same ids, "BEATS its control" iff the mean difference is negative and more than 2 se below zero, "IS BELOW" iff positive and more than 2 se above, else "TIES" ("the plain net does as well" is the line the board exists to be able to say).
-// Exit 0 printed; 1 a usage error; 2 a file or a champion that is not there. Pure but for the flights and the files it reads (the plain-net study file; the fish weights file with --fish). No clock, no random.
+// Exit 0 printed; 1 a usage error; 2 a file or a champion that is not there. Pure but for the flights and the files it reads (the plain-net study file; the fish weights file with --fish; the plain14 weights file with --plain14). No clock, no random.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -18,26 +18,28 @@ import * as A from "../../render/subAquariumSim.mjs";
 import * as L from "../../brain/pilotLeakyHeading.mjs";
 import * as PNK from "../../render/subAquariumPlainNet.mjs";
 import * as FK from "../../render/subAquariumFish.mjs";
+import * as P14 from "../../render/subAquariumPlain14.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
-export const STUDY_FILE = "brain/rig-results/plainNetStudy.jsonl", FISH_FILE = "brain/pilotSubWeightsFishWip.json";
-export const DEFAULTS = Object.freeze({ ids: 12, from: 1, seconds: 160, plain: Object.freeze(["P/B/mn:3"]), cost: false, fish: false });
+export const STUDY_FILE = "brain/rig-results/plainNetStudy.jsonl", FISH_FILE = "brain/pilotSubWeightsFishWip.json", PLAIN14_FILE = "brain/pilotSubPlain14Wip.json";
+export const DEFAULTS = Object.freeze({ ids: 12, from: 1, seconds: 160, plain: Object.freeze(["P/B/mn:3"]), cost: false, fish: false, plain14: false });
 export const TICK = 1 / 30, SETTLE = 12, SE_FACTOR = 2;
 const TWO_PI = 2 * Math.PI;
 const wrap = (a) => { let x = a % TWO_PI; if (x > Math.PI) x -= TWO_PI; if (x <= -Math.PI) x += TWO_PI; return x; };
 const meanOf = (a) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0);
 const seOf = (a) => { if (a.length < 2) return 0; const m = meanOf(a); return Math.sqrt(a.reduce((x, y) => x + (y - m) * (y - m), 0) / (a.length - 1) / a.length); };
 
-/** { ids, from, seconds, plain, cost, fish } from the command line, or { error } naming the fault. */
+/** { ids, from, seconds, plain, cost, fish, plain14 } from the command line, or { error } naming the fault. */
 export function parseArgs(argv) {
-    const out = { ids: DEFAULTS.ids, from: DEFAULTS.from, seconds: DEFAULTS.seconds, plain: [...DEFAULTS.plain], cost: DEFAULTS.cost, fish: DEFAULTS.fish }, seen = new Set();
-    for (let i = 0; i < argv.length; i += argv[i] === "--cost" || argv[i] === "--fish" ? 1 : 2) {
+    const out = { ids: DEFAULTS.ids, from: DEFAULTS.from, seconds: DEFAULTS.seconds, plain: [...DEFAULTS.plain], cost: DEFAULTS.cost, fish: DEFAULTS.fish, plain14: DEFAULTS.plain14 }, seen = new Set();
+    for (let i = 0; i < argv.length; i += argv[i] === "--cost" || argv[i] === "--fish" || argv[i] === "--plain14" ? 1 : 2) {
         const flag = argv[i], v = argv[i + 1];
-        if (!["--ids", "--from", "--seconds", "--plain", "--cost", "--fish"].includes(flag)) return { error: `not understood: ${flag}` };
+        if (!["--ids", "--from", "--seconds", "--plain", "--cost", "--fish", "--plain14"].includes(flag)) return { error: `not understood: ${flag}` };
         if (seen.has(flag)) return { error: `${flag} given twice` };
         seen.add(flag);
         if (flag === "--cost") { out.cost = true; continue; }
         if (flag === "--fish") { out.fish = true; continue; }
+        if (flag === "--plain14") { out.plain14 = true; continue; }
         if (v === undefined) return { error: `${flag} needs a value` };
         if (flag === "--ids") { const n = Number(v); if (!/^\d+$/.test(v) || n < 2 || n > 200) return { error: `--ids is a whole number from 2 to 200, got ${v}` }; out.ids = n; }
         else if (flag === "--from") { const n = Number(v); if (!/^\d+$/.test(v) || n < 1 || n > 1000000) return { error: `--from is a whole number from 1 to 1000000, got ${v}` }; out.from = n; }
@@ -63,8 +65,8 @@ export function championsOf(text) {
     return out;
 }
 
-/** The arms, each { arm, event }: the autopilot and the leaky unit and its lesion under the tank's dropout, the navigator (the autopilot under the tank's own navigator event), and one plain net per spec, and the fish champion when `fishFile` (the parsed brain/pilotSubWeightsFishWip.json) is given. Controls are arm ids. An unknown spec throws naming it. */
-export function armsFor(records, plain, fishFile = null) {
+/** The arms, each { arm, event }: the autopilot and the leaky unit and its lesion under the tank's dropout, the navigator (the autopilot under the tank's own navigator event), and one plain net per spec, the fish champion when `fishFile` (the parsed brain/pilotSubWeightsFishWip.json) is given and the 14-feature plain net when `plain14File` (the parsed brain/pilotSubPlain14Wip.json) is. Controls are arm ids. An unknown spec throws naming it. */
+export function armsFor(records, plain, fishFile = null, plain14File = null) {
     const auto = { id: "autopilot", layer: "flying", controls: [], entry: () => ({ pilot: "autopilot", circuit: "gfc", weights: null }) };
     const arms = [
         { arm: auto, event: "dropout" },
@@ -78,6 +80,7 @@ export function armsFor(records, plain, fishFile = null) {
         arms.push({ arm: PNK.plainNetArm({ record: r, controls: ["autopilot", "leaky-unit"] }), event: "dropout" });
     }
     if (fishFile) arms.push({ arm: FK.fishArm({ file: fishFile, controls: ["autopilot", "leaky-unit"] }), event: "dropout" });
+    if (plain14File) arms.push({ arm: P14.plain14Arm({ file: plain14File, controls: ["autopilot", "leaky-unit"] }), event: "dropout" });
     return arms;
 }
 
@@ -167,12 +170,13 @@ export function reportLines(res) {
 export function main(argv, io = {}) {
     const read = io.read || ((f) => fs.readFileSync(path.join(ENG, f), "utf8")), print = io.print || ((t) => process.stdout.write(t)), err = io.err || console.error, go = io.go || run;
     const a = parseArgs(argv);
-    if (a.error) { err(`usage: node tools/ship/takeTankDropout.mjs [--ids 12] [--from 1] [--seconds 160] [--plain P/B/mn:3,E/E/mn:0|none] [--cost] [--fish]   (${a.error})`); return 1; }
+    if (a.error) { err(`usage: node tools/ship/takeTankDropout.mjs [--ids 12] [--from 1] [--seconds 160] [--plain P/B/mn:3,E/E/mn:0|none] [--cost] [--fish] [--plain14]   (${a.error})`); return 1; }
     let armList;
     try {
         let text = ""; if (a.plain.length) { try { text = read(STUDY_FILE); } catch { throw new Error(`takeTankDropout: ${STUDY_FILE} is missing`); } }
         let fish = null; if (a.fish) { try { fish = JSON.parse(read(FISH_FILE)); } catch { throw new Error(`takeTankDropout: ${FISH_FILE} is missing or is not JSON`); } }
-        armList = armsFor(championsOf(text), a.plain, fish);
+        let plain14 = null; if (a.plain14) { try { plain14 = JSON.parse(read(PLAIN14_FILE)); } catch { throw new Error(`takeTankDropout: ${PLAIN14_FILE} is missing or is not JSON`); } }
+        armList = armsFor(championsOf(text), a.plain, fish, plain14);
     } catch (e) { err(String((e && e.message) || e)); return 2; }
     print(reportLines(go(armList, a.ids, a.seconds, a.from, a.cost ? { costFn: costFlight } : {})).join("\n") + "\n");
     return 0;
