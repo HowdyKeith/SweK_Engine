@@ -12,6 +12,7 @@
 //   6 IN THE TANK   flown as the board flies the dropout task (a fresh one-sub tank per id, arm.register, sync, setEvent "dropout", 160 s): the sub is seated by the kind and never lost; the hand-weight plain net equals the autopilot's settled dark heading error; the fixture is live (differs from the autopilot by over 0.02 rad on an id).
 //   7 THE SOURCE    pure; the one import.
 // NOT CHECKED, said plainly: that a trained plain net flies WELL (no champion exists yet); that it is worse than a wired network (that is the head-to-head round's question); the page; the switchboard (not in this tree).
+// SABOTAGE (2026-11-05, 56 mutants of render/subAquariumPlain14.mjs: 30 mechanical single-site and 26 by hand, each run alone in a scratch tree): 56 killed -- 35 red BY NAME, 21 the gate threw on (a guard refusing the changed input), 0 survivors. The first pass left 4: the numbers in the arm's note text (963, 50) -- closed by the row that holds the note word for word; all four red on the rerun. Two hand mutants were not applied (their text did not occur once in the file).
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -96,7 +97,7 @@ sec("4. THE FILE");
 sec("5. THE ARM");
 {
     const arm = K.plain14Arm({ file: FILE }), keys = Object.keys(arm).sort();
-    ok("!! the arm is { id, layer, controls, note, entry, register } and frozen: id plain14-954, layer flying, controls [autopilot] (frozen), a note naming the 954 weights, no wiring and no state", J(keys) === J(["controls", "entry", "id", "layer", "note", "register"]) && Object.isFrozen(arm) && arm.id === "plain14-954" && arm.layer === "flying" && J(arm.controls) === '["autopilot"]' && Object.isFrozen(arm.controls) && /954 weights/.test(arm.note) && /no wiring, no state/.test(arm.note) && /no connectome/.test(arm.note));
+    ok("!! the arm is { id, layer, controls, note, entry, register } and frozen: id plain14-954, layer flying, controls [autopilot] (frozen), a note naming the 954 weights, no wiring and no state", J(keys) === J(["controls", "entry", "id", "layer", "note", "register"]) && Object.isFrozen(arm) && arm.id === "plain14-954" && arm.layer === "flying" && J(arm.controls) === '["autopilot"]' && Object.isFrozen(arm.controls) && /954 weights/.test(arm.note) && /no wiring, no state/.test(arm.note) && /no connectome/.test(arm.note) && arm.note === "the plain control of the 963-weight networks (954 weights, 50 relu units, no wiring, no state): the PD autopilot's laws plus a learned residual through a net with no connectome in it");
     const e1 = arm.entry("sb-1"), e2 = arm.entry();
     ok("!! entry() is the tank entry { pilot: plain14, circuit: plain14, weights: the 954 }, a fresh array each call, no key that would override the board's own fields (id, name, hue, from, local, theta)", J(Object.keys(e1).sort()) === '["circuit","pilot","weights"]' && e1.circuit === "plain14" && e1.weights.length === 954 && e1.weights !== e2.weights && (e1.weights[0] = 99, arm.entry().weights[0] === W[0]));
     const calls = [], fake = { registerPilotKind: (c, kk) => { calls.push([c, kk]); return { seated: 2 }; } }, ret = arm.register(fake);

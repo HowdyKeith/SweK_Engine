@@ -11,6 +11,7 @@
 //   6 THE COMMAND  run as a program it prints the two report lines and exits 0; imported it prints nothing (the gate is registered to see an exit on import).
 // SABOTAGED: see the log at the foot of this header.
 // NOT CHECKED, said plainly: that a trained plain net is any good (tools/ship/trainSubPilot.mjs --circuit plain14 makes and grades one); that 954 is the right size for a control of the 963 (it is the nearest whole hidden layer: 50 units give 954, 51 give 973).
+// SABOTAGE (2026-11-05, 41 mutants of brain/pilotSubPlain.mjs: 27 mechanical single-site and 14 by hand, each run alone in a scratch tree): 40 red BY NAME, 1 survivor, equivalent: `||` for `&&` in the main guard (`typeof process !== "undefined" && Array.isArray(process.argv)`): under Node both clauses are true, so the two operators agree; the second clause only matters in a host that has a `process` without an argv, which this gate cannot be run in.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
