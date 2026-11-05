@@ -11,7 +11,7 @@ import path from "node:path";
 import http from "node:http";
 import { spawn, execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import * as W from "./angularImpulseWatch.mjs";
 import * as H from "./angularImpulseHook.mjs";
 import { buildGraph } from "../ship/affected.mjs";
@@ -85,7 +85,7 @@ export function runHooked(script, { args = [], run = script, limitMs = LIMIT_MS,
     const out = dir || fs.mkdtempSync(path.join(os.tmpdir(), "angcensus-"));
     const t0 = Date.now();
     return new Promise((resolve) => {
-        const opts = [process.env.NODE_OPTIONS || "", `--import ${H.HOOK_PATH}`].filter(Boolean).join(" ");
+        const opts = [process.env.NODE_OPTIONS || "", `--import ${pathToFileURL(H.HOOK_PATH).href}`].filter(Boolean).join(" ");
         const child = spawn(process.execPath, [script, ...args], { cwd: root, detached: true, stdio: ["ignore", "pipe", "pipe"],
             env: { ...process.env, ...env, NODE_OPTIONS: opts, [H.ENV_DIR]: out, [H.ENV_RUN]: run } });
         let tail = "", timedOut = false;
@@ -168,10 +168,10 @@ export async function runCorpusP(pages = PAGES, { root = ENG, extra = {} } = {})
 
 // ---- the controls ---------------------------------------------------------------------------------------------------------------
 /** A script for node's `-e`: the facade adopted in node, then `body`. Every probe's output is one JSON line. */
-const PROBE_HEAD = `import { adoptBox3dInNode } from ${J(path.join(ENG, "physics", "backendNode.mjs"))};\nimport { box3d } from ${J(path.join(ENG, "physics", "box3d", "box3dLoader.js"))};\nawait adoptBox3dInNode();\n`;
+const PROBE_HEAD = `import { adoptBox3dInNode } from ${J(pathToFileURL(path.join(ENG, "physics", "backendNode.mjs")).href)};\nimport { box3d } from ${J(pathToFileURL(path.join(ENG, "physics", "box3d", "box3dLoader.js")).href)};\nawait adoptBox3dInNode();\n`;
 function probe(body, { hooked = true, root = ENG } = {}) {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "angprobe-"));
-    const env = { ...process.env, NODE_OPTIONS: [process.env.NODE_OPTIONS || "", hooked ? `--import ${H.HOOK_PATH}` : ""].filter(Boolean).join(" "), [H.ENV_DIR]: hooked ? dir : "", [H.ENV_RUN]: "probe" };
+    const env = { ...process.env, NODE_OPTIONS: [process.env.NODE_OPTIONS || "", hooked ? `--import ${pathToFileURL(H.HOOK_PATH).href}` : ""].filter(Boolean).join(" "), [H.ENV_DIR]: hooked ? dir : "", [H.ENV_RUN]: "probe" };
     if (!hooked) delete env[H.ENV_DIR];
     try {
         const text = execFileSync(process.execPath, ["--input-type=module", "-e", PROBE_HEAD + body], { cwd: root, env, encoding: "utf8", maxBuffer: 1 << 26 });
@@ -181,7 +181,7 @@ function probe(body, { hooked = true, root = ENG } = {}) {
 }
 /** C-transparent: backendDivergence's scene, 14 boxes for 120 steps, gives the same state hash at every step hooked and unhooked. */
 export function cTransparent() {
-    const body = `import { buildScene, harnessHash } from ${J(path.join(ENG, "physics", "backendDivergence.mjs"))};\n` +
+    const body = `import { buildScene, harnessHash } from ${J(pathToFileURL(path.join(ENG, "physics", "backendDivergence.mjs")).href)};\n` +
         `const w = box3d.createWorld({ gravity: [0, -9.8, 0] }), idx = buildScene(w), h = [];\nfor (let t = 0; t < 120; t++) { w.step(1 / 60, 2); h.push([w.stateHash(), harnessHash(w, idx)]); }\nconsole.log(JSON.stringify({ h }));`;
     const a = probe(body, { hooked: true }), b = probe(body, { hooked: false });
     const steps = a.out.h.length, same = J(a.out.h) === J(b.out.h);
@@ -208,7 +208,7 @@ export function cReads() {
     const fly = (spin) => `{ const w = box3d.createWorld({ gravity: [0, -9.8, 0] });${spin}\n  D.addGround(w, { ...sc.ground });\n` +
         `  const bodies = D.makePhysicsDebris(w, L.fragmentsOf(sc, 1), [...sc.impact], { force: sc.force, rng: L.rng(201), maxSpin: Infinity });\n` +
         `  const A = w.readAngularVelocities(), top = Math.max(...bodies.map((b) => Math.hypot(A[b.idx * 3], A[b.idx * 3 + 1], A[b.idx * 3 + 2]))); w.destroy(); return { n: bodies.length, top }; }`;
-    const debris = probe(`import * as D from ${J(path.join(ENG, "fx", "fracture", "debrisPhysics.js"))};\nimport * as L from ${J(path.join(ENG, "tools", "roundhouse", "joltScenes.mjs"))};\nconst sc = L.DEBRIS[0];\n` +
+    const debris = probe(`import * as D from ${J(pathToFileURL(path.join(ENG, "fx", "fracture", "debrisPhysics.js")).href)};\nimport * as L from ${J(pathToFileURL(path.join(ENG, "tools", "roundhouse", "joltScenes.mjs")).href)};\nconst sc = L.DEBRIS[0];\n` +
         `const facade = (() => ${fly("")})();\n` +
         `const raw = (() => ${fly(" w.angularImpulse = (i, v) => w._m._swk_body_ang_impulse(i, v[0], v[1], v[2]);")})();\n` +
         `console.log(JSON.stringify({ n: facade.n, top: raw.top, facadeTop: facade.top, rawN: raw.n }));`);
@@ -229,7 +229,7 @@ export async function cJolt() {
 }
 /** C-site: calls made from known lines are put to them -- through the facade, through the slug ticker's raw world, and through the kaiju's angularImpulse(rec, v). */
 export function cSite() {
-    const body = `import { worldFromModule } from ${J(path.join(ENG, "render", "slugTicker.mjs"))};\nimport { createKaijuBox3D } from ${J(path.join(ENG, "physics", "kaijuBox3d.js"))};\n` +
+    const body = `import { worldFromModule } from ${J(pathToFileURL(path.join(ENG, "render", "slugTicker.mjs")).href)};\nimport { createKaijuBox3D } from ${J(pathToFileURL(path.join(ENG, "physics", "kaijuBox3d.js")).href)};\n` +
         `const w = box3d.createWorld({ gravity: [0, 0, 0] }), b = w.addBox({ type: "dynamic", pos: [0, 0, 0], half: [0.5, 0.5, 0.5] });\n` +
         `w.angularImpulse(b, [0, 0, 0.01]);\n` +                                                   // line 7 of the probe: the facade
         `const k = createKaijuBox3D(w), rec = k.addDynamic({ pos: [3, 0, 0] }); k.angularImpulse(rec, [0, 0, 0.01]);\n` +   // line 8: the kaiju's pass-through

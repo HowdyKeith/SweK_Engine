@@ -92,7 +92,7 @@ import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import * as C from "./angularImpulseCensus.mjs";
 import * as H from "./angularImpulseHook.mjs";
 import * as W from "./angularImpulseWatch.mjs";
@@ -110,7 +110,7 @@ const atReg = (f) => execFileSync("git", ["show", `${REG_COMMIT}:./${f}`], { cwd
 const lineOf = (site) => +site.replace(/^.*:/, "");
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), "angcensus-gate-"));
 const script = (name, text) => { const f = path.join(TMP, name); fs.writeFileSync(f, text); return f; };
-const BACKEND = J(path.join(ENG, "physics", "backendNode.mjs")), LOADER = J(path.join(ENG, "physics", "box3d", "box3dLoader.js")), NODEMOD = J(path.join(ENG, "physics", "box3d", "box3dNode.mjs"));
+const BACKEND = J(pathToFileURL(path.join(ENG, "physics", "backendNode.mjs")).href), LOADER = J(pathToFileURL(path.join(ENG, "physics", "box3d", "box3dLoader.js")).href), NODEMOD = J(pathToFileURL(path.join(ENG, "physics", "box3d", "box3dNode.mjs")).href);
 const PELVIS = { half: [0.34, 0.2, 0.2], impulse: [0, 0, 3], spin: 531.6232299804688 };   // a lone box of ragdoll.html's pelvis, as the note measured it
 
 console.log("angularImpulseCensus-selfcheck -- who spins a body past Jolt's cap on box3d: the census's parts, never its run\n");

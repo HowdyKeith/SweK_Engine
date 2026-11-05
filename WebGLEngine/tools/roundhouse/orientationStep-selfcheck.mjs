@@ -282,7 +282,7 @@ try {
     ok("!! setOrientationDefault() makes no option mean the step it names here, carries it as SWEK_6DOF_ORIENTATION, and hands back what it meant: a fresh copy of the module reads 'euler' from it, a copy with nothing carried reads RK4, and an unknown step is refused",
         was === "rk4" && here === "euler" && carriedNow === "euler" && f1 === "euler" && f2 === "rk4" && back === "euler" && RB.orientationDefault() === "rk4" && /"rk2" is neither/.test(refused),
         `${was} -> ${here}, carried ${carriedNow}, fresh copies ${f1} and ${f2}, back to ${RB.orientationDefault()}`);
-    const before = RB.orientationDefault(); await import(eulerUrl + "?fresh=1"); const flown = RB.orientationDefault(); RB.setOrientationDefault(before); unset();
+    const before = RB.orientationDefault(); await import(pathToFileURL(path.join(ENG, "physics", "mechanics", "rigidBody6dofEuler.mjs")).href + "?fresh=1"); const flown = RB.orientationDefault(); RB.setOrientationDefault(before); unset();
     ok("!! importing physics/mechanics/rigidBody6dofEuler.mjs flies the first-order step: a fresh copy of it, imported here, makes no option mean 'euler' (and the gate puts RK4 back)",
         before === "rk4" && flown === "euler" && RB.orientationDefault() === "rk4");
     // the census: who imports the module, and where

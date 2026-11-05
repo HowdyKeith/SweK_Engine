@@ -21,7 +21,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { EventEmitter } from "node:events";
 import { Readable } from "node:stream";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { createRequire } from "node:module";
 
 const require_ = createRequire(import.meta.url);
@@ -188,7 +188,7 @@ const restore = () => {};
     ok("...launch is passed `confirm` only as the literal true from the body, nothing else from the request reaches a command", /confirm: d\.confirm === true/.test(routeBlock));
     const panel = fs.readFileSync(path.join(ENG, "ui", "appInstallPanel.js"), "utf8");
     for (const f of ["nectarlink.html", "duodesk.html"]) { const h = fs.readFileSync(path.join(ENG, f), "utf8"); ok(f + " mounts the panel for its own app id and keeps the plain download links", new RegExp('mountAppInstall\\(.*"' + f.replace(".html", "") + '"\\)').test(h) && /releases\/download/.test(h) && /not code-signed|unsigned/i.test(h)); }
-    const { describePanel } = await import(path.join(ENG, "ui", "appInstallPanel.js"));
+    const { describePanel } = await import(pathToFileURL(path.join(ENG, "ui", "appInstallPanel.js")).href);
     const st = (o) => ({ ok: true, local: true, host: { platform: "linux", arch: "x64" }, job: null, apps: [{ id: "duodesk", name: "DuoDesk", version: "2.5.0", recommended: "a.AppImage", assets: [{ name: "a.AppImage", kind: "appimage", platform: "linux", arch: "x64", bytes: 5e6, sha256: "0".repeat(64), staged: false }, { name: "b.deb", kind: "deb", platform: "linux", arch: "x64", bytes: 5e6, sha256: "1".repeat(64), staged: false }] }], ...o });
     ok("panel: local host, nothing staged -> can download, cannot run", (() => { const p = describePanel(st(), "duodesk"); return p.canDownload && !p.canRun; })());
     ok("!! panel: a REMOTE session gets neither button", (() => { const p = describePanel(st({ local: false }), "duodesk"); return !p.canDownload && !p.canRun && p.local === false; })());
