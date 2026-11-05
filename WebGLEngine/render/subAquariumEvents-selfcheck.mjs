@@ -1,6 +1,7 @@
 // WebGLEngine/render/subAquariumEvents-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node render/subAquariumEvents-selfcheck.mjs      (~25 s)
+// Run: node render/subAquariumEvents-selfcheck.mjs      (~0.7-25 s)
+//   (a RANGE on purpose: 0.7 s is what the per-box rings of the two older sandboxes hold, measured before section 14 (the survey) was added; 22 s is this box now, 40 s the rig. Those rings cannot be re-timed from here.)
 //
 // A SUB IN THE TANK CAN BE FLOODED OR TOLD TO SURFACE. render/subAquariumSim.mjs gained setEvent(id, "flood" | "sink" | "surface" | null) in v4901; this gate holds it:
 //   1  OFF BY DEFAULT   a tank where setEvent was never called, and one where it was called and undone before the first tick, swim to the bit; no event means `event` and `tank` are null in the snapshot
