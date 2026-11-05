@@ -4,7 +4,7 @@
 //
 //   output  =  the PD autopilot's laws (brain/autopilotSub.mjs, on the same 14 features)  +  a RESIDUAL read from the net, all four clamped to [-1, 1]; the output layer and its biases start at ZERO, so the pilot STARTS AS THE AUTOPILOT, exactly
 //   input   the SAME four tilt signals the circuit's afferents are driven by (brain/pilotSubVestibular.mjs sense(): pTonic, rTonic, pPhasic, rPhasic), each times its unit-RMS scale -- the circuit sees them only through sin(theta) P + cos(theta) R, a linear mix the first layer can represent
-//   net     `widths` hidden layers of relu units, no state, no leak: a pilot reads the present tick only (the comparison is with the circuit's NO STATE pilots). Weights, in this order, layer by layer: [ W (nOut x nIn, row per output unit), b (nOut) ]
+//   net     `widths` hidden layers of relu units (or, with opts.activation "tanh", of tanh units: the plain-net variants, brain/PLAIN_NET_VARIANTS_WIP.md), no state, no leak: a pilot reads the present tick only (the comparison is with the circuit's NO STATE pilots). Weights, in this order, layer by layer: [ W (nOut x nIn, row per output unit), b (nOut) ]
 //   mirror  a MIRRORED PAIR with the SAME (tied) weights: the left copy's two roll signals (rTonic, rPhasic) are sign-flipped; the residuals are summed with yaw odd (the left copy's yaw negated), pitch, thrust and ballast even -- decode() of the 4b pilot, exactly
 //   shapes  MN  one hidden layer of H = matchedHidden(the circuit's NO STATE weight count) units: 9H + 4 weights (65 -> 589, 72 -> 652, 9 -> 85)       MG  the GPU Brain's width and depth, 4 -> 32 -> 32 -> 4: 1,348 weights
 //   start   hidden layer 1 ~ N(0, 0.5), hidden layer 2 ~ N(0, 0.25), biases 0, output layer 0; the draw is seeded (`opts.seed`, default 4711) with brain/pilotSubPolicy.mjs's mulberry
@@ -22,6 +22,8 @@ export { FEATURES, OUTPUTS };
 export const SIGNALS = V.SENSES.length;
 export const INIT = Object.freeze({ seed: 4711, layer1: 0.5, layer2: 0.25 });
 export const MG_WIDTHS = Object.freeze([32, 32]);
+export const ACTIVATIONS = Object.freeze(["relu", "tanh"]);
+const checkActivation = (a) => { if (!ACTIVATIONS.includes(a)) throw new Error(`pilotSubPlainNet: the activation is one of ${ACTIVATIONS.join(", ")}, got ${JSON.stringify(a)}`); return a; };
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 const fin = (v) => (Number.isFinite(v) ? v : 0);
 const gauss = (rng) => { let u = 0, v = 0; while (!u) u = rng(); while (!v) v = rng(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
@@ -37,14 +39,15 @@ export function layoutOf(widths) {
 /** The largest single hidden layer whose weights (SIGNALS H + H + OUTPUTS H + OUTPUTS) do not pass `count`; 0 when even one unit passes it. */
 export const matchedHidden = (count) => Math.max(0, Math.floor((count - OUTPUTS) / (SIGNALS + 1 + OUTPUTS)));
 
-/** A forward pass of the net `layers` with buffers of its own: (w, x, dest) -> dest, the OUTPUTS numbers; x holds SIGNALS numbers. */
-export function makeForward(layers) {
+/** A forward pass of the net `layers` with buffers of its own: (w, x, dest) -> dest, the OUTPUTS numbers; x holds SIGNALS numbers. `activation` is the hidden layers' ("relu", the default, or "tanh"); the output layer has none. */
+export function makeForward(layers, activation = "relu") {
+    const tanh = checkActivation(activation) === "tanh";
     const bufs = layers.map((l) => new Float64Array(l.nOut));
     return (w, x, dest) => {
         let a = x;
         for (let l = 0; l < layers.length; l++) {
             const { nIn, nOut, offW, offB, relu } = layers[l], o = bufs[l];
-            for (let j = 0; j < nOut; j++) { let s = w[offB + j]; const row = offW + j * nIn; for (let i = 0; i < nIn; i++) s += w[row + i] * a[i]; o[j] = relu && !(s > 0) ? 0 : s; }
+            for (let j = 0; j < nOut; j++) { let s = w[offB + j]; const row = offW + j * nIn; for (let i = 0; i < nIn; i++) s += w[row + i] * a[i]; o[j] = relu ? (tanh ? Math.tanh(s) : s > 0 ? s : 0) : s; }
             a = o;
         }
         for (let j = 0; j < OUTPUTS; j++) dest[j] = a[j];
@@ -53,10 +56,10 @@ export function makeForward(layers) {
 }
 
 /**
- * The whole pilot for one net shape. `widths` the hidden layer widths ([H] for MN, MG_WIDTHS for MG). `opts`: { seed (the start draw, default INIT.seed), scales (default all 1), evaluate (pilot, set, opts) -> result, the task to train on; default brain/subTask.mjs's }.
+ * The whole pilot for one net shape. `widths` the hidden layer widths ([H] for MN, MG_WIDTHS for MG). `opts`: { seed (the start draw, default INIT.seed), scales (default all 1), evaluate (pilot, set, opts) -> result, the task to train on; default brain/subTask.mjs's, activation ("relu" by default, or "tanh") }.
  */
 export function createPlainNetPolicy(widths, name = "plainnet", opts = {}, init = INIT) {
-    const lay = layoutOf(widths), L = lay.layers, WEIGHT_COUNT = lay.count, run = opts.evaluate || T.evaluate, seed = opts.seed === undefined ? init.seed : opts.seed;
+    const activation = checkActivation(opts.activation === undefined ? "relu" : opts.activation), lay = layoutOf(widths), L = lay.layers, WEIGHT_COUNT = lay.count, run = opts.evaluate || T.evaluate, seed = opts.seed === undefined ? init.seed : opts.seed;
     const scales = { pTonic: 1, rTonic: 1, pPhasic: 1, rPhasic: 1, ...(opts.scales || {}) }, K = AS.AUTOPILOT_SUB;
     const law = (x) => [0.3 * K.kTheta * x[2] - 0.2 * K.kQ * x[3], Math.PI * K.kHdg * x[4] - 0.2 * K.kR * x[5] - 0.2 * K.kBeta * x[6], x[1] + K.kSpd * x[7], 10 * K.kBalD * x[8] + 0.5 * K.kBalV * x[9]];
     const zeroWeights = () => new Float32Array(WEIGHT_COUNT);
@@ -67,7 +70,7 @@ export function createPlainNetPolicy(widths, name = "plainnet", opts = {}, init 
     }
     /** A pilot (state, target, current) -> controls from weights. */
     const pilotFor = (w) => {
-        const forward = makeForward(L), xr = new Float64Array(SIGNALS), xl = new Float64Array(SIGNALS), r = new Float64Array(OUTPUTS), l = new Float64Array(OUTPUTS);
+        const forward = makeForward(L, activation), xr = new Float64Array(SIGNALS), xl = new Float64Array(SIGNALS), r = new Float64Array(OUTPUTS), l = new Float64Array(OUTPUTS);
         return (state, tgt, current = [0, 0, 0]) => {
             const x = features(state, tgt, current), s = V.sense(state), base = law(x);
             xr[0] = s.pTonic * scales.pTonic; xr[1] = s.rTonic * scales.rTonic; xr[2] = s.pPhasic * scales.pPhasic; xr[3] = s.rPhasic * scales.rPhasic;
@@ -84,6 +87,6 @@ export function createPlainNetPolicy(widths, name = "plainnet", opts = {}, init 
         return o;
     }
     const cells = widths.reduce((s, n) => s + n, 0), reach = { pairs: L[0].nIn * L[0].nOut };
-    const reportLines = () => [`[pilotSubPlainNet] ${name} (${widths.join("-")} relu units) as a NO-STATE mirrored pair: the ${SIGNALS} tilt signals -> net -> ${OUTPUTS} controls added to the autopilot's, ${WEIGHT_COUNT} trained weights`];
-    return { name, FEATURES, OUTPUTS, WEIGHT_COUNT, INPUTS: SIGNALS, CELLS: cells, persist: false, LAMBDA_INDEX: -1, widths: [...widths], zeroWeights, handWeights, pilotFor, mutate, evaluate, reportLines, reach, scales };
+    const reportLines = () => [`[pilotSubPlainNet] ${name} (${widths.join("-")} ${activation} units) as a NO-STATE mirrored pair: the ${SIGNALS} tilt signals -> net -> ${OUTPUTS} controls added to the autopilot's, ${WEIGHT_COUNT} trained weights`];
+    return { name, FEATURES, OUTPUTS, WEIGHT_COUNT, INPUTS: SIGNALS, CELLS: cells, persist: false, LAMBDA_INDEX: -1, widths: [...widths], activation, zeroWeights, handWeights, pilotFor, mutate, evaluate, reportLines, reach, scales };
 }
