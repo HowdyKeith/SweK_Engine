@@ -398,6 +398,12 @@ export const RECORD_HANDOVERS = Object.freeze([
         decidedBy: "Keith",
         evidence: "boxId() reads linux-x64-4c-16gb-46f962 at v4912 (this session's container, after the 2026-11-05 resume); the shared record still names 420793. The round's rotation (31 readings) and first verdict's sweep went to " +
                   "sweep-timings.local.json and refused the shared record; that local file and its ledger are deleted at the handover, as at v4818, v4838, v4850, v4880 and v4897. 420793 held the record from v4897 to v4912." }),
+    // v4912 (later, same round) -- AND BACK: the worker restarted on 2026-11-05 and the container came up as 420793 again, so the record that had just followed the sandbox to 46f962 named a box that no longer existed. Verdict 4 went DO NOT SHIP on
+    // sweepCoverage and timingRecords for that reason alone (the box could not rewrite the record). Keith decided it in the session ("Yes, hand it over") when asked.
+    Object.freeze({ at: "v4912", from: "linux-x64-4c-16gb-46f962", to: "linux-x64-4c-16gb-420793",
+        decidedBy: "Keith",
+        evidence: "boxId() reads linux-x64-4c-16gb-420793 after the worker restart of 2026-11-05 (uptime 34 min at the first reading); the shared record names 46f962, the container this round's rotation and verdicts 1-3 ran on. " +
+                  "Verdict 4's sweep wrote sweep-timings.local.json and refused the shared record ('the record belongs to 46f962')." }),
 ]);
 
 /** The box that may write a record whose `host` reads `host`, after following every handover. */
