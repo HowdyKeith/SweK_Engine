@@ -164,7 +164,7 @@ const restore = () => {};
     ok("!! a .deb is NEVER executed: the sudo command is returned for the user to run", r.ok && r.launched === false && /sudo apt install/.test(r.note) && calls.length === 0);
     const ai = mk("appimage"), aiB = Buffer.from("ai".repeat(800)); pin(ai, aiB); stageFake(ai, aiB);
     r = await L.launch("duodesk", ai.name, { confirm: true });
-    ok("an AppImage is marked executable and run directly", r.ok && (fs.statSync(path.join(stage, "duodesk", ai.name)).mode & 0o111) !== 0 && calls.at(-1).cmd.endsWith(ai.name));
+    ok("an AppImage is marked executable and run directly", r.ok && (process.platform === "win32" /* Windows has no execute bit: statSync().mode never carries 0o111 there, so the chmod is only graded where it exists */ || (fs.statSync(path.join(stage, "duodesk", ai.name)).mode & 0o111) !== 0) && calls.at(-1).cmd.endsWith(ai.name));
 
     const apk = mk("apk"), apkB = Buffer.from("apk".repeat(600)); pin(apk, apkB); stageFake(apk, apkB);
     calls.length = 0; r = await L.launch("duodesk", apk.name, { confirm: true });

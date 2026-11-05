@@ -287,14 +287,14 @@ guard(9, () => { if (!want(9)) return;
     console.log("\n9  THE LOADER, THE REPORT AND THE COMMAND");
     const specs = { one: { held: "h1", out: "brain/one.jsonl" }, two: { held: "h2", out: "brain/two.jsonl" } };
     const files = { "/r/brain/one.jsonl": ['{"arm":"exact","reached":true,"kind":"hard-islands"}', "", '{"arm":"inc@W","reached":false}', '{"arm":"inc@W","reached":true}', "  "].join("\n"), "/r/brain/two.jsonl": '{"arm":"exact","reached":true}\n' };
-    const seen = []; const l = P.loadRows(specs, "/r", (p) => { seen.push(p); return files[p]; });
+    const seen = []; const l = P.loadRows(specs, "/r", (p) => { p = p.replace(/\\/g, "/"); seen.push(p); return files[p]; });
     ok("loadRows reads each spec's `out` under the root, in spec order, skips blank lines, and keeps { set, arm, reached } only", same(seen, ["/r/brain/one.jsonl", "/r/brain/two.jsonl"]) && same(l.sets, ["h1", "h2"]) && l.rows.length === 4 && same(l.rows[1], { set: "h1", arm: "inc@W", reached: false }) && same(l.rows[3], { set: "h2", arm: "exact", reached: true }) && !("kind" in l.rows[0]));
     // a whole fixture through run(): three sets, inc and e30 under W; every number below was computed apart, by hand, in Python's statistics module
     const defs = { inc: sp([1, 1], FORGET), e30: sp([1, 1], EV30) };
     const mkset = (set, kinc, ke30) => [...flights({ exact: { [set]: 170 }, "long+fix+forget": { [set]: 165 }, "inc@W": { [set]: kinc }, "e30@W": { [set]: ke30 } })].map((r) => JSON.stringify(r)).join("\n");
     const specs3 = { a: { held: "s1", out: "a.jsonl" }, b: { held: "s2", out: "b.jsonl" }, c: { held: "s3", out: "c.jsonl" } };
     const fx = { "/x/a.jsonl": mkset("s1", 100, 106), "/x/b.jsonl": mkset("s2", 110, 116), "/x/c.jsonl": mkset("s3", 90, 97) };
-    const res = P.run({ defs, specs: specs3, root: "/x", read: (p) => fx[p] });
+    const res = P.run({ defs, specs: specs3, root: "/x", read: (p) => fx[p.replace(/\\/g, "/")] });
     ok("run() on a three-set fixture: 3 sets, two arms in the noise table, one F8 row with effects 6 6 7 (mean 19/3), eight predictions", res.sets.length === 3 && res.noise.arms.length === 2 && res.rows.length === 1 && same(res.rows[0].effects, [6, 6, 7]) && near(res.rows[0].mean, 19 / 3) && res.preds.length === 8);
     const EXPECT = [
         "POOLED READING (follow-up 59): 3 sets (s1 to s3), the flights already in the repository; no flight was made",
