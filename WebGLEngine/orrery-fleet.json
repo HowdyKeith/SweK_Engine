@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "139922d8747ac469dc302d092da82480c0d55f10",
+ "head": "abf46b65e45d70cc16d01c06a3e29a250dcceead",
  "bodies": {
   "box3d": [
    {
@@ -27,7 +27,7 @@
    {
     "path": "physics/box3d/box3dLoader.js",
     "bytes": 34630,
-    "sha": "8b7fec4bc5803441aa2e7e333bdba1356c664e8d"
+    "sha": "abf46b65e45d70cc16d01c06a3e29a250dcceead"
    },
    {
     "path": "physics/box3d/box3dNode.mjs",
@@ -92,7 +92,7 @@
    {
     "path": "tools/roundhouse/angularImpulseCensus-selfcheck.mjs",
     "bytes": 72576,
-    "sha": "139922d8747ac469dc302d092da82480c0d55f10"
+    "sha": "abf46b65e45d70cc16d01c06a3e29a250dcceead"
    },
    {
     "path": "tools/roundhouse/angularImpulseCensus.mjs",

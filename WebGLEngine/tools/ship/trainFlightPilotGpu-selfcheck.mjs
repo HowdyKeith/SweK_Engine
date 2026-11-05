@@ -38,6 +38,7 @@
 //   the first, the timeout the second -- the same species as the hung gate of v4869, read from the partial output) | Q4 an empty or missing --brain value taken as the fruit fly 0 RED THE FIRST TIME: in the one-pass loop a missing value throws before the brain is
 //   read, so the branch the sabotage changed was reachable only by --brain "" -- which no row asked; the row now asks, and it goes red 1 | Q5 an unknown brain accepted 1 | Q6 the unknown-option refusal dropped 1.
 "use strict";
+import "../../physics/mechanics/rigidBody6dofEuler.mjs";   // 2026-11-05 -- the 6-DOF numbers this gate holds were measured under the first-order orientation step, so it flies that step (see that file); RK4's default (42845879) turned it red and missed it
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";

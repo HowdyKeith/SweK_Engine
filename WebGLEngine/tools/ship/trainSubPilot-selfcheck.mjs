@@ -25,6 +25,7 @@
 //   they are now only in seeds 1000 and over), and the three child-process rows compared a search that ended at the autopilot's weights (two iterations on a seventh of the dives: 6 moved, 0 kept), which cannot tell search 0 from nothing -- four
 //   iterations keep two weights, and the rows assert that search 0 and search 1 differ.
 "use strict";
+import "../../physics/mechanics/rigidBody6dofEuler.mjs";   // 2026-11-05 -- the 6-DOF numbers this gate holds were measured under the first-order orientation step, so it flies that step (see that file); RK4's default (42845879) turned it red and missed it
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";

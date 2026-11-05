@@ -305,3 +305,25 @@ orientation by RK4 when it is given no `orientation`, and "euler" is still the f
   the first-order module and who imports it, and the craft families under both steps. Sabotaged with the byte-safe
   runner: 12 designs (D1 to D10b), against that gate and the gates the default reaches, each red by name; the counts
   are in the gate's header.
+
+### Eight gates the measurement missed (2026-11-05)
+
+Eight gates holding first-order numbers were not among the 36, and RK4's default turned them red at 42845879:
+
+- `brain/pilotFlightTrain`, the fruit fly's trainer;
+- `tools/ship/trainFlightPilotGpu`, `trainDronePilot` and `trainSubPilot`, the flight, drone and sub trainers' shipped pilots;
+- `tools/ship/trainDogfightPilotShipped` and `tournamentDogfightShipped`, the dogfight's;
+- `tools/ship/dogfightPage` and `render/subDropoutView`, two pages.
+
+Every one was green at c2ce4537, the commit before the default, red at 42845879 on the very rows red since, and green under
+the first-order step. For two days they were reported as standing reds that did not come from this work. They did. The sub
+pilot's audit, for one, reads -0.3236 under the first-order step, as its record says, and -0.3232 under RK4.
+
+- **The fix.** Each now imports the first-order module first.
+  - `dogfightPage`'s page script imports it first in the browser, as the battleship and 6-DOF page gates do.
+  - `subDropoutView` opens `sub-aquarium.html` itself, so it sets the step in sessionStorage before any of the page's
+    scripts runs.
+  - `tools/ship/trainSubPilot-selfcheck.mjs` is in the other chat's area. It was changed at Keith's word ("Fix them"),
+    one line.
+- **Gated.** The register in section 7 of `tools/roundhouse/orientationStep-selfcheck.mjs` now counts 44 and names the eight.
+- **Sabotaged.** E1 to E6: each import dropped or moved, and a page's step dropped or set to RK4. Each went red by name.
