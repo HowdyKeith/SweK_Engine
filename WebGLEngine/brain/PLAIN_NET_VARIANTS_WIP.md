@@ -53,3 +53,22 @@ The first round's plain net was not special, so: **(a) HOLDS about 55 percent.**
 ## 7. Not checked, said now
 
 Whether the reading would change with a net of a different depth, a different optimizer or a different loss; whether MC and MT are the right two variants (cell-matching to the circuit's cell count and tanh are the two the first round named); whether the first round's MN draws (init seeds 4711 + ordinal) share anything with these (they do not: 4811 + ordinal and a different ordinal); the larval fish.
+
+## 8. BUILT 2026-11-05 (the registration above is unchanged): the library, the command, the smoke run, the rig command. NOTHING IS TRAINED.
+
+**What was built.** `brain/pilotSubPlainNet.mjs` takes `opts.activation` ("relu" by default, "tanh"), validated when the policy is made (gate rows, 33 mutants: 28 red, 3 threw, 2 equivalent, logged in its header). `tools/ship/plainNetVariants.mjs` (the 64 jobs, the ordinals and seeds of section 2, one pilot's training on the first round's sets, the checks of section 4, the reading, the command), `tools/ship/plainNetVariantsCmd.mjs`, `tools/ship/plainNetVariants-selfcheck.mjs` (the gate, a few seconds; mutation passes logged in its header). One fact the gate reads from the data and the registration only asserted: the extraction's arms have 42 (B), 47 (whole) and 5 (E) central cells, which is what MC's widths are. The gate also checks that no search seed here is one the first round or rung 4b's addenda used.
+
+**One thing found while gating, not a change of rule:** the report printed `NaN percent` for the share kept when a pilot's score was not a number; it now prints `n/a`, as it does where REAL's own gain is too small.
+
+**The smoke run** (six pilots, one search of three iterations on every eighth dive, four real worker processes, 6.5 s): `node tools/ship/plainNetVariantsCmd.mjs run --specs "P/B/mc:0,P/B/mt:0,P/whole/mc:0,E/E/mc:0,E/E/mt:0,E/whole/mt:0" --out <throwaway> --smoke --runs 1 --iters 3 --prune-budget 3 --workers 4 --quiet`. All three checks passed (the first round's file, the start check on six pilots, the registered sizes), every cell read INCOMPLETE, and the verdict read NOT EXTENDED (both families NOT ASSESSED), as it must with six pilots of 64.
+
+**The cost.** The first round's measured full-size pilots took at most 5.5 to 14.1 core-minutes for an MN pilot (E/E to P/B) and 5.27 core-hours for its 32 MN pilots. The 64 variant pilots are the same size or smaller (MC's nets are between 5/9 and 2/3 of MN's width in every cell; MT is MN's width), so **at most about 10.5 core-hours: about 2.7 hours on 4 workers, 1.4 hours on 8.** An upper bound from the first round's timings, not a new measurement.
+
+**The command for the rig (not run).** A stopped run resumes from the file; one pilot is one process; a file of another recipe or a smoke run is refused.
+
+```
+node tools/ship/plainNetVariantsCmd.mjs run --specs all --out brain/plainNetVariants.jsonl --workers 8
+node tools/ship/plainNetVariantsCmd.mjs report --in brain/plainNetVariants.jsonl
+```
+
+Read the three CHECK lines first; a failed check is the first line of the report and the verdicts are then NOT READ. The verdict line is one of the three of section 4: HOLDS ACROSS THESE VARIANTS, BREAKS FOR MC / MT / MC AND MT, or NOT EXTENDED with the clause that stopped it. The results file belongs in `brain/rig-results/` once read (the first round's did).
