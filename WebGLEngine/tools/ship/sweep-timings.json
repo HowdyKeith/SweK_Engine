@@ -2293,7 +2293,7 @@
   "render/seaOgre3d-selfcheck.mjs": 2314,
   "render/seaOgreView-selfcheck.mjs": 2170,
   "render/seaPicker-selfcheck.mjs": 5893,
-  "render/subAquariumEvents-selfcheck.mjs": 1611,
+  "render/subAquariumEvents-selfcheck.mjs": 22430,
   "render/subBallastCues-selfcheck.mjs": 4875,
   "render/subDropoutScene-selfcheck.mjs": 3259,
   "render/subDropoutView-selfcheck.mjs": 9362,
@@ -6661,7 +6661,7 @@
   "render/seaOgre3d-selfcheck.mjs": "2026-10-28T03:29:10.738Z",
   "render/seaOgreView-selfcheck.mjs": "2026-10-28T03:29:10.738Z",
   "render/seaPicker-selfcheck.mjs": "2026-10-27T03:46:04.221Z",
-  "render/subAquariumEvents-selfcheck.mjs": "2026-10-28T03:29:10.738Z",
+  "render/subAquariumEvents-selfcheck.mjs": "2026-11-05T14:27:39.400Z",
   "render/subBallastCues-selfcheck.mjs": "2026-10-27T03:46:04.221Z",
   "render/subDropoutScene-selfcheck.mjs": "2026-10-27T16:36:44.572Z",
   "render/subDropoutView-selfcheck.mjs": "2026-10-27T03:46:04.221Z",
@@ -8820,7 +8820,7 @@
   "render/seaOgre3d-selfcheck.mjs": 20000,
   "render/seaOgreView-selfcheck.mjs": 20000,
   "render/seaPicker-selfcheck.mjs": 20000,
-  "render/subAquariumEvents-selfcheck.mjs": 20000,
+  "render/subAquariumEvents-selfcheck.mjs": 600000,
   "render/subBallastCues-selfcheck.mjs": 20000,
   "render/subDropoutScene-selfcheck.mjs": 20000,
   "render/subDropoutView-selfcheck.mjs": 20000,
@@ -13317,7 +13317,7 @@
   "render/learnedUpscaleStudy-selfcheck.mjs": 19129,
   "render/seaOgre3d-selfcheck.mjs": 2314,
   "render/seaPicker-selfcheck.mjs": 5893,
-  "render/subAquariumEvents-selfcheck.mjs": 1611,
+  "render/subAquariumEvents-selfcheck.mjs": 22430,
   "render/subBallastCues-selfcheck.mjs": 4875,
   "render/subDropoutScene-selfcheck.mjs": 3259,
   "render/subDropoutView-selfcheck.mjs": 9362,
@@ -15392,7 +15392,7 @@
   "render/learnedUpscaleStudy-selfcheck.mjs": "2026-10-27T03:45:48.839Z",
   "render/seaOgre3d-selfcheck.mjs": "2026-10-28T03:28:55.555Z",
   "render/seaPicker-selfcheck.mjs": "2026-10-27T03:45:48.839Z",
-  "render/subAquariumEvents-selfcheck.mjs": "2026-10-28T03:28:55.555Z",
+  "render/subAquariumEvents-selfcheck.mjs": "2026-11-05T14:27:39.400Z",
   "render/subBallastCues-selfcheck.mjs": "2026-10-27T03:45:48.839Z",
   "render/subDropoutScene-selfcheck.mjs": "2026-10-27T16:36:28.841Z",
   "render/subDropoutView-selfcheck.mjs": "2026-10-27T03:45:48.839Z",
@@ -25503,9 +25503,9 @@
    5893
   ],
   "render/subAquariumEvents-selfcheck.mjs": [
-   1382,
    1318,
-   1611
+   1611,
+   22430
   ],
   "render/subBallastCues-selfcheck.mjs": [
    4918,

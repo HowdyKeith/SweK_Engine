@@ -1,6 +1,6 @@
 // WebGLEngine/tools/roundhouse/joltGyroImplicit-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node tools/roundhouse/joltGyroImplicit-selfcheck.mjs      (~4 s)
+// Run: node tools/roundhouse/joltGyroImplicit-selfcheck.mjs      (~1.1 s)
 //
 // THE GATE OF tools/roundhouse/joltGyroImplicit.mjs (and its command, joltGyroImplicitRun.mjs): the implicit gyroscopic step
 // in Jolt's wrapper, as physics/mechanics/SPINNING_BODY_WIP.md registers its third round -- and of the step itself

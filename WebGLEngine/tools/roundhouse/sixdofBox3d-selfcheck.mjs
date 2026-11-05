@@ -1,6 +1,6 @@
 // WebGLEngine/tools/roundhouse/sixdofBox3d-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node tools/roundhouse/sixdofBox3d-selfcheck.mjs      (~2 s)
+// Run: node tools/roundhouse/sixdofBox3d-selfcheck.mjs      (~1.0 s)
 //
 // THE GATE OF THE 6-DOF-ON-box3d ROUND (physics/mechanics/SIXDOF_BOX3D_WIP.md, registered before any code): the box3d stepper, the duel's new
 // `stepA`, and the library that flies the round. It never runs the registered round or its command: it flies the registration's controls,

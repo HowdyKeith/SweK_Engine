@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/train6dofMlp-selfcheck.mjs
 //
-// Run: node tools/ship/train6dofMlp-selfcheck.mjs      (~20 s)
+// Run: node tools/ship/train6dofMlp-selfcheck.mjs      (~9.8 s)
 //
 // THE GATE OF tools/ship/train6dofMlp.mjs (and its command, tools/ship/trainMlp6dof.mjs): the GPU Brain's space-duel pilot trained by the fruit fly's Default recipe, as brain/SIXDOF_GPU_BRAIN_WIP.md registers it.
 // *** SECTIONS 1-4 FLY NO REGISTERED AUDIT OR H2 SEED. *** Every run there is handed seeds from 99000 up, outside every block, so the registered sets were read once, by the registered run. Section 5 was written after

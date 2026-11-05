@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/gpuCrossover-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node tools/ship/gpuCrossover-selfcheck.mjs      (~10 s with a browser; the live section is SKIPPED, and said, without one)
+// Run: node tools/ship/gpuCrossover-selfcheck.mjs      (~1.4 s without a browser, about 10 s with one; the live section is SKIPPED, and said, without one)
 //
 // THE GPU BATCH-SIZE CROSSOVER TOOL (tools/ship/gpuCrossover.mjs), held to the registration (brain/GPU_CROSSOVER_WIP.md) before its numbers are read. A timing tool that mis-reads its own timings reports a crossover that is not there, so the Node side is tested on
 // synthetic timings with the answer known, and the page side is run once for real:

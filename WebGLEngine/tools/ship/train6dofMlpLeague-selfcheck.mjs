@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/train6dofMlpLeague-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node tools/ship/train6dofMlpLeague-selfcheck.mjs      (~25 s)
+// Run: node tools/ship/train6dofMlpLeague-selfcheck.mjs      (~12 s)
 //
 // THE GATE OF tools/ship/train6dofMlpLeague.mjs (and its command, tools/ship/trainMlp6dofLeague.mjs): Round 2 of the GPU Brain's 6-DOF arc, as brain/SIXDOF_GPU_BRAIN_WIP.md registers it.
 // *** NOTHING HERE FLIES A REGISTERED HELD-OUT, AUDIT OR CHECK SEED, AND NOTHING HERE STARTS THE COMMAND'S ROUND. *** The miniature is handed scratch seeds (99601 up), and the command's guards are held as the

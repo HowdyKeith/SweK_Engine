@@ -1,6 +1,6 @@
 // WebGLEngine/brain/subFieldNav-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node brain/subFieldNav-selfcheck.mjs      (~15 s)
+// Run: node brain/subFieldNav-selfcheck.mjs      (~1.6 s)
 //
 // FLOW-FIELD WAYPOINTS FOR THE SUBMARINE (brain/subFieldNav.mjs), held to its word before the HELD set is flown (registration: brain/SUB_FIELD_NAV_WIP.md):
 //   1  THE GEOMETRY   segmentDistance (interior, beyond an end, a degenerate segment), isBlocked (inclusive at r + 14, not beyond the ends), clearanceAt (the half-hull is taken off, the nearest disc wins, no disc is Infinity), cellOf (the grid's edges)

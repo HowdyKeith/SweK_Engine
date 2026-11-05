@@ -1,6 +1,6 @@
 // WebGLEngine/tools/roundhouse/box3dPdJoust-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node tools/roundhouse/box3dPdJoust-selfcheck.mjs      (~3 s)
+// Run: node tools/roundhouse/box3dPdJoust-selfcheck.mjs      (~1.2 s)
 //
 // THE GATE OF THE PD-JOUST ROUND (physics/mechanics/BOX3D_PD_JOUST_WIP.md, registered before any code): D, box3d's scheme ported to
 // double precision; the variants; the library that flies the round; and the rule that names the part. It never runs the registered

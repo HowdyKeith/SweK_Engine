@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/subFieldNavStudy-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node tools/ship/subFieldNavStudy-selfcheck.mjs      (~20 s)
+// Run: node tools/ship/subFieldNavStudy-selfcheck.mjs      (~5.7 s)
 //
 // THE STUDY COMMAND OF FLOW-FIELD WAYPOINTS FOR THE SUBMARINE (tools/ship/subFieldNavStudy.mjs), held to the registration (brain/SUB_FIELD_NAV_WIP.md and its Amendment 1) BEFORE the HELD set is flown. The verdict rule is the thing that must not be wrong:
 // a study that reads its own result with an off-by-one threshold reports the wrong verdict in good faith.

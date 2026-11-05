@@ -1,6 +1,6 @@
 // WebGLEngine/tools/roundhouse/box3dBothShips-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node tools/roundhouse/box3dBothShips-selfcheck.mjs      (~3 s)
+// Run: node tools/roundhouse/box3dBothShips-selfcheck.mjs      (~1.5 s)
 //
 // THE GATE OF THE BOTH-SHIPS ROUND (physics/mechanics/BOX3D_BOTH_SHIPS_WIP.md, registered before any code): the duel's new `stepB`, and
 // the library that flies the round. It never runs the registered round or its command. It flies the registration's controls where the

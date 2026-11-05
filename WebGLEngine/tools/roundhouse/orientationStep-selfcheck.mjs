@@ -1,6 +1,6 @@
 // WebGLEngine/tools/roundhouse/orientationStep-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node tools/roundhouse/orientationStep-selfcheck.mjs      (~1 s)
+// Run: node tools/roundhouse/orientationStep-selfcheck.mjs      (~6.7 s)
 //
 // THE GATE OF THE ORIENTATION-STEP ROUND (physics/mechanics/ORIENTATION_STEP_WIP.md, registered before any code): the step's new option, the
 // duel's three, and the library that flies the round. It never runs the registered round or its command: it flies C-unchanged's anchors and

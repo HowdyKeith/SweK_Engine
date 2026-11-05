@@ -1,6 +1,6 @@
 // WebGLEngine/tools/tankFlyCxBench-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node tools/tankFlyCxBench-selfcheck.mjs      (~10 s)
+// Run: node tools/tankFlyCxBench-selfcheck.mjs      (~2.4 s)
 //
 // THE BENCH THAT MEASURES THE STATEFUL FLY PILOT IN THE SUB AQUARIUM'S TANK (tools/tankFlyCxBench.mjs). A measurement is only worth its numbers if the tool that made them does what it says, so this holds the pieces to their word:
 //   1  THE ANGLE     wrap puts an angle in (-pi, pi]; the error a tick adds is the absolute wrapped angle between the sub's heading and its target's (so 3.0 against -3.0 is 0.283, not 6)

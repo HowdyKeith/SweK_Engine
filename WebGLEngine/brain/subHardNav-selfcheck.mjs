@@ -1,6 +1,6 @@
 // WebGLEngine/brain/subHardNav-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node brain/subHardNav-selfcheck.mjs      (~40 s)
+// Run: node brain/subHardNav-selfcheck.mjs      (~4.8 s)
 //
 // THE HARDER NAVIGATION TEST (brain/subHardNav.mjs), held to its word before HELD4 is flown (registration and Amendment 1: "FOLLOW-UP 3" of brain/SUB_FIELD_NAV_WIP.md):
 //   1  THE CONSTANTS   kinds, arms and what each kind flies, the designated arms and bars, the vertical margin, the replan rate and horizon, the ladder, the gap widths, the sets

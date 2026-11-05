@@ -973,8 +973,9 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // rounds 77-78 (sections 176-179) merged over v4911 -- one gate main did not have, render/movingScenes-selfcheck.mjs, defining ok(n, c, d) once and naming first: gates 2208 -> 2209, usesOk 2187 -> 2188, definesOk 2179 -> 2180, nameFirst 2069 -> 2070, read off the code's own report.
     // backlog denoise-framegen-page-chain -- one more, render/frameGenChainLive-selfcheck.mjs, defining ok(n, c, d) once and naming first: gates 2209 -> 2210, usesOk 2188 -> 2189, definesOk 2180 -> 2181, nameFirst 2070 -> 2071, read off the code's own report.
     // the render upscaler switch -- one more, ui/upscalerSwitch-selfcheck.mjs, defining ok(n, c, d) once and naming first: gates 2210 -> 2211, usesOk 2189 -> 2190, definesOk 2181 -> 2182, nameFirst 2071 -> 2072, read off the code's own report.
-    gates: 2211, usesOk: 2190, definesOk: 2182, importsOk: 0,
-    distinctDefinitions: 49, nameFirst: 2072, condFirst: 99, unknownSignature: 19,
+    // 2026-11-05 -- THE MERGE OF FOUR LINES AND THIS ROUND'S OWN GATES: 72 gates more than the last recorded tree (the 75 added since v4911 less three renamed or removed by the merges), each defining ok(n, c, d) once and naming first, read off the code's own report: gates 2211 -> 2283, usesOk 2190 -> 2262, definesOk 2182 -> 2254, nameFirst 2072 -> 2144; condFirst, distinctDefinitions and unknownSignature did not move.
+    gates: 2283, usesOk: 2262, definesOk: 2254, importsOk: 0,
+    distinctDefinitions: 49, nameFirst: 2144, condFirst: 99, unknownSignature: 19,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

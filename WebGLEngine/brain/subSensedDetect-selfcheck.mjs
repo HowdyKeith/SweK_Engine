@@ -1,6 +1,6 @@
 // WebGLEngine/brain/subSensedDetect-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node brain/subSensedDetect-selfcheck.mjs      (~90 s)
+// Run: node brain/subSensedDetect-selfcheck.mjs      (~41 s)
 //
 // THE GENERAL DETECTOR (brain/subSensedDetect.mjs), held to its word before any set of follow-ups 8 to 58 is flown (registrations: brain/SENSED_NAV_WIP.md; section 7 and the second half of section 1 are follow-ups 25 to 58's):
 //   1  THE TABLES    the faults (COND) against a literal copy of the registrations' words, and every detector of follow-ups 7 to 24 (ARM_DEFS) against the registration's own description of it, written here by hand and not read back from the code; the names, splitArm, describe

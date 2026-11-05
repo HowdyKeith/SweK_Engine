@@ -1,6 +1,6 @@
 // WebGLEngine/tools/roundhouse/spinningBody-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node tools/roundhouse/spinningBody-selfcheck.mjs      (~2 s)
+// Run: node tools/roundhouse/spinningBody-selfcheck.mjs      (~0.8 s)
 //
 // THE GATE OF tools/roundhouse/spinningBody.mjs (and its command, tools/roundhouse/spinningBodyRun.mjs): the spinning
 // body, as physics/mechanics/SPINNING_BODY_WIP.md registers it -- and of the angular calls it needed, added to box3d's

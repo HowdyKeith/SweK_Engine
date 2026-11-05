@@ -1,6 +1,6 @@
 // WebGLEngine/brain/pilot6dofMlp-selfcheck.mjs
 //
-// Run: node brain/pilot6dofMlp-selfcheck.mjs      (~10 s)
+// Run: node brain/pilot6dofMlp-selfcheck.mjs      (~0.8 s)
 //
 // THE SIBLING GATE OF brain/pilot6dofMlp.mjs: the GPU Brain's pilot for the 6-DOF space duel -- 12 features -> 32 relu -> 32 relu -> 5, 1,637 weights -- registered in brain/SIXDOF_GPU_BRAIN_WIP.md before it was built.
 //
