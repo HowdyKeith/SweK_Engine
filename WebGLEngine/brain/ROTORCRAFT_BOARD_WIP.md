@@ -1,0 +1,40 @@
+# The helicopter and quadrotor brains on a board of their own: arms, controls and one registered read (2026-11-06; UNNUMBERED; REGISTERED BEFORE ANY CODE FOR IT IS WRITTEN AND BEFORE ANY SEED OF ITS SET IS FLOWN)
+
+Keith, 2026-11-06: "lets queue up and proceed to do all those items" -- the first of them: the helicopter and quadrotor pilots (the hand autopilots, the fruit-fly network pilots of 1,167 weights, the quadrotor's MLP of 1,860) are on no page and in no tournament (`brain/capabilityMap.mjs`: the row `sky-rotor`, its quadrotor MLP cell "exists, unread"). This is item R1: put them on the switchboard's pattern -- the same seeds, every brain side by side, a paired reading against each brain's control -- and read them once.
+
+## 1. What is built, and where
+
+* **A board of their own, not the standard board.** `brain/switchboard.mjs` (the other chat's) is NOT edited, and the rotorcraft arms are not added to `standardBoard`: the board lists every arm of a task's LAYER by default, and a rotorcraft arm on the tank's `dropout` task would throw (it has no `entry()`), which would break `tools/ship/takeSwitchboard.mjs`'s default run. `brain/rotorcraftBoard.mjs` builds its own board with `createBoard()` and registers two flying-layer tasks, `rotor` and `drone`, and their arms through `addTask` / `addArm` -- the extension path the switchboard states. Putting these tasks on `switchboard.html` is a later edit to that page (shared) and is NOT done here.
+* **The tasks.** `rotor` is `brain/rotorTask.mjs`'s job (the helicopter held at a point, a height and a heading for 30 s; four kinds: `hover` in a wind with gusts, `recovery` from a large upset, `engine` out from 45-160 m, `terrain` over a noise ground); `drone` is `brain/droneTask.mjs`'s (the quadrotor, 20 s; `hover`, `recovery`, `motor` out, `goto`). A scenario is a function of its seed and kind; the SAME seeds are flown by every arm. The score is the task's own (minus the mean tracking error; an engine or motor flight is the landing's cost, or a crash's). A run is BAD when the task calls the flight not standing (an early end; an engine flight that did not end standing).
+* **The arms.** For the helicopter: `hand` (`brain/autopilotRotor.mjs`), `hand-net` (the hand pilot written as the 1,167-weight network, `pilotRotorPolicy.handWeights()`: the same laws, so it must TIE `hand`), `fly` (the fruit-fly network pilot, `brain/pilotRotorWeightsDefault.json`), `zero` (the same network with every weight zero: a pilot that does nothing, the floor). There are no committed weights for a helicopter MLP, so there is no helicopter MLP arm (said). For the quadrotor: `hand`, `hand-net`, `fly` (`brain/pilotDroneWeightsV2.json`), `mlp` (`brain/pilotDroneMlpWeightsDefault.json`), `mlp-v2` (`brain/pilotDroneMlpWeightsV2.json`) and `zero`. The controls: `fly`, `mlp` and `mlp-v2` must BEAT `hand` and `zero`; `hand-net` is read against `hand` and is expected to TIE it; `zero` has none.
+
+## 2. THE REGISTERED READ
+
+> On fresh scenarios of each task, does each trained rotorcraft brain fly better than the hand autopilot it was trained from, and does the network form of the hand pilot fly exactly as the hand pilot does?
+
+**Scenarios, fresh and read once:** seeds **8001 to 8012 of each of the four kinds** (48 scenarios a task). Nothing has used these seeds: the training, held-out, audit, baseline and safety sets of both tasks are seeds up to 5030. The command is flown once on a few DEV seeds (1 to 3, which are TRAIN seeds: a sanity run of the code only, not a result), then once on 8001-8012 per task.
+
+**The reading (the series' convention):** pooled paired difference a - b of the per-scenario scores over the 48, **BETTER iff the mean is above 2 standard errors and positive, WORSE iff below -2 se and negative, else TIES**; the lines are the board's (`X BEATS its control Y`, `X TIES its control Y`, `X IS BELOW its control Y`). Printed with them and NOT part of any verdict: the reading per kind (each kind's 12), the numbers of scenarios better / worse / the same, the lost (BAD) runs per arm, and each arm's mean score.
+
+**Checks (a failure and the readings are NOT WEIGHED):** every arm flew all 48 scenarios, in the same order; no score is non-finite; `hand-net` and `hand` differ by less than 1e-3 on every scenario (it IS the hand pilot, written as a network; see Amendment 1) -- if not, the network form is not the hand pilot and the line says so first; `zero` is below `hand` on at least 40 of the 48 (the floor is a floor).
+
+**Expectations, written before any seed is flown.**
+* helicopter `fly` BEATS `hand`: about 85 percent (the v4877 audit read -1.2188 against -2.0770 on other seeds, 24 scenarios better and 10 worse); it BEATS `hand` on `engine` alone: about 80 (the entry's engine-out landings); it is WORSE than `hand` on at least one kind: about 25 (trained on 34 scenarios, graded on kinds it saw few of).
+* helicopter `hand-net` TIES `hand`: about 90 percent; `zero` IS BELOW `hand`: 99.
+* quadrotor `fly` (V2) BEATS `hand`: about 75; `mlp` BEATS `hand`: about 65; `mlp-v2` BEATS `hand`: about 65; at least one of the three is WORSE than `hand`: about 15; the three trained brains TIE each other pairwise (not registered as a reading, printed): about 60.
+* A lost (BAD) run for any trained brain: at least one in its 48: about 35 percent.
+
+**What a result would not say.** That a brain is better than a hand pilot in general: one model of each machine, 48 scenarios of a family I did not make but did not choose either, the hand pilot's gains derived from the airframe. That the wiring pays: the fruit-fly network and the MLP are different sizes and trainings (the series' finding, again and again, is that structure is not what pays), so BEATS against `hand` is a statement about the trained weights, not the connectome. Nothing about a real helicopter or quadrotor. The board is a reading of THESE 48 seeds, not a ranking.
+
+## 3. What will be built, and gated
+
+`brain/rotorcraftBoard.mjs` (the two tasks, the arms from weights handed in, the checks, the per-kind lines, the board), `tools/ship/takeRotorcraftBoard.mjs` (the command: reads the weight files, `--task rotor|drone|both`, `--set dev|held73`, `--write`), and `brain/rotorcraftBoard-selfcheck.mjs` with a mutation pass logged in its header. Then DEV, the read once, the RESULT here, and the capability map's `sky-rotor` cells brought up to what was read.
+
+## 4. Not in this round, said now
+
+The page (`switchboard.html` and a page of their own are later items, R2 and R3); a helicopter MLP (no weights); the wind, the terrain and the failure kinds one at a time as arms' controls; a lesion toggle on the network's recurrent core; any training.
+
+### AMENDMENT 1 (2026-11-06; made on DEV, BEFORE HELD73 was flown and before any code existed; DEV is not a result)
+
+A sanity run of every arm on seeds 1 and 2 of each kind (the code of the existing modules only; 28 flights a task) showed the network form of the hand pilot agreeing with the hand pilot to the printed digit on every helicopter flight and every quadrotor flight but one: quadrotor `recovery` seed 1 reads -0.4428 for `hand` and -0.4429 for `hand-net` (a difference of about 1e-4, the 32-bit weights). **The check's tolerance is 1e-3, not 1e-6, and the expectation reads TIES, not "exactly".** Nothing else is changed: the arms, the seeds, the reading, the other checks and the other expectations stand. (The same run showed `zero` far below `hand` everywhere, and that on quadrotor `motor` seed 1 every arm, the hand pilot included, scores -7: a loss the task charges the worst for.)
+
