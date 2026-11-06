@@ -1,0 +1,183 @@
+// WebGLEngine/tools/ship/headToHead8-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
+//
+// Run: node tools/ship/headToHead8-selfcheck.mjs      (a few seconds: hand fixtures, a scripted tank and short real flights)
+//
+// THE GATE OF tools/ship/headToHead8.mjs (Round H8 of brain/HEAD_TO_HEAD.md, registered first: memory on a biased, noisy gyro).
+//   1 SETS      the ids 8000-8199 (disjoint from every earlier round's), 160 s, the four levels, the memories, the seventeen cells and their order.
+//   2 GYRO      the gyro: deterministic, the bias drawn once and constant, its spread and the white noise's spread at the registered levels, level 0 the identity, refusals.
+//   3 WRAPPER   noisyMemory: the memory is handed the gyro's rates and the inner pilot the TRUE ones (even after the memory turned the world), zero noise changes nothing; memoryBuilder, cellsOf and their refusals.
+//   4 FLIGHT    the flight on a scripted tank (belief, flight score, the window bins and their boundary at 120 ticks, two windows) and on real short flights (level 0 equals H4's arm exactly; level 3 differs; deterministic).
+//   5 AUDIT     every cell on every id in order, the first three ids of H4's two arms.
+//   6 VERDICT   the registered verdict in every branch (survives; fails at level 1, 2 and 3, naming the arms), the cost of the level, the survival of fly and er not counting.
+//   7 LINES     the seven bottom lines in their cases; lost subs.
+//   8 CHECKS    sizes, ids aligned, scores inside (0, 1), dark ticks, level 0 is H4's arm, the bias integrates, cells distinct; a failed check says NOT WEIGHED.
+//   9 REPORT    the means table, the against-held blocks, the level costs, the window profiles, the lines last.
+//  10 SOURCE    the ids appear once; no clock, random or file.
+// NOT CHECKED, said plainly: that the constant-bias-plus-white model is how a real gyro errs (it leaves out scale-factor error, bias that wanders and cross-axis coupling), and whether the autopilot's own rate loop would suffer from the same gyro (here it is handed the true rates).
+"use strict";
+import fs from "node:fs";
+let fails = 0, finished = false;
+const died = (e) => { console.log("  FAIL  !! THE GATE THREW before it finished: " + String((e && e.stack) || e).split("\n").slice(0, 3).join(" | ").slice(0, 400)); process.exitCode = 1; };
+process.on("uncaughtException", died); process.on("unhandledRejection", died);
+process.on("exit", () => { if (!finished) { console.log("  FAIL  !! THE GATE ENDED BEFORE IT FINISHED"); process.exitCode = 1; } });
+const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
+const sec = (t) => console.log("\n" + t);
+const J = JSON.stringify, near = (a, b, t = 1e-9) => Math.abs(a - b) < t;
+import * as X from "./headToHead8.mjs";
+import * as H4 from "./headToHead4.mjs";
+const thr = (f) => { try { f(); return ""; } catch (e) { return String(e.message); } };
+const src = fs.readFileSync(new URL("./headToHead8.mjs", import.meta.url), "utf8"), code = src.split("\n").filter((l) => !/^\s*\/\//.test(l)).join("\n");
+console.log("headToHead8-selfcheck -- Round H8\n");
+const idb = (i) => i, B0 = { fly: idb, er: idb };
+
+sec("1. SETS");
+{
+    ok("!! ids 8000-8199 (200), 160 s, a 30 Hz tick, settle 12 s, 4 s bins and 4 of them, H4 check on 3 ids; not H1's 2000, H2's 3000, H4's 4000, H5's 5000, H6's 6000, H7's 7000, not the gates' 0-14", X.IDS.from === 8000 && X.IDS.to === 8199 && X.SECONDS === 160 && near(X.TICK, 1 / 30, 1e-15) && X.SETTLE === 12 && X.BIN_S === 4 && X.BINS === 4 && X.H4_IDS === 3 && Object.isFrozen(X.IDS));
+    ok("!! four levels in order: perfect (0, 0), good (0.002, 0.003), rough (0.006, 0.009), bad day (0.02, 0.015); frozen (the white noise is subDisturb's rate noise at x1, x3, x5 of 0.003)", X.LEVELS.length === 4 && J(X.LEVELS.map((l) => [l.name, l.bias, l.white])) === J([["perfect", 0, 0], ["good", 0.002, 0.003], ["rough", 0.006, 0.009], ["bad day", 0.02, 0.015]]) && Object.isFrozen(X.LEVELS) && X.LEVELS.every(Object.isFrozen));
+    ok("!! the memories are navigator, leaky-unit, fly, er; the verdict reads the first two; cellId is arm@level; seventeen cells: held first, then each memory at levels 0..3 in order; frozen", J(X.MEMORY_IDS) === J(["navigator", "leaky-unit", "fly", "er"]) && J(X.VERDICT_IDS) === J(["navigator", "leaky-unit"]) && X.cellId("fly", 2) === "fly@2" && X.CELL_IDS.length === 17 && X.CELL_IDS[0] === "held" && X.CELL_IDS[1] === "navigator@0" && X.CELL_IDS[4] === "navigator@3" && X.CELL_IDS[5] === "leaky-unit@0" && X.CELL_IDS[16] === "er@3" && Object.isFrozen(X.CELL_IDS) && Object.isFrozen(X.MEMORY_IDS) && Object.isFrozen(X.VERDICT_IDS));
+}
+sec("2. GYRO");
+{
+    const seq = (g, n = 6) => Array.from({ length: n }, () => g([1, 2, 3]).map((v) => +v.toFixed(12)));
+    ok("!! a gyro is deterministic for (level, seed): twice the same bias and the same white sequence; another seed gives another bias and another sequence; another level another one", J(X.gyroOf(3, 5).bias) === J(X.gyroOf(3, 5).bias) && J(seq(X.gyroOf(3, 5))) === J(seq(X.gyroOf(3, 5))) && J(X.gyroOf(3, 5).bias) !== J(X.gyroOf(3, 6).bias) && J(seq(X.gyroOf(3, 5))) !== J(seq(X.gyroOf(3, 6))) && J(seq(X.gyroOf(3, 5))) !== J(seq(X.gyroOf(2, 5))));
+    ok("!! level 0 is the identity (the rates come back as handed, the bias is three zeros), and a { bias: 0, white: 0 } record is level 0", J(X.gyroOf(0, 9)([1, -2, 3])) === "[1,-2,3]" && J(X.gyroOf(0, 9).bias.map((b) => b + 0)) === "[0,0,0]" && J(X.gyroOf({ bias: 0, white: 0 }, 9)([4, 5, 6])) === "[4,5,6]");
+    const sd = (xs) => { const m = xs.reduce((a, b) => a + b, 0) / xs.length; return Math.sqrt(xs.reduce((a, b) => a + (b - m) * (b - m), 0) / (xs.length - 1)); }, mean = (xs) => xs.reduce((a, b) => a + b, 0) / xs.length;
+    const biases = (l) => Array.from({ length: 1500 }, (_, s) => X.gyroOf(l, s + 1).bias).flat();
+    ok("!! the bias is N(0, level bias) per axis: over 4500 draws the mean is near 0 and the sd within 6 percent of 0.002 (good), 0.006 (rough) and 0.02 (bad day)", [1, 2, 3].every((l) => Math.abs(sd(biases(l)) / X.LEVELS[l].bias - 1) < 0.06 && Math.abs(mean(biases(l))) < 0.1 * X.LEVELS[l].bias), [1, 2, 3].map((l) => (sd(biases(l)) / X.LEVELS[l].bias).toFixed(3)).join(" "));
+    const whites = (l) => { const g = X.gyroOf(l, 3); return Array.from({ length: 4000 }, () => g([0, 0, 0]).map((v, i) => v - g.bias[i])).flat(); };
+    ok("!! the white noise is N(0, level white) per axis, fresh each call: the sd of 12000 draws is within 5 percent of 0.003, 0.009, 0.015; and the constant bias is not redrawn (the mean of the draws stays near the bias)", [1, 2, 3].every((l) => Math.abs(sd(whites(l)) / X.LEVELS[l].white - 1) < 0.05), [1, 2, 3].map((l) => (sd(whites(l)) / X.LEVELS[l].white).toFixed(3)).join(" "));
+    ok("!! the bias is constant: two calls with white noise 0 and bias 0.02 differ from the input by the same three numbers (the bias) every call", (() => { const g = X.gyroOf({ bias: 0.02, white: 0 }, 4), a = g([1, 1, 1]), b = g([1, 1, 1]), c = g([2, 3, 4]); return J(a) === J(b) && near(a[0] - 1, g.bias[0], 1e-12) && near(c[2] - 4, g.bias[2], 1e-12) && g.bias.some((v) => v !== 0); })());
+    ok("!! gyroOf refuses a level outside 0..3, a negative or non-numeric bias or white, and null, naming the fault", /a gyro level is 0\.\.3/.test(thr(() => X.gyroOf(4, 1))) && /a gyro level is 0\.\.3/.test(thr(() => X.gyroOf(-1, 1))) && /a gyro level is 0\.\.3/.test(thr(() => X.gyroOf({ bias: -1, white: 0 }, 1))) && /a gyro level is 0\.\.3/.test(thr(() => X.gyroOf({ bias: 0, white: NaN }, 1))) && /a gyro level is 0\.\.3/.test(thr(() => X.gyroOf(null, 1))));
+}
+sec("3. WRAPPER");
+{
+    const stateOf = () => ({ pos: [1, 2, -5], q: [1, 0, 0, 0], vel: [1, 0, 0], w: [0.1, 0.2, 0.3] });
+    const run = (level, turn) => { const memSaw = [], inSaw = []; const make = (inner) => (st, tg, cur, aux) => { memSaw.push(st); return inner(turn ? { ...st, q: [0, 1, 0, 0] } : st, tg, cur, aux); }; const p = X.noisyMemory(make, level, 3)((st) => { inSaw.push(st); return { cmd: 1 }; }); const out = p(stateOf(), { t: 1 }, [0, 0, 0], { dt: 0.05 }); return { memSaw, inSaw, out, p }; };
+    const z = run({ bias: 0, white: 0 }, false), n = run({ bias: 1, white: 0 }, false), t = run({ bias: 1, white: 0 }, true);
+    ok("!! at zero noise the wrapper changes nothing: the memory and the inner pilot are handed the state as it came (the same rates) and the command comes back", J(z.memSaw[0].w) === "[0.1,0.2,0.3]" && J(z.inSaw[0].w) === "[0.1,0.2,0.3]" && J(z.out) === '{"cmd":1}' && J(z.inSaw[0].pos) === "[1,2,-5]");
+    ok("!! the MEMORY is handed the gyro's rates (w + bias: not the true ones) and the INNER pilot the TRUE ones", J(n.memSaw[0].w) !== "[0.1,0.2,0.3]" && near(n.memSaw[0].w[0] - 0.1, n.p.gyro.bias[0], 1e-12) && J(n.inSaw[0].w) === "[0.1,0.2,0.3]");
+    ok("!! the inner pilot gets the true rates even when the memory turned the world before calling it (the unit does: the state it hands on has another attitude) and keeps what the memory changed", J(t.inSaw[0].q) === "[0,1,0,0]" && J(t.inSaw[0].w) === "[0.1,0.2,0.3]" && J(t.memSaw[0].q) === "[1,0,0,0]");
+    ok("!! the memory's own arguments pass through (target, current, aux) and the wrapper exposes its gyro", (() => { let got = null; const p = X.noisyMemory((inner) => (st, tg, cur, aux) => { got = [tg, cur, aux]; return inner(st, tg, cur, aux); }, 0, 1)(() => 0); p(stateOf(), "T", "C", "A"); return J(got) === J(["T", "C", "A"]) && typeof p.gyro === "function" && p.gyro.bias.length === 3; })());
+    ok("!! noisyMemory refuses a `make` that is not a function, naming it", /make must be a function/.test(thr(() => X.noisyMemory(null, 0, 1))) && /make must be a function/.test(thr(() => X.noisyMemory("x", 0, 1))));
+    const sA = X.noisyMemory(() => (st) => st.w.slice(), 3, 11)(() => 0), sB = X.noisyMemory(() => (st) => st.w.slice(), 3, 11)(() => 0);
+    ok("!! two wrappers of one (level, seed) feed their memories the same gyro readings in the same order", J([sA(stateOf()), sA(stateOf())]) === J([sB(stateOf()), sB(stateOf())]) && J(sA(stateOf())) !== J(X.noisyMemory(() => (st) => st.w.slice(), 3, 12)(() => 0)(stateOf())));
+    const nv = X.memoryBuilder("navigator", B0)(() => 0), lk = X.memoryBuilder("leaky-unit", B0)(() => 0);
+    ok("!! memoryBuilder: the navigator is tools/subNavigator's (its pilot exposes `last` with a rate), the leaky unit is brain/pilotLeakyHeading's (`last` with an estimate), fly and er are the builders handed in", typeof nv === "function" && "rate" in nv.last && "shown" in nv.last && typeof lk === "function" && "estimate" in lk.last && !("shown" in lk.last) && X.memoryBuilder("fly", B0) === idb && X.memoryBuilder("er", { fly: 1, er: idb }) === idb);
+    ok("!! memoryBuilder refuses an unknown arm and a missing or non-function fly or er builder, naming it", /arm must be one of navigator, leaky-unit, fly, er, got "held"/.test(thr(() => X.memoryBuilder("held", B0))) && /builders\.fly must be a function/.test(thr(() => X.memoryBuilder("fly", { er: idb }))) && /builders\.er must be a function/.test(thr(() => X.memoryBuilder("er", { fly: idb, er: 3 }))) && /builders\.fly must be a function/.test(thr(() => X.memoryBuilder("fly", null))));
+    const cells = X.cellsOf(B0);
+    ok("!! cellsOf gives the seventeen cells in CELL_IDS order: held on the dropout event with no builder; every memory cell on fly-estimator with a builder factory (n -> builder) and its arm and level", cells.length === 17 && J(cells.map((c) => c.id)) === J(X.CELL_IDS) && cells[0].event === "dropout" && cells[0].build === null && cells[0].level === null && cells.slice(1).every((c) => c.event === "fly-estimator" && typeof c.build === "function" && c.id === `${c.arm}@${c.level}`) && typeof cells[3].build(7) === "function" && cells[3].arm === "navigator" && cells[3].level === 2);
+    ok("!! cellsOf refuses a missing or non-function builder, naming it", /builders\.fly must be a function/.test(thr(() => X.cellsOf({ er: idb }))) && /builders\.er must be a function/.test(thr(() => X.cellsOf({ fly: idb, er: 3 }))) && /builders\.fly must be a function/.test(thr(() => X.cellsOf(null))));
+}
+sec("4. FLIGHT");
+{
+    const scripted = (fn) => () => { let i = 0, tgt = { heading: 0 }; const snap = () => { const t = fn(i); if (t.targetNew) tgt = { heading: 0 }; return [{ target: tgt, heading: tgt.heading - t.headingErr, lost: !!t.lost, compass: { valid: !t.dark, seen: 0, error: t.error } }]; }; return { registerEstimator() {}, sync() {}, setEvent() {}, step() { i++; }, snapshot: () => snap() }; };
+    const cell = { id: "x", event: "dropout", build: null };
+    const t1 = scripted((i) => ({ dark: i >= 100 && i < 300, error: i < 220 ? 0.1 : 0.3, targetNew: i === 1, headingErr: 0.5 })), r1 = X.flight(cell, 7, 12, t1);
+    ok("!! belief is 1 minus the RMS of compass.error over the DARK ticks only, over pi: 120 dark ticks at 0.1 (ticks 100 to 219) and 80 at 0.3 give rms sqrt((120 x 0.01 + 80 x 0.09)/200)", near(r1.belief, 1 - Math.sqrt((120 * 0.01 + 80 * 0.09) / 200) / Math.PI, 1e-12) && r1.dark === 200, `${r1.belief}`);
+    ok("!! the window bins are 4 s = 120 ticks since the window opened: the first 120 dark ticks are bin 0 (rms 0.1), the next 80 bin 1 (rms 0.3), bins 2 and 3 are empty (null); the boundary is exact (the 121st dark tick is the first of bin 1)", near(r1.bins[0], 0.1, 1e-12) && near(r1.bins[1], 0.3, 1e-12) && r1.bins[2] === null && r1.bins[3] === null && r1.bins.length === 4);
+    const t2 = scripted((i) => ({ dark: (i >= 100 && i < 130) || (i >= 400 && i < 440), error: i < 130 ? 0.2 : 0.4, targetNew: i === 1, headingErr: 0.1 })), r2 = X.flight(cell, 7, 20, t2);
+    ok("!! a second window starts its bins again at 0: 30 dark ticks at 0.2 then, after valid ticks, 40 at 0.4 are BOTH bin 0 (rms sqrt((30 x 0.04 + 40 x 0.16)/70)), the other bins empty", near(r2.bins[0], Math.sqrt((30 * 0.04 + 40 * 0.16) / 70), 1e-12) && r2.bins[1] === null && r2.dark === 70, J(r2.bins));
+    const t3 = scripted((i) => ({ dark: i >= 100 && i < 700, error: i < 400 ? 0.1 : i < 520 ? 0.2 : 0.9, targetNew: i === 1, headingErr: 0.1 })), r3 = X.flight(cell, 7, 25, t3);
+    ok("!! a window longer than 16 s puts everything past the last bin into the last bin (bin 3 holds dark ticks 360 on: 60 at 0.2 and 180 at 0.9 -> rms sqrt((60 x 0.04 + 180 x 0.81)/240); bin 2 holds 60 at 0.1 and 60 at 0.2); a bin with ticks is never null", near(r3.bins[3], Math.sqrt((60 * 0.04 + 180 * 0.81) / 240), 1e-12) && near(r3.bins[2], Math.sqrt((60 * 0.01 + 60 * 0.04) / 120), 1e-12) && r3.bins.every((b) => b !== null), J(r3.bins));
+    const t4 = scripted((i) => ({ dark: i >= 400 && i < 600, error: 0.2, targetNew: i === 1 || i === 450, headingErr: i < 450 ? 0.2 + 2 * Math.PI : 1.0 })), r4 = X.flight(cell, 7, 40, t4);
+    ok("!! the flight score is the mean SETTLED dark heading error: the 50 dark ticks 12 s or more after a new target have error 0.2 (read through the wrap) and the 150 within 5 s of one have 1.0, so 1 - 0.2/pi and not 1 - 0.8/pi", near(r4.flight, 1 - 0.2 / Math.PI, 1e-12) && r4.dark === 200, `${r4.flight}`);
+    ok("!! with no settled dark tick the flight score falls back to ALL the dark ticks: heading error 0.5 gives 1 - 0.5/pi", near(r1.flight, 1 - 0.5 / Math.PI, 1e-12));
+    ok("!! a run with no dark tick is refused, naming the cell and the id; lost is the last snapshot's flag", /cell x id sb-7 had no dark ticks/.test(thr(() => X.flight(cell, 7, 10, scripted(() => ({ dark: false, error: 0, headingErr: 0 }))))) && X.flight(cell, 8, 10, scripted((i) => ({ dark: i >= 100 && i < 200, error: 0, targetNew: i === 1, headingErr: 0.1, lost: i === 300 }))).lost === true && X.flight(cell, 8, 10, scripted((i) => ({ dark: i >= 100 && i < 200, error: 0, targetNew: i === 1, headingErr: 0.1 }))).lost === false);
+    const reg = []; X.flight({ id: "y", event: "fly-estimator", build: (n) => `builder-${n}` }, 9, 10, () => ({ registerEstimator: (e, b) => reg.push([e, b]), sync() {}, setEvent: (id, e) => reg.push(["set", id, e]), step() {}, snapshot: () => [{ target: {}, heading: 0, compass: { valid: false, seen: 0, error: 0 } }] }));
+    ok("!! a cell with a builder factory registers build(n) under its event on the tank (the id's own seed), and the event is set on the sub sb-<n>; a cell without one registers nothing", reg.length === 2 && J(reg[0]) === J(["fly-estimator", "builder-9"]) && J(reg[1]) === J(["set", "sb-9", "fly-estimator"]) && (() => { const r = []; X.flight({ id: "z", event: "dropout", build: null }, 9, 10, () => ({ registerEstimator: () => r.push(1), sync() {}, setEvent() {}, step() {}, snapshot: () => [{ target: {}, heading: 0, compass: { valid: false, seen: 0, error: 0 } }] })); return r.length === 0; })());
+    // real short flights: the dark window opens at 10 s
+    const cells = X.cellsOf(B0), cn = (id) => cells.find((c) => c.id === id), arms = H4.armsOf(B0), SEC = 25;
+    const a0 = X.flight(cn("navigator@0"), 8000, SEC), h0 = H4.flight(arms.find((a) => a.id === "navigator"), 8000, SEC), l0 = X.flight(cn("leaky-unit@0"), 8000, SEC), hl = H4.flight(arms.find((a) => a.id === "leaky-unit"), 8000, SEC);
+    ok("!! on a REAL tank the navigator and the leaky unit at level 0 fly exactly as H4's arms do (belief and flight within 1e-9: the wrapper at zero noise is the identity)", near(a0.belief, h0.belief, 1e-9) && near(a0.flight, h0.flight, 1e-9) && near(l0.belief, hl.belief, 1e-9) && near(l0.flight, hl.flight, 1e-9), `${a0.belief} ${h0.belief} ${l0.belief} ${hl.belief}`);
+    const a3 = X.flight(cn("navigator@3"), 8000, SEC), a3b = X.flight(cn("navigator@3"), 8000, SEC), hd = X.flight(cn("held"), 8000, SEC), l3 = X.flight(cn("leaky-unit@3"), 8000, SEC);
+    ok("!! at level 3 the navigator believes worse than at level 0 (the bias integrates), the flight is deterministic (twice the same record), another id has another gyro, and the leaky unit at level 3 differs from the navigator's", a3.belief < a0.belief - 0.01 && J(a3) === J(a3b) && X.flight(cn("navigator@3"), 8001, SEC).belief !== a3.belief && l3.belief !== a3.belief);
+    ok("!! the held cell flies with no builder, has dark ticks and four bins; the navigator's bins at level 3 rise over the window", hd.dark > 0 && hd.bins.length === 4 && hd.bins.every((b) => b !== null) && a3.bins[1] > a3.bins[0] && a0.bins.every((b) => b < 1e-6), J(a3.bins));
+}
+sec("5. AUDIT");
+{
+    const calls = [], fake = (cell, n, secs) => { calls.push([cell.id, n, secs]); return { belief: 0.9, flight: 0.8, lost: n === 8002 && cell.id === "er@3", dark: 100 + n, bins: [0.1, 0.2, 0.3, 0.4] }; };
+    const h4calls = [], h4fake = (arm, n, secs) => { h4calls.push([arm.id, n, secs]); return { belief: 0.9, flight: 0.8 }; };
+    const au = X.audit(B0, { range: { from: 8001, to: 8005 }, seconds: 33, flightFn: fake, h4Fn: h4fake });
+    ok("!! audit flies every cell on every id in order (cell-major), hands the cell, the id and the seconds to the flight, and keeps belief, flight, lost-as-bad, dark ticks, bins and the key sb-<n>", calls.length === 17 * 5 && J(calls.slice(0, 3)) === J([["held", 8001, 33], ["held", 8002, 33], ["held", 8003, 33]]) && J(calls[5]) === J(["navigator@0", 8001, 33]) && au.runs["er@3"][1].bad === true && au.runs["er@3"][0].bad === false && au.runs.held[2].key === "sb-8003" && au.runs.held[0].dark === 8101 && au.runs.held[0].belief === 0.9 && au.runs.held[0].flight === 0.8 && J(au.runs.held[0].bins) === "[0.1,0.2,0.3,0.4]" && au.range.from === 8001 && au.seconds === 33);
+    ok("!! audit flies H4's navigator and leaky-unit arms (H4's own arm objects) on the FIRST THREE ids with the same seconds, and keeps their belief, flight and key", J(h4calls) === J([["navigator", 8001, 33], ["navigator", 8002, 33], ["navigator", 8003, 33], ["leaky-unit", 8001, 33], ["leaky-unit", 8002, 33], ["leaky-unit", 8003, 33]]) && au.h4.navigator.length === 3 && au.h4["leaky-unit"][2].key === "sb-8003" && au.h4.navigator[0].belief === 0.9);
+    const two = X.audit(B0, { range: { from: 8001, to: 8002 }, seconds: 5, flightFn: fake, h4Fn: h4fake }), none = X.audit(B0, { range: { from: 8001, to: 8002 }, seconds: 5, flightFn: fake, withH4: false });
+    ok("!! with fewer than three ids audit flies H4's arms on the ids there are; withH4 false skips them and leaves h4 null", two.h4.navigator.length === 2 && none.h4 === null);
+}
+// a synthetic audit: n ids, per cell belief and flight lists; spec[cell] = { belief, flight (functions of the id index), lost: true, bins }
+const N = 40, wob = (i, a) => (i % 2 ? a : -a), base = (f) => Array.from({ length: N }, (_, i) => 0.6 + 0.02 * Math.sin(i + f));
+const mkAu = (spec = {}, n = N) => {
+    const runs = {};
+    for (const c of X.CELL_IDS) {
+        const s = spec[c] || {}, bf = s.belief || (() => 0), fl = s.flight || (() => 0);
+        runs[c] = Array.from({ length: n }, (_, i) => ({ key: "sb-" + (8000 + i), belief: base(0)[i % N] + bf(i) + (c === "held" ? 0 : (i % 2 ? 1 : -1) * 0.0001 * X.CELL_IDS.indexOf(c)), flight: base(1)[i % N] + fl(i) + (c === "held" ? 0 : (i % 2 ? 1 : -1) * 0.0001 * X.CELL_IDS.indexOf(c)), bad: !!s.lost && i < 2, dark: 100, bins: s.bins || [0.1, 0.2, 0.3, 0.4] }));
+    }
+    const h4 = { navigator: runs["navigator@0"].slice(0, 3).map((r) => ({ key: r.key, belief: r.belief, flight: r.flight })), "leaky-unit": runs["leaky-unit@0"].slice(0, 3).map((r) => ({ key: r.key, belief: r.belief, flight: r.flight })) };
+    return { runs, range: { from: 8000, to: 8000 + n - 1 }, seconds: 60, h4 };
+};
+const gain = (d) => ({ belief: (i) => d + wob(i, 0.02) }), levelsOf = (arm, ls, d) => Object.fromEntries(ls.map((l) => [X.cellId(arm, l), gain(d)]));
+const allMem = (d, arms = X.MEMORY_IDS, ls = [0, 1, 2, 3]) => Object.assign({}, ...arms.map((a) => levelsOf(a, ls, d)));
+sec("6. VERDICT");
+{
+    const v = (spec) => X.verdictOf(mkAu(spec)), ok0 = allMem(0.2);
+    ok("!! all memories 0.2 above held at every level: THE MEMORY SURVIVES THE GYRO", v(ok0) === "THE MEMORY SURVIVES THE GYRO" && X.survival(mkAu(ok0)).survives === true && X.survival(mkAu(ok0)).failLevel === null);
+    ok("!! the navigator no better than held at level 2 (a tie): THE MEMORY FAILS AT LEVEL 2: navigator; at level 3 only: LEVEL 3; at level 1 only: LEVEL 1", v({ ...ok0, ...levelsOf("navigator", [2], 0) }) === "THE MEMORY FAILS AT LEVEL 2: navigator" && v({ ...ok0, ...levelsOf("navigator", [3], 0) }) === "THE MEMORY FAILS AT LEVEL 3: navigator" && v({ ...ok0, ...levelsOf("navigator", [1], 0) }) === "THE MEMORY FAILS AT LEVEL 1: navigator");
+    ok("!! the leaky unit WORSE than held at level 3 names it (WORSE fails as a tie does); both failing at one level name both in the order navigator, leaky-unit", v({ ...ok0, ...levelsOf("leaky-unit", [3], -0.2) }) === "THE MEMORY FAILS AT LEVEL 3: leaky-unit" && v({ ...ok0, ...levelsOf("navigator", [2], 0), ...levelsOf("leaky-unit", [2], -0.1) }) === "THE MEMORY FAILS AT LEVEL 2: navigator, leaky-unit");
+    ok("!! the LOWEST failing level is named: the leaky unit failing at level 1 and the navigator at level 3 give LEVEL 1: leaky-unit only (the navigator is not named: it fails later)", v({ ...ok0, ...levelsOf("leaky-unit", [1], 0), ...levelsOf("navigator", [3], 0) }) === "THE MEMORY FAILS AT LEVEL 1: leaky-unit");
+    ok("!! level 0 is not part of the verdict (a memory that ties held at level 0 but beats it at 1 to 3 survives), and fly and er failing everywhere do not count", v({ ...ok0, ...levelsOf("navigator", [0], 0) }) === "THE MEMORY SURVIVES THE GYRO" && v({ ...ok0, ...allMem(-0.3, ["fly", "er"]) }) === "THE MEMORY SURVIVES THE GYRO");
+    ok("!! the verdict reads BELIEF, not flight: a navigator that flies 0.2 better than held but believes level 3 no better fails; one that believes 0.2 better and flies worse survives", v({ ...ok0, "navigator@3": { belief: gain(0).belief, flight: (i) => 0.2 + wob(i, 0.02) } }) === "THE MEMORY FAILS AT LEVEL 3: navigator" && v({ ...ok0, "navigator@3": { belief: gain(0.2).belief, flight: (i) => -0.3 + wob(i, 0.02) } }) === "THE MEMORY SURVIVES THE GYRO");
+    { const au = mkAu({ "navigator@3": { belief: (i) => 0.3 + wob(i, 0.02), flight: (i) => 0.1 + wob(i, 0.02) } });
+      const d = X.pairOf(au, "navigator@3", "held", "belief"), f = X.pairOf(au, "navigator@3", "held", "flight"), back = X.pairOf(au, "held", "navigator@3", "belief");
+      ok("!! pairOf is a minus b on the field asked for: +0.3 belief and +0.1 flight over held read about +0.3 BETTER and +0.1 BETTER, held against it about -0.3 WORSE; belief is the default field", d.reading === "BETTER" && near(d.mean, 0.3, 2e-3) && f.reading === "BETTER" && near(f.mean, 0.1, 2e-3) && back.reading === "WORSE" && near(back.mean, -0.3, 2e-3) && X.pairOf(au, "navigator@3", "held").mean === d.mean && J(X.pairOf(au, "navigator@3", "held", "flight")) === J(f), `${d.mean.toFixed(4)} ${f.mean.toFixed(4)}`);
+      const m = (a, fld) => au.runs[a].reduce((x, r) => x + r[fld], 0) / au.runs[a].length;
+      ok("!! meanOf is a cell's mean of the field asked for (belief and flight differ for the navigator at level 3 and each equals the hand-computed mean); errorOf is the mean over the ids of (1 - belief) x pi", near(X.meanOf(au, "navigator@3", "belief"), m("navigator@3", "belief"), 1e-12) && near(X.meanOf(au, "navigator@3", "flight"), m("navigator@3", "flight"), 1e-12) && Math.abs(X.meanOf(au, "navigator@3", "belief") - X.meanOf(au, "navigator@3", "flight")) > 0.1 && near(X.errorOf(au, "navigator@3"), (1 - m("navigator@3", "belief")) * Math.PI, 1e-12)); }
+    ok("!! costOf is the level minus level 0 on belief for a memory: the navigator at level 3 0.3 below level 0 reads about -0.3 WORSE, and level 1 and 2 are read when asked for", (() => { const au = mkAu({ ...levelsOf("navigator", [0], 0.5), ...levelsOf("navigator", [1], 0.45), ...levelsOf("navigator", [2], 0.4), ...levelsOf("navigator", [3], 0.2) }), c3 = X.costOf(au, "navigator"), c1 = X.costOf(au, "navigator", 1), c2 = X.costOf(au, "navigator", 2); return near(c3.mean, -0.3, 2e-3) && c3.reading === "WORSE" && near(c1.mean, -0.05, 2e-3) && near(c2.mean, -0.1, 2e-3) && X.costOf(au, "navigator", 3).mean === c3.mean; })());
+    ok("!! profileOf is the mean over the ids of the rms error in each bin (nulls left out of that bin): ids with bins [0.1, 0.2, 0.3, 0.4] and, on half of them, a null in the last bin give 0.1, 0.2, 0.3 and 0.4 (the nulls are not zeros)", (() => { const au = mkAu({}); au.runs.held.forEach((r, i) => { if (i % 2) r.bins = [0.1, 0.2, 0.3, null]; }); const p = X.profileOf(au, "held"); return near(p[0], 0.1, 1e-12) && near(p[3], 0.4, 1e-12) && p.length === 4; })());
+}
+sec("7. LINES");
+{
+    const L = (spec) => X.bottomLines(mkAu(spec)), ok0 = allMem(0.2), a = L(ok0);
+    ok("!! a clean survival: line 1 gives each level's four readings (BETTER at 0..3), line 2 the rms errors by level, line 3 the cost of level 3 (TIES), line 4 the profile, line 5 the flight (TIES), line 6 SURVIVES, line 7 zero lost", a.length === 7 && a[0] === "BELIEF AGAINST THE HELD HEADING, BY LEVEL: L0 navigator BETTER, leaky-unit BETTER, fly BETTER, er BETTER; L1 navigator BETTER, leaky-unit BETTER, fly BETTER, er BETTER; L2 navigator BETTER, leaky-unit BETTER, fly BETTER, er BETTER; L3 navigator BETTER, leaky-unit BETTER, fly BETTER, er BETTER" && /^GYRO ERROR IN THE BELIEF \(rms rad, mean over the ids, levels 0\/1\/2\/3\): navigator \d\.\d+\/\d\.\d+\/\d\.\d+\/\d\.\d+; leaky-unit \d\.\d+\/\d\.\d+\/\d\.\d+\/\d\.\d+; held \d\.\d+$/.test(a[1]) && /^THE ROUGH GYRO COSTS THE NAVIGATOR \+0\.0000 IN BELIEF \(TIES\); THE LEAKY UNIT \+0\.0000 \(TIES\)$/.test(a[2]) && a[3] === "WINDOW PROFILE, NAVIGATOR AT LEVEL 3 (rms rad by 4 s bin): 0.100, 0.200, 0.300, 0.400" && a[4] === "FLIGHT AT LEVEL 3: navigator TIES, leaky-unit TIES AGAINST THE HELD HEADING" && a[5] === "VERDICT: THE MEMORY SURVIVES THE GYRO" && a[6] === "LOST SUBS: held 0, memories 0 (0 in the worst)", J(a));
+    const b = L({ ...ok0, ...levelsOf("navigator", [3], 0), ...levelsOf("leaky-unit", [3], -0.2), "navigator@0": { belief: (i) => 0.5 + wob(i, 0.02) } });
+    ok("!! a failing case: line 1 shows TIES for the navigator and WORSE for the leaky unit at level 3, line 3 the navigator's cost of level 3 about -0.5 (WORSE) and the leaky unit's about -0.4 (WORSE), line 6 FAILS AT LEVEL 3 naming both", /L3 navigator TIES, leaky-unit WORSE, fly BETTER, er BETTER$/.test(b[0]) && /^THE ROUGH GYRO COSTS THE NAVIGATOR -0\.5000 IN BELIEF \(WORSE\); THE LEAKY UNIT -0\.4000 \(WORSE\)$/.test(b[2]) && b[5] === "VERDICT: THE MEMORY FAILS AT LEVEL 3: navigator, leaky-unit", b[2] + " | " + b[5]);
+    const fl = L({ ...ok0, "navigator@3": { belief: gain(0.2).belief, flight: (i) => 0.2 + wob(i, 0.02) }, "leaky-unit@3": { belief: gain(0.2).belief, flight: (i) => -0.2 + wob(i, 0.02) } })[4];
+    ok("!! line 5 reads the flight at level 3 against held, per memory: BETTER for a navigator +0.2, WORSE for a leaky unit -0.2", fl === "FLIGHT AT LEVEL 3: navigator BETTER, leaky-unit WORSE AGAINST THE HELD HEADING", fl);
+    const pr = L({ "navigator@3": { bins: [0.05, 0.1, 0.2, 0.7] } })[3], p0 = L({ "navigator@0": { bins: [0.9, 0.9, 0.9, 0.9] } })[3];
+    ok("!! line 4 is the navigator's profile at LEVEL 3 (not level 0, not another memory's)", pr === "WINDOW PROFILE, NAVIGATOR AT LEVEL 3 (rms rad by 4 s bin): 0.050, 0.100, 0.200, 0.700" && p0 === "WINDOW PROFILE, NAVIGATOR AT LEVEL 3 (rms rad by 4 s bin): 0.100, 0.200, 0.300, 0.400");
+    const e = L({ "navigator@2": { belief: () => -0.1 }, "navigator@3": { belief: () => -0.3 } })[1];
+    ok("!! line 2 gives each level's error in order and the held error last: navigator error grows with the level when belief falls", (() => { const m = /navigator (\d\.\d+)\/(\d\.\d+)\/(\d\.\d+)\/(\d\.\d+); leaky-unit/.exec(e); return !!m && +m[4] > +m[3] && +m[3] > +m[2] && Math.abs(+m[1] - +m[2]) < 0.01 && /held \d\.\d+$/.test(e); })(), e);
+    const l = L({ held: { lost: true }, "navigator@0": { lost: true }, "navigator@3": { lost: true }, "er@2": { lost: true }, "leaky-unit@1": { lost: true } })[6];
+    ok("!! lost subs are counted over the cells: held 2 (two ids), memories 8 (four cells of two ids) with 2 in the worst", l === "LOST SUBS: held 2, memories 8 (2 in the worst)", l);
+}
+sec("8. CHECKS");
+{
+    const names = (au) => X.checksOf(au).filter((c) => !c.ok).map((c) => c.name), rising = { ...allMem(0.2), "navigator@3": { belief: gain(0.2).belief, bins: [0.1, 0.2, 0.3, 0.5] } }, good = () => mkAu(rising);
+    ok("!! seven check rows on a clean audit, all passing", J(X.checksOf(good()).map((c) => c.name)) === J(["SIZES", "IDS ALIGNED", "SCORES INSIDE (0, 1)", "DARK TICKS EXIST", "LEVEL 0 IS H4'S ARM", "THE BIAS INTEGRATES", "CELLS DISTINCT"]) && names(good()).length === 0);
+    const a1 = good(); a1.runs["er@3"].pop(); const a2 = good(); a2.runs["fly@1"][3].key = "x"; const a3 = good(); a3.runs.held[0].belief = 1.0; const a4 = good(); a4.runs["navigator@2"][5].dark = 0; const a5 = good(); a5.runs["leaky-unit@1"][2].flight = 0;
+    ok("!! a short cell breaks SIZES, a different id IDS ALIGNED, a belief of 1 or a flight of 0 SCORES INSIDE, a run with no dark tick DARK TICKS EXIST", names(a1).includes("SIZES") && names(a2).includes("IDS ALIGNED") && names(a3).includes("SCORES INSIDE (0, 1)") && names(a5).includes("SCORES INSIDE (0, 1)") && names(a4).includes("DARK TICKS EXIST"));
+    const b1 = good(); b1.h4.navigator[1].belief += 1e-6; const b2 = good(); b2.h4["leaky-unit"][2].flight += 1e-6; const b3 = good(); b3.h4 = null; const b4 = good(); b4.h4.navigator[0].key = "sb-1"; const b5 = good(); b5.h4.navigator[2].belief += 1e-10; const b6 = good(); b6.h4.navigator = [];
+    ok("!! a navigator belief off H4's by 1e-6, a leaky-unit flight off by 1e-6, no H4 record, a different key or an empty record breaks LEVEL 0 IS H4'S ARM; an error of 1e-10 is inside the tolerance", [b1, b2, b3, b4, b6].every((a) => names(a).includes("LEVEL 0 IS H4'S ARM")) && !names(b5).includes("LEVEL 0 IS H4'S ARM"));
+    const c1 = good(); c1.runs["navigator@3"].forEach((r) => { r.bins = [0.3, 0.2, 0.2, 0.3]; }); const c2 = good(); c2.runs["navigator@3"].forEach((r) => { r.bins = [0.3, 0.3, 0.3, 0.3]; }); const c3 = good(); c3.runs["navigator@3"].forEach((r) => { delete r.bins; });
+    ok("!! a profile whose last bin is below its first, or equal to it, or missing, breaks THE BIAS INTEGRATES; the row reads the navigator at level 3 (a rising profile elsewhere does not help)", names(c1).includes("THE BIAS INTEGRATES") && names(c2).includes("THE BIAS INTEGRATES") && names(c3).includes("THE BIAS INTEGRATES"));
+    const d1 = good(); d1.runs["fly@2"] = d1.runs["fly@1"].map((r) => ({ ...r })); const d2 = good(); d2.runs["er@0"] = d2.runs.held.map((r) => ({ ...r }));
+    ok("!! two identical cells break CELLS DISTINCT, as does a memory cell identical to held", names(d1).includes("CELLS DISTINCT") && names(d2).includes("CELLS DISTINCT"));
+    const e1 = good(); e1.range = { from: 8000, to: 8000 + N }; const e2 = good(); e2.runs.held.push({ key: "sb-8040", belief: 0.5, flight: 0.5, dark: 1, bins: [0, 0, 0, 0] });
+    ok("!! a range of 41 ids with 40 runs and a cell one run too long both break SIZES", names(e1).includes("SIZES") && names(e2).includes("SIZES"));
+}
+sec("9. REPORT");
+{
+    const au = mkAu({ ...allMem(0.2), "navigator@3": { belief: gain(0.2).belief, bins: [0.1, 0.2, 0.3, 0.5] } }), L = X.report(au), t = L.join("\n");
+    ok("!! the head names the ids, the seconds and 'read once'; the seven checks pass first", /^ROUND H8: .* Ids 8000-8039 \(40\), 60 s, one sub per tank; read once$/.test(L[0]) && L.slice(1, 8).every((l) => /^  PASS /.test(l)));
+    const m = (c, f) => au.runs[c].reduce((s, r) => s + r[f], 0) / au.runs[c].length, row = (c) => t.split("\n").find((l) => l.startsWith("  " + c.padEnd(16) + " "));
+    ok("!! the means table prints each of the seventeen cells' belief rms error, belief and flight to four places", X.CELL_IDS.every((c) => !!row(c) && row(c).startsWith(`  ${c.padEnd(16)} ${((1 - m(c, "belief")) * Math.PI).toFixed(4)} / ${m(c, "belief").toFixed(4)} / ${m(c, "flight").toFixed(4)}`)), row("navigator@3"));
+    ok("!! an against-held block (belief, flight) for each of the sixteen memory cells, and held itself has none", X.CELL_IDS.filter((c) => c !== "held").every((c) => new RegExp("^" + c.replace("@", "@") + ":\\n   belief .*\\n   flight ", "m").test(t)) && !/^held:/m.test(t));
+    ok("!! a level-minus-level-0 line for each memory at levels 1, 2 and 3 (twelve), and a window-profile line for each memory at each level (sixteen) with four numbers", X.MEMORY_IDS.every((a) => [1, 2, 3].every((l) => new RegExp(`^${a} level ${l}: [+-]\\d`, "m").test(t))) && X.MEMORY_IDS.every((a) => [0, 1, 2, 3].every((l) => new RegExp(`^  ${a}@${l}\\s+\\d\\.\\d{3} \\d\\.\\d{3} \\d\\.\\d{3} \\d\\.\\d{3}$`, "m").test(t))) && /^  navigator@3\s+0\.100 0\.200 0\.300 0\.500$/m.test(t));
+    ok("!! the seven bottom lines come last, each prefixed BOTTOM LINE:", L.slice(-7).every((l) => l.startsWith("BOTTOM LINE: ")) && /^BOTTOM LINE: BELIEF AGAINST/.test(L[L.length - 7]) && /VERDICT: /.test(L[L.length - 2]) && /LOST SUBS/.test(L[L.length - 1]));
+    const bad = mkAu({}); bad.runs.held.pop(); const Lb = X.report(bad);
+    ok("!! a failed check says the verdicts are NOT WEIGHED, with one bottom line and no table", Lb.some((l) => /^  FAIL SIZES/.test(l)) && Lb.includes("A CHECK FAILED: the verdicts below are NOT WEIGHED.") && Lb[Lb.length - 1] === "BOTTOM LINE: NOT WEIGHED (a check failed)" && Lb.filter((l) => l.startsWith("BOTTOM LINE")).length === 1 && !/means \(belief/.test(Lb.join("\n")));
+}
+sec("10. SOURCE");
+{
+    ok("!! the ids 8000 and 8199 appear once each; no clock, no random number, nothing read from the disk", code.split("8000").length === 2 && code.split("8199").length === 2 && !/Date\.now|Math\.random|performance\.now|readFileSync|writeFileSync/.test(code));
+}
+console.log(fails ? `\n${fails} FAIL` : "\nall checks pass");
+finished = true;
