@@ -12,6 +12,8 @@
 //   6 REPORT    the means table with the held-out scores, the gain blocks, the lines last.
 //   7 FLIGHT    one real short audit (ids 0-1, 30 s): the replicate arms seated as 963-weight networks, the shipped weights, deterministic, the checks pass.
 //   8 SOURCE    the ids appear once; no clock, random or file.
+// SABOTAGE LOG (144 mutants of tools/ship/headToHead7.mjs, each alone in its own worktree copy): 128 went red by name on the first pass. 16 went 0 red; 14 got a row and went red: the base search ignoring the training dives, the sigma, the prune or swapping its improving and neutral counts (a pinned tiny search, a 40-iteration search read against the policy's own train + prune, a sigma that must change the weights), the robust search's held-out score taken over the wrong vessels, its sigma and weights-per-step ignored, an arm's weights not copied, network-Wip seated with the Robust weights, the report's robust rows reading the base champions, the correlation line reading the wrong recipe's held-out scores (the fixture's two held-out lists now have opposite slopes), and a correlation of two numbers refused.
+//   Two are EQUIVALENT and declared: the models cached or rebuilt on every call (a speed difference only), and `>=` against `>` in the robust search's improving step at a margin of exactly 1e-9.
 // NOT CHECKED, said plainly: whether ten replicates are enough to see a recipe effect smaller than the spread (they are not, and the verdict says so in its words), and that the robust recipe's five vessels, which the dropout does not use, are the right thing to vary.
 "use strict";
 import fs from "node:fs";

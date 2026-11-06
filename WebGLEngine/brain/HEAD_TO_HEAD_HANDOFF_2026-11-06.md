@@ -30,3 +30,7 @@ A memory score with a noisy gyro (every integrator here is fed the exact heading
 - Owed at ship, as for H2/H4/H5: timings for the new gate (boxTimings), knowledge index rebuild, census restatements for the new files, the handover row.
 - H6 verdict: NOT ASSESSED (tuning gained +0.0104 against the networks' +0.0904) and every champion sits on the search bounds; wider-box and dropout-objective tuning are untried.
 - H7 (recipe vs luck, heavy training) and H8 (memory with a noisy gyro) are NOT started. H8 needs a design step first: the tank has no gyro-noise model and the leaky unit and navigator read the exact body rate, so a noisy-gyro round needs a rate-noise wrapper on those two pilots (and its own gate) before it can be registered.
+
+## Added after H7 build (2026-11-06)
+- New files: `tools/ship/headToHead7.mjs`, `headToHead7Cmd.mjs`, `headToHead7-selfcheck.mjs` (gate, ~16 s; mutation log in its header: 144 mutants, 128 red first pass, 14 rows added, 2 declared equivalent). H7 is REGISTERED in `brain/HEAD_TO_HEAD.md`; the training (80 searches, about 17 hours of one core) and the flight are NOT run: run them on the rig (`node tools/ship/headToHead7Cmd.mjs train --workers 12`, then `fly`).
+- Owed at ship, as for H2 to H6: timings for the new gate, knowledge index rebuild, census restatements, the handover row.
