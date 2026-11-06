@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/headToHead2-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node tools/ship/headToHead2-selfcheck.mjs      (~0.2-12 s: hand fixtures and one short real audit)
+// Run: node tools/ship/headToHead2-selfcheck.mjs      (~3 s: hand fixtures and one short real audit; 3.0-3.3 s on this box)
 //
 // THE GATE OF tools/ship/headToHead2.mjs (Round H2 of brain/HEAD_TO_HEAD.md, registered first).
 //   1 SETS      the seventeen arms, the eight network names, the five plain-net specs, the ids 3000-3199 (disjoint from H1's 2000-2199, the unregistered looks' 1-12 and 9001-9060 and every gate's ids), 160 s; boardOf's refusals and controls.
@@ -91,6 +91,8 @@ sec("3. LINES");
     ok("!! a network that beats four of the five plain nets (one plain net is +0.3 over it) is NOT in the beat-all-five list: Wip at +0.2 against E/E/mn:0 at +0.3 and four level plain nets", /; none BEAT ALL FIVE PLAIN NETS$/.test(part) && /4 OF 40 PAIRS READ BETTER/.test(part), part);
     const vl = L({ [pid("P/B/mn:3")]: { dark: () => 0 }, "leaky-unit": { dark: (i) => -0.2 + wob(i, 0.02) } })[3], vl2 = L({ [pid("P/B/mn:3")]: { dark: (i) => 0.2 + wob(i, 0.02) } })[3];
     ok("!! line 4 reads against the LEAKY UNIT: a plain net level with the autopilot above a leaky unit at -0.2 beats it (P/B/mn:3 is named, five at most), while a plain net at +0.2 over the autopilot and a level leaky unit is named too; a plain net level with a level leaky unit is not", vl === "5 OF 5 PLAIN NETS BEAT THE LEAKY UNIT IN THE DARK (P/B/mn:3, P/whole/mn:0, E/whole/mn:1, P/B/mg:0, E/E/mn:0)" && vl2 === "1 OF 5 PLAIN NETS BEAT THE LEAKY UNIT IN THE DARK (P/B/mn:3)", vl + " | " + vl2);
+    { const au = mkAu({ "network-Robust": { dark: (i) => 0.2 + wob(i, 0.02) }, [pid("P/B/mg:0")]: { dark: (i) => 0.05 + wob(i, 0.02) } }), ps = X.networkPlainPairs(au), r = ps.find((x) => x.network === "Robust" && x.plain === "P/B/mg:0"), back = ps.find((x) => x.network === "Wip" && x.plain === "P/B/mg:0");
+      ok("!! networkPlainPairs is 40 pairs, network-major then spec order, each the NETWORK minus the PLAIN NET in the dark: Robust at +0.2 over P/B/mg:0 at +0.05 reads about +0.15 BETTER, and the level Wip against the same plain net about -0.05 WORSE", ps.length === 40 && J(ps.slice(0, 5).map((x) => x.plain)) === J(X.PLAIN_SPECS) && ps[0].network === "Wip" && ps[5].network === "Actuators" && r.p.reading === "BETTER" && near(r.p.mean, 0.15, 2e-3) && back.p.reading === "WORSE" && near(back.p.mean, -0.05, 2e-3), `${r.p.mean.toFixed(4)} ${back.p.mean.toFixed(4)}`); }
     const n5 = L({ ...up(["network-Wip", "network-RobustNoisy"], 0.1, 0), "network-Robust": { dark: (i) => 0.1 + wob(i, 0.02), lit: (i) => 0.1 + wob(i, 0.02) } })[4];
     ok("!! line 5: three networks beat the autopilot in the dark (Wip, Robust, RobustNoisy); the dark-specific ones are the two with a dark-only gain (the third has the same gain lit), named in network order", n5 === "3 OF 8 NETWORKS BEAT THE AUTOPILOT IN THE DARK; THE GAIN IS DARK-SPECIFIC IN 2 (Wip, RobustNoisy)", n5);
     const l = L({ autopilot: { lost: ["dark", "lit"] }, "leaky-unit": { lost: ["lit"] }, [pid("P/B/mn:3")]: { lost: ["dark"] }, [pid("E/E/mn:0")]: { lost: ["dark", "lit"] }, "network-Wip": { lost: ["dark"] }, "network-Robust": { lost: ["dark", "lit"] } })[5];
