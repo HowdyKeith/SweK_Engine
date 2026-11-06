@@ -1,7 +1,7 @@
 {
  "host": "linux-x64-4c-16gb-142c0d",
  "note": "THIS BOX'S OWN gate runtimes, written by tools/ship/boxTimings.mjs. The shared sweep-timings.json is host-claimed and a foreign box cannot write it (v4647, and that refusal is right); this is how a box records what IT measured without overwriting another machine's numbers. `kinds` says which quantity each ms is, as in the shared record: `alone` is an uncontended serial reading, `capped` is a FLOOR and not a runtime. Read for COVERAGE -- has this gate ever been timed -- and NOT for the ship-time budget, which still reads the shared file. See task #87. `serialRing` holds the last three alone readings; recordReach's margin row reads it on a box that does not own the shared record, because that row asks what a gate costs HERE and nothing here can refresh another box's ring.",
- "captured": "2026-11-06T02:37:01.037Z",
+ "captured": "2026-11-06T02:51:50.265Z",
  "timings": {
   "render/denoiseDevice-selfcheck.mjs": 5461,
   "render/denoiseTiming-selfcheck.mjs": 8195,
@@ -66,7 +66,8 @@
   "tools/ship/plannerRound-selfcheck.mjs": 14103,
   "tools/ship/plannerReplicate-selfcheck.mjs": 4284,
   "tools/ship/plannerTolerance-selfcheck.mjs": 13638,
-  "tools/ship/headToHead2-selfcheck.mjs": 2833
+  "tools/ship/headToHead2-selfcheck.mjs": 2833,
+  "tools/ship/headToHead4-selfcheck.mjs": 643
  },
  "at": {
   "render/denoiseDevice-selfcheck.mjs": "2026-10-09T21:00:45.655Z",
@@ -132,7 +133,8 @@
   "tools/ship/plannerRound-selfcheck.mjs": "2026-11-02T20:40:38.053Z",
   "tools/ship/plannerReplicate-selfcheck.mjs": "2026-11-02T20:40:38.053Z",
   "tools/ship/plannerTolerance-selfcheck.mjs": "2026-11-02T20:40:38.053Z",
-  "tools/ship/headToHead2-selfcheck.mjs": "2026-11-06T02:37:01.037Z"
+  "tools/ship/headToHead2-selfcheck.mjs": "2026-11-06T02:37:01.037Z",
+  "tools/ship/headToHead4-selfcheck.mjs": "2026-11-06T02:51:50.265Z"
  },
  "kinds": {
   "render/denoiseDevice-selfcheck.mjs": "alone",
@@ -198,7 +200,8 @@
   "tools/ship/plannerRound-selfcheck.mjs": "alone",
   "tools/ship/plannerReplicate-selfcheck.mjs": "alone",
   "tools/ship/plannerTolerance-selfcheck.mjs": "alone",
-  "tools/ship/headToHead2-selfcheck.mjs": "alone"
+  "tools/ship/headToHead2-selfcheck.mjs": "alone",
+  "tools/ship/headToHead4-selfcheck.mjs": "alone"
  },
  "codes": {
   "render/denoiseDevice-selfcheck.mjs": 0,
@@ -264,7 +267,8 @@
   "tools/ship/plannerRound-selfcheck.mjs": 0,
   "tools/ship/plannerReplicate-selfcheck.mjs": 0,
   "tools/ship/plannerTolerance-selfcheck.mjs": 0,
-  "tools/ship/headToHead2-selfcheck.mjs": 0
+  "tools/ship/headToHead2-selfcheck.mjs": 0,
+  "tools/ship/headToHead4-selfcheck.mjs": 0
  },
  "serialRing": {
   "render/denoiseDevice-selfcheck.mjs": [
@@ -581,6 +585,11 @@
    3117,
    3042,
    2833
+  ],
+  "tools/ship/headToHead4-selfcheck.mjs": [
+   770,
+   653,
+   643
   ]
  }
 }

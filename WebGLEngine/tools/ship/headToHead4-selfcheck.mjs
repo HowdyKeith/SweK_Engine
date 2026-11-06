@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/headToHead4-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node tools/ship/headToHead4-selfcheck.mjs      (~5-15 s: hand fixtures and one short real audit)
+// Run: node tools/ship/headToHead4-selfcheck.mjs      (~0.7-0.9 s: hand fixtures and one short real audit)
 //
 // THE GATE OF tools/ship/headToHead4.mjs (Round H4 of brain/HEAD_TO_HEAD.md, registered first).
 //   1 SETS      the six arms and their events, the four read arms, the ids 4000-4199 (disjoint from H1's, H2's, the looks' and every gate's ids), 160 s; armsOf's refusals and builders; audit() calls the flight per arm and id and keeps what it returns.
