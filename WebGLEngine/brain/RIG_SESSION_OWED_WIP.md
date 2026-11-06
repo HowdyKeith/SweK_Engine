@@ -22,6 +22,7 @@ Each is resumable (a second run skips what is in the file) and writes one line p
 **Step 2, the one verify (about the usual length of a verify).** On the rig, the GitHub panel's `Clone -> verify` of main's tip (or `node tools/ship/shipVerdict.mjs --version <tip>` in a fresh clone). This is the answer to "rig verdicts never asked". Send back the verdict's last line and the names of any red gates. Two things to watch for in it, from the entries:
 
 * v4880's note: "the rig-only non-zero exit in one of seven gates (avatarServerViews, boundaryLint, canvasFill, homography, proseAudit, registerResidue, wasmSupport) is still unidentified". Nothing later says which, or that it was closed. If one of those seven is red, it is that one.
+* `brain/WIN_PATH_PROBE_2026-11-06.md` lists 51 gates that are red only under the sandbox's win32 spelling, among them `homography` and `registerResidue` (two of v4880's seven) and `declaredCost` and `strandCensus` (v4910's two). It is a candidate list with unknown precision: compare it with this verify's reds, and a gate on both is a Windows bug the sandbox can now reproduce.
 * v4911's two reds that were "handed back as rig-side steps": `declaredCost` (new gates with a declared cost and no timing record on the rig) and `strandCensus` (`ai-bridge/apks` left untracked and unignored by `routeShadow-selfcheck` on that box). Whether they were done is not recorded in the entries I read.
 
 **Step 3, the looks (real GPU, a real browser window, not headless).** These are looks that were only ever taken in headless Chromium on a software adapter. Each is one sentence of what to do and one of what a wrong picture looks like.
@@ -44,7 +45,7 @@ Each is resumable (a second run skips what is in the file) and writes one line p
 * The ocean's costs on both GPUs: v4894 slice 5.
 * The record probe's kill rows on win32: v4893 (green on the rig's win32 box, run alone at 7fbce89e).
 * The advisor study (Round 5): read in v4907.
-* The Windows path class of failure: `node tools/ship/winPathLint.mjs --probe --changed` now reproduces it in the sandbox (this tree, 2026-11-06).
+* The two fixture classes of the Windows path failure (a stub keyed by a posix path; `path.relative` against a posix name): `node tools/ship/winPathLint.mjs --probe <gate>` reproduces both exactly in the sandbox. That is a tool, not a reading of the rig.
 
 ## 3. Not checked here, said plainly
 

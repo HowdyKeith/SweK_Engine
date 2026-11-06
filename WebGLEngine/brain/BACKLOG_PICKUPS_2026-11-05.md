@@ -70,3 +70,22 @@ Read the CHECK lines of each report first; a failed check is the first line and 
 * **The `nav-*` items of `brain/BACKLOG_2026-11-01.md` section A:** not addressed in this stretch.
 * **Anything on the board itself:** it is not in this tree. The gates apply a copy of the board's acceptance rules and fly a copy of its dropout loop.
 * **Gate census and the ship:** new gates this stretch: `tools/ship/tankPairedReplicate-selfcheck.mjs`, `brain/pilotSubPlain-selfcheck.mjs`, `render/subAquariumFish-selfcheck.mjs`, `render/subAquariumPlain14-selfcheck.mjs`, `tools/ship/plainNetVariants-selfcheck.mjs` (and the earlier three); the knowledge-index bake at ship time picks them up. **Orphan scan:** `orphanScan-selfcheck` is green only because `takeTankDropout.mjs` imports the leaky, plain-net, fish and plain14 modules; `plainNetVariants`, `tankPairedReplicate` and the other commands are entry points in `tools/ship/`; if the merge replaces `takeTankDropout` with the board's command, those rows need the board to import the modules, or the command stays. This stretch's work was pushed to `claude/sweet-lovelace-8leivh` only; `main` is untouched.
+
+## The 2026-11-06 stretch (Keith: "lets do these backlog items ... also, lets run the plain-net variants on the rig")
+
+| id | status |
+|---|---|
+| (merge) | main (v4912, "hound h" proceeding) merged into this branch with no conflict. |
+| `fish-wiring-rank-circuits` (Addendum 17 of rung 4b) | **REGISTERED AND BUILT, NOT RUN:** `brain/FISH_WIRING_RANK_WIP.md`. 64 new shuffled-wiring circuits (generation 7) and the real wiring ranked as ONE circuit among 44, p = rank/45, SUPPORTED per cell iff p <= 0.05. **My forecast was wrong before any circuit was trained and is corrected in section 7:** Addendum 12's file has a single-circuit sd of 0.033 / 0.020, not 0.015, so the test clears the line about 1 and 4 percent of the time on my weights (2.4 and 12 percent even if the whole observed 0.02 gap is real); a NOT SUPPORTED will say little. Gate rows, 279 mutants of the changed lines (one real survivor, closed). ~21 core-hours. |
+| `brain-capability-map-refresh` | **DONE** (44c418b4): the cells for v4903, v4905 and v4911 read; the tally row and the rendered doc regenerated. |
+| `win-path-lint` | **DONE, with a candidate list:** `tools/ship/winPathLint.mjs` (five static rules, tree at its baseline) and `tools/ship/winPathShim.mjs` (`node --import`: a sandbox that spells paths the way the rig does); 221 + 22 mutants, all killed. First probe of the tree (1,110 path-using gates of 8 s or less): **51 are red only under the shim**, `brain/WIN_PATH_PROBE_2026-11-06.md`; whether they are red on the rig is unknown. The probe's first parallel run left eleven gates carrying an injected failure line (gateMutation); restored, none committed; the tool now guards against it. |
+| `sea-ogre-default-tactician` | **DONE, diagnosis corrected:** a wider fire gate does NOT cure the default (fireRange 380: 2 shots, 420: 7 shots, breached 6 of 6); passive fire on a loud contact does (blindSnr 22 alone: 48 shots, defended 6 of 6). `GUNNER_THETA` exported from `brain/seaOgre.mjs`, shared by the page and the gate; `THETA_DEFAULT` untouched. Torpedoes DO home (proportional navigation, `physics/mechanics/subTorpedo.mjs`, gated). The look on a real GPU is owed. |
+| `rig-session-owed` | **WRITTEN:** `brain/RIG_SESSION_OWED_WIP.md`. The 1080's rounds 33 to 35 are NOT owed any more (denoiser sections 100 and 102). |
+| `fly-plain-net-variants` on the rig | **NOT RUN:** the sandbox cannot reach the rig. The command is below. |
+
+Rig commands added:
+
+```
+node tools/ship/trainSubVestibularCmd.mjs run --specs wiringPermutations --out brain/rig-results/fishVestibularGen2.jsonl --workers 4   # ~21 core-hours; resumes Addendum 12's file
+node tools/ship/trainSubVestibularCmd.mjs report --in brain/rig-results/fishVestibularGen2.jsonl
+```

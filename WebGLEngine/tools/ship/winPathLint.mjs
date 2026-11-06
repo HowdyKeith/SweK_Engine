@@ -76,12 +76,12 @@ export const runNode = (args, o) => new Promise((resolve) => {
 /** The FAIL lines of a gate's output: a line that starts (after spaces) with FAIL, and a missing "all checks pass" reported as one more. */
 export const failsOf = (text) => String(text).split("\n").filter((l) => /^\s*FAIL\b/.test(l)).length;
 /**
- * One gate, plain and under the shim: { gate, plain: { fails, code }, shim: { fails, code }, verdict }. verdict: "NOT READ (BOTH KILLED AT THE TIMEOUT)", "SAME" (both give the same fails and exit code), "RED ONLY UNDER THE WIN32 SPELLING" (the rig's failure, reproduced), "GREEN ONLY UNDER THE SHIM" (odd: reported), "RED BOTH WAYS" (a gate red here already: not this probe's finding).
+ * One gate, plain and under the shim: { gate, plain: { fails, code }, shim: { fails, code }, verdict }. verdict: "NOT READ (BOTH KILLED AT THE TIMEOUT)", "SAME" (both give the same fails and exit code), "RED ONLY UNDER THE WIN32 SPELLING" (a CANDIDATE for the rig's failure: the fixture gates of the class are reproduced exactly, the shim is an over-approximation elsewhere), "GREEN ONLY UNDER THE SHIM" (odd: reported), "RED BOTH WAYS" (a gate red here already: not this probe's finding).
  * `run(args, opts)` is the process runner (for the gate): returns a promise of { stdout, stderr, status }; status null when the process was killed at `timeout`.
  */
 export async function probeGate(gate, { cwd = ENG, timeout = 300000, run = runNode } = {}) {
     const one = async (args) => { const r = await run(args, { cwd, timeout }); return { fails: failsOf((r.stdout || "") + "\n" + (r.stderr || "")), code: r.status === null || r.status === undefined ? -1 : r.status }; };
-    const [plain, shim] = await Promise.all([one([gate]), one(["--import", SHIM, gate])]);
+    const plain = await one([gate]), shim = await one(["--import", SHIM, gate]);   // ONE AFTER THE OTHER: two copies of a gate that writes a scratch file or watches for one (strandCensus) read each other's
     const same = plain.fails === shim.fails && plain.code === shim.code;
     if (plain.code === -1 && shim.code === -1) return { gate, plain, shim, verdict: "NOT READ (BOTH KILLED AT THE TIMEOUT)" };
     const verdict = same ? (plain.code === 0 && plain.fails === 0 ? "SAME" : "RED BOTH WAYS") : (plain.code === 0 && plain.fails === 0 ? "RED ONLY UNDER THE WIN32 SPELLING" : shim.code === 0 && shim.fails === 0 ? "GREEN ONLY UNDER THE SHIM" : "RED BOTH WAYS");
@@ -95,6 +95,8 @@ export function changedGates(git = (a) => spawnSync("git", a, { cwd: ENG, encodi
     return [...names].map((f) => (prefix && f.startsWith(prefix) ? f.slice(prefix.length) : f.replace(/^WebGLEngine\//, ""))).filter((f) => f.endsWith("-selfcheck.mjs") && fs.existsSync(path.join(ENG, f))).sort();
 }
 
+/** Gates that EDIT OTHER GATES to see whether they go red (gateMutation injects a forced failure into a gate and puts it back): never probed beside others, and left out of --all (in the first whole-tree probe eleven gates were left carrying the injected line). Name one explicitly to run it. */
+export const MUTATORS = Object.freeze(["tools/ship/gateMutation-selfcheck.mjs"]);
 export const USAGE = "usage: node tools/ship/winPathLint.mjs [--probe (<gate> ... | --changed | --all)] [--workers N]";
 /** The command. `io`: { print, err, scan, probe, changed, gates } for the gate. Exit 0 clean; 1 a rule over its baseline or a gate red only under the win32 spelling; 2 usage. */
 export async function main(argv, io = {}) {
@@ -116,16 +118,19 @@ export async function main(argv, io = {}) {
         else { if (mode && mode !== "names") { err(`${USAGE}   (--changed, --all and named gates are exclusive)`); return 2; } mode = "names"; names.push(a); }
     }
     if (!mode) { err(`${USAGE}   (--probe needs gates, --changed or --all)`); return 2; }
-    const list = mode === "--changed" ? (io.changed || changedGates)() : mode === "--all" ? (io.gates || (() => gatherFiles().filter((f) => f.endsWith("-selfcheck.mjs"))))() : names;
+    const list = mode === "--changed" ? (io.changed || changedGates)() : mode === "--all" ? (io.gates || (() => gatherFiles().filter((f) => f.endsWith("-selfcheck.mjs"))))().filter((f) => !MUTATORS.includes(f)) : names;
     if (!list.length) { print("winPathLint --probe: no gate to probe\n"); return 0; }
     const results = [], queue = [...list], probe = io.probe || ((g) => probeGate(g));
     const worker = async () => { while (queue.length) { const g = queue.shift(); results.push(await probe(g)); } };
     await Promise.all(Array.from({ length: Math.min(workers, list.length) }, worker));
+    const unconfirmed = [];
+    if (workers > 1) for (let i = 0; i < results.length; i++) if (results[i].verdict === "RED ONLY UNDER THE WIN32 SPELLING") { const again = await probe(results[i].gate); if (again.verdict !== "RED ONLY UNDER THE WIN32 SPELLING") { unconfirmed.push(results[i].gate); results[i] = again; } }   // a difference seen beside other gates counts only if it repeats ALONE
     results.sort((a, b) => (a.gate < b.gate ? -1 : 1));
     const L = [`winPathLint --probe: ${results.length} gate(s), each plain and under the win32 spelling (tools/ship/winPathShim.mjs)`];
     for (const r of results) L.push(`  ${r.verdict === "SAME" ? "same" : r.verdict}  ${r.gate}  (plain ${r.plain.fails} red, exit ${r.plain.code}; shim ${r.shim.fails} red, exit ${r.shim.code})`);
     const bad = results.filter((r) => r.verdict === "RED ONLY UNDER THE WIN32 SPELLING");
-    L.push(bad.length ? `PROBE: ${bad.length} gate(s) RED ONLY UNDER THE WIN32 SPELLING -- the rig would say the same: ${bad.map((r) => r.gate).join(", ")}` : "PROBE: no gate answers differently under the win32 spelling");
+    if (unconfirmed.length) L.push(`  differed beside other gates and not alone (not counted): ${unconfirmed.join(", ")}`);
+    L.push(bad.length ? `PROBE: ${bad.length} gate(s) RED ONLY UNDER THE WIN32 SPELLING -- CANDIDATES for a red on the rig, not a verdict (the shim respells relative() always and join() only for invented roots, so it can differ here where Windows would not): ${bad.map((r) => r.gate).join(", ")}` : "PROBE: no gate answers differently under the win32 spelling");
     print(L.join("\n") + "\n"); return bad.length ? 1 : 0;
 }
 
