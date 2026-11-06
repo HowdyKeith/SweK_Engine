@@ -11,7 +11,8 @@
 //   6 FLIGHT    one real short audit (ids 0-1, 40 s, the study's estimators from pilotDefs): the lesion IS the held heading, the navigator's belief is near exact, the leaky unit's is far better than the held heading's, deterministic.
 //   7 SOURCE    the ids appear once; no clock, random or file.
 // NOT CHECKED, said plainly: which memory is best (that is the experiment); that the leaky unit and navigator are realistic (they integrate the exact heading rate).
-// SABOTAGE LOG: see the end of this header once the mutation pass has been run.
+// SABOTAGE LOG (42 mutants of tools/ship/headToHead4.mjs, each alone in its own worktree copy): 33 went red by name on the first pass. 9 went 0 red and each got a row, then went red: belief counted over the valid ticks too; the belief taken as a mean absolute error instead of an RMS; the belief score without the division by pi; the settle age ignored; the settled-tick fallback dropped; a run with no dark tick no longer refused (these six by the scripted tank of section 1b, with answers computed by hand: `flight` takes an injectable tank for it); line 3's two readings taken against the held heading instead of the leaky unit; the event check read with `every` for `some` (fixtures added).
+//   The fixture lesson, as in H1 and H2: exact zero-mean pairs for the synthetic offsets, and the lesion gets none. And a finding the round's first smoke run made before any registered id was flown: the lesion arm equals the held heading to 1e-16, not exactly (the belief is read off an attitude recomputed through a rotation by zero), so the registered check reads "equals" as within 1e-9, amended in HEAD_TO_HEAD.md before the run.
 "use strict";
 import fs from "node:fs";
 let fails = 0, finished = false;
