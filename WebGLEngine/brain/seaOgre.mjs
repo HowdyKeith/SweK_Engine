@@ -4,7 +4,7 @@
 // submarine arena of brain/subDuel.mjs. N defending boats (any side of brain/subTournament.mjs: a hand tactician with the PD autopilot or the connectome-wired network) hold a headquarters at the origin against ONE
 // monster that is marching on it. This is ROUTE ONE of two: the OGRE here is a physics-arena body (a kinematic hull with hit zones), not the voxel game's own world; the voxel port is route two and is NOT done.
 //
-//   THE OGRE      a 40 m hull that steers for the headquarters at 2.6 m/s (turn limited) and is LOUD: its noise is a boat's at that speed plus 10 dB, so the defenders hear it from ~700 m. It has FOUR HIT ZONES on
+//   THE OGRE      a 40 m hull that steers for the headquarters at 2.3 m/s (turn limited) and is LOUD: its noise is a boat's at that speed plus 10 dB, so the defenders hear it from ~700 m. It has FOUR HIT ZONES on
 //                 top of the hull (the voxel OGRE's turret hard points, translated): TUBES (bow: without them it cannot fire), SONAR (without it, it is deaf and cannot aim), CANNON (the deck gun: without it
 //                 the surfaced bombardment stops) and ENGINE (stern: dead, it crawls at 40% speed). A torpedo detonates on the NEAREST zone (the proximity fuse of subTorpedo.mjs picks the closest target point): a hit on a
 //                 zone damages it fully and the hull for HALF of it (a zone that is gone is no longer a target, and the next hit goes to the next nearest); a hit on the hull damages the hull only.
@@ -36,6 +36,15 @@ export const OGRE = Object.freeze({
     phase2: 0.5, phase3: 0.2, escortEvery: 15, escortMax: 2, escortTtl: 35, escortHp: 30, escortSpeed: 3, escortBurst: 15, escortDamage: 35, spill: 0.5,
 });
 export const HQ_HP = 100, AMMO = 6;
+/**
+ * THE DEFENDERS' THETA FOR THIS LEVEL, the one the page, the gate and any caller share (it was a literal in two places): a hand tactician (brain/subTactics.mjs, over THETA_DEFAULT) that shoots at the OGRE, by the lever the level turns on. WHAT THE LEVEL TURNS ON, MEASURED
+ * (three defenders, scenarios 1..6, brain/seaOgre-selfcheck.mjs section 7 holds each number): the DEFAULT never fires (0 shots, breached 6 of 6). The backlog's reading -- "its fire gate waits for 320 m and the OGRE shoots from 380" -- is
+ * HALF RIGHT AND WIDENING THE GATE DOES NOT CURE IT: fireRange 380 gives 2 shots in all 18 boat-fights and fireRange 420 gives 7, and both are still breached 6 of 6, because the default fires only on a fresh ACTIVE echo (blindSnr 99 switches the
+ * passive shot off) and fresh echoes are few (WHY they are few -- range, aim, the look cadence -- is NOT measured here). PASSIVE FIRE ON A LOUD CONTACT is the lever: blindSnr 22 alone gives 48 shots and 6 defended of 6 (pingAfter 1 alone and trackSpeed 2.5 alone give 0 shots). The
+ * numbers below are the level's own baseline, not the best theta: this one defends 4 of 6 on the same seeds, so blindSnr 22 alone is STRONGER here and is NOT used, because the rows of section 7 (four boats defend, one is not enough) are pinned to this
+ * gunner. THETA_DEFAULT is untouched: it is the duel's, the league's and the tournament's default and a different level's answer.
+ */
+export const GUNNER_THETA = Object.freeze({ fireRange: 420, blindSnr: 22, pingAfter: 1, trackSpeed: 2.5 });
 /** The hit zones: { name, id, at (metres along the hull, + toward the bow), hp }. The spacing (>= 7 m) is wider than the fuse's shell so the nearest one is the one a detonation names. */
 export const ZONES = Object.freeze([
     Object.freeze({ name: "tubes", id: 901, at: 14, hp: 120 }), Object.freeze({ name: "sonar", id: 902, at: 7, hp: 100 }),

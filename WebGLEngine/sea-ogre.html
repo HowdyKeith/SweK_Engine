@@ -68,12 +68,12 @@ const $ = (id) => document.getElementById(id);
 let THREE3 = null; try { THREE3 = await import("/vendor/three/three.module.js"); } catch (e) { THREE3 = null; }
 let sea3d = null, camId = "tank", sides = [], trace = null, bounds = null, clock = 0, last = 0, names = [], busy = false;
 const fetchJson = (u) => fetch(u, { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
-const GUNNER = { fireRange: 420, blindSnr: 22, pingAfter: 1, trackSpeed: 2.5 };
+const GUNNER = G.GUNNER_THETA;
 async function load() {
   const [weights, theta, ping, league] = await Promise.all(["/brain/pilotSubWeightsWip.json", "/brain/subTacticsThetaWip.json", "/brain/subTacticsThetaSearchPingWip.json", "/brain/subTacticsLeagueWip.json"].map(fetchJson));
   sides = roster({ weights, theta, ping, league });
   sides.push({ id: "gunner", label: "gunner (fires from 420 m on a loud contact) + PD autopilot", note: "the hand tactician with a theta that shoots at the OGRE: the baseline that can win this level", side: T.makeSide("gunner", { theta: GUNNER }) });
-  $("rosterNote").textContent = sides.length + " sides on offer; the default hand tactician has no way to shoot a monster that outranges its fire gate -- on this level it is breached every time (the point of the 'gunner').";
+  $("rosterNote").textContent = sides.length + " sides on offer; the default hand tactician only shoots on a fresh active echo and never fires at this monster -- on this level it is breached every time; a wider fire gate alone does not change that, firing on a loud passive contact does (the point of the 'gunner').";
   slots();
 }
 function slots() {
