@@ -1,0 +1,113 @@
+<!doctype html>
+<!-- rotorcraft-demo.html -- UNNUMBERED (the version is chosen at ship time): THE HELICOPTER AND THE QUADROTOR, A HAND PILOT AGAINST A TRAINED ONE, REPLAYED SIDE BY SIDE.
+
+     Pick a machine, a scenario (a hover in a gusting wind, a recovery from an upset, an engine out or a motor out, a terrain flight or a goto), a seed and a pair of pilots from the board of brain/rotorcraftBoard.mjs; the page flies both on the SAME scenario (brain/rotorTask.mjs or brain/droneTask.mjs, which record a trace when asked) and replays them
+     as a plan view and a side view (render/rotorcraftView.mjs, the tree's first renderer for either machine). The gust slider scales the scenario's gusts (the mean wind and the frequencies are left alone). The machines are drawn at a fixed size in pixels, not to scale.
+     WHAT THE BOARD READ (brain/ROTORCRAFT_BOARD_WIP.md): the trained helicopter pilot TIES the hand autopilot pooled and lands more engine-outs standing (6 of 12 lost against 9); the quadrotor's trained pilots TIE the hand pilot at flying, and NO pilot but one MLP survives a quadrotor motor out (the page lets you watch how each one falls).
+     Nothing here comes from the network except the JSON the repository ships (brain/*.json), fetched as data. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="Rotorcraft Demo">
+<meta name="demo:desc" content="A helicopter or a quadrotor flown by a hand autopilot and by a trained pilot on the same scenario, replayed side by side: a hover in gusts you can turn up, a recovery, an engine or motor out, a terrain flight.">
+<meta name="demo:category" content="science">
+<title>SweK &middot; Rotorcraft Demo</title>
+<style>
+  :root { --bg:#050a12; --panel:#0b131f; --line:#1c2c44; --fg:#dbe7ff; --dim:#7c93b8; --cyan:#59d1ff; --amber:#f6a623; --green:#5fe08a; --red:#ff7a7a; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:13px ui-monospace, Menlo, monospace; }
+  header { padding:14px 16px 6px; } h1 { font-size:15px; letter-spacing:.13em; text-transform:uppercase; color:var(--cyan); margin:0 0 6px; }
+  .desc { color:var(--dim); max-width:980px; line-height:1.6; margin:0 0 6px; }
+  .bar { display:flex; gap:8px; align-items:center; flex-wrap:wrap; padding:6px 16px; }
+  button, select, input[type=number], input[type=range] { background:var(--panel); color:var(--fg); border:1px solid var(--line); border-radius:5px; padding:4px 10px; font:inherit; }
+  input[type=range] { padding:0; } button { cursor:pointer; } button:hover { border-color:var(--cyan); } button:disabled { opacity:.5; cursor:default; }
+  main { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:12px; padding:6px 16px 20px; }
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:8px 10px; min-width:0; }
+  .panel h2 { margin:0 0 6px; font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--cyan); font-weight:600; display:flex; justify-content:space-between; gap:8px; }
+  canvas { width:100%; background:#050a12; border:1px solid var(--line); border-radius:6px; display:block; }
+  .note { color:var(--dim); line-height:1.6; font-size:12px; margin:6px 0 0; } .err { color:var(--red); }
+  @media (max-width:900px) { main { grid-template-columns:minmax(0,1fr); } }
+</style>
+</head>
+<body>
+<header>
+  <h1>&#9670; Rotorcraft Demo</h1>
+  <p class="desc">A helicopter or a quadrotor flown by a <b>hand autopilot</b> and by a <b>trained pilot</b> on the <b>same scenario</b>, replayed side by side as a plan view and a side view. Turn the gusts up on a hover; take the engine or a motor away and watch how each one comes down. The machines are drawn at a fixed size in pixels, not to scale. On the board's 48 and 96 fresh scenarios the trained pilots <b>tie</b> the hand pilot at flying; the helicopter's gain is in the engine-out landings, and the quadrotor survives no motor failure but for one MLP in 24.</p>
+</header>
+<div class="bar">
+  <label>machine <select id="which"><option value="rotor">helicopter</option><option value="drone">quadrotor</option></select></label>
+  <label>scenario <select id="kind"></select></label>
+  <label>seed <input id="seed" type="number" min="1" max="99999" value="2" style="width:78px"></label>
+  <label>gusts <input id="gust" type="range" min="0" max="3" step="0.25" value="1" style="width:110px"> <span id="gustTxt">x1</span></label>
+  <label>A <select id="pA"></select></label>
+  <label>B <select id="pB"></select></label>
+  <button id="flyBtn">Fly both</button>
+  <span id="msg" class="note"></span>
+</div>
+<div class="bar">
+  <button id="playBtn" disabled>Pause</button>
+  <input id="clock" type="range" min="0" max="1000" value="0" style="width:340px" disabled>
+  <label>speed <select id="speed"><option value="1">1x</option><option value="2" selected>2x</option><option value="4">4x</option><option value="8">8x</option></select></label>
+  <span id="clockTxt" class="note"></span>
+</div>
+<main>
+  <section class="panel"><h2><span id="nameA">A</span><span id="scoreA"></span></h2><canvas id="cvA" width="720" height="360" aria-label="Plan and side view of pilot A's flight"></canvas><p class="note" id="capA"></p></section>
+  <section class="panel"><h2><span id="nameB">B</span><span id="scoreB"></span></h2><canvas id="cvB" width="720" height="360" aria-label="Plan and side view of pilot B's flight"></canvas><p class="note" id="capB"></p></section>
+</main>
+<script type="module">
+import * as RT from "/brain/rotorTask.mjs";
+import * as DT from "/brain/droneTask.mjs";
+import * as RB from "/brain/rotorcraftBoard.mjs";
+import * as V from "/render/rotorcraftView.mjs";
+
+const $ = (id) => document.getElementById(id);
+const TASK = { rotor: RT, drone: DT }, KIND_LABEL = { hover: "hover in a gusting wind", recovery: "recovery from an upset", engine: "engine out", terrain: "terrain flight", motor: "motor out", goto: "goto a point" };
+const weights = { rotor: {}, drone: {} }, hasWind = (which, kind) => !!TASK[which].scenario(1, kind).wind;   // only a hover and a goto have a wind to turn up
+let run = null, t = 0, playing = false, last = 0;
+const fetchJson = (u) => fetch(u, { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+async function load() {
+  const [rf, df, dm, dm2] = await Promise.all(["/brain/pilotRotorWeightsDefault.json", "/brain/pilotDroneWeightsV2.json", "/brain/pilotDroneMlpWeightsDefault.json", "/brain/pilotDroneMlpWeightsV2.json"].map(fetchJson));
+  weights.rotor = rf && rf.weights ? { fly: rf.weights } : {};
+  weights.drone = { ...(df && df.weights ? { fly: df.weights } : {}), ...(dm && dm.weights ? { mlp: dm.weights } : {}), ...(dm2 && dm2.weights ? { mlpV2: dm2.weights } : {}) };
+  fill();
+}
+const armsOf = (which) => (which === "rotor" ? RB.rotorArms(weights.rotor) : RB.droneArms(weights.drone));
+function fill() {
+  const which = $("which").value, kinds = $("kind"), a = $("pA"), b = $("pB"), keepK = kinds.value, arms = armsOf(which);
+  kinds.textContent = ""; for (const k of TASK[which].KINDS) { const o = document.createElement("option"); o.value = k; o.textContent = KIND_LABEL[k] || k; kinds.appendChild(o); } if (TASK[which].KINDS.includes(keepK)) kinds.value = keepK;
+  for (const sel of [a, b]) { const keep = sel.value; sel.textContent = ""; for (const x of arms) { const o = document.createElement("option"); o.value = x.id; o.textContent = x.id; o.title = x.note; sel.appendChild(o); } if (arms.some((x) => x.id === keep)) sel.value = keep; }
+  if (!arms.some((x) => x.id === a.value) || a.value === "") a.value = "hand"; if (b.value === "" || b.value === "hand") b.value = arms.some((x) => x.id === "fly") ? "fly" : "zero";
+  gustState();
+}
+function gustState() { const wind = hasWind($("which").value, $("kind").value); $("gust").disabled = !wind; $("gustTxt").textContent = wind ? "x" + $("gust").value : "(no wind in this scenario)"; }
+function fly() {
+  const which = $("which").value, T = TASK[which], kind = $("kind").value, seed = Math.max(1, Number($("seed").value) || 1), arms = Object.fromEntries(armsOf(which).map((x) => [x.id, x]));
+  const ids = [$("pA").value, $("pB").value], sc = V.withGust(T.scenario(seed, kind), hasWind(which, kind) ? Number($("gust").value) : 1), traces = [[], []], results = ids.map((id, i) => T.fly(arms[id].pilot(), sc, { trace: traces[i] }));
+  run = { which, kind, sc, ids, traces, results, bounds: V.boundsOf(traces, sc), duration: V.durationOf(traces), windAt: (tt) => (sc.wind ? T.windAt(sc.wind, tt) : null) };
+  t = 0; playing = true; $("playBtn").disabled = false; $("clock").disabled = false; $("playBtn").textContent = "Pause";
+  for (const [i, s] of [["A", 0], ["B", 1]]) { $("name" + i).textContent = `${i}: ${ids[s]}`; $("score" + i).textContent = `score ${results[s].score.toFixed(3)}`; $("cap" + i).textContent = V.captionOf(results[s], kind); }
+  $("msg").textContent = `${KIND_LABEL[kind]}, seed ${seed}, ${ids[0]} against ${ids[1]}`;
+}
+function draw() {
+  for (const [id, s, col] of [["cvA", 0, V.COLOURS.trailA], ["cvB", 1, V.COLOURS.trailB]]) {
+    const cv = $(id), g = cv.getContext("2d");
+    if (!run) { g.fillStyle = V.COLOURS.bg; g.fillRect(0, 0, cv.width, cv.height); g.fillStyle = V.COLOURS.dim; g.font = "13px ui-monospace, Menlo, monospace"; g.fillText("choose a scenario and press Fly both", 14, 30); continue; }
+    V.drawPanel(g, cv.width, cv.height, { frame: V.frameAt(run.traces[s], t), trail: V.trailTo(run.traces[s], t), sc: run.sc, bounds: run.bounds, machine: run.which, colour: col, label: run.ids[s], windNow: run.windAt(t) });
+  }
+  if (run) { $("clock").value = String(Math.round(1000 * Math.min(1, t / Math.max(1e-9, run.duration)))); $("clockTxt").textContent = `${t.toFixed(1)} of ${run.duration.toFixed(1)} s`; }
+}
+function frame(now) {
+  const dt = last ? Math.min(0.1, (now - last) / 1000) : 0; last = now;
+  if (run && playing) { t += dt * Number($("speed").value); if (t >= run.duration + 1.5) t = 0; }
+  draw(); requestAnimationFrame(frame);
+}
+$("which").onchange = () => { run = null; fill(); }; $("kind").onchange = gustState; $("gust").oninput = gustState;
+$("flyBtn").onclick = fly;
+$("playBtn").onclick = () => { playing = !playing; $("playBtn").textContent = playing ? "Pause" : "Play"; };
+$("clock").oninput = () => { if (run) { playing = false; $("playBtn").textContent = "Play"; t = run.duration * Number($("clock").value) / 1000; } };
+load().then(() => requestAnimationFrame(frame));
+window.__rotorcraftDemo = { get run() { return run; }, fly };
+</script>
+</body>
+</html>

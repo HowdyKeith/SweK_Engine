@@ -36,3 +36,7 @@ A helicopter in a wind and a quadrotor with a motor out do not fight each other:
 ## 4. Not in this round, said now
 
 A league between hand pilots at different gains; wind or terrain as the unit of a fight; a helicopter MLP (no weights); seats (there are none); any training.
+
+## STATUS (2026-11-06; PARKED unfinished, to go on after the navigation items)
+
+Built and gated (the gate, 52 rows plus one, passes): `brain/rotorLeague.mjs`, `render/rotorLeagueView.mjs`, `tools/ship/takeRotorLeague.mjs`, `rotor-league.html` (loaded and run in headless Chromium for both machines on DEV seed 1, no page error). NOT DONE: the sabotage of any of it (the mutant lists were written, none was run); the registered read of seeds 8301-8340 (not flown; the gate and every smoke run use DEV seeds 1 to 3); the capability map entry. ALSO PARKED, with no registration of its own and no gate yet: R3, the rotorcraft replay demo -- `render/rotorcraftView.mjs` (the tree's first renderer for either machine: a plan and a side view on a 2D canvas, a gust scaler, the result captions), `rotorcraft-demo.html`, and an optional `trace` argument on `fly` in `brain/rotorTask.mjs` and `brain/droneTask.mjs` (with it absent the flight is the one it was: checked on four flights, and both task gates pass). The demo was run in headless Chromium for a helicopter engine out, a quadrotor motor out and a gusty hover without a page error; the gust slider scales the wind's gusts and the hover score moves with it (helicopter seed 1: -0.776 at none, -0.785 at x1, -0.817 at x3, -0.882 at x6).

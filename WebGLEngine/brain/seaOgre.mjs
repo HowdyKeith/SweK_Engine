@@ -26,6 +26,7 @@ import * as Tp from "../physics/mechanics/subTorpedo.mjs";
 import { createActuators } from "../physics/mechanics/subActuators.mjs";
 import { foldHash } from "../physics/raceCar.mjs";
 import { createSquad, SQUAD } from "./subSquad.mjs";
+import * as CMX from "./subCountermeasures.mjs";
 
 export const TRACE_EVERY = 6;
 export const DT = S.DT, SECONDS = 300, LOOK_EVERY = 15, STAGGER = 7, RELOAD_TICKS = 300, HP = 100;
@@ -91,6 +92,8 @@ export function fight(sides, sc, { seconds = SECONDS, dt = DT, actuators = null,
         return { id: i + 1, state: S.createState({ depth: st.depth, pos: [st.pos[0], st.pos[1], -st.depth], speed: st.speed, heading: st.heading, model }), tactics: sq ? sq.wrap(i, sd.tactics) : sd.tactics, pilot: sd.pilot, probes: probesOf(i), act: actuators ? createActuators(actuators) : null,
             hp: HP, ammo: AMMO, cooldown: 0, target: { depth: st.depth, heading: st.heading, speed: st.speed }, alive: true, fate: "afloat", echoes: [], pings: [], fired: 0, hits: 0 }; });
     const og = { x: sc.ogre.pos[0], y: sc.ogre.pos[1], depth: O.subDepth, heading: sc.ogre.heading, speed: O.speed, hull: Number.isFinite(start.hull) ? start.hull : O.hull, zones: { ...Object.fromEntries(ZONES.map((z) => [z.name, z.hp])), ...(start.zones || {}) }, cycle: 0, fireIn: Math.round(2 * 30), cannonIn: 0, escortIn: Math.round(O.escortEvery / dt), contact: null };
+    const cmKits = {}; sides.forEach((sd, i) => { if (CMX.carries(sd.cm)) cmKits[i + 1] = sd.cm; });
+    const cm = Object.keys(cmKits).length ? CMX.createCm(cmKits) : null;   // countermeasures (brain/subCountermeasures.mjs): off unless a defender carries a kit
     const escorts = [], torps = []; let probesSent = 0; let hq = Number.isFinite(start.hq) ? start.hq : HQ_HP, nextTorp = 1, nextEscort = 1, launched = 0, h = 0x811c9dc5, flown = 0, outcome = "holdout", ogreFired = 0;
     const plat = (b) => K.platformOf(b.state), att = (b) => S.attitude(b.state);
     const ogrePlat = () => ({ pos: [og.x, og.y, -og.depth], heading: og.heading, speed: og.speed });
@@ -109,6 +112,7 @@ export function fight(sides, sc, { seconds = SECONDS, dt = DT, actuators = null,
             const obs = { t: tick * dt, self: { depth: a.depth, heading: a.heading, speed: a.speed, x: b.state.pos[0], y: b.state.pos[1], hp: b.hp, ammo: b.ammo, ready: b.cooldown <= 0 && b.ammo > 0, ...(sq ? { probes: b.probes } : {}) }, contacts, echoes: b.echoes, pings: b.pings };
             b.echoes = []; b.pings = [];
             const cmd = b.tactics(obs) || {};
+            if (cm) for (const e of cm.order(b.id, cmd, { pos: b.state.pos, heading: a.heading, pitch: a.pitch }, tick, dt)) events.push({ tick, ...e });
             b.target = { depth: clamp(Number.isFinite(cmd.depth) ? cmd.depth : a.depth, 12, 45), heading: Number.isFinite(cmd.heading) ? cmd.heading : a.heading, speed: clamp(Number.isFinite(cmd.speed) ? cmd.speed : a.speed, 0.3, 4.5) };
             if (cmd.fire === true && b.ammo > 0 && b.cooldown <= 0) { torps.push(Tp.launch(b.id, { pos: b.state.pos, heading: a.heading, pitch: a.pitch }, { id: nextTorp++ })); b.ammo--; b.fired++; b.cooldown = RELOAD_TICKS; events.push({ tick, type: "fire", boat: b.id }); }
             if (cmd.probe === true && sq && b.probes > 0) {   // a probe, dropped SQUAD.probeAhead m along the nose at the boat's depth
@@ -173,8 +177,9 @@ export function fight(sides, sc, { seconds = SECONDS, dt = DT, actuators = null,
         const foeTargets = [...ogrePoints(og), ...escorts.map((e) => ({ id: 800 + e.id, pos: [e.x, e.y, -e.depth], heading: e.heading, speed: O.escortSpeed }))];
         for (let i = 0; i < torps.length; i++) {
             if (torps[i].status !== "running") continue;
-            const theirs = torps[i].owner === O.id, r = Tp.stepTorpedo(torps[i], theirs ? defTargets : foeTargets, { dt, tick, seed, floor: model.spec.seabed }); torps[i] = r.torpedo;
+            const theirs = torps[i].owner === O.id, r = Tp.stepTorpedo(torps[i], theirs ? (cm ? defTargets.concat(cm.decoyTargets()) : defTargets) : foeTargets, cm && theirs ? { dt, tick, seed, floor: model.spec.seabed, screens: cm.screenList() } : { dt, tick, seed, floor: model.spec.seabed }); torps[i] = r.torpedo;
             if (!r.event) continue;
+            if (cm && theirs && cm.isDecoy(r.event.target)) { cm.stats.decoyed++; events.push({ tick, type: "decoyed", boat: 0, decoy: r.event.target }); continue; }
             const id = r.event.target, dmg = r.event.damage;
             if (theirs) {
                 const v = boats.find((b) => b.id === id); v.hp = Math.max(0, v.hp - dmg); events.push({ tick, type: "hit", boat: 0, target: id, damage: dmg });
@@ -189,6 +194,10 @@ export function fight(sides, sc, { seconds = SECONDS, dt = DT, actuators = null,
                 }
             }
         }
+        if (cm) {
+            for (const k of cm.stepInterceptors(torps, { dt, tick, seed, floor: model.spec.seabed, hostile: (t) => t.owner === O.id })) { torps[k.index] = Object.freeze({ ...torps[k.index], status: "intercepted" }); events.push({ tick, type: "intercepted", boat: k.owner, torpedo: k.torpedo }); }
+            cm.step(dt);
+        }
         flown++;
         if (trace && tick % TRACE_EVERY === 0) trace.push({ tick, boats: boats.map((b) => { const a = att(b); return { id: b.id, x: b.state.pos[0], y: b.state.pos[1], depth: a.depth, heading: a.heading, pitch: a.pitch, hp: b.hp, alive: b.alive, ammo: b.ammo }; }), torps: torps.filter((q) => q.status === "running").map((q) => ({ id: q.id, owner: q.owner, x: q.pos[0], y: q.pos[1], depth: -q.pos[2] })),
             ogre: { x: og.x, y: og.y, depth: og.depth, heading: og.heading, speed: og.speed, hull: og.hull, surfaced: surfaced(), phase: phaseOf(og.hull), zones: { ...og.zones } }, escorts: escorts.map((e) => ({ id: e.id, x: e.x, y: e.y, depth: e.depth, hp: e.hp })), hq, probes: sq ? sq.liveProbes(tick * dt).map((p) => ({ id: p.id, x: p.x, y: p.y, depth: p.depth })) : [], fix: sq ? sq.fix(tick * dt) : null });
@@ -198,5 +207,5 @@ export function fight(sides, sc, { seconds = SECONDS, dt = DT, actuators = null,
     }
     const lost = boats.filter((b) => !b.alive).length, frac = 1 - og.hull / O.hull, left = 1 - flown / total;
     const score = frac + (outcome === "defended" ? 1 + 0.5 * left : 0) - (outcome === "breached" ? 1 : 0) - 0.15 * lost;
-    return { outcome, score, hull: og.hull, hq, hullDamage: frac, lost, fates: boats.map((b) => b.fate), fired: boats.map((b) => b.fired), hits: boats.map((b) => b.hits), ogreFired, zones: { ...og.zones }, phase: phaseOf(og.hull), escorts: launched, probes: probesSent, squad: !!sq, ticks: flown, events, seed, n: sc.n, fingerprint: (h >>> 0).toString(16) };
+    return { ...(cm ? { cm: { ...cm.stats } } : {}), outcome, score, hull: og.hull, hq, hullDamage: frac, lost, fates: boats.map((b) => b.fate), fired: boats.map((b) => b.fired), hits: boats.map((b) => b.hits), ogreFired, zones: { ...og.zones }, phase: phaseOf(og.hull), escorts: launched, probes: probesSent, squad: !!sq, ticks: flown, events, seed, n: sc.n, fingerprint: (h >>> 0).toString(16) };
 }

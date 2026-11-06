@@ -12,8 +12,9 @@
 //            heading and pitch. The line-of-sight rate is low-passed (0.15 per look). Between looks the last command holds.
 //   WARHEAD  ARMED after 40 m of run (a torpedo does not go off in its own tube), then its PROXIMITY FUSE watches the nearest target: inside 8 m it detonates at the CLOSEST APPROACH (the first tick the distance grows again, scoring the damage at the closest distance it saw) or the moment it is within 1 m (contact). 100 damage inside 3 m, falling linearly to 40 at 8 m, none beyond. One event, then done. (A fuse that fired on entering the 8 m shell scored every hit as an edge hit: the first smoke test showed 41-42 damage on all three hits.)
 //
-// WHAT IS NOT IN IT: no wire guidance, no active homing, no decoys or countermeasures, no wake homing, no hydrodynamic coupling to the sea (current), no buoyancy, no fuel other than time. Said plainly; the arena (brain/subDuel.mjs)
-// is built so each of those is an addition to this file, not a change to it.
+// WHAT IS NOT IN IT: no wire guidance, no active homing, no wake homing, no hydrodynamic coupling to the sea (current), no buoyancy, no fuel other than time. Said plainly; the arena (brain/subDuel.mjs)
+// is built so each of those is an addition to this file, not a change to it. (Countermeasures are the first such addition, brain/SUB_COUNTERMEASURES_WIP.md: a target may carry `sl` (a source level that replaces the boat's, a decoy), `screens` (bubble curtains that cost the
+// seeker dB on a line through them) and `params` (constants for one body, an anti-torpedo interceptor); with none of them given every flight is the one it was.)
 // Pure: no DOM, no Math.random, no clock.
 "use strict";
 import * as K from "./subSonar.mjs";
@@ -43,9 +44,23 @@ export function damageAt(distance) {
 }
 
 /** A torpedo fired by `owner` (an id) from a launcher platform { pos, heading, pitch } along its nose, starting `muzzle` m ahead of its position. */
-export function launch(owner, launcher, { muzzle = 6, id = 0 } = {}) {
+export function launch(owner, launcher, { muzzle = 6, id = 0, params = null } = {}) {
     const f = forward(launcher.heading, launcher.pitch || 0);
-    return Object.freeze({ id, owner, pos: [launcher.pos[0] + muzzle * f[0], launcher.pos[1] + muzzle * f[1], launcher.pos[2] + muzzle * f[2]], heading: launcher.heading, pitch: launcher.pitch || 0, speed: TORPEDO.launchSpeed, age: 0, run: 0, armed: false, locked: false, sinceLook: 0, lastLos: null, cmd: Object.freeze({ heading: 0, pitch: 0 }), rate: null, prev: null, status: "running", ticks: 0 });
+    return Object.freeze({ id, owner, pos: [launcher.pos[0] + muzzle * f[0], launcher.pos[1] + muzzle * f[1], launcher.pos[2] + muzzle * f[2]], heading: launcher.heading, pitch: launcher.pitch || 0, speed: params && Number.isFinite(params.launchSpeed) ? params.launchSpeed : TORPEDO.launchSpeed, age: 0, run: 0, armed: false, locked: false, sinceLook: 0, lastLos: null, cmd: Object.freeze({ heading: 0, pitch: 0 }), rate: null, prev: null, status: "running", ticks: 0 });
+}
+
+/**
+ * The loss (dB) a SCREEN (a bubble curtain: { pos, r, db }) puts on the line from a listener at `from` to a source at `to`: the largest `db` of the screens whose sphere the segment passes through (or starts or ends inside), 0 for none. One screen counts once and screens do not add.
+ */
+export function screenLoss(from, to, screens) {
+    let loss = 0;
+    const dx = to[0] - from[0], dy = to[1] - from[1], dz = to[2] - from[2], len2 = dx * dx + dy * dy + dz * dz;
+    for (const sc of screens) {
+        const u = len2 > 0 ? clamp(((sc.pos[0] - from[0]) * dx + (sc.pos[1] - from[1]) * dy + (sc.pos[2] - from[2]) * dz) / len2, 0, 1) : 0;
+        const qx = from[0] + u * dx - sc.pos[0], qy = from[1] + u * dy - sc.pos[1], qz = from[2] + u * dz - sc.pos[2];
+        if (qx * qx + qy * qy + qz * qz <= sc.r * sc.r && sc.db > loss) loss = sc.db;
+    }
+    return loss;
 }
 
 /** The torpedo as a sonar source: a platform { pos, heading, speed } that is LOUD (the arena adds subSonar.SONAR.torpedoSL). */
@@ -55,9 +70,9 @@ export const platformOf = (t) => ({ pos: t.pos, heading: t.heading, speed: t.spe
  * One tick. `targets` is a list of { id, pos, heading, speed } (anything that can be homed on and hit; the torpedo's OWNER is skipped). Returns { torpedo (a new frozen state), event } where event is null or
  * { type: "hit", target: id, damage, distance }. A torpedo that has ended (hit, expired, lost) is returned unchanged. `tick` and `seed` feed the sonar luck; `floor` is the seabed depth (m); `seeker: false` is a DUMB torpedo (it runs straight and only the fuse works: the gate's way to test the fuse alone).
  */
-export function stepTorpedo(t, targets, { dt = 1 / 30, tick = 0, seed = 0, floor = TORPEDO.maxDepth, seeker = true } = {}) {
+export function stepTorpedo(t, targets, { dt = 1 / 30, tick = 0, seed = 0, floor = TORPEDO.maxDepth, seeker = true, params = null, screens = null } = {}) {
     if (t.status !== "running") return { torpedo: t, event: null };
-    const T = TORPEDO, mine = targets.filter((x) => x.id !== t.owner);
+    const T = params ? { ...TORPEDO, ...params } : TORPEDO, mine = targets.filter((x) => x.id !== t.owner);
     let { heading, pitch, locked, sinceLook, lastLos, cmd } = t;
     let rate = t.rate;
     // ---- the seeker: a look every `lookEvery` ticks, on the loudest target inside the cone and above the threshold ----
@@ -68,7 +83,7 @@ export function stepTorpedo(t, targets, { dt = 1 / 30, tick = 0, seed = 0, floor
             if (range < 1e-9) continue;
             const cos = (dx * f[0] + dy * f[1] + dz * f[2]) / range;
             if (Math.acos(clamp(cos, -1, 1)) > T.halfCone) continue;
-            const snr = seekerSNR(K.sourceLevel(x.speed), range) + K.SONAR.luckSd * K.luck(seed, tick, 4 * (x.id + 1) + 900 + 7 * t.id);
+            const snr = seekerSNR(Number.isFinite(x.sl) ? x.sl : K.sourceLevel(x.speed), range) - (screens && screens.length ? screenLoss(t.pos, x.pos, screens) : 0) + K.SONAR.luckSd * K.luck(seed, tick, 4 * (x.id + 1) + 900 + 7 * t.id);
             if (snr < K.SONAR.dt) continue;
             if (!best || snr > best.snr) best = { x, snr, dx, dy, dz, range };
         }
