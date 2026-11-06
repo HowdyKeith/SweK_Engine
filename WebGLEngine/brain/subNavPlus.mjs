@@ -155,6 +155,7 @@ export function flyPlus(pilot, sc, armName, o = {}) {
         if (replans && i > 0 && i % every === 0) { field = H.buildLadderField(shapes(i * dt), sc.goal, { x: s.pos[0], y: s.pos[1] }, { ladder: ladderFor(ladder, curK, cNow()), own: { x: s.pos[0], y: s.pos[1] }, edgeExtra: spec.edge }); nReplans++; }
         const cv = ST.currentAt(sc.current, i * dt), ctx = custom ? { obstacles: world(i * dt, shipsMode).obstacles, t: 0, at: H.posAt, minDepth: scV.minDepth, yieldSpeed } : { obstacles: sc.obstacles, t: i * dt, at: H.posAt, minDepth: scV.minDepth, yieldSpeed };
         let target = H.hardTarget(pa.base, s, field, sc.goal, ctx);
+        if (o.depthOf) { const dTarget = o.depthOf(s, i); if (Number.isFinite(dTarget)) target = { ...target, depth: dTarget }; }   // a depth schedule (brain/subNav3d.mjs): the depth the vessel is asked for, in place of the waypoint's
         if (crab !== "none") target = { ...target, heading: crabHeading(target.heading, crab === "mean" ? meanC : cNow(), S.attitude(s, cv).speed) };
         const cmd = pilot(s, target, cv), res = S.stepSub(model, s, cmd, dt, cv, sc.weightError);
         const px = s.pos[0], py = s.pos[1], vgx = s.vel[0], vgy = s.vel[1];
@@ -166,6 +167,7 @@ export function flyPlus(pilot, sc, armName, o = {}) {
         path += Math.hypot(x - px, y - py);
         const clear = clearOf(sc.obstacles, x, y, -s.pos[2], now, atNow);
         if (clear < minClear) minClear = clear;
+        if (o.groundAt && o.groundAt(x, y, -s.pos[2])) { status = "grounded"; break; }   // a seabed that rises (brain/subNav3d.mjs): the hull's bottom is on it
         if (clear < 0) { status = "collided"; const ob = sc.obstacles.find((q) => H.gapTo(q, x, y, -s.pos[2], now, atNow) < 0); hit = ob && ob.type === "ship" ? (ob.behaviour || "holds") : "static"; break; }
         if (x < N.REGION.x0 || x > N.REGION.x1 || y < N.REGION.y0 || y > N.REGION.y1) { status = "left"; break; }
         if (MT.reached(s, sc.goal)) { status = "reached"; t = now; break; }

@@ -42,3 +42,7 @@ Keith, 2026-11-06: "lets complete the nav items first." The navigation items of 
 ## 4. Not in this round, said now
 
 A seabed seen by sonar; a keel seen by sonar; walls that do not span the region (a vertical plan that chooses between going round and going under); the tank's 3D view of obstacles (`tank-nav-3d`, a shared page); the UPSTREAM items.
+
+### AMENDMENT 1 (2026-11-06; made on DEV seeds 1 to 12 of each kind, BEFORE any seed of HELD77 was flown; DEV is not a result; it changes no rule and no forecast)
+
+The DEV run (36 scenarios, the code of `brain/subNav3d.mjs` as it stands) read: keel wall `any` 0 of 12 reached (all collided, the field had no route in all 12) and `any+vertical` 12 of 12; ridge `any` 6 of 12 reached and 6 GROUNDED, `any+vertical` 12 of 12; both `any` 0 of 12 and `any+vertical` 12 of 12. **Every forecast of section 3 that is about `any+vertical` reaching 32 of 40 or more was written too cautiously** (55 to 70 percent against a DEV ceiling), and the one DEV bears on directly, "ridge: `any` is grounded in at least 10 of 40" (about 70 percent), reads 6 of 12 here (half), which is on the right side of 10 of 40. The registered forecasts stand as written and will be scored as written; the read is expected to confirm the item, and it is worth saying why before it is flown: **the walls span the region, the map and the seabed are exact and the schedule is computed from them, so this study can show that the machinery works and cannot show that a vessel could plan its dive.**
