@@ -14,7 +14,13 @@ import * as RP from "./pilotRotorPolicy.mjs";
 import * as DP from "./pilotDronePolicy.mjs";
 import * as DM from "./pilotDroneMlp.mjs";
 
-export const RC_SETS = Object.freeze({ dev: Object.freeze({ from: 1, to: 3 }), held73: Object.freeze({ from: 8001, to: 8012 }) });
+export const RC_SETS = Object.freeze({ dev: Object.freeze({ from: 1, to: 3 }), held73: Object.freeze({ from: 8001, to: 8012 }), held74: Object.freeze({ from: 8201, to: 8224 }) });
+/** What each set flies and how its hand-net check reads (section 6 of the registration: held74 is the quadrotor alone, with the hand-net check on the flights that stand). */
+export const SET_RULES = Object.freeze({
+    dev: Object.freeze({ tasks: Object.freeze(["rotor", "drone"]), handNet: "all" }),
+    held73: Object.freeze({ tasks: Object.freeze(["rotor", "drone"]), handNet: "all" }),
+    held74: Object.freeze({ tasks: Object.freeze(["drone"]), handNet: "standing" }),
+});
 export const TASKS = Object.freeze({ rotor: Object.freeze({ T: RT, outKind: "engine" }), drone: Object.freeze({ T: DT, outKind: "motor" }) });
 export const SAME_TOL = 1e-3, FLOOR_FRACTION = 5 / 6;
 export const WEIGHT_FILES = Object.freeze({ rotorFly: "brain/pilotRotorWeightsDefault.json", droneFly: "brain/pilotDroneWeightsV2.json", droneMlp: "brain/pilotDroneMlpWeightsDefault.json", droneMlpV2: "brain/pilotDroneMlpWeightsV2.json" });
@@ -71,11 +77,11 @@ export function rotorcraftBoard(which, weights = {}) {
 const finite = (x) => Number.isFinite(x);
 const kindOf = (r) => r.key.split(":")[0];
 /**
- * The registered checks of a result (brain/ROTORCRAFT_BOARD_WIP.md section 2 and Amendment 2): every arm flew the same scenarios in the same order; no score is non-finite; hand-net and hand differ by less than SAME_TOL on every scenario;
+ * The registered checks of a result (brain/ROTORCRAFT_BOARD_WIP.md section 2 and Amendment 2, and section 6): every arm flew the same scenarios in the same order; no score is non-finite; hand-net and hand differ by less than SAME_TOL on every scenario (opts.handNet "standing": on every scenario whose hand flight is not BAD, the largest difference on the lost flights printed and not checked);
  * zero is below hand on at least FLOOR_FRACTION of the scenarios of the kinds that are NOT the task's failure kind (the hand pilot loses most failure-kind flights, where doing nothing ties it or beats it: that comparison is printed, not checked).
  * Returns { ok, failures: [string], info: [string] } -- a failure and the readings are NOT WEIGHED; info lines are printed and weigh nothing.
  */
-export function checksOf(res) {
+export function checksOf(res, opts = {}) {
     const ids = Object.keys(res.runs), failures = [], info = [], first = res.runs[ids[0]];
     for (const id of ids) {
         const rs = res.runs[id];
@@ -84,8 +90,10 @@ export function checksOf(res) {
     }
     const aligned = (a, b) => res.runs[a].length === res.runs[b].length;
     if (res.runs.hand && res.runs["hand-net"] && aligned("hand", "hand-net")) {
-        const worst = Math.max(...res.runs.hand.map((r, i) => Math.abs(r.score - res.runs["hand-net"][i].score)));
-        if (!(worst < SAME_TOL)) failures.push(`hand-net is not the hand pilot: the largest difference is ${worst.toExponential(2)} (the limit is ${SAME_TOL})`);
+        const standing = opts.handNet === "standing", diffs = res.runs.hand.map((r, i) => ({ d: Math.abs(r.score - res.runs["hand-net"][i].score), lost: !!r.bad })), checked = standing ? diffs.filter((x) => !x.lost) : diffs, worst = Math.max(...checked.map((x) => x.d));
+        if (!(worst < SAME_TOL)) failures.push(`hand-net is not the hand pilot: the largest difference ${standing ? "on a flight that stands " : ""}is ${worst.toExponential(2)} (the limit is ${SAME_TOL})`);
+        const lost = diffs.filter((x) => x.lost);
+        if (standing && lost.length) info.push(`on the ${lost.length} lost flights (not checked) the largest hand-net difference is ${Math.max(...lost.map((x) => x.d)).toExponential(2)}`);
     }
     if (res.runs.hand && res.runs.zero && aligned("hand", "zero")) {
         const outKind = TASKS[res.task] ? TASKS[res.task].outKind : null, idx = first.map((r, i) => i).filter((i) => kindOf(first[i]) !== outKind), outIdx = first.map((r, i) => i).filter((i) => kindOf(first[i]) === outKind);
@@ -98,6 +106,7 @@ export function checksOf(res) {
     }
     return { ok: failures.length === 0, failures, info };
 }
+const readOf = (id, p) => (id === "hand-net" && Math.abs(p.mean) < SAME_TOL ? "TIES" : B.readingOf(p));
 /** The reading per kind: for every arm with a control, its paired difference from that control within each kind: [{ arm, control, kind, n, mean, se, reading, better, worse }]. */
 export function perKind(board, res) {
     const out = [], kinds = [...new Set(res.runs[Object.keys(res.runs)[0]].map((r) => r.key.split(":")[0]))];
@@ -105,27 +114,40 @@ export function perKind(board, res) {
         if (!res.runs[c]) continue;
         for (const kind of kinds) {
             const sub = (rs) => rs.filter((r) => r.key.startsWith(kind + ":")), p = B.paired(sub(res.runs[id]), sub(res.runs[c]));
-            out.push({ arm: id, control: c, kind, n: p.n, mean: p.mean, se: p.se, reading: id === "hand-net" && Math.abs(p.mean) < SAME_TOL ? "TIES" : B.readingOf(p), better: p.better, worse: p.worse });
+            out.push({ arm: id, control: c, kind, n: p.n, mean: p.mean, se: p.se, reading: readOf(id, p), better: p.better, worse: p.worse });
         }
     }
     return out;
 }
+/** The reading pooled over the kinds that are NOT the task's failure kind (section 6, reading B: how well a brain flies, not how softly it crashes): for every arm with a control, [{ arm, control, n, mean, se, reading, better, worse }]; none for a task the board does not know. */
+export function standingPooled(board, res) {
+    const out = [], outKind = TASKS[res.task] ? TASKS[res.task].outKind : null, keep = (rs) => rs.filter((r) => kindOf(r) !== outKind);
+    if (!outKind) return out;
+    for (const id of Object.keys(res.runs)) for (const c of board.arms.get(id).controls) {
+        if (!res.runs[c]) continue;
+        const p = B.paired(keep(res.runs[id]), keep(res.runs[c]));
+        out.push({ arm: id, control: c, n: p.n, mean: p.mean, se: p.se, reading: readOf(id, p), better: p.better, worse: p.worse });
+    }
+    return out;
+}
 /** The trained brains against each other, pairwise and pooled (printed, not a registered reading): [{ a, b, n, mean, se, reading, better, worse }] for each unordered pair of the trained arms present, in TRAINED order. */
-export function trainedPairs(res) {
-    const present = TRAINED.filter((id) => res.runs[id]), out = [];
-    for (let i = 0; i < present.length; i++) for (let j = i + 1; j < present.length; j++) { const p = B.paired(res.runs[present[i]], res.runs[present[j]]); out.push({ a: present[i], b: present[j], n: p.n, mean: p.mean, se: p.se, reading: B.readingOf(p), better: p.better, worse: p.worse }); }
+export function trainedPairs(res, skipKind = null) {
+    const present = TRAINED.filter((id) => res.runs[id]), out = [], keep = (rs) => rs.filter((r) => kindOf(r) !== skipKind);
+    for (let i = 0; i < present.length; i++) for (let j = i + 1; j < present.length; j++) { const p = B.paired(keep(res.runs[present[i]]), keep(res.runs[present[j]])); out.push({ a: present[i], b: present[j], n: p.n, mean: p.mean, se: p.se, reading: B.readingOf(p), better: p.better, worse: p.worse }); }
     return out;
 }
 /** The lines of a read: the checks first (a failure is the first line and the readings follow marked NOT WEIGHED), the board's lines, the per-kind lines, then the trained brains against each other (printed, not registered). */
-export function readLines(board, res) {
-    const ck = checksOf(res), L = [];
+export function readLines(board, res, opts = {}) {
+    const ck = checksOf(res, opts), L = [], fmtS = (x) => `${x.mean >= 0 ? "+" : ""}${x.mean.toFixed(4)}, se ${x.se.toFixed(4)}, better ${x.better}, worse ${x.worse}, of ${x.n}`;
     if (!ck.ok) for (const f of ck.failures) L.push(`CHECK FAILED -- the readings below are NOT WEIGHED: ${f}`);
     else L.push("checks: every arm flew the same scenarios, no score is non-finite, hand-net is the hand pilot, zero is a floor");
     for (const f of ck.info) L.push(`  ${f}`);
     try {
         L.push(...board.read(res).lines);
         for (const k of perKind(board, res)) L.push(`  by kind ${k.kind.padEnd(9)} ${k.arm} against ${k.control}: ${k.reading} (${k.mean >= 0 ? "+" : ""}${k.mean.toFixed(4)}, se ${k.se.toFixed(4)}, better ${k.better}, worse ${k.worse}, of ${k.n})`);
+        for (const k of standingPooled(board, res)) L.push(`  standing kinds pooled (all but ${TASKS[res.task].outKind}) ${k.arm} against ${k.control}: ${k.reading} (${fmtS(k)})`);
         for (const t of trainedPairs(res)) L.push(`  among the trained brains ${t.a} against ${t.b}: ${t.reading} (${t.mean >= 0 ? "+" : ""}${t.mean.toFixed(4)}, se ${t.se.toFixed(4)}, better ${t.better}, worse ${t.worse}, of ${t.n})`);
+        if (TASKS[res.task]) for (const t of trainedPairs(res, TASKS[res.task].outKind)) L.push(`  among the trained brains, standing kinds, ${t.a} against ${t.b}: ${t.reading} (${fmtS(t)})`);
     } catch (e) { L.push(`the readings could not be paired: ${e.message}`); }
     return L;
 }

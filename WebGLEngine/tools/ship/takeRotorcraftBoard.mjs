@@ -1,7 +1,7 @@
 // WebGLEngine/tools/ship/takeRotorcraftBoard.mjs -- UNNUMBERED (the library is brain/rotorcraftBoard.mjs, the registration brain/ROTORCRAFT_BOARD_WIP.md, the gate brain/rotorcraftBoard-selfcheck.mjs)
-//   node tools/ship/takeRotorcraftBoard.mjs [--task rotor|drone|both] [--set dev|held73] [--seeds N] [--write]
+//   node tools/ship/takeRotorcraftBoard.mjs [--task rotor|drone|both] [--set dev|held73|held74] [--seeds N] [--write]
 // Flies the helicopter's and the quadrotor's arms (the hand autopilot, the hand pilot written as the fruit-fly network, the trained networks, the zero-weight floor) on the same scenarios of each of the four kinds, prints the checks, the board's lines, the per-kind lines and the
-// trained brains against each other. --set dev is seeds 1 to 3 (a sanity run of the code, not a result); --set held73 is seeds 8001 to 8012 -- the registered read, flown ONCE; --write (held73 only) writes every flight to brain/rotorcraftBoardHeld73.jsonl.
+// trained brains against each other. --set dev is seeds 1 to 3 (a sanity run of the code, not a result); --set held73 is seeds 8001 to 8012 -- the registered read, flown ONCE; --set held74 is seeds 8201 to 8224 of the quadrotor alone -- the second registration (section 6), flown ONCE, with the hand-net check on the flights that stand; --write (held73 or held74) writes every flight to brain/rotorcraftBoardHeld73.jsonl or Held74.jsonl.
 // --seeds N takes the first N seeds of the set (a shorter run for the gate; with --write it is refused, so a written file is always the whole set).
 "use strict";
 import fs from "node:fs";
@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
 import * as R from "../../brain/rotorcraftBoard.mjs";
 
 const ENG = fileURLToPath(new URL("../../", import.meta.url));
-export const OUT_FILE = "brain/rotorcraftBoardHeld73.jsonl";
+export const OUT_FILES = Object.freeze({ held73: "brain/rotorcraftBoardHeld73.jsonl", held74: "brain/rotorcraftBoardHeld74.jsonl" });
 export const WEIGHT_COUNT = Object.freeze({ rotorFly: 1167, droneFly: 1167, droneMlp: 1860, droneMlpV2: 1860 });
 
 /** The weights of one file (its .weights array); a file with the wrong number of weights is refused by name. */
@@ -34,16 +34,18 @@ export function command(argv, io = {}) {
         else if (a === "--seeds") { const v = Number(argv[++i]); if (!Number.isInteger(v) || v <= 0) { err("takeRotorcraftBoard: --seeds needs a positive whole number"); return 2; } o.seeds = v; }
         else { err(`takeRotorcraftBoard: unknown argument ${JSON.stringify(a)}`); return 2; }
     }
-    if (o.write && o.set !== "held73") { err("takeRotorcraftBoard: --write goes with --set held73 only"); return 2; }
-    if (o.write && (o.seeds !== null || o.task !== "both")) { err("takeRotorcraftBoard: --write needs the whole set of both tasks (no --seeds, no --task)"); return 2; }
-    const sets = io.sets || R.RC_SETS, whole = sets[o.set], range = o.seeds ? { from: whole.from, to: Math.min(whole.to, whole.from + o.seeds - 1) } : whole, which = o.task === "both" ? Object.keys(R.TASKS) : [o.task], rows = [];
+    if (o.write && !OUT_FILES[o.set]) { err("takeRotorcraftBoard: --write goes with --set held73 or held74 only"); return 2; }
+    const rules = R.SET_RULES[o.set];
+    if (o.task !== "both" && !rules.tasks.includes(o.task)) { err(`takeRotorcraftBoard: --set ${o.set} flies ${rules.tasks.join(", ")} only`); return 2; }
+    if (o.write && (o.seeds !== null || o.task !== "both")) { err("takeRotorcraftBoard: --write needs the whole set of its tasks (no --seeds, no --task)"); return 2; }
+    const sets = io.sets || R.RC_SETS, whole = sets[o.set], range = o.seeds ? { from: whole.from, to: Math.min(whole.to, whole.from + o.seeds - 1) } : whole, which = o.task === "both" ? rules.tasks : [o.task], rows = [];
     for (const w of which) {
         const board = R.rotorcraftBoard(w, weightsOf(w, load)), res = board.run(w, R.ARM_IDS[w], range);
         out(`${TITLE[w]}: ${o.set.toUpperCase()} seeds ${range.from} to ${range.to} of each of ${R.TASKS[w].T.KINDS.length} kinds (${o.set === "dev" ? "a sanity run of the code, not a result" : "the registered read"})`);
-        out(R.readLines(board, res).join("\n")); out("");
+        out(R.readLines(board, res, { handNet: rules.handNet }).join("\n")); out("");
         for (const id of Object.keys(res.runs)) for (const r of res.runs[id]) rows.push({ set: o.set, task: w, arm: id, key: r.key, score: r.score, bad: r.bad });
     }
-    if (o.write) { writeFile(path.join(ENG, OUT_FILE), rows.map((r) => JSON.stringify(r)).join("\n") + "\n"); out(`wrote ${rows.length} flights to ${OUT_FILE}`); }
+    if (o.write) { writeFile(path.join(ENG, OUT_FILES[o.set]), rows.map((r) => JSON.stringify(r)).join("\n") + "\n"); out(`wrote ${rows.length} flights to ${OUT_FILES[o.set]}`); }
     return 0;
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) process.exitCode = command(process.argv.slice(2));
