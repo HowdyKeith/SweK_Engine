@@ -34,3 +34,6 @@ A memory score with a noisy gyro (every integrator here is fed the exact heading
 ## Added after H7 build (2026-11-06)
 - New files: `tools/ship/headToHead7.mjs`, `headToHead7Cmd.mjs`, `headToHead7-selfcheck.mjs` (gate, ~16 s; mutation log in its header: 144 mutants, 128 red first pass, 14 rows added, 2 declared equivalent). H7 is REGISTERED in `brain/HEAD_TO_HEAD.md`; the training (80 searches, about 17 hours of one core) and the flight are NOT run: run them on the rig (`node tools/ship/headToHead7Cmd.mjs train --workers 12`, then `fly`).
 - Owed at ship, as for H2 to H6: timings for the new gate, knowledge index rebuild, census restatements, the handover row.
+
+## H7 result (2026-11-06)
+Trained and flown on the rig; result written in `brain/HEAD_TO_HEAD.md` (Round H7, RESULT): LUCK (robust -0.0206 against base, 1.6 se; sd inside a recipe 0.027 and 0.030). Data: `brain/rig-results/head-to-head7-training.jsonl` (80 records) and `head-to-head7.json`. H8 (noisy gyro) is still not designed.
