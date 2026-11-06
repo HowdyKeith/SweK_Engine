@@ -37,3 +37,6 @@ A memory score with a noisy gyro (every integrator here is fed the exact heading
 
 ## H7 result (2026-11-06)
 Trained and flown on the rig; result written in `brain/HEAD_TO_HEAD.md` (Round H7, RESULT): LUCK (robust -0.0206 against base, 1.6 se; sd inside a recipe 0.027 and 0.030). Data: `brain/rig-results/head-to-head7-training.jsonl` (80 records) and `head-to-head7.json`. H8 (noisy gyro) is still not designed.
+
+## H8 (2026-11-06)
+New files: `tools/ship/headToHead8.mjs`, `headToHead8Cmd.mjs`, `headToHead8-selfcheck.mjs` (gate under 1 s; mutation log in its header: 153 mutants, 134 red first pass, 14 rows added, 5 declared equivalent). Registered, flown here (17 cells, ids 8000-8199, about 10 minutes) and written up in `brain/HEAD_TO_HEAD.md` (Round H8, RESULT): THE MEMORY SURVIVES THE GYRO. Data: `brain/rig-results/head-to-head8.json`. Owed at ship as for H2 to H7: gate timings, knowledge index, census restatements, handover row. H6 to H8 are all done; parked: decision-circuit-vs-twin, fish righting/tank kind, lesion toggle, matched controls for the other seven networks.
