@@ -11,6 +11,8 @@
 //   6 REPORT    the means table with the held-out scores, the gain blocks, the frozen-minus-base blocks, the lines last.
 //   7 FLIGHT    one real short audit (ids 0-1, 30 s): the frozen networks seated as 963-weight networks, base-off is the lesion of base, deterministic, the checks pass.
 //   8 SOURCE    the ids appear once; no clock, random or file.
+// SABOTAGE LOG (132 mutants of tools/ship/headToHead10.mjs, each alone in its own worktree copy): 120 went red by name on the first pass. 12 went 0 red; 7 got a row and went red: the report and the held-out lines reading the base maps for the frozen rows (the fixture's two maps now have different held-out scores), the core-off arms built from the frozen weights (the two maps now differ outside the core too), the masked mutation's gaussian at the wrong scale, the search ignoring its maxK, and a 964-weight frozen champion passing the check.
+//   Five are EQUIVALENT and declared: the sine for the cosine in the Box-Muller draw (the same distribution), `>` against `>=` at a 1e-9 improvement margin, and `>`, `>=` and `<` at a mean of exactly 0.02 or a difference of exactly 2 se in the verdict (a float ratio cannot sit on them; the rows test 0.0199 and 0.0201, 0.0188 and 0.0190).
 // NOT CHECKED, said plainly: that ten replicates see a difference smaller than about 0.025 (they do not, and the verdict's words say so), and that a core frozen at zero is the only way to train without one (a 14-34-4 map trained with a wider hidden layer is another question).
 "use strict";
 import fs from "node:fs";
