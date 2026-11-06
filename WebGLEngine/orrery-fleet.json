@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "70cac3687fa705f5f9280f45997fa29e22b6e635",
+ "head": "d30824314ae8427fd8c6c151131efb933dc57a3e",
  "bodies": {
   "box3d": [
    {
@@ -961,7 +961,7 @@
    {
     "path": "render/subModels3d-selfcheck.mjs",
     "bytes": 36604,
-    "sha": "70cac3687fa705f5f9280f45997fa29e22b6e635"
+    "sha": "d30824314ae8427fd8c6c151131efb933dc57a3e"
    },
    {
     "path": "render/subModels3d.mjs",
