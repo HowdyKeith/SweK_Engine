@@ -21,7 +21,7 @@
   }
  },
  "counts": {
-  "page": 498,
+  "page": 500,
   "demo": 49,
   "builtin": 38
  },
@@ -2976,6 +2976,22 @@
    "display": "Rocket League",
    "href": "/rocket-league.html",
    "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "rotor-league.html",
+   "display": "Rotor League",
+   "href": "/rotor-league.html",
+   "section": "Fruit Fly Brain",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "rotorcraft-demo.html",
+   "display": "Rotorcraft Demo",
+   "href": "/rotorcraft-demo.html",
+   "section": "Fruit Fly Brain",
    "collision": false
   },
   {

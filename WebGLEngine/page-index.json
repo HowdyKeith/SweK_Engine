@@ -1,7 +1,7 @@
 {
  "version": 1,
  "generated": "derived by tools/ship/buildPageIndex.mjs -- DO NOT HAND-EDIT, the group comes from tools/ship/pageSections.mjs",
- "count": 498,
+ "count": 500,
  "pages": [
   {
    "f": "AudioLab.html",
@@ -2584,6 +2584,20 @@
    "t": "Rocket League RL &mdash; SweK Engine",
    "d": "",
    "g": "",
+   "p": 0
+  },
+  {
+   "f": "rotor-league.html",
+   "t": "SweK &middot; Rotor League",
+   "d": "Every helicopter and quadrotor pilot against every other on the same scenarios: the hand autopilots, the hand pilot as a fruit-fly network, the trained fruit-fly pilots, two quadrotor MLPs and a pilot that does nothing, counted by scenarios won and rated.",
+   "g": "flybrain",
+   "p": 0
+  },
+  {
+   "f": "rotorcraft-demo.html",
+   "t": "SweK &middot; Rotorcraft Demo",
+   "d": "A helicopter or a quadrotor flown by a hand autopilot and by a trained pilot on the same scenario, replayed side by side: a hover in gusts you can turn up, a recovery, an engine or motor out, a terrain flight.",
+   "g": "flybrain",
    "p": 0
   },
   {

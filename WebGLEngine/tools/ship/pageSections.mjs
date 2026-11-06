@@ -696,8 +696,8 @@ export const SECTIONS = [
     // A text match followed through imports also finds index, orrery, orrery-gpu, instruments, lab-home, method-lab,
     // panel-brain, race-car, es-box3d-6dof and es-aircraft, and every one of those is a COMMENT or a catalogue string
     // naming the module (main.js, orreryFleet, instruments, brainTrail, raceCar, autopilot6dof), not an import.
-    { id: "flybrain", tab: "flybrain", label: "Fruit Fly Brain", note: "pages built on Janelia's male-cns connectome: the connectome, and the brains that drive, shoot and fly through it",
-      pages: ["fly-connectome.html", "race-brain.html", "es-box3d-fly3d.html", "es-flight6dof.html"] },
+    { id: "flybrain", tab: "flybrain", label: "Fruit Fly Brain", note: "pages built on Janelia's male-cns connectome: the connectome, and the brains that drive, shoot and fly through it (a helicopter and a quadrotor among them, beside their hand autopilots)",
+      pages: ["fly-connectome.html", "race-brain.html", "es-box3d-fly3d.html", "es-flight6dof.html", "rotorcraft-demo.html", "rotor-league.html"] },
     // FSR, KEITH'S CALL: "Let's separate fsr into a link bucket." fsr.html and fsr-three.html sat in UNPLACED since
     // v4623 waiting on exactly this: the temporal/FSR arc gave fsr.html an adapter path, so it belonged in the WebGPU
     // drawer, which is at MAX_PER_PANEL, as is the techniques drawer (Renders) it used to sit in -- "a drawer decision,
