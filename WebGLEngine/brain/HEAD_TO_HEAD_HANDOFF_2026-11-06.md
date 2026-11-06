@@ -24,3 +24,9 @@ The registrations and results are in `brain/HEAD_TO_HEAD.md` (H2, H4, H5; H1 and
 
 ## Open science (from the backlog)
 A memory score with a noisy gyro (every integrator here is fed the exact heading rate); a matched control for the other seven networks (each has its own recipe); `decision-circuit-vs-twin` (no trained circuit exists yet); the fish pilot as a tank kind; the lesion toggle.
+
+## Added after H6 (2026-11-06)
+- New files: `tools/ship/headToHead6.mjs` (library), `headToHead6Cmd.mjs` (train / fly / --one), `headToHead6-selfcheck.mjs` (gate; mutation log in its header: 133 mutants, 119 red first pass, 9 rows added, 5 declared equivalent). Data: `brain/rig-results/head-to-head6-training.jsonl` (20 records) and `head-to-head6.json`. Result and expectations scored in `brain/HEAD_TO_HEAD.md` (Round H6, RESULT).
+- Owed at ship, as for H2/H4/H5: timings for the new gate (boxTimings), knowledge index rebuild, census restatements for the new files, the handover row.
+- H6 verdict: NOT ASSESSED (tuning gained +0.0104 against the networks' +0.0904) and every champion sits on the search bounds; wider-box and dropout-objective tuning are untried.
+- H7 (recipe vs luck, heavy training) and H8 (memory with a noisy gyro) are NOT started. H8 needs a design step first: the tank has no gyro-noise model and the leaky unit and navigator read the exact body rate, so a noisy-gyro round needs a rate-noise wrapper on those two pilots (and its own gate) before it can be registered.
