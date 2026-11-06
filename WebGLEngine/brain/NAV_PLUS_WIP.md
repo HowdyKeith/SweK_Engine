@@ -84,3 +84,79 @@ DEV (30 seeds a kind, the parameters registered above) put the incumbent `any` a
 ## Not in this round, said now
 
 The sensed map (the series' own, finished); the current in the cost; the corner-angle margin; a 3-D seabed (`nav-3d-terrain`); fleets (`nav-fleet-avoidance`); the ship-vs-ship match (`nav-match-consumes-layer`); the tank's 3D view (`tank-nav-3d`); missions with energy (`nav-missions-and-cost`). The last four are upstream or in shared files.
+
+# RESULTS (2026-11-06; each HELD set flown ONCE, after the module, the command and both gates were sabotaged and committed; every flight is in `brain/subNavPlus<Study>Held7x.jsonl`)
+
+`node tools/ship/subNavPlusStudy.mjs --study margin --set held70 --write` (1,680 flights), `--study current --set held71 --write` (800), `--study reactive --set held72 --write` (360). The numbers below are the command's own output; the "post hoc" lines are computed from the flight files afterwards, with throwaway scripts, and move nothing.
+
+## ITEM 1, RESULT: **THE INCUMBENT MARGIN STANDS** (the margin sweep found nothing the sea can tell apart)
+
+DEV choice (the registered rule, 120 DEV scenarios): **m8** (110 reached against the incumbent's 105). On HELD70's 240 scenarios m8 reached 221 and the incumbent 215: 11 scenarios only m8, 5 only m12, both 210, neither 14; **gain 6, sign-test p 0.2101**. The verdict needed a gain of 5 AND p <= 0.10: the gain is there and the p is not.
+
+| variant | reached of 240 | collided | left | timed out |
+|---|---|---|---|---|
+| m12 (incumbent) | 215 (90%) | 19 | 5 | 1 |
+| m16 | 220 (92%) | 16 | 2 | 2 |
+| m10 | 215 (90%) | 20 | 4 | 1 |
+| **m8** (the DEV choice) | **221 (92%)** | 15 | 3 | 1 |
+| m6 | 214 (89%) | 23 | 2 | 1 |
+| v0 | 215 (90%) | 19 | 5 | 1 |
+| v10 | 214 (89%) | 20 | 5 | 1 |
+
+By kind (reached of 60, m12 / m8): hard-islands 59 / 59, **hard-gaps 60 / 60 (every one of the seven variants reached 60 of 60 on the gaps)**, hard-current 54 / 56, hard-traffic 42 / 46. **Predictions:** M1 (the DEV choice is the incumbent) MISSED; M2 (the verdict is the incumbent's) HELD; M3 HELD; M4 HELD; M5 HELD; M6 HELD.
+
+**Post hoc (not registered, from the file):** against m12, m16 gained 5 (10 only m16, 5 only m12; p 0.30), m10 0 (7 and 7), m6 -1 (11 and 12), v0 0 (3 and 3), v10 -1 (2 and 3). m8's gain is in hard-traffic (7 scenarios won, 3 lost) and hard-current (3 and 1); hard-islands is 1 and 1 and hard-gaps 0 and 0.
+
+**What it says.** No margin variant is distinguishable from the incumbent on 240 fresh scenarios, and the sweep covers a top rung of 6 to 16 m and a vertical margin of 0 to 10 m. Two of the four kinds are at their ceiling (islands 58-59 of 60, gaps 60 of 60 for ALL seven variants), so the sweep could only ever have moved hard-current and hard-traffic, and there the differences are a handful of scenarios inside the noise of 60. The caveat both write-ups carried -- "the margin was never swept" -- is closed in the direction of "it does not matter here"; it is NOT closed for a denser or narrower sea or a worse position fix, which this round did not test.
+
+## ITEM 2, RESULT: **PARTLY SUPPORTED** under the registered rule -- the designated arm gained 7 (p 0.14) -- AND THE ARM THAT WON IS NOT THE ONE REGISTERED
+
+200 scenarios (100 hard-current, 100 hard-current-gap). Designated `any+crab+margin` against `any`, paired: **12 only the designated arm, 5 only `any`, both 183; gain 7, sign-test p 0.1435**: the gain bar (5) is met, the p bar (0.10) is not, and the designated arm has fewer collisions (3 against 9), so by the registered rule PARTLY SUPPORTED.
+
+| kind | arm | reached | collided | left | timed out | median path / chord |
+|---|---|---|---|---|---|---|
+| hard-current | any | 93/100 | 5 | 2 | 0 | 1.09 |
+| | any+crab | **100/100** | 0 | 0 | 0 | 1.03 |
+| | any+crab+margin (designated) | 97/100 | 1 | 0 | 2 | 1.06 |
+| | any+crab-mean | **100/100** | 0 | 0 | 0 | 1.03 |
+| hard-current-gap | any | 95/100 | 4 | 0 | 1 | 1.05 |
+| | any+crab | 98/100 | 2 | 0 | 0 | 1.01 |
+| | any+crab+margin (designated) | 98/100 | 2 | 0 | 0 | 1.00 |
+| | any+crab-mean | 98/100 | 2 | 0 | 0 | 1.00 |
+
+**Predictions:** C1 (crab alone does not beat `any` by 5) MISSED -- it gained 10; C2 (the mean-told arm reaches at least as many as the estimating one) HELD; C3 (`any` reaches fewer on the gap kind) MISSED (95 on the gap kind, 93 on hard-current); C4 (the designated arm's path is at least `any`'s) MISSED; C5 (the estimate within 0.25 m/s of the mean at 60 s on 75 percent) HELD at 100 percent; C6 SUPPORTED MISSED, PARTLY HELD.
+
+**Post hoc, labelled (from the file; not registered; moves nothing):**
+* **The crab alone is the finding.** `any+crab` against `any`: 12 only the crab, 2 only `any`, **gain 10, p 0.0129** (7 and 0 on hard-current, 5 and 2 on the gap kind); it has no collision on hard-current. It is the second arm of four, so this p is one of three post hoc looks and is not corrected for that, and it is NOT the registered comparison: **it wants its own fresh set before it is called a result.**
+* **The growing margin cost the designated arm.** Against the crab alone it lost 3 scenarios and won none (p 0.25): both lost flights are TIMEOUTS on hard-current at mean currents of about 1.5 m/s, where the top rung grows to 28-31 m and the detour takes more than 260 s. K = 12 s was derived and fixed in advance, as registered; it was not tuned, and the result says it is too much at the top end of this current family.
+* **The estimate is as good as knowing the mean.** `any+crab` and `any+crab-mean` both reach 198 of 200; the estimate's error at 60 s has a median of 0.082 m/s and a maximum of 0.187 m/s. (The estimator reads the perfect logs, so this says the smoothing costs nothing, not that a real log would.)
+* `any` failed 12 of 200: 9 collisions, 2 exits through the edge, 1 timeout.
+
+**What it says.** A vessel that is told, by its own logs, what current it is in and points its nose into it makes good a straighter track (path 1.03 of the chord against 1.09, and 7 more arrivals on hard-current) -- that is the post hoc result, and it is large relative to the noise. The registered idea of widening the margin by the current did not add to it and cost two timeouts. The current-in-the-COST and the corner-angle margin were not tried (said in the registration).
+
+## ITEM 3, RESULT: **SUPPORTED** -- the estimated-velocity arm reached 54 of 60 against the assumed-velocity arm's 47, with no flight leaving the region
+
+60 `hard-reactive` scenarios (183 ships: 58 that hold, 54 that turn away, 71 that stop). Designated `any+predict-est+edge+yield` against `any+predict+edge+yield` (HELD5's fix arm with the ships' original velocities), paired: **8 only the designated arm, 1 only the assumed-velocity arm, both 46, neither 5; gain 7, sign-test p 0.0391; no exit.** The rule (gain 5, p <= 0.10, no exit) is met.
+
+| arm | reached | collided | left | timed out | median path / chord |
+|---|---|---|---|---|---|
+| hard-reactive any+replan | 41/60 (68%) | 17 | 0 | 2 | 1.03 |
+| hard-reactive any+predict (assumed velocity) | 44/60 (73%) | 4 | 12 | 0 | 1.32 |
+| hard-reactive any+predict+edge+yield (assumed; the reference) | 47/60 (78%) | 9 | 4 | 0 | 1.20 |
+| hard-reactive any+predict-est (estimated velocity) | 40/60 (67%) | 7 | 13 | 0 | 1.13 |
+| **hard-reactive any+predict-est+edge+yield (designated)** | **54/60 (90%)** | 6 | 0 | 0 | 1.09 |
+| hard-traffic any+predict+edge+yield (the same seeds, ships that hold) | 38/60 (63%) | 20 | 1 | 1 | 1.14 |
+
+**Predictions:** R1 (the reaction changes the assumed-velocity arm's reach by at least 5) HELD (47 against 38); R2 (it RAISES it) HELD; R3 (the designated arm reaches at least as many as `any+replan`) HELD; R4 SUPPORTED HELD (and NOT SUPPORTED missed); R5 (a `stops` ship is hit less per ship than a `holds` ship) HELD (2 hits in 71 stops ships, 0 in 54 turning ships, 4 in 58 holding ships); R6 (no timeout) HELD.
+
+**Post hoc, labelled:**
+* **The estimated model alone does not win.** Without the edge band and the yield rule, the estimated-velocity arm (`any+predict-est`, 40 of 60) is BELOW the assumed one (`any+predict`, 44 of 60), and 13 of its 20 failures are exits through the edge. The win is the estimated model WITH the edge and yield: against `any+predict-est` the same arm gained 17 and lost 3 (p 0.0026). What the filter buys is visible only in combination.
+* **Ships that answer help the vessel.** The assumed-velocity fix arm reached 47 on `hard-reactive` and 38 on `hard-traffic` (the same seeds, ships that hold): paired by seed 13 gained and 4 lost (p 0.049). Collisions with ships that hold, per ship, are about 7 percent; with ships that stop 3 percent; with ships that turn none.
+* The designated arm is also faster: median arrival 151.6 s against 174.9 s.
+* The designated arm against `any+replan`: 16 only the designated arm, 3 only `any+replan` (p 0.0044).
+
+**What it says.** On ships that turn away from or stop for the vessel, a plan that estimates each ship's velocity from where it sees it, widened at the edge and slowed at a predicted conflict, reached 90 percent of fresh scenarios with no exit; the same plan on the velocities the ships started with reached 78. **What it does not say:** the rule that makes the ships answer is mine and simple (one rule, no right of way, no ship that tries to ram), the filter sees exact positions, collisions with a static obstacle after a ship's turn are ignored, and the comparison that the registration made is between the two edge-and-yield arms; the estimate by itself is not shown to help.
+
+## Not checked, said plainly
+
+The margin sweep covers one sea family at an exact fix; the crab result is post hoc and unreplicated; K was not swept; the current is uniform in space; the reactive ships' rule was not varied (the turn rate, the sense range, the clearance); the three HELD sets are 240, 200 and 60 scenarios. The gates for the module and the command are sabotaged and logged in their headers (three passes each; the survivors left are argued equivalent there).
