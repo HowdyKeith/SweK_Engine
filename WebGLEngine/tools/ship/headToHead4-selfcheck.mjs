@@ -43,6 +43,23 @@ sec("1. SETS");
     const au = X.audit(B0, { range: { from: 4001, to: 4003 }, seconds: 33, flightFn: fake });
     ok("!! audit flies every arm on every id in order (arm-major), hands the arm and id and seconds to the flight, and keeps belief, flight, lost-as-bad, dark ticks and the key sb-<n>", calls.length === 18 && J(calls.slice(0, 4)) === J([["held", 4001, 33], ["held", 4002, 33], ["held", 4003, 33], ["leaky-unit-off", 4001, 33]]) && au.runs.er[1].bad === true && au.runs.er[0].bad === false && au.runs.held[2].key === "sb-4003" && au.runs.held[0].dark === 4101 && au.runs.held[0].belief === 0.9 && au.runs.held[0].flight === 0.8 && au.range.from === 4001 && au.seconds === 33);
 }
+sec("1b. THE FLIGHT, ON A SCRIPTED TANK (the arithmetic, with answers known in advance)");
+{
+    // a tank that answers from a script: tick i (1-based) -> { dark, error, targetNew, headingErr }; the target object changes where `targetNew` says
+    const scripted = (fn) => () => { let i = 0, tgt = { heading: 0 }; const snap = () => { const t = fn(i); if (t.targetNew) tgt = { heading: 0 }; return [{ target: tgt, heading: tgt.heading - t.headingErr, lost: !!t.lost, compass: { valid: !t.dark, seen: 0, error: t.error } }]; }; return { registerEstimator() {}, sync() {}, setEvent() {}, step() { i++; }, snapshot: () => snap() }; };
+    const arm = { id: "x", event: "dropout", build: null };
+    const rms = Math.sqrt((50 * 0.01 + 50 * 0.09) / 100);
+    const t1 = scripted((i) => ({ dark: i >= 100 && i < 200, error: i >= 100 && i < 150 ? 0.1 : i >= 150 && i < 200 ? 0.3 : 0.7, targetNew: i === 1, headingErr: 0.5 })), r1 = X.flight(arm, 7, 10, t1);
+    ok("!! belief is 1 minus the RMS of compass.error over the DARK ticks only, over pi: errors 0.1 (50 ticks) and 0.3 (50 ticks) in the dark and 0.7 on every valid tick give rms 0.2236 and belief 1 - 0.2236/pi", near(r1.belief, 1 - rms / Math.PI, 1e-12) && r1.dark === 100, `${r1.belief} ${r1.dark}`);
+    ok("!! with no settled dark tick (the dark window is 3 to 6 s after the dive's first target) the flight score falls back to ALL the dark ticks: heading error 0.5 gives 1 - 0.5/pi", near(r1.flight, 1 - 0.5 / Math.PI, 1e-12));
+    const t2 = scripted((i) => ({ dark: i >= 400 && i < 600, error: 0.2, targetNew: i === 1 || i === 450, headingErr: i < 450 ? 0.2 + 2 * Math.PI : 1.0 })), r2 = X.flight(arm, 7, 40, t2);
+    ok("!! the flight score is the mean SETTLED dark heading error: the 50 dark ticks 12 s or more after a new target have error 0.2 (read through the wrap, 0.2 + 2 pi is 0.2) and the 150 within 5 s of one have 1.0, so the score is 1 - 0.2/pi and not 1 - 0.8/pi", near(r2.flight, 1 - 0.2 / Math.PI, 1e-12) && r2.dark === 200 && near(r2.belief, 1 - 0.2 / Math.PI, 1e-12), `${r2.flight}`);
+    ok("!! a run with no dark tick is refused, naming the arm and the id", /arm x id sb-7 had no dark ticks/.test(thr(() => X.flight(arm, 7, 10, scripted(() => ({ dark: false, error: 0, headingErr: 0 }))))));
+    const r3 = X.flight(arm, 8, 10, scripted((i) => ({ dark: i >= 100 && i < 200, error: 0, targetNew: i === 1, headingErr: 0.1, lost: i === 300 })));
+    ok("!! lost is the last snapshot's flag, and the dark ticks are counted (100)", r3.lost === true && r3.dark === 100 && X.flight(arm, 8, 10, scripted((i) => ({ dark: i >= 100 && i < 200, error: 0, targetNew: i === 1, headingErr: 0.1 }))).lost === false);
+    const reg = []; X.flight({ id: "y", event: "fly-estimator", build: idb }, 9, 10, () => ({ registerEstimator: (e, b) => reg.push([e, b]), sync() {}, setEvent: (id, e) => reg.push(["set", id, e]), step() {}, snapshot: () => [{ target: {}, heading: 0, compass: { valid: false, seen: 0, error: 0 } }] }));
+    ok("!! an arm with a builder registers it under its event on the tank, and the event is set on the sub sb-<n>; an arm without a builder registers nothing", reg.length === 2 && reg[0][0] === "fly-estimator" && reg[0][1] === idb && J(reg[1]) === J(["set", "sb-9", "fly-estimator"]) && (() => { const r = []; X.flight({ id: "z", event: "dropout", build: null }, 9, 10, () => ({ registerEstimator: () => r.push(1), sync() {}, setEvent() {}, step() {}, snapshot: () => [{ target: {}, heading: 0, compass: { valid: false, seen: 0, error: 0 } }] })); return r.length === 0; })());
+}
 // a synthetic audit: n ids, per arm a belief and flight list
 const N = 40, base = (f) => Array.from({ length: N }, (_, i) => 0.6 + 0.02 * Math.sin(i + (f === "flight" ? 1 : 0)));
 const wob = (i, a) => (i % 2 ? a : -a);
@@ -77,6 +94,8 @@ sec("3. LINES");
     ok("!! line 2 reads the navigator against the LEAKY UNIT: +0.2 BEATS, -0.2 IS BELOW", b === "THE NAVIGATOR BEATS THE LEAKY UNIT IN BELIEF" && b2 === "THE NAVIGATOR IS BELOW THE LEAKY UNIT IN BELIEF", b + " | " + b2);
     const c = L({ ...up(["fly"], "belief", 0.2), ...up(["leaky-unit"], "belief", 0.05), ...up(["er"], "belief", -0.2) })[2];
     ok("!! line 3: the fly loop beats the leaky unit (+0.15) and the random wiring is below it (-0.25)", c === "THE FLY HEADING LOOP BEATS THE LEAKY UNIT IN BELIEF; THE RANDOM WIRING IS BELOW IT", c);
+    const c2 = L({ ...up(["fly"], "belief", 0.2), ...up(["leaky-unit"], "belief", 0.2), ...up(["er"], "belief", 0.1) })[2], c3 = L({ ...up(["leaky-unit"], "belief", 0.3), ...up(["er"], "belief", 0.1), ...up(["fly"], "belief", 0.3) })[2];
+    ok("!! line 3 reads the fly loop and the random wiring against the LEAKY UNIT, not against the held heading: the fly loop level with a leaky unit that beats the held heading TIES it though it beats the held heading, and the random wiring beating the held heading but under the leaky unit IS BELOW it", c2 === "THE FLY HEADING LOOP TIES THE LEAKY UNIT IN BELIEF; THE RANDOM WIRING IS BELOW IT" && c3 === "THE FLY HEADING LOOP TIES THE LEAKY UNIT IN BELIEF; THE RANDOM WIRING IS BELOW IT", c2 + " | " + c3);
     const d = L({ ...up(["fly"], "belief", 0.2), ...up(["er"], "belief", 0.05) })[3], d2 = L({ ...up(["fly"], "belief", 0.05), ...up(["er"], "belief", 0.2) })[3];
     ok("!! line 4: the fly loop against the random wiring, and not against the leaky unit: BEATS at +0.15, IS BELOW at -0.15", d === "THE FLY HEADING LOOP BEATS THE RANDOM WIRING IN BELIEF" && d2 === "THE FLY HEADING LOOP IS BELOW THE RANDOM WIRING IN BELIEF", d + " | " + d2);
     const e = L({ ...up(["leaky-unit"], "flight", 0.1), ...up(["er"], "flight", -0.1) })[4];
@@ -95,6 +114,8 @@ sec("4. CHECKS");
     const a1 = good(); a1.runs.er.pop(); const a2 = good(); a2.runs.fly[3].key = "x"; const a3 = good(); a3.runs.held[0].belief = 1.0; const a4 = good(); a4.runs.navigator[2].dark = 0;
     const a5 = good(); a5.runs["leaky-unit-off"][7].belief += 0.01; const a6 = good(); a6.runs["leaky-unit-off"][2].flight += 0.01; const a7 = good(); a7.runs.navigator = a7.runs.held.map((r) => ({ ...r })); const a8 = good(); a8.runs.fly = a8.runs.er.map((r) => ({ ...r }));
     ok("!! a short arm breaks SIZES, a different id IDS ALIGNED, a belief of 1 SCORES INSIDE, a run with no dark ticks DARK TICKS EXIST, a lesion off the held heading by 0.01 (belief, then flight) LESION IS THE HELD HEADING, a navigator equal to held EVENT REACHES THE FLIGHT, two identical arms ARMS DISTINCT", names(a1).includes("SIZES") && names(a2).includes("IDS ALIGNED") && names(a3).includes("SCORES INSIDE (0, 1)") && names(a4).includes("DARK TICKS EXIST") && names(a5).includes("LESION IS THE HELD HEADING") && names(a6).includes("LESION IS THE HELD HEADING") && names(a7).includes("EVENT REACHES THE FLIGHT") && names(a8).includes("ARMS DISTINCT"));
+    const a13 = good(); a13.runs.navigator = a13.runs.held.map((r, i) => (i === 7 ? { ...r, belief: r.belief + 0.05 } : { ...r }));
+    ok("!! the event reaches the flight when held and navigator differ on ONE id and agree on the rest (EVENT REACHES THE FLIGHT passes), and fails only when they agree on every id", !names(a13).includes("EVENT REACHES THE FLIGHT") && names(a7).includes("EVENT REACHES THE FLIGHT"));
     const a9 = good(); a9.runs.held[5].flight = 0;
     ok("!! a flight score of exactly 0 breaks SCORES INSIDE (0, 1) as a belief of 1 does", names(a9).includes("SCORES INSIDE (0, 1)"));
     const a10 = good(); a10.range = { from: 1, to: 41 };

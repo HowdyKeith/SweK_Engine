@@ -30,8 +30,8 @@ export function armsOf(builders) {
     ];
 }
 /** One id of one arm in its own tank: { belief (1 - rms/pi over the dark ticks), flight (the board's dropout score), lost, dark (the dark ticks counted) }. */
-export function flight(arm, n, seconds = SECONDS) {
-    const id = "sb-" + n, q = A.createTank();
+export function flight(arm, n, seconds = SECONDS, makeTank = A.createTank) {   // `makeTank` is for the gate: a scripted tank whose belief and heading errors are known in advance
+    const id = "sb-" + n, q = makeTank();
     if (arm.build) q.registerEstimator(arm.event, arm.build);
     q.sync([{ id, name: "H4 " + arm.id, hue: 100, from: "board", local: true, theta: null, pilot: "autopilot", circuit: "gfc", weights: null }]);
     q.setEvent(id, arm.event);
