@@ -50,6 +50,11 @@ Everything of the series stands unless a line below says otherwise: the PD autop
 
 **What a result would not say.** Anything about a current that varies in space (this one is uniform in the region and varies only in time), a current that is not measurable, or a vessel with another hull or autopilot; nothing about the current in the cost or the corner-angle margin; nothing about the sensed map (the map is exact). `hard-current-gap` is a family I made with these parameters; the gap and the current are drawn independently.
 
+
+### AMENDMENT 1 TO ITEM 2 (2026-11-06; made on DEV, BEFORE HELD71 was read or flown and before any gate for the code existed; DEV is not a result)
+
+DEV (30 seeds a kind, the parameters registered above) put the incumbent `any` at **26 of 30 in hard-current and 28 of 30 in hard-current-gap**, and the other three arms at 28 and 29: the ceiling the harder test ended on again, with room for at most four or five flights in 60. The verdict asks for a gain of at least 5 with p <= 0.10, which on 60 + 60 scenarios needs about six scenarios won against one lost, more than the room there is. **One change, made once: HELD71 is seeds 7101 to 7200 (100 of each kind, 200 scenarios) instead of 7101 to 7160.** (7201 to 7260 stay HELD72's; no seed is shared.) The verdict rule, its thresholds (gain at least 5, p <= 0.10, no more collisions), the arms, tau = 15 s, K = 12 s and the predictions are unchanged, and the generator is NOT made harder: 4 and 2 failures in 30 are not a degenerate generator, and I will not tune a family until an arm wins. **I expect the pooled gain to be small (DEV: +3 of 60 for the designated arm, p 0.375) and the round to read NOT SUPPORTED or PARTLY SUPPORTED**; C3 and C4 each missed on DEV (the gap kind did not cost `any` more than hard-current did, and the designated arm's path was not longer), which changes none of the stated probabilities by more than a few points.
+
 ## ITEM 3. nav-reacting-traffic: ships that answer, and a velocity that has to be estimated
 
 **What is open.** HELD4 and HELD5's ships hold course and speed, do not see the vessel, and have a velocity the plan knows exactly. `any+predict` is only as good as its prediction, and the prediction is perfect there. Follow-up 5 ended at 40 of 60 (67 percent) with 14 of 20 failures collisions with ships.
