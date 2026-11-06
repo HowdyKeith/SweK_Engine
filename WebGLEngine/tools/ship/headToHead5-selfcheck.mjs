@@ -13,7 +13,8 @@
 //   7 FLIGHT    one real short audit (ids 0-1, 30 s): the real Wip weights, controls seated through their tank kinds, deterministic, the checks pass.
 //   8 SOURCE    the ids appear once; no clock, random or file.
 // NOT CHECKED, said plainly: whether the wiring matters (that is the experiment), and that the recipe the controls were trained by is a good one.
-// SABOTAGE LOG: see the end of this header once the mutation pass has been run.
+// SABOTAGE LOG (58 mutants of tools/ship/headToHead5.mjs, each alone in its own worktree copy): 53 went red by name on the first pass. 5 went 0 red and each got a row, then went red: parseSpec without its end anchor (trailing junk accepted); the random wirings' topology seed 6301 + c instead of 6300 + c (the gate only checked determinism: now it compares with the fish trainer's controlTopology edge for edge); the record's weights unpruned (a 3-iteration search prunes nothing: a 40-iteration one moves 58 and keeps 11); the TOPOLOGIES row made trivial (the check takes a `topologyOf` on the audit for the gate to hand in a duplicate); the lit-tank line's random-wiring count read in the dark (the row now compares the whole line for a lit-only and a dark-only leader).
+//   The fixture lessons: a gain of exactly 0.02 cannot be built (float noise decides the boundary), so the learning margin is tested at 0.0199 and 0.0201 and the `>=` form of the margin is an equivalent mutant not tried; and a control made from the hand weights moved by ONE weight can fly exactly as the autopilot does (the recurrent core starts at zero), so the real-flight fixture scales every weight by its own factor.
 "use strict";
 import fs from "node:fs";
 let fails = 0, finished = false;
