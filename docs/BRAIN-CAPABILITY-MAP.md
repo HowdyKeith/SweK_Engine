@@ -21,7 +21,7 @@ Which brain can do what at each simulation level, and what the record says about
 
 Brains: **Hand rule / PD autopilot**, **Fly circuit**, **GPU Brain (MLP)**, **Fish circuits**, **Language model**. An 'amoeba brain' does not exist in the tree.
 
-15 tasks x 5 brains = 75 cells: 11 TRAINED, 1 HAND-WIRED, 2 NO CHAMPION, 4 TUNED, 1 SCRIPTED, 1 NO EFFECT, 1 NOT CONCLUDED, 11 EXISTS, UNREAD, 41 -, 2 n/a.
+15 tasks x 5 brains = 75 cells: 11 TRAINED, 1 HAND-WIRED, 2 NO CHAMPION, 4 TUNED, 2 SCRIPTED, 3 NO EFFECT, 1 NOT CONCLUDED, 8 EXISTS, UNREAD, 41 -, 2 n/a.
 
 ## Submarine
 
@@ -30,7 +30,7 @@ Brains: **Hand rule / PD autopilot**, **Fly circuit**, **GPU Brain (MLP)**, **Fi
 | Hold depth, heading and speed (a 6-DOF boat, no weapons) | no | TRAINED | TRAINED | - | TRAINED | n/a |
 | Find and sink a drone with sonar and torpedoes | yes | TUNED | - | - | - | - |
 | Survey run with a battery, a hull that feels pressure, a noisy gauge (needs and limits) | no | TUNED | NOT CONCLUDED | - | - | NO EFFECT |
-| Heading through a compass dropout (rung 4a: circuits as estimators) | no | EXISTS, UNREAD | EXISTS, UNREAD | - | EXISTS, UNREAD | - |
+| Heading through a compass dropout (rung 4a: circuits as estimators) | no | SCRIPTED | NO EFFECT | - | NO EFFECT | - |
 
 ### Hold depth, heading and speed (a 6-DOF boat, no weapons)
 
@@ -47,16 +47,16 @@ Brains: **Hand rule / PD autopilot**, **Fly circuit**, **GPU Brain (MLP)**, **Fi
 
 ### Survey run with a battery, a hull that feels pressure, a noisy gauge (needs and limits)
 
-- **Hand rule / PD autopilot: TUNED.** the rule advisor GUARDED-FILTER (surface under a charge threshold that falls with depth) beats every model and every fixed cap: mean 0.763/0.713/0.806 against the brain alone 0.586/0.558/0.638. Sources: brain/NEEDS_AND_LIMITS.md ("RULE-GF 0.763 | 0.713 | 0.806").
+- **Hand rule / PD autopilot: TUNED.** the rule advisor GUARDED-FILTER (surface under a charge threshold that falls with depth) beats every model and every fixed cap: mean 0.763/0.713/0.806 against the brain alone 0.586/0.558/0.638; choosing the next station by trying the orders of the four nearest on a twin of the boat's own simulation (brain/plannerSeat.mjs) adds +0.0214 (se 0.0040) on 288 fresh dives, 35 better and 3 worse, a small gain (far +0.031, both +0.012) that keeps about half of itself when the twin is 10 percent wrong in all four ways at once and is lost at 20 percent. Sources: brain/NEEDS_AND_LIMITS.md ("RULE-GF 0.763 | 0.713 | 0.806"); changelog v4911 ("+0.0214 (se 0.0040)"); changelog v4911 ("10 percent in all four keep about half of it").
 - **Fly circuit: NOT CONCLUDED.** the circuit pilot's registered task re-check could not pass under the noisy gauge (a defect of my registration, restated post hoc as Round 3 amendment 3). Sources: brain/NEEDS_AND_LIMITS.md ("AMENDMENT 3").
 - **GPU Brain (MLP): -.** a trained advisor or pilot on the MLP is the experiment not yet run.
 - **Language model: NO EFFECT.** gemma2:9b and llama3.1:8b at temperature 0, 4,273 and 4,217 situations on the reserved seeds: mixed against the brain alone, a tie with the best fixed cap, a loss to the rule on every audit. Sources: brain/NEEDS_AND_LIMITS.md ("NO CONSISTENT EFFECT (MIXED)").
 
 ### Heading through a compass dropout (rung 4a: circuits as estimators)
 
-- **Hand rule / PD autopilot: EXISTS, UNREAD.** a plain dead-reckoning navigator flies the dropout. Sources: render/subDropoutData.mjs.
-- **Fly circuit: EXISTS, UNREAD.** the fly's heading-loop circuit as an estimator behind the autopilot (rung 4a versions 3-5 in the WIP); result not read for this map. Sources: brain/SUBMARINE_WIP.md ("RUNG 4a VERSION 3").
-- **Fish circuits: EXISTS, UNREAD.** the best random wiring of the same size is the control; result not read for this map. Sources: brain/SUBMARINE_WIP.md ("RUNG 4a VERSION 4").
+- **Hand rule / PD autopilot: SCRIPTED.** a plain dead-reckoning navigator flies the dropout: on the tank's settled dark error it only TIES the autopilot (the score mostly measures how fast the sub turns), but on the dark cost it pays nothing for losing the compass (0.0000 against the autopilot's +0.0293 on 100 far ids); one leaky unit fed the heading rate pays +0.0008. Sources: render/subDropoutData.mjs; brain/BACKLOG_PICKUPS_2026-11-05.md ("0.0000").
+- **Fly circuit: NO EFFECT.** the fly's real heading-loop wiring as an estimator behind the autopilot, against random wirings of its size: v3 (every wiring at its own measured edge of stability) FAIL in all three arms, the real wiring winning on 0 of 3 audits against the strongest family with skill 0.01 to 0.15 against 0.90 to 0.92 for ONE leaky unit; v4 (a ring map with the flag) FAILED both arms; v5 (a flag-free signed rate) found NO SIGNAL in the signed arm -- the graph as wired cannot tell the sign of a turn. Sources: changelog v4903 ("FAIL in all three arms by the rule written down in advance"); changelog v4903 ("against the strongest family the real wiring wins on 0 of 3 audits"); changelog v4905 ("version 4 (a ring map with the flag, 7-factor grid) FAILED both arms"); changelog v4905 ("found NO SIGNAL in the signed arm").
+- **Fish circuits: NO EFFECT.** no fish circuit is tried as an estimator; the random wirings of the fly's size are the controls, and they rise while the real wiring does not (v3: the real wiring wins on 0 of 3 audits against the strongest family; v4 FAILED both arms). Sources: changelog v4903 ("against the strongest family the real wiring wins on 0 of 3 audits"); changelog v4905 ("version 4 (a ring map with the flag, 7-factor grid) FAILED both arms").
 
 ## Sky
 
