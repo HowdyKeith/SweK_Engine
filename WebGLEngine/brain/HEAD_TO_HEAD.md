@@ -391,7 +391,7 @@ Every trained 963-weight network in this series beats the PD autopilot on the co
 ### 4. The bottom lines
 1. `LEARNED: <n> OF 28 INTACT NETWORKS BEAT THE AUTOPILOT IN THE DARK BY MORE THAN 0.02`.
 2. `DARK GAIN OVER THE AUTOPILOT: INTACT <mean> (sd <sd>, range <lo> to <hi>); CORE OFF <mean> (sd, range); SURVIVING FRACTION <f>`.
-3. `THE LESION CHANGES <b> NETWORKS FOR THE BETTER, <t> NOT AT ALL, <w> FOR THE WORSE (dark, core off minus intact, of 28)`.
+3. `THE LESION CHANGES <b> NETWORKS FOR THE BETTER, <t> TIED, <w> FOR THE WORSE (dark, core off minus intact, of 28)`.
 4. `BY GROUP (intact / core off, dark gain): SHIPPED <a> / <b>; BASE <a> / <b>; ROBUST <a> / <b>`.
 5. `LIT TANK: INTACT <mean>, CORE OFF <mean>, SURVIVING FRACTION <f>`.
 6. `VERDICT: <as above>`.
