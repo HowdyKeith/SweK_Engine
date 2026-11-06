@@ -1,0 +1,239 @@
+// WebGLEngine/brain/rotorcraftBoard-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
+//
+// Run: node brain/rotorcraftBoard-selfcheck.mjs      (about 15 s: fixtures, and real flights of one seed of each kind)
+//
+// THE GATE OF brain/rotorcraftBoard.mjs AND tools/ship/takeRotorcraftBoard.mjs (the registration is brain/ROTORCRAFT_BOARD_WIP.md, Amendments 1 and 2; the board is brain/switchboard.mjs's and is held by brain/switchboard-selfcheck.mjs):
+//   1 CONSTANTS   the sets (DEV 1 to 3; HELD73 8001 to 8012, above every seed another set of either task used), the tolerances (1e-3, 5/6), the tasks and their failure kinds, the weight files, the arm ids of each rotorcraft, the trained list
+//   2 ARMS        each arm's id, layer and controls; the hand arm IS the hand autopilot, zero IS the zero-weight network, hand-net IS the hand weights, a plain array and a Float32Array of the same weights fly the same; mlp and mlp-v2 are different pilots; a missing weight leaves that arm out
+//   3 THE TASKS   the keys (kind-major, "<kind>:<seed>"), each score IS the task's own flight, the BAD rule (engine / motor: not settled; every other kind: not airborne) on flights that are bad and flights that are not, the kinds option, refusals by name
+//   4 THE CHECKS  every failure mode of Amendments 1 and 2 on fixtures: order, length, non-finite, the hand-net limit (strict, 1e-3), the floor (30 of the 36 that are not the failure kind; the failure kind printed and never checked), each rotorcraft's own failure kind
+//   5 THE READ    the per-kind readings (the hand-net tolerance applies to hand-net alone), the trained brains pairwise, the lines in order and to the character, a failed check marks the readings NOT WEIGHED
+//   6 THE COMMAND arguments and refusals, the weight loader (counts refused by name), a real run on one seed, the rows written for a stubbed HELD set (and not for DEV)
+//   7 THE SOURCE  no clock, no random number, no file in the library; the imports; the header names the registration
+// NOT CHECKED, said plainly: which brain is better (that is the experiment); the weights; any claim about a real helicopter or quadrotor.
+//
+// SABOTAGES (2026-11-06; the real files checked by sha256 before and after every pass). PASS 1: 102 mechanical mutants of rotorcraftBoard.mjs: 60 red BY NAME, 10 crashed the gate, 32 survived; 70 of takeRotorcraftBoard.mjs: 45 red, 20 crashed, 5 survived. The survivors asked for rows: the arm
+// notes to the character (the numbers inside them); the odd arm being the SECOND arm (ids[0] read as ids[1]); hand-net's tolerance on the SIZE of the mean (Math.abs) and strict at exactly 1e-3; a mean of exactly zero printing its plus sign; the trained-pair line to the character; the
+// floor rounding UP (7 scenarios, 6 required); a too-long weight file; the command run as a program (exit codes, the default run with no arguments, an import under `node -e`, the symlinks preserved so a mutant is the one that runs). PASS 2 (the gate as it stands): library 102: 88 red,
+// 8 crashed, 6 survived; command 70: 48 red, 20 crashed, 2 survived. THE EIGHT SURVIVORS: four numbers inside the JSDoc comment of checksOf (comment text); `Object.keys(res.runs)[0]` read as `[1]` in perKind (the kinds are the same from any arm of a result the board produced:
+// board.run refuses unequal lists and paired throws on unequal keys) -- DECLARED EQUIVALENT; `i < present.length` read as `<=` in trainedPairs (the inner loop is empty at i = n) -- DECLARED EQUIVALENT; and the command's main guard read at argv[2] and at argv[0], which went red
+// with the no-argument program run and the `node -e` import. HAND-WRITTEN: 18 of the library (the floor rounded down; the floor read over the failure kind; a tie counted as below; the info line dropped; the hand-net tolerance on every arm; the helicopter's fly arm without the zero
+// control; the BAD rule swapped; the key seed:kind; the kinds option ignored; the last seed not flown; the quadrotor's failure kind engine; the limit 1e-2; the finite check dropped; hand among the trained brains; the missing-control guard dropped; mlp-v2 on the first training's weights; the hand arm as the
+// zero network; the quadrotor's hand arm as the helicopter's) and 8 of the command (a too-long weight file accepted; --seeds one too many; the rows saying dev; the wrong task in a row; a write allowed on DEV; the wrong output file; the quadrotor loading the helicopter's weights; both tasks flown when one is
+// named): all 26 red by name. Found while building: checksOf crashed on run lists of unequal length and readLines on lists that cannot be paired; both now report instead of throwing (rows).
+"use strict";
+import fs from "node:fs";
+import * as R from "./rotorcraftBoard.mjs";
+import * as C from "../tools/ship/takeRotorcraftBoard.mjs";
+import * as B from "./switchboard.mjs";
+import * as AR from "./autopilotRotor.mjs";
+import * as AD from "./autopilotDrone.mjs";
+import * as RP from "./pilotRotorPolicy.mjs";
+import * as DP from "./pilotDronePolicy.mjs";
+import * as DM from "./pilotDroneMlp.mjs";
+
+let fails = 0;
+const ok = (l, c, n = "") => { if (!c) fails++; console.log(`  ${c ? "PASS" : "FAIL"}  ${l}${n ? "   " + n : ""}`); };
+const near = (a, b, t = 1e-9) => Math.abs(a - b) <= t;
+const J = JSON.stringify;
+const thr = (f) => { try { f(); return ""; } catch (e) { return String(e.message); } };
+const W = (key) => C.loadWeights(key);
+
+// ---- fixtures ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+const KINDS = { rotor: R.TASKS.rotor.T.KINDS, drone: R.TASKS.drone.T.KINDS };
+const keysOf = (task, seeds = 12, from = 8001) => KINDS[task].flatMap((k) => Array.from({ length: seeds }, (_, i) => `${k}:${from + i}`));
+/** A result for the task `task` from a function of (arm, index, key) -> score. */
+const mkRes = (task, arms, f, seeds = 12) => { const ks = keysOf(task, seeds), runs = {}; for (const a of arms) runs[a] = ks.map((key, i) => ({ key, score: f(a, i, key), bad: false })); return { task, layer: "flying", range: { from: 8001, to: 8000 + seeds }, opts: {}, runs }; };
+const clean = (task) => mkRes(task, ["hand", "hand-net", "fly", "zero"], (a, i) => (a === "zero" ? -3 - i * 0.01 : a === "hand-net" ? -1 - i * 0.01 + 0.0004 : a === "fly" ? -0.5 - i * 0.01 : -1 - i * 0.01));
+
+console.log("1. CONSTANTS");
+{
+    ok("!! the DEV set is seeds 1 to 3 and the registered read is seeds 8001 to 8012, both frozen, and nothing else is in RC_SETS", J(R.RC_SETS) === '{"dev":{"from":1,"to":3},"held73":{"from":8001,"to":8012}}' && Object.isFrozen(R.RC_SETS) && Object.isFrozen(R.RC_SETS.dev) && Object.isFrozen(R.RC_SETS.held73));
+    ok("the registered read is above every seed another set of either task used (the registration: training, held-out, audit, baseline and safety sets are seeds up to 5030)", R.RC_SETS.held73.from > 5030 && R.RC_SETS.held73.to - R.RC_SETS.held73.from + 1 === 12);
+    ok("!! the same-pilot limit is 1e-3 and the floor fraction is 5/6 (Amendments 1 and 2)", R.SAME_TOL === 1e-3 && R.FLOOR_FRACTION === 5 / 6);
+    ok("!! the tasks: rotor is the helicopter task with the failure kind engine, drone the quadrotor task with motor; both frozen", J(Object.keys(R.TASKS)) === '["rotor","drone"]' && R.TASKS.rotor.outKind === "engine" && R.TASKS.drone.outKind === "motor" && Object.isFrozen(R.TASKS) && Object.isFrozen(R.TASKS.rotor) && R.TASKS.rotor.T.KINDS.includes("engine") && R.TASKS.drone.T.KINDS.includes("motor"));
+    ok("the kinds: hover, recovery, engine, terrain for the helicopter; hover, recovery, motor, goto for the quadrotor (the registration)", J(KINDS.rotor) === '["hover","recovery","engine","terrain"]' && J(KINDS.drone) === '["hover","recovery","motor","goto"]');
+    ok("!! the weight files are the registered ones", J(R.WEIGHT_FILES) === J({ rotorFly: "brain/pilotRotorWeightsDefault.json", droneFly: "brain/pilotDroneWeightsV2.json", droneMlp: "brain/pilotDroneMlpWeightsDefault.json", droneMlpV2: "brain/pilotDroneMlpWeightsV2.json" }) && Object.isFrozen(R.WEIGHT_FILES));
+    ok("!! the arm ids of each rotorcraft, in the order they are flown and printed, and the trained list", J(R.ARM_IDS.rotor) === '["hand","hand-net","fly","zero"]' && J(R.ARM_IDS.drone) === '["hand","hand-net","fly","mlp","mlp-v2","zero"]' && J(R.TRAINED) === '["fly","mlp","mlp-v2"]' && Object.isFrozen(R.ARM_IDS) && Object.isFrozen(R.TRAINED));
+}
+
+console.log("\n2. ARMS");
+{
+    const wr = { fly: W("rotorFly") }, wd = { fly: W("droneFly"), mlp: W("droneMlp"), mlpV2: W("droneMlpV2") };
+    const ra = R.rotorArms(wr), da = R.droneArms(wd), by = (as) => Object.fromEntries(as.map((a) => [a.id, a]));
+    ok("!! the helicopter's arms in order, all flying-layer, with their controls: hand and zero none, hand-net against hand, fly against hand and zero", J(ra.map((a) => [a.id, a.layer, a.controls])) === J([["hand", "flying", []], ["zero", "flying", []], ["hand-net", "flying", ["hand"]], ["fly", "flying", ["hand", "zero"]]]));
+    ok("!! the quadrotor's arms: the same three, then fly, mlp and mlp-v2, each against hand and zero", J(da.map((a) => [a.id, a.layer, a.controls])) === J([["hand", "flying", []], ["zero", "flying", []], ["hand-net", "flying", ["hand"]], ["fly", "flying", ["hand", "zero"]], ["mlp", "flying", ["hand", "zero"]], ["mlp-v2", "flying", ["hand", "zero"]]]));
+    ok("!! the notes are the registered words (the helicopter's four and the quadrotor's six, to the character)", J(ra.map((a) => a.note)) === J(["the hand autopilot (brain/autopilotRotor.mjs)", "the fruit-fly network with every weight zero: it does nothing (the floor)", "the hand pilot written as the 1,167-weight network: the same laws", "the fruit-fly network pilot, trained"]) && J(da.map((a) => a.note)) === J(["the hand autopilot (brain/autopilotDrone.mjs)", "the fruit-fly network with every weight zero: it does nothing (the floor)", "the hand pilot written as the 1,167-weight network: the same laws", "the fruit-fly network pilot (second recipe), trained", "the 1,860-weight MLP, first training", "the 1,860-weight MLP, second training"]));
+    ok("without weights the networks that need them are left out (no fly for the helicopter; for the quadrotor each of fly, mlp, mlp-v2 only if its weights are given)", J(R.rotorArms().map((a) => a.id)) === '["hand","zero","hand-net"]' && J(R.droneArms({ mlp: wd.mlp }).map((a) => a.id)) === '["hand","zero","hand-net","mlp"]' && J(R.droneArms({ mlpV2: wd.mlpV2 }).map((a) => a.id)) === '["hand","zero","hand-net","mlp-v2"]' && J(R.droneArms({ fly: wd.fly }).map((a) => a.id)) === '["hand","zero","hand-net","fly"]');
+    ok("!! every arm has a pilot() and a note; the hand arms ARE the hand autopilots", [...ra, ...da].every((a) => typeof a.pilot === "function" && a.note.length > 10) && by(ra).hand.pilot() === AR.pilot && by(da).hand.pilot() === AD.pilot);
+    const T = R.TASKS, sc = (t, kind, seed) => T[t].T.scenario(seed, kind), fly = (t, p, kind, seed) => T[t].T.fly(p, sc(t, kind, seed)).score;
+    // the same pilot through the arm and built directly: identical flights
+    ok("!! the zero arm IS the zero-weight network (helicopter hover 8001 and quadrotor recovery 8001, to the digit)", fly("rotor", by(ra).zero.pilot(), "hover", 8001) === fly("rotor", RP.pilotFor(RP.zeroWeights()), "hover", 8001) && fly("drone", by(da).zero.pilot(), "recovery", 8001) === fly("drone", DP.pilotFor(DP.zeroWeights()), "recovery", 8001));
+    ok("!! the hand-net arm IS the hand weights as a network (to the digit), and it is not the zero network", fly("rotor", by(ra)["hand-net"].pilot(), "recovery", 8001) === fly("rotor", RP.pilotFor(RP.handWeights()), "recovery", 8001) && fly("drone", by(da)["hand-net"].pilot(), "goto", 8001) === fly("drone", DP.pilotFor(DP.handWeights()), "goto", 8001) && fly("drone", by(da)["hand-net"].pilot(), "goto", 8001) !== fly("drone", by(da).zero.pilot(), "goto", 8001));
+    ok("!! fly is the trained weights through the network pilot: the helicopter's through pilotRotorPolicy and the quadrotor's through pilotDronePolicy (to the digit)", fly("rotor", by(ra).fly.pilot(), "hover", 8001) === fly("rotor", RP.pilotFor(Float32Array.from(wr.fly)), "hover", 8001) && fly("drone", by(da).fly.pilot(), "hover", 8001) === fly("drone", DP.pilotFor(Float32Array.from(wd.fly)), "hover", 8001));
+    ok("!! mlp and mlp-v2 are the MLP pilot on their own files, and different from each other and from the fruit-fly network", fly("drone", by(da).mlp.pilot(), "hover", 8001) === fly("drone", DM.pilotFor(Float32Array.from(wd.mlp)), "hover", 8001) && fly("drone", by(da)["mlp-v2"].pilot(), "hover", 8001) === fly("drone", DM.pilotFor(Float32Array.from(wd.mlpV2)), "hover", 8001) && new Set([fly("drone", by(da).mlp.pilot(), "hover", 8001), fly("drone", by(da)["mlp-v2"].pilot(), "hover", 8001), fly("drone", by(da).fly.pilot(), "hover", 8001)]).size === 3);
+    ok("a plain array and a Float32Array of the same weights fly the same (the command hands in arrays; the arm converts)", fly("rotor", R.rotorArms({ fly: Float32Array.from(wr.fly) }).find((a) => a.id === "fly").pilot(), "terrain", 8001) === fly("rotor", by(ra).fly.pilot(), "terrain", 8001));
+    ok("each call to pilot() gives a flight that does not depend on the one before (the same arm flown twice scores the same)", fly("drone", by(da).fly.pilot(), "motor", 8002) === fly("drone", by(da).fly.pilot(), "motor", 8002));
+    const b = R.rotorcraftBoard("drone", wd), r = R.rotorcraftBoard("rotor", wr);
+    ok("!! rotorcraftBoard holds ONE task and the arms of that rotorcraft: rotor -> task rotor with hand, zero, hand-net, fly; drone -> task drone with six; an unknown name is refused by name", J([...r.tasks.keys()]) === '["rotor"]' && J([...r.arms.keys()]) === '["hand","zero","hand-net","fly"]' && J([...b.tasks.keys()]) === '["drone"]' && J([...b.arms.keys()]) === '["hand","zero","hand-net","fly","mlp","mlp-v2"]' && /unknown rotorcraft "boat"/.test(thr(() => R.rotorcraftBoard("boat"))));
+    ok("the switchboard's own standard board is not touched: it has no rotor task and none of these arms", (() => { const sb = B.standardBoard({ noisy: Array(963).fill(0), plain: Array(963).fill(0) }); return !sb.tasks.has("rotor") && !sb.tasks.has("drone") && !sb.arms.has("hand-net") && !sb.arms.has("mlp-v2"); })());
+}
+
+console.log("\n3. THE TASKS");
+{
+    const T = R.TASKS, wr = { fly: W("rotorFly") }, wd = { fly: W("droneFly"), mlp: W("droneMlp"), mlpV2: W("droneMlpV2") };
+    const arms = { rotor: Object.fromEntries(R.rotorArms(wr).map((a) => [a.id, a])), drone: Object.fromEntries(R.droneArms(wd).map((a) => [a.id, a])) };
+    const tk = { rotor: R.rotorTask, drone: R.droneTask };
+    ok("!! each task is a frozen flying-layer task named rotor / drone", tk.rotor.name === "rotor" && tk.drone.name === "drone" && tk.rotor.layer === "flying" && tk.drone.layer === "flying" && Object.isFrozen(tk.rotor) && Object.isFrozen(tk.drone));
+    let sawBadOut = false, sawOkOut = false, sawBadOther = false, sawOkOther = false;
+    for (const t of ["rotor", "drone"]) {
+        const range = { from: 1, to: 2 }, armIds = ["hand", "zero", "fly"];
+        for (const id of armIds) {
+            const rs = tk[t].run(arms[t][id], range), exp = [];
+            for (const kind of T[t].T.KINDS) for (let seed = 1; seed <= 2; seed++) { const r = T[t].T.fly(arms[t][id].pilot(), T[t].T.scenario(seed, kind)); exp.push({ key: `${kind}:${seed}`, score: r.score, bad: kind === T[t].outKind ? !r.settled : r.status !== "airborne" }); }
+            for (const e of exp) { if (e.key.startsWith(T[t].outKind + ":")) { if (e.bad) sawBadOut = true; else sawOkOut = true; } else if (e.bad) sawBadOther = true; else sawOkOther = true; }
+            ok(`!! ${t} / ${id}: eight runs, kind-major (each kind's seeds 1, 2 together), each key "<kind>:<seed>", each score and BAD flag IS the task's own flight`, rs.length === 8 && J(rs) === J(exp), rs.map((r) => r.key).join(" "));
+        }
+    }
+    ok("the flights above include a failure-kind flight that is BAD and one that is not, and another-kind flight that is BAD and one that is not (so the BAD rule is read in all four cases)", sawBadOut && sawOkOut && sawBadOther && sawOkOther, J({ sawBadOut, sawOkOut, sawBadOther, sawOkOther }));
+    // the BAD rule is each task's own: a flight that is not standing, by status for the others and by settled for the failure kind
+    {
+        const r = T.drone.T.fly(arms.drone.zero.pilot(), T.drone.T.scenario(8001, "hover")), run = tk.drone.run(arms.drone.zero, { from: 8001, to: 8001 }, { kinds: ["hover"] })[0];
+        ok("the BAD flag of a non-failure kind is the task's `status !== airborne` (a zero-weight quadrotor in hover is bad exactly when its flight is not airborne)", run.bad === (r.status !== "airborne") && run.score === r.score);
+    }
+    ok("!! opts.kinds restricts and orders the kinds flown (engine then hover: engine's seeds first), the default is all four in the task's order", J(tk.rotor.run(arms.rotor.hand, { from: 8001, to: 8001 }, { kinds: ["engine", "hover"] }).map((r) => r.key)) === '["engine:8001","hover:8001"]' && J(tk.drone.run(arms.drone.hand, { from: 8003, to: 8003 }).map((r) => r.key)) === '["hover:8003","recovery:8003","motor:8003","goto:8003"]');
+    ok("!! refusals by name: an unknown kind (naming the kinds), an arm without a pilot (naming the task and the arm)", /unknown kind "wind" \(hover, recovery, engine, terrain\)/.test(thr(() => tk.rotor.run(arms.rotor.hand, { from: 1, to: 1 }, { kinds: ["wind"] }))) && /rotorcraftBoard\.drone: arm nopilot has no pilot\(\)/.test(thr(() => tk.drone.run({ id: "nopilot" }, { from: 1, to: 1 }))));
+    ok("!! through the board: the run keys are the same for every arm, in the same order (board.run refuses otherwise), and the board is the switchboard's own object", (() => { const b = R.rotorcraftBoard("rotor", wr), res = b.run("rotor", ["hand", "fly"], { from: 8001, to: 8001 }); return res.task === "rotor" && res.layer === "flying" && J(res.runs.hand.map((r) => r.key)) === J(res.runs.fly.map((r) => r.key)) && typeof b.read === "function" && b.read(res).lines.length > 3; })());
+}
+
+console.log("\n4. THE CHECKS");
+{
+    const ck = R.checksOf(clean("drone"));
+    ok("!! a clean result passes every check, with one info line for the failure kind (here zero is below hand on all 12 motor scenarios)", ck.ok && ck.failures.length === 0 && J(ck.info) === '["on the motor scenarios (not checked) zero is below hand on 12, tied on 0, above on 0, of 12"]', J(ck));
+    ok("a clean helicopter result passes too, with the failure kind named engine", (() => { const c = R.checksOf(clean("rotor")); return c.ok && c.info[0] === "on the engine scenarios (not checked) zero is below hand on 12, tied on 0, above on 0, of 12"; })());
+    // same scenarios
+    const swap = clean("drone"); [swap.runs.fly[3], swap.runs.fly[4]] = [swap.runs.fly[4], swap.runs.fly[3]];
+    ok("!! the same scenarios in the same order: two keys swapped in fly is a failure naming fly and hand", (() => { const c = R.checksOf(swap); return !c.ok && c.failures.length === 1 && c.failures[0] === "fly did not fly the same scenarios in the same order as hand"; })());
+    const shortR = clean("drone"); shortR.runs.zero = shortR.runs.zero.slice(0, 47);
+    ok("a run list one scenario short is a failure naming zero", (() => { const c = R.checksOf(shortR); return !c.ok && c.failures.includes("zero did not fly the same scenarios in the same order as hand"); })());
+    const longR = clean("drone"); longR.runs.fly.push({ key: "goto:8013", score: -1, bad: false });
+    ok("a run list one scenario long is a failure naming fly", (() => { const c = R.checksOf(longR); return !c.ok && c.failures.includes("fly did not fly the same scenarios in the same order as hand"); })());
+    const swap2 = clean("drone"); { const a = swap2.runs["hand-net"][3].key; swap2.runs["hand-net"][3].key = swap2.runs["hand-net"][4].key; swap2.runs["hand-net"][4].key = a; }
+    ok("!! the odd arm may be the SECOND one: two keys of hand-net swapped (scores left alone) is exactly one failure, naming hand-net and hand", J(R.checksOf(swap2).failures) === '["hand-net did not fly the same scenarios in the same order as hand"]');
+    const odd0 = clean("drone"); { const a = odd0.runs.hand[3].key; odd0.runs.hand[3].key = odd0.runs.hand[4].key; odd0.runs.hand[4].key = a; }
+    ok("when the first arm is the odd one every other arm is reported against it (three failures, each naming an arm and hand)", J(R.checksOf(odd0).failures) === J(["hand-net", "fly", "zero"].map((id) => `${id} did not fly the same scenarios in the same order as hand`)));
+    const seven = (nBelow) => { const ks = [...Array.from({ length: 7 }, (_, i) => `hover:${i + 1}`), "motor:1"]; const hand = ks.map((key) => ({ key, score: -1, bad: false })), zero = ks.map((key, i) => ({ key, score: i < nBelow ? -2 : -1, bad: false })); return R.checksOf({ task: "drone", runs: { hand, zero } }); };
+    ok("!! the floor rounds UP: of 7 non-failure scenarios 7 x 5/6 = 5.83 so 6 are required: 6 below passes, 5 below fails with `at least 6`", seven(6).ok && !seven(5).ok && seven(5).failures[0] === "zero is below hand on only 5 of the 7 scenarios that are not motor (at least 6 are required)");
+    // finite
+    const nan = clean("rotor"); nan.runs.fly[7].score = NaN; const inf = clean("rotor"); inf.runs.fly[7].score = -Infinity;
+    ok("!! a NaN score and an infinite score are each a failure naming the arm", R.checksOf(nan).failures.includes("fly has a non-finite score") && R.checksOf(inf).failures.includes("fly has a non-finite score") && R.checksOf(clean("rotor")).failures.every((f) => !/non-finite/.test(f)));
+    // hand-net limit, strict
+    const hn = (d, at = 20) => { const r = clean("drone"); r.runs.hand[at].score = 0; r.runs["hand-net"] = r.runs.hand.map((x, i) => ({ ...x, score: i === at ? d : x.score })); return R.checksOf(r); };
+    ok("!! the hand-net limit is strict and on every scenario: a worst difference of 0.00099 passes, exactly 0.001 fails (the limit is `less than`), 0.002 fails, and the same difference below the hand pilot fails the same", hn(0.00099).ok && !hn(0.001).ok && !hn(0.002).ok && !hn(-0.002).ok && hn(0).ok);
+    ok("!! the hand-net failure line names the largest difference in exponential form and the limit, and the position of the one bad scenario does not matter (first, middle, last)", hn(0.002, 0).failures[0] === "hand-net is not the hand pilot: the largest difference is 2.00e-3 (the limit is 0.001)" && !hn(0.002, 47).ok && !hn(0.002, 23).ok);
+    // floor
+    const fl = (nTie, nAbove = 0, outTie = 0, outAbove = 0) => {
+        const r = clean("drone"), ks = r.runs.hand.map((x) => x.key), non = ks.map((k, i) => i).filter((i) => !ks[i].startsWith("motor:")), out = ks.map((k, i) => i).filter((i) => ks[i].startsWith("motor:"));
+        non.slice(0, nTie).forEach((i) => { r.runs.zero[i].score = r.runs.hand[i].score; }); non.slice(nTie, nTie + nAbove).forEach((i) => { r.runs.zero[i].score = r.runs.hand[i].score + 1; });
+        out.slice(0, outTie).forEach((i) => { r.runs.zero[i].score = r.runs.hand[i].score; }); out.slice(outTie, outTie + outAbove).forEach((i) => { r.runs.zero[i].score = r.runs.hand[i].score + 1; });
+        return R.checksOf(r);
+    };
+    ok("!! the floor: zero below hand on 30 of the 36 non-failure scenarios passes (6 tied), on 29 fails (7 tied), and a scenario where zero is ABOVE hand counts against it just as a tie does", fl(6).ok && !fl(7).ok && fl(5).ok && fl(3, 3).ok && !fl(3, 4).ok && !fl(0, 7).ok);
+    ok("!! the floor failure line gives the count below, the number of scenarios that are not the failure kind and the number required", fl(7).failures[0] === "zero is below hand on only 29 of the 36 scenarios that are not motor (at least 30 are required)" && fl(36).failures[0] === "zero is below hand on only 0 of the 36 scenarios that are not motor (at least 30 are required)");
+    ok("!! the failure kind is NEVER checked: all 12 motor scenarios tied, or all above, still passes; the info line counts below, tied and above (here 5 below, 4 tied, 3 above of 12)", fl(0, 0, 12).ok && fl(0, 0, 0, 12).ok && J(fl(0, 0, 4, 3).info) === '["on the motor scenarios (not checked) zero is below hand on 5, tied on 4, above on 3, of 12"]' && J(fl(0, 0, 12, 0).info) === '["on the motor scenarios (not checked) zero is below hand on 0, tied on 12, above on 0, of 12"]');
+    ok("!! each rotorcraft has its own failure kind: for the helicopter engine is exempt (all tied still passes) and a kind named motor is NOT; for the quadrotor the reverse", (() => {
+        const rr = clean("rotor"); rr.runs.zero.forEach((x, i) => { if (rr.runs.hand[i].key.startsWith("engine:")) x.score = rr.runs.hand[i].score; });
+        const c1 = R.checksOf(rr); const rm = mkRes("rotor", ["hand", "zero"], (a, i, key) => (a === "zero" && key.startsWith("hover:") ? -1 : a === "zero" ? -3 : -1));
+        const rd = mkRes("drone", ["hand", "zero"], (a, i, key) => (a === "zero" && key.startsWith("engine:") ? -1 : a === "zero" ? -3 : -1));
+        return c1.ok && c1.info[0] === "on the engine scenarios (not checked) zero is below hand on 0, tied on 12, above on 0, of 12" && !R.checksOf(rm).ok && R.checksOf(rd).ok;
+    })());
+    ok("an unknown task name checks every scenario for the floor and prints no failure-kind line; a result without zero or without hand-net skips that check", (() => { const r = clean("drone"); r.task = "boat"; r.runs.zero.forEach((x, i) => { if (r.runs.hand[i].key.startsWith("motor:")) x.score = r.runs.hand[i].score; }); const c = R.checksOf(r); const nz = clean("drone"); delete nz.runs.zero; const nh = clean("drone"); delete nh.runs["hand-net"]; return c.ok === false && c.failures.length === 1 && c.failures[0] === "zero is below hand on only 36 of the 48 scenarios (at least 40 are required)" && c.info.length === 0 && R.checksOf(nz).ok && R.checksOf(nz).info.length === 0 && R.checksOf(nh).ok; })());
+    ok("the failures accumulate in the order the checks run (scenarios, finite, hand-net, floor) and the result is not ok", (() => { const r = clean("drone"); r.runs.fly[0].score = NaN; r.runs["hand-net"][3].score += 0.5; r.runs.zero.forEach((x, i) => { x.score = r.runs.hand[i].score; }); const c = R.checksOf(r); return !c.ok && c.failures.length === 3 && /non-finite/.test(c.failures[0]) && /hand-net is not/.test(c.failures[1]) && /zero is below hand on only 0 of/.test(c.failures[2]); })());
+}
+
+console.log("\n5. THE READ");
+{
+    const wd = { fly: [0], mlp: [0], mlpV2: [0] }, board = R.rotorcraftBoard("drone", wd);
+    // a small result: 2 kinds of 3 scenarios, task drone (so kinds hover / motor)
+    const keys = ["hover:1", "hover:2", "hover:3", "motor:1", "motor:2", "motor:3"], hand = [1, 2, 3, 4, 5, 6];
+    const mk = (f) => keys.map((key, i) => ({ key, score: f(i), bad: false }));
+    const res = { task: "drone", layer: "flying", range: { from: 1, to: 3 }, opts: {}, runs: { hand: mk((i) => hand[i]), "hand-net": mk((i) => hand[i] + (i < 3 ? 0.0005 : 0.002)), fly: mk((i) => hand[i] + [0.1, 0.2, 0.3, -0.5, -0.5, -0.5][i]), mlp: mk((i) => hand[i] + 0.0004), zero: mk((i) => hand[i] - 5) } };
+    const pk = R.perKind(board, res), cell = (arm, control, kind) => pk.find((x) => x.arm === arm && x.control === control && x.kind === kind);
+    ok("!! perKind lists, for every arm that has a control that was flown, its paired difference from that control within each kind, kinds in the order of the first arm's keys (hover, motor): hand-net 2, fly 4, mlp 4 (mlp-v2 was not flown, so none)", pk.length === 10 && J(pk.map((x) => [x.arm, x.control, x.kind])) === J([["hand-net", "hand", "hover"], ["hand-net", "hand", "motor"], ["fly", "hand", "hover"], ["fly", "hand", "motor"], ["fly", "zero", "hover"], ["fly", "zero", "motor"], ["mlp", "hand", "hover"], ["mlp", "hand", "motor"], ["mlp", "zero", "hover"], ["mlp", "zero", "motor"]]));
+    const fh = cell("fly", "hand", "hover"), fm = cell("fly", "hand", "motor");
+    ok("!! the numbers of a cell: fly against hand on hover is n 3, mean +0.2, se 0.1/sqrt(3) = 0.057735, better 3, worse 0 and reads BETTER; on motor the constant -0.5 has se 0 and reads WORSE", fh.n === 3 && near(fh.mean, 0.2) && near(fh.se, 0.1 / Math.sqrt(3), 1e-9) && fh.better === 3 && fh.worse === 0 && fh.reading === "BETTER" && fm.n === 3 && near(fm.mean, -0.5) && fm.se === 0 && fm.worse === 3 && fm.reading === "WORSE");
+    ok("!! the hand-net tolerance: a mean difference of 0.0005 (se 0) reads TIES for hand-net although the board's rule would say BETTER; at 0.002 it falls to the board's rule and reads BETTER", cell("hand-net", "hand", "hover").reading === "TIES" && B.readingOf(B.paired(res.runs["hand-net"].slice(0, 3), res.runs.hand.slice(0, 3))) === "BETTER" && cell("hand-net", "hand", "motor").reading === "BETTER");
+    ok("!! the tolerance is for hand-net ALONE: the same 0.0004 difference for mlp (se 0) reads BETTER, by the board's rule", cell("mlp", "hand", "hover").reading === "BETTER" && cell("mlp", "hand", "motor").reading === "BETTER");
+    ok("an arm against its control with a missing control is skipped (mlp-v2 is not in the result, hand-net against hand is read)", !pk.some((x) => x.arm === "mlp-v2"));
+    {
+        const k1 = ["hover:1", "hover:2", "hover:3"], mk3 = (f) => k1.map((key, i) => ({ key, score: f(i), bad: false })), hn3 = (d) => ({ task: "drone", runs: { hand: mk3((i) => i + 1), "hand-net": mk3((i) => i + 1 + d) } });
+        const rd = (r) => R.perKind(board, r).find((x) => x.arm === "hand-net");
+        ok("!! the hand-net tolerance is on the SIZE of the mean: -0.0005 is a TIE, -0.002 (se 0) is WORSE by the board's rule, +0.002 is BETTER", rd(hn3(-0.0005)).reading === "TIES" && rd(hn3(-0.002)).reading === "WORSE" && rd(hn3(0.002)).reading === "BETTER");
+        const one = { task: "drone", runs: { hand: [{ key: "hover:1", score: 0, bad: false }, { key: "motor:1", score: 0, bad: false }], "hand-net": [{ key: "hover:1", score: 0.001, bad: false }, { key: "motor:1", score: 0.00099, bad: false }] } };
+        ok("!! the tolerance is strict: a mean of exactly 0.001 (one scenario, se 0) falls to the board's rule and reads BETTER, 0.00099 reads TIES", R.perKind(board, one).map((x) => x.reading).join() === "BETTER,TIES");
+        const same = { task: "drone", runs: { hand: mk3((i) => i + 1), "hand-net": mk3((i) => i + 1), fly: mk3((i) => i + 1), mlp: mk3((i) => i + 1) } }, ls = R.readLines(board, same);
+        ok("!! a mean of exactly zero prints with a plus sign, in the by-kind line and in the trained-pair line", ls.includes("  by kind hover     hand-net against hand: TIES (+0.0000, se 0.0000, better 0, worse 0, of 3)") && ls.includes("  among the trained brains fly against mlp: TIES (+0.0000, se 0.0000, better 0, worse 0, of 3)"));
+    }
+    const tp = R.trainedPairs(res);
+    ok("!! the trained brains pairwise, pooled over all six scenarios, in TRAINED order and only those present: fly against mlp (mean over scenarios of fly - mlp)", tp.length === 1 && tp[0].a === "fly" && tp[0].b === "mlp" && tp[0].n === 6 && near(tp[0].mean, ([0.1, 0.2, 0.3, -0.5, -0.5, -0.5].reduce((s, x) => s + x - 0.0004, 0)) / 6, 1e-9) && tp[0].reading === B.readingOf(B.paired(res.runs.fly, res.runs.mlp)));
+    const full = { ...res, runs: { ...res.runs, "mlp-v2": mk((i) => hand[i] + 0.3) } };
+    ok("!! with all three trained brains the pairs are fly-mlp, fly-mlp-v2, mlp-mlp-v2 in that order; with none they are none", J(R.trainedPairs(full).map((x) => [x.a, x.b])) === '[["fly","mlp"],["fly","mlp-v2"],["mlp","mlp-v2"]]' && R.trainedPairs({ runs: { hand: res.runs.hand, zero: res.runs.zero } }).length === 0);
+    const ln = R.readLines(board, { ...res, task: "drone" });
+    ok("!! a result that fails a check prints the failure FIRST, marked NOT WEIGHED, and never the passing checks line; the board's lines still follow", (() => { const bad = { ...res, runs: { ...res.runs, fly: res.runs.fly.slice(0, 5) } }; const l = R.readLines(board, bad); return l[0] === "CHECK FAILED -- the readings below are NOT WEIGHED: fly did not fly the same scenarios in the same order as hand" && !l.some((x) => x.startsWith("checks: ")) && l[l.length - 1].startsWith("the readings could not be paired: switchboard.paired: the two arms flew"); })());
+    ok("a failed check on a result whose lists CAN be paired still prints the readings after the failure (marked NOT WEIGHED by the line above them)", (() => { const bd = R.rotorcraftBoard("drone", wd), r2 = { ...res, runs: { ...res.runs, fly: res.runs.fly.map((x) => ({ ...x, score: x.score + 1 })) , zero: res.runs.hand.map((x) => ({ ...x })) } }; const l = R.readLines(bd, r2); return l[0].startsWith("CHECK FAILED -- the readings below are NOT WEIGHED: hand-net is not the hand pilot") && l[1] === "CHECK FAILED -- the readings below are NOT WEIGHED: zero is below hand on only 0 of the 3 scenarios that are not motor (at least 3 are required)" && l.some((x) => x.startsWith("drone (flying layer)")) && l.some((x) => x.startsWith("  by kind")); })());
+    ok("!! a result that passes its checks begins with the checks line, then the failure-kind info, then the board's header, and the lines are in that order (checks, info, board, by kind, trained)", (() => {
+        // zero is 5 below hand on every scenario, hand-net within 2e-3: its failure in this fixture, so use the clean one for the pass path
+        const c = clean("drone"), b = R.rotorcraftBoard("drone", { fly: [0], mlp: [0], mlpV2: [0] }); delete c.runs["hand-net"]; c.runs.mlp = c.runs.fly.map((x) => ({ ...x, score: x.score - 0.01 }));
+        const l = R.readLines(b, c), iBoard = l.findIndex((x) => x.startsWith("drone (flying layer)")), iKind = l.findIndex((x) => x.startsWith("  by kind")), iTr = l.findIndex((x) => x.startsWith("  among the trained brains"));
+        return l[0] === "checks: every arm flew the same scenarios, no score is non-finite, hand-net is the hand pilot, zero is a floor" && l[1].startsWith("  on the motor scenarios (not checked)") && iBoard === 2 && iKind > iBoard && iTr > iKind && l.length === iTr + 1;
+    })());
+    ok("!! the lines to the character on the small result: a by-kind line and a trained-pair line", (() => { const bd = R.rotorcraftBoard("drone", wd); const l = R.readLines(bd, { ...res, runs: { hand: res.runs.hand, fly: res.runs.fly, mlp: res.runs.mlp } }); return l.includes("  by kind hover     fly against hand: BETTER (+0.2000, se 0.0577, better 3, worse 0, of 3)") && l.includes("  by kind motor     fly against hand: WORSE (-0.5000, se 0.0000, better 0, worse 3, of 3)") && l.includes("  among the trained brains fly against mlp: TIES (-0.1504, se 0.1586, better 3, worse 3, of 6)"); })());
+}
+
+console.log("\n6. THE COMMAND");
+{
+    const runCmd = (argv, io = {}) => { const out = [], err = []; const code = C.command(argv, { out: (m) => out.push(m), err: (m) => err.push(m), ...io }); return { code, out: out.join("\n"), err: err.join("\n") }; };
+    const bad = (argv, re) => { const r = runCmd(argv); return r.code === 2 && re.test(r.err) && r.out === ""; };
+    ok("!! refusals, each exit 2 with nothing flown: a task that is not rotor, drone or both; an unknown set; --seeds 0, 1.5 and abc; an unknown argument", bad(["--task", "boat"], /--task needs both or one of rotor, drone/) && bad(["--set", "held9"], /--set needs one of dev, held73/) && bad(["--seeds", "0"], /--seeds needs a positive whole number/) && bad(["--seeds", "1.5"], /--seeds needs a positive whole number/) && bad(["--seeds", "abc"], /--seeds needs a positive whole number/) && bad(["--frob"], /unknown argument "--frob"/));
+    ok("!! --write goes with --set held73 only, and with the whole set of both tasks (not --seeds, not one task)", bad(["--write"], /--write goes with --set held73 only/) && bad(["--set", "dev", "--write"], /--write goes with --set held73 only/) && bad(["--set", "held73", "--write", "--seeds", "2"], /--write needs the whole set of both tasks/) && bad(["--set", "held73", "--write", "--task", "rotor"], /--write needs the whole set of both tasks/));
+    // the loader
+    ok("!! the weight loader returns the arrays of the four files with the right counts (1,167, 1,167, 1,860, 1,860) and the two MLP files differ", W("rotorFly").length === 1167 && W("droneFly").length === 1167 && W("droneMlp").length === 1860 && W("droneMlpV2").length === 1860 && J(W("droneMlp")) !== J(W("droneMlpV2")) && C.WEIGHT_COUNT.rotorFly === 1167 && C.WEIGHT_COUNT.droneMlpV2 === 1860);
+    ok("!! a file with the wrong number of weights is refused naming the file and both counts; a file with no weights array; an unknown key", /pilotRotorWeightsDefault\.json has 3 weights, 1167 are required/.test(thr(() => C.loadWeights("rotorFly", () => J({ weights: [1, 2, 3] })))) && /has no weights, 1860 are required/.test(thr(() => C.loadWeights("droneMlp", () => J({ nope: 1 })))) && /no weight file named "tank"/.test(thr(() => C.loadWeights("tank"))) && /has 1168 weights, 1167 are required/.test(thr(() => C.loadWeights("rotorFly", () => J({ weights: Array(1168).fill(0) })))) && C.loadWeights("rotorFly", () => J({ weights: Array(1167).fill(0.5) })).length === 1167);
+    const calls = []; const zeros = (k) => { calls.push(k); return Array(C.WEIGHT_COUNT[k]).fill(0); };
+    const r1 = runCmd(["--seeds", "1"], { load: zeros });
+    ok("!! a real run of DEV on one seed of both tasks: the helicopter's title and then the quadrotor's, labelled a sanity run, the lines of each read, and only the weights each needs were loaded (rotorFly; then droneFly, droneMlp, droneMlpV2)", r1.code === 0 && r1.out.startsWith("HELICOPTER (task rotor): DEV seeds 1 to 1 of each of 4 kinds (a sanity run of the code, not a result)\nchecks: ") && r1.out.includes("\nQUADROTOR (task drone): DEV seeds 1 to 1 of each of 4 kinds (a sanity run of the code, not a result)\n") && J(calls) === '["rotorFly","droneFly","droneMlp","droneMlpV2"]' && /\nrotor \(flying layer\), 4 scenarios, 4 arms;/.test(r1.out) && /\ndrone \(flying layer\), 4 scenarios, 6 arms;/.test(r1.out) && !/wrote /.test(r1.out), r1.out.split("\n").length + " lines");
+    const calls2 = []; const r2 = runCmd(["--task", "drone", "--seeds", "1"], { load: (k) => { calls2.push(k); return zeros(k); } });
+    ok("--task drone alone flies only the quadrotor (the helicopter's title is absent) and --seeds 1 on DEV is seed 1 only; --seeds larger than the set is the whole set", r2.code === 0 && !r2.out.includes("HELICOPTER") && r2.out.includes("QUADROTOR (task drone): DEV seeds 1 to 1") && runCmd(["--task", "rotor", "--seeds", "9"], { load: zeros }).out.includes("HELICOPTER (task rotor): DEV seeds 1 to 3 of each of 4 kinds"));
+    // the write path on a stubbed HELD set of one seed
+    const files = []; const io = { sets: { dev: { from: 1, to: 3 }, held73: { from: 8001, to: 8001 } }, load: zeros, writeFile: (f, t) => files.push([f, t]) };
+    const r3 = runCmd(["--set", "held73", "--write"], io);
+    ok("!! a HELD set with --write flies once and writes one JSON row per arm per scenario: 4 kinds x (4 arms + 6 arms) = 40 rows with set, task, arm, key, score, bad, to brain/rotorcraftBoardHeld73.jsonl; the output says where; the title says the registered read", r3.code === 0 && files.length === 1 && files[0][0].endsWith("brain/rotorcraftBoardHeld73.jsonl") && files[0][1].endsWith("\n") && files[0][1].trim().split("\n").length === 40 && r3.out.includes("HELICOPTER (task rotor): HELD73 seeds 8001 to 8001 of each of 4 kinds (the registered read)") && r3.out.includes("wrote 40 flights to brain/rotorcraftBoardHeld73.jsonl"));
+    const rows = files[0] ? files[0][1].trim().split("\n").map((l) => JSON.parse(l)) : [];
+    ok("!! the rows: set held73, tasks rotor then drone, the arms in board order, keys kind-major, scores finite, bad boolean; a row's score is the same as the printed board's mean basis (hand on rotor hover:8001 equals the task's own flight)", rows.length === 40 && rows.every((r) => r.set === "held73" && Number.isFinite(r.score) && typeof r.bad === "boolean") && J([...new Set(rows.map((r) => r.task))]) === '["rotor","drone"]' && J([...new Set(rows.filter((r) => r.task === "drone").map((r) => r.arm))]) === '["hand","hand-net","fly","mlp","mlp-v2","zero"]' && J(rows.filter((r) => r.task === "rotor" && r.arm === "hand").map((r) => r.key)) === '["hover:8001","recovery:8001","engine:8001","terrain:8001"]' && rows.find((r) => r.task === "rotor" && r.arm === "hand" && r.key === "hover:8001").score === R.TASKS.rotor.T.fly(AR.pilot, R.TASKS.rotor.T.scenario(8001, "hover")).score);
+    const files2 = []; runCmd(["--set", "held73", "--seeds", "1"], { ...io, writeFile: (f, t) => files2.push(f) });
+    ok("a HELD run without --write writes nothing; a DEV run never writes", files2.length === 0 && runCmd(["--seeds", "1", "--task", "rotor"], { load: zeros, writeFile: (f) => files2.push(f) }).code === 0 && files2.length === 0);
+    ok("the registered HELD73 set is what --set held73 reads when no stub is given (the command's range is the library's)", (() => { const o = []; const e = []; /* a refusal path that reaches the range: --write with a task is refused before flying, so check the title of a one-seed run on the real set */ const r = runCmd(["--set", "held73", "--seeds", "1", "--task", "drone"], { load: zeros, out: (m) => o.push(m), err: (m) => e.push(m) }); return r.code === 0 && o.join("\n").includes("QUADROTOR (task drone): HELD73 seeds 8001 to 8001 of each of 4 kinds (the registered read)"); })());
+    {
+        const { spawnSync } = await import("node:child_process"), prog = new URL("../tools/ship/takeRotorcraftBoard.mjs", import.meta.url).pathname, flags = ["--preserve-symlinks", "--preserve-symlinks-main", prog];
+        const a = spawnSync(process.execPath, [...flags, "--task", "boat"], { encoding: "utf8", timeout: 60000 }), b = spawnSync(process.execPath, [...flags, "--bogus"], { encoding: "utf8", timeout: 60000 }), c = spawnSync(process.execPath, [...flags, "--task", "rotor", "--seeds", "1"], { encoding: "utf8", timeout: 120000 });
+        ok("!! run as a program (the symlinks preserved so a mutant is the one that runs): a bad --task exits 2 with the usage on stderr and nothing on stdout; an unknown argument exits 2 naming it; a one-seed DEV helicopter run exits 0 and prints its title and board", a.status === 2 && /--task needs both or one of rotor, drone/.test(a.stderr) && a.stdout === "" && b.status === 2 && /unknown argument "--bogus"/.test(b.stderr) && c.status === 0 && c.stdout.startsWith("HELICOPTER (task rotor): DEV seeds 1 to 1 of each of 4 kinds (a sanity run of the code, not a result)\nchecks: ") && /\nrotor \(flying layer\), 4 scenarios, 4 arms;/.test(c.stdout) && !/QUADROTOR/.test(c.stdout), String(c.status));
+        const e = spawnSync(process.execPath, ["--preserve-symlinks", "--input-type=module", "-e", `import(${J(prog)})`], { encoding: "utf8", timeout: 60000 });
+        ok("!! imported from `node -e` (no script path in argv) the command runs nothing, prints nothing and does not throw", e.status === 0 && e.stdout === "" && e.stderr === "", String(e.status) + " " + e.stderr.slice(0, 120));
+        const d = spawnSync(process.execPath, flags, { encoding: "utf8", timeout: 180000 });
+        ok("!! run as a program with NO arguments (the plain `node tools/ship/takeRotorcraftBoard.mjs`): it flies the DEV set of both tasks, prints the helicopter's title and then the quadrotor's, and exits 0", d.status === 0 && d.stdout.startsWith("HELICOPTER (task rotor): DEV seeds 1 to 3 of each of 4 kinds (a sanity run of the code, not a result)\nchecks: ") && d.stdout.includes("\nQUADROTOR (task drone): DEV seeds 1 to 3 of each of 4 kinds (a sanity run of the code, not a result)\n") && /\ndrone \(flying layer\), 12 scenarios, 6 arms;/.test(d.stdout), String(d.status));
+    }
+    ok("importing the command runs nothing and sets no exit code (the main guard compares the script path with this module's)", process.exitCode === undefined);
+}
+
+console.log("\n7. THE SOURCE");
+{
+    const raw = fs.readFileSync(new URL("./rotorcraftBoard.mjs", import.meta.url), "utf8"), code = raw.split("\n").filter((l) => !l.trim().startsWith("//")).join("\n");
+    const cmdRaw = fs.readFileSync(new URL("../tools/ship/takeRotorcraftBoard.mjs", import.meta.url), "utf8"), cmdCode = cmdRaw.split("\n").filter((l) => !l.trim().startsWith("//")).join("\n");
+    ok("!! the library has no clock, no Math.random and no file; its imports are the switchboard, the two tasks, the four pilot modules and the MLP, and nothing from render/", !/Math\.random|Date\.now|new Date|performance\.now|node:fs|readFileSync|writeFileSync/.test(code) && J([...code.matchAll(/^import \* as (\w+) from "(.*)";$/gm)].map((m) => m[2])) === J(["./switchboard.mjs", "./rotorTask.mjs", "./droneTask.mjs", "./autopilotRotor.mjs", "./autopilotDrone.mjs", "./pilotRotorPolicy.mjs", "./pilotDronePolicy.mjs", "./pilotDroneMlp.mjs"]) && !/render\//.test(code));
+    ok("!! the command has no clock and no Math.random; it is the only reader of the weight files (the library names them and reads none)", !/Math\.random|Date\.now|new Date|performance\.now/.test(cmdCode) && /readFileSync/.test(cmdCode) && J([...cmdCode.matchAll(/^import .* from "(.*)";$/gm)].map((m) => m[1])) === '["node:fs","node:path","node:url","../../brain/rotorcraftBoard.mjs"]');
+    ok("the headers name the registration (brain/ROTORCRAFT_BOARD_WIP.md), the command and the gate; the library says it is unnumbered and edits nothing of the switchboard's", /ROTORCRAFT_BOARD_WIP\.md/.test(raw) && /takeRotorcraftBoard\.mjs/.test(raw) && /rotorcraftBoard-selfcheck\.mjs/.test(raw) && /UNNUMBERED/.test(raw) && /ROTORCRAFT_BOARD_WIP\.md/.test(cmdRaw) && /rotorcraftBoard-selfcheck\.mjs/.test(cmdRaw));
+    ok("the registration exists and carries both amendments and the sections this gate follows", (() => { const reg = fs.readFileSync(new URL("./ROTORCRAFT_BOARD_WIP.md", import.meta.url), "utf8"); return /AMENDMENT 1/.test(reg) && /AMENDMENT 2/.test(reg) && /THE REGISTERED READ/.test(reg) && /8001 to 8012/.test(reg); })());
+    ok("ASCII only in the library, the command and this gate", [raw, cmdRaw, fs.readFileSync(new URL(import.meta.url), "utf8")].every((t) => !/[^\x00-\x7F]/.test(t)));
+}
+console.log(fails ? `\n${fails} FAIL` : "\nall checks pass");
+process.exit(fails ? 1 : 0);
