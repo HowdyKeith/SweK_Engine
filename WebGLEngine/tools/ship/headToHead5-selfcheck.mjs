@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/headToHead5-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node tools/ship/headToHead5-selfcheck.mjs      (~10-25 s: hand fixtures, two tiny searches and one short real audit)
+// Run: node tools/ship/headToHead5-selfcheck.mjs      (~9 s: hand fixtures, three tiny searches and one short real audit; 8.9-9.3 s on this box)
 //
 // THE GATE OF tools/ship/headToHead5.mjs (Round H5 of brain/HEAD_TO_HEAD.md, registered first).
 //   1 SETS      the twenty control specs, the twenty-two arms, the ids 5000-5199 (disjoint from H1's, H2's, H4's, the looks' and every gate's ids), 160 s; the recipe IS trainSubPilot's; the circuits (the random wirings have the GFC's 34 neurons and 313
@@ -14,6 +14,7 @@
 //   8 SOURCE    the ids appear once; no clock, random or file.
 // NOT CHECKED, said plainly: whether the wiring matters (that is the experiment), and that the recipe the controls were trained by is a good one.
 // SABOTAGE LOG (58 mutants of tools/ship/headToHead5.mjs, each alone in its own worktree copy): 53 went red by name on the first pass. 5 went 0 red and each got a row, then went red: parseSpec without its end anchor (trailing junk accepted); the random wirings' topology seed 6301 + c instead of 6300 + c (the gate only checked determinism: now it compares with the fish trainer's controlTopology edge for edge); the record's weights unpruned (a 3-iteration search prunes nothing: a 40-iteration one moves 58 and keeps 11); the TOPOLOGIES row made trivial (the check takes a `topologyOf` on the audit for the gate to hand in a duplicate); the lit-tank line's random-wiring count read in the dark (the row now compares the whole line for a lit-only and a dark-only leader).
+//   Two more mutants after that (the condition ignored in pairOf, and in meanOf) went red on the two rows added to name those exports for tools/ship/definitionGates, which had counted them as ungated; 60 mutants in all.
 //   The fixture lessons: a gain of exactly 0.02 cannot be built (float noise decides the boundary), so the learning margin is tested at 0.0199 and 0.0201 and the `>=` form of the margin is an equivalent mutant not tried; and a control made from the hand weights moved by ONE weight can fly exactly as the autopilot does (the recurrent core starts at zero), so the real-flight fixture scales every weight by its own factor.
 "use strict";
 import fs from "node:fs";
