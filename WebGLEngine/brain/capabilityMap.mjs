@@ -78,9 +78,9 @@ export const LEVELS = Object.freeze([
             lm: nb(),
         } },
         { id: "sky-rotor", name: "Helicopter and quadrotor: hover, land, engine-out landings", shoots: false, cells: {
-            hand: { status: "EXISTS_UNREAD", text: "hand pilots for the helicopter and the quadrotor", src: [f("brain/autopilotRotor.mjs"), f("brain/autopilotDrone.mjs")] },
-            fly: { status: "TRAINED", text: "the helicopter's fruit-fly pilot: audit -1.2188 against the hand pilot's -2.0770, 24 scenarios better and 10 worse, engine-out landings stand 8 s after contact in 18 of 20 flights against 5", src: [L("v4877", "-1.2188")] },
-            gpu: { status: "EXISTS_UNREAD", text: "a quadrotor MLP (1,860 weights) with V2 weights; result not read for this map", src: [f("brain/pilotDroneMlp.mjs"), f("brain/pilotDroneMlpWeightsV2.json")] },
+            hand: { status: "SCRIPTED", text: "hand autopilots for the helicopter and the quadrotor, the controls of the rotorcraft board: on 48 fresh scenarios the helicopter's reads -1.8177 (9 of 12 engine-outs lost), on 96 the quadrotor's -2.4285 (every motor-out lost)", src: [f("brain/ROTORCRAFT_BOARD_WIP.md", "-1.8177"), f("brain/ROTORCRAFT_BOARD_WIP.md", "-2.4285"), f("brain/autopilotRotor.mjs"), f("brain/autopilotDrone.mjs")] },
+            fly: { status: "TRAINED", text: "the helicopter's fruit-fly pilot: audit -1.2188 against the hand pilot's -2.0770, 24 scenarios better and 10 worse, engine-out landings stand 8 s after contact in 18 of 20 flights against 5 (v4877); on 48 fresh scenarios it TIES the hand autopilot pooled (+0.1795 against a bar of +0.1966), is better on terrain, and loses 6 of 12 engine-outs against 9. The quadrotor's fruit-fly pilot TIES the hand pilot at flying and beats it only at crashing softer after a motor-out (+0.2861 pooled)", src: [L("v4877", "-1.2188"), f("brain/ROTORCRAFT_BOARD_WIP.md", "+0.1795"), f("brain/ROTORCRAFT_BOARD_WIP.md", "+0.2861")] },
+            gpu: { status: "TRAINED", text: "the quadrotor's MLP (1,860 weights), two trainings: on 96 fresh scenarios the first TIES the hand pilot at flying (+0.0096) and the second is slightly below it (-0.0097); both land softer after a motor-out (+0.2275 and +0.3310 pooled) and the second stood 3 of 24 motor-outs where every other pilot stood none. No helicopter MLP exists", src: [f("brain/pilotDroneMlp.mjs"), f("brain/pilotDroneMlpWeightsV2.json"), f("brain/ROTORCRAFT_BOARD_WIP.md", "+0.2275")] },
             fish: nb(),
             lm: nb(),
         } },

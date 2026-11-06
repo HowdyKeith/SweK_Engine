@@ -21,7 +21,7 @@ Which brain can do what at each simulation level, and what the record says about
 
 Brains: **Hand rule / PD autopilot**, **Fly circuit**, **GPU Brain (MLP)**, **Fish circuits**, **Language model**. An 'amoeba brain' does not exist in the tree.
 
-15 tasks x 5 brains = 75 cells: 11 TRAINED, 1 HAND-WIRED, 2 NO CHAMPION, 4 TUNED, 2 SCRIPTED, 3 NO EFFECT, 1 NOT CONCLUDED, 8 EXISTS, UNREAD, 41 -, 2 n/a.
+15 tasks x 5 brains = 75 cells: 12 TRAINED, 1 HAND-WIRED, 2 NO CHAMPION, 4 TUNED, 3 SCRIPTED, 3 NO EFFECT, 1 NOT CONCLUDED, 6 EXISTS, UNREAD, 41 -, 2 n/a.
 
 ## Submarine
 
@@ -64,7 +64,7 @@ Brains: **Hand rule / PD autopilot**, **Fly circuit**, **GPU Brain (MLP)**, **Fi
 |---|---|---|---|---|---|---|
 | Real fixed-wing flight: hold altitude, heading and airspeed through gusts and recoveries | no | TRAINED | TRAINED | HAND-WIRED | - | - |
 | Aircraft heading hold (es-aircraft) | no | EXISTS, UNREAD | TRAINED | - | - | - |
-| Helicopter and quadrotor: hover, land, engine-out landings | no | EXISTS, UNREAD | TRAINED | EXISTS, UNREAD | - | - |
+| Helicopter and quadrotor: hover, land, engine-out landings | no | SCRIPTED | TRAINED | TRAINED | - | - |
 | Jet dogfight (guns), league against the autopilot, itself and the other brain | yes | EXISTS, UNREAD | NO CHAMPION | NO CHAMPION | - | - |
 | Bomber and capital ship against fighters (gunners in the seats) | yes | EXISTS, UNREAD | - | EXISTS, UNREAD | - | - |
 | Endless-Sky style fleet battles (flight-gpu.html, es-box3d.html): who to shoot, when to break off | yes | TUNED | n/a | EXISTS, UNREAD | - | - |
@@ -82,9 +82,9 @@ Brains: **Hand rule / PD autopilot**, **Fly circuit**, **GPU Brain (MLP)**, **Fi
 
 ### Helicopter and quadrotor: hover, land, engine-out landings
 
-- **Hand rule / PD autopilot: EXISTS, UNREAD.** hand pilots for the helicopter and the quadrotor. Sources: brain/autopilotRotor.mjs; brain/autopilotDrone.mjs.
-- **Fly circuit: TRAINED.** the helicopter's fruit-fly pilot: audit -1.2188 against the hand pilot's -2.0770, 24 scenarios better and 10 worse, engine-out landings stand 8 s after contact in 18 of 20 flights against 5. Sources: changelog v4877 ("-1.2188").
-- **GPU Brain (MLP): EXISTS, UNREAD.** a quadrotor MLP (1,860 weights) with V2 weights; result not read for this map. Sources: brain/pilotDroneMlp.mjs; brain/pilotDroneMlpWeightsV2.json.
+- **Hand rule / PD autopilot: SCRIPTED.** hand autopilots for the helicopter and the quadrotor, the controls of the rotorcraft board: on 48 fresh scenarios the helicopter's reads -1.8177 (9 of 12 engine-outs lost), on 96 the quadrotor's -2.4285 (every motor-out lost). Sources: brain/ROTORCRAFT_BOARD_WIP.md ("-1.8177"); brain/ROTORCRAFT_BOARD_WIP.md ("-2.4285"); brain/autopilotRotor.mjs; brain/autopilotDrone.mjs.
+- **Fly circuit: TRAINED.** the helicopter's fruit-fly pilot: audit -1.2188 against the hand pilot's -2.0770, 24 scenarios better and 10 worse, engine-out landings stand 8 s after contact in 18 of 20 flights against 5 (v4877); on 48 fresh scenarios it TIES the hand autopilot pooled (+0.1795 against a bar of +0.1966), is better on terrain, and loses 6 of 12 engine-outs against 9. The quadrotor's fruit-fly pilot TIES the hand pilot at flying and beats it only at crashing softer after a motor-out (+0.2861 pooled). Sources: changelog v4877 ("-1.2188"); brain/ROTORCRAFT_BOARD_WIP.md ("+0.1795"); brain/ROTORCRAFT_BOARD_WIP.md ("+0.2861").
+- **GPU Brain (MLP): TRAINED.** the quadrotor's MLP (1,860 weights), two trainings: on 96 fresh scenarios the first TIES the hand pilot at flying (+0.0096) and the second is slightly below it (-0.0097); both land softer after a motor-out (+0.2275 and +0.3310 pooled) and the second stood 3 of 24 motor-outs where every other pilot stood none. No helicopter MLP exists. Sources: brain/pilotDroneMlp.mjs; brain/pilotDroneMlpWeightsV2.json; brain/ROTORCRAFT_BOARD_WIP.md ("+0.2275").
 
 ### Jet dogfight (guns), league against the autopilot, itself and the other brain
 
