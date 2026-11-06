@@ -132,7 +132,7 @@ export function checksOf(au) {
     rows.push({ name: "CHAMPIONS OF FOUR SEARCHES", ok: !!champs, text: `every control is the champion of exactly ${RECIPE.runs} searches with its circuit's weight count (963 er, 947 dense): ${!!champs}` });
     const distinct = new Set(TRAINED_IDS.map((a) => (au.dark[a] || []).map((r) => r.score).join("|"))).size === TRAINED_IDS.length;
     rows.push({ name: "ARMS DISTINCT", ok: distinct, text: `the ${TRAINED_IDS.length} trained arms are pairwise different in the dark: ${distinct}` });
-    const edgeKey = (s) => topologyOf(s).EDGES.map((e) => e.join(",")).join(";"), erTop = new Set(specsOf("er").map(edgeKey)).size === COUNTS.er;
+    const topo = au.topologyOf || topologyOf, edgeKey = (s) => topo(s).EDGES.map((e) => e.join(",")).join(";"), erTop = new Set(specsOf("er").map(edgeKey)).size === COUNTS.er;
     rows.push({ name: "TOPOLOGIES DISTINCT", ok: erTop, text: `the ${COUNTS.er} random wirings are pairwise different circuits: ${erTop}` });
     return rows;
 }
