@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/tankNavRun-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node tools/ship/tankNavRun-selfcheck.mjs      (~10 s)
+// Run: node tools/ship/tankNavRun-selfcheck.mjs      (~1.9 s)
 //
 // THE DESCRIPTIVE RUN OF THE TANK'S NAVIGATION SCENE (tools/ship/tankNavRun.mjs), held to its word before the registered run is made ("FOLLOW-UP 4" of brain/SUB_FIELD_NAV_WIP.md; the run is DESCRIPTIVE, not a test of the study):
 //   1  THE CONSTANTS   the file, 12 seas, 600 s, the navigator seed, the 10-sea bar, the start, the arm order

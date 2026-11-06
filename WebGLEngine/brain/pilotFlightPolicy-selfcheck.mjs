@@ -33,6 +33,7 @@
 //   THE FORWARD PASS WAS REWRITTEN WHEN THE GATE TOOK 3.1 S AND MOST OF IT WAS mlpLayerCpu's dense 34 x 34 recurrent matrix: over the circuit's own 313 edges it is a third of the multiplies and the gate runs in 1.7 s, which keeps it inside the
 //   ship-time sweep's 3 s; the old dense path is kept as layersOf() for the twins and the gate holds the two to each other.
 "use strict";
+import "../physics/mechanics/rigidBody6dofEuler.mjs";   // 2026-11-04 -- the 6-DOF numbers this gate holds were measured under the first-order orientation step, so it flies that step (see that file)
 import fs from "node:fs";
 import * as PF from "./pilotFlightPolicy.mjs";
 import * as AF from "./autopilotFlight.mjs";

@@ -26,6 +26,7 @@
 //   iterations keep two weights, and the rows assert that search 0 and search 1 differ.
 // PLAIN14 ROUND (2026-11-05: the circuit plain14, a plain 14-50-4 net with no wiring, for tools/ship/trainPilotSub.mjs --circuit plain14; 11 mutants of the changed lines of trainSubPilot.mjs, 4 mechanical and 7 by hand): 8 killed (7 red BY NAME, 1 threw), 3 survivors, all closed by the row that now holds the entry's name, seed 6300 and default file (null) -- the number 14 in the name and the name itself; all three red on the rerun. The champion this circuit trained is brain/pilotSubPlain14Wip.json (brain/PLAIN14_CONTROL_WIP.md).
 "use strict";
+import "../../physics/mechanics/rigidBody6dofEuler.mjs";   // 2026-11-05 -- the 6-DOF numbers this gate holds were measured under the first-order orientation step, so it flies that step (see that file); RK4's default (42845879) turned it red and missed it
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";

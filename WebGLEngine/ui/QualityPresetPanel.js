@@ -19,7 +19,8 @@ export const PRESETS = {
         bloom: false,
         shadowMapSize: 256,
         gridRadius: 5,
-        description: "shadow 256 · bloom off · grid 5 (lighter terrain)",
+        upscaler: "bilinear",
+        description: "shadow 256 · bloom off · grid 5 (lighter terrain) · rendered at 2/3, bilinear",
     },
     balanced: {
         label: "BALANCED",
@@ -27,7 +28,8 @@ export const PRESETS = {
         bloom: true,
         shadowMapSize: 512,
         gridRadius: 7,
-        description: "shadow 512 · bloom on · grid 7 (default)",
+        upscaler: "native",
+        description: "shadow 512 · bloom on · grid 7 (default) · native resolution",
     },
     quality: {
         label: "QUALITY",
@@ -35,7 +37,8 @@ export const PRESETS = {
         bloom: true,
         shadowMapSize: 1024,
         gridRadius: 10,
-        description: "shadow 1024 · bloom on · grid 10 (heaviest)",
+        upscaler: "native",
+        description: "shadow 1024 · bloom on · grid 10 (heaviest) · native resolution",
     },
     // v643 — AUTO modulates between quality/balanced/fast based on a live
     // FPS target. Knobs are runtime-only (currently bloom on/off; future
@@ -47,6 +50,7 @@ export const PRESETS = {
         bloom: true,                   // initial state; controller may flip
         shadowMapSize: 512,            // reload-only; auto can't change this
         gridRadius: 7,                 // reload-only
+        upscaler: "native",            // AUTO's controller moves bloom only; the render scale stays native under it
         description: "try slider FPS; ease down on dip, climb back up when easy",
     },
 };
@@ -70,7 +74,10 @@ export function setAutoTargetFps(n) {
     return n;
 }
 
-const RUNTIME_KEYS = ["bloom"];        // apply immediately
+// the upscaler (ui/upscalerSwitch.mjs's main-engine modes, a render scale) applies immediately too, through hooks.setUpscaler -- the
+// engine's own Upscaler switch, so the preset and the switch are one setting: choosing a preset moves the switch, and the switch can still
+// be moved by hand afterwards. It is applied only when a preset is CHOSEN, never at startup, so a hand-set switch survives a reload.
+const RUNTIME_KEYS = ["bloom", "upscaler"];        // apply immediately
 const RELOAD_KEYS  = ["shadowMapSize", "gridRadius"];  // require restart
 
 /** Read the current preset name from localStorage, default "balanced". */
@@ -93,7 +100,7 @@ export function getPresetConfig(name = null) {
  * but not applied.
  *
  * @param {string} name     "fast" | "balanced" | "quality"
- * @param {Object} hooks    { setBloom?:(bool)=>void }
+ * @param {Object} hooks    { setBloom?:(bool)=>void, setUpscaler?:(mode)=>void }
  * @returns {{requiresReload: boolean, applied: string[], pending: string[]}}
  */
 export function setPreset(name, hooks = {}) {
@@ -111,6 +118,12 @@ export function setPreset(name, hooks = {}) {
         catch (e) { console.warn("[quality] setBloom hook failed:", e?.message ?? e); }
     } else {
         pending.push("bloom (no hook registered)");
+    }
+    if (typeof hooks.setUpscaler === "function") {
+        try { hooks.setUpscaler(cfg.upscaler); applied.push("upscaler"); }
+        catch (e) { console.warn("[quality] setUpscaler hook failed:", e?.message ?? e); }
+    } else {
+        pending.push("upscaler (no hook registered)");
     }
 
     // Reload-only knobs — only "pending" if the preset actually changed

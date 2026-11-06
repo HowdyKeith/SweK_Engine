@@ -23,6 +23,7 @@
 //   render/subDropoutData.mjs, 26 mutants, 26 red by name: each baked number of both circuits and of the references changed in turn (rho, radius, penalty, a readout number, the spec, RMSE, skill, closed-loop score, the audit order, the audit base, the source file, the leaky sigma, the three
 //   flights), the freezing of the study removed or stopped at the top, and a readout number dropped.
 "use strict";
+import "../physics/mechanics/rigidBody6dofEuler.mjs";   // 2026-11-04 -- the 6-DOF numbers this gate holds were measured under the first-order orientation step, so it flies that step (see that file)
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";

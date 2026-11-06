@@ -28,6 +28,7 @@
 //   (the fighting pilot against the cruise pilot) lose one of six, not none.
 //   F41 (evaluate() defaulting to the bench) CRASHED the gate at its last row (the report line indexes a kind the bench does not hold) instead of going red by name: the report row now catches the throw, and a row asks evaluate() with no set for the 24 fights.
 "use strict";
+import "../physics/mechanics/rigidBody6dofEuler.mjs";   // 2026-11-04 -- the 6-DOF numbers this gate holds were measured under the first-order orientation step, so it flies that step (see that file)
 import * as J from "./jetFight.mjs";
 import * as D from "./dogfightTask.mjs";
 import * as A from "./dogfightArena.mjs";

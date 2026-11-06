@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/subTrafficFixStudy-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node tools/ship/subTrafficFixStudy-selfcheck.mjs      (~8 s)
+// Run: node tools/ship/subTrafficFixStudy-selfcheck.mjs      (~3.5 s)
 //
 // THE STUDY OF THE TRAFFIC FIX (tools/ship/subTrafficFixStudy.mjs), held to its word before HELD5 is flown ("FOLLOW-UP 5" and its Amendment 1 in brain/SUB_FIELD_NAV_WIP.md):
 //   1  THE CONSTANTS   the file, the sets (DEV and HELD5), the reference arm, the thresholds

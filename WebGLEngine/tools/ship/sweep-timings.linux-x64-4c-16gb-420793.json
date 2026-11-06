@@ -1,7 +1,7 @@
 {
  "host": "linux-x64-4c-16gb-420793",
  "note": "THIS BOX'S OWN gate runtimes, written by tools/ship/boxTimings.mjs. The shared sweep-timings.json is host-claimed and a foreign box cannot write it (v4647, and that refusal is right); this is how a box records what IT measured without overwriting another machine's numbers. `kinds` says which quantity each ms is, as in the shared record: `alone` is an uncontended serial reading, `capped` is a FLOOR and not a runtime. Read for COVERAGE -- has this gate ever been timed -- and NOT for the ship-time budget, which still reads the shared file. See task #87. `serialRing` holds the last three alone readings; recordReach's margin row reads it on a box that does not own the shared record, because that row asks what a gate costs HERE and nothing here can refresh another box's ring.",
- "captured": "2026-10-28T00:58:35.866Z",
+ "captured": "2026-11-05T18:55:06.044Z",
  "timings": {
   "tools/ship/cloneProvision-selfcheck.mjs": 7171,
   "tools/ship/exitBusy-selfcheck.mjs": 15284,
@@ -114,7 +114,31 @@
   "brain/pilotNeedsCircuit-selfcheck.mjs": 1949,
   "tools/subReservoirV4-selfcheck.mjs": 11876,
   "tools/subReservoirV5-selfcheck.mjs": 10706,
-  "tools/ship/trainNeedsCircuit-selfcheck.mjs": 9014
+  "tools/ship/trainNeedsCircuit-selfcheck.mjs": 9014,
+  "render/movingScenes-selfcheck.mjs": 31766,
+  "render/frameGenChainLive-selfcheck.mjs": 5935,
+  "ui/upscalerSwitch-selfcheck.mjs": 4700,
+  "brain/plannerPerturbed-selfcheck.mjs": 54586,
+  "brain/subSensedDetect-selfcheck.mjs": 64781,
+  "brain/subSensedNav-selfcheck.mjs": 200105,
+  "brain/surveySeat-selfcheck.mjs": 55758,
+  "brain/switchboard-selfcheck.mjs": 84515,
+  "render/learnedUpscaleTemporal-selfcheck.mjs": 33900,
+  "tools/roundhouse/angularImpulseCensus-selfcheck.mjs": 38714,
+  "tools/ship/plainNetStudy-selfcheck.mjs": 46244,
+  "tools/ship/plannerCap-selfcheck.mjs": 59301,
+  "tools/ship/plannerEnsemble-selfcheck.mjs": 60513,
+  "tools/ship/plannerHeadroom-selfcheck.mjs": 200113,
+  "tools/ship/plannerRobust-selfcheck.mjs": 50037,
+  "tools/ship/subSensedDetStudy-selfcheck.mjs": 75402,
+  "tools/ship/train6dofMlpClose-selfcheck.mjs": 51756,
+  "brain/autopilotJet-selfcheck.mjs": 2794,
+  "tools/ship/crtPass-selfcheck.mjs": 3148,
+  "tools/fishVestibularCircuit-selfcheck.mjs": 229,
+  "brain/ogreSubBridge-selfcheck.mjs": 2027,
+  "render/subModels3d-selfcheck.mjs": 1912,
+  "brain/subSquad-selfcheck.mjs": 1809,
+  "tools/ship/swekTvLauncher-selfcheck.mjs": 2496
  },
  "at": {
   "tools/ship/cloneProvision-selfcheck.mjs": "2026-09-25T03:35:16.858Z",
@@ -228,7 +252,31 @@
   "brain/pilotNeedsCircuit-selfcheck.mjs": "2026-10-28T00:58:35.866Z",
   "tools/subReservoirV4-selfcheck.mjs": "2026-10-28T00:58:35.866Z",
   "tools/subReservoirV5-selfcheck.mjs": "2026-10-28T00:58:35.866Z",
-  "tools/ship/trainNeedsCircuit-selfcheck.mjs": "2026-10-28T00:58:35.866Z"
+  "tools/ship/trainNeedsCircuit-selfcheck.mjs": "2026-10-28T00:58:35.866Z",
+  "render/movingScenes-selfcheck.mjs": "2026-11-05T18:55:06.044Z",
+  "render/frameGenChainLive-selfcheck.mjs": "2026-11-03T23:07:42.741Z",
+  "ui/upscalerSwitch-selfcheck.mjs": "2026-11-03T23:28:57.707Z",
+  "brain/plannerPerturbed-selfcheck.mjs": "2026-11-05T18:55:06.044Z",
+  "brain/subSensedDetect-selfcheck.mjs": "2026-11-05T18:55:06.044Z",
+  "brain/subSensedNav-selfcheck.mjs": "2026-11-05T18:55:06.044Z",
+  "brain/surveySeat-selfcheck.mjs": "2026-11-05T18:55:06.044Z",
+  "brain/switchboard-selfcheck.mjs": "2026-11-05T18:55:06.044Z",
+  "render/learnedUpscaleTemporal-selfcheck.mjs": "2026-11-05T18:55:06.044Z",
+  "tools/roundhouse/angularImpulseCensus-selfcheck.mjs": "2026-11-05T18:55:06.044Z",
+  "tools/ship/plainNetStudy-selfcheck.mjs": "2026-11-05T18:55:06.044Z",
+  "tools/ship/plannerCap-selfcheck.mjs": "2026-11-05T18:55:06.044Z",
+  "tools/ship/plannerEnsemble-selfcheck.mjs": "2026-11-05T18:55:06.044Z",
+  "tools/ship/plannerHeadroom-selfcheck.mjs": "2026-11-05T18:55:06.044Z",
+  "tools/ship/plannerRobust-selfcheck.mjs": "2026-11-05T18:55:06.044Z",
+  "tools/ship/subSensedDetStudy-selfcheck.mjs": "2026-11-05T18:55:06.044Z",
+  "tools/ship/train6dofMlpClose-selfcheck.mjs": "2026-11-05T18:55:06.044Z",
+  "brain/autopilotJet-selfcheck.mjs": "2026-11-05T18:55:06.044Z",
+  "tools/ship/crtPass-selfcheck.mjs": "2026-11-05T18:55:06.044Z",
+  "tools/fishVestibularCircuit-selfcheck.mjs": "2026-11-05T18:55:06.044Z",
+  "brain/ogreSubBridge-selfcheck.mjs": "2026-11-05T18:55:06.044Z",
+  "render/subModels3d-selfcheck.mjs": "2026-11-05T18:55:06.044Z",
+  "brain/subSquad-selfcheck.mjs": "2026-11-05T18:55:06.044Z",
+  "tools/ship/swekTvLauncher-selfcheck.mjs": "2026-11-05T18:55:06.044Z"
  },
  "kinds": {
   "tools/ship/cloneProvision-selfcheck.mjs": "alone",
@@ -342,7 +390,31 @@
   "brain/pilotNeedsCircuit-selfcheck.mjs": "alone",
   "tools/subReservoirV4-selfcheck.mjs": "alone",
   "tools/subReservoirV5-selfcheck.mjs": "alone",
-  "tools/ship/trainNeedsCircuit-selfcheck.mjs": "alone"
+  "tools/ship/trainNeedsCircuit-selfcheck.mjs": "alone",
+  "render/movingScenes-selfcheck.mjs": "alone",
+  "render/frameGenChainLive-selfcheck.mjs": "alone",
+  "ui/upscalerSwitch-selfcheck.mjs": "alone",
+  "brain/plannerPerturbed-selfcheck.mjs": "alone",
+  "brain/subSensedDetect-selfcheck.mjs": "alone",
+  "brain/subSensedNav-selfcheck.mjs": "capped",
+  "brain/surveySeat-selfcheck.mjs": "alone",
+  "brain/switchboard-selfcheck.mjs": "alone",
+  "render/learnedUpscaleTemporal-selfcheck.mjs": "alone",
+  "tools/roundhouse/angularImpulseCensus-selfcheck.mjs": "alone",
+  "tools/ship/plainNetStudy-selfcheck.mjs": "alone",
+  "tools/ship/plannerCap-selfcheck.mjs": "alone",
+  "tools/ship/plannerEnsemble-selfcheck.mjs": "alone",
+  "tools/ship/plannerHeadroom-selfcheck.mjs": "capped",
+  "tools/ship/plannerRobust-selfcheck.mjs": "alone",
+  "tools/ship/subSensedDetStudy-selfcheck.mjs": "alone",
+  "tools/ship/train6dofMlpClose-selfcheck.mjs": "alone",
+  "brain/autopilotJet-selfcheck.mjs": "alone",
+  "tools/ship/crtPass-selfcheck.mjs": "alone",
+  "tools/fishVestibularCircuit-selfcheck.mjs": "alone",
+  "brain/ogreSubBridge-selfcheck.mjs": "alone",
+  "render/subModels3d-selfcheck.mjs": "alone",
+  "brain/subSquad-selfcheck.mjs": "alone",
+  "tools/ship/swekTvLauncher-selfcheck.mjs": "alone"
  },
  "codes": {
   "tools/ship/cloneProvision-selfcheck.mjs": 0,
@@ -456,7 +528,31 @@
   "brain/pilotNeedsCircuit-selfcheck.mjs": 0,
   "tools/subReservoirV4-selfcheck.mjs": 0,
   "tools/subReservoirV5-selfcheck.mjs": 0,
-  "tools/ship/trainNeedsCircuit-selfcheck.mjs": 0
+  "tools/ship/trainNeedsCircuit-selfcheck.mjs": 0,
+  "render/movingScenes-selfcheck.mjs": 0,
+  "render/frameGenChainLive-selfcheck.mjs": 0,
+  "ui/upscalerSwitch-selfcheck.mjs": 0,
+  "brain/plannerPerturbed-selfcheck.mjs": 0,
+  "brain/subSensedDetect-selfcheck.mjs": 0,
+  "brain/subSensedNav-selfcheck.mjs": null,
+  "brain/surveySeat-selfcheck.mjs": 0,
+  "brain/switchboard-selfcheck.mjs": 0,
+  "render/learnedUpscaleTemporal-selfcheck.mjs": 0,
+  "tools/roundhouse/angularImpulseCensus-selfcheck.mjs": 0,
+  "tools/ship/plainNetStudy-selfcheck.mjs": 0,
+  "tools/ship/plannerCap-selfcheck.mjs": 0,
+  "tools/ship/plannerEnsemble-selfcheck.mjs": 0,
+  "tools/ship/plannerHeadroom-selfcheck.mjs": null,
+  "tools/ship/plannerRobust-selfcheck.mjs": 0,
+  "tools/ship/subSensedDetStudy-selfcheck.mjs": 0,
+  "tools/ship/train6dofMlpClose-selfcheck.mjs": 0,
+  "brain/autopilotJet-selfcheck.mjs": 0,
+  "tools/ship/crtPass-selfcheck.mjs": 0,
+  "tools/fishVestibularCircuit-selfcheck.mjs": 0,
+  "brain/ogreSubBridge-selfcheck.mjs": 0,
+  "render/subModels3d-selfcheck.mjs": 0,
+  "brain/subSquad-selfcheck.mjs": 0,
+  "tools/ship/swekTvLauncher-selfcheck.mjs": 0
  },
  "serialRing": {
   "tools/ship/frozenRecords-selfcheck.mjs": [
@@ -995,6 +1091,116 @@
    9313,
    9848,
    9014
+  ],
+  "render/movingScenes-selfcheck.mjs": [
+   34266,
+   35893,
+   31766
+  ],
+  "render/frameGenChainLive-selfcheck.mjs": [
+   5976,
+   6211,
+   5935
+  ],
+  "ui/upscalerSwitch-selfcheck.mjs": [
+   4942,
+   4956,
+   4700
+  ],
+  "brain/plannerPerturbed-selfcheck.mjs": [
+   53885,
+   55600,
+   54586
+  ],
+  "brain/subSensedDetect-selfcheck.mjs": [
+   63217,
+   66188,
+   64781
+  ],
+  "brain/surveySeat-selfcheck.mjs": [
+   57200,
+   59689,
+   55758
+  ],
+  "brain/switchboard-selfcheck.mjs": [
+   82666,
+   87009,
+   84515
+  ],
+  "render/learnedUpscaleTemporal-selfcheck.mjs": [
+   37991,
+   37479,
+   33900
+  ],
+  "tools/roundhouse/angularImpulseCensus-selfcheck.mjs": [
+   89945,
+   39290,
+   38714
+  ],
+  "tools/ship/plainNetStudy-selfcheck.mjs": [
+   47352,
+   47510,
+   46244
+  ],
+  "tools/ship/plannerCap-selfcheck.mjs": [
+   62359,
+   63629,
+   59301
+  ],
+  "tools/ship/plannerEnsemble-selfcheck.mjs": [
+   64651,
+   62870,
+   60513
+  ],
+  "tools/ship/plannerRobust-selfcheck.mjs": [
+   47281,
+   60538,
+   50037
+  ],
+  "tools/ship/subSensedDetStudy-selfcheck.mjs": [
+   72457,
+   84300,
+   75402
+  ],
+  "tools/ship/train6dofMlpClose-selfcheck.mjs": [
+   50868,
+   53356,
+   51756
+  ],
+  "brain/autopilotJet-selfcheck.mjs": [
+   2499,
+   2836,
+   2794
+  ],
+  "tools/ship/crtPass-selfcheck.mjs": [
+   2659,
+   2763,
+   3148
+  ],
+  "tools/fishVestibularCircuit-selfcheck.mjs": [
+   256,
+   200,
+   229
+  ],
+  "brain/ogreSubBridge-selfcheck.mjs": [
+   1728,
+   1749,
+   2027
+  ],
+  "render/subModels3d-selfcheck.mjs": [
+   1698,
+   1957,
+   1912
+  ],
+  "brain/subSquad-selfcheck.mjs": [
+   1724,
+   1958,
+   1809
+  ],
+  "tools/ship/swekTvLauncher-selfcheck.mjs": [
+   5748,
+   2501,
+   2496
   ]
  }
 }

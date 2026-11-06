@@ -1,0 +1,622 @@
+{
+ "registration": "physics/mechanics/SPINNING_BODY_WIP.md (the implicit gyroscopic step in Jolt's wrapper)",
+ "rates": [2,5,10,20],
+ "axes": [0,2],
+ "stable": {
+  "T": 30,
+  "dt": 0.016666666666666666,
+  "eps": 0.00001,
+  "lost": 0.1,
+  "kept": 2
+ },
+ "cube": {
+  "half": 0.5,
+  "density": 1,
+  "W": 2,
+  "axis": [1,2,3]
+ },
+ "configs": [
+  {
+   "id": "JI",
+   "engine": "jolt",
+   "flag": "default",
+   "substeps": 1,
+   "label": "Jolt with the new default: the wrapper's implicit step, one substep"
+  },
+  {
+   "id": "JE",
+   "engine": "jolt",
+   "flag": true,
+   "substeps": 1,
+   "label": "Jolt's own explicit force (passed true), one substep: the second round's J"
+  },
+  {
+   "id": "OWN",
+   "engine": "own",
+   "flag": null,
+   "substeps": null,
+   "label": "the engine's own physics, rigidBody6dof.step()"
+  },
+  {
+   "id": "B3",
+   "engine": "box3d",
+   "flag": null,
+   "substeps": 4,
+   "label": "reported: box3d's own implicit step, at its four substeps"
+  },
+  {
+   "id": "J0",
+   "engine": "jolt",
+   "flag": false,
+   "substeps": 1,
+   "label": "reported: Jolt with neither"
+  }
+ ],
+ "at": "2026-11-03T15:08:03.525Z",
+ "registered": true,
+ "T": 30,
+ "dt": 0.016666666666666666,
+ "m1Axis": 1,
+ "flag": {
+  "ok": true,
+  "got": {
+   "default": [
+    "implicit",
+    false
+   ],
+   "true": [
+    "jolt",
+    true
+   ],
+   "false": [
+    false,
+    false
+   ],
+   "static": [
+    false,
+    false
+   ]
+  }
+ },
+ "box3d": {
+  "ok": true,
+  "off": 3.140913083603725e-8,
+  "offExplicit": 0.000031876775826968706,
+  "moved": 0.003957997710253032
+ },
+ "key": {
+  "ok": true,
+  "got": [
+   {
+    "axis": 0,
+    "factor": 1,
+    "bound": 1,
+    "steps": 1800,
+    "ok": true
+   },
+   {
+    "axis": 2,
+    "factor": 1.4422203957027826,
+    "bound": 1.4422205101855958,
+    "steps": 1800,
+    "ok": true
+   }
+  ]
+ },
+ "joltControls": [
+  {
+   "config": "JI",
+   "inertia": {
+    "ok": true,
+    "diag": [6.500000476837158,4.999999523162842,2.499999761581421],
+    "off": [0,0,0]
+   },
+   "undamped": {
+    "ok": true,
+    "worst": 0
+   }
+  },
+  {
+   "config": "JE",
+   "inertia": {
+    "ok": true,
+    "diag": [6.500000476837158,4.999999523162842,2.499999761581421],
+    "off": [0,0,0]
+   },
+   "undamped": {
+    "ok": true,
+    "worst": 0
+   }
+  },
+  {
+   "config": "J0",
+   "inertia": {
+    "ok": true,
+    "diag": [6.500000476837158,4.999999523162842,2.499999761581421],
+    "off": [0,0,0]
+   },
+   "undamped": {
+    "ok": true,
+    "worst": 0
+   }
+  }
+ ],
+ "m1": {
+  "axis": 1,
+  "setting": "implicit",
+  "joltFlag": false,
+  "fit": {
+   "p0": 0.000019999999494757503,
+   "sigma": 0.968456360201822,
+   "r2": 0.9999999949860849,
+   "points": 385,
+   "crossed": 9.266666666666666,
+   "factor": 110071.4546723564
+  },
+  "reading": "Euler's equations",
+  "invariants": {
+   "energyChange": -0.057210589950159665,
+   "driftE": 0.057210589950159665,
+   "driftL": 0.02902512437195926,
+   "driftWorldL": 0.03011969045948745,
+   "flips": 2
+  },
+  "twin": true
+ },
+ "m2": {
+  "setting": "implicit",
+  "settingOff": false,
+  "change": 0,
+  "changeOff": 0,
+  "apart": 0,
+  "same": true,
+  "steps": 1800
+ },
+ "m3": [
+  {
+   "config": "JI",
+   "W": 2,
+   "axis": 0,
+   "bound": 1,
+   "factor": 1,
+   "lostAt": null,
+   "end": 0.5842627731754622,
+   "reading": "kept",
+   "twin": true
+  },
+  {
+   "config": "JI",
+   "W": 2,
+   "axis": 2,
+   "bound": 1.4422205101855958,
+   "factor": 1.4215466503977299,
+   "lostAt": null,
+   "end": 1.03728207132455,
+   "reading": "kept",
+   "twin": true
+  },
+  {
+   "config": "JI",
+   "W": 5,
+   "axis": 0,
+   "bound": 1,
+   "factor": 1,
+   "lostAt": null,
+   "end": 0.0499306876147206,
+   "reading": "kept",
+   "twin": true
+  },
+  {
+   "config": "JI",
+   "W": 5,
+   "axis": 2,
+   "bound": 1.4422205101855958,
+   "factor": 1.3915324353805152,
+   "lostAt": null,
+   "end": 0.21059535984318184,
+   "reading": "kept",
+   "twin": true
+  },
+  {
+   "config": "JI",
+   "W": 10,
+   "axis": 0,
+   "bound": 1,
+   "factor": 1,
+   "lostAt": null,
+   "end": 0.000006187418387812582,
+   "reading": "kept",
+   "twin": true
+  },
+  {
+   "config": "JI",
+   "W": 10,
+   "axis": 2,
+   "bound": 1.4422205101855958,
+   "factor": 1.3440914892228852,
+   "lostAt": null,
+   "end": 0.0005360143882634489,
+   "reading": "kept",
+   "twin": true
+  },
+  {
+   "config": "JI",
+   "W": 20,
+   "axis": 0,
+   "bound": 1,
+   "factor": 1,
+   "lostAt": null,
+   "end": 7.023211475446984e-7,
+   "reading": "kept",
+   "twin": true
+  },
+  {
+   "config": "JI",
+   "W": 20,
+   "axis": 2,
+   "bound": 1.4422205101855958,
+   "factor": 1.256947177490258,
+   "lostAt": null,
+   "end": 0.0000017770732193002897,
+   "reading": "kept",
+   "twin": true
+  },
+  {
+   "config": "JE",
+   "W": 2,
+   "axis": 0,
+   "bound": 1,
+   "factor": 1.6031862502518686,
+   "lostAt": null,
+   "end": 1.525571885923254,
+   "reading": "kept",
+   "twin": true
+  },
+  {
+   "config": "JE",
+   "W": 2,
+   "axis": 2,
+   "bound": 1.4422205101855958,
+   "factor": 1.956595775539934,
+   "lostAt": null,
+   "end": 1.9191881198887373,
+   "reading": "kept",
+   "twin": true
+  },
+  {
+   "config": "JE",
+   "W": 5,
+   "axis": 0,
+   "bound": 1,
+   "factor": 19.943741630054515,
+   "lostAt": null,
+   "end": 19.943741630054515,
+   "reading": "drifting",
+   "twin": true
+  },
+  {
+   "config": "JE",
+   "W": 5,
+   "axis": 2,
+   "bound": 1.4422205101855958,
+   "factor": 9.81881006716994,
+   "lostAt": null,
+   "end": 9.81881006716994,
+   "reading": "drifting",
+   "twin": true
+  },
+  {
+   "config": "JE",
+   "W": 10,
+   "axis": 0,
+   "bound": 1,
+   "factor": 94128.08466105167,
+   "lostAt": 23.216666666666665,
+   "end": 93454.626395382,
+   "reading": "lost",
+   "twin": true
+  },
+  {
+   "config": "JE",
+   "W": 10,
+   "axis": 2,
+   "bound": 1.4422205101855958,
+   "factor": 2919.186069514561,
+   "lostAt": null,
+   "end": 2436.2393117582847,
+   "reading": "drifting",
+   "twin": true
+  },
+  {
+   "config": "JE",
+   "W": 20,
+   "axis": 0,
+   "bound": 1,
+   "factor": 130022.09843743865,
+   "lostAt": 5.95,
+   "end": 130022.09843743865,
+   "reading": "lost",
+   "twin": true
+  },
+  {
+   "config": "JE",
+   "W": 20,
+   "axis": 2,
+   "bound": 1.4422205101855958,
+   "factor": 50001.26264698911,
+   "lostAt": 8.966666666666667,
+   "end": 47708.50736810533,
+   "reading": "lost",
+   "twin": true
+  },
+  {
+   "config": "OWN",
+   "W": 2,
+   "axis": 0,
+   "bound": 1,
+   "factor": 1,
+   "lostAt": null,
+   "end": 0.9429688139858562,
+   "reading": "kept",
+   "twin": true
+  },
+  {
+   "config": "OWN",
+   "W": 2,
+   "axis": 2,
+   "bound": 1.4422205101855958,
+   "factor": 1.4422203957027826,
+   "lostAt": null,
+   "end": 1.4101540030412072,
+   "reading": "kept",
+   "twin": true
+  },
+  {
+   "config": "OWN",
+   "W": 5,
+   "axis": 0,
+   "bound": 1,
+   "factor": 1,
+   "lostAt": null,
+   "end": 0.9922898639605274,
+   "reading": "kept",
+   "twin": true
+  },
+  {
+   "config": "OWN",
+   "W": 5,
+   "axis": 2,
+   "bound": 1.4422205101855958,
+   "factor": 1.4422202336837038,
+   "lostAt": null,
+   "end": 1.4413872985500233,
+   "reading": "kept",
+   "twin": true
+  },
+  {
+   "config": "OWN",
+   "W": 10,
+   "axis": 0,
+   "bound": 1,
+   "factor": 1,
+   "lostAt": null,
+   "end": 0.9707419381364193,
+   "reading": "kept",
+   "twin": true
+  },
+  {
+   "config": "OWN",
+   "W": 10,
+   "axis": 2,
+   "bound": 1.4422205101855958,
+   "factor": 1.4422201313834249,
+   "lostAt": null,
+   "end": 1.004783893206171,
+   "reading": "kept",
+   "twin": true
+  },
+  {
+   "config": "OWN",
+   "W": 20,
+   "axis": 0,
+   "bound": 1,
+   "factor": 1,
+   "lostAt": null,
+   "end": 0.9064422736244614,
+   "reading": "kept",
+   "twin": true
+  },
+  {
+   "config": "OWN",
+   "W": 20,
+   "axis": 2,
+   "bound": 1.4422205101855958,
+   "factor": 1.4418582913918978,
+   "lostAt": null,
+   "end": 1.0189479360984643,
+   "reading": "kept",
+   "twin": true
+  },
+  {
+   "config": "B3",
+   "W": 2,
+   "axis": 0,
+   "bound": 1,
+   "factor": 1,
+   "lostAt": null,
+   "end": 0.8369018407528367,
+   "reading": "kept",
+   "twin": true
+  },
+  {
+   "config": "B3",
+   "W": 2,
+   "axis": 2,
+   "bound": 1.4422205101855958,
+   "factor": 1.4369942943567862,
+   "lostAt": null,
+   "end": 1.3056500948345133,
+   "reading": "kept",
+   "twin": true
+  },
+  {
+   "config": "B3",
+   "W": 5,
+   "axis": 0,
+   "bound": 1,
+   "factor": 1,
+   "lostAt": null,
+   "end": 0.4694043899443477,
+   "reading": "kept",
+   "twin": true
+  },
+  {
+   "config": "B3",
+   "W": 5,
+   "axis": 2,
+   "bound": 1.4422205101855958,
+   "factor": 1.4291865840431281,
+   "lostAt": null,
+   "end": 0.8910055543324552,
+   "reading": "kept",
+   "twin": true
+  },
+  {
+   "config": "B3",
+   "W": 10,
+   "axis": 0,
+   "bound": 1,
+   "factor": 1,
+   "lostAt": null,
+   "end": 0.04871001423223371,
+   "reading": "kept",
+   "twin": true
+  },
+  {
+   "config": "B3",
+   "W": 10,
+   "axis": 2,
+   "bound": 1.4422205101855958,
+   "factor": 1.4162711715953373,
+   "lostAt": null,
+   "end": 0.14742879073902543,
+   "reading": "kept",
+   "twin": true
+  },
+  {
+   "config": "B3",
+   "W": 20,
+   "axis": 0,
+   "bound": 1,
+   "factor": 1,
+   "lostAt": null,
+   "end": 0.00000613702789202791,
+   "reading": "kept",
+   "twin": true
+  },
+  {
+   "config": "B3",
+   "W": 20,
+   "axis": 2,
+   "bound": 1.4422205101855958,
+   "factor": 1.3906983286118908,
+   "lostAt": null,
+   "end": 0.0005066041819213889,
+   "reading": "kept",
+   "twin": true
+  },
+  {
+   "config": "J0",
+   "W": 2,
+   "axis": 0,
+   "bound": 1,
+   "factor": 1.0000092912625649,
+   "lostAt": null,
+   "end": 1.0000072125555555,
+   "reading": "kept",
+   "twin": true
+  },
+  {
+   "config": "J0",
+   "W": 2,
+   "axis": 2,
+   "bound": 1.4422205101855958,
+   "factor": 1.0000092912625649,
+   "lostAt": null,
+   "end": 1.0000072125555555,
+   "reading": "kept",
+   "twin": true
+  },
+  {
+   "config": "J0",
+   "W": 5,
+   "axis": 0,
+   "bound": 1,
+   "factor": 1.0000056617665054,
+   "lostAt": null,
+   "end": 1.0000051667140648,
+   "reading": "kept",
+   "twin": true
+  },
+  {
+   "config": "J0",
+   "W": 5,
+   "axis": 2,
+   "bound": 1.4422205101855958,
+   "factor": 1.0000056617665054,
+   "lostAt": null,
+   "end": 1.0000051667140648,
+   "reading": "kept",
+   "twin": true
+  },
+  {
+   "config": "J0",
+   "W": 10,
+   "axis": 0,
+   "bound": 1,
+   "factor": 1.0000146800676026,
+   "lostAt": null,
+   "end": 1.000014307321218,
+   "reading": "kept",
+   "twin": true
+  },
+  {
+   "config": "J0",
+   "W": 10,
+   "axis": 2,
+   "bound": 1.4422205101855958,
+   "factor": 1.0000146800676026,
+   "lostAt": null,
+   "end": 1.000014307321218,
+   "reading": "kept",
+   "twin": true
+  },
+  {
+   "config": "J0",
+   "W": 20,
+   "axis": 0,
+   "bound": 1,
+   "factor": 1.000008283700666,
+   "lostAt": null,
+   "end": 1.0000078053576051,
+   "reading": "kept",
+   "twin": true
+  },
+  {
+   "config": "J0",
+   "W": 20,
+   "axis": 2,
+   "bound": 1.4422205101855958,
+   "factor": 1.000008283700666,
+   "lostAt": null,
+   "end": 1.0000078053576051,
+   "reading": "kept",
+   "twin": true
+  }
+ ],
+ "repeat": {
+  "ok": true,
+  "spins": 8,
+  "off": []
+ }
+}

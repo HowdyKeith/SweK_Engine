@@ -403,7 +403,7 @@ export function doorReach(doors, { root = ENG, files = null, gates = null } = {}
  */
 export const DOORS_AT_V4840 = Object.freeze({
     at: "v4840",
-    reach: 58, measured: 14, crashShapeBefore: 5,
+    reach: 58, measured: 15, crashShapeBefore: 5,   // v4910: measured 14 -> 15 (render/subModels3d-selfcheck.mjs, which reaches the Draco encoder's command-line exit and never runs it)
     members: Object.freeze([
         { gate: "ai-bridge/fingerprintBridge-selfcheck.mjs", door: "physics/box3d/box3dNode.mjs", wasmCalls: 0, exitAfterWasmBefore: false, exitCalls: 1 },
         { gate: "brain/raceLockstep-selfcheck.mjs", door: "brain/raceLockstep-selfcheck.mjs", wasmCalls: 13, exitAfterWasmBefore: false, exitCalls: 1 },
@@ -419,5 +419,6 @@ export const DOORS_AT_V4840 = Object.freeze({
         { gate: "tools/ship/jointDrive-selfcheck.mjs", door: "physics/box3d/box3dNode.mjs", wasmCalls: 0, exitAfterWasmBefore: false, exitCalls: 1 },
         { gate: "tools/ship/lockstepRelay-selfcheck.mjs", door: "physics/box3d/box3dNode.mjs", wasmCalls: 3, exitAfterWasmBefore: false, exitCalls: 1 },
         { gate: "tools/ship/peerBrain-selfcheck.mjs", door: "physics/box3d/box3dNode.mjs", wasmCalls: 3, exitAfterWasmBefore: true, exitCalls: 0 },   // converted
+        { gate: "render/subModels3d-selfcheck.mjs", door: "tools/export/dracoEncode.mjs", wasmCalls: 0, exitAfterWasmBefore: false, exitCalls: 1 },   // v4910: the sub-model host's gate imports the Draco encoder to build a test model; the exit sits in the encoder's own command-line path, which the gate never runs
     ].map(Object.freeze)),
 });

@@ -31,6 +31,7 @@
 //     T01 the record rounds to 1e-5 6 | T02 the hash is not the weights' hash 2 | T03 the fruit fly trained to fight is read from the flight file 7 | T04 the scenario count off by one 1 | T05 the seeds end one early 1
 //     T06 the seat table's standard error is its mean 2 | T07 the upsets carry the edge as z 2 | T08 the stability's order flag always true 2
 "use strict";
+import "../../physics/mechanics/rigidBody6dofEuler.mjs";   // 2026-11-05 -- the 6-DOF numbers this gate holds were measured under the first-order orientation step, so it flies that step (see that file); RK4's default (42845879) turned it red and missed it
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";

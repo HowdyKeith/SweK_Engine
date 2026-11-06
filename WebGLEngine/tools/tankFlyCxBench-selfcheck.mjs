@@ -1,6 +1,6 @@
 // WebGLEngine/tools/tankFlyCxBench-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node tools/tankFlyCxBench-selfcheck.mjs      (~10 s)
+// Run: node tools/tankFlyCxBench-selfcheck.mjs      (~2.4 s)
 //
 // THE BENCH THAT MEASURES THE STATEFUL FLY PILOT IN THE SUB AQUARIUM'S TANK (tools/tankFlyCxBench.mjs). A measurement is only worth its numbers if the tool that made them does what it says, so this holds the pieces to their word:
 //   1  THE ANGLE     wrap puts an angle in (-pi, pi]; the error a tick adds is the absolute wrapped angle between the sub's heading and its target's (so 3.0 against -3.0 is 0.283, not 6)
@@ -33,6 +33,7 @@
 //   EQUIVALENT, left standing and said: M12 (the count taken with `>` where `>=` stood: the 1e-8 tolerance already makes an exact tie count either way), M25 (`p <= alpha` for `p < alpha`: an exact p is a whole number over 2^n and 0.05 is not one, so no p equals alpha), M39 (the first two tests handed to the verdict in the other order: the verdict
 //   treats P1 and P2 alike). ON THE FIRST RUN SEVEN WENT 0 RED: M10 (no tolerance) needed a sample whose two uniform assignments differ in the last bit of their float sums ([0.1, 0.2, 0.3]); M44, M45 and M46 (the registered defaults of 24 ids and 240 s, and the limit of 26) needed the bench replaced by a stand-in that records what it was asked (the real one takes 12 s).
 "use strict";
+import "../physics/mechanics/rigidBody6dofEuler.mjs";   // 2026-11-04 -- the 6-DOF numbers this gate holds were measured under the first-order orientation step; RK4 is the default now (box3d merge), so the gate says euler out loud
 import * as T from "./tankFlyCxBench.mjs";
 import * as A from "../render/subAquariumSim.mjs";
 

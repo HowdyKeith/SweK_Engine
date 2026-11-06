@@ -1,6 +1,6 @@
 {
  "note": "WHO the bytes say wrote each vendored body, read from the copyright line in its licence and from a PROVENANCE.md where one records an upstream. Baked by tools/ship/orreryAuthorScan.mjs. A body whose author cannot be read is in `unattributed` -- never dropped, never given a placeholder.",
- "built": "2026-10-25",
+ "built": "2026-11-03",
  "bodies": [
   {
    "name": "box3d",
@@ -16,7 +16,7 @@
     "owner": "erincatto",
     "repo": "box3d"
    },
-   "bytes": 1082363
+   "bytes": 1084575
   },
   {
    "name": "draco",
@@ -449,7 +449,7 @@
     "owner": "bagnall-lab",
     "repo": "EM_analysis"
    },
-   "bytes": 2491929
+   "bytes": 2579651
   }
  ],
  "systems": [
@@ -502,7 +502,7 @@
    "bodies": [
     "box3d"
    ],
-   "bytes": 1082363
+   "bytes": 1084575
   },
   {
    "author": "Krbn contributors",

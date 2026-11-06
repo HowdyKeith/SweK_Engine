@@ -295,8 +295,8 @@ console.log("\n7. *** THE COMMIT BELT, RE-MEASURED RATHER THAN TRUSTED ***");
            ". ORDER and COUNT are still compared exactly; only the LENGTH of each identity is tolerated.");
     }
 
-    const moved = F.COMMIT_BELT_DRIFT_V4905.movedSince4475;   // v4905: the newest record
-    const arrived = F.COMMIT_BELT_DRIFT_V4905.arrivedSince4475;
+    const moved = F.COMMIT_BELT_DRIFT_V4912.movedSince4475;   // v4912: the newest record
+    const arrived = F.COMMIT_BELT_DRIFT_V4912.arrivedSince4475;
     const expectedFor = (n) => (moved[n] ? moved[n].now : arrived[n] ? arrived[n].now : (R.perBody[n] || []));
 
     // *** v4665 -- AND THE THIRD TIME THIS ROW HAS COMPARED A RENDERING RATHER THAN AN IDENTITY. *** v4472
@@ -490,6 +490,14 @@ console.log("\n7. *** THE COMMIT BELT, RE-MEASURED RATHER THAN TRUSTED ***");
            added.length === 0 && changed.join(",") === "zebrafish-vestibular" && O.at === "v4899" && N.at === "v4905" && N.bodiesNow === O.bodiesNow && N.movedSince4475 === O.movedSince4475 &&
            N.arrivedSince4475["zebrafish-vestibular"].now[0] === "cda083cb" && N.arrivedSince4475["zebrafish-vestibular"].now.slice(1).join() === O.arrivedSince4475["zebrafish-vestibular"].now.join(),
            `bodiesNow ${O.bodiesNow} -> ${N.bodiesNow}; extends ${changed.join(", ")}`);
+    }
+    {
+        const O = F.COMMIT_BELT_DRIFT_V4905, N = F.COMMIT_BELT_DRIFT_V4912;
+        const changed = Object.keys(O.movedSince4475).filter((k) => N.movedSince4475[k] !== O.movedSince4475[k]);
+        ok("!! the v4912 belt record is v4905's with ONE body moved (box3d: the spinning-body round's commit, 5fed473f, in front of the three it had); every other entry is v4905's own object",
+           changed.join(",") === "box3d" && O.at === "v4905" && N.at === "v4912" && N.bodiesNow === O.bodiesNow && N.arrivedSince4475 === O.arrivedSince4475 &&
+           N.movedSince4475.box3d.now[0] === "5fed473f" && N.movedSince4475.box3d.now.slice(1).join() === O.movedSince4475.box3d.now.join(),
+           `moved ${changed.join(", ")}; box3d ${O.movedSince4475.box3d.now.length} -> ${N.movedSince4475.box3d.now.length} commits`);
     }
     // *** v4665 -- agreesWithin, NOT sameList, AND A FOURTH CLASS BESIDE IT. ***
     // On a shallow clone the live list stops at the graft, so a body that has not changed since v4475 still

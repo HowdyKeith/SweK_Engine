@@ -1,6 +1,6 @@
 // WebGLEngine/brain/subFieldNav-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node brain/subFieldNav-selfcheck.mjs      (~15 s)
+// Run: node brain/subFieldNav-selfcheck.mjs      (~1.6 s)
 //
 // FLOW-FIELD WAYPOINTS FOR THE SUBMARINE (brain/subFieldNav.mjs), held to its word before the HELD set is flown (registration: brain/SUB_FIELD_NAV_WIP.md):
 //   1  THE GEOMETRY   segmentDistance (interior, beyond an end, a degenerate segment), isBlocked (inclusive at r + 14, not beyond the ends), clearanceAt (the half-hull is taken off, the nearest disc wins, no disc is Infinity), cellOf (the grid's edges)
@@ -53,6 +53,7 @@
 //   the same as skipping it). ON THE FIRST RUN ELEVEN WENT 0 RED: Z11 and Z12 had no segment shorter than a sample whose ONLY blocked point is its start or its end; Z27 and Z29 had no malformed flow (one leaving the grid, whose wrap-around lands on a cell that HAS an aim point; one flowing to a TIE in distance that has one), so a hand-made 3 x 3 field has both now;
 //   Z42 died of a thrown error (a point outside the grid) and the call is guarded.
 "use strict";
+import "../physics/mechanics/rigidBody6dofEuler.mjs";   // 2026-11-04 -- the 6-DOF numbers this gate holds were measured under the first-order orientation step; RK4 is the default now (merge of the box3d line), so this gate says euler out loud
 import * as N from "./subFieldNav.mjs";
 import * as MT from "./missionTask.mjs";
 import * as ST from "./subTask.mjs";

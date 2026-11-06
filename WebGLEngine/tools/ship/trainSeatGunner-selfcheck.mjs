@@ -36,6 +36,7 @@
 //   R4 reportLines() returns [] 3 | R5 the networks' policy names dropped 1 | R6 the report's sentence on when a file is written, "AND audit" dropped 0 -- A FINDING,
 //   the three rows above it never read that sentence. Closed with a row that asserts the sentence AND the rule it states (qualifies(), four clauses, each alone refusing a
 //   champion better everywhere else); re-sabotaged 1 red. R7 the export pin without reportLines 1 (the pin moved with the export, on purpose).
+import "../../physics/mechanics/rigidBody6dofEuler.mjs";   // 2026-11-04 -- the 6-DOF numbers this gate holds were measured under the first-order orientation step, so it flies that step (see that file)
 import fs from "node:fs";
 import * as T from "./trainSeatGunner.mjs";
 import * as BF from "../../brain/battleshipFight.mjs";

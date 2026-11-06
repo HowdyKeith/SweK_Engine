@@ -120,7 +120,7 @@ import { FleshSph, hybridGrid, DT } from "./physics/soft/fleshSph.js";   // DT: 
 
 const $ = (id) => document.getElementById(id);
 const cv = $("cv"), ctx = cv.getContext("2d");
-let world = null, tick = 0, running = false, shoveAt = -1, showSkel = false;
+let world = null, tick = 0, running = false, shoveAt = -1, showSkel = false, bone = {};   // bone: build()'s bone name -> body index, which the shove reads (2026-11-05)
 let cells = 28, blend = 0.16;
 let dyn = null, jiggle = true;
 let sph = null, mode = "hybrid";   // "spring" = the v2526 lag; "sph" = raw particle density; "hybrid" = capsule shape + fluid bulge
@@ -177,7 +177,7 @@ function build() {
   world = box3d.createWorld({ gravity: [0, -9.8, 0] });
   world.addBox({ type: "static", pos: [0, -0.5, 0], half: [30, 0.5, 30] });
   HALVES = [[30, 0.5, 30]];
-  const idx = {};
+  const idx = bone = {};   // the ground above is body 0, so each bone's body is one past its place in BONES: the shove asks this map, by name
   for (const [name, pos, half] of BONES) { idx[name] = world.addBox({ type: "dynamic", pos, half, density: 1 }); HALVES.push(half); }
   for (const [kind, a, b, anchor, axis, lim] of JOINTS) {
     const A = idx[BONES[a][0]], B = idx[BONES[b][0]];
@@ -302,7 +302,7 @@ function draw() {
 
 function frame() {
   if (!running) return;
-  if (tick === shoveAt) { world.impulse(4, [14, 6, 0]); world.angularImpulse(1, [0, 0, 3]); }
+  if (tick === shoveAt) { world.impulse(bone.lowerArmL, [14, 6, 0]); world.angularImpulse(bone.chest, [0, 0, 3]); }   // by name, as ragdoll.html: the typed 4 and 1 were upperArmL and the pelvis
   world.step(1 / 60, 4);
   // ONE dynamics step per TICK, here -- never in draw(). draw() runs on rAF and on every slider drag, and a spring
   // advanced by the UI would make the flesh wobble while the figure stands still. Same law as the shove.

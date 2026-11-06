@@ -80,6 +80,7 @@
 //   P13 the helm's label has no hash 1 | P14 a good import is reported as bad 1 | P15 the note does not say where it went 1 | P16 the import button does nothing 1 (0 red until the gate counted the click: the file was dropped on the input and never through the button).
 // A THING THE GATE FOUND IN ITSELF: the first "not chosen for you" check read the lists after fights of its own had left their controls on the imported choices (a fight writes its options back to the controls); it now starts a plain fight before the helm file is dropped and reads the lists straight after.
 "use strict";
+import "../../physics/mechanics/rigidBody6dofEuler.mjs";   // 2026-11-04 -- the 6-DOF numbers this gate holds were measured under the first-order orientation step, so it flies that step (see that file)
 import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
 import { createRequire } from "node:module";
 import fs from "node:fs";
@@ -112,7 +113,7 @@ const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..
 // THE FILES A PEER WOULD SEND (swek-brain-v1, brain/peerBrain.mjs): the shipped pilot's own file, the gate's two gunner networks (CUSTOM above), and a helm network that is NOT the rule (a throttle correction: output bias 2)
 const HELM_W = (() => { const w = HP.zeroWeights(); w[HP.FEATURES * HP.HIDDEN + HP.HIDDEN + HP.REC_EDGES + HP.HIDDEN * HP.OUTPUTS + 3] = 2; return w; })();
 const PEER = (() => {
-    const pilot = fs.readFileSync(path.join(ENG, "brain", "pilot6dofWeightsDefault.json"), "utf8"), helm = PB.exportBrain(PB.describePolicy("helmPolicy", HP), HELM_W, { score: 0.25, by: "the gate's own helm", citation: "gate" }), pj = JSON.parse(pilot);
+    const pilot = fs.readFileSync(path.join(ENG, "brain", "pilot6dofWeightsDefault-d18.json"), "utf8"), helm = PB.exportBrain(PB.describePolicy("helmPolicy", HP), HELM_W, { score: 0.25, by: "the gate's own helm", citation: "gate" }), pj = JSON.parse(pilot);
     return { pilot, fly: CUSTOM.fly, mlp: CUSTOM.mlp, helm: JSON.stringify(helm),
         notJson: "{not json", nul: "null", num: "3", drive: JSON.stringify({ format: PB.FORMAT, policy: "drivePolicy", weights: [] }), ctor: JSON.stringify({ format: PB.FORMAT, policy: "constructor", weights: [] }), proto: '{"format":"swek-brain-v1","policy":"__proto__","weights":[]}',
         short: JSON.stringify({ ...pj, weights: pj.weights.slice(0, 10), weightCount: 10 }), format: JSON.stringify({ ...helm, format: "something-else" }), huge: JSON.stringify({ ...helm, weights: helm.weights.map((v, i) => (i === 7 ? 1e40 : v)) }), nanish: JSON.stringify({ ...helm, weights: helm.weights.map((v, i) => (i === 7 ? "x" : v)) }) };
@@ -129,6 +130,7 @@ else {
     const run = await runInEngineOrigin({
         engineRoot: ENG, timeoutMs: 560000,
         script: `async () => {
+            await import("/physics/mechanics/rigidBody6dofEuler.mjs");   // 2026-11-04 -- the page flies the step this gate's 6-DOF numbers were measured under (sessionStorage carries it into the iframe)
             globalThis.__swekStep = "booting space-battleship.html in an iframe";
             const f = document.createElement("iframe");
             f.style.width = "1100px"; f.style.height = "1250px";
@@ -467,9 +469,9 @@ else {
     if (run.ok && run.result && run.result.booted) {
         const r = run.result;
         const blobOf = (f) => JSON.parse(fs.readFileSync(path.join(ENG, "brain", f), "utf8")), weightsOf = (f) => Float32Array.from(blobOf(f).weights);
-        const WS = weightsOf("pilot6dofWeightsDefault.json"), WL = weightsOf("pilot6dofWeightsLeague.json"), WC = weightsOf("pilot6dofWeightsClose.json"), WH = P6.handWeights();
+        const WS = weightsOf("pilot6dofWeightsDefault-d18.json"), WL = weightsOf("pilot6dofWeightsLeague-d18.json"), WC = weightsOf("pilot6dofWeightsClose-d18.json"), WH = P6.handWeights();
         const SHIPPED = P6.pilotFor(WS), LEAGUE = P6.pilotFor(WL), CLOSE = P6.pilotFor(WC), HAND = P6.pilotFor(WH), MIX = [undefined, SHIPPED, LEAGUE, CLOSE];
-        const DESC = PB.describePolicy("pilot6dofPolicy", P6), shipImp = PB.importBrain(DESC, blobOf("pilot6dofWeightsDefault.json"));
+        const DESC = PB.describePolicy("pilot6dofPolicy", P6), shipImp = PB.importBrain(DESC, blobOf("pilot6dofWeightsDefault-d18.json"));
         const SHIP = CS.createCapitalShip(), seatsOf = SHIP.seats;
         // the page's tally against battleshipFight.fight()'s, to the bit in every count it reports
         const same = (a, b) => ["winner", "over", "ticks", "killed", "rammed", "flying", "damageOnShip"].every((k) => Object.is(a[k], b[k])) && ["status", "hpLeft", "enginesRunning", "seatRounds", "hitsDealt", "waves", "charge"].every((k) => Object.is(a.ship[k], b.ship[k])) && a.ship.partsOut.join() === b.ship.partsOut.join()

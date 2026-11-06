@@ -19,6 +19,7 @@
 //   The gate was edited after that run, so all mutants were run again (two patterns that the cut had moved were rewritten, and the finite test dropped from the weights check was added as B26): 79 of 79 red by name.
 // NOT SABOTAGED: the exact wording of the dry-run line beyond the numbers it quotes.
 "use strict";
+import { fileURLToPath } from "node:url";
 import fs from "node:fs";
 import path from "node:path";
 import * as CS from "../../brain/pilotSubCircuitState.mjs";
@@ -34,7 +35,7 @@ const sec = (t) => console.log("\n" + t);
 const J = JSON.stringify, near = (a, b, e = 1e-12) => Math.abs(a - b) <= e;
 console.log("flyCxPilotFile-selfcheck -- the stateful fly pilot's weights file\n");
 
-const ENG = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..", "..");
+const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const srcText = fs.readFileSync(path.join(ENG, FP.SOURCE), "utf8"), records = readRecords(srcText), cj = JSON.parse(fs.readFileSync(path.join(ENG, FP.CIRCUIT), "utf8")), circuit = { neurons: cj.neurons, edges: cj.edges, io: cj.io };
 const cx = records.find((r) => r.spec === "cx");
 const clone = (o) => JSON.parse(J(o));

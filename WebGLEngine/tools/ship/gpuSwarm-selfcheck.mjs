@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/gpuSwarm-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node tools/ship/gpuSwarm-selfcheck.mjs      (~15 s with a browser; the live section is SKIPPED, and said, without one)
+// Run: node tools/ship/gpuSwarm-selfcheck.mjs      (~1.4 s without a browser, about 15 s with one; the live section is SKIPPED, and said, without one)
 //
 // THE GPU PILOT SWARM TOOL (tools/ship/gpuSwarm.mjs), held to the registration (brain/GPU_SWARM_WIP.md) before its numbers are read. A timing tool that mis-reads its own timings reports a speedup that is not there, so the Node side is tested on synthetic
 // timings with the answer known, and the page side is run once for real:

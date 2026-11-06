@@ -1,6 +1,6 @@
 // WebGLEngine/tools/ship/subHardNavStudy-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node tools/ship/subHardNavStudy-selfcheck.mjs      (~10 s)
+// Run: node tools/ship/subHardNavStudy-selfcheck.mjs      (~2.1 s)
 //
 // THE STUDY OF THE HARDER NAVIGATION TEST (tools/ship/subHardNavStudy.mjs), held to its word before HELD4 is flown (registration and Amendment 1: "FOLLOW-UP 3" of brain/SUB_FIELD_NAV_WIP.md):
 //   1  THE STATISTICS  median (odd, even, empty, unsorted, input untouched); pathRatio (arm A over arm B, only the scenarios both reached, one kind)

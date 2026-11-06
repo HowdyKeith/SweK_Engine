@@ -218,7 +218,7 @@ console.log("\n5. *** WHAT THE EXILE WAS HIDING, AND WHO PUT IT THERE ***");
     const HIDDEN_CEILING = 0;    // v4642: 16 of 17; v4816: 0, measured live -- ratchets DOWN, never up
     ok(`*** the exile hides at most ${HIDDEN_CEILING} red(s) behind a recorded green, and the number ratchets down ***`,
         hiddenByRecord.length <= HIDDEN_CEILING && unreg.length > 0,
-        `${hiddenByRecord.length} of ${unreg.length} gates red in v4425's frozen census carry a recorded exit code of 0 while ` +
+        `${hiddenByRecord.length}${hiddenByRecord.length ? " (" + hiddenByRecord.map((g) => g + " live exit " + liveAll[g].code).join(", ") + ")" : ""} of ${unreg.length} gates red in v4425's frozen census carry a recorded exit code of 0 while ` +
         `exiting non-zero when run NOW -- the exile working as a hiding place, against a ceiling of ${HIDDEN_CEILING}. ` +
         `${repairedLive.length} of the ${unreg.length} exit 0 run live just now (repaired since v4425). ` +
         `The other ${honestCode.length} carry an honest non-zero code` +

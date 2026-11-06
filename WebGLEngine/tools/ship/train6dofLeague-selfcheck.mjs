@@ -49,6 +49,7 @@
 //   T11 train6dofLeague.mjs: the log hides the per-start record                                         3 red (the log row, the `by` row, the champion-line row)
 //   T12 train6dofLeague.mjs: the mirror baseline played without the profile's duel options              1 red (the audit-is-the-champion-against-the-shipped-pilot row: the baseline must be the same games)
 "use strict";
+import "../../physics/mechanics/rigidBody6dofEuler.mjs";   // 2026-11-04 -- the 6-DOF numbers this gate holds were measured under the first-order orientation step, so it flies that step (see that file)
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";

@@ -49,9 +49,10 @@ export function generateBetween(a, b, { t = 0.5, fill = LIVE.fill, holes = LIVE.
 /**
  * The live view's state: real(job, start, ready) takes the worker's frame k as the pacer takes it; at(time) is what the refresh at
  * `time` shows -- { kind: "real" | "gen" | "hold", k, frame, holes } -- a half-way frame made when it is first shown, as
- * fsr-three.html makes its own. `generate: false` paces the real frames alone (policy "none"), the page's comparison.
+ * fsr-three.html makes its own. `generate: false` paces the real frames alone (policy "none"), the page's comparison. `genOf(a, b, t)`
+ * (backlog denoise-framegen-page-chain) replaces generateBetween -- the chain view hands back the half-way frame it made on arrival.
  */
-export function makeLiveFrameGen({ refresh, generate = true, genCost = 0, fill = LIVE.fill, holes = LIVE.holes } = {}) {
+export function makeLiveFrameGen({ refresh, generate = true, genCost = 0, fill = LIVE.fill, holes = LIVE.holes, genOf = null } = {}) {
     const pacer = makeFramePacer({ refresh, policy: generate ? "midpoint" : "none", genCost }), jobs = [];
     let made = 0;
     return {
@@ -67,7 +68,7 @@ export function makeLiveFrameGen({ refresh, generate = true, genCost = 0, fill =
         at(time) {
             const s = pacer.at(time);
             if (s.kind === "real") return { kind: "real", k: s.k, scene: s.scene, frame: jobs[s.k].frame, holes: 0 };
-            if (s.kind === "gen") { const g = generateBetween(jobs[s.k - 1], jobs[s.k], { t: s.t, fill, holes }); made++;
+            if (s.kind === "gen") { const g = genOf ? genOf(jobs[s.k - 1], jobs[s.k], s.t) : generateBetween(jobs[s.k - 1], jobs[s.k], { t: s.t, fill, holes }); made++;
                 return { kind: "gen", k: s.k, t: s.t, scene: s.scene, frame: g.frame, holes: g.holes }; }
             return { kind: "hold", k: s.k, scene: s.scene, frame: null, holes: 0 };
         },

@@ -186,6 +186,46 @@ export const SPLITS_UPSCALE_LEARNED_67 = Object.freeze({ train: SPLITS_UPSCALE_L
 export const SPLITS_UPSCALE_LEARNED_68 = Object.freeze({ train: SPLITS_UPSCALE_LEARNED.train, val: SPLITS_UPSCALE_LEARNED.val,
     T1: Object.freeze({ family: "R+C", families: Object.freeze([...rep("R", 12), ...rep("C", 12)]), seeds: Object.freeze([...range(69000, 12), ...range(70000, 12)]) }),
 });
+/** FSR4's round 70 (pre-registration section 161): round 65's training and validation scenes as sequences, and a new test set, 12 R and 12 C. */
+export const SPLITS_UPSCALE_TEMPORAL = Object.freeze({ train: SPLITS_UPSCALE_LEARNED.train, val: SPLITS_UPSCALE_LEARNED.val,
+    T1: Object.freeze({ family: "R+C", families: Object.freeze([...rep("R", 12), ...rep("C", 12)]), seeds: Object.freeze([...range(73000, 12), ...range(74000, 12)]) }),
+});
+/** FSR4's round 72 (pre-registration section 167): round 65's training and validation scenes as sequences, and a new test set, 12 R and 12 C. */
+export const SPLITS_UPSCALE_TEMPORAL_72 = Object.freeze({ train: SPLITS_UPSCALE_LEARNED.train, val: SPLITS_UPSCALE_LEARNED.val,
+    T1: Object.freeze({ family: "R+C", families: Object.freeze([...rep("R", 12), ...rep("C", 12)]), seeds: Object.freeze([...range(75000, 12), ...range(76000, 12)]) }),
+});
+/** FSR4's round 69 (pre-registration section 159): round 65's training and validation scenes, and a new test set, 12 R and 12 C. */
+/** FSR4's round 77 (pre-registration section 176): moving scenes, a test only -- 12 R and 12 C, no training or validation of its own. */
+export const SPLITS_UPSCALE_MOVING = Object.freeze({
+    T1: Object.freeze({ family: "R+C", families: Object.freeze([...rep("R", 12), ...rep("C", 12)]), seeds: Object.freeze([...range(77000, 12), ...range(78000, 12)]) }),
+});
+/** FSR4's round 78 (pre-registration section 178): round 65's training and validation scenes (each trained still and moving), and a new test set, 12 R and 12 C. */
+export const SPLITS_UPSCALE_MOVING_78 = Object.freeze({ train: SPLITS_UPSCALE_LEARNED.train, val: SPLITS_UPSCALE_LEARNED.val,
+    T1: Object.freeze({ family: "R+C", families: Object.freeze([...rep("R", 12), ...rep("C", 12)]), seeds: Object.freeze([...range(79000, 12), ...range(80000, 12)]) }),
+});
+/** FSR4's round 79 (pre-registration section 180): object motion vectors, a test only -- 12 R and 12 C moving scenes. */
+export const SPLITS_UPSCALE_VECTORS = Object.freeze({
+    T1: Object.freeze({ family: "R+C", families: Object.freeze([...rep("R", 12), ...rep("C", 12)]), seeds: Object.freeze([...range(81000, 12), ...range(82000, 12)]) }),
+});
+/** FSR4's round 80 (pre-registration section 182): the mover history check, a test only -- 12 R and 12 C moving scenes. */
+export const SPLITS_UPSCALE_CHECK = Object.freeze({
+    T1: Object.freeze({ family: "R+C", families: Object.freeze([...rep("R", 12), ...rep("C", 12)]), seeds: Object.freeze([...range(83000, 12), ...range(84000, 12)]) }),
+});
+/** FSR4's round 81 (pre-registration section 184): the speed sweep, a test only -- 12 R and 12 C scenes, each at four speeds. */
+export const SPLITS_UPSCALE_SPEED = Object.freeze({
+    T1: Object.freeze({ family: "R+C", families: Object.freeze([...rep("R", 12), ...rep("C", 12)]), seeds: Object.freeze([...range(85000, 12), ...range(86000, 12)]) }),
+});
+/** FSR4's round 82 (pre-registration section 186): samples where the history is short, a test only -- 12 R and 12 C moving scenes. */
+export const SPLITS_UPSCALE_SAMPLING = Object.freeze({
+    T1: Object.freeze({ family: "R+C", families: Object.freeze([...rep("R", 12), ...rep("C", 12)]), seeds: Object.freeze([...range(87000, 12), ...range(88000, 12)]) }),
+});
+/** FSR4's round 83 (pre-registration section 188): moving lights, a test only -- 12 R and 12 C scenes. */
+export const SPLITS_UPSCALE_LIGHTS = Object.freeze({
+    T1: Object.freeze({ family: "R+C", families: Object.freeze([...rep("R", 12), ...rep("C", 12)]), seeds: Object.freeze([...range(89000, 12), ...range(90000, 12)]) }),
+});
+export const SPLITS_UPSCALE_LEARNED_69 = Object.freeze({ train: SPLITS_UPSCALE_LEARNED.train, val: SPLITS_UPSCALE_LEARNED.val,
+    T1: Object.freeze({ family: "R+C", families: Object.freeze([...rep("R", 12), ...rep("C", 12)]), seeds: Object.freeze([...range(71000, 12), ...range(72000, 12)]) }),
+});
 export const SPLITS_MESH_C = Object.freeze({
     T1: Object.freeze({ family: "VC", seeds: range(50000, 12) }),
     T2: Object.freeze({ family: "MC", seeds: range(51000, 12) }),
@@ -223,7 +263,7 @@ export const SPLITS_TEMPORALUP = Object.freeze({
 export const SPLITS_R47 = Object.freeze({ train: SPLITS_R11.train, val: SPLITS_R11.val, T1: Object.freeze({ family: "R", seeds: range(48000, 12) }), T2: Object.freeze({ family: "C", seeds: range(49000, 12) }) });
 /** The family of a split's i-th scene: its own entry in `families` when the split mixes them, else the split's. */
 export const familyOf = (split, i) => (split.families ? split.families[i] : split.family);
-const RESERVED = new Set([SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, SPLITS_R8, SPLITS_R9, SPLITS_R10, SPLITS_R11, SPLITS_MESH, SPLITS_FSR1, SPLITS_HALFRES, SPLITS_EMITTER, SPLITS_TEMPORALUP, SPLITS_R47, SPLITS_MESH_C, SPLITS_PAGE, SPLITS_FRAMEGEN, SPLITS_FRAMEGEN_LF, SPLITS_FRAMEGEN_DISPLAY, SPLITS_FRAMEGEN_LARGE, SPLITS_FRAMEGEN_HOLES, SPLITS_UPSCALE_LEARNED, SPLITS_UPSCALE_LEARNED_67, SPLITS_UPSCALE_LEARNED_68].flatMap((S) => Object.values(S).flatMap((s) => s.seeds)));
+const RESERVED = new Set([SPLITS, SPLITS_R2, SPLITS_R3, SPLITS_R4, SPLITS_R5, SPLITS_R6, SPLITS_R7, SPLITS_R8, SPLITS_R9, SPLITS_R10, SPLITS_R11, SPLITS_MESH, SPLITS_FSR1, SPLITS_HALFRES, SPLITS_EMITTER, SPLITS_TEMPORALUP, SPLITS_R47, SPLITS_MESH_C, SPLITS_PAGE, SPLITS_FRAMEGEN, SPLITS_FRAMEGEN_LF, SPLITS_FRAMEGEN_DISPLAY, SPLITS_FRAMEGEN_LARGE, SPLITS_FRAMEGEN_HOLES, SPLITS_UPSCALE_LEARNED, SPLITS_UPSCALE_LEARNED_67, SPLITS_UPSCALE_LEARNED_68, SPLITS_UPSCALE_LEARNED_69, SPLITS_UPSCALE_TEMPORAL, SPLITS_UPSCALE_TEMPORAL_72, SPLITS_UPSCALE_MOVING, SPLITS_UPSCALE_MOVING_78, SPLITS_UPSCALE_VECTORS, SPLITS_UPSCALE_CHECK, SPLITS_UPSCALE_SPEED, SPLITS_UPSCALE_SAMPLING, SPLITS_UPSCALE_LIGHTS].flatMap((S) => Object.values(S).flatMap((s) => s.seeds)));
 export const isDatasetSeed = (seed) => RESERVED.has(seed);
 
 /** The render seeds of a scene: the input, the reference and the second reference -- distinct for every scene seed. */

@@ -32,6 +32,7 @@
 // NONE WENT 0 RED. THE GATE'S OWN FIRST DRAFT WAS WRONG IN TWO PLACES THAT THE RUN FOUND, AND THE GATE WAS CORRECTED, NOT THE SHIP: the hull spheres cover 73% of the box, not the 77% a poorly mixed generator had said (a hand-rolled LCG gave 76.8% on the same points; the mulberry stream gives 72.7%), and they cover the axis from x = -23 to 22, not the box's whole 48 (the bow's last 2 units and the stern's 1 are bare). THE AUTHORITY WAS CHANGED BY THE FIRST MEASUREMENT: at 0.1 rad/s^2 a 90-degree turn took 32 s, longer than a fight's first act, so the limit is 0.25 (20 s).
 // AND THE SHIP WAS CHANGED BY THE ARENA GATE (brain/spaceArena-selfcheck.mjs): a target straight above the deck was seen by NO seat -- the flank mounts sit 5 units off the axis, so from each mount it is a degree past the edge of the hemisphere, and the main turrets stop at 83 degrees -- a blind cone over the ship. The direction-only coverage row had said every direction was covered (it measured from the centre). Two DORSAL PD mounts were added (C47-C49 are theirs) and a row now measures from each seat's own mount.
 "use strict";
+import "./rigidBody6dofEuler.mjs";   // 2026-11-04 -- the 6-DOF numbers this gate holds were measured under the first-order orientation step, so it flies that step (see that file)
 import * as CS from "./capitalShip.mjs";
 import * as RB from "./rigidBody6dof.mjs";
 import * as GS from "./gunSeats.mjs";

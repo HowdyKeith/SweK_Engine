@@ -57,7 +57,7 @@ function shatterHerd() {
   const impact = [0, 0.4, 0];
   const frags = fractureMesh(lastMesh, makeSites(_bounds(lastMesh.positions), 22, { impact, bias: 0.5 }));
   try { if (pWorld) pWorld.destroy(); } catch (e) {}
-  pWorld = physics.createWorld({ gravity: [0, -9.8, 0] }); addGround(pWorld, { y: -2.2, extent: 12 });
+  pWorld = physics.createWorld({ gravity: [0, -9.8, 0] }); addGround(pWorld, { y: -2.2, extent: 12, rim: 2 });   // 2026-11-03: a rim, so the debris piles instead of sliding off (fx/fracture/debrisPhysics.js)
   pBodies = makePhysicsDebris(pWorld, frags, impact, { force: 3.0 }); shatterT = 0;
   subEl.textContent = "the whole herd shattered \u2014 " + frags.length + " fragments (" + physName + ") \u00b7 they will all re-form";
 }

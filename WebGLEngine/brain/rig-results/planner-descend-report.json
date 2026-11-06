@@ -1,0 +1,23 @@
+{
+ "winner": "L-0.12H0",
+ "report": [
+  "ROUND 29: a search for the low trip point below -0.12. Selection K1 5801-5900 (four arms, 200 dives each); confirmation K2a 5901-6000, K2b 6001-6100, K2c 6101-6200 (600 dives per arm; read once)",
+  "  PASS GRID DISTINCT: the four selection arms are pairwise different on at least one dive: true",
+  "  PASS SIZES: every selection arm has 200 dives and every confirmation arm 200 a block: true",
+  "  PASS KINDS ALIGNED: every confirmation arm's dives are the same scenarios in the same order: true",
+  "selection means (twin on the shifted constants; difference from the reference L-0.12H0):",
+  "  L-0.12H0      0.8451  +0.0000  <- WINNER  (reference)",
+  "  L-0.16H0      0.8152  -0.0299",
+  "  L-0.20H0      0.7080  -0.1371",
+  "  L-0.23H0      0.6662  -0.1789",
+  "winner L-0.12H0 (selection advantage over L-0.12H0: +0.0000)",
+  "TWIN-WIN minus TWIN-REF: +0.0000 (se 0.0000; better 0, worse 0, same 600)",
+  "TWIN-WIN minus TUNED-WIN (the twin over the rule on the winner's constants): +0.0108 (se 0.0019; better 46, worse 7, same 547)",
+  "TUNED-WIN minus TUNED-REF (the rule alone, the winner's constants against the reference's): +0.0000 (se 0.0000; better 0, worse 0, same 600)",
+  "confirmation means: TWIN-WIN 0.8434, TWIN-REF 0.8434, TUNED-WIN 0.8326, TUNED-REF 0.8326",
+  "BOTTOM LINE: THE OPTIMUM IS AT OR ABOVE LOW -0.12 (L-0.12H0)",
+  "BOTTOM LINE: THE TWIN'S GAIN SURVIVES (+0.0108, se 0.0019)",
+  "BOTTOM LINE: THE RULE ALONE WANTS THE SAME CONSTANTS",
+  "BOTTOM LINE: THE HULL IS UNHARMED (0 CRUSHED, 0 STRANDED)"
+ ]
+}

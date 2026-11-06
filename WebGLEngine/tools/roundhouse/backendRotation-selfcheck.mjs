@@ -101,8 +101,12 @@ console.log("\n4. WHAT IS NOT CLAIMED, AND WHY IT IS NOT DECIDABLE HERE");
     ok("!! the shim damps every box, deliberately", d.angularDamping > 0,
         "v2468 set bd.angularDamping = 0.05f after measuring box3d's default at 0.00/s against Jolt's 0.05/s " +
         "and deciding THE ENGINE should choose rather than inherit. *** DAMPED ROTATION IS NOT TORQUE-FREE. ***");
-    ok("!! ...and no export can turn it off, so the rate comparison is REFUSED rather than fudged",
-        !d.settable,
+    // 2026-11-03 -- THIS ROW ASSERTED "no export can turn it off" AND WENT RED WHEN ONE COULD. The spinning-body round
+    // (physics/mechanics/SPINNING_BODY_WIP.md) added swk_body_set_damping and rebuilt the wasm, so the rate comparison
+    // this round refused is no longer refused for want of an export: it is THAT round's to make, registered there, and
+    // this file does not pre-empt it. The text beside the row is v3564's, kept as the reason.
+    ok("!! ...and since 2026-11-03 an export CAN turn it off (swk_body_set_damping), so the rate comparison is the spinning-body round's, not refused here",
+        d.settable,
         "damping bleeds omega and sigma follows omega, so the flip COUNT in a fixed window is expected UNDER " +
         "the undamped key's -- measured key " + key.flips + ", box3d " + b3.flips + ". *** THAT IS REPORTED AS " +
         "CONSISTENT WITH THE DAMPING AND NOT AS A DEFECT: separating 'damped as designed' from 'a different " +

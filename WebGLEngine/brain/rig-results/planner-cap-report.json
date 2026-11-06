@@ -1,0 +1,15 @@
+{
+ "report": [
+  "ROUND 24: does the four-station cap cost anything at five stations? pooled over M1 3901-3996, M2 4001-4096 (far and both, 5 stations; read once)",
+  "  PASS IDENTITY M1: CAP-4 equals the default planner (TWIN-FULL) dive for dive on M1: true",
+  "  PASS IDENTITY M2: CAP-4 equals the default planner (TWIN-FULL) dive for dive on M2: true",
+  "  PASS FULL IS REAL: TWIN-FULL is REAL on these seeds (else there is no gain to cap): true",
+  "TWIN-FULL minus TUNED-R8: +0.0285 (se 0.0035; better 98, worse 20, same 266); cost 38358 rollout seconds per dive",
+  "  CAP-2  +0.0175 (se 0.0028; better 56, worse 9, same 319)  KEEPS WORSE  vs CAP-4 -0.0110 (se 0.0025)  cost 7065",
+  "  CAP-3  +0.0237 (se 0.0033; better 81, worse 17, same 286)  KEEPS WORSE  vs CAP-4 -0.0047 (se 0.0022)  cost 14970",
+  "  CAP-4  +0.0285 (se 0.0035; better 98, worse 20, same 266)  KEEPS SAME   vs CAP-4 +0.0000 (se 0.0000)  cost 38358",
+  "  CAP-5  +0.0324 (se 0.0036; better 115, worse 23, same 246)  KEEPS BETTER vs CAP-4 +0.0040 (se 0.0016)  cost 101643",
+  "BOTTOM LINE: A LARGER CAP BEATS THE FOUR-STATION CAP",
+  "BOTTOM LINE: A SMALLER CAP LOSES GAIN (CAP-2, CAP-3)"
+ ]
+}

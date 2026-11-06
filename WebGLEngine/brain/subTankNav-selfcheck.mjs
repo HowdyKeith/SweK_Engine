@@ -1,6 +1,6 @@
 // WebGLEngine/brain/subTankNav-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node brain/subTankNav-selfcheck.mjs      (~15 s)
+// Run: node brain/subTankNav-selfcheck.mjs      (~5.1 s)
 //
 // NAVIGATION IN THE SUB AQUARIUM'S TANK (brain/subTankNav.mjs), held to its word (design: "FOLLOW-UP 4" of brain/SUB_FIELD_NAV_WIP.md). These are checks of CODE; none of them measures navigation (the descriptive run T1 to T3 is a separate command).
 //   1  THE CONSTANTS   the tank's size and grid, the arms and the default, the depth range the tank wanders in (held against the tank's own), the scene's and the goal's numbers

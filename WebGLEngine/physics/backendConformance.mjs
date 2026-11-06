@@ -70,6 +70,12 @@ export const CONTRACT = [
     // diagonal push. THE SAME HOLE WAS OPEN FOR UP THE WHOLE TIME. An axis you never test is an axis a backend
     // is free to eat, and this file said so in a comment while doing it.
     "dimensionality",
+    // 2026-11-03 -- FOURTEENTH CALL, and the first that asks a ROTATIONAL question. physics/mechanics/freeRotation.mjs
+    // (v3562) measured the gap from the tree: "conformance contract has an angular call ...... NO -- it cannot ask a
+    // rotational question at all", and readVelocities() is linear only. box3d and Jolt now report angular velocity
+    // (physics/mechanics/SPINNING_BODY_WIP.md registers the round that needed it). A world must SAY whether it does:
+    // the two stand-ins honestly say no, and a world that says yes is held to it in section 8 below.
+    "supportsAngular",
 ];
 
 export const FLOATS_PER_BODY = 7;   // pos xyz + quat xyzw. Guessing 3 here is how v2552 started.
@@ -203,6 +209,28 @@ export function conform(world, name) {
     t("...and the joint calls MATCH that claim", claims ? !jointThrew : true,
       claims ? (jointThrew ? "claims joints and jointWeld THREW" : "claims joints, jointWeld worked")
              : "claims no joints" + (jointThrew ? " and jointWeld threw, which is consistent" : " but jointWeld did not throw -- fine, as long as callers check the flag"));
+
+    // ---- 8. ANGULAR: honest about whether it can spin a body and say how fast ------------------------------------
+    // A world that says yes must report the angular velocity it was given -- three floats per body, the world frame,
+    // readVelocities' layout -- and TURN the body about that axis. The probe spins a 1 x 2 x 3 box about its LARGEST
+    // axis, which is stable, so the body stays turning about x whatever the world's damping or gyroscopics do.
+    // THE CHECKER MUST SURVIVE THE THING IT CHECKS (section 1's lesson): a world that says yes and then lacks the calls is a
+    // failed check, not a crash -- the first draft called setAngularVelocity() on it and threw, which a sabotage found.
+    const spins = world.supportsAngular();
+    t("supportsAngular() answers a boolean", typeof spins === "boolean", "returned " + typeof spins + ": " + spins);
+    const hasAngular = typeof world.setAngularVelocity === "function" && typeof world.readAngularVelocities === "function";
+    if (spins === true && !hasAngular) t("...and a world that says yes answers the angular calls", false, "it claims angular velocity and has no setAngularVelocity()/readAngularVelocities()");
+    if (spins === true && hasAngular) try {
+        const s = world.addBox({ pos: [0, 0, 10], half: [0.5, 1, 1.5] });
+        const set = world.setAngularVelocity(s, [0.4, 0, 0]), w0 = world.readAngularVelocities();
+        t("...and a world that says yes reports the angular velocity it was given, three floats per body",
+          set !== false && !!w0 && w0.length === world.bodyCount() * 3 && Math.abs(w0[s * 3] - 0.4) < 1e-4 && Math.abs(w0[s * 3 + 1]) < 1e-4 && Math.abs(w0[s * 3 + 2]) < 1e-4,
+          w0 ? "length " + w0.length + " for " + world.bodyCount() + " bodies; body " + s + " reads (" + [0, 1, 2].map((k) => f(w0[s * 3 + k])).join(", ") + ")" : "returned " + w0);
+        for (let i = 0; i < 30; i++) world.step(1 / 60);
+        const q = world.readTransforms().slice(s * FLOATS_PER_BODY + 3, s * FLOATS_PER_BODY + 7);   // qx qy qz qw
+        t("...and TURNS the body about that axis (half a second at 0.4 rad/s is about 0.2 rad about x)",
+          Number.isFinite(q[0]) && q[0] > 0.05 && Math.abs(q[1]) < 1e-3 && Math.abs(q[2]) < 1e-3, "quaternion (" + [...q].map(f).join(", ") + ")");
+    } catch (e) { t("...and the angular calls answer without throwing", false, "threw: " + String(e && e.message || e).slice(0, 80)); }
 
     const ok = checks.every((c) => c.ok);
     return { name, ok, checks };

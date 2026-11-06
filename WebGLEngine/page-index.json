@@ -1,7 +1,7 @@
 {
  "version": 1,
  "generated": "derived by tools/ship/buildPageIndex.mjs -- DO NOT HAND-EDIT, the group comes from tools/ship/pageSections.mjs",
- "count": 495,
+ "count": 498,
  "pages": [
   {
    "f": "AudioLab.html",
@@ -991,6 +991,13 @@
    "p": 0
   },
   {
+   "f": "duodesk.html",
+   "t": "Nectarlink",
+   "d": "",
+   "g": "nearshare",
+   "p": 0
+  },
+  {
    "f": "echo-show.html",
    "t": "Show on Echo",
    "d": "",
@@ -1049,7 +1056,7 @@
   {
    "f": "es-box3d-6dof.html",
    "t": "SweK &middot; Newtonian 6DOF space combat",
-   "d": "Newtonian 6DOF space combat: two small fleets under REAL force and torque (F=ma, tau=I*alpha, orientation a genuine quaternion, angular velocity a free vector) -- physics/mechanics/rigidBody6dof.mjs, not the engine's kinematic flight model. brain/autopilot6dof.mjs flies them (a PD attitude controller that has to WIN the turn with torque, not just set a heading), physics/mechanics/rigidBody6dofWeapon.mjs arms them with straight-line projectiles hit-tested against an oriented bounding box, and physics/mechanics/rigidBody6dofCollision.mjs resolves ship-ship hits with a real impulse response (momentum and angular momentum conserved, energy never created) that can spin a ship up on an off-centre hit. Every module is independently gated before this page wires them together. Answer-key gates: rigidBody6dof-selfcheck, rigidBody6dofCollision-selfcheck, rigidBody6dofWeapon-selfcheck, autopilot6dof-selfcheck.",
+   "d": "Newtonian 6DOF space combat: two small fleets under REAL force and torque (F=ma, tau=I*alpha, orientation a genuine quaternion, angular velocity a free vector) -- physics/mechanics/rigidBody6dof.mjs, not the engine's kinematic flight model. by default the fruit fly's close-quarters pilot flies both fleets (first by far in the page's own fight; Load Pilots picks others), measured against brain/autopilot6dof.mjs (a PD attitude controller that has to WIN the turn with torque, not just set a heading), physics/mechanics/rigidBody6dofWeapon.mjs arms them with straight-line projectiles hit-tested against an oriented bounding box, and physics/mechanics/rigidBody6dofCollision.mjs resolves ship-ship hits with a real impulse response (momentum and angular momentum conserved, energy never created) that can spin a ship up on an off-centre hit. Every module is independently gated before this page wires them together. Answer-key gates: rigidBody6dof-selfcheck, rigidBody6dofCollision-selfcheck, rigidBody6dofWeapon-selfcheck, autopilot6dof-selfcheck.",
    "g": "rtx",
    "p": 0
   },
@@ -2031,6 +2038,13 @@
    "t": "Nebula",
    "d": "A parallax volumetric nebula for the EV flight view: domain-warped colored gas, a starfield, and depth from a drifting camera -- with ships flying through it so combat happens INSIDE the cloud. WebGPU, WebGL2 fallback, Canvas2D fallback. Drag to steer the camera.",
    "g": "webgpu",
+   "p": 0
+  },
+  {
+   "f": "nectarlink.html",
+   "t": "Nectarlink",
+   "d": "",
+   "g": "nearshare",
    "p": 0
   },
   {
@@ -3025,6 +3039,13 @@
    "t": "SweK &middot; SVG forge",
    "d": "Paste an SVG and forge it into a 3D metal medal/badge: its paths are parsed and bevel-extruded, holes and inner points preserved (the vector counterpart to the raster sprite-loft). Controls for thickness, bevel, color and metalness; orbit to inspect. Parsing is pinned by svgExtrudeCore-selfcheck. For faction insignia, achievement medals, and 3D UI ornaments.",
    "g": "",
+   "p": 0
+  },
+  {
+   "f": "switchboard.html",
+   "t": "SweK &middot; Switchboard",
+   "d": "One task, the same seeds, every brain side by side: paired differences against each arm's control, with a TIE shown as a result. Survey (decision layer) and compass dropout (flying layer).",
+   "g": "flightsim",
    "p": 0
   },
   {

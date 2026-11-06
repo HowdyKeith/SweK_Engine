@@ -1,0 +1,22 @@
+{
+ "report": [
+  "ROUND 16: does the gain grow with the number of stations? pooled over T1 1461-1508, T2 1521-1568 (far and both; read once)",
+  "  PASS GENERATOR: the generator at 3 stations equals needsTask.scenario on eight sample scenarios (two of them deep ones where the first station's reach clip binds): true",
+  "  PASS IDENTITY T1: the full twin at 3 stations equals the Round 11 twin dive for dive on T1: true",
+  "  PASS IDENTITY T2: the full twin at 3 stations equals the Round 11 twin dive for dive on T2: true",
+  "  PASS REFERENCE GAIN IS REAL: the gain at 3 stations is REAL on these seeds (else the sweep has no reference): true",
+  "means (tuned | twin) and crushed/stranded per station count",
+  "  n 3  0.786 | 0.805   crushed 0/0  stranded 0/0",
+  "  n 4  0.779 | 0.813   crushed 0/0  stranded 0/0",
+  "  n 5  0.758 | 0.787   crushed 0/0  stranded 0/0",
+  "  n 6  0.739 | 0.775   crushed 0/0  stranded 0/0",
+  "twin gain over the tuned rule at each station count:",
+  "  n 3  +0.0195 (se 0.0043; better 25, worse 2, same 165)  KEEPS",
+  "  n 4  +0.0336 (se 0.0052; better 48, worse 3, same 141)  KEEPS",
+  "  n 5  +0.0287 (se 0.0047; better 51, worse 8, same 133)  KEEPS",
+  "  n 6  +0.0360 (se 0.0045; better 63, worse 6, same 123)  KEEPS",
+  "growth of the gain from n = 3 to n = 6: +0.0164 (se of two independent means 0.0062) GROWS",
+  "BOTTOM LINE: THE GAIN GROWS WITH THE NUMBER OF STATIONS",
+  "BOTTOM LINE: THE GAIN KEEPS AT N = 3, 4, 5, 6"
+ ]
+}

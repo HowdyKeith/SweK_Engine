@@ -49,5 +49,11 @@ function frame() {
 }
 frame();
 </script>
+<script type="module">
+// ui/upscalerSwitch.mjs: the shared upscaler switch -- this page renders at 260 pixels wide on the CPU and stretches it, so bilinear is
+// the one mode it runs; every other mode is shown, greyed, as not on this page
+import { mountUpscalerSwitch } from "/ui/upscalerSwitch.mjs";
+mountUpscalerSwitch({ page: "nebula-live", pageDefault: "bilinear", modes: { bilinear: {} }, onChange: () => {} });
+</script>
 </body>
 </html>

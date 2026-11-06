@@ -1,0 +1,20 @@
+{
+ "report": [
+  "ROUND 21: can a rule on the scenario say when to plan? fitted on 1056 dives of Rounds 13-17, judged once on 192 far-and-both dives of Round 20; NO NEW DIVE",
+  "  PASS TRAIN COUNT: 1056 training dives, 1056 expected: true",
+  "  PASS TEST COUNT: 192 test dives, 192 expected: true",
+  "  PASS FEATURES FINITE: every feature and gain is a finite number",
+  "training: always planning +0.0189 (se 0.0019) over the tuned rule; the best five candidates (training gain over always planning, dives that plan):",
+  "  always                     +0.0000  plans on 1056 of 1056",
+  "  damage0 >= 0               +0.0000  plans on 1056 of 1056",
+  "  kindIsBoth >= 0            +0.0000  plans on 1056 of 1056",
+  "  unreachable >= 0           +0.0000  plans on 1056 of 1056",
+  "  frac0 < 0.648577           -0.0003  plans on 950 of 1056",
+  "training correlation of each feature with the gain: frac0 -0.032, damage0 -0.183, depth0 -0.010, kindIsBoth -0.204, nearest 0.014, farthest -0.016, spread -0.001, deepest -0.173, unreachable -0.068",
+  "FITTED RULE: always",
+  "test: gated minus always-twin +0.0000 (se 0.0000); gated minus tuned +0.0250 (se 0.0053); always-twin minus tuned +0.0250 (se 0.0053); plans on 100% of the test dives",
+  "optimistic bound (the same fit made ON the test dives): always, gated minus always-twin +0.0000 (se 0.0000)",
+  "BOTTOM LINE: NO RULE ON THE SCENARIO IMPROVES ON ALWAYS PLANNING",
+  "BOTTOM LINE: THE FITTED RULE KEEPS THE TWIN'S GAIN (it plans on 100% of the test dives)"
+ ]
+}

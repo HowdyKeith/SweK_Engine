@@ -97,7 +97,7 @@ function shatter(impact) {
   shatterT = 0;
   if (physics) {   // real solver: bodies that collide, pile up and settle
     try { if (pWorld) pWorld.destroy(); } catch (e) {}
-    pWorld = physics.createWorld({ gravity: [0, -9.8, 0] }); addGround(pWorld, { y: -1.6, extent: 9 });
+    pWorld = physics.createWorld({ gravity: [0, -9.8, 0] }); addGround(pWorld, { y: -1.6, extent: 9, rim: 2 });   // 2026-11-03: a rim, so the debris piles instead of sliding off (fx/fracture/debrisPhysics.js)
     pBodies = makePhysicsDebris(pWorld, frags, impact, { force: 2.6 }); debris = null;
   } else { debris = makeDebris(frags, impact, { force: 2.6 }); pBodies = null; }
   if (petOn && pet.state === "merged") pet.state = "part";   // the blow breaks the bond -- they come back as two, then re-bond on their own

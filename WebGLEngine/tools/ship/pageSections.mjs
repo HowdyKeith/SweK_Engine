@@ -532,7 +532,8 @@ export const SECTIONS = [
       // honest placement today.
       pages: ["android-invite.html", "remote-desktop.html", "lan.html", "sync-probe.html", "pairlane.html",
               // v4211 -- the two BitTorrent front doors, which belonged to no panel before this round.
-              "torrents.html", "webtorrent.html"] },
+              "torrents.html", "webtorrent.html",
+              "nectarlink.html", "duodesk.html"] },
     // v3434 -- the one-page "Terrain WASM" panel is GONE and biome-map-demo.html joined Voxel & Render.
     // Procedural terrain generation is meshing and rendering; a panel holding ONE page was a heading, not a group.
 
@@ -717,7 +718,7 @@ export const SECTIONS = [
     // later one): the aircraft (flight.html, flight-gpu.html, flight-coop.html, es-flight6dof.html, es-aircraft.html, es-box3d-fly3d.html), the 6DOF and dogfight pages (es-box3d-6dof.html, dogfight.html, bomber.html, space-battleship.html), the
     // submarine tank (sub-aquarium.html) and the ships on the sea (battleship3d.html). flight-coop.html and battleship3d.html had NO anchor on server.html at all (nothing linked them from it); they have one in Arriving now.
     { id: "flightsim", tab: "flightsim", label: "Flight Simulation", note: "every page that flies an aircraft, a spacecraft, a ship or a submarine under a physics model: free flight, 6DOF, dogfights, the tank of submarines",
-      pages: ["flight.html", "flight-gpu.html", "flight-coop.html", "es-flight6dof.html", "es-aircraft.html", "es-box3d-fly3d.html", "es-box3d-6dof.html", "dogfight.html", "bomber.html", "space-battleship.html", "sub-aquarium.html", "sub-tournament.html", "sea-ogre.html", "battleship3d.html"] },
+      pages: ["flight.html", "flight-gpu.html", "flight-coop.html", "es-flight6dof.html", "es-aircraft.html", "es-box3d-fly3d.html", "es-box3d-6dof.html", "dogfight.html", "bomber.html", "space-battleship.html", "sub-aquarium.html", "sub-tournament.html", "switchboard.html", "sea-ogre.html", "battleship3d.html"] },
 ];
 
 /** Keith's rule. A drawer of 25 is the flat row again with a lid on it. */

@@ -33,6 +33,8 @@
 //   AMENDMENT 2 (the reproduction limit became 1e-4 and the report began to judge from the stored difference): the gate was edited, so ALL mutants were run again, 275 now (6 added for the new `state` rule, 4 patterns moved): 272 red by name (677 red rows), the same 2 equivalents (R13, D40) and the same timeout (R01).
 // NOT SABOTAGED: the wording of the progress lines beyond what rows quote; the message text of the refusals that no row quotes; a full-size run (nothing has been trained at full size by the gate; the smoke run and the cost timing are in brain/PLAIN_NET_CONTROL_WIP.md).
 "use strict";
+import "../../physics/mechanics/rigidBody6dofEuler.mjs";   // 2026-11-04 -- the 6-DOF numbers this gate holds were measured under the first-order orientation step; RK4 is the default now (merge of the box3d line), so this gate says euler out loud
+import { fileURLToPath } from "node:url";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -362,9 +364,9 @@ sec("7. THE COMMAND");
         const t0 = Date.now(), code3 = await PN.command(["run", "--specs", "P/B/mn:0,cmp:P/B/qer:1", "--out", outFile, "--workers", "2", "--smoke", "--runs", "1", "--iters", "3", "--prune-budget", "3", "--quiet"], { out: (l) => quiet.push(l), err: (l) => quiet.push("ERR " + l) });
         const recs = fs.readFileSync(outFile, "utf8").trim().split("\n").map((l) => JSON.parse(l));
         ok("!! TWO REAL CHILD PROCESSES (one pilot, one comparator, smoke): the command spawns plainNetStudyCmd.mjs with --one for each, reads their RESULT lines, writes the references and both records, and prints the report", code3 === 0 && recs.length === 3 && recs[0].spec === "refs:NP" && recs.some((r) => r.spec === "P/B/mn:0" && r.family === "mn" && r.smoke === true && r.recipe.iters === 3) && recs.some((r) => r.spec === "cmp:P/B/qer:1" && r.reproduced.skipped === "smoke") && quiet.some((l) => /^THE PLAIN-NET CONTROL/.test(l)), `${((Date.now() - t0) / 1000).toFixed(1)} s`);
-        const one1 = JSON.parse(execFileSync(process.execPath, [path.join(path.dirname(new URL(import.meta.url).pathname), "plainNetStudyCmd.mjs"), "run", "--one", "P/B/mg:0", "--smoke", "--runs", "1", "--iters", "2", "--prune-budget", "2", "--quiet"], { encoding: "utf8" }).split("\n").find((l) => l.startsWith("RESULT ")).slice(7));
+        const one1 = JSON.parse(execFileSync(process.execPath, [path.join(path.dirname(fileURLToPath(import.meta.url)), "plainNetStudyCmd.mjs"), "run", "--one", "P/B/mg:0", "--smoke", "--runs", "1", "--iters", "2", "--prune-budget", "2", "--quiet"], { encoding: "utf8" }).split("\n").find((l) => l.startsWith("RESULT ")).slice(7));
         ok("!! the command-line file runs --one by itself: a RESULT line with the pilot's record (the 4-32-32-4 net, 1,348 weights)", one1.spec === "P/B/mg:0" && one1.weightCount === 1348 && one1.smoke === true && one1.recipe.iters === 2 && J(one1.widths) === J([32, 32]));
-        const pre = fs.readFileSync(outFile, "utf8"), rep2 = execFileSync(process.execPath, [path.join(path.dirname(new URL(import.meta.url).pathname), "plainNetStudyCmd.mjs"), "report", "--in", outFile, "--allow-smoke"], { encoding: "utf8" });
+        const pre = fs.readFileSync(outFile, "utf8"), rep2 = execFileSync(process.execPath, [path.join(path.dirname(fileURLToPath(import.meta.url)), "plainNetStudyCmd.mjs"), "report", "--in", outFile, "--allow-smoke"], { encoding: "utf8" });
         ok("!! and the command-line report prints a file's report (a partial smoke file: the 4b-E references are missing, said first, and the verdicts NOT READ)", /^THE PLAIN-NET CONTROL/.test(rep2) && /CHECK FAIL  REFERENCES 4b-E/.test(rep2) && /NOT READ/.test(rep2) && pre === fs.readFileSync(outFile, "utf8"));
     } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 }

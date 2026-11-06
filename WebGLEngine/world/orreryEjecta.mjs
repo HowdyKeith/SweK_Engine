@@ -234,6 +234,9 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
         "tools/ship/snowflowVendor-selfcheck.mjs",
         "tools/ship/wgslCorpus.mjs",
     ]),
+    // UNNUMBERED (2026-11-04) -- TWO ARRIVALS IN box3d, BY NAME: tools/roundhouse/angularImpulseCensus.mjs and its gate, the angular-impulse census
+    // (physics/mechanics/BOX3D_ANGULAR_IMPULSE_CAP_WIP.md, built at e1a56d0d). The census serves its hook's stand-in at /vendor/box3d/box3d.js with the real
+    // file behind it, and the gate reads that file to check the stand-in serves it byte for byte -- a real dependency: a move of the vendored box3d.js turns both red.
     "box3d": Object.freeze([
         "ai-bridge/doctorBridge.js",
         "ai-bridge/server.js",
@@ -252,6 +255,8 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
         "tools/crossarch-box3d.mjs",
         "tools/crossarchBox3d-selfcheck.mjs",
         "tools/macSession.mjs",
+        "tools/roundhouse/angularImpulseCensus-selfcheck.mjs",
+        "tools/roundhouse/angularImpulseCensus.mjs",
         "tools/roundhouse/backendRotation.mjs",
         "tools/roundhouse/box3dBind-selfcheck.mjs",
         "tools/roundhouse/box3dBind.mjs",
@@ -510,6 +515,10 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
         "render/seaPicker-selfcheck.mjs",
         "render/subBallastCues-selfcheck.mjs",
         "sea-ogre.html",
+        // v4910 -- the sub .glb model swap (render/subModels3d.mjs, its picker and the host's gate): the host builds a boat's model as three.js objects, the picker takes THREE as a parameter and its gate drives the form in a browser. Three arrivals, each by name.
+        "render/subModels3d-selfcheck.mjs",
+        "render/subModels3d.mjs",
+        "render/subModelsPanel-selfcheck.mjs",
     ]),
     "three-webgpu": Object.freeze([
         // backlog #31/#49/#51 -- the AI-presence orb (krispuckett/murmur-web ported into tslSource.mjs) is a
@@ -684,6 +693,14 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
         "tools/ship/trainSubState.mjs",
         // v4901 -- the aquarium page loads the hemibrain-backed pilots (named by the sub-aquarium round).
         "sub-aquarium.html",
+        // v4912 -- ARRIVED with the merge of the sub-aquarium, needs and plain-net lines (named by orreryEjecta-selfcheck): the aquarium core and sim gates, the brain panel gate, the stateful pilot's file library, its gate, and the tank fly bench.
+        "ai-bridge/subAquariumCore-selfcheck.mjs",
+        "render/brainPanel-selfcheck.mjs",
+        "render/subAquariumFlyCx-selfcheck.mjs",
+        "render/subAquariumSim-selfcheck.mjs",
+        "tools/ship/flyCxPilotFile-selfcheck.mjs",
+        "tools/ship/flyCxPilotFile.mjs",
+        "tools/tankFlyCxBench.mjs",
     ]),
     // v4898 -- vendor/zebrafish-vestibular is a PAPER-ONLY body: the supplementary files of an article, read by no source file (dependantsOf returns []), which is a measurement and not an omission.
     // v4906 -- ONE DEPENDANT ARRIVED: tools/fishVestibularCircuit.mjs reads the supplementary spreadsheets (the rung 4b extraction), so the body is no longer reached by nothing. It is still DATA and holds no code on disk.

@@ -18,6 +18,11 @@
 //
 // That is why the fakes live in the gate rather than in a scratch file: the blind spots they close would reopen
 // silently the moment someone simplified a check.
+//
+// 2026-11-03 -- THREE MORE, FOR ROTATION (the contract's fourteenth call, physics/mechanics/SPINNING_BODY_WIP.md), AND THE THIRD WAS FOUND BY A
+// SABOTAGE: making the planar stand-in claim angular velocity CRASHED THE CHECKER -- section 8 called setAngularVelocity() on a world without
+// it -- and a crash prints no FAIL line, so the sabotage counted nothing. The checker now reports the missing calls and survives a throw, and
+// "claims angular velocity, has no angular calls" is a fake below. The rule this file opens with, again: it must survive what it checks.
 import { conform, CONTRACT, FLOATS_PER_BODY } from "./backendConformance.mjs";
 import { planarFallbackWorld } from "./planarFallbackWorld.js";
 
@@ -36,7 +41,9 @@ const ok = (name, cond, detail) => {
     // stand-in gets promoted to a backend and a cross-arch test measures the wrong thing (v2546 nearly did).
 }
 
-// ---- 2. SIX BACKENDS THAT ANSWER THE CALLS AND LIE ------------------------------------------------------------
+// ---- 2. NINE BACKENDS THAT ANSWER THE CALLS AND LIE ------------------------------------------------------------
+// (2026-11-03: the last three lie about ROTATION, for the angular section the contract's fourteenth call brought --
+// physics/mechanics/SPINNING_BODY_WIP.md. A check nothing hands a liar is a check nobody has seen fail.)
 {
     const fakes = {
         "packs 3 floats per body, not 7": () => {
@@ -57,6 +64,15 @@ const ok = (name, cond, detail) => {
             w.readTransforms = () => { const a = o.call(w); a[0] = NaN; return a; }; return w;
         },
         "half a backend (a joint call missing)": () => { const w = planarFallbackWorld(); delete w.jointRevolute; return w; },
+        "claims angular velocity, reports zeros": () => {
+            const w = planarFallbackWorld(); w.supportsAngular = () => true; w.setAngularVelocity = () => true;
+            w.readAngularVelocities = () => new Float32Array(w.bodyCount() * 3); return w;
+        },
+        "claims angular velocity, has no angular calls": () => { const w = planarFallbackWorld(); w.supportsAngular = () => true; return w; },
+        "claims angular velocity, echoes it, never turns the body": () => {
+            const w = planarFallbackWorld(), set = new Map(); w.supportsAngular = () => true; w.setAngularVelocity = (i, v) => { set.set(i, [...v]); return true; };
+            w.readAngularVelocities = () => { const a = new Float32Array(w.bodyCount() * 3); for (const [i, v] of set) a.set(v, i * 3); return a; }; return w;
+        },
     };
     for (const [label, mk] of Object.entries(fakes)) {
         let r = null, threw = null;
@@ -77,7 +93,9 @@ const ok = (name, cond, detail) => {
     // contract and its test have not drifted apart. A contract that grows silently is two files disagreeing.
     // v2567: twelve became THIRTEEN when impulse joined. This going red on every growth is the point -- a
     // contract that grows silently is two files disagreeing, and the disagreement would look like a pass.
-    ok("the contract names all thirteen calls", CONTRACT.length === 13, CONTRACT.join(" "));
+    // 2026-11-03: thirteen became FOURTEEN when supportsAngular joined (physics/mechanics/SPINNING_BODY_WIP.md) -- the
+    // first rotational question the contract can ask. This row going red on the growth was the gate working.
+    ok("the contract names all fourteen calls", CONTRACT.length === 14, CONTRACT.join(" "));
     const w = planarFallbackWorld();
     ok("...and the real world has exactly those", CONTRACT.every((c) => typeof w[c] === "function"));
     ok("FLOATS_PER_BODY is 7, not 3", FLOATS_PER_BODY === 7,

@@ -394,6 +394,7 @@ export const REACH_ARRIVALS_SINCE_V4407 = Object.freeze([
     Object.freeze({ module: "text/slugText.js", why: "reached only through ogre.brainSubs()'s lazy import of the sub brains (v4901): loaded on the console call, not at boot" }),
     Object.freeze({ module: "world/kenneyKit.mjs", why: "reached only through ogre.brainSubs()'s lazy import of the sub brains (v4901): loaded on the console call, not at boot" }),
     Object.freeze({ module: "world/raceTrack.mjs", why: "reached only through ogre.brainSubs()'s lazy import of the sub brains (v4901): loaded on the console call, not at boot" }),
+    Object.freeze({ module: "ui/upscalerSwitch.mjs", why: "v4912 -- main.js's static import at line ~7106 (mountUpscalerSwitch, renderScaleFor: the engine's own render-scale switch), measured against origin/main's walk of 772 modules, where it was the one module missing; it arrived with the merge of the render lines" }),
 ]);
 export const REACH_LOST_SINCE_V4407 = Object.freeze([]);
 

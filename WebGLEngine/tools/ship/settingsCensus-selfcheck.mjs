@@ -42,8 +42,11 @@ const k = censusConsumers(ROOT);
         "its header claims 'buildSettingsSchema() is pure (no DOM) so it can be unit-tested' and THAT CLAIM IS " +
         "TRUE -- driven here rather than believed, which is what lets this census run in the suite");
 
-    ok("!! ...and 145 controls are NOT 145 settings",
-        c.values === 42 && c.actions === 47 && c.views === 56,
+    // the upscaler switch (ui/upscalerSwitch.mjs's settingsControl) adds a 43rd value, the render pages' default mode, with get and set:
+    // 146 controls, 43 values. SABOTAGED, restored byte-identical: the entry removed from the Graphics tab -> 2 red over this gate and
+    // ui/upscalerSwitch-selfcheck.mjs (that one's U11).
+    ok("!! ...and 146 controls are NOT 146 settings",
+        c.values === 43 && c.actions === 47 && c.views === 56,
         settingsReceipt(c) + " A BUTTON IS AN ACTION AND A PANEL IS A VIEW; neither has a value a JSON document " +
         "could carry, and any 'settings coverage' figure that counts them is describing nothing");
 

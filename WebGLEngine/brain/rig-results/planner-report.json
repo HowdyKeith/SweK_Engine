@@ -1,0 +1,28 @@
+{
+ "r8": {
+  "alpha": 0.001,
+  "low": 0.3803560726214647,
+  "high": 0.68938489754682,
+  "ramp": 20,
+  "cap": 0.8861494767879255
+ },
+ "report": [
+  "ROUND 11: a planned visiting order on the tuned rule (the twin: every order tried on a copy of the boat's own simulation), hard kinds (far, both), noisy gauge sd 0.1; audits Y1 761-784, Y2 801-824, Y3 841-864 (48 dives each, read once)",
+  "  PASS IDENTITY Y1: PLANNER-NEAREST equals TUNED-R8 dive for dive on Y1: true",
+  "  PASS ORACLE Y1: the oracle is at least TUNED-R8 on every dive of Y1: true",
+  "  PASS IDENTITY Y2: PLANNER-NEAREST equals TUNED-R8 dive for dive on Y2: true",
+  "  PASS ORACLE Y2: the oracle is at least TUNED-R8 on every dive of Y2: true",
+  "  PASS IDENTITY Y3: PLANNER-NEAREST equals TUNED-R8 dive for dive on Y3: true",
+  "  PASS ORACLE Y3: the oracle is at least TUNED-R8 on every dive of Y3: true",
+  "means Y1 | Y2 | Y3",
+  "  TUNED-R8         0.795 | 0.788 | 0.803   crushed 0/0/0  stranded 0/0/0",
+  "  PLANNER-NEAREST  0.795 | 0.788 | 0.803   crushed 0/0/0  stranded 0/0/0",
+  "  PLANNER-TWIN     0.811 | 0.806 | 0.825   crushed 0/0/0  stranded 0/0/0",
+  "  ORACLE-ORDER     0.820 | 0.813 | 0.847   crushed 0/0/0  stranded 0/0/0",
+  "PLANNER-TWIN against TUNED-R8: +0.016 tie | +0.019 tie | +0.022 WINS = TIES",
+  "ORACLE-ORDER against TUNED-R8 (reported, it sees the future and the noise): +0.025 WINS | +0.025 WINS | +0.044 WINS",
+  "share of the oracle gap closed by the twin: 0.63 | 0.75 | 0.50",
+  "replans per dive (twin): 6.42",
+  "BOTTOM LINE: NO GAIN OVER THE TUNED RULE"
+ ]
+}

@@ -27,6 +27,7 @@
 //   flight on a non-finite state before an error is summed -- and was REMOVED rather than kept as dead code that a sabotage cannot see.
 //   fly() flew every model at the TRAINER's mass until T16 found it: createState defaulted the state's mass, and a lighter airframe flew the same flight.
 "use strict";
+import "../physics/mechanics/rigidBody6dofEuler.mjs";   // 2026-11-04 -- the 6-DOF numbers this gate holds were measured under the first-order orientation step, so it flies that step (see that file)
 import * as T from "./flightTask.mjs";
 import * as AF from "./autopilotFlight.mjs";
 import * as F from "../physics/mechanics/flightModel6dof.mjs";

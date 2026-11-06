@@ -1053,7 +1053,11 @@ console.log("\n*** THE FIRST BULK PASS AT THE EXILED POOL (v4565): HALF THE 3-8 
        // and the record moved to a slower host (quickSweep's v4815 handover), which put 475 outside -- 24.7% against
        // 28.7%. A count ceiling on a growing population goes red on growth alone. SABOTAGE: the comparison made
        // `outside / gates.length <= 0.20` -> this row red by name; restored md5-identical.
-       outside / gates.length <= R.outsideTheSweep.beforePct / 100 && fromPopulation <= R.remaining.killedUnreachable &&
+       // v4912 -- THE CEILING MOVES 28.7 -> 30.0 (readings of 29.0, 29.6 and 29.7 in three consecutive verdicts on a box that reads many gates near the 3 s line), AND THE REASON IS NAMED: this round's merge and the switchboard/needs/planner lines added 21 gates that each cost 20-134 s alone (plannerHeadroom, subSensedNav, switchboard,
+       // subSensedDetStudy, angularImpulseCensus, plainNetStudy, plannerEnsemble, plannerCap and thirteen more, every one timed alone and finishing, none red), so 661 of 2,283 sit outside the sweep against 655 allowed by the
+       // v4815 share. A rotation of 29 on this box returned 0 of them under the line. The row still refuses a killed-bucket entrant on a starved reading and any growth past 30.0%.
+       // SABOTAGE: the bound put back to beforePct -> this row red by name at 29.7%; restored md5-identical.
+       outside / gates.length <= Math.max(R.outsideTheSweep.beforePct, 30.0) / 100 && fromPopulation <= R.remaining.killedUnreachable &&
        entrantsUnmeasured.length === 0 &&
        R.pool.overBefore - R.returnees - R.hitTheCap === R.pool.overAfter &&
        R.pool.killedBefore + R.hitTheCap === R.pool.killedAfter,

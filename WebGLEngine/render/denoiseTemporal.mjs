@@ -65,12 +65,15 @@ export function firstHits(S, eye, w = IMAGE, h = IMAGE) {
  * Where each pixel of `cur` was in `prev`: up to four bilinear taps and their weights, renormalised over the taps that
  * saw the same object, within POS_TOL footprints of the same point, facing within NORMAL_DOT. A pixel with no valid
  * tap (sky, or disoccluded) has weight 0 everywhere. Returns { taps: Int32Array(4 n), wts: Float64Array(4 n), valid }.
+ * Round 79 (section 180): `vel`, indexed by scene object, is each mover's motion a frame. A pixel whose current hit P is on a mover with
+ * velocity v was at P - v in `prev`, so that point is projected and matched; with no `vel`, or off the movers, P itself, as before.
  */
-export function reproject(prev, cur, w = IMAGE, h = IMAGE) {
+export function reproject(prev, cur, w = IMAGE, h = IMAGE, vel = null) {
     const n = w * h, taps = new Int32Array(4 * n).fill(-1), wts = new Float64Array(4 * n), valid = new Uint8Array(n), B = prev.B;
     for (let p = 0; p < n; p++) {
         if (cur.obj[p] < 0) continue;
-        const P = [cur.pos[p * 3], cur.pos[p * 3 + 1], cur.pos[p * 3 + 2]], N = [cur.nrm[p * 3], cur.nrm[p * 3 + 1], cur.nrm[p * 3 + 2]];
+        const Pc = [cur.pos[p * 3], cur.pos[p * 3 + 1], cur.pos[p * 3 + 2]], N = [cur.nrm[p * 3], cur.nrm[p * 3 + 1], cur.nrm[p * 3 + 2]], mv = vel && vel[cur.obj[p]];
+        const P = mv ? [Pc[0] - mv[0], Pc[1] - mv[1], Pc[2] - mv[2]] : Pc;   // where this surface point was in `prev`
         const d = [P[0] - prev.eye[0], P[1] - prev.eye[1], P[2] - prev.eye[2]];
         const df = d[0] * B.fwd[0] + d[1] * B.fwd[1] + d[2] * B.fwd[2];
         if (df <= 1e-9) continue;
@@ -79,8 +82,8 @@ export function reproject(prev, cur, w = IMAGE, h = IMAGE) {
         const X = (u / (B.scale * (w / h)) + 1) / 2 * w - 0.5, Y = (1 - v / B.scale) / 2 * h - 0.5;
         const x0 = Math.floor(X), y0 = Math.floor(Y), fx = X - x0, fy = Y - y0;
         // the tolerance: a pixel's footprint at this depth, stretched where the surface is seen at a grazing angle
-        const dist = Math.hypot(P[0] - cur.eye[0], P[1] - cur.eye[1], P[2] - cur.eye[2]);
-        const cosV = Math.abs((N[0] * (cur.eye[0] - P[0]) + N[1] * (cur.eye[1] - P[1]) + N[2] * (cur.eye[2] - P[2])) / dist);
+        const dist = Math.hypot(Pc[0] - cur.eye[0], Pc[1] - cur.eye[1], Pc[2] - cur.eye[2]);
+        const cosV = Math.abs((N[0] * (cur.eye[0] - Pc[0]) + N[1] * (cur.eye[1] - Pc[1]) + N[2] * (cur.eye[2] - Pc[2])) / dist);
         const tol = POS_TOL * dist * 2 * cur.B.scale / h / Math.max(cosV, 0.2);
         let sum = 0;
         const cand = [[x0, y0, (1 - fx) * (1 - fy)], [x0 + 1, y0, fx * (1 - fy)], [x0, y0 + 1, (1 - fx) * fy], [x0 + 1, y0 + 1, fx * fy]];

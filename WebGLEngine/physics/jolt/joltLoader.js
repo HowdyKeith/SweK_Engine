@@ -18,6 +18,7 @@ import { LINEAR_DAMPING, ANGULAR_DAMPING } from "../damping.js";
 "use strict";
 
 import { probeWasm, explainWasmFailure } from "../../engine/wasmSupport.mjs";
+import { implicitGyroStep, isIsotropic } from "../mechanics/implicitGyro.mjs";
 
 let _Jolt = null;
 async function _load() {
@@ -58,7 +59,7 @@ class JoltWorld {
         if (gravity) this.ps.SetGravity(new Jolt.Vec3(gravity[0], gravity[1], gravity[2]));
         this.bodies = [];   // { body, id, dynamic }
     }
-    addBox({ type = "dynamic", pos = [0, 0, 0], half = [0.5, 0.5, 0.5], density = 1, damping = LINEAR_DAMPING } = {}) {
+    addBox({ type = "dynamic", pos = [0, 0, 0], half = [0.5, 0.5, 0.5], density = 1, damping = LINEAR_DAMPING, plane2d = false, gyroscopic = "implicit" } = {}) {
         const Jolt = this.Jolt, dyn = type !== "static";
         const shape = new Jolt.BoxShapeSettings(new Jolt.Vec3(half[0], half[1], half[2])).Create().Get();
         const cs = new Jolt.BodyCreationSettings(shape, new Jolt.RVec3(pos[0], pos[1], pos[2]), new Jolt.Quat(0, 0, 0, 1), dyn ? Jolt.EMotionType_Dynamic : Jolt.EMotionType_Static, dyn ? LAYER_M : LAYER_NM);
@@ -67,8 +68,50 @@ class JoltWorld {
         // behaviour changes; what changes is that the ENGINE now chooses it, and box3d is held to the same number.
         cs.mLinearDamping = damping;
         cs.mAngularDamping = damping === 0 ? 0 : ANGULAR_DAMPING;
+        // 2026-11-03 (unnumbered) -- THE GYROSCOPIC TERM, three settings, and the default is the WRAPPER'S OWN IMPLICIT STEP.
+        // Jolt leaves its own force off (mApplyGyroscopicForce = false), and then a body's angular velocity is held constant
+        // between torques: a spinning brick never wobbles, precesses or flips. physics/mechanics/SPINNING_BODY_WIP.md measured
+        // Jolt's own force (an explicit step) reading Euler's rate to 0.8% -- and then losing fast STABLE spins: at 1/60 s a
+        // spin of 10 rad/s about the largest axis tumbled after 23 s, one of 20 rad/s after 6. So, the same day:
+        //   "implicit" (the default): Jolt's own force off, and step() takes box3d's implicit step first
+        //              (physics/mechanics/implicitGyro.mjs), which shrinks a stable wobble instead of growing it;
+        //   true / "jolt": Jolt's own explicit force, exactly as the opt-in was -- every caller that passed true keeps it;
+        //   false: neither, as Jolt makes a body.
+        // A static body never takes either, and a body whose three moments are equal (a ship) is skipped by the implicit
+        // step: its gyroscopic torque is exactly zero.
+        const mode = !dyn ? false : gyroscopic === true || gyroscopic === "jolt" ? "jolt" : gyroscopic === "implicit" ? "implicit" : false;
+        if (mode === "jolt") cs.mApplyGyroscopicForce = true;
+        // 2026-11-03 (unnumbered) -- `plane2d`: a dynamic body LOCKED TO THE XY-PLANE (Jolt's EAllowedDOFs_Plane2D): it moves in x and y and
+        // turns about z alone, for a page that draws a side view (jolt-arena.html). With one axis of turning there is no gyroscopic torque,
+        // so the implicit step skips it, as it skips an equal-moment body -- and Jolt holds a zero inverse inertia on the locked axes, which
+        // has no inverse to read. Off unless asked, so every other body is built as it was.
+        if (dyn && plane2d) cs.mAllowedDOFs = Jolt.EAllowedDOFs_Plane2D;
         const b = this.bi.CreateBody(cs); Jolt.destroy(cs); this.bi.AddBody(b.GetID(), dyn ? Jolt.EActivation_Activate : Jolt.EActivation_DontActivate);
-        this.bodies.push({ body: b, id: b.GetID(), dynamic: dyn }); return this.bodies.length - 1;
+        const rec = { body: b, id: b.GetID(), dynamic: dyn, gyro: mode, I: null, plane2d: dyn && !!plane2d };
+        if (mode === "implicit" && !rec.plane2d) {
+            // the body's local inertia, as Jolt holds it, row-major from its three columns -- read once: a rigid body's does not change
+            const m = b.GetMotionProperties().GetLocalSpaceInverseInertia().Inversed(), c = (v) => [v.GetX(), v.GetY(), v.GetZ()];
+            const x = c(m.GetAxisX()), y = c(m.GetAxisY()), z = c(m.GetAxisZ()), I = [x[0], y[0], z[0], x[1], y[1], z[1], x[2], y[2], z[2]];
+            rec.I = isIsotropic(I) ? null : I;
+        }
+        this.bodies.push(rec); return this.bodies.length - 1;
+    }
+    /** Which gyroscopic term body `idx` has: "implicit" (the wrapper's step), "jolt" (Jolt's own force) or false. */
+    gyroscopicOf(idx) { return this.bodies[idx].gyro; }
+    /** Whether body `idx` is locked to the xy-plane (addBox's `plane2d`). */
+    plane2dOf(idx) { return this.bodies[idx].plane2d; }
+    // THE IMPLICIT STEP, taken before every Jolt step over its whole dt -- box3d's step exactly at the pages' one substep (box3d
+    // takes it once a substep; at more substeps this still takes it once). Only awake dynamic bodies with the "implicit" setting
+    // and unequal moments, and only when they turn.
+    _implicitGyro(h) {
+        const J = this.Jolt;
+        for (const r of this.bodies) {
+            if (r.gyro !== "implicit" || r.I === null || !this.bi.IsActive(r.id)) continue;
+            const wv = r.body.GetAngularVelocity(), w = [wv.GetX(), wv.GetY(), wv.GetZ()];
+            if (w[0] === 0 && w[1] === 0 && w[2] === 0) continue;
+            const qq = r.body.GetRotation(), o = implicitGyroStep(r.I, [qq.GetW(), qq.GetX(), qq.GetY(), qq.GetZ()], w, h);
+            const v = new J.Vec3(o[0], o[1], o[2]); this.bi.SetAngularVelocity(r.id, v); J.destroy(v);
+        }
     }
     // planar ES helper: a cube at (x, 0, z). Matches box3d.addShip so esBox3d/esHullCombat are backend-agnostic.
     //
@@ -78,7 +121,7 @@ class JoltWorld {
     // went through addBox and inherited Jolt's 0.05 default, so ES ships have been flying through 5%-per-second
     // molasses on Jolt and through vacuum on box3d -- while this very file claimed the substrate "just works on
     // either backend". The two backends were never agnostic; nothing had ever measured them against each other.
-    addShip({ x = 0, z = 0, half = 0.5, density = 1 } = {}) { return this.addBox({ type: "dynamic", pos: [x, 0, z], half: [half, half, half], density, damping: 0 }); }
+    addShip({ x = 0, z = 0, half = 0.5, density = 1, gyroscopic } = {}) { return this.addBox({ type: "dynamic", pos: [x, 0, z], half: [half, half, half], density, damping: 0, gyroscopic }); }   // 2026-11-03: a gyroscopic setting passes through when given; otherwise addBox's default
     // v2470 -- a world now says WHICH ENGINE IT IS, because lockstep across two different engines is not merely
     // broken, it is impossible, and until now nothing in the stack could even tell them apart.
     backendId() { return "jolt"; }
@@ -87,7 +130,7 @@ class JoltWorld {
     impulse(idx, v) { const J = this.Jolt, vv = new J.Vec3(v[0], v[1], v[2]); this.bi.AddImpulse(this._id(idx), vv); J.destroy(vv); this.bi.ActivateBody(this._id(idx)); }
     angularImpulse(idx, v) { const J = this.Jolt, vv = new J.Vec3(v[0], v[1], v[2]); this.bi.AddAngularImpulse(this._id(idx), vv); J.destroy(vv); this.bi.ActivateBody(this._id(idx)); }
     setTransform(idx, p, q) { const J = this.Jolt, pp = new J.RVec3(p[0], p[1], p[2]), qq = new J.Quat(q[0], q[1], q[2], q[3]); this.bi.SetPositionAndRotation(this._id(idx), pp, qq, J.EActivation_Activate); J.destroy(pp); J.destroy(qq); }
-    step(dt = 1 / 60, substeps = 1) { this.j.Step(dt, substeps); }
+    step(dt = 1 / 60, substeps = 1) { this._implicitGyro(dt); this.j.Step(dt, substeps); }
     readTransforms() {
         const out = new Float32Array(this.bodies.length * 7);
         for (let i = 0; i < this.bodies.length; i++) { const b = this.bodies[i].body, p = b.GetPosition(), r = b.GetRotation(), o = i * 7; out[o] = p.GetX(); out[o + 1] = p.GetY(); out[o + 2] = p.GetZ(); out[o + 3] = r.GetX(); out[o + 4] = r.GetY(); out[o + 5] = r.GetZ(); out[o + 6] = r.GetW(); }
@@ -97,6 +140,24 @@ class JoltWorld {
         const out = new Float32Array(this.bodies.length * 3);
         for (let i = 0; i < this.bodies.length; i++) { const b = this.bodies[i]; if (!b.dynamic) continue; const v = this.bi.GetLinearVelocity(b.id), o = i * 3; out[o] = v.GetX(); out[o + 1] = v.GetY(); out[o + 2] = v.GetZ(); }
         return out;
+    }
+    // 2026-11-03 (unnumbered) -- ANGULAR VELOCITY, box3dLoader's angular calls with the same shapes: [wx,wy,wz] per body in
+    // the WORLD frame (rad/s, Jolt's own convention), setting it, damping settable to zero, and the body's inertia in its
+    // own frame as Jolt computed it. All through calls the vendored binding already had: no rebuild.
+    supportsAngular() { return true; }
+    readAngularVelocities() {
+        const out = new Float32Array(this.bodies.length * 3);
+        for (let i = 0; i < this.bodies.length; i++) { const b = this.bodies[i]; if (!b.dynamic) continue; const w = this.bi.GetAngularVelocity(b.id), o = i * 3; out[o] = w.GetX(); out[o + 1] = w.GetY(); out[o + 2] = w.GetZ(); }
+        return out;
+    }
+    setAngularVelocity(idx, w) { const J = this.Jolt, ww = new J.Vec3(w[0], w[1], w[2]); this.bi.SetAngularVelocity(this._id(idx), ww); J.destroy(ww); this.bi.ActivateBody(this._id(idx)); return true; }
+    setDamping(idx, linear, angular) { if (!this.bodies[idx].dynamic) return false; const mp = this.bodies[idx].body.GetMotionProperties(); mp.SetLinearDamping(linear); mp.SetAngularDamping(angular); return true; }
+    // { diag: [Ixx, Iyy, Izz], off: [Ixy, Ixz, Iyz] } -- the inverse of the local-space inverse inertia, each axis read as it is returned
+    inertia(idx) {
+        if (!this.bodies[idx].dynamic) return null;
+        const m = this.bodies[idx].body.GetMotionProperties().GetLocalSpaceInverseInertia().Inversed(), col = (v) => [v.GetX(), v.GetY(), v.GetZ()];
+        const x = col(m.GetAxisX()), y = col(m.GetAxisY()), z = col(m.GetAxisZ());
+        return { diag: [x[0], y[1], z[2]], off: [y[0], z[0], z[1]] };
     }
     // quantized position hash for cross-peer desync detection, same spirit + width as box3d's stateHash (uint32)
     // v2509 -- THE RECORDING API, HONESTLY REFUSED.

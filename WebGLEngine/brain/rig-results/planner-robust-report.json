@@ -1,0 +1,29 @@
+{
+ "report": [
+  "ROUND 31: do the -0.12 constants hold up outside the conditions they were chosen in? REF 7001-7150, DMG 7201-7350, NOISE 7401-7550, STN5 7601-7750 (far and both, 300 dives per arm and condition; read once)",
+  "  PASS GENERATOR: the generator at 3 stations and damage scale 1 equals needsTask.scenario on 6 sample scenarios: true",
+  "  PASS DAMAGE SCALE: scale 1.6 raises the starting damage of every damaged sample dive and leaves the undamaged ones undamaged: true",
+  "  PASS SIZES: every arm has 300 dives in every condition: true",
+  "  PASS KINDS ALIGNED: within a condition every arm's dives are the same scenarios in the same order: true",
+  "REF (3 stations, damage x1, gauge sd 0.1): means R8 0.7920, L12 0.8295, twin 0.8447",
+  "   rule gain (L12 minus R8) +0.0375 (se 0.0058; better 95, worse 29, same 176)  KEEPS",
+  "   twin gain (twin L12 minus L12) +0.0153 (se 0.0031; better 31, worse 3, same 266)  KEEPS",
+  "   crushed/stranded: TUNED-R8 0/0, TUNED-L12 0/0, TWIN-L12 0/0",
+  "DMG (3 stations, damage x1.6, gauge sd 0.1): means R8 0.7518, L12 0.7763, twin 0.7934",
+  "   rule gain (L12 minus R8) +0.0246 (se 0.0075; better 77, worse 31, same 192)  KEEPS",
+  "   twin gain (twin L12 minus L12) +0.0171 (se 0.0042; better 30, worse 4, same 266)  KEEPS",
+  "   crushed/stranded: TUNED-R8 21/0, TUNED-L12 23/0, TWIN-L12 22/0",
+  "NOISE (3 stations, damage x1, gauge sd 0.3): means R8 0.8090, L12 0.8089, twin 0.8176",
+  "   rule gain (L12 minus R8) -0.0001 (se 0.0123; better 103, worse 42, same 155)  LOSES",
+  "   twin gain (twin L12 minus L12) +0.0087 (se 0.0039; better 21, worse 3, same 276)  KEEPS",
+  "   crushed/stranded: TUNED-R8 0/0, TUNED-L12 18/0, TWIN-L12 19/0",
+  "STN5 (5 stations, damage x1, gauge sd 0.1): means R8 0.7529, L12 0.7736, twin 0.8124",
+  "   rule gain (L12 minus R8) +0.0208 (se 0.0056; better 98, worse 45, same 157)  KEEPS",
+  "   twin gain (twin L12 minus L12) +0.0387 (se 0.0043; better 94, worse 10, same 196)  KEEPS",
+  "   crushed/stranded: TUNED-R8 0/0, TUNED-L12 0/0, TWIN-L12 0/0",
+  "BOTTOM LINE: THE -0.12 CONSTANTS KEEP THEIR GAIN IN 3 OF 4 CONDITIONS (REF, DMG, STN5); THEY LOSE IT IN (NOISE)",
+  "BOTTOM LINE: THE TWIN KEEPS ITS GAIN ON THEM IN 4 OF 4 CONDITIONS (REF, DMG, NOISE, STN5)",
+  "BOTTOM LINE: THE HULL PAYS AT -0.12 IN DMG, NOISE: 82 CRUSHED, 0 STRANDED",
+  "BOTTOM LINE: -0.12 CRUSHES MORE THAN THE ROUND 8 CONSTANTS IN DMG, NOISE"
+ ]
+}
