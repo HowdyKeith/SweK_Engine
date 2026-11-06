@@ -1,0 +1,38 @@
+# The helicopter and quadrotor pilots in a league: every pilot against every other on the same scenarios, rated (2026-11-06; UNNUMBERED; REGISTERED BEFORE ANY CODE FOR IT IS WRITTEN AND BEFORE ANY SEED OF ITS SET IS FLOWN)
+
+Keith, 2026-11-06: "lets queue up and proceed to do all those items" -- item R2. `brain/rotorcraftBoard.mjs` (R1, `brain/ROTORCRAFT_BOARD_WIP.md`) reads each trained pilot against two controls. The tree's other brains also have ROUND ROBINS (`brain/dogfightTournament.mjs` for the jets, `brain/subTournament.mjs` for the boats, `sub-tournament.html` for the page): every pilot against every other, a Bradley-Terry rating, a matrix. The rotorcraft have none. This is it, and a page of its own (`rotor-league.html`, a later step of this item).
+
+## 1. What a fight is here (said plainly, because it is not a fight)
+
+A helicopter in a wind and a quadrotor with a motor out do not fight each other: each flies ALONE in its own copy of the scenario. A "fight" of this league is **one scenario flown by X and by Y (the same seed, the same wind, the same upset), compared by their scores**: X WINS if X's score is above Y's by more than a margin, LOSES if below by more than the margin, DRAWS otherwise. There are no seats (nothing to cancel), no shooting, no interaction; the league is a different way of COUNTING the same flights the board averages. What it adds to the board: (a) every pilot against every other, not only against the hand pilot and the zero pilot; (b) the Bradley-Terry rating and the matrix the other tournaments have; (c) a count of scenarios won, which a few lost flights with a large score cannot dominate (the board's means can: section 5.2 of `ROTORCRAFT_BOARD_WIP.md`); (d) the page.
+
+**The margin is 0.01 of a score, my choice**, made from the sizes of the score differences between pilots in the two sets already read (HELD73 and HELD74, standing kinds): the median absolute difference between a trained pilot and the hand pilot is 0.02 (helicopter 0.032, quadrotor 0.015 to 0.024), and a margin of 0.01 draws about a fifth of the helicopter's `fly`-against-`hand` fights and between a quarter and a third of the quadrotor's trained-against-`hand`, while `hand-net` against `hand` is a draw in all of them. The sensitivity (0.002 and 0.05) is printed and weighs nothing.
+
+## 2. What is built
+
+* `brain/rotorLeague.mjs`: each pilot of the board's roster flies each scenario ONCE (`n` pilots x `s` scenarios flights, not `n^2`); a matchup is read off the two score lists; the round robin is shaped like `dogfightTournament`'s (`{ ids, scenarios, pairs: { "x|y": { summary } } }`) so that its `ratings`, `against`, `flip`, `fieldEdges`, `rankOf`, `transitivity` and `upsets` are reused and not copied; the summary has one fight a scenario (`fights` = scenarios), so the rating's game counts are right. Three leagues per rotorcraft, from the same flights: ALL (every kind), STANDING (every kind but the failure kind: the helicopter's `engine`, the quadrotor's `motor`), FAILURE (the failure kind alone; printed).
+* `tools/ship/takeRotorLeague.mjs` (`--task rotor|drone|both --set dev|held75 [--seeds N] [--write]`), `render/rotorLeagueView.mjs` (the pure view model for the page: the roster, the matrix cells, the rating bars), `rotor-league.html`, `brain/rotorLeague-selfcheck.mjs` with a mutation pass logged in its header.
+
+## 3. THE REGISTERED READ
+
+> On fresh scenarios, how do the rotorcraft's pilots rank against each other by scenarios won, and does the ranking agree with the board's readings?
+
+**Scenarios, fresh and read once:** seeds **8301 to 8340 of each of the four kinds** (160 scenarios a rotorcraft; nothing has used them: the board's sets are 8001-8012 and 8201-8224). The pilots are the board's: the helicopter's `hand`, `hand-net`, `fly`, `zero`; the quadrotor's `hand`, `hand-net`, `fly`, `mlp`, `mlp-v2`, `zero`. DEV is seeds 1 to 3 of each kind (a sanity run of the code, not a result; smoke runs use DEV and nothing else).
+
+**The reading of a pair (the league's own, in its three leagues):** X BEATS Y iff X wins more fights than it loses AND the exact two-sided sign test on the decisive fights (draws set aside) gives p <= 0.05; X IS BELOW Y iff the mirror; else TIES. Printed with it and not part of the verdict: wins-draws-losses, the mean edge and its paired z (the other tournaments' reading), the rating on the Elo scale (read differences), the rank by rating, and the stability of the rating (refit on the first 10, 20 and 40 scenarios of each kind against the fit to all).
+
+**Checks (a failure and the readings are NOT WEIGHED):** every pilot flew every scenario; no score is non-finite; `hand-net` against `hand` has an edge below 1e-3 in size on the STANDING league and draws at least 90 percent of ALL its fights (the network form of the hand pilot is the hand pilot; the lost flights may differ, section 5.2 of the board's note); `zero` is rated lowest in ALL and in STANDING; the matrix is antisymmetric (X against Y is the flip of Y against X, to the digit).
+
+**Expectations, written before any seed is flown (informed by the board's two reads; they are about whether the SAME pilots read the same under another count, not independent of it).**
+* Helicopter: `zero` rated lowest in ALL: 99 percent; `hand-net` TIES `hand` in every league: 97; in STANDING `fly` BEATS `hand`: about 70 (HELD73: 26 better against 10 worse on the 36 standing scenarios); in ALL `fly` BEATS `hand`: about 75 (35 against 13); in FAILURE (engine) `fly` BEATS `hand`: about 45 (9 against 3 of 12 only); `fly` rated above `hand` in ALL by at least 40 Elo points: about 65.
+* Quadrotor, STANDING: `fly` TIES `hand`: about 70; `mlp` TIES `hand`: about 60 (BEATS about 25); `mlp-v2` IS BELOW `hand`: about 60; the three trained brains pairwise: at least two of the three pairs TIE: about 65.
+* Quadrotor, FAILURE (motor): `fly` BEATS `hand`: about 75; `mlp` BEATS `hand`: about 70; `mlp-v2` BEATS `hand`: about 70.
+* Quadrotor, ALL: `mlp-v2` rated below `hand`: about 55 (its standing deficit is a count of many small losses; its motor-kind gain is 24 fights of 96).
+* Across the two rotorcraft: no cycle of three pilots each beating the next (the transitivity report is empty): about 92; no pair whose significant lead runs against the rating (the upset report is empty): about 80; the rating of every trained pilot within 150 Elo points of `hand`'s in ALL: about 85.
+* The stability: the rating order refit on the first 10 scenarios of each kind equals the full fit's order for the helicopter: about 80, for the quadrotor: about 55.
+
+**What a result would not say.** Anything a mean could not: that a pilot that wins more scenarios is a better pilot in a way that matters (a hundredth of a score is the margin, and it is a choice); that the ranking is a ranking of structures (an MLP and a fruit-fly network are different sizes and trainings); anything about a real helicopter or quadrotor. A league of pilots that fly alone is a way of counting, not a contest; the page will say so on its face.
+
+## 4. Not in this round, said now
+
+A league between hand pilots at different gains; wind or terrain as the unit of a fight; a helicopter MLP (no weights); seats (there are none); any training.
