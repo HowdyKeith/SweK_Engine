@@ -85,6 +85,16 @@ export function reportLines(rd) {
         `  REAL against PLAIN: ${rd.versus.reading} (PLAIN minus REAL ${rd.versus.diff >= 0 ? "+" : ""}${f4(rd.versus.diff)} rad s, se ${f4(rd.versus.se)})`, `BOTTOM LINE: ${rd.bottom}`];
 }
 
+/** True iff two flights agree in score, fingerprint and status (the runner without a kick against subTask.fly). */
+export const sameFlight = (a, b) => a.score === b.score && a.fingerprint === b.fingerprint && a.status === b.status;
+/** Check (1) of the registration: for the first CHECK_DIVES dives the runner without a kick IS subTask.fly. `fa` and `fb` fly a pilot on a dive (a test hands in others). Returns the failures. */
+export const CHECK_DIVES = 4;
+export function runnerFailures(scenarios, fa = (p, sc) => R.fly(p, sc, { seconds: T.SECONDS }), fb = (p, sc) => T.fly(p, sc)) {
+    const failures = [];
+    for (const sc of scenarios.slice(0, CHECK_DIVES)) if (!sameFlight(fa(AS.pilot(), sc), fb(AS.pilot(), sc))) failures.push(`the runner without a kick is not subTask.fly on dive ${sc.seed}`);
+    return failures;
+}
+
 export function command(argv, io = {}) {
     const out = io.out || ((m) => console.log(m)), err = io.err || ((m) => console.error(m)), writeFile = io.writeFile || fs.writeFileSync, sets = io.sets || SETS;
     const o = { set: "dev", seeds: null, write: false, rebuild: false };
@@ -103,7 +113,7 @@ export function command(argv, io = {}) {
     const arms = io.arms || loadArms(), tag = o.set === "registered" ? "the registered read" : "a sanity run of the code, not a result";
     out(`[takeRighting] ${arms.length} pilots, ${scenarios.length} nominal dives (${scenarios[0].seed} to ${scenarios[scenarios.length - 1].seed}), a kick of ${R.RIGHT.kickRate} rad/s at ${R.RIGHT.kickAt} s, both signs, ${scenarios.length * SIGNS.length} kicks a pilot (${tag}); first-order orientation step`);
     const failures = [];
-    for (const sc of scenarios.slice(0, 4)) { const a = R.fly(AS.pilot(), sc, { seconds: T.SECONDS }), b = T.fly(AS.pilot(), sc); if (a.score !== b.score || a.fingerprint !== b.fingerprint || a.status !== b.status) failures.push(`the runner without a kick is not subTask.fly on dive ${sc.seed}`); }
+    failures.push(...runnerFailures(scenarios));
     if (o.rebuild || o.set === "registered") for (const arm of arms) { const c = rebuildCheck(arm); if (c && !c.ok) failures.push(`${c.id} rebuilt from its record misses the recorded score by ${c.diff.toExponential(2)}`); }
     const rows = runArms(arms, scenarios), rd = readingsOf(rows);
     if (rows.length !== arms.length * scenarios.length * SIGNS.length) failures.push("the number of kicks flown is not arms x dives x signs");
