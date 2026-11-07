@@ -19,11 +19,11 @@ export const isCircuitProfile = (profile) => CIRCUIT_PROFILE_NAMES.includes(prof
 let policy = null;
 /** The plain net the champion was trained in (built once). */
 export const plainPolicy = () => policy || (policy = CS.createPlainPolicy(PLAIN_CHAMPION.hidden, "plain"));
-/** The seat of a circuit profile: a function of the dive's context that returns the seat, the shape brain/surveySeat.mjs `surveySeat` gives. An unknown name is refused by name. */
-export function circuitSeat(profile) {
+/** The seat of a circuit profile: a function of the dive's context that returns the seat, the shape brain/surveySeat.mjs `surveySeat` gives. An unknown name is refused by name. `champion` is a seam for the gate (default the generated champion). */
+export function circuitSeat(profile, champion = PLAIN_CHAMPION) {
     if (profile === "rule") return U.tunedSeat(SS.SURVEY_CONSTANTS, U.WIDE_BOUNDS);
     if (profile === "circuit") {
-        const Pol = plainPolicy(), w = Float32Array.from(PLAIN_CHAMPION.weights);
+        const Pol = plainPolicy(), w = Float32Array.from(champion.weights);
         if (w.length !== Pol.WEIGHT_COUNT) throw new Error(`subAquariumCircuit.circuitSeat: the champion has ${w.length} weights and its net takes ${Pol.WEIGHT_COUNT}`);
         return Pol.seatFor(w);
     }
