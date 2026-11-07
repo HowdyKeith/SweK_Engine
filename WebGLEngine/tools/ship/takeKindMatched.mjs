@@ -79,7 +79,7 @@ export function bootDiff(files, rows, { draws = BOOT.draws, seed = BOOT.seed } =
         const hm = dm.map((v) => im.reduce((s, i) => s + v[i], 0) / nm), hx = dx.map((v) => ix.reduce((s, i) => s + v[i], 0) / nx);
         ds.push(RV.sOf(hm, a, strata).s - RV.sOf(hx, a, strata).s);
     }
-    const sorted = ds.slice().sort((p, q) => p - q), at = (q) => sorted[Math.min(draws - 1, Math.floor(q * draws))];
+    const sorted = ds.slice().sort((p, q) => p - q), at = (q) => sorted[Math.floor(q * draws)];
     return { draws, seed, nMatched: nm, nMixed: nx, mean: ds.reduce((s, x) => s + x, 0) / draws, lo: at(0.025), hi: at(0.975), above: ds.filter((x) => x > 0).length / draws };
 }
 const sdOf = (x) => { const m = x.reduce((s, v) => s + v, 0) / x.length; return Math.sqrt(x.reduce((s, v) => s + (v - m) ** 2, 0) / (x.length - 1)); };
