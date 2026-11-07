@@ -78,6 +78,25 @@ node tools\ship\takeCounterfactualCmd.mjs subsets --seed 105
 node tools\ship\takeCounterfactualCmd.mjs fly --seed 105 --kit decoy
 ```
 
+## 2b. Round 7, stage 1 (registered in `brain/PLAIN14_DISTRIBUTION_WIP.md`; the report tool is built, gated and swept): ten fly champions against ten plain 14-50-4 champions
+About 6.5 hours on 4 cores; the loop alternates the arms so a partial run is balanced. Run it from `WebGLEngine\`:
+
+```
+New-Item -ItemType Directory -Force brain\rig-results\plain14 | Out-Null
+foreach ($s in 6310,6320,6330,6340,6350,6360,6370,6380,6390,6400) {
+  node tools\ship\trainPilotSub.mjs --circuit fly --seed $s --workers 4 --dump brain\rig-results\plain14\fly$s.json 2>&1 | Tee-Object brain\rig-results\plain14\flylog$s.txt
+  node tools\ship\trainPilotSub.mjs --circuit plain14 --seed $s --workers 4 --dump brain\rig-results\plain14\plain$s.json 2>&1 | Tee-Object brain\rig-results\plain14\plainlog$s.txt
+}
+```
+
+Then, ONCE, on the machine that made the dumps, when all twenty are in:
+
+```
+node tools\ship\plain14DistributionCmd.mjs report --dir brain\rig-results\plain14
+```
+
+It prints the four checks first (a failure is the first line and the reading is NOT WEIGHED), the twenty champions, the exact rank-sum readings (the safety audit marked READ ON) and the bottom line in the registration's words. With ten against ten, BEATS needs the fly's champions above the plain champions in at least 73 of the 100 pairs.
+
 ## 3. Not here
 
 * **Matched controls for the other seven networks** (`#80`, about 20 searches each): no command is built yet; it needs a registration first.
