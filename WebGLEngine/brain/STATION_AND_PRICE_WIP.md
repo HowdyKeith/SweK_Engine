@@ -62,3 +62,44 @@ The reservoir (only the plain net, the best of last round's three, trains here);
 * The priced family lost two of its four searches to the POOL crush count (2 of 4 not eligible) against the station families' 1 of 8: the price did not stop the pool crushes in training; that is a training-set reading and says nothing about the audit.
 
 **What this does NOT say:** that any champion will beat the rule on the audit (the last round's champions raised their held-out scores too and the audit tied them; `brain/DECISION_CIRCUIT_VS_TWIN_WIP.md` section 11); that the held-out scores are comparable across the priced family and the others beyond the start they share (the priced family's is the PRICED mean; the unpriced one is printed beside it). **Next, per section 5: fly seeds 18001 to 18300 of far and both ONCE, `report` ONCE.**
+
+## 10. RESULT -- the audit, flown once and read once (2026-11-07; `brain/stationRoundAudit.jsonl`, eight lines, sha256 9ac9637c...; `takeStationRoundCmd.mjs fly --workers 4`, 13:36Z to 13:59Z, the first-order orientation step; `report` run once, offline)
+
+**THE CHECKS ALL HELD** (training file; START: the untrained station-large, station-small and plain-priced equal `rule-low06` on 24 baseline dives, scores and fingerprints; MASK: with every readout pushed to +1 the station-only seat's surfacing, cap, pump and repair were the rule's on all 432,000 calls of the 24 dives, the unmasked control differing on all 432,000 and the station on none; KEYS: the same 600 dives in the same order; CHAMPIONS: every arm flown from the champion its file names, `circuit-plain` from the committed digest c916e7f5; SCORES: every score in [0, 1] and every strain a finite number). **CALIBRATION:** `twin-standard` minus `rule-low06` = **+0.0159 (se 0.0025)**, inside the +0.012 to +0.033 the series has read.
+
+**The means (600 dives an arm, far and both, seeds 18001 to 18300):**
+
+| arm | score | priced | bad (crushed, stranded) | strain > 0.92 | strain > 0.95 | largest strain |
+|---|---|---|---|---|---|---|
+| rule-low06 | 0.8120 | 0.8120 | 0 | 1 | 0 | 0.9204 |
+| twin-standard | 0.8279 | 0.8279 | 0 | 1 | 0 | 0.9204 |
+| circuit-plain | 0.8186 | 0.7801 | 1 (1, 0) | **158** | **48** | 1.0000 |
+| station-large | 0.8065 | 0.8065 | 0 | 1 | 0 | 0.9204 |
+| station-small | 0.8106 | 0.8106 | 0 | 0 | 0 | 0.9184 |
+| plain-priced | 0.8195 | 0.8195 | 0 | **0** | **0** | 0.9195 |
+
+**The verdicts (BEATS iff positive, above 2 se and at least 0.02; the mirror for IS BELOW; else TIES):**
+* **R0** `circuit-plain` against `rule-low06`: **+0.0066 (se 0.0034; better 76, worse 46, same 478; bad 1 against 0) TIES.**
+* **S1** `station-large` against `rule-low06`: **-0.0055 (se 0.0026; better 33, worse 51, same 516) TIES.**
+* **S2** `station-large` against `twin-standard`: **-0.0214 (se 0.0031; better 22, worse 98, same 480) IS BELOW.**
+* **S3** `station-large` against `station-small`: **-0.0041 (se 0.0024; better 27, worse 41, same 532) TIES.**
+* **P1** `plain-priced` against `circuit-plain`: **+0.0009 (se 0.0024; better 30, worse 29, same 541; bad 0 against 1) TIES.**
+* **P2** `plain-priced` against `rule-low06`: +0.0075 (se 0.0031; better 76, worse 46, same 478) TIES.
+* **H** (crushed or stranded dives against the rule's 0): circuit-plain 1 NO WORSE, station-large 0, station-small 0, plain-priced 0 NO WORSE (every one).
+
+**THE THREE BOTTOM LINES, as the report printed them:**
+* **STATION: `THE LEARNED STATION CHOICE IS THE RULE`** (S1 -0.0055, S2 -0.0214, S3 -0.0041) -- `MORE DATA CHANGES NOTHING THE SCORE CAN SEE`.
+* **PRICE: `THE PRICE CHANGES NOTHING THE SCORE CAN SEE`** (P1 +0.0009, se 0.0024); dives above a strain of 0.95: **plain-priced 0 against circuit-plain 48 (fewer)**; the hull of plain-priced: NO WORSE (0 crushed or stranded dives against the rule's 0).
+* **REPLICATION: `THE PLAIN NET'S POST HOC GAIN DOES NOT REPLICATE`** (R0 +0.0066, se 0.0034, TIES).
+
+**THE FORECASTS OF SECTION 6, SCORED.** R0 TIES (forecast 80): CAME TRUE. S1 TIES (60): TRUE (BEATS was 12, IS BELOW 28). S2 IS BELOW (70): TRUE. S3 TIES (75): TRUE. P1 TIES (70): TRUE. "The priced pilot's dives above a strain of 0.95 fewer than the unpriced pilot's: about 80 percent": TRUE, and by far more than I pictured (0 against 48). STATION bottom line (4) (55): TRUE. PRICE `CHANGES NOTHING` (65): TRUE. A family with no eligible champion (20 each): none, as written in section 9. **The one forecast that was WRONG is the one section 9 already scored: four of the eight station searches raised the held-out score above the start's 0.8838 (I expected at most one), and the audit then gave the champion of the 40-dive family -0.0055 against the rule: the held-out gain of +0.0075 did not survive.**
+
+**What each bottom line WOULD and WOULD NOT mean (section 2).** STATION: under this recipe on these seeds a station scorer learned on 16 or on 40 dives is not above the rule by the floor, and the planner is above it by 0.0214; it does NOT mean that no station scorer can beat nearest-first (three stations, one net width, one recipe, four searches). The more-data comparison went the wrong way (-0.0041, TIES): 40 dives are not better than 16 for this scorer on these seeds. PRICE: charging for hull strain in the training objective gave a net whose score the audit cannot tell from the unpriced net's (+0.0009), with no dive above a strain of 0.92 (the unpriced net has 158) and no crush (the unpriced net has one); it does NOT mean that this price is the right one (one value was tried) or that the price will help a net that wants to dive deeper. REPLICATION: the plain net's gain over the rule is again positive and again small; it did not clear the floor.
+
+**POST HOC, not registered, read from the rows after the read -- labelled so.**
+* **The plain net's gain, pooled:** R0 is 1.9 se above zero and last round's (+0.0050) was 1.4 se; an inverse-variance pool of the two audits (1,200 dives, different dives) is about **+0.0058 (se 0.0025, 2.4 se)** -- a little above the rule on both audits, by about a third of the floor the series asks of a gain. It is the thing the registration called a post hoc observation, and it stays one.
+* **The price removed the strain without removing the gain:** `plain-priced` is +0.0075 above the rule (2.4 se, under the floor), as `circuit-plain` is +0.0066, and its largest strain is 0.9195 (the rule's 0.9204) against 1.0000. **The unpriced net's small gain did not need its deeper dives** on these seeds (one pair of nets; not a test). The registered expectation that the circuits "gained score partly by diving deeper than the rule ever does" is half-confirmed by the strain counts (158 dives above 0.92 for the unpriced net) and half-contradicted by the score (the net that does not dive deeper scores as much).
+* **The station scorer is net negative, not neutral:** S1 is -2.1 se (under the 0.02 floor, so the registered reading is TIES). The station nets changed the dive on 84 of 600 (33 better, 51 worse) and the 40-dive champion is below the 16-dive champion by 1.7 se. Selecting the best of three on 40 held-out dives picked a net whose held-out lead was luck, as the last round's champions' were.
+* **The hull:** the one crushed dive in the whole audit is `circuit-plain`'s (the rule, the twin and the four other arms crushed or stranded none); 48 of its dives sit above a strain of 0.95.
+
+**Limits, said plainly.** One recipe, one net width, three stations, seeds nobody had looked at (18001-18300, read once); the station nets are the plain relu net only; the price is one value (lambda 0.5, free 0.92); every number is under the first-order orientation step the series was measured in. Nothing in this section changes the survey score or another round's number. **The registration is closed by this section; the next question on this line, if there is one, is a new registration.**
