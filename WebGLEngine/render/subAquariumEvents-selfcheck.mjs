@@ -12,6 +12,7 @@
 //   6  ENDING           ending a surface puts the boat back to wandering (it is below 5 m again within a minute) with no tank state; swapping flood -> surface keeps the dropped weight
 //   8  THE HIGH RIDER  surfacing on the hull with a 25% ballast range floats at its own 0.3 m; a 6% flood on it is trimmed out by the tank with no weight dropped
 //   7  THE REST         an event on one sub leaves the others in the tank bit-identical to a tank where nothing happened; setHull clears every event
+//  15  THE KICK         (2026-11-07) the kick event: a pitch-rate change of 0.3 rad/s, once, before the pilot reads the state, in the sign asked, at the time asked; refusals; ending forgets it; the page's two buttons
 //
 // SABOTAGE LOG -- SEVENTEEN, each applied to render/subAquariumSim.mjs in place, the gate run, the file restored; every one red by name (rows red in brackets):
 //   V1 an unknown event name not refused 1 | V2 ending an event leaves the tank 1 | V3 the leak 0 6 | V4 flood flown with no rescue 4 | V5 the rescue at the flood task's 5 m / 10 m (too late for a 40 m boat in a 50 m tank) 5 | V6 surface flown with the plain pilot 2
@@ -38,6 +39,12 @@
 //   | "returned status" (returned also demands status submerged: a boat that is under 3 m yet not submerged cannot be built from outside) | "hold not surface" (the held boat's speed/depth target already pulls it to the surface with the flag off, 0 RED).
 //   The "needsTank missing" mutant pattern was not found in the file and was dropped; the 5 needsView mutants (list line: survey, done, status, no needs, appended) each go red 1.
 //   FIRST RUN CRASHED: the damage-option row built a snapshot through a stub (mkSnap) that returned null -- it now reads the default tank's own snapshot.
+// SECTION 15 (the kick event, 2026-11-07, added to the shared tank files by Keith's say-so after brain/FISH_RIGHTING_WIP.md section 8), SABOTAGED in isolated trees (a copy of the sim; sha256 of the sim, this gate, the sim gate and the page checked before and after, identical):
+//   18 hand mutants of render/subAquariumSim.mjs (kick missing from EVENTS, KICK.at 4, the kick a tick late, the sign ignored, the kick every tick, `fired` never set, clearing leaving the kick, setEvent keeping the pending kick, any sign accepted, a negative `at` accepted, the snapshot's kick always null, an unknown id throwing,
+//   a kick of 0.6, the kick event given a tank, the default `at` 0, the default sign -1, a refused start leaving the pending kick, the kick applied outside the event) + 75 line mutants of the lines changed: FIRST PASS 17 red, 1 crash, 3 hand and 28 line mutants alive.
+//   THE SURVIVORS WERE: the default sign (kick(id) with no sign was never called), the refusals' wording, setEvent consuming the pending kick (the earlier tests cleared the event first, which cleared it too), a refused start on a STEERED sub leaving the pending kick (no test refused a start), and `sub.event === "kick" &&` in the step, which is
+//   REDUNDANT (sub.kick exists only while the event is kick: setEvent sets it, every other start and clearEvent null it) and was removed rather than kept as an equivalent mutant. 24 of the 28 line survivors are in the snapshot line's older code (needs readings, survey) and in JSDoc numbers: not this change, not counted.
+//   SECOND PASS: the survivors that were this change (3) and the mutants of the changed lines (5), and all the hand mutants again (17): 20 red, 5 crashes, none alive. THE PAGE (sub-aquarium.html), six mutants in place and restored: a button renamed, the nose-up button wired to +1, the nose-down to -1, the sign not passed, the KICK import dropped, the nose-up button not wired: all red by the one page row.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -49,6 +56,8 @@ import * as PSN from "../brain/pilotSubPolicy.mjs";
 
 let fails = 0;
 function ok(name, cond, detail) { console.log(`  ${cond ? "PASS" : "FAIL"}  ${name}${detail ? "   " + detail : ""}`); if (!cond) fails++; }
+const near = (a, b, t = 1e-9) => Math.abs(a - b) <= t;
+const J = JSON.stringify;
 const entry = (id, extra = {}) => ({ id, name: "Sub " + id, hue: 100, pilot: "autopilot", from: "x", local: true, weights: null, ...extra });
 const run = (tank, seconds) => { for (let i = 0; i < Math.round(seconds * 30); i++) tank.step(1 / 30); };
 const one = (id = "a", pre = 40) => { const t = A.createTank(); t.sync([entry(id)]); run(t, pre); return t; };
@@ -70,7 +79,7 @@ console.log("1. OFF BY DEFAULT");
 console.log("\n2. THE CALL");
 {
     const t = one();
-    ok("the names are pinned: flood, sink, surface, dropout, navigator, the two estimators, needs and survey (the compass ones are held by render/compassView-selfcheck.mjs and section 9); the leak is 6%; the rescue blows at 2 m and drops the weight at 4 m", A.EVENTS.join() === "flood,sink,surface,dropout,navigator,fly-estimator,er-estimator,needs,survey" && A.ESTIMATORS.join() === "fly-estimator,er-estimator" && A.LEAK === 0.06 && A.RESCUE.blowDepth === 2 && A.RESCUE.releaseDepth === 4 && Object.isFrozen(A.EVENTS) && Object.isFrozen(A.RESCUE));
+    ok("the names are pinned: flood, sink, surface, dropout, navigator, the two estimators, needs, survey and kick (the compass ones are held by render/compassView-selfcheck.mjs and section 9); the leak is 6%; the rescue blows at 2 m and drops the weight at 4 m", A.EVENTS.join() === "flood,sink,surface,dropout,navigator,fly-estimator,er-estimator,needs,survey,kick" && A.ESTIMATORS.join() === "fly-estimator,er-estimator" && A.LEAK === 0.06 && A.RESCUE.blowDepth === 2 && A.RESCUE.releaseDepth === 4 && Object.isFrozen(A.EVENTS) && Object.isFrozen(A.RESCUE));
     ok("!! setEvent answers the event now running, and the snapshot carries it with a tank at level and air", t.setEvent("a", "flood") === "flood" && snap(t).event === "flood" && snap(t).tank && snap(t).tank.airMax === 1.5 && snap(t).tank.released === false);
     let threw = false; try { t.setEvent("a", "capsize"); } catch (e) { threw = /unknown event "capsize"/.test(e.message); }
     ok("!! an unknown event throws by name and changes nothing (the flood is still running)", threw && snap(t).event === "flood");
@@ -343,6 +352,42 @@ console.log("14. THE SURVEY (v4912, brain/surveySeat.mjs in the tank)");
     const pg = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "sub-aquarium.html"), "utf8");
     ok("!! the page has the survey button and the profile menu (standard, events, wide, ensemble), calls tank.setSurvey(selected, { profile }), and draws the survey's stations on the plan and the side view (amber, green once visited) from the snapshot", /id="surveyBtn"/.test(pg) && /id="surveyProf"/.test(pg) && /value="events"/.test(pg) && /value="wide"/.test(pg) && /value="ensemble"/.test(pg) && /tank\.setSurvey\(selected, \{ profile: \$\("surveyProf"\)\.value \}\)/.test(pg) && /s\.survey && !s\.survey\.finished/.test(pg) && /#5be37d/.test(pg) && /#ffc94d/.test(pg));
     ok("!! the survey stands on the shipped survey seat: the sim calls brain/surveySeat.mjs with the profile and wraps it in needsTask.flyDecision, the planner's constants are the Round 33 ones (low 0.3204), and SS.planOf refuses an unknown profile (the profile menu cannot name one the seat does not have)", /SS\.surveySeat\(/.test(fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "subAquariumSim.mjs"), "utf8")) && /T\.flyDecision\(/.test(fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "subAquariumSim.mjs"), "utf8")) && Math.abs(SS.SURVEY_CONSTANTS.low - 0.3203560726214647) < 1e-12 && /unknown profile/.test(thr(() => SS.planOf("x"))) && T.SECONDS === 600);
+}
+
+
+console.log("\n15. THE KICK EVENT (2026-11-07, brain/FISH_RIGHTING_WIP.md section 8): a change of the pitch rate, once, before the pilot reads the state; the sub flies on with its own pilot and model");
+{
+    const mk = () => { const t = A.createTank(); t.sync([entry("a"), entry("b")]); run(t, 10); return t; };
+    const spy = (t, id) => { const sub = t.subs.get(id), inner = sub.pilot, seen = []; sub.pilot = (s, tg, c) => { seen.push(s.w[1]); return inner(s, tg, c); }; return seen; };
+    const firstDiff = (a, b) => a.findIndex((v, i) => v !== b[i]);
+    const flown = (sign, opt) => { const K = mk(), C = mk(), sk = spy(K, "a"), sc = spy(C, "a"); K.kick("a", sign, opt); run(K, 6); run(C, 6); const d = firstDiff(sk, sc); return { K, C, d, delta: sk[d] - sc[d], same: sk.slice(0, d).every((v, i) => v === sc[i]) }; };
+    ok("!! the exports: EVENTS ends with kick, KICK.at is 3 s and frozen, the tank has kick()", A.EVENTS[A.EVENTS.length - 1] === "kick" && A.KICK.at === 3 && Object.isFrozen(A.KICK) && typeof mk().kick === "function");
+    const t0 = mk(), r0 = t0.kick("a", 1);
+    ok("!! kick answers 'kick', the snapshot says event kick with { sign 1, at 3, fired false }, and the sub has NO tank, no compass, no needs (it keeps its own model and pilot); nothing before the first tick has fired", r0 === "kick" && snap(t0).event === "kick" && J(snap(t0).kick) === '{"sign":1,"at":3,"fired":false}' && snap(t0).tank === null && snap(t0).compass === null && snap(t0).needs === null);
+    const dn = flown(1), up = flown(-1);
+    ok("!! the kick lands on the 92nd tick of the event (the 91st the pilot sees after it started, 3 s of event time): everything before is identical to the bit to a tank where nothing was started, and the pitch rate the PILOT reads on that tick differs from the control's by exactly +0.3 rad/s for sign +1 (nose down) and -0.3 for sign -1 -- the kick is in the state BEFORE the pilot reads it", dn.d === 91 && dn.same && near(dn.delta, 0.3, 1e-12) && up.d === 91 && up.same && near(up.delta, -0.3, 1e-12));
+    const k = mk(); k.kick("a", 1); let flip = -1; for (let i = 0; i < 150 && flip < 0; i++) { k.step(1 / 30); if (snap(k).kick.fired) flip = i + 1; }
+    ok("!! the snapshot's fired is false after 91 steps and true after 92 (and stays true); the pitch falls for a nose-down kick (3 s later it is 0.019 rad below the control's) and rises for a nose-up one", flip === 92 && snap(k).kick.fired === true && (() => { const K = mk(), C = mk(); K.kick("a", 1); run(K, 3.1); run(C, 3.1); const U = mk(); U.kick("a", -1); run(U, 3.1); return near(snap(K).pitch - snap(C).pitch, -0.019335075331932627, 1e-9) && snap(U).pitch > snap(C).pitch; })());
+    const at0 = flown(1, { at: 0 }), at15 = flown(1, { at: 1.5 });
+    ok("!! the `at` option: 0 fires on the first tick (the pilot sees +0.3 on call 0), 1.5 s on call 45, the snapshot carries the `at` asked", at0.d === 0 && near(at0.delta, 0.3, 1e-12) && at15.d === 45 && near(at15.delta, 0.3, 1e-12) && snap(at15.K).kick.at === 1.5);
+    const bad = mk();
+    const thrown = (f) => { try { f(); return ""; } catch (e) { return e.message; } };
+    ok("!! a sign that is not +1 or -1 (0, 2, '1', null), an `at` that is not a finite number of 0 or more (-1, NaN, '3', Infinity) are refused with their message and change nothing (the event stays null); an unknown id returns null", /sign must be \+1/.test(thrown(() => bad.kick("a", 0))) && /sign must be \+1/.test(thrown(() => bad.kick("a", 2))) && /sign must be \+1/.test(thrown(() => bad.kick("a", "1"))) && /sign must be \+1/.test(thrown(() => bad.kick("a", null))) && /at must be a finite number/.test(thrown(() => bad.kick("a", 1, { at: -1 }))) && /at must be a finite number/.test(thrown(() => bad.kick("a", 1, { at: NaN }))) && /at must be a finite number/.test(thrown(() => bad.kick("a", 1, { at: "3" }))) && /at must be a finite number/.test(thrown(() => bad.kick("a", 1, { at: Infinity }))) && snap(bad).event === null && snap(bad).kick === null && bad.kick("zz", 1) === null && (() => { const z = mk(); return z.kick("a", 1, { at: 0 }) === "kick"; })());
+    const sw = mk(); sw.kick("a", -1); sw.setEvent("a", null);
+    ok("!! ending the event forgets the kick (the snapshot's kick is null, the sub flies on with no tank), a plain setEvent('a', 'kick') afterwards is sign +1 at 3 s (the earlier call's sign is not left behind), and a second start fires a second kick", snap(sw).kick === null && snap(sw).event === null && sw.setEvent("a", "kick") === "kick" && J(snap(sw).kick) === '{"sign":1,"at":3,"fired":false}' && (() => { const q = mk(); q.kick("a", 1); run(q, 4); const f1 = snap(q).kick.fired; q.kick("a", -1); const f2 = snap(q).kick; return f1 === true && J(f2) === '{"sign":-1,"at":3,"fired":false}'; })());
+    const dflt = mk(); dflt.kick("a");
+    ok("!! kick with no sign is +1 (nose down); the refusals say what is wanted: 'sign must be +1 (nose down) or -1 (nose up)' and 'at must be a finite number of seconds, 0 or more'", J(snap(dflt).kick) === '{"sign":1,"at":3,"fired":false}' && /sign must be \+1 \(nose down\) or -1 \(nose up\)/.test(thrown(() => mk().kick("a", 5))) && /at must be a finite number of seconds, 0 or more/.test(thrown(() => mk().kick("a", 1, { at: -2 }))));
+    const rs = mk(); rs.kick("a", -1);
+    ok("!! a start consumes the pending kick: kick(-1) and then, with no ending in between, setEvent('a', 'kick') again is a fresh kick of sign +1 at 3 s (the -1 is not used twice)", rs.setEvent("a", "kick") === "kick" && J(snap(rs).kick) === '{"sign":1,"at":3,"fired":false}');
+    {
+        const PSN2 = await import("../brain/pilotSubPolicy.mjs"), W2 = Array.from(Float32Array.from(PSN2.handWeights())), st2 = A.createTank(); st2.sync([entry("net", { weights: W2 })]); run(st2, 5); st2.setSteer("net", 3, 1);
+        const msg = thrown(() => st2.kick("net", -1)); st2.setSteer("net", null);
+        ok("!! a kick on a STEERED sub is refused with the steer's message and leaves nothing behind: after the steer is cleared a plain setEvent('net', 'kick') is sign +1 (the refused -1 is not remembered), and the refused call started no event", /clear the sub's steer first/.test(msg) && snap(st2).event === null && st2.setEvent("net", "kick") === "kick" && J(snap(st2).kick) === '{"sign":1,"at":3,"fired":false}');
+    }
+    const K = mk(), C = mk(); K.kick("a", 1); run(K, 20); run(C, 20);
+    ok("!! a kick on one sub leaves the other sub of the tank bit-identical to a tank where nothing happened", J(snap(K, 1)) === J(snap(C, 1)));
+    const pg = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "sub-aquarium.html"), "utf8"), src = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "subAquariumSim.mjs"), "utf8");
+    ok("!! the page has the two kick buttons (nose down, nose up), imports KICK, and calls tank.kick(selected, sign) with +1 and -1 from them; the sim's kick is subRighting.kickState (one arithmetic for the measurement and the tank)", /id="kickDnBtn"/.test(pg) && /id="kickUpBtn"/.test(pg) && /DEPTH_MAX, KICK \} from "\/render\/subAquariumSim\.mjs"/.test(pg) && /tank\.kick\(selected, sign\)/.test(pg) && /\$\("kickDnBtn"\)\.onclick = \(\) => kickSub\(1\)/.test(pg) && /\$\("kickUpBtn"\)\.onclick = \(\) => kickSub\(-1\)/.test(pg) && /RT\.kickState\(sub\.state, sub\.kick\.sign\)/.test(src) && /import \* as RT from "\.\.\/brain\/subRighting\.mjs"/.test(src));
 }
 
 console.log(fails ? `\n${fails} FAIL` : "\nall checks pass");

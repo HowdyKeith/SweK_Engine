@@ -29,6 +29,7 @@ import * as AV from "../brain/needsAdvisor.mjs";
 import * as T from "../brain/needsTask.mjs";
 import * as SS from "../brain/surveySeat.mjs";
 import * as TN from "../brain/subTankNav.mjs";
+import * as RT from "../brain/subRighting.mjs";   // 2026-11-07 -- the kick event: kickState is the arithmetic brain/FISH_RIGHTING_WIP.md measured
 
 export const LENGTH = 500, WIDTH = 300, MARGIN = 60, DEPTH_MIN = 14, DEPTH_MAX = 40, TRAIL = 80, TRAIL_EVERY = 0.5, MAX_STEP = 0.1;
 const DT = S.DT, wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
@@ -42,7 +43,7 @@ const hash = (str) => { let h = 2166136261; for (let i = 0; i < str.length; i++)
 //   "sink"     the same leak and NO rescue: the autopilot blows its tank to the stop and still sinks to the seabed; the boat is lost and put back (the count shows it)
 //   "surface"  brain/surfacePilot.mjs's wrap with `surface: true` in the target: the boat rises, blows its tank and rides on its buoyancy with the tower out of the water
 // setEvent(id, null) ends it: the leak stops, the tank state goes (the boat is repaired and the weight is back: it is an aquarium), the sub is flown as before. Pure like the rest: no clock but the tank's.
-export const EVENTS = Object.freeze(["flood", "sink", "surface", "dropout", "navigator", "fly-estimator", "er-estimator", "needs", "survey"]);
+export const EVENTS = Object.freeze(["flood", "sink", "surface", "dropout", "navigator", "fly-estimator", "er-estimator", "needs", "survey", "kick"]);
 // THE COMPASS EVENTS (tools/subDropout.mjs and tools/subNavigator.mjs, rung 4a, in the tank): for the event's own clock the compass reports for COMPASS.darkFrom seconds, then stops for COMPASS.darkLen seconds, and repeats every COMPASS.period.
 //   "dropout"    the plain pilot, shown a heading that stays at the last valid one while the compass is dark (a rotated copy of the world: body rates, pitch, depth and speed stay true)
 //   "navigator"  the SAME pilot behind the dead-reckoning navigator: it integrates the vessel's own heading rate through the dark and hands the pilot that estimate. Started on two subs at once the two meet the same windows.
@@ -54,6 +55,11 @@ export const EVENTS = Object.freeze(["flood", "sink", "surface", "dropout", "nav
 //                lowers, a leak that grows with depth and damage). It rides the tank model of the flood events (so it can blow its tank and surface) and flies behind the refill-trip rule over the surfacing pilot: low charge -> up, charged -> back to its task. `setNeeds(id, class, { crushDepth })`
 //                starts it (the tank-scale crush depth is 60 m: the Explorer's 100 m would never be felt in a 50 m tank), `injure(id, amount)` hurts the hull. One event at a time: it does not mix with the flood events or the compass ones.
 // Neither needs a tank: the sub keeps its hull's own model. The snapshot's `compass` says { valid, seen (the heading the pilot is shown, rad), error (seen less true, wrapped, rad) }.
+// THE KICK EVENT (2026-11-07, brain/FISH_RIGHTING_WIP.md section 8, added by Keith's say-so to these shared files): "kick" changes the sub's PITCH RATE once, KICK.at seconds of event time after it starts, by RT.RIGHT.kickRate (0.3 rad/s) in the sign asked
+//   (+1 nose down, -1 nose up -- subRighting.kickState, the arithmetic the righting round measured), BEFORE the pilot reads the state, and then flies on as before: the sub keeps its own pilot and its own model (no tank, no wrap), so what a page sees is the
+//   pilot righting the hull. `kick(id, sign, { at })` starts it (sign defaults to +1); `setEvent(id, "kick")` starts it with sign +1. The snapshot's `kick` says { sign, at, fired } (null with no kick event). Ending the event (null) forgets the kick; a
+//   second start fires a second kick. One event at a time, like the others.
+export const KICK = Object.freeze({ at: 3 });
 export const COMPASS = Object.freeze({ period: 40, darkFrom: 10, darkLen: 16 });
 /** Is the compass reporting at event time t (seconds)? */
 export const compassValidAt = (t) => { const p = ((t % COMPASS.period) + COMPASS.period) % COMPASS.period; return !(p >= COMPASS.darkFrom && p < COMPASS.darkFrom + COMPASS.darkLen); };
@@ -185,7 +191,7 @@ export function createTank({ hull = "nominal", length = LENGTH, width = WIDTH } 
     function clearEvent(sub) {
         if (!sub.event) return;
         if (sub.state && sub.state.tank) { const { tank, ...rest } = sub.state; sub.state = rest; }
-        sub.event = null; sub.eventT = 0; sub.eventModel = null; sub.eventPilot = null; sub.compass = null; sub.needs = null; sub.needsInfo = null; sub.advisor = false; sub.advice = null; sub.survey = null; sub.pendingSurvey = null;
+        sub.event = null; sub.eventT = 0; sub.eventModel = null; sub.eventPilot = null; sub.compass = null; sub.needs = null; sub.needsInfo = null; sub.advisor = false; sub.advice = null; sub.survey = null; sub.pendingSurvey = null; sub.kick = null; sub.pendingKick = null;
     }
     function add(entry) {
         const rng = mulberry(hash(entry.id));
@@ -332,11 +338,23 @@ export function createTank({ hull = "nominal", length = LENGTH, width = WIDTH } 
                 if (!sub.state.tank) { sub.eventModel = withTank(MODEL); sub.state = { ...sub.state, tank: { ...S.initialTank(sub.eventModel), level: sub.cmd ? Math.max(-1, Math.min(1, sub.cmd.ballast)) : 0 } }; }
             } else if (sub.state.tank) { const { tank, ...rest } = sub.state; sub.state = rest; sub.eventModel = MODEL; }   // a compass event has no tank
             else sub.eventModel = MODEL;
+            sub.kick = ev === "kick" ? { sign: sub.pendingKick ? sub.pendingKick.sign : 1, at: sub.pendingKick ? sub.pendingKick.at : KICK.at, fired: false } : null; sub.pendingKick = null;
             sub.event = ev; sub.eventT = 0; sub.holdDepth = -sub.state.pos[2]; sub.compass = null; sub.needsInfo = null; sub.aux = null; sub.advisor = false; sub.advice = null;
             if (ev === "needs" || ev === "survey") { sub.needs = sub.pendingNeeds || N.initialNeeds("battery", { crushDepth: NEEDS_CRUSH }); sub.pendingNeeds = null; } else sub.needs = null;
             sub.survey = null; if (ev === "survey") { sub.survey = sub.pendingSurvey || { stations: surveyStations(hash(String(sub.id)), SURVEY.count, length, width).map((q) => ({ ...q, visited: false })), profile: "standard", gaugeSd: SURVEY.gaugeSd, seconds: SURVEY.seconds, damage0: sub.needs.damage, ticks: 0, done: false, status: "running", score: null, returned: false, stats: null }; sub.surveyResult = null; } sub.pendingSurvey = null;
             sub.eventPilot = ev === "needs" ? needsPilotOf(sub) : ev === "survey" ? surveyPilotOf(sub) : ev === "flood" ? (trimsOut(sub.eventModel) ? sub.pilot : EP.wrap(sub.pilot, RESCUE)) : ev === "surface" ? SP.wrap(sub.pilot, { model: sub.eventModel }) : isCompass(ev) ? compassPilot(sub, ev === "navigator" ? "nav" : ev === "dropout" ? "plain" : ev) : sub.pilot;
             return ev;
+        },
+        /**
+         * Start the KICK event on one sub (see KICK): `sign` +1 (nose down, the default) or -1 (nose up), `at` seconds of event time before the pitch rate is changed once (default KICK.at). A sign that is not +1 or -1, or an `at` that is not a finite number of at least 0, throws and changes nothing;
+         * an unknown id does nothing and returns null; a sub with a steer throws as setEvent does. Returns "kick".
+         */
+        kick(id, sign = 1, { at = KICK.at } = {}) {
+            if (sign !== 1 && sign !== -1) throw new Error(`subAquariumSim.kick: sign must be +1 (nose down) or -1 (nose up), got ${JSON.stringify(sign)}`);
+            if (!Number.isFinite(at) || at < 0) throw new Error(`subAquariumSim.kick: at must be a finite number of seconds, 0 or more, got ${JSON.stringify(at)}`);
+            const sub = subs.get(id); if (!sub) return null;
+            sub.pendingKick = { sign, at };
+            try { return this.setEvent(id, "kick"); } catch (e) { sub.pendingKick = null; throw e; }
         },
         /** Reconcile with the aquarium's list [{ id, name, hue, pilot, from, local, weights }]: new ids join, ids that are gone leave, the ones that stay keep swimming. Returns { added, removed }. */
         sync(list) {
@@ -352,6 +370,7 @@ export function createTank({ hull = "nominal", length = LENGTH, width = WIDTH } 
                 const dt = Math.min(DT, left); left -= dt; clock += dt;
                 for (const sub of subs.values()) {
                     sub.age += dt;
+                    if (sub.kick && !sub.kick.fired && sub.eventT >= sub.kick.at) { sub.state = RT.kickState(sub.state, sub.kick.sign); sub.kick.fired = true; }   // the kick lands before the pilot reads the state
                     const s = sub.state, x = s.pos[0], y = s.pos[1];
                     let t;
                     if (sub.nav) t = sub.tgt = sub.target = sub.nav.step(s, clock, dt);   // a courier: the navigator's target (it brings a sub in from outside the tank by itself)
@@ -387,7 +406,7 @@ export function createTank({ hull = "nominal", length = LENGTH, width = WIDTH } 
         probe(id) { const sub = subs.get(id); return sub ? { id: sub.id, name: sub.name, kind: sub.weights ? "fly" : sub.kindInfo ? sub.kindInfo.circuit : "autopilot", weights: sub.steerW || sub.weights, steer: sub.steer ? { ...sub.steer } : null, state: sub.state, target: sub.tgt || sub.target } : null; },
         /** What a page draws: one plain record per sub. */
         snapshot() {
-            return [...subs.values()].map((sub) => { const a = S.attitude(sub.state); return { hull: hullName, id: sub.id, name: sub.name, hue: sub.hue, pilot: sub.pilotKind, circuit: sub.circuit, kind: sub.kindInfo ? sub.kindInfo.circuit : null, kindError: sub.kindError, from: sub.from, local: sub.local, x: sub.state.pos[0], y: sub.state.pos[1], depth: a.depth, heading: a.heading, pitch: a.pitch, speed: a.speed, cmd: sub.cmd ? { ...sub.cmd } : { pitch: 0, yaw: 0, thrust: 0, ballast: 0 }, event: sub.event, steer: sub.steer ? { ...sub.steer } : null, needs: sub.needs ? { ...N.readings(sub.eventModel, sub.needs, sub.state), pump: sub.aux ? sub.aux.pump : 0, repair: sub.aux ? sub.aux.repair : 0, repairing: !!(sub.aux && sub.aux.repair > 0 && -sub.state.pos[2] <= N.REPAIR.maxDepth && Math.hypot(sub.state.vel[0], sub.state.vel[1], sub.state.vel[2]) <= N.REPAIR.maxSpeed), refilling: !!(sub.eventPilot && sub.eventPilot.refilling), advisor: sub.advisor ? { on: true, ...(sub.advice || { surface: false, pump: false, repair: false, threshold: 0 }) } : { on: false }, watts: sub.needsInfo ? sub.needsInfo.watts : 0, charging: !!(sub.needsInfo && sub.needsInfo.charging) } : null, survey: sub.survey ? surveyRecord(sub.survey, sub.eventT) : sub.surveyResult ? { ...sub.surveyResult, finished: true } : null, compass: sub.compass ? { ...sub.compass } : null, tank: sub.state.tank ? { level: sub.state.tank.level, air: sub.state.tank.air, airMax: sub.eventModel ? sub.eventModel.spec.airMax : null, released: sub.state.tank.released, blowing: !!(sub.cmd && sub.cmd.blow > 0.5) } : null, target: sub.target, nav: sub.nav ? sub.nav.snapshot() : null, lost: sub.lost, status: sub.status, trail: sub.trail.slice() }; });
+            return [...subs.values()].map((sub) => { const a = S.attitude(sub.state); return { hull: hullName, id: sub.id, name: sub.name, hue: sub.hue, pilot: sub.pilotKind, circuit: sub.circuit, kind: sub.kindInfo ? sub.kindInfo.circuit : null, kindError: sub.kindError, from: sub.from, local: sub.local, x: sub.state.pos[0], y: sub.state.pos[1], depth: a.depth, heading: a.heading, pitch: a.pitch, speed: a.speed, cmd: sub.cmd ? { ...sub.cmd } : { pitch: 0, yaw: 0, thrust: 0, ballast: 0 }, event: sub.event, kick: sub.kick ? { sign: sub.kick.sign, at: sub.kick.at, fired: sub.kick.fired } : null, steer: sub.steer ? { ...sub.steer } : null, needs: sub.needs ? { ...N.readings(sub.eventModel, sub.needs, sub.state), pump: sub.aux ? sub.aux.pump : 0, repair: sub.aux ? sub.aux.repair : 0, repairing: !!(sub.aux && sub.aux.repair > 0 && -sub.state.pos[2] <= N.REPAIR.maxDepth && Math.hypot(sub.state.vel[0], sub.state.vel[1], sub.state.vel[2]) <= N.REPAIR.maxSpeed), refilling: !!(sub.eventPilot && sub.eventPilot.refilling), advisor: sub.advisor ? { on: true, ...(sub.advice || { surface: false, pump: false, repair: false, threshold: 0 }) } : { on: false }, watts: sub.needsInfo ? sub.needsInfo.watts : 0, charging: !!(sub.needsInfo && sub.needsInfo.charging) } : null, survey: sub.survey ? surveyRecord(sub.survey, sub.eventT) : sub.surveyResult ? { ...sub.surveyResult, finished: true } : null, compass: sub.compass ? { ...sub.compass } : null, tank: sub.state.tank ? { level: sub.state.tank.level, air: sub.state.tank.air, airMax: sub.eventModel ? sub.eventModel.spec.airMax : null, released: sub.state.tank.released, blowing: !!(sub.cmd && sub.cmd.blow > 0.5) } : null, target: sub.target, nav: sub.nav ? sub.nav.snapshot() : null, lost: sub.lost, status: sub.status, trail: sub.trail.slice() }; });
         },
     };
 }
