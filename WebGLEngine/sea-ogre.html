@@ -43,6 +43,9 @@
   <label>seed <input id="seed" type="number" min="1" max="999" value="2" style="width:64px"></label>
   <label title="The defenders spread on stations across the OGRE's approach (one depth band each, patrolling while they hear nothing), share what they hear over a datalink (a fix from crossing bearings) and the first boat sends out sensor probes (three stationary hydrophones, 150 m ahead, 120 s each)."><input type="checkbox" id="squad" checked> squad (spread, share a fix, probes)</label>
   <label title="How loud the OGRE is, in dB over a boat of the same speed: 10 is the default, lower is harder to find."><input type="checkbox" id="quiet"> quiet OGRE (-15 dB)</label>
+  <label title="Each defender carries 3 decoys: a noisemaker louder than a boat (130 dB), left drifting for 40 s, which the OGRE's torpedo prefers. The defender releases one when it hears a torpedo at 22 dB or more. The numbers are chosen, not measured (brain/SUB_COUNTERMEASURES_WIP.md)."><input type="checkbox" id="cmDecoy"> decoys</label>
+  <label title="Each defender carries 2 bubble screens: a 20 m, 20 dB curtain left for 30 s. In the registered read it changed nothing."><input type="checkbox" id="cmScreen"> screens</label>
+  <label title="Each defender carries 2 anti-torpedo interceptors: a 9 m/s torpedo for 20 s that listens for the OGRE's torpedoes. The replay does not draw them."><input type="checkbox" id="cmInterceptor"> interceptors</label>
   <button id="watchBtn">Watch</button>
   <button id="runBtn" title="Fly seeds 1..12 with this roster and tally the outcomes">Run 12 seeds</button>
   <span id="msg" class="note"></span>
@@ -60,6 +63,7 @@
 <script type="module">
 import * as G from "/brain/seaOgre.mjs";
 import * as T from "/brain/subTournament.mjs";
+import * as C from "/brain/subCountermeasures.mjs";
 import { roster } from "/render/subTournamentView.mjs";
 import { frameAt, boundsOf, drawLevel, verdictLine } from "/render/seaOgreView.mjs";
 import { createSeaOgre3d, cameraChoices } from "/render/seaOgre3d.mjs";
@@ -82,6 +86,8 @@ function slots() {
 }
 const picked = () => [...$("slots").querySelectorAll("select")].map((s) => sides.find((x) => x.id === s.value));
 const tick = () => new Promise((r) => setTimeout(r, 0));
+const kit = () => ({ decoy: $("cmDecoy").checked, screen: $("cmScreen").checked, interceptor: $("cmInterceptor").checked });
+const defenders = (pick) => { const en = kit(), has = C.carries(C.kitOf(en)); return pick.map((s) => { const sd = s.side.side(); return has ? { ...sd, tactics: C.withCountermeasures(sd.tactics, C.CM.tactician, en), cm: C.kitOf(en) } : sd; }); };
 const opts = () => ({ squad: $("squad").checked ? { probes: [0] } : null, start: $("quiet").checked ? { loud: -15 } : {} });
 function remake3d(n) {
   const cv3 = $("view3d"); if (sea3d) { sea3d.dispose(); sea3d = null; }
@@ -92,16 +98,16 @@ function remake3d(n) {
 async function watch() {
   if (busy) return; const pick = picked(), n = pick.length, sc = G.scenario(Math.max(1, Number($("seed").value) || 1), n), tr = [];
   $("msg").textContent = "flying the fight ..."; await tick();
-  const r = G.fight(pick.map((s) => s.side.side()), sc, { trace: tr, ...opts() });
+  const r = G.fight(defenders(pick), sc, { trace: tr, ...opts() });
   trace = tr; bounds = boundsOf(tr); remake3d(pick.length); clock = 0; names = pick.map((s, i) => s.id + (pick.filter((q) => q.id === s.id).length > 1 ? "#" + (i + 1) : ""));
   $("msg").textContent = ""; $("verdict").textContent = verdictLine(r, names);
 }
 async function run() {
-  if (busy) return; busy = true; $("runBtn").disabled = $("watchBtn").disabled = true; const pick = picked(), n = pick.length, o = { defended: 0, breached: 0, holdout: 0 }, rows = []; let sum = 0, lost = 0;
-  for (let s = 1; s <= 12; s++) { $("msg").textContent = `seed ${s} of 12`; await tick(); const r = G.fight(pick.map((q) => q.side.side()), G.scenario(s, n), opts()); o[r.outcome]++; sum += r.score; lost += r.lost; rows.push(r); }
+  if (busy) return; busy = true; $("runBtn").disabled = $("watchBtn").disabled = true; const pick = picked(), n = pick.length, o = { defended: 0, breached: 0, holdout: 0 }, rows = []; let sum = 0, lost = 0, rel = { decoysReleased: 0, screensReleased: 0, interceptorsLaunched: 0, decoyed: 0, intercepted: 0 };
+  for (let s = 1; s <= 12; s++) { $("msg").textContent = `seed ${s} of 12`; await tick(); const r = G.fight(defenders(pick), G.scenario(s, n), opts()); o[r.outcome]++; sum += r.score; lost += r.lost; rows.push(r); if (r.cm) for (const k of Object.keys(rel)) rel[k] += r.cm[k] || 0; }
   const t = document.createElement("table"), h = document.createElement("tr"); for (const c of ["seed", "outcome", "time s", "hull left", "HQ", "boats lost", "score"]) { const th = document.createElement("th"); th.textContent = c; h.appendChild(th); } t.appendChild(h);
   rows.forEach((r, i) => { const tr = document.createElement("tr"); for (const c of [i + 1, r.outcome, (r.ticks / 30).toFixed(0), Math.round(r.hull), Math.round(r.hq), r.lost, r.score.toFixed(2)]) { const td = document.createElement("td"); td.textContent = c; if (c === "defended") td.className = "win"; if (c === "breached") td.className = "lose"; tr.appendChild(td); } t.appendChild(tr); });
-  const box = $("tally"); box.textContent = ""; const p = document.createElement("p"); p.className = "note"; p.textContent = `defended ${o.defended}, breached ${o.breached}, holdout ${o.holdout}; mean score ${(sum / 12).toFixed(2)}; ${lost} boats lost in 12 fights`; box.append(p, t);
+  const box = $("tally"); box.textContent = ""; const p = document.createElement("p"); p.className = "note"; p.textContent = `defended ${o.defended}, breached ${o.breached}, holdout ${o.holdout}; mean score ${(sum / 12).toFixed(2)}; ${lost} boats lost in 12 fights` + (C.carries(C.kitOf(kit())) ? `; countermeasures released ${rel.decoysReleased} decoys, ${rel.screensReleased} screens, ${rel.interceptorsLaunched} interceptors; ${rel.decoyed} torpedoes decoyed, ${rel.intercepted} intercepted` : ""); box.append(p, t);
   $("msg").textContent = ""; busy = false; $("runBtn").disabled = $("watchBtn").disabled = false;
 }
 const cv = $("replay"), g = cv.getContext("2d");
