@@ -333,7 +333,10 @@ export const SECTIONS = [
               // the OTHER half of this shelf's note -- an opt-in install button, fetched onto your machine, never in
               // the zip -- because System Tools, where install and rig pages live, is at MAX_PER_PANEL (15 of 15)
               // and this shelf is its own sub-drawer. Nine of fifteen.
-              "install-fsr-caches.html"] },
+              "install-fsr-caches.html",
+              // privatelm.html JOINS (2026-11-07, Keith: "add this to swek-engine, either use features, or at least have an install button"): an install page for orailnoor/cross-platform-llm-client (MIT), which this engine did not write; it also
+              // talks to the OpenAI-compatible server the app can run on a phone. Ten of fifteen.
+              "privatelm.html"] },
 
     // *** v4321 -- "Voxel & Render" IS TWO DRAWERS WEARING ONE NAME, AND THE AMPERSAND WAS THE TELL. ***
     // Keith: "let's separate Voxel & Render into a Voxels button and a Renders button." A label with an "&" in

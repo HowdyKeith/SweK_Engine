@@ -1,7 +1,7 @@
 {
  "version": 1,
  "generated": "derived by tools/ship/buildPageIndex.mjs -- DO NOT HAND-EDIT, the group comes from tools/ship/pageSections.mjs",
- "count": 500,
+ "count": 501,
  "pages": [
   {
    "f": "AudioLab.html",
@@ -2353,6 +2353,13 @@
    "t": "Primitive: a picture in a few dozen shapes",
    "d": "Approximates any image with coloured triangles, rectangles and ellipses, one at a time. The colour of each shape is never searched for -- it is solved in closed form, the exact least-squares answer -- and each candidate is scored only over the pixels it covers, which is what makes it fast enough to watch. Drop in your own picture.",
    "g": "renders",
+   "p": 0
+  },
+  {
+   "f": "privatelm.html",
+   "t": "PrivateLM",
+   "d": "Install PrivateLM (a phone app that runs language models on the phone) and use it from the engine: check the phone, chat with it, or make it the engine's local OpenAI-compatible brain.",
+   "g": "thirdparty",
    "p": 0
   },
   {

@@ -21,7 +21,7 @@
   }
  },
  "counts": {
-  "page": 500,
+  "page": 501,
   "demo": 49,
   "builtin": 38
  },
@@ -2712,6 +2712,14 @@
    "display": "Primitive Paint",
    "href": "/primitive-paint.html",
    "section": "Renders",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "privatelm.html",
+   "display": "Privatelm",
+   "href": "/privatelm.html",
+   "section": "Opt-in: somebody else's work",
    "collision": false
   },
   {
