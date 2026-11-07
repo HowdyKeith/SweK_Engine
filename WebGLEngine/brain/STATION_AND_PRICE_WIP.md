@@ -41,3 +41,24 @@ R0: TIES about 80 percent, BEATS 10, IS BELOW 10. S1: TIES about 60, IS BELOW 28
 
 ## 8. Not in this round
 The reservoir (only the plain net, the best of last round's three, trains here); more than one value of the price; a change to the survey score itself; the wiring controls; the other conditions; the aquarium profile (its own item, below, after this round); Scenario 105 and the counterfactual re-flights (their own notes).
+
+## 9. BUILT, SWEPT AND TRAINED -- THE LEDGER, WRITTEN AND COMMITTED BEFORE THE AUDIT IS FLOWN (2026-11-07; `brain/stationRoundTraining.jsonl`, 12 lines, sha256 cc179c37...; `node tools/ship/trainStationCmd.mjs run --specs all --workers 4`, 11:44Z to 13:35Z with other jobs on the box)
+
+**Built, in the order of section 7, each gated and swept in isolated trees (the logs are in the gates' headers):** `brain/stationSeat.mjs` (gate 40-odd rows, 50 mutants, 2 equivalents), `tools/ship/trainStation.mjs` (+ `trainStationCmd.mjs`; gate 33 rows, 222 mutants, 1 equivalent), `tools/ship/takeStationRound.mjs` (+ `takeStationRoundCmd.mjs`; gate 102 rows, 397 mutants, 6 equivalents and one timeout argued). The sweep of the audit module had a false start (262 mutants crashed because I added files to the shared tree while a pass was running; they were re-run on a fresh tree) and one change to the module after the second pass (a `fam` seam in `startRows`); both are in the gate's header. **Nothing of the audit has been flown.** A DEV smoke of the whole command (seeds 1 and 2, 60 s dives, a throwaway training file, two worker processes) ran end to end and the report labelled itself NOT THE REGISTERED BLOCK.
+
+**The recipe was the registered one** (4 searches x 300 children, sigma 0.3, 1 to 4 weights a child, prune budget 60); every family started from the rule (held-out 0.8838, pool crushed 0 -- the START check holds on the records).
+
+| family (training set) | k0 | k1 | k2 | k3 | champion (digest) |
+|---|---|---|---|---|---|
+| station-large (TRAIN_SET, 40 dives; start train 0.8894) | 0.8838 | 0.8856 | **0.8913** | 0.8631 (pool crushed 1: NOT ELIGIBLE) | k 2, seed 98102 (3079e794); 3 of 4 eligible |
+| station-small (TRAIN_SMALL, 16 dives; start train 0.8687) | **0.8875** | 0.8875 | 0.8762 | 0.8819 | k 0 (tie with k 1, the lower k), seed 98110 (adc0f039); 4 of 4 eligible |
+| plain-priced (TRAIN_SMALL, the PRICED fitness; start train 0.8687) | 0.8939 (pool crushed 1: NOT ELIGIBLE; unpriced 0.8968) | 0.8389 (pool crushed 2: NOT ELIGIBLE; unpriced 0.8513) | **0.8894** (unpriced 0.8894) | 0.8783 (unpriced 0.8800) | k 2, seed 96522 (3e0ed772); 2 of 4 eligible |
+
+(Held-out scores; the start is 0.8838 for all three families. The champion rule is the decision-circuit round's: eligible = crushed in no more pool runs than the start, the best held-out, ties to the lower k.) The kept-weight counts are 94 to 466 of 503 to 610 moved for the searches that were eligible (k 0 of station-large kept 4); the readout rows of the four masked outputs are inert, as registered.
+
+**SCORED AGAINST SECTION 6, where the ledger already decides something.**
+* **"Whether any station search raises HELD-OUT above the start (0.8838); I expect at most one of the eight does": WRONG. Four of the eight station searches do** (station-large k1 and k2; station-small k0 and k1), and two more of the four priced ones (k0, not eligible, and k2). On the training sets' own readings the learned station scorers did raise the held-out score; whether that survives the audit is what section 5 asks.
+* "A family with NO eligible champion: about 20 percent each": none was without one (all three have a champion), consistent with the 80 percent side.
+* The priced family lost two of its four searches to the POOL crush count (2 of 4 not eligible) against the station families' 1 of 8: the price did not stop the pool crushes in training; that is a training-set reading and says nothing about the audit.
+
+**What this does NOT say:** that any champion will beat the rule on the audit (the last round's champions raised their held-out scores too and the audit tied them; `brain/DECISION_CIRCUIT_VS_TWIN_WIP.md` section 11); that the held-out scores are comparable across the priced family and the others beyond the start they share (the priced family's is the PRICED mean; the unpriced one is printed beside it). **Next, per section 5: fly seeds 18001 to 18300 of far and both ONCE, `report` ONCE.**
