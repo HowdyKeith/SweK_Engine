@@ -46,3 +46,6 @@ New files: `tools/ship/headToHead9.mjs`, `headToHead9Cmd.mjs`, `headToHead9-self
 
 ## H10 build (2026-11-06)
 New files: `tools/ship/headToHead10.mjs`, `headToHead10Cmd.mjs`, `headToHead10-selfcheck.mjs` (gate about 36 s: it runs several real 40-iteration searches, so it is OVER the quick sweep's 3 s line and wants a timing and a stated-runtime header; mutation log in its header: 132 mutants, 120 red first pass, 7 rows added, 5 declared equivalent). REGISTERED in `brain/HEAD_TO_HEAD.md`; training (40 searches) and the flight are NOT run: rig commands in the session; training writes `brain/rig-results/head-to-head10-training.jsonl`, fly writes `head-to-head10.json` and needs `head-to-head7-training.jsonl`.
+
+## H10 result (2026-11-07)
+Trained and flown on the rig; result in `brain/HEAD_TO_HEAD.md` (Round H10, RESULT): THE CORE IS NOT NEEDED FOR THE GAIN (frozen +0.0570 against base +0.0781, 1.94 se). Data: `brain/rig-results/head-to-head10-training.jsonl` (40 records) and `head-to-head10.json`. H6 to H10 are done. Parked still: decision-circuit-vs-twin, fish righting/tank kind, matched controls for the other seven networks (less pressing after H7: the seed spread is known), a wider-hidden-layer frozen-core arm, more replicates for H10.
