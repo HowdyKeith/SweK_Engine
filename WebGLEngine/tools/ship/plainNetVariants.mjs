@@ -10,6 +10,7 @@
 // THE READING: (a) HOLDS iff both families read NOT SUPPORTED overall and each keeps at least 90 percent of REAL's gain on at least two audits in at least three cells; (b) BREAKS FOR a family iff it reads SUPPORTED or MIXED; (c) otherwise NOT EXTENDED, with the clause.
 // Pure apart from the files it reads and the processes it starts. No clock, no Math.random.
 "use strict";
+import "../../physics/mechanics/rigidBody6dofEuler.mjs";   // 2026-11-07 -- the first round's records (plainNetStudy.jsonl, the REAL circuits it quotes) were measured under the first-order orientation step; the variants are read against them, so they fly it too (found when the run was already started under the RK4 default: see brain/PLAIN_NET_VARIANTS_WIP.md, Amendment A of 2026-11-07)
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
