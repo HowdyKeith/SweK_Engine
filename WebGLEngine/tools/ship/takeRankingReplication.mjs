@@ -57,7 +57,7 @@ export function championsBig(rows) {
 }
 
 // ---- the report ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-const f4 = (x) => (Number.isFinite(x) ? x.toFixed(4) : String(x)), f3 = (x) => (Number.isFinite(x) ? x.toFixed(3) : String(x)), sg = (x) => (x.toFixed(4) === "-0.0000" ? "+0.0000" : (x >= 0 ? "+" : "") + x.toFixed(4)), fp = (p) => (p < 0.001 ? p.toExponential(1) : p.toFixed(4));
+const f4 = (x) => (Number.isFinite(x) ? x.toFixed(4) : String(x)), sg = (x) => (x.toFixed(4) === "-0.0000" ? "+0.0000" : (x >= 0 ? "+" : "") + x.toFixed(4)), fp = (p) => (p < 0.001 ? p.toExponential(1) : p.toFixed(4));
 const slopeLine = (o) => (o.slope === null ? "slope not defined" : `slope ${o.slope.toFixed(3)} (se ${o.se.toFixed(3)}), intercept ${sg(o.intercept)}`);
 /** THE REPORT: the checks first (a failure is the first line and the verdicts are NOT WEIGHED), the table, Q1 to Q6, the two bottom lines. `opts`: draws and seed of the Monte Carlo, round1 (readAudit's result of round 1's file). Returns the lines. */
 export function report(files, searches, opts = {}) {
