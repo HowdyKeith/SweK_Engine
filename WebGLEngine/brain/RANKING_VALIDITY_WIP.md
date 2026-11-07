@@ -30,3 +30,6 @@ Seeds **19001 to 19600** of the kinds **far and both** (1,200 dives an arm, 25 a
 
 ## 6. Not in this round
 Any new training; the third audit of `circuit-plain` against the rule on its own block (round 2, registered separately and flown on seeds 20001 to 20600); the other seven sub networks; anything on the rig.
+
+## 7. ERRATUM (2026-11-07, BEFORE ANY ARM WAS FLOWN ON THE BLOCK; found by the DEV smoke of the report on seeds 1 to 4)
+Section 2 says the exact test counts "2!x3!x2!x3!x4!x2! = 3,456 arrangements". **The product is 6,912** (2 x 6 x 2 x 6 x 24 x 2); I multiplied wrongly. Nothing else in section 2 depended on it: the p-values quoted there (S >= 8 is 0.0483, S >= 6 is 0.1212, S = 14 is 1 in 3,456) were computed by enumerating the permutations (the count of arrangements with S = 14 is 2 of 6,912, which is 1 in 3,456), and the report prints `exact over 6912 arrangements`. The reading rules, the forecasts and the block are unchanged.
