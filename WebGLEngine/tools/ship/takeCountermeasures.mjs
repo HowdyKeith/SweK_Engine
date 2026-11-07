@@ -55,6 +55,22 @@ export function ogreRuns(seeds, n = 3) {
     }
     return { runs, stats };
 }
+/** The checks of arena A (a failure and the readings are NOT WEIGHED): `selfEdge` is the edge of a side without countermeasures against itself (it must be exactly 0), `results` the four kits' matchups ({ fights, stats }). Returns the failures, [] for none. */
+export function duelChecks(selfEdge, results) {
+    const failures = [];
+    if (selfEdge !== 0) failures.push(`a side without countermeasures against itself has an edge of ${selfEdge} (it must be exactly 0)`);
+    if (Object.values(results).some((r) => r.fights.some((f) => !Number.isFinite(f.sx) || !Number.isFinite(f.sy)))) failures.push("a duel has a non-finite score");
+    const fires = { decoy: results.decoy.stats.decoysReleased, screen: results.screen.stats.screensReleased, interceptor: results.interceptor.stats.interceptorsLaunched };
+    for (const k of Object.keys(fires)) if (!(fires[k] > 0)) failures.push(`the ${k} matchup released nothing (a read of nothing)`);
+    return failures;
+}
+/** The checks of arena B: `R` is what ogreRuns returned. Returns the failures, [] for none. */
+export function ogreChecks(R) {
+    const failures = [];
+    if ([...R.runs.base, ...R.runs.cm].some((r) => !Number.isFinite(r.score))) failures.push("a fight has a non-finite score");
+    if (!(R.stats.decoysReleased + R.stats.screensReleased + R.stats.interceptorsLaunched > 0)) failures.push("the defenders released nothing (a read of nothing)");
+    return failures;
+}
 const f4 = (x) => `${x >= 0 ? "+" : ""}${x.toFixed(4)}`;
 
 export function command(argv, io = {}) {
@@ -76,11 +92,7 @@ export function command(argv, io = {}) {
         const geos = T.geometries(sz(sets[o.set].duel), sets[o.set].duel.first), none = sideOf("none"), self = duelMatchup(none, sideOf("none2"), geos);
         out(`ARENA A (duel): ${o.set.toUpperCase()} geometries ${geos[0].seed} to ${geos[geos.length - 1].seed}, ${geos.length * 2} duels a matchup (${tag})`);
         const results = {}; for (const k of Object.keys(KITS)) results[k] = duelMatchup(sideOf(k, KITS[k]), none, geos);
-        const failures = [];
-        if (self.summary.edge !== 0) failures.push(`a side without countermeasures against itself has an edge of ${self.summary.edge} (it must be exactly 0)`);
-        if (Object.values(results).some((r) => r.fights.some((f) => !Number.isFinite(f.sx) || !Number.isFinite(f.sy)))) failures.push("a duel has a non-finite score");
-        const fires = { decoy: results.decoy.stats.decoysReleased, screen: results.screen.stats.screensReleased, interceptor: results.interceptor.stats.interceptorsLaunched };
-        for (const k of Object.keys(fires)) if (!(fires[k] > 0)) failures.push(`the ${k} matchup released nothing (a read of nothing)`);
+        const failures = (io.checks && io.checks.duel || duelChecks)(self.summary.edge, results);
         if (failures.length) for (const f of failures) out(`CHECK FAILED -- the readings below are NOT WEIGHED: ${f}`); else out("checks: the self edge is exactly 0, no score is non-finite, each mechanism fired in its matchup");
         for (const k of Object.keys(KITS)) {
             const r = results[k], s = r.summary;
@@ -91,10 +103,8 @@ export function command(argv, io = {}) {
         out("");
     }
     if (o.arena !== "duel") {
-        const sc = sets[o.set].ogre, seeds = Array.from({ length: sz(sc) }, (_, i) => sc.first + i), R = ogreRuns(seeds), failures = [];
+        const sc = sets[o.set].ogre, seeds = Array.from({ length: sz(sc) }, (_, i) => sc.first + i), R = ogreRuns(seeds), failures = (io.checks && io.checks.ogre || ogreChecks)(R);
         out(`ARENA B (the Sea OGRE): ${o.set.toUpperCase()} scenarios ${seeds[0]} to ${seeds[seeds.length - 1]}, three defenders with GUNNER_THETA, with and without all three countermeasures (${tag})`);
-        if ([...R.runs.base, ...R.runs.cm].some((r) => !Number.isFinite(r.score))) failures.push("a fight has a non-finite score");
-        if (!(R.stats.decoysReleased + R.stats.screensReleased + R.stats.interceptorsLaunched > 0)) failures.push("the defenders released nothing (a read of nothing)");
         if (failures.length) for (const f of failures) out(`CHECK FAILED -- the readings below are NOT WEIGHED: ${f}`); else out("checks: no score is non-finite, the defenders released countermeasures");
         const p = B.paired(R.runs.cm, R.runs.base), count = (arm, k) => R.runs[arm].filter((r) => r.outcome === k).length, lostOf = (arm) => R.runs[arm].reduce((a, r) => a + r.lost, 0);
         out(`  with all three against without: ${B.readingOf(p)} (${f4(p.mean)}, se ${p.se.toFixed(4)}; better ${p.better}, worse ${p.worse}, same ${p.same}, of ${p.n}); defended ${count("cm", "defended")} against ${count("base", "defended")}, breached ${count("cm", "breached")} against ${count("base", "breached")}, holdout ${count("cm", "holdout")} against ${count("base", "holdout")}; defenders lost ${lostOf("cm")} against ${lostOf("base")}; the OGRE fired ${R.runs.cm.reduce((a, r) => a + r.ogreFired, 0)} and ${R.runs.base.reduce((a, r) => a + r.ogreFired, 0)} torpedoes; released ${R.stats.decoysReleased} decoys ${R.stats.screensReleased} screens ${R.stats.interceptorsLaunched} interceptors; ${R.stats.decoyed} decoyed, ${R.stats.intercepted} intercepted`);
