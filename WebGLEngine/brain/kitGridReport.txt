@@ -1,0 +1,44 @@
+THE KIT GRID (brain/KIT_GRID_WIP.md; POST HOC: the pair of every scenario was read before): the eight subsets of the kit on 12 Sea OGRE scenarios (3 defenders)
+  PASS SCENARIOS: 12 scenarios, seeds 101 to 112, once each
+  PASS SUBSETS: eight subsets in every scenario, in the order none, decoy, screen, interceptor, decoy+screen, decoy+interceptor, screen+interceptor, decoy+screen+interceptor
+  PASS ENDS: the empty kit repeats run B and the full kit run K in every scenario (by fingerprint)
+  PASS DETERMINISM: scenario 105's eight rows are the table of brain/COUNTERFACTUAL_WIP.md section 7 (outcomes and scores)
+  PASS SCORES: every score is a number
+the scores, one row a scenario (outcome, score, defenders lost for each subset in the order none, decoy, screen, interceptor, decoy+screen, decoy+interceptor, screen+interceptor, decoy+screen+interceptor):
+  101: h0.418/2 d2.195/0 h0.418/2 h0.568/1 d2.184/0 d2.180/0 b-0.265/1 d2.180/0
+  102: d2.333/0 d2.333/0 d2.333/0 d2.333/0 d2.333/0 d2.333/0 d2.333/0 d2.333/0
+  103: d2.346/0 d2.346/0 d2.346/0 d2.346/0 d2.346/0 d2.346/0 d2.346/0 d2.346/0
+  104: d2.364/0 d2.364/0 d2.364/0 d2.364/0 d2.364/0 d2.364/0 d2.364/0 d2.364/0
+  105: d1.702/3 b-0.167/0 b-0.467/2 b-0.467/2 b-0.317/1 b-0.317/1 b-0.317/1 b-0.317/1
+  106: d2.344/0 d2.344/0 d2.344/0 d2.344/0 d2.344/0 d2.344/0 d2.344/0 d2.344/0
+  107: d2.329/0 d2.329/0 d2.329/0 d2.329/0 d2.329/0 d2.329/0 d2.329/0 d2.329/0
+  108: b-0.327/2 d2.168/0 b-0.327/2 b-0.327/2 d2.010/1 d2.193/0 d2.232/0 d2.149/0
+  109: d2.343/0 d2.343/0 d2.343/0 d2.343/0 d2.343/0 d2.343/0 d2.343/0 d2.343/0
+  110: d2.331/0 d2.331/0 d2.331/0 d2.331/0 d2.331/0 d2.331/0 d2.331/0 d2.331/0
+  111: d2.363/0 d2.363/0 d2.363/0 d2.363/0 d2.363/0 d2.363/0 d2.363/0 d2.363/0
+  112: b-0.500/3 b-0.050/0 b-0.500/3 b-0.200/1 b-0.050/0 b-0.050/0 b-0.200/1 b-0.050/0
+Q1 pooled, each non-empty subset against the empty kit (score difference over the scenarios):
+  decoy                      +0.2378 (se 0.3065); better 3, worse 1, same 8: TIES
+  screen                     -0.1807 (se 0.1807); better 0, worse 1, same 11: TIES
+  interceptor                -0.1432 (se 0.1861); better 2, worse 1, same 9: TIES
+  decoy+screen               +0.2112 (se 0.3056); better 3, worse 1, same 8: TIES
+  decoy+interceptor          +0.2261 (se 0.3153); better 3, worse 1, same 8: TIES
+  screen+interceptor         +0.0131 (se 0.2911); better 2, worse 2, same 8: TIES
+  decoy+screen+interceptor   +0.2225 (se 0.3129); better 3, worse 1, same 8: TIES
+Q2 in how many scenarios each subset's fight (outcome, defenders lost, score) is the full kit's, and the empty kit's:
+  decoy                      the full kit's in 9 of 12; the empty kit's in 8 of 12
+  screen                     the full kit's in 8 of 12; the empty kit's in 11 of 12
+  interceptor                the full kit's in 8 of 12; the empty kit's in 9 of 12
+  decoy+screen               the full kit's in 10 of 12; the empty kit's in 8 of 12
+  decoy+interceptor          the full kit's in 10 of 12; the empty kit's in 8 of 12
+  screen+interceptor         the full kit's in 9 of 12; the empty kit's in 8 of 12
+  decoy+screen+interceptor   the full kit's in 12 of 12; the empty kit's in 8 of 12
+  the subset that matches the full kit most often, the full kit excluded: decoy+screen, decoy+interceptor (10 of 12)
+Q3 all seven non-empty subsets below the empty kit in 1 scenario(s): 105; at least one below in 2: 101, 105; at least one above in 3: 101, 108, 112
+Q4 the first divergence from the empty kit, over 84 (scenario, subset) fights: intercepted 48, decoyed 10, a different hit 4, a loss 0, a different fire 0, something else 0, none 22; divergent 62
+  fights that never diverge, per subset: decoy 7, screen 8, interceptor 0, decoy+screen 7, decoy+interceptor 0, screen+interceptor 0, decoy+screen+interceptor 0
+BOTTOM LINE: NO SUBSET BEATS THE EMPTY KIT; NO SUBSET IS BELOW IT (the series' reading over 12 scenarios; the pattern of 105 is in 1 scenario(s))
+
+real	0m14.624s
+user	0m19.190s
+sys	0m0.302s
