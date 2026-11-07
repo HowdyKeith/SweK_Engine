@@ -94,3 +94,11 @@ Rig commands added:
 node tools/ship/trainSubVestibularCmd.mjs run --specs wiringPermutations --out brain/rig-results/fishVestibularGen2.jsonl --workers 4   # ~21 core-hours; resumes Addendum 12's file
 node tools/ship/trainSubVestibularCmd.mjs report --in brain/rig-results/fishVestibularGen2.jsonl
 ```
+
+## Added 2026-11-07 (items 62 and 82 of the session's list)
+| item | state |
+|---|---|
+| `demo-fish-righting` (measurement) | **DONE and read** (`brain/FISH_RIGHTING_WIP.md`): after a 0.3 rad/s pitch kick the 8 stateless vestibular circuits and the 16 plain nets (fitted to 4b-P) bring the nose back about 10 and 13 percent faster over the first 5 s than the autopilot, and tie each other; the committed 803-weight fish pilot ties the autopilot. `NETS RIGHT FASTER, AND THE FISH WIRING IS NOT WHAT DID IT`. Library `brain/subRighting.mjs`, command `tools/ship/takeRighting.mjs`, both gated and sabotaged. |
+| `demo-fish-righting` (the tank event and the page) | **NOT DONE; a hand-off, needs the shared files:** add `"kick"` to `EVENTS` in `render/subAquariumSim.mjs` with `subRighting.kickState`'s arithmetic, and a button on `sub-aquarium.html`. |
+| `fly-plain-net-variants` (item 62) | **Running in the sandbox from 2026-11-07 03:29Z** (4 workers, resumable, `brain/plainNetVariants.jsonl`); read once when whole. It now flies the first-order orientation step (Amendment A of `brain/PLAIN_NET_VARIANTS_WIP.md`): the first round's records were measured before the RK4 default. |
+
