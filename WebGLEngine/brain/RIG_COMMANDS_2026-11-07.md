@@ -22,7 +22,7 @@ cd WebGLEngine
 git log -1 --oneline
 ```
 
-`git log -1` must name a commit at or after the one the sandbox last pushed (it says so in the message that goes with this file). Every command below is run from `WebGLEngine\`.
+`git log -1` must name a commit at or after the one the sandbox last pushed (the final report of the session names it; any later commit on the branch also has everything below). Every command below is run from `WebGLEngine\`.
 
 ## 1. CPU work, one after another (no eyes needed; do not run beside a GPU look)
 
@@ -81,7 +81,7 @@ node tools\ship\takeCounterfactualCmd.mjs fly --seed 105 --kit decoy
 ## 3. Not here
 
 * **Matched controls for the other seven networks** (`#80`, about 20 searches each): no command is built yet; it needs a registration first.
-* **The station-and-price round** (`brain/STATION_AND_PRICE_WIP.md`) is being trained and audited in the sandbox, not on the rig.
+* **The station-and-price round** (`brain/STATION_AND_PRICE_WIP.md`) was trained, audited and read in the sandbox (RESULT in its section 10); nothing of it is owed on the rig.
 * **The one verify** (`Clone -> verify` of main's tip, `brain/RIG_SESSION_OWED_WIP.md` step 2) is the GitHub panel's button, not a command here.
 * **Any Decider round:** held by the owner.
 
