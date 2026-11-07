@@ -30,6 +30,7 @@ import * as T from "../brain/needsTask.mjs";
 import * as SS from "../brain/surveySeat.mjs";
 import * as TN from "../brain/subTankNav.mjs";
 import * as RT from "../brain/subRighting.mjs";   // 2026-11-07 -- the kick event: kickState is the arithmetic brain/FISH_RIGHTING_WIP.md measured
+import * as CP from "./subAquariumCircuit.mjs";   // 2026-11-07 -- the decision circuit as a survey profile (rule, circuit): render/subAquariumCircuit.mjs
 
 export const LENGTH = 500, WIDTH = 300, MARGIN = 60, DEPTH_MIN = 14, DEPTH_MAX = 40, TRAIL = 80, TRAIL_EVERY = 0.5, MAX_STEP = 0.1;
 const DT = S.DT, wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
@@ -159,7 +160,7 @@ export function createTank({ hull = "nominal", length = LENGTH, width = WIDTH } 
     /** v4912 -- the survey event's pilot: the survey seat (brain/surveySeat.mjs) behind needsTask's decision wrapper, shown what the task shows a seat (the stations with their visited flags, the needs readings through the task's noisy gauge). After the survey it holds the surface. */
     function surveyPilotOf(sub) {
         const sv = sub.survey, model = sub.eventModel, read = () => N.readings(model, sub.needs, sub.state);
-        const seat = SS.surveySeat({ profile: sv.profile, overrides: sv.seconds !== T.SECONDS ? { seconds: sv.seconds } : {} });
+        const seat = CP.isCircuitProfile(sv.profile) ? CP.circuitSeat(sv.profile) : SS.surveySeat({ profile: sv.profile, overrides: sv.seconds !== T.SECONDS ? { seconds: sv.seconds } : {} });
         const flown = T.flyDecision((c) => { const sx = seat(c); sv.stats = sx.stats; return sx; })({ model, read }), hold = SP.wrap(sub.pilot, { model });
         const gaugeFn = sv.gaugeSd > 0 ? T.gaugeOf({ seed: hash(sub.id), kind: "far" }, { sd: sv.gaugeSd, hz: T.GAUGE.hz }, DT) : null;
         return (st, tg, cur, aux) => {
@@ -234,13 +235,13 @@ export function createTank({ hull = "nominal", length = LENGTH, width = WIDTH } 
             sub.pendingNeeds = n; try { return this.setEvent(id, "needs"); } catch (e) { sub.pendingNeeds = null; throw e; }
         },
         /**
-         * v4912 -- start the SURVEY event on a sub: a battery hull (the class the planner models) with a charge, the survey seat (brain/surveySeat.mjs, `profile`: standard, events, wide or ensemble) choosing the order of the stations. `opts`: stations
+         * v4912 -- start the SURVEY event on a sub: a battery hull (the class the planner models) with a charge, the survey seat (brain/surveySeat.mjs, `profile`: standard, events, wide or ensemble; or, from render/subAquariumCircuit.mjs, rule or circuit -- the tuned rule and the decision circuit's champion, which fly the task's own 600 s survey) choosing the order of the stations. `opts`: stations
          * ([{ x, y, depth }, ...], 1 to SURVEY.maxStations; default surveyStations(seed, count)), seed (default the sub's id), count (default 3), profile (default standard), charge (fraction of the battery, default 0.6), damage (0..0.8, default 0), gaugeSd (the charge
          * gauge's noise, default 0.1 as measured; 0 reads it exactly), seconds (default 600; a test may shorten it), crushDepth (default NEEDS_CRUSH). A bad option throws and changes nothing; an unknown id answers null; a sub with a steer is refused (see setEvent).
          */
         setSurvey(id, opts = {}) {
             const o = opts || {}, profile = o.profile === undefined ? "standard" : o.profile, charge = o.charge === undefined ? SURVEY.charge : o.charge, damage = o.damage === undefined ? 0 : o.damage, gaugeSd = o.gaugeSd === undefined ? SURVEY.gaugeSd : o.gaugeSd, seconds = o.seconds === undefined ? SURVEY.seconds : o.seconds;
-            SS.planOf(profile);   // throws on an unknown profile before anything changes
+            if (CP.isCircuitProfile(profile)) { if (seconds !== T.SECONDS) throw new Error(`subAquariumSim.setSurvey: the ${profile} profile is the needs task's own seat and flies its ${T.SECONDS} s survey; got ${seconds} s`); } else SS.planOf(profile);   // throws on an unknown profile before anything changes
             if (!(charge > 0 && charge <= 1)) throw new Error(`subAquariumSim.setSurvey: the charge must be in (0, 1], got ${charge}`);
             if (!(damage >= 0 && damage <= 0.8)) throw new Error(`subAquariumSim.setSurvey: the damage must be in [0, 0.8], got ${damage}`);
             if (!(gaugeSd >= 0 && Number.isFinite(gaugeSd))) throw new Error(`subAquariumSim.setSurvey: the gauge noise must be a number from 0, got ${gaugeSd}`);
