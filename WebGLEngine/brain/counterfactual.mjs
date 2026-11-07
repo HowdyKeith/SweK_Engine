@@ -115,18 +115,18 @@ export function readingOf(m, checksHeld = true) {
 }
 
 // ---- the pipeline checks (Q1): a CHECK of the engine, not a finding -------------------------------------------------------------------------------------------------------------------------------------
-/** The failures of the pipeline on `seeds`: the empty kit must repeat run B and the full kit run K, a re-flight must be deterministic, the new facts must continue the numbering without changing the pair's, and a request must round-trip through its line. */
-export function pipelineChecks(seeds, fly = A.flyPair) {
+/** The failures of the pipeline on `seeds` (the last argument is a seam for the gate: the fight, the answer, the reader and the facts generator): the empty kit must repeat run B and the full kit run K, a re-flight must be deterministic, the new facts must continue the numbering without changing the pair's, and a request must round-trip through its line. */
+export function pipelineChecks(seeds, fly = A.flyPair, { fly1 = flyKit, answer = answerRequest, read = readRequest, factsOf = A.factsOf } = {}) {
     const f = [];
     for (const seed of seeds) {
-        const pair = fly(seed), facts = A.factsOf(pair), none = flyKit(seed, []), all = flyKit(seed, [...KIT_NAMES]), again = flyKit(seed, ["decoy", "screen"]), twice = flyKit(seed, ["decoy", "screen"]);
+        const pair = fly(seed), facts = factsOf(pair), none = fly1(seed, []), all = fly1(seed, [...KIT_NAMES]), again = fly1(seed, ["decoy", "screen"]), twice = fly1(seed, ["decoy", "screen"]);
         if (none.fingerprint !== pair.base.fingerprint) f.push(`seed ${seed}: the empty kit does not repeat run B (fingerprints ${none.fingerprint} and ${pair.base.fingerprint})`);
         if (all.fingerprint !== pair.kit.fingerprint) f.push(`seed ${seed}: the full kit does not repeat run K (fingerprints ${all.fingerprint} and ${pair.kit.fingerprint})`);
         if (again.fingerprint !== twice.fingerprint) f.push(`seed ${seed}: a re-flight flown twice gives two fights (fingerprints ${again.fingerprint} and ${twice.fingerprint})`);
-        const a = answerRequest(pair, facts, { seed, kit: ["decoy", "screen"] }), ids = a.facts.map((x) => x.id);
+        const a = answer(pair, facts, { seed, kit: ["decoy", "screen"] }), ids = a.facts.map((x) => x.id);
         if (ids.some((id, i) => id !== "F" + (facts.length + i + 1))) f.push(`seed ${seed}: the re-flight's facts are not numbered on from F${facts.length + 1}`);
-        if (JSON.stringify(A.factsOf(pair)) !== JSON.stringify(facts)) f.push(`seed ${seed}: the pair's facts changed`);
-        const back = readRequest(requestLine(seed, ["screen", "decoy"]), seed);
+        if (JSON.stringify(factsOf(pair)) !== JSON.stringify(facts)) f.push(`seed ${seed}: the pair's facts changed`);
+        const back = read(requestLine(seed, ["screen", "decoy"]), seed);
         if (!back.ok || back.request.seed !== seed || back.request.kit.join() !== "decoy,screen") f.push(`seed ${seed}: a request does not round-trip through its line`);
     }
     return f;

@@ -72,9 +72,9 @@ export function flyArm(armId, training, last, { range = RANGE, kinds = KINDS, se
 }
 const rule = () => T.flyDecision(U.tunedSeat(SV.SURVEY_CONSTANTS, U.WIDE_BOUNDS));
 const startDives = () => START_KINDS.flatMap((kind) => Array.from({ length: START_SEEDS.to - START_SEEDS.from + 1 }, (_, i) => ({ kind, seed: START_SEEDS.from + i })));
-/** The START rows: the untrained station-large, station-small and plain-priced pilots against rule-low06 on 24 baseline dives (seeds 501-506 of the four kinds, the noisy gauge): score and fingerprint of each. */
-export function startRows(seconds = null) {
-    const ruleP = rule(), fam = Object.fromEntries(TS.FAMILIES.map((f) => [f, TS.familyPolicy(f)])), rows = [];
+/** The START rows: the untrained station-large, station-small and plain-priced pilots against rule-low06 on 24 baseline dives (seeds 501-506 of the four kinds, the noisy gauge): score and fingerprint of each. `fam` is the families' policies (a seam for the gate). */
+export function startRows(seconds = null, fam = Object.fromEntries(TS.FAMILIES.map((f) => [f, TS.familyPolicy(f)]))) {
+    const ruleP = rule(), rows = [];
     for (const { kind, seed } of startDives()) {
         const c = T.scenario(seed, kind), o = { gauge: T.GAUGE, ...(seconds ? { seconds } : {}) }, one = (p) => { const r = T.fly(p, c, o); return { score: r.score, fingerprint: r.fingerprint }; };
         rows.push({ key: `${kind}:${seed}`, rule: one(ruleP), ...Object.fromEntries(TS.FAMILIES.map((f) => [f, one(fam[f].pilotFor(fam[f].handWeights()))])) });

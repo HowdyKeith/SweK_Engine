@@ -11,7 +11,10 @@
 //   5  REPORT         the pipeline checks first (a failure is the first line and the proposals are NOT WEIGHED), the transcript checks, then per model VALID, the refusals by reason, the repeats and fresh outcomes, the kits asked for, one line per valid request, and the bottom line at each of its three readings.
 // NOT CHECKED, said plainly: a real model (owed); the real network (the fake server stands in; the loopback measurement of takeAfterAction applies to the same client and is not repeated).
 //
-// SABOTAGE LOG: see the end of this header once the pass has been run.
+// SABOTAGE LOG (2026-11-07), tools/ship/takeCounterfactual.mjs -- 176 mutants: 164 mechanical (every comparison, sign, arithmetic operator, constant +-1 and boolean of every code line, one at a time) and 12 by hand (the transcript kind not checked, propose asking the after-action prompt, the subsets summary counting the non-negative, the delta taken against the last subset, fly naming the kit in typed order, a transcript of another model accepted, a failed reply recorded, the pipeline failures not weighed,
+// the reading ignoring a failed check, the key written to the header, propose not resuming, two files of one model accepted), each applied to an isolated tree and this gate run; the file restored (sha256 identical before and after).
+//   FIRST PASS: 119 red, 42 threw, 15 went 0 red -- none of the 12 hand mutants among them. THE FIFTEEN were shapes tested and not contents: the tolerance of the table (a delta of exactly 1e-9 read as ABOVE or BELOW), the REGISTERED header (only the DEV header had been read: the arithmetic of 'scenarios 101 to 112' was never run), 'TRANSCRIPTS whole' (the checks line had been tested for the pipeline half only), the `failed` flag of reportLines (the command prints the lines and never reads it),
+//   the seam of `subsets` (every test of it had used the real fights) and the runtime's own `fetch` (every test had passed one). Rows were written for each. SECOND PASS: the 15 re-run against the new gate: 15 red. None remains.
 "use strict";
 import * as A from "../../brain/afterAction.mjs";
 import * as CF from "../../brain/counterfactual.mjs";
@@ -124,6 +127,23 @@ sec("5. REPORT");
     ok("!! transcriptChecks wants a counterfactual-transcript header (an after-action header is named), then the replies of the set; the header builder carries kind, schema, model, params, set and the id asked for", J(X.transcriptChecks({ ...hd, kind: "afterAction-transcript" }, [], [])) === J(["the header is not a counterfactual-transcript"]) && X.transcriptChecks(null, [], []).length >= 1 && tc.length >= 1 && hd.kind === "counterfactual-transcript" && hd.schema === 1 && hd.model === "m" && hd.set === "dev" && hd.requested === "asked" && hd.params.temperature === 0);
     const real = mem({ "t.jsonl": file }); delete real.io.pipeline; real.io.fly = A.flyPair;
     ok("!! the DEFAULT pipeline seam is the real pipeline checks (on real pairs: a transcript of synthetic pairs is not of them, so the transcript check fails by key while the pipeline check holds: exactly one kind of failure)", await (async () => { const c = await X.command(["report", "--in", "t.jsonl"], real.io); return c === 0 && real.out.some((l) => /checks: PIPELINE ok/.test(l)) && real.out.some((l) => /^CHECK FAILED -- TRANSCRIPT/.test(l)) && !real.out.some((l) => /^CHECK FAILED -- PIPELINE/.test(l)); })());
+}
+
+{
+    // 2026-11-07, the survivors of the first sweep: the tolerance of the table, the registered header, the seam of `subsets`, the global fetch, the flag `failed`
+    const row = (name, delta) => ({ kit: name === "none" ? [] : [name], name, run: { outcome: "defended", score: 1, lost: 0 }, repeats: null, divergence: null, decoyed: 0, intercepted: 0, delta });
+    const tl = X.subsetLines({ seed: 9, rows: [row("none", 0), row("decoy", 1e-9), row("screen", -1e-9), row("interceptor", 1.1e-9), row("decoy+screen", -1.1e-9)] });
+    ok("!! the table's tolerance is exactly 1e-9: a delta of +1e-9 or -1e-9 is EQUAL, +1.1e-9 is ABOVE and -1.1e-9 is BELOW, and only the BELOW one is counted in the summary", / against none: EQUAL$/.test(tl[2]) && / against none: EQUAL$/.test(tl[3]) && / against none: ABOVE$/.test(tl[4]) && / against none: BELOW$/.test(tl[5]) && tl[tl.length - 1] === "  1 of the 7 non-empty subsets score BELOW the empty kit: decoy+screen");
+    const mR = mem(), sR = server({ script: (p) => CF.requestLine(p.seed, ["decoy"]) }); await X.command(["propose", "--base", "10.0.0.5:8080", "--model", "asked-model", "--set", "registered", "--out", "t.jsonl"], { ...mR.io, fetch: sR.f });
+    const rR = mem({ "t.jsonl": mR.files["t.jsonl"] }); await X.command(["report", "--in", "t.jsonl"], rR.io);
+    ok("!! a registered-set report names the registered scenarios (101 to 112, twelve pairs, no 'DEV' and no 'not the registered read'), says the transcripts are whole, and reads VALID 1.000 (12 of 12)", sR.log.requests.length === 12 && rR.out[0] === "THE COUNTERFACTUAL RE-FLIGHTS: 12 pairs of the Sea OGRE (scenarios 101 to 112), 1 model(s)" && / TRANSCRIPTS whole$/.test(rR.out[1]) && rR.out.some((l) => /VALID 1\.000 \(12 of 12\)/.test(l)));
+    const dv = X.reportLines([{ name: "t", header: JSON.parse(mR.files["t.jsonl"].split("\n")[0]), entries: [] }], DEV, "dev", () => []), okR = X.reportLines([], DEV, "dev", () => []), badR = X.reportLines([], DEV, "dev", () => ["boom"]);
+    ok("!! reportLines says `failed`: false when the pipeline holds and the transcripts are whole (no transcript at all included), true when the pipeline fails and when a transcript is not whole; the dev header says DEV scenarios 1 to 4 and that it is not the registered read", okR.failed === false && badR.failed === true && dv.failed === true && okR.lines.some((l) => l === "THE COUNTERFACTUAL RE-FLIGHTS: 4 pairs of the Sea OGRE (DEV scenarios 1 to 4 -- prompt development, NOT the registered read), 0 model(s)"));
+    const mS = mem(); await X.command(["subsets", "--seed", "5"], mS.io);
+    ok("!! `subsets` flies the pair through the seam it is given: with the synthetic pair of seed 5 (fingerprints that no real fight has) even the empty kit reads 'a new fight' and not 'repeats run B'", mS.out.length === 10 && / a new fight /.test(mS.out[1]) && !mS.out.some((l) => /repeats run/.test(l)));
+    const mG = mem(), sG = server(), saved = globalThis.fetch; globalThis.fetch = sG.f; let cG;
+    try { cG = await X.command(["propose", "--base", "10.0.0.5:8080", "--key", "sekret", "--model", "asked-model", "--set", "dev", "--out", "t.jsonl"], mG.io); } finally { globalThis.fetch = saved; }
+    ok("!! with no `fetch` in the seam the command uses the runtime's own: a global fetch (here the fake server) is used and the run is whole", cG === 0 && sG.log.requests.length === 4 && mG.files["t.jsonl"].trim().split("\n").length === 5);
 }
 
 console.log(fails ? `\n${fails} FAIL` : "\nall checks pass");

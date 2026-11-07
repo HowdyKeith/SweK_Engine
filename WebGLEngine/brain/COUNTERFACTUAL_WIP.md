@@ -31,3 +31,26 @@ VALID >= 0.9: about 35 percent; 0.5 to 0.9: about 40; under 0.5: about 25 (a sma
 
 ## 6. Not in this round
 A model deciding anything in a fight; a model's text used as a judge of a result; the narration checker extended to the new C facts (the engine states them, the model does not narrate them here); the duel arena's pairs; any scenario other than the sets above; why 105 went the way it did beyond which subsets do (that would be a separate, registered question).
+
+## 7. BUILT AND READ (2026-11-07; sections 1 to 6 are unchanged)
+
+**Built, in the order of section 2, each gated and swept in isolated trees (the logs are in the gates' headers):** `brain/counterfactual.mjs` (gate 40 rows; 132 mutants, 1 equivalent argued), `tools/ship/takeCounterfactual.mjs` and `tools/ship/takeCounterfactualCmd.mjs` (gate 28 rows; 176 mutants, none alive). **The model run (Q2) is OWED on the owner's side**: `takeCounterfactualCmd.mjs propose` with `--set dev` first, then `--set registered` once, then `report` (the commands are in `brain/RIG_COMMANDS_2026-11-07.md`). Q1 (the pipeline) is a check the report runs on every seed of the set it reads; on the dev seeds 1 to 4 and on 105 it holds (the empty kit repeats run B and the full kit run K, a re-flight is deterministic, the new facts are numbered on, a request round-trips); it has not been run on the twelve registered seeds, that is the first line of the owed report.
+
+**Q3, SCENARIO 105, POST HOC (`takeCounterfactualCmd.mjs subsets --seed 105`; engine only; read after the registration was committed, ea7cdaef).**
+
+| kit | outcome | score | lost | first divergence from the empty kit |
+|---|---|---|---|---|
+| none (run B) | defended | 1.702 | 3 | (the reference) |
+| decoy | breached | -0.167 | 0 | tick 2986, a hit in none, a decoyed torpedo here |
+| screen | breached | -0.467 | 2 | tick 3050, a hit in both (a different one) |
+| interceptor | breached | -0.467 | 2 | tick 2293, a hit in none, an intercepted torpedo here |
+| decoy+screen | breached | -0.317 | 1 | tick 2873, a hit in none, a decoyed torpedo here |
+| decoy+interceptor | breached | -0.317 | 1 | tick 2285, a hit in none, an intercepted torpedo here |
+| screen+interceptor | breached | -0.317 | 1 | tick 2291, a hit in none, an intercepted torpedo here |
+| all three (run K) | breached | -0.317 | 1 | tick 2279, a hit in none, an intercepted torpedo here |
+
+**EVERY NON-EMPTY SUBSET SCORES BELOW THE EMPTY KIT on this scenario (7 of 7), and every one of them is breached: it is not one countermeasure that turns 105, it is any of them.** The OGRE fires three torpedoes at ticks 1500, 1798 and 2218 in the three timelines read (none, the decoy alone, all three); without a kit they sink two defenders (ticks 3050 and 3321) and the third boat fires six times, hits six times and brings the OGRE's hull to 0 at tick 6270 (all three defenders lost, defended, 1.702). With any kit the torpedoes are decoyed or intercepted, 0 to 2 boats are lost, the defenders fire 17 times (the decoy alone), land 8 hits, and the OGRE reaches 60 m of the headquarters at tick 7085 with 50.2 of its hull left in all four kit runs read (83 percent of it gone), breached. **What the table does NOT say, said plainly: WHY.** The first divergence is the kit saving a torpedo's target (or, for the screen alone, a different hit); what the fight does after that was not traced here, and the same hull remainder in four different kit fights is a number I did not explain. A reading of WHICH, not of why.
+
+**The forecasts of section 5, scored.** (1) "Of the seven non-empty subsets the number below the empty kit: 1 to 3 about 55, 4 to 7 about 25, none but the full kit about 15, none at all about 5": the result is 7 of 7, the 25 percent branch; I gave the full-kit-only branch 15 and the 1-to-3 branch 55 and both were wrong. (2) "The interceptor is in the worst subset, about 55 percent": TRUE, tied (the screen alone and the interceptor alone both score -0.467). (3) "The decoy alone beats the empty kit, about 55 percent; the screen alone, about 45": BOTH FALSE (the decoy alone scores -0.167 against 1.702). (4) "The first divergence is a countermeasure-caused event rather than a loss, about 70 percent": TRUE in all seven (a hit replaced by a decoyed or intercepted torpedo in six, a different hit in the seventh, never a loss).
+
+**One scenario is one scenario.** This is Scenario 105 under eight kits. The registered sets' other three turning scenarios (101, 108 and 112 turned for the better) were not re-flown under the subsets; whether the kit helps there through one countermeasure or any is a question for the same command, not answered here.

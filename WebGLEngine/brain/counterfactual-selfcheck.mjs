@@ -14,7 +14,11 @@
 //   9  THE PIPELINE the checks pass on the dev seeds 1 and 2 and fail by their words when the pair does not match the re-flight.
 // NOT CHECKED, said plainly: that a model can write a REQUEST line (that is the owed run); that the twelve registered pairs pass the pipeline checks (the command's report runs them).
 //
-// SABOTAGE LOG: see the end of this header once the pass has been run.
+// SABOTAGE LOG (2026-11-07), brain/counterfactual.mjs -- 132 mutants: 112 mechanical (every comparison, sign, arithmetic operator, constant +-1 and boolean of every code line, one at a time) and 20 by hand (two REQUEST lines not refused, the word boundary of REQUEST dropped, extra keys accepted, a decimal seed accepted, a kit name twice accepted, another seed accepted, the kit returned as written, the empty kit flown as an all-false subset, the labels of a repeat swapped, the divergence taken
+// against run K, the new facts numbered from the pair's last, a repeat also counted as fresh, VALID at exactly 0.9 refused, the ask losing its last sentence, the kit names joined with a comma, the full kit missing from the subsets, a request answered for another seed, the loss facts dropped, hits on the OGRE and on the defenders swapped, no blank line before the ask), each applied to an isolated tree and this gate run; the file restored (sha256 be2138d6... identical before and after the first pass; the seams of `pipelineChecks` were added between the passes: 9f2e5737... from there, and this gate was run whole on it).
+//   FIRST PASS: 102 red, 20 threw, 10 went 0 red. THE TEN: (a) the three checks of `pipelineChecks` that cannot fail on honest code -- the determinism of a re-flight, the numbering of the new facts and the round trip of a request -- were never made to fail (the real functions are right), so a mutant inside them was invisible: `pipelineChecks` now takes the fight, the answer, the reader and the facts generator as seams, and the gate makes each misbehave in turn (a fingerprint that changes between two flights, facts numbered
+//   one late, only the second or third wrong, all one late, a pair whose facts change, a refused request, the wrong seed, the kit in the wrong order, a name missing) and pins the words of each failure; (b) the `fresh` count was compared as a SUM over four controlled pairs, so two wrong comparisons cancelled (one pair counted fresh that should not be, another not counted that should): each pair is now read alone; (c) the empty kit flown as an all-false subset (below).
+//   SECOND PASS: the 10 survivors and the one mutant of the new seam line, re-run: 10 red (one by a throw), then the last two (P0086 and P0087, the `fresh` comparisons) after the per-pair rows: red. 1 REMAINS AND IS EQUIVALENT, argued: the empty kit flown as `enabledOf([])` (every countermeasure false) instead of as no kit at all -- the tactician's wrapper with nothing enabled releases nothing and the fight has run B's fingerprint on dev seeds 1 and 2 and Scenario 105, so the gate cannot tell them apart; the report's pipeline check runs the same comparison on every seed of the set it reads (twelve registered pairs), where a difference would be named.
 "use strict";
 import * as A from "./afterAction.mjs";
 import * as CF from "./counterfactual.mjs";
@@ -135,6 +139,13 @@ sec("8. THE MEASURES");
     const rd = (share) => CF.readingOf({ share });
     ok("!! the bottom line at the edges: 0.9 and above CAN, 0.5 to under 0.9 SOMETIMES, under 0.5 CANNOT; 0.8999 is SOMETIMES, 0.4999 CANNOT; a pipeline that failed its checks is not weighed whatever the share", rd(1) === "THE MODEL CAN ASK FOR A RE-FLIGHT" && rd(0.9) === "THE MODEL CAN ASK FOR A RE-FLIGHT" && rd(0.8999) === "THE MODEL SOMETIMES ASKS FOR A VALID RE-FLIGHT" && rd(0.5) === "THE MODEL SOMETIMES ASKS FOR A VALID RE-FLIGHT" && rd(0.4999) === "THE MODEL CANNOT ASK FOR A RE-FLIGHT IN THE FORMAT" && rd(0) === "THE MODEL CANNOT ASK FOR A RE-FLIGHT IN THE FORMAT" && CF.readingOf({ share: 1 }, false) === "THE PIPELINE IS BROKEN: THE PROPOSALS ARE NOT WEIGHED");
     void pair; void facts;
+    // controlled pairs: the outcomes and fingerprints of the shown runs are set by hand, the re-flight (seed 1, the decoy alone) is the real fight
+    const rr = CF.flyKit(1, ["decoy"]), stubPair = (bf, bo, ko) => ({ seed: 1, base: { fingerprint: bf, outcome: bo, events: [] }, kit: { fingerprint: "zk", outcome: ko, events: [] } });
+    const S = (p) => ({ seed: 1, pair: p, facts: [], reply: 'REQUEST {"seed": 1, "kit": ["decoy"]}' });
+    const one = (p) => CF.measuresOf([S(p)]), per = [one(stubPair("zb", "AAA", "BBB")), one(stubPair("zb", rr.outcome, "BBB")), one(stubPair("zb", "AAA", rr.outcome)), one(stubPair(rr.fingerprint, "AAA", "BBB"))];
+    const c4 = CF.measuresOf([S(stubPair("zb", "AAA", "BBB")), S(stubPair("zb", rr.outcome, "BBB")), S(stubPair("zb", "AAA", rr.outcome)), S(stubPair(rr.fingerprint, "AAA", "BBB"))]);
+    ok("!! `fresh` counts a valid request whose fight is NEW and whose outcome is neither shown run's: of four controlled pairs the first (new fight, new outcome) is fresh, the second (the base's outcome) and the third (the kit's outcome) are not, and the fourth (the same fingerprint as run B: a repeat, though its outcome is new to both shown outcomes) is a repeat and NOT fresh: n 4, valid 4, repeats 1, fresh 1 (and each of the four read ALONE gives its own answer, so that two wrong comparisons cannot cancel in a sum)", c4.n === 4 && c4.valid === 4 && c4.repeats === 1 && c4.fresh === 1 && J(per.map((m) => m.fresh)) === J([1, 0, 0, 0]) && J(per.map((m) => m.repeats)) === J([0, 0, 0, 1]) && rr.outcome !== "AAA" && rr.outcome !== "BBB");
+    ok("!! the kit asked for is counted once for each valid request (four requests for the decoy alone: decoy 4)", J(c4.kits) === J({ decoy: 4 }));
 }
 
 sec("9. THE PIPELINE CHECKS");
@@ -145,6 +156,25 @@ sec("9. THE PIPELINE CHECKS");
     ok("!! a pair whose run B is not what the empty kit flies is reported by its words, with the seed and both fingerprints; the same for run K; and neither mentions the other", fb.some((x) => /^seed 1: the empty kit does not repeat run B \(fingerprints [0-9a-f]+ and other\)$/.test(x)) && !fb.some((x) => /full kit/.test(x)) && fk.some((x) => /^seed 1: the full kit does not repeat run K \(fingerprints [0-9a-f]+ and other\)$/.test(x)) && !fk.some((x) => /empty kit/.test(x)));
     const w = CF.pipelineChecks([1, 2], (s) => (s === 2 ? wrapB(s) : A.flyPair(s)));
     ok("!! the checks run over every seed given: a fault in seed 2 only is reported for seed 2 only", w.length >= 1 && w.every((x) => /^seed 2:/.test(x)));
+}
+
+{
+    // the engine checks are exercised by hand: the fights are memoised (they are deterministic) and each seam is made to misbehave in turn
+    const flyM = new Map(), flyP = (seed) => { if (!flyM.has(seed)) flyM.set(seed, A.flyPair(seed)); return flyM.get(seed); };
+    const kitM = new Map(), flyK = (seed, kit) => { const k = seed + kit.join(); if (!kitM.has(k)) kitM.set(k, CF.flyKit(seed, kit)); return kitM.get(k); };
+    const base = { fly1: flyK }, n1 = A.factsOf(flyP(1)).length;
+    ok("!! with honest seams the checks pass", CF.pipelineChecks([1], flyP, base).length === 0);
+    let c = 0; const twice = CF.pipelineChecks([1], flyP, { ...base, fly1: (seed, kit) => { const r = flyK(seed, kit); return kit.length === 2 ? { ...r, fingerprint: r.fingerprint + (c++ % 2) } : r; } });
+    ok("!! a re-flight that is not deterministic (the same request flown twice gives two fingerprints) is reported by its words with both fingerprints", twice.length === 1 && /^seed 1: a re-flight flown twice gives two fights \(fingerprints [0-9a-f]+0 and [0-9a-f]+1\)$/.test(twice[0]), twice.join("|"));
+    const mis = (fix) => CF.pipelineChecks([1], flyP, { ...base, answer: (pair, facts, req) => { const a = CF.answerRequest(pair, facts, req); return { ...a, facts: a.facts.map(fix) }; } });
+    const msgNum = `seed 1: the re-flight's facts are not numbered on from F${n1 + 1}`;
+    ok("!! facts that are not numbered on from the pair's last are reported, wherever the numbering goes wrong: the first one late (F13 for F12), only the second wrong, only the third wrong, all one late; and right numbering is not", mis((x, i) => (i === 0 ? { ...x, id: "F" + (n1 + 2) } : x)).join("|") === msgNum && mis((x, i) => (i === 1 ? { ...x, id: "F" + (n1 + 1) } : x)).join("|") === msgNum && mis((x, i) => (i === 2 ? { ...x, id: "F" + (n1 + 9) } : x)).join("|") === msgNum && mis((x, i) => ({ ...x, id: "F" + (n1 + i + 2) })).join("|") === msgNum && mis((x) => x).length === 0);
+    let g = 0; const changed = CF.pipelineChecks([1], flyP, { ...base, factsOf: (pair) => (g++ === 0 ? A.factsOf(pair) : A.factsOf(pair).slice(1)) });
+    ok("!! a pair whose facts are not the same when generated again is reported (the re-flight must not change the pair's facts)", changed.length === 1 && changed[0] === "seed 1: the pair's facts changed", changed.join("|"));
+    const rt = (r) => CF.pipelineChecks([1], flyP, { ...base, read: () => r }), RT = "seed 1: a request does not round-trip through its line";
+    ok("!! a request that does not round-trip is reported by its words: refused (ok false), the wrong seed, the kit in the wrong order, the kit with a name missing; and the right one is not", rt({ ok: false, reason: "x" }).join("|") === RT && rt({ ok: true, request: { seed: 2, kit: ["decoy", "screen"] } }).join("|") === RT && rt({ ok: true, request: { seed: 1, kit: ["screen", "decoy"] } }).join("|") === RT && rt({ ok: true, request: { seed: 1, kit: ["decoy"] } }).join("|") === RT && rt({ ok: true, request: { seed: 1, kit: ["decoy", "screen"] } }).length === 0);
+    const seedsTwo = CF.pipelineChecks([1, 2], (sd) => flyP(sd), { ...base, read: () => ({ ok: false }) });
+    ok("!! every seed given is checked: a fault that is in all of them is reported once for each, in the order of the seeds", seedsTwo.length === 2 && /^seed 1:/.test(seedsTwo[0]) && /^seed 2:/.test(seedsTwo[1]));
 }
 
 console.log(fails ? `\n${fails} FAIL` : "\nall checks pass");
