@@ -66,3 +66,29 @@ foreach ($s in 6310,6320,6330,6340,6350,6360,6370,6380,6390,6400) {
 ```
 
 After the FIRST seed finishes, `plainlog6310.txt` should show the autopilot line `held-out -0.4880 ... safety pool: 0 ended early of 500` and the dump's `auto` must read audit -0.4955792873753405; a different autopilot number means the step did not reach the trainer and the run should be stopped. The ten plain dumps and their logs are what comes back.
+
+## 10. RESULT (2026-11-08; the delivery `f302aa19-plain14.zip`; THE REGISTERED READING WAS RUN ONCE, `node tools\ship\plain14DistributionCmd.mjs report --dir brain\rig-results\plain14`, and its whole output is `brain/plain14DistributionReport.txt`)
+
+**What arrived, before anything was read.** The ten plain dumps `plain6310.json` to `plain6400.json` with their ten logs (the logs are UTF-16, as PowerShell's `Tee-Object` writes them), and the ten fly dumps and ten fly logs again: **all twenty of those are byte-identical to the files committed on 2026-11-08** (`cmp`), so the fly arm was not re-run and nothing was replaced. The ten plain logs of the failed first attempt (each the one `--circuit must be one of` line) are replaced by the real ones; they stay in the git history. Amendment B's check after the first seed, made on the autopilot rows only and before the report: all ten plain dumps carry ONE autopilot row (held-out -0.48805, audit -0.4955792873753405, reserve -0.5146037809204544), equal to the fly dumps', and `plainlog6310.txt` shows `held-out -0.4880`. The first-order step reached the trainer.
+
+**The four checks: all PASS** (SEEDS, RECIPE, ONE ENVIRONMENT, CHAMPIONS: ten champions in each arm, every draw QUALIFIES).
+
+**BOTTOM LINE (the registration's words): THE FLY CANNOT BE TOLD APART FROM ITS PLAIN CONTROLS.**
+
+| set | fly mean (range) | plain14 mean (range) | difference | exact one-sided p, fly higher / lower |
+|---|---|---|---|---|
+| audit (36 dives) | -0.3168 (-0.3313 to -0.2987) | -0.3241 (-0.3386 to -0.3168) | +0.0073 | 0.1237 / 0.8912 |
+| **safety audit (500 dives, THE READING)** | **-0.3436 (-0.3603 to -0.3212)** | **-0.3517 (-0.3745 to -0.3414)** | **+0.0081** | **0.1237 / 0.8912** |
+| reserve (18 dives) | -0.3347 (-0.3576 to -0.3105) | -0.3393 (-0.3546 to -0.3271) | +0.0046 | 0.2894 / 0.7356 |
+
+Draws that QUALIFY (the trainer's own test): fly 10 of 10, plain14 10 of 10.
+
+**The section 5 expectations, scored (every one held; nothing was missed this round).** CANNOT BE TOLD APART (about 55 percent): **held**, and BEATS (about 30) and BELOW (about 15) did not happen. The safety audit's difference of the means between -0.01 and +0.03 (about 75): **held**, +0.0081. The two arms' ranges each between 0.01 and 0.06 (about 70): **held** (safety audit: fly 0.0391, plain14 0.0331; audit 0.0326 and 0.0218). At least 8 of 10 draws QUALIFY in each arm (about 80): **held**, 10 and 10. No draw without an eligible search (about 80): **held**.
+
+**POST HOC, not in the registered reading, and labelled so** (counted from the report's printed table): the fly's champion is above the plain champion in **66 of the 100 pairs on the audit and on the safety audit and 58 on the reserve** (the exact test needs 73, section 8); 5, 6 and 5 of the ten fly draws sit above the plain arm's median on the three sets. **All three differences of the means have the same sign (the fly higher) and are about 0.005 to 0.008, inside a spread of 0.02 to 0.04 within each arm.** That is the direction the single draws of the earlier notes pointed (0.012 to 0.031) with a smaller lead. The report cannot say the lead is real and cannot say it is not; ten more draws of each arm is the way to tell and is NOT registered or asked for.
+
+**What it means** (section 2): under this recipe on these sets, the fly's wiring is not distinguished from what a plain net of its size reaches by the same search. **What it does not mean:** anything about the other seven networks (stage 2 below), the tank's dropout task, the needs task or the fish; that the wiring is useless (a lead of about 0.008 is not excluded); that a real animal's connectome is or is not what makes a pilot.
+
+**A forecast that was wrong, said plainly: the time.** Section 6 and Amendment B said about 19 to 20 minutes a seed per arm on 4 cores and about 6.5 hours for the twenty. The logs say otherwise: the 40 fly searches took **39.9 hours** (mean 3,592 s a search) and the 40 plain14 searches **35.3 hours** (mean 3,174 s), about **75 hours in all**, roughly eleven times the figure given. The cause is not measured (the rig's cores against the sandbox's, other work on the rig, the first-order step); the figure came from a smoke run in the sandbox and should not have been quoted for the rig. Any later round that trains on this recipe should be planned at about an hour a search until a rig measurement says otherwise.
+
+**Stage 2 (the other seven networks) is unchanged and still needs the owner's choice (section 7):** (a) a CHAIN-matched control, about 70 core-hours for ten chains by the sandbox's figures, which by this round's rig figure is a large under-estimate, or (b) an OBJECTIVE-matched control. Nothing of it is built or registered. Backlog item `#80`.

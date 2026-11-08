@@ -78,7 +78,7 @@ node tools\ship\takeCounterfactualCmd.mjs subsets --seed 105
 node tools\ship\takeCounterfactualCmd.mjs fly --seed 105 --kit decoy
 ```
 
-## 2b. Round 7, stage 1 (registered in `brain/PLAIN14_DISTRIBUTION_WIP.md`; the report tool is built, gated and swept): ten fly champions against ten plain 14-50-4 champions
+## 2b. Round 7, stage 1 -- DONE 2026-11-08, nothing more to run (result: `brain/PLAIN14_DISTRIBUTION_WIP.md` section 10; registered in the same note; the report tool is built, gated and swept): ten fly champions against ten plain 14-50-4 champions
 About 6.5 hours on 4 cores; the loop alternates the arms so a partial run is balanced. Run it from `WebGLEngine\`:
 
 ```
@@ -106,7 +106,7 @@ It prints the four checks first (a failure is the first line and the reading is 
 
 Send the results files back (or commit them under `brain/rig-results/` on this branch) and say which command made each; the registrations read each once.
 
-## 2c. Round 7, stage 1: CORRECTION (2026-11-08) -- the plain arm has not run; use this loop for it
+## 2c. Round 7, stage 1: CORRECTION (2026-11-08) -- DONE the same day: the plain arm ran under this loop and came back (the history of how it was run follows)
 The loop in 2b ran the fly arm for all ten seeds (those ten dumps are in and kept) and failed instantly on the plain arm (the checkout it ran in has no `plain14` circuit). The fly dumps were made under the FIRST-ORDER orientation step, so the plain arm must be too; the loop, the reason and the check after the first seed are in `brain/PLAIN14_DISTRIBUTION_WIP.md` section 9 (Amendment B). In short, from `WebGLEngine\` on this branch (`git log -1` at or after the commit that carries this section):
 ```
 $env:SWEK_6DOF_ORIENTATION = "euler"

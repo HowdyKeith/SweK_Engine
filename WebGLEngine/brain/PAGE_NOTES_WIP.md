@@ -17,7 +17,7 @@ Every note under `brain/` (`brain/*.md`) is EITHER linked from the page it appli
 | `ui/pageNotesMount.mjs` | the two-line loader every listed page includes as its last module script |
 | `tools/ship/pageNotes-selfcheck.mjs` | the gate (the rule on the real tree and on made-up ones; the loader on exactly the listed pages; the module against a fake DOM and a stub fetch, including a slow answer racing a later one) |
 
-Nine pages carry it: `privatelm.html` (3 notes), `gputaskman.html` (2), `sea-ogre.html` (4), `sub-aquarium.html` (9), `rotorcraft-demo.html` (1), `rotor-league.html` (1), `es-box3d-6dof.html` (2), `brain-bench.html` (3) and `server.html` (6, all rig runs). 31 entries; 23 records (this note is one); all 49 notes under `brain/` classified when this was written. `gputaskman.html` had its own hand-made notes card; it now uses the shared row (the client module lost its `NOTES` table and `getText`).
+Nine pages carry it: `privatelm.html` (3 notes), `gputaskman.html` (2), `sea-ogre.html` (4), `sub-aquarium.html` (9), `rotorcraft-demo.html` (1), `rotor-league.html` (1), `es-box3d-6dof.html` (2), `brain-bench.html` (3) and `server.html` (6: five rig runs and, since Round 7 was read, the Round 7 note as a plain note). 31 entries; 23 records (this note is one); all 49 notes under `brain/` classified when this was written. `gputaskman.html` had its own hand-made notes card; it now uses the shared row (the client module lost its `NOTES` table and `getText`).
 
 ## To add a note, or a page
 

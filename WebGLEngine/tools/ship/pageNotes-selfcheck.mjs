@@ -28,6 +28,9 @@
 //     record that says "another chat" (FISH_VESTIBULAR_HELPER_WIP.md, SUBMARINE_WIP.md) has one (they say a lower-case "owed" in passing). The rule itself is proved on
 //     a made-up tree (section 1, "A NOTE WITH OWED WORK CANNOT BE FILED AS A RECORD"). The checker's first conjunct, `/\bOWED\b|rig command/i`, was dead code (the last
 //     conjunct demands the upper-case word anyway) and was removed, and the comment above now says what the rule really is.
+//     AFTER ROUND 7 WAS READ the registry changed (its note left the rig worklist for a plain note on server.html; sha256 44b06e220601d9e4...): J16 (which demoted
+//     that note) no longer applies and was replaced by J21, the finished note put back in the rig worklist: RED, held by the row "Round 7 is DONE ...". The others were
+//     re-run on the changed file: 15 RED, J18 the same argued survivor.
 //   THE PAGE privatelm.html (6 hand mutants of the loader and the host element: the loader removed, the loader duplicated, the host duplicated, the host removed, the loader
 //     followed by other content, the loader not a module): 6 RED.
 //   NOT MUTATED: ui/pageNotesMount.mjs (two lines, held by the row that reads its source) and the eight other pages' one-line loader (the exact-set row).
@@ -121,7 +124,8 @@ const noteFiles = fs.readdirSync(path.join(ENG, "brain")).filter((f) => /\.md$/.
     ok("there are notes, pages and records (the checker was not run on nothing)", noteFiles.length >= 40 && Object.keys(REG.pages).length >= 8 && Object.keys(REG.records).length >= 15);
     ok("the registry is ASCII and ends with a newline", !/[^\x00-\x7F]/.test(REG_TEXT) && REG_TEXT.endsWith("\n"));
     const rig = (REG.pages["server.html"] || []).filter((n) => n.kind === "rig").map((n) => n.path);
-    ok("the rig worklist on server.html holds the notes of the runs still owed (rig commands, the owed session, the Round 7 plain arm, Addendum 17, the backlog)", ["brain/RIG_COMMANDS_2026-11-07.md", "brain/RIG_SESSION_OWED_WIP.md", "brain/PLAIN14_DISTRIBUTION_WIP.md", "brain/FISH_WIRING_RANK_WIP.md", "brain/BACKLOG_PICKUPS_2026-11-05.md"].every((p) => rig.includes(p)));
+    ok("the rig worklist on server.html holds the notes of the runs still owed (rig commands, the owed session, Addendum 17, the backlog)", ["brain/RIG_COMMANDS_2026-11-07.md", "brain/RIG_SESSION_OWED_WIP.md", "brain/FISH_WIRING_RANK_WIP.md", "brain/BACKLOG_PICKUPS_2026-11-05.md"].every((p) => rig.includes(p)));
+    ok("Round 7 is DONE, so its note is on server.html as a plain note (the stage 2 choice is the owner's), not in the rig worklist", !rig.includes("brain/PLAIN14_DISTRIBUTION_WIP.md") && (REG.pages["server.html"] || []).some((n) => n.path === "brain/PLAIN14_DISTRIBUTION_WIP.md" && n.kind !== "rig"));
     ok("the pages that Keith named are listed: privatelm, gputaskman, sea-ogre, sub-aquarium", ["privatelm.html", "gputaskman.html", "sea-ogre.html", "sub-aquarium.html"].every((p) => Array.isArray(REG.pages[p]) && REG.pages[p].length > 0));
 }
 
