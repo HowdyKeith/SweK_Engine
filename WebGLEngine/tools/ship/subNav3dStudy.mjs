@@ -12,7 +12,7 @@ import * as N from "../../brain/subFieldNav.mjs";
 import * as S from "./subNavPlusStudy.mjs";
 
 const ENG = fileURLToPath(new URL("../../", import.meta.url));
-export const OUT = "brain/subNav3dHeld77.jsonl";
+export const HELD77_FILE = "brain/subNav3dHeld77.jsonl";   // not named OUT: that spelling declares a front-door artefact (registerResidue), and this file is a registered record
 export const BAR = 0.8, GAIN = 5, P_MAX = 0.10, SPACING_MIN = 130;
 
 /** Every scenario of every kind for the seeds, seed-major, and both arms of each: the flights, scenario-major. */
@@ -80,7 +80,7 @@ export function command(argv, io = {}) {
     if (!ck.ok) for (const f of ck.failures) out(`CHECK FAILED -- the readings below are NOT WEIGHED: ${f}`); else out("checks: every wall is inside the region, the keel wall and the ridge of `both` are at least 130 m apart, every window is feasible, every path is finite");
     const j = judge(flights); for (const l of tableLines(flights, o.set.toUpperCase())) out(l);
     for (const l of verdictLines(j)) out(l); if (real) for (const l of expectationLines(flights, j)) out(l);
-    if (o.write) { writeFile(path.join(ENG, OUT), flights.map((r) => JSON.stringify({ set: o.set, ...r })).join("\n") + "\n"); out(`wrote ${flights.length} flights to ${OUT}`); }
+    if (o.write) { writeFile(path.join(ENG, HELD77_FILE), flights.map((r) => JSON.stringify({ set: o.set, ...r })).join("\n") + "\n"); out(`wrote ${flights.length} flights to ${HELD77_FILE}`); }
     return 0;
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) process.exitCode = command(process.argv.slice(2));

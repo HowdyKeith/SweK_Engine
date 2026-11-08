@@ -128,7 +128,7 @@ console.log("\n5. THE COMMAND");
 
 console.log("\n6b. THE PROGRAM");
 {
-    const { spawnSync } = await import("node:child_process"), prog = new URL("./subNavPlusStudy.mjs", import.meta.url).pathname;
+    const { spawnSync } = await import("node:child_process"), prog = (await import("node:url")).fileURLToPath(new URL("./subNavPlusStudy.mjs", import.meta.url));
     const a = spawnSync(process.execPath, ["--preserve-symlinks", "--preserve-symlinks-main", prog, "--study", "current", "--set", "dev", "--seeds", "1"], { encoding: "utf8", timeout: 120000 }), b = spawnSync(process.execPath, ["--preserve-symlinks", "--preserve-symlinks-main", prog, "--bogus"], { encoding: "utf8", timeout: 60000 }), c = spawnSync(process.execPath, ["--preserve-symlinks", "--preserve-symlinks-main", prog], { encoding: "utf8", timeout: 60000 });
     ok("!! run as a program the command takes its arguments from the command line (after the script's name): --study current --set dev --seeds 1 prints the table and the verdict and exits 0; an unknown argument and no argument exit 2 with the refusal on stderr and nothing on stdout; the margin study's arm for each kind is the registered one", a.status === 0 && /hard-current any/.test(a.stdout) && /VERDICT/.test(a.stdout) && b.status === 2 && /unknown argument "--bogus"/.test(b.stderr) && b.stdout === "" && c.status === 2 && /--study needs one of/.test(c.stderr) && J(T.MARGIN_ARM) === J({ "hard-islands": "any", "hard-gaps": "any", "hard-current": "any", "hard-traffic": "any+predict+edge+yield" }) && J(T.CURRENT_KINDS) === J(["hard-current", "hard-current-gap"]) && T.REACTIVE_REFERENCE === "any+predict+edge+yield");
 }

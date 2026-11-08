@@ -14,7 +14,7 @@
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { spawn, spawnSync } from "node:child_process";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -68,9 +68,9 @@ export function verdictOf(counts, baseline = BASELINE) {
 
 /** Run node with `args` in `o.cwd`, killed at `o.timeout` ms: a promise of { stdout, stderr, status }. */
 export const runNode = (args, o) => new Promise((resolve) => {
-    const p = spawn(process.execPath, args, { cwd: o.cwd, stdio: ["ignore", "pipe", "pipe"] }); let out = "", er = "", done = false;
-    const finish = (status) => { if (!done) { done = true; clearTimeout(timer); resolve({ stdout: out, stderr: er, status }); } };
-    const timer = setTimeout(() => { p.kill("SIGKILL"); finish(null); }, o.timeout);
+    // the limit is spawn's own `timeout` option, so the runtime kills the child and reports it through "close" with a null status: nothing here signals a process by hand and then claims it is gone
+    const p = spawn(process.execPath, args, { cwd: o.cwd, stdio: ["ignore", "pipe", "pipe"], timeout: o.timeout }); let out = "", er = "", done = false;
+    const finish = (status) => { if (!done) { done = true; resolve({ stdout: out, stderr: er, status }); } };
     p.stdout.on("data", (d) => { out += d; }); p.stderr.on("data", (d) => { er += d; }); p.on("error", () => finish(null)); p.on("close", (code) => finish(code));
 });
 /** The FAIL lines of a gate's output: a line that starts (after spaces) with FAIL, and a missing "all checks pass" reported as one more. */
@@ -81,7 +81,7 @@ export const failsOf = (text) => String(text).split("\n").filter((l) => /^\s*FAI
  */
 export async function probeGate(gate, { cwd = ENG, timeout = 300000, run = runNode } = {}) {
     const one = async (args) => { const r = await run(args, { cwd, timeout }); return { fails: failsOf((r.stdout || "") + "\n" + (r.stderr || "")), code: r.status === null || r.status === undefined ? -1 : r.status }; };
-    const plain = await one([gate]), shim = await one(["--import", SHIM, gate]);   // ONE AFTER THE OTHER: two copies of a gate that writes a scratch file or watches for one (strandCensus) read each other's
+    const plain = await one([gate]), shim = await one(["--import", pathToFileURL(SHIM).href, gate]);   // ONE AFTER THE OTHER: two copies of a gate that writes a scratch file or watches for one (strandCensus) read each other's
     const same = plain.fails === shim.fails && plain.code === shim.code;
     if (plain.code === -1 && shim.code === -1) return { gate, plain, shim, verdict: "NOT READ (BOTH KILLED AT THE TIMEOUT)" };
     const verdict = same ? (plain.code === 0 && plain.fails === 0 ? "SAME" : "RED BOTH WAYS") : (plain.code === 0 && plain.fails === 0 ? "RED ONLY UNDER THE WIN32 SPELLING" : shim.code === 0 && shim.fails === 0 ? "GREEN ONLY UNDER THE SHIM" : "RED BOTH WAYS");

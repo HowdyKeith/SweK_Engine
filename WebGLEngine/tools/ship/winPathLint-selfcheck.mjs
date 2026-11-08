@@ -16,7 +16,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { spawnSync } from "node:child_process";
 import * as W from "./winPathLint.mjs";
 
@@ -77,7 +77,7 @@ const out = { fakeJoin: path.join("/x", "brain", "a.jsonl"), fakeResolve: path.r
 fs.writeFileSync(real + "\\\\g.txt", "w"); out.wrote = fs.readFileSync(path.join(real, "g.txt"), "utf8"); fs.copyFileSync(real + "\\\\g.txt", real + "\\\\h.txt"); out.copied = fs.readFileSync(path.join(real, "h.txt"), "utf8");
 fs.renameSync(real + "\\\\h.txt", real + "\\\\i.txt"); out.renamed = fs.existsSync(real + "\\\\i.txt") && !fs.existsSync(real + "\\\\h.txt");
 console.log(JSON.stringify(out));`);
-        const r = spawnSync(process.execPath, ["--import", W.SHIM, script], { encoding: "utf8", timeout: 60000 }), o = r.status === 0 ? JSON.parse(r.stdout) : {};
+        const r = spawnSync(process.execPath, ["--import", pathToFileURL(W.SHIM).href, script], { encoding: "utf8", timeout: 60000 }), o = r.status === 0 ? JSON.parse(r.stdout) : {};
         ok("!! a child under the shim runs and prints its facts", r.status === 0 && typeof o === "object" && "fakeJoin" in o, (r.stderr || "").slice(0, 200));
         ok("!! a FAKE root is spelled with backslashes by join, resolve and normalize, exactly as win32 does", o.fakeJoin === "\\x\\brain\\a.jsonl" && o.fakeResolve === "\\zz\\q\\r" && o.fakeNormalize === "\\x\\a", J([o.fakeJoin, o.fakeResolve, o.fakeNormalize]));
         ok("!! a REAL root is not respelled (the box's own fs and child processes need it): the temporary directory, /tmp, and the root itself ('/'); one fake segment alone is", o.realJoin === path.join(real, "f.txt") && o.realJoin.startsWith("/") && !o.realJoin.includes("\\") && o.tmpJoin === "/tmp/w" && o.root === "/" && o.fakeOne === "\\x", J([o.tmpJoin, o.root, o.fakeOne]));

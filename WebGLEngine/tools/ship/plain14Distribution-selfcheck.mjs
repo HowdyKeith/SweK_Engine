@@ -250,7 +250,7 @@ sec("6. THE COMMAND");
         ok("!! with no seams the command reads the real directory (an absolute path) and prints on console.log: exit 0, 32 lines, the bottom line BEATS", cd === 0 && errs.length === 0 && lines.length === 32 && lines[31].startsWith("BOTTOM LINE: THE FLY'S WIRING BEATS"));
         const errs2 = []; console.error = (x) => errs2.push(x); let ce; try { ce = await P.command(["report", "--dir", path.join(tmp, "nope")]); } finally { console.error = oe; }
         ok("!! with no seams a missing directory goes to console.error: exit 1", ce === 1 && errs2.length === 1 && /cannot read the directory .*nope: ENOENT/.test(errs2[0]));
-        const rel = path.relative(ENG, tmp), lines2 = [], o2 = console.log; console.log = (x) => lines2.push(x); let cr; try { cr = await P.command(["report", "--dir", rel]); } finally { console.log = o2; }
+        const rel = path.relative(ENG, tmp).split(path.sep).join("/"), lines2 = [], o2 = console.log; console.log = (x) => lines2.push(x); let cr; try { cr = await P.command(["report", "--dir", rel]); } finally { console.log = o2; }
         ok("!! a relative directory is read from the engine folder (WebGLEngine), not from where the command was started: the same 32 lines", cr === 0 && lines2.length === 32);
         const child = spawnSync(process.execPath, [path.join(HERE, "plain14DistributionCmd.mjs"), "report", "--dir", tmp], { cwd: os.tmpdir(), encoding: "utf8" });
         ok("!! the command line (a child process started in another folder): exit 0, the report on stdout, nothing on stderr", child.status === 0 && child.stderr === "" && child.stdout.split("\n").filter(Boolean).length === 32 && /BOTTOM LINE: THE FLY'S WIRING BEATS ITS PLAIN CONTROLS/.test(child.stdout));
