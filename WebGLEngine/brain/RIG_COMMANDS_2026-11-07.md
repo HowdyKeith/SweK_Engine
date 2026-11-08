@@ -117,3 +117,6 @@ foreach ($s in 6310,6320,6330,6340,6350,6360,6370,6380,6390,6400) {
 }
 ```
 About 20 minutes a seed on 4 cores, about 3.5 hours. Send back the ten `plain<seed>.json` dumps and their logs; do not re-run the fly arm.
+
+## 2d. gputaskman: the page that installs it and runs a session (2026-11-08; `brain/GPUTASKMAN_WIP.md`)
+Not a study: a measurement of the machine. With the engine's bridge running (default port 8787), open `http://localhost:8787/gputaskman.html` (or the gputaskman link in `server.html`), then: **Check this machine**; **Install with uv** (or pipx; if it still says it cannot find gputaskman afterwards, restart the bridge from a NEW terminal); type a model exactly as `ollama list` shows it (pull it first: `ollama pull qwen2.5-coder:7b` is a good first try, it fits an 8 GB card); **Start the model, run gputaskman, save a snapshot**. The JSON appears in the page and is saved as `brain\rig-results\gpu-snapshots\gpusnap-<time>-<model>.json`. Look at it (it lists the programs using the GPU), then send that file back.

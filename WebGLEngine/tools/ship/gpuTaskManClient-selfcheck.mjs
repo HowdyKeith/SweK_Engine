@@ -8,7 +8,19 @@
 // Run: node tools/ship/gpuTaskManClient-selfcheck.mjs      (about 1 s)
 //
 // SABOTAGE: see the LOG at the foot of this header, written when the sweep finished.
-// LOG: (written after the sweep)
+// LOG (2026-11-08; harness /tmp/claude-0/sab, as the bridge gate's). sha256 of ui/gpuTaskManClient.mjs 65529d757602bc81... and of gputaskman.html 6ce2a9742ee48f95...
+//   at the sweeps and at the end.
+//   THE CLIENT FILE (161 mechanical mutants): first sweep 116 RED, 5 CRASH, 40 SURVIVORS; rows were added for the 200-character name boundary, every cut length
+//     (160, 200, 300, 400, 60, read as the exact string, because an endsWith of a shorter tail passed a longer cut), the defaults of the install choices, a tool
+//     found with no version, a missing installers block, postJson with the bridge down, and the exact number of polls made at maxPolls and at three lost answers.
+//     Second sweep 149 RED, 6 CRASH, 6 survivors; one of them (the 300-character cut of a failed session's reason) was a row that used endsWith, made exact,
+//     and re-run: killed. FIVE REMAIN, ARGUED EQUIVALENT: L55 a `+` inside a message; L65 and L66 (two each) the `e && e.message || e` text of a failed fetch.
+//   THE PAGE (45 hand mutants of gputaskman.html: the wiring of every button, the route and id names, the classes, the disabled switches, the guard against a
+//     second press, the reset after a refusal, the install note, the placeholder, the download name and type, the wording of the caution): first run 36 RED,
+//     3 CRASH, SIX SURVIVORS: the guard against a second press, Start staying on while running, the running flag after a refusal, the install note, the
+//     "starting..." placeholder, and a check that matched the word PyPI in the page's own header COMMENT rather than the caution a reader sees (now read
+//     from the caution card, with comments and script stripped). All closed (the new rows hold a running session open with a sequenced stub and press Start
+//     twice); re-run: 42 RED, 3 CRASH, 0 survivors.
 // ---------------------------------------------------------------------------------------------------------------------------------
 "use strict";
 import fs from "node:fs";
@@ -21,6 +33,8 @@ const HTML = fs.readFileSync(path.join(ENG, "gputaskman.html"), "utf8");
 const CLIENT_SRC = fs.readFileSync(path.join(ENG, "ui", "gpuTaskManClient.mjs"), "utf8");
 const SERVER = fs.readFileSync(path.join(ENG, "ai-bridge", "server.js"), "utf8");
 const SERVER_HTML = fs.readFileSync(path.join(ENG, "server.html"), "utf8");
+const VISIBLE = HTML.replace(/<!--[\s\S]*?-->/g, "").replace(/<script[\s\S]*?<\/script>/g, "");   // what a reader sees: no comments, no script
+const CAUTION = ((HTML.match(/<div class="card warn" id="caution">([\s\S]*?)<\/div>/) || [, ""])[1]).replace(/<[^>]+>/g, "");
 
 let fails = 0;
 const ok = (l, c, n = "") => { if (!c) fails++; console.log(`  ${c ? "PASS" : "FAIL"}  ${l}${n ? "   " + n : ""}`); };
@@ -136,6 +150,39 @@ console.log("\n5. stepLine, summaryLines, jsonText, downloadName");
     ok("!! downloadName never has a path separator, even from a hostile saved path or model", !/[\\/]/.test(C.downloadName({ request: { model: "../../a" } }, "x/../../evil name.json")) && C.downloadName({}, undefined) === "gpusnap-now-snapshot.json");
 }
 
+// ---- 5b. added after the first sweep -------------------------------------------------------------------------------------------------------------
+console.log("\n5b. ADDED AFTER THE FIRST SWEEP (each closes surviving mutants; see the LOG in the header)");
+{
+    const x = (n, ch = "x") => ch.repeat(n);
+    ok("a model name of exactly 200 characters is accepted, 201 refused", C.sessionBody({ model: x(200, "a") }).ok && !C.sessionBody({ model: x(201, "a") }).ok);
+    const ins = (over) => C.installChoices(STATUS(over));
+    ok("a long failure reason is cut to 160 (157 and '...') and one of exactly 160 is not cut", ins({ gputaskman: { installed: true, works: false, error: x(500) } }).note === "gputaskman is installed but did not run cleanly: " + x(157) + "..." && ins({ gputaskman: { installed: true, works: false, error: x(160) } }).note === "gputaskman is installed but did not run cleanly: " + x(160));
+    ok("the bridge-down line cuts its reason to 160 the same way", C.statusLines({ ok: false, error: x(500) })[0].endsWith("(" + x(157) + "...): is it running on this machine?") && C.statusLines({ ok: false, error: x(160) })[0].includes("(" + x(160) + ")"));
+    const gl = (g) => C.statusLines(STATUS({ gputaskman: g })).join("\n");
+    ok("a GPU list is cut to 400 (397 and '...'), a failure reason to 200 (197 and '...')", gl({ installed: true, works: true, gpus: x(1000, "g") }).includes("\n  " + x(397, "g") + "...") && !gl({ installed: true, works: true, gpus: x(400, "g") }).includes("...") && gl({ installed: true, works: false, error: x(900, "e") }).includes("\n  " + x(197, "e") + "...") && gl({ installed: true, works: false, error: x(200, "e") }).includes("\n  " + x(200, "e")) && !gl({ installed: true, works: false, error: x(200, "e") }).includes("..."));
+    ok("Ollama's reason is cut to 200 the same way", C.statusLines(STATUS({ ollama: { up: false, error: x(900, "o"), models: [] } })).join("\n").includes("(" + x(197, "o") + "...)") && C.statusLines(STATUS({ ollama: { up: false, error: x(200, "o"), models: [] } })).join("\n").includes("(" + x(200, "o") + ")"));
+    ok("a step note is cut to 300, and so is a failed session's reason", C.stepLine({ at: "2026-11-08T05:12:33.000Z", step: "s", ok: true, note: x(900, "n") }).endsWith(": " + x(297, "n") + "...") && C.stepLine({ at: "2026-11-08T05:12:33.000Z", step: "s", ok: true, note: x(300, "n") }).endsWith(": " + x(300, "n")) && C.summaryLines({ ok: false, error: x(900, "r"), request: { model: "q" } })[0] === "The session did not complete: " + x(297, "r") + "..." && C.summaryLines({ ok: false, error: x(300, "r"), request: { model: "q" } })[0] === "The session did not complete: " + x(300, "r"));
+    ok("the model part of a built download name is cut to 60 characters", C.downloadName({ startedAt: "2026-11-08T05:12:33.000Z", request: { model: x(100, "m") } }, null) === "gpusnap-20261108-051233-" + x(60, "m") + ".json");
+    const defaults = C.installChoices({ installers: { uv: { found: true }, pipx: { found: true } } });
+    ok("with no command given the choices carry the documented defaults, uv's and pipx's own", defaults.choices[0].command === "uv tool install gputaskman" && defaults.choices[1].command === "pipx install gputaskman" && defaults.choices[0].why === "found");
+    const noVer = C.statusLines(STATUS({ installers: { uv: { found: true }, pipx: { found: true } }, python: { found: true } })).join("\n");
+    ok("a tool that is found but gave no version reads 'found'", /uv: found +pipx: found +python: found/.test(noVer));
+    ok("no installers block at all reads not found, not a throw", /uv: not found +pipx: not found/.test(C.statusLines({ ok: true, platform: "x" }).join("\n")));
+    const dn = await C.postJson("/x", {}, async () => { throw new Error("ECONNREFUSED"); });
+    ok("postJson with the bridge down: a flagged failure with the reason (as getJson)", dn.ok === false && dn.unreachable === true && /ECONNREFUSED/.test(dn.error));
+    const cnt = (list) => { let i = 0, n = 0; const fn = async () => { n++; const v = list[Math.min(i++, list.length - 1)]; if (v instanceof Error) throw v; return { json: async () => v }; }; fn.count = () => n; return fn; };
+    const sleepNone = async () => {};
+    const f4 = cnt([{ ok: true, state: "running", steps: [{}] }]), r4 = await C.pollJob("g", f4, { sleep: sleepNone, maxPolls: 4 });
+    ok("maxPolls 4 asks the bridge exactly four times, and the answer is not ok", f4.count() === 4 && r4.ok === false && r4.state === "error");
+    const f3 = cnt([new Error("x")]), r3 = await C.pollJob("g", f3, { sleep: sleepNone });
+    ok("three lost answers end it on the THIRD, and the answer is not ok", f3.count() === 3 && r3.ok === false && r3.state === "error");
+    const fu = cnt([{ ok: false, error: "no such session" }]), ru = await C.pollJob("g", fu, { sleep: sleepNone });
+    ok("a bridge that does not know the session ends it on the first answer, not ok", fu.count() === 1 && ru.ok === false);
+    const fe = cnt([{ ok: false }]), re = await C.pollJob("g", fe, { sleep: sleepNone });
+    ok("and with no words of its own the answer says the bridge no longer knows the session", /no longer knows this session/.test(re.error));
+    ok("downloadName with a saved name that is not a safe .json name falls back to the built one", C.downloadName({ startedAt: "2026-11-08T05:12:33.000Z", request: { model: "q" } }, "dir/evil name.json") === "gpusnap-20261108-051233-q.json" && C.downloadName({ startedAt: "2026-11-08T05:12:33.000Z", request: { model: "q" } }, 5) === "gpusnap-20261108-051233-q.json");
+}
+
 // ---- 6. the page: markup ---------------------------------------------------------------------------------------------------------------------------------
 console.log("\n6. THE PAGE: MARKUP AND WIRING");
 const script = (HTML.match(/<script type="module">([\s\S]*?)<\/script>/) || [, ""])[1];
@@ -151,10 +198,10 @@ const ids = new Set([...HTML.replace(/<script[\s\S]*?<\/script>/g, "").matchAll(
     ok("every route the page uses is a route the client names and the bridge serves", routesUsed.length >= 4 && routesUsed.every((r) => r in C.ROUTES && SERVER.includes(`"${C.ROUTES[r]}"`)), routesUsed.join(","));
     ok("the script imports the client from the right path, and that file exists", /import \* as C from "\/ui\/gpuTaskManClient\.mjs"/.test(script) && fs.existsSync(path.join(ENG, "ui", "gpuTaskManClient.mjs")));
     ok("the page names the project, its MIT license and links its repository and releases", /shanselman\/gputaskman/.test(HTML) && /MIT/.test(HTML) && HTML.includes('href="https://github.com/shanselman/gputaskman"') && HTML.includes('href="https://github.com/shanselman/gputaskman/releases"'));
-    ok("!! the page says what the install button runs, that it is on THIS machine, from PyPI, and that nothing is pinned or scanned", /uv tool install gputaskman/.test(HTML) && /pipx install gputaskman/.test(HTML) && /on this machine/.test(HTML) && /PyPI/.test(HTML) && /does not pin or scan/.test(HTML));
-    ok("the page warns the JSON lists the programs using the GPU, twice, and says the file holds no host, user or path", (HTML.match(/programs that are using the GPU/g) || []).length >= 1 && /no host name, user name or file path/.test(HTML));
+    ok("!! the CAUTION CARD (what a reader sees, not the comments) says what the install button runs, that it is on THIS machine, from PyPI, and that nothing is pinned or scanned", CAUTION.length > 200 && /uv tool install gputaskman/.test(CAUTION) && /pipx install gputaskman/.test(CAUTION) && /on this machine/.test(CAUTION) && /PyPI/.test(CAUTION) && /does not pin or scan/.test(CAUTION));
+    ok("the visible page warns the JSON lists the programs using the GPU, and says the file holds no host, user or path", /programs that are using the GPU/.test(VISIBLE) && /no host name, user name or file path/.test(VISIBLE));
     ok("the page says what it does NOT do (not run against a real gputaskman, Ollama or GPU) and that the bridge has no origin check", /has not run\s+against a real gputaskman/.test(HTML) && /no origin check/.test(HTML));
-    ok("the page names the unsupported (Intel) and the supported platforms", /Intel GPUs are not supported/.test(HTML) && /Windows 10\/11/.test(HTML));
+    ok("the caution card names the unsupported (Intel) and the supported platforms", /Intel GPUs are not supported/.test(CAUTION) && /Windows 10\/11/.test(CAUTION));
     ok("the page's tokens field carries the client's limits", /min="16"/.test(HTML) && /max="1024"/.test(HTML) && /value="200"/.test(HTML));
     ok("the client file contains nothing but the pure logic (no document, window or fetch call of its own)", !/\bdocument\./.test(CLIENT_SRC) && !/\bwindow\./.test(CLIENT_SRC) && !/[^.\w]fetch\(/.test(CLIENT_SRC));
     ok("server.html links the page", /href="\/gputaskman\.html"/.test(SERVER_HTML));
@@ -169,7 +216,8 @@ console.log("\n7. THE PAGE SCRIPT, RUN AGAINST A FAKE DOM AND A STUB BRIDGE");
         const els = {}; for (const i of ids) els[i] = stub(i);
         const nets = [], appended = [], clip = [];
         const doc = { getElementById: (i) => els[i] || null, createElement: (t) => { const e = stub(t); e.tag = t; return e; }, body: { append: (x) => appended.push(x) }, execCommand: () => { if (over.noExec) throw new Error("no"); return true; } };
-        const job = over.job || (() => ({ ok: true, id: "gt1", state: "done", startedAt: "x", steps: [{ at: "2026-11-08T05:12:30.000Z", step: "detect", ok: true, note: "gputaskman found" }, { at: "2026-11-08T05:12:40.000Z", step: "generate", ok: true, note: "60 tokens at 3 tokens/s" }], error: "", savedAs: "brain/rig-results/gpu-snapshots/gpusnap-20261108-051233-q-7b.json", result: { schema: 1, kind: "gputaskman-session", ok: true, error: "", request: { model: "q:7b" }, summary: { modelSizeGB: 15.83, inVramGB: 6.52, onGpuPct: 41.2, tokensPerSecond: 3, loadSeconds: 12.5, gputaskmanInstalled: true }, snapshots: { baseline: { ok: true }, loaded: { ok: true }, busy: { ok: true } } } }));
+        let jobCalls = 0;
+        const job = over.jobSeq ? (u) => over.jobSeq(++jobCalls) : over.job || (() => ({ ok: true, id: "gt1", state: "done", startedAt: "x", steps: [{ at: "2026-11-08T05:12:30.000Z", step: "detect", ok: true, note: "gputaskman found" }, { at: "2026-11-08T05:12:40.000Z", step: "generate", ok: true, note: "60 tokens at 3 tokens/s" }], error: "", savedAs: "brain/rig-results/gpu-snapshots/gpusnap-20261108-051233-q-7b.json", result: { schema: 1, kind: "gputaskman-session", ok: true, error: "", request: { model: "q:7b" }, summary: { modelSizeGB: 15.83, inVramGB: 6.52, onGpuPct: 41.2, tokensPerSecond: 3, loadSeconds: 12.5, gputaskmanInstalled: true }, snapshots: { baseline: { ok: true }, loaded: { ok: true }, busy: { ok: true } } } }));
         const fetchF = async (u, o = {}) => {
             const url = String(u), b = o.body ? JSON.parse(o.body) : null; nets.push({ url, method: o.method, body: b });
             let j;
@@ -220,6 +268,21 @@ console.log("\n7. THE PAGE SCRIPT, RUN AGAINST A FAKE DOM AND A STUB BRIDGE");
     const a = w.appended[0];
     ok("the downloaded blob is the JSON box's text, typed application/json", w.blobs.length === 1 && w.blobs[0].parts[0] === w.els.json.value && w.blobs[0].type === "application/json");
     ok("Download makes a link to a blob named like the saved file, clicks it and removes it", a && a.download === "gpusnap-20261108-051233-q-7b.json" && a.href === "blob:fake" && a.clicked === true && a.removed === true);
+
+    const wn = world({ status: STATUS({ installers: { uv: { found: false }, pipx: { found: false } } }) }); wn.run(); await settle();
+    ok("with neither installer found the install note says where to get one, and both install buttons stay off", /docs\.astral\.sh\/uv/.test(wn.els.installNote.textContent) && wn.els.uvBtn.disabled === true && wn.els.pipxBtn.disabled === true);
+
+    const doneJob = () => ({ ok: true, id: "gt1", state: "done", steps: [{ at: "2026-11-08T05:12:30.000Z", step: "detect", ok: true, note: "x" }], error: "", savedAs: "brain/rig-results/gpu-snapshots/gpusnap-a.json", result: { ok: true, error: "", request: { model: "q:7b" }, summary: null, snapshots: {} } });
+    const wh = world({ jobSeq: (n) => (n === 1 ? { ok: true, id: "gt1", state: "running", steps: [] } : doneJob()) }); wh.run(); await settle();
+    wh.els.model.value = "q:7b"; const p1 = wh.els.runBtn.onclick(); await settle();
+    ok("while a session runs: Start is off and the progress box says 'starting...' until the first step arrives", wh.els.runBtn.disabled === true && wh.els.progress.textContent === "starting...");
+    await wh.els.runBtn.onclick();
+    ok("!! a second press while a session runs starts nothing", wh.nets.filter((n) => n.url === "/gputaskman/session").length === 1);
+    await p1;
+    ok("when the session ends Start is on again and the JSON is shown", wh.els.runBtn.disabled === false && JSON.parse(wh.els.json.value).ok === true);
+    const wr = world({ sessionRefused: true }); wr.run(); await settle(); wr.els.model.value = "q:7b";
+    await wr.els.runBtn.onclick(); await wr.els.runBtn.onclick();
+    ok("!! after the bridge REFUSES a session a second press tries again (the running flag was reset)", wr.nets.filter((n) => n.url === "/gputaskman/session").length === 2);
 
     const w2 = world({ clipFails: true }); w2.run(); await settle(); w2.els.json.value = "{}"; await w2.els.copyBtn.onclick();
     ok("a clipboard that refuses falls back to selecting the text and the old copy command", w2.els.json.selected === true && /copied 2 characters/.test(w2.els.savedAs.textContent));

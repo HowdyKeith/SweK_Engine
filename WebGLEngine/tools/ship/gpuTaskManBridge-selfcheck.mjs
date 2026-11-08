@@ -24,7 +24,32 @@
 // after in the log line below; a survivor is a finding, a mutant that makes the gate THROW or TIME OUT is caught). See the LOG
 // at the foot of this header, written when the sweep finished.
 //
-// LOG: (written after the sweep)
+// LOG (2026-11-08; harness /tmp/claude-0/sab: gen_mutants_lines.py + mut_run_render.py, 4 slices, isolated trees; RED and CRASH are caught).
+//   sha256 of ai-bridge/gpuTaskManBridge.js 476ba7d2cbae4061... at the last sweep and at the end (the harness writes only into its own trees).
+//   FOUR SWEEPS, each followed by the gate rows that closed its survivors.
+//   sweep 1: 544 mutants, 273 RED, 35 CRASH, 236 SURVIVORS (80 lines). Read line by line; rows were added for: a username or a password alone in the Ollama
+//     address, trailing text after JSON, every command's timeout, every truncation length, the shapes of a failing version or tags answer, the refusals of ps,
+//     generate and unload, the fields of ps, the nvidia-smi columns, the session's step notes and flags, the settleMs clamps, which model the summary reads,
+//     the catch-all, and the jobs' retention and rejection paths. THE READ ALSO FOUND FOUR FAULTS IN THE MODULE, fixed there: a failed file save left
+//     ok:true beside an error string (now a separate saveError); a model of another tag (q:3b for q:7b) could be taken for the one asked about; gpu [1] and true
+//     were accepted as GPU 1 (now numbers and one- or two-digit strings only); a host that would not say what it is could reject the whole session (safeHost).
+//   sweep 2: 544, 403 RED, 44 CRASH, 97 SURVIVORS. It showed my own rows were weak: every "no command or request was made" row used a fake that THROWS, which the
+//     module's own error handling swallows, so a mutant that made the call still passed (now counting spies, read from the call count); and a timeout mutant
+//     passed by waiting 30 s, because the gate's own 60 s watchdog kept the event loop alive (timers and the clock are now injectable; each wait is pinned at
+//     the place it is used, and a fired fake timer replaces real waiting). Dead code the sweep exposed was removed (a default parameter, a done flag, a
+//     redundant tail() around a slice, a base-name model match that could borrow another tag).
+//   sweep 3: 541, 453 RED, 51 CRASH, 37 SURVIVORS. sweep 4: 541, 461 RED, 51 CRASH, 29 SURVIVORS.
+//   THE 29 THAT REMAIN, ARGUED EQUIVALENT OR UNOBSERVABLE (each changes nothing the module returns or does):
+//     L64 the bytes-per-GB constant +-1 (the result is rounded to two decimals); L97, L156, L263, L268, L309 and L324 the `e && e.message || e` text of an error
+//     that already has its words (the branches that matter are held); L100 `o.env || process.env` (execFile's own default is process.env); L116 `b > a` (no
+//     character is both the first opening and the last closing bracket) and `a >= 0 && b > a` as `||` (with no opening bracket the slice is empty and the
+//     parse fails inside its try); L148 the `unref` guard (a Node timer always has unref); L171, L278, L319 a `+` inside a message string; L213 `{1,2}` as
+//     `{0,2}` (an empty string is handled before the pattern); L214 the `0` inside the message "0 to 63"; L275 `ok: false` as the initial value (finish()
+//     overwrites it); L304 `!list || !list.ok` as `&&` (a failed ps returns an empty list, which finds nothing); L306 `sizeBytes > 0` as `> 1` (a model of one
+//     byte); L313 `_seq = 0` as 1 (_reset sets it); L321 `toString(36)` as 35 (the spelling of an id).
+//   Also run, not a row of this gate: an end-to-end smoke (the real module, the five real route lines taken out of server.js, real child processes for
+//     gputaskman, nvidia-smi and uv, a real HTTP server on loopback for Ollama): status, install, a refused method, snapshot, a refused gpu, a session polled
+//     to its end, a second start refused, a model that is not pulled, a LAN address refused, the file written and equal to the result. All as expected.
 // ---------------------------------------------------------------------------------------------------------------------------------
 "use strict";
 import { createRequire } from "node:module";

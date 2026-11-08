@@ -54,4 +54,5 @@ Keith, 2026-11-08: "let's add a install link/page to swek engine that installs g
 
 ## 6. The gates and their sabotage
 
-(see the headers of the two gate files; the log is copied here when the sweeps finish)
+`tools/ship/gpuTaskManBridge-selfcheck.mjs` (257 rows; 0.1 s) and `tools/ship/gpuTaskManClient-selfcheck.mjs` (120 rows, about 2 s, with the page's script RUN against a fake DOM and a stub bridge). Mutation sweeps in isolated trees, logged in the gates' headers: **the bridge module 4 sweeps of about 540 mechanical mutants each, ending at 29 survivors, each argued equivalent in the header; the client file 161 mutants, 5 survivors, argued; the page 45 hand mutants, 0 survivors.** What the sweeps found is worth the line it takes here: four faults in the module itself (a failed file save left `ok: true` beside an error; another tag of the same model could be taken for the one asked about; `--gpu` accepted `[1]` and `true`; a host that would not name itself could reject the whole session), and a weakness in the first version of the gate (every "nothing was run" row used a fake that throws, which the module's own error handling swallows, so a mutant that DID make the call passed; the rows now count calls).
+Neighbouring gates run and green after the page joined the indexes: pageIndex, launchIndex, pagePlacement, orphanScan, goLinkStyle.
