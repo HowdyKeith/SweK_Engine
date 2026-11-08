@@ -29,7 +29,7 @@ function addSample(acc, x, y) {
 }
 /** Sum accumulators (a list) into one. */
 export function mergeAcc(list) { const out = newAcc(); for (const a of list) { out.n += a.n; out.yty += a.yty; out.sy += a.sy; for (let i = 0; i < FEATURES; i++) { out.xty[i] += a.xty[i]; out.sx[i] += a.sx[i]; } for (let k = 0; k < FEATURES * FEATURES; k++) out.xtx[k] += a.xtx[k]; } return out; }
-/** Solve the ridge normal equations of an accumulator: { n, coef (14), r2, weight (14: |coef| x the feature's sd), leading: the feature index of the largest weight }. Ridge = 1e-8 of the mean diagonal. */
+/** Solve the ridge normal equations of an accumulator: { n, coef (14), r2, weight (14: |coef| x the feature's sd) }. Ridge = 1e-8 of the mean diagonal. */
 export function solveAcc(acc) {
     const F = FEATURES, n = acc.n; if (!(n > 1)) throw new Error("headToHead14.solveAcc: an accumulator with fewer than 2 samples");
     let tr = 0; for (let i = 0; i < F; i++) tr += acc.xtx[i * F + i]; const ridge = 1e-8 * tr / F;
@@ -43,8 +43,7 @@ export function solveAcc(acc) {
     let bXty = 0, bXXb = 0; for (let i = 0; i < F; i++) { bXty += coef[i] * acc.xty[i]; for (let j = 0; j < F; j++) bXXb += coef[i] * coef[j] * acc.xtx[i * F + j]; }
     const sst = acc.yty - acc.sy * acc.sy / n, sse = acc.yty - 2 * bXty + bXXb, r2 = sst > 1e-12 ? 1 - sse / sst : 0;
     const weight = coef.map((b, i) => { const m = acc.sx[i] / n, v = Math.max(0, acc.xtx[i * F + i] / n - m * m); return Math.abs(b) * Math.sqrt(v); });
-    let leading = 0; weight.forEach((w, i) => { if (w > weight[leading]) leading = i; });
-    return { n, coef, r2, weight, leading };
+    return { n, coef, r2, weight };
 }
 
 // ---- the tank kinds
@@ -217,7 +216,7 @@ export function checksOf(au) {
     rows.push({ name: "NETWORKS", ok: nets, text: `every network is ${PS.WEIGHT_COUNT} finite weights: ${nets}` });
     const ident = ["dark", "lit"].every((c) => IDENT_IDS.every((a) => au[c][a] && au[c][a].every((r, i) => au[c].autopilot[i] && Math.abs(r.score - au[c].autopilot[i].score) < 1e-6)));
     rows.push({ name: "IDENTITY ARMS ARE THE AUTOPILOT", ok: ident, text: `thr+0, spd*1, sched*0 and turn+0 equal the autopilot on every id in both conditions (within 1e-6): ${ident}` });
-    const regOk = ["dark", "lit"].every((c) => NET_IDS.every((a) => { const acc = au.reg && au.reg[c] && au.reg[c][a]; if (!acc || acc.n !== n * ticksPer) return false; try { const s = solveAcc(acc); return s.r2 >= -1e-9 && s.r2 <= 1 + 1e-9 && s.coef.every(Number.isFinite); } catch (e) { return false; } }));
+    const regOk = ["dark", "lit"].every((c) => NET_IDS.every((a) => { const acc = au.reg && au.reg[c] && au.reg[c][a]; if (!acc || acc.n !== n * ticksPer) return false; const s = solveAcc(acc); return s.r2 >= -1e-9 && s.r2 <= 1 + 1e-9 && s.coef.every(Number.isFinite); }));
     rows.push({ name: "REGRESSIONS COMPLETE", ok: regOk, text: `every network has ${n * ticksPer} samples in both conditions, R2 in [0, 1] and finite coefficients: ${regOk}` });
     const e = (a) => (au.dark[a] ? excessOf(au, a) : NaN), t = H13.THR_IDS, faster = e(t[0]) < e(t[t.length - 1]) && e(t[t.length - 1]) > e("autopilot");
     rows.push({ name: "OFFSETS FLY FASTER", ok: faster, text: `the largest thrust offset flies faster than the smallest and than the autopilot (mean speed excess): ${faster}` });
