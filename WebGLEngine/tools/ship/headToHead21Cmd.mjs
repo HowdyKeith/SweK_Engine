@@ -67,7 +67,7 @@ if (has("--one")) {
     fs.writeFileSync(file, JSON.stringify({ dark: au.dark, lit: au.lit }));
 } else if (args[0] === "fly" && has("--from-json")) {
     const j = JSON.parse(fs.readFileSync(path.resolve(val("--from-json", "")), "utf8"));
-    finish({ dark: j.dark, lit: j.lit, range: j.range, seconds: j.seconds, nets: loadNets(), laws: j.laws, search: j.search, h16Law: X.H16_LAW.slice() }, path.resolve(val("--out", eng + "brain/rig-results")));
+    finish({ dark: j.dark, lit: j.lit, range: j.range, seconds: j.seconds, nets: loadNets(), laws: j.laws, search: j.search, fixed: [X.LAW_C02.slice(), X.LAW_H16.slice()] }, path.resolve(val("--out", eng + "brain/rig-results")));
 } else if (args[0] === "fly") {
     const inFile = path.resolve(val("--in", eng + "brain/rig-results/head-to-head21-search.jsonl")), rows = readRows(inFile);
     if (!rows.length) { console.error(`no search file at ${inFile} (run search first)`); process.exit(2); }
@@ -84,5 +84,5 @@ if (has("--one")) {
     for (const f of files) { const d = JSON.parse(fs.readFileSync(f, "utf8")); for (const [a, runs] of Object.entries(d.dark)) if (!(a in dark)) dark[a] = runs; for (const [a, runs] of Object.entries(d.lit)) if (!(a in lit)) lit[a] = runs; }
     fs.rmSync(tmp, { recursive: true, force: true });
     const ordered = [...rows].sort((a, b) => (a.group === b.group ? a.seed - b.seed : a.group < b.group ? -1 : 1));
-    finish({ dark, lit, range, seconds, nets: loadNets(), laws: cs.map((c) => c.law), search: ordered, h16Law: X.H16_LAW.slice() }, path.resolve(val("--out", eng + "brain/rig-results")));
+    finish({ dark, lit, range, seconds, nets: loadNets(), laws: cs.map((c) => c.law), search: ordered, fixed: [X.LAW_C02.slice(), X.LAW_H16.slice()] }, path.resolve(val("--out", eng + "brain/rig-results")));
 } else { console.error("usage: search | fly | --one SEED:GROUP   (see the header)"); process.exit(2); }
