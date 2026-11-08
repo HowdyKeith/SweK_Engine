@@ -13,7 +13,8 @@
 //   8 CHECKS   the nine rows; a failed check says NOT WEIGHED.
 //   9 REPORT   the tables and the lines last.
 //  10 SOURCE   the ids appear once; no clock, random or file.
-// SABOTAGE LOG: filled in below once the mutation pass has run.
+// SABOTAGE LOG (79 mutants of tools/ship/headToHead15.mjs, each alone in its own worktree copy): 71 went red by name on the first pass. 8 went 0 red; 7 got a row and went red on the second run: the priced-gain line from the networks' MEAN, the best network and sched*2 (the first check had a vacuous fallback; now each cell is built from its own arm), the lit efficiency and the lit mean in the report tables, the autopilot's DARK power as the base of the percentage, and the networks' mean and range read from the dark power (lit power now differs).
+//   One is EQUIVALENT and declared: the networks' mean gain `<=` against `<` at exactly 0.02 (a float mean cannot sit on it; the rows test 0.0199 and 0.0201). Also declared, as in H14, because no float fixture can sit on them: `>=` against `>` at an extra power of exactly 0.1 kW, at a ratio of exactly 1.25 or 0.8, and `>` against `>=` at a settled age of exactly 12 s; a tie in the best efficiency going to the last instead of the first.
 // NOT CHECKED, said plainly: that the snapshot's speed through the water stands for the forward speed in the power formula (the two differ by the cosine of a small angle); what a price on speed does to a task whose score is not heading error.
 "use strict";
 import fs from "node:fs";
