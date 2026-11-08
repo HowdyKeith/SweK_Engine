@@ -1448,7 +1448,7 @@
   {
    "f": "gputaskman.html",
    "t": "gputaskman",
-   "d": "Install gputaskman (a terminal monitor for what is inside your GPU) and run a one-button session: start an Ollama model, take GPU snapshots, and get one JSON file to send.",
+   "d": "Install gputaskman (a terminal monitor for what is inside your GPU), run a one-button session that starts an Ollama model, watch the card over time or while the GPU brain runs, and get one JSON file to send.",
    "g": "thirdparty",
    "p": 0
   },

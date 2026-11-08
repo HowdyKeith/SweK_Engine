@@ -50,6 +50,30 @@
 //   Also run, not a row of this gate: an end-to-end smoke (the real module, the five real route lines taken out of server.js, real child processes for
 //     gputaskman, nvidia-smi and uv, a real HTTP server on loopback for Ollama): status, install, a refused method, snapshot, a refused gpu, a session polled
 //     to its end, a second start refused, a model that is not pulled, a LAN address refused, the file written and equal to the result. All as expected.
+//   THE WATCH (2026-11-08: "sample for N seconds", and the GPU brain run under the samples; sections 11 to 14, 457 rows in all; module 21fc08c26aa730a1...).
+//     THE FIRST DRAFT of the digest searched each gputaskman snapshot's TEXT for words (Direct3D, Vulkan, CUDA, chrome...). THE REAL gputaskman 0.3.3, found installed in
+//     the sandbox, printed a snapshot with a KEY called "cuda" in it, which that search would have counted as a runtime in every sample: the search was replaced, before
+//     any row was written, by a defensive reading of the fields (read from the program's source), and the real output is a fixture in section 11.
+//     sweep 5 (before the watch rows were closed): 976 mutants, 800 RED, 57 CRASH, 119 SURVIVORS. Read line by line; rows were added for the median (sorted, odd and even,
+//     rounded), the busiest-GPU choice (ties, N/A, a garbled index, the fallback), every program aggregation (busiest process of a name, the during-only share, engine
+//     peaks, the memory peak, onlyDuring, the runtimes map, the order and the cut at ten), the digest's corners, the size budget at its edge, the clock starting away from
+//     zero, the sample cap, and the steps' verdicts. THE READ ALSO FOUND REAL FAULTS, fixed in the module: a phase that ended by its sample cap still waited one more
+//     interval (the swarm started an interval late and the watch ended an interval late); the swarm's duration was timed to the END OF THE SAMPLING, not to the swarm's own
+//     end (now stamped when its child resolves); the runtimes map came out in the order seen (now sorted); and dead code went: a loop guard the in-loop break made redundant,
+//     a `|| 0` the default parameter already gave, and a comparator that returned 1 for 'greater' and for 'equal' alike.
+//     sweep 6: 979 mutants, 865 RED, 57 CRASH, 57 survivors; sweep 7: 973 mutants, 868 RED, 57 CRASH, 48 survivors; then a targeted re-run of the 66 mutants of the sort and
+//     aggregation lines after rows that put two programs in BOTH insertion orders (an `a`-side `|| 1` in a comparator only shows when the null one is the pivot) and a
+//     300-program list: 55 caught. FINAL: 973 mutants, 926 caught, 47 survivors, ARGUED EQUIVALENT OR UNOBSERVABLE: the 29 above that are old (L77, L114, L130, L162, L170,
+//     L185, L224, L234, L282, L287, L295, L298, L327, L329, L332, L494, L501, L510 and the `e && e.message || e` texts) and, new: L320 `sampleSecs > 0` as `> 1` (1 is below the
+//     minimum of 3) and the budget's starting 0 as 1 (one byte of 3 MiB); L345 the digit count of a form string ({1,6} as {1,7}, {0,6}, {1,5}: a longer string is out of range
+//     either way and an empty one is handled before); L380 a missing memory figure as 1 in a tie-break (differs only for a process with exactly ONE byte); L387 `g.raw || ""`
+//     (the raw text is cut to 4,003 characters by snapshot(), so 120 of them never reach the budget); L424, L429 and L430 `>` as `>=` where the two values are equal;
+//     L436 `<` as `<=`, `>` as `>=` and the returns of the name comparator (names are unique, and a sort that is told 'not before' for both greater and equal orders a
+//     list of 300 the same); L459 and L490, L504 the initial `ok: false` (finish() overwrites it) and the error texts of a thrown non-Error.
+//   Also run, not a row of this gate: the end-to-end smoke again with the watch (the real module, the real route lines out of server.js, real child processes: THE REAL
+//     gputaskman 0.3.3 with no GPU, stand-in scripts printing busy snapshots in its real shape, and THE REAL swarm tool as the child). Refused modes, sizes and seconds;
+//     a second start refused; a brain watch polled to its end: the swarm printed `*** SOFTWARE ADAPTER *** google swiftshader`, the watch read it, ended not ok saying the
+//     card was not used, and still wrote its file; the stand-ins gave `runtimes: {Direct3D: [chrome.exe]}` with `onlyDuring: true`; a sample watch through the route line.
 // ---------------------------------------------------------------------------------------------------------------------------------
 "use strict";
 import { createRequire } from "node:module";
@@ -283,7 +307,7 @@ function sessionWorld(over = {}) {
         if (/gputaskman/.test(cmd)) {
             if (over.gt === "missing") return { err: errOf({ code: "ENOENT" }) };
             if (args.includes("--list-gpus")) return { stdout: "0: GTX 1080\n" };
-            gtCount++; events.push("gt-snapshot#" + gtCount); if (gtCount === 3 && events.includes("generate-start")) releaseGen();
+            gtCount++; events.push("gt-snapshot#" + gtCount); if (gtCount === (over.releaseAtGt || 3) && events.includes("generate-start")) releaseGen();
             return { stdout: JSON.stringify({ n: gtCount, gpus: [{ name: "GTX 1080", vram_used_mb: 1000 * gtCount }], processes: [{ name: "ollama.exe" }] }) };
         }
         if (cmd === "nvidia-smi") { events.push("smi"); return over.smi === false ? { err: errOf({ code: "ENOENT" }) } : { stdout: "0, NVIDIA GeForce GTX 1080, 552.44, 8192, 2000, 55, 61\n" }; }
@@ -305,7 +329,7 @@ function sessionWorld(over = {}) {
         return { status: 404, json: {} };
     });
     const fsx = fakeFs(over.fs || {}), sleeps = [];
-    return { events, exec, fetch, fsx, sleeps, release: () => releaseGen(), opts: { nowMs: (() => { let t = 0; return () => (t += 1250); })(), execFileImpl: exec, fetchImpl: fetch, fsImpl: fsx, osImpl: fakeOs(), sleepImpl: async (ms) => { sleeps.push(ms); events.push("sleep"); if (over.gt === "missing") releaseGen(); await tick(); }, now: clock(), platform: "win32", home: "C:\\Users\\k", root: "/eng", nodeVersion: "v22.0.0" } };
+    return { events, exec, fetch, fsx, sleeps, release: () => releaseGen(), opts: { nowMs: over.virtual ? () => over.virtual.t : (() => { let t = 0; return () => (t += 1250); })(), execFileImpl: exec, fetchImpl: fetch, fsImpl: fsx, osImpl: fakeOs(), sleepImpl: async (ms) => { sleeps.push(ms); events.push("sleep"); if (over.virtual) over.virtual.t += ms; if (over.gt === "missing") releaseGen(); await tick(); }, now: clock(), platform: "win32", home: "C:\\Users\\k", root: "/eng", nodeVersion: "v22.0.0" } };
 }
 {
     const w = sessionWorld(), { result, saved } = await G.runSession({ model: "q:7b", numPredict: 128 }, w.opts);
@@ -598,6 +622,376 @@ console.log("\n9. THE SOURCE AND THE ROUTES IN THE BRIDGE");
     ok("POST /gputaskman/snapshot -> snapshot({ gpu }) and nothing else from the body", /POST/.test(L.snapshot) && /gpuTaskManBridge\.snapshot\(\{ gpu: \(d \|\| \{\}\)\.gpu \}\)/.test(L.snapshot));
     ok("POST /gputaskman/session -> startSession with the model, base, numPredict, settleMs and unloadWhenDone only", /POST/.test(L.session) && /gpuTaskManBridge\.startSession\(/.test(L.session) && /model: /.test(L.session) && /unloadWhenDone/.test(L.session) && !/\.\.\.d\b/.test(L.session));
     ok("GET /gputaskman/job -> jobStatus(id)", /GET/.test(L.job) && /gpuTaskManBridge\.jobStatus\(/.test(L.job));
+}
+
+
+// ---- 11. watching: many snapshots over time, and the GPU brain under them ---------------------------------------------------------------------------
+console.log("\n11. WATCHING (added 2026-11-08): sample for N seconds, and run the GPU brain under the samples");
+/** The shape gputaskman 0.3.3 prints (read from its source): a busy card with a browser's GPU process under Direct3D, and an idle one. */
+const busySnap = (busy) => ({ taken: 1, gpu: "NVIDIA GeForce GTX 1080", vram_total: 8589934592, vram_used: busy ? 1887436800 : 943718400, device: { index: 0, util_gpu: busy ? 71 : 4, sm_clock: busy ? 1700 : 300, power_w: busy ? 88.5 : 21, temp: busy ? 58 : 41 },
+    processes: busy ? [{ pid: 99, name: "dwm.exe", runtimes: [], gpu_pct: 1.5, engines: { "3D": 1.5 }, vram_bytes: 104857600 }, { pid: 4242, name: "chrome.exe", runtimes: ["Direct3D"], gpu_pct: 62.5, engines: { "3D": 50, Compute_0: 12.5 }, vram_bytes: 314572800 }, { pid: 4243, name: "chrome.exe", runtimes: [], gpu_pct: 0, engines: {}, vram_bytes: 5242880 }, { pid: 7, name: "idle.exe", runtimes: [], gpu_pct: 0, vram_bytes: 0 }] : [{ pid: 99, name: "dwm.exe", runtimes: [], gpu_pct: 1, engines: { "3D": 1 }, vram_bytes: 104857600 }] });
+/** A scripted machine for the watch: virtual time (a snapshot costs `cost` ms, a sleep advances it), gputaskman and nvidia-smi answering by call number, and a stand-in for the swarm that ends when `releaseAt` snapshots have been taken. */
+function watchWorld(over = {}) {
+    let gtN = 0, releaseChild; const T = { t: over.startT || 0 }, events = [], sleeps = [], childGate = new Promise((r) => { releaseChild = r; });
+    const isBusy = (n) => n >= 3 && n <= 5, snapOf = over.snap || ((n) => busySnap(isBusy(n)));
+    const exec = fakeExec(async (cmd, args) => {
+        if (/gputaskman/.test(cmd)) {
+            if (over.gt === "missing") return { err: errOf({ code: "ENOENT" }) };
+            if (args.includes("--list-gpus")) return { stdout: "0: GTX 1080\n" };
+            gtN++; events.push("gt#" + gtN); T.t += over.cost === undefined ? 100 : over.cost; if (over.releaseAt && gtN === over.releaseAt) releaseChild();
+            return { stdout: JSON.stringify(snapOf(gtN)) };
+        }
+        if (cmd === "nvidia-smi") { if (over.smi === false) return { err: errOf({ code: "ENOENT" }) }; events.push("smi"); return { stdout: over.smiText ? over.smiText(gtN) : `0, NVIDIA GeForce GTX 1080, 552.44, 8192, ${isBusy(gtN) ? 1800 : 900}, ${isBusy(gtN) ? 73 : 3}, ${isBusy(gtN) ? 58 : 41}\n` }; }
+        if (cmd === "fakenode") {
+            events.push("swarm-start"); if (over.releaseAfterMs) setTimeout(() => releaseChild(), over.releaseAfterMs); if (!over.noGate) await childGate; events.push("swarm-end"); if (over.childMs) T.t += over.childMs;
+            if (over.childErr) return { err: over.childErr, stdout: over.childOut || "", stderr: over.childStderr || "" };
+            return { stdout: over.childOut === undefined ? "hardware adapter: nvidia pascal NVIDIA GeForce GTX 1080\n\nswarm flown by flyFleet\n   N | ticks\n" : over.childOut, stderr: "" };
+        }
+        return { err: errOf({ code: "ENOENT" }) };
+    });
+    const fsx = fakeFs(over.fs || {});
+    return { events, exec, fsx, sleeps, T, release: () => releaseChild(), opts: { nowMs: () => T.t, execFileImpl: exec, fsImpl: fsx, osImpl: fakeOs(), sleepImpl: async (ms) => { T.t += ms; sleeps.push(ms); await tick(); }, now: clock(), platform: "win32", home: "C:\\Users\\k", root: "/eng", nodeVersion: "v22.0.0", nodeBin: "fakenode" } };
+}
+{
+    // the limits and the parameter checks
+    const I = (v) => G._intIn(v, { min: 3, max: 300, def: 20 });
+    ok("intIn: nothing means the default; the two edges are accepted; a digit string is a number (and is trimmed)", I(undefined) === 20 && I(null) === 20 && I("") === 20 && I(3) === 3 && I(300) === 300 && I("20") === 20 && I(" 5 ") === 5);
+    ok("!! intIn: outside the range, fractions, exponents, signs, words, booleans, lists and objects are NaN", [2, 301, -5, 2.5, "2.5", "1e2", "+5", "-5", "abc", true, false, [5], {}, NaN, Infinity, "1234567", "0x10"].every((x) => Number.isNaN(I(x))));
+    ok("the session's option: nothing and 0 are off; 3 to 300 are seconds; the rest are NaN", [undefined, null, "", 0, "0"].every((x) => G._sampleSecondsOf(x) === 0) && G._sampleSecondsOf(3) === 3 && G._sampleSecondsOf("20") === 20 && G._sampleSecondsOf(300) === 300 && [2, 301, "x", -1, 1.5, true].every((x) => Number.isNaN(G._sampleSecondsOf(x))));
+    ok("the limits are exported and frozen", Object.isFrozen(G.WATCH) && Object.isFrozen(G.WATCH.seconds) && Object.isFrozen(G.WATCH.intervalMs) && G.WATCH.seconds.min === 3 && G.WATCH.seconds.max === 300 && G.WATCH.seconds.def === 20 && G.WATCH.intervalMs.min === 500 && G.WATCH.intervalMs.max === 10000 && G.WATCH.intervalMs.def === 1000 && G.WATCH.maxSamples === 120 && G.WATCH.edgeSamples === 2 && G.WATCH.budgetBytes === 3145728 && Object.isFrozen(G.BRAIN) && Object.isFrozen(G.BRAIN.sizes) && Object.isFrozen(G.BRAIN.script) && eq(G.BRAIN.script, ["tools", "ship", "gpuSwarm.mjs"]) && eq(G.BRAIN.sizes, [64, 256, 1024, 2048, 4096, 8192]) && eq(G.BRAIN.defaultSizes, [4096, 8192]) && G.BRAIN.rounds.min === 1 && G.BRAIN.rounds.max === 5 && G.BRAIN.rounds.def === 2 && G.BRAIN.seconds.min === 1 && G.BRAIN.seconds.max === 20 && G.BRAIN.seconds.def === 10 && G.TIMEOUTS.brain === 1800000);
+    const P = (p) => G._watchParams(p);
+    for (const m of [undefined, null, "", "Sample", "BRAIN", "sample ", "__proto__", "constructor", "brain; rm -rf /", 5, {}, ["sample"]]) ok(`!! a watch with mode ${JSON.stringify(m)} is refused`, P({ mode: m }).ok === false && /mode must be/.test(P({ mode: m }).error));
+    ok("sample: seconds and the interval default to 20 s and 1000 ms, the GPU to none, no swarm", eq(P({ mode: "sample" }), { ok: true, mode: "sample", seconds: 20, intervalMs: 1000, gpu: null, brain: null }));
+    ok("sample: given values are read (strings from a form too)", eq(P({ mode: "sample", seconds: "45", intervalMs: "2000", gpu: "1" }), { ok: true, mode: "sample", seconds: 45, intervalMs: 2000, gpu: 1, brain: null }));
+    for (const [k, v, re] of [["seconds", 2, /seconds must be a whole number from 3 to 300/], ["seconds", 301, /from 3 to 300/], ["seconds", "x", /from 3 to 300/], ["intervalMs", 499, /interval must be a whole number of milliseconds from 500 to 10000/], ["intervalMs", 10001, /500 to 10000/], ["gpu", 64, /GPU number must be a whole number from 0 to 63/], ["gpu", "1; ls", /GPU number/], ["gpu", [1], /GPU number/]]) { const r = P({ mode: "sample", [k]: v }); ok(`!! sample with ${k} ${JSON.stringify(v)} is refused with the range in the message`, r.ok === false && re.test(r.error), r.error); }
+    ok("sample: the edges 3, 300, 500 and 10000 are accepted", P({ mode: "sample", seconds: 3, intervalMs: 500 }).ok && P({ mode: "sample", seconds: 300, intervalMs: 10000 }).ok);
+    ok("brain: the defaults are sizes 4096 and 8192, 2 rounds, 10 simulated seconds, and no wall-clock seconds are asked of the caller", eq(P({ mode: "brain" }), { ok: true, mode: "brain", seconds: null, intervalMs: 1000, gpu: null, brain: { sizes: [4096, 8192], rounds: 2, swarmSeconds: 10 } }));
+    ok("brain: sizes are sorted, and rounds and seconds are read", eq(P({ mode: "brain", sizes: [8192, 1024], rounds: "3", swarmSeconds: 20 }).brain, { sizes: [1024, 8192], rounds: 3, swarmSeconds: 20 }));
+    ok("brain: the edges are accepted (rounds 1 and 5, seconds 1 and 20, every size)", P({ mode: "brain", rounds: 1, swarmSeconds: 1 }).ok && P({ mode: "brain", rounds: 5, swarmSeconds: 20, sizes: [64, 256, 1024, 2048, 4096, 8192] }).ok);
+    for (const [label, body, re] of [["a size that is not on the list", { sizes: [4096, 5000] }, /distinct numbers from: 64, 256, 1024, 2048, 4096, 8192/], ["a size as a string", { sizes: ["4096"] }, /distinct numbers/], ["an empty list", { sizes: [] }, /distinct numbers/], ["a repeated size", { sizes: [4096, 4096] }, /distinct numbers/], ["sizes that are not a list", { sizes: "4096" }, /distinct numbers/], ["a number alone", { sizes: 4096 }, /distinct numbers/], ["a size with a flag in it", { sizes: ["4096 --write"] }, /distinct numbers/], ["rounds 0", { rounds: 0 }, /rounds must be a whole number from 1 to 5/], ["rounds 6", { rounds: 6 }, /from 1 to 5/], ["seconds 0", { swarmSeconds: 0 }, /swarm's seconds must be a whole number from 1 to 20/], ["seconds 21", { swarmSeconds: 21 }, /from 1 to 20/]]) { const r = P({ mode: "brain", ...body }); ok(`!! brain with ${label} is refused`, r.ok === false && re.test(r.error), r.error); }
+    ok("brain: the swarm's seconds are not asked of a sample-mode request, and a brain request needs no seconds of its own", P({ mode: "sample", swarmSeconds: 999, rounds: 99, sizes: ["x"] }).ok === true && P({ mode: "brain", seconds: 1 }).ok === true);
+}
+{
+    // sample mode
+    const w = watchWorld(), { result, saved } = await G.runWatch({ mode: "sample", seconds: 20, intervalMs: 1000 }, w.opts);
+    ok("sample: the watch succeeds, says what it is, and records the request", result.ok === true && result.error === "" && result.kind === "gputaskman-watch" && result.mode === "sample" && result.schema === 1 && eq(result.request, { seconds: 20, intervalMs: 1000, gpu: null, brain: null }) && result.brain === null);
+    ok("!! sample: exactly one snapshot a second for 20 s, from t = 0 (a snapshot costs 100 ms, so the wait before the next is 900 ms, which is the interval less the cost)", result.samples.length === 20 && eq(result.samples.map((x) => x.tMs), Array.from({ length: 20 }, (_, i) => i * 1000)) && result.samples.every((x) => x.tookMs === 100 && x.phase === "sample") && w.sleeps.every((x) => x === 900) && w.sleeps.length === 20);
+    ok("sample: each sample holds the gputaskman snapshot and the nvidia-smi answer, and the digest", result.samples.every((x) => x.gputaskman.ok && x.nvidiaSmi.ok && x.read && Array.isArray(x.read.processes)) && result.samples[2].gputaskman.json.device.util_gpu === 71 && result.samples[2].nvidiaSmi.gpus[0].utilizationPct === 73);
+    ok("sample: a sample carries no private fields (the size counter is removed once the budget has been applied)", result.samples.every((x) => !("bytes" in x)) && result.samples.every((x) => eq(Object.keys(x).sort(), ["gputaskman", "nvidiaSmi", "phase", "read", "tMs", "tookMs"])));
+    ok("sample: the steps read detect, sample, sample, and gputaskman was found", ["detect", "sample"].every((k) => result.steps.some((x) => x.step === k)) && /^gputaskman found$/.test(result.steps[0].note) && result.steps.some((x) => x.step === "sample" && x.note === "taking a snapshot every 1000 ms for 20 s") && result.steps.some((x) => x.step === "sample" && x.note === "20 snapshots" && x.ok === true));
+    ok("sample: the file is gpuwatch-<time>-sample.json inside brain/rig-results/gpu-snapshots/, as 2-space JSON", saved.ok && /^brain\/rig-results\/gpu-snapshots\/gpuwatch-20261108-\d{6}-sample\.json$/.test(saved.relative) && path.dirname(saved.absolute) === path.join("/eng", "brain", "rig-results", "gpu-snapshots") && Object.keys(w.fsx.w.files).length === 1 && /^\{\n  "schema": 1,/.test(Object.values(w.fsx.w.files)[0]) && JSON.parse(Object.values(w.fsx.w.files)[0]).kind === "gputaskman-watch");
+    const sm = result.summary;
+    ok("sample: the summary counts the samples and both tools' answers, names the card and the busiest GPU, and the median gap", eq(sm.samples, { total: 20, before: 0, during: 20, after: 0 }) && sm.gputaskmanOk === 20 && sm.nvidiaSmiOk === 20 && sm.gpuIndex === 0 && sm.gpuName === "NVIDIA GeForce GTX 1080" && sm.intervalMsMedian === 1000 && sm.omittedSnapshots === 0);
+    ok("sample: utilization and memory from nvidia-smi (the busy snapshots are the 3rd to 5th: median of all 20 is 3, the peak 73; memory peak 1800 MiB)", sm.utilizationPct.during === 3 && sm.utilizationPct.duringPeak === 73 && sm.utilizationPct.before === null && sm.utilizationPct.after === null && sm.memoryUsedMiB.duringPeak === 1800 && sm.memoryUsedMiB.rise === null && sm.temperatureCPeak === 58);
+    ok("!! sample: gputaskman's own device readings (utilization, SM clock, power) are read from device.util_gpu, sm_clock and power_w", sm.gputaskmanDevice.utilGpuPct.duringPeak === 71 && sm.gputaskmanDevice.smClockMHz.duringPeak === 1700 && sm.gputaskmanDevice.powerW.duringPeak === 88.5 && sm.gputaskmanDevice.utilGpuPct.before === null);
+    ok("!! sample: the programs that used the card, by name, with their runtimes: chrome.exe under Direct3D at 62.5 percent (engines 3D 50, Compute_0 12.5, 300 MiB), seen in 3 samples; dwm.exe first seen in all 20; the idle one is not listed", sm.programs.length === 2 && sm.programs[0].name === "chrome.exe" && eq(sm.programs[0].runtimes, ["Direct3D"]) && sm.programs[0].gpuPctDuringPeak === 62.5 && sm.programs[0].gpuPctDuringMedian === 62.5 && sm.programs[0].vramPeakMiB === 300 && eq(sm.programs[0].enginesPeak, { "3D": 50, Compute_0: 12.5 }) && eq(sm.programs[0].seen, { before: 0, during: 3, after: 0 }) && sm.programs[0].pids === 2 && sm.programs[1].name === "dwm.exe" && sm.programs[1].seen.during === 20 && sm.programs[1].gpuPctDuringPeak === 1.5);
+    ok("sample: the runtimes map says which programs ran under which runtime during the watch, and onlyDuring needs a 'before' to compare with (a plain sample has none, so it is false)", eq(sm.runtimes, { Direct3D: ["chrome.exe"] }) && sm.programs.every((x) => x.onlyDuring === false));
+}
+{
+    // sample mode: the cap, a slow snapshot, a request that is refused, tools that are missing
+    const w = watchWorld({ cost: 0 }), { result } = await G.runWatch({ mode: "sample", seconds: 300, intervalMs: 500 }, w.opts);
+    ok("!! sample: never more than 120 samples, however long it was asked to watch (300 s at 500 ms would be 600)", result.samples.length === 120 && result.ok);
+    const w2 = watchWorld({ cost: 1500 }), r2 = await G.runWatch({ mode: "sample", seconds: 5, intervalMs: 1000 }, w2.opts);
+    ok("sample: a snapshot slower than the interval is followed by NO wait (0, never negative), and the watch ends when the time is up: samples at 0, 1500, 3000, 4500", r2.result.samples.length === 4 && eq(r2.result.samples.map((x) => x.tMs), [0, 1500, 3000, 4500]) && w2.sleeps.every((x) => x === 0));
+    const w3 = watchWorld({ cost: 400 }); await G.runWatch({ mode: "sample", seconds: 3, intervalMs: 1000 }, w3.opts);
+    ok("sample: the wait is the interval less what the snapshot took (1000 - 400 = 600)", w3.sleeps[0] === 600);
+    const w4 = watchWorld({ cost: 0 }), r4 = await G.runWatch({ mode: "sample", seconds: 3, intervalMs: 1000 }, w4.opts);
+    ok("sample: 3 s at 1 s is samples at 0, 1000 and 2000 (the watch stops AT the end time, it does not take one more)", eq(r4.result.samples.map((x) => x.tMs), [0, 1000, 2000]));
+    for (const bad of [{ mode: "x" }, { mode: "sample", seconds: 2 }, { mode: "sample", intervalMs: 100 }, { mode: "sample", gpu: 99 }]) {
+        const wb = watchWorld(), rb = await G.runWatch(bad, wb.opts);
+        ok(`!! a refused watch (${JSON.stringify(bad)}) runs no command, saves no file and says why`, rb.result.ok === false && rb.saved.ok === false && wb.exec.calls.length === 0 && Object.keys(wb.fsx.w.files).length === 0 && rb.result.steps.length === 1 && rb.result.steps[0].step === "check" && rb.result.steps[0].ok === false && rb.result.error === rb.result.steps[0].note && rb.result.request === null);
+    }
+    const wn = watchWorld({ gt: "missing", smi: false }), rn = await G.runWatch({ mode: "sample", seconds: 3 }, wn.opts);
+    ok("sample: with no gputaskman and no nvidia-smi the watch is not ok, says there is nothing to read, and the file is still saved", !rn.result.ok && /neither gputaskman nor nvidia-smi answered/.test(rn.result.error) && rn.saved.ok && rn.result.gputaskman.installed === false && rn.result.samples.length > 0 && rn.result.samples.every((x) => !x.gputaskman.ok && !x.nvidiaSmi.ok));
+    const wo = watchWorld({ gt: "missing" }), ro = await G.runWatch({ mode: "sample", seconds: 4 }, wo.opts);
+    ok("sample: nvidia-smi alone is enough (ok), the gputaskman samples are marked not ok, and the digest is null", ro.result.ok && ro.result.samples.every((x) => !x.gputaskman.ok && x.read === null && x.nvidiaSmi.ok) && ro.result.summary.gputaskmanOk === 0 && ro.result.summary.nvidiaSmiOk === ro.result.samples.length && eq(ro.result.summary.programs, []));
+    const wg = watchWorld({ smi: false }), rg = await G.runWatch({ mode: "sample", seconds: 4 }, wg.opts);
+    ok("sample: gputaskman alone is enough (ok); the summary takes no utilization from nvidia-smi but reads the programs", rg.result.ok && rg.result.summary.utilizationPct.during === null && rg.result.summary.gpuIndex === null && rg.result.summary.gpuName === null && rg.result.summary.programs.length >= 1);
+    const wd = watchWorld({ fs: { write: new Error("EACCES: no") } }), rd = await G.runWatch({ mode: "sample", seconds: 3 }, wd.opts);
+    ok("sample: a disk that refuses the file leaves the watch ok, with the reason in saveError", rd.result.ok === true && rd.saved.ok === false && /EACCES/.test(rd.result.saveError) && rd.result.error === "");
+    const wt = watchWorld(); wt.opts.sleepImpl = async () => { throw new Error("sleep exploded"); };
+    const rt = await G.runWatch({ mode: "sample", seconds: 5 }, wt.opts).then((x) => ({ resolved: true, ...x }), () => ({ resolved: false }));
+    ok("an unexpected throw inside a watch is caught: the promise resolves, the error says so, the file is still written", rt.resolved && !rt.result.ok && /^the watch failed: sleep exploded$/.test(rt.result.error) && rt.result.steps.some((x) => x.step === "error" && x.ok === false) && rt.saved.ok);
+    const wh = watchWorld(); wh.opts.onStep = () => { throw new Error("hook exploded"); };
+    ok("a progress hook that throws never stops a watch", (await G.runWatch({ mode: "sample", seconds: 3 }, wh.opts)).result.ok);
+    const wq = watchWorld(), rq = await G.runWatch({ mode: "sample", seconds: 3, gpu: 1 }, wq.opts);
+    ok("sample: a GPU number is passed to gputaskman as --gpu 1, and the summary reads that nvidia-smi row", wq.exec.calls.filter((c) => c.args.includes("--once")).every((c) => eq(c.args, ["--once", "--json", "--gpu", "1"])) && rq.result.request.gpu === 1);
+    const two = (n) => `0, NVIDIA GeForce GTX 1080, 552.44, 8192, 900, 5, 40\n1, Second GPU, 552.44, 4096, 2000, 90, 70\n`;
+    const w5 = watchWorld({ smiText: two }), r5 = await G.runWatch({ mode: "sample", seconds: 3 }, w5.opts), w6 = watchWorld({ smiText: two }), r6 = await G.runWatch({ mode: "sample", seconds: 3, gpu: 0 }, w6.opts);
+    ok("!! with two GPUs and none asked for, the summary follows the one that was busiest; asked for GPU 0 it reads GPU 0", r5.result.summary.gpuIndex === 1 && r5.result.summary.gpuName === "Second GPU" && r5.result.summary.utilizationPct.duringPeak === 90 && r6.result.summary.gpuIndex === 0 && r6.result.summary.utilizationPct.duringPeak === 5);
+}
+{
+    // the size budget
+    const big = (n) => ({ pad: "x".repeat(n - 12), processes: [] });
+    const w = watchWorld({ snap: () => big(1000000), cost: 0 }), { result } = await G.runWatch({ mode: "sample", seconds: 8, intervalMs: 1000 }, w.opts);
+    const kept = result.samples.filter((x) => x.gputaskman.json), omitted = result.samples.filter((x) => x.gputaskman.omitted);
+    ok("!! the size budget: the first three snapshots (about 1,000,000 characters each) are kept in full and the rest, which would pass 3 MiB, are marked omitted", result.samples.length === 8 && kept.length === 3 && omitted.length === 5 && kept.every((x, i) => result.samples.indexOf(x) === i), `${kept.length} kept, ${omitted.length} omitted`);
+    ok("the omitted snapshots keep their verdict, time, command and size, and drop the body", omitted.every((x) => x.gputaskman.ok === true && x.gputaskman.omitted === true && x.gputaskman.bytes >= 999980 && x.gputaskman.bytes <= 1000020 && !("json" in x.gputaskman) && /^2026-/.test(x.gputaskman.at) && x.gputaskman.command === "gputaskman --once --json") && result.summary.omittedSnapshots === 5);
+    const w2 = watchWorld({ snap: () => big(1000000), cost: 0 }), r2 = await G.runWatch({ mode: "sample", seconds: 8 }, w2.opts);
+    ok("the file is still valid JSON of the whole result, and the digest of an omitted sample is kept", JSON.parse(Object.values(w2.fsx.w.files)[0]).samples.length === 8 && omitted.every((x) => x.read && Array.isArray(x.read.processes)));
+    const w3 = watchWorld({ snap: () => ({ processes: [] }), cost: 0 }), r3 = await G.runWatch({ mode: "sample", seconds: 120, intervalMs: 1000 }, w3.opts);
+    ok("small snapshots are never omitted", r3.result.samples.length === 120 && r3.result.samples.every((x) => x.gputaskman.json) && r3.result.summary.omittedSnapshots === 0);
+    const w4 = watchWorld({ snap: () => big(1500000), cost: 0 }), r4 = await G.runWatch({ mode: "sample", seconds: 5, intervalMs: 1000 }, w4.opts);
+    ok("the budget is a running total: two snapshots of 1,500,000 fit (3,000,000 < 3,145,728) and the third does not", r4.result.samples.filter((x) => x.gputaskman.json).length === 2 && r4.result.samples[2].gputaskman.omitted === true);
+    const raw = watchWorld({ snap: () => "not json" }); raw.exec.calls.length = 0;
+    const wr = watchWorld(); const rawEx = fakeExec((cmd, args) => (/gputaskman/.test(cmd) ? (args.includes("--list-gpus") ? { stdout: "0: x\n" } : { stdout: "this is not json at all" }) : { err: errOf({ code: "ENOENT" }) }));
+    const rr = await G.runWatch({ mode: "sample", seconds: 3 }, { ...wr.opts, execFileImpl: rawEx });
+    ok("a snapshot that is not JSON is a not-ok sample with its raw text, a null digest, and the watch is not ok (nothing usable)", rr.result.samples.every((x) => !x.gputaskman.ok && /not json/i.test(x.gputaskman.raw) && x.read === null) && !rr.result.ok);
+}
+{
+    // the digest of one snapshot, taken defensively
+    const R = G._readSnapshot;
+    ok("readSnapshot: not a snapshot reads null (null, a string, a number, undefined)", [null, undefined, "x", 5].every((x) => R(x) === null));
+    ok("readSnapshot: an object with nothing in it reads as an idle empty snapshot, not as null", eq(R({}), { utilGpuPct: null, smClockMHz: null, powerW: null, vramUsedBytes: null, processes: [] }) && eq(R([]), { utilGpuPct: null, smClockMHz: null, powerW: null, vramUsedBytes: null, processes: [] }));
+    const real = { taken: 1794155424.1664827, gpu: null, driver: "", cuda: "", adapter: null, vram_total: 0, vram_used: null, shared_used: null, attributed: 0, backend: "nvml", shared_is_spill: true, host_status: null, process_status: null, counter_status: null, counter_adapter_matched: null, wsl_split: null, device: null, processes: [] };
+    ok("!! readSnapshot: the REAL output of gputaskman 0.3.3 on a machine with no GPU (the sandbox's own) reads as empty, and the 'cuda' KEY is not mistaken for a runtime", eq(R(real), { utilGpuPct: null, smClockMHz: null, powerW: null, vramUsedBytes: null, processes: [] }));
+    const d = R(busySnap(true));
+    ok("readSnapshot: device readings and VRAM used", d.utilGpuPct === 71 && d.smClockMHz === 1700 && d.powerW === 88.5 && d.vramUsedBytes === 1887436800);
+    ok("!! readSnapshot: only processes that use the card are kept (a gpu_pct or a vram_bytes above 0), busiest first, with pid, name, runtimes and engines", d.processes.length === 3 && d.processes[0].name === "chrome.exe" && d.processes[0].pid === 4242 && eq(d.processes[0].runtimes, ["Direct3D"]) && d.processes[0].gpuPct === 62.5 && d.processes[0].vramBytes === 314572800 && eq(d.processes[0].engines, { "3D": 50, Compute_0: 12.5 }) && d.processes[1].name === "dwm.exe" && d.processes[2].pid === 4243 && d.processes[2].gpuPct === 0 && d.processes[2].vramBytes === 5242880);
+    const odd = R({ device: "no", processes: [null, 5, "x", { name: 7, pid: "1", runtimes: "Direct3D", gpu_pct: "50", vram_bytes: NaN, engines: [1] }, { name: "a".repeat(200), pid: 2, runtimes: ["Vulkan", 3, null], gpu_pct: 5, engines: { a: 1, b: "x", c: NaN } }] });
+    ok("!! readSnapshot: junk is survived: a device that is not an object, entries that are not objects, a name that is not text, a pid or a percentage that is a string, runtimes that are not a list, engines that are not numbers; a name is cut to 80 characters", odd.utilGpuPct === null && odd.processes.length === 1 && odd.processes[0].name.length === 80 && eq(odd.processes[0].runtimes, ["Vulkan"]) && eq(odd.processes[0].engines, { a: 1 }) && odd.processes[0].gpuPct === 5 && odd.processes[0].pid === 2);
+    const many = R({ processes: Array.from({ length: 30 }, (_, i) => ({ pid: i + 1, name: "p" + i, gpu_pct: i + 1 })) });
+    ok("readSnapshot: at most 12 processes, the busiest 12", many.processes.length === 12 && many.processes[0].name === "p29" && many.processes[11].name === "p18");
+    const eng = R({ processes: [{ pid: 1, name: "e", gpu_pct: 1, engines: Object.fromEntries(Array.from({ length: 20 }, (_, i) => ["e" + i, i + 1])) }] });
+    ok("readSnapshot: at most 12 engines, 8 runtimes", Object.keys(eng.processes[0].engines).length === 12 && R({ processes: [{ pid: 1, name: "e", gpu_pct: 1, runtimes: Array.from({ length: 20 }, (_, i) => "r" + i) }] }).processes[0].runtimes.length === 8);
+    const tie = R({ processes: [{ pid: 1, name: "small", gpu_pct: 5, vram_bytes: 100 }, { pid: 2, name: "big", gpu_pct: 5, vram_bytes: 900 }, { pid: 3, name: "zero", gpu_pct: null, vram_bytes: 50 }] });
+    ok("readSnapshot: equal percentages are ordered by VRAM, and a process with only VRAM is kept after those with a percentage", eq(tie.processes.map((x) => x.name), ["big", "small", "zero"]));
+}
+
+
+// ---- 12. the GPU brain under the samples ------------------------------------------------------------------------------------------------------------
+console.log("\n12. THE GPU BRAIN RUN UNDER THE SAMPLES");
+{
+    const w = watchWorld({ releaseAt: 5 }), { result, saved } = await G.runWatch({ mode: "brain" }, w.opts);
+    const sw = w.exec.calls.find((c) => c.cmd === "fakenode"), ev = w.events;
+    ok("brain: the swarm is run with the node it was given, the engine's own tool by its absolute path, and the fixed arguments (--hardware, the sizes, the rounds, the simulated seconds)", sw && eq(sw.args, [path.join("/eng", "tools", "ship", "gpuSwarm.mjs"), "--hardware", "--sizes", "4096,8192", "--rounds", "2", "--seconds", "10"]));
+    ok("!! brain: no shell, the engine's folder as the working directory, the 30-minute limit, and NEVER --write (so a watched swarm's timings cannot land in the rig's results file)", sw.opts.shell === false && sw.opts.cwd === "/eng" && sw.opts.timeout === 1800000 && !sw.args.includes("--write") && !/["']--write["']/.test(SRC));
+    ok("!! brain: the ORDER is two snapshots, then the swarm starts, then samples while it runs, then it ends, then two snapshots after", ev.indexOf("gt#2") < ev.indexOf("swarm-start") && ev.indexOf("swarm-start") < ev.indexOf("gt#3") && ev.indexOf("swarm-end") > ev.indexOf("gt#5") - 1 && ev.indexOf("swarm-end") < ev.indexOf("gt#" + (result.samples.length - 1)) && ev.filter((e) => /^gt#/.test(e)).length === result.samples.length, ev.join(" "));
+    const ph = (n) => result.samples.filter((x) => x.phase === n).length;
+    ok("brain: two samples before, at least three during and two after, in time order, every one with both tools' answers", ph("before") === 2 && ph("during") >= 3 && ph("during") <= 4 && ph("after") === 2 && result.samples.every((x, i) => i === 0 || x.tMs >= result.samples[i - 1].tMs) && eq(result.samples.map((x) => x.phase).filter((v, i, a) => i === 0 || v !== a[i - 1]), ["before", "during", "after"]));
+    ok("brain: the swarm's record: ok, exit code 0, the command text, the adapter line and 'not software', the output, and the note that it was NOT written to the results file", result.brain.ok === true && result.brain.exitCode === 0 && result.brain.command === "node tools/ship/gpuSwarm.mjs --hardware --sizes 4096,8192 --rounds 2 --seconds 10" && result.brain.adapterLine === "hardware adapter: nvidia pascal NVIDIA GeForce GTX 1080" && result.brain.software === false && /^hardware adapter/.test(result.brain.output) && /NOT written to brain\/rig-results\/gpuSwarm\.jsonl/.test(result.brain.note) && result.brain.timedOut === false && result.brain.notFound === false && result.brain.durationMs > 0 && result.brain.stderrTail === "");
+    ok("brain: on a hardware adapter the watch is ok, and the request names the swarm's settings", result.ok === true && result.error === "" && eq(result.request.brain, { sizes: [4096, 8192], rounds: 2, swarmSeconds: 10 }) && result.mode === "brain" && saved.ok && /gpuwatch-20261108-\d{6}-brain\.json$/.test(saved.relative));
+    const sm = result.summary;
+    ok("!! brain: BEFORE versus DURING in the summary: nvidia-smi utilization 3 before, 73 at the peak during, 3 after; memory 900 MiB before and 1800 at the peak (a rise of 900)", sm.utilizationPct.before === 3 && sm.utilizationPct.duringPeak === 73 && sm.utilizationPct.after === 3 && sm.memoryUsedMiB.before === 900 && sm.memoryUsedMiB.duringPeak === 1800 && sm.memoryUsedMiB.after === 900 && sm.memoryUsedMiB.rise === 900 && eq(sm.samples, { total: result.samples.length, before: 2, during: ph("during"), after: 2 }));
+    ok("!! brain: gputaskman's own readings agree: utilization 4 before and 71 at the peak, the SM clock 300 then 1700 MHz, the power 21 then 88.5 W", sm.gputaskmanDevice.utilGpuPct.before === 4 && sm.gputaskmanDevice.utilGpuPct.duringPeak === 71 && sm.gputaskmanDevice.smClockMHz.before === 300 && sm.gputaskmanDevice.smClockMHz.duringPeak === 1700 && sm.gputaskmanDevice.powerW.before === 21 && sm.gputaskmanDevice.powerW.duringPeak === 88.5);
+    const chrome = sm.programs.find((x) => x.name === "chrome.exe"), dwm = sm.programs.find((x) => x.name === "dwm.exe");
+    ok("!! brain: THE ANSWER TO 'DOES IT SHOW AS DIRECT3D UNDER THE BROWSER'S GPU PROCESS': chrome.exe appears under Direct3D, NOT before the swarm and during it (onlyDuring), while dwm.exe was there all along (not onlyDuring)", chrome && eq(chrome.runtimes, ["Direct3D"]) && chrome.seen.before === 0 && chrome.seen.during >= 3 && chrome.seen.after === 0 && chrome.onlyDuring === true && dwm.seen.before === 2 && dwm.seen.after === 2 && dwm.onlyDuring === false && eq(sm.runtimes, { Direct3D: ["chrome.exe"] }));
+    ok("brain: the programs are listed busiest first", sm.programs[0].name === "chrome.exe" && sm.programs[0].gpuPctDuringPeak === 62.5);
+    ok("brain: the steps tell the story (detect, before, swarm started with its command, swarm finished with the adapter line, after)", ["detect", "before", "swarm", "swarm", "after"].every((k, i) => result.steps[i].step === k) && result.steps[2].note === "starting: node tools/ship/gpuSwarm.mjs --hardware --sizes 4096,8192 --rounds 2 --seconds 10" && /^finished in [\d.]+ s; hardware adapter: nvidia pascal/.test(result.steps[3].note) && result.steps[1].note === "2 snapshots before the swarm starts" && result.steps[4].note === "2 snapshots after it ended" && result.steps.every((x) => x.ok === true));
+}
+{
+    const w = watchWorld({ releaseAt: 5 }), { result } = await G.runWatch({ mode: "brain", sizes: [8192, 1024], rounds: 3, swarmSeconds: 4, intervalMs: 2000, gpu: 0 }, w.opts), sw = w.exec.calls.find((c) => c.cmd === "fakenode");
+    ok("brain: the sizes go in sorted, the rounds, seconds and interval as given", eq(sw.args.slice(1), ["--hardware", "--sizes", "1024,8192", "--rounds", "3", "--seconds", "4"]) && result.request.intervalMs === 2000 && result.samples[1].tMs - result.samples[0].tMs === 2000);
+    ok("brain: a GPU number goes to every gputaskman snapshot, not to the swarm", w.exec.calls.filter((c) => c.args.includes("--once")).every((c) => eq(c.args, ["--once", "--json", "--gpu", "0"])) && !sw.args.includes("--gpu"));
+    const wo = watchWorld({ releaseAt: 5, childOut: "*** SOFTWARE ADAPTER *** google swiftshader\n(a CPU emulating a GPU)\n" }), ro = await G.runWatch({ mode: "brain" }, wo.opts);
+    ok("!! brain: a SOFTWARE adapter is NOT ok: the error says the card was not used, the samples and the file are kept, and software is true", !ro.result.ok && /SOFTWARE adapter: the browser did not reach the graphics card/.test(ro.result.error) && ro.result.brain.software === true && ro.result.brain.ok === true && /SOFTWARE ADAPTER/.test(ro.result.brain.adapterLine) && ro.saved.ok && ro.result.samples.length >= 7);
+    const wu = watchWorld({ releaseAt: 5, childOut: "something else entirely\n" }), ru = await G.runWatch({ mode: "brain" }, wu.opts);
+    ok("brain: an output that names no adapter is ok but says so: software null, an empty adapter line, and the step says 'no adapter line'", ru.result.ok && ru.result.brain.software === null && ru.result.brain.adapterLine === "" && ru.result.steps.some((x) => x.step === "swarm" && /no adapter line/.test(x.note)));
+    const wf = watchWorld({ releaseAt: 5, childErr: errOf({ code: 2 }, "exit 2"), childStderr: "TypeError: boom\n    at x" }), rf = await G.runWatch({ mode: "brain" }, wf.opts);
+    ok("brain: a swarm that fails (exit code 2) is not ok: the error names the exit code and the stderr, the after samples are still taken, and the file is saved", !rf.result.ok && /^the GPU swarm did not finish \(exit code 2\): TypeError: boom/.test(rf.result.error) && rf.result.brain.ok === false && rf.result.brain.exitCode === 2 && rf.result.samples.filter((x) => x.phase === "after").length === 2 && rf.saved.ok && /boom/.test(rf.result.brain.stderrTail) && rf.result.steps.some((x) => x.step === "swarm" && x.ok === false && /^failed: TypeError: boom/.test(x.note)));
+    const wt = watchWorld({ releaseAt: 5, childErr: errOf({ killed: true }, "killed") }), rt = await G.runWatch({ mode: "brain" }, wt.opts);
+    ok("brain: a swarm killed at the time limit says it did not finish in time", !rt.result.ok && /^the GPU swarm did not finish in time:/.test(rt.result.error) && rt.result.brain.timedOut === true && rt.result.steps.some((x) => x.step === "swarm" && x.note === "did not finish within the time allowed"));
+    const wn = watchWorld({ noGate: true, childErr: errOf({ code: "ENOENT" }, "spawn fakenode ENOENT") }), rn = await G.runWatch({ mode: "brain" }, wn.opts);
+    ok("brain: node not found: not ok, notFound true, the step says so, and the after samples are still taken", !rn.result.ok && rn.result.brain.notFound === true && /^the GPU swarm did not finish:/.test(rn.result.error) && rn.result.steps.some((x) => x.step === "swarm" && x.note === "node was not found") && rn.result.samples.filter((x) => x.phase === "after").length === 2);
+    const wm = watchWorld({ gt: "missing", smi: false }), rm = await G.runWatch({ mode: "brain" }, wm.opts);
+    ok("!! brain: when NOTHING can be sampled the swarm is NOT started (a node call is never made) and the file says why", !rm.result.ok && /so the swarm was not started/.test(rm.result.error) && !wm.exec.calls.some((c) => c.cmd === "fakenode") && rm.result.brain === null && rm.saved.ok);
+    const wc = watchWorld({ releaseAt: 118, cost: 0 }), rc = await G.runWatch({ mode: "brain", intervalMs: 500 }, wc.opts);
+    ok("!! brain: the samples during the swarm stop at 116 (120 less the four before and after) and the swarm is still waited for: 2 + 116 + 2 = 120", rc.result.samples.filter((x) => x.phase === "during").length === 116 && rc.result.samples.length === 120 && rc.result.brain.ok === true);
+    const wl = watchWorld({ releaseAt: 5 }); wl.opts.brainTimeoutMs = 4321; await G.runWatch({ mode: "brain" }, wl.opts);
+    ok("brain: the time limit can be shortened by the caller's options (the gate uses it)", wl.exec.calls.find((c) => c.cmd === "fakenode").opts.timeout === 4321);
+    const wb = watchWorld({ releaseAt: 5 }); const bo = { ...wb.opts }; delete bo.nodeBin;
+    await G.runWatch({ mode: "brain" }, bo);
+    const used = wb.exec.calls.find((c) => /gpuSwarm\.mjs$/.test(c.args[0])).cmd;
+    ok("brain: with no node given it uses the bridge's own when that is node, else `node` from the PATH", used === (/^node(\.exe)?$/i.test(path.basename(process.execPath)) ? process.execPath : "node") && G._nodeBin({}) === used && G._nodeBin({ nodeBin: "x" }) === "x");
+    const wp = watchWorld({ releaseAt: 5, childOut: "hardware adapter: x\n" + "t".repeat(20000) }), rp = await G.runWatch({ mode: "brain" }, wp.opts);
+    ok("brain: the swarm's output is kept to its first 8000 characters and its stderr to the last 1500", rp.result.brain.output.length === 8000 && G.BRAIN.outputChars === 8000);
+    const wq = watchWorld({ releaseAt: 5, childErr: errOf({ code: 1 }), childStderr: "e".repeat(3000) }), rq = await G.runWatch({ mode: "brain" }, wq.opts);
+    ok("brain: a long stderr is cut to its last 1500 characters behind '...'", rq.result.brain.stderrTail.length === 1503 && rq.result.brain.stderrTail.startsWith("..."));
+    const wa = watchWorld({ releaseAt: 5, childOut: "x".repeat(400) + " adapter\n" }), ra = await G.runWatch({ mode: "brain" }, wa.opts);
+    ok("brain: the adapter line is cut to 300 characters", ra.result.brain.adapterLine.length === 300);
+    const wx = watchWorld({ releaseAt: 5 }); const bad = await G.runWatch({ mode: "brain", sizes: [4096, "8192"] }, wx.opts);
+    ok("!! brain: a bad size list is refused with no command run at all (not even gputaskman)", !bad.result.ok && wx.exec.calls.length === 0 && bad.saved.ok === false);
+}
+{
+    // the session's own option: sample while the answer is generated
+    const v = { t: 0 }, w = sessionWorld({ virtual: v, releaseAtGt: 6 }), { result } = await G.runSession({ model: "q:7b", sampleSeconds: 10, sampleIntervalMs: 2000 }, w.opts);
+    ok("session: with sampleSeconds the series is taken WHILE the answer is generated, labelled 'generate', and the request records the settings", result.ok && result.samples.length >= 3 && result.samples.every((x) => x.phase === "generate" && x.gputaskman.ok) && result.request.sampleSeconds === 10 && result.request.sampleIntervalMs === 2000, `${result.samples.length} samples`);
+    ok("session: the series stops when the answer ends (the fake answer ends at the sixth snapshot), not at the 10 seconds", result.samples.length < 6 && result.samples.every((x, i) => i === 0 || x.tMs > result.samples[i - 1].tMs) && result.steps.some((x) => x.step === "samples" && x.ok === true && /^\d+ snapshots while the answer was generated$/.test(x.note)));
+    ok("session: the summary carries the digest of the series (programs, runtimes and device readings)", result.summary.sampled && result.summary.sampled.samples.during === result.samples.length && Array.isArray(result.summary.sampled.programs) && result.summary.sampled.gputaskmanOk === result.samples.length);
+    ok("session: the three labelled snapshots are still taken as before (baseline, loaded, busy)", ["baseline", "loaded", "busy"].every((k) => result.snapshots[k] && result.snapshots[k].ok));
+    const w0 = sessionWorld(), r0 = await G.runSession({ model: "q:7b" }, w0.opts);
+    ok("!! session: with the option OFF (the default) no series is taken, the request says 0, the summary has no 'sampled', and the steps have no 'samples' step", eq(r0.result.samples, []) && r0.result.request.sampleSeconds === 0 && r0.result.request.sampleIntervalMs === 1000 && r0.result.summary.sampled === null && !r0.result.steps.some((x) => x.step === "samples"));
+    for (const bad of [{ sampleSeconds: 2 }, { sampleSeconds: 301 }, { sampleSeconds: "x" }, { sampleSeconds: 10, sampleIntervalMs: 100 }, { sampleSeconds: 10, sampleIntervalMs: 99999 }]) {
+        const wb = sessionWorld(), rb = await G.runSession({ model: "q:7b", ...bad }, wb.opts);
+        ok(`!! session with ${JSON.stringify(bad)}: refused before anything runs, no file, and the reason is the sampling message`, !rb.result.ok && rb.result.error === "the sampling settings must be whole numbers: seconds 0 (off) or 3 to 300, interval 500 to 10000 ms" && wb.exec.calls.length === 0 && wb.fetch.calls.length === 0 && Object.keys(wb.fsx.w.files).length === 0 && rb.result.steps.length === 1 && rb.result.steps[0].note === "the sampling settings are not valid");
+    }
+    const wz = sessionWorld({ gt: "missing" }), rz = await G.runSession({ model: "q:7b", sampleSeconds: 5 }, wz.opts);
+    ok("session: with no gputaskman the series is nvidia-smi alone (still ok), the gputaskman samples are not ok", rz.result.ok && rz.result.samples.length >= 1 && rz.result.samples.every((x) => !x.gputaskman.ok && x.nvidiaSmi.ok));
+}
+{
+    // the jobs: a watch is a job like a session
+    G._reset();
+    const w = watchWorld({ releaseAt: 5 }), a = G.startWatch({ mode: "brain" }, w.opts);
+    ok("a watch starts as a job and returns an id; its kind is 'watch'", a.ok === true && /^gt1-/.test(a.id) && G.jobStatus(a.id).kind === "watch" && G.jobStatus(a.id).state === "running");
+    const b = G.startWatch({ mode: "sample", seconds: 5 }, w.opts), c = G.startSession({ model: "q:7b" }, sessionWorld().opts);
+    ok("!! while a watch runs, another watch AND a session are refused, each naming the one running ('a watch is already running')", b.ok === false && /^a watch is already running$/.test(b.error) && b.id === a.id && c.ok === false && /^a watch is already running$/.test(c.error) && c.id === a.id);
+    for (let i = 0; i < 400 && G.jobStatus(a.id).state === "running"; i++) await tick();
+    const s1 = G.jobStatus(a.id);
+    ok("when it ends: done, the steps, the result, the relative path of the file", s1.state === "done" && s1.kind === "watch" && s1.steps.length >= 5 && s1.result.kind === "gputaskman-watch" && /^brain\/rig-results\/gpu-snapshots\/gpuwatch-/.test(s1.savedAs) && s1.error === "");
+    const sess = G.startSession({ model: "q:7b" }, sessionWorld().opts), d = G.startWatch({ mode: "sample", seconds: 5 }, w.opts);
+    ok("!! while a session runs, a watch is refused ('a session is already running') and the session's kind is 'session'", sess.ok && G.jobStatus(sess.id).kind === "session" && d.ok === false && /^a session is already running$/.test(d.error) && d.id === sess.id);
+    for (let i = 0; i < 400 && G.jobStatus(sess.id).state === "running"; i++) await tick();
+    for (const bad of [{ mode: "x" }, { mode: "sample", seconds: 1 }, { mode: "brain", sizes: [3] }]) { const r = G.startWatch(bad, watchWorld().opts); ok(`!! startWatch ${JSON.stringify(bad)} is refused at the start with the reason and no job`, r.ok === false && typeof r.error === "string" && r.id === undefined); }
+    ok("!! a bad sampling option is refused at the start of a session", G.startSession({ model: "q:7b", sampleSeconds: 2 }, sessionWorld().opts).ok === false && /sampling settings/.test(G.startSession({ model: "q:7b", sampleIntervalMs: 1 }, sessionWorld().opts).error));
+    G._reset();
+    const sw = watchWorld({ releaseAt: 5, childOut: "*** SOFTWARE ADAPTER *** x\n" }), e = G.startWatch({ mode: "brain" }, sw.opts);
+    for (let i = 0; i < 400 && G.jobStatus(e.id).state === "running"; i++) await tick();
+    const se = G.jobStatus(e.id);
+    ok("a watch that ran on a software adapter ends in state error with the reason, and still holds its result and its file", se.state === "error" && /SOFTWARE adapter/.test(se.error) && se.result && se.result.ok === false && se.savedAs);
+    G._reset();
+}
+{
+    // the route lines in server.js
+    const line = (re) => SERVER.split("\n").find((l) => re.test(l)) || "";
+    const W = line(/"\/gputaskman\/watch"/), S = line(/"\/gputaskman\/session"/);
+    ok("POST /gputaskman/watch -> startWatch with the mode, seconds, intervalMs, gpu, sizes, rounds and swarmSeconds only, and nothing else from the body", /POST/.test(W) && /gpuTaskManBridge\.startWatch\(\{ mode: d\.mode, seconds: d\.seconds, intervalMs: d\.intervalMs, gpu: d\.gpu, sizes: d\.sizes, rounds: d\.rounds, swarmSeconds: d\.swarmSeconds \}\)/.test(W) && !/\.\.\.d\b/.test(W));
+    ok("POST /gputaskman/session passes the two sampling options as well, and still only named fields", /sampleSeconds: d\.sampleSeconds, sampleIntervalMs: d\.sampleIntervalMs/.test(S) && !/\.\.\.d\b/.test(S));
+    ok("server.js says six routes", /gputaskman\.html's six routes/.test(SERVER));
+    ok("!! the module runs the swarm through execFile by a fixed script path (BRAIN.script) and never builds a command from a request field", /BRAIN\.script/.test(SRC) && !/exec\(|execSync|spawn\(/.test(SRC.replace(/execFileImpl|execFile|execOf/g, "")) && !/(p|v)\.(command|script|cmd|path|args)\b/.test(SRC.slice(SRC.indexOf("async function runWatch"), SRC.indexOf("// ---- jobs"))));
+}
+
+
+// ---- 13. added after the first sweep of the watch (each row closes surviving mutants; see the LOG in the header) --------------------------------------------
+console.log("\n13. ADDED AFTER THE FIRST SWEEP OF THE WATCH");
+{
+    // hand-made samples, so every number the summary reads is known
+    const smp = (phase, tMs, rows, read) => ({ tMs, tookMs: 0, phase, read: read === undefined ? { utilGpuPct: null, smClockMHz: null, powerW: null, vramUsedBytes: null, processes: [] } : read, gputaskman: { ok: true }, nvidiaSmi: rows === null ? { ok: false } : { ok: true, gpus: rows } });
+    const row = (index, util, mem = 100, temp = 50) => ({ index, name: "GPU " + index, driver: "d", memoryTotalMiB: 8192, memoryUsedMiB: mem, utilizationPct: util, temperatureC: temp });
+    const prog = (name, gpuPct, vramMiB, runtimes = [], pid = 1, engines = {}) => ({ pid, name, runtimes, gpuPct, vramBytes: vramMiB === null ? null : vramMiB * 1048576, engines });
+    const rd = (...processes) => ({ utilGpuPct: null, smClockMHz: null, powerW: null, vramUsedBytes: null, processes });
+    const utilSeries = (vals, phase = "during") => vals.map((v, i) => smp(phase, i * 1000, [row(0, v)]));
+    const U = (vals, phase) => G.watchSummary(utilSeries(vals, phase), null).utilizationPct;
+    ok("!! medians: an odd list reads its middle after SORTING (90 10 50 30 70 -> 50), an even list the mean of the two middle ones (90 10 50 30 -> 40), rounded to two decimals ((1.111 + 2.222) / 2 -> 1.67)", U([90, 10, 50, 30, 70]).during === 50 && U([90, 10, 50, 30]).during === 40 && U([1, 4]).during === 2.5 && U([1.111, 2.222]).during === 1.67 && U([7]).during === 7 && U([50, 10, 30]).during === 30 && U([2, 2, 9, 1, 1]).during === 2);
+    ok("peaks: the largest of the during samples, a null is ignored, and an all-null series reads null", U([3, 90, 20]).duringPeak === 90 && U([null, 5, null]).duringPeak === 5 && U([null, null]).during === null && U([null, null]).duringPeak === null);
+    ok("the generate and sample phases count as 'during' like the swarm's own; before and after are their own buckets", eq(G.watchSummary([smp("generate", 0, [row(0, 10)]), smp("generate", 1000, [row(0, 20)]), smp("generate", 2000, [row(0, 30)])], null).samples, { total: 3, before: 0, during: 3, after: 0 }) && G.watchSummary([smp("generate", 0, [row(0, 10)]), smp("generate", 1, [row(0, 20)]), smp("generate", 2, [row(0, 30)])], null).utilizationPct.during === 20 && eq(G.watchSummary([smp("before", 0, [row(0, 1)]), smp("during", 1, [row(0, 80)]), smp("after", 2, [row(0, 2)]), smp("sample", 3, [row(0, 60)])], null).samples, { total: 4, before: 1, during: 2, after: 1 }));
+    ok("!! the GPU the summary follows: the busiest by peak; on a TIE the lower index (the first); an N/A (null) counts below any number; with every value null the first row's index", G.watchSummary([smp("during", 0, [row(0, 50), row(1, 50)])], null).gpuIndex === 0 && G.watchSummary([smp("during", 0, [row(0, null), row(1, 10)])], null).gpuIndex === 1 && G.watchSummary([smp("during", 0, [row(0, null), row(1, null)])], null).gpuIndex === 0 && G.watchSummary([smp("during", 0, [row(0, 5), row(1, 6)])], null).gpuIndex === 1 && G.watchSummary([smp("during", 0, [row(2, null), row(1, null)])], null).gpuIndex === 2);
+    ok("!! a row with no index (a line nvidia-smi garbled) is never the followed GPU", G.watchSummary([smp("during", 0, [row(null, 99), row(1, 5)])], null).gpuIndex === 1);
+    ok("!! with no 'during' samples at all the summary falls back to the FIRST nvidia-smi row seen (not the second), and with no nvidia-smi rows the index and name are null", G.watchSummary([smp("before", 0, [row(3, 5), row(7, 9)])], null).gpuIndex === 3 && G.watchSummary([smp("before", 0, null), smp("during", 1, [])], null).gpuIndex === null && G.watchSummary([smp("before", 0, null)], null).gpuName === null && G.watchSummary([smp("during", 0, [row(0, 5)])], 2).gpuIndex === 2);
+    ok("the omitted-snapshot count is 0 when none is given and is what it is told otherwise", G.watchSummary([], null).omittedSnapshots === 0 && G.watchSummary([], null, 4).omittedSnapshots === 4);
+    ok("memory and temperature: the median before, the peak during, the rise, the median after, the hottest during", eq(G.watchSummary([smp("before", 0, [row(0, 1, 100, 40)]), smp("before", 1, [row(0, 1, 300, 41)]), smp("during", 2, [row(0, 80, 500, 70)]), smp("during", 3, [row(0, 80, 900, 75)]), smp("after", 4, [row(0, 2, 200, 50)])], null).memoryUsedMiB, { before: 200, duringPeak: 900, after: 200, rise: 700 }) && G.watchSummary([smp("during", 0, [row(0, 1, 100, 70)]), smp("during", 1, [row(0, 1, 100, 75)])], null).temperatureCPeak === 75);
+
+    // programs
+    const P = (samples) => G.watchSummary(samples, null);
+    const chromeS = P([smp("during", 0, [row(0, 5)], rd(prog("chrome.exe", 30, 100, ["Direct3D"], 1), prog("chrome.exe", 62.5, 50, [], 2))), smp("during", 1, [row(0, 5)], rd(prog("chrome.exe", 40, 150, [], 1))), smp("during", 2, [row(0, 5)], rd(prog("chrome.exe", 10, 200, ["Vulkan"], 1)))]).programs[0];
+    ok("!! a program with several processes: in each sample its BUSIEST process counts (62.5, then 40, then 10), the peak is 62.5, the median 40, the memory peak the largest anywhere (200), two pids seen, the runtimes joined and sorted", chromeS.name === "chrome.exe" && chromeS.gpuPctDuringPeak === 62.5 && chromeS.gpuPctDuringMedian === 40 && chromeS.vramPeakMiB === 200 && chromeS.pids === 2 && eq(chromeS.runtimes, ["Direct3D", "Vulkan"]) && eq(chromeS.seen, { before: 0, during: 3, after: 0 }));
+    const lowFirst = P([smp("during", 0, [row(0, 5)], rd(prog("a", 30, 10, [], 1), prog("a", 62.5, 90, [], 2)))]).programs[0], highFirst = P([smp("during", 0, [row(0, 5)], rd(prog("a", 62.5, 90, [], 1), prog("a", 30, 10, [], 2)))]).programs[0];
+    ok("!! within one sample the larger share and the larger memory win whichever process comes first (list order does not matter)", lowFirst.gpuPctDuringPeak === 62.5 && lowFirst.vramPeakMiB === 90 && highFirst.gpuPctDuringPeak === 62.5 && highFirst.vramPeakMiB === 90);
+    const growing = P([smp("during", 0, [row(0, 5)], rd(prog("g", 5, 100))), smp("during", 1, [row(0, 5)], rd(prog("g", 5, 200))), smp("during", 2, [row(0, 5)], rd(prog("g", 5, 150))), smp("during", 3, [row(0, 5)], rd(prog("g", 5, null)))]).programs[0];
+    ok("memory peak across samples: 100, 200, 150, then a sample with no figure -> 200; a program that never gave a figure reads null; an equal figure is not a change", growing.vramPeakMiB === 200 && P([smp("during", 0, [row(0, 5)], rd(prog("h", 5, null)))]).programs[0].vramPeakMiB === null && P([smp("during", 0, [row(0, 5)], rd(prog("h", 5, 64)))]).programs[0].vramPeakMiB === 64);
+    const dw = P([smp("before", 0, [row(0, 1)], rd(prog("dwm.exe", 1.0, 100))), smp("before", 1, [row(0, 1)], rd(prog("dwm.exe", 1.0, 100))), smp("during", 2, [row(0, 80)], rd(prog("dwm.exe", 1.5, 100))), smp("during", 3, [row(0, 80)], rd(prog("dwm.exe", 2.5, 100)))]).programs[0];
+    ok("!! the share DURING counts only the during samples: dwm.exe at 1.0 before and 1.5 and 2.5 during has a median of 2 and a peak of 2.5 (the before values stay out)", dw.gpuPctDuringMedian === 2 && dw.gpuPctDuringPeak === 2.5 && eq(dw.seen, { before: 2, during: 2, after: 0 }));
+    const nullShare = P([smp("during", 0, [row(0, 5)], rd(prog("n", null, 40)))]).programs[0];
+    ok("a program with a memory figure and no share has no share (null), not 0", nullShare.gpuPctDuringPeak === null && nullShare.gpuPctDuringMedian === null && nullShare.vramPeakMiB === 40);
+    const E = P([smp("during", 0, [row(0, 5)], rd(prog("e", 5, 1, [], 1, { "3D": 10, Compute_0: 5 }))), smp("during", 1, [row(0, 5)], rd(prog("e", 5, 1, [], 1, { "3D": 30 }), prog("e", 5, 1, [], 2, { "3D": 20, Copy: 2 }))), smp("during", 2, [row(0, 5)], rd(prog("e", 5, 1, [], 1, { "3D": 25 })))]).programs[0];
+    ok("!! each engine keeps its peak across samples and across processes (3D 30, Compute_0 5, Copy 2)", eq(E.enginesPeak, { "3D": 30, Compute_0: 5, Copy: 2 }));
+    const only = P([smp("before", 0, [row(0, 1)], rd(prog("always", 1, 1), prog("early", 1, 1, ["CUDA"]))), smp("during", 1, [row(0, 9)], rd(prog("always", 1, 1), prog("late", 1, 1, ["Vulkan"]))), smp("after", 2, [row(0, 1)], rd(prog("always", 1, 1), prog("ending", 1, 1)))]).programs, by = (n) => only.find((x) => x.name === n);
+    ok("!! onlyDuring: a program first seen while it ran is true; one that was there before is false; one seen only before, or only after, is false (it was not seen during)", by("late").onlyDuring === true && by("always").onlyDuring === false && by("early").onlyDuring === false && by("ending").onlyDuring === false);
+    ok("onlyDuring needs a 'before' to compare with: with none it is false; seen once during, with a before taken, it is true; a SINGLE before sample is a comparison too", P([smp("during", 0, [row(0, 9)], rd(prog("p", 1, 1)))]).programs[0].onlyDuring === false && P([smp("before", 0, [row(0, 1)], rd()), smp("during", 1, [row(0, 9)], rd(prog("p", 1, 1)))]).programs[0].onlyDuring === true);
+    const rt = P([smp("before", 0, [row(0, 1)], rd(prog("early", 1, 1, ["CUDA"]))), smp("during", 1, [row(0, 9)], rd(prog("zeta", 1, 1, ["Vulkan"]), prog("alpha", 1, 1, ["Vulkan", "Direct3D"]))), smp("after", 2, [row(0, 1)], rd(prog("ending", 1, 1, ["HIP"])))]).runtimes;
+    ok("!! the runtimes map lists only programs seen DURING, the names sorted ('alpha' before 'zeta' though 'zeta' came first), and a runtime seen only before or after is absent", eq(rt, { Direct3D: ["alpha"], Vulkan: ["alpha", "zeta"] }) && Object.keys(rt).length === 2);
+    const one = P([smp("before", 0, [row(0, 1)], rd(prog("once", 1, 1, ["Direct3D"]))), smp("during", 1, [row(0, 9)], rd(prog("once", 1, 1, ["Direct3D"])))]).runtimes;
+    ok("a program seen exactly once during is in the runtimes map", eq(one, { Direct3D: ["once"] }));
+    ok("!! the programs are ordered by the share during (largest first), then memory (largest first), then name (alphabetical); a null share comes last", eq(P([smp("during", 0, [row(0, 5)], rd(prog("d", 5, 20), prog("c", 5, 20), prog("b", 5, 10), prog("a", null, 500), prog("z", 90, 1)))]).programs.map((x) => x.name), ["z", "c", "d", "b", "a"]));
+    ok("a name that sorts first wins the last tie even when it came last (insertion order is not the order)", eq(P([smp("during", 0, [row(0, 5)], rd(prog("y", 5, 20), prog("x", 5, 20)))]).programs.map((x) => x.name), ["x", "y"]));
+    ok("at most ten programs are listed, the ten busiest", P([smp("during", 0, [row(0, 5)], rd(...Array.from({ length: 12 }, (_, i) => prog("p" + String(i).padStart(2, "0"), i + 1, 1))))]).programs.length === 10 && P([smp("during", 0, [row(0, 5)], rd(...Array.from({ length: 12 }, (_, i) => prog("p" + String(i).padStart(2, "0"), i + 1, 1))))]).programs[9].name === "p02");
+    ok("memory in MiB is the bytes over 1048576, rounded (314572800 -> 300; 100 MiB + 600000 bytes -> 101)", P([smp("during", 0, [row(0, 5)], rd({ pid: 1, name: "m", runtimes: [], gpuPct: 5, vramBytes: 314572800, engines: {} }))]).programs[0].vramPeakMiB === 300 && P([smp("during", 0, [row(0, 5)], rd({ pid: 1, name: "m", runtimes: [], gpuPct: 5, vramBytes: 100 * 1048576 + 600000, engines: {} }))]).programs[0].vramPeakMiB === 101);
+    ok("a pid seen in every sample counts once", P([smp("during", 0, [row(0, 5)], rd(prog("k", 5, 1, [], 7))), smp("during", 1, [row(0, 5)], rd(prog("k", 5, 1, [], 7))), smp("during", 2, [row(0, 5)], rd(prog("k", 5, 1, [], 8)))]).programs[0].pids === 2);
+    ok("a sample whose snapshot was not readable (digest null) adds no program and does not throw", P([smp("during", 0, [row(0, 5)], null), smp("during", 1, [row(0, 5)], rd(prog("q", 5, 1)))]).programs.length === 1);
+    ok("the gputaskman device readings: the before median, the peak during, and a null where nothing was read", eq(G.watchSummary([smp("before", 0, [], { utilGpuPct: 4, smClockMHz: 300, powerW: 21, vramUsedBytes: null, processes: [] }), smp("before", 1, [], { utilGpuPct: 6, smClockMHz: 300, powerW: 21, vramUsedBytes: null, processes: [] }), smp("during", 2, [], { utilGpuPct: 71, smClockMHz: 1700, powerW: 88.5, vramUsedBytes: null, processes: [] }), smp("during", 3, [], { utilGpuPct: 60, smClockMHz: 1600, powerW: 80, vramUsedBytes: null, processes: [] })], null).gputaskmanDevice, { utilGpuPct: { before: 5, duringPeak: 71 }, smClockMHz: { before: 300, duringPeak: 1700 }, powerW: { before: 21, duringPeak: 88.5 } }) && G.watchSummary([smp("during", 0, [row(0, 5)])], null).gputaskmanDevice.utilGpuPct.duringPeak === null);
+    ok("the median gap between samples is the median of the differences of their times", G.watchSummary([smp("sample", 0, [row(0, 5)]), smp("sample", 1000, [row(0, 5)]), smp("sample", 2500, [row(0, 5)]), smp("sample", 3500, [row(0, 5)])], null).intervalMsMedian === 1000 && G.watchSummary([smp("sample", 0, [row(0, 5)])], null).intervalMsMedian === null);
+    ok("a sample with neither tool answering still counts in the totals but in neither 'ok' count", eq((({ gputaskmanOk, nvidiaSmiOk, samples }) => [gputaskmanOk, nvidiaSmiOk, samples.total])(G.watchSummary([{ ...smp("sample", 0, null), gputaskman: { ok: false } }, smp("sample", 1, [row(0, 1)])], null)), [1, 1, 2]));
+}
+{
+    // the clock, the cut-offs and the swarm's own time
+    const w = watchWorld({ startT: 5000 }), { result } = await G.runWatch({ mode: "sample", seconds: 3, intervalMs: 1000 }, w.opts);
+    ok("!! tMs counts from the START of the watch, not from the clock's zero (a clock that starts at 5000 still gives samples at 0, 1000, 2000)", eq(result.samples.map((x) => x.tMs), [0, 1000, 2000]));
+    const w2 = watchWorld({ cost: 0 }), r2 = await G.runWatch({ mode: "sample", seconds: 3, intervalMs: 999 }, w2.opts);
+    ok("!! the watch lasts exactly `seconds` x 1000 ms: 3 s at 999 ms gives samples at 0, 999, 1998 and 2997 (the last begins before the 3000 ms are up)", eq(r2.result.samples.map((x) => x.tMs), [0, 999, 1998, 2997]));
+    const w3 = watchWorld({ cost: 0 }), r3 = await G.runWatch({ mode: "sample", seconds: 300, intervalMs: 500 }, w3.opts);
+    ok("!! a watch that ends by the sample cap does not wait one more interval after its last sample (120 samples, 119 waits)", r3.result.samples.length === 120 && w3.sleeps.length === 119);
+    const w4 = watchWorld({ cost: 0 }), r4 = await G.runWatch({ mode: "sample", seconds: 4, intervalMs: 1000 }, w4.opts);
+    ok("a watch that ends by TIME waits out the last interval (4 samples, 4 waits, the last one bringing the clock to the end time)", r4.result.samples.length === 4 && w4.sleeps.length === 4 && w4.T.t === 4000);
+    ok("every step of a good sample watch is ok, including the one that announces it", r4.result.steps.every((x) => x.ok === true) && r4.result.steps.some((x) => x.step === "sample" && x.note === "taking a snapshot every 1000 ms for 4 s"));
+    const wr1 = watchWorld(), rr1 = await G.runWatch({ mode: "x" }, wr1.opts), rr2 = await G.runWatch({ mode: "brain", sizes: [1] }, wr1.opts), rr3 = await G.runWatch({ mode: "sample", seconds: 1 }, wr1.opts);
+    ok("a refused request still says which mode it asked for (brain, or sample for anything else)", rr1.result.mode === "sample" && rr2.result.mode === "brain" && rr3.result.mode === "sample");
+    // the budget at its edge: three snapshots of exactly 1 MiB fit (3 x 1048576 = 3145728), the fourth does not
+    const exact = (n) => { const base = JSON.stringify({ pad: "", processes: [] }).length; return { pad: "x".repeat(n - base), processes: [] }; };
+    const w5 = watchWorld({ snap: () => exact(1048576), cost: 0 }), r5 = await G.runWatch({ mode: "sample", seconds: 5, intervalMs: 1000 }, w5.opts);
+    ok("!! the size budget is spent exactly: snapshots of 1048576 characters each, three fit (their sum IS the budget), the fourth is omitted", r5.result.samples.filter((x) => x.gputaskman.json).length === 3 && r5.result.samples[3].gputaskman.omitted === true && r5.result.samples[3].gputaskman.bytes === 1048576 && r5.result.summary.omittedSnapshots === 2);
+    const w6 = watchWorld({ snap: () => exact(1000000), cost: 0, releaseAt: 6 }), r6 = await G.runWatch({ mode: "brain" }, w6.opts);
+    ok("brain: the omitted count is in the summary too (6 snapshots of 1,000,000: three kept, three omitted)", r6.result.summary.omittedSnapshots === r6.result.samples.filter((x) => x.gputaskman.omitted).length && r6.result.summary.omittedSnapshots >= 3);
+    const w7 = watchWorld({ releaseAt: 5 }), r7 = await G.runWatch({ mode: "brain" }, w7.opts);
+    ok("brain: with nothing omitted the summary says 0", r7.result.summary.omittedSnapshots === 0);
+    const w8 = watchWorld({ gt: "missing", smi: false }), r8 = await G.runWatch({ mode: "brain" }, w8.opts);
+    ok("brain: when nothing can be sampled the summary is still written, with 0 omitted", r8.result.summary && r8.result.summary.omittedSnapshots === 0 && r8.result.summary.samples.total === 2);
+    // the cap on samples during the swarm, with the swarm still running when it is reached
+    const w9 = watchWorld({ cost: 0, releaseAfterMs: 60 }), r9 = await G.runWatch({ mode: "brain", intervalMs: 500 }, w9.opts);
+    ok("!! brain: the swarm is still running when the 116-sample cap is reached: exactly 116 samples during, 2 before and 2 after (120), and the swarm is still waited for", r9.result.samples.filter((x) => x.phase === "during").length === 116 && r9.result.samples.filter((x) => x.phase === "before").length === 2 && r9.result.samples.filter((x) => x.phase === "after").length === 2 && r9.result.samples.length === 120 && r9.result.brain.ok === true);
+    // the swarm's own time and notes
+    const wd = watchWorld({ cost: 0, noGate: true, childMs: 41234, childOut: "hardware adapter: nvidia pascal GTX 1080\n" }), rd2 = await G.runWatch({ mode: "brain" }, wd.opts);
+    ok("!! the swarm's duration is the time from its start to its own end (41234 ms), not to the end of the sampling, and the step note reads it in tenths of a second", rd2.result.brain.durationMs === 41234 && rd2.result.steps.find((x) => x.step === "swarm" && x.note.startsWith("finished")).note === "finished in 41.2 s; hardware adapter: nvidia pascal GTX 1080");
+    for (const [ms, text] of [[41249, "41.2"], [41250, "41.3"], [100, "0.1"], [49, "0"]]) { const wq = watchWorld({ cost: 0, noGate: true, childMs: ms }), rq = await G.runWatch({ mode: "brain" }, wq.opts); ok(`the swarm's seconds are rounded to a tenth: ${ms} ms reads ${text} s`, rq.result.steps.find((x) => x.step === "swarm" && x.note.startsWith("finished")).note.startsWith(`finished in ${text} s;`) && rq.result.brain.durationMs === ms); }
+    const wl = watchWorld({ releaseAt: 5, childErr: errOf({ code: 2 }, "exit 2"), childStderr: "S".repeat(500) }), rl = await G.runWatch({ mode: "brain" }, wl.opts);
+    ok("!! a failed swarm's reason is cut to its last 300 characters (+3) in the step note and in the error, and a stderr of exactly 300 is not cut", rl.result.steps.find((x) => x.step === "swarm" && x.ok === false).note === "failed: ..." + "S".repeat(300) && rl.result.error === "the GPU swarm did not finish (exit code 2): ..." + "S".repeat(300));
+    const wm = watchWorld({ releaseAt: 5, childErr: errOf({ code: 2 }, "exit 2"), childStderr: "S".repeat(300) }), rm = await G.runWatch({ mode: "brain" }, wm.opts);
+    ok("a stderr of exactly 300 characters is not cut", rm.result.error === "the GPU swarm did not finish (exit code 2): " + "S".repeat(300));
+    const wn = watchWorld({ releaseAt: 5, childErr: errOf({ code: 2 }, "exit 2"), childStderr: "" }), rn = await G.runWatch({ mode: "brain" }, wn.opts);
+    ok("with no stderr the reason is the error's own message", /^the GPU swarm did not finish \(exit code 2\): exit 2$/.test(rn.result.error));
+}
+{
+    // the session's series: the steps and the refusal
+    const v = { t: 0 }, w = sessionWorld({ virtual: v, gt: "missing", smi: false, releaseAtGt: 99 }), r = await G.runSession({ model: "q:7b", sampleSeconds: 3, sampleIntervalMs: 1000 }, w.opts);
+    ok("session: with neither tool the series step says so (not ok) and the session itself goes on", r.result.steps.some((x) => x.step === "samples" && x.ok === false) && r.result.ok);
+    const v2 = { t: 0 }, w2 = sessionWorld({ virtual: v2, gt: "missing", releaseAtGt: 99 }), r2 = await G.runSession({ model: "q:7b", sampleSeconds: 3, sampleIntervalMs: 1000 }, w2.opts);
+    ok("session: nvidia-smi alone is enough for the series step to be ok", r2.result.steps.some((x) => x.step === "samples" && x.ok === true));
+    const wb = sessionWorld(), rb = await G.runSession({ model: "q:7b", sampleSeconds: 2 }, wb.opts);
+    ok("a refused sampling request logs its one failed 'check' step", rb.result.steps.length === 1 && rb.result.steps[0].step === "check" && rb.result.steps[0].ok === false);
+    const wbad = sessionWorld(), rbad = await G.runSession({ model: "q:7b", sampleSeconds: 2 }, wbad.opts);
+    ok("a refused sampling request records null for the settings that were not valid and the interval as given", rbad.result.request.sampleSeconds === null && rbad.result.request.sampleIntervalMs === 1000);
+    const wi = sessionWorld(), ri = await G.runSession({ model: "q:7b", sampleSeconds: 5, sampleIntervalMs: 99999 }, wi.opts);
+    ok("and a refused interval records null for it", ri.result.request.sampleIntervalMs === null && ri.result.request.sampleSeconds === 5);
+}
+{
+    // readSnapshot: the corners the sweep found
+    const R = G._readSnapshot;
+    ok("!! readSnapshot: engines given as a LIST are not engines ({}), on a process that is otherwise kept", eq(R({ processes: [{ pid: 1, name: "e", gpu_pct: 5, engines: [1, 2] }] }).processes[0].engines, {}) && eq(R({ processes: [{ pid: 1, name: "e", gpu_pct: 5, engines: null }] }).processes[0].engines, {}) && eq(R({ processes: [{ pid: 1, name: "e", gpu_pct: 5 }] }).processes[0].engines, {}));
+    ok("!! readSnapshot: a process with neither a share nor memory (both null, or 0 and null, or null and 0) is NOT kept", R({ processes: [{ pid: 1, name: "a", gpu_pct: null, vram_bytes: null }, { pid: 2, name: "b", gpu_pct: 0, vram_bytes: null }, { pid: 3, name: "c", gpu_pct: null, vram_bytes: 0 }, { pid: 4, name: "d" }] }).processes.length === 0);
+    ok("!! readSnapshot: order is share first (0.5 before a bigger memory with no share), then memory; a missing share sorts as 0", eq(R({ processes: [{ pid: 1, name: "bigmem", gpu_pct: null, vram_bytes: 9000 }, { pid: 2, name: "small", gpu_pct: 0.5, vram_bytes: 1 }, { pid: 3, name: "zero", gpu_pct: 0, vram_bytes: 5000 }] }).processes.map((x) => x.name), ["small", "bigmem", "zero"]));
+    ok("readSnapshot: a process with a share and no memory is kept; one with memory and no share is kept", R({ processes: [{ pid: 1, name: "a", gpu_pct: 3 }, { pid: 2, name: "b", vram_bytes: 7 }] }).processes.length === 2);
+    ok("readSnapshot: a share given as a string is null and, with no memory, drops the process", R({ processes: [{ pid: 1, name: "a", gpu_pct: "50" }] }).processes.length === 0);
+}
+
+
+// ---- 14. added after the second sweep of the watch ------------------------------------------------------------------------------------------------------
+console.log("\n14. ADDED AFTER THE SECOND SWEEP OF THE WATCH");
+{
+    const smp = (phase, tMs, read) => ({ tMs, tookMs: 0, phase, read, gputaskman: { ok: true }, nvidiaSmi: { ok: false } });
+    const rd = (...processes) => ({ utilGpuPct: null, smClockMHz: null, powerW: null, vramUsedBytes: null, processes });
+    const pr = (name, gpuPct, vramBytes, runtimes = []) => ({ pid: 1, name, runtimes, gpuPct, vramBytes, engines: {} });
+    const names = (list) => G.watchSummary([smp("during", 0, rd(...list))], null).programs.map((x) => x.name);
+    ok("!! the runtimes of a program are sorted whatever order they were seen in (Vulkan in one sample, then Direct3D in the next)", eq(G.watchSummary([smp("during", 0, rd(pr("a", 5, 1, ["Vulkan"]))), smp("during", 1, rd(pr("a", 5, 1, ["Direct3D"])))], null).programs[0].runtimes, ["Direct3D", "Vulkan"]));
+    ok("!! memory in MiB is bytes over 1048576 and rounds at the half: 105381888 bytes (100.5 MiB) reads 101, 105381800 (just under) reads 100", G.watchSummary([smp("during", 0, rd(pr("m", 5, 105381888)))], null).programs[0].vramPeakMiB === 101 && G.watchSummary([smp("during", 0, rd(pr("m", 5, 105381800)))], null).programs[0].vramPeakMiB === 100);
+    ok("!! a program with a share of 0.5 comes before one with no share and more memory (a missing share is 0, not 1)", eq(names([pr("nulls", null, 500 * 1048576), pr("half", 0.5, 1048576)]), ["half", "nulls"]));
+    ok("!! with equal shares a program with 0 MiB of memory ties with one with no figure, and then the NAME decides ('a' before 'b' whichever has the figure)", eq(names([pr("b", 5, null), pr("a", 5, 1000)]), ["a", "b"]) && eq(names([pr("a", 5, null), pr("b", 5, 1000)]), ["a", "b"]));
+    ok("with equal shares more memory comes first, and a figure beats no figure", eq(names([pr("small", 5, 10 * 1048576), pr("big", 5, 20 * 1048576), pr("none", 5, null)]), ["big", "small", "none"]));
+    ok("!! thirty programs that tie on everything come out in alphabetical order, ten of them, whatever order they went in", eq(names(Array.from({ length: 30 }, (_, i) => pr("p" + String(29 - i).padStart(2, "0"), 5, 1048576))), Array.from({ length: 10 }, (_, i) => "p" + String(i).padStart(2, "0"))));
+    ok("!! the ordering does not depend on which of two programs came first: a share of 0.5 beats no share and a figure beats none, in BOTH insertion orders", eq(names([pr("half", 0.5, 1048576), pr("nulls", null, 500 * 1048576)]), ["half", "nulls"]) && eq(names([pr("fig", 5, 10 * 1048576), pr("nofig", 5, null)]), ["fig", "nofig"]) && eq(names([pr("nofig", 5, null), pr("fig", 5, 10 * 1048576)]), ["fig", "nofig"]) && eq(names([pr("a", 5, 1000), pr("b", 5, null)]), ["a", "b"]) && eq(names([pr("small", 5, 10 * 1048576), pr("big", 5, 20 * 1048576)]), ["big", "small"]) && eq(names([pr("big", 5, 20 * 1048576), pr("small", 5, 10 * 1048576)]), ["big", "small"]));
+    ok("three hundred programs that tie on everything, in reverse and in forward order, come out alphabetical (the sort is exercised beyond a short list)", eq(names(Array.from({ length: 300 }, (_, i) => pr("p" + String(299 - i).padStart(3, "0"), 5, 1048576))), Array.from({ length: 10 }, (_, i) => "p" + String(i).padStart(3, "0"))) && eq(names(Array.from({ length: 300 }, (_, i) => pr("p" + String(i).padStart(3, "0"), 5, 1048576))), Array.from({ length: 10 }, (_, i) => "p" + String(i).padStart(3, "0"))));
+    const R = G._readSnapshot;
+    ok("!! readSnapshot: a process with ONE byte of memory and no share is kept; with a tie on share the one WITH a memory figure comes before one with none", R({ processes: [{ pid: 1, name: "tiny", gpu_pct: 0, vram_bytes: 1 }] }).processes.length === 1 && eq(R({ processes: [{ pid: 1, name: "nofig", gpu_pct: 5, vram_bytes: null }, { pid: 2, name: "fig", gpu_pct: 5, vram_bytes: 1 }] }).processes.map((x) => x.name), ["fig", "nofig"]));
+    // the watch ends AT its end time with no further wait
+    const w = watchWorld({ cost: 1000 }), { result } = await G.runWatch({ mode: "sample", seconds: 3, intervalMs: 1000 }, w.opts);
+    ok("!! a sample that ENDS exactly at the end time is the last, and there is no wait after it: samples at 0, 1000, 2000 each costing 1000 ms, and two waits (of 0) between them, none after", eq(result.samples.map((x) => x.tMs), [0, 1000, 2000]) && w.sleeps.length === 2 && w.sleeps.every((x) => x === 0) && w.T.t === 3000);
 }
 
 clearTimeout(WATCHDOG);

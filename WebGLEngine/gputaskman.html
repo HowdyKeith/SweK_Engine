@@ -3,15 +3,16 @@
      gputaskman is an early, experimental terminal monitor for what is inside a GPU: per-process VRAM, spill into system memory, engine activity, the runtime, and (for language models) the model file and its estimated weights and KV-cache.
      Nothing of it is in this tree or in a release zip. This page (1) asks the engine's bridge what is on this machine, (2) installs it with `uv tool install gputaskman` or `pipx install gputaskman` when you press the button,
      and (3) runs a session: take a snapshot, load an Ollama model through Ollama's own HTTP API, take a snapshot with the model resident, ask for a short answer and take a snapshot WHILE it runs, then show you ONE JSON file
-     (also saved under brain/rig-results/gpu-snapshots/) to send on.
-     THE LOGIC IS ui/gpuTaskManClient.mjs (pure) and ai-bridge/gpuTaskManBridge.js (the bridge side); ui/gpuTaskManClient-selfcheck.mjs RUNS THIS SCRIPT against a fake DOM and a stub bridge. NOT DONE, said plainly: it has not run
-     against a real gputaskman, a real Ollama or a real GPU; the package is not pinned or scanned (it comes from PyPI through uv or pipx). The bridge has no origin check, as the engine's other install routes have none. -->
+     (also saved under brain/rig-results/gpu-snapshots/) to send on. Added 2026-11-08: (4) WATCH the card over time, either for N seconds while you run something yourself or while the engine's own GPU-brain
+     swarm (`node tools/ship/gpuSwarm.mjs --hardware`, never with --write) runs, as many snapshots in one file; and the model session can take a series while its answer is generated.
+     THE LOGIC IS ui/gpuTaskManClient.mjs (pure) and ai-bridge/gpuTaskManBridge.js (the bridge side); ui/gpuTaskManClient-selfcheck.mjs RUNS THIS SCRIPT against a fake DOM and a stub bridge. NOT DONE, said plainly: it has run
+     against the real gputaskman 0.3.3 only on a machine with no GPU, never against a real Ollama or a graphics card; the package is not pinned or scanned (it comes from PyPI through uv or pipx). The bridge has no origin check, as the engine's other install routes have none. -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="demo:title" content="gputaskman">
-<meta name="demo:desc" content="Install gputaskman (a terminal monitor for what is inside your GPU) and run a one-button session: start an Ollama model, take GPU snapshots, and get one JSON file to send.">
+<meta name="demo:desc" content="Install gputaskman (a terminal monitor for what is inside your GPU), run a one-button session that starts an Ollama model, watch the card over time or while the GPU brain runs, and get one JSON file to send.">
 <meta name="demo:category" content="tools">
 <title>gputaskman</title>
 <style>
@@ -36,7 +37,7 @@
 <h1>gputaskman</h1>
 <div class="sub">a monitor for what is inside your GPU, and a one-button session that starts a model and saves the numbers &mdash; a separate project (<a href="https://github.com/shanselman/gputaskman" rel="noopener" target="_blank">shanselman/gputaskman</a>, MIT), linked here for convenience. It does not touch any SweK protocol.</div>
 <div class="card warn" id="caution">
-  Early, experimental software that this engine did not write. The install button below runs <code>uv tool install gputaskman</code> or <code>pipx install gputaskman</code> <b>on this machine</b>, which fetches a package from PyPI; the engine does not pin or scan it. It reads NVIDIA and AMD GPUs (Windows 10/11 and Linux; Apple Silicon from a clone); Intel GPUs are not supported yet. The engine's bridge must be running on this machine.
+  Early, experimental software that this engine did not write. The install button below runs <code>uv tool install gputaskman</code> or <code>pipx install gputaskman</code> <b>on this machine</b>, which fetches a package from PyPI; the engine does not pin or scan it. It reads NVIDIA and AMD GPUs (Windows 10/11 and Linux; Apple Silicon from a clone); Intel GPUs are not supported yet. The engine's bridge must be running on this machine. The <b>Run the GPU brain and watch it</b> button in section 4 also starts the engine's own swarm tool (<code>node tools/ship/gpuSwarm.mjs --hardware</code>), which launches a browser and keeps the card busy for a minute or two.
 </div>
 
 <h2>How to use this, step by step</h2>
@@ -47,10 +48,11 @@
     <li>Press <b>Install with uv</b> (or pipx) in section 2. If it still says gputaskman is not installed afterwards, close the bridge and start it again from a <b>NEW terminal</b> (uv and pipx add <code>~/.local/bin</code> to the PATH for new terminals only), then press Check again.</li>
     <li>Get a model into Ollama, in a command prompt: <code>ollama pull qwen2.5-coder:7b</code> (about 4.7 GB; it fits an 8 GB card). <code>ollama list</code> shows the exact names. Ollama has to be running: the Windows app starts it, otherwise run <code>ollama serve</code>.</li>
     <li>In section 3 type the model name and press <b>Start the model, run gputaskman, save a snapshot</b>. A large model can take minutes to load; the progress box shows each step.</li>
-    <li>When it ends, the JSON is in section 4 and is saved in <code>brain/rig-results/gpu-snapshots/</code>. Read it, then send that file (or paste the box).</li>
+    <li>When it ends, the JSON is in section 5 and is saved in <code>brain/rig-results/gpu-snapshots/</code>. Read it, then send that file (or paste the box).</li>
+    <li>Optional, section 4: <b>Sample now</b> watches the card for the seconds you set while you run something yourself (a game, the pilot-swarm demo, a model in another window), and <b>Run the GPU brain and watch it</b> runs the engine's swarm of pilots on the card with snapshots before, during and after. Each gputaskman snapshot takes a second or more, so the gap between snapshots is at least that. For a long model answer, put a number of seconds in the &ldquo;also sample while it answers&rdquo; box in section 3.</li>
   </ol>
   <div class="note"><b>What the numbers mean.</b> &ldquo;On the GPU&rdquo; is Ollama's own count of how much of the model sits in video memory; the rest is in system memory, which is slower. Tokens per second is the speed of the short test answer. The &ldquo;busy&rdquo; snapshot is taken about 2.5 seconds into that answer.</div>
-  <div class="note"><b>Known limits.</b> It has not been run against a real gputaskman, Ollama or GPU yet. The README of gputaskman does not describe its JSON, so the snapshots are stored exactly as it prints them. Windows is untested. The session does not start Ollama and does not download models, and a model that thinks before it answers spends part of the test's tokens thinking.</div>
+  <div class="note"><b>Known limits.</b> It has been run against the real gputaskman 0.3.3 only on a machine with no GPU (its snapshots were empty), and never against a real Ollama or a graphics card. The README of gputaskman does not describe its JSON; the engine reads the fields of version 0.3.3 from the program's source (the device readings, and each program's name, runtimes, GPU share and memory) and stores every snapshot exactly as it prints it. Windows is untested. The session does not start Ollama and does not download models, and a model that thinks before it answers spends part of the test's tokens thinking.</div>
 </div>
 
 <h2>1. What is on this machine</h2>
@@ -73,12 +75,24 @@
   <div class="note">Needs Ollama running on this machine (the Windows app starts it; otherwise <code>ollama serve</code>) with the model already pulled (<code>ollama pull &lt;name&gt;</code>). The session takes a baseline snapshot, loads the model, snapshots again, asks for a short answer while snapshotting a third time, and saves everything as one file. A large model can take minutes to load.</div>
   <div class="row"><input id="model" class="grow" list="models" placeholder="model, exactly as 'ollama list' shows it, e.g. qwen2.5-coder:7b" autocomplete="off" spellcheck="false"><datalist id="models"></datalist></div>
   <div class="row"><label class="note" for="numPredict">tokens to generate</label><input id="numPredict" type="number" min="16" max="1024" value="200"><label class="note"><input id="unload" type="checkbox"> unload the model when finished</label></div>
+  <div class="row"><label class="note" for="sampleSecs">also sample while it answers, for (seconds, 0 = just the one snapshot)</label><input id="sampleSecs" type="number" min="0" max="300" value="0"></div>
   <div class="row"><button id="runBtn" class="go">Start the model, run gputaskman, save a snapshot</button></div>
   <pre id="progress">nothing started</pre>
   <pre id="summary"></pre>
 </div>
 
-<h2>4. The JSON to send</h2>
+<h2>4. Watch the GPU over time</h2>
+<div class="card" id="watchCard">
+  <div class="note">gputaskman and nvidia-smi are asked together, again and again, and every answer goes into one file with the time it was taken (seconds since the start). The summary reads which programs used the card, under which runtime (Direct3D, Vulkan, CUDA), and what the card's utilization and memory did. At most 120 snapshots; the file keeps the full text of the first few megabytes and marks the rest left out.</div>
+  <div class="row"><b>A.</b> <label class="note" for="wSeconds">sample for (seconds)</label><input id="wSeconds" type="number" min="3" max="300" value="20"><label class="note" for="wEvery">wait between snapshots (ms)</label><input id="wEvery" type="number" min="500" max="10000" value="1000"><button id="wSampleBtn" class="go">Sample now</button></div>
+  <div class="note">A watches the card while you run something yourself: start it, then start the thing, and let it run.</div>
+  <div class="row"><b>B.</b> <label class="note" for="bSizes">swarm sizes</label><select id="bSizes"><option value="4096,8192">4096 and 8192 aircraft</option><option value="8192">8192 aircraft</option><option value="1024,4096,8192">1024, 4096 and 8192</option><option value="64,256,1024,2048,4096,8192">every size (a long run)</option></select><label class="note" for="bRounds">rounds</label><input id="bRounds" type="number" min="1" max="5" value="2"><label class="note" for="bSeconds">seconds flown</label><input id="bSeconds" type="number" min="1" max="20" value="10"><button id="wBrainBtn" class="go">Run the GPU brain and watch it</button></div>
+  <div class="note">B runs the engine's swarm of pilots (<code>node tools/ship/gpuSwarm.mjs --hardware</code>: the CPU twin, then one GPU dispatch a tick) with two snapshots before, one every wait while it runs, and two after. It does NOT write the swarm's results file: the timings it prints were taken while being watched, and are in the JSON only. If the browser falls back to a software adapter the page says so and the card was not used.</div>
+  <pre id="wProgress">nothing started</pre>
+  <pre id="wSummary"></pre>
+</div>
+
+<h2>5. The JSON to send</h2>
 <div class="card" id="jsonCard">
   <div class="row"><button id="snapBtn">Snapshot only (gputaskman now)</button><button id="copyBtn" disabled>Copy the JSON</button><button id="saveBtn" disabled>Download the JSON</button></div>
   <div class="note" id="savedAs"></div>
@@ -92,7 +106,8 @@ import * as C from "/ui/gpuTaskManClient.mjs";
 const $ = (id) => document.getElementById(id);
 const say = (el, text, cls) => { el.textContent = text; el.className = cls || ""; };
 const net = (u, o) => fetch(u, o);
-let lastResult = null, lastSaved = null, running = false;
+let lastResult = null, lastSaved = null, running = false, watching = false;
+const lock = (on) => { for (const id of ["runBtn", "wSampleBtn", "wBrainBtn"]) $(id).disabled = on; };
 
 function showJson(obj, saved, note) {
   lastResult = obj; lastSaved = saved || null;
@@ -124,15 +139,29 @@ async function install(method) {
 
 async function run() {
   if (running) return;
-  const b = C.sessionBody({ model: $("model").value, numPredict: $("numPredict").value, unloadWhenDone: $("unload").checked });
+  if (watching) return;
+  const b = C.sessionBody({ model: $("model").value, numPredict: $("numPredict").value, unloadWhenDone: $("unload").checked, sampleSeconds: $("sampleSecs").value });
   if (!b.ok) { say($("progress"), b.error, "bad"); return; }
-  running = true; $("runBtn").disabled = true; say($("summary"), ""); say($("progress"), "starting...");
+  running = true; lock(true); say($("summary"), ""); say($("progress"), "starting...");
   const st = await C.postJson(C.ROUTES.session, b.body, net);
-  if (!st.ok) { say($("progress"), (st.error || "the bridge refused") + (st.unreachable ? " (is the engine's bridge running on this machine?)" : ""), "bad"); running = false; $("runBtn").disabled = false; return; }
+  if (!st.ok) { say($("progress"), (st.error || "the bridge refused") + (st.unreachable ? " (is the engine's bridge running on this machine?)" : ""), "bad"); running = false; lock(false); return; }
   const fin = await C.pollJob(st.id, net, { onUpdate: (s) => say($("progress"), s.steps.map(C.stepLine).join("\n") || "starting...") });
   say($("progress"), (fin.steps || []).map(C.stepLine).join("\n") + (fin.state === "done" ? "" : "\n" + (fin.error || "")), fin.state === "done" ? "ok" : "bad");
   if (fin.result) { showJson(fin.result, fin.savedAs); say($("summary"), C.summaryLines(fin.result).join("\n"), fin.result.ok ? "ok" : "warn"); }
-  running = false; $("runBtn").disabled = false;
+  running = false; lock(false);
+}
+
+async function watch(mode) {
+  if (running || watching) return;
+  const b = C.watchBody({ mode, seconds: $("wSeconds").value, intervalMs: $("wEvery").value, sizes: $("bSizes").value, rounds: $("bRounds").value, swarmSeconds: $("bSeconds").value });
+  if (!b.ok) { say($("wProgress"), b.error, "bad"); return; }
+  watching = true; lock(true); say($("wSummary"), ""); say($("wProgress"), "starting...");
+  const st = await C.postJson(C.ROUTES.watch, b.body, net);
+  if (!st.ok) { say($("wProgress"), (st.error || "the bridge refused") + (st.unreachable ? " (is the engine's bridge running on this machine?)" : ""), "bad"); watching = false; lock(false); return; }
+  const fin = await C.pollJob(st.id, net, { onUpdate: (s) => say($("wProgress"), s.steps.map(C.stepLine).join("\n") || "starting...") });
+  say($("wProgress"), (fin.steps || []).map(C.stepLine).join("\n") + (fin.state === "done" ? "" : "\n" + (fin.error || "")), fin.state === "done" ? "ok" : "bad");
+  if (fin.result) { showJson(fin.result, fin.savedAs); say($("wSummary"), C.watchLines(fin.result).join("\n"), fin.result.ok ? "ok" : "warn"); }
+  watching = false; lock(false);
 }
 
 async function snap() {
@@ -154,7 +183,7 @@ function save() {
 }
 
 $("checkBtn").onclick = check; $("uvBtn").onclick = () => install("uv"); $("pipxBtn").onclick = () => install("pipx");
-$("runBtn").onclick = run; $("snapBtn").onclick = snap; $("copyBtn").onclick = copy; $("saveBtn").onclick = save;
+$("runBtn").onclick = run; $("wSampleBtn").onclick = () => watch("sample"); $("wBrainBtn").onclick = () => watch("brain"); $("snapBtn").onclick = snap; $("copyBtn").onclick = copy; $("saveBtn").onclick = save;
 check();
 </script>
 <div id="swek-notes"></div>

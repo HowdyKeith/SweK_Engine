@@ -12343,11 +12343,12 @@ ${text.replace(/'/g, "''")}
     if (req.url === "/mlx/pull" && req.method === "POST") { readJson(d => mlxInstallBridge.pullModel((d || {}).model).then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) }))); return; }
     if (req.url === "/mlx/status" && req.method === "GET") { sendJson(mlxInstallBridge.managedStatus()); return; }
     if (req.url === "/mlx/stop" && req.method === "POST") { sendJson(mlxInstallBridge.stopManaged("manual")); return; }
-    // gputaskman.html's five routes (UNNUMBERED; see ai-bridge/gpuTaskManBridge.js for what each does and does not do). Only the fields named here are passed on from a request body.
+    // gputaskman.html's six routes (UNNUMBERED; see ai-bridge/gpuTaskManBridge.js for what each does and does not do). Only the fields named here are passed on from a request body.
     if (req.url === "/gputaskman/status" && req.method === "GET") { gpuTaskManBridge.detect().then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) })); return; }
     if (req.url === "/gputaskman/install" && req.method === "POST") { readJson(d => gpuTaskManBridge.install((d || {}).method).then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) }))); return; }
     if (req.url === "/gputaskman/snapshot" && req.method === "POST") { readJson(d => gpuTaskManBridge.snapshot({ gpu: (d || {}).gpu }).then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) }))); return; }
-    if (req.url === "/gputaskman/session" && req.method === "POST") { readJson(d => { d = d || {}; sendJson(gpuTaskManBridge.startSession({ model: d.model, base: d.base, numPredict: d.numPredict, settleMs: d.settleMs, unloadWhenDone: !!d.unloadWhenDone })); }); return; }
+    if (req.url === "/gputaskman/session" && req.method === "POST") { readJson(d => { d = d || {}; sendJson(gpuTaskManBridge.startSession({ model: d.model, base: d.base, numPredict: d.numPredict, settleMs: d.settleMs, unloadWhenDone: !!d.unloadWhenDone, sampleSeconds: d.sampleSeconds, sampleIntervalMs: d.sampleIntervalMs })); }); return; }
+    if (req.url === "/gputaskman/watch" && req.method === "POST") { readJson(d => { d = d || {}; sendJson(gpuTaskManBridge.startWatch({ mode: d.mode, seconds: d.seconds, intervalMs: d.intervalMs, gpu: d.gpu, sizes: d.sizes, rounds: d.rounds, swarmSeconds: d.swarmSeconds })); }); return; }
     if (req.url.split("?")[0] === "/gputaskman/job" && req.method === "GET") { const q = new URLSearchParams(req.url.split("?")[1] || ""); sendJson(gpuTaskManBridge.jobStatus(q.get("id"))); return; }
     if (req.url === "/keepawake/status" && req.method === "GET") { sendJson(keepAwakeBridge.status()); return; }
     if (req.url === "/keepawake/config" && req.method === "POST") { readJson(d => sendJson(keepAwakeBridge.setEnabled(!!(d && d.enabled)))); return; }
