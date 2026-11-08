@@ -28,6 +28,7 @@
   pre, textarea { background:#070b10; border:1px solid var(--line); border-radius:7px; padding:10px; margin:8px 0; font:12.5px/1.45 ui-monospace, Consolas, monospace; color:var(--ink); white-space:pre-wrap; word-break:break-word; }
   textarea { width:100%; min-height:260px; box-sizing:border-box; }
   code { background:#070b10; border:1px solid var(--line); border-radius:5px; padding:1px 6px; font:12.5px ui-monospace, Consolas, monospace; }
+  ol { margin:6px 0 6px 20px; padding:0; } li { margin:7px 0; } summary { cursor:pointer; color:var(--go); margin:6px 0; }
   .ok { color:var(--go); } .bad { color:var(--err); } .warn { color:var(--warn); }
 </style>
 </head>
@@ -36,6 +37,20 @@
 <div class="sub">a monitor for what is inside your GPU, and a one-button session that starts a model and saves the numbers &mdash; a separate project (<a href="https://github.com/shanselman/gputaskman" rel="noopener" target="_blank">shanselman/gputaskman</a>, MIT), linked here for convenience. It does not touch any SweK protocol.</div>
 <div class="card warn" id="caution">
   Early, experimental software that this engine did not write. The install button below runs <code>uv tool install gputaskman</code> or <code>pipx install gputaskman</code> <b>on this machine</b>, which fetches a package from PyPI; the engine does not pin or scan it. It reads NVIDIA and AMD GPUs (Windows 10/11 and Linux; Apple Silicon from a clone); Intel GPUs are not supported yet. The engine's bridge must be running on this machine.
+</div>
+
+<h2>How to use this, step by step</h2>
+<div class="card" id="steps">
+  <ol>
+    <li>Start the engine's bridge as you usually do (it listens on port 8787) and keep this page open at <code>http://localhost:8787/gputaskman.html</code>.</li>
+    <li>Press <b>Check this machine</b> (section 1): it lists uv, pipx, Python, gputaskman and Ollama.</li>
+    <li>Press <b>Install with uv</b> (or pipx) in section 2. If it still says gputaskman is not installed afterwards, close the bridge and start it again from a <b>NEW terminal</b> (uv and pipx add <code>~/.local/bin</code> to the PATH for new terminals only), then press Check again.</li>
+    <li>Get a model into Ollama, in a command prompt: <code>ollama pull qwen2.5-coder:7b</code> (about 4.7 GB; it fits an 8 GB card). <code>ollama list</code> shows the exact names. Ollama has to be running: the Windows app starts it, otherwise run <code>ollama serve</code>.</li>
+    <li>In section 3 type the model name and press <b>Start the model, run gputaskman, save a snapshot</b>. A large model can take minutes to load; the progress box shows each step.</li>
+    <li>When it ends, the JSON is in section 4 and is saved in <code>brain/rig-results/gpu-snapshots/</code>. Read it, then send that file (or paste the box).</li>
+  </ol>
+  <div class="note"><b>What the numbers mean.</b> &ldquo;On the GPU&rdquo; is Ollama's own count of how much of the model sits in video memory; the rest is in system memory, which is slower. Tokens per second is the speed of the short test answer. The &ldquo;busy&rdquo; snapshot is taken about 2.5 seconds into that answer.</div>
+  <div class="note"><b>Known limits.</b> It has not been run against a real gputaskman, Ollama or GPU yet. The README of gputaskman does not describe its JSON, so the snapshots are stored exactly as it prints them. Windows is untested. The session does not start Ollama and does not download models, and a model that thinks before it answers spends part of the test's tokens thinking.</div>
 </div>
 
 <h2>1. What is on this machine</h2>
@@ -71,13 +86,20 @@
   <div class="note">Look at it before you send it: gputaskman lists the programs that are using the GPU. The file holds no host name, user name or file path of its own.</div>
 </div>
 
+<h2>The notes</h2>
+<div class="card" id="notesCard">
+  <div class="note">The full notes for this page (what each piece does, what was and was not checked, the safety properties) and the list of every command the rig still owes. The engine serves a note file as a download, so the first note can also be read here.</div>
+  <div class="row"><a class="btn" id="notesLink" href="/brain/GPUTASKMAN_WIP.md" download>Download brain/GPUTASKMAN_WIP.md</a><a class="btn" id="rigLink" href="/brain/RIG_COMMANDS_2026-11-07.md" download>Download brain/RIG_COMMANDS_2026-11-07.md</a></div>
+  <details id="notes"><summary>Read GPUTASKMAN_WIP.md here</summary><pre id="notesText">not loaded</pre></details>
+</div>
+
 <script type="module">
 import * as C from "/ui/gpuTaskManClient.mjs";
 
 const $ = (id) => document.getElementById(id);
 const say = (el, text, cls) => { el.textContent = text; el.className = cls || ""; };
 const net = (u, o) => fetch(u, o);
-let lastResult = null, lastSaved = null, running = false;
+let lastResult = null, lastSaved = null, running = false, notesLoaded = false;
 
 function showJson(obj, saved, note) {
   lastResult = obj; lastSaved = saved || null;
@@ -127,6 +149,14 @@ async function snap() {
   $("snapBtn").disabled = false;
 }
 
+async function loadNotes() {
+  if (!$("notes").open || notesLoaded) return;
+  notesLoaded = true; say($("notesText"), "loading...");
+  const r = await C.getText(C.NOTES.wip, net);
+  if (r.ok) say($("notesText"), r.text);
+  else { notesLoaded = false; say($("notesText"), "could not load " + C.NOTES.wip + ": " + r.error + " (is the engine's bridge running and serving the brain folder?)", "bad"); }
+}
+
 async function copy() {
   const text = $("json").value;
   try { await navigator.clipboard.writeText(text); $("savedAs").textContent = "copied " + text.length + " characters"; }
@@ -139,7 +169,7 @@ function save() {
 }
 
 $("checkBtn").onclick = check; $("uvBtn").onclick = () => install("uv"); $("pipxBtn").onclick = () => install("pipx");
-$("runBtn").onclick = run; $("snapBtn").onclick = snap; $("copyBtn").onclick = copy; $("saveBtn").onclick = save;
+$("notes").ontoggle = loadNotes; $("runBtn").onclick = run; $("snapBtn").onclick = snap; $("copyBtn").onclick = copy; $("saveBtn").onclick = save;
 check();
 </script>
 </body>
