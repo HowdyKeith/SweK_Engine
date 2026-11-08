@@ -21,7 +21,7 @@
   }
  },
  "counts": {
-  "page": 501,
+  "page": 502,
   "demo": 49,
   "builtin": 38
  },
@@ -1672,6 +1672,14 @@
    "display": "Gpu Rig Check",
    "href": "/gpu-rig-check.html",
    "section": "Render TSL",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "gputaskman.html",
+   "display": "Gputaskman",
+   "href": "/gputaskman.html",
+   "section": "Opt-in: somebody else's work",
    "collision": false
   },
   {

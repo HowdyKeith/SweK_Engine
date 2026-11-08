@@ -1,7 +1,7 @@
 {
  "version": 1,
  "generated": "derived by tools/ship/buildPageIndex.mjs -- DO NOT HAND-EDIT, the group comes from tools/ship/pageSections.mjs",
- "count": 501,
+ "count": 502,
  "pages": [
   {
    "f": "AudioLab.html",
@@ -1443,6 +1443,13 @@
    "t": "SweK GPU rig check",
    "d": "",
    "g": "rendertsl",
+   "p": 0
+  },
+  {
+   "f": "gputaskman.html",
+   "t": "gputaskman",
+   "d": "Install gputaskman (a terminal monitor for what is inside your GPU) and run a one-button session: start an Ollama model, take GPU snapshots, and get one JSON file to send.",
+   "g": "thirdparty",
    "p": 0
   },
   {

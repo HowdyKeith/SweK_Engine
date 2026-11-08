@@ -336,7 +336,9 @@ export const SECTIONS = [
               "install-fsr-caches.html",
               // privatelm.html JOINS (2026-11-07, Keith: "add this to swek-engine, either use features, or at least have an install button"): an install page for orailnoor/cross-platform-llm-client (MIT), which this engine did not write; it also
               // talks to the OpenAI-compatible server the app can run on a phone. Ten of fifteen.
-              "privatelm.html"] },
+              "privatelm.html",
+              // gputaskman.html JOINS (2026-11-08, Keith: "let's add a install link/page to swek engine that installs gputaskman. can we have swek also start the model, run gputaskman, save snapshot, and give me the json to send to you?"): an install page for shanselman/gputaskman (MIT), a GPU monitor this engine did not write, and a one-button session that loads an Ollama model, takes GPU snapshots and hands back one JSON file. Eleven of fifteen.
+              "gputaskman.html"] },
 
     // *** v4321 -- "Voxel & Render" IS TWO DRAWERS WEARING ONE NAME, AND THE AMPERSAND WAS THE TELL. ***
     // Keith: "let's separate Voxel & Render into a Voxels button and a Renders button." A label with an "&" in
