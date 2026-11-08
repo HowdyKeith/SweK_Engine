@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "d30824314ae8427fd8c6c151131efb933dc57a3e",
+ "head": "6cf3b2f6957172874dc47d2e13a85bbf68ae94cb",
  "bodies": {
   "box3d": [
    {
@@ -11,8 +11,8 @@
    },
    {
     "path": "ai-bridge/server.js",
-    "bytes": 1497554,
-    "sha": "b2c698a60703f141db411e301740223b86398b2d"
+    "bytes": 1499390,
+    "sha": "0febf4d424b81f11b0e9c71858e73dc8cb9d03f0"
    },
    {
     "path": "physics/backendRouting-selfcheck.mjs",
@@ -355,13 +355,13 @@
    },
    {
     "path": "render/subAquariumSim-selfcheck.mjs",
-    "bytes": 56268,
-    "sha": "977d5396421eb059857bfe8c297db19eff716981"
+    "bytes": 56655,
+    "sha": "6cf3b2f6957172874dc47d2e13a85bbf68ae94cb"
    },
    {
     "path": "sub-aquarium.html",
-    "bytes": 49430,
-    "sha": "977d5396421eb059857bfe8c297db19eff716981"
+    "bytes": 50634,
+    "sha": "a6ce4134db2c73df4ff55e345d9980ad108e77f2"
    },
    {
     "path": "tools/flyCx.mjs",
@@ -377,6 +377,21 @@
     "path": "tools/ship/flyCxPilotFile.mjs",
     "bytes": 9654,
     "sha": "b9dda10b134013ec06bdf9ccdaa26026871e3e72"
+   },
+   {
+    "path": "tools/ship/headToHead4-selfcheck.mjs",
+    "bytes": 24675,
+    "sha": "5d01c7fad9e0e2a213755f3c8df887211b4654af"
+   },
+   {
+    "path": "tools/ship/headToHead4Cmd.mjs",
+    "bytes": 1686,
+    "sha": "2504dccb78ba35c34135089842a692bbc9530889"
+   },
+   {
+    "path": "tools/ship/headToHead8Cmd.mjs",
+    "bytes": 1704,
+    "sha": "f56f08f95fa766ecacceb62742eda6fce9fa2f7c"
    },
    {
     "path": "tools/ship/trainNeedsCircuit.mjs",
@@ -407,8 +422,8 @@
    },
    {
     "path": "ai-bridge/server.js",
-    "bytes": 1497554,
-    "sha": "b2c698a60703f141db411e301740223b86398b2d"
+    "bytes": 1499390,
+    "sha": "0febf4d424b81f11b0e9c71858e73dc8cb9d03f0"
    },
    {
     "path": "clients.html",
@@ -417,8 +432,8 @@
    },
    {
     "path": "server.html",
-    "bytes": 902376,
-    "sha": "3e481e5e29e82f2689bed906879782d449f2050b"
+    "bytes": 904940,
+    "sha": "a6ce4134db2c73df4ff55e345d9980ad108e77f2"
    },
    {
     "path": "tools/ship/artifactWeight.mjs",
@@ -695,8 +710,8 @@
    },
    {
     "path": "ai-bridge/server.js",
-    "bytes": 1497554,
-    "sha": "b2c698a60703f141db411e301740223b86398b2d"
+    "bytes": 1499390,
+    "sha": "0febf4d424b81f11b0e9c71858e73dc8cb9d03f0"
    },
    {
     "path": "aquarelle.html",
@@ -790,8 +805,8 @@
    },
    {
     "path": "es-box3d-6dof.html",
-    "bytes": 40767,
-    "sha": "0e461f4686e91bd4726a4490bd141db4baec5458"
+    "bytes": 40828,
+    "sha": "a6ce4134db2c73df4ff55e345d9980ad108e77f2"
    },
    {
     "path": "es-box3d-fly3d.html",
@@ -905,7 +920,7 @@
    },
    {
     "path": "main.js",
-    "bytes": 3742392,
+    "bytes": 3748182,
     "sha": "015f4665d130f6b92ab0b4cf6e827ef53bfe6b64"
    },
    {
@@ -995,13 +1010,13 @@
    },
    {
     "path": "sea-ogre.html",
-    "bytes": 12836,
-    "sha": "4fb1551b514f2915e5188fbd8e27bcfeec6f1bc2"
+    "bytes": 14499,
+    "sha": "a6ce4134db2c73df4ff55e345d9980ad108e77f2"
    },
    {
     "path": "server.html",
-    "bytes": 902376,
-    "sha": "3e481e5e29e82f2689bed906879782d449f2050b"
+    "bytes": 904940,
+    "sha": "a6ce4134db2c73df4ff55e345d9980ad108e77f2"
    },
    {
     "path": "shipavatar.html",
@@ -1035,8 +1050,8 @@
    },
    {
     "path": "sub-aquarium.html",
-    "bytes": 49430,
-    "sha": "977d5396421eb059857bfe8c297db19eff716981"
+    "bytes": 50634,
+    "sha": "a6ce4134db2c73df4ff55e345d9980ad108e77f2"
    },
    {
     "path": "svg-forge.html",

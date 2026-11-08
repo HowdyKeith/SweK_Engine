@@ -701,6 +701,10 @@ export const DEPENDANTS_AT_V4410 = Object.freeze({
         "tools/ship/flyCxPilotFile-selfcheck.mjs",
         "tools/ship/flyCxPilotFile.mjs",
         "tools/tankFlyCxBench.mjs",
+        // 2026-11-08 -- THREE ARRIVED with the merge of claude/wizardly-einstein-wr30pd (the head-to-head line, at d4615eea; named by orreryEjecta-selfcheck): the round H4 gate and its command, and the H8 command, each of which loads the vendored circuit to fly the fly's arms.
+        "tools/ship/headToHead4-selfcheck.mjs",
+        "tools/ship/headToHead4Cmd.mjs",
+        "tools/ship/headToHead8Cmd.mjs",
     ]),
     // v4898 -- vendor/zebrafish-vestibular is a PAPER-ONLY body: the supplementary files of an article, read by no source file (dependantsOf returns []), which is a measurement and not an omission.
     // v4906 -- ONE DEPENDANT ARRIVED: tools/fishVestibularCircuit.mjs reads the supplementary spreadsheets (the rung 4b extraction), so the body is no longer reached by nothing. It is still DATA and holds no code on disk.
