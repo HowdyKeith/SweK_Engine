@@ -3,14 +3,38 @@
 // GATES tools/ship/plain14RobustStage.mjs (round 7 stage 2 as one stage: twenty draws started from the stage-1 champions and trained for the
 // five-vessel robust objective; the registration is brain/PLAIN14_ROBUST_STAGE_WIP.md, written before the tool) AND the one change it needs
 // in tools/trainSubRobust.mjs (a --circuit flag whose default must change NOTHING: that tool made committed networks).
-// Nothing here trains or flies: every file, child process, audit flight and environment variable is a scripted fake handed to the tool's own
-// seams, so each branch (a champion with no weights, a search that dies, a record that is not this tool's, a draw that did not start from its
-// stage-1 champion, a bad argument) is held by a row that needs no rig. Section 7 is the exception: it runs the real trainer for one iteration.
+// Sections 1 to 6 train and fly nothing: every file, child process, audit flight and environment variable is a scripted fake handed to the tool's
+// own seams, so each branch (a champion with no weights, a search that dies, a record that is not this tool's, a draw that did not start from its
+// stage-1 champion, a bad argument) is held by a row that needs no rig. Section 7 is the exception: it runs the real trainer for one iteration (the
+// default, --circuit fly, --circuit plain14, a usage error) and is skipped when SWEK_GATE_NOREAL=1; section 9 flies a few real dives on tiny sets.
 //
-// Run: node tools/ship/plain14RobustStage-selfcheck.mjs      (about 12 s: section 7 runs the trainer three times)
+// Run: node tools/ship/plain14RobustStage-selfcheck.mjs      (about 40 s on 4 cores: section 7 runs the real trainer four times; 157 rows, 150 with SWEK_GATE_NOREAL=1)
 //
 // SABOTAGE: see the LOG at the foot of this header, written when the sweeps finished.
-// LOG: (written after the sweeps)
+// LOG (2026-11-08; sha256 of the swept files: tools/ship/plain14RobustStage.mjs d082e380..., tools/trainSubRobust.mjs 27234c79..., plain14RobustStageCmd.mjs 5be1e195...;
+//   each mutant is one single-site change in a copy of the tree, the gate run against it, caught = RED, CRASH, THREW or TIMEOUT; a first pass of 326 and 88 mutants drove
+//   the rows of sections 7 and 9 and the FORBID guard, this is the pass on the final files):
+//   * LIBRARY tools/ship/plain14RobustStage.mjs, 328 mutants (SWEK_GATE_NOREAL=1): 298 RED by name, 23 CRASH, 7 survived. Two of the seven were REAL and are CLOSED by rows added
+//     afterwards, each re-run and now RED by name: line 144 `d.arm === arm` -> `!==` in the per-arm champion count (row "with 8 plain14 draws that have a champion against
+//     10 fly draws the counts are PER ARM") and line 165 `+` -> `-` in the early-end sum over the five vessels, which survived because no real dive had ended early (row
+//     "a weight list that makes real dives end early (all 3.0)", audit 1, safety 0, reserve 1). FIVE are EQUIVALENT, argued: line 47 `b.seed < a.seed` -> `<=` (the tie-break
+//     of the champion pick compares two different searches, whose seeds 52000 + 10 d + k are all different, so `<` and `<=` cannot differ); lines 53 and 54 (the `>` of an `->`
+//     and the `true` of `{ skipped: true }` are inside a block comment); line 173 `windowsHide: true` -> `false` (a Windows-only flag that hides a console window; nothing
+//     in a process on this box can observe it, and it is NOT checked on Windows).
+//   * TRAINER tools/trainSubRobust.mjs, 88 mutants (the real trainer, run): 62 RED, 2 CRASH, 1 TIMEOUT, 23 survived, ALL IN LINES THE GATE CANNOT REACH IN A ONE-ITERATION RUN AND
+//     SAID PLAINLY, none closed: lines 33 (the acceptance rule: a child that TIES the best by less than 1e-9 is kept; four mutants of the tolerance and of `>=`; a tie
+//     needs a child whose 1 to 4 changed weights do not move the score, which the pinned runs do not produce), 34 (the progress line every 50th iteration: `i % 50`, the
+//     text and its elapsed seconds; the loop starts at 1, so a one-iteration run never prints one) and 35 (the checkpoint every 100th iteration, including the `circuit` field
+//     that THIS round added to it, which is the same expression as the one the pinned final file does carry, so what the gate holds of it is the final file's), and line 28
+//     (the rng's divisor 4294967296 +- 1, a change of 2e-10 in each draw, which no pinned run is resolved enough to see). The rng and the acceptance rule are the fly
+//     chain's own pre-existing lines (the gate pins that `--circuit fly` and the default write the same bytes as the committed trainer; this round touched only the
+//     argument, the policy choice, the usage line and the `circuit` field). Nothing in the rig run depends on the checkpoint: the tool reads each search's FINAL file only.
+//     Pinning them would take a 50 to 100 iteration trainer run (about 3 minutes) in a gate; not done.
+//   * COMMAND tools/ship/plain14RobustStageCmd.mjs: held by the gate's section 6 (the environment variable is set before the import) and section 8's source guards; no
+//     separate mutation pass (two statements).
+//   * A FINDING OF THE SWEEP ITSELF: in the sweep's copy of the tree `brain/` is made of links into the real one, so a mutant that ignores `--out` wrote
+//     `brain/rig-results/plain14-robust/start-*.json` into the REAL tree (twice). They were deleted; a stray record there would have made the rig skip a draw. The gate does not
+//     write there (it was run and the folder checked after), and the tool's own refusal to run outside its folders is not a defence against a MUTANT of it.
 // ---------------------------------------------------------------------------------------------------------------------------------
 "use strict";
 import fs from "node:fs";
@@ -191,6 +215,8 @@ console.log("\n5. report: the checks first, then the reading");
     const mixed = rep(goodRecords({ edit: (r, arm, seed) => ({ ...r, scores: sc(-0.3, -0.30 - (R.SEEDS.indexOf(seed) * 2 + (arm === "fly" ? 0 : 1)) / 1000, -0.32) }) }));
     ok("!! interleaved draws read CANNOT BE TOLD APART (the fly leads by a thousandth on average, which is no reading), and each audit is read, with its mean, range, difference and the two p-values", /^BOTTOM LINE: THE FLY CANNOT BE TOLD APART FROM ITS PLAIN CONTROLS UNDER THE ROBUST OBJECTIVE/.test(mixed[mixed.length - 1]) && mixed.filter((l) => /^(READ ON )?(audit|safetyAudit|reserve): fly mean/.test(l)).length === 3 && mixed.some((l) => /^READ ON safetyAudit: fly mean -0\.3090 \(range -0\.3180 to -0\.3000\), plain14 mean -0\.3100 \(range -0\.3190 to -0\.3010\), difference \+0\.0010; exact one-sided p fly higher 0\.3697, fly lower 0\.6579: TIES$/.test(l)));
     ok("the improvement and early-end counts: 10 of 10 improved on their own start (champions -0.3x, starts -0.5), none ended a dive early", L.includes("draws that IMPROVED on their own start on the safety audit: fly 10 of 10, plain14 10 of 10; draws with a dive that ended early on it: fly 0, plain14 0"));
+    const uneven = rep(goodRecords({ edit: (r, arm, seed) => (arm === "plain14" && R.SEEDS.indexOf(seed) < 2 ? { ...r, champion: null, scores: null } : r) }));
+    ok("!! with 8 plain14 draws that have a champion against 10 fly draws the counts are PER ARM ('plain14 8 of 8', 'fly 10 of 10'), not the other arm's count", uneven.some((l) => /^draws that IMPROVED on their own start on the safety audit: fly 10 of 10, plain14 8 of 8; draws with a dive that ended early on it: fly 0, plain14 0$/.test(l)));
     const worse = rep(goodRecords({ edit: (r, arm, seed) => ({ ...r, scores: sc(-0.3, -0.7, -0.3, 0, arm === "plain14" && R.SEEDS.indexOf(seed) < 4 ? 2 : 0, 0), start: sc(-0.5, arm === "fly" && R.SEEDS.indexOf(seed) < 3 ? -0.9 : -0.5, -0.5) }) }));
     ok("!! a champion BELOW its own start does not count as improved (fly: 3 of the starts are -0.9, the other 7 are -0.5 and the champions -0.7); draws with early ends are counted per arm", worse.includes("draws that IMPROVED on their own start on the safety audit: fly 3 of 10, plain14 0 of 10; draws with a dive that ended early on it: fly 0, plain14 4"));
     const bad = rep(goodRecords(), { "fly:6310": "x" });
@@ -330,6 +356,8 @@ console.log("\n9. THE REAL SEAMS (a temporary folder, the real trainer for one i
     ok("!! the same for PLAIN14 (the other policy, a 954-weight net): audit -0.717514454, safety -0.360564472, reserve -0.355385228 (so the arm picks the policy)", near(plain.audit.score, -0.717514454) && near(plain.safetyAudit.score, -0.360564472) && near(plain.reserve.score, -0.355385228) && AUDITS.every((a) => plain[a].vessels === 5 && plain[a].crashed === 0));
     ok("!! the PD autopilot (weights null) on the same sets: audit -0.9491668257, safety -0.5344491073, reserve -0.5854266526, whichever arm asks, and it is not the champion's score", near(auto.audit.score, -0.9491668257) && near(auto.safetyAudit.score, -0.5344491073) && near(auto.reserve.score, -0.5854266526) && eq(three(auto), three(auto2)) && three(auto).every((x, i) => x !== three(fly)[i]));
     ok("each audit is the MEAN over five vessels of the score and the SUM over them of the early ends (not a single vessel's, and not a total)", (() => { const t = Object.fromEntries(Object.keys(sets).map((k) => [k, sets[k]])); return AUDITS.every((a) => fly[a].score > -2 && fly[a].score < 0); })());
+    const crashy = await R.realFlyAudits("fly", new Array(963).fill(3), { sets, allowReal: true });
+    ok("!! a weight list that makes real dives end early (all 3.0): the early ends are SUMMED over the five vessels and are not negative (audit 1, safety 0, reserve 1), the scores are the five-vessel means (-4.805981676, -4.378254438, -5.016615168)", crashy.audit.crashed === 1 && crashy.safetyAudit.crashed === 0 && crashy.reserve.crashed === 1 && near(crashy.audit.score, -4.805981676) && near(crashy.safetyAudit.score, -4.378254438) && near(crashy.reserve.score, -5.016615168));
     const w0 = Float32Array.from(champ("fly", "fly6310.json"));
     const again = await R.realFlyAudits("fly", Array.from(w0), { sets, allowReal: true });
     ok("a weight list given as an ordinary array or from a Float32Array flies the same (the tool converts), and it is deterministic", eq(three(again), three(fly)));
