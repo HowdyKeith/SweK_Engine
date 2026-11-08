@@ -86,20 +86,13 @@
   <div class="note">Look at it before you send it: gputaskman lists the programs that are using the GPU. The file holds no host name, user name or file path of its own.</div>
 </div>
 
-<h2>The notes</h2>
-<div class="card" id="notesCard">
-  <div class="note">The full notes for this page (what each piece does, what was and was not checked, the safety properties) and the list of every command the rig still owes. The engine serves a note file as a download, so the first note can also be read here.</div>
-  <div class="row"><a class="btn" id="notesLink" href="/brain/GPUTASKMAN_WIP.md" download>Download brain/GPUTASKMAN_WIP.md</a><a class="btn" id="rigLink" href="/brain/RIG_COMMANDS_2026-11-07.md" download>Download brain/RIG_COMMANDS_2026-11-07.md</a></div>
-  <details id="notes"><summary>Read GPUTASKMAN_WIP.md here</summary><pre id="notesText">not loaded</pre></details>
-</div>
-
 <script type="module">
 import * as C from "/ui/gpuTaskManClient.mjs";
 
 const $ = (id) => document.getElementById(id);
 const say = (el, text, cls) => { el.textContent = text; el.className = cls || ""; };
 const net = (u, o) => fetch(u, o);
-let lastResult = null, lastSaved = null, running = false, notesLoaded = false;
+let lastResult = null, lastSaved = null, running = false;
 
 function showJson(obj, saved, note) {
   lastResult = obj; lastSaved = saved || null;
@@ -149,14 +142,6 @@ async function snap() {
   $("snapBtn").disabled = false;
 }
 
-async function loadNotes() {
-  if (!$("notes").open || notesLoaded) return;
-  notesLoaded = true; say($("notesText"), "loading...");
-  const r = await C.getText(C.NOTES.wip, net);
-  if (r.ok) say($("notesText"), r.text);
-  else { notesLoaded = false; say($("notesText"), "could not load " + C.NOTES.wip + ": " + r.error + " (is the engine's bridge running and serving the brain folder?)", "bad"); }
-}
-
 async function copy() {
   const text = $("json").value;
   try { await navigator.clipboard.writeText(text); $("savedAs").textContent = "copied " + text.length + " characters"; }
@@ -169,8 +154,10 @@ function save() {
 }
 
 $("checkBtn").onclick = check; $("uvBtn").onclick = () => install("uv"); $("pipxBtn").onclick = () => install("pipx");
-$("notes").ontoggle = loadNotes; $("runBtn").onclick = run; $("snapBtn").onclick = snap; $("copyBtn").onclick = copy; $("saveBtn").onclick = save;
+$("runBtn").onclick = run; $("snapBtn").onclick = snap; $("copyBtn").onclick = copy; $("saveBtn").onclick = save;
 check();
 </script>
+<div id="swek-notes"></div>
+<script type="module" src="/ui/pageNotesMount.mjs"></script>
 </body>
 </html>

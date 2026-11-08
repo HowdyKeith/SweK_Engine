@@ -188,13 +188,6 @@ console.log("\n5b. ADDED AFTER THE FIRST SWEEP (each closes surviving mutants; s
     ok("a bridge that does not know the session ends it on the first answer, not ok", fu.count() === 1 && ru.ok === false);
     const fe = cnt([{ ok: false }]), re = await C.pollJob("g", fe, { sleep: sleepNone });
     ok("and with no words of its own the answer says the bridge no longer knows the session", /no longer knows this session/.test(re.error));
-    const gt = await C.getText("/n.md", async () => ({ ok: true, status: 200, text: async () => 12345 }));
-    ok("getText: the text of a file (always a string)", gt.ok === true && gt.text === "12345");
-    const g404 = await C.getText("/n.md", async () => ({ ok: false, status: 404, text: async () => "nope" })), gd = await C.getText("/n.md", async () => { throw new Error("ECONNREFUSED"); });
-    ok("getText: an HTTP error and a failed fetch are plain failures with the reason", g404.ok === false && g404.error === "HTTP 404" && !("text" in g404) && gd.ok === false && /ECONNREFUSED/.test(gd.error));
-    const gcalls = []; await C.getText("/x/y.md", async (u, o) => { gcalls.push([u, o.method]); return { ok: true, status: 200, text: async () => "" }; });
-    ok("getText asks for the path it was given with a GET", eq(gcalls, [["/x/y.md", "GET"]]));
-    ok("the notes table is frozen and names the two files", Object.isFrozen(C.NOTES) && Object.keys(C.NOTES).join() === "wip,rig");
     ok("downloadName with a saved name that is not a safe .json name falls back to the built one", C.downloadName({ startedAt: "2026-11-08T05:12:33.000Z", request: { model: "q" } }, "dir/evil name.json") === "gpusnap-20261108-051233-q.json" && C.downloadName({ startedAt: "2026-11-08T05:12:33.000Z", request: { model: "q" } }, 5) === "gpusnap-20261108-051233-q.json");
 }
 
@@ -222,8 +215,9 @@ const ids = new Set([...HTML.replace(/<script[\s\S]*?<\/script>/g, "").matchAll(
     const RIG_MD = fs.readFileSync(path.join(ENG, "brain", "RIG_COMMANDS_2026-11-07.md"), "utf8"), WIP_MD = fs.readFileSync(path.join(ENG, "brain", "GPUTASKMAN_WIP.md"), "utf8");
     ok("!! THE INSTRUCTIONS ARE ON THE PAGE: the steps card gives the bridge's port and address, Check, both installers, the NEW-terminal advice, ollama pull / list / serve, where the file is saved and what to send", STEPS.length > 900 && /port 8787/.test(STEPS) && /localhost:8787\/gputaskman\.html/.test(STEPS) && /Check this machine/.test(STEPS) && /Install with uv/.test(STEPS) && /NEW terminal/.test(STEPS) && /ollama pull qwen2\.5-coder:7b/.test(STEPS) && /ollama list/.test(STEPS) && /ollama serve/.test(STEPS) && /brain\/rig-results\/gpu-snapshots\//.test(STEPS) && /send that file/.test(STEPS), String(STEPS.length));
     ok("the steps card says what the numbers mean and the known limits (not run on real hardware, undocumented JSON, Windows untested, no Ollama start or download, thinking models)", /How to use this|On the GPU/.test(STEPS + "On the GPU") && /Ollama's own count/.test(STEPS) && /has not been run against a real gputaskman, Ollama or GPU/.test(STEPS) && /does not describe its JSON/.test(STEPS) && /Windows is untested/.test(STEPS) && /does not start Ollama and does not download models/.test(STEPS) && /thinks before it answers/.test(STEPS));
-    ok("!! THE NOTES ARE LINKED: both note files are linked by href from the page, as downloads, to the paths the client names, and both files exist", /id="notesLink" href="\/brain\/GPUTASKMAN_WIP\.md" download/.test(VISIBLE) && /id="rigLink" href="\/brain\/RIG_COMMANDS_2026-11-07\.md" download/.test(VISIBLE) && C.NOTES.wip === "/brain/GPUTASKMAN_WIP.md" && C.NOTES.rig === "/brain/RIG_COMMANDS_2026-11-07.md" && fs.existsSync(path.join(ENG, C.NOTES.wip)) && fs.existsSync(path.join(ENG, C.NOTES.rig)));
-    ok("the first note can be read in place: a details element with its own text box", /<details id="notes">/.test(VISIBLE) && /id="notesText"/.test(VISIBLE));
+    const REG = JSON.parse(fs.readFileSync(path.join(ENG, "page-notes.json"), "utf8"));
+    ok("!! THE NOTES ARE LINKED THROUGH THE SHARED ROW: the page has the inline host and the one-line loader, and the registry lists its notes (the rule itself is held by tools/ship/pageNotes-selfcheck.mjs)", (VISIBLE.match(/<div id="swek-notes"><\/div>/g) || []).length === 1 && (HTML.match(/<script type="module" src="\/ui\/pageNotesMount\.mjs"><\/script>/g) || []).length === 1 && Array.isArray(REG.pages["gputaskman.html"]) && REG.pages["gputaskman.html"].some((n) => n.path === "brain/GPUTASKMAN_WIP.md") && REG.pages["gputaskman.html"].some((n) => n.path === "brain/RIG_COMMANDS_2026-11-07.md"));
+    ok("the page keeps no notes viewer of its own (it moved to ui/pageNotes.mjs)", !/id="notes"/.test(VISIBLE) && !/loadNotes|notesLoaded/.test(script));
     ok("the page and the two notes give the same first model to pull and the same page address", /ollama pull qwen2\.5-coder:7b/.test(RIG_MD) && /ollama pull qwen2\.5-coder:7b/.test(STEPS) && /localhost:8787\/gputaskman\.html/.test(WIP_MD) && /localhost:8787\/gputaskman\.html/.test(STEPS));
     ok("server.html links the page", /href="\/gputaskman\.html"/.test(SERVER_HTML));
 }
@@ -243,7 +237,6 @@ console.log("\n7. THE PAGE SCRIPT, RUN AGAINST A FAKE DOM AND A STUB BRIDGE");
             const url = String(u), b = o.body ? JSON.parse(o.body) : null; nets.push({ url, method: o.method, body: b });
             let j;
             if (over.down) throw new Error("ECONNREFUSED");
-            if (url === "/brain/GPUTASKMAN_WIP.md") { const bad = typeof over.notesFail === "function" ? over.notesFail(nets.filter((n) => n.url === url).length) : over.notesFail; return { ok: !bad, status: bad ? 404 : 200, json: async () => ({}), text: async () => "# the notes\nline two" }; }
             if (url === "/gputaskman/status") j = over.status || STATUS();
             else if (url === "/gputaskman/install") j = { ok: true, method: b.method, command: b.method + " tool install gputaskman", stdout: "installed", stderr: "", installed: true, hint: "" };
             else if (url === "/gputaskman/session") j = over.sessionRefused ? { ok: false, error: "a session is already running" } : { ok: true, id: "gt1" };
@@ -305,20 +298,6 @@ console.log("\n7. THE PAGE SCRIPT, RUN AGAINST A FAKE DOM AND A STUB BRIDGE");
     const wr = world({ sessionRefused: true }); wr.run(); await settle(); wr.els.model.value = "q:7b";
     await wr.els.runBtn.onclick(); await wr.els.runBtn.onclick();
     ok("!! after the bridge REFUSES a session a second press tries again (the running flag was reset)", wr.nets.filter((n) => n.url === "/gputaskman/session").length === 2);
-
-    const wnote = world(); wnote.run(); await settle();
-    const notesGets = () => wnote.nets.filter((n) => n.url === "/brain/GPUTASKMAN_WIP.md").length;
-    ok("the notes are NOT fetched when the page loads", notesGets() === 0 && wnote.nets.length >= 1);
-    await wnote.els.notes.ontoggle();
-    ok("!! closing or toggling a closed details element fetches nothing", notesGets() === 0);
-    wnote.els.notes.open = true; await wnote.els.notes.ontoggle(); await settle();
-    ok("opening it fetches the first note once and shows its text", notesGets() === 1 && wnote.els.notesText.textContent === "# the notes\nline two" && wnote.nets.find((n) => n.url === "/brain/GPUTASKMAN_WIP.md").method === "GET");
-    await wnote.els.notes.ontoggle(); await wnote.els.notes.ontoggle();
-    ok("!! toggling again does not fetch again", notesGets() === 1);
-    const wnf = world({ notesFail: (n) => n === 1 }); wnf.run(); await settle(); wnf.els.notes.open = true; await wnf.els.notes.ontoggle(); await settle();
-    ok("a note that cannot be loaded says so, with the path, the reason and the likely cause, in the bad colour", /could not load \/brain\/GPUTASKMAN_WIP\.md: HTTP 404/.test(wnf.els.notesText.textContent) && /bridge running/.test(wnf.els.notesText.textContent) && wnf.els.notesText.className === "bad");
-    await wnf.els.notes.ontoggle(); await settle();
-    ok("!! and opening it again tries again (the failure did not count as loaded)", wnf.nets.filter((n) => n.url === "/brain/GPUTASKMAN_WIP.md").length === 2 && wnf.els.notesText.textContent === "# the notes\nline two");
 
     const w2 = world({ clipFails: true }); w2.run(); await settle(); w2.els.json.value = "{}"; await w2.els.copyBtn.onclick();
     ok("a clipboard that refuses falls back to selecting the text and the old copy command", w2.els.json.selected === true && /copied 2 characters/.test(w2.els.savedAs.textContent));

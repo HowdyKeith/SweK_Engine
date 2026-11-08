@@ -11,8 +11,6 @@
 
 export const REPO = "https://github.com/shanselman/gputaskman";
 export const ROUTES = Object.freeze({ status: "/gputaskman/status", install: "/gputaskman/install", snapshot: "/gputaskman/snapshot", session: "/gputaskman/session", job: "/gputaskman/job" });
-/** The notes the page links and can show in place (the bridge serves .md as a download, so the page reads the text itself). */
-export const NOTES = Object.freeze({ wip: "/brain/GPUTASKMAN_WIP.md", rig: "/brain/RIG_COMMANDS_2026-11-07.md" });
 export const MODEL_RE = /^[A-Za-z0-9][A-Za-z0-9._:\/@+-]{0,199}$/;
 export const NUM_PREDICT = Object.freeze({ min: 16, max: 1024, def: 200 });
 export const POLL = Object.freeze({ intervalMs: 1500, maxPolls: 4000, lostAfter: 3 });
@@ -66,15 +64,6 @@ export function sessionBody(f = {}) {
 async function asJson(r) { try { return await r.json(); } catch (e) { return { ok: false, error: "the bridge answered with something that is not JSON" }; } }
 export async function getJson(url, fetchImpl) { try { return await asJson(await fetchImpl(url, { method: "GET" })); } catch (e) { return { ok: false, error: String((e && e.message) || e), unreachable: true }; } }
 export async function postJson(url, body, fetchImpl) { try { return await asJson(await fetchImpl(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body == null ? {} : body) })); } catch (e) { return { ok: false, error: String((e && e.message) || e), unreachable: true }; } }
-
-/** A text file from the engine: { ok, text } or { ok: false, error }. */
-export async function getText(url, fetchImpl) {
-    try {
-        const r = await fetchImpl(url, { method: "GET" });
-        if (!r.ok) return { ok: false, error: "HTTP " + r.status };
-        return { ok: true, text: String(await r.text()) };
-    } catch (e) { return { ok: false, error: String((e && e.message) || e) }; }
-}
 
 /** Poll a session until it is not running. onUpdate(status) is called with each answer. Three answers lost in a row end it as an error. */
 export async function pollJob(id, fetchImpl, o = {}) {

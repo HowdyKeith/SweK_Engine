@@ -1,0 +1,210 @@
+{
+ "schema": 1,
+ "rule": "Every note under brain/ (brain/*.md) is either linked from a page below (pages), or is a record: a registration and its result, a hand-off or a snapshot, with nothing for a reader to do or run (records, with the reason). A note with instructions that go beyond the steps its page already shows, or that sends the reader to a rig run to do and return, MUST be linked from the page it applies to; runs that belong to no page go under server.html with kind rig. tools/ship/pageNotes-selfcheck.mjs fails a new note that is neither. Each page that is listed shows the row through ui/pageNotesMount.mjs.",
+ "pages": {
+  "privatelm.html": [
+   {
+    "path": "brain/AFTER_ACTION_WIP.md",
+    "title": "The after-action analyzer",
+    "why": "Have a model narrate two Sea OGRE fights and check every sentence against the event log: the checker, the prompt and how to run it against the phone."
+   },
+   {
+    "path": "brain/COUNTERFACTUAL_WIP.md",
+    "title": "Counterfactual re-flights",
+    "why": "Have a model ask for a fight to be flown again with a different kit: the request format, the validator and the commands."
+   },
+   {
+    "path": "brain/RIG_COMMANDS_2026-11-07.md",
+    "title": "Rig commands (section 2: the model runs)",
+    "why": "The exact commands for the two model runs: the dev set first, the registered set once, then the report."
+   }
+  ],
+  "gputaskman.html": [
+   {
+    "path": "brain/GPUTASKMAN_WIP.md",
+    "title": "gputaskman: the full notes",
+    "why": "What each piece does, what was and was not checked, the safety properties, and the shape of the saved JSON."
+   },
+   {
+    "path": "brain/RIG_COMMANDS_2026-11-07.md",
+    "title": "Rig commands (section 2d)",
+    "why": "The short version of using this page on the rig, beside every other command the rig owes."
+   }
+  ],
+  "sea-ogre.html": [
+   {
+    "path": "brain/SUB_COUNTERMEASURES_WIP.md",
+    "title": "Countermeasures: decoy, bubble screen, interceptor",
+    "why": "What each one does, how the kit is flown against the Sea OGRE, and what the twelve registered scenarios showed."
+   },
+   {
+    "path": "brain/KIT_GRID_WIP.md",
+    "title": "Which countermeasure turns a fight",
+    "why": "The eight kit subsets across all twelve scenarios, and the command that reproduces them."
+   },
+   {
+    "path": "brain/COUNTERFACTUAL_WIP.md",
+    "title": "Counterfactual re-flights and Scenario 105",
+    "why": "Fly a scenario again under any subset of the kit (takeCounterfactualCmd.mjs subsets --seed 105)."
+   },
+   {
+    "path": "brain/AFTER_ACTION_WIP.md",
+    "title": "The after-action analyzer",
+    "why": "A model's narration of two fights, checked line by line against the event log."
+   }
+  ],
+  "sub-aquarium.html": [
+   {
+    "path": "brain/SUB_FIELD_NAV_WIP.md",
+    "title": "Flow-field waypoints",
+    "why": "How the submarine's navigation field is built and the rounds that measured it."
+   },
+   {
+    "path": "brain/SENSED_NAV_WIP.md",
+    "title": "The sensed map",
+    "why": "Navigating from a sonar-built map with a noisy position fix: the registered follow-ups and their results."
+   },
+   {
+    "path": "brain/NAV_3D_WIP.md",
+    "title": "Navigation with a depth dimension",
+    "why": "Walls to pass beneath or over, and a vertical plan under a keel."
+   },
+   {
+    "path": "brain/NAV_PLUS_WIP.md",
+    "title": "Three open navigation items",
+    "why": "Registered together: what each asks and what was found."
+   },
+   {
+    "path": "brain/TANK_PILOTS_WIP.md",
+    "title": "The pilot kinds in the tank",
+    "why": "The stateful fly pilot and the other pilots that can be seated in the tank, and what was measured."
+   },
+   {
+    "path": "brain/FISH_RIGHTING_WIP.md",
+    "title": "Fish righting",
+    "why": "The righting task and its tank kind: how the fish-wired pilots recover from a sudden kick."
+   },
+   {
+    "path": "brain/AQUARIUM_CIRCUIT_PROFILE_WIP.md",
+    "title": "The decision circuit as a survey profile",
+    "why": "The rule and circuit entries in the survey menu and what they do."
+   },
+   {
+    "path": "brain/PLAIN14_CONTROL_WIP.md",
+    "title": "The plain 14-50-4 control",
+    "why": "The wiring-free control of the 963-weight tank networks and how it is seated."
+   },
+   {
+    "path": "brain/NEEDS_AND_LIMITS.md",
+    "title": "Needs and limits",
+    "why": "Energy that only the surface refills and a hull that feels the pressure: the design behind the survey."
+   }
+  ],
+  "rotorcraft-demo.html": [
+   {
+    "path": "brain/ROTORCRAFT_BOARD_WIP.md",
+    "title": "The helicopter and quadrotor brains on a board",
+    "why": "The arms, the controls and the registered question behind this page."
+   }
+  ],
+  "rotor-league.html": [
+   {
+    "path": "brain/ROTOR_LEAGUE_WIP.md",
+    "title": "The rotor league",
+    "why": "Every helicopter and quadrotor pilot against every other on the same gusts: the rules and the results."
+   }
+  ],
+  "es-box3d-6dof.html": [
+   {
+    "path": "brain/SIXDOF_GPU_BRAIN_WIP.md",
+    "title": "The GPU Brain in the 6-DOF duel",
+    "why": "What the GPU Brain does in this duel and how it was measured."
+   },
+   {
+    "path": "brain/SIXDOF_PAGE_FIGHT_WIP.md",
+    "title": "The 6-DOF page's own fight, measured",
+    "why": "The fight this page runs, measured, with the question registered first."
+   }
+  ],
+  "brain-bench.html": [
+   {
+    "path": "brain/GPU_CROSSOVER_WIP.md",
+    "title": "The GPU batch-size crossover",
+    "why": "Where one GPU dispatch beats the CPU, measured on the rig's card: the rows and the command."
+   },
+   {
+    "path": "brain/GPU_SWARM_WIP.md",
+    "title": "The GPU pilot swarm",
+    "why": "Thousands of aircraft decided in one dispatch against the CPU twin: what was asked and what was found."
+   },
+   {
+    "path": "brain/GPUTASKMAN_WIP.md",
+    "title": "Watching the GPU while this runs",
+    "why": "gputaskman shows which process holds the video memory and how busy each GPU engine is; the install page and the session are in these notes."
+   }
+  ],
+  "server.html": [
+   {
+    "path": "brain/RIG_COMMANDS_2026-11-07.md",
+    "title": "Rig commands",
+    "why": "The exact commands for every run the rig still owes, each with what to send back.",
+    "kind": "rig"
+   },
+   {
+    "path": "brain/RIG_SESSION_OWED_WIP.md",
+    "title": "One rig session for the owed readings",
+    "why": "The verify, the looks on a real GPU and the long runs, in the order that wastes the least of the rig's time.",
+    "kind": "rig"
+   },
+   {
+    "path": "brain/PLAIN14_DISTRIBUTION_WIP.md",
+    "title": "Round 7: the plain arm is still to run (section 9)",
+    "why": "The loop for the ten plain 14-50-4 pilots under the first-order step, and the check to make after the first seed.",
+    "kind": "rig"
+   },
+   {
+    "path": "brain/FISH_WIRING_RANK_WIP.md",
+    "title": "Addendum 17: the wiring rank test",
+    "why": "Real wiring ranked among 44 shuffled circuits; about 21 core-hours; resumes Addendum 12's file.",
+    "kind": "rig"
+   },
+   {
+    "path": "brain/BACKLOG_PICKUPS_2026-11-05.md",
+    "title": "Everything picked up, and what is still owed",
+    "why": "The master table: each item, where it is, what was read and what is owed on the rig.",
+    "kind": "rig"
+   },
+   {
+    "path": "brain/WIN_PATH_PROBE_2026-11-06.md",
+    "title": "The Windows-spelling probe",
+    "why": "A candidate list of gates that fail only under the Windows spelling, to compare with the verify's reds.",
+    "kind": "rig"
+   }
+  ]
+ },
+ "records": {
+  "brain/BACKLOG_2026-11-01.md": "a backlog snapshot of 2026-11-01, superseded by BACKLOG_PICKUPS_2026-11-05.md; nothing to run",
+  "brain/BACKLOG_2026-11-04_BRAINS.md": "another chat's backlog; not edited or linked from this chat",
+  "brain/DECIDER_AUDIT_RESULT.md": "the result of one audit read once; nothing to run",
+  "brain/DECISION_CIRCUIT_VS_TWIN_DRAFT.md": "a draft registration, superseded by DECISION_CIRCUIT_VS_TWIN_WIP.md",
+  "brain/DECISION_CIRCUIT_VS_TWIN_WIP.md": "a registration and its result, read once; nothing to run",
+  "brain/DEEP_PLAIN_WIP.md": "a registration and its result, read once; the flights it needed are done",
+  "brain/DOGFIGHT_LEAGUE_WIP.md": "the record of two finished training runs and their results; nothing to run",
+  "brain/FISH_ESCAPE_PREREAD.md": "a pre-read (reading only); nothing to run",
+  "brain/FISH_VESTIBULAR_HELPER_WIP.md": "another chat's rung 4b note; its owed runs are in the rig worklist",
+  "brain/FISH_WIRING_FRESH_WIP.md": "a registration and its result, read once; the run it needed has come back",
+  "brain/HANDOFF_NEXT_CHAT.md": "a hand-off written 2026-10-24; nothing to run",
+  "brain/HEAD_TO_HEAD.md": "its page, switchboard.html, is another chat's file and is not edited from here; link it when that chat allows",
+  "brain/KIND_MATCHED_WIP.md": "a registration and its result, read once; nothing to run",
+  "brain/PAGE_NOTES_WIP.md": "the record of the Notes row and its rule (the rule is also in this file and in the gate that enforces it); nothing to run",
+  "brain/PLAIN_FAMILY_WIP.md":"a registration and its result, read once; the searches and flights are done",
+  "brain/PLAIN_NET_CONTROL_WIP.md": "a registration and its result, read once; nothing to run",
+  "brain/PLAIN_NET_VARIANTS_WIP.md": "a registration and its result, read once; the rig run has come back",
+  "brain/PLAIN_THIRD_AUDIT_WIP.md": "a registration and its result, read once; nothing to run",
+  "brain/RANKING_REPLICATION_WIP.md": "a registration and its result, read once; nothing to run",
+  "brain/RANKING_VALIDITY_WIP.md": "a registration and its result, read once; nothing to run",
+  "brain/RUNG_4A_CLOSEOUT.md": "the close-out of a finished rung; nothing to run",
+  "brain/STATION_AND_PRICE_WIP.md": "a registration and its result, read once; nothing to run",
+  "brain/SUBMARINE_WIP.md": "another chat's work-in-progress note; not edited or linked from this chat"
+ }
+}
