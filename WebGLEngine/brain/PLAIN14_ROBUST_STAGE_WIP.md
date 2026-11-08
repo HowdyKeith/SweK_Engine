@@ -23,7 +23,15 @@ THE READING: CANNOT BE TOLD APART about 60 percent; BEATS about 20; IS BELOW abo
 ## 6. The cost, said now (corrected: see the note at the end of stage 1's section 10)
 Per draw: 4 searches in four processes, 200 iterations at about 2.8 s a child on the sandbox's cores, and this round's rig ran about three times slower than the sandbox: **about 30 minutes of wall time a draw, about 10 hours for the twenty**, plus the audits (about 8,300 flights a draw: a few minutes). **Not yet measured on the rig.** Nothing is trained until the rig runs it.
 
-## 7. The run (the commands are written when the tool exists, below; nothing is trained here)
+## 7. The run
+From `WebGLEngine\` on the rig, on this branch (PowerShell or cmd; the command sets the first-order orientation step itself, before anything imports the physics, and the four search processes inherit it):
+```
+node tools\ship\plain14RobustStageCmd.mjs run --all
+```
+It trains the twenty draws one after another, the arms alternating by seed (so a partial run is balanced), four search processes at a time, and writes `brain\rig-results\plain14-robust\robust-<fly|plain>-<S>.json` for each (plus the four search files and the start file of each draw); **a draw whose record exists is skipped, so it can be stopped and resumed**. One draw: `run --arm fly --seed 6310`. It prints each search's progress behind `[search <seed>]`. The stage-1 dumps in `brain\rig-results\plain14\` must be there (they are committed). **What comes back: the whole folder `brain\rig-results\plain14-robust`.** The reading, once, when all twenty are in: `node tools\ship\plain14RobustStageCmd.mjs report` (it reads the records and the stage-1 dumps; it trains and flies nothing).
+
+## 7b. SMOKE DISCLOSURE (2026-11-08, after the tool was written, before any registered search): the registered audits were flown once for draw 6310 of each arm
+To prove the plumbing end to end (real child processes, real flying of the audits) I ran draw 6310 of both arms with the searches cut to 2 iterations. That flew the registered fresh audits (`auditSets(95000)` and the reserve) for those two starts and for the autopilot. **I have therefore SEEN these numbers for two of the twenty draws, and the audits are not unseen for them:** five-vessel safety audit, the start of fly 6310 -0.5340, of plain14 6310 -0.4365, the PD autopilot -0.6351 (the two-iteration champions: -0.5329 and -0.4345, which are NOT the registered champions). Nothing that selects a champion reads the audits (the held-out score does), so the selection is not touched; what is touched is my own forecast: **on this one draw the plain net's start is about 0.10 above the fly's on five vessels, which makes the section 5 forecast of a difference of the means between -0.03 and +0.03 (75 percent) unlikely.** The section 5 numbers are NOT changed: they were written before the tool, and the miss, if it comes, will be scored. Timing from the smoke on the sandbox: a draw's audits take about 100 s; the searches at 2 iterations about 20 s.
 
 ## 8. NOT DONE, said plainly
 This does not repeat the actuator stage, the tail, the wide or the noisy stages, and the full eight-stage chain control with five fly chains against five plain chains is NOT built (about 90 hours of wall time). The starts are the stage-1 champions, so the twenty draws share their stage-1 luck with stage 1.

@@ -99,7 +99,7 @@ It prints the four checks first (a failure is the first line and the reading is 
 
 ## 3. Not here
 
-* **Matched controls for the other seven networks** (`#80`, about 20 searches each): no command is built yet; it needs a registration first.
+* **Matched controls for the other seven networks** (`#80`, about 20 searches each): the full eight-stage chain version still has no command (it needs three trainers changed and is about 90 hours of wall time); its cheap first step, the robust stage as ONE stage, is section 2e below.
 * **The station-and-price round** (`brain/STATION_AND_PRICE_WIP.md`) was trained, audited and read in the sandbox (RESULT in its section 10); nothing of it is owed on the rig.
 * **The one verify** (`Clone -> verify` of main's tip, `brain/RIG_SESSION_OWED_WIP.md` step 2) is the GitHub panel's button, not a command here.
 * **Any Decider round:** held by the owner.
@@ -122,3 +122,18 @@ About 20 minutes a seed on 4 cores, about 3.5 hours. Send back the ten `plain<se
 Not a study: a measurement of the machine. With the engine's bridge running (default port 8787), open `http://localhost:8787/gputaskman.html` (or the gputaskman link in `server.html`), then: **Check this machine**; **Install with uv** (or pipx; if it still says it cannot find gputaskman afterwards, restart the bridge from a NEW terminal); type a model exactly as `ollama list` shows it (pull it first: `ollama pull qwen2.5-coder:7b` is a good first try, it fits an 8 GB card); **Start the model, run gputaskman, save a snapshot**. The JSON appears in the page and is saved as `brain\rig-results\gpu-snapshots\gpusnap-<time>-<model>.json`. Look at it (it lists the programs using the GPU), then send that file back.
 
 **Added 2026-11-08, section 4 of the same page: watch the card, and watch the GPU brain.** (a) *Sample now*: press it, then start whatever you want watched (a game, the pilot-swarm demo, a model in another window); it takes a snapshot every second or so for the seconds you set (3 to 300) and saves `brain\rig-results\gpu-snapshots\gpuwatch-<time>-sample.json`. (b) *Run the GPU brain and watch it*: the page starts the engine's own swarm (`node tools\ship\gpuSwarm.mjs --hardware`, a browser opens, about two minutes at the defaults) with two snapshots before, one every second or so while it runs, and two after, and saves `gpuwatch-<time>-brain.json`. The summary at the bottom of the card says which programs used the card under which runtime: **the question is whether the browser's GPU process (chrome.exe or msedge.exe) shows up, under Direct3D, only while the swarm ran (`seen ONLY while it ran`).** If it says THE BROWSER USED A SOFTWARE ADAPTER the card was not used: check the browser's hardware acceleration and say so. It does NOT write the swarm's own results file (those timings were taken while being watched). For the model session, the box "also sample while it answers" (try 60) adds a series of snapshots while the test answer is generated, which shows whether the card sits idle while the CPU computes the part of a big model that did not fit. Send the `gpuwatch-*.json` and `gpusnap-*.json` files back. (`brain/GPUTASKMAN_WIP.md` section 7.)
+
+## 2e. Round 7, stage 2 as ONE STAGE (2026-11-08; `brain/PLAIN14_ROBUST_STAGE_WIP.md`): does the stage-1 tie hold under the five-vessel robust objective?
+Keith chose the one-stage control, not the eight-stage chain. The tool is built and gated; nothing is trained until the rig runs it. About 30 minutes of wall time a draw on 4 cores, about 10 hours for the twenty (the sandbox's figure times the factor of three this round's rig showed; NOT measured on the rig). From `WebGLEngine\` on this branch (the command sets the first-order orientation step itself, so there is nothing to set in the shell). The stage-1 dumps in `brain\rig-results\plain14\` must be there (they are committed).
+```
+node tools\ship\plain14RobustStageCmd.mjs run --all
+```
+It trains the twenty draws one after another, the arms alternating by seed (a partial run is balanced), four search processes at a time, and writes `brain\rig-results\plain14-robust\robust-<fly|plain>-<S>.json` for each (plus the four search files and the start file of each draw). **A draw whose record exists is skipped, so it can be stopped with Ctrl-C and resumed with the same command.** One draw: `node tools\ship\plain14RobustStageCmd.mjs run --arm fly --seed 6310`. Each search prints its progress behind `[search <seed>]`.
+
+When all twenty records are in, ONCE, on the machine that made them:
+```
+node tools\ship\plain14RobustStageCmd.mjs report
+```
+It reads the records and the stage-1 dumps; it trains and flies nothing. It prints the five checks first (a failure is the first line and the reading is NOT WEIGHED), the twenty draws, the three exact one-sided rank-sum readings (the 500-dive safety audit is the one that decides) and the bottom line in the registration's words. With ten against ten, BEATS needs the fly above in at least 73 of the 100 pairs.
+
+**What comes back: the whole folder `brain\rig-results\plain14-robust` (and, if you like, what the command printed).** Said plainly: this is one stage with the actuator retrain not repeated, so it says nothing about the other six stages of the chain; the chain control (`#80`) stays open and is about 90 hours of wall time.
