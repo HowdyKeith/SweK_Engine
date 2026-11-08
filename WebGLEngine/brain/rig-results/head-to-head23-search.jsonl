@@ -8,3 +8,4 @@
 {"seed":23012,"group":"L00","law":[0,-0.4,-0.9305935200667456,1.1857165213863856],"trainScore":0.9427477466003054,"heldScore":0.9497446933549917,"accepted":52,"iters":300,"litFlights":302,"darkFlights":0,"smoke":false}
 {"seed":23013,"group":"L00","law":[0,-0.19214609856182402,-0.6828317469741652,0.8269124038824067],"trainScore":0.94277247295599,"heldScore":0.9528437519337128,"accepted":27,"iters":300,"litFlights":302,"darkFlights":0,"smoke":false}
 {"seed":23014,"group":"L00","law":[0,-0.20659134637901932,-0.7914910028246904,0.8800823324433573],"trainScore":0.9427196497915008,"heldScore":0.9487290573306757,"accepted":29,"iters":300,"litFlights":302,"darkFlights":0,"smoke":false}
+{"seed":23015,"group":"L00","law":[4.558574079767043,0.4677551004697589,-0.4062077589850742,0.4005806868153169],"trainScore":0.9406229287705328,"heldScore":0.9507796477421108,"accepted":193,"iters":300,"litFlights":302,"darkFlights":0,"smoke":false}
