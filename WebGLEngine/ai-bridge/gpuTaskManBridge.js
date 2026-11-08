@@ -38,10 +38,10 @@
 //
 // Everything that touches the world takes it as an OPTIONAL injected param (execFileImpl, fetchImpl, fsImpl, osImpl,
 // sleepImpl, now, platform, env, home, root) and defaults to the real thing, the pattern of mlxInstallBridge.js, so
-// tools/ship/gpuTaskManBridge-selfcheck.mjs drives every branch with no GPU, no Ollama, no pip and no gigabyte of weights.
+// tools/ship/gpuTaskManBridge-selfcheck.mjs drives every branch without a graphics card, an Ollama server, pip or a gigabyte of weights.
 //
-// NOT DONE, said plainly: it has not run against a real gputaskman, a real Ollama or a real GPU (the sandbox that wrote it
-// has none); the JSON shape of `gputaskman --json` is not described in its README, so the snapshot is stored as it comes.
+// NOT DONE, said plainly: it was never exercised against a real gputaskman, a real Ollama or a real graphics card (the machine that wrote it
+// lacks all three); the JSON shape of `gputaskman --json` is not described in its README, so the snapshot is stored as it comes.
 // ---------------------------------------------------------------------------------------------------------------
 "use strict";
 
