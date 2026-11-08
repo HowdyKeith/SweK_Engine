@@ -11,6 +11,8 @@ import * as H9 from "./headToHead9.mjs";
 
 export const IDS = Object.freeze({ from: 11000, to: 11199 }), SECONDS = 160;
 export const LEARN_MARGIN = 0.02, NEED_MIN = 0.5, SUFF_MIN = 0.5;
+/** The tolerance of the hand-transplant check: the hand weights are the autopilot only to float32, so the hand network itself differs from the autopilot by up to 2e-9 in a score over 160 s (the first run of this round found 2.2e-9 and a registered 1e-9 failed); a fault in a transplant would show at 1e-3 or more. */
+export const HAND_TOL = 1e-6;
 export const CHANNELS = Object.freeze(["pitch", "yaw", "thrust", "ballast"]);
 export const NET_IDS = H9.NET_IDS;
 /** The two modes: "-" (the network with channel c from the autopilot) and "+" (the autopilot with channel c from the network). */
@@ -104,8 +106,8 @@ export function checksOf(au) {
     const get = (id) => (au.nets && typeof au.nets.get === "function" ? au.nets.get(id) : au.nets ? au.nets[id] : undefined);
     const nets = NET_IDS.every((id) => { const w = get(id); return !!w && w.length === PS.WEIGHT_COUNT && Array.from(w).every(Number.isFinite); });
     rows.push({ name: "NETWORKS", ok: nets, text: `every network is ${PS.WEIGHT_COUNT} finite weights: ${nets}` });
-    const hand = MODES.every((m) => CHANNELS.every((c) => au.dark[armId("hand", m, c)] && au.dark[armId("hand", m, c)].every((r, i) => au.dark.autopilot[i] && Math.abs(r.score - au.dark.autopilot[i].score) < 1e-9)));
-    rows.push({ name: "HAND TRANSPLANTS ARE THE AUTOPILOT", ok: hand, text: `hand/-c and hand/+c equal the autopilot on every id for every channel (within 1e-9): ${hand}` });
+    const hand = MODES.every((m) => CHANNELS.every((c) => au.dark[armId("hand", m, c)] && au.dark[armId("hand", m, c)].every((r, i) => au.dark.autopilot[i] && Math.abs(r.score - au.dark.autopilot[i].score) < HAND_TOL)));
+    rows.push({ name: "HAND TRANSPLANTS ARE THE AUTOPILOT", ok: hand, text: `hand/-c and hand/+c equal the autopilot on every id for every channel (within ${HAND_TOL}): ${hand}` });
     const changed = NET_IDS.filter((id) => CHANNELS.some((c) => au.dark[armId(id, "-", c)] && au.dark[id] && au.dark[armId(id, "-", c)].some((r, i) => r.score !== au.dark[id][i].score))).length, ch = changed >= 20;
     rows.push({ name: "TRANSPLANTS CHANGE THE FLIGHT", ok: ch, text: `a transplant changes the flight of ${changed} of ${NET_IDS.length} networks (at least 20): ${ch}` });
     const key = (a) => (au.dark[a] || []).map((r) => r.score).join("|"), distinct = new Set(NET_IDS.map(key)).size === NET_IDS.length;

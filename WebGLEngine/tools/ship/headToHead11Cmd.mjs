@@ -1,5 +1,6 @@
 // WebGLEngine/tools/ship/headToHead11Cmd.mjs -- the command for tools/ship/headToHead11.mjs (export-free on purpose). Round H11 of brain/HEAD_TO_HEAD.md.
 //   node tools/ship/headToHead11Cmd.mjs [--parts 4] [--h7 brain/rig-results/head-to-head7-training.jsonl] [--from 11000 --to 11199] [--seconds 160] [--out brain/rig-results]
+//   node tools/ship/headToHead11Cmd.mjs --from-json brain/rig-results/head-to-head11.json     report the runs of an earlier flight again (no flight)
 //   node tools/ship/headToHead11Cmd.mjs --part 2/4 --to-file <path> [--from ... --to ... --seconds ...]     the child's mode: the arms of part 2 of 4 flown, the runs written to <path>
 // Reads the eight shipped weight files and H7's twenty champions, flies the 262 arms (each network and `hand`, intact and with its eight transplants) in parallel parts, merges, prints and writes <out>/head-to-head11.json.
 "use strict";
@@ -33,6 +34,12 @@ if (has("--part")) {
     if (!file) { console.error("--part needs --to-file"); process.exit(2); }
     const au = X.audit(loadNets(), { range, seconds, arms: armsOfPart(p, P) });
     fs.writeFileSync(file, JSON.stringify(au.dark));
+} else if (has("--from-json")) {
+    // re-read the runs of an earlier flight (the file this command wrote) and report them again: no flight; for a check or a report that changed AFTER the flight
+    const src = path.resolve(val("--from-json", "")), j = JSON.parse(fs.readFileSync(src, "utf8")), au = { dark: j.dark, range: j.range, seconds: j.seconds, nets: loadNets() }, lines = X.report(au);
+    for (const l of lines) console.log(l);
+    const out = path.resolve(val("--out", eng + "brain/rig-results")); fs.mkdirSync(out, { recursive: true });
+    fs.writeFileSync(path.join(out, "head-to-head11.json"), JSON.stringify({ range: j.range, seconds: j.seconds, report: lines, dark: j.dark }));
 } else {
     const parts = Number(val("--parts", 4)), tmp = fs.mkdtempSync(path.join(os.tmpdir(), "h11-")), files = Array.from({ length: parts }, (_, p) => path.join(tmp, `part${p}.json`));
     console.log(`[h11] flying ${X.ARM_IDS.length} arms on ids ${range.from}-${range.to}, ${seconds} s, in ${parts} parts`);
