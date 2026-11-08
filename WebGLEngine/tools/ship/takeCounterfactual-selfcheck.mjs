@@ -146,6 +146,9 @@ sec("5. REPORT");
     ok("!! with no `fetch` in the seam the command uses the runtime's own: a global fetch (here the fake server) is used and the run is whole", cG === 0 && sG.log.requests.length === 4 && mG.files["t.jsonl"].trim().split("\n").length === 5);
 }
 
+
+// 2026-11-08 -- the exports of this module that no row named (definitionGates counts a symbol its gate never mentions), each now asserted rather than only mentioned.
+ok("!! SET_NAMES is the dev and registered sets and TRANSCRIPT_KIND is \"counterfactual-transcript\"", JSON.stringify(X.SET_NAMES) === '["dev","registered"]' && Object.isFrozen(X.SET_NAMES) && X.TRANSCRIPT_KIND === "counterfactual-transcript");
 console.log(fails ? `\n${fails} FAIL` : "\nall checks pass");
 finished = true;
 process.exit(fails ? 1 : 0);

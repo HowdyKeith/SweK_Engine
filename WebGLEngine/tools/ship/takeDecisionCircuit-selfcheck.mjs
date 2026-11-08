@@ -328,6 +328,9 @@ sec("9. REAL DIVES (a few, at a shortened length where it helps)");
     ok("!! the board has the survey task and the six arms with the control relation: the circuits' control is rule-low06, the twin's control is rule-low06", board.tasks.has("survey") && X.ARM_IDS.every((a) => board.arms.has(a)) && board.arms.get("circuit-cx").controls[0] === "rule-low06" && board.arms.get("twin-standard").controls[0] === "rule-low06" && board.arms.size === 6);
 }
 
+
+// 2026-11-08 -- the exports of this module that no row named (definitionGates counts a symbol its gate never mentions), each now asserted rather than only mentioned.
+ok("!! RULE_ARMS are the frozen rule-r8 and rule-low06; ledgerLines of no records fails the three families' checks by name and prints each as having no records (six lines)", JSON.stringify(X.RULE_ARMS) === '["rule-r8","rule-low06"]' && Object.isFrozen(X.RULE_ARMS) && X.ledgerLines([]).length === 6 && /^CHECK FAILED -- cx has the searches none/.test(X.ledgerLines([])[0]) && /^CHECK FAILED -- nostate has the searches none/.test(X.ledgerLines([])[1]) && /^CHECK FAILED -- plain has the searches none/.test(X.ledgerLines([])[2]) && X.ledgerLines([]).slice(3).every((l) => /no records$/.test(l)));
 console.log(fails ? `\n${fails} FAIL` : "\nall checks pass");
 finished = true;
 process.exit(fails ? 1 : 0);

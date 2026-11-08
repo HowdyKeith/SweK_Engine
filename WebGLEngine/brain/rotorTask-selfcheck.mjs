@@ -215,5 +215,8 @@ console.log("\n7. DETERMINISM, AND THE REPORTING");
     ok("!! a pilot that throws or returns NaN controls does not crash the task: the model reads a bad control as neutral and the flight ends or is scored, and fly() returns a finite score", (() => { const r = RT.fly(() => ({ collective: NaN, pitch: NaN, roll: NaN, yaw: NaN }), RT.scenario(1, "hover")); return Number.isFinite(r.score) && r.score >= -9 - 1e-9 && r.score <= 0; })());
 }
 
+
+// 2026-11-08 -- the exports of this module that no row named (definitionGates counts a symbol its gate never mentions), each now asserted rather than only mentioned.
+ok("!! the rotor task samples its trace every 3 ticks (TRACE_EVERY)", RT.TRACE_EVERY === 3);
 console.log(fails ? `\nrotorTask-selfcheck: ${fails} FAILED` : "\nrotorTask-selfcheck: all checks pass");
 process.exit(fails ? 1 : 0);

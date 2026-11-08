@@ -325,5 +325,8 @@ console.log("\nBIG TANK");
     ok("!! the tank is pure: no Math.random, no clock, no DOM, no file or network in the module (the caller says how long a frame took)", !/Math\.random|Date\.now|new Date|performance\.now|document\.|window\.|\bfs\b|node:fs|fetch\(/.test(code));
 }
 
+
+// 2026-11-08 -- the exports of this module that no row named (definitionGates counts a symbol its gate never mentions), each now asserted rather than only mentioned.
+ok("!! the pitch kick of the righting task is the frozen { at: 3 } (KICK)", JSON.stringify(A.KICK) === '{"at":3}' && Object.isFrozen(A.KICK));
 console.log(fails ? `\n${fails} FAIL` : "\nall checks pass");
 process.exit(fails ? 1 : 0);

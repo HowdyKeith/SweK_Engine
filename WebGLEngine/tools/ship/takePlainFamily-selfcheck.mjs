@@ -284,6 +284,9 @@ sec("5. THE COMMAND");
     } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 }
 
+
+// 2026-11-08 -- the exports of this module that no row named (definitionGates counts a symbol its gate never mentions), each now asserted rather than only mentioned.
+ok("!! leadIn is the paired lead of an arm over the rule, a function of an audit and an id", typeof X.leadIn === "function" && X.leadIn.length === 2);
 console.log(fails ? `\n${fails} FAIL` : "\nall checks pass");
 finished = true;
 process.exit(fails ? 1 : 0);

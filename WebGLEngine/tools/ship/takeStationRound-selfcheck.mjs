@@ -358,6 +358,9 @@ sec("9. REAL DIVES (a few, at a shortened length where it helps)");
     ok("!! the station policy used by the MASK is the station-only family of brain/stationSeat.mjs (kind station, masks 0, 4, 5, 6)", TS.familyPolicy("station-large").kind === "station" && J(TS.familyPolicy("station-large").masked) === J(ST.MASKED) && sd.kind === "station");
 }
 
+
+// 2026-11-08 -- the exports of this module that no row named (definitionGates counts a symbol its gate never mentions), each now asserted rather than only mentioned.
+ok("!! ledgerLines of no records fails the three station checks by name, says each has no records, and ends on the circuit-plain line", X.ledgerLines([], 0).length === 7 && /^CHECK FAILED -- station-large has the searches none/.test(X.ledgerLines([], 0)[0]) && /^CHECK FAILED -- station-small has the searches none/.test(X.ledgerLines([], 0)[1]) && /^CHECK FAILED -- plain-priced has the searches none/.test(X.ledgerLines([], 0)[2]) && /circuit-plain: the decision-circuit round's plain family has no eligible champion$/.test(X.ledgerLines([], 0)[6]));
 console.log(fails ? `\n${fails} FAIL` : "\nall checks pass");
 finished = true;
 process.exit(fails ? 1 : 0);

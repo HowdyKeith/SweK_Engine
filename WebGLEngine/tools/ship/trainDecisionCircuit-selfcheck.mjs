@@ -252,6 +252,9 @@ sec("8. THE START (one real search per family at a throwaway recipe on the smoke
     ok("!! the three real records pass the checks that need only these (the weights fit, one recipe, the same start across the families) and a family's champion is the search or none", D.checksOf(recs).filter((x) => /disagree|do not start|more than one recipe|do not fit/.test(x)).length === 0 && recs.every((r) => D.championOf(recs, r.family).searches === 1));
 }
 
+
+// 2026-11-08 -- the exports of this module that no row named (definitionGates counts a symbol its gate never mentions), each now asserted rather than only mentioned.
+ok("!! the training ledger is brain/decisionCircuitTraining.jsonl (OUT_FILE)", D.OUT_FILE === "brain/decisionCircuitTraining.jsonl");
 console.log(fails ? `\n${fails} FAIL` : "\nall checks pass");
 finished = true;
 process.exit(fails ? 1 : 0);

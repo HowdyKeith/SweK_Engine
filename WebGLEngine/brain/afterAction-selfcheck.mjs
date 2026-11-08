@@ -224,6 +224,9 @@ sec("10. SCRIPTED MODELS (no model is called)");
     ok("!! a model that is faithful but SHORT (the first three lines of the template): FORMAT 1, SUPPORT 1, COVERAGE well below 0.8; the reading is FAITHFUL BUT INCOMPLETE", mHalf.format === 1 && mHalf.support === 1 && mHalf.coverage < 0.8 && A.readingOf(mHalf) === "FAITHFUL BUT INCOMPLETE");
 }
 
+
+// 2026-11-08 -- the exports of this module that no row named (definitionGates counts a symbol its gate never mentions), each now asserted rather than only mentioned.
+ok("!! sidesOgre(n, enabled) builds n Sea OGRE sides, none for 0; checkNarration takes the reply and the facts list; SETS is the frozen dev (1, 4) and registered (101, 12) pair; PROMPT_HEAD opens the facts block and names the B, K and P tags", A.sidesOgre(2, false).length === 2 && A.sidesOgre(0, true).length === 0 && typeof A.checkNarration === "function" && A.checkNarration.length === 2 && JSON.stringify(A.SETS) === '{"dev":{"first":1,"count":4},"registered":{"first":101,"count":12}}' && Object.isFrozen(A.SETS) && Object.isFrozen(A.SETS.registered) && /^FACTS from two flights of the same Sea OGRE scenario \(tags: B = .*K = .*P = /.test(A.PROMPT_HEAD));
 console.log(fails ? `\n${fails} FAIL` : "\nall checks pass");
 finished = true;
 process.exit(fails ? 1 : 0);

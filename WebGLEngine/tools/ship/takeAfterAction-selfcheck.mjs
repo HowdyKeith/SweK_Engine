@@ -200,6 +200,9 @@ sec("5. REAL FIGHTS (the default flights, four DEV pairs)");
     ok("!! end to end on the REAL fights with a faithful scripted model: ask writes a whole transcript (the prompts of the real pairs), the report finds the checks hold and reads FAITHFUL AND COMPLETE with FORMAT, SUPPORT and COVERAGE 1.000", cA === 0 && cR === 0 && mA.out.some((l) => l === "BOTTOM LINE (real-faithful): FAITHFUL AND COMPLETE") && mA.out.some((l) => /FORMAT 1\.000  SUPPORT 1\.000  COVERAGE 1\.000/.test(l)) && !mA.out.some((l) => /^CHECK FAILED/.test(l)));
 }
 
+
+// 2026-11-08 -- the exports of this module that no row named (definitionGates counts a symbol its gate never mentions), each now asserted rather than only mentioned.
+ok("!! SET_NAMES is the frozen dev and registered; readTranscript of an empty text has no header and no entries, of one JSON line has that line as its header; askOnce is an async function of four arguments", JSON.stringify(X.SET_NAMES) === '["dev","registered"]' && Object.isFrozen(X.SET_NAMES) && JSON.stringify(X.readTranscript("")) === '{"header":null,"entries":[]}' && X.readTranscript('{"a":1}\n').header.a === 1 && X.readTranscript('{"a":1}\n').entries.length === 0 && X.askOnce.constructor.name === "AsyncFunction" && X.askOnce.length === 4);
 console.log(fails ? `\n${fails} FAIL` : "\nall checks pass");
 finished = true;
 process.exit(fails ? 1 : 0);
