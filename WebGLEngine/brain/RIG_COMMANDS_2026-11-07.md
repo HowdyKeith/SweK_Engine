@@ -105,3 +105,15 @@ It prints the four checks first (a failure is the first line and the reading is 
 * **Any Decider round:** held by the owner.
 
 Send the results files back (or commit them under `brain/rig-results/` on this branch) and say which command made each; the registrations read each once.
+
+## 2c. Round 7, stage 1: CORRECTION (2026-11-08) -- the plain arm has not run; use this loop for it
+The loop in 2b ran the fly arm for all ten seeds (those ten dumps are in and kept) and failed instantly on the plain arm (the checkout it ran in has no `plain14` circuit). The fly dumps were made under the FIRST-ORDER orientation step, so the plain arm must be too; the loop, the reason and the check after the first seed are in `brain/PLAIN14_DISTRIBUTION_WIP.md` section 9 (Amendment B). In short, from `WebGLEngine\` on this branch (`git log -1` at or after the commit that carries this section):
+```
+$env:SWEK_6DOF_ORIENTATION = "euler"
+foreach ($s in 6310,6320,6330,6340,6350,6360,6370,6380,6390,6400) {
+  if (-not (Test-Path brain\rig-results\plain14\plain$s.json)) {
+    node tools\ship\trainPilotSub.mjs --circuit plain14 --seed $s --workers 4 --dump brain\rig-results\plain14\plain$s.json 2>&1 | Tee-Object brain\rig-results\plain14\plainlog$s.txt
+  }
+}
+```
+About 20 minutes a seed on 4 cores, about 3.5 hours. Send back the ten `plain<seed>.json` dumps and their logs; do not re-run the fly arm.
