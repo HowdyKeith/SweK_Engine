@@ -81,8 +81,8 @@ export function audit(wip, h27, fresh, { range = IDS, seconds = SECONDS, arms = 
     return { dark, lit, range, seconds, wip, h27, fresh, search, original, fixture, startVals, starts, c02: all.c02.entry().weights };
 }
 /** The penalised train value of each start at each price (the first scored candidate of every search): { ACT: {price: value}, HND: {...} }. */
-export function startVals(starts, { seconds = SECONDS, flyFn = flyPen } = {}) {
-    const out = {}; for (const n of ["ACT", "HND"]) { out[n] = {}; for (const p of PRICES) out[n][p] = penObjective(netArm("net", starts[n]), TRAIN, p, seconds, flyFn); } return out;
+export function startVals(starts, { seconds = SECONDS, flyFn = flyPen, train = TRAIN } = {}) {
+    const out = {}; for (const n of ["ACT", "HND"]) { out[n] = {}; for (const p of PRICES) out[n][p] = penObjective(netArm("net", starts[n]), train, p, seconds, flyFn); } return out;
 }
 export const fixtureOf = X27.fixtureOf;
 // ---- the readings
