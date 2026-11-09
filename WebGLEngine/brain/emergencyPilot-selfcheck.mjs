@@ -1,6 +1,6 @@
 // WebGLEngine/brain/emergencyPilot-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node brain/emergencyPilot-selfcheck.mjs      (~4 s)
+// Run: node brain/emergencyPilot-selfcheck.mjs      (~1.8-4 s)
 //
 // THE FLOOD AND THE PILOT THAT GETS OUT OF IT. brain/floodTask.mjs is a breach the ballast tank cannot trim out (4%..8% of the weight taken on, against a tank of 3%); brain/emergencyPilot.mjs wraps any pilot with the emergency
 // blow and the one-way drop weight (physics/mechanics/subModel6dof.mjs, v4901). This gate holds the task, the wrapper's stages, and what the wrapper does to a flood and to a boat that is not flooding:

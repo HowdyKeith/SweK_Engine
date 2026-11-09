@@ -395,6 +395,7 @@ export const REACH_ARRIVALS_SINCE_V4407 = Object.freeze([
     Object.freeze({ module: "world/kenneyKit.mjs", why: "reached only through ogre.brainSubs()'s lazy import of the sub brains (v4901): loaded on the console call, not at boot" }),
     Object.freeze({ module: "world/raceTrack.mjs", why: "reached only through ogre.brainSubs()'s lazy import of the sub brains (v4901): loaded on the console call, not at boot" }),
     Object.freeze({ module: "ui/upscalerSwitch.mjs", why: "v4912 -- main.js's static import at line ~7106 (mountUpscalerSwitch, renderScaleFor: the engine's own render-scale switch), measured against origin/main's walk of 772 modules, where it was the one module missing; it arrived with the merge of the render lines" }),
+    Object.freeze({ module: "brain/subCountermeasures.mjs", why: "v4913 -- reached through brain/subDuel.mjs (the lazy import of the sub brains, v4901, like the other sub modules above): the decoy, bubble screen and anti-torpedo interceptor the duel arena now carries (the countermeasures round); measured against origin/main's walk of 773 modules, where it was the one module missing; loaded on the console call, not at boot" }),
 ]);
 export const REACH_LOST_SINCE_V4407 = Object.freeze([]);
 
