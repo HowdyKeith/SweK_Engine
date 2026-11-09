@@ -404,6 +404,13 @@ export const RECORD_HANDOVERS = Object.freeze([
         decidedBy: "Keith",
         evidence: "boxId() reads linux-x64-4c-16gb-420793 after the worker restart of 2026-11-05 (uptime 34 min at the first reading); the shared record names 46f962, the container this round's rotation and verdicts 1-3 ran on. " +
                   "Verdict 4's sweep wrote sweep-timings.local.json and refused the shared record ('the record belongs to 46f962')." }),
+    // v4913 -- TO 142c0d, BECAUSE THE SANDBOX CAME BACK ON ANOTHER HOST AND THE ROUND'S 62 GATES HAD NOWHERE TO BE RECORDED. The merge of two chats' branches brought 62 gates no shared record had a reading of; the sandbox's verdict read budgetEvidence at 62 new against
+    // its handful and "nothing timed out alone under the cap" at five of them, and THE RIG'S OWN CLONE-VERIFY WENT RED ON THE SAME CAUSE (17 slow new gates timed out under the cap: the rig is foreign to the record, so a gate no committed record has timed is run once under 20 s).
+    // I had offered the rig's verdict as the gate instead and said the rig owns the record; it does not, the sandbox does by these rows, and the rig's red proved it. Keith decided it in the session on 2026-11-09 ("i say yes") when asked.
+    Object.freeze({ at: "v4913", from: "linux-x64-4c-16gb-420793", to: "linux-x64-4c-16gb-142c0d",
+        decidedBy: "Keith",
+        evidence: "boxId() reads linux-x64-4c-16gb-142c0d after the container restart of 2026-11-09; the shared record names 420793 (captured 2026-11-05T23:31Z). Keith's answer \"i say yes\" of 2026-11-09 to the handover question put to him after the rig's clone-verify of main v4913 failed on the 17 untimed slow gates. " +
+                  "The sandbox's rotation and verdicts went to sweep-timings.local.json and refused the shared record; that local file and its ledger are deleted at the handover, as at v4818, v4838, v4850, v4880, v4897 and v4912. 420793 held the record from v4912 to v4913." }),
 ]);
 
 /** The box that may write a record whose `host` reads `host`, after following every handover. */
