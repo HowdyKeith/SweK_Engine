@@ -1,5 +1,5 @@
 {
- "host": "linux-x64-4c-16gb-420793",
+ "host": "linux-x64-4c-16gb-142c0d",
  "note": "OBSERVED at the last quickSweep run: ms per gate (serial where a serial re-run happened) and exit code. *** `kinds` (v4579) SAYS WHICH QUANTITY EACH MS IS: `loaded` is a parallel reading taken with `workers` gates running at once, `alone` is a serial re-run, `capped` is the SIGKILL cap and not a runtime at all. The two real kinds sit about 1.93x apart (v4578), so comparing a ms against anything without knowing its kind is comparing two different quantities -- which is how nine entries came to hold the wrong one. *** Rewritten every run; used only to choose which gates are under the ship-time budget. Not a claim about the tree -- the register is. `at` is PER ENTRY (v4408): the capture that actually observed that gate. `captured` is this run's stamp and applies ONLY to entries whose `at` equals it -- the rest were not run and say so. `crossings` (v4536) counts CONSECUTIVE sweeps on which a gate came in over budget, and it takes two to evict: one crossing is a reading from one hour, and this box moves 12-36% between hours on unchanged code. A gate that comes back under loses its count entirely. `serial` (v4562) is the UNCONTENDED cost -- from a phase-2 run or from this sweep's rotating slice -- while `timings` is a sample taken while seven other gates fought for the box and runs a MEDIAN 2.41x above it. Ask costOf(), not timings[], for what a gate costs. `contended` (v4556) says WHICH of the two `timings[g]` is: true for a parallel sample, false for a serial reading filed there -- by a red re-run, a budget confirm, or sweepRotation. A ratio taken without it divides 164 measurements by themselves. Ask contentionPairs() for the population a contention ratio may be taken over. *** `boxScale` (v4672) IS HOW FAST THE BOX WAS DURING ONE CAPTURE PASS, and it is what a ms must be divided by before it is compared to a budget. Keyed by capture stamp -- both the `at` stamp and the `serialAt` stamp a sweep writes, which are one sweep -- and measured as the median of new/prior over the gates that pass re-ran which already had serialRing history, so the GATE cancels and the MACHINE is what is left. A pass with fewer than SCALE_MIN_N such gates gets NO ENTRY, which says `no scale was measured` rather than `the box was ordinary`. selectGates divides by max(1, min(SCALE_MAX, scale)): only a slow pass moves anything, and a gate readmitted this way had a raw reading of at most budgetMs * SCALE_MAX. ***",
  "kindsInferred": [
   "brain/rl/dock-hazard-selfcheck.mjs",
@@ -2412,7 +2412,69 @@
   "tools/ship/tuneRule-selfcheck.mjs": 6087,
   "tools/ship/tuneWide-selfcheck.mjs": 5987,
   "tools/tankFlyCxBench-selfcheck.mjs": 4050,
-  "ui/upscalerSwitch-selfcheck.mjs": 10683
+  "ui/upscalerSwitch-selfcheck.mjs": 10683,
+  "brain/afterAction-selfcheck.mjs": 3081,
+  "brain/circuitSeat-selfcheck.mjs": 4755,
+  "brain/counterfactual-selfcheck.mjs": 7643,
+  "brain/pilotSubPlain-selfcheck.mjs": 2062,
+  "brain/rotorLeague-selfcheck.mjs": 21381,
+  "brain/rotorcraftBoard-selfcheck.mjs": 29824,
+  "brain/stationSeat-selfcheck.mjs": 4062,
+  "brain/subCountermeasures-selfcheck.mjs": 16483,
+  "brain/subNav3d-selfcheck.mjs": 4597,
+  "brain/subNavPlus-selfcheck.mjs": 13714,
+  "brain/subRighting-selfcheck.mjs": 659,
+  "render/rotorcraftView-selfcheck.mjs": 3122,
+  "render/subAquariumCircuit-selfcheck.mjs": 694,
+  "render/subAquariumFish-selfcheck.mjs": 1563,
+  "render/subAquariumPlain14-selfcheck.mjs": 999,
+  "tools/ship/gpuTaskManBridge-selfcheck.mjs": 641,
+  "tools/ship/gpuTaskManClient-selfcheck.mjs": 4645,
+  "tools/ship/headToHead10-selfcheck.mjs": 54219,
+  "tools/ship/headToHead11-selfcheck.mjs": 14705,
+  "tools/ship/headToHead12-selfcheck.mjs": 14112,
+  "tools/ship/headToHead13-selfcheck.mjs": 1378,
+  "tools/ship/headToHead14-selfcheck.mjs": 2321,
+  "tools/ship/headToHead15-selfcheck.mjs": 1405,
+  "tools/ship/headToHead16-selfcheck.mjs": 1122,
+  "tools/ship/headToHead17-selfcheck.mjs": 1235,
+  "tools/ship/headToHead18-selfcheck.mjs": 1364,
+  "tools/ship/headToHead19-selfcheck.mjs": 2028,
+  "tools/ship/headToHead2-selfcheck.mjs": 3375,
+  "tools/ship/headToHead20-selfcheck.mjs": 1542,
+  "tools/ship/headToHead21-selfcheck.mjs": 765,
+  "tools/ship/headToHead22-selfcheck.mjs": 423,
+  "tools/ship/headToHead23-selfcheck.mjs": 852,
+  "tools/ship/headToHead24-selfcheck.mjs": 2994,
+  "tools/ship/headToHead25-selfcheck.mjs": 1268,
+  "tools/ship/headToHead4-selfcheck.mjs": 928,
+  "tools/ship/headToHead5-selfcheck.mjs": 9947,
+  "tools/ship/headToHead6-selfcheck.mjs": 7791,
+  "tools/ship/headToHead7-selfcheck.mjs": 34457,
+  "tools/ship/headToHead8-selfcheck.mjs": 517,
+  "tools/ship/headToHead9-selfcheck.mjs": 8622,
+  "tools/ship/pageNotes-selfcheck.mjs": 254,
+  "tools/ship/plain14Distribution-selfcheck.mjs": 282,
+  "tools/ship/plain14RobustStage-selfcheck.mjs": 44197,
+  "tools/ship/plainNetVariants-selfcheck.mjs": 1658,
+  "tools/ship/subNavPlusStudy-selfcheck.mjs": 5421,
+  "tools/ship/takeAfterAction-selfcheck.mjs": 3801,
+  "tools/ship/takeCounterfactual-selfcheck.mjs": 13972,
+  "tools/ship/takeDecisionCircuit-selfcheck.mjs": 6976,
+  "tools/ship/takeDeepPlain-selfcheck.mjs": 6013,
+  "tools/ship/takeKindMatched-selfcheck.mjs": 5286,
+  "tools/ship/takeKitGrid-selfcheck.mjs": 4088,
+  "tools/ship/takePlainFamily-selfcheck.mjs": 5780,
+  "tools/ship/takeRankingReplication-selfcheck.mjs": 2272,
+  "tools/ship/takeRankingValidity-selfcheck.mjs": 12224,
+  "tools/ship/takeRighting-selfcheck.mjs": 11027,
+  "tools/ship/takeStationRound-selfcheck.mjs": 12764,
+  "tools/ship/takeThirdAudit-selfcheck.mjs": 534,
+  "tools/ship/tankPairedReplicate-selfcheck.mjs": 15599,
+  "tools/ship/trainDecisionCircuit-selfcheck.mjs": 10907,
+  "tools/ship/trainStation-selfcheck.mjs": 12544,
+  "tools/ship/winPathLint-selfcheck.mjs": 2737,
+  "ui/privateLmClient-selfcheck.mjs": 405
  },
  "codes": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 0,
@@ -4701,7 +4763,69 @@
   "tools/ship/tuneRule-selfcheck.mjs": 0,
   "tools/ship/tuneWide-selfcheck.mjs": 0,
   "tools/tankFlyCxBench-selfcheck.mjs": 0,
-  "ui/upscalerSwitch-selfcheck.mjs": 0
+  "ui/upscalerSwitch-selfcheck.mjs": 0,
+  "brain/afterAction-selfcheck.mjs": 0,
+  "brain/circuitSeat-selfcheck.mjs": 0,
+  "brain/counterfactual-selfcheck.mjs": 0,
+  "brain/pilotSubPlain-selfcheck.mjs": 0,
+  "brain/rotorLeague-selfcheck.mjs": 0,
+  "brain/rotorcraftBoard-selfcheck.mjs": 0,
+  "brain/stationSeat-selfcheck.mjs": 0,
+  "brain/subCountermeasures-selfcheck.mjs": 0,
+  "brain/subNav3d-selfcheck.mjs": 0,
+  "brain/subNavPlus-selfcheck.mjs": 0,
+  "brain/subRighting-selfcheck.mjs": 0,
+  "render/rotorcraftView-selfcheck.mjs": 0,
+  "render/subAquariumCircuit-selfcheck.mjs": 0,
+  "render/subAquariumFish-selfcheck.mjs": 0,
+  "render/subAquariumPlain14-selfcheck.mjs": 0,
+  "tools/ship/gpuTaskManBridge-selfcheck.mjs": 0,
+  "tools/ship/gpuTaskManClient-selfcheck.mjs": 0,
+  "tools/ship/headToHead10-selfcheck.mjs": 0,
+  "tools/ship/headToHead11-selfcheck.mjs": 0,
+  "tools/ship/headToHead12-selfcheck.mjs": 0,
+  "tools/ship/headToHead13-selfcheck.mjs": 0,
+  "tools/ship/headToHead14-selfcheck.mjs": 0,
+  "tools/ship/headToHead15-selfcheck.mjs": 0,
+  "tools/ship/headToHead16-selfcheck.mjs": 0,
+  "tools/ship/headToHead17-selfcheck.mjs": 0,
+  "tools/ship/headToHead18-selfcheck.mjs": 0,
+  "tools/ship/headToHead19-selfcheck.mjs": 0,
+  "tools/ship/headToHead2-selfcheck.mjs": 0,
+  "tools/ship/headToHead20-selfcheck.mjs": 0,
+  "tools/ship/headToHead21-selfcheck.mjs": 0,
+  "tools/ship/headToHead22-selfcheck.mjs": 0,
+  "tools/ship/headToHead23-selfcheck.mjs": 0,
+  "tools/ship/headToHead24-selfcheck.mjs": 0,
+  "tools/ship/headToHead25-selfcheck.mjs": 0,
+  "tools/ship/headToHead4-selfcheck.mjs": 0,
+  "tools/ship/headToHead5-selfcheck.mjs": 0,
+  "tools/ship/headToHead6-selfcheck.mjs": 0,
+  "tools/ship/headToHead7-selfcheck.mjs": 0,
+  "tools/ship/headToHead8-selfcheck.mjs": 0,
+  "tools/ship/headToHead9-selfcheck.mjs": 0,
+  "tools/ship/pageNotes-selfcheck.mjs": 0,
+  "tools/ship/plain14Distribution-selfcheck.mjs": 0,
+  "tools/ship/plain14RobustStage-selfcheck.mjs": 0,
+  "tools/ship/plainNetVariants-selfcheck.mjs": 0,
+  "tools/ship/subNavPlusStudy-selfcheck.mjs": 0,
+  "tools/ship/takeAfterAction-selfcheck.mjs": 0,
+  "tools/ship/takeCounterfactual-selfcheck.mjs": 0,
+  "tools/ship/takeDecisionCircuit-selfcheck.mjs": 0,
+  "tools/ship/takeDeepPlain-selfcheck.mjs": 0,
+  "tools/ship/takeKindMatched-selfcheck.mjs": 0,
+  "tools/ship/takeKitGrid-selfcheck.mjs": 0,
+  "tools/ship/takePlainFamily-selfcheck.mjs": 0,
+  "tools/ship/takeRankingReplication-selfcheck.mjs": 0,
+  "tools/ship/takeRankingValidity-selfcheck.mjs": 0,
+  "tools/ship/takeRighting-selfcheck.mjs": 0,
+  "tools/ship/takeStationRound-selfcheck.mjs": 0,
+  "tools/ship/takeThirdAudit-selfcheck.mjs": 0,
+  "tools/ship/tankPairedReplicate-selfcheck.mjs": 0,
+  "tools/ship/trainDecisionCircuit-selfcheck.mjs": 0,
+  "tools/ship/trainStation-selfcheck.mjs": 0,
+  "tools/ship/winPathLint-selfcheck.mjs": 0,
+  "ui/privateLmClient-selfcheck.mjs": 0
  },
  "at": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-11-05T23:31:52.780Z",
@@ -6990,7 +7114,69 @@
   "tools/ship/tuneRule-selfcheck.mjs": "2026-11-05T15:38:11.320Z",
   "tools/ship/tuneWide-selfcheck.mjs": "2026-11-05T15:38:11.320Z",
   "tools/tankFlyCxBench-selfcheck.mjs": "2026-11-05T20:19:37.863Z",
-  "ui/upscalerSwitch-selfcheck.mjs": "2026-11-05T15:38:11.320Z"
+  "ui/upscalerSwitch-selfcheck.mjs": "2026-11-05T15:38:11.320Z",
+  "brain/afterAction-selfcheck.mjs": "2026-11-09T04:11:53.818Z",
+  "brain/circuitSeat-selfcheck.mjs": "2026-11-09T04:11:58.745Z",
+  "brain/counterfactual-selfcheck.mjs": "2026-11-09T04:12:06.577Z",
+  "brain/pilotSubPlain-selfcheck.mjs": "2026-11-09T04:12:08.813Z",
+  "brain/rotorLeague-selfcheck.mjs": "2026-11-09T04:12:30.380Z",
+  "brain/rotorcraftBoard-selfcheck.mjs": "2026-11-09T04:13:00.392Z",
+  "brain/stationSeat-selfcheck.mjs": "2026-11-09T04:13:04.616Z",
+  "brain/subCountermeasures-selfcheck.mjs": "2026-11-09T04:13:21.276Z",
+  "brain/subNav3d-selfcheck.mjs": "2026-11-09T04:13:26.024Z",
+  "brain/subNavPlus-selfcheck.mjs": "2026-11-09T04:13:39.920Z",
+  "brain/subRighting-selfcheck.mjs": "2026-11-09T04:13:40.725Z",
+  "render/rotorcraftView-selfcheck.mjs": "2026-11-09T04:13:44.015Z",
+  "render/subAquariumCircuit-selfcheck.mjs": "2026-11-09T04:13:44.880Z",
+  "render/subAquariumFish-selfcheck.mjs": "2026-11-09T04:13:46.617Z",
+  "render/subAquariumPlain14-selfcheck.mjs": "2026-11-09T04:13:47.756Z",
+  "tools/ship/gpuTaskManBridge-selfcheck.mjs": "2026-11-09T04:13:48.598Z",
+  "tools/ship/gpuTaskManClient-selfcheck.mjs": "2026-11-09T04:13:53.384Z",
+  "tools/ship/headToHead10-selfcheck.mjs": "2026-11-09T04:14:47.762Z",
+  "tools/ship/headToHead11-selfcheck.mjs": "2026-11-09T04:15:02.635Z",
+  "tools/ship/headToHead12-selfcheck.mjs": "2026-11-09T04:15:16.893Z",
+  "tools/ship/headToHead13-selfcheck.mjs": "2026-11-09T04:15:18.424Z",
+  "tools/ship/headToHead14-selfcheck.mjs": "2026-11-09T04:15:20.940Z",
+  "tools/ship/headToHead15-selfcheck.mjs": "2026-11-09T04:15:22.489Z",
+  "tools/ship/headToHead16-selfcheck.mjs": "2026-11-09T04:15:23.773Z",
+  "tools/ship/headToHead17-selfcheck.mjs": "2026-11-09T04:15:25.161Z",
+  "tools/ship/headToHead18-selfcheck.mjs": "2026-11-09T04:15:26.686Z",
+  "tools/ship/headToHead19-selfcheck.mjs": "2026-11-09T04:15:28.872Z",
+  "tools/ship/headToHead2-selfcheck.mjs": "2026-11-09T04:15:32.484Z",
+  "tools/ship/headToHead20-selfcheck.mjs": "2026-11-09T04:15:34.199Z",
+  "tools/ship/headToHead21-selfcheck.mjs": "2026-11-09T04:15:35.113Z",
+  "tools/ship/headToHead22-selfcheck.mjs": "2026-11-09T04:15:35.679Z",
+  "tools/ship/headToHead23-selfcheck.mjs": "2026-11-09T04:15:36.690Z",
+  "tools/ship/headToHead24-selfcheck.mjs": "2026-11-09T04:15:39.865Z",
+  "tools/ship/headToHead25-selfcheck.mjs": "2026-11-09T04:15:41.303Z",
+  "tools/ship/headToHead4-selfcheck.mjs": "2026-11-09T04:15:42.389Z",
+  "tools/ship/headToHead5-selfcheck.mjs": "2026-11-09T04:15:52.526Z",
+  "tools/ship/headToHead6-selfcheck.mjs": "2026-11-09T04:16:00.482Z",
+  "tools/ship/headToHead7-selfcheck.mjs": "2026-11-09T04:16:35.105Z",
+  "tools/ship/headToHead8-selfcheck.mjs": "2026-11-09T04:16:35.787Z",
+  "tools/ship/headToHead9-selfcheck.mjs": "2026-11-09T04:16:44.576Z",
+  "tools/ship/pageNotes-selfcheck.mjs": "2026-11-09T04:16:44.996Z",
+  "tools/ship/plain14Distribution-selfcheck.mjs": "2026-11-09T04:16:45.467Z",
+  "tools/ship/plain14RobustStage-selfcheck.mjs": "2026-11-09T04:17:29.839Z",
+  "tools/ship/plainNetVariants-selfcheck.mjs": "2026-11-09T04:17:31.668Z",
+  "tools/ship/subNavPlusStudy-selfcheck.mjs": "2026-11-09T04:17:37.246Z",
+  "tools/ship/takeAfterAction-selfcheck.mjs": "2026-11-09T04:17:41.190Z",
+  "tools/ship/takeCounterfactual-selfcheck.mjs": "2026-11-09T04:17:55.321Z",
+  "tools/ship/takeDecisionCircuit-selfcheck.mjs": "2026-11-09T04:18:02.441Z",
+  "tools/ship/takeDeepPlain-selfcheck.mjs": "2026-11-09T04:18:08.621Z",
+  "tools/ship/takeKindMatched-selfcheck.mjs": "2026-11-09T04:18:14.052Z",
+  "tools/ship/takeKitGrid-selfcheck.mjs": "2026-11-09T04:18:18.298Z",
+  "tools/ship/takePlainFamily-selfcheck.mjs": "2026-11-09T04:18:24.238Z",
+  "tools/ship/takeRankingReplication-selfcheck.mjs": "2026-11-09T04:18:26.671Z",
+  "tools/ship/takeRankingValidity-selfcheck.mjs": "2026-11-09T04:18:39.071Z",
+  "tools/ship/takeRighting-selfcheck.mjs": "2026-11-09T04:18:50.264Z",
+  "tools/ship/takeStationRound-selfcheck.mjs": "2026-11-09T04:19:03.192Z",
+  "tools/ship/takeThirdAudit-selfcheck.mjs": "2026-11-09T04:19:03.888Z",
+  "tools/ship/tankPairedReplicate-selfcheck.mjs": "2026-11-09T04:19:19.632Z",
+  "tools/ship/trainDecisionCircuit-selfcheck.mjs": "2026-11-09T04:19:30.682Z",
+  "tools/ship/trainStation-selfcheck.mjs": "2026-11-09T04:19:43.361Z",
+  "tools/ship/winPathLint-selfcheck.mjs": "2026-11-09T04:19:46.255Z",
+  "ui/privateLmClient-selfcheck.mjs": "2026-11-09T04:19:46.863Z"
  },
  "capAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": 20000,
@@ -9254,7 +9440,69 @@
   "tools/ship/tuneRule-selfcheck.mjs": 20000,
   "tools/ship/tuneWide-selfcheck.mjs": 20000,
   "tools/tankFlyCxBench-selfcheck.mjs": 20000,
-  "ui/upscalerSwitch-selfcheck.mjs": 20000
+  "ui/upscalerSwitch-selfcheck.mjs": 20000,
+  "brain/afterAction-selfcheck.mjs": 300000,
+  "brain/circuitSeat-selfcheck.mjs": 300000,
+  "brain/counterfactual-selfcheck.mjs": 300000,
+  "brain/pilotSubPlain-selfcheck.mjs": 300000,
+  "brain/rotorLeague-selfcheck.mjs": 300000,
+  "brain/rotorcraftBoard-selfcheck.mjs": 300000,
+  "brain/stationSeat-selfcheck.mjs": 300000,
+  "brain/subCountermeasures-selfcheck.mjs": 300000,
+  "brain/subNav3d-selfcheck.mjs": 300000,
+  "brain/subNavPlus-selfcheck.mjs": 300000,
+  "brain/subRighting-selfcheck.mjs": 300000,
+  "render/rotorcraftView-selfcheck.mjs": 300000,
+  "render/subAquariumCircuit-selfcheck.mjs": 300000,
+  "render/subAquariumFish-selfcheck.mjs": 300000,
+  "render/subAquariumPlain14-selfcheck.mjs": 300000,
+  "tools/ship/gpuTaskManBridge-selfcheck.mjs": 300000,
+  "tools/ship/gpuTaskManClient-selfcheck.mjs": 300000,
+  "tools/ship/headToHead10-selfcheck.mjs": 300000,
+  "tools/ship/headToHead11-selfcheck.mjs": 300000,
+  "tools/ship/headToHead12-selfcheck.mjs": 300000,
+  "tools/ship/headToHead13-selfcheck.mjs": 300000,
+  "tools/ship/headToHead14-selfcheck.mjs": 300000,
+  "tools/ship/headToHead15-selfcheck.mjs": 300000,
+  "tools/ship/headToHead16-selfcheck.mjs": 300000,
+  "tools/ship/headToHead17-selfcheck.mjs": 300000,
+  "tools/ship/headToHead18-selfcheck.mjs": 300000,
+  "tools/ship/headToHead19-selfcheck.mjs": 300000,
+  "tools/ship/headToHead2-selfcheck.mjs": 300000,
+  "tools/ship/headToHead20-selfcheck.mjs": 300000,
+  "tools/ship/headToHead21-selfcheck.mjs": 300000,
+  "tools/ship/headToHead22-selfcheck.mjs": 300000,
+  "tools/ship/headToHead23-selfcheck.mjs": 300000,
+  "tools/ship/headToHead24-selfcheck.mjs": 300000,
+  "tools/ship/headToHead25-selfcheck.mjs": 300000,
+  "tools/ship/headToHead4-selfcheck.mjs": 300000,
+  "tools/ship/headToHead5-selfcheck.mjs": 300000,
+  "tools/ship/headToHead6-selfcheck.mjs": 300000,
+  "tools/ship/headToHead7-selfcheck.mjs": 300000,
+  "tools/ship/headToHead8-selfcheck.mjs": 300000,
+  "tools/ship/headToHead9-selfcheck.mjs": 300000,
+  "tools/ship/pageNotes-selfcheck.mjs": 300000,
+  "tools/ship/plain14Distribution-selfcheck.mjs": 300000,
+  "tools/ship/plain14RobustStage-selfcheck.mjs": 300000,
+  "tools/ship/plainNetVariants-selfcheck.mjs": 300000,
+  "tools/ship/subNavPlusStudy-selfcheck.mjs": 300000,
+  "tools/ship/takeAfterAction-selfcheck.mjs": 300000,
+  "tools/ship/takeCounterfactual-selfcheck.mjs": 300000,
+  "tools/ship/takeDecisionCircuit-selfcheck.mjs": 300000,
+  "tools/ship/takeDeepPlain-selfcheck.mjs": 300000,
+  "tools/ship/takeKindMatched-selfcheck.mjs": 300000,
+  "tools/ship/takeKitGrid-selfcheck.mjs": 300000,
+  "tools/ship/takePlainFamily-selfcheck.mjs": 300000,
+  "tools/ship/takeRankingReplication-selfcheck.mjs": 300000,
+  "tools/ship/takeRankingValidity-selfcheck.mjs": 300000,
+  "tools/ship/takeRighting-selfcheck.mjs": 300000,
+  "tools/ship/takeStationRound-selfcheck.mjs": 300000,
+  "tools/ship/takeThirdAudit-selfcheck.mjs": 300000,
+  "tools/ship/tankPairedReplicate-selfcheck.mjs": 300000,
+  "tools/ship/trainDecisionCircuit-selfcheck.mjs": 300000,
+  "tools/ship/trainStation-selfcheck.mjs": 300000,
+  "tools/ship/winPathLint-selfcheck.mjs": 300000,
+  "ui/privateLmClient-selfcheck.mjs": 300000
  },
  "finished": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": true,
@@ -11538,7 +11786,69 @@
   "tools/ship/tuneRule-selfcheck.mjs": true,
   "tools/ship/tuneWide-selfcheck.mjs": true,
   "tools/tankFlyCxBench-selfcheck.mjs": true,
-  "ui/upscalerSwitch-selfcheck.mjs": true
+  "ui/upscalerSwitch-selfcheck.mjs": true,
+  "brain/afterAction-selfcheck.mjs": true,
+  "brain/circuitSeat-selfcheck.mjs": true,
+  "brain/counterfactual-selfcheck.mjs": true,
+  "brain/pilotSubPlain-selfcheck.mjs": true,
+  "brain/rotorLeague-selfcheck.mjs": true,
+  "brain/rotorcraftBoard-selfcheck.mjs": true,
+  "brain/stationSeat-selfcheck.mjs": true,
+  "brain/subCountermeasures-selfcheck.mjs": true,
+  "brain/subNav3d-selfcheck.mjs": true,
+  "brain/subNavPlus-selfcheck.mjs": true,
+  "brain/subRighting-selfcheck.mjs": true,
+  "render/rotorcraftView-selfcheck.mjs": true,
+  "render/subAquariumCircuit-selfcheck.mjs": true,
+  "render/subAquariumFish-selfcheck.mjs": true,
+  "render/subAquariumPlain14-selfcheck.mjs": true,
+  "tools/ship/gpuTaskManBridge-selfcheck.mjs": true,
+  "tools/ship/gpuTaskManClient-selfcheck.mjs": true,
+  "tools/ship/headToHead10-selfcheck.mjs": true,
+  "tools/ship/headToHead11-selfcheck.mjs": true,
+  "tools/ship/headToHead12-selfcheck.mjs": true,
+  "tools/ship/headToHead13-selfcheck.mjs": true,
+  "tools/ship/headToHead14-selfcheck.mjs": true,
+  "tools/ship/headToHead15-selfcheck.mjs": true,
+  "tools/ship/headToHead16-selfcheck.mjs": true,
+  "tools/ship/headToHead17-selfcheck.mjs": true,
+  "tools/ship/headToHead18-selfcheck.mjs": true,
+  "tools/ship/headToHead19-selfcheck.mjs": true,
+  "tools/ship/headToHead2-selfcheck.mjs": true,
+  "tools/ship/headToHead20-selfcheck.mjs": true,
+  "tools/ship/headToHead21-selfcheck.mjs": true,
+  "tools/ship/headToHead22-selfcheck.mjs": true,
+  "tools/ship/headToHead23-selfcheck.mjs": true,
+  "tools/ship/headToHead24-selfcheck.mjs": true,
+  "tools/ship/headToHead25-selfcheck.mjs": true,
+  "tools/ship/headToHead4-selfcheck.mjs": true,
+  "tools/ship/headToHead5-selfcheck.mjs": true,
+  "tools/ship/headToHead6-selfcheck.mjs": true,
+  "tools/ship/headToHead7-selfcheck.mjs": true,
+  "tools/ship/headToHead8-selfcheck.mjs": true,
+  "tools/ship/headToHead9-selfcheck.mjs": true,
+  "tools/ship/pageNotes-selfcheck.mjs": true,
+  "tools/ship/plain14Distribution-selfcheck.mjs": true,
+  "tools/ship/plain14RobustStage-selfcheck.mjs": true,
+  "tools/ship/plainNetVariants-selfcheck.mjs": true,
+  "tools/ship/subNavPlusStudy-selfcheck.mjs": true,
+  "tools/ship/takeAfterAction-selfcheck.mjs": true,
+  "tools/ship/takeCounterfactual-selfcheck.mjs": true,
+  "tools/ship/takeDecisionCircuit-selfcheck.mjs": true,
+  "tools/ship/takeDeepPlain-selfcheck.mjs": true,
+  "tools/ship/takeKindMatched-selfcheck.mjs": true,
+  "tools/ship/takeKitGrid-selfcheck.mjs": true,
+  "tools/ship/takePlainFamily-selfcheck.mjs": true,
+  "tools/ship/takeRankingReplication-selfcheck.mjs": true,
+  "tools/ship/takeRankingValidity-selfcheck.mjs": true,
+  "tools/ship/takeRighting-selfcheck.mjs": true,
+  "tools/ship/takeStationRound-selfcheck.mjs": true,
+  "tools/ship/takeThirdAudit-selfcheck.mjs": true,
+  "tools/ship/tankPairedReplicate-selfcheck.mjs": true,
+  "tools/ship/trainDecisionCircuit-selfcheck.mjs": true,
+  "tools/ship/trainStation-selfcheck.mjs": true,
+  "tools/ship/winPathLint-selfcheck.mjs": true,
+  "ui/privateLmClient-selfcheck.mjs": true
  },
  "crossings": {
   "brain/gunnerPolicy-selfcheck.mjs": 2,
@@ -14046,7 +14356,69 @@
   "tools/ship/localModel-selfcheck.mjs": 44,
   "tools/ship/plannerGate-selfcheck.mjs": 84,
   "tools/ship/plannerMeta-selfcheck.mjs": 36,
-  "tools/ship/subSensedPool-selfcheck.mjs": 1714
+  "tools/ship/subSensedPool-selfcheck.mjs": 1714,
+  "brain/afterAction-selfcheck.mjs": 3081,
+  "brain/circuitSeat-selfcheck.mjs": 4755,
+  "brain/counterfactual-selfcheck.mjs": 7643,
+  "brain/pilotSubPlain-selfcheck.mjs": 2062,
+  "brain/rotorLeague-selfcheck.mjs": 21381,
+  "brain/rotorcraftBoard-selfcheck.mjs": 29824,
+  "brain/stationSeat-selfcheck.mjs": 4062,
+  "brain/subCountermeasures-selfcheck.mjs": 16483,
+  "brain/subNav3d-selfcheck.mjs": 4597,
+  "brain/subNavPlus-selfcheck.mjs": 13714,
+  "brain/subRighting-selfcheck.mjs": 659,
+  "render/rotorcraftView-selfcheck.mjs": 3122,
+  "render/subAquariumCircuit-selfcheck.mjs": 694,
+  "render/subAquariumFish-selfcheck.mjs": 1563,
+  "render/subAquariumPlain14-selfcheck.mjs": 999,
+  "tools/ship/gpuTaskManBridge-selfcheck.mjs": 641,
+  "tools/ship/gpuTaskManClient-selfcheck.mjs": 4645,
+  "tools/ship/headToHead10-selfcheck.mjs": 54219,
+  "tools/ship/headToHead11-selfcheck.mjs": 14705,
+  "tools/ship/headToHead12-selfcheck.mjs": 14112,
+  "tools/ship/headToHead13-selfcheck.mjs": 1378,
+  "tools/ship/headToHead14-selfcheck.mjs": 2321,
+  "tools/ship/headToHead15-selfcheck.mjs": 1405,
+  "tools/ship/headToHead16-selfcheck.mjs": 1122,
+  "tools/ship/headToHead17-selfcheck.mjs": 1235,
+  "tools/ship/headToHead18-selfcheck.mjs": 1364,
+  "tools/ship/headToHead19-selfcheck.mjs": 2028,
+  "tools/ship/headToHead2-selfcheck.mjs": 3375,
+  "tools/ship/headToHead20-selfcheck.mjs": 1542,
+  "tools/ship/headToHead21-selfcheck.mjs": 765,
+  "tools/ship/headToHead22-selfcheck.mjs": 423,
+  "tools/ship/headToHead23-selfcheck.mjs": 852,
+  "tools/ship/headToHead24-selfcheck.mjs": 2994,
+  "tools/ship/headToHead25-selfcheck.mjs": 1268,
+  "tools/ship/headToHead4-selfcheck.mjs": 928,
+  "tools/ship/headToHead5-selfcheck.mjs": 9947,
+  "tools/ship/headToHead6-selfcheck.mjs": 7791,
+  "tools/ship/headToHead7-selfcheck.mjs": 34457,
+  "tools/ship/headToHead8-selfcheck.mjs": 517,
+  "tools/ship/headToHead9-selfcheck.mjs": 8622,
+  "tools/ship/pageNotes-selfcheck.mjs": 254,
+  "tools/ship/plain14Distribution-selfcheck.mjs": 282,
+  "tools/ship/plain14RobustStage-selfcheck.mjs": 44197,
+  "tools/ship/plainNetVariants-selfcheck.mjs": 1658,
+  "tools/ship/subNavPlusStudy-selfcheck.mjs": 5421,
+  "tools/ship/takeAfterAction-selfcheck.mjs": 3801,
+  "tools/ship/takeCounterfactual-selfcheck.mjs": 13972,
+  "tools/ship/takeDecisionCircuit-selfcheck.mjs": 6976,
+  "tools/ship/takeDeepPlain-selfcheck.mjs": 6013,
+  "tools/ship/takeKindMatched-selfcheck.mjs": 5286,
+  "tools/ship/takeKitGrid-selfcheck.mjs": 4088,
+  "tools/ship/takePlainFamily-selfcheck.mjs": 5780,
+  "tools/ship/takeRankingReplication-selfcheck.mjs": 2272,
+  "tools/ship/takeRankingValidity-selfcheck.mjs": 12224,
+  "tools/ship/takeRighting-selfcheck.mjs": 11027,
+  "tools/ship/takeStationRound-selfcheck.mjs": 12764,
+  "tools/ship/takeThirdAudit-selfcheck.mjs": 534,
+  "tools/ship/tankPairedReplicate-selfcheck.mjs": 15599,
+  "tools/ship/trainDecisionCircuit-selfcheck.mjs": 10907,
+  "tools/ship/trainStation-selfcheck.mjs": 12544,
+  "tools/ship/winPathLint-selfcheck.mjs": 2737,
+  "ui/privateLmClient-selfcheck.mjs": 405
  },
  "serialAt": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "2026-11-05T20:53:59.833Z",
@@ -16226,7 +16598,69 @@
   "tools/ship/localModel-selfcheck.mjs": "2026-11-05T14:55:21.405Z",
   "tools/ship/plannerGate-selfcheck.mjs": "2026-11-05T14:55:21.405Z",
   "tools/ship/plannerMeta-selfcheck.mjs": "2026-11-05T14:55:21.405Z",
-  "tools/ship/subSensedPool-selfcheck.mjs": "2026-11-05T23:31:37.254Z"
+  "tools/ship/subSensedPool-selfcheck.mjs": "2026-11-05T23:31:37.254Z",
+  "brain/afterAction-selfcheck.mjs": "2026-11-09T04:11:53.818Z",
+  "brain/circuitSeat-selfcheck.mjs": "2026-11-09T04:11:58.745Z",
+  "brain/counterfactual-selfcheck.mjs": "2026-11-09T04:12:06.577Z",
+  "brain/pilotSubPlain-selfcheck.mjs": "2026-11-09T04:12:08.813Z",
+  "brain/rotorLeague-selfcheck.mjs": "2026-11-09T04:12:30.380Z",
+  "brain/rotorcraftBoard-selfcheck.mjs": "2026-11-09T04:13:00.392Z",
+  "brain/stationSeat-selfcheck.mjs": "2026-11-09T04:13:04.616Z",
+  "brain/subCountermeasures-selfcheck.mjs": "2026-11-09T04:13:21.276Z",
+  "brain/subNav3d-selfcheck.mjs": "2026-11-09T04:13:26.024Z",
+  "brain/subNavPlus-selfcheck.mjs": "2026-11-09T04:13:39.920Z",
+  "brain/subRighting-selfcheck.mjs": "2026-11-09T04:13:40.725Z",
+  "render/rotorcraftView-selfcheck.mjs": "2026-11-09T04:13:44.015Z",
+  "render/subAquariumCircuit-selfcheck.mjs": "2026-11-09T04:13:44.880Z",
+  "render/subAquariumFish-selfcheck.mjs": "2026-11-09T04:13:46.617Z",
+  "render/subAquariumPlain14-selfcheck.mjs": "2026-11-09T04:13:47.756Z",
+  "tools/ship/gpuTaskManBridge-selfcheck.mjs": "2026-11-09T04:13:48.598Z",
+  "tools/ship/gpuTaskManClient-selfcheck.mjs": "2026-11-09T04:13:53.384Z",
+  "tools/ship/headToHead10-selfcheck.mjs": "2026-11-09T04:14:47.762Z",
+  "tools/ship/headToHead11-selfcheck.mjs": "2026-11-09T04:15:02.635Z",
+  "tools/ship/headToHead12-selfcheck.mjs": "2026-11-09T04:15:16.893Z",
+  "tools/ship/headToHead13-selfcheck.mjs": "2026-11-09T04:15:18.424Z",
+  "tools/ship/headToHead14-selfcheck.mjs": "2026-11-09T04:15:20.940Z",
+  "tools/ship/headToHead15-selfcheck.mjs": "2026-11-09T04:15:22.489Z",
+  "tools/ship/headToHead16-selfcheck.mjs": "2026-11-09T04:15:23.773Z",
+  "tools/ship/headToHead17-selfcheck.mjs": "2026-11-09T04:15:25.161Z",
+  "tools/ship/headToHead18-selfcheck.mjs": "2026-11-09T04:15:26.686Z",
+  "tools/ship/headToHead19-selfcheck.mjs": "2026-11-09T04:15:28.872Z",
+  "tools/ship/headToHead2-selfcheck.mjs": "2026-11-09T04:15:32.484Z",
+  "tools/ship/headToHead20-selfcheck.mjs": "2026-11-09T04:15:34.199Z",
+  "tools/ship/headToHead21-selfcheck.mjs": "2026-11-09T04:15:35.113Z",
+  "tools/ship/headToHead22-selfcheck.mjs": "2026-11-09T04:15:35.679Z",
+  "tools/ship/headToHead23-selfcheck.mjs": "2026-11-09T04:15:36.690Z",
+  "tools/ship/headToHead24-selfcheck.mjs": "2026-11-09T04:15:39.865Z",
+  "tools/ship/headToHead25-selfcheck.mjs": "2026-11-09T04:15:41.303Z",
+  "tools/ship/headToHead4-selfcheck.mjs": "2026-11-09T04:15:42.389Z",
+  "tools/ship/headToHead5-selfcheck.mjs": "2026-11-09T04:15:52.526Z",
+  "tools/ship/headToHead6-selfcheck.mjs": "2026-11-09T04:16:00.482Z",
+  "tools/ship/headToHead7-selfcheck.mjs": "2026-11-09T04:16:35.105Z",
+  "tools/ship/headToHead8-selfcheck.mjs": "2026-11-09T04:16:35.787Z",
+  "tools/ship/headToHead9-selfcheck.mjs": "2026-11-09T04:16:44.576Z",
+  "tools/ship/pageNotes-selfcheck.mjs": "2026-11-09T04:16:44.996Z",
+  "tools/ship/plain14Distribution-selfcheck.mjs": "2026-11-09T04:16:45.467Z",
+  "tools/ship/plain14RobustStage-selfcheck.mjs": "2026-11-09T04:17:29.839Z",
+  "tools/ship/plainNetVariants-selfcheck.mjs": "2026-11-09T04:17:31.668Z",
+  "tools/ship/subNavPlusStudy-selfcheck.mjs": "2026-11-09T04:17:37.246Z",
+  "tools/ship/takeAfterAction-selfcheck.mjs": "2026-11-09T04:17:41.190Z",
+  "tools/ship/takeCounterfactual-selfcheck.mjs": "2026-11-09T04:17:55.321Z",
+  "tools/ship/takeDecisionCircuit-selfcheck.mjs": "2026-11-09T04:18:02.441Z",
+  "tools/ship/takeDeepPlain-selfcheck.mjs": "2026-11-09T04:18:08.621Z",
+  "tools/ship/takeKindMatched-selfcheck.mjs": "2026-11-09T04:18:14.052Z",
+  "tools/ship/takeKitGrid-selfcheck.mjs": "2026-11-09T04:18:18.298Z",
+  "tools/ship/takePlainFamily-selfcheck.mjs": "2026-11-09T04:18:24.238Z",
+  "tools/ship/takeRankingReplication-selfcheck.mjs": "2026-11-09T04:18:26.671Z",
+  "tools/ship/takeRankingValidity-selfcheck.mjs": "2026-11-09T04:18:39.071Z",
+  "tools/ship/takeRighting-selfcheck.mjs": "2026-11-09T04:18:50.264Z",
+  "tools/ship/takeStationRound-selfcheck.mjs": "2026-11-09T04:19:03.192Z",
+  "tools/ship/takeThirdAudit-selfcheck.mjs": "2026-11-09T04:19:03.888Z",
+  "tools/ship/tankPairedReplicate-selfcheck.mjs": "2026-11-09T04:19:19.632Z",
+  "tools/ship/trainDecisionCircuit-selfcheck.mjs": "2026-11-09T04:19:30.682Z",
+  "tools/ship/trainStation-selfcheck.mjs": "2026-11-09T04:19:43.361Z",
+  "tools/ship/winPathLint-selfcheck.mjs": "2026-11-09T04:19:46.255Z",
+  "ui/privateLmClient-selfcheck.mjs": "2026-11-09T04:19:46.863Z"
  },
  "serialRing": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": [
@@ -26884,6 +27318,192 @@
    1785,
    1757,
    1714
+  ],
+  "brain/afterAction-selfcheck.mjs": [
+   3081
+  ],
+  "brain/circuitSeat-selfcheck.mjs": [
+   4755
+  ],
+  "brain/counterfactual-selfcheck.mjs": [
+   7643
+  ],
+  "brain/pilotSubPlain-selfcheck.mjs": [
+   2062
+  ],
+  "brain/rotorLeague-selfcheck.mjs": [
+   21381
+  ],
+  "brain/rotorcraftBoard-selfcheck.mjs": [
+   29824
+  ],
+  "brain/stationSeat-selfcheck.mjs": [
+   4062
+  ],
+  "brain/subCountermeasures-selfcheck.mjs": [
+   16483
+  ],
+  "brain/subNav3d-selfcheck.mjs": [
+   4597
+  ],
+  "brain/subNavPlus-selfcheck.mjs": [
+   13714
+  ],
+  "brain/subRighting-selfcheck.mjs": [
+   659
+  ],
+  "render/rotorcraftView-selfcheck.mjs": [
+   3122
+  ],
+  "render/subAquariumCircuit-selfcheck.mjs": [
+   694
+  ],
+  "render/subAquariumFish-selfcheck.mjs": [
+   1563
+  ],
+  "render/subAquariumPlain14-selfcheck.mjs": [
+   999
+  ],
+  "tools/ship/gpuTaskManBridge-selfcheck.mjs": [
+   641
+  ],
+  "tools/ship/gpuTaskManClient-selfcheck.mjs": [
+   4645
+  ],
+  "tools/ship/headToHead10-selfcheck.mjs": [
+   54219
+  ],
+  "tools/ship/headToHead11-selfcheck.mjs": [
+   14705
+  ],
+  "tools/ship/headToHead12-selfcheck.mjs": [
+   14112
+  ],
+  "tools/ship/headToHead13-selfcheck.mjs": [
+   1378
+  ],
+  "tools/ship/headToHead14-selfcheck.mjs": [
+   2321
+  ],
+  "tools/ship/headToHead15-selfcheck.mjs": [
+   1405
+  ],
+  "tools/ship/headToHead16-selfcheck.mjs": [
+   1122
+  ],
+  "tools/ship/headToHead17-selfcheck.mjs": [
+   1235
+  ],
+  "tools/ship/headToHead18-selfcheck.mjs": [
+   1364
+  ],
+  "tools/ship/headToHead19-selfcheck.mjs": [
+   2028
+  ],
+  "tools/ship/headToHead2-selfcheck.mjs": [
+   3375
+  ],
+  "tools/ship/headToHead20-selfcheck.mjs": [
+   1542
+  ],
+  "tools/ship/headToHead21-selfcheck.mjs": [
+   765
+  ],
+  "tools/ship/headToHead22-selfcheck.mjs": [
+   423
+  ],
+  "tools/ship/headToHead23-selfcheck.mjs": [
+   852
+  ],
+  "tools/ship/headToHead24-selfcheck.mjs": [
+   2994
+  ],
+  "tools/ship/headToHead25-selfcheck.mjs": [
+   1268
+  ],
+  "tools/ship/headToHead4-selfcheck.mjs": [
+   928
+  ],
+  "tools/ship/headToHead5-selfcheck.mjs": [
+   9947
+  ],
+  "tools/ship/headToHead6-selfcheck.mjs": [
+   7791
+  ],
+  "tools/ship/headToHead7-selfcheck.mjs": [
+   34457
+  ],
+  "tools/ship/headToHead8-selfcheck.mjs": [
+   517
+  ],
+  "tools/ship/headToHead9-selfcheck.mjs": [
+   8622
+  ],
+  "tools/ship/pageNotes-selfcheck.mjs": [
+   254
+  ],
+  "tools/ship/plain14Distribution-selfcheck.mjs": [
+   282
+  ],
+  "tools/ship/plain14RobustStage-selfcheck.mjs": [
+   44197
+  ],
+  "tools/ship/plainNetVariants-selfcheck.mjs": [
+   1658
+  ],
+  "tools/ship/subNavPlusStudy-selfcheck.mjs": [
+   5421
+  ],
+  "tools/ship/takeAfterAction-selfcheck.mjs": [
+   3801
+  ],
+  "tools/ship/takeCounterfactual-selfcheck.mjs": [
+   13972
+  ],
+  "tools/ship/takeDecisionCircuit-selfcheck.mjs": [
+   6976
+  ],
+  "tools/ship/takeDeepPlain-selfcheck.mjs": [
+   6013
+  ],
+  "tools/ship/takeKindMatched-selfcheck.mjs": [
+   5286
+  ],
+  "tools/ship/takeKitGrid-selfcheck.mjs": [
+   4088
+  ],
+  "tools/ship/takePlainFamily-selfcheck.mjs": [
+   5780
+  ],
+  "tools/ship/takeRankingReplication-selfcheck.mjs": [
+   2272
+  ],
+  "tools/ship/takeRankingValidity-selfcheck.mjs": [
+   12224
+  ],
+  "tools/ship/takeRighting-selfcheck.mjs": [
+   11027
+  ],
+  "tools/ship/takeStationRound-selfcheck.mjs": [
+   12764
+  ],
+  "tools/ship/takeThirdAudit-selfcheck.mjs": [
+   534
+  ],
+  "tools/ship/tankPairedReplicate-selfcheck.mjs": [
+   15599
+  ],
+  "tools/ship/trainDecisionCircuit-selfcheck.mjs": [
+   10907
+  ],
+  "tools/ship/trainStation-selfcheck.mjs": [
+   12544
+  ],
+  "tools/ship/winPathLint-selfcheck.mjs": [
+   2737
+  ],
+  "ui/privateLmClient-selfcheck.mjs": [
+   405
   ]
  },
  "contended": {
@@ -29064,7 +29684,69 @@
   "tools/ship/tuneRule-selfcheck.mjs": false,
   "tools/ship/tuneWide-selfcheck.mjs": false,
   "tools/tankFlyCxBench-selfcheck.mjs": false,
-  "ui/upscalerSwitch-selfcheck.mjs": false
+  "ui/upscalerSwitch-selfcheck.mjs": false,
+  "brain/afterAction-selfcheck.mjs": false,
+  "brain/circuitSeat-selfcheck.mjs": false,
+  "brain/counterfactual-selfcheck.mjs": false,
+  "brain/pilotSubPlain-selfcheck.mjs": false,
+  "brain/rotorLeague-selfcheck.mjs": false,
+  "brain/rotorcraftBoard-selfcheck.mjs": false,
+  "brain/stationSeat-selfcheck.mjs": false,
+  "brain/subCountermeasures-selfcheck.mjs": false,
+  "brain/subNav3d-selfcheck.mjs": false,
+  "brain/subNavPlus-selfcheck.mjs": false,
+  "brain/subRighting-selfcheck.mjs": false,
+  "render/rotorcraftView-selfcheck.mjs": false,
+  "render/subAquariumCircuit-selfcheck.mjs": false,
+  "render/subAquariumFish-selfcheck.mjs": false,
+  "render/subAquariumPlain14-selfcheck.mjs": false,
+  "tools/ship/gpuTaskManBridge-selfcheck.mjs": false,
+  "tools/ship/gpuTaskManClient-selfcheck.mjs": false,
+  "tools/ship/headToHead10-selfcheck.mjs": false,
+  "tools/ship/headToHead11-selfcheck.mjs": false,
+  "tools/ship/headToHead12-selfcheck.mjs": false,
+  "tools/ship/headToHead13-selfcheck.mjs": false,
+  "tools/ship/headToHead14-selfcheck.mjs": false,
+  "tools/ship/headToHead15-selfcheck.mjs": false,
+  "tools/ship/headToHead16-selfcheck.mjs": false,
+  "tools/ship/headToHead17-selfcheck.mjs": false,
+  "tools/ship/headToHead18-selfcheck.mjs": false,
+  "tools/ship/headToHead19-selfcheck.mjs": false,
+  "tools/ship/headToHead2-selfcheck.mjs": false,
+  "tools/ship/headToHead20-selfcheck.mjs": false,
+  "tools/ship/headToHead21-selfcheck.mjs": false,
+  "tools/ship/headToHead22-selfcheck.mjs": false,
+  "tools/ship/headToHead23-selfcheck.mjs": false,
+  "tools/ship/headToHead24-selfcheck.mjs": false,
+  "tools/ship/headToHead25-selfcheck.mjs": false,
+  "tools/ship/headToHead4-selfcheck.mjs": false,
+  "tools/ship/headToHead5-selfcheck.mjs": false,
+  "tools/ship/headToHead6-selfcheck.mjs": false,
+  "tools/ship/headToHead7-selfcheck.mjs": false,
+  "tools/ship/headToHead8-selfcheck.mjs": false,
+  "tools/ship/headToHead9-selfcheck.mjs": false,
+  "tools/ship/pageNotes-selfcheck.mjs": false,
+  "tools/ship/plain14Distribution-selfcheck.mjs": false,
+  "tools/ship/plain14RobustStage-selfcheck.mjs": false,
+  "tools/ship/plainNetVariants-selfcheck.mjs": false,
+  "tools/ship/subNavPlusStudy-selfcheck.mjs": false,
+  "tools/ship/takeAfterAction-selfcheck.mjs": false,
+  "tools/ship/takeCounterfactual-selfcheck.mjs": false,
+  "tools/ship/takeDecisionCircuit-selfcheck.mjs": false,
+  "tools/ship/takeDeepPlain-selfcheck.mjs": false,
+  "tools/ship/takeKindMatched-selfcheck.mjs": false,
+  "tools/ship/takeKitGrid-selfcheck.mjs": false,
+  "tools/ship/takePlainFamily-selfcheck.mjs": false,
+  "tools/ship/takeRankingReplication-selfcheck.mjs": false,
+  "tools/ship/takeRankingValidity-selfcheck.mjs": false,
+  "tools/ship/takeRighting-selfcheck.mjs": false,
+  "tools/ship/takeStationRound-selfcheck.mjs": false,
+  "tools/ship/takeThirdAudit-selfcheck.mjs": false,
+  "tools/ship/tankPairedReplicate-selfcheck.mjs": false,
+  "tools/ship/trainDecisionCircuit-selfcheck.mjs": false,
+  "tools/ship/trainStation-selfcheck.mjs": false,
+  "tools/ship/winPathLint-selfcheck.mjs": false,
+  "ui/privateLmClient-selfcheck.mjs": false
  },
  "kinds": {
   "ai-bridge/assetSync-perf-selfcheck.mjs": "loaded",
@@ -31353,7 +32035,69 @@
   "tools/ship/tuneRule-selfcheck.mjs": "alone",
   "tools/ship/tuneWide-selfcheck.mjs": "alone",
   "tools/tankFlyCxBench-selfcheck.mjs": "alone",
-  "ui/upscalerSwitch-selfcheck.mjs": "alone"
+  "ui/upscalerSwitch-selfcheck.mjs": "alone",
+  "brain/afterAction-selfcheck.mjs": "alone",
+  "brain/circuitSeat-selfcheck.mjs": "alone",
+  "brain/counterfactual-selfcheck.mjs": "alone",
+  "brain/pilotSubPlain-selfcheck.mjs": "alone",
+  "brain/rotorLeague-selfcheck.mjs": "alone",
+  "brain/rotorcraftBoard-selfcheck.mjs": "alone",
+  "brain/stationSeat-selfcheck.mjs": "alone",
+  "brain/subCountermeasures-selfcheck.mjs": "alone",
+  "brain/subNav3d-selfcheck.mjs": "alone",
+  "brain/subNavPlus-selfcheck.mjs": "alone",
+  "brain/subRighting-selfcheck.mjs": "alone",
+  "render/rotorcraftView-selfcheck.mjs": "alone",
+  "render/subAquariumCircuit-selfcheck.mjs": "alone",
+  "render/subAquariumFish-selfcheck.mjs": "alone",
+  "render/subAquariumPlain14-selfcheck.mjs": "alone",
+  "tools/ship/gpuTaskManBridge-selfcheck.mjs": "alone",
+  "tools/ship/gpuTaskManClient-selfcheck.mjs": "alone",
+  "tools/ship/headToHead10-selfcheck.mjs": "alone",
+  "tools/ship/headToHead11-selfcheck.mjs": "alone",
+  "tools/ship/headToHead12-selfcheck.mjs": "alone",
+  "tools/ship/headToHead13-selfcheck.mjs": "alone",
+  "tools/ship/headToHead14-selfcheck.mjs": "alone",
+  "tools/ship/headToHead15-selfcheck.mjs": "alone",
+  "tools/ship/headToHead16-selfcheck.mjs": "alone",
+  "tools/ship/headToHead17-selfcheck.mjs": "alone",
+  "tools/ship/headToHead18-selfcheck.mjs": "alone",
+  "tools/ship/headToHead19-selfcheck.mjs": "alone",
+  "tools/ship/headToHead2-selfcheck.mjs": "alone",
+  "tools/ship/headToHead20-selfcheck.mjs": "alone",
+  "tools/ship/headToHead21-selfcheck.mjs": "alone",
+  "tools/ship/headToHead22-selfcheck.mjs": "alone",
+  "tools/ship/headToHead23-selfcheck.mjs": "alone",
+  "tools/ship/headToHead24-selfcheck.mjs": "alone",
+  "tools/ship/headToHead25-selfcheck.mjs": "alone",
+  "tools/ship/headToHead4-selfcheck.mjs": "alone",
+  "tools/ship/headToHead5-selfcheck.mjs": "alone",
+  "tools/ship/headToHead6-selfcheck.mjs": "alone",
+  "tools/ship/headToHead7-selfcheck.mjs": "alone",
+  "tools/ship/headToHead8-selfcheck.mjs": "alone",
+  "tools/ship/headToHead9-selfcheck.mjs": "alone",
+  "tools/ship/pageNotes-selfcheck.mjs": "alone",
+  "tools/ship/plain14Distribution-selfcheck.mjs": "alone",
+  "tools/ship/plain14RobustStage-selfcheck.mjs": "alone",
+  "tools/ship/plainNetVariants-selfcheck.mjs": "alone",
+  "tools/ship/subNavPlusStudy-selfcheck.mjs": "alone",
+  "tools/ship/takeAfterAction-selfcheck.mjs": "alone",
+  "tools/ship/takeCounterfactual-selfcheck.mjs": "alone",
+  "tools/ship/takeDecisionCircuit-selfcheck.mjs": "alone",
+  "tools/ship/takeDeepPlain-selfcheck.mjs": "alone",
+  "tools/ship/takeKindMatched-selfcheck.mjs": "alone",
+  "tools/ship/takeKitGrid-selfcheck.mjs": "alone",
+  "tools/ship/takePlainFamily-selfcheck.mjs": "alone",
+  "tools/ship/takeRankingReplication-selfcheck.mjs": "alone",
+  "tools/ship/takeRankingValidity-selfcheck.mjs": "alone",
+  "tools/ship/takeRighting-selfcheck.mjs": "alone",
+  "tools/ship/takeStationRound-selfcheck.mjs": "alone",
+  "tools/ship/takeThirdAudit-selfcheck.mjs": "alone",
+  "tools/ship/tankPairedReplicate-selfcheck.mjs": "alone",
+  "tools/ship/trainDecisionCircuit-selfcheck.mjs": "alone",
+  "tools/ship/trainStation-selfcheck.mjs": "alone",
+  "tools/ship/winPathLint-selfcheck.mjs": "alone",
+  "ui/privateLmClient-selfcheck.mjs": "alone"
  },
  "boxScale": {
   "2026-10-21T14:18:38.040Z": {
