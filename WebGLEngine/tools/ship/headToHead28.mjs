@@ -8,6 +8,7 @@ import * as B from "../../brain/switchboard.mjs";
 import * as H15 from "./headToHead15.mjs";
 import * as H16 from "./headToHead16.mjs";
 import * as X27 from "./headToHead27.mjs";
+import * as A from "../../render/subAquariumSim.mjs";
 
 export const IDS = Object.freeze({ from: 28200, to: 28399 }), SECONDS = X27.SECONDS, PRICES = X27.PRICES, WEIGHT_COUNT = X27.WEIGHT_COUNT;
 export const TRAIN = X27.NET_TRAIN, HELD = X27.NET_HELD, ITERS = X27.NET_ITERS, LAW_C02 = X27.LAW_C02;
@@ -20,13 +21,42 @@ export const A_IDS = Object.freeze(["a005", "a02", "a04"]), H_IDS = Object.freez
 export const NEW_IDS = Object.freeze([...A_IDS, ...H_IDS]);
 export const ARM_IDS = Object.freeze(["autopilot", "law0", "c02", "wip", ...Q_IDS, ...M_IDS, ...NEW_IDS]);
 export const fingerprint = X27.fingerprint, netArm = X27.netArm, penObjective = X27.penObjective, penScore = X27.penScore;
+
+// ---- THE FLIGHT (a post-registration repair, disclosed in brain/HEAD_TO_HEAD.md): H15's flight scores a dark run on the ticks where the compass reads dark, and throws when there are none. A candidate that loses its sub BEFORE the dropout
+// (seed 28032's, lost at 9.1 s and respawned seven times in 160 s) respawns with no compass reading, so the dark never registers and H15.fly throws, ending the search. Under the penalty such a run is a LOST run and scores 0, so here it is
+// flown again and returned as the run it is: bad true, its heading error read over EVERY tick (a number inside (0, pi), as H27's lost runs have), its power, speed and thrust as flown. A run that throws without being lost, and every other error, still throws.
+const TWO_PI = 2 * Math.PI, wrapPi = (a) => { let x = a % TWO_PI; if (x > Math.PI) x -= TWO_PI; if (x <= -Math.PI) x += TWO_PI; return x; };
+const NO_TICKS = /has no ticks in the bucket it is scored on/;
+function lostRun(arm, n, seconds, event, makeTank, original) {
+    const id = "sb-" + n, q = makeTank();
+    if (arm.register) arm.register(q);
+    q.sync([{ id, name: "H28 " + arm.id, hue: 100, from: "board", local: true, theta: null, ...arm.entry(id) }]);
+    if (event) q.setEvent(id, event);
+    let sum = 0, w = 0, sp = 0, th = 0, ticks = 0;
+    for (let i = 0, m = Math.round(seconds / H15.TICK); i < m; i++) {
+        q.step(H15.TICK); const s = q.snapshot()[0];
+        sum += Math.abs(wrapPi(s.target.heading - s.heading)); w += H15.wattsOf(s.cmd.thrust, s.speed); sp += s.speed; th += s.cmd.thrust; ticks++;
+    }
+    const last = q.snapshot()[0];
+    if (!last.lost) throw original;
+    return { key: id, score: 1 - (sum / ticks) / Math.PI, bad: true, watts: w / ticks, speed: sp / ticks, thrust: th / ticks };
+}
+/** H15's flight, id by id, except that a run with no scoreable tick whose sub was lost is returned as a lost run (see above). Identical to H15.fly on every run that H15.fly scores. */
+export function flyPen(arm, range, seconds, event, makeTank = A.createTank) {
+    const out = [];
+    for (let n = range.from; n <= range.to; n++) {
+        try { out.push(...H15.fly(arm, { from: n, to: n }, seconds, event, makeTank)); }
+        catch (e) { if (!NO_TICKS.test(String(e && e.message))) throw e; out.push(lostRun(arm, n, seconds, event, makeTank, e)); }
+    }
+    return out;
+}
 const avg = (xs) => xs.reduce((p, q) => p + q, 0) / xs.length;
 const wOk = (w) => (Array.isArray(w) || ArrayBuffer.isView(w)) && w.length === WEIGHT_COUNT && Array.from(w).every(Number.isFinite);
 const startNameOf = (g) => (ACT_GROUPS.includes(g) ? "ACT" : "HND");
 /** One network search of group `g` from `start`: H27's search exactly (its loop, its objective), run under the group's own price; { seed, group, weights, startTrain, trainScore, heldScore, accepted, iters, changed, lostFlights }. */
 export function netSearch(seed, group, start, opts = {}) {
     if (!GROUPS.includes(group)) throw new Error(`headToHead28: the group must be one of ${GROUPS.join(", ")}, got ${JSON.stringify(group)}`);
-    return { ...X27.netSearch(seed, "M" + group.slice(1), start, opts), group };
+    return { ...X27.netSearch(seed, "M" + group.slice(1), start, { flyFn: flyPen, ...opts }), group };
 }
 /** The champion of a group (four seeds): the best held-out PENALISED value, the first of a tie in seed order. */
 export function champion(rows, group) {
@@ -43,7 +73,7 @@ export function armsOf(wip, h27, fresh) {
     return Object.fromEntries(ARM_IDS.map((id) => [id, out[id]]));
 }
 /** The arms of `arms` (default all 16; the autopilot is always flown) on `range` ids, dark and lit. */
-export function audit(wip, h27, fresh, { range = IDS, seconds = SECONDS, arms = ARM_IDS, flyFn = H15.fly, search = null, original = null, fixture = null, startVals = null, starts = null } = {}) {
+export function audit(wip, h27, fresh, { range = IDS, seconds = SECONDS, arms = ARM_IDS, flyFn = flyPen, search = null, original = null, fixture = null, startVals = null, starts = null } = {}) {
     const all = armsOf(wip, h27, fresh), want = [...new Set(["autopilot", ...arms])];
     for (const a of want) if (!all[a]) throw new Error(`headToHead28.audit: no arm ${a}`);
     const dark = {}, lit = {};
@@ -51,7 +81,7 @@ export function audit(wip, h27, fresh, { range = IDS, seconds = SECONDS, arms = 
     return { dark, lit, range, seconds, wip, h27, fresh, search, original, fixture, startVals, starts, c02: all.c02.entry().weights };
 }
 /** The penalised train value of each start at each price (the first scored candidate of every search): { ACT: {price: value}, HND: {...} }. */
-export function startVals(starts, { seconds = SECONDS, flyFn = H15.fly } = {}) {
+export function startVals(starts, { seconds = SECONDS, flyFn = flyPen } = {}) {
     const out = {}; for (const n of ["ACT", "HND"]) { out[n] = {}; for (const p of PRICES) out[n][p] = penObjective(netArm("net", starts[n]), TRAIN, p, seconds, flyFn); } return out;
 }
 export const fixtureOf = X27.fixtureOf;
