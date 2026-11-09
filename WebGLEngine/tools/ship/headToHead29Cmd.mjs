@@ -28,14 +28,14 @@ const freshOf = (rows) => ({ nets: X.GROUPS.flatMap((g) => [1200, 1800, 2400].ma
 const finish = (au, out) => {
     const lines = X.report(au); for (const l of lines) console.log(l);
     fs.mkdirSync(out, { recursive: true });
-    fs.writeFileSync(path.join(out, "head-to-head28.json"), JSON.stringify({ range: au.range, seconds: au.seconds, fresh: au.fresh, search: au.search, fixture: au.fixture, startVals: au.startVals, report: lines, dark: au.dark, lit: au.lit }));
+    fs.writeFileSync(path.join(out, "head-to-head29.json"), JSON.stringify({ range: au.range, seconds: au.seconds, fresh: au.fresh, search: au.search, fixture: au.fixture, startVals: au.startVals, report: lines, dark: au.dark, lit: au.lit }));
 };
 
 if (has("--one")) {
     const [seed, group] = val("--one", ":").split(":");
     console.log(JSON.stringify({ ...X.longSearch(Number(seed), group, loadWip(), smoke ? SMOKE : {}), smoke }));
 } else if (args[0] === "search") {
-    const outFile = path.resolve(val("--out", eng + "brain/rig-results/head-to-head28-search.jsonl")), done = new Set(readRows(outFile).map((r) => `${r.seed}:${r.group}`)), workers = Number(val("--workers", 4));
+    const outFile = path.resolve(val("--out", eng + "brain/rig-results/head-to-head29-search.jsonl")), done = new Set(readRows(outFile).map((r) => `${r.seed}:${r.group}`)), workers = Number(val("--workers", 4));
     const todo = X.GROUPS.flatMap((g) => X.SEEDS[g].map((s) => [s, g])).filter(([s, g]) => !done.has(`${s}:${g}`));
     console.log(`[h29 search] ${todo.length} searches to run, ${done.size} already in ${outFile}, ${workers} workers${smoke ? " (SMOKE)" : ""}`);
     fs.mkdirSync(path.dirname(outFile), { recursive: true });
@@ -68,7 +68,7 @@ if (has("--one")) {
     const j = JSON.parse(fs.readFileSync(path.resolve(val("--from-json", "")), "utf8")), wip = loadWip();
     finish({ dark: j.dark, lit: j.lit, range: j.range, seconds: j.seconds, wip, h27: h27Sets(), fresh: j.fresh, search: j.search, original: { search: h27Rows() }, fixture: X.fixtureOf(), startVals: X.startVals(wip), c02: X.LAW_C02.slice() }, path.resolve(val("--out", eng + "brain/rig-results")));
 } else if (args[0] === "fly") {
-    const inFile = path.resolve(val("--in", eng + "brain/rig-results/head-to-head28-search.jsonl")), rows = readRows(inFile);
+    const inFile = path.resolve(val("--in", eng + "brain/rig-results/head-to-head29-search.jsonl")), rows = readRows(inFile);
     if (!rows.length) { console.error(`no search file at ${inFile} (run search first)`); process.exit(2); }
     if (rows.some((r) => r.smoke)) { console.error("the search file holds SMOKE records: fly refuses them (search again without --smoke)"); process.exit(2); }
     let fresh; try { fresh = freshOf(rows); } catch (e) { console.error(String(e.message)); process.exit(2); }
