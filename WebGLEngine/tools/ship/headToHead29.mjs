@@ -93,7 +93,7 @@ const meanThrust = (au, a) => avg(au.dark[a].map((r) => r.thrust));
 const l1 = (a, b) => { let s = 0; for (let i = 0; i < a.length; i++) s += Math.abs(a[i] - b[i]); return s; };
 /** Per longer champion: its L1 distance from wip and from the 600-iteration champion of its group. */
 export function distances(au) {
-    return X_IDS.map((id, i) => { const g = GROUPS[i < 3 ? 0 : 1], w = au.fresh.nets[i]; return { id, l1Wip: l1(w, au.wip), l1M: l1(w, au.h27.nets[i < 3 ? 0 : 1]) }; });
+    return X_IDS.map((id, i) => { const w = au.fresh.nets[i]; return { id, l1Wip: l1(w, au.wip), l1M: l1(w, au.h27.nets[i < 3 ? 0 : 1]) }; });
 }
 export function bottomLines(au) {
     const shown = ["autopilot", "c02", ...Q_IDS, ...M_IDS, ...X_IDS], priceRow = (a, f) => `${a} ${[0.005, 0.02, 0.04].map((p) => f4(f(au, a, p))).join(" / ")}`;
