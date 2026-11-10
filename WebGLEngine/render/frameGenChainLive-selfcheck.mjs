@@ -9,6 +9,10 @@
 //   skipped, P9 the device's two frames swapped, P10 the page never using WebGPU -> 2 red each; P2 the real frame lit at the orbit's start and
 //   P3 the half-way lights at the newer eye -> *** 0 RED at first *** (the default scene has no light source in view anywhere on its orbit),
 //   then 1 each with the R 990950 row added.
+// U_TH ON EACH REAL FRAME (section 1b and the page rows), each restored byte-identical: U2 the generator handed Bt's history with U_TH only
+//   lit, U5 the worker ignoring `ut`, U6 the page never passing it, U7 the box unticked by default -> 2 red each; U3 the real frame lit
+//   from Bt's history, U4 U_TH's input altered, U8 the worker loading the last run not the candidate, U9 LIVE_C.ut another file -> 1 red
+//   each; U1 U_TH from the seventh frame -> red by a crash (liveExample refuses seven frames) before any row reads it.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -25,6 +29,8 @@ const D = await imp("render/denoiseScenes.mjs"), { FRAMES } = await imp("render/
 const { emitterRadiance } = await imp("render/denoiseMask.mjs"), { compositeEmitters } = await imp("render/denoiseUpscale.mjs"), { interpolateFrameCPU } = await imp("render/frameInterp.mjs");
 const { decodeNet } = await imp("render/denoiseDevice.mjs");
 const net = decodeNet(JSON.parse(fs.readFileSync(path.join(ENG, "render", "denoise-net-r11.json"), "utf8")).net);
+const UTR = JSON.parse(fs.readFileSync(path.join(ENG, "render", "upscale-net-r72.json"), "utf8")), ut = decodeNet(UTR.runs.find((r) => r.seed === UTR.candidate).net);
+const LUT = await imp("render/learnedUpscaleTemporal.mjs");
 const same = (a, b) => a.length === b.length && a.every((v, i) => Object.is(v, b[i]));
 const rgba = (img3) => { const n = img3.length / 3, o = new Float32Array(n * 4); for (let p = 0; p < n; p++) { o[p * 4] = img3[p * 3]; o[p * 4 + 1] = img3[p * 3 + 1]; o[p * 4 + 2] = img3[p * 3 + 2]; o[p * 4 + 3] = 1; } return o; };
 
@@ -52,6 +58,23 @@ for (let k = 0; k < 10; k++) steps.push(C.chainStep(st, k));
     let bad = null; try { C.chainStep(st, 12); } catch (e) { bad = e.message; }
     let noNet = null; try { C.makeChainState({ W }); } catch (e) { noNet = e.message; }
     ok("  frames out of order, and a chain without the denoiser, are refused", /come in order -- expected 10, got 12/.test(bad || "") && /needs the shipped denoiser/.test(noNet || ""));
+}
+
+console.log("\n1b. WITH U_TH ON EACH REAL FRAME");
+{
+    const su = C.makeChainState({ net, W, sppIn: 1, ut }), us = [];
+    for (let k = 0; k < 10; k++) us.push(C.chainStep(su, k));
+    const S = D.makeScene(C.LIVE_C.family, C.LIVE_C.seed), spec = (k) => ({ eye: FL.orbitEye(S, k * C.LIVE_C.stepDeg), jitter: TU.JITTER[k % FRAMES], seed: C.LIVE_C.seedBase + k, W, sppIn: 1 });
+    const win = [2, 3, 4, 5, 6, 7, 8, 9].map((k) => L.liveFrame(S, net, spec(k))), y = LUT.temporalUpscale(ut, L.liveExample(S, win, W).x, W, W).y;
+    ok("  U_TH is round 72's candidate, from the file the U_TH view loads", C.LIVE_C.ut === L.LIVE_T.ut && C.LIVE_C.ut === "render/upscale-net-r72.json" && UTR.candidate === 1 && LUT.isHalfT(ut));
+    ok("!! with U_TH, real frame 9 is U_TH's light-free image over frames 2-9's example (liveExample, temporalUpscale) bit for bit, lit at eye 9; the history lengths still Bt's",
+        us[9].uth === true && same(us[9].A, rgba(y)) && same(us[9].frame, rgba(compositeEmitters(y, emitterRadiance({ ...S, eye: spec(9).eye }, W, W)))) && same(us[9].n, steps[9].n) && !same(us[9].A, steps[9].A));
+    ok("!! ...before eight frames there is no example and the frame is Bt's (frame 6 bit for bit the chain's without U_TH, uth false); from the eighth frame (k = 7) it is U_TH's",
+        us.slice(0, 7).every((f, k) => f.uth === false && same(f.A, steps[k].A) && same(f.frame, steps[k].frame)) && us[7].uth === true && !same(us[7].A, steps[7].A) && steps.every((f) => f.uth === false));
+    const gu = C.generateChainCPU(us[8], us[9]), want = interpolateFrameCPU({ prev: us[8].A, cur: us[9].A, w: W, h: W, flow: us[9].flow, bw: W, bh: W, block: 1, depthBlock: us[9].depth, indexedBy: "cur", t: 0.5,
+        fill: { radius: 4, reach: 16, side: "blend", prefer: "farther" }, holes: "crossfade" });
+    ok("  the half-way frame is generated between the two U_TH images (the motion field and half-way lights as without it)",
+        same(gu.gen, want.frame) && same(us[9].flow, steps[9].flow) && same(us[9].mid.E, steps[9].mid.E));
 }
 
 console.log("\n2. THE GENERATOR, ON THE CPU");
@@ -109,6 +132,10 @@ console.log("\n4. THE PAGE AND THE WORKER");
         ["fccv", "fcgen", "fccpu", "fcgo", "fcstop", "fcout"].every((id) => html.includes(`id="${id}"`)));
     ok("  ...the half-way frame made before its newer frame is handed to the pacer (genOf), and a line naming where it ran and its ms",
         /genOf: \(a, b\) => b\.gen/.test(html) && /the half-way frame generated on \$\{run\.where\} in \$\{run\.genMs\.toFixed\(1\)\} ms/.test(html) && html.indexOf("m.gen = {") < html.indexOf("run.view.real(m, run.sent, ready)"));
+    ok("!! U_TH's box: ticked by default, its state passed to the worker's init, the worker loading LIVE_C.ut's candidate (checked as it loads) into makeChainState, the line saying which the real frame is",
+        /<input id="fcuth" type="checkbox" checked \/>/.test(html) && /ut: \$\("fcuth"\)\.checked/.test(html) && /postMessage\(\{ type: "init", ut: run\.ut \}\)/.test(html) && /run\.uth = !!m\.uth/.test(html) &&
+        /if \(m\.ut\) \{/.test(wk) && /fetch\("\/" \+ LIVE_C\.ut\)/.test(wk) && /if \(!r2\.ok\) throw/.test(wk) && /tr\.runs\.find\(\(r\) => r\.seed === tr\.candidate\)\.net/.test(wk) && /makeChainState\(\{ net: decodeNet\(\(await res\.json\(\)\)\.net\), ut \}\)/.test(wk) &&
+        html.includes(`"\\nthe real frame: U_TH over Bt's history"`));
     ok("  the worker: the shipped denoiser checked as it loads, chainStep per frame, its buffers transferred",
         /fetch\("\/" \+ LIVE_C\.net\)/.test(wk) && /if \(!res\.ok\) throw/.test(wk) && /chainStep\(state, m\.k\)/.test(wk) && /self\.postMessage\(\{ type: "step", \.\.\.r, ms \}, xfer\)/.test(wk));
 }
@@ -121,7 +148,7 @@ console.log("\n5. THE PAGE, DRIVEN");
         await new Promise((r) => f.onload = r); const d = f.contentDocument, sleep = (ms) => new Promise((r) => setTimeout(r, ms));
         for (let i = 0; i < 50 && !d.getElementById("fcgo"); i++) await sleep(100);
         d.getElementById("fcgo").click(); let out = "";
-        for (let i = 0; i < 240; i++) { await sleep(1000); out = d.getElementById("fcout").textContent; if (/generated [1-9]/.test(out) && /over 2 s/.test(out)) break; }
+        for (let i = 0; i < 240; i++) { await sleep(1000); out = d.getElementById("fcout").textContent; if (/generated [1-9]/.test(out) && /over 2 s/.test(out) && /U_TH over Bt's history/.test(out)) break; }
         d.getElementById("fcstop").click();
         const c = d.getElementById("fccv").getContext("2d").getImageData(0, 0, 128, 128).data; let lit = 0; for (let i = 0; i < c.length; i += 4) if (c[i] + c[i + 1] + c[i + 2] > 30) lit++;
         return { out, prog: d.getElementById("fcprog").textContent, lit, hasGpu: !!navigator.gpu };
@@ -129,8 +156,8 @@ console.log("\n5. THE PAGE, DRIVEN");
     if (r.skipped) ok("  the page ran (no browser here: NOT A PASS)", false, r.reason);
     else {
         const R = r.result || {}, m = /generated on (WebGPU|the CPU)[^\n]* in ([\d.]+) ms/.exec(R.out || "");
-        ok("!! *** the page, driven: Start pressed, real chain frames come back from the worker, a half-way frame is generated -- on WebGPU where the browser has it -- and shown, the canvas painted, no page error ***",
-            r.ok && /real frames [2-9]\d*, generated [1-9]/.test(R.out || "") && !!m && (R.hasGpu ? m[1] === "WebGPU" : true) && R.lit > 8000 && !(r.pageErrors || []).length && R.prog === "stopped",
+        ok("!! *** the page, driven: Start pressed, real chain frames come back from the worker (U_TH's from the eighth), a half-way frame is generated -- on WebGPU where the browser has it -- and shown, the canvas painted, no page error ***",
+            r.ok && /real frames ([89]|\d\d+), generated [1-9]/.test(R.out || "") && /the real frame: U_TH over Bt's history/.test(R.out || "") && !!m && (R.hasGpu ? m[1] === "WebGPU" : true) && R.lit > 8000 && !(r.pageErrors || []).length && R.prog === "stopped",
             `${(R.out || "").replace(/\n/g, " | ").slice(0, 260)}; ${R.lit} lit pixels; ${JSON.stringify(r.pageErrors || []).slice(0, 200)}`);
     }
 }

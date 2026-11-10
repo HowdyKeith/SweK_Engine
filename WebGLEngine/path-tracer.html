@@ -353,7 +353,7 @@
     The view above generates between raw traces. This one generates between what the denoiser arc measured: each <b>real</b> frame
     is the chain &mdash; traced at half size, through the shipped denoiser, the emitter fill and EASU, then Bt's history over the last
     eight frames (<code>render/frameGenChainLive.mjs</code>). The half-way frame is made from the two real frames' light-free
-    histories with the scene's own motion field (round 66's fill, the holes cross-faded) and lit at the half-way eye &mdash; on
+    histories (with the box ticked, U_TH's images over them, round 72's) with the scene's own motion field (round 66's fill, the holes cross-faded) and lit at the half-way eye &mdash; on
     WebGPU by <code>render/denoiseFrameGenGPU.mjs</code>'s compute generator, on the CPU where there is none or the box is ticked.
     The line below says which ran, and how long each part took.
   </p>
@@ -363,6 +363,7 @@
     <div class="panel">
       <label><input id="fcgen" type="checkbox" checked /> generate the half-way frame (off: the real frames alone)</label>
       <label><input id="fccpu" type="checkbox" /> generate on the CPU even with WebGPU</label>
+      <label><input id="fcuth" type="checkbox" checked /> U_TH on each real frame (round 72's candidate, once eight frames exist; off: Bt's history)</label>
       <p><button id="fcgo">Start</button> <button id="fcstop">Stop</button></p>
       <div id="fcout" class="sub" style="margin-top:10px;white-space:pre;font-family:ui-monospace,monospace"></div>
       <div class="note">Graded by render/frameGenChainLive-selfcheck.mjs: the chain is the arc's, and the compute generator is the CPU
@@ -1025,7 +1026,7 @@ $("fcstop").onclick = fcStop;
 $("fcgo").onclick = async () => {
   fcStop();
   const run = fc = { stop: false, stamps: [], view: null, live: makeLivePacing(), k: 0, sent: 0, chainMs: 0, genMs: 0, prev: null, gpu: null, where: "the CPU",
-                     worker: new Worker("/render/frameGenChainLive-worker.mjs", { type: "module" }), generate: $("fcgen").checked };
+                     worker: new Worker("/render/frameGenChainLive-worker.mjs", { type: "module" }), generate: $("fcgen").checked, ut: $("fcuth").checked, uth: false };
   if (!$("fccpu").checked && navigator.gpu) try {
     const cv = document.createElement("canvas"); cv.width = 8; cv.height = 8;
     run.gpu = createDeviceGenerator(await requestDevice(cv, { backend: "webgpu", offscreen: true }), LIVE_C.W, LIVE_C.W); run.where = "WebGPU";
@@ -1036,7 +1037,7 @@ $("fcgo").onclick = async () => {
     const m = e.data;
     if (m.type === "error") { $("fcprog").textContent = "the chain failed: " + m.message; return; }
     if (m.type === "ready") { $("fcprog").textContent = "measuring the refresh..."; requestAnimationFrame(fcTick); return; }
-    run.chainMs = m.ms;
+    run.chainMs = m.ms; run.uth = !!m.uth;
     // the half-way frame is made when its newer frame arrives, so it is ready when the pacer shows it
     if (run.generate && run.prev) {
       const g0 = performance.now();
@@ -1049,8 +1050,8 @@ $("fcgo").onclick = async () => {
     run.view.real(m, run.sent, ready); run.live.real(m.k, run.sent, ready); run.prev = m; run.k++;
     ask();
   };
-  run.worker.postMessage({ type: "init" });
-  $("fcprog").textContent = "loading the denoiser...";
+  run.worker.postMessage({ type: "init", ut: run.ut });
+  $("fcprog").textContent = run.ut ? "loading the denoiser and U_TH..." : "loading the denoiser...";
   let lastOut = 0;
   function fcTick(stamp) {
     if (run.stop) return;
@@ -1065,6 +1066,7 @@ $("fcgo").onclick = async () => {
     if (stamp - lastOut > 500) {
       lastOut = stamp;
       let line = `refresh ${run.view.pacer.refresh.toFixed(2)} ms; a real frame's chain ${run.chainMs.toFixed(0)} ms (${LIVE_C.W} x ${LIVE_C.W}, traced at ${LIVE_C.W / 2}, ${LIVE_C.sppIn} spp)` +
+                 (run.ut ? (run.uth ? "\nthe real frame: U_TH over Bt's history" : "\nthe real frame: Bt's history (U_TH from the eighth frame)") : "\nthe real frame: Bt's history (U_TH off)") +
                  (run.generate ? `\nthe half-way frame generated on ${run.where} in ${run.genMs.toFixed(1)} ms` : "\nno generation (the real frames alone)") +
                  `\nreal frames ${run.k}, generated ${run.view.generated}`;
       try { const q = run.live.metrics(2000); line += `\nover 2 s: ${q.newPerSecond.toFixed(1)} new images/s, judder ${q.judder.toFixed(1)} ms, latency ${q.meanLatency.toFixed(0)} ms` +
