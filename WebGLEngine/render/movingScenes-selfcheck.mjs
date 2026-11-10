@@ -171,7 +171,7 @@ console.log("\n3. ROUND 77's STUDY CODE");
         R.image === 256 && R.sppIn === 4 && R.sppRefTest === 2048 && R.c1Min === 22 && R.minGain === 0.01 && R.test === "signflip" &&
         R.results === "render/denoise-results-upscale-moving-r77.json" && LT.temporalRound(77) === R && LT.temporalRound(72) === R72);
     let bad = null; try { LT.temporalRound(73); } catch (e) { bad = e.message; }
-    ok("  ...and temporalRound refuses any other round, naming 77 (and, since sections 178 and 180, 78 and 79)", /70, 72, 77, 78, 79, 80, 81, 82 or 83/.test(bad || ""));
+    ok("  ...and temporalRound refuses any other round, naming 77 (and, since sections 178 and 180, 78 and 79)", /70, 72, 77, 78, 79, 80, 81, 82, 83 or 84/.test(bad || ""));
     const o = { W: 256, sppIn: 4, sppRef: 2048, ref2: true, harvest: true };
     ok("  movingKey is the still sequence's key marked moving, so the two never share a cache entry", LT.movingKey("R", 77000, o) === LT.temporalKey("R", 77000, o) + "-moving");
     const y = Float64Array.from({ length: 12 }, (_, i) => 0.1 + i / 20), r = Float64Array.from({ length: 12 }, (_, i) => 0.12 + i / 21), m = Uint8Array.of(1, 0, 1, 0);

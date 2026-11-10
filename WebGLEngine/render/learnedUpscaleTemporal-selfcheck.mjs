@@ -19,6 +19,11 @@
 // corners and S3 the study's training without the variant -> *** 0 RED at first ***, then 1 each with the two rows added for them.
 // SECTION 170: V170a round 72's candidate typed 2, V170b H72a's count typed 15, V170c the gain typed 0.0644, V170d the test's commit
 // typed 670c28bd -> 1 red each. Each restored byte-identical.
+// ROUND 84 (section 190), against this gate, denoiseLearnedUpscaleGPU-selfcheck and denoiseScenes-selfcheck, each restored byte-identical:
+//   E3 U_TH8's crops at odd corners, E5 U0 graded as U, E6 the kept fraction inverted, E7 round 84 without its baseline, E10 temporalRound(84)
+//   round 72's, E15 the odd-crop refusal U_TH's alone -> 1 red each; E8 its R seeds onto round 72's and E9 its seeds not reserved -> 2 red
+//   each (here and denoiseScenes-selfcheck); E1 isHalfT 16 wide only -> 4 red; E2 U_TH8 12 wide and E4 shapeOfT's half8 U_TH's shape ->
+//   5 red each. This gate's v4909 row pinned UT_VARIANTS to "full,half" and was widened to "full,half,half8" with the variant.
 "use strict";
 import fs from "node:fs";
 import os from "node:os";
@@ -221,6 +226,56 @@ console.log("\n6. ROUND 72 (section 167): U_TH -- THE NETWORK AT HALF SIZE AND 1
         /RD = LT\.temporalRound\(/.test(ta) && /variant: RD\.variant/.test(ta) && /RD = LT\.temporalRound\(/.test(tb) && /round: RD\.round, harvest: true/.test(tb));
 }
 
+console.log("\n6b. ROUND 84 (section 190): U_TH8 -- U_TH AT 8 WIDE");
+{
+    const hw = W / 2, u0 = T.makeUpscalerT(4, "half8");
+    ok("!! an untrained U_TH8 is Bt exactly; it is three 3 x 3 layers of 8 and a 1 x 1 3-channel head at half size, the half-size kind; shapeOfT names each variant's shape",
+        T.temporalChain(u0, ex).every((v, i) => Object.is(v, ex.bt[i])) && T.UTH8_WIDTH === 8 && T.UTH8_SHAPE.map((l) => `${l[0]}-${l[1]}-${l[3] ?? 3}`).join() === "17-8-3,8-8-3,8-8-3,8-3-1" &&
+        u0.layers.map((L) => `${L.Cin}-${L.Cout}-${L.k}`).join() === "17-8-3,8-8-3,8-8-3,8-3-1" && T.isHalfT(u0) && T.temporalUpscale(u0, ex.x, W, W).rh.length === hw * hw * 3 &&
+        T.shapeOfT("half8") === T.UTH8_SHAPE && T.shapeOfT("half") === T.UTH_SHAPE && T.shapeOfT("full") === T.UT_SHAPE && Object.isFrozen(T.UTH8_SHAPE));
+    const nh = T.makeUpscalerT(5, "half8");
+    nh.layers.forEach((L, li) => { const qq = seededRandom(180 + li); for (let i = 0; i < L.W.length; i++) L.W[i] += 0.3 * (qq.u() - 0.5); for (let i = 0; i < L.b.length; i++) L.b[i] += 0.3 * (qq.u() - 0.5); });
+    const G = T.temporalLoss(nh, ex.x, W, W, ex.ref, ex.cov, ex.E), Lf = () => T.temporalLoss(nh, ex.x, W, W, ex.ref, ex.cov, ex.E).loss;
+    let worst = 0;
+    for (const [li, wi] of [[0, 9], [0, 17 * 9 + 2], [1, 100], [2, 300], [3, 5], [3, 20]]) { const Wt = nh.layers[li].W, keep = Wt[wi], e = 1e-5; Wt[wi] = keep + e; const a1 = Lf(); Wt[wi] = keep - e; const b1 = Lf(); Wt[wi] = keep;
+        const fd = (a1 - b1) / (2 * e), an = G.grads[li].dW[wi]; worst = Math.max(worst, Math.abs(fd - an) / Math.max(1e-9, Math.abs(fd) + Math.abs(an))); }
+    ok("!! U_TH8's gradient matches central differences within 1e-5 relative", worst < 1e-5, `worst ${worst.toExponential(2)}`);
+    const a2 = T.trainTemporal(seqs, { seed: 3, steps: 6, batch: 2, crop: 16, variant: "half8" }), b2 = T.trainTemporal(seqs, { seed: 3, steps: 6, batch: 2, crop: 16, variant: "half8" }), corners = [];
+    T.trainTemporal(seqs, { seed: 4, steps: 20, batch: 2, crop: 16, variant: "half8", onCrop: (cx, cy) => corners.push(cx, cy) });
+    let odd = null; try { T.trainTemporal(seqs, { seed: 1, steps: 1, crop: 15, variant: "half8" }); } catch (e) { odd = e.message; }
+    ok("!! U_TH8 trains deterministically by seed, 8 wide, at even corners reaching the far edge, an odd crop refused",
+        a2.net.layers.every((L, i) => L.W.every((v, j) => Object.is(v, b2.net.layers[i].W[j]))) && a2.net.layers[0].Cout === 8 && corners.length === 80 && corners.every((v) => v % 2 === 0 && v >= 0 && v <= W - 16) && corners.some((v) => v > 0) && /even crops/.test(odd || ""));
+    const long = T.trainTemporal(seqs, { seed: 2, steps: 150, batch: 2, crop: 16, variant: "half8" }), m = (xs) => xs.reduce((q2, v) => q2 + v, 0) / xs.length;
+    const g2 = (y, e) => relMSE(Float64Array.from(y, toPerceptual), Float64Array.from(e.ref, toPerceptual));
+    ok("!! ...and it learns: 150 steps on four sequences bring their loss below Bt's on the mean", m(seqs.map((e) => g2(T.temporalChain(long.net, e), e))) < m(seqs.map((e) => g2(e.bt, e))));
+    const miniH = Object.freeze({ train: Object.freeze({ family: "R+C", families: Object.freeze(["R", "C"]), seeds: Object.freeze([990951, 990952]) }),
+                                  val: Object.freeze({ family: "R", families: Object.freeze(["R"]), seeds: Object.freeze([990955]) }) });
+    const th = LT.runTemporalTraining({ splits: miniH, net, ...o, seeds: [1], train: { steps: 4, batch: 2, crop: 16 }, variant: "half8" });
+    ok("!! the study's training under round 84's variant trains U_TH8 for every seed and C2, and records the variant and its shape",
+        th.runs.every((qq) => qq.net.layers[0].Cout === 8) && th.c2.net.layers[0].Cout === 8 && th.config.variant === "half8" && th.config.shape === T.UTH8_SHAPE);
+    // the test with round 72's U_TH beside: U0 graded on every scene, H1 still U against Bt; without U0 the output is round 72's shape
+    const miniT = Object.freeze({ T1: Object.freeze({ family: "R+C", families: Object.freeze(["R", "C"]), seeds: Object.freeze([990956, 990957]) }) });
+    const Ua = th.runs[0].net, U0 = T.makeUpscalerT(9, "half"); U0.layers[3].b[0] = 0.2;
+    const te = LT.runTemporalTest({ splits: miniT, net, U: Ua, Uc2: th.c2.net, U0, ...o, sppRef: 8, round: 84, c1Min: 0 }), t0n = LT.runTemporalTest({ splits: miniT, net, U: Ua, Uc2: th.c2.net, ...o, sppRef: 8, round: 84, c1Min: 0 });
+    const mm = (xs) => xs.reduce((q2, v) => q2 + v, 0) / xs.length, es = miniT.T1.seeds.map((sd, i) => T.temporalExample(miniT.T1.families[i], sd, net, { ...o, sppRef: 8, ref2: true }));
+    const { gradeDisplay } = await imp("render/learnedUpscaleStudy.mjs"), u0g = es.map((e) => gradeDisplay(T.temporalChain(U0, e), e)), sec = te.secondary;
+    ok("!! round 84's test grades round 72's U_TH (U0) beside U_TH8 on every scene, H1 still U against Bt; the gains re-derive (U0's over Bt, U_TH8's as a fraction of it, U_TH8 against U0); without U0 none of it",
+        te.tables.U0.every((v, i) => Object.is(v, u0g[i])) && te.tables.U.every((v, i) => Object.is(v, t0n.tables.U[i])) && te.verdict.hypotheses.H1.d.every((v, i) => Object.is(v, t0n.verdict.hypotheses.H1.d[i])) &&
+        sec.u0GainOverBt === 1 - mm(te.tables.U0) / mm(te.tables.bt) && sec.keep === sec.gainOverBt / sec.u0GainOverBt && sec.overU0 === 1 - mm(te.tables.U) / mm(te.tables.U0) &&
+        !("U0" in t0n.tables) && !("keep" in t0n.secondary) && !("u0GainOverBt" in t0n.secondary));
+    const R84 = LT.ROUND_UPSCALE_TEMPORAL_84, S84 = D.SPLITS_UPSCALE_TEMPORAL_84, R72 = LT.ROUND_UPSCALE_TEMPORAL_72;
+    const prev = new Set([...D.SPLITS_UPSCALE_TEMPORAL.T1.seeds, ...D.SPLITS_UPSCALE_TEMPORAL_72.T1.seeds, ...D.SPLITS_UPSCALE_LIGHTS.T1.seeds, ...D.SPLITS_UPSCALE_SAMPLING.T1.seeds]);
+    ok("!! ROUND_UPSCALE_TEMPORAL_84: U_TH8's variant, round 72's training, validation and samples, 24 new test scenes (91000-91011 R, 92000-92011 C), round 72's U_TH as its baseline, its own two files; temporalRound 84",
+        R84.variant === "half8" && R84.round === 84 && R84.splits === S84 && S84.train === D.SPLITS_UPSCALE_TEMPORAL_72.train && S84.val === D.SPLITS_UPSCALE_TEMPORAL_72.val &&
+        S84.T1.seeds.slice(0, 12).every((x, i) => x === 91000 + i && S84.T1.families[i] === "R") && S84.T1.seeds.slice(12).every((x, i) => x === 92000 + i && S84.T1.families[12 + i] === "C") &&
+        S84.T1.seeds.every((x) => D.isDatasetSeed(x) && !prev.has(x)) && ["image", "sppIn", "sppRef", "sppRefTest", "c1Min", "minGain", "seeds", "train", "test"].every((key) => R84[key] === R72[key]) &&
+        R84.baseline === "render/upscale-net-r72.json" && !R84.moving && R84.net === "render/upscale-net-r84.json" && R84.results === "render/denoise-results-upscale-temporal-r84.json" && LT.temporalRound(84) === R84);
+    const cli = fs.readFileSync(path.join(ENG, "tools/denoiseStudy.mjs"), "utf8"), br = (flag) => { const b0 = cli.indexOf(`} else if (args.includes("${flag}")) {`); return b0 >= 0 ? cli.slice(b0, cli.indexOf("} else if (", b0 + 10)).replace(/\/\/.*$/gm, "") : ""; };
+    const tb = br("--harvest-upscale-temporal-test");
+    ok("  the test command loads the round's baseline (round 72's candidate) as U0 and hands it to the runner, recording which file and commit it came from",
+        /const b0 = RD\.baseline \? JSON\.parse/.test(tb) && /U0 = b0 \? decodeNet\(b0\.runs\.find\(\(x\) => x\.seed === b0\.candidate\)\.net\)/.test(tb) && /\(\{ U0, gamma/.test(tb) && /if \(b0\) out\.baseline = \{ file: RD\.baseline, candidate: b0\.candidate, commit: b0\.commit \}/.test(tb));
+}
+
 console.log("\n7. SECTION 170: ROUND 72's COMMITTED HARVESTS, READ BACK -- U_TH BEAT Bt BY 5.4 %");
 {
     const R = LT.ROUND_UPSCALE_TEMPORAL_72, tr = JSON.parse(fs.readFileSync(path.join(ENG, R.net), "utf8")), res = JSON.parse(fs.readFileSync(path.join(ENG, R.results), "utf8")), Tb = res.tables;
@@ -250,9 +305,10 @@ console.log("\n7. SECTION 170: ROUND 72's COMMITTED HARVESTS, READ BACK -- U_TH 
     const x = T.temporalInput(v(1), v(2), v(3), nn, v(4), v(5), dep, W, H), at = (p, c) => x[p * T.UT_CHANNELS + c];
     ok("  v4909: temporalInput lays out U_T's 17 channels -- A, Au, C, n / 8, albedo, normal, depth d / (1 + d) with a miss as 0",
         x.length === n * 17 && at(4, 0) === 1.12 && at(4, 4) === 2.13 && at(4, 8) === 3.14 && at(4, 9) === 5 / FRAMES && at(4, 11) === 4.13 && at(4, 15) === 5.14 && at(4, 16) === 4 / 5 && at(0, 16) === 0);
-    ok("  v4909: U_TH is UTH_WIDTH (16) wide in every hidden layer and isHalfT reads it; UT_VARIANTS is full and half, and makeUpscalerT builds each",
-        T.UTH_WIDTH === 16 && T.UTH_SHAPE.slice(0, 3).every((l) => l[1] === T.UTH_WIDTH) && T.UT_VARIANTS.join() === "full,half" && Object.isFrozen(T.UT_VARIANTS) &&
-        T.UT_VARIANTS.map((vv) => T.isHalfT(T.makeUpscalerT(seededRandom(3), vv))).join() === "false,true");
+    // round 84 (section 190) added "half8": this row read "full,half" until then
+    ok("  v4909: U_TH is UTH_WIDTH (16) wide in every hidden layer and isHalfT reads it; UT_VARIANTS is full, half and (round 84) half8, and makeUpscalerT builds each",
+        T.UTH_WIDTH === 16 && T.UTH_SHAPE.slice(0, 3).every((l) => l[1] === T.UTH_WIDTH) && T.UT_VARIANTS.join() === "full,half,half8" && Object.isFrozen(T.UT_VARIANTS) &&
+        T.UT_VARIANTS.map((vv) => T.isHalfT(T.makeUpscalerT(seededRandom(3), vv))).join() === "false,true,true");
 }
 
 {   // round 77 (section 176): exampleFrames, the eight frames temporalExample takes (moved out of it so a moving frame can be held to sceneAt)

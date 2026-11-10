@@ -655,6 +655,14 @@ console.log("\n18. ROUND 58: FAMILY P, path-tracer.html'S OWN SIX SCENES (pre-re
         Object.keys(D.SPLITS_UPSCALE_MOVING).join() === "T1" && Object.isFrozen(D.SPLITS_UPSCALE_MOVING) && T1.seeds.length === 24 && T1.seeds[0] === 77000 && T1.seeds[11] === 77011 && T1.seeds[12] === 78000 && T1.seeds[23] === 78011 &&
         T1.families.slice(0, 12).every((f) => f === "R") && T1.families.slice(12).every((f) => f === "C") && T1.seeds.every((x) => !seen.has(x) && D.isDatasetSeed(x)));
 }
+{   // round 84 (section 190): U_TH8's test set
+    // SABOTAGED, restored byte-identical: E8 its R seeds onto round 72's and E9 its seeds not reserved -> 2 red each (this row, and learnedUpscaleTemporal-selfcheck's round row).
+    const T1 = D.SPLITS_UPSCALE_TEMPORAL_84.T1, seen = new Set([...D.SPLITS_UPSCALE_LIGHTS.T1.seeds, ...D.SPLITS_UPSCALE_SAMPLING.T1.seeds, ...D.SPLITS_UPSCALE_TEMPORAL_72.T1.seeds, ...D.SPLITS_UPSCALE_TEMPORAL.T1.seeds]);
+    ok("  SPLITS_UPSCALE_TEMPORAL_84: round 72's training and validation, a new T1 of 12 R at 91000-91011 then 12 C at 92000-92011, frozen, reserved, none an earlier test seed",
+        Object.keys(D.SPLITS_UPSCALE_TEMPORAL_84).join() === "train,val,T1" && Object.isFrozen(D.SPLITS_UPSCALE_TEMPORAL_84) && D.SPLITS_UPSCALE_TEMPORAL_84.train === D.SPLITS_UPSCALE_TEMPORAL_72.train &&
+        D.SPLITS_UPSCALE_TEMPORAL_84.val === D.SPLITS_UPSCALE_TEMPORAL_72.val && T1.seeds.length === 24 && T1.seeds[0] === 91000 && T1.seeds[11] === 91011 && T1.seeds[12] === 92000 && T1.seeds[23] === 92011 &&
+        T1.families.slice(0, 12).every((f) => f === "R") && T1.families.slice(12).every((f) => f === "C") && T1.seeds.every((x) => !seen.has(x) && D.isDatasetSeed(x)));
+}
 {   // round 83 (section 188): the moving-light test set
     // SABOTAGED, restored byte-identical: Z6 its R seeds onto round 82's 87000 -> 2 red (this row, and movingScenes-selfcheck's round 83 row).
     const T1 = D.SPLITS_UPSCALE_LIGHTS.T1, seen = new Set([...D.SPLITS_UPSCALE_SAMPLING.T1.seeds, ...D.SPLITS_UPSCALE_SPEED.T1.seeds, ...D.SPLITS_UPSCALE_CHECK.T1.seeds, ...D.SPLITS_UPSCALE_VECTORS.T1.seeds, ...D.SPLITS_UPSCALE_MOVING.T1.seeds, ...D.SPLITS_UPSCALE_MOVING_78.T1.seeds]);

@@ -261,6 +261,13 @@ export function readH74(rep) {
     for (const l of (g && g.measured) || []) { const m = l.match(/^section 169: U_TH at 1920 x 1080 ([\d.]+) ms \((device|wall)\)/); if (m && +m[1] > 0) { U = +m[1]; clock = m[2]; break; } }
     return { commit: base.commit, counts: base.counts, T: base.T, U, clock, ratio: U !== null && base.T !== null ? U / base.T : null };
 }
+/** SECTION 190's RULE (H85): round 85's line, U_TH8 (8 wide) with the coalesced down pass, against the same T; h71 is its verdict rule. */
+export function readH85(rep) {
+    const base = readH63(rep), g = (rep.gates || []).find((x) => x.gate === "render/denoiseLearnedUpscaleGPU-selfcheck.mjs");
+    let U = null, clock = null;
+    for (const l of (g && g.measured) || []) { const m = l.match(/^section 190: U_TH8 at 1920 x 1080 ([\d.]+) ms \((device|wall)\)/); if (m && +m[1] > 0) { U = +m[1]; clock = m[2]; break; } }
+    return { commit: base.commit, counts: base.counts, T: base.T, U, clock, ratio: U !== null && base.T !== null ? U / base.T : null };
+}
 /** SECTION 167's RULE (H73), readH71's for U_TH: its gate line, against the same T. h71 is the verdict rule for both. */
 export function readH73(rep) {
     const base = readH63(rep), g = (rep.gates || []).find((x) => x.gate === "render/denoiseLearnedUpscaleGPU-selfcheck.mjs");

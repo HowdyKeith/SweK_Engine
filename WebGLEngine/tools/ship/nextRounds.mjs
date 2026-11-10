@@ -2561,6 +2561,13 @@ export const NEXT_ROUNDS = [
         why: "So the page shows what the arc measured -- generation between the chain's frames -- not only the generator.",
     },
     {
+        id: "fsr4-uth8-intel",
+        blocker: "OPEN",
+        what: "Rounds 84 and 85 (section 190), set up and awaiting the rig: U_TH8, U_TH with its three layers 8 wide (a third of the layers' work), for the Intel, where U_TH costs 0.28-0.30 of a traced frame. Round 84, the quality: trained as round 72 (seeds 1-3, C2), tested on 24 new scenes (12 R 91000-91011, 12 C 92000-92011) with round 72's U_TH graded beside it -- H84a: U_TH8 beats Bt by the 1 % rule; H84b: it beats B1. Round 85, the cost: a seeded U_TH8 on the device with round 74's coalesced down pass, timed at 1920 x 1080 -- H85: U <= 0.25 T on both GPUs in both runs (readH85, h71).",
+        how: "On the rig at the rounds' commit, in one clone: node tools/denoiseStudy.mjs --harvest-upscale-temporal-train --round 84 (render/upscale-net-r84.json), then --harvest-upscale-temporal-test --round 84 (render/denoise-results-upscale-temporal-r84.json); and two realGpuRun --only denoise on each GPU (the gate's section 190 line). Each committed byte for byte before it is read; section 191 reads them.",
+        why: "Section 171: U_TH is real-time on the 1080 class (0.15 of a frame) and not on the Intel's integrated graphics (153 ms, 0.28-0.30); Keith asked for the cheaper U_TH, quality and then timing.",
+    },
+    {
         id: "fsr4-moving-lights",
         blocker: "CLOSED",
         what: "CLOSED, BOTH SUPPORTED (section 189): with only the lights moving (section 176's speeds), U_TH's chain is 8.10 % below Bt (19 of 24, p 0.00010) and Bt is 3.94 % below B1 (15 of 24, p 0.012). The moving light halves the history's gain (9.18 % still) but does not undo it: reproject keeps the history (mean length 5.118 against 5.132 still) and Bt's clamp handles the stale shading. U_TH's gain does not drop (7.88 % still). Nothing changes in the chain and a luminance-change rejection is not opened. By family the C scenes keep only 0.68 % of Bt's gain over B1. The file came unzipped and was shown on upload, so it was read before it was committed; 8 of its 48 sequences came from the rig's cache.",

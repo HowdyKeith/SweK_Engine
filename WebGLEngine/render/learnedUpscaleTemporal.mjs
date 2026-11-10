@@ -35,9 +35,14 @@ export const UT_SHAPE = Object.freeze([Object.freeze([UT_CHANNELS, 32, "relu"]),
 /** U_TH's width, and its shape: three 3 x 3 layers of 16, then the 3-channel head as 1 x 1 -- run on the 17 channels averaged to half size. */
 export const UTH_WIDTH = 16;
 export const UTH_SHAPE = Object.freeze([Object.freeze([UT_CHANNELS, UTH_WIDTH, "relu"]), Object.freeze([UTH_WIDTH, UTH_WIDTH, "relu"]), Object.freeze([UTH_WIDTH, UTH_WIDTH, "relu"]), Object.freeze([UTH_WIDTH, 3, "none", 1])]);
-/** The two variants: "full" (round 70's U_T) and "half" (U_TH). A net is U_TH when its first layer is 16 wide. */
-export const UT_VARIANTS = Object.freeze(["full", "half"]);
-export const isHalfT = (net) => net.layers[0].Cout === UTH_WIDTH;
+/** Section 190, ROUND 84: U_TH8 -- U_TH with its three 3 x 3 layers 8 wide, the head 8 -> 3, at half size. */
+export const UTH8_WIDTH = 8;
+export const UTH8_SHAPE = Object.freeze([Object.freeze([UT_CHANNELS, UTH8_WIDTH, "relu"]), Object.freeze([UTH8_WIDTH, UTH8_WIDTH, "relu"]), Object.freeze([UTH8_WIDTH, UTH8_WIDTH, "relu"]), Object.freeze([UTH8_WIDTH, 3, "none", 1])]);
+/** The three variants: "full" (round 70's U_T), "half" (U_TH) and "half8" (U_TH8). A net is the half-size kind when its first layer is narrower than U_T's 32. */
+export const UT_VARIANTS = Object.freeze(["full", "half", "half8"]);
+export const isHalfT = (net) => net.layers[0].Cout < UT_SHAPE[0][1];
+/** A variant's shape. */
+export const shapeOfT = (variant) => (variant === "half8" ? UTH8_SHAPE : variant === "half" ? UTH_SHAPE : UT_SHAPE);
 /** The 17 channels of a W x H input averaged over 2 x 2: (W / 2) x (H / 2) x 17. */
 export function halfInput(x, W, H) {
     if (W % 2 || H % 2) throw new Error(`learnedUpscaleTemporal: a ${W} x ${H} input has no half size`);
@@ -65,10 +70,10 @@ export function upHalfT(g, w, h) {
     return o;
 }
 
-/** A fresh U_T (or, `variant` "half", U_TH) from a seed's stream: the head's weights and biases zero, so its untrained frame is A exactly. */
+/** A fresh U_T (or, `variant` "half", U_TH; "half8", U_TH8) from a seed's stream: the head's weights and biases zero, so its untrained frame is A exactly. */
 export function makeUpscalerT(rand, variant = "full") {
-    if (!UT_VARIANTS.includes(variant)) throw new Error(`learnedUpscaleTemporal: the variant is "full" or "half" -- got ${JSON.stringify(variant)}`);
-    const net = initNet(variant === "half" ? UTH_SHAPE : UT_SHAPE, typeof rand === "number" ? seededRandom(rand) : rand), last = net.layers[net.layers.length - 1];
+    if (!UT_VARIANTS.includes(variant)) throw new Error(`learnedUpscaleTemporal: the variant is "full", "half" or "half8" -- got ${JSON.stringify(variant)}`);
+    const net = initNet(shapeOfT(variant), typeof rand === "number" ? seededRandom(rand) : rand), last = net.layers[net.layers.length - 1];
     last.W.fill(0); last.b.fill(0);
     return net;
 }
@@ -126,15 +131,15 @@ export function temporalCrop(ex, cx, cy, size) {
 export function trainTemporal(examples, { seed, steps = UP_TRAIN.steps, batch = UP_TRAIN.batch, crop = UP_TRAIN.crop, adam = ADAM, variant = "full", onCrop = null } = {}) {
     if (!Number.isInteger(seed)) throw new Error("learnedUpscaleTemporal: training needs an integer seed");
     if (examples.some((e) => e.W < crop || e.H < crop)) throw new Error(`learnedUpscaleTemporal: a crop no larger than every frame -- got ${crop}`);
-    if (variant === "half" && crop % 2) throw new Error(`learnedUpscaleTemporal: U_TH trains on even crops -- got ${crop}`);
+    if (variant !== "full" && crop % 2) throw new Error(`learnedUpscaleTemporal: U_TH trains on even crops -- got ${crop}`);
     const rand = seededRandom(seed), net = makeUpscalerT(rand, variant), state = adamState(net), losses = [];
     for (let step = 0; step < steps; step++) {
         let loss = 0, acc = null;
         for (let b = 0; b < batch; b++) {
             const ex = examples[Math.floor(rand.u() * examples.length)];
             // round 70's corners as they were; U_TH's on even pixels, so a crop's 2 x 2 blocks are the frame's
-            const cx = variant === "half" ? 2 * Math.floor(rand.u() * ((ex.W - crop) / 2 + 1)) : Math.floor(rand.u() * (ex.W - crop + 1));
-            const cy = variant === "half" ? 2 * Math.floor(rand.u() * ((ex.H - crop) / 2 + 1)) : Math.floor(rand.u() * (ex.H - crop + 1)), C = temporalCrop(ex, cx, cy, crop);
+            const cx = variant !== "full" ? 2 * Math.floor(rand.u() * ((ex.W - crop) / 2 + 1)) : Math.floor(rand.u() * (ex.W - crop + 1));
+            const cy = variant !== "full" ? 2 * Math.floor(rand.u() * ((ex.H - crop) / 2 + 1)) : Math.floor(rand.u() * (ex.H - crop + 1)), C = temporalCrop(ex, cx, cy, crop);
             if (onCrop) onCrop(cx, cy);
             const g = temporalLoss(net, C.x, crop, crop, C.ref, C.cov, C.E);
             loss += g.loss / batch;
