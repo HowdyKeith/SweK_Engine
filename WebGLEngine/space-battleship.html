@@ -115,9 +115,9 @@ const DESC = PB.describePolicy("pilot6dofPolicy", P6);
 const CHOICES = [
   { id: "pd", label: "PD autopilot (the 6DOF page's)", policy: false },
   { id: "hand", label: "network, hand weights (the PD written into the net)", hand: () => P6.handWeights() },
-  { id: "shipped", label: "6DOF pilot, shipped", file: "/brain/pilot6dofWeightsDefault.json" },
-  { id: "league", label: "6DOF pilot, league-trained", file: "/brain/pilot6dofWeightsLeague.json" },
-  { id: "close", label: "6DOF pilot, close-quarters", file: "/brain/pilot6dofWeightsClose.json" },
+  { id: "shipped", label: "6DOF pilot, shipped", file: "/brain/pilot6dofWeightsDefault-d18.json" },
+  { id: "league", label: "6DOF pilot, league-trained", file: "/brain/pilot6dofWeightsLeague-d18.json" },
+  { id: "close", label: "6DOF pilot, close-quarters", file: "/brain/pilot6dofWeightsClose-d18.json" },
   { id: "imported", label: "6DOF pilot, imported", file: "(a file you chose)" },
   { id: "mix", label: "a mix: PD, shipped, league, close in turn", mix: ["pd", "shipped", "league", "close"] },
 ];

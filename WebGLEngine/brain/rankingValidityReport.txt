@@ -1,0 +1,58 @@
+RANKING VALIDITY (brain/RANKING_VALIDITY_WIP.md): 24 searches of the decision-circuit and station-and-price rounds, each flown on the audit block and read as its mean paired lead over rule-low06
+  PASS SEARCHES: 24 searches (cx, nostate, plain, station-large, station-small, plain-priced, k 0 to 3), one recipe, one start
+  PASS ARMS: rule-low06 and the 24 searches, once each (25 arms)
+  PASS WEIGHTS: every search flew the weights of its line of the training file (by digest)
+  PASS CHAMPIONS: the six champions are the ones the earlier audits flew (8e9fb0c2, fabc804d, c916e7f5, 3079e794, adc0f039, 3e0ed772)
+  PASS KEYS: every arm flew the same 1200 dives in the same order (seeds 19001 to 19600 of far and both)
+  PASS SCORES: every score is a number in [0, 1] and every strain a number or null
+the searches: held-out lead (unpriced), pool crushed (start), audit lead (se), dives better / worse / same, crushed or stranded (the rule's)
+  cx:0                     eligible held-out -0.0331  pool 0 (0)  audit -0.0208 (se 0.0048)  188 / 198 / 814  bad 37 (0)
+  cx:1            CHAMPION eligible held-out -0.0019  pool 0 (0)  audit -0.0079 (se 0.0031)  167 / 207 / 826  bad 4 (0)
+  cx:2                     dropped  held-out +0.0110  pool 1 (0)  audit -0.0121 (se 0.0038)  182 / 214 / 804  bad 17 (0)
+  cx:3                     dropped  held-out -0.0402  pool 1 (0)  audit -0.0231 (se 0.0053)  228 / 216 / 756  bad 47 (0)
+  nostate:0                dropped  held-out -0.0124  pool 1 (0)  audit -0.0138 (se 0.0043)  197 / 231 / 772  bad 25 (0)
+  nostate:1                eligible held-out -0.0113  pool 0 (0)  audit -0.0018 (se 0.0009)  17 / 31 / 1152  bad 0 (0)
+  nostate:2       CHAMPION eligible held-out -0.0038  pool 0 (0)  audit +0.0009 (se 0.0028)  162 / 137 / 901  bad 3 (0)
+  nostate:3                eligible held-out -0.0138  pool 0 (0)  audit -0.0035 (se 0.0033)  154 / 147 / 899  bad 11 (0)
+  plain:0                  dropped  held-out -0.0644  pool 3 (0)  audit -0.0811 (se 0.0079)  219 / 307 / 674  bad 139 (0)
+  plain:1                  dropped  held-out +0.0012  pool 3 (0)  audit -0.0512 (se 0.0070)  248 / 252 / 700  bad 96 (0)
+  plain:2         CHAMPION eligible held-out +0.0169  pool 0 (0)  audit +0.0063 (se 0.0027)  177 / 129 / 894  bad 2 (0)
+  plain:3                  eligible held-out +0.0074  pool 0 (0)  audit +0.0022 (se 0.0025)  156 / 140 / 904  bad 0 (0)
+  station-large:0          eligible held-out +0.0000  pool 0 (0)  audit -0.0051 (se 0.0022)  114 / 151 / 935  bad 0 (0)
+  station-large:1          eligible held-out +0.0019  pool 0 (0)  audit -0.0076 (se 0.0022)  92 / 155 / 953  bad 0 (0)
+  station-large:2 CHAMPION eligible held-out +0.0075  pool 0 (0)  audit -0.0012 (se 0.0018)  86 / 93 / 1021  bad 0 (0)
+  station-large:3          dropped  held-out -0.0206  pool 1 (0)  audit -0.0068 (se 0.0022)  92 / 140 / 968  bad 0 (0)
+  station-small:0 CHAMPION eligible held-out +0.0037  pool 0 (0)  audit +0.0024 (se 0.0017)  83 / 61 / 1056  bad 0 (0)
+  station-small:1          eligible held-out +0.0037  pool 0 (0)  audit -0.0063 (se 0.0019)  79 / 121 / 1000  bad 0 (0)
+  station-small:2          eligible held-out -0.0075  pool 0 (0)  audit -0.0129 (se 0.0025)  118 / 207 / 875  bad 0 (0)
+  station-small:3          eligible held-out -0.0019  pool 0 (0)  audit -0.0285 (se 0.0027)  58 / 238 / 904  bad 1 (0)
+  plain-priced:0           dropped  held-out +0.0131  pool 1 (0)  audit -0.0287 (se 0.0059)  232 / 218 / 750  bad 65 (0)
+  plain-priced:1           dropped  held-out -0.0325  pool 2 (0)  audit -0.0360 (se 0.0063)  251 / 252 / 697  bad 69 (0)
+  plain-priced:2  CHAMPION eligible held-out +0.0056  pool 0 (0)  audit +0.0058 (se 0.0027)  163 / 118 / 919  bad 1 (0)
+  plain-priced:3           eligible held-out -0.0038  pool 0 (0)  audit +0.0039 (se 0.0025)  164 / 140 / 896  bad 0 (0)
+Q1 (THE VERDICT) within the families, the 16 eligible searches: S = 10 (15 pairs, 14 untied in the held-out lead); exact over 6912 arrangements, p that S is as large or larger 0.0145, as small or smaller 0.9971: RANKS
+Q2a pooled over the 16 eligible searches (120 pairs): S = 47; Monte Carlo p (1000000 draws, seed 20261107) larger or equal 0.0181, smaller or equal 0.9858
+Q2a pooled over all 24 searches (276 pairs): S = 93; Monte Carlo p larger or equal 0.0107, smaller or equal 0.9906
+Q2b within the families over all 24 searches (36 pairs): S = 21; exact over 191102976 arrangements, p larger or equal 0.0020, smaller or equal 0.9993
+Q2c the slope of the audit lead on the held-out lead over the 16 eligible: 0.462 (se 0.190), intercept -0.0038
+Q2d the champions against the other eligible searches of their family (rank by audit lead, 1 = best; the champion's lead minus the others' mean):
+  cx: cx:1 is rank 1 of 2, +0.0129 against the others' mean: ABOVE
+  nostate: nostate:2 is rank 1 of 3, +0.0035 against the others' mean: ABOVE
+  plain: plain:2 is rank 1 of 2, +0.0042 against the others' mean: ABOVE
+  station-large: station-large:2 is rank 1 of 3, +0.0052 against the others' mean: ABOVE
+  station-small: station-small:0 is rank 1 of 4, +0.0183 against the others' mean: ABOVE
+  plain-priced: plain-priced:2 is rank 1 of 2, +0.0019 against the others' mean: ABOVE
+  champions above their family's other eligible mean: 6 of 6
+  the search with the highest audit lead of the 24: plain:2 (+0.0063), a champion
+Q2e the champions' audit leads over the rule, on the earlier block and on this one:
+  cx: here -0.0079 (se 0.0031); decision-circuit audit (seeds 17001 to 17300) -0.0120 (se 0.0044)
+  nostate: here +0.0009 (se 0.0028); decision-circuit audit (seeds 17001 to 17300) -0.0069 (se 0.0042)
+  plain: here +0.0063 (se 0.0027); decision-circuit audit (seeds 17001 to 17300) +0.0050 (se 0.0037); station-and-price audit (seeds 18001 to 18300) +0.0066 (se 0.0034)
+  station-large: here -0.0012 (se 0.0018); station-and-price audit (seeds 18001 to 18300) -0.0055 (se 0.0026)
+  station-small: here +0.0024 (se 0.0017); station-and-price audit (seeds 18001 to 18300) -0.0014 (se 0.0024)
+  plain-priced: here +0.0058 (se 0.0027); station-and-price audit (seeds 18001 to 18300) +0.0075 (se 0.0031)
+BOTTOM LINE: THE HELD-OUT SCORE RANKS THE SEARCHES (16 eligible searches in 6 families, S = 10 of 14 untied pairs, exact p 0.0145 for a positive S and 0.9971 for a negative one)
+
+real	0m5.025s
+user	0m4.995s
+sys	0m0.051s

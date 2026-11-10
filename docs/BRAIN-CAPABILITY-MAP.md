@@ -21,7 +21,7 @@ Which brain can do what at each simulation level, and what the record says about
 
 Brains: **Hand rule / PD autopilot**, **Fly circuit**, **GPU Brain (MLP)**, **Fish circuits**, **Language model**. An 'amoeba brain' does not exist in the tree.
 
-15 tasks x 5 brains = 75 cells: 10 TRAINED, 1 HAND-WIRED, 2 NO CHAMPION, 4 TUNED, 1 SCRIPTED, 1 NO EFFECT, 1 NOT CONCLUDED, 11 EXISTS, UNREAD, 42 -, 2 n/a.
+15 tasks x 5 brains = 75 cells: 12 TRAINED, 1 HAND-WIRED, 2 NO CHAMPION, 4 TUNED, 3 SCRIPTED, 3 NO EFFECT, 1 NOT CONCLUDED, 6 EXISTS, UNREAD, 41 -, 2 n/a.
 
 ## Submarine
 
@@ -30,7 +30,7 @@ Brains: **Hand rule / PD autopilot**, **Fly circuit**, **GPU Brain (MLP)**, **Fi
 | Hold depth, heading and speed (a 6-DOF boat, no weapons) | no | TRAINED | TRAINED | - | TRAINED | n/a |
 | Find and sink a drone with sonar and torpedoes | yes | TUNED | - | - | - | - |
 | Survey run with a battery, a hull that feels pressure, a noisy gauge (needs and limits) | no | TUNED | NOT CONCLUDED | - | - | NO EFFECT |
-| Heading through a compass dropout (rung 4a: circuits as estimators) | no | EXISTS, UNREAD | EXISTS, UNREAD | - | EXISTS, UNREAD | - |
+| Heading through a compass dropout (rung 4a: circuits as estimators) | no | SCRIPTED | NO EFFECT | - | NO EFFECT | - |
 
 ### Hold depth, heading and speed (a 6-DOF boat, no weapons)
 
@@ -47,16 +47,16 @@ Brains: **Hand rule / PD autopilot**, **Fly circuit**, **GPU Brain (MLP)**, **Fi
 
 ### Survey run with a battery, a hull that feels pressure, a noisy gauge (needs and limits)
 
-- **Hand rule / PD autopilot: TUNED.** the rule advisor GUARDED-FILTER (surface under a charge threshold that falls with depth) beats every model and every fixed cap: mean 0.763/0.713/0.806 against the brain alone 0.586/0.558/0.638. Sources: brain/NEEDS_AND_LIMITS.md ("RULE-GF 0.763 | 0.713 | 0.806").
+- **Hand rule / PD autopilot: TUNED.** the rule advisor GUARDED-FILTER (surface under a charge threshold that falls with depth) beats every model and every fixed cap: mean 0.763/0.713/0.806 against the brain alone 0.586/0.558/0.638; choosing the next station by trying the orders of the four nearest on a twin of the boat's own simulation (brain/plannerSeat.mjs) adds +0.0214 (se 0.0040) on 288 fresh dives, 35 better and 3 worse, a small gain (far +0.031, both +0.012) that keeps about half of itself when the twin is 10 percent wrong in all four ways at once and is lost at 20 percent. Sources: brain/NEEDS_AND_LIMITS.md ("RULE-GF 0.763 | 0.713 | 0.806"); changelog v4911 ("+0.0214 (se 0.0040)"); changelog v4911 ("10 percent in all four keep about half of it").
 - **Fly circuit: NOT CONCLUDED.** the circuit pilot's registered task re-check could not pass under the noisy gauge (a defect of my registration, restated post hoc as Round 3 amendment 3). Sources: brain/NEEDS_AND_LIMITS.md ("AMENDMENT 3").
 - **GPU Brain (MLP): -.** a trained advisor or pilot on the MLP is the experiment not yet run.
 - **Language model: NO EFFECT.** gemma2:9b and llama3.1:8b at temperature 0, 4,273 and 4,217 situations on the reserved seeds: mixed against the brain alone, a tie with the best fixed cap, a loss to the rule on every audit. Sources: brain/NEEDS_AND_LIMITS.md ("NO CONSISTENT EFFECT (MIXED)").
 
 ### Heading through a compass dropout (rung 4a: circuits as estimators)
 
-- **Hand rule / PD autopilot: EXISTS, UNREAD.** a plain dead-reckoning navigator flies the dropout. Sources: render/subDropoutData.mjs.
-- **Fly circuit: EXISTS, UNREAD.** the fly's heading-loop circuit as an estimator behind the autopilot (rung 4a versions 3-5 in the WIP); result not read for this map. Sources: brain/SUBMARINE_WIP.md ("RUNG 4a VERSION 3").
-- **Fish circuits: EXISTS, UNREAD.** the best random wiring of the same size is the control; result not read for this map. Sources: brain/SUBMARINE_WIP.md ("RUNG 4a VERSION 4").
+- **Hand rule / PD autopilot: SCRIPTED.** a plain dead-reckoning navigator flies the dropout: on the tank's settled dark error it only TIES the autopilot (the score mostly measures how fast the sub turns), but on the dark cost it pays nothing for losing the compass (0.0000 against the autopilot's +0.0293 on 100 far ids); one leaky unit fed the heading rate pays +0.0008. Sources: render/subDropoutData.mjs; brain/BACKLOG_PICKUPS_2026-11-05.md ("0.0000").
+- **Fly circuit: NO EFFECT.** the fly's real heading-loop wiring as an estimator behind the autopilot, against random wirings of its size: v3 (every wiring at its own measured edge of stability) FAIL in all three arms, the real wiring winning on 0 of 3 audits against the strongest family with skill 0.01 to 0.15 against 0.90 to 0.92 for ONE leaky unit; v4 (a ring map with the flag) FAILED both arms; v5 (a flag-free signed rate) found NO SIGNAL in the signed arm -- the graph as wired cannot tell the sign of a turn. Sources: changelog v4903 ("FAIL in all three arms by the rule written down in advance"); changelog v4903 ("against the strongest family the real wiring wins on 0 of 3 audits"); changelog v4905 ("version 4 (a ring map with the flag, 7-factor grid) FAILED both arms"); changelog v4905 ("found NO SIGNAL in the signed arm").
+- **Fish circuits: NO EFFECT.** no fish circuit is tried as an estimator; the random wirings of the fly's size are the controls, and they rise while the real wiring does not (v3: the real wiring wins on 0 of 3 audits against the strongest family; v4 FAILED both arms). Sources: changelog v4903 ("against the strongest family the real wiring wins on 0 of 3 audits"); changelog v4905 ("version 4 (a ring map with the flag, 7-factor grid) FAILED both arms").
 
 ## Sky
 
@@ -64,7 +64,7 @@ Brains: **Hand rule / PD autopilot**, **Fly circuit**, **GPU Brain (MLP)**, **Fi
 |---|---|---|---|---|---|---|
 | Real fixed-wing flight: hold altitude, heading and airspeed through gusts and recoveries | no | TRAINED | TRAINED | HAND-WIRED | - | - |
 | Aircraft heading hold (es-aircraft) | no | EXISTS, UNREAD | TRAINED | - | - | - |
-| Helicopter and quadrotor: hover, land, engine-out landings | no | EXISTS, UNREAD | TRAINED | EXISTS, UNREAD | - | - |
+| Helicopter and quadrotor: hover, land, engine-out landings | no | SCRIPTED | TRAINED | TRAINED | - | - |
 | Jet dogfight (guns), league against the autopilot, itself and the other brain | yes | EXISTS, UNREAD | NO CHAMPION | NO CHAMPION | - | - |
 | Bomber and capital ship against fighters (gunners in the seats) | yes | EXISTS, UNREAD | - | EXISTS, UNREAD | - | - |
 | Endless-Sky style fleet battles (flight-gpu.html, es-box3d.html): who to shoot, when to break off | yes | TUNED | n/a | EXISTS, UNREAD | - | - |
@@ -82,9 +82,9 @@ Brains: **Hand rule / PD autopilot**, **Fly circuit**, **GPU Brain (MLP)**, **Fi
 
 ### Helicopter and quadrotor: hover, land, engine-out landings
 
-- **Hand rule / PD autopilot: EXISTS, UNREAD.** hand pilots for the helicopter and the quadrotor. Sources: brain/autopilotRotor.mjs; brain/autopilotDrone.mjs.
-- **Fly circuit: TRAINED.** the helicopter's fruit-fly pilot: audit -1.2188 against the hand pilot's -2.0770, 24 scenarios better and 10 worse, engine-out landings stand 8 s after contact in 18 of 20 flights against 5. Sources: changelog v4877 ("-1.2188").
-- **GPU Brain (MLP): EXISTS, UNREAD.** a quadrotor MLP (1,860 weights) with V2 weights; result not read for this map. Sources: brain/pilotDroneMlp.mjs; brain/pilotDroneMlpWeightsV2.json.
+- **Hand rule / PD autopilot: SCRIPTED.** hand autopilots for the helicopter and the quadrotor, the controls of the rotorcraft board: on 48 fresh scenarios the helicopter's reads -1.8177 (9 of 12 engine-outs lost), on 96 the quadrotor's -2.4285 (every motor-out lost). Sources: brain/ROTORCRAFT_BOARD_WIP.md ("-1.8177"); brain/ROTORCRAFT_BOARD_WIP.md ("-2.4285"); brain/autopilotRotor.mjs; brain/autopilotDrone.mjs.
+- **Fly circuit: TRAINED.** the helicopter's fruit-fly pilot: audit -1.2188 against the hand pilot's -2.0770, 24 scenarios better and 10 worse, engine-out landings stand 8 s after contact in 18 of 20 flights against 5 (v4877); on 48 fresh scenarios it TIES the hand autopilot pooled (+0.1795 against a bar of +0.1966), is better on terrain, and loses 6 of 12 engine-outs against 9. The quadrotor's fruit-fly pilot TIES the hand pilot at flying and beats it only at crashing softer after a motor-out (+0.2861 pooled). Counted by scenarios won on 160 fresh scenarios (the rotor league), the helicopter's pilot beats the hand autopilot, 91 scenarios won against 51, though its mean edge on the standing kinds is only +0.0064 and on engine-outs the count is level. Sources: changelog v4877 ("-1.2188"); brain/ROTORCRAFT_BOARD_WIP.md ("+0.1795"); brain/ROTORCRAFT_BOARD_WIP.md ("+0.2861"); brain/ROTOR_LEAGUE_WIP.md ("91 scenarios won, 51 lost").
+- **GPU Brain (MLP): TRAINED.** the quadrotor's MLP (1,860 weights), two trainings: on 96 fresh scenarios the first TIES the hand pilot at flying (+0.0096) and the second is slightly below it (-0.0097); both land softer after a motor-out (+0.2275 and +0.3310 pooled) and the second stood 3 of 24 motor-outs where every other pilot stood none. No helicopter MLP exists. In the rotor league the hand pilot beats the second training on the standing kinds by count (42 scenarios won against 23) and is itself below all three trained brains after a motor-out. Sources: brain/pilotDroneMlp.mjs; brain/pilotDroneMlpWeightsV2.json; brain/ROTORCRAFT_BOARD_WIP.md ("+0.2275"); brain/ROTOR_LEAGUE_WIP.md ("42 won, 23 lost").
 
 ### Jet dogfight (guns), league against the autopilot, itself and the other brain
 
@@ -107,15 +107,15 @@ Brains: **Hand rule / PD autopilot**, **Fly circuit**, **GPU Brain (MLP)**, **Fi
 
 | task | shoots | Hand rule / PD autopilot | Fly circuit | GPU Brain (MLP) | Fish circuits | Language model |
 |---|---|---|---|---|---|---|
-| Newtonian 6-DOF ship duel (es-box3d-6dof.html): turn, thrust, fire, and not ram | yes | EXISTS, UNREAD | TRAINED | - | - | - |
+| Newtonian 6-DOF ship duel (es-box3d-6dof.html): turn, thrust, fire, and not ram | yes | EXISTS, UNREAD | TRAINED | TRAINED | - | - |
 | Navigation around black holes and anomalies (field navigation, probes as emitters) | no | TUNED | - | - | - | - |
 | Fuel, heat and hull as limits, with advisor seats (the submarine's needs-and-limits idea) | no | - | - | - | - | - |
 
 ### Newtonian 6-DOF ship duel (es-box3d-6dof.html): turn, thrust, fire, and not ram
 
 - **Hand rule / PD autopilot: EXISTS, UNREAD.** the PD attitude controller is the opponent and the baseline. Sources: brain/autopilot6dof.mjs.
-- **Fly circuit: TRAINED.** a league-trained pilot (85 of 930 weights moved) -- but its 42-3 was one start's corridor; from a close joust start it lost all 80 games to the PD autopilot; a close-quarters pilot then beat the shipped one 106-12 and nothing learned to ram less; retrained at damage 6 at v4896. Sources: changelog v4846 ("85 of the 930 weights"); changelog v4848 ("loses all 80 games to the PD autopilot"); changelog v4848 ("106-12"); changelog v4896 ("retrained at damage 6").
-- **GPU Brain (MLP): -.** pilot6dofPolicy.mjs is the fly circuit only.
+- **Fly circuit: TRAINED.** a league-trained pilot (85 of 930 weights moved) -- but its 42-3 was one start's corridor; from a close joust start it lost all 80 games to the PD autopilot; a close-quarters pilot then beat the shipped one 106-12 and nothing learned to ram less; retrained at damage 6 at v4896; in the page's own fight (three a side, collisions on) the close-quarters pilot wins 730 of its 800 and is the only one better than the PD autopilot, which beats the League pilot 155-44. Sources: changelog v4846 ("85 of the 930 weights"); changelog v4848 ("loses all 80 games to the PD autopilot"); changelog v4848 ("106-12"); changelog v4896 ("retrained at damage 6"); brain/SIXDOF_PAGE_FIGHT_WIP.md ("W730/L58/D12"); brain/SIXDOF_PAGE_FIGHT_WIP.md ("W155/L44/D1").
+- **GPU Brain (MLP): TRAINED.** the fly's Default recipe on the MLP, 29 of 1,637 weights kept: it beats its hand twin by the fly's rule (audit W10/L0/D10, where the twin draws all 20), but head to head with the fly's Default it won none of 80 (W0/L70/D10: fly better); a choice on the page's Load Pilots panel; in the page's own fight it ties the PD autopilot and loses to the fly's Default 76-123; a league round against the Default halved the duel gap (0-74 to 9-46 on fresh games) but did not qualify; a close-quarters round learned the joust against the Default (79-1 on fresh games, from 29-27) but not the standoff (0-66: it died in every standoff game), so it did not qualify either; nothing was written by either; twenty searches a brain by the first recipe could not tell the two networks apart (p = 0.265), and the fly's Default beat all 40 fresh searches of both: the 70-0 was the Default's draw. Sources: brain/SIXDOF_PAGE_FIGHT_WIP.md ("W123/L76/D1"); brain/SIXDOF_GPU_BRAIN_WIP.md ("p = 0.265"); brain/SIXDOF_GPU_BRAIN_WIP.md ("W1205/L24/D371"); brain/SIXDOF_GPU_BRAIN_WIP.md ("W9/L46/D25"); brain/SIXDOF_GPU_BRAIN_WIP.md ("W79/L1/D0"); brain/SIXDOF_GPU_BRAIN_WIP.md ("W0/L66/D14"); brain/SIXDOF_GPU_BRAIN_WIP.md ("died in all 80 standoff games"); brain/SIXDOF_GPU_BRAIN_WIP.md ("29 of the 1,637"); brain/SIXDOF_GPU_BRAIN_WIP.md ("W10/L0/D10"); brain/SIXDOF_GPU_BRAIN_WIP.md ("W0/L70/D10"); brain/pilot6dofMlpWeightsDefault.json; es-box3d-6dof.html ("pilot6dofMlpWeightsDefault.json").
 
 ### Navigation around black holes and anomalies (field navigation, probes as emitters)
 

@@ -58,6 +58,7 @@
 //   G29 IS AN EQUIVALENT MUTANT, SAID: `if (K.leadTime)` -> `if (true)` subtracts 0 x a finite rate from the heading, and x - 0 is x to the bit. FOUR WENT 0 RED THE FIRST TIME AND ROWS WERE ADDED: G12 (the break-off's airspeed clamped to the trainer's limits: no row broke off from an opponent whose speed the limits change -- the row now breaks away from a 45 m/s opponent with limits of 60..90 and 10..30), G17 (B's pursuit not given the guide: B was scripted in
 //   every fight that passed a guide; duel 6, in which both hunt, is flown with a 5,000 m altitude floor and its fingerprint pinned, d83a47e3), G37 (the default trigger range 400 m: the only aligned shot in the gate was at 500 m, refused by both; one at 430 m is now taken by the default and refused by a guide of 400), and G29 above. THE FIRST RUN OF THE LEAD ROW FOUND ITS OWN TOLERANCE WRONG: a forward difference of the bearing with a step of 1e-4 is 3.7e-6 off the closed form; the row takes a central difference and holds 1e-7.
 "use strict";
+import "../physics/mechanics/rigidBody6dofEuler.mjs";   // 2026-11-04 -- the 6-DOF numbers this gate holds were measured under the first-order orientation step, so it flies that step (see that file)
 import * as D from "./dogfightTask.mjs";
 import * as G from "../physics/mechanics/flightGuns.mjs";
 import * as F from "../physics/mechanics/flightModel6dof.mjs";

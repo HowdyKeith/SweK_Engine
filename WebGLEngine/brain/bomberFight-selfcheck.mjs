@@ -29,6 +29,7 @@
 //   B57 the report forgets it is chosen 1
 // TWO WENT 0 RED THE FIRST TIME AND WERE FIXED IN THE GATE, NOT EXCUSED: B41 (an options object is looked up as a name) because the gate called build() with it unguarded and the exception ended the run before a row could fail -- every section now runs inside a guard that turns a throw into a named FAIL, and the row calls build() inside a try; and B52 (friendly hits summed from the wrong field) because the numbers\n// I had set by hand for the two fields happened to add up to the same 6 -- friendly hits taken are now 0, 2 and 5. THE FIRST DRAFT OF THE GATE ALSO FOUND A BUG IN THE SCENARIO: the beam attack's 'back' distance was drawn twice (once for each coordinate), so the position was not 0-200 m behind the bomber at all but a skewed vector (the stated box failed at 419-717 m out) -- it is drawn once, and every pinned fight below is from the corrected scenario.
 "use strict";
+import "../physics/mechanics/rigidBody6dofEuler.mjs";   // 2026-11-04 -- the 6-DOF numbers this gate holds were measured under the first-order orientation step, so it flies that step (see that file)
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";

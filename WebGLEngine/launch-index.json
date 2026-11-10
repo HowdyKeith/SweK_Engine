@@ -21,7 +21,7 @@
   }
  },
  "counts": {
-  "page": 495,
+  "page": 502,
   "demo": 49,
   "builtin": 38
  },
@@ -1156,6 +1156,14 @@
   },
   {
    "kind": "page",
+   "id": "duodesk.html",
+   "display": "Duodesk",
+   "href": "/duodesk.html",
+   "section": "Peer 2 Peer",
+   "collision": false
+  },
+  {
+   "kind": "page",
    "id": "echo-show.html",
    "display": "Echo Show",
    "href": "/echo-show.html",
@@ -1664,6 +1672,14 @@
    "display": "Gpu Rig Check",
    "href": "/gpu-rig-check.html",
    "section": "Render TSL",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "gputaskman.html",
+   "display": "Gputaskman",
+   "href": "/gputaskman.html",
+   "section": "Opt-in: somebody else's work",
    "collision": false
   },
   {
@@ -2348,6 +2364,14 @@
   },
   {
    "kind": "page",
+   "id": "nectarlink.html",
+   "display": "Nectarlink",
+   "href": "/nectarlink.html",
+   "section": "Peer 2 Peer",
+   "collision": false
+  },
+  {
+   "kind": "page",
    "id": "nest-protect.html",
    "display": "Nest Protect",
    "href": "/nest-protect.html",
@@ -2700,6 +2724,14 @@
   },
   {
    "kind": "page",
+   "id": "privatelm.html",
+   "display": "Privatelm",
+   "href": "/privatelm.html",
+   "section": "Opt-in: somebody else's work",
+   "collision": false
+  },
+  {
+   "kind": "page",
    "id": "probe-lab.html",
    "display": "Probe Lab",
    "href": "/probe-lab.html",
@@ -2960,6 +2992,22 @@
    "display": "Rocket League",
    "href": "/rocket-league.html",
    "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "rotor-league.html",
+   "display": "Rotor League",
+   "href": "/rotor-league.html",
+   "section": "Fruit Fly Brain",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "rotorcraft-demo.html",
+   "display": "Rotorcraft Demo",
+   "href": "/rotorcraft-demo.html",
+   "section": "Fruit Fly Brain",
    "collision": false
   },
   {
@@ -3480,6 +3528,14 @@
    "display": "Svg Forge",
    "href": "/svg-forge.html",
    "section": null,
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "switchboard.html",
+   "display": "Switchboard",
+   "href": "/switchboard.html",
+   "section": "Flight Simulation",
    "collision": false
   },
   {

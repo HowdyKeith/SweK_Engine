@@ -22,20 +22,37 @@
 // T18 and T19 went 0 red the first time: the pilots row only asked for 'a function that does not throw', and a 962-weight vector fed to the network still flies. The row that swims the SAME id three ways now separates
 // them: corrupt weights must swim bit-for-bit like the PD autopilot, real weights must not. THE FIRST DRAFT OF THE WALL RULE WAS A REAL DEFECT THE GATE FOUND, not a mutant: it overrode the target only outside the margin, so
 // a boat aimed at a wall hugged it (max x 476, still near the wall after 108 s); the rule is now edge-triggered (retarget on crossing) and the row asks for the retarget, not a timing.
+// ADDENDUM (unnumbered work, section 12: pilot kinds): 54 MORE mutants of render/subAquariumSim.mjs, each run against a copy of this gate, 3 at a time: 49 red BY NAME (142 red rows), 4 red BY A THROWN ERROR and 1 EQUIVALENT.
+//   the gfc test (the default circuit dropped, always true, never true), the network's count check and its copy; a sub with no weights, the weights kept for a kind that comes later (kept, copied), the kind looked up by the wrong name, the count check off, loosened, the kind check off, the builder given the weights uncopied, no context, another boat's, a build that is not a pilot unchecked
+//   and its message, the kind record dropped or wrong, a failing builder's words dropped or cut, the sub's circuit default, seating never done or done before the target exists; registerPilotKind: the built-in circuit accepted, an empty or non-string name, no kind, no build, a weight count that is not a whole number or is under 1, the kind set before it was validated or never stored,
+//   every circuit re-seated, subs with no weights re-seated, the event kept at a re-seat or cleared on the wrong boat, the re-seat not done, the seated count wrong in both ways, nothing returned, the message; the probe's kind and the snapshot's circuit, kind and kindError (three ways); the clock.
+//   FIRST RUN, 56 mutants: 23 had no named red. Cut as code that did nothing: kind.label (a fallback nobody read; the record is now { circuit }), the repeated reset of the pilot in the catch, the `if (sub.event)` guard (clearEvent has it). Rows added: an explicit circuit 'gfc' (the server's list names it; the network had only ever been tried with none named) and its weights copied; the weights of a sub waiting for its kind copied;
+//   a sub of ANOTHER circuit not re-seated by a kind it does not belong to; a sub with no weights keeping its event; a working kind replaced by a failing one (no stale record, { seated: 0 }); the target existing when the builder runs; the tank pure. The surface row had asked for a minute: both the autopilot and the stateful pilot take about 80 s (measured), so it asks for two. Rows that threw instead of failing now fail by name.
+//   THE 4 RED BY A THROWN ERROR (T07 a sub with no weights seated as if it had some, T13 the kind check off, T26 the fallback pilot null, T31 the seat never done): each breaks the tank at its first sync or step, in rows far above this section, so the gate dies reporting the exception and exits 1. They are red, not named.
+//   THE 1 EQUIVALENT (T05, the gfc branch falling through instead of returning): the sub then also keeps its weights as `kindWeights`, which nothing reads for a gfc sub (a re-seat is by circuit, and gfc cannot be registered).
+// ADDENDUM (UNNUMBERED, section 13: the navigation sea and couriers; brain/SUB_FIELD_NAV_WIP.md FOLLOW-UP 4): 32 MORE mutants of render/subAquariumSim.mjs, each run against a copy of this gate, 2 to 3 at a time: 31 RED (27 by a named row, 4 by a thrown error that the section's guard reports), 1 EQUIVALENT.
+//   N01 and N02 (a navigator's seed ignores the sub's id / the sea), N03 to N05 (ending a navigation: no fresh wandering target, the nav kept, the guard for a sub that never had one), N06 to N12 (setScene: undefined, the integer check, a new sea restarts every courier, the arm kept,
+//   the count returned, null ends them, the tank's own size), N13 to N16 (sceneNow's clock and its empty answer, the scene getter), N17 to N22 (setNav: undefined / "" as off, an unknown arm checked before the id, an unknown id answering null, no sea, the return), N23 to N26 (the step: the
+//   navigator's target used and kept as the sub's target, the TANK clock and the tick handed over), N27 and N28 (a lost sub / a hull change drops the plan), N29 and N30 (the snapshot's nav and its being a copy), N32 (a courier running the wandering schedule's draws underneath).
+//   EQUIVALENT: N31 (the `nav: null` default in the sub record: undefined is just as falsy at every use).
+//   ON THE FIRST RUN ELEVEN WENT 0 RED and the gate grew what separated them: N02 (a sea of its own for the same sub: eight distinct first goals in eight seas), N03 (a FRESH wandering target at once, checked after a 60 s sail, longer than a wander lasts), N06 and N17 and N19 (undefined and "" mean off and answer null),
+//   N24 (the snapshot's target is the navigator's), N26 (a courier SET DOWN on an island is in contact and the contact ends a second and a half after it is set down in open water: the tank hands the navigator its tick), N32 (a GOLDEN position after a courier is sent wandering again: its
+//   schedule's random draws were not spent while it sailed), N14 and N16 (the section died of a thrown error: it is guarded now).
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import * as A from "./subAquariumSim.mjs";
+import * as FX from "./subAquariumFlyCx.mjs";
 
 const ENG = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const C = createRequire(import.meta.url)("../ai-bridge/subAquariumCore.js");
 let fails = 0;
 function ok(name, cond, detail) { console.log(`  ${cond ? "PASS" : "FAIL"}  ${name}${detail ? "   " + detail : ""}`); if (!cond) fails++; }
-const near = (a, b, tol = 1e-9) => Math.abs(a - b) <= tol;
+const near = (a, b, tol = 1e-9) => Math.abs(a - b) <= tol, J = JSON.stringify;
 const read = (rel) => { try { return JSON.parse(fs.readFileSync(path.join(ENG, rel), "utf8")); } catch { return null; } };
-const seed = C.seedSubs(read).subs.map((s, i) => ({ id: "s" + i, name: s.name, hue: s.hue, pilot: s.weights ? "network" : "autopilot", from: "this-box", local: true, weights: s.weights }));
+const seed = C.seedSubs(read).subs.map((s, i) => ({ id: "s" + i, name: s.name, hue: s.hue, pilot: s.weights ? (s.circuit === "flycx" ? "stateful" : "network") : "autopilot", circuit: s.circuit, from: "this-box", local: true, weights: s.weights }));
 const run = (tank, seconds) => { for (let i = 0; i < Math.round(seconds * 30); i++) tank.step(1 / 30); };
 const entry = (id, extra = {}) => ({ id, name: "Sub " + id, hue: 100, pilot: "autopilot", from: "x", local: false, weights: null, ...extra });
 
@@ -59,7 +76,7 @@ console.log("\n2. SYNC");
 
 console.log("\n3. SWIMMING");
 {
-    ok("!! the tree offers six subs here: the PD autopilot (no weights) and five trained networks (963 weights)", seed.length === 6 && seed[0].weights === null && seed.slice(1).every((s) => s.weights.length === 963));
+    ok("!! the tree offers seven subs here: the PD autopilot (no weights), five trained networks (circuit gfc, 963 weights) and the stateful fly pilot (circuit flycx, 1,729 weights)", seed.length === 7 && seed[0].weights === null && seed.slice(1, 6).every((s) => s.circuit === "gfc" && s.weights.length === 963) && seed[6].circuit === "flycx" && seed[6].weights.length === 1729);
     const t = A.createTank(); t.sync(seed); let minX = 1e9, maxX = -1e9, minY = 1e9, maxY = -1e9, minD = 1e9, maxD = -1e9;
     for (let i = 0; i < 30 * 600; i++) { t.step(1 / 30); if (i % 30 === 0) for (const s of t.snapshot()) { minX = Math.min(minX, s.x); maxX = Math.max(maxX, s.x); minY = Math.min(minY, s.y); maxY = Math.max(maxY, s.y); minD = Math.min(minD, s.depth); maxD = Math.max(maxD, s.depth); } }
     const snap = t.snapshot();
@@ -132,7 +149,7 @@ console.log("\n9. SNAPSHOT");
 {
     const t = A.createTank(); t.sync([entry("p", { name: "Pip", hue: 42, from: "10.0.0.2", local: true })]); run(t, 60);
     const s = t.snapshot()[0], tr = s.trail.length; s.trail.push([0, 0, 0]); s.trail.length = 0;
-    ok("!! a snapshot is a plain record with exactly the fields the page draws (id, name, hue, hull, pilot, from, local, x, y, depth, heading, pitch, speed, cmd, event, steer, needs, compass, tank, target, lost, status, trail -- v4904 added steer, v4901 added event and tank, v4899 added cmd, the pilot's four commands this tick, which the 3D view draws the fins from), and its trail is a COPY (emptying it does not empty the boat's)", Object.keys(s).sort().join() === "cmd,compass,depth,event,from,heading,hue,hull,id,local,lost,name,needs,pilot,pitch,speed,status,steer,tank,target,trail,x,y".split(",").sort().join() && t.snapshot()[0].trail.length === tr && tr > 50 && s.name === "Pip" && s.hue === 42 && s.from === "10.0.0.2" && s.local === true && s.pilot === "autopilot");
+    ok("!! a snapshot is a plain record with exactly the fields the page draws (id, name, hue, hull, pilot, circuit, kind, kindError, from, local, x, y, depth, heading, pitch, speed, cmd, event, kick, steer, needs, survey, compass, tank, target, lost, status, trail -- v4912 added survey, the kick event added kick (null unless a kick event is running), the navigation scene added nav (null unless the sub is a courier), unnumbered work added circuit, kind and kindError, v4904 added steer, v4901 added event and tank, v4899 added cmd, the pilot's four commands this tick, which the 3D view draws the fins from), and its trail is a COPY (emptying it does not empty the boat's)", Object.keys(s).sort().join() === "circuit,cmd,compass,depth,event,from,heading,hue,hull,id,kick,kind,kindError,local,lost,name,nav,needs,pilot,pitch,speed,status,steer,survey,tank,target,trail,x,y".split(",").sort().join() && t.snapshot()[0].trail.length === tr && tr > 50 && s.name === "Pip" && s.hue === 42 && s.from === "10.0.0.2" && s.local === true && s.pilot === "autopilot");
     run(t, 300);
     ok("!! a trail never grows past 80 points however long the boat swims (5 minutes more)", t.snapshot()[0].trail.length === 80 && A.TRAIL === 80 && t.snapshot()[0].trail.every((p) => p.length === 3 && p.every(Number.isFinite)));
     const big = A.createTank(); big.sync(Array.from({ length: 24 }, (_, i) => entry("g" + i, i % 2 ? { pilot: "network", weights: seed[2].weights } : {}))); const t0 = Date.now(); run(big, 60);
@@ -170,6 +187,127 @@ console.log("\n11. THE NAMED CONSTANTS (DEPTH_MIN, DEPTH_MAX, TRAIL_EVERY)");
 
 // BIG TANK sabotages: Z1 the tank ignores the size it was given (1 red). Z2 the wall test kept at 500 x 300 inside a big tank: 0 red, SAID PLAINLY -- the wall logic only acts when a sub CROSSES from inside to outside
 // and a sub is spawned anywhere in the tank, so that mutant changes where a boat turns back, not whether the big tank is used; no row of this gate tells it from the true one, and none is claimed.
+console.log("\n12. PILOT KINDS (unnumbered work: a circuit other than gfc is flown by the kind a page registers for it)");
+{
+    const cj = JSON.parse(fs.readFileSync(path.join(ENG, "vendor/hemibrain/hemibrain-cx-heading-loop.json"), "utf8")), circuit = { neurons: cj.neurons, edges: cj.edges, io: cj.io };
+    const W = seed[6].weights, cx = (id, extra = {}) => entry(id, { pilot: "stateful", circuit: "flycx", weights: W, ...extra });
+    const swim = (build, secs = 90, tankArg) => { const q = tankArg || A.createTank(); build(q); run(q, secs); const x = q.snapshot()[0]; return JSON.stringify([x.x, x.y, x.depth, x.heading, x.pitch, x.speed]); };
+    const pd = swim((q) => q.sync([entry("same")])), unreg = swim((q) => q.sync([cx("same")])), kind = FX.flyCxKind(circuit);
+    const reg = swim((q) => { q.registerPilotKind("flycx", kind); q.sync([cx("same")]); });
+    ok("!! with NO kind registered a flycx sub flies the PD autopilot bit for bit (it waits with its weights), says nothing is wrong (kind null, kindError null) and names its circuit; with the real stateful kind registered first it swims DIFFERENTLY from the autopilot", unreg === pd && reg !== pd && (() => { const q = A.createTank(); q.sync([cx("same")]); const s = q.snapshot()[0]; return s.circuit === "flycx" && s.kind === null && s.kindError === null && q.probe("same").kind === "autopilot" && q.probe("same").weights === null; })());
+    let lateSeated = null; const late = swim((q) => { q.sync([cx("same")]); lateSeated = q.registerPilotKind("flycx", kind); }, 90);
+    ok("!! A KIND REGISTERED AFTER THE SUB ARRIVED SEATS IT: registering at tank time 0 leaves it swimming exactly as if it had been registered first (nothing is lost), and answers { seated: 1 }", late === reg && lateSeated && lateSeated.seated === 1);
+    const t1 = A.createTank(); t1.sync([cx("m")]); run(t1, 20); const before = t1.snapshot()[0], obj = t1.subs.get("m"), r1 = t1.registerPilotKind("flycx", kind), after = t1.snapshot()[0];
+    ok("!! registered MID-RUN it seats the sub where it is: the very same boat, the same place, heading and trail, the same lost count; the brain panel then reads kind flycx with no 963-weight network (weights null) and the snapshot says kind flycx", r1 && r1.seated === 1 && t1.subs.get("m") === obj && after.x === before.x && after.y === before.y && after.heading === before.heading && after.trail.length === before.trail.length && after.kind === "flycx" && after.kindError === null && t1.probe("m").kind === "flycx" && t1.probe("m").weights === null);
+    // a spy kind: what the tank hands the builder and the pilot
+    const log = { builds: [], calls: [], cmd: { pitch: 0.11, yaw: -0.22, thrust: 0.33, ballast: 0.44 } };
+    const spy = { weightCount: 1729, build(w, ctx) { log.builds.push({ w, ctx, targetAtBuild: ctx.sub.target }); return (state, target, current, aux) => { log.calls.push({ state, target, current, aux, wander: ctx.sub.target }); return log.cmd; }; } };
+    const ts = A.createTank(); ts.registerPilotKind("flycx", spy); ts.sync([cx("a"), cx("b")]);
+    ok("!! the builder is called ONCE for each sub (two subs with the same weights get two pilots) with a Float32Array COPY of the entry's weights and { sub } the tank's own record of that sub", log.builds.length === 2 && log.builds.every((b) => b.w instanceof Float32Array && b.w.length === 1729 && b.w !== W && b.w.every((v, i) => v === Math.fround(W[i]))) && log.builds[0].ctx.sub === ts.subs.get("a") && log.builds[1].ctx.sub === ts.subs.get("b") && log.builds.every((b) => b.targetAtBuild && typeof b.targetAtBuild.depth === "number") && log.builds[0].w !== log.builds[1].w && log.builds[0].ctx.sub !== log.builds[1].ctx.sub);
+    run(ts, 1);
+    ok("!! each tick the pilot is called with (the boat's state, the target, still water [0, 0, 0], no aux) and ITS commands are what the snapshot reports and the fins follow", log.calls.length >= 60 && log.calls.every((c) => c.current.join() === "0,0,0" && c.aux === undefined && typeof c.target.depth === "number" && c.state.pos.length === 3) && J(ts.snapshot()[0].cmd) === J(log.cmd));
+    const sA = ts.subs.get("a"); const tgt0 = sA.target; ts.step(0.1); let changed = false;
+    for (let i = 0; i < 30 * 120 && !changed; i++) { ts.step(1 / 30); if (sA.target !== tgt0) changed = true; }
+    ok("!! `ctx.sub.target` is the WANDERING target and a NEW OBJECT at each retarget (the identity the stateful pilot restarts its memory on), while the per-tick target the pilot is handed is another matter", changed && log.calls.some((c) => c.wander === tgt0) && log.calls.some((c) => c.wander !== tgt0));
+    // lost and respawned: also a new target
+    const tl = A.createTank(); tl.registerPilotKind("flycx", { weightCount: 1729, build: (w, ctx) => () => ({ pitch: 0, yaw: 0, thrust: 0, ballast: 1 }) }); tl.sync([cx("lost")]); const sl = tl.subs.get("lost"), tgtL = sl.target; run(tl, 400);
+    ok("!! a boat that is LOST (here a pilot that floods its tank until it grounds) is put back and given a new wandering target, as a retarget does (so the stateful pilot's memory restarts at a respawn too)", sl.lost >= 1 && sl.target !== tgtL);
+    // refusals of the kind and fallbacks
+    const tw = A.createTank(); tw.registerPilotKind("flycx", spy); log.builds.length = 0;
+    tw.sync([cx("short", { weights: W.slice(1) }), cx("long", { weights: [...W, 0] }), entry("g963", { pilot: "network", weights: seed[1].weights }), entry("gfcLong", { pilot: "network", circuit: "gfc", weights: W }), entry("flyBad963", { circuit: "flycx", weights: seed[1].weights }), entry("nokind", { circuit: "other", weights: W }), entry("pd")]);
+    const pdPilot = tw.subs.get("pd").pilot;
+    ok("!! with a kind registered: 1,728 and 1,730 weights, a flycx sub with 963, a gfc sub with 1,729 and an unregistered circuit all fly the PD autopilot (no builder call, no error); 963 weights with NO circuit named are still the gfc NETWORK; a gfc sub says circuit gfc", log.builds.length === 0 && ["short", "long", "gfcLong", "flyBad963", "nokind"].every((id) => tw.subs.get(id).kindInfo === null && tw.subs.get(id).kindError === null && tw.subs.get(id).weights === null) && tw.subs.get("g963").weights && tw.subs.get("g963").weights.length === 963 && tw.snapshot().find((s) => s.id === "g963").circuit === "gfc" && tw.snapshot().find((s) => s.id === "nokind").circuit === "other" && pdPilot !== tw.subs.get("g963").pilot);
+    const te = A.createTank(); te.registerPilotKind("flycx", { weightCount: 1729, build() { throw new Error("no circuit loaded here"); } }); te.registerPilotKind("flycxb", { weightCount: 1729, build: () => 7 }); te.sync([cx("boom"), cx("seven", { circuit: "flycxb" })]);
+    let teThrew = null; try { run(te, 20); } catch (e) { teThrew = e; }
+    ok("!! a builder that THROWS, or returns something that is not a pilot, leaves the sub on the PD autopilot, says why in the snapshot's kindError (the builder's own words) and the sub swims on; kind stays null", ["boom", "seven"].every((id) => te.snapshot().find((s) => s.id === id).kind === null) && te.snapshot().find((s) => s.id === "boom").kindError === "no circuit loaded here" && /did not return a pilot/.test(te.snapshot().find((s) => s.id === "seven").kindError) && teThrew === null && te.snapshot().every((s) => Number.isFinite(s.x)));
+    const bad = [["gfc", spy], ["", spy], [7, spy], [null, spy], ["flycx", null], ["flycx", {}], ["flycx", { build() {}, weightCount: 0 }], ["flycx", { build() {}, weightCount: 1.5 }], ["flycx", { build() {}, weightCount: "1729" }], ["flycx", { weightCount: 1729 }], ["flycx", { build: 1, weightCount: 1729 }]].map(([c, k]) => { const q = A.createTank(); try { q.registerPilotKind(c, k); return null; } catch (e) { return String(e.message); } });
+    ok("!! registerPilotKind refuses, naming the module: the built-in circuit gfc, an empty or non-string circuit, a kind that is nothing, has no build, a weight count of 0, 1.5 or '1729'", bad.every((m) => m && /subAquariumSim\.registerPilotKind/.test(m)) && /"gfc"/.test(bad[0]));
+    const tr = A.createTank(); tr.registerPilotKind("flycx", spy); try { tr.registerPilotKind("flycx", { weightCount: 5 }); } catch (e) { /* refused */ } tr.sync([cx("k")]);
+    ok("!! a refused registration changes nothing: the kind registered before still seats subs", tr.subs.get("k").kindInfo && tr.subs.get("k").kindInfo.circuit === "flycx");
+    const tg = A.createTank(); tg.sync([cx("e1"), cx("e2")]); tg.setEvent("e1", "dropout"); tg.setEvent("e2", "surface"); const seatedN = tg.registerPilotKind("flycx", kind);
+    ok("!! a sub that had an EVENT running when its kind arrived has the event ended (it wrapped the autopilot) and is seated; registering the same circuit again replaces the kind and seats them again (a new pilot: a different function)", seatedN && seatedN.seated === 2 && tg.snapshot().every((s) => s.event === null && s.kind === "flycx") && (() => { const before = tg.subs.get("e1").pilot; tg.registerPilotKind("flycx", FX.flyCxKind(circuit)); const ki = tg.subs.get("e1").kindInfo; return tg.subs.get("e1").pilot !== before && !!ki && ki.circuit === "flycx"; })());
+    // copies, explicit gfc, other circuits, weightless subs, a kind that fails after one that worked
+    const ent = entry("c", { circuit: "gfc", pilot: "network", weights: Array.from(seed[1].weights) }), tc = A.createTank(); tc.sync([ent]); const w5 = (tc.subs.get("c").weights || [])[5]; ent.weights[5] += 1; const cwt = tc.subs.get("c").weights;
+    ok("!! A SUB NAMING THE circuit 'gfc' with 963 weights (as the server's list does) is the NETWORK, exactly as one naming none; its weights are COPIED (editing the entry's afterwards changes nothing); it swims differently from the PD autopilot", !!cwt && cwt.length === 963 && cwt[5] === w5 && cwt[5] !== ent.weights[5] && tc.probe("c").kind === "fly" && swim((q) => q.sync([entry("same", { circuit: "gfc", pilot: "network", weights: seed[1].weights })])) !== pd && swim((q) => q.sync([entry("same", { circuit: "gfc", pilot: "network", weights: seed[1].weights })])) === swim((q) => q.sync([entry("same", { pilot: "network", weights: seed[1].weights })])));
+    const waiting = cx("w", { weights: Array.from(W) }), tcw = A.createTank(); tcw.sync([waiting]); waiting.weights[7] += 1; const heard = [];
+    tcw.registerPilotKind("flycx", { weightCount: 1729, build(w) { heard.push(w); return () => ({ pitch: 0, yaw: 0, thrust: 0, ballast: 0 }); } });
+    ok("!! a sub that WAITS for its kind keeps a COPY of its weights: editing the entry's array after the sub arrived does not change what the kind is built with", heard.length === 1 && heard[0][7] === Math.fround(W[7]) && heard[0][7] !== waiting.weights[7]);
+    const to = A.createTank(); to.sync([cx("o1", { circuit: "other" }), cx("o2")]); const rOther = to.registerPilotKind("flycx", spy);
+    ok("!! registering a kind seats ONLY the subs of that circuit: a sub of another circuit with the same number of weights is left on the PD autopilot (kind null) and not counted", rOther && rOther.seated === 1 && to.subs.get("o1").kindInfo === null && to.subs.get("o2").kindInfo !== null);
+    const tn = A.createTank(); tn.sync([cx("nw", { weights: null }), cx("hw")]); tn.setEvent("nw", "dropout"); tn.registerPilotKind("flycx", spy);
+    ok("!! a flycx sub that has NO weights (the PD autopilot) keeps its event when the kind is registered: nothing about it is re-seated", tn.subs.get("nw").event === "dropout" && tn.subs.get("hw").kindInfo !== null);
+    const tf2 = A.createTank(); tf2.sync([cx("x1")]); const good1 = tf2.registerPilotKind("flycx", kind), bad1 = tf2.registerPilotKind("flycx", { weightCount: 1729, build() { throw new Error("gone"); } }), snapX = tf2.snapshot()[0];
+    ok("!! a kind that WORKED and is replaced by one that fails leaves the sub on the PD autopilot with the new builder's words as its kindError and no kind (no stale record of the first), and the registration answers { seated: 0 }", good1 && good1.seated === 1 && bad1 && bad1.seated === 0 && snapX.kind === null && snapX.kindError === "gone");
+    const ts2 = A.createTank(); ts2.registerPilotKind("flycx", kind); ts2.sync([cx("s")]);
+    let steerMsg = null; try { ts2.setSteer("s", 3, 1); } catch (e) { steerMsg = e.message; }
+    ok("!! a stateful sub has no hidden neuron to push: setSteer refuses, naming the 963-weight network; a plain clear (null) of a sub with no steer is not an error either", /963/.test(steerMsg || "") && ts2.probe("s").steer === null);
+    // the real kind in the real tank
+    const tk = A.createTank(); tk.registerPilotKind("flycx", kind); tk.sync([cx("real")]); let outside = 0, minD = 1e9, maxD = -1e9;
+    for (let i = 0; i < 30 * 600; i++) { tk.step(1 / 30); if (i % 30 === 0) { const s = tk.snapshot()[0]; if (s.x < 0 || s.x > 500 || s.y < 0 || s.y > 300) outside++; minD = Math.min(minD, s.depth); maxD = Math.max(maxD, s.depth); } }
+    ok("!! THE REAL STATEFUL PILOT SWIMS FOR TEN TANK-MINUTES in the real tank: it stays inside the box, within the depth range, is never lost (the rung 4a champion flies as an autopilot with a learned residual does)", outside === 0 && minD >= 8 && maxD <= 46 && tk.snapshot()[0].lost === 0, `depth ${minD.toFixed(1)}..${maxD.toFixed(1)}, lost ${tk.snapshot()[0].lost}`);
+    const again = swim((q) => { q.registerPilotKind("flycx", FX.flyCxKind(circuit)); q.sync([cx("same")]); });
+    ok("!! and it is deterministic: the same tank swims the same way twice", again === reg);
+    const tdr = A.createTank(); tdr.registerPilotKind("flycx", kind); tdr.sync([cx("d"), entry("pdd")]); tdr.setEvent("d", "dropout"); tdr.setEvent("pdd", "dropout"); let valid = 0, dark = 0;
+    for (let i = 0; i < 30 * 100; i++) { tdr.step(1 / 30); const c = tdr.snapshot()[0].compass; if (c) { if (c.valid) valid++; else dark++; } }
+    const sn = tdr.snapshot();
+    ok("!! the compass events run on a stateful sub as on any other (the dropout windows come and go: valid and dark ticks both counted, the compass block present, a finite error) and it is not lost", valid > 0 && dark > 0 && sn[0].compass && Number.isFinite(sn[0].compass.error) && sn[0].lost === 0 && sn[0].event === "dropout");
+    const tsf = A.createTank(); tsf.registerPilotKind("flycx", kind); tsf.sync([cx("f")]); tsf.setEvent("f", "surface"); run(tsf, 120); const tsn = tsf.snapshot()[0];
+    ok("!! and so do the other events: a stateful sub told to surface rises (depth falls below 5 m within two minutes; measured, from the depth it was at, the autopilot and the stateful pilot both arrive at the surface in about 80 s) with the tank state present, and ending the event leaves it flying its kind", tsn.event === "surface" && tsn.depth < 5 && tsn.tank !== null && (() => { tsf.setEvent("f", null); run(tsf, 5); return tsf.snapshot()[0].event === null && tsf.snapshot()[0].kind === "flycx" && Number.isFinite(tsf.snapshot()[0].x); })());
+}
+
+console.log("\n13. NAVIGATION (UNNUMBERED, brain/SUB_FIELD_NAV_WIP.md FOLLOW-UP 4: a sea of obstacles in the tank and couriers that sail through it)");
+try {
+    const TN = await import("../brain/subTankNav.mjs"), HLm = await import("../physics/mechanics/subHulls.mjs");
+    const mkTank = (n = 1) => { const t = A.createTank(); t.sync(Array.from({ length: n }, (_, i) => entry("n" + i))); return t; };
+    const thrown = (f) => { try { f(); return "no throw"; } catch (e) { return String(e.message); } };
+    const t0 = A.createTank(); t0.sync([entry("n0")]);
+    ok("!! a tank has no sea until one is set: scene is null, sceneNow is [], and a sub's snapshot has nav null", t0.scene === null && t0.sceneNow().length === 0 && t0.snapshot()[0].nav === null);
+    const t1 = mkTank(2), r1 = t1.setScene(3), sc3 = TN.tankScene(3);
+    ok("!! setScene(seed) puts that sea in the tank and says so: { seed, obstacles } with the scene's obstacle count; `scene` is { seed, length, width }; sceneNow lists every obstacle as a plain record (type, group, x, y, r, keel)", J(r1) === J({ seed: 3, obstacles: sc3.obstacles.length }) && J(t1.scene) === J({ seed: 3, length: 500, width: 300 }) && t1.sceneNow().length === sc3.obstacles.length && t1.sceneNow().every((o) => Object.keys(o).join() === "type,group,x,y,r,keel"));
+    ok("!! a bad seed throws and changes nothing (1.5, '3', NaN); a tank that is not the standard size has no sea (setScene throws, naming the size, and the scene stays null); setScene(null) takes the sea away and returns null", /whole-number seed/.test(thrown(() => t1.setScene(1.5))) && /whole-number seed/.test(thrown(() => t1.setScene("3"))) && /whole-number seed/.test(thrown(() => t1.setScene(NaN))) && t1.scene.seed === 3 && (() => { const big = A.createTank({ length: 1500, width: 900 }); const m = thrown(() => big.setScene(1)); return /standard 500 x 300/.test(m) && big.scene === null; })() && (() => { const t = mkTank(1); t.setScene(2); const a = t.setScene(undefined); const u = a === null && t.scene === null && t.sceneNow().length === 0; t.setScene(2); return u && t.setScene(null) === null && t.scene === null && t.sceneNow().length === 0; })());
+    const ship = t1.sceneNow().findIndex((o) => o.type === "ship"), before = t1.sceneNow(); run(t1, 20); const after = t1.sceneNow();
+    ok("!! the sea moves with the tank's clock: after 20 s the ships are elsewhere and the islands and icebergs are where they were", ship >= 0 && before.every((o, i) => (o.type === "ship") === (o.x !== after[i].x || o.y !== after[i].y)) && before.some((o) => o.type === "ship"));
+    const t2 = mkTank(2); t2.setScene(1);
+    ok("!! setNav: an unknown arm throws and names the arms (BEFORE the id is looked up: for an unknown id too); an unknown id answers null; with no sea it throws 'start a sea first'; with one it answers the arm", new RegExp(`unknown arm "magnet" \\(${TN.TANK_ARMS.join(", ").replace(/\+/g, "\\+")}\\)`).test(thrown(() => t2.setNav("n0", "magnet"))) && /unknown arm/.test(thrown(() => t2.setNav("nobody", "magnet"))) && t2.setNav("nobody", "any") === null && /start a sea first/.test(thrown(() => mkTank(1).setNav("n0", "any"))) && t2.setNav("n0", "any+predict") === "any+predict");
+    const s2 = t2.snapshot(), nv = s2.find((q) => q.id === "n0").nav;
+    ok("!! a courier's snapshot carries its navigation: { arm, goal { x, y, depth }, arrivals, hits, replans, noRoute, margin, travel, contact } (a goal and the time t exist only after its first step); the other sub's nav is null", s2.find((q) => q.id === "n1").nav === null && nv !== null && nv.arm === "any+predict" && nv.goal === null && Object.keys(nv).sort().join() === "arm,arrivals,contact,goal,hits,margin,noRoute,replans,t,travel");
+    run(t2, 300);
+    const c2 = t2.snapshot().find((q) => q.id === "n0");
+    ok("!! a courier's snapshot target is the NAVIGATOR'S (the goal's depth, the cruise speed 3), not a wandering one", c2.target.speed === 3 && Math.abs(c2.target.depth - c2.nav.goal.depth) < 1e-9);
+    ok("!! a courier SAILS: 300 tank-seconds on the PD autopilot in sea 1 and it has a goal in the tank, arrivals counted (at least 2), plans made, 700 m or more travelled, not lost, and the other (wandering) sub never gets a navigator", c2.nav.goal !== null && c2.nav.arrivals >= 2 && c2.nav.replans > 20 && c2.nav.travel > 700 && c2.lost === 0 && t2.snapshot().find((q) => q.id === "n1").nav === null);
+    const pr = t2.probe("n0");
+    ok("!! the brain panel's probe shows the courier's target (the navigator's: the goal's depth and the cruise speed 3)", pr.target.speed === 3 && Math.abs(pr.target.depth - c2.nav.goal.depth) < 1e-9);
+    const ta = mkTank(2), tb = mkTank(2); tb.setScene(1); run(ta, 60); run(tb, 60);
+    ok("!! a SEA changes nothing for a sub that has no navigator: two tanks of the same subs, one with a sea, are in the same place to the digit after a minute", J(ta.snapshot().map((q) => [q.x, q.y, q.depth, q.heading])) === J(tb.snapshot().map((q) => [q.x, q.y, q.depth, q.heading])));
+    const tc = mkTank(1); tc.setScene(1); tc.setNav("n0", "any"); run(tc, 60); tc.setNav("n0", null); const afterOff = tc.snapshot()[0], freshT = tc.subs.get("n0").nextTarget > tc.subs.get("n0").age; run(tc, 90);
+    ok("!! setNav(id, null) sends the courier wandering again: nav null, a FRESH wandering target at once (its next change is still ahead although it sailed 60 s, longer than a wander lasts), still swimming and not lost after 90 s more; \"\" and undefined mean off too and answer null", afterOff.nav === null && freshT && tc.setNav("n0", null) === null && tc.snapshot()[0].nav === null && tc.snapshot()[0].lost === 0 && (() => { tc.setNav("n0", "any"); const r1 = tc.setNav("n0", ""); const on = tc.snapshot()[0].nav; tc.setNav("n0", "any"); const r2 = tc.setNav("n0", undefined); return r1 === null && r2 === null && on === null && tc.snapshot()[0].nav === null; })());
+    const td = mkTank(2); td.setScene(1); td.setNav("n0", "any"); td.setNav("n1", "straight"); run(td, 120); const dn = td.snapshot().map((q) => q.nav), g0 = dn[0].goal; td.setScene(4);
+    ok("!! a new sea gives each courier a NEW navigator in it (the arm kept, the counters from zero, no goal yet) and setScene(null) ends them all", td.snapshot().map((q) => q.nav.arm).join() === "any,straight" && td.snapshot().every((q) => q.nav.arrivals === 0 && q.nav.hits === 0 && q.nav.goal === null) && dn[0].travel > 0 && (td.setScene(null), td.snapshot().every((q) => q.nav === null)));
+    const te = mkTank(1); te.setScene(2); te.setNav("n0", "any+predict"); te.setEvent("n0", "flood"); run(te, 40); const ev = te.snapshot()[0];
+    ok("!! a courier can have an event: a flood on a sailing sub leaves its navigator and the event running, and it is not thrown by it (40 s)", ev.event === "flood" && ev.nav !== null && ev.nav.travel > 0);
+    const th = mkTank(1); th.setScene(2); th.setNav("n0", "any+replan"); run(th, 20); const hn = Object.keys(HLm.LABELS).find((h) => h !== th.hull); th.setHull(hn); run(th, 20);
+    ok("!! a hull change puts the courier back in the water and it sails on (the navigator stays, a plan is made again)", th.snapshot()[0].nav !== null && th.snapshot()[0].nav.arm === "any+replan" && th.snapshot()[0].lost === 0 && th.snapshot()[0].nav.replans > 5);
+    const tj = mkTank(2); tj.setScene(1); tj.setNav("n0", "any"); tj.setNav("n1", "any"); run(tj, 1); const gj = tj.snapshot().map((q) => q.nav.goal), tk = mkTank(2); tk.setScene(4); tk.setNav("n0", "any"); run(tk, 1);
+    ok("!! each courier has ITS OWN goals (two couriers of one arm in one sea draw different goals) and a sea has its own (the same sub in sea 4 draws another goal than in sea 1)", gj[0] !== null && gj[1] !== null && J(gj[0]) !== J(gj[1]) && J(tk.snapshot()[0].nav.goal) !== J(gj[0]));
+    const gs = []; for (let sd = 1; sd <= 8; sd++) { const tq = mkTank(1); tq.setScene(sd); tq.setNav("n0", "any"); run(tq, 0.2); gs.push(tq.snapshot()[0].nav.goal.x.toFixed(1)); }
+    ok("!! a navigator's seed carries the SEA: the same sub's first goal in seas 1 to 8 is a different goal every time (8 distinct)", new Set(gs).size === 8);
+    const tx = mkTank(1); tx.setScene(1); tx.setNav("n0", "straight"); const isl1 = tx.sceneNow().find((o) => o.type === "island"), sx = tx.subs.get("n0"); sx.state = { ...sx.state, pos: [isl1.x, isl1.y, -20] }; run(tx, 0.2); const inIsl = tx.snapshot()[0].nav;
+    sx.state = { ...sx.state, pos: [60, 60, -20] }; run(tx, 1.5); const outIsl = tx.snapshot()[0].nav;
+    ok("!! a courier set down on an island is in CONTACT (hits 1, contact on); set down in open water and a second and a half later the contact is over (the tank hands the navigator the tick, so the clear second runs)", inIsl.hits === 1 && inIsl.contact === true && outIsl.hits === 1 && outIsl.contact === false);
+    const tn = mkTank(1); tn.setScene(1); tn.setNav("n0", "any"); run(tn, 120); tn.setNav("n0", null); run(tn, 60); const gq = tn.snapshot()[0];
+    ok("!! GOLDEN: a courier that sailed 120 s in sea 1 and was then sent wandering is at (191.4, 23.4) at 20.5 m after 60 s more -- the wander schedule and its random draws are not disturbed by the time it spent navigating", Math.abs(gq.x - 191.36) < 0.5 && Math.abs(gq.y - 23.4) < 0.5 && Math.abs(gq.depth - 20.45) < 0.3);
+    const tw1 = mkTank(2), tw2 = mkTank(2); tw1.setScene(1); run(tw1, 30); run(tw2, 30); tw1.setScene(null); tw1.setNav("n0", null); run(tw1, 60); run(tw2, 60);
+    ok("!! ending a navigation that was never started changes nothing: setScene(null) and setNav(id, null) on wanderers leave them swimming exactly as a tank where neither was called", J(tw1.snapshot().map((q) => [q.x, q.y, q.depth, q.heading])) === J(tw2.snapshot().map((q) => [q.x, q.y, q.depth, q.heading])));
+    const tl = A.createTank(); tl.sync([entry("n0")]); run(tl, 40); tl.setScene(1); tl.setNav("n0", "any"); run(tl, 10);
+    ok("!! the courier's navigator reads the TANK'S clock, not the sub's age: a sub that joined 40 s ago and was sent to goals sees the tank time (nav.t is the clock, 50 s, within a tick; the sub's age is 50 s too, so the row also compares with a sub added later)", Math.abs(tl.snapshot()[0].nav.t - tl.clock) < 0.05 && (() => { const tm = A.createTank(); tm.setScene(1); run(tm, 40); tm.sync([entry("late")]); tm.setNav("late", "any"); run(tm, 10); const q = tm.snapshot()[0].nav; return Math.abs(q.t - tm.clock) < 0.05 && tm.clock > 49.9 && tm.subs.get("late").age < 10.1; })());
+    const tz = mkTank(1); tz.setScene(1); tz.setNav("n0", "any"); tz.subs.get("n0").pilot = () => ({ ballast: 1, thrust: 0 }); run(tz, 150); const zs = tz.snapshot()[0];
+    ok("!! a courier that is LOST is put back and sails on with a new plan for its goal: lost at least once in 150 s and one plan for the goal PLUS one per loss (`any` plans only when told to)", zs.lost >= 1 && zs.nav !== null && zs.nav.replans === 1 + zs.lost);
+    const tY = mkTank(1); tY.setScene(1); tY.setNav("n0", "any"); run(tY, 20); const rp = tY.snapshot()[0].nav.replans; tY.setHull(Object.keys(HLm.LABELS).find((h) => h !== tY.hull)); run(tY, 1);
+    ok("!! a hull change makes the courier plan again from where it is put (an `any` courier: exactly one more plan)", tY.snapshot()[0].nav.replans === rp + 1);
+    const tf = mkTank(2), tg = mkTank(2); for (const t of [tf, tg]) { t.setScene(5); t.setNav("n0", "any+predict"); t.setNav("n1", "any+replan"); run(t, 120); }
+    ok("!! the same tank twice is the same sea and the same sailing: identical navigation records after 120 s", J(tf.snapshot().map((q) => q.nav)) === J(tg.snapshot().map((q) => q.nav)) && tf.snapshot().every((q) => q.nav.travel > 200));
+} catch (e) { fails++; console.log(`  FAIL  !! section 13 ran to the end (THE GATE THREW: ${String((e && e.message) || e).slice(0, 160)})`); }
+
 console.log("\nBIG TANK");
 {
     const big = A.createTank({ length: 1500, width: 900 }), small = A.createTank();
@@ -182,5 +320,13 @@ console.log("\nBIG TANK");
 { const M = await import("./subAquariumSim.mjs"); const names = ["COMPASS", "EVENTS", "LEAK", "RESCUE", "compassValidAt", "trimsOut", "ESTIMATORS", "NEEDS_CRUSH"];   // v4904: the two estimator events' names and the needs hull's tank-scale crush depth (rows in subAquariumEvents-selfcheck sections 9 and 11)
   const okShape = names.every((n) => n in M && (typeof M[n] === "function" || typeof M[n] === "number" || typeof M[n] === "string" || typeof M[n] === "object"));
   ok("the event machinery's exports (EVENTS, COMPASS, LEAK, RESCUE, compassValidAt, trimsOut, ESTIMATORS, NEEDS_CRUSH) are present", okShape, names.map((n) => n + ":" + typeof M[n]).join(" ")); }
+{
+    const code = fs.readFileSync(new URL("./subAquariumSim.mjs", import.meta.url), "utf8").split("\n").filter((l) => !l.trim().startsWith("//") && !l.trim().startsWith("*") && !l.trim().startsWith("/**")).join("\n");
+    ok("!! the tank is pure: no Math.random, no clock, no DOM, no file or network in the module (the caller says how long a frame took)", !/Math\.random|Date\.now|new Date|performance\.now|document\.|window\.|\bfs\b|node:fs|fetch\(/.test(code));
+}
+
+
+// 2026-11-08 -- the exports of this module that no row named (definitionGates counts a symbol its gate never mentions), each now asserted rather than only mentioned.
+ok("!! the pitch kick of the righting task is the frozen { at: 3 } (KICK)", JSON.stringify(A.KICK) === '{"at":3}' && Object.isFrozen(A.KICK));
 console.log(fails ? `\n${fails} FAIL` : "\nall checks pass");
 process.exit(fails ? 1 : 0);

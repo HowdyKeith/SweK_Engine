@@ -1,0 +1,137 @@
+<!doctype html>
+<!-- switchboard.html -- UNNUMBERED (the version is chosen at ship time): ONE TASK, THE SAME SEEDS, EVERY BRAIN SIDE BY SIDE, AND A LINE FOR EVERY ARM THAT HAS A CONTROL.
+
+     WHAT IT IS: the page of brain/switchboard.mjs (the core, its gate brain/switchboard-selfcheck.mjs) and render/switchboardView.mjs (what is drawn, as data). Pick a task, tick the arms, press Run: every arm flies the same
+     scenarios and each arm that has a control is read against it as a paired difference -- "BEATS its control", "TIES its control" or "IS BELOW its control" at two standard errors. A TIE is shown as a result: this page exists to
+     be able to say "this brain does as well as its control and no better" (the notes on the fish and fly brains say that is what several of their tests found).
+     TWO LAYERS: the SURVEY is a decision-layer task (which station next, when to surface: the tuned rule, the rule at low -0.06, the twin planner); the DROPOUT is a flying-layer task (a heading through the tank's compass
+     dropout: the PD autopilot and the 963-weight networks). They are not interchangeable and the board refuses to put an arm on the other layer's task.
+     WHAT IT IS NOT: the survey and dropout here run for a few seconds-to-minutes in this tab on a handful of seeds, so a result is a reading of THOSE seeds, not a measurement; the series' rounds use hundreds of dives. The fish pilot,
+     the stateful fly, the plain-net control, the leaky unit, the trained needs circuit and the lesion toggle are NOT on the board yet and the page says so below. Nothing from outside is ever put in as markup: textContent only. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="Switchboard">
+<meta name="demo:desc" content="One task, the same seeds, every brain side by side: paired differences against each arm's control, with a TIE shown as a result. Survey (decision layer) and compass dropout (flying layer).">
+<meta name="demo:category" content="science">
+<title>SweK &middot; Switchboard</title>
+<style>
+  :root { --bg:#050a12; --panel:#0b131f; --line:#1c2c44; --fg:#dbe7ff; --dim:#7c93b8; --cyan:#59d1ff; --amber:#f6a623; --green:#5fe08a; --red:#ff7a7a; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:13px ui-monospace, Menlo, monospace; }
+  header { padding:14px 16px 6px; }
+  h1 { font-size:15px; letter-spacing:.13em; text-transform:uppercase; color:var(--cyan); margin:0 0 6px; }
+  .desc { color:var(--dim); max-width:900px; line-height:1.6; margin:0 0 6px; }
+  main { display:grid; grid-template-columns:minmax(260px,320px) minmax(0,1fr); gap:12px; padding:6px 16px 16px; }
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:10px 12px; }
+  .panel h2 { margin:0 0 8px; font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--cyan); font-weight:600; }
+  label { display:flex; gap:6px; align-items:center; margin:4px 0; }
+  label.arm { align-items:flex-start; }
+  label .note { color:var(--dim); font-size:11px; }
+  input[type=number], select { background:#0f1a2b; color:var(--fg); border:1px solid var(--line); border-radius:5px; padding:3px 6px; font:inherit; width:90px; }
+  select { width:auto; }
+  button { background:var(--panel); color:var(--fg); border:1px solid var(--line); border-radius:5px; padding:5px 12px; font:inherit; cursor:pointer; }
+  button:hover:not(:disabled) { border-color:var(--cyan); }
+  button:disabled { opacity:.5; cursor:default; }
+  .bar { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:8px; }
+  .prog { height:6px; background:#12203a; border-radius:3px; overflow:hidden; margin-top:8px; }
+  .prog > i { display:block; height:100%; width:0; background:var(--cyan); }
+  .arow { padding:6px 0; border-bottom:1px solid #12203a; }
+  .arow .top { display:flex; gap:10px; align-items:center; }
+  .arow .id { width:150px; flex:none; }
+  .arow .track { flex:1 1 auto; height:12px; background:#12203a; border-radius:3px; overflow:hidden; }
+  .arow .track > i { display:block; height:100%; background:var(--cyan); }
+  .arow .num { width:120px; flex:none; text-align:right; font-variant-numeric:tabular-nums; }
+  .v { margin:3px 0 0 160px; color:var(--dim); font-size:12px; }
+  .v b { font-weight:700; }
+  .v.beats b { color:var(--green); } .v.ties b { color:var(--amber); } .v.below b { color:var(--red); } .v.missing b { color:var(--dim); }
+  .head { color:var(--dim); margin:0 0 8px; }
+  .cav { color:var(--dim); font-size:12px; line-height:1.5; margin-top:10px; }
+  ul.not { margin:6px 0 0 18px; padding:0; color:var(--dim); font-size:12px; line-height:1.6; }
+  .err { color:var(--red); }
+  @media (max-width: 800px) { main { grid-template-columns:minmax(0,1fr); } .v { margin-left:0; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Switchboard</h1>
+  <p class="desc">One task, the same seeds, every brain side by side. Each arm that has a control is read against it as a paired difference at two standard errors: BEATS, TIES or IS BELOW. A tie is a result.</p>
+</header>
+<main>
+  <section class="panel" id="controls">
+    <h2>Task and arms</h2>
+    <label>task <select id="task"></select></label>
+    <div id="arms"></div>
+    <h2 style="margin-top:12px">Seeds and options</h2>
+    <label>from <input type="number" id="from" step="1"></label>
+    <label>to <input type="number" id="to" step="1"></label>
+    <label>seconds <input type="number" id="seconds" step="10" min="10"></label>
+    <label id="sdRow">gauge sd <input type="number" id="sd" step="0.05" min="0"></label>
+    <div id="kindsRow"><label><input type="checkbox" id="kFar" checked> far</label><label><input type="checkbox" id="kBoth" checked> both</label><label><input type="checkbox" id="kPlain"> plain</label><label><input type="checkbox" id="kDeep"> deep</label></div>
+    <div class="bar"><button id="run">Run</button><button id="stop" disabled>Stop</button><button id="copy" disabled>Copy result</button></div>
+    <div class="prog"><i id="progBar"></i></div>
+    <div class="cav" id="status"></div>
+  </section>
+  <section class="panel" id="out">
+    <h2>Reading</h2>
+    <div class="head" id="head">Press Run.</div>
+    <div id="rows"></div>
+    <div class="cav" id="caveat"></div>
+    <h2 style="margin-top:14px">Not on the board yet</h2>
+    <ul class="not" id="notOn"></ul>
+  </section>
+</main>
+<script type="module">
+import * as B from "./brain/switchboard.mjs";
+import * as V from "./render/switchboardView.mjs";
+const $ = (id) => document.getElementById(id), put = (el, t) => { el.textContent = t; return el; };
+const loadWeights = async (f) => { try { const r = await fetch(f); if (!r.ok) return null; const j = await r.json(); return Array.isArray(j.weights) && j.weights.length === 963 ? j.weights : null; } catch { return null; } };
+const nets = {}, got = { noisy: await loadWeights("brain/pilotSubWeightsRobustNoisyWip.json"), plain: await loadWeights("brain/pilotSubWeightsWip.json") };
+for (const [k, v] of Object.entries(got)) if (v) nets[k] = v;
+const board = B.standardBoard(nets);
+const taskSel = $("task"); for (const n of board.tasks.keys()) { const o = document.createElement("option"); o.value = n; put(o, `${n} (${board.tasks.get(n).layer} layer)`); taskSel.appendChild(o); }
+for (const l of V.notOnBoard) { const li = document.createElement("li"); put(li, l); $("notOn").appendChild(li); }
+if (Object.keys(nets).length < 2) put($("status"), "Some network weights could not be loaded (" + Object.entries(got).filter(([, v]) => !v).map(([k]) => k).join(", ") + "): those arms are not on the board.");
+function fill() {
+    const t = taskSel.value, d = V.defaultsOf(t), box = $("arms"); box.replaceChildren();
+    for (const a of V.armsFor(board, t)) {
+        const l = document.createElement("label"); l.className = "arm"; const c = document.createElement("input"); c.type = "checkbox"; c.value = a.id; c.checked = a.checked; l.appendChild(c);
+        const s = document.createElement("span"); put(s, a.id); const n = document.createElement("div"); n.className = "note"; put(n, a.note + (a.controls.length ? " -- held to " + a.controls.join(", ") : "")); const w = document.createElement("div"); w.appendChild(s); w.appendChild(n); l.appendChild(w); box.appendChild(l);
+    }
+    $("from").value = d.range.from; $("to").value = d.range.to; $("seconds").value = d.seconds;
+    $("sdRow").style.display = t === "survey" ? "" : "none"; $("kindsRow").style.display = t === "survey" ? "" : "none";
+    if (d.sd !== undefined) $("sd").value = d.sd;
+    for (const [id, k] of [["kFar", "far"], ["kBoth", "both"], ["kPlain", "plain"], ["kDeep", "deep"]]) $(id).checked = !!(d.kinds && d.kinds.includes(k));
+}
+taskSel.addEventListener("change", fill); fill();
+let stopped = false, last = null, lastTask = null;
+$("stop").addEventListener("click", () => { stopped = true; });
+$("copy").addEventListener("click", async () => { try { await navigator.clipboard.writeText(V.textOf(last, lastTask)); put($("status"), "Copied."); } catch { put($("status"), "Could not copy; select the reading by hand."); } });
+function draw(rd, task) {
+    const v = V.viewOf(rd, task); put($("head"), v.head); const rows = $("rows"); rows.replaceChildren();
+    for (const r of v.rows) {
+        const row = document.createElement("div"); row.className = "arow"; const top = document.createElement("div"); top.className = "top";
+        const id = document.createElement("div"); id.className = "id"; put(id, r.id); const tr = document.createElement("div"); tr.className = "track"; const bar = document.createElement("i"); bar.style.width = (r.bar * 100).toFixed(1) + "%"; tr.appendChild(bar);
+        const num = document.createElement("div"); num.className = "num"; put(num, `${r.mean.toFixed(4)}  bad ${r.bad}`); top.append(id, tr, num); row.appendChild(top);
+        for (const x of r.verdicts) { const p = document.createElement("div"); p.className = "v " + x.cls; const b = document.createElement("b"); put(b, x.word); p.append("its control " + x.control + ": ", b, " " + x.text); row.appendChild(p); }
+        rows.appendChild(row);
+    }
+    put($("caveat"), v.caveat);
+}
+$("run").addEventListener("click", async () => {
+    const task = taskSel.value, ids = [...$("arms").querySelectorAll("input:checked")].map((c) => c.value);
+    const range = { from: Number($("from").value), to: Number($("to").value) }, opts = { seconds: Number($("seconds").value) };
+    if (task === "survey") { opts.sd = Number($("sd").value); opts.kinds = [["kFar", "far"], ["kBoth", "both"], ["kPlain", "plain"], ["kDeep", "deep"]].filter(([id]) => $(id).checked).map(([, k]) => k); if (!opts.kinds.length) { put($("status"), "Tick at least one kind."); return; } }
+    if (!ids.length) { put($("status"), "Tick at least one arm."); return; }
+    if (range.to - range.from > 49) { put($("status"), "At most 50 seeds a run in this tab."); return; }
+    stopped = false; $("run").disabled = true; $("stop").disabled = false; $("copy").disabled = true; put($("status"), "Flying " + ids.length + " arms on " + (range.to - range.from + 1) + " seeds..."); $("progBar").style.width = "0";
+    try {
+        const res = await B.runAsync(board, task, ids, range, opts, { yieldTo: () => new Promise((r) => setTimeout(r, 0)).then(() => { if (stopped) throw new Error("stopped"); }), onProgress: (d, n) => { $("progBar").style.width = (100 * d / n).toFixed(0) + "%"; } });
+        last = board.read(res); lastTask = task; draw(last, task); $("copy").disabled = false; put($("status"), "Done.");
+    } catch (e) { const m = String(e && e.message || e); if (m === "stopped") put($("status"), "Stopped; nothing is shown for a partial run."); else { put($("status"), "Refused: " + m); $("status").classList.add("err"); setTimeout(() => $("status").classList.remove("err"), 4000); } }
+    $("run").disabled = false; $("stop").disabled = true;
+});
+</script>
+</body>
+</html>

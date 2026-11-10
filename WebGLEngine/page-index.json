@@ -1,7 +1,7 @@
 {
  "version": 1,
  "generated": "derived by tools/ship/buildPageIndex.mjs -- DO NOT HAND-EDIT, the group comes from tools/ship/pageSections.mjs",
- "count": 495,
+ "count": 502,
  "pages": [
   {
    "f": "AudioLab.html",
@@ -991,6 +991,13 @@
    "p": 0
   },
   {
+   "f": "duodesk.html",
+   "t": "Nectarlink",
+   "d": "",
+   "g": "nearshare",
+   "p": 0
+  },
+  {
    "f": "echo-show.html",
    "t": "Show on Echo",
    "d": "",
@@ -1049,7 +1056,7 @@
   {
    "f": "es-box3d-6dof.html",
    "t": "SweK &middot; Newtonian 6DOF space combat",
-   "d": "Newtonian 6DOF space combat: two small fleets under REAL force and torque (F=ma, tau=I*alpha, orientation a genuine quaternion, angular velocity a free vector) -- physics/mechanics/rigidBody6dof.mjs, not the engine's kinematic flight model. brain/autopilot6dof.mjs flies them (a PD attitude controller that has to WIN the turn with torque, not just set a heading), physics/mechanics/rigidBody6dofWeapon.mjs arms them with straight-line projectiles hit-tested against an oriented bounding box, and physics/mechanics/rigidBody6dofCollision.mjs resolves ship-ship hits with a real impulse response (momentum and angular momentum conserved, energy never created) that can spin a ship up on an off-centre hit. Every module is independently gated before this page wires them together. Answer-key gates: rigidBody6dof-selfcheck, rigidBody6dofCollision-selfcheck, rigidBody6dofWeapon-selfcheck, autopilot6dof-selfcheck.",
+   "d": "Newtonian 6DOF space combat: two small fleets under REAL force and torque (F=ma, tau=I*alpha, orientation a genuine quaternion, angular velocity a free vector) -- physics/mechanics/rigidBody6dof.mjs, not the engine's kinematic flight model. by default the fruit fly's close-quarters pilot flies both fleets (first by far in the page's own fight; Load Pilots picks others), measured against brain/autopilot6dof.mjs (a PD attitude controller that has to WIN the turn with torque, not just set a heading), physics/mechanics/rigidBody6dofWeapon.mjs arms them with straight-line projectiles hit-tested against an oriented bounding box, and physics/mechanics/rigidBody6dofCollision.mjs resolves ship-ship hits with a real impulse response (momentum and angular momentum conserved, energy never created) that can spin a ship up on an off-centre hit. Every module is independently gated before this page wires them together. Answer-key gates: rigidBody6dof-selfcheck, rigidBody6dofCollision-selfcheck, rigidBody6dofWeapon-selfcheck, autopilot6dof-selfcheck.",
    "g": "rtx",
    "p": 0
   },
@@ -1436,6 +1443,13 @@
    "t": "SweK GPU rig check",
    "d": "",
    "g": "rendertsl",
+   "p": 0
+  },
+  {
+   "f": "gputaskman.html",
+   "t": "gputaskman",
+   "d": "Install gputaskman (a terminal monitor for what is inside your GPU), run a one-button session that starts an Ollama model, watch the card over time or while the GPU brain runs, and get one JSON file to send.",
+   "g": "thirdparty",
    "p": 0
   },
   {
@@ -2034,6 +2048,13 @@
    "p": 0
   },
   {
+   "f": "nectarlink.html",
+   "t": "Nectarlink",
+   "d": "",
+   "g": "nearshare",
+   "p": 0
+  },
+  {
    "f": "nest-protect.html",
    "t": "Nest Protect",
    "d": "",
@@ -2342,6 +2363,13 @@
    "p": 0
   },
   {
+   "f": "privatelm.html",
+   "t": "PrivateLM",
+   "d": "Install PrivateLM (a phone app that runs language models on the phone) and use it from the engine: check the phone, chat with it, or make it the engine's local OpenAI-compatible brain.",
+   "g": "thirdparty",
+   "p": 0
+  },
+  {
    "f": "probe-lab.html",
    "t": "Probe Lab - a released instrument on a timelike geodesic",
    "d": "",
@@ -2570,6 +2598,20 @@
    "t": "Rocket League RL &mdash; SweK Engine",
    "d": "",
    "g": "",
+   "p": 0
+  },
+  {
+   "f": "rotor-league.html",
+   "t": "SweK &middot; Rotor League",
+   "d": "Every helicopter and quadrotor pilot against every other on the same scenarios: the hand autopilots, the hand pilot as a fruit-fly network, the trained fruit-fly pilots, two quadrotor MLPs and a pilot that does nothing, counted by scenarios won and rated.",
+   "g": "flybrain",
+   "p": 0
+  },
+  {
+   "f": "rotorcraft-demo.html",
+   "t": "SweK &middot; Rotorcraft Demo",
+   "d": "A helicopter or a quadrotor flown by a hand autopilot and by a trained pilot on the same scenario, replayed side by side: a hover in gusts you can turn up, a recovery, an engine or motor out, a terrain flight.",
+   "g": "flybrain",
    "p": 0
   },
   {
@@ -3025,6 +3067,13 @@
    "t": "SweK &middot; SVG forge",
    "d": "Paste an SVG and forge it into a 3D metal medal/badge: its paths are parsed and bevel-extruded, holes and inner points preserved (the vector counterpart to the raster sprite-loft). Controls for thickness, bevel, color and metalness; orbit to inspect. Parsing is pinned by svgExtrudeCore-selfcheck. For faction insignia, achievement medals, and 3D UI ornaments.",
    "g": "",
+   "p": 0
+  },
+  {
+   "f": "switchboard.html",
+   "t": "SweK &middot; Switchboard",
+   "d": "One task, the same seeds, every brain side by side: paired differences against each arm's control, with a TIE shown as a result. Survey (decision layer) and compass dropout (flying layer).",
+   "g": "flightsim",
    "p": 0
   },
   {

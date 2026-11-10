@@ -51,6 +51,7 @@
 //   AUDIT_V2's 3; V08 BASELINE_V2 recovery is the first baseline's 3; V09 AUDIT_V2 is the first audit 3; V10 SAFETY_AUDIT2_V2 is the first one 3.
 //   ONE EQUIVALENT MUTANT, SAID: G06 (a result's missing guarded kind is not checked for presence) is 0 red because `undefined >= x` is false in JavaScript: the comparison that follows refuses a missing kind just as the presence check did.
 "use strict";
+import "../physics/mechanics/rigidBody6dofEuler.mjs";   // 2026-11-04 -- the 6-DOF numbers this gate holds were measured under the first-order orientation step, so it flies that step (see that file)
 import * as DT from "./droneTask.mjs";
 import * as AD from "./autopilotDrone.mjs";
 import * as Q from "../physics/mechanics/multirotorModel6dof.mjs";
@@ -344,5 +345,8 @@ console.log("\n6. DETERMINISM, AND THE REPORTING");
     ok("!! a pilot that THROWS is not hidden: the task lets the exception out (a pilot with a bug is not a pilot that crashed)", attempt(() => { DT.fly(() => { throw new Error("boom"); }, DT.scenario(1, "hover")); return false; }, true));
 }
 
+
+// 2026-11-08 -- the exports of this module that no row named (definitionGates counts a symbol its gate never mentions), each now asserted rather than only mentioned.
+ok("!! the drone task samples its trace every 6 ticks (TRACE_EVERY)", DT.TRACE_EVERY === 6);
 console.log(fails ? `\ndroneTask-selfcheck: ${fails} FAILED` : "\ndroneTask-selfcheck: all checks pass");
 process.exit(fails ? 1 : 0);

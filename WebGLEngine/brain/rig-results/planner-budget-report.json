@@ -1,0 +1,24 @@
+{
+ "report": [
+  "ROUND 14: how much search does the twin need? pooled over W1 1221-1268, W2 1281-1328 (far and both; read once)",
+  "  PASS IDENTITY W1: the full twin with the new options at their defaults equals the Round 11 twin dive for dive on W1: true",
+  "  PASS ORACLE W1: the oracle is at least TUNED-R8 on every dive of W1: true",
+  "  PASS IDENTITY W2: the full twin with the new options at their defaults equals the Round 11 twin dive for dive on W2: true",
+  "  PASS ORACLE W2: the oracle is at least TUNED-R8 on every dive of W2: true",
+  "  PASS FULL IS REAL: TWIN-FULL is REAL on these seeds (else the sweep has no gain to keep): true",
+  "TWIN-FULL minus TUNED-R8: +0.0078 (se 0.0036; better 14, worse 5, same 173); cost 8282 rollout seconds per dive, 6.15 plans",
+  "  REPLAN-30 +0.0125 (se 0.0040; better 18, worse 4, same 170)  KEEPS MATCHES vs full +0.0047  cost 25624 (309%), 20.79 plans  share of full gain 1.60",
+  "  REPLAN-60 +0.0086 (se 0.0038; better 14, worse 5, same 173)  KEEPS MATCHES vs full +0.0008  cost 14029 (169%), 11.08 plans  share of full gain 1.10",
+  "  REPLAN-240 +0.0070 (se 0.0035; better 12, worse 3, same 177)  KEEPS MATCHES vs full -0.0008  cost 6250 (75%), 4.07 plans  share of full gain 0.90",
+  "  REPLAN-480 +0.0031 (se 0.0036; better 10, worse 6, same 176)  LOSES WORSE   vs full -0.0047  cost 5206 (63%), 3.01 plans  share of full gain 0.40",
+  "  LOOK-60   -0.0051 (se 0.0039; better 6, worse 12, same 174)  LOSES WORSE   vs full -0.0129  cost 1223 (15%), 6.11 plans  share of full gain -0.65",
+  "  LOOK-120  -0.0020 (se 0.0040; better 9, worse 11, same 172)  LOSES WORSE   vs full -0.0098  cost 2321 (28%), 6.11 plans  share of full gain -0.25",
+  "  LOOK-240  -0.0043 (se 0.0043; better 8, worse 12, same 172)  LOSES WORSE   vs full -0.0121  cost 4365 (53%), 6.12 plans  share of full gain -0.55",
+  "  LOOK-360  -0.0031 (se 0.0044; better 9, worse 14, same 169)  LOSES WORSE   vs full -0.0109  cost 6072 (73%), 6.14 plans  share of full gain -0.40",
+  "  ONCE      +0.0023 (se 0.0039; better 10, worse 6, same 176)  LOSES WORSE   vs full -0.0055  cost 5153 (62%), 2.74 plans  share of full gain 0.30",
+  "  CHEAP-A   -0.0035 (se 0.0040; better 8, worse 12, same 172)  LOSES WORSE   vs full -0.0113  cost 3114 (38%), 4.05 plans  share of full gain -0.45",
+  "  CHEAP-B   -0.0023 (se 0.0037; better 7, worse 10, same 175)  LOSES WORSE   vs full -0.0102  cost 1240 (15%), 2.99 plans  share of full gain -0.30",
+  "ORACLE-ORDER minus TUNED-R8 (reported, it sees the future and the noise): +0.0242 (se 0.0044; better 28, worse 0, same 164)",
+  "BOTTOM LINE: THE CHEAPEST PLANNER THAT KEEPS THE GAIN COSTS 75 PERCENT OF THE FULL ONE (REPLAN-240)"
+ ]
+}

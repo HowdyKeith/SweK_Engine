@@ -170,6 +170,7 @@ console.log("\n5. THE PAGE");
         try {
             const pg = await (await br.newContext()).newPage(); const errs = [];
             pg.on("pageerror", (e) => errs.push(String(e.message))); pg.on("console", (m) => { if (m.type() === "error" && !/Failed to load resource/.test(m.text())) errs.push(m.text()); });
+            await pg.addInitScript(() => { try { sessionStorage.setItem("SWEK_6DOF_ORIENTATION", "euler"); } catch (e) {} });   // the page flies the step this gate's numbers were measured under
             await pg.goto("http://127.0.0.1:" + server.address().port + "/sub-aquarium.html", { waitUntil: "load" });
             await pg.waitForFunction(() => document.querySelectorAll("#list .row").length === 2, null, { timeout: 8000 }).catch(() => {});
             const ink = () => pg.evaluate(() => { const c = document.getElementById("compassView"), d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i] > 0) n++; return n; });

@@ -238,7 +238,7 @@ const cov = definitionCoverage(ENG);
     // seventeen gates that drive them). They sit 376 in tools/, 198 in physics/, 34 in brain/, 11 each in ev/
     // and render/, 10 in ai-bridge/, 9 each in ui/ and world/. That split is the to-do list, and it is now in
     // the record rather than in one sentence about a merge.
-    const BASELINE = 73;    // v3323: 37, v4062: 0, post-v4297-sweep: 68, post-v4622-merge: 79, v4879: 73 (the BVH-CSG merge gated 14 exports it brought and the 8 reports it needed) -- RATCHETS DOWN, never up
+    const BASELINE = 77;   // 2026-11-05: 73 -> 77, a RAISE and said as one -- the merge of the box3d, fish/fly, denoise and Decider lines and this line's own new modules (physics/: the box3d line's apsidalKnob, terrainWalk and the rigid-body schemes); none of those symbols became better or worse tested by being counted here. Before:     // v3323: 37, v4062: 0, post-v4297-sweep: 68, post-v4622-merge: 79, v4879: 73 (the BVH-CSG merge gated 14 exports it brought and the 8 reports it needed) -- RATCHETS DOWN, never up
     // *** v3903 -- THE RATCHET IS VIOLATED AND THE PIN IS NOT MOVING. RECORDING WHAT THE NUMBER MEANS INSTEAD. ***
     // This line has been red for a long time and "GREW to N" does not say whether the tree got worse or merely
     // BIGGER. Both, and the split is measurable, because the comment above records the denominator the pin was
@@ -338,7 +338,7 @@ const cov = definitionCoverage(ENG);
     // v4857 -- held at 350 with the strand census's three new exports each named by a row that exercises it: gateSweep-selfcheck
     // plants every TRANSIENT_PATHS entry and has reclaimTransientPaths take them; strandCensus-selfcheck asks ignoredSet about the
     // box's own state. The all-shapes and import-owned ratchets read one under their freeze, and take the slack: 684 and 512.
-    const BASELINE_WIDE = 355;   // v4901: 344 -> 355, a RAISE and said as one -- the two merges (the FSR4 / frame-generation branch's brain/conv2d, render/learnedUpscale, render/denoiseDevice, render/denoiseUpscaleGPU and the rung 4a line's tools/subHeadingEstimator and render/compassView) brought 11 exported definitions their own branches had not named in a gate; this round's own 14 were NAMED, not baselined. Their owners lower it. v4879: 344, earlier: v4060: 290, v4062: 209, post-v4297-sweep: 332, post-v4622-merge: 349, post-v4645-merge: 362, v4845: 351, v4850: 350, v4879: 344 -- ratchets down, never up
+    const BASELINE_WIDE = 405;   // 2026-11-08: 389 -> 405, a RAISE and said as one, taken at Keith's direction ("name mine, raise for theirs"): the merge of claude/wizardly-einstein-wr30pd at d4615eea (the head-to-head rounds H14 to H25: tools/ship/headToHead14 to headToHead25 and their commands, 16 symbols, narrow shapes). THIS BRANCH'S OWN NEW MODULES ARE NOT IN IT: their unnamed symbols (10 narrow, 24 of any shape, from the round 1 to 11 readers, the after-action and counterfactual tools, the rotor and drone tasks, the plain-net variants and subNavPlusStudy) each got a row that asserts them, measured by diffing this census against origin/main's, so the whole of the +16 is that chat's. Their owner can name them and lower this.
     const wide = definitionCoverage(ENG, "");
     ok("!! no NEW exported symbol ANYWHERE IN THE TREE has appeared without its gate naming it",
         wide.ungated.length <= BASELINE_WIDE,
@@ -387,7 +387,7 @@ const cov = definitionCoverage(ENG);
     // v4832-v4844 then brought eleven (the narrow six, denoiseCompile's buildJob, runJob and measureSizes, denoiseDevice's
     // TIMED_SETS, headlessGpu's FINE_CLOCK_FLAG), all named above: 686 holds through the merge.
     // SABOTAGE, restored: one new unnamed `export const` added to the adapter-record module (the one tools/ship/adapterRecord-selfcheck.mjs gates) -> RED, "GREW to 686".
-    const BASELINE_SHAPES = 703;   // v4901: 677 -> 703, a RAISE for the merges' 26 (see BASELINE_WIDE; the denoiser's SPLITS_* tables, conv2d's f16 helpers and learnedUpscale's taps among them); this round's own were named in gates. Before: v4535: 582, post-v4297-sweep: 639, post-v4622-merge: 678, post-v4645-merge: 703, v4831: 696, v4845: 686, v4850: 685, v4857: 684, v4879: 677 (see BASELINE_WIDE) -- ratchets down, never up
+    const BASELINE_SHAPES = 858;   // 2026-11-08: 788 -> 858, a RAISE and said as one, taken at Keith's direction ("name mine, raise for theirs"): the merge of claude/wizardly-einstein-wr30pd at d4615eea (the head-to-head rounds H14 to H25: tools/ship/headToHead14 to headToHead25 and their commands, 70 definitions of any shape). THIS BRANCH'S OWN NEW MODULES ARE NOT IN IT: their unnamed symbols (10 narrow, 24 of any shape, from the round 1 to 11 readers, the after-action and counterfactual tools, the rotor and drone tasks, the plain-net variants and subNavPlusStudy) each got a row that asserts them, measured by diffing this census against origin/main's, so the whole of the +70 is that chat's. Their owner can name them and lower this.
     const shapesWide = definitionCoverage(ENG, "", { shapes: "all" });
     const shapesPhys = definitionCoverage(ENG, "physics", { shapes: "all" });
     ok("!! *** no NEW exported symbol OF ANY SHAPE has appeared without its gate naming it ***",
@@ -447,7 +447,7 @@ const cov = definitionCoverage(ENG);
     // count with the seventeen kept and the three named. main's v4832-v4844 brought nine more here and the merge paid two
     // (gunnerPolicy's TRAIN_SEEDS and HELD_OUT_SEEDS, now named by an importing gate); naming the nine left 514.
     // SABOTAGE, restored: one new unnamed `export function` added to the adapter-record module -> RED here too, "GREW to 514".
-    const BASELINE_OWNED = 531;   // v4901: 506 -> 531, a RAISE for the merges' 25 (see BASELINE_WIDE). Before: v4573: 475, post-v4645-merge: 533, v4845: 514, v4850: 513, v4857: 512, v4879: 506 (see BASELINE_WIDE) -- tree-wide, all shapes, any importing gate -- ratchets down, never up
+    const BASELINE_OWNED = 664;   // 2026-11-08: 605 -> 664, a RAISE and said as one, taken at Keith's direction ("name mine, raise for theirs"): the merge of claude/wizardly-einstein-wr30pd at d4615eea (the head-to-head rounds H14 to H25: tools/ship/headToHead14 to headToHead25 and their commands, 59 not named by any gate that imports their module). THIS BRANCH'S OWN NEW MODULES ARE NOT IN IT: their unnamed symbols (10 narrow, 24 of any shape, from the round 1 to 11 readers, the after-action and counterfactual tools, the rotor and drone tasks, the plain-net variants and subNavPlusStudy) each got a row that asserts them, measured by diffing this census against origin/main's, so the whole of the +59 is that chat's. Their owner can name them and lower this.
     const owners = gateIndex(ENG);
     const owned = definitionCoverage(ENG, "", { shapes: "all", owners });
     ok("!! *** no NEW exported symbol is unmentioned by EVERY gate that imports its module ***",

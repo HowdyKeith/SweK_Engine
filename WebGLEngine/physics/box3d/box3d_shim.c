@@ -249,6 +249,50 @@ void swk_body_set_velocity(int idx, float vx, float vy, float vz) {
     b3Body_SetLinearVelocity(g_bodies[idx], (b3Vec3){ vx, vy, vz });
 }
 
+// =============================================================================
+// 2026-11-03 (unnumbered) -- ANGULAR VELOCITY, READ AND SET; DAMPING, SETTABLE; THE MOMENTS, READABLE.
+// physics/mechanics/SPINNING_BODY_WIP.md registers the round that needs them: a free body spun about its middle
+// axis, read against Euler's equations. tools/roundhouse/backendRotation.mjs (v3564) saw box3d's spin axis
+// reverse through the orientation alone, and could not ask about the RATE, for two reasons these close:
+//   - swk_velocities above is LINEAR only, so no caller could read w;
+//   - swk_body_box gives every box angular damping 0.05/s, and nothing could set it to zero. Damped rotation is
+//     not torque-free, and sigma follows omega, so the damping slows the very instability being measured.
+// The angular velocity is box3d's own: WORLD frame (solver.c turns it into body coordinates only for the
+// gyroscopic step), radians per second, three floats per body in body order -- swk_velocities' layout.
+
+// [wx,wy,wz] * bodyCount into `out`.
+void swk_ang_velocities(float* out) {
+    for (int i = 0; i < g_bodyCount; i++) {
+        b3Vec3 w = b3Body_GetAngularVelocity(g_bodies[i]);
+        out[i * 3 + 0] = w.x; out[i * 3 + 1] = w.y; out[i * 3 + 2] = w.z;
+    }
+}
+
+// Set a body's angular velocity outright (world frame, rad/s) -- swk_body_set_velocity's angular twin.
+void swk_body_set_ang_velocity(int idx, float wx, float wy, float wz) {
+    if (!_valid(idx)) return;
+    b3Body_SetAngularVelocity(g_bodies[idx], (b3Vec3){ wx, wy, wz });
+}
+
+// Set a body's linear and angular damping (1/s). swk_body_box's 0.05/0.05 is the ENGINE'S choice (v2468) and
+// stays its default; this lets a caller that needs torque-free rotation say zero.
+void swk_body_set_damping(int idx, float linear, float angular) {
+    if (!_valid(idx)) return;
+    b3Body_SetLinearDamping(g_bodies[idx], linear);
+    b3Body_SetAngularDamping(g_bodies[idx], angular);
+}
+
+// A body's rotational inertia in its own frame, as box3d computed it from its shapes: the 3x3 matrix,
+// column by column (cx, cy, cz), into `out` (9 floats). Returns 1, or 0 for a bad index.
+int swk_body_inertia(int idx, float* out) {
+    if (!_valid(idx)) return 0;
+    b3Matrix3 m = b3Body_GetLocalRotationalInertia(g_bodies[idx]);
+    out[0] = m.cx.x; out[1] = m.cx.y; out[2] = m.cx.z;
+    out[3] = m.cy.x; out[4] = m.cy.y; out[5] = m.cy.z;
+    out[6] = m.cz.x; out[7] = m.cz.y; out[8] = m.cz.z;
+    return 1;
+}
+
 // Drive a body's transform -- for a KINEMATIC kaiju collider the AI moves each frame, which then shoves
 // whatever dynamic bodies (buildings, debris) it sweeps through. Quat is { {x,y,z}, w }.
 void swk_body_set_transform(int idx, float x, float y, float z, float qx, float qy, float qz, float qw) {

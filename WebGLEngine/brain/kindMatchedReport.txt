@@ -1,0 +1,73 @@
+KIND-MATCHED HELD-OUT (brain/KIND_MATCHED_WIP.md): 24 searches and rule-low06 on MIXED, MATCHED and AUDIT 3 (fresh) and on round 1's audit, AUDIT 2, the BIG block and the 40-dive set
+  PASS SEARCHES: 24 searches (cx, nostate, plain, station-large, station-small, plain-priced, k 0 to 3), one recipe, one start
+  PASS CHAMPIONS: the six champions are the ones the earlier audits flew (8e9fb0c2, fabc804d, c916e7f5, 3079e794, adc0f039, 3e0ed772)
+  PASS ARMS: in all seven files (mixed, matched, audit3, audit2, round1, big, h40): rule-low06 and the 24 searches, once each (25 arms)
+  PASS WEIGHTS: in all seven files (mixed, matched, audit3, audit2, round1, big, h40): every search flew the weights of its line of the training file (by digest)
+  PASS KEYS: MIXED: every arm flew the same 600 dives in the same order (seeds 24001 to 24150 of plain and deep and far and both); MATCHED: every arm flew the same 600 dives in the same order (seeds 24151 to 24450 of far and both); AUDIT3: every arm flew the same 1200 dives in the same order (seeds 25001 to 25600 of far and both); AUDIT2: every arm flew the same 1200 dives in the same order (seeds 22001 to 22600 of far and both); ROUND1: every arm flew the same 1200 dives in the same order (seeds 19001 to 19600 of far and both); BIG: every arm flew the same 400 dives in the same order (seeds 23001 to 23100 of plain and deep and far and both); H40: every arm flew the same 40 dives in the same order (seeds 11 to 20 of plain and deep and far and both)
+  PASS SCORES: in all seven files (mixed, matched, audit3, audit2, round1, big, h40): every score is a number in [0, 1] and every strain a number or null
+  PASS DISJOINT: no dive is in two of the seven files (mixed, matched, audit3, audit2, round1, big, h40)
+  PASS H40 REPRODUCES: the 40-dive held-out of the rule and of every search, re-flown through this module's arms, equals the training lines' to 1e-9
+the searches: 40-dive held-out lead, MIXED lead (se), MATCHED lead (se), TARGET lead (se), AUDIT 3 lead (se), AUDIT 3 dives better / worse / same, crushed or stranded on AUDIT 3 (the rule's); C40 the 40-dive champion, CMA the MATCHED pick, CMI the MIXED pick
+  cx:0                        eligible h40 -0.0331  mixed -0.0169 (se 0.0055)  matched -0.0314 (se 0.0071)  target -0.0190 (se 0.0027)  audit3 -0.0214 (se 0.0047)  181 / 200 / 819  bad 33 (0)
+  cx:1            C40 CMA CMI eligible h40 -0.0019  mixed -0.0102 (se 0.0037)  matched -0.0190 (se 0.0042)  target -0.0058 (se 0.0017)  audit3 -0.0063 (se 0.0031)  185 / 208 / 807  bad 3 (0)
+  cx:2                        dropped  h40 +0.0110  mixed -0.0017 (se 0.0048)  matched -0.0176 (se 0.0055)  target -0.0119 (se 0.0023)  audit3 -0.0127 (se 0.0041)  195 / 200 / 805  bad 21 (0)
+  cx:3                        dropped  h40 -0.0402  mixed -0.0247 (se 0.0065)  matched -0.0472 (se 0.0087)  target -0.0319 (se 0.0033)  audit3 -0.0363 (se 0.0057)  213 / 242 / 745  bad 55 (0)
+  nostate:0                   dropped  h40 -0.0124  mixed -0.0129 (se 0.0053)  matched -0.0224 (se 0.0063)  target -0.0174 (se 0.0025)  audit3 -0.0155 (se 0.0044)  205 / 238 / 757  bad 24 (0)
+  nostate:1           CMA     eligible h40 -0.0113  mixed -0.0031 (se 0.0023)  matched -0.0018 (se 0.0013)  target -0.0014 (se 0.0005)  audit3 -0.0033 (se 0.0010)  16 / 41 / 1143  bad 0 (0)
+  nostate:2       C40         eligible h40 -0.0038  mixed -0.0084 (se 0.0042)  matched -0.0135 (se 0.0047)  target -0.0005 (se 0.0017)  audit3 -0.0003 (se 0.0030)  189 / 163 / 848  bad 1 (0)
+  nostate:3               CMI eligible h40 -0.0138  mixed +0.0013 (se 0.0040)  matched -0.0159 (se 0.0051)  target -0.0078 (se 0.0021)  audit3 -0.0102 (se 0.0038)  155 / 157 / 888  bad 21 (0)
+  plain:0                     dropped  h40 -0.0644  mixed -0.0600 (se 0.0099)  matched -0.0918 (se 0.0109)  target -0.0783 (se 0.0045)  audit3 -0.0824 (se 0.0078)  218 / 319 / 663  bad 139 (0)
+  plain:1                     dropped  h40 +0.0012  mixed -0.0406 (se 0.0080)  matched -0.0752 (se 0.0104)  target -0.0569 (se 0.0041)  audit3 -0.0651 (se 0.0072)  216 / 259 / 725  bad 109 (0)
+  plain:2         C40 CMA CMI eligible h40 +0.0169  mixed +0.0041 (se 0.0030)  matched -0.0010 (se 0.0034)  target +0.0049 (se 0.0014)  audit3 +0.0019 (se 0.0024)  146 / 123 / 931  bad 1 (0)
+  plain:3                     eligible h40 +0.0074  mixed -0.0059 (se 0.0041)  matched -0.0010 (se 0.0036)  target +0.0029 (se 0.0014)  audit3 +0.0031 (se 0.0025)  160 / 133 / 907  bad 0 (0)
+  station-large:0             eligible h40 +0.0000  mixed +0.0019 (se 0.0032)  matched -0.0051 (se 0.0029)  target -0.0046 (se 0.0012)  audit3 -0.0050 (se 0.0022)  96 / 141 / 963  bad 0 (0)
+  station-large:1             eligible h40 +0.0019  mixed -0.0001 (se 0.0028)  matched -0.0106 (se 0.0029)  target -0.0084 (se 0.0012)  audit3 -0.0106 (se 0.0021)  76 / 158 / 966  bad 0 (0)
+  station-large:2 C40 CMA CMI eligible h40 +0.0075  mixed +0.0020 (se 0.0027)  matched -0.0007 (se 0.0024)  target -0.0021 (se 0.0010)  audit3 -0.0057 (se 0.0019)  69 / 116 / 1015  bad 0 (0)
+  station-large:3             dropped  h40 -0.0206  mixed -0.0080 (se 0.0041)  matched -0.0093 (se 0.0029)  target -0.0089 (se 0.0013)  audit3 -0.0099 (se 0.0021)  76 / 141 / 983  bad 2 (0)
+  station-small:0 C40 CMA CMI eligible h40 +0.0037  mixed -0.0005 (se 0.0027)  matched -0.0051 (se 0.0028)  target +0.0005 (se 0.0010)  audit3 -0.0003 (se 0.0016)  70 / 76 / 1054  bad 0 (0)
+  station-small:1             eligible h40 +0.0037  mixed -0.0010 (se 0.0030)  matched -0.0075 (se 0.0030)  target -0.0041 (se 0.0011)  audit3 -0.0041 (se 0.0019)  78 / 112 / 1010  bad 0 (0)
+  station-small:2             eligible h40 -0.0075  mixed -0.0051 (se 0.0035)  matched -0.0115 (se 0.0031)  target -0.0118 (se 0.0014)  audit3 -0.0124 (se 0.0024)  94 / 194 / 912  bad 0 (0)
+  station-small:3             eligible h40 -0.0019  mixed -0.0114 (se 0.0033)  matched -0.0318 (se 0.0040)  target -0.0287 (se 0.0016)  audit3 -0.0302 (se 0.0028)  52 / 239 / 909  bad 1 (0)
+  plain-priced:0              dropped  h40 +0.0131  mixed -0.0383 (se 0.0083)  matched -0.0465 (se 0.0086)  target -0.0412 (se 0.0037)  audit3 -0.0559 (se 0.0070)  239 / 265 / 696  bad 102 (0)
+  plain-priced:1              dropped  h40 -0.0325  mixed -0.0318 (se 0.0073)  matched -0.0664 (se 0.0098)  target -0.0419 (se 0.0037)  audit3 -0.0530 (se 0.0067)  219 / 261 / 720  bad 89 (0)
+  plain-priced:2  C40 CMA CMI eligible h40 +0.0056  mixed +0.0021 (se 0.0031)  matched -0.0013 (se 0.0034)  target +0.0053 (se 0.0014)  audit3 +0.0018 (se 0.0024)  142 / 122 / 936  bad 0 (0)
+  plain-priced:3              eligible h40 -0.0038  mixed -0.0030 (se 0.0039)  matched -0.0075 (se 0.0036)  target +0.0019 (se 0.0014)  audit3 +0.0015 (se 0.0025)  152 / 139 / 909  bad 0 (0)
+Q1 (THE VERDICT) the MATCHED held-out lead (600 far-and-both dives) against TARGET (the three audits pooled), within the families, the 16 eligible searches: S = 12 (15 pairs, 14 untied), exact p 0.0029 / 0.9997 over 6912 arrangements: THE KIND-MATCHED HELD-OUT RANKS THE SEARCHES
+Q2 MATCHED beside MIXED (600 dives each; reported, no verdict): each held-out against TARGET and against AUDIT 3 alone, the eligible, S and slope
+  MATCHED against TARGET : S = 12 (15 pairs, 14 untied), exact p 0.0029 / 0.9997; slope 0.789 (se 0.114), intercept +0.0032; within families over all 24 S = 29, exact p 1.1e-5 / 1.0000
+  MATCHED against AUDIT 3: S = 10 (15 pairs, 14 untied), exact p 0.0145 / 0.9971; slope 0.777 (se 0.124), intercept +0.0016; within families over all 24 S = 27, exact p 5.3e-5 / 1.0000
+  MIXED   against TARGET : S = 9 (15 pairs, 15 untied), exact p 0.0314 / 0.9913; slope 0.966 (se 0.318), intercept -0.0016; within families over all 24 S = 26, exact p 1.3e-4 / 1.0000
+  MIXED   against AUDIT 3: S = 5 (15 pairs, 15 untied), exact p 0.1824 / 0.9152; slope 0.891 (se 0.338), intercept -0.0033; within families over all 24 S = 22, exact p 0.0013 / 0.9996
+  S(MATCHED) minus S(MIXED): +3 against TARGET, +5 against AUDIT 3; paired bootstrap over seeds of the difference against TARGET (300 MATCHED seeds, 150 MIXED seeds, 2000 draws, seed 20261108): mean +3.973, 2.5th to 97.5th percentile -2 to 10, 0.8225 of the draws above 0
+Q3 the champion rule redone (the champion of each family among its eligible searches by each held-out, ties to the lower k); the TARGET lead and the AUDIT 3 lead of each pick, and the oracle (the eligible search of highest TARGET lead):
+  cx: 40-dive cx:1 (-0.0058, -0.0063), MATCHED cx:1 (-0.0058, -0.0063), MIXED cx:1 (-0.0058, -0.0063), oracle cx:1 (-0.0058, -0.0063)
+  nostate: 40-dive nostate:2 (-0.0005, -0.0003), MATCHED nostate:1 (-0.0014, -0.0033), MIXED nostate:3 (-0.0078, -0.0102), oracle nostate:2 (-0.0005, -0.0003)
+  plain: 40-dive plain:2 (+0.0049, +0.0019), MATCHED plain:2 (+0.0049, +0.0019), MIXED plain:2 (+0.0049, +0.0019), oracle plain:2 (+0.0049, +0.0019)
+  station-large: 40-dive station-large:2 (-0.0021, -0.0057), MATCHED station-large:2 (-0.0021, -0.0057), MIXED station-large:2 (-0.0021, -0.0057), oracle station-large:2 (-0.0021, -0.0057)
+  station-small: 40-dive station-small:0 (+0.0005, -0.0003), MATCHED station-small:0 (+0.0005, -0.0003), MIXED station-small:0 (+0.0005, -0.0003), oracle station-small:0 (+0.0005, -0.0003)
+  plain-priced: 40-dive plain-priced:2 (+0.0053, +0.0018), MATCHED plain-priced:2 (+0.0053, +0.0018), MIXED plain-priced:2 (+0.0053, +0.0018), oracle plain-priced:2 (+0.0053, +0.0018)
+  the MATCHED picks differ from the 40-dive champions in 1 of 6 families, the MIXED picks in 1; the mean TARGET lead of the six picks: 40-dive +0.0004, MATCHED +0.0002, MIXED -0.0008, oracle +0.0004; the mean AUDIT 3 lead: 40-dive -0.0015, MATCHED -0.0020, MIXED -0.0031, oracle -0.0015
+Q4 how well the audits agree (the ceiling of any held-out; the eligible, within families):
+  round1 against audit2: S = 13 (15 pairs, 15 untied), exact p 0.0016 / 0.9999
+  round1 against audit3: S = 11 (15 pairs, 15 untied), exact p 0.0087 / 0.9984
+  audit2 against audit3: S = 9 (15 pairs, 15 untied), exact p 0.0314 / 0.9913
+  the standard deviation of the TARGET leads over the eligible 0.0090, of the AUDIT 3 leads 0.0091; the mean se of one audit's lead 0.0025, of TARGET's 0.0014
+Q5 the earlier held-outs against the audits (S of the eligible, within families; AUDIT 3 is fresh for all three, AUDIT 2 and round 1's block are where round 8's far-and-both cut was found):
+  40-dive set (40)         AUDIT 3 S = 6 (15 pairs, 14 untied), exact p 0.1212 / 0.9517; AUDIT 2 S = 8; round 1 S = 10
+  BIG all kinds (400)      AUDIT 3 S = -1 (15 pairs, 15 untied), exact p 0.6738 / 0.5000; AUDIT 2 S = 5; round 1 S = 3
+  BIG far and both (200)   AUDIT 3 S = 5 (15 pairs, 15 untied), exact p 0.1824 / 0.9152; AUDIT 2 S = 11; round 1 S = 9
+Q6 which kind carries it: the MIXED block's lead from one kind's 150 dives against TARGET (the eligible):
+  plain (150 dives): S = -8 (15 pairs, 14 untied), exact p 0.9855 / 0.0483
+  deep  (150 dives): S = 3 (15 pairs, 15 untied), exact p 0.3262 / 0.8176
+  far   (150 dives): S = 8 (15 pairs, 14 untied), exact p 0.0483 / 0.9855
+  both  (150 dives): S = 9 (15 pairs, 13 untied), exact p 0.0237 / 0.9948
+Q7 the hull on AUDIT 3 (dives above strain 0.92 and 0.95, the largest strain, crushed, stranded; the rule's: 0, 0, 0.9183, 0, 0):
+  cx:1            C40 CMA 4 of 1200 above 0.92, 3 above 0.95, largest 0.9998, crushed 3, stranded 0
+  nostate:1           CMA 0 of 1200 above 0.92, 0 above 0.95, largest 0.9183, crushed 0, stranded 0
+  nostate:2       C40     192 of 1200 above 0.92, 42 above 0.95, largest 0.9995, crushed 1, stranded 0
+  plain:2         C40 CMA 342 of 1200 above 0.92, 84 above 0.95, largest 0.9992, crushed 1, stranded 0
+  station-large:2 C40 CMA 0 of 1200 above 0.92, 0 above 0.95, largest 0.9189, crushed 0, stranded 0
+  station-small:0 C40 CMA 0 of 1200 above 0.92, 0 above 0.95, largest 0.9182, crushed 0, stranded 0
+  plain-priced:2  C40 CMA 0 of 1200 above 0.92, 0 above 0.95, largest 0.9168, crushed 0, stranded 0
+BOTTOM LINE (KIND-MATCHED): THE KIND-MATCHED HELD-OUT RANKS THE SEARCHES (S = 12 of 14 untied pairs, exact p 0.0029 for a positive S and 0.9997 for a negative one)
+BOTTOM LINE (MIXED, FOR COMPARISON, NO VERDICT): THE MIXED HELD-OUT OF THE SAME SIZE RANKS THE SEARCHES (S = 9 of 15 untied pairs, exact p 0.0314 and 0.9913; the MATCHED S was 12; bootstrap 2.5th to 97.5th percentile of the difference -2 to 10)

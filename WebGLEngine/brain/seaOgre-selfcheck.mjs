@@ -11,8 +11,9 @@
 //   5  THE ZONES DO   (a damaged OGRE to begin with) no tubes: it never fires; no sonar: it never fires; no cannon: the headquarters is not shelled; a dead engine: it crawls; a hull under 50%: escorts, at
 //                     most two alive; under 20%: berserk, faster; escorts and shells only in their phase and depth (the cannon only when it is UP, the tubes only when it is DOWN)
 //   6  THE OUTCOMES   the breach (inside 60 m, or the headquarters at 0), the holdout, the defence; the score is the formula, written out
-//   7  THE LEVEL      measured on fixed seeds: the default hand tactician NEVER FIRES at a loud OGRE it has to ping to range and loses every time (said: its fire gate wants an echo inside 320 m and the OGRE shoots from
-//                     380); a gunner theta (fire from 420 m, on a loud passive contact) defends most of the time with four boats and less with three and one
+//   7  THE LEVEL      measured on fixed seeds: the default hand tactician NEVER FIRES at a loud OGRE and loses every time (CORRECTED 2026-11-06: the earlier reading, "its fire gate wants an echo inside 320 m and the OGRE shoots from
+//                     380", is half right and a wider gate alone does not cure it -- fireRange 380 or 420 still breach six of six; it is PASSIVE FIRE on a loud contact, blindSnr 22, that turns the level); the exported GUNNER_THETA
+//                     (fire from 420 m, on a loud passive contact) defends most of the time with four boats and less with three and one
 //
 // SABOTAGES (each mutant breaks the thing a row guards; the row that went red, by name; an entry that went 0 red is a finding, and was fixed):
 //   brain/seaOgre.mjs: S1 spill 0 (1: the four-gunner defence rate) | S2 spill 1 (2: the holdout seed is now a defence) | S3 sonar zone 5 m from the tubes (2: the gap row) | S4 zone side flipped (3) | S5 a dead zone stays a target (3) |
@@ -21,14 +22,16 @@
 //   loss term 0.1 (2) | S20 TRACE_EVERY 5 (0 red THE FIRST TIME: the row read the constant back from the module; the number is pinned now, 1) | S21 hull hit doubled (1) | S22 headquarters unclamped (0 red THE FIRST TIME: no
 //   fight in the set shelled it to the bottom; start.hq makes one, 1) | S23 surfaced 100 ticks (4) | S24 roster size unchecked (1) | S25 holdout default breached (1) | S26 berserk fire interval same (1) | S27 the OGRE
 //   quiet (6) | S28 AMMO 2 (0 red THE FIRST TIME: a ceiling row cannot see a lower cap; 'someone fires all six' on named seeds, 1) | S31 AMMO 7 (1) | S29 the trace mutates the fight (12) | S30 the OGRE does not move (7).
+//   THE LEVER ROUND (2026-11-06, the backlog item "the default tactician never fires at the Sea OGRE": GUNNER_THETA is exported from brain/seaOgre.mjs, the page and this gate share it, and three rows in section 7 hold which lever turns the level -- a wider fire gate alone does NOT, passive fire on a loud contact does): 16 mutants of the changed code, 8 mechanical (each of the four numbers of GUNNER_THETA, +1 and -1) and 8 by hand (not frozen, a key added, the keys reordered, fireRange dropped, the theta emptied, the theta swapped for the 320 m default with only blindSnr 22, the OGRE quiet, the OGRE's fire range 200), every one red BY NAME (16 of 16, none threw, none survived; the comment lines of the same change were mutated mechanically too and are inert by construction, not counted).
 "use strict";
 import * as G from "./seaOgre.mjs";
 import * as T from "./subTournament.mjs";
+import * as TA from "./subTactics.mjs";
 
 let fails = 0;
 const ok = (l, c, n = "") => { if (!c) fails++; console.log(`  ${c ? "PASS" : "FAIL"}  ${l}${n ? "   " + n : ""}`); };
 const near = (a, b, t = 1e-9) => Math.abs(a - b) <= t;
-const GUNNER = { fireRange: 420, blindSnr: 22, pingAfter: 1, trackSpeed: 2.5 };
+const GUNNER = G.GUNNER_THETA;
 const sides = (n, theta = null) => Array.from({ length: n }, (_, i) => T.makeSide("d" + i, { theta }).side());
 const run = (n, seed, opts = {}, theta = GUNNER) => { const trace = []; const r = G.fight(sides(n, theta), G.scenario(seed, n), { ...opts, trace }); return { r, trace }; };
 
@@ -163,6 +166,11 @@ console.log("\n7. THE LEVEL");
     ok("three gunners win some and lose some", three.defended >= 2 && three.defended <= 6 && three.breached >= 2, JSON.stringify(three));
     ok("one gunner is not enough (it defends at most once in eight)", solo.defended <= 1, JSON.stringify(solo));
     ok("!! more boats, more defences (four >= three >= one, defended)", four.defended >= three.defended && three.defended >= solo.defended);
+    // v4912+ (UNNUMBERED, the diagnosis of the backlog item "the default tactician never fires at the Sea OGRE"): which lever turns the level, measured one at a time on the same 18 boat-fights (three defenders, scenarios 1..6)
+    const lever = Object.fromEntries(Object.entries({ fire380: { fireRange: 380 }, fire420: { fireRange: 420 }, passive22: { blindSnr: 22 }, ping1: { pingAfter: 1 }, track25: { trackSpeed: 2.5 }, gunner: GUNNER }).map(([k, th]) => [k, tally(3, th, 6)]));
+    ok("!! a WIDER FIRE GATE ALONE DOES NOT CURE THE DEFAULT (the backlog's reading was half right): fireRange 380 (the OGRE's own) fires only a few times in 18 boat-fights and is breached six of six, fireRange 420 the same -- the default fires on a fresh ACTIVE echo only (why the echoes are few is not measured here)", lever.fire380.breached === 6 && lever.fire380.defended === 0 && lever.fire380.fired >= 1 && lever.fire380.fired <= 10 && lever.fire420.breached === 6 && lever.fire420.defended === 0 && lever.fire420.fired <= 15 && lever.fire420.fired >= lever.fire380.fired, JSON.stringify({ fire380: lever.fire380, fire420: lever.fire420 }));
+    ok("!! PASSIVE FIRE ON A LOUD CONTACT IS THE LEVER: blindSnr 22 alone (the default's fire gate untouched) fires dozens of times and defends six of six; pinging sooner alone and a faster track alone fire nothing and are breached six of six", lever.passive22.defended === 6 && lever.passive22.fired >= 30 && lever.ping1.fired === 0 && lever.ping1.breached === 6 && lever.track25.fired === 0 && lever.track25.breached === 6, JSON.stringify({ passive22: lever.passive22, ping1: lever.ping1, track25: lever.track25 }));
+    ok("!! the level's gunner is an exported frozen theta of four numbers (fireRange 420, blindSnr 22, pingAfter 1, trackSpeed 2.5) shared by the page and this gate, it fires and defends some of the time on the same eighteen boat-fights (it is NOT the strongest theta: blindSnr 22 alone defends more here, said in the module's comment), and the default theta is untouched (fireRange 320, blindSnr 99)", G.GUNNER_THETA === GUNNER && Object.isFrozen(G.GUNNER_THETA) && JSON.stringify(Object.keys(G.GUNNER_THETA)) === JSON.stringify(["fireRange", "blindSnr", "pingAfter", "trackSpeed"]) && G.GUNNER_THETA.fireRange === 420 && G.GUNNER_THETA.blindSnr === 22 && G.GUNNER_THETA.pingAfter === 1 && G.GUNNER_THETA.trackSpeed === 2.5 && lever.gunner.fired >= 30 && lever.gunner.defended >= 3 && lever.gunner.defended <= lever.passive22.defended && TA.THETA_DEFAULT.fireRange === 320 && TA.THETA_DEFAULT.blindSnr === 99, JSON.stringify(lever.gunner));
 }
 
 // v4901 -- the exports the definition census asked this gate to name (DT, HP, LOOK_EVERY, RELOAD_TICKS, SECONDS, STAGGER), checked in one row.

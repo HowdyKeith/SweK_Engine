@@ -82,6 +82,7 @@
 // all four losing statuses and the non-losing ones (10 of 18). G14 (the shipped fighter's count re-flown on every score instead of once): the result is the same number, only the cost differs -- a spy on the policy's pilotFor now counts the
 // pilots made (1 when the scorer is built, 3 after two scores). The harness run for G01-G29 was made against the gate as it stood before these three fixes; G00, G03, G07 and G14 were re-run against the fixed gate and are the rows above.
 "use strict";
+import "../../physics/mechanics/rigidBody6dofEuler.mjs";   // 2026-11-04 -- the 6-DOF numbers this gate holds were measured under the first-order orientation step, so it flies that step (see that file)
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";

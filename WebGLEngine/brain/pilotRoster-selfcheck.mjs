@@ -44,11 +44,22 @@
 //   AC pilotRoster.mjs: 'close' never offered                                                     1 red (the offered-only-when-held, in-order row)
 //   AD pilotRoster.mjs: 'close' resolves to the league pilot's weights                            1 red (the flies-THAT-vector row)
 //   (AE and AF were for a 'careful' choice that did not qualify and was taken out before the ship; the same two failure shapes, 1 red each.)
+//   2026-11-02 -- THE GPU BRAIN'S CHOICE, ANOTHER NETWORK (section 2's five new rows, read on the 6-DOF substrate), with the byte-safe runner, this gate and brain/pilot6dofMlpPage-selfcheck.mjs run:
+//   AG pilotRoster.mjs: 'gpu' offered when none is held                                          7 red (the not-offered rows and every row that counts the choices a page holds, node and page)
+//   AH pilotRoster.mjs: teamPilot() ignores the choice's own network                              1 red here (the THROUGH-ITS-OWN-NETWORK row), and 2 on the page (the measured-pilot and fight rows)
+//   AI pilotRoster.mjs: 'gpu' resolved without its network                                        1 red (the never-through-another-network row)
+//   AJ pilotRoster.mjs: 'gpu' resolves to the shipped fruit-fly pilot's weights                   1 red here (the THROUGH-ITS-OWN-NETWORK row), and 3 on the page
+//   2026-11-02 -- A PAGE'S OWN DEFAULT (section 2's three new rows), with the byte-safe runner, this gate, brain/pilot6dofPolicy-selfcheck.mjs and tools/ship/rigidBody6dofPage-selfcheck.mjs run:
+//   AK pilotRoster.mjs: a page's own default ignored                                            1 red here (the flies-it-once-held row), and 1 on the page (the default-lineup row)
+//   AL pilotRoster.mjs: the default used before the page holds it                               1 red (the until-it-holds-it row)
+//   AM pilotRoster.mjs: the default's label ignored                                             1 red here (the label row), and 1 on the page
 "use strict";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as PP from "./pilotPolicy.mjs";
 import * as R from "./pilotRoster.mjs";
+import * as P6 from "./pilot6dofPolicy.mjs";   // 2026-11-02 -- the 6-DOF page's network, and the GPU Brain's beside it: the one choice that carries its own network
+import * as M6 from "./pilot6dofMlp.mjs";
 import { planarFallbackWorld } from "../physics/planarFallbackWorld.js";
 import { runInEngineOrigin, webgpuSkipReason } from "../tools/ship/webgpuHarness.mjs";
 
@@ -116,6 +127,35 @@ sec("2. EVERY CHOICE THE PANEL CAN OFFER");
         const ctx4 = ctxOf({ shipped: shippedW, league: leagueW, close: closeW }), cl = R.resolveTeam("A", "close", ctx4, 3), none = R.resolveRoster({ A: "close", B: "league" }, ctxOf({ shipped: shippedW, league: leagueW }), 3);
         ok("!! choosing it flies THAT vector on every ship (not the league's, not the shipped pilot's), under its own label; a saved 'close' on a page that does not hold one falls back to the hand pilot BY NAME", cl.id === "close" && cl.weights.length === 3 && cl.weights.every((w) => w === closeW) && /close-quarters/.test(cl.label) && cl.problems.length === 0 && none.problems.length === 1 && /team A.*"close"/.test(none.problems[0]) && none.A.weights.every((w) => same(w, PP.handWeights())) && none.B.weights.every((w) => w === leagueW), cl.label);
         ok("the Brain panel's pilot ignores it (a choice made in the roster, not a new default)", R.resolveTeam("A", "brain", ctx4, 2).weights[0] === shippedW);
+    }
+    {   // 2026-11-02 -- the GPU Brain's pilot (es-box3d-6dof.html): ANOTHER NETWORK, carried by the choice itself (ctx.gpu the weights, ctx.gpuPP the module). Read on the 6-DOF substrate, the page it is for.
+        const rngOf = (seed) => { let a = seed; return () => { a = (Math.imul(a, 1664525) + 1013904223) >>> 0; return a / 4294967296; }; };
+        const flyW = P6.perturb(P6.handWeights(), 0.2, rngOf(61)), gpuW = M6.perturb(M6.handWeights(), 0.2, rngOf(67)), seeds = [99301, 99302, 99303];
+        const all5 = R.choices({ shipped: true, league: true, close: true, gpu: true, imported: true }).map((c) => c.id), noGpu = { shipped: true, league: true, close: true, imported: true };
+        ok("!! 'gpu' is offered only when the page holds it, after 'close' and before 'imported', and a page that holds none offers the same choices it did before",
+            all5.indexOf("gpu") === all5.indexOf("close") + 1 && all5.indexOf("imported") === all5.indexOf("gpu") + 1 && !R.choices(noGpu).some((c) => c.id === "gpu") &&
+            JSON.stringify(R.choices(noGpu)) === JSON.stringify(R.choices({ ...noGpu, gpu: null })), all5.join(","));
+        const ctx6 = { PP: P6, shipped: flyW, imported: null, brainPilotOn: false, gpu: gpuW, gpuPP: M6 }, g = R.resolveTeam("A", "gpu", ctx6, 3), sh = R.resolveTeam("B", "shipped", ctx6, 3);
+        const fp = (f, seed) => P6.duel(f, "autopilot", { seed }).fingerprint, fg = R.teamPilot(g, P6), fs = R.teamPilot(sh, P6);
+        ok("!! choosing it flies THAT vector on every ship, under its own label, THROUGH ITS OWN NETWORK: the team's pilot flies the headless duel to the fingerprint of pilot6dofMlp.pilotFor() on those weights, seed for seed",
+            g.id === "gpu" && /GPU Brain/.test(g.label) && g.weights.length === 3 && g.weights.every((w) => w === gpuW) && g.PP === M6 && g.problems.length === 0 && seeds.every((s) => fp(fg, s) === fp(M6.pilotFor(gpuW), s)),
+            `${g.label}: ${seeds.map((s) => fp(fg, s)).join(" ")}`);
+        ok("!! ...and the fly's choices still fly the fly's network: 'shipped' carries no network of its own, and its pilot flies pilot6dofPolicy.pilotFor()'s duel to the bit", sh.PP === undefined && seeds.every((s) => fp(fs, s) === fp(P6.pilotFor(flyW), s)));
+        const noNet = R.resolveTeam("A", "gpu", { ...ctx6, gpuPP: undefined }, 3), noW = R.resolveTeam("A", "gpu", { ...ctx6, gpu: null }, 3);
+        ok("!! the MLP's weights are never flown through another network: a saved 'gpu' on a page that holds the weights but not the network, or the network but no weights, falls back to the hand pilot BY NAME",
+            [noNet, noW].every((r) => r.id === "hand" && r.PP === undefined && r.weights[0].length === P6.WEIGHT_COUNT && r.problems.length === 1 && /"gpu"/.test(r.problems[0])), noNet.problems.join("; "));
+        ok("the Brain panel's pilot ignores it (a choice made in the roster, not a new default)", R.resolveTeam("A", "brain", ctx6, 2).weights[0] === flyW);
+    }
+    {   // 2026-11-02 -- A PAGE'S OWN DEFAULT (ctx.defaultChoice): es-box3d-6dof.html names the close-quarters pilot, Keith's call on the page fight's ranking
+        const rngOf = (seed) => { let a = seed; return () => { a = (Math.imul(a, 1664525) + 1013904223) >>> 0; return a / 4294967296; }; };
+        const closeW = P6.perturb(P6.handWeights(), 0.2, rngOf(71)), held = { PP: P6, close: closeW, imported: null, brainPilotOn: false, defaultChoice: "close" }, notYet = { ...held, close: null };
+        const both = (ctx) => ["A", "B"].map((t) => R.resolveTeam(t, "auto", ctx, 3));
+        const [hA, hB] = both(held), [nA, nB] = both(notYet), [oA, oB] = both({ ...held, defaultChoice: undefined });
+        ok("!! a page that names its own default flies it on BOTH teams once it holds it: 'default for this team' is the close-quarters pilot, on the very vector, every ship, under its own label, with nothing to report",
+            [hA, hB].every((r) => r.id === "close" && r.weights.length === 3 && r.weights.every((w) => w === closeW) && /close-quarters/.test(r.label) && r.problems.length === 0), `${hA.label} | ${hB.label}`);
+        ok("!! ...and until it holds it (the file has not loaded, or never does), the old rule: both teams on the scripted pilot, which is not a fallback and reports nothing -- as a page that names no default does",
+            [nA, nB, oA, oB].every((r) => r.id === "scripted" && r.scripted && r.problems.length === 0) && R.autoChoice("A", { ...notYet, brainPilotOn: true }) === "brain" && R.autoChoice("A", { brainPilotOn: true }) === "brain");
+        ok("  the select's default entry carries the page's own label when it gives one, and the plain one otherwise", R.choices({ defaultLabel: "default for this team (close-quarters)" })[0].label === "default for this team (close-quarters)" && R.choices({})[0].label === "default for this team");
     }
     const brainOrder = [R.resolveTeam("A", "brain", ctxOf({ imported: importedW, shipped: shippedW }), 2), R.resolveTeam("A", "brain", ctxOf({ shipped: shippedW }), 2), R.resolveTeam("A", "brain", ctxOf(), 2)];
     ok("the Brain panel's pilot is the imported one, else the shipped default, else the hand weights (what Brain pilot has always flown), and each is the vector itself, not a copy that drifts", brainOrder[0].weights[0] === importedW && brainOrder[1].weights[0] === shippedW && same(brainOrder[2].weights[0], PP.handWeights()));

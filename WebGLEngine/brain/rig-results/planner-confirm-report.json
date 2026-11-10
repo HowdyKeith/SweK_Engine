@@ -1,0 +1,23 @@
+{
+ "report": [
+  "ROUND 22: the confirmatory run, C1 2401-2650, C2 2651-2900, C3 2901-3150, C4 3151-3400 (far and both, 2000 dives per arm; read once)",
+  "  PASS IDENTITY C1: the full twin equals the Round 11 twin dive for dive on C1: true",
+  "  PASS IDENTITY C2: the full twin equals the Round 11 twin dive for dive on C2: true",
+  "  PASS IDENTITY C3: the full twin equals the Round 11 twin dive for dive on C3: true",
+  "  PASS IDENTITY C4: the full twin equals the Round 11 twin dive for dive on C4: true",
+  "  PASS KINDS ALIGNED: the twin's and the tuned rule's dives are the same scenarios in the same order: true",
+  "  PASS BLOCK SIZE: every block has 500 dives per arm: true",
+  "POOLED twin minus TUNED-R8: +0.0198 (se 0.0014; better 245, worse 22, same 1733); lower bound 0.0170",
+  "  far  +0.0300 (se 0.0023; better 195, worse 17, same 788)",
+  "  both +0.0096 (se 0.0016; better 50, worse 5, same 945)",
+  "  C1 +0.0127 (se 0.0026; better 44, worse 9, same 447)",
+  "  C2 +0.0206 (se 0.0028; better 66, worse 6, same 428)",
+  "  C3 +0.0234 (se 0.0031; better 67, worse 4, same 429)",
+  "  C4 +0.0225 (se 0.0029; better 68, worse 3, same 429)",
+  "blocks: Q 9.68 on 3 df, p 0.0215; I-squared 69%; random-effects +0.0196 (se 0.0025)",
+  "the twin's dive differs from the tuned rule's on 486 of 2000 (24.3%), by +0.0815 on average where it differs; means (tuned | twin) 0.7952 | 0.8150; crushed 0/0, stranded 0/0",
+  "BOTTOM LINE: THE TWIN'S GAIN IS CONFIRMED AT +0.0198 (se 0.0014; 2000 DIVES)",
+  "BOTTOM LINE: THE GAIN EXCEEDS ONE POINT OF THE SCORE",
+  "BOTTOM LINE: THE FOUR BLOCKS DISAGREE BEYOND CHANCE"
+ ]
+}

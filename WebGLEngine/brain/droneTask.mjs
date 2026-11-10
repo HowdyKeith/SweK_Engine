@@ -25,7 +25,7 @@ import * as Q from "../physics/mechanics/multirotorModel6dof.mjs";
 import * as AD from "./autopilotDrone.mjs";
 import { foldHash } from "../physics/raceCar.mjs";
 
-export const DT = Q.DT, SECONDS = 20, TICKS_PER_SCORE = 6;   // the model steps at 120 Hz; the error is read every sixth tick (20 Hz)
+export const DT = Q.DT, SECONDS = 20, TICKS_PER_SCORE = 6, TRACE_EVERY = 6;   // the model steps at 120 Hz; the error is read every sixth tick (20 Hz)
 export const WORST_TICK = 3 + 3 + 3;   // 9: what a scoring tick that was never flown is charged
 export const KINDS = Object.freeze(["hover", "recovery", "motor", "goto"]);
 const MOTOR_SECONDS = 40, SETTLE_SECONDS = 4;
@@ -74,11 +74,15 @@ export function windAt(wind, t) {
     return [0, 1, 2].map((i) => wind.mean[i] + wind.amp[i] * (0.65 * Math.sin(wind.freq[i][0] * t + wind.phase[i][0]) + 0.35 * Math.sin(wind.freq[i][1] * t + wind.phase[i][1])));
 }
 
+/** One frame of a replay trace: the state's position and attitude at tick `i`, the status the tick ended in and the four motors' health (1 running, 0 failed). */
+const frameOf = (s, wind, status, i) => { const a = Q.attitude(s, wind); return { t: i * DT, pos: [s.pos[0], s.pos[1], s.pos[2]], heading: a.heading, pitch: a.pitch, bank: a.bank, status, health: s.health.slice() }; };
+
 /**
  * Fly one scenario with `pilot` ((state, target, wind) -> controls). Returns { score, status, ticks, ... }: for a hover, recovery or goto { ePos, eAlt, eHdg } (mean per-scoring-tick errors over the ticks flown) and `status` ("airborne" | "landed" | "crashed" | "lost" -- how the flight ENDED);
  * for a motor flight { sink, gs (the speed over the ground at first contact), speed (the speed there), touchdown ("landed" | "crashed" | null), why, settled } (how it landed and whether it was still standing four seconds later). Deterministic.
+ * `trace` (an array, optional) is pushed a frame every TRACE_EVERY ticks (20 Hz), and one on every tick after the machine is down (so the last frame is the tick the flight ends on), for a replay: { t (s), pos [x, y, z], heading, pitch, bank, status, health [4] }, with none given nothing is recorded and the flight is the one it was.
  */
-export function fly(pilot, sc, { model = AD.defaultModel() } = {}) {
+export function fly(pilot, sc, { model = AD.defaultModel(), trace = null } = {}) {
     let s = Q.createState(model, { ...sc.start }), h = 0x811c9dc5, status = "airborne", why = null, flown = 0;
     if (sc.kind === "motor") {
         let first = null, tEnd = Infinity, failed = false;
@@ -86,6 +90,7 @@ export function fly(pilot, sc, { model = AD.defaultModel() } = {}) {
         for (let i = 0; i < total; i++) {
             if (!failed && i * DT >= sc.failure.at) { failed = true; s = { ...s, health: s.health.map((x, k) => (k === sc.failure.motor ? 0 : x)) }; }
             const o = Q.stepMultirotor(model, s, pilot(s, sc.target, [0, 0, 0], {}), DT, [0, 0, 0]); s = o.state; flown = i + 1;
+            if (trace && (i % TRACE_EVERY === 0 || o.status !== "airborne")) trace.push(frameOf(s, [0, 0, 0], o.status, i));
             if (i % 40 === 0) for (const c of [s.pos[0], s.pos[2], s.q[0], s.q[1], s.q[2], s.q[3]]) h = foldHash(h, Math.round(c * 1000) & 0xffffffff);
             if (!first && o.status !== "airborne") { first = { status: o.status, sink: o.sink || 0, gs: Math.hypot(s.vel[0], s.vel[1]), speed: Math.hypot(s.vel[0], s.vel[1], s.vel[2]), why: o.why || null }; tEnd = i + Math.round(SETTLE_SECONDS / DT); }
             if (o.status === "crashed" || o.status === "lost") { status = o.status; why = o.why || null; break; }
@@ -101,6 +106,7 @@ export function fly(pilot, sc, { model = AD.defaultModel() } = {}) {
     for (let i = 0; i < total; i++) {
         const wv = windAt(sc.wind, i * DT), o = Q.stepMultirotor(model, s, pilot(s, sc.target, wv, {}), DT, wv);
         s = o.state;
+        if (trace && (i % TRACE_EVERY === 0 || o.status !== "airborne")) trace.push(frameOf(s, wv, o.status, i));
         if (o.status !== "airborne") { status = o.status; why = o.why || null; break; }
         flown = i + 1;
         if (i % TICKS_PER_SCORE === 0) {

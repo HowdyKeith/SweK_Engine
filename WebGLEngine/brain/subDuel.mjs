@@ -23,6 +23,7 @@ import { createActuators } from "../physics/mechanics/subActuators.mjs";
 import * as AS from "./autopilotSub.mjs";
 import * as TA from "./subTactics.mjs";
 import { foldHash } from "../physics/raceCar.mjs";
+import * as CMX from "./subCountermeasures.mjs";
 
 export const TRACE_EVERY = 6;   // ticks between the frames of an optional `trace` (the duel's replay): 5 a second
 export const DT = S.DT, SECONDS = 240, LOOK_EVERY = 15, STAGGER = 7, AMMO = 4, RELOAD_TICKS = 300, HP = 100, KILL_BONUS = 0.5, SPEED_BONUS = 0.5;
@@ -55,6 +56,7 @@ export function duel(side, sc, { seconds = SECONDS, dt = DT, actuators = null, m
         hp: HP, ammo: AMMO, cooldown: 0, target: { depth: start.depth, heading: start.heading, speed: start.speed }, alive: true, fate: "afloat", echoes: [], pings: [], dealt: 0, fired: 0, hits: 0, pinged: 0 });
     const A = mk(1, sc.a, side.tactics, side.pilot), B = mk(2, sc.b, opponent ? opponent.tactics : TA.scripted(sc.kind, { drift: sc.drift }), opponent ? opponent.pilot : AS.pilot()), boats = [A, B], torps = [];
     let nextTorp = 1, h = 0x811c9dc5, flown = 0;
+    const cm = CMX.carries(side.cm) || CMX.carries(opponent && opponent.cm) ? CMX.createCm({ 1: side.cm || CMX.KIT_NONE, 2: (opponent && opponent.cm) || CMX.KIT_NONE }) : null;   // countermeasures (brain/subCountermeasures.mjs): off unless a side carries a kit
     const plat = (b) => K.platformOf(b.state);
     const att = (b) => S.attitude(b.state);
     const others = (b) => boats.filter((o) => o !== b && o.alive);
@@ -69,6 +71,7 @@ export function duel(side, sc, { seconds = SECONDS, dt = DT, actuators = null, m
             const obs = { t: tick * dt, self: { depth: a.depth, heading: a.heading, speed: a.speed, x: b.state.pos[0], y: b.state.pos[1], hp: b.hp, ammo: b.ammo, ready: b.cooldown <= 0 && b.ammo > 0 }, contacts, echoes: b.echoes, pings: b.pings };
             b.echoes = []; b.pings = [];
             const cmd = b.tactics(obs) || {};
+            if (cm) for (const e of cm.order(b.id, cmd, { pos: b.state.pos, heading: a.heading, pitch: a.pitch }, tick, dt)) events.push({ tick, ...e });
             b.target = { depth: clamp(Number.isFinite(cmd.depth) ? cmd.depth : a.depth, 12, 45), heading: Number.isFinite(cmd.heading) ? cmd.heading : a.heading, speed: clamp(Number.isFinite(cmd.speed) ? cmd.speed : a.speed, 0.3, 4.5) };
             if (cmd.fire === true && b.ammo > 0 && b.cooldown <= 0) { torps.push(Tp.launch(b.id, { pos: b.state.pos, heading: a.heading, pitch: a.pitch }, { id: nextTorp++ })); b.ammo--; b.fired++; b.cooldown = RELOAD_TICKS; events.push({ tick, type: "fire", boat: b.id }); }
             if (cmd.ping === true) {
@@ -90,12 +93,17 @@ export function duel(side, sc, { seconds = SECONDS, dt = DT, actuators = null, m
         const targets = boats.filter((b) => b.alive).map((b) => ({ id: b.id, pos: b.state.pos, heading: att(b).heading, speed: att(b).speed }));
         for (let i = 0; i < torps.length; i++) {
             if (torps[i].status !== "running") continue;
-            const r = Tp.stepTorpedo(torps[i], targets, { dt, tick, seed, floor: model.spec.seabed }); torps[i] = r.torpedo;
-            if (r.event) {
+            const r = Tp.stepTorpedo(torps[i], cm ? targets.concat(cm.decoyTargets()) : targets, cm ? { dt, tick, seed, floor: model.spec.seabed, screens: cm.screenList() } : { dt, tick, seed, floor: model.spec.seabed }); torps[i] = r.torpedo;
+            if (r.event && cm && cm.isDecoy(r.event.target)) { cm.stats.decoyed++; events.push({ tick, type: "decoyed", boat: torps[i].owner, decoy: r.event.target }); }
+            else if (r.event) {
                 const victim = boats.find((b) => b.id === r.event.target), owner = boats.find((b) => b.id === torps[i].owner);
                 victim.hp = Math.max(0, victim.hp - r.event.damage); owner.dealt += Math.min(r.event.damage, victim.hp + r.event.damage); owner.hits++; events.push({ tick, type: "hit", boat: owner.id, target: victim.id, damage: r.event.damage });
                 if (victim.hp <= 0 && victim.alive) { victim.alive = false; victim.fate = "sunk"; events.push({ tick, type: "loss", boat: victim.id, why: "sunk" }); }
             }
+        }
+        if (cm) {
+            for (const k of cm.stepInterceptors(torps, { dt, tick, seed, floor: model.spec.seabed })) { torps[k.index] = Object.freeze({ ...torps[k.index], status: "intercepted" }); events.push({ tick, type: "intercepted", boat: k.owner, torpedo: k.torpedo }); }
+            cm.step(dt);
         }
         flown++;
         if (trace && tick % TRACE_EVERY === 0) trace.push({ tick, boats: boats.map((b) => { const a = att(b); return { id: b.id, x: b.state.pos[0], y: b.state.pos[1], depth: a.depth, heading: a.heading, pitch: a.pitch, hp: b.hp, alive: b.alive, ammo: b.ammo }; }), torps: torps.filter((q) => q.status === "running").map((q) => ({ id: q.id, owner: q.owner, x: q.pos[0], y: q.pos[1], depth: -q.pos[2] })) });   // v4901: an optional record for a replay (the tournament page); it reads, it never changes the fight
@@ -105,7 +113,7 @@ export function duel(side, sc, { seconds = SECONDS, dt = DT, actuators = null, m
     const dmgA = A.dealt, dmgB = B.dealt, sunkB = B.fate === "sunk", lostA = !A.alive;
     const score = (dmgA - dmgB) / HP + (sunkB ? KILL_BONUS : 0) - (lostA ? KILL_BONUS : 0) + (sunkB && !lostA ? SPEED_BONUS * (1 - flown / total) : 0);
     const winner = A.alive && !B.alive ? "A" : B.alive && !A.alive ? "B" : "draw";
-    return { score, winner, hp: [A.hp, B.hp], damage: [dmgA, dmgB], fired: [A.fired, B.fired], hits: [A.hits, B.hits], pings: [A.pinged, B.pinged], fates: [A.fate, B.fate], ticks: flown, events, seed, kind: sc.kind, fingerprint: (h >>> 0).toString(16) };
+    return { ...(cm ? { cm: { ...cm.stats } } : {}), score, winner, hp: [A.hp, B.hp], damage: [dmgA, dmgB], fired: [A.fired, B.fired], hits: [A.hits, B.hits], pings: [A.pinged, B.pinged], fates: [A.fate, B.fate], ticks: flown, events, seed, kind: sc.kind, fingerprint: (h >>> 0).toString(16) };
 }
 
 

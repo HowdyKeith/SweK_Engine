@@ -1,0 +1,13 @@
+  search 4/4 (seed 6383) done in 2726 s: pruned 280 moved weights to 129
+  search 3/4 (seed 6382) done in 3144 s: pruned 303 moved weights to 129
+  search 2/4 (seed 6381) done in 3355 s: pruned 317 moved weights to 152
+  search 1/4 (seed 6380) done in 3511 s: pruned 305 moved weights to 131
+the autopilot (the hand weights): train -0.5741 (nominal -0.531, recovery -0.590, current -0.585; 0 ended early) | held-out -0.4880 (nominal -0.404, recovery -0.609, current -0.451; 0 ended early) | safety pool: 0 ended early of 500
+  run 1/4 seed 6380: train -0.3601, 105 improvements + 53 neutral moves; pruned 305 moved weights to 131; held-out -0.3309 (nominal -0.264, recovery -0.399, current -0.329; 0 ended early); safety pool: 0 ended early of 500
+  run 2/4 seed 6381: train -0.3736, 123 improvements + 58 neutral moves; pruned 317 moved weights to 152; held-out -0.3390 (nominal -0.307, recovery -0.399, current -0.311; 0 ended early); safety pool: 0 ended early of 500
+  run 3/4 seed 6382: train -0.3489, 107 improvements + 56 neutral moves; pruned 303 moved weights to 129; held-out -0.3238 (nominal -0.279, recovery -0.380, current -0.312; 0 ended early); safety pool: 0 ended early of 500
+  run 4/4 seed 6383: train -0.3580, 105 improvements + 58 neutral moves; pruned 280 moved weights to 129; held-out -0.3243 (nominal -0.272, recovery -0.399, current -0.302; 0 ended early); safety pool: 0 ended early of 500
+the autopilot on what the champion is graded on: audit -0.4956 (nominal -0.382, recovery -0.646, current -0.459; 0 ended early) | safety audit -0.5564 (nominal -0.488, recovery -0.586, current -0.536; 0 ended early) | reserve -0.5146 (nominal -0.320, recovery -0.659, current -0.565; 0 ended early)
+champion (seed 6382, the best held-out of the eligible): train -0.3489 (nominal -0.356, recovery -0.343, current -0.355; 0 ended early) | held-out -0.3238 (nominal -0.279, recovery -0.380, current -0.312; 0 ended early) | audit -0.3323 (nominal -0.268, recovery -0.441, current -0.288; 0 ended early) (36 better / 0 worse; tail -0.755 against -1.130) | safety audit -0.3593 (nominal -0.335, recovery -0.373, current -0.343; 0 ended early) (498 better / 0 worse; tail -0.739 against -1.129; 0 ended that the autopilot completes) | reserve -0.3480 (nominal -0.266, recovery -0.420, current -0.358; 0 ended early)
+QUALIFIES: beats the autopilot on the held-out, audit and safety audit, ends no dive early that the autopilot completes, keeps its tail and every kind of dive, and does not dive the reserve worse.
+dumped every run's weights and scores to brain\rig-results\plain14\plain6380.json (not a shipped file)

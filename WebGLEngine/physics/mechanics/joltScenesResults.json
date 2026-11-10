@@ -1,0 +1,5713 @@
+{
+ "registration": "physics/mechanics/SPINNING_BODY_WIP.md (the new default in the engine's own Jolt scenes)",
+ "seeds": [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40],
+ "nudge": 0.00001,
+ "pLine": 0.01,
+ "hold": 2,
+ "settings": [
+  {
+   "id": "D",
+   "gyroscopic": "default",
+   "nudge": 0,
+   "label": "the new default: no gyroscopic key, so the wrapper's implicit step"
+  },
+  {
+   "id": "F",
+   "gyroscopic": false,
+   "nudge": 0,
+   "label": "false on every body: what ships today"
+  },
+  {
+   "id": "F'",
+   "gyroscopic": false,
+   "nudge": 0.00001,
+   "label": "false, nudged by 1e-5 m: the chaos control"
+  }
+ ],
+ "arena": {
+  "ground": {
+   "pos": [0,-0.5,0],
+   "half": [40,0.5,0.5]
+  },
+  "wall": {
+   "x": 0,
+   "y": 0,
+   "z": 0,
+   "cols": 7,
+   "rows": 6,
+   "half": 0.5
+  },
+  "crew": {
+   "n": 3,
+   "x0": 3.5,
+   "dx": 1.4,
+   "y": 1.6,
+   "z": 0,
+   "scale": 0.85,
+   "jitterX": 0.2,
+   "raiseY": 0.4
+  },
+  "fling": {
+   "speed": 30,
+   "up": 7,
+   "spin": 5
+  },
+  "dt": 0.016666666666666666,
+  "substeps": 2,
+  "addedT": 10,
+  "flungT": 20,
+  "goneY": -5
+ },
+ "debris": [
+  {
+   "id": "D1",
+   "page": "blob-avatar.html",
+   "herd": null,
+   "N": 38,
+   "LO": -3.35,
+   "HI": 3.35,
+   "iso": 1,
+   "sites": 16,
+   "bias": 0.6,
+   "impact": [1.2,0.6,0],
+   "force": 2.6,
+   "ground": {
+    "y": -1.6,
+    "extent": 9
+   }
+  },
+  {
+   "id": "D2",
+   "page": "blob-herd.html",
+   "herd": {
+    "n": 5,
+    "orbitR": 3.1,
+    "separation": 1.35,
+    "seed": 7
+   },
+   "N": 32,
+   "LO": -4.4,
+   "HI": 4.4,
+   "iso": 1,
+   "sites": 22,
+   "bias": 0.5,
+   "impact": [0,0.4,0],
+   "force": 3,
+   "ground": {
+    "y": -2.2,
+    "extent": 12
+   }
+  }
+ ],
+ "debrisRun": {
+  "dt": 0.016666666666666666,
+  "substeps": 1,
+  "T": 15,
+  "goneBelow": 1
+ },
+ "stats": {
+  "A1": [
+   "restTime",
+   "height",
+   "cohesion"
+  ],
+  "A2": [
+   "broken",
+   "cohesion",
+   "gone",
+   "peakSpeed",
+   "peakSpin"
+  ],
+  "D1": [
+   "restTime",
+   "spread",
+   "height",
+   "gone",
+   "peakSpeed"
+  ],
+  "D2": [
+   "restTime",
+   "spread",
+   "height",
+   "gone",
+   "peakSpeed"
+  ]
+ },
+ "primary": {
+  "A1": [
+   "restTime"
+  ],
+  "A2": [
+   "broken",
+   "cohesion"
+  ],
+  "D1": [
+   "restTime",
+   "spread"
+  ],
+  "D2": [
+   "restTime",
+   "spread"
+  ]
+ },
+ "at": "2026-11-03T19:27:44.642Z",
+ "registered": true,
+ "addedT": 10,
+ "flungT": 20,
+ "debrisT": 15,
+ "page": {
+  "ok": true,
+  "checked": 25,
+  "missing": []
+ },
+ "setting": {
+  "ok": true,
+  "stepping": {
+   "A": 21,
+   "wall": 42,
+   "D1": 16,
+   "D2": 19
+  }
+ },
+ "flights": {
+  "A": [
+   {
+    "seed": 1,
+    "D": {
+     "A1": {
+      "restTime": 5.8,
+      "height": 1.1341119557619095,
+      "cohesion": 0.6040034776885774,
+      "gone": 0,
+      "finite": true,
+      "end": "cf1d0e06dd3cf23c"
+     },
+     "A2": {
+      "broken": 33,
+      "cohesion": 1.8012648465813448,
+      "gone": 14,
+      "peakSpeed": 477.1695968403479,
+      "peakSpin": 47.12389370448508,
+      "finite": true,
+      "end": "fb841c777829ddfc"
+     }
+    },
+    "F": {
+     "A1": {
+      "restTime": 5.833333333333333,
+      "height": 1.1339285629136222,
+      "cohesion": 0.6040036887695882,
+      "gone": 0,
+      "finite": true,
+      "end": "a686b759b2dd8668"
+     },
+     "A2": {
+      "broken": 31,
+      "cohesion": 1.915544259528325,
+      "gone": 14,
+      "peakSpeed": 478.347986617902,
+      "peakSpin": 47.12389380828526,
+      "finite": true,
+      "end": "bbd63d00da963e95"
+     }
+    },
+    "F'": {
+     "A1": {
+      "restTime": 5.783333333333333,
+      "height": 1.1343535745427722,
+      "cohesion": 0.6040002062129346,
+      "gone": 0,
+      "finite": true,
+      "end": "4507e6e6c69c6e80"
+     },
+     "A2": {
+      "broken": 36,
+      "cohesion": 1.7940638917975256,
+      "gone": 21,
+      "peakSpeed": 476.1819650248485,
+      "peakSpin": 47.12389611337188,
+      "finite": true,
+      "end": "2f5ccffbdf6d9f86"
+     }
+    }
+   },
+   {
+    "seed": 2,
+    "D": {
+     "A1": {
+      "restTime": 2.8666666666666667,
+      "height": 1.1300148651713418,
+      "cohesion": 0.49862303588848456,
+      "gone": 0,
+      "finite": true,
+      "end": "2331ba6baf2e6094"
+     },
+     "A2": {
+      "broken": 45,
+      "cohesion": 1.714669314740433,
+      "gone": 21,
+      "peakSpeed": 123.29872194259613,
+      "peakSpin": 47.12389132901412,
+      "finite": true,
+      "end": "9e3fc64c4c8f3825"
+     }
+    },
+    "F": {
+     "A1": {
+      "restTime": 4.7,
+      "height": 1.1299593647321065,
+      "cohesion": 0.49862303588848456,
+      "gone": 0,
+      "finite": true,
+      "end": "ec9dc38b549ec5c9"
+     },
+     "A2": {
+      "broken": 45,
+      "cohesion": 1.4689870092996091,
+      "gone": 21,
+      "peakSpeed": 120.47430951618465,
+      "peakSpin": 47.12389236627246,
+      "finite": true,
+      "end": "c492f6343c21cc6b"
+     }
+    },
+    "F'": {
+     "A1": {
+      "restTime": 2.8666666666666667,
+      "height": 1.1296522177401043,
+      "cohesion": 0.49862332101021284,
+      "gone": 0,
+      "finite": true,
+      "end": "c08a4b817ac9daf4"
+     },
+     "A2": {
+      "broken": 45,
+      "cohesion": 1.482202205991264,
+      "gone": 7,
+      "peakSpeed": 121.5759421328717,
+      "peakSpin": 47.123890452524535,
+      "finite": true,
+      "end": "eee12c7e3c2ed601"
+     }
+    }
+   },
+   {
+    "seed": 3,
+    "D": {
+     "A1": {
+      "restTime": 3.1166666666666667,
+      "height": 1.1298491209745407,
+      "cohesion": 0.4991054309098982,
+      "gone": 0,
+      "finite": true,
+      "end": "b4ae6e1a4e53baae"
+     },
+     "A2": {
+      "broken": 43,
+      "cohesion": 1.4891412886093742,
+      "gone": 21,
+      "peakSpeed": 350.13859097480645,
+      "peakSpin": 47.123894184542095,
+      "finite": true,
+      "end": "d44ca19f4f9e8f44"
+     }
+    },
+    "F": {
+     "A1": {
+      "restTime": 4.7,
+      "height": 1.1293269296487172,
+      "cohesion": 0.49915830143602413,
+      "gone": 0,
+      "finite": true,
+      "end": "72f03f77cd82ffea"
+     },
+     "A2": {
+      "broken": 43,
+      "cohesion": 1.7027113887179237,
+      "gone": 21,
+      "peakSpeed": 343.7152354897749,
+      "peakSpin": 47.123892870493464,
+      "finite": true,
+      "end": "eaccd87e9ea57523"
+     }
+    },
+    "F'": {
+     "A1": {
+      "restTime": 2.6166666666666667,
+      "height": 1.1299416351886022,
+      "cohesion": 0.4990428459534313,
+      "gone": 0,
+      "finite": true,
+      "end": "8561e9d39fc48972"
+     },
+     "A2": {
+      "broken": 44,
+      "cohesion": 1.511852084690618,
+      "gone": 7,
+      "peakSpeed": 344.44267493909734,
+      "peakSpin": 47.123893668456915,
+      "finite": true,
+      "end": "90bf4dc1c8fedc24"
+     }
+    }
+   },
+   {
+    "seed": 4,
+    "D": {
+     "A1": {
+      "restTime": 2.8833333333333333,
+      "height": 1.1268990479764485,
+      "cohesion": 0.5786977018305028,
+      "gone": 0,
+      "finite": true,
+      "end": "cdcc95a46a5a3426"
+     },
+     "A2": {
+      "broken": 31,
+      "cohesion": 1.6961146005676437,
+      "gone": 21,
+      "peakSpeed": 478.09573551631985,
+      "peakSpin": 47.12389402808628,
+      "finite": true,
+      "end": "c237e252574631a8"
+     }
+    },
+    "F": {
+     "A1": {
+      "restTime": 2.7666666666666666,
+      "height": 1.1264597248463404,
+      "cohesion": 0.578697701697413,
+      "gone": 0,
+      "finite": true,
+      "end": "02ec76a16cdf3d08"
+     },
+     "A2": {
+      "broken": 30,
+      "cohesion": 1.6749282987247684,
+      "gone": 21,
+      "peakSpeed": 478.6995989033355,
+      "peakSpin": 47.1238933598421,
+      "finite": true,
+      "end": "216665cce720cf7a"
+     }
+    },
+    "F'": {
+     "A1": {
+      "restTime": 3.4833333333333334,
+      "height": 1.1300016116528284,
+      "cohesion": 0.5786929265811507,
+      "gone": 0,
+      "finite": true,
+      "end": "d490a3e781434ec5"
+     },
+     "A2": {
+      "broken": 36,
+      "cohesion": 1.534101374891288,
+      "gone": 21,
+      "peakSpeed": 455.7163861978525,
+      "peakSpin": 47.1238948724787,
+      "finite": true,
+      "end": "6fce4bf927861555"
+     }
+    }
+   },
+   {
+    "seed": 5,
+    "D": {
+     "A1": {
+      "restTime": 5.166666666666667,
+      "height": 1.131902813911438,
+      "cohesion": 0.577118312110166,
+      "gone": 0,
+      "finite": true,
+      "end": "24813d532b6b2e6f"
+     },
+     "A2": {
+      "broken": 47,
+      "cohesion": 1.8125536372033693,
+      "gone": 21,
+      "peakSpeed": 398.59764526001123,
+      "peakSpin": 47.12389634372737,
+      "finite": true,
+      "end": "b862b22c73a87827"
+     }
+    },
+    "F": {
+     "A1": {
+      "restTime": 5.116666666666666,
+      "height": 1.1304024798529488,
+      "cohesion": 0.5771183119841806,
+      "gone": 0,
+      "finite": true,
+      "end": "4770dac685f67e63"
+     },
+     "A2": {
+      "broken": 45,
+      "cohesion": 1.9418425255426224,
+      "gone": 21,
+      "peakSpeed": 390.40305245205707,
+      "peakSpin": 47.12389385828442,
+      "finite": true,
+      "end": "7d83fea814ee2945"
+     }
+    },
+    "F'": {
+     "A1": {
+      "restTime": 5.2,
+      "height": 1.1248816067264193,
+      "cohesion": 0.5771140547220728,
+      "gone": 0,
+      "finite": true,
+      "end": "a452e9e9cd89bd5e"
+     },
+     "A2": {
+      "broken": 54,
+      "cohesion": 1.7509916976019517,
+      "gone": 21,
+      "peakSpeed": 394.3743818867062,
+      "peakSpin": 47.123894977894786,
+      "finite": true,
+      "end": "2635313b9d17de12"
+     }
+    }
+   },
+   {
+    "seed": 6,
+    "D": {
+     "A1": {
+      "restTime": 4.733333333333333,
+      "height": 1.0260518540938695,
+      "cohesion": 0.576478682585105,
+      "gone": 0,
+      "finite": true,
+      "end": "d195c5da9e7e4f05"
+     },
+     "A2": {
+      "broken": 45,
+      "cohesion": 1.7564956151791027,
+      "gone": 14,
+      "peakSpeed": 124.46309015986802,
+      "peakSpin": 47.12389145358991,
+      "finite": true,
+      "end": "9a4d296070c8e21f"
+     }
+    },
+    "F": {
+     "A1": {
+      "restTime": 3.0166666666666666,
+      "height": 1.0135820181596846,
+      "cohesion": 0.5764786826024113,
+      "gone": 0,
+      "finite": true,
+      "end": "b52e22b5e7d6b2c8"
+     },
+     "A2": {
+      "broken": 56,
+      "cohesion": 1.6427623852979367,
+      "gone": 14,
+      "peakSpeed": 133.6093357567474,
+      "peakSpin": 47.123893059968964,
+      "finite": true,
+      "end": "f039b92ee41e08d2"
+     }
+    },
+    "F'": {
+     "A1": {
+      "restTime": 3.05,
+      "height": 1.0142506389390855,
+      "cohesion": 0.5764743150374374,
+      "gone": 0,
+      "finite": true,
+      "end": "2276b00031c8c28b"
+     },
+     "A2": {
+      "broken": 54,
+      "cohesion": 1.8247840667079864,
+      "gone": 21,
+      "peakSpeed": 152.70233110154686,
+      "peakSpin": 47.123895318645225,
+      "finite": true,
+      "end": "b02060852b478eee"
+     }
+    }
+   },
+   {
+    "seed": 7,
+    "D": {
+     "A1": {
+      "restTime": 3.75,
+      "height": 1.1366367510386877,
+      "cohesion": 0.576126853286209,
+      "gone": 0,
+      "finite": true,
+      "end": "746b05a7ba6bb666"
+     },
+     "A2": {
+      "broken": 41,
+      "cohesion": 2.8919650461754056,
+      "gone": 21,
+      "peakSpeed": 381.30917160450855,
+      "peakSpin": 47.12389339575153,
+      "finite": true,
+      "end": "35826556c2990f0b"
+     }
+    },
+    "F": {
+     "A1": {
+      "restTime": 4.283333333333333,
+      "height": 1.1363471703869956,
+      "cohesion": 0.5761268533076471,
+      "gone": 0,
+      "finite": true,
+      "end": "8d1b45af2e20c655"
+     },
+     "A2": {
+      "broken": 40,
+      "cohesion": 2.020710920861748,
+      "gone": 14,
+      "peakSpeed": 297.85659753751054,
+      "peakSpin": 47.123893823857735,
+      "finite": true,
+      "end": "1583ff6d994306aa"
+     }
+    },
+    "F'": {
+     "A1": {
+      "restTime": 3.8833333333333333,
+      "height": 1.136002861318134,
+      "cohesion": 0.5761231748899396,
+      "gone": 0,
+      "finite": true,
+      "end": "6fd7ce9e9fbf66c6"
+     },
+     "A2": {
+      "broken": 41,
+      "cohesion": 2.254016822912468,
+      "gone": 21,
+      "peakSpeed": 301.43049875092345,
+      "peakSpin": 47.12389291387911,
+      "finite": true,
+      "end": "087085fb3ad52ea9"
+     }
+    }
+   },
+   {
+    "seed": 8,
+    "D": {
+     "A1": {
+      "restTime": 2.933333333333333,
+      "height": 1.019783181803567,
+      "cohesion": 0.6214954893554234,
+      "gone": 0,
+      "finite": true,
+      "end": "7118e00136f116c9"
+     },
+     "A2": {
+      "broken": 45,
+      "cohesion": 1.502473869949996,
+      "gone": 21,
+      "peakSpeed": 122.76576301686514,
+      "peakSpin": 47.12389265150244,
+      "finite": true,
+      "end": "73a9605bc7c16fe6"
+     }
+    },
+    "F": {
+     "A1": {
+      "restTime": 2.85,
+      "height": 1.0198486475717454,
+      "cohesion": 0.6214959606403675,
+      "gone": 0,
+      "finite": true,
+      "end": "14d82179e719db7a"
+     },
+     "A2": {
+      "broken": 45,
+      "cohesion": 1.5044606912234992,
+      "gone": 14,
+      "peakSpeed": 122.96204907533799,
+      "peakSpin": 47.12389259242213,
+      "finite": true,
+      "end": "d8b370845a6ab426"
+     }
+    },
+    "F'": {
+     "A1": {
+      "restTime": 2.85,
+      "height": 1.019857297341029,
+      "cohesion": 0.6214907717007792,
+      "gone": 0,
+      "finite": true,
+      "end": "18436e49eb697224"
+     },
+     "A2": {
+      "broken": 45,
+      "cohesion": 1.5043767680784497,
+      "gone": 7,
+      "peakSpeed": 122.51024190464089,
+      "peakSpin": 47.12389381031327,
+      "finite": true,
+      "end": "c5d2f62d8b9fa232"
+     }
+    }
+   },
+   {
+    "seed": 9,
+    "D": {
+     "A1": {
+      "restTime": 3,
+      "height": 1.0159463754722051,
+      "cohesion": 0.5952446448300849,
+      "gone": 0,
+      "finite": true,
+      "end": "95e5fcb1c1a4728b"
+     },
+     "A2": {
+      "broken": 43,
+      "cohesion": 1.5151118849263574,
+      "gone": 21,
+      "peakSpeed": 341.012334487235,
+      "peakSpin": 47.123893730036194,
+      "finite": true,
+      "end": "9c66e8375a30ed8f"
+     }
+    },
+    "F": {
+     "A1": {
+      "restTime": 3,
+      "height": 1.015923878266698,
+      "cohesion": 0.5952448943022686,
+      "gone": 0,
+      "finite": true,
+      "end": "3186321447eec6e2"
+     },
+     "A2": {
+      "broken": 44,
+      "cohesion": 1.5539252133032029,
+      "gone": 21,
+      "peakSpeed": 349.3961248084171,
+      "peakSpin": 47.123891804542254,
+      "finite": true,
+      "end": "f5747c5aa891402b"
+     }
+    },
+    "F'": {
+     "A1": {
+      "restTime": 3,
+      "height": 1.0157790162733622,
+      "cohesion": 0.5952417665093496,
+      "gone": 0,
+      "finite": true,
+      "end": "1c9e2b75dddc10cb"
+     },
+     "A2": {
+      "broken": 43,
+      "cohesion": 1.516361611600047,
+      "gone": 21,
+      "peakSpeed": 349.14699080451965,
+      "peakSpin": 47.12389313220078,
+      "finite": true,
+      "end": "449c330212bce309"
+     }
+    }
+   },
+   {
+    "seed": 10,
+    "D": {
+     "A1": {
+      "restTime": 1.8833333333333333,
+      "height": 1.132810000152815,
+      "cohesion": 0.5926324451718417,
+      "gone": 0,
+      "finite": true,
+      "end": "f9f1d4af440387c2"
+     },
+     "A2": {
+      "broken": 36,
+      "cohesion": 1.7421881519356794,
+      "gone": 14,
+      "peakSpeed": 476.9216731409369,
+      "peakSpin": 47.12389320937293,
+      "finite": true,
+      "end": "6aa996ea048b14f7"
+     }
+    },
+    "F": {
+     "A1": {
+      "restTime": 1.8833333333333333,
+      "height": 1.1327930972689675,
+      "cohesion": 0.592631487022474,
+      "gone": 0,
+      "finite": true,
+      "end": "e4027ed7325f40ae"
+     },
+     "A2": {
+      "broken": 36,
+      "cohesion": 1.7430394944741991,
+      "gone": 14,
+      "peakSpeed": 479.9007031160755,
+      "peakSpin": 47.12389217333611,
+      "finite": true,
+      "end": "a7ef55ddd79ac9bc"
+     }
+    },
+    "F'": {
+     "A1": {
+      "restTime": 1.8833333333333333,
+      "height": 1.132796843846639,
+      "cohesion": 0.592630508385008,
+      "gone": 0,
+      "finite": true,
+      "end": "a7e32a9f3bb39b8c"
+     },
+     "A2": {
+      "broken": 36,
+      "cohesion": 1.7430463261936595,
+      "gone": 21,
+      "peakSpeed": 479.7927855117022,
+      "peakSpin": 47.12389263738592,
+      "finite": true,
+      "end": "4cc0f506f5194ee2"
+     }
+    }
+   },
+   {
+    "seed": 11,
+    "D": {
+     "A1": {
+      "restTime": 2.1666666666666665,
+      "height": 1.133059947263627,
+      "cohesion": 0.5946292521873713,
+      "gone": 0,
+      "finite": true,
+      "end": "c37b15acd7362a4f"
+     },
+     "A2": {
+      "broken": 43,
+      "cohesion": 1.610856282175449,
+      "gone": 14,
+      "peakSpeed": 461.06145577854477,
+      "peakSpin": 47.123893913831864,
+      "finite": true,
+      "end": "936c1ffb2e0345b8"
+     }
+    },
+    "F": {
+     "A1": {
+      "restTime": 2.1666666666666665,
+      "height": 1.1330763328643072,
+      "cohesion": 0.5946292447847387,
+      "gone": 0,
+      "finite": true,
+      "end": "3aa291ebb1adcc38"
+     },
+     "A2": {
+      "broken": 43,
+      "cohesion": 1.611605379527465,
+      "gone": 21,
+      "peakSpeed": 462.2291192432366,
+      "peakSpin": 47.12389283796951,
+      "finite": true,
+      "end": "e6e649b9660090f3"
+     }
+    },
+    "F'": {
+     "A1": {
+      "restTime": 2.1666666666666665,
+      "height": 1.13309655161131,
+      "cohesion": 0.5946245666734581,
+      "gone": 0,
+      "finite": true,
+      "end": "73d17cbeb9c0157a"
+     },
+     "A2": {
+      "broken": 43,
+      "cohesion": 1.6114161476846507,
+      "gone": 21,
+      "peakSpeed": 462.24360524538537,
+      "peakSpin": 47.12389324863283,
+      "finite": true,
+      "end": "b9bfacbccd4b0d65"
+     }
+    }
+   },
+   {
+    "seed": 12,
+    "D": {
+     "A1": {
+      "restTime": 4.05,
+      "height": 1.137001490309125,
+      "cohesion": 0.6031402798580876,
+      "gone": 0,
+      "finite": true,
+      "end": "acd2b8b317f45a8d"
+     },
+     "A2": {
+      "broken": 45,
+      "cohesion": 1.6740437561391601,
+      "gone": 14,
+      "peakSpeed": 124.24918383153863,
+      "peakSpin": 47.1238942364418,
+      "finite": true,
+      "end": "c133b38ab28c6d41"
+     }
+    },
+    "F": {
+     "A1": {
+      "restTime": 4.033333333333333,
+      "height": 1.136962190980003,
+      "cohesion": 0.6031402492389139,
+      "gone": 0,
+      "finite": true,
+      "end": "b1fa7358c0c49cc2"
+     },
+     "A2": {
+      "broken": 45,
+      "cohesion": 1.6760189261991327,
+      "gone": 21,
+      "peakSpeed": 131.28758405317782,
+      "peakSpin": 47.12389428460907,
+      "finite": true,
+      "end": "437d163ffa8581bb"
+     }
+    },
+    "F'": {
+     "A1": {
+      "restTime": 4.433333333333334,
+      "height": 1.1369014566852933,
+      "cohesion": 0.6031260227822153,
+      "gone": 0,
+      "finite": true,
+      "end": "189a588f6b164c55"
+     },
+     "A2": {
+      "broken": 45,
+      "cohesion": 1.7822537209408935,
+      "gone": 21,
+      "peakSpeed": 147.55853341013855,
+      "peakSpin": 47.12389557476262,
+      "finite": true,
+      "end": "b7b1b828136ef25d"
+     }
+    }
+   },
+   {
+    "seed": 13,
+    "D": {
+     "A1": {
+      "restTime": 3.466666666666667,
+      "height": 1.1358224593457722,
+      "cohesion": 0.5106427784411061,
+      "gone": 0,
+      "finite": true,
+      "end": "2d582cafb4ab1708"
+     },
+     "A2": {
+      "broken": 39,
+      "cohesion": 1.5954227653655433,
+      "gone": 21,
+      "peakSpeed": 471.42980750630204,
+      "peakSpin": 47.12389346546329,
+      "finite": true,
+      "end": "0ab6dd4f2e651e89"
+     }
+    },
+    "F": {
+     "A1": {
+      "restTime": 3.0666666666666664,
+      "height": 1.1368306903612047,
+      "cohesion": 0.5106152824903172,
+      "gone": 0,
+      "finite": true,
+      "end": "8a94296d0cab706e"
+     },
+     "A2": {
+      "broken": 30,
+      "cohesion": 1.6391793209999443,
+      "gone": 14,
+      "peakSpeed": 462.43128255283284,
+      "peakSpin": 47.123894005688896,
+      "finite": true,
+      "end": "ee8bef2fd1b2140b"
+     }
+    },
+    "F'": {
+     "A1": {
+      "restTime": 2.8833333333333333,
+      "height": 1.1364126687958127,
+      "cohesion": 0.5106674813230965,
+      "gone": 0,
+      "finite": true,
+      "end": "6de02b1344018739"
+     },
+     "A2": {
+      "broken": 36,
+      "cohesion": 1.5192060373188572,
+      "gone": 14,
+      "peakSpeed": 460.8522893583883,
+      "peakSpin": 47.123893609525396,
+      "finite": true,
+      "end": "bef34866914afc37"
+     }
+    }
+   },
+   {
+    "seed": 14,
+    "D": {
+     "A1": {
+      "restTime": 2.933333333333333,
+      "height": 1.1269802962030684,
+      "cohesion": 0.5061709129633973,
+      "gone": 0,
+      "finite": true,
+      "end": "99dcc8d14aa8d71e"
+     },
+     "A2": {
+      "broken": 33,
+      "cohesion": 1.9581335860248077,
+      "gone": 14,
+      "peakSpeed": 480.85854021659327,
+      "peakSpin": 47.123893714659324,
+      "finite": true,
+      "end": "96e8d5467af62f31"
+     }
+    },
+    "F": {
+     "A1": {
+      "restTime": 2.8333333333333335,
+      "height": 1.1292111284676052,
+      "cohesion": 0.5060111415485831,
+      "gone": 0,
+      "finite": true,
+      "end": "8309260af4b0bc47"
+     },
+     "A2": {
+      "broken": 33,
+      "cohesion": 1.7950504358187462,
+      "gone": 7,
+      "peakSpeed": 480.9556358460828,
+      "peakSpin": 47.12389398219792,
+      "finite": true,
+      "end": "6febb0c89cc43954"
+     }
+    },
+    "F'": {
+     "A1": {
+      "restTime": 4.316666666666666,
+      "height": 1.1287358296769006,
+      "cohesion": 0.5059234921639004,
+      "gone": 0,
+      "finite": true,
+      "end": "0e7463feb677e175"
+     },
+     "A2": {
+      "broken": 30,
+      "cohesion": 1.782291540559476,
+      "gone": 21,
+      "peakSpeed": 480.7519456749912,
+      "peakSpin": 47.12389378417488,
+      "finite": true,
+      "end": "84a39c878713a393"
+     }
+    }
+   },
+   {
+    "seed": 15,
+    "D": {
+     "A1": {
+      "restTime": 7.2,
+      "height": 1.135634991384688,
+      "cohesion": 0.5780133079047691,
+      "gone": 0,
+      "finite": true,
+      "end": "5f0c442bb81a3faf"
+     },
+     "A2": {
+      "broken": 48,
+      "cohesion": 1.8044167836518037,
+      "gone": 21,
+      "peakSpeed": 165.36351726209145,
+      "peakSpin": 47.12389419225949,
+      "finite": true,
+      "end": "b77896de05d32bc5"
+     }
+    },
+    "F": {
+     "A1": {
+      "restTime": 4.35,
+      "height": 1.1365404994714827,
+      "cohesion": 0.5780133480053128,
+      "gone": 0,
+      "finite": true,
+      "end": "a8ee25db4d8a02f5"
+     },
+     "A2": {
+      "broken": 48,
+      "cohesion": 1.6692826058359889,
+      "gone": 14,
+      "peakSpeed": 174.0941805738439,
+      "peakSpin": 47.12389456184636,
+      "finite": true,
+      "end": "3a0c591b11306160"
+     }
+    },
+    "F'": {
+     "A1": {
+      "restTime": 4.666666666666667,
+      "height": 1.1361518019721621,
+      "cohesion": 0.5780097890399554,
+      "gone": 0,
+      "finite": true,
+      "end": "49f90e4ad10b4388"
+     },
+     "A2": {
+      "broken": 45,
+      "cohesion": 1.720257881965963,
+      "gone": 21,
+      "peakSpeed": 263.2278440713264,
+      "peakSpin": 47.12389403558993,
+      "finite": true,
+      "end": "52d8abd850886793"
+     }
+    }
+   },
+   {
+    "seed": 16,
+    "D": {
+     "A1": {
+      "restTime": 5.633333333333333,
+      "height": 1.015149869379543,
+      "cohesion": 0.5764936105872027,
+      "gone": 0,
+      "finite": true,
+      "end": "9d755a57018f218a"
+     },
+     "A2": {
+      "broken": 31,
+      "cohesion": 1.6135610349228366,
+      "gone": 21,
+      "peakSpeed": 471.74194757900193,
+      "peakSpin": 47.123896313913534,
+      "finite": true,
+      "end": "7989abd5b0465a43"
+     }
+    },
+    "F": {
+     "A1": {
+      "restTime": 5.633333333333333,
+      "height": 1.0117611324503308,
+      "cohesion": 0.5764933753028755,
+      "gone": 0,
+      "finite": true,
+      "end": "d213213f239a4468"
+     },
+     "A2": {
+      "broken": 35,
+      "cohesion": 1.509821690047976,
+      "gone": 21,
+      "peakSpeed": 444.68755116229903,
+      "peakSpin": 47.12389298312938,
+      "finite": true,
+      "end": "6248690ef7db79cb"
+     }
+    },
+    "F'": {
+     "A1": {
+      "restTime": 5.633333333333333,
+      "height": 1.0275935112010866,
+      "cohesion": 0.576488421707467,
+      "gone": 0,
+      "finite": true,
+      "end": "12aeb0aeea48dad7"
+     },
+     "A2": {
+      "broken": 43,
+      "cohesion": 2.259331626320007,
+      "gone": 21,
+      "peakSpeed": 344.7336876452975,
+      "peakSpin": 47.123893687558386,
+      "finite": true,
+      "end": "52f3e649886da42d"
+     }
+    }
+   },
+   {
+    "seed": 17,
+    "D": {
+     "A1": {
+      "restTime": 2.8333333333333335,
+      "height": 1.1317220145747775,
+      "cohesion": 0.5758048517102842,
+      "gone": 0,
+      "finite": true,
+      "end": "a407ed52e6cf0809"
+     },
+     "A2": {
+      "broken": 43,
+      "cohesion": 1.5842965983394095,
+      "gone": 21,
+      "peakSpeed": 454.86441371721753,
+      "peakSpin": 47.123894176496115,
+      "finite": true,
+      "end": "c2d26a0d90d1585f"
+     }
+    },
+    "F": {
+     "A1": {
+      "restTime": 2.9,
+      "height": 1.136251619883946,
+      "cohesion": 0.5758048517296888,
+      "gone": 0,
+      "finite": true,
+      "end": "65d31d1488ff2aa9"
+     },
+     "A2": {
+      "broken": 34,
+      "cohesion": 2.253754213549598,
+      "gone": 21,
+      "peakSpeed": 437.47984920989575,
+      "peakSpin": 47.12389454022236,
+      "finite": true,
+      "end": "32e36e3bc2dbd655"
+     }
+    },
+    "F'": {
+     "A1": {
+      "restTime": 2.533333333333333,
+      "height": 1.1313861040841966,
+      "cohesion": 0.5758006474191135,
+      "gone": 0,
+      "finite": true,
+      "end": "149787aa147d9225"
+     },
+     "A2": {
+      "broken": 34,
+      "cohesion": 1.652396189242521,
+      "gone": 21,
+      "peakSpeed": 454.83604514528685,
+      "peakSpin": 47.123895373169,
+      "finite": true,
+      "end": "a0f2d05dcda5a645"
+     }
+    }
+   },
+   {
+    "seed": 18,
+    "D": {
+     "A1": {
+      "restTime": 2.966666666666667,
+      "height": 1.1352449669724418,
+      "cohesion": 0.5754440978625994,
+      "gone": 0,
+      "finite": true,
+      "end": "c439cbf0e39b968b"
+     },
+     "A2": {
+      "broken": 55,
+      "cohesion": 1.7876340720188433,
+      "gone": 21,
+      "peakSpeed": 131.80129268502267,
+      "peakSpin": 47.12389260243098,
+      "finite": true,
+      "end": "27d21bd8c7326e0e"
+     }
+    },
+    "F": {
+     "A1": {
+      "restTime": 4.9,
+      "height": 1.1280476578644343,
+      "cohesion": 0.5754440978812021,
+      "gone": 0,
+      "finite": true,
+      "end": "68d6b31ecbf3c4a6"
+     },
+     "A2": {
+      "broken": 46,
+      "cohesion": 1.636678021847141,
+      "gone": 14,
+      "peakSpeed": 143.0787388960327,
+      "peakSpin": 47.123893373998904,
+      "finite": true,
+      "end": "a1e35183cd66630f"
+     }
+    },
+    "F'": {
+     "A1": {
+      "restTime": null,
+      "height": 0.9067312393869672,
+      "cohesion": 0.57543994802491,
+      "gone": 0,
+      "finite": true,
+      "end": "47006f2278fa66a9"
+     },
+     "A2": {
+      "broken": 60,
+      "cohesion": 1.5185080993477569,
+      "gone": 21,
+      "peakSpeed": 498.6998526335579,
+      "peakSpin": 47.1238936563387,
+      "finite": true,
+      "end": "79c81e8c4454ac08"
+     }
+    }
+   },
+   {
+    "seed": 19,
+    "D": {
+     "A1": {
+      "restTime": 4.366666666666666,
+      "height": 0.9706255935487293,
+      "cohesion": 0.6206474879899047,
+      "gone": 0,
+      "finite": true,
+      "end": "b4ed8b00e750c2e5"
+     },
+     "A2": {
+      "broken": 45,
+      "cohesion": 1.5602797232594974,
+      "gone": 21,
+      "peakSpeed": 183.12333320565895,
+      "peakSpin": 47.12389349159447,
+      "finite": true,
+      "end": "9b0af0548273785b"
+     }
+    },
+    "F": {
+     "A1": {
+      "restTime": 4,
+      "height": 0.970663885985102,
+      "cohesion": 0.6206474820462359,
+      "gone": 0,
+      "finite": true,
+      "end": "cd215bebec7f4a08"
+     },
+     "A2": {
+      "broken": 45,
+      "cohesion": 1.5224414437330827,
+      "gone": 21,
+      "peakSpeed": 184.0351704835402,
+      "peakSpin": 47.12389647115775,
+      "finite": true,
+      "end": "17e4f323176dbb67"
+     }
+    },
+    "F'": {
+     "A1": {
+      "restTime": 4,
+      "height": 0.9706619048402423,
+      "cohesion": 0.6206420460408179,
+      "gone": 0,
+      "finite": true,
+      "end": "bff3c211dc46b5bd"
+     },
+     "A2": {
+      "broken": 45,
+      "cohesion": 1.5270903871575485,
+      "gone": 21,
+      "peakSpeed": 184.06907707601897,
+      "peakSpin": 47.12389355417453,
+      "finite": true,
+      "end": "1932bb2513e7be6d"
+     }
+    }
+   },
+   {
+    "seed": 20,
+    "D": {
+     "A1": {
+      "restTime": 2.216666666666667,
+      "height": 1.1309008371262324,
+      "cohesion": 0.5946580322940206,
+      "gone": 0,
+      "finite": true,
+      "end": "0123ad1486a538a8"
+     },
+     "A2": {
+      "broken": 51,
+      "cohesion": 1.4678972697396446,
+      "gone": 21,
+      "peakSpeed": 464.64934000585345,
+      "peakSpin": 47.12389505294909,
+      "finite": true,
+      "end": "489df3e5c718b04f"
+     }
+    },
+    "F": {
+     "A1": {
+      "restTime": 2.2333333333333334,
+      "height": 1.130894185531707,
+      "cohesion": 0.594658697395922,
+      "gone": 0,
+      "finite": true,
+      "end": "33ec671f3bb61415"
+     },
+     "A2": {
+      "broken": 53,
+      "cohesion": 1.4691873592881464,
+      "gone": 14,
+      "peakSpeed": 464.31082241264545,
+      "peakSpin": 47.12389162488582,
+      "finite": true,
+      "end": "a91f40067ad83f06"
+     }
+    },
+    "F'": {
+     "A1": {
+      "restTime": 2.2333333333333334,
+      "height": 1.1309213127408708,
+      "cohesion": 0.5946547542933965,
+      "gone": 0,
+      "finite": true,
+      "end": "7d424e57a17553b8"
+     },
+     "A2": {
+      "broken": 53,
+      "cohesion": 1.4691762943420983,
+      "gone": 14,
+      "peakSpeed": 464.7276977026537,
+      "peakSpin": 47.12389118242612,
+      "finite": true,
+      "end": "b16349fac71159ec"
+     }
+    }
+   },
+   {
+    "seed": 21,
+    "D": {
+     "A1": {
+      "restTime": 3.2,
+      "height": 1.1304253141085308,
+      "cohesion": 0.5921033680405673,
+      "gone": 0,
+      "finite": true,
+      "end": "0c37ccd146b4216b"
+     },
+     "A2": {
+      "broken": 47,
+      "cohesion": 1.5421486905535253,
+      "gone": 21,
+      "peakSpeed": 139.57025670353084,
+      "peakSpin": 47.12389260142443,
+      "finite": true,
+      "end": "e96d7cbd7a9c0970"
+     }
+    },
+    "F": {
+     "A1": {
+      "restTime": 3.5666666666666664,
+      "height": 1.130445352622441,
+      "cohesion": 0.5921033374320336,
+      "gone": 0,
+      "finite": true,
+      "end": "1958cea91d58f07a"
+     },
+     "A2": {
+      "broken": 45,
+      "cohesion": 1.5432244356935039,
+      "gone": 21,
+      "peakSpeed": 140.00122562871562,
+      "peakSpin": 47.12389390811753,
+      "finite": true,
+      "end": "b5875d7ff3fcfd1b"
+     }
+    },
+    "F'": {
+     "A1": {
+      "restTime": 3.05,
+      "height": 1.130423019329707,
+      "cohesion": 0.5921018118322713,
+      "gone": 0,
+      "finite": true,
+      "end": "5afe34e843aed64b"
+     },
+     "A2": {
+      "broken": 43,
+      "cohesion": 1.5451159577384992,
+      "gone": 21,
+      "peakSpeed": 140.21494070954756,
+      "peakSpin": 47.12389318856902,
+      "finite": true,
+      "end": "37ed5dbd5f31af0c"
+     }
+    }
+   },
+   {
+    "seed": 22,
+    "D": {
+     "A1": {
+      "restTime": 2.8,
+      "height": 0.9977532774209976,
+      "cohesion": 0.5938393872582963,
+      "gone": 0,
+      "finite": true,
+      "end": "9b5aec8cd6edc414"
+     },
+     "A2": {
+      "broken": 43,
+      "cohesion": 1.6404282506789694,
+      "gone": 21,
+      "peakSpeed": 124.42798693319548,
+      "peakSpin": 47.12389299014999,
+      "finite": true,
+      "end": "bf88b918c031883b"
+     }
+    },
+    "F": {
+     "A1": {
+      "restTime": 2.85,
+      "height": 0.9975752319608416,
+      "cohesion": 0.5938389570771094,
+      "gone": 0,
+      "finite": true,
+      "end": "4646d2aa11f290c9"
+     },
+     "A2": {
+      "broken": 44,
+      "cohesion": 1.7450821580385372,
+      "gone": 21,
+      "peakSpeed": 124.55328020258194,
+      "peakSpin": 47.123895422001056,
+      "finite": true,
+      "end": "47527a8e5e52729f"
+     }
+    },
+    "F'": {
+     "A1": {
+      "restTime": 2.9,
+      "height": 0.9980709268933251,
+      "cohesion": 0.5938345402099666,
+      "gone": 0,
+      "finite": true,
+      "end": "0ef514b06084fd13"
+     },
+     "A2": {
+      "broken": 42,
+      "cohesion": 1.7536057623111638,
+      "gone": 21,
+      "peakSpeed": 124.44134797255997,
+      "peakSpin": 47.12389417230966,
+      "finite": true,
+      "end": "3ec05bf3f841254e"
+     }
+    }
+   },
+   {
+    "seed": 23,
+    "D": {
+     "A1": {
+      "restTime": 6.15,
+      "height": 1.1362863466853188,
+      "cohesion": 0.6026063260840333,
+      "gone": 0,
+      "finite": true,
+      "end": "e2e27a2b784f3a89"
+     },
+     "A2": {
+      "broken": 39,
+      "cohesion": 1.5833053855149126,
+      "gone": 21,
+      "peakSpeed": 476.1061761086195,
+      "peakSpin": 47.123894706463865,
+      "finite": true,
+      "end": "b800b7db097d5cf4"
+     }
+    },
+    "F": {
+     "A1": {
+      "restTime": 5.4,
+      "height": 1.1366243475959414,
+      "cohesion": 0.602605937043744,
+      "gone": 0,
+      "finite": true,
+      "end": "069a8279a3f70970"
+     },
+     "A2": {
+      "broken": 39,
+      "cohesion": 1.5508182822377348,
+      "gone": 14,
+      "peakSpeed": 476.1605694064886,
+      "peakSpin": 47.12389488811365,
+      "finite": true,
+      "end": "e89499cd440b3fae"
+     }
+    },
+    "F'": {
+     "A1": {
+      "restTime": 5.75,
+      "height": 1.1373670626254309,
+      "cohesion": 0.6027138815238389,
+      "gone": 0,
+      "finite": true,
+      "end": "408fc6ad4b4b462b"
+     },
+     "A2": {
+      "broken": 36,
+      "cohesion": 1.9685716063016694,
+      "gone": 21,
+      "peakSpeed": 479.0728013002249,
+      "peakSpin": 47.12389412157817,
+      "finite": true,
+      "end": "57be56c16e13a262"
+     }
+    }
+   },
+   {
+    "seed": 24,
+    "D": {
+     "A1": {
+      "restTime": 2.2333333333333334,
+      "height": 1.1279187606913703,
+      "cohesion": 0.49907008195392594,
+      "gone": 0,
+      "finite": true,
+      "end": "ca4569b0f1c023fd"
+     },
+     "A2": {
+      "broken": 43,
+      "cohesion": 1.4718345491056268,
+      "gone": 21,
+      "peakSpeed": 138.30542338983943,
+      "peakSpin": 47.12389431113688,
+      "finite": true,
+      "end": "0bcc1a7a95738eb2"
+     }
+    },
+    "F": {
+     "A1": {
+      "restTime": 2.1,
+      "height": 1.1281338319891976,
+      "cohesion": 0.49907008195392594,
+      "gone": 0,
+      "finite": true,
+      "end": "33fbe6a70dc86df3"
+     },
+     "A2": {
+      "broken": 45,
+      "cohesion": 1.4661129224559617,
+      "gone": 21,
+      "peakSpeed": 139.79947156756612,
+      "peakSpin": 47.123892138672325,
+      "finite": true,
+      "end": "adc98b7a76a310ed"
+     }
+    },
+    "F'": {
+     "A1": {
+      "restTime": 2,
+      "height": 1.128536282550721,
+      "cohesion": 0.4990706015168667,
+      "gone": 0,
+      "finite": true,
+      "end": "af73645f566f51a4"
+     },
+     "A2": {
+      "broken": 45,
+      "cohesion": 1.4779791715944945,
+      "gone": 21,
+      "peakSpeed": 139.78152006670274,
+      "peakSpin": 47.12389636174684,
+      "finite": true,
+      "end": "ae5469247c0b962c"
+     }
+    }
+   },
+   {
+    "seed": 25,
+    "D": {
+     "A1": {
+      "restTime": 4.816666666666666,
+      "height": 1.0163457876160031,
+      "cohesion": 0.5476787650055256,
+      "gone": 0,
+      "finite": true,
+      "end": "9bf143d16555d3b9"
+     },
+     "A2": {
+      "broken": 42,
+      "cohesion": 1.8469843671634112,
+      "gone": 21,
+      "peakSpeed": 244.09880618807784,
+      "peakSpin": 47.1238962106107,
+      "finite": true,
+      "end": "0bae3b39f73105c8"
+     }
+    },
+    "F": {
+     "A1": {
+      "restTime": 4.816666666666666,
+      "height": 1.0169167880501067,
+      "cohesion": 0.547602501472224,
+      "gone": 0,
+      "finite": true,
+      "end": "c19184f38db9296e"
+     },
+     "A2": {
+      "broken": 42,
+      "cohesion": 1.8770544436990737,
+      "gone": 21,
+      "peakSpeed": 251.5971042837172,
+      "peakSpin": 47.12389533170156,
+      "finite": true,
+      "end": "2a5a820287dbf9f8"
+     }
+    },
+    "F'": {
+     "A1": {
+      "restTime": 4.816666666666666,
+      "height": 1.0263723851669402,
+      "cohesion": 0.5476015511617657,
+      "gone": 0,
+      "finite": true,
+      "end": "c9656fd216e4ad69"
+     },
+     "A2": {
+      "broken": 44,
+      "cohesion": 1.8141491192931016,
+      "gone": 21,
+      "peakSpeed": 240.09795673106922,
+      "peakSpin": 47.12389338860987,
+      "finite": true,
+      "end": "159e37893a03b672"
+     }
+    }
+   },
+   {
+    "seed": 26,
+    "D": {
+     "A1": {
+      "restTime": 4.766666666666667,
+      "height": 1.1361037265686762,
+      "cohesion": 0.5772891995917492,
+      "gone": 0,
+      "finite": true,
+      "end": "596f7a1a6ceecfa0"
+     },
+     "A2": {
+      "broken": 31,
+      "cohesion": 2.1011524984657037,
+      "gone": 21,
+      "peakSpeed": 452.101919661194,
+      "peakSpin": 47.12389506461948,
+      "finite": true,
+      "end": "979c4948c6285b9b"
+     }
+    },
+    "F": {
+     "A1": {
+      "restTime": 5.866666666666666,
+      "height": 1.1443908938339777,
+      "cohesion": 0.5772891994609396,
+      "gone": 0,
+      "finite": true,
+      "end": "739ec2aaa6646792"
+     },
+     "A2": {
+      "broken": 41,
+      "cohesion": 2.2555048011492147,
+      "gone": 21,
+      "peakSpeed": 332.5554800812741,
+      "peakSpin": 47.12389285153381,
+      "finite": true,
+      "end": "efdf8c04ff8e0f6a"
+     }
+    },
+    "F'": {
+     "A1": {
+      "restTime": 5.866666666666666,
+      "height": 1.1357658136458624,
+      "cohesion": 0.5772850097056923,
+      "gone": 0,
+      "finite": true,
+      "end": "3ba021980e14e902"
+     },
+     "A2": {
+      "broken": 31,
+      "cohesion": 2.0913570880479586,
+      "gone": 21,
+      "peakSpeed": 458.2539079256983,
+      "peakSpin": 47.12389373966064,
+      "finite": true,
+      "end": "6da233df72f5e1c3"
+     }
+    }
+   },
+   {
+    "seed": 27,
+    "D": {
+     "A1": {
+      "restTime": 4.066666666666666,
+      "height": 1.1431505041463035,
+      "cohesion": 0.575840038758239,
+      "gone": 0,
+      "finite": true,
+      "end": "6fe91c9a0e63a1ee"
+     },
+     "A2": {
+      "broken": 45,
+      "cohesion": 2.271530091387828,
+      "gone": 21,
+      "peakSpeed": 348.8119233843248,
+      "peakSpin": 47.12389411620051,
+      "finite": true,
+      "end": "4dc4182466618bf1"
+     }
+    },
+    "F": {
+     "A1": {
+      "restTime": 2.4166666666666665,
+      "height": 1.1303534805774689,
+      "cohesion": 0.575840038638899,
+      "gone": 0,
+      "finite": true,
+      "end": "778da6447adedd19"
+     },
+     "A2": {
+      "broken": 36,
+      "cohesion": 1.9127875472545726,
+      "gone": 21,
+      "peakSpeed": 480.9885383845717,
+      "peakSpin": 47.12389341306457,
+      "finite": true,
+      "end": "72dd3ceac48a98ec"
+     }
+    },
+    "F'": {
+     "A1": {
+      "restTime": 3.2333333333333334,
+      "height": 1.132432656628745,
+      "cohesion": 0.5758357282385422,
+      "gone": 0,
+      "finite": true,
+      "end": "18313008975caac2"
+     },
+     "A2": {
+      "broken": 52,
+      "cohesion": 2.152339491841218,
+      "gone": 21,
+      "peakSpeed": 310.9550132621024,
+      "peakSpin": 47.12389526491454,
+      "finite": true,
+      "end": "583ec18e779f3350"
+     }
+    }
+   },
+   {
+    "seed": 28,
+    "D": {
+     "A1": {
+      "restTime": 4.566666666666666,
+      "height": 1.1473498117356074,
+      "cohesion": 0.5751372064067788,
+      "gone": 0,
+      "finite": true,
+      "end": "72c78457514c31b3"
+     },
+     "A2": {
+      "broken": 38,
+      "cohesion": 1.9083032559674904,
+      "gone": 14,
+      "peakSpeed": 413.9497986979278,
+      "peakSpin": 47.12389297081478,
+      "finite": true,
+      "end": "d8742c24a7f5e022"
+     }
+    },
+    "F": {
+     "A1": {
+      "restTime": 2.4833333333333334,
+      "height": 1.130706970180784,
+      "cohesion": 0.5751372064251792,
+      "gone": 0,
+      "finite": true,
+      "end": "3770f73cbccc904b"
+     },
+     "A2": {
+      "broken": 33,
+      "cohesion": 1.9451374444211094,
+      "gone": 21,
+      "peakSpeed": 399.6202533415967,
+      "peakSpin": 47.123894381237434,
+      "finite": true,
+      "end": "23fffa8426201777"
+     }
+    },
+    "F'": {
+     "A1": {
+      "restTime": 3.4833333333333334,
+      "height": 1.1366936152889615,
+      "cohesion": 0.5751335104301082,
+      "gone": 0,
+      "finite": true,
+      "end": "12b721cf45760bde"
+     },
+     "A2": {
+      "broken": 41,
+      "cohesion": 1.7695582027806909,
+      "gone": 21,
+      "peakSpeed": 272.6491611806018,
+      "peakSpin": 47.12389431996752,
+      "finite": true,
+      "end": "41c6b8ad9bd787ab"
+     }
+    }
+   },
+   {
+    "seed": 29,
+    "D": {
+     "A1": {
+      "restTime": 3.0166666666666666,
+      "height": 1.131062973113287,
+      "cohesion": 0.574763797703437,
+      "gone": 0,
+      "finite": true,
+      "end": "f2016cb6156966f6"
+     },
+     "A2": {
+      "broken": 32,
+      "cohesion": 1.41227868515872,
+      "gone": 21,
+      "peakSpeed": 453.7828460674355,
+      "peakSpin": 47.12389246550018,
+      "finite": true,
+      "end": "8a163d6c6cb4463e"
+     }
+    },
+    "F": {
+     "A1": {
+      "restTime": 3.25,
+      "height": 1.136830061674118,
+      "cohesion": 0.574763797722587,
+      "gone": 0,
+      "finite": true,
+      "end": "45dfad2ebb9d9f48"
+     },
+     "A2": {
+      "broken": 41,
+      "cohesion": 2.2176857861321375,
+      "gone": 21,
+      "peakSpeed": 322.3676693883205,
+      "peakSpin": 47.12389453481054,
+      "finite": true,
+      "end": "af4269b42bb55038"
+     }
+    },
+    "F'": {
+     "A1": {
+      "restTime": 2.2333333333333334,
+      "height": 1.1310341684591203,
+      "cohesion": 0.5747594124992396,
+      "gone": 0,
+      "finite": true,
+      "end": "1616387ce2a43e39"
+     },
+     "A2": {
+      "broken": 43,
+      "cohesion": 1.5996867934028265,
+      "gone": 21,
+      "peakSpeed": 449.44741526370524,
+      "peakSpin": 47.12389411298153,
+      "finite": true,
+      "end": "00346e5c99963cd0"
+     }
+    }
+   },
+   {
+    "seed": 30,
+    "D": {
+     "A1": {
+      "restTime": 3.3833333333333333,
+      "height": 1.1352749906835102,
+      "cohesion": 0.5743099697087389,
+      "gone": 0,
+      "finite": true,
+      "end": "e242cb5961fb0b33"
+     },
+     "A2": {
+      "broken": 31,
+      "cohesion": 1.8144963926942932,
+      "gone": 21,
+      "peakSpeed": 465.006033633819,
+      "peakSpin": 47.1238940563936,
+      "finite": true,
+      "end": "21de08eb132da036"
+     }
+    },
+    "F": {
+     "A1": {
+      "restTime": 4.266666666666667,
+      "height": 1.1349898789610182,
+      "cohesion": 0.5743099697381592,
+      "gone": 0,
+      "finite": true,
+      "end": "3517b27fbb9c7bef"
+     },
+     "A2": {
+      "broken": 32,
+      "cohesion": 1.8081669637618116,
+      "gone": 21,
+      "peakSpeed": 462.57212050002664,
+      "peakSpin": 47.12389408060187,
+      "finite": true,
+      "end": "11360bb5f659b625"
+     }
+    },
+    "F'": {
+     "A1": {
+      "restTime": 3.25,
+      "height": 1.1364667628492628,
+      "cohesion": 0.5743059494858657,
+      "gone": 0,
+      "finite": true,
+      "end": "b9b714772388403d"
+     },
+     "A2": {
+      "broken": 34,
+      "cohesion": 1.8751248238073879,
+      "gone": 21,
+      "peakSpeed": 468.60143004379546,
+      "peakSpin": 47.12389455462731,
+      "finite": true,
+      "end": "d2807eef0811bab2"
+     }
+    }
+   },
+   {
+    "seed": 31,
+    "D": {
+     "A1": {
+      "restTime": 5.716666666666667,
+      "height": 1.0098550674461184,
+      "cohesion": 0.5939541716184361,
+      "gone": 0,
+      "finite": true,
+      "end": "b6c88529587365b0"
+     },
+     "A2": {
+      "broken": 42,
+      "cohesion": 2.270925424400321,
+      "gone": 7,
+      "peakSpeed": 305.0352017712368,
+      "peakSpin": 47.123892408011706,
+      "finite": true,
+      "end": "6d9c86753d710bf8"
+     }
+    },
+    "F": {
+     "A1": {
+      "restTime": 5.033333333333333,
+      "height": 1.0114639692363285,
+      "cohesion": 0.5939580674308995,
+      "gone": 0,
+      "finite": true,
+      "end": "1e9b772ce40b946f"
+     },
+     "A2": {
+      "broken": 42,
+      "cohesion": 2.259584560148001,
+      "gone": 21,
+      "peakSpeed": 305.0170095016261,
+      "peakSpin": 47.12389311648029,
+      "finite": true,
+      "end": "7d6871e960be8b84"
+     }
+    },
+    "F'": {
+     "A1": {
+      "restTime": 6.166666666666667,
+      "height": 1.0114557303133465,
+      "cohesion": 0.5939500183345063,
+      "gone": 0,
+      "finite": true,
+      "end": "8c1dff470fe13b11"
+     },
+     "A2": {
+      "broken": 42,
+      "cohesion": 2.2185421967449193,
+      "gone": 21,
+      "peakSpeed": 305.0681884395497,
+      "peakSpin": 47.123891903338546,
+      "finite": true,
+      "end": "340aa242cca2b28e"
+     }
+    }
+   },
+   {
+    "seed": 32,
+    "D": {
+     "A1": {
+      "restTime": 2.3833333333333333,
+      "height": 1.135372227146512,
+      "cohesion": 0.5915277171185854,
+      "gone": 0,
+      "finite": true,
+      "end": "0b551ad02895f85d"
+     },
+     "A2": {
+      "broken": 45,
+      "cohesion": 1.7350890451525183,
+      "gone": 21,
+      "peakSpeed": 202.80620325420938,
+      "peakSpin": 47.12389206867821,
+      "finite": true,
+      "end": "f125d82ed6fcf73c"
+     }
+    },
+    "F": {
+     "A1": {
+      "restTime": 3.5666666666666664,
+      "height": 1.1346772213776906,
+      "cohesion": 0.5915252069887688,
+      "gone": 0,
+      "finite": true,
+      "end": "36350f4c025c5d0c"
+     },
+     "A2": {
+      "broken": 44,
+      "cohesion": 1.5285418941902196,
+      "gone": 21,
+      "peakSpeed": 341.85385341068104,
+      "peakSpin": 47.12389382097267,
+      "finite": true,
+      "end": "c39f6ae623d1712e"
+     }
+    },
+    "F'": {
+     "A1": {
+      "restTime": 2.3833333333333333,
+      "height": 1.135408171585628,
+      "cohesion": 0.5915215774589059,
+      "gone": 0,
+      "finite": true,
+      "end": "9c46a908beb9308b"
+     },
+     "A2": {
+      "broken": 48,
+      "cohesion": 1.7361909635726727,
+      "gone": 14,
+      "peakSpeed": 194.3506010784424,
+      "peakSpin": 47.12389444606384,
+      "finite": true,
+      "end": "678855cb9c5be2db"
+     }
+    }
+   },
+   {
+    "seed": 33,
+    "D": {
+     "A1": {
+      "restTime": 2.8,
+      "height": 1.0138875061557406,
+      "cohesion": 0.5930109626914281,
+      "gone": 0,
+      "finite": true,
+      "end": "f404679ac6e8b46c"
+     },
+     "A2": {
+      "broken": 42,
+      "cohesion": 1.7064061326896198,
+      "gone": 21,
+      "peakSpeed": 141.65630767441755,
+      "peakSpin": 47.123894246613155,
+      "finite": true,
+      "end": "d6d3d06a1498cd6d"
+     }
+    },
+    "F": {
+     "A1": {
+      "restTime": 2.75,
+      "height": 1.0139963158539362,
+      "cohesion": 0.5930107318443686,
+      "gone": 0,
+      "finite": true,
+      "end": "bc9fd464c53c41e5"
+     },
+     "A2": {
+      "broken": 44,
+      "cohesion": 1.707473254218671,
+      "gone": 21,
+      "peakSpeed": 161.4819961698383,
+      "peakSpin": 47.12389241804979,
+      "finite": true,
+      "end": "cfded73d37a98014"
+     }
+    },
+    "F'": {
+     "A1": {
+      "restTime": 2.7333333333333334,
+      "height": 1.0139761978671664,
+      "cohesion": 0.5930079058906743,
+      "gone": 0,
+      "finite": true,
+      "end": "49d0495c87669772"
+     },
+     "A2": {
+      "broken": 36,
+      "cohesion": 1.9815032894628708,
+      "gone": 21,
+      "peakSpeed": 272.3049734242838,
+      "peakSpin": 47.12389343513752,
+      "finite": true,
+      "end": "14f9d043ee2f394a"
+     }
+    }
+   },
+   {
+    "seed": 34,
+    "D": {
+     "A1": {
+      "restTime": 5.916666666666667,
+      "height": 1.0193540851275127,
+      "cohesion": 0.6019460516588064,
+      "gone": 0,
+      "finite": true,
+      "end": "43cbc49f564b877b"
+     },
+     "A2": {
+      "broken": 44,
+      "cohesion": 1.502358249846691,
+      "gone": 21,
+      "peakSpeed": 123.66848632178535,
+      "peakSpin": 47.123892469461964,
+      "finite": true,
+      "end": "105fdff64bce6f3c"
+     }
+    },
+    "F": {
+     "A1": {
+      "restTime": 6.333333333333333,
+      "height": 1.020142409063521,
+      "cohesion": 0.6019457860309145,
+      "gone": 0,
+      "finite": true,
+      "end": "81236fbca1766efe"
+     },
+     "A2": {
+      "broken": 50,
+      "cohesion": 1.7473107862813997,
+      "gone": 21,
+      "peakSpeed": 120.22282369353385,
+      "peakSpin": 47.12389276293925,
+      "finite": true,
+      "end": "7a612ac64006c926"
+     }
+    },
+    "F'": {
+     "A1": {
+      "restTime": null,
+      "height": -62.675914883613586,
+      "cohesion": 0.6019557958576253,
+      "gone": 7,
+      "finite": true,
+      "end": "28e0f5da327e64fa"
+     },
+     "A2": {
+      "broken": 28,
+      "cohesion": 1.7465389087366723,
+      "gone": 14,
+      "peakSpeed": 500.0000247584919,
+      "peakSpin": 47.12389121154016,
+      "finite": true,
+      "end": "674880ab97a0f0fb"
+     }
+    }
+   },
+   {
+    "seed": 35,
+    "D": {
+     "A1": {
+      "restTime": 7.416666666666667,
+      "height": 1.1283110607238043,
+      "cohesion": 0.5495519155181863,
+      "gone": 0,
+      "finite": true,
+      "end": "885e076fb8223cb1"
+     },
+     "A2": {
+      "broken": 44,
+      "cohesion": 2.15268860339946,
+      "gone": 21,
+      "peakSpeed": 310.92263941525107,
+      "peakSpin": 47.123895501740634,
+      "finite": true,
+      "end": "62f74c4719cca0b2"
+     }
+    },
+    "F": {
+     "A1": {
+      "restTime": 4.35,
+      "height": 1.133006452094941,
+      "cohesion": 0.5493953435720712,
+      "gone": 0,
+      "finite": true,
+      "end": "117785e7849e9087"
+     },
+     "A2": {
+      "broken": 71,
+      "cohesion": 1.9728178187311454,
+      "gone": 21,
+      "peakSpeed": 449.3894389938371,
+      "peakSpin": 47.1238964011717,
+      "finite": true,
+      "end": "5221b7e81f8f911d"
+     }
+    },
+    "F'": {
+     "A1": {
+      "restTime": 3.683333333333333,
+      "height": 1.0145242675429298,
+      "cohesion": 0.5493853947400499,
+      "gone": 0,
+      "finite": true,
+      "end": "de1d5cd0747040f6"
+     },
+     "A2": {
+      "broken": 48,
+      "cohesion": 1.9068922823627426,
+      "gone": 21,
+      "peakSpeed": 202.90953953890875,
+      "peakSpin": 47.123894250302996,
+      "finite": true,
+      "end": "d113b495c7997b92"
+     }
+    }
+   },
+   {
+    "seed": 36,
+    "D": {
+     "A1": {
+      "restTime": 5.35,
+      "height": 1.1303837299346924,
+      "cohesion": 0.5474173514189646,
+      "gone": 0,
+      "finite": true,
+      "end": "6957286ce369462e"
+     },
+     "A2": {
+      "broken": 39,
+      "cohesion": 1.9378222079262357,
+      "gone": 21,
+      "peakSpeed": 470.3437294618852,
+      "peakSpin": 47.123892210102085,
+      "finite": true,
+      "end": "5620ecfc482b43a0"
+     }
+    },
+    "F": {
+     "A1": {
+      "restTime": 4.466666666666667,
+      "height": 1.1330467703796567,
+      "cohesion": 0.5474176484557924,
+      "gone": 0,
+      "finite": true,
+      "end": "577e283934deb51a"
+     },
+     "A2": {
+      "broken": 30,
+      "cohesion": 1.950214559666418,
+      "gone": 21,
+      "peakSpeed": 462.99099589554106,
+      "peakSpin": 47.12389439513294,
+      "finite": true,
+      "end": "de7559d97383864e"
+     }
+    },
+    "F'": {
+     "A1": {
+      "restTime": 8.2,
+      "height": 1.1277729684398288,
+      "cohesion": 0.5474142889503415,
+      "gone": 0,
+      "finite": true,
+      "end": "2158ffa4dbdcc9ad"
+     },
+     "A2": {
+      "broken": 39,
+      "cohesion": 1.963373316804684,
+      "gone": 21,
+      "peakSpeed": 467.4062996195018,
+      "peakSpin": 47.12389264811998,
+      "finite": true,
+      "end": "73f24720f7c46f42"
+     }
+    }
+   },
+   {
+    "seed": 37,
+    "D": {
+     "A1": {
+      "restTime": 5.866666666666666,
+      "height": 1.1356725267001562,
+      "cohesion": 0.5765265844173533,
+      "gone": 0,
+      "finite": true,
+      "end": "016c92af8d05cf8f"
+     },
+     "A2": {
+      "broken": 43,
+      "cohesion": 1.6266374917534094,
+      "gone": 21,
+      "peakSpeed": 263.12126061413454,
+      "peakSpin": 47.123895085905914,
+      "finite": true,
+      "end": "3797a6a41d9337ad"
+     }
+    },
+    "F": {
+     "A1": {
+      "restTime": 5.3,
+      "height": 1.1355920263699122,
+      "cohesion": 0.5765265842935511,
+      "gone": 0,
+      "finite": true,
+      "end": "aeeb43ff35775790"
+     },
+     "A2": {
+      "broken": 44,
+      "cohesion": 1.6900926418938267,
+      "gone": 21,
+      "peakSpeed": 264.5106428600266,
+      "peakSpin": 47.12389370983686,
+      "finite": true,
+      "end": "abe2258c1103206c"
+     }
+    },
+    "F'": {
+     "A1": {
+      "restTime": 4.383333333333333,
+      "height": 1.1443259233520144,
+      "cohesion": 0.5765218115275567,
+      "gone": 0,
+      "finite": true,
+      "end": "04b6ea45787591f8"
+     },
+     "A2": {
+      "broken": 45,
+      "cohesion": 1.8416606852544617,
+      "gone": 21,
+      "peakSpeed": 252.1381158495489,
+      "peakSpin": 47.12389214089834,
+      "finite": true,
+      "end": "ecb4cbdb26f70858"
+     }
+    }
+   },
+   {
+    "seed": 38,
+    "D": {
+     "A1": {
+      "restTime": 2.7333333333333334,
+      "height": 1.1289373026007699,
+      "cohesion": 0.5751960223910543,
+      "gone": 0,
+      "finite": true,
+      "end": "f42c739792a3b228"
+     },
+     "A2": {
+      "broken": 45,
+      "cohesion": 1.48836624267101,
+      "gone": 21,
+      "peakSpeed": 205.26825864333162,
+      "peakSpin": 47.12389304557597,
+      "finite": true,
+      "end": "e8cb8a1f77a1e401"
+     }
+    },
+    "F": {
+     "A1": {
+      "restTime": 3.9499999999999997,
+      "height": 1.132140881958462,
+      "cohesion": 0.5751960222729449,
+      "gone": 0,
+      "finite": true,
+      "end": "0aca89d7705dd22b"
+     },
+     "A2": {
+      "broken": 45,
+      "cohesion": 1.560395323654628,
+      "gone": 21,
+      "peakSpeed": 342.56471263453267,
+      "peakSpin": 47.12389269319062,
+      "finite": true,
+      "end": "b8ca79f25b8ba1d8"
+     }
+    },
+    "F'": {
+     "A1": {
+      "restTime": 5.65,
+      "height": 1.1447469237304868,
+      "cohesion": 0.5751931002903725,
+      "gone": 0,
+      "finite": true,
+      "end": "58795b1b1a5e3fc6"
+     },
+     "A2": {
+      "broken": 45,
+      "cohesion": 1.7717718706247834,
+      "gone": 21,
+      "peakSpeed": 425.4959946777986,
+      "peakSpin": 47.12389545082777,
+      "finite": true,
+      "end": "10880e1faa13f24d"
+     }
+    }
+   },
+   {
+    "seed": 39,
+    "D": {
+     "A1": {
+      "restTime": 2.7,
+      "height": 1.1267815771557035,
+      "cohesion": 0.5744695946915963,
+      "gone": 0,
+      "finite": true,
+      "end": "8f9868e2eb534c7a"
+     },
+     "A2": {
+      "broken": 33,
+      "cohesion": 1.985751013218635,
+      "gone": 14,
+      "peakSpeed": 478.72816240417313,
+      "peakSpin": 47.123894618362186,
+      "finite": true,
+      "end": "5cdda6746a8df01b"
+     }
+    },
+    "F": {
+     "A1": {
+      "restTime": 3.7666666666666666,
+      "height": 1.1463015647161574,
+      "cohesion": 0.5744695947080973,
+      "gone": 0,
+      "finite": true,
+      "end": "c93b86101029d9f6"
+     },
+     "A2": {
+      "broken": 45,
+      "cohesion": 2.2507049169465163,
+      "gone": 21,
+      "peakSpeed": 351.91947645566376,
+      "peakSpin": 47.12389079019729,
+      "finite": true,
+      "end": "a315d86e8e6b065b"
+     }
+    },
+    "F'": {
+     "A1": {
+      "restTime": 5.366666666666666,
+      "height": 1.1448811235881986,
+      "cohesion": 0.5744654431444118,
+      "gone": 0,
+      "finite": true,
+      "end": "64a590ca6b9fda03"
+     },
+     "A2": {
+      "broken": 41,
+      "cohesion": 2.24969587004082,
+      "gone": 21,
+      "peakSpeed": 348.43247859950833,
+      "peakSpin": 47.12389454595729,
+      "finite": true,
+      "end": "d373ae080e1d5e37"
+     }
+    }
+   },
+   {
+    "seed": 40,
+    "D": {
+     "A1": {
+      "restTime": 3.9499999999999997,
+      "height": 1.1353392828078497,
+      "cohesion": 0.5740864627699697,
+      "gone": 0,
+      "finite": true,
+      "end": "01b05685f2993b4a"
+     },
+     "A2": {
+      "broken": 45,
+      "cohesion": 1.7460245408742843,
+      "gone": 21,
+      "peakSpeed": 149.8421541787731,
+      "peakSpin": 47.12389453983527,
+      "finite": true,
+      "end": "7ca2e08fbaaa59ff"
+     }
+    },
+    "F": {
+     "A1": {
+      "restTime": 3.8666666666666667,
+      "height": 1.1344948538712092,
+      "cohesion": 0.5740864627872189,
+      "gone": 0,
+      "finite": true,
+      "end": "e30ed01bc265742d"
+     },
+     "A2": {
+      "broken": 45,
+      "cohesion": 1.7653489219686227,
+      "gone": 21,
+      "peakSpeed": 146.1142974110094,
+      "peakSpin": 47.123895208058954,
+      "finite": true,
+      "end": "ce5a18c0123d6320"
+     }
+    },
+    "F'": {
+     "A1": {
+      "restTime": 4.666666666666667,
+      "height": 1.134198982091177,
+      "cohesion": 0.5740822117838551,
+      "gone": 0,
+      "finite": true,
+      "end": "211a91921a805954"
+     },
+     "A2": {
+      "broken": 52,
+      "cohesion": 1.7673831010056935,
+      "gone": 21,
+      "peakSpeed": 145.75592621712778,
+      "peakSpin": 47.123892508609444,
+      "finite": true,
+      "end": "9932ea5c79ba4c6e"
+     }
+    }
+   }
+  ],
+  "D1": [
+   {
+    "seed": 1,
+    "D": {
+     "fragments": 16,
+     "restTime": 6.6499999999999995,
+     "spread": 2.8583872765769005,
+     "height": -1.0373744778335094,
+     "gone": 0,
+     "peakSpeed": 5.737539805405709,
+     "finite": true,
+     "end": "a130cd3449d8bf3d"
+    },
+    "F": {
+     "fragments": 16,
+     "restTime": 4.466666666666667,
+     "spread": 2.768364516941054,
+     "height": -0.8900220766663551,
+     "gone": 0,
+     "peakSpeed": 5.705347266907247,
+     "finite": true,
+     "end": "3f904f1538a820e2"
+    },
+    "F'": {
+     "fragments": 16,
+     "restTime": 5.05,
+     "spread": 2.720257020397806,
+     "height": -0.9648916572332382,
+     "gone": 0,
+     "peakSpeed": 5.799853112345522,
+     "finite": true,
+     "end": "39726341fa89ba0c"
+    }
+   },
+   {
+    "seed": 2,
+    "D": {
+     "fragments": 16,
+     "restTime": 4.616666666666666,
+     "spread": 2.987619724018934,
+     "height": -0.6893108962103724,
+     "gone": 0,
+     "peakSpeed": 7.230388702712688,
+     "finite": true,
+     "end": "84f0099201f7a401"
+    },
+    "F": {
+     "fragments": 16,
+     "restTime": 4.733333333333333,
+     "spread": 3.041091853422597,
+     "height": -0.6887278242502362,
+     "gone": 0,
+     "peakSpeed": 7.128500158643066,
+     "finite": true,
+     "end": "b767de38b2a42dae"
+    },
+    "F'": {
+     "fragments": 16,
+     "restTime": 4.683333333333334,
+     "spread": 3.1211210929731448,
+     "height": -0.6902683933731169,
+     "gone": 0,
+     "peakSpeed": 7.240507822317138,
+     "finite": true,
+     "end": "2e8f40ab75f98742"
+    }
+   },
+   {
+    "seed": 3,
+    "D": {
+     "fragments": 14,
+     "restTime": 4.033333333333333,
+     "spread": 2.7197152450233717,
+     "height": -0.4066383455480848,
+     "gone": 0,
+     "peakSpeed": 6.910130046657574,
+     "finite": true,
+     "end": "10bbadc432087750"
+    },
+    "F": {
+     "fragments": 14,
+     "restTime": 4.066666666666666,
+     "spread": 2.6192544651497283,
+     "height": -0.4118169439690454,
+     "gone": 0,
+     "peakSpeed": 6.932171446583405,
+     "finite": true,
+     "end": "0931800719a84890"
+    },
+    "F'": {
+     "fragments": 14,
+     "restTime": 4.416666666666667,
+     "spread": 2.598016920060829,
+     "height": -0.42328288512570517,
+     "gone": 0,
+     "peakSpeed": 6.932898061301696,
+     "finite": true,
+     "end": "52252ffecf2e5cbc"
+    }
+   },
+   {
+    "seed": 4,
+    "D": {
+     "fragments": 16,
+     "restTime": 6.483333333333333,
+     "spread": 2.1462938559315172,
+     "height": -0.5077288672327995,
+     "gone": 0,
+     "peakSpeed": 6.338329974136051,
+     "finite": true,
+     "end": "a8a5c4a17b78c5bc"
+    },
+    "F": {
+     "fragments": 16,
+     "restTime": 3.783333333333333,
+     "spread": 2.133334633201128,
+     "height": -0.5132323261350393,
+     "gone": 0,
+     "peakSpeed": 6.292339883576661,
+     "finite": true,
+     "end": "967b3956f7b73502"
+    },
+    "F'": {
+     "fragments": 16,
+     "restTime": 6.316666666666666,
+     "spread": 2.142578426168882,
+     "height": -0.5076375287026167,
+     "gone": 0,
+     "peakSpeed": 6.292334060684764,
+     "finite": true,
+     "end": "6c660d86b8b5be88"
+    }
+   },
+   {
+    "seed": 5,
+    "D": {
+     "fragments": 14,
+     "restTime": 3.4833333333333334,
+     "spread": 2.608924201701086,
+     "height": -0.5845292551176888,
+     "gone": 0,
+     "peakSpeed": 7.292277734749889,
+     "finite": true,
+     "end": "55e2c0917461e15e"
+    },
+    "F": {
+     "fragments": 14,
+     "restTime": 4.2,
+     "spread": 2.7692474944495507,
+     "height": -0.7430016132337707,
+     "gone": 0,
+     "peakSpeed": 7.297513104453414,
+     "finite": true,
+     "end": "16735b1e510a52c0"
+    },
+    "F'": {
+     "fragments": 14,
+     "restTime": 4.133333333333333,
+     "spread": 2.769230842445083,
+     "height": -0.7439469248056412,
+     "gone": 0,
+     "peakSpeed": 7.289452677985772,
+     "finite": true,
+     "end": "31673f301ed0e2b9"
+    }
+   },
+   {
+    "seed": 6,
+    "D": {
+     "fragments": 16,
+     "restTime": 3.7333333333333334,
+     "spread": 2.8808945422351018,
+     "height": -0.9673931300640106,
+     "gone": 0,
+     "peakSpeed": 5.693009753638758,
+     "finite": true,
+     "end": "43cbd0339470b197"
+    },
+    "F": {
+     "fragments": 16,
+     "restTime": 4.283333333333333,
+     "spread": 2.8266545223466606,
+     "height": -0.972095855511725,
+     "gone": 0,
+     "peakSpeed": 5.778919184283564,
+     "finite": true,
+     "end": "1323dccb80195e2a"
+    },
+    "F'": {
+     "fragments": 16,
+     "restTime": 4.05,
+     "spread": 2.7994253327564933,
+     "height": -0.9164438955485821,
+     "gone": 0,
+     "peakSpeed": 5.77708289153701,
+     "finite": true,
+     "end": "9b74c43018b59fb7"
+    }
+   },
+   {
+    "seed": 7,
+    "D": {
+     "fragments": 16,
+     "restTime": 3.216666666666667,
+     "spread": 2.1652153345045435,
+     "height": -0.46365423779934645,
+     "gone": 0,
+     "peakSpeed": 5.305074543484889,
+     "finite": true,
+     "end": "ac61a9706353e24d"
+    },
+    "F": {
+     "fragments": 16,
+     "restTime": 4.216666666666667,
+     "spread": 2.1804453949046345,
+     "height": -0.4971967423334718,
+     "gone": 0,
+     "peakSpeed": 5.29575871376162,
+     "finite": true,
+     "end": "8492a261f21ac6df"
+    },
+    "F'": {
+     "fragments": 16,
+     "restTime": 3.1333333333333333,
+     "spread": 2.146484179365044,
+     "height": -0.4630094850435853,
+     "gone": 0,
+     "peakSpeed": 5.292438617131957,
+     "finite": true,
+     "end": "f39311cfb5cb333e"
+    }
+   },
+   {
+    "seed": 8,
+    "D": {
+     "fragments": 16,
+     "restTime": 3.6,
+     "spread": 2.063194567444243,
+     "height": -0.09613935276865959,
+     "gone": 0,
+     "peakSpeed": 5.902842399919113,
+     "finite": true,
+     "end": "a6ce454f45bfdc97"
+    },
+    "F": {
+     "fragments": 16,
+     "restTime": 3.6,
+     "spread": 2.117737022199594,
+     "height": -0.09433399885892868,
+     "gone": 0,
+     "peakSpeed": 6.0383289739251795,
+     "finite": true,
+     "end": "12687251e23f1fcf"
+    },
+    "F'": {
+     "fragments": 16,
+     "restTime": 3.85,
+     "spread": 2.147235749286083,
+     "height": -0.09439790435135365,
+     "gone": 0,
+     "peakSpeed": 6.038240963347234,
+     "finite": true,
+     "end": "72cb181f2970b335"
+    }
+   },
+   {
+    "seed": 9,
+    "D": {
+     "fragments": 16,
+     "restTime": 3.6166666666666667,
+     "spread": 2.984950494732195,
+     "height": -0.7624323591589928,
+     "gone": 0,
+     "peakSpeed": 5.600872867223259,
+     "finite": true,
+     "end": "1dad7a3310c5611e"
+    },
+    "F": {
+     "fragments": 16,
+     "restTime": 3.716666666666667,
+     "spread": 2.999813908917507,
+     "height": -0.7075027152895927,
+     "gone": 0,
+     "peakSpeed": 5.579948831569517,
+     "finite": true,
+     "end": "76157f8d641a2536"
+    },
+    "F'": {
+     "fragments": 16,
+     "restTime": 3.3666666666666667,
+     "spread": 2.9437482949336387,
+     "height": -0.7614957429468632,
+     "gone": 0,
+     "peakSpeed": 5.583578077252798,
+     "finite": true,
+     "end": "55386ba60d3fbb49"
+    }
+   },
+   {
+    "seed": 10,
+    "D": {
+     "fragments": 16,
+     "restTime": 4.9,
+     "spread": 2.9062537680742437,
+     "height": -0.8330844901502132,
+     "gone": 0,
+     "peakSpeed": 6.764198608019625,
+     "finite": true,
+     "end": "7b6d6cdb924e09da"
+    },
+    "F": {
+     "fragments": 16,
+     "restTime": 5.316666666666666,
+     "spread": 2.932885979702931,
+     "height": -0.8344051763415337,
+     "gone": 0,
+     "peakSpeed": 6.7177742059496905,
+     "finite": true,
+     "end": "bb7d53819b9f8319"
+    },
+    "F'": {
+     "fragments": 16,
+     "restTime": 5.933333333333334,
+     "spread": 2.987973477422919,
+     "height": -0.8342189788818359,
+     "gone": 0,
+     "peakSpeed": 6.745618507728475,
+     "finite": true,
+     "end": "137d270d3dd7e8a7"
+    }
+   },
+   {
+    "seed": 11,
+    "D": {
+     "fragments": 16,
+     "restTime": 4.35,
+     "spread": 2.5103633467365265,
+     "height": -0.7322642179206014,
+     "gone": 0,
+     "peakSpeed": 5.829849722348116,
+     "finite": true,
+     "end": "044cc4fed91c0673"
+    },
+    "F": {
+     "fragments": 16,
+     "restTime": 4.366666666666666,
+     "spread": 2.4668924053719765,
+     "height": -0.7463600491173565,
+     "gone": 0,
+     "peakSpeed": 5.867614626979055,
+     "finite": true,
+     "end": "fcb24d79be365e10"
+    },
+    "F'": {
+     "fragments": 16,
+     "restTime": 4.383333333333333,
+     "spread": 2.427857356309665,
+     "height": -0.7271655462682247,
+     "gone": 0,
+     "peakSpeed": 5.862894739720954,
+     "finite": true,
+     "end": "c6a75d01fb0093f9"
+    }
+   },
+   {
+    "seed": 12,
+    "D": {
+     "fragments": 15,
+     "restTime": 2.4166666666666665,
+     "spread": 2.237832555414118,
+     "height": -0.6317008594671886,
+     "gone": 0,
+     "peakSpeed": 6.261637256497585,
+     "finite": true,
+     "end": "355b4ad6d98d8b6a"
+    },
+    "F": {
+     "fragments": 15,
+     "restTime": 2.4,
+     "spread": 2.2663850926917455,
+     "height": -0.6254609664281209,
+     "gone": 0,
+     "peakSpeed": 6.369593091691375,
+     "finite": true,
+     "end": "113124e65b51892a"
+    },
+    "F'": {
+     "fragments": 15,
+     "restTime": 2.4166666666666665,
+     "spread": 2.260289011456671,
+     "height": -0.6253980159759521,
+     "gone": 0,
+     "peakSpeed": 6.369576412275123,
+     "finite": true,
+     "end": "4838e898133abf43"
+    }
+   },
+   {
+    "seed": 13,
+    "D": {
+     "fragments": 15,
+     "restTime": 4.216666666666667,
+     "spread": 3.421842002885576,
+     "height": -0.9646416163576457,
+     "gone": 0,
+     "peakSpeed": 5.936377627998708,
+     "finite": true,
+     "end": "929041c74e285879"
+    },
+    "F": {
+     "fragments": 15,
+     "restTime": 4.216666666666667,
+     "spread": 3.328111210291711,
+     "height": -0.9696844916422075,
+     "gone": 0,
+     "peakSpeed": 6.044790837908448,
+     "finite": true,
+     "end": "104e932a698ccba1"
+    },
+    "F'": {
+     "fragments": 15,
+     "restTime": 4.25,
+     "spread": 3.3780701476278967,
+     "height": -0.9732917033601552,
+     "gone": 0,
+     "peakSpeed": 6.0484828537556385,
+     "finite": true,
+     "end": "0c387d1ad37594fd"
+    }
+   },
+   {
+    "seed": 14,
+    "D": {
+     "fragments": 15,
+     "restTime": 4.766666666666667,
+     "spread": 2.811769694697044,
+     "height": -0.6450088103612264,
+     "gone": 0,
+     "peakSpeed": 7.918321952568138,
+     "finite": true,
+     "end": "4c6db0ecc899363a"
+    },
+    "F": {
+     "fragments": 15,
+     "restTime": 3.4166666666666665,
+     "spread": 2.699128047723563,
+     "height": -0.6371340215206146,
+     "gone": 0,
+     "peakSpeed": 7.910323787490614,
+     "finite": true,
+     "end": "16d36fe5f9748862"
+    },
+    "F'": {
+     "fragments": 15,
+     "restTime": 4.383333333333333,
+     "spread": 2.7686490693534953,
+     "height": -0.6987277309099833,
+     "gone": 0,
+     "peakSpeed": 7.910683650350234,
+     "finite": true,
+     "end": "00d676ccc35ed2ca"
+    }
+   },
+   {
+    "seed": 15,
+    "D": {
+     "fragments": 15,
+     "restTime": 3.9,
+     "spread": 2.273102551387644,
+     "height": -0.7644253482421239,
+     "gone": 0,
+     "peakSpeed": 6.064610621517548,
+     "finite": true,
+     "end": "98e85838c06f52a4"
+    },
+    "F": {
+     "fragments": 15,
+     "restTime": 5.766666666666667,
+     "spread": 2.439198092249486,
+     "height": -0.9715416905780633,
+     "gone": 0,
+     "peakSpeed": 6.044912663286347,
+     "finite": true,
+     "end": "bf6a359631bb5181"
+    },
+    "F'": {
+     "fragments": 15,
+     "restTime": 3.9499999999999997,
+     "spread": 2.3958561877345437,
+     "height": -0.8173970937728882,
+     "gone": 0,
+     "peakSpeed": 6.026474755769173,
+     "finite": true,
+     "end": "d00df0840c361dfe"
+    }
+   },
+   {
+    "seed": 16,
+    "D": {
+     "fragments": 15,
+     "restTime": 2.8666666666666667,
+     "spread": 2.4504807688780983,
+     "height": -0.44699678421020506,
+     "gone": 0,
+     "peakSpeed": 7.027612312488385,
+     "finite": true,
+     "end": "1dcf923796e3755e"
+    },
+    "F": {
+     "fragments": 15,
+     "restTime": 2.8666666666666667,
+     "spread": 2.4391803493061888,
+     "height": -0.44734568198521935,
+     "gone": 0,
+     "peakSpeed": 6.9923119774970415,
+     "finite": true,
+     "end": "153f307f31e3c40a"
+    },
+    "F'": {
+     "fragments": 15,
+     "restTime": 2.8666666666666667,
+     "spread": 2.4532073554659086,
+     "height": -0.4474039196968079,
+     "gone": 0,
+     "peakSpeed": 7.0153688357264015,
+     "finite": true,
+     "end": "fdc907c96a4d10c3"
+    }
+   },
+   {
+    "seed": 17,
+    "D": {
+     "fragments": 16,
+     "restTime": 3.433333333333333,
+     "spread": 2.6710300699042215,
+     "height": -0.7273954572156072,
+     "gone": 0,
+     "peakSpeed": 6.857965292239495,
+     "finite": true,
+     "end": "e92f7d51a0cec66f"
+    },
+    "F": {
+     "fragments": 16,
+     "restTime": 4.15,
+     "spread": 2.5325446106943326,
+     "height": -0.7115446086972952,
+     "gone": 0,
+     "peakSpeed": 6.897129445042958,
+     "finite": true,
+     "end": "c22db2a445909691"
+    },
+    "F'": {
+     "fragments": 16,
+     "restTime": 3.933333333333333,
+     "spread": 2.7015952664254854,
+     "height": -0.7122044218704104,
+     "gone": 0,
+     "peakSpeed": 6.903004939007672,
+     "finite": true,
+     "end": "658d0ee8cb95926d"
+    }
+   },
+   {
+    "seed": 18,
+    "D": {
+     "fragments": 15,
+     "restTime": 3.6666666666666665,
+     "spread": 3.6177467389965146,
+     "height": -1.0671115438143413,
+     "gone": 0,
+     "peakSpeed": 7.887827549695469,
+     "finite": true,
+     "end": "9a7f5862ab4361c1"
+    },
+    "F": {
+     "fragments": 15,
+     "restTime": 3.716666666666667,
+     "spread": 3.76387806922359,
+     "height": -1.083034590880076,
+     "gone": 0,
+     "peakSpeed": 6.5465193916774655,
+     "finite": true,
+     "end": "2a0ebf084da4dbcd"
+    },
+    "F'": {
+     "fragments": 15,
+     "restTime": 3.7666666666666666,
+     "spread": 3.7925751953505698,
+     "height": -1.0940663774808248,
+     "gone": 0,
+     "peakSpeed": 7.717141706434225,
+     "finite": true,
+     "end": "0db8becf545e18c1"
+    }
+   },
+   {
+    "seed": 19,
+    "D": {
+     "fragments": 16,
+     "restTime": 4.416666666666667,
+     "spread": 3.6115558147901834,
+     "height": -0.9174643107689917,
+     "gone": 0,
+     "peakSpeed": 7.715853521422099,
+     "finite": true,
+     "end": "15e53994fd433158"
+    },
+    "F": {
+     "fragments": 16,
+     "restTime": 4.616666666666666,
+     "spread": 3.392429798325437,
+     "height": -0.9324626652523875,
+     "gone": 0,
+     "peakSpeed": 7.740518106141186,
+     "finite": true,
+     "end": "199c433723242847"
+    },
+    "F'": {
+     "fragments": 16,
+     "restTime": 4.216666666666667,
+     "spread": 3.356949881670957,
+     "height": -0.9336309726350009,
+     "gone": 0,
+     "peakSpeed": 7.729811551959295,
+     "finite": true,
+     "end": "b5f2ca69e2ba0513"
+    }
+   },
+   {
+    "seed": 20,
+    "D": {
+     "fragments": 15,
+     "restTime": 3.35,
+     "spread": 2.169588779859324,
+     "height": -0.6337348644932111,
+     "gone": 0,
+     "peakSpeed": 6.850192615556177,
+     "finite": true,
+     "end": "4d72cb95bbaa8483"
+    },
+    "F": {
+     "fragments": 15,
+     "restTime": 3.2,
+     "spread": 2.2379778013152594,
+     "height": -0.6293227732181549,
+     "gone": 0,
+     "peakSpeed": 6.683993265062672,
+     "finite": true,
+     "end": "645fa9cd0ce26a05"
+    },
+    "F'": {
+     "fragments": 15,
+     "restTime": 3.183333333333333,
+     "spread": 2.22440517949345,
+     "height": -0.6295308192571004,
+     "gone": 0,
+     "peakSpeed": 6.730819682506779,
+     "finite": true,
+     "end": "e958bbb3488cad5b"
+    }
+   },
+   {
+    "seed": 21,
+    "D": {
+     "fragments": 16,
+     "restTime": 6.316666666666666,
+     "spread": 2.558213469244358,
+     "height": -0.9433082938194275,
+     "gone": 0,
+     "peakSpeed": 6.480964627611799,
+     "finite": true,
+     "end": "1ff379925e760d1a"
+    },
+    "F": {
+     "fragments": 16,
+     "restTime": 6.5,
+     "spread": 2.5812668525551716,
+     "height": -0.9335285183042288,
+     "gone": 0,
+     "peakSpeed": 6.5915378957368285,
+     "finite": true,
+     "end": "b79b2aadfc378a25"
+    },
+    "F'": {
+     "fragments": 16,
+     "restTime": 6.383333333333333,
+     "spread": 2.5769341358126927,
+     "height": -0.9322107527405024,
+     "gone": 0,
+     "peakSpeed": 6.5826476644344005,
+     "finite": true,
+     "end": "4913e368aeca9465"
+    }
+   },
+   {
+    "seed": 22,
+    "D": {
+     "fragments": 16,
+     "restTime": 4.85,
+     "spread": 2.6376399031405344,
+     "height": -0.6625831349520013,
+     "gone": 0,
+     "peakSpeed": 6.60257522846534,
+     "finite": true,
+     "end": "e8dbee3575fc6457"
+    },
+    "F": {
+     "fragments": 16,
+     "restTime": 4.866666666666666,
+     "spread": 2.6310538420026273,
+     "height": -0.6647709200624377,
+     "gone": 0,
+     "peakSpeed": 6.646792185492668,
+     "finite": true,
+     "end": "14ef414814c5c94e"
+    },
+    "F'": {
+     "fragments": 16,
+     "restTime": 4.883333333333333,
+     "spread": 2.6350813304315817,
+     "height": -0.6647955388762057,
+     "gone": 0,
+     "peakSpeed": 6.661678012013653,
+     "finite": true,
+     "end": "2b9d77b18f3e1e36"
+    }
+   },
+   {
+    "seed": 23,
+    "D": {
+     "fragments": 14,
+     "restTime": 5.416666666666667,
+     "spread": 2.2559207048794727,
+     "height": -0.7839675566979817,
+     "gone": 0,
+     "peakSpeed": 5.948254947980288,
+     "finite": true,
+     "end": "78a267ab890d51bd"
+    },
+    "F": {
+     "fragments": 14,
+     "restTime": 4.633333333333333,
+     "spread": 2.1635997975619623,
+     "height": -0.5679328782217843,
+     "gone": 0,
+     "peakSpeed": 5.976227189363519,
+     "finite": true,
+     "end": "319e4255fe21ed69"
+    },
+    "F'": {
+     "fragments": 14,
+     "restTime": 4.866666666666666,
+     "spread": 2.1590561958636596,
+     "height": -0.6297349653073719,
+     "gone": 0,
+     "peakSpeed": 5.9562371203100755,
+     "finite": true,
+     "end": "6a6de37f82762a04"
+    }
+   },
+   {
+    "seed": 24,
+    "D": {
+     "fragments": 16,
+     "restTime": 2.683333333333333,
+     "spread": 2.3365231403343145,
+     "height": -0.777949582785368,
+     "gone": 0,
+     "peakSpeed": 5.808628178225531,
+     "finite": true,
+     "end": "5fa15bf31509122a"
+    },
+    "F": {
+     "fragments": 16,
+     "restTime": 2.95,
+     "spread": 2.4384841127108325,
+     "height": -0.7776233647018671,
+     "gone": 0,
+     "peakSpeed": 5.838354306636563,
+     "finite": true,
+     "end": "4e30da5e09fa345c"
+    },
+    "F'": {
+     "fragments": 16,
+     "restTime": 2.966666666666667,
+     "spread": 2.442534863136302,
+     "height": -0.7787765404209495,
+     "gone": 0,
+     "peakSpeed": 5.900162310250091,
+     "finite": true,
+     "end": "48d8e64bca6bd585"
+    }
+   },
+   {
+    "seed": 25,
+    "D": {
+     "fragments": 15,
+     "restTime": 3.2666666666666666,
+     "spread": 2.337333020343868,
+     "height": -0.7753031879663468,
+     "gone": 0,
+     "peakSpeed": 5.596911203140491,
+     "finite": true,
+     "end": "ad268425cdb5f6d1"
+    },
+    "F": {
+     "fragments": 15,
+     "restTime": 3.25,
+     "spread": 2.3222454119401736,
+     "height": -0.7755097260077795,
+     "gone": 0,
+     "peakSpeed": 5.661505463181866,
+     "finite": true,
+     "end": "5f9bef57aeecf13a"
+    },
+    "F'": {
+     "fragments": 15,
+     "restTime": 3.25,
+     "spread": 2.3306842201370492,
+     "height": -0.7748153865337372,
+     "gone": 0,
+     "peakSpeed": 5.573138608914672,
+     "finite": true,
+     "end": "048892ef9fa9df09"
+    }
+   },
+   {
+    "seed": 26,
+    "D": {
+     "fragments": 16,
+     "restTime": 4.166666666666667,
+     "spread": 2.43600451837287,
+     "height": -0.4133621398359537,
+     "gone": 0,
+     "peakSpeed": 6.399624859677426,
+     "finite": true,
+     "end": "baf3eae0b0f8e331"
+    },
+    "F": {
+     "fragments": 16,
+     "restTime": 5.533333333333333,
+     "spread": 2.3497365461862167,
+     "height": -0.26275015249848366,
+     "gone": 0,
+     "peakSpeed": 6.319059365199252,
+     "finite": true,
+     "end": "ca53be7d69d0d011"
+    },
+    "F'": {
+     "fragments": 16,
+     "restTime": 4.816666666666666,
+     "spread": 2.4577153538277114,
+     "height": -0.42355286329984665,
+     "gone": 0,
+     "peakSpeed": 6.406010640976736,
+     "finite": true,
+     "end": "17489f1f8acdadc0"
+    }
+   },
+   {
+    "seed": 27,
+    "D": {
+     "fragments": 15,
+     "restTime": 3.3833333333333333,
+     "spread": 2.9531615431575355,
+     "height": -0.9637878013153871,
+     "gone": 0,
+     "peakSpeed": 6.3250450451159725,
+     "finite": true,
+     "end": "afab3d7e7b24e0a3"
+    },
+    "F": {
+     "fragments": 15,
+     "restTime": 3.6999999999999997,
+     "spread": 2.9453268463390607,
+     "height": -0.9636371529350678,
+     "gone": 0,
+     "peakSpeed": 6.31416970626928,
+     "finite": true,
+     "end": "d61565f3cd6b26bf"
+    },
+    "F'": {
+     "fragments": 15,
+     "restTime": 3.283333333333333,
+     "spread": 2.902724444141499,
+     "height": -0.9143814198672772,
+     "gone": 0,
+     "peakSpeed": 6.313109034880359,
+     "finite": true,
+     "end": "3001c3ff81921eff"
+    }
+   },
+   {
+    "seed": 28,
+    "D": {
+     "fragments": 15,
+     "restTime": 4.633333333333333,
+     "spread": 3.227169703903309,
+     "height": -0.7699369947115581,
+     "gone": 0,
+     "peakSpeed": 7.509399983180187,
+     "finite": true,
+     "end": "8cae22ac2dd644d8"
+    },
+    "F": {
+     "fragments": 15,
+     "restTime": 4.5,
+     "spread": 3.2052156150953253,
+     "height": -0.7690641681353251,
+     "gone": 0,
+     "peakSpeed": 7.4046268438126726,
+     "finite": true,
+     "end": "b914a7a2b5755ca0"
+    },
+    "F'": {
+     "fragments": 15,
+     "restTime": 4.266666666666667,
+     "spread": 3.2422725627409976,
+     "height": -0.7666480302810669,
+     "gone": 0,
+     "peakSpeed": 7.415484025367031,
+     "finite": true,
+     "end": "d5f5769f5794c70d"
+    }
+   },
+   {
+    "seed": 29,
+    "D": {
+     "fragments": 16,
+     "restTime": 2.466666666666667,
+     "spread": 2.031341831376265,
+     "height": -0.3434612713754177,
+     "gone": 0,
+     "peakSpeed": 7.472769061027094,
+     "finite": true,
+     "end": "b33ef16a688fdceb"
+    },
+    "F": {
+     "fragments": 16,
+     "restTime": 2.4833333333333334,
+     "spread": 2.0166197930190006,
+     "height": -0.32732798159122467,
+     "gone": 0,
+     "peakSpeed": 7.332781407524661,
+     "finite": true,
+     "end": "3c941c4941ea6242"
+    },
+    "F'": {
+     "fragments": 16,
+     "restTime": 2.3166666666666664,
+     "spread": 2.0155055172668788,
+     "height": -0.3281532507389784,
+     "gone": 0,
+     "peakSpeed": 7.386391735106241,
+     "finite": true,
+     "end": "18d5bc696a45cd48"
+    }
+   },
+   {
+    "seed": 30,
+    "D": {
+     "fragments": 16,
+     "restTime": 3.783333333333333,
+     "spread": 2.8460588208485715,
+     "height": -0.7452109837904572,
+     "gone": 0,
+     "peakSpeed": 7.04245211050851,
+     "finite": true,
+     "end": "cf3c283c146a813e"
+    },
+    "F": {
+     "fragments": 16,
+     "restTime": 3.7666666666666666,
+     "spread": 2.678969935552088,
+     "height": -0.7509764134883881,
+     "gone": 0,
+     "peakSpeed": 6.9972502564085275,
+     "finite": true,
+     "end": "4caed067f2e13e03"
+    },
+    "F'": {
+     "fragments": 16,
+     "restTime": 3.7666666666666666,
+     "spread": 2.6788174814,
+     "height": -0.7510038856416941,
+     "gone": 0,
+     "peakSpeed": 6.996964693778917,
+     "finite": true,
+     "end": "cddea383867d43d3"
+    }
+   },
+   {
+    "seed": 31,
+    "D": {
+     "fragments": 16,
+     "restTime": 4.116666666666666,
+     "spread": 2.2246408866953122,
+     "height": -0.43529736110940576,
+     "gone": 0,
+     "peakSpeed": 5.07616233608621,
+     "finite": true,
+     "end": "c8e4f8d83a019294"
+    },
+    "F": {
+     "fragments": 16,
+     "restTime": 2.8166666666666664,
+     "spread": 2.137799879032959,
+     "height": -0.3620127346366644,
+     "gone": 0,
+     "peakSpeed": 5.07613776265654,
+     "finite": true,
+     "end": "72c37b1c37f7d77e"
+    },
+    "F'": {
+     "fragments": 16,
+     "restTime": 3.2,
+     "spread": 2.1794866607341135,
+     "height": -0.4204039475880563,
+     "gone": 0,
+     "peakSpeed": 5.076126234851093,
+     "finite": true,
+     "end": "1e17acd7be1bb45e"
+    }
+   },
+   {
+    "seed": 32,
+    "D": {
+     "fragments": 13,
+     "restTime": 2.966666666666667,
+     "spread": 2.011936765219029,
+     "height": -0.4756233004423288,
+     "gone": 0,
+     "peakSpeed": 6.572611416218447,
+     "finite": true,
+     "end": "70a0627155d386bf"
+    },
+    "F": {
+     "fragments": 13,
+     "restTime": 2.966666666666667,
+     "spread": 2.0019340089848265,
+     "height": -0.4799996098646751,
+     "gone": 0,
+     "peakSpeed": 6.570680089745127,
+     "finite": true,
+     "end": "f1ca20a9934c26c6"
+    },
+    "F'": {
+     "fragments": 13,
+     "restTime": 2.933333333333333,
+     "spread": 2.009762245211388,
+     "height": -0.48027389210004073,
+     "gone": 0,
+     "peakSpeed": 6.400589388361266,
+     "finite": true,
+     "end": "8dde28709c5ee23a"
+    }
+   },
+   {
+    "seed": 33,
+    "D": {
+     "fragments": 15,
+     "restTime": 3.05,
+     "spread": 2.177642134879348,
+     "height": -0.39853971600532534,
+     "gone": 0,
+     "peakSpeed": 6.475418220933457,
+     "finite": true,
+     "end": "732e272527be761d"
+    },
+    "F": {
+     "fragments": 15,
+     "restTime": 3.0833333333333335,
+     "spread": 2.0523338031268916,
+     "height": -0.3980981230735779,
+     "gone": 0,
+     "peakSpeed": 6.469639444993189,
+     "finite": true,
+     "end": "15ccd5ec119c5f75"
+    },
+    "F'": {
+     "fragments": 15,
+     "restTime": 3.1333333333333333,
+     "spread": 2.0678006630581103,
+     "height": -0.39745787580808006,
+     "gone": 0,
+     "peakSpeed": 6.469639620427513,
+     "finite": true,
+     "end": "ee49a9d4582276dd"
+    }
+   },
+   {
+    "seed": 34,
+    "D": {
+     "fragments": 16,
+     "restTime": 4.416666666666667,
+     "spread": 2.411337282215355,
+     "height": -0.42078691627830267,
+     "gone": 0,
+     "peakSpeed": 6.4429625225512215,
+     "finite": true,
+     "end": "03b7d7952e37d7c1"
+    },
+    "F": {
+     "fragments": 16,
+     "restTime": 2.716666666666667,
+     "spread": 2.13751108840989,
+     "height": -0.313078498467803,
+     "gone": 0,
+     "peakSpeed": 6.468036853748652,
+     "finite": true,
+     "end": "0f1f4ea23ff56428"
+    },
+    "F'": {
+     "fragments": 16,
+     "restTime": 2.8166666666666664,
+     "spread": 2.2660941346642476,
+     "height": -0.314963610842824,
+     "gone": 0,
+     "peakSpeed": 6.474066980020826,
+     "finite": true,
+     "end": "cdf3885a393b4c67"
+    }
+   },
+   {
+    "seed": 35,
+    "D": {
+     "fragments": 15,
+     "restTime": 3.5666666666666664,
+     "spread": 2.8535977105296557,
+     "height": -0.9073456466197968,
+     "gone": 0,
+     "peakSpeed": 7.653159717381384,
+     "finite": true,
+     "end": "0abbe03c394833aa"
+    },
+    "F": {
+     "fragments": 15,
+     "restTime": 3.55,
+     "spread": 2.837400139343123,
+     "height": -0.902431211868922,
+     "gone": 0,
+     "peakSpeed": 7.740165603915728,
+     "finite": true,
+     "end": "b398b5d97c50c58c"
+    },
+    "F'": {
+     "fragments": 15,
+     "restTime": 3.55,
+     "spread": 2.843132114694496,
+     "height": -0.9053873101870219,
+     "gone": 0,
+     "peakSpeed": 7.736500572291133,
+     "finite": true,
+     "end": "dd510ea9a6ab7c8e"
+    }
+   },
+   {
+    "seed": 36,
+    "D": {
+     "fragments": 16,
+     "restTime": 3.0166666666666666,
+     "spread": 2.0319372938406906,
+     "height": -0.471693467348814,
+     "gone": 0,
+     "peakSpeed": 6.776421350599351,
+     "finite": true,
+     "end": "92636b5a816fe081"
+    },
+    "F": {
+     "fragments": 16,
+     "restTime": 2.8833333333333333,
+     "spread": 2.0191506146468052,
+     "height": -0.4733955878764391,
+     "gone": 0,
+     "peakSpeed": 6.776066215027964,
+     "finite": true,
+     "end": "7e25e3a10ff716fe"
+    },
+    "F'": {
+     "fragments": 16,
+     "restTime": 3.0166666666666666,
+     "spread": 2.0330802570317057,
+     "height": -0.47452997602522373,
+     "gone": 0,
+     "peakSpeed": 6.776151711215418,
+     "finite": true,
+     "end": "0bb661f9648a44b5"
+    }
+   },
+   {
+    "seed": 37,
+    "D": {
+     "fragments": 16,
+     "restTime": 6.533333333333333,
+     "spread": 2.707642086332025,
+     "height": -0.8780603192280978,
+     "gone": 0,
+     "peakSpeed": 7.422158728745132,
+     "finite": true,
+     "end": "a036ae43f64b1ebe"
+    },
+    "F": {
+     "fragments": 16,
+     "restTime": 6.35,
+     "spread": 2.706291694980598,
+     "height": -0.7508856714703143,
+     "gone": 0,
+     "peakSpeed": 7.422562235930678,
+     "finite": true,
+     "end": "dd6a56fc37a131ae"
+    },
+    "F'": {
+     "fragments": 16,
+     "restTime": 6.616666666666666,
+     "spread": 2.650026603183755,
+     "height": -0.7504591785836965,
+     "gone": 0,
+     "peakSpeed": 7.445503847917392,
+     "finite": true,
+     "end": "b149189637cea3c4"
+    }
+   },
+   {
+    "seed": 38,
+    "D": {
+     "fragments": 15,
+     "restTime": 3.4833333333333334,
+     "spread": 1.87518712914364,
+     "height": -0.4410276452700297,
+     "gone": 0,
+     "peakSpeed": 6.269293056047021,
+     "finite": true,
+     "end": "1f07d6be1dd3789c"
+    },
+    "F": {
+     "fragments": 15,
+     "restTime": 3.6,
+     "spread": 1.8922947665107488,
+     "height": -0.4444328844547272,
+     "gone": 0,
+     "peakSpeed": 6.237965157442978,
+     "finite": true,
+     "end": "050d8411bf8f9d4a"
+    },
+    "F'": {
+     "fragments": 15,
+     "restTime": 3.5666666666666664,
+     "spread": 1.8907206173822944,
+     "height": -0.4436404248078664,
+     "gone": 0,
+     "peakSpeed": 6.2390274729294815,
+     "finite": true,
+     "end": "8c12b8b956729537"
+    }
+   },
+   {
+    "seed": 39,
+    "D": {
+     "fragments": 16,
+     "restTime": 4.666666666666667,
+     "spread": 2.7025655205206527,
+     "height": -0.7534184604883194,
+     "gone": 0,
+     "peakSpeed": 7.870582926121515,
+     "finite": true,
+     "end": "05d6c615a309f0e8"
+    },
+    "F": {
+     "fragments": 16,
+     "restTime": 4.283333333333333,
+     "spread": 2.6101466653510754,
+     "height": -0.7538936287164688,
+     "gone": 0,
+     "peakSpeed": 8.098157607157082,
+     "finite": true,
+     "end": "72e683450ec5fa24"
+    },
+    "F'": {
+     "fragments": 16,
+     "restTime": 4.45,
+     "spread": 2.6093370410461167,
+     "height": -0.7535808086395264,
+     "gone": 0,
+     "peakSpeed": 8.098182662127087,
+     "finite": true,
+     "end": "955550aa7f49a44d"
+    }
+   },
+   {
+    "seed": 40,
+    "D": {
+     "fragments": 15,
+     "restTime": 2.7333333333333334,
+     "spread": 2.9407356579274055,
+     "height": -0.7683595114698013,
+     "gone": 0,
+     "peakSpeed": 6.5759236593853485,
+     "finite": true,
+     "end": "980da24d54d899da"
+    },
+    "F": {
+     "fragments": 15,
+     "restTime": 3,
+     "spread": 2.762558071324041,
+     "height": -0.7697009953359762,
+     "gone": 0,
+     "peakSpeed": 6.810394672044792,
+     "finite": true,
+     "end": "14bd71024e894642"
+    },
+    "F'": {
+     "fragments": 15,
+     "restTime": 2.75,
+     "spread": 2.7799575726147037,
+     "height": -0.7493303364763657,
+     "gone": 0,
+     "peakSpeed": 6.81220950861777,
+     "finite": true,
+     "end": "b6dc7966086945e2"
+    }
+   }
+  ],
+  "D2": [
+   {
+    "seed": 1,
+    "D": {
+     "fragments": 19,
+     "restTime": 3.2333333333333334,
+     "spread": 4.212794586286748,
+     "height": -1.2640519816624491,
+     "gone": 0,
+     "peakSpeed": 6.523410766509647,
+     "finite": true,
+     "end": "ad7e69bb4f34d4e0"
+    },
+    "F": {
+     "fragments": 19,
+     "restTime": 3.433333333333333,
+     "spread": 4.282182829615412,
+     "height": -1.2901297870435213,
+     "gone": 0,
+     "peakSpeed": 6.522126075839006,
+     "finite": true,
+     "end": "a2f1e35952debd20"
+    },
+    "F'": {
+     "fragments": 19,
+     "restTime": 3.2333333333333334,
+     "spread": 4.2173546786278155,
+     "height": -1.2909170608771474,
+     "gone": 0,
+     "peakSpeed": 6.522181888215456,
+     "finite": true,
+     "end": "8cd7adb2b3b1e2bc"
+    }
+   },
+   {
+    "seed": 2,
+    "D": {
+     "fragments": 22,
+     "restTime": 4.316666666666666,
+     "spread": 3.957500848525848,
+     "height": -1.3516748960722575,
+     "gone": 0,
+     "peakSpeed": 7.210932940858489,
+     "finite": true,
+     "end": "532a02e303da4adf"
+    },
+    "F": {
+     "fragments": 22,
+     "restTime": 4.083333333333333,
+     "spread": 3.97723232073987,
+     "height": -1.347007031129165,
+     "gone": 0,
+     "peakSpeed": 7.5432236943792805,
+     "finite": true,
+     "end": "af773fccd0b73c8d"
+    },
+    "F'": {
+     "fragments": 22,
+     "restTime": 3.8833333333333333,
+     "spread": 3.961855786199426,
+     "height": -1.3488370220769534,
+     "gone": 0,
+     "peakSpeed": 7.543424086657323,
+     "finite": true,
+     "end": "68246cc7f1950466"
+    }
+   },
+   {
+    "seed": 3,
+    "D": {
+     "fragments": 20,
+     "restTime": 3.75,
+     "spread": 3.43771746684147,
+     "height": -0.8925753057003021,
+     "gone": 0,
+     "peakSpeed": 6.365865796475595,
+     "finite": true,
+     "end": "6c34e77b38e25158"
+    },
+    "F": {
+     "fragments": 20,
+     "restTime": 3.7666666666666666,
+     "spread": 3.4407003830838634,
+     "height": -0.8291679158806801,
+     "gone": 0,
+     "peakSpeed": 6.26193264684774,
+     "finite": true,
+     "end": "7cd3429941c2ab46"
+    },
+    "F'": {
+     "fragments": 20,
+     "restTime": 3.783333333333333,
+     "spread": 3.411272619356375,
+     "height": -0.8313486278057098,
+     "gone": 0,
+     "peakSpeed": 6.358737652041169,
+     "finite": true,
+     "end": "506cae0f77d2b099"
+    }
+   },
+   {
+    "seed": 4,
+    "D": {
+     "fragments": 22,
+     "restTime": 5.433333333333334,
+     "spread": 3.791845751627228,
+     "height": -0.7425593848932873,
+     "gone": 0,
+     "peakSpeed": 6.692479512237559,
+     "finite": true,
+     "end": "631b8411a910d9c0"
+    },
+    "F": {
+     "fragments": 22,
+     "restTime": 4.4,
+     "spread": 3.57393174952736,
+     "height": -0.7258984981612726,
+     "gone": 0,
+     "peakSpeed": 6.7918843316260435,
+     "finite": true,
+     "end": "20b55070bdd420ab"
+    },
+    "F'": {
+     "fragments": 22,
+     "restTime": 6.433333333333334,
+     "spread": 3.607378206525748,
+     "height": -0.7512386830692942,
+     "gone": 0,
+     "peakSpeed": 6.5278339069166815,
+     "finite": true,
+     "end": "7896ccec37a18678"
+    }
+   },
+   {
+    "seed": 5,
+    "D": {
+     "fragments": 22,
+     "restTime": 4.333333333333333,
+     "spread": 4.221194514498351,
+     "height": -1.490151435136795,
+     "gone": 0,
+     "peakSpeed": 6.081522323179069,
+     "finite": true,
+     "end": "d3572779f0717c77"
+    },
+    "F": {
+     "fragments": 22,
+     "restTime": 5.35,
+     "spread": 4.274525863397064,
+     "height": -1.5051542547616092,
+     "gone": 0,
+     "peakSpeed": 6.102784751842205,
+     "finite": true,
+     "end": "5f57d771b72f1844"
+    },
+    "F'": {
+     "fragments": 22,
+     "restTime": 5.766666666666667,
+     "spread": 4.284441336244416,
+     "height": -1.5069361437450757,
+     "gone": 0,
+     "peakSpeed": 5.9942280096325415,
+     "finite": true,
+     "end": "11c56e15f60b49c4"
+    }
+   },
+   {
+    "seed": 6,
+    "D": {
+     "fragments": 19,
+     "restTime": 3.7666666666666666,
+     "spread": 4.947531094767826,
+     "height": -1.2725101003521366,
+     "gone": 0,
+     "peakSpeed": 7.139389217839956,
+     "finite": true,
+     "end": "e0e3f43b6c82dc0d"
+    },
+    "F": {
+     "fragments": 19,
+     "restTime": 3.6,
+     "spread": 4.866644409444771,
+     "height": -1.2289501365862394,
+     "gone": 0,
+     "peakSpeed": 7.245431469062321,
+     "finite": true,
+     "end": "48747ff5a2dd9c0f"
+    },
+    "F'": {
+     "fragments": 19,
+     "restTime": 3.6666666666666665,
+     "spread": 4.865188052973121,
+     "height": -1.2276081693799872,
+     "gone": 0,
+     "peakSpeed": 7.244362189258214,
+     "finite": true,
+     "end": "05adb435aaf72380"
+    }
+   },
+   {
+    "seed": 7,
+    "D": {
+     "fragments": 20,
+     "restTime": 4.416666666666667,
+     "spread": 4.045790816369493,
+     "height": -1.2916550756432117,
+     "gone": 0,
+     "peakSpeed": 6.764975711438569,
+     "finite": true,
+     "end": "b5122b68576227fb"
+    },
+    "F": {
+     "fragments": 20,
+     "restTime": 4.683333333333334,
+     "spread": 4.05524612682895,
+     "height": -1.2907962444238366,
+     "gone": 0,
+     "peakSpeed": 6.786996278301033,
+     "finite": true,
+     "end": "12505326f483c52e"
+    },
+    "F'": {
+     "fragments": 20,
+     "restTime": 4.516666666666667,
+     "spread": 4.054051651557066,
+     "height": -1.2910356663167477,
+     "gone": 0,
+     "peakSpeed": 6.76471886960128,
+     "finite": true,
+     "end": "55c1c4092b967b57"
+    }
+   },
+   {
+    "seed": 8,
+    "D": {
+     "fragments": 19,
+     "restTime": 4.45,
+     "spread": 3.6338272450691074,
+     "height": -1.0148944274375313,
+     "gone": 0,
+     "peakSpeed": 6.3107658331440275,
+     "finite": true,
+     "end": "e3870bf7cf3214e1"
+    },
+    "F": {
+     "fragments": 19,
+     "restTime": 4.333333333333333,
+     "spread": 3.6098174989142358,
+     "height": -1.0195959822127694,
+     "gone": 0,
+     "peakSpeed": 6.314844152029343,
+     "finite": true,
+     "end": "d5010c33ae992bc2"
+    },
+    "F'": {
+     "fragments": 19,
+     "restTime": 4.35,
+     "spread": 3.602695288402691,
+     "height": -1.0196137585138019,
+     "gone": 0,
+     "peakSpeed": 6.31484366966961,
+     "finite": true,
+     "end": "731c12399f681d30"
+    }
+   },
+   {
+    "seed": 9,
+    "D": {
+     "fragments": 18,
+     "restTime": 3.8666666666666667,
+     "spread": 3.3790609953674586,
+     "height": -1.3618097779350744,
+     "gone": 0,
+     "peakSpeed": 7.203221211716023,
+     "finite": true,
+     "end": "f52962c0db97a950"
+    },
+    "F": {
+     "fragments": 18,
+     "restTime": 3.6999999999999997,
+     "spread": 3.3992045996247393,
+     "height": -1.37669929714563,
+     "gone": 0,
+     "peakSpeed": 7.630022761814744,
+     "finite": true,
+     "end": "8a1362a18fdae9a9"
+    },
+    "F'": {
+     "fragments": 18,
+     "restTime": 3.6666666666666665,
+     "spread": 3.3148638456017636,
+     "height": -1.376801279709778,
+     "gone": 0,
+     "peakSpeed": 7.630016532222234,
+     "finite": true,
+     "end": "74030e317e1f1765"
+    }
+   },
+   {
+    "seed": 10,
+    "D": {
+     "fragments": 19,
+     "restTime": 7.083333333333333,
+     "spread": 3.8547510086837815,
+     "height": -1.1537410167695366,
+     "gone": 0,
+     "peakSpeed": 6.321999798212457,
+     "finite": true,
+     "end": "b643288c26022d25"
+    },
+    "F": {
+     "fragments": 19,
+     "restTime": 7.116666666666666,
+     "spread": 3.898142146705403,
+     "height": -1.155283295077664,
+     "gone": 0,
+     "peakSpeed": 6.423197609049314,
+     "finite": true,
+     "end": "f6eaec06e5684358"
+    },
+    "F'": {
+     "fragments": 19,
+     "restTime": 7.183333333333334,
+     "spread": 3.895051629829412,
+     "height": -1.153788211534878,
+     "gone": 0,
+     "peakSpeed": 6.421728523485949,
+     "finite": true,
+     "end": "19c9dd7a916843c8"
+    }
+   },
+   {
+    "seed": 11,
+    "D": {
+     "fragments": 21,
+     "restTime": 3.2666666666666666,
+     "spread": 3.7181258992450203,
+     "height": -1.3807275806154524,
+     "gone": 0,
+     "peakSpeed": 7.370175318577417,
+     "finite": true,
+     "end": "bc8245d295d33052"
+    },
+    "F": {
+     "fragments": 21,
+     "restTime": 3.7333333333333334,
+     "spread": 3.7224249499968614,
+     "height": -1.3900338212649028,
+     "gone": 0,
+     "peakSpeed": 7.366723213225063,
+     "finite": true,
+     "end": "3702758b8b1082d2"
+    },
+    "F'": {
+     "fragments": 21,
+     "restTime": 3.35,
+     "spread": 3.713444993012616,
+     "height": -1.389111340045929,
+     "gone": 0,
+     "peakSpeed": 7.36672257216778,
+     "finite": true,
+     "end": "deb574cdb6c905a5"
+    }
+   },
+   {
+    "seed": 12,
+    "D": {
+     "fragments": 22,
+     "restTime": 4.816666666666666,
+     "spread": 3.8469890505253233,
+     "height": -1.3880965191532264,
+     "gone": 0,
+     "peakSpeed": 6.433700190744996,
+     "finite": true,
+     "end": "118e659004275af3"
+    },
+    "F": {
+     "fragments": 22,
+     "restTime": 5.066666666666666,
+     "spread": 3.6949102105734846,
+     "height": -1.3704712621190331,
+     "gone": 0,
+     "peakSpeed": 6.429294189213388,
+     "finite": true,
+     "end": "f271c2363e734fab"
+    },
+    "F'": {
+     "fragments": 22,
+     "restTime": 4.8,
+     "spread": 3.984728646658259,
+     "height": -1.411788523197174,
+     "gone": 0,
+     "peakSpeed": 6.4317035689049655,
+     "finite": true,
+     "end": "08a59c23a786b530"
+    }
+   },
+   {
+    "seed": 13,
+    "D": {
+     "fragments": 18,
+     "restTime": 4.033333333333333,
+     "spread": 4.250544137096576,
+     "height": -1.481316132677926,
+     "gone": 0,
+     "peakSpeed": 6.083894912546842,
+     "finite": true,
+     "end": "3133ebdc0538f159"
+    },
+    "F": {
+     "fragments": 18,
+     "restTime": 4.516666666666667,
+     "spread": 4.372585095842073,
+     "height": -1.479014214542177,
+     "gone": 0,
+     "peakSpeed": 6.090091181134928,
+     "finite": true,
+     "end": "ca3ee6bc9d66b9c8"
+    },
+    "F'": {
+     "fragments": 18,
+     "restTime": 4.383333333333333,
+     "spread": 4.3736156942201685,
+     "height": -1.4792607691552904,
+     "gone": 0,
+     "peakSpeed": 6.092870566687624,
+     "finite": true,
+     "end": "e531d0a74f93a584"
+    }
+   },
+   {
+    "seed": 14,
+    "D": {
+     "fragments": 20,
+     "restTime": 3.8,
+     "spread": 4.29455745554444,
+     "height": -1.346983826905489,
+     "gone": 0,
+     "peakSpeed": 6.457688901983597,
+     "finite": true,
+     "end": "5db285f20b864e05"
+    },
+    "F": {
+     "fragments": 20,
+     "restTime": 3.8166666666666664,
+     "spread": 4.157952380646905,
+     "height": -1.345488151907921,
+     "gone": 0,
+     "peakSpeed": 6.347651998447306,
+     "finite": true,
+     "end": "715b4ad191a68ba6"
+    },
+    "F'": {
+     "fragments": 20,
+     "restTime": 3.8,
+     "spread": 4.152675633302919,
+     "height": -1.3448992229998111,
+     "gone": 0,
+     "peakSpeed": 6.347653378970338,
+     "finite": true,
+     "end": "bd616519c0dbb531"
+    }
+   },
+   {
+    "seed": 15,
+    "D": {
+     "fragments": 20,
+     "restTime": 5.116666666666666,
+     "spread": 4.104422399084817,
+     "height": -1.4113743342459202,
+     "gone": 0,
+     "peakSpeed": 5.455618426525873,
+     "finite": true,
+     "end": "d9680164eaf5ff77"
+    },
+    "F": {
+     "fragments": 20,
+     "restTime": 5.266666666666667,
+     "spread": 3.8850056564966455,
+     "height": -1.4259826347231865,
+     "gone": 0,
+     "peakSpeed": 5.4597207454720875,
+     "finite": true,
+     "end": "43aca853e4f5852d"
+    },
+    "F'": {
+     "fragments": 20,
+     "restTime": 5.016666666666667,
+     "spread": 3.889133886173546,
+     "height": -1.4266299083828926,
+     "gone": 0,
+     "peakSpeed": 5.459720400612058,
+     "finite": true,
+     "end": "c1d940a2ae59f7a4"
+    }
+   },
+   {
+    "seed": 16,
+    "D": {
+     "fragments": 20,
+     "restTime": 3.716666666666667,
+     "spread": 3.9471971935675567,
+     "height": -1.46263068318367,
+     "gone": 0,
+     "peakSpeed": 6.47616197223792,
+     "finite": true,
+     "end": "3ef85581fb57b585"
+    },
+    "F": {
+     "fragments": 20,
+     "restTime": 3.6666666666666665,
+     "spread": 3.9508067242062506,
+     "height": -1.472273588180542,
+     "gone": 0,
+     "peakSpeed": 6.748497678365634,
+     "finite": true,
+     "end": "d91e30ad0e114654"
+    },
+    "F'": {
+     "fragments": 20,
+     "restTime": 3.9,
+     "spread": 3.948922194233003,
+     "height": -1.4711962312459945,
+     "gone": 0,
+     "peakSpeed": 6.748338250596386,
+     "finite": true,
+     "end": "c8e4b8658c16120e"
+    }
+   },
+   {
+    "seed": 17,
+    "D": {
+     "fragments": 22,
+     "restTime": null,
+     "spread": 5.858734486571985,
+     "height": -24.536395207047462,
+     "gone": 1,
+     "peakSpeed": 83.34440492905475,
+     "finite": true,
+     "end": "c43f74a4fbfd4cf0"
+    },
+    "F": {
+     "fragments": 22,
+     "restTime": 4.283333333333333,
+     "spread": 4.967405737017537,
+     "height": -1.5455780720168895,
+     "gone": 0,
+     "peakSpeed": 6.755082244130255,
+     "finite": true,
+     "end": "062f37087034ae30"
+    },
+    "F'": {
+     "fragments": 22,
+     "restTime": 4.266666666666667,
+     "spread": 4.933996051721448,
+     "height": -1.5441068370233884,
+     "gone": 0,
+     "peakSpeed": 6.797412049235704,
+     "finite": true,
+     "end": "af11a57019ab5de2"
+    }
+   },
+   {
+    "seed": 18,
+    "D": {
+     "fragments": 17,
+     "restTime": 3.0833333333333335,
+     "spread": 3.5903930153999215,
+     "height": -1.3702507509904749,
+     "gone": 0,
+     "peakSpeed": 6.628361956073241,
+     "finite": true,
+     "end": "e2d10cea9d5c57c4"
+    },
+    "F": {
+     "fragments": 17,
+     "restTime": 3.0666666666666664,
+     "spread": 3.6334866482249413,
+     "height": -1.3699929538895101,
+     "gone": 0,
+     "peakSpeed": 6.629120789792567,
+     "finite": true,
+     "end": "6bb99202d6c17dd8"
+    },
+    "F'": {
+     "fragments": 17,
+     "restTime": 3.033333333333333,
+     "spread": 3.625999314379734,
+     "height": -1.3715062246603125,
+     "gone": 0,
+     "peakSpeed": 6.62912050831525,
+     "finite": true,
+     "end": "84d05b54eb8263ee"
+    }
+   },
+   {
+    "seed": 19,
+    "D": {
+     "fragments": 18,
+     "restTime": 4.633333333333333,
+     "spread": 3.50681962131115,
+     "height": -1.237534953488244,
+     "gone": 0,
+     "peakSpeed": 5.917887030150302,
+     "finite": true,
+     "end": "2ac5cc62043f49c1"
+    },
+    "F": {
+     "fragments": 18,
+     "restTime": 2.8,
+     "spread": 3.4167268417035377,
+     "height": -1.161067126525773,
+     "gone": 0,
+     "peakSpeed": 5.917528842628033,
+     "finite": true,
+     "end": "9f8f862fb516bad2"
+    },
+    "F'": {
+     "fragments": 18,
+     "restTime": 2.8,
+     "spread": 3.4156585408125966,
+     "height": -1.1617282645569906,
+     "gone": 0,
+     "peakSpeed": 5.917213449635108,
+     "finite": true,
+     "end": "d149f6bd5c995fcc"
+    }
+   },
+   {
+    "seed": 20,
+    "D": {
+     "fragments": 21,
+     "restTime": 3.15,
+     "spread": 3.7059292525778695,
+     "height": -1.359923600086144,
+     "gone": 0,
+     "peakSpeed": 6.279994043283472,
+     "finite": true,
+     "end": "396a32dfb95a4fee"
+    },
+    "F": {
+     "fragments": 21,
+     "restTime": 3.4499999999999997,
+     "spread": 3.7207687702224077,
+     "height": -1.3549615733680271,
+     "gone": 0,
+     "peakSpeed": 6.2796189941351335,
+     "finite": true,
+     "end": "2f218265098304cd"
+    },
+    "F'": {
+     "fragments": 21,
+     "restTime": 3.183333333333333,
+     "spread": 3.7062520851222955,
+     "height": -1.370636403915428,
+     "gone": 0,
+     "peakSpeed": 6.279719965048849,
+     "finite": true,
+     "end": "315bb27662b6765f"
+    }
+   },
+   {
+    "seed": 21,
+    "D": {
+     "fragments": 19,
+     "restTime": 6.3,
+     "spread": 4.386792661724948,
+     "height": -1.506855692518385,
+     "gone": 0,
+     "peakSpeed": 6.474573814249078,
+     "finite": true,
+     "end": "02061ba7c9b4a240"
+    },
+    "F": {
+     "fragments": 19,
+     "restTime": 6.383333333333333,
+     "spread": 4.455760482651131,
+     "height": -1.4955610884843689,
+     "gone": 0,
+     "peakSpeed": 6.049384429680163,
+     "finite": true,
+     "end": "452543f028e97de7"
+    },
+    "F'": {
+     "fragments": 19,
+     "restTime": 6.3,
+     "spread": 4.4955156579854805,
+     "height": -1.5064337019269403,
+     "gone": 0,
+     "peakSpeed": 6.030265767911936,
+     "finite": true,
+     "end": "71f3317c57fcd486"
+    }
+   },
+   {
+    "seed": 22,
+    "D": {
+     "fragments": 18,
+     "restTime": null,
+     "spread": 3.3914568940424674,
+     "height": -1.3493727445602417,
+     "gone": 0,
+     "peakSpeed": 5.941638064775696,
+     "finite": true,
+     "end": "0b34828b5343f5a5"
+    },
+    "F": {
+     "fragments": 18,
+     "restTime": null,
+     "spread": 3.220322520711619,
+     "height": -1.3244510524802737,
+     "gone": 0,
+     "peakSpeed": 5.94164498893391,
+     "finite": true,
+     "end": "d69f3e7a43202979"
+    },
+    "F'": {
+     "fragments": 18,
+     "restTime": null,
+     "spread": 3.2440677368281245,
+     "height": -1.2998102340433333,
+     "gone": 0,
+     "peakSpeed": 5.94164526257771,
+     "finite": true,
+     "end": "c2d5b0a72a1c0642"
+    }
+   },
+   {
+    "seed": 23,
+    "D": {
+     "fragments": 21,
+     "restTime": 3.783333333333333,
+     "spread": 3.6024835681318526,
+     "height": -1.3310148325704394,
+     "gone": 0,
+     "peakSpeed": 6.726442250720315,
+     "finite": true,
+     "end": "3d4e86c1abdeb4cd"
+    },
+    "F": {
+     "fragments": 21,
+     "restTime": 4.733333333333333,
+     "spread": 3.5620808230337597,
+     "height": -1.3252122678927012,
+     "gone": 0,
+     "peakSpeed": 6.727149228554257,
+     "finite": true,
+     "end": "d14b54beaaf34a79"
+    },
+    "F'": {
+     "fragments": 21,
+     "restTime": 3.8166666666666664,
+     "spread": 3.552956995988053,
+     "height": -1.3211402992407482,
+     "gone": 0,
+     "peakSpeed": 6.728990898433369,
+     "finite": true,
+     "end": "66a7d9b427ab2df3"
+    }
+   },
+   {
+    "seed": 24,
+    "D": {
+     "fragments": 20,
+     "restTime": 5.65,
+     "spread": 4.2752405251093455,
+     "height": -1.4369621470570564,
+     "gone": 0,
+     "peakSpeed": 6.49942949235521,
+     "finite": true,
+     "end": "bd9761b4aa3ae7d5"
+    },
+    "F": {
+     "fragments": 20,
+     "restTime": 5.866666666666666,
+     "spread": 4.220367403423636,
+     "height": -1.4383857935667037,
+     "gone": 0,
+     "peakSpeed": 6.478133033943555,
+     "finite": true,
+     "end": "463beb195ef10a55"
+    },
+    "F'": {
+     "fragments": 20,
+     "restTime": 5.816666666666666,
+     "spread": 4.220799412211335,
+     "height": -1.437517811357975,
+     "gone": 0,
+     "peakSpeed": 6.4743092680389065,
+     "finite": true,
+     "end": "42e7c600418076cb"
+    }
+   },
+   {
+    "seed": 25,
+    "D": {
+     "fragments": 19,
+     "restTime": 3.283333333333333,
+     "spread": 3.8253422913203448,
+     "height": -1.2314878576680233,
+     "gone": 0,
+     "peakSpeed": 7.73860061222221,
+     "finite": true,
+     "end": "f7f59eedbbe06c8d"
+    },
+    "F": {
+     "fragments": 19,
+     "restTime": 3.4,
+     "spread": 3.998492487182363,
+     "height": -1.2209072865937884,
+     "gone": 0,
+     "peakSpeed": 7.651503050316485,
+     "finite": true,
+     "end": "f7bca45723963b78"
+    },
+    "F'": {
+     "fragments": 19,
+     "restTime": 3.4166666666666665,
+     "spread": 4.011520138898923,
+     "height": -1.220908196348893,
+     "gone": 0,
+     "peakSpeed": 7.651502228797879,
+     "finite": true,
+     "end": "3b4119438548aabc"
+    }
+   },
+   {
+    "seed": 26,
+    "D": {
+     "fragments": 21,
+     "restTime": 3.533333333333333,
+     "spread": 3.444677419897247,
+     "height": -1.0029048430068153,
+     "gone": 0,
+     "peakSpeed": 6.2962816970862905,
+     "finite": true,
+     "end": "bcdaa711005370b4"
+    },
+    "F": {
+     "fragments": 21,
+     "restTime": 3.5666666666666664,
+     "spread": 3.436223637746195,
+     "height": -1.0075577135596956,
+     "gone": 0,
+     "peakSpeed": 6.453436088612558,
+     "finite": true,
+     "end": "e970c0465512098e"
+    },
+    "F'": {
+     "fragments": 21,
+     "restTime": 3.5666666666666664,
+     "spread": 3.436256352988699,
+     "height": -1.0076609388703393,
+     "gone": 0,
+     "peakSpeed": 6.45343495581946,
+     "finite": true,
+     "end": "d4f86b3387e384b0"
+    }
+   },
+   {
+    "seed": 27,
+    "D": {
+     "fragments": 21,
+     "restTime": 4.033333333333333,
+     "spread": 4.330152656492181,
+     "height": -1.3186505784591038,
+     "gone": 0,
+     "peakSpeed": 6.170144599151382,
+     "finite": true,
+     "end": "e400c64c6538e67d"
+    },
+    "F": {
+     "fragments": 21,
+     "restTime": 3.9833333333333334,
+     "spread": 4.393371954205455,
+     "height": -1.3184576114373547,
+     "gone": 0,
+     "peakSpeed": 6.291003338880097,
+     "finite": true,
+     "end": "3dd16b21554d3ecc"
+    },
+    "F'": {
+     "fragments": 21,
+     "restTime": 3.9833333333333334,
+     "spread": 4.3964014898479435,
+     "height": -1.3178176894074394,
+     "gone": 0,
+     "peakSpeed": 6.291002620454812,
+     "finite": true,
+     "end": "ceb781612d8ce516"
+    }
+   },
+   {
+    "seed": 28,
+    "D": {
+     "fragments": 20,
+     "restTime": 3.8666666666666667,
+     "spread": 3.5389167333188962,
+     "height": -1.1417347460985183,
+     "gone": 0,
+     "peakSpeed": 7.069828530008326,
+     "finite": true,
+     "end": "a6d6f3a4a5fdc9bb"
+    },
+    "F": {
+     "fragments": 20,
+     "restTime": 3.466666666666667,
+     "spread": 3.6117631233957166,
+     "height": -1.2223702177405358,
+     "gone": 0,
+     "peakSpeed": 7.119512426829707,
+     "finite": true,
+     "end": "2d4d949cc8bbbb54"
+    },
+    "F'": {
+     "fragments": 20,
+     "restTime": 3.9166666666666665,
+     "spread": 3.624914099944829,
+     "height": -1.184769156575203,
+     "gone": 0,
+     "peakSpeed": 7.1195117040097875,
+     "finite": true,
+     "end": "8708a171cc875bbc"
+    }
+   },
+   {
+    "seed": 29,
+    "D": {
+     "fragments": 21,
+     "restTime": 5,
+     "spread": 4.800835604830646,
+     "height": -1.580057700475057,
+     "gone": 0,
+     "peakSpeed": 6.716415912904202,
+     "finite": true,
+     "end": "5c092d6799de9299"
+    },
+    "F": {
+     "fragments": 21,
+     "restTime": 5.066666666666666,
+     "spread": 4.812549584083045,
+     "height": -1.5813158693767728,
+     "gone": 0,
+     "peakSpeed": 6.700478102360843,
+     "finite": true,
+     "end": "22807658e15f7edb"
+    },
+    "F'": {
+     "fragments": 21,
+     "restTime": 5.033333333333333,
+     "spread": 4.826076657362859,
+     "height": -1.582355266525632,
+     "gone": 0,
+     "peakSpeed": 6.700477502608065,
+     "finite": true,
+     "end": "9995319a53d8c042"
+    }
+   },
+   {
+    "seed": 30,
+    "D": {
+     "fragments": 21,
+     "restTime": 3.8833333333333333,
+     "spread": 3.6297694556053535,
+     "height": -1.2049958464645205,
+     "gone": 0,
+     "peakSpeed": 6.312294240710002,
+     "finite": true,
+     "end": "ada1bf9a021aa5bb"
+    },
+    "F": {
+     "fragments": 21,
+     "restTime": 4.55,
+     "spread": 3.642692341712707,
+     "height": -1.261348769778297,
+     "gone": 0,
+     "peakSpeed": 6.312178855559725,
+     "finite": true,
+     "end": "09959db5ef195439"
+    },
+    "F'": {
+     "fragments": 21,
+     "restTime": 3.8,
+     "spread": 3.6011660824067526,
+     "height": -1.2342472906623567,
+     "gone": 0,
+     "peakSpeed": 6.312175299098366,
+     "finite": true,
+     "end": "6b3907a27ff3dcd0"
+    }
+   },
+   {
+    "seed": 31,
+    "D": {
+     "fragments": 20,
+     "restTime": 2.3333333333333335,
+     "spread": 3.270288559321994,
+     "height": -1.2431921750307082,
+     "gone": 0,
+     "peakSpeed": 6.487984880866147,
+     "finite": true,
+     "end": "6ec5fa2f9e261b04"
+    },
+    "F": {
+     "fragments": 20,
+     "restTime": 2.6666666666666665,
+     "spread": 3.284470853383136,
+     "height": -1.2357169166207314,
+     "gone": 0,
+     "peakSpeed": 6.488546529909206,
+     "finite": true,
+     "end": "6c39048e0e8d95f4"
+    },
+    "F'": {
+     "fragments": 20,
+     "restTime": 2.7,
+     "spread": 3.2813846765378543,
+     "height": -1.2358303651213647,
+     "gone": 0,
+     "peakSpeed": 6.4872124661035615,
+     "finite": true,
+     "end": "58d9dbf9c414d7da"
+    }
+   },
+   {
+    "seed": 32,
+    "D": {
+     "fragments": 19,
+     "restTime": 3.4833333333333334,
+     "spread": 4.147671222645149,
+     "height": -1.203638986537331,
+     "gone": 0,
+     "peakSpeed": 6.796260682287224,
+     "finite": true,
+     "end": "1afd3e79581e8704"
+    },
+    "F": {
+     "fragments": 19,
+     "restTime": 3.4833333333333334,
+     "spread": 4.138694950547904,
+     "height": -1.2283029885668504,
+     "gone": 0,
+     "peakSpeed": 6.805044174373315,
+     "finite": true,
+     "end": "5e84f62b01aa371b"
+    },
+    "F'": {
+     "fragments": 19,
+     "restTime": 3.4833333333333334,
+     "spread": 4.141665546247326,
+     "height": -1.2268463188880367,
+     "gone": 0,
+     "peakSpeed": 6.805216248716949,
+     "finite": true,
+     "end": "af72b15658290293"
+    }
+   },
+   {
+    "seed": 33,
+    "D": {
+     "fragments": 19,
+     "restTime": 3.8333333333333335,
+     "spread": 3.9997719683367476,
+     "height": -1.4176645749493648,
+     "gone": 0,
+     "peakSpeed": 6.240660476279352,
+     "finite": true,
+     "end": "a75d3cff287dec07"
+    },
+    "F": {
+     "fragments": 19,
+     "restTime": 4.083333333333333,
+     "spread": 3.987725513568504,
+     "height": -1.416915542200992,
+     "gone": 0,
+     "peakSpeed": 6.232166806949578,
+     "finite": true,
+     "end": "0248bd565132ed2d"
+    },
+    "F'": {
+     "fragments": 19,
+     "restTime": 4.216666666666667,
+     "spread": 3.8898157643228286,
+     "height": -1.3158828788682033,
+     "gone": 0,
+     "peakSpeed": 6.336507838343794,
+     "finite": true,
+     "end": "bab173a4f741db3d"
+    }
+   },
+   {
+    "seed": 34,
+    "D": {
+     "fragments": 20,
+     "restTime": 3.35,
+     "spread": 3.6644410026195238,
+     "height": -1.2917163513600827,
+     "gone": 0,
+     "peakSpeed": 6.920967708821335,
+     "finite": true,
+     "end": "7d6363800fb7c0c3"
+    },
+    "F": {
+     "fragments": 20,
+     "restTime": 3.4833333333333334,
+     "spread": 3.83500512767565,
+     "height": -1.2916602157056332,
+     "gone": 0,
+     "peakSpeed": 6.859977042771612,
+     "finite": true,
+     "end": "aa58b1e9aa75086e"
+    },
+    "F'": {
+     "fragments": 20,
+     "restTime": 3.4499999999999997,
+     "spread": 3.833146913735248,
+     "height": -1.2910823754966259,
+     "gone": 0,
+     "peakSpeed": 6.857551724822034,
+     "finite": true,
+     "end": "0a78e07ff89cf56c"
+    }
+   },
+   {
+    "seed": 35,
+    "D": {
+     "fragments": 18,
+     "restTime": 3.3,
+     "spread": 3.7464433567535584,
+     "height": -1.2035951357748773,
+     "gone": 0,
+     "peakSpeed": 6.183824520318152,
+     "finite": true,
+     "end": "7d4c4847c898a945"
+    },
+    "F": {
+     "fragments": 18,
+     "restTime": 3.5166666666666666,
+     "spread": 3.7746122452724458,
+     "height": -1.1931173118452232,
+     "gone": 0,
+     "peakSpeed": 6.184727028167572,
+     "finite": true,
+     "end": "e380f26a106f66f2"
+    },
+    "F'": {
+     "fragments": 18,
+     "restTime": 3.4499999999999997,
+     "spread": 3.765151550726949,
+     "height": -1.1920933826929994,
+     "gone": 0,
+     "peakSpeed": 6.184722808695183,
+     "finite": true,
+     "end": "133429850a189dca"
+    }
+   },
+   {
+    "seed": 36,
+    "D": {
+     "fragments": 19,
+     "restTime": 3.1,
+     "spread": 3.4543644898015664,
+     "height": -1.1275673885891018,
+     "gone": 0,
+     "peakSpeed": 6.137826915292901,
+     "finite": true,
+     "end": "094380ecc34f89cc"
+    },
+    "F": {
+     "fragments": 19,
+     "restTime": 3.55,
+     "spread": 3.4533576465818734,
+     "height": -1.1268081226092028,
+     "gone": 0,
+     "peakSpeed": 6.137826915292901,
+     "finite": true,
+     "end": "0c2f0a27b6276ce6"
+    },
+    "F'": {
+     "fragments": 19,
+     "restTime": 3.3166666666666664,
+     "spread": 3.452468338877674,
+     "height": -1.1273006735320545,
+     "gone": 0,
+     "peakSpeed": 6.137825188507542,
+     "finite": true,
+     "end": "577fd4a05ab29b96"
+    }
+   },
+   {
+    "seed": 37,
+    "D": {
+     "fragments": 20,
+     "restTime": 4.2,
+     "spread": 3.562242559734129,
+     "height": -1.2964178681373597,
+     "gone": 0,
+     "peakSpeed": 7.54244167141479,
+     "finite": true,
+     "end": "1265aec95972c5df"
+    },
+    "F": {
+     "fragments": 20,
+     "restTime": 3.55,
+     "spread": 3.7205064613402445,
+     "height": -1.3459590435028077,
+     "gone": 0,
+     "peakSpeed": 7.646337020798276,
+     "finite": true,
+     "end": "ebaa4ba0cc7227f9"
+    },
+    "F'": {
+     "fragments": 20,
+     "restTime": 3.5,
+     "spread": 3.720378475070324,
+     "height": -1.3462914526462555,
+     "gone": 0,
+     "peakSpeed": 7.6463366547694225,
+     "finite": true,
+     "end": "0e040cbd59cd5680"
+    }
+   },
+   {
+    "seed": 38,
+    "D": {
+     "fragments": 19,
+     "restTime": 2.3166666666666664,
+     "spread": 3.204844938765798,
+     "height": -1.1147931920070397,
+     "gone": 0,
+     "peakSpeed": 6.240714923764498,
+     "finite": true,
+     "end": "76d4c94479cfb472"
+    },
+    "F": {
+     "fragments": 19,
+     "restTime": 2.5166666666666666,
+     "spread": 3.1995336150065152,
+     "height": -1.1151946294856698,
+     "gone": 0,
+     "peakSpeed": 6.2407251804682025,
+     "finite": true,
+     "end": "687e851d96504847"
+    },
+    "F'": {
+     "fragments": 19,
+     "restTime": 2.5166666666666666,
+     "spread": 3.2023091905294003,
+     "height": -1.115509433769866,
+     "gone": 0,
+     "peakSpeed": 6.24072425975175,
+     "finite": true,
+     "end": "3fd60fedf049c356"
+    }
+   },
+   {
+    "seed": 39,
+    "D": {
+     "fragments": 21,
+     "restTime": 4.7,
+     "spread": 4.132400700435494,
+     "height": -0.9618666383127371,
+     "gone": 0,
+     "peakSpeed": 6.395080864203412,
+     "finite": true,
+     "end": "24ba97c6255383d0"
+    },
+    "F": {
+     "fragments": 21,
+     "restTime": 4.8,
+     "spread": 4.15181805681939,
+     "height": -0.9634433330169746,
+     "gone": 0,
+     "peakSpeed": 6.654761320743838,
+     "finite": true,
+     "end": "a514c3da54fa4281"
+    },
+    "F'": {
+     "fragments": 21,
+     "restTime": 4.7,
+     "spread": 4.256777218901954,
+     "height": -0.9625481535636243,
+     "gone": 0,
+     "peakSpeed": 6.654763267428502,
+     "finite": true,
+     "end": "e1721a9ea86842e2"
+    }
+   },
+   {
+    "seed": 40,
+    "D": {
+     "fragments": 18,
+     "restTime": 3.6166666666666667,
+     "spread": 3.9217817212585726,
+     "height": -1.2676239700780974,
+     "gone": 0,
+     "peakSpeed": 6.342135868073149,
+     "finite": true,
+     "end": "19551f5824b55e8f"
+    },
+    "F": {
+     "fragments": 18,
+     "restTime": 3.6333333333333333,
+     "spread": 3.969700419899104,
+     "height": -1.2562927562329504,
+     "gone": 0,
+     "peakSpeed": 6.360171074363796,
+     "finite": true,
+     "end": "2c80c080501fd52a"
+    },
+    "F'": {
+     "fragments": 18,
+     "restTime": 3.5166666666666666,
+     "spread": 3.9092383727575695,
+     "height": -1.257969867851999,
+     "gone": 0,
+     "peakSpeed": 6.360170412080858,
+     "finite": true,
+     "end": "85aa891519463cf0"
+    }
+   }
+  ]
+ },
+ "determinism": {
+  "ok": true,
+  "seed": 1,
+  "flights": 9,
+  "off": []
+ },
+ "tests": {
+  "A1": {
+   "stats": {
+    "restTime": {
+     "primary": true,
+     "default": {
+      "up": 19,
+      "down": 16,
+      "ties": 5,
+      "p": 0.735878800856881,
+      "reading": "no change"
+     },
+     "chaos": {
+      "up": 17,
+      "down": 14,
+      "ties": 9,
+      "p": 0.720100131817162,
+      "reading": "no change"
+     },
+     "median": {
+      "D": 3.425,
+      "F": 3.908333333333333,
+      "F'": 3.583333333333333
+     }
+    },
+    "height": {
+     "primary": false,
+     "default": {
+      "up": 20,
+      "down": 20,
+      "ties": 0,
+      "p": 1,
+      "reading": "no change"
+     },
+     "chaos": {
+      "up": 19,
+      "down": 21,
+      "ties": 0,
+      "p": 0.8746293123804207,
+      "reading": "no change"
+     },
+     "median": {
+      "D": 1.1306630756173814,
+      "F": 1.1308005778562453,
+      "F'": 1.1306721660352888
+     }
+    },
+    "cohesion": {
+     "primary": false,
+     "default": {
+      "up": 21,
+      "down": 17,
+      "ties": 2,
+      "p": 0.6271025701571489,
+      "reading": "no change"
+     },
+     "chaos": {
+      "up": 5,
+      "down": 35,
+      "ties": 0,
+      "p": 0.000001382612026645802,
+      "reading": "changes it downward"
+     },
+     "median": {
+      "D": 0.576510097502278,
+      "F": 0.5765099797982133,
+      "F'": 0.5765051166175118
+     }
+    }
+   },
+   "nudged": 40,
+   "seeds": 40,
+   "settled": {
+    "D": 40,
+    "F": 40,
+    "F'": 38
+   },
+   "held": {
+    "D": 40,
+    "F": 40,
+    "F'": 40
+   },
+   "finite": {
+    "D": 40,
+    "F": 40,
+    "F'": 40
+   },
+   "gone": {
+    "D": 0,
+    "F": 0,
+    "F'": 7
+   }
+  },
+  "A2": {
+   "stats": {
+    "broken": {
+     "primary": true,
+     "default": {
+      "up": 12,
+      "down": 14,
+      "ties": 14,
+      "p": 0.8450189828872681,
+      "reading": "no change"
+     },
+     "chaos": {
+      "up": 17,
+      "down": 12,
+      "ties": 11,
+      "p": 0.45825831964612007,
+      "reading": "no change"
+     },
+     "median": {
+      "D": 43,
+      "F": 44,
+      "F'": 43
+     }
+    },
+    "cohesion": {
+     "primary": true,
+     "default": {
+      "up": 16,
+      "down": 24,
+      "ties": 0,
+      "p": 0.26818725105476915,
+      "reading": "no change"
+     },
+     "chaos": {
+      "up": 20,
+      "down": 20,
+      "ties": 0,
+      "p": 1,
+      "reading": "no change"
+     },
+     "median": {
+      "D": 1.7105377237150265,
+      "F": 1.7050923214682974,
+      "F'": 1.7604944316584286
+     }
+    },
+    "gone": {
+     "primary": false,
+     "default": {
+      "up": 8,
+      "down": 5,
+      "ties": 27,
+      "p": 0.5810546875,
+      "reading": "no change"
+     },
+     "chaos": {
+      "up": 8,
+      "down": 5,
+      "ties": 27,
+      "p": 0.5810546875,
+      "reading": "no change"
+     },
+     "median": {
+      "D": 21,
+      "F": 21,
+      "F'": 21
+     }
+    },
+    "peakSpeed": {
+     "primary": false,
+     "default": {
+      "up": 17,
+      "down": 23,
+      "ties": 0,
+      "p": 0.42959050784338615,
+      "reading": "no change"
+     },
+     "chaos": {
+      "up": 22,
+      "down": 18,
+      "ties": 0,
+      "p": 0.6358280026288412,
+      "reading": "no change"
+     },
+     "median": {
+      "D": 344.91212893577995,
+      "F": 342.2092830226069,
+      "F'": 344.5881812921974
+     }
+    },
+    "peakSpin": {
+     "primary": false,
+     "default": {
+      "up": 17,
+      "down": 23,
+      "ties": 0,
+      "p": 0.42959050784338615,
+      "reading": "no change"
+     },
+     "chaos": {
+      "up": 21,
+      "down": 19,
+      "ties": 0,
+      "p": 0.8746293123804207,
+      "reading": "no change"
+     },
+     "median": {
+      "D": 47.12389382193403,
+      "F": 47.12389375906106,
+      "F'": 47.123893761917756
+     }
+    }
+   },
+   "nudged": 40,
+   "seeds": 40,
+   "held": {
+    "D": 35,
+    "F": 34,
+    "F'": 34
+   },
+   "finite": {
+    "D": 40,
+    "F": 40,
+    "F'": 40
+   },
+   "gone": {
+    "D": 770,
+    "F": 756,
+    "F'": 770
+   }
+  },
+  "D1": {
+   "stats": {
+    "restTime": {
+     "primary": true,
+     "default": {
+      "up": 15,
+      "down": 21,
+      "ties": 4,
+      "p": 0.4050322461407632,
+      "reading": "no change"
+     },
+     "chaos": {
+      "up": 19,
+      "down": 17,
+      "ties": 4,
+      "p": 0.8679394004284404,
+      "reading": "no change"
+     },
+     "median": {
+      "D": 3.7583333333333333,
+      "F": 3.775,
+      "F'": 3.8916666666666666
+     }
+    },
+    "spread": {
+     "primary": true,
+     "default": {
+      "up": 27,
+      "down": 13,
+      "ties": 0,
+      "p": 0.03847730828420026,
+      "reading": "no change"
+     },
+     "chaos": {
+      "up": 21,
+      "down": 19,
+      "ties": 0,
+      "p": 0.8746293123804207,
+      "reading": "no change"
+     },
+     "median": {
+      "D": 2.5835688354727218,
+      "F": 2.5569057316247523,
+      "F'": 2.587475527936761
+     }
+    },
+    "height": {
+     "primary": false,
+     "default": {
+      "up": 20,
+      "down": 20,
+      "ties": 0,
+      "p": 1,
+      "reading": "no change"
+     },
+     "chaos": {
+      "up": 16,
+      "down": 24,
+      "ties": 0,
+      "p": 0.26818725105476915,
+      "reading": "no change"
+     },
+     "median": {
+      "D": -0.7298298375681043,
+      "F": -0.709523661993444,
+      "F'": -0.7196849840693176
+     }
+    },
+    "gone": {
+     "primary": false,
+     "default": {
+      "up": 0,
+      "down": 0,
+      "ties": 40,
+      "p": 1,
+      "reading": "no change"
+     },
+     "chaos": {
+      "up": 0,
+      "down": 0,
+      "ties": 40,
+      "p": 1,
+      "reading": "no change"
+     },
+     "median": {
+      "D": 0,
+      "F": 0,
+      "F'": 0
+     }
+    },
+    "peakSpeed": {
+     "primary": false,
+     "default": {
+      "up": 21,
+      "down": 19,
+      "ties": 0,
+      "p": 0.8746293123804207,
+      "reading": "no change"
+     },
+     "chaos": {
+      "up": 23,
+      "down": 17,
+      "ties": 0,
+      "p": 0.42959050784338615,
+      "reading": "no change"
+     },
+     "median": {
+      "D": 6.526788021915123,
+      "F": 6.558599740711296,
+      "F'": 6.528357322227613
+     }
+    }
+   },
+   "nudged": 40,
+   "seeds": 40,
+   "settled": {
+    "D": 40,
+    "F": 40,
+    "F'": 40
+   },
+   "finite": {
+    "D": 40,
+    "F": 40,
+    "F'": 40
+   },
+   "gone": {
+    "D": 0,
+    "F": 0,
+    "F'": 0
+   }
+  },
+  "D2": {
+   "stats": {
+    "restTime": {
+     "primary": true,
+     "default": {
+      "up": 12,
+      "down": 26,
+      "ties": 2,
+      "p": 0.03355243967962451,
+      "reading": "no change"
+     },
+     "chaos": {
+      "up": 11,
+      "down": 23,
+      "ties": 6,
+      "p": 0.05761267291381955,
+      "reading": "no change"
+     },
+     "median": {
+      "D": 3.8666666666666667,
+      "F": 3.7916666666666665,
+      "F'": 3.808333333333333
+     }
+    },
+    "spread": {
+     "primary": true,
+     "default": {
+      "up": 16,
+      "down": 24,
+      "ties": 0,
+      "p": 0.26818725105476915,
+      "reading": "no change"
+     },
+     "chaos": {
+      "up": 16,
+      "down": 24,
+      "ties": 0,
+      "p": 0.26818725105476915,
+      "reading": "no change"
+     },
+     "median": {
+      "D": 3.836165670922834,
+      "F": 3.8600053920861477,
+      "F'": 3.889474825248187
+     }
+    },
+    "height": {
+     "primary": false,
+     "default": {
+      "up": 17,
+      "down": 23,
+      "ties": 0,
+      "p": 0.42959050784338615,
+      "reading": "no change"
+     },
+     "chaos": {
+      "up": 17,
+      "down": 23,
+      "ties": 0,
+      "p": 0.42959050784338615,
+      "reading": "no change"
+     },
+     "median": {
+      "D": -1.2940671097487213,
+      "F": -1.3050589135714938,
+      "F'": -1.2954463047699796
+     }
+    },
+    "gone": {
+     "primary": false,
+     "default": {
+      "up": 1,
+      "down": 0,
+      "ties": 39,
+      "p": 1,
+      "reading": "no change"
+     },
+     "chaos": {
+      "up": 0,
+      "down": 0,
+      "ties": 40,
+      "p": 1,
+      "reading": "no change"
+     },
+     "median": {
+      "D": 0,
+      "F": 0,
+      "F'": 0
+     }
+    },
+    "peakSpeed": {
+     "primary": false,
+     "default": {
+      "up": 15,
+      "down": 24,
+      "ties": 1,
+      "p": 0.19959086691960698,
+      "reading": "no change"
+     },
+     "chaos": {
+      "up": 13,
+      "down": 27,
+      "ties": 0,
+      "p": 0.03847730828420026,
+      "reading": "no change"
+     },
+     "median": {
+      "D": 6.466131358116337,
+      "F": 6.465784561278056,
+      "F'": 6.463872111929183
+     }
+    }
+   },
+   "nudged": 40,
+   "seeds": 40,
+   "settled": {
+    "D": 38,
+    "F": 39,
+    "F'": 39
+   },
+   "finite": {
+    "D": 40,
+    "F": 40,
+    "F'": 40
+   },
+   "gone": {
+    "D": 1,
+    "F": 0,
+    "F'": 0
+   }
+  }
+ }
+}

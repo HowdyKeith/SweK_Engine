@@ -1,0 +1,6970 @@
+{
+ "registration": "physics/mechanics/ORIENTATION_STEP_WIP.md",
+ "pilots": [
+  {
+   "id": "scripted",
+   "hash": null
+  },
+  {
+   "id": "shipped",
+   "hash": "215e26d9"
+  },
+  {
+   "id": "league",
+   "hash": "32789ff9"
+  },
+  {
+   "id": "close",
+   "hash": "360580a7"
+  },
+  {
+   "id": "gpu",
+   "hash": "0ffd8554"
+  }
+ ],
+ "m1": {
+  "flights": {
+   "1/30": {
+    "Q0": {
+     "driftWorldL": 0.016083941552914087,
+     "driftE": 6.553799991265533e-9,
+     "flips": 1,
+     "steps": 900
+    },
+    "Q4": {
+     "driftWorldL": 9.84096869010523e-8,
+     "driftE": 6.553799991265533e-9,
+     "flips": 1,
+     "steps": 900
+    }
+   },
+   "1/60": {
+    "Q0": {
+     "driftWorldL": 0.008024170558310685,
+     "driftE": 3.7603360423584246e-10,
+     "flips": 1,
+     "steps": 1800
+    },
+    "Q4": {
+     "driftWorldL": 6.152952694682549e-9,
+     "driftE": 3.7603360423584246e-10,
+     "flips": 1,
+     "steps": 1800
+    }
+   },
+   "1/240": {
+    "Q0": {
+     "driftWorldL": 0.0020027047304461633,
+     "driftE": 1.3729462011038062e-12,
+     "flips": 1,
+     "steps": 7200
+    },
+    "Q4": {
+     "driftWorldL": 2.4037730438835296e-11,
+     "driftE": 1.3729462011038062e-12,
+     "flips": 1,
+     "steps": 7200
+    }
+   },
+   "1/960": {
+    "Q0": {
+     "driftWorldL": 0.000500467228165489,
+     "driftE": 1.474376176628489e-14,
+     "flips": 1,
+     "steps": 28800
+    },
+    "Q4": {
+     "driftWorldL": 1.0326760853656919e-13,
+     "driftE": 1.474376176628489e-14,
+     "flips": 1,
+     "steps": 28800
+    }
+   }
+  },
+  "order": {
+   "Q0": 1.001201269528702,
+   "Q4": 3.9999172012445445
+  }
+ },
+ "m2": {
+  "duels": [
+   {
+    "scenario": "standoff",
+    "seed": 91001,
+    "ticks": 174,
+    "peakSpin": 0.021530717698102563,
+    "q0": 0.0003588454775179328,
+    "q4": 4.3316177033307904e-15,
+    "q0fine": 0.00000560695778196015,
+    "omegaSame": true,
+    "replayIsDuel": true
+   },
+   {
+    "scenario": "standoff",
+    "seed": 91002,
+    "ticks": 183,
+    "peakSpin": 0.04457041335064544,
+    "q0": 0.0007428418418767801,
+    "q4": 2.9090062537339423e-15,
+    "q0fine": 0.000011606878903253445,
+    "omegaSame": true,
+    "replayIsDuel": true
+   },
+   {
+    "scenario": "standoff",
+    "seed": 91003,
+    "ticks": 198,
+    "peakSpin": 0.05658751817187128,
+    "q0": 0.0009431286169744294,
+    "q4": 1.0547415718025448e-15,
+    "q0fine": 0.000014736333730161059,
+    "omegaSame": true,
+    "replayIsDuel": true
+   },
+   {
+    "scenario": "standoff",
+    "seed": 91004,
+    "ticks": 183,
+    "peakSpin": 0.037080268698757336,
+    "q0": 0.0006180054107801399,
+    "q4": 8.163930774569159e-15,
+    "q0fine": 0.000009656320219266758,
+    "omegaSame": true,
+    "replayIsDuel": true
+   },
+   {
+    "scenario": "standoff",
+    "seed": 91005,
+    "ticks": 198,
+    "peakSpin": 0.11023703019060854,
+    "q0": 0.0018373083376829913,
+    "q4": 2.4703184869221348e-14,
+    "q0fine": 0.000028707566398445857,
+    "omegaSame": true,
+    "replayIsDuel": true
+   },
+   {
+    "scenario": "standoff",
+    "seed": 91006,
+    "ticks": 198,
+    "peakSpin": 0.09482974554399703,
+    "q0": 0.0015805113559682596,
+    "q4": 1.3008884704074923e-14,
+    "q0fine": 0.0000246952503432711,
+    "omegaSame": true,
+    "replayIsDuel": true
+   },
+   {
+    "scenario": "standoff",
+    "seed": 91007,
+    "ticks": 189,
+    "peakSpin": 0.06956597464764912,
+    "q0": 0.0011594390681671641,
+    "q4": 6.35844134239043e-15,
+    "q0fine": 0.00001811614085288776,
+    "omegaSame": true,
+    "replayIsDuel": true
+   },
+   {
+    "scenario": "standoff",
+    "seed": 91008,
+    "ticks": 183,
+    "peakSpin": 0.043082548175547394,
+    "q0": 0.0007180439321373612,
+    "q4": 9.44704173862113e-15,
+    "q0fine": 0.000011219413972621562,
+    "omegaSame": true,
+    "replayIsDuel": true
+   },
+   {
+    "scenario": "standoff",
+    "seed": 91009,
+    "ticks": 174,
+    "peakSpin": 0.027040070914166558,
+    "q0": 0.0004506682101696154,
+    "q4": 1.3410169783924587e-15,
+    "q0fine": 0.0000070416852291441,
+    "omegaSame": true,
+    "replayIsDuel": true
+   },
+   {
+    "scenario": "standoff",
+    "seed": 91010,
+    "ticks": 183,
+    "peakSpin": 0.04294936379635442,
+    "q0": 0.0007158241789622598,
+    "q4": 1.1743593845887959e-14,
+    "q0fine": 0.000011184730536975641,
+    "omegaSame": true,
+    "replayIsDuel": true
+   },
+   {
+    "scenario": "joust",
+    "seed": 91001,
+    "ticks": 292,
+    "peakSpin": 2.360048833259701,
+    "q0": 0.0396138676834242,
+    "q4": 2.3881504101663557e-8,
+    "q0fine": 0.0006146691238248024,
+    "omegaSame": true,
+    "replayIsDuel": true
+   },
+   {
+    "scenario": "joust",
+    "seed": 91002,
+    "ticks": 296,
+    "peakSpin": 2.1686410680064245,
+    "q0": 0.036380117371089246,
+    "q4": 1.6461972819935225e-8,
+    "q0fine": 0.0005648116399171567,
+    "omegaSame": true,
+    "replayIsDuel": true
+   },
+   {
+    "scenario": "joust",
+    "seed": 91003,
+    "ticks": 329,
+    "peakSpin": 1.9319393514890233,
+    "q0": 0.03239250118963906,
+    "q4": 1.0181304597414824e-8,
+    "q0fine": 0.0005031590948100877,
+    "omegaSame": true,
+    "replayIsDuel": true
+   },
+   {
+    "scenario": "joust",
+    "seed": 91004,
+    "ticks": 345,
+    "peakSpin": 1.9126135826041877,
+    "q0": 0.03205961071522055,
+    "q4": 9.59262240944298e-9,
+    "q0fine": 0.0004981236239789845,
+    "omegaSame": true,
+    "replayIsDuel": true
+   },
+   {
+    "scenario": "joust",
+    "seed": 91005,
+    "ticks": 355,
+    "peakSpin": 1.9522056859101489,
+    "q0": 0.03273782840427279,
+    "q4": 1.0631610761615113e-8,
+    "q0fine": 0.0005084387144597371,
+    "omegaSame": true,
+    "replayIsDuel": true
+   },
+   {
+    "scenario": "joust",
+    "seed": 91006,
+    "ticks": 397,
+    "peakSpin": 1.5833303542010093,
+    "q0": 0.026523213838912332,
+    "q4": 4.291696370936477e-9,
+    "q0fine": 0.00041235987867523175,
+    "omegaSame": true,
+    "replayIsDuel": true
+   },
+   {
+    "scenario": "joust",
+    "seed": 91007,
+    "ticks": 302,
+    "peakSpin": 2.4223840574741082,
+    "q0": 0.04069101314527383,
+    "q4": 2.678115098475112e-8,
+    "q0fine": 0.0006309119745185058,
+    "omegaSame": true,
+    "replayIsDuel": true
+   },
+   {
+    "scenario": "joust",
+    "seed": 91008,
+    "ticks": 370,
+    "peakSpin": 1.730710051152732,
+    "q0": 0.0289965690990458,
+    "q4": 6.261421022164714e-9,
+    "q0fine": 0.00045074460787320484,
+    "omegaSame": true,
+    "replayIsDuel": true
+   },
+   {
+    "scenario": "joust",
+    "seed": 91009,
+    "ticks": 290,
+    "peakSpin": 2.545086344095127,
+    "q0": 0.04274092769787225,
+    "q4": 3.315847419654974e-8,
+    "q0fine": 0.0006628676860012285,
+    "omegaSame": true,
+    "replayIsDuel": true
+   },
+   {
+    "scenario": "joust",
+    "seed": 91010,
+    "ticks": 370,
+    "peakSpin": 1.9451113005031737,
+    "q0": 0.032608216661814314,
+    "q4": 1.0307632362908749e-8,
+    "q0fine": 0.0005065884066247949,
+    "omegaSame": true,
+    "replayIsDuel": true
+   }
+  ]
+ },
+ "m3": {
+  "cells": [
+   {
+    "pilot": "scripted",
+    "scenario": "standoff",
+    "seeds": [91001,91002,91003,91004,91005,91006,91007,91008,91009,91010,91011,91012,91013,91014,91015,91016,91017,91018,91019,91020,91021,91022,91023,91024,91025,91026,91027,91028,91029,91030,91031,91032,91033,91034,91035,91036,91037,91038,91039,91040],
+    "flights": {
+     "Q0": [
+      {
+       "outcome": "draw",
+       "fingerprint": "21479736",
+       "ticks": 174
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "82d94564",
+       "ticks": 183
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "d2ee1907",
+       "ticks": 198
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "0e5b4c7f",
+       "ticks": 183
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "d2fcb056",
+       "ticks": 198
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "43dbd280",
+       "ticks": 198
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "c0841a8d",
+       "ticks": 189
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "00eead86",
+       "ticks": 183
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "d6fb315c",
+       "ticks": 174
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "f3821ff0",
+       "ticks": 183
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "c3be7c21",
+       "ticks": 198
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "4f8b165c",
+       "ticks": 183
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "d9ba7740",
+       "ticks": 174
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "2acdad3a",
+       "ticks": 183
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "43ddb267",
+       "ticks": 201
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "ec98834c",
+       "ticks": 198
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "d07f1c37",
+       "ticks": 198
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "9f5f9b48",
+       "ticks": 183
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "358ed4d0",
+       "ticks": 192
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "92496c35",
+       "ticks": 198
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "d217c528",
+       "ticks": 174
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "288eafa1",
+       "ticks": 189
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "1537c18c",
+       "ticks": 207
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "362234a7",
+       "ticks": 189
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "1d12d020",
+       "ticks": 198
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "0761f6bb",
+       "ticks": 189
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "149900a6",
+       "ticks": 174
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "5172bbbe",
+       "ticks": 201
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "719975f7",
+       "ticks": 198
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "5bf87433",
+       "ticks": 198
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "7a13857b",
+       "ticks": 174
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "1db996b8",
+       "ticks": 183
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "3f780e97",
+       "ticks": 183
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "aea5e98e",
+       "ticks": 201
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "d1c31455",
+       "ticks": 198
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "209bfe0f",
+       "ticks": 198
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "b37f4461",
+       "ticks": 174
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "8fe925ae",
+       "ticks": 207
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "328a0a5f",
+       "ticks": 198
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "d61cb190",
+       "ticks": 183
+      }
+     ],
+     "Q4": [
+      {
+       "outcome": "draw",
+       "fingerprint": "3adb854b",
+       "ticks": 165
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "b61fbc9a",
+       "ticks": 183
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "32fc0903",
+       "ticks": 192
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "8a347f3f",
+       "ticks": 183
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "9581c985",
+       "ticks": 198
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "6cf26859",
+       "ticks": 198
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "83f5a2de",
+       "ticks": 189
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "24f7eb01",
+       "ticks": 183
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "5d96fe88",
+       "ticks": 174
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "7573187e",
+       "ticks": 183
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "45f12ed3",
+       "ticks": 198
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "d0e26a9c",
+       "ticks": 183
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "766b8c7f",
+       "ticks": 174
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "cdc2cdf3",
+       "ticks": 183
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "e3178678",
+       "ticks": 201
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "eed589d5",
+       "ticks": 198
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "2e76d950",
+       "ticks": 198
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "de4bd4ec",
+       "ticks": 183
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "f6cf723a",
+       "ticks": 192
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "f76ba099",
+       "ticks": 198
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "c1e76263",
+       "ticks": 174
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "2d24de21",
+       "ticks": 189
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "78028be4",
+       "ticks": 216
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "90c7f307",
+       "ticks": 189
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "834170b9",
+       "ticks": 198
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "370a66b4",
+       "ticks": 189
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "dae221b0",
+       "ticks": 174
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "cd7063b1",
+       "ticks": 201
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "e6854e44",
+       "ticks": 198
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "2e8ad2cf",
+       "ticks": 198
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "8175a2ba",
+       "ticks": 174
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "f4b7218b",
+       "ticks": 183
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "7c9c81b0",
+       "ticks": 183
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "65c5e2f6",
+       "ticks": 201
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "4062f1f1",
+       "ticks": 198
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "28c4cf69",
+       "ticks": 198
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "92a1d341",
+       "ticks": 174
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "916043c5",
+       "ticks": 207
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "e4bae9c9",
+       "ticks": 198
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "5030765f",
+       "ticks": 183
+      }
+     ],
+     "Q0'": [
+      {
+       "outcome": "draw",
+       "fingerprint": "21479736",
+       "ticks": 174
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "82d94564",
+       "ticks": 183
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "d2ee1907",
+       "ticks": 198
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "0e5b4c7f",
+       "ticks": 183
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "d2fcb056",
+       "ticks": 198
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "43dbd280",
+       "ticks": 198
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "c0841a8d",
+       "ticks": 189
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "00eead86",
+       "ticks": 183
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "d6fb315c",
+       "ticks": 174
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "f3821ff0",
+       "ticks": 183
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "c3be7c21",
+       "ticks": 198
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "4f8b165c",
+       "ticks": 183
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "d9ba7740",
+       "ticks": 174
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "2acdad3a",
+       "ticks": 183
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "43ddb267",
+       "ticks": 201
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "ec98834c",
+       "ticks": 198
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "d07f1c37",
+       "ticks": 198
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "9f5f9b48",
+       "ticks": 183
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "358ed4d0",
+       "ticks": 192
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "92496c35",
+       "ticks": 198
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "d217c528",
+       "ticks": 174
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "288eafa1",
+       "ticks": 189
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "1537c18c",
+       "ticks": 207
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "362234a7",
+       "ticks": 189
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "1d12d020",
+       "ticks": 198
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "0761f6bb",
+       "ticks": 189
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "149900a6",
+       "ticks": 174
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "5172bbbe",
+       "ticks": 201
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "719975f7",
+       "ticks": 198
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "5bf87433",
+       "ticks": 198
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "7a13857b",
+       "ticks": 174
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "1db996b8",
+       "ticks": 183
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "3f780e97",
+       "ticks": 183
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "aea5e98e",
+       "ticks": 201
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "d1c31455",
+       "ticks": 198
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "209bfe0f",
+       "ticks": 198
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "b37f4461",
+       "ticks": 174
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "8fe925ae",
+       "ticks": 207
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "328a0a5f",
+       "ticks": 198
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "d61cb190",
+       "ticks": 183
+      }
+     ]
+    },
+    "q4": {
+     "better": 0,
+     "worse": 0,
+     "same": 40,
+     "changed": 0,
+     "p": 1
+    },
+    "chaos": {
+     "better": 0,
+     "worse": 0,
+     "same": 40,
+     "changed": 0,
+     "p": 1
+    },
+    "reading": "changes nothing a sign test can see",
+    "chaosReading": "changes nothing a sign test can see",
+    "tally": {
+     "Q0": {
+      "win": 0,
+      "loss": 0,
+      "draw": 40
+     },
+     "Q4": {
+      "win": 0,
+      "loss": 0,
+      "draw": 40
+     },
+     "Q0'": {
+      "win": 0,
+      "loss": 0,
+      "draw": 40
+     }
+    }
+   },
+   {
+    "pilot": "scripted",
+    "scenario": "joust",
+    "seeds": [91001,91002,91003,91004,91005,91006,91007,91008,91009,91010,91011,91012,91013,91014,91015,91016,91017,91018,91019,91020,91021,91022,91023,91024,91025,91026,91027,91028,91029,91030,91031,91032,91033,91034,91035,91036,91037,91038,91039,91040],
+    "flights": {
+     "Q0": [
+      {
+       "outcome": "loss",
+       "fingerprint": "84dba782",
+       "ticks": 292
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "9ca8b04b",
+       "ticks": 296
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "e9519b02",
+       "ticks": 329
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "5631ce19",
+       "ticks": 345
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "2d176052",
+       "ticks": 355
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "db9e5cac",
+       "ticks": 397
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "e4aa155f",
+       "ticks": 302
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "e93c9c13",
+       "ticks": 370
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "0fa371d8",
+       "ticks": 290
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "57fb91fc",
+       "ticks": 370
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "aed784ff",
+       "ticks": 311
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "80a72973",
+       "ticks": 343
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "d8022855",
+       "ticks": 398
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "64c054ab",
+       "ticks": 300
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "18bb0630",
+       "ticks": 290
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "85a5e9b2",
+       "ticks": 370
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "9deda673",
+       "ticks": 290
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "c98b5a3c",
+       "ticks": 260
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "6717eb53",
+       "ticks": 309
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "c962b8c4",
+       "ticks": 397
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "c0489345",
+       "ticks": 350
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "3ae9eba3",
+       "ticks": 316
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "9997dc4d",
+       "ticks": 422
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "c07afcbe",
+       "ticks": 355
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "0738ee36",
+       "ticks": 360
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "881a9c43",
+       "ticks": 274
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "d6d6eb29",
+       "ticks": 399
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "0749b717",
+       "ticks": 391
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "6ccb2787",
+       "ticks": 309
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "147995a4",
+       "ticks": 242
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "36c4fb05",
+       "ticks": 315
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "3cb1019f",
+       "ticks": 344
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "83533a0c",
+       "ticks": 382
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "5f35492c",
+       "ticks": 308
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "d3aae376",
+       "ticks": 355
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "d8b1d3a5",
+       "ticks": 293
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "25acbb71",
+       "ticks": 288
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "038e7b74",
+       "ticks": 299
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "5a3e92fc",
+       "ticks": 406
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "43e0ea0f",
+       "ticks": 308
+      }
+     ],
+     "Q4": [
+      {
+       "outcome": "draw",
+       "fingerprint": "eb84862c",
+       "ticks": 307
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "261000da",
+       "ticks": 305
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "c7e0574a",
+       "ticks": 334
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "b10443dd",
+       "ticks": 351
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "ff5cdb9d",
+       "ticks": 361
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "689779b8",
+       "ticks": 397
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "62c7d77f",
+       "ticks": 308
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "355b39b1",
+       "ticks": 373
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "d94f3323",
+       "ticks": 302
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "0528d1cb",
+       "ticks": 370
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "60631bfe",
+       "ticks": 317
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "5db7b66d",
+       "ticks": 346
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "0dcdf2ce",
+       "ticks": 398
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "a201bf04",
+       "ticks": 307
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "35e4ce38",
+       "ticks": 293
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "efae57af",
+       "ticks": 370
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "1280a699",
+       "ticks": 293
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "a2b2003e",
+       "ticks": 264
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "0f1e969e",
+       "ticks": 312
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "4485447d",
+       "ticks": 400
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "c9be177c",
+       "ticks": 350
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "7f080862",
+       "ticks": 319
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "1be98fac",
+       "ticks": 423
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "0cc3c687",
+       "ticks": 361
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "e758b2a1",
+       "ticks": 369
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "4b84415c",
+       "ticks": 289
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "888d452e",
+       "ticks": 408
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "a86170c9",
+       "ticks": 900
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "435a7c5f",
+       "ticks": 315
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "5b742722",
+       "ticks": 242
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "d9d236a7",
+       "ticks": 315
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "5a8e8ae8",
+       "ticks": 344
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "08907e9c",
+       "ticks": 382
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "59afcc63",
+       "ticks": 308
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "7f2b71b3",
+       "ticks": 361
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "6f9ced5f",
+       "ticks": 299
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "b2fffc14",
+       "ticks": 300
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "06c36fcf",
+       "ticks": 299
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "55a93763",
+       "ticks": 409
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "8eafe64f",
+       "ticks": 308
+      }
+     ],
+     "Q0'": [
+      {
+       "outcome": "loss",
+       "fingerprint": "84dba782",
+       "ticks": 292
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "9ca8b04b",
+       "ticks": 296
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "e9519b02",
+       "ticks": 329
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "5631ce19",
+       "ticks": 345
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "2d176052",
+       "ticks": 355
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "db9e5cac",
+       "ticks": 397
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "e4aa155f",
+       "ticks": 302
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "e93c9c13",
+       "ticks": 370
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "0fa371d8",
+       "ticks": 290
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "57fb91fc",
+       "ticks": 370
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "aed784ff",
+       "ticks": 311
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "80a72973",
+       "ticks": 343
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "d8022855",
+       "ticks": 398
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "64c054ab",
+       "ticks": 300
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "18bb0630",
+       "ticks": 290
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "85a5e9b2",
+       "ticks": 370
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "9deda673",
+       "ticks": 290
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "c98b5a3c",
+       "ticks": 260
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "6717eb53",
+       "ticks": 309
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "c962b8c4",
+       "ticks": 397
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "c0489345",
+       "ticks": 350
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "3ae9eba3",
+       "ticks": 316
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "9997dc4d",
+       "ticks": 422
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "c07afcbe",
+       "ticks": 355
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "0738ee36",
+       "ticks": 360
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "881a9c43",
+       "ticks": 274
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "d6d6eb29",
+       "ticks": 399
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "0749b717",
+       "ticks": 391
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "6ccb2787",
+       "ticks": 309
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "147995a4",
+       "ticks": 242
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "36c4fb05",
+       "ticks": 315
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "3cb1019f",
+       "ticks": 344
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "83533a0c",
+       "ticks": 382
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "5f35492c",
+       "ticks": 308
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "d3aae376",
+       "ticks": 355
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "d8b1d3a5",
+       "ticks": 293
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "25acbb71",
+       "ticks": 288
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "038e7b74",
+       "ticks": 299
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "5a3e92fc",
+       "ticks": 406
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "43e0ea0f",
+       "ticks": 308
+      }
+     ]
+    },
+    "q4": {
+     "better": 8,
+     "worse": 7,
+     "same": 25,
+     "changed": 15,
+     "p": 0.9999999999999998
+    },
+    "chaos": {
+     "better": 0,
+     "worse": 0,
+     "same": 40,
+     "changed": 0,
+     "p": 1
+    },
+    "reading": "changes nothing a sign test can see",
+    "chaosReading": "changes nothing a sign test can see",
+    "tally": {
+     "Q0": {
+      "win": 3,
+      "loss": 9,
+      "draw": 28
+     },
+     "Q4": {
+      "win": 0,
+      "loss": 5,
+      "draw": 35
+     },
+     "Q0'": {
+      "win": 3,
+      "loss": 9,
+      "draw": 28
+     }
+    }
+   },
+   {
+    "pilot": "shipped",
+    "scenario": "standoff",
+    "seeds": [91001,91002,91003,91004,91005,91006,91007,91008,91009,91010,91011,91012,91013,91014,91015,91016,91017,91018,91019,91020,91021,91022,91023,91024,91025,91026,91027,91028,91029,91030,91031,91032,91033,91034,91035,91036,91037,91038,91039,91040],
+    "flights": {
+     "Q0": [
+      {
+       "outcome": "win",
+       "fingerprint": "2a68a5cc",
+       "ticks": 155
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "ab595344",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "84544670",
+       "ticks": 170
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "549df8fc",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "5590f448",
+       "ticks": 179
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "c782f829",
+       "ticks": 165
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "20052d3d",
+       "ticks": 173
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "32d0ba65",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "51e4bdd0",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "174fdc7a",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "2d25a0af",
+       "ticks": 165
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "ad5054dd",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "f512951a",
+       "ticks": 155
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "4c968ab1",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "27d5d1ee",
+       "ticks": 170
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "5ff76d0f",
+       "ticks": 165
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "a915b946",
+       "ticks": 165
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "cb1c1291",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "5d9563e6",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "d1238738",
+       "ticks": 170
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "a1d5125f",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "dfce1354",
+       "ticks": 162
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "e14512c9",
+       "ticks": 170
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "2de418fc",
+       "ticks": 173
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "bcc147e8",
+       "ticks": 165
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "fbeefe26",
+       "ticks": 173
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "46dc5ce6",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "a9aaaef4",
+       "ticks": 179
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "1baadc4d",
+       "ticks": 165
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "dbd0ae79",
+       "ticks": 170
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "3383f528",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "5637f112",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "73bf50bc",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "39c5d213",
+       "ticks": 179
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "d1e4c3e7",
+       "ticks": 165
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "7d05c0c8",
+       "ticks": 179
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "f0a584c9",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "938c9336",
+       "ticks": 170
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "dde3d81f",
+       "ticks": 165
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "cc295f17",
+       "ticks": 164
+      }
+     ],
+     "Q4": [
+      {
+       "outcome": "win",
+       "fingerprint": "62ccf90e",
+       "ticks": 155
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "061ca0af",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "d928267b",
+       "ticks": 170
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "15615f9c",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "80efe892",
+       "ticks": 179
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "5cb52413",
+       "ticks": 165
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "2c6c1b88",
+       "ticks": 173
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "86c4ed86",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "9b6e411a",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "8e5c9542",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "e5f825f0",
+       "ticks": 165
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "2c90b906",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "71c97df2",
+       "ticks": 155
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "b11e20cb",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "e0f90194",
+       "ticks": 170
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "5346137b",
+       "ticks": 173
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "c8b0d9ef",
+       "ticks": 165
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "88d5c3ac",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "0596bb5a",
+       "ticks": 173
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "4f96989c",
+       "ticks": 170
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "58bb3f1c",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "689fed92",
+       "ticks": 170
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "ddf5ec0a",
+       "ticks": 179
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "9cf2cd88",
+       "ticks": 173
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "28eb193a",
+       "ticks": 165
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "db7e0ff6",
+       "ticks": 173
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "0a9fd4f0",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "98053c09",
+       "ticks": 179
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "246f6e36",
+       "ticks": 165
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "3c0aa732",
+       "ticks": 173
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "16d03b42",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "a5c88fc8",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "1368f2e4",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "1f012724",
+       "ticks": 179
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "a181f9c1",
+       "ticks": 165
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "3f89491b",
+       "ticks": 173
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "7cf2eb0f",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "023c11d8",
+       "ticks": 170
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "194bdb03",
+       "ticks": 173
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "07de9495",
+       "ticks": 164
+      }
+     ],
+     "Q0'": [
+      {
+       "outcome": "win",
+       "fingerprint": "2a68a5cc",
+       "ticks": 155
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "ab595344",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "84544670",
+       "ticks": 170
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "549df8fc",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "5590f448",
+       "ticks": 179
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "c782f829",
+       "ticks": 165
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "20052d3d",
+       "ticks": 173
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "32d0ba65",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "51e4bdd0",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "174fdc7a",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "2d25a0af",
+       "ticks": 165
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "ad5054dd",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "f512951a",
+       "ticks": 155
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "4c968ab1",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "27d5d1ee",
+       "ticks": 170
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "5ff76d0f",
+       "ticks": 165
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "a915b946",
+       "ticks": 165
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "cb1c1291",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "5d9563e6",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "d1238738",
+       "ticks": 170
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "a1d5125f",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "dfce1354",
+       "ticks": 162
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "e14512c9",
+       "ticks": 170
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "2de418fc",
+       "ticks": 173
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "bcc147e8",
+       "ticks": 165
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "fbeefe26",
+       "ticks": 173
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "46dc5ce6",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "a9aaaef4",
+       "ticks": 179
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "1baadc4d",
+       "ticks": 165
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "dbd0ae79",
+       "ticks": 170
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "3383f528",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "5637f112",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "73bf50bc",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "39c5d213",
+       "ticks": 179
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "d1e4c3e7",
+       "ticks": 165
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "7d05c0c8",
+       "ticks": 179
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "f0a584c9",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "938c9336",
+       "ticks": 170
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "dde3d81f",
+       "ticks": 165
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "cc295f17",
+       "ticks": 164
+      }
+     ]
+    },
+    "q4": {
+     "better": 0,
+     "worse": 0,
+     "same": 40,
+     "changed": 0,
+     "p": 1
+    },
+    "chaos": {
+     "better": 0,
+     "worse": 0,
+     "same": 40,
+     "changed": 0,
+     "p": 1
+    },
+    "reading": "changes nothing a sign test can see",
+    "chaosReading": "changes nothing a sign test can see",
+    "tally": {
+     "Q0": {
+      "win": 40,
+      "loss": 0,
+      "draw": 0
+     },
+     "Q4": {
+      "win": 40,
+      "loss": 0,
+      "draw": 0
+     },
+     "Q0'": {
+      "win": 40,
+      "loss": 0,
+      "draw": 0
+     }
+    }
+   },
+   {
+    "pilot": "shipped",
+    "scenario": "joust",
+    "seeds": [91001,91002,91003,91004,91005,91006,91007,91008,91009,91010,91011,91012,91013,91014,91015,91016,91017,91018,91019,91020,91021,91022,91023,91024,91025,91026,91027,91028,91029,91030,91031,91032,91033,91034,91035,91036,91037,91038,91039,91040],
+    "flights": {
+     "Q0": [
+      {
+       "outcome": "loss",
+       "fingerprint": "09aa168a",
+       "ticks": 283
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "283437d9",
+       "ticks": 308
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "2bd9dfee",
+       "ticks": 347
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "84fce4ec",
+       "ticks": 305
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "d4398bbb",
+       "ticks": 344
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "e1e1c71f",
+       "ticks": 351
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "e567afff",
+       "ticks": 284
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "717a567d",
+       "ticks": 345
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "2a369a16",
+       "ticks": 271
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "7ace71db",
+       "ticks": 324
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "f4a13ce3",
+       "ticks": 271
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "d989412c",
+       "ticks": 300
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "8de1c29a",
+       "ticks": 900
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "a1e44ebf",
+       "ticks": 279
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "312dcb0f",
+       "ticks": 282
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "77388e43",
+       "ticks": 325
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "24b1be32",
+       "ticks": 272
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "1510a1bb",
+       "ticks": 251
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "6ec3ce56",
+       "ticks": 300
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "a38024f0",
+       "ticks": 406
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "8a7dc1ec",
+       "ticks": 350
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "9b3672cd",
+       "ticks": 307
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "898e0bcb",
+       "ticks": 351
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "ecdd3104",
+       "ticks": 325
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "4e268205",
+       "ticks": 344
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "c4626634",
+       "ticks": 265
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "c9cc0660",
+       "ticks": 369
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "d68bb06c",
+       "ticks": 344
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "dad2239f",
+       "ticks": 326
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "06f44197",
+       "ticks": 232
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "1eca4617",
+       "ticks": 290
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "e4221687",
+       "ticks": 293
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "0be21c09",
+       "ticks": 378
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "9a54ce84",
+       "ticks": 290
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "a6a3de0e",
+       "ticks": 324
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "345587fc",
+       "ticks": 290
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "d0123ef2",
+       "ticks": 273
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "6ae7935a",
+       "ticks": 291
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "443698e9",
+       "ticks": 355
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "a611eb50",
+       "ticks": 282
+      }
+     ],
+     "Q4": [
+      {
+       "outcome": "loss",
+       "fingerprint": "11b9795e",
+       "ticks": 283
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "aa40a0d1",
+       "ticks": 323
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "0fcd7d32",
+       "ticks": 793
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "b15da6c2",
+       "ticks": 308
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "37a80fc1",
+       "ticks": 338
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "2fdc7028",
+       "ticks": 351
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "501b90b2",
+       "ticks": 293
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "48bf3f48",
+       "ticks": 345
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "8c03c4b4",
+       "ticks": 275
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "21f9ea9c",
+       "ticks": 333
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "ebf362ab",
+       "ticks": 281
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "f1119f33",
+       "ticks": 315
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "998bd2ca",
+       "ticks": 900
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "54620d21",
+       "ticks": 288
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "2d252274",
+       "ticks": 291
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "e5ee2fd3",
+       "ticks": 334
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "14fa4337",
+       "ticks": 276
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "3d2b58e3",
+       "ticks": 251
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "3269c96c",
+       "ticks": 285
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "8abe5ec1",
+       "ticks": 406
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "508babc7",
+       "ticks": 350
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "fa528f50",
+       "ticks": 307
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "8d813b1d",
+       "ticks": 381
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "c279cdf7",
+       "ticks": 325
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "fd20412c",
+       "ticks": 353
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "5e4471d4",
+       "ticks": 265
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "df8cf39c",
+       "ticks": 378
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "e499107d",
+       "ticks": 844
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "6223830a",
+       "ticks": 332
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "031f7d6a",
+       "ticks": 243
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "5433b68d",
+       "ticks": 306
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "a3b1538b",
+       "ticks": 900
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "fdf7bdb4",
+       "ticks": 378
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "4b16e096",
+       "ticks": 284
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "9e329227",
+       "ticks": 324
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "ef76f2b9",
+       "ticks": 271
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "fdd1786f",
+       "ticks": 279
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "b2fe1fc4",
+       "ticks": 272
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "feac1824",
+       "ticks": 373
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "fc22b72f",
+       "ticks": 291
+      }
+     ],
+     "Q0'": [
+      {
+       "outcome": "loss",
+       "fingerprint": "09aa168a",
+       "ticks": 283
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "283437d9",
+       "ticks": 308
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "2bd9dfee",
+       "ticks": 347
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "84fce4ec",
+       "ticks": 305
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "d4398bbb",
+       "ticks": 344
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "e1e1c71f",
+       "ticks": 351
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "e567afff",
+       "ticks": 284
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "717a567d",
+       "ticks": 345
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "2a369a16",
+       "ticks": 271
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "7ace71db",
+       "ticks": 324
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "f4a13ce3",
+       "ticks": 271
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "d989412c",
+       "ticks": 300
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "32830e12",
+       "ticks": 900
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "a1e44ebf",
+       "ticks": 279
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "7fdd3cc6",
+       "ticks": 282
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "77388e43",
+       "ticks": 325
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "24b1be32",
+       "ticks": 272
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "1510a1bb",
+       "ticks": 251
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "470c605a",
+       "ticks": 300
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "a38024f0",
+       "ticks": 406
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "8a7dc1ec",
+       "ticks": 350
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "9b3672cd",
+       "ticks": 307
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "898e0bcb",
+       "ticks": 351
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "ecdd3104",
+       "ticks": 325
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "4e268205",
+       "ticks": 344
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "c4626634",
+       "ticks": 265
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "c9cc0660",
+       "ticks": 369
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "d68bb06c",
+       "ticks": 344
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "dad2239f",
+       "ticks": 326
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "463f88fe",
+       "ticks": 232
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "1eca4617",
+       "ticks": 290
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "e4221687",
+       "ticks": 293
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "0be21c09",
+       "ticks": 378
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "9a54ce84",
+       "ticks": 290
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "a6a3de0e",
+       "ticks": 324
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "345587fc",
+       "ticks": 290
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "d0123ef2",
+       "ticks": 273
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "6ae7935a",
+       "ticks": 291
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "443698e9",
+       "ticks": 355
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "a611eb50",
+       "ticks": 282
+      }
+     ]
+    },
+    "q4": {
+     "better": 1,
+     "worse": 0,
+     "same": 39,
+     "changed": 1,
+     "p": 1
+    },
+    "chaos": {
+     "better": 0,
+     "worse": 0,
+     "same": 40,
+     "changed": 0,
+     "p": 1
+    },
+    "reading": "changes nothing a sign test can see",
+    "chaosReading": "changes nothing a sign test can see",
+    "tally": {
+     "Q0": {
+      "win": 0,
+      "loss": 39,
+      "draw": 1
+     },
+     "Q4": {
+      "win": 0,
+      "loss": 38,
+      "draw": 2
+     },
+     "Q0'": {
+      "win": 0,
+      "loss": 39,
+      "draw": 1
+     }
+    }
+   },
+   {
+    "pilot": "league",
+    "scenario": "standoff",
+    "seeds": [91001,91002,91003,91004,91005,91006,91007,91008,91009,91010,91011,91012,91013,91014,91015,91016,91017,91018,91019,91020,91021,91022,91023,91024,91025,91026,91027,91028,91029,91030,91031,91032,91033,91034,91035,91036,91037,91038,91039,91040],
+    "flights": {
+     "Q0": [
+      {
+       "outcome": "win",
+       "fingerprint": "fddc13f4",
+       "ticks": 155
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "603405b2",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "8d5a09ed",
+       "ticks": 170
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "293f8e5e",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "0b3e6376",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "f1874907",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "2f385d65",
+       "ticks": 161
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "a94c54e7",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "148598a5",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "b5f78ae0",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "5c18a70e",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "61bce87d",
+       "ticks": 173
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "0be1146b",
+       "ticks": 155
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "179e6139",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "806bcb95",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "14d1bcd8",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "adb78de6",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "0226a531",
+       "ticks": 173
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "9b6cde91",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "e43e6820",
+       "ticks": 161
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "c4763ff1",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "4335d150",
+       "ticks": 161
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "1f04aaa9",
+       "ticks": 170
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "289e5714",
+       "ticks": 161
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "e254c549",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "02d27958",
+       "ticks": 161
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "d5d8149b",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "7565bb3c",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "388e16bb",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "cf1934af",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "a5f353a4",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "e80b298e",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "0a827d2d",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "397e0239",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "3feeb13b",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "c0c06ec0",
+       "ticks": 164
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "a839d1c1",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "d471e3cf",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "4ff6c786",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "004a1af3",
+       "ticks": 164
+      }
+     ],
+     "Q4": [
+      {
+       "outcome": "win",
+       "fingerprint": "31b2a734",
+       "ticks": 155
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "b75b03fd",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "e2d69581",
+       "ticks": 170
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "8533e169",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "5049b9dd",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "c492bac1",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "8b77dd15",
+       "ticks": 161
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "210fd420",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "96d2302c",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "962b7411",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "c033d077",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "f47a62e4",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "4fbcb9fe",
+       "ticks": 155
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "5028431d",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "9f6eec08",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "3e6118c2",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "7a418ac0",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "d271d6a8",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "c7d69889",
+       "ticks": 161
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "ae64f265",
+       "ticks": 161
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "aeb0fa8f",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "307c2f88",
+       "ticks": 161
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "833a38a2",
+       "ticks": 170
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "92f3fde6",
+       "ticks": 170
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "f05906a2",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "2ef04a6a",
+       "ticks": 161
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "187385ce",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "c24a43ce",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "32360b16",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "ecdadc51",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "93ffa889",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "759aed79",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "280c02f0",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "fcc47f89",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "76343aca",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "8f7c3f19",
+       "ticks": 164
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "eed4f161",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "6e679246",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "ca10e29e",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "8f237827",
+       "ticks": 164
+      }
+     ],
+     "Q0'": [
+      {
+       "outcome": "win",
+       "fingerprint": "fddc13f4",
+       "ticks": 155
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "603405b2",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "8d5a09ed",
+       "ticks": 170
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "293f8e5e",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "0b3e6376",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "f1874907",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "2f385d65",
+       "ticks": 161
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "a94c54e7",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "148598a5",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "b5f78ae0",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "5c18a70e",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "61bce87d",
+       "ticks": 173
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "0be1146b",
+       "ticks": 155
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "179e6139",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "806bcb95",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "14d1bcd8",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "adb78de6",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "0226a531",
+       "ticks": 173
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "9b6cde91",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "e43e6820",
+       "ticks": 161
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "c4763ff1",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "4335d150",
+       "ticks": 161
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "1f04aaa9",
+       "ticks": 170
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "289e5714",
+       "ticks": 161
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "e254c549",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "02d27958",
+       "ticks": 161
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "d5d8149b",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "7565bb3c",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "388e16bb",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "cf1934af",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "a5f353a4",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "e80b298e",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "0a827d2d",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "397e0239",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "3feeb13b",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "c0c06ec0",
+       "ticks": 164
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "a839d1c1",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "d471e3cf",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "4ff6c786",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "004a1af3",
+       "ticks": 164
+      }
+     ]
+    },
+    "q4": {
+     "better": 0,
+     "worse": 0,
+     "same": 40,
+     "changed": 0,
+     "p": 1
+    },
+    "chaos": {
+     "better": 0,
+     "worse": 0,
+     "same": 40,
+     "changed": 0,
+     "p": 1
+    },
+    "reading": "changes nothing a sign test can see",
+    "chaosReading": "changes nothing a sign test can see",
+    "tally": {
+     "Q0": {
+      "win": 39,
+      "loss": 0,
+      "draw": 1
+     },
+     "Q4": {
+      "win": 39,
+      "loss": 0,
+      "draw": 1
+     },
+     "Q0'": {
+      "win": 39,
+      "loss": 0,
+      "draw": 1
+     }
+    }
+   },
+   {
+    "pilot": "league",
+    "scenario": "joust",
+    "seeds": [91001,91002,91003,91004,91005,91006,91007,91008,91009,91010,91011,91012,91013,91014,91015,91016,91017,91018,91019,91020,91021,91022,91023,91024,91025,91026,91027,91028,91029,91030,91031,91032,91033,91034,91035,91036,91037,91038,91039,91040],
+    "flights": {
+     "Q0": [
+      {
+       "outcome": "loss",
+       "fingerprint": "5863ef45",
+       "ticks": 275
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "4e8d79e8",
+       "ticks": 269
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "0d48a64f",
+       "ticks": 302
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "f1d99aef",
+       "ticks": 318
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "603d3926",
+       "ticks": 311
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "83b2e942",
+       "ticks": 356
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "0bae6492",
+       "ticks": 282
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "cfc64066",
+       "ticks": 343
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "e3d3be12",
+       "ticks": 271
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "63ecf1fa",
+       "ticks": 346
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "12d9fd08",
+       "ticks": 285
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "b9f28172",
+       "ticks": 316
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "605ee426",
+       "ticks": 346
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "57457afd",
+       "ticks": 289
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "010a0713",
+       "ticks": 272
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "84654783",
+       "ticks": 344
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "19602cd5",
+       "ticks": 291
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "c30f67f4",
+       "ticks": 261
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "08f3c516",
+       "ticks": 291
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "9c86a8f7",
+       "ticks": 371
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "fbff102b",
+       "ticks": 372
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "6a648084",
+       "ticks": 290
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "df272b5a",
+       "ticks": 334
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "e5bdaafc",
+       "ticks": 326
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "b7eabb0b",
+       "ticks": 324
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "0e28ddae",
+       "ticks": 275
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "ea875a54",
+       "ticks": 372
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "3b0139ab",
+       "ticks": 347
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "17b582fe",
+       "ticks": 300
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "dd316a30",
+       "ticks": 233
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "73f61887",
+       "ticks": 315
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "02be7a92",
+       "ticks": 294
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "c46e7f07",
+       "ticks": 352
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "5af04a61",
+       "ticks": 271
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "3093be64",
+       "ticks": 320
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "49ec9ff3",
+       "ticks": 271
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "b6388b39",
+       "ticks": 289
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "355af372",
+       "ticks": 282
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "4572ef5b",
+       "ticks": 335
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "cdf0c30c",
+       "ticks": 291
+      }
+     ],
+     "Q4": [
+      {
+       "outcome": "loss",
+       "fingerprint": "fde6a9af",
+       "ticks": 281
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "25b28883",
+       "ticks": 279
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "44b8bd95",
+       "ticks": 299
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "5b890f15",
+       "ticks": 333
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "4f318805",
+       "ticks": 317
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "f7483b0b",
+       "ticks": 347
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "276e177e",
+       "ticks": 294
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "2cba657f",
+       "ticks": 343
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "6ea9a841",
+       "ticks": 285
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "91813d54",
+       "ticks": 343
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "591e0c71",
+       "ticks": 281
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "21272ae2",
+       "ticks": 328
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "fb9dd335",
+       "ticks": 318
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "14dd24bf",
+       "ticks": 280
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "4bb0cd00",
+       "ticks": 276
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "37c62004",
+       "ticks": 344
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "d277caa9",
+       "ticks": 285
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "dae6ee29",
+       "ticks": 252
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "84ac41bb",
+       "ticks": 304
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "ad73063c",
+       "ticks": 347
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "9ec9aa6c",
+       "ticks": 360
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "041bbc16",
+       "ticks": 290
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "312d0856",
+       "ticks": 334
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "31958fd0",
+       "ticks": 320
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "a123fec0",
+       "ticks": 351
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "328cc7b5",
+       "ticks": 281
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "780cd1f3",
+       "ticks": 372
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "e0ad08e3",
+       "ticks": 345
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "f57fc3d0",
+       "ticks": 324
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "358e2fb8",
+       "ticks": 233
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "7334b7a3",
+       "ticks": 306
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "5960c4bd",
+       "ticks": 318
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "bcb262ce",
+       "ticks": 361
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "92a6536e",
+       "ticks": 291
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "e6b6edf6",
+       "ticks": 326
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "2babfb7d",
+       "ticks": 291
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "47937d19",
+       "ticks": 289
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "74f101ee",
+       "ticks": 282
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "41b0275a",
+       "ticks": 329
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "bb1b87f7",
+       "ticks": 300
+      }
+     ],
+     "Q0'": [
+      {
+       "outcome": "loss",
+       "fingerprint": "5b583f92",
+       "ticks": 275
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "f5a137af",
+       "ticks": 269
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "0d48a64f",
+       "ticks": 302
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "f1d99aef",
+       "ticks": 318
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "75590f9c",
+       "ticks": 311
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "2ffaafee",
+       "ticks": 356
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "ab2cc45f",
+       "ticks": 282
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "cfc64066",
+       "ticks": 343
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "3edb75ff",
+       "ticks": 271
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "36383947",
+       "ticks": 346
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "5dd9bbc2",
+       "ticks": 285
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "647d55a1",
+       "ticks": 316
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "605ee426",
+       "ticks": 346
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "57457afd",
+       "ticks": 289
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "987cc51e",
+       "ticks": 272
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "84654783",
+       "ticks": 344
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "19602cd5",
+       "ticks": 291
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "05dca752",
+       "ticks": 261
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "08f3c516",
+       "ticks": 291
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "9c86a8f7",
+       "ticks": 371
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "843a7818",
+       "ticks": 372
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "e965c968",
+       "ticks": 290
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "08167027",
+       "ticks": 334
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "87128cb7",
+       "ticks": 326
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "e385dc9f",
+       "ticks": 324
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "0e28ddae",
+       "ticks": 275
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "ea875a54",
+       "ticks": 372
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "3b0139ab",
+       "ticks": 347
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "17b582fe",
+       "ticks": 300
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "dd316a30",
+       "ticks": 233
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "73f61887",
+       "ticks": 315
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "02be7a92",
+       "ticks": 294
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "1c2846ec",
+       "ticks": 352
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "5af04a61",
+       "ticks": 271
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "3093be64",
+       "ticks": 320
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "49ec9ff3",
+       "ticks": 271
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "f6e31a57",
+       "ticks": 289
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "355af372",
+       "ticks": 282
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "4572ef5b",
+       "ticks": 335
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "cdf0c30c",
+       "ticks": 291
+      }
+     ]
+    },
+    "q4": {
+     "better": 0,
+     "worse": 0,
+     "same": 40,
+     "changed": 0,
+     "p": 1
+    },
+    "chaos": {
+     "better": 0,
+     "worse": 0,
+     "same": 40,
+     "changed": 0,
+     "p": 1
+    },
+    "reading": "changes nothing a sign test can see",
+    "chaosReading": "changes nothing a sign test can see",
+    "tally": {
+     "Q0": {
+      "win": 0,
+      "loss": 40,
+      "draw": 0
+     },
+     "Q4": {
+      "win": 0,
+      "loss": 40,
+      "draw": 0
+     },
+     "Q0'": {
+      "win": 0,
+      "loss": 40,
+      "draw": 0
+     }
+    }
+   },
+   {
+    "pilot": "close",
+    "scenario": "standoff",
+    "seeds": [91001,91002,91003,91004,91005,91006,91007,91008,91009,91010,91011,91012,91013,91014,91015,91016,91017,91018,91019,91020,91021,91022,91023,91024,91025,91026,91027,91028,91029,91030,91031,91032,91033,91034,91035,91036,91037,91038,91039,91040],
+    "flights": {
+     "Q0": [
+      {
+       "outcome": "win",
+       "fingerprint": "8465e893",
+       "ticks": 155
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "ee35d6cc",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "5555f392",
+       "ticks": 161
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "1203af93",
+       "ticks": 173
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "29ad6a9f",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "257aefa6",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "ee28598f",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "8fbc1580",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "497aa30d",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "46f58b33",
+       "ticks": 173
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "e5600720",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "4f6fb875",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "81dda1cc",
+       "ticks": 155
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "48e0d241",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "c4ed73f9",
+       "ticks": 170
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "51e6b618",
+       "ticks": 161
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "1b38e358",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "6efcb70a",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "7c676f0e",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "a0ec97cd",
+       "ticks": 170
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "4772d532",
+       "ticks": 155
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "9ee162d6",
+       "ticks": 161
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "5fcdf3bc",
+       "ticks": 179
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "ab344b19",
+       "ticks": 173
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "81ed90ad",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "c1c3bc03",
+       "ticks": 170
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "a98a1403",
+       "ticks": 155
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "4c71bca0",
+       "ticks": 179
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "8049e5f4",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "92565922",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "ccfe9a34",
+       "ticks": 155
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "2e49aa23",
+       "ticks": 155
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "1e35d867",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "855a2f54",
+       "ticks": 179
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "ac9d4394",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "9ac26403",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "c3626d30",
+       "ticks": 155
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "04904e71",
+       "ticks": 179
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "53423bc7",
+       "ticks": 161
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "84df1a8c",
+       "ticks": 164
+      }
+     ],
+     "Q4": [
+      {
+       "outcome": "win",
+       "fingerprint": "81fd15e3",
+       "ticks": 155
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "ed0e7926",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "e05ef2dd",
+       "ticks": 160
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "a9a60bb1",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "6996de77",
+       "ticks": 173
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "a057c7b4",
+       "ticks": 161
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "cc5aa638",
+       "ticks": 170
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "ca74b890",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "ccd47e47",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "db43f3f4",
+       "ticks": 173
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "f720d671",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "8c5a482a",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "1ffcca50",
+       "ticks": 155
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "169d9915",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "5a359e73",
+       "ticks": 170
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "d68b2889",
+       "ticks": 161
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "97a769c3",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "f5854409",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "0507ded9",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "cb0f0e44",
+       "ticks": 170
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "065c2edd",
+       "ticks": 155
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "7c4cca0f",
+       "ticks": 161
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "c52a0bc5",
+       "ticks": 179
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "a2d790eb",
+       "ticks": 173
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "f616f9f7",
+       "ticks": 161
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "10b7a51c",
+       "ticks": 170
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "9fcd7a21",
+       "ticks": 155
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "10fe1fc0",
+       "ticks": 179
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "efaf4a24",
+       "ticks": 161
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "99533fcd",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "42985195",
+       "ticks": 155
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "9c88e128",
+       "ticks": 155
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "d911e637",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "32b0f12e",
+       "ticks": 179
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "084228a0",
+       "ticks": 161
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "e6555acc",
+       "ticks": 173
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "e16fb8f6",
+       "ticks": 155
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "d0a74453",
+       "ticks": 170
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "02a55457",
+       "ticks": 161
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "02dd9e15",
+       "ticks": 164
+      }
+     ],
+     "Q0'": [
+      {
+       "outcome": "win",
+       "fingerprint": "8465e893",
+       "ticks": 155
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "ee35d6cc",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "5555f392",
+       "ticks": 161
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "1203af93",
+       "ticks": 173
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "29ad6a9f",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "257aefa6",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "ee28598f",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "8fbc1580",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "497aa30d",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "46f58b33",
+       "ticks": 173
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "e5600720",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "4f6fb875",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "81dda1cc",
+       "ticks": 155
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "48e0d241",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "c4ed73f9",
+       "ticks": 170
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "51e6b618",
+       "ticks": 161
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "1b38e358",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "6efcb70a",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "7c676f0e",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "a0ec97cd",
+       "ticks": 170
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "4772d532",
+       "ticks": 155
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "9ee162d6",
+       "ticks": 161
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "5fcdf3bc",
+       "ticks": 179
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "ab344b19",
+       "ticks": 173
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "81ed90ad",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "c1c3bc03",
+       "ticks": 170
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "a98a1403",
+       "ticks": 155
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "4c71bca0",
+       "ticks": 179
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "8049e5f4",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "92565922",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "ccfe9a34",
+       "ticks": 155
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "2e49aa23",
+       "ticks": 155
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "1e35d867",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "855a2f54",
+       "ticks": 179
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "ac9d4394",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "9ac26403",
+       "ticks": 164
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "c3626d30",
+       "ticks": 155
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "04904e71",
+       "ticks": 179
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "53423bc7",
+       "ticks": 161
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "84df1a8c",
+       "ticks": 164
+      }
+     ]
+    },
+    "q4": {
+     "better": 0,
+     "worse": 0,
+     "same": 40,
+     "changed": 0,
+     "p": 1
+    },
+    "chaos": {
+     "better": 0,
+     "worse": 0,
+     "same": 40,
+     "changed": 0,
+     "p": 1
+    },
+    "reading": "changes nothing a sign test can see",
+    "chaosReading": "changes nothing a sign test can see",
+    "tally": {
+     "Q0": {
+      "win": 40,
+      "loss": 0,
+      "draw": 0
+     },
+     "Q4": {
+      "win": 40,
+      "loss": 0,
+      "draw": 0
+     },
+     "Q0'": {
+      "win": 40,
+      "loss": 0,
+      "draw": 0
+     }
+    }
+   },
+   {
+    "pilot": "close",
+    "scenario": "joust",
+    "seeds": [91001,91002,91003,91004,91005,91006,91007,91008,91009,91010,91011,91012,91013,91014,91015,91016,91017,91018,91019,91020,91021,91022,91023,91024,91025,91026,91027,91028,91029,91030,91031,91032,91033,91034,91035,91036,91037,91038,91039,91040],
+    "flights": {
+     "Q0": [
+      {
+       "outcome": "draw",
+       "fingerprint": "5666b2d1",
+       "ticks": 900
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "7567c840",
+       "ticks": 296
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "5f861c7e",
+       "ticks": 900
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "e3b1e8a8",
+       "ticks": 473
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "4d4c2d96",
+       "ticks": 900
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "dc6c924f",
+       "ticks": 344
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "f0202c3b",
+       "ticks": 900
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "24386256",
+       "ticks": 527
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "d4afcc4c",
+       "ticks": 763
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "6c9a8eb6",
+       "ticks": 497
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "ff6841c4",
+       "ticks": 798
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "8a57e028",
+       "ticks": 497
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "149b1043",
+       "ticks": 900
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "5bb5e83e",
+       "ticks": 448
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "346a9b2e",
+       "ticks": 900
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "241ddb5b",
+       "ticks": 497
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "7de22eb4",
+       "ticks": 884
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "5a29c4e9",
+       "ticks": 876
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "5b65206c",
+       "ticks": 900
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "2cac51b0",
+       "ticks": 900
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "7a546e5a",
+       "ticks": 377
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "7e2ea397",
+       "ticks": 478
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "4b44c626",
+       "ticks": 359
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "ef780e1f",
+       "ticks": 896
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "4615b86b",
+       "ticks": 402
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "87076761",
+       "ticks": 900
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "b85a7c0c",
+       "ticks": 407
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "45bebbe4",
+       "ticks": 900
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "b49a6d05",
+       "ticks": 389
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "fbed2434",
+       "ticks": 900
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "1fef0957",
+       "ticks": 454
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "88443561",
+       "ticks": 896
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "3f25ca7c",
+       "ticks": 487
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "3f6d1c2e",
+       "ticks": 900
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "9a3dc2bf",
+       "ticks": 306
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "b15b69b7",
+       "ticks": 900
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "eae36970",
+       "ticks": 333
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "ad8565f8",
+       "ticks": 900
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "63497a52",
+       "ticks": 309
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "fe0111a8",
+       "ticks": 900
+      }
+     ],
+     "Q4": [
+      {
+       "outcome": "win",
+       "fingerprint": "4c5b5a7b",
+       "ticks": 888
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "dbabf7aa",
+       "ticks": 281
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "88a97f1c",
+       "ticks": 896
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "c155beb7",
+       "ticks": 478
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "338aa365",
+       "ticks": 900
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "bc22f2ba",
+       "ticks": 335
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "0c2c02a8",
+       "ticks": 889
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "71f3d814",
+       "ticks": 478
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "d92e044a",
+       "ticks": 791
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "90e2b16d",
+       "ticks": 487
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "089ebf65",
+       "ticks": 900
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "e4a5f172",
+       "ticks": 491
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "1cac722c",
+       "ticks": 900
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "8b4635a9",
+       "ticks": 458
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "f54ca53d",
+       "ticks": 900
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "44342aaf",
+       "ticks": 463
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "d4c21f06",
+       "ticks": 791
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "fc46dcd6",
+       "ticks": 872
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "cb1040e8",
+       "ticks": 308
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "b99c9d56",
+       "ticks": 900
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "1bda5e70",
+       "ticks": 385
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "8758a2af",
+       "ticks": 478
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "cc3455bf",
+       "ticks": 317
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "95c85723",
+       "ticks": 900
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "2a40ebb1",
+       "ticks": 412
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "9a8d86e0",
+       "ticks": 900
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "202b5e5e",
+       "ticks": 407
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "965af24d",
+       "ticks": 900
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "f8cf5743",
+       "ticks": 432
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "ecaf0cde",
+       "ticks": 712
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "477461e3",
+       "ticks": 473
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "f3e438bb",
+       "ticks": 746
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "58b4830f",
+       "ticks": 497
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "96c453c3",
+       "ticks": 900
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "94ad2433",
+       "ticks": 315
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "50ac779f",
+       "ticks": 809
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "aa4cdf96",
+       "ticks": 336
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "75a99da3",
+       "ticks": 841
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "50b55192",
+       "ticks": 336
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "2233dd9a",
+       "ticks": 892
+      }
+     ],
+     "Q0'": [
+      {
+       "outcome": "draw",
+       "fingerprint": "f13916f1",
+       "ticks": 900
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "7567c840",
+       "ticks": 296
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "beaa66b6",
+       "ticks": 900
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "e3b1e8a8",
+       "ticks": 473
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "4d4c2d96",
+       "ticks": 900
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "dc6c924f",
+       "ticks": 344
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "578d07de",
+       "ticks": 900
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "24386256",
+       "ticks": 527
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "7baf868b",
+       "ticks": 763
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "6c9a8eb6",
+       "ticks": 497
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "e7771c17",
+       "ticks": 798
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "8a57e028",
+       "ticks": 497
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "d287c2cf",
+       "ticks": 900
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "5bb5e83e",
+       "ticks": 448
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "346a9b2e",
+       "ticks": 900
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "241ddb5b",
+       "ticks": 497
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "7de22eb4",
+       "ticks": 884
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "db862c50",
+       "ticks": 876
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "65e78260",
+       "ticks": 900
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "2cac51b0",
+       "ticks": 900
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "7a546e5a",
+       "ticks": 377
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "7e2ea397",
+       "ticks": 478
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "4b44c626",
+       "ticks": 359
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "752511aa",
+       "ticks": 896
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "4615b86b",
+       "ticks": 402
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "8466c0df",
+       "ticks": 900
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "b85a7c0c",
+       "ticks": 407
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "45bebbe4",
+       "ticks": 900
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "b49a6d05",
+       "ticks": 389
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "de235af7",
+       "ticks": 900
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "1fef0957",
+       "ticks": 454
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "931b0237",
+       "ticks": 896
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "b6fa6f78",
+       "ticks": 487
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "0f4d139c",
+       "ticks": 900
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "9a3dc2bf",
+       "ticks": 306
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "b15b69b7",
+       "ticks": 900
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "eae36970",
+       "ticks": 333
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "4f729827",
+       "ticks": 900
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "63497a52",
+       "ticks": 309
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "fe0111a8",
+       "ticks": 900
+      }
+     ]
+    },
+    "q4": {
+     "better": 7,
+     "worse": 7,
+     "same": 26,
+     "changed": 14,
+     "p": 1
+    },
+    "chaos": {
+     "better": 0,
+     "worse": 0,
+     "same": 40,
+     "changed": 0,
+     "p": 1
+    },
+    "reading": "changes nothing a sign test can see",
+    "chaosReading": "changes nothing a sign test can see",
+    "tally": {
+     "Q0": {
+      "win": 17,
+      "loss": 8,
+      "draw": 15
+     },
+     "Q4": {
+      "win": 19,
+      "loss": 12,
+      "draw": 9
+     },
+     "Q0'": {
+      "win": 17,
+      "loss": 8,
+      "draw": 15
+     }
+    }
+   },
+   {
+    "pilot": "gpu",
+    "scenario": "standoff",
+    "seeds": [91001,91002,91003,91004,91005,91006,91007,91008,91009,91010,91011,91012,91013,91014,91015,91016,91017,91018,91019,91020,91021,91022,91023,91024,91025,91026,91027,91028,91029,91030,91031,91032,91033,91034,91035,91036,91037,91038,91039,91040],
+    "flights": {
+     "Q0": [
+      {
+       "outcome": "win",
+       "fingerprint": "eef08814",
+       "ticks": 165
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "aa64f469",
+       "ticks": 174
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "6897149a",
+       "ticks": 174
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "e71aa3cb",
+       "ticks": 174
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "82140ac1",
+       "ticks": 189
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "faff26b0",
+       "ticks": 183
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "5ee9c2ec",
+       "ticks": 180
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "d274150e",
+       "ticks": 174
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "83602886",
+       "ticks": 174
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "4d6fe7cf",
+       "ticks": 183
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "d0ef1a80",
+       "ticks": 183
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "68d7f22e",
+       "ticks": 174
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "3d7b6bc7",
+       "ticks": 174
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "be98cea9",
+       "ticks": 183
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "dc1c957b",
+       "ticks": 180
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "97855ebe",
+       "ticks": 183
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "95618232",
+       "ticks": 183
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "91c91732",
+       "ticks": 183
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "b2fad516",
+       "ticks": 183
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "7fae43ac",
+       "ticks": 189
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "1d3ccde7",
+       "ticks": 174
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "2994b6f9",
+       "ticks": 180
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "452dee37",
+       "ticks": 180
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "b6248016",
+       "ticks": 180
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "2d119d74",
+       "ticks": 174
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "db046066",
+       "ticks": 180
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "ce5aabaf",
+       "ticks": 174
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "4d539d4e",
+       "ticks": 189
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "f81800f3",
+       "ticks": 174
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "98a622bc",
+       "ticks": 174
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "04ca5561",
+       "ticks": 174
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "b49b9c78",
+       "ticks": 183
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "1a59d386",
+       "ticks": 174
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "56eea68b",
+       "ticks": 189
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "54f445b9",
+       "ticks": 183
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "9996c9e7",
+       "ticks": 183
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "318f79b4",
+       "ticks": 165
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "92920f64",
+       "ticks": 180
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "865c6b26",
+       "ticks": 183
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "4c7f2ea3",
+       "ticks": 183
+      }
+     ],
+     "Q4": [
+      {
+       "outcome": "draw",
+       "fingerprint": "0386c040",
+       "ticks": 165
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "230b6ec7",
+       "ticks": 174
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "ec04870b",
+       "ticks": 174
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "324f884c",
+       "ticks": 174
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "711f328c",
+       "ticks": 189
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "63317d01",
+       "ticks": 183
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "f958e954",
+       "ticks": 180
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "23ec4464",
+       "ticks": 174
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "184591a5",
+       "ticks": 174
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "3aaab444",
+       "ticks": 174
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "532d9a2b",
+       "ticks": 183
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "edfa52b9",
+       "ticks": 174
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "51dee560",
+       "ticks": 174
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "5ba64a68",
+       "ticks": 183
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "17460c42",
+       "ticks": 180
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "3a6aeae1",
+       "ticks": 183
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "0ca98848",
+       "ticks": 183
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "a0e91fe1",
+       "ticks": 183
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "4e825b56",
+       "ticks": 180
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "97482d97",
+       "ticks": 189
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "9b36870c",
+       "ticks": 174
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "92944935",
+       "ticks": 180
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "089f5c22",
+       "ticks": 180
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "e2be3c21",
+       "ticks": 180
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "b7ff3cd4",
+       "ticks": 174
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "090bbc71",
+       "ticks": 180
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "d736e559",
+       "ticks": 174
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "0c4f0160",
+       "ticks": 189
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "32d37c58",
+       "ticks": 183
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "08afd29f",
+       "ticks": 183
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "a1db9801",
+       "ticks": 165
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "3e82a3c8",
+       "ticks": 183
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "6cf4ee3e",
+       "ticks": 174
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "c896bb73",
+       "ticks": 189
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "afb4287f",
+       "ticks": 183
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "c68af373",
+       "ticks": 183
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "829e1af2",
+       "ticks": 165
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "63d3d3a0",
+       "ticks": 180
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "b25b5846",
+       "ticks": 183
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "a68580c5",
+       "ticks": 183
+      }
+     ],
+     "Q0'": [
+      {
+       "outcome": "win",
+       "fingerprint": "eef08814",
+       "ticks": 165
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "aa64f469",
+       "ticks": 174
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "6897149a",
+       "ticks": 174
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "e71aa3cb",
+       "ticks": 174
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "82140ac1",
+       "ticks": 189
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "faff26b0",
+       "ticks": 183
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "5ee9c2ec",
+       "ticks": 180
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "d274150e",
+       "ticks": 174
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "83602886",
+       "ticks": 174
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "4d6fe7cf",
+       "ticks": 183
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "d0ef1a80",
+       "ticks": 183
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "68d7f22e",
+       "ticks": 174
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "3d7b6bc7",
+       "ticks": 174
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "be98cea9",
+       "ticks": 183
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "dc1c957b",
+       "ticks": 180
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "97855ebe",
+       "ticks": 183
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "95618232",
+       "ticks": 183
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "91c91732",
+       "ticks": 183
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "b2fad516",
+       "ticks": 183
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "7fae43ac",
+       "ticks": 189
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "1d3ccde7",
+       "ticks": 174
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "2994b6f9",
+       "ticks": 180
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "452dee37",
+       "ticks": 180
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "b6248016",
+       "ticks": 180
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "2d119d74",
+       "ticks": 174
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "db046066",
+       "ticks": 180
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "ce5aabaf",
+       "ticks": 174
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "4d539d4e",
+       "ticks": 189
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "f81800f3",
+       "ticks": 174
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "98a622bc",
+       "ticks": 174
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "04ca5561",
+       "ticks": 174
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "b49b9c78",
+       "ticks": 183
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "1a59d386",
+       "ticks": 174
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "56eea68b",
+       "ticks": 189
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "54f445b9",
+       "ticks": 183
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "9996c9e7",
+       "ticks": 183
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "318f79b4",
+       "ticks": 165
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "92920f64",
+       "ticks": 180
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "865c6b26",
+       "ticks": 183
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "4c7f2ea3",
+       "ticks": 183
+      }
+     ]
+    },
+    "q4": {
+     "better": 2,
+     "worse": 1,
+     "same": 37,
+     "changed": 3,
+     "p": 1
+    },
+    "chaos": {
+     "better": 0,
+     "worse": 0,
+     "same": 40,
+     "changed": 0,
+     "p": 1
+    },
+    "reading": "changes nothing a sign test can see",
+    "chaosReading": "changes nothing a sign test can see",
+    "tally": {
+     "Q0": {
+      "win": 30,
+      "loss": 0,
+      "draw": 10
+     },
+     "Q4": {
+      "win": 31,
+      "loss": 0,
+      "draw": 9
+     },
+     "Q0'": {
+      "win": 30,
+      "loss": 0,
+      "draw": 10
+     }
+    }
+   },
+   {
+    "pilot": "gpu",
+    "scenario": "joust",
+    "seeds": [91001,91002,91003,91004,91005,91006,91007,91008,91009,91010,91011,91012,91013,91014,91015,91016,91017,91018,91019,91020,91021,91022,91023,91024,91025,91026,91027,91028,91029,91030,91031,91032,91033,91034,91035,91036,91037,91038,91039,91040],
+    "flights": {
+     "Q0": [
+      {
+       "outcome": "loss",
+       "fingerprint": "ef94a65a",
+       "ticks": 464
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "e9f80235",
+       "ticks": 281
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "7bdc5502",
+       "ticks": 900
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "4ae8558f",
+       "ticks": 318
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "829b68b0",
+       "ticks": 344
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "b788ed81",
+       "ticks": 360
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "a971c708",
+       "ticks": 293
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "aa31ec97",
+       "ticks": 333
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "e61ed1ce",
+       "ticks": 290
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "4c31307f",
+       "ticks": 361
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "3318cd21",
+       "ticks": 302
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "2c25be5b",
+       "ticks": 334
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "8fc4dd02",
+       "ticks": 389
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "200b8695",
+       "ticks": 300
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "7913ab2d",
+       "ticks": 290
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "cd812be8",
+       "ticks": 343
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "5048a070",
+       "ticks": 290
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "27ea2be8",
+       "ticks": 251
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "5c8f4ff9",
+       "ticks": 462
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "c7cd7e30",
+       "ticks": 343
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "20c1b3e8",
+       "ticks": 341
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "7abf2de6",
+       "ticks": 307
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "c0cd9dba",
+       "ticks": 403
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "3302114f",
+       "ticks": 355
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "bd6caa71",
+       "ticks": 360
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "34364120",
+       "ticks": 455
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "3207791b",
+       "ticks": 372
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "178efaf6",
+       "ticks": 326
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "3ddd76cc",
+       "ticks": 300
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "71d72f75",
+       "ticks": 232
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "0460300f",
+       "ticks": 306
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "99884c9d",
+       "ticks": 344
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "44341bdc",
+       "ticks": 370
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "c6d1f4ae",
+       "ticks": 290
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "413a440c",
+       "ticks": 337
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "75827cb9",
+       "ticks": 290
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "10a6e29f",
+       "ticks": 288
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "1a61946d",
+       "ticks": 479
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "2dff971b",
+       "ticks": 900
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "0c5b2bd1",
+       "ticks": 471
+      }
+     ],
+     "Q4": [
+      {
+       "outcome": "loss",
+       "fingerprint": "397bca3f",
+       "ticks": 479
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "a84674f3",
+       "ticks": 287
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "c09906b7",
+       "ticks": 900
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "29406209",
+       "ticks": 324
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "aac43753",
+       "ticks": 344
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "0f5b8d44",
+       "ticks": 360
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "d996f15e",
+       "ticks": 299
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "75b82b2e",
+       "ticks": 342
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "0eff995b",
+       "ticks": 293
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "a6f6f2af",
+       "ticks": 361
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "d3b7a250",
+       "ticks": 308
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "43416cd5",
+       "ticks": 337
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "1a5df7ca",
+       "ticks": 389
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "4678f4f9",
+       "ticks": 307
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "e42a2fbe",
+       "ticks": 293
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "a422f28f",
+       "ticks": 343
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "9728b196",
+       "ticks": 290
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "931996cb",
+       "ticks": 255
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "e27f6076",
+       "ticks": 484
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "1062a8ad",
+       "ticks": 334
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "a165d822",
+       "ticks": 341
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "0345d4b6",
+       "ticks": 310
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "073458f7",
+       "ticks": 396
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "2b001b1a",
+       "ticks": 361
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "05ad9e2c",
+       "ticks": 360
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "b101e6c6",
+       "ticks": 900
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "9f539745",
+       "ticks": 381
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "3e0371a9",
+       "ticks": 379
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "14404529",
+       "ticks": 306
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "a340c9fb",
+       "ticks": 242
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "8e4aeffa",
+       "ticks": 306
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "16822b2d",
+       "ticks": 326
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "c622a296",
+       "ticks": 364
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "7e17f425",
+       "ticks": 290
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "1827fbd7",
+       "ticks": 328
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "2e231125",
+       "ticks": 284
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "6bcb28de",
+       "ticks": 291
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "591b3887",
+       "ticks": 488
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "206cfb84",
+       "ticks": 900
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "77fafdd1",
+       "ticks": 471
+      }
+     ],
+     "Q0'": [
+      {
+       "outcome": "loss",
+       "fingerprint": "ef94a65a",
+       "ticks": 464
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "e9f80235",
+       "ticks": 281
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "7bdc5502",
+       "ticks": 900
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "4ae8558f",
+       "ticks": 318
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "829b68b0",
+       "ticks": 344
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "b788ed81",
+       "ticks": 360
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "a971c708",
+       "ticks": 293
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "aa31ec97",
+       "ticks": 333
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "e61ed1ce",
+       "ticks": 290
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "4c31307f",
+       "ticks": 361
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "3318cd21",
+       "ticks": 302
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "2c25be5b",
+       "ticks": 334
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "8fc4dd02",
+       "ticks": 389
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "200b8695",
+       "ticks": 300
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "7913ab2d",
+       "ticks": 290
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "cd812be8",
+       "ticks": 343
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "5048a070",
+       "ticks": 290
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "27ea2be8",
+       "ticks": 251
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "5c8f4ff9",
+       "ticks": 462
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "c7cd7e30",
+       "ticks": 343
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "20c1b3e8",
+       "ticks": 341
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "7abf2de6",
+       "ticks": 307
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "c0cd9dba",
+       "ticks": 403
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "3302114f",
+       "ticks": 355
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "bd6caa71",
+       "ticks": 360
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "34364120",
+       "ticks": 455
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "3207791b",
+       "ticks": 372
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "178efaf6",
+       "ticks": 326
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "3ddd76cc",
+       "ticks": 300
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "71d72f75",
+       "ticks": 232
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "0460300f",
+       "ticks": 306
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "99884c9d",
+       "ticks": 344
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "44341bdc",
+       "ticks": 370
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "c6d1f4ae",
+       "ticks": 290
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "413a440c",
+       "ticks": 337
+      },
+      {
+       "outcome": "win",
+       "fingerprint": "75827cb9",
+       "ticks": 290
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "10a6e29f",
+       "ticks": 288
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "1a61946d",
+       "ticks": 479
+      },
+      {
+       "outcome": "draw",
+       "fingerprint": "2dff971b",
+       "ticks": 900
+      },
+      {
+       "outcome": "loss",
+       "fingerprint": "0c5b2bd1",
+       "ticks": 471
+      }
+     ]
+    },
+    "q4": {
+     "better": 4,
+     "worse": 1,
+     "same": 35,
+     "changed": 5,
+     "p": 0.375
+    },
+    "chaos": {
+     "better": 0,
+     "worse": 0,
+     "same": 40,
+     "changed": 0,
+     "p": 1
+    },
+    "reading": "changes nothing a sign test can see",
+    "chaosReading": "changes nothing a sign test can see",
+    "tally": {
+     "Q0": {
+      "win": 9,
+      "loss": 28,
+      "draw": 3
+     },
+     "Q4": {
+      "win": 10,
+      "loss": 25,
+      "draw": 5
+     },
+     "Q0'": {
+      "win": 9,
+      "loss": 28,
+      "draw": 3
+     }
+    }
+   }
+  ]
+ },
+ "controls": {
+  "unchanged": {
+   "ok": true,
+   "fingerprints": {
+    "standoff": {
+     "scripted": "2e273b72",
+     "shipped": "cb71fd3c",
+     "league": "b8cf6a84",
+     "close": "1d0eaca0",
+     "gpu": "1cff9908"
+    },
+    "joust": {
+     "scripted": "b8c47981",
+     "shipped": "44c37caf",
+     "league": "de3ad715",
+     "close": "fe052a44",
+     "gpu": "d75958a1"
+    }
+   },
+   "digest": "29216a6bf1de97d3"
+  },
+  "omega": {
+   "free": true,
+   "turn": true,
+   "replayIsDuel": true
+  },
+  "key": {
+   "axis": 0,
+   "off": {
+    "Q0": 0.022207419155048338,
+    "Q4": 6.170390129400891e-7
+   },
+   "ok": true
+  },
+  "reference": {
+   "checked": 20,
+   "of": 20,
+   "worstRatio": 0.015624992185334006,
+   "ok": true
+  },
+  "chaos": {
+   "cells": [
+    {
+     "pilot": "scripted",
+     "scenario": "standoff",
+     "p": 1,
+     "reading": "changes nothing a sign test can see"
+    },
+    {
+     "pilot": "scripted",
+     "scenario": "joust",
+     "p": 1,
+     "reading": "changes nothing a sign test can see"
+    },
+    {
+     "pilot": "shipped",
+     "scenario": "standoff",
+     "p": 1,
+     "reading": "changes nothing a sign test can see"
+    },
+    {
+     "pilot": "shipped",
+     "scenario": "joust",
+     "p": 1,
+     "reading": "changes nothing a sign test can see"
+    },
+    {
+     "pilot": "league",
+     "scenario": "standoff",
+     "p": 1,
+     "reading": "changes nothing a sign test can see"
+    },
+    {
+     "pilot": "league",
+     "scenario": "joust",
+     "p": 1,
+     "reading": "changes nothing a sign test can see"
+    },
+    {
+     "pilot": "close",
+     "scenario": "standoff",
+     "p": 1,
+     "reading": "changes nothing a sign test can see"
+    },
+    {
+     "pilot": "close",
+     "scenario": "joust",
+     "p": 1,
+     "reading": "changes nothing a sign test can see"
+    },
+    {
+     "pilot": "gpu",
+     "scenario": "standoff",
+     "p": 1,
+     "reading": "changes nothing a sign test can see"
+    },
+    {
+     "pilot": "gpu",
+     "scenario": "joust",
+     "p": 1,
+     "reading": "changes nothing a sign test can see"
+    }
+   ],
+   "ok": true
+  },
+  "determinism": {
+   "flights": 40,
+   "ok": true,
+   "off": []
+  }
+ },
+ "readings": [
+  {
+   "pilot": "scripted",
+   "scenario": "standoff",
+   "reading": "changes nothing a sign test can see",
+   "better": 0,
+   "worse": 0,
+   "p": 1
+  },
+  {
+   "pilot": "scripted",
+   "scenario": "joust",
+   "reading": "changes nothing a sign test can see",
+   "better": 8,
+   "worse": 7,
+   "p": 0.9999999999999998
+  },
+  {
+   "pilot": "shipped",
+   "scenario": "standoff",
+   "reading": "changes nothing a sign test can see",
+   "better": 0,
+   "worse": 0,
+   "p": 1
+  },
+  {
+   "pilot": "shipped",
+   "scenario": "joust",
+   "reading": "changes nothing a sign test can see",
+   "better": 1,
+   "worse": 0,
+   "p": 1
+  },
+  {
+   "pilot": "league",
+   "scenario": "standoff",
+   "reading": "changes nothing a sign test can see",
+   "better": 0,
+   "worse": 0,
+   "p": 1
+  },
+  {
+   "pilot": "league",
+   "scenario": "joust",
+   "reading": "changes nothing a sign test can see",
+   "better": 0,
+   "worse": 0,
+   "p": 1
+  },
+  {
+   "pilot": "close",
+   "scenario": "standoff",
+   "reading": "changes nothing a sign test can see",
+   "better": 0,
+   "worse": 0,
+   "p": 1
+  },
+  {
+   "pilot": "close",
+   "scenario": "joust",
+   "reading": "changes nothing a sign test can see",
+   "better": 7,
+   "worse": 7,
+   "p": 1
+  },
+  {
+   "pilot": "gpu",
+   "scenario": "standoff",
+   "reading": "changes nothing a sign test can see",
+   "better": 2,
+   "worse": 1,
+   "p": 1
+  },
+  {
+   "pilot": "gpu",
+   "scenario": "joust",
+   "reading": "changes nothing a sign test can see",
+   "better": 4,
+   "worse": 1,
+   "p": 0.375
+  }
+ ]
+}

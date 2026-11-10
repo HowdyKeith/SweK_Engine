@@ -45,6 +45,17 @@
 // real seconds here", which tools/ship/aircraftPage-selfcheck.mjs still cites as headless running below real time.
 // It is kept as that host's reading; this box does not reproduce it: three runs alone at the review, battles of
 // 93-109 ticks in 1556-1884 ms, about 57-60 ticks per real second.
+// 2026-11-02 -- THE PAGE'S DEFAULT IS THE CLOSE-QUARTERS PILOT, so this gate chooses the PD autopilot explicitly and says so in a row. Sabotaged with the byte-safe runner: the explicit choice removed,
+// 1 red (the measured-under-the-PD-autopilot row: the lineup it measured was the close-quarters pilot's).
+// 2026-11-04 -- THE READ WAITS FOR TICKS, NOT FOR THE CLOCK (Keith's item 5 of five). Under a loaded sweep the position row went red alone -- A#0's
+// position the same at both ends, every other row green, the tick row included -- and the gate was green alone. The page's own stepper
+// says how: in 2 of 200 seeds (4 and 148) ship A#0 turns from tick 2 and holds its place until tick 37 or 47, and a 90 s ceiling on a
+// slow page could end the read inside that span. The ceiling no longer decides when to read: the read waits for the battle's end, or 150
+// ticks with hit points down, and the clock only says whether the page has STOPPED (no new tick in 30 s; 600 s in all is the last guard;
+// the harness allows 900 s). Two rows hold it: where the battle was read, and the misreading reproduced through runBattles(). Sabotaged
+// with the byte-safe runner, every one red by name: R1 the read cut by the clock again, half a second in 3 | R2 the page's tick stopped
+// (es-box3d-6dof.html's tick++ made void 0) 9, the read row saying 'STOPPED: no new tick in 30 s, at tick 0' | R3 the reproduction steps
+// seed 1, whose ship moves at once 1 | R4 it reads ship B#0 1 | R5 the shortest battle said to be 45 ticks 1.
 "use strict";
 import { runInEngineOrigin, webgpuSkipReason } from "./webgpuHarness.mjs";
 import { createRequire } from "node:module";
@@ -62,7 +73,7 @@ const skip = webgpuSkipReason(createRequire(import.meta.url));
 if (skip) { console.log(`  SKIP  ${skip}`); report("*** NOT A PASS. ***", ""); fails++; }
 else {
     const run = await runInEngineOrigin({
-        engineRoot: ENG, timeoutMs: 180000,
+        engineRoot: ENG, timeoutMs: 900000,   // 2026-11-04: the fight is read by its ticks (see below), so the script may take as long as a loaded page needs to make them
         script: `async () => {
             globalThis.__swekStep = "booting es-box3d-6dof.html in an iframe";
             const f = document.createElement("iframe");
@@ -94,12 +105,22 @@ else {
             // is deliberately NOT read as an end, so the never-healing row below still sees a heal) or, for a
             // longer battle, once it is 150 ticks in with hp down. "mid" is always the last sample of the SAME
             // battle "initial" opened. The real-time ceiling is only a backstop for a stalled page.
+            // 2026-11-02 -- the page's DEFAULT is the close-quarters pilot since Keith's call on brain/SIXDOF_PAGE_FIGHT_WIP.md's ranking. This gate measures what it always measured -- the page's physics and
+            // its balance UNDER THE PD AUTOPILOT -- so it chooses the autopilot explicitly, before the first battle, and records the lineup it measured under
+            win.__sixdof.roster.setSpecs({ A: "scripted", B: "scripted" });
             win.__sixdof.newBattle();
             const initial = win.__sixdof.state();
             let mid = initial, battleEnded = false, endWins = initial.wins, finiteThroughout = allFinite(initial), samples = 1;
             globalThis.__swekStep = "letting the fight run";
+            // 2026-11-04 -- THE READ WAITS FOR TICKS, NOT FOR THE CLOCK. Until today a 90 s ceiling could end the read mid-battle, and under a
+            // loaded sweep it did: ship A#0's position read the same at both ends while every other row passed, the tick row included (more than
+            // 30 ticks in). The page's own stepper says how: in 2 of 200 seeds (4 and 148) A#0 turns from tick 2 and does not move until tick 37
+            // or 47 -- a read inside that span calls a live ship static -- and a battle lasts 84 ticks or more, so a read at its end never is
+            // (measured, and held by a row below). So the clock no longer decides when to read. What it still decides is whether the page has
+            // STOPPED: no new tick in 30 s ends the read and is said so, by name, in its own row; 600 s in all is the last guard.
             const fightT0 = performance.now();
-            while (performance.now() - fightT0 < 90000) {
+            let lastTick = initial.tick, lastTickAt = fightT0, stopped = null;
+            while (true) {
                 await wait(20);
                 const st = win.__sixdof.state(); samples++;
                 if (st.tick < mid.tick || st.wins.A !== mid.wins.A || st.wins.B !== mid.wins.B || st.wins.draws !== mid.wins.draws) { battleEnded = true; endWins = st.wins; break; }
@@ -107,6 +128,10 @@ else {
                 mid = st;
                 globalThis.__swekStep = "fight tick " + st.tick;
                 if (st.tick >= initial.tick + 150 && hpSum(st) < hpSum(initial)) break;
+                const now = performance.now();
+                if (st.tick !== lastTick) { lastTick = st.tick; lastTickAt = now; }
+                else if (now - lastTickAt > 30000) { stopped = "no new tick in 30 s, at tick " + st.tick; break; }
+                if (now - fightT0 > 600000) { stopped = "600 s in all, at tick " + st.tick; break; }
             }
             const fightMs = Math.round(performance.now() - fightT0);
 
@@ -128,8 +153,18 @@ else {
             // v4895: THE BALANCE, measured the way the page re-tuned it -- 120 battles run headless from seed 1 (no drawing), after everything above has been read
             const w0 = win.__sixdof.state().wins, rb = win.__sixdof.runBattles(120, 1, 4000), w1 = win.__sixdof.state().wins, tk = rb.map((x) => x.ticks).sort((a, b) => a - b);
             const bal = { A: rb.filter((x) => x.w === "A").length, B: rb.filter((x) => x.w === "B").length, draw: rb.filter((x) => x.w === "draw").length, timeout: rb.filter((x) => x.timeout).length, counted: [w1.A - w0.A, w1.B - w0.B, w1.draws - w0.draws, w1.timeouts - w0.timeouts], medianTicks: tk[tk.length >> 1], n: rb.length };
+            const lineupMeasured = [win.__sixdof.roster.lineup.A && win.__sixdof.roster.lineup.A.id, win.__sixdof.roster.lineup.B && win.__sixdof.roster.lineup.B.id];
+            // 2026-11-04: the misreading the position row used to make, through the page's own headless stepper -- runBattles(1, seed, k) leaves
+            // the battle at tick k + 1 -- for the two seeds of 200 whose ship A#0 turns before it moves
+            const turnFirst = [4, 148].map((seed) => {
+                const S = win.__sixdof, at = (k) => { S.runBattles(1, seed, k); const st = S.state(); return { tick: st.tick, pos: JSON.stringify(st.A[0].pos), q: JSON.stringify(st.A[0].q) }; };
+                const first = at(-1); let movedAt = null, turnedAt = null;
+                for (let k = 0; k <= 80 && (movedAt === null || turnedAt === null); k++) { const x = at(k); if (movedAt === null && x.pos !== first.pos) movedAt = x.tick; if (turnedAt === null && x.q !== first.q) turnedAt = x.tick; }
+                return { seed, firstTick: first.tick, movedAt, turnedAt };
+            });
+            win.__sixdof.roster.setSpecs({ A: "auto", B: "auto" });   // the page's own default again, as a fresh page finds it
             return {
-                booted: true, bal,
+                booted: true, bal, lineupMeasured, turnFirst, stopped, shortestBattle: tk[0],
                 initialTick: initial.tick, midTick: mid.tick,
                 initialA0: initial.A[0], midA0: mid.A[0],
                 initialHpSum: hpSum(initial), midHpSum: hpSum(mid),
@@ -148,6 +183,8 @@ else {
     ok("!! no page errors were logged during the whole run", !run.pageErrors || run.pageErrors.length === 0, (run.pageErrors || []).join(" | ").slice(0, 300));
 
     if (run.ok && run.result && run.result.booted) {
+        ok("!! the page's physics and balance below are measured under the PD AUTOPILOT, chosen explicitly: the page's default has been the close-quarters pilot since 2026-11-02, and this gate measures what it always measured",
+            JSON.stringify(run.result.lineupMeasured) === JSON.stringify(["scripted", "scripted"]), JSON.stringify(run.result.lineupMeasured));
         const r = run.result;
         report("initial tick / last tick of that battle", `${r.initialTick} -> ${r.midTick}   (${r.battleEnded ? "the battle ended" : "no end seen"}, ${r.samples} samples in ${r.fightMs} ms)`);
         report("hp sum (600 max) initial / last sample", `${r.initialHpSum} -> ${r.midHpSum}`);
@@ -155,6 +192,13 @@ else {
 
         ok("!! fleets spawn at the configured size (3 per side)", r.fleetSizesOk);
         ok("!! the tick counter actually advances -- the physics loop is really running, not stalled", r.midTick > r.initialTick + 30, `${r.initialTick} -> ${r.midTick}`);
+        ok("!! *** the battle was read where this gate means to read it -- at its own end, or 150 ticks in with hit points down -- and never where a clock ran out: a page that stops is said to have stopped, here, by name ***",
+            !r.stopped && (r.battleEnded || (r.midTick >= r.initialTick + 150 && r.midHpSum < r.initialHpSum)), r.stopped ? `STOPPED: ${r.stopped} (${r.samples} samples in ${r.fightMs} ms)` : `${r.battleEnded ? "at the battle's end" : "150 ticks in, hp down"}, tick ${r.midTick}, ${r.fightMs} ms`);
+        {   // 2026-11-04: why the read waits for ticks -- the misreading it used to make, reproduced through the page's own stepper
+            const tf = r.turnFirst || [];
+            ok("!! *** THE MISREADING THE POSITION ROW USED TO MAKE, REPRODUCED: in seeds 4 and 148 ship A#0 turns from tick 2 and holds its place for 20 ticks or more -- a read inside that span calls a live ship static -- and every battle of the 120 below lasts longer than that span, so a read at a battle's end does not ***",
+                tf.length === 2 && tf.every((x) => x.firstTick === 1 && x.turnedAt === 2 && x.movedAt !== null && x.movedAt - x.turnedAt >= 20 && x.movedAt < r.shortestBattle), `${tf.map((x) => `seed ${x.seed}: turned at ${x.turnedAt}, moved at ${x.movedAt}`).join("; ")}; the shortest battle ${r.shortestBattle} ticks`);
+        }
         ok("!! ship A#0's position actually changed -- real force/torque is moving real rigidBody6dof state, not a static scene", JSON.stringify(r.initialA0.pos) !== JSON.stringify(r.midA0.pos), `${JSON.stringify(r.initialA0.pos)} -> ${JSON.stringify(r.midA0.pos)}`);
         ok("!! ship A#0's orientation actually changed -- the autopilot's torque is really turning the ship", JSON.stringify(r.initialA0.q) !== JSON.stringify(r.midA0.q));
         ok("!! total fleet hp is <= its starting value -- combat (weapon hits and/or ram damage) is doing something, never healing", r.midHpSum <= r.initialHpSum, `${r.initialHpSum} -> ${r.midHpSum}`);

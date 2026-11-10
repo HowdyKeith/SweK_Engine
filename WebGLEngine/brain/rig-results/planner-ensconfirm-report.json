@@ -1,0 +1,18 @@
+{
+ "report": [
+  "ROUND 27: does the small start-energy ensemble replicate? pooled over F1 4801-4900, F2 4901-5000, F3 5001-5100 (far and both, 600 dives per arm; read once)",
+  "  PASS IDENTITY F1: the point-estimate twin equals the Round 11 twin dive for dive on F1: true",
+  "  PASS ENSEMBLE DIFFERS 0.05: ENS-0.05 differs from the twin on at least one dive: true",
+  "  PASS ENSEMBLE DIFFERS 0.10: ENS-0.10 differs from the twin on at least one dive: true",
+  "  PASS KINDS ALIGNED: every arm's dives are the same scenarios in the same order: true",
+  "  PASS BLOCK SIZE: every block has 200 dives per arm: true",
+  "ENS-0.05 minus TWIN-FULL (primary): +0.0023 (se 0.0011; better 14, worse 5, same 581)",
+  "ENS-0.05 minus TUNED-R8: +0.0200 (se 0.0026; better 78, worse 8, same 514)",
+  "ENS-0.10 minus TWIN-FULL (reported): +0.0015 (se 0.0014; better 12, worse 9, same 579)",
+  "TWIN-FULL minus TUNED-R8 (reported; the twin's usual gain, on these seeds): +0.0178 (se 0.0024; better 68, worse 6, same 526)",
+  "pooled over Round 23 and this round (reported, fixed-effect): ENS-0.05 minus TWIN-FULL +0.0034 (se 0.0009; Round 23 +0.0057, se 0.0016)",
+  "means: TUNED-R8 0.7959, TWIN-FULL 0.8136, ENS-0.05 0.8159, ENS-0.10 0.8151; scheduled rollout seconds per dive: twin 8158, ENS-0.05 24395, ENS-0.10 24412",
+  "BOTTOM LINE: THE ENSEMBLE EFFECT REPLICATES (ENS-0.05: +0.0023, se 0.0011)",
+  "BOTTOM LINE: THE ENSEMBLE GAIN OVER THE TUNED RULE IS +0.0200 (se 0.0026), IT EXCEEDS THE POINT-ESTIMATE TWIN'S"
+ ]
+}

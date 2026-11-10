@@ -1,0 +1,28 @@
+{
+ "report": [
+  "ROUND 15: how bad a gauge can the planner stand? pooled over U1 1341-1388, U2 1401-1448 (far and both; read once)",
+  "  PASS IDENTITY U1: the full twin at sd 0.1 equals the Round 11 twin dive for dive on U1: true",
+  "  PASS IDENTITY U2: the full twin at sd 0.1 equals the Round 11 twin dive for dive on U2: true",
+  "  PASS REFERENCE GAIN IS REAL: the gain at sd 0.1 is REAL on these seeds (else the sweep has no reference): true",
+  "means (tuned | twin) and crushed/stranded per level",
+  "  sd 0    0.784 | 0.809   crushed 0/0  stranded 0/0",
+  "  sd 0.05 0.785 | 0.803   crushed 0/0  stranded 0/0",
+  "  sd 0.1  0.784 | 0.805   crushed 0/0  stranded 0/0",
+  "  sd 0.2  0.793 | 0.805   crushed 0/0  stranded 0/0",
+  "  sd 0.3  0.801 | 0.817   crushed 0/0  stranded 0/0",
+  "planner gain (twin minus tuned) at each sd:",
+  "  sd 0    +0.0258 (se 0.0042; better 32, worse 0, same 160)  KEEPS",
+  "  sd 0.05 +0.0184 (se 0.0038; better 24, worse 1, same 167)  KEEPS",
+  "  sd 0.1  +0.0211 (se 0.0046; better 27, worse 3, same 162)  KEEPS",
+  "  sd 0.2  +0.0125 (se 0.0037; better 16, worse 2, same 174)  KEEPS",
+  "  sd 0.3  +0.0156 (se 0.0041; better 17, worse 2, same 173)  KEEPS",
+  "tuned rule against sd 0.10:",
+  "  sd 0    -0.0000 (se 0.0042; better 13, worse 13, same 166)",
+  "  sd 0.05 +0.0012 (se 0.0033; better 9, worse 7, same 176)",
+  "  sd 0.1  +0.0000 (se 0.0000; better 0, worse 0, same 192)",
+  "  sd 0.2  +0.0090 (se 0.0046; better 19, worse 10, same 163)",
+  "  sd 0.3  +0.0176 (se 0.0060; better 32, worse 14, same 146)",
+  "BOTTOM LINE: THE GAIN KEEPS FROM SD 0 TO SD 0.3 (NO LIMIT TESTED: EVERY LEVEL KEEPS IT)",
+  "BOTTOM LINE: THE TUNED RULE LOSES -0.018 FROM SD 0 TO SD 0.30 (DEGRADES GRACEFULLY)"
+ ]
+}

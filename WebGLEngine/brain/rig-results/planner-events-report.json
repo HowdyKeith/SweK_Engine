@@ -1,0 +1,19 @@
+{
+ "report": [
+  "ROUND 17: replan on events instead of the clock? pooled over S1 1601-1648, S2 1661-1708, S3 1721-1768 (far and both; read once)",
+  "  PASS IDENTITY S1: the full twin with the new option off equals the Round 11 twin dive for dive on S1: true",
+  "  PASS IDENTITY S2: the full twin with the new option off equals the Round 11 twin dive for dive on S2: true",
+  "  PASS IDENTITY S3: the full twin with the new option off equals the Round 11 twin dive for dive on S3: true",
+  "  PASS FULL IS REAL: TWIN-FULL is REAL on these seeds (else the sweep has no gain to compare with): true",
+  "TWIN-FULL minus TUNED-R8: +0.0216 (se 0.0042; better 40, worse 5, same 243); cost 8141 rollout seconds per dive, 6.15 plans",
+  "  REPLAN-30 +0.0234 (se 0.0044; better 45, worse 7, same 236)  KEEPS MATCHES vs full +0.0018  cost 24991 (307%), 20.57 plans  share of full gain 1.08",
+  "  REPLAN-60 +0.0219 (se 0.0043; better 43, worse 7, same 238)  KEEPS MATCHES vs full +0.0003  cost 13909 (171%), 11.02 plans  share of full gain 1.01",
+  "  ONCE      +0.0159 (se 0.0041; better 35, worse 10, same 243)  KEEPS WORSE   vs full -0.0057  cost 5172 (64%), 2.75 plans  share of full gain 0.73",
+  "  EVENT     +0.0216 (se 0.0042; better 40, worse 5, same 243)  KEEPS MATCHES vs full +0.0000  cost 6141 (75%), 3.70 plans  share of full gain 1.00",
+  "  EVENT-240 +0.0216 (se 0.0042; better 40, worse 5, same 243)  KEEPS MATCHES vs full +0.0000  cost 6790 (83%), 4.56 plans  share of full gain 1.00",
+  "EVENT minus ONCE: +0.0057 (se 0.0017; better 11, worse 0, same 277)",
+  "EVENT-240 minus REPLAN-60: -0.0003 (se 0.0020; better 5, worse 6, same 277)",
+  "BOTTOM LINE: EVENTS ADD TO A PLAN MADE ONCE",
+  "BOTTOM LINE: EVENTS MATCH THE CLOCK AT 75 PERCENT OF ITS COST (EVENT)"
+ ]
+}

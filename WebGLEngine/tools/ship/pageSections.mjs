@@ -333,7 +333,12 @@ export const SECTIONS = [
               // the OTHER half of this shelf's note -- an opt-in install button, fetched onto your machine, never in
               // the zip -- because System Tools, where install and rig pages live, is at MAX_PER_PANEL (15 of 15)
               // and this shelf is its own sub-drawer. Nine of fifteen.
-              "install-fsr-caches.html"] },
+              "install-fsr-caches.html",
+              // privatelm.html JOINS (2026-11-07, Keith: "add this to swek-engine, either use features, or at least have an install button"): an install page for orailnoor/cross-platform-llm-client (MIT), which this engine did not write; it also
+              // talks to the OpenAI-compatible server the app can run on a phone. Ten of fifteen.
+              "privatelm.html",
+              // gputaskman.html JOINS (2026-11-08, Keith: "let's add a install link/page to swek engine that installs gputaskman. can we have swek also start the model, run gputaskman, save snapshot, and give me the json to send to you?"): an install page for shanselman/gputaskman (MIT), a GPU monitor this engine did not write, and a one-button session that loads an Ollama model, takes GPU snapshots and hands back one JSON file. Eleven of fifteen.
+              "gputaskman.html"] },
 
     // *** v4321 -- "Voxel & Render" IS TWO DRAWERS WEARING ONE NAME, AND THE AMPERSAND WAS THE TELL. ***
     // Keith: "let's separate Voxel & Render into a Voxels button and a Renders button." A label with an "&" in
@@ -532,7 +537,8 @@ export const SECTIONS = [
       // honest placement today.
       pages: ["android-invite.html", "remote-desktop.html", "lan.html", "sync-probe.html", "pairlane.html",
               // v4211 -- the two BitTorrent front doors, which belonged to no panel before this round.
-              "torrents.html", "webtorrent.html"] },
+              "torrents.html", "webtorrent.html",
+              "nectarlink.html", "duodesk.html"] },
     // v3434 -- the one-page "Terrain WASM" panel is GONE and biome-map-demo.html joined Voxel & Render.
     // Procedural terrain generation is meshing and rendering; a panel holding ONE page was a heading, not a group.
 
@@ -695,8 +701,8 @@ export const SECTIONS = [
     // A text match followed through imports also finds index, orrery, orrery-gpu, instruments, lab-home, method-lab,
     // panel-brain, race-car, es-box3d-6dof and es-aircraft, and every one of those is a COMMENT or a catalogue string
     // naming the module (main.js, orreryFleet, instruments, brainTrail, raceCar, autopilot6dof), not an import.
-    { id: "flybrain", tab: "flybrain", label: "Fruit Fly Brain", note: "pages built on Janelia's male-cns connectome: the connectome, and the brains that drive, shoot and fly through it",
-      pages: ["fly-connectome.html", "race-brain.html", "es-box3d-fly3d.html", "es-flight6dof.html"] },
+    { id: "flybrain", tab: "flybrain", label: "Fruit Fly Brain", note: "pages built on Janelia's male-cns connectome: the connectome, and the brains that drive, shoot and fly through it (a helicopter and a quadrotor among them, beside their hand autopilots)",
+      pages: ["fly-connectome.html", "race-brain.html", "es-box3d-fly3d.html", "es-flight6dof.html", "rotorcraft-demo.html", "rotor-league.html"] },
     // FSR, KEITH'S CALL: "Let's separate fsr into a link bucket." fsr.html and fsr-three.html sat in UNPLACED since
     // v4623 waiting on exactly this: the temporal/FSR arc gave fsr.html an adapter path, so it belonged in the WebGPU
     // drawer, which is at MAX_PER_PANEL, as is the techniques drawer (Renders) it used to sit in -- "a drawer decision,
@@ -717,7 +723,7 @@ export const SECTIONS = [
     // later one): the aircraft (flight.html, flight-gpu.html, flight-coop.html, es-flight6dof.html, es-aircraft.html, es-box3d-fly3d.html), the 6DOF and dogfight pages (es-box3d-6dof.html, dogfight.html, bomber.html, space-battleship.html), the
     // submarine tank (sub-aquarium.html) and the ships on the sea (battleship3d.html). flight-coop.html and battleship3d.html had NO anchor on server.html at all (nothing linked them from it); they have one in Arriving now.
     { id: "flightsim", tab: "flightsim", label: "Flight Simulation", note: "every page that flies an aircraft, a spacecraft, a ship or a submarine under a physics model: free flight, 6DOF, dogfights, the tank of submarines",
-      pages: ["flight.html", "flight-gpu.html", "flight-coop.html", "es-flight6dof.html", "es-aircraft.html", "es-box3d-fly3d.html", "es-box3d-6dof.html", "dogfight.html", "bomber.html", "space-battleship.html", "sub-aquarium.html", "sub-tournament.html", "sea-ogre.html", "battleship3d.html"] },
+      pages: ["flight.html", "flight-gpu.html", "flight-coop.html", "es-flight6dof.html", "es-aircraft.html", "es-box3d-fly3d.html", "es-box3d-6dof.html", "dogfight.html", "bomber.html", "space-battleship.html", "sub-aquarium.html", "sub-tournament.html", "switchboard.html", "sea-ogre.html", "battleship3d.html"] },
 ];
 
 /** Keith's rule. A drawer of 25 is the flat row again with a lid on it. */

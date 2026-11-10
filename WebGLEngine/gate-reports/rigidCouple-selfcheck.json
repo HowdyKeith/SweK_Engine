@@ -1,6 +1,6 @@
 {
  "gate": "physics/xpbd/rigidCouple-selfcheck.mjs",
- "at": "2026-10-11",
+ "at": "2026-11-04",
  "tables": [
   {
    "title": "box3d's own mass properties against the solid-box formula",
@@ -24,7 +24,7 @@
      0.00031204167587578664
     ]
    ],
-   "note": "neither is readable through the 45 built exports, so both are derived and then probed"
+   "note": "both are derived and then probed through box3d's dynamics; no export returns the mass, and since 2026-11-03 swk_body_inertia returns the inertia, which section 2 also reads directly"
   },
   {
    "title": "generalized inverse mass on a 0.4 x 0.3 x 0.24 box at density 300",

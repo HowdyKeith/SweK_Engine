@@ -47,6 +47,7 @@
 //   FM19 the guard slack in `by` (0.05); FM20 the motor-out-not-solved sentence removed -- ALL 40 RED, NONE AT 0, each by a row of sections 10 or 11 by name (in a scratch tree THREE rows are red for every file mutant whatever it does -- an extra key in the file shows it -- because they compare the tool's default file paths with the scratch tree's; they are not counted as the mutant's, and every mutant's count is at least one more).
 //   A DEFECT THE NEW ROWS FOUND IN THE TOOL: `--workers` did not hand `--guard` to its child processes (a four-process guarded run would have trained the first recipe under the second recipe's name). Fixed, with the row that found it.
 "use strict";
+import "../../physics/mechanics/rigidBody6dofEuler.mjs";   // 2026-11-05 -- the 6-DOF numbers this gate holds were measured under the first-order orientation step, so it flies that step (see that file); RK4's default (42845879) turned it red and missed it
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";

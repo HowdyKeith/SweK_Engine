@@ -5,8 +5,10 @@
 //
 // A SUB ON THE WIRE (a JSON object; nothing in it is ever executed or evaluated -- it is DATA a page flies with code the page already has):
 //   name     1..40 characters of letters, digits, space and . _ - ( )   (anything else is dropped; a name is a label, not markup)
-//   circuit  "gfc"   the only circuit a sub pilot is wired for: the fruit fly's Giant Fiber Circuit (34 neurons, 313 synapses) -- THE STAND-IN, not a fish
-//   weights  null (the PD autopilot flies it) or EXACTLY 963 finite numbers, each |w| <= 1000 (brain/pilotSubPolicy.mjs: 14 x 34 + 34 + 313 + 34 x 4 + 4)
+//   circuit  "gfc"    the fruit fly's Giant Fiber Circuit (34 neurons, 313 synapses) -- THE STAND-IN, not a fish; the default
+//            "flycx"  (unnumbered work, brain/TANK_PILOTS_WIP.md) the fly's central-complex HEADING LOOP (148 cells, 7,080 synapses) as a reservoir WITH MEMORY, brain/pilotSubCircuitState.mjs: a stateful pilot. A page flies it only after it has loaded that circuit and registered the kind
+//                     (render/subAquariumSim.mjs registerPilotKind); a page that has not flies the PD autopilot, as it does for any weights it cannot fly
+//   weights  null (the PD autopilot flies it) or EXACTLY WEIGHTS[circuit] finite numbers, each |w| <= 1000: gfc 963 (brain/pilotSubPolicy.mjs: 14 x 34 + 34 + 313 + 34 x 4 + 4), flycx 1,729 (brain/pilotSubCircuitState.mjs: 15 x 88 + 148 + 1 + 4 x 64 + 4)
 //   theta    null or the twelve tactician numbers by name (brain/subTactics.mjs), each finite and |v| <= 10000; a page clamps them into their real bounds before use
 //   hue      0..359 (derived from the name when absent)
 // The sender's FROM is never taken from the body: the bridge stamps it from the connection (the address that dialled). A body that claims {local: true} or a from is IGNORED.
@@ -18,7 +20,8 @@
 // Pure: no I/O, no clock beyond the `now` handed in, no randomness.
 "use strict";
 
-const WEIGHTS = { gfc: 963 };
+const WEIGHTS = { gfc: 963, flycx: 1729 };
+const PILOT_LABEL = { gfc: "network", flycx: "stateful" };   // what the list calls a sub that arrived with weights, by circuit
 const THETA_NAMES = ["searchSpeed", "trackSpeed", "evadeSpeed", "fireRange", "aimTol", "pingAfter", "echoWindow", "evadeTime", "evadeTurn", "blindSnr", "pingEvery", "searchPing"];
 const MAX_BODY = 64 * 1024, CAP = 24, MAX_W = 1000, MAX_THETA = 10000;
 const RE_NAME_BAD = /[^A-Za-z0-9 ._()\-]/g;
@@ -69,7 +72,7 @@ function createRegistry({ cap = CAP, now = () => Date.now() } = {}) {
         /** Admit a validated sub. `from` and `local` come from the CONNECTION, never the body. Returns { id, replaced }. */
         add(sub, { from = "", local = false } = {}) {
             const id = subId(sub), replaced = map.has(id);
-            map.set(id, { id, name: sub.name, circuit: sub.circuit, weights: sub.weights, theta: sub.theta, hue: sub.hue, pilot: sub.weights ? "network" : "autopilot", from: String(from).replace(/[^\w.:\-\[\]]/g, "").slice(0, 60), local: !!local, arrivedAt: now() });
+            map.set(id, { id, name: sub.name, circuit: sub.circuit, weights: sub.weights, theta: sub.theta, hue: sub.hue, pilot: sub.weights ? PILOT_LABEL[sub.circuit] : "autopilot", from: String(from).replace(/[^\w.:\-\[\]]/g, "").slice(0, 60), local: !!local, arrivedAt: now() });
             evict();
             return { id, replaced };
         },
@@ -93,14 +96,16 @@ const SEED_RECIPES = [
     { name: "Explorer robust pilot", weights: "brain/pilotSubWeightsRobustWip.json", theta: "brain/subTacticsThetaSearchPingWip.json" },
     { name: "Explorer tail pilot", weights: "brain/pilotSubWeightsRobustTail2Wip.json", theta: "brain/subTacticsThetaSearchPingWip.json" },   // seed 9400: the one that qualifies on the Munk x3 hull too (brain/SUBMARINE_WIP.md)
     { name: "Explorer noisy-senses pilot", weights: "brain/pilotSubWeightsRobustNoisyWip.json", theta: "brain/subTacticsThetaSearchPingWip.json" },   // seed 9602: trained on sensor noise, delay and gusts; qualifies at every disturbance level on five hulls (brain/SUBMARINE_WIP.md)
+    { name: "Fly heading-loop pilot (rung 4a)", circuit: "flycx", weights: "brain/pilotSubFlyCxWip.json", theta: null },   // the stateful fly pilot: the cx champion of brain/flyCxStageA.jsonl (tools/ship/flyCxPilotFile.mjs writes the file); no tactician theta of its own
 ];
 /** Build the offerable subs from a reader: read(relPath) -> parsed JSON or null. A recipe whose file is missing or invalid is skipped, by name, with the reason. */
 function seedSubs(read) {
     const subs = [], skipped = [];
     for (const r of SEED_RECIPES) {
-        const w = r.weights ? read(r.weights) : null, t = r.theta ? read(r.theta) : null;
+        const w = r.weights ? read(r.weights) : null, t = r.theta ? read(r.theta) : null, circuit = r.circuit || "gfc";
         if (r.weights && !(w && Array.isArray(w.weights))) { skipped.push({ name: r.name, why: `${r.weights} missing or has no weights` }); continue; }
-        const v = validateSub({ name: r.name, circuit: "gfc", weights: w ? w.weights : null, theta: t && t.theta ? Object.assign({}, THETA_LEGACY, t.theta) : null });
+        if (w && r.circuit && w.circuit !== circuit) { skipped.push({ name: r.name, why: `${r.weights} declares circuit ${JSON.stringify(w.circuit)} (or none) and the recipe wants ${JSON.stringify(circuit)}` }); continue; }
+        const v = validateSub({ name: r.name, circuit, weights: w ? w.weights : null, theta: t && t.theta ? Object.assign({}, THETA_LEGACY, t.theta) : null });
         if (!v.ok) { skipped.push({ name: r.name, why: v.error }); continue; }
         subs.push(v.sub);
     }

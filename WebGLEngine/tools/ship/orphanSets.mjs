@@ -281,10 +281,8 @@ export const RECORDED = Object.freeze({
         "tools/ship/registryOrphans.mjs",
         "tools/ship/removeCluster.mjs",
         "tools/ship/runnerCallers.mjs",
-        "tools/ship/serverShutdown.mjs",
         "tools/ship/shaderPairs.mjs",
         "tools/ship/shadowedHelper.mjs",
-        "tools/ship/shipVerdict.mjs",
         "tools/ship/spellCost.mjs",
         "tools/ship/spriteSheetImport.mjs",
         "tools/ship/strandCensus.mjs",
@@ -313,7 +311,17 @@ export const RECORDED = Object.freeze({
         "world/populationPolicy.mjs",
         "world/traderGraphGithub.mjs",
         // v4901 -- ARRIVED through the merge of the FSR4 / frame-generation branch (its round 63: MOTION_WGSL, a shipping compute module whose only callers are its own gates); recorded by name rather than argued away, and the branch's owner decides whether to wire it.
-        "render/denoiseFrameGenGPU.mjs",
+        // 2026-11-05 -- the merge of the fish / fly / navigation line brought ten study and bench commands whose only callers are their gates (each is run by its own note's command); three modules left the set (render/denoiseFrameGenGPU, serverShutdown and shipVerdict gained callers). RECORDED by name, a rise said as one.
+        "tools/ship/flyCxPilotFile.mjs",
+        "tools/ship/gpuSwarm.mjs",
+        "tools/ship/subFieldNavStudy.mjs",
+        "tools/ship/subHardNavStudy.mjs",
+        "tools/ship/subSensedDetSweep.mjs",
+        "tools/ship/subSensedFollowStudy.mjs",
+        "tools/ship/subSensedPool.mjs",
+        "tools/ship/takeTankDropout.mjs",
+        "tools/ship/tankNavRun.mjs",
+        "tools/tankFlyCxBench.mjs",
     ]),
     // referenceKind-selfcheck: no resolved non-gate importer, held off the census by a MENTION somewhere.
     proseRescued: Object.freeze([
@@ -617,7 +625,6 @@ export const RECORDED = Object.freeze({
         "tools/ship/roundTripCensus.mjs",
         "tools/ship/runnerCallers.mjs",
         "tools/ship/seamCensus.mjs",
-        "tools/ship/serverShutdown.mjs",
         "tools/ship/settingsCensus.mjs",
         "tools/ship/shaderPairs.mjs",
         "tools/ship/shaderRefs.mjs",
@@ -675,6 +682,16 @@ export const RECORDED = Object.freeze({
         "vendor/web-ocean/js/main.js",
         // v4901 -- ARRIVED through the two merges (the FSR4 branch's render/denoiseFrameGenGPU.mjs, and the submarine chat's tools/selfPlaySubTactics.mjs); each is named in prose by its own gate and header and by nothing that calls it.
         "tools/selfPlaySubTactics.mjs",
+        // 2026-11-05 -- the same nine study and bench modules (tankFlyCxBench is not prose-rescued) are named by a sentence in a note or a closing, which the prose rescue counts; serverShutdown left.
+        "tools/ship/flyCxPilotFile.mjs",
+        "tools/ship/gpuSwarm.mjs",
+        "tools/ship/subFieldNavStudy.mjs",
+        "tools/ship/subHardNavStudy.mjs",
+        "tools/ship/subSensedDetSweep.mjs",
+        "tools/ship/subSensedFollowStudy.mjs",
+        "tools/ship/subSensedPool.mjs",
+        "tools/ship/takeTankDropout.mjs",
+        "tools/ship/tankNavRun.mjs",
     ]),
     // referenceKind-selfcheck: the subset of proseRescued whose rescuers include tools/ship/gateSweep.mjs --
     // the sweep closing the ship ritual REQUIRES every gate-adding round to write.

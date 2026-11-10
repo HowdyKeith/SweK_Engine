@@ -67,6 +67,7 @@ export function freeSpaceWorld() {
             return a;
         },
         supportsJoints() { return false; },
+        supportsAngular() { return false; },   // 2026-11-03: the contract's fourteenth call -- this stand-in reports no angular velocity, and says so
         jointSpherical() {}, jointRevolute() {}, jointWeld() {},
 
         /**

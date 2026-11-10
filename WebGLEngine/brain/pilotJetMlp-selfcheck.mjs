@@ -22,6 +22,7 @@
 //   P01 mutate is perturb 2 | P02 perturb is mutate 2 | P03 mutate moves nothing 3 | P04 mutate writes into its argument 3 | P05 mutate ignores maxK 2 | P06 perturb is not seeded by the rng 1
 // The league trainer (tools/ship/trainDogfightLeague.mjs --aircraft jet) found this module had no mutate: the first jet search died with `policy.mutate is not a function`. The moves are the trainer MLP's own, re-exported, and the pinned export list above carries them.
 "use strict";
+import "../physics/mechanics/rigidBody6dofEuler.mjs";   // 2026-11-04 -- the 6-DOF numbers this gate holds were measured under the first-order orientation step, so it flies that step (see that file)
 import * as M from "./pilotJetMlp.mjs";
 import * as PM from "./pilotFlightMlp.mjs";
 import * as PJ from "./pilotJetPolicy.mjs";

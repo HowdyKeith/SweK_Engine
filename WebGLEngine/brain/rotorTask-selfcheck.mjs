@@ -39,6 +39,7 @@
 //   AUDIT one engine seed short 1; T81 spent AUDIT2 terrain one short 1; T82 spent SAFETY_AUDIT2 dropped 1; T83 ground-speed term is not monotone 13; T84 spent sets overlap a live set (SPENT BASELINE terrain is TRAIN's)
 //   1; T85 TRAIN recovery seeds 61..66 run into AUDIT2's 51..58 2; T86 TRAIN recovery has only the first six 2; T87 TRAIN recovery extra seeds are HELD_OUT's 2.
 "use strict";
+import "../physics/mechanics/rigidBody6dofEuler.mjs";   // 2026-11-04 -- the 6-DOF numbers this gate holds were measured under the first-order orientation step, so it flies that step (see that file)
 import * as RT from "./rotorTask.mjs";
 import * as AR from "./autopilotRotor.mjs";
 import * as H from "../physics/mechanics/rotorcraftModel6dof.mjs";
@@ -214,5 +215,8 @@ console.log("\n7. DETERMINISM, AND THE REPORTING");
     ok("!! a pilot that throws or returns NaN controls does not crash the task: the model reads a bad control as neutral and the flight ends or is scored, and fly() returns a finite score", (() => { const r = RT.fly(() => ({ collective: NaN, pitch: NaN, roll: NaN, yaw: NaN }), RT.scenario(1, "hover")); return Number.isFinite(r.score) && r.score >= -9 - 1e-9 && r.score <= 0; })());
 }
 
+
+// 2026-11-08 -- the exports of this module that no row named (definitionGates counts a symbol its gate never mentions), each now asserted rather than only mentioned.
+ok("!! the rotor task samples its trace every 3 ticks (TRACE_EVERY)", RT.TRACE_EVERY === 3);
 console.log(fails ? `\nrotorTask-selfcheck: ${fails} FAILED` : "\nrotorTask-selfcheck: all checks pass");
 process.exit(fails ? 1 : 0);

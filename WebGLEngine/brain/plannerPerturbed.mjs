@@ -52,38 +52,42 @@ export function rollout(model0, st0, nd0, stations, t0, order, params, e, second
     return 0.45 * (feasibleCount ? Math.min(1, seen / feasibleCount) : 1) + 0.45 * (returned ? 1 : 0) + 0.1 * hull;
 }
 /** The twin's plan under error `e`: { order, values } as plannerSeat.twinPlan. */
-export function twinPlan(model, st, obs, ema, params, e, prefer = -1, seconds = T.SECONDS) {
+export function twinPlan(model, st, obs, ema, params, e, prefer = -1, seconds = T.SECONDS, ensemble = [0], maxStations = MAX_STATIONS) {
     const open = obs.stations.map((q, k) => [q, k]).filter(([q]) => !q.visited && A.feasible(q, obs.r)), cap = N.CLASSES[T.CLASS].capacityJ;
-    const nd0 = { ...N.initialNeeds(T.CLASS, { crushDepth: T.CRUSH }), energy: clamp(ema * (1 + e.start), 0, 1) * cap, damage: obs.r.damage, flood: obs.r.flood || 0 };
-    const near = [...open].sort((a, b) => hyp(st.pos[0], st.pos[1], a[0].x, a[0].y) - hyp(st.pos[0], st.pos[1], b[0].x, b[0].y)).slice(0, MAX_STATIONS).map(([, k]) => k);
+    const nd0s = ensemble.map((o) => ({ ...N.initialNeeds(T.CLASS, { crushDepth: T.CRUSH }), energy: clamp(ema * (1 + e.start + o), 0, 1) * cap, damage: obs.r.damage, flood: obs.r.flood || 0 }));
+    const score = (order) => nd0s.reduce((a, nd0) => a + rollout(model, st, nd0, obs.stations, obs.t, order, params, e, seconds), 0) / nd0s.length;
+    const near = [...open].sort((a, b) => hyp(st.pos[0], st.pos[1], a[0].x, a[0].y) - hyp(st.pos[0], st.pos[1], b[0].x, b[0].y)).slice(0, maxStations).map(([, k]) => k);
     const values = {}; let bestOrder = null;
-    let bestV = rollout(model, st, nd0, obs.stations, obs.t, null, params, e, seconds) + (near[0] === prefer || prefer < 0 ? 1e-6 : 0); values.nearest = bestV;
+    let bestV = score(null) + (near[0] === prefer || prefer < 0 ? 1e-6 : 0); values.nearest = bestV;
     if (near.length >= 2) for (const o of perms(near)) {
-        const raw = rollout(model, st, nd0, obs.stations, obs.t, o, params, e, seconds), v = raw + (o[0] === prefer ? 2e-6 : 0);
+        const raw = score(o), v = raw + (o[0] === prefer ? 2e-6 : 0);
         values[o.join(">")] = raw; if (v > bestV + 1e-9) { bestV = v; bestOrder = o; }
     }
     return { order: bestOrder, values };
 }
 const nearestOf = (open, x, y) => { let best = null, bd = Infinity; for (const q of open) { const d = hyp(x, y, q.x, q.y); if (d < bd) { bd = d; best = q; } } return best; };
 
-/** The seat: plannerSeat's twin with the errors `err` in its planning model. `plan` { replanS, seconds }. Carries `stats` { ticks, switches, plans }. */
+/** The seat: plannerSeat's twin with the errors `err` in its planning model. `plan` { replanS, seconds, horizon, onDive, ensemble }: `ensemble` (default [0], Round 23) is a list of starting-energy offsets added to the START error: an order's value is the mean of its rollout scores over the offsets; `onDive` (default off, Round 17) also replans on the tick the boat leaves the surface; `horizon` is the look-ahead in seconds RELATIVE to each plan's time (default unlimited; Round 14), `seconds` the absolute end. Carries `stats` { ticks, switches, plans, rolloutSeconds }: the rollout seconds SCHEDULED (the rollouts planned times the time each was asked to simulate; a rollout that ends early in a crush is counted in full). */
 export function perturbedSeat(params, err = {}, plan = {}) {
-    const q = U.normalise(params, U.WIDE_BOUNDS), p = { replanS: REPLAN_S, seconds: T.SECONDS, ...plan }, e = errOf(err);
+    const q = U.normalise(params, U.WIDE_BOUNDS), p = { replanS: REPLAN_S, seconds: T.SECONDS, horizon: Infinity, onDive: false, ensemble: [0], maxStations: MAX_STATIONS, ...plan }, e = errOf(err);
     return (ctx) => {
-        let ema = null, current = -1, plan_ = null, lastPlanT = -Infinity, openKey = "";
-        const stats = { ticks: 0, switches: 0, plans: 0 };
+        let ema = null, current = -1, plan_ = null, lastPlanT = -Infinity, openKey = "", wasAtSurface = false;
+        const stats = { ticks: 0, switches: 0, plans: 0, rolloutSeconds: 0 };
         const seat = (st, obs) => {
             ema = ema === null ? obs.r.frac : ema + q.alpha * (obs.r.frac - ema);
-            const r = obs.r, atSurface = -st.pos[2] < T.RETURN_DEPTH;
+            const r = obs.r, atSurface = -st.pos[2] < T.RETURN_DEPTH, leftSurface = wasAtSurface && !atSurface;
+            wasAtSurface = atSurface;
             const pump = r.flood > 0.001 && ema > 0.1, repair = atSurface && r.damage > 0 && ema > 0.1;
             const open = obs.stations.filter((s) => !s.visited && A.feasible(s, r));
             let station = null;
             if (open.length) {
                 const next = (pl) => (pl && pl.order ? pl.order.map((i) => obs.stations[i]).find((s2) => s2 && !s2.visited && A.feasible(s2, r)) : null);
                 const key = open.map((s2) => obs.stations.indexOf(s2)).join(",");
-                if (!plan_ || obs.t - lastPlanT >= p.replanS || (plan_.order && !next(plan_)) || key !== openKey) {
+                if (!plan_ || obs.t - lastPlanT >= p.replanS || (plan_.order && !next(plan_)) || key !== openKey || (p.onDive && leftSurface)) {
                     const keep = next(plan_);
-                    plan_ = twinPlan(ctx.model, st, obs, ema, q, e, keep ? obs.stations.indexOf(keep) : -1, p.seconds); lastPlanT = obs.t; openKey = key; stats.plans++;
+                    const end = Math.min(p.seconds, obs.t + p.horizon);
+                    plan_ = twinPlan(ctx.model, st, obs, ema, q, e, keep ? obs.stations.indexOf(keep) : -1, end, p.ensemble, p.maxStations); lastPlanT = obs.t; openKey = key; stats.plans++;
+                    stats.rolloutSeconds += Object.keys(plan_.values).length * p.ensemble.length * Math.max(0, end - obs.t);
                 }
                 station = next(plan_) || nearestOf(open, st.pos[0], st.pos[1]);
             }

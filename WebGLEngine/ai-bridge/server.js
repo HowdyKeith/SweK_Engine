@@ -2009,6 +2009,7 @@ const bookloreBridge = require("./bookloreBridge.js");     // v1135 — self-hos
 const comicBridge = require("./comicBridge.js");           // v1138 — built-in cross-platform .cbz/.cbr viewer
 const autoInstall = require("./autoInstall.js");           // v1199 — Auto-Install registry: per-panel deps + global auto toggle
 const mlxInstallBridge = require("./mlxInstallBridge.js"); // v1139 — Mac MLX server install/detect
+const gpuTaskManBridge = require("./gpuTaskManBridge.js"); // UNNUMBERED -- gputaskman.html: install, snapshot and an Ollama session for github.com/shanselman/gputaskman
 const keepAwakeBridge = require("./keepAwakeBridge.js");   // v1149 — hold the PC awake during long cloud jobs
 const terminalBridge = require("./terminalBridge.js");     // v1154 — localhost-only opt-in shell (xterm.js terminal)
 const googleHomeBridge = require("./googleHomeBridge.js");  // v1162 — mint the ha-google-home master token
@@ -12342,6 +12343,13 @@ ${text.replace(/'/g, "''")}
     if (req.url === "/mlx/pull" && req.method === "POST") { readJson(d => mlxInstallBridge.pullModel((d || {}).model).then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) }))); return; }
     if (req.url === "/mlx/status" && req.method === "GET") { sendJson(mlxInstallBridge.managedStatus()); return; }
     if (req.url === "/mlx/stop" && req.method === "POST") { sendJson(mlxInstallBridge.stopManaged("manual")); return; }
+    // gputaskman.html's six routes (UNNUMBERED; see ai-bridge/gpuTaskManBridge.js for what each does and does not do). Only the fields named here are passed on from a request body.
+    if (req.url === "/gputaskman/status" && req.method === "GET") { gpuTaskManBridge.detect().then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) })); return; }
+    if (req.url === "/gputaskman/install" && req.method === "POST") { readJson(d => gpuTaskManBridge.install((d || {}).method).then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) }))); return; }
+    if (req.url === "/gputaskman/snapshot" && req.method === "POST") { readJson(d => gpuTaskManBridge.snapshot({ gpu: (d || {}).gpu }).then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) }))); return; }
+    if (req.url === "/gputaskman/session" && req.method === "POST") { readJson(d => { d = d || {}; sendJson(gpuTaskManBridge.startSession({ model: d.model, base: d.base, numPredict: d.numPredict, settleMs: d.settleMs, unloadWhenDone: !!d.unloadWhenDone, sampleSeconds: d.sampleSeconds, sampleIntervalMs: d.sampleIntervalMs })); }); return; }
+    if (req.url === "/gputaskman/watch" && req.method === "POST") { readJson(d => { d = d || {}; sendJson(gpuTaskManBridge.startWatch({ mode: d.mode, seconds: d.seconds, intervalMs: d.intervalMs, gpu: d.gpu, sizes: d.sizes, rounds: d.rounds, swarmSeconds: d.swarmSeconds })); }); return; }
+    if (req.url.split("?")[0] === "/gputaskman/job" && req.method === "GET") { const q = new URLSearchParams(req.url.split("?")[1] || ""); sendJson(gpuTaskManBridge.jobStatus(q.get("id"))); return; }
     if (req.url === "/keepawake/status" && req.method === "GET") { sendJson(keepAwakeBridge.status()); return; }
     if (req.url === "/keepawake/config" && req.method === "POST") { readJson(d => sendJson(keepAwakeBridge.setEnabled(!!(d && d.enabled)))); return; }
     if (req.url === "/terminal/status" && req.method === "GET") { sendJson(terminalBridge.status()); return; }
@@ -16631,6 +16639,29 @@ ${text.replace(/'/g, "''")}
         readJson(d => {
             try { require("./galaxyProfileBridge.js").generate(d || {}).then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) })); }
             catch (e) { sendJson({ ok: false, error: "galaxy-profile bridge unavailable: " + String(e && e.message || e) }); }
+        });
+        return;
+    }
+
+    // --- app installs: Nectarlink (thtbee/nectarlink) and DuoDesk (0xCodez/DuoDesk), pinned binary installers ---
+    // Keith 2026-11-03: "let's also do the DuoDesk and Nectarlink installs." Both ship unsigned binaries, so this is voxtral's shape (pin the BYTES: size and SHA-256
+    // per asset) rather than galaxy-profile's (pin a commit). /apps/status is information and open; /apps/download writes to disk and /apps/launch RUNS A FILE ON
+    // THIS MACHINE, so both are the host's alone: _isLocalReq alone is not enough, because cloudflared connects from loopback and a Public-tunnel viewer would
+    // pass it -- hence the _isRemoteReq refusal as well (the same pair line ~8143 uses for remote POSTs).
+    if (req.url.split("?")[0] === "/apps/status" && req.method === "GET") {
+        try { sendJson({ ...require("./appInstallBridge.js").status(), local: _isLocalReq(req) && !_isRemoteReq(req) }); }
+        catch (e) { sendJson({ ok: false, error: "app install bridge unavailable: " + String(e && e.message || e) }); }
+        return;
+    }
+    if ((req.url === "/apps/download" || req.url === "/apps/launch") && req.method === "POST") {
+        if (!_isLocalReq(req) || _isRemoteReq(req)) { sendJson({ ok: false, error: "installing is done from the machine that runs the engine, not from a remote session" }, 403); return; }
+        readJson(d => {
+            d = d || {};
+            try {
+                const ab = require("./appInstallBridge.js");
+                if (req.url === "/apps/download") sendJson(ab.download(String(d.id || ""), String(d.name || "")));
+                else ab.launch(String(d.id || ""), String(d.name || ""), { confirm: d.confirm === true }).then(sendJson).catch(e => sendJson({ ok: false, error: String(e && e.message || e) }));
+            } catch (e) { sendJson({ ok: false, error: "app install bridge unavailable: " + String(e && e.message || e) }); }
         });
         return;
     }

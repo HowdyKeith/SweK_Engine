@@ -1,6 +1,6 @@
 // WebGLEngine/tools/fishVestibularCircuit-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node tools/fishVestibularCircuit-selfcheck.mjs      (~0.3 s -- to be restated at ship)
+// Run: node tools/fishVestibularCircuit-selfcheck.mjs      (~0.15-0.3 s)
 //
 // THE GATE OF tools/fishVestibularCircuit.mjs (and its command): the tool that re-derives rung 4b's circuit from the vendored tables, which brain/FISH_VESTIBULAR_HELPER_WIP.md named as "the next step" beside "a gate that holds the files to their hashes". It does both.
 //   1  THE FILES     every vendored file is held to the sha256 PROVENANCE.md records for it; the workbook beside the zip is the zip's own member, byte for byte.

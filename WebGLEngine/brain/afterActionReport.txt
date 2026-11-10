@@ -1,0 +1,7 @@
+THE AFTER-ACTION ANALYZER: 12 pairs of the Sea OGRE (scenarios 101 to 112), 1 model(s)
+  checks: FACTS deterministic ok; TEMPLATE SUPPORT 1.000 COVERAGE 1.000; SHUFFLED brain/rig-results/afterAction-qwen2.5-7b.jsonl 0.224; TRANSCRIPTS whole
+  TEMPLATE (the control): 107.9 words and 7.2 lines a narration
+  llama3.1:8b-t0: FORMAT 1.000  SUPPORT 0.878  COVERAGE 0.558  narrations under 0.75: 4 of 12  words 68.3 (template 107.9)  lines 4.1
+    lines that failed, by kind: no ids 0, an id that does not exist 0, a number not in the facts 4, a causal word 0, a run mismatch 2 (a line can fail in several ways)
+BOTTOM LINE (llama3.1:8b-t0): UNFAITHFUL: THE NARRATION CANNOT BE TRUSTED LINE BY LINE
+Limits of the checker, said plainly: number WORDS ("two") are not checked, and polarity beyond the run label is not checked; whether the prose is better than the template's is a human judgment this report prints the means to make (words, lines) and does not decide.

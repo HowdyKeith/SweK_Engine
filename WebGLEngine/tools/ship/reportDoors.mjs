@@ -161,6 +161,18 @@ export const FORMATTERS = Object.freeze([
     "tools/ship/advisorChipStudy.mjs",
     "tools/ship/advisorLlmAudit.mjs",
     "tools/ship/trainSubVestibular.mjs",
+    // 2026-11-05 -- THREE ARRIVALS AT THE MERGE OF THE FOUR LINES, found by this gate reading 25 formatters against 22 registered and each confirmed by CALLING it bare: the Decider audit (round 14), the plain-net control study and the tank dropout over the memory arms; each refuses a bare call.
+    "tools/ship/deciderAudit.mjs",
+    "tools/ship/plainNetStudy.mjs",
+    "tools/ship/takeTankDropout.mjs",
+    // 2026-11-08 -- SEVEN ARRIVALS FROM THIS BRANCH (the round-7 to round-11 readers and trainers), found by this gate reading 32 formatters against 25 registered; each is confirmed by CALLING it bare in the section 3 loop, which is what sorts it into the strict or the tolerant list below.
+    "tools/ship/plainNetVariants.mjs",
+    "tools/ship/takeAfterAction.mjs",
+    "tools/ship/takeCounterfactual.mjs",
+    "tools/ship/takeRighting.mjs",
+    "tools/ship/tankPairedReplicate.mjs",
+    "tools/ship/trainDecisionCircuit.mjs",
+    "tools/ship/trainStation.mjs",
 ]);
 
 // *** AND Function.length CANNOT TELL THE LAST TWO FROM THE FIRST FOUR EITHER, WHICH IS THE THIRD INSTRUMENT
@@ -223,6 +235,18 @@ export const STRICT_FORMATTERS = Object.freeze([
     "tools/ship/advisorChipStudy.mjs",
     "tools/ship/advisorLlmAudit.mjs",
     "tools/ship/trainSubVestibular.mjs",
+    // 2026-11-05 -- THREE ARRIVALS AT THE MERGE OF THE FOUR LINES, found by this gate reading 25 formatters against 22 registered and each confirmed by CALLING it bare: the Decider audit (round 14), the plain-net control study and the tank dropout over the memory arms; each refuses a bare call.
+    "tools/ship/deciderAudit.mjs",
+    "tools/ship/plainNetStudy.mjs",
+    "tools/ship/takeTankDropout.mjs",
+    // 2026-11-08 -- the same seven, each confirmed by CALLING it bare (see the FORMATTERS entry above): they refuse.
+    "tools/ship/plainNetVariants.mjs",
+    "tools/ship/takeAfterAction.mjs",
+    "tools/ship/takeCounterfactual.mjs",
+    "tools/ship/takeRighting.mjs",
+    "tools/ship/tankPairedReplicate.mjs",
+    "tools/ship/trainDecisionCircuit.mjs",
+    "tools/ship/trainStation.mjs",
 ]);
 export const TOLERANT_FORMATTERS = Object.freeze([
     "tools/roundhouse/curriculum.mjs",

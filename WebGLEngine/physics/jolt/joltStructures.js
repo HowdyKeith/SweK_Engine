@@ -25,11 +25,12 @@ function createStructures(world) {
     }
     // a wall: cols x rows grid of dynamic boxes, each joined to its right + upper neighbor. strengthAt(c,r,dir) can
     // reinforce specific joints (return a multiplier); default uniform.
-    function addWall({ x = 0, y = 0, z = 0, cols = 6, rows = 5, half = 0.5, gap = 0.02, strengthAt = null } = {}) {
+    // 2026-11-03 (unnumbered): `plane2d` locks the wall's boxes to the xy-plane (the Jolt wrapper's addBox option); off unless asked.
+    function addWall({ x = 0, y = 0, z = 0, cols = 6, rows = 5, half = 0.5, gap = 0.02, strengthAt = null, plane2d = false } = {}) {
         const grid = [], idxs = [];
         for (let r = 0; r < rows; r++) { grid[r] = []; for (let c = 0; c < cols; c++) {
             const bx = x + (c - (cols - 1) / 2) * (half * 2 + gap), by = y + half + r * (half * 2 + gap);
-            const i = world.addBox({ type: "dynamic", pos: [bx, by, z], half: [half, half, half] }); grid[r][c] = i; idxs.push(i);
+            const i = world.addBox({ type: "dynamic", pos: [bx, by, z], half: [half, half, half], ...(plane2d ? { plane2d: true } : {}) }); grid[r][c] = i; idxs.push(i);
         } }
         for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
             if (c + 1 < cols) join(grid[r][c], grid[r][c + 1], strengthAt ? strengthAt(c, r, "h") : 1);

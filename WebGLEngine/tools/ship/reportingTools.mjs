@@ -367,6 +367,18 @@ export const NO_MAIN = new Map([
     // built -- sysadminBridge.patchScan() beside the Downloads scan, routed at /sys/patchbase, with a row in
     // System Tools. THE ANTIDOTE WORKED FOR THE THIRD TIME (v3196 wrote it, v3197 obeyed it, this is v3377).
     ...PAGE_DOOR_ROWS.map(([rel, page, what]) => [rel, pageIsTheDoor(page, what)]),
+    // 2026-11-05 -- FIVE STUDY COMMANDS FROM THE FISH / FLY / NAVIGATION LINE (merged into the publish branch). Each writes a committed, once-read record of a registered study; a door
+    // (a button on a page) would be a way to spend the study's reserved seeds again, which each refuses by design, so the door is the command line the study's own note gives.
+    ["tools/ship/subFieldNavStudy.mjs",
+     "writes brain/subFieldNavHeld.jsonl, the held-set record of a registered navigation study: each held seed set is read once and the study refuses to fly it again, so a button on a page would be a way to spend reserved seeds; the door is the command its own note (brain/SUB_FIELD_NAV_WIP.md) gives"],
+    ["tools/ship/subHardNavStudy.mjs",
+     "writes brain/subHardNavHeld4.jsonl, the held-set record of the harder navigation test: read once, refused on a second flight of the same seeds, so its door is the registered command and not a button that could re-fly reserved seeds"],
+    ["tools/ship/subSensedStudy.mjs",
+     "writes brain/subSensedHeld6.jsonl, the held-set record of a sensed-navigation follow-up: each follow-up's held set is flown once and written, so the study is run by the command its note gives, not from a page that could re-fly it"],
+    ["tools/ship/subTrafficFixStudy.mjs",
+     "writes brain/subTrafficFixHeld5.jsonl, the held-set record of the traffic-fix follow-up: flown once on its reserved seeds, so a page button would be a way to burn them; the door is the command in brain/SENSED_NAV_WIP.md"],
+    ["tools/ship/tankNavRun.mjs",
+     "writes brain/tankNavRun.jsonl, the record of the tank navigation scene's registered run: the run is registered before it is flown and read once, so the door is the command its note gives and a page only READS the record"],
     ["tools/ship/controlDossier.mjs",
      "controlDossier(engRoot, census) consumes roundTripCensus's output: it reports ON a measurement rather than taking one, and roundTripCensus is offered above"],
 ]);

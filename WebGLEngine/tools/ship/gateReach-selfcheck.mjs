@@ -227,6 +227,7 @@ for (const l of reachLines(r)) console.log("        " + l);
     //          subActuators, subHulls, subModel6dof, subSonar, subTorpedo and terrain, each gated in its own selfcheck) and physics/mesh +7 (the
     //          arc's blastEngine, exactArrangement, exactPredicates, implicitPoints, manifoldAudit, triContact and triArrangement, each gated
     //          in its own selfcheck). Growth only, live work. Re-recorded with --write AFTER compare() had been read.
+    //   587 -> 2026-11-04, the merge of the box3d line (tier-2-keys-patch) into the publish branch: compare(), read BEFORE writing, reported GREW, 8 ADDED, 0 REMOVED, reconciles:true: physics/jolt/joltArena.js and physics/mechanics +7 (atmosphereISA, implicitGyro, multirotorModel6dof, rigidBody6dofBox3d, rigidBody6dofBox3dScheme, rigidBody6dofEuler, and subNeeds from the needs-and-limits line, each gated in its own selfcheck). Growth only, live work. Re-recorded with --write AFTER compare() had been read. (The record carried 579 from v4879; the intervening 580 and later entries were on other lines.)
     //   580 -> v4881 -- compare(), read BEFORE writing, reports GREW, 1 ADDED, 0 REMOVED, reconciles:true: physics/ocean/oceanSurface.mjs, the
     //          CPU sea the physics stands on (slice 1 of ocean-optin-surface), gated in its own oceanSurface-selfcheck. Growth only, live work.
     //          Re-recorded with --write AFTER compare() had been read.

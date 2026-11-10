@@ -1,0 +1,135 @@
+POOLED READING (follow-up 59): 51 sets (held13 to held63), the flights already in the repository; no flight was made
+
+(A) BETWEEN-SET NOISE, arms flown in at least 3 sets: 58 arms (58 with a ratio)
+median ratio of the standard deviation across sets to the binomial one: 0.87; largest range: 23; arms with a range over 12: 17
+arm (aliases) @ sea | sets | counts | mean | sd | binomial sd | ratio | range
+d1-1=inc=m1-1@D30 | 12 | 145,140,146,155,160,147,147,150,154,137,149,156 | 148.83 | 6.67 | 5.08 | 1.31 | 23
+d1-1=inc=m1-1@W | 18 | 129,135,123,139,132,129,130,128,124,128,125,118,126,118,123,136,137,130 | 128.33 | 6.03 | 6.07 | 0.99 | 21
+f100=m23e30@R3D30 | 7 | 145,135,141,144,129,150,143 | 141.00 | 6.95 | 5.53 | 1.26 | 21
+d1-1=inc=m1-1@R3D30 | 20 | 125,126,127,125,124,129,137,120,127,139,126,129,134,136,130,130,130,124,129,139 | 129.30 | 5.27 | 6.03 | 0.87 | 19
+d1-1=inc=m1-1@WD30L | 14 | 127,134,135,126,130,145,134,136,126,126,130,133,131,134 | 131.93 | 5.18 | 5.94 | 0.87 | 19
+re30@W | 3 | 135,132,117 | 128.00 | 9.64 | 6.08 | 1.59 | 18
+rn30@D30 | 5 | 164,146,157,157,162 | 157.20 | 6.98 | 4.46 | 1.56 | 18
+d1-1=inc=m1-1@P | 14 | 148,157,156,157,149,160,151,151,151,148,144,161,155,148 | 152.57 | 5.11 | 4.82 | 1.06 | 17
+f100=m23e30@WD30 | 4 | 130,138,147,130 | 136.25 | 8.10 | 5.75 | 1.41 | 17
+m23rn30k@R3D30 | 5 | 145,128,139,145,142 | 139.80 | 7.05 | 5.59 | 1.26 | 17
+rm23@R3D30 | 3 | 119,135,125 | 126.33 | 8.08 | 6.14 | 1.32 | 16
+rm23re30@R3D30 | 7 | 118,124,131,118,115,126,120 | 121.71 | 5.56 | 6.28 | 0.89 | 16
+f80=m23e30k=m23f80=noG@R3D30 | 6 | 138,141,139,145,132,136 | 138.50 | 4.42 | 5.65 | 0.78 | 13
+f80g=gU=m23e30kg=m23f80g@WD30L | 6 | 161,165,153,161,156,152 | 158.00 | 5.14 | 4.39 | 1.17 | 13
+m34e30@WD30 | 4 | 136,127,140,135 | 134.50 | 5.45 | 5.83 | 0.93 | 13
+rm34f80@R3D30 | 3 | 132,119,126 | 125.67 | 6.51 | 6.16 | 1.06 | 13
+rn30c@D30 | 6 | 148,157,159,154,149,161 | 154.67 | 5.32 | 4.67 | 1.14 | 13
+crre30=r3re30@P | 3 | 123,122,134 | 126.33 | 6.66 | 6.14 | 1.08 | 12
+crre30g@R3D30 | 3 | 109,117,121 | 115.67 | 6.11 | 6.43 | 0.95 | 12
+m23re30k@WD30L | 4 | 153,143,155,144 | 148.75 | 6.13 | 5.08 | 1.21 | 12
+m23re30kg@WD30L | 4 | 156,144,148,148 | 149.00 | 5.03 | 5.07 | 0.99 | 12
+m23rn30k@WD30L | 5 | 159,149,159,161,150 | 155.60 | 5.64 | 4.59 | 1.23 | 12
+m23rn30kg@P | 3 | 146,153,158 | 152.33 | 6.03 | 4.84 | 1.25 | 12
+rm23re30@W | 3 | 97,108,109 | 104.67 | 6.66 | 6.62 | 1.01 | 12
+rn30@P | 5 | 156,147,159,158,148 | 153.60 | 5.68 | 4.75 | 1.20 | 12
+crre30=r3re30@R3D30 | 5 | 118,114,110,107,118 | 113.40 | 4.88 | 6.48 | 0.75 | 11
+e30=m11e30@R3D30 | 3 | 130,137,126 | 131.00 | 5.57 | 5.97 | 0.93 | 11
+f80g=gU=m23e30kg=m23f80g@R3D30 | 5 | 139,134,141,137,145 | 139.20 | 4.15 | 5.62 | 0.74 | 11
+rm34e30@WD30 | 4 | 82,80,81,91 | 83.50 | 5.07 | 6.69 | 0.76 | 11
+rm34e30g@R3D30 | 3 | 127,116,127 | 123.33 | 6.35 | 6.23 | 1.02 | 11
+cre30=r3e30=rm33e30@R3D30 | 3 | 131,121,122 | 124.67 | 5.51 | 6.19 | 0.89 | 10
+f80=m23e30k=m23f80=noG@WD30L | 10 | 163,156,157,162,160,164,159,154,159,159 | 159.30 | 3.13 | 4.28 | 0.73 | 10
+m23re30k@R3D30 | 7 | 130,128,131,134,133,138,131 | 132.14 | 3.24 | 5.93 | 0.55 | 10
+m23rn30k@P | 4 | 147,145,155,152 | 149.75 | 4.57 | 5.02 | 0.91 | 10
+rm34f80@WD30L | 3 | 100,90,94 | 94.67 | 5.03 | 6.70 | 0.75 | 10
+rn30c@WD30L | 5 | 125,121,127,131,121 | 125.00 | 4.24 | 6.18 | 0.69 | 10
+crre30k@WD30L | 3 | 69,78,78 | 75.00 | 5.20 | 6.61 | 0.79 | 9
+e30=m11e30@WD30 | 5 | 103,106,111,105,102 | 105.40 | 3.51 | 6.61 | 0.53 | 9
+f80=m23e30k=m23f80=noG@WD30 | 3 | 142,133,135 | 136.67 | 4.73 | 5.74 | 0.82 | 9
+rm23e30@R3D30 | 5 | 134,136,135,138,129 | 134.40 | 3.36 | 5.84 | 0.58 | 9
+crre30=r3re30@W | 3 | 69,74,77 | 73.33 | 4.04 | 6.59 | 0.61 | 8
+full@WD30L | 3 | 160,155,152 | 155.67 | 4.04 | 4.59 | 0.88 | 8
+m2-3=m23@WD30L | 3 | 162,158,154 | 158.00 | 4.00 | 4.39 | 0.91 | 8
+m23rn30kg@R3D30 | 3 | 134,142,139 | 138.33 | 4.04 | 5.66 | 0.71 | 8
+m23re30kg@R3D30 | 4 | 133,132,138,131 | 133.50 | 3.11 | 5.87 | 0.53 | 7
+rm34e30@R3D30 | 5 | 126,119,125,119,123 | 122.40 | 3.29 | 6.26 | 0.53 | 7
+m2-3=m23@W | 3 | 157,156,162 | 158.33 | 3.21 | 4.37 | 0.74 | 6
+m23rn30kg@WD30L | 3 | 153,156,150 | 153.00 | 3.00 | 4.79 | 0.63 | 6
+rm23e30g@R3D30 | 3 | 139,135,141 | 138.33 | 3.06 | 5.66 | 0.54 | 6
+d1-1=inc=m1-1@R3 | 3 | 151,146,149 | 148.67 | 2.52 | 5.09 | 0.49 | 5
+e30=m11e30@D30 | 3 | 157,162,161 | 160.00 | 2.65 | 4.22 | 0.63 | 5
+m34e30@R3D30 | 3 | 132,136,131 | 133.00 | 2.65 | 5.89 | 0.45 | 5
+crre30k@R3D30 | 3 | 110,114,111 | 111.67 | 2.08 | 6.51 | 0.32 | 4
+m23re30kg@P | 3 | 145,142,141 | 142.67 | 2.08 | 5.44 | 0.38 | 4
+rn30@WD30L | 4 | 123,124,125,127 | 124.75 | 1.71 | 6.19 | 0.28 | 4
+rd@R3D30 | 3 | 14,11,14 | 13.00 | 1.73 | 3.47 | 0.50 | 3
+f100=m23e30@WD30L | 3 | 168,166,166 | 166.67 | 1.15 | 3.51 | 0.33 | 2
+rm23re30@P | 3 | 142,142,140 | 141.33 | 1.15 | 5.51 | 0.21 | 2
+controls (not in the statistic): exact 51 sets mean 174.33 sd 2.26 range 9; long+fix+forget 51 sets mean 171.33 sd 2.43 range 12
+
+(B) THE EFFECT OF ONE FEATURE: 58 rows (feature, variant, sea) with at least one set; seen 6, suggested 5, not separable 47; the registration's grid is 9 features x 6 seas = 54, unadjusted
+feature | variant | sea | sets | mean effect | interval | sets + / - / 0 | call
+F1 | zone all at mark nbr false carry false min 4 life 60 | R3D30 | 18 | 1.81 | 0.22 to 3.39 | 10/6/2 | suggested
+F1 | zone all at mark nbr false carry false min 4 life 60 | WD30L | 12 | 1.38 | -0.64 to 3.39 | 8/2/2 | not separable
+F1 | zone all at mark nbr false carry false min 4 life 60 | WD30 | 3 | 2.17 | -7.80 to 12.13 | 2/1/0 | not separable
+F1 | zone all at mark nbr false carry false min 4 life 60 | W | 3 | 5.33 | -11.21 to 21.87 | 3/0/0 | not separable
+F1 | zone all at mark nbr false carry false min 4 life 60 | P | 14 | 1.21 | -1.55 to 3.98 | 6/8/0 | not separable
+F1 | zone all at mark nbr false carry true min 4 life 60 | WD30L | 3 | 0.00 | -6.57 to 6.57 | 2/1/0 | not separable
+F1 | zone all at mark nbr false carry true min 4 life 60 | P | 2 | -1.50 | -7.85 to 4.85 | 0/2/0 | not separable
+F1 | zone all at mark nbr false carry true min 4 life 60 | D30 | 4 | 0.63 | -1.75 to 3.00 | 2/1/1 | not separable
+F1 | zone all at mark nbr true carry false min 4 life 60 | R3D30 | 3 | -3.00 | -5.48 to -0.52 | 0/3/0 | suggested
+F1 | zone all at mark nbr true carry false min 4 life 60 | WD30L | 2 | 1.00 | -24.41 to 26.41 | 1/1/0 | not separable
+F1 | zone all at mark nbr true carry false min 4 life 60 | P | 2 | 0.50 | -43.97 to 44.97 | 1/1/0 | not separable
+F1 | zone far at clear nbr false carry false min 4 life 60 | R3D30 | 3 | 3.33 | 1.90 to 4.77 | 3/0/0 | suggested
+F1 | zone far at clear nbr false carry false min 4 life 60 | WD30 | 1 | 6.00 | none | 1/0/0 | not separable
+F1 | zone far at clear nbr false carry false min 4 life 60 | W | 2 | 7.50 | -62.38 to 77.38 | 2/0/0 | not separable
+F1 | zone far at clear nbr false carry false min 4 life 60 | P | 3 | 2.00 | -19.66 to 23.66 | 1/2/0 | not separable
+F1 | zone far at mark nbr false carry false min 4 life 60 | R3D30 | 3 | -2.33 | -6.13 to 1.46 | 0/3/0 | not separable
+F1 | zone far at mark nbr false carry false min 4 life 60 | WD30L | 2 | 0.00 | -38.12 to 38.12 | 1/1/0 | not separable
+F1 | zone far at mark nbr false carry false min 4 life 60 | P | 2 | -3.00 | -15.71 to 9.71 | 0/2/0 | not separable
+F1 | zone far at mark nbr false carry true min 4 life 60 | WD30L | 2 | -4.50 | -10.85 to 1.85 | 0/2/0 | not separable
+F1 | zone far at mark nbr false carry true min 4 life 60 | P | 2 | 2.00 | -23.41 to 27.41 | 1/0/1 | not separable
+F1 | zone far at mark nbr false carry true min 4 life 60 | D30 | 2 | 0.50 | -5.85 to 6.85 | 1/0/1 | not separable
+F1 | zone far at mark nbr true carry false min 4 life 60 | R3D30 | 1 | -5.00 | none | 0/1/0 | not separable
+F1 | zone near at clear nbr false carry false min 4 life 60 | R3D30 | 3 | 0.00 | 0.00 to 0.00 | 0/0/3 | not separable
+F1 | zone near at mark nbr false carry false min 4 life 60 | R3D30 | 2 | 1.50 | -42.97 to 45.97 | 1/1/0 | not separable
+F1 | zone near at mark nbr false carry false min 4 life 60 | WD30L | 1 | -2.00 | none | 0/1/0 | not separable
+F1 | zone near at mark nbr false carry true min 4 life 60 | D30 | 1 | 1.00 | none | 1/0/0 | not separable
+F3 | - | R3D30 | 7 | 0.14 | -2.79 to 3.08 | 4/3/0 | not separable
+F3 | - | WD30L | 11 | -1.05 | -3.34 to 1.24 | 5/6/0 | not separable
+F3 | - | WD30 | 1 | -5.00 | none | 0/1/0 | not separable
+F3 | - | P | 1 | -3.00 | none | 0/1/0 | not separable
+F3 | - | D30 | 2 | -1.75 | -17.63 to 14.13 | 0/2/0 | not separable
+F4 | - | R3D30 | 10 | -9.65 | -12.10 to -7.20 | 0/10/0 | seen
+F4 | - | WD30L | 6 | -12.25 | -22.73 to -1.77 | 0/6/0 | seen
+F4 | - | W | 1 | 5.00 | none | 1/0/0 | not separable
+F4 | - | P | 1 | -5.00 | none | 0/1/0 | not separable
+F4 | - | D30 | 1 | -9.00 | none | 0/1/0 | not separable
+F5a | - | R3D30 | 3 | 2.50 | -1.98 to 6.98 | 3/0/0 | not separable
+F5a | - | WD30L | 3 | -2.33 | -10.32 to 5.65 | 0/2/1 | not separable
+F5b | - | R3D30 | 2 | 14.00 | 7.65 to 20.35 | 2/0/0 | suggested
+F5b | - | D30 | 1 | 11.50 | none | 1/0/0 | not separable
+F6 | - | R3D30 | 7 | -7.29 | -11.84 to -2.73 | 0/7/0 | seen
+F6 | - | WD30L | 1 | -43.00 | none | 0/1/0 | not separable
+F6 | - | WD30 | 3 | -53.00 | -71.76 to -34.24 | 0/3/0 | suggested
+F6 | - | W | 1 | -47.00 | none | 0/1/0 | not separable
+F7 | - | R3D30 | 9 | -6.44 | -10.37 to -2.52 | 1/8/0 | seen
+F7 | - | WD30L | 5 | -16.60 | -25.39 to -7.81 | 0/5/0 | seen
+F7 | - | WD30 | 3 | 2.17 | -14.05 to 18.38 | 2/1/0 | not separable
+F7 | - | W | 1 | -9.00 | none | 0/1/0 | not separable
+F8 | - | R3D30 | 6 | -2.28 | -9.09 to 4.53 | 1/5/0 | not separable
+F8 | - | WD30L | 5 | -1.60 | -12.07 to 8.87 | 3/2/0 | not separable
+F8 | - | WD30 | 2 | 1.25 | -33.69 to 36.19 | 1/1/0 | not separable
+F8 | - | W | 5 | -0.60 | -3.98 to 2.78 | 1/3/1 | not separable
+F8 | - | P | 6 | 0.25 | -2.68 to 3.18 | 2/2/2 | not separable
+F8 | - | D30 | 8 | 5.11 | 0.79 to 9.44 | 7/1/0 | seen
+F9 | - | R3D30 | 2 | -0.25 | -28.84 to 28.34 | 1/1/0 | not separable
+F9 | - | WD30L | 4 | 7.25 | -2.48 to 16.98 | 4/0/0 | not separable
+F9 | - | P | 4 | 0.25 | -1.75 to 2.25 | 1/1/2 | not separable
+F9 | - | D30 | 2 | 0.75 | -34.19 to 35.69 | 1/1/0 | not separable
+
+THE PREDICTIONS
+PA1 MISSED: the ghost (F1) is not separable under every sea. 19 rows without the carry, 3 seen or suggested
+PA2 HELD: the carry (F2) is not separable. 7 F1 rows whose ghost carries (F2 has no matched pair), 0 seen or suggested
+PA3 HELD: the confirmed clear (F3) is not separable, or seen with a negative sign of at most 6. 5 rows, 0 outside
+PA4 HELD: the step gate (F4) is seen with a negative effect between 4 and 17 under R3D30. seen, mean -9.65, 10 sets
+PA5 MISSED: the ramp against the step (F5) is seen with a positive effect between 8 and 20 under R3D30. suggested, mean 14.00, 2 sets
+PA6 MISSED: the first-reading near mark (F6) is seen with a negative effect of at least 15 under WD30, WD30L and W. WD30 suggested -53.00 (3); WD30L not separable -43.00 (1); W not separable -47.00 (1)
+PA7 MISSED: the evidence hold (F8) is seen with a positive effect of at least 15 under WD30L and not separable under R3D30 and D30. WD30L not separable -1.60 (5); R3D30 not separable -2.28 (6); D30 seen 5.11 (8)
+PA8 MISSED: the median between-set ratio is above 1.3 and at least one arm has a range over 12. median ratio 0.87 over 58 arms (first half); largest range 23 (second half, known when the module was written)

@@ -1,0 +1,115 @@
+<!doctype html>
+<!-- privatelm.html -- UNNUMBERED (the version is chosen at ship time): AN INSTALL PAGE FOR PrivateLM (github.com/orailnoor/cross-platform-llm-client, MIT), A SEPARATE PROJECT -- AND THE ENGINE TALKING TO IT.
+     PrivateLM is a Flutter chat app that runs GGUF models on a phone and can serve them as an OpenAI-compatible API. Nothing of it is in this tree or in a release zip: this page links to ITS releases (it asks GitHub's API from your browser which APK
+     fits your phone), says how to sideload the iOS build, and, once the server is on in the app, checks the phone, chats with it, and can hand its address to the engine's local OpenAI-compatible provider (/ai/mlx-config).
+     THE LOGIC IS ui/privateLmClient.mjs (pure, gated by ui/privateLmClient-selfcheck.mjs, which also runs THIS script against a fake DOM and a stub of the phone). NOT DONE, said plainly: it has not talked to a real phone, and the APK is not pinned to
+     a digest the way ai-bridge/appInstallBridge.js pins Nectarlink's (the sandbox that wrote this could not reach the release files); you download it from GitHub, not through this engine. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="PrivateLM">
+<meta name="demo:desc" content="Install PrivateLM (a phone app that runs language models on the phone) and use it from the engine: check the phone, chat with it, or make it the engine's local OpenAI-compatible brain.">
+<meta name="demo:category" content="ai">
+<title>PrivateLM</title>
+<style>
+  :root { --bg:#0b1016; --ink:#dbe7f5; --dim:#8aa0b8; --line:#243246; --go:#7fd88f; --warn:#ffd166; --err:#ff8a8a; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.55 system-ui, sans-serif; padding:18px; max-width:820px; }
+  h1 { font-size:20px; margin:0 0 4px; } h2 { font-size:14px; color:var(--go); margin:24px 0 8px; letter-spacing:.04em; text-transform:uppercase; }
+  .sub, .note { color:var(--dim); font-size:13px; } .note { margin:6px 0; } a { color:var(--go); }
+  .card { border:1px solid var(--line); border-radius:10px; padding:12px 14px; margin:10px 0; background:rgba(255,255,255,.015); }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:8px 0; }
+  input { background:#070b10; color:var(--ink); border:1px solid var(--line); border-radius:7px; padding:8px 10px; font:14px system-ui; }
+  input.grow { flex:1; min-width:210px; }
+  button, a.btn { background:#14202c; color:var(--ink); border:1px solid var(--line); border-radius:7px; padding:9px 14px; cursor:pointer; font:14px system-ui; text-decoration:none; display:inline-block; }
+  a.go, button.go { background:#123020; color:var(--go); border-color:#2a6; font-weight:600; }
+  button:disabled { opacity:.5; cursor:default; }
+  .ok { color:var(--go); } .bad { color:var(--err); } .warn { color:var(--warn); }
+  pre { background:#070b10; border:1px solid var(--line); border-radius:7px; padding:9px 11px; white-space:pre-wrap; margin:6px 0; font:13px ui-monospace, Menlo, monospace; min-height:1.4em; }
+</style>
+</head>
+<body>
+<h1>&#128241; PrivateLM</h1>
+<div class="sub">language models that run on your phone, and a cloud fallback &mdash; a separate project (<a href="https://github.com/orailnoor/cross-platform-llm-client" rel="noopener">orailnoor/cross-platform-llm-client</a>, MIT), linked here for convenience. It does not touch any SweK protocol; the engine reaches it through the OpenAI-style API the app can serve.</div>
+
+<h2>Install</h2>
+<div class="card" id="installCard">
+  <div class="row"><b>Android</b> <span id="apkNote" class="note">looking up the latest release&hellip;</span></div>
+  <div class="row" id="apkRow"><a class="btn go" id="apkBtn" href="https://github.com/orailnoor/cross-platform-llm-client/releases/latest" rel="noopener">Releases (latest)</a></div>
+  <div class="note" id="apkSum"></div>
+  <div class="note" id="apkOthers"></div>
+  <div class="row" style="margin-top:14px"><b>iPhone / iPad</b></div>
+  <div class="note">Sideloaded with AltStore. The project's README says a release carries an iOS package (<code>PrivateLM-iOS.zip</code>); the four newest releases on GitHub when this page was written had none, so look through the releases for one before you start. Run AltServer on a Mac or PC, install AltStore on the device, download the package from the release in Safari, unzip it, open the <code>.ipa</code> with AltStore, and turn on Developer Mode (iOS 16 and later). Sideloaded apps expire after 7 days and AltStore renews them while it can reach AltServer. An iPad is the better target: the models need the memory.</div>
+  <div class="row"><a class="btn" id="iosBtn" href="https://github.com/orailnoor/cross-platform-llm-client/releases/latest" rel="noopener">iOS package (releases)</a></div>
+  <div class="row" style="margin-top:14px"><b>In a browser</b></div>
+  <div class="note">The web build runs cloud models only (OpenAI, Anthropic, Gemini, Kimi: your own key, kept in the page's storage); the phone builds are the ones that run models locally.</div>
+  <div class="row"><a class="btn" id="webBtn" href="https://ai-chat-orailnoor.web.app/" target="_blank" rel="noopener">Open the web app</a> <a class="btn" href="https://github.com/orailnoor/cross-platform-llm-client/releases" target="_blank" rel="noopener">All releases</a></div>
+  <div class="note">An unsigned build from a project this engine did not write: it is not scanned or pinned here. The Android install asks you to allow installs from your browser or files app.</div>
+</div>
+
+<h2>Use it from the engine</h2>
+<div class="card">
+  <div class="note">In PrivateLM open the server screen, load a model, set an <b>API key</b> and turn on network access. The key matters twice: the app listens on the network only with one, and it sends the headers a browser needs only when one is set. Then type the phone's address here (the app shows it).</div>
+  <div class="row"><input id="phone" class="grow" placeholder="192.168.1.20:8080" autocomplete="off" spellcheck="false"><input id="key" class="grow" type="password" placeholder="the server's API key" autocomplete="off"></div>
+  <div class="row"><button id="checkBtn" class="go">Check the phone</button><button id="sayBtn" disabled>Say hello</button><button id="useBtn" disabled>Use as the engine's local brain</button></div>
+  <pre id="status">not checked</pre>
+  <pre id="reply"></pre>
+  <div class="note">&ldquo;Use as the engine's local brain&rdquo; saves the address, key and model in the engine's local OpenAI-compatible provider (the one the Mac System panel calls MLX), so the engine's voice and chat loops can use the phone (<code>localai</code> or <code>mlx</code> as the provider). It needs the engine's bridge running on this machine. The same fields are in Settings.</div>
+</div>
+<script type="module">
+import * as P from "/ui/privateLmClient.mjs";
+
+const $ = (id) => document.getElementById(id);
+const say = (el, text, cls) => { el.textContent = text; el.className = cls || ""; };
+let last = null;
+
+async function release() {
+  try {
+    const r = await fetch(P.LATEST_API, { headers: { Accept: "application/vnd.github+json" } });
+    if (!r.ok) throw new Error("GitHub answered " + r.status);
+    const s = P.releaseSummary(await r.json(), P.deviceAbis(navigator.userAgent));
+    const abis = P.deviceAbis(navigator.userAgent), android = abis.length > 0;
+    $("apkNote").textContent = s.tag ? `latest release ${s.tag}` + (s.best ? (android ? `; the ${s.best.abi} build fits this device` : "; this is not an Android device, so the APK below is for a phone") : "") : "latest release";
+    if (s.best) { $("apkBtn").href = s.best.url; $("apkBtn").textContent = `Download ${s.best.name}` + (s.best.size ? ` (${P.sizeText(s.best.size)})` : ""); }
+    else $("apkBtn").href = s.url;
+    $("apkSum").textContent = s.best && s.best.sha256 ? `GitHub lists sha256 ${s.best.sha256} for this file: compare it after downloading (sha256sum on Linux and macOS, certutil -hashfile <file> SHA256 on Windows).` : "";
+    const others = s.apks.filter((a) => !s.best || a.url !== s.best.url);
+    $("apkOthers").textContent = "";
+    if (others.length) { $("apkOthers").append("Other builds: "); others.forEach((a, i) => { const x = document.createElement("a"); x.href = a.url; x.rel = "noopener"; x.textContent = `${a.abi}${a.size ? " " + P.sizeText(a.size) : ""}`; if (i) $("apkOthers").append(", "); $("apkOthers").append(x); }); }
+    if (s.ios) $("iosBtn").href = s.ios.url;
+  } catch (e) { $("apkNote").textContent = "could not ask GitHub which build fits (" + (e && e.message || e) + "); the button opens the releases page"; }
+}
+
+async function check() {
+  say($("status"), "asking the phone...");
+  last = await P.probe($("phone").value, $("key").value, (u, o) => fetch(u, o), { pageProtocol: location.protocol });
+  const c = last.capabilities;
+  say($("status"), last.ok ? `the phone answered at ${last.base}\nmodel: ${last.model || "none loaded"}${last.runtime ? " (" + last.runtime + ")" : ""}\ncan: ${["text", "image", "audio", "streaming"].filter((k) => c[k]).join(", ") || "nothing yet"}${last.hint ? "\n" + last.hint : ""}` : last.hint, last.ok ? (last.loaded ? "ok" : "warn") : "bad");
+  $("sayBtn").disabled = !(last.ok && last.loaded); $("useBtn").disabled = !last.ok;
+}
+
+async function hello() {
+  say($("reply"), "");
+  $("sayBtn").disabled = true;
+  const r = await P.chatStream($("phone").value, $("key").value, [{ role: "user", content: "Say hello in one short sentence." }], (u, o) => fetch(u, o), { model: last && last.model || "", maxTokens: 64, onToken: (t) => { $("reply").textContent += t; }, pageProtocol: location.protocol });
+  if (!r.ok) say($("reply"), (r.text ? r.text + "\n" : "") + (r.interrupted ? "(interrupted) " : "") + r.error, "bad");
+  $("sayBtn").disabled = false;
+}
+
+async function useIt() {
+  const body = P.mlxConfigBody($("phone").value, $("key").value, last && last.model || "");
+  try {
+    const r = await fetch("/ai/mlx-config", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const j = await r.json();
+    const back = await (await fetch("/ai/mlx-config")).json();
+    say($("status"), j && j.ok === false ? "the engine refused: " + (j.error || "?") : `saved in the engine: ${back.baseUrl || body.baseUrl}${back.model ? " (" + back.model + ")" : ""}${back.hasKey ? ", key stored" : ""}`, j && j.ok === false ? "bad" : "ok");
+  } catch (e) { say($("status"), "the engine's bridge did not answer (is it running on this machine?): " + (e && e.message || e), "bad"); }
+}
+
+$("checkBtn").onclick = check; $("sayBtn").onclick = hello; $("useBtn").onclick = useIt;
+release();
+</script>
+<div id="swek-notes"></div>
+<script type="module" src="/ui/pageNotesMount.mjs"></script>
+</body>
+</html>

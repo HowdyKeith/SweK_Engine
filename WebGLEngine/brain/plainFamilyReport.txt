@@ -1,0 +1,80 @@
+PLAIN FAMILY (brain/PLAIN_FAMILY_WIP.md): 32 new searches (plain:4 to 19, plain-priced:4 to 19), 20 eligible, each flown with the rule on its own block of 1,200 dives; the sixteen eligible old searches and the rule on the common block of 2400 dives
+  PASS SPECS: the 32 new searches (plain:4 to 19, plain-priced:4 to 19) once each, the seed of index k 96520 + k, the old recipe, the old start
+  PASS ELIGIBLE: 20 of 32 new searches are eligible and each has its flight, none else; the old eligible are the registered sixteen
+  PASS ARMS: each new file holds the rule and its search, the old file the rule and the sixteen, once each
+  PASS WEIGHTS: every flight flew the weights of its ledger line (by digest)
+  PASS BLOCKS: every file flew its registered block (a slot's 600 seeds of far and both; the old file's 90001 to 91200)
+  PASS KEYS: in every file the arms flew the same dives in the same order
+  PASS SCORES: every score is a number in [0, 1] and every strain a number or null
+  PASS DISJOINT: no dive is in two of the 21 files
+the eligible new searches: slot and block, the training-line held-out lead, the audit lead over the rule on its own block (se), dives better / worse / same, crushed or stranded (the rule's); CH the family's champion
+  plain:4         CH slot  0 seeds 70001-70600  held-out lead +0.0206  lead +0.0011 (se 0.0031)  190 / 163 / 847  bad 5 (0)
+  plain:5            slot  1 seeds 70601-71200  held-out lead +0.0075  lead +0.0193 (se 0.0032)  256 / 81 / 863  bad 8 (0)
+  plain:9            slot  5 seeds 73001-73600  held-out lead -0.0062  lead -0.0190 (se 0.0023)  85 / 253 / 862  bad 0 (0)
+  plain:11           slot  7 seeds 74201-74800  held-out lead -0.0019  lead -0.0071 (se 0.0025)  121 / 160 / 919  bad 0 (0)
+  plain:12           slot  8 seeds 74801-75400  held-out lead -0.0300  lead -0.0106 (se 0.0025)  86 / 148 / 966  bad 1 (0)
+  plain:13           slot  9 seeds 75401-76000  held-out lead +0.0000  lead -0.0198 (se 0.0025)  87 / 223 / 890  bad 0 (0)
+  plain:15           slot 11 seeds 76601-77200  held-out lead -0.0456  lead -0.0148 (se 0.0029)  113 / 200 / 887  bad 5 (0)
+  plain:17           slot 13 seeds 77801-78400  held-out lead -0.0097  lead -0.0154 (se 0.0030)  125 / 219 / 856  bad 1 (0)
+  plain:18           slot 14 seeds 78401-79000  held-out lead +0.0112  lead -0.0132 (se 0.0027)  120 / 206 / 874  bad 0 (0)
+  plain-priced:5     slot 17 seeds 80201-80800  held-out lead -0.0189  lead +0.0036 (se 0.0034)  214 / 176 / 810  bad 5 (0)
+  plain-priced:6     slot 18 seeds 80801-81400  held-out lead -0.0344  lead -0.0070 (se 0.0031)  161 / 186 / 853  bad 5 (0)
+  plain-priced:7     slot 19 seeds 81401-82000  held-out lead -0.0319  lead -0.0648 (se 0.0041)  117 / 491 / 592  bad 7 (0)
+  plain-priced:8     slot 20 seeds 82001-82600  held-out lead -0.0387  lead -0.0515 (se 0.0062)  171 / 255 / 774  bad 71 (0)
+  plain-priced:9     slot 21 seeds 82601-83200  held-out lead +0.0073  lead -0.0124 (se 0.0022)  83 / 203 / 914  bad 1 (0)
+  plain-priced:12    slot 24 seeds 84401-85000  held-out lead -0.0113  lead -0.0036 (se 0.0019)  79 / 112 / 1009  bad 0 (0)
+  plain-priced:14    slot 26 seeds 85601-86200  held-out lead -0.0158  lead -0.0151 (se 0.0041)  198 / 229 / 773  bad 14 (0)
+  plain-priced:15    slot 27 seeds 86201-86800  held-out lead -0.0081  lead -0.0143 (se 0.0040)  159 / 179 / 862  bad 22 (0)
+  plain-priced:16    slot 28 seeds 86801-87400  held-out lead -0.0100  lead -0.0245 (se 0.0051)  178 / 192 / 830  bad 43 (0)
+  plain-priced:17    slot 29 seeds 87401-88000  held-out lead +0.0019  lead -0.0139 (se 0.0026)  107 / 213 / 880  bad 0 (0)
+  plain-priced:18 CH slot 30 seeds 88001-88600  held-out lead +0.0072  lead -0.0148 (se 0.0026)  120 / 230 / 850  bad 0 (0)
+Q1 (VERDICT 1: THE FAMILY) the 20 eligible new searches (9 plain, 11 plain-priced), each on its own 1,200 dives: mean lead -0.0149 (sd 0.0178, 3 above 0); exact sign-flip over 1048576 assignments, p+ 0.9998 / p- 1.6e-4: THE PLAIN FAMILIES ARE BELOW THE RULE
+Q2 (VERDICT 2: THE FOUR OLD ONES) on the common block (2400 dives), the average of plain:2, plain:3, plain-priced:2, plain-priced:3: mean lead +0.0022 (se 0.0015), z 1.52: THE FOUR OLD PLAIN-FAMILY SEARCHES CANNOT BE TOLD APART FROM THE RULE ON THE FRESH BLOCK
+Q3 the new searches by family (reported, no verdict): trained, eligible, above 0, mean lead, sd across the eligible, t, median, exact sign-flip p+ / p- for the family alone
+  plain        trained 16, eligible 9, above 0 2; mean -0.0088, sd 0.0123, t -2.14, median -0.0132; p+ 0.9629 / p- 0.0391
+  plain-priced trained 16, eligible 11, above 0 1; mean -0.0198, sd 0.0205, t -3.21, median -0.0143; p+ 0.9995 / p- 9.8e-4
+  plain-priced minus plain (the eligible new searches' means): -0.0110, Welch t -1.48
+Q4 what the pool filter does (reported): the new searches that are not eligible (not flown), each with its pool crash count and its training-line held-out lead
+  plain        not eligible: plain:6 (pool crashed 1, held-out lead -0.0062), plain:7 (pool crashed 4, held-out lead -0.0613), plain:8 (pool crashed 2, held-out lead -0.0669), plain:10 (pool crashed 1, held-out lead -0.0348), plain:14 (pool crashed 1, held-out lead +0.0054), plain:16 (pool crashed 1, held-out lead -0.0231), plain:19 (pool crashed 1, held-out lead +0.0110)
+  plain-priced not eligible: plain-priced:4 (pool crashed 1, held-out lead -0.0119), plain-priced:10 (pool crashed 2, held-out lead -0.0932), plain-priced:11 (pool crashed 3, held-out lead -0.0677), plain-priced:13 (pool crashed 1, held-out lead -0.0040), plain-priced:19 (pool crashed 2, held-out lead +0.0037)
+  the mean training-line held-out lead of the eligible -0.0103, of the ineligible -0.0291
+Q5 the sixteen eligible old searches on the common block (reported; they share dives, so no test): lead (se), by family the mean lead and how many are above 0
+  cx             cx:0 -0.0236 (se 0.0033), cx:1 -0.0078 (se 0.0022); mean -0.0157, 0 of 2 above 0
+  nostate        nostate:1 -0.0008 (se 0.0008), nostate:2 -0.0030 (se 0.0021), nostate:3 -0.0073 (se 0.0025); mean -0.0037, 0 of 3 above 0
+  plain          plain:2 +0.0038 (se 0.0019), plain:3 +0.0000 (se 0.0017); mean +0.0019, 2 of 2 above 0
+  station-large  station-large:0 -0.0074 (se 0.0016), station-large:1 -0.0103 (se 0.0015), station-large:2 -0.0039 (se 0.0013); mean -0.0072, 0 of 3 above 0
+  station-small  station-small:0 -0.0027 (se 0.0012), station-small:1 -0.0073 (se 0.0014), station-small:2 -0.0140 (se 0.0017), station-small:3 -0.0306 (se 0.0019); mean -0.0136, 0 of 4 above 0
+  plain-priced   plain-priced:2 +0.0056 (se 0.0018), plain-priced:3 -0.0005 (se 0.0017); mean +0.0026, 1 of 2 above 0
+  the four plain-family ones: mean +0.0022; the twelve circuit-family ones: mean -0.0099; difference +0.0121, Welch t 4.09
+Q6 the champion rule on the new searches (reported): the family's champion by the ledger (eligible, best held-out, ties to the lower k), its lead, its rank among the family's eligible leads
+  plain        champion plain:4: lead +0.0011, rank 2 of 9 (the family's mean eligible lead -0.0088)
+  plain-priced champion plain-priced:18: lead -0.0148, rank 7 of 11 (the family's mean eligible lead -0.0198)
+Q7 the hull (reported): dives above strain 0.92 and 0.95, the largest strain, crushed, stranded, with the rule's on the same block
+  plain:4         353 of 1200 above 0.92, 252 above 0.95, largest 1.0000, crushed 5, stranded 0 (the rule: 0, 0, 0.9186, 0, 0)
+  plain:5         8 of 1200 above 0.92, 8 above 0.95, largest 0.9998, crushed 8, stranded 0 (the rule: 0, 0, 0.9177, 0, 0)
+  plain:9         218 of 1200 above 0.92, 96 above 0.95, largest 0.9708, crushed 0, stranded 0 (the rule: 0, 0, 0.9189, 0, 0)
+  plain:11        38 of 1200 above 0.92, 0 above 0.95, largest 0.9434, crushed 0, stranded 0 (the rule: 0, 0, 0.9182, 0, 0)
+  plain:12        141 of 1200 above 0.92, 1 above 0.95, largest 0.9994, crushed 1, stranded 0 (the rule: 0, 0, 0.9186, 0, 0)
+  plain:13        131 of 1200 above 0.92, 0 above 0.95, largest 0.9377, crushed 0, stranded 0 (the rule: 0, 0, 0.9182, 0, 0)
+  plain:15        212 of 1200 above 0.92, 8 above 0.95, largest 1.0000, crushed 5, stranded 0 (the rule: 0, 0, 0.9187, 0, 0)
+  plain:17        311 of 1200 above 0.92, 42 above 0.95, largest 0.9993, crushed 1, stranded 0 (the rule: 0, 0, 0.9195, 0, 0)
+  plain:18        302 of 1200 above 0.92, 5 above 0.95, largest 0.9549, crushed 0, stranded 0 (the rule: 0, 0, 0.9193, 0, 0)
+  plain-priced:5  8 of 1200 above 0.92, 5 above 0.95, largest 0.9999, crushed 5, stranded 0 (the rule: 0, 0, 0.9182, 0, 0)
+  plain-priced:6  3 of 1200 above 0.92, 3 above 0.95, largest 0.9999, crushed 3, stranded 2 (the rule: 0, 0, 0.9180, 0, 0)
+  plain-priced:7  32 of 1200 above 0.92, 9 above 0.95, largest 1.0000, crushed 7, stranded 0 (the rule: 0, 0, 0.9184, 0, 0)
+  plain-priced:8  114 of 1200 above 0.92, 79 above 0.95, largest 1.0000, crushed 70, stranded 1 (the rule: 0, 0, 0.9197, 0, 0)
+  plain-priced:9  90 of 1200 above 0.92, 17 above 0.95, largest 0.9563, crushed 0, stranded 1 (the rule: 0, 0, 0.9183, 0, 0)
+  plain-priced:12 23 of 1200 above 0.92, 0 above 0.95, largest 0.9263, crushed 0, stranded 0 (the rule: 1, 0, 0.9202, 0, 0)
+  plain-priced:14 17 of 1200 above 0.92, 10 above 0.95, largest 1.0000, crushed 10, stranded 4 (the rule: 0, 0, 0.9183, 0, 0)
+  plain-priced:15 33 of 1200 above 0.92, 22 above 0.95, largest 1.0000, crushed 22, stranded 0 (the rule: 0, 0, 0.9183, 0, 0)
+  plain-priced:16 46 of 1200 above 0.92, 43 above 0.95, largest 1.0000, crushed 43, stranded 0 (the rule: 0, 0, 0.9194, 0, 0)
+  plain-priced:17 0 of 1200 above 0.92, 0 above 0.95, largest 0.9176, crushed 0, stranded 0 (the rule: 0, 0, 0.9182, 0, 0)
+  plain-priced:18 4 of 1200 above 0.92, 0 above 0.95, largest 0.9213, crushed 0, stranded 0 (the rule: 1, 0, 0.9207, 0, 0)
+  plain        total over 9 searches: 1714 dives above 0.92, 412 above 0.95, crushed 20, stranded 0
+  plain-priced total over 11 searches: 370 dives above 0.92, 188 above 0.95, crushed 160, stranded 8
+  plain:2 (old)   626 of 2400 above 0.92, 151 above 0.95, largest 1.0000, crushed 5, stranded 1 (the rule: 0, 0, 0.9193, 0, 0)
+  plain:3 (old)   63 of 2400 above 0.92, 0 above 0.95, largest 0.9325, crushed 0, stranded 0 (the rule: 0, 0, 0.9193, 0, 0)
+  plain-priced:2 (old) 2 of 2400 above 0.92, 1 above 0.95, largest 0.9997, crushed 1, stranded 3 (the rule: 0, 0, 0.9193, 0, 0)
+  plain-priced:3 (old) 39 of 2400 above 0.92, 0 above 0.95, largest 0.9316, crushed 0, stranded 0 (the rule: 0, 0, 0.9193, 0, 0)
+BOTTOM LINE (FAMILY): THE PLAIN FAMILIES ARE BELOW THE RULE (20 eligible new searches, mean lead -0.0149, exact sign-flip p+ 0.9998 and p- 1.6e-4)
+BOTTOM LINE (THE FOUR OLD ONES): THE FOUR OLD PLAIN-FAMILY SEARCHES CANNOT BE TOLD APART FROM THE RULE ON THE FRESH BLOCK (mean lead +0.0022, se 0.0015, z 1.52)
