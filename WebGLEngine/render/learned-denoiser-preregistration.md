@@ -11753,3 +11753,67 @@ first layer is narrower than U_T's 32 (16 or 8).
 - The device: two `realGpuRun --only denoise` on each GPU.
 
 All are committed byte for byte before they are read. Section 191 reads them.
+
+## 192. ROUND 86 -- A DENOISER THAT KNOWS EACH PIXEL's SAMPLE COUNT: WAS ROUND 82's LOSS THE DENOISER'S OR THE SAMPLES'? FIXED BEFORE ITS CODE
+
+**Why.** Section 187: moving round 82's samples to the pixels whose history would be rejected made Bt 9.28 % worse. The rejected pixels
+gained (6.77 %), and the other ~86 % lost more at ~3.65 samples. The shipped denoiser was trained at a uniform 4 samples and is not told how
+many a pixel had, so a 3-sample pixel's noise reaches it as if it were a 4-sample pixel's. Two causes are mixed in that 9.28 %:
+- **the mismatch:** a denoiser that does not know the counts, and
+- **the information:** fewer samples where most of the frame is.
+Section 187 named the question that separates them, a denoiser trained on uneven samples, and Keith asked for it.
+
+**D_S (render/countDenoiser.mjs).** Round 11's network (the large kernel-predicting one, the emitter mask) with ONE more input channel: the
+pixel's sample count over the mean budget, m / 4 (1 for every pixel of a uniform frame). Its kernel taps keep the emitter mask's rule. The
+first layer takes 11 channels; nothing else changes.
+
+**Its training: round 11's in every way but the inputs.**
+- **Scenes:** round 11's 192 training scenes (96 R, 96 C) and 8 validation scenes, at 64 x 64, against round 11's 1,024-sample references.
+- **Inputs:** each scene traced as SAMPLING.maxSpp (12) one-sample passes from its own seeds. Each pixel averages its first m passes.
+- **The counts:** m comes from round 82's rule (allocate: 4 a pixel on the mean, 1-12, weight 1 + 2 s) over a share map s drawn from the
+  scene's own stream. The map has 0-3 disks of radius 3-12 pixels where s = 1, and s = 0 elsewhere. A scene with no disk has the uniform 4.
+  The disks stand for disoccluded regions; the training sees no history.
+- **Schedule:** 4,500 steps of 4 crops of 32, seeds 1-3, the candidate by validation (display relMSE on the 8 scenes, each with its
+  count map), and C2: the candidate's seed retrained on shuffled targets.
+- File: render/denoise-net-count-r86.json.
+
+**ROUND 86, the test: round 82's (section 186), on new scenes, with D_S.**
+- **Scenes:** 24 new ones whose objects move (section 176's motion), 12 R (93000-93011) and 12 C (94000-94011), against two 2,048-sample
+  references.
+- **The same one-sample passes per frame give four arms:**
+  - S_U, the uniform 4 through the shipped denoiser (round 82's uniform arm, today's chain);
+  - S_A, the adaptive allocation through the shipped denoiser (round 82's adaptive arm);
+  - D_U, the uniform 4 through D_S;
+  - D_A, the adaptive allocation through D_S.
+- Each goes through the chain as it is (the fill, EASU, Bt's history) and is graded on Bt's image.
+- **H86a:** D_A's Bt beats D_U's, by section 159's rule, through verdict() (the sign-flip test, Holm with H86b, C1-C5). With the denoiser
+  told the counts, does the history-guided allocation pay?
+- **H86b:** D_A's Bt beats S_U's, by the same rule. Does the new pair beat today's chain?
+- **C2:** C2's D_S on the adaptive frames, against D_A.
+- **Descriptive, deciding nothing:**
+  - S_A against S_U (round 82's comparison again);
+  - D_U against S_U;
+  - every arm on the rejected pixels;
+  - B1 in each arm.
+- File: render/denoise-results-count-r86.json.
+
+**Predictions, fixed now, deciding nothing.**
+- **P1:** C1 and C3 hold.
+- **P2:** H86a is NOT supported: D_A is within 1 % of D_U or worse. I expect most of round 82's loss to be the information, which no
+  denoiser gets back.
+- **P3:** H86b is NOT supported.
+- **P4:** D_A loses less to D_U than S_A loses to S_U. The mismatch is a real part of the cost: D_A is between 6 % worse and 2 % better than
+  D_U, while S_A is 5-12 % worse than S_U (round 82's was 9.28 %).
+- **P5:** D_U is within 2 % of S_U. Being told the counts costs a uniform frame nothing.
+- **P6:** on the rejected pixels, D_A beats D_U by 5-15 %.
+
+**What each outcome means, fixed now.**
+- **H86a holds:** a denoiser that knows the counts makes history-guided sampling pay. H86b then says whether the pair beats today's chain;
+  if it does, D_S and the allocation on the device is the next round.
+- **H86a fails and P4 holds:** the mismatch was part of round 82's cost and the information the rest. History-guided sampling closes at
+  this budget. A larger budget, where the rest of the frame can spare samples, is the only form left, and it is not set up.
+- **H86a fails and D_A loses as much as S_A:** the denoiser was not the problem. History-guided sampling closes.
+
+**The runs, on Keith's rig, at the round's commit, in one clone:** `--harvest-count-train --round 86` (render/denoise-net-count-r86.json), then
+`--harvest-count-test --round 86` (render/denoise-results-count-r86.json). Each is committed byte for byte before it is read. Section 193
+reads them.
