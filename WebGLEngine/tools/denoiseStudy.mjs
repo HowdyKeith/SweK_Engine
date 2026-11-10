@@ -28,6 +28,8 @@
 //                                                  -> render/upscale-net-r65.json
 //       node tools/denoiseStudy.mjs --harvest-upscale-test      FSR4 round 65: the 24 test scenes -> render/denoise-results-upscale-learned.json
 //                                                  (either with --round 67, 68 or 69 for sections 155, 157 and 159, and --cache <dir> to resume)
+//       node tools/denoiseStudy.mjs --harvest-count-train --round 86   D_S, the denoiser told each pixel's sample count (section 192) -> render/denoise-net-count-r86.json
+//       node tools/denoiseStudy.mjs --harvest-count-test --round 86    round 82's test in four arms with D_S (section 192) -> render/denoise-results-count-r86.json
 //       node tools/denoiseStudy.mjs --harvest-upscale-temporal-train   FSR4 round 70: U_T on sequences (section 161) -> render/upscale-net-r70.json
 //       node tools/denoiseStudy.mjs --harvest-upscale-temporal-test    FSR4 round 70: the 24 test sequences -> render/denoise-results-upscale-temporal-r70.json
 //                                       ... --round 77                 FSR4 round 77 (section 176): round 72's U_TH on 24 moving scenes -> render/denoise-results-upscale-moving-r77.json
@@ -322,6 +324,37 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
                       round: RD.round, ...(cache ? { cache: { hits: cache.hits, misses: cache.misses } } : {}) };
         fs.writeFileSync(file, JSON.stringify(out, (k, v) => (v instanceof Float64Array ? Array.from(v) : v), 1) + "\n");
         console.log(`[denoiseStudy] wrote ${RD.net}`);
+    } else if (args.includes("--harvest-count-train")) {
+        // round 86 (section 192): D_S, round 11's network told each pixel's sample count, trained on round 11's scenes as count images
+        const CS = await import("../render/countDenoiserStudy.mjs"), { encodeNet: enc } = await import("../render/denoiseDevice.mjs"), ri = args.indexOf("--round"), RD = CS.countRound(ri >= 0 ? +args[ri + 1] : null);
+        const file = path.join(ENG, RD.net);
+        if (fs.existsSync(file)) { console.log(`[denoiseStudy] ${RD.net} exists -- a harvest's results are never overwritten`); process.exit(2); }
+        const git = (...a) => execFileSync("git", a, { cwd: ENG, encoding: "utf8", maxBuffer: 1 << 28 });
+        const startCommit = git("rev-parse", "--short=8", "HEAD").trim(), cache = upscaleCache(args, git, RD.net);
+        const r = CS.runCountTraining({ splits: RD.trainSplits, harvest: true, w: RD.image, sppRef: RD.sppRef, seeds: RD.seeds, train: RD.train, cache, log: (m) => console.log("[denoiseStudy] " + m) });
+        const out = { candidate: r.candidate, runs: r.runs.map((x) => ({ seed: x.seed, valMean: x.valMean, val: x.val, losses: x.losses, net: enc(x.net) })),
+                      c2: { seed: r.c2.seed, shuffle: r.c2.shuffle, losses: r.c2.losses, net: enc(r.c2.net) }, config: r.config, ms: r.ms, commit: startCommit,
+                      round: RD.round, ...(cache ? { cache: { hits: cache.hits, misses: cache.misses } } : {}) };
+        fs.writeFileSync(file, JSON.stringify(out, (k, v) => (v instanceof Float64Array ? Array.from(v) : v), 1) + "\n");
+        console.log(`[denoiseStudy] wrote ${RD.net}`);
+    } else if (args.includes("--harvest-count-test")) {
+        // round 86 (section 192): round 82's test in four arms, the candidate D_S and C2's read from the committed training file
+        const CS = await import("../render/countDenoiserStudy.mjs"), ri = args.indexOf("--round"), RD = CS.countRound(ri >= 0 ? +args[ri + 1] : null);
+        const file = path.join(ENG, RD.results);
+        if (fs.existsSync(file)) { console.log(`[denoiseStudy] ${RD.results} exists -- a harvest's results are never overwritten`); process.exit(2); }
+        const tr = JSON.parse(fs.readFileSync(path.join(ENG, RD.net), "utf8")), cand = tr.runs.find((x) => x.seed === tr.candidate);
+        const bytes = fs.readFileSync(path.join(ENG, SHIPPED_NET)), shipped = JSON.parse(bytes.toString("utf8"));
+        const git = (...a) => execFileSync("git", a, { cwd: ENG, encoding: "utf8", maxBuffer: 1 << 28 });
+        const startCommit = git("rev-parse", "--short=8", "HEAD").trim(), cache = upscaleCache(args, git, RD.results);
+        const out = CS.runCountTest({ splits: RD.splits, W: RD.testImage, sppIn: RD.sppIn, sppRef: RD.sppRefTest, net: decodeNet(shipped.net), ds: decodeNet(cand.net), dsC2: decodeNet(tr.c2.net),
+                                      round: RD.round, harvest: true, test: RD.test, c1Min: RD.c1Min, cache, log: (m) => console.log("[denoiseStudy] " + m) });
+        out.trained = { file: RD.net, candidate: tr.candidate, commit: tr.commit };
+        out.round = RD.round;
+        out.shipped = { file: SHIPPED_NET, sha256: crypto.createHash("sha256").update(bytes).digest("hex") };
+        out.commit = startCommit;
+        if (cache) out.cache = { hits: cache.hits, misses: cache.misses };
+        fs.writeFileSync(file, JSON.stringify(out, (k, v) => (v instanceof Float64Array ? Array.from(v) : v), 1) + "\n");
+        console.log(`[denoiseStudy] wrote ${RD.results}`);
     } else if (args.includes("--harvest-upscale-temporal-test")) {
         // FSR4, round 70 (section 161): the 24 test sequences, the candidate U_T and C2's read from the committed training file
         const LT = await import("../render/learnedUpscaleTemporalStudy.mjs"), ri = args.indexOf("--round"), RD = LT.temporalRound(ri >= 0 ? +args[ri + 1] : null);
@@ -404,7 +437,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
         // section 33: the verdict is in the file, which is committed before it is read -- the log says only that it was written
         console.log(`[denoiseStudy] wrote ${round.results}`);
     } else {
-        console.log("usage: node tools/denoiseStudy.mjs --mini | --harvest-temporalup | --harvest-emitter | --harvest-halfres | --harvest-fsr1 | --harvest-mesh | --harvest-mesh-c | --harvest-page | --harvest-framegen | --harvest-framegen-lf | --harvest-framegen-display | --harvest-framegen-large | --harvest-framegen-holes | --harvest-upscale-train | --harvest-upscale-test | --harvest-upscale-temporal-train | --harvest-upscale-temporal-test | --harvest-r47 | --secondary-r11 | --harvest-r11 | --harvest-r10 | --harvest-r9 | --harvest-r8 | --harvest-r7 | --harvest-r6 | --harvest-r5 | --harvest-r4 | --harvest-r3 | --harvest-r2 | --harvest-r1 [--cache <dir>] [--workers <n>]   (a harvest renders the pre-registered dataset; see render/learned-denoiser-preregistration.md)");
+        console.log("usage: node tools/denoiseStudy.mjs --mini | --harvest-temporalup | --harvest-emitter | --harvest-halfres | --harvest-fsr1 | --harvest-mesh | --harvest-mesh-c | --harvest-page | --harvest-framegen | --harvest-framegen-lf | --harvest-framegen-display | --harvest-framegen-large | --harvest-framegen-holes | --harvest-upscale-train | --harvest-upscale-test | --harvest-upscale-temporal-train | --harvest-upscale-temporal-test | --harvest-count-train | --harvest-count-test | --harvest-r47 | --secondary-r11 | --harvest-r11 | --harvest-r10 | --harvest-r9 | --harvest-r8 | --harvest-r7 | --harvest-r6 | --harvest-r5 | --harvest-r4 | --harvest-r3 | --harvest-r2 | --harvest-r1 [--cache <dir>] [--workers <n>]   (a harvest renders the pre-registered dataset; see render/learned-denoiser-preregistration.md)");
         process.exit(2);
     }
 }

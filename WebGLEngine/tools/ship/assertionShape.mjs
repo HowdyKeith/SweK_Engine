@@ -973,8 +973,9 @@ export const SHAPE_AT_V4480 = Object.freeze({
     // rounds 77-78 (sections 176-179) merged over v4911 -- one gate main did not have, render/movingScenes-selfcheck.mjs, defining ok(n, c, d) once and naming first: gates 2208 -> 2209, usesOk 2187 -> 2188, definesOk 2179 -> 2180, nameFirst 2069 -> 2070, read off the code's own report.
     // backlog denoise-framegen-page-chain -- one more, render/frameGenChainLive-selfcheck.mjs, defining ok(n, c, d) once and naming first: gates 2209 -> 2210, usesOk 2188 -> 2189, definesOk 2180 -> 2181, nameFirst 2070 -> 2071, read off the code's own report.
     // the render upscaler switch -- one more, ui/upscalerSwitch-selfcheck.mjs, defining ok(n, c, d) once and naming first: gates 2210 -> 2211, usesOk 2189 -> 2190, definesOk 2181 -> 2182, nameFirst 2071 -> 2072, read off the code's own report.
-    gates: 2211, usesOk: 2190, definesOk: 2182, importsOk: 0,
-    distinctDefinitions: 49, nameFirst: 2072, condFirst: 99, unknownSignature: 19,
+    // round 86 (section 192) -- one more, render/countDenoiser-selfcheck.mjs, defining ok(n, c, d) once and naming first: gates 2211 -> 2212, usesOk 2190 -> 2191, definesOk 2182 -> 2183, nameFirst 2072 -> 2073, read off the code's own report.
+    gates: 2212, usesOk: 2191, definesOk: 2183, importsOk: 0,
+    distinctDefinitions: 49, nameFirst: 2073, condFirst: 99, unknownSignature: 19,
     suspects: 0,
     // Written three times in three rounds by this session, all caught by reading and none by running.
     writtenThisSession: Object.freeze([

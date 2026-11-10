@@ -655,6 +655,13 @@ console.log("\n18. ROUND 58: FAMILY P, path-tracer.html'S OWN SIX SCENES (pre-re
         Object.keys(D.SPLITS_UPSCALE_MOVING).join() === "T1" && Object.isFrozen(D.SPLITS_UPSCALE_MOVING) && T1.seeds.length === 24 && T1.seeds[0] === 77000 && T1.seeds[11] === 77011 && T1.seeds[12] === 78000 && T1.seeds[23] === 78011 &&
         T1.families.slice(0, 12).every((f) => f === "R") && T1.families.slice(12).every((f) => f === "C") && T1.seeds.every((x) => !seen.has(x) && D.isDatasetSeed(x)));
 }
+{   // round 86 (section 192): D_S's test set
+    // SABOTAGED, restored byte-identical: K15 its seeds not reserved -> 2 red (this row, added for definitionGates, and render/countDenoiser-selfcheck.mjs's split row).
+    const T1 = D.SPLITS_COUNT_86.T1, seen = new Set([...D.SPLITS_UPSCALE_TEMPORAL_84.T1.seeds, ...D.SPLITS_UPSCALE_LIGHTS.T1.seeds, ...D.SPLITS_UPSCALE_SAMPLING.T1.seeds]);
+    ok("  SPLITS_COUNT_86: a test set only, 12 R at 93000-93011 then 12 C at 94000-94011, frozen, reserved, none an earlier test seed",
+        Object.keys(D.SPLITS_COUNT_86).join() === "T1" && Object.isFrozen(D.SPLITS_COUNT_86) && T1.seeds.length === 24 && T1.seeds[0] === 93000 && T1.seeds[11] === 93011 && T1.seeds[12] === 94000 && T1.seeds[23] === 94011 &&
+        T1.families.slice(0, 12).every((f) => f === "R") && T1.families.slice(12).every((f) => f === "C") && T1.seeds.every((x) => !seen.has(x) && D.isDatasetSeed(x)));
+}
 {   // round 84 (section 190): U_TH8's test set
     // SABOTAGED, restored byte-identical: E8 its R seeds onto round 72's and E9 its seeds not reserved -> 2 red each (this row, and learnedUpscaleTemporal-selfcheck's round row).
     const T1 = D.SPLITS_UPSCALE_TEMPORAL_84.T1, seen = new Set([...D.SPLITS_UPSCALE_LIGHTS.T1.seeds, ...D.SPLITS_UPSCALE_SAMPLING.T1.seeds, ...D.SPLITS_UPSCALE_TEMPORAL_72.T1.seeds, ...D.SPLITS_UPSCALE_TEMPORAL.T1.seeds]);

@@ -66,8 +66,9 @@ export function emitterRadiance(S, w, h, offset = null) {
     return { cov, E };
 }
 
-/** The mask's channel in an input of stride C: MASK_CHANNEL at MASK_STRIDE, and -1 (no mask) at any other stride. */
-export const maskChannelOf = (C) => (C === MASK_STRIDE ? MASK_CHANNEL : -1);
+/** The mask's channel in an input of stride C: MASK_CHANNEL at MASK_STRIDE and (round 86, section 192: the mask's ten channels and a sample
+ * count, render/countDenoiser.mjs) at MASK_STRIDE + 1; -1 (no mask) at any other stride. */
+export const maskChannelOf = (C) => (C === MASK_STRIDE || C === MASK_STRIDE + 1 ? MASK_CHANNEL : -1);
 
 /** A 9-channel input (n pixels) with the emitter mask (n values in [0, 1]) appended: n x MASK_STRIDE. */
 export function withMask(x9, mask) {
