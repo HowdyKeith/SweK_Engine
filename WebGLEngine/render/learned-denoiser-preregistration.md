@@ -11701,3 +11701,55 @@ and read before it was committed** (fc0d6ea3, sha-256 4fd93eff..., byte for byte
 history keeps paying. The moving light halves the history's gain and does not undo it, and U_TH keeps its full gain on top. Nothing changes in the
 chain. A luminance-change rejection is not opened: section 188 named it only for the outcome where H83b failed. Section 188 called this the case
 that should hurt the history most, and it hurt less than round 81's twice-speed objects did.
+
+## 190. ROUNDS 84 AND 85 -- U_TH AT 8 WIDE FOR THE INTEL: DOES A THIRD OF THE LAYERS' COST KEEP THE GAIN, AND DOES IT FIT THE INTEL's FRAME? FIXED BEFORE THE CODE
+
+**Why.** Section 171: U_TH costs the Intel's integrated graphics 153 ms at 1920 x 1080, 0.28-0.30 of a traced frame, against the 0.25 H71's
+rule allows. Its four layers were ~110 ms of that, the down pass ~20 and the upsample and hold ~21. Section 171 said a cheaper U_TH would need a
+new quality round, and Keith asked for it. Of the two cuts named then (8 wide, or a quarter-size input) this round takes **8 wide**. It keeps
+U_TH's half-size correction, its device passes and its kernel, and changes only the width.
+
+**U_TH8 (render/learnedUpscaleTemporal.mjs's "half8" variant).** U_TH with its three 3 x 3 layers **8** wide instead of 16: 17 -> 8, 8 -> 8,
+8 -> 8 (ReLU), then the 1 x 1 head 8 -> 3, its weights and biases zero, at half size. The input, the upsample and section 159's hold are
+U_TH's. **Its cost, from the shapes:** 2,400 multiply-adds a half-size pixel against U_TH's 7,104, a third. A net is the half-size kind when its
+first layer is narrower than U_T's 32 (16 or 8).
+
+**ROUND 84, the quality, as round 72's (section 167) in every way but the width.**
+- **Training and validation:** round 72's 200 + 20 scenes as sequences, 512 samples, seeds 1-3, the candidate by validation, and C2 on
+  shuffled targets. File: render/upscale-net-r84.json.
+- **Test:** 24 new scenes, 12 R (91000-91011) and 12 C (92000-92011), against two 2048-sample references. File:
+  render/denoise-results-upscale-temporal-r84.json.
+- **H84a:** U_TH8's chain beats Bt's, by section 159's rule (a mean display relMSE at least 1 % below), through verdict() (the sign-flip
+  test, Holm with H84b, C1-C5).
+- **H84b:** U_TH8's chain beats B1's, as H72b.
+- **Descriptive, deciding nothing:** round 72's U_TH graded beside it on every scene; U_TH8's gain over Bt as a fraction of U_TH's; each
+  scene's mean correction.
+
+**ROUND 85, the cost, as round 74's (section 169) in every way but the width.**
+- **The passes on the device (render/learnedUpscaleTemporalGPU.mjs):** round 74's coalesced down pass, four layers on the fast kernel at
+  half size (8 wide), and the upsample and hold.
+- **Held to the CPU** at 64 x 64 on family R's seed 990914 as round 73's was, on a seeded U_TH8 with its head made non-zero: the cost does not
+  depend on the weights, so round 85 does not wait for round 84's training.
+- **Timed at 1920 x 1080** on the device's clock against T read off the same run: the gate's "section 190" line, read by readH85.
+- **H85: U <= 0.25 x T on both GPUs, in both of each GPU's runs** (H71's threshold and counting rule, h71).
+
+**Predictions, fixed now, deciding nothing.**
+- **P1:** C1 and C3 hold in round 84.
+- **P2:** H84a is supported, at a gain over Bt of 2.5-5 % (U_TH's was 5.4 % on round 72's scenes).
+- **P3:** H84b is supported.
+- **P4:** on round 84's scenes U_TH8 keeps 55-95 % of U_TH's gain over Bt.
+- **P5:** on the Intel, U is 70-100 ms and U / T 0.13-0.20, so H85 holds there. The layers fall from ~110 ms to 37-55 (a third of the work, and
+  8-wide vec4 groups run less efficiently, so up to 1.5 x that); the down pass and the upsample and hold stay at ~41.
+- **P6:** on the 1080, U is 2.5-4.5 ms, U / T 0.06-0.12.
+
+**What each outcome means, fixed now.**
+- **H84a and H85 both hold:** U_TH8 is the Intel class's U_TH. Whether the chain and the page run it there (an entry in UTH_BY_ADAPTER beside
+  the 1080's) is Keith's call.
+- **H84a holds and H85 fails on the Intel:** 8 wide is not cheap enough; the quarter-size input is the next cut.
+- **H84a fails:** 8 wide threw away the gain; the quarter-size input at 16 wide is the other cut, and U_TH stays the 1080 class's alone.
+
+**The runs, on Keith's rig, at the rounds' commit.**
+- The training and then the test, in one clone: `--harvest-upscale-temporal-train --round 84`, then `--harvest-upscale-temporal-test --round 84`.
+- The device: two `realGpuRun --only denoise` on each GPU.
+
+All are committed byte for byte before they are read. Section 191 reads them.
