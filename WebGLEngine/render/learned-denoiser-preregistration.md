@@ -11657,3 +11657,47 @@ shuffled-target U_TH on the adaptive history) is far worse (mean d -3.32). By th
 a uniform 4 samples, does not turn uneven samples into a better image. The few pixels given more gain less than the many given fewer
 lose. Sampling by history is not opened as a device round. A denoiser trained on uneven samples is the question section 186 named next; it
 is not set up.
+
+## 189. ROUND 83's VERDICT -- BOTH HOLD: WITH THE LIGHTS MOVING, U_TH IS 8.10 % BELOW Bt AND Bt IS 3.94 % BELOW B1. THE CLAMP HANDLES MOVING LIGHTS AND THE HISTORY KEEPS PAYING
+
+**The run.** render/denoise-results-upscale-lights-r83.json, run on Keith's rig at commit 203c1403 (which holds round 83's code) in 3.5 hours,
+round 72's U_TH (seed 1, 670c28bd), 24 scenes, each with moving lights and still. **8 of its 48 sequences came from the rig's cache** (40
+rendered); the cache keys on the scene and the code, so a cached sequence is the same computation. **It came unzipped, so it was shown on upload
+and read before it was committed** (fc0d6ea3, sha-256 4fd93eff..., byte for byte); nothing was changed in it.
+
+**The verdict: BOTH SUPPORTED** (verdict(), the sign-flip test, Holm, C1-C5 all holding; C2's shuffled-target U_TH far worse, mean d -3.72).
+- **H83a SUPPORTED:** with the lights moving, U_TH's chain is **8.10 %** below Bt's, better on 19 of 24, p 0.00010 under Holm's 0.025.
+- **H83b SUPPORTED:** with the lights moving, Bt is **3.94 %** below B1, better on 15 of 24, p 0.012 under 0.05.
+
+**The description, deciding nothing.**
+
+| | lights moving | still twins |
+|---|---|---|
+| B1 (one frame, shared) | 1.7355e-3 | 1.7355e-3 |
+| Bt | 1.6671e-3 | 1.5762e-3 |
+| U_TH on Bt | 1.5320e-3 | 1.4520e-3 |
+| U_TH over Bt | 8.10 % (19 of 24) | 7.88 % (21 of 24) |
+| Bt over B1 | 3.94 % (15 of 24) | 9.18 % (16 of 24) |
+| Bt's mean history | 5.118 | 5.132 |
+
+- **The moving light costs the history about half its gain.** Bt is 5.77 % worse with the lights moving than still, and its gain over B1 falls
+  from 9.18 % to 3.94 %. It does not fall below B1.
+- **The history is kept, as section 188 expected.** The mean lengths differ by 0.014 (at most 0.074 on a scene, never longer moving), and on 13
+  of 24 they are equal: the geometry does not move, so almost nothing is rejected, and the clamp alone stands against the stale shading.
+- **U_TH's gain does not drop:** 8.10 % moving against 7.88 % still (a drop of -0.22 points). It takes up some of what the stale history adds.
+- **By family:** Bt over B1 is 17.27 % on R and 0.68 % on C; U_TH over Bt is 8.72 % on R and 7.98 % on C. The C scenes are where the moving light
+  leaves the history barely worth having.
+- **The light pixels** are in view on 11 of 24 scenes, at most 2 % of the frame; there U_TH is 0.33 % worse than Bt, too few pixels to mean
+  anything. Off them U_TH is 8.11 % better.
+
+**The predictions.**
+- **P1 HELD:** C1 and C3 hold.
+- **P2 MISSED:** H83a is supported, but at 8.10 %, above the 1-4 % predicted and above the still twins' 7.88 %, not below.
+- **P3 MISSED:** H83b is supported; Bt is 3.94 % below B1, not within 1 % of it.
+- **P4 HELD:** the mean histories are within 0.014 (0.3 allowed).
+- **P5 HELD:** still, Bt is 9.18 % below B1.
+
+**What it means, as section 188 fixed it** (its "Both hold" reading). Bt's clamp handles moving lights at section 176's speeds, and the
+history keeps paying. The moving light halves the history's gain and does not undo it, and U_TH keeps its full gain on top. Nothing changes in the
+chain. A luminance-change rejection is not opened: section 188 named it only for the outcome where H83b failed. Section 188 called this the case
+that should hurt the history most, and it hurt less than round 81's twice-speed objects did.

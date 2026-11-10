@@ -74,6 +74,11 @@
 //   typed 22, W7 the first rejected spp typed 9, W8 section 187 opening the device round, W9 it calling P4 missed -> 1 red each; W5 U_TH-on-
 //   adaptive's first grade nudged -> 2; W4 the adaptive Bt's -> 3; W6 the first rejected-pixel grade nudged -> *** 0 RED at first *** (the row
 //   read the file's own stored gain), then 1 with the gain re-derived from the per-scene grades.
+// SECTION 189 (round 83's verdict rows, sabotaged in the committed file and the registration, each restored byte-identical): Z1 the commit
+//   typed 203c1404, Z2 the cache hits typed 0, Z3 H83a's count typed 18, Z4 H83b's p typed 0.0306, Z7 a still Bt grade nudged, Z8 a moving
+//   history typed longer than its still twin's, Z9 the still Bt-over-B1 nudged, Z10 a light share typed 3 %, Z11 section 189 opening the
+//   rejection round, Z12 it calling P3 held, Z13 it saying none came from the cache, Z14 it saying committed unread -> 1 red each; Z5 a U_TH
+//   grade and Z6 a Bt grade nudged -> 3 red each.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -610,7 +615,7 @@ console.log("\n13. ROUND 83 (section 188): MOVING LIGHTS");
         out.secondary.lights === true && out.secondary.btOverB1.moving === 1 - mean(gB) / mean(gB1) && out.secondary.btOverB1.still === 1 - mean(gBs) / mean(gB1),
         `Bt ${gB.map((v) => v.toExponential(3)).join(", ")} with the lights moving, ${gBs.map((v) => v.toExponential(3)).join(", ")} still`);
     const study = fs.readFileSync(path.join(ENG, "render", "learnedUpscaleTemporalStudy.mjs"), "utf8"), cli = fs.readFileSync(path.join(ENG, "tools", "denoiseStudy.mjs"), "utf8");
-    const reg = fs.readFileSync(path.join(ENG, "render", "learned-denoiser-preregistration.md"), "utf8"), s188 = reg.slice(reg.indexOf("## 188."), reg.indexOf("## 189.") > 0 ? reg.indexOf("## 189.") : undefined);
+    const reg = fs.readFileSync(path.join(ENG, "render", "learned-denoiser-preregistration.md"), "utf8"), i188 = reg.indexOf("## 188."), s188 = reg.slice(i188, reg.indexOf("\n## ", i188 + 1) > 0 ? reg.indexOf("\n## ", i188 + 1) : undefined);
     ok("  a moving-light sequence has its own cache entry, the test command passes the round's `lights`, and section 188 states the motion, H83a/H83b and the seeds",
         /movingKey\(fam, sd, o\) \+ \(lights \? "-lights" : ""\)/.test(study) && /\(\{ U0, gamma: RD\.moverGamma, lights: !!RD\.lights, splits: RD\.splits,/.test(cli) &&
         /Every light, and nothing else, moves/.test(s188) && /\*\*H83a:\*\* with moving lights, U_TH's chain beats Bt's/.test(s188) && /\*\*H83b:\*\* with moving lights, Bt beats B1/.test(s188) && /89000-89011/.test(s188) && /90000-90011/.test(s188) && s188.includes(R.results));
@@ -663,6 +668,34 @@ console.log("\n15. SECTION 187: ROUND 82's VERDICT, RE-DERIVED FROM ITS COMMITTE
         i187 > 0 && /NOT REPORTED \(C1 FAILED\)/.test(s187) && /the candidate needs 22/.test(s187) && /\*\*P4 HELD:\*\*/.test(s187) && /\*\*P2 MISSED:\*\*/.test(s187) && /Sampling by history is not opened as a device round\./.test(s187) && /committed unread/.test(s187));
 }
 
+console.log("\n16. SECTION 189: ROUND 83's VERDICT, RE-DERIVED FROM ITS COMMITTED FILE");
+{
+    const R = LT.ROUND_UPSCALE_LIGHTS, r = JSON.parse(fs.readFileSync(path.join(ENG, R.results), "utf8")), H = r.verdict.hypotheses, T = r.tables, S = r.still, sec = r.secondary;
+    const mean = (a) => a.reduce((q, v) => q + v, 0) / a.length, g = (u, b) => 1 - mean(u) / mean(b), near = (a, b, e = 5e-5) => Math.abs(a - b) < e, fewer = (u, b) => u.filter((v, i) => v < b[i]).length;
+    ok("!! the run is round 83's: commit 203c1403, the lights moving, round 72's candidate (seed 1, 670c28bd), 48 sequences of which 8 came from the cache",
+        r.round === 83 && r.commit === "203c1403" && sec.lights === true && r.trained.file === R.net && r.trained.candidate === 1 && r.trained.commit === "670c28bd" &&
+        r.cache.misses === 40 && r.cache.hits === 8 && r.determinism === true && T.U.length === 24 && S.bt.length === 24);
+    ok("!! *** H83a SUPPORTED: U_TH 8.10 % below Bt with the lights moving, 19 of 24, p 0.00010 under Holm's 0.025; H83b SUPPORTED: Bt 3.94 % below B1, 15 of 24, p 0.012 ***",
+        H.H1.status === "supported" && H.H1.k === 19 && near(H.H1.p, 0.00010079, 1e-7) && H.H1.threshold === 0.025 && same(H.H1.d, effects(T.bt, T.U)) && near(g(T.U, T.bt), 0.0810) &&
+        H.H2.status === "supported" && H.H2.k === 15 && near(H.H2.p, 0.011606, 1e-5) && same(H.H2.d, effects(T.b1, T.bt)) && near(g(T.bt, T.b1), 0.0394) &&
+        r.verdict.run === "reported" && r.verdict.controls.C1 && r.verdict.controls.C4 && r.verdict.controls.C5 && r.verdict.controls.C2.ok && near(r.verdict.controls.C2.meanD, -3.7220, 1e-4) && H.H1.c3.resolvable && H.H2.c3.resolvable);
+    ok("!! the table: B1 1.7355e-3; Bt 1.6671e-3 moving, 1.5762e-3 still; U_TH 1.5320e-3, 1.4520e-3; U_TH over Bt 8.10 / 7.88 % (19, 21 of 24); Bt over B1 3.94 / 9.18 % (15, 16) -- P2 and P3 MISSED, P5 HELD",
+        near(mean(T.b1), 1.7355e-3, 5e-8) && near(mean(T.bt), 1.6671e-3, 5e-8) && near(mean(S.bt), 1.5762e-3, 5e-8) && near(mean(T.U), 1.5320e-3, 5e-8) && near(mean(S.U), 1.4520e-3, 5e-8) &&
+        fewer(T.U, T.bt) === 19 && fewer(S.U, S.bt) === 21 && fewer(T.bt, T.b1) === 15 && fewer(S.bt, T.b1) === 16 && near(sec.gainOverBt, g(T.U, T.bt), 1e-15) && near(sec.stillGainOverBt, g(S.U, S.bt), 1e-15) &&
+        near(sec.stillGainOverBt, 0.0788) && near(sec.btOverB1.moving, 0.0394) && near(sec.btOverB1.still, 0.0918) && sec.gainOverBt > 0.04 && sec.gainOverBt > sec.stillGainOverBt && near(g(T.bt, S.bt), -0.0577));
+    const hm = sec.history.moving, hs = sec.history.still, dh = hm.map((v, i) => Math.abs(v - hs[i]));
+    ok("!! P4 HELD: the mean history 5.118 moving, 5.132 still (within 0.014, at most 0.074 on a scene, never longer moving, equal on 13 of 24)",
+        near(mean(hm), 5.118, 1e-3) && near(mean(hs), 5.132, 1e-3) && Math.abs(mean(hm) - mean(hs)) < 0.3 && near(Math.max(...dh), 0.074, 1e-3) && hm.every((v, i) => v <= hs[i] + 1e-12) && hm.filter((v, i) => v === hs[i]).length === 13);
+    const lit = sec.mover.U.map((v, i) => (v != null ? i : -1)).filter((i) => i >= 0);
+    ok("  by family Bt over B1 17.27 % (R) and 0.68 % (C), U_TH over Bt 8.72 and 7.98 %; the light pixels in view on 11 of 24 (at most 2 %), U_TH 0.33 % worse there, 8.11 % better off them",
+        near(g(T.bt.slice(0, 12), T.b1.slice(0, 12)), 0.1727) && near(g(T.bt.slice(12), T.b1.slice(12)), 0.0068) && near(g(T.U.slice(0, 12), T.bt.slice(0, 12)), 0.0872) && near(g(T.U.slice(12), T.bt.slice(12)), 0.0798) &&
+        lit.length === 11 && Math.max(...lit.map((i) => sec.mover.share[i])) < 0.025 && near(g(lit.map((i) => sec.mover.U[i]), lit.map((i) => sec.mover.bt[i])), -0.0033) && near(g(sec.rest.U, sec.rest.bt), 0.0811));
+    const reg = fs.readFileSync(path.join(ENG, "render", "learned-denoiser-preregistration.md"), "utf8"), i189 = reg.indexOf("## 189."), s189 = reg.slice(i189, reg.indexOf("\n## ", i189 + 1) > 0 ? reg.indexOf("\n## ", i189 + 1) : undefined);
+    ok("  section 189 says both hold, each miss, that the chain does not change and no rejection round opens, the cache hits, and that the file was read before it was committed",
+        i189 > 0 && /BOTH HOLD/.test(s189) && /\*\*H83a SUPPORTED:\*\*/.test(s189) && /\*\*H83b SUPPORTED:\*\*/.test(s189) && /\*\*P2 MISSED:\*\*/.test(s189) && /\*\*P3 MISSED:\*\*/.test(s189) && /\*\*P4 HELD:\*\*/.test(s189) &&
+        /Nothing changes in the\s+chain\./.test(s189) && /A luminance-change rejection is not opened/.test(s189) && /8 of its 48 sequences came from the rig's cache/.test(s189) && /read before it was committed/.test(s189));
+}
+
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +
-    "\nnot closed here: whether the history pays when the lights move. That is round 83's harvest, section 189's.");
+    "\nnot closed here: a cheaper U_TH for the Intel, and a denoiser trained on uneven samples (section 187's question, not set up).");
 process.exit(fails ? 1 : 0);
