@@ -4,7 +4,10 @@
 //
 // THE GATE OF tools/ship/headToHead44.mjs (Round H44 of brain/HEAD_TO_HEAD.md, registered first: a different seed count; no search).
 //   1 SETS   2 NETWORKS AND H42'S VALUES   3 ARMS AND AUDIT   4 SUBSETS, PICKS, RHO   5 VERDICT (eight parts in every branch)   6 CHECKS (fifteen rows, each broken once)   7 REPORT AND LINES   8 SOURCE.
-// SABOTAGE LOG: see the end of this header (filled in after the serial mutation pass of tools/ship/headToHead44.mjs).
+// SABOTAGE LOG (serial mutation pass of tools/ship/headToHead44.mjs, one mutant per code line and operator, run one at a time in ONE worktree): 179 mutants; 149 red on the first pass; 30 survived. 18 of the survivors were turned into rows (section 9; each re-run and red by name): RISES is NO for equal audit means, the standard deviation against a reference,
+//   the PRICED GAIN line and the pairings at 0.04 and 0.005 to the digit, the PAIRED line exactly, the LOST line's list and counts (autopilot left out), the REPORTED line's headers, and the check texts' numbers. 12 are EQUIVALENT and declared: L49-o7 (every -> some over a list forced to length 1), L75-o4 (the extra bit mask 256 selects no member of the eight), L87-o14 (sum of (rx + mx)(ry - my) equals sum of (rx - mx)(ry - my)),
+//   L88-o6 (a zero spread gives 0/0 = NaN either way), L106-o3 (> -> >= at a difference of exactly 0.0005 that no fixture of float means reaches), L106-o4 (< -> <= on the first of three strict comparisons joined by &&: an exact four-decimal tie of the means of N = 1 and 2 followed by strict rises is not constructible from the eight audit means without hand-built ties),
+//   L145-o4, L147-o4 and L163-o4 (< -> <= at a float tie of exactly 1e-6 or 1e-12), L151-o7 (every -> some on the eight HO values, which the 32-network conjunct beside it covers: the eight are among the 32), L159-o5 and L161-o5 (the self-test rows of the subset resampling and counts: && -> || of a library self-test).
 // NOT CHECKED, said plainly: that the best of more seeds is better (the round's run); the real flight. NOTE: the registration says fourteen checks; its list names fifteen, which the library has.
 "use strict";
 import fs from "node:fs";
