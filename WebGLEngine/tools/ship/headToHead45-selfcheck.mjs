@@ -5,7 +5,10 @@
 // THE GATE OF tools/ship/headToHead45.mjs (Round H45 of brain/HEAD_TO_HEAD.md, registered first: a different train set seed: H32's search on a new draw of 72 train ids).
 //   1 SETS   2 SEARCH (identity with H32's longSearch when H32's train ids are handed in; a reference loop; the train ids used; the defaults; refusals; states carry the train ids and other ids are refused; a resumed search equals an uninterrupted one at every saved state)
 //   3 CHAMPION / ARMS / AUDIT   4 STATS (the eight-part verdict in every branch)   5 CHECKS (sixteen rows, each broken once; the registration's seventeenth row is the identity row of section 2)   6 REPORT   7 PRINTED NUMBERS   8 SOURCE.
-// SABOTAGE LOG: see the end of this header (filled in after the serial mutation pass of tools/ship/headToHead45.mjs).
+// SABOTAGE LOG (serial mutation pass of tools/ship/headToHead45.mjs, one mutant per code line and operator, run one at a time in ONE worktree): 208 mutants; 184 red on the first pass; 24 survived. 15 of the survivors were turned into rows (section 9; each re-run and red by name): a run lost on ONE id of two counts the flight lost, meanPower's dark/lit sum, the L1 distances of a network
+//   equal to wip and to its twin, every seed's own gap, THE BEST OF THE TWELVE going to the first on an exact tie, NETWORKS NOT BEHIND reads c02 not q02, the VALUES line's HO values from the right study, the arm lists of the lines (c02 first, q02 once, the autopilot out, law0 first in LOST), the VALUES header and the check texts' numbers.
+//   9 are EQUIVALENT and declared: L70-o7 (every -> some over a list forced to length 1), L127-o21 (a `power` list the lines no longer print: the POWER line was dropped from this round's lines and the variable is unused), L155-o4 and L157-o4 (< -> <= at a float tie of exactly 1e-6 or 1e-12),
+//   L163-o3 (a non-empty search list is required by the count row in front of it), L167-o1, L167-o5, L167-o7 and L167-o54 (the champion check's best-held-out conjuncts: a tautology while champion() is correct).
 // NOT CHECKED, said plainly: that a different train draw does anything for the search (the round's run); the real searches and audit. NOTE: the registration says fifteen arms; its list names SIXTEEN (autopilot, law0, c02, q02, four s02, four t02, four n72), which the library has.
 "use strict";
 import fs from "node:fs";
