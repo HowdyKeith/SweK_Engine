@@ -50,7 +50,7 @@ if (args[0] === "laws") {
     const state = X.loadState(fs, file, { seed: Number(seed), group, ...(smoke ? { iters: SMOKE.iters, checkpoints: SMOKE.checkpoints } : {}) });
     console.log(JSON.stringify({ ...X.longSearch(Number(seed), group, loadWip(), { ...opts, consts, state, save: (s) => X.saveStateAtomic(fs, file, s) }), smoke }));
 } else if (args[0] === "search") {
-    const outFile = path.resolve(val("--out", RR + "head-to-head47-search.jsonl")), done = new Set(readRows(outFile).map((r) => `${r.seed}:${r.group}`)), workers = Number(val("--workers", 4));
+    const outFile = path.resolve(val("--out", smoke ? path.join(os.tmpdir(), "h47-smoke-search.jsonl") : RR + "head-to-head47-search.jsonl")), done = new Set(readRows(outFile).map((r) => `${r.seed}:${r.group}`)), workers = Number(val("--workers", 4));
     const todo = X.SEEDS.R12.map((s) => [s, "R12"]).filter(([s, g]) => !done.has(`${s}:${g}`));
     console.log(`[h47 search] ${todo.length} searches to run, ${done.size} already in ${outFile}, ${workers} workers${smoke ? " (SMOKE)" : ""}`);
     fs.mkdirSync(path.dirname(outFile), { recursive: true });
