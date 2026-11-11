@@ -55,9 +55,14 @@ export function verdictOf(au) {
 const f4 = (x) => (x >= 0 ? "+" : "") + x.toFixed(4), v4 = (x) => x.toFixed(4);
 const pearson = (x, y) => { const mx = avg(x), my = avg(y); let a = 0, b = 0, c = 0; x.forEach((_, i) => { a += (x[i] - mx) * (y[i] - my); b += (x[i] - mx) ** 2; c += (y[i] - my) ** 2; }); return b === 0 || c === 0 ? NaN : a / Math.sqrt(b * c); };
 /** Difficulty terciles of 266, 267 and 267 ids cut into sets of 40 (the remainder dropped): { picks per group per tercile: [{ pick, agree of N sets }] }. */
+/** The ids of the three difficulty terciles (266, 267 and 267 ids, the easiest cut first; ties in difficulty go to the smaller id first), each in increasing id order. */
+export function tercileIds(au) {
+    const d = difficulty(au), order = d.map((v, i) => [v, i]).sort((a, b) => (a[0] !== b[0] ? a[0] - b[0] : a[1] - b[1])).map((x) => x[1]);
+    return [[0, 266], [266, 533], [533, 800]].map(([a, b]) => order.slice(a, b).sort((p, q) => p - q));
+}
 export function terciles(au) {
-    const d = difficulty(au), order = d.map((v, i) => [v, i]).sort((a, b) => (a[0] !== b[0] ? a[0] - b[0] : a[1] - b[1])).map((x) => x[1]), cuts = [[0, 266], [266, 533], [533, 800]], out = {};
-    for (const g of Object.keys(GROUPS)) { const full = pickOver(au, g, Array.from({ length: N_IDS }, (_, i) => i)).pick; out[g] = cuts.map(([a, b]) => { const ids = order.slice(a, b).sort((p, q) => p - q), ss = setsOf(ids), agree = ss.filter((s) => pickOver(au, g, s).pick === full).length; return { n: ids.length, sets: ss.length, agree, pick: pickOver(au, g, ids).pick }; }); }
+    const T = tercileIds(au), out = {};
+    for (const g of Object.keys(GROUPS)) { const full = pickOver(au, g, Array.from({ length: N_IDS }, (_, i) => i)).pick; out[g] = T.map((ids) => { const ss = setsOf(ids), agree = ss.filter((s) => pickOver(au, g, s).pick === full).length; return { n: ids.length, sets: ss.length, agree, pick: pickOver(au, g, ids).pick }; }); }
     return out;
 }
 export function bottomLines(au) {
