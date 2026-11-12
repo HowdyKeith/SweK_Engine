@@ -11817,3 +11817,96 @@ first layer takes 11 channels; nothing else changes.
 **The runs, on Keith's rig, at the round's commit, in one clone:** `--harvest-count-train --round 86` (render/denoise-net-count-r86.json), then
 `--harvest-count-test --round 86` (render/denoise-results-count-r86.json). Each is committed byte for byte before it is read. Section 193
 reads them.
+
+## 191. ROUND 84's VERDICT -- BOTH HOLD: U_TH8 IS 9.72 % BELOW Bt AND KEEPS 87 % OF U_TH's GAIN. ROUND 85 HAS NO VERDICT YET: THE INTEL's TWO RUNS DID NOT COUNT
+
+**The runs.**
+- **The training** ran on BOTH rig machines at 57edf87e, the rounds' commit:
+  - the 1080's machine: 5.55 h, nothing from a cache;
+  - the Intel's machine: 3.77 h, 140 of 220 sequences from a cache.
+- **The two machines trained the same U_TH8 bit for bit:** every seed's weights, losses and validation, and C2. The files differ only in their
+  timing and cache counts. The 1080 machine's file is render/upscale-net-r84.json (c1f365e, sha-256 15cacaa0...), the net its test read; the
+  Intel machine's is kept unchanged as render/upscale-net-r84-intel.json (first committed at 902b352 under the round's name, sha-256
+  9c4c925a...). The candidate is seed 1 (validation 1.6881e-3 against 1.7056e-3 and 1.6989e-3).
+- **The test**, render/denoise-results-upscale-temporal-r84.json (852c70da...), ran on the 1080's machine at 57edf87e in 4.0 h. 1 of its 24
+  sequences came from the cache.
+- **All of these came zipped and were committed unread.**
+
+**The verdict: BOTH SUPPORTED** (verdict(), the sign-flip test, Holm, C1-C5 all holding; C2's shuffled-target U_TH8 far worse, mean d -3.07).
+- **H84a SUPPORTED:** U_TH8's chain is **9.72 %** below Bt's, better on 23 of 24, p 1.8e-7 under Holm's 0.025.
+- **H84b SUPPORTED:** it is 9.62 % below B1's, better on 19 of 24, p 0.0029 under 0.05.
+
+**The description, deciding nothing.**
+
+| on round 84's 24 scenes | mean display relMSE | against Bt |
+|---|---|---|
+| Bt | 2.2505e-3 | |
+| B1 | 2.2480e-3 | Bt 0.11 % above it |
+| U_TH8 on Bt | 2.0317e-3 | 9.72 % below (23 of 24) |
+| round 72's U_TH on Bt | 1.9988e-3 | 11.18 % below (21 of 24) |
+
+- **U_TH8 keeps 87 % of U_TH's gain over Bt on the same scenes,** and is 1.65 % above U_TH (better on 10 of 24).
+- **This set is an easy one for the correction:** U_TH's own gain here is 11.18 %, against 5.4 % on round 72's set. The gain is again C's:
+  U_TH8 takes 11.67 % off Bt on C and 3.35 % on R.
+- Its mean correction is 0.83 %.
+
+**The predictions.**
+- **P1 HELD:** C1 and C3 hold.
+- **P2 MISSED:** H84a is supported, but at 9.72 %, above the 2.5-5 % predicted. I took U_TH's 5.4 % from round 72's set as this set's level.
+- **P3 HELD:** H84b is supported.
+- **P4 HELD:** U_TH8 keeps 87 % of U_TH's gain (55-95 %).
+
+**ROUND 85: NOT READ.** The Intel's two realGpuRun reports (render/denoise-rig-s190-{a,b}-intel.json, 902b352, committed unread) were run in
+the fresh clone without Playwright.
+- The gate that times U_TH8 (render/denoiseLearnedUpscaleGPU-selfcheck.mjs) runs in a browser. It failed in 0.4 s in both runs ("NOT A
+  PASS"), as did denoiseFrameGenCost-selfcheck's browser half, and printed no section 190 line.
+- So readH85 reads no U from either, and neither run counts (every gate must be green).
+- The 1080's two runs have not been made. Both GPUs' runs are owed again, with Playwright installed in the clone (tools/render-qa's npm
+  install, which fetches Chromium). P5 and P6 wait for them, and section 194 reads them.
+
+**What it means, as section 190 fixed it, so far.** U_TH8 keeps the gain: 8 wide is enough for the quality. Whether it is cheap enough for
+the Intel is round 85's, still owed. Nothing changes in the chain or the page until it is read.
+
+## 193. ROUND 86's VERDICT -- NEITHER HOLDS: TOLD THE COUNTS, THE DENOISER MAKES HISTORY-GUIDED SAMPLING NO BETTER. ROUND 82's LOSS WAS THE SAMPLES', AND HISTORY-GUIDED SAMPLING CLOSES
+
+**The runs.** Both ran on the 1080's machine at 57edf87e, the round's commit. They came zipped and were committed unread (c1f365e).
+- **The training**, render/denoise-net-count-r86.json (df9030a2...), took 3.5 h, nothing from a cache. 49 of the 192 training images drew no
+  disk (the uniform 4). The candidate is seed 2 (validation 3.6264e-3 against 3.8571e-3 and 3.8823e-3).
+- **The test**, render/denoise-results-count-r86.json (0506040e...), took 4.4 h, nothing from a cache.
+
+**The verdict: NEITHER SUPPORTED** (verdict(), the sign-flip test, Holm, C1-C5 all holding; C2's shuffled-target D_S far worse, mean d -2.71).
+- **H86a NOT SUPPORTED:** D_A's Bt is **9.97 % ABOVE** D_U's, better on 4 of 24 (p 1.00).
+- **H86b NOT SUPPORTED:** D_A's Bt is 6.52 % above S_U's, today's chain, better on 8 of 24 (p 0.99).
+
+**The description, deciding nothing.**
+
+| Bt, mean display relMSE | through the shipped denoiser | through D_S |
+|---|---|---|
+| uniform 4 | S_U 2.0966e-3 | D_U 2.0308e-3 (3.14 % below S_U, 16 of 24) |
+| adaptive | S_A 2.2557e-3 (7.59 % above S_U, 6 of 24) | D_A 2.2333e-3 (9.97 % above D_U, 4 of 24) |
+
+- **Telling the denoiser the counts did not soften the loss; it grew.** D_A loses 9.97 % to D_U, and S_A loses 7.59 % to S_U (round 82's
+  comparison again, 9.28 % there). By family, D_A loses 6.15 % on R and 10.92 % on C.
+- **Where the samples went, they helped about equally either way.** On the rejected pixels (8.7 % of the frame, at 6.52 samples), D_A is
+  6.67 % below D_U and S_A 6.33 % below S_U.
+- **D_S is better than the shipped denoiser on uniform frames:** D_U is 3.14 % below S_U (16 of 24), and its B1 3.47 % below. Nothing was
+  pre-registered on this. It is a second network trained on round 11's scenes with more varied noise and a different seed, and this round
+  does not say which of those made it better.
+- **On these moving scenes B1 beats Bt** in the uniform arm (Bt 8.08 % above it), as in round 82: a fast set by round 81's measure.
+
+**The predictions.**
+- **P1 HELD:** C1 and C3 hold.
+- **P2 HELD:** H86a is not supported.
+- **P3 HELD:** H86b is not supported.
+- **P4 MISSED:** D_A loses MORE to D_U (9.97 %) than S_A to S_U (7.59 %). I predicted less: between 6 % worse and 2 % better. The mismatch was
+  not part of the cost.
+- **P5 MISSED:** D_U is 3.14 % below S_U, outside the 2 % predicted.
+- **P6 HELD:** on the rejected pixels, D_A is 6.67 % below D_U (5-15 %).
+
+**What it means, as section 192 fixed it** (its "D_A loses as much as S_A" reading). The denoiser was not the problem:
+round 82's loss is the samples' information, which moving them takes from most of the frame, and no denoiser gives it back.
+**History-guided sampling closes** at this budget. A larger budget is not set up.
+
+D_U's 3.14 % over the shipped denoiser on uniform frames is the one thing here that could change the chain. It would need its own round,
+pre-registered: is a denoiser retrained this way better on today's frames, and what does an 11th channel cost on the device? Whether to open
+it is Keith's call.

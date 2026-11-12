@@ -13,6 +13,9 @@
 //   its plain input, K15 round 86's seeds not reserved (here and denoiseScenes-selfcheck) -> 2 red each; K8 the training's head residual and small -> 4 red. K2 the share map's stream unsalted and K11 the
 //   uniform extra arm handed the adaptive counts -> *** 0 RED at first *** (990960 draws no disk either way; no row read the counts an
 //   arm is handed), then 1 each with every seed's disks re-drawn by hand and the counts each arm is handed recorded.
+// SECTION 193 (round 86's verdict rows, sabotaged in the committed files and the registration, each restored byte-identical): Y10 H86a's
+//   count typed 5, Y13 a rejected share nudged, Y14 the candidate typed 1, Y15 section 193 keeping history-guided sampling open, Y16 it
+//   calling P4 held -> 1 red each; Y11 a D_A grade and Y12 a D_U grade nudged -> 2 red each.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -145,6 +148,30 @@ console.log("\n3. THE TEST");
         /RD = CS\.countRound\(/.test(ta) && /CS\.runCountTraining\(\{ splits: RD\.trainSplits, harvest: true, w: RD\.image, sppRef: RD\.sppRef, seeds: RD\.seeds, train: RD\.train,/.test(ta) && /exists -- a harvest's results are never overwritten/.test(ta) &&
         /RD = CS\.countRound\(/.test(tb) && /cand = tr\.runs\.find\(\(x\) => x\.seed === tr\.candidate\)/.test(tb) && /ds: decodeNet\(cand\.net\), dsC2: decodeNet\(tr\.c2\.net\)/.test(tb) &&
         /W: RD\.testImage, sppIn: RD\.sppIn, sppRef: RD\.sppRefTest/.test(tb) && tb.indexOf("startCommit = git(") < tb.indexOf("CS.runCountTest(") && /exists -- a harvest's results are never overwritten/.test(tb));
+}
+
+console.log("\n4. SECTION 193: ROUND 86's VERDICT, RE-DERIVED FROM ITS COMMITTED FILES");
+{
+    const R = CS.ROUND_COUNT_86, tr = JSON.parse(fs.readFileSync(path.join(ENG, R.net), "utf8")), r = JSON.parse(fs.readFileSync(path.join(ENG, R.results), "utf8")), H = r.verdict.hypotheses, Tb = r.tables, sec = r.secondary;
+    const mean = (a) => a.reduce((q, v) => q + v, 0) / a.length, g = (u, b) => 1 - mean(u) / mean(b), near = (a, b, e = 5e-5) => Math.abs(a - b) < e, fewer = (u, b) => u.filter((v, i) => v < b[i]).length;
+    ok("!! the training: round 86 at 57edf87e, 192 + 8 count images (49 uniform), nothing cached, candidate seed 2 (3.6264e-3 against 3.8571e-3 and 3.8823e-3), stride 11; the test read it, at the same commit, nothing cached",
+        tr.round === 86 && tr.commit === "57edf87e" && tr.config.splits.train === 192 && tr.config.splits.val === 8 && tr.config.uniformImages === 49 && tr.cache.hits === 0 && tr.candidate === 2 && tr.config.stride === 11 &&
+        tr.runs.map((q) => q.valMean.toExponential(4)).join() === "3.8571e-3,3.6264e-3,3.8823e-3" && r.round === 86 && r.commit === "57edf87e" && r.trained.file === R.net && r.trained.candidate === 2 &&
+        r.cache.hits === 0 && r.cache.misses === 24 && r.determinism === true && decodeNet(tr.runs[1].net).layers[0].Cin === 11);
+    ok("!! *** H86a NOT SUPPORTED: D_A 9.97 % ABOVE D_U, better on 4 of 24, p 1.00; H86b NOT SUPPORTED: D_A 6.52 % above S_U, 8 of 24, p 0.99 ***",
+        H.H1.status === "not supported" && H.H1.k === 4 && H.H1.p > 0.999 && same(H.H1.d, effects(Tb.dU, Tb.dA)) && near(g(Tb.dA, Tb.dU), -0.0997) &&
+        H.H2.status === "not supported" && H.H2.k === 8 && H.H2.p > 0.98 && same(H.H2.d, effects(Tb.sU, Tb.dA)) && near(g(Tb.dA, Tb.sU), -0.0652) &&
+        r.verdict.run === "reported" && r.verdict.controls.C1 && r.verdict.controls.C4 && r.verdict.controls.C5 && r.verdict.controls.C2.ok && near(r.verdict.controls.C2.meanD, -2.7140, 1e-4) && H.H1.c3.resolvable);
+    ok("!! the table: S_U 2.0966e-3, S_A 2.2557e-3 (7.59 % above, 6 of 24), D_U 2.0308e-3 (3.14 % below S_U, 16 of 24), D_A 2.2333e-3 -- P4 MISSED (D_A loses more than S_A), P5 MISSED",
+        near(mean(Tb.sU), 2.0966e-3, 5e-8) && near(mean(Tb.sA), 2.2557e-3, 5e-8) && near(mean(Tb.dU), 2.0308e-3, 5e-8) && near(mean(Tb.dA), 2.2333e-3, 5e-8) &&
+        near(g(Tb.sA, Tb.sU), -0.0759) && fewer(Tb.sA, Tb.sU) === 6 && near(g(Tb.dU, Tb.sU), 0.0314) && fewer(Tb.dU, Tb.sU) === 16 && g(Tb.dA, Tb.dU) < g(Tb.sA, Tb.sU) &&
+        sec.gains.dAoverdU === g(Tb.dA, Tb.dU) && sec.gains.dUoversU === g(Tb.dU, Tb.sU) && near(g(Tb.dA.slice(0, 12), Tb.dU.slice(0, 12)), -0.0615) && near(g(Tb.dA.slice(12), Tb.dU.slice(12)), -0.1092));
+    ok("!! P6 HELD: on the rejected pixels (8.7 % of the frame, 6.52 samples) D_A is 6.67 % below D_U, S_A 6.33 % below S_U; B1 beats Bt in the uniform arm (Bt 8.08 % above)",
+        near(sec.rejected.gains.dAoverdU, 0.0667) && near(sec.rejected.gains.sAoversU, 0.0633) && near(mean(sec.rejected.share), 0.0874, 1e-4) && near(mean(sec.rejected.sppA.filter((v) => v !== null)), 6.521, 1e-3) && near(g(Tb.sU, Tb.b1sU), -0.0808));
+    const reg = fs.readFileSync(path.join(ENG, "render", "learned-denoiser-preregistration.md"), "utf8"), iX = reg.indexOf("## 193."), sX = reg.slice(iX, reg.indexOf("\n## ", iX + 1) > 0 ? reg.indexOf("\n## ", iX + 1) : undefined);
+    ok("  section 193 says neither holds, P4 and P5 missed, that history-guided sampling closes, and that D_U's gain is unregistered and Keith's call",
+        iX > 0 && /\*\*H86a NOT SUPPORTED:\*\*/.test(sX) && /\*\*H86b NOT SUPPORTED:\*\*/.test(sX) && /\*\*P4 MISSED:\*\*/.test(sX) && /\*\*P5 MISSED:\*\*/.test(sX) && /\*\*P6 HELD:\*\*/.test(sX) &&
+        /\*\*History-guided sampling closes\*\*/.test(sX) && /Nothing was\s+pre-registered on this/.test(sX) && /Keith's call/.test(sX) && /committed unread/.test(sX));
 }
 
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +

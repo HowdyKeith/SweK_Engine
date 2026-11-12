@@ -30,6 +30,7 @@
 // ROUND 85 (section 190): E11 readH85 reading round 74's line -> 2 red; E12 the printed line round 74's, E14 the seeded U_TH8 left with
 //   its head zero -> 1 red each; E13 U_TH8's parity run on the loop down pass -> *** 0 RED at first *** (the two passes agree bit for bit,
 //   and the row read only the timed run's pass), then 1 with the parity run's own pass checked. Each restored byte-identical.
+// SECTION 191: Y9 an Intel run's U_TH gate printing a section 190 line -> 1 red. Restored byte-identical.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -310,6 +311,15 @@ else {
             !R.errs.length && Number.isFinite(te.ms) && te.ms > 0 && E.passes.length === 6 && E.passes[0] === "down" && E.passes[5] === "upsample and hold" &&
             readBack === +te.ms.toFixed(3) && (R.soft ? G.readH85(asRun(lineE)).U === null : G.readH85(asRun(lineE)).U === readBack), `readH85 reads ${readBack}`);
     }
+}
+
+console.log("\n6. SECTION 191: ROUND 85's INTEL RUNS, READ BY ITS OWN RULE");
+{
+    const runs = ["a", "b"].map((k) => JSON.parse(fs.readFileSync(path.join(ENG, "render", `denoise-rig-s190-${k}-intel.json`), "utf8")));
+    const q = runs.map((rp) => G.readH85(rp)), lg = runs.map((rp) => rp.gates.find((x) => x.gate === "render/denoiseLearnedUpscaleGPU-selfcheck.mjs"));
+    ok("!! *** the Intel's two round 85 runs (57edf87e) DO NOT COUNT: this gate failed in under a second in each, no Playwright in the clone, and printed no section 190 line -- readH85 reads no U, and h71 gives no verdict ***",
+        runs.every((rp) => rp.commit.startsWith("57edf87e")) && q.every((x) => x.counts === false && x.U === null && x.ratio === null) && G.h71(q) === "no verdict" &&
+        lg.every((x) => x.ok === false && x.ms < 1000 && x.skips.some((s) => /playwright is not installed/.test(s)) && !x.measured.some((l) => /^section 190:/.test(l))));
 }
 
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +

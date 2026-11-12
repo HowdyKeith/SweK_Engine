@@ -24,6 +24,9 @@
 //   round 72's, E15 the odd-crop refusal U_TH's alone -> 1 red each; E8 its R seeds onto round 72's and E9 its seeds not reserved -> 2 red
 //   each (here and denoiseScenes-selfcheck); E1 isHalfT 16 wide only -> 4 red; E2 U_TH8 12 wide and E4 shapeOfT's half8 U_TH's shape ->
 //   5 red each. This gate's v4909 row pinned UT_VARIANTS to "full,half" and was widened to "full,half,half8" with the variant.
+// SECTION 191 (round 84's verdict rows, sabotaged in the committed files and the registration, each restored byte-identical): Y1 the
+//   test's cache hits typed 0, Y2 H84a's count typed 22, Y4 a U_TH grade nudged, Y5 seed 2's validation altered in the 1080's net, Y6 one
+//   loss altered in the Intel's, Y7 section 191 reading round 85, Y8 it calling P2 held -> 1 red each; Y3 a U_TH8 grade nudged -> 2 red.
 "use strict";
 import fs from "node:fs";
 import os from "node:os";
@@ -329,6 +332,33 @@ console.log("\n7. SECTION 170: ROUND 72's COMMITTED HARVESTS, READ BACK -- U_TH 
     const C = TU.shiftResample(fr[FRAMES - 1].y, 16, 16, ...fr[FRAMES - 1].shift), c6 = []; for (let p = 0; p < 256; p++) for (let c = 0; c < 3; c++) c6.push(ex.x[p * T.UT_CHANNELS + 6 + c]);
     ok("  exampleFrames: eight frames, each W x W after EASU with its jitter's full-size shift, and the last one, re-sampled, is the example's C (channels 6-8) bit for bit",
         fr.length === FRAMES && fr.every((f, k) => f.y.length === 768 && f.input.length === 192 && f.shift.join() === TU.halfShift(TU.JITTER[k]).join()) && c6.every((v, i) => Object.is(v, C[i])));
+}
+
+console.log("\n8. SECTION 191: ROUND 84's VERDICT, RE-DERIVED FROM ITS COMMITTED FILES");
+{
+    const R = LT.ROUND_UPSCALE_TEMPORAL_84, tr = JSON.parse(fs.readFileSync(path.join(ENG, R.net), "utf8")), tri = JSON.parse(fs.readFileSync(path.join(ENG, "render", "upscale-net-r84-intel.json"), "utf8"));
+    const r = JSON.parse(fs.readFileSync(path.join(ENG, R.results), "utf8")), H = r.verdict.hypotheses, Tb = r.tables, sec = r.secondary, { effects } = await imp("render/denoiseStats.mjs");
+    const mean = (a) => a.reduce((q, v) => q + v, 0) / a.length, g = (u, b) => 1 - mean(u) / mean(b), near = (a, b, e = 5e-5) => Math.abs(a - b) < e, fewer = (u, b) => u.filter((v, i) => v < b[i]).length;
+    const core = (q) => JSON.stringify({ candidate: q.candidate, runs: q.runs, c2: q.c2, config: q.config, shipped: q.shipped });
+    const same = (a, b) => a.length === b.length && a.every((v, i) => Object.is(v, b[i]));
+    ok("!! the training: U_TH8 (half8, 17-8-8-8-3) at 57edf87e, candidate seed 1 (validation 1.6881e-3, 1.7056e-3, 1.6989e-3); the Intel machine's training is the same nets, losses, validation and C2 bit for bit, its file differing only in time and cache",
+        tr.round === 84 && tr.commit === "57edf87e" && tr.config.variant === "half8" && JSON.stringify(tr.config.shape) === JSON.stringify(T.UTH8_SHAPE) && tr.candidate === 1 &&
+        tr.runs.map((q) => q.valMean.toExponential(4)).join() === "1.6881e-3,1.7056e-3,1.6989e-3" && core(tr) === core(tri) && tri.commit === "57edf87e" && tr.cache.hits === 0 && tri.cache.hits === 140 && tr.ms !== tri.ms);
+    ok("!! the test read that net: round 84 at 57edf87e, the candidate from render/upscale-net-r84.json at 57edf87e, round 72's U_TH beside it, 1 of 24 sequences cached",
+        r.round === 84 && r.commit === "57edf87e" && r.trained.file === R.net && r.trained.candidate === 1 && r.trained.commit === "57edf87e" && r.baseline.file === "render/upscale-net-r72.json" &&
+        r.cache.hits === 1 && r.cache.misses === 23 && r.determinism === true && Tb.U.length === 24 && Tb.U0.length === 24);
+    ok("!! *** H84a SUPPORTED: U_TH8 9.72 % below Bt, 23 of 24, p 1.8e-7 under Holm's 0.025; H84b SUPPORTED: 9.62 % below B1, 19 of 24, p 0.0029 ***",
+        H.H1.status === "supported" && H.H1.k === 23 && near(H.H1.p, 1.788e-7, 1e-9) && H.H1.threshold === 0.025 && same(H.H1.d, effects(Tb.bt, Tb.U)) && near(g(Tb.U, Tb.bt), 0.0972) &&
+        H.H2.status === "supported" && H.H2.k === 19 && near(H.H2.p, 0.00286, 1e-5) && same(H.H2.d, effects(Tb.b1, Tb.U)) && near(g(Tb.U, Tb.b1), 0.0962) &&
+        r.verdict.run === "reported" && r.verdict.controls.C1 && r.verdict.controls.C4 && r.verdict.controls.C5 && r.verdict.controls.C2.ok && near(r.verdict.controls.C2.meanD, -3.0698, 1e-4) && H.H1.c3.resolvable);
+    ok("!! the table: Bt 2.2505e-3, B1 2.2480e-3, U_TH8 2.0317e-3, U_TH 1.9988e-3 (11.18 % below Bt, 21 of 24); U_TH8 keeps 87 % of U_TH's gain and is 1.65 % above it (10 of 24); C 11.67 %, R 3.35 % -- P2 MISSED, P4 HELD",
+        near(mean(Tb.bt), 2.2505e-3, 5e-8) && near(mean(Tb.b1), 2.2480e-3, 5e-8) && near(mean(Tb.U), 2.0317e-3, 5e-8) && near(mean(Tb.U0), 1.9988e-3, 5e-8) && near(g(Tb.U0, Tb.bt), 0.1118) && fewer(Tb.U0, Tb.bt) === 21 &&
+        near(sec.keep, 0.8693) && sec.keep === sec.gainOverBt / sec.u0GainOverBt && near(sec.overU0, -0.0165) && fewer(Tb.U, Tb.U0) === 10 && sec.gainOverBt > 0.05 && sec.keep >= 0.55 && sec.keep <= 0.95 &&
+        near(g(Tb.U.slice(12), Tb.bt.slice(12)), 0.1167) && near(g(Tb.U.slice(0, 12), Tb.bt.slice(0, 12)), 0.0335));
+    const reg = fs.readFileSync(path.join(ENG, "render", "learned-denoiser-preregistration.md"), "utf8"), iX = reg.indexOf("## 191."), sX = reg.slice(iX, reg.indexOf("\n## ", iX + 1) > 0 ? reg.indexOf("\n## ", iX + 1) : undefined);
+    ok("  section 191 says both hold, P2 missed, that the two machines' trainings are the same net, and that round 85 is not read (the Intel's runs without Playwright) and is owed again",
+        iX > 0 && /\*\*H84a SUPPORTED:\*\*/.test(sX) && /\*\*H84b SUPPORTED:\*\*/.test(sX) && /\*\*P2 MISSED:\*\*/.test(sX) && /\*\*P4 HELD:\*\*/.test(sX) && /trained the same U_TH8 bit for bit/.test(sX) &&
+        /\*\*ROUND 85: NOT READ\.\*\*/.test(sX) && /without Playwright/.test(sX) && /committed unread/.test(sX));
 }
 
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +
