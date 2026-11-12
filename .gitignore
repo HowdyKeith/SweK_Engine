@@ -172,3 +172,4 @@ WebGLEngine/ai-bridge/tasker-state.json
 # "left after a clean exit"): the bridge's APK folder and the loop-scope flag. Ignored, never reclaimed.
 WebGLEngine/ai-bridge/apks/
 WebGLEngine/ai-bridge/swek_loop_scope.flag
+WebGLEngine/rig-out/
