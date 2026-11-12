@@ -184,6 +184,11 @@
     "title": "Round 7 stage 2 (one stage): the robust-objective control, registered, to run",
     "why": "Twenty draws started from the stage-1 champions and trained for the five-vessel objective, then read once; the commands are in the rig commands.",
     "kind": "rig"
+   },
+   {
+    "path": "brain/BACKLOG_2026-11-12_BRAIN_PROJECTS.md",
+    "title": "The current backlog: ship against ship, the painting fly, the voxel home",
+    "why": "Three open brain projects for another chat to pick up, one at a time: what exists, what is missing, the stages, and the peers stage they share."
    }
   ]
  },
