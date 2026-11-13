@@ -7,6 +7,7 @@
 //   1  THE CATALOGUES       six hands, three helms, five brain files; every file a catalogue names is in FILES, is on disk, and is a brain for the policy and module FILES says; every entry says what it is not
 //   2  A FILE IS CHECKED    weightsOf gives the file's weights; a name that is not a file, a file not loaded, and a file for another policy are refused with a reason that names the file
 //   3  A SIDE IS ITS CHOICE each hand puts the right module and weights in the seats (none for the rule; the car's own hand weights for `car`; the trained file's for `car-trained`), each helm the right rule and network; sights and cannon pass; a bad hand, helm or file is refused by name
+//   3b A PEER'S FILES      (`choice.peer`) take what they have a brain for -- the seats, the helm, the escorts -- through brain/peerFleet.mjs, and leave the rest the choice's; junk seats nothing and breaks nothing; peerLines is the report
 //   4  THE FIGHT IS THE DUEL stepped to its end here it is battleshipDuel.duel() of the same sides to the bit; step() says how many ticks it stepped and steps none when the fight is done
 //   5  THE SNAPSHOT         the tally's numbers untouched (its `rounds` are still the rounds FIRED a side) plus the drawing's: a craft for a craft, thirteen seats a ship with the seat's own angles, `firing` exactly when the seat's count rose in the last tick, `working` exactly while its mount stands,
 //                           `net` exactly where a network sits, the rounds in flight, the cannon's charge (none without a cannon), the networks asked this tick
@@ -18,6 +19,8 @@
 //   C15 the rounds in flight overwrite the rounds fired 3 | C16 the arena's arrays are handed out 1 | C17 no cannon shows the never 1 | C18 the escorts are not passed 2
 // ONE WENT 0 RED THE FIRST TIME AND WAS A GAP IN THE GATE, closed and re-run: C11 -- in every natural fight the escorts are dead before a flagship is, so 'the arena is over' and 'a side has no capital ship' were the same tick (a flagship is now struck out by hand with its escorts flying).
 // TWO OF THE MUTANTS ARE MISTAKES THIS FILE'S FIRST DRAFT REALLY MADE, found by running it and not by the gate: C15 (the snapshot's rounds in flight took the name of the tally's rounds fired) and a seat's mount looked up by the seat's id where the ship lists it by the seat's place (C13's row holds that one).
+// AND SIX ONCE A SIDE COULD CARRY A PEER'S FILES (section 3b), all red: K1 a peer's gunner does not take the seats 1 | K2 a peer's helm does not take the helm 1 | K3 a peer's pilot does not fly 1 (these three by a section that THREW: red by the section's own row) | K4 the hand chosen stays beside the peer's gunner 1
+//   K5 the peer's helm corrects the bow-on rule whatever is chosen 1 | K6 peerLines says nothing 1
 // NOT CHECKED HERE: anything drawn (tools/ship/spaceDuelPage-selfcheck.mjs, in a browser).
 "use strict";
 import fs from "node:fs";
@@ -63,6 +66,22 @@ section(() => {
     ok("!! refused by name: a hand that is not in the catalogue, a helm that is not, a hand whose file was not loaded, a helm whose file is another policy's", throwsWith(() => s({ hand: "laser" }), /side "X": no hand "laser" \(rule, gpu, fly, fish, car, car-trained\)/) && throwsWith(() => s({ helm: "ram" }), /side "X": no helm "ram" \(face, broadside, trained\)/) && throwsWith(() => C.sideOf("B", { hand: "gpu" }, {}), /side "B": brain\/seatGunnerMlpWeightsDefault\.json was not loaded/) && throwsWith(() => C.sideOf("B", { helm: "trained" }, { helm: FILES.fly }), /side "B": brain\/helmWeightsDefault\.json: this brain is for "seatGunnerPolicy"/));
 });
 
+console.log("3b. A PEER'S FILES TAKE WHAT THEY HAVE A BRAIN FOR");
+section(() => {
+    const txt = (k) => JSON.stringify(FILES[k]), pilot = fs.readFileSync(new URL("../brain/pilot6dofWeightsDefault-d18.json", import.meta.url), "utf8"), P6 = D.PEER_POLICIES.pilot6dofPolicy.mod;
+    const gun = C.sideOf("A", { hand: "fly", helm: "trained", peer: [{ name: "peer-gpu.json", text: txt("gpu") }, { name: "junk.json", text: "{" }] }, FILES);
+    ok("!! a peer's gunner file takes ALL the seats from the hand chosen (the GPU Brain's in every seat, not the fruit fly's the choice named) and leaves the helm the choice's (the trained helm on the bow-on rule); the junk beside it refuses nothing else", gun.network === null && D.seatNetOf(gun, "main-a").module === SM && D.seatNetOf(gun, "pd-d2").module === SM && gun.helmNet.module === HP && gun.helmNet.weights.join() === Float32Array.from(FILES.helm.weights).join() && gun.helmRule === "face" && D.seatedBrains(gun).total === 14);
+    const zero = JSON.stringify({ ...FILES.helm, weights: FILES.helm.weights.map(() => 0), by: "a peer's helm" }), hl = C.sideOf("A", { hand: "car", helm: "broadside", gunners: "green", cannon: false, peer: [{ name: "peer-helm.json", text: zero }, { name: "peer-pilot.json", text: pilot }] }, FILES);
+    ok("!! a peer's helm file takes the helm and CORRECTS THE RULE THE HELM CHOICE NAMES (broadside), the seats stay the hand chosen (the car's), a pilot's file flies the escorts, and the sights and the cannon stay the choice's", hl.helmNet.module === HP && hl.helmNet.weights.every((v) => v === 0) && hl.helmRule === "broadside" && hl.network.module === ST && hl.seatNetworks === null && hl.pilots.length === 1 && hl.pilots[0].module === P6 && hl.gunners === "green" && hl.cannon === false && D.seatedBrains(hl, { escorts: 2 }).total === 16);
+    const none = C.sideOf("A", { hand: "gpu", peer: [{ name: "junk.json", text: "{" }] }, FILES), plain = C.sideOf("A", { hand: "gpu" }, FILES), empty = C.sideOf("A", { hand: "gpu", peer: [] }, FILES);
+    ok("peer files that seat nothing, and no peer files, leave the side exactly the choice's", JSON.stringify(D.seatedBrains(none)) === JSON.stringify(D.seatedBrains(plain)) && none.network.module === SM && none.seatNetworks === null && none.pilots === null && empty.network.module === SM);
+    const L = C.peerLines("A", { peer: [{ name: "peer-gpu.json", text: txt("gpu") }, { name: "junk.json", text: "{" }] });
+    ok("peerLines is the fleet's report -- a SEATED line for the file that was seated, a REFUSED line with its reason for the one that was not -- and no lines for a side with no peer files; it throws on nothing", L.length === 3 && /^fleet A: 1 brains seated/.test(L[0]) && /SEATED {3}peer-gpu\.json: seatGunnerMlp, seat/.test(L[1]) && /REFUSED {2}junk\.json: not JSON/.test(L[2]) && C.peerLines("A", {}).length === 0 && C.peerLines("A", { peer: [null, { text: 5 }] }).length === 3);
+    const f = C.createFight({ seed: 2, kind: "crossing", escorts: 2, a: { peer: [{ name: "g.json", text: txt("gpu") }, { name: "p.json", text: pilot }] }, b: {} }, FILES); while (!f.done) f.step(100);
+    const d = D.duel(f.sides[0], f.sides[1], 2, "crossing", { escorts: 2 }), s = f.snapshot();
+    ok("a fight with a side of peer files is the duel of that side: the fingerprint, and 15 networks seated (thirteen seats and two escorts)", s.fingerprint === d.fingerprint && s.brains.seated.join() === "15,0" && s.crafts.find((c) => c.kind === "capital").seats.every((q) => q.net));
+});
+
 console.log("4. THE FIGHT IS THE DUEL");
 section(() => {
     for (const setup of [{ seed: 2, kind: "crossing", a: { hand: "car", helm: "trained" }, b: { hand: "gpu" } }, { seed: 3, kind: "broadside", ships: 2, escorts: 3, a: { hand: "fish", gunners: "green" }, b: { hand: "rule", helm: "broadside", cannon: false } }]) {
@@ -96,7 +115,7 @@ section(() => {
 console.log("6. THE FRONT DOOR");
 section(() => {
     ok("the report says the catalogues as they are", C.reportLines().length === 2 && C.reportLines()[1].includes("6 hands (rule, gpu, fly, fish, car, car-trained), 3 helms (face, broadside, trained), 5 brain files"));
-    ok("the export list", Object.keys(C).sort().join() === "DEFAULT_CHOICE,FILES,GUNNERS,HANDS,HELMS,KINDS,MAX_ESCORTS,MAX_SHIPS,createFight,reportLines,sideOf,weightsOf");
+    ok("the export list", Object.keys(C).sort().join() === "DEFAULT_CHOICE,FILES,GUNNERS,HANDS,HELMS,KINDS,MAX_ESCORTS,MAX_SHIPS,createFight,peerLines,reportLines,sideOf,weightsOf");
 });
 
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);

@@ -7,6 +7,7 @@
 //           RACE CAR'S turret gunner laying the gun itself (`car`: the car's own untrained hand weights, no file; `car-trained`: the file trained in a ship's seat). Each says in `note` what it is NOT, in a line a page can show.
 //   HELMS   `face` (the arena's rule: the bow on the enemy), `broadside` (the hand rule), `trained` (the trained helm network correcting the bow-on rule -- the only rule it was trained for).
 //   FILES   the core reads no disk and no network: the page (or a gate) loads the brain files named in FILES and hands the parsed objects in. Each goes through brain/peerBrain.mjs's importBrain against the module it is for; a file that is refused refuses the SIDE, by name and with the reason.
+//   PEERS   a side's choice may carry `peer`: brain files as they arrived ([{ name, text }]). They go through brain/peerFleet.mjs (which never throws on a file) and take the seats, the helm and the escorts where they have a brain for them; the catalogue's choice stands for the rest. peerLines() is the report.
 //   A FIGHT createFight({ seed, kind, ships, escorts, a, b }, files) -> { step(n), snapshot(), done, build }. step() is battleshipDuel's own loop a tick at a time (finished(), the arena's step, the peak of networks asked); snapshot() is battleshipDuel.tally of the fight AS IT STANDS plus what a page draws:
 //           every craft's place and attitude, every seat's angles and whether it fired this tick, the rounds in flight, the cannon's charge. A fight stepped to its end here IS battleshipDuel.duel() of the same choices, to the bit, IN THE SAME ENGINE (the gate compares in node; the page's gate compares in the browser, where Math.log differs from node's in the last place and a fight is another fight).
 //
@@ -21,6 +22,7 @@ import * as SM from "../brain/seatGunnerMlp.mjs";
 import * as SF from "../brain/seatGunnerFish.mjs";
 import * as ST from "../brain/seatTurretGunner.mjs";
 import * as HP from "../brain/helmPolicy.mjs";
+import * as PF from "../brain/peerFleet.mjs";
 
 /** The brain files the page loads, by the name the catalogues below use: a path under brain/ and the policy it must be for. */
 export const FILES = Object.freeze({
@@ -62,8 +64,15 @@ export function sideOf(id, choice = {}, files = {}) {
     if (hand.id === "car") network = { module: ST, weights: ST.handWeights() };
     else if (hand.file) { const r = weightsOf(hand.file, files); if (!r.ok) throw new Error(`spaceDuelCore.sideOf: side "${id}": ${r.reason}`); network = { module: FILES[hand.file].mod, weights: r.weights }; }
     if (helm.file) { const r = weightsOf(helm.file, files); if (!r.ok) throw new Error(`spaceDuelCore.sideOf: side "${id}": ${r.reason}`); helmNet = { module: HP, weights: r.weights }; }
-    return D.makeSide(id, { label: id, gunners: c.gunners, cannon: c.cannon, helmRule: helm.rule, network, helmNet });
+    // A PEER'S FILES (`choice.peer`: [{ name, text }], as they arrived) go through brain/peerFleet.mjs and OVERRIDE the catalogue where they have something to seat: gunners' brains take the seats from `hand`, a helm's brain takes the helm (correcting the rule the helm choice names), pilots' brains fly the escorts.
+    // What the files do not decide stays the choice's. A file that is refused seats nothing and refuses nothing else: peerLines() says which and why.
+    const F = peerFleet(id, c), s = F ? F.side : null;
+    const side = D.makeSide(id, { label: id, gunners: c.gunners, cannon: c.cannon, helmRule: helm.rule, network: s && F.roles.seat ? null : network, seatNetworks: s && F.roles.seat ? s.seatNetworks : null, helmNet: s && F.roles.helm ? s.helmNet : helmNet });
+    return s && F.roles.pilot ? Object.freeze({ ...side, pilots: s.pilots }) : side;
 }
+const peerFleet = (id, c) => (Array.isArray(c.peer) && c.peer.length ? PF.fleet(id, c.peer, { gunners: c.gunners, cannon: c.cannon, helmRule: (HELMS.find((h) => h.id === c.helm) || HELMS[0]).rule }) : null);
+/** What a side's peer files came to, in lines a page shows (brain/peerFleet.mjs's fleetLines), or [] when the side has none. Never throws on a file. */
+export function peerLines(id, choice = {}) { const F = peerFleet(id, { ...DEFAULT_CHOICE, ...choice }); return F ? PF.fleetLines(F) : []; }
 
 /**
  * A fight to step and read. `setup` is { seed, kind, ships, escorts, seconds, a, b } (a and b are choices). Returns { build, sides, setup, step(n = 1) -> ticks stepped, snapshot(), get done() }.

@@ -18,7 +18,9 @@
 //   T10 pitch turns at the yaw slew 4 | T11 the arc is not kept 3 | T12 the trigger is the drop output 6 | T13 the trigger is the sight's 1 | T14 with no target the seat rests 3 | T15 any idle is taken 1 | T16 the hand's error is fed back 4 | T17 the hand's error is half 3 | T18 the pitch error is the yaw error 2
 //   T19 the shake does not depend on the tick 3 | T20 every seat shares one stream 3 | T21 every seat shares one sight 4 | T22 the network is asked with no target 2 (both are sections that THREW: red by the section's own row, not by a row that names the fault) | T23 post leaves the trigger unsquashed 1
 //   T24 the synapses start one late 6 | T25 the output weights are indexed by unit first 1 | T26 the policy id is the seat's 2 | T27 the default tick is a tenth 7 | T28 the hand's error is on by default 4
-// None went 0 red. NOT CHECKED: a gunner actually TRAINED on the race page and exported (none is in the tree: the page keeps them in the browser); brain/battleshipFight.mjs with this seat (it does not pass `sigma`, so the hand's error is off there: see the module's header); the GPU batch.
+// AND THREE ON brain/battleshipFight.mjs ONCE IT PASSED THE HAND'S ERROR (section 6b): E1 the hand's error is not passed 1 | E2 every ship's seats share their streams 1 | E3 the error is always the regular gunner's 1. E2 WENT 0 RED THE FIRST TIME: the row compared the seats' COMMANDS, which differ anyway because each
+// ship's sights have noise of their own; the gunner now says its hand's shake apart (`decide.shake`) and the row reads that.
+// None of the first twenty-eight went 0 red. NOT CHECKED: a gunner actually TRAINED on the race page and exported (none is in the tree: the page keeps them in the browser);  the GPU batch.
 "use strict";
 import * as ST from "./seatTurretGunner.mjs";
 import * as GP from "./gunnerPolicy.mjs";
@@ -26,6 +28,7 @@ import * as D from "./battleshipDuel.mjs";
 import * as PB from "./peerBrain.mjs";
 import * as CS from "../physics/mechanics/capitalShip.mjs";
 import * as GS from "../physics/mechanics/gunSeats.mjs";
+import * as BF from "./battleshipFight.mjs";
 
 let fails = 0;
 function ok(name, cond, detail) { console.log(`  ${cond ? "PASS" : "FAIL"}  ${name}${detail ? "   " + detail : ""}`); if (!cond) fails++; }
@@ -101,6 +104,16 @@ section(() => {
     ok("... and plainly behind perfect sights, where a proportional turn's lag is all there is: none won, 9 lost, -0.881", per.w === 0 && per.l === 9 && near(per.lead, -0.881, 0.0005), `${per.w} won, ${per.l} lost, ${per.lead.toFixed(3)}`);
     const filt = row(D.makeSide("car-steady", { network: { module: steady, weights: ST.handWeights() } }), D.makeSide("hand"));
     ok("!! *** WITHOUT THE HAND'S ERROR THE SAME WEIGHTS LEAD BY +1.710 (10 won, none lost): THE LEAD IS THE FILTER, which is why the error is put back *** ", filt.w === 10 && filt.l === 0 && near(filt.lead, 1.710, 0.0005), `${filt.w} won, ${filt.l} lost, ${filt.lead.toFixed(3)}`);
+});
+
+console.log("6b. THE SHIP-AGAINST-FIGHTERS FIGHT CARRIES THE HAND'S ERROR TOO (brain/battleshipFight.mjs, since 2026-11-14)");
+section(() => {
+    const net = { module: ST, weights: ST.handWeights() }, steady = { ...ST, gunnerFactory: (w, mk, o = {}) => ST.gunnerFactory(w, mk, { ...o, sigma: 0 }) }, key = (t) => `${t.killed}/${t.damageOnShip}/${t.ship.seatRounds}/${t.ship.hitsDealt}`;
+    const withErr = [1, 2].map((s) => key(BF.fight(s, "swarm", { network: net }))), without = [1, 2].map((s) => key(BF.fight(s, "swarm", { network: { module: steady, weights: ST.handWeights() } }))), zero = [1, 2].map((s) => key(BF.fight(s, "swarm", { network: net, gunners: { ...BF.GUNNERS.regular, sigma: 0 } }))), zeroSteady = [1, 2].map((s) => key(BF.fight(s, "swarm", { network: { module: steady, weights: ST.handWeights() }, gunners: { ...BF.GUNNERS.regular, sigma: 0 } })));
+    ok("!! two swarm attacks with the car's hand weights in the seats behind regular sights: the fight WITH the setting's aim error on the hand is not the fight with it forced off, so the error reaches this seat; and where the setting's own error is 0, forcing it off changes nothing", withErr.join() !== without.join() && zero.join() === zeroSteady.join(), `with ${withErr.join(" ")} | forced off ${without.join(" ")}`);
+    const b1 = BF.build(1, "swarm", { network: net, ships: 2 }), caps = b1.arena.crafts.filter((c) => c.kind === "capital"), shake = (c, k) => { const d = c.seats[k].decide, tg = [{ id: 99, pos: [c.body.pos[0], c.body.pos[1] + 200, c.body.pos[2] + 20], vel: [0, 0, 0], radius: 1.5 }]; let out = null; for (let i = 0; i < 40; i++) out = d(c.seats[k].seat, { yaw: 0, pitch: 0 }, c.body, tg, i / 30); return out && out.target === 99 ? d.shake.join() : null; };
+    const a3 = shake(caps[0], 3), b3 = shake(caps[1], 3), a4 = shake(caps[0], 4), again = shake(BF.build(1, "swarm", { network: net, ships: 2 }).arena.crafts.filter((c) => c.kind === "capital")[0], 3);
+    ok("!! each seat of each ship has a stream of its own for the HAND'S shake (read off the gunner's `shake`, apart from the sight's own noise): the same seat of the two ships is shaken differently, and so are two seats of one ship; the same fight built again shakes the same; the shake is not nothing", a3 !== null && a3 !== "0,0" && a3 !== b3 && a3 !== a4 && a3 === again, `${a3} | ${b3}`);
 });
 
 console.log("7. THE FRONT DOOR");

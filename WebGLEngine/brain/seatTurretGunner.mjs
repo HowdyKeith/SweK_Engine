@@ -15,8 +15,8 @@
 //
 // *** THE HAND'S AIM ERROR HAS TO BE PUT BACK, AND THIS WAS MEASURED BEFORE IT WAS WRITTEN. *** gunSeats.handGunner adds the gunner's aim error (`sigma`: 0.03 rad for a regular gunner) to the aim it REPORTS, every tick. A correcting network passes that aim on and carries the error; a network that lays the gun by rates from
 // the error it is shown AVERAGES it away -- a proportional turn is a low-pass filter. The car's untrained hand weights, seated without this, led the hand gunner by +1.71 in twelve ship-against-ship pairs behind regular sights and by +1.16 behind perfect ones, and TRAILED it by 0.93 with every noise taken out of both
-// (where all that is left is the lag): the lead was the filter and nothing else, and what it filtered was an error the arena means every gunner to have. So gunnerFor takes `sigma` -- the SAME error, drawn the same way, added each tick to where the network's rates have LAID the gun (the network turns `laid`, the seat is sent to `laid` plus the tick's error, and the error is not fed back: added to the seat's own angle it would be integrated into a random walk, which was tried first and cost the car's hand weights a further 1.0 of lead that no gunner's hand owes) -- and battleshipDuel passes the side's own. With `sigma` left
-// at 0 (brain/battleshipFight.mjs does not pass it) this seat is a gunner with a steadier hand than the arena's settings say, and a result from it says so or is not a result. Smoothing what the SIGHT measured (its noise is in the aim the network is shown) is still open to the network, and is a skill.
+// (where all that is left is the lag): the lead was the filter and nothing else, and what it filtered was an error the arena means every gunner to have. So gunnerFor takes `sigma` -- the SAME error, drawn the same way, added each tick to where the network's rates have LAID the gun (the network turns `laid`, the seat is sent to `laid` plus the tick's error, and the error is not fed back: added to the seat's own angle it would be integrated into a random walk, which was tried first and cost the car's hand weights a further 1.0 of lead that no gunner's hand owes) -- and battleshipDuel passes the side's own. brain/battleshipFight.mjs passes it too (since 2026-11-14; before that this seat was unfairly steady in the ship-against-fighters fight). With `sigma` left
+// at 0 by a caller that builds a gunner itself, this seat is a gunner with a steadier hand than the arena's settings say, and a result from it says so or is not a result. Smoothing what the SIGHT measured (its noise is in the aim the network is shown) is still open to the network, and is a skill.
 //
 // THE HAND WEIGHTS ARE THE CAR'S OWN (gunnerPolicy.handWeights(): turn at 12 x the bearing, lift at 8 x the pitch, fire when aligned) AND THEY ARE NOT THE HAND GUNNER -- unlike every other seat network's hand weights. A proportional turn LAGS a moving aim point where the hand gunner's seat goes straight to it at the slew
 // limit; the gate pins the two in the same fights. WHICH IS BETTER WAS FIRST SAID WRONG HERE: on twelve pairs the car's hand weights read 0.183 BEHIND the hand gunner and this header said they trail; on 600 fresh pairs (tools/ship/takeTurretAudit.mjs's audit and replication, 2026-11-14) they LEAD it, +0.099 (se 0.033, z 2.96), behind regular sights with the hand's error on. So the car's hand rule carries over to a ship's seat as it is and is a little better there than the seat's own hand gunner; behind perfect sights (twelve pairs only, not re-read) it read 0.881 behind.
@@ -68,13 +68,14 @@ export function gunnerFor(w, sight, { reach = REACH, dt = 1 / 30, idle = "hold",
         decide.last = { x: prep.x, y };
         let ey = 0, ep = 0;
         if (sigma) { const rng = mulberry((seed * 7919 + Math.round(prep.t * 1000) * 104729 + hash(prep.seat.id)) >>> 0); ey = gauss(rng) * sigma; ep = gauss(rng) * sigma; }   // THE HAND'S ERROR, on what the hand does (see the header)
+        decide.shake = [ey, ep];
         laid = clampToArc(prep.seat, laid.yaw + y[0] * prep.seat.slew.yaw * dt, laid.pitch + y[1] * prep.seat.slew.pitch * dt);
         return { yaw: laid.yaw + ey, pitch: laid.pitch + ep, fire: y[2] > 0, target: prep.rule.target };
     }
     function decide(seat, st, body, targets, t = 0) { const p = prepare(seat, st, body, targets, t); return finish(p, p.x === null ? null : fwd(w, p.x)); }
     decide.prepare = prepare; decide.finish = finish;
     decide.net = { w, forward: fwd, layersOf: lo, post: pst };
-    decide.last = null;
+    decide.last = null; decide.shake = [0, 0];   // `shake`: the hand's error added to the last command, [yaw, pitch] in radians (0 when sigma is 0): for a page to draw and for a gate to tell it from the sight's own noise
     return decide;
 }
 /** The factory spaceArena's `gunner(seat, k)` wants: each seat gets its own sight from `makeSight(seat, k)` and its own stream for the hand's error (`seed` + k). */

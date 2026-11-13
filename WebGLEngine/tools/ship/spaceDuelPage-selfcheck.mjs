@@ -11,14 +11,16 @@
 //   3  THE CONTROLS ARE THE FIGHT what newFight() builds is what the selects, numbers and boxes say, clamped to what a fight allows
 //   4  THE DRAWING IS THE STATE each hull is where its craft is, turned as it is turned; a barrel runs from its seat's mount along where the seat points; a ring stands at a seat a NETWORK works and at no other; a destroyed ship is drawn dark; one object a craft
 //   5  THE PANELS            thirteen seat rows a ship, `network` where a network works the seat and `rule` where none does, the hit points and the networks seated the fight's own
+//   7  A PEER'S BRAIN FILES   given to a side the way the file button gives them: they take the seats and the escorts they have a brain for, the fight is the core's own for the same files, each file's fate is listed under the controls, and `clear` forgets them
 //   6  A FIGHT THAT CANNOT BE BUILT is said: with a brain file taken away, choosing the hand that needs it names the file and builds nothing
 //
-// SABOTAGE LOG: (13 mutants, each written into space-duel.html itself, the gate run in the browser, the page restored byte for byte; the number is how many rows went red):
+// SABOTAGE LOG: (18 mutants, each written into space-duel.html itself, the gate run in the browser, the page restored byte for byte; the number is how many rows went red):
 //   G1 the page ignores side B's hand 7 | G2 the seed is not read 5 | G3 the ships are not clamped 1 | G4 the quaternion is set in the arena's order 1 | G5 a barrel points along the seat's rest 1 | G6 every barrel is nine units 1 | G7 a ring at every seat 1 | G8 a destroyed ship keeps its colour 1
 //   G9 the panel says network in every seat 1 | G10 a fight that cannot be built keeps the old one 1 | G12 the fight starts paused 2 | G13 the notes are side A's twice 1 | G14 the fish's file is not fetched 1 (the page did not boot: red by the boot row)
 //   (G11, the verdict without the fingerprint, was written and did NOT APPLY -- its text did not match the page's -- so it is not counted and that clause of section 2 is unsabotaged.)
+//   AND FIVE ON THE PEER FILES (section 7), all red: H1 the choice does not carry the peer files 2 | H2 clear does not forget 1 | H3 side A's peer lines are not shown 1 | H4 a side's files go to the other side 2 | H5 the lines are dropped 1
 // None went 0 red. WHAT THE FIRST RUNS OF THIS GATE FOUND, before any sabotage: the page did not load at all (OrbitControls imports "three" and the page had no import map); two of three fights were not node's (Math.log, above); and the first camera this page shipped with showed an empty sky, both ships just
-// outside the frame -- found by LOOKING at the picture SWEK_DUEL_SHOT writes, which no row reads. NOT CHECKED: that anything is in the frame (no row looks at pixels), the orbit controls, the layout at a phone's width, the cannon's beam, and the page on a real GPU.
+// outside the frame -- found by LOOKING at the picture SWEK_DUEL_SHOT writes, which no row reads. NOT CHECKED: that anything is in the frame (no row looks at pixels), the orbit controls, the layout at a phone's width, the cannon's beam, the page on a real GPU, and the FILE BUTTON itself (section 7 hands the files to the function the button's handler calls; no file dialog is opened).
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -38,6 +40,7 @@ const SETUPS = [
     { seed: 3, kind: "broadside", ships: 2, escorts: 3, a: { hand: "car-trained", helm: "trained", gunners: "green", cannon: true }, b: { hand: "fish", helm: "broadside", gunners: "regular", cannon: false } },
     { seed: 5, kind: "chase", ships: 1, escorts: 0, a: { hand: "rule", helm: "broadside", gunners: "perfect", cannon: false }, b: { hand: "fly", helm: "face", gunners: "ace", cannon: true } },
 ];
+const PEER = [{ name: "rig-gunner.json", text: JSON.stringify(files.gpu) }, { name: "broken.json", text: "{not json" }, { name: "mac-pilot.json", text: fs.readFileSync(path.join(ENG, "brain", "pilot6dofWeightsDefault-d18.json"), "utf8") }, { name: "copy.json", text: JSON.stringify(files.gpu) }];
 const nodeEnd = (setup) => { const f = C.createFight(setup, files); while (!f.done) f.step(100); const s = f.snapshot(); return { fingerprint: s.fingerprint, scores: s.scores, winner: s.winner, peak: s.brains.peak, seated: s.brains.seated, ticks: s.ticks }; };
 
 console.log("spaceDuelPage-selfcheck -- space-duel.html really is the fight it says\n");
@@ -45,7 +48,7 @@ const skip = webgpuSkipReason(createRequire(import.meta.url));
 if (skip) { console.log(`  SKIP  ${skip}`); console.log("  ----  *** NOT A PASS. ***"); fails++; }
 else {
     const run = await runInEngineOrigin({
-        engineRoot: ENG, timeoutMs: 400000, args: { SETUPS },
+        engineRoot: ENG, timeoutMs: 400000, args: { SETUPS, PEER },
         script: `async (args) => {
             const f = document.createElement("iframe"); f.style.width = "1500px"; f.style.height = "900px"; f.src = "/space-duel.html"; document.body.appendChild(f);
             await new Promise((res) => { f.onload = res; });
@@ -79,6 +82,13 @@ else {
             apply(args.SETUPS[0]); const kept = U.files.fish; delete U.files.fish; $("handB").value = "fish"; $("newBtn").click();
             out.refused = { fight: U.fight === null, error: U.error, status: $("status").textContent, drawn: U.drawnCount(), panel: $("panelA").textContent };
             U.files.fish = kept; $("newBtn").click(); out.recovered = { fight: U.fight !== null, error: U.error };
+            // a peer's files, given to side A the way the file button gives them
+            apply(args.SETUPS[2]); $("escorts").value = 2;
+            U.setPeers("A", args.PEER); const fp = U.fight; fp.step(30); U.redraw(); const sp = fp.snapshot(), capA = sp.crafts.find((c) => c.kind === "capital" && c.team === 1);
+            out.peer = { names: U.peersOf("A"), count: $("peerCountA").textContent, notes: $("notes").textContent, seated: sp.brains.seated, nets: capA.seats.filter((q) => q.net).length, rings: capA.seats.filter((q, i) => U.ringVisible(capA.id, i)).length, netCells: $("panelA").querySelectorAll("td.net").length, setup: U.setupNow().a };
+            const C3 = await import("/render/spaceDuelCore.mjs"), fe = C3.createFight({ ...args.SETUPS[2], escorts: 2, a: { ...args.SETUPS[2].a, peer: args.PEER } }, U.files); while (!fe.done) fe.step(100); while (!fp.done) fp.step(100);
+            out.peer.same = fp.snapshot().fingerprint === fe.snapshot().fingerprint;
+            $("peerClearA").click(); out.peerCleared = { names: U.peersOf("A"), seated: U.fight.snapshot().brains.seated, notes: $("notes").textContent, count: $("peerCountA").textContent };
             return out;
         }`,
     });
@@ -107,6 +117,10 @@ else {
             && r.fights.every((f) => f.panel.a.includes(`hit points ${f.panel.hp[0]} of`) && f.panel.a.includes(`networks seated ${f.panel.seated[0]}`) && f.panel.b.includes(`networks seated ${f.panel.seated[1]}`)) && r.fights[1].panel.a.includes("escorts") && r.fights[1].panel.b.includes("no cannon") && r.fights[1].panel.seated.join() === "28,26");
         console.log("6. A FIGHT THAT CANNOT BE BUILT");
         ok("!! with the fish's file taken away, choosing the fish names the file in the status line, builds no fight and draws nothing; with the file back the same choice builds", r.refused.fight && /seatGunnerFishWeightsDefault\.json was not loaded/.test(r.refused.error) && r.refused.status.includes("this fight cannot be built") && r.refused.status.includes("seatGunnerFishWeightsDefault.json") && r.refused.drawn === 0 && r.refused.panel === "" && r.recovered.fight && r.recovered.error === "");
+        console.log("7. A PEER'S BRAIN FILES");
+        ok("!! four files given to side A (a gunner, a broken file, a pilot, a copy of the gunner) over a side whose seats were the hand gunner's: the gunner's brain is in all thirteen seats (the snapshot, the rings and the panel agree), the pilot's flies the two escorts -- 15 networks seated where there were none -- and the fight is the core's own for the same files", r.peer.names.join() === "rig-gunner.json,broken.json,mac-pilot.json,copy.json" && r.peer.seated[0] === 15 && r.peer.nets === 13 && r.peer.rings === 13 && r.peer.netCells === 13 && r.peer.same && r.peer.setup.peer.length === 4 && r.peer.setup.hand === "rule", `seated ${r.peer.seated}`);
+        ok("!! each file's fate is under the controls: SEATED with what it works for the gunner and the pilot, REFUSED with the reason for the broken file (not JSON) and the copy (a duplicate, naming the first); the count beside the button says four files", /SEATED\s+rig-gunner\.json: seatGunnerMlp, seat -- 13 seats/.test(r.peer.notes) && /SEATED\s+mac-pilot\.json: pilot6dofPolicy, pilot/.test(r.peer.notes) && /REFUSED\s+broken\.json: not JSON/.test(r.peer.notes) && /REFUSED\s+copy\.json: the same weights as rig-gunner\.json/.test(r.peer.notes) && r.peer.count === "4 files");
+        ok("`clear` forgets them: no file, no line, no count, and the side is the hand gunner's again (no network seated)", r.peerCleared.names.length === 0 && r.peerCleared.seated[0] === 0 && !/SEATED|REFUSED/.test(r.peerCleared.notes) && r.peerCleared.count === "");
     }
 }
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);

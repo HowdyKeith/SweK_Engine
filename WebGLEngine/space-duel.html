@@ -14,7 +14,8 @@
   numbers in the notes under the controls were measured in node.
 
   WHAT IS DRAWN: each hull as a box of the ship's own half-extents in its side's colour (dark when destroyed), a barrel for every gun seat along where the seat points (bright while it fires, dim when its mount is shot out, a ring at its foot when a NETWORK works it), the rounds in flight, the escorts, and the
-  wave-motion cannon's beam for a third of a second when it fires. WHAT IS NOT: the hit spheres, a window per seat, the networks' own activity (space-battleship.html has those for the ship-against-fighters fight), the GPU (the networks run on the CPU), and a peer's brain file (the five files are the tree's own).
+  wave-motion cannon's beam for a third of a second when it fires. A PEER'S BRAIN FILES can be given to either side ('Peer brains...'): they go through brain/peerFleet.mjs, take the seats, the helm or the escorts they have a brain for, and each file's fate -- seated where, or refused why -- is listed under the controls.
+  WHAT IS NOT: the hit spheres, a window per seat, the networks' own activity (space-battleship.html has those for the ship-against-fighters fight), and the GPU (the networks run on the CPU).
   EVERY NUMBER OF THE SHIP IS INVENTED (physics/mechanics/capitalShip.mjs). Each hand and helm says under the controls what it is NOT -- what it was trained against, and what a larger audit made of it.
 -->
 <style>
@@ -61,8 +62,8 @@
     <label>speed <select id="speed"><option value="1">1&times;</option><option value="2" selected>2&times;</option><option value="4">4&times;</option><option value="8">8&times;</option></select></label>
     <label><input id="follow" type="checkbox" checked> follow</label>
   </div>
-  <div class="row"><b class="a">A</b> <label>gun seats <select id="handA"></select></label> <label>helm <select id="helmA"></select></label> <label>sights <select id="gunnersA"></select></label> <label><input id="cannonA" type="checkbox" checked> cannon</label></div>
-  <div class="row"><b class="b">B</b> <label>gun seats <select id="handB"></select></label> <label>helm <select id="helmB"></select></label> <label>sights <select id="gunnersB"></select></label> <label><input id="cannonB" type="checkbox" checked> cannon</label></div>
+  <div class="row"><b class="a">A</b> <label>gun seats <select id="handA"></select></label> <label>helm <select id="helmA"></select></label> <label>sights <select id="gunnersA"></select></label> <label><input id="cannonA" type="checkbox" checked> cannon</label> <button id="peerBtnA" title="load brain files a peer exported (swek-brain-v1 .json; several at once). A gunner's file takes this side's gun seats, a helm's its helm (correcting the helm rule chosen), a pilot's its escorts; what no file decides stays as chosen. A file that is refused is said below with the reason and seats nothing.">Peer brains&hellip;</button><input id="peerFileA" type="file" accept=".json,application/json" multiple hidden> <button id="peerClearA" title="forget this side's peer files">clear</button> <span id="peerCountA" class="kv"></span></div>
+  <div class="row"><b class="b">B</b> <label>gun seats <select id="handB"></select></label> <label>helm <select id="helmB"></select></label> <label>sights <select id="gunnersB"></select></label> <label><input id="cannonB" type="checkbox" checked> cannon</label> <button id="peerBtnB" title="load brain files a peer exported (swek-brain-v1 .json; several at once). A gunner's file takes this side's gun seats, a helm's its helm (correcting the helm rule chosen), a pilot's its escorts; what no file decides stays as chosen. A file that is refused is said below with the reason and seats nothing.">Peer brains&hellip;</button><input id="peerFileB" type="file" accept=".json,application/json" multiple hidden> <button id="peerClearB" title="forget this side's peer files">clear</button> <span id="peerCountB" class="kv"></span></div>
 </div>
 <div id="notes"></div>
 <main>
@@ -137,11 +138,13 @@ function draw(s) {
     beams = beams.filter((b) => { if (s.t <= b.userData.until) return true; world.remove(b); b.geometry.dispose(); b.material.dispose(); return false; });
     if ($("follow").checked) { const caps = s.crafts.filter((c) => c.kind === "capital"), m = [0, 1, 2].map((i) => caps.reduce((a, c) => a + c.pos[i], 0) / caps.length), d = new THREE.Vector3(m[0], m[1], m[2]).sub(orbit.target); orbit.target.add(d); camera.position.add(d); }
 }
-const choice = (s) => ({ hand: $("hand" + s).value, helm: $("helm" + s).value, gunners: $("gunners" + s).value, cannon: $("cannon" + s).checked });
+const peers = { A: [], B: [] };   // the brain files a peer sent for each side, as they arrived: [{ name, text }]
+const choice = (s) => ({ hand: $("hand" + s).value, helm: $("helm" + s).value, gunners: $("gunners" + s).value, cannon: $("cannon" + s).checked, ...(peers[s].length ? { peer: peers[s] } : {}) });
 const setupNow = () => ({ seed: Math.max(1, Math.floor(Number($("seed").value) || 1)), kind: $("kind").value, ships: Math.min(C.MAX_SHIPS, Math.max(1, Math.floor(Number($("ships").value) || 1))), escorts: Math.min(C.MAX_ESCORTS, Math.max(0, Math.floor(Number($("escorts").value) || 0))), a: choice("A"), b: choice("B") });
 function notes() {
     const line = (s, cls) => { const h = C.HANDS.find((x) => x.id === $("hand" + s).value), m = C.HELMS.find((x) => x.id === $("helm" + s).value); return `<b class="${cls}">${s}</b> seats: ${h.note}. Helm: ${m.note}.`; };
-    $("notes").innerHTML = line("A", "a") + "<br>" + line("B", "b") + (fileErrors.length ? `<br><span style="color:#ff6b6b">not loaded: ${fileErrors.join("; ")}</span>` : "");
+    const esc = (t) => t.replace(/[&<>]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[ch])), peerNote = (s) => { const L = C.peerLines(s, choice(s)); $("peerCount" + s).textContent = peers[s].length ? `${peers[s].length} file${peers[s].length > 1 ? "s" : ""}` : ""; return L.length ? `<div class="peer" style="white-space:pre-wrap">${esc(L.join("\n"))}</div>` : ""; };
+    $("notes").innerHTML = line("A", "a") + "<br>" + line("B", "b") + peerNote("A") + peerNote("B") + (fileErrors.length ? `<br><span style="color:#ff6b6b">not loaded: ${fileErrors.join("; ")}</span>` : "");
 }
 function newFight(setup = setupNow()) {
     lastError = ""; $("verdict").textContent = "";
@@ -176,9 +179,16 @@ $("newBtn").onclick = () => newFight();
 $("runBtn").onclick = () => { running = !running; $("runBtn").innerHTML = running ? "&#10074;&#10074; Pause" : "&#9654; Run"; };
 $("stepBtn").onclick = () => { if (fight && !fight.done) { fight.step(1); const s = fight.snapshot(); draw(s); status(s); panels(s); } };
 for (const id of ["handA", "handB", "helmA", "helmB"]) $(id).addEventListener("change", notes);
+/** Give a side its peer files (as text, as they arrived) and build the fight again; [] forgets them. What the file buttons do, and what a gate calls. */
+function setPeers(s, entries) { peers[s] = entries.map((e) => ({ name: String(e.name), text: e.text })); notes(); return newFight(); }
+for (const s of ["A", "B"]) {
+    $("peerBtn" + s).onclick = () => $("peerFile" + s).click();
+    $("peerClear" + s).onclick = () => setPeers(s, []);
+    $("peerFile" + s).onchange = async (ev) => { const list = [...ev.target.files], entries = []; for (const f of list) { let text = null; try { text = await f.text(); } catch {} entries.push({ name: f.name, text }); } ev.target.value = ""; setPeers(s, [...peers[s], ...entries]); };
+}
 notes(); newFight(); tick();
 // what a gate (tools/ship/spaceDuelPage-selfcheck.mjs) drives: the core, the files as loaded, the fight that runs, and the page's own verbs
-window.__duel = { core: C, files, fileErrors, get fight() { return fight; }, get error() { return lastError; }, newFight, setupNow, pause() { running = false; }, run() { running = true; }, drawnCount: () => drawn.size, barrelOf: (craftId, i) => { const g = drawn.get(craftId); const p = g.userData.barrels.geometry.attributes.position.array; return Array.from(p.slice(i * 6, i * 6 + 6)); }, ringVisible: (craftId, i) => drawn.get(craftId).userData.rings[i].visible, poseOf: (craftId) => { const g = drawn.get(craftId); return { pos: g.position.toArray(), q: [g.quaternion.w, g.quaternion.x, g.quaternion.y, g.quaternion.z], hull: g.userData.hull.material.color.getHex(), visible: g.visible }; }, redraw() { if (fight) { const s = fight.snapshot(); draw(s); status(s); panels(s); } }, shot() { resize(); renderer.render(scene, camera); return renderer.domElement.toDataURL("image/png"); }, ready: true };
+window.__duel = { core: C, files, fileErrors, setPeers, peersOf: (s) => peers[s].map((e) => e.name), get fight() { return fight; }, get error() { return lastError; }, newFight, setupNow, pause() { running = false; }, run() { running = true; }, drawnCount: () => drawn.size, barrelOf: (craftId, i) => { const g = drawn.get(craftId); const p = g.userData.barrels.geometry.attributes.position.array; return Array.from(p.slice(i * 6, i * 6 + 6)); }, ringVisible: (craftId, i) => drawn.get(craftId).userData.rings[i].visible, poseOf: (craftId) => { const g = drawn.get(craftId); return { pos: g.position.toArray(), q: [g.quaternion.w, g.quaternion.x, g.quaternion.y, g.quaternion.z], hull: g.userData.hull.material.color.getHex(), visible: g.visible }; }, redraw() { if (fight) { const s = fight.snapshot(); draw(s); status(s); panels(s); } }, shot() { resize(); renderer.render(scene, camera); return renderer.domElement.toDataURL("image/png"); }, ready: true };
 </script>
 <script type="module" src="/ui/pageNotesMount.mjs"></script>
 </body>
