@@ -2926,7 +2926,7 @@
    "f": "space-duel.html",
    "t": "SweK &middot; Space duel",
    "d": "Space duel: a capital ship against a capital ship (brain/battleshipDuel.mjs) -- choose each side's gunners, helm and cannon, watch the fight a tick at a time, and see which gun seats are worked by a network and how many networks were asked each tick.",
-   "g": "",
+   "g": "spacecombat",
    "p": 0
   },
   {

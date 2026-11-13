@@ -724,6 +724,10 @@ export const SECTIONS = [
     // submarine tank (sub-aquarium.html) and the ships on the sea (battleship3d.html). flight-coop.html and battleship3d.html had NO anchor on server.html at all (nothing linked them from it); they have one in Arriving now.
     { id: "flightsim", tab: "flightsim", label: "Flight Simulation", note: "every page that flies an aircraft, a spacecraft, a ship or a submarine under a physics model: free flight, 6DOF, dogfights, the tank of submarines",
       pages: ["flight.html", "flight-gpu.html", "flight-coop.html", "es-flight6dof.html", "es-aircraft.html", "es-box3d-fly3d.html", "es-box3d-6dof.html", "dogfight.html", "bomber.html", "space-battleship.html", "sub-aquarium.html", "sub-tournament.html", "switchboard.html", "sea-ogre.html", "battleship3d.html"] },
+    // UNNUMBERED (2026-11-14) -- SPACE COMBAT, KEITH'S CALL. space-duel.html arrived with Flight Simulation at its fifteen; asked whether it should have a drawer of its own or stay a loose link, Keith: "'Space Combat' is good." The pages that FIGHT in vacuum: the 6DOF fleet fight
+    // (es-box3d-6dof.html), the capital ship against fighters (space-battleship.html) and the capital ship against a capital ship (space-duel.html). FILED AFTER Flight Simulation, so the first two keep their homes there and are CLONED here, and Flight Simulation stays at fifteen; the duel page lives here.
+    { id: "spacecombat", tab: "spacecombat", label: "Space Combat", note: "the pages that fight in vacuum: the 6DOF fleets, a capital ship against fighters, a capital ship against a capital ship",
+      pages: ["es-box3d-6dof.html", "space-battleship.html", "space-duel.html"] },
 ];
 
 /** Keith's rule. A drawer of 25 is the flat row again with a lid on it. */
