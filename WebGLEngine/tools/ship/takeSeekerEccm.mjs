@@ -109,7 +109,7 @@ export function command(argv, io = {}) {
         if (argv.includes("--write")) { write(DEV_FILE, JSON.stringify({ set, chosen: res.chosen, rule: RULE, rows: res.rows.map((r) => ({ rung: r.rung, play: r.play, checks: r.checks, arms: Object.fromEntries(Object.entries(r.arms).map(([k, a]) => [k, strip(a)])) })) }, null, 1) + "\n"); log(`  written ${DEV_FILE}`); }
         return res.rows.some((r) => r.checks.length) ? 1 : 0;
     }
-    const rung = Number(flag("--rung")); if (!Number.isInteger(rung) || rung < 0 || rung >= LADDER.length) { log(`takeSeekerEccm: held needs --rung N, N one of 0 to ${LADDER.length - 1}`); return 2; }
+    const rv = flag("--rung"), rung = rv !== null && /^\d+$/.test(rv) ? Number(rv) : NaN; if (!Number.isInteger(rung) || rung < 0 || rung >= LADDER.length) { log(`takeSeekerEccm: held needs --rung N, N one of 0 to ${LADDER.length - 1}`); return 2; }
     if (argv.includes("--write") && exists(HELD_FILE)) { log(`takeSeekerEccm: ${HELD_FILE} exists; the HELD set is read once and a second read is refused`); return 2; }
     if (!io.heldSet && !argv.includes("--write")) { log("takeSeekerEccm: the HELD set is read once and the read is recorded; run held with --write (Amendment A: an unrecorded run spent a set once)"); return 2; }
     const hs = io.heldSet || "held", r = readHeld(rung, hs), L = LADDER[rung];   // io.heldSet is for the gate: it flies the smoke geometries, never the HELD set
