@@ -115,6 +115,8 @@ console.log("5. THE SCORE");
     const close = D.duel(FACE, BEAM, 2, "head-on", { seconds: 8 });
     const closeA = D.duel(FACE, BEAM, 3, "crossing", { seconds: 12 });
     ok("a lead that is not more than 0.05 is a DRAW, whichever side has it: head-on, seed 2, cut at eight seconds, 320 hit points dealt against 350 is 0.04 to B; crossing, seed 3, cut at twelve, 200 against 190 is 0.013 to A", close.damage.join() === "320,350" && Math.abs(close.scores[1] - close.scores[0] - 0.04) < 1e-12 && close.winner === "draw" && closeA.damage.join() === "200,190" && closeA.scores[0] > closeA.scores[1] && closeA.winner === "draw");
+    const sb = D.build(FACE, BEAM, 2, "crossing"), mid = []; let pk = 0; while (!D.finished(sb)) { sb.count.tick = 0; SA.stepSpaceArena(sb.arena); pk = Math.max(pk, sb.count.tick); if (sb.arena.i === 300) mid.push(D.tally(sb, pk)); }
+    ok("!! a fight stepped by hand (build, step until finished, tally) is duel()'s fight to the bit -- what a page does; and a tally taken at tick 300 of it is the fight AS IT STOOD: both ships flying, the scores the damage alone and each other's negative, no winner yet unless the damage says so", JSON.stringify(D.tally(sb, pk)) === JSON.stringify(d) && D.finished(sb) && mid.length === 1 && mid[0].ticks === 300 && mid[0].lost.join() === "0,0" && Math.abs(mid[0].scores[0] + mid[0].scores[1]) < 1e-12 && Math.abs(mid[0].scores[0] - (mid[0].damage[0] - mid[0].damage[1]) / 1500) < 1e-12 && !D.finished(D.build(FACE, BEAM, 2, "crossing")));
     const short = D.duel(FACE, FACE, 1, "broadside", { seconds: 5 });
     ok("a fight cut at five seconds ends at the bell with both ships flying and no bonus: the two scores are each other's negative", short.lost.join() === "0,0" && Math.abs(short.t - 5) < 0.04 && Math.abs(short.scores[0] + short.scores[1]) < 1e-12);
 }
@@ -163,7 +165,7 @@ console.log("9. THE FINDINGS, PINNED (seeds 1-2 of each kind: eight pairs, sixte
     const g = row(D.makeSide("gpu", { network: mlpNet }), D.makeSide("fly", { network: flyNet }));
     ok("!! THE GPU BRAIN'S SHIPPED HAND AGAINST THE FRUIT FLY'S, both bow-on behind regular sights (neither was trained against a ship or behind this sight): the GPU Brain's wins seven pairs of eight and loses none", g.w === 7 && g.l === 0 && Math.abs(g.lead - 1.012) < 0.0005, `${g.w} won, ${g.l} lost, mean lead ${g.lead.toFixed(3)}`);
     ok("the report lines say real numbers", D.reportLines().length === 2 && /\d+ pairs won, \d+ lost of 8, mean lead -?\d\.\d{3}/.test(D.reportLines()[1]));
-    ok("the front door: the export list", Object.keys(D).sort().join() === "BROADSIDE_LEAN,BROADSIDE_RANGE,BROADSIDE_ROLL,BROADSIDE_SLOPE,DECISIVE,HELM_RULES,KILL_BONUS,KINDS,LOSS,MAX_ESCORTS,MAX_SHIPS,PEER_POLICIES,RANGE,SECONDS,SHIP_SPACING,SPEED_BONUS,broadsideHelm,build,duel,makeSide,pair,quatYaw,reportLines,scenario,scoreFor,seatNetOf,seatedBrains,sideFromBrains");
+    ok("the front door: the export list", Object.keys(D).sort().join() === "BROADSIDE_LEAN,BROADSIDE_RANGE,BROADSIDE_ROLL,BROADSIDE_SLOPE,DECISIVE,HELM_RULES,KILL_BONUS,KINDS,LOSS,MAX_ESCORTS,MAX_SHIPS,PEER_POLICIES,RANGE,SECONDS,SHIP_SPACING,SPEED_BONUS,broadsideHelm,build,duel,finished,makeSide,pair,quatYaw,reportLines,scenario,scoreFor,seatNetOf,seatedBrains,sideFromBrains,tally");
 }
 
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);

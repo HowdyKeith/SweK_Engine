@@ -21,7 +21,7 @@
   }
  },
  "counts": {
-  "page": 502,
+  "page": 503,
   "demo": 49,
   "builtin": 38
  },
@@ -3360,6 +3360,14 @@
    "display": "Space Battleship",
    "href": "/space-battleship.html",
    "section": "Flight Simulation",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "space-duel.html",
+   "display": "Space Duel",
+   "href": "/space-duel.html",
+   "section": null,
    "collision": false
   },
   {

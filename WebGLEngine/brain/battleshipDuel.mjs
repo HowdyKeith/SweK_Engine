@@ -176,10 +176,19 @@ const F64 = new Float64Array(1), U8 = new Uint8Array(F64.buffer);
  * rounds: [A, B] (fired from seats), t, ticks, brains: { seated: [A, B], asked, peak, mean (asked per tick) }, fingerprint }. Deterministic. `onTick(arena)` is called after every tick if given.
  */
 export function duel(sideA, sideB, seed, kind, opts = {}) {
-    const b = build(sideA, sideB, seed, kind, opts), { arena, shipIds, count } = b, ships = opts.ships ?? 1, escorts = opts.escorts ?? 0;
+    const b = build(sideA, sideB, seed, kind, opts); let peak = 0;
+    while (!finished(b)) { b.count.tick = 0; SA.stepSpaceArena(b.arena); if (b.count.tick > peak) peak = b.count.tick; if (opts.onTick) opts.onTick(b.arena); }
+    return tally(b, peak);
+}
+/** Is a build()'s fight over? When the arena's clock has run out or a side has no capital ship flying (escorts alone do not keep it going). */
+export function finished(b) { return b.arena.done || !b.shipIds.every((ids) => ids.some((i) => !b.arena.crafts.find((c) => c.id === i).dead)); }
+/**
+ * A build()'s fight in numbers, AS IT STANDS (finished or not: a page reads it every frame): what duel() returns. `peak` is the most networks asked in one tick so far, which the caller counts as it steps (b.count.tick is this tick's). The kill bonus and the loss are given only for a fleet that is gone, so an unfinished
+ * fight's scores are its damage alone.
+ */
+export function tally(b, peak = 0) {
+    const { arena, shipIds, count, sides } = b, ships = shipIds[0].length, escorts = arena.crafts.filter((c) => c.kind === "fighter" && c.team === 1).length;
     const caps = shipIds.map((ids) => ids.map((i) => arena.crafts.find((c) => c.id === i))), flying = (t) => caps[t].some((c) => !c.dead);
-    let peak = 0;
-    while (!arena.done && flying(0) && flying(1)) { count.tick = 0; SA.stepSpaceArena(arena); if (count.tick > peak) peak = count.tick; if (opts.onTick) opts.onTick(arena); }
     const taken = caps.map((cs) => cs.reduce((a, c) => a + c.hpMax - Math.max(0, c.hp), 0)), hpSide = caps[0].reduce((a, c) => a + c.hpMax, 0), gone = [!flying(0), !flying(1)], timeLeft = Math.max(0, 1 - arena.t / arena.seconds);
     const scores = [scoreFor(taken[1], taken[0], gone[1], gone[0], timeLeft, hpSide), scoreFor(taken[0], taken[1], gone[0], gone[1], timeLeft, hpSide)];
     const mates = [1, 2].map((t) => arena.crafts.filter((c) => c.kind === "fighter" && c.team === t));
@@ -188,7 +197,7 @@ export function duel(sideA, sideB, seed, kind, opts = {}) {
         scores, score: scores[0], winner: scores[0] - scores[1] > DECISIVE ? "A" : scores[1] - scores[0] > DECISIVE ? "B" : "draw",
         hp: caps.map((cs) => cs.reduce((a, c) => a + Math.max(0, c.hp), 0)), damage: [taken[1], taken[0]], lost: caps.map((cs) => cs.filter((c) => c.dead).length), escortsLost: mates.map((m) => m.filter((c) => c.dead).length),
         waves: caps.map((cs) => cs.reduce((a, c) => a + c.waves, 0)), rounds: caps.map((cs) => cs.reduce((a, c) => a + c.seats.reduce((x, s) => x + s.state.gun.fired, 0), 0)),
-        t: arena.t, ticks: arena.i, brains: { seated: [seatedBrains(sideA, { ships, escorts }).total, seatedBrains(sideB, { ships, escorts }).total], asked: count.asked, peak, mean: arena.i ? count.asked / arena.i : 0 }, fingerprint: h.toString(16).padStart(8, "0"),
+        t: arena.t, ticks: arena.i, brains: { seated: [seatedBrains(sides[0], { ships, escorts }).total, seatedBrains(sides[1], { ships, escorts }).total], asked: count.asked, peak, mean: arena.i ? count.asked / arena.i : 0 }, fingerprint: h.toString(16).padStart(8, "0"),
     };
 }
 

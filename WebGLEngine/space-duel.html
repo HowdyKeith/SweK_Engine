@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SweK &middot; Space duel</title>
+<meta name="demo:desc" content="Space duel: a capital ship against a capital ship (brain/battleshipDuel.mjs) -- choose each side's gunners, helm and cannon, watch the fight a tick at a time, and see which gun seats are worked by a network and how many networks were asked each tick." />
+<!--
+  space-duel.html -- UNNUMBERED (the version is chosen at ship time)
+
+  A SHIP AGAINST A SHIP, WATCHED. brain/battleshipDuel.mjs sets two capital ships (or two lines of them, with escorts) against each other in a geometry a seed fixes; render/spaceDuelCore.mjs is everything this page knows that is arithmetic (the hands and helms a side can be given, the side they make, the fight
+  stepped and read a frame at a time). THE PAGE IS THE DRAWING AND THE CONTROLS: it loads the five brain files the core names, builds the fight from what is chosen, steps it, and draws what the core's snapshot says. A fight run to its end here is battleshipDuel.duel() of the same choices to the bit IN THIS BROWSER; the verdict
+  line carries its fingerprint. IT IS NOT NECESSARILY NODE'S FIGHT: a browser's Math.log and Math.pow can differ from node's in the last place (measured: Chrome 153 against node 22), the sights' noise is drawn through Math.log, and a fight that differs in one bit is soon another fight. The
+  numbers in the notes under the controls were measured in node.
+
+  WHAT IS DRAWN: each hull as a box of the ship's own half-extents in its side's colour (dark when destroyed), a barrel for every gun seat along where the seat points (bright while it fires, dim when its mount is shot out, a ring at its foot when a NETWORK works it), the rounds in flight, the escorts, and the
+  wave-motion cannon's beam for a third of a second when it fires. WHAT IS NOT: the hit spheres, a window per seat, the networks' own activity (space-battleship.html has those for the ship-against-fighters fight), the GPU (the networks run on the CPU), and a peer's brain file (the five files are the tree's own).
+  EVERY NUMBER OF THE SHIP IS INVENTED (physics/mechanics/capitalShip.mjs). Each hand and helm says under the controls what it is NOT -- what it was trained against, and what a larger audit made of it.
+-->
+<style>
+  :root { --bg:#05070c; --panel:#0b1018; --line:#1b2636; --ink:#cfd8e6; --dim:#6f7f96; --a:#5ab0ff; --b:#ff8a5a; --ok:#7be08a; --warn:#ffd45c; }
+  * { box-sizing:border-box; }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--ink); font:12px/1.5 ui-monospace,"SF Mono",Menlo,Consolas,monospace; }
+  header { padding:8px 12px; border-bottom:1px solid var(--line); }
+  h1 { margin:0 0 2px; font-size:14px; letter-spacing:.06em; text-transform:uppercase; color:var(--warn); }
+  header p { margin:0; color:var(--dim); max-width:1100px; }
+  .controls { display:flex; flex-wrap:wrap; gap:6px 12px; align-items:center; padding:8px 12px; border-bottom:1px solid var(--line); }
+  .controls label { color:var(--dim); } .controls b.a { color:var(--a); } .controls b.b { color:var(--b); }
+  select, input, button { background:#101826; color:var(--ink); border:1px solid #2a3a52; border-radius:4px; padding:2px 6px; font:inherit; }
+  input[type=number] { width:64px; } button { cursor:pointer; } button:hover { background:#17233a; }
+  .row { display:flex; flex-wrap:wrap; gap:6px 12px; align-items:center; width:100%; }
+  #notes { padding:4px 12px; color:var(--dim); border-bottom:1px solid var(--line); min-height:38px; } #notes b.a { color:var(--a); } #notes b.b { color:var(--b); }
+  main { display:grid; grid-template-columns:minmax(0,1fr) 300px 300px; height:calc(100vh - 210px); min-height:420px; }
+  #view { position:relative; min-width:0; } #view canvas { display:block; width:100%; height:100%; }
+  #status { position:absolute; left:8px; top:6px; right:8px; color:var(--ink); text-shadow:0 0 4px #000; pointer-events:none; white-space:pre-wrap; }
+  #verdict { position:absolute; left:8px; bottom:8px; font-size:14px; color:var(--warn); text-shadow:0 0 4px #000; }
+  .side { border-left:1px solid var(--line); background:var(--panel); padding:8px 10px; overflow:auto; }
+  .side h2 { margin:0 0 4px; font-size:12px; letter-spacing:.06em; text-transform:uppercase; } .side.a h2 { color:var(--a); } .side.b h2 { color:var(--b); }
+  .bar { height:8px; background:#1a2434; border-radius:4px; overflow:hidden; margin:3px 0 6px; } .bar i { display:block; height:100%; } .side.a .bar i { background:var(--a); } .side.b .bar i { background:var(--b); }
+  .kv { color:var(--dim); } .kv b { color:var(--ink); font-weight:normal; }
+  table { width:100%; border-collapse:collapse; margin-top:6px; } td { padding:1px 3px; border-bottom:1px solid #121a27; white-space:nowrap; } td.n { text-align:right; }
+  .dot { display:inline-block; width:8px; height:8px; border-radius:50%; background:#2a3446; vertical-align:middle; } .dot.fire { background:var(--warn); box-shadow:0 0 6px var(--warn); } .dot.out { background:#5a2020; } .dot.aim { background:#3d5a80; }
+  .net { color:var(--ok); } .rule { color:var(--dim); }
+  @media (max-width:900px) { main { grid-template-columns:1fr; height:auto; } #view { height:60vh; } .side { border-left:0; border-top:1px solid var(--line); } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Space duel &mdash; a capital ship against a capital ship</h1>
+  <p>Two sides in a geometry a seed fixes (<code>brain/battleshipDuel.mjs</code>). Choose who works each side's thirteen gun seats and its helm; a ring at a barrel's foot means a network works that seat. Every number of the ship is invented.</p>
+</header>
+<div class="controls">
+  <div class="row">
+    <label>seed <input id="seed" type="number" min="1" step="1" value="1"></label>
+    <label>start <select id="kind"></select></label>
+    <label title="capital ships a side, in line abreast">ships a side <input id="ships" type="number" min="1" max="4" value="1"></label>
+    <label title="fighters of each side, between the flagships">escorts a side <input id="escorts" type="number" min="0" max="12" value="0"></label>
+    <button id="newBtn" title="build the fight again from its first tick with what is chosen">&#8635; New fight</button>
+    <button id="runBtn">&#10074;&#10074; Pause</button>
+    <button id="stepBtn" title="one tick (1/30 s)">Step</button>
+    <label>speed <select id="speed"><option value="1">1&times;</option><option value="2" selected>2&times;</option><option value="4">4&times;</option><option value="8">8&times;</option></select></label>
+    <label><input id="follow" type="checkbox" checked> follow</label>
+  </div>
+  <div class="row"><b class="a">A</b> <label>gun seats <select id="handA"></select></label> <label>helm <select id="helmA"></select></label> <label>sights <select id="gunnersA"></select></label> <label><input id="cannonA" type="checkbox" checked> cannon</label></div>
+  <div class="row"><b class="b">B</b> <label>gun seats <select id="handB"></select></label> <label>helm <select id="helmB"></select></label> <label>sights <select id="gunnersB"></select></label> <label><input id="cannonB" type="checkbox" checked> cannon</label></div>
+</div>
+<div id="notes"></div>
+<main>
+  <div id="view"><div id="status">loading the brain files&hellip;</div><div id="verdict"></div></div>
+  <div class="side a" id="panelA"></div>
+  <div class="side b" id="panelB"></div>
+</main>
+<script type="importmap">
+{ "imports": { "three": "/vendor/three/three.module.js" } }
+</script>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "/vendor/three/jsm/controls/OrbitControls.js";
+import * as C from "/render/spaceDuelCore.mjs";
+import * as CS from "/physics/mechanics/capitalShip.mjs";
+import * as GS from "/physics/mechanics/gunSeats.mjs";
+import * as RB from "/physics/mechanics/rigidBody6dof.mjs";
+
+const $ = (id) => document.getElementById(id), COL = { 1: 0x5ab0ff, 2: 0xff8a5a }, SHIP = CS.createCapitalShip();
+const fill = (sel, items, value) => { sel.innerHTML = items.map((x) => `<option value="${x.id}">${x.label}</option>`).join(""); sel.value = value; };
+fill($("kind"), C.KINDS.map((k) => ({ id: k, label: k })), "head-on");
+for (const s of ["A", "B"]) { fill($("hand" + s), C.HANDS, "rule"); fill($("helm" + s), C.HELMS, "face"); fill($("gunners" + s), C.GUNNERS.map((g) => ({ id: g, label: g })), "regular"); }
+$("handA").value = "car"; $("handB").value = "gpu";
+
+// ---- the brain files (the core reads nothing itself) ----
+const files = {}, fileErrors = [];
+await Promise.all(Object.entries(C.FILES).map(async ([name, f]) => { try { const r = await fetch("/" + f.path); if (!r.ok) throw new Error(`HTTP ${r.status}`); files[name] = await r.json(); } catch (e) { fileErrors.push(`${f.path}: ${e.message}`); } }));
+
+// ---- the scene (the arena is z-up: a deck faces +Z) ----
+const view = $("view"), renderer = new THREE.WebGLRenderer({ antialias: true }); renderer.setPixelRatio(Math.min(2, devicePixelRatio || 1)); view.prepend(renderer.domElement);
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x05070c);
+const camera = new THREE.PerspectiveCamera(50, 1, 1, 20000); camera.up.set(0, 0, 1); camera.position.set(350, -520, 260);
+const orbit = new OrbitControls(camera, renderer.domElement); orbit.enableDamping = true;
+scene.add(new THREE.AmbientLight(0xffffff, 0.55)); const sun = new THREE.DirectionalLight(0xffffff, 1.1); sun.position.set(300, -200, 500); scene.add(sun);
+const world = new THREE.Group(); scene.add(world);
+const resize = () => { const w = view.clientWidth, h = view.clientHeight; renderer.setSize(w, h, false); camera.aspect = w / Math.max(1, h); camera.updateProjectionMatrix(); }; addEventListener("resize", resize); resize();
+const setPose = (obj, pos, q) => { obj.position.set(pos[0], pos[1], pos[2]); obj.quaternion.set(q[1], q[2], q[3], q[0]); };   // the arena's quaternions are [w, x, y, z]
+
+let fight = null, drawn = new Map(), shots = null, beams = [], running = true, lastError = "";
+function clearWorld() { for (const o of [...world.children]) { world.remove(o); o.traverse?.((n) => { n.geometry?.dispose?.(); n.material?.dispose?.(); }); } drawn = new Map(); beams = []; }
+function buildCraft(c) {
+    const g = new THREE.Group(), col = COL[c.team];
+    if (c.kind === "capital") {
+        const hull = new THREE.Mesh(new THREE.BoxGeometry(CS.HALF[0] * 2, CS.HALF[1] * 2, CS.HALF[2] * 2), new THREE.MeshStandardMaterial({ color: col, roughness: 0.7, metalness: 0.2 })); g.add(hull);
+        const bow = new THREE.Mesh(new THREE.ConeGeometry(4, 10, 12), new THREE.MeshStandardMaterial({ color: col })); bow.rotation.z = -Math.PI / 2; bow.position.x = CS.HALF[0] + 5; g.add(bow);
+        const pos = new Float32Array(SHIP.seats.length * 6), colr = new Float32Array(SHIP.seats.length * 6), geo = new THREE.BufferGeometry(); geo.setAttribute("position", new THREE.BufferAttribute(pos, 3)); geo.setAttribute("color", new THREE.BufferAttribute(colr, 3));
+        const barrels = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ vertexColors: true })); barrels.frustumCulled = false; g.add(barrels);
+        const rings = SHIP.seats.map((seat) => { const r = new THREE.Mesh(new THREE.RingGeometry(1.1, 1.7, 16), new THREE.MeshBasicMaterial({ color: 0x7be08a, side: THREE.DoubleSide })); r.position.set(seat.mount[0], seat.mount[1], seat.mount[2]); r.lookAt(seat.mount[0] + seat.rest[0], seat.mount[1] + seat.rest[1], seat.mount[2] + seat.rest[2]); r.visible = false; g.add(r); return r; });
+        g.userData = { hull, bow, barrels, rings };
+    } else { const m = new THREE.Mesh(new THREE.ConeGeometry(1.2, 4, 8), new THREE.MeshStandardMaterial({ color: col })); m.rotation.z = -Math.PI / 2; g.add(m); g.userData = { hull: m }; }
+    world.add(g); return g;
+}
+function draw(s) {
+    for (const c of s.crafts) {
+        let g = drawn.get(c.id); if (!g) drawn.set(c.id, g = buildCraft(c));
+        setPose(g, c.pos, c.q); g.userData.hull.material.color.setHex(c.dead ? 0x222831 : COL[c.team]); if (g.userData.bow) g.userData.bow.material.color.setHex(c.dead ? 0x222831 : COL[c.team]);
+        if (c.kind !== "capital") { g.visible = !c.dead; continue; }
+        const p = g.userData.barrels.geometry.attributes.position.array, k = g.userData.barrels.geometry.attributes.color.array;
+        c.seats.forEach((q, i) => {
+            const seat = SHIP.seats[i], d = GS.dirAt(seat, q.yaw, q.pitch), len = seat.id.startsWith("main") ? 9 : 4, o = i * 6, v = !q.working ? 0.18 : q.firing ? 1 : 0.55;
+            p[o] = seat.mount[0]; p[o + 1] = seat.mount[1]; p[o + 2] = seat.mount[2]; p[o + 3] = seat.mount[0] + d[0] * len; p[o + 4] = seat.mount[1] + d[1] * len; p[o + 5] = seat.mount[2] + d[2] * len;
+            for (let j = 0; j < 2; j++) { k[o + j * 3] = v; k[o + j * 3 + 1] = q.firing ? v : v * 0.9; k[o + j * 3 + 2] = q.firing ? 0.35 : v; }
+            g.userData.rings[i].visible = q.net && q.working;
+        });
+        g.userData.barrels.geometry.attributes.position.needsUpdate = true; g.userData.barrels.geometry.attributes.color.needsUpdate = true;
+    }
+    if (shots) { world.remove(shots); shots.geometry.dispose(); shots.material.dispose(); }
+    const sp = new Float32Array(s.shots.length * 3), sc = new Float32Array(s.shots.length * 3); s.shots.forEach((r, i) => { sp.set(r.pos, i * 3); const col = new THREE.Color(COL[r.team]).lerp(new THREE.Color(0xffffff), 0.5); sc.set([col.r, col.g, col.b], i * 3); });
+    const sg = new THREE.BufferGeometry(); sg.setAttribute("position", new THREE.BufferAttribute(sp, 3)); sg.setAttribute("color", new THREE.BufferAttribute(sc, 3)); shots = new THREE.Points(sg, new THREE.PointsMaterial({ size: 3, sizeAttenuation: false, vertexColors: true })); shots.frustumCulled = false; world.add(shots);
+    for (const e of s.events) if (e.type === "wave") { const c = s.crafts.find((x) => x.id === e.craft); if (!c) continue; const from = c.pos.map((v, i) => v + RB.rotateByQuat(c.q, SHIP.waveGun.muzzle)[i]), dir = RB.rotateByQuat(c.q, [1, 0, 0]), to = from.map((v, i) => v + dir[i] * SHIP.waveGun.range);
+        const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(...from), new THREE.Vector3(...to)]), new THREE.LineBasicMaterial({ color: 0xffffff })); line.userData.until = s.t + 0.33; world.add(line); beams.push(line); }
+    beams = beams.filter((b) => { if (s.t <= b.userData.until) return true; world.remove(b); b.geometry.dispose(); b.material.dispose(); return false; });
+    if ($("follow").checked) { const caps = s.crafts.filter((c) => c.kind === "capital"), m = [0, 1, 2].map((i) => caps.reduce((a, c) => a + c.pos[i], 0) / caps.length), d = new THREE.Vector3(m[0], m[1], m[2]).sub(orbit.target); orbit.target.add(d); camera.position.add(d); }
+}
+const choice = (s) => ({ hand: $("hand" + s).value, helm: $("helm" + s).value, gunners: $("gunners" + s).value, cannon: $("cannon" + s).checked });
+const setupNow = () => ({ seed: Math.max(1, Math.floor(Number($("seed").value) || 1)), kind: $("kind").value, ships: Math.min(C.MAX_SHIPS, Math.max(1, Math.floor(Number($("ships").value) || 1))), escorts: Math.min(C.MAX_ESCORTS, Math.max(0, Math.floor(Number($("escorts").value) || 0))), a: choice("A"), b: choice("B") });
+function notes() {
+    const line = (s, cls) => { const h = C.HANDS.find((x) => x.id === $("hand" + s).value), m = C.HELMS.find((x) => x.id === $("helm" + s).value); return `<b class="${cls}">${s}</b> seats: ${h.note}. Helm: ${m.note}.`; };
+    $("notes").innerHTML = line("A", "a") + "<br>" + line("B", "b") + (fileErrors.length ? `<br><span style="color:#ff6b6b">not loaded: ${fileErrors.join("; ")}</span>` : "");
+}
+function newFight(setup = setupNow()) {
+    lastError = ""; $("verdict").textContent = "";
+    try { fight = C.createFight(setup, files); } catch (e) { fight = null; lastError = e.message; $("status").textContent = "this fight cannot be built: " + e.message; clearWorld(); panels(null); return null; }
+    clearWorld(); const s = fight.snapshot(); const f = s.crafts.filter((c) => c.kind === "capital" && [1, fight.build.shipIds[1][0]].includes(c.id)), mid = [0, 1, 2].map((i) => (f[0].pos[i] + f[1].pos[i]) / 2);
+    const range = Math.hypot(...[0, 1, 2].map((i) => f[0].pos[i] - f[1].pos[i])), side = [0, 1, 2].map((i) => f[1].pos[i] - f[0].pos[i]), n = Math.hypot(side[0], side[1]) || 1, across = [-side[1] / n, side[0] / n];   // look from abeam of the line between the flagships, a little above the deck plane
+    orbit.target.set(mid[0], mid[1], mid[2]); camera.position.set(mid[0] + across[0] * range * 0.95, mid[1] + across[1] * range * 0.95, mid[2] + range * 0.4);   // far enough that both flagships are inside a 50-degree view draw(s); panels(s); status(s); return fight;
+}
+function panels(s) {
+    for (const [t, id, hand, helm] of [[1, "panelA", "handA", "helmA"], [2, "panelB", "handB", "helmB"]]) {
+        if (!s) { $(id).innerHTML = ""; continue; }
+        const k = t - 1, caps = s.crafts.filter((c) => c.kind === "capital" && c.team === t), hpMax = caps.reduce((a, c) => a + c.hpMax, 0), esc = s.crafts.filter((c) => c.kind === "fighter" && c.team === t);
+        const seats = caps.map((c) => `<tr><td colspan="4" class="kv">${c.name}${c.dead ? " &mdash; DESTROYED" : ""} &middot; ${c.hp}/${c.hpMax}${c.chargeFull ? ` &middot; cannon ${(100 * c.charge / c.chargeFull).toFixed(0)}%` : " &middot; no cannon"}</td></tr>` + c.seats.map((q) => `<tr><td><span class="dot ${!q.working ? "out" : q.firing ? "fire" : q.target != null ? "aim" : ""}"></span></td><td>${q.name}</td><td class="${q.net ? "net" : "rule"}">${q.net ? "network" : "rule"}</td><td class="n">${q.fired}</td></tr>`).join("")).join("");
+        $(id).innerHTML = `<h2>Side ${t === 1 ? "A" : "B"}</h2><div class="kv">seats <b>${C.HANDS.find((x) => x.id === $(hand).value).label}</b></div><div class="kv">helm <b>${C.HELMS.find((x) => x.id === $(helm).value).label}</b></div>
+          <div class="bar"><i style="width:${(100 * s.hp[k] / hpMax).toFixed(1)}%"></i></div>
+          <div class="kv">hit points <b>${s.hp[k]}</b> of ${hpMax} &middot; score <b>${s.scores[k].toFixed(3)}</b></div>
+          <div class="kv">dealt <b>${s.damage[k]}</b> &middot; rounds <b>${s.rounds[k]}</b> &middot; cannon shots <b>${s.waves[k]}</b></div>
+          <div class="kv">networks seated <b>${s.brains.seated[k]}</b>${esc.length ? ` &middot; escorts <b>${esc.filter((c) => !c.dead).length}</b> of ${esc.length}` : ""}</div><table>${seats}</table>`;
+    }
+}
+function status(s) {
+    $("status").textContent = `t ${s.t.toFixed(1)} s  tick ${s.ticks}   live brains: ${s.askedNow} asked this tick, peak ${s.brains.peak}, of ${s.brains.seated[0] + s.brains.seated[1]} seated   rounds in flight ${s.shots.length}`;
+    $("verdict").textContent = s.done ? `${s.winner === "draw" ? "A DRAW" : "SIDE " + s.winner + " WINS"}  —  scores ${s.scores.map((x) => x.toFixed(3)).join(" / ")}  —  fingerprint ${s.fingerprint}` : "";
+}
+let frame = 0;
+function tick() {
+    requestAnimationFrame(tick); orbit.update();
+    if (fight && running && !fight.done) { fight.step(Number($("speed").value)); const s = fight.snapshot(); draw(s); status(s); if (++frame % 6 === 0 || s.done) panels(s); }
+    renderer.render(scene, camera);
+}
+$("newBtn").onclick = () => newFight();
+$("runBtn").onclick = () => { running = !running; $("runBtn").innerHTML = running ? "&#10074;&#10074; Pause" : "&#9654; Run"; };
+$("stepBtn").onclick = () => { if (fight && !fight.done) { fight.step(1); const s = fight.snapshot(); draw(s); status(s); panels(s); } };
+for (const id of ["handA", "handB", "helmA", "helmB"]) $(id).addEventListener("change", notes);
+notes(); newFight(); tick();
+// what a gate (tools/ship/spaceDuelPage-selfcheck.mjs) drives: the core, the files as loaded, the fight that runs, and the page's own verbs
+window.__duel = { core: C, files, fileErrors, get fight() { return fight; }, get error() { return lastError; }, newFight, setupNow, pause() { running = false; }, run() { running = true; }, drawnCount: () => drawn.size, barrelOf: (craftId, i) => { const g = drawn.get(craftId); const p = g.userData.barrels.geometry.attributes.position.array; return Array.from(p.slice(i * 6, i * 6 + 6)); }, ringVisible: (craftId, i) => drawn.get(craftId).userData.rings[i].visible, poseOf: (craftId) => { const g = drawn.get(craftId); return { pos: g.position.toArray(), q: [g.quaternion.w, g.quaternion.x, g.quaternion.y, g.quaternion.z], hull: g.userData.hull.material.color.getHex(), visible: g.visible }; }, redraw() { if (fight) { const s = fight.snapshot(); draw(s); status(s); panels(s); } }, shot() { resize(); renderer.render(scene, camera); return renderer.domElement.toDataURL("image/png"); }, ready: true };
+</script>
+<script type="module" src="/ui/pageNotesMount.mjs"></script>
+</body>
+</html>
