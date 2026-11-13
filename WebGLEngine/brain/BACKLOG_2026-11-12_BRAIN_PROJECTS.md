@@ -15,7 +15,10 @@ house's method.
 **State, 2026-11-13:** `ship-vs-ship-brains` is TAKEN by another chat (branch `claude/epic-cori-2hm1my`, not on main yet: the duel
 `brain/battleshipDuel.mjs`, `space-duel.html`, a trained helm, the fish's gun seat, and `brain/peerFleet.mjs`, which takes in a
 folder of peers' brain files and sets them to a fleet action -- with no network in it, by its own header). `painting-fly` is
-STARTED in this chat (Keith: "Start with the painting fly"; its registration is `brain/PAINTING_FLY_WIP.md`). `voxel-home` and
+STARTED in this chat (Keith: "Start with the painting fly"): **P1 and P2 are DONE** -- the painter `brain/rl/paintCircuitPolicy.mjs`,
+the trainer's policy factory, and round 1 (`brain/PAINTING_FLY_WIP.md` section 10, gate `tools/ship/paintingFly-selfcheck.mjs`):
+THE FLY'S WIRING CANNOT BE TOLD APART FROM A SHUFFLE OF IT (p 0.56) and PAINTS WORSE THAN A PLAIN NET OF ITS SIZE (p 0.0014, about
+3 percent), every painter within 11 percent of a random one. **P3, the self-portrait, is OPEN.** `voxel-home` and
 `peer-jobs` are OPEN. Under `peer-jobs` the tree's own list (`tools/ship/todo.mjs`) has two open items no chat has touched:
 `peer-fly-brain-badge` (small) and `peer-brains-in-roster` (medium).
 

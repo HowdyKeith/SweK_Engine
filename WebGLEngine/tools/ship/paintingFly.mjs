@@ -167,6 +167,6 @@ export function readingLines(R) {
     out.push("", "arm     n   mean      sd        least     most");
     for (const [arm, s] of Object.entries(R.arms)) out.push(`${arm.padEnd(7)} ${String(s.n).padStart(2)}  ${f(s.mean)}  ${f(s.sd)}  ${f(s.min)}  ${f(s.max)}`);
     if (R.floors) { const r = stats(R.floors.random); out.push("", `eight random painters: ${f(r.mean)} +/- ${f(r.sd)}; the random search at 90 evaluations a shape (${R.floors.searchPictures} pictures): ${f(R.floors.search)}`, `untrained draw 1: ${Object.entries(R.floors.untrained).map(([a, v]) => `${a} ${f(v)}`).join(", ")}`); }
-    for (const [name, t] of [["T1 (FLY against SHUF)", R.T1], ["T2 (FLY against PLAIN)", R.T2]]) if (t) out.push("", `${name}: the fly's ranks sum to ${t.sumA} of ${t.n * (t.n + t.m + 1) / 2} at the middle, ties ${t.ties}; exact two-sided p ${t.p.toFixed(5)}`, `  ${t.word}`);
+    for (const [name, t] of [["T1 (FLY against SHUF)", R.T1], ["T2 (FLY against PLAIN)", R.T2]]) if (t) out.push("", `${name}: the fly's ranks sum to ${t.sumA} (the middle is ${t.n * (t.n + t.m + 1) / 2}), ties ${t.ties}; exact two-sided p ${t.p.toFixed(5)}`, `  ${t.word}`);
     return out;
 }

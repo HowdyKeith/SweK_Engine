@@ -10,6 +10,7 @@
 //   3  THE ROUND'S NUMBERS  tools/ship/paintingFly.mjs holds what the registration says, and the exact rank-sum test is exact
 //   4  THE RECORDS          the registration's checks, each failing by name on a results file that breaks it; the reading's words
 //   5  THE COMMAND          tools/ship/takePaintingFly.mjs refuses what it does not know, and this gate starts no training of the round's
+//   6  THE VERDICT          round 1, run 2026-11-13 and committed unread at 0abaffea: the file's bytes, the checks, the two readings, the arms beside the floors, the expectations against what came
 // SABOTAGE LOG (2026-11-13) -- through a byte-safe runner (one at a time, every file restored and its sha256 checked), the gate run whole; every one red by name (the number is the rows that went red):
 //   brain/rl/paintCircuitPolicy.mjs: A1 two steps where the tree takes three 1 | A2 no relu in the step 1 | A3 the synapses start at 0.01 1 | A4 a synapse runs backwards 1 | A5 PLAIN has 47 units 6 | A6 a unit onto itself is let in 1
 //     A7 the shuffle ignores its seed 2 | A8 SHUF is the fly's own wiring 6 | A9 no tanh on the outputs 1 | A10 a step reads what it has just written 1 | A11 the start ignores its seed 1 | A12 an edge twice is let in 1
@@ -29,8 +30,11 @@
 //   THREE FINDINGS ON THE WAY, each a row now. C20 (the audit plays one step fewer) went 0 RED: nothing counted the audit's steps; the row that asks the painter 15 times and plays the score by hand is the fix, and
 //   C20' is C20 again. Before the first run two more were seen by reading: a training that ignored its recipe would have carried the recipe in its record all the same (the row that calls the trainer itself with
 //   the record's recipe), and a record's score was checked through the library's own painter, which would have hidden a wrong wiring (the row builds the painter from the wiring's own factory).
+//   THE VERDICT'S (section 6, 2026-11-13), the same runner, each red by name: V1 a FLY score in the file made 0.0760 7 | V2 alpha one in ten thousand 4 | V3 T1 reads the PLAIN 3 | V4 the audit scores one picture fewer 2
+//     V5 the note's T2 word is CANNOT BE TOLD APART 1 | V6 the verdict's T2 pin reads BETTER 1 | V7 a tie counts for the claim 2 | V8 BETTER and WORSE swapped 5
 "use strict";
 import fs from "node:fs";
+import { createHash } from "node:crypto";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -198,6 +202,29 @@ section(() => {
     const me = src("tools/ship/paintingFly-selfcheck.mjs"), calls = [...me.matchAll(/PF\.trainOne\(([^)]*)\)/g)].map((m) => m[1]), probes = [...me.matchAll(/probe\(("[^)]*)\)/g)].map((m) => m[1]);
     ok("!! THIS GATE STARTS NO TRAINING OF THE ROUND'S AND LEAVES ITS RESULTS FILE AS IT WAS: every training here is at its own recipe (5 steps, 2 iterations) on draws 901 and 902 or refused before it starts; the command is never given the word run, nor a job it could do; and the file's size and time are what they were before this section",
         calls.length >= 5 && calls.every((c) => /, TINY, TINY_AUDIT$/.test(c)) && TINY.iters === 2 && !PF.SEEDS.includes(901) && probes.length === 4 && probes.every((p) => !/"run"/.test(p) && PF.parseArgs(JSON.parse(`[${p}]`)) === null) && stateOf() === before, `${calls.length} trainings, ${probes.length + 1} probes, the file ${before === "absent" ? "absent" : "unchanged"}`);
+});
+
+console.log("\n6. THE VERDICT (round 1; the results were committed at 0abaffea before they were read, and are read here from the file)");
+section(() => {
+    const bytes = fs.readFileSync(path.join(ENG, PF.RESULTS)), lines = bytes.toString("utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l)), R = PF.reading(lines), near = (a, b, e = 5e-6) => Math.abs(a - b) < e;
+    ok("!! the results file is the one the run wrote: 82 records, sha256 e870553804e4535b...", lines.length === 82 && createHash("sha256").update(bytes).digest("hex") === "e870553804e4535b2e9711ce0e6e82c5e3edf6848d1852c5da9942a8e4676b4b");
+    ok("!! THE CHECKS HOLD: 80 draws each once, the registered recipe, each arm's weight count and wiring, FLY draw 1 the same twice, the floors", R.checks.length === 0, R.checks.slice(0, 2).join(" | "));
+    ok("!! *** T1, THE WIRING: THE FLY'S WIRING CANNOT BE TOLD APART FROM A SHUFFLE OF IT *** -- the fly's ranks sum to 280 (the middle is 264), no tie, exact two-sided p 0.5641", R.T1 && R.T1.word === "THE FLY'S WIRING CANNOT BE TOLD APART FROM A SHUFFLE OF IT" && R.T1.sumA === 280 && R.T1.ties === 0 && near(R.T1.p, 0.564102), R.T1 ? `p ${R.T1.p.toFixed(5)}` : "no test");
+    ok("!! *** T2, THE RECURRENCE AT THIS SIZE: THE FLY'S WIRING PAINTS WORSE THAN A PLAIN NET OF ITS SIZE *** -- the fly's ranks sum to 182 (196 or less speaks), no tie, exact two-sided p 0.00144", R.T2 && R.T2.word === "THE FLY'S WIRING PAINTS WORSE THAN A PLAIN NET OF ITS SIZE" && R.T2.sumA === 182 && R.T2.sumA <= 196 && R.T2.ties === 0 && near(R.T2.p, 0.001443), R.T2 ? `p ${R.T2.p.toFixed(5)}` : "no test");
+    const A = R.arms, fl = R.floors, rMean = fl.random.reduce((a, b) => a + b, 0) / 8, draws = lines.filter((r) => r.kind === "draw");
+    ok("!! the arms, 16 draws each (mean, sd): FLY 0.06919 0.00200, SHUF 0.06893 0.00168, PLAIN 0.07107 0.00059, FISH 0.06974 0.00125, MLP 0.07097 0.00078 -- the two arms with no synapses lead and vary a third as much",
+        near(A.FLY.mean, 0.06919) && near(A.FLY.sd, 0.00200) && near(A.SHUF.mean, 0.06893) && near(A.SHUF.sd, 0.00168) && near(A.PLAIN.mean, 0.07107) && near(A.PLAIN.sd, 0.00059) && near(A.FISH.mean, 0.06974) && near(A.FISH.sd, 0.00125) && near(A.MLP.mean, 0.07097) && near(A.MLP.sd, 0.00078) &&
+        Math.min(A.PLAIN.mean, A.MLP.mean) > Math.max(A.FLY.mean, A.SHUF.mean, A.FISH.mean) && Math.max(A.PLAIN.sd, A.MLP.sd) < 0.5 * Math.min(A.FLY.sd, A.SHUF.sd));
+    ok("!! BESIDE THE FLOORS, SAID PLAINLY: eight random painters close 0.06512 and the best arm's mean is 9 percent above that; 79 of the 80 trained draws are above the random painters' mean (FLY draw 5, 0.06370, is below it); and the random search at 90 evaluations a shape closes 0.13944, about twice the best draw (0.07222)",
+        near(rMean, 0.06512) && near(A.PLAIN.mean / rMean, 1.0914, 1e-3) && draws.filter((r) => r.score > rMean).length === 79 && draws.find((r) => r.score <= rMean).arm === "FLY" && draws.find((r) => r.score <= rMean).s === 5 && near(fl.search, 0.13944) && near(Math.max(...draws.map((r) => r.score)), 0.07222) && fl.search > 1.9 * Math.max(...draws.map((r) => r.score)));
+    ok("an untrained painter closes almost nothing (draw 1: 0.0047 to 0.0054 an arm), so the training is where the 0.07 comes from", Object.values(fl.untrained).every((v) => v > 0.004 && v < 0.006));
+    // two records an arm, their weights audited again here (400 pictures an arm: not a training)
+    const again = PF.ARMS.flatMap((arm) => [3, 11].map((s) => { const r = draws.find((d) => d.arm === arm && d.s === s), p = arm === "MLP" ? PF.policyOf(arm, s) : P.painterFactory(arm, s)({ obsDim: OBS_DIM, actDim: ACT_DIM }); p.setParams(PF.unpackWeights(r.weights)); return [arm, s, PF.auditScore(p).score === r.score]; }));
+    ok("!! THE WEIGHTS IN A RECORD GIVE ITS SCORE AGAIN: draws 3 and 11 of every arm, audited here on the 200 pictures through the wiring's own factory, to the bit", again.every((x) => x[2]), again.filter((x) => !x[2]).map((x) => x[0] + " " + x[1]).join(", "));
+    const note = src("brain/PAINTING_FLY_WIP.md");
+    ok("the expectations, written before any code, against what came: T1 CANNOT BE TOLD APART was the 75 percent guess; T2 WORSE was the 30 percent one (CANNOT BE TOLD APART had 55); every arm's mean is above the random painters (85); no arm reaches the random search (90); the FISH's mean lies between the PLAIN's and the FLY's (40)",
+        /T1: CANNOT BE TOLD APART about 75 percent/.test(note) && /T2: CANNOT BE TOLD APART about 55 percent, FLY WORSE about 30/.test(note) && PF.ARMS.every((a) => A[a].mean > rMean) && PF.ARMS.every((a) => A[a].max < fl.search) && A.FISH.mean > A.FLY.mean && A.FISH.mean < A.PLAIN.mean);
+    ok("the registration carries the result (section 10) with both readings' words", /## 10\. The result/.test(note) && note.includes(R.T1.word) && note.includes(R.T2.word));
 });
 
 console.log(`\npaintingFly-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILED"}`);

@@ -80,3 +80,31 @@ trainings on four processes: 10 to 30 minutes in the sandbox. No rig is needed.
 ## 9. The run (to be written; the gate never runs it)
 `node tools/ship/takePaintingFly.mjs run` -> `brain/paintingFlyRound.jsonl`, one record a training (resumable), committed byte for
 byte before it is read; `node tools/ship/takePaintingFly.mjs read` prints the checks and the reading.
+
+## 10. The result (run 2026-11-13 in the sandbox, 6.8 minutes; `brain/paintingFlyRound.jsonl` committed at 0abaffea before it was read; read once)
+**The checks hold** (80 draws, each once; the recipe; each arm's weight count and wiring; FLY draw 1 the same twice).
+
+| arm | mean | sd | least | most |
+|---|---|---|---|---|
+| FLY | 0.06919 | 0.00200 | 0.06370 | 0.07180 |
+| SHUF | 0.06893 | 0.00168 | 0.06618 | 0.07098 |
+| PLAIN | 0.07107 | 0.00059 | 0.06996 | 0.07203 |
+| FISH | 0.06974 | 0.00125 | 0.06793 | 0.07213 |
+| MLP | 0.07097 | 0.00078 | 0.06875 | 0.07222 |
+
+* **T1: THE FLY'S WIRING CANNOT BE TOLD APART FROM A SHUFFLE OF IT** (the fly's ranks sum to 280, the middle 264; exact two-sided p 0.5641).
+* **T2: THE FLY'S WIRING PAINTS WORSE THAN A PLAIN NET OF ITS SIZE** (the fly's ranks sum to 182, and 196 or less speaks; p 0.00144).
+* **Beside the floors:** eight random painters close 0.06512 +- 0.00042, and the best arm's mean is 9 percent above that; 79 of the 80
+  draws are above the random painters' mean (FLY draw 5 is below it). The random search at 90 evaluations a shape closes 0.13944,
+  about twice the best draw. An untrained painter closes about 0.005.
+* **Against the expectations:** T1 was the 75 percent guess. T2's WORSE was the 30 percent guess, not the favourite. Every arm above
+  the random painters in the mean, none near the random search, and the FISH between the PLAIN and the FLY: as guessed.
+
+**What it means, and no more:** under this trainer and this budget, on these pictures, WHERE the 313 synapses are makes no
+difference that 16 draws can see, and HAVING them costs about 3 percent against a plain net of the same weight count. The two arms
+with no recurrent weights (PLAIN, MLP) lead and vary about a third as much from draw to draw; the three with them (FLY, SHUF, FISH)
+sit together below. That fits the reason written in section 6 before the run (noise of sigma 0.14 on recurrent weights applied three
+times is noise a plain net does not carry), and this round did not test that reason: a smaller sigma on the synapses, or a longer
+training, is a different round. NOT REGISTERED, so not a reading: the FLY against the MLP looks the same as against the PLAIN.
+All of it is small beside the task: every trained painter here is within 11 percent of a random one, and half a random search.
+The gate holds every number above from the file (`tools/ship/paintingFly-selfcheck.mjs` section 6).
