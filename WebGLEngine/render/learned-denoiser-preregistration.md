@@ -11910,3 +11910,55 @@ round 82's loss is the samples' information, which moving them takes from most o
 D_U's 3.14 % over the shipped denoiser on uniform frames is the one thing here that could change the chain. It would need its own round,
 pre-registered: is a denoiser retrained this way better on today's frames, and what does an 11th channel cost on the device? Whether to open
 it is Keith's call.
+
+## 194. ROUND 85's VERDICT -- H85 FAILS: U_TH8 COSTS THE INTEL 0.18-0.20 OF A FRAME IN THREE RUNS AND 0.27 IN ONE, AND EVERY RUN MUST HOLD
+
+**The runs.** Eight realGpuRun reports at the rounds' commit, each committed byte for byte before it was read. Six of them count.
+- **The Intel's first pair** (denoise-rig-s190-{a,b}-intel.json, at 57edf87e, 902b352) does not count: run without Playwright (section 191).
+- **The Intel's second upload** held FOUR reports at e40fb591 (7fd5f4b), all on intel gen-9 (D3D12 31.0.101.2137), every gate green:
+  - c and d, the pair the commands named for it;
+  - two more written to the 1080's names (the 1080's commands run on the Intel machine), committed under those names and then renamed,
+    bytes unchanged, -e-intel (15:47 UTC) and -f-intel (16:05) (3265a73).
+- **The 1080's pair** (denoise-rig-s190-{a,b}-gtx1080.json, at e40fb591, 98e7ef2), nvidia pascal (D3D12 32.0.15.8180):
+  - **run a does not count.** denoiseCompile-selfcheck's native children crashed: exit 3221225477, an access violation, with four children
+    giving no result. That gate is not U_TH8's; U_TH8's own gate was green and printed its line.
+  - run b counts.
+
+**How the Intel's runs are counted, fixed before the 1080's were read.** H85 asks for U <= 0.25 T "in both of each GPU's runs", and h71
+holds only when every counting run holds. The Intel made four counting runs, so all four are its runs. Counting only c and d, the pair the
+commands named, would have been chosen after e was seen, so they are not taken alone.
+
+| run | GPU | U_TH8 (ms) | T (ms) | **U_TH8 / T** | U_TH (round 74's line) / T |
+|---|---|---|---|---|---|
+| e | Intel | 117.731 | 429.104 | **0.274** | 0.385 |
+| f | Intel | 79.339 | 432.014 | **0.184** | 0.265 |
+| c | Intel | 88.124 | 444.180 | **0.198** | 0.317 |
+| d | Intel | 83.077 | 442.420 | **0.188** | 0.260 |
+| a (not counted) | 1080 | 3.423 | 39.689 | 0.086 | 0.146 |
+| b | 1080 | 3.395 | 37.831 | **0.090** | 0.154 |
+
+**The verdict: H85 FAILS as fixed.**
+- **The Intel fails:** run e is at 0.274, over 0.25. The other three are 0.18-0.20.
+- **The 1080 has no verdict by h71:** only one run counts. Its counting run is at 0.090, and the run that does not count read 0.086.
+- A failure on either GPU fails H85, so it fails whatever a second counting 1080 run would read.
+
+**The description, deciding nothing.**
+- **Run e was slow throughout.** U_TH in the same run read 0.385, against 0.26-0.32 in the other three. It was the first of the four.
+- **Without e, U_TH8 is 0.18-0.20 of the Intel's frame,** against U_TH's 0.26-0.32 in the same runs: 63-72 % of U_TH's time, run by run.
+- **On the Intel the full-size passes are now nearly half of it.** In runs f, c and d, the down pass and the upsample with the hold take
+  32-36 ms of 79-88; the four layers 47-53. On the 1080, U_TH8 is 3.4 ms against U_TH's 5.8.
+
+**The predictions.**
+- **P5 MISSED:** I predicted U 70-100 ms and U / T 0.13-0.20, so that H85 would hold on the Intel. Three runs land inside both ranges; run e
+  (117.7 ms, 0.274) does not, and H85 fails there.
+- **P6 HELD:** on the 1080, U is 3.40 ms and U / T 0.090 in the counting run (2.5-4.5 ms, 0.06-0.12).
+
+**What it means, as section 190 fixed it** (its "H84a holds and H85 fails on the Intel" reading). 8 wide is not cheap enough by the rule as
+fixed, and U_TH stays the 1080 class's alone. The quarter-size input is the next cut. It fails by one run of four, a run that was slow for
+U_TH too; that is said here and changes nothing.
+
+Two things would come before a round on that cut:
+- the full-size passes, now half the Intel's cost, which a quarter-size network does not shrink;
+- whether the slow first run is the machine warming up, in which case the timing rule should say how runs are warmed.
+
+Neither is set up.

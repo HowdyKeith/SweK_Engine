@@ -31,6 +31,10 @@
 //   its head zero -> 1 red each; E13 U_TH8's parity run on the loop down pass -> *** 0 RED at first *** (the two passes agree bit for bit,
 //   and the row read only the timed run's pass), then 1 with the parity run's own pass checked. Each restored byte-identical.
 // SECTION 191: Y9 an Intel run's U_TH gate printing a section 190 line -> 1 red. Restored byte-identical.
+// SECTION 194 (round 85's verdict rows, sabotaged in the committed reports and the registration, each restored byte-identical): X1 run e's
+//   U_TH8 typed 97.731 ms, X2 the 1080's crashed child typed exit 0, X4 the 1080's counting U_TH8 typed 3.959 ms, X5 run c's layer 0
+//   typed 29.408, X6 section 194 taking c and d alone, X7 it calling P5 held, X8 its layers typed 47-52 (what I first wrote), X9 it sending
+//   U_TH8 to the Intel class -> 1 red each; X3 run f's U_TH typed 104.390 ms -> 2 red.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -320,6 +324,37 @@ console.log("\n6. SECTION 191: ROUND 85's INTEL RUNS, READ BY ITS OWN RULE");
     ok("!! *** the Intel's two round 85 runs (57edf87e) DO NOT COUNT: this gate failed in under a second in each, no Playwright in the clone, and printed no section 190 line -- readH85 reads no U, and h71 gives no verdict ***",
         runs.every((rp) => rp.commit.startsWith("57edf87e")) && q.every((x) => x.counts === false && x.U === null && x.ratio === null) && G.h71(q) === "no verdict" &&
         lg.every((x) => x.ok === false && x.ms < 1000 && x.skips.some((s) => /playwright is not installed/.test(s)) && !x.measured.some((l) => /^section 190:/.test(l))));
+}
+
+console.log("\n7. SECTION 194: ROUND 85's VERDICT, RE-DERIVED FROM ITS COMMITTED REPORTS");
+{
+    const rd = (k) => JSON.parse(fs.readFileSync(path.join(ENG, "render", `denoise-rig-s190-${k}.json`), "utf8")), adapters = (rp) => [...new Set(rp.gates.flatMap((x) => x.adapters || []))].join(" ");
+    const intel = ["e-intel", "f-intel", "c-intel", "d-intel"].map(rd), nv = ["a-gtx1080", "b-gtx1080"].map(rd), qi = intel.map((rp) => G.readH85(rp)), qn = nv.map((rp) => G.readH85(rp));
+    const near = (a, b, e = 5e-4) => Math.abs(a - b) < e;
+    ok("!! the six reports at e40fb591: the four in the Intel's upload all on intel gen-9 (two of them written to the 1080's names, renamed -e and -f), every gate green; the 1080's two on nvidia pascal",
+        [...intel, ...nv].every((rp) => rp.commit.startsWith("e40fb591")) && intel.every((rp) => /intel gen-9/.test(adapters(rp)) && !/nvidia/.test(adapters(rp)) && rp.gates.every((x) => x.ok)) &&
+        nv.every((rp) => /nvidia pascal/.test(adapters(rp)) && !/intel/.test(adapters(rp))) && intel.map((rp) => rp.at.slice(11, 16)).join() === "15:47,16:05,16:18,16:31");
+    const ca = nv[0].gates.find((x) => x.gate === "render/denoiseCompile-selfcheck.mjs");
+    ok("!! the 1080's run a does not count: denoiseCompile-selfcheck's native children crashed (exit 3221225477) and four gave no result; run b counts -- so h71 gives the 1080 no verdict",
+        qn[0].counts === false && ca.ok === false && ca.exit.status === 3221225477 && ca.fails.some((f) => /a child that exits without one/.test(f)) && nv[0].gates.filter((x) => !x.ok).length === 1 &&
+        qn[1].counts === true && nv[1].gates.every((x) => x.ok) && G.h71(qn) === "no verdict");
+    ok("!! *** H85 FAILS: on the Intel U_TH8 / T is 0.274, 0.184, 0.198, 0.188 (117.7, 79.3, 88.1, 83.1 ms) -- every run counts and run e is over 0.25, so h71 fails there; on the 1080 0.090 (3.395 ms) in its counting run ***",
+        qi.every((q) => q.counts) && G.h71(qi) === "fails" && [0.2744, 0.1836, 0.1984, 0.1878].every((v, i) => near(qi[i].ratio, v)) && [117.731, 79.339, 88.124, 83.077].every((v, i) => qi[i].U === v) &&
+        qi[0].ratio > G.H71_RATIO && qi.slice(1).every((q) => q.ratio <= G.H71_RATIO) && qn[1].U === 3.395 && near(qn[1].ratio, 0.0897) && qn[0].U === 3.423);
+    const ui = intel.map((rp) => G.readH74(rp)), un = nv.map((rp) => G.readH74(rp));
+    ok("  the description: U_TH (round 74's line) in the same runs 0.385, 0.265, 0.317, 0.260 on the Intel and 0.146 / 0.154 on the 1080 (5.780 / 5.813 ms); taking c and d alone would have held",
+        [0.3852, 0.2648, 0.3166, 0.2601].every((v, i) => near(ui[i].ratio, v)) && near(un[0].ratio, 0.1456) && near(un[1].ratio, 0.1537) && un[0].U === 5.78 && un[1].U === 5.813 && G.h71(qi.slice(2)) === "holds");
+    // the per-pass figures section 194 states, off the section 190 lines of runs f, c and d (I first wrote "about 64 %" and "47-52"; they are 63-72 % and 47-53)
+    const passes = intel.slice(1).map((rp) => { const l = rp.gates.find((x) => x.gate === "render/denoiseLearnedUpscaleGPU-selfcheck.mjs").measured.find((x) => /^section 190:/.test(x));
+        const v = (k) => +l.match(new RegExp(k + " ([\\d.]+)"))[1]; return { full: v("down") + v("upsample and hold"), layers: v("layer 0") + v("layer 1") + v("layer 2") + v("layer 3") }; });
+    const share = [1, 2, 3].map((i) => qi[i].U / ui[i].U);
+    ok("  ...and the per-pass split in runs f, c, d: the full-size passes 32-36 ms, the layers 47-53 ms; U_TH8 63-72 % of U_TH's time run by run",
+        passes.every((x) => x.full >= 32 && x.full <= 36.5 && x.layers >= 47 && x.layers <= 53.5) && Math.round(Math.min(...share) * 100) === 63 && Math.round(Math.max(...share) * 100) === 72,
+        passes.map((x) => `${x.full.toFixed(1)} + ${x.layers.toFixed(1)}`).join(", ") + "; " + share.map((x) => (100 * x).toFixed(1) + " %").join(", "));
+    const reg = fs.readFileSync(path.join(ENG, "render", "learned-denoiser-preregistration.md"), "utf8"), i194 = reg.indexOf("## 194."), s194 = reg.slice(i194, reg.indexOf("\n## ", i194 + 1) > 0 ? reg.indexOf("\n## ", i194 + 1) : undefined);
+    ok("  section 194 says H85 fails, how the Intel's four runs are counted and that c and d are not taken alone, the 1080's run a not counting, P5 missed and P6 held, and U_TH staying the 1080 class's (and the per-pass figures as derived above)",
+        i194 > 0 && /\*\*The verdict: H85 FAILS as fixed\.\*\*/.test(s194) && /are not taken alone/.test(s194) && /\*\*run a does not count\.\*\*/.test(s194) && /\*\*P5 MISSED:\*\*/.test(s194) && /\*\*P6 HELD:\*\*/.test(s194) &&
+        /U_TH stays the 1080 class's alone/.test(s194) && /fixed before the 1080's were read/.test(s194) && /63-72 % of U_TH's time/.test(s194) && /the four layers 47-53\./.test(s194) && /32-36 ms of 79-88/.test(s194));
 }
 
 console.log(`\n${fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"} (${Date.now() - t0} ms)` +
