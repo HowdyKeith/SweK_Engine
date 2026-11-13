@@ -93,7 +93,7 @@ console.log("\n5. THE FRONT DOOR");
     ok("!! the export list is pinned: FEATURES, FEATURE_NAMES, HIDDEN, OUTPUTS, OUTPUT_NAMES, REC_EDGES, REC_STEPS, THROTTLE_FRACTION, TORQUE_FRACTION, WEIGHT_COUNT, featuresOf, forward, handWeights, helmFactory, helmFor, layersOf, perturb, reportLines, zeroWeights",
         Object.keys(H).sort().join() === "FEATURES,FEATURE_NAMES,HIDDEN,OUTPUTS,OUTPUT_NAMES,REC_EDGES,REC_STEPS,THROTTLE_FRACTION,TORQUE_FRACTION,WEIGHT_COUNT,featuresOf,forward,handWeights,helmFactory,helmFor,layersOf,perturb,reportLines,zeroWeights", Object.keys(H).sort().join());
     const lines = H.reportLines();
-    ok("!! the report lines name the module, say 930 weights and that the rule is the network with none non-zero, and say that NO HELM WAS TRAINED", lines.length === 2 && lines.every((l) => !/NaN|undefined/.test(l)) && /helmPolicy/.test(lines[0]) && /930 weights/.test(lines[1]) && /0 non-zero weights/.test(lines[1]) && /no helm network was trained/.test(lines[1]), lines[1]);
+    ok("!! the report lines name the module, say 930 weights and that the rule is the network with none non-zero, and name the one trained helm and its trainer", lines.length === 2 && lines.every((l) => !/NaN|undefined/.test(l)) && /helmPolicy/.test(lines[0]) && /930 weights/.test(lines[1]) && /0 non-zero weights/.test(lines[1]) && /a helm trained for the ship-against-ship duel is brain\/helmWeightsDefault\.json \(tools\/ship\/trainHelm\.mjs\)/.test(lines[1]), lines[1]);
 }
 
 console.log(fails ? `\n${fails} FAIL` : "\nall checks pass");

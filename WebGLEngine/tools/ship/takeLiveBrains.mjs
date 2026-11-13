@@ -3,8 +3,8 @@
 // Run: node tools/ship/takeLiveBrains.mjs [--seconds 10] [--kind head-on] [--seed 1]      (about a minute; prints, writes nothing)
 //
 // HOW MANY NETWORKS CAN A FLEET ACTION ASK IN REAL TIME ON THIS BOX? Keith's question ("how much live brains can we achieve"), answered by measurement and for THIS machine only. A LIVE BRAIN is brain/battleshipDuel.mjs's: a network asked for a decision in a tick -- a gun seat's hand, a helm's correction,
-// an escort's pilot. Both sides of a brain/battleshipDuel.mjs fight are given the shipped brain files the way a peer's would arrive (sideFromBrains: the fruit fly's gunner and the GPU Brain's dealt round the seats, the fruit fly's pilot and the GPU Brain's round the escorts, a helm network with the zero
-// weights -- NO HELM WAS TRAINED, so the helm's network is asked and corrects nothing), the fight is stepped for the first `--seconds` of each fleet size, and each tick is timed.
+// an escort's pilot. Both sides of a brain/battleshipDuel.mjs fight are given the shipped brain files the way a peer's would arrive (sideFromBrains: the fruit fly's gunner and the GPU Brain's dealt round the seats, the fruit fly's pilot and the GPU Brain's round the escorts, the helm that
+// tools/ship/trainHelm.mjs trained), the fight is stepped for the first `--seconds` of each fleet size, and each tick is timed.
 //
 //   seated     the networks the two sides brought (13 seats and a helm a ship, a pilot an escort)
 //   peak/mean  the most asked in one tick and the mean a tick: a seat with no target in its arc is not asked, a dead craft's are not
@@ -20,17 +20,15 @@ import * as D from "../../brain/battleshipDuel.mjs";
 import * as SA from "../../brain/spaceArena.mjs";
 import * as SG from "../../brain/seatGunnerPolicy.mjs";
 import * as SM from "../../brain/seatGunnerMlp.mjs";
-import * as HP from "../../brain/helmPolicy.mjs";
 import * as P6 from "../../brain/pilot6dofPolicy.mjs";
 import * as PM from "../../brain/pilot6dofMlp.mjs";
 
 export const BUDGET_MS = 1000 / 30;
 export const FLEETS = Object.freeze([[1, 0], [1, 4], [1, 12], [2, 8], [3, 12], [4, 12]]);   // [ships, escorts] a side
 const J = (f) => JSON.parse(fs.readFileSync(new URL("../../brain/" + f, import.meta.url), "utf8"));
-/** The shipped brains as a peer's files would arrive, plus a helm with the zero weights (the rule: no helm was trained). */
+/** The shipped brains as a peer's files would arrive: the two gunners, the trained helm, the two pilots. */
 export function shippedBrains() {
-    const pil = J("pilot6dofWeightsDefault-d18.json");
-    return [J("seatGunnerWeightsDefault.json"), J("seatGunnerMlpWeightsDefault.json"), { ...pil, policy: "helmPolicy", weights: Array.from(HP.handWeights()), by: "the zero weights: the rule (no helm was trained)", score: null }, pil, J("pilot6dofMlpWeightsDefault.json")];
+    return [J("seatGunnerWeightsDefault.json"), J("seatGunnerMlpWeightsDefault.json"), J("helmWeightsDefault.json"), J("pilot6dofWeightsDefault-d18.json"), J("pilot6dofMlpWeightsDefault.json")];
 }
 /** Step one fleet size for `seconds` and time every tick: { ships, escorts, seated, peak, mean, ms: { mean, p95, max }, xReal, ticks, flying (crafts still flying at the end), crafts }. */
 export function measure(ships, escorts, { seconds = 10, kind = "head-on", seed = 1, now = () => performance.now() } = {}) {
