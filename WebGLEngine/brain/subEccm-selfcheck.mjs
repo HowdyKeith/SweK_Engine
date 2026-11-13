@@ -12,7 +12,22 @@
 //   5 THE SOURCE    no clock, no random number; the headers; the registration's ladder equals the code's
 // NOT CHECKED, said plainly: that the options are a good model of a seeker (the numbers are chosen, not measured), which rung DEV chooses and what HELD says (that is the experiment).
 //
-// SABOTAGES: see the log below the gate's last section header comment once it is written (this file is written before its sabotage pass).
+// SABOTAGES (2026-11-13; every mutant is applied to a COPY of the target in one of four isolated trees whose directories are real -- the closure of the gate's imports, 93 files -- the gate is run there and killed at its first FAIL; the trees are checked against the sources
+// after the pass: the harness reported brain/subDuel.mjs as differing in pass 1 because item 2's hook was added to the working copy while the pass ran, and the tree's copy was compared by sha with the committed file it was made from (191ead81a) and is identical):
+//   PASS 1, the gate as first written (370 mutants: 337 token mutants -- an operator, a comparison, a boolean or a number moved by one, one at a time -- on every line of tools/ship/takeSeekerEccm.mjs and on the lines of physics/mechanics/subTorpedo.mjs and brain/subDuel.mjs
+//     this item changed, and 33 hand mutants, a named behaviour broken): 243 + 27 red by name, 31 + 1 crashes of the gate, 63 + 5 alive. Before the pass the gate had already found one real defect, in the command and not in a mutant: `held` with no --rung read it as rung 0 (Number(null)).
+//   WHAT THE SURVIVORS OF PASS 1 SHOWED (each is a row now): the fates and ticks of an arm's fights (statusX, statusY were never read); the whole sentence of seekerOf's refusal and of each check; the edge of the mechanism checks (ONE recognised decoy, ONE held look is enough); `held` at its rung edges
+//     (rung 0 accepted, rung 6 refused by name, not run into the ladder's error); `held` with the override and no --write; the dev --write path and the indent of both written files (through `io.devSet`, which flies the smoke geometries); a failed check's NOT WEIGHED line and its exit code
+//     (through `io.checks`); the held output to the byte. Two overrides, `io.devSet` and `io.checks`, and the checker's being a parameter of calibrate() and readHeld(), were added for the gate and every line they touched was re-mutated in pass 2.
+//   PASS 2, the gate with its rows (378 mutants, 340 token and 38 hand): 279 + 34 red, 31 + 1 crashes, 30 + 3 alive. The 33 that stand are EQUIVALENT, argued:
+//     subTorpedo.mjs  the guard `if (!(p > 0)) return false` in the draw's helper (>=, -1, true: the only caller already tests classifyReject > 0, so p is above 0 whenever it runs); the last mixing shift 14 -> 13 or 15 and the divisor 2^32 -> 2^32 +- 1 and `<` -> `<=` in
+//       `draw < p` (they move the draw by under 2^-14 of its range or by 2^-32: a decision flips only if the draw lands that close to p, and the pinned 217 of 400 and the first sixteen torpedoes do not); the same guard in the caller (`classifyReject > 0` -> `>= 0`, `> -1`: the helper then returns false for p = 0)
+//       the signature's defaults (dt, tick, seed, floor): flown against the torpedo's own gate they die 4 of 9; against the countermeasures gate, which pins them, 9 of 9 (the old rows of those gates, not this one's)
+//     subDuel.mjs  `(h >>> 0)` -> `h >>>= 0` in the fingerprint (the assignment returns the same unsigned value)
+//     takeSeekerEccm.mjs  the digits inside a comment (92001 to 92024); `Object.values(arms)[0].n` -> `[1]` (any arm of a different size is still flagged against the other); the argument parser `flag`: `i < 0` -> `<= 0`, `< 1`, `< -1` (a flag is never at index 0, and
+//       a missing flag then returns the mode word, which `--set` takes as its default and `--rung` refuses exactly as it refuses null); `rung < 0` -> `< -1` (the regular expression of the line before admits no negative); `typeof process !== "undefined" && ...` -> `||` (always true under node)
+//     hand: the lockId null test (a source id is never null: `x.id === null` is false either way); the classifier's guard order (`>= 0`, above); the no-kit duel path's seeker (with no decoy in the water and one boat to hear, neither option can change a flight or a count).
+// NOT SABOTAGED: section 5's reads of the headers and of the registration (they read text), and the numbers of the registered read (they are not code).
 "use strict";
 import fs from "node:fs";
 import crypto from "node:crypto";
