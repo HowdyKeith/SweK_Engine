@@ -11,7 +11,7 @@
 // WHAT A CIRCUIT DOES HERE is set WHICH recurrent weights may exist: the twelve features through an encoder into the circuit's neurons, three weight-tied recurrent steps over its synapses (every other recurrent weight structurally zero, the identity added), out to three numbers. createSeatCircuit(topo) is that for any
 // wiring of the baked shape ({ NEURON_ORDER, EDGES: [toIdx, fromIdx] }); the arithmetic is seatGunnerPolicy's own, layer by layer (the gate runs the fruit fly's wiring through this file and compares it with that file to the bit).
 //
-// *** THE HAND WEIGHTS ARE THE HAND GUNNER, as the fruit fly's: the 'aimed' feature through hidden unit 0 into the trigger (+4, -2), no correction, the recurrent core zero -- three non-zero weights, and a seat given them does what a seat given the hand gunner does, to the bit. NOTHING HERE IS TRAINED: a result
+// *** THE HAND WEIGHTS ARE THE HAND GUNNER, as the fruit fly's: the 'aimed' feature through hidden unit 0 into the trigger (+4, -2), no correction, the recurrent core zero -- three non-zero weights, and a seat given them does what a seat given the hand gunner does, to the bit. NOTHING IN THIS FILE IS TRAINED. ONE WAS TRAINED LATER (2026-11-13, tools/ship/trainFishSeat.mjs -> brain/seatGunnerFishWeightsDefault.json, beating the hand gunner behind the green sight) AND THE FISH'S WIRING DID NOTHING IN IT: no synapse carries a weight, and the control trained to the same weights. A result
 // would say what a fish-shaped recurrent core costs or buys over the hand gunner in a seat -- not that a fish can lay a gun. *** Pure: no I/O, no clock, no Math.random.
 "use strict";
 import { mlpLayerCpu } from "../render/brainTsl.mjs";
@@ -87,7 +87,7 @@ export const control = createSeatCircuit(controlTopology(ZF, CONTROL_SEED));
 export function reportLines() {
     const nz = Array.from(handWeights()).filter((v) => v !== 0).length;
     return ["[seatGunnerFish] the fish in a gun seat: the hand gunner's sight, and the larval zebrafish's circuit for the hand (a correction to the aim and the trigger); and a random circuit of its size as the control",
-        `  ${FEATURES} features, ${HIDDEN} hidden neurons (the Fish1 TEN core, ${REC_EDGES} synapses), ${OUTPUTS} outputs: ${WEIGHT_COUNT} weights; the hand weights are the hand gunner through the network in ${nz} non-zero weights; nothing is trained`];
+        `  ${FEATURES} features, ${HIDDEN} hidden neurons (the Fish1 TEN core, ${REC_EDGES} synapses), ${OUTPUTS} outputs: ${WEIGHT_COUNT} weights; the hand weights are the hand gunner through the network in ${nz} non-zero weights; the trained file uses none of the synapses`];
 }
 
 if (typeof process !== "undefined" && Array.isArray(process.argv)) {   // see physics/mechanics/aircraftAssembly.mjs for why this is guarded and the import is dynamic

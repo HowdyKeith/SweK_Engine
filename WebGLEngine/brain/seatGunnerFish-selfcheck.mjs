@@ -1,6 +1,6 @@
 // WebGLEngine/brain/seatGunnerFish-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
-// Run: node brain/seatGunnerFish-selfcheck.mjs      (a few seconds: six fights)
+// Run: node brain/seatGunnerFish-selfcheck.mjs      (about half a minute: thirty fights)
 //
 // THE FISH IN A GUN SEAT, HELD TO THE FRUIT FLY'S CONTRACT (brain/seatGunnerPolicy-selfcheck.mjs holds that one). brain/seatGunnerFish.mjs is the seat gunner's network over the larval zebrafish's circuit, and the same library over a random circuit of its size as the control. Six things hold it:
 //
@@ -9,6 +9,7 @@
 //   3  THE CONTROL        the same sizes, 153 edges with no self-loop and no repeat, the draw of seed 4242 (brain/pilotSubFish.mjs's, the submarine's own control), not the fish's wiring; the same weights give another answer
 //   4  THE HAND TWIN      the hand weights are three non-zero weights and ARE the hand gunner, to the bit, in a ship-against-ship fight of twenty-six seats -- the fish's and the control's; the zero gunner never fires
 //   5  THE TRAINER'S HOOKS liveIndices are the nineteen weights of the hand path and each one moves an output; mutate moves one to maxK weights and perturb all of them, from a seeded generator; a bad wiring is refused by name
+//   7  THE FILE THAT SHIPS brain/seatGunnerFishWeightsDefault.json: what its `by` quotes is what it flies now, and the fish's wiring did nothing in it (no synapse carries a weight; the control's wiring flies the same weights to the same result)
 //   6  THE FRONT DOOR     a fish brain file is seated by battleshipDuel.sideFromBrains and a truncated one refused; the export list is pinned and the report says real numbers
 //
 // SABOTAGE LOG: (22 mutants, each applied to a COPY of brain/seatGunnerFish.mjs with a copy of this gate importing it, the copies deleted by name; the number is how many rows went red. ONE ROW IS RED IN EVERY COPY AND IS NOT COUNTED: section 6's seat row asks that the module battleshipDuel seats IS this
@@ -16,7 +17,7 @@
 //   F1 the fish has the fruit fly's wiring 11 | F2 two recurrent steps 5 | F3 no identity in the recurrent step 7 | F4 a synapse is wired backwards 5 | F5 the read-out is relu 4 | F6 the encoder is linear 3 | F7 the outputs are not squashed 3 | F8 the trigger's bias is -1 in the hand weights 2
 //   F9 the hand weights drive the pitch output 4 | F10 the hand weights read the bias feature 4 | F11 the live weights leave out unit 0's bias 2 | F12 the live weights take unit 1's read-out 3 | F13 the live output biases are off by one 3 | F14 mutate may move five weights 1 | F15 perturb is mutate 1
 //   F16 the control is the fish 2 | F17 the control is another draw 1 | F18 the seat runs the fruit fly's network on these weights 1 | F19 the layers are never rebuilt 1 | F20 an edge out of range is let in 1 | F21 the read-out is cut one early 7 | F22 every seat shares one sight 1
-// None went 0 red. NOT CHECKED: anything about a TRAINED fish (none exists), and the GPU batch with this network (brain/seatGunnerGpu.mjs takes any `decide.net`; its own gate flies the fruit fly's and the GPU Brain's).
+// None went 0 red. SECTION 7 WAS WRITTEN AFTER THE SWEEP AND NOT SABOTAGED (it reads a file, not this module's code). NOT CHECKED: that the training gives this file again (two searches of about half an hour each; the search is seeded), the file's audit line (twelve more fights), and the GPU batch with this network (brain/seatGunnerGpu.mjs takes any `decide.net`; its own gate flies the fruit fly's and the GPU Brain's).
 "use strict";
 import * as SF from "./seatGunnerFish.mjs";
 import * as SG from "./seatGunnerPolicy.mjs";
@@ -110,9 +111,18 @@ console.log("6. THE FRONT DOOR");
 section(() => {
     const blob = PB.exportBrain(PB.describePolicy("seatGunnerFish", SF), SF.handWeights(), { by: "a peer's fish" }), r = D.sideFromBrains("fishy", [blob]), bad = D.sideFromBrains("bad", [{ ...blob, weights: blob.weights.slice(0, 699) }]);
     ok("!! a fish brain file is seated in all thirteen seats by battleshipDuel.sideFromBrains (the module in the seat is this one) and one a weight short is refused with the count", r.refused.length === 0 && r.seated[0].where.length === 13 && D.seatNetOf(r.side, "main-a").module === SF && D.seatedBrains(r.side).total === 13 && bad.seated.length === 0 && /weight count 699 does not match seatGunnerFish's current 700/.test(bad.refused[0].reason));
-    ok("the report says real numbers", SF.reportLines().length === 2 && /12 features, 34 hidden neurons \(the Fish1 TEN core, 153 synapses\), 3 outputs: 700 weights; .* in 3 non-zero weights; nothing is trained/.test(SF.reportLines()[1]));
+    ok("the report says real numbers", SF.reportLines().length === 2 && /12 features, 34 hidden neurons \(the Fish1 TEN core, 153 synapses\), 3 outputs: 700 weights; .* in 3 non-zero weights; the trained file uses none of the synapses/.test(SF.reportLines()[1]));
     ok("the export list", Object.keys(SF).sort().join() === "AIM_GAIN,CONTROL_SEED,FEATURES,FEATURE_NAMES,HIDDEN,OUTPUTS,OUTPUT_NAMES,REC_EDGES,REC_STEPS,WEIGHT_COUNT,control,createSeatCircuit,features,forward,gunnerFactory,gunnerFor,handWeights,layersOf,liveIndices,mutate,perturb,post,reportLines,rngFor,zeroWeights");
 });
+
+console.log("7. THE FILE THAT SHIPS (twenty-four fights flown again)");
+await (async () => { try {
+    const fs = await import("node:fs"), TS = await import("../tools/ship/trainSeatGunner.mjs"), blob = JSON.parse(fs.readFileSync(new URL("./seatGunnerFishWeightsDefault.json", import.meta.url), "utf8")), back = PB.importBrain(PB.describePolicy("seatGunnerFish", SF), blob), w = back.weights, hand = SF.handWeights();
+    const moved = []; for (let i = 0; i < 700; i++) if (w[i] !== hand[i]) moved.push(i);
+    const held = TS.evaluate(SF, w, TS.HELD_OUT_FIGHTS), ctl = TS.evaluate(SF.control, w, TS.HELD_OUT_FIGHTS), rule = TS.evaluate(SF, hand, TS.HELD_OUT_FIGHTS);
+    ok("brain/seatGunnerFishWeightsDefault.json is a seatGunnerFish brain peerBrain takes; flown again behind the green sight its held-out result is the one its `by` quotes and its score, and it beats the hand gunner's on the same fights", back.ok && blob.by.includes(`held-out ${TS.describeEval(held)}, audit`) && blob.score === Number(held.score.toFixed(3)) && held.score > rule.score && blob.by.includes(`${moved.length} of 700 weights differ from the hand gunner`), `${TS.describeEval(held)} against the hand gunner's ${rule.score.toFixed(3)}`);
+    ok("!! *** THE FISH'S WIRING DID NOTHING IN IT, AND THE FILE SAYS SO *** not one of the 153 synapses carries a weight and every weight that moved belongs to hidden unit 0 (the hand path); the SAME weights over the control's random wiring fly the same fights to the same result, run for run", moved.every((i) => i < REC ? (i < F * H ? Math.floor(i / F) === 0 : i === F * H) : i >= OUT && (i >= BIAS || (i - OUT) % H === 0)) && !moved.some((i) => i >= REC && i < OUT) && JSON.stringify(ctl) === JSON.stringify(held) && /NOT ONE of the circuit's 153 synapses carries a weight/.test(blob.by), `${moved.length} weights moved, 0 synapses`);
+} catch (e) { ok(`!! the section THREW instead of answering: ${e.message}`, false); } })();
 
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
 process.exit(fails === 0 ? 0 : 1);
