@@ -77,3 +77,19 @@ That a real seeker can tell a decoy from a boat at any rate, or that a real deco
 
 **What the rule does NOT say about rung 1 (and the HELD read cannot say either):** rungs 3 and 5, with a classifier, are also playable and make the game more lethal (63 and 83 percent sunk) while keeping a decoy worth carrying (+33 and +29); the rule picks the weakest option, not the best game. Whether lock memory is a plausible model of a seeker is not shown: it is one sentence of rules. Nothing is changed after this result; HELD is flown once at rung 1 next.
 
+## HELD RESULT (2026-11-13; `node tools/ship/takeSeekerEccm.mjs held --rung 1 --write`, 19 s, flown ONCE, geometries 93001 to 93024, both seats, 48 duels an arm; `brain/subEccmHeld.json`; the checks passed)
+
+| arm (rung 1 unless marked) | a boat sunk | timed out | torpedoes fired / hit | carrier sunk / other sunk | decoys released / spent on one |
+|---|---|---|---|---|---|
+| no kit | 48 of 48 | 0 | 192 / 48 | 24 / 24 | 0 / 0 |
+| decoy on both | **4 of 48 (8 percent)** | 44 | 244 / 4 | 2 / 2 | 198 / 64 |
+| decoy on one | 30 of 48 (63 percent) | 18 | 214 / 30 | **0 / 30** | 72 / 26 |
+| all three on both | 24 of 48 (50 percent) | 24 | 232 / 24 | 12 / 12 | 184 / 12 |
+| decoy on both, the OLD seeker (rung 0) | 0 of 48 | 48 | 246 / **0** | 0 / 0 | 198 / 102 |
+
+**By the registered rule rung 1 is NOT playable on the fresh geometries: the decoy on both boats leaves a boat sunk in 8 percent of the duels (the bar is 30), against 38 percent on DEV; the decoy on one boat still decides the duel (the carrier is sunk in none, the other in 30 of 48: +63 percent, above the bar of 25).** The old seeker's collapse replicates on the fresh set (0 hits in 246 torpedoes, 48 of 48 timed out), and the kitless duel is the same as at every rung (48 of 48 sunk, 192 torpedoes, 48 hits, as on DEV). Lock memory mattered (it held a lock on 16,644 looks in the both-kit arm) and moved the both-kit game from 0 to 8 percent here and to 38 percent on DEV, which is the size of the difference between the two sets of 24 geometries, not a game.
+
+**The forecasts of the HELD part, scored (written before any geometry was flown):** with the chosen rung on HELD the both-kit sunk share is within 15 points of its DEV value (70): **NO** (8 against 38 percent: 30 points). The one-kit advantage is at least 25 percent (65): yes, 63. The mechanisms fire (a check, not a forecast): yes.
+
+**What this says and does not say.** The rule chose the weakest playable rung on 48 duels, and the both-kit share it had to clear (30 percent) sat inside the noise of 24 geometries: 18 sunk of 48 on DEV and 4 of 48 on HELD are two draws from a quantity whose standard error is several points (two seats of one geometry are not independent) and the rule carried no margin. **The honest reading is: nothing in this ladder is confirmed as a seeker that keeps the two-sided game alive.** What the DEV table also shows, and HELD was not asked, is that rungs 3 (a classifier of 0.5) and 5 (lock memory and 0.5) were far from the bar on DEV (63 and 83 percent sunk, with a decoy still worth +33 and +29), so a classifier is the better candidate; that is a statement about DEV, not a result. **Not claimed:** that lock memory is a model of a real seeker, or that a classifier is; that rung 3 or 5 would pass on a fresh set. **A next registration**, not made here, would flip the order of the rule (a margin on the bar, a larger set, and the classifier rungs first) and use geometries nothing has read. The seeker options stay in the tree, default off, gated and sabotaged; nothing was changed after this read.
+

@@ -1,0 +1,105 @@
+{
+ "rung": 1,
+ "set": "held",
+ "rule": {
+  "bothSunk": 0.3,
+  "oneAdvantage": 0.25
+ },
+ "play": {
+  "a": false,
+  "b": true,
+  "ok": false,
+  "bothShare": 0.08333333333333333,
+  "advantage": 0.625
+ },
+ "checks": [],
+ "arms": {
+  "none": {
+   "n": 48,
+   "sunk": 48,
+   "timeouts": 0,
+   "xSunk": 24,
+   "ySunk": 24,
+   "fired": 192,
+   "hits": 48,
+   "decoysReleased": 0,
+   "spentOnDecoys": 0,
+   "meanX": 0.16756799768518518,
+   "seatAWins": 38,
+   "stats": {
+    "rejected": 0,
+    "held": 0
+   },
+   "edge": 0
+  },
+  "both": {
+   "n": 48,
+   "sunk": 4,
+   "timeouts": 44,
+   "xSunk": 2,
+   "ySunk": 2,
+   "fired": 244,
+   "hits": 4,
+   "decoysReleased": 198,
+   "spentOnDecoys": 64,
+   "meanX": 0.0009505208333333339,
+   "seatAWins": 0,
+   "stats": {
+    "rejected": 0,
+    "held": 16644
+   },
+   "edge": 0
+  },
+  "one": {
+   "n": 48,
+   "sunk": 30,
+   "timeouts": 18,
+   "xSunk": 0,
+   "ySunk": 30,
+   "fired": 214,
+   "hits": 30,
+   "decoysReleased": 72,
+   "spentOnDecoys": 26,
+   "meanX": 1.1078645833333332,
+   "seatAWins": 20,
+   "stats": {
+    "rejected": 0,
+    "held": 7265
+   },
+   "edge": 2.045364583333334
+  },
+  "all3": {
+   "n": 48,
+   "sunk": 24,
+   "timeouts": 24,
+   "xSunk": 12,
+   "ySunk": 12,
+   "fired": 232,
+   "hits": 24,
+   "decoysReleased": 184,
+   "spentOnDecoys": 12,
+   "meanX": 0.06943287037037038,
+   "seatAWins": 18,
+   "stats": {
+    "rejected": 0,
+    "held": 5826
+   },
+   "edge": 0
+  },
+  "bothOld": {
+   "n": 48,
+   "sunk": 0,
+   "timeouts": 48,
+   "xSunk": 0,
+   "ySunk": 0,
+   "fired": 246,
+   "hits": 0,
+   "decoysReleased": 198,
+   "spentOnDecoys": 102,
+   "meanX": 0,
+   "seatAWins": 0,
+   "stats": null,
+   "edge": 0
+  }
+ }
+}
