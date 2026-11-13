@@ -96,7 +96,7 @@ section(() => {
     const row = (X, Y) => { let w = 0, l = 0, lead = 0; for (const kind of D.KINDS) for (const seed of [1, 2, 3]) { const p = D.pair(X, Y, seed, kind, { countBrains: false }); lead += p.lead; w += p.lead > D.DECISIVE ? 1 : 0; l += p.lead < -D.DECISIVE ? 1 : 0; } return { w, l, lead: lead / 12 }; };
     const net = { module: ST, weights: ST.handWeights() }, steady = { ...ST, gunnerFactory: (w, mk, o = {}) => ST.gunnerFactory(w, mk, { ...o, sigma: 0 }) };
     const reg = row(D.makeSide("car", { network: net }), D.makeSide("hand"));
-    ok("!! THE CAR'S HAND WEIGHTS, CARRIED OVER UNTRAINED, TRAIL THE SEAT'S HAND GUNNER A LITTLE behind regular sights: 6 pairs won, 4 lost, mean lead -0.183", reg.w === 6 && reg.l === 4 && near(reg.lead, -0.183, 0.0005), `${reg.w} won, ${reg.l} lost, ${reg.lead.toFixed(3)}`);
+    ok("!! the car's hand weights, carried over untrained, on THESE twelve pairs behind regular sights: 6 won, 4 lost, mean lead -0.183 -- A PIN OF THE ARITHMETIC AND NOT A FINDING: this row once said they TRAIL the hand gunner, and 600 fresh pairs (tools/ship/takeTurretAudit.mjs) say they LEAD it, +0.099 (se 0.033)", reg.w === 6 && reg.l === 4 && near(reg.lead, -0.183, 0.0005), `${reg.w} won, ${reg.l} lost, ${reg.lead.toFixed(3)}`);
     const per = row(D.makeSide("car", { network: net, gunners: "perfect" }), D.makeSide("hand", { gunners: "perfect" }));
     ok("... and plainly behind perfect sights, where a proportional turn's lag is all there is: none won, 9 lost, -0.881", per.w === 0 && per.l === 9 && near(per.lead, -0.881, 0.0005), `${per.w} won, ${per.l} lost, ${per.lead.toFixed(3)}`);
     const filt = row(D.makeSide("car-steady", { network: { module: steady, weights: ST.handWeights() } }), D.makeSide("hand"));

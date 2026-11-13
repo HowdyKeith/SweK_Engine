@@ -19,7 +19,7 @@
 // at 0 (brain/battleshipFight.mjs does not pass it) this seat is a gunner with a steadier hand than the arena's settings say, and a result from it says so or is not a result. Smoothing what the SIGHT measured (its noise is in the aim the network is shown) is still open to the network, and is a skill.
 //
 // THE HAND WEIGHTS ARE THE CAR'S OWN (gunnerPolicy.handWeights(): turn at 12 x the bearing, lift at 8 x the pitch, fire when aligned) AND THEY ARE NOT THE HAND GUNNER -- unlike every other seat network's hand weights. A proportional turn LAGS a moving aim point where the hand gunner's seat goes straight to it at the slew
-// limit; the gate measures the difference in a fight and pins it. That difference is what "carrying the car's gunner over" costs before any training in space, and the first thing a search has to win back.
+// limit; the gate pins the two in the same fights. WHICH IS BETTER WAS FIRST SAID WRONG HERE: on twelve pairs the car's hand weights read 0.183 BEHIND the hand gunner and this header said they trail; on 600 fresh pairs (tools/ship/takeTurretAudit.mjs's audit and replication, 2026-11-14) they LEAD it, +0.099 (se 0.033, z 2.96), behind regular sights with the hand's error on. So the car's hand rule carries over to a ship's seat as it is and is a little better there than the seat's own hand gunner; behind perfect sights (twelve pairs only, not re-read) it read 0.881 behind.
 //
 // A DECISION IS TWO HALVES, as seatGunnerPolicy's: `prepare` (the sight and the eleven features), `finish(prep, y)` (the rates into a command), and `decide.net` for a batch. With no target the gun is left where it is and the trigger is off. Pure: no I/O, no clock, no Math.random.
 "use strict";
