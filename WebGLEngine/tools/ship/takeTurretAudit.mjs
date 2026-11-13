@@ -13,6 +13,14 @@
 //                R4  THE OTHER THREE SEARCHES, the same three readings each. NINE MORE READINGS: with twelve in all, one |z| of 2 by chance is about an even bet, so a lone LEADS or TRAILS among R4 is a hint and is said as one; R1-R3 are the three that were asked.
 //   NOTHING IS CHOSEN ON THIS AUDIT: the file that ships stays the one picked on held-out, whatever is read here.
 //
+// THE REPLICATION OF s7003 (registered 2026-11-14, AFTER the audit above was read and BEFORE any pair of it was flown). The audit read: R1 the champion LEADS the hand gunner (+0.109, z 2.36); R2 its synapse CANNOT BE TOLD (-0.029, z -0.79); R3 its training CANNOT BE TOLD (-0.011, z -0.27) -- the START
+// ALREADY LEADS the hand gunner (+0.119, z 2.54), so the champion's lead is the car's untrained hand weights' lead and the search added nothing to it. Among R4's nine hints one search stood out on all three: s7003 (five synapses) +0.195 over the hand gunner (z 3.92), its synapses +0.082 (z 2.74), its training +0.076
+// (z 2.13); and s7002's synapses TRAIL (-0.081, z -2.27). A hint picked out of nine after the fact is what a replication is for:
+//   THE PAIRS    300 more, seeds 2001-2075 of each kind (`--set replication`), flown by nothing before.
+//   THE ARMS     start, s7003, s7003-ablated.
+//   THE READINGS three, the same words at the same z of 2, each asked ONE-SIDED in the direction the audit hinted: P1 s7003 leads the hand gunner; P2 s7003's synapses (s7003 less its ablation) lead; P3 s7003's training (s7003 less the start) leads. REPLICATED means all three read LEADS; PARTLY, one or two; NOT REPLICATED, none.
+//   Nothing is chosen on it either: s7003 does not become the file that ships because of this reading (that is a decision for Keith, with the reading in front of him).
+//
 //     node tools/ship/takeTurretAudit.mjs run --arm s7000 --out <file.jsonl>     # one arm, a line a pair; a file that already holds pairs is resumed
 //     node tools/ship/takeTurretAudit.mjs report --in <dir>                      # every arm's file in the directory, the readings above
 "use strict";
@@ -23,6 +31,7 @@ import * as D from "../../brain/battleshipDuel.mjs";
 
 export const SEEDS = Object.freeze(Array.from({ length: 75 }, (_, i) => 1001 + i));
 export const PAIRS = Object.freeze(D.KINDS.flatMap((kind) => SEEDS.map((seed) => Object.freeze({ kind, seed }))));
+export const REPLICATION_SEEDS = Object.freeze(Array.from({ length: 75 }, (_, i) => 2001 + i)), REPLICATION_PAIRS = Object.freeze(D.KINDS.flatMap((kind) => REPLICATION_SEEDS.map((seed) => Object.freeze({ kind, seed })))), REPLICATION_ARM = "s7003";
 export const RECORD_SEEDS = Object.freeze([7000, 7001, 7002, 7003]), CHAMPION = "s7000";
 export const ARMS = Object.freeze(["start", ...RECORD_SEEDS.flatMap((s) => [`s${s}`, `s${s}-ablated`])]);
 /** The weights of an arm, from the records (an array of trainTurretSeat search records). */
@@ -52,12 +61,19 @@ if (typeof process !== "undefined" && Array.isArray(process.argv)) {
         if (step === "run") {
             const arm = arg("arm"), out = arg("out"); if (!ARMS.includes(arm) || !out) { console.error(`takeTurretAudit: run needs --arm (${ARMS.join(", ")}) and --out <file.jsonl>`); process.exit(2); }
             const done = new Set(fs.existsSync(out) ? fs.readFileSync(out, "utf8").trim().split("\n").filter(Boolean).map((l) => { const r = JSON.parse(l); return r.kind + "|" + r.seed; }) : []), w = weightsOf(arm, records);
-            for (const p of PAIRS) { if (done.has(p.kind + "|" + p.seed)) continue; const r = T.evaluate(w, [p]).runs[0]; fs.appendFileSync(out, JSON.stringify({ arm, kind: r.kind, seed: r.seed, lead: r.lead }) + "\n"); }
-            console.log(`${arm}: ${PAIRS.length} pairs in ${out}`);
+            const list = arg("set") === "replication" ? REPLICATION_PAIRS : PAIRS;
+            for (const p of list) { if (done.has(p.kind + "|" + p.seed)) continue; const r = T.evaluate(w, [p]).runs[0]; fs.appendFileSync(out, JSON.stringify({ arm, kind: r.kind, seed: r.seed, lead: r.lead }) + "\n"); }
+            console.log(`${arm}: ${list.length} pairs in ${out}`);
         } else if (step === "report") {
             const dir = arg("in"), leads = {};
             for (const f of fs.readdirSync(dir).filter((f) => f.endsWith(".jsonl"))) for (const l of fs.readFileSync(path.join(dir, f), "utf8").trim().split("\n").filter(Boolean)) { const r = JSON.parse(l); (leads[r.arm] ||= new Map()).set(r.kind + "|" + r.seed, r.lead); }
             const R = readings(leads), c = CHAMPION;
+            if (arg("set") === "replication") {
+                const a = REPLICATION_ARM, three = [R.arms[a], R.synapse[a], R.training[a]], n = three.filter((x) => x.z >= 2).length;
+                console.log(`[takeTurretAudit] THE REPLICATION OF ${a}: ${REPLICATION_PAIRS.length} pairs (seeds ${REPLICATION_SEEDS[0]}-${REPLICATION_SEEDS[74]} of each kind)`);
+                console.log(`  P1 ${a} against the hand gunner: ${line(R.arms[a])}`); console.log(`  P2 its synapses (${a} less its ablation): ${line(R.synapse[a])}`); console.log(`  P3 its training (${a} less the start): ${line(R.training[a])}`); console.log(`     the start against the hand gunner: ${line(R.arms.start)}`);
+                console.log(`  ${n === 3 ? "REPLICATED" : n ? "PARTLY REPLICATED" : "NOT REPLICATED"}: ${n} of the three read LEADS`); process.exit(0);
+            }
             console.log(`[takeTurretAudit] ${PAIRS.length} pairs (seeds ${SEEDS[0]}-${SEEDS[SEEDS.length - 1]} of ${D.KINDS.join(", ")}), every arm against the hand gunner`);
             console.log(`  R1 THE CHAMPION AGAINST THE HAND GUNNER: ${line(R.arms[c])}`);
             console.log(`  R2 THE CHAMPION'S SYNAPSE (champion less its ablation): ${line(R.synapse[c])}`);
