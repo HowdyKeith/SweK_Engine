@@ -54,19 +54,25 @@ export function calibrate(set = "dev", sides = sidesOf(), onRung = null) {
     const first = rows.find((r) => r.binds); return { set, rows, chosen: first ? first.rung : null };
 }
 
+/** Read 1's rule for one pair, from its summaries without and with the cost ({ edge, z } each): { flips (the sign of the edge changed), big (the summary with the larger |edge|), matters (flipped, that larger |edge| at least MATTERS_EDGE with |z| at least MATTERS_Z) }. */
+export function mattersOf(free, cost) {
+    const flips = Math.sign(free.edge) * Math.sign(cost.edge) < 0, big = Math.abs(free.edge) >= Math.abs(cost.edge) ? free : cost;
+    return { flips, big, matters: flips && Math.abs(big.edge) >= MATTERS_EDGE && Math.abs(big.z) >= MATTERS_Z };
+}
+
 /** Read 1 on `set` at `rung`: every pair of the four doctrines, with and without the cost. Returns { rung, set, ids, runs: { free, cost }, pairs: [{ x, y, free: summary, cost: summary, flips, matters }], matters, doctrines: [{ id, deadShare, charge }], ratings }. */
-export function readRanking(rung, set = "held", sides = sidesOf()) {
+export function readRanking(rung, set = "held", sides = sidesOf(), check = checks) {
     const geos = geometriesOf(set), ids = DOCTRINES, runs = { free: { ids: [...ids], scenarios: geos.length, pairs: {} }, cost: { ids: [...ids], scenarios: geos.length, pairs: {} } }, tally = Object.fromEntries(ids.map((id) => [id, { dead: 0, boatDuels: 0, charge: 0 }])), out = [];
     for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++) {
         const x = sides[ids[i]], y = sides[ids[j]], free = pair(x, y, geos, null), cost = pair(x, y, geos, needsOf(rung));
         runs.free.pairs[`${ids[i]}|${ids[j]}`] = { x: ids[i], y: ids[j], fights: free.fights, summary: free.summary }; runs.cost.pairs[`${ids[i]}|${ids[j]}`] = { x: ids[i], y: ids[j], fights: cost.fights, summary: cost.summary };
         for (const [k, id] of [[0, ids[i]], [1, ids[j]]]) { tally[id].dead += cost.dead[k]; tally[id].boatDuels += cost.boatDuels; tally[id].charge += cost.charge[k] * cost.boatDuels; }
-        const fe = free.summary, ce = cost.summary, flips = Math.sign(fe.edge) * Math.sign(ce.edge) < 0, big = Math.abs(fe.edge) >= Math.abs(ce.edge) ? fe : ce;
-        out.push({ x: ids[i], y: ids[j], free: { edge: fe.edge, z: fe.z }, cost: { edge: ce.edge, z: ce.z }, flips, matters: flips && Math.abs(big.edge) >= MATTERS_EDGE && Math.abs(big.z) >= MATTERS_Z });
+        const fe = free.summary, ce = cost.summary, m = mattersOf(fe, ce);
+        out.push({ x: ids[i], y: ids[j], free: { edge: fe.edge, z: fe.z }, cost: { edge: ce.edge, z: ce.z }, flips: m.flips, matters: m.matters });
     }
     const decisive = { free: 0, cost: 0 }, flown = { free: 0, cost: 0 }; for (const k of ["free", "cost"]) for (const q of Object.values(runs[k].pairs)) { flown[k] += q.fights.length; decisive[k] += q.fights.filter((f) => f.xKilledY || f.yKilledX).length; }
     const ratings = {}; for (const k of ["free", "cost"]) { const sum = (a, b) => { const s = runs[k].pairs[`${a}|${b}`]; if (s) return s.summary; const q = runs[k].pairs[`${b}|${a}`]; return q ? T.flipSummary(q.summary) : null; }; const fit = T.ratings(runs[k], { summaryOf: sum }); ratings[k] = Object.fromEntries(ids.map((id) => [id, fit.rating[id]])); }
-    const self = pair(sides.hand, sides.hand, geos, needsOf(rung)), bad = checks(Object.values(runs.cost.pairs).map((q) => ({ fights: q.fights, charge: [0, 0] })), { selfEdge: self.summary.edge });
+    const self = pair(sides.hand, sides.hand, geos, needsOf(rung)), bad = check(Object.values(runs.cost.pairs).map((q) => ({ fights: q.fights, charge: [0, 0] })), { selfEdge: self.summary.edge });
     return { rung, set, ids, checks: bad, sunkShare: { free: decisive.free / flown.free, cost: decisive.cost / flown.cost }, spread: Object.fromEntries(["free", "cost"].map((k) => [k, Math.max(...ids.map((id) => ratings[k][id])) - Math.min(...ids.map((id) => ratings[k][id]))])), pairs: out, matters: out.some((p) => p.matters), doctrines: ids.map((id) => ({ id, deadShare: tally[id].dead / tally[id].boatDuels, charge: tally[id].charge / tally[id].boatDuels })), ratings };
 }
 
@@ -92,18 +98,18 @@ const pct = (v) => (100 * v).toFixed(0) + "%";
 const J = (e) => (e / 1e6).toFixed(2) + " MJ";
 /** The command: argv (after the program), io { log, exists, write, read, heldSet } (defaults: the console and the file system; heldSet is for the gate, which flies the smoke geometries). Returns the exit code. */
 export function command(argv, io = {}) {
-    const log = io.log || ((s) => console.log(s)), exists = io.exists || ((f) => fs.existsSync(ENG + f)), write = io.write || ((f, s) => fs.writeFileSync(ENG + f, s));
+    const log = io.log || ((s) => console.log(s)), exists = io.exists || ((f) => fs.existsSync(ENG + f)), write = io.write || ((f, s) => fs.writeFileSync(ENG + f, s)), check = io.checks || checks;   // io.checks, io.devSet and io.heldSet are for the gate (a failed check to see the exit code; smoke geometries instead of the DEV and HELD sets)
     const mode = argv[0], flag = (n) => { const i = argv.indexOf(n); return i < 0 ? null : argv[i + 1]; };
     if (!["dev", "held", "retune"].includes(mode)) { log("usage: takeSubEnergy.mjs dev [--set smoke|dev] [--write] | held --rung N --write | retune [--dir D] [--write]"); return 2; }
     if (mode === "dev") {
-        const set = flag("--set") || "dev"; if (set !== "smoke" && set !== "dev") { log(`takeSubEnergy: --set is smoke or dev, not "${set}" (the HELD set is read by the held command, once)`); return 2; }
-        if (argv.includes("--write") && set !== "dev") { log("takeSubEnergy: --write is for the dev set"); return 2; }
+        const set = io.devSet || flag("--set") || "dev"; if (set !== "smoke" && set !== "dev") { log(`takeSubEnergy: --set is smoke or dev, not "${set}" (the HELD set is read by the held command, once)`); return 2; }
+        if (argv.includes("--write") && set !== "dev" && !io.devSet) { log("takeSubEnergy: --write is for the dev set"); return 2; }
         log(`[takeSubEnergy] DEV calibration, set ${set} (geometries ${SETS[set].first} to ${SETS[set].first + SETS[set].count - 1}, both seats): the search-ping champion against the default tactician, no kit; a rung BINDS at ${pct(BIND)} of the boat-duels with a dead screw`);
         const res = calibrate(set, io.sides || sidesOf(io.read), (r) => {
             const p = r.pair; log(`  RUNG ${r.rung}  ${J(r.energyJ)} a boat`); log(`    screws dead: ping ${p.dead[0]}/${p.boatDuels}, hand ${p.dead[1]}/${p.boatDuels}  (${pct(r.deadShare)} of the boat-duels); charge left: ping ${p.charge[0].toFixed(2)}, hand ${p.charge[1].toFixed(2)}; a boat sunk in ${p.sunk} of ${p.fights.length} duels (ping sunk ${p.xSunk}, hand sunk ${p.ySunk}); ping mean ${p.summary.meanX.toFixed(3)}  ->  ${r.binds ? "BINDS" : "does not bind"}`);
         });
         log(res.chosen === null ? "  RESULT: no rung binds; the reads are not flown and a budget of these sizes does not bind within a duel" : `  RESULT: the cost binds first at rung ${res.chosen} (${J(LADDER[res.chosen])})`);
-        const bad = checks(res.rows.map((r) => r.pair), { mustFire: res.chosen !== null }); if (bad.length) log("  CHECKS FAILED, NOT WEIGHED: " + bad.join("; "));
+        const bad = check(res.rows.map((r) => r.pair), { mustFire: res.chosen !== null }); if (bad.length) log("  CHECKS FAILED, NOT WEIGHED: " + bad.join("; "));
         if (argv.includes("--write")) { write(DEV_FILE, JSON.stringify({ set, chosen: res.chosen, bind: BIND, rows: res.rows.map((r) => ({ rung: r.rung, energyJ: r.energyJ, deadShare: r.deadShare, binds: r.binds, dead: r.pair.dead, boatDuels: r.pair.boatDuels, charge: r.pair.charge, sunk: r.pair.sunk, xSunk: r.pair.xSunk, ySunk: r.pair.ySunk, meanX: r.pair.summary.meanX })) }, null, 1) + "\n"); log(`  written ${DEV_FILE}`); }
         return bad.length ? 1 : 0;
     }
@@ -111,7 +117,7 @@ export function command(argv, io = {}) {
         const rv = flag("--rung"), rung = rv !== null && /^\d+$/.test(rv) ? Number(rv) : NaN; if (!Number.isInteger(rung) || rung < 0 || rung >= LADDER.length) { log(`takeSubEnergy: held needs --rung N, N one of 0 to ${LADDER.length - 1}`); return 2; }
         if (!io.heldSet && !argv.includes("--write")) { log("takeSubEnergy: the HELD set is read once and the read is recorded; run held with --write"); return 2; }
         if (argv.includes("--write") && exists(HELD_FILE)) { log(`takeSubEnergy: ${HELD_FILE} exists; the HELD set is read once and a second read is refused`); return 2; }
-        const hs = io.heldSet || "held", r = readRanking(rung, hs, io.sides || sidesOf(io.read));
+        const hs = io.heldSet || "held", r = readRanking(rung, hs, io.sides || sidesOf(io.read), check);
         log(`[takeSubEnergy] HELD read 1, rung ${rung} (${J(LADDER[rung])} a boat), geometries ${SETS[hs].first} to ${SETS[hs].first + SETS[hs].count - 1}, both seats; the four doctrines' round robin without and with the cost`);
         log(`  ratings (Bradley-Terry, Elo scale; read DIFFERENCES): ${r.ids.map((id) => `${id} ${r.ratings.free[id].toFixed(0)} -> ${r.ratings.cost[id].toFixed(0)}`).join(", ")}`);
         log(`  duels with a boat sunk: ${pct(r.sunkShare.free)} without the cost, ${pct(r.sunkShare.cost)} with it; the ratings' spread (best less worst): ${r.spread.free.toFixed(0)} without, ${r.spread.cost.toFixed(0)} with   (printed; NOT in the rule)`);
