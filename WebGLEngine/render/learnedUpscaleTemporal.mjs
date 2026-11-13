@@ -38,11 +38,14 @@ export const UTH_SHAPE = Object.freeze([Object.freeze([UT_CHANNELS, UTH_WIDTH, "
 /** Section 190, ROUND 84: U_TH8 -- U_TH with its three 3 x 3 layers 8 wide, the head 8 -> 3, at half size. */
 export const UTH8_WIDTH = 8;
 export const UTH8_SHAPE = Object.freeze([Object.freeze([UT_CHANNELS, UTH8_WIDTH, "relu"]), Object.freeze([UTH8_WIDTH, UTH8_WIDTH, "relu"]), Object.freeze([UTH8_WIDTH, UTH8_WIDTH, "relu"]), Object.freeze([UTH8_WIDTH, 3, "none", 1])]);
-/** The three variants: "full" (round 70's U_T), "half" (U_TH) and "half8" (U_TH8). A net is the half-size kind when its first layer is narrower than U_T's 32. */
-export const UT_VARIANTS = Object.freeze(["full", "half", "half8"]);
+/** The four variants: "full" (round 70's U_T), "half" (U_TH), "half8" (U_TH8) and, section 195, "quarter" (U_TQ: U_TH's network at a quarter
+ * of the size). A net runs at a reduced size when its first layer is narrower than U_T's 32; U_TQ names its scale, 4, since its shapes are U_TH's. */
+export const UT_VARIANTS = Object.freeze(["full", "half", "half8", "quarter"]);
 export const isHalfT = (net) => net.layers[0].Cout < UT_SHAPE[0][1];
+/** The factor a net runs below full size by: 4 for U_TQ, 2 for the other reduced nets, 1 for U_T. */
+export const scaleOfT = (net) => (net.scale === 4 ? 4 : isHalfT(net) ? 2 : 1);
 /** A variant's shape. */
-export const shapeOfT = (variant) => (variant === "half8" ? UTH8_SHAPE : variant === "half" ? UTH_SHAPE : UT_SHAPE);
+export const shapeOfT = (variant) => (variant === "half8" ? UTH8_SHAPE : variant === "half" || variant === "quarter" ? UTH_SHAPE : UT_SHAPE);
 /** The 17 channels of a W x H input averaged over 2 x 2: (W / 2) x (H / 2) x 17. */
 export function halfInput(x, W, H) {
     if (W % 2 || H % 2) throw new Error(`learnedUpscaleTemporal: a ${W} x ${H} input has no half size`);
@@ -63,6 +66,34 @@ export function upHalf(rh, w, h) {
     for (let Y = 0; Y < H; Y++) for (let X = 0; X < W; X++) { const p = Y * W + X; for (const [q, a] of upTapsH(X, Y, w, h)) for (let c = 0; c < 3; c++) r[p * 3 + c] += a * rh[q * 3 + c]; }
     return r;
 }
+// ---- section 195 (round 87): U_TQ's two resamplings, by 4 -------------------------------------------------------------------------
+/** The 17 channels of a W x H input averaged over 4 x 4: (W / 4) x (H / 4) x 17, the sixteen summed row by row, then / 16. */
+export function quarterInput(x, W, H) {
+    if (W % 4 || H % 4) throw new Error(`learnedUpscaleTemporal: a ${W} x ${H} input has no quarter size`);
+    const w = W / 4, h = H / 4, C = UT_CHANNELS, o = new Float64Array(w * h * C);
+    for (let y = 0; y < h; y++) for (let xx = 0; xx < w; xx++) for (let c = 0; c < C; c++) {
+        let s = 0; for (let dy = 0; dy < 4; dy++) for (let dx = 0; dx < 4; dx++) s += x[((4 * y + dy) * W + 4 * xx + dx) * C + c];
+        o[(y * w + xx) * C + c] = s / 16;
+    }
+    return o;
+}
+function upTapsQ(X, Y, w, h) {
+    const u = Math.min(w - 1, Math.max(0, (X + 0.5) / 4 - 0.5)), v = Math.min(h - 1, Math.max(0, (Y + 0.5) / 4 - 0.5));
+    const x0 = Math.floor(u), y0 = Math.floor(v), x1 = Math.min(w - 1, x0 + 1), y1 = Math.min(h - 1, y0 + 1), tx = u - x0, ty = v - y0;
+    return [[y0 * w + x0, (1 - tx) * (1 - ty)], [y0 * w + x1, tx * (1 - ty)], [y1 * w + x0, (1 - tx) * ty], [y1 * w + x1, tx * ty]];
+}
+/** A quarter-size 3-channel field upsampled bilinearly to 4w x 4h: pixel centres, edges clamped. */
+export function upQuarter(rq, w, h) {
+    const W = 4 * w, H = 4 * h, r = new Float64Array(W * H * 3);
+    for (let Y = 0; Y < H; Y++) for (let X = 0; X < W; X++) { const p = Y * W + X; for (const [q, a] of upTapsQ(X, Y, w, h)) for (let c = 0; c < 3; c++) r[p * 3 + c] += a * rq[q * 3 + c]; }
+    return r;
+}
+/** upQuarter's transpose: a full-size gradient gathered back onto the quarter-size field. */
+export function upQuarterT(g, w, h) {
+    const W = 4 * w, H = 4 * h, o = new Float64Array(w * h * 3);
+    for (let Y = 0; Y < H; Y++) for (let X = 0; X < W; X++) { const p = Y * W + X; for (const [q, a] of upTapsQ(X, Y, w, h)) for (let c = 0; c < 3; c++) o[q * 3 + c] += a * g[p * 3 + c]; }
+    return o;
+}
 /** upHalf's transpose: a full-size gradient gathered back onto the half-size field. */
 export function upHalfT(g, w, h) {
     const W = 2 * w, H = 2 * h, o = new Float64Array(w * h * 3);
@@ -75,6 +106,7 @@ export function makeUpscalerT(rand, variant = "full") {
     if (!UT_VARIANTS.includes(variant)) throw new Error(`learnedUpscaleTemporal: the variant is "full", "half" or "half8" -- got ${JSON.stringify(variant)}`);
     const net = initNet(shapeOfT(variant), typeof rand === "number" ? seededRandom(rand) : rand), last = net.layers[net.layers.length - 1];
     last.W.fill(0); last.b.fill(0);
+    if (variant === "quarter") net.scale = 4;
     return net;
 }
 
@@ -96,8 +128,9 @@ const dToPerceptual = (v) => { const a = Math.max(v, T_FLOOR); return v <= 0 ? 0
 /** U_T applied to a W x H input: { y (W x H x 3), r (the residual at full size), acts }. The base A is the input's channels 0-2. U_TH runs on the
  * half-size input and its residual is upsampled (rh beside it). */
 export function temporalUpscale(net, x, W, H) {
-    const half = isHalfT(net), acts = half ? netForward(net, halfInput(x, W, H), H / 2, W / 2) : netForward(net, x, H, W), rh = acts[acts.length - 1];
-    const r = half ? upHalf(rh, W / 2, H / 2) : rh, y = new Float64Array(W * H * 3);
+    // section 195: U_TQ runs at a quarter of the size and its residual is upsampled by 4; U_TH and U_TH8 by 2, as before
+    const sc = scaleOfT(net), half = sc > 1, xs = sc === 4 ? quarterInput(x, W, H) : sc === 2 ? halfInput(x, W, H) : x, acts = netForward(net, xs, H / sc, W / sc), rh = acts[acts.length - 1];
+    const r = sc === 4 ? upQuarter(rh, W / 4, H / 4) : sc === 2 ? upHalf(rh, W / 2, H / 2) : rh, y = new Float64Array(W * H * 3);
     for (let p = 0; p < W * H; p++) for (let c = 0; c < 3; c++) y[p * 3 + c] = x[p * UT_CHANNELS + c] * (1 + UT_SCALE * Math.tanh(r[p * 3 + c]));
     return { y, r, acts, ...(half ? { rh } : {}) };
 }
@@ -112,7 +145,8 @@ export function temporalLoss(net, x, W, H, ref, cov, E) {
         dz[i] = 2 * e / den / N * dToPerceptual(o) * (1 - cov[p]) * x[p * UT_CHANNELS + c] * UT_SCALE * (1 - t * t);
     }
     // U_TH: the full-size gradient on r carried back through the upsample onto the half-size head
-    return { loss: loss / N, ...(isHalfT(net) ? netBackward(net, acts, H / 2, W / 2, upHalfT(dz, W / 2, H / 2)) : netBackward(net, acts, H, W, dz)) };
+    const sc = scaleOfT(net);
+    return { loss: loss / N, ...(sc === 4 ? netBackward(net, acts, H / 4, W / 4, upQuarterT(dz, W / 4, H / 4)) : sc === 2 ? netBackward(net, acts, H / 2, W / 2, upHalfT(dz, W / 2, H / 2)) : netBackward(net, acts, H, W, dz)) };
 }
 
 /** A size x size crop of an example at (cx, cy): its input, reference, coverage and emission. */
@@ -131,6 +165,8 @@ export function temporalCrop(ex, cx, cy, size) {
 export function trainTemporal(examples, { seed, steps = UP_TRAIN.steps, batch = UP_TRAIN.batch, crop = UP_TRAIN.crop, adam = ADAM, variant = "full", onCrop = null } = {}) {
     if (!Number.isInteger(seed)) throw new Error("learnedUpscaleTemporal: training needs an integer seed");
     if (examples.some((e) => e.W < crop || e.H < crop)) throw new Error(`learnedUpscaleTemporal: a crop no larger than every frame -- got ${crop}`);
+    const grid = variant === "quarter" ? 4 : variant === "full" ? 1 : 2;
+    if (variant === "quarter" && crop % 4) throw new Error(`learnedUpscaleTemporal: U_TQ trains on crops that are multiples of 4 -- got ${crop}`);
     if (variant !== "full" && crop % 2) throw new Error(`learnedUpscaleTemporal: U_TH trains on even crops -- got ${crop}`);
     const rand = seededRandom(seed), net = makeUpscalerT(rand, variant), state = adamState(net), losses = [];
     for (let step = 0; step < steps; step++) {
@@ -138,8 +174,9 @@ export function trainTemporal(examples, { seed, steps = UP_TRAIN.steps, batch = 
         for (let b = 0; b < batch; b++) {
             const ex = examples[Math.floor(rand.u() * examples.length)];
             // round 70's corners as they were; U_TH's on even pixels, so a crop's 2 x 2 blocks are the frame's
-            const cx = variant !== "full" ? 2 * Math.floor(rand.u() * ((ex.W - crop) / 2 + 1)) : Math.floor(rand.u() * (ex.W - crop + 1));
-            const cy = variant !== "full" ? 2 * Math.floor(rand.u() * ((ex.H - crop) / 2 + 1)) : Math.floor(rand.u() * (ex.H - crop + 1)), C = temporalCrop(ex, cx, cy, crop);
+            // section 195: U_TQ's corners on multiples of 4, so a crop's 4 x 4 blocks are the frame's own
+            const cx = grid === 4 ? 4 * Math.floor(rand.u() * ((ex.W - crop) / 4 + 1)) : variant !== "full" ? 2 * Math.floor(rand.u() * ((ex.W - crop) / 2 + 1)) : Math.floor(rand.u() * (ex.W - crop + 1));
+            const cy = grid === 4 ? 4 * Math.floor(rand.u() * ((ex.H - crop) / 4 + 1)) : variant !== "full" ? 2 * Math.floor(rand.u() * ((ex.H - crop) / 2 + 1)) : Math.floor(rand.u() * (ex.H - crop + 1)), C = temporalCrop(ex, cx, cy, crop);
             if (onCrop) onCrop(cx, cy);
             const g = temporalLoss(net, C.x, crop, crop, C.ref, C.cov, C.E);
             loss += g.loss / batch;

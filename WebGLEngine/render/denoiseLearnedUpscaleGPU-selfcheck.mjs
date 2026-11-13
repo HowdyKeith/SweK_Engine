@@ -35,6 +35,9 @@
 //   U_TH8 typed 97.731 ms, X2 the 1080's crashed child typed exit 0, X4 the 1080's counting U_TH8 typed 3.959 ms, X5 run c's layer 0
 //   typed 29.408, X6 section 194 taking c and d alone, X7 it calling P5 held, X8 its layers typed 47-52 (what I first wrote), X9 it sending
 //   U_TH8 to the Intel class -> 1 red each; X3 run f's U_TH typed 104.390 ms -> 2 red.
+// ROUND 88 (section 195): Q15 the device's upsample by 2, Q17 the printed line round 85's, Q18 the loop down pass allowed for U_TQ -> 1 red
+//   each; Q16 readH88 reading round 85's line -> 2 red; Q14 the device's 4 x 4 average over 15 -> 3 red (and the rows in
+//   learnedUpscaleTemporal-selfcheck for Q1-Q4 and Q19 count here too). Each restored byte-identical.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -92,6 +95,14 @@ console.log("1. ON THE CPU");
         G.readH85(r85).U === 2.7 && Math.abs(G.readH85(r85).ratio - 2.7 / 37.483) < 1e-12 && G.readH74(r85).U === 5.9 && G.readH85(rep("45.000")).U === null && G.h71([G.readH85(r85), G.readH85(r85)]) === "holds" &&
         G.readH85({ ...r85, gates: [r85.gates[0], { ...r85.gates[1], measured: ["section 190: U_TH8 at 1920 x 1080 0.000 ms (device)"] }] }).U === null &&
         L8.map((l) => `${l.Cin}-${l.Cout}-${l.k}-${l.act}`).join() === "17-8-3-relu,8-8-3-relu,8-8-3-relu,8-3-1-none" && T.isHalfT(U8) && T.isHalfT(T.makeUpscalerT(1, "half")) && !T.isHalfT(Ut));
+    // round 88 (section 195): readH88 reads U_TQ's own line and no other; U_TQ's two passes are by 4
+    const r88 = { commit: "x", gates: [rep("45.000").gates[0], { ...rep("45.000").gates[1], measured: ["section 190: U_TH8 at 1920 x 1080 2.700 ms (device); x", "section 195: U_TQ at 1920 x 1080 1.900 ms (device); y"] }] };
+    const Uq = T.makeUpscalerT(88, "quarter");
+    ok("!! readH88, section 195's rule: round 88's U_TQ line (1.900), not round 85's U_TH8 line, nor the other way; a 0.000 line reads no U; U_TQ is scale 4 on U_TH's layers; its passes average 4 x 4 and upsample by 4",
+        G.readH88(r88).U === 1.9 && Math.abs(G.readH88(r88).ratio - 1.9 / 37.483) < 1e-12 && G.readH85(r88).U === 2.7 && G.readH88(r85).U === null && G.h71([G.readH88(r88), G.readH88(r88)]) === "holds" &&
+        G.readH88({ ...r88, gates: [r88.gates[0], { ...r88.gates[1], measured: ["section 195: U_TQ at 1920 x 1080 0.000 ms (device)"] }] }).U === null && T.scaleOfT(Uq) === 4 &&
+        G.deviceLayersT(Uq).map((l) => `${l.Cin}-${l.Cout}-${l.k}`).join() === "17-16-3,16-16-3,16-16-3,16-3-1" && /fn k_down4_fast/.test(G.DOWN4_FAST_WGSL) && /Y\[i\] = s \/ 16\.0;/.test(G.DOWN4_FAST_WGSL) &&
+        /fn k_uphold4/.test(G.UPHOLD4_WGSL) && /\/ 4\.0 - 0\.5/.test(G.UPHOLD4_WGSL));
     ok("  U_TH's device buffers: its input at full size is the largest, 141,004,800 bytes at 1920 x 1080 -- over the default binding too, so temporalDevice raises it",
         G.temporalBytes(1080, 1920, true) === 1920 * 1080 * 17 * 4 && G.temporalBytes(1080, 1920, true) > 134217728 && /fn k_down/.test(G.DOWN_WGSL) && /fn k_uphold/.test(G.UPHOLD_WGSL));
     // section 164: the rig's first 1080 runs printed 0.000 ms from passes that failed on the default binding limit, and readH71 read it
@@ -212,7 +223,10 @@ else {
     // section 190 (round 85): a seeded U_TH8 the same way -- the cost does not depend on the weights, so this does not wait for round 84's training
     const Ue = T.makeUpscalerT(85, "half8"), re = seededRandom(850);
     for (const Lr of Ue.layers) { for (let i = 0; i < Lr.W.length; i++) Lr.W[i] += 0.2 * (re.u() - 0.5); for (let i = 0; i < Lr.b.length; i++) Lr.b[i] += 0.1 * (re.u() - 0.5); }
-    const r = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 900000, args: { net: enc(Ut), netH: enc(Uh), netE: enc(Ue), x: Array.from(ex.x), Hs, Ws }, script: `async (a) => {
+    // section 195 (round 88): a seeded U_TQ the same way
+    const Uqs = T.makeUpscalerT(88, "quarter"), rqq = seededRandom(880);
+    for (const Lr of Uqs.layers) { for (let i = 0; i < Lr.W.length; i++) Lr.W[i] += 0.2 * (rqq.u() - 0.5); for (let i = 0; i < Lr.b.length; i++) Lr.b[i] += 0.1 * (rqq.u() - 0.5); }
+    const r = await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 900000, args: { net: enc(Ut), netH: enc(Uh), netE: enc(Ue), netQ: enc(Uqs), x: Array.from(ex.x), Hs, Ws }, script: `async (a) => {
         const TG = await import("/render/learnedUpscaleTemporalGPU.mjs");
         // section 164: the device from temporalDevice, its storage limits raised for 1920 x 1080 -- the default 128 MiB binding failed every pass
         const ad = await navigator.gpu.requestAdapter(), info = (ad && ad.info) || {}, soft = !!(ad && ad.isFallbackAdapter) || /swiftshader|llvmpipe|software/i.test([info.vendor, info.architecture, info.description].join(" "));
@@ -246,7 +260,14 @@ else {
         const bigE = await TG.createDeviceTemporal(g, netE, { H, W, down: "fast" }), tmE = await bigE.time(xb, { warmup: 2, reps: soft ? 3 : 9 });
         const E_ = { y: Array.from(oe.y), r: Array.from(oe.r), xh: Array.from(oe.xh), acts: oe.acts.map((v) => Array.from(v)), tm: tmE, passes: bigE.passes, half: bigE.half, down: bigE.down, downSmall: smallE.down };
         smallE.destroy(); bigE.destroy();
-        return { y: Array.from(o.y), r: Array.from(o.r), acts: o.acts.map((v) => Array.from(v)), tm, W, H, soft, errs, passes: big.passes, H_, F_, E_,
+        // round 88 (section 195): U_TQ (scale 4) -- its parity at 64 x 64, then its time; and the loop down pass refused for it
+        const netQ = { scale: 4, layers: a.netQ.map((L) => ({ ...L, W: Float64Array.from(L.W), b: Float64Array.from(L.b) })) };
+        let loopRefused = null; try { await TG.createDeviceTemporal(g, netQ, { H: a.Hs, W: a.Ws }); } catch (e) { loopRefused = e.message; }
+        const smallQ = await TG.createDeviceTemporal(g, netQ, { H: a.Hs, W: a.Ws, down: "fast" }), oq = await smallQ.run(Float32Array.from(a.x), { keep: true });
+        const bigQ = await TG.createDeviceTemporal(g, netQ, { H, W, down: "fast" }), tmQ = await bigQ.time(xb, { warmup: 2, reps: soft ? 3 : 9 });
+        const Q8 = { y: Array.from(oq.y), r: Array.from(oq.r), xh: Array.from(oq.xh), acts: oq.acts.map((v) => Array.from(v)), tm: tmQ, passes: bigQ.passes, scale: bigQ.scale, scaleSmall: smallQ.scale, loopRefused };
+        smallQ.destroy(); bigQ.destroy();
+        return { Q8, y: Array.from(o.y), r: Array.from(o.r), acts: o.acts.map((v) => Array.from(v)), tm, W, H, soft, errs, passes: big.passes, H_, F_, E_,
                  adapter: [info.vendor, info.architecture, info.description].filter(Boolean).join(" / ") };
     }` });
     if (r.skipped) console.log("  SKIP  " + r.reason);
@@ -314,6 +335,24 @@ else {
         ok(`  ...and U_TH8's line is printed -- the line readH85 reads at 1920 x 1080 -- at ${R.soft ? "240 x 136 on this software adapter, which readH85 does not read" : "1920 x 1080 on hardware"}`,
             !R.errs.length && Number.isFinite(te.ms) && te.ms > 0 && E.passes.length === 6 && E.passes[0] === "down" && E.passes[5] === "upsample and hold" &&
             readBack === +te.ms.toFixed(3) && (R.soft ? G.readH85(asRun(lineE)).U === null : G.readH85(asRun(lineE)).U === readBack), `readH85 reads ${readBack}`);
+        // ---- ROUND 88 (section 195): U_TQ on the device ----------------------------------------------------------------------
+        const Q4 = R.Q8, qs = Hs / 4, LQ = G.deviceLayersT(Uqs);
+        const dq = rel(Q4.xh, T.quarterInput(ex.x, Ws, Hs)), perQ = LQ.map((l, i) => rel(Q4.acts[i], conv2dCpu(i ? Float32Array.from(Q4.acts[i - 1]) : Float32Array.from(Q4.xh), qs, qs, l)));
+        ok("!! round 88: U_TQ's first pass is quarterInput, the 17 channels averaged over 4 x 4, within 1e-6 relative, and its four layers at quarter size are conv2dCpu on the device's own input to each within 1e-5",
+            Q4.scale === 4 && Q4.scaleSmall === 4 && dq <= 1e-6 && Q4.xh.length === qs * qs * 17 && perQ.every((v) => v <= 1e-5), `down ${dq.toExponential(2)}; ` + perQ.map((v, i) => `layer ${i} ${v.toExponential(2)}`).join(", "));
+        const yq4 = T.temporalUpscale(Uqs, ex.x, Ws, Hs).y, wq4 = rel(Q4.y, yq4), wr4 = rel(Q4.y, G.holdCpu(ex.x, Q4.r, Hs, Ws, 4));
+        let movedQ = 0; for (let i = 0; i < yq4.length; i++) if (Math.abs(yq4[i] - ex.x[Math.floor(i / 3) * 17 + (i % 3)]) > 1e-6) movedQ++;
+        ok("!! ...its last pass upsamples by 4 (upQuarter's taps) and holds, within 1e-5 of holdCpu on its own residual; the whole of U_TQ is temporalUpscale in f64 within 1e-4, on a seeded U_TQ that moves the frame; the loop down pass refused",
+            wr4 <= 1e-5 && wq4 <= 1e-4 && movedQ > n && Q4.r.length === qs * qs * 3 && /coalesced one/.test(Q4.loopRefused || ""), `hold ${wr4.toExponential(2)}, whole ${wq4.toExponential(2)}; ${movedQ} corrected`);
+        const tq = Q4.tm, pmQ = tq.passMs ? tq.passMs.map((v, i) => `${Q4.passes[i].split(" (")[0]} ${v.toFixed(3)}`).join(", ") : "no per-pass clock";
+        const lineQ = `section 195: U_TQ at ${R.W} x ${R.H} ${tq.ms.toFixed(3)} ms (${tq.clock}); ${pmQ}`;
+        if (!R.errs.length && tq.ms > 0) say(lineQ);
+        const asRunQ = (l) => ({ commit: "x", gates: [{ gate: "render/denoiseUpscaleGPU-selfcheck.mjs", ok: true, exit: { status: 0 }, measured: ["section 103: x; with its history 37.483 ms, ratio 1.998 x"] },
+            { gate: "render/denoiseLearnedUpscaleGPU-selfcheck.mjs", ok: true, exit: { status: 0 }, measured: [l] }] });
+        const readQ = G.readH88(asRunQ(lineQ.replace(`at ${R.W} x ${R.H} `, "at 1920 x 1080 "))).U;
+        ok(`  ...and U_TQ's line is printed -- the line readH88 reads at 1920 x 1080 -- at ${R.soft ? "240 x 136 on this software adapter, which readH88 does not read" : "1920 x 1080 on hardware"}`,
+            !R.errs.length && tq.ms > 0 && Q4.passes.length === 6 && Q4.passes[0] === "down" && Q4.passes[5] === "upsample and hold" && readQ === +tq.ms.toFixed(3) &&
+            (R.soft ? G.readH88(asRunQ(lineQ)).U === null : G.readH88(asRunQ(lineQ)).U === readQ), `readH88 reads ${readQ}`);
     }
 }
 

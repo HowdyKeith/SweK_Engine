@@ -5,7 +5,7 @@
 // sequences. runTemporalTest: the 24 test sequences, U_T's chain against Bt (H1) and against the single-frame chain B1 (H2), graded
 // in display space, with each scene's mean correction (P4).
 "use strict";
-import { SPLITS_UPSCALE_TEMPORAL, SPLITS_UPSCALE_TEMPORAL_72, SPLITS_UPSCALE_TEMPORAL_84, SPLITS_UPSCALE_MOVING, SPLITS_UPSCALE_MOVING_78, SPLITS_UPSCALE_VECTORS, SPLITS_UPSCALE_CHECK, SPLITS_UPSCALE_SPEED, SPLITS_UPSCALE_SAMPLING, SPLITS_UPSCALE_LIGHTS, familyOf, makeScene } from "./denoiseScenes.mjs";
+import { SPLITS_UPSCALE_TEMPORAL, SPLITS_UPSCALE_TEMPORAL_72, SPLITS_UPSCALE_TEMPORAL_84, SPLITS_UPSCALE_TEMPORAL_87, SPLITS_UPSCALE_MOVING, SPLITS_UPSCALE_MOVING_78, SPLITS_UPSCALE_VECTORS, SPLITS_UPSCALE_CHECK, SPLITS_UPSCALE_SPEED, SPLITS_UPSCALE_SAMPLING, SPLITS_UPSCALE_LIGHTS, familyOf, makeScene } from "./denoiseScenes.mjs";
 import { sceneMotion, scaleMotion, SPEED_LEVELS, lightMotion } from "./movingScenes.mjs";
 import { samplingFrames, rejectedMask, SAMPLING } from "./adaptiveSampling.mjs";
 import { temporalExample, temporalChain, trainTemporal, temporalCorrection, shapeOfT, UT_CHANNELS } from "./learnedUpscaleTemporal.mjs";
@@ -45,8 +45,11 @@ export const ROUND_UPSCALE_LIGHTS = Object.freeze({ ...ROUND_UPSCALE_MOVING, spl
 /** Section 190, ROUND 84: U_TH8 (half size, 8 wide) trained and tested as round 72's U_TH, on new test scenes, round 72's U_TH (`baseline`) graded beside it. */
 export const ROUND_UPSCALE_TEMPORAL_84 = Object.freeze({ ...ROUND_UPSCALE_TEMPORAL_72, splits: SPLITS_UPSCALE_TEMPORAL_84, variant: "half8", round: 84,
     results: "render/denoise-results-upscale-temporal-r84.json", net: "render/upscale-net-r84.json", baseline: "render/upscale-net-r72.json" });
+/** Section 195, ROUND 87: U_TQ (U_TH's network at a quarter of the size) trained and tested as round 84's U_TH8, round 72's U_TH beside it. */
+export const ROUND_UPSCALE_TEMPORAL_87 = Object.freeze({ ...ROUND_UPSCALE_TEMPORAL_84, splits: SPLITS_UPSCALE_TEMPORAL_87, variant: "quarter", round: 87,
+    results: "render/denoise-results-upscale-temporal-r87.json", net: "render/upscale-net-r87.json" });
 /** The temporal round a harvest runs: 70 (section 161) unless --round 72 (section 167), 77 (176, a test only), 78 (178), 79 (180), 80 (182), 81 (184), 82 (186) or 83 (188), the last five tests only. */
-export const temporalRound = (n) => (n === 84 ? ROUND_UPSCALE_TEMPORAL_84 : n === 83 ? ROUND_UPSCALE_LIGHTS : n === 82 ? ROUND_UPSCALE_SAMPLING : n === 81 ? ROUND_UPSCALE_SPEED : n === 80 ? ROUND_UPSCALE_CHECK : n === 79 ? ROUND_UPSCALE_VECTORS : n === 78 ? ROUND_UPSCALE_MOVING_78 : n === 77 ? ROUND_UPSCALE_MOVING : n === 72 ? ROUND_UPSCALE_TEMPORAL_72 : n === 70 || n == null ? ROUND_UPSCALE_TEMPORAL : (() => { throw new Error(`learnedUpscaleTemporalStudy: no temporal round ${n} -- 70, 72, 77, 78, 79, 80, 81, 82, 83 or 84`); })());
+export const temporalRound = (n) => (n === 87 ? ROUND_UPSCALE_TEMPORAL_87 : n === 84 ? ROUND_UPSCALE_TEMPORAL_84 : n === 83 ? ROUND_UPSCALE_LIGHTS : n === 82 ? ROUND_UPSCALE_SAMPLING : n === 81 ? ROUND_UPSCALE_SPEED : n === 80 ? ROUND_UPSCALE_CHECK : n === 79 ? ROUND_UPSCALE_VECTORS : n === 78 ? ROUND_UPSCALE_MOVING_78 : n === 77 ? ROUND_UPSCALE_MOVING : n === 72 ? ROUND_UPSCALE_TEMPORAL_72 : n === 70 || n == null ? ROUND_UPSCALE_TEMPORAL : (() => { throw new Error(`learnedUpscaleTemporalStudy: no temporal round ${n} -- 70, 72, 77, 78, 79, 80, 81, 82, 83, 84 or 87`); })());
 /** A sequence's cache key: everything it depends on. */
 export const temporalKey = (family, seed, { W, sppIn, sppRef, ref2 = false, harvest = false }) => `upscale-temporal-${family}-${seed}-${W}-${sppIn}-${sppRef}-${ref2 ? "ref2" : "ref1"}-${harvest ? "harvest" : "gate"}`;
 const cachedSeq = (cache, family, seed, net, o) => cached(cache, temporalKey(family, seed, o), () => temporalExample(family, seed, net, o));

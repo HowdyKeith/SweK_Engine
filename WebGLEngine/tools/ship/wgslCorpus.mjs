@@ -1275,6 +1275,11 @@ export const EXCLUDED = Object.freeze([
         why: "the upsample, the hold on Bt's light and the composite, reading U_TH's head output; held with the chain to compositeEmitters(temporalUpscale(U_TH, x)) within 1e-4" }),
     Object.freeze({ id: "learnedUpscaleTemporalGPU.UPHOLD_WGSL", kind: "ordered multi-dispatch chain, graded against a CPU twin",
         why: "U_TH's last pass, the half-size head's residual upsampled and the hold at full size, reading what the four conv passes wrote; held to holdCpu(half) on the device's own residual (within 1e-5) and the whole chain to temporalUpscale (within 1e-4)" }),
+    // round 88 (section 195) -- U_TQ's own two passes, by 4: first and last of its six
+    Object.freeze({ id: "learnedUpscaleTemporalGPU.DOWN4_FAST_WGSL", kind: "ordered multi-dispatch chain, graded against a CPU twin",
+        why: "U_TQ's first pass, the 17 channels averaged over 4 x 4 with one thread per quarter-size value, feeding the quarter-size layers after it; render/denoiseLearnedUpscaleGPU-selfcheck.mjs reads it back and holds it to quarterInput (within 1e-6)" }),
+    Object.freeze({ id: "learnedUpscaleTemporalGPU.UPHOLD4_WGSL", kind: "ordered multi-dispatch chain, graded against a CPU twin",
+        why: "U_TQ's last pass, the quarter-size head's residual upsampled by 4 and the hold at full size, reading what the four conv passes wrote; held to holdCpu(4) on the device's own residual (within 1e-5) and the whole chain to temporalUpscale (within 1e-4)" }),
 ]);
 
 /**

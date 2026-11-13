@@ -2693,6 +2693,13 @@ export const NEXT_ROUNDS = [
         why: "Section 187: round 82's adaptive sampling made Bt 9.28 % worse through a denoiser trained at a uniform 4 samples and blind to the counts; this separated the denoiser's mismatch from the samples' information.",
     },
     {
+        id: "fsr4-utq-intel",
+        blocker: "OPEN",
+        what: "Rounds 87 and 88 (section 195), set up and awaiting the rig: U_TQ, U_TH's 16-wide network run at a quarter of the size (the 17 channels averaged over 4 x 4, the residual upsampled by 4, the hold at full size), Keith's choice after section 194. Round 87, the quality: trained as round 84 (seeds 1-3, C2), tested on 24 new scenes (12 R 95000-95011, 12 C 96000-96011) with round 72's U_TH graded beside it -- H87a: U_TQ beats Bt by the 1 % rule; H87b: it beats B1. Round 88, the cost: a seeded U_TQ on the device, timed at 1920 x 1080 -- H88: U <= 0.25 T on both GPUs in every counting run (readH88, h71).",
+        how: "On the rig at the rounds' commit: in one clone, node tools/denoiseStudy.mjs --harvest-upscale-temporal-train --round 87 then --harvest-upscale-temporal-test --round 87, each with its OWN --cache directory; and on each GPU, tools/render-qa's npm install first (Playwright), then exactly two realGpuRun --only denoise written to that GPU's file names (render/denoise-rig-s195-{a,b}-{gtx1080,intel}.json). Each committed byte for byte before it is read; section 196 reads them.",
+        why: "Section 194: U_TH8 kept the gain but missed the Intel's frame by one run of four (0.274; the others 0.18-0.20). U_TH's layers were 80-102 ms of the Intel's 114-141; a quarter-size network should cut them to a quarter.",
+    },
+    {
         id: "fsr4-uth8-intel",
         blocker: "CLOSED",
         what: "CLOSED: ROUND 84 BOTH SUPPORTED, ROUND 85 H85 FAILS (sections 191, 194). U_TH8 (U_TH's layers 8 wide) keeps the gain: 9.72 % below Bt (23 of 24), 87 % of U_TH's gain on the same scenes. But it does not fit the Intel's frame by the rule as fixed: of the Intel's four counting runs, three read 0.18-0.20 of a traced frame and the first 0.274 (a run slow for U_TH too), and every run must hold. The 1080 reads 0.090 (3.4 ms) in its one counting run; its other run's denoiseCompile children crashed. U_TH stays the 1080 class's alone. The quarter-size input is section 190's next cut; before it, the full-size passes (now about half the Intel's cost) and whether a timing run should be warmed. Neither is set up. Every file came zipped and was committed unread.",

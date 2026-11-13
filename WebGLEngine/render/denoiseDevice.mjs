@@ -780,11 +780,12 @@ const fromB64 = (s) => { const bin = atob(s), v = new DataView(new ArrayBuffer(b
                          return Float64Array.from({ length: bin.length / 8 }, (_, i) => v.getFloat64(i * 8, true)); };
 /** A network as data: { layers: [{ Cin, Cout, k, act, W, b }] }, W and b base64 float64. */
 export function encodeNet(net) {
-    return { layers: net.layers.map((L) => ({ Cin: L.Cin, Cout: L.Cout, k: L.k, act: L.act ?? "none", W: toB64(L.W), b: toB64(L.b) })) };
+    // section 195: a net that runs at a reduced size names its scale (U_TQ, 4); every other net encodes exactly as before
+    return { ...(net.scale ? { scale: net.scale } : {}), layers: net.layers.map((L) => ({ Cin: L.Cin, Cout: L.Cout, k: L.k, act: L.act ?? "none", W: toB64(L.W), b: toB64(L.b) })) };
 }
 /** encodeNet's inverse, refusing a layer whose weights do not fill its shape. */
 export function decodeNet(data) {
-    return { layers: data.layers.map((L, i) => {
+    return { ...(data.scale ? { scale: data.scale } : {}), layers: data.layers.map((L, i) => {
         const W = fromB64(L.W), b = fromB64(L.b);
         if (W.length !== L.Cout * L.k * L.k * L.Cin || b.length !== L.Cout) throw new Error(`denoiseDevice: layer ${i} holds ${W.length} + ${b.length} values for ${L.Cin} -> ${L.Cout}, k ${L.k}`);
         return { Cin: L.Cin, Cout: L.Cout, k: L.k, act: L.act, W, b };

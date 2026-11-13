@@ -309,7 +309,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
         console.log(`[denoiseStudy] wrote ${ROUND_FRAMEGEN_HOLES.results}`);
     } else if (args.includes("--harvest-upscale-temporal-train")) {
         // FSR4, round 70 (section 161): U_T trained on three seeds over the training sequences, the candidate by validation, and C2's U_T
-        // section 167: --round 72 trains U_TH (half size, 16 wide); section 190: --round 84 trains U_TH8 (half size, 8 wide); round 70's U_T otherwise
+        // section 167: --round 72 trains U_TH (half size, 16 wide); section 190: --round 84 trains U_TH8 (half size, 8 wide); section 195: --round 87 trains U_TQ (quarter size, 16 wide); round 70's U_T otherwise
         const LT = await import("../render/learnedUpscaleTemporalStudy.mjs"), { encodeNet: enc } = await import("../render/denoiseDevice.mjs"), ri = args.indexOf("--round"), RD = LT.temporalRound(ri >= 0 ? +args[ri + 1] : null);
         if (RD.moving && !RD.trainMoving) { console.log(`[denoiseStudy] round ${RD.round} is a test only (section 176) -- it trains nothing; run --harvest-upscale-temporal-test --round ${RD.round}`); process.exit(2); }
         const file = path.join(ENG, RD.net);
