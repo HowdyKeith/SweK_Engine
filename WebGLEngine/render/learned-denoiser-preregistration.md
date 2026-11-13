@@ -11962,3 +11962,58 @@ Two things would come before a round on that cut:
 - whether the slow first run is the machine warming up, in which case the timing rule should say how runs are warmed.
 
 Neither is set up.
+
+## 195. ROUNDS 87 AND 88 -- U_TH's NETWORK AT A QUARTER OF THE SIZE: DOES IT KEEP THE GAIN, AND DOES IT FIT THE INTEL's FRAME? FIXED BEFORE THE CODE
+
+**Why.** Section 194: U_TH8 kept the gain (section 191) and missed the Intel's frame by one run of four: 0.274 in the first, 0.18-0.20 in the
+other three. Section 190 named the quarter-size input as the next cut, and Keith chose it. On the Intel, U_TH's four layers were 80-102 ms of
+its 114-141 in section 194's runs f, c and d. At a quarter of the pixels they should fall to about a quarter of that. The down pass and the
+upsample with the hold stay at full size.
+
+**U_TQ (render/learnedUpscaleTemporal.mjs's "quarter" variant).** U_TH's network in every way (three 3 x 3 layers of 16, ReLU, a zero-started
+1 x 1 head of 3) run on the 17 channels averaged over 4 x 4 blocks, at a quarter of the width and height (480 x 270 at 1080p). The head's r is
+upsampled bilinearly by 4 to full size: pixel centres, edges clamped, as U_TH's by 2. Section 159's hold is then applied on Bt's light at
+full size. A U_TQ net carries its scale (4) in its file, because its layers have U_TH's shapes.
+
+**ROUND 87, the quality, as round 84's (section 190) in every way but the network.**
+- **Training and validation:** round 72's 200 + 20 sequences, 512 samples, seeds 1-3, the candidate by validation, and C2. Crops are 32 at
+  corners that are multiples of 4. File: render/upscale-net-r87.json.
+- **Test:** 24 new scenes, 12 R (95000-95011) and 12 C (96000-96011), against two 2,048-sample references, with round 72's U_TH graded
+  beside it. File: render/denoise-results-upscale-temporal-r87.json.
+- **H87a:** U_TQ's chain beats Bt's, by section 159's rule (1 %), through verdict() (the sign-flip test, Holm with H87b, C1-C5).
+- **H87b:** U_TQ's chain beats B1's.
+- **Descriptive:** U_TQ's gain as a fraction of U_TH's on the same scenes, and each scene's mean correction.
+
+**ROUND 88, the cost, as round 85's in every way but the network.**
+- **The passes:**
+  - the 17 channels averaged over 4 x 4, one thread a quarter-size value, coalesced as round 74's pass;
+  - the four layers on the fast kernel at quarter size;
+  - the upsample by 4 with the hold.
+- **Held to the CPU** at 64 x 64 on R 990914, on a seeded U_TQ with its head made non-zero.
+- **Timed at 1920 x 1080:** the gate's "section 195" line, read by readH88.
+- **H88: U <= 0.25 x T on both GPUs, in every run that counts on each** (h71). The counting is section 194's: every run in the reports is
+  counted. **So exactly two runs are made on each GPU, each written to its own GPU's file name.**
+
+**Predictions, fixed now, deciding nothing.**
+- **P1:** C1 and C3 hold in round 87.
+- **P2:** H87a is supported.
+- **P3:** H87b is supported.
+- **P4:** U_TQ keeps 50-90 % of U_TH's gain over Bt on round 87's scenes. U_TH8 kept 87 % at half size; a quarter-size correction is
+  smoother, and I expect it to lose more.
+- **P5:** on the Intel, U_TQ is 50-80 ms and U / T 0.11-0.19 in both runs, so H88 holds there. The layers fall to ~20-26 ms, and the down pass
+  and the upsample with the hold stay at ~30-45.
+- **P6:** on the 1080, U is 2.0-3.5 ms and U / T 0.05-0.09.
+
+**What each outcome means, fixed now.**
+- **H87a and H88 both hold:** U_TQ is the Intel class's learned temporal upscaler. Whether the chain and the page run it there (an entry beside
+  the 1080's in UTH_BY_ADAPTER) is Keith's call.
+- **H87a holds and H88 fails on the Intel:** the network is no longer the cost. The full-size passes are what is left, and they are the next
+  round.
+- **H87a fails:** a quarter-size correction is too coarse, and the learned temporal upscaler stays the 1080 class's.
+
+**The runs, on Keith's rig, at the rounds' commit.**
+- **In one clone:** `--harvest-upscale-temporal-train --round 87`, then `--harvest-upscale-temporal-test --round 87`, each with its own
+  `--cache` directory.
+- **On each GPU:** tools/render-qa's npm install first (Playwright), then two `realGpuRun --only denoise` with that GPU's file names.
+
+All are committed byte for byte before they are read. Section 196 reads them.
