@@ -21,7 +21,7 @@
 //               (0.5 x the fraction of the time left); -0.5 when every one of its own is. A fight ends when a side has no capital ship flying (escorts alone do not keep it going) or at the time limit. WHO WON is the side whose score is higher by more than DECISIVE (0.05).
 //   LIVE BRAINS a NETWORK that is asked for a decision in a tick: a seat's hand, a helm's correction, an escort's pilot. duel() counts them as the fight runs -- `brains.seated` (the networks the two sides brought), `brains.asked` (forward passes over the whole fight), `brains.peak` (the most in one tick). A seat with no
 //               target in its arc is not asked, a dead ship's are not, and the hand rules and the PD autopilot are not networks and are not counted. The count wraps each network's forward and changes no arithmetic (the gate flies a fight with and without the wrapping and compares).
-//   PEERS' BRAINS sideFromBrains(id, blobs) seats the brains other machines exported (brain/peerBrain.mjs's swek-brain-v1 files): seat gunners (seatGunnerPolicy, seatGunnerMlp, seatGunnerFish) are dealt round the thirteen seats in turn, the first helm (helmPolicy) takes the helm, pilots (pilot6dofPolicy, pilot6dofMlp) are dealt
+//   PEERS' BRAINS sideFromBrains(id, blobs) seats the brains other machines exported (brain/peerBrain.mjs's swek-brain-v1 files): seat gunners (seatGunnerPolicy, seatGunnerMlp, seatGunnerFish, and gunnerPolicy -- the RACE CAR'S turret gunner, seated by brain/seatTurretGunner.mjs) are dealt round the thirteen seats in turn, the first helm (helmPolicy) takes the helm, pilots (pilot6dofPolicy, pilot6dofMlp) are dealt
 //               round the escorts in turn; every file goes through importBrain and a refused one is listed with its reason and seats nothing. THIS FILE READS NO NETWORK AND NO DISK: a peer's brain reaches it as a file somebody loaded.
 //
 // WHAT IS NOT HERE, SAID PLAINLY: a FISH network AT A HELM or flying an escort (brain/seatGunnerFish.mjs is the zebrafish circuit's SEAT; the helm's and the pilot's networks are the fruit fly's circuit, so the brains a side can seat are the fruit fly's, the fish's and the GPU Brain's in a gun seat, the fruit fly's at a helm, the fruit fly's and the GPU Brain's in an escort, and the hand rules on the CPU);
@@ -38,6 +38,7 @@ import * as PB from "./peerBrain.mjs";
 import * as SG from "./seatGunnerPolicy.mjs";
 import * as SM from "./seatGunnerMlp.mjs";
 import * as SF from "./seatGunnerFish.mjs";
+import * as ST from "./seatTurretGunner.mjs";
 import * as HP from "./helmPolicy.mjs";
 import * as P6 from "./pilot6dofPolicy.mjs";
 import * as PM from "./pilot6dofMlp.mjs";
@@ -48,7 +49,7 @@ export const SECONDS = 180, RANGE = Object.freeze([500, 800]), SHIP_SPACING = 14
 export const KILL_BONUS = 0.5, SPEED_BONUS = 0.5, LOSS = 0.5, DECISIVE = 0.05;
 export const BROADSIDE_RANGE = 300, BROADSIDE_SLOPE = 200, BROADSIDE_LEAN = Object.freeze([-0.6, 0.9]), BROADSIDE_ROLL = 0.25;
 /** The policies a peer's brain file may be for, and the role each takes in a side (sideFromBrains). */
-export const PEER_POLICIES = Object.freeze({ seatGunnerPolicy: Object.freeze({ mod: SG, role: "seat" }), seatGunnerMlp: Object.freeze({ mod: SM, role: "seat" }), seatGunnerFish: Object.freeze({ mod: SF, role: "seat" }), helmPolicy: Object.freeze({ mod: HP, role: "helm" }), pilot6dofPolicy: Object.freeze({ mod: P6, role: "pilot" }), pilot6dofMlp: Object.freeze({ mod: PM, role: "pilot" }) });
+export const PEER_POLICIES = Object.freeze({ seatGunnerPolicy: Object.freeze({ mod: SG, role: "seat" }), seatGunnerMlp: Object.freeze({ mod: SM, role: "seat" }), seatGunnerFish: Object.freeze({ mod: SF, role: "seat" }), gunnerPolicy: Object.freeze({ mod: ST, role: "seat" }), helmPolicy: Object.freeze({ mod: HP, role: "helm" }), pilot6dofPolicy: Object.freeze({ mod: P6, role: "pilot" }), pilot6dofMlp: Object.freeze({ mod: PM, role: "pilot" }) });
 
 const mulberry = (a) => () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
 const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
@@ -146,7 +147,7 @@ export function build(sideA, sideB, seed, kind, { ships = 1, escorts = 0, second
         const offset = (t + 1) * 1000 + k * 50, sight = (seat, i) => GS.handGunner({ seed: seed * 100 + offset + i, ...side.gunnerOptions });
         const gunner = (seat, i) => {
             const net = seatNetOf(side, seat.id); if (!net) return sight(seat, i);
-            const g = net.module.gunnerFactory(net.weights, sight, { reach: side.gunnerOptions.maxRange })(seat, i);
+            const g = net.module.gunnerFactory(net.weights, sight, { reach: side.gunnerOptions.maxRange, sigma: side.gunnerOptions.sigma ?? 0, seed: seed * 100 + offset + 500 })(seat, i);   // `sigma` and `seed` are for a network that lays the gun itself (brain/seatTurretGunner.mjs: the hand's aim error, on what the hand does); the correcting networks do not read them
             if (countBrains && g.net) { const f = g.net.forward; g.net = { ...g.net, forward: (w, x) => { asked(); return f(w, x); } }; }
             return g;
         };
