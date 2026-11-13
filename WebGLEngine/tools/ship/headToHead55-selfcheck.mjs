@@ -188,5 +188,9 @@ sec("9. ROWS FROM H55'S OWN MUTATION PASS");
 {
     ok("!! the per-arm header names the three prices exactly (L190-o20: a changed last price, 0.081, must be seen): the report holds the line 'per arm: dark / lit gain over the autopilot, extra power (kW, dark / lit), penalised priced gain at 0.02 / 0.04 / 0.08:' word for word", X.report(mkAu()).includes("per arm: dark / lit gain over the autopilot, extra power (kW, dark / lit), penalised priced gain at 0.02 / 0.04 / 0.08:"));
 }
+sec("9b. THE COMMAND READS THE LAW OF ITS OWN GROUP (found on the rig in H61: a command copied from H50 read H27's law of 0.01 for a q04 arm and the check C02, WIP AND Q-ARM went red)");
+{
+    ok("!! the command's h27Sets reads H27's stored law at index 3 of fresh.laws (the order is Q005, Q01, Q02, Q04), the law of this round's Q04 comparator, and no other index", (() => { const cs = fs.readFileSync(new URL("./headToHead55Cmd.mjs", import.meta.url), "utf8"), m = cs.match(/h27Sets = \(\) => \{[^\n]*\};/); return !!m && /return \{ laws: \[f\.laws\[3\]\] \}/.test(m[0]) && (m[0].match(/laws\[/g) || []).length === 1; })());
+}
 console.log(`\n${fails ? "SOME CHECKS FAILED: " + fails : "all checks pass"}`);
 finished = true; if (fails) process.exitCode = 1;

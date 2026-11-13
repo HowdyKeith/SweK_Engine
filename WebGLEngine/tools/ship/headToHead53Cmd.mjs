@@ -23,7 +23,7 @@ const oldNets = () => X.netsOf(storedRows());
 const readRows = (f) => (fs.existsSync(f) ? fs.readFileSync(f, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l)) : []);
 const loadWip = () => JSON.parse(fs.readFileSync(eng + "brain/pilotSubWeightsWip.json", "utf8")).weights;
 const readJ = (f) => JSON.parse(fs.readFileSync(RR + f, "utf8"));
-const h27Sets = () => { const f = readJ("head-to-head27.json").fresh; return { laws: [f.laws[1]] }; };
+const h27Sets = () => { const f = readJ("head-to-head27.json").fresh; return { laws: [f.laws[2]] }; };
 const h32Rows = () => readRows(RR + "head-to-head32-search.jsonl");
 const originals = () => ({ original: { search: readRows(RR + "head-to-head27-search.jsonl") }, rows: storedRows(), proof32: readJ("head-to-head32-proof.json") });
 const armsOfPart = (p, P) => X.ARM_IDS.filter((a, i) => a === "autopilot" || i % P === p);

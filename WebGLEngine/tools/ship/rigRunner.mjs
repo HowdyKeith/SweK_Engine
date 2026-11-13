@@ -33,10 +33,10 @@ const sh = (c, a, o = {}) => spawnSync(c, a, { cwd: eng, encoding: "utf8", shell
 if (!Number.isInteger(workers) || workers < 1) { console.error("--workers must be a positive integer"); process.exit(2); }
 fs.mkdirSync(RR, { recursive: true }); fs.mkdirSync(OUT, { recursive: true });
 
-/** Is the round's flight result already there (and not a smoke result)? */
+/** Is the round's flight result already there (not a smoke result, and not a report whose verdict is NOT WEIGHED because a check failed)? */
 function finished(n) {
     const f = resultOf(n); if (!fs.existsSync(f)) return false;
-    try { const j = JSON.parse(fs.readFileSync(f, "utf8")); return !j.smoke; } catch (e) { return false; }
+    try { const j = JSON.parse(fs.readFileSync(f, "utf8")); return !j.smoke && !(Array.isArray(j.report) && j.report.some((l) => /NOT WEIGHED/.test(l))); } catch (e) { return false; }
 }
 /** What the round's command offers. */
 function offers(n) {

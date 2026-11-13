@@ -192,5 +192,9 @@ sec("7. PRICE 0 IS FALSY IN CODE (registered)");
     const st = []; run0({ save: (x) => st.push(JSON.parse(JSON.stringify(x))) });
     ok("!! a state of price 0 is ACCEPTED by a search at the default price 0 (and at an explicit 0), a state with the price field missing is refused naming undefined, a state of price 0.02 is refused, and a search record of price 0 passes the price row while one with the price missing does not", st.length > 0 && st.every((x) => x.price === 0 && Object.is(x.price, 0)) && thr(() => run0({ state: st[0] })) === "" && thr(() => run0({ state: st[0], price: 0 })) === "" && /price is undefined, not 0/.test(thr(() => { const m = { ...st[0] }; delete m.price; run0({ state: m }); })) && /price is 0\.02, not 0/.test(thr(() => run0({ state: { ...st[0], price: 0.02 } }))) && ((x) => { const r = X.checksOf(x).filter((c) => !c.ok).map((c) => c.name); return r.length === 1 && r[0].startsWith("THE PRICE"); })(mkAu({}, { search: mkAu().search.map((r, i) => (i === 1 ? (({ price, ...q }) => q)(r) : r)) })));
 }
+sec("9b. THE COMMAND READS THE LAW OF ITS OWN GROUP (found on the rig in H61: a command copied from H50 read H27's law of 0.01 for a q04 arm and the check C02, WIP AND Q-ARM went red)");
+{
+    ok("!! the command's h27Sets reads H27's stored law at index 0 of fresh.laws (the order is Q005, Q01, Q02, Q04), the law of this round's Q005 comparator, and no other index", (() => { const cs = fs.readFileSync(new URL("./headToHead58Cmd.mjs", import.meta.url), "utf8"), m = cs.match(/h27Sets = \(\) => \{[^\n]*\};/); return !!m && /return \{ laws: \[f\.laws\[0\]\] \}/.test(m[0]) && (m[0].match(/laws\[/g) || []).length === 1; })());
+}
 console.log(`\n${fails ? "SOME CHECKS FAILED: " + fails : "all checks pass"}`);
 finished = true; if (fails) process.exitCode = 1;

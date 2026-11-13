@@ -22,7 +22,7 @@ const SMOKE = { iters: 6, checkpoints: [2, 4, 6], stateEvery: 2, train: [{ from:
 const readRows = (f) => (fs.existsSync(f) ? fs.readFileSync(f, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l)) : []);
 const loadWip = () => JSON.parse(fs.readFileSync(eng + "brain/pilotSubWeightsWip.json", "utf8")).weights;
 const readJ = (f) => JSON.parse(fs.readFileSync(RR + f, "utf8"));
-const h27Sets = () => { const f = readJ("head-to-head27.json").fresh; return { laws: [f.laws[1]] }; };
+const h27Sets = () => { const f = readJ("head-to-head27.json").fresh; return { laws: [f.laws[3]] }; };
 const h32Rows = () => readRows(RR + "head-to-head32-search.jsonl");
 const s32Sets = () => ({ nets: X32.SEEDS.S02.map((s) => h32Rows().find((r) => r.seed === s).checkpoints.find((k) => k.iter === 1800).weights) });
 const originals = () => ({ original: { search: readRows(RR + "head-to-head27-search.jsonl") }, h32: { search: h32Rows() }, earlier: h32Rows().map((x) => x.seed), proof32: readJ("head-to-head32-proof.json") });
