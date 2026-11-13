@@ -11,8 +11,8 @@
 //   WHAT SHIPS    several searches (one after another: each uses every core through tools/ship/pairPool.mjs); the champion is the best on held-out; the audit is read once, with tools/ship/takeTurretAudit.mjs's words at its z of 2: the champion against the hand gunner, the champion less the START, the champion less its
 //                 ABLATION. It is written (brain/seatTurretGunnerWeightsBig.json -- the earlier file is left as it is) only if it LEADS the hand gunner AND LEADS the start: a gunner no better than the car's untrained hand weights is not a trained gunner, which is what the first trainer's rule missed.
 //
-//     node tools/ship/trainTurretSeatBig.mjs search --seed 9000 --iters 200 --record <file.json> [--workers 4]
-//     node tools/ship/trainTurretSeatBig.mjs finish --records a.json,b.json [--write]
+//     node tools/ship/trainTurretSeatBig.mjs search --seed 9000 --iters 200 --record <dir>/s9000.json [--workers 4]     # RESUMABLE: it keeps <record>.ckpt after every child; the same command goes on from it
+//     node tools/ship/trainTurretSeatBig.mjs finish --records-dir <dir> [--write]                                        # every s<seed>.json there; REFUSES to read the audit a second time (the reading file is its mark)
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -53,17 +53,21 @@ export async function stagedTest(leadsOf, base, stages = STAGES) {
  * The search. `fly(w, list)` -> Promise of leads (default: the pool's). Returns a record: { seed, iters, sigma, maxK, weights (an array), trainLeads (the final network's 300), startTrain, train (means), improved, by, tried, stages (children dropped at each stage and accepted), accepted: [{ i, kind, z, mean }],
  * pruned: [{ index, kept, z }], moved, kept, synapsesBefore, synapses, pairsFlown }.
  */
-export async function search(opts = {}, log = () => {}, { fly, train = TRAIN_PAIRS, stages = STAGES, startLeads = null } = {}) {
-    const o = { ...RECIPE, ...opts }, rng = mulberry(o.seed), mean = (xs) => xs.reduce((a, b) => a + b, 0) / xs.length; let flown = 0;
+export async function search(opts = {}, log = () => {}, { fly, train = TRAIN_PAIRS, stages = STAGES, startLeads = null, checkpoint = null } = {}) {
+    const o = { ...RECIPE, ...opts }, gen = { a: o.seed >>> 0 }, rng = () => { gen.a = (gen.a + 0x6D2B79F5) >>> 0; let t = gen.a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }, mean = (xs) => xs.reduce((a, b) => a + b, 0) / xs.length; let flown = 0;
     const leadsOn = async (w, from, to) => { const l = await fly(w, train.slice(from, to)); flown += l.length; return l; };
-    let best = T.startWeights(), bestLeads = startLeads ? startLeads.slice() : await leadsOn(best, 0, train.length); const startTrain = mean(bestLeads);
-    const by = { synapse: 0, path: 0, tune: 0, bias: 0 }, tried = { synapse: 0, path: 0, tune: 0, bias: 0 }, dropped = Object.fromEntries(stages.map((s) => [s.n, 0])), accepted = [];
-    log(`  seed ${o.seed}: the start on the ${train.length} train pairs ${startTrain.toFixed(3)}`);
-    for (let i = 1; i <= o.iters; i++) {
+    // A CHECKPOINT ({ load() -> state | null, save(state) }, the command's: a file) lets a search of hours be stopped and gone on with: the state after each child is everything the next child depends on (the generator's word, the parent, its leads, the counts), so a search resumed is the search not stopped, to the bit.
+    const saved = checkpoint ? checkpoint.load() : null;
+    if (saved && (saved.seed !== o.seed || saved.sigma !== o.sigma || saved.maxK !== o.maxK || saved.trainPairs !== train.length)) throw new Error(`trainTurretSeatBig.search: the checkpoint is another search's (seed ${saved.seed}, sigma ${saved.sigma}, ${saved.trainPairs} train pairs)`);
+    let best = saved ? Float32Array.from(saved.best) : T.startWeights(), bestLeads = saved ? saved.bestLeads.slice() : startLeads ? startLeads.slice() : await leadsOn(best, 0, train.length); const startTrain = saved ? saved.startTrain : mean(bestLeads);
+    const by = saved ? saved.by : { synapse: 0, path: 0, tune: 0, bias: 0 }, tried = saved ? saved.tried : { synapse: 0, path: 0, tune: 0, bias: 0 }, dropped = saved ? saved.dropped : Object.fromEntries(stages.map((s) => [s.n, 0])), accepted = saved ? saved.accepted : [];
+    if (saved) { gen.a = saved.gen; flown = saved.flown; log(`  seed ${o.seed}: resumed after child ${saved.i} (${accepted.length} accepted, ${flown} pairs flown)`); } else log(`  seed ${o.seed}: the start on the ${train.length} train pairs ${startTrain.toFixed(3)}`);
+    for (let i = saved ? saved.i + 1 : 1; i <= o.iters; i++) {
         const c = T.child(best, o.sigma, rng, o.maxK); tried[c.kind]++;
         const r = await stagedTest((from, to) => leadsOn(c.w, from, to), bestLeads, stages);
         if (r.accepted) { best = c.w; bestLeads = r.leads; by[c.kind]++; accepted.push({ i, kind: c.kind, z: r.z, mean: r.mean }); log(`    seed ${o.seed} iteration ${i}: a ${c.kind} child ACCEPTED, +${r.mean.toFixed(3)} over its parent (z ${r.z.toFixed(2)}); train ${mean(bestLeads).toFixed(3)}, ${ST.synapsesUsed(best)} synapses`); }
         else dropped[r.stage]++;
+        if (checkpoint) checkpoint.save({ seed: o.seed, sigma: o.sigma, maxK: o.maxK, trainPairs: train.length, i, gen: gen.a, best: Array.from(best), bestLeads, startTrain, by, tried, dropped, accepted, flown });
         if (i % 20 === 0) log(`    seed ${o.seed} iteration ${i}: train ${mean(bestLeads).toFixed(3)}, ${accepted.length} accepted, ${flown} pairs flown`);
     }
     // the prune: a weight stays only if the network WITH it beats the network WITHOUT it
@@ -108,14 +112,22 @@ export function blobOf(result) {
 function mulberry(a) { return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
 
 if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
-    const [step, ...rest] = process.argv.slice(2), arg = (k, d = null) => { const i = rest.indexOf("--" + k); return i >= 0 ? rest[i + 1] : d; }, known = ["seed", "iters", "record", "records", "workers", "write", "out"], bad = rest.filter((a) => a.startsWith("--") && !known.includes(a.slice(2)));
+    const [step, ...rest] = process.argv.slice(2), arg = (k, d = null) => { const i = rest.indexOf("--" + k); return i >= 0 ? rest[i + 1] : d; }, known = ["seed", "iters", "record", "records", "records-dir", "workers", "write", "out"], bad = rest.filter((a) => a.startsWith("--") && !known.includes(a.slice(2)));
     if (!["search", "finish"].includes(step) || bad.length) { console.error(`trainTurretSeatBig: ${bad.length ? `unknown option ${bad.join(", ")}` : "the first argument is search or finish"}`); process.exit(2); }
     const pool = createPool(arg("workers") ? { workers: Number(arg("workers")) } : {}), fly = (w, list) => pool.leads(jobsOf(Array.from(w), list)), log = (m) => console.log(m);
     if (step === "search") {
         if (!arg("record")) { console.error("trainTurretSeatBig: search needs --record <file.json>"); process.exit(2); }
-        const rec = await search({ seed: Number(arg("seed", RECIPE.seed)), iters: Number(arg("iters", RECIPE.iters)) }, log, { fly }); fs.writeFileSync(arg("record"), JSON.stringify(rec) + "\n"); console.log(`wrote ${arg("record")}`);
+        const ckpt = arg("record") + ".ckpt", checkpoint = { load: () => (fs.existsSync(ckpt) ? JSON.parse(fs.readFileSync(ckpt, "utf8")) : null), save: (st) => { fs.writeFileSync(ckpt + ".tmp", JSON.stringify(st)); fs.renameSync(ckpt + ".tmp", ckpt); } };
+        if (fs.existsSync(arg("record"))) { console.log(`${arg("record")} is already there: this search is finished`); await pool.close(); process.exit(0); }
+        fs.mkdirSync(path.dirname(path.resolve(arg("record"))), { recursive: true });
+        const rec = await search({ seed: Number(arg("seed", RECIPE.seed)), iters: Number(arg("iters", RECIPE.iters)) }, log, { fly, checkpoint }); fs.writeFileSync(arg("record"), JSON.stringify(rec) + "\n"); console.log(`wrote ${arg("record")}`);
     } else {
-        const result = await finish(arg("records").split(",").map((f) => JSON.parse(fs.readFileSync(f, "utf8"))), log, { fly });
+        const dir = arg("records-dir"), files = dir ? fs.readdirSync(dir).filter((f) => /^s\d+\.json$/.test(f)).sort().map((f) => path.join(dir, f)) : (arg("records") || "").split(",").filter(Boolean);
+        if (!files.length) { console.error("trainTurretSeatBig: finish needs --records a.json,b.json or --records-dir <dir of s<seed>.json>"); process.exit(2); }
+        const outBase = arg("out", DEFAULT_OUT), readingFile = outBase.replace(/\.json$/, ".reading.json");
+        if (fs.existsSync(readingFile)) { console.error(`trainTurretSeatBig: ${readingFile} is already there -- THE AUDIT HAS BEEN READ ONCE and is not read again; its reading is that file`); process.exit(1); }
+        console.log(`the records: ${files.join(", ")}`);
+        const result = await finish(files.map((f) => JSON.parse(fs.readFileSync(f, "utf8"))), log, { fly });
         fs.writeFileSync(arg("out", DEFAULT_OUT).replace(/\.json$/, ".reading.json"), JSON.stringify({ champion: result.champion.seed, runs: result.runs.map((r) => ({ seed: r.seed, heldOut: r.heldOut, kept: r.kept, synapses: r.synapses })), reading: result.reading, verdict: result.verdict }) + "\n");
         if (rest.includes("--write")) { if (!result.verdict.ok) console.log("not written: " + result.verdict.reasons.join("; ")); else { const blob = blobOf(result); fs.writeFileSync(arg("out", DEFAULT_OUT), JSON.stringify(blob) + "\n"); console.log(`wrote ${arg("out", DEFAULT_OUT)}`); } }
     }
