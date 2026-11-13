@@ -74,37 +74,37 @@ export function armLine(name, a) {
 }
 
 /** The DEV calibration over `set` ("smoke" or "dev"): every rung, the arms none, both and one; returns { set, rows: [{ rung, arms, play, checks }], chosen }. */
-export function calibrate(set = "dev", rungs = LADDER.map((l) => l.rung), onRung = null) {
+export function calibrate(set = "dev", rungs = LADDER.map((l) => l.rung), onRung = null, check = checks) {
     const geos = geometriesOf(set), rows = [];
     for (const rung of rungs) {
         const arms = {}; for (const k of ["none", "both", "one"]) arms[k] = arm(sideOf("X", ARMS[k].x), sideOf("Y", ARMS[k].y), geos, seekerOf(rung));
-        const row = { rung, arms, play: playable(arms.both, arms.one), checks: checks({ none: arms.none, both: arms.both }, rung) }; rows.push(row); if (onRung) onRung(row);
+        const row = { rung, arms, play: playable(arms.both, arms.one), checks: check({ none: arms.none, both: arms.both }, rung) }; rows.push(row); if (onRung) onRung(row);
     }
     return { set, rows, chosen: chooseRung(rows) };
 }
 /** The HELD read for one rung: the arms none, both, one, all3 at that rung, and `both` at rung 0 (the collapse's reference). */
-export function readHeld(rung, set = "held") {
+export function readHeld(rung, set = "held", check = checks) {
     const geos = geometriesOf(set), arms = {};
     for (const k of ["none", "both", "one", "all3"]) arms[k] = arm(sideOf("X", ARMS[k].x), sideOf("Y", ARMS[k].y), geos, seekerOf(rung));
     arms.bothOld = arm(sideOf("X", ARMS.both.x), sideOf("Y", ARMS.both.y), geos, null);
-    return { rung, set: "held", arms, play: playable(arms.both, arms.one), checks: checks({ none: arms.none, both: arms.both, all3: arms.all3 }, rung) };
+    return { rung, set: "held", arms, play: playable(arms.both, arms.one), checks: check({ none: arms.none, both: arms.both, all3: arms.all3 }, rung) };
 }
 
 const strip = (a) => { const { fights, fingerprints, summary, ...rest } = a; return { ...rest, edge: summary.edge }; };
 /** The command: argv (after the program), io { log, exists, write } (defaults to the console and the file system). Returns the exit code. */
 export function command(argv, io = {}) {
-    const log = io.log || ((s) => console.log(s)), exists = io.exists || ((f) => fs.existsSync(ENG + f)), write = io.write || ((f, s) => fs.writeFileSync(ENG + f, s));
+    const log = io.log || ((s) => console.log(s)), exists = io.exists || ((f) => fs.existsSync(ENG + f)), write = io.write || ((f, s) => fs.writeFileSync(ENG + f, s)), check = io.checks || checks;   // io.checks and io.devSet / io.heldSet are for the gate (a failed check to see the exit code; smoke geometries instead of the DEV and HELD sets)
     const mode = argv[0], flag = (n) => { const i = argv.indexOf(n); return i < 0 ? null : argv[i + 1]; };
     if (mode !== "dev" && mode !== "held") { log("usage: takeSeekerEccm.mjs dev [--set smoke|dev] [--write] | held --rung N [--write]"); return 2; }
     if (mode === "dev") {
-        const set = flag("--set") || "dev"; if (set !== "smoke" && set !== "dev") { log(`takeSeekerEccm: --set is smoke or dev, not "${set}" (the HELD set is read by the held command, once)`); return 2; }
-        if (argv.includes("--write") && set !== "dev") { log("takeSeekerEccm: --write is for the dev set"); return 2; }
+        const set = io.devSet || flag("--set") || "dev"; if (set !== "smoke" && set !== "dev") { log(`takeSeekerEccm: --set is smoke or dev, not "${set}" (the HELD set is read by the held command, once)`); return 2; }
+        if (argv.includes("--write") && set !== "dev" && !io.devSet) { log("takeSeekerEccm: --write is for the dev set"); return 2; }
         log(`[takeSeekerEccm] DEV calibration, set ${set} (geometries ${SETS[set].first} to ${SETS[set].first + SETS[set].count - 1}, both seats: ${2 * SETS[set].count} duels an arm); the rule: both-kit sunk >= ${pct(RULE.bothSunk)} and one-kit advantage >= ${pct(RULE.oneAdvantage)}`);
         const res = calibrate(set, undefined, (row) => {
             const L = LADDER[row.rung]; log(`  RUNG ${row.rung}  lockMemory ${L.lockMemory ? "on" : "off"}, classifyReject ${L.classifyReject}`);
             for (const k of ["none", "both", "one"]) log(armLine(k, row.arms[k]));
             log(`    rule: both-kit sunk ${pct(row.play.bothShare)} (${row.play.a ? "ok" : "short"}); one-kit advantage ${pct(row.play.advantage)} (${row.play.b ? "ok" : "short"})  ->  ${row.play.ok ? "PLAYABLE" : "not playable"}${row.checks.length ? "   CHECKS FAILED, NOT WEIGHED: " + row.checks.join("; ") : ""}`);
-        });
+        }, check);
         log(res.chosen === null ? "  RESULT: no rung of the ladder is playable; the read is not flown and the ladder is not extended in this note" : `  RESULT: the task is rung ${res.chosen} (the first playable one)`);
         if (argv.includes("--write")) { write(DEV_FILE, JSON.stringify({ set, chosen: res.chosen, rule: RULE, rows: res.rows.map((r) => ({ rung: r.rung, play: r.play, checks: r.checks, arms: Object.fromEntries(Object.entries(r.arms).map(([k, a]) => [k, strip(a)])) })) }, null, 1) + "\n"); log(`  written ${DEV_FILE}`); }
         return res.rows.some((r) => r.checks.length) ? 1 : 0;
@@ -112,7 +112,7 @@ export function command(argv, io = {}) {
     const rv = flag("--rung"), rung = rv !== null && /^\d+$/.test(rv) ? Number(rv) : NaN; if (!Number.isInteger(rung) || rung < 0 || rung >= LADDER.length) { log(`takeSeekerEccm: held needs --rung N, N one of 0 to ${LADDER.length - 1}`); return 2; }
     if (argv.includes("--write") && exists(HELD_FILE)) { log(`takeSeekerEccm: ${HELD_FILE} exists; the HELD set is read once and a second read is refused`); return 2; }
     if (!io.heldSet && !argv.includes("--write")) { log("takeSeekerEccm: the HELD set is read once and the read is recorded; run held with --write (Amendment A: an unrecorded run spent a set once)"); return 2; }
-    const hs = io.heldSet || "held", r = readHeld(rung, hs), L = LADDER[rung];   // io.heldSet is for the gate: it flies the smoke geometries, never the HELD set
+    const hs = io.heldSet || "held", r = readHeld(rung, hs, check), L = LADDER[rung];   // io.heldSet is for the gate: it flies the smoke geometries, never the HELD set
     log(`[takeSeekerEccm] HELD read, rung ${rung} (lockMemory ${L.lockMemory ? "on" : "off"}, classifyReject ${L.classifyReject}), geometries ${SETS[hs].first} to ${SETS[hs].first + SETS[hs].count - 1}, both seats`);
     for (const k of ["none", "both", "one", "all3", "bothOld"]) log(armLine(k === "bothOld" ? "old" : k, r.arms[k]) + (k === "bothOld" ? "   (rung 0 seeker, the decoy on both: the collapse's reference)" : ""));
     log(`    rule at this rung: both-kit sunk ${pct(r.play.bothShare)}, one-kit advantage ${pct(r.play.advantage)}  ->  ${r.play.ok ? "PLAYABLE" : "not playable"}${r.checks.length ? "\n    CHECKS FAILED, NOT WEIGHED: " + r.checks.join("; ") : ""}`);
