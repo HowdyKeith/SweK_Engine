@@ -21,8 +21,9 @@ THE FLY'S WIRING CANNOT BE TOLD APART FROM A SHUFFLE OF IT (p 0.56) and PAINTS W
 3 percent), every painter within 11 percent of a random one. **P3, the self-portrait, is DONE** (2026-11-13): `fly-portrait.html`, `brain/flyPortrait.mjs`, gate
 `tools/ship/flyPortrait-selfcheck.mjs` -- one duel's record of the 34 neurons (27 fire in the league pilot's close-quarters duel
 of seed 1), one line a neuron, time outward, activity as the width of a wave, the brush the cell type's. The mapping differs from
-this note's sketch (direction, length and colour): it is the one the page prints. Nothing of `painting-fly` is left open. `voxel-home` and
-`peer-jobs` are OPEN. Under `peer-jobs` the tree's own list (`tools/ship/todo.mjs`) has two open items no chat has touched:
+this note's sketch (direction, length and colour): it is the one the page prints. Nothing of `painting-fly` is left open. `voxel-home` is STARTED in this chat
+(Keith: "Let's do voxel home"): V1 is DONE (`brain/rl/buildEnv.mjs`, gate `tools/ship/buildEnv-selfcheck.mjs`) and V2 is registered
+(`brain/VOXEL_HOME_WIP.md`). `peer-jobs` is OPEN. Under `peer-jobs` the tree's own list (`tools/ship/todo.mjs`) has two open items no chat has touched:
 `peer-fly-brain-badge` (small) and `peer-brains-in-roster` (medium).
 
 | id | the question | its first stage | parallel? |
