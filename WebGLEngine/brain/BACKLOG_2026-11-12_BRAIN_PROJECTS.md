@@ -10,7 +10,14 @@ branch, and an edit there conflicts. **Writing only: every fact below was read f
 otherwise. No engine code was run for this note, and nothing below has been registered.** A chat that picks a topic registers its own round before any code, by the
 house's method.
 
-## The backlog (all OPEN; "parallel" = another chat can take it without touching a file the other topics touch)
+## The backlog ("parallel" = another chat can take it without touching a file the other topics touch)
+
+**State, 2026-11-13:** `ship-vs-ship-brains` is TAKEN by another chat (branch `claude/epic-cori-2hm1my`, not on main yet: the duel
+`brain/battleshipDuel.mjs`, `space-duel.html`, a trained helm, the fish's gun seat, and `brain/peerFleet.mjs`, which takes in a
+folder of peers' brain files and sets them to a fleet action -- with no network in it, by its own header). `painting-fly` is
+STARTED in this chat (Keith: "Start with the painting fly"; its registration is `brain/PAINTING_FLY_WIP.md`). `voxel-home` and
+`peer-jobs` are OPEN. Under `peer-jobs` the tree's own list (`tools/ship/todo.mjs`) has two open items no chat has touched:
+`peer-fly-brain-badge` (small) and `peer-brains-in-roster` (medium).
 
 | id | the question | its first stage | parallel? |
 |---|---|---|---|
@@ -103,7 +110,8 @@ control.
   least-squares colour over the covered pixels). The observation is a 4 x 4 grid of where the canvas is still wrong plus 4 more
   numbers: **`OBS_DIM` is 20 in the code (the file's header says 17; read the code)**. `maxSteps` 20 by default; `makeTarget(w, h,
   seed)` makes target pictures. The trainer is `brain/rl/dockPolicy.js` `trainDockES` (the same drop-in interface as the rocket,
-  dock and drive environments). The floor to beat is `fx/primitiveFit.mjs`'s own random search: about 90 shapes tried to place one,
+  dock and drive environments). **Corrected 2026-11-13: the trainer takes any ENVIRONMENT but builds its own policy, the plain
+  `FlightPolicy` MLP; it has no way to be handed another network.** The floor to beat is `fx/primitiveFit.mjs`'s own random search: about 90 shapes tried to place one,
   where the policy tries exactly one.
 - **The pages and brushes:** `primitive-paint.html` (any image approximated one coloured shape at a time), `proc-brush.html` (brushes --
   sketchy, fur, shaded, ribbon -- `fx/procBrush.mjs`, `ui/procBrushCanvas.js`), and the paint modules in `fx/` (`paintFields`,
@@ -117,7 +125,8 @@ from activity rather than toward a target.
 **The plan:**
 1. **P1, engineering:** a fly-wired painter (a new file): `OBS_DIM` 20 -> the GFC's 34 neurons (one weight per real synapse, three
    weight-tied recurrent steps, the house's masked-recurrent form) -> 5 shape actions: 680 + 34 + 313 + 170 + 5 = 1,202 weights.
-   Gate rows: the shapes, the weight count, determinism, `trainDockES` drives it unchanged.
+   Gate rows: the shapes, the weight count, determinism, and `trainDockES` drives it through an optional policy factory (new, and
+   without it the trainer's answer is what it was, to the bit).
 2. **P2, training:** the fly painter and the existing MLP painter on the same targets and seeds, and a plain net at 1,202 weights as
    the control; the hill climber as the floor, per shape evaluation.
 3. **P3, the self-portrait (no training):** record the 34 GFC neurons while a ship flies a fight (`brain/battleshipFight.mjs` or the
