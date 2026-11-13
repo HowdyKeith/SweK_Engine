@@ -51,8 +51,12 @@ function evaluate(flat, opts = {}) {
     // and then the last three action components were simply `undefined`, clamped to 0 by the env, so the
     // policy could not express a width, a height or an angle AT ALL. It trained, it improved, and it was
     // steering three controls it did not have. Same shape as the maxSteps omission fixed at v4218.
-    const p = new FlightPolicy({ hidden: opts.hidden || [16, 16], obsDim: opts.obsDim || env.obsDim,
-                                 actDim: opts.actDim || env.actDim });
+    // 2026-11-13 (unnumbered) -- AN OPTIONAL POLICY FACTORY, AND WITHOUT ONE NOTHING CHANGES. The trainer took any ENVIRONMENT
+    // and built its own policy, so a network that is not this file's MLP (brain/rl/paintCircuitPolicy.mjs: a circuit's wiring as
+    // the only recurrent weights) could not be trained by it at all. policyFactory({ obsDim, actDim, seed }) returns anything with
+    // paramCount / getParams / setParams / act; tools/ship/paintingFly-selfcheck.mjs pins this trainer's answers without it.
+    const dims = { obsDim: opts.obsDim || env.obsDim, actDim: opts.actDim || env.actDim };
+    const p = opts.policyFactory ? opts.policyFactory(dims) : new FlightPolicy({ hidden: opts.hidden || [16, 16], ...dims });
     p.setParams(flat);
     const K = opts.episodes || 24; let ret = 0, docks = 0, dsum = 0, crashes = 0;
     for (let k = 0; k < K; k++) { const r = rollout(p, env, 5000 + k * 17); ret += r.total; if (r.docked) docks++; dsum += r.dist; crashes += r.crashes || 0; }
@@ -65,7 +69,7 @@ function trainDockES(opts = {}) {
     const probe = mk({});
     const obsDim = opts.obsDim || probe.obsDim;
     const actDim = opts.actDim || probe.actDim;                      // see the note in evaluate()
-    const base = new FlightPolicy({ hidden: opts.hidden || [16, 16], seed: opts.seed || 3, obsDim, actDim });
+    const base = opts.policyFactory ? opts.policyFactory({ obsDim, actDim, seed: opts.seed || 3 }) : new FlightPolicy({ hidden: opts.hidden || [16, 16], seed: opts.seed || 3, obsDim, actDim });   // the factory: see evaluate()
     let theta = base.getParams(); const n = theta.length;
     const iters = opts.iters || 60, pop = opts.pop || 24, sigma = opts.sigma || 0.12, lr = opts.lr || 0.06;
     const rng = mulberry32(opts.seed || 3); const history = [];
@@ -77,7 +81,7 @@ function trainDockES(opts = {}) {
     // 157-267 steps to reach a goal and stop: training ran at 200 (no episode could finish) and the reported
     // result at 400, and the trainer's own best.ev disagreed with a re-evaluation of the very same params --
     // dockRate 0.21 against 1.0. No caller in this tree passes maxSteps, so this leaves them all at 200.
-    const evOpts = { hidden: opts.hidden || [16, 16], envFactory: mk, obsDim, actDim, maxSteps: opts.maxSteps };
+    const evOpts = { hidden: opts.hidden || [16, 16], envFactory: mk, obsDim, actDim, maxSteps: opts.maxSteps, policyFactory: opts.policyFactory };
     for (let it = 0; it < iters; it++) {
         // antithetic pairs: for each of pop/2 noise vectors, evaluate +noise and -noise
         const half = pop >> 1; const noises = [], rets = [];
