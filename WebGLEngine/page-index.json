@@ -1,7 +1,7 @@
 {
  "version": 1,
  "generated": "derived by tools/ship/buildPageIndex.mjs -- DO NOT HAND-EDIT, the group comes from tools/ship/pageSections.mjs",
- "count": 502,
+ "count": 503,
  "pages": [
   {
    "f": "AudioLab.html",
@@ -1303,6 +1303,13 @@
    "t": "SweK &middot; Fly Connectome",
    "d": "34 real neurons from Janelia's male-cns connectome -- the fruit fly's Giant Fiber escape circuit, the fastest reflex in the animal's nervous system -- drawn as their own traced skeletons (not a stylized model) from a one-time Neuprint fetch. Orbit the circuit, pick a neuron, and see its actual synaptic connections to the rest of the circuit. A second mode replays brain/gunnerPolicy.mjs's real turret-gunner AI -- these same 34 neurons ARE its hidden layer -- coloring each one by its real per-tick activation from a recorded duel, hand-tuned versus ES-trained.",
    "g": "rtx",
+   "p": 0
+  },
+  {
+   "f": "fly-portrait.html",
+   "t": "SweK The Fly's Self-Portrait",
+   "d": "What the 34 neurons of the fruit fly's Giant Fiber Circuit did in one 6-DOF duel, drawn by a stated rule with the procedural brushes: one line a neuron, time outward, activity as a turn. Nothing is trained and nothing is expression.",
+   "g": "flybrain",
    "p": 0
   },
   {

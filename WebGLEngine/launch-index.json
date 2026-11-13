@@ -21,7 +21,7 @@
   }
  },
  "counts": {
-  "page": 502,
+  "page": 503,
   "demo": 49,
   "builtin": 38
  },
@@ -1511,6 +1511,14 @@
    "id": "fly-connectome.html",
    "display": "Fly Connectome",
    "href": "/fly-connectome.html",
+   "section": "Fruit Fly Brain",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "fly-portrait.html",
+   "display": "Fly Portrait",
+   "href": "/fly-portrait.html",
    "section": "Fruit Fly Brain",
    "collision": false
   },

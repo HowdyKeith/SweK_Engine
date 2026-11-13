@@ -149,6 +149,9 @@ console.log(`\n  ${pure} gates assume NOTHING outside their own arithmetic.\n`);
         // render/subTournamentView-selfcheck.mjs load their pages in headless Chromium and read canvas pixels; render/seaPicker-selfcheck.mjs and render/subBallastCues-selfcheck.mjs and render/seaOgre3d-selfcheck.mjs draw a three.js scene
         // (the sea styles, the ballast cues, the Sea OGRE and its first-person camera) through WebGL and read the pixels back.
         "render/brainPanel-selfcheck.mjs", "render/compassView-selfcheck.mjs", "render/seaOgre3d-selfcheck.mjs", "render/seaPicker-selfcheck.mjs", "render/subBallastCues-selfcheck.mjs", "render/subTournamentView-selfcheck.mjs",
+        // UNNUMBERED (2026-11-13) -- 37 -> 38: tools/ship/flyPortrait-selfcheck.mjs opens fly-portrait.html in headless Chromium and reads the 2D canvas's pixels, to hold that the picture is painted, that the hub is left dark and that
+        // each cell type is in its own colour; its other three sections are arithmetic and need no context.
+        "tools/ship/flyPortrait-selfcheck.mjs",
     ]);
     const gpuNow = [...byGate.entries()].filter(([, h]) => h.includes("gpu")).map(([f]) => f).sort();
     const arrived = gpuNow.filter((g) => !GPU_GATES.includes(g));

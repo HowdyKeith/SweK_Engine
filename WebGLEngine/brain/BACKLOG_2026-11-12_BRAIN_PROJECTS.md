@@ -18,7 +18,10 @@ folder of peers' brain files and sets them to a fleet action -- with no network 
 STARTED in this chat (Keith: "Start with the painting fly"): **P1 and P2 are DONE** -- the painter `brain/rl/paintCircuitPolicy.mjs`,
 the trainer's policy factory, and round 1 (`brain/PAINTING_FLY_WIP.md` section 10, gate `tools/ship/paintingFly-selfcheck.mjs`):
 THE FLY'S WIRING CANNOT BE TOLD APART FROM A SHUFFLE OF IT (p 0.56) and PAINTS WORSE THAN A PLAIN NET OF ITS SIZE (p 0.0014, about
-3 percent), every painter within 11 percent of a random one. **P3, the self-portrait, is OPEN.** `voxel-home` and
+3 percent), every painter within 11 percent of a random one. **P3, the self-portrait, is DONE** (2026-11-13): `fly-portrait.html`, `brain/flyPortrait.mjs`, gate
+`tools/ship/flyPortrait-selfcheck.mjs` -- one duel's record of the 34 neurons (27 fire in the league pilot's close-quarters duel
+of seed 1), one line a neuron, time outward, activity as the width of a wave, the brush the cell type's. The mapping differs from
+this note's sketch (direction, length and colour): it is the one the page prints. Nothing of `painting-fly` is left open. `voxel-home` and
 `peer-jobs` are OPEN. Under `peer-jobs` the tree's own list (`tools/ship/todo.mjs`) has two open items no chat has touched:
 `peer-fly-brain-badge` (small) and `peer-brains-in-roster` (medium).
 

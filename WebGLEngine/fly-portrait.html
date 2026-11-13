@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="The Fly's Self-Portrait">
+<meta name="demo:desc" content="What the 34 neurons of the fruit fly's Giant Fiber Circuit did in one 6-DOF duel, drawn by a stated rule with the procedural brushes: one line a neuron, time outward, activity as a turn. Nothing is trained and nothing is expression.">
+<title>SweK The Fly's Self-Portrait</title>
+<!-- fly-portrait.html -- UNNUMBERED (the version is chosen at ship time). The picture is brain/flyPortrait.mjs's: record() flies brain/pilot6dofPolicy.mjs's duel with one of the page's three shipped
+     pilots and writes down the circuit's 34 activities a tick; portrait() draws them by the rule the page prints. Gate: tools/ship/flyPortrait-selfcheck.mjs. -->
+<style>
+  :root { --ink:#dbe6f5; --dim:#7e93ad; --edge:#243247; --bg:#080b11; }
+  html,body { margin:0; background:var(--bg); color:var(--ink); font:13px system-ui,sans-serif; }
+  header { display:flex; align-items:center; gap:10px; padding:8px 12px; border-bottom:1px solid var(--edge); flex-wrap:wrap; }
+  h1 { margin:0; font-size:14px; font-weight:700; color:#8fd0ff; letter-spacing:.3px; }
+  select,input,button { background:#131c28; color:var(--ink); border:1px solid var(--edge); border-radius:7px; padding:5px 8px; font:12px system-ui,sans-serif; }
+  input { width:64px; }
+  main { display:flex; flex-wrap:wrap; gap:16px; padding:12px; align-items:flex-start; }
+  canvas { background:#05070b; border:1px solid var(--edge); border-radius:8px; width:min(720px, calc(100vw - 26px)); height:auto; aspect-ratio:1; }
+  aside { flex:1 1 260px; max-width:420px; color:var(--dim); line-height:1.5; }
+  aside p { margin:0 0 9px; } aside b { color:var(--ink); }
+  #stats { font:12px ui-monospace,monospace; color:var(--ink); }
+  .key span { display:inline-block; width:10px; height:10px; border-radius:2px; margin:0 5px 0 10px; vertical-align:middle; }
+</style>
+</head>
+<body>
+<header>
+  <h1>The Fly's Self-Portrait</h1>
+  <label>pilot <select id="pilot"></select></label>
+  <label>duel <select id="scenario"><option value="joust">close quarters</option><option value="standoff">standoff</option></select></label>
+  <label>seed <input id="seed" type="number" min="1" max="9999" value="1"></label>
+  <button id="draw">Draw</button>
+</header>
+<main>
+  <canvas id="pad" width="720" height="720"></canvas>
+  <aside>
+    <p id="stats">flying the duel...</p>
+    <div id="rule"></div>
+    <p class="key" id="key"></p>
+  </aside>
+</main>
+<script type="module">
+import * as F from "/brain/flyPortrait.mjs";
+
+const PILOTS = [
+  { id: "league", label: "league-trained", file: "/brain/pilot6dofWeightsLeague-d18.json" },
+  { id: "shipped", label: "shipped", file: "/brain/pilot6dofWeightsDefault-d18.json" },
+  { id: "close", label: "close-quarters", file: "/brain/pilot6dofWeightsClose-d18.json" },
+];
+const el = (id) => document.getElementById(id), pad = el("pad"), g = pad.getContext("2d"), weights = new Map();
+for (const p of PILOTS) { const o = document.createElement("option"); o.value = p.id; o.textContent = p.label; el("pilot").appendChild(o); }
+for (const line of F.ruleLines()) { const p = document.createElement("p"); p.textContent = line; el("rule").appendChild(p); }
+for (const [type, colour] of Object.entries(F.COLOURS)) { const s = document.createElement("span"); s.style.background = colour; el("key").append(s, type); }
+
+async function weightsOf(id) {
+  if (!weights.has(id)) { const file = PILOTS.find((p) => p.id === id).file, res = await fetch(file); if (!res.ok) throw new Error(`${file} answered ${res.status}`); const j = await res.json(); if (!j || !Array.isArray(j.weights)) throw new Error(`${file} holds no weights`); weights.set(id, Float32Array.from(j.weights)); }
+  return weights.get(id);
+}
+function paint(pic) {
+  g.globalAlpha = 1; g.fillStyle = "#05070b"; g.fillRect(0, 0, pad.width, pad.height); g.lineCap = "round";
+  for (const s of pic.strokes) {
+    g.strokeStyle = s.colour;
+    for (const q of s.segments) { g.globalAlpha = Math.min(1, q.alpha); g.lineWidth = q.width; g.beginPath(); g.moveTo(q.x1, q.y1); g.lineTo(q.x2, q.y2); g.stroke(); }
+  }
+  g.globalAlpha = 1;
+}
+async function draw() {
+  const pilot = el("pilot").value, scenario = el("scenario").value, seed = Math.max(1, Math.min(9999, Math.round(Number(el("seed").value)) || 1));
+  el("seed").value = seed; el("stats").textContent = "flying the duel...";
+  try {
+    const rec = F.record(await weightsOf(pilot), { seed, scenario }), pic = F.portrait(rec, { size: pad.width });
+    paint(pic);
+    el("stats").textContent = `${rec.ticks} ticks · ${rec.active} of ${rec.neurons} neurons fired · ${pic.segments.toLocaleString()} segments · record ${rec.hash} · picture ${pic.hash}`;
+    window.swekPortrait = { pilot, scenario, seed, ticks: rec.ticks, active: rec.active, neurons: rec.neurons, segments: pic.segments, recordHash: rec.hash, hash: pic.hash, error: null };
+  } catch (e) {
+    el("stats").textContent = "the portrait could not be drawn: " + e.message;
+    window.swekPortrait = { pilot, scenario, seed, error: String(e.message) };
+  }
+}
+el("draw").addEventListener("click", draw);
+for (const id of ["pilot", "scenario", "seed"]) el(id).addEventListener("change", draw);
+draw();
+</script>
+</body>
+</html>
