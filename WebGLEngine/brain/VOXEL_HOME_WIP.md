@@ -70,3 +70,34 @@ three-line rule builds every home, so nothing here is hard for a program -- the 
 ## 9. The run (to be written; the gate never runs it and never gives the command the word `run`)
 `node tools/ship/takeVoxelHome.mjs run` -> `brain/voxelHomeRound.jsonl`, committed byte for byte before it is read;
 `node tools/ship/takeVoxelHome.mjs read` prints the checks and the reading.
+
+## 10. The result (run 2026-11-13 in the sandbox, 6.6 minutes; `brain/voxelHomeRound.jsonl` committed at 108df706 before it was read; read once)
+**The checks hold.**
+
+| arm | mean share built | sd | least | most | homes (16 x 200 builds) |
+|---|---|---|---|---|---|
+| FLY | 0.4295 | 0.0386 | 0.3729 | 0.5067 | 0 |
+| SHUF | 0.4339 | 0.0362 | 0.3964 | 0.5323 | 0 |
+| FISH | 0.4965 | 0.0507 | 0.3784 | 0.5836 | 0 |
+| PLAIN | 0.5536 | 0.0408 | 0.4498 | 0.6181 | 0 |
+| MLP | 0.5624 | 0.0335 | 0.4767 | 0.6032 | 0 |
+| 16 random builders | 0.5722 | 0.0028 | 0.5681 | 0.5774 | 0 |
+| the rule | 1 | | | | every plan |
+
+* **T0: A FLY-WIRED BUILDER BUILDS LESS OF A HOME THAN A RANDOM ONE** (all 16 below all 16 random builders; exact two-sided p 3.3e-9).
+* **T1: THE FLY'S WIRING CANNOT BE TOLD APART FROM A SHUFFLE OF IT** (p 0.78).
+* **T2: THE FLY'S WIRING BUILDS WORSE THAN A PLAIN NET OF ITS SIZE** (p 6.3e-8).
+* **Against the expectations: THE MAIN ONE WAS WRONG.** T0 was guessed BUILDS MORE at 85 percent. T1 and T2 came as guessed. The best
+  arm's mean was guessed 0.65 to 0.85 and is 0.56. No home was built (guessed: 35 percent that one would be).
+
+**The answer to Keith's question, said plainly: no, not with this training.** No arm's mean reaches what choosing columns at random
+builds. Of the 80 trained builders 9 are above every random builder (5 MLP, 3 PLAIN, 1 FISH; the best 0.618) and 66 are below every
+one. Nobody built a home; a three-line rule builds every one. The training did move the networks -- an untrained one names nearly
+the same column every step and builds about 0.011 of a home -- so what each learned is to SPREAD its choices, toward what random
+choice does and not past it. The order of the arms is the painting round's, larger: the more recurrent synapses, the less built
+(FLY and SHUF 313, FISH 153, PLAIN and MLP none), and where the synapses are makes no difference.
+
+**What this does not say:** that such a network cannot learn to build. Not tested here, each a round of its own: a builder whose
+choice is DRAWN (a network that names one column for one observation can only vary through the two noise inputs, and a random
+builder is all variation); a longer training; a smaller sigma on the synapses; an action that names a block's neighbour and not
+a column. The gate holds every number above from the file (`tools/ship/voxelHome-selfcheck.mjs` section 5).

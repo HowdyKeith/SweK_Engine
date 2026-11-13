@@ -22,8 +22,11 @@ THE FLY'S WIRING CANNOT BE TOLD APART FROM A SHUFFLE OF IT (p 0.56) and PAINTS W
 `tools/ship/flyPortrait-selfcheck.mjs` -- one duel's record of the 34 neurons (27 fire in the league pilot's close-quarters duel
 of seed 1), one line a neuron, time outward, activity as the width of a wave, the brush the cell type's. The mapping differs from
 this note's sketch (direction, length and colour): it is the one the page prints. Nothing of `painting-fly` is left open. `voxel-home` is STARTED in this chat
-(Keith: "Let's do voxel home"): V1 is DONE (`brain/rl/buildEnv.mjs`, gate `tools/ship/buildEnv-selfcheck.mjs`) and V2 is registered
-(`brain/VOXEL_HOME_WIP.md`). `peer-jobs` is OPEN. Under `peer-jobs` the tree's own list (`tools/ship/todo.mjs`) has two open items no chat has touched:
+(Keith: "Let's do voxel home"): V1 is DONE (`brain/rl/buildEnv.mjs`, gate `tools/ship/buildEnv-selfcheck.mjs`) and **V2 is DONE**
+(`brain/VOXEL_HOME_WIP.md` section 10, gate `tools/ship/voxelHome-selfcheck.mjs`): A FLY-WIRED BUILDER BUILDS LESS OF A HOME THAN A
+RANDOM ONE (0.43 of a home against 0.57; p 3e-9), its wiring CANNOT BE TOLD APART FROM A SHUFFLE OF IT and BUILDS WORSE THAN A PLAIN
+NET OF ITS SIZE; no arm's mean reaches a random builder's and nobody built a home, where a three-line rule builds every one.
+**V3, the page, is OPEN**, and so is the follow-up the result points at (a builder whose choice is drawn; a longer training). `peer-jobs` is OPEN. Under `peer-jobs` the tree's own list (`tools/ship/todo.mjs`) has two open items no chat has touched:
 `peer-fly-brain-badge` (small) and `peer-brains-in-roster` (medium).
 
 | id | the question | its first stage | parallel? |
