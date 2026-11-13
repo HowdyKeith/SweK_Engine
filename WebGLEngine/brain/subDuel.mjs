@@ -20,6 +20,7 @@ import * as S from "../physics/mechanics/subModel6dof.mjs";
 import * as K from "../physics/mechanics/subSonar.mjs";
 import * as Tp from "../physics/mechanics/subTorpedo.mjs";
 import { createActuators } from "../physics/mechanics/subActuators.mjs";
+import * as N from "../physics/mechanics/subNeeds.mjs";
 import * as AS from "./autopilotSub.mjs";
 import * as TA from "./subTactics.mjs";
 import { foldHash } from "../physics/raceCar.mjs";
@@ -47,13 +48,13 @@ const duelModel = () => MODEL || (MODEL = S.createSubModel());
 
 /**
  * Fight one duel. `side` is { tactics: (obs) -> { depth, heading, speed, fire, ping } (a FRESH one: it has memory), pilot: (state, target, current) -> controls } for A; B is the scenario's scripted drone flown by the
- * PD autopilot. Options: { seconds, dt, actuators (a rate set: both boats), model, opponent (a { tactics, pilot } that replaces the drone: a test, or self-play), seeker (null: the torpedoes' seeker is the old one; else subTorpedo.stepTorpedo's `eccm`, handed to every torpedo of the duel, brain/SUB_ECCM_WIP.md), trace (an array that is pushed a frame every TRACE_EVERY ticks: { tick, boats: [{ id, x, y, depth, heading, pitch, hp, alive, ammo }], torps: [{ id, owner, x, y, depth }] }; the fight is the same with or without it) }. Returns { score, winner ("A" | "B" | "draw"), hp: [A, B], damage: [dealt by A, dealt by B], fired: [A, B], hits: [A, B],
+ * PD autopilot. Options: { seconds, dt, actuators (a rate set: both boats), model, opponent (a { tactics, pilot } that replaces the drone: a test, or self-play), needs (null: speed is free; else { cls, energyJ } -- each boat starts with energyJ joules of that class of subNeeds.mjs and flies through its stepNeeds, so a dead battery kills the screw; brain/SUB_ENERGY_WIP.md), seeker (null: the torpedoes' seeker is the old one; else subTorpedo.stepTorpedo's `eccm`, handed to every torpedo of the duel, brain/SUB_ECCM_WIP.md), trace (an array that is pushed a frame every TRACE_EVERY ticks: { tick, boats: [{ id, x, y, depth, heading, pitch, hp, alive, ammo }], torps: [{ id, owner, x, y, depth }] }; the fight is the same with or without it) }. Returns { score, winner ("A" | "B" | "draw"), hp: [A, B], damage: [dealt by A, dealt by B], fired: [A, B], hits: [A, B],
  * pings: [A, B], fates: [A, B] ("afloat" | "sunk" | "grounded" | "broached" | "crushed" | "lost"), ticks, events (what happened: { tick, type: "fire" | "ping" | "hit" | "loss", boat, ... }), fingerprint }. Deterministic.
  */
-export function duel(side, sc, { seconds = SECONDS, dt = DT, actuators = null, model = duelModel(), opponent = null, trace = null, seeker = null } = {}) {
+export function duel(side, sc, { seconds = SECONDS, dt = DT, actuators = null, model = duelModel(), opponent = null, trace = null, seeker = null, needs = null } = {}) {
     const total = Math.round(seconds / dt), seed = sc.seed, events = [];
     const mk = (id, start, tactics, pilot) => ({ id, state: S.createState({ depth: start.depth, pos: start.pos ? [start.pos[0], start.pos[1], -start.depth] : [0, 0, -start.depth], speed: start.speed, heading: start.heading, model }), tactics, pilot, act: actuators ? createActuators(actuators) : null,
-        hp: HP, ammo: AMMO, cooldown: 0, target: { depth: start.depth, heading: start.heading, speed: start.speed }, alive: true, fate: "afloat", echoes: [], pings: [], dealt: 0, fired: 0, hits: 0, pinged: 0 });
+        hp: HP, ammo: AMMO, cooldown: 0, needs: needs ? { ...N.initialNeeds(needs.cls || "battery"), energy: Math.min(needs.energyJ, N.CLASSES[needs.cls || "battery"].capacityJ) } : null, charge0: needs ? Math.min(needs.energyJ, N.CLASSES[needs.cls || "battery"].capacityJ) : 0, deadAt: null, target: { depth: start.depth, heading: start.heading, speed: start.speed }, alive: true, fate: "afloat", echoes: [], pings: [], dealt: 0, fired: 0, hits: 0, pinged: 0 });
     const A = mk(1, sc.a, side.tactics, side.pilot), B = mk(2, sc.b, opponent ? opponent.tactics : TA.scripted(sc.kind, { drift: sc.drift }), opponent ? opponent.pilot : AS.pilot()), boats = [A, B], torps = [];
     let nextTorp = 1, h = 0x811c9dc5, flown = 0;
     const cm = CMX.carries(side.cm) || CMX.carries(opponent && opponent.cm) ? CMX.createCm({ 1: side.cm || CMX.KIT_NONE, 2: (opponent && opponent.cm) || CMX.KIT_NONE }) : null;   // countermeasures (brain/subCountermeasures.mjs): off unless a side carries a kit
@@ -68,7 +69,7 @@ export function duel(side, sc, { seconds = SECONDS, dt = DT, actuators = null, m
             const a = att(b), me = plat(b), contacts = [];
             for (const o of others(b)) { const c = K.listen(me, plat(o), { seed, tick, channel: b.id }); if (c) contacts.push({ kind: "boat", bearing: c.bearing, elevation: c.elevation, snr: c.snr }); }
             for (const t of torps) { if (t.status !== "running" || t.owner === b.id) continue; const c = K.listen(me, Tp.platformOf(t), { seed, tick, channel: b.id + 10 + t.id, sl: K.SONAR.torpedoSL }); if (c) contacts.push({ kind: "torpedo", bearing: c.bearing, elevation: c.elevation, snr: c.snr }); }
-            const obs = { t: tick * dt, self: { depth: a.depth, heading: a.heading, speed: a.speed, x: b.state.pos[0], y: b.state.pos[1], hp: b.hp, ammo: b.ammo, ready: b.cooldown <= 0 && b.ammo > 0 }, contacts, echoes: b.echoes, pings: b.pings };
+            const obs = { t: tick * dt, self: { depth: a.depth, heading: a.heading, speed: a.speed, x: b.state.pos[0], y: b.state.pos[1], hp: b.hp, ammo: b.ammo, ready: b.cooldown <= 0 && b.ammo > 0, ...(b.needs ? { charge: b.needs.energy / b.charge0 } : {}) }, contacts, echoes: b.echoes, pings: b.pings };
             b.echoes = []; b.pings = [];
             const cmd = b.tactics(obs) || {};
             if (cm) for (const e of cm.order(b.id, cmd, { pos: b.state.pos, heading: a.heading, pitch: a.pitch }, tick, dt)) events.push({ tick, ...e });
@@ -85,8 +86,8 @@ export function duel(side, sc, { seconds = SECONDS, dt = DT, actuators = null, m
         // ---- the hulls ----
         for (const b of boats) {
             if (!b.alive) continue;
-            const ctl = b.pilot(b.state, b.target, [0, 0, 0]), res = S.stepSub(model, b.state, b.act ? b.act.step(ctl, dt) : ctl, dt);
-            b.state = res.state; if (b.cooldown > 0) b.cooldown--;
+            const ctl = b.pilot(b.state, b.target, [0, 0, 0]), res = b.needs ? N.stepNeeds(model, b.state, b.needs, b.act ? b.act.step(ctl, dt) : ctl, dt) : S.stepSub(model, b.state, b.act ? b.act.step(ctl, dt) : ctl, dt);
+            b.state = res.state; if (b.needs) { b.needs = res.needs; if (b.deadAt === null && b.needs.energy <= 0) b.deadAt = tick; } if (b.cooldown > 0) b.cooldown--;
             if (res.status !== "submerged") { b.alive = false; b.fate = res.status; events.push({ tick, type: "loss", boat: b.id, why: res.status }); }
         }
         // ---- the torpedoes ----
@@ -113,7 +114,7 @@ export function duel(side, sc, { seconds = SECONDS, dt = DT, actuators = null, m
     const dmgA = A.dealt, dmgB = B.dealt, sunkB = B.fate === "sunk", lostA = !A.alive;
     const score = (dmgA - dmgB) / HP + (sunkB ? KILL_BONUS : 0) - (lostA ? KILL_BONUS : 0) + (sunkB && !lostA ? SPEED_BONUS * (1 - flown / total) : 0);
     const winner = A.alive && !B.alive ? "A" : B.alive && !A.alive ? "B" : "draw";
-    return { ...(cm ? { cm: { ...cm.stats } } : {}), ...(seeker && seeker.stats ? { seeker: { ...seeker.stats } } : {}), score, winner, hp: [A.hp, B.hp], damage: [dmgA, dmgB], fired: [A.fired, B.fired], hits: [A.hits, B.hits], pings: [A.pinged, B.pinged], fates: [A.fate, B.fate], ticks: flown, events, seed, kind: sc.kind, fingerprint: (h >>> 0).toString(16) };
+    return { ...(cm ? { cm: { ...cm.stats } } : {}), ...(seeker && seeker.stats ? { seeker: { ...seeker.stats } } : {}), ...(needs ? { charge: [A.needs.energy / A.charge0, B.needs.energy / B.charge0], deadAt: [A.deadAt, B.deadAt] } : {}), score, winner, hp: [A.hp, B.hp], damage: [dmgA, dmgB], fired: [A.fired, B.fired], hits: [A.hits, B.hits], pings: [A.pinged, B.pinged], fates: [A.fate, B.fate], ticks: flown, events, seed, kind: sc.kind, fingerprint: (h >>> 0).toString(16) };
 }
 
 
