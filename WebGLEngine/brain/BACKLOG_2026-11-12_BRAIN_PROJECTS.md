@@ -209,6 +209,24 @@ fingerprint -- the fold of the world's state hash -- does).
 **Said plainly:** no peer is called on today for any of the three; battles, painting and building run on one machine, and the seat
 networks run on its own GPU. One chat should add the kinds once; two chats editing `brain/fleetRouting.mjs` at once would conflict.
 
+## Added 2026-11-13: how else the fly brain could live in the voxel world (all OPEN; ideas, nothing registered, no code read for them beyond what this note already cites)
+
+Keith, 2026-11-13: "How else could the fly brain live in voxel world? Could it play minecraft or create something to attract a
+different fly brain?" and, of the five answers: "Yes, add those to the backlog". Each builds on `voxel-home` (`brain/rl/buildEnv.mjs`:
+the site, the plan, `homeCheck`). **Said first: the real Minecraft is not reachable from here and is not to be rebuilt; "play
+Minecraft" below means a survival loop in the tree's own voxel world.**
+
+| id | the idea | what is real in it | what it needs | parallel? |
+|---|---|---|---|---|
+| `fly-escapes-home` | A fly body in the voxel world sees something loom (a falling block, a predator) and dodges, or dives through its door | **The Giant Fiber Circuit is the fly's escape circuit: in a real fly it fires on a looming object and triggers take-off. This is the one use where the circuit would do its own job.** | a looming feature (the angular size of the nearest approaching thing and its rate), a small body in the voxel world (`render/voxelBodies.mjs`), a threat generator; a round against the matched plain net | yes |
+| `fly-finds-home` | The fly wanders off to forage and steers back to its door by its heading | the heading circuit (`brain/pilotSubCircuitState.mjs`: 148 cells, 7,080 synapses) is what a real fly keeps a compass bearing with. **The measured answer on it so far is mostly negative (rung 4a): expect a modest result.** | a 2-D or 3-D walk with the heading as the only sense of direction, a home position; the stateless and plain-net controls the earlier rounds used | yes; best with `fly-escapes-home` as "the fly lives in its home" |
+| `fly-survives` | A survival loop: hunger, night, weather; dig to gather blocks, build shelter before dark, eat | little: the rules would carry most of it, the brain a small part. `brain/NEEDS_AND_LIMITS.md`'s needs planner is the layer above a flying pilot | the largest build of the five: an inventory, digging (`render/voxelDeviceEdit.mjs` `digAt`), a day, needs | yes |
+| `fly-attracts-fly` | A signalling game: one fly-wired builder makes a structure, a second fly-wired agent, trained separately, chooses which structure to approach; trained together | the wiring of both. **An invented behaviour on real wiring: real flies attract by song and scent, not architecture, and the tree holds neither circuit. The page must say so.** | a chooser environment (two sites, one the builder's, one a random pile of the same block count), co-training; the test: does the visitor pick the builder's over the pile, and does a shuffled wiring do as well | yes; **the visitor could be another peer's brain (`swek-brain-v1`), which would give `peer-jobs` a first real use** |
+| `two-flies-one-site` | Two builders on one site: together, or competing for the same blocks | the wiring | `BuildEnv` with two builders taking turns; cheap once `voxel-home` is done | yes |
+
+**Recommended order, if asked:** finish `voxel-home` (the result, then the page), then `fly-escapes-home` with `fly-finds-home`
+(each circuit used for what it is for), then `fly-attracts-fly` as the bridge to peers.
+
 ## Notes for the chat that picks
 
 - **The method:** a research round is registered (its note committed) before any code, built and sabotaged, run, its results
