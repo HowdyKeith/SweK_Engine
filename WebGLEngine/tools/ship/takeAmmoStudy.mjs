@@ -15,6 +15,12 @@
 //   FORECAST, for the record: always firing still LEADS at 0.5, cannot be told at 0.25, TRAILS at 0.125 and 0.0625. Fifteen readings at z 2: one stray word among them would not surprise; the PATTERN across rations is what is read.
 //   Nothing is chosen on this study: it decides only whether a rationed arena is worth training in, and at which ration.
 //
+// THE CONFIRMATION WITHOUT THE CANNON (registered 2026-11-14, AFTER the study above was read and BEFORE any pair of this was flown). The study's answer: holding the trigger LEADS at every ration flown (the forecast above was wrong). Read post hoc on the same pairs, from a scratch script whose flights were not kept:
+// with NO CANNON on either side it turned over -- always firing worth +1.260 with the whole magazines, -0.318 at an eighth, -0.613 at a sixteenth. A turn-over found after the fact on the pairs that suggested it is a hint; this is its test:
+//   THE PAIRS    120 more, seeds 12001-12030 of each kind (`--set confirm`), flown by nothing before. NO CANNON ON EITHER SIDE. Rations 1, 0.125 and 0.0625. The same three arms.
+//   THE READINGS at each ration, always firing (champion less start, paired), at z 2. C1 at the whole magazines it LEADS; C2 at an eighth it TRAILS; C3 at a sixteenth it TRAILS. CONFIRMED means all three read as said; PARTLY, C1 and one of the others; NOT CONFIRMED otherwise.
+//   WHAT HANGS ON IT: whether a round 3 is trained in that arena (no cannon, rationed). Nothing else is chosen on it.
+//
 //     node tools/ship/takeAmmoStudy.mjs run --out <dir>      # resumable: a jsonl an arm and ration
 //     node tools/ship/takeAmmoStudy.mjs report --in <dir>
 "use strict";
@@ -31,6 +37,7 @@ export const SEEDS = Object.freeze(Array.from({ length: 30 }, (_, i) => 11001 + 
 export const PAIRS = Object.freeze(SEEDS.flatMap((seed) => D.KINDS.map((kind) => Object.freeze({ kind, seed }))));
 export const RATIONS = Object.freeze([1, 0.5, 0.25, 0.125, 0.0625]);
 export const ARMS = Object.freeze(["start", "champion", "eager"]);
+export const CONFIRM_SEEDS = Object.freeze(Array.from({ length: 30 }, (_, i) => 12001 + i)), CONFIRM_PAIRS = Object.freeze(CONFIRM_SEEDS.flatMap((seed) => D.KINDS.map((kind) => Object.freeze({ kind, seed })))), CONFIRM_RATIONS = Object.freeze([1, 0.125, 0.0625]);
 export const EAGER = Object.freeze({ ...BF.GUNNERS.regular, tolerance: 1e9 });
 /** The side of an arm (plain data for tools/ship/pairPool.mjs). `champion` is the weights of brain/seatTurretGunnerWeightsBig.json. */
 export function sideOfArm(arm, champion) {
@@ -39,17 +46,19 @@ export function sideOfArm(arm, champion) {
     if (arm === "eager") return { id: "eager", gunners: EAGER };
     throw new Error(`takeAmmoStudy.sideOfArm: no arm "${arm}" (${ARMS.join(", ")})`);
 }
-export const jobsOf = (arm, ration, champion, list = PAIRS) => list.map(({ kind, seed }) => ({ x: sideOfArm(arm, champion), y: { id: "hand" }, kind, seed, opts: { ammo: ration } }));
+export const jobsOf = (arm, ration, champion, list = PAIRS, cannon = true) => list.map(({ kind, seed }) => ({ x: cannon ? sideOfArm(arm, champion) : { ...sideOfArm(arm, champion), cannon: false }, y: cannon ? { id: "hand" } : { id: "hand", cannon: false }, kind, seed, opts: { ammo: ration } }));
 export const fileOf = (arm, ration) => `${arm}-${ration}.jsonl`;
 /** The readings from { "arm|ration": Map("kind|seed" -> lead) }: for each ration { firing (champion less start, paired), eager, champion, start }, each { n, mean, se, z }. */
-export function readings(leads) {
+export function readings(leads, rations = RATIONS) {
     const out = {};
-    for (const r of RATIONS) {
+    for (const r of rations) {
         const g = (a) => leads[`${a}|${r}`]; if (!g("start") || !g("champion") || !g("eager")) continue;
         out[r] = { firing: TA.stat([...g("champion")].map(([k, v]) => v - g("start").get(k))), eager: TA.stat([...g("eager").values()]), champion: TA.stat([...g("champion").values()]), start: TA.stat([...g("start").values()]) };
     }
     return out;
 }
+/** The confirmation's verdict from its readings: { c1, c2, c3 (each as registered or not), word }. */
+export function confirmed(R) { const c1 = !!R[1] && R[1].firing.z >= 2, c2 = !!R[0.125] && R[0.125].firing.z <= -2, c3 = !!R[0.0625] && R[0.0625].firing.z <= -2; return { c1, c2, c3, word: c1 && c2 && c3 ? "CONFIRMED" : c1 && (c2 || c3) ? "PARTLY CONFIRMED" : "NOT CONFIRMED" }; }
 /** The registered answer: the largest ration at which always firing does not read LEADS (null if it leads at every one), and the rations at which it reads TRAILS. */
 export function answer(R) { const rs = RATIONS.filter((r) => R[r]); return { stopsPaying: rs.find((r) => !(R[r].firing.z >= 2)) ?? null, disciplinePays: rs.filter((r) => R[r].firing.z <= -2) }; }
 
@@ -58,16 +67,22 @@ if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
     if (step === "run") {
         const out = arg("out"); if (!out) { console.error("takeAmmoStudy: run needs --out <dir>"); process.exit(2); }
         fs.mkdirSync(out, { recursive: true });
-        const champion = JSON.parse(fs.readFileSync(new URL("../../brain/seatTurretGunnerWeightsBig.json", import.meta.url), "utf8")).weights, pool = createPool();
-        for (const ration of RATIONS) for (const arm of ARMS) {
-            const file = path.join(out, fileOf(arm, ration)), done = new Set(fs.existsSync(file) ? fs.readFileSync(file, "utf8").trim().split("\n").filter(Boolean).map((l) => { const r = JSON.parse(l); return r.kind + "|" + r.seed; }) : []), todo = PAIRS.filter((p) => !done.has(p.kind + "|" + p.seed));
-            await pool.leads(jobsOf(arm, ration, champion, todo), (i, lead) => fs.appendFileSync(file, JSON.stringify({ arm, ration, kind: todo[i].kind, seed: todo[i].seed, lead }) + "\n"));
-            console.log(`${arm} at ${ration}: ${PAIRS.length} pairs`);
+        const champion = JSON.parse(fs.readFileSync(new URL("../../brain/seatTurretGunnerWeightsBig.json", import.meta.url), "utf8")).weights, pool = createPool(), confirm = arg("set") === "confirm", PAIRS_ = confirm ? CONFIRM_PAIRS : PAIRS;
+        for (const ration of confirm ? CONFIRM_RATIONS : RATIONS) for (const arm of ARMS) {
+            const file = path.join(out, fileOf(arm, ration)), done = new Set(fs.existsSync(file) ? fs.readFileSync(file, "utf8").trim().split("\n").filter(Boolean).map((l) => { const r = JSON.parse(l); return r.kind + "|" + r.seed; }) : []), todo = PAIRS_.filter((p) => !done.has(p.kind + "|" + p.seed));
+            await pool.leads(jobsOf(arm, ration, champion, todo, !confirm), (i, lead) => fs.appendFileSync(file, JSON.stringify({ arm, ration, kind: todo[i].kind, seed: todo[i].seed, lead }) + "\n"));
+            console.log(`${arm} at ${ration}${confirm ? ", no cannon" : ""}: ${PAIRS_.length} pairs`);
         }
         await pool.close();
     } else if (step === "report") {
         const dir = arg("in"), leads = {};
         for (const f of fs.readdirSync(dir).filter((x) => x.endsWith(".jsonl"))) for (const l of fs.readFileSync(path.join(dir, f), "utf8").trim().split("\n").filter(Boolean)) { const r = JSON.parse(l); (leads[`${r.arm}|${r.ration}`] ||= new Map()).set(r.kind + "|" + r.seed, r.lead); }
+        if (arg("set") === "confirm") {
+            const R = readings(leads, CONFIRM_RATIONS), V = confirmed(R);
+            console.log(`[takeAmmoStudy] THE CONFIRMATION WITHOUT THE CANNON: ${CONFIRM_PAIRS.length} pairs (seeds ${CONFIRM_SEEDS[0]}-${CONFIRM_SEEDS[29]} of each kind), no cannon on either side`);
+            for (const r of CONFIRM_RATIONS) console.log(`  ration ${r}: always firing (champion less start) ${TA.line(R[r].firing)} | champion ${TA.line(R[r].champion)} | start ${TA.line(R[r].start)} | the hand gunner made to always fire ${TA.line(R[r].eager)}`);
+            console.log(`  ${V.word}: C1 leads at the whole magazines ${V.c1}, C2 trails at an eighth ${V.c2}, C3 trails at a sixteenth ${V.c3}`); process.exit(0);
+        }
         const R = readings(leads), A = answer(R);
         console.log(`[takeAmmoStudy] ${PAIRS.length} pairs (seeds ${SEEDS[0]}-${SEEDS[29]} of each kind) at each ration of the magazines; every arm against the hand gunner at the same ration`);
         for (const r of RATIONS) if (R[r]) { console.log(`  ration ${r} (${D.magazineOf({ magazine: 160 }, r)} rounds a main gun, ${D.magazineOf({ magazine: 900 }, r)} a mount):`); console.log(`    A1 always firing (champion less start): ${TA.line(R[r].firing)}`); console.log(`    A2 the hand gunner made to always fire: ${TA.line(R[r].eager)}`); console.log(`    A3 champion ${TA.line(R[r].champion)} | start ${TA.line(R[r].start)}`); }
