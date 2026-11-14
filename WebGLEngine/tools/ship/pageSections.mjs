@@ -704,7 +704,9 @@ export const SECTIONS = [
     { id: "flybrain", tab: "flybrain", label: "Fruit Fly Brain", note: "pages built on Janelia's male-cns connectome: the connectome, and the brains that drive, shoot and fly through it (a helicopter and a quadrotor among them, beside their hand autopilots)",
       pages: ["fly-connectome.html", "race-brain.html", "es-box3d-fly3d.html", "es-flight6dof.html", "rotorcraft-demo.html", "rotor-league.html",
               // 2026-11-13 -- fly-portrait.html: one duel's record of the circuit's 34 neurons, drawn (brain/flyPortrait.mjs). Renders, where the brushes' own page is, was full (15)
-              "fly-portrait.html"] },
+              "fly-portrait.html",
+              // 2026-11-14 -- voxel-home.html: a builder from the voxel-home rounds puts up a house a block at a time (brain/voxelHomeShow.mjs)
+              "voxel-home.html"] },
     // FSR, KEITH'S CALL: "Let's separate fsr into a link bucket." fsr.html and fsr-three.html sat in UNPLACED since
     // v4623 waiting on exactly this: the temporal/FSR arc gave fsr.html an adapter path, so it belonged in the WebGPU
     // drawer, which is at MAX_PER_PANEL, as is the techniques drawer (Renders) it used to sit in -- "a drawer decision,

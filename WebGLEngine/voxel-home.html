@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="A Builder Puts Up a House">
+<meta name="demo:desc" content="Watch a builder put up a house one block at a time: the rule that always finishes, a lean with no network, a random builder, or a trained builder from the three voxel-home rounds (fly wiring, its shuffle, a plain net, fish wiring, a small standard net), played from the rounds' own results. Nothing is trained on the page.">
+<title>SweK A Builder Puts Up a House</title>
+<!-- voxel-home.html -- UNNUMBERED (the version is chosen at ship time). The build and its picture are brain/voxelHomeShow.mjs's: build() plays one episode of brain/rl/buildEnv.mjs with a builder, scene() is the
+     picture after a step. The trained builders' weights are read from the rounds' committed results files. Gate: tools/ship/voxelHomeShow-selfcheck.mjs. -->
+<style>
+  :root { --ink:#dbe6f5; --dim:#7e93ad; --edge:#243247; --bg:#080b11; }
+  html,body { margin:0; background:var(--bg); color:var(--ink); font:13px system-ui,sans-serif; }
+  header { display:flex; align-items:center; gap:10px; padding:8px 12px; border-bottom:1px solid var(--edge); flex-wrap:wrap; }
+  h1 { margin:0; font-size:14px; font-weight:700; color:#8fd0ff; letter-spacing:.3px; }
+  select,input,button { background:#131c28; color:var(--ink); border:1px solid var(--edge); border-radius:7px; padding:5px 8px; font:12px system-ui,sans-serif; }
+  input { width:84px; } button { cursor:pointer; } select:disabled,input:disabled { opacity:.4; }
+  main { display:flex; flex-wrap:wrap; gap:16px; padding:12px; align-items:flex-start; }
+  #pad { background:#05070b; border:1px solid var(--edge); border-radius:8px; width:min(720px, calc(100vw - 26px)); height:auto; aspect-ratio:720/560; }
+  aside { flex:1 1 280px; max-width:440px; color:var(--dim); line-height:1.5; }
+  aside p { margin:0 0 9px; }
+  #stats, #end { font:12px ui-monospace,monospace; color:var(--ink); }
+  .grids { display:flex; gap:14px; margin:0 0 10px; } .grids figure { margin:0; } .grids canvas { width:132px; height:132px; border:1px solid var(--edge); border-radius:6px; background:#05070b; display:block; }
+  figcaption { font-size:11px; margin-top:3px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>A Builder Puts Up a House</h1>
+  <label>builder <select id="kind"></select></label>
+  <label>from <select id="round"></select></label>
+  <label>draw <select id="draw"></select></label>
+  <label>plan <input id="plan" type="number" min="1" max="99999999" value="2196692"></label>
+  <button id="play">Pause</button><button id="one">Step</button><button id="again">Restart</button>
+  <label>speed <select id="speed"><option value="2">slow</option><option value="6" selected>steady</option><option value="20">fast</option></select></label>
+</header>
+<main>
+  <canvas id="pad" width="720" height="560"></canvas>
+  <aside>
+    <p id="stats">building...</p>
+    <p id="end"></p>
+    <div class="grids">
+      <figure><canvas id="need" width="132" height="132"></canvas><figcaption>what each column still needs</figcaption></figure>
+      <figure><canvas id="lean" width="132" height="132"></canvas><figcaption id="leancap">where the builder leans</figcaption></figure>
+    </div>
+    <div id="said"></div>
+  </aside>
+</main>
+<script type="module">
+import * as S from "/brain/voxelHomeShow.mjs";
+
+const el = (id) => document.getElementById(id), pad = el("pad"), g = pad.getContext("2d"), files = new Map(), TRAINED = new Set(S.ARMS);
+const option = (sel, value, text) => { const o = document.createElement("option"); o.value = value; o.textContent = text; sel.appendChild(o); };
+for (const k of S.KINDS) option(el("kind"), k, S.LABELS[k]);
+for (const [n, R] of Object.entries(S.ROUNDS)) option(el("round"), n, R.label);
+for (let d = 1; d <= S.DRAWS; d++) option(el("draw"), d, String(d));
+el("kind").value = "FLY"; el("round").value = "3";
+for (const line of S.saidLines()) { const p = document.createElement("p"); p.textContent = line; el("said").appendChild(p); }
+
+let b = null, k = 0, playing = true, timer = null, token = 0;
+
+async function recordsOf(round) {
+  if (!files.has(round)) { const file = "/" + S.ROUNDS[round].file, res = await fetch(file); if (!res.ok) throw new Error(`${file} answered ${res.status}`); files.set(round, S.recordsOf(await res.text())); }
+  return files.get(round);
+}
+function grid(canvas, values, mark, markColour) {
+  const c = canvas.getContext("2d"), n = 6, s = canvas.width / n, top = Math.max(1e-9, ...values);
+  c.fillStyle = "#05070b"; c.fillRect(0, 0, canvas.width, canvas.height);
+  for (let i = 0; i < n * n; i++) { const x = i % n, z = Math.floor(i / n), v = values[i] / top; c.fillStyle = `rgb(${Math.round(20 + 120 * v)},${Math.round(28 + 180 * v)},${Math.round(40 + 215 * v)})`; c.fillRect(x * s + 1, z * s + 1, s - 2, s - 2); }
+  if (mark !== null) { c.strokeStyle = markColour; c.lineWidth = 3; c.strokeRect((mark % n) * s + 2.5, Math.floor(mark / n) * s + 2.5, s - 5, s - 5); }
+}
+function paint() {
+  const sc = S.scene(b, k, { width: pad.width, height: pad.height });
+  g.globalAlpha = 1; g.fillStyle = "#05070b"; g.fillRect(0, 0, pad.width, pad.height); g.lineJoin = "round";
+  for (const f of sc.faces) {
+    g.beginPath(); f.points.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y))); g.closePath();
+    if (f.fill) { g.globalAlpha = f.alpha; g.fillStyle = f.fill; g.fill(); }
+    g.globalAlpha = 1; g.strokeStyle = f.stroke; g.lineWidth = f.kind === "placed" || f.kind === "refused" ? 2.5 : 1; g.stroke();
+  }
+  const last = k > 0 ? b.steps[k - 1] : null, shown = b.steps[Math.min(k, b.steps.length - 1)], colour = last && last.placed ? S.COLOURS.placed : S.COLOURS.refused;
+  grid(el("need"), (k < b.steps.length ? b.steps[k] : shown).need.map((v, i) => (k === b.steps.length && last.placed && i === last.col ? Math.max(0, v - 0.25) : v)), last ? last.col : null, colour);
+  const leanOf = last || b.steps[0];
+  grid(el("lean"), leanOf.chances || leanOf.need.map((_, i) => (i === leanOf.col ? 1 : 0)), last ? last.col : null, colour);
+  el("leancap").textContent = b.choice === "drawn" ? "where the builder leans (its chance for each column)" : "the column the builder named";
+  const placed = S.cellsAt(b, k).length, refused = k - placed;
+  el("stats").textContent = `step ${k} of ${b.steps.length} · ${placed} of ${b.blocks} blocks · ${refused} picks refused` + (last && !last.placed ? ` · refused: ${last.why}` : "");
+  const c = b.check, done = k === b.steps.length;
+  el("end").textContent = !done ? "" : c.home ? `A HOME: every block, roofed, a door, the room closed but for the door (${b.steps.length} steps).`
+    : `Not a home: ${(b.share * 100).toFixed(0)}% built when the ${b.maxSteps} steps ran out` + (c.roofed ? "" : ", no whole roof") + (c.enclosed ? "" : ", the room open to the outside") + ".";
+  window.swekHome = { kind: b.kind, round: b.round, draw: b.draw, plan: b.planSeed, planHash: b.plan.hash, steps: b.steps.length, step: k, placed, blocks: b.blocks, share: b.share, home: c.home, hash: b.hash, faces: sc.faces.length, playing, done, error: null };
+}
+function tick() { if (!b || !playing) return; if (k < b.steps.length) { k++; paint(); } if (k >= b.steps.length) { playing = false; el("play").textContent = "Play"; paint(); return; } timer = setTimeout(tick, 1000 / Number(el("speed").value)); }
+function setPlaying(on) { playing = on; el("play").textContent = on ? "Pause" : "Play"; clearTimeout(timer); if (on) { if (b && k >= b.steps.length) k = 0; tick(); } else if (b) paint(); }
+
+async function start() {
+  const mine = ++token, kind = el("kind").value, trained = TRAINED.has(kind), round = Number(el("round").value), draw = Number(el("draw").value);
+  const plan = Math.max(1, Math.min(99999999, Math.round(Number(el("plan").value)) || 1)); el("plan").value = plan;
+  el("round").disabled = !trained; el("draw").disabled = !trained && kind !== "random";
+  clearTimeout(timer); el("stats").textContent = "building..."; el("end").textContent = "";
+  try {
+    const record = trained ? (await recordsOf(round)).get(`${kind} ${draw}`) : null; if (mine !== token) return;
+    if (trained && !record) throw new Error(`${S.ROUNDS[round].file} holds no ${kind} draw ${draw}`);
+    b = S.build(S.builderOf(kind, { round, draw, record }), plan); k = 0; paint();
+    if (playing) timer = setTimeout(tick, 1000 / Number(el("speed").value));
+  } catch (e) {
+    if (mine !== token) return; b = null;
+    el("stats").textContent = "the build could not be made: " + e.message;
+    g.fillStyle = "#05070b"; g.fillRect(0, 0, pad.width, pad.height);
+    window.swekHome = { kind, round: trained ? round : null, draw, plan, error: String(e.message) };
+  }
+}
+el("play").addEventListener("click", () => setPlaying(!playing));
+el("one").addEventListener("click", () => { if (!b) return; setPlaying(false); if (k < b.steps.length) k++; paint(); });
+el("again").addEventListener("click", () => { playing = true; el("play").textContent = "Pause"; start(); });
+for (const id of ["kind", "round", "draw", "plan"]) el(id).addEventListener("change", () => { playing = true; el("play").textContent = "Pause"; start(); });
+window.swekHomeSeek = (step) => { if (!b) return; setPlaying(false); k = Math.max(0, Math.min(b.steps.length, Math.round(step))); paint(); };
+start();
+</script>
+</body>
+</html>

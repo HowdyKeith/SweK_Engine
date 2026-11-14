@@ -34,7 +34,13 @@ trained builders beat every random one), its wiring still CANNOT BE TOLD APART F
 for 0.666, p 0.0085) but only by 0.01 to 0.02 of a home; the trainer's history shows the learning levelled by about iteration 166;
 two homes in 16,000 builds (one FLY, one FISH), the first any trained builder finished; the fly's wiring still cannot be told from
 a shuffle (p 0.78) and is no longer told apart from a plain net (p 0.10). More iterations of this trainer are not the way to a
-home: the open choices are a start at the lean, a smaller sigma, or another trainer. **V3, the page, is OPEN.** `peer-jobs` is OPEN. Under `peer-jobs` the tree's own list (`tools/ship/todo.mjs`) has two open items no chat has touched:
+home: what is left to try is the item `voxel-home-trainer` below. **V3, the page, is DONE** (2026-11-14): `voxel-home.html`,
+filed in the Fruit Fly Brain drawer and linked from `server.html`, plays one build a block at a time -- the rule, the lean, a
+random builder, or any of the three rounds' 240 trained builders read from the rounds' own results -- with the builder's view
+beside it; `brain/voxelHomeShow.mjs`, gate `tools/ship/voxelHomeShow-selfcheck.mjs` (a build here, over the 200 audit plans, is
+the record's score and homes to the bit). It opens on the one house the fly-wired builder finished. **Said plainly: the picture
+is a 2D drawing of the build's blocks, not the engine's voxel mesh -- step 3 of the plan below said `editVoxel`, which needs a
+WebGPU device, and the page is to open anywhere.** Nothing of `voxel-home` is left open but `voxel-home-trainer`. `peer-jobs` is OPEN. Under `peer-jobs` the tree's own list (`tools/ship/todo.mjs`) has two open items no chat has touched:
 `peer-fly-brain-badge` (small) and `peer-brains-in-roster` (medium).
 
 | id | the question | its first stage | parallel? |
@@ -235,7 +241,29 @@ Minecraft" below means a survival loop in the tree's own voxel world.**
 | `fly-attracts-fly` | A signalling game: one fly-wired builder makes a structure, a second fly-wired agent, trained separately, chooses which structure to approach; trained together | the wiring of both. **An invented behaviour on real wiring: real flies attract by song and scent, not architecture, and the tree holds neither circuit. The page must say so.** | a chooser environment (two sites, one the builder's, one a random pile of the same block count), co-training; the test: does the visitor pick the builder's over the pile, and does a shuffled wiring do as well | yes; **the visitor could be another peer's brain (`swek-brain-v1`), which would give `peer-jobs` a first real use** |
 | `two-flies-one-site` | Two builders on one site: together, or competing for the same blocks | the wiring | `BuildEnv` with two builders taking turns; cheap once `voxel-home` is done | yes |
 
-**Recommended order, if asked:** finish `voxel-home` (the result, then the page), then `fly-escapes-home` with `fly-finds-home`
+## Added 2026-11-14: `voxel-home-trainer` -- another training round that changes the trainer, not its length (OPEN)
+
+Keith, 2026-11-14, of the three choices after round 3: "Do item 1. Backlog item 2 another training." Round 3
+(`brain/VOXEL_HOME_LONG_WIP.md` section 8) measured that 6.7 times the iterations of the same trainer bought 0.01 to 0.02 of a
+home and that the learning had levelled by about iteration 166; the best arm stands 0.375 of the way from a random builder (0.572)
+to the lean that needs no network (0.923, 123 homes of 200). So the next round keeps the environment, the arms, the draws and the
+audit, and changes ONE thing about the trainer. The candidates, none tried, none registered:
+
+| id | the one change | why it might matter | what it would and would not show |
+|---|---|---|---|
+| `start-at-the-lean` | Each builder starts with its decoder set so that it already leans to the unfinished columns, then trains | the lean is a linear function of the observation, and every arm can express it; training from it asks whether the trainer can IMPROVE on the lean (learn the order: walls before lintel, roof inward) rather than find it | whether these networks can beat 0.92; NOT whether they can find the lean themselves, which rounds 2 and 3 say they do only a third of the way |
+| `smaller-steps` | sigma 0.14 -> a smaller one (and the learning rate with it), or a sigma that falls over the run | with 2,967 weights and 24 samples an iteration, a large sigma may be why the history levels at 0.25 missing | whether the plateau is the step size |
+| `more-samples` | pop 24 -> larger, or more training plans an iteration (trainEps 8 -> more) | the reward is noisy (a column is DRAWN), so the gradient estimate may be mostly noise | whether the plateau is noise |
+| `another-trainer` | a different optimiser on the same reward (the tree has others under `brain/rl/`: read before choosing) | natural ES with rank shaping is one choice of many | whether the finding is the trainer's |
+
+**Recommended: `start-at-the-lean` first** -- it is the one whose answer is new either way (above the lean: the networks learned
+the building order; at it or below: this trainer cannot even hold what it is given), it reuses `makeRound()` with one more cfg key,
+and it costs a round 2 (about 10 minutes at 150 iterations). `smaller-steps` and `more-samples` are one cfg key each as well and
+could be one round of three trainer settings on FLY and PLAIN alone if the wiring question is set aside. **The wiring question
+(T1) has now been asked four times with the same answer; a fifth round should not be sold as asking it again.** Registered first,
+as every round: a note before code, the results committed before they are read.
+
+**Recommended order, if asked:** `voxel-home-trainer` (`start-at-the-lean`), then `fly-escapes-home` with `fly-finds-home`
 (each circuit used for what it is for), then `fly-attracts-fly` as the bridge to peers.
 
 ## Notes for the chat that picks

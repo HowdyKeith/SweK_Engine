@@ -152,6 +152,9 @@ console.log(`\n  ${pure} gates assume NOTHING outside their own arithmetic.\n`);
         // UNNUMBERED (2026-11-13) -- 37 -> 38: tools/ship/flyPortrait-selfcheck.mjs opens fly-portrait.html in headless Chromium and reads the 2D canvas's pixels, to hold that the picture is painted, that the hub is left dark and that
         // each cell type is in its own colour; its other three sections are arithmetic and need no context.
         "tools/ship/flyPortrait-selfcheck.mjs",
+        // UNNUMBERED (2026-11-14) -- 38 -> 39: tools/ship/voxelHomeShow-selfcheck.mjs opens voxel-home.html in headless Chromium and reads the 2D canvas's pixels, to hold that the house is painted (no roof or wall at step 0, both at the
+        // end); its other three sections are arithmetic and need no context.
+        "tools/ship/voxelHomeShow-selfcheck.mjs",
     ]);
     const gpuNow = [...byGate.entries()].filter(([, h]) => h.includes("gpu")).map(([f]) => f).sort();
     const arrived = gpuNow.filter((g) => !GPU_GATES.includes(g));

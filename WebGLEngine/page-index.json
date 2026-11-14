@@ -1,7 +1,7 @@
 {
  "version": 1,
  "generated": "derived by tools/ship/buildPageIndex.mjs -- DO NOT HAND-EDIT, the group comes from tools/ship/pageSections.mjs",
- "count": 503,
+ "count": 504,
  "pages": [
   {
    "f": "AudioLab.html",
@@ -3291,6 +3291,13 @@
    "t": "Voxel Earth",
    "d": "Spinning voxel globe; zoom from orbit to a local geological strata view.",
    "g": "",
+   "p": 0
+  },
+  {
+   "f": "voxel-home.html",
+   "t": "SweK A Builder Puts Up a House",
+   "d": "Watch a builder put up a house one block at a time: the rule that always finishes, a lean with no network, a random builder, or a trained builder from the three voxel-home rounds (fly wiring, its shuffle, a plain net, fish wiring, a small standard net), played from the rounds' own results. Nothing is trained on the page.",
+   "g": "flybrain",
    "p": 0
   },
   {
