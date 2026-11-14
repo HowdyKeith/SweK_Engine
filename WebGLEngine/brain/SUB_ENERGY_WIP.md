@@ -88,3 +88,19 @@ Ratings (Bradley-Terry, Elo scale, read differences): hand -356 to -312, champ -
 
 Read 2, the doctrine re-tuned under the cost (four searches, seeds 6100 to 6103, 150 iterations each, `--needs 750000`, from the default tactician), is started and will be read from its four files by `takeSubEnergy.mjs retune --write`.
 
+## HELD RESULT, READ 2 (2026-11-14; four searches of `tools/tuneSubTactics.mjs --needs 750000`, seeds 6100 to 6103, 150 iterations, from the DEFAULT tactician, against the four scripted drones on TRAIN_SET, the champion picked on HELD_OUT_SET; then `node tools/ship/takeSubEnergy.mjs retune --write`; `brain/subEnergyTuned6100.json` to `6103.json` and `brain/subEnergyRetune.json`)
+
+| seed | held score under the cost | search speed (m/s) | track speed | evade speed | fire range (m) | aim tolerance | search ping (s) |
+|---|---|---|---|---|---|---|---|
+| 6100 | 1.557 | 2.38 | 1.47 | 3.41 | 500 | 0.11 | 2.35 |
+| 6101 | 1.788 | 4.18 | 2.55 | 2.93 | 471 | 0.20 | 3.11 |
+| 6102 | 1.784 | 0.58 | 2.90 | 3.37 | 417 | 0.21 | 10.64 |
+| **6103 (the champion: best held score)** | **1.819** | **2.28** | **2.81** | **4.50** | 500 | 0.23 | 4.45 |
+| the no-cost champion (5100, from the notes) | (1.861, no cost) | 4.50 | 4.43 | 3.42 | 458 | 0.47 | 7.69 |
+
+**READING BY THE RULE AS REGISTERED: the doctrine SLOWS.** The mean of the champion's search and track speed is 2.54 m/s against the no-cost champion's 4.46: **a move of -1.92 m/s**, nearly four times the bar of 0.5. All four searches landed below the no-cost champion on that mean (the others by -2.5, -1.1 and -2.7 m/s): the direction replicates over four seeds, the size does not (the track speeds run from 1.47 to 2.90, the search speeds from 0.58 to 4.18). The champion SPRINTS to evade (evade speed at the 4.50 ceiling, against 3.42) and cruises slowly otherwise: a doctrine that spends charge only when it is being shot at.
+
+**What would make this read wrong, said before the reader finds it:** the no-cost champion was reached by searches started partly from an earlier champion (seeds 5100 and 5101), and these searches started from the DEFAULT tactician, whose speeds are 2.0 and 1.5; 150 iterations of a (1+1)-ES from there may not reach 4.5 m/s whether or not there is a cost. **Read 2 as registered does not separate "slower because of the cost" from "slower because the search had not got fast yet".** The control that does (the same four seeds, the same recipe, from the default, with NO budget) was not registered; it is run next, flagged POST HOC, and its result is appended below.
+
+**The forecast, scored (written before any geometry was flown):** the re-tuned doctrine SLOWS by the rule (55): **yes**.
+
