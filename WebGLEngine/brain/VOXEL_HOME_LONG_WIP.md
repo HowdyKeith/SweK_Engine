@@ -46,3 +46,49 @@ sandbox. The run is resumable.
 ## 7. The run (to be written; the gate never runs it and never gives the command the word `run`)
 `node tools/ship/takeVoxelHomeLong.mjs run` -> `brain/voxelHomeLongRound.jsonl`, committed byte for byte before it is read;
 `node tools/ship/takeVoxelHomeLong.mjs read` prints the checks and the reading.
+
+## 8. The result (run 2026-11-14 in the sandbox, 80.7 minutes; `brain/voxelHomeLongRound.jsonl` committed at 257d2d8c before it was read; read once)
+**The checks hold.**
+
+| arm | mean share built | sd | least | most | homes (16 x 200 builds) | round 2 (150 iterations) | gain | draws that built more |
+|---|---|---|---|---|---|---|---|---|
+| SHUF | 0.6848 | 0.0210 | 0.6240 | 0.7282 | 0 | 0.6612 | +0.024 | 16 of 16 |
+| FLY | 0.6869 | 0.0198 | 0.6413 | 0.7173 | 1 | 0.6664 | +0.021 | 13 |
+| FISH | 0.6888 | 0.0195 | 0.6339 | 0.7222 | 1 | 0.6741 | +0.015 | 15 |
+| PLAIN | 0.7010 | 0.0178 | 0.6715 | 0.7327 | 0 | 0.6905 | +0.011 | 12 |
+| MLP | 0.7037 | 0.0152 | 0.6754 | 0.7335 | 0 | 0.6892 | +0.015 | 13 |
+| 16 random builders | 0.5722 | 0.0028 | | 0.5774 | 0 | | | |
+| the lean to the unfinished columns, no network | 0.9226 | | | | 123 of 200 | | | |
+
+* **T3: A LONGER TRAINING BUILDS MORE OF A HOME** (the ranks sum to 333, where 332 or more speaks; exact two-sided p 0.0085).
+  It speaks, and only just, and what it speaks of is small: two hundredths of a home for 6.7 times the training.
+* **T0: A FLY-WIRED BUILDER BUILDS MORE OF A HOME THAN A RANDOM ONE** (all 16 above all 16; p 3.3e-9), as in round 2.
+* **T1: THE FLY'S WIRING CANNOT BE TOLD APART FROM A SHUFFLE OF IT** (the ranks sum to 272, the middle 264; p 0.78). The fourth
+  round to say so.
+* **T2: THE FLY'S WIRING CANNOT BE TOLD APART FROM A PLAIN NET OF ITS SIZE** (the ranks sum to 220; p 0.10). Round 2 said WORSE
+  (p 0.00027). The fly's mean is still the lower, and the three arms with recurrent synapses are still below the two without;
+  the gap between FLY and PLAIN went from 0.024 to 0.014 and the test no longer speaks. That is not a reading that they are alike.
+
+**Two homes, the first any trained builder has finished:** FLY draw 1 and FISH draw 13, one each of their 200 plans, in 16,000
+builds. As section 5 said before the run, a home here is a lean plus chance; the lean alone finishes 123 of 200.
+
+**The learning had levelled.** The trainer's own battery, share of the plan missing, mean of an arm's 16 draws:
+
+| arm | iteration 0 | 166 | 332 | 498 | 664 | 830 | 996 | 999 |
+|---|---|---|---|---|---|---|---|---|
+| FLY | 0.4818 | 0.2931 | 0.2797 | 0.2723 | 0.2674 | 0.2617 | 0.2652 | 0.2664 |
+| SHUF | 0.4704 | 0.2967 | 0.2844 | 0.2723 | 0.2720 | 0.2690 | 0.2700 | 0.2687 |
+| PLAIN | 0.4588 | 0.2712 | 0.2657 | 0.2579 | 0.2628 | 0.2522 | 0.2535 | 0.2548 |
+| FISH | 0.4721 | 0.2921 | 0.2719 | 0.2648 | 0.2610 | 0.2634 | 0.2568 | 0.2591 |
+| MLP | 0.4435 | 0.2724 | 0.2558 | 0.2509 | 0.2510 | 0.2531 | 0.2432 | 0.2440 |
+
+Every arm drops 0.17 to 0.19 in the first 166 iterations and 0.016 to 0.033 in the 833 after. The best arm is 0.375 of the way
+from a random builder to the lean (round 2's: a third). More iterations of this trainer are not what stands between these
+builders and a home.
+
+**The expectations against what came.** T3 MORE (80), T0 MORE (97), T1 CANNOT BE TOLD APART (75): all came. T2 came as the 35
+(CANNOT), not the 55 (WORSE). The best arm above 0.80 (35): no, 0.70. Any home (45) and a FLY home (30): both came, one home
+each. The history still falling at the end (60): no -- the best arm's last reading is above the one before it. The guess that
+was most wrong was the size: I gave 35 percent to a best arm above 0.80, and the whole gain was 0.01 to 0.02.
+
+**What this does not say** (section 5): what another trainer, a smaller sigma, or a start at the lean would do.
