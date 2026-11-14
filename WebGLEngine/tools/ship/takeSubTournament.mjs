@@ -35,6 +35,14 @@ export function recordOf(result, sides, set, seat = {}) {
     };
 }
 
+/** The two verdict lines of a record: the cycles (or that there is none) and the upsets (or that there is none). */
+export function verdictLines(r) {
+    return [
+        r.cycles.length ? `  cycles: ${r.cycles.join("; ")}` : "  no cycle: the significant leads are transitive",
+        r.upsets.length ? `  upsets: ${r.upsets.map((u) => `${u.lower} over ${u.higher} (edge ${u.edge.toFixed(3)}, z ${u.z.toFixed(1)})`).join("; ")}` : "  no upset: no significant lead runs against the rating",
+    ];
+}
+
 /** The command: argv (after the program), io { log, exists, write, read } (defaults: the console and the file system). Returns the exit code. */
 export function command(argv, io = {}) {
     const log = io.log || ((s) => console.log(s)), exists = io.exists || ((f) => fs.existsSync(ENG + f)), write = io.write || ((f, s) => fs.writeFileSync(ENG + f, s));
@@ -55,8 +63,7 @@ export function command(argv, io = {}) {
     for (const l of T.reportLines(result, { labels })) log(l);
     const seat = {}, seatGeos = T.geometries(SEAT_GEOMETRIES, first); for (const s of sides) { seat[s.id] = T.seatBias(s.side, seatGeos); log(`  seat bias ${s.id}: seat A is worth ${seat[s.id].mean >= 0 ? "+" : ""}${seat[s.id].mean.toFixed(3)} a duel (se ${seat[s.id].se.toFixed(3)}, ${seat[s.id].n} geometries)`); }
     const r = recordOf(result, sides, set, seat);
-    log(r.cycles.length ? `  cycles: ${r.cycles.join("; ")}` : "  no cycle: the significant leads are transitive");
-    log(r.upsets.length ? `  upsets: ${r.upsets.map((u) => `${u.lower} over ${u.higher} (edge ${u.edge.toFixed(3)}, z ${u.z.toFixed(1)})`).join("; ")}` : "  no upset: no significant lead runs against the rating");
+    for (const l of verdictLines(r)) log(l);
     if (rec) { write(rec, JSON.stringify(r, null, 1) + "\n"); log(`  written ${rec}`); }
     return 0;
 }
