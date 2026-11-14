@@ -4,7 +4,7 @@
 // node gate holds it and the page is left with drawing.
 //
 //   HANDS   who works a side's thirteen gun seats: `rule` (the hand gunner), the three CORRECTING networks' shipped files (`fly`: the fruit fly's circuit; `gpu`: the GPU Brain's plain network, run here by its CPU twin; `fish`: the zebrafish circuit -- whose wiring did nothing in training, its file says), and the
-//           RACE CAR'S turret gunner laying the gun itself (`car`: the car's own untrained hand weights, no file; `car-trained`: the file trained in a ship's seat). Each says in `note` what it is NOT, in a line a page can show.
+//           RACE CAR'S turret gunner laying the gun itself (`car`: the car's own untrained hand weights, no file; `car-trained`: the file trained in a ship's seat on 8 pairs a child; `car-big`: the file the rig trained on 300 pairs a child, which always fires). Each says in `note` what it is NOT, in a line a page can show.
 //   HELMS   `face` (the arena's rule: the bow on the enemy), `broadside` (the hand rule), `trained` (the trained helm network correcting the bow-on rule -- the only rule it was trained for).
 //   FILES   the core reads no disk and no network: the page (or a gate) loads the brain files named in FILES and hands the parsed objects in. Each goes through brain/peerBrain.mjs's importBrain against the module it is for; a file that is refused refuses the SIDE, by name and with the reason.
 //   PEERS   a side's choice may carry `peer`: brain files as they arrived ([{ name, text }]). They go through brain/peerFleet.mjs (which never throws on a file) and take the seats, the helm and the escorts where they have a brain for them; the catalogue's choice stands for the rest. peerLines() is the report.
@@ -30,6 +30,7 @@ export const FILES = Object.freeze({
     gpu: Object.freeze({ path: "brain/seatGunnerMlpWeightsDefault.json", policy: "seatGunnerMlp", mod: SM }),
     fish: Object.freeze({ path: "brain/seatGunnerFishWeightsDefault.json", policy: "seatGunnerFish", mod: SF }),
     "car-trained": Object.freeze({ path: "brain/seatTurretGunnerWeightsDefault.json", policy: "gunnerPolicy", mod: ST }),
+    "car-big": Object.freeze({ path: "brain/seatTurretGunnerWeightsBig.json", policy: "gunnerPolicy", mod: ST }),
     helm: Object.freeze({ path: "brain/helmWeightsDefault.json", policy: "helmPolicy", mod: HP }),
 });
 export const HANDS = Object.freeze([
@@ -39,6 +40,7 @@ export const HANDS = Object.freeze([
     Object.freeze({ id: "fish", label: "zebrafish circuit (corrects the sight)", file: "fish", note: "trained against fighters behind green sights; none of its 153 synapses carries a weight, and a random circuit trained to the same weights" }),
     Object.freeze({ id: "car", label: "race car's turret gunner, untrained (lays the gun)", file: null, note: "the car's own hand weights, carried over as they are; on 600 pairs they lead the hand gunner by about 0.1" }),
     Object.freeze({ id: "car-trained", label: "race car's turret gunner, trained in a seat (lays the gun)", file: "car-trained", note: "trained against a ship; on 300 fresh pairs its training bought nothing that could be told from the untrained one" }),
+    Object.freeze({ id: "car-big", label: "race car's turret gunner, trained on 300 pairs a child (lays the gun, always fires)", file: "car-big", note: "the one trained gunner shown to beat the rest: +0.85 over the hand gunner on 600 pairs. What it learned is to HOLD THE TRIGGER whenever it has a target; its one synapse does what a trigger bias would" }),
 ]);
 export const HELMS = Object.freeze([
     Object.freeze({ id: "face", label: "bow-on rule", rule: "face", file: null, note: "the arena's own: the bow, and the cannon, on the nearest enemy" }),

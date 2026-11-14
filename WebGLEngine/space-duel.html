@@ -9,7 +9,7 @@
   space-duel.html -- UNNUMBERED (the version is chosen at ship time)
 
   A SHIP AGAINST A SHIP, WATCHED. brain/battleshipDuel.mjs sets two capital ships (or two lines of them, with escorts) against each other in a geometry a seed fixes; render/spaceDuelCore.mjs is everything this page knows that is arithmetic (the hands and helms a side can be given, the side they make, the fight
-  stepped and read a frame at a time). THE PAGE IS THE DRAWING AND THE CONTROLS: it loads the five brain files the core names, builds the fight from what is chosen, steps it, and draws what the core's snapshot says. A fight run to its end here is battleshipDuel.duel() of the same choices to the bit IN THIS BROWSER; the verdict
+  stepped and read a frame at a time). THE PAGE IS THE DRAWING AND THE CONTROLS: it loads the brain files the core names, builds the fight from what is chosen, steps it, and draws what the core's snapshot says. A fight run to its end here is battleshipDuel.duel() of the same choices to the bit IN THIS BROWSER; the verdict
   line carries its fingerprint. IT IS NOT NECESSARILY NODE'S FIGHT: a browser's Math.log and Math.pow can differ from node's in the last place (measured: Chrome 153 against node 22), the sights' noise is drawn through Math.log, and a fight that differs in one bit is soon another fight. The
   numbers in the notes under the controls were measured in node.
 
