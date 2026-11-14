@@ -11,7 +11,16 @@
 //   6 THE SOURCE    no clock, no random number; the headers; ASCII
 // NOT CHECKED, said plainly: the verdict on the real runs (that is the read of brain/SUB_LEAGUE_WIP.md, flown by the command once the twelve runs exist).
 //
-// SABOTAGES: written after the gate; the log is added below when the pass is done.
+// SABOTAGES (the mutation harness copies the gate's import closure to isolated trees, runs the unmutated gate first, changes one token at a time plus 28 hand mutants, and counts a FAIL, a crash or a hang as killed):
+//   PASS 1  207 mutants: 175 red, 9 crash, 4 hang, 19 ALIVE (14 token, 5 hand). Triage: REAL, each got rows (and, where the code was one expression inside a larger function, became an exported pure function so the row can reach it): the median sorted as strings (the
+//           old row used 1-digit numbers, where a string sort agrees); the cross-play's bar (`decided`: the edge and z boundaries at exactly 0.5 and 2, and the AND); the checks that void the read (`checksOf`: a non-finite EDGE or Z each alone, the self edge, the two counts,
+//           and their texts -- no real read can reach them, so the gate could not run them before); the sign of a zero in the printed edge and in the direction columns (`signed`: +0.000, +0.00, and -0.00 for a small negative); the exit code 1 on a failed check and the
+//           CHECKS FAILED line and that the record is STILL written (a `reader` override hands the command a made-up read, the only way to a failed check); the record's indent (JSON with ONE space, byte for byte).
+//           A DEFECT OF THE GATE, not of a mutant, found while this pass was being fixed: the program row ran `read --smoke` and expected the twelve run files to be MISSING; the harness's isolated trees do not hold them, so it passed there, and it FAILED in the repository the
+//           day the twelve runs were committed. It now runs `read --smoke --write` (a refusal that does not look at the disk).
+//   PASS 2  205 mutants after the rows: 188 red, 10 crash, 4 hang, 3 ALIVE, all EQUIVALENT, said: `s.length === 0 ? NaN` -> `=== -1` in the median (an empty list then falls to (s[-1] + s[0]) / 2, which is NaN as well); the loader's `!Number.isFinite(t[k]) ||` dropped
+//           (clampTheta returns a finite in-bounds number for NaN, Infinity, -Infinity, null, undefined, a string, an object, an array and a boolean -- probed on the first theta number -- and none of those is `===` to what it was handed, so the bounds clause already refuses every
+//           non-finite value and the finite clause is redundant; it stays as the reading of the rule); `typeof process !== "undefined" && Array.isArray(process.argv)` -> `||` (Node always has a process; the guard is for a browser that imports the file).
 "use strict";
 import fs from "node:fs";
 import crypto from "node:crypto";
