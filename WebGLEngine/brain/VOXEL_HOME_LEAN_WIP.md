@@ -68,3 +68,57 @@ some episodes early (a finished house), so about the same. The run is resumable.
 ## 7. The run (to be written; the gate never runs it and never gives the command the word `run`)
 `node tools/ship/takeVoxelHomeLean.mjs run` -> `brain/voxelHomeLeanRound.jsonl`, committed byte for byte before it is read;
 `node tools/ship/takeVoxelHomeLean.mjs read` prints the checks and the reading.
+
+## 8. The result (run 2026-11-14 in the sandbox, 14.3 minutes; `brain/voxelHomeLeanRound.jsonl` committed at 4636c841 before it was read; read once)
+**The checks hold, and the start was the lean:** the untrained builder of every arm scores 0.9226, to the bit.
+
+| arm | mean share built | sd | least | most | homes of 3,200 builds | a builder's homes of 200, mean | its best builder's |
+|---|---|---|---|---|---|---|---|
+| SHUF | 0.9879 | 0.0068 | 0.9647 | 0.9961 | 2,420 | 151 | 181 |
+| FISH | 0.9887 | 0.0041 | 0.9758 | 0.9930 | 2,495 | 156 | 175 |
+| PLAIN | 0.9892 | 0.0038 | 0.9765 | 0.9929 | 2,546 | 159 | 178 |
+| FLY | 0.9894 | 0.0046 | 0.9753 | 0.9949 | 2,491 | 156 | 179 |
+| MLP | 0.9924 | 0.0046 | 0.9771 | 0.9960 | 2,748 | 172 | 183 |
+| the lean, no network (and every builder at iteration 0) | 0.9226 | | | | | 123 | |
+| 16 random builders | 0.5722 | | | | 0 | | |
+
+* **T3: A BUILDER STARTED AT THE LEAN BUILDS MORE THAN THE LEAN** (all 80 above it, none below, none equal; exact two-sided
+  p 1.7e-24).
+* **T0: A FLY-WIRED BUILDER STARTED AT THE LEAN BUILDS MORE THAN THE LEAN** (all 16 above; p 2 / 65536).
+* **T1: THE FLY'S WIRING CANNOT BE TOLD APART FROM A SHUFFLE OF IT** (the ranks sum to 287, the middle 264; p 0.40). The fifth
+  round to say so.
+* **T2: THE FLY'S WIRING CANNOT BE TOLD APART FROM A PLAIN NET OF ITS SIZE** (275; p 0.70).
+
+**They finish houses.** 12,700 homes in 16,000 builds, where rounds 1 to 3 finished 2 in 48,000. 78 of the 80 builders finish
+more of the 200 plans than the lean's 123; the least finishes 115, the best 183 (MLP draw 2).
+
+**The learning was quick and was still going, slowly.** The trainer's own battery, share of the plan missing, mean of an arm's
+16 draws:
+
+| arm | iteration 0 | 25 | 50 | 75 | 100 | 125 | 149 |
+|---|---|---|---|---|---|---|---|
+| FLY | 0.1265 | 0.0358 | 0.0240 | 0.0170 | 0.0148 | 0.0125 | 0.0103 |
+| SHUF | 0.1220 | 0.0412 | 0.0267 | 0.0208 | 0.0162 | 0.0152 | 0.0140 |
+| PLAIN | 0.1259 | 0.0192 | 0.0173 | 0.0144 | 0.0118 | 0.0132 | 0.0125 |
+| FISH | 0.1370 | 0.0289 | 0.0215 | 0.0191 | 0.0169 | 0.0152 | 0.0139 |
+| MLP | 0.1376 | 0.0198 | 0.0121 | 0.0109 | 0.0086 | 0.0087 | 0.0094 |
+
+(Iteration 0 is after the trainer's first move, already off the lean.)
+
+**What they learned -- LOOKED AT AFTER THE READING, NOT REGISTERED.** On the first 50 audit plans the lean spends 23.8 picks a
+build asking for a block that would hang in the air; FLY draw 1 spends 5.3. Its network holds back the columns that need a
+single block -- the roof over the room, which cannot go in until a wall or a roof block beside it is there (0.30 where the lean
+says 1) -- and favours the columns that are part built (0.75 and 0.86 for those needing a half and three quarters) over those
+needing everything (0.46). That is an order, and it is one the builder can read off what it sees. Two other builders looked at
+(MLP draw 2, PLAIN draw 5) show the same shape. The price is picks at finished columns (the network lifts them from -1 toward
+0): 7.5 a build for FLY draw 1 where the lean has almost none.
+
+**The expectations against what came.** T3 MORE (40) and T0 MORE (25): both came, and I had given them less than an even
+chance. T1 (80) and T2 (70) CANNOT BE TOLD APART: both came. The best arm above 0.95 (20): every arm is above 0.98. A builder
+with more than 123 homes (45): 78 of 80. **My reason for doubt was wrong:** I wrote that the trainer's noise "may only learn to
+be quiet"; it learned an order within 25 iterations.
+
+**What this does and does not say** (section 5). Under this trainer a small network can add a building order to the lean, and
+does so whichever of the five it is. It does NOT say a network can find the lean (rounds 2 and 3: a third of the way), so the
+whole builder is still "the lean, which a person wrote, corrected". And nothing here is about the fly: its wiring is one arm of
+five and cannot be told from a shuffle of itself.
