@@ -56,6 +56,7 @@
     <label>start <select id="kind"></select></label>
     <label title="capital ships a side, in line abreast">ships a side <input id="ships" type="number" min="1" max="4" value="1"></label>
     <label title="fighters of each side, between the flagships">escorts a side <input id="escorts" type="number" min="0" max="12" value="0"></label>
+    <label title="the fraction of every gun seat's magazine both sides carry into the fight. With the whole magazines no gun runs dry and holding the trigger costs nothing; a main gun has 160 rounds, a point-defence mount 900">magazines <select id="ammo"></select></label>
     <button id="newBtn" title="build the fight again from its first tick with what is chosen">&#8635; New fight</button>
     <button id="runBtn">&#10074;&#10074; Pause</button>
     <button id="stepBtn" title="one tick (1/30 s)">Step</button>
@@ -85,6 +86,7 @@ import * as RB from "/physics/mechanics/rigidBody6dof.mjs";
 const $ = (id) => document.getElementById(id), COL = { 1: 0x5ab0ff, 2: 0xff8a5a }, SHIP = CS.createCapitalShip();
 const fill = (sel, items, value) => { sel.innerHTML = items.map((x) => `<option value="${x.id}">${x.label}</option>`).join(""); sel.value = value; };
 fill($("kind"), C.KINDS.map((k) => ({ id: k, label: k })), "head-on");
+fill($("ammo"), C.RATIONS.map((r) => ({ id: String(r), label: r === 1 ? "whole" : `1/${1 / r}` })), "1");
 for (const s of ["A", "B"]) { fill($("hand" + s), C.HANDS, "rule"); fill($("helm" + s), C.HELMS, "face"); fill($("gunners" + s), C.GUNNERS.map((g) => ({ id: g, label: g })), "regular"); }
 $("handA").value = "car"; $("handB").value = "gpu";
 
@@ -140,7 +142,7 @@ function draw(s) {
 }
 const peers = { A: [], B: [] };   // the brain files a peer sent for each side, as they arrived: [{ name, text }]
 const choice = (s) => ({ hand: $("hand" + s).value, helm: $("helm" + s).value, gunners: $("gunners" + s).value, cannon: $("cannon" + s).checked, ...(peers[s].length ? { peer: peers[s] } : {}) });
-const setupNow = () => ({ seed: Math.max(1, Math.floor(Number($("seed").value) || 1)), kind: $("kind").value, ships: Math.min(C.MAX_SHIPS, Math.max(1, Math.floor(Number($("ships").value) || 1))), escorts: Math.min(C.MAX_ESCORTS, Math.max(0, Math.floor(Number($("escorts").value) || 0))), a: choice("A"), b: choice("B") });
+const setupNow = () => ({ seed: Math.max(1, Math.floor(Number($("seed").value) || 1)), kind: $("kind").value, ships: Math.min(C.MAX_SHIPS, Math.max(1, Math.floor(Number($("ships").value) || 1))), escorts: Math.min(C.MAX_ESCORTS, Math.max(0, Math.floor(Number($("escorts").value) || 0))), ammo: C.RATIONS.includes(Number($("ammo").value)) ? Number($("ammo").value) : 1, a: choice("A"), b: choice("B") });
 function notes() {
     const line = (s, cls) => { const h = C.HANDS.find((x) => x.id === $("hand" + s).value), m = C.HELMS.find((x) => x.id === $("helm" + s).value); return `<b class="${cls}">${s}</b> seats: ${h.note}. Helm: ${m.note}.`; };
     const esc = (t) => t.replace(/[&<>]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[ch])), peerNote = (s) => { const L = C.peerLines(s, choice(s)); $("peerCount" + s).textContent = peers[s].length ? `${peers[s].length} file${peers[s].length > 1 ? "s" : ""}` : ""; return L.length ? `<div class="peer" style="white-space:pre-wrap">${esc(L.join("\n"))}</div>` : ""; };
@@ -157,7 +159,7 @@ function panels(s) {
     for (const [t, id, hand, helm] of [[1, "panelA", "handA", "helmA"], [2, "panelB", "handB", "helmB"]]) {
         if (!s) { $(id).innerHTML = ""; continue; }
         const k = t - 1, caps = s.crafts.filter((c) => c.kind === "capital" && c.team === t), hpMax = caps.reduce((a, c) => a + c.hpMax, 0), esc = s.crafts.filter((c) => c.kind === "fighter" && c.team === t);
-        const seats = caps.map((c) => `<tr><td colspan="4" class="kv">${c.name}${c.dead ? " &mdash; DESTROYED" : ""} &middot; ${c.hp}/${c.hpMax}${c.chargeFull ? ` &middot; cannon ${(100 * c.charge / c.chargeFull).toFixed(0)}%` : " &middot; no cannon"}</td></tr>` + c.seats.map((q) => `<tr><td><span class="dot ${!q.working ? "out" : q.firing ? "fire" : q.target != null ? "aim" : ""}"></span></td><td>${q.name}</td><td class="${q.net ? "net" : "rule"}">${q.net ? "network" : "rule"}</td><td class="n">${q.fired}</td></tr>`).join("")).join("");
+        const seats = caps.map((c) => `<tr><td colspan="4" class="kv">${c.name}${c.dead ? " &mdash; DESTROYED" : ""} &middot; ${c.hp}/${c.hpMax}${c.chargeFull ? ` &middot; cannon ${(100 * c.charge / c.chargeFull).toFixed(0)}%` : " &middot; no cannon"}</td></tr>` + c.seats.map((q) => `<tr><td><span class="dot ${!q.working ? "out" : q.firing ? "fire" : q.target != null ? "aim" : ""}"></span></td><td>${q.name}</td><td class="${q.net ? "net" : "rule"}">${q.net ? "network" : "rule"}</td><td class="n" title="rounds fired / rounds left">${q.fired}<span class="kv"> / ${q.left}</span></td></tr>`).join("")).join("");
         $(id).innerHTML = `<h2>Side ${t === 1 ? "A" : "B"}</h2><div class="kv">seats <b>${C.HANDS.find((x) => x.id === $(hand).value).label}</b></div><div class="kv">helm <b>${C.HELMS.find((x) => x.id === $(helm).value).label}</b></div>
           <div class="bar"><i style="width:${(100 * s.hp[k] / hpMax).toFixed(1)}%"></i></div>
           <div class="kv">hit points <b>${s.hp[k]}</b> of ${hpMax} &middot; score <b>${s.scores[k].toFixed(3)}</b></div>

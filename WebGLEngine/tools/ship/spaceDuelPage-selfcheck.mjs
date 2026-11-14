@@ -19,6 +19,7 @@
 //   G9 the panel says network in every seat 1 | G10 a fight that cannot be built keeps the old one 1 | G12 the fight starts paused 2 | G13 the notes are side A's twice 1 | G14 the fish's file is not fetched 1 (the page did not boot: red by the boot row)
 //   (G11, the verdict without the fingerprint, was written and did NOT APPLY -- its text did not match the page's -- so it is not counted and that clause of section 2 is unsabotaged.)
 //   AND FIVE ON THE PEER FILES (section 7), all red: H1 the choice does not carry the peer files 2 | H2 clear does not forget 1 | H3 side A's peer lines are not shown 1 | H4 a side's files go to the other side 2 | H5 the lines are dropped 1
+//   AND TWO ON THE MAGAZINES CONTROL, both red: J1 the magazines control is not read 5 | J2 the panel does not say rounds left 1
 // None went 0 red. WHAT THE FIRST RUNS OF THIS GATE FOUND, before any sabotage: the page did not load at all (OrbitControls imports "three" and the page had no import map); two of three fights were not node's (Math.log, above); and the first camera this page shipped with showed an empty sky, both ships just
 // outside the frame -- found by LOOKING at the picture SWEK_DUEL_SHOT writes, which no row reads. NOT CHECKED: that anything is in the frame (no row looks at pixels), the orbit controls, the layout at a phone's width, the cannon's beam, the page on a real GPU, and the FILE BUTTON itself (section 7 hands the files to the function the button's handler calls; no file dialog is opened).
 "use strict";
@@ -36,9 +37,9 @@ let fails = 0;
 function ok(name, cond, detail) { console.log(`  ${cond ? "PASS" : "FAIL"}  ${name}${detail ? "   " + detail : ""}`); if (!cond) fails++; }
 const files = Object.fromEntries(Object.entries(C.FILES).map(([k, f]) => [k, JSON.parse(fs.readFileSync(path.join(ENG, f.path), "utf8"))]));
 const SETUPS = [
-    { seed: 2, kind: "crossing", ships: 1, escorts: 0, a: { hand: "car", helm: "face", gunners: "regular", cannon: true }, b: { hand: "gpu", helm: "face", gunners: "regular", cannon: true } },
-    { seed: 3, kind: "broadside", ships: 2, escorts: 3, a: { hand: "car-trained", helm: "trained", gunners: "green", cannon: true }, b: { hand: "fish", helm: "broadside", gunners: "regular", cannon: false } },
-    { seed: 5, kind: "chase", ships: 1, escorts: 0, a: { hand: "rule", helm: "broadside", gunners: "perfect", cannon: false }, b: { hand: "fly", helm: "face", gunners: "ace", cannon: true } },
+    { seed: 2, kind: "crossing", ships: 1, escorts: 0, ammo: 1, a: { hand: "car", helm: "face", gunners: "regular", cannon: true }, b: { hand: "gpu", helm: "face", gunners: "regular", cannon: true } },
+    { seed: 3, kind: "broadside", ships: 2, escorts: 3, ammo: 0.125, a: { hand: "car-trained", helm: "trained", gunners: "green", cannon: true }, b: { hand: "fish", helm: "broadside", gunners: "regular", cannon: false } },
+    { seed: 5, kind: "chase", ships: 1, escorts: 0, ammo: 0.0625, a: { hand: "rule", helm: "broadside", gunners: "perfect", cannon: false }, b: { hand: "fly", helm: "face", gunners: "ace", cannon: true } },
 ];
 const PEER = [{ name: "rig-gunner.json", text: JSON.stringify(files.gpu) }, { name: "broken.json", text: "{not json" }, { name: "mac-pilot.json", text: fs.readFileSync(path.join(ENG, "brain", "pilot6dofWeightsDefault-d18.json"), "utf8") }, { name: "copy.json", text: JSON.stringify(files.gpu) }];
 const nodeEnd = (setup) => { const f = C.createFight(setup, files); while (!f.done) f.step(100); const s = f.snapshot(); return { fingerprint: s.fingerprint, scores: s.scores, winner: s.winner, peak: s.brains.peak, seated: s.brains.seated, ticks: s.ticks }; };
@@ -59,7 +60,7 @@ else {
             await wait(500);
             out.boot = { fileErrors: U.fileErrors, files: Object.keys(U.files).sort(), setup: U.setupNow(), ticksAfterHalfASecond: U.fight.snapshot().ticks, drawn: U.drawnCount(), notes: $("notes").textContent, status: $("status").textContent, seated: U.fight.snapshot().brains.seated };
             U.pause(); out.shot1 = U.shot();
-            const apply = (s) => { $("seed").value = s.seed; $("kind").value = s.kind; $("ships").value = s.ships; $("escorts").value = s.escorts; for (const [k, c] of [["A", s.a], ["B", s.b]]) { $("hand" + k).value = c.hand; $("helm" + k).value = c.helm; $("gunners" + k).value = c.gunners; $("cannon" + k).checked = c.cannon; } };
+            const apply = (s) => { $("seed").value = s.seed; $("kind").value = s.kind; $("ships").value = s.ships; $("escorts").value = s.escorts; $("ammo").value = String(s.ammo); for (const [k, c] of [["A", s.a], ["B", s.b]]) { $("hand" + k).value = c.hand; $("helm" + k).value = c.helm; $("gunners" + k).value = c.gunners; $("cannon" + k).checked = c.cannon; } };
             out.fights = [];
             for (const s of args.SETUPS) {
                 apply(s); $("newBtn").click(); const built = U.setupNow(), fight = U.fight; fight.step(40);
@@ -105,6 +106,7 @@ else {
         console.log(`  ----  NOT ASSERTED, SAID: against NODE's fight of the same choices ${sameAsNode.filter(Boolean).length} of 3 fingerprints agree. This browser's Math.log(0.37) ${r.mathProbe[0] === probe[0] ? "is" : "is NOT"} node's and its Math.pow(1.7, 2.2) ${r.mathProbe[1] === probe[1] ? "is" : "is NOT"}: the sight's noise is drawn through Math.log, so a fight is the same fight only within one engine`);
         console.log("3. THE CONTROLS ARE THE FIGHT");
         ok("what the page built is what its controls said, for all three fights", r.fights.every((f, i) => JSON.stringify(f.built) === JSON.stringify(SETUPS[i])));
+        ok("!! THE MAGAZINES CONTROL IS THE FIGHT: fight 2 was built with an eighth of the magazines and fight 3 with a sixteenth (their fingerprints above are the core's own with those rations), and the panel's seat rows say rounds fired and rounds LEFT", r.fights[1].built.ammo === 0.125 && r.fights[2].built.ammo === 0.0625 && r.fights[0].built.ammo === 1 && /\d+ \/ \d+/.test(r.fights[1].panel.a));
         ok("nine ships, ninety-nine escorts and a seed of -4 are clamped to four, twelve and 1", r.clamped.ships === 4 && r.clamped.escorts === 12 && r.clamped.seed === 1);
         console.log("4. THE DRAWING IS THE STATE");
         const SHIP = CS.createCapitalShip(), close = (a, b, tol = 1e-4) => a.every((v, i) => Math.abs(v - b[i]) <= tol);

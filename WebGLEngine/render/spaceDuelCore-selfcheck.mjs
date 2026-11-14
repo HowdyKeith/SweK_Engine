@@ -21,6 +21,7 @@
 // TWO OF THE MUTANTS ARE MISTAKES THIS FILE'S FIRST DRAFT REALLY MADE, found by running it and not by the gate: C15 (the snapshot's rounds in flight took the name of the tally's rounds fired) and a seat's mount looked up by the seat's id where the ship lists it by the seat's place (C13's row holds that one).
 // AND SIX ONCE A SIDE COULD CARRY A PEER'S FILES (section 3b), all red: K1 a peer's gunner does not take the seats 1 | K2 a peer's helm does not take the helm 1 | K3 a peer's pilot does not fly 1 (these three by a section that THREW: red by the section's own row) | K4 the hand chosen stays beside the peer's gunner 1
 //   K5 the peer's helm corrects the bow-on rule whatever is chosen 1 | K6 peerLines says nothing 1
+// AND THREE ON THE RATION, all red: N1 the ration does not reach the fight 1 | N2 a seat's rounds left are its rounds fired 2 | N3 the default ration is a half 2
 // NOT CHECKED HERE: anything drawn (tools/ship/spaceDuelPage-selfcheck.mjs, in a browser).
 "use strict";
 import fs from "node:fs";
@@ -91,8 +92,11 @@ section(() => {
     }
     const e = C.createFight({ seed: 4, kind: "chase", escorts: 2 }, FILES); e.step(1); e.build.arena.crafts[1].hp = 0; e.step(1);   // B's flagship struck out by hand: its escorts fly on and the ARENA is not over
     ok("!! a fight is DONE when a side has no capital ship flying, although escorts fly on and the arena itself is not over -- and then it steps no further", e.done && e.build.arena.done === false && e.build.arena.crafts.filter((c) => c.kind === "fighter" && !c.dead).length === 4 && e.step(5) === 0 && e.snapshot().ticks === 2 && e.snapshot().winner === "A");
+    const ra = C.createFight({ seed: 3, kind: "broadside", ammo: 0.0625, a: { hand: "car-big", cannon: false }, b: { cannon: false } }, FILES); while (!ra.done) ra.step(100);
+    const rs = ra.snapshot(), rd = D.duel(ra.sides[0], ra.sides[1], 3, "broadside", { ammo: 0.0625 }), seatsA = rs.crafts[0].seats;
+    ok("!! THE RATION REACHES THE FIGHT: at a sixteenth of the magazines the fight is battleshipDuel.duel() with that `ammo` (not the fight with the whole magazines), every seat says the rounds it has LEFT -- what it carried (10 a main gun, 56 a mount) less what it fired -- and the gunner that always fires has run guns dry", rs.fingerprint === rd.fingerprint && rs.fingerprint !== D.duel(ra.sides[0], ra.sides[1], 3, "broadside").fingerprint && seatsA.every((q, k) => q.left === (k < 3 ? 10 : 56) - q.fired && q.left >= 0) && seatsA.some((q) => q.left === 0) && ra.setup.ammo === 0.0625 && C.RATIONS.join() === "1,0.5,0.25,0.125,0.0625");
     const f = C.createFight({}, FILES);
-    ok("with nothing said the fight is head-on, seed 1, one ship a side and no escort, the hand gunner behind the bow-on rule on both sides, three minutes; it is not done before it starts and step() with no number steps one tick", f.setup.kind === "head-on" && f.setup.seed === 1 && f.setup.ships === 1 && f.setup.escorts === 0 && f.setup.seconds === 180 && f.build.arena.crafts.length === 2 && f.sides[0].network === null && !f.done && f.step() === 1 && f.snapshot().ticks === 1);
+    ok("with nothing said the fight is head-on, seed 1, one ship a side and no escort, the hand gunner behind the bow-on rule on both sides, three minutes; it is not done before it starts and step() with no number steps one tick", f.setup.kind === "head-on" && f.setup.seed === 1 && f.setup.ships === 1 && f.setup.escorts === 0 && f.setup.seconds === 180 && f.setup.ammo === 1 && f.snapshot().crafts[0].seats[0].left === 160 && f.build.arena.crafts.length === 2 && f.sides[0].network === null && !f.done && f.step() === 1 && f.snapshot().ticks === 1);
 });
 
 console.log("5. THE SNAPSHOT");
@@ -115,7 +119,7 @@ section(() => {
 console.log("6. THE FRONT DOOR");
 section(() => {
     ok("the report says the catalogues as they are", C.reportLines().length === 2 && C.reportLines()[1].includes("7 hands (rule, gpu, fly, fish, car, car-trained, car-big), 3 helms (face, broadside, trained), 6 brain files"));
-    ok("the export list", Object.keys(C).sort().join() === "DEFAULT_CHOICE,FILES,GUNNERS,HANDS,HELMS,KINDS,MAX_ESCORTS,MAX_SHIPS,createFight,peerLines,reportLines,sideOf,weightsOf");
+    ok("the export list", Object.keys(C).sort().join() === "DEFAULT_CHOICE,FILES,GUNNERS,HANDS,HELMS,KINDS,MAX_ESCORTS,MAX_SHIPS,RATIONS,createFight,peerLines,reportLines,sideOf,weightsOf");
 });
 
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);

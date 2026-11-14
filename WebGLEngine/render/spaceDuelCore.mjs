@@ -8,7 +8,8 @@
 //   HELMS   `face` (the arena's rule: the bow on the enemy), `broadside` (the hand rule), `trained` (the trained helm network correcting the bow-on rule -- the only rule it was trained for).
 //   FILES   the core reads no disk and no network: the page (or a gate) loads the brain files named in FILES and hands the parsed objects in. Each goes through brain/peerBrain.mjs's importBrain against the module it is for; a file that is refused refuses the SIDE, by name and with the reason.
 //   PEERS   a side's choice may carry `peer`: brain files as they arrived ([{ name, text }]). They go through brain/peerFleet.mjs (which never throws on a file) and take the seats, the helm and the escorts where they have a brain for them; the catalogue's choice stands for the rest. peerLines() is the report.
-//   A FIGHT createFight({ seed, kind, ships, escorts, a, b }, files) -> { step(n), snapshot(), done, build }. step() is battleshipDuel's own loop a tick at a time (finished(), the arena's step, the peak of networks asked); snapshot() is battleshipDuel.tally of the fight AS IT STANDS plus what a page draws:
+//   RATION  `setup.ammo` is battleshipDuel's: the fraction of every gun seat's magazine both sides carry (1 by default: the whole magazines). A snapshot's seat says the rounds it has LEFT.
+//   A FIGHT createFight({ seed, kind, ships, escorts, ammo, a, b }, files) -> { step(n), snapshot(), done, build }. step() is battleshipDuel's own loop a tick at a time (finished(), the arena's step, the peak of networks asked); snapshot() is battleshipDuel.tally of the fight AS IT STANDS plus what a page draws:
 //           every craft's place and attitude, every seat's angles and whether it fired this tick, the rounds in flight, the cannon's charge. A fight stepped to its end here IS battleshipDuel.duel() of the same choices, to the bit, IN THE SAME ENGINE (the gate compares in node; the page's gate compares in the browser, where Math.log differs from node's in the last place and a fight is another fight).
 //
 // Pure: no DOM, no clock, no I/O.
@@ -47,6 +48,8 @@ export const HELMS = Object.freeze([
     Object.freeze({ id: "broadside", label: "broadside rule", rule: "broadside", file: null, note: "a hand rule; it loses to the bow-on rule in seven pairs of eight" }),
     Object.freeze({ id: "trained", label: "trained helm (corrects the bow-on rule)", rule: "face", file: "helm", note: "on 300 fresh pairs it leads the bow-on rule by 0.38; with no cannon on either side it is no better than the rule; it was not trained for the broadside rule and trails behind it" }),
 ]);
+/** The rations of the magazines a page offers (battleshipDuel's `ammo`): the whole magazines, and what tools/ship/takeAmmoStudy.mjs flew. */
+export const RATIONS = Object.freeze([1, 0.5, 0.25, 0.125, 0.0625]);
 export const GUNNERS = Object.freeze(Object.keys(BF.GUNNERS)), KINDS = D.KINDS, MAX_SHIPS = D.MAX_SHIPS, MAX_ESCORTS = D.MAX_ESCORTS;
 export const DEFAULT_CHOICE = Object.freeze({ hand: "rule", helm: "face", gunners: "regular", cannon: true });
 
@@ -80,8 +83,8 @@ export function peerLines(id, choice = {}) { const F = peerFleet(id, { ...DEFAUL
  * A fight to step and read. `setup` is { seed, kind, ships, escorts, seconds, a, b } (a and b are choices). Returns { build, sides, setup, step(n = 1) -> ticks stepped, snapshot(), get done() }.
  */
 export function createFight(setup = {}, files = {}) {
-    const s = { seed: 1, kind: "head-on", ships: 1, escorts: 0, seconds: D.SECONDS, a: {}, b: {}, ...setup }, sides = [sideOf("A", s.a, files), sideOf("B", s.b, files)];
-    const build = D.build(sides[0], sides[1], s.seed, s.kind, { ships: s.ships, escorts: s.escorts, seconds: s.seconds });
+    const s = { seed: 1, kind: "head-on", ships: 1, escorts: 0, seconds: D.SECONDS, ammo: 1, a: {}, b: {}, ...setup }, sides = [sideOf("A", s.a, files), sideOf("B", s.b, files)];
+    const build = D.build(sides[0], sides[1], s.seed, s.kind, { ships: s.ships, escorts: s.escorts, seconds: s.seconds, ammo: s.ammo });
     let peak = 0, askedNow = 0; const firedBefore = new Map();
     const fight = {
         build, sides, setup: s,
@@ -100,7 +103,7 @@ export function createFight(setup = {}, files = {}) {
             const crafts = a.crafts.map((c) => ({
                 id: c.id, team: c.team, kind: c.kind, name: c.name, pos: c.body.pos.slice(), q: c.body.q.slice(), hp: Math.max(0, c.hp), hpMax: c.hpMax, dead: !!c.dead,
                 ...(c.kind === "capital" ? { charge: Number.isFinite(c.ship.waveGun.charge) ? c.charge : 0, chargeFull: Number.isFinite(c.ship.waveGun.charge) ? c.ship.waveGun.charge : 0, waves: c.waves,
-                    seats: c.seats.map((q, k) => ({ id: q.seat.id, name: q.seat.name, yaw: q.state.yaw, pitch: q.state.pitch, fired: q.state.gun.fired, firing: q.state.gun.fired > (firedBefore.get(q) ?? q.state.gun.fired), working: (c.partHp.get(c.ship.seatPart[k]) ?? 1) > 0 && !c.dead, net: !!(q.decide && q.decide.net), target: q.last ? q.last.target ?? null : null })) } : {}),
+                    seats: c.seats.map((q, k) => ({ id: q.seat.id, name: q.seat.name, yaw: q.state.yaw, pitch: q.state.pitch, fired: q.state.gun.fired, left: q.state.gun.ammo, firing: q.state.gun.fired > (firedBefore.get(q) ?? q.state.gun.fired), working: (c.partHp.get(c.ship.seatPart[k]) ?? 1) > 0 && !c.dead, net: !!(q.decide && q.decide.net), target: q.last ? q.last.target ?? null : null })) } : {}),
             }));
             return { ...t, crafts, shots: a.rounds.map((r) => ({ pos: r.pos.slice(), team: r.team })), askedNow, done: D.finished(build), events: a.events ? a.events.slice() : [] };
         },
