@@ -67,3 +67,24 @@ The search-ping champion against the default tactician, no kit:
 
 **What this says:** the cost binds on the boats' charge and does not bind on the fight, at the size of battery the ladder tried. That is read 1's question (does the cost change the ranking of the doctrines) before it is asked; it is flown once next on the HELD geometries at rung 2, and read 2 (the doctrine re-tuned under the cost) after it.
 
+## HELD RESULT, READ 1 (2026-11-14; `node tools/ship/takeSubEnergy.mjs held --rung 2 --write`, 22 s, flown ONCE, geometries 95001 to 95024, both seats, 48 duels a pair and run; `brain/subEnergyHeld.json`; the checks passed)
+
+The four doctrines' round robin, without the cost and with 0.75 MJ a boat (the paired edge of the first over the second, z in brackets):
+
+| pair | without the cost | with the cost |
+|---|---|---|
+| hand v champ | -2.670 (-9.4) | -2.671 (-9.4) |
+| hand v ping | -2.808 (-10.7) | -2.810 (-10.7) |
+| hand v league7001 | -3.020 (-17.5) | -2.812 (-10.8) |
+| champ v ping | +0.019 (+9.8) | +0.010 (+16.5) |
+| champ v league7001 | -2.622 (-12.4) | **-0.012 (-0.1)** |
+| ping v league7001 | -2.826 (-12.9) | **+0.119 (+0.9)** |
+
+Ratings (Bradley-Terry, Elo scale, read differences): hand -356 to -312, champ -3 to 82, ping -5 to 90, league7001 376 to 82. Duels with a boat sunk: 97 percent without the cost, 100 percent with it. The ratings' spread, best less worst: 732 without, 402 with. The screws died in 83 percent of the hand tactician's boat-duels, 89 percent of the search-ping champion's and 100 percent of the other two's.
+
+**READING BY THE RULE AS REGISTERED: the cost MATTERS to the ranking.** One pair satisfies it: ping v league7001, whose edge goes from -2.826 (z -12.9) to +0.119 (z +0.9): the sign flips, and the larger |edge|, the cost-free one, is far above 0.05 at z far above 2. **What the printed numbers say that the rule does not:** that flip is a flip from a decisive lead to an edge that is INDISTINGUISHABLE FROM ZERO (z 0.9). The league doctrine's lead of about 2.6 to 2.8 over the two tuned doctrines is gone (champ v league: -0.012 at z -0.1), the three of them are a tie, and the hand tactician is still last by about 2.7 to 2.8 against each. The cost does not reorder the top; it erases what separates it, and the duels are still decided (100 percent of them end in a sinking), which fits what the smoke run suggested: once neither boat can still drive, who wins is the geometry the duel started from, not the doctrine. **That last clause is a guess, not a finding:** `subTournament.seatBias` with and without the cost would test it and was not part of the registered reads.
+
+**The forecasts of read 1, scored (written before any geometry was flown):** the cost MATTERS to the ranking by the rule (40): **yes, by one pair and on an edge that is itself a zero**; the search-ping champion stays above the default in the cost run (75): yes (rating 90 against -312).
+
+Read 2, the doctrine re-tuned under the cost (four searches, seeds 6100 to 6103, 150 iterations each, `--needs 750000`, from the default tactician), is started and will be read from its four files by `takeSubEnergy.mjs retune --write`.
+
