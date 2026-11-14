@@ -38,3 +38,34 @@ Part A: 1,008 duels, about a minute for the PD sides and several for the network
 ## 5. What a result would not say
 
 That any of these doctrines is good against a real adversary: the opponents are the default and earlier generations of the same 12-number family, flown by the PD autopilot, and the family's counter-doctrine against an unmodelled opponent says nothing about it. That eight leagues of one recipe say what other recipes (a mixed-strategy pool, a larger training set, a longer league) would find: they do not, and they are named in the backlog as the next step. Nothing is tuned after the read; `AUDIT_SET` of the duel is NOT read by this note.
+
+## PART A RESULT (2026-11-14; `node tools/ship/takeSubTournament.mjs --record brain/subTournamentRecord.json`, 45 s, flown ONCE, geometries 97001 to 97024, seven sides, both seats, 48 duels a pair, 21 pairs; `brain/subTournamentRecord.json`; the gate `tools/ship/takeSubTournament-selfcheck.mjs` passed and its sabotage log is in its header)
+
+The order, by the rating (Bradley-Terry on the Elo scale; read DIFFERENCES) and the mean edge:
+
+| rank | side (the page's label) | rating | mean edge | seat A is worth (a duel, 8 geometries) |
+|---|---|---|---|---|
+| 1 | league7001 ("league A (found a counter-doctrine), generation 4") | 599 | +3.109 | **-1.873** (se 0.830) |
+| 2 | champ+net | 53 | +0.469 | +3.331 (se 0.011) |
+| 3 | champ | 52 | +0.457 | +3.330 (se 0.011) |
+| 4 | ping | 52 | +0.441 | +3.368 (se 0.008) |
+| 5 | league7000 ("league B (did not)") | 6 | +0.047 | +3.405 (se 0.006) |
+| 6 | hand+net | -292 | -2.202 | +2.521 (se 0.844) |
+| 7 | hand | -312 | -2.321 | +3.350 (se 0.016) |
+
+**The shape is three tiers and one side above them.** league7001 beats every other side in nearly every duel: 48-0-0 over league7000, 0-0-48 against it for the search-ping tactician (edge +3.238, paired se 0.008), 0-2-46 for the tuned tactician with the PD autopilot, 1-4-43 for the hand tactician; its edge over each is 2.95 to 3.28, which is about the size of the seat bias the other sides show (+3.3 a duel). The middle three (champ+net, champ, ping) are within 1 rating point of each other; league7000 is 46 below them (each of them beats it 28 to 20, edge about +0.6, z 2.2 to 2.3); against the hand tactician the four win 42 to 44 of 48. The hand tactician with and without the network ties itself (24-0-24, edge +0.000 +- 0.286), and the two tuned sides tie (24-0-24, edge -0.001 +- 0.001). **No cycle** (the significant leads are transitive) and **no upset** (no significant lead runs against the rating).
+
+**The forecasts, scored (written before the set was flown):**
+
+| forecast | probability | result |
+|---|---|---|
+| league7001 is rated first | 80 | **yes** (599; the next is 53) |
+| the ranking has no cycle | 80 | **yes** |
+| seat A is worth at least 0.5 a duel to every side | 70 | **NO**: six sides are worth +2.5 to +3.4; **league7001's seat A is worth -1.873** (se 0.830), a side that does better from the seat that starts BEHIND |
+| the two network sides rate below their PD twins | 60 | **NO**: hand+net is 20 points ABOVE hand and champ+net 1 above champ; neither pair is a difference (24-0-24, z 0.0 and -0.7), so "below" was a forecast about the sign of a tie |
+| the 4-geometry impression (the page's default) has the same top side as the 24-geometry record | 85 | **yes** (`--smoke`, geometries 1 to 4, all seven sides: league7001 first at 573; the second to fourth sides are the same three, in the same order, 40, 32, 32) |
+
+Three right and two wrong, said. The first wrong forecast is the more interesting one: I wrote "to every side" and one side is the exception, and it is the one that wins everything.
+
+**What this says.** The record exists, to the digit, on a set nothing else used: the order of the seven, that it is transitive, and each side's seat bias. The doctrine that league 7001 found (stop pinging blind, aim tighter, evade harder, in the notes) does not just beat generation 0 by 1.4 to 1.7 as in the 8-geometry probe: on fresh geometries it beats every other side of the page by about 3 points a duel. A side that is worth MORE from the seat that starts with the enemy outside its forward arc suggests the doctrine uses the opening differently from the others, and that the +3.3 seat bias of the table is partly an effect of how the OTHER sides play the opening, not of the geometry alone. **Not claimed:** that the doctrine is a good submarine, only that against these six opponents on these 24 geometries it wins; that a different seed's league would find it (that is Part B); that the seat bias of -1.873 is a seat effect and not one or two geometries (its se is 0.83 on 8 geometries, and which geometries was not looked at).
+

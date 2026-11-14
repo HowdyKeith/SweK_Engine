@@ -1,0 +1,718 @@
+{
+ "set": {
+  "name": "subTournament",
+  "kind": "patrol",
+  "first": 97001,
+  "scenarios": 24
+ },
+ "sides": [
+  {
+   "id": "hand",
+   "label": "hand tactician + PD autopilot",
+   "theta": {
+    "searchSpeed": 2,
+    "trackSpeed": 1.5,
+    "evadeSpeed": 4,
+    "fireRange": 320,
+    "aimTol": 0.17,
+    "pingAfter": 2,
+    "echoWindow": 8,
+    "evadeTime": 20,
+    "evadeTurn": 1.4,
+    "blindSnr": 99,
+    "pingEvery": 12,
+    "searchPing": 0
+   },
+   "weightsSha256": null
+  },
+  {
+   "id": "hand+net",
+   "label": "hand tactician + the fruit fly network",
+   "theta": {
+    "searchSpeed": 2,
+    "trackSpeed": 1.5,
+    "evadeSpeed": 4,
+    "fireRange": 320,
+    "aimTol": 0.17,
+    "pingAfter": 2,
+    "echoWindow": 8,
+    "evadeTime": 20,
+    "evadeTurn": 1.4,
+    "blindSnr": 99,
+    "pingEvery": 12,
+    "searchPing": 0
+   },
+   "weightsSha256": "a80170ba038ab3b6adea1925a95d157ab1113355cbcbaa9568a82ebf3076d9de"
+  },
+  {
+   "id": "champ",
+   "label": "tuned tactician + PD autopilot",
+   "theta": {
+    "searchSpeed": 4.131392760468369,
+    "trackSpeed": 4.427937431075328,
+    "evadeSpeed": 3.6162004648855346,
+    "fireRange": 446.6904944616251,
+    "aimTol": 0.5171898055013743,
+    "pingAfter": 1,
+    "echoWindow": 9.21060075078207,
+    "evadeTime": 30.747825359196604,
+    "evadeTurn": 2.1926273757154986,
+    "blindSnr": 79.85018222556684,
+    "pingEvery": 4,
+    "searchPing": 0
+   },
+   "weightsSha256": null
+  },
+  {
+   "id": "champ+net",
+   "label": "tuned tactician + the fruit fly network",
+   "theta": {
+    "searchSpeed": 4.131392760468369,
+    "trackSpeed": 4.427937431075328,
+    "evadeSpeed": 3.6162004648855346,
+    "fireRange": 446.6904944616251,
+    "aimTol": 0.5171898055013743,
+    "pingAfter": 1,
+    "echoWindow": 9.21060075078207,
+    "evadeTime": 30.747825359196604,
+    "evadeTurn": 2.1926273757154986,
+    "blindSnr": 79.85018222556684,
+    "pingEvery": 4,
+    "searchPing": 0
+   },
+   "weightsSha256": "a80170ba038ab3b6adea1925a95d157ab1113355cbcbaa9568a82ebf3076d9de"
+  },
+  {
+   "id": "ping",
+   "label": "search-ping tactician",
+   "theta": {
+    "searchSpeed": 4.5,
+    "trackSpeed": 4.427937431075328,
+    "evadeSpeed": 3.417979071851008,
+    "fireRange": 457.6497693195073,
+    "aimTol": 0.46518273902599105,
+    "pingAfter": 1,
+    "echoWindow": 13.69436793898636,
+    "evadeTime": 36.867755751046126,
+    "evadeTurn": 1.7085338441028852,
+    "blindSnr": 66.15036643611151,
+    "pingEvery": 4,
+    "searchPing": 7.6937721116066
+   },
+   "weightsSha256": null
+  },
+  {
+   "id": "league7001",
+   "label": "league A (found a counter-doctrine), generation 4",
+   "theta": {
+    "searchSpeed": 3.831304587630088,
+    "trackSpeed": 4.071074796748428,
+    "evadeSpeed": 4.316612835521744,
+    "fireRange": 428.2071728266575,
+    "aimTol": 0.32862947227201433,
+    "pingAfter": 1,
+    "echoWindow": 19.57634785648253,
+    "evadeTime": 33.68088955190734,
+    "evadeTurn": 2.8,
+    "blindSnr": 80.86950823187793,
+    "pingEvery": 4,
+    "searchPing": 0
+   },
+   "weightsSha256": null
+  },
+  {
+   "id": "league7000",
+   "label": "league B (did not), generation 4",
+   "theta": {
+    "searchSpeed": 4.146189462891025,
+    "trackSpeed": 4.5,
+    "evadeSpeed": 3.0156070454690735,
+    "fireRange": 383.6174242610964,
+    "aimTol": 0.5528597032047663,
+    "pingAfter": 1,
+    "echoWindow": 19.758008951710114,
+    "evadeTime": 28.57739481207988,
+    "evadeTurn": 0.5466132220373447,
+    "blindSnr": 92.13552076839296,
+    "pingEvery": 4,
+    "searchPing": 7.4234768225547265
+   },
+   "weightsSha256": null
+  }
+ ],
+ "pairs": [
+  {
+   "pair": "hand|hand+net",
+   "x": "hand",
+   "y": "hand+net",
+   "summary": {
+    "n": 24,
+    "fights": 48,
+    "winsX": 24,
+    "winsY": 24,
+    "draws": 0,
+    "edge": 0.00039207175925919563,
+    "se": 0.285837597690301,
+    "z": 0.0013716591604019746,
+    "meanX": 0.1791608796296296,
+    "meanY": 0.1787688078703704,
+    "killsX": 24,
+    "killsY": 24,
+    "collisions": 0,
+    "groundX": 0,
+    "groundY": 0,
+    "floorX": 0,
+    "floorY": 0
+   }
+  },
+  {
+   "pair": "hand|champ",
+   "x": "hand",
+   "y": "champ",
+   "summary": {
+    "n": 24,
+    "fights": 48,
+    "winsX": 5,
+    "winsY": 43,
+    "draws": 0,
+    "edge": -2.6752575231481477,
+    "se": 0.283794812853031,
+    "z": -9.42673157501855,
+    "meanX": -1.151584201388889,
+    "meanY": 1.5236733217592595,
+    "killsX": 5,
+    "killsY": 43,
+    "collisions": 0,
+    "groundX": 0,
+    "groundY": 0,
+    "floorX": 0,
+    "floorY": 0
+   }
+  },
+  {
+   "pair": "hand|champ+net",
+   "x": "hand",
+   "y": "champ+net",
+   "summary": {
+    "n": 24,
+    "fights": 48,
+    "winsX": 5,
+    "winsY": 43,
+    "draws": 0,
+    "edge": -2.6740219907407408,
+    "se": 0.28353815053770987,
+    "z": -9.430907218903872,
+    "meanX": -1.1513049768518517,
+    "meanY": 1.522717013888889,
+    "killsX": 5,
+    "killsY": 43,
+    "collisions": 0,
+    "groundX": 0,
+    "groundY": 0,
+    "floorX": 0,
+    "floorY": 0
+   }
+  },
+  {
+   "pair": "hand|ping",
+   "x": "hand",
+   "y": "ping",
+   "summary": {
+    "n": 24,
+    "fights": 48,
+    "winsX": 4,
+    "winsY": 44,
+    "draws": 0,
+    "edge": -2.8120876736111113,
+    "se": 0.2614454363273114,
+    "z": -10.7559256459561,
+    "meanX": -1.2182060185185184,
+    "meanY": 1.5938816550925925,
+    "killsX": 4,
+    "killsY": 44,
+    "collisions": 0,
+    "groundX": 0,
+    "groundY": 0,
+    "floorX": 0,
+    "floorY": 0
+   }
+  },
+  {
+   "pair": "hand|league7001",
+   "x": "hand",
+   "y": "league7001",
+   "summary": {
+    "n": 24,
+    "fights": 48,
+    "winsX": 1,
+    "winsY": 43,
+    "draws": 4,
+    "edge": -2.95417824074074,
+    "se": 0.18109081553173373,
+    "z": -16.313241685208823,
+    "meanX": -1.3061689814814814,
+    "meanY": 1.6480092592592588,
+    "killsX": 1,
+    "killsY": 43,
+    "collisions": 0,
+    "groundX": 0,
+    "groundY": 0,
+    "floorX": 0,
+    "floorY": 0
+   }
+  },
+  {
+   "pair": "hand|league7000",
+   "x": "hand",
+   "y": "league7000",
+   "summary": {
+    "n": 24,
+    "fights": 48,
+    "winsX": 4,
+    "winsY": 44,
+    "draws": 0,
+    "edge": -2.808427372685186,
+    "se": 0.26265193988857005,
+    "z": -10.692581878042324,
+    "meanX": -1.2154325810185185,
+    "meanY": 1.5929947916666665,
+    "killsX": 4,
+    "killsY": 44,
+    "collisions": 0,
+    "groundX": 0,
+    "groundY": 0,
+    "floorX": 0,
+    "floorY": 0
+   }
+  },
+  {
+   "pair": "hand+net|champ",
+   "x": "hand+net",
+   "y": "champ",
+   "summary": {
+    "n": 24,
+    "fights": 48,
+    "winsX": 6,
+    "winsY": 42,
+    "draws": 0,
+    "edge": -2.5361631944444447,
+    "se": 0.3025990150353288,
+    "z": -8.381267183398943,
+    "meanX": -1.0822294560185186,
+    "meanY": 1.4539337384259257,
+    "killsX": 6,
+    "killsY": 42,
+    "collisions": 0,
+    "groundX": 0,
+    "groundY": 0,
+    "floorX": 0,
+    "floorY": 0
+   }
+  },
+  {
+   "pair": "hand+net|champ+net",
+   "x": "hand+net",
+   "y": "champ+net",
+   "summary": {
+    "n": 24,
+    "fights": 48,
+    "winsX": 6,
+    "winsY": 42,
+    "draws": 0,
+    "edge": -2.535719039351852,
+    "se": 0.30255865661531034,
+    "z": -8.380917167330974,
+    "meanX": -1.0822280092592593,
+    "meanY": 1.4534910300925927,
+    "killsX": 6,
+    "killsY": 42,
+    "collisions": 0,
+    "groundX": 0,
+    "groundY": 0,
+    "floorX": 0,
+    "floorY": 0
+   }
+  },
+  {
+   "pair": "hand+net|ping",
+   "x": "hand+net",
+   "y": "ping",
+   "summary": {
+    "n": 24,
+    "fights": 48,
+    "winsX": 6,
+    "winsY": 42,
+    "draws": 0,
+    "edge": -2.532602719907407,
+    "se": 0.3038982457940224,
+    "z": -8.333719443790296,
+    "meanX": -1.0784302662037037,
+    "meanY": 1.4541724537037035,
+    "killsX": 6,
+    "killsY": 42,
+    "collisions": 0,
+    "groundX": 0,
+    "groundY": 0,
+    "floorX": 0,
+    "floorY": 0
+   }
+  },
+  {
+   "pair": "hand+net|league7001",
+   "x": "hand+net",
+   "y": "league7001",
+   "summary": {
+    "n": 24,
+    "fights": 48,
+    "winsX": 0,
+    "winsY": 44,
+    "draws": 4,
+    "edge": -3.079960937499999,
+    "se": 0.1300664952492764,
+    "z": -23.679894899890705,
+    "meanX": -1.375,
+    "meanY": 1.7049609375000003,
+    "killsX": 0,
+    "killsY": 44,
+    "collisions": 0,
+    "groundX": 0,
+    "groundY": 0,
+    "floorX": 0,
+    "floorY": 0
+   }
+  },
+  {
+   "pair": "hand+net|league7000",
+   "x": "hand+net",
+   "y": "league7000",
+   "summary": {
+    "n": 24,
+    "fights": 48,
+    "winsX": 6,
+    "winsY": 42,
+    "draws": 0,
+    "edge": -2.5274262152777776,
+    "se": 0.30548137813325127,
+    "z": -8.273585220554137,
+    "meanX": -1.0739670138888888,
+    "meanY": 1.4534592013888883,
+    "killsX": 6,
+    "killsY": 42,
+    "collisions": 0,
+    "groundX": 0,
+    "groundY": 0,
+    "floorX": 0,
+    "floorY": 0
+   }
+  },
+  {
+   "pair": "champ|champ+net",
+   "x": "champ",
+   "y": "champ+net",
+   "summary": {
+    "n": 24,
+    "fights": 48,
+    "winsX": 24,
+    "winsY": 24,
+    "draws": 0,
+    "edge": -0.0006655092592592615,
+    "se": 0.0009788084282126499,
+    "z": -0.6799177858271129,
+    "meanX": 0.1630931712962963,
+    "meanY": 0.16375868055555554,
+    "killsX": 24,
+    "killsY": 24,
+    "collisions": 0,
+    "groundX": 0,
+    "groundY": 0,
+    "floorX": 0,
+    "floorY": 0
+   }
+  },
+  {
+   "pair": "champ|ping",
+   "x": "champ",
+   "y": "ping",
+   "summary": {
+    "n": 24,
+    "fights": 48,
+    "winsX": 24,
+    "winsY": 24,
+    "draws": 0,
+    "edge": 0.018946759259259288,
+    "se": 0.0013696930865172696,
+    "z": 13.832850180645487,
+    "meanX": 0.1829181134259259,
+    "meanY": 0.16397135416666664,
+    "killsX": 24,
+    "killsY": 24,
+    "collisions": 0,
+    "groundX": 0,
+    "groundY": 0,
+    "floorX": 0,
+    "floorY": 0
+   }
+  },
+  {
+   "pair": "champ|league7001",
+   "x": "champ",
+   "y": "league7001",
+   "summary": {
+    "n": 24,
+    "fights": 48,
+    "winsX": 0,
+    "winsY": 46,
+    "draws": 2,
+    "edge": -3.083070023148148,
+    "se": 0.09111529012717098,
+    "z": -33.83702141369534,
+    "meanX": -1.4375,
+    "meanY": 1.6455700231481485,
+    "killsX": 0,
+    "killsY": 46,
+    "collisions": 0,
+    "groundX": 0,
+    "groundY": 0,
+    "floorX": 0,
+    "floorY": 0
+   }
+  },
+  {
+   "pair": "champ|league7000",
+   "x": "champ",
+   "y": "league7000",
+   "summary": {
+    "n": 24,
+    "fights": 48,
+    "winsX": 28,
+    "winsY": 20,
+    "draws": 0,
+    "edge": 0.594972511574074,
+    "se": 0.2603422708076313,
+    "z": 2.2853473226931458,
+    "meanX": 0.4849493634259258,
+    "meanY": -0.11002314814814813,
+    "killsX": 28,
+    "killsY": 20,
+    "collisions": 0,
+    "groundX": 0,
+    "groundY": 0,
+    "floorX": 0,
+    "floorY": 0
+   }
+  },
+  {
+   "pair": "champ+net|ping",
+   "x": "champ+net",
+   "y": "ping",
+   "summary": {
+    "n": 24,
+    "fights": 48,
+    "winsX": 24,
+    "winsY": 24,
+    "draws": 0,
+    "edge": 0.01971498842592596,
+    "se": 0.0015246193471725325,
+    "z": 12.931088971478811,
+    "meanX": 0.1825868055555556,
+    "meanY": 0.16287181712962964,
+    "killsX": 24,
+    "killsY": 24,
+    "collisions": 0,
+    "groundX": 0,
+    "groundY": 0,
+    "floorX": 0,
+    "floorY": 0
+   }
+  },
+  {
+   "pair": "champ+net|league7001",
+   "x": "champ+net",
+   "y": "league7001",
+   "summary": {
+    "n": 24,
+    "fights": 48,
+    "winsX": 0,
+    "winsY": 45,
+    "draws": 3,
+    "edge": -3.014123263888889,
+    "se": 0.10864701430821364,
+    "z": -27.74234785079615,
+    "meanX": -1.40625,
+    "meanY": 1.607873263888889,
+    "killsX": 0,
+    "killsY": 45,
+    "collisions": 0,
+    "groundX": 0,
+    "groundY": 0,
+    "floorX": 0,
+    "floorY": 0
+   }
+  },
+  {
+   "pair": "champ+net|league7000",
+   "x": "champ+net",
+   "y": "league7000",
+   "summary": {
+    "n": 24,
+    "fights": 48,
+    "winsX": 28,
+    "winsY": 20,
+    "draws": 0,
+    "edge": 0.5955931712962963,
+    "se": 0.2601883708111262,
+    "z": 2.289084517649885,
+    "meanX": 0.4847222222222222,
+    "meanY": -0.11087094907407408,
+    "killsX": 28,
+    "killsY": 20,
+    "collisions": 0,
+    "groundX": 0,
+    "groundY": 0,
+    "floorX": 0,
+    "floorY": 0
+   }
+  },
+  {
+   "pair": "ping|league7001",
+   "x": "ping",
+   "y": "league7001",
+   "summary": {
+    "n": 24,
+    "fights": 48,
+    "winsX": 0,
+    "winsY": 48,
+    "draws": 0,
+    "edge": -3.237649016203704,
+    "se": 0.007872566514400289,
+    "z": -411.25711802897854,
+    "meanX": -1.5,
+    "meanY": 1.7376490162037035,
+    "killsX": 0,
+    "killsY": 48,
+    "collisions": 0,
+    "groundX": 0,
+    "groundY": 0,
+    "floorX": 0,
+    "floorY": 0
+   }
+  },
+  {
+   "pair": "ping|league7000",
+   "x": "ping",
+   "y": "league7000",
+   "summary": {
+    "n": 24,
+    "fights": 48,
+    "winsX": 28,
+    "winsY": 20,
+    "draws": 0,
+    "edge": 0.5803747106481482,
+    "se": 0.2616216544906965,
+    "z": 2.218374131827787,
+    "meanX": 0.4849363425925926,
+    "meanY": -0.09543836805555554,
+    "killsX": 28,
+    "killsY": 20,
+    "collisions": 0,
+    "groundX": 0,
+    "groundY": 0,
+    "floorX": 0,
+    "floorY": 0
+   }
+  },
+  {
+   "pair": "league7001|league7000",
+   "x": "league7001",
+   "y": "league7000",
+   "summary": {
+    "n": 24,
+    "fights": 48,
+    "winsX": 48,
+    "winsY": 0,
+    "draws": 0,
+    "edge": 3.283430266203703,
+    "se": 0.011294763002355414,
+    "z": 290.70377709731275,
+    "meanX": 1.7834302662037038,
+    "meanY": -1.5,
+    "killsX": 48,
+    "killsY": 0,
+    "collisions": 0,
+    "groundX": 0,
+    "groundY": 0,
+    "floorX": 0,
+    "floorY": 0
+   }
+  }
+ ],
+ "ratings": {
+  "order": [
+   "league7001",
+   "champ+net",
+   "champ",
+   "ping",
+   "league7000",
+   "hand+net",
+   "hand"
+  ],
+  "rating": {
+   "hand": -311.73389874208715,
+   "hand+net": -292.43497364613944,
+   "champ": 51.644217918357896,
+   "champ+net": 53.09912324056214,
+   "ping": 51.64421791835787,
+   "league7001": 599.46723966565,
+   "league7000": 5.69065771954077
+  },
+  "converged": true
+ },
+ "fieldEdge": {
+  "hand": -2.3205967881944445,
+  "hand+net": -2.2020440297067903,
+  "champ": 0.4569340760030864,
+  "champ+net": 0.4685985725308641,
+  "ping": 0.44145905671296287,
+  "league7001": 3.1087352912808637,
+  "league7000": 0.04691382137345701
+ },
+ "seat": {
+  "hand": {
+   "mean": 3.350199652777778,
+   "se": 0.01583674012566831,
+   "n": 8
+  },
+  "hand+net": {
+   "mean": 2.5212586805555555,
+   "se": 0.8441347722182754,
+   "n": 8
+  },
+  "champ": {
+   "mean": 3.3302256944444446,
+   "se": 0.010727920495128619,
+   "n": 8
+  },
+  "champ+net": {
+   "mean": 3.3308246527777774,
+   "se": 0.010578117510268078,
+   "n": 8
+  },
+  "ping": {
+   "mean": 3.3678385416666665,
+   "se": 0.007764628880413114,
+   "n": 8
+  },
+  "league7001": {
+   "mean": -1.8731336805555556,
+   "se": 0.8295845468826141,
+   "n": 8
+  },
+  "league7000": {
+   "mean": 3.4046875,
+   "se": 0.005690601926562432,
+   "n": 8
+  }
+ },
+ "cycles": [],
+ "upsets": []
+}
