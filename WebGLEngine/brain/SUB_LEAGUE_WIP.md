@@ -69,3 +69,41 @@ Three right and two wrong, said. The first wrong forecast is the more interestin
 
 **What this says.** The record exists, to the digit, on a set nothing else used: the order of the seven, that it is transitive, and each side's seat bias. The doctrine that league 7001 found (stop pinging blind, aim tighter, evade harder, in the notes) does not just beat generation 0 by 1.4 to 1.7 as in the 8-geometry probe: on fresh geometries it beats every other side of the page by about 3 points a duel. A side that is worth MORE from the seat that starts with the enemy outside its forward arc suggests the doctrine uses the opening differently from the others, and that the +3.3 seat bias of the table is partly an effect of how the OTHER sides play the opening, not of the geometry alone. **Not claimed:** that the doctrine is a good submarine, only that against these six opponents on these 24 geometries it wins; that a different seed's league would find it (that is Part B); that the seat bias of -1.873 is a seat effect and not one or two geometries (its se is 0.83 on 8 geometries, and which geometries was not looked at).
 
+## PART B RESULT (2026-11-14; twelve runs flown first, `league --gens 3 --iters 60` for 7100 to 7105 and `--gens 1 --iters 180` for 7200 to 7205, 135 to 567 s each, four at a time; then `node tools/ship/takeSubLeague.mjs read --write`, 72 s, flown ONCE, geometries 96001 to 96024, both seats, 48 duels a run; `brain/subLeagueRuns/`, `brain/subLeagueRead.json`; the checks that void the read: none failed; the gate `tools/ship/takeSubLeague-selfcheck.mjs` passed and its sabotage log is in its header)
+
+Each run's final generation against generation 0 (the search-ping champion), the paired edge, its standard error, z, and wins-draws-losses:
+
+| run | kind | edge +- se (z) | W-D-L | finds (edge >= 0.5, z >= 2) | final evadeTurn / searchPing |
+|---|---|---|---|---|---|
+| league7000 | old | -0.301 +- 0.195 (-1.5) | 22-0-26 | no | 0.55 / 7.4 |
+| league7001 | old | +2.964 +- 0.274 (10.8) | 46-0-2 | **yes** | 2.80 / 0.0 |
+| league7100 | new | +2.981 +- 0.275 (10.9) | 46-0-2 | **yes** | 2.70 / 0.0 |
+| league7101 | new | +0.397 +- 0.369 (1.1) | 27-0-21 | no | 0.40 / 3.1 |
+| league7102 | new | +0.415 +- 0.231 (1.8) | 27-0-21 | no (near: z) | 1.78 / 1.2 |
+| league7103 | new | +1.643 +- 0.340 (4.8) | 36-0-12 | **yes** | 2.80 / 7.1 |
+| league7104 | new | -0.276 +- 0.193 (-1.4) | 22-0-26 | no | 1.88 / 1.0 |
+| league7105 | new | -0.295 +- 0.194 (-1.5) | 22-0-26 | no | 1.06 / 9.0 |
+| exploit7200 | exploiter | +2.965 +- 0.274 (10.8) | 46-0-2 | **yes** | 2.80 / 0.0 |
+| exploit7201 | exploiter | -0.295 +- 0.194 (-1.5) | 22-0-26 | no | 0.62 / 2.3 |
+| exploit7202 | exploiter | +0.008 +- 0.201 (0.0) | 24-0-24 | no | 2.58 / 26.4 |
+| exploit7203 | exploiter | -0.156 +- 0.318 (-0.5) | 23-0-25 | no | 1.11 / 3.3 |
+| exploit7204 | exploiter | +2.843 +- 0.221 (12.9) | 45-0-3 | **yes** | 2.65 / 8.3 |
+| exploit7205 | exploiter | -0.301 +- 0.281 (-1.1) | 22-0-26 | no | 0.82 / 4.2 |
+
+(generation 0: evadeTurn 1.71 of a ceiling of 2.80, searchPing 7.7 s.) **LEAGUES: 3 of 8 find one (the median edge +0.406), so by the rule the recipe is MIXED** (at least 6 of 8 is ROBUST, at most 2 FRAGILE). **EXPLOITERS: 2 of 6 find one, the median edge -0.074, against the leagues' +0.406.** CROSS-PLAY of the eight final generations on the same geometries: 23 of 28 pairs are decided by at least 0.5 at z 2, and there is no cycle. Among the six new leagues alone, 12 of the 15 pairs are decided.
+
+**The forecasts, scored (written before any league was run):**
+
+| forecast | probability | result |
+|---|---|---|
+| the verdict: ROBUST / FRAGILE / MIXED | 25 / 35 / 40 | **MIXED** (3 of 8); the most probable of the three came true |
+| at least 4 of the 6 exploiters find a counter-doctrine | 65 | **NO**: 2 of 6 |
+| the median exploiter edge is at least the median league edge | 55 | **NO**: -0.074 against +0.406 |
+| the six new leagues' final generations are not all the same doctrine (some pair decided by 0.5 at z 2) | 70 | **yes**: 12 of 15 pairs |
+
+Two right and two wrong, said. The exploiter forecasts were both wrong in the same direction: I expected a search with three times the iterations on one generation to find a best response to generation 0 more often than a three-generation league, and it found one in 2 of 6 (7200 and 7204), the same as the six NEW leagues (7100 and 7103), with a lower median edge (-0.074 against +0.406). **With eight leagues the rule cannot tell a recipe that works one time in four from one that works one time in two:** 3 of 8 has a 95 percent Wilson interval of 14 to 69 percent, and the verdict is the rule's, not a measurement of the recipe's rate.
+
+**What the read shows beyond the rule (POST HOC: read from the printed columns after the read, over fourteen runs, NOT tested and not registered).** (1) **The notes' league 7001 replicates on fresh geometries** (+2.964, 46-0-2; in the notes it beat generation 0 by 1.4 to 1.7 on training geometries) **and league 7000's null replicates too** (-0.301, z -1.5). (2) **Three runs of different seeds and different recipes, 7001, 7100 and the exploiter 7200, land on nearly the same numbers**: search-ping 0.00, 0.00 and 0.01 s (the lower bound is 0; generation 0 is 7.7), evadeTurn 2.80, 2.70 and 2.80 (the ceiling is 2.80), evadeSpeed 4.32, 4.50 and 4.42 (the ceiling is 4.50), and each beats generation 0 in 46 of 48 duels with an edge of 2.96 to 2.98. (3) **Every one of the five runs that find has an evadeTurn of 2.65 or more**; of the nine that do not, eight are at 1.88 or less, and the ninth (exploit7202, 2.58) pings for 26 s a search, 19 s more than generation 0. So of the three phrases the notes use for the doctrine ("stop pinging blind, aim tighter, evade harder"), **only "evade harder" is in all five**: 7103 pings as much as generation 0 (7.1 s) and 7204 pings a little more (8.3 s), and aimTol moved by -0.14, -0.09, +0.02, +0.07 and 0.00 among the five. (4) The bar is not on a cliff: the nearest misses are +0.415 (z 1.8) and +0.397 (z 1.1); the five finders are at +1.64 or more. (5) In the Part A record league7001 beat every other side of the page by about 3 points a duel, and its seat A was worth -1.9; a doctrine that turns as hard as the bounds allow may be one that profits from starting behind, which is a question for the replay and not something this read tested.
+
+**What this says and does not say.** The recipe finds a doctrine that beats the search-ping champion by about 3 points a duel in 3 of 8 leagues and 2 of 6 exploiters, and the doctrine that three of the five finders share is mostly a maximum evade turn. **Not claimed:** that it is a good doctrine against anything but generation 0 and the sides of the Part A record (league7001 is first there; nothing else was asked); that 3 of 8 is the recipe's rate (the interval is 14 to 69 percent); that "evade harder" is the cause (an evadeTurn at or near its ceiling in the 5 runs that find is what was read, and nothing was held fixed); that 180 iterations on one generation are worse than three generations of 60 (six runs against six, the bar crossed 2 times against 2 and the medians are -0.074 against +0.406: that is not a test). **Open, not started:** a registration for the claim in (3): hold the evade numbers at the doctrine's values on generation 0 and read the edge; a bigger league sample (the bar sits where 8 runs cannot separate p = 0.25 from p = 0.5).
+
