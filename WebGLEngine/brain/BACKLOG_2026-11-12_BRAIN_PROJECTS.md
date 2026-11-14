@@ -228,6 +228,18 @@ networks run on its own GPU. One chat should add the kinds once; two chats editi
 
 ## Added 2026-11-13: how else the fly brain could live in the voxel world (all OPEN; ideas, nothing registered, no code read for them beyond what this note already cites)
 
+**`fly-escapes-home`: the environment and ONE ROUND are DONE, and the round did not answer its question (2026-11-14).**
+`brain/rl/escapeEnv.mjs` (gate `tools/ship/escapeEnv-selfcheck.mjs`): a fly feeds in the yard of its voxel house; strikes fly at
+it and passes fly by; one number chooses home or food. Floors written by hand: hide 0.50, flee from everything 0.54, a
+looming-on-a-steady-bearing reflex 0.65; a fly told each mover's kind 0.84. The round (`brain/FLY_ESCAPE_WIP.md` section 11,
+`tools/ship/flyEscape-selfcheck.mjs` section 5): **from a random start no arm learned to tell a strike from a pass** -- all 80
+trained flies go home for everything (0.517 to 0.521 by arm; 79 of 80 below fleeing from everything; p 1.3e-22). The fly's
+wiring cannot be told from a shuffle (p 0.47), the sixth time, but among flies that did not learn the task. **Found after the
+reading, mine:** `trainDockES` keeps the iteration that LIVED most (the environment reports `docked` as lived), a thumb on the
+scale toward hiding. **OPEN, the round that would answer it (`fly-escapes-reflex`, not registered):** start each fly at the
+reflex and train a correction (as voxel-home round 4 did with the lean), have the trainer keep the best return, then ask the
+wiring question of flies that do the task. Also OPEN: a page to watch the fly and the movers.
+
 Keith, 2026-11-13: "How else could the fly brain live in voxel world? Could it play minecraft or create something to attract a
 different fly brain?" and, of the five answers: "Yes, add those to the backlog". Each builds on `voxel-home` (`brain/rl/buildEnv.mjs`:
 the site, the plan, `homeCheck`). **Said first: the real Minecraft is not reachable from here and is not to be rebuilt; "play

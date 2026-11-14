@@ -79,3 +79,50 @@ millisecond each; perhaps 30 to 60 minutes for the 80 on four processes. The run
 ## 10. The run (to be written; the gate never runs it and never gives the command the word `run`)
 `node tools/ship/takeFlyEscape.mjs run` -> `brain/flyEscapeRound.jsonl`, committed byte for byte before it is read;
 `node tools/ship/takeFlyEscape.mjs read` prints the checks and the reading.
+
+## 11. The result (run 2026-11-14 in the sandbox, 54.1 minutes beside another round's run; `brain/flyEscapeRound.jsonl` committed at 2af0cdf3 before it was read; read once)
+**The checks hold.**
+
+| | mean score | sd | lives (of 200 episodes) | feeds (share of the time) | off its food for a pass | caught by a strike |
+|---|---|---|---|---|---|---|
+| PLAIN | 0.5173 | 0.0083 | 193.2 | 0.069 | 0.999 | 0.012 |
+| SHUF | 0.5176 | 0.0104 | 193.3 | 0.069 | 1.000 | 0.012 |
+| FISH | 0.5178 | 0.0077 | 192.9 | 0.071 | 1.000 | 0.013 |
+| MLP | 0.5189 | 0.0116 | 192.8 | 0.074 | 0.998 | 0.013 |
+| FLY | 0.5208 | 0.0084 | 190.0 | 0.092 | 0.996 | 0.019 |
+| *written by hand:* freeze | 0.2840 | | 23 | 0.453 | 0.000 | 1.000 |
+| hide | 0.5000 | | 200 | 0.000 | 1.000 | 0.000 |
+| fleeAll | 0.5395 | | 198 | 0.089 | 1.000 | 0.004 |
+| reflex | 0.6465 | | 156 | 0.513 | 0.247 | 0.107 |
+| told each mover's kind | 0.8351 | | 198 | 0.680 | 0.296 | 0.004 |
+
+* **T3: A TRAINED FLY ESCAPES WORSE THAN FLEEING FROM EVERYTHING** (79 of the 80 below fleeAll's 0.5395, 1 above -- MLP draw 9,
+  0.5453; exact two-sided p 1.3e-22).
+* **T0: A FLY-WIRED FLY ESCAPES WORSE THAN THE REFLEX WRITTEN BY HAND** (all 16 below 0.6465; p 2 / 65536).
+* **T1: THE FLY'S WIRING CANNOT BE TOLD APART FROM A SHUFFLE OF IT** (the ranks sum to 284, the middle 264; p 0.47).
+* **T2: THE FLY'S WIRING CANNOT BE TOLD APART FROM A PLAIN NET OF ITS SIZE** (297; p 0.22).
+
+**Training did not learn the task.** The trained flies go home for everything: they are off their food for 32,963 of the 33,009
+passes they meet, feed 0.07 to 0.09 of the time, and live. None of the five arms tells a strike from a pass; all five means lie
+within four thousandths of each other, just above hiding all day (0.5). The trainer's own battery says the same of its running
+weights: every arm's mean return is 0.44 to 0.48 at iteration 0 and 0.47 to 0.49 at iteration 149, never above 0.52.
+
+**So T1 does not answer the question this round was run for.** It is the sixth round in which the fly's wiring cannot be told
+from a shuffle of it, and the first on the task its circuit is for -- but it compares flies none of which learned to escape
+selectively. Whether the wiring helps a fly that DOES learn this task is still not known.
+
+**Said after the reading, and it is mine: the trainer keeps the weights that lived most.** `trainDockES` hands back the iteration
+that scored best by `dockRate x 1000 - avgDist`, and I had the environment report `docked` as "lived". So of its 150 iterations it
+kept the one whose flies survived most on 24 episodes -- the one that hid most. The registration did not see this. It is not the
+whole of the result (the running weights do not learn either), but it is a thumb on the scale toward hiding, and a second round
+should remove it.
+
+**Why it probably stuck, not tested:** from a random start a fly that leaves home less often dies sooner (it loses 0.5) long
+before it has learned which movers to stay out for (it gains a few hundredths), so every small step away from hiding is punished.
+The voxel home's rounds 2 to 4 are the same shape: these trainers did not find the lean from nothing, and did well when given it.
+
+**The expectations against what came.** T3 BETTER (85): came WORSE -- the guess most wrong of any round here. T0: WORSE came (15),
+not BETTER (55). T1 CANNOT (70) and T2 CANNOT (60): both came. The best arm above 0.75 (35): 0.52.
+
+**What would answer the question (none registered):** start each fly at the reflex and train a correction, as round 4 did with
+the lean; have the trainer keep the best RETURN; then ask T1 again of flies that do the task.

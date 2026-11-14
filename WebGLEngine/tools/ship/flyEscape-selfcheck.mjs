@@ -8,6 +8,7 @@
 //   2  ONE TRAINING          a record is its arm's and its draw's; its weights are the trainer's called here by hand and give its score again
 //   3  THE RECORDS           the registration's checks, each failing by name; the two sign tests and the two rank-sums and their words
 //   4  THE COMMAND           its words as arithmetic; it is this round's; this gate starts no training of the round's and no process (the command as a process: tools/ship/voxelHome-selfcheck.mjs section 4)
+//   5  THE VERDICT           the committed results, read from the file: the four tests, the arms beside the flies written by hand, what the trained flies do, the trainer's part in it, the expectations
 // ONE LOOK BEFORE THE ROUND, SAID: to state the cost, one training of 2 iterations with 8 flies tried was timed on draw 901 (which the round does not use); its two history readings were both 0.5 (an
 // untrained fly of that draw hides). Nothing else was trained before the round's own run.
 // SABOTAGE LOG (2026-11-14) -- through a byte-safe runner (one at a time, every file restored and its sha256 checked), this gate and tools/ship/voxelHome-selfcheck.mjs run whole for each; the number is the rows red:
@@ -18,8 +19,12 @@
 //   F25 the history's return is the share that lived 1 | F26 another 200 audit episodes 1 | F27 the registered reflex floor 0.70 3 | F4' a training's wiring is draw 1's 1
 //   TWO WENT 0 RED. F4 IS A ROW NOW: a SHUF record's wiring was read from its draw and its training was not -- the row trains SHUF draw 901 by hand on its own shuffle. F4' is F4 again.
 //   F24 IS EQUIVALENT (a training's environments made without the recipe's length): the trainer hands the length to the factory itself (dockPolicy.js evaluate: mk({ maxSteps })), as logged for the voxel home.
+//   THE VERDICT'S (section 5, 2026-11-14), this gate run whole for each, every one red by name: V1 MLP draw 9's score in the file lowered to 0.50 4 | V2 a FLY score in the file raised to 0.70 6
+//   V3 the sign tests' BETTER and WORSE swapped 6 | V4 T1 reads the fly against the MLP 2 | V5 the note's T3 says BETTER 1 | V6 the note's T1 says BETTER 1
+//   V7 the environment reports docked for a fly that fed most (the row on the trainer's part) 1 | V8 a pass counts as left-for only if the fly reached home 2
 "use strict";
 import fs from "node:fs";
+import { createHash } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as V from "./flyEscape.mjs";
@@ -133,6 +138,35 @@ section(() => {
     const me = src("tools/ship/flyEscape-selfcheck.mjs"), calls = [...me.matchAll(/V\.trainOne\(([^)]*)\)/g)].map((m) => m[1]);
     ok("!! THIS GATE STARTS NO TRAINING OF THE ROUND'S AND LEAVES ITS RESULTS FILE AS IT WAS: its trainings are of 2 iterations with 4 flies tried on draw 901, or refused before they start; this gate starts no process at all (the command is never run from here); and the file's size and time are what they were before this section",
         calls.length === 5 && calls.every((c) => /^"[A-Z]+", (901|0|1\.5), TINY, TINY_AUDIT$/.test(c)) && TINY.iters === 2 && TINY.pop === 4 && !V.SEEDS.includes(901) && !/Sync\(/.test(me.replace(/readFileSync\(|statSync\(|existsSync\(/g, "")) && stateOf() === before, `${calls.length} trainings, no process, the file ${before === "absent" ? "absent" : "unchanged"}`);
+});
+
+console.log("\n5. THE VERDICT (the results were committed at 2af0cdf3 before they were read, and are read here from the file)");
+section(() => {
+    const bytes = fs.readFileSync(path.join(ENG, V.RESULTS)), lines = bytes.toString("utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l)), R = V.reading(lines), A = R.arms, draws = lines.filter((r) => r.kind === "draw");
+    ok("!! the results file is the one the run wrote: 82 records, sha256 4c5a48c4100f5fc1...", lines.length === 82 && createHash("sha256").update(bytes).digest("hex") === "4c5a48c4100f5fc1db61f0b499b1b3e3828f11c832d21403b7a1e3604f1d2569");
+    ok("!! THE CHECKS HOLD: 80 draws each once, the registered recipe, each arm's weight count and wiring, FLY draw 1 the same twice, a history in every record, the registration's five floors", R.checks.length === 0, R.checks.slice(0, 2).join(" | "));
+    ok("!! *** T3: A TRAINED FLY ESCAPES WORSE THAN FLEEING FROM EVERYTHING *** -- of the 80 trained flies 79 score below the fly that goes home for everything (0.5395) and 1 above (MLP draw 9, 0.5453); exact two-sided p 1.3e-22. TRAINING DID NOT LEARN TO TELL A STRIKE FROM A PASS",
+        R.T3 && R.T3.word === V.WORDS.T3[1] && R.T3.above === 1 && R.T3.below === 79 && R.T3.ties === 0 && R.T3.p < 2e-22 && near(R.T3.ref, 0.5395) && J(draws.filter((r) => r.score > R.T3.ref).map((r) => [r.arm, r.s])) === J([["MLP", 9]]) && near(Math.max(...draws.map((r) => r.score)), 0.5453));
+    ok("!! *** T0: A FLY-WIRED FLY ESCAPES WORSE THAN THE REFLEX WRITTEN BY HAND *** -- all 16 below the reflex's 0.6465 (exact two-sided p 2 / 65536)", R.T0 && R.T0.word === V.WORDS.T0[1] && R.T0.below === 16 && R.T0.above === 0 && R.T0.p === 2 / 65536 && near(R.T0.ref, 0.6465));
+    ok("!! *** T1 AND T2, THE WIRING: THE FLY'S CANNOT BE TOLD APART FROM A SHUFFLE OF IT (the ranks sum to 284, p 0.47) NOR FROM A PLAIN NET OF ITS SIZE (297, p 0.22) *** -- on the task its circuit is for; the sixth round to say the first. And it is a comparison among flies none of which learned the task", R.T1 && R.T1.word === V.WORDS.T1[2] && R.T1.sumA === 284 && near(R.T1.p, 0.46767) && R.T2 && R.T2.word === V.WORDS.T2[2] && R.T2.sumA === 297 && near(R.T2.p, 0.22401));
+    ok("!! the arms' mean scores, 16 draws each (mean, sd): PLAIN 0.5173 0.0083, SHUF 0.5176 0.0104, FISH 0.5178 0.0077, MLP 0.5189 0.0116, FLY 0.5208 0.0084 -- all five within four thousandths, between the fly that hides (0.5000) and the fly that goes home for everything (0.5395); the least trained fly 0.494, 79 of 80 above 0.5",
+        near(A.PLAIN.mean, 0.5173) && near(A.PLAIN.sd, 0.0083) && near(A.SHUF.mean, 0.5176) && near(A.SHUF.sd, 0.0104) && near(A.FISH.mean, 0.5178) && near(A.FISH.sd, 0.0077) && near(A.MLP.mean, 0.5189) && near(A.MLP.sd, 0.0116) && near(A.FLY.mean, 0.5208) && near(A.FLY.sd, 0.0084) &&
+        Math.max(...V.ARMS.map((a) => A[a].mean)) - Math.min(...V.ARMS.map((a) => A[a].mean)) < 0.004 && near(Math.min(...draws.map((r) => r.score)), 0.4940) && draws.filter((r) => r.score > 0.5).length === 79);
+    const fled = draws.reduce((n, r) => n + r.fledPass, 0), passes = draws.reduce((n, r) => n + r.passes, 0), caught = draws.reduce((n, r) => n + r.caught, 0), strikes = draws.reduce((n, r) => n + r.strikes, 0);
+    ok("!! *** WHAT THE TRAINED FLIES DO: THEY GO HOME FOR EVERYTHING, AND FEED A LITTLE LESS THAN THE FLY WRITTEN TO *** -- they are off their food for 32,963 of the 33,009 passes they meet (the reflex: a quarter of its); they feed 0.07 to 0.09 of the time by arm (fleeAll 0.089, the reflex 0.51); 605 of 43,504 strikes catch one (1.4 percent; fleeAll 0.4); they live in 190 to 193 of 200 episodes by arm",
+        fled === 32963 && passes === 33009 && caught === 605 && strikes === 43504 && V.ARMS.every((a) => A[a].fed > 0.068 && A[a].fed < 0.092 && A[a].alive >= 190 && A[a].alive < 193.4 && A[a].fledPass > 0.995) && near(R.floors.fleeAll.fed, 0.089, 5e-4) && near(R.floors.reflex.fed, 0.513, 5e-4) && near(R.floors.reflex.fledPass / R.floors.reflex.passes, 0.247, 5e-4));
+    const H = (a) => A[a].history.map((h) => h.ret);
+    ok("!! THE HISTORY: THE TRAINER'S OWN BATTERY NEVER LEAVES THE FLY THAT HIDES -- every arm's mean return is 0.44 to 0.48 at iteration 0, 0.47 to 0.49 at iteration 149 (to two places), and at no reading of any arm above 0.52 (hiding all day is 0.5)",
+        V.ARMS.every((a) => H(a).length === 7 && H(a)[0] > 0.43 && H(a)[0] < 0.485 && H(a)[6] > 0.465 && H(a)[6] < 0.491 && H(a).every((v) => v < 0.52)) && near(H("FLY")[0], 0.4358) && near(H("FLY")[6], 0.4805));
+    const lib = src("brain/rl/dockPolicy.js"), env = src("brain/rl/escapeEnv.mjs");
+    ok("!! *** SAID AFTER THE READING, AND IT IS MINE: THE TRAINER KEEPS THE WEIGHTS THAT LIVED MOST, NOT THE WEIGHTS THAT RETURNED MOST *** -- trainDockES hands back the iteration that scored best by `dockRate x 1000 - avgDist`, and the escape environment reports `docked` as LIVED: so of 150 iterations it keeps the one whose flies survived most on its 24 episodes, which is the one that hid most. The registration did not see this. It is not the whole of the result -- the history above is the trainer's own running weights, and they do not learn either -- but it is a thumb on the scale toward hiding",
+        /const score = ev\.dockRate \* 1000 - ev\.avgDist - \(ev\.avgCrashes \|\| 0\) \* 200;/.test(lib) && /if \(score > best\.score\) best = \{ params: theta\.slice\(\), score, ev \};/.test(lib) && /return \{ params: best\.params, history, best: best\.ev \};/.test(lib) && /docked: done && !this\.caught, crashed: this\.caught/.test(env));
+    const again = V.ARMS.flatMap((arm) => [5, 9].map((s) => { const r = draws.find((d) => d.arm === arm && d.s === s), p = V.policyOf(arm, s); p.setParams(PF.unpackWeights(r.weights)); const a = V.auditScore((o) => p.act(o)); return [arm, s, a.score === r.score && a.alive === r.alive && a.fledPass === r.fledPass && a.caught === r.caught]; }));
+    ok("!! THE WEIGHTS IN A RECORD GIVE ITS SCORE AND ITS COUNTS AGAIN: draws 5 and 9 of every arm (the one fly above fleeAll among them), audited here on the 200 episodes, to the bit", again.every((x) => x[2]), again.filter((x) => !x[2]).map((x) => x[0] + " " + x[1]).join(", "));
+    const note = src("brain/FLY_ESCAPE_WIP.md"), res = note.slice(note.indexOf("## 11. The result"));
+    ok("the expectations, written before the tool, against what came: T3 BETTER was given 85 percent and came WORSE -- the guess most wrong of any round; T0 came as the 15 (WORSE), not the 55 (BETTER); T1 CANNOT BE TOLD APART the 70 and T2 the 60, and both came; the best arm above 0.75 was given 35 and is 0.52",
+        /T3: BETTER about 85 percent/.test(note) && /T0: BETTER about 55, CANNOT about 30, WORSE about 15/.test(note) && /T1: CANNOT BE TOLD APART about 70 percent/.test(note) && /T2: CANNOT about 60/.test(note) && /above 0\.75: about 35 percent/.test(note) && Math.max(...V.ARMS.map((a) => A[a].mean)) < 0.53);
+    ok("the registration's RESULT SECTION (section 11, and not the list of possible words in section 5) carries the four readings' words", /## 11\. The result/.test(note) && [["T0", R.T0.word], ["T1", R.T1.word], ["T2", R.T2.word], ["T3", R.T3.word]].every(([t, w]) => res.includes(`**${t}: ${w}**`)));
 });
 
 console.log(`\nflyEscape-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILED"}`);
