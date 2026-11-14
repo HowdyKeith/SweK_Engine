@@ -35,6 +35,11 @@ export function recordOf(result, sides, set, seat = {}) {
     };
 }
 
+/** The line of a side's seat bias: `seat A is worth +3.350 a duel (se 0.016, 8 geometries)`, the sign always shown (a negative mean is a side that does better from the seat that starts behind). */
+export function seatLine(id, s) {
+    return `  seat bias ${id}: seat A is worth ${s.mean >= 0 ? "+" : ""}${s.mean.toFixed(3)} a duel (se ${s.se.toFixed(3)}, ${s.n} geometries)`;
+}
+
 /** The two verdict lines of a record: the cycles (or that there is none) and the upsets (or that there is none). */
 export function verdictLines(r) {
     return [
@@ -61,7 +66,7 @@ export function command(argv, io = {}) {
     log(`[takeSubTournament] ${sides.length} sides (${ids.join(", ")}), geometries ${first} to ${first + n - 1}, both seats${smoke ? " (smoke: not recorded)" : ""}`);
     const result = T.roundRobin(sides.map((s) => s.side), geos, {});
     for (const l of T.reportLines(result, { labels })) log(l);
-    const seat = {}, seatGeos = T.geometries(SEAT_GEOMETRIES, first); for (const s of sides) { seat[s.id] = T.seatBias(s.side, seatGeos); log(`  seat bias ${s.id}: seat A is worth ${seat[s.id].mean >= 0 ? "+" : ""}${seat[s.id].mean.toFixed(3)} a duel (se ${seat[s.id].se.toFixed(3)}, ${seat[s.id].n} geometries)`); }
+    const seat = {}, seatGeos = T.geometries(SEAT_GEOMETRIES, first); for (const s of sides) { seat[s.id] = T.seatBias(s.side, seatGeos); log(seatLine(s.id, seat[s.id])); }
     const r = recordOf(result, sides, set, seat);
     for (const l of verdictLines(r)) log(l);
     if (rec) { write(rec, JSON.stringify(r, null, 1) + "\n"); log(`  written ${rec}`); }
