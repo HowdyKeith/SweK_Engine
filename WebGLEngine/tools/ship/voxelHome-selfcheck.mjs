@@ -155,7 +155,7 @@ section(() => {
     const note = src("brain/VOXEL_HOME_WIP.md");
     ok("the expectations, written before the tool, against what came: T0 BUILDS MORE was the 85 percent guess AND WAS WRONG (it builds less); T1 CANNOT BE TOLD APART was the 80 percent guess; T2 WORSE the 50 percent one; the best arm's mean was guessed between 0.65 and 0.85 (60 percent) and is 0.56; a home at all was given 35 percent and there is none",
         /T0: BUILDS MORE about 85 percent/.test(note) && /T1: CANNOT BE TOLD APART about\s+80 percent/.test(note) && /T2: FLY WORSE about 50 percent/.test(note) && /between 0\.65 and 0\.85: about 60 percent/.test(note) && Math.max(...V.ARMS.map((a) => A[a].mean)) < 0.65);
-    ok("the registration carries the result (section 10) with the three readings' words", /## 10\. The result/.test(note) && [R.T0.word, R.T1.word, R.T2.word].every((w) => note.includes(w)));
+    ok("the registration's RESULT SECTION (section 10, and not the list of possible words in section 4) carries the three readings' words", /## 10\. The result/.test(note) && [["T0", R.T0.word], ["T1", R.T1.word], ["T2", R.T2.word]].every(([t, w]) => note.slice(note.indexOf("## 10. The result")).includes(`**${t}: ${w}**`)));
 });
 
 console.log(`\nvoxelHome-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILED"}`);

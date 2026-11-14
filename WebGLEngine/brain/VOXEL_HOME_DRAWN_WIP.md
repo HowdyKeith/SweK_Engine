@@ -61,3 +61,35 @@ own stream decides each block.
 ## 9. The run (to be written; the gate never runs it and never gives the command the word `run`)
 `node tools/ship/takeVoxelHomeDrawn.mjs run` -> `brain/voxelHomeDrawnRound.jsonl`, committed byte for byte before it is read;
 `node tools/ship/takeVoxelHomeDrawn.mjs read` prints the checks and the reading.
+
+## 10. The result (run 2026-11-14 in the sandbox, 10.2 minutes; `brain/voxelHomeDrawnRound.jsonl` committed at 1f5e0ec3 before it was read; read once)
+**The checks hold.**
+
+| arm | mean share built | sd | least | most | homes (16 x 200 builds) | round 1 (named) |
+|---|---|---|---|---|---|---|
+| SHUF | 0.6612 | 0.0213 | 0.6069 | 0.6811 | 0 | 0.4339 |
+| FLY | 0.6664 | 0.0174 | 0.6351 | 0.6874 | 0 | 0.4295 |
+| FISH | 0.6741 | 0.0206 | 0.6228 | 0.7074 | 0 | 0.4965 |
+| MLP | 0.6892 | 0.0139 | 0.6655 | 0.7153 | 0 | 0.5624 |
+| PLAIN | 0.6905 | 0.0143 | 0.6649 | 0.7088 | 0 | 0.5536 |
+| 16 random builders | 0.5722 | 0.0028 | | 0.5774 | 0 | |
+| the lean to the unfinished columns, no network | 0.9226 | | | | 123 of 200 | |
+| the rule | 1 | | | | every plan | |
+
+* **T0: A FLY-WIRED BUILDER BUILDS MORE OF A HOME THAN A RANDOM ONE** (all 16 above all 16; exact two-sided p 3.3e-9). Round 1's
+  reading, turned over by the one change.
+* **T1: THE FLY'S WIRING CANNOT BE TOLD APART FROM A SHUFFLE OF IT** (p 0.47).
+* **T2: THE FLY'S WIRING BUILDS WORSE THAN A PLAIN NET OF ITS SIZE** (p 0.00027; 0.666 against 0.691).
+* **Against the expectations:** the three tests came as guessed (65, 75 and 55 percent). The best arm's mean above 0.75 (40 percent)
+  did not come: 0.69. A home (50 percent; a FLY home 30) did not come: none in 16,000 audit builds.
+
+**The answer to Keith's question, said plainly: it learns to build about two thirds of a house, and never finishes one.** Every one
+of the 80 trained builders beats every random builder, the fly-wired ones included, so round 1's failure was the way the choice was
+made and not the networks. But the trained builders closed only about a third of the way from a random builder (0.57) to a lean
+that needs no network at all (0.92, 123 homes): what there is to learn is nearly written in the observation, and 150 iterations
+of this trainer found a part of it. The wiring finding is the third of its kind: where the 313 synapses are makes no difference,
+and the arms that have recurrent synapses sit below the two that have none.
+
+**Not tested, each a round of its own:** a longer training (the obvious next: nothing here says the curve had flattened); a smaller
+sigma on the synapses; starting a builder AT the lean and asking what training adds. The gate holds every number above from the
+two results files (`tools/ship/voxelHomeDrawn-selfcheck.mjs` section 5).

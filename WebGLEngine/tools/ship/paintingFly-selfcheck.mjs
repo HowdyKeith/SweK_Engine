@@ -224,7 +224,7 @@ section(() => {
     const note = src("brain/PAINTING_FLY_WIP.md");
     ok("the expectations, written before any code, against what came: T1 CANNOT BE TOLD APART was the 75 percent guess; T2 WORSE was the 30 percent one (CANNOT BE TOLD APART had 55); every arm's mean is above the random painters (85); no arm reaches the random search (90); the FISH's mean lies between the PLAIN's and the FLY's (40)",
         /T1: CANNOT BE TOLD APART about 75 percent/.test(note) && /T2: CANNOT BE TOLD APART about 55 percent, FLY WORSE about 30/.test(note) && PF.ARMS.every((a) => A[a].mean > rMean) && PF.ARMS.every((a) => A[a].max < fl.search) && A.FISH.mean > A.FLY.mean && A.FISH.mean < A.PLAIN.mean);
-    ok("the registration carries the result (section 10) with both readings' words", /## 10\. The result/.test(note) && note.includes(R.T1.word) && note.includes(R.T2.word));
+    ok("the registration's RESULT SECTION (section 10, and not the list of possible words in section 4) carries both readings' words", /## 10\. The result/.test(note) && [["T1", R.T1.word], ["T2", R.T2.word]].every(([t, w]) => note.slice(note.indexOf("## 10. The result")).includes(`**${t}: ${w}**`)));
 });
 
 console.log(`\npaintingFly-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILED"}`);

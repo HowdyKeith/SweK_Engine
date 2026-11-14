@@ -26,7 +26,11 @@ this note's sketch (direction, length and colour): it is the one the page prints
 (`brain/VOXEL_HOME_WIP.md` section 10, gate `tools/ship/voxelHome-selfcheck.mjs`): A FLY-WIRED BUILDER BUILDS LESS OF A HOME THAN A
 RANDOM ONE (0.43 of a home against 0.57; p 3e-9), its wiring CANNOT BE TOLD APART FROM A SHUFFLE OF IT and BUILDS WORSE THAN A PLAIN
 NET OF ITS SIZE; no arm's mean reaches a random builder's and nobody built a home, where a three-line rule builds every one.
-**V3, the page, is OPEN**, and so is the follow-up the result points at (a builder whose choice is drawn; a longer training). `peer-jobs` is OPEN. Under `peer-jobs` the tree's own list (`tools/ship/todo.mjs`) has two open items no chat has touched:
+**ROUND 2 IS DONE** (2026-11-14: the choice DRAWN from 36 numbers; `brain/VOXEL_HOME_DRAWN_WIP.md` section 10, gate
+`tools/ship/voxelHomeDrawn-selfcheck.mjs`): A FLY-WIRED BUILDER BUILDS MORE OF A HOME THAN A RANDOM ONE (0.67 against 0.57; all 80
+trained builders beat every random one), its wiring still CANNOT BE TOLD APART FROM A SHUFFLE and BUILDS WORSE THAN A PLAIN NET
+(0.69); nobody built a home, and a lean that needs no network builds 0.92 and 123 homes of 200. **V3, the page, is OPEN**, and a
+longer training is the obvious next round. `peer-jobs` is OPEN. Under `peer-jobs` the tree's own list (`tools/ship/todo.mjs`) has two open items no chat has touched:
 `peer-fly-brain-badge` (small) and `peer-brains-in-roster` (medium).
 
 | id | the question | its first stage | parallel? |

@@ -9,6 +9,7 @@
 //   2  ONE TRAINING          a record is its arm's and its draw's, and its weights give its score again
 //   3  THE RECORDS           the registration's checks, each failing by name; the three tests' words
 //   4  THE COMMAND           its words as arithmetic; this gate starts no training of the round's and leaves its results file as it was
+//   5  THE VERDICT           round 2, run 2026-11-14 and committed unread at 1f5e0ec3: the file's bytes, the checks, the three readings, the arms beside the random builders, the lean and round 1
 // SABOTAGE LOG (2026-11-14) -- through a byte-safe runner (one at a time, every file restored and its sha256 checked), THIS gate and round 1's run whole for each; every one red by name
 // (the two numbers are the rows that went red here, then in tools/ship/voxelHome-selfcheck.mjs):
 //   X1 round 2 names its column after all 9, 0 | X2 the random builders are flown on the round's own environment 1, 0 | X3 the lean is left out of the drawn round's floors 1, 0 | X4 round 1's floors carry a lean too 1, 0
@@ -16,6 +17,12 @@
 //   X9 round 2's command reads round 1's library 1, 0 | X10 makeRound takes any choice 1, 0 | X11 the lean is to the finished columns 1, 0 | X12 round 2's FLY has 2,966 weights 6, 0 | X13 round 1 draws its column 2, 8
 //   AND SEVEN OF ROUND 1'S, AGAIN, after its library became makeRound(): H6'' a half-built house counted a home 1, 2 | H8'' the score is the share missing 1, 3 | H12'' T0 reads the SHUF arm 2, 4
 //     H13'' T1 reads the PLAIN arm 1, 3 | H15'' MORE and LESS swapped 3, 6 | H17'' the reading is weighed with a check failed 1, 1 | H10'' a training's wiring is draw 1's 1, 1
+//   THE VERDICT'S (section 5, 2026-11-14), this gate run whole for each: Y1 a FLY score in the file lowered to 0.50 7 | Y2 MORE and LESS swapped 7 | Y3 the audit is of the named environment 3 | Y5 the lean in the file made 0.60 2
+//     Y6 T2 reads the fly against the fish 3 | Y7 round 1's file's first FLY score raised (the comparison row) 1 | Y4' round 2's result says the fly cannot be told from random 1 | Y8 round 2's result says the wiring is BETTER than a shuffle 1
+//   *** Y4 WENT 0 RED, AND THE HOLE WAS IN THREE GATES. *** The row asked whether the NOTE carries the reading's words, and section 4 of every registration lists all the words a test could say: a result
+//   rewritten to another word was still "carried". The row now reads the result section alone and asks for the test's own line. The same row was in tools/ship/voxelHome-selfcheck.mjs and
+//   tools/ship/paintingFly-selfcheck.mjs (their own V5 and W5 had gone red only because of which words section 4 happened to abbreviate) and is corrected there: Y9 (round 1's result says BETTER) 1 and
+//   Y10 (the painting result says BETTER) 1, each red in its own gate.
 //   SEEN BEFORE THE RUN, said so: writing this gate printed the floors of three of its own plans once (880001 to 880003, 12 steps): untrained draws of this round build about as much as a random builder there.
 "use strict";
 import fs from "node:fs";
@@ -127,6 +134,34 @@ section(() => {
     const me = src("tools/ship/voxelHomeDrawn-selfcheck.mjs"), calls = [...me.matchAll(/V\.trainOne\(([^)]*)\)/g)].map((m) => m[1]), probes = [...me.matchAll(/probe\(("[^)]*)\)/g)].map((m) => m[1]);
     ok("!! THIS GATE STARTS NO TRAINING OF THE ROUND'S AND LEAVES ITS RESULTS FILE AS IT WAS: every training here is at its own recipe (12 steps, 2 iterations) on draws 901 and 902 or refused before it starts; the command is never given the word run, nor a job it could do; and the file's size and time are what they were before this section",
         calls.length >= 6 && calls.every((c) => /^"[A-Z]+", (901|902|0), TINY, TINY_AUDIT(, |$)/.test(c)) && TINY.iters === 2 && !V.SEEDS.includes(901) && probes.length === 4 && probes.every((p) => !/"run"/.test(p) && V.parseArgs(JSON.parse(`[${p}]`)) === null) && stateOf() === before, `${calls.length} trainings, ${probes.length + 1} probes, the file ${before === "absent" ? "absent" : "unchanged"}`);
+});
+
+console.log("\n5. THE VERDICT (round 2; the results were committed at 1f5e0ec3 before they were read, and are read here from the file)");
+section(() => {
+    const bytes = fs.readFileSync(path.join(ENG, V.RESULTS)), lines = bytes.toString("utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l)), R = V.reading(lines), near = (a, b, e = 5e-5) => Math.abs(a - b) < e;
+    ok("!! the results file is the one the run wrote: 82 records, sha256 5e339d1b8a1ea30a...", lines.length === 82 && createHash("sha256").update(bytes).digest("hex") === "5e339d1b8a1ea30aa7f09622282c496d1da6acdb6cdf465ddbc67b1660ad36a8");
+    ok("!! THE CHECKS HOLD: 80 draws each once, the registered recipe, each arm's weight count and wiring, FLY draw 1 the same twice, the 16 random builders and the untrained draws", R.checks.length === 0, R.checks.slice(0, 2).join(" | "));
+    ok("!! *** T0: A FLY-WIRED BUILDER BUILDS MORE OF A HOME THAN A RANDOM ONE *** -- with the choice drawn, every one of the 16 trained FLY builders is above every one of the 16 random builders (the fly's ranks sum to 392, the most there is; exact two-sided p 3.3e-9): round 1's reading, turned over", R.T0 && R.T0.word === V.WORDS.T0[0] && R.T0.sumA === 392 && R.T0.ties === 0 && R.T0.p < 4e-9, R.T0 ? `p ${R.T0.p.toExponential(2)}` : "no test");
+    ok("!! *** T1, THE WIRING: THE FLY'S WIRING CANNOT BE TOLD APART FROM A SHUFFLE OF IT *** -- the fly's ranks sum to 284 (the middle is 264), exact two-sided p 0.47", R.T1 && R.T1.word === V.WORDS.T1[2] && R.T1.sumA === 284 && near(R.T1.p, 0.46769), R.T1 ? `p ${R.T1.p.toFixed(4)}` : "no test");
+    ok("!! *** T2: THE FLY'S WIRING BUILDS WORSE THAN A PLAIN NET OF ITS SIZE *** -- the fly's ranks sum to 172 (196 or less speaks), exact two-sided p 0.00027", R.T2 && R.T2.word === V.WORDS.T2[1] && R.T2.sumA === 172 && near(R.T2.p, 0.000275, 5e-6), R.T2 ? `p ${R.T2.p.toExponential(2)}` : "no test");
+    const A = R.arms, fl = R.floors, rMean = fl.random.reduce((a, b) => a + b, 0) / 16, rMax = Math.max(...fl.random), draws = lines.filter((r) => r.kind === "draw");
+    ok("!! the arms' mean share of a home built, 16 draws each (mean, sd): SHUF 0.6612 0.0213, FLY 0.6664 0.0174, FISH 0.6741 0.0206, MLP 0.6892 0.0139, PLAIN 0.6905 0.0143 -- the arms with recurrent synapses below the two without, as in round 1 and the painting round; the 16 random builders 0.5722",
+        near(A.FLY.mean, 0.6664) && near(A.FLY.sd, 0.0174) && near(A.SHUF.mean, 0.6612) && near(A.SHUF.sd, 0.0213) && near(A.FISH.mean, 0.6741) && near(A.FISH.sd, 0.0206) && near(A.PLAIN.mean, 0.6905) && near(A.PLAIN.sd, 0.0143) && near(A.MLP.mean, 0.6892) && near(A.MLP.sd, 0.0139) && near(rMean, 0.5722) &&
+        Math.max(A.FLY.mean, A.SHUF.mean, A.FISH.mean) < Math.min(A.PLAIN.mean, A.MLP.mean));
+    ok("!! *** EVERY TRAINED BUILDER BEATS EVERY RANDOM ONE, AND NONE BUILDS A HOME *** -- all 80 are above the best random builder (the least trained draw 0.607, the best 0.715, against 0.577); and among their 80 x 200 audit builds there is not one home",
+        draws.every((r) => r.score > rMax) && near(Math.min(...draws.map((r) => r.score)), 0.6069) && near(Math.max(...draws.map((r) => r.score)), 0.7153) && near(rMax, 0.5774) && V.ARMS.every((a) => A[a].homes === 0 && A[a].bestHomes === 0));
+    ok("!! *** AND THE LEAN THAT NEEDS NO NETWORK IS FAR ABOVE THEM ALL: leaning to the columns the observation says are unfinished builds 0.9226 of a home and 123 homes of the same 200 plans *** -- the trained builders closed about a third of the way from a random builder to it (0.572 -> 0.69 -> 0.92)",
+        near(fl.lean, 0.9226) && fl.leanHomes === 123 && fl.lean > Math.max(...draws.map((r) => r.score)) + 0.2 && (A.PLAIN.mean - rMean) / (fl.lean - rMean) > 0.3 && (A.PLAIN.mean - rMean) / (fl.lean - rMean) < 0.37);
+    ok("the untrained draws start just under a random builder (0.548 to 0.578: 36 numbers that are not level lean somewhere, and nowhere useful), so the training is what lifted them", V.ARMS.every((a) => fl.untrained[a] > 0.54 && fl.untrained[a] < 0.58 && A[a].min > fl.untrained[a]));
+    const again = V.ARMS.flatMap((arm) => [3, 11].map((s) => { const r = draws.find((d) => d.arm === arm && d.s === s), p = V.policyOf(arm, s); p.setParams(PF.unpackWeights(r.weights)); const a = V.auditScore(p); return [arm, s, a.score === r.score && a.homes === r.homes]; }));
+    ok("!! THE WEIGHTS IN A RECORD GIVE ITS SCORE AND ITS HOMES AGAIN: draws 3 and 11 of every arm, audited here on the 200 plans with the drawn choice, to the bit", again.every((x) => x[2]), again.filter((x) => !x[2]).map((x) => x[0] + " " + x[1]).join(", "));
+    // round 1, from its own file: the same arms, the choice named
+    const r1 = V1.reading(fs.readFileSync(path.join(ENG, V1.RESULTS), "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l)));
+    ok("!! BESIDE ROUND 1, FROM ITS OWN FILE: with the column named every arm's mean was under a random builder's (FLY 0.43, PLAIN 0.55); with it drawn every arm's is over (FLY 0.67, PLAIN 0.69) -- each arm built more, the fly-wired one the most more (0.24), and the order of the arms did not change at the ends", r1.checks.length === 0 && V.ARMS.every((a) => r1.arms[a].mean < rMean && A[a].mean > rMean && A[a].mean > r1.arms[a].mean) && near(A.FLY.mean - r1.arms.FLY.mean, 0.2369, 5e-4) && r1.T0.word === V.WORDS.T0[1]);
+    const note = src("brain/VOXEL_HOME_DRAWN_WIP.md");
+    ok("the expectations, written before the tool, against what came: T0 BUILDS MORE was the 65 percent guess; T1 CANNOT BE TOLD APART the 75; T2 WORSE the 55; the best arm's mean above 0.75 was given 40 percent and is 0.69; any home 50 percent, a FLY home 30, and there is none",
+        /T0: BUILDS MORE about 65 percent/.test(note) && /T1: CANNOT BE TOLD APART about\s+75 percent/.test(note) && /T2: FLY WORSE about 55 percent/.test(note) && /above 0\.75: about 40 percent/.test(note) && Math.max(...V.ARMS.map((a) => A[a].mean)) < 0.75);
+    ok("the registration's RESULT SECTION (section 10, and not the list of possible words in section 4) carries the three readings' words", /## 10\. The result/.test(note) && [["T0", R.T0.word], ["T1", R.T1.word], ["T2", R.T2.word]].every(([t, w]) => note.slice(note.indexOf("## 10. The result")).includes(`**${t}: ${w}**`)));
 });
 
 console.log(`\nvoxelHomeDrawn-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILED"}`);
