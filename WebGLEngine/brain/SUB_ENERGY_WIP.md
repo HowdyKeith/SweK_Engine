@@ -104,3 +104,18 @@ Read 2, the doctrine re-tuned under the cost (four searches, seeds 6100 to 6103,
 
 **The forecast, scored (written before any geometry was flown):** the re-tuned doctrine SLOWS by the rule (55): **yes**.
 
+## POST HOC CONTROL TO READ 2 (2026-11-14; NOT REGISTERED; the same four seeds, the same recipe, from the default tactician, with NO budget; `brain/subEnergyFree6100.json` to `6103.json`; flown after read 2 was read, because read 2 could not separate the cost from the start)
+
+| seed | no-cost search: search / track / evade speed | its move from the 5100 champion (mean of search and track, m/s) | the cost search's move | cost minus no-cost |
+|---|---|---|---|---|
+| 6100 | 3.93 / 1.65 / 3.92 | -1.67 | -2.54 | -0.87 |
+| 6101 | 4.18 / 2.55 / 2.93 | -1.10 | -1.10 | 0.00 |
+| 6102 | 2.03 / 3.63 / 4.30 | -1.63 | -2.72 | -1.09 |
+| 6103 | 2.28 / 2.81 / 4.50 | -1.92 | -1.92 | 0.00 |
+
+**READ AS A CONTROL, THIS SAYS READ 2'S "SLOWS" IS NOT THE COST'S.** The searches with NO battery, from the same start, also land 1.1 to 1.9 m/s below the no-cost champion of the notes (their champion, by held score, seed 6102, moves -1.63); the cost champion moves -1.92, **0.29 m/s below the control's** (under the 0.5 bar of the rule). **In two of the four seeds (6101 and 6103) the search with the budget and the search without it ended on the SAME speeds, to the digit**: the cost did not change which candidates the (1+1)-ES accepted. In the other two it ended 0.9 and 1.1 m/s lower. Four seeds, two of them identical: a paired mean of -0.49 m/s, which is not a finding.
+
+**So, on the registration's own reading and on its control together:** the doctrine searched under the 0.75 MJ cost is slower than the champion of the notes by -1.92 m/s (the rule's SLOWS, as registered); a search of the same recipe with no cost is slower than that champion by -1.63; **the difference the cost makes to what a 150-iteration search finds is about -0.3 m/s at the champion and 0 in half the seeds.** The slowdown of read 2 is the search's (a start at the default, 150 iterations) and not the budget's. That agrees with the DEV result (the cost binds on the charge and not on the fight: no duel outcome moved) and with read 1 (the cost erases the differences between the doctrines rather than reordering them): **at a battery that binds, speed is nearly free of consequence for the outcome of a duel, so a search has little reason to give it up.**
+
+**What this does NOT say:** that a search that READ its charge would not slow down (the tactician is not told it, as registered); that a bigger battery or a longer duel would not; that two identical seeds are a coincidence: they are most likely a search in which no candidate that differed under the cost was ever accepted, which is itself the result. Nothing in the registered reads is changed by this section.
+
