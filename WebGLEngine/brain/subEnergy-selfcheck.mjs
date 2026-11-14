@@ -12,7 +12,23 @@
 //   5 THE SOURCE    no clock, no random number; the headers; the registration's ladder equals the code's
 // NOT CHECKED, said plainly: that the model's numbers are good (they are the layer's own, "tank-scale"), which rung DEV chooses and what HELD says (that is the experiment).
 //
-// SABOTAGES: written after the gate; the log is added below when the pass is done.
+// SABOTAGES (2026-11-13 and 14; every mutant is applied to a COPY of the target in one of four isolated trees whose directories are real -- the gate's import closure plus the data files, the tuner and the registration it reads -- the gate is run there and killed at its first FAIL;
+// the harness runs the UNMUTATED gate in the tree first and refuses to go on if that fails, and checks the trees against the sources after the pass):
+//   PASS 0 was INVALID and is thrown away: 441 mutants run in trees that lacked the four JSON files the roster reads and the registration note, so every one "crashed" -- a pass that measured a broken tree; the harness got its baseline check and an `--extra` list because of it.
+//   PASS 1 (the gate as first written; 441 mutants: 407 token mutants -- an operator, a comparison, a boolean or a number moved by one -- on every line of tools/ship/takeSubEnergy.mjs and on the lines of brain/subDuel.mjs and tools/tuneSubTactics.mjs this item changed, and 34 hand
+//     mutants): 286 + 25 red by name, 24 + 5 crashes of the gate, 97 + 4 alive. WHAT THE SURVIVORS SHOWED (each is a row now): read 1's rule was tested only through a copy of itself in the gate (so `mattersOf` is now a function of the command and tested at its edges, the larger |edge| and
+//     its |z| included); the fates and ticks of a pair's fights; the whole sentence of needsOf's refusal; the observed charge being a fraction of the START charge (the hand mutant that divided by the class's capacity); a tie in the held score; the dead screw of the FIRST side counting as the
+//     cost firing; `--dir`; the output of read 2 and of held to the byte; the dev --write path and the indent of the three written files (through `io.devSet`); the exit codes of a failed check (through `io.checks`, a parameter of readRanking() and of the command); held at its rung edges
+//     (0 and 4 accepted, 5 refused by name) and with the override and no --write; the tuner's `from` field.
+//   PASS 2 (the gate with those rows; 450 mutants, 410 token and 40 hand): 344 + 35 red, 24 + 5 crashes, 42 + 0 alive. Two of the 42 were real and are rows: the display of a signed number was a string built in two places and its minus-one-to-zero range was never reached by the data (now `signed()`,
+//     tested at -0.5, 0, 0.4, -1.5), and an EMPTY --rung read as rung 0 under a loose parse (now refused, tested). The three readings of read 2 are each said in their own words in a row.
+//   PASS 3 (the lines changed after pass 2, and all 42 hand mutants again; 72 mutants): 61 red, 10 crashes, 1 alive. The 41 that stand across passes 2 and 3 are EQUIVALENT, argued:
+//     subDuel.mjs  `cooldown: 0`, `ready: b.cooldown <= 0 && b.ammo > 0` and `if (b.cooldown > 0) b.cooldown--` (the arena's own lines, held by brain/subDuel-selfcheck.mjs, not this item's); the unused `: 0` of `charge0` with no battery; `(h >>> 0)` -> `h >>>= 0` in the fingerprint
+//     tuneSubTactics.mjs  the defaults 5000 and 150 (a tool with no gate of its own; this gate always passes --seed and --iters)
+//     takeSubEnergy.mjs  the digit in a comment (`rung 0`); `i < ids.length` -> `<=` in the outer loop of the pairs (the inner loop is then empty); the fabricated `charge: [0, 0]` handed to the checker (only its finiteness is read); the argument parser `flag`: `i < 0` -> `<= 0`, `< 1`, `< -1`
+//       (a flag is never at index 0, and a missing flag then returns the mode word, which `--set` takes as its default and `--rung` refuses as it refuses null); `io.sides || sidesOf(io.read)` -> `&&` (an undefined `sides` takes the default parameter either way); `res.chosen !== null` -> `===` in the
+//       mustFire flag (a rung chosen means a screw died, so the check passes either way; the case of no death anywhere with no rung chosen is not exercised); `rung < 0` -> `< -1` (the regular expression before it admits no negative); `typeof process !== "undefined" && ...` -> `||` (always true under node)
+// NOT SABOTAGED: section 5's reads of the headers and of the registration (they read text), and the numbers of the registered reads (they are not code).
 "use strict";
 import fs from "node:fs";
 import os from "node:os";
