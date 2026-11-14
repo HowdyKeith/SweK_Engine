@@ -21,6 +21,10 @@
 // THE HAND WEIGHTS ARE THE CAR'S OWN (gunnerPolicy.handWeights(): turn at 12 x the bearing, lift at 8 x the pitch, fire when aligned) AND THEY ARE NOT THE HAND GUNNER -- unlike every other seat network's hand weights. A proportional turn LAGS a moving aim point where the hand gunner's seat goes straight to it at the slew
 // limit; the gate pins the two in the same fights. WHICH IS BETTER WAS FIRST SAID WRONG HERE: on twelve pairs the car's hand weights read 0.183 BEHIND the hand gunner and this header said they trail; on 600 fresh pairs (tools/ship/takeTurretAudit.mjs's audit and replication, 2026-11-14) they LEAD it, +0.099 (se 0.033, z 2.96), behind regular sights with the hand's error on. So the car's hand rule carries over to a ship's seat as it is and is a little better there than the seat's own hand gunner; behind perfect sights (twelve pairs only, not re-read) it read 0.881 behind.
 //
+// THE ROUNDS-LEFT SENSE (`ammoSense`, off by default: every fight flown without it is the fight it was). The car's `reloading` feature says its gun cannot fire for the moment; a seat's gun has no reload and the feature is held at 0. In a fight where rounds are SCARCE (battleshipDuel's `ammo`) a gunner that
+// cannot tell how many rounds it has left cannot ration them, so with `ammoSense` that feature carries the share of the seat's magazine it has spent -- 0 with a full magazine, 1 with an empty one, where it means what the car's feature means: this gun cannot fire. battleshipDuel turns it on exactly when the fight
+// is rationed (`ammo` below 1). NO WEIGHTS IN THIS TREE READ THAT FEATURE (the car's hand weights do not, nor does either trained file), so they fly a rationed fight as they would without the sense; a gunner TRAINED ON THE RACE might, and would then be reading something its training never showed it -- said plainly.
+//
 // A DECISION IS TWO HALVES, as seatGunnerPolicy's: `prepare` (the sight and the eleven features), `finish(prep, y)` (the rates into a command), and `decide.net` for a batch. With no target the gun is left where it is and the trigger is off. Pure: no I/O, no clock, no Math.random.
 "use strict";
 import * as GP from "./gunnerPolicy.mjs";
@@ -42,18 +46,19 @@ const fin = (v) => (Number.isFinite(v) ? v : 0);
 /**
  * The eleven features for a seat that has a target. `rule` is the sight's answer ({ yaw, pitch, fire, target }), `tg` the target as the arena shows it ({ pos, vel }), `st` the seat's state ({ yaw, pitch }), `body` the craft's body ({ pos, vel }), `reach` the sight's range.
  */
-export function features(seat, st, body, rule, tg, reach = REACH) {
+export function features(seat, st, body, rule, tg, reach = REACH, spent = 0) {
     const d = sub(tg.pos, body.pos), range = Math.hypot(d[0], d[1], d[2]), n = range > 1e-9 ? range : 1, dh = [d[0] / n, d[1] / n, d[2] / n], rel = sub(tg.vel || [0, 0, 0], body.vel || [0, 0, 0]);
     const along = rel[0] * dh[0] + rel[1] * dh[1] + rel[2] * dh[2], lat = Math.hypot(rel[0] - along * dh[0], rel[1] - along * dh[1], rel[2] - along * dh[2]);
-    return [1, fin((rule.yaw - st.yaw) / Math.PI), fin((rule.pitch - st.pitch) / (Math.PI / 2)), Math.min(2, fin(range / (reach / 2))), fin(-along / CLOSING), fin(lat / CLOSING), 0, 1, rule.fire ? 1 : 0, 0, 0];
+    return [1, fin((rule.yaw - st.yaw) / Math.PI), fin((rule.pitch - st.pitch) / (Math.PI / 2)), Math.min(2, fin(range / (reach / 2))), fin(-along / CLOSING), fin(lat / CLOSING), Math.min(1, Math.max(0, fin(spent))), 1, rule.fire ? 1 : 0, 0, 0];
 }
 
 /**
  * `sigma` (default 0) is THE HAND'S AIM ERROR in radians, added to the seat's command on each axis every tick from a stream seeded by `seed`, the seat and the tick (gunSeats.handGunner's own recipe): see the header for why a gunner that lays the gun has to carry it.
+ * `ammoSense` (default false) puts the share of the seat's magazine it has SPENT (0 full, 1 empty) on the car's `reloading` feature: see the header.
  * `idle` is what the seat does with NO target: "hold" (default: it stays where it points) or "rest" (it is sent back to yaw 0, pitch 0, which is what gunSeats.handGunner does). THIS IS THE ADAPTER'S CHOICE, NOT THE NETWORK'S, and the gate measures what it is worth.
  * The gunner for weights `w` behind `sight` (a gunSeats.handGunner or anything with its contract): decide(seat, state, body, targets, t) -> { yaw, pitch, fire, target }, the contract of a seat's gunner. `dt` is the tick the rates are turned over (the arena's, 1/30).
  */
-export function gunnerFor(w, sight, { reach = REACH, dt = 1 / 30, idle = "hold", sigma = 0, seed = 1, forward: fwd = forward, layersOf: lo = layersOf, post: pst = post } = {}) {
+export function gunnerFor(w, sight, { reach = REACH, dt = 1 / 30, idle = "hold", sigma = 0, seed = 1, ammoSense = false, forward: fwd = forward, layersOf: lo = layersOf, post: pst = post } = {}) {
     if (idle !== "hold" && idle !== "rest") throw new Error(`seatTurretGunner.gunnerFor: idle is "hold" or "rest" (got ${idle})`);
     let laid = null;   // where the hand MEANS the gun to be: the seat's own angles are this plus the hand's error of the tick, and the error is not carried from one tick into the next (a gunner's hand shakes about where it holds the gun; it does not wander)
     function prepare(seat, st, body, targets, t = 0) {
@@ -61,7 +66,8 @@ export function gunnerFor(w, sight, { reach = REACH, dt = 1 / 30, idle = "hold",
         if (rule.target == null) { decide.last = null; laid = null; return { rule, x: null, st, seat, t }; }
         const tg = targets.find((q) => q.id === rule.target); if (!tg) { decide.last = null; laid = null; return { rule, x: null, st, seat, t }; }
         if (!laid || !sigma) laid = { yaw: st.yaw, pitch: st.pitch };
-        return { rule, x: features(seat, laid, body, rule, tg, reach), st, seat, t };
+        const spent = ammoSense && st.gun && seat.gun && seat.gun.magazine > 0 ? 1 - st.gun.ammo / seat.gun.magazine : 0;   // THE ROUNDS-LEFT SENSE (see the header): off unless asked for
+        return { rule, x: features(seat, laid, body, rule, tg, reach, spent), st, seat, t };
     }
     function finish(prep, y) {
         if (prep.x === null) return idle === "rest" ? { yaw: 0, pitch: 0, fire: false, target: null } : { yaw: prep.st.yaw, pitch: prep.st.pitch, fire: false, target: null };   // nothing to shoot at: the gun stays where it is, or with `idle: "rest"` goes back to its rest as the hand gunner's seat does
@@ -86,6 +92,8 @@ const O_B1 = FEATURES * HIDDEN, O_REC = O_B1 + HIDDEN, O_OUT = O_REC + REC_EDGES
 export const encoderAt = (h, f) => h * FEATURES + f, hiddenBiasAt = (h) => O_B1 + h, synapseAt = (k) => O_REC + k, outputAt = (o, h) => O_OUT + o * HIDDEN + h, biasAt = (o) => O_B2 + o;
 /** The outputs a seat reads (yaw, pitch, fire) and the features that are ever anything but a constant in a seat (the bias is 1, reloading and the two oil features 0, reachable 1): a search that moves another weight of the encoder moves a bias at best. */
 export const READ_OUTPUTS = Object.freeze([0, 1, 2]), LIVE_FEATURES = Object.freeze([0, 1, 2, 3, 4, 5, 8]);
+/** The features that vary in a seat WITH the rounds-left sense on (a rationed fight): the seven, and `reloading` (6), which then carries the share of the magazine spent. */
+export const LIVE_FEATURES_RATIONED = Object.freeze([0, 1, 2, 3, 4, 5, 6, 8]);
 /** How many of the circuit's synapses carry a weight in `w`. */
 export const synapsesUsed = (w) => { let n = 0; for (let k = 0; k < REC_EDGES; k++) if (w[O_REC + k] !== 0) n++; return n; };
 

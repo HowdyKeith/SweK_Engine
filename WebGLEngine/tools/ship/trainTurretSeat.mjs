@@ -12,7 +12,7 @@
 //                 PATH (1 in 5)     a neuron's weight from a varying feature and its weight into a read output, together (tools/ship/trainHelm.mjs's)
 //                 TUNE (1 in 5)     one to `maxK` of the weights that already differ from zero
 //                 BIAS (1 in 5)     one of the three output biases a seat reads
-//                 The car's `drop` and `ignite` outputs and the four features a seat holds constant are never moved.
+//                 The car's `drop` and `ignite` outputs and the four features a seat holds constant are never moved. (`features`, the last argument of the children: which features vary -- a rationed fight adds the rounds-left sense, ST.LIVE_FEATURES_RATIONED; the default is the seven, and every search before 2026-11-14 drew from those.)
 //   THE PRUNE     every weight that differs from the START is put back to it whenever that does not lower the train score: a synapse that buys nothing does not survive, so THE SYNAPSES LEFT ARE THE ONES THE TRAIN FIGHTS PAID FOR.
 //   WHAT SHIPS    several searches; the champion is the best on the HELD-OUT pairs; the AUDIT pairs are read once. It is written only if it leads the hand gunner on held-out AND audit and wins at least as many pairs as it loses on each.
 //   WHAT THE SYNAPSES DID is then ASKED, not assumed: the champion with every synapse put back to zero is flown on the same audit pairs (the ABLATION), beside the start. The difference between the champion and its ablation is what the circuit's wiring carried; if it is nothing, that is said.
@@ -52,33 +52,33 @@ const mulberry = (a) => () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.
 const gauss = (rng) => { let u = 0, v = 0; while (!u) u = rng(); while (!v) v = rng(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
 const pick = (rng, n) => Math.floor(rng() * n);
 /** The neurons that are AWAKE in `w`: those with a weight from a feature that varies in a seat or a bias, and then, to a fixed point, those a synapse with a weight reaches from an awake one. A Set of indices. */
-export function awake(w) {
+export function awake(w, features = ST.LIVE_FEATURES) {
     const on = new Set();
-    for (let h = 0; h < H; h++) if (w[ST.hiddenBiasAt(h)] !== 0 || ST.LIVE_FEATURES.some((f) => w[ST.encoderAt(h, f)] !== 0)) on.add(h);
+    for (let h = 0; h < H; h++) if (w[ST.hiddenBiasAt(h)] !== 0 || features.some((f) => w[ST.encoderAt(h, f)] !== 0)) on.add(h);
     for (let grew = true; grew;) { grew = false; EDGES.forEach(([to, from], k) => { if (!on.has(to) && on.has(from) && w[ST.synapseAt(k)] !== 0) { on.add(to); grew = true; } }); }
     return on;
 }
 /** Is neuron h read by an output a seat reads? */
 export const isRead = (w, h) => ST.READ_OUTPUTS.some((o) => w[ST.outputAt(o, h)] !== 0);
 /** The synapses a synapse child may move in `w`: those whose source is awake (the index k of each). */
-export const reachable = (w) => { const on = awake(w), ks = []; EDGES.forEach(([, from], k) => { if (on.has(from)) ks.push(k); }); return ks; };
+export const reachable = (w, features = ST.LIVE_FEATURES) => { const on = awake(w, features), ks = []; EDGES.forEach(([, from], k) => { if (on.has(from)) ks.push(k); }); return ks; };
 /** A synapse child (see the header). With no awake neuron (the zero weights) it is a path child. */
-export function synapseChild(w, sigma, rng) {
-    const ks = reachable(w); if (!ks.length) return pathChild(w, sigma, rng);
+export function synapseChild(w, sigma, rng, features = ST.LIVE_FEATURES) {
+    const ks = reachable(w, features); if (!ks.length) return pathChild(w, sigma, rng, features);
     const o = Float32Array.from(w), k = ks[pick(rng, ks.length)], to = EDGES[k][0];
     o[ST.synapseAt(k)] += gauss(rng) * sigma;
     if (!isRead(w, to)) o[ST.outputAt(ST.READ_OUTPUTS[pick(rng, ST.READ_OUTPUTS.length)], to)] += gauss(rng) * sigma;
     return o;
 }
-export function pathChild(w, sigma, rng) { const o = Float32Array.from(w), h = pick(rng, H); o[ST.encoderAt(h, ST.LIVE_FEATURES[pick(rng, ST.LIVE_FEATURES.length)])] += gauss(rng) * sigma; o[ST.outputAt(ST.READ_OUTPUTS[pick(rng, ST.READ_OUTPUTS.length)], h)] += gauss(rng) * sigma; return o; }
+export function pathChild(w, sigma, rng, features = ST.LIVE_FEATURES) { const o = Float32Array.from(w), h = pick(rng, H); o[ST.encoderAt(h, features[pick(rng, features.length)])] += gauss(rng) * sigma; o[ST.outputAt(ST.READ_OUTPUTS[pick(rng, ST.READ_OUTPUTS.length)], h)] += gauss(rng) * sigma; return o; }
 export function biasChild(w, sigma, rng) { const o = Float32Array.from(w); o[ST.biasAt(ST.READ_OUTPUTS[pick(rng, ST.READ_OUTPUTS.length)])] += gauss(rng) * sigma; return o; }
 /** The indices of the weights that are not zero, less the car's drop and ignite read-outs and biases (which a seat never reads and a search never moves). */
 export const tunable = (w) => { const idx = [], lo = ST.outputAt(3, 0), hi = ST.outputAt(4, H - 1); for (let i = 0; i < w.length; i++) if (w[i] !== 0 && !(i >= lo && i <= hi) && i !== ST.biasAt(3) && i !== ST.biasAt(4)) idx.push(i); return idx; };
-export function tuneChild(w, sigma, rng, maxK) { const idx = tunable(w); if (!idx.length) return pathChild(w, sigma, rng); const o = Float32Array.from(w), k = 1 + pick(rng, maxK); for (let j = 0; j < k; j++) o[idx[pick(rng, idx.length)]] += gauss(rng) * sigma; return o; }
+export function tuneChild(w, sigma, rng, maxK, features = ST.LIVE_FEATURES) { const idx = tunable(w); if (!idx.length) return pathChild(w, sigma, rng, features); const o = Float32Array.from(w), k = 1 + pick(rng, maxK); for (let j = 0; j < k; j++) o[idx[pick(rng, idx.length)]] += gauss(rng) * sigma; return o; }
 /** A child, by SHARE. Returns { w, kind }. */
-export function child(w, sigma, rng, maxK) {
+export function child(w, sigma, rng, maxK, features = ST.LIVE_FEATURES) {
     const r = rng();
-    return r < SHARE.synapse ? { w: synapseChild(w, sigma, rng), kind: "synapse" } : r < SHARE.synapse + SHARE.path ? { w: pathChild(w, sigma, rng), kind: "path" } : r < SHARE.synapse + SHARE.path + SHARE.tune ? { w: tuneChild(w, sigma, rng, maxK), kind: "tune" } : { w: biasChild(w, sigma, rng), kind: "bias" };
+    return r < SHARE.synapse ? { w: synapseChild(w, sigma, rng, features), kind: "synapse" } : r < SHARE.synapse + SHARE.path ? { w: pathChild(w, sigma, rng, features), kind: "path" } : r < SHARE.synapse + SHARE.path + SHARE.tune ? { w: tuneChild(w, sigma, rng, maxK, features), kind: "tune" } : { w: biasChild(w, sigma, rng), kind: "bias" };
 }
 /** The weights that differ between two vectors. */
 export const differs = (w, base) => { const idx = []; for (let i = 0; i < w.length; i++) if (w[i] !== base[i]) idx.push(i); return idx; };

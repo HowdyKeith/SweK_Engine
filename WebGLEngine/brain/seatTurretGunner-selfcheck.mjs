@@ -8,6 +8,7 @@
 //   2  THE FEATURES              the eleven, on a seat and a target placed by hand: the errors still to turn, the range over half the reach, the closing and crossing speeds over 200, the sight's flag as `aligned`, and the four the seat holds constant
 //   3  THE COMMAND               the outputs are RATES: a full output turns the laid gun by the seat's slew in a tick, inside the arc; the trigger is the third output; the car's drop and ignite change nothing; with no target the gun holds (or rests, when asked); the zero weights never move or fire
 //   4  THE HAND'S ERROR          `sigma` shakes the command about where the gun is laid -- the stated size, no drift, not fed back into what the network is shown -- from a stream of the seat's own; with none the command is the laid gun exactly
+//   4b THE ROUNDS-LEFT SENSE     off by default (the feature is 0, every fight the fight it was); on, the share of the magazine spent; battleshipDuel turns it on exactly in a rationed fight, where a network wired to it rations its rounds
 //   5  THE TWO HALVES            decide is finish(prepare, forward); `net` is what a batch needs and its layers and post give forward's numbers
 //   6  THE FINDINGS, PINNED      (twelve ship-against-ship pairs a row, seeds 1-3 of each kind) the car's hand weights against the seat's hand gunner behind regular and perfect sights WITH the hand's error, and behind regular sights WITHOUT it -- the lead that was a filter
 //   7  THE FRONT DOOR            the car's brain file is seated by battleshipDuel.sideFromBrains under the car's own policy id; where the weights are; the export list; the report
@@ -20,6 +21,9 @@
 //   T24 the synapses start one late 6 | T25 the output weights are indexed by unit first 1 | T26 the policy id is the seat's 2 | T27 the default tick is a tenth 7 | T28 the hand's error is on by default 4
 // AND THREE ON brain/battleshipFight.mjs ONCE IT PASSED THE HAND'S ERROR (section 6b): E1 the hand's error is not passed 1 | E2 every ship's seats share their streams 1 | E3 the error is always the regular gunner's 1. E2 WENT 0 RED THE FIRST TIME: the row compared the seats' COMMANDS, which differ anyway because each
 // ship's sights have noise of their own; the gunner now says its hand's shake apart (`decide.shake`) and the row reads that.
+// AND TEN ON THE ROUNDS-LEFT SENSE (section 4b; the last three on tools/ship/trainTurretSeat.mjs against its own gate): V1 the sense is on by default 2 | V2 the sense is the share LEFT 3 | V3 the sense is never on 3 | V4 the sense is on another feature 4 | V5 the sense is not clamped 2
+//   W1 a rationed fight does not turn the sense on 1 | W2 the sense is on in every fight 1 | X1 a path child ignores the features given 1 | X2 awake ignores the features given 1 | X3 the default draws the rationed features 1. W2 WENT 0 RED THE FIRST TIME: no fight with the whole magazines runs long enough for a seat to
+//   spend half of them, so a gunner wired to stop at half looked the same with the sense on (a row now reads what the seats are shown).
 // None of the first twenty-eight went 0 red. NOT CHECKED: a gunner actually TRAINED on the race page and exported (none is in the tree: the page keeps them in the browser);  the GPU batch.
 "use strict";
 import * as ST from "./seatTurretGunner.mjs";
@@ -29,6 +33,7 @@ import * as PB from "./peerBrain.mjs";
 import * as CS from "../physics/mechanics/capitalShip.mjs";
 import * as GS from "../physics/mechanics/gunSeats.mjs";
 import * as BF from "./battleshipFight.mjs";
+import * as SA from "./spaceArena.mjs";
 
 let fails = 0;
 function ok(name, cond, detail) { console.log(`  ${cond ? "PASS" : "FAIL"}  ${name}${detail ? "   " + detail : ""}`); if (!cond) fails++; }
@@ -86,6 +91,21 @@ section(() => {
     ok("the same seed is the same shake and another seed another; the factory gives seat k the stream of `seed` + k and each seat its own sight", a.map((r) => r.c.yaw).join() === b.map((r) => r.c.yaw).join() && a[3].c.yaw !== c[3].c.yaw && (() => { const seen = [], f = ST.gunnerFactory(biasNet(0, 0.05), (seat, k) => { seen.push(k); return sightAt(1, 1); }, { sigma: 0.03, seed: 4 }), k0 = f(PD, 0)(PD, { yaw: 0, pitch: 0 }, BODY, [TG], 0), k1 = f(PD, 1)(PD, { yaw: 0, pitch: 0 }, BODY, [TG], 0), direct = ST.gunnerFor(biasNet(0, 0.05), sightAt(1, 1), { sigma: 0.03, seed: 5 })(PD, { yaw: 0, pitch: 0 }, BODY, [TG], 0); return seen.join() === "0,1" && k0.yaw !== k1.yaw && k1.yaw === direct.yaw; })());
 });
 
+console.log("4b. THE ROUNDS-LEFT SENSE (`ammoSense`)");
+section(() => {
+    const gun = (ammo) => ({ yaw: 0, pitch: 0, gun: { ammo } }), seen = (o, ammo) => { const d = ST.gunnerFor(ST.zeroWeights(), sightAt(0.5, 0.3), o); d(PD, gun(ammo), BODY, [TG], 0); return d.last ? d.last.x[6] : null; };
+    const z = ST.gunnerFor(ST.zeroWeights(), sightAt(0.5, 0.3)); z(PD, gun(100), BODY, [TG], 0);
+    ok("!! OFF BY DEFAULT: the `reloading` feature is 0 whatever the magazine holds -- so every fight flown without the sense is the fight it was; ON, it is the share of the seat's magazine SPENT: 0 full, a half at half, 1 empty (a point-defence mount carries 900)", PD.gun.magazine === 900 && seen({}, 900) === 0 && seen({}, 100) === 0 && seen({}, 0) === 0 && seen({ ammoSense: true }, 900) === 0 && seen({ ammoSense: true }, 450) === 0.5 && seen({ ammoSense: true }, 0) === 1 && seen({ ammoSense: true }, 225) === 0.75);
+    ok("the other ten features are untouched by it, a state with no gun reads 0, and the features that vary with the sense on are the seven and the sixth", (() => { const a = ST.gunnerFor(ST.zeroWeights(), sightAt(0.5, 0.3)), b = ST.gunnerFor(ST.zeroWeights(), sightAt(0.5, 0.3), { ammoSense: true }); a(PD, gun(300), BODY, [TG], 0); b(PD, gun(300), BODY, [TG], 0); const c = ST.gunnerFor(ST.zeroWeights(), sightAt(0.5, 0.3), { ammoSense: true }); c(PD, { yaw: 0, pitch: 0 }, BODY, [TG], 0); return a.last.x.every((v, i) => i === 6 || v === b.last.x[i]) && c.last.x[6] === 0; })() && ST.LIVE_FEATURES_RATIONED.join() === "0,1,2,3,4,5,6,8" && ST.features(PD, { yaw: 0, pitch: 0 }, BODY, { yaw: 0, pitch: 0, fire: false }, TG, 600, 7)[6] === 1);
+    // a gunner that fires only while it has spent less than half its magazine: unit 9 = relu(1 - 2 x spent), read by the trigger
+    const miser = ST.handWeights(); miser[ST.outputAt(2, 4)] = 0; miser[ST.outputAt(2, 5)] = 0; miser[ST.encoderAt(9, 0)] = 1; miser[ST.encoderAt(9, 6)] = -2; miser[ST.outputAt(2, 9)] = 5;
+    const side = D.makeSide("miser", { network: { module: ST, weights: miser }, cannon: false }), other = D.makeSide("o", { cannon: false }), spentOf = (ammo) => { const b = D.build(side, other, 3, "broadside", { ammo }); while (!D.finished(b)) SA.stepSpaceArena(b.arena); return b.arena.crafts[0].seats.map((q) => [q.state.gun.fired, q.seat.gun.magazine]); };
+    const rationed = spentOf(0.0625), whole = spentOf(1);
+    const shown = (ammo) => { const b = D.build(side, other, 3, "broadside", { ammo }), xs = []; for (let i = 0; i < 600 && !D.finished(b); i++) { SA.stepSpaceArena(b.arena); for (const q of b.arena.crafts[0].seats) if (q.decide.last && q.state.gun.fired > 0) xs.push(q.decide.last.x[6]); } return xs; };
+    ok("!! battleshipDuel turns the sense on EXACTLY in a rationed fight: with the whole magazines a seat that has fired is still shown 0 on that feature (hundreds of readings, every one 0); at a sixteenth it is shown what it has spent", (() => { const w = shown(1), r = shown(0.0625); return w.length > 100 && w.every((v) => v === 0) && r.length > 100 && r.some((v) => v > 0.2) && r.every((v) => v >= 0 && v <= 1); })());
+    ok("!! IN A RATIONED FIGHT THE SENSE IS ON AND A NETWORK CAN USE IT: a gunner wired to fire only while it has spent less than half its magazine stops at half in every seat (ten rounds a main gun: none fires more than five; 56 a mount: none more than 28) and some reach that; with the whole magazines the sense is off and the same gunner fires on past any half", rationed.every(([f, m]) => f <= Math.ceil(m / 2)) && rationed.some(([f, m]) => f === Math.ceil(m / 2)) && rationed.every(([, m]) => m === 10 || m === 56) && whole.some(([f]) => f > 60), `rationed ${rationed.map(([f]) => f).join(",")}`);
+});
+
 console.log("5. THE TWO HALVES");
 section(() => {
     const w = ST.perturb(ST.handWeights(), 0.2, ST.rngFor(3)), st = { yaw: 0.2, pitch: -0.1 }, d = ST.gunnerFor(w, sightAt(0.5, 0.3, true)), whole = d(PD, st, BODY, [TG], 0), e = ST.gunnerFor(w, sightAt(0.5, 0.3, true)), p = e.prepare(PD, st, BODY, [TG], 0), parts = e.finish(p, e.net.forward(e.net.w, p.x));
@@ -124,7 +144,7 @@ section(() => {
     const k = GP.layersOf(ST.zeroWeights())[1].W.length && 5, s = ST.zeroWeights(); s[ST.synapseAt(k)] = 0.25; s[ST.synapseAt(0)] = -1;
     ok("where the weights are, against the network's own forward(): feature 1 into unit 7 into output 1 answers tanh(2 x 0.5); a hidden bias of 1 into output 0 with -1 answers tanh(-1); output 2's bias answers tanh(0.5); and synapsesUsed counts the synapses that carry a weight (0, then 2)", near(GP.forward(w, x)[1], Math.tanh(1), 1e-6) && near(GP.forward(w, x)[0], Math.tanh(-1), 1e-6) && near(GP.forward(w, x)[2], Math.tanh(0.5), 1e-6) && ST.synapsesUsed(w) === 0 && ST.synapsesUsed(s) === 2 && ST.synapsesUsed(ST.handWeights()) === 0 && ST.biasAt(4) === 895 && ST.synapseAt(0) === 11 * 34 + 34);
     ok("the report says real numbers", ST.reportLines().length === 2 && /11 features, 34 hidden neurons .* 313 synapses\), 5 outputs of which a seat reads 3: 896 weights, policy gunnerPolicy; .*\(18 non-zero weights\)/.test(ST.reportLines()[1]));
-    ok("the export list", Object.keys(ST).sort().join() === "CLOSING,FEATURES,FEATURE_NAMES,HIDDEN,LIVE_FEATURES,OUTPUTS,OUTPUT_NAMES,POLICY_ID,REACH,READ_OUTPUTS,REC_EDGES,REC_STEPS,WEIGHT_COUNT,biasAt,encoderAt,features,forward,gunnerFactory,gunnerFor,handWeights,hiddenBiasAt,layersOf,outputAt,perturb,post,reportLines,rngFor,synapseAt,synapsesUsed,zeroWeights");
+    ok("the export list", Object.keys(ST).sort().join() === "CLOSING,FEATURES,FEATURE_NAMES,HIDDEN,LIVE_FEATURES,LIVE_FEATURES_RATIONED,OUTPUTS,OUTPUT_NAMES,POLICY_ID,REACH,READ_OUTPUTS,REC_EDGES,REC_STEPS,WEIGHT_COUNT,biasAt,encoderAt,features,forward,gunnerFactory,gunnerFor,handWeights,hiddenBiasAt,layersOf,outputAt,perturb,post,reportLines,rngFor,synapseAt,synapsesUsed,zeroWeights");
 });
 
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);

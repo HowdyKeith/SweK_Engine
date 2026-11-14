@@ -41,6 +41,11 @@
     "path": "brain/RIG_COMMANDS_2026-11-14_TURRET_ROUND2.md",
     "title": "Rig commands: the second round, from the gunner that always fires",
     "why": "Round 1's champion learned to hold the trigger. These commands search again from it on fresh pairs, so anything kept has to beat always firing."
+   },
+   {
+    "path": "brain/RIG_COMMANDS_2026-11-14_TURRET_ROUND3.md",
+    "title": "Rig commands: the third round, with no cannon and rationed rounds",
+    "why": "The arena in which holding the trigger loses: these commands train a gunner that is told how much of its magazine it has spent."
    }
   ],
   "sea-ogre.html": [
