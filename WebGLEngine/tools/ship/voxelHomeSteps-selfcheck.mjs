@@ -8,6 +8,7 @@
 //   2  ONE TRAINING          the setting's number reaches the trainer: a quarter of the step is a quarter of the first move, to the float; more builders tried is another training
 //   3  THE RECORDS           the registration's checks, each failing by name; the four rank-sums against round 2's own arm and their words
 //   4  THE COMMAND           its words as arithmetic; it is this round's; this gate starts no training of the round's and no process (the command as a process: tools/ship/voxelHome-selfcheck.mjs section 4)
+//   5  THE VERDICT           the committed results, read from the file: the four tests, the cells beside round 2's and round 3's, the history, the expectations
 // SABOTAGE LOG (2026-11-14) -- through a byte-safe runner (one at a time, every file restored and its sha256 checked), this gate and round 1's run whole for each; the number is the rows that went red:
 //   Q1 a cfg's step ignored 3 | Q2 a cfg's count of builders ignored 3 | Q3 SMALL half the step, not a quarter 3 | Q4 MANY 48 builders 3 | Q5 SMALL changes the count of builders too 3
 //   Q6 every training is MANY's round 1 | Q7 a record carries no setting 1 | Q8 every test reads round 2's FLY 1 | Q9 MORE and LESS each other's 3 | Q10 the tests made with a check failed 1
@@ -15,8 +16,12 @@
 //   Q17 the command exits 0 on a word it does not know 1 (in tools/ship/voxelHome-selfcheck.mjs) | Q18 makeRound takes an odd count of builders 1 | Q19 the history check gone 1
 //   Q20 the trainer's move ignores the step (brain/rl/dockPolicy.js) 1 | Q22 the command reads no control 1 | Q23 the wiring check gone 1 | Q21' the recheck may be any cell's 1
 //   ONE WENT 0 RED, AND IS A ROW NOW: Q21 -- no broken file here had a recheck that named another cell; the row "a recheck that says it is MANY's" is that file. Q21' is Q21 again.
+//   THE VERDICT'S (section 5, 2026-11-14), this gate run whole for each, every one red by name: V1 a MANY FLY score in the file lowered to 0.60 4 | V2 a SMALL PLAIN builder given a home in the file 2
+//   V3 a round 2 PLAIN score in round 2's file raised to 0.80 3 | V4 MORE and LESS each other's 5 | V5 SMALL's tests read MANY's cells 3 | V6 the note's M-FLY says CANNOT 1 | V7 the note's S-PLAIN says LESS 1
+//   V8 the audit is of the named environment 2
 "use strict";
 import fs from "node:fs";
+import { createHash } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as V from "./voxelHomeSteps.mjs";
@@ -119,6 +124,34 @@ section(() => {
     const me = src("tools/ship/voxelHomeSteps-selfcheck.mjs"), calls = [...me.matchAll(/V2?\.trainOne\(([^)]*)\)/g)].map((m) => m[1]);
     ok("!! THIS GATE STARTS NO TRAINING OF THE ROUND'S AND LEAVES ITS RESULTS FILE AS IT WAS: its trainings are of 1 and 2 iterations with 4 or 8 builders on draw 901 or refused before they start; this gate starts no process at all (the command is never run from here); and the file's size and time are what they were before this section",
         calls.length === 6 && calls.every((c) => /901, TINY(_SMALL|_MANY|_TWO)?, TINY_AUDIT$/.test(c)) && TINY.iters === 1 && TINY_MANY.iters === 2 && !V.SEEDS.includes(901) && !/Sync\(/.test(me.replace(/readFileSync\(|statSync\(|existsSync\(/g, "")) && stateOf() === before, `${calls.length} trainings, no process, the file ${before === "absent" ? "absent" : "unchanged"}`);
+});
+
+console.log("\n5. THE VERDICT (round 5; the results were committed at 8e362d0e before they were read, and are read here from the file)");
+section(() => {
+    const parse = (f) => src(f).split("\n").filter(Boolean).map((l) => JSON.parse(l)), bytes = fs.readFileSync(path.join(ENG, V.RESULTS)), lines = parse(V.RESULTS), before = parse(V.BEFORE), R = V.reading(lines, before), near = (a, b, e = 5e-5) => Math.abs(a - b) < e, T = R.tests, C = R.cells;
+    ok("!! the results file is the one the run wrote: 65 records, sha256 910dd28fa016fe2c...", lines.length === 65 && createHash("sha256").update(bytes).digest("hex") === "910dd28fa016fe2c5b09b8a0b2aa07622ae95c5fa7a5da17add9feb628807ff8");
+    ok("!! THE CHECKS HOLD: 64 draws each once, each setting's recipe, each arm's weight count and wiring, SMALL FLY draw 1 the same twice, a history in every record, round 2's 16 FLY and 16 PLAIN draws", R.checks.length === 0, R.checks.slice(0, 2).join(" | "));
+    ok("!! *** M-FLY AND M-PLAIN: MORE BUILDERS TRIED BUILDS MORE OF A HOME *** -- with 96 builders tried an iteration for 24, every one of the 16 builders of each arm is above every one of round 2's 16 of that arm (the ranks sum to 392, the most there is; exact two-sided p 3.3e-9, twice)",
+        T["M-FLY"].word === V.WORDS.MANY[0] && T["M-PLAIN"].word === V.WORDS.MANY[0] && T["M-FLY"].sumA === 392 && T["M-PLAIN"].sumA === 392 && T["M-FLY"].ties === 0 && T["M-PLAIN"].ties === 0 && T["M-FLY"].p < 4e-9);
+    ok("!! *** S-FLY AND S-PLAIN: A SMALLER STEP CANNOT BE TOLD APART FROM ROUND 2'S *** -- a quarter of the step: FLY's ranks sum to 269 (the middle is 264; p 0.87), PLAIN's to 219 (p 0.094, its mean a hundredth lower)", T["S-FLY"].word === V.WORDS.SMALL[2] && T["S-PLAIN"].word === V.WORDS.SMALL[2] && T["S-FLY"].sumA === 269 && near(T["S-FLY"].p, 0.86718) && T["S-PLAIN"].sumA === 219 && near(T["S-PLAIN"].p, 0.09381) && C["SMALL PLAIN"].mean < R.control.PLAIN.mean);
+    const rm = R.floors.random.reduce((a, b) => a + b, 0) / 16, way = (m) => (m - rm) / (R.floors.lean - rm);
+    ok("!! the cells' mean share of a home built, 16 draws each (mean, sd), beside round 2's own arm: SMALL FLY 0.6677 0.0130 and MANY FLY 0.7140 0.0146 against 0.6664; SMALL PLAIN 0.6794 0.0177 and MANY PLAIN 0.7452 0.0137 against 0.6905 -- MANY adds 0.048 and 0.055; and MANY's PLAIN stands 0.49 of the way from a random builder (0.572) to the lean (0.923), where round 2's stood a third",
+        near(C["SMALL FLY"].mean, 0.6677) && near(C["SMALL FLY"].sd, 0.0130) && near(C["MANY FLY"].mean, 0.7140) && near(C["MANY FLY"].sd, 0.0146) && near(C["SMALL PLAIN"].mean, 0.6794) && near(C["SMALL PLAIN"].sd, 0.0177) && near(C["MANY PLAIN"].mean, 0.7452) && near(C["MANY PLAIN"].sd, 0.0137) && near(R.control.FLY.mean, 0.6664) && near(R.control.PLAIN.mean, 0.6905) &&
+        near(C["MANY FLY"].mean - R.control.FLY.mean, 0.0476, 5e-4) && near(C["MANY PLAIN"].mean - R.control.PLAIN.mean, 0.0547, 5e-4) && near(way(C["MANY PLAIN"].mean), 0.4935, 5e-4) && near(way(R.control.PLAIN.mean), 0.3375, 5e-4));
+    const r3 = parse("brain/voxelHomeLongRound.jsonl").filter((r) => r.kind === "draw"), m3 = (a) => r3.filter((r) => r.arm === a).reduce((n, r) => n + r.score, 0) / 16;
+    ok("!! *** FOUR TIMES THE BUILDERS FOR 150 ITERATIONS BUILDS MORE THAN 1,000 ITERATIONS OF ROUND 2'S TRAINER DID *** -- from round 3's own file: FLY 0.7140 here against 0.6869 there, PLAIN 0.7452 against 0.7010, at 0.6 of round 3's cost (96 x 150 builders tried against 24 x 1,000)",
+        near(m3("FLY"), 0.6869) && near(m3("PLAIN"), 0.7010) && C["MANY FLY"].mean > m3("FLY") + 0.025 && C["MANY PLAIN"].mean > m3("PLAIN") + 0.04 && V.RECIPES.MANY.pop * V.RECIPES.MANY.iters / (24 * 1000) === 0.6);
+    const draws = lines.filter((r) => r.kind === "draw"), homes = draws.filter((r) => r.homes > 0).map((r) => `${r.setting} ${r.arm} ${r.s} ${r.homes}`);
+    ok("one home in 12,800 builds (a MANY PLAIN builder's, one of its 200 plans), and the lean alone finishes 123 of 200: neither setting comes near what a start at the lean did in round 4", homes.length === 1 && /^MANY PLAIN \d+ 1$/.test(homes[0]) && C["MANY PLAIN"].homes === 1 && C["SMALL FLY"].homes + C["SMALL PLAIN"].homes + C["MANY FLY"].homes === 0 && R.floors.leanHomes === 123, homes.join(", "));
+    const H = (c) => C[c].history.map((h) => h.missing);
+    ok("!! THE HISTORY: NEITHER SETTING HAD LEVELLED AT 150 -- on the trainer's own battery the share missing is still falling in every cell (the last reading below the one before it): SMALL FLY 0.4358 to 0.2927, SMALL PLAIN 0.4443 to 0.2791, MANY FLY 0.4114 to 0.2383, MANY PLAIN 0.4145 to 0.2042; SMALL is where round 2's trainer was, by a slower road, and MANY is below where 1,000 iterations left round 3 (FLY 0.2664, PLAIN 0.2548)",
+        Object.keys(C).every((c) => H(c).length === 7 && H(c)[6] < H(c)[5] && H(c)[5] < H(c)[4]) && near(H("SMALL FLY")[0], 0.4358) && near(H("SMALL FLY")[6], 0.2927) && near(H("SMALL PLAIN")[0], 0.4443) && near(H("SMALL PLAIN")[6], 0.2791) && near(H("MANY FLY")[0], 0.4114) && near(H("MANY FLY")[6], 0.2383) && near(H("MANY PLAIN")[0], 0.4145) && near(H("MANY PLAIN")[6], 0.2042) && H("MANY FLY")[6] < 0.2664 && H("MANY PLAIN")[6] < 0.2548);
+    const again = V.CELLS.flatMap(([x, a]) => [4, 12].map((s) => { const r = draws.find((d) => d.setting === x && d.arm === a && d.s === s), p = V.policyOf(a, s); p.setParams(PF.unpackWeights(r.weights)); const au = V.auditScore(p); return [x, a, s, au.score === r.score && au.homes === r.homes]; }));
+    ok("!! THE WEIGHTS IN A RECORD GIVE ITS SCORE AND ITS HOMES AGAIN: draws 4 and 12 of every cell, audited here on the 200 plans, to the bit", again.every((x) => x[3]), again.filter((x) => !x[3]).map((x) => x.slice(0, 3).join(" ")).join(", "));
+    const note = src("brain/VOXEL_HOME_STEPS_WIP.md"), res = note.slice(note.indexOf("## 9. The result"));
+    ok("the expectations, written before the tool, against what came: MANY builds more in either arm was given 70 percent and in both 55 -- both came; SMALL was MORE 35, LESS 30, cannot tell 35 -- cannot tell came; the best cell above 0.75 was given 35 and is 0.745; any home 30, and there is one; neither setting building more 20, and it did not come",
+        /MANY builds more than round 2 \(either arm\): about 70 percent; both arms: about 55/.test(note) && /SMALL builds more: about 35 percent, LESS about\s+30/.test(note) && /above 0\.75: about 35 percent/.test(note) && /Any home: about 30 percent/.test(note) && Math.max(...Object.values(C).map((c) => c.mean)) < 0.75);
+    ok("the registration's RESULT SECTION (section 9, and not the list of possible words in section 3) carries the four readings' words", /## 9\. The result/.test(note) && Object.entries(T).every(([name, t]) => res.includes(`**${name}: ${t.word}**`)));
 });
 
 console.log(`\nvoxelHomeSteps-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILED"}`);

@@ -62,3 +62,48 @@ The run is resumable.
 ## 8. The run (to be written; the gate never runs it and never gives the command the word `run`)
 `node tools/ship/takeVoxelHomeSteps.mjs run` -> `brain/voxelHomeStepsRound.jsonl`, committed byte for byte before it is read;
 `node tools/ship/takeVoxelHomeSteps.mjs read` prints the checks and the reading.
+
+## 9. The result (run 2026-11-14 in the sandbox, 24.9 minutes; `brain/voxelHomeStepsRound.jsonl` committed at 8e362d0e before it was read; read once)
+**The checks hold.**
+
+| cell | mean share built | sd | least | most | homes (16 x 200 builds) | round 2's arm | against it | round 3's arm (1,000 iterations) |
+|---|---|---|---|---|---|---|---|---|
+| SMALL FLY | 0.6677 | 0.0130 | 0.6482 | 0.6900 | 0 | 0.6664 | +0.001 | 0.6869 |
+| SMALL PLAIN | 0.6794 | 0.0177 | 0.6472 | 0.7100 | 0 | 0.6905 | -0.011 | 0.7010 |
+| MANY FLY | 0.7140 | 0.0146 | 0.6931 | 0.7392 | 0 | 0.6664 | +0.048 | 0.6869 |
+| MANY PLAIN | 0.7452 | 0.0137 | 0.7099 | 0.7678 | 1 | 0.6905 | +0.055 | 0.7010 |
+| 16 random builders | 0.5722 | | | | 0 | | | |
+| the lean, no network | 0.9226 | | | | 123 of 200 | | | |
+
+* **M-FLY: MORE BUILDERS TRIED BUILDS MORE OF A HOME** and **M-PLAIN: MORE BUILDERS TRIED BUILDS MORE OF A HOME** -- every one
+  of the 16 builders of each arm above every one of round 2's 16 of that arm (the ranks sum to 392; exact two-sided p 3.3e-9).
+* **S-FLY: A SMALLER STEP CANNOT BE TOLD APART FROM ROUND 2'S** (269, the middle 264; p 0.87) and
+  **S-PLAIN: A SMALLER STEP CANNOT BE TOLD APART FROM ROUND 2'S** (219; p 0.094, its mean a hundredth lower).
+
+**So of the two, it is how little the trainer tried each iteration, not the size of its step.** Four times the builders for 150
+iterations builds more than 1,000 iterations of round 2's trainer did (FLY 0.714 against round 3's 0.687, PLAIN 0.745 against
+0.701) at 0.6 of round 3's cost. MANY's PLAIN stands 0.49 of the way from a random builder to the lean, where round 2's stood a
+third and round 3's best 0.375.
+
+**It is still half way, and one home.** One home in 12,800 builds. Round 4's start at the lean reached 0.99 and 12,700 homes in
+16,000: a better estimate of the same trainer does not find the lean in 150 iterations.
+
+**The history: neither setting had levelled.** The trainer's own battery, share of the plan missing, mean of a cell's 16 draws:
+
+| cell | iteration 0 | 25 | 50 | 75 | 100 | 125 | 149 |
+|---|---|---|---|---|---|---|---|
+| SMALL FLY | 0.4358 | 0.3911 | 0.3499 | 0.3347 | 0.3202 | 0.3095 | 0.2927 |
+| SMALL PLAIN | 0.4443 | 0.3552 | 0.3401 | 0.3285 | 0.3091 | 0.2972 | 0.2791 |
+| MANY FLY | 0.4114 | 0.3178 | 0.2791 | 0.2618 | 0.2535 | 0.2464 | 0.2383 |
+| MANY PLAIN | 0.4145 | 0.3121 | 0.2574 | 0.2302 | 0.2137 | 0.2056 | 0.2042 |
+
+Every cell's last reading is below the one before it. SMALL arrives where round 2's trainer did by a slower road and is still
+moving, so "cannot be told apart at 150" is, as section 6 said, also "a quarter of the distance"; what a longer SMALL would do
+is not known. MANY at 150 is already below where 1,000 iterations left round 3 (FLY 0.2664, PLAIN 0.2548).
+
+**The expectations against what came.** MANY builds more in either arm (70) and in both (55): came. SMALL: cannot tell (35)
+came, of MORE 35, LESS 30. The best cell above 0.75 (35): no, 0.745. Any home (30): one. Neither setting builds more (20): did
+not come.
+
+**What this does not say** (section 6): the best setting (two points are not a search); what more than 96 would do; anything
+about the fly's wiring.

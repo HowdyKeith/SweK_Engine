@@ -241,7 +241,7 @@ Minecraft" below means a survival loop in the tree's own voxel world.**
 | `fly-attracts-fly` | A signalling game: one fly-wired builder makes a structure, a second fly-wired agent, trained separately, chooses which structure to approach; trained together | the wiring of both. **An invented behaviour on real wiring: real flies attract by song and scent, not architecture, and the tree holds neither circuit. The page must say so.** | a chooser environment (two sites, one the builder's, one a random pile of the same block count), co-training; the test: does the visitor pick the builder's over the pile, and does a shuffled wiring do as well | yes; **the visitor could be another peer's brain (`swek-brain-v1`), which would give `peer-jobs` a first real use** |
 | `two-flies-one-site` | Two builders on one site: together, or competing for the same blocks | the wiring | `BuildEnv` with two builders taking turns; cheap once `voxel-home` is done | yes |
 
-## Added 2026-11-14: `voxel-home-trainer` -- another training round that changes the trainer, not its length (`start-at-the-lean` DONE; `smaller-steps` and `more-samples` REGISTERED as round 5)
+## Added 2026-11-14: `voxel-home-trainer` -- another training round that changes the trainer, not its length (`start-at-the-lean` DONE; `smaller-steps` and `more-samples` DONE as round 5)
 
 **Round 4, `start-at-the-lean`, is DONE** (`brain/VOXEL_HOME_LEAN_WIP.md` section 8, `tools/ship/voxelHomeLean-selfcheck.mjs`
 section 6; `brain/rl/leanStart.mjs`): the builder is the lean plus its network, the network's output layer started at zero. **All
@@ -249,7 +249,13 @@ section 6; `brain/rl/leanStart.mjs`): the builder is the lean plus its network, 
 16,000 builds**, 151 to 172 of 200 a builder by arm against the lean's 123. Looked at after: the network learned not to ask for a
 roof block that would hang (23.8 such picks a build for the lean, 5.3 for FLY draw 1). The fly's wiring cannot be told from a
 shuffle (p 0.40), the fifth time. The page (`voxel-home.html`) does not yet play round 4's builders: its module knows rounds 1
-to 3 (OPEN, small). **Round 5** (`brain/VOXEL_HOME_STEPS_WIP.md`) is registered: the trainer's step and its samples.
+to 3 (OPEN, small). **Round 5 is DONE** (`brain/VOXEL_HOME_STEPS_WIP.md` section 9, `tools/ship/voxelHomeSteps-selfcheck.mjs` section 5), from a
+random start on FLY and PLAIN: **four times the builders tried an iteration builds more** (FLY 0.714 for 0.666, PLAIN 0.745 for
+0.690; all 16 above all 16, twice) and more than round 3's 1,000 iterations did at 0.6 of its cost; **a quarter of the step
+cannot be told apart from round 2's** at 150 iterations. Neither had levelled. It is still half way to the lean, and one home.
+The trainer's step is `lr / (sigma x sqrt(pop))` a weight whatever the signal, so the backlog's "smaller sigma" below was the
+wrong knob (a smaller sigma is a LARGER step). **Open, none registered:** the two together (a start at the lean with 96
+builders); more than 96; a longer SMALL; `another-trainer`.
 
 Keith, 2026-11-14, of the three choices after round 3: "Do item 1. Backlog item 2 another training." Round 3
 (`brain/VOXEL_HOME_LONG_WIP.md` section 8) measured that 6.7 times the iterations of the same trainer bought 0.01 to 0.02 of a
