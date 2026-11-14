@@ -17,6 +17,9 @@
 // ONE CODE, TWO ROUNDS (2026-11-14): everything below is makeRound(cfg), and this file's own exports are makeRound(ROUND1). Round 2 (brain/VOXEL_HOME_DRAWN_WIP.md: the builder's column DRAWN from 36
 // numbers, not named by 2) is tools/ship/voxelHomeDrawn.mjs, the same function with another cfg: { choice, plainUnits, weights, results }. The random builders are flown on the named environment in both.
 //
+// ROUND 3 (brain/VOXEL_HOME_LONG_WIP.md, tools/ship/voxelHomeLong.mjs) is round 2's cfg with three more keys: `iters` (1,000 for 150), `history` (each record carries the trainer's own readings along the
+// way) and `before` (an earlier round's results file: T3 reads this round's FLY builders against that file's, and reading() and checkRecords() then take its records as a second argument).
+//
 // NOT HERE: the 80 trainings (the command runs them; tools/ship/voxelHome-selfcheck.mjs never does). Pure but for what trainOne costs.
 "use strict";
 import { trainDockES, FlightPolicy } from "../../brain/rl/dockPolicy.js";
@@ -26,8 +29,9 @@ import { rankSum, hashWeights, packWeights, unpackWeights, hashEdges } from "./p
 
 /** See the header: a round's whole arithmetic for a cfg { choice: "named" | "drawn", plainUnits, weights: { arm: count }, results }. */
 export function makeRound(cfg) {
-    if (!cfg || (cfg.choice !== "named" && cfg.choice !== "drawn") || !Number.isInteger(cfg.plainUnits) || !cfg.weights || typeof cfg.results !== "string") throw new Error("voxelHome.makeRound: a cfg is { choice: \"named\" | \"drawn\", plainUnits, weights, results }");
-    const RECIPE = Object.freeze({ maxSteps: 96, iters: 150, pop: 24, sigma: 0.14, lr: 0.05, trainEps: 8 });
+    if (!cfg || (cfg.choice !== "named" && cfg.choice !== "drawn") || !Number.isInteger(cfg.plainUnits) || !cfg.weights || typeof cfg.results !== "string" || (cfg.iters !== undefined && !(Number.isInteger(cfg.iters) && cfg.iters > 0)) || (cfg.before !== undefined && typeof cfg.before !== "string")) throw new Error("voxelHome.makeRound: a cfg is { choice: \"named\" | \"drawn\", plainUnits, weights, results }");
+    const RECIPE = Object.freeze({ maxSteps: 96, iters: cfg.iters === undefined ? 150 : cfg.iters, pop: 24, sigma: 0.14, lr: 0.05, trainEps: 8 });
+    const HISTORY = cfg.history === true, BEFORE = cfg.before === undefined ? null : cfg.before;   // round 3: each record carries the trainer's history, and T3 reads this round's FLY against an earlier round's file
     const CHOICE = cfg.choice, ACT = CHOICE === "drawn" ? SITE * SITE : ACT_DIM, envOf = (maxSteps, o = {}) => new BuildEnv({ maxSteps, choice: CHOICE, ...o });
     const SEEDS = Object.freeze(Array.from({ length: 16 }, (_, k) => k + 1));
     const ARMS = Object.freeze(["FLY", "SHUF", "PLAIN", "FISH", "MLP"]);
@@ -67,7 +71,8 @@ export function makeRound(cfg) {
         base.setParams(res.params);
         const a = auditOf(base, audit, recipe.maxSteps);
         return { kind: "draw", arm, s, recipe: { ...recipe }, units: circuit ? circuit.units : null, edges: circuit ? circuit.edges.length : null, edgesHash: circuit ? hashEdges(circuit.edges) : null,
-            weightCount: res.params.length, weights: packWeights(res.params), weightsHash: hashWeights(res.params), trainerBest: res.best, score: a.score, homes: a.homes };
+            weightCount: res.params.length, weights: packWeights(res.params), weightsHash: hashWeights(res.params), trainerBest: res.best, score: a.score, homes: a.homes,
+            ...(HISTORY ? { history: res.history.map((h) => ({ it: h.it, missing: h.avgDist })) } : {}) };
     }
 
     const auditNamed = (policy, seeds, maxSteps) => auditScore(policy, seeds, maxSteps, new BuildEnv({ maxSteps }));   // a random builder is the same builder whichever way the choice is made: it is flown on the named environment in both rounds
@@ -95,7 +100,7 @@ export function makeRound(cfg) {
 
     const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
     /** See the header. */
-    function checkRecords(lines) {
+    function checkRecords(lines, beforeLines = null) {
         const bad = [], draws = lines.filter((r) => r && r.kind === "draw"), seen = new Map();
         for (const r of draws) { const k = r.arm + "/" + r.s; seen.set(k, (seen.get(k) || 0) + 1); }
         for (const arm of ARMS) for (const s of SEEDS) { const c = seen.get(arm + "/" + s) || 0; if (c !== 1) bad.push(`${arm} draw ${s} is there ${c} times (once is registered)`); }
@@ -109,6 +114,7 @@ export function makeRound(cfg) {
             if (!w || w.length !== r.weightCount || hashWeights(w) !== r.weightsHash || !w.every(Number.isFinite)) bad.push(`${id}'s weights are not ${r.weightCount} finite numbers with its hash`);
             if (!Number.isFinite(r.score) || r.score < 0 || r.score > 1) bad.push(`${id} has no score that is a share`);
             if (!Number.isInteger(r.homes) || r.homes < 0 || r.homes > AUDIT.length) bad.push(`${id} has no count of homes`);
+            if (HISTORY && !(Array.isArray(r.history) && r.history.length >= 2 && r.history.every((h) => h && Number.isInteger(h.it) && Number.isFinite(h.missing)) && r.history[0].it === 0 && r.history[r.history.length - 1].it === RECIPE.iters - 1)) bad.push(`${id} has no history from iteration 0 to ${RECIPE.iters - 1}`);
             if (r.arm !== "MLP") {
                 const c = circuitOf(r.arm, r.s);
                 if (r.edgesHash !== hashEdges(c.edges) || r.edges !== c.edges.length || r.units !== c.units) bad.push(`${id}'s wiring is not its arm's`);
@@ -123,6 +129,7 @@ export function makeRound(cfg) {
         if (re.length !== 1 || !fly1 || re[0].arm !== "FLY" || re[0].s !== 1 || re[0].weightsHash !== fly1.weightsHash) bad.push("FLY draw 1 trained a second time is not there once with the same weights");
         const fl = lines.filter((r) => r && r.kind === "floors");
         if (fl.length !== 1 || !Array.isArray(fl[0].random) || fl[0].random.length !== RANDOM_SEEDS.length || !fl[0].random.every(Number.isFinite) || !fl[0].untrained || !ARMS.every((a) => Number.isFinite(fl[0].untrained[a]))) bad.push("the 16 random builders and the untrained draws are not there once");
+        if (BEFORE) { const fb = (beforeLines || []).filter((r) => r && r.kind === "draw" && r.arm === "FLY" && Number.isFinite(r.score)), ss = fb.map((r) => r.s).sort((a, b) => a - b); if (!same(ss, [...SEEDS])) bad.push(`the earlier round's file (${BEFORE}) does not hold its 16 FLY draws, each once`); }
         return bad;
     }
     const stats = (v) => { const n = v.length, mean = v.reduce((a, b) => a + b, 0) / n; return { n, mean, sd: Math.sqrt(v.reduce((a, b) => a + (b - mean) ** 2, 0) / n), min: Math.min(...v), max: Math.max(...v) }; };
@@ -132,15 +139,18 @@ export function makeRound(cfg) {
         T0: ["A FLY-WIRED BUILDER BUILDS MORE OF A HOME THAN A RANDOM ONE", "A FLY-WIRED BUILDER BUILDS LESS OF A HOME THAN A RANDOM ONE", "A FLY-WIRED BUILDER CANNOT BE TOLD APART FROM A RANDOM ONE"],
         T1: ["THE FLY'S WIRING BUILDS BETTER THAN A SHUFFLE OF IT", "THE FLY'S WIRING BUILDS WORSE THAN A SHUFFLE OF IT", "THE FLY'S WIRING CANNOT BE TOLD APART FROM A SHUFFLE OF IT"],
         T2: ["THE FLY'S WIRING BUILDS BETTER THAN A PLAIN NET OF ITS SIZE", "THE FLY'S WIRING BUILDS WORSE THAN A PLAIN NET OF ITS SIZE", "THE FLY'S WIRING CANNOT BE TOLD APART FROM A PLAIN NET OF ITS SIZE"],
+        T3: ["A LONGER TRAINING BUILDS MORE OF A HOME", "A LONGER TRAINING BUILDS LESS OF A HOME", "A LONGER TRAINING CANNOT BE TOLD APART FROM THE SHORTER"],
     });
     /** See the header. */
-    function reading(lines) {
-        const checks = checkRecords(lines), draws = lines.filter((r) => r && r.kind === "draw"), of = (arm) => draws.filter((r) => r.arm === arm).sort((a, b) => a.s - b.s), scores = (arm) => of(arm).map((r) => r.score);
-        const arms = {}; for (const arm of ARMS) { const v = of(arm); if (v.length) arms[arm] = { ...stats(v.map((r) => r.score)), homes: v.reduce((a, r) => a + (r.homes || 0), 0), bestHomes: Math.max(...v.map((r) => r.homes || 0)) }; }
+    function reading(lines, beforeLines = null) {
+        const checks = checkRecords(lines, beforeLines), draws = lines.filter((r) => r && r.kind === "draw"), of = (arm) => draws.filter((r) => r.arm === arm).sort((a, b) => a.s - b.s), scores = (arm) => of(arm).map((r) => r.score);
+        const arms = {}; for (const arm of ARMS) { const v = of(arm); if (v.length) arms[arm] = { ...stats(v.map((r) => r.score)), homes: v.reduce((a, r) => a + (r.homes || 0), 0), bestHomes: Math.max(...v.map((r) => r.homes || 0)) };
+            if (v.length && HISTORY && v.every((r) => Array.isArray(r.history) && r.history.length === v[0].history.length)) arms[arm].history = v[0].history.map((h, k) => ({ it: h.it, missing: v.reduce((a, r) => a + r.history[k].missing, 0) / v.length })); }
         const fl = lines.find((r) => r && r.kind === "floors") || null;
-        if (checks.length) return { checks, arms, T0: null, T1: null, T2: null, floors: fl };
+        if (checks.length) return { checks, arms, T0: null, T1: null, T2: null, ...(BEFORE ? { T3: null } : {}), floors: fl };
         const mk = (name, other) => { const t = rankSum(scores("FLY"), other); return { ...t, word: word3(t, ...WORDS[name]) }; };
-        return { checks, arms, T0: mk("T0", fl.random), T1: mk("T1", scores("SHUF")), T2: mk("T2", scores("PLAIN")), floors: fl };
+        const before = BEFORE ? beforeLines.filter((r) => r && r.kind === "draw" && r.arm === "FLY").sort((a, b) => a.s - b.s).map((r) => r.score) : null;
+        return { checks, arms, T0: mk("T0", fl.random), T1: mk("T1", scores("SHUF")), T2: mk("T2", scores("PLAIN")), ...(BEFORE ? { T3: mk("T3", before) } : {}), floors: fl };
     }
     /** See the header. */
     function readingLines(R) {
@@ -151,10 +161,11 @@ export function makeRound(cfg) {
         for (const [arm, s] of Object.entries(R.arms)) out.push(`${arm.padEnd(7)} ${String(s.n).padStart(2)}  ${f(s.mean)}  ${f(s.sd)}  ${f(s.min)}  ${f(s.max)}  ${String(s.homes).padStart(6)}               ${s.bestHomes}`);
         if (R.floors && Number.isFinite(R.floors.lean)) out.push("", `the lean to the unfinished columns, no network: ${f(R.floors.lean)}, homes ${R.floors.leanHomes} of ${AUDIT.length}`);
         if (R.floors) { const r = stats(R.floors.random); out.push("", `16 random builders: ${f(r.mean)} +/- ${f(r.sd)}, homes ${R.floors.randomHomes.reduce((a, b) => a + b, 0)}; the rule: 1.0000, every plan a home`, `untrained draw 1: ${Object.entries(R.floors.untrained).map(([a, v]) => `${a} ${f(v)}`).join(", ")}`); }
-        for (const [name, t] of [["T0 (FLY against 16 random builders)", R.T0], ["T1 (FLY against SHUF)", R.T1], ["T2 (FLY against PLAIN)", R.T2]]) if (t) out.push("", `${name}: the fly's ranks sum to ${t.sumA} (the middle is ${t.n * (t.n + t.m + 1) / 2}), ties ${t.ties}; exact two-sided p ${t.p.toExponential(3)}`, `  ${t.word}`);
+        for (const [arm, a] of Object.entries(R.arms)) if (a.history) out.push(`${arm.padEnd(7)} the trainer's own battery, share missing at iteration ${a.history.map((h) => `${h.it}: ${f(h.missing)}`).join(", ")}`);
+        for (const [name, t] of [["T0 (FLY against 16 random builders)", R.T0], ["T1 (FLY against SHUF)", R.T1], ["T2 (FLY against PLAIN)", R.T2], ["T3 (this round's FLY against the earlier round's FLY)", R.T3]]) if (t) out.push("", `${name}: the fly's ranks sum to ${t.sumA} (the middle is ${t.n * (t.n + t.m + 1) / 2}), ties ${t.ties}; exact two-sided p ${t.p.toExponential(3)}`, `  ${t.word}`);
         return out;
     }
-    return Object.freeze({ RECIPE, SEEDS, ARMS, MLP_HIDDEN, PLAIN_UNITS, WEIGHTS, AUDIT, RANDOM_SEEDS, ALPHA, RESULTS, circuitOf, policyOf, auditScore, trainOne, floors, parseArgs, checkRecords, WORDS, reading, readingLines });
+    return Object.freeze({ BEFORE, RECIPE, SEEDS, ARMS, MLP_HIDDEN, PLAIN_UNITS, WEIGHTS, AUDIT, RANDOM_SEEDS, ALPHA, RESULTS, circuitOf, policyOf, auditScore, trainOne, floors, parseArgs, checkRecords, WORDS, reading, readingLines });
 }
 
 export const ROUND1 = Object.freeze({ choice: "named", plainUnits: 41, weights: Object.freeze({ FLY: 1777, SHUF: 1777, PLAIN: 1765, FISH: 1617, MLP: 962 }), results: "brain/voxelHomeRound.jsonl" });
