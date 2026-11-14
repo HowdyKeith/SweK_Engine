@@ -10,7 +10,15 @@
 //   5 THE SOURCE    no clock, no random number; the headers; ASCII
 // NOT CHECKED, said plainly: the ratings of the seven sides on the recorded set (that is the read of brain/SUB_LEAGUE_WIP.md, flown by the command, not here).
 //
-// SABOTAGES: written after the gate; the log is added below when the pass is done.
+// SABOTAGES (the mutation harness copies the gate's import closure to isolated trees, runs the unmutated gate first, changes one token at a time plus 16 hand mutants, and counts a FAIL, a crash or a hang as killed):
+//   PASS 1  112 mutants (96 tokens, 16 hand): 79 red, 17 crash, 1 hang, 15 ALIVE. Triage: three HAND survivors were REAL and each got a row: the seat bias flown on the wrong geometries (every earlier row used --first 1, where the seat geometries from 1 and from --first are the same
+//           eight), the record's ratings order unsorted (the earlier record had its sides already in rank order), the record ignoring the flipped pair (the two-side record's ratings are both 0, a tie, so reading the pair one way or both gave the same numbers);
+//           and the `||` -> `&&` that let `--record ""` through, the 200 boundary of --geometries (n <= 200 -> n < 200), and the upsets line's digits (edge to 3 decimals, z to 1; no real run has an upset, so the formatting was never executed) -- the last by making the two
+//           verdict lines an exported pure function (verdictLines) and testing it on made-up cycles and upsets.
+//   PASS 2  112 mutants after the rows: 88 red, 18 crash, 1 hang, 4 ALIVE, 1 hand mutant whose old string moved with the refactor (the cycles line; re-made by hand against verdictLines: 5 rows FAIL, file restored). The four survivors are EQUIVALENT, said:
+//           the sign of the seat-bias line `mean >= 0` -> `> 0` (the two differ only at a mean of exactly 0.000..., which a measured mean is not) and `0` -> `-1` (differs only for a NEGATIVE seat bias in (-1, 0), which no side of the roster has: seat A is worth +0.9 to +3.4 a duel
+//           on every side measured; a side that had one would print `-0.500` without the `+` either way and `0.500` without it, and the line is read by a person); `typeof process !== "undefined" && Array.isArray(process.argv)` -> `||` (Node always has a process, so both
+//           readings agree; the guard is for a browser that imports the file); `process.argv.slice(2)` -> `slice(1)` (the program takes no positional argument, and a path in the first place is not a flag, so every flag lookup and the unknown-argument check are the same).
 "use strict";
 import fs from "node:fs";
 import crypto from "node:crypto";
