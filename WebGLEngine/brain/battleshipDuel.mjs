@@ -19,6 +19,9 @@
 //               nose on the enemy, flying the arena's doctrine. Every capital ship of a side has the side's gunners, helm and cannon; each has sights and a helm network of its own.
 //   THE SCORE   of a side, subDuel's: the damage its ships dealt to the enemy's CAPITAL ships less what its own took, over the hit points of a side's ships (1,500 each); +KILL_BONUS (0.5) when every enemy capital ship is destroyed, and up to SPEED_BONUS (0.5) more for doing it early
 //               (0.5 x the fraction of the time left); -0.5 when every one of its own is. A fight ends when a side has no capital ship flying (escorts alone do not keep it going) or at the time limit. WHO WON is the side whose score is higher by more than DECISIVE (0.05).
+//   SCARCE ROUNDS (the option `ammo`, default 1: the ship's magazines as capitalShip.mjs has them, so that every fight flown without it is the fight it was) -- a fraction, above 0 and at most 1, of every gun seat's magazine that BOTH sides carry into the fight. WHY IT EXISTS, MEASURED: with the whole magazines (160 rounds
+//               a main gun, 900 a point-defence mount) no gun runs dry in a fight, a round costs nothing, and the search of 2026-11-14 (tools/ship/trainTurretSeatBig.mjs) found what that makes right: hold the trigger whenever there is a target (+0.642 over the gunner that fires when the sight says to). With `ammo` 0.25 a main gun
+//               has 40 rounds -- 27 seconds of holding the trigger -- and a gun that is empty is empty for the rest of the fight. The cannon is not a seat and is not rationed. EVERY NUMBER IS INVENTED, this one included.
 //   LIVE BRAINS a NETWORK that is asked for a decision in a tick: a seat's hand, a helm's correction, an escort's pilot. duel() counts them as the fight runs -- `brains.seated` (the networks the two sides brought), `brains.asked` (forward passes over the whole fight), `brains.peak` (the most in one tick). A seat with no
 //               target in its arc is not asked, a dead ship's are not, and the hand rules and the PD autopilot are not networks and are not counted. The count wraps each network's forward and changes no arithmetic (the gate flies a fight with and without the wrapping and compares).
 //   PEERS' BRAINS sideFromBrains(id, blobs) seats the brains other machines exported (brain/peerBrain.mjs's swek-brain-v1 files): seat gunners (seatGunnerPolicy, seatGunnerMlp, seatGunnerFish, and gunnerPolicy -- the RACE CAR'S turret gunner, seated by brain/seatTurretGunner.mjs) are dealt round the thirteen seats in turn, the first helm (helmPolicy) takes the helm, pilots (pilot6dofPolicy, pilot6dofMlp) are dealt
@@ -139,7 +142,8 @@ export function seatedBrains(side, { ships = 1, escorts = 0 } = {}) {
  * The arena of a duel, steppable (spaceArena.stepSpaceArena), with the counter the fight's brains report to: { arena, scenario, sides: [A, B], shipIds: [[A's], [B's]], count: { tick, asked } }. Team 1 is A, team 2 is B; ids run A's ships, B's ships, A's escorts, B's escorts.
  * Options: ships (1), escorts (0), seconds (180), and the arena's own friendlyFire, holdFire, wrecks, impact, crew, shipCollisions (all as battleshipFight passes them, all off by default).
  */
-export function build(sideA, sideB, seed, kind, { ships = 1, escorts = 0, seconds = SECONDS, cruise = 0.3, friendlyFire = false, holdFire = true, wrecks = false, impact = 0, crew = false, shipCollisions = false, countBrains = true } = {}) {
+export function build(sideA, sideB, seed, kind, { ships = 1, escorts = 0, seconds = SECONDS, cruise = 0.3, friendlyFire = false, holdFire = true, wrecks = false, impact = 0, crew = false, shipCollisions = false, countBrains = true, ammo = 1 } = {}) {
+    if (!(Number.isFinite(ammo) && ammo > 0 && ammo <= 1)) throw new Error(`battleshipDuel.build: ammo is a fraction of the ship's magazines, above 0 and at most 1 (got ${ammo})`);
     const sc = scenario(seed, kind, { ships, escorts }), count = { tick: 0, asked: 0 }, crafts = [], shipIds = [[], []];
     const asked = () => { count.tick += 1; count.asked += 1; };
     let id = 1;
@@ -153,7 +157,8 @@ export function build(sideA, sideB, seed, kind, { ships = 1, escorts = 0, second
         };
         const hand = side.helmRule === "broadside" ? broadsideHelm() : null, net = side.helmNet ? side.helmNet.module.helmFactory(side.helmNet.weights)() : null;
         const helmPilot = hand || net ? (rule, ctx) => { const r = hand ? hand(rule, ctx) : rule; if (!net) return r; if (countBrains) asked(); return net(r, ctx); } : null;
-        const hull = CS.createCapitalShip(), ship = side.cannon ? hull : { ...hull, waveGun: { ...hull.waveGun, charge: Infinity } };   // a cannon that never finishes charging is no cannon; the arena is not edited
+        const whole = CS.createCapitalShip(), hull = ammo === 1 ? whole : { ...whole, seats: Object.freeze(whole.seats.map((q) => Object.freeze({ ...q, gun: Object.freeze({ ...q.gun, magazine: magazineOf(q.gun, ammo) }) }))) };   // SCARCE ROUNDS: see the header; with ammo 1 the ship is the ship it was
+        const ship = side.cannon ? hull : { ...hull, waveGun: { ...hull.waveGun, charge: Infinity } };   // a cannon that never finishes charging is no cannon; the arena is not edited
         shipIds[t].push(id);
         crafts.push({ id: id++, team: t + 1, name: `${side.label} ship ${k + 1}`, kind: "capital", ship, state: s, behaviour: "face", cruise, holdFire, gunner, ...(helmPilot ? { helmPilot } : {}) });
     }));
@@ -164,6 +169,8 @@ export function build(sideA, sideB, seed, kind, { ships = 1, escorts = 0, second
     return { arena: SA.createSpaceArena({ crafts, seconds, friendlyFire, wrecks, impact, crew, shipCollisions }), scenario: sc, sides: [sideA, sideB], shipIds, count };
 }
 
+/** The rounds a gun carries into a fight of `ammo`: that fraction of its magazine, to the nearest round, never fewer than one. */
+export const magazineOf = (gun, ammo) => Math.max(1, Math.round(gun.magazine * ammo));
 /** The score of one side from what its ships dealt and took (hit points of capital ships), whether each fleet is gone, the fraction of the time left when the fight ended and the hit points a side started with (see the header). */
 export function scoreFor(dealt, taken, enemyGone, ownGone, timeLeft, hpSide) {
     return (dealt - taken) / hpSide + (enemyGone ? KILL_BONUS + SPEED_BONUS * timeLeft : 0) - (ownGone ? LOSS : 0);

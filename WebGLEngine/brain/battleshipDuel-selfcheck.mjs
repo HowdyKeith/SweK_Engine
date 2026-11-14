@@ -8,6 +8,7 @@
 //                                    the escorts are 60-110 units out with their noses on the other flagship, and a fight without them starts where it did; a bad kind and bad counts are refused by name
 //   2  A SIDE IS CHECKED             the defaults; every bad field refused by name; a seat takes the network its own id names, else its group's, else `network`, else the rule
 //   3  THE BUILD IS WIRED            ids, teams and names; a side with no cannon never fires one and a side with one does; the sights' seeds are the craft's own
+//   3b SCARCE ROUNDS                 the option `ammo`: off, the ship's own magazines and the pinned fights; on, that fraction in every seat of both sides and nothing else changed; an empty gun stays empty; refused outside (0, 1]
 //   4  THE BROADSIDE HELM            no enemy: the rule's own answer; its torque is inside the hull's limit; it turns the ship beam-on and rolls the deck toward the enemy (the angles, pinned); without the roll the main battery of a ship whose enemy is below its deck never fires
 //   5  THE SCORE                     scoreFor's closed forms; a fight's scores are scoreFor of its own hit points; the winner is the higher score by more than DECISIVE; the fight ends when a side's capital ships are gone
 //   6  THE SAME FIGHT                twice is the same fingerprint; with the brain count off it is the same fight; the hand weights in every seat and the zero helm are the hand rules TO THE BIT while 'asked' counts them; a pair is antisymmetric and a side against itself leads by nothing
@@ -88,6 +89,17 @@ console.log("3. THE BUILD IS WIRED");
     ok("!! head-on, seed 1: two bow-on ships with cannons both fire them; take B's away and B fires none while A still does", withC.waves[0] > 0 && withC.waves[1] > 0 && noB.waves[1] === 0 && noB.waves[0] > 0, `waves ${withC.waves} and ${noB.waves}`);
 }
 
+console.log("3b. SCARCE ROUNDS (the option `ammo`)");
+{
+    const full = D.build(FACE, FACE, 3, "broadside"), q = D.build(FACE, FACE, 3, "broadside", { ammo: 0.25 }), mags = (b) => b.arena.crafts.map((c) => c.seats.map((x) => x.state.gun.ammo).join()).join(" | ");
+    ok("!! with nothing said every seat has the ship's own magazine (160 a main gun, 900 a point-defence mount) and the ship is capitalShip's own object for a side with its cannon; with `ammo` 0.25 BOTH ships carry 40 and 225, and nothing else of the ship is another number", mags(full) === mags(D.build(FACE, FACE, 3, "broadside", { ammo: 1 })) && full.arena.crafts[0].seats.map((x) => x.state.gun.ammo).join() === "160,160,160,900,900,900,900,900,900,900,900,900,900" && q.arena.crafts.every((c) => c.seats.map((x) => x.state.gun.ammo).join() === "40,40,40,225,225,225,225,225,225,225,225,225,225") && q.arena.crafts[0].ship.hp === full.arena.crafts[0].ship.hp && q.arena.crafts[0].seats[0].seat.gun.damage === 60 && q.arena.crafts[0].seats[0].seat.gun.rate === 1.5 && q.arena.crafts[0].ship.waveGun.charge === 12);
+    ok("magazineOf: the fraction of the magazine to the nearest round and never fewer than one (160 at 0.25 is 40, at 0.01 is 2, at 0.001 is 1); `ammo` of 0, above 1 or not a number is refused by name", D.magazineOf({ magazine: 160 }, 0.25) === 40 && D.magazineOf({ magazine: 160 }, 0.01) === 2 && D.magazineOf({ magazine: 160 }, 0.001) === 1 && D.magazineOf({ magazine: 900 }, 1) === 900 && throwsWith(() => D.build(FACE, FACE, 1, "chase", { ammo: 0 }), /ammo is a fraction of the ship's magazines, above 0 and at most 1 \(got 0\)/) && throwsWith(() => D.build(FACE, FACE, 1, "chase", { ammo: 1.5 }), /got 1\.5/) && throwsWith(() => D.build(FACE, FACE, 1, "chase", { ammo: "half" }), /got half/));
+    const nc = D.makeSide("nc", { cannon: false }), a = D.duel(nc, nc, 3, "broadside"), b = D.duel(nc, nc, 3, "broadside", { ammo: 0.05 }), sb = D.build(nc, nc, 3, "broadside", { ammo: 0.05 }); while (!D.finished(sb)) SA.stepSpaceArena(sb.arena);
+    const fired = sb.arena.crafts.flatMap((c) => c.seats.map((x) => [x.state.gun.fired, x.seat.gun.magazine, x.state.gun.ammo]));
+    ok("!! a gun that is empty is empty: with a twentieth of the magazines (8 rounds a main gun, 45 a mount) and no cannon, no seat fires more than it carried, some run dry, what is fired and what is left add up to the magazine, and the fight is another fight than the one with the whole magazines (fewer rounds, and it runs longer)", fired.every(([f, m, left]) => f <= m && f + left === m) && fired.some(([f, m]) => f === m) && fired.every(([, m]) => m === 8 || m === 45) && b.fingerprint !== a.fingerprint && b.rounds[0] + b.rounds[1] < a.rounds[0] + a.rounds[1] && b.t > a.t, `rounds ${a.rounds} with the whole magazines, ${b.rounds} with a twentieth; ${a.t.toFixed(0)} s and ${b.t.toFixed(0)} s`);
+    ok("the option reaches a pair (both of its fights) and a fight without it is the pinned fight", D.pair(FACE, BEAM, 2, "crossing", { ammo: 0.05 }).first.fingerprint !== D.pair(FACE, BEAM, 2, "crossing").first.fingerprint && D.pair(FACE, BEAM, 2, "crossing", { ammo: 1 }).lead === D.pair(FACE, BEAM, 2, "crossing").lead);
+}
+
 console.log("4. THE BROADSIDE HELM");
 {
     const SHIP = CS.createCapitalShip(), body = (o = {}) => ({ ...RB.createBody({ mass: SHIP.mass, I: [...SHIP.I] }), ...o }), rule = { torque: [1, 2, 3], thrust: 450 }, helm = D.broadsideHelm();
@@ -165,7 +177,7 @@ console.log("9. THE FINDINGS, PINNED (seeds 1-2 of each kind: eight pairs, sixte
     const g = row(D.makeSide("gpu", { network: mlpNet }), D.makeSide("fly", { network: flyNet }));
     ok("!! THE GPU BRAIN'S SHIPPED HAND AGAINST THE FRUIT FLY'S, both bow-on behind regular sights (neither was trained against a ship or behind this sight): the GPU Brain's wins seven pairs of eight and loses none", g.w === 7 && g.l === 0 && Math.abs(g.lead - 1.012) < 0.0005, `${g.w} won, ${g.l} lost, mean lead ${g.lead.toFixed(3)}`);
     ok("the report lines say real numbers", D.reportLines().length === 2 && /\d+ pairs won, \d+ lost of 8, mean lead -?\d\.\d{3}/.test(D.reportLines()[1]));
-    ok("the front door: the export list", Object.keys(D).sort().join() === "BROADSIDE_LEAN,BROADSIDE_RANGE,BROADSIDE_ROLL,BROADSIDE_SLOPE,DECISIVE,HELM_RULES,KILL_BONUS,KINDS,LOSS,MAX_ESCORTS,MAX_SHIPS,PEER_POLICIES,RANGE,SECONDS,SHIP_SPACING,SPEED_BONUS,broadsideHelm,build,duel,finished,makeSide,pair,quatYaw,reportLines,scenario,scoreFor,seatNetOf,seatedBrains,sideFromBrains,tally");
+    ok("the front door: the export list", Object.keys(D).sort().join() === "BROADSIDE_LEAN,BROADSIDE_RANGE,BROADSIDE_ROLL,BROADSIDE_SLOPE,DECISIVE,HELM_RULES,KILL_BONUS,KINDS,LOSS,MAX_ESCORTS,MAX_SHIPS,PEER_POLICIES,RANGE,SECONDS,SHIP_SPACING,SPEED_BONUS,broadsideHelm,build,duel,finished,magazineOf,makeSide,pair,quatYaw,reportLines,scenario,scoreFor,seatNetOf,seatedBrains,sideFromBrains,tally");
 }
 
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
