@@ -24,7 +24,6 @@
 import fs from "node:fs";
 import { createHash } from "node:crypto";
 import path from "node:path";
-import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import * as V from "./voxelHomeLong.mjs";
 import * as V2 from "./voxelHomeDrawn.mjs";
@@ -98,15 +97,13 @@ section(() => {
     const file = path.join(ENG, V.RESULTS), stateOf = () => (fs.existsSync(file) ? `${fs.statSync(file).size}/${fs.statSync(file).mtimeMs}` : "absent"), before = stateOf();
     const no = [[], ["bogus"], ["job", "WORM", "1"], ["job", "FLY", "x"], ["job", "FLY", "17"], ["run", "--jobs", "0"], ["run", "4"], ["read", "extra"]];
     ok("the command's words are the shared parseArgs' (run, read, job ARM S for a registered arm and draw; eight other shapes are not words)", J(V.parseArgs(["run"])) === J({ cmd: "run", jobs: 4 }) && J(V.parseArgs(["read"])) === J({ cmd: "read" }) && J(V.parseArgs(["job", "FLY", "16"])) === J({ cmd: "job", arm: "FLY", s: 16 }) && no.every((a) => V.parseArgs(a) === null));
-    const cmd = path.join(ENG, "tools", "ship", "takeVoxelHomeLong.mjs"), probe = (...a) => spawnSync(process.execPath, [cmd, ...a], { encoding: "utf8" });
-    const bad = [probe(), probe("bogus"), probe("job", "WORM", "1"), probe("job", "FLY", "x"), probe("read", "extra")];
-    ok("!! the command refuses what it does not know with its usage and exit 2", bad.every((r) => r.status === 2 && /^usage: node tools\/ship\/takeVoxelHomeLong\.mjs/.test(r.stderr) && r.stdout === ""), bad.map((r) => r.status).join(" "));
+    // the command as a process (its usage and exit 2 for what it does not know) is probed in tools/ship/voxelHome-selfcheck.mjs section 4, with round 1's: one gate that starts processes, not three
     const csrc = src("tools/ship/takeVoxelHomeLong.mjs");
     ok("!! the command is this round's -- its library and results file, not round 2's -- reads its words through parseArgs alone, refuses a run of no processes itself, and READS ROUND 2'S FILE FOR T3 (the library's BEFORE) and hands its records to the reading",
         (csrc.match(/process\.argv/g) || []).length === 1 && /const args = PF\.parseArgs\(process\.argv\.slice\(2\)\);/.test(csrc) && /!\(args\.jobs >= 1\)/.test(csrc) && /from "\.\/voxelHomeLong\.mjs"/.test(csrc) && !/voxelHomeDrawnRound|"\.\/voxelHomeDrawn\.mjs"|"\.\/voxelHome\.mjs"/.test(csrc) && /path\.join\(ENG, PF\.BEFORE\)/.test(csrc) && /PF\.reading\(linesOf\(\), before\)/.test(csrc));
-    const me = src("tools/ship/voxelHomeLong-selfcheck.mjs"), calls = [...me.matchAll(/V2?\.trainOne\(([^)]*)\)/g)].map((m) => m[1]), probes = [...me.matchAll(/probe\(("[^)]*)\)/g)].map((m) => m[1]);
-    ok("!! THIS GATE STARTS NO TRAINING OF THE ROUND'S AND LEAVES ITS RESULTS FILE AS IT WAS: its three trainings are of 4 and 2 iterations on draw 901; the command is never given the word run, nor a job it could do; and the file's size and time are what they were before this section",
-        calls.length === 3 && calls.every((c) => /^"FLY", 901, TINY2?, TINY_AUDIT$/.test(c)) && TINY.iters === 4 && !V.SEEDS.includes(901) && probes.length === 4 && probes.every((p) => !/"run"/.test(p) && V.parseArgs(JSON.parse(`[${p}]`)) === null) && stateOf() === before, `${calls.length} trainings, ${probes.length + 1} probes, the file ${before === "absent" ? "absent" : "unchanged"}`);
+    const me = src("tools/ship/voxelHomeLong-selfcheck.mjs"), calls = [...me.matchAll(/V2?\.trainOne\(([^)]*)\)/g)].map((m) => m[1]);
+    ok("!! THIS GATE STARTS NO TRAINING OF THE ROUND'S AND LEAVES ITS RESULTS FILE AS IT WAS: its three trainings are of 4 and 2 iterations on draw 901; this gate starts no process at all (the command is never run from here); and the file's size and time are what they were before this section",
+        calls.length === 3 && calls.every((c) => /^"FLY", 901, TINY2?, TINY_AUDIT$/.test(c)) && TINY.iters === 4 && !V.SEEDS.includes(901) && !/Sync\(/.test(me.replace(/readFileSync\(|statSync\(|existsSync\(/g, "")) && stateOf() === before, `${calls.length} trainings, no process, the file ${before === "absent" ? "absent" : "unchanged"}`);
 });
 
 console.log("\n5. THE VERDICT (round 3; the results were committed at 257d2d8c before they were read, and are read here from the file)");

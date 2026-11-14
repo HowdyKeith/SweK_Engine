@@ -28,7 +28,6 @@
 import fs from "node:fs";
 import { createHash } from "node:crypto";
 import path from "node:path";
-import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import * as V from "./voxelHomeDrawn.mjs";
 import * as V1 from "./voxelHome.mjs";
@@ -126,14 +125,12 @@ section(() => {
     const no = [[], ["bogus"], ["job", "WORM", "1"], ["job", "FLY", "x"], ["job", "FLY", "0"], ["job", "FLY", "17"], ["job", "FLY"], ["run", "--jobs", "0"], ["run", "--jobs"], ["run", "--jobs", "2", "x"], ["run", "4"], ["read", "extra"]];
     ok("!! THE COMMAND'S WORDS, AS ARITHMETIC (parseArgs, never the command): run is four processes or --jobs of at least 1, read takes nothing, job takes a registered arm and a draw 1 to 16 -- and twelve other shapes are not words",
         J(V.parseArgs(["run"])) === J({ cmd: "run", jobs: 4 }) && J(V.parseArgs(["run", "--jobs", "2"])) === J({ cmd: "run", jobs: 2 }) && J(V.parseArgs(["read"])) === J({ cmd: "read" }) && J(V.parseArgs(["job", "FISH", "16"])) === J({ cmd: "job", arm: "FISH", s: 16 }) && no.every((a) => V.parseArgs(a) === null) && V.parseArgs("run") === null);
-    const cmd = path.join(ENG, "tools", "ship", "takeVoxelHomeDrawn.mjs"), probe = (...a) => spawnSync(process.execPath, [cmd, ...a], { encoding: "utf8" });
-    const bad = [probe(), probe("bogus"), probe("job", "WORM", "1"), probe("job", "FLY", "x"), probe("read", "extra")];
-    ok("!! the command refuses what it does not know with its usage and exit 2: no word, another word, an arm that is not one, a draw that is not a number, a word too many", bad.every((r) => r.status === 2 && /^usage: node tools\/ship\/takeVoxelHomeDrawn\.mjs/.test(r.stderr) && r.stdout === ""), bad.map((r) => r.status).join(" "));
+    // the command as a process (its usage and exit 2 for what it does not know) is probed in tools/ship/voxelHome-selfcheck.mjs section 4, with round 1's: one gate that starts processes, not three
     const csrc = src("tools/ship/takeVoxelHomeDrawn.mjs");
     ok("the command's words are parseArgs' and nothing else's, it refuses a run of no processes itself, and it is this round's: the drawn round's library and results file, not round 1's and not the painting round's", (csrc.match(/process\.argv/g) || []).length === 1 && /const args = PF\.parseArgs\(process\.argv\.slice\(2\)\);/.test(csrc) && /!\(args\.jobs >= 1\)/.test(csrc) && /from "\.\/voxelHomeDrawn\.mjs"/.test(csrc) && !/paintingFly|PAINTING_FLY|voxelHomeRound|"\.\/voxelHome\.mjs"/.test(csrc));
-    const me = src("tools/ship/voxelHomeDrawn-selfcheck.mjs"), calls = [...me.matchAll(/V\.trainOne\(([^)]*)\)/g)].map((m) => m[1]), probes = [...me.matchAll(/probe\(("[^)]*)\)/g)].map((m) => m[1]);
-    ok("!! THIS GATE STARTS NO TRAINING OF THE ROUND'S AND LEAVES ITS RESULTS FILE AS IT WAS: every training here is at its own recipe (12 steps, 2 iterations) on draws 901 and 902 or refused before it starts; the command is never given the word run, nor a job it could do; and the file's size and time are what they were before this section",
-        calls.length >= 6 && calls.every((c) => /^"[A-Z]+", (901|902|0), TINY, TINY_AUDIT(, |$)/.test(c)) && TINY.iters === 2 && !V.SEEDS.includes(901) && probes.length === 4 && probes.every((p) => !/"run"/.test(p) && V.parseArgs(JSON.parse(`[${p}]`)) === null) && stateOf() === before, `${calls.length} trainings, ${probes.length + 1} probes, the file ${before === "absent" ? "absent" : "unchanged"}`);
+    const me = src("tools/ship/voxelHomeDrawn-selfcheck.mjs"), calls = [...me.matchAll(/V\.trainOne\(([^)]*)\)/g)].map((m) => m[1]);
+    ok("!! THIS GATE STARTS NO TRAINING OF THE ROUND'S AND LEAVES ITS RESULTS FILE AS IT WAS: every training here is at its own recipe (12 steps, 2 iterations) on draws 901 and 902 or refused before it starts; this gate starts no process at all (the command is never run from here); and the file's size and time are what they were before this section",
+        calls.length >= 6 && calls.every((c) => /^"[A-Z]+", (901|902|0), TINY, TINY_AUDIT(, |$)/.test(c)) && TINY.iters === 2 && !V.SEEDS.includes(901) && !/Sync\(/.test(me.replace(/readFileSync\(|statSync\(|existsSync\(/g, "")) && stateOf() === before, `${calls.length} trainings, no process, the file ${before === "absent" ? "absent" : "unchanged"}`);
 });
 
 console.log("\n5. THE VERDICT (round 2; the results were committed at 1f5e0ec3 before they were read, and are read here from the file)");

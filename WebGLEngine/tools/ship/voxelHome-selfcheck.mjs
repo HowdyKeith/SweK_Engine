@@ -23,6 +23,8 @@
 //   whatever the factory would have used, so the factory's own number is never the one flown.
 //   THE VERDICT'S (section 5, 2026-11-13), the same runner, each red by name: W1 a FLY score in the file raised to 0.62 6 | W2 T0 reads the fly against the plain net 3 | W3 MORE and LESS swapped 6
 //     W4 the audit counts a half-built house a home 2 | W5 the note says the fly builds more 1 | W6 the verdict's T0 pin reads MORE 1 | W7 alpha one in a billion 7 | W8 a random builder's score in the file lowered to 0.40 4
+//   2026-11-14, THE THREE COMMANDS PROBED HERE (section 4), this gate and the gates of rounds 2 and 3 run whole for each, every one red by name in one row: K1 round 2's command takes any word (exit 0) | K2 round 3's command
+//   prints round 2's usage | K3 this gate probes only its own command | K4 round 3's gate starts a process | K5 round 2's gate starts a process | K6 round 3's command prints its usage to stdout
 "use strict";
 import fs from "node:fs";
 import { createHash } from "node:crypto";
@@ -125,9 +127,12 @@ section(() => {
     const no = [[], ["bogus"], ["job", "WORM", "1"], ["job", "FLY", "x"], ["job", "FLY", "0"], ["job", "FLY", "17"], ["job", "FLY"], ["run", "--jobs", "0"], ["run", "--jobs"], ["run", "--jobs", "2", "x"], ["run", "4"], ["read", "extra"]];
     ok("!! THE COMMAND'S WORDS, AS ARITHMETIC (parseArgs, never the command): run is four processes or --jobs of at least 1, read takes nothing, job takes a registered arm and a draw 1 to 16 -- and twelve other shapes are not words",
         J(V.parseArgs(["run"])) === J({ cmd: "run", jobs: 4 }) && J(V.parseArgs(["run", "--jobs", "2"])) === J({ cmd: "run", jobs: 2 }) && J(V.parseArgs(["read"])) === J({ cmd: "read" }) && J(V.parseArgs(["job", "FISH", "16"])) === J({ cmd: "job", arm: "FISH", s: 16 }) && no.every((a) => V.parseArgs(a) === null) && V.parseArgs("run") === null);
-    const cmd = path.join(ENG, "tools", "ship", "takeVoxelHome.mjs"), probe = (...a) => spawnSync(process.execPath, [cmd, ...a], { encoding: "utf8" });
-    const bad = [probe(), probe("bogus"), probe("job", "WORM", "1"), probe("job", "FLY", "x"), probe("read", "extra")];
-    ok("!! the command refuses what it does not know with its usage and exit 2: no word, another word, an arm that is not one, a draw that is not a number, a word too many", bad.every((r) => r.status === 2 && /^usage: node tools\/ship\/takeVoxelHome\.mjs/.test(r.stderr) && r.stdout === ""), bad.map((r) => r.status).join(" "));
+    // 2026-11-14 -- THE THREE ROUNDS' COMMANDS ARE PROBED HERE, AS PROCESSES, AND NOT IN THE GATES OF ROUNDS 2 AND 3: the three commands are one shape, and tools/ship/gateAxioms-selfcheck.mjs bounds how many gates start a
+    // process (this branch's own gates had taken the count from 77 to 81 against a bound of 80, and the answer is fewer gates that spawn, not a wider bound). The other two gates keep their rows that read the command's source.
+    const CMDS = ["takeVoxelHome.mjs", "takeVoxelHomeDrawn.mjs", "takeVoxelHomeLong.mjs"], others = ["brain/voxelHomeDrawnRound.jsonl", "brain/voxelHomeLongRound.jsonl"].map((f) => path.join(ENG, f)), othersOf = () => others.map((f) => `${fs.statSync(f).size}/${fs.statSync(f).mtimeMs}`).join(" "), othersBefore = othersOf();
+    const bad = CMDS.map((c) => { const probe = (...a) => spawnSync(process.execPath, [path.join(ENG, "tools", "ship", c), ...a], { encoding: "utf8" }); return [c, [probe(), probe("bogus"), probe("job", "WORM", "1"), probe("job", "FLY", "x"), probe("read", "extra")]]; });
+    ok("!! EACH OF THE THREE ROUNDS' COMMANDS refuses what it does not know with ITS OWN usage and exit 2: no word, another word, an arm that is not one, a draw that is not a number, a word too many -- and the results files of rounds 2 and 3 are as they were",
+        bad.length === 3 && bad.every(([c, rs]) => rs.length === 5 && rs.every((r) => r.status === 2 && r.stderr.startsWith(`usage: node tools/ship/${c} run [--jobs N] | read | job ARM S`) && r.stdout === "")) && othersOf() === othersBefore, bad.map(([c, rs]) => rs.map((r) => r.status).join("")).join(" "));
     const csrc = src("tools/ship/takeVoxelHome.mjs");
     ok("the command's words are parseArgs' and nothing else's, it refuses a run of no processes itself, and it is the voxel home's: this round's library and results file, not the painting round's", (csrc.match(/process\.argv/g) || []).length === 1 && /const args = PF\.parseArgs\(process\.argv\.slice\(2\)\);/.test(csrc) && /!\(args\.jobs >= 1\)/.test(csrc) && /from "\.\/voxelHome\.mjs"/.test(csrc) && !/paintingFly|PAINTING_FLY/.test(csrc));
     const me = src("tools/ship/voxelHome-selfcheck.mjs"), calls = [...me.matchAll(/V\.trainOne\(([^)]*)\)/g)].map((m) => m[1]), probes = [...me.matchAll(/probe\(("[^)]*)\)/g)].map((m) => m[1]);
