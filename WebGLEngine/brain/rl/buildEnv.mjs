@@ -12,8 +12,12 @@
 // order matters because A BLOCK MUST BE HELD UP: it rests on the ground, on the block under it, or against a block beside it in its own layer. The lintel over the door needs a wall beside it first;
 // the roof over the room grows inward from the walls. A choice that cannot be placed (the column is finished, is outside the house, or its next block has nothing to hold it) is a step spent.
 //
+// TWO WAYS TO CHOOSE (the option `choice`). "named" (the default, and round 1's): the action is two numbers that NAME one column. "drawn" (2026-11-14, after round 1 found every trained builder below a
+// random one): the action is 36 numbers, one a column, and THE COLUMN IS DRAWN -- its chance proportional to exp(4 x its number) -- with a number of the episode's own stream, so a build is still its
+// seed's. A builder that says the same of every column is then exactly a random builder, and what it can learn is to lean: toward the columns that still need a block, away from the finished ones.
+//
 //   OBS (40)   the 6 x 6 site, a column each: the share of the house's four layers still missing there | the share of the whole plan missing | the step over maxSteps | two noise draws (the episode's)
-//   ACTION (2) [x, z] in [-1, 1], each cut into the site's six columns
+//   ACTION     named: (2) [x, z] in [-1, 1], each cut into the site's six columns | drawn: (36) a number a column, in [-1, 1]
 //   REWARD     1 / (the plan's blocks) for a block placed: an episode's return is the share of the home built
 //
 // homePlan(seed) is the plan; homeCheck(world, plan, at) reads a HOME'S FUNCTION off the voxels (every block there, roofed, a door, and the room closed but for the door: a flood from outside
@@ -30,6 +34,7 @@ export const OBS_DIM = SITE * SITE + 4, ACT_DIM = 2;
 export const BLOCKS = Object.freeze({ air: 0, wall: 1, roof: 2, ground: 3, glass: FACADE.glass });
 export const ORIGIN = Object.freeze({ x: 5, y: 1, z: 5 });   // the site's corner in the world: the ground is the layer under y
 export const MAX_STEPS = 96;
+export const DRAW_GAIN = 4;   // a drawn choice: a column's chance is proportional to exp(DRAW_GAIN x its number), the number held to [-1, 1] (chosen, not tuned: e^8 between the most and the least wanted)
 
 function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 const keyOf = (x, y, z) => (y * SITE + z) * SITE + x;
@@ -79,7 +84,9 @@ export function homeCheck(world, plan, at = ORIGIN) {
 
 export class BuildEnv {
     constructor(opts = {}) {
-        this.obsDim = OBS_DIM; this.actDim = ACT_DIM; this.maxSteps = opts.maxSteps || MAX_STEPS;
+        if (opts.choice !== undefined && opts.choice !== "named" && opts.choice !== "drawn") throw new Error(`buildEnv.BuildEnv: the choice is "named" or "drawn" (got ${opts.choice})`);
+        this.choice = opts.choice || "named";
+        this.obsDim = OBS_DIM; this.actDim = this.choice === "drawn" ? SITE * SITE : ACT_DIM; this.maxSteps = opts.maxSteps || MAX_STEPS;
         this.world = opts.world || miniWorld(); this.at = opts.at || ORIGIN; this.planOf = typeof opts.planOf === "function" ? opts.planOf : homePlan;
         for (let z = -1; z <= SITE; z++) for (let x = -1; x <= SITE; x++) this.world.setVoxel(this.at.x + x, this.at.y - 1, this.at.z + z, BLOCKS.ground);
         this.plan = null; this.reset(opts.seed || 1);
@@ -104,8 +111,17 @@ export class BuildEnv {
     }
     /** An action in [-1, 1]^2 as a site column. */
     columnFor(action) { const cut = (v) => Math.min(SITE - 1, Math.max(0, Math.floor(((Math.max(-1, Math.min(1, Number.isFinite(v) ? v : 0)) + 1) / 2) * SITE))); return cut(action[1]) * SITE + cut(action[0]); }
+    /** The chances a drawn choice gives the 36 columns for an action of 36 numbers: exp(DRAW_GAIN x number) over their sum. */
+    chancesFor(action) {
+        const p = new Float64Array(SITE * SITE); let sum = 0;
+        for (let c = 0; c < p.length; c++) { const v = Number.isFinite(action[c]) ? Math.max(-1, Math.min(1, action[c])) : 0; p[c] = Math.exp(DRAW_GAIN * v); sum += p[c]; }
+        for (let c = 0; c < p.length; c++) p[c] /= sum;
+        return p;
+    }
+    /** A drawn choice: one number of the episode's own stream against the chances. */
+    drawFor(action) { const p = this.chancesFor(action), u = this._noise(); let acc = 0; for (let c = 0; c < p.length; c++) { acc += p[c]; if (u < acc) return c; } return p.length - 1; }
     step(action) {
-        const col = this.columnFor(action), c = this.nextOf(col); let reward = 0, why = null;
+        const col = this.choice === "drawn" ? this.drawFor(action) : this.columnFor(action), c = this.nextOf(col); let reward = 0, why = null;
         if (!c) why = "nothing left in that column"; else if (!this.held(c)) why = "nothing to hold the block up";
         if (why) { this.rejected++; this.last = { col, placed: null, why }; }
         else { this.world.setVoxel(this.at.x + c.x, this.at.y + c.y, this.at.z + c.z, c.id); this.next[col]++; this.placed++; reward = 1 / this.plan.blocks; this.last = { col, placed: c, why: null }; }

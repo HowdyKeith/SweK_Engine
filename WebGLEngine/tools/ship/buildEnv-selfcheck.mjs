@@ -6,6 +6,7 @@
 //   1  THE PLAN             a hollow house from the tree's building grammar: walls, a roof, the facade's windows and door, and a room inside
 //   2  THE ENVIRONMENT      the policy chooses a column; the block and its height are the plan's; a block must be held up; a choice that cannot be placed is a step spent
 //   3  A HOME'S FUNCTION    read off the voxels: roofed, a door, the room closed but for the door -- the rule that always finishes builds one every time, a random builder never
+//   3b THE DRAWN CHOICE     the second way to choose: 36 numbers, the column drawn by their chances with the episode's own stream; what leaning to the unfinished columns builds
 //   4  THE TRAINER          brain/rl/dockPolicy.js's trainDockES drives it, with its own MLP and with a circuit-wired policy
 // SABOTAGE LOG (2026-11-13) -- through a byte-safe runner (one at a time, the file restored and its sha256 checked), the gate run whole; every one red by name (the number is the rows that went red):
 //   E1 the house is solid: the room is filled 9 | E2 the door is bricked up in the plan 7 | E3 the windows are stone 2 | E4 the roof covers only the walls 6 | E5 a block needs nothing to hold it 4
@@ -16,6 +17,9 @@
 //   TWO WENT 0 RED, AND EACH IS A ROW NOW: E12 (nothing read the observation after a block went in) and E18 (nothing asked whether the last block ends the episode). E12' and E18' are those again.
 //   E23 (the rule that always finishes does not ask whether a block is held): 0 RED, AND EQUIVALENT -- taken in the site's order, every column before a block's own is already finished, so its block is
 //   always held; the 200 homes of section 3 are the same 200 either way. The test in the rule is belt and braces, said here so that nobody reads it as load-bearing.
+//   THE DRAWN CHOICE'S (section 3b, 2026-11-14), the same runner, each red by name: D1 the gain is 2 3 | D2 the numbers are not held to [-1, 1] 1 | D3 the draw is Math.random's 2 | D4 the draw always takes the likeliest column 2
+//     D5 the drawn choice is the default 8 | D6 a drawn env still says 2 actions 1 | D7 an unknown choice is taken as named 1 | D8 the draw uses the same number at every step of an episode 1
+//     D9 the chances are the numbers, not their exponentials 3. One row of 3b was wrong when written (it compared a chance across two actions whose other columns differ) and was corrected before these ran.
 "use strict";
 import { miniWorld } from "../../render/voxelDevice.mjs";
 import { buildingGrammar } from "../../world/buildingGrammar.mjs";
@@ -102,6 +106,28 @@ section(() => {
     let sum = 0, rh = 0, least = 1, most = 0; for (const s of SEEDS) { const r = lcg(1000 + s); env.reset(s); let d = false; while (!d) d = env.step([r() * 2 - 1, r() * 2 - 1]).done; const f = 1 - env.missing(); sum += f; least = Math.min(least, f); most = Math.max(most, f); if (B.homeCheck(env.world, env.plan).home) rh++; }
     ok("!! A BUILDER THAT CHOOSES COLUMNS AT RANDOM BUILDS 57 PERCENT OF THE HOME AND NEVER A HOME: on the same 200 plans, 96 steps each, a mean share of 0.573 (0.39 to 0.77) and no house with a roof over a closed room", Math.abs(sum / 200 - 0.5731) < 5e-4 && rh === 0 && least > 0.38 && most < 0.78, `${(sum / 200).toFixed(4)}, ${least.toFixed(2)} to ${most.toFixed(2)}, ${rh} homes`);
     env.reset(1); ok("the rule is the first placeable column in the site's order, and has nothing to say once the home is built", env.columnFor(B.greedyColumn(env)) === 0 && (build(env, 1), B.greedyColumn(env) === null));
+});
+
+console.log("\n3b. THE DRAWN CHOICE (the option choice: \"drawn\", 2026-11-14)");
+section(() => {
+    const env = new B.BuildEnv({ choice: "drawn" }), named = new B.BuildEnv(), level = new Float32Array(36), one = Float32Array.from({ length: 36 }, (_, c) => (c === 7 ? 1 : -1));
+    ok("!! the action is 36 numbers, one a column, and the default is still the named choice of 2: nothing that was built before this option chooses differently", env.actDim === 36 && env.obsDim === 40 && env.choice === "drawn" && named.actDim === 2 && named.choice === "named" && new B.BuildEnv({ choice: "named" }).actDim === 2);
+    const pl = env.chancesFor(level), po = env.chancesFor(one), big = env.chancesFor(Float32Array.from({ length: 36 }, (_, c) => (c === 7 ? 50 : c === 8 ? NaN : -50)));
+    ok("!! A COLUMN'S CHANCE IS PROPORTIONAL TO exp(4 x ITS NUMBER): the same number for every column is 1/36 each (a random builder exactly); one column at +1 against the rest at -1 is e^8 times as likely as any other; the numbers are held to [-1, 1] and what is not a number counts as 0",
+        Array.from(pl).every((v) => Math.abs(v - 1 / 36) < 1e-12) && Math.abs(po[7] / po[0] - Math.exp(8)) < 1e-6 && Math.abs(Array.from(po).reduce((a, b) => a + b, 0) - 1) < 1e-12 && Math.abs(big[7] / big[0] - Math.exp(8)) < 1e-6 && Math.abs(big[8] / big[0] - Math.exp(4)) < 1e-9 && B.DRAW_GAIN === 4);
+    // the draws follow the chances, and are the seed's
+    const lean = Float32Array.from({ length: 36 }, (_, c) => (c < 6 ? 0.5 : -0.5)), want = env.chancesFor(lean), count = new Float64Array(36); let n = 0;
+    for (let s = 1; s <= 60; s++) { env.reset(s); for (let t = 0; t < 96; t++) { env.step(lean); count[env.last.col]++; n++; if (env.placed === env.plan.blocks) break; } }
+    const firstRow = Array.from(count.subarray(0, 6)).reduce((a, b) => a + b, 0) / n, wantRow = Array.from(want.subarray(0, 6)).reduce((a, b) => a + b, 0);
+    const trace = (seed) => { env.reset(seed); const out = []; for (let t = 0; t < 30; t++) { env.step(level); out.push(env.last.col); } return out; };
+    ok("!! THE DRAWS FOLLOW THE CHANCES AND ARE THE SEED'S: leaning to the site's first row, that row is drawn as often as its chance says (within 2 in 100 over thousands of steps), every column is drawn sometimes, and the same seed draws the same columns again while another seed draws others",
+        Math.abs(firstRow - wantRow) < 0.02 && wantRow > 0.9 && Array.from(trace(3)).length === 30 && J(trace(3)) === J(trace(3)) && J(trace(3)) !== J(trace(4)) && new Set(trace(3)).size > 15, `${firstRow.toFixed(3)} against ${wantRow.toFixed(3)} over ${n} steps`);
+    const play = (act) => { let sum = 0, homes = 0; for (const s of SEEDS) { let o = env.reset(s), d = false; while (!d) { const r = env.step(act(o)); o = r.obs; d = r.done; } sum += 1 - env.missing(); if (B.homeCheck(env.world, env.plan).home) homes++; } return { share: sum / 200, homes }; };
+    const flat = play(() => level), unfinished = play((o) => Float32Array.from({ length: 36 }, (_, c) => (o[c] > 0 ? 1 : -1))), byShare = play((o) => Float32Array.from({ length: 36 }, (_, c) => o[c] * 2 - 1));
+    ok("!! WHAT THERE IS TO LEARN, MEASURED ON PLANS 1 TO 200: saying the same of every column builds 0.571 of a home and no home (the random builder again); LEANING TO THE COLUMNS THE OBSERVATION SAYS ARE UNFINISHED builds 0.919 and 128 homes; leaning by how much each still needs, 0.975 and 127 -- so most of a home is one look at the observation away",
+        Math.abs(flat.share - 0.5710) < 5e-4 && flat.homes === 0 && Math.abs(unfinished.share - 0.9187) < 5e-4 && unfinished.homes === 128 && Math.abs(byShare.share - 0.9749) < 5e-4 && byShare.homes === 127, J([flat, unfinished, byShare].map((x) => [x.share.toFixed(4), x.homes])));
+    let threw = false; try { new B.BuildEnv({ choice: "guessed" }); } catch (e) { threw = /"named" or "drawn"/.test(e.message); }
+    ok("a choice that is neither is refused by name, and a drawn build still holds every block up (a refused draw is a step spent, as a named one is)", threw && (() => { env.reset(1); let spent = 0; for (let t = 0; t < 40; t++) { const r = env.step(level); if (!r.info.last.placed) spent++; } return spent > 0 && env.t === 40 && siteVoxels(env).length === env.placed; })());
 });
 
 console.log("\n4. THE TRAINER");
