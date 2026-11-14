@@ -49,3 +49,21 @@ That a real boat's battery is 0.75 MJ or that real hotel loads are 200 W: the ca
 
 **CORRECTION to Amendment A (same sitting, before any DEV or HELD geometry was flown).** Amendment A said that at 0.75 MJ "every duel between them stops being decisive". The command's own new line, run on the same four smoke geometries, says otherwise: a boat is sunk in 98 percent of the duels without the cost and in 100 percent with it, so the duels are still decided. What changed is WHO decides them: the edge of one doctrine over another, which is the difference of the two seats' scores, falls to about zero while a boat is still sunk in every duel, which fits the seat (the geometry the duel starts from) deciding it once neither boat can still use its speed. **That reading is a guess from four geometries, not a finding;** the seat bias of each doctrine with and without the cost (`subTournament.seatBias`) would test it and is NOT part of the registered reads. What stands is the amendment's decision: the decisive share and the ratings' spread are printed with read 1, and the rule is as registered.
 
+## DEV RESULT (2026-11-14; `node tools/ship/takeSubEnergy.mjs dev --write`, 7 s, geometries 94001 to 94024, both seats, 48 duels a rung; `brain/subEnergyDev.json`; the gate `brain/subEnergy-selfcheck.mjs` green and sabotaged before it was flown; the HELD set not flown yet)
+
+The search-ping champion against the default tactician, no kit:
+
+| rung | battery a boat | screws dead (ping / hand, of 48 boat-duels each) | dead share | charge left (ping / hand) | a boat sunk (ping / hand sunk) | binds (25 percent) |
+|---|---|---|---|---|---|---|
+| 0 | 3.00 MJ | 0 / 0 | 0 percent | 0.56 / 0.73 | 48 of 48 (9 / 39) | no |
+| 1 | 1.50 MJ | 16 / 0 | 17 percent | 0.17 / 0.46 | 48 of 48 (9 / 39) | no |
+| **2** | **0.75 MJ** | 42 / 38 | **83 percent** | 0.01 / 0.17 | 48 of 48 (9 / 39) | **yes** |
+| 3 | 0.40 MJ | 48 / 40 | 92 percent | 0.00 / 0.14 | 48 of 48 (8 / 40) | yes |
+| 4 | 0.20 MJ | 48 / 39 | 91 percent | 0.00 / 0.12 | 48 of 48 (9 / 39) | yes |
+
+**By the registered rule the cost binds first at rung 2, 0.75 MJ a boat, and that is the rung of the reads.** The checks passed (the cost fired). At rung 2 the champion's screw is dead in 42 of 48 duels and the hand tactician's in 38, and **the outcome of the duels does not move**: a boat is sunk in 48 of 48 at every rung, the champion sunk in 9 of 48 and the hand tactician in 39 whether the battery is 3 MJ or 0.2 MJ (8 and 40 at 0.4 MJ). Duels are decided in about a minute, the screws die after about half of one, and a boat that cannot drive any more has already fired what it was going to fire.
+
+**The forecasts of the DEV part, scored (written before any geometry was flown):** the class's own capacity (rung 0) does not bind (90): yes, no screw died. Some rung binds (80): yes. The first binding rung is 2 or 3 (55): yes, 2. A boat whose screw died is sunk in more of its duels than one whose screw did not (65): scored by a THROWAWAY script, not by the command and not gated, over the 48 duels at rung 2 (96 boat-duels): **41 of 80 boats with a dead screw were sunk (51 percent) and 7 of 16 whose screw did not die (44 percent): yes by the count, and with 16 boats on one side that is no difference worth the word.** (In 38 of the 48 duels both screws were dead, in 4 one, in 6 none.)
+
+**What this says:** the cost binds on the boats' charge and does not bind on the fight, at the size of battery the ladder tried. That is read 1's question (does the cost change the ranking of the doctrines) before it is asked; it is flown once next on the HELD geometries at rung 2, and read 2 (the doctrine re-tuned under the cost) after it.
+

@@ -1,0 +1,102 @@
+{
+ "set": "dev",
+ "chosen": 2,
+ "bind": 0.25,
+ "rows": [
+  {
+   "rung": 0,
+   "energyJ": 3000000,
+   "deadShare": 0,
+   "binds": false,
+   "dead": [
+    0,
+    0
+   ],
+   "boatDuels": 48,
+   "charge": [
+    0.5615048009429858,
+    0.7308878244970515
+   ],
+   "sunk": 48,
+   "xSunk": 9,
+   "ySunk": 39,
+   "meanX": 1.2418475115740741
+  },
+  {
+   "rung": 1,
+   "energyJ": 1500000,
+   "deadShare": 0.16666666666666666,
+   "binds": false,
+   "dead": [
+    16,
+    0
+   ],
+   "boatDuels": 48,
+   "charge": [
+    0.17138158313144544,
+    0.46177565005195853
+   ],
+   "sunk": 48,
+   "xSunk": 9,
+   "ySunk": 39,
+   "meanX": 1.2418475115740741
+  },
+  {
+   "rung": 2,
+   "energyJ": 750000,
+   "deadShare": 0.8333333333333334,
+   "binds": true,
+   "dead": [
+    42,
+    38
+   ],
+   "boatDuels": 48,
+   "charge": [
+    0.01197875505454979,
+    0.17275062727043614
+   ],
+   "sunk": 48,
+   "xSunk": 9,
+   "ySunk": 39,
+   "meanX": 1.2437991898148146
+  },
+  {
+   "rung": 3,
+   "energyJ": 400000,
+   "deadShare": 0.9166666666666666,
+   "binds": true,
+   "dead": [
+    48,
+    40
+   ],
+   "boatDuels": 48,
+   "charge": [
+    0,
+    0.14239172914256817
+   ],
+   "sunk": 48,
+   "xSunk": 8,
+   "ySunk": 40,
+   "meanX": 1.3150376157407409
+  },
+  {
+   "rung": 4,
+   "energyJ": 200000,
+   "deadShare": 0.90625,
+   "binds": true,
+   "dead": [
+    48,
+    39
+   ],
+   "boatDuels": 48,
+   "charge": [
+    0,
+    0.1235893733326874
+   ],
+   "sunk": 48,
+   "xSunk": 9,
+   "ySunk": 39,
+   "meanX": 1.2447569444444442
+  }
+ ]
+}
