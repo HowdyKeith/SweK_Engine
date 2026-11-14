@@ -1,7 +1,7 @@
 // WebGLEngine/brain/voxelHomeShow.mjs -- UNNUMBERED (the version is chosen at ship time)
 //
 // WATCH A BUILDER PUT UP A HOUSE (backlog `voxel-home`, V3; Keith, 2026-11-14: "Do item 1"). One build of brain/rl/buildEnv.mjs's BuildEnv, kept step by step, and the picture of it after any step.
-// Nothing here trains and nothing here measures: the three rounds did that (tools/ship/voxelHome.mjs and the two beside it), and this file plays their builders -- the same environment, the same
+// Nothing here trains and nothing here measures: the rounds did that (tools/ship/voxelHome.mjs and those beside it), and this file plays their builders -- the same environment, the same
 // plans, the same weights, read from the rounds' own committed results files -- so that what the page shows is what the rounds scored.
 //
 // THE BUILDERS (KINDS). Three need no file:
@@ -10,7 +10,7 @@
 //   random   two numbers a step that name a column, as the rounds' random builders did -- but NOT their stream: the rounds ran one stream through all 200 plans, which a page showing one plan cannot
 //            replay, so this one is mulberry32 seeded by the draw (1..16) and the plan. On the 200 audit plans it builds what the rounds' did (0.57), and the gate holds that.
 // and five are a round's trained arm (FLY, SHUF, PLAIN, FISH, MLP), draw 1..16, whose weights are the record's in that round's results file (ROUNDS: 1 names a column, 150 iterations; 2 draws it,
-// 150; 3 draws it, 1,000).
+// 150; 3 draws it, 1,000; 4 is round 2's builders started AT the lean -- the lean plus a network -- and those are the ones that finish houses).
 //
 //   ROUNDS, KINDS, ARMS, LABELS
 //   unpackWeights(b64)                 a record's weights (little-endian float32s in base64), with no Buffer: this file loads in a page
@@ -29,11 +29,13 @@
 import { BuildEnv, SITE, LAYERS, OBS_DIM, ACT_DIM, MAX_STEPS, BLOCKS, homeCheck, greedyColumn } from "./rl/buildEnv.mjs";
 import { FlightPolicy } from "./rl/dockPolicy.js";
 import * as P from "./rl/paintCircuitPolicy.mjs";
+import { LeanStart, tailOf } from "./rl/leanStart.mjs";
 
 export const ROUNDS = Object.freeze({
     1: Object.freeze({ choice: "named", plainUnits: 41, iters: 150, file: "brain/voxelHomeRound.jsonl", label: "round 1: names a column, 150 iterations" }),
     2: Object.freeze({ choice: "drawn", plainUnits: 38, iters: 150, file: "brain/voxelHomeDrawnRound.jsonl", label: "round 2: the column is drawn, 150 iterations" }),
     3: Object.freeze({ choice: "drawn", plainUnits: 38, iters: 1000, file: "brain/voxelHomeLongRound.jsonl", label: "round 3: the column is drawn, 1,000 iterations" }),
+    4: Object.freeze({ choice: "drawn", plainUnits: 38, iters: 150, start: "lean", file: "brain/voxelHomeLeanRound.jsonl", label: "round 4: started at the lean, 150 iterations" }),   // 2026-11-14: the builders that finish houses
 });
 export const ARMS = Object.freeze(["FLY", "SHUF", "PLAIN", "FISH", "MLP"]);
 export const KINDS = Object.freeze(["rule", "lean", "random", ...ARMS]);
@@ -57,15 +59,16 @@ export function recordsOf(text) {
     for (const line of String(text).split("\n")) { if (!line) continue; const r = JSON.parse(line); if (r && r.kind === "draw") out.set(`${r.arm} ${r.s}`, r); }
     return out;
 }
-const roundOf = (round) => { const R = ROUNDS[round]; if (!R) throw new Error(`voxelHomeShow: no round ${round} (the rounds are 1, 2, 3)`); return R; };
+const roundOf = (round) => { const R = ROUNDS[round]; if (!R) throw new Error(`voxelHomeShow: no round ${round} (the rounds are ${Object.keys(ROUNDS).join(", ")})`); return R; };
 const drawOf = (draw) => { if (!Number.isInteger(draw) || draw < 1 || draw > DRAWS) throw new Error(`voxelHomeShow: no draw ${draw} (the draws are 1 to ${DRAWS})`); return draw; };
 /** See the header. */
 export function policyFor(round, arm, s) {
     const R = roundOf(round), actDim = R.choice === "drawn" ? SITE * SITE : ACT_DIM; drawOf(s);
     if (!ARMS.includes(arm)) throw new Error(`voxelHomeShow.policyFor: no arm ${arm} (the arms are ${ARMS.join(", ")})`);
-    if (arm === "MLP") return new FlightPolicy({ hidden: [...MLP_HIDDEN], obsDim: OBS_DIM, actDim, seed: s });
+    const lean = (inner, under) => (R.start === "lean" ? new LeanStart(inner, { columns: actDim, tail: tailOf(actDim, under) }) : inner);   // round 4: the builder is the lean plus its network (brain/rl/leanStart.mjs)
+    if (arm === "MLP") return lean(new FlightPolicy({ hidden: [...MLP_HIDDEN], obsDim: OBS_DIM, actDim, seed: s }), MLP_HIDDEN[MLP_HIDDEN.length - 1]);
     const c = arm === "PLAIN" ? { units: R.plainUnits, edges: [] } : P.ARMS[arm](s);
-    return new P.CircuitPolicy({ obsDim: OBS_DIM, actDim, units: c.units, edges: c.edges, seed: s });
+    return lean(new P.CircuitPolicy({ obsDim: OBS_DIM, actDim, units: c.units, edges: c.edges, seed: s }), c.units);
 }
 /** See the header. */
 export function builderOf(kind, { round = 3, draw = 1, record = null } = {}) {
@@ -139,7 +142,7 @@ export function saidLines() {
         "A house from the engine's building grammar, 50 to 94 blocks on a 6 by 6 site: three layers of wall with windows and a door, then a roof. A builder has 96 steps. Each step it picks a column, and the plan's next block for that column goes in -- the builder never picks the block or its height.",
         "A block must be held up: on the ground, on the block under it, or against a block beside it. A pick that cannot be placed (the column is finished, is outside the house, or the block would hang in the air) is a step spent; it is outlined in red.",
         "The two small grids are the builder's view. Left: how much each column still needs (what the builder is shown). Right: where it leans -- the chance it gives each column -- or, for a builder that names a column, the one it named.",
-        "The trained builders are the three rounds' own, played from the rounds' committed results. What the rounds found: naming a column, every trained builder built less than a random one; with the column drawn they build more (about 0.69 of a house, a random builder 0.57); 6.7 times the training added 0.01 to 0.02; the lean that needs no network builds 0.92 and finishes 123 houses of 200; two trained builders finished one house each in 16,000 builds.",
+        "The trained builders are the rounds' own, played from the rounds' committed results. What the rounds found: naming a column, every trained builder built less than a random one; with the column drawn they build more (about 0.69 of a house, a random builder 0.57); 6.7 times the training added 0.01 to 0.02; the lean that needs no network builds 0.92 and finishes 123 houses of 200; two trained builders finished one house each in 16,000 builds. Round 4 gave each builder the lean and trained a correction to it: every one of the 80 then built more than the lean (0.99 of a house) and they finish about 155 houses of 200 -- what the network added is an order, chiefly not asking for a roof block that would hang.",
         "Not a fly building a house. The fly's Giant Fiber Circuit is an escape circuit; a builder here is a small network with that circuit's wiring, trained by trial and error, and in four rounds its wiring could not be told apart from a shuffle of it.",
     ];
 }
