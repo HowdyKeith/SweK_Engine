@@ -95,6 +95,8 @@ export function checks(pairs, { selfEdge = null, mustFire = false } = {}) {
 }
 
 const pct = (v) => (100 * v).toFixed(0) + "%";
+/** A number with its sign always shown: "+0.018", "-2.537", "+0.000" for zero, to `d` places. */
+export const signed = (v, d) => (v >= 0 ? "+" : "") + v.toFixed(d);
 const J = (e) => (e / 1e6).toFixed(2) + " MJ";
 /** The command: argv (after the program), io { log, exists, write, read, heldSet } (defaults: the console and the file system; heldSet is for the gate, which flies the smoke geometries). Returns the exit code. */
 export function command(argv, io = {}) {
@@ -121,7 +123,7 @@ export function command(argv, io = {}) {
         log(`[takeSubEnergy] HELD read 1, rung ${rung} (${J(LADDER[rung])} a boat), geometries ${SETS[hs].first} to ${SETS[hs].first + SETS[hs].count - 1}, both seats; the four doctrines' round robin without and with the cost`);
         log(`  ratings (Bradley-Terry, Elo scale; read DIFFERENCES): ${r.ids.map((id) => `${id} ${r.ratings.free[id].toFixed(0)} -> ${r.ratings.cost[id].toFixed(0)}`).join(", ")}`);
         log(`  duels with a boat sunk: ${pct(r.sunkShare.free)} without the cost, ${pct(r.sunkShare.cost)} with it; the ratings' spread (best less worst): ${r.spread.free.toFixed(0)} without, ${r.spread.cost.toFixed(0)} with   (printed; NOT in the rule)`);
-        for (const p of r.pairs) log(`    ${p.x} v ${p.y}: edge ${p.free.edge >= 0 ? "+" : ""}${p.free.edge.toFixed(3)} (z ${p.free.z.toFixed(1)}) -> ${p.cost.edge >= 0 ? "+" : ""}${p.cost.edge.toFixed(3)} (z ${p.cost.z.toFixed(1)})${p.flips ? "  SIGN FLIPS" : ""}${p.matters ? "  MATTERS" : ""}`);
+        for (const p of r.pairs) log(`    ${p.x} v ${p.y}: edge ${signed(p.free.edge, 3)} (z ${p.free.z.toFixed(1)}) -> ${signed(p.cost.edge, 3)} (z ${p.cost.z.toFixed(1)})${p.flips ? "  SIGN FLIPS" : ""}${p.matters ? "  MATTERS" : ""}`);
         for (const d of r.doctrines) log(`    ${d.id}: screw dead in ${pct(d.deadShare)} of its boat-duels, ${d.charge.toFixed(2)} of the charge left on average`);
         if (r.checks.length) log("  CHECKS FAILED, NOT WEIGHED: " + r.checks.join("; "));
         log(`  READING: the cost ${r.matters ? "MATTERS to the ranking" : "does not matter to the ranking"} by the rule (a flipped sign, the larger |edge| at least ${MATTERS_EDGE}, z at least ${MATTERS_Z})`);
@@ -132,7 +134,7 @@ export function command(argv, io = {}) {
     if (r.error) { log("takeSubEnergy: " + r.error); return 2; }
     log(`[takeSubEnergy] HELD read 2, the doctrine re-tuned under the cost (seeds ${TUNE_SEEDS.join(", ")}, needs ${r.needs === undefined ? "?" : J(r.needs)} a boat); the champion is seed ${r.champion} (the best held score of the four: ${r.held.map((h) => `${h.seed} ${h.held.toFixed(3)}`).join(", ")})`);
     log(`  speeds (m/s)   search ${r.speeds.searchSpeed.toFixed(2)} (was ${r.free.searchSpeed.toFixed(2)}), track ${r.speeds.trackSpeed.toFixed(2)} (was ${r.free.trackSpeed.toFixed(2)}), evade ${r.speeds.evadeSpeed.toFixed(2)} (was ${r.free.evadeSpeed.toFixed(2)})`);
-    log(`  READING: the mean of search and track speed moved by ${r.delta >= 0 ? "+" : ""}${r.delta.toFixed(2)} m/s: the doctrine ${r.reading === "SLOWS" ? "SLOWS" : r.reading === "faster" ? "is FASTER" : "is as fast"} by the rule (${SLOW_BY} m/s)`);
+    log(`  READING: the mean of search and track speed moved by ${signed(r.delta, 2)} m/s: the doctrine ${r.reading === "SLOWS" ? "SLOWS" : r.reading === "faster" ? "is FASTER" : "is as fast"} by the rule (${SLOW_BY} m/s)`);
     if (argv.includes("--write")) { if (exists(RETUNE_FILE)) { log(`takeSubEnergy: ${RETUNE_FILE} exists; read 2 is recorded once`); return 2; } write(RETUNE_FILE, JSON.stringify(r, null, 1) + "\n"); log(`  written ${RETUNE_FILE}`); }
     return 0;
 }
