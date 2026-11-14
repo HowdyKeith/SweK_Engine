@@ -21,6 +21,19 @@ export const DIRECTION = Object.freeze(["searchPing", "aimTol", "evadeTurn", "ec
 
 /** Does a summary { edge, z } find a counter-doctrine: an edge of at least FIND_EDGE and z of at least FIND_Z? */
 export const finds = (s) => s.edge >= FIND_EDGE && s.z >= FIND_Z;
+/** Is a pair of the cross-play DECIDED (either way): an edge of at least FIND_EDGE in size and z of at least FIND_Z in size? */
+export const decided = (e) => Math.abs(e.edge) >= FIND_EDGE && Math.abs(e.z) >= FIND_Z;
+/** A number with its sign always shown (a zero is `+0.000`), to `d` decimals. */
+export const signed = (v, d) => (v >= 0 ? "+" : "") + v.toFixed(d);
+/** The checks that VOID the read, by name and not weighed: a non-finite score in `rows`; a final generation against itself (`self`, an edge) that is not exactly 0; not 8 leagues; not 6 exploiters. */
+export function checksOf(rows, nLeagues, nExploiters, self) {
+    const checks = [];
+    if (rows.some((r) => !Number.isFinite(r.edge) || !Number.isFinite(r.z))) checks.push("a score is non-finite");
+    if (self !== 0) checks.push(`a final generation against itself has an edge of ${self}, not exactly 0`);
+    if (nLeagues !== 8) checks.push(`${nLeagues} leagues, not 8`);
+    if (nExploiters !== 6) checks.push(`${nExploiters} exploiters, not 6`);
+    return checks;
+}
 /** The recipe's verdict from the number of leagues that find one (of `n`, 8 in the registration): ROBUST iff at least ROBUST, FRAGILE iff at most FRAGILE, else MIXED. */
 export const verdictOf = (k) => (k >= ROBUST ? "ROBUST" : k <= FRAGILE ? "FRAGILE" : "MIXED");
 export const median = (a) => { const s = [...a].sort((x, y) => x - y), m = s.length >> 1; return s.length === 0 ? NaN : s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
@@ -54,14 +67,14 @@ export function readLeagues(runs, set = "read") {
     const leagues = rows.filter((r) => r.kind !== "exploit"), exploiters = rows.filter((r) => r.kind === "exploit"), k = leagues.filter((r) => r.finds).length;
     const finals = runs.filter((r) => r.kind !== "exploit"), cross = T.roundRobin(finals.map((r) => side(r.id, r.final)), geos, {}), cyc = T.transitivity(cross);
     const edges = []; for (const [key, p] of Object.entries(cross.pairs)) edges.push({ pair: key, edge: p.summary.edge, z: p.summary.z });
-    const same = edges.filter((e) => Math.abs(e.edge) >= FIND_EDGE && Math.abs(e.z) >= FIND_Z);
+    const same = edges.filter(decided);
     const self = T.matchup(side("a", finals[0].final), side("b", finals[0].final), geos).summary.edge;
-    const checks = []; if (rows.some((r) => !Number.isFinite(r.edge) || !Number.isFinite(r.z))) checks.push("a score is non-finite"); if (self !== 0) checks.push(`a final generation against itself has an edge of ${self}, not exactly 0`); if (finals.length !== 8) checks.push(`${finals.length} leagues, not 8`); if (exploiters.length !== 6) checks.push(`${exploiters.length} exploiters, not 6`);
+    const checks = checksOf(rows, finals.length, exploiters.length, self);
     return { set, rows, leagues: { n: leagues.length, finds: k, verdict: verdictOf(k), medianEdge: median(leagues.map((r) => r.edge)) }, exploiters: { n: exploiters.length, finds: exploiters.filter((r) => r.finds).length, medianEdge: median(exploiters.map((r) => r.edge)) }, cross: { edges, decisive: same.length, cycles: cyc }, checks };
 }
 
-const f2 = (v) => (v >= 0 ? "+" : "") + v.toFixed(3);
-/** The command: argv (after the program), io { log, exists, write, read } (defaults: the console and the file system). Returns the exit code. */
+const f2 = (v) => signed(v, 3);
+/** The command: argv (after the program), io { log, exists, write, read, set, reader } (defaults: the console and the file system; `reader` replaces readLeagues, for the gate). Returns the exit code. */
 export function command(argv, io = {}) {
     const log = io.log || ((s) => console.log(s)), exists = io.exists || ((f) => fs.existsSync(ENG + f)), write = io.write || ((f, s) => fs.writeFileSync(ENG + f, s));
     if (argv[0] !== "read") { log("usage: takeSubLeague.mjs read [--smoke] [--write]"); return 2; }
@@ -71,9 +84,9 @@ export function command(argv, io = {}) {
     if (!smoke && !wr && !io.set) { log("takeSubLeague: the read set is flown once and the read is recorded; run read with --write (or --smoke to see that it runs)"); return 2; }
     if (wr && exists(READ_FILE)) { log(`takeSubLeague: ${READ_FILE} exists; the read is flown once and a second read is refused`); return 2; }
     const L = loadRuns(io.read); if (L.error) { log("takeSubLeague: " + L.error); return 2; }
-    const set = io.set || (smoke ? "smoke" : "read"), r = readLeagues(L.runs, set);
+    const set = io.set || (smoke ? "smoke" : "read"), r = (io.reader || readLeagues)(L.runs, set);
     log(`[takeSubLeague] the replicated leagues, final generation against generation 0 on geometries ${SETS[set].first} to ${SETS[set].first + SETS[set].count - 1} (both seats); a run FINDS a counter-doctrine at edge >= ${FIND_EDGE} and z >= ${FIND_Z}`);
-    for (const x of r.rows) log(`  ${x.id.padEnd(12)} ${x.kind.padEnd(7)} edge ${f2(x.edge)} +- ${x.se.toFixed(3)} (z ${x.z.toFixed(1)}), ${x.winsX}-${x.draws}-${x.winsY}  ${x.finds ? "FINDS" : "does not"}    final minus gen0: ${DIRECTION.map((k) => `${k} ${x.direction[k] >= 0 ? "+" : ""}${x.direction[k].toFixed(2)}`).join(", ")}`);
+    for (const x of r.rows) log(`  ${x.id.padEnd(12)} ${x.kind.padEnd(7)} edge ${f2(x.edge)} +- ${x.se.toFixed(3)} (z ${x.z.toFixed(1)}), ${x.winsX}-${x.draws}-${x.winsY}  ${x.finds ? "FINDS" : "does not"}    final minus gen0: ${DIRECTION.map((k) => `${k} ${signed(x.direction[k], 2)}`).join(", ")}`);
     log(`  LEAGUES: ${r.leagues.finds} of ${r.leagues.n} find one (median edge ${f2(r.leagues.medianEdge)})  ->  the recipe is ${r.leagues.verdict} (at least ${ROBUST} of 8 is ROBUST, at most ${FRAGILE} FRAGILE)`);
     log(`  EXPLOITERS: ${r.exploiters.finds} of ${r.exploiters.n} find one (median edge ${f2(r.exploiters.medianEdge)}; the leagues' median ${f2(r.leagues.medianEdge)})`);
     log(`  CROSS-PLAY of the eight final generations: ${r.cross.decisive} of ${r.cross.edges.length} pairs decided by at least ${FIND_EDGE} at z ${FIND_Z}; ${r.cross.cycles.length ? "cycles: " + r.cross.cycles.join("; ") : "no cycle"}`);
