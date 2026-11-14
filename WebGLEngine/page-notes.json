@@ -36,6 +36,11 @@
     "path": "brain/RIG_COMMANDS_2026-11-14_TURRET.md",
     "title": "Rig commands: the turret seat's search on many more pairs",
     "why": "The commands that train this page's 'race car's turret gunner' hand on the rig: four searches judged on 300 pairs a child, then one audit read once."
+   },
+   {
+    "path": "brain/RIG_COMMANDS_2026-11-14_TURRET_ROUND2.md",
+    "title": "Rig commands: the second round, from the gunner that always fires",
+    "why": "Round 1's champion learned to hold the trigger. These commands search again from it on fresh pairs, so anything kept has to beat always firing."
    }
   ],
   "sea-ogre.html": [
