@@ -52,20 +52,20 @@ const mulberry = (a) => () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.
 const gauss = (rng) => { let u = 0, v = 0; while (!u) u = rng(); while (!v) v = rng(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
 const pick = (rng, n) => Math.floor(rng() * n);
 /** The neurons that are AWAKE in `w`: those with a weight from a feature that varies in a seat or a bias, and then, to a fixed point, those a synapse with a weight reaches from an awake one. A Set of indices. */
-export function awake(w, features = ST.LIVE_FEATURES) {
+export function awake(w, features = ST.LIVE_FEATURES, edges = EDGES) {
     const on = new Set();
     for (let h = 0; h < H; h++) if (w[ST.hiddenBiasAt(h)] !== 0 || features.some((f) => w[ST.encoderAt(h, f)] !== 0)) on.add(h);
-    for (let grew = true; grew;) { grew = false; EDGES.forEach(([to, from], k) => { if (!on.has(to) && on.has(from) && w[ST.synapseAt(k)] !== 0) { on.add(to); grew = true; } }); }
+    for (let grew = true; grew;) { grew = false; edges.forEach(([to, from], k) => { if (!on.has(to) && on.has(from) && w[ST.synapseAt(k)] !== 0) { on.add(to); grew = true; } }); }
     return on;
 }
 /** Is neuron h read by an output a seat reads? */
 export const isRead = (w, h) => ST.READ_OUTPUTS.some((o) => w[ST.outputAt(o, h)] !== 0);
 /** The synapses a synapse child may move in `w`: those whose source is awake (the index k of each). */
-export const reachable = (w, features = ST.LIVE_FEATURES) => { const on = awake(w, features), ks = []; EDGES.forEach(([, from], k) => { if (on.has(from)) ks.push(k); }); return ks; };
+export const reachable = (w, features = ST.LIVE_FEATURES, edges = EDGES) => { const on = awake(w, features, edges), ks = []; edges.forEach(([, from], k) => { if (on.has(from)) ks.push(k); }); return ks; };
 /** A synapse child (see the header). With no awake neuron (the zero weights) it is a path child. */
-export function synapseChild(w, sigma, rng, features = ST.LIVE_FEATURES) {
-    const ks = reachable(w, features); if (!ks.length) return pathChild(w, sigma, rng, features);
-    const o = Float32Array.from(w), k = ks[pick(rng, ks.length)], to = EDGES[k][0];
+export function synapseChild(w, sigma, rng, features = ST.LIVE_FEATURES, edges = EDGES) {
+    const ks = reachable(w, features, edges); if (!ks.length) return pathChild(w, sigma, rng, features);
+    const o = Float32Array.from(w), k = ks[pick(rng, ks.length)], to = edges[k][0];
     o[ST.synapseAt(k)] += gauss(rng) * sigma;
     if (!isRead(w, to)) o[ST.outputAt(ST.READ_OUTPUTS[pick(rng, ST.READ_OUTPUTS.length)], to)] += gauss(rng) * sigma;
     return o;
@@ -76,9 +76,9 @@ export function biasChild(w, sigma, rng) { const o = Float32Array.from(w); o[ST.
 export const tunable = (w) => { const idx = [], lo = ST.outputAt(3, 0), hi = ST.outputAt(4, H - 1); for (let i = 0; i < w.length; i++) if (w[i] !== 0 && !(i >= lo && i <= hi) && i !== ST.biasAt(3) && i !== ST.biasAt(4)) idx.push(i); return idx; };
 export function tuneChild(w, sigma, rng, maxK, features = ST.LIVE_FEATURES) { const idx = tunable(w); if (!idx.length) return pathChild(w, sigma, rng, features); const o = Float32Array.from(w), k = 1 + pick(rng, maxK); for (let j = 0; j < k; j++) o[idx[pick(rng, idx.length)]] += gauss(rng) * sigma; return o; }
 /** A child, by SHARE. Returns { w, kind }. */
-export function child(w, sigma, rng, maxK, features = ST.LIVE_FEATURES) {
+export function child(w, sigma, rng, maxK, features = ST.LIVE_FEATURES, edges = EDGES) {
     const r = rng();
-    return r < SHARE.synapse ? { w: synapseChild(w, sigma, rng, features), kind: "synapse" } : r < SHARE.synapse + SHARE.path ? { w: pathChild(w, sigma, rng, features), kind: "path" } : r < SHARE.synapse + SHARE.path + SHARE.tune ? { w: tuneChild(w, sigma, rng, maxK, features), kind: "tune" } : { w: biasChild(w, sigma, rng), kind: "bias" };
+    return r < SHARE.synapse ? { w: synapseChild(w, sigma, rng, features, edges), kind: "synapse" } : r < SHARE.synapse + SHARE.path ? { w: pathChild(w, sigma, rng, features), kind: "path" } : r < SHARE.synapse + SHARE.path + SHARE.tune ? { w: tuneChild(w, sigma, rng, maxK, features), kind: "tune" } : { w: biasChild(w, sigma, rng), kind: "bias" };
 }
 /** The weights that differ between two vectors. */
 export const differs = (w, base) => { const idx = []; for (let i = 0; i < w.length; i++) if (w[i] !== base[i]) idx.push(i); return idx; };
