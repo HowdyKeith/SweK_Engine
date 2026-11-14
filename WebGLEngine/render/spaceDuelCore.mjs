@@ -45,7 +45,7 @@ export const HANDS = Object.freeze([
 export const HELMS = Object.freeze([
     Object.freeze({ id: "face", label: "bow-on rule", rule: "face", file: null, note: "the arena's own: the bow, and the cannon, on the nearest enemy" }),
     Object.freeze({ id: "broadside", label: "broadside rule", rule: "broadside", file: null, note: "a hand rule; it loses to the bow-on rule in seven pairs of eight" }),
-    Object.freeze({ id: "trained", label: "trained helm (corrects the bow-on rule)", rule: "face", file: "helm", note: "leads the bow-on rule by 0.67 on its audit; trails it without the cannon" }),
+    Object.freeze({ id: "trained", label: "trained helm (corrects the bow-on rule)", rule: "face", file: "helm", note: "on 300 fresh pairs it leads the bow-on rule by 0.38; with no cannon on either side it is no better than the rule; it was not trained for the broadside rule and trails behind it" }),
 ]);
 export const GUNNERS = Object.freeze(Object.keys(BF.GUNNERS)), KINDS = D.KINDS, MAX_SHIPS = D.MAX_SHIPS, MAX_ESCORTS = D.MAX_ESCORTS;
 export const DEFAULT_CHOICE = Object.freeze({ hand: "rule", helm: "face", gunners: "regular", cannon: true });
