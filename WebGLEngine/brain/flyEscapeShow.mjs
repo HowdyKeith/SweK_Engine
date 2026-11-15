@@ -32,6 +32,7 @@ import { unpackWeights, recordsOf } from "./voxelHomeShow.mjs";
 export { unpackWeights, recordsOf };
 export const ROUNDS = Object.freeze({
     1: Object.freeze({ file: "brain/flyEscapeRound.jsonl", label: "round 1: trained from nothing (they hide)" }),
+    2: Object.freeze({ file: "brain/flyEscapeReflexRound.jsonl", start: "reflex", label: "round 2: started at the reflex" }),   // 2026-11-15: the fly is half the reflex plus its network (brain/rl/reflexStart.mjs)
 });
 export const ARMS = Object.freeze(["FLY", "SHUF", "PLAIN", "FISH", "MLP"]);
 export const KINDS = Object.freeze(["reflex", "fleeAll", "hide", "freeze", "told", ...ARMS]);
@@ -157,7 +158,7 @@ export function saidLines() {
         "A fly feeds on the yellow tile in the yard of its house. Things fly at it (a strike, drawn red in the outside view) or past it (harmless, drawn grey). A strike catches a fly it reaches that is not inside its room, and it is faster than the fly walks. The fly chooses one thing each tick: go home, or go to the food. Its body finds the way, through the door.",
         "The outside view can be turned: drag it. The colours of the two kinds of mover are for you; the fly is not told the kind.",
         "The lower picture is from the fly's own eye, all the way round: the middle is straight ahead and the two edges are behind it, from 30 degrees below the horizon to 60 above, one lens a dot. The dark disc is the mover. How big it is, how fast it grows (it LOOMS) and how fast it slides sideways are three of the thirteen numbers the fly is given; a thing on a collision course grows while staying where it is in the picture.",
-        "What the rounds found: trained from nothing, no fly learned to tell a strike from a harmless fly-by -- they go home for everything and score less than a fly written to do just that. The reflex written by hand (go home for what looms on a steady bearing) does better and is still caught by one strike in ten.",
+        "What the rounds found: trained from nothing, no fly learned to tell a strike from a harmless fly-by -- they go home for everything and score less than a fly written to do just that. The reflex written by hand (go home for what looms on a steady bearing) does better and is still caught by one strike in ten. Round 2 started every fly AT that reflex and trained a correction to it: most then do a little better than the reflex -- a hundredth and a half -- and still nothing like a fly that is told which movers are strikes.",
         "Not a fly's nervous system at work. The Giant Fiber Circuit is the fruit fly's real escape circuit, and a trained fly here is a small network with that circuit's wiring -- but it has none of the visual cells that feed the circuit in the animal, it has no memory between ticks, it walks where a fly would take off, and in every round so far its wiring could not be told apart from a shuffle of it.",
     ];
 }

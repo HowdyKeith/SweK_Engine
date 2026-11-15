@@ -9,6 +9,8 @@
 //   2  THE EPISODE     the rounds' numbers again from this file's episode(); a frame is the environment's tick
 //   3  THE PICTURES    the outside view and the eye's: what each sees, the mover's disc against its angular size and its bearing, what turning the camera does; what the page says
 //   4  THE PAGE        fly-escape.html in Chromium: the default episode, both canvases against this file's pictures, turning, other flies, a results file that does not arrive
+// 2026-11-15, ROUND 2'S FLIES ADDED (half the reflex plus a network; brain/rl/reflexStart.mjs), this gate run whole for each, every one red by name: W1 round 2's flies played without the reflex 2
+//   W2 round 2 reads round 1's file 2 | W3 the page says a tenth better 1
 // SABOTAGE LOG (2026-11-15) -- through a byte-safe runner (one at a time, every file restored and its sha256 checked), this gate run whole for each; the number is the rows that went red:
 //   THE MODULE: P1 the fly told the kind goes home for everything 2 | P2 a trained fly left untrained 1 | P3 any record will do 1 | P4 the plain net 54 units 2 | P5 a frame never says the fly chose home 1
 //   P6 the heading never turns 1 | P7 a frame carries the numbers from the tick before 1 | P9 the eye told the mover's kind by its colour 3 | P10 every mover red from outside 1 | P11 the mover at half its radius 5
@@ -28,6 +30,7 @@ import { fileURLToPath } from "node:url";
 import * as S from "../../brain/flyEscapeShow.mjs";
 import * as E from "../../brain/rl/escapeEnv.mjs";
 import * as V1 from "./flyEscape.mjs";
+import * as V2 from "./flyEscapeReflex.mjs";
 import * as C from "../roundhouse/angularImpulseCensus.mjs";
 import { shutdownServer } from "./serverShutdown.mjs";
 
@@ -37,7 +40,7 @@ function ok(name, cond, detail) { console.log(`  ${cond ? "PASS" : "FAIL"}  ${na
 async function section(fn) { try { await fn(); } catch (e) { ok(`!! the section THREW instead of answering: ${e.message}`, false, String(e.stack).split("\n").slice(1, 3).join(" | ")); } }
 const throws = (fn, re) => { try { fn(); return false; } catch (e) { return re.test(e.message); } };
 const J = JSON.stringify, src = (f) => fs.readFileSync(path.join(ENG, f), "utf8"), near = (a, b, e = 5e-5) => Math.abs(a - b) < e;
-const VS = { 1: V1 }, NS = Object.keys(S.ROUNDS).map(Number), RECS = Object.fromEntries(NS.map((n) => [n, S.recordsOf(src(S.ROUNDS[n].file))]));
+const VS = { 1: V1, 2: V2 }, NS = Object.keys(S.ROUNDS).map(Number), RECS = Object.fromEntries(NS.map((n) => [n, S.recordsOf(src(S.ROUNDS[n].file))]));
 const trained = (n, arm, s) => S.flyOf(arm, { round: n, draw: s, record: RECS[n].get(`${arm} ${s}`) });
 const over = (fly, seeds) => { let sum = 0, alive = 0; for (const s of seeds) { const ep = S.episode(fly, s); sum += ep.ret; if (!ep.caught) alive++; } return { score: sum / seeds.length, alive }; };
 const FREEZE = S.episode(S.flyOf("freeze"), 900001), REFLEX = S.episode(S.flyOf("reflex"), 900001), HIDE = S.episode(S.flyOf("hide"), 900001);
@@ -48,9 +51,9 @@ console.log("flyEscapeShow-selfcheck -- the page where the fly escapes, in 3D an
 console.log("1. THE FLIES");
 await section(() => {
     ok("the kinds are the four flies written by hand, the one told each mover's kind, and the rounds' five arms, each with a label; a round is its results file", J(S.KINDS) === J(["reflex", "fleeAll", "hide", "freeze", "told", "FLY", "SHUF", "PLAIN", "FISH", "MLP"]) && J(S.ARMS) === J(V1.ARMS) && S.KINDS.every((k) => typeof S.LABELS[k] === "string" && S.LABELS[k].length > 10) && S.DRAWS === V1.SEEDS.length && S.PLAIN_UNITS === V1.PLAIN_UNITS && J(S.MLP_HIDDEN) === J(V1.MLP_HIDDEN) &&
-        NS.every((n) => S.ROUNDS[n].file === VS[n].RESULTS && S.ROUNDS[n].label.startsWith(`round ${n}: `) && RECS[n].size === 80) && NS.includes(1));
+        J(NS) === J([1, 2]) && S.ROUNDS[2].start === "reflex" && V2.START === "reflex" && S.ROUNDS[1].start === undefined && NS.every((n) => S.ROUNDS[n].file === VS[n].RESULTS && S.ROUNDS[n].label.startsWith(`round ${n}: `) && RECS[n].size === 80) && NS.includes(1));
     const same = NS.flatMap((n) => S.ARMS.map((a) => [n, a, J(Array.from(S.policyFor(n, a, 2).getParams())) === J(Array.from(VS[n].policyOf(a, 2).getParams())) && S.policyFor(n, a, 2).getParams().length === VS[n].WEIGHTS[a]]));
-    ok("!! A ROUND'S UNTRAINED FLY HERE IS THE ROUND'S OWN, WEIGHT FOR WEIGHT: draw 2 of every arm of every round, against tools/ship/flyEscape.mjs's policyOf (which a page cannot load), and the weight counts the rounds registered", same.every((x) => x[2]), same.filter((x) => !x[2]).map((x) => x[0] + " " + x[1]).join(", "));
+    ok("!! A ROUND'S UNTRAINED FLY HERE IS THE ROUND'S OWN, WEIGHT FOR WEIGHT: draw 2 of every arm of every round (round 2's with its output layer at zero, wrapped in the reflex), against tools/ship/flyEscape.mjs's policyOf (which a page cannot load), and the weight counts the rounds registered", same.every((x) => x[2]), same.filter((x) => !x[2]).map((x) => x[0] + " " + x[1]).join(", "));
     const o = REFLEX.frames[20].obs, env = { mover: { kind: "strike" } };
     ok("the four flies written by hand are the environment's own RULES, answer for answer; the fly told the kind goes home for a strike and to its food for a pass or an empty sky", ["reflex", "fleeAll", "hide", "freeze"].every((k) => REFLEX.frames.every((f) => J(S.flyOf(k).act(f.obs)) === J(E.RULES[k](f.obs)))) && J(S.flyOf("told").act(o, env)) === J([1]) && J(S.flyOf("told").act(o, { mover: { kind: "pass" } })) === J([-1]) && J(S.flyOf("told").act(o, { mover: null })) === J([-1]));
     ok("!! WHAT IS REFUSED, BY NAME: a fly that is not one; a trained fly with no record, with another arm's or another draw's; draw 17; a round that is not one; a seed of 0; a tick past the episode's end; a picture of no pixels",
@@ -65,6 +68,9 @@ await section(() => {
         ref.score === fl.reflex.score && ref.alive === 156 && all.score === fl.fleeAll.score && all.alive === 198 && told.score === fl.told.score && told.alive === 198 && near(ref.score, 0.6465) && near(told.score, 0.8351), `${ref.score.toFixed(4)} ${all.score.toFixed(4)} ${told.score.toFixed(4)}`);
     const t5 = over(trained(1, "FLY", 5), V1.AUDIT), t9 = over(trained(1, "MLP", 9), V1.AUDIT);
     ok("!! ...AND THE TRAINED FLIES ARE THE RECORDS': round 1's FLY draw 5 and its MLP draw 9 (the one trained fly above fleeing from everything), flown here on the 200 audit episodes, give their records' scores to the bit and the episodes they lived", t5.score === RECS[1].get("FLY 5").score && t5.alive === RECS[1].get("FLY 5").alive && t9.score === RECS[1].get("MLP 9").score && t9.alive === RECS[1].get("MLP 9").alive && near(t9.score, 0.5453));
+    const b6 = over(trained(2, "FLY", 6), V2.AUDIT), un = S.policyFor(2, "FISH", 9);
+    ok("!! ROUND 2'S FLIES ARE PLAYED AS THE ROUND AUDITED THEM, THROUGH THE REFLEX: its best fly (FLY draw 6), flown here on the 200 audit episodes, gives its record's score to the bit (0.7273) and the episodes it lived; and an untrained round 2 fly chooses as the reflex does on every observation of an episode",
+        b6.score === RECS[2].get("FLY 6").score && b6.alive === RECS[2].get("FLY 6").alive && near(b6.score, 0.7273) && REFLEX.frames.every((f) => (un.act(f.obs)[0] > 0) === (E.RULES.reflex(f.obs)[0] > 0)), `${b6.score.toFixed(4)}`);
     const env = new E.EscapeEnv(), fly = S.flyOf("reflex"); let o = env.reset(900001), done = false, good = REFLEX.frames[0].x === env.x && REFLEX.frames[0].atFood === true && REFLEX.frames[0].t === 0 && J(REFLEX.frames[0].obs) === J(Array.from(o)), k = 0;
     while (!done) { const a = fly.act(o, env), r = env.step(a); o = r.obs; done = r.done; k++; const f = REFLEX.frames[k];
         if (!(f.t === k && f.x === env.x && f.z === env.z && f.home === (a[0] > 0) && f.inRoom === env.inRoom() && f.atFood === env.atFood() && f.fed === env.fed && J(f.obs) === J(Array.from(o)) && (env.mover ? f.mover && f.mover.kind === env.mover.kind && f.mover.x === env.mover.x && f.mover.z === env.mover.z : f.mover === null))) good = false; }
@@ -104,12 +110,12 @@ await section(() => {
     ok("the middle of the eye's picture is straight ahead: the same tick with the fly's heading turned is the same view shifted round, another picture", walk > 0 && ahead.hash !== same.hash && J(ahead.counts.block > 0) === J(same.counts.block > 0));
     const said = S.saidLines().join(" ");
     ok("!! WHAT THE PICTURES ARE AND ARE NOT IS SAID WITH THEM: the colours of the movers are for the watcher; the eye's picture is all the way round, the middle straight ahead, one lens a dot; the disc that LOOMS and a collision course's steady place; what the rounds found; and 'Not a fly's nervous system at work'",
-        /The colours of the two kinds of mover are for you; the fly is not told the kind/.test(said) && /all the way round: the middle is straight ahead and the two edges are behind it/.test(said) && /one lens a dot/.test(said) && /it LOOMS/.test(said) && /grows while staying where it is in the picture/.test(said) && /no fly learned to tell a strike from a harmless fly-by/.test(said) && /Not a fly's nervous system at work/.test(said) && /none of the visual cells/.test(said) && /could not be told apart from a shuffle/.test(said));
+        /The colours of the two kinds of mover are for you; the fly is not told the kind/.test(said) && /all the way round: the middle is straight ahead and the two edges are behind it/.test(said) && /one lens a dot/.test(said) && /it LOOMS/.test(said) && /grows while staying where it is in the picture/.test(said) && /no fly learned to tell a strike from a harmless fly-by/.test(said) && /most then do a little better than the reflex -- a hundredth and a half/.test(said) && /Not a fly's nervous system at work/.test(said) && /none of the visual cells/.test(said) && /could not be told apart from a shuffle/.test(said));
 });
 
 console.log("\n4. THE PAGE (fly-escape.html in Chromium)");
 await section(async () => {
-    const { srv, origin } = await C.serveTree(ENG), browser = await C.launchBrowser(); const errors = []; let first = null, ran = null, at = null, px = null, turnedP = null, frz = null, frzEnd = null, text = "", endText = "", tr = null, state = null, lost = null, dragged = null, meters = null;
+    const { srv, origin } = await C.serveTree(ENG), browser = await C.launchBrowser(); const errors = []; let first = null, ran = null, at = null, px = null, turnedP = null, frz = null, frzEnd = null, text = "", endText = "", tr = null, state = null, lost = null, dragged = null, meters = null, r2 = null;
     const wait = (p, f, arg) => p.waitForFunction(f, arg, { timeout: 30000 });
     try {
         const p = await browser.newPage({ viewport: { width: 1240, height: 900 } }); p.on("pageerror", (e) => errors.push(e.message));
@@ -123,6 +129,7 @@ await section(async () => {
         const box = await p.locator("#out").boundingBox(); await p.mouse.move(box.x + 200, box.y + 150); await p.mouse.down(); await p.mouse.move(box.x + 300, box.y + 190, { steps: 4 }); await p.mouse.up(); dragged = await p.evaluate(() => window.swekEscape);
         await p.evaluate(() => window.swekEscapeSeek(999)); frzEnd = await p.evaluate(() => window.swekEscape); endText = await p.evaluate(() => document.getElementById("end").textContent);
         state = await p.evaluate(() => ({ round: document.getElementById("round").disabled, draw: document.getElementById("draw").disabled, labels: [...document.getElementById("round").options].map((o) => o.textContent) }));
+        await p.selectOption("#kind", "FLY"); await p.selectOption("#round", "2"); await p.selectOption("#draw", "6"); await wait(p, () => window.swekEscape.kind === "FLY" && window.swekEscape.round === 2 && window.swekEscape.draw === 6 && window.swekEscape.ticks); r2 = await p.evaluate(() => window.swekEscape); await p.selectOption("#round", "1");
         await p.selectOption("#kind", "MLP"); await p.selectOption("#draw", "9"); await wait(p, () => window.swekEscape.kind === "MLP" && window.swekEscape.draw === 9 && window.swekEscape.ticks); tr = await p.evaluate(() => ({ ...window.swekEscape, roundOff: document.getElementById("round").disabled }));
         const q = await browser.newPage(); await q.route("**/flyEscapeRound.jsonl", (r) => r.fulfill({ status: 404, body: "gone" }));
         await q.goto(`${origin}/fly-escape.html`, { waitUntil: "load", timeout: 60000 }); await wait(q, () => window.swekEscape && window.swekEscape.ticks); await q.selectOption("#kind", "FLY"); await wait(q, () => window.swekEscape.error);
@@ -141,6 +148,8 @@ await section(async () => {
         !!meters && meters[0].v === o24[1].toFixed(3) && Math.abs(parseFloat(meters[0].w) - o24[1] * 100) < 0.01 && meters[1].v === o24[2].toFixed(3) && Math.abs(parseFloat(meters[1].w) - Math.abs(o24[2]) * 50) < 0.01 && meters[2].v === o24[3].toFixed(3) && parseFloat(meters[2].w) === 0 && Math.abs(o24[1] - 0.825) < 5e-4 && o24[2] === 1 && o24[3] === 0, J(meters));
     const m9 = S.episode(trained(1, "MLP", 9), 900001);
     ok("!! A TRAINED FLY IS PLAYED FROM ITS ROUND'S OWN FILE: round 1's MLP draw 9 on the same episode is this file's episode; the round and the draw can be chosen for a trained fly and not for one written by hand; the rounds listed are the module's", !!tr && tr.error === null && tr.hash === m9.hash && tr.ticks === m9.ticks && tr.round === 1 && tr.roundOff === false && !!state && state.round === true && state.draw === true && J(state.labels) === J(NS.map((n) => S.ROUNDS[n].label)));
+    const f6 = S.episode(trained(2, "FLY", 6), 900001);
+    ok("!! THE PAGE OFFERS ROUND 2 AND PLAYS ITS FLIES FROM ROUND 2'S OWN FILE: round 2's FLY draw 6 on episode 900001 is this file's episode", !!r2 && r2.error === null && r2.hash === f6.hash && r2.ticks === f6.ticks && r2.round === 2);
     ok("!! A RESULTS FILE THAT DOES NOT ARRIVE IS SAID, BY NAME, and no episode is shown as if it had: the page answers that round 1's file answered 404", !!lost && /brain\/flyEscapeRound\.jsonl answered 404/.test(lost.h.error || "") && /could not be flown: .*answered 404/.test(lost.text) && lost.h.hash === undefined && lost.h.ticks === undefined, lost ? lost.text : "");
 });
 
