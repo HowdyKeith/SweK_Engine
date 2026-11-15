@@ -86,3 +86,34 @@ Item 1 changes a rule, so it is first and says why; the rest fill in what the re
 6. **Printed besides the rules** (for reading): each arm's edge, se, z, wins-draws-losses and per-seat edges; each step's edge, se, z and label; B1 minus A and B2 minus A at each dose; A's slope over the top three doses; and **the forecast quantities of section 5 as yes/no** (so they are scored from the printed line, not recomputed).
 7. **What smoke is and is not.** Geometries 1 to 4 are among those (1 to 8) on which every league was TRAINED. I saw the smoke output (it ran, the checks passed); the forecasts of section 5 stand as written and will be scored as written.
 
+
+## DEV RESULT (2026-11-15; `node tools/ship/takeEvadeDose.mjs dev --write`, geometries 102001 to 102024, 101 s, exit 0; record `brain/subEvadeDoseDev.json`)
+
+DEV is free to read; HELD (103001 to 103024) is not flown by this entry. The void-checks passed (none printed). Forecasts are not scored on DEV except "R0 holds on DEV" (92): **TRUE**. The others stand as written for HELD.
+
+**R0 holds.** Ceiling arm of A (turn 2.8): +1.498, z 4.5, 35-0-13, FINDS. Ceiling arm of B1: +3.097, z 23.2, 47-0-1, FINDS.
+
+**The arms** (edge against G, both seats, 24 geometries; wins-draws-losses of the 48 duels; F = finds, edge at least 0.5 and z at least 2):
+
+| dose (rad) | A (G + dose) | B1 (+ league7001's speed and time) | B2 (+ league7103's speed and time) |
+|---|---|---|---|
+| 1.71 (G's own) | 0 (G) | +0.005, 24-0-24 | +0.001, 24-0-24 |
+| 1.90 | +0.006, 24-0-24 | +0.014, 24-0-24 | +0.007, 24-0-24 |
+| 2.10 | +0.012, 24-0-24 | +0.027, 24-0-24 | +0.014, 24-0-24 |
+| 2.30 | +0.021, 24-0-24 | **+0.900** (z 3.1), 30-1-17, F | +0.024, 24-0-24 |
+| 2.50 | **+0.555** (z 2.2), 28-0-20, F | **+2.026** (z 6.3), 39-0-9, F | **+0.562** (z 2.3), 28-0-20, F |
+| 2.65 | **+1.229** (z 3.8), 33-0-15, F | **+2.958** (z 16.2), 46-0-2, F | **+1.501** (z 4.5), 35-0-13, F |
+| 2.80 | **+1.498** (z 4.5), 35-0-13, F | **+3.097** (z 23.2), 47-0-1, F | **+1.769** (z 5.3), 37-0-11, F |
+
+**R1 THRESHOLD:** A 2.5 (MID); B1 2.3 (MID); B2 2.5 (MID). **R2 MONOTONE:** all three, no DOWN step. **R3 SATURATION:** 2.65 on all three (the last step, 2.65 to 2.8, is FLAT everywhere: +0.268 z 1.5 on A, +0.136 z 0.8 on B1, +0.267 z 1.5 on B2). Steps, all as the rule labels them: A FLAT FLAT UP UP FLAT; B1 FLAT FLAT UP UP UP FLAT; B2 FLAT FLAT FLAT UP UP FLAT. **Slope of A over 2.5, 2.65, 2.8:** +3.14 per radian (section 1 had 1.8 from the finders' own turns).
+
+**B1 minus A** at 1.9, 2.1, 2.3, 2.5, 2.65, 2.8: +0.008, +0.014, +0.878, +1.471, +1.729, +1.599. **B2 minus A:** +0.001, +0.002, +0.003, +0.007, +0.272, +0.271.
+
+**The forecast quantities as printed** (scored on HELD, not here): A threshold at most 2.5: yes. A threshold LOW: no. A monotone: yes. All monotone: yes. B1 threshold lower than A's: yes. B1 above A from 2.1: yes (by +0.014 at 2.1: a margin that is nothing, the arms there are all 24-0-24; the content is from 2.3). B2 within 0.5 of A: yes (largest +0.272). A saturates below the ceiling: yes.
+
+**Observations (DEV, for reading, not rules):**
+
+1. **The shape is not the straight line of section 1.** Below 2.3 the arms are 24-0-24 with edges of +0.005 to +0.027: no duel changes its outcome, on any curve, at any speed and time. The effect appears between 2.3 and 2.5 on A and B2 (+0.02 to +0.56) and between 2.1 and 2.3 on B1 (+0.03 to +0.90), then rises steeply and flattens at 2.65. The registered line (bar at 2.3 to 2.5) put the threshold about where it landed, but not the flat stretch before it or the steepness after it: A gains +1.0 between 2.3 and 2.65 and nothing visible between 1.9 and 2.3. The grid cannot place the onset closer than one step (2.3 to 2.5 on A and B2, 2.1 to 2.3 on B1).
+2. **B1's speed and time move the onset down by one step and add +1.5 to +1.7 at the middle and top doses; B2's add +0.27 at the top two and nothing below.** That is the split note's finding again, now with the turn as the variable: the speed carries the part the turn does not, and league7103's speed (3.55, near G's 3.42) has almost none to give.
+3. **Seats:** every arm below the onset has seat A at about +1.96 and seat B at about -1.94 (the G-against-G bias of the seat note); the finders' edge appears as seat B rising (B1 at 2.80: +3.16) while seat A stays near +2.2 to +3.0, so the turn's effect shows mostly in the seat that G loses.
+4. **What is NOT shown:** why 2.3 to 2.5 (a mechanism; the torpedo is evaded at some angle of the bearing that the grid does not resolve, which is a guess about the boat and not something read here); anything about turns above 2.8 (the bound); anything on geometries this set did not fly. R0 held, so HELD may be flown on Keith's word: `node tools/ship/takeEvadeDose.mjs held --write`.
