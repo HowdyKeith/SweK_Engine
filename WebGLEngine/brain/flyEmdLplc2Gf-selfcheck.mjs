@@ -149,6 +149,15 @@ console.log("\n6. THE LATTICE VARIANT");
     ok("!! DIRECTION: the centroid of the active units lands within 20 pixels (about 12 degrees) of the looming's centre at five positions across the field", errs.every((e) => e < 20), errs.map((e) => e.toFixed(1)).join(", ") + " px");
 }
 
+console.log("\n6b. THE SURROUND VARIANT (Round 3, detector C)");
+{
+    const s = M.loomingSquare({ rv: 0.05 }), peak = (p) => Math.max(...M.runStimulus(s.frames, { w: 200, h: 150, params: p }).nAct);
+    const base = peak({}), off = peak({ surroundKappa: null }), huge = peak({ surroundKappa: 1e9 }), k0 = peak({ surroundKappa: 0 }), k1 = peak({ surroundKappa: 1 }), kh = peak({ surroundKappa: 0.2 });
+    ok("!! surroundKappa null is the plain model, and an enormous kappa never inhibits (the same peak as without)", base > 0 && off === base && huge === base, `${base}, ${off}, ${huge}`);
+    ok("!! kappa 0 (any ring motion inhibits) lowers the looming square's peak, and the peak never rises as kappa falls (kappa 0 <= 0.2 <= 1 <= plain)", k0 < base && k0 <= kh && kh <= k1 && k1 <= base, `${k0} <= ${kh} <= ${k1} <= ${base}`);
+    ok("a bad kappa (negative) or ring (outer not above 1) is refused", throws(() => M.createModel({ w: 20, h: 20, params: { surroundKappa: -1 } })) && throws(() => M.createModel({ w: 20, h: 20, params: { surroundKappa: 1, surroundOuter: 1 } })));
+}
+
 console.log("\n7. THE SOURCE");
 {
     const src = fs.readFileSync(path.join(HERE, "flyEmdLplc2Gf.mjs"), "utf8").split("\n").filter((l) => !/^\s*\/\//.test(l)).join("\n");

@@ -23,6 +23,8 @@ export const PARAMS = Object.freeze({
     rkStep: 0.0005,
     lumScale: 255,                // input luminance 0..1 is multiplied by this (grey levels 0..255): the paper gives the thresholds L0, L1 = 2 and the OFF cutoff 0.05 without units
     integration: "multiplicative",
+    surroundKappa: null,          // Round 3 variant C: null = off; a number kappa inhibits a unit whose RING motion energy exceeds kappa x its arms' outward motion (an assumed strength; Klapoetke 2017 gives the direction only)
+    surroundOuter: 1.5,           // the ring runs from the receptive-field side out to this multiple of it
 });
 
 const clampPos = (x) => (x > 0 ? x : 0);
@@ -64,7 +66,8 @@ export function createModel({ w, h, units = null, params = {}, keepMaps = false 
     const aHP = P.tauHP / (P.tauHP + P.step), aLP = P.step / (P.tauLP + P.step);
     let hp = new Float32Array(n), xprev = new Float32Array(n), onLp = new Float32Array(n), offLp = new Float32Array(n), started = false;
     const on = new Float32Array(n), off = new Float32Array(n), dh = new Float64Array(n), dv = new Float64Array(n);
-    const arms = ux.map((x, i) => crossArms(x, uy[i], P.rfSide));
+    if (P.surroundKappa !== null && !(P.surroundKappa >= 0 && P.surroundOuter > 1)) throw new Error("flyEmdLplc2Gf.createModel: surroundKappa >= 0 and surroundOuter > 1");
+    const arms = ux.map((x, i) => crossArms(x, uy[i], P.rfSide)), surr = P.surroundKappa !== null, ab = new Float64Array(n);
     return {
         params: P, units: ux.map((x, i) => ({ x, y: uy[i] })),
         reset() { hp.fill(0); xprev.fill(0); onLp.fill(0); offLp.fill(0); started = false; },
@@ -84,11 +87,19 @@ export function createModel({ w, h, units = null, params = {}, keepMaps = false 
                 if (y < h - 1) { const j = i + w; const vd = onLp[i] * on[j] + offLp[i] * off[j], vu = on[i] * onLp[j] + off[i] * offLp[j]; dv[i] = vd - vu; }
             }
             for (let i = 0; i < n; i++) { onLp[i] += aLP * (on[i] - onLp[i]); offLp[i] += aLP * (off[i] - offLp[i]); }
-            const Ih = integral(dh, w, h), Iv = integral(dv, w, h), active = new Uint8Array(ux.length); let nAct = 0;
+            const Ih = integral(dh, w, h), Iv = integral(dv, w, h);
+            let Ie = null;
+            if (surr) { for (let i = 0; i < n; i++) ab[i] = Math.abs(dh[i]) + Math.abs(dv[i]); Ie = integral(ab, w, h); }
+            const active = new Uint8Array(ux.length); let nAct = 0;
             for (let k = 0; k < ux.length; k++) {
                 const a = arms[k];
                 const Lr = boxSum(Ih, w, h, ...a.r), Ll = -boxSum(Ih, w, h, ...a.l), Ld = boxSum(Iv, w, h, ...a.d), Lu = -boxSum(Iv, w, h, ...a.u);
                 const v = P.integration === "multiplicative" ? clampPos(Lr - P.L0) * clampPos(Ll - P.L0) * clampPos(Ld - P.L0) * clampPos(Lu - P.L1) : clampPos(Lr - P.L0) + clampPos(Ll - P.L0) + clampPos(Ld - P.L0) + clampPos(Lu - P.L1);
+                if (v > 0 && surr) {
+                    const hs = P.rfSide / 2, ho = hs * P.surroundOuter, X = ux[k], Y = uy[k];
+                    const ring = boxSum(Ie, w, h, X - ho, X + ho, Y - ho, Y + ho) - boxSum(Ie, w, h, X - hs, X + hs, Y - hs, Y + hs);
+                    if (ring > P.surroundKappa * (clampPos(Lr) + clampPos(Ll) + clampPos(Ld) + clampPos(Lu))) continue;
+                }
                 if (v > 0) { active[k] = 1; nAct++; }
             }
             return { nAct, active, L: null, maps: keepMaps ? { dh: Float64Array.from(dh), dv: Float64Array.from(dv) } : null };

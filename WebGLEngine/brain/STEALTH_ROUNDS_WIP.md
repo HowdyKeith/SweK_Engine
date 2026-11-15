@@ -53,3 +53,24 @@ What each round is and its status (updated as the rounds finish):
 
 **Verdict rule.** SUPPORTED iff predictions 1 and 6 both hold; PARTLY if 1 holds and 6 fails (the lattice variant is too sparse to say); NOT SUPPORTED if A's moving-stripe ratio is **0.9 or more at either r/v**: then the cuttlefish's stripes would not mask a looming ellipse from this detector, and that is reported as the result. Predictions 2 to 5 are reported as hits or misses and do not decide the verdict.
 **Said before the run:** a model's answer says nothing about a fly or a crab; it says which of three detector designs the stripes would fool. The Zhao model's own authors note that it lacks the inhibitory surround Klapoetke measured, which is why C is in the test.
+
+## Round 3 RESULTS (run 2026-11-15 with `node brain/stealthRound3-run.mjs`; raw table in `brain/stealthRound3-results.txt`)
+
+Moving-stripe ratio = peak active-unit count on the moving-stripe ellipse over the plain one (static ratio likewise); the Giant Fiber spike counts and first-spike angle are in the raw table.
+
+| detector | r/v 50 ms moving / static | r/v 100 ms moving / static | spikes plain → moving (50 ms, 100 ms) |
+|---|---|---|---|
+| A multiplicative | 0.756 / 0.885 | 1.000 / 0.955 | 18 → 10, 28 → 28 |
+| B additive | 1.018 / 0.991 | 1.015 / 1.001 | 308 → 374, 434 → 598 |
+| C surround (kappa 1) | 0.696 / 0.835 | 1.022 / 0.947 | 18 → 9, 22 → 22 |
+| D lattice (57 units) | 0.667 / 0.667 | 1.000 / 1.000 | 30 → 15, 45 → 45 |
+
+**VERDICT (by the rule written before the run): NOT SUPPORTED.** A's moving-stripe ratio is 1.000 at r/v 100 ms (the rule's line is 0.9 or more at either r/v). In this model the cuttlefish's moving stripes do NOT mask a looming ellipse from the LPLC2 array at the slower approach; at the fast approach (50 ms) they cut the peak by about a quarter and the spike count nearly in half, which is a partial effect, not the "at most 0.6" predicted.
+
+**Predictions, hit or miss:** 1 MISS (0.756 and 1.000, not at most 0.6 at both). 2 HIT (static 0.885, 0.955 within 0.5 to 1.5). 3 MISS (the first spike comes at the same 57.3 degrees on plain and moving at both r/v; only the count falls at 50 ms). 4 HIT (additive 1.018 and 1.015, at least 1.0; it also answers the stripes with many more spikes, the additive unit being a motion detector, not a looming detector). 5 MISS on a strict reading (C 0.696 is below A's 0.756 at 50 ms, but C 1.022 is above A's 1.000 at 100 ms; the surround at kappa 1 changes little). 6 MISS (D 0.667 at 50 ms but 1.000 at 100 ms, not at most 0.8 at both). Hits 2 of 6; the stated confidences were 60 to 80 percent, so these predictions were overconfident.
+
+**Why, said as inference (labelled; not tested here):** at the slower approach the expanding edge of the ellipse sweeps across many pixels per frame and the stripes' downward motion does not remove the edge's outward motion from the up arm; at the fast approach the stripes occupy a larger share of the arms' motion. This was not isolated by a further experiment.
+
+**What this does NOT say:** it says nothing about the fly or the crab; it says one particular detector model (Zhao 2023's, with an assumed luminance scale and an assumed surround strength) is only partly fooled. The surround strength kappa was made up, so C is a direction, not a result; the lattice degrees-per-column is an assumption (5). The stimulus is a looming ellipse on a collision course, not the paper's treadmill ellipse.
+
+**Gate:** `flyEmdLplc2Gf-selfcheck.mjs` gained section 6b (surround: null equals plain, huge kappa equals plain, kappa 0 lowers the peak and the peak is monotone in kappa, bad options refused). Mutants of the surround code: NOT YET RUN.
