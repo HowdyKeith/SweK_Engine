@@ -77,6 +77,17 @@
 // tightens the bound, and a formula that used the per-run relSd here would be a looser bound than the evidence
 // supports.
 //
+// *** SECTION 15 (v4915) IS ANY-HIT AND INSTANCES, AND SECTION 1's "DO NOT DELETE THIS CHECK" ROW WAS FLIPPED, NOT
+// DELETED. *** The fifth stage exists: rtAnyHit, asked of each candidate triangle inside the BVH's leaf loop, one
+// procedural rule (a barycentric cutout) selected by a uniform. And the one mesh can be placed more than once: a list
+// of instances, each a stored inverse transform and its own binding-table record. Both are graded with section 9b's
+// instrument -- the same seeds on both sides, pixel for pixel -- against a CPU that states each a second way: any-hit
+// as a re-cast past rejected hits with baryAt's barycentrics, instances as TRIANGLES moved into world space, where
+// the device moves rays into object space. Counted over the pixels that see the mesh (the first run counted sky and
+// could not tell one instance from three): 93.1% to 99.6% clean, at most 61.0% for nine planted devices. What it does
+// not hold: a tree over the instances (it is a list), a second mesh, translucency, any-hit on a sphere, or per-
+// triangle material under an instance -- none is written. And every number is this box's software rasteriser.
+//
 // *** SECTION 9b (v4914) IS THE SAME SCENE WITH THE SAME SEEDS, AND IT DOES NOT TAKE BACK THE PARAGRAPH ABOVE. ***
 // Section 9's note names two limits of its own row: POWER (its bound is 1.67e-2 at 8 seeds a side) and SYMMETRY
 // (the open box seen down its axis keeps its frame mean under any permutation of the camera basis). Both were
@@ -190,14 +201,19 @@ const say = (m) => console.log("  ----  " + m);
     for (const s of R.STAGES)
         say(`  ${s.implemented ? "PRESENT" : "ABSENT "}  ${s.id.padEnd(13)} ${s.fn || "--"}`);
 
+    // v4915 -- a stage with a `since` is optional text, so it is looked for in a shader that asks for it
+    const anySrc = R.pipelineWgsl({ bvh: true, anyHit: true });
     ok("every stage the list calls implemented is a NAMED function in the WGSL",
-        impl.every((s) => new RegExp("fn\\s+" + s.fn + "\\s*\\(").test(src)),
+        impl.every((s) => new RegExp("fn\\s+" + s.fn + "\\s*\\(").test(s.since ? anySrc : src)),
         "the seams are the deliverable: a stage that is only a comment is still inlined");
-    ok("!! and any-hit is ABSENT and SAYS SO rather than being dropped from the list",
-        R.STAGES.some((s) => s.id === "anyHit" && !s.implemented) &&
-        !/fn\s+rtAnyHit\s*\(/.test(src),
-        "a stage list that quietly omitted the row it cannot fill would report a complete pipeline. When " +
-        "somebody writes an any-hit shader, flip `implemented` -- do not delete this check");
+    // v4915 -- THE ROW THAT SAID "WHEN SOMEBODY WRITES AN ANY-HIT SHADER, FLIP `implemented` -- DO NOT DELETE THIS
+    // CHECK". Flipped, not deleted, and it keeps both halves: the stage is in the list as written, and it is in
+    // the WGSL ONLY when asked for, so the default shader this section reads is still the four-stage one.
+    ok("!! any-hit is PRESENT since v4915, named in the WGSL when asked for and absent from it when not",
+        R.STAGES.some((s) => s.id === "anyHit" && s.implemented && s.fn === "rtAnyHit" && s.since === "v4915") &&
+        /fn\s+rtAnyHit\s*\(/.test(anySrc) && !/rtAnyHit/.test(src) && !/rtAnyHit/.test(R.pipelineWgsl({ bvh: true })),
+        "the list's `implemented` is true for a stage the default shader does not contain: the stage exists, and a " +
+        "scene that never asks for it compiles the text it always did. Section 15 holds what it does");
     ok("the binding table is read as DATA, not branched on at the call site",
         /U\[SBT_BASE \+ /.test(src) && /switch \(shaderIndex\)/.test(src),
         "WGSL has no function pointers and neither does WebRTX -- both compile the dispatch to a switch. " +
@@ -206,11 +222,15 @@ const say = (m) => console.log("  ----  " + m);
     // v4778 -- MEASURED_AT_V4418 was an export no gate named. Its three stage fields are the list above, read
     // back: a record that says "four of five, any-hit missing" beside a list that says otherwise is a claim.
     const m = R.MEASURED_AT_V4418;
-    ok("MEASURED_AT_V4418's stage fields are the STAGES list above, read back rather than restated",
-        m.stagesTotal === R.STAGES.length && m.stagesPresentInV4417Monolith === impl.length &&
-        R.STAGES.find((s) => !s.implemented)?.id === m.missing,
-        `${m.stagesPresentInV4417Monolith} of ${m.stagesTotal}, missing ${m.missing}; the list reads ${impl.length} of ` +
-        `${R.STAGES.length}. Naming the fifth stage is the day this row must be re-taken, on purpose`);
+    // v4915 -- re-taken on the day it said it must be. The record is HISTORY (what v4418 measured) and the list is
+    // today, so they no longer read the same and must not be made to: the four the monolith had are the stages with
+    // no `since`, and the one it lacked is the one stage that carries one.
+    const later = R.STAGES.filter((s) => s.since);
+    ok("MEASURED_AT_V4418's stage fields are the STAGES list as it stood then: every stage without a `since`, and the one with",
+        m.stagesTotal === R.STAGES.length && m.stagesPresentInV4417Monolith === R.STAGES.length - later.length &&
+        later.length === 1 && later[0].id === m.missing && impl.length === R.STAGES.length,
+        `${m.stagesPresentInV4417Monolith} of ${m.stagesTotal} at v4418, missing ${m.missing}; today ${impl.length} of ` +
+        `${R.STAGES.length}, ${later.map((s) => s.id + " since " + s.since).join(", ")}`);
 }
 
 // ---- 1b. THE UNIFORM BLOCK'S SLOT MAP AND THE BINDING INDICES -- CPU ONLY, SO THEY RUN ON EVERY BOX -----------
@@ -2196,6 +2216,233 @@ say("14. RTX ROUND 9: MULTI-SCATTER ENERGY COMPENSATION");
             "correctness for THIS combination is gated by 14a's own JS-side validation tests, not a statistical render; " +
             "this only proves the WGSL actually compiles and executes the four-way combination without NaN/Inf/a blank frame");
     }
+}
+
+// ---- 15. v4915: ANY-HIT, AND INSTANCES OF THE ONE MESH ----------------------------------------------------------------
+// Both are graded by the instrument section 9b built: the SAME seeds on both sides, pixel for pixel, against a CPU
+// reference that states each feature a second way.
+//   ANY-HIT on the device is a test inside the BVH's leaf loop. On the CPU it is pathTracer.mjs's re-cast: take the
+//     nearest hit, ask the rule, and if it says no, cast again from there -- with barycentrics from baryAt()'s
+//     projection, not Moller-Trumbore's by-products. The rule itself is written here a third time, in JS.
+//   INSTANCES on the device carry each RAY into object space through a stored inverse. The CPU never transforms a
+//     ray: it moves the TRIANGLES, one world-space mesh and one BVH per instance, and traces those. Nothing on that
+//     side knows what an inverse transpose is, so a wrong one on the device has nowhere to hide.
+// The view is oblique and the sky a gradient, on purpose: section 9's two blind spots (symmetry, and a constant
+// environment that makes direction irrelevant) are exactly what a wrong transform or a wrong normal would use.
+{
+    console.log("\n15. any-hit and instances (v4915)");
+    const positions = [
+        [-1, -1, -1], [1, -1, -1], [1, 1, -1], [-1, 1, -1],
+        [-1, -1, 1], [1, -1, 1], [1, 1, 1], [-1, 1, 1],
+    ];
+    const indices = [                                   // section 9's open box: five faces, normals into the cavity
+        [0, 1, 2], [0, 2, 3], [4, 6, 5], [4, 7, 6], [0, 4, 5], [0, 5, 1], [0, 3, 7], [0, 7, 4], [1, 5, 6], [1, 6, 2],
+    ];
+    const tris = trianglesFrom(positions, indices), cpuBvh = new MeshBVH(tris), gpuBvh = R.bvhBuffersFromMesh(positions, indices);
+    const W = 16, H = 16, SPP = 32, NS = 6, TOL = 1e-5, CUT = 0.15;
+    const top = { w: W, h: H, eye: [0, 1.5, 0], look: [0, -1, 0], up: [0, 0, -1], fovDeg: 30 };
+    const wide = { w: W, h: H, eye: [1.5, 5, 7], look: [0, -0.2, 0], up: [0, 1, 0], fovDeg: 50 };
+    const sky = (d) => 0.3 + 0.7 * (0.5 * (d[1] + 1));                                  // pipelineWgsl({ gradient })'s own
+    const meanOf = (v) => v.reduce((a, b) => a + b, 0) / v.length;
+    const sdOf = (v, m) => Math.sqrt(v.reduce((a, b) => a + (b - m) ** 2, 0) / (v.length - 1));
+    const e2 = (v) => v.toExponential(2), pct = (v) => (v * 100).toFixed(1) + "%";
+    // the rule, a third time: accept unless all three weights are above the margin
+    const cutout = (p) => (tri, u, v) => Math.min(1 - u - v, u, v) <= p;
+
+    // three placements of the one box: as it is; turned about y and shrunk; turned about z and scaled UNEVENLY,
+    // which is the one that tells an inverse transpose from an inverse
+    const rotY = (a) => [Math.cos(a), 0, Math.sin(a), 0, 1, 0, -Math.sin(a), 0, Math.cos(a)];
+    const rotZ = (a) => [Math.cos(a), -Math.sin(a), 0, Math.sin(a), Math.cos(a), 0, 0, 0, 1];
+    const mul3 = (A, B) => { const o = []; for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) o.push(A[r * 3] * B[c] + A[r * 3 + 1] * B[3 + c] + A[r * 3 + 2] * B[6 + c]); return o; };
+    const affine = (L, t) => [L[0], L[1], L[2], t[0], L[3], L[4], L[5], t[1], L[6], L[7], L[8], t[2]];
+    const INST = [
+        { transform: affine([1, 0, 0, 0, 1, 0, 0, 0, 1], [0, 0, 0]), albedo: 0.6 },
+        { transform: affine(mul3(rotY(0.5), [0.7, 0, 0, 0, 0.7, 0, 0, 0, 0.7]), [2.6, 0.2, 0.3]), albedo: 0.3 },
+        { transform: affine(mul3(rotZ(0.35), [0.8, 0, 0, 0, 1.3, 0, 0, 0, 0.6]), [-2.5, 0.4, -0.2]), albedo: 0.8 },
+    ];
+    const placed = (M) => { const out = new Float64Array(tris.length);
+        for (let i = 0; i < tris.length; i += 3) for (let r = 0; r < 3; r++) out[i + r] = M[r * 4] * tris[i] + M[r * 4 + 1] * tris[i + 1] + M[r * 4 + 2] * tris[i + 2] + M[r * 4 + 3];
+        return out; };
+    const cpuPlaced = (extra = {}) => INST.map((it) => ({ bvh: new MeshBVH(placed(it.transform)), albedo: it.albedo, ...extra }));
+    // packed under a guard: a packer that throws on a good list is a red row here, not a stack trace (sabotage J)
+    let instBuf, packErr = null;
+    try { instBuf = R.instanceBuffer(INST); } catch (e) { packErr = String(e.message); instBuf = new Float32Array(INST.length * R.INSTANCE_FLOATS); }
+    ok("instanceBuffer packs three well-formed instances without refusing any", packErr === null, packErr || `${instBuf.length} floats`);
+    const meshIn = R.bvhInputs(gpuBvh);
+    const withInst = (buf) => [...meshIn, { binding: R.BVH_BINDINGS.instances, data: buf }];
+
+    // ---- 15a. structure: what is emitted, what is refused, what is packed --------------------------------------
+    const plain = R.pipelineWgsl({ bvh: true }), both = R.pipelineWgsl({ bvh: true, anyHit: true, instances: true });
+    ok("neither feature is in a shader that did not ask for it, and each is in one that did",
+        !/rtAnyHit|bvhInst|rtTraverseInstances/.test(plain) && /fn rtAnyHit\(/.test(both) && /fn rtTraverseInstances\(/.test(both) &&
+        !/bvhInst/.test(R.pipelineWgsl({ bvh: true, anyHit: true })) && !/rtAnyHit/.test(R.pipelineWgsl({ bvh: true, instances: true })),
+        `${plain.length} chars plain, ${both.length} with both`);
+    ok("!! any-hit is asked in ONE place -- the leaf loop's own condition, beside the test that shortens the ray -- so camera, bounce and shadow rays share it",
+        both.split("rtAnyHit(").length - 1 === 2 && /th\.t < best && rtAnyHit\(tri, th\.u, th\.v\)/.test(both) && both.split("fn rtTraverseBvh(").length === 2,
+        "two mentions: the definition and the one call. A second triangle traversal, or a call after the loop, would be a second rule");
+    const throws = (f) => { try { f(); return null; } catch (e) { return String(e.message); } };
+    const mirrorT = affine([-1, 0, 0, 0, 1, 0, 0, 0, 1], [0, 0, 0]), flatT = affine([1, 0, 0, 0, 1, 0, 0, 0, 0], [0, 0, 0]);
+    const refusals = [
+        ["anyHit without a mesh", () => R.pipelineWgsl({ anyHit: true }), /needs bvh/],
+        ["instances without a mesh", () => R.pipelineWgsl({ instances: true }), /needs bvh/],
+        ["instances with per-triangle materials", () => R.pipelineWgsl({ bvh: true, instances: true, meshMaterials: true }), /two answers/],
+        ["a mirroring instance", () => R.instanceBuffer([{ transform: mirrorT, albedo: 0.5 }]), /mirrors/],
+        ["a singular instance", () => R.instanceBuffer([{ transform: flatT, albedo: 0.5 }]), /singular/],
+        ["an emissive instance", () => R.instanceBuffer([{ transform: INST[0].transform, albedo: 0.5, emit: 1 }]), /cannot emit/],
+        ["an instance with no transform", () => R.instanceBuffer([{ albedo: 0.5 }]), /12 finite numbers/],
+        ["no instances at all", () => R.instanceBuffer([]), /at least one/],
+        ["a cutout margin of a third", () => R.pipelineUniforms([], { bvh: { nodeCount: 1, triCount: 1, hit: "lambertian", albedo: 0.5, anyHit: { rule: "cutout", param: 1 / 3 } } }), /0 <= p < 1\/3/],
+        ["an any-hit rule nobody wrote", () => R.pipelineUniforms([], { bvh: { nodeCount: 1, triCount: 1, hit: "lambertian", albedo: 0.5, anyHit: { rule: "alpha" } } }), /no any-hit rule/],
+    ].map(([name, f, want]) => ({ name, msg: throws(f), want }));
+    ok("ten things are REFUSED by name rather than rendered wrong", refusals.every((r) => r.msg && r.want.test(r.msg)),
+        refusals.filter((r) => !(r.msg && r.want.test(r.msg))).map((r) => r.name + ": " + r.msg).join(" | ") || refusals.map((r) => r.name).join("; "));
+    // the buffer holds the INVERSE: applied to a placed point it gives the object-space point back
+    let worstInv = 0;
+    INST.forEach((it, k) => { const M = it.transform, o = k * R.INSTANCE_FLOATS;
+        for (const pt of positions) { const w = [0, 1, 2].map((r) => M[r * 4] * pt[0] + M[r * 4 + 1] * pt[1] + M[r * 4 + 2] * pt[2] + M[r * 4 + 3]);
+            for (let r = 0; r < 3; r++) worstInv = Math.max(worstInv, Math.abs(instBuf[o + r * 4] * w[0] + instBuf[o + r * 4 + 1] * w[1] + instBuf[o + r * 4 + 2] * w[2] + instBuf[o + r * 4 + 3] - pt[r])); } });
+    ok("!! instanceBuffer stores the object-from-world INVERSE: it carries every placed corner back to the box's own", worstInv < 1e-6 && instBuf.length === INST.length * R.INSTANCE_FLOATS,
+        `worst corner ${e2(worstInv)} over ${INST.length} instances x 8 corners, f32; ${R.INSTANCE_FLOATS} floats each, the record in the last four (${Array.from(instBuf.slice(28, 32)).map((v) => +v.toFixed(3))})`);
+    // ...and each instance's own record behind its inverse, where rtInstanceRecord reads it. Found by sabotage: packed one
+    // float late, the buffer overran and the gate THREW instead of failing a row; packed elsewhere, nothing said so.
+    const recs = INST.map((it, k) => Array.from(instBuf.slice(k * R.INSTANCE_FLOATS + 12, k * R.INSTANCE_FLOATS + 16)));
+    ok("!! and each instance's record sits in its last four floats: the lambertian index, then that instance's own albedo",
+        recs.every((r, k) => r[0] === R.HIT_SHADERS.lambertian && Math.abs(r[1] - INST[k].albedo) < 1e-7 && r[2] === 0 && r[3] === 0),
+        recs.map((r) => "[" + r.map((v) => +v.toFixed(3)) + "]").join(" "));
+    const uBoth = R.pipelineUniforms([], { view: wide, bvh: { nodeCount: gpuBvh.nodeCount, triCount: gpuBvh.triCount, instanceCount: 3, anyHit: { rule: "cutout", param: CUT } } });
+    const uPlain = R.pipelineUniforms([], { view: wide, bvh: { nodeCount: gpuBvh.nodeCount, triCount: gpuBvh.triCount, hit: "lambertian", albedo: 0.6 } });
+    ok("the rule and the count ride in slots nothing else used: U[5] and U[MESH_META].w, both zero in a scene with neither",
+        R.ANYHIT_SLOT === 5 && uBoth[20] === R.ANY_HIT_SHADERS.cutout && Math.abs(uBoth[21] - CUT) < 1e-7 && uBoth[R.MESH_META_SLOT * 4 + 3] === 3 &&
+        [20, 21, 22, 23, R.MESH_META_SLOT * 4 + 3].every((i) => uPlain[i] === 0),
+        `U[5] = ${Array.from(uBoth.slice(20, 22)).map((v) => +v.toFixed(3))}, U[${R.MESH_META_SLOT}].w = ${uBoth[R.MESH_META_SLOT * 4 + 3]}`);
+
+    // ---- the comparison: the same seeds on both sides ---------------------------------------------------------
+    const gpuFrame = async (code, view, seed, bvhU, inputs, patch = null) => {
+        const u = R.pipelineUniforms([], { spp: SPP, seed, view, eps: R.EPS, bvh: { nodeCount: gpuBvh.nodeCount, triCount: gpuBvh.triCount, ...bvhU } });
+        const r = await runWgslCompute({ code: patch ? patch(code) : code, outCount: W * H, workgroups: Math.ceil(W * H / 64), uniforms: u, inputs });
+        if (!r.ok) throw new Error("section 15 GPU render failed: " + r.reason);
+        return Array.from(r.values);
+    };
+    const cpuFrame = (scene, view, seed, gradient) => Array.from(renderCpuMesh(scene, { ...view, spp: SPP, seed, maxDepth: R.MAX_DEPTH, sky: gradient ? sky : () => 1, nee: false }));
+    // *** ONLY THE PIXELS THAT SEE THE MESH ARE COUNTED, AND THE FIRST RUN OF THIS SECTION IS WHY. *** Counted over the
+    // whole oblique frame, a device traversing ONE instance of three still "agreed" on 76.5% of pixels and a plant
+    // that asks any-hit too late on 94.7%: most of that frame is sky, and sky agrees with anything. So the empty
+    // scene is rendered with the same seeds and a pixel counts only where the reference differs from it.
+    const emptyAt = new Map();
+    const emptyFrame = (view, s, gradient) => { const k = [view.eye, s, !!gradient].join("|"); if (!emptyAt.has(k)) emptyAt.set(k, cpuFrame([], view, s, gradient)); return emptyAt.get(k); };
+    const paired = async ({ code, view, gradient, bvhU, inputs, scene, patch = null, cpu = null }) => {
+        let same = 0, pix = 0, all = 0; const d = [], cm = [], frames = [];
+        for (let s = 1; s <= NS; s++) {
+            const c = cpu ? cpu[s - 1] : cpuFrame(scene, view, s, gradient), g = await gpuFrame(code, view, s, bvhU, inputs, patch), bg = emptyFrame(view, s, gradient);
+            for (let i = 0; i < c.length; i++) { all++; if (c[i] === bg[i]) continue; pix++; if (Math.abs(g[i] - c[i]) <= TOL) same++; }
+            d.push(meanOf(g) / meanOf(c) - 1); cm.push(meanOf(c)); frames.push(c);
+        }
+        const m = meanOf(d), sd = sdOf(d, m);
+        return { same, pix, all, share: same / pix, mean: m, se: sd / Math.sqrt(NS), cpuMean: meanOf(cm), frames };
+    };
+    // floors: a clean device keeps 93.1% to 99.6% of mesh pixels here and the worst plant 61.0%; 85% and 75% sit between
+    const CLEAN = 0.85, PLANTED = 0.75;
+    const agrees = (r) => r.share >= CLEAN && Math.abs(r.mean) < 3 * r.se + TOL;
+    const tell = (name, r) => { say(`${name}: ${r.same} of the ${r.pix} pixels that see the mesh (of ${r.all}) within ${TOL} (${(r.share * 100).toFixed(2)}%), paired gpu/cpu-1 ${e2(r.mean)} +- ${e2(r.se)}, frame mean ${r.cpuMean.toFixed(4)}`);
+        REPORT_ROWS.push([name, `${W}x${H}`, `${SPP} spp x ${NS} seeds, same seeds`, `${r.same} of ${r.pix} mesh pixels within ${TOL}; paired mean ${e2(r.mean)}, se ${e2(r.se)}`]); };
+
+    // ---- 15b. any-hit ------------------------------------------------------------------------------------------
+    const anyCode = R.pipelineWgsl({ bvh: true, anyHit: true }), anyGrad = R.pipelineWgsl({ bvh: true, anyHit: true, gradient: true });
+    const solidU = { hit: "lambertian", albedo: 0.6 }, cutU = { ...solidU, anyHit: { rule: "cutout", param: CUT } };
+    const g0 = await gpuFrame(plain, top, 1, solidU, meshIn), g1 = await gpuFrame(anyCode, top, 1, solidU, meshIn);
+    ok("!! compiled in and bound to no rule, the stage changes NOTHING: the frame is the plain shader's, bit for bit", g0.every((v, i) => Object.is(v, g1[i])),
+        `${g0.filter((v, i) => !Object.is(v, g1[i])).length} of ${g0.length} pixels differ -- rule 0 accepts every candidate`);
+    const solid = await paired({ code: plain, view: top, bvhU: solidU, inputs: meshIn, scene: [{ bvh: cpuBvh, albedo: 0.6 }] });
+    const cutTop = await paired({ code: anyCode, view: top, bvhU: cutU, inputs: meshIn, scene: [{ bvh: cpuBvh, albedo: 0.6, anyHit: cutout(CUT) }] });
+    const cutWide = await paired({ code: anyGrad, view: wide, gradient: true, bvhU: cutU, inputs: meshIn, scene: [{ bvh: cpuBvh, albedo: 0.6, anyHit: cutout(CUT) }] });
+    tell("open box, solid (the control)", solid); tell(`open box, cutout ${CUT}, from above`, cutTop); tell(`open box, cutout ${CUT}, oblique under a gradient sky`, cutWide);
+    ok("!! *** ANY-HIT: the device's in-traversal test and the CPU's re-cast walk the same paths, from above and obliquely ***", agrees(cutTop) && agrees(cutWide),
+        `${(cutTop.share * 100).toFixed(2)}% and ${(cutWide.share * 100).toFixed(2)}% of pixels, paired means ${e2(cutTop.mean)} and ${e2(cutWide.mean)} inside 3 standard errors`);
+    ok("!! and the holes are really there: the cut box is a different picture from the solid one, on the CPU alone", Math.abs(cutTop.cpuMean / solid.cpuMean - 1) > 0.05,
+        `frame mean ${cutTop.cpuMean.toFixed(4)} cut against ${solid.cpuMean.toFixed(4)} solid, ${pct(cutTop.cpuMean / solid.cpuMean - 1)} -- (1 - 3 x ${CUT})^2 = ${((1 - 3 * CUT) ** 2).toFixed(4)} of every triangle is open to the sky`);
+
+    // ---- 15c. instances ----------------------------------------------------------------------------------------
+    const instCode = R.pipelineWgsl({ bvh: true, instances: true }), instGrad = R.pipelineWgsl({ bvh: true, instances: true, gradient: true });
+    const g2 = await gpuFrame(instCode, top, 1, { instanceCount: 1 }, withInst(R.instanceBuffer([INST[0]])));
+    ok("!! one instance under the identity IS the mesh: the frame is the plain shader's, bit for bit", g0.every((v, i) => Object.is(v, g2[i])),
+        `${g0.filter((v, i) => !Object.is(v, g2[i])).length} of ${g0.length} pixels differ -- and its record came from the instance buffer, not U[MESH_SBT], which this scene left empty`);
+    const three = await paired({ code: instGrad, view: wide, gradient: true, bvhU: { instanceCount: 3 }, inputs: withInst(instBuf), scene: cpuPlaced() });
+    tell("three instances of the box (identity; turned and shrunk; turned and unevenly scaled)", three);
+    ok("!! *** INSTANCES: rays carried into object space on the device, triangles carried into world space on the CPU, the same paths ***", agrees(three),
+        `${(three.share * 100).toFixed(2)}% of pixels, paired mean ${e2(three.mean)} against 3 x ${e2(three.se)}`);
+    const one = await paired({ code: instGrad, view: wide, gradient: true, bvhU: { instanceCount: 1 }, inputs: withInst(instBuf), scene: cpuPlaced(), cpu: three.frames });
+    ok("!! and all three are in the picture: the same buffer with the count set to 1 no longer matches", one.share < PLANTED,
+        `${pct(one.share)} of pixels with one instance traversed against ${pct(three.share)} with three`);
+
+    // ---- 15d. both at once -------------------------------------------------------------------------------------
+    const bothGrad = R.pipelineWgsl({ bvh: true, instances: true, anyHit: true, gradient: true });
+    const bothU = { instanceCount: 3, anyHit: { rule: "cutout", param: CUT } };
+    const combo = await paired({ code: bothGrad, view: wide, gradient: true, bvhU: bothU, inputs: withInst(instBuf), scene: cpuPlaced({ anyHit: cutout(CUT) }) });
+    tell(`three instances, each cut out at ${CUT}`, combo);
+    ok("!! *** BOTH: a cutout asked in object space of an instanced triangle is the cutout of the placed one ***", agrees(combo),
+        `${(combo.share * 100).toFixed(2)}% of pixels, paired mean ${e2(combo.mean)} against 3 x ${e2(combo.se)} -- barycentrics do not change under an affine map`);
+
+    // ---- 15e. the plants: each a device that is wrong, the CPU untouched ------------------------------------------
+    // A plant whose target is not in the shader plants nothing, and says so as a row rather than as a throw (the first
+    // sabotage pass of this section ended three runs in a stack trace, which is an exit code and not a finding).
+    const missed = new Set();
+    const plantOf = (find, put) => (code) => { const parts = code.split(find); if (parts.length !== 2) missed.add(find); return parts.join(put); };
+    const PLANTS = [
+        { id: "any-hit: the rule inverted (holes solid, margins open)", of: "anyHit", patch: plantOf("min(1.0 - u - v, min(u, v)) <= rule.y", "min(1.0 - u - v, min(u, v)) > rule.y") },
+        { id: "any-hit: vertex A's weight left out of the rule", of: "anyHit", patch: plantOf("min(1.0 - u - v, min(u, v)) <= rule.y", "min(u, v) <= rule.y") },
+        { id: "any-hit: asked AFTER the candidate has shortened the ray", of: "anyHit",
+          patch: plantOf("if (th.t > 0.0 && th.t < best && rtAnyHit(tri, th.u, th.v)) { best = th.t; bvhHitTri = tri; bvhHitU = th.u; bvhHitV = th.v; }",
+                         "if (th.t > 0.0 && th.t < best) { best = th.t; if (rtAnyHit(tri, th.u, th.v)) { bvhHitTri = tri; bvhHitU = th.u; bvhHitV = th.v; } else { bvhHitTri = -1; } }") },
+        { id: "instances: the normal left in object space", of: "inst", patch: plantOf("N = rtInstanceNormal(bvhHitInst, bvhHitTri);", "N = rtTriNormal(bvhHitTri * 9);") },
+        { id: "instances: the normal through the inverse instead of its transpose", of: "inst",
+          patch: plantOf("return normalize(vec3<f32>(bvhInst[b] * n.x + bvhInst[b + 4] * n.y + bvhInst[b + 8] * n.z,", "return normalize(vec3<f32>(bvhInst[b] * n.x + bvhInst[b + 1] * n.y + bvhInst[b + 2] * n.z,") },
+        { id: "instances: every hit reads instance 0's record", of: "inst", patch: plantOf("rec = rtInstanceRecord(bvhHitInst);", "rec = rtInstanceRecord(0);") },
+        { id: "instances: the object-space direction renormalised", of: "inst", patch: plantOf("let t = rtTraverseBvh(o, d, best);", "let t = rtTraverseBvh(o, normalize(d), best);") },
+        { id: "instances: the translation's x dropped", of: "inst", patch: plantOf("dot(r0.xyz, orig) + r0.w", "dot(r0.xyz, orig)") },
+        { id: "instances: the winner's triangle not written back", of: "inst", patch: plantOf("bvhHitTri = tri; bvhHitInst = inst;", "bvhHitInst = inst;") },
+    ];
+    const seen = [];
+    for (const pl of PLANTS) {
+        const r = pl.of === "anyHit"
+            ? await paired({ code: anyGrad, view: wide, gradient: true, bvhU: cutU, inputs: meshIn, patch: pl.patch, cpu: cutWide.frames })
+            : await paired({ code: instGrad, view: wide, gradient: true, bvhU: { instanceCount: 3 }, inputs: withInst(instBuf), patch: pl.patch, cpu: three.frames });
+        seen.push({ pl, r });
+        say(`plant, ${pl.id}: ${pct(r.share)} of pixels where the reference put them, paired mean ${e2(r.mean)}`);
+        REPORT_ROWS.push([`planted device: ${pl.id}`, `${W}x${H}`, `${SPP} spp x ${NS} seeds, same seeds`, `${pct(r.share)} of pixels identical, paired mean ${e2(r.mean)}`]);
+    }
+    ok("each plant's target is in the generated WGSL exactly once, so it changes the line it names and no other", missed.size === 0,
+        [...missed].map((f) => f.slice(0, 60)).join(" | ") || `${PLANTS.length} plants, grepped in the generated string`);
+    ok("!! *** EVERY PLANTED DEVICE IS SEEN: none keeps three mesh pixels in four, where the clean ones keep " + pct(Math.min(cutWide.share, three.share)) + " ***",
+        seen.every((x) => x.r.share < PLANTED), seen.map((x) => pct(x.r.share)).join(", "));
+    ok("!! and a plant whose frame mean stays inside its own noise is still seen, by pixels: the mean alone would have passed it",
+        seen.filter((x) => Math.abs(x.r.mean) < 3 * x.r.se + TOL).every((x) => x.r.share < PLANTED),
+        (seen.filter((x) => Math.abs(x.r.mean) < 3 * x.r.se + TOL).map((x) => `${x.pl.id} (mean ${e2(x.r.mean)} inside its noise, ${pct(x.r.share)} of pixels)`).join("; ")) || "every plant moves the paired mean past 3 standard errors as well");
+    // SABOTAGE (v4915), fourteen, each against the real file, each restored and md5-verified; reds over the whole gate.
+    // TWO WENT WRONG FIRST AND BOTH ARE FIXED ABOVE: J threw inside instanceBuffer and ended the run in a stack trace
+    // with 0 rows red (the packer is now called under a guard and the record has its own row), and three others
+    // ended the same way after their named reds because a plant whose target had gone threw (now a row).
+    //   A  rtPipeline.mjs, the leaf loop never asks rtAnyHit -> 4 red: "asked in ONE place", ANY-HIT (0.00% and 7.14%
+    //      of mesh pixels), BOTH, and the plant-target row.
+    //   B  rtPipeline.mjs, the rule compares against rule.x (its own index) -> 2 red: ANY-HIT, BOTH.
+    //   C  rtPipeline.mjs, instanceBuffer's translation with the wrong sign -> 3 red: the INVERSE row (worst corner
+    //      6.11), INSTANCES (25.79%), BOTH.
+    //   D  rtPipeline.mjs, a mirroring instance not refused -> 1 red: the refusals row, naming it.
+    //   E  rtPipeline.mjs, each instance traversed to the ray's own limit instead of the best so far -> 3 red:
+    //      INSTANCES (47.02%), BOTH, and the plant-target row. The later instance wins whichever is nearer.
+    //   F  pathTracer.mjs, the CPU's re-cast accepts its first hit -> 3 red: ANY-HIT, "the holes are really there"
+    //      (0.2297 against 0.2297), BOTH.
+    //   G  pathTracer.mjs, the re-cast forgets the distance already travelled -> 1 red, BOTH (79.76% against the 85%
+    //      floor). Only BOTH can see it -- a wrong t matters only when another entry competes for nearest -- and it
+    //      is the narrowest catch in this log.
+    //   H  rtPipeline.mjs, the instance count not written to the block -> 4 red, the slot row by name.
+    //   I  rtPipeline.mjs, the any-hit rule not written to the block -> 3 red, the slot row by name.
+    //   J  rtPipeline.mjs, the record packed one float late -> 3 red: the packer row ("offset is out of bounds"), the
+    //      INVERSE row, the record row. J2, packed over the inverse's third row -> 5 red. J3, every instance given
+    //      one albedo -> 4 red, the record row by name ([0,0.5,0,0] three times).
+    //   K  this file, pixels counted over the whole frame again -> 3 red: "all three are in the picture" (76.5%),
+    //      EVERY PLANTED DEVICE (up to 94.7%), and the inside-its-noise row. The mask is load-bearing.
+    //   L  rtPipeline.mjs, rtAnyHit emitted into every mesh shader -> 1 red by name in section 1, then the probe
+    //      kernels (which declare no uniform block) fail to compile and the run stops.
 }
 
 // ---- THE CACHE'S OWN ROWS ---------------------------------------------------------------------------------------------

@@ -314,6 +314,14 @@ spheres are still a linear loop, and there is no TLAS anywhere in the file. `too
 asserts both halves from the file itself. So half of the sentence below is done -- rtPipeline points at meshBVH --
 and the two-level half is what stays open.
 
+**v4915 -- half of the two-level half landed, and not the half this item named.** `rtPipeline.mjs` now places its
+one mesh more than once: `instanceBuffer()` packs a stored inverse transform and a binding-table record per
+instance, and `rtTraverseInstances` carries each ray into object space and walks the one BVH there. That is the
+second LEVEL -- a shared BLAS under instance transforms -- without the second TREE: the instances are a list,
+walked linearly, exactly as honest at three and as useless at three thousand as the sphere loop. The file says so
+in those words, and `tools/ship/absenceScope-selfcheck.mjs` holds both halves from its code. What stays open is a
+BVH over the instances, and more than one mesh. (Any-hit, the fifth Vulkan stage, was written in the same round.)
+
 **So the item shrinks, and its hard part is already solved.** It is not "build a BVH" -- the tree ships one,
 with SAH, graded. It is: **make `mesh/meshBVH.mjs` two-level (a TLAS over instance transforms with a shared
 BLAS) and point `physics/render/rtPipeline.mjs`'s linear-over-geometries loop at it.**

@@ -250,6 +250,90 @@
      "12x12",
      "64 spp",
      "finite&non-negative=true, 144 of 144 not sky"
+    ],
+    [
+     "open box, solid (the control)",
+     "16x16",
+     "32 spp x 6 seeds, same seeds",
+     "1523 of 1536 mesh pixels within 0.00001; paired mean -3.60e-5, se 2.28e-4"
+    ],
+    [
+     "open box, cutout 0.15, from above",
+     "16x16",
+     "32 spp x 6 seeds, same seeds",
+     "741 of 744 mesh pixels within 0.00001; paired mean -3.19e-6, se 1.84e-5"
+    ],
+    [
+     "open box, cutout 0.15, oblique under a gradient sky",
+     "16x16",
+     "32 spp x 6 seeds, same seeds",
+     "206 of 210 mesh pixels within 0.00001; paired mean 2.88e-5, se 2.83e-5"
+    ],
+    [
+     "three instances of the box (identity; turned and shrunk; turned and unevenly scaled)",
+     "16x16",
+     "32 spp x 6 seeds, same seeds",
+     "477 of 504 mesh pixels within 0.00001; paired mean -1.21e-4, se 1.07e-4"
+    ],
+    [
+     "three instances, each cut out at 0.15",
+     "16x16",
+     "32 spp x 6 seeds, same seeds",
+     "469 of 504 mesh pixels within 0.00001; paired mean -1.04e-4, se 6.35e-5"
+    ],
+    [
+     "planted device: any-hit: the rule inverted (holes solid, margins open)",
+     "16x16",
+     "32 spp x 6 seeds, same seeds",
+     "0.0% of pixels identical, paired mean 1.85e-2"
+    ],
+    [
+     "planted device: any-hit: vertex A's weight left out of the rule",
+     "16x16",
+     "32 spp x 6 seeds, same seeds",
+     "6.2% of pixels identical, paired mean 9.88e-3"
+    ],
+    [
+     "planted device: any-hit: asked AFTER the candidate has shortened the ray",
+     "16x16",
+     "32 spp x 6 seeds, same seeds",
+     "61.0% of pixels identical, paired mean 4.05e-3"
+    ],
+    [
+     "planted device: instances: the normal left in object space",
+     "16x16",
+     "32 spp x 6 seeds, same seeds",
+     "34.9% of pixels identical, paired mean 7.58e-4"
+    ],
+    [
+     "planted device: instances: the normal through the inverse instead of its transpose",
+     "16x16",
+     "32 spp x 6 seeds, same seeds",
+     "45.6% of pixels identical, paired mean -1.59e-3"
+    ],
+    [
+     "planted device: instances: every hit reads instance 0's record",
+     "16x16",
+     "32 spp x 6 seeds, same seeds",
+     "33.7% of pixels identical, paired mean -1.94e-3"
+    ],
+    [
+     "planted device: instances: the object-space direction renormalised",
+     "16x16",
+     "32 spp x 6 seeds, same seeds",
+     "28.2% of pixels identical, paired mean 6.50e-2"
+    ],
+    [
+     "planted device: instances: the translation's x dropped",
+     "16x16",
+     "32 spp x 6 seeds, same seeds",
+     "0.0% of pixels identical, paired mean 3.16e-2"
+    ],
+    [
+     "planted device: instances: the winner's triangle not written back",
+     "16x16",
+     "32 spp x 6 seeds, same seeds",
+     "30.2% of pixels identical, paired mean NaN"
     ]
    ],
    "note": "A sweep whose numbers only reached the terminal it was written to is a measurement nobody can re-read."

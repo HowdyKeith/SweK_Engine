@@ -553,6 +553,8 @@ export const BVH_AT_V4435 = Object.freeze({
     // v4778 -- `why` is v4435's and stays v4435's, and its first clause is no longer true of the tree: the rtx
     // line pointed rtPipeline.mjs at meshBVH (71d40a6d). The selfcheck's section 3 row now asserts the tracer
     // HAS one; the two-level half of item 10 is what stays open.
+    // v4915 -- and half of THAT landed: rtPipeline.mjs places the one mesh under a list of instance transforms. The
+    // selfcheck's two rows say what is there (a second level) and what is not (a tree over it, a second mesh).
     why: "the tracer really has no BVH and rtPipeline.mjs says so itself, so the NARROW claim survives. What " +
          "did not survive is the sentence supporting it: it named two files where the tree holds twelve, and " +
          "hid the two that change what the item should DO -- a binned-SAH ray-triangle BVH the tree already " +

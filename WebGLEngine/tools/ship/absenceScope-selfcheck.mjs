@@ -166,8 +166,21 @@ ok("the tracer HAS a BVH since the rtx merge -- rtPipeline.mjs builds on meshBVH
    !/NO BVH/i.test(rt) && classifyFile(rt, "bvh") === "code" &&
    /from "\.\.\/\.\.\/mesh\/meshBVH\.mjs"/.test(rt) && /fn rtTraverseBvh\(/.test(rt),
    "the narrow claim v4435 kept is false as of v4778 -- see BVH_AT_V4435's v4778 note and docs/EXPLAIN-ITSELF.md item 10");
-ok("  ...and it is ONE level: no TLAS anywhere in the file, so item 10's two-level half is still open",
-   !/\btlas\b/i.test(rt), "a single BLAS per scene; the day a TLAS lands this row goes red and item 10 moves again");
+// *** v4915 -- "THE DAY A TLAS LANDS THIS ROW GOES RED AND ITEM 10 MOVES AGAIN." IT WENT RED, AND WHAT LANDED IS HALF
+// OF ONE. *** The row read "no TLAS anywhere in the file" by the word. rtPipeline.mjs now places its one mesh more
+// than once -- instanceBuffer() packs a stored inverse and a record per instance, rtTraverseInstances carries each
+// ray into object space -- and uses the word only to say what that is NOT: a LIST walked linearly, with no tree
+// built over the instances. So the row is two, from the file's code and not its vocabulary: the second level exists,
+// and it is not accelerated. What stays open of item 10 is the tree over instances, and a second mesh.
+const instFn = (rt.match(/fn rtTraverseInstances\([\s\S]*?\n}\n/) || [""])[0];
+ok("  ...and since v4915 it has a SECOND level: the one mesh under a list of instance transforms, each with its own record",
+   /export function instanceBuffer\(/.test(rt) && instFn.length > 0 && instFn.split("rtTraverseBvh(").length === 2,
+   "rtTraverseInstances calls the one BVH's traversal once per instance; physics/render/rtPipeline-selfcheck.mjs section 15 grades it");
+ok("  ...which is a LIST and not a tree: one linear loop over the count, no stack, no boxes over instances -- item 10's open half, narrowed",
+   /for \(var k = 0; k < count; k = k \+ 1\)/.test(instFn) && !/bvhStack|rtHitBox/.test(instFn) && (rt.match(/^\s*const bvh = new MeshBVH\(/gm) || []).length === 2,
+   "one mesh, one BVH (built in two packers, one per input shape); the day a tree is built over the instances this row goes red and item 10 closes");
+// SABOTAGE (v4915), against rtPipeline.mjs, restored by copy: a stack write put inside rtTraverseInstances -> 1 red, the
+// LIST row; instanceBuffer renamed -> 1 red, the SECOND-level row.
 
 // ---- 4. THE FROZEN RECORD MATCHES THE TREE ---------------------------------------------------------------
 console.log("\n4. the record is a record, not a rendering");

@@ -27,7 +27,7 @@ import { raySphere } from "./occlusion.mjs";
 import { sampleCone, conePdf, capHalfAngle } from "./nee.mjs";
 // RTX round 4 -- the CPU reference gains eyes for a triangle mesh (mesh/meshBVH.mjs's own raycastFirst and
 // triNormal), so a concave BVH scene has an independent estimator to be held to statistically. See intersect().
-import { triNormal } from "../../mesh/meshBVH.mjs";
+import { triNormal, baryAt } from "../../mesh/meshBVH.mjs";
 // v3493 -- THE THREE MODULES THAT WERE GRADED AND UNCALLED. microfacet (v3490), fresnel (v3491) and
 // energyCompensation (v3492) each shipped with an exact key and NO CONSUMER, which is v3473's nee.mjs shape
 // three times over. This is the round that gives them one.
@@ -73,7 +73,24 @@ export function intersect(orig, dir, scene) {
     let best = null;
     for (const s of scene) {
         if (s.bvh) {
-            const hit = s.bvh.raycastFirst(orig[0], orig[1], orig[2], dir[0], dir[1], dir[2]);
+            let hit = null;
+            if (!s.anyHit) hit = s.bvh.raycastFirst(orig[0], orig[1], orig[2], dir[0], dir[1], dir[2]);
+            else {
+                // v4915 -- ANY-HIT, STATED A SECOND WAY. rtPipeline.mjs's WGSL asks its rule of each candidate INSIDE
+                // the traversal. This asks it of the nearest hit and, when the rule rejects, casts again from that
+                // point -- the same semantics (a rejected triangle is not there) by a different route, with the
+                // barycentrics from baryAt()'s projection rather than Moller-Trumbore's by-products. `s.anyHit` is
+                // (tri, u, v) => accept, u and v the weights on vertices B and C; the entry without one takes the
+                // line above, unchanged. The re-cast cannot re-hit the triangle it left: its t is ~0, under EPS.
+                let o = orig, tAcc = 0;
+                for (let guard = 0; guard < 256; guard++) {
+                    const h = s.bvh.raycastFirst(o[0], o[1], o[2], dir[0], dir[1], dir[2]);
+                    if (!h) break;
+                    const w = baryAt(s.bvh.tris, h.tri * 9, h.point[0], h.point[1], h.point[2]);
+                    if (s.anyHit(h.tri, w[1], w[2])) { hit = { t: tAcc + h.t, point: h.point, tri: h.tri }; break; }
+                    tAcc += h.t; o = h.point;
+                }
+            }
             if (hit && (best === null || hit.t < best.t)) {
                 best = { t: hit.t, P: hit.point, N: triNormal(s.bvh.tris, hit.tri * 9), sphere: s };
             }

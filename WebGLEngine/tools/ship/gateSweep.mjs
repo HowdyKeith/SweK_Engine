@@ -16407,6 +16407,13 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
         widened: Object.freeze([]),
         verdict: "no gate file added, so nothing is claimed here (a gate may be claimed by ONE closing); one gate grew a sub-section of twelve rows (physics/render/rtPipeline-selfcheck, section 9b: the same seeds on both sides of the concave-mesh comparison), run alone and green (132 PASS, 0 FAIL, 0 SKIP) and sabotaged eighteen ways against the real files, each red by name and none 0 red; and one gate the rotation returned red had its control's pattern given this box's wording of a lost device (tools/ship/pageShot-selfcheck, 3 PASS, with its v4739 sabotage P6 found 0 red here and logged with the channel that does carry the loss)",
     }),
+    since623: Object.freeze({
+        at: "v4915", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "no gate file added, so nothing is claimed here (a gate may be claimed by ONE closing); one gate grew a section of seventeen rows (physics/render/rtPipeline-selfcheck, section 15: any-hit and instances, with section 1's two stage-list rows re-taken), run alone and green (149 PASS, 0 FAIL, 0 SKIP) and sabotaged fourteen ways against the real files -- two of which found the gate ending in a stack trace instead of a red row, fixed, and after that none 0 red; and tools/ship/absenceScope-selfcheck's one-level row, which this round turned red as it said it would, is two rows now (a second level exists; it is a list, not a tree), each sabotaged",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
