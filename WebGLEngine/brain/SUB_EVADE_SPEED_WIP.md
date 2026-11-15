@@ -94,3 +94,38 @@ Item 1 changes the HELD gate of the command, so it is first and says why; items 
 7. **The checks as coded, in this order** (every one an identity or a file's own number, as section 4 asks): every arm, step and span flew the set's geometries (each seed twice); no non-finite score; every theta one `clampTheta` leaves unchanged; every run's generation 0 is G; **the arm of T0 at G's own speed has an edge of exactly 0 against G (it is G; there is no separate identity flight)**; the arm of T28 at 4.5 against a copy of itself has an edge of exactly 0; the arms of T28 at league7001's speed, at league7103's and at G's own are SN of league7001 and SN of league7103 (`takeEvadeSplit.mjs`) and GN of league7001 (`takeEvadeTurn.mjs`), the same theta to the number; the speeds are the files' (G's, league7103's, league7001's, the bound) in the places 2, 3, 6 and 7; the speeds are strictly increasing; every number of every arm but the speed and the turn is G's, the time included. A failed check is printed, not weighed, makes the exit code 1, and the record is still written.
 8. **Printed besides the rules** (for reading): each arm's edge, se, z, wins-draws-losses and per-seat edges; each step's and span's edge, se, z and label; the edge of T25 and of T28 less T0's at each speed; the slope; and the forecast quantities of section 5 as yes/no, by the names in the printed line (`the turn is the gate`, `T28 speed matters`, `T25 speed matters`, `T0 speed matters not`, `T28 threshold is G's speed`, `T25 threshold above T28's`, `T28 monotone`, `all monotone`, `T28 bound binds`, `league7103's speed within 0.5 of G's`; "R0 holds" is the DEV line and the R0 line).
 9. **What smoke is and is not.** Geometries 1 to 4 are among those (1 to 8) on which every league was TRAINED, so a smoke read says nothing about the claims, and the arms' edges at 8 duels are too coarse to read. I saw the smoke report (the command ran; no check failed); the forecasts of section 5 stand as written.
+
+## DEV RESULT (2026-11-15; `node tools/ship/takeEvadeSpeed.mjs dev --write`, geometries 108001 to 108024, exit 0; record `brain/subEvadeSpeedDev.json`: 24 arms, 21 steps, 6 spans)
+
+DEV is free to read; HELD (109001 to 109024) is not flown by this entry. The void-checks passed (none printed; the HELD gate of Amendment A item 1 would accept this record). Forecasts are not scored on DEV except "R0 holds on DEV" (87): **TRUE**. The others stand as written for HELD.
+
+**R0 holds.** T28 at league7001's speed (4.32): **+3.096**, z 23.3, 47-0-1, FINDS; T28 at G's own speed (the GN arm): **+1.104**, z 3.5, 32-0-16, FINDS.
+
+**The arms** (edge against G, both seats, 24 geometries; wins-draws-losses of the 48 duels; F = finds):
+
+| speed (m/s) | T0 (G's own turn) | T25 (turn 2.5) | T28 (turn 2.8) |
+|---|---|---|---|
+| 2.00 | -0.004, 24-0-24 | +0.004, 24-0-24 | +0.008, 24-0-24 |
+| 2.70 | -0.003, 24-0-24 | +0.013, 24-0-24 | +0.020, 24-0-24 |
+| 3.42 (G's) | 0 (G) | +0.160, z 1.2, 25-0-23 | **+1.104**, z 3.5, 32-0-16, F |
+| 3.55 (league7103's) | +0.001, 24-0-24 | +0.162, z 1.2, 25-0-23 | **+1.504**, z 4.5, 35-0-13, F |
+| 3.80 | +0.002, 24-0-24 | **+0.698**, z 2.6, 29-0-19, F | **+2.301**, z 7.6, 41-0-7, F |
+| 4.10 | +0.003, 24-0-24 | **+1.501**, z 4.5, 35-0-13, F | **+2.832**, z 12.9, 45-0-3, F |
+| 4.32 (league7001's) | +0.005, 24-0-24 | **+1.897**, z 5.8, 38-0-10, F | **+3.096**, z 23.3, 47-0-1, F |
+| 4.50 (the bound) | +0.005, 24-0-24 | **+2.294**, z 7.6, 41-0-7, F | **+3.094**, z 23.3, 47-0-1, F |
+
+**R1 THRESHOLD:** T0 NONE; T25 **MID (3.80)**; T28 **AT G (3.42)**. **R2 MONOTONE:** T0 yes, T25 yes, **T28 no (reversal at 4.50)**: the step of 4.50 over 4.32 is **-0.379**, z -2.8, DOWN. **R3 SATURATION:** T0 2.00 (no step UP), **T25 none** (the last step, 4.50 over 4.32, is UP: +0.457, z 2.1), **T28 4.10** (its last UP step is 4.10 over 3.80). **R4 THE TURN IS THE GATE: yes**, 0 of 7 non-G arms of T0 find (every T0 arm is 24-0-24, -0.004 to +0.005). **R5 THE SPEED MATTERS** (4.5 over G's speed): T0 FLAT (+0.005), **T25 UP** (+2.132, z 6.9), **T28 UP** (+1.981, z 6.1). **R6 THE BOUND BINDS** (4.5 over 4.1): T0 FLAT, **T25 UP** (+0.790, z 2.8), **T28 FLAT** (+0.195, z 0.9). LOSES: none (no arm at -0.5 and z -2). **T minus T0** at the eight speeds: T25 +0.009 +0.015 +0.160 +0.162 +0.697 +1.497 +1.893 +2.289; T28 +0.012 +0.022 +1.104 +1.504 +2.299 +2.829 +3.092 +3.089. **T28 slope between G's speed and league7001's:** **+2.22** edge points an m/s (the split's +1.8 to +2.1 over 0.9 m/s is the same measure on the finders' own sets).
+
+Steps on T28: FLAT, UP (+1.085), FLAT (+0.399, z 1.8), UP (+0.795), UP (+0.530), FLAT (+0.262), **DOWN (-0.379)**; on T25: FLAT, FLAT, FLAT, UP (+0.536), UP (+0.801), FLAT (+0.333, z 1.4), UP (+0.457).
+
+**The forecast quantities as printed** (scored on HELD, not here): the turn is the gate yes; T28 speed matters yes; T25 speed matters yes; T0 speed matters not yes; T28 threshold is G's speed yes; T25 threshold above T28's yes; **T28 monotone NO**; **all monotone NO**; T28 bound binds no; league7103's speed within 0.5 of G's yes (+0.40 at z 1.8: the step of 3.55 over 3.42 is FLAT, and not nothing).
+
+**Observations (DEV, for reading, not rules):**
+
+1. **The turn gate holds across the whole speed range, and the speed has a gate of its own.** With G's own turn no speed from 2.0 to 4.5 does anything (all 24-0-24, to the third decimal). With the turn at 2.8 a slow evade does nothing either: at 2.0 and 2.7 the arm is G (+0.008, +0.020, 24-0-24), and the edge appears between 2.7 and G's 3.42 (+1.104). Neither number does anything without the other; this grid has no speed between 2.7 and 3.42, so where the speed's own onset lies is not resolved.
+2. **The turn at 2.5 is where the speed matters most:** T25 at G's own speed is +0.160 (z 1.2, not finding, as the dose note's A@2.5 on HELD) and at 4.5 it is +2.294; the speed turns a turn that does not find into one that finds by 3.80, and T25 is still rising at the bound (R3 none, R6 UP: the one place on this set where a faster evade than the search could set would pay).
+3. **At the ceiling turn the curve stops at 4.32 to 4.5** (+3.096 and +3.094, both 47-0-1) and the step from 4.32 to 4.50 is **DOWN** at -0.379 (z -2.8): league7001's speed beats the bound head-to-head while the two score the same against G. **Said before it is over-read:** these arms win 47 of 48 duels against G, so the edge against G is near the ceiling of the score (+3.0 to +3.4 in seat A on every set so far); a saturation against G at that height is a property of the measure as much as of the speed, and the head-to-head DOWN is one step at z -2.8 among 21, on one set.
+4. **The speed's size, at the ceiling turn, matches the split:** T28 at 4.32 less T28 at 3.42 is +1.99 over 0.90 m/s (+2.22 an m/s); league7103's 3.55 adds +0.40 (z 1.8) over G's speed, the split's +0.20 on HELD in the same direction and not nothing.
+5. **G's seat bias on this set** (the seat edges of the flat arms, +1.40 and -1.40) is smaller than on the earlier DEV sets (+1.96) and larger than HELD's of the dose (+0.84), as the seat note found for G across sets.
+
+**What is NOT shown:** a mechanism; any HELD read; a speed between 2.7 and 3.42, or above 4.5 (the bound; the finders' 4.3 to 4.5 cannot be shown to be a clamp or an optimum at T28 by this set, and at T25 the curve is still rising at 4.5); a time or a turn but these three. R0 held, so HELD may be flown on Keith's word: `node tools/ship/takeEvadeSpeed.mjs held --write`.
