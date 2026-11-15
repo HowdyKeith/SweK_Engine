@@ -46,6 +46,11 @@
     "path": "brain/RIG_COMMANDS_2026-11-14_TURRET_ROUND3.md",
     "title": "Rig commands: the third round, with no cannon and rationed rounds",
     "why": "The arena in which holding the trigger loses: these commands train a gunner that is told how much of its magazine it has spent."
+   },
+   {
+    "path": "brain/RIG_COMMANDS_2026-11-15_HELM_STEER.md",
+    "title": "Rig commands: the fly's steering circuit at the helm, against a random circuit",
+    "why": "A helm searched over the fly's own steering circuit, and the same search over a random circuit of its size, so that a result can say whether the wiring mattered."
    }
   ],
   "sea-ogre.html": [
