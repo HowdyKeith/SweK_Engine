@@ -11,6 +11,7 @@
 // 2026-11-14, ROUND 4'S BUILDERS ADDED (the lean plus a network; brain/rl/leanStart.mjs), this gate run whole for each: R1 round 4's builders played without the lean 3 | R2 round 4 reads round 2's file 2
 //   R3 a round 4 MLP's output layer counted over 8 units 1 | R4 the page says some of the 80 beat the lean 1 | R5 round 3's builders played through the lean too 7 | R6' round 4's label says round 3 1
 //   ONE WENT 0 RED, AND IS A CLAUSE NOW: R6 -- the page's list was held to the module's labels and the labels to nothing; each must now begin with its own round's number. R6' is R6 again.
+// 2026-11-15, ROUND 6'S BUILDERS ADDED, this gate run whole for each: U1 round 6 reads round 4's file 2 | U2 round 6's builders played without the lean 3 | U3 the page says about 150 houses 1
 // SABOTAGE LOG (2026-11-14) -- through a byte-safe runner (one at a time, every file restored and its sha256 checked), this gate run whole for each; the number is the rows that went red:
 //   THE MODULE: H1 a round's plain net has one unit more 1 | H2 weights unpacked big-endian 12 | H3 a trained builder left untrained 12 | H4 any record will do for a trained builder 1
 //   H5 the lean leans to the finished columns 1 | H6 every build names its column 10 | H8 no step carries chances 1 | H9 the blocks standing are one step behind 8 | H10 the blocks drawn front to back 2
@@ -34,6 +35,7 @@ import * as V1 from "./voxelHome.mjs";
 import * as V2 from "./voxelHomeDrawn.mjs";
 import * as V3 from "./voxelHomeLong.mjs";
 import * as V4 from "./voxelHomeLean.mjs";
+import * as V6 from "./voxelHomeBoth.mjs";
 import * as PF from "./paintingFly.mjs";
 import * as C from "../roundhouse/angularImpulseCensus.mjs";
 import { shutdownServer } from "./serverShutdown.mjs";
@@ -44,7 +46,7 @@ function ok(name, cond, detail) { console.log(`  ${cond ? "PASS" : "FAIL"}  ${na
 async function section(fn) { try { await fn(); } catch (e) { ok(`!! the section THREW instead of answering: ${e.message}`, false, String(e.stack).split("\n").slice(1, 3).join(" | ")); } }
 const throws = (fn, re) => { try { fn(); return false; } catch (e) { return re.test(e.message); } };
 const J = JSON.stringify, src = (f) => fs.readFileSync(path.join(ENG, f), "utf8");
-const VS = { 1: V1, 2: V2, 3: V3, 4: V4 }, NS = [1, 2, 3, 4], TEXT = Object.fromEntries(NS.map((n) => [n, src(S.ROUNDS[n].file)])), RECS = Object.fromEntries(NS.map((n) => [n, S.recordsOf(TEXT[n])]));
+const VS = { 1: V1, 2: V2, 3: V3, 4: V4, 6: V6 }, NS = [1, 2, 3, 4, 6], TEXT = Object.fromEntries(NS.map((n) => [n, src(S.ROUNDS[n].file)])), RECS = Object.fromEntries(NS.map((n) => [n, S.recordsOf(TEXT[n])]));
 const floorsOf = (n) => TEXT[n].split("\n").filter(Boolean).map((l) => JSON.parse(l)).find((r) => r.kind === "floors");
 const trained = (n, arm, s) => S.builderOf(arm, { round: n, draw: s, record: RECS[n].get(`${arm} ${s}`) });
 const over = (builder, seeds) => { let sum = 0; const homes = []; for (const seed of seeds) { const b = S.build(builder, seed); sum += b.share; if (b.check.home) homes.push(b); } return { score: sum / seeds.length, homes }; };
@@ -54,9 +56,9 @@ console.log("voxelHomeShow-selfcheck -- the page where a builder puts up a house
 
 console.log("1. THE BUILDERS");
 await section(() => {
-    ok("the kinds are the rule, the lean, a random builder and the rounds' five arms, each with a label; the four rounds are the rounds' own choice, plain net, start and results file",
+    ok("the kinds are the rule, the lean, a random builder and the rounds' five arms, each with a label; the five rounds played (1 to 4 and 6; round 5's records are of another shape) are the rounds' own choice, plain net, start and results file",
         J(S.KINDS) === J(["rule", "lean", "random", "FLY", "SHUF", "PLAIN", "FISH", "MLP"]) && J(S.ARMS) === J(V3.ARMS) && S.KINDS.every((k) => typeof S.LABELS[k] === "string" && S.LABELS[k].length > 8) && S.DRAWS === V3.SEEDS.length && J(S.MLP_HIDDEN) === J(V3.MLP_HIDDEN) &&
-        J(Object.keys(S.ROUNDS).map(Number)) === J(NS) && S.ROUNDS[4].start === "lean" && V4.START === "lean" && [1, 2, 3].every((n) => S.ROUNDS[n].start === undefined) && S.ROUNDS[4].choice === "drawn" && NS.every((n) => S.ROUNDS[n].file === VS[n].RESULTS && S.ROUNDS[n].plainUnits === VS[n].PLAIN_UNITS && S.ROUNDS[n].iters === VS[n].RECIPE.iters) && S.ROUNDS[1].choice === "named" && S.ROUNDS[2].choice === "drawn" && S.ROUNDS[3].choice === "drawn" && J(V1.ROUND1.choice) === J("named") && V2.ROUND2.choice === "drawn" && V3.ROUND3.choice === "drawn");
+        J(Object.keys(S.ROUNDS).map(Number)) === J(NS) && S.ROUNDS[4].start === "lean" && V4.START === "lean" && S.ROUNDS[6].start === "lean" && V6.START === "lean" && V6.RECIPE.pop === 96 && [1, 2, 3].every((n) => S.ROUNDS[n].start === undefined) && S.ROUNDS[4].choice === "drawn" && NS.every((n) => S.ROUNDS[n].file === VS[n].RESULTS && S.ROUNDS[n].plainUnits === VS[n].PLAIN_UNITS && S.ROUNDS[n].iters === VS[n].RECIPE.iters) && S.ROUNDS[1].choice === "named" && S.ROUNDS[2].choice === "drawn" && S.ROUNDS[3].choice === "drawn" && J(V1.ROUND1.choice) === J("named") && V2.ROUND2.choice === "drawn" && V3.ROUND3.choice === "drawn");
     const same = NS.flatMap((n) => S.ARMS.map((a) => [n, a, J(Array.from(S.policyFor(n, a, 2).getParams())) === J(Array.from(VS[n].policyOf(a, 2).getParams())) && S.policyFor(n, a, 2).getParams().length === VS[n].WEIGHTS[a]]));
     ok("!! A ROUND'S UNTRAINED BUILDER HERE IS THE ROUND'S OWN, WEIGHT FOR WEIGHT: draw 2 of every arm of every round (round 4's with its output layer at zero, wrapped in the lean), against tools/ship/voxelHome.mjs's policyOf (which a page cannot load), and the weight counts the rounds registered", same.every((x) => x[2]), same.filter((x) => !x[2]).map((x) => x[0] + " " + x[1]).join(", "));
     const r = RECS[3].get("SHUF 5");
@@ -66,7 +68,7 @@ await section(() => {
     ok("!! WHAT IS REFUSED, BY NAME: a builder that is not one; a trained builder with no record, with another arm's, with another draw's; a round 2 record given to round 1 (another weight count); draw 17; round 7; a plan seed of 0; a step past the build's end",
         throws(() => S.builderOf("WORM"), /no builder WORM/) && throws(() => S.builderOf("FLY", { round: 3, draw: 1 }), /FLY draw 1 of round 3 needs its record from brain\/voxelHomeLongRound\.jsonl/) && throws(() => S.builderOf("FLY", { round: 3, draw: 1, record: RECS[3].get("SHUF 1") }), /needs its record/) &&
         throws(() => S.builderOf("FLY", { round: 3, draw: 1, record: RECS[3].get("FLY 2") }), /needs its record/) && throws(() => S.builderOf("FLY", { round: 1, draw: 1, record: RECS[2].get("FLY 1") }), /has 2967 weights, and its builder takes 1777/) && throws(() => S.builderOf("random", { draw: 17 }), /no draw 17/) &&
-        throws(() => S.policyFor(7, "FLY", 1), /no round 7 \(the rounds are 1, 2, 3, 4\)/) && throws(() => S.build(S.builderOf("rule"), 0), /plan's seed is a whole number from 1/) && throws(() => S.scene(HOME, HOME.steps.length + 1), /no step 86 of this build/) && throws(() => S.cellsAt(HOME, -1), /no step -1/));
+        throws(() => S.policyFor(7, "FLY", 1), /no round 7 \(the rounds are 1, 2, 3, 4, 6\)/) && throws(() => S.build(S.builderOf("rule"), 0), /plan's seed is a whole number from 1/) && throws(() => S.scene(HOME, HOME.steps.length + 1), /no step 86 of this build/) && throws(() => S.cellsAt(HOME, -1), /no step -1/));
 });
 
 console.log("\n2. THE BUILD");
@@ -79,6 +81,8 @@ await section(() => {
     const best = over(trained(4, "MLP", 2), V4.AUDIT), f1 = over(trained(4, "FLY", 1), V4.AUDIT), untr = S.policyFor(4, "FISH", 9), o4 = new B.BuildEnv({ choice: "drawn" }).reset(700001);
     ok("!! *** ROUND 4'S BUILDERS ARE PLAYED AS THE ROUND AUDITED THEM, THROUGH THE LEAN *** -- its best builder (MLP draw 2) built here on the 200 audit plans gives the record's score to the bit and its 183 homes; FLY draw 1 its record's score and homes; and an untrained round 4 builder's choice is the lean's, number for number",
         best.score === RECS[4].get("MLP 2").score && best.homes.length === 183 && RECS[4].get("MLP 2").homes === 183 && f1.score === RECS[4].get("FLY 1").score && f1.homes.length === RECS[4].get("FLY 1").homes && f1.homes.length > 123 && J(Array.from(untr.act(o4))) === J(Array.from(S.builderOf("lean").act(o4))), `${best.homes.length} and ${f1.homes.length} homes`);
+    const best6 = over(trained(6, "MLP", 4), V6.AUDIT);
+    ok("!! ...AND ROUND 6'S: its best builder (MLP draw 4) built here on the 200 audit plans gives the record's score to the bit and its 192 homes", best6.score === RECS[6].get("MLP 4").score && best6.homes.length === 192 && RECS[6].get("MLP 4").homes === 192, `${best6.homes.length} homes`);
     const f = floorsOf(3), lean = over(S.builderOf("lean"), V3.AUDIT), rnd1 = over(S.builderOf("random", { draw: 1 }), V3.AUDIT), rnd16 = over(S.builderOf("random", { draw: 16 }), V3.AUDIT);
     ok("!! THE LEAN IS THE ROUNDS' FLOOR, TO THE BIT: built here on the 200 audit plans it gives the file's 0.9226 and its 123 homes", lean.score === f.lean && lean.homes.length === f.leanHomes && f.leanHomes === 123 && Math.abs(f.lean - 0.9226) < 5e-5);
     console.log(`     random builders 1 and 16 here: ${rnd1.score.toFixed(4)}, ${rnd16.score.toFixed(4)}; in the file: ${f.random[0].toFixed(4)}, ${f.random[15].toFixed(4)}`);
@@ -119,7 +123,7 @@ await section(() => {
         marked(sn, "refused").length === 3 && Math.abs(topOf(marked(sh, "refused")[2])[0][0] - (360 + (w.x - w.z) * a)) < 1e-6 && w.x !== w.z && S.scene(b, 0).faces.every((f) => f.kind === "ground"), `steps ${kPlaced}, ${kHang}, ${kNone}`);
     const said = S.saidLines().join(" ");
     ok("!! WHAT THE PICTURE IS AND IS NOT IS SAID WITH IT: the builder never picks the block or its height; a block must be held up; the two grids are the builder's view; the rounds' findings in their own numbers; and 'Not a fly building a house'",
-        /never picks the block or its height/.test(said) && /A block must be held up/.test(said) && /the builder's view/.test(said) && /built less than a random one/.test(said) && /0\.69 of a house, a random builder 0\.57/.test(said) && /builds 0\.92 and finishes 123 houses of 200/.test(said) && /one house each in 16,000 builds/.test(said) && /every one of the 80 then built more than the lean \(0\.99 of a house\) and they finish about 155 houses of 200/.test(said) && /not asking for a roof block that would hang/.test(said) && /Not a fly building a house/.test(said) && /could not be told apart from a shuffle/.test(said));
+        /never picks the block or its height/.test(said) && /A block must be held up/.test(said) && /the builder's view/.test(said) && /built less than a random one/.test(said) && /0\.69 of a house, a random builder 0\.57/.test(said) && /builds 0\.92 and finishes 123 houses of 200/.test(said) && /one house each in 16,000 builds/.test(said) && /every one of the 80 then built more than the lean \(0\.99 of a house\) and they finish about 155 houses of 200/.test(said) && /not asking for a roof block that would hang/.test(said) && /about 188 houses of 200/.test(said) && /Not a fly building a house/.test(said) && /could not be told apart from a shuffle/.test(said));
 });
 
 console.log("\n4. THE PAGE (voxel-home.html in Chromium)");
@@ -157,7 +161,7 @@ await section(async () => {
         !!rnd && rnd.hash === mr.hash && rnd.placed === 25 && rnd.home === false && rnd.round === null && /^Not a home: 50% built when the 96 steps ran out, no whole roof, the room open to the outside\.$/.test(rndState.end) && !!rule && rule.hash === mrule.hash && rule.steps === 50 && rule.home === true &&
         !!r1 && r1.error === null && r1.hash === m1.hash && r1.steps === m1.steps.length && r1.planHash === m1.plan.hash && r1.hash !== HOME.hash, rnd && r1 ? `${rnd.hash} ${rule.hash} ${r1.hash}` : "");
     const m4 = S.build(trained(4, "MLP", 2), 700001);
-    ok("!! THE PAGE OFFERS ROUND 4 AND PLAYS ITS BUILDERS FROM ROUND 4'S OWN FILE: the four rounds are in its list by the module's labels, and round 4's MLP draw 2 on plan 700001 is this file's build -- a home", !!labels && J(labels) === J(NS.map((n) => S.ROUNDS[n].label)) && NS.every((n) => S.ROUNDS[n].label.startsWith(`round ${n}: `)) && /started at the lean/.test(S.ROUNDS[4].label) && !!r4 && r4.error === null && r4.hash === m4.hash && r4.steps === m4.steps.length && m4.check.home === true && r4.hash !== (r1 && r1.hash), r4 ? r4.hash : "");
+    ok("!! THE PAGE OFFERS ROUND 4 AND PLAYS ITS BUILDERS FROM ROUND 4'S OWN FILE: the five rounds are in its list by the module's labels, and round 4's MLP draw 2 on plan 700001 is this file's build -- a home", !!labels && J(labels) === J(NS.map((n) => S.ROUNDS[n].label)) && NS.every((n) => S.ROUNDS[n].label.startsWith(`round ${n}: `)) && /started at the lean/.test(S.ROUNDS[4].label) && !!r4 && r4.error === null && r4.hash === m4.hash && r4.steps === m4.steps.length && m4.check.home === true && r4.hash !== (r1 && r1.hash), r4 ? r4.hash : "");
     ok("the controls say what applies: a random builder has a draw and no round; the rule has neither; and for a builder that names a column the second grid is captioned so", !!rndState && rndState.round === true && rndState.draw === false && rule.drawOff === true && rule.roundOff === true && /the column the builder named/.test(rndState.cap));
     ok("!! A RESULTS FILE THAT DOES NOT ARRIVE IS SAID, BY NAME, and no build is shown as if it had: the page answers that round 3's file answered 404", !!lost && /brain\/voxelHomeLongRound\.jsonl answered 404/.test(lost.h.error || "") && /could not be made: .*answered 404/.test(lost.text) && lost.h.hash === undefined && lost.h.steps === undefined, lost ? lost.text : "");
 });

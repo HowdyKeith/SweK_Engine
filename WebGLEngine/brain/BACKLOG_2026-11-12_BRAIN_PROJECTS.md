@@ -260,8 +260,8 @@ section 6; `brain/rl/leanStart.mjs`): the builder is the lean plus its network, 
 80 builders beat the lean** (0.988 to 0.992 of a home by arm against 0.9226; p 1.7e-24) **and they finish houses: 12,700 homes in
 16,000 builds**, 151 to 172 of 200 a builder by arm against the lean's 123. Looked at after: the network learned not to ask for a
 roof block that would hang (23.8 such picks a build for the lean, 5.3 for FLY draw 1). The fly's wiring cannot be told from a
-shuffle (p 0.40), the fifth time. The page (`voxel-home.html`) plays round 4's builders too (2026-11-14: `brain/voxelHomeShow.mjs`
-knows rounds 1 to 4). **Round 5 is DONE** (`brain/VOXEL_HOME_STEPS_WIP.md` section 9, `tools/ship/voxelHomeSteps-selfcheck.mjs` section 5), from a
+shuffle (p 0.40), the fifth time. The page (`voxel-home.html`) plays round 4's and round 6's builders too (`brain/voxelHomeShow.mjs`
+knows rounds 1 to 4 and 6; round 5's records are of another shape). **Round 5 is DONE** (`brain/VOXEL_HOME_STEPS_WIP.md` section 9, `tools/ship/voxelHomeSteps-selfcheck.mjs` section 5), from a
 random start on FLY and PLAIN: **four times the builders tried an iteration builds more** (FLY 0.714 for 0.666, PLAIN 0.745 for
 0.690; all 16 above all 16, twice) and more than round 3's 1,000 iterations did at 0.6 of its cost; **a quarter of the step
 cannot be told apart from round 2's** at 150 iterations. Neither had levelled. It is still half way to the lean, and one home.
