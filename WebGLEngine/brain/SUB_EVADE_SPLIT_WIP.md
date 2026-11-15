@@ -91,3 +91,21 @@ None of this changes a rule, a bar, a count, an arm or a forecast of sections 2 
 6. **The checks that void the read** are those of `brain/SUB_EVADE_WIP.md` (made by that command's own `checksOf`, imported) plus the registration's: the STN cell of each finder is that command's GT arm and the N cell its GN arm, the same theta to the number. One identity matchup and five direct ones are flown with the 40 arms, as there.
 7. **What smoke is and is not.** Geometries 1 to 4 are among those (1 to 8) on which every league and exploiter was TRAINED, so the smoke output says the command runs and says nothing about the claim. I saw it (all 40 arms flew, the checks passed) and **the forecasts of section 5 stand as written and will be scored as written.**
 
+## DEV RESULT (2026-11-15; `node tools/ship/takeEvadeSplit.mjs dev --write`, 125 s, geometries 100001 to 100024, both seats, 48 duels an arm, 40 arms; `brain/subEvadeSplitDev.json`; the checks passed; the gate `tools/ship/takeEvadeSplit-selfcheck.mjs` passed and its sabotage log is in its header)
+
+The edge of each arm over generation 0 (**F** = the arm finds, edge >= 0.5 and z >= 2; each cell is G with the finder's numbers S evadeSpeed, T evadeTime, N evadeTurn):
+
+| finder | U | S | T | N | ST | SN | TN | STN |
+|---|---|---|---|---|---|---|---|---|
+| league7001 | +2.63 F | +0.00 | +0.00 | +1.50 F | +0.00 | +2.69 F | +1.36 F | +2.63 F |
+| league7100 | +2.41 F | +0.01 | +0.00 | +1.36 F | +0.01 | +2.96 F | +1.37 F | +2.97 F |
+| league7103 | +1.08 F | +0.00 | +0.00 | +1.50 F | +0.00 | +1.50 F | +1.36 F | +1.49 F |
+| exploit7200 | +2.69 F | +0.01 | +0.00 | +1.50 F | +0.01 | +2.96 F | +1.49 F | +2.83 F |
+| exploit7204 | +2.70 F | +0.00 | +0.00 | +1.36 F | +0.00 | +2.69 F | +1.23 F | +2.70 F |
+
+**R0 holds: 5 of 5 unmodified finders find on a third fresh set** (their edges are lower here, +2.4 to +2.7 for the four strong ones where they were +3.1 on 98001 to 99024; the carry bar is relative to each finder's own edge, so this does not move a rule). **By the registered rules on DEV: R1 the speed alone does not find (0 of 5, NO), R2 the time alone does not find (0 of 5, NO), R3 speed and turn CARRY (5 of 5, YES), R4 time and turn carry for 1 of 5 (NO), R5 speed and time carry for 0 of 5 (NO). So the speed is NEEDED, the time DISPENSABLE and the turn NEEDED: the headline is "THE SPEED AND THE TURN".** The median shares of the finder's own edge: S 0.00, T 0.00, N 0.56, ST 0.00, SN 1.10, TN 0.56, STN 1.05. The command's last line: HELD may be flown. DEV is a calibration and the rules are about HELD; of the forecasts of section 5 only the first (R0 holds on DEV, 92) is scored on it, and it came true. The rest stand as written.
+
+**What the table shows that the labels do not (read from DEV, free to read; nothing here moves a rule).** (1) **The speed and the time do nothing alone or together; the turn is the gate and the speed multiplies it.** S, T and ST are +0.00 to +0.01 for all five finders (a boat that has only the speed, the time or both is G to the second decimal), the turn alone is +1.4 to +1.5, and speed with turn is +2.7 to +3.0: the speed adds +1.2 to +1.5 when the turn is on and nothing when it is off. (2) **The time is inert in everything that was flown:** adding it to the speed and turn changes the median share from 1.10 to 1.05, and adding it to the turn from 0.56 to 0.56. (3) **league7103 is the finder the candidate predicted.** Its evadeSpeed (3.55) is near G's (3.42), and for it the speed adds nothing: SN is +1.50, the same as N, and TN (+1.36) carries 1.26 of its own edge (+1.08) where for the four strong ones TN carries 0.46 to 0.57. That is why R4 reads 1 of 5 and not 0. (4) **The seat.** With the speed on, the cell wins from both seats (SN, strong finders: seat A +3.0 to +3.3, seat B +2.3 to +2.6); without it the cell wins from seat A and is only slightly ahead from seat B (N and TN: +2.0 to +2.3 and +0.5 to +0.8). The speed carries the target's seat, which is the question of registration 4.
+
+**HELD is next and is not flown yet**: `node tools/ship/takeEvadeSplit.mjs held --write`, once, on 101001 to 101024 (the command refuses without this DEV record, which exists and replicates). No amendment is made after DEV.
+
