@@ -101,3 +101,48 @@ No rule's bar, no arm, no forecast is changed; items 1 and 2 correct what sectio
 7. **The HELD gate** refuses a DEV record whose `checks` is not an empty list (or records none), as in the speed note's Amendment A item 1; the DEV run prints "DEV: a check FAILED, the read is void" in place of the R0 line when one failed.
 8. **Printed besides the rules**, as section 4 says, and the forecast quantities of section 5 as yes/no by these names: `onset MID`, `onset LOW`, `onset HIGH`, `ON monotone`, `shape a RAMP`, `the turn sets the threshold`, `the bound binds at lower turns`, `plateau at the ceiling turn`, `T23 at the bound finds` ("R0 holds" is the DEV line and the R0 line).
 9. **What smoke is and is not.** Geometries 1 to 4 are among those (1 to 8) on which every league was TRAINED, so a smoke read says nothing about the claims, and its edges at 8 duels are too coarse to read. I saw the smoke report (the command ran in 24 s; no check failed); the forecasts of section 5 stand as written. A DEV read is 48 geometries, 12 times the smoke's duels: about five minutes.
+
+## DEV RESULT (2026-11-15; `node tools/ship/takeEvadeSpeedFine.mjs dev --write`, geometries 110001 to 110048 (96 duels an arm), exit 0; record `brain/subEvadeSpeedFineDev.json`: 24 arms, 19 steps, 4 spans)
+
+DEV is free to read; HELD (111001 to 111048) was authorised by Keith for after this read ("fly DEV and then HELD once DEV is complete"), and the registration allows it: R0 held and no check failed (none printed; the HELD gate of Amendment A item 7 accepts this record). Forecasts are not scored on DEV except "R0 holds on DEV" (88): **TRUE**. The others stand as written for HELD.
+
+**R0 holds.** T28 at league7001's speed (4.32): **+2.965**, z 23.0, 92-0-4, FINDS; ON at G's own speed (the GN arm): **+0.967**, z 4.6, 62-0-34, FINDS.
+
+**Part A, the onset (turn 2.8):**
+
+| speed (m/s) | edge against G | z | wins-draws-losses | finds |
+|---|---|---|---|---|
+| 2.70 | +0.017 | 15.8 | 48-0-48 | no |
+| 2.80 | +0.020 | 15.4 | 48-0-48 | no |
+| 2.90 | +0.090 | 1.3 | 49-0-47 | no |
+| 3.00 | +0.225 | 2.0 | 51-0-45 | no |
+| 3.10 | +0.228 | 2.0 | 51-0-45 | no |
+| 3.20 | **+0.563** | 3.2 | 56-0-40 | **FINDS** |
+| 3.30 | **+0.566** | 3.2 | 56-0-40 | **FINDS** |
+| 3.42 (G's) | **+0.967** | 4.6 | 62-0-34 | **FINDS** |
+
+**RA1 ONSET: MID (3.20).** **RA2 MONOTONE: yes** (no DOWN step). **RA3 SHAPE: RAMP:** the rise from 2.7 to G's speed is +0.950 and the largest step's rise (3.30 to 3.42) is +0.401, 0.42 of it, under the 0.6 of a JUMP. **RA4 BELOW G: yes** (the onset is under G's own speed). The slope of ON from 2.70 to G's speed is **+1.32** edge points an m/s. Steps: UP at 3.20 over 3.10 (+0.335, z 2.4) and at 3.42 over 3.30 (+0.401, z 2.6), the other five FLAT.
+
+**What the grid shows that the label does not (read from DEV, free to read; nothing here moves a rule).** The RAMP is a **staircase**: the duels won move 48, 49, 51, 56, 62 of 96 and the arms come in pairs with the same edge (3.00 and 3.10: +0.225, +0.228; 3.20 and 3.30: +0.563, +0.566), the head-to-head of each pair being +0.003. So outcomes change at particular speeds, about 2.9, 3.0, 3.2 and between 3.3 and 3.42, a few duels each, and a grid of 0.1 m/s sees a step every second point. The rule reads it as a RAMP; it is not smooth and it is not a single jump.
+
+**Part B, the top at lower turns:**
+
+| turn | 3.80 | 4.10 | 4.32 (league7001's) | 4.50 | threshold | SPAN-TOP (4.5 over 4.1) |
+|---|---|---|---|---|---|---|
+| T23 (2.3) | +0.025 | +0.198 (z 2.0) | +0.367 | **+0.637** F | 4.50 | **UP** +0.470, z 3.0 |
+| T25 (2.5) | +0.465 (z 3.0) | **+1.234** F | **+1.765** F | **+2.096** F | 4.10 | **UP** +0.859, z 4.2 |
+| T265 (2.65) | **+1.834** F | **+2.432** F | **+2.960** F | **+3.024** F | 3.80 | **UP** +0.525, z 2.7 |
+| T28 (2.8) | **+2.104** F | **+2.768** F | **+2.965** F | **+3.030** F | 3.80 | FLAT +0.102, z 0.7 |
+
+**RB1 THRESHOLD:** T23 4.50, T25 4.10, T265 3.80, T28 3.80. **RB2 THE TURN SETS THE THRESHOLD: yes** (non-increasing with the turn, T23's above T28's). **RB3** the spans as in the table. **RB4 THE BOUND BINDS AT LOWER TURNS: YES (3 of 3 lower turns UP).** **RB5 THE PLATEAU AT THE CEILING TURN: yes** (T28's span is FLAT). **B minus T28** at 3.80, 4.10, 4.32, 4.50: T23 -2.078 -2.570 -2.598 -2.393; T25 -1.638 -1.534 -1.200 -0.934; T265 -0.270 -0.336 -0.005 -0.005.
+
+**The forecast quantities as printed** (scored on HELD, not here): onset MID yes, LOW no, HIGH no; ON monotone yes; shape a RAMP yes; the turn sets the threshold yes; **the bound binds at lower turns yes**; plateau at the ceiling turn yes; T23 at the bound finds yes.
+
+**Observations (DEV, for reading, not rules):**
+
+1. **At lower turns the speed still pays up to the bound, and at the ceiling turn it does not.** 4.5 beats 4.1 head-to-head at turns 2.3, 2.5 and 2.65 (+0.47, +0.86, +0.53, each at z of 2.7 or more) and not at 2.8 (+0.10, z 0.7): the finders' 4.3 to 4.5 reads on this set as a clamp below the ceiling turn and a plateau at it. This is the question on which the speed note's two sets had disagreed at turn 2.5 (UP on its DEV, FLAT on its HELD); here it is UP at z 4.2 on 48 geometries. One set; HELD reads it.
+2. **A lower turn moves the threshold up the speed axis by one grid place a step and the edge down:** thresholds 3.80, 3.80, 4.10, 4.50 for turns 2.8, 2.65, 2.5, 2.3; at turn 2.3 an evade at the bound is the only arm that finds (+0.637, z 3.6, 56-2-38). The two highest turns are alike against G at 4.32 and 4.50 (-0.005 apart) because both are near the ceiling of the score (92-0-4 and 93-0-3), which is why the spans, and not the edges against G, are the instrument there.
+3. **The speed's own onset sits at 3.0 to 3.3 on this set** (MID), at half or less of G's edge (+0.56 at 3.2 and 3.3, +0.97 at G's), and it is below G's own speed; **what it says about the speed note's "G's speed finds on both sets and 2.7 does not": 2.7 and 2.8 are G (48-0-48 on both).**
+4. **G's seat bias on this set** (the flat arms' seat edges, +1.41 and -1.38) is between the earlier sets' +0.84 and +1.96, as the seat note found G's bias varying across sets.
+
+**What is NOT shown:** a mechanism; any HELD read; a speed below 2.7 or above 4.5 on ON, a turn but 2.3, 2.5, 2.65 and 2.8, or the time (G's throughout); anything against an opponent but G. R0 held and no check failed, so HELD may be flown.
