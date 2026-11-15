@@ -21,7 +21,7 @@ export const PARAMS = Object.freeze({
     Cw: 4, dc: 0.01, Tg: 30,
     ci1: 0.5, ci2: 0.3, ca: 0.3, tau: 0.04,
     Ts: 0.7, nsp: 4, Na: 1, aFfi1: 0.5, TF0: 15, aFfi: 0.02,
-    mFromThresholded: true,       // true: m = sum |G| over the pixels that pass T_g (eq. 11; the grouping layer exists to suppress noise); false: sum |G~| over all pixels (eq. 12 as printed)
+    mFromThresholded: true, polarity: "both",       // true: m = sum |G| over the pixels that pass T_g (eq. 11; the grouping layer exists to suppress noise); false: sum |G~| over all pixels (eq. 12 as printed)
 });
 
 // the lateral inhibition kernel (eq. 5): the 8 neighbours, 1/8 at the corners and 1/4 at the edge midpoints, 0 at the centre
@@ -57,10 +57,10 @@ export function photoreceptor(Pprev, L, Lprev, a1) { const out = new Float32Arra
 /** Eq. 6: S = E + sign W_I I (E = P, eq. 3; I the neighbour-weighted previous P, eq. 4 and 5; `sign` -1 in this implementation, +1 as the paper prints it). */
 export function summation(P, I, Wi, sign) { const out = new Float32Array(P.length); for (let i = 0; i < out.length; i++) out[i] = P[i] + sign * Wi * I[i]; return out; }
 
-/** Eq. 7 to 12: the grouping layer and the cell's potential on a w x h plane S: Ce = the 3 x 3 mean (eq. 7, 8); omega = dc + max|Ce| / Cw (eq. 10); G~ = S Ce / omega (eq. 9); G = G~ where G~ >= Tg (eq. 11); m = sum |G~| over all pixels (eq. 12 as printed) or, with `thresholded`, sum |G| over the pixels that pass. Returns { m, omega, Ce }. */
-export function groupingM(S, w, h, { Cw, dc, Tg, thresholded = false }) {
+/** Eq. 7 to 12: the grouping layer and the cell's potential on a w x h plane S: Ce = the 3 x 3 mean (eq. 7, 8); omega = dc + max|Ce| / Cw (eq. 10); G~ = S Ce / omega (eq. 9); G = G~ where G~ >= Tg (eq. 11); m = sum |G~| over all pixels (eq. 12 as printed) or, with `thresholded`, sum |G| over the pixels that pass. `polarity` (NOT in the paper as far as read; an addition, Round 4b): "both" (default) lets every pixel contribute, "off" only the pixels whose summation S is negative (a DARKENING; the expansion of a dark object), "on" only the positive. Returns { m, omega, Ce }. */
+export function groupingM(S, w, h, { Cw, dc, Tg, thresholded = false, polarity = "both" }) {
     const Ce = conv3(S, w, h, [1 / 9, 1 / 9, 1 / 9, 1 / 9, 1 / 9, 1 / 9, 1 / 9, 1 / 9, 1 / 9]); let mx = 0; for (let i = 0; i < Ce.length; i++) mx = Math.max(mx, Math.abs(Ce[i]));
-    const omega = dc + mx / Cw; let m = 0; for (let i = 0; i < S.length; i++) { const g = (S[i] * Ce[i]) / omega; if (thresholded) { if (g >= Tg) m += Math.abs(g); } else m += Math.abs(g); }
+    const omega = dc + mx / Cw; let m = 0; for (let i = 0; i < S.length; i++) { if (polarity === "off" && !(S[i] < 0)) continue; if (polarity === "on" && !(S[i] > 0)) continue; const g = (S[i] * Ce[i]) / omega; if (thresholded) { if (g >= Tg) m += Math.abs(g); } else m += Math.abs(g); }
     return { m, omega, Ce };
 }
 
@@ -98,6 +98,7 @@ export function winnerTakeAll(active, n) {
  */
 export function createNetwork({ W, H, params = {} }) {
     const P = { ...PARAMS, ...params }, n = P.segments;
+    if (!["both", "off", "on"].includes(P.polarity)) throw new Error(`crabMlg1.createNetwork: polarity is both, off or on, got ${JSON.stringify(P.polarity)}`);
     if (!(W >= n && H >= 3)) throw new Error(`crabMlg1.createNetwork: a panorama at least ${n} x 3 pixels, got ${W} x ${H}`);
     const cols = Array.from({ length: n }, (_, j) => segmentColumns(j, W, P)), sw = cols[0].length, ncell = sw * H;
     const a1 = 1 / (1 + Math.exp(P.mu * 1)), fresh = () => ({ Lprev: null, Pprev: new Float32Array(sw * H), c: P.dc, m1: 0, m2: 0, F: 0, Tffi: P.TF0, hist: [], started: false });
@@ -112,7 +113,7 @@ export function createNetwork({ W, H, params = {} }) {
             if (!s.started) { s.Lprev = L; s.started = true; continue; }
             const Pn = photoreceptor(s.Pprev, L, s.Lprev, a1);                                            // eq. 1, 2
             const Iin = conv3(s.Pprev, sw, H, KI), Sg = summation(Pn, Iin, P.Wi, P.inhibitionSign);       // eq. 3 to 6
-            const { m } = groupingM(Sg, sw, H, { Cw: P.Cw, dc: P.dc, Tg: P.Tg, thresholded: P.mFromThresholded });   // eq. 7 to 12
+            const { m } = groupingM(Sg, sw, H, { Cw: P.Cw, dc: P.dc, Tg: P.Tg, thresholded: P.mFromThresholded, polarity: P.polarity });   // eq. 7 to 12
             s.c = adaptC(s.c, m, s.m1, s.m2, P);                                                          // eq. 14 to 16
             const M = sigmoidM(s.c, m, ncell);                                                            // eq. 13
             let absP = 0; for (let i = 0; i < s.Pprev.length; i++) absP += Math.abs(s.Pprev[i]);
