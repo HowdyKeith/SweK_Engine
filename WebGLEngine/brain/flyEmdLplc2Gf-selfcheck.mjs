@@ -169,6 +169,15 @@ console.log("\n6b. THE SURROUND VARIANT (Round 3, detector C)");
     ok("!! the threshold kappa (the strength at which the unit stops being inhibited) is the ring's motion energy over the arms' outward motion: a REGRESSION PIN on this scene, right 0.0082 and down 0.0082 (equal by symmetry), left 0.0089 (each within 10 percent); it moves if the ring energy (|horizontal| + |vertical| motion) or the outward sum (all four arms) is changed", kr !== null && near(kr, 0.00824, 0.00082) && near(kd, 0.00824, 0.00082) && near(kl, 0.00893, 0.00089), `${kr}, ${kd}, ${kl}`);
 }
 
+console.log("\n6c. POLARITY (Round 8: the ON and OFF paths separately)");
+{
+    const fr = (dark) => { const out = []; for (let k = 0; k < 12; k++) { const d = new Float32Array(40 * 30).fill(0.5); for (let y = 10; y < 20; y++) for (let x = 5; x < 9 + 2 * k; x++) d[y * 40 + x] = dark ? 0 : 1; out.push({ w: 40, h: 30, data: d }); } return out; };
+    const sums = (frames, pol) => { const m = M.createModel({ w: 40, h: 30, params: { polarity: pol }, keepMaps: true }); let s = 0; for (const f of frames) { const r = m.step(f); if (r.maps) for (const v of r.maps.dh) s += v; } return s; };
+    const dk = (p) => sums(fr(true), p), lt = (p) => sums(fr(false), p);
+    ok("!! a dark bar GROWING rightward (one leading edge, no trailing edge) drives the OFF path and not the ON path (horizontal motion sum: off and both positive and equal, on zero), a light bar the ON path and not the OFF", dk("off") > 0 && near(dk("off"), dk("both"), 1e-6 * dk("both")) && dk("on") === 0 && lt("on") > 0 && near(lt("on"), lt("both"), 1e-6 * lt("on")) && lt("off") === 0, `${dk("off").toFixed(1)}, ${dk("on")}, ${lt("on").toFixed(1)}, ${lt("off")}`);
+    ok("a bad polarity is refused and the default is both", throws(() => M.createModel({ w: 20, h: 20, params: { polarity: "up" } })) && M.PARAMS.polarity === "both");
+}
+
 console.log("\n7. THE SOURCE");
 {
     const src = fs.readFileSync(path.join(HERE, "flyEmdLplc2Gf.mjs"), "utf8").split("\n").filter((l) => !/^\s*\/\//.test(l)).join("\n");
