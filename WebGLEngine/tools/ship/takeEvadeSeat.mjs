@@ -37,13 +37,22 @@ export function sidesOf(G, finders) {
 /** A side's label from its mean seat bias and z: SEAT-A at +BIAS and +MIN_Z or more, REVERSED at -BIAS and -MIN_Z or less, NEUTRAL otherwise. */
 export const labelOf = (mean, z) => (mean >= BIAS && z >= MIN_Z ? "SEAT-A" : mean <= -BIAS && z <= -MIN_Z ? "REVERSED" : "NEUTRAL");
 
-/** One side against itself on a set of geometries: { mean, se, n, z, sunkA, sunkB, neither, both } (the mean of seat A's score less seat B's, as subTournament.seatBias; z is infinite in the direction of the mean when the se is 0, and 0 for a mean of 0). */
+/** z from a mean and its standard error: the mean over the se; infinite in the direction of the mean when the se is 0, and 0 for a mean of 0. */
+export const zOf = (mean, se) => (se > 0 ? mean / se : (mean > 0 ? Infinity : mean < 0 ? -Infinity : 0));
+/** From the `fates` of each duel ([seat A's, seat B's]): how many had seat A's boat sunk, seat B's boat sunk, both, and neither. */
+export function countSunk(fates) {
+    const sa = fates.filter((f) => f[0] === "sunk").length, sb = fates.filter((f) => f[1] === "sunk").length, both = fates.filter((f) => f[0] === "sunk" && f[1] === "sunk").length;
+    return { sunkA: sa, sunkB: sb, both, neither: fates.length - (sa + sb - both) };
+}
+/** Is a mean within `tol` of `ref` (at most)? */
+export const withinBias = (mean, ref, tol) => Math.abs(mean - ref) <= tol;
+
+/** One side against itself on a set of geometries: { mean, se, n, z, sunkA, sunkB, neither, both } (the mean of seat A's score less seat B's, as subTournament.seatBias; z is `zOf`; the sunk counts are `countSunk` of the duels' fates). */
 export function mirror(side, geos, opts = {}) {
     const seconds = opts.seconds || D.SECONDS, v = [], fates = [];
     for (const sc of geos) { const r = D.duel(side.side(), sc, { ...opts, opponent: side.side() }); v.push(r.score - D.scoreFor(r, "B", seconds)); fates.push(r.fates); }
-    const n = v.length, mean = v.reduce((a, b) => a + b, 0) / n, sd = n > 1 ? Math.sqrt(v.reduce((a, b) => a + (b - mean) ** 2, 0) / (n - 1)) : 0, se = sd / Math.sqrt(n);
-    const sa = fates.filter((f) => f[0] === "sunk").length, sb = fates.filter((f) => f[1] === "sunk").length, both = fates.filter((f) => f[0] === "sunk" && f[1] === "sunk").length;
-    return { mean, se, n, z: se > 0 ? mean / se : (mean > 0 ? Infinity : mean < 0 ? -Infinity : 0), sunkA: sa, sunkB: sb, both, neither: n - (sa + sb - both) };
+    const n = v.length, mean = v.reduce((a, b) => a + b, 0) / n, sd = n > 1 ? Math.sqrt(v.reduce((a, b) => a + (b - mean) ** 2, 0) / (n - 1)) : 0, se = sd / Math.sqrt(n), c = countSunk(fates);
+    return { mean, se, n, z: zOf(mean, se), sunkA: c.sunkA, sunkB: c.sunkB, both: c.both, neither: c.neither };
 }
 
 /** Flies the 17 sides against themselves on a set ("smoke", "dev" or "held"), plus what the checks need: G flown a second time (`again`) and subTournament.seatBias's own figure for G (`reference`). Returns { rows, again: { mean }, reference: { mean } }. */
@@ -62,7 +71,7 @@ export function checksOf({ rows, sides, again, reference, G, runs }) {
     if (rows.some((r) => !Number.isFinite(r.mean) || !Number.isFinite(r.se))) c.push("a mean seat bias is non-finite");
     if (!sides.every((s) => TA.THETA_NAMES.every((k) => TA.clampTheta(s.theta)[k] === s.theta[k]))) c.push("a side has a theta that clampTheta changes");
     if (runs.some((r) => JSON.stringify(r.gen0) !== JSON.stringify(G))) c.push("a run's generation 0 is not G");
-    if (g && !(Math.abs(g.mean - G_BIAS) <= G_TOLERANCE)) c.push(`G's mirror bias ${g.mean} is not within ${G_TOLERANCE} of +${G_BIAS}`);
+    if (g && !withinBias(g.mean, G_BIAS, G_TOLERANCE)) c.push(`G's mirror bias ${g.mean} is not within ${G_TOLERANCE} of +${G_BIAS}`);
     return c;
 }
 
@@ -72,7 +81,7 @@ export function rulesOf(rows) {
     const r1 = rev(`U:${STRONG}`), r2 = rev(`STN:${STRONG}`), r3 = rev(`N:${STRONG}`), r4 = rev(`SN:${STRONG}`), r5 = rev(`S:${STRONG}`), r6 = !rev(`U:${ODD}`) && !rev(`STN:${ODD}`);
     const headline = r4 && !r3 && r6 ? "THE SPEED IS WHAT REVERSES IT" : r3 ? "THE TURN ALONE REVERSES IT" : r2 && !r3 && !r4 && !r5 ? "THE TRIPLE, AND NO PART OF IT ALONE" : !r2 ? "NOTHING OF THE TRIPLE REVERSES IT" : null;
     const reversed = rows.filter((r) => r.label === "REVERSED"), g = by("G");
-    return { replicates: lab("G") === "SEAT-A" && r1, R1: r1, R2: r2, R3: r3, R4: r4, R5: r5, R6: r6, headline, forecast: { reversedSunkMore: reversed.length > 0 && reversed.every((r) => r.sunkA > r.sunkB), gWithinHalf: !!g && Math.abs(g.mean - G_BIAS) <= 0.5 } };
+    return { replicates: lab("G") === "SEAT-A" && r1, R1: r1, R2: r2, R3: r3, R4: r4, R5: r5, R6: r6, headline, forecast: { reversedSunkMore: reversed.length > 0 && reversed.every((r) => r.sunkA > r.sunkB), gWithinHalf: !!g && withinBias(g.mean, G_BIAS, 0.5) } };
 }
 
 /** The report of a read, one string a line. */
