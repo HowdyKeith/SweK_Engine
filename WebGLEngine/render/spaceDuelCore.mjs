@@ -4,8 +4,8 @@
 // node gate holds it and the page is left with drawing.
 //
 //   HANDS   who works a side's thirteen gun seats: `rule` (the hand gunner), the three CORRECTING networks' shipped files (`fly`: the fruit fly's circuit; `gpu`: the GPU Brain's plain network, run here by its CPU twin; `fish`: the zebrafish circuit -- whose wiring did nothing in training, its file says), and the
-//           RACE CAR'S turret gunner laying the gun itself (`car`: the car's own untrained hand weights, no file; `car-trained`: the file trained in a ship's seat on 8 pairs a child; `car-big`: the file the rig trained on 300 pairs a child, which always fires). Each says in `note` what it is NOT, in a line a page can show.
-//   HELMS   `face` (the arena's rule: the bow on the enemy), `broadside` (the hand rule), `trained` (the trained helm network correcting the bow-on rule -- the only rule it was trained for).
+//           RACE CAR'S turret gunner laying the gun itself (`car`: the car's own untrained hand weights, no file; `car-trained`: the file trained in a ship's seat on 8 pairs a child; `car-big`: the file the rig trained on 300 pairs a child, which always fires; `track`: brain/seatTrackGunner.mjs, the fly's target-tracking circuit with the car's hand rule on it, untrained, no file). Each says in `note` what it is NOT, in a line a page can show.
+//   HELMS   `face` (the arena's rule: the bow on the enemy), `broadside` (the hand rule), `trained` (the trained helm network correcting the bow-on rule -- the only rule it was trained for), `steer` (the helm trained over the fly's steering circuit, brain/helmSteerPolicy.mjs, correcting the bow-on rule).
 //   FILES   the core reads no disk and no network: the page (or a gate) loads the brain files named in FILES and hands the parsed objects in. Each goes through brain/peerBrain.mjs's importBrain against the module it is for; a file that is refused refuses the SIDE, by name and with the reason.
 //   PEERS   a side's choice may carry `peer`: brain files as they arrived ([{ name, text }]). They go through brain/peerFleet.mjs (which never throws on a file) and take the seats, the helm and the escorts where they have a brain for them; the catalogue's choice stands for the rest. peerLines() is the report.
 //   RATION  `setup.ammo` is battleshipDuel's: the fraction of every gun seat's magazine both sides carry (1 by default: the whole magazines). A snapshot's seat says the rounds it has LEFT.
@@ -23,6 +23,8 @@ import * as SM from "../brain/seatGunnerMlp.mjs";
 import * as SF from "../brain/seatGunnerFish.mjs";
 import * as ST from "../brain/seatTurretGunner.mjs";
 import * as HP from "../brain/helmPolicy.mjs";
+import * as HS from "../brain/helmSteerPolicy.mjs";
+import * as SK from "../brain/seatTrackGunner.mjs";
 import * as PF from "../brain/peerFleet.mjs";
 
 /** The brain files the page loads, by the name the catalogues below use: a path under brain/ and the policy it must be for. */
@@ -33,6 +35,7 @@ export const FILES = Object.freeze({
     "car-trained": Object.freeze({ path: "brain/seatTurretGunnerWeightsDefault.json", policy: "gunnerPolicy", mod: ST }),
     "car-big": Object.freeze({ path: "brain/seatTurretGunnerWeightsBig.json", policy: "gunnerPolicy", mod: ST }),
     helm: Object.freeze({ path: "brain/helmWeightsDefault.json", policy: "helmPolicy", mod: HP }),
+    "helm-steer": Object.freeze({ path: "brain/helmSteerWeightsDefault.json", policy: "helmSteerPolicy", mod: HS }),
 });
 export const HANDS = Object.freeze([
     Object.freeze({ id: "rule", label: "hand gunner (the rule)", file: null, note: "no network: the sight's own aim and trigger" }),
@@ -42,11 +45,13 @@ export const HANDS = Object.freeze([
     Object.freeze({ id: "car", label: "race car's turret gunner, untrained (lays the gun)", file: null, note: "the car's own hand weights, carried over as they are; on 600 pairs they lead the hand gunner by about 0.1" }),
     Object.freeze({ id: "car-trained", label: "race car's turret gunner, trained in a seat (lays the gun)", file: "car-trained", note: "trained against a ship; on 300 fresh pairs its training bought nothing that could be told from the untrained one" }),
     Object.freeze({ id: "car-big", label: "race car's turret gunner, trained on 300 pairs a child (lays the gun, always fires)", file: "car-big", note: "the one trained gunner shown to beat the rest: +0.85 over the hand gunner on 600 pairs. What it learned is to HOLD THE TRIGGER whenever it has a target; its one synapse does what a trigger bias would" }),
+    Object.freeze({ id: "track", label: "fruit fly's target-tracking circuit, untrained (lays the gun)", file: null, note: "281 neurons of the fly's visual pursuit pathway, carrying the race car's hand rule and no weight on any of its 6,589 synapses: untrained, it flies the untrained car's fights to the bit" }),
 ]);
 export const HELMS = Object.freeze([
     Object.freeze({ id: "face", label: "bow-on rule", rule: "face", file: null, note: "the arena's own: the bow, and the cannon, on the nearest enemy" }),
     Object.freeze({ id: "broadside", label: "broadside rule", rule: "broadside", file: null, note: "a hand rule; it loses to the bow-on rule in seven pairs of eight" }),
     Object.freeze({ id: "trained", label: "trained helm (corrects the bow-on rule)", rule: "face", file: "helm", note: "on 300 fresh pairs it leads the bow-on rule by 0.38; with no cannon on either side it is no better than the rule; it was not trained for the broadside rule and trails behind it" }),
+    Object.freeze({ id: "steer", label: "trained helm over the fly's steering circuit (corrects the bow-on rule)", rule: "face", file: "helm-steer", note: "three weights and no synapse: it throttles back and turns harder about one axis. On 600 pairs it leads the bow-on rule by 0.64 and the other trained helm by 0.20, in the one fight it was trained in; the fly's wiring took no part" }),
 ]);
 /** The rations of the magazines a page offers (battleshipDuel's `ammo`): the whole magazines, and what tools/ship/takeAmmoStudy.mjs flew. */
 export const RATIONS = Object.freeze([1, 0.5, 0.25, 0.125, 0.0625]);
@@ -67,8 +72,9 @@ export function sideOf(id, choice = {}, files = {}) {
     if (!helm) throw new Error(`spaceDuelCore.sideOf: side "${id}": no helm "${c.helm}" (${HELMS.map((h) => h.id).join(", ")})`);
     let network = null, helmNet = null;
     if (hand.id === "car") network = { module: ST, weights: ST.handWeights() };
+    else if (hand.id === "track") network = { module: SK, weights: SK.handWeights() };
     else if (hand.file) { const r = weightsOf(hand.file, files); if (!r.ok) throw new Error(`spaceDuelCore.sideOf: side "${id}": ${r.reason}`); network = { module: FILES[hand.file].mod, weights: r.weights }; }
-    if (helm.file) { const r = weightsOf(helm.file, files); if (!r.ok) throw new Error(`spaceDuelCore.sideOf: side "${id}": ${r.reason}`); helmNet = { module: HP, weights: r.weights }; }
+    if (helm.file) { const r = weightsOf(helm.file, files); if (!r.ok) throw new Error(`spaceDuelCore.sideOf: side "${id}": ${r.reason}`); helmNet = { module: FILES[helm.file].mod, weights: r.weights }; }
     // A PEER'S FILES (`choice.peer`: [{ name, text }], as they arrived) go through brain/peerFleet.mjs and OVERRIDE the catalogue where they have something to seat: gunners' brains take the seats from `hand`, a helm's brain takes the helm (correcting the rule the helm choice names), pilots' brains fly the escorts.
     // What the files do not decide stays the choice's. A file that is refused seats nothing and refuses nothing else: peerLines() says which and why.
     const F = peerFleet(id, c), s = F ? F.side : null;
