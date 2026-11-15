@@ -135,7 +135,7 @@ export function command(argv, io = {}) {
         if (dev.set !== "dev" || !dev.rules || dev.rules.replicates !== true) { log("takeEvadeTurn: DEV did not replicate (R0) or is not a DEV record; HELD is not flown by this registration"); return 2; }
     }
     const L = loadRuns(io.read); if (L.error) { log("takeEvadeTurn: " + L.error); return 2; }
-    const finders = FINDERS.map((id) => L.runs.find((r) => r.id === id)), missing = FINDERS.filter((id, i) => !finders[i]); if (missing.length) { log(`takeEvadeTurn: no run named ${missing.join(", ")}`); return 2; }
+    const finders = FINDERS.map((id) => L.runs.find((r) => r.id === id));   // loadRuns refuses unless every one of the twelve runs (and so all five finders) exists
     const G = L.runs[0].gen0, name = mode === "smoke" ? "smoke" : mode === "dev" ? (io.devSet || "dev") : (io.heldSet || "held"), arms = armsOf(G, finders);
     const { rows, identity, direct } = flyIt(arms, G, finders, name), rules = rulesOf(rows), checks = checksOf({ rows, arms, identity, direct, G, runs: L.runs, count: SETS[name].count });
     for (const l of reportLines(rows, rules, name)) log(l);
