@@ -109,3 +109,45 @@ The edge of each arm over generation 0 (**F** = the arm finds, edge >= 0.5 and z
 
 **HELD is next and is not flown yet**: `node tools/ship/takeEvadeSplit.mjs held --write`, once, on 101001 to 101024 (the command refuses without this DEV record, which exists and replicates). No amendment is made after DEV.
 
+## HELD RESULT (2026-11-15; `node tools/ship/takeEvadeSplit.mjs held --write`, 124 s, flown ONCE, geometries 101001 to 101024, both seats, 48 duels an arm, 40 arms; `brain/subEvadeSplitHeld.json`; the checks passed; flown because DEV replicated, as registered and as Keith asked)
+
+The edge of each arm over generation 0 (z in brackets for the cells that are not flat; **F** = the arm finds):
+
+| finder | U | S | T | N | ST | SN | TN | STN |
+|---|---|---|---|---|---|---|---|---|
+| league7001 | +2.35 F (5.8) | +0.00 | +0.00 | +0.83 F (2.9) | +0.00 | +2.63 F (10.5) | +0.77 F (2.8) | +2.64 F (10.5) |
+| league7100 | +2.47 F (6.3) | +0.01 | +0.00 | +0.69 F (2.6) | +0.01 | +2.76 F (12.3) | +0.63 F (2.5) | +2.64 F (10.5) |
+| league7103 | +0.97 F (2.3) | +0.00 | +0.00 | +0.83 F (2.9) | +0.00 | +1.03 F (3.4) | +0.83 F (2.9) | +0.90 F (3.1) |
+| exploit7200 | +2.61 F (10.4) | +0.00 | +0.00 | +0.83 F (2.9) | +0.00 | +2.63 F (10.5) | +0.97 F (3.2) | +2.64 F (10.5) |
+| exploit7204 | +2.51 F (9.2) | +0.00 | +0.00 | +0.69 F (2.6) | +0.00 | +2.63 F (10.5) | +0.63 F (2.5) | +2.65 F (10.5) |
+
+**R0 holds: 5 of 5 unmodified finders find on a fourth fresh set. R1 the speed alone does not find (0 of 5, NO), R2 the time alone does not find (0 of 5, NO), R3 speed and turn CARRY (5 of 5, YES), R4 time and turn carry for 1 of 5 (NO), R5 speed and time carry for 0 of 5 (NO): the speed is NEEDED, the time DISPENSABLE, the turn NEEDED, and the headline is "THE SPEED AND THE TURN"**, as on DEV, label for label. The median shares of the finders' own edges: S 0.00, T 0.00, N 0.32, ST 0.00, SN 1.07, TN 0.33, STN 1.06.
+
+**The forecasts, scored (written before any geometry of any of the four sets was flown):**
+
+| forecast | probability | result |
+|---|---|---|
+| R0 holds on DEV | 92 | **yes** (5 of 5) |
+| R0 holds on HELD | 90 | **yes** (5 of 5) |
+| R1: the speed alone FINDS (YES) | 45 | **no** (0 of 5: +0.00 to +0.01 in every finder) |
+| R2: the time alone FINDS (YES) | 10 | no (0 of 5) |
+| R3: speed and turn CARRY (YES) | 60 | **yes** (5 of 5; shares 1.01 to 1.12) |
+| R4: time and turn CARRY (YES) | 10 | no (1 of 5, league7103) |
+| R5: speed and time CARRY (YES) | 5 | no (0 of 5) |
+| the turn is NEEDED (R5 is NO) | 88 | **yes** |
+| the speed is NEEDED (R4 is NO) | 75 | **yes** |
+| the time is DISPENSABLE (R3 is YES) | 60 | **yes** |
+| the headline is "THE SPEED AND THE TURN" | 45 | **yes** |
+| the headline is "ALL THREE NUMBERS" | 25 | no |
+| the median share of the SN cell is at least 0.9 | 55 | **yes** (1.07) |
+
+Of the 13, every forecast of 55 or more came true (7 of 7) and one of the six at 45 or less did (the headline); the five that did not were forecasts that something would happen at 45, 25, 10, 10 and 5. **The one that was nearest a coin and went the other way is R1: the speed alone does nothing**, not a little, to the second decimal in all five finders; I had given it 45 because the strong finders' speed is 0.9 to 1.1 m/s above G's and the one finder that does not win from the target's seat has a speed near G's. The speed matters, and only with the turn on.
+
+**What this says.** (1) **The DEV reading holds on a second set: the turn is the gate and the speed multiplies it, and the time is inert.** With the turn off (S, T, ST) a boat is G to the second decimal in all fifteen cells; the turn alone gives +0.7 to +0.8; the speed with the turn gives +2.6 to +2.8 for the four strong finders (a share of 1.01 to 1.12 of their own edge): **the speed adds +1.8 to +2.1 when the turn is on and nothing when it is off.** Adding the time to speed and turn changes the median share from 1.07 to 1.06, and to the turn from 0.32 to 0.33. (2) **The candidate of registration 1 is what the table says, with the speed held fixed:** league7103, whose speed is near G's, gains nothing from it (SN +1.03 against N +0.83), and for it the turn alone is 0.86 of its edge where for the four strong finders it is 0.28 to 0.35. (3) **The turn alone is set-dependent, and the sets differ by about their standard errors.** The same boat (G with a turn of 2.80) has an edge of +0.97 (98001 to 98024, DEV of the first note), +1.36 (99001 to 99024), +1.50 (100001 to 100024) and +0.83 (101001 to 101024); each has a standard error of 0.27 to 0.33, and the spread of the four (a standard deviation of 0.32) is what four draws with that standard error give. So the share of 0.31 to 0.56 that the turn carried on those four sets is a share of a quantity that moves by 0.3 from set to set, while the share of speed and turn (1.07 here, 1.10 on DEV) does not. (4) **The seat, for registration 4:** with the speed on, a cell wins from both seats (SN, the four strong finders: seat A +3.0, seat B +2.3 to +2.5; league7103's SN +1.4 and +0.7); with the turn alone it wins from seat A (+1.4) and is level from seat B (-0.02 to +0.25). The speed carries the target's seat.
+
+**Independence, said.** Three of the five N cells are one boat (the finders with a turn of 2.80: +0.83 in all three, to the digit), and the strong four's SN and STN cells are near-copies (+2.63 and +2.64 in three of them), so the effective number of independent finders is nearer three than five, as in the other notes.
+
+**Not claimed:** that the time is irrelevant in general (it was flown at the finders' values, 27.8 to 33.7 s, against G's 36.9, with the other nine numbers G's, and nothing was read at 5 s or at 40 s); that the speed and the turn act through a mechanism (a faster boat, a louder one, one that opens the range from a torpedo: not asked); a dose of either (registrations 2 and, for the turn, 2 only; the speed was not graduated); that a cell at G's other nine numbers is the finder (the 2 x 2 x 2 is read at one corner); anything against an opponent but G (registration 3); the mirror (registration 4).
+
+**For registration 4:** no cell asked about there is wrong, so no amendment is made to it from this result. Three of its seven cells (S, T, ST) are indistinguishable from G against G (+0.00 to +0.01), so their mirrors are expected to equal G's; they stay as the check that the mirror measure does not find a seat effect where the sides play alike.
+

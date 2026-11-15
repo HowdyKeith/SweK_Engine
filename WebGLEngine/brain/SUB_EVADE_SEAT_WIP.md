@@ -64,3 +64,6 @@ Why these: Part A read league7001 at -1.87 with a standard error of 0.83 on 8 ge
 ## 7. Cost
 
 17 sides x 24 duels = 408 duels a set (a few seconds), plus a second flight for the determinism check: this is the cheapest of the four to fly; the command, its gate and a sabotage pass are the work.
+
+*(2026-11-15, an addendum, made after the HELD result of registration 1 and before any geometry of this note's sets was flown; no rule, arm or forecast is changed: the split result (`brain/SUB_EVADE_SPLIT_WIP.md`) shows the S, T and ST cells to be G to the second decimal against G and the SN cell to carry the whole edge, so no cell asked about here is the wrong one; S, T and ST stay as the check that the mirror measure finds no seat effect where the sides play alike.)*
+
