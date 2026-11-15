@@ -61,3 +61,44 @@ Round 1 measured 54.1 minutes beside another round's run. About the same here, b
 ## 7. The run (to be written; the gate never runs it and never gives the command the word `run`)
 `node tools/ship/takeFlyEscapeReflex.mjs run` -> `brain/flyEscapeReflexRound.jsonl`, committed byte for byte before it is read;
 `node tools/ship/takeFlyEscapeReflex.mjs read` prints the checks and the reading.
+
+## 8. The result (run 2026-11-15 in the sandbox, 28.6 minutes; `brain/flyEscapeReflexRound.jsonl` committed at 8193559f before it was read; read once)
+**The checks hold, and the start was the reflex:** the untrained fly of every arm scores 0.6465, to the bit.
+
+| | mean score | sd | above the reflex (of 16) | lives (of 200) | feeds | off its food for a pass | caught by a strike |
+|---|---|---|---|---|---|---|---|
+| FISH | 0.6583 | 0.0310 | 11 | 158.1 | 0.526 | 0.257 | 0.105 |
+| PLAIN | 0.6595 | 0.0243 | 11 | 157.1 | 0.534 | 0.260 | 0.110 |
+| SHUF | 0.6617 | 0.0291 | 14 | 160.1 | 0.523 | 0.260 | 0.098 |
+| MLP | 0.6623 | 0.0412 | 13 | 159.9 | 0.525 | 0.277 | 0.100 |
+| FLY | 0.6636 | 0.0420 | 10 | 159.9 | 0.528 | 0.257 | 0.101 |
+| the reflex (and every fly at iteration 0) | 0.6465 | | | 156 | 0.513 | 0.247 | 0.107 |
+| fleeAll | 0.5395 | | | 198 | 0.089 | 1.000 | 0.004 |
+| told each mover's kind | 0.8351 | | | 198 | 0.680 | 0.296 | 0.004 |
+
+* **T3: A FLY STARTED AT THE REFLEX ESCAPES BETTER THAN THE REFLEX** (59 of the 80 above it, 21 below; exact two-sided p 2.5e-5).
+* **T0: A FLY-WIRED FLY STARTED AT THE REFLEX CANNOT BE TOLD APART FROM THE REFLEX** (10 above, 6 below; p 0.45).
+* **T1 is asked of flies that do the task** (the FLY arm's mean 0.6636 and the SHUF arm's 0.6617 are both above the reflex's),
+  for the first time: **T1: THE FLY'S WIRING CANNOT BE TOLD APART FROM A SHUFFLE OF IT** (the ranks sum to 272, the middle 264;
+  p 0.78).
+* **T2: THE FLY'S WIRING CANNOT BE TOLD APART FROM A PLAIN NET OF ITS SIZE** (279; p 0.59).
+
+**The gain is real and small: a hundredth and a half.** The 80 flies average 0.6611 against the reflex's 0.6465, and what they
+do is very nearly what the reflex does (they live in 157 to 160 episodes for its 156, feed 0.52 to 0.53 of the time for its
+0.51, are caught by a tenth of strikes as it is). The fly told each mover's kind scores 0.835; nothing here comes near it. This
+is not what the voxel home's round 4 found, where the correction to the lean was large and learned in 25 iterations.
+
+**Most of what the trainer gained was its own 24 episodes'.** On the trainer's battery every arm starts at the reflex's 0.6991
+there, and the best reading of a training averages 0.78 to 0.80: a gain of 0.08 to 0.10. On the 200 audit episodes, which the
+trainer never saw, the same weights gain 0.012 to 0.017. The battery is the same 24 episodes at every iteration and the weights
+handed back are the best on it -- which is what this round asked for ("keep the best return"), and on an environment this
+chancy it keeps luck as readily as skill. A battery that changes, or a larger one, is the obvious next thing; not registered.
+
+**The wiring.** This is the round the question was waiting for: flies that do the escape task, on the fly's own escape
+circuit's wiring against a shuffle of it. They cannot be told apart (p 0.78), the eighth such reading and the first on the
+circuit's own job. What it is a reading OF is in `brain/FLY_ESCAPE_WIP.md` section 2: 313 connections as a mask on a small rate
+network with no visual inputs and no memory -- and here a network that only corrects a rule a person wrote, by a hundredth and
+a half. It says nothing about the animal.
+
+**The expectations against what came.** T3 BETTER (60): came. T0 CANNOT (45): came. T1 asked of flies that do the task (65):
+it is. T1 CANNOT (75) and T2 CANNOT (70): both came. The best arm above 0.75 (30): no, 0.66.

@@ -241,8 +241,13 @@ reflex and train a correction (as voxel-home round 4 did with the lean), have th
 wiring question of flies that do the task. **The page is DONE (2026-11-15):** `fly-escape.html` (Fruit Fly Brain drawer; `brain/flyEscapeShow.mjs`, gate
 `tools/ship/flyEscapeShow-selfcheck.mjs`) plays an episode in 3D -- the real voxel house, the fly, the mover, a camera that
 turns on a drag -- and THROUGH THE FLY'S EYE, all the way round, where the mover is a disc that looms; both pictures are
-ray-cast in JavaScript from the episode's voxels (no GPU). `fly-escapes-reflex` is REGISTERED and running as round 2
-(`brain/FLY_ESCAPE_REFLEX_WIP.md`).
+ray-cast in JavaScript from the episode's voxels (no GPU). **`fly-escapes-reflex` is DONE as round 2** (`brain/FLY_ESCAPE_REFLEX_WIP.md`
+section 8, `tools/ship/flyEscapeReflex-selfcheck.mjs` section 6; `brain/rl/reflexStart.mjs`): started at the reflex, with the
+trainer keeping the best return, **59 of the 80 flies escape better than the reflex (p 2.5e-5), by a hundredth and a half**
+(0.661 for 0.6465; the fly told the kind 0.835). **T1 was, for the first time, asked of flies that do the task: the fly's wiring
+cannot be told from a shuffle of it (p 0.78).** Most of the trainer's gain was its own 24 battery episodes' (0.08 to 0.10 there,
+0.012 to 0.017 on the audit). **OPEN, not registered:** a battery that changes or a larger one; memory between ticks (the real
+circuit integrates); the visual inputs the real circuit has.
 
 Keith, 2026-11-13: "How else could the fly brain live in voxel world? Could it play minecraft or create something to attract a
 different fly brain?" and, of the five answers: "Yes, add those to the backlog". Each builds on `voxel-home` (`brain/rl/buildEnv.mjs`:
