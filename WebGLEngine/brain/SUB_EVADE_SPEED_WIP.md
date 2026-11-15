@@ -129,3 +129,55 @@ Steps on T28: FLAT, UP (+1.085), FLAT (+0.399, z 1.8), UP (+0.795), UP (+0.530),
 5. **G's seat bias on this set** (the seat edges of the flat arms, +1.40 and -1.40) is smaller than on the earlier DEV sets (+1.96) and larger than HELD's of the dose (+0.84), as the seat note found for G across sets.
 
 **What is NOT shown:** a mechanism; any HELD read; a speed between 2.7 and 3.42, or above 4.5 (the bound; the finders' 4.3 to 4.5 cannot be shown to be a clamp or an optimum at T28 by this set, and at T25 the curve is still rising at 4.5); a time or a turn but these three. R0 held, so HELD may be flown on Keith's word: `node tools/ship/takeEvadeSpeed.mjs held --write`.
+
+## HELD RESULT (2026-11-15; `node tools/ship/takeEvadeSpeed.mjs held --write`, geometries 109001 to 109024, flown ONCE, exit 0; record `brain/subEvadeSpeedHeld.json`: 24 arms, 21 steps, 6 spans)
+
+Keith asked for it after the DEV read; R0 held on DEV and no check failed. The void-checks passed on HELD too (none printed). Nothing in the rules, the arms or the forecasts was changed between DEV and HELD (Amendment A is dated before DEV).
+
+**R0 holds on HELD.** T28 at league7001's speed (4.32): **+3.027**, z 20.8, 46-1-1, FINDS; T28 at G's own speed (the GN arm): **+1.764**, z 5.3, 37-0-11, FINDS.
+
+**The arms** (edge against G, both seats, 24 geometries; wins-draws-losses of the 48 duels; F = finds), with the DEV edge beside each:
+
+| speed (m/s) | T0: HELD (DEV) | T25: HELD (DEV) | T28: HELD (DEV) |
+|---|---|---|---|
+| 2.00 | -0.005, 24-0-24 (-0.004) | +0.005, 24-0-24 (+0.004) | +0.009, 24-0-24 (+0.008) |
+| 2.70 | -0.003, 24-0-24 (-0.003) | +0.014, 24-0-24 (+0.013) | +0.288, z 1.6, 26-0-22 (+0.020, 24-0-24) |
+| 3.42 (G's) | 0 (G) | +0.294, z 1.6, 26-0-22 (+0.160) | **+1.764**, z 5.3, 37-0-11, F (+1.104 F) |
+| 3.55 (league7103's) | +0.001 (+0.001) | +0.429, z 2.0, 27-0-21 (+0.162) | **+2.029**, z 6.3, 39-0-9, F (+1.504 F) |
+| 3.80 | +0.002 (+0.002) | **+0.963**, z 3.2, 31-0-17, F (+0.698 F) | **+2.295**, z 7.6, 41-0-7, F (+2.301 F) |
+| 4.10 | +0.003 (+0.003) | **+1.758**, z 5.3, 37-0-11, F (+1.501 F) | **+2.897**, z 15.2, 45-1-2, F (+2.832 F) |
+| 4.32 (league7001's) | +0.005 (+0.005) | **+2.155**, z 6.9, 40-0-8, F (+1.897 F) | **+3.027**, z 20.8, 46-1-1, F (+3.096 F) |
+| 4.50 (the bound) | +0.005 (+0.005) | **+2.223**, z 7.5, 40-1-7, F (+2.294 F) | **+3.025**, z 20.9, 46-1-1, F (+3.094 F) |
+
+**R1 THRESHOLD:** T0 NONE; T25 **MID (3.80)**; T28 **AT G (3.42)** (on DEV: the same three). **R2 MONOTONE:** all three yes (on DEV T28 was not: its 4.50 over 4.32 was DOWN at -0.379; on HELD that step is **-0.065**, z -1.0, FLAT). **R3 SATURATION:** T0 2.00; T25 **4.10** (DEV: none); T28 **4.10** (DEV: 4.10). **R4 THE TURN IS THE GATE: yes**, 0 of 7 non-G arms of T0 find (all 24-0-24, -0.005 to +0.005). **R5 THE SPEED MATTERS** (4.5 over G's speed): T0 FLAT, T25 UP (+1.927, z 5.7), T28 UP (+1.193, z 3.3). **R6 THE BOUND BINDS** (4.5 over 4.1): T0 FLAT, **T25 FLAT (+0.463, z 1.8; DEV UP)**, T28 FLAT (-0.062, z -0.4; DEV +0.195). LOSES: none. **T minus T0** at the eight speeds: T25 +0.010 +0.017 +0.294 +0.428 +0.961 +1.755 +2.151 +2.218; T28 +0.014 +0.290 +1.764 +2.029 +2.293 +2.893 +3.022 +3.020. **T28 slope between G's speed and league7001's:** **+1.41** edge points an m/s (DEV +2.22; the split's +1.8 to +2.1).
+
+Steps on T28: FLAT (+0.279, z 1.5), UP (+1.477), FLAT, FLAT, UP (+0.601), FLAT, FLAT (-0.065); on T25: FLAT, FLAT, FLAT, UP (+0.534), UP (+0.794), FLAT (+0.396, z 1.8), FLAT (+0.067).
+
+**Forecasts, scored** (my probability; outcome on the printed quantity of HELD; "calls" is the probability I gave to what happened):
+
+| forecast | mine | outcome | calls |
+|---|---|---|---|
+| R0 holds on DEV | 87 | held | 87 |
+| R0 holds on HELD | 85 | held | 85 |
+| R4: the turn is the gate (no arm of T0 finds) | 80 | yes | 80 |
+| R5 on T28: the speed matters | 92 | yes (+1.193, z 3.3) | 92 |
+| R5 on T25: the speed matters | 88 | yes (+1.927, z 5.7) | 88 |
+| R5 on T0 is not UP | 92 | yes (+0.005) | 92 |
+| T28's threshold is G's speed exactly (3.418) | 70 | yes | 70 |
+| T25's threshold is higher than T28's | 60 | yes (3.80 against 3.42) | 60 |
+| T28 is MONOTONE | 75 | yes | 75 |
+| T0, T25 and T28 are all MONOTONE | 55 | yes | 55 |
+| R6 on T28: the bound binds (SPAN-TOP UP) | 40 | no | 60 |
+| the arm at league7103's speed 3.546 within 0.5 of the arm at G's speed (T28) | 85 | yes (+0.265) | 85 |
+
+**All twelve went as the larger side said, and that is a thing about my priors and not a triumph:** the four near-coins (T25's threshold above T28's at 60, all-monotone at 55, the bound binding at 40, T28 monotone at 75) are the informative ones, and each fell on the side I leaned to; but two of them (T28 monotone and all-monotone) had printed NO on DEV, and the DEV DOWN step that said so (4.50 below 4.32 at z -2.8) did **not** replicate (-0.065 on HELD). I was right to give it 75 only because a DOWN needs z of 2 and the registered rule flags a false one about two times in a hundred a step; it was on one set a one-in-twenty-one event, which is about what 21 steps at z of 2 give.
+
+**What the two sets say together (post hoc, labelled as such: no rule reads two sets).**
+
+1. **The turn gate replicates exactly and the speed has a gate of its own.** With G's own turn no speed from 2.0 to 4.5 does anything on either set (all 24-0-24). With the turn at 2.8 an evade at 2.0 does nothing (+0.008, +0.009) and the edge appears between 2.7 and G's 3.42: at 2.7 it is +0.020 (DEV) and +0.288 (HELD, z 1.6, not finding), at 3.42 it is +1.104 and +1.764. **Neither number works without the other**; no speed between 2.7 and 3.42 was flown, so the onset of the speed is not located closer than that.
+2. **The speed's curve at the ceiling turn rises from G's speed to about 4.1 and is flat above it.** T28's steps: 4.10 over 3.80 UP on both sets (+0.530, +0.601); 4.32 over 4.10 FLAT on both (+0.262, +0.066); 4.50 over 4.32 DOWN on DEV (-0.379) and FLAT on HELD (-0.065). The head-to-head of 4.5 over 4.1 (SPAN-TOP, not capped by the score the way an edge against G is) is +0.195 (se 0.218) and -0.062 (se 0.175): pooled about **+0.07, se about 0.14**, where the slope below 4.1 (+1.4 to +2.2 an m/s) would give +0.6 to +0.9 over those 0.4 m/s. So **the slope above 4.1 is near zero on this evidence, and it is not the arms' ceiling against G that says so** (the head-to-head is free of it). The finders' speeds of 4.3 to 4.5 (league7100's is the bound itself) therefore look like a plateau and not a clamp **at the ceiling turn**; a bound of 4.5 does not bind there on either set (R6 FLAT twice). I do not say the same for a lower turn: **T25 is the other way on the two sets** (R6 UP on DEV +0.790, FLAT on HELD +0.463; saturation none on DEV and 4.10 on HELD), and it is the curve where a faster evade than the search could set might still pay.
+3. **The speed's size is set-dependent, as the turn's was.** T28 at G's speed (the GN arm) is +1.104 (DEV) and +1.764 (HELD), against +0.83 to +1.50 in the earlier sets (evade-turn, split, dose); at league7001's speed it is +3.096 and +3.027 (the split's SN: +2.69 and +2.63). So the speed adds +1.99 over 0.90 m/s on DEV and +1.26 on HELD (slopes +2.22 and +1.41), against the split's +1.8 to +2.1 on its HELD; it is the turn alone that moved most between sets, and the finders' speed lifts every set to about +3.0.
+4. **league7103's speed (3.55) is worth about +0.3**: +0.399 (DEV, z 1.8) and +0.265 (HELD, z 1.4), the split's +0.20: in the same direction on all three sets, never at the bar. It is consistent with "its speed is near G's and adds little" and not with "adds nothing".
+5. **No arm of the 24 on either set loses to G**; the largest negative edge on any arm is -0.005 (a slow evade with G's own turn).
+
+**What is NOT shown:** a mechanism (a faster boat is louder; nothing was read from events); a speed between 2.7 and 3.42 (the onset of the speed) or above 4.5 (the bound); the time (G's throughout) or a turn but 1.709, 2.5 and 2.8; whether T25 (and a lower turn) stays rising at the bound (the two sets disagree); anything against an opponent but G (`SUB_EVADE_OPPONENT_WIP.md`) or the seat.
