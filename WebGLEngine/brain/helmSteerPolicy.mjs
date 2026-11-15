@@ -17,18 +17,23 @@ import { mlpLayerCpu } from "../render/brainTsl.mjs";
 import * as HP from "./helmPolicy.mjs";
 import * as PFL from "./pflTopology.mjs";
 import { controlTopology } from "./pilotSubFish.mjs";
+import { createCore } from "./sparseRecurrent.mjs";
 
 export const POLICY_ID = "helmSteerPolicy", CONTROL_SEED = 4242;
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 const gauss = (rng) => { let u = 0, v = 0; while (!u) u = rng(); while (!v) v = rng(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
 
-/** A helm library over the wiring `topo` ({ NEURON_ORDER, EDGES: [toIdx, fromIdx] }): what brain/helmPolicy.mjs exports for the Giant Fiber Circuit, for this one. Frozen. */
-export function createHelmCircuit(topo) {
+/**
+ * A helm library over the wiring `topo` ({ NEURON_ORDER, EDGES: [toIdx, fromIdx] }): what brain/helmPolicy.mjs exports for the Giant Fiber Circuit, for this one. Frozen. `sparse: true` takes the recurrent steps over the connections only (brain/sparseRecurrent.mjs: the same float32 values, for a circuit
+ * of hundreds of neurons); layersOf() is the dense layers either way.
+ */
+export function createHelmCircuit(topo, { sparse = false } = {}) {
     if (!topo || !topo.NEURON_ORDER?.length || !topo.EDGES?.length) throw new Error("helmSteerPolicy.createHelmCircuit: a wiring is { NEURON_ORDER, EDGES: [toIdx, fromIdx] pairs }");
     const FEATURES = HP.FEATURES, OUTPUTS = HP.OUTPUTS, HIDDEN = topo.NEURON_ORDER.length, REC_STEPS = HP.REC_STEPS, REC_EDGES = topo.EDGES.length;
     for (const [to, from] of topo.EDGES) if (!Number.isInteger(to) || !Number.isInteger(from) || to < 0 || from < 0 || to >= HIDDEN || from >= HIDDEN) throw new Error(`helmSteerPolicy.createHelmCircuit: an edge names a neuron the wiring does not have ([${to}, ${from}] of ${HIDDEN})`);
     const REC_OFFSET = FEATURES * HIDDEN + HIDDEN, OUT_BASE = REC_OFFSET + REC_EDGES, WEIGHT_COUNT = OUT_BASE + HIDDEN * OUTPUTS + OUTPUTS, ZERO_HIDDEN = new Float32Array(HIDDEN), MEMO = new WeakMap();
-    const zeroWeights = () => new Float32Array(WEIGHT_COUNT);
+    const zeroWeights = () => new Float32Array(WEIGHT_COUNT), core = sparse ? createCore(HIDDEN, topo.EDGES) : null, VALS = new WeakMap(), OUT_B = OUT_BASE + HIDDEN * OUTPUTS;
+    function valsOf(w) { const m = VALS.get(w); if (m) { let k = 0; while (k < REC_EDGES && m.snap[k] === w[REC_OFFSET + k]) k++; if (k === REC_EDGES) return m.vals; } const snap = Float32Array.from(w.subarray(REC_OFFSET, REC_OFFSET + REC_EDGES)), vals = core.build(snap); VALS.set(w, { snap, vals }); return vals; }
     function layersOf(w) {
         const m = MEMO.get(w);
         if (m) { let k = 0; while (k < REC_EDGES && m.snap[k] === w[REC_OFFSET + k]) k++; if (k === REC_EDGES) return m.layers; }
@@ -42,9 +47,16 @@ export function createHelmCircuit(topo) {
     }
     /** features -> five numbers in [-1, 1]: the torque corrections about x, y and z, the throttle correction, and one that a helm does not read. */
     function forward(w, x) {
-        const layers = layersOf(w); let h = Float32Array.from(x);
-        for (let i = 0; i < layers.length - 1; i++) h = mlpLayerCpu(layers[i], h, 1);
-        const y = mlpLayerCpu(layers[layers.length - 1], h, 1);
+        let h, y;
+        if (core) {
+            const vals = valsOf(w); h = mlpLayerCpu({ nIn: FEATURES, nOut: HIDDEN, W: w.subarray(0, FEATURES * HIDDEN), b: w.subarray(FEATURES * HIDDEN, REC_OFFSET), act: "relu" }, Float32Array.from(x), 1);
+            for (let s = 0; s < REC_STEPS; s++) h = core.step(vals, h);
+            y = mlpLayerCpu({ nIn: HIDDEN, nOut: OUTPUTS, W: w.subarray(OUT_BASE, OUT_B), b: w.subarray(OUT_B, WEIGHT_COUNT), act: "none" }, h, 1);
+        } else {
+            const layers = layersOf(w); h = Float32Array.from(x);
+            for (let i = 0; i < layers.length - 1; i++) h = mlpLayerCpu(layers[i], h, 1);
+            y = mlpLayerCpu(layers[layers.length - 1], h, 1);
+        }
         return [Math.tanh(y[0]), Math.tanh(y[1]), Math.tanh(y[2]), Math.tanh(y[3]), Math.tanh(y[4])];
     }
     /** The helm for weights `w`: helm(rule, ctx) -> { torque, thrust }, brain/helmPolicy.mjs's contract and its arithmetic with this wiring's forward. With no enemy the rule's answer stands. */

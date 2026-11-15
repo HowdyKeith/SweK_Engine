@@ -18,6 +18,11 @@ import os from "node:os";
 import * as D from "../../brain/battleshipDuel.mjs";
 import * as TC from "../../brain/seatTurretCircuit.mjs";
 import * as HS from "../../brain/helmSteerPolicy.mjs";
+import * as HC from "../../brain/helmCompassPolicy.mjs";
+import * as SK from "../../brain/seatTrackGunner.mjs";
+
+/** The policies whose network can be flown over another wiring (`wiring: "control:<seed>"`), each with the module whose wiringOf() names it. */
+export const WIRED = Object.freeze({ gunnerPolicy: TC, helmSteerPolicy: HS, helmCompassPolicy: HC, seatTrackGunner: SK });
 
 /** A side from its plain description (see the header). A policy this fight does not seat is refused by name. */
 export function sideOf(spec) {
@@ -25,8 +30,9 @@ export function sideOf(spec) {
         if (!n) return null;
         const kind = D.PEER_POLICIES[n.policy]; if (!kind || kind.role !== role) throw new Error(`pairPool.sideOf: "${n.policy}" is not a ${role} policy this fight seats`);
         const other = n.wiring !== undefined && n.wiring !== "fly";
-        if (other && n.policy !== "gunnerPolicy" && n.policy !== "helmSteerPolicy") throw new Error(`pairPool.sideOf: only the turret seat's network (gunnerPolicy) and the steering helm (helmSteerPolicy) have another wiring to fly (got ${n.policy} with wiring ${n.wiring})`);
-        return { module: other ? (n.policy === "helmSteerPolicy" ? HS.wiringOf(n.wiring) : TC.wiringOf(n.wiring)) : kind.mod, weights: n.weights instanceof Float32Array ? n.weights : Float32Array.from(n.weights) };   // `wiring`: "control:<seed>" flies the same weights over a random circuit (brain/seatTurretCircuit.mjs)
+        const family = WIRED[n.policy];
+        if (other && !family) throw new Error(`pairPool.sideOf: only ${Object.keys(WIRED).join(", ")} have another wiring to fly (got ${n.policy} with wiring ${n.wiring})`);
+        return { module: other ? family.wiringOf(n.wiring) : kind.mod, weights: n.weights instanceof Float32Array ? n.weights : Float32Array.from(n.weights) };   // `wiring`: "control:<seed>" flies the same weights over a random circuit (brain/seatTurretCircuit.mjs)
     };
     return D.makeSide(spec.id, { gunners: spec.gunners ?? "regular", helmRule: spec.helmRule ?? "face", cannon: spec.cannon ?? true, network: net(spec.network, "seat"), helmNet: net(spec.helmNet, "helm") });
 }
