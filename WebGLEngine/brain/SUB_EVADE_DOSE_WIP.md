@@ -117,3 +117,49 @@ DEV is free to read; HELD (103001 to 103024) is not flown by this entry. The voi
 2. **B1's speed and time move the onset down by one step and add +1.5 to +1.7 at the middle and top doses; B2's add +0.27 at the top two and nothing below.** That is the split note's finding again, now with the turn as the variable: the speed carries the part the turn does not, and league7103's speed (3.55, near G's 3.42) has almost none to give.
 3. **Seats:** every arm below the onset has seat A at about +1.96 and seat B at about -1.94 (the G-against-G bias of the seat note); the arm's edge appears mostly in seat B, the seat that loses in G against G (A at 2.80: seat A +2.24, seat B +0.76, against a bias of +1.96 and -1.94, so the effect is about +0.3 in seat A and +2.7 in seat B; B1 at 2.80: +3.04 and +3.16, about +1.1 and +5.1).
 4. **What is NOT shown:** why 2.3 to 2.5 (a mechanism; the torpedo is evaded at some angle of the bearing that the grid does not resolve, which is a guess about the boat and not something read here); anything about turns above 2.8 (the bound); anything on geometries this set did not fly. R0 held, so HELD may be flown on Keith's word: `node tools/ship/takeEvadeDose.mjs held --write`.
+
+## HELD RESULT (2026-11-15; `node tools/ship/takeEvadeDose.mjs held --write`, geometries 103001 to 103024, flown ONCE, exit 0; record `brain/subEvadeDoseHeld.json`)
+
+Keith asked for it after the DEV read; R0 held on DEV. The void-checks passed (none printed). Nothing in the rules, the arms or the forecasts was changed between DEV and HELD.
+
+**R0 holds on HELD.** Ceiling arm of A (turn 2.8): **+0.969**, z 3.2, 31-0-17, FINDS. Ceiling arm of B1: **+2.639**, z 10.5, 43-1-4, FINDS.
+
+**The arms** (edge against G, both seats, 24 geometries; wins-draws-losses of the 48 duels; F = finds), with the DEV edge beside each:
+
+| dose (rad) | A: HELD (DEV) | B1: HELD (DEV) | B2: HELD (DEV) |
+|---|---|---|---|
+| 1.71 (G's own) | 0 (G) | +0.004 (+0.005) | +0.001 (+0.001) |
+| 1.90 | +0.005 (+0.006) | +0.013 (+0.014) | +0.006 (+0.007) |
+| 2.10 | +0.011 (+0.012) | +0.154, 25-0-23 (+0.027) | +0.013 (+0.014) |
+| 2.30 | +0.018 (+0.021) | +0.302, z 1.7, 26-0-22 (+0.900 F) | +0.151, 25-0-23 (+0.024) |
+| 2.50 | +0.157, z 1.2, 25-0-23 (+0.555 F) | **+1.894**, z 5.8, 38-0-10, F (+2.026 F) | +0.161, 25-0-23 (+0.562 F) |
+| 2.65 | **+0.831**, z 2.9, 30-0-18, F (+1.229 F) | **+2.699**, z 10.9, 44-0-4, F (+2.958 F) | **+1.104**, z 3.5, 32-0-16, F (+1.501 F) |
+| 2.80 | **+0.969**, z 3.2, 31-0-17, F (+1.498 F) | **+2.639**, z 10.5, 43-1-4, F (+3.097 F) | **+1.370**, z 4.2, 34-0-14, F (+1.769 F) |
+
+**R1 THRESHOLD:** A **2.65 (HIGH)**; B1 **2.50 (MID)**; B2 **2.65 (HIGH)** (on DEV: MID, MID, MID at 2.5, 2.3, 2.5). **R2 MONOTONE:** all three yes. **R3 SATURATION:** 2.65 on all three, as on DEV. Steps: A FLAT FLAT FLAT UP FLAT; B1 FLAT FLAT FLAT UP UP FLAT (the last step is +0.002, z 2.2: FLAT by the edge bar of Amendment A, which is what that bar is for); B2 FLAT FLAT FLAT FLAT UP FLAT. **Slope of A over the top three doses:** +2.71 a radian (DEV +3.14; section 1's 1.8). **B1 minus A** at 1.9 to 2.8: +0.007 +0.143 +0.285 +1.737 +1.868 +1.670. **B2 minus A:** +0.001 +0.002 +0.133 +0.004 +0.274 +0.401.
+
+**Forecasts, scored** (my probability for what I wrote; outcome on the printed quantity of HELD; "calls" is the probability I gave to what happened):
+
+| forecast | mine | outcome | calls |
+|---|---|---|---|
+| R0 holds on DEV | 92 | held | 92 |
+| R0 holds on HELD | 90 | held | 90 |
+| A threshold at most 2.5 (MID or LOW) | 65 | **no: 2.65** | 35 |
+| A threshold LOW (1.9 or 2.1) | 20 | no | 80 |
+| A monotone | 70 | yes | 70 |
+| A, B1 and B2 all monotone | 50 | yes | 50 |
+| B1 threshold lower than A's | 70 | yes (2.50 against 2.65) | 70 |
+| B1 above A at every dose from 2.1 | 80 | yes | 80 |
+| B2 within 0.5 of A at every dose | 55 | yes (largest +0.401) | 55 |
+| A saturates below 2.8 | 40 | yes (2.65) | 40 |
+
+**Nine of ten went as the larger side said; one miss, the one with the most weight: A's threshold.** The straight line of section 1 put the bar at 2.3 to 2.5 and I gave 65 to it; HELD put it at 2.65 (A at 2.5 is +0.157, z 1.2, 25-0-23; DEV had +0.555 there). The miss is of one grid step; DEV and HELD disagree by one step on each curve (DEV 2.5 / 2.3 / 2.5, HELD 2.65 / 2.5 / 2.65), because the edge between 2.3 and 2.65 is steep and the finding bar of z 2 at 24 geometries falls on different sides of it on two sets. The "40" for saturation and the "50" for all-monotone were not favoured by anything I knew and came out yes; I cannot say they were well-judged. The two "yes" with the most to lose (B1 above A, 80; A monotone, 70) came out yes.
+
+**What the two sets say together (post hoc, labelled as such: no rule reads two sets).**
+
+1. **The shape replicates.** The turn does nothing visible below about 2.1 to 2.3 on any curve (24-0-24 on both sets for every arm up to 2.1, and up to 2.3 on A and B2 on DEV), rises steeply between 2.3 and 2.65, and is flat from 2.65 to 2.8 on both sets and all three curves. The onset sits between 2.3 and 2.65 and the grid cannot place it closer, except that it moves with the strength of the arm (B1's is earlier on both sets, by one step).
+2. **The size of the effect is set-dependent;** the ceiling arm of A is +1.50 on DEV and +0.97 on HELD, B2's +1.77 and +1.37, B1's +3.10 and +2.64, each lower on HELD by 0.4 to 0.6: the pooled edge is about the half-way of the two.
+3. **B1 carries the speed's part at the top: B1 minus A is +1.7 at 2.5 to 2.8 on HELD (+1.5 to +1.7 on DEV); B2 minus A is +0.27 to +0.40 at the top two doses (+0.27 on DEV).** The speed of league7001 is worth about 1.7 edge points on top of the turn and league7103's about 0.3: the split note's finding, now with the turn varied.
+4. **Seats:** G's seat bias on HELD (the seat edges of the flat arms, +0.84 and -0.83) is smaller than on DEV (+1.96 and -1.94), so the set matters to it as much as to the edge; the effect of the turn shows mostly in seat B in both.
+
+**What is NOT shown:** a mechanism for the onset; doses above 2.8 or between the grid points; a curve for any other finder, speed or time; the straight-line extrapolation of section 1 is not borne out by either set (the edge is flat and then steep, with a slope of 2.7 to 3.1 over the top three).
