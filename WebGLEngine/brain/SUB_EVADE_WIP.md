@@ -87,3 +87,14 @@ Why these and not others, so that a miss can be read: the three families found b
 ## 7. Cost
 
 25 arms of 48 duels is 1,200 duels a set, the size of the Part A tournament without its seat passes: about a minute or two on one core for the PD sides, the same on DEV and on HELD. The command, its gate and a sabotage pass (the league gate's 205 mutants took a few tens of minutes on four cores) are the work.
+
+## AMENDMENT A (2026-11-15; made while the command `tools/ship/takeEvadeTurn.mjs` was written and smoke-run on geometries 1 to 4, BEFORE any DEV geometry (98001 to 98024) or HELD geometry (99001 to 99024) was flown)
+
+None of this changes a rule, a bar, a count, an arm or a forecast of sections 2 to 5; it fills in what the registration left unsaid, and it is written here so that it is dated before any data.
+
+1. **Fewer than 3 finders.** "Most" (at least n' - 1 of n') and "few" (at most 1) overlap when n' is 2 or less, so a label there would contradict itself. **For n' below 3 the four labels are `n/a`** and the command prints them so; R0 fails at n' below 4 in any case, and the readings of the note are then not made. For n' of 3 or more nothing is different.
+2. **What the command does.** `smoke` flies geometries 1 to 4 and is never recorded. `dev` flies 98001 to 98024 and prints; it may be run without `--write` (DEV is free to read) and `dev --write` records `brain/subEvadeDev.json` once (a second record is refused). `held --write` is the only way to fly 99001 to 99024: it refuses without `--write`, refuses if `brain/subEvadeHeld.json` exists, and refuses unless `brain/subEvadeDev.json` exists, is a record of the `dev` set (not of smoke) and says R0 held. The record's `set` is the set that was flown.
+3. **The two extra flights of the void-checks.** Section 4 lists a check that G with its own triple has an edge of exactly 0 against G and one that an unmodified finder's edge equals the same `matchup` called on the finder directly. They are flown with the arms: one identity matchup and five direct ones a set (six more matchups, 25 percent more duels). A failed check is printed, not weighed, makes the exit code 1, and the record is still written (as in the other commands).
+4. **Printed besides the rules** (all of it for reading, none of it a rule): each arm's edge in seat A and in seat B; the median share of the finder's own edge for GT, LT, GN and LN over F'; and the median edge of each kind over the five (the forecast "the median GT edge is at least half the median U edge" is read from the last line).
+5. **What smoke is and is not.** Geometries 1 to 4 are among the geometries (1 to 8) on which every league and exploiter was TRAINED, so the smoke output says the command runs and says nothing about the claim; I saw it (all 25 arms flew, the checks passed) and **the forecasts of section 5 stand as written and will be scored as written.**
+
