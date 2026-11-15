@@ -10,8 +10,8 @@ What each round is and its status (updated as the rounds finish):
 | 2 | Zhao's EMD, LPLC2 and Giant Fiber model, and a variant with the LPLC2 units on the measured lattice | `brain/flyEmdLplc2Gf.mjs`, `-selfcheck.mjs` | DONE |
 | 3 | Stealth stimuli on the fly models (predictions registered first) | `brain/stealthLoomStimuli.mjs`, `brain/stealthRound3-run.mjs`, `brain/stealthRound3-results.txt` | DONE: NOT SUPPORTED |
 | 4 | Luan's crab MLG1 looming-localization network | `brain/crabMlg1.mjs`, `-selfcheck.mjs` | DONE (one paper result NOT reproduced) |
-| 5 | Stealth stimuli on the crab model (predictions registered first) | | |
-| 6 | The Escape task against a camouflaged predator (registered first) | | |
+| 5 | Stealth stimuli on the crab model (predictions registered first) | `brain/stealthRound5-run.mjs`, `brain/stealthRound5-results.txt` | DONE: NOT SUPPORTED (opposite direction) |
+| 6 | Warning margin against a camouflaged predator, in place of the Escape task (registered first) | `brain/stealthRound6-run.mjs`, `brain/stealthRound6-results.txt` | DONE: NOT SUPPORTED |
 
 ## Round 1: Santon's motion-detector analysis (DONE)
 
@@ -130,3 +130,22 @@ Moving over plain: alarm size ratio 0.595 and 0.456, spike ratio 1.32 and 1.66. 
 4. Crab with moving stripes: an alarm at EVERY contrast including 0.2 (the stripes trigger the alarm whatever the ellipse's contrast, from Round 5) (60%): the display would then ALERT the crab model to a predator it would otherwise miss.
 5. At contrast 1 the plain ellipse's margin is at least T_min for both detectors (85%).
 **Verdict rule (per detector).** CAMOUFLAGED if at some contrast the plain ellipse's margin is at least T_min and the moving-stripe margin is MISSED or under T_min, or lower by 20 percent or more; BETRAYS if at some contrast the moving stripes are detected where the plain ellipse is MISSED, or give a margin 20 percent or more LONGER; otherwise NEUTRAL. **Overall: SUPPORTED iff at least one detector is CAMOUFLAGED and none BETRAYS; NOT SUPPORTED if no detector is CAMOUFLAGED.** My prior that the overall result is SUPPORTED: 15 percent (Rounds 3 and 5 pointed the other way). Predictions 1 to 5 are reported as hits and misses and do not decide.
+
+## Round 6 RESULTS (run 2026-11-15 with `node brain/stealthRound6-run.mjs`; raw table in `brain/stealthRound6-results.txt`)
+
+Warning margin (milliseconds to collision at the first alarm; MISSED = no alarm):
+
+| contrast | fly plain | fly moving | crab plain | crab moving |
+|---|---|---|---|---|
+| 1 | 183 | 183 | 2798 | 6131 |
+| 0.6 | 183 | 183 | 2231 | 6131 |
+| 0.4 | 183 | 183 | 1665 | 6131 |
+| 0.2 | 183 | 183 | 1065 | 4165 |
+
+**VERDICT: NOT SUPPORTED.** No detector is CAMOUFLAGED (T_min 100 ms fly, 300 ms crab, both assumed). Fly: NEUTRAL, the margin is identical at every contrast and with or without the moving stripes. Crab: BETRAYS, the moving stripes give a margin 2.2 to 3.9 times LONGER than the plain ellipse's at every contrast (the crab network alarms to the stripes early), so in this model the display warns the prey more, not less.
+**Predictions:** 1 MISS (the fly array is never missed, even at contrast 0.2; the margin is constant, which satisfies "non-increasing" but not "missed at 0.2"). 2 untested (nothing was missed, so the condition is vacuous). 3 MISS (the crab's plain margin falls steadily, 2798, 2231, 1665, 1065 ms, but it is never missed, even at 0.2). 4 HIT (alarms at every contrast with the stripes). 5 HIT (183 and 2798 ms against T_min).
+**Two readings to hold loosely.** (a) The fly array's insensitivity to contrast over 0.2 to 1 is probably the assumed luminance scale (0 to 255 grey levels against thresholds L0 = L1 = 2): a dim edge still clears a threshold of 2 grey levels. It is not a finding about a fly; a different scale or a noise floor would change it (NOT TESTED). (b) The crab margins are long (seconds) because the model alarms while the ellipse is under 20 degrees (Rounds 4 and 5), and it alarms on a receding ball; they are not a measure of a crab's real warning time.
+**The whole series in one line:** across Rounds 3, 5 and 6, none of the three models (Zhao's fly array, its surround and lattice variants, Luan's crab network) is fooled by the cuttlefish's moving stripes the way the real crabs were; the fly array is partly fooled at the fast approach only (Round 3, 0.756), and the crab network is alerted by them. That is a statement about these model implementations with their assumptions, not about the animals.
+
+## Series NOT CHECKED (all rounds)
+The authors' code for Zhao and Luan; the recorded hunting videos and the animal data beyond the figures read off the plot; Wu et al. 2016 for LC4's receptive field; ModelDB for W_i1; the lattice-to-angle calibration (5 degrees per column is assumed); T_min (assumed); a surround strength other than kappa 1; stripe onset other than at the first frame; whether the crab model's receding-ball alarm is a transcription error of mine or a property of the equations as printed.
