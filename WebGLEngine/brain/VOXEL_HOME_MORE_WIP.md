@@ -50,3 +50,50 @@ The run is resumable.
 ## 7. The run (to be written; the gate never runs it and never gives the command the word `run`)
 `node tools/ship/takeVoxelHomeMore.mjs run` -> `brain/voxelHomeMoreRound.jsonl`, committed byte for byte before it is read;
 `node tools/ship/takeVoxelHomeMore.mjs read` prints the checks and the reading.
+
+## 8. The result (run 2026-11-15 in the sandbox, 90.0 minutes; `brain/voxelHomeMoreRound.jsonl` committed at 19040f8e before it was read; read once)
+**The checks hold.**
+
+| cell | mean share built | sd | least | most | homes (16 x 200 builds) | read against | gain |
+|---|---|---|---|---|---|---|---|
+| HUGE FLY | 0.7327 | 0.0148 | 0.7101 | 0.7575 | 4 | round 5's MANY FLY 0.7140 | +0.019 |
+| HUGE PLAIN | 0.7608 | 0.0122 | 0.7387 | 0.7819 | 4 | round 5's MANY PLAIN 0.7452 | +0.016 |
+| SLOW FLY | 0.7141 | 0.0112 | 0.6929 | 0.7326 | 1 | round 2's FLY 0.6664 | +0.048 |
+| SLOW PLAIN | 0.7450 | 0.0140 | 0.7198 | 0.7667 | 8 | round 2's PLAIN 0.6905 | +0.055 |
+| 16 random builders | 0.5722 | | | | 0 | | |
+| the lean, no network | 0.9226 | | | | 123 of 200 | | |
+
+* **H-FLY: FOUR TIMES THE BUILDERS AGAIN BUILDS MORE OF A HOME** (the ranks sum to 343, the middle 264; exact two-sided p 0.0022)
+  and **H-PLAIN: FOUR TIMES THE BUILDERS AGAIN BUILDS MORE OF A HOME** (340; p 0.0034).
+* **L-FLY: A SMALLER STEP FOR FOUR TIMES AS LONG BUILDS MORE OF A HOME** and
+  **L-PLAIN: A SMALLER STEP FOR FOUR TIMES AS LONG BUILDS MORE OF A HOME** (all 16 above all 16 of round 2's; 392; p 3.3e-9).
+
+**More builders still helps, and by less.** 24 to 96 gave 0.048 and 0.055 (round 5); 96 to 384 gives 0.019 and 0.016, at four
+times the cost again.
+
+**The smaller step was "a quarter of the distance", as round 5's note said it might be.** Given four times the iterations it
+builds 0.048 and 0.055 more than round 2 -- **and lands where 96 builders for 150 iterations did, to four places** (FLY 0.7141
+beside 0.7140, PLAIN 0.7450 beside 0.7452), at the same cost (each tries four times round 2's builders in all). That agreement
+is described, not tested, and may be chance; what it suggests is that this trainer's result on this task is set by how many
+builders it has tried and how finely it steps, not by which of the two it spends the budget on. Both are well above round 2's
+step run for 1,000 iterations (round 3: 0.687 and 0.701 at 6.7 times the cost): a large step for a long time is the poor way to
+spend it.
+
+**It is still half way, and seventeen homes.** The best cell stands 0.54 of the way from a random builder to the lean. 17 homes
+in 12,800 builds, the most by one builder 4. Round 6's builders, given the lean, finish 188 of 200.
+
+**The history: all four still falling at every reading, each last step under a hundredth.**
+
+| cell | 1st reading | 2nd | 3rd | 4th | 5th | 6th | last |
+|---|---|---|---|---|---|---|---|
+| HUGE FLY (iterations 0 to 149) | 0.4091 | 0.3220 | 0.2740 | 0.2549 | 0.2386 | 0.2291 | 0.2233 |
+| HUGE PLAIN | 0.4096 | 0.3168 | 0.2651 | 0.2300 | 0.2092 | 0.1950 | 0.1900 |
+| SLOW FLY (iterations 0 to 599) | 0.4358 | 0.3202 | 0.2766 | 0.2642 | 0.2562 | 0.2470 | 0.2425 |
+| SLOW PLAIN | 0.4443 | 0.3091 | 0.2584 | 0.2316 | 0.2182 | 0.2074 | 0.2037 |
+
+**The expectations against what came.** HUGE more, either arm (75) and both (60); SLOW more, either (60) and both (45): all
+came. The best cell above 0.80 (40): no, 0.76. Any home (60): 17. More than ten in a cell (15): the most is 8.
+
+**What this does not say** (section 5): the best setting; what another trainer would do (not in this round, and still open);
+anything about the fly's wiring. **What the seven rounds say together:** from nothing, this trainer climbs slowly toward a rule
+a person can write in a line, and more budget buys less each time; given that rule, it improves on it within 25 iterations.

@@ -9,13 +9,17 @@
 //   2  ONE TRAINING          each setting's numbers reach the trainer
 //   3  THE RECORDS           the checks, each failing by name; each test against its own control and no other
 //   4  THE COMMAND           its words as arithmetic; it is this round's and reads both earlier files; no training of the round's, no process
+//   5  THE VERDICT           the committed results, read from the file: the four tests, the cells beside rounds 2, 3 and 5, the homes, the history, the expectations
 // SABOTAGE LOG (2026-11-15) -- through a byte-safe runner (one at a time, every file restored and its sha256 checked), this gate and round 1's run whole for each; every one red by name (the number is the rows):
 //   M1 HUGE 96 builders 2 | M2 SLOW 150 iterations 6 | M3 SLOW round 2's step 2 | M4 HUGE read against round 5's SMALL 5 | M5 HUGE read against round 2 5 | M6 a control takes any setting's draws 4
 //   M7 every test reads HUGE's control 2 | M8 every test reads the FLY control 1 | M9 MORE and LESS each other's 3 | M10 the tests made with a check failed 1 | M11 the controls not checked 2
 //   M12 the recipe not checked 1 | M13 every training HUGE's round 1 | M14 the recheck any cell's 1 | M15 the command hands every setting round 2's file 1
 //   M16 the command exits 0 on a word it does not know 1 (round 1's gate) | M17 writes round 5's results file 1 | M18 a history may end anywhere 1
+//   THE VERDICT'S (section 5, 2026-11-15), this gate run whole for each, every one red by name: V1 a HUGE FLY score in the file lowered to 0.60 4 | V2 a SLOW PLAIN builder's homes made 9 3
+//   V3 a round 5 MANY PLAIN score in round 5's file raised to 0.90 4 | V4 MORE and LESS each other's 6 | V5 HUGE read against round 5's SMALL 8 | V6 the note's H-FLY says CANNOT 1 | V7 the note's L-PLAIN says LESS 1
 "use strict";
 import fs from "node:fs";
+import { createHash } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as V from "./voxelHomeMore.mjs";
@@ -118,6 +122,34 @@ section(() => {
     const me = src("tools/ship/voxelHomeMore-selfcheck.mjs"), calls = [...me.matchAll(/V2?\.trainOne\(([^)]*)\)/g)].map((m) => m[1]);
     ok("!! THIS GATE STARTS NO TRAINING OF THE ROUND'S AND LEAVES ITS RESULTS FILE AS IT WAS: its trainings are of 1 to 4 iterations with 4 or 16 builders on draw 901 or refused before they start; this gate starts no process at all; and the file's size and time are what they were before this section",
         calls.length === 5 && calls.every((c) => /901, TINY(_HUGE|_SLOW)?, TINY_AUDIT$/.test(c)) && TINY_HUGE.pop === 16 && TINY_SLOW.iters === 4 && !V.SEEDS.includes(901) && !/Sync\(/.test(me.replace(/readFileSync\(|statSync\(|existsSync\(/g, "")) && stateOf() === before, `${calls.length} trainings, no process, the file ${before === "absent" ? "absent" : "unchanged"}`);
+});
+
+console.log("\n5. THE VERDICT (round 7; the results were committed at 19040f8e before they were read, and are read here from the file)");
+section(() => {
+    const parse = (f) => src(f).split("\n").filter(Boolean).map((l) => JSON.parse(l)), bytes = fs.readFileSync(path.join(ENG, V.RESULTS)), lines = parse(V.RESULTS), befores = { HUGE: parse(V.BEFORES.HUGE.file), SLOW: parse(V.BEFORES.SLOW.file) }, R = V.reading(lines, befores), near = (a, b, e = 5e-5) => Math.abs(a - b) < e, T = R.tests, C = R.cells, K = R.control;
+    ok("!! the results file is the one the run wrote: 65 records, sha256 bd82e61f1d4b8776...", lines.length === 65 && createHash("sha256").update(bytes).digest("hex") === "bd82e61f1d4b8776517e532c32874572dbb92530588132cfd3e73ee00e23d281");
+    ok("!! THE CHECKS HOLD: 64 draws each once, each setting's recipe, each arm's weight count and wiring, SLOW FLY draw 1 the same twice, a history to each setting's last iteration, round 5's 16 MANY draws an arm and round 2's 16 an arm", R.checks.length === 0, R.checks.slice(0, 2).join(" | "));
+    ok("!! *** L-FLY AND L-PLAIN: A SMALLER STEP FOR FOUR TIMES AS LONG BUILDS MORE OF A HOME *** -- the quarter step for 600 iterations: every one of the 16 builders of each arm above every one of round 2's 16 (the ranks sum to 392; exact two-sided p 3.3e-9, twice). At 150 iterations (round 5) the same step could not be told apart from round 2's",
+        T["L-FLY"].word === V.WORDS.SLOW[0] && T["L-PLAIN"].word === V.WORDS.SLOW[0] && T["L-FLY"].sumA === 392 && T["L-PLAIN"].sumA === 392 && T["L-FLY"].p < 4e-9);
+    ok("!! *** H-FLY AND H-PLAIN: FOUR TIMES THE BUILDERS AGAIN BUILDS MORE OF A HOME *** -- 384 builders tried against round 5's 96: FLY's ranks sum to 343 (p 0.0022), PLAIN's to 340 (p 0.0034); it speaks, and the gain is a third of what 24 to 96 gave", T["H-FLY"].word === V.WORDS.HUGE[0] && T["H-PLAIN"].word === V.WORDS.HUGE[0] && T["H-FLY"].sumA === 343 && near(T["H-FLY"].p, 0.002248, 5e-6) && T["H-PLAIN"].sumA === 340 && near(T["H-PLAIN"].p, 0.003426, 5e-6));
+    ok("!! the cells' mean share of a home built, 16 draws each (mean, sd), beside what each is read against: HUGE FLY 0.7327 0.0148 (round 5's MANY 0.7140) and HUGE PLAIN 0.7608 0.0122 (0.7452): +0.019 and +0.016; SLOW FLY 0.7141 0.0112 (round 2's 0.6664) and SLOW PLAIN 0.7450 0.0140 (0.6905): +0.048 and +0.055",
+        near(C["HUGE FLY"].mean, 0.7327) && near(C["HUGE FLY"].sd, 0.0148) && near(C["HUGE PLAIN"].mean, 0.7608) && near(C["HUGE PLAIN"].sd, 0.0122) && near(C["SLOW FLY"].mean, 0.7141) && near(C["SLOW FLY"].sd, 0.0112) && near(C["SLOW PLAIN"].mean, 0.7450) && near(C["SLOW PLAIN"].sd, 0.0140) &&
+        near(K["HUGE FLY"].mean, 0.7140) && near(K["HUGE PLAIN"].mean, 0.7452) && near(K["SLOW FLY"].mean, 0.6664) && near(K["SLOW PLAIN"].mean, 0.6905) && near(C["HUGE FLY"].mean - K["HUGE FLY"].mean, 0.0187, 5e-4) && near(C["HUGE PLAIN"].mean - K["HUGE PLAIN"].mean, 0.0156, 5e-4));
+    const r3 = parse("brain/voxelHomeLongRound.jsonl").filter((r) => r.kind === "draw"), m3 = (a) => r3.filter((r) => r.arm === a).reduce((n, r) => n + r.score, 0) / 16;
+    ok("!! *** DESCRIBED, NOT TESTED: THE SMALLER STEP FOR 600 ITERATIONS LANDS WHERE 96 BUILDERS FOR 150 DID, AT THE SAME COST *** -- SLOW's FLY 0.7141 beside round 5's MANY FLY 0.7140, SLOW's PLAIN 0.7450 beside 0.7452 (each within two ten-thousandths; each four times round 2's builders tried in all) -- and well above round 2's step run for 1,000 iterations (round 3: FLY 0.6869, PLAIN 0.7010, at 6.7 times round 2's cost)",
+        Math.abs(C["SLOW FLY"].mean - K["HUGE FLY"].mean) < 2e-4 && Math.abs(C["SLOW PLAIN"].mean - K["HUGE PLAIN"].mean) < 3e-4 && V.RECIPES.SLOW.pop * V.RECIPES.SLOW.iters === V5.RECIPES.MANY.pop * V5.RECIPES.MANY.iters && near(m3("FLY"), 0.6869) && near(m3("PLAIN"), 0.7010) && C["SLOW FLY"].mean > m3("FLY") + 0.025 && C["SLOW PLAIN"].mean > m3("PLAIN") + 0.04);
+    const rm = R.floors.random.reduce((a, b) => a + b, 0) / 16, way = (m) => (m - rm) / (R.floors.lean - rm), draws = lines.filter((r) => r.kind === "draw");
+    ok("!! STILL HALF WAY, AND SEVENTEEN HOMES: the best cell (HUGE PLAIN, 0.7608) stands 0.54 of the way from a random builder to the lean; the four cells finish 4, 4, 1 and 8 homes of their 3,200 builds (the most by one builder: 4, a SLOW PLAIN), where the lean alone finishes 123 of 200 and round 6's builders 188",
+        near(way(C["HUGE PLAIN"].mean), 0.5382, 5e-4) && C["HUGE FLY"].homes === 4 && C["HUGE PLAIN"].homes === 4 && C["SLOW FLY"].homes === 1 && C["SLOW PLAIN"].homes === 8 && C["SLOW PLAIN"].bestHomes === 4 && draws.reduce((n, r) => n + r.homes, 0) === 17 && R.floors.leanHomes === 123);
+    const H = (c) => C[c].history.map((h) => h.missing);
+    ok("!! THE HISTORY: BOTH STILL FALLING, SLOWLY -- every cell's share missing on the trainer's own battery falls at every reading to the last: HUGE FLY 0.4091 to 0.2233, HUGE PLAIN 0.4096 to 0.1900, SLOW FLY 0.4358 to 0.2425 (at iteration 599), SLOW PLAIN 0.4443 to 0.2037; the last step of each is under a hundredth",
+        Object.keys(C).every((c) => H(c).length === 7 && H(c).every((v, i) => i === 0 || v < H(c)[i - 1]) && H(c)[5] - H(c)[6] < 0.01) && near(H("HUGE FLY")[0], 0.4091) && near(H("HUGE FLY")[6], 0.2233) && near(H("HUGE PLAIN")[6], 0.1900) && near(H("SLOW FLY")[6], 0.2425) && near(H("SLOW PLAIN")[6], 0.2037) && C["SLOW FLY"].history[6].it === 599 && C["HUGE FLY"].history[6].it === 149);
+    const again = V.CELLS.flatMap(([x, a]) => [3, 14].map((s) => { const r = draws.find((d) => d.setting === x && d.arm === a && d.s === s), p = V.policyOf(a, s); p.setParams(PF.unpackWeights(r.weights)); const au = V.auditScore(p); return [x, a, s, au.score === r.score && au.homes === r.homes]; }));
+    ok("!! THE WEIGHTS IN A RECORD GIVE ITS SCORE AND ITS HOMES AGAIN: draws 3 and 14 of every cell, audited here on the 200 plans, to the bit", again.every((x) => x[3]), again.filter((x) => !x[3]).map((x) => x.slice(0, 3).join(" ")).join(", "));
+    const note = src("brain/VOXEL_HOME_MORE_WIP.md"), res = note.slice(note.indexOf("## 8. The result"));
+    ok("the expectations, written before the tool, against what came: HUGE more in either arm was given 75 percent and in both 60; SLOW more in either 60 and in both 45 -- all four came; the best cell above 0.80 was given 40 and is 0.76; any home 60, and there are 17; more than ten homes in a cell 15, and the most is 8",
+        /HUGE builds more than 96 did, either arm: about 75 percent; both: about 60/.test(note) && /SLOW builds more than round 2, either arm: about 60\s+percent; both: about 45/.test(note) && /above 0\.80: about 40 percent/.test(note) && /more than ten homes in a cell's 3,200 builds: about 15/.test(note) && Math.max(...Object.values(C).map((c) => c.mean)) < 0.80 && Math.max(...Object.values(C).map((c) => c.homes)) <= 10);
+    ok("the registration's RESULT SECTION (section 8, and not the list of possible words in section 2) carries the four readings' words", /## 8\. The result/.test(note) && Object.entries(T).every(([name, t]) => res.includes(`**${name}: ${t.word}**`)));
 });
 
 console.log(`\nvoxelHomeMore-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILED"}`);
