@@ -146,3 +146,63 @@ DEV is free to read; HELD (111001 to 111048) was authorised by Keith for after t
 4. **G's seat bias on this set** (the flat arms' seat edges, +1.41 and -1.38) is between the earlier sets' +0.84 and +1.96, as the seat note found G's bias varying across sets.
 
 **What is NOT shown:** a mechanism; any HELD read; a speed below 2.7 or above 4.5 on ON, a turn but 2.3, 2.5, 2.65 and 2.8, or the time (G's throughout); anything against an opponent but G. R0 held and no check failed, so HELD may be flown.
+
+## HELD RESULT (2026-11-15; `node tools/ship/takeEvadeSpeedFine.mjs held --write`, geometries 111001 to 111048 (96 duels an arm), flown ONCE, exit 0; record `brain/subEvadeSpeedFineHeld.json`: 24 arms, 19 steps, 4 spans)
+
+Keith asked for it with the DEV flight ("fly DEV and then HELD once DEV is complete"); R0 held on DEV and no check failed. The void-checks passed on HELD too (none printed). Nothing in the rules, the arms or the forecasts was changed between DEV and HELD (Amendment A is dated before DEV).
+
+**R0 holds on HELD.** T28 at league7001's speed (4.32): **+2.794**, z 18.0, 89-1-6, FINDS; ON at G's own speed (the GN arm): **+0.965**, z 4.6, 62-0-34, FINDS.
+
+**Part A, the onset (turn 2.8), HELD with the DEV edge beside each:**
+
+| speed (m/s) | HELD edge, z, w-d-l | DEV edge |
+|---|---|---|
+| 2.70 | +0.021 (11.8), 48-0-48 | +0.017 |
+| 2.80 | +0.090 (1.3), 49-0-47 | +0.020 |
+| 2.90 | +0.224 (2.0), 51-0-45 | +0.090 |
+| 3.00 | +0.359 (2.5), 53-0-43 | +0.225 |
+| 3.10 | **+0.626** (3.4), 57-0-39, F | +0.228 |
+| 3.20 | **+0.563** (3.2), 56-0-40, F | **+0.563** F |
+| 3.30 | **+0.829** (4.1), 60-0-36, F | **+0.566** F |
+| 3.42 (G's) | **+0.965** (4.6), 62-0-34, F | **+0.967** F |
+
+**RA1 ONSET: MID (3.10)** (DEV: MID, 3.20). **RA2 MONOTONE: yes** (a step of -0.063, z -1.0, at 3.20 over 3.10 is FLAT). **RA3 SHAPE: RAMP** (the rise +0.944, the largest step's rise +0.266, 0.28 of it; DEV +0.950 and 0.42). **RA4 BELOW G: yes.** **Slope of ON from 2.70 to G's speed: +1.31** edge points an m/s (DEV +1.32). Steps: UP at 3.10 over 3.00 (+0.266, z 2.1) and 3.30 over 3.20 (+0.266, z 2.1), the other five FLAT.
+
+**Part B, the top at lower turns, HELD (DEV in brackets for the edge at the bound and the span):**
+
+| turn | 3.80 | 4.10 | 4.32 | 4.50 | threshold | SPAN-TOP (4.5 over 4.1) |
+|---|---|---|---|---|---|---|
+| T23 (2.3) | +0.092 | +0.364 (z 2.7) | **+0.630** F | **+0.700** F (+0.637) | **4.32** (DEV 4.50) | **UP** +0.335, z 2.5 (DEV +0.470) |
+| T25 (2.5) | **+0.663** F | **+1.068** F | **+1.797** F | **+2.193** F (+2.096) | **3.80** (DEV 4.10) | **UP** +1.122, z 5.1 (DEV +0.859) |
+| T265 (2.65) | **+1.798** F | **+2.526** F | **+2.790** F | **+2.921** F (+3.024) | 3.80 (DEV 3.80) | **UP** +0.360, z 2.2 (DEV +0.525) |
+| T28 (2.8) | **+2.163** F | **+2.730** F | **+2.794** F | **+2.962** F (+3.030) | 3.80 (DEV 3.80) | FLAT +0.073, z 0.5 (DEV +0.102) |
+
+**RB1 THRESHOLD:** T23 4.32, T25 3.80, T265 3.80, T28 3.80. **RB2 THE TURN SETS THE THRESHOLD: yes.** **RB3** as in the table. **RB4 THE BOUND BINDS AT LOWER TURNS: YES (3 of 3 lower turns UP)**, as on DEV. **RB5 THE PLATEAU AT THE CEILING TURN: yes**, as on DEV. **B minus T28** at 3.80, 4.10, 4.32, 4.50: T23 -2.071 -2.366 -2.164 -2.262; T25 -1.501 -1.663 -0.998 -0.769; T265 -0.366 -0.204 -0.004 -0.041.
+
+**Forecasts, scored** (my probability; outcome on the printed quantity of HELD; "calls" is the probability I gave to what happened):
+
+| forecast | mine | outcome | calls |
+|---|---|---|---|
+| R0 holds on DEV | 88 | held | 88 |
+| R0 holds on HELD | 86 | held | 86 |
+| RA1: the onset is MID (3.0 to 3.2) | 50 | yes (3.10) | 50 |
+| RA1: the onset is LOW (2.7 to 2.9) | 15 | no | 85 |
+| RA1: the onset is HIGH (3.3 or G's) | 35 | no | 65 |
+| RA2: ON is MONOTONE | 80 | yes | 80 |
+| RA3: the shape is a RAMP | 65 | yes | 65 |
+| RB2: the turn sets the speed threshold | 80 | yes | 80 |
+| **RB4: the bound binds at lower turns** | **40** | **yes (3 of 3)** | **40** |
+| RB5: the plateau at the ceiling turn | 85 | yes | 85 |
+| the arm of T23 at the bound finds | 55 | yes (+0.700) | 55 |
+
+**Ten of eleven went as the larger side said; the miss is the one I flagged as the question: RB4, the bound binding at lower turns (40), came out YES on both sets, 3 of 3 each time.** I leaned against it because the speed note's two sets had disagreed on the turn-2.5 span (UP on DEV, FLAT on HELD); with 48 geometries that span is **UP at z 4.2 and z 5.1 on the two sets** (+0.86, +1.12), so the earlier HELD FLAT (+0.463, z 1.8 on 24 geometries) was the noisy reading. MID at 50 was the most likely of three onset zones, and the near-coins (MID, RAMP at 65, T23 at the bound at 55) fell on the side I leaned to.
+
+**What the two sets say together (post hoc, labelled as such: no rule reads two sets).**
+
+1. **The onset of the speed is a ramp that begins near 2.7 to 2.8 and crosses the finding bar between 3.1 and 3.2.** The two sets' edges pooled are about +0.02 (2.7), +0.06 (2.8), +0.16 (2.9), +0.29 (3.0), +0.43 (3.1), +0.56 (3.2), +0.70 (3.3) and +0.97 (G's 3.42): a rise of +0.95 over 0.72 m/s, **a slope of +1.31 to +1.32 an m/s on each set**. HELD's curve sits about 0.1 m/s earlier than DEV's (the arms at 2.8, 2.9 and 3.0 on HELD have DEV's edges of the next speed up), and the staircase DEV showed (pairs of speeds with one edge) is not there on HELD; it is a feature of the set. **Neither set shows a JUMP**; the onset has no one place, and the 0.1 m/s grid cannot resolve the stair-steps (a few duels at a time, 48 to 62 of 96 on DEV).
+2. **Below the ceiling turn the speed still pays up to the bound, on both sets:** 4.5 beats 4.1 head-to-head at 2.3, 2.5 and 2.65 on both (+0.47 and +0.34; +0.86 and +1.12; +0.53 and +0.36, each at z of 2.2 or more) and not at 2.8 (+0.10 and +0.07, pooled about +0.09, se about 0.11). **The finders' 4.3 to 4.5 reads as a clamp at the turns below 2.8 and a plateau at 2.8.** At turn 2.5 the gain over the last 0.4 m/s (+0.86, +1.12) is as large as the slope below it (about 2 an m/s). A reading that the bound binds there does not say how much a faster evade would pay: the arms of T265 and T28 are at the cap of the score against G (91-1-4 and 91-2-3), and only the head-to-head spans see past it.
+3. **The turn sets where the speed starts to find:** thresholds 3.80, 3.80, 3.80 / 4.10, 4.50 (DEV) and 3.80, 3.80, 3.80 / 4.32 (HELD) for turns 2.8, 2.65 (2.5 on HELD) ... with 4.32 or 4.50 the first speed that finds at turn 2.3 on both sets, T25's one place earlier on HELD (3.80 against 4.10). The two sets agree to within a place on all four, which is more than the dose note's turn thresholds did (one step apart on every curve).
+4. **A hypothesis this suggests and does not test:** league7100, the best finder in the mirror of `SUB_EVADE_OPPONENT_WIP.md`, has an evadeSpeed of exactly the bound (4.5) and an evadeTurn of 2.70, between T265 (where the bound binds) and T28 (where it does not); league7001 (4.32, 2.8) is the one it beat on both sets. Nothing here is a head-to-head of those two, and their other ten numbers differ; it is a reason to read G with each pair of (speed, turn) head-to-head, not a finding.
+5. **Not a coincidence worth checking, but one worth saying:** G's own speed arm (ON at 3.42) has the same record on the two sets (62-0-34, +0.967 and +0.965) and the arm at 3.20 too (56-0-40, +0.563 on both): the two sets have different seat edges (+1.42 and +2.11 for the arm at 3.42) and different records at the other speeds, so they are two sets, and equal win counts at two of the eight points, at a standard error of 0.2, are chance.
+
+**What is NOT shown:** a mechanism; whether the clamp at turns below 2.8 means a doctrine with a faster evade than 4.5 would win (nothing above 4.5 can be flown here: `THETA_BOUNDS` is a shared file this note does not edit); a speed below 2.7, the time (G's), a turn but 2.3, 2.5, 2.65 and 2.8, or anything against an opponent but G.
