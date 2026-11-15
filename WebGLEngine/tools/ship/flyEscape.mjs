@@ -13,6 +13,9 @@
 //   checkRecords(lines)                    the registration's checks, as lines; [] when they hold
 //   reading(lines)                         { checks, arms, floors, T0, T1, T2, T3 }; with a failed check no test is made
 //   readingLines(R)
+// ONE CODE, TWO ROUNDS (2026-11-15): everything below is makeEscapeRound(cfg). Round 1 is cfg { results }; round 2 (brain/FLY_ESCAPE_REFLEX_WIP.md, tools/ship/flyEscapeReflex.mjs) adds
+// start: "reflex" (the fly is the reflex plus its network, brain/rl/reflexStart.mjs; T0 and T3 are then both against the reflex, the floors carry every arm's untrained fly, and the reading
+// says whether T1 is asked of flies that do the task) and report: "return" (the trainer keeps the best return: brain/rl/escapeEnv.mjs REPORT).
 // NOT HERE: the 80 trainings (the command runs them; tools/ship/flyEscape-selfcheck.mjs never does). Pure but for what trainOne costs.
 "use strict";
 import { trainDockES, FlightPolicy } from "../../brain/rl/dockPolicy.js";
@@ -20,39 +23,49 @@ import { EscapeEnv, OBS_DIM, ACT_DIM, RULES } from "../../brain/rl/escapeEnv.mjs
 import * as P from "../../brain/rl/paintCircuitPolicy.mjs";
 import { rankSum, hashWeights, packWeights, unpackWeights, hashEdges } from "./paintingFly.mjs";
 import { signTest } from "./voxelHome.mjs";
+import { ReflexStart } from "../../brain/rl/reflexStart.mjs";
 
-export const RECIPE = Object.freeze({ maxSteps: 160, iters: 150, pop: 96, sigma: 0.14, lr: 0.05, trainEps: 8 });
-export const SEEDS = Object.freeze(Array.from({ length: 16 }, (_, k) => k + 1));
-export const ARMS = Object.freeze(["FLY", "SHUF", "PLAIN", "FISH", "MLP"]);
-export const MLP_HIDDEN = Object.freeze([16, 16]), PLAIN_UNITS = 55;
-export const WEIGHTS = Object.freeze({ FLY: 824, SHUF: 824, PLAIN: 826, FISH: 664, MLP: 513 });
-export const AUDIT = Object.freeze(Array.from({ length: 200 }, (_, k) => 900001 + 7919 * k));
-export const ALPHA = 0.01, RESULTS = "brain/flyEscapeRound.jsonl";
-export const FLOORS = Object.freeze({ freeze: 0.2840, hide: 0.5000, fleeAll: 0.5395, reflex: 0.6465, told: 0.8351 });
-export const WORDS = Object.freeze({
+/** See the header: a round's whole arithmetic for a cfg { results, start: "reflex" (optional), report: "lived" | "return" (optional) }. */
+export function makeEscapeRound(cfg) {
+if (!cfg || typeof cfg.results !== "string" || (cfg.start !== undefined && cfg.start !== "reflex") || (cfg.report !== undefined && cfg.report !== "lived" && cfg.report !== "return")) throw new Error("flyEscape.makeEscapeRound: a cfg is { results, start: \"reflex\" (optional), report: \"lived\" | \"return\" (optional) }");
+const RECIPE = Object.freeze({ maxSteps: 160, iters: 150, pop: 96, sigma: 0.14, lr: 0.05, trainEps: 8 });
+const SEEDS = Object.freeze(Array.from({ length: 16 }, (_, k) => k + 1));
+const ARMS = Object.freeze(["FLY", "SHUF", "PLAIN", "FISH", "MLP"]);
+const MLP_HIDDEN = Object.freeze([16, 16]), PLAIN_UNITS = 55;
+const WEIGHTS = Object.freeze({ FLY: 824, SHUF: 824, PLAIN: 826, FISH: 664, MLP: 513 });
+const AUDIT = Object.freeze(Array.from({ length: 200 }, (_, k) => 900001 + 7919 * k));
+const ALPHA = 0.01, RESULTS = cfg.results;
+const START = cfg.start === undefined ? null : cfg.start, REPORT = cfg.report === undefined ? "lived" : cfg.report;   // round 2: the fly is the reflex plus its network (brain/rl/reflexStart.mjs), and the trainer keeps the best return
+const FLOORS = Object.freeze({ freeze: 0.2840, hide: 0.5000, fleeAll: 0.5395, reflex: 0.6465, told: 0.8351 });
+const WORDS = Object.freeze({
     T0: ["A FLY-WIRED FLY ESCAPES BETTER THAN THE REFLEX WRITTEN BY HAND", "A FLY-WIRED FLY ESCAPES WORSE THAN THE REFLEX WRITTEN BY HAND", "A FLY-WIRED FLY CANNOT BE TOLD APART FROM THE REFLEX WRITTEN BY HAND"],
     T1: ["THE FLY'S WIRING ESCAPES BETTER THAN A SHUFFLE OF IT", "THE FLY'S WIRING ESCAPES WORSE THAN A SHUFFLE OF IT", "THE FLY'S WIRING CANNOT BE TOLD APART FROM A SHUFFLE OF IT"],
     T2: ["THE FLY'S WIRING ESCAPES BETTER THAN A PLAIN NET OF ITS SIZE", "THE FLY'S WIRING ESCAPES WORSE THAN A PLAIN NET OF ITS SIZE", "THE FLY'S WIRING CANNOT BE TOLD APART FROM A PLAIN NET OF ITS SIZE"],
     T3: ["A TRAINED FLY ESCAPES BETTER THAN FLEEING FROM EVERYTHING", "A TRAINED FLY ESCAPES WORSE THAN FLEEING FROM EVERYTHING", "A TRAINED FLY CANNOT BE TOLD APART FROM FLEEING FROM EVERYTHING"],
+    ...(START === "reflex" ? {
+        T0: ["A FLY-WIRED FLY STARTED AT THE REFLEX ESCAPES BETTER THAN THE REFLEX", "A FLY-WIRED FLY STARTED AT THE REFLEX ESCAPES WORSE THAN THE REFLEX", "A FLY-WIRED FLY STARTED AT THE REFLEX CANNOT BE TOLD APART FROM THE REFLEX"],
+        T3: ["A FLY STARTED AT THE REFLEX ESCAPES BETTER THAN THE REFLEX", "A FLY STARTED AT THE REFLEX ESCAPES WORSE THAN THE REFLEX", "A FLY STARTED AT THE REFLEX CANNOT BE TOLD APART FROM THE REFLEX"],
+    } : {}),
 });
 
 /** See the header. */
-export function circuitOf(arm, s) {
+function circuitOf(arm, s) {
     if (arm === "PLAIN") return { units: PLAIN_UNITS, edges: [] };
     if (arm === "FLY" || arm === "SHUF" || arm === "FISH") return P.ARMS[arm](s);
     throw new Error(`flyEscape.circuitOf: no circuit arm ${arm} (FLY, SHUF, PLAIN, FISH)`);
 }
+const started = (inner, under) => (START === "reflex" ? new ReflexStart(inner, { rule: RULES.reflex, tail: under + 1 }) : inner);   // the output layer of a one-output net: `under` weights and a bias
 const factoryOf = (arm, s) => {
-    if (arm === "MLP") return ({ obsDim, actDim, seed } = {}) => new FlightPolicy({ hidden: [...MLP_HIDDEN], obsDim, actDim, seed: seed ?? 3 });
-    const c = circuitOf(arm, s); return ({ obsDim, actDim, seed } = {}) => new P.CircuitPolicy({ obsDim, actDim, units: c.units, edges: c.edges, seed: seed ?? 1234 });
+    if (arm === "MLP") return ({ obsDim, actDim, seed } = {}) => started(new FlightPolicy({ hidden: [...MLP_HIDDEN], obsDim, actDim, seed: seed ?? 3 }), MLP_HIDDEN[MLP_HIDDEN.length - 1]);
+    const c = circuitOf(arm, s); return ({ obsDim, actDim, seed } = {}) => started(new P.CircuitPolicy({ obsDim, actDim, units: c.units, edges: c.edges, seed: seed ?? 1234 }), c.units);
 };
 /** See the header. */
-export function policyOf(arm, s) {
+function policyOf(arm, s) {
     if (!ARMS.includes(arm)) throw new Error(`flyEscape.policyOf: no arm ${arm} (the arms are ${ARMS.join(", ")})`);
     return factoryOf(arm, s)({ obsDim: OBS_DIM, actDim: ACT_DIM, seed: s });
 }
 /** See the header. `act` is act(obs, env) -> [number]; a policy is given as (o) => policy.act(o). */
-export function auditScore(act, seeds = AUDIT, maxSteps = RECIPE.maxSteps) {
+function auditScore(act, seeds = AUDIT, maxSteps = RECIPE.maxSteps) {
     const env = new EscapeEnv({ maxSteps }); let sum = 0, alive = 0, fed = 0, strikes = 0, caught = 0, passes = 0, fledPass = 0;
     for (const seed of seeds) {
         let o = env.reset(seed), done = false, ret = 0; while (!done) { const r = env.step(act(o, env)); ret += r.reward; o = r.obs; done = r.done; }
@@ -62,10 +75,10 @@ export function auditScore(act, seeds = AUDIT, maxSteps = RECIPE.maxSteps) {
     return { score: sum / seeds.length, alive, fed: fed / seeds.length, strikes, caught, passes, fledPass };
 }
 /** See the header. `recipe` and `audit` are the registration's unless a gate hands in its own. */
-export function trainOne(arm, s, recipe = RECIPE, audit = AUDIT) {
+function trainOne(arm, s, recipe = RECIPE, audit = AUDIT) {
     if (!Number.isInteger(s) || s < 1) throw new Error(`flyEscape.trainOne: a draw is a whole number from 1 (got ${s})`);
     const fly = policyOf(arm, s), circuit = arm === "MLP" ? null : circuitOf(arm, s);
-    const res = trainDockES({ envFactory: (o = {}) => new EscapeEnv({ maxSteps: recipe.maxSteps, ...o }), obsDim: OBS_DIM, actDim: ACT_DIM, maxSteps: recipe.maxSteps, iters: recipe.iters, pop: recipe.pop, sigma: recipe.sigma, lr: recipe.lr, trainEps: recipe.trainEps, seed: s, policyFactory: factoryOf(arm, s) });
+    const res = trainDockES({ envFactory: (o = {}) => new EscapeEnv({ maxSteps: recipe.maxSteps, report: REPORT, ...o }), obsDim: OBS_DIM, actDim: ACT_DIM, maxSteps: recipe.maxSteps, iters: recipe.iters, pop: recipe.pop, sigma: recipe.sigma, lr: recipe.lr, trainEps: recipe.trainEps, seed: s, policyFactory: factoryOf(arm, s) });
     fly.setParams(res.params);
     const a = auditScore((o) => fly.act(o), audit, recipe.maxSteps);
     return { kind: "draw", arm, s, recipe: { ...recipe }, units: circuit ? circuit.units : null, edges: circuit ? circuit.edges.length : null, edgesHash: circuit ? hashEdges(circuit.edges) : null,
@@ -73,14 +86,15 @@ export function trainOne(arm, s, recipe = RECIPE, audit = AUDIT) {
 }
 const TOLD = (o, env) => [env.mover && env.mover.kind === "strike" ? 1 : -1];
 /** See the header. */
-export function floors(audit = AUDIT, maxSteps = RECIPE.maxSteps) {
+function floors(audit = AUDIT, maxSteps = RECIPE.maxSteps) {
     const out = { kind: "floors" }; for (const [name, act] of Object.entries(RULES)) out[name] = auditScore(act, audit, maxSteps);
     out.told = auditScore(TOLD, audit, maxSteps);
+    if (START) { out.untrained = {}; for (const arm of ARMS) { const fly = policyOf(arm, 1); out.untrained[arm] = auditScore((o) => fly.act(o), audit, maxSteps).score; } }   // the start: every arm's untrained fly
     return out;
 }
 
 /** See the header. `job` takes a registered arm and draw only; `run` at least one process. */
-export function parseArgs(argv) {
+function parseArgs(argv) {
     if (!Array.isArray(argv)) return null;
     const [cmd, ...rest] = argv;
     if (cmd === "job" && rest.length === 2 && ARMS.includes(rest[0]) && /^[1-9]\d*$/.test(rest[1]) && SEEDS.includes(Number(rest[1]))) return { cmd, arm: rest[0], s: Number(rest[1]) };
@@ -92,7 +106,7 @@ export function parseArgs(argv) {
 
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 /** See the header. */
-export function checkRecords(lines) {
+function checkRecords(lines) {
     const bad = [], draws = lines.filter((r) => r && r.kind === "draw"), seen = new Map();
     for (const r of draws) { const k = r.arm + "/" + r.s; seen.set(k, (seen.get(k) || 0) + 1); }
     for (const arm of ARMS) for (const s of SEEDS) { const c = seen.get(arm + "/" + s) || 0; if (c !== 1) bad.push(`${arm} draw ${s} is there ${c} times (once is registered)`); }
@@ -121,24 +135,26 @@ export function checkRecords(lines) {
     if (re.length !== 1 || !fly1 || re[0].arm !== "FLY" || re[0].s !== 1 || re[0].weightsHash !== fly1.weightsHash) bad.push("FLY draw 1 trained a second time is not there once with the same weights");
     const fl = lines.filter((r) => r && r.kind === "floors");
     if (fl.length !== 1 || !Object.keys(FLOORS).every((k) => fl[0][k] && Number.isFinite(fl[0][k].score) && Math.abs(fl[0][k].score - FLOORS[k]) < 5e-5)) bad.push("the floors are not there once with the registration's five numbers (freeze 0.2840, hide 0.5000, fleeAll 0.5395, reflex 0.6465, told 0.8351)");
+    if (START === "reflex" && fl.length === 1) for (const a of ARMS) if (!(fl[0].untrained && fl[0].reflex && fl[0].untrained[a] === fl[0].reflex.score)) bad.push(`the untrained ${a} fly does not score the reflex's number: the start is not the reflex`);
     return bad;
 }
 const stats = (v) => { const n = v.length, mean = v.reduce((a, b) => a + b, 0) / n; return { n, mean, sd: Math.sqrt(v.reduce((a, b) => a + (b - mean) ** 2, 0) / n), min: Math.min(...v), max: Math.max(...v) }; };
 const pick = (three, more, less) => three[more ? 0 : less ? 1 : 2];
 /** See the header. */
-export function reading(lines) {
+function reading(lines) {
     const checks = checkRecords(lines), draws = lines.filter((r) => r && r.kind === "draw"), of = (arm) => draws.filter((r) => r.arm === arm).sort((a, b) => a.s - b.s), scores = (arm) => of(arm).map((r) => r.score);
     const arms = {}; for (const arm of ARMS) { const v = of(arm); if (!v.length) continue; const mean = (k) => v.reduce((n, r) => n + (r[k] || 0), 0) / v.length;
         arms[arm] = { ...stats(v.map((r) => r.score)), alive: mean("alive"), fed: mean("fed"), fledPass: v.reduce((n, r) => n + (r.fledPass || 0), 0) / Math.max(1, v.reduce((n, r) => n + (r.passes || 0), 0)), caught: v.reduce((n, r) => n + (r.caught || 0), 0) / Math.max(1, v.reduce((n, r) => n + (r.strikes || 0), 0)) };
         if (v.every((r) => Array.isArray(r.history) && r.history.length === v[0].history.length)) arms[arm].history = v[0].history.map((h, k) => ({ it: h.it, ret: v.reduce((n, r) => n + r.history[k].ret, 0) / v.length })); }
     const fl = lines.find((r) => r && r.kind === "floors") || null;
-    if (checks.length) return { checks, arms, floors: fl, T0: null, T1: null, T2: null, T3: null };
+    if (checks.length) return { checks, arms, floors: fl, T0: null, T1: null, T2: null, T3: null, ...(START ? { asked: null } : {}) };
     const sg = (name, values, ref) => { const t = signTest(values, ref); return { ...t, sign: true, ref, word: pick(WORDS[name], t.p <= ALPHA && t.above > t.below, t.p <= ALPHA && t.below > t.above) }; };
     const rs = (name, other) => { const t = rankSum(scores("FLY"), other); return { ...t, word: pick(WORDS[name], t.p <= ALPHA && t.pHigher < t.pLower, t.p <= ALPHA && t.pLower < t.pHigher) }; };
-    return { checks, arms, floors: fl, T0: sg("T0", scores("FLY"), fl.reflex.score), T1: rs("T1", scores("SHUF")), T2: rs("T2", scores("PLAIN")), T3: sg("T3", ARMS.flatMap((a) => scores(a)), fl.fleeAll.score) };
+    return { checks, arms, floors: fl, T0: sg("T0", scores("FLY"), fl.reflex.score), T1: rs("T1", scores("SHUF")), T2: rs("T2", scores("PLAIN")), T3: sg("T3", ARMS.flatMap((a) => scores(a)), START === "reflex" ? fl.reflex.score : fl.fleeAll.score),
+        ...(START === "reflex" ? { asked: arms.FLY.mean >= fl.reflex.score && arms.SHUF.mean >= fl.reflex.score } : {}) };   // round 2: is T1 asked of flies that do the task (registered: both arms' means at or above the reflex)
 }
 /** See the header. */
-export function readingLines(R) {
+function readingLines(R) {
     const out = [], f = (x) => x.toFixed(4);
     if (R.checks.length) { out.push("A CHECK FAILED, AND THE READING IS NOT WEIGHED:"); for (const c of R.checks) out.push("  " + c); }
     else out.push("the checks hold: 80 draws, each once, the registered recipe, each arm's weight count and wiring, FLY draw 1 the same twice, a history in every record, the registration's floors");
@@ -146,7 +162,14 @@ export function readingLines(R) {
     for (const [arm, s] of Object.entries(R.arms)) out.push(`${arm.padEnd(7)} ${String(s.n).padStart(2)}  ${f(s.mean)}  ${f(s.sd)}  ${f(s.min)}  ${f(s.max)}  ${s.alive.toFixed(1).padStart(6)}          ${s.fed.toFixed(3)}   ${s.fledPass.toFixed(3)}              ${s.caught.toFixed(3)}`);
     if (R.floors) { out.push(""); for (const k of Object.keys(FLOORS)) { const x = R.floors[k]; if (x) out.push(`${(k === "told" ? "told the kind" : k).padEnd(14)} ${f(x.score)}  lives ${String(x.alive).padStart(3)}  feeds ${x.fed.toFixed(3)}   leaves for a pass ${(x.fledPass / Math.max(1, x.passes)).toFixed(3)}   caught by a strike ${(x.caught / Math.max(1, x.strikes)).toFixed(3)}`); } }
     for (const [arm, a] of Object.entries(R.arms)) if (a.history) out.push(`${arm.padEnd(7)} the trainer's own battery, mean return at iteration ${a.history.map((h) => `${h.it}: ${f(h.ret)}`).join(", ")}`);
-    for (const [name, t] of [["T3 (all the trained flies against fleeAll)", R.T3], ["T0 (FLY against the reflex)", R.T0]]) if (t) out.push("", `${name}: of ${t.n}, ${t.above} above its ${f(t.ref)}, ${t.below} below, ${t.ties} equal; exact two-sided p ${t.p.toExponential(3)}`, `  ${t.word}`);
+    for (const [name, t] of [[START === "reflex" ? "T3 (all the flies against the reflex)" : "T3 (all the trained flies against fleeAll)", R.T3], ["T0 (FLY against the reflex)", R.T0]]) if (t) out.push("", `${name}: of ${t.n}, ${t.above} above its ${f(t.ref)}, ${t.below} below, ${t.ties} equal; exact two-sided p ${t.p.toExponential(3)}`, `  ${t.word}`);
+    if (R.asked !== undefined && R.asked !== null) out.push("", R.asked ? "T1 IS ASKED OF FLIES THAT DO THE TASK: the FLY arm's mean and the SHUF arm's are both at or above the reflex's" : "T1 IS NOT ASKED OF FLIES THAT DO THE TASK: the FLY arm's mean or the SHUF arm's is below the reflex's");
     for (const [name, t] of [["T1 (FLY against SHUF)", R.T1], ["T2 (FLY against PLAIN)", R.T2]]) if (t) out.push("", `${name}: the fly's ranks sum to ${t.sumA} (the middle is ${t.n * (t.n + t.m + 1) / 2}), ties ${t.ties}; exact two-sided p ${t.p.toExponential(3)}`, `  ${t.word}`);
     return out;
 }
+return Object.freeze({ START, REPORT, RECIPE, SEEDS, ARMS, MLP_HIDDEN, PLAIN_UNITS, WEIGHTS, AUDIT, ALPHA, RESULTS, FLOORS, WORDS, circuitOf, policyOf, auditScore, trainOne, floors, parseArgs, checkRecords, reading, readingLines });
+}
+
+/** Round 1 (brain/FLY_ESCAPE_WIP.md): a random start, and the trainer told which episodes LIVED. */
+export const ROUND1 = Object.freeze({ results: "brain/flyEscapeRound.jsonl" });
+export const { RECIPE, SEEDS, ARMS, MLP_HIDDEN, PLAIN_UNITS, WEIGHTS, AUDIT, ALPHA, RESULTS, FLOORS, WORDS, circuitOf, policyOf, auditScore, trainOne, floors, parseArgs, checkRecords, reading, readingLines } = makeEscapeRound(ROUND1);

@@ -22,6 +22,10 @@
 //   ACTION (1) above 0: go home. Otherwise: go to the food and feed.
 //   REWARD     0.5 / maxSteps for a tick spent feeding, and 0.5 at the end for being alive: an episode's return is 0.5 x (the share of the time it fed) + 0.5 x (it lived). Hiding all day is 0.5.
 //
+// REPORT (the option `report`). brain/rl/dockPolicy.js's trainDockES hands back the iteration that scored best by `dockRate x 1000 - avgDist - crashes x 200`, read from a step's info. With
+// report "lived" (the default, and the escape round 1's) docked is LIVED and crashed is CAUGHT, so the trainer keeps the weights whose flies lived most -- which round 1 found is the fly that hides.
+// With report "return" no episode is docked or crashed, so that rule is `-avgDist` and dist is 1 - the return: THE TRAINER KEEPS THE BEST RETURN. The reward it climbs is the same either way.
+//
 // RULES are four flies written by hand, the floors a trained fly is measured against: freeze (never flee), hide (never leave), fleeAll (home whenever anything is in the sky), and reflex -- home when
 // the thing LOOMS ON A STEADY BEARING (the collision course), and, once it has left its food, for as long as the thing still looms. reflex's one threshold is from the geometry; the rule was written
 // twice (the first asked for a steady bearing all the way home, and the fly's own walking unsteadied it: 96 of 205 strikes caught) and is not tuned beyond that.
@@ -52,6 +56,8 @@ export class EscapeEnv {
     constructor(opts = {}) {
         this.obsDim = OBS_DIM; this.actDim = ACT_DIM; this.maxSteps = opts.maxSteps || MAX_STEPS;
         this.world = opts.world || miniWorld(); this.at = opts.at || ORIGIN;
+        if (opts.report !== undefined && opts.report !== "lived" && opts.report !== "return") throw new Error(`escapeEnv.EscapeEnv: report is "lived" or "return" (got ${opts.report})`);
+        this.report = opts.report || "lived";   // what the last step tells a trainer: see REPORT below
         for (let z = YARD_LO; z < YARD_LO + YARD; z++) for (let x = YARD_LO; x < YARD_LO + YARD; x++) this.world.setVoxel(this.at.x + x, this.at.y - 1, this.at.z + z, BLOCKS.ground);
         this.plan = null; this.reset(opts.seed || 1);
     }
@@ -122,7 +128,7 @@ export class EscapeEnv {
         const done = this.caught || this.t >= this.maxSteps; if (done && !this.caught) reward += 0.5;
         this.ret += reward;
         const now = this.sight(), obs = this._obs(m && before && now ? before : null, now);
-        return { obs, reward, done, info: { caught: this.caught, fed: this.fed, t: this.t, movers: this.log.length, docked: done && !this.caught, crashed: this.caught, dist: 1 - this.ret } };
+        return { obs, reward, done, info: { caught: this.caught, fed: this.fed, t: this.t, movers: this.log.length, docked: this.report === "lived" && done && !this.caught, crashed: this.report === "lived" && this.caught, dist: 1 - this.ret } };
     }
 }
 
