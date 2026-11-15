@@ -88,3 +88,35 @@ None of this changes a rule, a bar, a side or a forecast of sections 2 to 5; it 
 7. **Printed besides the rules** (for reading): every matchup's edge, se, z, wins-draws-losses, whether it BEATS and ADDS (with the paired mean and z), and its edge in seat A and seat B; G's baseline edges; the five finders' median edge over G and over each opponent; and the forecast quantities of section 5 as yes/no.
 8. **What smoke is and is not.** Geometries 1 to 4 are among those (1 to 8) on which every league was TRAINED, so the smoke output says the command runs and says nothing about the claim. I saw it (63 rows flew, the checks passed) and **the forecasts of section 5 stand as written and will be scored as written.**
 
+
+## DEV RESULT (2026-11-15; `node tools/ship/takeEvadeOpponent.mjs dev --write`, geometries 104001 to 104024, exit 0; record `brain/subEvadeOpponentDev.json`, 63 rows)
+
+**One slip, said.** I started this DEV flight twice by mistake (a first launch whose shell wrapper looked as if it had exited, then a second), so two copies of the same read ran at the same time and each wrote the record. The flights are deterministic (the set's seeds), the record parses, its 63 rows are what the printed lines say (checked on U:league7001@G, +2.084, z 5.6, and on the rules block), and DEV is free to read; HELD is untouched.
+
+DEV is free to read; HELD (105001 to 105024) is not flown by this entry. The void-checks passed (none printed). Forecasts are not scored on DEV except "R0 holds on DEV" (92): **TRUE**. The others stand as written for HELD.
+
+**R0 holds:** 5 of 5 unmodified finders find against G (+2.074 to +2.351 for four; league7103 +0.978, z 2.7).
+
+**G, the baseline:** against hand +2.255 (z 5.8, 40-0-8, BEATS); against champ +0.122 (z 0.9) and league7000 +0.157 (z 0.6), neither beaten. G is about level with the two stronger opponents; the finders are not.
+
+**Labels over F' (all five finders), as the rules print them:**
+
+| kind | BEATS hand | ADDS over G (hand) | BEATS champ | ADDS (champ) | BEATS league7000 | ADDS (league7000) | summary |
+|---|---|---|---|---|---|---|---|
+| U (the finder) | YES 5/5 | NO 1/5 | YES 5/5 | YES 4/5 | YES 5/5 | YES 5/5 | beats 3 of 3, adds against 2 |
+| GT (G + the triple) | YES 5/5 | PARTIAL 3/5 | YES 5/5 | YES 5/5 | YES 5/5 | YES 5/5 | beats 3 of 3, adds against 2 |
+| GN (G + the turn only) | YES 5/5 | NO 0/5 | YES 5/5 | YES 4/5 | NO 0/5 | NO 0/5 | beats 2 of 3, adds against 1 |
+
+**Median U edge over G, hand, champ, league7000:** +2.084, +2.596, +1.997, +2.062. The finders' edge over the two opponents that G cannot beat is as large as their edge over G, and the ADDS means there are +1.3 to +2.4 (the finder's edge over the opponent minus G's, geometry by geometry).
+
+**Where it is thin:**
+
+* **Hand:** G already wins by +2.255 and the seat-A edge is capped near +3.24 (it prints +3.241 on seven arms), so there is little to add; only exploit7204's U adds (+0.550, z 2.6) and the GT arms of league7001, league7100 and exploit7204 (+0.555 to +0.618, z 2.6). One GT (exploit7200) misses by 0.007 (+0.493).
+* **league7103** is the weak finder everywhere: U edge over G +0.978, over champ +1.101, over league7000 +1.420, over hand +2.117; its U arm does not add over G against hand (-0.138) or against champ (+0.979, z 1.9).
+* **GN against league7000** is +0.45 to +0.59 (z 1.5 to 1.8): near the bar and under it on all five. **GN against champ** is +0.813 on four arms: the finders with turn 2.8 (three of the five, per the evade-turn note) have the same GN theta, so those four are fewer than four independent arms; the label counts them as the registration said to count.
+
+**The mirror (finders against each other, first side's edge):** league7001 over league7100 -1.070 (z -3.9, 6-19-23: 19 draws); league7001 over league7103 +1.317; league7001 over exploit7200 -0.380; league7001 over exploit7204 +0.395; league7100 over league7103 +1.111; league7100 over exploit7200 +0.518 (not decided); league7100 over exploit7204 +1.020; league7103 over exploit7200 -1.777; league7103 over exploit7204 -0.929; exploit7200 over exploit7204 +0.648. **M1 THE STRONG FOUR ARE ALIKE: NO** (three of their six pairs are decided: league7100 over league7001 by 1.07, league7100 over exploit7204 by 1.02, exploit7200 over exploit7204 by 0.65). **M2 league7103 LOSES TO THE STRONG FOUR: YES**, and in all four pairs, not three.
+
+**The forecast quantities as printed** (scored on HELD, not here): U BEATS hand, champ, league7000: yes, yes, yes. U ADDS hand: no; champ: yes; league7000: yes. The strong four's edges over each opponent within 0.5 of their edge over G: **no, by 0.012** (the median over hand is +2.596 against +2.084 over G, a difference of 0.512). GT BEATS champ: yes. GN BEATS champ: yes. GN ADDS champ: yes. M1: no. M2: yes.
+
+**What is NOT shown here:** any HELD read; any opponent other than these three PD-autopilot tacticians; whether the strong four differ because of their thetas or because of the draws (19 of 48 duels between league7001 and league7100 are draws, the mirror's largest count); why the edge is capped at +3.24 in seat A (a ceiling of the score, not examined). R0 held, so HELD may be flown on Keith's word: `node tools/ship/takeEvadeOpponent.mjs held --write`.
