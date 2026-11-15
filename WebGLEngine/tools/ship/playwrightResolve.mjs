@@ -247,6 +247,22 @@ export function resolvePlaywright(requireFn) {
 }
 
 /**
+ * Section 196's rig runs: the version of the Playwright package resolvePlaywright found, read off the nearest package.json above `from`
+ * that names playwright or playwright-core; null when there is none. A report says which browser build ran because the 1080's round 88
+ * runs failed in Chromium (dxcompiler.dll, Windows error 87) with nothing in the report to say which build that was.
+ */
+export function playwrightVersion(from) {
+    if (!from) return null;
+    let dir = path.dirname(from);
+    for (let i = 0; i < 8; i++) {
+        const f = path.join(dir, "package.json");
+        try { const p = JSON.parse(fs.readFileSync(f, "utf8")); if (p.name === "playwright" || p.name === "playwright-core") return p.version || null; } catch { /* not here */ }
+        const up = path.dirname(dir); if (up === dir) break; dir = up;
+    }
+    return null;
+}
+
+/**
  * *** THE DIAGNOSIS THAT DOES NOT MISATTRIBUTE, BECAUSE THIS IS THE BUG THE TREE HAS ALREADY PAID FOR TWICE.
  * *** Two independent facts -- "chromium is on disk" and "playwright resolves" -- are reported on their own
  * evidence rather than collapsed into one guess about which is missing.

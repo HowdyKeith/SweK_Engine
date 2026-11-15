@@ -25,7 +25,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { gateList, categorize, parseRows, verdict, runGates, runLaunchArgs, probeSoftwareGl, softwareGlLines, TREE_SOFTWARE_GL,
          probeNativeAdapters, nativeAdapterLines, GATE_TIMEOUT_MS, RETIRED_SOFTWARE_GL, TREE_SOFTWARE_WEBGPU, SOFTWARE_GL_CANDIDATES,
-         NATIVE_LAUNCH, readAdapterLog, gateEntry, addAdapters, nodeWebgpuRecord, capsLine,
+         NATIVE_LAUNCH, readAdapterLog, gateEntry, addAdapters, nodeWebgpuRecord, capsLine, browserLabel, browsersOf,
          NATIVE_USE, nativeGateList, nativeLaunchArgs, nativeSweepCompare } from "./realGpuRun.mjs";   // v4851, section 66: NATIVE_LAUNCH..nodeWebgpuRecord; v4853, section 69: the last four
 import { noteNativeAdapter, adapterCaps, ADAPTER_LIMITS } from "./headlessGpu.mjs";
 import { webgpuSkipReason, launchArgsFor, hardwareArgsFor, parityArgsFor, HARDWARE_ARGS, softwareClaims } from "./webgpuHarness.mjs";
@@ -548,6 +548,38 @@ console.log("\n7. SECTION 69 (v4853): THE WHOLE NATIVE SWEEP -- EVERY GATE THAT 
     ok("  section 69: realGpuRun --native is accepted, says it is the native sweep, and its report carries native: true, the package it ran on, and no browser flags of its own",
        r.status === 1 && !!rep && rep.native === true && rep.gates.length === 0 && /the whole native sweep/.test(r.stdout || "") && !!rep.nodeWebgpu && "version" in rep.nodeWebgpu && rep.launchArgs === null,
        `exit ${r.status}; native ${rep && rep.native}; ${(r.stderr || "").split("\n")[0].slice(0, 100)}`);
+}
+
+console.log("\nSECTION 196: WHICH BROWSER BUILD A RUN LAUNCHED");
+{
+    // the 1080's round 88 runs failed in Chromium's WebGPU (dxcompiler.dll, Windows error 87) and no report said which build ran
+    // SABOTAGED, each restored byte-identical: B1 the harness writing no browser, B2 its version left null, B3 playwrightVersion reading no
+    //   package, B4 the label without Playwright's version, B5 readAdapterLog dropping the browser, B6 the report not gathering builds -> 1 red each.
+    const { playwrightVersion, resolvePlaywright, HEADLESS_SHELL } = await import("./playwrightResolve.mjs"), { runInEngineOrigin } = await import("./webgpuHarness.mjs");
+    const b1 = { version: "149.0.7795.2", shell: "C:/x/chrome-headless-shell.exe", playwright: "1.61.1" }, b2 = { ...b1, version: "150.0.1" };
+    const log = [{ gate: "g", adapter: { vendor: "nvidia", architecture: "pascal" }, software: false, launchArgs: ["--a"], browser: b1 },
+                 { gate: "g", adapter: { vendor: "nvidia", architecture: "pascal" }, software: false, launchArgs: ["--a"], browser: b1 },
+                 { gate: "g", adapter: { vendor: "nvidia", architecture: "pascal" }, software: false, launchArgs: [NATIVE_LAUNCH] },
+                 { gate: "h", adapter: null, software: null, launchArgs: ["--a"], browser: b2 }].map((x) => JSON.stringify(x)).join("\n");
+    const seen = readAdapterLog(log, "g"), e = gateEntry({ gate: "g", src: "", status: 0, ms: 1, logText: log }).entry;
+    ok("!! a record's browser build reaches the gate's entry: one label per distinct build, the native record (no browser) adding none, another gate's not counted",
+        seen.browsers.length === 1 && seen.browsers[0] === "Chromium 149.0.7795.2; playwright 1.61.1; C:/x/chrome-headless-shell.exe" && browserLabel(b1) === seen.browsers[0] &&
+        e.browsers.join() === seen.browsers.join() && readAdapterLog(log, "h").browsers[0] === browserLabel(b2) && browsersOf([{ browser: null }]).length === 0);
+    const rsrc = fs.readFileSync(path.join(ENG, "tools", "ship", "realGpuRun.mjs"), "utf8"), hsrc = fs.readFileSync(path.join(ENG, "tools", "ship", "webgpuHarness.mjs"), "utf8");
+    ok("  the report gathers every gate's builds into its own `browsers` list and prints each; the harness writes Chromium's version, the shell path and the package's version into every record",
+        /gates: \[\], adapters: \[\], browsers: \[\] \}/.test(rsrc) && /for \(const bl of entry\.browsers\) if \(!report\.browsers\.includes\(bl\)\) report\.browsers\.push\(bl\);/.test(rsrc) && /log\(`  browser: \$\{bl\}`\)/.test(rsrc) &&
+        /const browserRec = \{ version: bv, shell: HEADLESS_SHELL \|\| null, playwright: playwrightVersion\(pw && pw\.from\) \};/.test(hsrc) && /launchArgs: \[\.\.\.launchArgs\], browser: browserRec \}/.test(hsrc));
+    const pw = resolvePlaywright(), pv = playwrightVersion(pw.from), tmp = path.join(os.tmpdir(), `swek-browser-log-${process.pid}.jsonl`);
+    if (!pw.chromium) console.log("  SKIP  no playwright here -- the live row needs one");
+    else {
+        const keep = process.env.SWEK_ADAPTER_LOG; process.env.SWEK_ADAPTER_LOG = tmp;
+        let rec = null;
+        try { await runInEngineOrigin({ engineRoot: ENG, timeoutMs: 120000, script: "async () => 1" }); rec = JSON.parse(fs.readFileSync(tmp, "utf8").trim().split("\n").pop()); }
+        catch (err) { rec = { err: String(err) }; } finally { if (keep === undefined) delete process.env.SWEK_ADAPTER_LOG; else process.env.SWEK_ADAPTER_LOG = keep; try { fs.unlinkSync(tmp); } catch {} }
+        ok("!! *** live: a real harness call writes the browser build -- Chromium's version as the browser reports it, the shell it launched, and this Playwright's package version ***",
+            !!rec && !!rec.browser && /^\d+\.\d+\.\d+\.\d+$/.test(rec.browser.version || "") && rec.browser.shell === (HEADLESS_SHELL || null) && rec.browser.playwright === pv && /^\d+\.\d+\.\d+/.test(pv || ""),
+            JSON.stringify(rec && rec.browser).slice(0, 200));
+    }
 }
 
 console.log(fails ? "\nFAIL -- " + fails + " check(s)" : "\nALL GREEN");

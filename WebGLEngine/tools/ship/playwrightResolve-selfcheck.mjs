@@ -32,7 +32,7 @@
 "use strict";
 import { shellRoots, resolveHeadlessShell, SHELL_LEAVES, SHELL_DIR, HEADLESS_SHELL,
          HEADLESS_SHELL_TRIED, PLAYWRIGHT_PATHS, browserSkipReason, askPlaywright, globalNpmPaths, siblingCopies,
-         resolvePlaywright, absoluteFrom, SHELL_DIR_SAMPLES, DXC_LEAVES, resolveDxcDir, launchEnv, dxcAdvice } from "./playwrightResolve.mjs";
+         resolvePlaywright, absoluteFrom, SHELL_DIR_SAMPLES, DXC_LEAVES, resolveDxcDir, launchEnv, dxcAdvice, playwrightVersion } from "./playwrightResolve.mjs";
 import fs from "node:fs";
 import { treePaths } from "./treeRead.mjs";
 import path from "node:path";
@@ -450,6 +450,19 @@ console.log("\n9. A RESOLVED PLAYWRIGHT IS A PATH, AND THE LIST IS THE ONLY PLAC
     ok("!! no gate or module spells its own playwright path -- each asks resolvePlaywright, so a box that has playwright is a box every browser gate can use",
         spelled.length === 0 && files.length > 1000 && listOwn, spelled.length ? "STILL SPELLED IN: " + spelled.join(", ") :
         `none of ${files.length} sources outside tools/ship/playwrightResolve.mjs, whose own list the same pattern does find (${listOwn}) -- so the scan can see one`);
+}
+
+{   // section 196: playwrightVersion, which realGpuRun's reports now carry beside Chromium's own version
+    // SABOTAGED, restored byte-identical: B3 the package name misread -> red here and in realGpuRun-selfcheck's live row.
+    const os = await import("node:os"), pw = resolvePlaywright(), v = playwrightVersion(pw.from);
+    const d = fs.mkdtempSync(path.join(os.tmpdir(), "swek-pwv-")), sub = path.join(d, "node_modules", "playwright-core", "lib");
+    fs.mkdirSync(sub, { recursive: true }); fs.writeFileSync(path.join(d, "node_modules", "playwright-core", "package.json"), JSON.stringify({ name: "playwright-core", version: "9.8.7" }));
+    fs.writeFileSync(path.join(d, "package.json"), JSON.stringify({ name: "not-playwright", version: "1.0.0" }));
+    const nested = playwrightVersion(path.join(sub, "index.js")), none = playwrightVersion(path.join(d, "x.js")), blank = playwrightVersion("");
+    fs.rmSync(d, { recursive: true, force: true });
+    let want = null; if (pw.from) { let dir = path.dirname(pw.from); for (let i = 0; i < 8 && !want; i++) { try { const q = JSON.parse(fs.readFileSync(path.join(dir, "package.json"), "utf8")); if (/^playwright(-core)?$/.test(q.name)) want = q.version; } catch {} dir = path.dirname(dir); } }
+    ok("!! playwrightVersion: the nearest package.json above a file that names playwright or playwright-core (9.8.7 found two levels up, past nothing else); another package's is not taken; no path, null; this box's resolved package read as it is",
+        nested === "9.8.7" && none === null && blank === null && (pw.from ? v === want && /^\d+\.\d+/.test(v || "") : v === null), `here: ${v}`);
 }
 
 console.log(`\nplaywrightResolve-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILURE(S)"}`);

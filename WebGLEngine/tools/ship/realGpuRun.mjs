@@ -145,11 +145,17 @@ export function readAdapterLog(text, gate) {
         .map((x) => ({ name: x.adapter ? [x.adapter.vendor, x.adapter.architecture, x.adapter.description].filter(Boolean).join(" ") || "unnamed" : "none",
                        software: x.software, launchArgs: x.launchArgs, native: Array.isArray(x.launchArgs) && x.launchArgs.includes(NATIVE_LAUNCH),
                        // v4871+ (rig-adapter-features-probe): features, ADAPTER_LIMITS and subgroup sizes, as the writer read them; null from an older writer
-                       caps: (x.adapter && x.adapter.caps) || null }));
+                       caps: (x.adapter && x.adapter.caps) || null,
+                       // section 196: the browser build the harness launched (null from a native record or an older writer)
+                       browser: x.browser || null }));
     const adapters = [];
     for (const r of recs) if (r.name !== "none" && !adapters.some((a) => adapterLabel(a) === adapterLabel(r))) adapters.push(r);
-    return { names: [...new Set(recs.map(adapterLabel))], adapters };
+    return { names: [...new Set(recs.map(adapterLabel))], adapters, browsers: browsersOf(recs) };
 }
+
+/** Section 196: the distinct browser builds a gate's (or a run's) records name, as "Chromium <version>; playwright <version>; <shell>". */
+export const browserLabel = (b) => `Chromium ${b.version || "unknown"}; playwright ${b.playwright || "unknown"}; ${b.shell || "no shell path"}`;
+export function browsersOf(recs) { return [...new Set(recs.filter((r) => r.browser).map((r) => browserLabel(r.browser)))]; }
 
 /**
  * A gate's report entry from what its run left: its source (for its kind), its exit, its time, its stdout and the adapter log.
@@ -161,7 +167,7 @@ export function gateEntry({ gate, src, status, signal = null, ms, stdout = "", s
     const stderrTail = String(stderr).split(/\r?\n/).map((l) => l.trimEnd()).filter(Boolean).slice(-5).map((l) => l.slice(0, 300));
     return { entry: { gate, category: categorize(src), ok: status === 0, ms, exit: { status: status ?? null, signal: signal ?? null }, stderrTail, adapters: seen.names,
                       software: seen.adapters.length ? seen.adapters.some((x) => x.software !== false) : null,
-                      fails: rows.fails, measured: rows.measured, skips: rows.skips },
+                      browsers: seen.browsers, fails: rows.fails, measured: rows.measured, skips: rows.skips },
              adapters: seen.adapters };
 }
 
@@ -239,7 +245,7 @@ export function runGates({ root = ENG, only = null, native = false, log = consol
     // v4853 -- generatedFrom: a report names gate files by basename, and tools/ship/recordProvenance-selfcheck.mjs asks every such record
     // to say which tool wrote it -- at the writer, since a key added to a written file alone is gone at the next run
     const report = { generatedFrom: "tools/ship/realGpuRun.mjs", at: new Date().toISOString(), platform: `${process.platform} ${os.release()} ${os.arch()}`, node: process.version,
-                     commit: git.status === 0 ? git.stdout.trim().slice(0, 120) : null, only, native, launchArgs, gates: [], adapters: [] };
+                     commit: git.status === 0 ? git.stdout.trim().slice(0, 120) : null, only, native, launchArgs, gates: [], adapters: [], browsers: [] };
     for (const g of gates) {
         const t0 = Date.now();
         const r = spawnSync(process.execPath, [g], { cwd: root, encoding: "utf8", timeout: GATE_TIMEOUT_MS,
@@ -249,12 +255,14 @@ export function runGates({ root = ENG, only = null, native = false, log = consol
                                                 stdout: r.stdout || "", stderr: r.stderr || "", logText: fs.existsSync(logFile) ? fs.readFileSync(logFile, "utf8") : "" });
         report.gates.push(entry);
         addAdapters(report.adapters, adapters);
+        for (const bl of entry.browsers) if (!report.browsers.includes(bl)) report.browsers.push(bl);
         log(`  ${entry.ok ? "PASS" : "FAIL"}  ${g}  [${entry.category}]  ${(entry.ms / 1000).toFixed(1)} s  on ${entry.adapters.join(", ") || "no adapter"}` +
             (entry.skips.length ? `  (${entry.skips.length} SKIP)` : ""));
     }
     try { fs.unlinkSync(logFile); } catch {}
     // v4871+ (rig-adapter-features-probe): one line per adapter, so the console says what each half of the GPU offers
     for (const a of report.adapters) log(`  features on ${adapterLabel(a)}: ${a.caps ? capsLine(a.caps) : "not recorded"}`);
+    for (const bl of report.browsers) log(`  browser: ${bl}`);
     report.verdict = verdict(report);
     report.summary = ["exact", "quality", "timing"].map((c) => { const gs = report.gates.filter((x) => x.category === c); return `${c} ${gs.filter((x) => x.ok).length}/${gs.length}`; }).join(", ");
     return report;
