@@ -16414,6 +16414,13 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
         widened: Object.freeze([]),
         verdict: "no gate file added, so nothing is claimed here (a gate may be claimed by ONE closing); one gate grew a section of seventeen rows (physics/render/rtPipeline-selfcheck, section 15: any-hit and instances, with section 1's two stage-list rows re-taken), run alone and green (149 PASS, 0 FAIL, 0 SKIP) and sabotaged fourteen ways against the real files -- two of which found the gate ending in a stack trace instead of a red row, fixed, and after that none 0 red; and tools/ship/absenceScope-selfcheck's one-level row, which this round turned red as it said it would, is two rows now (a second level exists; it is a list, not a tree), each sabotaged",
     }),
+    since624: Object.freeze({
+        at: "v4916", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "no gate file added, so nothing is claimed here (a gate may be claimed by ONE closing); one gate grew nine rows (tools/ship/sweepRotation-selfcheck: a cap retried once, an outlier held once), run alone and green (37 PASS) and sabotaged seven ways, each red by name",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

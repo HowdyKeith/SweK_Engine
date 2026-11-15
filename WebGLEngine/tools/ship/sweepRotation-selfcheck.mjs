@@ -24,7 +24,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runSlice, classifyRows, restoreLost, rebuildFinished, mergeTimings, writeBase,
-         CORROBORATION_BAND, UNDATED, ledgerFile, LEDGER_FILE, LOCAL_LEDGER } from "./sweepRotation.mjs";
+         CORROBORATION_BAND, UNDATED, ledgerFile, LEDGER_FILE, LOCAL_LEDGER,
+         hostOutlier, HOST_OUTLIER_FACTOR, RETRY_CAP_MS } from "./sweepRotation.mjs";
 import { BUDGET_MS } from "./sweepCoverage.mjs";
 import { KIND } from "./quickSweep.mjs";
 
@@ -238,7 +239,57 @@ console.log("\n*** v4824 -- THE CAP IS A KILL THE GATE CANNOT REFUSE ***");
     } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 }
 
-console.log("\nunchecked here: runSlice and the command line, both of which spawn gates. The CLI's argument " +
+console.log("\n*** v4916 -- ONE BOX ID, MORE THAN ONE MACHINE: A CAP IS RETRIED, AND AN OUTLIER IS HELD ONCE ***");
+{
+    // The readings below are v4915's own, from the rotation that was not committed: subAquariumPage's ring was
+    // [3820, 3306, 5377] and this host timed it at 32628; dogfightPage [5667, 5395, 17122] and 12369.
+    ok("a reading is an outlier only past the factor, on either side, and only against a ring of two or more",
+        HOST_OUTLIER_FACTOR === 2 && hostOutlier([3820, 3306, 5377], 32628) === "slow" && hostOutlier([15214, 11163, 13036], 6000) === "fast" &&
+        hostOutlier([3820, 3306, 5377], 7639) === null && hostOutlier([3820, 3306, 5377], 7641) === "slow" &&
+        hostOutlier([5000], 50000) === null && hostOutlier(undefined, 50000) === null && hostOutlier([5667, 5395, 17122], 12369) === "slow",
+        "the median, so one earlier outlier in the ring (17122) does not make a third reading look normal");
+    const file = { budgetMs: 3000, timings: { g: 5377, r: 5000, n: 4000 }, codes: { g: 0, r: 0, n: 0 }, at: { g: "T0", r: "T0", n: "T0" },
+                   serialRing: { g: [3820, 3306, 5377], r: [5000, 5100, 4900], n: [4000] }, finished: { g: true, r: true, n: true } };
+    const rows = [{ gate: "g", ms: 32628, code: 0, finished: true }, { gate: "r", ms: 30000, code: 1, finished: true }, { gate: "n", ms: 30000, code: 0, finished: true }];
+    const first = mergeTimings(file, rows, "T1", 20000, { heldBefore: {} });
+    ok("!! *** the first slow reading is HELD: the record's timing, ring and stamp for that gate are untouched ***",
+        first.held.length === 1 && first.held[0].gate === "g" && first.merged.timings.g === 5377 && first.merged.at.g === "T0" &&
+        JSON.stringify(first.merged.serialRing.g) === "[3820,3306,5377]" && first.heldOut.g.ms === 32628 && first.heldOut.g.side === "slow" && first.heldOut.g.median === 3820,
+        JSON.stringify(first.heldOut.g));
+    ok("!! a RED is never held, however far from its ring, and neither is a gate with one prior reading",
+        first.merged.timings.r === 30000 && first.merged.codes.r === 1 && first.merged.timings.n === 30000 && !("r" in first.heldOut) && !("n" in first.heldOut),
+        "a failing gate's verdict is not a host's opinion, and one reading is not a history");
+    const second = mergeTimings(file, [rows[0]], "T2", 20000, { heldBefore: first.heldOut });
+    ok("!! *** the SECOND slow reading in a row is WRITTEN, and the hold is cleared: nothing is suppressed for more than one rotation ***",
+        second.held.length === 0 && second.merged.timings.g === 32628 && second.merged.at.g === "T2" && !("g" in second.heldOut) &&
+        JSON.stringify(second.merged.serialRing.g) === "[3306,5377,32628]", JSON.stringify(second.merged.serialRing.g));
+    const back = mergeTimings(file, [{ gate: "g", ms: 4100, code: 0, finished: true }], "T2", 20000, { heldBefore: first.heldOut });
+    const flip = mergeTimings(file, [{ gate: "g", ms: 900, code: 0, finished: true }], "T2", 20000, { heldBefore: first.heldOut });
+    ok("a normal reading after a hold is written and clears it; an outlier on the OTHER side is a first, and held",
+        back.merged.timings.g === 4100 && !("g" in back.heldOut) && flip.held.length === 1 && flip.heldOut.g.side === "fast" && flip.merged.timings.g === 5377);
+    const legacy = mergeTimings(file, rows, "T1", 20000);
+    ok("a caller that passes no hold state gets the writer it always had: every row written",
+        legacy.held.length === 0 && legacy.merged.timings.g === 32628 && Object.keys(legacy.heldOut).length === 0);
+    // the retry, on a stand-in runner: killed at the first cap, finished at the second
+    const calls = []; const slow = (g, { timeoutMs }) => { calls.push(timeoutMs); return timeoutMs >= 1000 ? { code: 0 } : { code: "timeout/signal" }; };
+    const [again] = runSlice(["x"], { capMs: 200, retryCapMs: 1000, run: slow });
+    const [once] = runSlice(["x"], { capMs: 200, run: slow });
+    const [dead] = runSlice(["x"], { capMs: 200, retryCapMs: 1000, run: () => ({ code: "timeout/signal" }) });
+    ok("!! *** a gate killed at the cap is run ONCE more at the longer cap, and a finish there is the row ***",
+        JSON.stringify(calls.slice(0, 2)) === "[200,1000]" && again.finished === true && again.code === 0 && again.retriedFrom === 200 && again.capMs === 1000 && RETRY_CAP_MS === 120000,
+        `calls at ${calls.slice(0, 2).join(" then ")} ms`);
+    ok("with no retry cap the kill is recorded as it always was; killed twice is a kill, once, with the retry's cap on the row",
+        once.finished === false && once.retriedFrom === undefined && dead.finished === false && dead.code === "timeout/signal" && dead.capMs === 1000);
+    const capped = mergeTimings({ budgetMs: 3000 }, [again], "T3", 200);
+    ok("and the record's capAt for a retried gate is the cap it actually ran under", capped.merged.capAt.x === 1000 && capped.merged.kinds.x === "alone");
+    // SABOTAGE (v4916), each against sweepRotation.mjs, restored by copy:
+    //   1 a second outlier held like the first -> 1 red (the SECOND row). 2 a held reading written anyway -> 2 red.
+    //   3 a red may be held -> 2 red, "a RED is never held" by name. 4 the retry never runs -> 3 red.
+    //   5 the factor ten -> 2 red. 6 capAt ignoring the row's own cap -> 1 red. 7 the mean in place of the median ->
+    //   1 red: dogfightPage's ring holds one 17122 and the mean lets 12369 through.
+}
+
+console.log("\nunchecked here: the command line, and runSlice against real gates (v4916's retry is driven on a stand-in runner). The CLI's argument " +
     "handling is gated by tools/ship/cliArgs-selfcheck.mjs, which drives `--gates` against this tool's real " +
     "command line and watches it be refused; the slice runner itself is exercised every time a rotation runs.");
 process.exitCode = fails ? 1 : 0;
