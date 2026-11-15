@@ -130,3 +130,57 @@ None of this changes a rule, a bar, a side or a forecast of sections 2 to 5; it 
 **Forecasts.** Unchanged and scored as written on HELD, including "G's mirror bias on HELD is within 0.5 of +3.35" (80), for which the DEV figure (+2.248, 1.10 away) is bad news that I do not revise the forecast for.
 
 **The gate.** The rows that pinned 1.0 now pin 2.0 (5.3 and 1.4 pass, 1.95 away; the DEV figure 2.248 passes; 5.4 and 1.3 fail by name), and a row asks that this note carries the amendment.
+
+## HELD RESULT (2026-11-15; `node tools/ship/takeEvadeSeat.mjs held --write`, geometries 107001 to 107024, flown ONCE, exit 0; record `brain/subEvadeSeatHeld.json`)
+
+Keith asked for it after Amendment C. The registered checks (as amended) all passed (none printed, exit 0), **G's mirror bias among them: +1.684 is 1.67 from +3.35, inside the amended 2.0 by 0.33 and outside the old 1.0 by 0.67**: under the check as first registered this read would have been void too. Under the check as amended it is the read, and it is read as it stands.
+
+**R0 FAILS on HELD: U:league7001 is NEUTRAL (-0.483, se 0.552, z -0.9), not REVERSED.** G is SEAT-A (+1.684, se 0.608, z 2.8; seat A's boat sunk 6 times, seat B's 18). The reversal that Part A read (-1.873, 8 geometries) and that the DEV read printed (-2.280, void by the registered check) does not appear on this set at the registered bar.
+
+**The 17 sides, each against itself** (HELD; the DEV figure beside each, from the void read, for the eye only):
+
+| side | HELD mean (se) | z | label | sunk A / B / neither | DEV mean |
+|---|---|---|---|---|---|
+| G | +1.684 (0.608) | +2.8 | SEAT-A | 6 / 18 / 0 | +2.248 |
+| U:league7001 | -0.483 (0.552) | -0.9 | NEUTRAL | 11 / 7 / 6 | -2.280 |
+| S:league7001 (speed alone) | +1.679 (0.606) | +2.8 | SEAT-A | 6 / 18 / 0 | +2.242 |
+| T:league7001 (time alone) | +1.684 (0.608) | +2.8 | SEAT-A | 6 / 18 / 0 | +2.248 |
+| N:league7001 (turn alone) | +0.063 (0.674) | +0.1 | NEUTRAL | 12 / 12 / 0 | +0.997 |
+| ST:league7001 | +1.679 (0.606) | +2.8 | SEAT-A | 6 / 18 / 0 | +2.242 |
+| SN:league7001 | -0.360 (0.572) | -0.6 | NEUTRAL | 11 / 8 / 5 | -1.782 |
+| TN:league7001 | +0.061 (0.675) | +0.1 | NEUTRAL | 12 / 12 / 0 | +0.601 |
+| STN:league7001 | -0.223 (0.590) | -0.4 | NEUTRAL | 11 / 9 / 4 | -1.920 |
+| U:league7103 | +1.110 (0.638) | +1.7 | NEUTRAL | 8 / 16 / 0 | +0.325 |
+| S, T, ST:league7103 | +1.683, +1.684, +1.683 | +2.8 | SEAT-A | 6 / 18 / 0 | +2.247, +2.248, +2.247 |
+| N:league7103 | +0.063 (0.674) | +0.1 | NEUTRAL | 12 / 12 / 0 | +0.997 |
+| SN:league7103 | +0.187 (0.656) | +0.3 | NEUTRAL | 11 / 12 / 1 | +0.723 |
+| TN:league7103 | +0.316 (0.646) | +0.5 | NEUTRAL | 10 / 12 / 2 | +0.602 |
+| STN:league7103 | +0.313 (0.642) | +0.5 | NEUTRAL | 10 / 12 / 2 | +0.597 |
+
+**As printed:** R0 no. R1 no; R2 (STN:league7001) no; R3 (N alone) no; R4 (SN) no; R5 (S alone) no; R6 (league7103: neither U nor STN reversed) yes. **HEADLINE (the registered rule): NOTHING OF THE TRIPLE REVERSES IT** (R2 does not hold). Forecast quantities: in every REVERSED side seat A's boat is sunk more often than seat B's: **no** (there is no REVERSED side, and Amendment A item 1 asks for at least one); G's mirror bias within 0.5 of +3.35: **no**.
+
+**Forecasts, scored** (my probability; outcome on the printed quantity of HELD; "calls" is the probability I gave to what happened). "R0 holds on DEV" (70) is **not scored**: the DEV read was void under the registered check.
+
+| forecast | mine | outcome | calls |
+|---|---|---|---|
+| R0 holds on HELD | 72 | **no** | 28 |
+| R2: STN(league7001) REVERSED | 60 | **no** | 40 |
+| R3: N(league7001) alone REVERSED | 8 | no | 92 |
+| R4: SN(league7001) REVERSED | 45 | no | 55 |
+| R5: S(league7001) alone REVERSED | 10 | no | 90 |
+| R6: neither of league7103's sides REVERSED | 80 | yes | 80 |
+| headline is "THE SPEED IS WHAT REVERSES IT" | 30 | no | 70 |
+| headline is "THE TRIPLE, AND NO PART OF IT ALONE" | 20 | no | 80 |
+| in every REVERSED side seat B's boat is sunk more than seat A's (at least one REVERSED side, Amendment B) | 85 | **no** | 15 |
+| G's mirror bias within 0.5 of +3.35 | 80 | **no** | 20 |
+
+**Six of ten went as the larger side said, four did not, and they are the four that mattered:** R0 (72), R2 (60), the sunk-boats quantity (85, which needs a REVERSED side to exist and so fell with R0, not independently of it) and G's bias (80). The last I did not revise after the DEV figure of +2.248 had already said no, as Amendment C records, and HELD said no by more (+1.684): G's mirror bias is +3.37 on 8 geometries, +2.25 and +1.68 on the two sets of 24, and a forecast of 80 for "within 0.5" was not a forecast of that spread. The six that came out as forecast are the ones that said "not": the turn alone, the speed alone, and the triple-with-no-part headlines were all given low odds and none happened, which is cheap when nothing reverses.
+
+**What the three reads say together (post hoc, labelled as such: no rule reads more than the one set; DEV is void under the registered tolerance, so reading it here is a choice).**
+
+1. **The registered claim, that league7001 is REVERSED against itself, did not replicate on HELD.** Part A -1.873 (se 0.830, 8 geometries), DEV -2.280 (se 0.378, void), HELD **-0.483 (se 0.552)**. All three are negative; only the first two cross the bar. Pooling DEV and HELD (equal sets of 24), U is about -1.38 with a standard error of about 0.33, which would cross the bar, but it includes a read the rules do not weigh, and HELD alone, the registered read, does not.
+2. **The direction does replicate, and so does its order.** On both sets G is the highest (+2.248, +1.684) and U the lowest of the league7001 sides (-2.280, -0.483), with the cells between them: the turn alone takes G to about +1.0 (DEV) and +0.06 (HELD), speed with the turn to -1.78 and -0.36, the triple to -1.92 and -0.22. Speed alone and time alone are G to the digit on both sets (S and T and ST are SEAT-A, the same as G); the turn is what moves the seat bias; speed matters only with the turn: the split and dose notes' pattern again. **The size of the move is smaller on HELD:** G to U is -4.53 on DEV and -2.17 on HELD, and the sunk counts say the same (U on DEV: seat A's boat sunk 20, seat B's 2; on HELD 11 to 7 with 6 duels in which neither is sunk).
+3. **The seat bias of G itself is set-dependent** (+3.37, +2.25, +1.68: sets of 8, 24 and 24 geometries), which is also what the amended check allows for; and a reading that says "a doctrine reverses the seat" needs a fixed G to be compared to.
+4. **league7103** has no reversed side on either set (U +0.325 DEV, +1.110 HELD).
+
+**What is NOT shown:** that league7001's seat reversal is real (HELD does not show it; DEV and Part A show it and are not the registered read); that it is not real (HELD is one set, and a z of -0.9 with a standard error of 0.55 is not a bound); a mechanism; why G's own bias moves between sets by a factor of two (not examined); anything about another finder than these two.
