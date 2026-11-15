@@ -170,7 +170,7 @@ Steps on T28: FLAT (+0.279, z 1.5), UP (+1.477), FLAT, FLAT, UP (+0.601), FLAT, 
 | R6 on T28: the bound binds (SPAN-TOP UP) | 40 | no | 60 |
 | the arm at league7103's speed 3.546 within 0.5 of the arm at G's speed (T28) | 85 | yes (+0.265) | 85 |
 
-**All twelve went as the larger side said, and that is a thing about my priors and not a triumph:** the four near-coins (T25's threshold above T28's at 60, all-monotone at 55, the bound binding at 40, T28 monotone at 75) are the informative ones, and each fell on the side I leaned to; but two of them (T28 monotone and all-monotone) had printed NO on DEV, and the DEV DOWN step that said so (4.50 below 4.32 at z -2.8) did **not** replicate (-0.065 on HELD). I was right to give it 75 only because a DOWN needs z of 2 and the registered rule flags a false one about two times in a hundred a step; it was on one set a one-in-twenty-one event, which is about what 21 steps at z of 2 give.
+**All twelve went as the larger side said, and that is a thing about my priors and not a triumph:** the four near-coins (T25's threshold above T28's at 60, all-monotone at 55, the bound binding at 40, T28 monotone at 75) are the informative ones, and each fell on the side I leaned to; but two of them (T28 monotone and all-monotone) had printed NO on DEV, and the DEV DOWN step that said so (4.50 below 4.32 at z -2.8) did **not** replicate (-0.065 on HELD). A false DOWN is about 2 in 100 a step under the registered rule, so about 13 in 100 over a curve's seven steps; the DEV step was either one of those or a small real effect that HELD does not show, and HELD says FLAT.
 
 **What the two sets say together (post hoc, labelled as such: no rule reads two sets).**
 
