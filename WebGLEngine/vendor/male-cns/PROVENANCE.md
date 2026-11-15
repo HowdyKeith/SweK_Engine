@@ -83,15 +83,37 @@ circuits "significant-only" in the flat files is the edge set Neuprint returned.
 1,571; PFL3 to PFL3 853; PFL3 to DNa02 736 (every one to the DNa02 of the other `somaSide`); PFL2 to
 PFL2 606; DNa03 to DNa02 552; PFL3 to DNa03 468. `brain/helmSteerPolicy-selfcheck.mjs` pins these.
 
+The JSON's `sources.*.file` are the names the files had on the disk that read them
+(`body-annotations-v1.0.feather`, `connectome-weights-v1.0-significant-only.feather`,
+`body-neurotransmitters-v1.0.feather`); the names above are the bucket's. The sha256 is the same file.
+
+### Transmitter predictions, and two more circuits (same day, same route)
+
+- `body-neurotransmitters-male-cns-v1.0.feather`
+  sha256 `95c9289220663abeb3409f3ad9e5a7f8a53f8093f5139d15502cd08da8879621`
+
+With `--neurotransmitters`, each neuron also carries `nt` (the release's `consensus_nt`: a classifier's
+PREDICTION from the EM images, pooled over the cell type -- not a measurement) and `ntConfidence`.
+`cx-steering-circuit.json` was re-extracted with them; its neurons and edges are unchanged.
+
+`cx-steering-inputs-circuit.json` -- the steering output WITH ITS INPUTS: `EPG` 46, `Delta7` 42
+(predicted glutamate), `FC2A` 18, `FC2B` 27, `FC2C` 47, and the 40 neurons above. 220 neurons, 7,981
+edges. The 40-neuron file is exactly its sub-circuit.
+
+`lc10-tracking-circuit.json` -- a visual target-tracking pathway: `LC10a` 275, `AOTU019` 2 (predicted
+GABA), `AOTU025` 2, `DNa02` 2. 281 neurons, 6,589 edges.
+
+Both are DATA ONLY so far (nothing runs on them). `brain/maleCnsCircuits-selfcheck.mjs` pins all three.
+
 **Licence, said plainly:** the bucket's own README states no licence. CC-BY-4.0 is what this file
 records for the dataset as served by Neuprint; it was NOT re-confirmed for the bucket route.
 
-**Not here:** the inputs to this circuit (the fan-shaped body's goal cells and the compass, which is
-`epg-compass-circuit.json`; no E-PG to PFL connection is in either file), and neurotransmitter signs.
+**Not here:** the eye's own input to LC10a, the other LC10 subtypes, and anything upstream of FC2.
 
 ## Contents
 
-- `giant-fiber-circuit.json`, `epg-compass-circuit.json`, `cx-steering-circuit.json` — see the circuit sections above.
+- `giant-fiber-circuit.json`, `epg-compass-circuit.json`, `cx-steering-circuit.json`,
+  `cx-steering-inputs-circuit.json`, `lc10-tracking-circuit.json` — see the circuit sections above.
 - `PROVENANCE.md` — this file.
 
 Re-running the fetch (e.g. for a different circuit, or a refreshed dataset version) uses the same fetch

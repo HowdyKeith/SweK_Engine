@@ -6,6 +6,7 @@
 # shape vendor/male-cns/*.json already has (without the skeletons: the flat connectome has none), so tools/bakeConnectomeTopology.mjs bakes it as it bakes the others.
 #
 #   python3 tools/maleCnsFlatExtract.py --annotations <body-annotations-...feather> --weights <connectome-weights-...feather> --types PFL2,PFL3,DNa02,DNa03 --name "..." --out vendor/male-cns/<file>.json
+#   ... --neurotransmitters <body-neurotransmitters-...feather>     # also write each neuron's PREDICTED transmitter (`nt`, the release's consensus_nt) and the cell type's confidence (`ntConfidence`)
 #   ... --check vendor/male-cns/giant-fiber-circuit.json     # instead of --out: extract the types that file holds and say whether the neurons and the edges are the same (the cross-check against the Neuprint fetch)
 #
 # Needs pyarrow (pip install pyarrow). It reads the weights a record batch at a time (the file is 25 million rows), keeps only rows whose two ends are both in the set, and holds nothing else. The neurons come out sorted by type (in the order given) and then by bodyId; the edges sorted by (from, to).
@@ -22,7 +23,7 @@ def sha256(path):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--annotations", required=True); ap.add_argument("--weights", required=True)
-    ap.add_argument("--types"); ap.add_argument("--name", default=""); ap.add_argument("--out"); ap.add_argument("--check")
+    ap.add_argument("--types"); ap.add_argument("--name", default=""); ap.add_argument("--out"); ap.add_argument("--check"); ap.add_argument("--neurotransmitters")
     a = ap.parse_args()
     import pyarrow as pa, pyarrow.compute as pc, pyarrow.feather as pf
     ref = json.load(open(a.check)) if a.check else None
@@ -34,6 +35,10 @@ def main():
     missing = [t for t in types if not any(r[2] == t for r in rows)]
     if missing: sys.exit(f"maleCnsFlatExtract: no neuron of type {', '.join(missing)} in the annotations")
     ids = [r[1] for r in rows]; idset = pa.array(ids, type=pa.int64())
+    nts = {}
+    if a.neurotransmitters:   # the release's PREDICTED transmitter for each neuron (a classifier's call from the EM images, pooled over the cell type: `consensus_nt`), and how sure the cell type's call is
+        nt = pf.read_table(a.neurotransmitters, columns=["body", "consensus_nt", "celltype_predicted_nt_confidence"]); nt = nt.filter(pc.is_in(nt.column("body"), value_set=idset)).to_pydict()
+        nts = {b: (c, None if q is None else round(q, 3)) for b, c, q in zip(nt["body"], nt["consensus_nt"], nt["celltype_predicted_nt_confidence"])}
     reader = pa.ipc.open_file(pa.memory_map(a.weights)); edges = []; seen = 0
     for k in range(reader.num_record_batches):
         b = reader.get_batch(k); seen += b.num_rows
@@ -55,9 +60,9 @@ def main():
         "dataset": "male-cns:v1.0", "server": "https://storage.googleapis.com/flyem-male-cns/v1.0/connectome-data/flat-connectome/", "fetchedAt": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         "license": "CC-BY-4.0 (as vendor/male-cns/PROVENANCE.md records for this dataset from the Neuprint server; the release bucket's README states none; not re-confirmed)",
         "citation": "Janelia FlyEM male-cns connectome v1.0, flat-connectome release files (gs://flyem-male-cns)", "name": a.name, "types": types,
-        "sources": {"annotations": {"file": a.annotations.split("/")[-1], "sha256": sha256(a.annotations)}, "weights": {"file": a.weights.split("/")[-1], "sha256": sha256(a.weights), "rows": seen}},
+        "sources": {"annotations": {"file": a.annotations.split("/")[-1], "sha256": sha256(a.annotations)}, "weights": {"file": a.weights.split("/")[-1], "sha256": sha256(a.weights), "rows": seen}, **({"neurotransmitters": {"file": a.neurotransmitters.split("/")[-1], "sha256": sha256(a.neurotransmitters)}} if a.neurotransmitters else {})},
         "neuronCount": len(ids), "edgeCount": len(edges),
-        "neurons": [{"bodyId": b, "type": t, "instance": i, "somaSide": s} for _, b, t, i, s in rows], "edges": edges,
+        "neurons": [{"bodyId": b, "type": t, "instance": i, "somaSide": s, **({"nt": nts.get(b, (None, None))[0], "ntConfidence": nts.get(b, (None, None))[1]} if a.neurotransmitters else {})} for _, b, t, i, s in rows], "edges": edges,
     }
     json.dump(out, open(a.out, "w"), separators=(",", ":")); open(a.out, "a").write("\n")
     print(f"[maleCnsFlatExtract] {a.out}: {len(ids)} neurons ({', '.join(f'{t} {sum(1 for r in rows if r[2] == t)}' for t in types)}), {len(edges)} edges among them, of {seen} rows read")
