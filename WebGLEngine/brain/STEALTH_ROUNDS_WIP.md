@@ -7,9 +7,9 @@ What each round is and its status (updated as the rounds finish):
 | # | round | files | status |
 |---|---|---|---|
 | 1 | Santon's motion-detector analysis on synthetic treadmill stimuli | `brain/stealthMotion.mjs`, `brain/stealthMotion-selfcheck.mjs` | DONE (this section) |
-| 2 | Zhao's EMD, LPLC2 and Giant Fiber model, and a variant with the LPLC2 units on the measured lattice | | |
-| 3 | Stealth stimuli on the fly models (predictions registered first) | | |
-| 4 | Luan's crab MLG1 looming-localization network | | |
+| 2 | Zhao's EMD, LPLC2 and Giant Fiber model, and a variant with the LPLC2 units on the measured lattice | `brain/flyEmdLplc2Gf.mjs`, `-selfcheck.mjs` | DONE |
+| 3 | Stealth stimuli on the fly models (predictions registered first) | `brain/stealthLoomStimuli.mjs`, `brain/stealthRound3-run.mjs`, `brain/stealthRound3-results.txt` | DONE: NOT SUPPORTED |
+| 4 | Luan's crab MLG1 looming-localization network | `brain/crabMlg1.mjs`, `-selfcheck.mjs` | DONE (one paper result NOT reproduced) |
 | 5 | Stealth stimuli on the crab model (predictions registered first) | | |
 | 6 | The Escape task against a camouflaged predator (registered first) | | |
 
@@ -73,4 +73,15 @@ Moving-stripe ratio = peak active-unit count on the moving-stripe ellipse over t
 
 **What this does NOT say:** it says nothing about the fly or the crab; it says one particular detector model (Zhao 2023's, with an assumed luminance scale and an assumed surround strength) is only partly fooled. The surround strength kappa was made up, so C is a direction, not a result; the lattice degrees-per-column is an assumption (5). The stimulus is a looming ellipse on a collision course, not the paper's treadmill ellipse.
 
-**Gate:** `flyEmdLplc2Gf-selfcheck.mjs` gained section 6b (surround: null equals plain, huge kappa equals plain, kappa 0 lowers the peak and the peak is monotone in kappa, bad options refused). Mutants of the surround code: NOT YET RUN.
+**Gate:** `flyEmdLplc2Gf-selfcheck.mjs` gained section 6b (surround: null equals plain, huge kappa equals plain, kappa 0 lowers the peak and the peak is monotone in kappa, bad options refused). Mutants of the surround code: 15, 14 red, 1 equivalent.
+
+## Round 2 (DONE): Zhao 2023's EMD, LPLC2 and Giant Fiber model
+
+`brain/flyEmdLplc2Gf.mjs` (pure, no authors' code read): per-pixel high-pass and rectified, low-passed ON/OFF paths, half-detectors on neighbouring pixels, cross-shaped LPLC2 fields (multiplicative or additive), and a leaky integrate-and-fire Giant Fiber driven by N_act dN_act/dt. **What holds (gate rows):** silent for bars, edges, gratings, receding and contracting squares; active for looming, constant-edge-speed and outward cross motion; the additive control answers a bar and a grating; first spike at a nearly constant angular size across r/v (CV under 0.15) and its time linear in r/v; the first-spike size grows with the field side (34.4, 41.7, 48.3, 57.3 degrees for 60 to 120 pixels). The 57-unit lattice variant (units at the measured LPLC2 positions, 5 degrees per column assumed) is silent for a bar, fires for a loom and its active centroid lands within 20 pixels of the loom centre at five positions.
+**What does NOT agree with the paper:** first-spike size about 49 degrees (46 to 52), the paper's 34; no firing at r/v 10 ms (the paper fires from 10 ms; the square moves 5 pixels per frame, beyond the detector's range). The luminance scale (0 to 255) and the units of N_act dN_act/dt are assumptions. **Gate:** `node brain/flyEmdLplc2Gf-selfcheck.mjs`, 74 mutants (70 red, 1 equivalent, 3 invalid strings; five survivors closed), plus 15 for the surround code.
+**NOT CHECKED:** the authors' MATLAB, the robot and real-video tests.
+
+## Round 4 (DONE): Luan 2022's MLG1 crab model
+
+`brain/crabMlg1.mjs`: 16 segments of 37.5 degrees over a 360 degree strip, each with the photoreceptor-persistence, lateral-inhibition, grouping (3x3 mean product over omega), adaptive coefficient c(t), sigmoid, feed-forward inhibition, spike and alarm layers (eq. 1 to 20, Table 1), plus a winner-take-all over the first alarming segments (eq. 21, 22). **What holds:** a static scene gives M 0.5 and no spike; the approaching ball is localised to its segment at azimuth 0, 45, 90, 180, 270 (segments 0, 2, 4, 8, 12); 5 degrees off gives the same segment within one; the alarm distance grows with size and speed; a darker ball alarms earlier and a low-contrast one not at all; a whole-scene flicker is suppressed by the feed-forward inhibition (under 5 percent of the spikes); a drifting texture alone does not alarm.
+**What is NOT reproduced, said plainly:** a RECEDING ball alarms in this implementation (within 12 frames), against the paper's report that it does not, and this survived mu 3, n_sp 6, the printed inhibition sign and the printed |G~| form of eq. 12; pinned as a negative finding, cause unknown (candidates not isolated: the first-frame handling, the 3x3 kernel details, the assumed thresholded sum m; none tested). Round 5 results must carry this caveat. **Gate:** `node brain/crabMlg1-selfcheck.mjs`; 82 mutants, 14 first-pass survivors, all but the equivalent ones closed (see the gate header). **NOT CHECKED:** the authors' code, their camera panoramas, the Colias robot, the physiological recordings.
