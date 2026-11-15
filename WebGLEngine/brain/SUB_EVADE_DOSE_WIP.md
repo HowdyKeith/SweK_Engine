@@ -1,0 +1,75 @@
+# Submarine duel: a dose of the evade turn (REGISTRATION 2 OF 4 of the evade follow-ups; 2026-11-15; UNNUMBERED; REGISTERED BEFORE ANY CODE FOR IT IS WRITTEN AND BEFORE ANY GEOMETRY OF ITS SETS IS FLOWN)
+
+Keith, 2026-11-15: "lets register each of those in the order that you suggest". Second of four, written before the result of any of them (`brain/SUB_EVADE_SPLIT_WIP.md` is the first, `brain/SUB_EVADE_OPPONENT_WIP.md` the third, `brain/SUB_EVADE_SEAT_WIP.md` the fourth; the order and its reasons are in the first). A registration and nothing else: **no command, no gate and no geometry of its sets exists yet.**
+
+**What this changes in shared files, said first: nothing.** New files only: this note, `tools/ship/takeEvadeDose.mjs` (the command), `tools/ship/takeEvadeDose-selfcheck.mjs` (its gate), `brain/subEvadeDoseDev.json` and `brain/subEvadeDoseHeld.json`. It imports, and does not edit, `tools/ship/takeEvadeTurn.mjs` (`graft`, `rowOf`, `seatEdge`), `tools/ship/takeSubLeague.mjs` (`loadRuns`, `finds`, `signed`) and `brain/subTournament.mjs`. The bar and the method are those of `brain/SUB_EVADE_WIP.md`: an arm FINDS at an edge of at least 0.5 with z of at least 2 against generation 0 (G), both seats, 24 geometries.
+
+## 1. What is known (read from the records; nothing here is flown again)
+
+* **The turn has been read at two ends and three points between.** On G alone (the GN arms of `brain/SUB_EVADE_WIP.md`) the turn is 1.71 at G, and 2.65, 2.70 and 2.80 at the three distinct finders' values. **The edge rises with the turn at those three points, on both sets**: DEV +0.70, +0.84, +0.97 and HELD +1.10, +1.23, +1.36, for turns of 2.651, 2.698 and 2.800: about 1.8 points of edge per radian near the top, the same slope on two sets of 24 geometries. A straight line through those points reaches an edge of 0 at a turn of about 2.0 (HELD) to 2.3 (DEV) and the bar (0.5) at about 2.3 (HELD) to 2.5 (DEV); it does not pass through G (1.71, edge exactly 0) with a slope of 1.8 (it would be -0.6 there on HELD and -1.0 on DEV), so the curve is not a straight line from G, and **nothing between 1.71 and 2.65 has been flown.**
+* **A reference point:** the tuned tactician of the notes (`brain/subTacticsThetaWip.json`) has a turn of 2.19, and ties G in the Part A record (24-0-24, edge +0.019); the two differ in other numbers, so it is not a dose of the turn.
+* **The turn is bounded 0.4 to 2.8 rad** (`THETA_BOUNDS`) and the finders' turns of 2.80 are the bound itself (three of the five; checked: league7001, league7103 and exploit7200 are exactly 2.8). A turn of 2.8 is a heading 160 degrees off the torpedo's bearing; G's is 98.
+* **The strong finders' speed and time are what is added to the turn in the triple** (`brain/SUB_EVADE_SPLIT_WIP.md` asks which of the two matters). Here they are held at two fixed pairs, not varied.
+
+## 2. The question and the arms
+
+**The question.** Where on the way from G's turn (1.71) to the ceiling (2.8) does the turn start to matter, is the curve monotone, and where does it stop paying? And does it behave the same with the strong finders' speed and time on as with G's?
+
+**Three curves, each a set of arms flown against G, both seats, 24 geometries (48 duels) by `subTournament.matchup`; every side a tactician and the PD autopilot.** Doses of the turn (rad): **1.9, 2.1, 2.3, 2.5, 2.65, 2.8** (the ceiling).
+
+| curve | what the arm is (G with ...) | arms |
+|---|---|---|
+| A | evadeTurn = the dose | 6 |
+| B1 | league7001's evadeSpeed (4.317) and evadeTime (33.68), and evadeTurn = the dose; and the dose G's own turn (1.709): the speed and time alone | 7 |
+| B2 | league7103's evadeSpeed (3.546) and evadeTime (30.08), and evadeTurn = the dose; and G's own turn | 7 |
+
+**20 arms.** A dose of G's own turn on curve A is G, with an edge of exactly 0 against itself. **The steps:** the arm of each dose against the arm of the next dose down on its curve (the higher dose as the first side): 5 on A, 6 on B1 and 6 on B2, **17 head-to-head matchups**, each both seats on the same 24 geometries. Nothing is searched, tuned or re-fit; every number is a number of G or of a finder in a file.
+
+## 3. The sets and the order
+
+* **smoke**: geometries 1 to 4, never recorded, free to read.
+* **DEV**: **102001 to 102024**, both seats; flown first, read freely, recorded once in `brain/subEvadeDoseDev.json`; it decides whether HELD is spent (R0).
+* **HELD**: **103001 to 103024**, both seats; flown ONCE (`held --write`; refuses without a recorded DEV that replicates, without `--write`, or if its record exists); the rules are about HELD.
+* No submarine file uses 102001 to 103024 (searched; the digits appear in sub-named files only as the number 100000 for a range).
+* **Amendments:** as in the other notes: only dated, only before this note's HELD, said why; this note is written before the results of the other three and a result of theirs that should change it is an amendment dated before this note's DEV, or it is not used.
+* **The order of work:** this note, the command, its gate with a sabotage log (never flying 102001 to 103024), smoke, DEV, then HELD if R0 holds.
+
+## 4. The rules (MY CHOICES, said; Keith may set them differently)
+
+* **R0 REPLICATES** iff the ceiling arm of curve A (turn 2.8, the GN arm of the other note) finds AND the ceiling arm of curve B1 (the triple of league7001, GT of the other note) finds. On DEV, if R0 fails HELD is not flown by this registration. (Both found on both earlier sets, at +0.97 and +3.10 on DEV and +1.36 and +3.10 on HELD.)
+* **A STEP** is UP if the higher dose beats the lower head-to-head at paired z of at least 2, DOWN if it loses at z of at most -2, FLAT otherwise.
+* **R1 THRESHOLD** (per curve): the smallest dose whose arm finds against G; for B1 and B2 the dose of G's own turn counts. It is named LOW (1.9 or 2.1), MID (2.3 or 2.5), HIGH (2.65 or 2.8) or NONE (no dose finds).
+* **R2 MONOTONE** (per curve): no step is DOWN. **REVERSAL** names the dose of the first DOWN step.
+* **R3 SATURATION** (per curve): the smallest dose from which no later step is UP (all FLAT or DOWN); "none" if the last step is UP.
+* **The readings** (written now): a curve's threshold LOW means the turn works well below the bound; MID that it works in the middle of the range; HIGH that it needs the top of it; a saturation dose below 2.8 means the last stretch to the ceiling pays nothing on that curve; a REVERSAL is a dose that is worse than the one below it and is reported with its z.
+* **Reported with the read, not in a rule:** each arm's edge, se, z, wins-draws-losses and its edge in seat A and in seat B; the edge of B1 minus A (and B2 minus A) at each shared dose; the slope of curve A over its top three doses (2.5, 2.65, 2.8), to compare with the 1.8 a radian of section 1.
+* **Checks that void the read, said and not weighed:** every arm flew the same geometries (48 fights on the set's seeds, each twice); no non-finite score; every theta one `clampTheta` leaves unchanged; the dose of G's own turn on curve A has an edge of exactly 0 against G; the ceiling arm of curve A is the GN arm of league7001 and the ceiling arms of B1 and B2 are GT(league7001) and GT(league7103) of `tools/ship/takeEvadeTurn.mjs`, to the number (theta equal); the head-to-head of two equal thetas has an edge of exactly 0.
+
+## 5. Forecasts, written before any geometry of any of the four sets is flown (probabilities, mine)
+
+| forecast | probability |
+|---|---|
+| R0 holds on DEV | **92** |
+| R0 holds on HELD | **90** |
+| curve A's threshold is MID or LOW (at most 2.5) | **65** |
+| curve A's threshold is LOW (1.9 or 2.1) | **20** |
+| curve A is MONOTONE (no DOWN step) | **70** |
+| curves A, B1 and B2 are all MONOTONE | **50** |
+| curve B1's threshold is lower than curve A's | **70** |
+| curve B1's edge is above curve A's at every dose of 2.1 and up | **80** |
+| curve B2's edge is within 0.5 of curve A's at every dose (its speed and time add nothing) | **55** |
+| curve A saturates below 2.8 (its last step to the ceiling is not UP) | **40** |
+
+Why these: the slope of 1.8 and the line through three points put the bar at 2.3 to 2.5, hence 65 for MID or LOW and 20 for LOW (the line says 2.0 to 2.3 for zero edge, and a curve that bends up toward the top, which the missing -0.6 at G suggests, would put the threshold higher); five steps at z of 2 will each flag a false DOWN about two times in a hundred, which with a real bend is why monotone is 70 and not 90; the strong finders' speed makes the boat louder and faster and I expect it to add to the turn at every dose, but league7103's HELD numbers (the turn alone is all its edge, its triple adds +0.006) are why curve B2 may sit on curve A.
+
+## 6. What a result would not say
+
+* **That the turn works by the same mechanism along the whole curve.** A dose is a heading further from the torpedo's bearing; whether a larger turn does better because the torpedo cannot follow it, because the boat is out of the seeker's cone sooner, or because of something about where the boat ends up, was not asked.
+* **That a dose between the ones flown behaves like its neighbours** (six doses on A, seven on B1 and B2; nothing between 2.3 and 2.5 or between 2.5 and 2.65).
+* **That B1 or B2 is the finders' behaviour:** each is G with two of a finder's numbers (speed and time) and the dose, and the other nine are G's.
+* **That a FLAT step is no difference:** twenty-four geometries cannot see a difference smaller than about 0.5 at z of 2 on the arms the finders' edges are made of; FLAT means "not shown".
+* **Anything against an opponent but G** (registration 3), **the three numbers apart** (1) **or the seat** (4).
+
+## 7. Cost
+
+20 arms and 17 steps plus the checks' two extra matchups is about 40 matchups of 48 duels a set, a minute and a half of one core; the command, its gate and a sabotage pass are the work.
