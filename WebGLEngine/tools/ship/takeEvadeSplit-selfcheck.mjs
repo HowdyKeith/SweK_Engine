@@ -11,7 +11,13 @@
 //   6 THE SOURCE  no clock, no random number; the headers; ASCII; the registration names the sets, the finders, the arms and the bar
 // NOT CHECKED, said plainly: the readings on DEV and HELD (that is the read of brain/SUB_EVADE_SPLIT_WIP.md, flown by the command, not here).
 //
-// SABOTAGES: written after the gate; the log is added below when the pass is done.
+// SABOTAGES (the mutation harness copies the gate's import closure to isolated trees, runs the unmutated gate first, changes one token at a time plus 43 hand mutants, and counts a FAIL, a crash or a hang as killed):
+//   PASS 1  197 mutants (154 tokens, 43 hand): 169 red, 26 crash, 0 hang, 2 ALIVE; all 43 hand mutants (the cells' keys one by one, the U arm as G, the wrong donor, the carry bar and its direction, needed and dispensable swapped, the speed and time reading each other's label, the turn
+//           reading R4, R1 and R2 counting carries, F' as every finder, the odd finder, the strong four including it, the apart line from the first finder, the shares over every finder, the headline's join and its none-needed name and its partial guard, the replicate bar, the yes/NO of R0,
+//           the seats swapped in the report, cellChecks without the N cell, the evade-turn checks dropped, every HELD and DEV refusal, smoke recorded, unknown arguments, the exit code, the default sets, the sets' starts, the record's set and file, the direct flight) was killed.
+//           The first gate version had no survivor that was real: the two that live are EQUIVALENT, said: `L.runs[0].gen0` -> `L.runs[1].gen0` (loadRuns refuses any run whose generation 0 is not the search-ping champion, so every run's gen0 is G, and the checks' own row compares all of them);
+//           `typeof process !== "undefined" && Array.isArray(process.argv)` -> `||` (Node always has a process; the guard is for a browser). The harness's summary says `treesIntact: false` because the registration note, which the gate reads and which is copied into each tree, was appended to (Amendment A) while the pass ran;
+//           each tree's four source files and the note were compared with the committed blobs after the pass and are identical, so every mutant ran on the committed text.
 "use strict";
 import fs from "node:fs";
 import crypto from "node:crypto";

@@ -78,3 +78,16 @@ Why these: the strong finders' evade speed is 0.9 to 1.1 m/s above G's while the
 ## 7. Cost
 
 46 matchups of 48 duels (40 arms, one identity, five direct) is about 2,200 duels a set, a minute and a half to two minutes of one core; the command, its gate and a sabotage pass (the evade-turn gate's 217 mutants took about 10 minutes on four cores) are the work.
+
+## AMENDMENT A (2026-11-15; made while the command `tools/ship/takeEvadeSplit.mjs` was written and smoke-run on geometries 1 to 4, BEFORE any DEV geometry (100001 to 100024) or HELD geometry (101001 to 101024) was flown)
+
+None of this changes a rule, a bar, a count, an arm or a forecast of sections 2 to 5; it fills in what the registration left unsaid, and it is dated before any data.
+
+1. **Fewer than 3 finders**, as in Amendment A of `brain/SUB_EVADE_WIP.md`: "most" and "few" overlap, so every label is `n/a`, the three NEEDED / DISPENSABLE words are `n/a` and there is no headline; R0 fails at n' below 4 in any case.
+2. **What the command does**, as for `tools/ship/takeEvadeTurn.mjs`: `smoke` flies geometries 1 to 4 and is never recorded; `dev` flies 100001 to 100024 and prints (it may be run without `--write`); `dev --write` records `brain/subEvadeSplitDev.json` once; `held --write` is the only way to fly 101001 to 101024 and refuses without `--write`, over an existing `brain/subEvadeSplitHeld.json`, and unless the DEV record is a record of the `dev` set whose rules say R0 held. The record's `set` is the set that was flown.
+3. **The bar, written as code.** A cell CARRIES iff its edge is **at least 0.8 times its finder's unmodified edge** (`edge >= 0.8 * edge of U`), so a cell at exactly four fifths carries; a cell FINDS iff its edge is at least 0.5 with z at least 2. The speed is read DISPENSABLE from R4 (time and turn carry), the time from R3 (speed and turn carry) and the turn from R5 (speed and time carry), as in section 4.
+4. **The headline names the numbers NEEDED in the order speed, time, turn**: none needed, "ANY TWO OF THE THREE"; one, "THE SPEED ONLY", "THE TIME ONLY" or "THE TURN ONLY"; two, "THE SPEED AND THE TIME", "THE SPEED AND THE TURN" or "THE TIME AND THE TURN"; all three, "ALL THREE NUMBERS". It is withheld when any of the three words is PARTIAL or n/a.
+5. **Printed besides the rules** (none of it a rule): every arm's edge, se, z, wins-draws-losses and per-seat edges; each cell's median share of its finder's own edge over F'; the median edge of each kind over the five finders (the 2 x 2 x 2 at G, and U); and league7103's edge in each kind beside the median of the other four's (the odd finder apart).
+6. **The checks that void the read** are those of `brain/SUB_EVADE_WIP.md` (made by that command's own `checksOf`, imported) plus the registration's: the STN cell of each finder is that command's GT arm and the N cell its GN arm, the same theta to the number. One identity matchup and five direct ones are flown with the 40 arms, as there.
+7. **What smoke is and is not.** Geometries 1 to 4 are among those (1 to 8) on which every league and exploiter was TRAINED, so the smoke output says the command runs and says nothing about the claim. I saw it (all 40 arms flew, the checks passed) and **the forecasts of section 5 stand as written and will be scored as written.**
+
