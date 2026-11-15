@@ -94,3 +94,39 @@ No rule's bar, no arm, no forecast is changed; item 1 corrects what section 1 of
 7. **The HELD gate** refuses a DEV record whose `checks` is not an empty list (or records none), as in the speed note's Amendment A item 1; the DEV run prints "DEV: a check FAILED, the read is void" in place of the R0 line when one failed.
 8. **Printed besides the rules**, as section 4 says, and the forecast quantities of section 5 as yes/no by these names: `RP1 YES`, `RP1 PARTIAL`, `RP1 NO`, `no contradiction`, `the pair explains league7103's losses`, `the strong grafts are alike`, `league7100's pair over league7001's is decided`, `headline NEITHER`, `headline THE SPEED`, `headline THE TURN` ("R0 holds" is the DEV line and the R0 line). The ten pairs are printed side by side (U edge, P edge, the category) as well as in their own two blocks.
 9. **What smoke is and is not.** Geometries 1 to 4 are among those (1 to 8) on which every league was TRAINED, so a smoke read says nothing about the claims, and its edges at 8 duels are too coarse to read (every arm and most pairs are 8-0-0 or near it). I saw the smoke report (the command ran in 22 s; no check failed); the forecasts of section 5 stand as written. A DEV read is 48 geometries, 12 times the smoke's duels: about four minutes.
+
+## DEV RESULT (2026-11-15; `node tools/ship/takeEvadePairs.mjs dev --write`, geometries 112001 to 112048 (96 duels a matchup), exit 0; record `brain/subEvadePairsDev.json`: 7 arms, 10 P pairs, 10 U pairs, 4 steps)
+
+DEV is free to read; HELD (113001 to 113048) was authorised by Keith to follow this read ("the next 2 rounds": DEV, then HELD), and the registration allows it: R0 held and no check failed (none printed; the HELD gate of Amendment A item 7 accepts this record). Forecasts are not scored on DEV except "R0 holds on DEV" (90): **TRUE**. The others stand as written for HELD.
+
+**R0 holds.** The P arms of league7001 (+2.832, z 20.5, 88-4-4) and league7100 (+2.859, z 21.1, 89-3-4) find against G. The others: league7103 +1.366 (z 6.0, 68-0-28), exploit7200 +2.862, exploit7204 +2.824; the two 2 x 2 arms +2.829 (4.5 with 2.8) and +2.794 (4.32 with 2.70).
+
+**The ten pairs side by side** (the first finder's edge over the second; U the finders themselves, P their grafts on G; "decided" is an edge of 0.5 and a z of 2 in size):
+
+| pair | U | P | category |
+|---|---|---|---|
+| league7001 / league7100 | **-1.008** (z -5.7), 8-48-40 | +0.067 (z 1.1) | LOST |
+| league7001 / league7103 | **+1.295** (z 4.7) | **+1.524** (z 6.2) | CARRIED |
+| league7001 / exploit7200 | +0.072 | +0.064 | both undecided |
+| league7001 / exploit7204 | +0.099 | +0.007 | both undecided |
+| league7100 / league7103 | **+1.442** (z 5.6) | **+1.520** (z 6.2) | CARRIED |
+| league7100 / exploit7200 | **+0.669** (z 3.2) | -0.096 (z -1.8) | LOST |
+| league7100 / exploit7204 | **+1.023** (z 4.9) | +0.034 (z 0.3) | LOST |
+| league7103 / exploit7200 | **-1.892** (z -7.9) | **-1.553** (z -6.5) | CARRIED |
+| league7103 / exploit7204 | **-1.436** (z -5.7) | **-1.454** (z -5.9) | CARRIED |
+| exploit7200 / exploit7204 | +0.196 | +0.067 | both undecided |
+
+**RP1 THE PAIRS CARRY THE ORDER: PARTIAL** (4 of the 7 decided U pairs carried). **RP2 NO CONTRADICTION: yes** (0 contradicted). **RP3 THE PAIR EXPLAINS league7103'S LOSSES: yes** (4 of 4 strong grafts decided over it). **RP4 THE STRONG FOUR'S GRAFTS ARE ALIKE: yes** (none of their six pairs is decided). Categories: 4 CARRIED, 3 LOST, 0 CONTRADICTED, 0 SPURIOUS.
+
+**The 2 x 2** (the speed 4.5 over 4.317 at a turn, the turn 2.698 over 2.8 at a speed): S@2.80 **-0.129** (z -2.1, DOWN: 4.5 is slightly worse than 4.317 at turn 2.8, as in the speed note's DEV step of -0.379 and in no other read); S@2.70 +0.002 (FLAT); N@4.32 -0.006 (FLAT); N@4.50 -0.000 (FLAT). **RB1 THE HEADLINE: NEITHER.** **RB2 league7100's PAIR OVER league7001's: undecided** (+0.067 for league7001, z 1.1).
+
+**The forecast quantities as printed** (scored on HELD, not here): RP1 YES no, RP1 PARTIAL yes, RP1 NO no; no contradiction yes; the pair explains league7103's losses yes; the strong grafts are alike yes; league7100's pair over league7001's is decided no; headline NEITHER yes, THE SPEED no, THE TURN no.
+
+**Observations (DEV, for reading, not rules):**
+
+1. **The partial is clean: the pair carries league7103's losses and nothing of league7100's wins.** All four pairs with league7103 are CARRIED, in the same direction and about the same size (U +1.30 to -1.89, P +1.52 to -1.55); all three LOST pairs are league7100 against another strong finder (over league7001 by 1.01, over exploit7200 by 0.67, over exploit7204 by 1.02 as the unmodified finder, and **+0.07, -0.10 and +0.03 as grafts**). The other three strong pairs are undecided both ways. So the ten pairs split as: league7103's speed (3.546, near G's 3.418) with a turn of 2.8 is what loses; league7100's order over the others is **not** in its speed and turn.
+2. **The 2 x 2 says the same from the other side:** the speed step (4.5 over 4.317) and the turn step (2.698 over 2.8) are FLAT in three of four cells and a small DOWN in the fourth; league7100's pair is not better than league7001's by any step of its own.
+3. **The mirror reproduces on this set:** league7100 over league7001 by 1.01 (8-48-40: half of the 96 duels are draws), over exploit7204 by 1.02 and over exploit7200 by 0.67; in the opponent note it was over league7001 by 1.07 and 1.33 and over exploit7204 by 1.02 and 1.63.
+4. **Where the order of league7100 could sit:** in the other ten numbers (search, track, fire range, aim tolerance, ping after, echo window, blind SNR, ping every, search ping, evade time). Nothing here says which; the time was inert against G only.
+
+**What is NOT shown:** which of the other ten numbers carry league7100's order (not asked); any HELD read; whether league7100's order holds against opponents but the other finders. R0 held and no check failed, so HELD may be flown.
