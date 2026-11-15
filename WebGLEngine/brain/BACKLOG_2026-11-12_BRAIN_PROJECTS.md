@@ -266,8 +266,12 @@ random start on FLY and PLAIN: **four times the builders tried an iteration buil
 0.690; all 16 above all 16, twice) and more than round 3's 1,000 iterations did at 0.6 of its cost; **a quarter of the step
 cannot be told apart from round 2's** at 150 iterations. Neither had levelled. It is still half way to the lean, and one home.
 The trainer's step is `lr / (sigma x sqrt(pop))` a weight whatever the signal, so the backlog's "smaller sigma" below was the
-wrong knob (a smaller sigma is a LARGER step). **Open, none registered:** the two together (a start at the lean with 96
-builders); more than 96; a longer SMALL; `another-trainer`.
+wrong knob (a smaller sigma is a LARGER step). **Round 6, the two together, is DONE** (`brain/VOXEL_HOME_BOTH_WIP.md` section 8,
+`tools/ship/voxelHomeBoth-selfcheck.mjs` section 5): a start at the lean with 96 builders tried builds 0.997 of a home in every
+arm (round 4: 0.988 to 0.992) and finishes **15,023 homes in 16,000 builds, 188 of 200 a builder** (round 4: 159; the lean 123;
+the best 192, none all 200); 79 of 80 builders above their round 4 selves (p 1.3e-22); the five arms within two ten-thousandths;
+the wiring not told from a shuffle (p 0.42), the seventh time. **Open, none registered:** more than 96; a longer SMALL;
+`another-trainer`.
 
 Keith, 2026-11-14, of the three choices after round 3: "Do item 1. Backlog item 2 another training." Round 3
 (`brain/VOXEL_HOME_LONG_WIP.md` section 8) measured that 6.7 times the iterations of the same trainer bought 0.01 to 0.02 of a

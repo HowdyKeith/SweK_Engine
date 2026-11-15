@@ -49,3 +49,51 @@ resumable.
 ## 7. The run (to be written; the gate never runs it and never gives the command the word `run`)
 `node tools/ship/takeVoxelHomeBoth.mjs run` -> `brain/voxelHomeBothRound.jsonl`, committed byte for byte before it is read;
 `node tools/ship/takeVoxelHomeBoth.mjs read` prints the checks and the reading.
+
+## 8. The result (run 2026-11-14 in the sandbox, 81.1 minutes beside another round's run; `brain/voxelHomeBothRound.jsonl` committed at 248bae41 before it was read; read once)
+**The checks hold, and the start was the lean** (every arm's untrained builder 0.9226, to the bit).
+
+| arm | mean share built | sd | least | most | homes of 3,200 builds | round 4 (24 tried) | round 4's homes |
+|---|---|---|---|---|---|---|---|
+| SHUF | 0.9971 | 0.0006 | 0.9953 | 0.9978 | 2,991 | 0.9879 | 2,420 |
+| FLY | 0.9973 | 0.0003 | 0.9969 | 0.9978 | 3,009 | 0.9894 | 2,491 |
+| PLAIN | 0.9973 | 0.0004 | 0.9968 | 0.9980 | 3,010 | 0.9892 | 2,546 |
+| FISH | 0.9973 | 0.0004 | 0.9962 | 0.9978 | 3,006 | 0.9887 | 2,495 |
+| MLP | 0.9973 | 0.0004 | 0.9967 | 0.9980 | 3,007 | 0.9924 | 2,748 |
+| the lean, no network | 0.9226 | | | | 123 of 200 | | |
+
+* **P3: FROM THE LEAN, MORE BUILDERS TRIED BUILDS MORE OF A HOME** (79 of the 80 above their round 4 selves, 1 below -- SHUF
+  draw 4; exact two-sided p 1.3e-22).
+* **P0: A FLY-WIRED BUILDER, FROM THE LEAN, MORE BUILDERS TRIED BUILDS MORE OF A HOME** (all 16 above all 16 of round 4's; the
+  ranks sum to 392; p 3.3e-9).
+* **T0: A FLY-WIRED BUILDER STARTED AT THE LEAN BUILDS MORE THAN THE LEAN** (16 of 16) and
+  **T3: A BUILDER STARTED AT THE LEAN BUILDS MORE THAN THE LEAN** (80 of 80).
+* **T1: THE FLY'S WIRING CANNOT BE TOLD APART FROM A SHUFFLE OF IT** (the ranks sum to 287 with 2 ties, the middle 264; p 0.42).
+* **T2: THE FLY'S WIRING CANNOT BE TOLD APART FROM A PLAIN NET OF ITS SIZE** (274.5 with 1 tie; p 0.72).
+
+**The homes, which section 2 said would show more than the score: 15,023 in 16,000 builds** (round 4: 12,700). A builder
+finishes 188 of the 200 plans on average, where round 4's finished 159 and the lean alone 123; the least 179, the best 192 (MLP
+draw 4). 79 of the 80 finish more than their round 4 selves. No builder finishes all 200, as the rule does.
+
+**The arms are now indistinguishable to four places:** the five means lie within two ten-thousandths. Whatever the wiring, the
+size or the kind of network, the correction it learns is the same one.
+
+**The history: almost all of it in the first 25 iterations.** The trainer's own battery, share of the plan missing:
+
+| arm | iteration 0 | 25 | 50 | 75 | 100 | 125 | 149 |
+|---|---|---|---|---|---|---|---|
+| FLY | 0.1290 | 0.0039 | 0.0020 | 0.0018 | 0.0017 | 0.0020 | 0.0023 |
+| SHUF | 0.1221 | 0.0036 | 0.0026 | 0.0024 | 0.0027 | 0.0029 | 0.0033 |
+| PLAIN | 0.1313 | 0.0017 | 0.0019 | 0.0016 | 0.0019 | 0.0017 | 0.0015 |
+| FISH | 0.1287 | 0.0040 | 0.0028 | 0.0021 | 0.0023 | 0.0030 | 0.0024 |
+| MLP | 0.1369 | 0.0048 | 0.0035 | 0.0028 | 0.0036 | 0.0034 | 0.0026 |
+
+Round 4 stood at 0.02 to 0.04 by iteration 25 and 0.009 to 0.014 at the end; here it is under 0.005 by 25 and level after.
+
+**The expectations against what came.** P3 MORE (65) and P0 MORE (45): both came. T0, T3 MORE (97); T1, T2 CANNOT (80): all
+came. The mean homes a builder finishes above 170 (50): yes -- and above 185, which I gave 12 percent: 188. A builder that
+finishes all 200 (5): none; the best is 192.
+
+**What this does and does not say** (section 5). The gain round 5 measured from a random start is there from a good start too,
+and the two together leave about one plan in sixteen unfinished. It is still "the lean, which a person wrote, corrected"; and the
+rule, three lines, finishes every plan.

@@ -9,13 +9,18 @@
 //   2  ONE TRAINING          the count of builders reaches the trainer under the lean start; the start is still the lean
 //   3  THE RECORDS           the new check, failing by name; P3 (each builder against its round 4 self) and P0 (FLY against round 4's FLY) and their words; round 4's four tests are still made
 //   4  THE COMMAND           its words as arithmetic; it is this round's and reads round 4's file; this gate starts no training of the round's and no process
+//   5  THE VERDICT           the committed results, read from the file: P3 and P0 against round 4's own records, round 4's four tests, the homes, the history, the expectations
 // SABOTAGE LOG (2026-11-14) -- through a byte-safe runner (one at a time, every file restored and its sha256 checked), this gate and round 1's run whole for each; every one red by name (the number is the rows):
 //   B1 round 6 tries 24 builders after all 1 | B2 not started at the lean 5 | B3 writes round 4's results file 1 | B4 round 4's file not checked 1 | B5 P3 against the round 4 builder of draw 1 1
 //   B6 P3's MORE and LESS each other's 3 | B7 P0 reads every arm 2 | B8 P0's MORE and LESS each other's 2 | B9 the tests made with a check failed 1 | B10 round 4's tests kept with a check failed 1
 //   B11 a builder with as many homes counts as more 1 | B12 the command reads no earlier file 1 | B13 the command reads round 4's library 1 | B14 the command exits 0 on a word it does not know 1 (round 1's gate)
 //   B15 P3's lines not printed 1 | B16 P3 a sign test against the lean, not round 4 3
+//   THE VERDICT'S (section 5, 2026-11-15), this gate run whole for each, every one red by name: V1 a FLY score in the file lowered to 0.98 5 | V2 MLP draw 4's homes made 200 4
+//   V3 a round 4 FLY score in round 4's file raised to 0.999 2 | V4 P3's MORE and LESS swapped 5 | V5 P3 pairs each builder with round 4's draw 1 3 | V6 the note's P3 says CANNOT 1
+//   V7 the note's T1 says BETTER 1 | V8 P0 reads every arm 3
 "use strict";
 import fs from "node:fs";
+import { createHash } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as V from "./voxelHomeBoth.mjs";
@@ -96,6 +101,33 @@ section(() => {
     const me = src("tools/ship/voxelHomeBoth-selfcheck.mjs"), calls = [...me.matchAll(/V4?\.trainOne\(([^)]*)\)/g)].map((m) => m[1]);
     ok("!! THIS GATE STARTS NO TRAINING OF THE ROUND'S AND LEAVES ITS RESULTS FILE AS IT WAS: its three trainings are of 2 iterations with 8 or 4 builders on draw 901; this gate starts no process at all (the command is never run from here); and the file's size and time are what they were before this section",
         calls.length === 3 && calls.every((c) => /^"FLY", 901, TINY4?, TINY_AUDIT$/.test(c)) && TINY.iters === 2 && TINY.pop === 8 && !V.SEEDS.includes(901) && !/Sync\(/.test(me.replace(/readFileSync\(|statSync\(|existsSync\(/g, "")) && stateOf() === before, `${calls.length} trainings, no process, the file ${before === "absent" ? "absent" : "unchanged"}`);
+});
+
+console.log("\n5. THE VERDICT (round 6; the results were committed at 248bae41 before they were read, and are read here from the file)");
+section(() => {
+    const parse = (f) => src(f).split("\n").filter(Boolean).map((l) => JSON.parse(l)), bytes = fs.readFileSync(path.join(ENG, V.RESULTS)), lines = parse(V.RESULTS), before = parse(V.BEFORE), R = V.reading(lines, before), near = (a, b, e = 5e-5) => Math.abs(a - b) < e, A = R.arms, draws = lines.filter((r) => r.kind === "draw"), old = before.filter((r) => r.kind === "draw");
+    ok("!! the results file is the one the run wrote: 82 records, sha256 e79a779d3369c50c...", lines.length === 82 && createHash("sha256").update(bytes).digest("hex") === "e79a779d3369c50ccdabac18f1ddda3414807a7ad1b69315b30644dad833f069");
+    ok("!! THE CHECKS HOLD: 80 draws each once, round 4's recipe with 96 builders tried, each arm's weight count and wiring, FLY draw 1 the same twice, the floors, a history in every record, the start the lean to the bit, and round 4's 80 draws", R.checks.length === 0 && V.ARMS.every((a) => R.floors.untrained[a] === R.floors.lean), R.checks.slice(0, 2).join(" | "));
+    ok("!! *** P3: FROM THE LEAN, MORE BUILDERS TRIED BUILDS MORE OF A HOME *** -- 79 of the 80 builders score above their round 4 selves (the same arm, the same draw) and 1 below (SHUF draw 4, 0.9953 for 0.9961); exact two-sided p 1.3e-22",
+        R.P3 && R.P3.word === V.WORDS.P3[0] && R.P3.above === 79 && R.P3.below === 1 && R.P3.ties === 0 && R.P3.p < 2e-22 && J(draws.filter((r) => r.score < old.find((o) => o.arm === r.arm && o.s === r.s).score).map((r) => [r.arm, r.s])) === J([["SHUF", 4]]));
+    ok("!! *** P0: A FLY-WIRED BUILDER, FROM THE LEAN, MORE BUILDERS TRIED BUILDS MORE OF A HOME *** -- every one of the 16 FLY builders above every one of round 4's 16 (the ranks sum to 392; exact two-sided p 3.3e-9)", R.P0 && R.P0.word === V.WORDS.P0[0] && R.P0.sumA === 392 && R.P0.ties === 0 && R.P0.p < 4e-9);
+    ok("!! round 4's four tests, made again: T0 and T3 -- every builder above the lean (16 of 16, 80 of 80); T1 and T2, THE WIRING -- THE FLY'S CANNOT BE TOLD APART FROM A SHUFFLE OF IT (the ranks sum to 287 with 2 ties; p 0.42) NOR FROM A PLAIN NET OF ITS SIZE (274.5 with 1 tie; p 0.72): the seventh round to say the first",
+        R.T0.word === V.WORDS.T0[0] && R.T0.above === 16 && R.T3.word === V.WORDS.T3[0] && R.T3.above === 80 && R.T1.word === V.WORDS.T1[2] && R.T1.sumA === 287 && R.T1.ties === 2 && near(R.T1.p, 0.42302) && R.T2.word === V.WORDS.T2[2] && R.T2.sumA === 274.5 && R.T2.ties === 1 && near(R.T2.p, 0.72398));
+    ok("!! the arms' mean share of a home built, 16 draws each (mean, sd): SHUF 0.9971 0.0006, FLY 0.9973 0.0003, PLAIN 0.9973 0.0004, FISH 0.9973 0.0004, MLP 0.9973 0.0004 -- the five within two ten-thousandths of each other, every builder between 0.9953 and 0.9980; round 4's arms were 0.9879 to 0.9924",
+        near(A.SHUF.mean, 0.9971) && near(A.SHUF.sd, 0.0006) && near(A.FLY.mean, 0.9973) && near(A.FLY.sd, 0.0003) && near(A.PLAIN.mean, 0.9973) && near(A.PLAIN.sd, 0.0004) && near(A.FISH.mean, 0.9973) && near(A.FISH.sd, 0.0004) && near(A.MLP.mean, 0.9973) && near(A.MLP.sd, 0.0004) &&
+        near(Math.min(...draws.map((r) => r.score)), 0.9953) && near(Math.max(...draws.map((r) => r.score)), 0.9980) && near(R.before.SHUF.mean, 0.9879) && near(R.before.MLP.mean, 0.9924));
+    const total = draws.reduce((n, r) => n + r.homes, 0), oldTotal = old.reduce((n, r) => n + r.homes, 0);
+    ok("!! *** THE HOMES: 15,023 IN 16,000 BUILDS (round 4: 12,700) *** -- a builder finishes 188 of the 200 plans on average where round 4's finished 159 and the lean alone 123; the least finishes 179 and the best 192 (MLP draw 4); 79 of the 80 finish more than their round 4 selves (SHUF draw 4: 179 for 181); no builder finishes all 200, as the rule does",
+        total === 15023 && oldTotal === 12700 && A.FLY.homes === 3009 && A.SHUF.homes === 2991 && A.PLAIN.homes === 3010 && A.FISH.homes === 3006 && A.MLP.homes === 3007 && Math.min(...draws.map((r) => r.homes)) === 179 && Math.max(...draws.map((r) => r.homes)) === 192 && draws.find((r) => r.homes === 192).arm === "MLP" && draws.find((r) => r.homes === 192).s === 4 && R.moreHomes === 79 && R.floors.leanHomes === 123);
+    const H = (a) => A[a].history.map((h) => h.missing);
+    ok("!! THE HISTORY: ALMOST ALL OF IT IN THE FIRST 25 ITERATIONS, THEN LEVEL -- every arm's share missing on the trainer's own battery is 0.12 to 0.14 at iteration 0, under 0.005 by iteration 25, and 0.0015 to 0.0033 at iteration 149 (round 4 was at 0.02 to 0.04 by iteration 25 and 0.009 to 0.014 at the end)",
+        V.ARMS.every((a) => H(a).length === 7 && H(a)[0] > 0.12 && H(a)[0] < 0.14 && H(a)[1] < 0.005 && H(a)[6] > 0.0014 && H(a)[6] < 0.0034) && near(H("FLY")[1], 0.0039) && near(H("FLY")[6], 0.0023) && near(H("PLAIN")[6], 0.0015));
+    const again = V.ARMS.flatMap((arm) => [4, 11].map((s) => { const r = draws.find((d) => d.arm === arm && d.s === s), p = V.policyOf(arm, s); p.setParams(PF.unpackWeights(r.weights)); const a = V.auditScore(p); return [arm, s, a.score === r.score && a.homes === r.homes]; }));
+    ok("!! THE WEIGHTS IN A RECORD GIVE ITS SCORE AND ITS HOMES AGAIN: draws 4 and 11 of every arm (the best builder and the one below its round 4 self among them), audited here on the 200 plans through the wrapped builder, to the bit", again.every((x) => x[2]), again.filter((x) => !x[2]).map((x) => x[0] + " " + x[1]).join(", "));
+    const note = src("brain/VOXEL_HOME_BOTH_WIP.md"), res = note.slice(note.indexOf("## 8. The result"));
+    ok("the expectations, written before the tool, against what came: P3 MORE was given 65 percent and P0 MORE 45 -- both came; T0 and T3 MORE the 97, T1 and T2 CANNOT the 80 -- all came; the mean homes a builder finishes above 170 was given 50 and above 185 only 12, and it is 188; a builder that finishes all 200 was given 5, and there is none",
+        /P3: MORE about 65 percent/.test(note) && /P0: MORE about 45/.test(note) && /above 170 of 200\s+\(round 4: 159\): about 50 percent; above 185: about 12/.test(note) && /A builder that finishes all 200: about 5/.test(note) && total / 80 > 185 && Math.max(...draws.map((r) => r.homes)) < 200);
+    ok("the registration's RESULT SECTION (section 8, and not the list of possible words in section 2) carries the six readings' words", /## 8\. The result/.test(note) && [["P3", R.P3.word], ["P0", R.P0.word], ["T0", R.T0.word], ["T1", R.T1.word], ["T2", R.T2.word], ["T3", R.T3.word]].every(([t, w]) => res.includes(`**${t}: ${w}**`)));
 });
 
 console.log(`\nvoxelHomeBoth-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILED"}`);
