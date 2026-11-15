@@ -383,7 +383,7 @@ function render() {
     sg.strokeStyle = c; sg.lineWidth = 2; sg.beginPath(); sg.arc(q.x * dx, q.depth * dz, 4, 0, 6.2832); sg.stroke();
   }
   drawCompass(snap); drawBrain();
-  if (view3d) view3d.render(snap, performance.now() / 1000);
+  if (view3d) { view3d.setObstacles(tank.sceneNow()); view3d.render(snap, performance.now() / 1000); }   // UNNUMBERED (tank-nav-3d, survey-3d-markers): the obstacles; goals and stations come with the snapshot
   updateStats(snap);
 }
 function frame(now) {

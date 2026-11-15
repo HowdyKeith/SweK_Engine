@@ -15,6 +15,7 @@ import { createSurface, defaultComponents } from "../physics/ocean/oceanSurface.
 import { applyDepthTint } from "../ui/seaDepthTint.mjs";
 import { EXPLORER } from "../physics/mechanics/subModel6dof.mjs";
 import { attachCues, poseCues, bubbleStep, dropStep, BUBBLE_MAX } from "./subBallastCues.mjs";
+import { createMarks } from "./subAquarium3dMarks.mjs";   // UNNUMBERED (backlog tank-nav-3d, survey-3d-markers): obstacles, goal buoys and survey stations
 
 export const HULL_LENGTH = 16;     // metres on screen: a sub is drawn larger than life so a 500 m tank can be read
 export const WATER_COLOUR = 0x0a3b46;
@@ -95,6 +96,7 @@ export function createView3d(THREE, canvas, { length = 500, width = 300, depthMa
     const camera = new THREE.PerspectiveCamera(50, canvas.width / canvas.height, 1, 4000);
     const view = { yaw: 0.6, pitch: 0.55, dist: 430 };   // v4899: closer, so the tank fills its panel
     const subs = new Map(), geo = {};
+    const marks = createMarks(THREE, scene, { depthMax }); let obstacles = [];   // the sea's obstacles are handed in by the page each frame (setObstacles); goals and survey stations are read from the snapshot
     let modelHost = models;   // v4909: a render/subModels3d.mjs host (or null): when a hull has a model assigned it is put on the boat, the procedural hull staying as the fallback
     // v4901 -- the ballast: bubbles while a tank is blown, a drop weight that falls (render/subBallastCues.mjs holds the arithmetic)
     let bubbles = { list: [], counter: 0 }, weights = [], lastT = null; const wasReleased = new Map();
@@ -130,6 +132,10 @@ export function createView3d(THREE, canvas, { length = 500, width = 300, depthMa
             return follow;
         },
         getFollow: () => follow,
+        /** The sea's obstacles as the tank gives them (tank.sceneNow(): [{ type island|berg|ship, group, x, y, r, keel }]) -- drawn at the next frame as columns, floating discs with a keel and hulls; an empty list (or null) takes them away. Goal buoys and survey stations need no call: they come with the snapshot. */
+        setObstacles(list) { obstacles = Array.isArray(list) ? list : []; return obstacles.length; },
+        /** For a gate: how many of each mark the view holds right now. */
+        marksCounts: () => marks.counts(),
         /** v4909 -- a render/subModels3d.mjs host (or null to take every model off at the next frame's sync): the boats wear the models the host's store assigns to the tank's hull. Answers the host now in use. */
         setModels(host) { if (!host && modelHost) for (const m of subs.values()) modelHost.release(m); modelHost = host || null; return modelHost; },
         getModels: () => modelHost,
@@ -154,6 +160,7 @@ export function createView3d(THREE, canvas, { length = 500, width = 300, depthMa
                 if (modelHost) modelHost.sync(m, s);
             }
             for (const [id, m] of subs) if (!live.has(id)) { if (modelHost) modelHost.release(m); scene.remove(m); m.userData.mat.dispose(); subs.delete(id); wasReleased.delete(id); }
+            marks.update(obstacles, snapshot);
             // the ballast cues that live in the world, not on the hull: the bubbles of a tank being blown, and a weight that has just been released
             const dt = lastT === null ? 0 : Math.max(0, Math.min(0.25, t - lastT)); lastT = t;
             const emits = snapshot.filter((s) => s.tank && s.tank.blowing).map((s) => [s.x, -s.depth, s.y]);
@@ -175,7 +182,7 @@ export function createView3d(THREE, canvas, { length = 500, width = 300, depthMa
         },
         /** For a gate: how many bubbles the view holds and how many it DRAWS, and how many dropped weights it holds, right now. */
         cues() { return { bubbles: bubbles.list.length, drawn: bubbleGeo.drawRange.count, weights: weights.length, resting: weights.filter((w) => w.rest >= 0).length }; },
-        dispose() { bubbleGeo.dispose(); weightMat.dispose(); sea.dispose(); for (const k of Object.keys(geo)) geo[k].dispose(); renderer.dispose(); },
+        dispose() { marks.dispose(); bubbleGeo.dispose(); weightMat.dispose(); sea.dispose(); for (const k of Object.keys(geo)) geo[k].dispose(); renderer.dispose(); },
     };
 }
 
