@@ -99,3 +99,21 @@ Moving-stripe ratio = peak active-unit count on the moving-stripe ellipse over t
 5. The additional-segment prediction: no other segment alarms before segment 4 (the ellipse is at 90 degrees, its width up to 74 degrees; segments 3 to 5 may also alarm; the winner is the mean) (the located segment of the plain ellipse is within one segment of 4: 85%).
 **Verdict rule.** SUPPORTED iff predictions 1, 2 and 3 all hold at both r/v. NOT SUPPORTED iff the moving-stripe alarm (present at BOTH r/v) is within 10 percent of the plain angular size and the spike ratio is 0.9 or more at either r/v: then this crab model is not fooled by the stripes, a miss against the animal, reported as such. Anything between is PARTLY. Predictions 4 and 5 are reported as hits or misses and do not decide.
 **Said before the run:** the animal's 0.58 against 0.8 is a response probability over 55 crabs and the model is deterministic; the model's agreement or disagreement with it says which kind of mechanism (a feed-forward inhibition) is enough, nothing more.
+
+## Round 5 RESULTS (run 2026-11-15 with `node brain/stealthRound5-run.mjs`; raw table in `brain/stealthRound5-results.txt`)
+
+| r/v | stripes | alarm (seg 4) | size at alarm (deg) | spike frames in seg 4 | peak F seg 4 | winner |
+|---|---|---|---|---|---|---|
+| 0.2 s | none | yes, frame 64 | 13.2 | 47 | 14.1 | 4 |
+| 0.2 s | static | yes, 77 | 17.6 | 34 | 35.3 | 4 |
+| 0.2 s | moving | yes, 28 | 7.9 | 62 | 52.9 | 4 |
+| 0.4 s | none | yes, 150 | 16.7 | 67 | 8.5 | 4 |
+| 0.4 s | static | yes, 166 | 20.7 | 53 | 26.6 | 5 |
+| 0.4 s | moving | yes, 50 | 7.6 | 111 | 57.1 | 4 |
+
+Moving over plain: alarm size ratio 0.595 and 0.456, spike ratio 1.32 and 1.66. Static over plain: size ratio 1.325 and 1.235, spike ratio 0.72 and 0.79.
+
+**VERDICT: NOT SUPPORTED in substance; the rule's letter gives PARTLY, and the rule had a gap.** Prediction 3 is falsified in DIRECTION: the moving stripes made the model alarm at a much SMALLER size (about half) and with more spikes, the opposite of the animal's lower response. The rule as I wrote it called NOT SUPPORTED only when the moving-stripe alarm is within 10 percent of the plain one; a result in the opposite direction fell between SUPPORTED and that condition, which I did not foresee. I report the substance: this crab model is not masked by the stripes, it is triggered by them.
+**Predictions:** 1 HIT (alarms at both r/v, winner segment 4). 2 MISS at 0.2 s (static size ratio 1.325 against the 1.30 line) and HIT at 0.4 s (1.235), so MISS overall by the "both" wording. 3 MISS (opposite direction). 4 HIT (peak F 52.9 and 57.1 against 14.1 and 8.5). 5 HIT (the plain ellipse's winner is segment 4 at both r/v).
+**Said as inference, NOT tested:** the downward motion of the stripes drives the photoreceptor layer in every segment cell from the first frame, so the grouping layer's potential m rises early and the alarm comes while the ellipse is still small; F does rise above its threshold (T_FFI about 15.3) later, but the alarm has already happened by then (spikes are counted before it). That the feed-forward inhibition is too slow to stop an alarm that is triggered at the start is a reading of the table, not an experiment. A different stripe onset (stripes fading in) was not tried.
+**What it does not say:** nothing about the animal beyond direction; the model alarms on a receding ball too (Round 4), so its alarm is not a looming detector in this implementation, and the stripes' result may reflect that. The stimulus is a looming ellipse, the 144 degree planar size law is a stand-in, and the stripe period is under-sampled at the smallest sizes (said before the run).
