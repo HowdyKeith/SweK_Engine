@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="The Fly Escapes">
+<meta name="demo:desc" content="Watch a fly feed in the yard of its voxel house and run home from what flies at it, in 3D (drag to turn) and through the fly's own eye, all the way round: the mover is a disc that looms. Flies written by hand, or trained flies from the escape rounds played from the rounds' own results. Nothing is trained on the page.">
+<title>SweK The Fly Escapes</title>
+<!-- fly-escape.html -- UNNUMBERED (the version is chosen at ship time). The episode and both pictures are brain/flyEscapeShow.mjs's: episode() plays one episode of brain/rl/escapeEnv.mjs with a fly,
+     view3d() and eyeView() ray-cast a tick from the episode's own voxels. The trained flies' weights are read from the rounds' committed results files. Gate: tools/ship/flyEscapeShow-selfcheck.mjs. -->
+<style>
+  :root { --ink:#dbe6f5; --dim:#7e93ad; --edge:#243247; --bg:#080b11; }
+  html,body { margin:0; background:var(--bg); color:var(--ink); font:13px system-ui,sans-serif; }
+  header { display:flex; align-items:center; gap:10px; padding:8px 12px; border-bottom:1px solid var(--edge); flex-wrap:wrap; }
+  h1 { margin:0; font-size:14px; font-weight:700; color:#8fd0ff; letter-spacing:.3px; }
+  select,input,button { background:#131c28; color:var(--ink); border:1px solid var(--edge); border-radius:7px; padding:5px 8px; font:12px system-ui,sans-serif; }
+  input { width:84px; } button { cursor:pointer; } select:disabled { opacity:.4; }
+  main { display:flex; flex-wrap:wrap; gap:16px; padding:12px; align-items:flex-start; }
+  .views { flex:0 1 720px; min-width:0; }
+  canvas { display:block; border:1px solid var(--edge); border-radius:8px; background:#05070b; image-rendering:pixelated; width:100%; height:auto; }
+  #out { aspect-ratio:320/220; cursor:grab; touch-action:none; } #eye { aspect-ratio:180/45; margin-top:4px; }
+  h2 { font-size:12px; font-weight:600; color:var(--dim); margin:10px 0 4px; }
+  aside { flex:1 1 280px; max-width:440px; color:var(--dim); line-height:1.5; }
+  aside p { margin:0 0 9px; }
+  #stats, #end { font:12px ui-monospace,monospace; color:var(--ink); }
+  .meter { display:grid; grid-template-columns:150px 1fr 54px; gap:8px; align-items:center; margin:3px 0; font-size:12px; }
+  .bar { height:10px; background:#131c28; border:1px solid var(--edge); border-radius:5px; position:relative; overflow:hidden; }
+  .bar i { position:absolute; top:0; bottom:0; background:#8fd0ff; }
+  .val { font:11px ui-monospace,monospace; color:var(--ink); text-align:right; }
+  #choice { font:600 12px ui-monospace,monospace; margin:6px 0 10px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>The Fly Escapes</h1>
+  <label>fly <select id="kind"></select></label>
+  <label>from <select id="round"></select></label>
+  <label>draw <select id="draw"></select></label>
+  <label>episode <input id="seed" type="number" min="1" max="99999999" value="900001"></label>
+  <button id="play">Pause</button><button id="one">Step</button><button id="again">Restart</button>
+  <label>speed <select id="speed"><option value="4">slow</option><option value="8" selected>steady</option><option value="20">fast</option></select></label>
+</header>
+<main>
+  <div class="views">
+    <h2>From outside (drag to turn)</h2>
+    <canvas id="out" width="320" height="220"></canvas>
+    <h2>Through the fly's eye, all the way round (the middle is straight ahead; the edges are behind it)</h2>
+    <canvas id="eye" width="720" height="180"></canvas>
+  </div>
+  <aside>
+    <p id="stats">flying the episode...</p>
+    <p id="end"></p>
+    <div class="meter"><span>how big it looks</span><div class="bar"><i id="m1"></i></div><span class="val" id="v1"></span></div>
+    <div class="meter"><span>how fast it looms</span><div class="bar"><i id="m2"></i></div><span class="val" id="v2"></span></div>
+    <div class="meter"><span>how fast it slides sideways</span><div class="bar"><i id="m3"></i></div><span class="val" id="v3"></span></div>
+    <p id="choice"></p>
+    <div id="said"></div>
+  </aside>
+</main>
+<script type="module">
+import * as S from "/brain/flyEscapeShow.mjs";
+
+const el = (id) => document.getElementById(id), out = el("out"), g = out.getContext("2d"), eye = el("eye"), ge = eye.getContext("2d"), files = new Map(), TRAINED = new Set(S.ARMS);
+const small = document.createElement("canvas"); small.width = 180; small.height = 45; const gs = small.getContext("2d");
+const option = (sel, value, text) => { const o = document.createElement("option"); o.value = value; o.textContent = text; sel.appendChild(o); };
+for (const k of S.KINDS) option(el("kind"), k, S.LABELS[k]);
+for (const [n, R] of Object.entries(S.ROUNDS)) option(el("round"), n, R.label);
+for (let d = 1; d <= S.DRAWS; d++) option(el("draw"), d, String(d));
+for (const line of S.saidLines()) { const p = document.createElement("p"); p.textContent = line; el("said").appendChild(p); }
+
+let ep = null, k = 0, playing = true, timer = null, token = 0; const cam = { ...S.CAM };
+
+async function recordsOf(round) {
+  if (!files.has(round)) { const file = "/" + S.ROUNDS[round].file, res = await fetch(file); if (!res.ok) throw new Error(`${file} answered ${res.status}`); files.set(round, S.recordsOf(await res.text())); }
+  return files.get(round);
+}
+function meter(id, value, signed) { const m = el("m" + id), v = Math.max(-1, Math.min(1, value)); if (signed) { m.style.left = (v < 0 ? 50 + v * 50 : 50) + "%"; m.style.width = Math.abs(v) * 50 + "%"; } else { m.style.left = "0"; m.style.width = Math.max(0, v) * 100 + "%"; } el("v" + id).textContent = value.toFixed(3); }
+function paint() {
+  const f = ep.frames[k], v = S.view3d(ep, k, cam, out.width, out.height), e = S.eyeView(ep, k, small.width, small.height);
+  g.putImageData(new ImageData(v.data, v.width, v.height), 0, 0);
+  gs.putImageData(new ImageData(e.data, e.width, e.height), 0, 0);
+  ge.imageSmoothingEnabled = false; ge.drawImage(small, 0, 0, eye.width, eye.height);
+  ge.strokeStyle = "rgba(0,0,0,0.28)"; ge.lineWidth = 1; ge.beginPath(); const c = eye.width / small.width;
+  for (let x = 0; x <= small.width; x++) { ge.moveTo(x * c + 0.5, 0); ge.lineTo(x * c + 0.5, eye.height); } for (let y = 0; y <= small.height; y++) { ge.moveTo(0, y * c + 0.5); ge.lineTo(eye.width, y * c + 0.5); } ge.stroke();
+  meter(1, f.obs[1], false); meter(2, f.obs[2], true); meter(3, f.obs[3], true);
+  el("choice").textContent = k === 0 ? "" : f.home ? "it chose: HOME" : "it chose: FOOD";
+  el("choice").style.color = f.home ? "#ffb4a8" : "#b8e6b0";
+  el("stats").textContent = `tick ${k} of ${ep.ticks} · fed ${f.fed} ticks · ${f.mover ? "a mover is in the sky" : "the sky is clear"}${f.inRoom ? " · in its room" : ""}`;
+  const done = k === ep.ticks;
+  el("end").textContent = !done ? "" : ep.caught ? `CAUGHT at tick ${ep.ticks}. Score ${ep.ret.toFixed(3)} (half the share of the time it fed; nothing for living).` : `It lived. Score ${ep.ret.toFixed(3)}: a half for living, and half the ${(ep.fed / ep.maxSteps * 100).toFixed(0)}% of the time it fed.`;
+  window.swekEscape = { kind: ep.kind, round: ep.round, draw: ep.draw, seed: ep.seed, planHash: ep.plan.hash, ticks: ep.ticks, t: k, caught: ep.caught, ret: ep.ret, fed: ep.fed, hash: ep.hash, view: v.hash, eye: e.hash, eyeMover: e.counts.mover, az: cam.az, el: cam.el, playing, done, error: null };
+}
+function tick() { if (!ep || !playing) return; if (k < ep.ticks) { k++; paint(); } if (k >= ep.ticks) { playing = false; el("play").textContent = "Play"; paint(); return; } timer = setTimeout(tick, 1000 / Number(el("speed").value)); }
+function setPlaying(on) { playing = on; el("play").textContent = on ? "Pause" : "Play"; clearTimeout(timer); if (on) { if (ep && k >= ep.ticks) k = 0; tick(); } else if (ep) paint(); }
+
+async function start() {
+  const mine = ++token, kind = el("kind").value, trained = TRAINED.has(kind), round = Number(el("round").value), draw = Number(el("draw").value);
+  const seed = Math.max(1, Math.min(99999999, Math.round(Number(el("seed").value)) || 1)); el("seed").value = seed;
+  el("round").disabled = !trained; el("draw").disabled = !trained;
+  clearTimeout(timer); el("stats").textContent = "flying the episode..."; el("end").textContent = "";
+  try {
+    const record = trained ? (await recordsOf(round)).get(`${kind} ${draw}`) : null; if (mine !== token) return;
+    if (trained && !record) throw new Error(`${S.ROUNDS[round].file} holds no ${kind} draw ${draw}`);
+    ep = S.episode(S.flyOf(kind, { round, draw, record }), seed); k = 0; paint();
+    if (playing) timer = setTimeout(tick, 1000 / Number(el("speed").value));
+  } catch (e) {
+    if (mine !== token) return; ep = null;
+    el("stats").textContent = "the episode could not be flown: " + e.message;
+    for (const [c, x] of [[out, g], [eye, ge]]) { x.fillStyle = "#05070b"; x.fillRect(0, 0, c.width, c.height); }
+    window.swekEscape = { kind, round: trained ? round : null, draw, seed, error: String(e.message) };
+  }
+}
+el("play").addEventListener("click", () => setPlaying(!playing));
+el("one").addEventListener("click", () => { if (!ep) return; setPlaying(false); if (k < ep.ticks) k++; paint(); });
+el("again").addEventListener("click", () => { playing = true; el("play").textContent = "Pause"; start(); });
+for (const id of ["kind", "round", "draw", "seed"]) el(id).addEventListener("change", () => { playing = true; el("play").textContent = "Pause"; start(); });
+let drag = null;
+out.addEventListener("pointerdown", (e) => { drag = { x: e.clientX, y: e.clientY, az: cam.az, el: cam.el }; out.setPointerCapture(e.pointerId); });
+out.addEventListener("pointermove", (e) => { if (!drag) return; cam.az = drag.az + (e.clientX - drag.x) * 0.01; cam.el = Math.max(0.08, Math.min(1.45, drag.el + (e.clientY - drag.y) * 0.008)); if (ep) paint(); });
+for (const type of ["pointerup", "pointercancel"]) out.addEventListener(type, () => { drag = null; });
+window.swekEscapeSeek = (tick) => { if (!ep) return; setPlaying(false); k = Math.max(0, Math.min(ep.ticks, Math.round(tick))); paint(); };
+window.swekEscapeTurn = (az, elv) => { cam.az = az; cam.el = elv; if (ep) paint(); };
+start();
+</script>
+</body>
+</html>

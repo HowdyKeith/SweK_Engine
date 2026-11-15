@@ -238,7 +238,11 @@ wiring cannot be told from a shuffle (p 0.47), the sixth time, but among flies t
 reading, mine:** `trainDockES` keeps the iteration that LIVED most (the environment reports `docked` as lived), a thumb on the
 scale toward hiding. **OPEN, the round that would answer it (`fly-escapes-reflex`, not registered):** start each fly at the
 reflex and train a correction (as voxel-home round 4 did with the lean), have the trainer keep the best return, then ask the
-wiring question of flies that do the task. Also OPEN: a page to watch the fly and the movers.
+wiring question of flies that do the task. **The page is DONE (2026-11-15):** `fly-escape.html` (Fruit Fly Brain drawer; `brain/flyEscapeShow.mjs`, gate
+`tools/ship/flyEscapeShow-selfcheck.mjs`) plays an episode in 3D -- the real voxel house, the fly, the mover, a camera that
+turns on a drag -- and THROUGH THE FLY'S EYE, all the way round, where the mover is a disc that looms; both pictures are
+ray-cast in JavaScript from the episode's voxels (no GPU). `fly-escapes-reflex` is REGISTERED and running as round 2
+(`brain/FLY_ESCAPE_REFLEX_WIP.md`).
 
 Keith, 2026-11-13: "How else could the fly brain live in voxel world? Could it play minecraft or create something to attract a
 different fly brain?" and, of the five answers: "Yes, add those to the backlog". Each builds on `voxel-home` (`brain/rl/buildEnv.mjs`:

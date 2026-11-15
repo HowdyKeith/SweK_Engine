@@ -155,6 +155,9 @@ console.log(`\n  ${pure} gates assume NOTHING outside their own arithmetic.\n`);
         // UNNUMBERED (2026-11-14) -- 38 -> 39: tools/ship/voxelHomeShow-selfcheck.mjs opens voxel-home.html in headless Chromium and reads the 2D canvas's pixels, to hold that the house is painted (no roof or wall at step 0, both at the
         // end); its other three sections are arithmetic and need no context.
         "tools/ship/voxelHomeShow-selfcheck.mjs",
+        // UNNUMBERED (2026-11-15) -- 39 -> 40: tools/ship/flyEscapeShow-selfcheck.mjs opens fly-escape.html in headless Chromium and reads its two 2D canvases' pixels (the outside view and the fly's eye), to hold that the pictures
+        // computed in node are the ones painted; its other three sections are arithmetic and need no context. The pictures are ray-cast in JavaScript: no GPU is asked for.
+        "tools/ship/flyEscapeShow-selfcheck.mjs",
     ]);
     const gpuNow = [...byGate.entries()].filter(([, h]) => h.includes("gpu")).map(([f]) => f).sort();
     const arrived = gpuNow.filter((g) => !GPU_GATES.includes(g));

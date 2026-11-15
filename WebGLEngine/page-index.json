@@ -1,7 +1,7 @@
 {
  "version": 1,
  "generated": "derived by tools/ship/buildPageIndex.mjs -- DO NOT HAND-EDIT, the group comes from tools/ship/pageSections.mjs",
- "count": 504,
+ "count": 505,
  "pages": [
   {
    "f": "AudioLab.html",
@@ -1303,6 +1303,13 @@
    "t": "SweK &middot; Fly Connectome",
    "d": "34 real neurons from Janelia's male-cns connectome -- the fruit fly's Giant Fiber escape circuit, the fastest reflex in the animal's nervous system -- drawn as their own traced skeletons (not a stylized model) from a one-time Neuprint fetch. Orbit the circuit, pick a neuron, and see its actual synaptic connections to the rest of the circuit. A second mode replays brain/gunnerPolicy.mjs's real turret-gunner AI -- these same 34 neurons ARE its hidden layer -- coloring each one by its real per-tick activation from a recorded duel, hand-tuned versus ES-trained.",
    "g": "rtx",
+   "p": 0
+  },
+  {
+   "f": "fly-escape.html",
+   "t": "SweK The Fly Escapes",
+   "d": "Watch a fly feed in the yard of its voxel house and run home from what flies at it, in 3D (drag to turn) and through the fly's own eye, all the way round: the mover is a disc that looms. Flies written by hand, or trained flies from the escape rounds played from the rounds' own results. Nothing is trained on the page.",
+   "g": "flybrain",
    "p": 0
   },
   {

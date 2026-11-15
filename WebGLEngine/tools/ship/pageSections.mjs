@@ -706,7 +706,9 @@ export const SECTIONS = [
               // 2026-11-13 -- fly-portrait.html: one duel's record of the circuit's 34 neurons, drawn (brain/flyPortrait.mjs). Renders, where the brushes' own page is, was full (15)
               "fly-portrait.html",
               // 2026-11-14 -- voxel-home.html: a builder from the voxel-home rounds puts up a house a block at a time (brain/voxelHomeShow.mjs)
-              "voxel-home.html"] },
+              "voxel-home.html",
+              // 2026-11-15 -- fly-escape.html: a fly runs home from what looms, in 3D and through its own eye (brain/flyEscapeShow.mjs)
+              "fly-escape.html"] },
     // FSR, KEITH'S CALL: "Let's separate fsr into a link bucket." fsr.html and fsr-three.html sat in UNPLACED since
     // v4623 waiting on exactly this: the temporal/FSR arc gave fsr.html an adapter path, so it belonged in the WebGPU
     // drawer, which is at MAX_PER_PANEL, as is the techniques drawer (Renders) it used to sit in -- "a drawer decision,

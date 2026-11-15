@@ -1,0 +1,148 @@
+// WebGLEngine/tools/ship/flyEscapeShow-selfcheck.mjs -- UNNUMBERED (the version is chosen at ship time)
+//
+// Run: node tools/ship/flyEscapeShow-selfcheck.mjs      (about twenty seconds; sections 1 to 3 are arithmetic, section 4 opens fly-escape.html in headless Chromium and reads its two 2D canvases)
+//
+// THE GATE OF THE PAGE WHERE THE FLY ESCAPES, IN 3D AND THROUGH ITS OWN EYE: brain/flyEscapeShow.mjs and fly-escape.html. What it holds is that THE PAGE PLAYS THE ROUNDS' OWN FLIES ON THE ROUNDS' OWN
+// EPISODES (an episode here, over the 200 audit episodes, gives the floors' and the records' scores to the bit), and that THE EYE'S PICTURE IS WHAT THE FLY IS GIVEN: the mover's disc is the size the
+// environment reports, where the environment says it is. It trains nothing.
+//   1  THE FLIES       the kinds; a round's untrained fly is the round's own; what is refused
+//   2  THE EPISODE     the rounds' numbers again from this file's episode(); a frame is the environment's tick
+//   3  THE PICTURES    the outside view and the eye's: what each sees, the mover's disc against its angular size and its bearing, what turning the camera does; what the page says
+//   4  THE PAGE        fly-escape.html in Chromium: the default episode, both canvases against this file's pictures, turning, other flies, a results file that does not arrive
+// SABOTAGE LOG (2026-11-15) -- through a byte-safe runner (one at a time, every file restored and its sha256 checked), this gate run whole for each; the number is the rows that went red:
+//   THE MODULE: P1 the fly told the kind goes home for everything 2 | P2 a trained fly left untrained 1 | P3 any record will do 1 | P4 the plain net 54 units 2 | P5 a frame never says the fly chose home 1
+//   P6 the heading never turns 1 | P7 a frame carries the numbers from the tick before 1 | P9 the eye told the mover's kind by its colour 3 | P10 every mover red from outside 1 | P11 the mover at half its radius 5
+//   P12 the eye's picture not turned to the heading 1 | P13 mirrored 1 | P14 half the way round 6 | P15 the house not in the pictures 4 | P16 the roof in the wall's colour 2 | P17 the food's tile not drawn 1
+//   P18 the camera does not turn 1 | P19 the page says it is a fly's nervous system at work 1 | P20 the eye's picture upside down 1 | P21 the eye on the ground 2
+//   THE PAGE: Q1 opens on episode 900002 6 | Q2 does not play by itself 1 | Q3 does not look at the answer's status 1 | Q4 the outside view of the tick before 2 | Q5 the eye's view of tick 0 3
+//   Q6 dragging does not turn the view 1 | Q7 does not print what it is 1 | Q8 a caught fly said to have lived 1 | Q9 the draw-1 fly whatever is chosen 1 | Q10 the eye's canvas painted from the outside view 1
+//   Q11' the meters not moved 1
+//   TWO WENT 0 RED. Q11 IS A ROW NOW (the meters were on the page and held to nothing); Q11' is Q11 again. P8 IS EQUIVALENT (the eye is allowed to see the fly): the eye is 0.6 up and its lowest lens
+//   looks 30 degrees down, and the fly's body is under it, below every lens.
+// TWO ROWS OF THIS GATE WERE WRONG WHEN WRITTEN, AND ARE CORRECTED: the disc's middle column was asked for on every tick, and in the last tick or two the disc runs off one edge of the all-round picture
+// and on at the other; and "no red in a pass's picture" was asked with a colour match loose enough to take the roof's shaded side for the strike's red.
+"use strict";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import * as S from "../../brain/flyEscapeShow.mjs";
+import * as E from "../../brain/rl/escapeEnv.mjs";
+import * as V1 from "./flyEscape.mjs";
+import * as C from "../roundhouse/angularImpulseCensus.mjs";
+import { shutdownServer } from "./serverShutdown.mjs";
+
+const HERE = path.dirname(fileURLToPath(import.meta.url)), ENG = path.resolve(HERE, "..", "..");
+let fails = 0;
+function ok(name, cond, detail) { console.log(`  ${cond ? "PASS" : "FAIL"}  ${name}${detail ? "   " + detail : ""}`); if (!cond) fails++; }
+async function section(fn) { try { await fn(); } catch (e) { ok(`!! the section THREW instead of answering: ${e.message}`, false, String(e.stack).split("\n").slice(1, 3).join(" | ")); } }
+const throws = (fn, re) => { try { fn(); return false; } catch (e) { return re.test(e.message); } };
+const J = JSON.stringify, src = (f) => fs.readFileSync(path.join(ENG, f), "utf8"), near = (a, b, e = 5e-5) => Math.abs(a - b) < e;
+const VS = { 1: V1 }, NS = Object.keys(S.ROUNDS).map(Number), RECS = Object.fromEntries(NS.map((n) => [n, S.recordsOf(src(S.ROUNDS[n].file))]));
+const trained = (n, arm, s) => S.flyOf(arm, { round: n, draw: s, record: RECS[n].get(`${arm} ${s}`) });
+const over = (fly, seeds) => { let sum = 0, alive = 0; for (const s of seeds) { const ep = S.episode(fly, s); sum += ep.ret; if (!ep.caught) alive++; } return { score: sum / seeds.length, alive }; };
+const FREEZE = S.episode(S.flyOf("freeze"), 900001), REFLEX = S.episode(S.flyOf("reflex"), 900001), HIDE = S.episode(S.flyOf("hide"), 900001);
+const isCol = (d, q, col, f = 1, tol = 3) => Math.abs(d[q] - col[0] * f) <= tol && Math.abs(d[q + 1] - col[1] * f) <= tol && Math.abs(d[q + 2] - col[2] * f) <= tol;
+
+console.log("flyEscapeShow-selfcheck -- the page where the fly escapes, in 3D and through its own eye: the flies, the episode, the pictures, the page (nothing is trained here)\n");
+
+console.log("1. THE FLIES");
+await section(() => {
+    ok("the kinds are the four flies written by hand, the one told each mover's kind, and the rounds' five arms, each with a label; a round is its results file", J(S.KINDS) === J(["reflex", "fleeAll", "hide", "freeze", "told", "FLY", "SHUF", "PLAIN", "FISH", "MLP"]) && J(S.ARMS) === J(V1.ARMS) && S.KINDS.every((k) => typeof S.LABELS[k] === "string" && S.LABELS[k].length > 10) && S.DRAWS === V1.SEEDS.length && S.PLAIN_UNITS === V1.PLAIN_UNITS && J(S.MLP_HIDDEN) === J(V1.MLP_HIDDEN) &&
+        NS.every((n) => S.ROUNDS[n].file === VS[n].RESULTS && S.ROUNDS[n].label.startsWith(`round ${n}: `) && RECS[n].size === 80) && NS.includes(1));
+    const same = NS.flatMap((n) => S.ARMS.map((a) => [n, a, J(Array.from(S.policyFor(n, a, 2).getParams())) === J(Array.from(VS[n].policyOf(a, 2).getParams())) && S.policyFor(n, a, 2).getParams().length === VS[n].WEIGHTS[a]]));
+    ok("!! A ROUND'S UNTRAINED FLY HERE IS THE ROUND'S OWN, WEIGHT FOR WEIGHT: draw 2 of every arm of every round, against tools/ship/flyEscape.mjs's policyOf (which a page cannot load), and the weight counts the rounds registered", same.every((x) => x[2]), same.filter((x) => !x[2]).map((x) => x[0] + " " + x[1]).join(", "));
+    const o = REFLEX.frames[20].obs, env = { mover: { kind: "strike" } };
+    ok("the four flies written by hand are the environment's own RULES, answer for answer; the fly told the kind goes home for a strike and to its food for a pass or an empty sky", ["reflex", "fleeAll", "hide", "freeze"].every((k) => REFLEX.frames.every((f) => J(S.flyOf(k).act(f.obs)) === J(E.RULES[k](f.obs)))) && J(S.flyOf("told").act(o, env)) === J([1]) && J(S.flyOf("told").act(o, { mover: { kind: "pass" } })) === J([-1]) && J(S.flyOf("told").act(o, { mover: null })) === J([-1]));
+    ok("!! WHAT IS REFUSED, BY NAME: a fly that is not one; a trained fly with no record, with another arm's or another draw's; draw 17; a round that is not one; a seed of 0; a tick past the episode's end; a picture of no pixels",
+        throws(() => S.flyOf("WORM"), /no fly WORM/) && throws(() => S.flyOf("FLY", { round: 1, draw: 1 }), /FLY draw 1 of round 1 needs its record from brain\/flyEscapeRound\.jsonl/) && throws(() => S.flyOf("FLY", { round: 1, draw: 1, record: RECS[1].get("SHUF 1") }), /needs its record/) && throws(() => S.flyOf("FLY", { round: 1, draw: 1, record: RECS[1].get("FLY 2") }), /needs its record/) &&
+        throws(() => S.policyFor(1, "FLY", 17), /no draw 17/) && throws(() => S.policyFor(9, "FLY", 1), /no round 9/) && throws(() => S.episode(S.flyOf("hide"), 0), /the seed is a whole number from 1/) && throws(() => S.view3d(FREEZE, FREEZE.frames.length), /no tick 29 of this episode/) && throws(() => S.eyeView(FREEZE, -1), /no tick -1/) && throws(() => S.view3d(FREEZE, 0, S.CAM, 0, 10), /a picture is a whole number of pixels/));
+});
+
+console.log("\n2. THE EPISODE");
+await section(() => {
+    const fl = V1.floors(), ref = over(S.flyOf("reflex"), V1.AUDIT), told = over(S.flyOf("told"), V1.AUDIT), all = over(S.flyOf("fleeAll"), V1.AUDIT);
+    ok("!! *** THE PAGE'S EPISODES ARE THE ROUNDS': the reflex fly, the fly that flees from everything and the fly told the kind, flown here on the 200 audit episodes, give the floors' scores to the bit and the episodes they live (0.6465 and 156; 0.5395 and 198; 0.8351 and 198) ***",
+        ref.score === fl.reflex.score && ref.alive === 156 && all.score === fl.fleeAll.score && all.alive === 198 && told.score === fl.told.score && told.alive === 198 && near(ref.score, 0.6465) && near(told.score, 0.8351), `${ref.score.toFixed(4)} ${all.score.toFixed(4)} ${told.score.toFixed(4)}`);
+    const t5 = over(trained(1, "FLY", 5), V1.AUDIT), t9 = over(trained(1, "MLP", 9), V1.AUDIT);
+    ok("!! ...AND THE TRAINED FLIES ARE THE RECORDS': round 1's FLY draw 5 and its MLP draw 9 (the one trained fly above fleeing from everything), flown here on the 200 audit episodes, give their records' scores to the bit and the episodes they lived", t5.score === RECS[1].get("FLY 5").score && t5.alive === RECS[1].get("FLY 5").alive && t9.score === RECS[1].get("MLP 9").score && t9.alive === RECS[1].get("MLP 9").alive && near(t9.score, 0.5453));
+    const env = new E.EscapeEnv(), fly = S.flyOf("reflex"); let o = env.reset(900001), done = false, good = REFLEX.frames[0].x === env.x && REFLEX.frames[0].atFood === true && REFLEX.frames[0].t === 0 && J(REFLEX.frames[0].obs) === J(Array.from(o)), k = 0;
+    while (!done) { const a = fly.act(o, env), r = env.step(a); o = r.obs; done = r.done; k++; const f = REFLEX.frames[k];
+        if (!(f.t === k && f.x === env.x && f.z === env.z && f.home === (a[0] > 0) && f.inRoom === env.inRoom() && f.atFood === env.atFood() && f.fed === env.fed && J(f.obs) === J(Array.from(o)) && (env.mover ? f.mover && f.mover.kind === env.mover.kind && f.mover.x === env.mover.x && f.mover.z === env.mover.z : f.mover === null))) good = false; }
+    ok("!! A FRAME IS THE ENVIRONMENT'S TICK: frame 0 is the fly on its food before anything; frame k is where the fly and the mover are after k steps, what the fly chose on that step, whether it is in its room or on its food, what it has fed, and the 13 numbers it is then given -- an episode flown beside it here, tick for tick", good && REFLEX.ticks === 160 && REFLEX.frames.length === 161 && k === 160 && REFLEX.plan.hash === env.plan.hash && J(REFLEX.food) === J(env.food) && J(REFLEX.log) === J(env.log));
+    const hs = REFLEX.frames.map((f) => f.heading), moved = REFLEX.frames.findIndex((f, i) => i > 0 && (f.x !== REFLEX.frames[i - 1].x || f.z !== REFLEX.frames[i - 1].z));
+    ok("the fly's heading is the way it last walked (straight along a row or a column of cells; kept while it stands), an episode is its fly's and its seed's (the same twice; another seed, another fly, another episode), and a caught fly's episode ends where it was caught",
+        moved > 0 && hs[0] === 0 && [0, Math.PI / 2, -Math.PI / 2, Math.PI].some((h) => Math.abs(hs[moved] - h) < 1e-9) && hs[moved - 1] === 0 && S.episode(S.flyOf("reflex"), 900001).hash === REFLEX.hash && S.episode(S.flyOf("reflex"), 900002).hash !== REFLEX.hash && HIDE.hash !== REFLEX.hash &&
+        FREEZE.caught === true && FREEZE.ticks === 28 && FREEZE.frames[28].caught === true && near(FREEZE.ret, 0.5 * 28 / 160, 1e-12) && HIDE.ret === 0.5 && HIDE.caught === false);
+});
+
+console.log("\n3. THE PICTURES");
+await section(() => {
+    const kS = FREEZE.frames.findIndex((f) => f.mover), kNear = 24, a = S.view3d(FREEZE, kNear), b = S.view3d(FREEZE, kNear), e = S.eyeView(FREEZE, kNear), sum = (c) => Object.values(c).reduce((x, y) => x + y, 0);
+    ok("a picture is its width x height of opaque pixels with a count of what each pixel met; the same tick twice is the same picture; the outside view is 320 x 220 and the eye's 180 x 45 unless asked otherwise", a.width === 320 && a.height === 220 && a.data.length === 320 * 220 * 4 && sum(a.counts) === 320 * 220 && a.hash === b.hash && e.width === 180 && e.height === 45 && sum(e.counts) === 180 * 45 && a.data.every((v, i) => i % 4 !== 3 || v === 255) && S.view3d(FREEZE, kNear, S.CAM, 64, 44).data.length === 64 * 44 * 4);
+    const tone = (v, col) => { let n = 0; for (let q = 0; q < v.data.length; q += 4) if ([0.75, 0.8, 0.85, 0.9, 0.95, 1].some((f) => isCol(v.data, q, col, f, 6))) n++; return n; }, reds = (v) => { let n = 0; for (let q = 0; q < v.data.length; q += 4) if (v.data[q] > 100 && v.data[q + 1] < 45 && v.data[q + 2] < 50) n++; return n; };
+    const before = S.view3d(FREEZE, kS - 1), inRoomK = HIDE.frames.findIndex((f) => f.inRoom), inside = S.view3d(HIDE, inRoomK);
+    ok("!! THE OUTSIDE VIEW SHOWS THE HOUSE, THE YARD, THE FLY AND THE MOVER: with no mover in the sky none is drawn; with a strike four cells off there are hundreds of its pixels and they are the strike's red; the fly is a few dozen dark pixels on its food; the house's blocks are thousands; the roof is in the roof's colour and the food's tile, once the fly is off it, in the food's; and a fly inside its room is not seen from outside (the roof is over it)",
+        before.counts.mover === 0 && FREEZE.frames[kS - 1].mover === null && a.counts.mover > 150 && a.counts.fly > 15 && a.counts.fly < 200 && a.counts.block > 3000 && a.counts.ground > 30000 && inside.counts.fly === 0 && HIDE.frames[inRoomK].inRoom === true && inRoomK > 0 && tone(inside, S.COLOURS.food) > 20 && tone(a, S.COLOURS.roof) > 1000 &&
+        (() => { let red = 0, n = 0; for (let q = 0; q < a.data.length; q += 4) if (a.data[q] > 100 && a.data[q + 1] < 45 && a.data[q + 2] < 50) { red++; } n = a.counts.mover; return red >= n * 0.9 && red <= n * 1.1; })(), J(a.counts));
+    const passEp = S.episode(S.flyOf("freeze"), 900002), kP = passEp.frames.findIndex((f) => f.mover && f.mover.kind === "pass" && f.t >= 28), pv = kP > 0 ? S.view3d(passEp, kP) : null, pe = kP > 0 ? S.eyeView(passEp, kP) : null;
+    ok("!! THE TWO KINDS OF MOVER ARE TOLD APART FOR THE WATCHER AND NOT FOR THE FLY: in the outside view a pass is grey where a strike is red; in the eye's view both are the same dark disc (the fly is not told the kind)",
+        kP > 0 && pv.counts.mover > 20 && tone(pv, S.COLOURS.pass) >= pv.counts.mover * 0.9 && reds(pv) === 0 && reds(a) > 150 && pe.counts.mover > 0 && (() => { let n = 0; for (let q = 0; q < pe.data.length; q += 4) if (isCol(pe.data, q, S.COLOURS.mover)) n++; return n === pe.counts.mover; })() && (() => { let n = 0; for (let q = 0; q < e.data.length; q += 4) if (isCol(e.data, q, S.COLOURS.mover)) n++; return n === e.counts.mover && n > 0; })(), `pass at tick ${kP}`);
+    const turned = S.view3d(FREEZE, kNear, { ...S.CAM, az: S.CAM.az + 1.2 }), high = S.view3d(FREEZE, kNear, { ...S.CAM, el: 1.4 });
+    ok("turning the camera is another picture of the same tick: another bearing, and from nearly overhead (where there is no sky and more yard)", turned.hash !== a.hash && high.hash !== a.hash && high.counts.sky === 0 && high.counts.ground > a.counts.ground && turned.counts.block > 1000 && S.CAM.dist === 16);
+    // the eye: the disc against the environment's own numbers, over the strike's approach at a fly that stays
+    const rows = []; for (let k = kS; k < FREEZE.frames.length - 1; k++) { const f = FREEZE.frames[k], v = S.eyeView(FREEZE, k), d = Math.hypot(f.mover.x - f.x, f.mover.z - f.z); let cx = 0, n = 0; for (let j = 0; j < v.height; j++) for (let i = 0; i < v.width; i++) if (isCol(v.data, (j * v.width + i) * 4, S.COLOURS.mover)) { cx += i + 0.5; n++; }
+        const half = Math.asin(Math.min(1, E.BIRD_RADIUS / d)), pix = (2 * Math.PI / v.width) * ((S.EYE_ELEV[1] - S.EYE_ELEV[0]) / v.height), want = 2 * Math.PI * (1 - Math.cos(half)) / pix; let rel = Math.atan2(f.mover.z - f.z, f.mover.x - f.x) - f.heading; while (rel > Math.PI) rel -= 2 * Math.PI; while (rel < -Math.PI) rel += 2 * Math.PI;
+        rows.push({ k, d, n, want, col: n ? cx / n : null, wantCol: (0.5 + rel / (2 * Math.PI)) * v.width, size: f.obs[1] }); }
+    const big = rows.filter((r) => r.want >= 12);
+    ok("!! *** THE EYE'S PICTURE IS WHAT THE FLY IS GIVEN: THE MOVER'S DISC IS ITS ANGULAR SIZE, WHERE ITS BEARING IS *** -- over a strike's whole approach to a fly that stays, the disc's count of lenses is the solid angle of a sphere 0.6 in radius at that distance (within a fifth once it is a dozen lenses; never more than 3 lenses off before); it never shrinks from one tick to the next; its middle column is the mover's bearing from the fly's heading, to a lens and a half (until, in the last tick or two, the disc is so wide it runs off one edge of the picture and on at the other); and it grows as the size the fly is given grows",
+        rows.length > 12 && big.length >= 4 && big.every((r) => Math.abs(r.n - r.want) <= 0.2 * r.want) && rows.every((r) => Math.abs(r.n - r.want) <= Math.max(3, 0.2 * r.want)) && rows.every((r, i) => i === 0 || r.n >= rows[i - 1].n) && rows.filter((r) => r.n > 0 && r.n < 300).every((r) => Math.abs(r.col - r.wantCol) <= 1.5) && rows.filter((r) => r.n > 0 && r.n < 300).length > 12 && rows[rows.length - 1].n > 10 * Math.max(1, rows[0].n) && rows.every((r, i) => i === 0 || r.size >= rows[i - 1].size),
+        `${rows[0].n} lenses at ${rows[0].d.toFixed(1)} cells to ${rows[rows.length - 1].n} at ${rows[rows.length - 1].d.toFixed(1)}`);
+    const clear = S.eyeView(FREEZE, kS - 1), room = S.eyeView(HIDE, HIDE.frames.length - 1), yard = S.eyeView(HIDE, 0), cols = (v, what) => v.counts[what] / (v.width * v.height);
+    ok("!! THE EYE SEES ALL THE WAY ROUND FROM WHERE THE FLY IS, AND NEVER ITSELF: with an empty sky there is no disc; in the yard most of what is above the horizon is sky and a part of the picture is its house; inside its room nearly all of it is the house's blocks and floor, with a little sky through the door; the top row of lenses is sky and the bottom row ground; no picture from the eye has the fly in it",
+        clear.counts.mover === 0 && cols(yard, "sky") > 0.4 && cols(yard, "block") > 0.02 && cols(yard, "block") < 0.4 && cols(room, "block") > 0.6 && cols(room, "sky") < 0.1 && [clear, room, yard, e].every((v) => v.counts.fly === 0) && (() => { const top = yard.data.subarray(0, yard.width * 4), bot = yard.data.subarray((yard.height - 1) * yard.width * 4); let sky = 0, grd = 0; for (let q = 0; q < top.length; q += 4) { if (top[q + 2] > 200 && top[q + 2] > top[q]) sky++; if (bot[q + 1] > bot[q] && bot[q + 1] > bot[q + 2]) grd++; } return sky > 0.7 * yard.width && grd === yard.width; })() && near(S.EYE_ELEV[0], -Math.PI / 6, 1e-12) && near(S.EYE_ELEV[1], Math.PI / 3, 1e-12) && S.EYE_HEIGHT === 0.6, `room ${cols(room, "block").toFixed(2)} blocks, ${cols(room, "sky").toFixed(3)} sky`);
+    const walk = REFLEX.frames.findIndex((f, i) => i > 0 && f.heading !== 0), ahead = S.eyeView(REFLEX, walk), same = S.eyeView({ ...REFLEX, frames: REFLEX.frames.map((f, i) => (i === walk ? { ...f, heading: 0 } : f)), _grid: undefined }, walk);
+    ok("the middle of the eye's picture is straight ahead: the same tick with the fly's heading turned is the same view shifted round, another picture", walk > 0 && ahead.hash !== same.hash && J(ahead.counts.block > 0) === J(same.counts.block > 0));
+    const said = S.saidLines().join(" ");
+    ok("!! WHAT THE PICTURES ARE AND ARE NOT IS SAID WITH THEM: the colours of the movers are for the watcher; the eye's picture is all the way round, the middle straight ahead, one lens a dot; the disc that LOOMS and a collision course's steady place; what the rounds found; and 'Not a fly's nervous system at work'",
+        /The colours of the two kinds of mover are for you; the fly is not told the kind/.test(said) && /all the way round: the middle is straight ahead and the two edges are behind it/.test(said) && /one lens a dot/.test(said) && /it LOOMS/.test(said) && /grows while staying where it is in the picture/.test(said) && /no fly learned to tell a strike from a harmless fly-by/.test(said) && /Not a fly's nervous system at work/.test(said) && /none of the visual cells/.test(said) && /could not be told apart from a shuffle/.test(said));
+});
+
+console.log("\n4. THE PAGE (fly-escape.html in Chromium)");
+await section(async () => {
+    const { srv, origin } = await C.serveTree(ENG), browser = await C.launchBrowser(); const errors = []; let first = null, ran = null, at = null, px = null, turnedP = null, frz = null, frzEnd = null, text = "", endText = "", tr = null, state = null, lost = null, dragged = null, meters = null;
+    const wait = (p, f, arg) => p.waitForFunction(f, arg, { timeout: 30000 });
+    try {
+        const p = await browser.newPage({ viewport: { width: 1240, height: 900 } }); p.on("pageerror", (e) => errors.push(e.message));
+        await p.goto(`${origin}/fly-escape.html`, { waitUntil: "load", timeout: 60000 }); await wait(p, () => window.swekEscape && window.swekEscape.ticks);
+        first = await p.evaluate(() => window.swekEscape); await wait(p, () => window.swekEscape.t >= 2); ran = await p.evaluate(() => window.swekEscape);
+        await p.selectOption("#kind", "freeze"); await wait(p, () => window.swekEscape.kind === "freeze" && window.swekEscape.ticks); await p.evaluate(() => window.swekEscapeSeek(24)); frz = await p.evaluate(() => window.swekEscape);
+        px = await p.evaluate(() => { const o = document.getElementById("out"), d = o.getContext("2d").getImageData(0, 0, o.width, o.height).data, e = document.getElementById("eye"), q = e.getContext("2d").getImageData(0, 0, e.width, e.height).data; let red = 0, dark = 0, roof = 0; for (let i = 0; i < d.length; i += 4) { if (d[i] > 100 && d[i + 1] < 45 && d[i + 2] < 50) red++; if (Math.abs(d[i] - 181) < 40 && Math.abs(d[i + 1] - 83) < 30 && Math.abs(d[i + 2] - 60) < 30) roof++; } for (let i = 0; i < q.length; i += 4) if (q[i] < 30 && q[i + 1] < 30 && q[i + 2] < 32) dark++; return { red, dark, roof, ow: o.width, oh: o.height, ew: e.width, eh: e.height }; });
+        text = await p.evaluate(() => document.querySelector("aside").textContent);
+        meters = await p.evaluate(() => [1, 2, 3].map((n) => ({ w: document.getElementById("m" + n).style.width, v: document.getElementById("v" + n).textContent })));
+        await p.evaluate(() => window.swekEscapeTurn(2.1, 0.8)); turnedP = await p.evaluate(() => window.swekEscape); await p.evaluate(() => window.swekEscapeTurn(0.9, 0.42));
+        const box = await p.locator("#out").boundingBox(); await p.mouse.move(box.x + 200, box.y + 150); await p.mouse.down(); await p.mouse.move(box.x + 300, box.y + 190, { steps: 4 }); await p.mouse.up(); dragged = await p.evaluate(() => window.swekEscape);
+        await p.evaluate(() => window.swekEscapeSeek(999)); frzEnd = await p.evaluate(() => window.swekEscape); endText = await p.evaluate(() => document.getElementById("end").textContent);
+        state = await p.evaluate(() => ({ round: document.getElementById("round").disabled, draw: document.getElementById("draw").disabled, labels: [...document.getElementById("round").options].map((o) => o.textContent) }));
+        await p.selectOption("#kind", "MLP"); await p.selectOption("#draw", "9"); await wait(p, () => window.swekEscape.kind === "MLP" && window.swekEscape.draw === 9 && window.swekEscape.ticks); tr = await p.evaluate(() => ({ ...window.swekEscape, roundOff: document.getElementById("round").disabled }));
+        const q = await browser.newPage(); await q.route("**/flyEscapeRound.jsonl", (r) => r.fulfill({ status: 404, body: "gone" }));
+        await q.goto(`${origin}/fly-escape.html`, { waitUntil: "load", timeout: 60000 }); await wait(q, () => window.swekEscape && window.swekEscape.ticks); await q.selectOption("#kind", "FLY"); await wait(q, () => window.swekEscape.error);
+        lost = await q.evaluate(() => ({ h: window.swekEscape, text: document.getElementById("stats").textContent }));
+    } finally { await browser.close(); await shutdownServer(srv); }
+    ok("!! THE PAGE OPENS ON THE REFLEX FLY'S EPISODE 900001 AND IT IS THIS FILE'S: 160 ticks, the episode's hash the one this file computes, alive, no error on the page -- and it plays by itself (it reaches tick 2 with no click)",
+        !!first && first.error === null && first.kind === "reflex" && first.seed === 900001 && first.ticks === 160 && first.hash === REFLEX.hash && first.planHash === REFLEX.plan.hash && first.caught === false && near(first.ret, REFLEX.ret, 1e-12) && !!ran && ran.playing === true && ran.t >= 2 && errors.length === 0, first ? `${first.hash} ${errors[0] || ""}` : "no episode");
+    const v24 = S.view3d(FREEZE, 24), e24 = S.eyeView(FREEZE, 24);
+    ok("!! *** BOTH CANVASES ARE THIS FILE'S PICTURES, PIXEL FOR PIXEL: the fly that never flees, sent to tick 24 -- the outside view's hash and the eye's are the ones computed here in node, and the eye's count of the mover's lenses is the same ***", !!frz && frz.hash === FREEZE.hash && frz.t === 24 && frz.playing === false && frz.view === v24.hash && frz.eye === e24.hash && frz.eyeMover === e24.counts.mover && frz.eyeMover > 50, frz ? `${frz.view} ${frz.eye}` : "");
+    ok("!! THE PICTURES ARE ON THE CANVASES: the outside view (320 x 220) has the strike's red and the roof's colour; the eye's canvas (720 x 180, each lens four pixels) has the dark disc at sixteen pixels a lens, less the lines between lenses", !!px && px.ow === 320 && px.oh === 220 && px.ew === 720 && px.eh === 180 && px.red > 150 && px.roof > 1500 && px.dark > 9 * e24.counts.mover && px.dark <= 16 * e24.counts.mover + 60, J(px));
+    ok("!! THE OUTSIDE VIEW TURNS: sent to another bearing and height it is this file's picture from there; and dragging it with the mouse turns it (the bearing and the height both change, and the picture with them)",
+        !!turnedP && turnedP.view === S.view3d(FREEZE, 24, { ...S.CAM, az: 2.1, el: 0.8 }).hash && turnedP.view !== v24.hash && turnedP.eye === e24.hash && !!dragged && dragged.az > 0.9 + 0.5 && dragged.el > 0.42 + 0.1 && dragged.view !== v24.hash && dragged.view === S.view3d(FREEZE, 24, { ...S.CAM, az: dragged.az, el: dragged.el }).hash);
+    ok("!! WHAT IT IS AND IS NOT IS ON THE PAGE, in the module's own lines, with the tick, what the fly chose and the three numbers; and a caught fly's episode says so: 'CAUGHT at tick 28'", S.saidLines().every((l) => text.includes(l)) && /tick 24 of 28 · fed 24 ticks · a mover is in the sky/.test(text) && /it chose: FOOD/.test(text) && /how fast it looms/.test(text) && !!frzEnd && frzEnd.t === 28 && frzEnd.done === true && /^CAUGHT at tick 28\. Score 0\.08[78] /.test(endText));
+    const o24 = FREEZE.frames[24].obs;
+    ok("!! THE THREE METERS ARE THE THREE NUMBERS THE FLY IS GIVEN AT THAT TICK: how big the mover looks (a bar of that share of its track, and the number), how fast it looms and how fast it slides sideways (each from the middle, half the track at most) -- for the fly that never flees at tick 24, this file's observation: the size 0.825, the looming rate at its top, the bearing rate 0",
+        !!meters && meters[0].v === o24[1].toFixed(3) && Math.abs(parseFloat(meters[0].w) - o24[1] * 100) < 0.01 && meters[1].v === o24[2].toFixed(3) && Math.abs(parseFloat(meters[1].w) - Math.abs(o24[2]) * 50) < 0.01 && meters[2].v === o24[3].toFixed(3) && parseFloat(meters[2].w) === 0 && Math.abs(o24[1] - 0.825) < 5e-4 && o24[2] === 1 && o24[3] === 0, J(meters));
+    const m9 = S.episode(trained(1, "MLP", 9), 900001);
+    ok("!! A TRAINED FLY IS PLAYED FROM ITS ROUND'S OWN FILE: round 1's MLP draw 9 on the same episode is this file's episode; the round and the draw can be chosen for a trained fly and not for one written by hand; the rounds listed are the module's", !!tr && tr.error === null && tr.hash === m9.hash && tr.ticks === m9.ticks && tr.round === 1 && tr.roundOff === false && !!state && state.round === true && state.draw === true && J(state.labels) === J(NS.map((n) => S.ROUNDS[n].label)));
+    ok("!! A RESULTS FILE THAT DOES NOT ARRIVE IS SAID, BY NAME, and no episode is shown as if it had: the page answers that round 1's file answered 404", !!lost && /brain\/flyEscapeRound\.jsonl answered 404/.test(lost.h.error || "") && /could not be flown: .*answered 404/.test(lost.text) && lost.h.hash === undefined && lost.h.ticks === undefined, lost ? lost.text : "");
+});
+
+console.log(`\nflyEscapeShow-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILED"}`);
+process.exitCode = fails === 0 ? 0 : 1;

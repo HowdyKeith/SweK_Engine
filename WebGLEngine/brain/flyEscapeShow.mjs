@@ -1,0 +1,163 @@
+// WebGLEngine/brain/flyEscapeShow.mjs -- UNNUMBERED (the version is chosen at ship time)
+//
+// WATCH THE FLY ESCAPE, IN 3D AND THROUGH ITS OWN EYES (Keith, 2026-11-15: "We do need to be able to watch the fly in 3d and also be able to see through fly eyes"). One episode of
+// brain/rl/escapeEnv.mjs, kept tick by tick, and two pictures of any tick. Nothing here trains and nothing here measures: the escape rounds did that (tools/ship/flyEscape.mjs and
+// tools/ship/flyEscapeReflex.mjs), and this file plays their flies -- the same environment, the same episodes, the weights read from the rounds' own committed results.
+//
+// THE FLIES (KINDS). Five need no file: the four written by hand (brain/rl/escapeEnv.mjs RULES: freeze, hide, fleeAll, reflex) and `told`, which is told each mover's kind. Five are a round's
+// trained arm (FLY, SHUF, PLAIN, FISH, MLP), draw 1 to 16, whose weights are the record's in that round's results file (ROUNDS).
+//
+// THE PICTURES ARE RAY-CAST FROM THE EPISODE'S OWN VOXELS: a ray a pixel, through the house's blocks (the plan's cells, the same the environment stamped into its world), the ground, the mover (a
+// sphere of the environment's radius at the height of the fly's eye) and, in the outside view, the fly. No GPU: the page is to open anywhere, and the gate holds the pictures without a browser.
+//   view3d(ep, k, cam, w, h)   from a camera that orbits the site: { az, el, dist } (radians, cells)
+//   eyeView(ep, k, w, h)       FROM THE FLY'S EYE, ALL THE WAY ROUND: a column of the picture is a bearing (the middle is straight ahead, the two edges are behind), a row an elevation
+//                              (EYE_ELEV: 30 degrees below the horizon to 60 above). A fly's two eyes see nearly the whole sphere at once, coarsely; this is that, one lens a pixel.
+//                              THE MOVER'S DISC IN THIS PICTURE IS WHAT THE ENVIRONMENT CALLS ITS ANGULAR SIZE, and how fast it grows is the looming rate.
+// Both return { width, height, data (RGBA bytes), hash }.
+//
+//   ROUNDS, KINDS, ARMS, LABELS, COLOURS, CAM, EYE_ELEV, EYE_HEIGHT
+//   policyFor(round, arm, s)                 that round's untrained fly of an arm and a draw (tools/ship/flyEscape.mjs's policyOf, which a page cannot load: it reads files)
+//   flyOf(kind, { round, draw, record })     { kind, round, draw, act(obs, env) }
+//   episode(fly, seed, opts)                 { seed, plan, food, frames: [{ t, x, z, heading, home, inRoom, atFood, fed, mover, obs }], ticks, ret, caught, fed, log, hash }
+//   saidLines()                              what the page says the pictures are and are not
+// Pure: no I/O, no clock, no Math.random.
+"use strict";
+import { EscapeEnv, RULES, OBS_DIM, ACT_DIM, MAX_STEPS, YARD, YARD_LO, BIRD_RADIUS } from "./rl/escapeEnv.mjs";
+import { SITE, LAYERS, BLOCKS } from "./rl/buildEnv.mjs";
+import { FlightPolicy } from "./rl/dockPolicy.js";
+import * as P from "./rl/paintCircuitPolicy.mjs";
+import { ReflexStart } from "./rl/reflexStart.mjs";
+import { unpackWeights, recordsOf } from "./voxelHomeShow.mjs";
+
+export { unpackWeights, recordsOf };
+export const ROUNDS = Object.freeze({
+    1: Object.freeze({ file: "brain/flyEscapeRound.jsonl", label: "round 1: trained from nothing (they hide)" }),
+});
+export const ARMS = Object.freeze(["FLY", "SHUF", "PLAIN", "FISH", "MLP"]);
+export const KINDS = Object.freeze(["reflex", "fleeAll", "hide", "freeze", "told", ...ARMS]);
+export const LABELS = Object.freeze({ reflex: "written by hand: the reflex (looms on a steady bearing)", fleeAll: "written by hand: flees from everything", hide: "written by hand: never leaves home", freeze: "written by hand: never flees",
+    told: "told which movers are strikes", FLY: "trained: the fly's wiring", SHUF: "trained: the fly's wiring, shuffled", PLAIN: "trained: a plain net of its size", FISH: "trained: the fish's wiring", MLP: "trained: a small standard net" });
+export const DRAWS = 16, PLAIN_UNITS = 55, MLP_HIDDEN = Object.freeze([16, 16]);
+export const COLOURS = Object.freeze({ wall: [185, 178, 163], glass: [127, 200, 255], roof: [181, 83, 60], yard: [58, 92, 62], beyond: [34, 52, 38], food: [232, 196, 64], door: [138, 106, 60], sky: [120, 170, 230], horizon: [200, 222, 245],
+    fly: [28, 24, 22], strike: [150, 30, 36], pass: [70, 76, 92], mover: [22, 22, 26] });
+export const CAM = Object.freeze({ az: 0.9, el: 0.42, dist: 16, fov: 0.9 }), EYE_ELEV = Object.freeze([-Math.PI / 6, Math.PI / 3]), EYE_HEIGHT = 0.6, FLY_RADIUS = 0.22;
+
+/** See the header. */
+export function policyFor(round, arm, s) {
+    const R = ROUNDS[round]; if (!R) throw new Error(`flyEscapeShow: no round ${round} (the rounds are ${Object.keys(ROUNDS).join(", ")})`);
+    if (!ARMS.includes(arm)) throw new Error(`flyEscapeShow.policyFor: no arm ${arm} (the arms are ${ARMS.join(", ")})`);
+    if (!Number.isInteger(s) || s < 1 || s > DRAWS) throw new Error(`flyEscapeShow: no draw ${s} (the draws are 1 to ${DRAWS})`);
+    const started = (inner, under) => (R.start === "reflex" ? new ReflexStart(inner, { rule: RULES.reflex, tail: under + 1 }) : inner);
+    if (arm === "MLP") return started(new FlightPolicy({ hidden: [...MLP_HIDDEN], obsDim: OBS_DIM, actDim: ACT_DIM, seed: s }), MLP_HIDDEN[MLP_HIDDEN.length - 1]);
+    const c = arm === "PLAIN" ? { units: PLAIN_UNITS, edges: [] } : P.ARMS[arm](s);
+    return started(new P.CircuitPolicy({ obsDim: OBS_DIM, actDim: ACT_DIM, units: c.units, edges: c.edges, seed: s }), c.units);
+}
+/** See the header. */
+export function flyOf(kind, { round = 1, draw = 1, record = null } = {}) {
+    if (!KINDS.includes(kind)) throw new Error(`flyEscapeShow.flyOf: no fly ${kind} (the flies are ${KINDS.join(", ")})`);
+    if (kind === "told") return { kind, round: null, draw: null, act: (o, env) => [env.mover && env.mover.kind === "strike" ? 1 : -1] };
+    if (Object.hasOwn(RULES, kind)) return { kind, round: null, draw: null, act: (o) => RULES[kind](o) };
+    const policy = policyFor(round, kind, draw);
+    if (!record || record.arm !== kind || record.s !== draw) throw new Error(`flyEscapeShow.flyOf: ${kind} draw ${draw} of round ${round} needs its record from ${ROUNDS[round].file}`);
+    const w = unpackWeights(record.weights);
+    if (w.length !== policy.getParams().length || w.length !== record.weightCount) throw new Error(`flyEscapeShow.flyOf: ${kind} draw ${draw} of round ${round} has ${w.length} weights, and its fly takes ${policy.getParams().length}`);
+    policy.setParams(w);
+    return { kind, round, draw, score: record.score, act: (o) => policy.act(o) };
+}
+
+/** See the header. One episode on a fresh environment. */
+export function episode(fly, seed, { maxSteps = MAX_STEPS } = {}) {
+    if (!Number.isInteger(seed) || seed < 1) throw new Error(`flyEscapeShow.episode: the seed is a whole number from 1 (got ${seed})`);
+    const env = new EscapeEnv({ maxSteps }), frames = []; let o = env.reset(seed), done = false, ret = 0, heading = 0, h = 0x811c9dc5;
+    const p = env.plan, snap = (home) => ({ t: env.t, x: env.x, z: env.z, heading, home, inRoom: env.inRoom(), atFood: env.atFood(), fed: env.fed, caught: env.caught,
+        mover: env.mover ? { kind: env.mover.kind, x: env.mover.x, z: env.mover.z } : null, obs: Array.from(o) });
+    frames.push(snap(false));
+    while (!done) {
+        const a = fly.act(o, env), home = Number.isFinite(a[0]) && a[0] > 0, x0 = env.x, z0 = env.z, r = env.step(a);
+        if (env.x !== x0 || env.z !== z0) heading = Math.atan2(env.z - z0, env.x - x0);
+        o = r.obs; done = r.done; ret += r.reward; frames.push(snap(home));
+        h ^= Math.round(env.x * 64) * 131 + Math.round(env.z * 64) * 7 + (home ? 1 : 0) + (env.mover ? 2 : 0); h = Math.imul(h, 0x01000193) >>> 0;
+    }
+    return { kind: fly.kind, round: fly.round, draw: fly.draw, seed, maxSteps, plan: { w: p.w, d: p.d, hash: p.hash, cells: p.cells.map((c) => ({ x: c.x, y: c.y, z: c.z, id: c.id })), door: p.door.map((c) => ({ x: c.x, y: c.y, z: c.z })) },
+        food: [env.food[0], env.food[1]], frames, ticks: frames.length - 1, ret, caught: env.caught, fed: env.fed, log: env.log.slice(), hash: (h >>> 0).toString(16).padStart(8, "0") };
+}
+
+// ---- the ray caster ----
+const gridOf = (ep) => { if (!ep._grid) { const g = new Uint8Array(SITE * LAYERS * SITE); for (const c of ep.plan.cells) g[(c.y * SITE + c.z) * SITE + c.x] = c.id; Object.defineProperty(ep, "_grid", { value: g }); } return ep._grid; };
+const SHADE = Object.freeze({ top: 1, x: 0.8, z: 0.62 });
+/** The nearest thing a ray from (ox, oy, oz) along the unit (dx, dy, dz) meets: writes an [r, g, b] into `out`, and returns what it was ("sky", "ground", "block", "mover", "fly"). */
+function cast(ep, f, ox, oy, oz, dx, dy, dz, withFly, eye, out) {
+    let best = Infinity, what = "sky", r = 0, g = 0, b = 0;
+    // the house's blocks: the site's box, then a step a cell
+    const grid = gridOf(ep), inv = [dx !== 0 ? 1 / dx : Infinity, dy !== 0 ? 1 / dy : Infinity, dz !== 0 ? 1 / dz : Infinity];
+    let t0 = 0, t1 = Infinity; const lo = [0, 0, 0], hi = [SITE, LAYERS, SITE], o = [ox, oy, oz], d = [dx, dy, dz]; let enter = -1;
+    for (let a = 0; a < 3; a++) {
+        if (d[a] === 0) { if (o[a] < lo[a] || o[a] > hi[a]) { t1 = -1; break; } continue; }
+        let ta = (lo[a] - o[a]) * inv[a], tb = (hi[a] - o[a]) * inv[a]; if (ta > tb) { const s = ta; ta = tb; tb = s; }
+        if (ta > t0) { t0 = ta; enter = a; } if (tb < t1) t1 = tb;
+    }
+    if (t1 >= t0) {
+        const e = 1e-6; let cx = Math.min(SITE - 1, Math.max(0, Math.floor(ox + dx * (t0 + e)))), cy = Math.min(LAYERS - 1, Math.max(0, Math.floor(oy + dy * (t0 + e)))), cz = Math.min(SITE - 1, Math.max(0, Math.floor(oz + dz * (t0 + e))));
+        const sx = dx > 0 ? 1 : -1, sy = dy > 0 ? 1 : -1, sz = dz > 0 ? 1 : -1;
+        let tx = dx !== 0 ? ((dx > 0 ? cx + 1 : cx) - ox) * inv[0] : Infinity, ty = dy !== 0 ? ((dy > 0 ? cy + 1 : cy) - oy) * inv[1] : Infinity, tz = dz !== 0 ? ((dz > 0 ? cz + 1 : cz) - oz) * inv[2] : Infinity;
+        const ddx = Math.abs(inv[0]), ddy = Math.abs(inv[1]), ddz = Math.abs(inv[2]); let t = t0, face = enter;
+        for (let n = 0; n < 3 * SITE + LAYERS; n++) {
+            const id = grid[(cy * SITE + cz) * SITE + cx];
+            if (id) { const col = id === BLOCKS.glass ? COLOURS.glass : id === BLOCKS.roof ? COLOURS.roof : COLOURS.wall, s = face === 1 ? SHADE.top : face === 0 ? SHADE.x : SHADE.z; best = t; what = "block"; r = col[0] * s; g = col[1] * s; b = col[2] * s; break; }
+            if (tx <= ty && tx <= tz) { t = tx; tx += ddx; cx += sx; face = 0; if (cx < 0 || cx >= SITE) break; } else if (ty <= tz) { t = ty; ty += ddy; cy += sy; face = 1; if (cy < 0 || cy >= LAYERS) break; } else { t = tz; tz += ddz; cz += sz; face = 2; if (cz < 0 || cz >= SITE) break; }
+        }
+    }
+    // the ground
+    if (dy < 0) { const t = -oy / dy; if (t > 0 && t < best) { const px = ox + dx * t, pz = oz + dz * t, cx = Math.floor(px), cz = Math.floor(pz), inYard = cx >= YARD_LO && cz >= YARD_LO && cx < YARD_LO + YARD && cz < YARD_LO + YARD;
+        let col = inYard ? COLOURS.yard : COLOURS.beyond; if (inYard && cx === ep.food[0] && cz === ep.food[1]) col = COLOURS.food; else if (inYard && ep.plan.door.some((c) => c.y === 0 && c.x === cx && c.z === cz)) col = COLOURS.door;
+        const s = inYard && col !== COLOURS.food && ((cx + cz) & 1) ? 0.9 : 1; best = t; what = "ground"; r = col[0] * s; g = col[1] * s; b = col[2] * s; } }
+    // the mover and the fly: spheres
+    const sphere = (sx0, sy0, sz0, rad) => { const lx = sx0 - ox, ly = sy0 - oy, lz = sz0 - oz, tc = lx * dx + ly * dy + lz * dz, d2 = lx * lx + ly * ly + lz * lz - tc * tc; if (d2 > rad * rad) return Infinity; const th = Math.sqrt(rad * rad - d2), t = tc - th; return t > 1e-4 ? t : (tc + th > 1e-4 && !eye ? tc + th : Infinity); };
+    if (f.mover) { const t = sphere(f.mover.x, EYE_HEIGHT, f.mover.z, BIRD_RADIUS); if (t < best) { const col = eye ? COLOURS.mover : f.mover.kind === "strike" ? COLOURS.strike : COLOURS.pass, s = eye ? 1 : 0.75 + 0.25 * Math.max(0, (oy + dy * t - EYE_HEIGHT) / BIRD_RADIUS); best = t; what = "mover"; r = col[0] * s; g = col[1] * s; b = col[2] * s; } }
+    if (withFly) { const t = sphere(f.x, FLY_RADIUS, f.z, FLY_RADIUS); if (t < best) { best = t; what = "fly"; r = COLOURS.fly[0]; g = COLOURS.fly[1]; b = COLOURS.fly[2]; } }
+    if (what === "sky") { const k = Math.max(0, Math.min(1, dy * 1.6)); r = COLOURS.horizon[0] + (COLOURS.sky[0] - COLOURS.horizon[0]) * k; g = COLOURS.horizon[1] + (COLOURS.sky[1] - COLOURS.horizon[1]) * k; b = COLOURS.horizon[2] + (COLOURS.sky[2] - COLOURS.horizon[2]) * k; }
+    out[0] = r; out[1] = g; out[2] = b;
+    return what;
+}
+const frameOf = (ep, k) => { if (!Number.isInteger(k) || k < 0 || k >= ep.frames.length) throw new Error(`flyEscapeShow: no tick ${k} of this episode (0 to ${ep.frames.length - 1})`); return ep.frames[k]; };
+const sizeOf = (w, h) => { if (!Number.isInteger(w) || !Number.isInteger(h) || w < 1 || h < 1 || w * h > 1 << 20) throw new Error(`flyEscapeShow: a picture is a whole number of pixels each way, at most a million (got ${w} x ${h})`); };
+const finish = (width, height, data, counts) => { let h = 0x811c9dc5; for (let i = 0; i < data.length; i += 4) { h ^= (data[i] << 16) | (data[i + 1] << 8) | data[i + 2]; h = Math.imul(h, 0x01000193) >>> 0; } return { width, height, data, counts, hash: (h >>> 0).toString(16).padStart(8, "0") }; };
+
+/** See the header. `counts` is how many pixels met each thing. */
+export function view3d(ep, k, cam = CAM, width = 320, height = 220) {
+    const f = frameOf(ep, k); sizeOf(width, height);
+    const az = cam.az ?? CAM.az, el = Math.max(0.05, Math.min(1.5, cam.el ?? CAM.el)), dist = cam.dist ?? CAM.dist, fov = cam.fov ?? CAM.fov, tx = SITE / 2, ty = 1, tz = SITE / 2;
+    const ox = tx + dist * Math.cos(el) * Math.cos(az), oy = ty + dist * Math.sin(el), oz = tz + dist * Math.cos(el) * Math.sin(az);
+    let fx = tx - ox, fy = ty - oy, fz = tz - oz; const fl = Math.hypot(fx, fy, fz); fx /= fl; fy /= fl; fz /= fl;
+    let rx = -fz, rz = fx; const rl = Math.hypot(rx, rz); rx /= rl; rz /= rl;                       // right = forward x up, flat
+    const ux = -rz * fy, uy = rz * fx - rx * fz, uz = rx * fy;                                       // up = right x forward
+    const data = new Uint8ClampedArray(width * height * 4), out = [0, 0, 0], counts = { sky: 0, ground: 0, block: 0, mover: 0, fly: 0 }, half = Math.tan(fov / 2), aspect = width / height;
+    for (let j = 0; j < height; j++) for (let i = 0; i < width; i++) {
+        const px = ((i + 0.5) / width * 2 - 1) * half * aspect, py = (1 - (j + 0.5) / height * 2) * half;
+        let dx = fx + rx * px + ux * py, dy = fy + uy * py, dz = fz + rz * px + uz * py; const l = Math.hypot(dx, dy, dz); dx /= l; dy /= l; dz /= l;
+        counts[cast(ep, f, ox, oy, oz, dx, dy, dz, true, false, out)]++;
+        const q = (j * width + i) * 4; data[q] = out[0]; data[q + 1] = out[1]; data[q + 2] = out[2]; data[q + 3] = 255;
+    }
+    return finish(width, height, data, counts);
+}
+/** See the header. */
+export function eyeView(ep, k, width = 180, height = 45) {
+    const f = frameOf(ep, k); sizeOf(width, height);
+    const data = new Uint8ClampedArray(width * height * 4), out = [0, 0, 0], counts = { sky: 0, ground: 0, block: 0, mover: 0, fly: 0 };
+    for (let j = 0; j < height; j++) { const elev = EYE_ELEV[1] - (j + 0.5) / height * (EYE_ELEV[1] - EYE_ELEV[0]), ce = Math.cos(elev), se = Math.sin(elev);
+        for (let i = 0; i < width; i++) { const bearing = f.heading + ((i + 0.5) / width - 0.5) * 2 * Math.PI;
+            counts[cast(ep, f, f.x, EYE_HEIGHT, f.z, ce * Math.cos(bearing), se, ce * Math.sin(bearing), false, true, out)]++;
+            const q = (j * width + i) * 4; data[q] = out[0]; data[q + 1] = out[1]; data[q + 2] = out[2]; data[q + 3] = 255; } }
+    return finish(width, height, data, counts);
+}
+
+/** See the header. */
+export function saidLines() {
+    return [
+        "A fly feeds on the yellow tile in the yard of its house. Things fly at it (a strike, drawn red in the outside view) or past it (harmless, drawn grey). A strike catches a fly it reaches that is not inside its room, and it is faster than the fly walks. The fly chooses one thing each tick: go home, or go to the food. Its body finds the way, through the door.",
+        "The outside view can be turned: drag it. The colours of the two kinds of mover are for you; the fly is not told the kind.",
+        "The lower picture is from the fly's own eye, all the way round: the middle is straight ahead and the two edges are behind it, from 30 degrees below the horizon to 60 above, one lens a dot. The dark disc is the mover. How big it is, how fast it grows (it LOOMS) and how fast it slides sideways are three of the thirteen numbers the fly is given; a thing on a collision course grows while staying where it is in the picture.",
+        "What the rounds found: trained from nothing, no fly learned to tell a strike from a harmless fly-by -- they go home for everything and score less than a fly written to do just that. The reflex written by hand (go home for what looms on a steady bearing) does better and is still caught by one strike in ten.",
+        "Not a fly's nervous system at work. The Giant Fiber Circuit is the fruit fly's real escape circuit, and a trained fly here is a small network with that circuit's wiring -- but it has none of the visual cells that feed the circuit in the animal, it has no memory between ticks, it walks where a fly would take off, and in every round so far its wiring could not be told apart from a shuffle of it.",
+    ];
+}
