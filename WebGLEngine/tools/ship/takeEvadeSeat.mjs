@@ -72,7 +72,7 @@ export function rulesOf(rows) {
     const r1 = rev(`U:${STRONG}`), r2 = rev(`STN:${STRONG}`), r3 = rev(`N:${STRONG}`), r4 = rev(`SN:${STRONG}`), r5 = rev(`S:${STRONG}`), r6 = !rev(`U:${ODD}`) && !rev(`STN:${ODD}`);
     const headline = r4 && !r3 && r6 ? "THE SPEED IS WHAT REVERSES IT" : r3 ? "THE TURN ALONE REVERSES IT" : r2 && !r3 && !r4 && !r5 ? "THE TRIPLE, AND NO PART OF IT ALONE" : !r2 ? "NOTHING OF THE TRIPLE REVERSES IT" : null;
     const reversed = rows.filter((r) => r.label === "REVERSED"), g = by("G");
-    return { replicates: lab("G") === "SEAT-A" && r1, R1: r1, R2: r2, R3: r3, R4: r4, R5: r5, R6: r6, headline, forecast: { reversedSunkMore: reversed.length > 0 && reversed.every((r) => r.sunkB > r.sunkA), gWithinHalf: !!g && Math.abs(g.mean - G_BIAS) <= 0.5 } };
+    return { replicates: lab("G") === "SEAT-A" && r1, R1: r1, R2: r2, R3: r3, R4: r4, R5: r5, R6: r6, headline, forecast: { reversedSunkMore: reversed.length > 0 && reversed.every((r) => r.sunkA > r.sunkB), gWithinHalf: !!g && Math.abs(g.mean - G_BIAS) <= 0.5 } };
 }
 
 /** The report of a read, one string a line. */
@@ -84,7 +84,7 @@ export function reportLines(rows, rules, name) {
     L.push(`  R1 U:${STRONG} REVERSED ${yn(rules.R1)}; R2 STN:${STRONG} ${yn(rules.R2)}; R3 N:${STRONG} (the turn alone) ${yn(rules.R3)}; R4 SN:${STRONG} (speed with the turn) ${yn(rules.R4)}; R5 S:${STRONG} (the speed alone) ${yn(rules.R5)}; R6 ${ODD}: neither U nor STN reversed ${yn(rules.R6)}`);
     L.push(`  HEADLINE: ${rules.headline === null ? "none" : rules.headline}`);
     L.push("  PART A (8 geometries, 97001 to 97008): league7001 -1.873 (se 0.830), G (the search-ping side) +3.368");
-    L.push(`  FORECAST QUANTITIES: in every REVERSED side seat B's boat is sunk more often than seat A's ${yn(rules.forecast.reversedSunkMore)}; G's mirror bias within 0.5 of +${G_BIAS} ${yn(rules.forecast.gWithinHalf)}`);
+    L.push(`  FORECAST QUANTITIES: in every REVERSED side seat A's boat is sunk more often than seat B's ${yn(rules.forecast.reversedSunkMore)}; G's mirror bias within 0.5 of +${G_BIAS} ${yn(rules.forecast.gWithinHalf)}`);
     return L;
 }
 
