@@ -11,6 +11,7 @@ What each round is and its status (updated as the rounds finish):
 | 3 | Stealth stimuli on the fly models (predictions registered first) | `brain/stealthLoomStimuli.mjs`, `brain/stealthRound3-run.mjs`, `brain/stealthRound3-results.txt` | DONE: NOT SUPPORTED |
 | 4 | Luan's crab MLG1 looming-localization network | `brain/crabMlg1.mjs`, `-selfcheck.mjs` | DONE (one paper result NOT reproduced) |
 | 5 | Stealth stimuli on the crab model (predictions registered first) | `brain/stealthRound5-run.mjs`, `brain/stealthRound5-results.txt` | DONE: NOT SUPPORTED (opposite direction) |
+| 7-11 | Held-out crab stripes, fly polarity, treadmill stimulus, FFI variants, ON-gain sweep | `brain/stealthRound7..11-run.mjs` and results files | DONE (see the sections below) |
 | 6 | Warning margin against a camouflaged predator, in place of the Escape task (registered first) | `brain/stealthRound6-run.mjs`, `brain/stealthRound6-results.txt` | DONE: NOT SUPPORTED |
 
 ## Round 1: Santon's motion-detector analysis (DONE)
@@ -225,3 +226,22 @@ Filmed-hunt frame sequences; Wu 2016 (LC4 receptive field); a trained 4b-E pilot
 3. The plain ellipse's peak count is within 5 percent of its gain-1 value at every gain (85%): the dark ellipse is a pure OFF stimulus.
 4. The static-stripe ratio is within 0.15 of the moving-stripe ratio at every gain and r/v (50%): the masking is not specific to the stripes' motion.
 **Verdict.** The masking is a GRADED effect of the ON path iff prediction 1 holds AND both ratios are at most 0.6 at gain 0.03; otherwise NOT SUPPORTED (it is an all-or-nothing effect of removing the path, or not monotone). The gain g* (the largest gain with both ratios at most 0.6) is reported.
+
+## Round 10 RESULTS (FFI variants, crab model; `node brain/stealthRound10-run.mjs`, raw `brain/stealthRound10-results.txt`): NOT SUPPORTED
+Gate first: `ffiPool` ("global": every segment's feed-forward drive is the mean over all 16 segments of the previous-frame |P|), 9 mutants, all red after one row (signed vs absolute sum). Held-out stimulus: azimuth 180, r/v 0.15 and 0.5 s. Alarm size ratio with stripes (static / moving) and the receding ellipse:
+| variant | r/v 0.15 | r/v 0.5 | receding |
+|---|---|---|---|
+| S, G, GE with "both" (identical) | x1.30 / x0.57 | x1.15 / x0.37 | alarms |
+| E ("both", persistence 0.9) | x1.30 / x0.57 | x1.15 / x0.37 | no alarm at 0.15, alarms at 0.5 |
+| S, G, GE with "off" (identical) | none / x1.51 | x2.36 / x0.84 | no alarm |
+| E "off" | none / none | none / none | no alarm |
+**Verdict: NOT SUPPORTED, 0 of 8 variants ANIMAL-LIKE.** Predictions: 1 HIT (pooling changes nothing: G equals S in every cell, to the digit). 2 MISS (longer persistence changed the "both" moving ratio not at all: x0.57 and x0.37 as S). 3 HIT (every variant's plain ellipse alarms at both r/v). 4 HIT (no "off" variant alarms on the receding ellipse).
+**What the table says, labelled.** (a) The feed-forward inhibition, pooled or not, does not set the alarm size in the "both" model at all: the alarm comes before F has risen (inference; the F trace was not tabulated for these runs). (b) The only variant that makes stripes matter is "off" with persistence 0.9, and there EVERY stripe pattern, static or moving, removes the alarm: masking by stripes in general, again not the animal's static-equals-plain pattern. (c) The moving stripes' alarm is early (x0.57, x0.37) in all four "both" variants: the earlier Round 5 and 9 finding, confirmed on a third azimuth.
+
+## Round 11 RESULTS (ON-gain sweep, fly array; `node brain/stealthRound11-run.mjs`, raw `brain/stealthRound11-results.txt`): NOT SUPPORTED
+Gate first: `onGain` (the ON path's gain; it enters the detector twice, the path and its own delayed copy, so the ON-path motion scales as gain squared; 8 mutants, 7 red, 1 equivalent `+ 0`). Moving-stripe ratio (peak count) at r/v 50 / 100 ms: gain 1: 0.756 / 1.000; 0.5: 0.756 / 1.000; 0.25: 0.746 / 1.000; 0.1: 0.679 / 1.000; 0.03: 0.677 / 0.987; 0: 0.123 / 0.414. Static ratio: 0.885 / 0.955 at gain 1, 0.829 / 0.955 at 0.1, 0.734 / 0.921 at 0.03, 0.000 / 0.344 at 0.
+**Verdict: NOT SUPPORTED** (rule: graded iff monotone AND both ratios at most 0.6 at gain 0.03; the 0.03 ratios are 0.677 and 0.987; g* does not exist, no gain above 0 gives masking at both r/v). Predictions: 1 HIT (non-increasing at 100 ms r/v: 1.000 down to 0.414). 2 MISS (no gain at or above 0.03 masks at both r/v). 3 HIT (the plain peak is identical at every gain: the dark ellipse is pure OFF). 4 HIT (static within 0.15 of moving everywhere; the gain-0.1 cell at 50 ms differs by exactly 0.150, on the line).
+**Reading.** The masking in Round 8 is not a graded property of the ON path: it needs the ON path essentially removed (the ratio jumps between gain 0.03 and 0 at both r/v, 0.677 to 0.123 and 0.987 to 0.414). Because the ON-path motion scales as the gain squared, gain 0.03 is a 1000-fold reduction and still leaves the array unmasked at 100 ms. An all-or-nothing effect fits "the stripes' light bands are carried entirely by the ON path"; that is an inference, the ON-path contributions were not inspected separately.
+
+## Series summary after Round 11
+Eleven rounds. Of the registered tests: Round 3 NOT SUPPORTED, 5 NOT SUPPORTED (opposite sign), 6 NOT SUPPORTED, 7 FAILS, 8 SUPPORTED (with the ON path removed), 9 NOT animal-like, 10 NOT SUPPORTED, 11 NOT SUPPORTED. The one positive result needs an array without its ON path. No model variant tried reproduces the animal's pattern (static about plain, moving lower) on any stimulus. Still needing input: filmed-hunt frames, Wu 2016, the trained 4b-E pilot.

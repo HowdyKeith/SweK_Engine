@@ -24,6 +24,7 @@ export const PARAMS = Object.freeze({
     lumScale: 255,                // input luminance 0..1 is multiplied by this (grey levels 0..255): the paper gives the thresholds L0, L1 = 2 and the OFF cutoff 0.05 without units
     integration: "multiplicative",
     polarity: "both",             // Round 8: "both" (ON and OFF paths, as the paper), "off" (the darkening path only) or "on" (the brightening path only)
+    onGain: 1,                    // Round 11: a multiplier of the ON path (1 as the paper; 0 is polarity "off")
     surroundKappa: null,          // Round 3 variant C: null = off; a number kappa inhibits a unit whose RING motion energy exceeds kappa x its arms' outward motion (an assumed strength; Klapoetke 2017 gives the direction only)
     surroundOuter: 1.5,           // the ring runs from the receptive-field side out to this multiple of it
 });
@@ -61,6 +62,7 @@ export function boxSum(I, w, h, x0, x1, y0, y1) {
 export function createModel({ w, h, units = null, params = {}, keepMaps = false }) {
     const P = { ...PARAMS, ...params };
     if (!(w > 3 && h > 3)) throw new Error(`flyEmdLplc2Gf.createModel: a frame at least 4 x 4, got ${w} x ${h}`);
+    if (!(P.onGain >= 0)) throw new Error(`flyEmdLplc2Gf.createModel: onGain is a number at least 0, got ${P.onGain}`);
     if (!["both", "off", "on"].includes(P.polarity)) throw new Error(`flyEmdLplc2Gf.createModel: polarity is both, off or on, got ${JSON.stringify(P.polarity)}`);
     if (!["multiplicative", "additive"].includes(P.integration)) throw new Error(`flyEmdLplc2Gf.createModel: integration is multiplicative or additive, got ${JSON.stringify(P.integration)}`);
     const n = w * h, ux = [], uy = [];
@@ -79,7 +81,7 @@ export function createModel({ w, h, units = null, params = {}, keepMaps = false 
             if (!started) { xprev.set(x); started = true; return { nAct: 0, active: new Uint8Array(ux.length), L: null }; }
             for (let i = 0; i < n; i++) {
                 hp[i] = aHP * (hp[i] + x[i] - xprev[i]); xprev[i] = x[i];
-                on[i] = P.polarity === "off" ? 0 : clampPos(hp[i] - P.cutOn); off[i] = P.polarity === "on" ? 0 : clampPos(-hp[i] - P.cutOff);
+                on[i] = P.polarity === "off" ? 0 : P.onGain * clampPos(hp[i] - P.cutOn); off[i] = P.polarity === "on" ? 0 : clampPos(-hp[i] - P.cutOff);
             }
             // the half-detectors use the low-pass of the PREVIOUS step as the delayed arm; then the low-pass is updated
             dh.fill(0); dv.fill(0);

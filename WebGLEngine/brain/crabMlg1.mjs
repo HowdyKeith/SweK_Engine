@@ -21,7 +21,7 @@ export const PARAMS = Object.freeze({
     Cw: 4, dc: 0.01, Tg: 30,
     ci1: 0.5, ci2: 0.3, ca: 0.3, tau: 0.04,
     Ts: 0.7, nsp: 4, Na: 1, aFfi1: 0.5, TF0: 15, aFfi: 0.02,
-    mFromThresholded: true, polarity: "both",       // true: m = sum |G| over the pixels that pass T_g (eq. 11; the grouping layer exists to suppress noise); false: sum |G~| over all pixels (eq. 12 as printed)
+    mFromThresholded: true, polarity: "both", ffiPool: "segment",       // true: m = sum |G| over the pixels that pass T_g (eq. 11; the grouping layer exists to suppress noise); false: sum |G~| over all pixels (eq. 12 as printed)
 });
 
 // the lateral inhibition kernel (eq. 5): the 8 neighbours, 1/8 at the corners and 1/4 at the edge midpoints, 0 at the centre
@@ -98,6 +98,7 @@ export function winnerTakeAll(active, n) {
  */
 export function createNetwork({ W, H, params = {} }) {
     const P = { ...PARAMS, ...params }, n = P.segments;
+    if (!["segment", "global"].includes(P.ffiPool)) throw new Error(`crabMlg1.createNetwork: ffiPool is segment or global, got ${JSON.stringify(P.ffiPool)}`);
     if (!["both", "off", "on"].includes(P.polarity)) throw new Error(`crabMlg1.createNetwork: polarity is both, off or on, got ${JSON.stringify(P.polarity)}`);
     if (!(W >= n && H >= 3)) throw new Error(`crabMlg1.createNetwork: a panorama at least ${n} x 3 pixels, got ${W} x ${H}`);
     const cols = Array.from({ length: n }, (_, j) => segmentColumns(j, W, P)), sw = cols[0].length, ncell = sw * H;
@@ -107,6 +108,7 @@ export function createNetwork({ W, H, params = {} }) {
         if (frame.w !== W || frame.h !== H) throw new Error(`crabMlg1.step: the frame is ${frame.w} x ${frame.h}, the network ${W} x ${H}`);
         t++;
         const out = { M: new Array(n).fill(0), spike: new Array(n).fill(0), alarm: new Array(n).fill(0), m: new Array(n).fill(0), F: new Array(n).fill(0), c: new Array(n).fill(0), lsl: lslVal, winner: winnerIdx, t };
+        let globalAbs = 0; if (P.ffiPool === "global") { for (let j = 0; j < n; j++) for (let i = 0; i < st[j].Pprev.length; i++) globalAbs += Math.abs(st[j].Pprev[i]); globalAbs /= n; }   // Round 10: the previous-frame |P| over all segments, per segment
         for (let j = 0; j < n; j++) {
             const s = st[j], L = new Float32Array(sw * H);
             for (let y = 0; y < H; y++) for (let i = 0; i < sw; i++) L[y * sw + i] = frame.data[y * W + cols[j][i]];
@@ -117,7 +119,7 @@ export function createNetwork({ W, H, params = {} }) {
             s.c = adaptC(s.c, m, s.m1, s.m2, P);                                                          // eq. 14 to 16
             const M = sigmoidM(s.c, m, ncell);                                                            // eq. 13
             let absP = 0; for (let i = 0; i < s.Pprev.length; i++) absP += Math.abs(s.Pprev[i]);
-            const ff = ffiStep(s.F, s.Tffi, absP, ncell, P); s.F = ff.F; s.Tffi = ff.Tffi;                // eq. 17, 18
+            const ff = ffiStep(s.F, s.Tffi, P.ffiPool === "global" ? globalAbs : absP, ncell, P); s.F = ff.F; s.Tffi = ff.Tffi;                // eq. 17, 18
             const spike = spikeOf(M, s.F, s.Tffi, P.Ts); s.hist.push(spike); if (s.hist.length > P.nsp) s.hist.shift();   // eq. 19
             const alarm = alarmOf(s.hist, P.nsp);                                                         // eq. 20
             out.M[j] = M; out.spike[j] = spike; out.alarm[j] = alarm; out.m[j] = m; out.F[j] = s.F; out.c[j] = s.c;

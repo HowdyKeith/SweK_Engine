@@ -131,6 +131,11 @@ console.log("\n5b. THE NETWORK'S BOOKKEEPING AND THE STIMULUS GENERATOR (rows ad
     ok("a bad polarity is refused", throws(() => C.createNetwork({ W: 180, H: 60, params: { polarity: "up" } })));
     const Sx = new Float32Array([-1, 1, -1, 1, -1, 1, -1, 1, -1]), g = (pol) => C.groupingM(Sx, 3, 3, { Cw: 4, dc: 0.01, Tg: -1e9, thresholded: true, polarity: pol }).m;
     ok("groupingM sums over the negative pixels only for off, the positive only for on, all for both (a checkerboard of -1 and +1: off + on = both, each positive)", g("off") > 0 && g("on") > 0 && Math.abs(g("off") + g("on") - g("both")) < 1e-9);
+    const fseq = [100, 100, 160, 100, 100, 100].map((v) => ({ w: 180, h: 60, data: Float32Array.from({ length: 180 * 60 }, (_, i) => ((i % 180) >= 80 && (i % 180) < 100 ? v : 100)) }));
+    const nG = C.createNetwork({ W: 180, H: 60, params: { ffiPool: "global" } }), nS = C.createNetwork({ W: 180, H: 60 }); let rG = null, rS = null; for (const f of fseq) { rG = nG.step(f); rS = nS.step(f); }
+    const meanS = rS.F.reduce((a, b) => a + b, 0) / 16;
+    ok("!! ffiPool global (Round 10): every segment gets the SAME F, equal to the mean of the per-segment F of the default network (F is linear in its drive), while the default F differs between segments (zero where nothing changed)", rG.F.every((v) => near(v, rG.F[0], 1e-9)) && near(rG.F[0], meanS, 1e-6) && rS.F.some((v) => v === 0) && rS.F.some((v) => v > 0) && rG.F[0] > 0, `${rG.F[0].toFixed(4)} vs mean ${meanS.toFixed(4)}`);
+    ok("a bad ffiPool is refused and the default is segment", throws(() => C.createNetwork({ W: 180, H: 60, params: { ffiPool: "all" } })) && C.PARAMS.ffiPool === "segment");
     ok("approachingBall refuses a non-positive half size or speed", throws(() => C.approachingBall({ halfSize: 0 })) && throws(() => C.approachingBall({ speed: -1 })));
 }
 
