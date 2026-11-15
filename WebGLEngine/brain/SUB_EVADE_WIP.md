@@ -155,3 +155,5 @@ Eight of eight true, said, and not a triumph: every one of the uncertain forecas
 
 **Open, not started** (each would be its own registration): split the triple (the speed alone, the time alone, the turn with the speed); a dose of the turn between 1.71 and 2.80 on generation 0; the same grafts against an opponent that is not generation 0 (the other sides of the Part A record); the seat.
 
+*(2026-11-15, an addendum to the HELD result, not a change to it: the four follow-ups listed as open are registered, in this order, each before the result of any of them and before any code or geometry of its own: `brain/SUB_EVADE_SPLIT_WIP.md` (the three numbers apart; DEV 100001, HELD 101001), `brain/SUB_EVADE_DOSE_WIP.md` (a dose of the turn; 102001, 103001), `brain/SUB_EVADE_OPPONENT_WIP.md` (opponents other than generation 0; 104001, 105001), `brain/SUB_EVADE_SEAT_WIP.md` (the seat; 106001, 107001).)*
+
