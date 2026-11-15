@@ -73,6 +73,14 @@ export const zeroWeights = STEER.zeroWeights, handWeights = STEER.handWeights, l
 export const encoderAt = STEER.encoderAt, hiddenBiasAt = STEER.hiddenBiasAt, synapseAt = STEER.synapseAt, outputAt = STEER.outputAt, biasAt = STEER.biasAt, topology = PFL;
 /** The control: the same library over a random circuit of the steering circuit's size (40 neurons, 523 edges, drawn uniformly from seed 4242). One draw. */
 export const control = createHelmCircuit(controlTopology(PFL, CONTROL_SEED));
+const CONTROLS = new Map([[CONTROL_SEED, control]]);
+/** The library for a wiring NAME: "fly" (the steering circuit), or "control:<seed>" (a random circuit of its size from that seed; one object a seed). What a search, a record and a pool job carry. */
+export function wiringOf(name = "fly") {
+    if (name === "fly") return STEER;
+    const m = /^control:(\d+)$/.exec(String(name)); if (!m) throw new Error(`helmSteerPolicy.wiringOf: a wiring is "fly" or "control:<seed>" (got ${name})`);
+    const seed = Number(m[1]); if (!CONTROLS.has(seed)) CONTROLS.set(seed, createHelmCircuit(controlTopology(PFL, seed)));
+    return CONTROLS.get(seed);
+}
 /** The neurons by type, as indices into the hidden layer: { PFL2: [...], PFL3: [...], DNa02: [...], DNa03: [...] }, and the side ("L" | "R") written in each neuron's INSTANCE NAME -- for a PFL cell that is its protocerebral-bridge glomerulus's side, for a descending neuron its own; it is not the dataset's `somaSide` (vendor/male-cns/cx-steering-circuit.json has that). */
 export const NEURONS = Object.freeze(Object.fromEntries([...new Set(PFL.NEURON_TYPES)].map((t) => [t, Object.freeze(PFL.NEURON_TYPES.map((x, i) => (x === t ? i : -1)).filter((i) => i >= 0))])));
 export const NAME_SIDES = Object.freeze(PFL.NEURON_INSTANCES.map((s) => { const m = /_([LR])(\d|$|_)/.exec(s); return m ? m[1] : null; }));

@@ -88,12 +88,17 @@ section(() => {
     ok("!! the control is a random circuit of the steering circuit's size -- 40 neurons, 523 edges, no self-loop, no repeat, the draw of seed 4242 -- and not the fly's (it shares fewer than half its edges with it); the same 1,248 weights give another answer over it, and with the synapses at zero the same answer", C.HIDDEN === 40 && C.REC_EDGES === 523 && C.WEIGHT_COUNT === 1248 && keys.size === 523 && C.edges.every(([a, b]) => a !== b) && JSON.stringify(C.edges) === JSON.stringify(controlTopology(PFL, 4242).EDGES) && shared < 262 && HS.forward(w, x).join() !== C.forward(w, x).join() && HS.forward(z, x).join() === C.forward(z, x).join(), `${shared} of 523 edges shared`);
 });
 
+section(() => {
+    const w = randomW(HS, 12), x = randomX(12), other = HS.wiringOf("control:7");
+    ok("!! a wiring by NAME: `fly` is this file's own network, `control:4242` is `control` itself, `control:7` another circuit of the same size (one object a seed, another answer), and any other name is refused", HS.wiringOf().forward(w, x).join() === HS.forward(w, x).join() && HS.wiringOf("fly").WEIGHT_COUNT === 1248 && HS.wiringOf("control:4242") === HS.control && other === HS.wiringOf("control:7") && other !== HS.control && other.REC_EDGES === 523 && other.forward(w, x).join() !== HS.control.forward(w, x).join() && throwsWith(() => HS.wiringOf("random"), /a wiring is "fly" or "control:<seed>" \(got random\)/));
+});
+
 console.log("6. THE FRONT DOOR");
 section(() => {
     const w = randomW(HS, 4, 0.05), blob = PB.exportBrain(PB.describePolicy("helmSteerPolicy", HS), w, { by: "a peer's steering helm" }), r = D.sideFromBrains("s", [blob]), bad = D.sideFromBrains("b", [{ ...blob, weights: blob.weights.slice(1) }]), d = D.duel(r.side, D.makeSide("rule"), 2, "head-on");
     ok("!! a helmSteerPolicy brain file is seated AT THE HELM by battleshipDuel.sideFromBrains (the module at the helm is this one, with the file's weights) and fights; a file a weight short is refused with the count; and a helmPolicy file still seats helmPolicy", r.refused.length === 0 && r.seated[0].role === "helm" && r.seated[0].where.join() === "helm" && r.side.helmNet.module === HS && r.side.helmNet.weights.join() === w.join() && d.brains.seated.join() === "1,0" && d.brains.asked > 100 && /weight count 1247 does not match helmSteerPolicy's current 1248/.test(bad.refused[0].reason) && D.sideFromBrains("h", [PB.exportBrain(PB.describePolicy("helmPolicy", HP), HP.zeroWeights())]).side.helmNet.module === HP);
     ok("the report says real numbers", /12 features, 40 neurons \(12 PFL2, 24 PFL3, 2 DNa02, 2 DNa03\), 523 synapses, 5 outputs: 1248 weights; 20 of the 24 PFL3-to-DNa02 connections join a bridge side to the other side's DNa02 \(all 24 by soma side\)/.test(HS.reportLines()[1]));
-    ok("the export list", Object.keys(HS).sort().join() === "CONTROL_SEED,FEATURES,FEATURE_NAMES,HIDDEN,NAME_SIDES,NEURONS,OUTPUTS,OUTPUT_NAMES,POLICY_ID,REC_EDGES,REC_STEPS,THROTTLE_FRACTION,TORQUE_FRACTION,WEIGHT_COUNT,biasAt,control,createHelmCircuit,encoderAt,featuresOf,forward,handWeights,helmFactory,helmFor,hiddenBiasAt,layersOf,outputAt,perturb,reportLines,synapseAt,topology,zeroWeights");
+    ok("the export list", Object.keys(HS).sort().join() === "CONTROL_SEED,FEATURES,FEATURE_NAMES,HIDDEN,NAME_SIDES,NEURONS,OUTPUTS,OUTPUT_NAMES,POLICY_ID,REC_EDGES,REC_STEPS,THROTTLE_FRACTION,TORQUE_FRACTION,WEIGHT_COUNT,biasAt,control,createHelmCircuit,encoderAt,featuresOf,forward,handWeights,helmFactory,helmFor,hiddenBiasAt,layersOf,outputAt,perturb,reportLines,synapseAt,topology,wiringOf,zeroWeights");
 });
 
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
