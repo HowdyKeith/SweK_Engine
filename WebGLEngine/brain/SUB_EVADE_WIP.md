@@ -98,3 +98,21 @@ None of this changes a rule, a bar, a count, an arm or a forecast of sections 2 
 4. **Printed besides the rules** (all of it for reading, none of it a rule): each arm's edge in seat A and in seat B; the median share of the finder's own edge for GT, LT, GN and LN over F'; and the median edge of each kind over the five (the forecast "the median GT edge is at least half the median U edge" is read from the last line).
 5. **What smoke is and is not.** Geometries 1 to 4 are among the geometries (1 to 8) on which every league and exploiter was TRAINED, so the smoke output says the command runs and says nothing about the claim; I saw it (all 25 arms flew, the checks passed) and **the forecasts of section 5 stand as written and will be scored as written.**
 
+## DEV RESULT (2026-11-15; `node tools/ship/takeEvadeTurn.mjs dev --write`, 79 s, geometries 98001 to 98024, both seats, 48 duels an arm, 25 arms; `brain/subEvadeDev.json`; the checks passed; the gate `tools/ship/takeEvadeTurn-selfcheck.mjs` passed, its sabotage log is in its header)
+
+The edge of each arm over generation 0 (z in brackets; **F** = the arm finds, edge >= 0.5 and z >= 2):
+
+| finder | U unmodified | GT triple on G | LT triple off the finder | GN turn on G | LN turn off the finder |
+|---|---|---|---|---|---|
+| league7001 | +3.09 (23.2) F | +3.10 (23.3) F | -0.28 (-1.4) | +0.97 (3.2) F | -0.27 (-1.4) |
+| league7100 | +3.10 (23.2) F | +3.11 (23.3) F | -0.28 (-1.4) | +0.84 (2.9) F | -0.27 (-1.4) |
+| league7103 | +1.03 (2.8) F | +1.51 (4.5) F | -0.56 (-2.1) | +0.97 (3.2) F | -0.56 (-2.1) |
+| exploit7200 | +3.10 (23.2) F | +3.10 (23.3) F | -0.28 (-1.4) | +0.97 (3.2) F | -0.27 (-1.4) |
+| exploit7204 | +2.98 (16.1) F | +3.11 (23.2) F | +0.00 (0.5) | +0.70 (2.6) F | +0.00 (54.0) |
+
+**R0 holds: 5 of 5 unmodified finders find on a fresh set** (the selection effect did not take them below the bar; league7103 is the weakest, at +1.03 where it was +1.64 on 96001 to 96024). **By the registered rules on DEV: R1 the triple is SUFFICIENT (5 of 5 grafts find), R2 NECESSARY (5 of 5 lesions stop finding), R3 the turn is SUFFICIENT (5 of 5), R4 NECESSARY (5 of 5): "it is the turn".** The command's last line: HELD may be flown. DEV is a calibration and the rules are about HELD; none of the forecasts of section 5 beyond the first is scored on it, and they stand as written.
+
+**What the table shows that the labels do not (read from DEV, free to read; nothing here moves a rule).** (1) **The triple carries the whole edge and the turn carries a third of it.** GT is 1.00 of the finder's own edge (median share; the finders' grafts equal their unmodified edges to 0.01 in four of five, +1.51 against +1.03 for league7103), LT is -0.09 (taking the triple off a finder leaves it where generation 0 is, with a little of the seat effect). **GN is 0.31 of the edge** (median; +0.70 to +0.97 against about +3.1 for the four strong finders; 0.95 only for league7103). So the registered bar (edge 0.5 at z 2) calls the turn alone SUFFICIENT and a share of 0.31 says it is a third of the doctrine; the bar is low enough for a part to cross it, and a reading that stops at "sufficient" would be too kind. **The turn is the necessary part** (LN is -0.28, the same as LT: put generation 0's turn back and the finder is generation 0's equal, to the second decimal) **and not the whole of the sufficient part** (the speed and the time are the other two thirds, on this set). (2) **The seat.** In every arm that finds, the seat A edge and the seat B edge are of the same size when the whole triple is on (+3.04 and +3.15), and apart when only the turn is (GN: +1.98 in seat A, -0.04 to -0.57 in seat B): the turn alone wins from the seat that starts with the enemy ahead and holds even from the other; with the triple the doctrine wins from both. (3) **exploit7204's lesions are a draw to the hundredth** (+0.000 and +0.005, 24-0-24 each): its two lesioned boats are indistinguishable from generation 0 on all 24 geometries, seat A +1.97 and seat B -1.96.
+
+**DEV is not scored and HELD is next**: `node tools/ship/takeEvadeTurn.mjs held --write`, flown once on 99001 to 99024 (the command refuses without this DEV record, which exists and replicates). No amendment is made after DEV.
+
