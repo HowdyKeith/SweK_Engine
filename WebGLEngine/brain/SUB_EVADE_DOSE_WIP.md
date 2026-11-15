@@ -73,3 +73,16 @@ Why these: the slope of 1.8 and the line through three points put the bar at 2.3
 ## 7. Cost
 
 20 arms and 17 steps plus the checks' two extra matchups is about 40 matchups of 48 duels a set, a minute and a half of one core; the command, its gate and a sabotage pass are the work.
+
+## AMENDMENT A (2026-11-15; made while the command `tools/ship/takeEvadeDose.mjs` was written and smoke-run on geometries 1 to 4, BEFORE any DEV geometry (102001 to 102024) or HELD geometry (103001 to 103024) was flown)
+
+Item 1 changes a rule, so it is first and says why; the rest fill in what the registration left unsaid. No forecast is changed.
+
+1. **A step also needs an edge of at least 0.05.** Section 4 defined UP and DOWN on paired z alone. The smoke run (geometries 1 to 4, on which every league was trained, so it says nothing about the claim) showed a step between two doses with an edge of +0.007 and a z of 12.5: the standard error of two boats that play nearly alike can be a few thousandths, and z of 2 is then a difference too small to be a step (the tournament counts a fight as won only by more than **DECISIVE = 0.05**). **A step is UP iff z is at least 2 AND its edge is at least 0.05; DOWN iff z is at most -2 AND its edge is at most -0.05; FLAT otherwise.** It makes MONOTONE easier to hold and SATURATION earlier or equal; the forecasts of section 5 stand as written and are scored under the amended rule.
+2. **SATURATION as coded.** Let a curve's doses be d0 < ... < dn and its steps s1 ... sn (s_j between d_(j-1) and d_j). If the last step sn is UP the saturation is "none"; otherwise it is d_j for the last UP step s_j; and if no step is UP it is d0, the curve's lowest dose.
+3. **THRESHOLD names:** LOW for a dose of 2.1 or less (G's own turn on B1 and B2 included), MID for 2.3 or 2.5, HIGH for 2.65 or 2.8; NONE when no dose finds.
+4. **R0** is: the ceiling arm of curve A (turn 2.8) finds and the ceiling arm of curve B1 finds. **The command is that of the other notes:** `smoke` (geometries 1 to 4, never recorded), `dev` (102001 to 102024; prints; `--write` records `brain/subEvadeDoseDev.json` once) and `held --write` (103001 to 103024, once; refuses without a recorded DEV of the `dev` set whose rules say R0 held, without `--write`, or over an existing `brain/subEvadeDoseHeld.json`).
+5. **The two extra flights of the void-checks:** the identity (G with its own evadeTurn against G: exactly 0) and the ceiling arm of curve A against a copy of itself (exactly 0): two matchups more than the 20 arms and 17 steps. A failed check is printed, not weighed, makes the exit code 1, and the record is still written.
+6. **Printed besides the rules** (for reading): each arm's edge, se, z, wins-draws-losses and per-seat edges; each step's edge, se, z and label; B1 minus A and B2 minus A at each dose; A's slope over the top three doses; and **the forecast quantities of section 5 as yes/no** (so they are scored from the printed line, not recomputed).
+7. **What smoke is and is not.** Geometries 1 to 4 are among those (1 to 8) on which every league was TRAINED. I saw the smoke output (it ran, the checks passed); the forecasts of section 5 stand as written and will be scored as written.
+
