@@ -82,3 +82,37 @@ None of this changes a rule, a bar, a side or a forecast of sections 2 to 5; it 
 
 **The direction of the sunk-boats forecast was written backwards.** Section 5 forecast "in every REVERSED side seat B's boat is sunk in more of the 24 duels than seat A's" (85), and item 1 of Amendment A repeated it. A REVERSED side is one whose mean seat bias, seat A's score less seat B's, is at most -0.5: **seat B does better, so it is seat A's boat that is sunk more often**, and read literally the forecast is false in every reversed side by construction. The smoke run (geometries 1 to 4, trained on, so it says nothing about the claim) showed the direction at once: in every REVERSED side seat A's boat was sunk in 4 of 4 duels and seat B's in none. **The forecast is corrected to what it was meant to say: in every REVERSED side seat A's boat is sunk in more of the duels than seat B's, and there is at least one REVERSED side (otherwise "no"). It keeps its 85 and is scored on this reading.** The code and the gate say the same (`reversedSunkMore`: seat A's sunk count above seat B's in every REVERSED side). Said plainly: this is a slip in my wording, caught by running the command, not a change made after seeing a result; no DEV or HELD geometry had been flown.
 
+
+## DEV RESULT (2026-11-15; `node tools/ship/takeEvadeSeat.mjs dev --write`, geometries 106001 to 106024, exit 1; record `brain/subEvadeSeatDev.json`)
+
+**ONE REGISTERED CHECK FAILED, and by section 4 a failed check VOIDS the read. This DEV read is void by the registration; what follows is what the command printed, and nothing in it is scored.** The check that failed: *G's mirror bias is within 1.0 of +3.35*: it is **+2.248** (se 0.523, z 4.3), 1.10 from the Part A figure. Every other check passed (a second flight of G gives the same mean to the last digit; the command's bias for G equals `subTournament.seatBias`'s; no non-finite mean; every theta is one `clampTheta` leaves unchanged; every run's generation 0 is G). The command still prints "DEV: R0 holds; HELD may be flown" because its HELD gate reads R0 and not the checks (section 4 says "printed, not weighed"); that line is not a licence.
+
+**Said, and labelled as a reading after the data, not as a rule:** the check was written to catch "the set or the measure is not the one read before". The measure is the same (two of the other checks, the equal means and `seatBias`'s figure, pass); the set is not the same by construction (24 new geometries against Part A's 8, 97001 to 97008), and Part A's +3.368 on 8 geometries has a standard error several times larger than a 24-geometry read's 0.52, so a gap of 1.10 is within what two reads of different sets of this size can differ by. That is a reason to think the tolerance of 1.0 was set too tight; it is not a reason to weigh the read, and I have not changed the check. **What would change it is a dated amendment before any HELD geometry is flown, written as made after DEV was read, and Keith's call.**
+
+**The 17 sides, each against itself** (seat A's score less seat B's over 24 mirror duels; SEAT-A at +0.5 or more with z of +2 or more, REVERSED at -0.5 and -2 or less; sunk = in how many of the 24 duels seat A's boat, seat B's boat, neither was sunk):
+
+| side | mean (se) | z | label | sunk A / B / neither |
+|---|---|---|---|---|
+| G | +2.248 (0.523) | +4.3 | SEAT-A | 4 / 20 / 0 |
+| U:league7001 | -2.280 (0.378) | -6.0 | REVERSED | 20 / 2 / 2 |
+| S:league7001 (speed alone) | +2.242 (0.521) | +4.3 | SEAT-A | 4 / 20 / 0 |
+| T:league7001 (time alone) | +2.248 (0.523) | +4.3 | SEAT-A | 4 / 20 / 0 |
+| N:league7001 (turn alone) | +0.997 (0.629) | +1.6 | NEUTRAL | 8 / 15 / 1 |
+| ST:league7001 | +2.242 (0.521) | +4.3 | SEAT-A | 4 / 20 / 0 |
+| SN:league7001 | -1.782 (0.483) | -3.7 | REVERSED | 18 / 4 / 2 |
+| TN:league7001 | +0.601 (0.663) | +0.9 | NEUTRAL | 10 / 14 / 0 |
+| STN:league7001 | -1.920 (0.481) | -4.0 | REVERSED | 19 / 4 / 1 |
+| U:league7103 | +0.325 (0.675) | +0.5 | NEUTRAL | 11 / 13 / 0 |
+| S:league7103 | +2.247 (0.522) | +4.3 | SEAT-A | 4 / 20 / 0 |
+| T:league7103 | +2.248 (0.523) | +4.3 | SEAT-A | 4 / 20 / 0 |
+| N:league7103 | +0.997 (0.629) | +1.6 | NEUTRAL | 8 / 15 / 1 |
+| ST:league7103 | +2.247 (0.522) | +4.3 | SEAT-A | 4 / 20 / 0 |
+| SN:league7103 | +0.723 (0.641) | +1.1 | NEUTRAL | 9 / 14 / 1 |
+| TN:league7103 | +0.602 (0.664) | +0.9 | NEUTRAL | 10 / 14 / 0 |
+| STN:league7103 | +0.597 (0.661) | +0.9 | NEUTRAL | 10 / 14 / 0 |
+
+**As printed:** R0 (G SEAT-A and U:league7001 REVERSED): yes. R1 yes; R2 STN:league7001 REVERSED yes; R3 N alone no; R4 SN yes; R5 S alone no; R6 league7103 neither U nor STN reversed yes. **HEADLINE (the registered rule): THE SPEED IS WHAT REVERSES IT** (R4 holds, R3 does not, R6 holds). **Read with the table, the label says less than it sounds:** the speed alone does not reverse the seat (S is SEAT-A, to the digit of G), the turn alone does not (N is NEUTRAL), speed with the turn does (SN, -1.78), and time adds nothing (STN -1.92 against SN -1.78, T and ST are G); that is the split note's "speed and turn" again, now on the seat. **Part A beside this set:** league7001 -1.873 (se 0.830) against -2.280 here; G +3.368 against +2.248 here. In every REVERSED side seat A's boat is sunk more often than seat B's (20 to 2, 18 to 4, 19 to 4): the forecast quantity is **yes**; in G it is the other way (4 to 20).
+
+**The forecast quantities as printed (not scored: the read is void):** R2 yes, R3 no, R4 yes, R5 no, R6 yes; headline "THE SPEED IS WHAT REVERSES IT" yes; headline "THE TRIPLE, AND NO PART OF IT ALONE" no; every REVERSED side sinks seat A's boat more often than seat B's yes; G's mirror bias within 0.5 of +3.35 **no** (the registered check failed with it).
+
+**What is NOT shown:** a clean DEV read (void); anything on HELD; the mechanism (who is sunk by what is from `fates`, not from events). For HELD, the same check would be applied to a set where G's bias is likely near +2.2 again, so `held --write` as registered would likely print the same failure and void that read too: an amendment to the check, if Keith wants one, has to come before HELD is flown.

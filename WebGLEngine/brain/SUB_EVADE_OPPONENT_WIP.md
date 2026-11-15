@@ -107,11 +107,11 @@ DEV is free to read; HELD (105001 to 105024) is not flown by this entry. The voi
 | GT (G + the triple) | YES 5/5 | PARTIAL 3/5 | YES 5/5 | YES 5/5 | YES 5/5 | YES 5/5 | beats 3 of 3, adds against 2 |
 | GN (G + the turn only) | YES 5/5 | NO 0/5 | YES 5/5 | YES 4/5 | NO 0/5 | NO 0/5 | beats 2 of 3, adds against 1 |
 
-**Median U edge over G, hand, champ, league7000:** +2.084, +2.596, +1.997, +2.062. The finders' edge over the two opponents that G cannot beat is as large as their edge over G, and the ADDS means there are +1.3 to +2.4 (the finder's edge over the opponent minus G's, geometry by geometry).
+**Median U edge over G, hand, champ, league7000:** +2.084, +2.596, +1.997, +2.062. The finders' edge over the two opponents that G cannot beat is as large as their edge over G, and the ADDS means there are +1.0 to +2.4 (league7103's +0.979 at the low end) (the finder's edge over the opponent minus G's, geometry by geometry).
 
 **Where it is thin:**
 
-* **Hand:** G already wins by +2.255 and the seat-A edge is capped near +3.24 (it prints +3.241 on seven arms), so there is little to add; only exploit7204's U adds (+0.550, z 2.6) and the GT arms of league7001, league7100 and exploit7204 (+0.555 to +0.618, z 2.6). One GT (exploit7200) misses by 0.007 (+0.493).
+* **Hand:** G already wins by +2.255 and the seat-A edge is capped near +3.24 (it prints +3.241 on five arms), so there is little to add; only exploit7204's U adds (+0.550, z 2.6) and the GT arms of league7001, league7100 and exploit7204 (+0.555 to +0.618, z 2.6). One GT (exploit7200) misses by 0.007 (+0.493).
 * **league7103** is the weak finder everywhere: U edge over G +0.978, over champ +1.101, over league7000 +1.420, over hand +2.117; its U arm does not add over G against hand (-0.138) or against champ (+0.979, z 1.9).
 * **GN against league7000** is +0.45 to +0.59 (z 1.5 to 1.8): near the bar and under it on all five. **GN against champ** is +0.813 on four arms: the finders with turn 2.8 (three of the five, per the evade-turn note) have the same GN theta, so those four are fewer than four independent arms; the label counts them as the registration said to count.
 
