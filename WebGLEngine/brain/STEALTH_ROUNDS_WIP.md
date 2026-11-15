@@ -204,3 +204,24 @@ Gate first: `polarity` on `flyEmdLplc2Gf.mjs` (section 6c; 6 mutants, all red). 
 
 ## Next rounds still open (need input I do not have)
 Filmed-hunt frame sequences; Wu 2016 (LC4 receptive field); a trained 4b-E pilot. Possible without input: a crab-model variant with a spatially pooled or temporally extended feed-forward inhibition (the only mechanism in the paper's model that distinguishes whole-field motion from a looming object), and a two-polarity fly array with the ON path's gain lowered (a continuum between "both" and "off").
+
+## Rounds 10 and 11 REGISTRATION (written 2026-11-15 BEFORE either is run; registered together)
+
+### Round 10: feed-forward inhibition (FFI) variants in the crab model
+**Why.** The paper's FFI is the only mechanism in the network that tells whole-field motion from a looming object; in the present implementation it is a per-segment sum of |P(t-1)| over that segment's pixels, persistence a_ffi1 0.5, threshold T_FFI about 15.3. If the stripes' downward motion is what the animal responds to by NOT alarming, a wider or longer FFI might supply it. **Variants** (new parameter `ffiPool`: "segment" as now, or "global": F's drive is the sum of |P(t-1)| over ALL 16 segments divided by (16 x pixels per segment), the same previous-frame quantity): S segment (baseline), G global, E segment with persistence a_ffi1 0.9, GE global with persistence 0.9; each with polarity "both" and "off": 8 variants.
+**Stimuli (held out: none was used in Rounds 5, 7 or 9).** The Round 5 construction at azimuth 180 (pixel 90, segment 8), r/v 0.15 and 0.5 s, contrast 1, stripes none / static / moving at 4 Hz, plus the receding plain ellipse. Measure: alarm of segment 8, the ellipse's angular size at the alarm, spike frames. Size ratio = with stripes over plain.
+**Predictions** (confidence):
+1. Pooled FFI barely helps the moving stripes: for "both", G's moving-stripe size ratio is within 15 percent of S's at both r/v (65%): a stripe pattern in one segment adds little to a whole-field average.
+2. Longer persistence delays the moving-stripe alarm: E's moving size ratio is at least 15 percent above S's (polarity "both") at both r/v (55%).
+3. Plain alarms are kept in at least 6 of the 8 variants at both r/v (60%).
+4. The receding plain ellipse does not alarm in every "off" variant (80%).
+**Verdict.** A variant is ANIMAL-LIKE iff at both r/v: the plain ellipse alarms, static stripes' size ratio is between 0.85 and 1.2, moving stripes alarm at a ratio of at least 1.15 or not at all, and the receding ellipse does not alarm. **SUPPORTED iff at least one of the 8 variants is ANIMAL-LIKE; NOT SUPPORTED if none is** (my expectation: 65 percent that none is). Predictions 1 to 4 are hits and misses.
+
+### Round 11: ON-gain sweep of the fly array
+**Change.** A parameter `onGain` (default 1) multiplying the ON path of the EMD (0 is the same as polarity "off"); gated with mutants before the run. **Stimuli and measures:** Round 3 (looming ellipse r/v 50 and 100 ms, none / static / moving, multiplicative array, lumScale 255), onGain 1, 0.5, 0.25, 0.1, 0.03, 0. Peak active-unit count, moving-stripe ratio and static-stripe ratio.
+**Predictions:**
+1. The moving-stripe ratio at 100 ms r/v does not rise as the gain falls (monotone non-increasing from gain 1 to gain 0, ties allowed) (60%).
+2. Masking (ratio at most 0.6) at BOTH r/v appears for gain 0.1 and below and is absent (ratio over 0.6 at 100 ms) at gain 0.5 and above (50%).
+3. The plain ellipse's peak count is within 5 percent of its gain-1 value at every gain (85%): the dark ellipse is a pure OFF stimulus.
+4. The static-stripe ratio is within 0.15 of the moving-stripe ratio at every gain and r/v (50%): the masking is not specific to the stripes' motion.
+**Verdict.** The masking is a GRADED effect of the ON path iff prediction 1 holds AND both ratios are at most 0.6 at gain 0.03; otherwise NOT SUPPORTED (it is an all-or-nothing effect of removing the path, or not monotone). The gain g* (the largest gain with both ratios at most 0.6) is reported.
