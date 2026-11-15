@@ -1,6 +1,6 @@
 {
  "gate": "physics/render/rtPipeline-selfcheck.mjs",
- "at": "2026-10-11",
+ "at": "2026-11-15",
  "tables": [
   {
    "title": "two spheres: CPU against the pipeline, per resolution and sample count",
@@ -76,6 +76,54 @@
      "12x12",
      "64 spp x 8 seeds",
      "cpu 0.22953 vs gpu 0.22766, |ratio-1|=8.19e-3, bound=1.67e-2"
+    ],
+    [
+     "concave open box, the same seeds on both sides",
+     "12x12",
+     "64 spp x 16 seeds",
+     "2281 of 2304 pixels within 0.00001; paired gpu/cpu-1 mean 9.01e-5, sd 6.77e-4, se 1.69e-4"
+    ],
+    [
+     "planted GPU: the image mirrored left to right (right negated)",
+     "12x12",
+     "64 spp x 8 + 8 seeds",
+     "frame-mean row accepts (-7.89e-3 vs 1.63e-2); same seeds 0.0% identical, paired mean -5.80e-3"
+    ],
+    [
+     "planted GPU: the image mirrored top to bottom (up negated)",
+     "12x12",
+     "64 spp x 8 + 8 seeds",
+     "frame-mean row accepts (-8.14e-3 vs 1.35e-2); same seeds 0.0% identical, paired mean -2.77e-3"
+    ],
+    [
+     "planted GPU: the image turned half a turn (right and up negated)",
+     "12x12",
+     "64 spp x 8 + 8 seeds",
+     "frame-mean row accepts (-5.01e-3 vs 1.35e-2); same seeds 0.0% identical, paired mean -3.39e-3"
+    ],
+    [
+     "planted GPU: the image transposed (right and up swapped)",
+     "12x12",
+     "64 spp x 8 + 8 seeds",
+     "frame-mean row accepts (-2.98e-3 vs 1.36e-2); same seeds 0.1% identical, paired mean -1.99e-3"
+    ],
+    [
+     "planted GPU: one bounce fewer on the GPU (depth < 7)",
+     "12x12",
+     "64 spp x 8 + 8 seeds",
+     "frame-mean row accepts (-1.12e-2 vs 1.68e-2); same seeds 0.0% identical, paired mean -1.51e-2"
+    ],
+    [
+     "planted GPU: the sky 0.2% brighter on the GPU",
+     "12x12",
+     "64 spp x 8 + 8 seeds",
+     "frame-mean row accepts (-6.20e-3 vs 1.67e-2); same seeds 0.0% identical, paired mean 1.82e-3"
+    ],
+    [
+     "planted GPU: a per-pixel seed that ignores the row",
+     "12x12",
+     "64 spp x 8 + 8 seeds",
+     "frame-mean row accepts (-2.77e-3 vs 2.51e-2); same seeds 8.4% identical, paired mean 3.46e-5"
     ],
     [
      "nee wide-cone direct light",

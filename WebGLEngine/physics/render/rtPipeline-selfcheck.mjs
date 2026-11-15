@@ -77,6 +77,19 @@
 // tightens the bound, and a formula that used the per-run relSd here would be a looser bound than the evidence
 // supports.
 //
+// *** SECTION 9b (v4914) IS THE SAME SCENE WITH THE SAME SEEDS, AND IT DOES NOT TAKE BACK THE PARAGRAPH ABOVE. ***
+// Section 9's note names two limits of its own row: POWER (its bound is 1.67e-2 at 8 seeds a side) and SYMMETRY
+// (the open box seen down its axis keeps its frame mean under any permutation of the camera basis). Both were
+// measured before anything was added: seven GPUs wrong on purpose -- four basis permutations, one bounce fewer,
+// a sky 0.2% too bright, a seed that ignores the row -- ALL PASS that row, the depth off-by-one at 0.66 of the
+// bound. The independent row is the right instrument for "do two estimators agree on the radiance" and it stays.
+// What it cannot answer is "did the port follow the reference", and for that the shared tape is not the trap the
+// paragraph above warns of but the instrument: with the SAME seed a faithful port lands on the same pixels (99.0%
+// within 1e-5), and the paired mean resolves a GPU-only offset 33 times smaller. A defect both sides SHARE is
+// still invisible to it -- that warning stands, and section 9b repeats it rather than arguing with it. Eighteen
+// sabotages are logged at the end of that section, none 0 red; one of them, the mesh record's albedo read 0.2%
+// low in the shipped WGSL, is red on two of its rows and on NOTHING ELSE in this file.
+//
 // SABOTAGE LOG (this round) -- each applied to the real file, gate run, exit read, file restored byte for byte:
 //   A  bvhMaterialProbeWgsl's lookup replaced with a hardcoded `bvhSbt[0]`
 //        -> exit=1, section 8's own check: 12 of 12 triangles read the WRONG record -- not just the 6 whose
@@ -878,6 +891,12 @@ const rec = R.sbtRecord;
     //   leave the FRAME MEAN this section compares unchanged. Neither limit is exercised by anything else in
     //   this file; both are real, and both are left for the round that needs the extra power rather than
     //   solved speculatively here.
+    //
+    //   *** v4914: BOTH ARE NOW MEASURED, IN SECTION 9b BELOW, AND THIS ROW IS LEFT EXACTLY AS IT WAS. *** The
+    //   0.8% was the luck of two seed ranges. What this row cannot see is no longer a caution but a list: a GPU
+    //   with its image mirrored, turned or transposed, with one bounce fewer, with a sky 0.2% too bright, or
+    //   with a seed that ignores the row -- seven plants, all inside this bound. "Not exercised by anything
+    //   else in this file" stopped being true at that section, which holds the same scene with the SAME seeds.
     const bound = 3 * Math.sqrt((cpuRelSd / Math.sqrt(N)) ** 2 + (gpuRelSd / Math.sqrt(N)) ** 2);
 
     say(`cpu (${N} seeds): mean ${cpuMean.toFixed(6)}, relSd ${(cpuRelSd * 100).toFixed(2)}%`);
@@ -901,6 +920,203 @@ const rec = R.sbtRecord;
         "not bit-exact -- this scene is concave (section 4's own argument for why bit-exactness cannot survive " +
         "multi-geometry interreflection), so the claim is a STATISTICAL one, and the bound comes from each " +
         "side's own measured noise rather than a number somebody picked");
+
+    // ---- 9b. THE SAME SEEDS ON BOTH SIDES: THE TWO LIMITS NAMED ABOVE, MEASURED, AND WHAT CLOSES THEM (v4914) ----
+    //
+    // Section 9 draws DIFFERENT seeds on each side on purpose, and that row stays exactly as it was: two independent
+    // estimators of one radiance. What the independence costs is POWER, and the note above says so. This
+    // sub-section measures the cost, and adds beside it the instrument that does not pay it.
+    //
+    // *** MEASURED FIRST: THE FRAME-MEAN ROW ACCEPTS A GPU THAT IS WRONG IN SEVEN WAYS. *** Each is planted on the
+    // GPU side only -- the CPU tracer and the scene untouched -- and put through section 9's own row (GPU seeds
+    // 2001..2008 against CPU seeds 1..8, the bound rebuilt from the planted run's own noise):
+    //   SYMMETRY, four plants: the image mirrored left to right, mirrored top to bottom, turned half a turn, or
+    //     transposed -- the camera's right and up permuted in the uniform block. The open box seen down its axis
+    //     is unchanged by all four, so the frame MEAN keeps its expectation and the row has nothing to see:
+    //     ratio-1 of -7.9e-3, -8.1e-3, -5.0e-3 and -3.0e-3 against bounds of 1.4e-2 to 1.6e-2.
+    //   POWER, three plants: one bounce fewer on the GPU (depth < 7 where the CPU runs 8) darkens the frame by
+    //     1.5% and reads -1.12e-2 against 1.68e-2 -- A DEPTH OFF-BY-ONE IN THE PORT PASSES THIS ROW, at 0.66 of
+    //     its bound.
+    //     The sky 0.2% brighter passes eight times over. A per-pixel seed that ignores the row -- every row of
+    //     the image on one tape -- raises the GPU's own noise, which WIDENS the bound from 1.67e-2 to 2.51e-2:
+    //     the degenerate-estimator trap the relSd floor above was written for, arriving from the other side.
+    //
+    // *** THE INSTRUMENT: THE SAME TAPE ON BOTH SIDES. *** CPU and GPU run the identical LCG from the identical
+    // per-pixel seed formula, so with the SAME seed they draw the same randoms and a faithful port walks the same
+    // paths. Measured over seeds 1..16: 2281 of 2304 pixels agree to 1e-5 (99.00%) and the frame means differ by
+    // 6.8e-4 of themselves, 15 times less than either side's own seed-to-seed noise. Two rows come out of it:
+    //   PIXEL IDENTITY. A planted basis, depth, sky or tape defect leaves almost no pixel where it was: 0.0%,
+    //     0.0%, 0.0%, 0.1%, 0.0%, 0.0% and 8.4% against the clean 99.0%. The row's floors are 90% and 25%.
+    //   THE PAIRED MEAN, gpu/cpu - 1 per seed. Its standard error is the path-splitting noise alone, 1.7e-4 at
+    //     16 seeds, so a GPU-only offset has to exceed 5.1e-4 to be seen where the frame-mean row needs 1.67e-2:
+    //     33 times tighter. The depth cut sits at 4.9 standard errors and the sky plant at 15.2; the sky plant's
+    //     paired mean is the planted 0.2% to five decimal places (0.0018201 against 0.0018202).
+    //
+    // *** AND THE 0.8% THE NOTE ABOVE ASKS ABOUT WAS SEED LUCK. *** Measured once in scratch for this round, not
+    // re-run by the gate: at 64 independent seeds a side the ratio reads +0.41% (2.1 standard errors, the sign
+    // turned over), and the CPU ALONE differs by 0.41% between seeds 1..64 and 2001..2064 (0.227895 against
+    // 0.228829). With the same seeds the two sides agree to 1.2e-4 over 1..64 and -4.6e-5 over 2001..2064, each
+    // inside 2 of its standard errors (6.2e-5 and 7.0e-5); 98.8% and 98.7% of pixels sit within 1e-6, and 10
+    // and 11 of the 64 frames agree in every pixel.
+    //
+    // *** AND WHERE THIS SECTION IS THE ONLY GUARD, FOUND BY SABOTAGING THE SHIPPED FILE. *** The plants above are
+    // read by section 9's row alone, and that row is not the whole gate: the bounce loop, raygen and the miss stage
+    // are shared with the sphere scenes, which sections 2 to 4 hold BIT-EXACT, so a depth cut made in
+    // rtPipeline.mjs itself is caught there (sabotage A: section 9's row green, three bit-exact rows red). What no
+    // bit-exact scene shares is the MESH-ONLY branch -- the triangle's normal and the mesh's own record. That
+    // record's albedo read 0.2% low in the shipped WGSL (sabotage Q) leaves all 120 rows this gate had before the
+    // section GREEN and turns exactly two red, both here: "the same paths" (0.00% of pixels) and "no GPU-only
+    // offset" (-3.52e-3 against 5.01e-4). A 0.35% darker mesh was a green gate until this section.
+    //
+    // *** NOT EVERY PIXEL, AND THAT IS HELD TOO. *** The mesh is concave, so f32 and f64 still send a few paths to
+    // different triangles -- section 4's argument, one level down. 23 pixels of 2304 differ, the largest by
+    // 0.06. A row that read 100% would be a renderer compared with itself, so "some pixel differs" is asserted.
+    //
+    // *** WHAT THIS IS NOT, AND IT IS THE HEADER'S OWN WARNING. *** It is not independence. A defect BOTH sides
+    // share -- a winding error in the mesh data (sabotage C), a formula ported faithfully from a wrong original
+    // -- agrees here exactly as it agrees above, and nothing same-seeded can see it. And the instrument is
+    // brittle ON PURPOSE: the day either side draws its randoms in a different order, pixel identity collapses
+    // and this section goes red BY NAME -- not because the picture is wrong but because the premise is gone.
+    // Read that red as "the tapes parted": restore the pairing or retire these rows, and widen no threshold.
+    // Section 9's independent row is what stays true through such a change, which is why it is left alone.
+    //
+    // UNCHECKED, AND SAID. Every number here was measured on this box's software rasteriser, through the browser
+    // harness. A hardware GPU may contract an f32 multiply-add differently and split a few more paths; the
+    // floors leave room for that (99.0% measured against 90%), and the rig's run is what confirms or corrects it.
+    {
+        say("");
+        const NP = 16, NC = 8, TOL = 1e-5;
+        const cleanCode = R.pipelineWgsl({ bvh: true });
+        const cpuFrameAt = (seed) => Array.from(renderCpuMesh([{ bvh: cpuBvh, albedo: ALBEDO }],
+            { ...view, spp: SPP, seed, maxDepth: R.MAX_DEPTH, sky: () => 1, nee: false }));
+        const blockAt = (seed) => R.pipelineUniforms([], { spp: SPP, seed, view, eps: R.EPS,
+            bvh: { nodeCount: gpuBvh.nodeCount, triCount: gpuBvh.triCount, hit: "lambertian", albedo: ALBEDO } });
+        const gpuFrameAt = async (seed, { code = cleanCode, basis = null } = {}) => {
+            const u = Float32Array.from(blockAt(seed)); if (basis) basis(u);
+            const r = await runWgslCompute({ code, outCount: W * H, workgroups: Math.ceil(W * H / 64), uniforms: u, inputs: R.bvhInputs(gpuBvh) });
+            if (!r.ok) throw new Error("same-seed GPU render failed: " + r.reason);
+            return Array.from(r.values);
+        };
+        const cpuFrames = new Map(); for (let s = 1; s <= NP; s++) cpuFrames.set(s, cpuFrameAt(s));
+        // gpu/cpu - 1 per seed, and how many pixels sit where the CPU put them
+        const paired = async (seeds, opts) => {
+            let same = 0, pix = 0, worst = 0; const d = [];
+            for (const s of seeds) {
+                const c = cpuFrames.get(s), g = await gpuFrameAt(s, opts);
+                for (let i = 0; i < c.length; i++) { const e = Math.abs(g[i] - c[i]); pix++; if (e <= TOL) same++; if (e > worst) worst = e; }
+                d.push(meanOf(g) / meanOf(c) - 1);
+            }
+            const m = meanOf(d), sd = sdOf(d, m);
+            return { same, pix, share: same / pix, worst, d, mean: m, sd, se: sd / Math.sqrt(d.length) };
+        };
+        // section 9's own row, run again on whatever GPU it is handed: seeds 2001.., the bound from that run's own noise
+        const frameMeanRow = async (opts) => {
+            const vals = []; for (let s = 1; s <= N; s++) vals.push(meanOf(await gpuFrameAt(2000 + s, opts)));
+            const m = meanOf(vals), rsd = sdOf(vals, m) / m;
+            const b = 3 * Math.sqrt((cpuRelSd / Math.sqrt(N)) ** 2 + (rsd / Math.sqrt(N)) ** 2);
+            return { ratio: m / cpuMean, bound: b, relSd: rsd, accepts: Math.abs(m / cpuMean - 1) < b };
+        };
+        const seedsP = Array.from({ length: NP }, (_, i) => i + 1), seedsC = seedsP.slice(0, NC);
+        const e2 = (v) => v.toExponential(2);
+
+        ok("the two sides run the same depth: section 9's literal 8 on the CPU is the GPU's MAX_DEPTH", R.MAX_DEPTH === 8,
+            `MAX_DEPTH ${R.MAX_DEPTH} -- held as its own row because the depth plant below shows the frame-mean row cannot see the two parting`);
+        const rerun = await frameMeanRow({});
+        ok("the frame-mean row as re-run here IS section 9's row: the same ratio and the same bound, to the last bit",
+            rerun.ratio === ratio && rerun.bound === bound, `ratio ${rerun.ratio} against ${ratio}, bound ${rerun.bound} against ${bound}`);
+
+        const clean = await paired(seedsP, {});
+        say(`the same seeds 1..${NP} on both sides: ${clean.same} of ${clean.pix} pixels within ${TOL} (${(clean.share * 100).toFixed(2)}%), the largest single-pixel difference ${clean.worst.toFixed(4)}`);
+        say(`paired gpu/cpu - 1: mean ${e2(clean.mean)}, sd ${e2(clean.sd)}, standard error ${e2(clean.se)} -- each side's own seed-to-seed noise is ${e2(cpuRelSd)}`);
+        say(`what a GPU-only offset has to exceed to be seen: ${e2(3 * clean.se)} here, ${e2(bound)} in the frame-mean row -- ${(bound / (3 * clean.se)).toFixed(0)} times tighter`);
+        REPORT_ROWS.push(["concave open box, the same seeds on both sides", `${W}x${H}`, `${SPP} spp x ${NP} seeds`,
+            `${clean.same} of ${clean.pix} pixels within ${TOL}; paired gpu/cpu-1 mean ${e2(clean.mean)}, sd ${e2(clean.sd)}, se ${e2(clean.se)}`]);
+        ok("!! *** WITH THE SAME SEEDS THE PORT WALKS THE SAME PATHS: at least nine pixels in ten agree ***", clean.share >= 0.90,
+            `${(clean.share * 100).toFixed(2)}% within ${TOL} -- CPU and GPU draw one tape from one per-pixel seed formula, so a faithful port lands where the reference did`);
+        ok("!! ...and NOT every pixel: the mesh is concave, so f32 and f64 still send a few paths to different triangles",
+            clean.same < clean.pix && clean.worst > TOL,
+            `${clean.pix - clean.same} pixels differ -- section 4's argument one level down; a row reading 100% would be a renderer compared with itself`);
+        ok("!! the paired frame means differ by far less than either side's own noise -- the pairing is real", clean.sd < cpuRelSd / 5,
+            `sd ${e2(clean.sd)} against a fifth of ${e2(cpuRelSd)}: ${(cpuRelSd / clean.sd).toFixed(0)} times quieter than an unpaired comparison`);
+        ok("!! *** NO GPU-ONLY OFFSET: the paired mean is inside 3 of its own standard errors ***", Math.abs(clean.mean) < 3 * clean.se,
+            `|${e2(clean.mean)}| against ${e2(3 * clean.se)} -- the 0.8% section 9's note asks about was the luck of two seed ranges`);
+
+        // ---- the plants: each a GPU that is wrong, the CPU and the scene untouched ----
+        const u0 = blockAt(1), v3 = (slot) => [u0[slot * 4], u0[slot * 4 + 1], u0[slot * 4 + 2]], dot3 = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+        const fwd = v3(1), right = v3(3), up = v3(4);
+        ok("the slots the basis plants permute ARE the camera's right and up: with U[1]'s forward, an orthonormal triad",
+            [right, up, fwd].every((a) => Math.abs(dot3(a, a) - 1) < 1e-6) && [dot3(right, up), dot3(right, fwd), dot3(up, fwd)].every((v) => Math.abs(v) < 1e-6),
+            `U[3] right ${right.map((v) => v.toFixed(3))}, U[4] up ${up.map((v) => v.toFixed(3))}, U[1] forward ${fwd.map((v) => v.toFixed(3))}`);
+        const negate = (u, slot) => { for (let k = 0; k < 3; k++) u[slot * 4 + k] = -u[slot * 4 + k]; };
+        const swapRightUp = (u) => { for (let k = 0; k < 3; k++) { const t = u[12 + k]; u[12 + k] = u[16 + k]; u[16 + k] = t; } };
+        const textPlant = (find, put) => { const parts = cleanCode.split(find); return { find, once: parts.length === 2, code: parts.join(put) }; };
+        const depthLoop = (n) => `for (var depth = 0; depth < ${n}; depth = depth + 1)`;
+        const SKY_PLANT = 1.002;
+        const PLANTS = [
+            { id: "the image mirrored left to right (right negated)", limit: "symmetry", opts: { basis: (u) => negate(u, 3) } },
+            { id: "the image mirrored top to bottom (up negated)", limit: "symmetry", opts: { basis: (u) => negate(u, 4) } },
+            { id: "the image turned half a turn (right and up negated)", limit: "symmetry", opts: { basis: (u) => { negate(u, 3); negate(u, 4); } } },
+            { id: "the image transposed (right and up swapped)", limit: "symmetry", opts: { basis: swapRightUp } },
+            { id: `one bounce fewer on the GPU (depth < ${R.MAX_DEPTH - 1})`, limit: "power", role: "depth", text: textPlant(depthLoop(R.MAX_DEPTH), depthLoop(R.MAX_DEPTH - 1)) },
+            { id: `the sky ${((SKY_PLANT - 1) * 100).toFixed(1)}% brighter on the GPU`, limit: "power", role: "sky",
+              text: textPlant("radiance = radiance + throughput * rtMiss(d); break;", `radiance = radiance + throughput * rtMiss(d) * ${SKY_PLANT}; break;`) },
+            { id: "a per-pixel seed that ignores the row", limit: "power", role: "tape", text: textPlant("^ (u32(y) * 83492791u)", "^ (u32(0) * 83492791u)") },
+        ];
+        ok("each text plant's target is in the generated WGSL exactly once, so a plant changes the line it names and no other",
+            PLANTS.filter((p) => p.text).every((p) => p.text.once), PLANTS.filter((p) => p.text && !p.text.once).map((p) => p.text.find).join(" | ") ||
+            "grepped in the generated string, not assumed from the source template");
+        const seen = [];
+        for (const p of PLANTS) {
+            const opts = p.text ? { code: p.text.code } : p.opts;
+            const fm = await frameMeanRow(opts), pr = await paired(seedsC, opts);
+            seen.push({ p, fm, pr });
+            say(`plant, ${p.limit}: ${p.id} -- the frame-mean row ${fm.accepts ? "ACCEPTS" : "rejects"} it (ratio-1 ${e2(fm.ratio - 1)} against ${e2(fm.bound)}); ` +
+                `same seeds: ${(pr.share * 100).toFixed(1)}% of pixels where they were, paired mean ${e2(pr.mean)} (${(Math.abs(pr.mean) / pr.se).toFixed(1)} standard errors)`);
+            REPORT_ROWS.push([`planted GPU: ${p.id}`, `${W}x${H}`, `${SPP} spp x ${N} + ${NC} seeds`,
+                `frame-mean row ${fm.accepts ? "accepts" : "rejects"} (${e2(fm.ratio - 1)} vs ${e2(fm.bound)}); same seeds ${(pr.share * 100).toFixed(1)}% identical, paired mean ${e2(pr.mean)}`]);
+        }
+        const blind = seen.filter((x) => x.fm.accepts), by = (role) => seen.find((x) => x.p.role === role);
+        ok("!! *** SECTION 9'S FRAME-MEAN ROW ACCEPTS ALL SEVEN PLANTED GPUS -- its two named limits, measured rather than cautioned ***",
+            blind.length === PLANTS.length,
+            `${blind.length} of ${PLANTS.length} accepted, the depth cut at ${(Math.abs(by("depth").fm.ratio - 1) / by("depth").fm.bound).toFixed(2)} of the bound. ` +
+            "If this goes red because that row now REJECTS a plant, that is power gained: re-read the section and move the plant, loosen nothing");
+        ok("!! *** AND THE SAME SEEDS SEE EVERY ONE: under a quarter of the pixels stay where they were ***", seen.every((x) => x.pr.share <= 0.25),
+            seen.map((x) => `${(x.pr.share * 100).toFixed(1)}%`).join(", ") + ` against the clean ${(clean.share * 100).toFixed(1)}%`);
+        const dep = by("depth").pr, sky = by("sky").pr, cleanC = meanOf(clean.d.slice(0, NC)), skyWant = (SKY_PLANT - 1) + SKY_PLANT * cleanC;
+        ok("!! the depth cut moves the paired mean too: darker, by more than 3 of its standard errors", dep.mean < 0 && Math.abs(dep.mean) > 3 * dep.se,
+            `${e2(dep.mean)} at ${(Math.abs(dep.mean) / dep.se).toFixed(1)} standard errors -- a depth off-by-one is ${(Math.abs(dep.mean) * 100).toFixed(1)}% of this frame`);
+        ok("!! the sky plant moves the paired mean by exactly what was planted, to five decimal places", Math.abs(sky.mean - skyWant) < 1e-5,
+            `${sky.mean.toFixed(7)} against ${skyWant.toFixed(7)} = ${(SKY_PLANT - 1).toFixed(3)} + ${SKY_PLANT} x the clean paired mean over the same ${NC} seeds`);
+        // SABOTAGE (v4914), eighteen, each against the real file, each restored and md5-verified. Reds are counted over
+        // the whole gate (132 rows); "here" is how many of them are this sub-section's twelve. NONE WENT 0 RED.
+        //   A  rtPipeline.mjs, the scalar bounce loop one short (depth < MAX_DEPTH - 1) -> 7 red, 4 here: the same paths
+        //      (0.00%), the pairing, no offset (-9.85e-3 against 7.46e-3), and the depth plant's target gone from the
+        //      WGSL. *** SECTION 9'S OWN ROW STAYED GREEN ***; the other three are the bit-exact sphere rows.
+        //   B  rtPipeline.mjs, raygen mirrored left to right (U[3].xyz * (-u)) -> 9 red, 3 here; section 9's row green.
+        //   C1 pathTracer.mjs, the CPU one bounce short -> 8 red, 5 here; section 9's row green.
+        //   C2 pathTracer.mjs, the CPU's per-pixel seed constant changed -- THE TAPES PART, both sides still correct
+        //      estimators -> 10 red, 3 here: 8.29% of pixels where 99.0% were, the pairing gone. Section 9's row green,
+        //      as the note above says it would be. This is the brittleness, seen.
+        //   D  rtPipeline.mjs, the miss stage returning 1.002 -> 12 red, 2 here (the same paths 0.00%; the paired mean
+        //      2.09e-3 against 5.09e-4). Section 9's row green.
+        //   E  pathTracerGpu.mjs, MAX_DEPTH 7: both sides of THIS section agree, section 9's literal 8 does not -> 3 red,
+        //      all here, the depth row by name. Section 9's row green -- that row is why the depth row exists.
+        //   M  rtPipeline.mjs, camUp moved to U[5] and raygen reading it there (another layout, the same picture) -> 3
+        //      red, all here, the triad row by name: U[4] reads 0,0,0.
+        //   Q  rtPipeline.mjs, THE MESH-ONLY BRANCH, rec = U[MESH_SBT] with its albedo 0.2% low -> *** 2 RED IN THE WHOLE
+        //      GATE, BOTH HERE *** (the same paths 0.00%; the paired mean -3.52e-3 against 5.01e-4).
+        //   R  rtPipeline.mjs, the mesh-only branch's normal negated -> 8 red, 5 here; not small, so section 9's two rows
+        //      and 14j's go red with them.
+        //   F  this file, negate() a no-op -> 1 red: "the same seeds see every one" (99.3%, 99.3%, 99.3% for the three).
+        //   G  this file, the paired GPU seed off by one -> 3 red: the same paths 0.04%, the pairing, the depth cut.
+        //   H  this file, the clean paired run handed the CPU's own frames -> 3 red, "NOT every pixel" by name.
+        //   I  this file, the re-run row on seeds 3001.. -> 1 red: "IS section 9's row" (0.99775 against 0.99181).
+        //   J  this file, the sky plant 1.2 -> 1 red: "accepts all seven" reads 6 of 7.
+        //   K  this file, the sky plant's text carrying 1.003 -> 1 red: "exactly what was planted" (0.0028202 against
+        //      0.0018202).
+        //   L  this file, the depth plant a no-op -> 2 red. O  the tape plant's target mistyped -> 2 red, "exactly
+        //      once" by name. P  TOL 1 instead of 1e-5 -> 2 red: "NOT every pixel", and every plant at 100.0%.
+    }
 }
 
 // ---- 10. RTX ROUND 5: bvhBuffersFromTriSoup() -- THE SAME BVH, FROM A FLAT BUFFER INSTEAD OF INDICES ----------

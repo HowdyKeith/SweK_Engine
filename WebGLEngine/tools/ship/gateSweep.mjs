@@ -16400,6 +16400,13 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
         widened: Object.freeze([]),
         verdict: "the 62 gates the tree gained since v4912, each run alone on the merged tree and green (exit 0), 2026-11-08: 39 from this line (the round 1 to 11 readers and their commands, the station-choice, decision-circuit and after-action tools, the rotor, countermeasure, nav-3d and righting rounds, the plain-net variants, the round 7 stage-1 and stage-2 tools, the gputaskman page and bridge, the notes-row rule and the windows-path lint) and 23 from the other chat's head-to-head line (headToHead2, 4 to 25), merged at d4615eea. Each carries its mutation or sabotage pass in its own header or in the round's commit message, with the counts there rather than restated here, and the declared equivalents are said in those. Nothing was red on arrival; a first quick sweep of the merged tree had named 22 OTHER gates red (none red on origin/main), which were fixed or re-read in the same round and are not part of this closing."
     }),
+    since622: Object.freeze({
+        at: "v4914", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "no gate file added, so nothing is claimed here (a gate may be claimed by ONE closing); one gate grew a sub-section of twelve rows (physics/render/rtPipeline-selfcheck, section 9b: the same seeds on both sides of the concave-mesh comparison), run alone and green (132 PASS, 0 FAIL, 0 SKIP) and sabotaged eighteen ways against the real files, each red by name and none 0 red; and one gate the rotation returned red had its control's pattern given this box's wording of a lost device (tools/ship/pageShot-selfcheck, 3 PASS, with its v4739 sabotage P6 found 0 red here and logged with the channel that does carry the loss)",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
