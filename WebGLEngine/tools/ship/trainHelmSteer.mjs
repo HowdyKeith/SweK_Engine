@@ -20,6 +20,10 @@
 // (nothing found so far in this tree has needed a synapse); H4 CANNOT BE TOLD. The sandbox's searches are 150 children a wiring, ONE search each; the rig's are 1,000 and four each (brain/RIG_COMMANDS_2026-11-15_HELM_STEER.md). A sandbox reading and a rig reading are two readings of the same pairs and the second is not
 // independent of the first: the rig's finish writes to --out of its own and says so.
 //
+// READ, 2026-11-15 (the sandbox's one search a wiring, 150 children each; brain/helmSteerWeightsDefault.reading.json): H1 LEADS, +0.638 (z 18.9); H2 exactly 0 -- THE CHAMPION HAS NO SYNAPSE; H3 +0.366 (z 11.5) and H4 +0.197 (z 4.9), both LEADS, so the forecast was wrong on both words. *** BUT H3 IS NOT A FINDING ABOUT WIRING: neither
+// champion carries a weight on a synapse (the fly's is three weights -- throttle back hard, and one path from the pointing error about z to the torque about z; the control's is one, throttle back a little), and the fly's champion flies the same fights over the control's wiring to the bit. H3 is one search's luck against
+// another's. The registration named the reading before knowing that; the file's `by` now says it whenever both champions are without synapses. *** What IS shown: a helm correction of three weights beats the rule and the escape circuit's shipped helm in this one fight, and most of it is THROTTLING BACK.
+//
 // WHAT IS NOT HERE: the circuit's inputs (vendor/male-cns/cx-steering-inputs-circuit.json is vendored and unused), transmitter signs (every synapse weight is free in sign), more than one control seed, a degree-preserving control, another fight than this one (no broadside rule, no fighters, no fleets).
 "use strict";
 import fs from "node:fs";
@@ -145,6 +149,7 @@ export function blobOf(result, { train = TRAIN_PAIRS, heldOut = HELD_OUT_PAIRS, 
     const c = result.fly.champion, R = result.reading, seeds = (l) => `seeds ${l[0].seed}-${l[l.length - 1].seed} of each kind`;
     const by = `tools/ship/trainHelmSteer.mjs: (1+1)-ES from the zero weights (the rule), seed ${c.seed} of ${result.fly.runs.length} searches over the fly's steering circuit, ${c.iters} children (synapse, path, tune, bias), a child kept only if it beat its parent by a paired test of z >= ${Z_ACCEPT} over ${train.length} train pairs (${seeds(train)}; ${c.improved} kept), then every moved weight put back unless it paid for itself: ${c.kept} of ${HS.WEIGHT_COUNT} weights differ from zero and ${c.synapses} of the circuit's ${HS.REC_EDGES} synapses carry a weight; ` +
         `champion picked on ${heldOut.length} held-out pairs: ${TA.line(c.heldOut)}; ${audit.length} audit pairs (${seeds(audit)}), read once: against the rule ${TA.line(R.H1)}; its synapses (this less its ablation) ${TA.line(R.H2)}; THE WIRING -- this less the champion of the same search over a random circuit of its size (${result.controlWiring}, ${result.control.runs.length} searches, itself ${TA.line(R.control)}) -- ${TA.line(R.H3)}` +
+        (c.synapses === 0 && result.control.champion.synapses === 0 ? ` *** NEITHER CHAMPION CARRIES A WEIGHT ON A SYNAPSE, SO THE WIRING TOOK NO PART: these weights fly the same fights over either circuit, and that difference is one search's luck against another's, not the fly's wiring ***` : "") +
         (R.H4 ? `; this less the escape circuit's shipped helm (itself ${TA.line(R.gfc)}) ${TA.line(R.H4)}` : "") + `; trained and read in one fight only: one ship a side, regular gunners, the cannon, the bow-on rule`;
     return PB.exportBrain(PB.describePolicy(HS.POLICY_ID, HS), c.weights, { score: Number(R.H1.mean.toFixed(3)), by, citation: "male-cns central-complex steering output, PFL2/PFL3/DNa02/DNa03 (Janelia FlyEM, vendor/male-cns/PROVENANCE.md)" });
 }
