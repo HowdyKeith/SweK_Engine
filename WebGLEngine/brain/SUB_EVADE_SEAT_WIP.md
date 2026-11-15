@@ -116,3 +116,17 @@ None of this changes a rule, a bar, a side or a forecast of sections 2 to 5; it 
 **The forecast quantities as printed (not scored: the read is void):** R2 yes, R3 no, R4 yes, R5 no, R6 yes; headline "THE SPEED IS WHAT REVERSES IT" yes; headline "THE TRIPLE, AND NO PART OF IT ALONE" no; every REVERSED side sinks seat A's boat more often than seat B's yes; G's mirror bias within 0.5 of +3.35 **no** (the registered check failed with it).
 
 **What is NOT shown:** a clean DEV read (void); anything on HELD; the mechanism (who is sunk by what is from `fates`, not from events). For HELD, the same check would be applied to a set where G's bias is likely near +2.2 again, so `held --write` as registered would likely print the same failure and void that read too: an amendment to the check, if Keith wants one, has to come before HELD is flown.
+
+## AMENDMENT C (2026-11-15; made AFTER the DEV read (106001 to 106024, one check failed) and BEFORE any HELD geometry (107001 to 107024) was flown; Keith asked for it, and it is a change to ONE check, said as made after data)
+
+**What changes.** The check "G's mirror bias is within 1.0 of +3.35" (section 4, item 5 of Amendment A) becomes **"G's mirror bias is within 2.0 of +3.35"**. Nothing else changes: no bar, no side, no rule, no forecast, no other check. The constant is `G_TOLERANCE` in `tools/ship/takeEvadeSeat.mjs` (2.0; it was 1.0), and the gate's rows that pin it are changed with it.
+
+**Why, and how the 2.0 was got (not from HELD, which is unflown, and not to make the DEV figure pass).** The check was meant to say that the set or the measure is not the one read before. The DEV read printed G at +2.248 with a standard error of 0.523 on 24 geometries, which puts the spread of one geometry's mirror duel at about 0.523 times the square root of 24, 2.56. Part A's G (+3.368) was read on 8 geometries; its standard error is **not in the notes**, so I infer it at the same spread over the square root of 8, about 0.91. The difference of two honest reads of G on sets of 8 and 24 then has a standard error of about the square root of (0.523 squared plus 0.91 squared), 1.05, and a tolerance of 1.0 is less than one of them: it would void a clean read about one time in three. Two of them is 2.1; I take **2.0**. The check can still fail: a G bias below +1.35 or above +5.35 voids the read.
+
+**A correction to the DEV RESULT above.** It says Part A's +3.368 has a standard error "several times larger" than a 24-geometry read's 0.52. By the inference just made it is about **1.7 times** larger (0.91 against 0.52), and it is an inference, not a number read from Part A.
+
+**What it does to the DEV read.** The DEV record stays as written: its `checks` still lists the failure under the registered 1.0, and the DEV read is not re-scored (no forecast is scored on DEV, as the DEV RESULT says). Under the amended tolerance the DEV figure's check would have passed (it is 1.10 away); the HELD gate of the command reads R0 on the record, which is true. **HELD is the read**, flown once under the amended check: `node tools/ship/takeEvadeSeat.mjs held --write`.
+
+**Forecasts.** Unchanged and scored as written on HELD, including "G's mirror bias on HELD is within 0.5 of +3.35" (80), for which the DEV figure (+2.248, 1.10 away) is bad news that I do not revise the forecast for.
+
+**The gate.** The rows that pinned 1.0 now pin 2.0 (5.3 and 1.4 pass, 1.95 away; the DEV figure 2.248 passes; 5.4 and 1.3 fail by name), and a row asks that this note carries the amendment.

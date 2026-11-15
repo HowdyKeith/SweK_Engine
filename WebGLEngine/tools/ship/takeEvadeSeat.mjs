@@ -19,7 +19,7 @@ const ENG = fileURLToPath(new URL("../../", import.meta.url));
 export const DEV_FILE = "brain/subEvadeSeatDev.json", HELD_FILE = "brain/subEvadeSeatHeld.json";
 export const SETS = Object.freeze({ smoke: Object.freeze({ first: 1, count: 4 }), dev: Object.freeze({ first: 106001, count: 24 }), held: Object.freeze({ first: 107001, count: 24 }) });
 export const FINDERS = Object.freeze(["league7001", "league7103"]), STRONG = "league7001", ODD = "league7103";
-export const BIAS = 0.5, MIN_Z = 2, G_BIAS = 3.35, G_TOLERANCE = 1.0;
+export const BIAS = 0.5, MIN_Z = 2, G_BIAS = 3.35, G_TOLERANCE = 2.0;   // 1.0 until Amendment C of the seat note (dated after the DEV read, before any HELD geometry)
 
 const f3 = (v) => signed(v, 3);
 
