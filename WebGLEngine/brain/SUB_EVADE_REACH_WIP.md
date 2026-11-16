@@ -123,3 +123,57 @@ DEV is free to read. **HELD (123001 to 123048) was authorised by Keith ("Rounds 
 4. **2.5 is no wider than D.** The same three bases pay at both, at a higher edge at 2.5 (+1.00 to +1.12 against +0.75 to +0.95), and no new base pays at 2.5.
 
 **What is NOT shown:** any HELD read; the effect against an opponent that is not the boat's own base; why the strong three gain (a mechanism); whether a boat with a hard turn and a fast speed that is not in the files would gain (the evade-pair reading is from 14 boats and three of them pay).
+
+## HELD RESULT (2026-11-16; `node tools/ship/takeEvadeReach.mjs held --write`, geometries 123001 to 123048 (96 duels a matchup), flown ONCE, exit 0; record `brain/subEvadeReachHeld.json`: 28 matchups, no check failed)
+
+Flown on Keith's word ("Rounds 2 and 3 HELD can fly when ready"), after the DEV read above; the registration and the command's HELD gate allowed it (R0 held on DEV and no check failed). **The rules are about this set.**
+
+**R0 holds.** The arm at D pays on league7001 by **+0.697** (z 6.3, 32-54-10) and on exploit7204 by **+0.910** (z 6.3, 43-38-15), both decided.
+
+**The arms, by base** (HELD edge at D and at 2.5; DEV beside it):
+
+| base (evadeSpeed, evadeTurn) | HELD at D | HELD at 2.5 | DEV at D, at 2.5 | status at D |
+|---|---|---|---|---|
+| league7000 (3.02, 0.55) | -0.071 | -0.351 | +0.142, +0.142 | NEUTRAL |
+| **league7001 (4.32, 2.80)** | **+0.697** | **+0.760** | +0.951, +1.080 | **PAYS** |
+| league7101 (3.04, 0.40) | +0.070 | +0.000 | +0.000, +0.000 | NEUTRAL |
+| league7102 (2.14, 1.78) | +0.419 (z 2.6) | +0.279 | +0.211, +0.211 | NEUTRAL |
+| league7103 (3.55, 2.80) | -0.489 (z -2.1) | **-0.501** (z -2.1) | -0.611, -0.382 | NEUTRAL (COSTS at 2.5) |
+| league7104 (3.02, 1.88) | +0.139 | +0.069 | +0.280, +0.280 | NEUTRAL |
+| league7105 (3.65, 1.06) | +0.280 | +0.281 | +0.212, +0.071 | NEUTRAL |
+| **exploit7200 (4.42, 2.80)** | **+0.764** | **+0.704** | +0.827, +1.118 | **PAYS** |
+| exploit7201 (1.66, 0.62) | -0.140 | -0.280 | +0.282, +0.212 | NEUTRAL |
+| exploit7202 (2.18, 2.58) | +0.069 | +0.003 | +0.138, +0.137 | NEUTRAL |
+| exploit7203 (4.15, 1.11) | -0.211 | -0.140 | +0.211, +0.071 | NEUTRAL |
+| **exploit7204 (4.35, 2.65)** | **+0.910** | **+1.223** | +0.747, +1.004 | **PAYS** |
+| exploit7205 (4.50, 0.82) | +0.141 | +0.283 | +0.212, -0.070 | NEUTRAL |
+| G (3.42, 1.71) | +0.070 | +0.070 | +0.070, +0.140 | NEUTRAL |
+
+**RR1 THE REACH AT D: PAYS on 3 of 14 bases -> NARROW** (league7001, exploit7200, exploit7204: the same three as on DEV). **RR2 THE COST AT D: none** (league7103 at D is -0.489, 0.011 under the bar). **RR3 THE REACH AT 2.5: 3 of 14 -> NARROW** (costs on: league7103, at -0.501). **RR4 THE HEADLINE: REACH NARROW / 2.5 NARROW.** Not paying at D: the other eleven; pays at 2.5 and not at D: none; pays at D and not at 2.5: none.
+
+**The forecasts, scored** (as the larger side of each probability; the two at 50 are coins and are not counted; GENERAL, COMMON and NARROW are one question in three parts and each is scored on its own):
+
+| forecast | probability | outcome |
+|---|---|---|
+| R0 holds on DEV | 90 | **true** |
+| R0 holds on HELD | 88 | **true** |
+| the reach at D is GENERAL | 35 | false (right) |
+| the reach at D is COMMON | 45 | false (right) |
+| the reach at D is NARROW | 20 | **true (a miss)** |
+| COSTS SOMEWHERE at D | 25 | false (right; true on DEV) |
+| the reach at 2.5 is GENERAL | 30 | false (right) |
+| 2.5 pays on at least as many bases as D | 50 | true (a coin) |
+| the arm at D PAYS on G | 55 | **false (a miss)** |
+| the arm at D PAYS on league7103 | 50 | false (a coin) |
+
+**6 of 8 as the larger side**, plus two coins. The two misses are NARROW at 20 and "D pays on G" at 55. **Said plainly:** NARROW was the headline of the smoke report I saw before DEV (Amendment A item 2), so even the miss is not a blind result; and the registration's reasoning for the likeliest labels rested on a statement about the finders' evade pairs that Amendment A item 1 shows to be false.
+
+**Observations (HELD, for reading, not rules; the evade-pair reading is post-hoc, labelled so by Amendment A item 3):**
+
+1. **HELD replicates DEV: the same three bases pay and no other.** league7001, exploit7200 and exploit7204 are +0.70 to +0.91 at D and +0.70 to +1.22 at 2.5 on HELD, as on DEV (+0.75 to +0.95 and +1.00 to +1.12). They are the three finders with evadeSpeed 4.3 or more **and** evadeTurn 2.65 or more; every other base is within -0.49 to +0.42 at both values on HELD (and within -0.61 to +0.28 on DEV).
+2. **The cost on league7103 repeats, on the edge of the bar.** The arm is -0.611 and -0.382 on DEV and **-0.489 and -0.501 on HELD**, at D and at 2.5: four negative numbers, z of -1.7 to -2.9, decided (by the registered bar) on two of the four. league7103 (3.55, 2.80) is the finder with the hard turn and the slower evade speed: a slower tracker loses to it by about half a point. Post-hoc, from two sets of one base.
+3. **league7102 is the closest non-payer** at +0.419 (z 2.6) at D on HELD (+0.211 on DEV): under the bar by 0.081, a boat with a weak evade pair (2.14, 1.78). Not a rule; a single base on one set.
+4. **Ten of the eleven non-payers are decided by who starts**, as on DEV (46-0-50 to 54-0-42, seat edges of about 1.0 to 2.3 one way in seat A and the mirror in seat B); league7103 (36-9-51) is the exception, as on DEV. The three that pay are the bases with draws (31 to 50 of 96).
+5. **2.5 is no wider than D, again.** The same three pay at both, at a similar edge on HELD (D +0.70 to +0.91, 2.5 +0.70 to +1.22), and no other base pays at 2.5.
+
+**What is NOT shown:** the effect against an opponent that is not the boat's own base; a mechanism; whether a boat with a hard turn and fast speed that is not in the files would gain (three boats pay; the reading comes from 14).
