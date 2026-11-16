@@ -266,6 +266,9 @@ cannot be told from a shuffle of it (p 0.78).** Most of the trainer's gain was i
   all 16 real-wired flies end at 0.741 to 0.757, 12 of 16 shuffles end in the same place and 4 fail (0.66 to 0.71). The real
   wiring brings all 40 visual cells onto the two cells read; a shuffle brings 13 to 20. A free net on the same two numbers
   cannot be told from the real circuit (0.757 against 0.750). With no connections nothing was learned (16 of 16 unmoved).
+* **The page plays all five rounds (2026-11-16):** `fly-escape.html` offers rounds 3 and 4's flies and round 5's four (the real
+  Giant Fiber circuit, its shuffle, the free net, the cells with no connections), each from its round's committed file, in 3D
+  and through the fly's eye; choosing a round 5 fly moves the page to round 5.
 * **OPEN, AND THE NEXT ROUND IF ASKED (`fly-escapes-degree-shuffle`, not registered):** the second round T1 needs before it is
   believed -- a shuffle that keeps each cell's count of connections in and out (so the convergence onto the Giant Fibers is
   kept), more draws, new shuffles. If the real wiring still trains more surely, the finer wiring matters; if not, it was the
