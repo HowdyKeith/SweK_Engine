@@ -25,6 +25,8 @@ export const PARAMS = Object.freeze({
     integration: "multiplicative",
     polarity: "both",             // Round 8: "both" (ON and OFF paths, as the paper), "off" (the darkening path only) or "on" (the brightening path only)
     onGain: 1,                    // Round 11: a multiplier of the ON path (1 as the paper; 0 is polarity "off")
+    downGain: null,               // Round 16: null = off; g >= 0 divides each unit's four arm signals by (1 + g D), D the ABSOLUTE net downward drift max(0, sum dv) / pixels over the region
+    downScope: "global",          // the region: "global" (the whole frame) or "local" (the unit's receptive-field square)
     surroundKappa: null,          // Round 3 variant C: null = off; a number kappa inhibits a unit whose RING motion energy exceeds kappa x its arms' outward motion (an assumed strength; Klapoetke 2017 gives the direction only)
     surroundOuter: 1.5,           // the ring runs from the receptive-field side out to this multiple of it
 });
@@ -62,6 +64,8 @@ export function boxSum(I, w, h, x0, x1, y0, y1) {
 export function createModel({ w, h, units = null, params = {}, keepMaps = false }) {
     const P = { ...PARAMS, ...params };
     if (!(w > 3 && h > 3)) throw new Error(`flyEmdLplc2Gf.createModel: a frame at least 4 x 4, got ${w} x ${h}`);
+    if (P.downGain !== null && !(P.downGain >= 0)) throw new Error(`flyEmdLplc2Gf.createModel: downGain is null or a number at least 0, got ${P.downGain}`);
+    if (!["global", "local"].includes(P.downScope)) throw new Error(`flyEmdLplc2Gf.createModel: downScope is global or local, got ${JSON.stringify(P.downScope)}`);
     if (!(P.onGain >= 0)) throw new Error(`flyEmdLplc2Gf.createModel: onGain is a number at least 0, got ${P.onGain}`);
     if (!["both", "off", "on"].includes(P.polarity)) throw new Error(`flyEmdLplc2Gf.createModel: polarity is both, off or on, got ${JSON.stringify(P.polarity)}`);
     if (!["multiplicative", "additive"].includes(P.integration)) throw new Error(`flyEmdLplc2Gf.createModel: integration is multiplicative or additive, got ${JSON.stringify(P.integration)}`);
@@ -97,7 +101,11 @@ export function createModel({ w, h, units = null, params = {}, keepMaps = false 
             const active = new Uint8Array(ux.length); let nAct = 0;
             for (let k = 0; k < ux.length; k++) {
                 const a = arms[k];
-                const Lr = boxSum(Ih, w, h, ...a.r), Ll = -boxSum(Ih, w, h, ...a.l), Ld = boxSum(Iv, w, h, ...a.d), Lu = -boxSum(Iv, w, h, ...a.u);
+                let Lr = boxSum(Ih, w, h, ...a.r), Ll = -boxSum(Ih, w, h, ...a.l), Ld = boxSum(Iv, w, h, ...a.d), Lu = -boxSum(Iv, w, h, ...a.u);
+                if (P.downGain !== null) {
+                    const hsq = P.rfSide / 2, D = P.downScope === "global" ? Math.max(0, boxSum(Iv, w, h, 0, w, 0, h)) / (w * h) : Math.max(0, boxSum(Iv, w, h, ux[k] - hsq, ux[k] + hsq, uy[k] - hsq, uy[k] + hsq)) / (P.rfSide * P.rfSide), f = 1 / (1 + P.downGain * D);
+                    Lr *= f; Ll *= f; Ld *= f; Lu *= f;
+                }
                 const v = P.integration === "multiplicative" ? clampPos(Lr - P.L0) * clampPos(Ll - P.L0) * clampPos(Ld - P.L0) * clampPos(Lu - P.L1) : clampPos(Lr - P.L0) + clampPos(Ll - P.L0) + clampPos(Ld - P.L0) + clampPos(Lu - P.L1);
                 if (v > 0 && surr) {
                     const hs = P.rfSide / 2, ho = hs * P.surroundOuter, X = ux[k], Y = uy[k];

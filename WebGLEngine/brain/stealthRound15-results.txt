@@ -1,0 +1,21 @@
+U none   peak  1816 (raw 1816); R_down over 216 active frames: -0.000 to 0.000; fraction of active frames with R >= 0.5: 0.00
+U static peak  1714 (raw 1714); R_down over 218 active frames: -0.497 to 0.490; fraction of active frames with R >= 0.5: 0.00
+U down   peak   730 (raw 730); R_down over 199 active frames: 0.852 to 0.922; fraction of active frames with R >= 0.5: 1.00
+U up     peak   673 (raw 673); R_down over 205 active frames: -0.932 to -0.846; fraction of active frames with R >= 0.5: 0.00
+G none   peak  1816 (raw 1816); R_down over 216 active frames: -0.000 to 0.000; fraction of active frames with R >= 0.5: 0.00
+G static peak  1714 (raw 1714); R_down over 218 active frames: -0.497 to 0.490; fraction of active frames with R >= 0.5: 0.00
+G down   peak     0 (raw 730); R_down over 199 active frames: 0.852 to 0.922; fraction of active frames with R >= 0.5: 1.00
+G up     peak   673 (raw 673); R_down over 205 active frames: -0.932 to -0.846; fraction of active frames with R >= 0.5: 0.00
+L none   peak  1816 (raw 1816); R_down over 0 active frames: -; fraction of active frames with R >= 0.5: 0.00
+L static peak  1702 (raw 1714); R_down over 0 active frames: -; fraction of active frames with R >= 0.5: 0.00
+L down   peak     0 (raw 730); R_down over 0 active frames: -; fraction of active frames with R >= 0.5: 0.00
+L up     peak   673 (raw 673); R_down over 0 active frames: -; fraction of active frames with R >= 0.5: 0.00
+
+ratios to the same detector's plain ellipse:
+U: static 0.944  down 0.402  up 0.371
+G: static 0.944  down 0.000  up 0.371
+L: static 0.937  down 0.000  up 0.371
+
+retention (plain / U plain) and the up control (up / U up):
+G: plain 1.000, up 1.000
+L: plain 1.000, up 1.000
