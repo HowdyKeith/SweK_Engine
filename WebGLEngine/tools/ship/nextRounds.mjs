@@ -3348,7 +3348,7 @@ export const NEXT_ROUNDS = [
     {
         id: "nav-traffic-avoid-not-slow",
         blocker: "OPEN",
-        what: "The traffic fix (brain/SUB_FIELD_NAV_WIP.md, RESULT OF THE TRAFFIC FIX, HELD5) reached 40 of 60 (PARTLY SUPPORTED: +6 over any+predict, bar 80% and no-exit missed): the failures that remain are collisions with ships (14 of the designated arm's 16) and four exits through the edge band; slowing to 2 m/s did not change the collision count.",
+        what: "FOLLOW-UP 6 (2026-11-16, registered first, HELD78 = seeds 7501-7560 read once): NOT SUPPORTED. +free removes the edge exit the diagnosis traced (1 -> 0); +giveway steers clear of 4 ships (13 -> 9 ship collisions) and takes 4 flights out of the region instead; the combined arm reached 45 of 60 against 44, net +1, p 1.0. Still open: a give-way that checks the turn back, not only the straight run. Earlier text: The traffic fix (brain/SUB_FIELD_NAV_WIP.md, RESULT OF THE TRAFFIC FIX, HELD5) reached 40 of 60 (PARTLY SUPPORTED: +6 over any+predict, bar 80% and no-exit missed): the failures that remain are collisions with ships (14 of the designated arm's 16) and four exits through the edge band; slowing to 2 m/s did not change the collision count.",
         how: "A vessel that turns away from a ship (a velocity-obstacle or a give-way heading chosen against the ship's relative velocity), a stop, or a plan whose capsule is the ship's reach rather than its track; and a look at why the vessel crosses a 36 m wall (is the plan routeless there?). New registration, fresh seeds (HELD5 is spent).",
         why: "The incumbent's rate moved nine flights between two 60-scenario sets, so a fix is only worth reading on a new set with the paired test beside it.",
     },

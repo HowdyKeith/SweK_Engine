@@ -389,3 +389,22 @@ The designated arm `any+predict+edge+yield` left the region on HELD5 seeds 504, 
 **Expectations, written before any flight.** `+free` alone leaves no exit: about 70 percent. `+giveway` alone halves the ship collisions: about 40. The designated arm reaches 48 of 60: about 25; gains 5 net at p <= 0.10: about 45; the verdict SUPPORTED about 20, PARTLY about 30, NOT about 50.
 
 **What will be built:** `brain/subGiveWay.mjs` (the flight copy and the two options), `tools/ship/subGiveWayStudy.mjs` (DEV, HELD78, the report), gates for both with mutation passes; then HELD78 once.
+
+## RESULT OF FOLLOW-UP 6 (2026-11-16; `node tools/ship/subGiveWayStudy.mjs --set held78 --write`, HELD78 = hard-traffic seeds 7501 to 7560, read once; 240 flights in `brain/subGiveWayHeld78.jsonl`): **NOT SUPPORTED.**
+
+The options and the command were gated and sabotaged first (22 mutants, all red by name, seven only after a row each; logged in the gate's header); six DEV flights were flown while building, as a smoke run, and DEV was flown once more as the registered sanity run (designated 21 of 30 against the reference's 20, not a result). All three checks passed.
+
+| arm | reached | collided (with a ship) | left | timeout | median time (s) | path / chord | median min clearance (m) |
+|---|---|---|---|---|---|---|---|
+| ref (`any+predict+edge+yield`) | 44 / 60 | 14 (13) | 1 | 1 | 163.4 | 1.13 | 14.02 |
+| ref+free | 45 / 60 | 14 (13) | **0** | 1 | 164.0 | 1.13 | 14.02 |
+| ref+giveway | 45 / 60 | 11 (**9**) | **4** | 0 | 162.9 | 1.18 | 19.38 |
+| **ref+free+giveway** | **45 / 60** | 10 (8) | 4 | 1 | 162.9 | 1.18 | 19.38 |
+
+**Verdict.** 48 of 60: MISSED (45). No exit: MISSED (4). Ship collisions at most half the reference's: MISSED (8 against 13). Net gain of 5 at p <= 0.10: MISSED (7 gained, 6 lost, net 1, exact sign p 1.0). By the registered rule, NOT SUPPORTED.
+
+**Against the expectations (written first).** `+free` alone leaves no exit, about 70: **held** (0 against the reference's 1). `+giveway` alone halves the ship collisions, about 40: **no** (13 to 9). The designated arm reaches 48, about 25: no. Net 5 at p <= 0.10, about 45: no. NOT SUPPORTED, about 50: it came.
+
+**What this says.** `+free` does what the diagnosis said it would and nothing else: the one exit it could see is gone, and no flight changed otherwise. `+giveway` moves the failures rather than removing them: it steers clear of four ships (13 to 9 ship collisions, minimum clearance 14 m to 19 m) and in doing so takes four flights out of the region, although every heading it chooses keeps a straight 30 s run 7 m inside. Why a run that is checked to stay inside still ends outside is NOT traced; the turn back after giving way (about 35 m at cruise) is the first suspect, and it is a guess. `+free` does not save them: it slows the vessel in the band but cannot shorten the turn. **Traffic is still not fixed**: on fresh ships the reference itself reached 44 of 60, the best arm 45.
+
+**What it leaves open (`nav-traffic-avoid-not-slow` stays OPEN).** A give-way that checks the turn back into the plan as well as the straight run, or that gives way only while the run back is clear; the one timeout per arm; a stop, which this vessel cannot do (its authority falls with speed).
