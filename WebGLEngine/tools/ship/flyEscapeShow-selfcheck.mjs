@@ -11,6 +11,8 @@
 //   4  THE PAGE        fly-escape.html in Chromium: the default episode, both canvases against this file's pictures, turning, other flies, a results file that does not arrive
 // 2026-11-15, ROUND 2'S FLIES ADDED (half the reflex plus a network; brain/rl/reflexStart.mjs), this gate run whole for each, every one red by name: W1 round 2's flies played without the reflex 2
 //   W2 round 2 reads round 1's file 2 | W3 the page says a tenth better 1
+// 2026-11-16, ROUNDS 3 AND 4 ADDED (round 4's flies remember: brain/rl/carryCircuit.mjs), this gate run whole for each, every one red by name: W4 round 4's flies played without their memory 1
+//   W5 round 3 reads round 2's file 2 | W6 the clock taken to be the tenth number 2 | W7 round 4 makes an MLP 1 | W8 round 3's flies played without the reflex 3
 // SABOTAGE LOG (2026-11-15) -- through a byte-safe runner (one at a time, every file restored and its sha256 checked), this gate run whole for each; the number is the rows that went red:
 //   THE MODULE: P1 the fly told the kind goes home for everything 2 | P2 a trained fly left untrained 1 | P3 any record will do 1 | P4 the plain net 54 units 2 | P5 a frame never says the fly chose home 1
 //   P6 the heading never turns 1 | P7 a frame carries the numbers from the tick before 1 | P9 the eye told the mover's kind by its colour 3 | P10 every mover red from outside 1 | P11 the mover at half its radius 5
@@ -31,6 +33,9 @@ import * as S from "../../brain/flyEscapeShow.mjs";
 import * as E from "../../brain/rl/escapeEnv.mjs";
 import * as V1 from "./flyEscape.mjs";
 import * as V2 from "./flyEscapeReflex.mjs";
+import * as V3 from "./flyEscapeFresh.mjs";
+import * as V4 from "./flyEscapeMemory.mjs";
+import { CarryCircuitPolicy } from "../../brain/rl/carryCircuit.mjs";
 import * as C from "../roundhouse/angularImpulseCensus.mjs";
 import { shutdownServer } from "./serverShutdown.mjs";
 
@@ -40,7 +45,7 @@ function ok(name, cond, detail) { console.log(`  ${cond ? "PASS" : "FAIL"}  ${na
 async function section(fn) { try { await fn(); } catch (e) { ok(`!! the section THREW instead of answering: ${e.message}`, false, String(e.stack).split("\n").slice(1, 3).join(" | ")); } }
 const throws = (fn, re) => { try { fn(); return false; } catch (e) { return re.test(e.message); } };
 const J = JSON.stringify, src = (f) => fs.readFileSync(path.join(ENG, f), "utf8"), near = (a, b, e = 5e-5) => Math.abs(a - b) < e;
-const VS = { 1: V1, 2: V2 }, NS = Object.keys(S.ROUNDS).map(Number), RECS = Object.fromEntries(NS.map((n) => [n, S.recordsOf(src(S.ROUNDS[n].file))]));
+const VS = { 1: V1, 2: V2, 3: V3, 4: V4 }, NS = Object.keys(S.ROUNDS).map(Number), RECS = Object.fromEntries(NS.map((n) => [n, S.recordsOf(src(S.ROUNDS[n].file))]));
 const trained = (n, arm, s) => S.flyOf(arm, { round: n, draw: s, record: RECS[n].get(`${arm} ${s}`) });
 const over = (fly, seeds) => { let sum = 0, alive = 0; for (const s of seeds) { const ep = S.episode(fly, s); sum += ep.ret; if (!ep.caught) alive++; } return { score: sum / seeds.length, alive }; };
 const FREEZE = S.episode(S.flyOf("freeze"), 900001), REFLEX = S.episode(S.flyOf("reflex"), 900001), HIDE = S.episode(S.flyOf("hide"), 900001);
@@ -51,8 +56,8 @@ console.log("flyEscapeShow-selfcheck -- the page where the fly escapes, in 3D an
 console.log("1. THE FLIES");
 await section(() => {
     ok("the kinds are the four flies written by hand, the one told each mover's kind, and the rounds' five arms, each with a label; a round is its results file", J(S.KINDS) === J(["reflex", "fleeAll", "hide", "freeze", "told", "FLY", "SHUF", "PLAIN", "FISH", "MLP"]) && J(S.ARMS) === J(V1.ARMS) && S.KINDS.every((k) => typeof S.LABELS[k] === "string" && S.LABELS[k].length > 10) && S.DRAWS === V1.SEEDS.length && S.PLAIN_UNITS === V1.PLAIN_UNITS && J(S.MLP_HIDDEN) === J(V1.MLP_HIDDEN) &&
-        J(NS) === J([1, 2]) && S.ROUNDS[2].start === "reflex" && V2.START === "reflex" && S.ROUNDS[1].start === undefined && NS.every((n) => S.ROUNDS[n].file === VS[n].RESULTS && S.ROUNDS[n].label.startsWith(`round ${n}: `) && RECS[n].size === 80) && NS.includes(1));
-    const same = NS.flatMap((n) => S.ARMS.map((a) => [n, a, J(Array.from(S.policyFor(n, a, 2).getParams())) === J(Array.from(VS[n].policyOf(a, 2).getParams())) && S.policyFor(n, a, 2).getParams().length === VS[n].WEIGHTS[a]]));
+        J(NS) === J([1, 2, 3, 4]) && [2, 3, 4].every((n) => S.ROUNDS[n].start === "reflex" && VS[n].START === "reflex") && S.ROUNDS[1].start === undefined && NS.every((n) => S.ROUNDS[n].file === VS[n].RESULTS && S.ROUNDS[n].label.startsWith(`round ${n}: `) && RECS[n].size === VS[n].ARMS.length * 16 && (S.ROUNDS[n].memory === true) === (VS[n].MEMORY === true)) && RECS[4].size === 64 && S.CLOCK === 10 && NS.includes(1));
+    const same = NS.flatMap((n) => VS[n].ARMS.map((a) => [n, a, J(Array.from(S.policyFor(n, a, 2).getParams())) === J(Array.from(VS[n].policyOf(a, 2).getParams())) && S.policyFor(n, a, 2).getParams().length === VS[n].WEIGHTS[a]]));
     ok("!! A ROUND'S UNTRAINED FLY HERE IS THE ROUND'S OWN, WEIGHT FOR WEIGHT: draw 2 of every arm of every round (round 2's with its output layer at zero, wrapped in the reflex), against tools/ship/flyEscape.mjs's policyOf (which a page cannot load), and the weight counts the rounds registered", same.every((x) => x[2]), same.filter((x) => !x[2]).map((x) => x[0] + " " + x[1]).join(", "));
     const o = REFLEX.frames[20].obs, env = { mover: { kind: "strike" } };
     ok("the four flies written by hand are the environment's own RULES, answer for answer; the fly told the kind goes home for a strike and to its food for a pass or an empty sky", ["reflex", "fleeAll", "hide", "freeze"].every((k) => REFLEX.frames.every((f) => J(S.flyOf(k).act(f.obs)) === J(E.RULES[k](f.obs)))) && J(S.flyOf("told").act(o, env)) === J([1]) && J(S.flyOf("told").act(o, { mover: { kind: "pass" } })) === J([-1]) && J(S.flyOf("told").act(o, { mover: null })) === J([-1]));
@@ -143,6 +148,10 @@ await section(async () => {
     ok("!! THE OUTSIDE VIEW TURNS: sent to another bearing and height it is this file's picture from there; and dragging it with the mouse turns it (the bearing and the height both change, and the picture with them)",
         !!turnedP && turnedP.view === S.view3d(FREEZE, 24, { ...S.CAM, az: 2.1, el: 0.8 }).hash && turnedP.view !== v24.hash && turnedP.eye === e24.hash && !!dragged && dragged.az > 0.9 + 0.5 && dragged.el > 0.42 + 0.1 && dragged.view !== v24.hash && dragged.view === S.view3d(FREEZE, 24, { ...S.CAM, az: dragged.az, el: dragged.el }).hash);
     ok("!! WHAT IT IS AND IS NOT IS ON THE PAGE, in the module's own lines, with the tick, what the fly chose and the three numbers; and a caught fly's episode says so: 'CAUGHT at tick 28'", S.saidLines().every((l) => text.includes(l)) && /tick 24 of 28 · fed 24 ticks · a mover is in the sky/.test(text) && /it chose: FOOD/.test(text) && /how fast it looms/.test(text) && !!frzEnd && frzEnd.t === 28 && frzEnd.done === true && /^CAUGHT at tick 28\. Score 0\.08[78] /.test(endText));
+    const b3 = over(trained(3, "FLY", 4), V3.AUDIT), b4 = over(trained(4, "FISH", 2), V4.AUDIT), w4 = over(trained(4, "SHUF", 4), V4.AUDIT), m4 = S.policyFor(4, "FLY", 3);
+    ok("!! ROUNDS 3 AND 4 ARE PLAYED AS THEY WERE AUDITED (added 2026-11-16): round 3's best fly (FLY draw 4, 0.7674) and round 4's best and worst (FISH draw 2, 0.7684; SHUF draw 4, 0.5624), flown here on the 200 audit episodes, give their records' scores to the bit and the episodes they lived; a round 4 fly REMEMBERS (its network is the carrying circuit, told the clock is the eleventh number) and a round 3 fly does not; round 4 has no MLP and says so by name",
+        b3.score === RECS[3].get("FLY 4").score && b3.alive === RECS[3].get("FLY 4").alive && near(b3.score, 0.7674) && b4.score === RECS[4].get("FISH 2").score && b4.alive === RECS[4].get("FISH 2").alive && near(b4.score, 0.7684) && w4.score === RECS[4].get("SHUF 4").score && near(w4.score, 0.5624) &&
+        m4.inner instanceof CarryCircuitPolicy && m4.inner.clock === 10 && !(S.policyFor(3, "FLY", 3).inner instanceof CarryCircuitPolicy) && (() => { try { S.policyFor(4, "MLP", 1); return false; } catch (e) { return /round 4 has no MLP/.test(e.message); } })() && !RECS[4].has("MLP 1"), `${b3.score.toFixed(4)} ${b4.score.toFixed(4)} ${w4.score.toFixed(4)}`);
     const o24 = FREEZE.frames[24].obs;
     ok("!! THE THREE METERS ARE THE THREE NUMBERS THE FLY IS GIVEN AT THAT TICK: how big the mover looks (a bar of that share of its track, and the number), how fast it looms and how fast it slides sideways (each from the middle, half the track at most) -- for the fly that never flees at tick 24, this file's observation: the size 0.825, the looming rate at its top, the bearing rate 0",
         !!meters && meters[0].v === o24[1].toFixed(3) && Math.abs(parseFloat(meters[0].w) - o24[1] * 100) < 0.01 && meters[1].v === o24[2].toFixed(3) && Math.abs(parseFloat(meters[1].w) - Math.abs(o24[2]) * 50) < 0.01 && meters[2].v === o24[3].toFixed(3) && parseFloat(meters[2].w) === 0 && Math.abs(o24[1] - 0.825) < 5e-4 && o24[2] === 1 && o24[3] === 0, J(meters));

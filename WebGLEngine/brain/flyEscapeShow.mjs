@@ -27,17 +27,21 @@ import { SITE, LAYERS, BLOCKS } from "./rl/buildEnv.mjs";
 import { FlightPolicy } from "./rl/dockPolicy.js";
 import * as P from "./rl/paintCircuitPolicy.mjs";
 import { ReflexStart } from "./rl/reflexStart.mjs";
+import { CarryCircuitPolicy } from "./rl/carryCircuit.mjs";
 import { unpackWeights, recordsOf } from "./voxelHomeShow.mjs";
 
 export { unpackWeights, recordsOf };
 export const ROUNDS = Object.freeze({
     1: Object.freeze({ file: "brain/flyEscapeRound.jsonl", label: "round 1: trained from nothing (they hide)" }),
-    2: Object.freeze({ file: "brain/flyEscapeReflexRound.jsonl", start: "reflex", label: "round 2: started at the reflex" }),   // 2026-11-15: the fly is half the reflex plus its network (brain/rl/reflexStart.mjs)
+    2: Object.freeze({ file: "brain/flyEscapeReflexRound.jsonl", start: "reflex", label: "round 2: started at the reflex" }),
+    3: Object.freeze({ file: "brain/flyEscapeFreshRound.jsonl", start: "reflex", label: "round 3: started at the reflex, trained on fresh episodes (the best flies)" }),   // 2026-11-16: the same flies, a trainer whose episodes change (tools/ship/flyEscapeFresh.mjs)
+    4: Object.freeze({ file: "brain/flyEscapeMemoryRound.jsonl", start: "reflex", memory: true, label: "round 4: round 3 with memory between ticks (no MLP)" }),   // 2026-11-16: brain/rl/carryCircuit.mjs; the MLP has nothing to carry and is not in the round   // 2026-11-15: the fly is half the reflex plus its network (brain/rl/reflexStart.mjs)
 });
 export const ARMS = Object.freeze(["FLY", "SHUF", "PLAIN", "FISH", "MLP"]);
 export const KINDS = Object.freeze(["reflex", "fleeAll", "hide", "freeze", "told", ...ARMS]);
 export const LABELS = Object.freeze({ reflex: "written by hand: the reflex (looms on a steady bearing)", fleeAll: "written by hand: flees from everything", hide: "written by hand: never leaves home", freeze: "written by hand: never flees",
     told: "told which movers are strikes", FLY: "trained: the fly's wiring", SHUF: "trained: the fly's wiring, shuffled", PLAIN: "trained: a plain net of its size", FISH: "trained: the fish's wiring", MLP: "trained: a small standard net" });
+export const CLOCK = 10;   // the observation's eleventh number is the episode's clock (brain/rl/escapeEnv.mjs); a remembering fly forgets when it reads 0
 export const DRAWS = 16, PLAIN_UNITS = 55, MLP_HIDDEN = Object.freeze([16, 16]);
 export const COLOURS = Object.freeze({ wall: [185, 178, 163], glass: [127, 200, 255], roof: [181, 83, 60], yard: [58, 92, 62], beyond: [34, 52, 38], food: [232, 196, 64], door: [138, 106, 60], sky: [120, 170, 230], horizon: [200, 222, 245],
     fly: [28, 24, 22], strike: [150, 30, 36], pass: [70, 76, 92], mover: [22, 22, 26] });
@@ -49,9 +53,10 @@ export function policyFor(round, arm, s) {
     if (!ARMS.includes(arm)) throw new Error(`flyEscapeShow.policyFor: no arm ${arm} (the arms are ${ARMS.join(", ")})`);
     if (!Number.isInteger(s) || s < 1 || s > DRAWS) throw new Error(`flyEscapeShow: no draw ${s} (the draws are 1 to ${DRAWS})`);
     const started = (inner, under) => (R.start === "reflex" ? new ReflexStart(inner, { rule: RULES.reflex, tail: under + 1 }) : inner);
+    if (arm === "MLP" && R.memory) throw new Error(`flyEscapeShow.policyFor: round ${round} has no MLP (it has nothing to carry between ticks)`);
     if (arm === "MLP") return started(new FlightPolicy({ hidden: [...MLP_HIDDEN], obsDim: OBS_DIM, actDim: ACT_DIM, seed: s }), MLP_HIDDEN[MLP_HIDDEN.length - 1]);
     const c = arm === "PLAIN" ? { units: PLAIN_UNITS, edges: [] } : P.ARMS[arm](s);
-    return started(new P.CircuitPolicy({ obsDim: OBS_DIM, actDim: ACT_DIM, units: c.units, edges: c.edges, seed: s }), c.units);
+    return started(R.memory ? new CarryCircuitPolicy({ obsDim: OBS_DIM, actDim: ACT_DIM, units: c.units, edges: c.edges, seed: s, clock: CLOCK }) : new P.CircuitPolicy({ obsDim: OBS_DIM, actDim: ACT_DIM, units: c.units, edges: c.edges, seed: s }), c.units);
 }
 /** See the header. */
 export function flyOf(kind, { round = 1, draw = 1, record = null } = {}) {
