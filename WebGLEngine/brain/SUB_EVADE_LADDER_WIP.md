@@ -143,3 +143,54 @@ DEV is free to read; HELD (115001 to 115048) was authorised by Keith to follow t
 4. **Lesion matchups against league7100 are mostly draws for the four groups that do not matter** (13-70-13, 14-69-13, 13-71-12, 12-71-13): the arms and league7100 play alike in 70 of 96 duels.
 
 **What is NOT shown:** which of M's two numbers carries it (not asked: searchSpeed and trackSpeed were one group by function); any HELD read; anything against an opponent but the strong finders and a graft that is not league7100's. R0 held and no check failed, so HELD may be flown.
+
+## HELD RESULT (2026-11-16; `node tools/ship/takeEvadeLadder.mjs held --write`, geometries 115001 to 115048 (96 duels a matchup), flown ONCE, exit 0; record `brain/subEvadeLadderHeld.json`: 26 matchups)
+
+Keith asked for it with the DEV flight ("fly DEV and HELD"); R0 held on DEV and no check failed. The void-checks passed on HELD too (none printed). Nothing in the rules, the arms, the groups or the forecasts was changed between DEV and HELD (Amendment A is dated before DEV).
+
+**R0 holds on HELD.** league7100 beats league7001 by **+1.113** (z 8.3, 43-45-8) and exploit7204 by **+1.281** (z 6.5, 52-32-12), both decided.
+
+**The ladder, HELD with the DEV edge beside it** (an arm's edge over its own base; "share" is the graft's edge over the lead of that comparator; the comparators are league7001 and exploit7204):
+
+| arm | against league7001: HELD (DEV), share | against exploit7204: HELD (DEV), share |
+|---|---|---|
+| LEAD | **+1.113** (+1.016) | **+1.281** (+0.899) |
+| GRAFT M (searchSpeed, trackSpeed) | **+0.886** (z 6.9) (+0.888), 0.80 | **+0.780** (z 6.6) (+0.752), 0.61 |
+| GRAFT W (fireRange, aimTol) | -0.000 (+0.068), 0.00 | +0.065 (-0.137), 0.05 |
+| GRAFT P (pingAfter, pingEvery, searchPing) | +0.411 (z 2.5) (+0.159), 0.37 | +0.479 (z 3.0) (-0.077), 0.37 |
+| GRAFT L (echoWindow, blindSnr) | +0.062 (+0.031), 0.06 | +0.068 (-0.097), 0.05 |
+| GRAFT T (evadeTime) | -0.093 (+0.005), -0.08 | -0.007 (+0.066), -0.01 |
+| LESION M | **-0.702** (z -6.3) (-0.757) | **-0.805** (z -6.6) (-0.639) |
+| LESION W, P, L, T | +0.031, -0.097, +0.031, -0.063 | -0.025, +0.003, +0.000, +0.000 |
+| ALL (the ten) | **+1.081** (z 6.8) (+0.926), 0.97 | **+1.154** (z 5.9) (+0.670), 0.90 |
+| LESALL | **-1.111** (z -8.3) (-0.915) | **-1.308** (z -6.9) (-0.923) |
+
+**RL1 THE TEN CARRY THE LEAD: yes** (ALL sufficient for both, LESALL necessary for both). **RL2 THE HEADLINE: ONE GROUP: M.** **RL3 the necessary groups: M.** Groups: **M SUFFICIENT BOTH, NECESSARY BOTH**; W, P, L and T NONE and NONE. The headline, the group labels and RL1 are **the same on both sets**, and so is the set of numbers that did nothing: W, L and T (eight grafts within 0.14 of 0 on each set).
+
+**Forecasts, scored** (my probability; outcome on the printed quantity of HELD; "calls" is the probability I gave to what happened):
+
+| forecast | mine | outcome | calls |
+|---|---|---|---|
+| R0 holds on DEV | 90 | held | 90 |
+| R0 holds on HELD | 88 | held | 88 |
+| RL1: the ten carry the lead | 60 | yes | 60 |
+| headline "THE TEN ARE NOT THE LEAD" | 25 | no | 75 |
+| headline "ONE GROUP" (any) | 25 | **yes (M)** | **25** |
+| headline "SEVERAL GROUPS" | 20 | no | 80 |
+| headline "NO GROUP ALONE" | 30 | no | 70 |
+| group P (pinging) is SUFFICIENT | 30 | no | 70 |
+| group L (listening) is SUFFICIENT | 25 | no | 75 |
+| group M (movement) is SUFFICIENT | 20 | **yes** | **20** |
+| group W (weapon) is SUFFICIENT | 5 | no | 95 |
+| group T (time) is SUFFICIENT | 4 | no | 96 |
+
+**Ten of twelve went as the larger side said; the two misses are one event (movement carries it alone), the likeliest single group I gave 20 and "ONE GROUP" 25. Said about them:** I had seen the smoke headline (M) before DEV (Amendment A item 8) and did not move the forecasts, so these two numbers are what I wrote before any geometry of DEV or HELD was flown and not what I would have said after the smoke; they are scored as written. The two I did lean to hardest (pinging at 30 and listening at 25, from a table that split the strong four by `pingEvery` and `blindSnr`) were wrong **on both sets.**
+
+**What the two sets say together (post hoc, labelled as such: no rule reads two sets).**
+
+1. **league7100's lead over the strong finders is carried by its movement numbers, searchSpeed and trackSpeed.** Grafted onto league7001 or exploit7204 they recover **0.87 and 0.84 (DEV) and 0.80 and 0.61 (HELD)** of the lead, decided every time; taken out of league7100 (replaced by the comparator's) they cost it **-0.76, -0.64, -0.70 and -0.81**, as much as the whole lead (the lead is +0.9 to +1.3). The ten numbers together recover 0.91, 0.75, 0.97 and 0.90.
+2. **Pinging may be a second, smaller piece, and the rule does not call it one.** On HELD the P graft is +0.41 (z 2.5) and +0.48 (z 3.0), a share of 0.37 over both comparators, **under the bar of 0.5, so it is not decided**; on DEV it was +0.16 and -0.08. The ten recover 0.97 and 0.90 on HELD against M's 0.80 and 0.61, a difference of 0.17 and 0.29 that is about the size of P's share. **The registered reading is ONE GROUP: M; the pooled picture that fits both sets is "M carries most, P perhaps a fifth to a third of it"** (the P grafts' mean across the four is +0.24, se about 0.09), which the rules do not read and a split of the pinging numbers could.
+3. **The table's tier reading was wrong, twice.** The strong four split into tiers by `pingEvery` and `blindSnr`; those numbers (listening, and the pinging group they sit in) are not what carries the lead over the two comparators. What is unusual about league7100 is its **trackSpeed of 3.15, the slowest of the five finders** (the others 4.07 to 4.50); its searchSpeed 4.09 is above both comparators' (3.83 and 3.31). **Which of the two numbers carries it is not asked here** (they are one group by function); the next read splits the group.
+4. **The 2 x 2 and the ladder agree:** the (speed, turn) pair carries none of the lead (pairs note), the ten other numbers carry it, and within them the two movement numbers carry most; evade time (the one number of group T) does nothing, as it did against G.
+
+**What is NOT shown:** which of M's two numbers, or which of P's three, does the work; whether the same holds for the lead of league7100 over exploit7200 or over G, or against an opponent but the strong finders; the interaction of the pair with the ten (ALL keeps each comparator's pair); a mechanism (a slower tracker could be quieter, or lose contact less, or the opposite: nothing was read from events). A split of M (and, if Keith wants, of P) is the next read, and its own registration.
