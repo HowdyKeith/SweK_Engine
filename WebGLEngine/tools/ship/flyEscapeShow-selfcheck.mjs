@@ -29,6 +29,10 @@
 //   looks 30 degrees down, and the fly's body is under it, below every lens.
 // TWO ROWS OF THIS GATE WERE WRONG WHEN WRITTEN, AND ARE CORRECTED: the disc's middle column was asked for on every tick, and in the last tick or two the disc runs off one edge of the all-round picture
 // and on at the other; and "no red in a pass's picture" was asked with a colour match loose enough to take the roof's shaded side for the strike's red.
+// 2026-11-16, ROUNDS 6 AND 7 ADDED (their own arms and draws; brain/rl/degreeShuffle.mjs and brain/rl/splitShuffle.mjs), this gate run whole for each, every one red by name: X8 GDEG is built as a free
+//   shuffle 1 | X9 every draw's GDEG is one shuffle 1 | X10 round 6's draws are 1 to 16 3 | X11 GGF keeps nothing 1 | X12 GIN is the out shuffle 1 | X13 round 7's flies are played without the reflex 3
+//   X14 the page says round 7 found it is the fibres 1 | X15 the page says round 6 found the finer wiring 1 | X16 choosing GDEG does not move the page to round 6 1 | X17 the draw list does not
+//   follow the round 1 | X18 a round 7 fly moves the page to round 6 1 | X19 a draw the round lacks is kept 1
 "use strict";
 import fs from "node:fs";
 import path from "node:path";

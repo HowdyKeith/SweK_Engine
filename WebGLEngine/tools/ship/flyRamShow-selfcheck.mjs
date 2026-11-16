@@ -8,6 +8,16 @@
 //   2  THE JOUST       watched, it is the round's; the frames are the duel's ticks; the joust the page opens on
 //   3  THE PICTURES    the outside view holds both craft and says which is which; the eye's disc is the size the reflex is given
 //   4  THE PAGE        fly-ram.html in Chromium: the opening joust, both canvases, the reflex firing, a trained craft from the file, turning, a results file that does not arrive
+// SABOTAGE LOG (2026-11-16) -- through a byte-safe runner (one at a time, every file restored and its sha256 checked), this gate run whole for each; the number is the rows red:
+//   THE LIBRARY (brain/flyRamShow.mjs): W1 the joust watched is a standoff 11 | W2 the watching hook resolves no contact 9 | W3 a frame's firing is the reverse 4 | W4 an untrained network's output
+//   layer is not zeroed 1 | W6 a touch is not drawn 2 | W7 a breaking craft is drawn as the pilot flying 2 | W8 the camera does not stand back 1 | W9 a trained craft takes any record 1
+//   W10 the eye's disc is twice the size 1 | W11 every rule is `always` 12 | W12 the reward does not price the rams 4 | W13 the page says the hand rule keeps the score 1
+//   THE PAGE (fly-ram.html): W14 opens on the hand rule 6 | W15 every line is painted red 3 | W16 a file that does not arrive is not said 1 | W17 the end gives the fight as the reward 1
+//   W18 the draw can be chosen for a rule 1 | W19 the looming meter shows the size 1 | W20 the eye's disc is never white 1
+//   ONE WENT 0 RED AT FIRST AND WAS A FINDING: W5 GSHUF is built with the real wiring (the gate replayed only free-net and real-circuit records over the audit, and compared weights, which do not
+//   hold the wiring). A row was added -- the shuffle's draw 9 to its record, and every wired arm's connections to the round's -- and W5 run again: 1.
+//   Two rows of mine were wrong when written and were corrected to what the code gives: the trail is 45 segments (not 44) and the jousters start 37 m apart (not 24); and by tick 30 shots have
+//   landed, so the hulls are 94 and 82, not whole.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -56,6 +66,9 @@ await section(() => {
     const f3 = over(trained("FREE", 3)), f8 = over(trained("FREE", 8)), g1 = over(trained("GF", 1)), r3 = RECS.get("FREE 3"), r8 = RECS.get("FREE 8"), rg = RECS.get("GF 1");
     ok("!! A RECORD'S CRAFT, PLAYED HERE ON THE 200 AUDIT JOUSTS, GIVES ITS RECORD'S REWARD TO THE BIT: the free net's draw 3 (the round's worst, 15.7365; 13 ticks firing a joust), its draw 8 (the round's best, 16.6984) and the real circuit's draw 1 (16.5092, the pilot alone's number: it never fires)",
         f3.score === r3.score && f3.breaks === r3.breaks && f3.ramHp === r3.ramHp && near(f3.score, 15.7365) && near(f3.breaks, 13.02, 1e-9) && f8.score === r8.score && near(f8.score, 16.6984) && g1.score === rg.score && g1.breaks === 0 && near(g1.score, V.PILOT_FLOOR), `${f3.score.toFixed(4)} ${f8.score.toFixed(4)} ${g1.score.toFixed(4)}`);
+    const g9 = over(trained("GSHUF", 9)), r9 = RECS.get("GSHUF 9"), places = (p) => Array.from(p.to).map((t, k) => [t, p.from[k]]), wired = S.ARMS.filter((a) => a !== "FREE").flatMap((a) => [2, 9].map((s) => J(places(S.policyFor(a, s))) === J(V.circuitOf(a, s).edges)));
+    ok("!! A SHUFFLED CRAFT IS PLAYED WITH ITS OWN DRAW'S SHUFFLE (sabotage W5 first went 0 red -- GSHUF built with the real wiring -- and this row is its answer): the shuffled wiring's draw 9, which fires, gives its record's reward on the 200 audit jousts to the bit (15.9890), and the connections of every wired arm's network here are the round's for that draw (the real ones for GF, the draw's shuffle for GSHUF, and the two are not one list)",
+        g9.score === r9.score && g9.breaks === r9.breaks && g9.ramHp === r9.ramHp && near(g9.score, 15.9890) && r9.breaks > 0 && wired.length === 4 && wired.every(Boolean) && J(places(S.policyFor("GSHUF", 9))) !== J(places(S.policyFor("GF", 9))) && J(places(S.policyFor("GSHUF", 9))) !== J(places(S.policyFor("GSHUF", 2))), `${g9.score.toFixed(4)}`);
     const eps = [ALONE, HAND, F3], sum = (a) => a.reduce((n, v) => n + v, 0), starts = (ep) => ep.frames.filter((f, i) => f.touch && !(i > 0 && ep.frames[i - 1].touch)).length;
     ok("!! THE FRAMES ARE THE DUEL'S TICKS: one a tick, numbered from 0; the ticks drawn as breaking are the ticks the reflex fired; the hull points the touches cost add up to the joust's ram damage, and the touches that begin are its rams; no hull gains a point; and a joust flown twice is the same joust",
         eps.every((ep) => ep.frames.length === ep.ticks && ep.frames.every((f, i) => f.t === i) && ep.frames.filter((f) => f.brk).length === ep.breaks && near(sum(ep.frames.map((f) => f.ram)), ep.ramHp, 1e-9) && starts(ep) === ep.rams && ep.frames.every((f, i) => i === 0 || (f.a.hp <= ep.frames[i - 1].a.hp && f.b.hp <= ep.frames[i - 1].b.hp)) &&
