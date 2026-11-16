@@ -85,3 +85,43 @@ Why these: the movement group carried the lead on both sets by large margins (0.
 **3. The report's column of set keys is padded to 53 characters** (the length of the set of five), so the three sets align; the first printing padded to 40 and misaligned MP. A formatting change, made after the first gate run and before the smoke report was pinned.
 
 **4. What is not changed:** the units, the arms, the sets, the rules R0, RM1 to RM3, RP1 and RP2, the forecasts, the geometries, the order of work.
+
+## DEV RESULT (2026-11-16; `node tools/ship/takeEvadeMove.mjs dev --write`, geometries 116001 to 116048 (96 duels a matchup), exit 0; record `brain/subEvadeMoveDev.json`: 28 matchups, no check failed)
+
+DEV is free to read. **HELD (117001 to 117048) is NOT flown by this note's work so far**: Keith's message for this round ("lets do the next suggested round, and then the next 2 suggested rounds after that") does not say "fly HELD", as his earlier ones did, so I am waiting for his word before spending the set. R0 held on DEV and no check failed (none printed), so the HELD gate of the command would accept this record. Forecasts are scored on DEV only for "R0 holds on DEV" (90): **TRUE**. The others stand as written for HELD.
+
+**R0 holds.** league7100 beats league7001 by **+1.047** (z 6.7, 43-43-10) and exploit7204 by **+1.058** (z 4.3, 49-31-16), both decided.
+
+**The arms against each comparator** (an arm's edge over its own base; GRAFT: the comparator with league7100's number or numbers, against the comparator; LESION: league7100 with the comparator's number, against league7100; "share" is the graft's edge over the lead):
+
+| arm | against league7001 | share | against exploit7204 | share |
+|---|---|---|---|---|
+| LEAD | **+1.047** (z 6.7) | | **+1.058** (z 4.3) | |
+| GRAFT S (searchSpeed) | -0.000 | 0.00 | +0.034 | 0.03 |
+| GRAFT K (trackSpeed) | **+0.984** (z 9.3) | **0.94** | **+0.752** (z 5.5) | **0.71** |
+| GRAFT A (pingAfter) | +0.031 | 0.03 | -0.004 | 0.00 |
+| GRAFT E (pingEvery) | +0.313 (z 1.9) | 0.30 | +0.349 (z 2.0) | 0.33 |
+| GRAFT Q (searchPing) | identical (0 exactly) | | -0.069 | -0.07 |
+| LESION S, K | +0.031, **-0.873** (z -6.3) | | -0.066, **-1.043** (z -7.8) | |
+| LESION A, E, Q | +0.113, -0.035, identical | | +0.113, -0.035, -0.097 | |
+| GRAFT M (S+K) | **+0.952** (z 8.8) | 0.91 | **+0.848** (z 7.7) | 0.80 |
+| GRAFT P (A+E+Q) | +0.312 (z 1.6) | 0.30 | +0.216 (z 1.0) | 0.20 |
+| GRAFT MP (all five) | **+1.046** (z 5.9) | 1.00 | **+0.569** (z 2.9) | 0.54 |
+
+**RM1 THE MOVEMENT SET REPLICATES: yes** (GRAFT(M) sufficient for both). **RM2 THE HEADLINE: TRACKSPEED.** **RM3 the necessary units: K.** **RP1 PINGING IS A SECOND PIECE: NO** (GRAFT(P) sufficient for none). **RP2:** neither A nor E is sufficient; Q's graft onto exploit7204 is not decided (-0.069). Units: **K SUFFICIENT BOTH and NECESSARY BOTH**; S, A, E and Q NONE and NONE.
+
+**What pinging adds to movement** (GRAFT(MP) against GRAFT(M)): +0.094 against league7001 and **-0.279** against exploit7204: no consistent sign.
+
+**The forecast quantities as printed** (scored on HELD, not here): RM1 yes; headline TRACKSPEED yes (SEARCHSPEED, BOTH, NEITHER ALONE, MOVEMENT DOES NOT REPLICATE no); K necessary for both yes; RP1 no; E sufficient no; A sufficient no; Q graft onto exploit7204 decided no.
+
+**Said plainly about this read:** the smoke report (Amendment A item 1) had the same headline, TRACKSPEED, on four training geometries at 8 duels a matchup. That is not independent evidence, and DEV is a different set of 48 geometries, but **I saw the smoke headline before writing any DEV rule down as read**: the 40 I gave TRACKSPEED is no longer a blind forecast; it is scored on HELD as written. Also said: **I flew DEV on my own reading of "do the round"**, as free-to-read data that gates HELD; it spent the DEV set 116001 to 116048, which is recorded once.
+
+**Observations (DEV, for reading, not rules):**
+
+1. **The movement lead lives in trackSpeed.** Grafting league7100's trackSpeed alone onto league7001 recovers 0.94 of the lead and onto exploit7204 0.71; giving league7100 either comparator's trackSpeed costs it -0.87 and -1.04, **the whole lead** (+1.05 and +1.06). Its searchSpeed does nothing alone either way (|edge| of 0.07 or less in all four arms). league7100's trackSpeed (3.15) is the slowest of the five finders; the comparators' are 4.07 and 4.50, i.e. at or near the bound of 4.5.
+2. **No arm that does nothing looks like nothing in the seats.** GRAFT S against league7001 is 39-18-39 with seat A -0.681 and seat B +0.680: an edge of exactly about 0 made of two seat effects that cancel. This is why the matchups are flown in both seats and read as one edge.
+3. **A small pinging piece is not ruled out and not shown.** pingEvery alone is **+0.313 and +0.349** (z 1.9 and 2.0) on the two comparators, the same sign and size twice and under the 0.5 bar; pingAfter and searchPing are about 0; the whole pinging set is +0.312 and +0.216. The ladder's pinging group on HELD was +0.411 and +0.479. Together with that read, a pingEvery piece of about 0.3 to 0.5 is the one candidate; it is a **post-hoc reading** from DEV, labelled, and it is exactly what HELD's rules (RP1, RP2) will or will not decide.
+4. **The ping numbers' lesions are the same matchup against both comparators for A and E:** pingAfter is 1 and pingEvery is 4 in both league7001 and exploit7204, so LESION A and LESION E are the identical theta pair (12-75-9 and 11-73-12 on both sides of the table); so "necessary for both comparators" for A or E would be one measurement counted twice. The registration did not say this (it said it of Q against league7001, not of A and E); it changes no rule's outcome here (neither is necessary) and is said for the readers of later rounds.
+5. **MP below M on exploit7204** (+0.569 against +0.848): within the noise of a difference of two edges of about 0.11 and 0.2 standard error each (z of the difference about 1.2); not read as pinging hurting.
+
+**What is NOT shown:** any HELD read; trackSpeed's dose (only league7100's one value, 3.15, was grafted; whether the effect is a threshold, a slope or an optimum is not known); whether it helps against anything but these two comparators; a mechanism.
