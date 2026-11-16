@@ -305,10 +305,17 @@ try {
     // sets the step in sessionStorage before any of the page's scripts runs, which is where the page reads it from.
     // 2026-11-05 -- 44 -> 51, at the merge of the needs-and-limits, fish/fly and denoise lines into the box3d line: seven more gates hold first-order numbers and now say so, as the first import:
     // brain/needsTask, brain/subFieldNav, brain/subSensedNav, tools/ship/plainNetStudy, tools/ship/needsHead (a gate for the survey round H3), tools/ship/takeTankDropout (the board's dropout loop) and tools/tankFlyCxBench. The COMMAND of a round (needsHeadCmd) sets it by name with setOrientationDefault("euler"), not by importing this module.
+    // 2026-11-16 -- 51 -> 55. Four more gates held first-order numbers and were red under RK4 since the merge, unseen because each runs over the quick sweep's budget:
+    // plannerEvents, plannerCap, plannerEnsemble and plannerEnsConfirm, each pinning the twin planner's rollout seconds and plan counts. Each was red with the old
+    // needsTask.gaugeOf as well, and green under SWEK_6DOF_ORIENTATION=euler with nothing else changed; each now imports this module first.
+    // Also 2026-11-16: the row had been red since 2026-11-07 on a second count -- two ROUND LIBRARIES (tools/ship/plainNetVariants.mjs, tools/ship/takeRighting.mjs) imported
+    // the module. Both now set "euler" BY NAME right after their imports, as needsHeadCmd does, and their gates hold that line. Sabotaged: the call removed from takeRighting
+    // -> 5 red (its gate); the module imported by plainNetVariants again -> 1 red (this row); a planner gate's import removed -> 1 red here and 1 in that gate.
+    const MISSED_PLANNERS = ["tools/ship/plannerCap-selfcheck.mjs", "tools/ship/plannerEnsConfirm-selfcheck.mjs", "tools/ship/plannerEnsemble-selfcheck.mjs", "tools/ship/plannerEvents-selfcheck.mjs"];
     const MISSED = ["brain/pilotFlightTrain-selfcheck.mjs", "render/subDropoutView-selfcheck.mjs", "tools/ship/dogfightPage-selfcheck.mjs", "tools/ship/tournamentDogfightShipped-selfcheck.mjs",
         "tools/ship/trainDogfightPilotShipped-selfcheck.mjs", "tools/ship/trainDronePilot-selfcheck.mjs", "tools/ship/trainFlightPilotGpu-selfcheck.mjs", "tools/ship/trainSubPilot-selfcheck.mjs"];
-    ok("!! the gates that hold first-order numbers say so: 51 of them import rigidBody6dofEuler.mjs as their FIRST import (before any module that steps a body), no library or page does, the four page scripts import it first in the browser, and the one page a gate opens itself is given the step before it loads",
-        restated.length === 51 && notFirst.length === 0 && others.length === 0 && pageScript && MISSED.every((f) => restated.includes(f)),
+    ok("!! the gates that hold first-order numbers say so: 55 of them import rigidBody6dofEuler.mjs as their FIRST import (before any module that steps a body), no library or page does, the four page scripts import it first in the browser, and the one page a gate opens itself is given the step before it loads",
+        restated.length === 55 && notFirst.length === 0 && others.length === 0 && pageScript && MISSED.every((f) => restated.includes(f)) && MISSED_PLANNERS.every((f) => restated.includes(f)),
         `${restated.length} gates${notFirst.length ? "; not first in " + notFirst.join(", ") : ""}${others.length ? "; imported by " + others.join(", ") : ""}${pageScript ? "" : "; a page script does not import it first"}`);
     // every 6-DOF craft family, under both steps: the baseline each task pins, flown here with each step named
     const FT = await import("../../brain/flightTask.mjs"), AF = await import("../../brain/autopilotFlight.mjs"), DTk = await import("../../brain/droneTask.mjs"), AD = await import("../../brain/autopilotDrone.mjs");

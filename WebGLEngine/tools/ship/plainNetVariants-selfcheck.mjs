@@ -273,7 +273,7 @@ sec("6. THE SOURCE");
 
 {
     const O = await import("../../physics/mechanics/rigidBody6dof.mjs"), text = fs.readFileSync(new URL("./plainNetVariants.mjs", import.meta.url), "utf8"), first = text.split("\n").find((l) => l.startsWith("import "));
-    ok("!! the variants fly the first-order orientation step the first round's records were measured under (Amendment A of 2026-11-07): the first import of the library is rigidBody6dofEuler, importing it sets the default to euler and the environment variable a worker process inherits", /^import "\.\.\/\.\.\/physics\/mechanics\/rigidBody6dofEuler\.mjs";/.test(first) && O.orientationDefault() === "euler" && process.env.SWEK_6DOF_ORIENTATION === "euler", String(first).slice(0, 80));
+    ok("!! the variants fly the first-order orientation step the first round's records were measured under (Amendment A of 2026-11-07): the library's first import is setOrientationDefault and it sets euler by name after its imports (only gates import rigidBody6dofEuler: orientationStep-selfcheck section 7), importing it sets the default to euler and the environment variable a worker process inherits", /^import \{ setOrientationDefault \} from "\.\.\/\.\.\/physics\/mechanics\/rigidBody6dof\.mjs";/.test(first) && /\nsetOrientationDefault\("euler"\);/.test(text) && O.orientationDefault() === "euler" && process.env.SWEK_6DOF_ORIENTATION === "euler", String(first).slice(0, 80));
 }
 
 // 2026-11-08 -- the exports of this module that no row named (definitionGates counts a symbol its gate never mentions), each now asserted rather than only mentioned.
