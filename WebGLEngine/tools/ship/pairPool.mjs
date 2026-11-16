@@ -20,9 +20,10 @@ import * as TC from "../../brain/seatTurretCircuit.mjs";
 import * as HS from "../../brain/helmSteerPolicy.mjs";
 import * as HC from "../../brain/helmCompassPolicy.mjs";
 import * as SK from "../../brain/seatTrackGunner.mjs";
+import * as FS from "../../brain/flySteering.mjs";
 
 /** The policies whose network can be flown over another wiring (`wiring: "control:<seed>"`), each with the module whose wiringOf() names it. */
-export const WIRED = Object.freeze({ gunnerPolicy: TC, helmSteerPolicy: HS, helmCompassPolicy: HC, seatTrackGunner: SK });
+export const WIRED = Object.freeze({ gunnerPolicy: TC, helmSteerPolicy: HS, helmCompassPolicy: HC, seatTrackGunner: SK, helmFlyWired: FS });
 
 /** A side from its plain description (see the header). A policy this fight does not seat is refused by name. */
 export function sideOf(spec) {
