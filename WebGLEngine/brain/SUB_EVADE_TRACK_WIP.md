@@ -88,3 +88,39 @@ Why these: the lead over both comparators is large (about +1.05 on DEV), so R0 i
 ## AMENDMENT B (2026-11-16; written after the mutation pass of the command's gate, BEFORE any geometry of the DEV set 118001 to 118048 or of HELD is flown)
 
 **One void-check was rewritten, because the mutation pass showed the first version could not fail (an identity, said before data).** Section 4 and Amendment A say the grid check is that "D is league7100's trackSpeed of the files and the grid is strictly increasing". In the first command the first half compared the grid's sixth value with league7100's trackSpeed, but the grid is built from that very number, so the comparison was an identity of the code with itself and could never fire (two hand mutants that removed it survived the pass; they were the same mutant). **The check now reads: every arm is marked D (`isD`) if and only if its value is league7100's own trackSpeed of the files, and exactly one arm per base is marked D (three in all); the grid is nine strictly increasing values on every base** (the two clauses of Amendment A item 2 are unchanged). Its message now ends "marked D on every base". Nothing else is changed: the arms, the rules, the forecasts and the geometries are as registered; the smoke report is byte for byte the same, since the message prints only when the check fails (the gate's pinned sha256 of the smoke report is unchanged).
+
+## DEV RESULT (2026-11-16; `node tools/ship/takeEvadeTrack.mjs dev --write`, geometries 118001 to 118048 (96 duels a matchup), exit 0; record `brain/subEvadeTrackDev.json`: 29 matchups, no check failed)
+
+DEV is free to read. **HELD (119001 to 119048) is NOT flown by this note's work so far**: Keith's message for these rounds does not say "fly HELD", so I am waiting for his word. R0 held on DEV and no check failed (none printed), so the command's HELD gate would accept this record. Forecasts are scored on DEV only for "R0 holds on DEV" (92): **TRUE**. The others stand as written for HELD. **I flew DEV on my own reading of "do the round"**, as free-to-read data that gates HELD; it spent the DEV set 118001 to 118048, which is recorded once.
+
+**R0 holds.** league7100 beats league7001 by **+1.047** (z 8.6, 38-53-5) and exploit7204 by **+1.248** (z 7.0, 50-35-11), both decided.
+
+**The arms** (an arm's edge over its own base: the base with that trackSpeed against the base; the base's own trackSpeed is 4.07 for league7001, 4.5 for exploit7204 and D = 3.15 for league7100):
+
+| trackSpeed | league7001 | exploit7204 | league7100 (read, not ruled) |
+|---|---|---|---|
+| 1.0 | -0.070 (4-86-6) | -0.171 (3-85-8) | -0.114 |
+| 1.5 | **+0.674** (z 4.4) | +0.045 (7-84-5) | -0.014 |
+| 2.0 | **+1.302** (z 11.8) | **+0.692** (z 6.3) | +0.065 |
+| 2.5 | **+1.173** (z 10.4) | **+1.060** (z 8.5) | +0.034 |
+| 3.0 | **+0.951** (z 8.9) | **+1.262** (z 14.3) | +0.000 |
+| **D (3.15)** | **+0.919** (z 8.5) | **+1.200** (z 11.5) | identical |
+| 3.5 | **+0.699** (z 6.4) | +0.471 (z 4.3) | -0.251 (z -3.1) |
+| 4.0 | +0.096 (z 1.8) | +0.205 (z 1.9) | **-0.790** (z -6.6) |
+| 4.5 | -0.295 (z -2.5) | identical | **-1.060** (z -10.2) |
+
+**RD1 THE GRAFT REPLICATES: yes** (D pays on both: +0.919 and +1.200). **RD2 THE ONSET:** the values that pay on both comparator bases are **2.0, 2.5, 3.0 and D**; the highest is D. **RD3 THE SLOW END:** the arm at 1.0 is NEUTRAL on both (-0.070 and -0.171): **SLOW END MIXED**. **RD4 THE HEADLINE: ONSET AT D / SLOW END MIXED.** The peaks (reported): league7001 at 2.0 (+1.302), exploit7204 at 3.0 (+1.262). The donor base is decided against league7100 at 4.0 and 4.5.
+
+**The forecast quantities as printed** (scored on HELD, not here): RD1 yes; onset above D no; onset at D yes; not replicated no; slow end pays no; slow end costs no; slow end mixed yes; the arm at 2.0 pays on both yes; both peaks at 3.0 or below yes; the donor's arm at 4.5 costs yes.
+
+**Said plainly about this read:** the smoke report (Amendment A item 1) had the same headline, "ONSET AT D / SLOW END MIXED", on four training geometries at 8 duels a matchup, and the same lowest arms at exactly 0 draws. That is not independent evidence, and DEV is a different set of 48 geometries, but **I saw the smoke headline before writing any DEV rule down as read**: the forecasts for it (30 for "onset at D", 40 for PAYS, which did not come true) are scored on HELD as written.
+
+**Observations (DEV, for reading, not rules):**
+
+1. **The onset reading depends on a margin of 0.03.** 3.5 pays on league7001 (+0.699) and is **+0.471 (z 4.3) on exploit7204**, 0.029 under the 0.5 bar, so the rule reads "ONSET AT D". With a bar of 0.45 it would read "ABOVE D". The bar is the registered one and the reading stands as printed; the honest statement is that the paying range reaches about 3.5 and its upper edge is where the two comparators' numbers differ (their own trackSpeeds are 4.07 and 4.5), and that it is not a sharp edge.
+2. **The curve is a hump, not a slope, and its slow end is made of draws, not of losses.** The gain on league7001 rises from 0 at 4.0 to **+1.30 at 2.0**; on exploit7204 from +0.2 at 4.0 to **+1.26 at 3.0**; both fall to about 0 at 1.0 and 1.5, where **84 to 86 of the 96 duels are draws** (4-86-6, 3-85-8, 7-84-5): a boat that tracks that slowly neither kills nor is killed, so the "no effect" at the slow end is a stalemate and not parity. The peaks (2.0 and 3.0) and the paying range (1.5 or 2.0 up to 3.15 to 3.5) are about league7001 and exploit7204 as bases.
+3. **The donor base shows no gain from going slower than league7100's own value, and a cost above it:** 1.0 to 3.0 are all within 0.114 of 0 (NEUTRAL); 3.5 is -0.251 (under the bar, z -3.1), 4.0 and 4.5 are **-0.790 and -1.060**. The comparators gain +0.9 to +1.3 from slowing to 2.0 to 3.15; league7100 itself gains nothing from slowing further. **Edges against different bases are not comparable with one another** (each is against its own base), so this is not "league7100's curve is flat while theirs rises": it says that the benefit of a slow tracker over a fast one is large, and that further slowing over league7100's own is not measured to pay.
+4. **Faster than the base costs a little on league7001:** 4.5 against its own 4.07 is -0.295 (z -2.5, under the bar), 4.0 +0.096.
+5. **Seat edges are large and mostly cancel.** e.g. exploit7204 at 4.0 is 44-14-38 with seat A -0.807 and seat B +1.218; the two-seat edge (+0.205) is a small difference of two large numbers, as in every earlier read.
+
+**What is NOT shown:** any HELD read; a graded dose of league7100's other numbers; the effect against any opponent but the boat's own base; the shape between grid values (a peak inside the 0.5 steps); a mechanism for the stalemate at the slow end.
