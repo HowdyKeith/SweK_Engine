@@ -2298,6 +2298,22 @@ export const PROBES = Object.freeze([Object.freeze({
                 for (let k = 0; k < 3; k++) out[3 * i + k] = w[0] * C[v[0]][k] + w[1] * C[v[1]][k] + w[2] * C[v[2]][k]; }
             return out; },
         key: () => ({ rays: PROBE_CUBE.shadeSweep.length / 6, colours: PROBE_CUBE.colors.length }) }),
+    // v4918 -- the instance probe, by the list: three unit cubes side by side. Its CPU twin never packs an instance: it
+    // moves each RAY by hand (a translation needs no inverse) and asks the one mesh's own raycastFirst, three times.
+    Object.freeze({ id: "rtPipeline.instanceProbeWgsl", code: (a) => instanceProbeWgsl(a.rays.length / 6), entryPoint: "main",
+        args: Object.freeze((() => { const bvh = bvhBuffersFromMesh(PROBE_CUBE.positions, PROBE_CUBE.indices), xs = [-3, 0, 3];
+            return { bvh, xs, inst: instanceBuffer(xs.map((x) => ({ transform: [1, 0, 0, x, 0, 1, 0, 0, 0, 0, 1, 0], albedo: 0.5 })), { meshes: bvh }),
+                     rays: new Float32Array([-3.2, 0.1, -5, 0, 0, 1, 0.3, -0.2, -5, 0, 0, 1, 2.7, 0.4, -5, 0, 0, 1, -8, 0.2, 0.1, 1, 0, 0, 0.2, 9, 0.1, 0, 1, 0, 1.5, 0, -5, 0, 0, 1, 0.1, 5, 0.3, 0, -1, 0, 8, 0.5, 0.4, -1, 0, 0]) }; })()),
+        pack: (a) => { const U = new Float32Array(96); U[MESH_META_SLOT * 4] = 1; U[MESH_META_SLOT * 4 + 3] = a.xs.length; return U; },
+        inputs: (a) => [...bvhInputs(a.bvh), { binding: BVH_BINDINGS.instances, data: a.inst }, { binding: 6, data: a.rays }],
+        outCount: (a) => a.rays.length / 6 * 4, workgroups: (a) => Math.ceil(a.rays.length / 6 / 64),
+        cpu: (a) => { const n = a.rays.length / 6, out = new Float32Array(4 * n);
+            for (let i = 0; i < n; i++) { const r = a.rays.subarray(6 * i, 6 * i + 6); let best = null;
+                a.xs.forEach((x, k) => { const h = a.bvh.bvh.raycastFirst(r[0] - x, r[1], r[2], r[3], r[4], r[5]); if (h && (!best || h.t < best.t)) best = { t: h.t, k, tri: h.tri }; });
+                out.set([best ? best.t : -1, best ? best.k : -1, best ? best.tri : -1, a.xs.length], 4 * i); }
+            return out; },
+        graded: "physics/render/rtPipeline-selfcheck.mjs section 17 -- 128 rays over sixteen instances of two meshes, the list against the tree and both against a brute search; the triangle on a shared edge is a tie that gate grades as one",
+        key: () => ({ rays: 8, instances: 3 }) }),
     Object.freeze({ id: "rtPipeline.bvhMaterialProbeWgsl", code: (a) => bvhMaterialProbeWgsl(a.rays.length / 6), entryPoint: "main",
         args: Object.freeze({ bvh: bvhBuffersFromMesh(PROBE_CUBE.positions, PROBE_CUBE.indices, { materialIndex: PROBE_CUBE.materialIndex }),
             sbt: meshSbtBuffer(PROBE_CUBE.records, { rgb: true }), rays: PROBE_CUBE.centroids }),
