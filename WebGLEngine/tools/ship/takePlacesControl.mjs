@@ -13,6 +13,8 @@
 // pairs, each a mean of paired differences with a word at |z| >= 2; THE SCRAMBLED lead of a pair is the mean of the three scrambles' leads on it:
 //   P1 `fly:medial` LESS THE SCRAMBLED;   P2 `fly:lateral` LESS THE SCRAMBLED -- is it the fly's own places?   P3 THE SCRAMBLED LESS `flat` -- is it only having places?   and beside them each wiring against the hand gunner, and each scramble apart.
 // FORECAST, for the record: P3 LEADS, by about 0.1 (what K3 saw is the graded command); P1 and P2 CANNOT BE TOLD (the two orientations could not be told apart, and the gradient the positions show is small).
+// READ 2026-11-16 (brain/flyTrackingPlacesControl.reading.json): P1 +0.051 (z 1.7), P2 +0.043 (z 1.4), P3 +0.027 (z 0.9): ALL THREE CANNOT BE TOLD. The forecast was right for P1 and P2 and WRONG for P3. Not registered, from the same flights: medial less flat +0.078 (z 2.1), so the earlier +0.101 shows again at
+// about its size -- and 600 pairs cannot divide it between the fly's own places and having places at all. To tell a difference of 0.05 at this spread (a standard error of 0.03 on 600 pairs) would take some 2,500 pairs.
 // NOTHING SHIPS: this is a control. The reading file is the mark that the audit was read.
 // WHAT IS NOT HERE: more than three scrambles, a scramble of one eye only, a scramble that keeps a cell's neighbours (the LC10a cells also talk to each other, and a scramble breaks that neighbourhood too: P1 and P2 cannot say which of the two it was).
 "use strict";

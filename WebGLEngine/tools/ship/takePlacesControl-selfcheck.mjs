@@ -8,7 +8,7 @@
 //   2  THE STUDY             against a stand-in: 18 train arms, each wiring's own gain after; THE SCRAMBLED lead of a pair is the MEAN of the three scrambles' leads on it; P1 and P2 are each orientation less it, P3 is it less flat; nothing ships
 //   3  WHAT WAS FOUND        once flown: the kept reading, re-derived from the kept flights
 //
-// SABOTAGE LOG: @@LOG@@
+// SABOTAGE LOG: 12 mutants of tools/ship/takePlacesControl.mjs, each a copy of the study with this gate (and the command rows) pointed at it: 12 red by name the first time -- the train pairs the gunner study's, the audit pairs the held-out ones, one scramble taken for the three, the scrambles summed and not averaged, P1 read against flat, P2 the medial's, P3's sign, every wiring flown at one gain, the gain chosen on the audit pairs, a second read allowed, --write taken, the gain that lays away flown again.
 "use strict";
 import fs from "node:fs";
 import os from "node:os";
@@ -55,7 +55,11 @@ await section(async () => {
 console.log("3. WHAT WAS FOUND");
 await section(() => {
     if (!fs.existsSync(P.READING)) { console.log("  ----  the study has not been flown here yet: no kept reading to pin"); return; }
-    /*@@FOUND@@*/
+    const rd = JSON.parse(fs.readFileSync(P.READING, "utf8")), kept = (w) => JSON.parse(fs.readFileSync(path.join(P.KEPT_DIR, P.keptName(w, rd.chosen[w].gain, "audit")), "utf8")).leads, a = Object.fromEntries(P.WIRINGS.map((w) => [w, kept(w)])), re = P.readings(a).reading, near = (s, v) => Math.abs(s.mean - v) < 5e-4, diff = (x, y) => { const d = x.map((v, i) => v - y[i]), m = d.reduce((p, q) => p + q, 0) / d.length, se = Math.sqrt(d.reduce((p, q) => p + (q - m) ** 2, 0) / (d.length - 1) / d.length); return { mean: m, z: m / se }; };
+    ok("!! AS KEPT AND RE-DERIVED FROM THE KEPT FLIGHTS -- NEITHER PART CAN BE TOLD: the fly's own places less the scrambled ones read +0.051 (medial, z 1.7) and +0.043 (lateral, z 1.4); the scrambled less no places at all reads +0.027 (z 0.9). All six wirings lead the hand gunner by 0.74 to 0.82", near(rd.reading.P1, 0.051) && near(rd.reading.P2, 0.043) && near(rd.reading.P3, 0.027) && ["P1", "P2", "P3"].every((k) => rd.words[k] === "CANNOT BE TOLD" && rd.reading[k].mean > 0 && rd.reading[k].z < 2) && P.WIRINGS.every((w) => rd.reading[w].mean > 0.73 && rd.reading[w].mean < 0.83 && rd.words[w] === "LEADS") && ["P1", "P2", "P3", "scrambled", ...P.WIRINGS].every((k) => Math.abs(re[k].mean - rd.reading[k].mean) < 1e-12) && fs.readdirSync(P.KEPT_DIR).length === 30);
+    const mf = diff(a["fly:medial"], a.flat), lf = diff(a["fly:lateral"], a.flat), ml = diff(a["fly:medial"], a["fly:lateral"]);
+    ok("!! NOT REGISTERED, DERIVED FROM THE SAME KEPT FLIGHTS, SAID AS SUCH: the earlier study's `places are worth +0.101` shows again here as medial less flat +0.078 (z 2.1) and lateral less flat +0.070 (z 1.95) -- a second set of pairs agreeing on its size -- and the two orientations are again the same (+0.008). So about 0.08 separates the fly's places from none, and 600 pairs cannot say how much of it is the fly's OWN places (about 0.05) and how much is having places at all (about 0.03): each half is under two standard errors", Math.abs(mf.mean - 0.078) < 5e-4 && mf.z > 2 && mf.z < 2.3 && Math.abs(lf.mean - 0.070) < 5e-4 && lf.z > 1.8 && lf.z < 2 && Math.abs(ml.mean - 0.008) < 5e-4 && Math.abs(ml.z) < 1 && Math.abs(rd.reading.P1.mean + rd.reading.P3.mean - mf.mean) < 1e-9);
+    ok("the scrambles differ among themselves no more than they differ from the fly's (+0.746 to +0.793 against the hand gunner), and two of the three, like flat, do best at the WEAKEST gain where the fly's two do best at the middle one", rd.reading["scrambled:1"].mean < rd.reading["scrambled:2"].mean && rd.chosen["scrambled:4242"].gain === -1 && rd.chosen["scrambled:2"].gain === -1 && rd.chosen["scrambled:1"].gain === -3 && rd.chosen.flat.gain === -1 && rd.chosen["fly:medial"].gain === -3 && rd.chosen["fly:lateral"].gain === -3);
 });
 
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);
