@@ -1344,3 +1344,20 @@ L-0.06 pays more under BIAS: about 90 (it did twice). L-0.04 pays more: about 50
 
 ## Round 36, AMENDMENT 1 (2026-11-16; made while building the library, before any of its seeds was flown; a REPORTED figure only, no verdict changes)
 Section 4's break-even ("gain x 300 / extra crushes, assuming the gauge is biased on every dive") was wrong on its own terms: if every dive has the biased gauge, the sound-gauge gain is never earned. The figure is restated: the price P of one crushed boat (score points beyond its 0) at which a shift is worth exactly what L0 is, when a share f of dives has the biased gauge, solves (1 - f) x gain at REF + f x gain under BIAS = f x (extra crushes / 300) x P; it is reported for f = 0.05, 0.25 and 1, and the share is said to be unknown.
+
+## Round 36, RESULT (2026-11-16): THE LARGEST SHIFT THAT HOLDS ITS HULL UNDER BIAS AND KEEPS A GAIN IS LOW -0.04 (+0.0163 AT A SOUND GAUGE); -0.06 PAYS MORE UNDER BIAS (10 crushed of 300)
+
+**The run.** `node tools/ship/gaugeCurveCmd.mjs run --jobs 4` in the sandbox, 32 jobs, 2,400 dives on seeds 48001-48300 (`both`), read once (`brain/rig-results/gauge-curve/`). A container restart stopped the run after 24 jobs; the 24 whole files were committed unread and the run resumed the other 8 (the command skips a job whose file exists). All six checks passed, L-0.06 flown as the shipped `surveyPilot()`.
+
+| shift | REF (crushed) | BIAS (crushed) | hull under BIAS | gain over L0 at REF | gain over L0 under BIAS | break-even price per crushed boat (5 / 25 / 100 % biased) |
+|---|---|---|---|---|---|---|
+| L0 (Round 8) | 0.7898 (0) | 0.8308 (0) | holds | -- | -- | -- |
+| L-0.02 | 0.7968 (0) | 0.8438 (0) | holds | +0.0070 (se 0.0030) KEEPS | +0.0130 | no extra crush |
+| **L-0.04** | 0.8060 (0) | 0.8462 (**1**) | **holds** | **+0.0163 (se 0.0043) KEEPS** | +0.0154 | 97.3 / 19.3 / 4.6 |
+| L-0.06 (shipped) | 0.8183 (0) | 0.8349 (**10**) | **PAYS MORE** | +0.0285 (se 0.0053) KEEPS | +0.0042 | 16.4 / 2.7 / 0.13 |
+
+Nothing was stranded. Bottom lines: `L-0.02 HOLDS ITS HULL UNDER BIAS`; `L-0.04 HOLDS ITS HULL UNDER BIAS`; `L-0.06 PAYS MORE UNDER BIAS`; `THE LARGEST SHIFT THAT HOLDS ITS HULL UNDER BIAS AND KEEPS A GAIN IS LOW -0.04 (+0.0163 AT A SOUND GAUGE)`.
+
+**Against the expectations of section 5 (written first).** L-0.06 pays more, about 90: held (a third time). L-0.04 pays more, about 50: no (1 against 0). L-0.02 pays more, about 20: held (it holds). L0 holds, about 95: held. Gains KEEP: L-0.06 (90) held, L-0.04 (70) held, L-0.02 (40) held. The bottom line names L-0.04, about 35: it came.
+
+**WHAT THIS MEANS and does not.** The curve is not linear in the hull: -0.02 and -0.04 cost nothing measurable under the biased gauge (0 and 1 crushed), -0.06 costs 10. **-0.04 keeps 57 percent of the shipped shift's sound-gauge gain (+0.016 of +0.029) and gives up 9 of its 10 crushed boats.** The break-even prices say the same in money: the shipped -0.06 is worth less than L0 as soon as a crushed boat costs more than about 16 good dives' score with a gauge biased 5 percent of the time (2.7 at 25 percent); -0.04 needs a price above about 97 (19 at 25 percent) before L0 wins. **This round chooses nothing**: which shift the seat flies is Keith's decision (the hull cost), and a change would be a round of its own, registered, with the confirmation on fresh dives Round 33 used.

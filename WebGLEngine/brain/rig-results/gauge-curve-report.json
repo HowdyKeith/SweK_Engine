@@ -1,0 +1,20 @@
+{
+ "report": [
+  "ROUND 36: the seat's low shift (L0, L-0.02, L-0.04, L-0.06) under REF and +0.10 BIAS; seeds 48001-48300, both",
+  "  PASS GENERATOR: the scenarios are needsTask.scenario's on 3 samples: true",
+  "  PASS SIZES: every arm has 300 dives in both conditions: true",
+  "  PASS ALIGNED: every arm and condition flies the same scenarios in the same order: true",
+  "  PASS THE FAULT REACHES THE PILOT: every arm's BIAS dives differ from its REF dives on at least one dive: true",
+  "  PASS THE SHIFTS DIFFER: every pair of arms differs on at least one REF dive: true",
+  "  PASS L-0.06 IS THE SHIPPED SEAT: the L-0.06 arm's pilot is surveyPilot() on the gate's two dives, fingerprint for fingerprint: true",
+  "  L0      REF 0.7898 (0/0)  BIAS 0.8308 (0/0)  hull holds",
+  "  L-0.02  REF 0.7968 (0/0)  BIAS 0.8438 (0/0)  hull holds  gain over L0: REF +0.0070 (se 0.0030) KEEPS, BIAS +0.0130 (se 0.0031) (reported)  extra crushed under BIAS 0  break-even price a crushed boat n/a (no extra)",
+  "  L-0.04  REF 0.8060 (0/0)  BIAS 0.8462 (1/0)  hull holds  gain over L0: REF +0.0163 (se 0.0043) KEEPS, BIAS +0.0154 (se 0.0043) (reported)  extra crushed under BIAS 1  break-even price a crushed boat 5% biased 97.25, 25% biased 19.25, 100% biased 4.62",
+  "  L-0.06  REF 0.8183 (0/0)  BIAS 0.8349 (10/0)  hull PAYS MORE  gain over L0: REF +0.0285 (se 0.0053) KEEPS, BIAS +0.0042 (se 0.0096) (reported)  extra crushed under BIAS 10  break-even price a crushed boat 5% biased 16.37, 25% biased 2.69, 100% biased 0.13",
+  "REPORTED, NOT WEIGHED: the break-even price is the cost of one crushed boat, in score points beyond its 0, above which the shift is worth less than L0, for a gauge biased on 5, 25 and 100 percent of dives; the share is not known.",
+  "BOTTOM LINE: L-0.02 HOLDS ITS HULL UNDER BIAS",
+  "BOTTOM LINE: L-0.04 HOLDS ITS HULL UNDER BIAS",
+  "BOTTOM LINE: L-0.06 PAYS MORE UNDER BIAS",
+  "BOTTOM LINE: THE LARGEST SHIFT THAT HOLDS ITS HULL UNDER BIAS AND KEEPS A GAIN IS LOW -0.04 (+0.0163 AT A SOUND GAUGE)"
+ ]
+}

@@ -8,12 +8,15 @@
 //   3 CHECKS        each of the six checks fails on a fixture that breaks it; a failed check says NOT WEIGHED.
 //   4 FLIGHT        short dives: each arm is the planner on its constants; L-0.06 is the shipped surveyPilot; BIAS reaches the pilot; refusals.
 //   5 SOURCE        the seeds in one place; no clock, random or file.
+//   6 RESULT        the committed run's checks, bottom lines and the table the RESULT note states, re-derived.
 // NOT CHECKED, said plainly: what the shifts do on the registered dives (that is the experiment), and what a crushed boat is worth (Keith's).
 // SABOTAGE LOG (17 mutants of tools/ship/gaugeCurve.mjs, each alone, restored byte-identical, sha-256 checked): a shift -0.03 (5 red), seeds ending 48299 (3), the
 //   constants moving high too (1), the hull against L0's REF (1), the gain weighed under BIAS (2), the smallest shift named (1), the hull not required (1), the extra over
 //   the arm's own REF (1), the break-even without (1 - f) (1), shares 0.1 (2), THE SHIFTS DIFFER always (1), the bite always (2), check 6 ignored (1), BIAS flown as
 //   DRIFT (1), the report ignoring a failed check (1). *** 2 WENT 0 RED ***: the events profile (60 s dives do not tell it apart: a source row added, then 1 red) and
 //   check 6 flown under REF instead of BIAS -- DECLARED EQUIVALENT: either condition shows the same identity of L-0.06 and surveyPilot.
+// SECTION 6 (the result rows, sabotaged in the committed run and the note, each restored byte-identical): Q1 the -0.04 crush removed, Q2 an L-0.02 REF score +0.05,
+//   Q3 one more L-0.06 BIAS crush, Q4 the note saying the round chooses -0.04 -> 1 red each.
 "use strict";
 import fs from "node:fs";
 let fails = 0, finished = false;
@@ -93,6 +96,20 @@ sec("5. SOURCE");
     const code = fs.readFileSync(new URL("./gaugeCurve.mjs", import.meta.url), "utf8").split("\n").filter((l) => !/^\s*\/\//.test(l)).join("\n");
     ok("!! every arm flies the planner in the standard profile, as the shipped seat does (60 s dives do not tell the profiles apart)", /Q\.perturbedSeat\(constantsOf\(arm\), \{\}, SS\.planOf\("standard", overrides\)\)/.test(code));
     ok("!! the seeds appear once in the library's code, the gate's once; no clock, random or file", (code.match(/48001/g) || []).length === 1 && (code.match(/48300/g) || []).length === 1 && (code.match(/48901/g) || []).length === 1 && !/Date\.now|Math\.random|new Date|from "node:fs"|readFileSync/.test(code));
+}
+
+sec("6. THE RESULT, RE-DERIVED FROM THE COMMITTED RUN (brain/rig-results/gauge-curve/, read once)");
+{
+    const dir = new URL("../../brain/rig-results/gauge-curve/", import.meta.url), file = (a, c, j) => JSON.parse(fs.readFileSync(new URL(`${a}__${c}__${j}.json`, dir), "utf8"));
+    const res = Object.fromEntries(X.ARMS.map((a) => [a, Object.fromEntries(X.COND_NAMES.map((c) => [c, X.mergeKinds(Array.from({ length: X.CHUNKS }, (_, j) => file(a, c, String(j))))]))]));
+    const rows = X.rowsOf(res), r = (a) => rows.find((x) => x.arm === a), nr = (a, b) => Math.abs(a - b) < 5e-5;
+    ok("!! the five data checks pass on the committed run", X.checksOf(res).every((c) => c.ok));
+    ok("!! *** the bottom lines: -0.02 and -0.04 hold, -0.06 pays more, and the largest that holds and keeps is -0.04 (+0.0163) ***", J(X.bottomLines(res)) === J(["L-0.02 HOLDS ITS HULL UNDER BIAS", "L-0.04 HOLDS ITS HULL UNDER BIAS", "L-0.06 PAYS MORE UNDER BIAS", "THE LARGEST SHIFT THAT HOLDS ITS HULL UNDER BIAS AND KEEPS A GAIN IS LOW -0.04 (+0.0163 AT A SOUND GAUGE)"]));
+    ok("!! the table: crushed under BIAS 0, 0, 1, 10; gains +0.0070, +0.0163, +0.0285 at REF; break-even for -0.04 97.25 / 19.25 / 4.62 and for -0.06 16.37 / 2.69 / 0.13",
+        J(X.ARMS.map((a) => res[a].BIAS.crashed)) === J([0, 0, 1, 10]) && X.ARMS.every((a) => res[a].REF.crashed === 0 && res[a].REF.stranded === 0 && res[a].BIAS.stranded === 0) &&
+        nr(r("L-0.02").gain.mean, 0.0070) && nr(r("L-0.04").gain.mean, 0.0163) && nr(r("L-0.06").gain.mean, 0.0285) && J(r("L-0.04").breakEven.map((v) => +v.toFixed(2))) === J([97.25, 19.25, 4.62]) && J(r("L-0.06").breakEven.map((v) => +v.toFixed(2))) === J([16.37, 2.69, 0.13]));
+    const nl = fs.readFileSync(new URL("../../brain/NEEDS_AND_LIMITS.md", import.meta.url), "utf8"), i = nl.indexOf("## Round 36, RESULT"), t = i > 0 ? nl.slice(i) : "";
+    ok("  the RESULT note states the choice, the 57 percent and 9 of 10, and that this round chooses nothing", /LOW -0\.04 \(\+0\.0163 AT A SOUND GAUGE\)/.test(t) && /57 percent/.test(t) && /9 of its 10 crushed boats/.test(t) && /This round chooses nothing/.test(t));
 }
 
 finished = true;
