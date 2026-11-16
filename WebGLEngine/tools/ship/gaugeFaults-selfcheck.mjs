@@ -9,6 +9,7 @@
 //   4 CHECKS        each of the five checks fails on a fixture that breaks it, and a failed check says NOT WEIGHED.
 //   5 FLIGHT        real short dives on 43901-43902: the arms are the pilots they name, the conditions reach the pilot; refusals.
 //   6 SOURCE        the seeds in one place; no clock, random or file in the library.
+//   7 RESULT        the committed run's checks, bottom lines, hull counts and the figures the RESULT note states, re-derived.
 // NOT CHECKED, said plainly: what the faults do on the registered dives (that is the experiment).
 // SABOTAGE LOG (27 mutants of tools/ship/gaugeFaults.mjs and needsTask.gaugeOf's fault branch, each applied alone and restored byte-identical, sha-256 checked):
 //   the faults (BIAS 0.11, DRIFT over 700 s, DROP from 31 s, the stuck test strict, no noise draw while stuck, the bias added after the clip, the drift per tick), the arms
@@ -18,6 +19,10 @@
 //   *** 4 WENT 0 RED AT FIRST ***: the first reading allowed to stick (equivalent under the registered faults, where no window starts at 0 s: a row with a fault stuck
 //   from 0 s added), the seat in the `events` profile (90 s dives do not tell the profiles apart: a source row added), the seat's lead taken over L06 and the hull taken
 //   against R8's REF (the fixtures had L06 equal to R8 and every REF hull at 0: both fixtures given a difference). Then 1 red each.
+// SECTION 7 (the result rows, sabotaged in the committed run files and the note, each restored byte-identical): Z1 one SEAT BIAS crush removed, Z2 an R8 BIAS score +0.05,
+//   Z3 a SEAT DROP score -0.05, Z4 R8-RAW's REF strandings 24, Z5 the RESULT without the lower-trip-point reading, Z6 it calling the BIAS cost held -> 1 red each;
+//   Z7 R8's DRIFT dives given REF's fingerprints -> 1 red (the checks row) -- *** my first Z7 went 0 red because it was malformed *** (it made the fingerprints differ
+//   MORE, which the bite check cannot object to); redone as written here.
 "use strict";
 import fs from "node:fs";
 let fails = 0, finished = false;
@@ -137,6 +142,24 @@ sec("6. SOURCE");
     ok("!! the SEAT arm is the shipped pilot in its default (standard) profile: no profile is passed", /if \(arm === "SEAT"\) return SS\.surveyPilot\(\{ overrides \}\);/.test(code) && SS.planOf().replanS === undefined);
     const nt = fs.readFileSync(new URL("../../brain/needsTask.mjs", import.meta.url), "utf8");
     ok("  needsTask's no-fault branch is the old line, character for character", nt.includes("if (!fault) return (i, frac) => { if (held === null || i % every === 0) held = clamp(frac + sd * gaussOf(rng), 0, 1); return held; };"));
+}
+
+sec("7. THE RESULT, RE-DERIVED FROM THE COMMITTED RUN (brain/rig-results/gauge-faults/, read once)");
+{
+    const dir = new URL("../../brain/rig-results/gauge-faults/", import.meta.url), file = (a, c, k) => JSON.parse(fs.readFileSync(new URL(`${a}__${c}__${k}.json`, dir), "utf8"));
+    const res = Object.fromEntries(X.ARMS.map((a) => [a, Object.fromEntries(X.COND_NAMES.map((c) => [c, X.mergeKinds(X.KINDS.map((k) => file(a, c, k)))]))]));
+    const rep = X.report(res), lines = X.bottomLines(res);
+    ok("!! the five checks pass on the committed run", X.checksOf(res).every((c) => c.ok) && !rep.includes("A CHECK FAILED: the verdicts below are NOT WEIGHED."));
+    ok("!! *** the bottom lines: NOT A LIABILITY UNDER ANY FAULT; THE SEAT'S HULL PAYS MORE UNDER BIAS; the seat KEEPS its lead under BIAS, DRIFT and DROP ***", J(lines) === J(["THE FILTER IS NOT A LIABILITY UNDER ANY FAULT", "THE SEAT'S HULL PAYS MORE UNDER BIAS",
+        "THE SEAT KEEPS ITS LEAD OVER THE ROUND 8 RULE UNDER BIAS", "THE SEAT KEEPS ITS LEAD OVER THE ROUND 8 RULE UNDER DRIFT", "THE SEAT KEEPS ITS LEAD OVER THE ROUND 8 RULE UNDER DROP"]));
+    const c = (a, k) => [res[a][k].crashed, res[a][k].stranded].join("/");
+    ok("!! the hull counts: R8 0/0 everywhere; SEAT 7 and L06 8 crushed under BIAS, every one a `both` dive; R8-RAW 56/25 under REF", X.COND_NAMES.every((k) => c("R8", k) === "0/0") && c("SEAT", "BIAS") === "7/0" && c("L06", "BIAS") === "8/0" && c("R8-RAW", "REF") === "56/25" &&
+        res.SEAT.BIAS.runs.filter((r) => r.crushed).every((r) => r.kind === "both") && res.L06.BIAS.runs.filter((r) => r.crushed).every((r) => r.kind === "both"));
+    const d = (a, k) => X.diffOf(res[a][k], res[a].REF).mean;
+    ok("!! the means and the signs the RESULT states: R8 0.7900 at REF; an optimistic gauge RAISES R8 (+0.0218 BIAS, +0.0347 DRIFT); the seat leads R8 by +0.0292, +0.0355, +0.0263",
+        near(res.R8.REF.score, 0.7900, 5e-5) && near(d("R8", "BIAS"), 0.0218, 5e-5) && near(d("R8", "DRIFT"), 0.0347, 5e-5) && near(X.faultOf(res, "BIAS").lead.mean, 0.0292, 5e-5) && near(X.faultOf(res, "DRIFT").lead.mean, 0.0355, 5e-5) && near(X.faultOf(res, "DROP").lead.mean, 0.0263, 5e-5));
+    const nl = fs.readFileSync(new URL("../../brain/NEEDS_AND_LIMITS.md", import.meta.url), "utf8"), i = nl.indexOf("## Round 34, RESULT"), r34 = i > 0 ? nl.slice(i) : "";
+    ok("  the RESULT note says the bottom lines, that the optimistic gauge acts as a lower trip point, and that the RAW control is weaker than the verdict sounds", i > 0 && /THE SEAT'S HULL PAYS MORE UNDER BIAS/.test(r34) && /acts as a lower trip point/.test(r34) && /weaker than the verdict sounds/.test(r34) && /\*\*no: it is a GAIN, \+0\.022\.\*\*/.test(r34));
 }
 
 finished = true;

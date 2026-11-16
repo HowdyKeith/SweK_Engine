@@ -1249,3 +1249,25 @@ For each fault c in BIAS, DRIFT, DROP:
 
 ## 8. What will be built, in this order
 `brain/needsTask.mjs`: `gaugeOf` gains an optional `fault` ({ bias, driftPerS, dropEveryS, dropFromS }); absent, nothing changes (check 2 and a gate row). `tools/ship/gaugeFaults.mjs` (library), `tools/ship/gaugeFaultsCmd.mjs` (export-free: `run`, `report`; one worker per arm and condition, each writes its file), `tools/ship/gaugeFaults-selfcheck.mjs` with a mutation pass. Then the run, once, and the report, read once. **NOT IN THIS ROUND:** pessimistic faults, other noise levels, DMG or STN5 with a fault, a fault-aware seat, changing or shipping any constant.
+
+## Round 34, RESULT (2026-11-16): THE FILTER IS NOT A LIABILITY UNDER ANY FAULT; THE SEAT'S HULL PAYS MORE UNDER BIAS (7 crushed of 300 against 0); THE SEAT KEEPS ITS LEAD OVER THE ROUND 8 RULE UNDER ALL THREE FAULTS
+
+**The run.** `node tools/ship/gaugeFaultsCmd.mjs run --jobs 4` in the sandbox, 32 jobs, all exit 0, 4,800 dives on seeds 43001-43150 (far and both), read once (`brain/rig-results/gauge-faults/`, `brain/rig-results/gauge-faults-report.json`). All five checks passed.
+
+| arm | REF | BIAS | DRIFT | DROP |
+|---|---|---|---|---|
+| R8 | 0.7900 (0/0) | 0.8117 (0/0) | 0.8247 (0/0) | 0.7902 (0/0) |
+| R8-RAW | 0.2055 (56/25) | 0.2850 (33/23) | 0.1940 (86/64) | 0.3371 (32/6) |
+| L06 | 0.8100 (0/0) | 0.8233 (8/0) | 0.8425 (0/0) | 0.8048 (2/0) |
+| SEAT | 0.8277 (0/0) | 0.8409 (7/0) | 0.8602 (0/0) | 0.8166 (2/0) |
+
+(mean score, crushed / stranded of 300.) The fault cost (fault minus REF, the same dives): R8 BIAS +0.0218 (se 0.0063), DRIFT +0.0347 (0.0047), DROP +0.0003 (0.0036); SEAT BIAS +0.0132 (0.0094), DRIFT +0.0325 (0.0043), DROP -0.0112 (0.0058). The seat's lead over R8: BIAS +0.0292 (se 0.0088), DRIFT +0.0355 (0.0056), DROP +0.0263 (0.0064), all KEEPS.
+All five registered bottom lines: `THE FILTER IS NOT A LIABILITY UNDER ANY FAULT`; `THE SEAT'S HULL PAYS MORE UNDER BIAS`; `THE SEAT KEEPS ITS LEAD OVER THE ROUND 8 RULE UNDER BIAS`, `... UNDER DRIFT`, `... UNDER DROP`. Reported: R8's hull holds under all three; L06's pays more under BIAS (8 against 0); R8-RAW's pays more under DRIFT (150 against 81).
+
+**Against the expectations of section 7 (written first).** R8's hull pays more under BIAS, about 75: **no** (0 against 0); under DRIFT, about 60: **no**; under DROP, about 15: held (it holds). The seat's hull pays more under BIAS, about 70: **held**; DRIFT, about 55: no; DROP, about 15: held (2 against 0 passes the test). Not a liability under any fault, about 65: **held**. The seat keeps its lead under BIAS (50), DRIFT (60), DROP (75): **held in all three.** R8's BIAS cost between -0.01 and -0.08, about 60: **no: it is a GAIN, +0.022.** My picture of the fault was wrong in its sign: I expected an optimistic gauge to cost score and strand boats. It raised every filtered arm's score under BIAS and DRIFT and stranded nothing; what it cost was hull, and only where the trip point was already lowered.
+
+**WHAT THIS MEANS and does not.**
+- **An optimistic gauge acts as a lower trip point.** A reading 0.10 high is, to the rule, a trip point 0.10 lower: the boat stays down longer and visits more, which is why the scores rise. On the Round 8 constants (low 0.38) that is still safe: 0 crushed. On the Round 33 constants (low 0.32) it is a low near 0.22, past the -0.08 to -0.12 shifts that Rounds 32-33 already saw crush: 8 (L06) and 7 (SEAT) of 300 crushed, every one a `both` dive (deep, damaged, start damage 0.21-0.40). **The -0.06 shift spent margin that a biased gauge then takes.** The shipped seat's hull is the one registered failure here.
+- **The filter is not a liability; but the control I registered is weaker than the verdict sounds.** R8-RAW is the Round 8 constants with alpha 1, and those constants were tuned WITH the filter: without it the rule chatters on noise sd 0.10 and crushes or strands 81 of 300 dives with a sound gauge. So "removing the filter from these constants is far worse under every fault" is shown (-0.45 to -0.63); "a filter-free rule tuned for itself would not do better under a fault" is not.
+- **DROP costs nothing measurable** for the rules and -0.011 (1.9 se) for the seat; a stale half-minute is short against how slowly the charge moves.
+- **Not shown:** why the BIAS failures are crushes and not strandings (not traced: the depth cap, the trip and the planner's rollouts all read the charge); a pessimistic gauge; a bias other than 0.10; BIAS with DMG or STN5; whether the seat at the Round 8 constants (no shift) would hold its hull under BIAS -- that arm was not flown, and is the obvious next question. Nothing is changed or shipped by this round.
