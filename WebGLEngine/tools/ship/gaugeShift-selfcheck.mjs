@@ -8,12 +8,15 @@
 //   3 CHECKS        each of the five checks fails on a fixture that breaks it, and a failed check says NOT WEIGHED.
 //   4 FLIGHT        real short dives on 45901-45902: SEAT is the shipped pilot, SEAT-R8 the same planner on SURVEY_R8; BIAS reaches the pilot; refusals.
 //   5 SOURCE        the seeds in one place; no clock, random or file in the library.
+//   6 RESULT        the committed run's checks, bottom lines and the figures the RESULT note states, re-derived.
 // NOT CHECKED, said plainly: what the two seats do on the registered dives (that is the experiment).
 // SABOTAGE LOG (18 mutants of tools/ship/gaugeShift.mjs, each applied alone and restored byte-identical, sha-256 checked): kind far (6 red), seeds ending 45299 (3),
 //   SEAT-R8 on SURVEY_CONSTANTS (1), SEAT-R8 in the events profile (1), SEAT in the ensemble profile (1), overlapping chunks (3), V1 not negated (4), V2 against the seat's
 //   REF (1), V3 on REF (1), the price reversed (1), the price weighed under BIAS (1), V4 on LOSES too (2), ALIGNED always (1), the bite on SEAT only (2), THE ARMS DIFFER
 //   always (1), the report ignoring a failed check (1), BIAS flown as DRIFT (1), bottom line 3 inverted (3). All red by name. Said plainly: the three wrong-constant or
 //   wrong-profile mutants are caught by the SOURCE row only -- 90 s dives on the gate's seeds do not tell those pilots apart.
+// SECTION 6 (the result rows, sabotaged in the committed run and the note, each restored byte-identical): X1 one SEAT BIAS crush removed, X2 a SEAT-R8 REF score +0.05,
+//   X3 one SEAT-R8 BIAS dive crushed, X4 the RESULT without the trade sentence, X5 it changing the constants -> 1 red each.
 "use strict";
 import fs from "node:fs";
 let fails = 0, finished = false;
@@ -91,6 +94,20 @@ sec("5. SOURCE");
     ok("!! the seeds appear once in the library's code, the gate's once", (code.match(/45001/g) || []).length === 1 && (code.match(/45300/g) || []).length === 1 && (code.match(/45901/g) || []).length === 1);
     ok("!! no clock, no random, no file; the seat is surveyPilot with no profile and SEAT-R8 the standard profile", !/Date\.now|Math\.random|new Date|from "node:fs"|readFileSync/.test(code) &&
         /if \(arm === "SEAT"\) return SS\.surveyPilot\(\{ overrides \}\);/.test(code) && /Q\.perturbedSeat\(SS\.SURVEY_R8, \{\}, SS\.planOf\("standard", overrides\)\)/.test(code));
+}
+
+sec("6. THE RESULT, RE-DERIVED FROM THE COMMITTED RUN (brain/rig-results/gauge-shift/, read once)");
+{
+    const dir = new URL("../../brain/rig-results/gauge-shift/", import.meta.url), file = (a, c, j) => JSON.parse(fs.readFileSync(new URL(`${a}__${c}__${j}.json`, dir), "utf8"));
+    const res = Object.fromEntries(X.ARMS.map((a) => [a, Object.fromEntries(X.COND_NAMES.map((c) => [c, X.mergeKinds(Array.from({ length: X.CHUNKS }, (_, j) => file(a, c, String(j))))]))]));
+    const v = X.verdictsOf(res), near = (a, b) => Math.abs(a - b) < 5e-5;
+    ok("!! the five checks pass on the committed run", X.checksOf(res).every((c) => c.ok));
+    ok("!! *** the bottom lines: REPLICATES; THE R8 SEAT HOLDS; THE SHIFT IS WHAT CRUSHES; GOING BACK COSTS SCORE ***", J(X.bottomLines(res)) === J(["ROUND 34'S FAILURE REPLICATES: THE SEAT'S HULL PAYS MORE UNDER BIAS", "THE SEAT ON THE ROUND 8 CONSTANTS HOLDS ITS HULL UNDER BIAS", "THE SHIFT IS WHAT CRUSHES", "GOING BACK TO THE ROUND 8 CONSTANTS COSTS SCORE"]));
+    ok("!! the counts and figures the RESULT states: SEAT 0 -> 9 crushed, SEAT-R8 0 -> 0, nothing stranded; the price -0.0290 (se 0.0050) at REF, -0.0073 under BIAS",
+        J(v.bad) === J({ SEAT: { REF: 0, BIAS: 9 }, "SEAT-R8": { REF: 0, BIAS: 0 } }) && res.SEAT.BIAS.crashed === 9 && X.ARMS.every((a) => X.COND_NAMES.every((c) => res[a][c].stranded === 0)) &&
+        near(v.price.mean, -0.0290) && near(v.price.se, 0.0050) && near(v.priceBias.mean, -0.0073) && near(res.SEAT.REF.score, 0.8185) && near(res["SEAT-R8"].BIAS.score, 0.8360));
+    const nl = fs.readFileSync(new URL("../../brain/NEEDS_AND_LIMITS.md", import.meta.url), "utf8"), i = nl.indexOf("## Round 35, RESULT"), r = i > 0 ? nl.slice(i) : "";
+    ok("  the RESULT note says the trade (+0.029 sound, 9 of 300 crushed under bias), that the score alone will never choose against the shift, and that the constants are not changed", /THE SHIFT IS WHAT CRUSHES/.test(r) && /9 crushed boats of 300/.test(r) && /the score alone will never choose against the shift/.test(r) && /does not change the shipped constants/.test(r));
 }
 
 finished = true;

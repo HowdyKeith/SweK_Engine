@@ -1300,3 +1300,19 @@ Round 34 crushed 7 of its 150 `both` dives under BIAS (4.7 percent), so about 14
 
 ## 7. What will be built
 `tools/ship/gaugeShift.mjs` (library, on `gaugeFaults.mjs`'s gauge, difference and hull test), `tools/ship/gaugeShiftCmd.mjs` (export-free: `run`, `report`), `tools/ship/gaugeShift-selfcheck.mjs` with a mutation pass. Then the run, once, and the report, read once. **NOT IN THIS ROUND:** shifts between 0 and -0.06, other biases, the rule arms, changing or shipping any constant.
+
+## Round 35, RESULT (2026-11-16): ROUND 34'S FAILURE REPLICATES; THE SEAT ON THE ROUND 8 CONSTANTS HOLDS ITS HULL UNDER BIAS; THE SHIFT IS WHAT CRUSHES; GOING BACK TO THE ROUND 8 CONSTANTS COSTS SCORE
+
+**The run.** `node tools/ship/gaugeShiftCmd.mjs run --jobs 4` in the sandbox, 16 jobs, all exit 0, 1,200 dives on seeds 45001-45300 (`both`), read once (`brain/rig-results/gauge-shift/`, `brain/rig-results/gauge-shift-report.json`). All five checks passed.
+
+| arm | REF | BIAS (+0.10) | bias cost (paired) |
+|---|---|---|---|
+| SEAT (Round 33 constants, shipped) | 0.8185 (0 crushed) | 0.8433 (**9 crushed**) | +0.0247 (se 0.0095) |
+| SEAT-R8 (Round 8 constants) | 0.7895 (0) | 0.8360 (**0**) | +0.0465 (se 0.0062) |
+
+SEAT-R8 minus SEAT: **REF -0.0290 (se 0.0050; better 13, worse 66), weighed**; BIAS -0.0073 (se 0.0092), reported. The nine crushed dives started with damage 0.21-0.42. Nothing was stranded.
+All four registered bottom lines: `ROUND 34'S FAILURE REPLICATES: THE SEAT'S HULL PAYS MORE UNDER BIAS` (0 -> 9); `THE SEAT ON THE ROUND 8 CONSTANTS HOLDS ITS HULL UNDER BIAS` (0 -> 0); `THE SHIFT IS WHAT CRUSHES` (9 against 0 under BIAS, beyond 2 x sqrt(9) = 6); `GOING BACK TO THE ROUND 8 CONSTANTS COSTS SCORE` (-0.029, 5.8 se).
+
+**Against the expectations of section 6 (written first).** About 14 crushes expected: 9 came. V1 replicates, about 80: held. V2 the Round 8 seat holds, about 75: held. V3 the shift crushes, about 70: held. V4 going back costs score, about 55: held.
+
+**WHAT THIS MEANS and does not.** The Round 33 shift is a trade, and both sides of it are now measured on the same dives. **With a sound gauge it is worth +0.029 on deep-and-far dives; with a gauge reading 0.10 high it costs 9 crushed boats of 300 (3 percent), where the Round 8 constants lose none.** Because a crushed dive scores 0 and the score already counts it, the shifted seat still scores a little higher under bias (+0.007, not distinguishable from zero). So the score alone will never choose against the shift: whether 3 percent crushed under a faulty gauge is acceptable is the cost judgement the series has twice left to Keith (`hull-cost-of-a-crushed-boat`). This round does not change the shipped constants. Shifts between 0 and -0.06, other biases, and any gauge-health check that would let the seat know its gauge is wrong are not tested.
