@@ -11,7 +11,7 @@
 //   OUT   DNa02 on the right less DNa02 on the left, READ THE ODD WAY as the helm's second variant is: asked for e and for -e, half the difference -- exactly zero when the gun is on its target. One number, S(e), over its own peak.
 //
 // WHAT IS NOT KNOWN AND IS FLOWN BOTH WAYS: which end of the sheet's axis is the FRONT of the visual field. `fly:medial` puts straight ahead at the medial end (place 1) and the rear at the lateral; `fly:lateral` the other way. The data used here cannot say (the gate of the vendored positions says so).
-// THE OTHER WIRINGS: `flat` -- the same circuit with NO places: every cell of an eye answers alike, so only the SIDE of the target is carried; `shuffled:<seed>` -- `fly:medial` with each pathway's targets shuffled within their type; `sine` -- no circuit, S = -sin(e) to a quarter turn and held beyond.
+// THE OTHER WIRINGS: `flat` -- the same circuit with NO places: every cell of an eye answers alike, so only the SIDE of the target is carried; `shuffled:<seed>` -- `fly:medial` with each pathway's targets shuffled within their type; `sine` -- no circuit, S = -sin(e) to a quarter turn and held beyond; `scrambled:<seed>` -- THE CONTROL FOR THE PLACES: the fly's circuit and connections with each eye's cells trading places among themselves, so that a target drives as many cells as much but not the fly's own cells for that bearing.
 //
 // WHAT IT COMPUTES (tuning(); the gate pins it): with places, S rises smoothly from zero through the overlap and on to a peak near a quarter turn, then falls toward the rear -- a graded command, larger for a target further off -- where `flat` is at its full value by 15 degrees and stays there (a switch).
 // The two orientations differ little in this (the peak moves): the gradient the positions show in which pathway a cell feeds is real and is small beside the overlap and the sheet's own shape.
@@ -51,9 +51,9 @@ function retargetOf(seed) {
     return (sourceType, to) => { const key = sourceType + ">" + TYPES[to]; if (!maps.has(key)) { const cells = byType[TYPES[to]], p = cells.slice(); for (let i = p.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [p[i], p[j]] = [p[j], p[i]]; } maps.set(key, new Map(cells.map((v, k) => [v, p[k]]))); } return maps.get(key).get(to); };
 }
 /** The circuit over a matrix: raw(e) -> DNa02 right less left for a target at bearing e; cells(e) -> the 281 activities. `front`: +1 straight ahead at the medial end of the sheet, -1 at the lateral; `flat`: no places. */
-function circuitOf(M, { front = 1, flat = false, baseline = BASELINE } = {}) {
+function circuitOf(M, { front = 1, flat = false, baseline = BASELINE, places = PL.ACROSS } = {}) {
     function cells(e) {
-        let h = new Float64Array(N); const wl = Math.min(1, Math.max(0, 0.5 + e / (2 * OVERLAP))), wr = 1 - wl, ecc = Math.min(1, Math.abs(e) / Math.PI), p = front > 0 ? 1 - ecc : ecc, g = (i) => (flat ? 1 : Math.exp(-((PL.ACROSS[i] - p) ** 2) / (2 * SIGMA * SIGMA)));
+        let h = new Float64Array(N); const wl = Math.min(1, Math.max(0, 0.5 + e / (2 * OVERLAP))), wr = 1 - wl, ecc = Math.min(1, Math.abs(e) / Math.PI), p = front > 0 ? 1 - ecc : ecc, g = (i) => (flat ? 1 : Math.exp(-((places[i] - p) ** 2) / (2 * SIGMA * SIGMA)));
         if (wl > 0) for (const i of EYE_L) h[i] = wl * g(i);
         if (wr > 0) for (const i of EYE_R) h[i] = wr * g(i);
         for (let s = 0; s < STEPS; s++) { const y = new Float64Array(N); for (let i = 0; i < N; i++) { let a = h[i] + (i === DNA02_L || i === DNA02_R ? baseline : 0); for (let t = M.start[i], t1 = M.start[i + 1]; t < t1; t++) a += M.val[t] * h[M.src[t]]; y[i] = a > 0 ? a : 0; } h = y; }
@@ -61,6 +61,12 @@ function circuitOf(M, { front = 1, flat = false, baseline = BASELINE } = {}) {
     }
     const raw = (e) => { const h = cells(e); return h[DNA02_R] - h[DNA02_L]; };
     return { cells, raw };
+}
+/** THE PLACES SCRAMBLED: each eye's cells keep their connections and trade PLACES among themselves (one random permutation an eye, from `seed`). The set of places is the same, so a target still drives as many cells as much; WHICH cell is where -- and so which pathway the cells under a target feed -- is not the fly's. */
+function scrambledPlaces(seed) {
+    const rng = mulberry(seed), out = Array.from(PL.ACROSS);
+    for (const eye of [EYE_L, EYE_R]) { const v = eye.map((i) => PL.ACROSS[i]); for (let i = v.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [v[i], v[j]] = [v[j], v[i]]; } eye.forEach((c, k) => { out[c] = v[k]; }); }
+    return out;
 }
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 /** A gunner library over a raw read-out raw(e): S(e) = the odd half of raw over its own peak, memoised on a fine grid of bearings (a gunner asks 26 times a tick); and the seat gunner's contract. */
@@ -87,7 +93,8 @@ export function wiringOf(name = "fly:medial") {
     else if (name === "flat") { const c = circuitOf(matrixOf(), { flat: true }); lib = libraryOf(name, c.raw, c.cells); }
     else if (name === "sine") lib = libraryOf(name, (e) => -Math.sin(Math.max(-Math.PI / 2, Math.min(Math.PI / 2, e))));
     else if (m) { const c = circuitOf(matrixOf(retargetOf(Number(m[1]))), { front: 1 }); lib = libraryOf(name, c.raw, c.cells); }
-    else throw new Error(`flyTracking.wiringOf: a wiring is "fly:medial", "fly:lateral", "flat", "sine" or "shuffled:<seed>" (got ${name})`);
+    else if (/^scrambled:\d+$/.test(String(name))) { const c = circuitOf(matrixOf(), { front: 1, places: scrambledPlaces(Number(String(name).slice(10))) }); lib = libraryOf(name, c.raw, c.cells); }
+    else throw new Error(`flyTracking.wiringOf: a wiring is "fly:medial", "fly:lateral", "flat", "sine", "shuffled:<seed>" or "scrambled:<seed>" (got ${name})`);
     LIBS.set(name, lib); return lib;
 }
 const MAIN = wiringOf("fly:medial");
