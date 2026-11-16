@@ -1,0 +1,113 @@
+// WebGLEngine/brain/flyTracking.mjs -- UNNUMBERED (the version is chosen at ship time)
+//
+// THE FLY'S TARGET-TRACKING CIRCUIT WIRED AS THE FLY WIRES IT, AND A GUNNER THAT READS IT. brain/flySteering.mjs gave a helm the fly's steering circuit with its own inputs and outputs and the connectome's own weights, and for the first time a fly's wiring did the work. Keith: "give the gunners the same treatment."
+// The gunners' circuit is the visual pursuit pathway of brain/lc10Topology.mjs -- 275 LC10a cells of the eye, onto AOTU019 and AOTU025, onto the steering neuron DNa02 -- and the search over it through a free encoder kept nothing (tools/ship/trainTrackSeat.mjs: 0 of 100 children). Here, as there, the free parts go:
+//
+//   IN    a target's BEARING e from where the gun points (radians, positive to one side) drives the LC10a cells of ONE EYE -- the left eye's for a target to the positive side, the right's for the other, both within the fly's binocular overlap (15 degrees either side of straight ahead, a linear share) -- and among them
+//         the cells whose DENDRITE IS WHERE THE TARGET IS: each cell has a place across its side's dendritic sheet (brain/lc10Places.mjs, a rank 0..1 from the lateral end to the medial, read off the dataset's synapse coordinates) and responds exp(-(place - p)^2 / 2 sigma^2), sigma 0.15, to a target whose eccentricity
+//         |e| of a half turn maps to the place p.
+//   CORE  the circuit with THE CONNECTOME'S OWN WEIGHTS: a connection's weight is its synapse count over all the synapses its target receives within the circuit, NEGATIVE from an AOTU019 cell (predicted GABA). Three steps of h <- max(0, h + W h + b), b a constant drive of 0.5 on the two DNa02 cells only (so that an
+//         inhibition has something to take from: without it AOTU019, two thirds of the synapses, does nothing). No weight is learned.
+//   OUT   DNa02 on the right less DNa02 on the left, READ THE ODD WAY as the helm's second variant is: asked for e and for -e, half the difference -- exactly zero when the gun is on its target. One number, S(e), over its own peak.
+//
+// WHAT IS NOT KNOWN AND IS FLOWN BOTH WAYS: which end of the sheet's axis is the FRONT of the visual field. `fly:medial` puts straight ahead at the medial end (place 1) and the rear at the lateral; `fly:lateral` the other way. The data used here cannot say (the gate of the vendored positions says so).
+// THE OTHER WIRINGS: `flat` -- the same circuit with NO places: every cell of an eye answers alike, so only the SIDE of the target is carried; `shuffled:<seed>` -- `fly:medial` with each pathway's targets shuffled within their type; `sine` -- no circuit, S = -sin(e) to a quarter turn and held beyond.
+//
+// WHAT IT COMPUTES (tuning(); the gate pins it): with places, S rises smoothly from zero through the overlap and on to a peak near a quarter turn, then falls toward the rear -- a graded command, larger for a target further off -- where `flat` is at its full value by 15 degrees and stays there (a switch).
+// The two orientations differ little in this (the peak moves): the gradient the positions show in which pathway a cell feeds is real and is small beside the overlap and the sheet's own shape.
+//
+// THE GUNNER (gunnerFor): brain/seatTurretGunner.mjs's gunner -- the sight, the hand's error, the rates turned over a tick -- with this in place of its network: the sight's error in traverse is a bearing, its error in elevation is another, each goes through the circuit, and tanh(gain x S) is the share of the seat's slew
+// rate commanded on that axis. THE TRIGGER IS THE SIGHT'S OWN RULE, untouched. TWO WEIGHTS: the two gains. (Zero gains are a gun that does not move: there is no rule underneath a gunner as there is under a helm.)
+//
+// *** CHOSEN BY ME, NOT BY A FLY AND NOT IN A FIGHT: sigma 0.15, the 15 degrees of overlap, the constant 0.5 on DNa02, three steps, the normalisation, a rank for a place, and that eccentricity maps linearly to place over a half turn. One axis of the sheet is used; the other (ALONG) is not. A real LC10a cell answers
+// a small MOVING object; nothing here moves. ***
+"use strict";
+import * as LC from "./lc10Topology.mjs";
+import * as SY from "./lc10Synapses.mjs";
+import * as PL from "./lc10Places.mjs";
+import * as ST from "./seatTurretGunner.mjs";
+
+export const POLICY_ID = "seatFlyWired", SIGMA = 0.15, OVERLAP = 15 * Math.PI / 180, BASELINE = 0.5, STEPS = 3, CONTROL_SEED = 4242;
+export const FEATURES = ST.FEATURES, HIDDEN = LC.NEURON_ORDER.length, OUTPUTS = ST.OUTPUTS, WEIGHT_COUNT = 2;   // peerBrain's description of a brain: the seat's eleven features, 281 neurons, the seat's five outputs, two weights (the gains)
+const N = HIDDEN, TYPES = LC.NEURON_TYPES, SOMA = SY.NEURON_SOMA;
+export const signOf = (nt) => (nt === "acetylcholine" ? 1 : -1);
+const EYE_L = [], EYE_R = []; TYPES.forEach((t, i) => { if (t === "LC10a") (SOMA[i] === "L" ? EYE_L : EYE_R).push(i); });
+const DNA02_L = TYPES.findIndex((t, i) => t === "DNa02" && SOMA[i] === "L"), DNA02_R = TYPES.findIndex((t, i) => t === "DNa02" && SOMA[i] === "R");
+const mulberry = (a) => () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+
+function matrixOf(retarget = null) {
+    const rows = Array.from({ length: N }, () => new Map()), total = new Float64Array(N);
+    LC.EDGES.forEach(([to0, from], k) => { const to = retarget ? retarget(TYPES[from], to0) : to0, c = SY.EDGE_COUNTS[k]; rows[to].set(from, (rows[to].get(from) || 0) + signOf(SY.NEURON_NT[from]) * c); total[to] += c; });
+    const start = new Int32Array(N + 1), src = [], val = [];
+    for (let i = 0; i < N; i++) { start[i] = src.length; for (const [j, v] of [...rows[i]].sort((a, b) => a[0] - b[0])) { src.push(j); val.push(v / total[i]); } }
+    start[N] = src.length;
+    return { start, src: Int32Array.from(src), val: Float64Array.from(val) };
+}
+function retargetOf(seed) {
+    const rng = mulberry(seed), byType = {}, maps = new Map(); TYPES.forEach((t, i) => (byType[t] ||= []).push(i));
+    return (sourceType, to) => { const key = sourceType + ">" + TYPES[to]; if (!maps.has(key)) { const cells = byType[TYPES[to]], p = cells.slice(); for (let i = p.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [p[i], p[j]] = [p[j], p[i]]; } maps.set(key, new Map(cells.map((v, k) => [v, p[k]]))); } return maps.get(key).get(to); };
+}
+/** The circuit over a matrix: raw(e) -> DNa02 right less left for a target at bearing e; cells(e) -> the 281 activities. `front`: +1 straight ahead at the medial end of the sheet, -1 at the lateral; `flat`: no places. */
+function circuitOf(M, { front = 1, flat = false, baseline = BASELINE } = {}) {
+    function cells(e) {
+        let h = new Float64Array(N); const wl = Math.min(1, Math.max(0, 0.5 + e / (2 * OVERLAP))), wr = 1 - wl, ecc = Math.min(1, Math.abs(e) / Math.PI), p = front > 0 ? 1 - ecc : ecc, g = (i) => (flat ? 1 : Math.exp(-((PL.ACROSS[i] - p) ** 2) / (2 * SIGMA * SIGMA)));
+        if (wl > 0) for (const i of EYE_L) h[i] = wl * g(i);
+        if (wr > 0) for (const i of EYE_R) h[i] = wr * g(i);
+        for (let s = 0; s < STEPS; s++) { const y = new Float64Array(N); for (let i = 0; i < N; i++) { let a = h[i] + (i === DNA02_L || i === DNA02_R ? baseline : 0); for (let t = M.start[i], t1 = M.start[i + 1]; t < t1; t++) a += M.val[t] * h[M.src[t]]; y[i] = a > 0 ? a : 0; } h = y; }
+        return h;
+    }
+    const raw = (e) => { const h = cells(e); return h[DNA02_R] - h[DNA02_L]; };
+    return { cells, raw };
+}
+const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
+/** A gunner library over a raw read-out raw(e): S(e) = the odd half of raw over its own peak, memoised on a fine grid of bearings (a gunner asks 26 times a tick); and the seat gunner's contract. */
+function libraryOf(name, raw, cells = null) {
+    const GRID = 720, table = new Float64Array(GRID + 1); let peak = 0;
+    for (let k = 0; k <= GRID; k++) { const e = Math.PI * k / GRID; table[k] = (raw(e) - raw(-e)) / 2; peak = Math.max(peak, Math.abs(table[k])); }
+    const amplitude = peak || 1;
+    /** The command for a bearing: odd in e, exactly 0 at 0, in [-1, 1]; linear between the grid's bearings (a quarter of a degree apart). */
+    function S(e) { const a = wrap(e), x = Math.abs(a) / Math.PI * GRID, k = Math.min(GRID - 1, Math.floor(x)), v = (table[k] + (table[k + 1] - table[k]) * (x - k)) / amplitude; return a < 0 ? -v : v; }
+    const zeroWeights = () => new Float32Array(WEIGHT_COUNT);
+    /** The seat's five outputs from its eleven features: the two rates from the circuit, the trigger the sight's own. */
+    const forward = (w, x) => [Math.tanh(w[0] * S(x[1] * Math.PI)), Math.tanh(w[1] * S(x[2] * Math.PI / 2)), x[8] > 0 ? 1 : -1, 0, 0];
+    const gunnerFor = (w, sight, opts = {}) => ST.gunnerFor(w, sight, { ...opts, forward, layersOf: () => [], post: (y) => y });
+    const gunnerFactory = (w, makeSight, opts = {}) => (seat, k) => gunnerFor(w, makeSight(seat, k), { ...opts, seed: (opts.seed ?? 1) + k });
+    return Object.freeze({ name, amplitude, FEATURES, HIDDEN, OUTPUTS, WEIGHT_COUNT, raw, cells, S, zeroWeights, handWeights: zeroWeights, forward, gunnerFor, gunnerFactory });
+}
+const FLY_M = circuitOf(matrixOf(), { front: 1 }), LIBS = new Map();
+/** The library for a wiring NAME: "fly:medial", "fly:lateral", "flat", "shuffled:<seed>", "sine". See the header. */
+export function wiringOf(name = "fly:medial") {
+    if (LIBS.has(name)) return LIBS.get(name);
+    let lib = null; const m = /^shuffled:(\d+)$/.exec(String(name));
+    if (name === "fly:medial") lib = libraryOf(name, FLY_M.raw, FLY_M.cells);
+    else if (name === "fly:lateral") { const c = circuitOf(matrixOf(), { front: -1 }); lib = libraryOf(name, c.raw, c.cells); }
+    else if (name === "flat") { const c = circuitOf(matrixOf(), { flat: true }); lib = libraryOf(name, c.raw, c.cells); }
+    else if (name === "sine") lib = libraryOf(name, (e) => -Math.sin(Math.max(-Math.PI / 2, Math.min(Math.PI / 2, e))));
+    else if (m) { const c = circuitOf(matrixOf(retargetOf(Number(m[1]))), { front: 1 }); lib = libraryOf(name, c.raw, c.cells); }
+    else throw new Error(`flyTracking.wiringOf: a wiring is "fly:medial", "fly:lateral", "flat", "sine" or "shuffled:<seed>" (got ${name})`);
+    LIBS.set(name, lib); return lib;
+}
+const MAIN = wiringOf("fly:medial");
+export const S = MAIN.S, raw = MAIN.raw, cells = MAIN.cells, forward = MAIN.forward, zeroWeights = MAIN.zeroWeights, handWeights = MAIN.handWeights, gunnerFor = MAIN.gunnerFor, gunnerFactory = MAIN.gunnerFactory, topology = LC;
+export const EYES = Object.freeze({ L: Object.freeze(EYE_L.slice()), R: Object.freeze(EYE_R.slice()), DNa02: Object.freeze([DNA02_L, DNA02_R]) });
+/** The circuit with another constant drive on DNa02 (for the gate's and the header's claim about what the baseline does). */
+export const withBaseline = (baseline) => circuitOf(matrixOf(), { front: 1, baseline });
+
+/** What a command S computes: its value at each of `degrees`, where it peaks, and the bearing by which it has reached 90% of its peak. */
+export function tuning(Sfn = S, degrees = [1, 3, 6, 10, 15, 25, 40, 60, 90, 120, 150, 175]) {
+    const curve = degrees.map((d) => Sfn(d * Math.PI / 180)); let peakAt = 0, peak = 0, reach = null;
+    for (let d = 0.5; d <= 180; d += 0.5) { const v = Math.abs(Sfn(d * Math.PI / 180)); if (v > peak) { peak = v; peakAt = d; } }
+    for (let d = 0.5; d <= 180 && reach === null; d += 0.5) if (Math.abs(Sfn(d * Math.PI / 180)) >= 0.9 * peak) reach = d;
+    return { degrees, curve, peakAt, peak, reach };
+}
+
+export function reportLines() {
+    const t = tuning(), f = tuning(wiringOf("flat").S), l = tuning(wiringOf("fly:lateral").S);
+    return ["[flyTracking] the fly's target-tracking circuit wired as the fly wires it: a target's bearing onto the LC10a cells of one eye at their own places, the connectome's own signed weights, DNa02 right less left out (read the odd way)",
+        `  ${N} neurons, ${LC.EDGES.length} connections, no learned weight inside; with places the command reaches 90% of its peak at ${t.reach} degrees and peaks at ${t.peakAt} (the other way round: ${l.reach} and ${l.peakAt}); with no places it is there by ${f.reach} degrees: a switch; the gunner on it has two weights (two gains) and the sight's own trigger`];
+}
+
+if (typeof process !== "undefined" && Array.isArray(process.argv)) {   // see physics/mechanics/aircraftAssembly.mjs for why this is guarded and the import is dynamic
+    const { pathToFileURL } = await import("node:url");
+    if (import.meta.url === pathToFileURL(process.argv[1] || "").href) { for (const l of reportLines()) console.log(l); process.exit(0); }
+}
