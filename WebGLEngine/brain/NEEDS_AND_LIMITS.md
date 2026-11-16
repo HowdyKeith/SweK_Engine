@@ -1341,3 +1341,6 @@ L-0.06 pays more under BIAS: about 90 (it did twice). L-0.04 pays more: about 50
 
 ## 6. What will be built
 `tools/ship/gaugeCurve.mjs` (on `gaugeShift.mjs`'s chunks and `gaugeFaults.mjs`'s gauge, difference and hull test), `tools/ship/gaugeCurveCmd.mjs` (`run`, `report`), `tools/ship/gaugeCurve-selfcheck.mjs` with a mutation pass; then the run once and the report read once. **NOT IN THIS ROUND:** choosing or shipping a shift (Keith's), other biases, the rule arms, other dive kinds.
+
+## Round 36, AMENDMENT 1 (2026-11-16; made while building the library, before any of its seeds was flown; a REPORTED figure only, no verdict changes)
+Section 4's break-even ("gain x 300 / extra crushes, assuming the gauge is biased on every dive") was wrong on its own terms: if every dive has the biased gauge, the sound-gauge gain is never earned. The figure is restated: the price P of one crushed boat (score points beyond its 0) at which a shift is worth exactly what L0 is, when a share f of dives has the biased gauge, solves (1 - f) x gain at REF + f x gain under BIAS = f x (extra crushes / 300) x P; it is reported for f = 0.05, 0.25 and 1, and the share is said to be unknown.
