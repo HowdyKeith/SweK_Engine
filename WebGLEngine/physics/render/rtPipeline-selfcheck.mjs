@@ -77,6 +77,12 @@
 // tightens the bound, and a formula that used the per-run relSd here would be a looser bound than the evidence
 // supports.
 //
+// *** SECTION 17 (v4918) IS THE TREE OVER THE INSTANCES AND MORE THAN ONE MESH. *** The list of v4915 is kept as the tree's
+// control: on sixteen instances of two meshes they find the same hit on every probed ray, to the bit, and the same frame bit
+// for bit -- and the tree enters 1.91 instances a ray where the list enters 16, which is the one number on which they may
+// differ and so the one a probe reports. Two meshes share the four buffers, each a root node; the CPU has no instances and
+// places each instance's own triangles. Two plants only make the tree SLOWER and no picture would show them; the count does.
+//
 // *** SECTION 16 (v4917) IS WHAT v4915 LISTED AS NOT WRITTEN OR NOT GRADED. *** Translucency (any-hit rule "alpha", a
 // coin per candidate); a sphere's own any-hit (a cap cut off, the far root seen through it); per-triangle materials
 // under an instance (the instance's record is an offset); and the colour, microfacet and light-sampling shaders with
@@ -2634,6 +2640,149 @@ say("14. RTX ROUND 9: MULTI-SCATTER ENERGY COMPENSATION");
     //      EVERY PLANTED DEVICE (up to 94.7%), and the inside-its-noise row. The mask is load-bearing.
     //   L  rtPipeline.mjs, rtAnyHit emitted into every mesh shader -> 1 red by name in section 1, then the probe
     //      kernels (which declare no uniform block) fail to compile and the run stops.
+}
+
+// ---- 17. v4918: A TREE OVER THE INSTANCES, AND MORE THAN ONE MESH ------------------------------------------------------
+// v4915 called the instances a list. Here is the tree, and the list is its CONTROL: the two must agree on every ray and
+// every pixel, exactly, because the tree may change which instances are entered and nothing else. What tells them apart is
+// one number -- how many instances a ray enters -- so a probe reports it. And a mesh is a root node now: two meshes share
+// the four buffers, and the CPU, which has no instances at all, places each instance's own triangles in the world.
+{
+    console.log("\n17. a tree over the instances, and more than one mesh (v4918)");
+    const meanOf = (v) => v.reduce((a, b) => a + b, 0) / v.length, sdOf = (v, m) => Math.sqrt(v.reduce((a, b) => a + (b - m) ** 2, 0) / (v.length - 1));
+    const e2 = (v) => v.toExponential(2);
+    const BOX = { positions: [[-1, -1, -1], [1, -1, -1], [1, 1, -1], [-1, 1, -1], [-1, -1, 1], [1, -1, 1], [1, 1, 1], [-1, 1, 1]],
+                  indices: [[0, 1, 2], [0, 2, 3], [4, 6, 5], [4, 7, 6], [0, 4, 5], [0, 5, 1], [0, 3, 7], [0, 7, 4], [1, 5, 6], [1, 6, 2]] };
+    const PYR = { positions: [[-1, -1, -1], [1, -1, -1], [1, -1, 1], [-1, -1, 1], [0, 1, 0]], indices: [[0, 4, 1], [1, 4, 2], [2, 4, 3], [3, 4, 0], [0, 1, 2], [0, 2, 3]] };   // closed, normals outward
+    // THE PYRAMID FIRST, AND A SABOTAGE IS WHY: with the box first, the second mesh was six triangles in ONE leaf -- no child links at
+    // all -- and leaving a second mesh's links unshifted went 0 red. The box has an interior node, so it is the one that goes second.
+    const meshes = R.bvhBuffersFromMeshes([PYR, BOX]), trisOf = [trianglesFrom(PYR.positions, PYR.indices), trianglesFrom(BOX.positions, BOX.indices)];
+    const aff = (sc, t) => [sc, 0, 0, t[0], 0, sc, 0, t[1], 0, 0, sc, t[2]];
+    const placedOf = (M, src) => { const out = new Float64Array(src.length); for (let i = 0; i < src.length; i += 3) for (let r = 0; r < 3; r++) out[i + r] = M[r * 4] * src[i] + M[r * 4 + 1] * src[i + 1] + M[r * 4 + 2] * src[i + 2] + M[r * 4 + 3]; return out; };
+    const cpuScene = (insts) => insts.map((it) => ({ bvh: new MeshBVH(placedOf(it.transform, trisOf[it.mesh])), albedo: it.albedo }));
+    const GRID = []; for (let x = 0; x < 4; x++) for (let z = 0; z < 4; z++) GRID.push({ transform: aff(0.45, [x * 1.6 - 2.4, ((x + z) % 3) * 0.3, z * 1.6 - 2.4]), mesh: (x + z) % 2, albedo: 0.3 + 0.04 * (x * 4 + z) });
+    const FOUR = [{ transform: aff(1, [0, 0, 0]), mesh: 1, albedo: 0.6 },
+                  { transform: [0.7 * Math.cos(0.5), 0, 0.7 * Math.sin(0.5), 2.6, 0, 0.9, 0, 0.1, -0.7 * Math.sin(0.5), 0, 0.7 * Math.cos(0.5), 0.3], mesh: 0, albedo: 0.35 },
+                  { transform: aff(0.8, [-2.5, 0.4, -0.2]), mesh: 0, albedo: 0.8 }, { transform: aff(0.5, [0.3, 0.2, 2.6]), mesh: 1, albedo: 0.5 }];
+    const gridBuf = R.instanceBuffer(GRID, { meshes }), fourBuf = R.instanceBuffer(FOUR, { meshes });
+    const W = 16, H = 16, SPP = 32, TOL = 1e-5, sky = (d) => 0.3 + 0.7 * (0.5 * (d[1] + 1));
+    const inputsOf = (buf) => [...R.bvhInputs(meshes), { binding: R.BVH_BINDINGS.instances, data: buf }];
+
+    // ---- 17a. what is packed --------------------------------------------------------------------------------------
+    const NB = GRID.length * R.INSTANCE_FLOATS, nodeCount = gridBuf[NB], treeNodes = gridBuf.slice(NB + 4, NB + 4 + nodeCount * 8), treeOrder = Array.from(gridBuf.slice(NB + 4 + nodeCount * 8));
+    const solo = [R.bvhBuffersFromMesh(PYR.positions, PYR.indices), R.bvhBuffersFromMesh(BOX.positions, BOX.indices)];
+    ok("two meshes lie end to end in the one set of buffers: each a root node, its links and leaf indices shifted to where it landed",
+        meshes.roots.length === 2 && meshes.roots[0] === 0 && meshes.roots[1] === solo[0].nodeCount && meshes.triBase[1] === solo[0].triCount &&
+        meshes.nodeCount === solo[0].nodeCount + solo[1].nodeCount && meshes.triCount === 16 && meshes.triBase[1] === 6 &&
+        Array.from(meshes.order.slice(meshes.triBase[1])).every((v, i) => v === solo[1].order[i] + meshes.triBase[1]) &&
+        Array.from(meshes.tris.slice(meshes.triBase[1] * 9)).every((v, i) => v === solo[1].tris[i]) &&
+        // the second mesh has an interior node, and its two links point at ITS children, not at the first mesh's
+        solo[1].meta[0] >= 0 && meshes.meta[meshes.roots[1] * 3] === solo[1].meta[0] + meshes.roots[1] && meshes.meta[meshes.roots[1] * 3 + 1] === solo[1].meta[1] + meshes.roots[1],
+        `roots ${meshes.roots}, triangles from ${meshes.triBase}, ${meshes.nodeCount} nodes, ${meshes.triCount} triangles`);
+    const kids = (n) => (treeNodes[n * 8 + 6] < 0 ? [] : [treeNodes[n * 8 + 6], treeNodes[n * 8 + 7]]);
+    const leafOf = (n) => { const a = treeNodes[n * 8 + 6]; return a < 0 ? treeOrder.slice(-a - 1, -a - 1 + treeNodes[n * 8 + 7]) : null; };
+    const under = (n) => (leafOf(n) || kids(n).flatMap(under));
+    const worldBox = (k) => { const bb = [Infinity, Infinity, Infinity, -Infinity, -Infinity, -Infinity], t = placedOf(GRID[k].transform, trisOf[GRID[k].mesh]);
+        for (let i = 0; i < t.length; i += 3) for (let a = 0; a < 3; a++) { bb[a] = Math.min(bb[a], t[i + a]); bb[a + 3] = Math.max(bb[a + 3], t[i + a]); } return bb; };
+    let treeOk = nodeCount > 0 && [...treeOrder].sort((a, b) => a - b).every((v, i) => v === i) && under(0).length === GRID.length, maxLeaf = 0;
+    for (let n = 0; n < nodeCount; n++) { const L = leafOf(n); if (L) maxLeaf = Math.max(maxLeaf, L.length);
+        for (const k of under(n)) { const wb = worldBox(k); for (let a = 0; a < 3; a++) if (treeNodes[n * 8 + a] > wb[a] + 1e-5 || treeNodes[n * 8 + 3 + a] < wb[a + 3] - 1e-5) treeOk = false; } }
+    ok("!! the tree behind the instances is a tree: every instance in exactly one leaf, and every node's box holds every triangle placed beneath it",
+        treeOk && maxLeaf <= 2 && gridBuf.length === NB + 4 + nodeCount * 8 + GRID.length && R.INSTANCE_FLOATS === 20,
+        `${nodeCount} nodes over ${GRID.length} instances, leaves of at most ${maxLeaf}; the boxes checked against the triangles themselves, not against the root boxes they were built from`);
+    // buildInstanceTree by itself, on boxes with an obvious answer: three far apart along x, split at the middle one
+    const bt = R.buildInstanceTree([[10, 0, 0, 11, 1, 1], [0, 0, 0, 1, 1, 1], [20, 0, 0, 21, 1, 1]], { maxLeaf: 1 });
+    ok("buildInstanceTree, alone: three boxes along x become five nodes, the root spans all three and the leaves read left to right",
+        bt.nodeCount === 5 && Array.from(bt.order).join() === "1,0,2" && Array.from(bt.nodes.slice(0, 6)).join() === "0,0,0,21,1,1" &&
+        R.buildInstanceTree([]).nodeCount === 0 && R.buildInstanceTree([[0, 0, 0, 1, 1, 1]]).nodeCount === 1,
+        `order ${Array.from(bt.order)}, root box ${Array.from(bt.nodes.slice(0, 6))}; no boxes is no nodes, one box is one leaf`);
+    const throws = (f) => { try { f(); return null; } catch (e) { return String(e.message); } };
+    const refusals = [["a tree with no instances", () => R.pipelineWgsl({ bvh: true, instanceTree: true }), /needs instances/],
+                      ["an instance of a mesh that is not there", () => R.instanceBuffer([{ transform: aff(1, [0, 0, 0]), mesh: 2, albedo: 0.5 }], { meshes }), /names mesh 2/],
+                      ["a second mesh with no meshes passed", () => R.instanceBuffer([{ transform: aff(1, [0, 0, 0]), mesh: 1, albedo: 0.5 }]), /pass `meshes`/],
+                      ["a mesh of half a triangle", () => R.bvhBuffersFromMeshes([{ tris: [0, 0, 0, 1, 0, 0, 0, 1] }]), /whole number of triangles/]].map(([name, f, want]) => ({ name, msg: throws(f), want }));
+    const treeSrc = R.pipelineWgsl({ bvh: true, instances: true, instanceTree: true }), listSrc = R.pipelineWgsl({ bvh: true, instances: true });
+    ok("four refusals by name; the tree's traversal is in a shader only when asked, and both shaders enter an instance by the same lines",
+        refusals.every((r) => r.msg && r.want.test(r.msg)) && /fn rtHitInstanceBox\(/.test(treeSrc) && !/instStack|rtHitInstanceBox/.test(listSrc) &&
+        [treeSrc, listSrc].every((c) => c.split("let t = rtTraverseBvh(o, d, best);").length === 2 && c.split("bvhRoot = i32(bvhInst[b + 16]);").length === 2),
+        refusals.filter((r) => !(r.msg && r.want.test(r.msg))).map((r) => r.name + ": " + r.msg).join(" | ") || refusals.map((r) => r.name).join("; "));
+
+    // ---- 17b. the probe: one ray, what it hit, and how many instances it entered -----------------------------------------
+    const NR = 128, rays = [];
+    for (let i = 0; i < NR; i++) { const a = i * 2.399963, r = 3.6 * Math.sqrt((i + 0.5) / NR), d = [r * Math.cos(a) - 3, 0.2 - 6, r * Math.sin(a) - 8], l = Math.hypot(...d); rays.push(3, 6, 8, d[0] / l, d[1] / l, d[2] / l); }
+    const UP = new Float32Array(96); UP[R.MESH_META_SLOT * 4] = 1; UP[R.MESH_META_SLOT * 4 + 3] = GRID.length;
+    const missed = new Set(), patchOf = (find, put) => (code) => { const parts = code.split(find); if (parts.length !== 2) missed.add(find); return parts.join(put); };
+    const probe = async (tree, patch = null) => { const code = R.instanceProbeWgsl(NR, { tree });
+        const r = await runWgslCompute({ code: patch ? patch(code) : code, outCount: NR * 4, workgroups: Math.ceil(NR / 64), uniforms: UP, inputs: [...inputsOf(gridBuf), { binding: 6, data: Float32Array.from(rays) }] });
+        if (!r.ok) throw new Error("section 17 probe failed: " + r.reason); return Array.from(r.values); };
+    const gridCpu = cpuScene(GRID);
+    const cpuNearest = (i) => { let best = null; gridCpu.forEach((e, k) => { const h = e.bvh.raycastFirst(rays[i * 6], rays[i * 6 + 1], rays[i * 6 + 2], rays[i * 6 + 3], rays[i * 6 + 4], rays[i * 6 + 5]); if (h && (!best || h.t < best.t)) best = { t: h.t, k, tri: h.tri }; }); return best; };
+    const grade = (out, ref) => { let same = 0, cpu = 0, entered = 0, hits = 0;
+        for (let i = 0; i < NR; i++) { entered += out[i * 4 + 3]; if (out[i * 4] > 0) hits++;
+            if (ref && out[i * 4 + 1] === ref[i * 4 + 1] && out[i * 4 + 2] === ref[i * 4 + 2] && Object.is(out[i * 4], ref[i * 4])) same++;
+            const b = cpuNearest(i); if ((b ? b.k : -1) === out[i * 4 + 1] && (b ? b.tri + meshes.triBase[GRID[b.k].mesh] : -1) === out[i * 4 + 2] && (!b || Math.abs(b.t - out[i * 4]) < 1e-4)) cpu++; }
+        return { same, cpu, entered: entered / NR, hits }; };
+    const pList = await probe(false), pTree = await probe(true), gL = grade(pList, null), gT = grade(pTree, pList);
+    say(`${NR} rays at ${GRID.length} instances of two meshes: ${gT.hits} hit; the list enters ${gL.entered.toFixed(2)} instances a ray, the tree ${gT.entered.toFixed(2)}`);
+    REPORT_ROWS.push(["instances entered per ray, sixteen instances of two meshes", `${NR} rays`, "list against tree", `list ${gL.entered.toFixed(2)}, tree ${gT.entered.toFixed(2)}; same hit on ${gT.same} of ${NR}; the CPU's nearest on ${gT.cpu}`]);
+    ok("!! *** THE TREE AND THE LIST FIND THE SAME HIT ON EVERY RAY -- distance to the bit, instance and triangle -- and it is the CPU's nearest ***",
+        gT.same === NR && gT.cpu === NR && gL.cpu === NR && gT.hits > NR / 4 && gT.hits < NR,
+        `${gT.same} of ${NR} identical to the list; ${gT.cpu} of ${NR} the instance, triangle (the mesh's own index plus where that mesh's triangles start) and distance a brute search over sixteen placed meshes finds; ${gT.hits} hits and ${NR - gT.hits} misses`);
+    ok("!! *** AND IT IS A TREE: the list enters every instance on every ray, the tree under a quarter of them ***",
+        gL.entered === GRID.length && gT.entered < GRID.length / 4, `${gL.entered.toFixed(2)} against ${gT.entered.toFixed(2)} -- the only number here on which the two may differ`);
+
+    // ---- 17c. frames ---------------------------------------------------------------------------------------------------
+    const frame = async (opts, view, seed, buf, n) => { const r = await runWgslCompute({ code: R.pipelineWgsl({ bvh: true, instances: true, gradient: true, ...opts }), outCount: W * H, workgroups: Math.ceil(W * H / 64), inputs: inputsOf(buf),
+        uniforms: R.pipelineUniforms([], { spp: SPP, seed, view, eps: R.EPS, bvh: { nodeCount: meshes.nodeCount, triCount: meshes.triCount, instanceCount: n } }) });
+        if (!r.ok) throw new Error("section 17 render failed: " + r.reason); return Array.from(r.values); };
+    const cpuAt = (scene, view, seed) => Array.from(renderCpuMesh(scene, { ...view, spp: SPP, seed, maxDepth: R.MAX_DEPTH, sky, nee: false }));
+    const gridView = { w: W, h: H, eye: [3, 6, 8], look: [0, 0, 0], up: [0, 1, 0], fovDeg: 45 }, fourView = { w: W, h: H, eye: [1.5, 5, 7], look: [0, -0.2, 0], up: [0, 1, 0], fovDeg: 50 };
+    let differ = 0; const d16 = []; let s16 = 0, p16 = 0;
+    for (let seed = 1; seed <= 4; seed++) { const a = await frame({}, gridView, seed, gridBuf, GRID.length), b = await frame({ instanceTree: true }, gridView, seed, gridBuf, GRID.length);
+        differ += a.filter((v, i) => !Object.is(v, b[i])).length;
+        const c = cpuAt(gridCpu, gridView, seed), bg = cpuAt([], gridView, seed); d16.push(meanOf(b) / meanOf(c) - 1);
+        for (let i = 0; i < c.length; i++) { if (c[i] === bg[i]) continue; p16++; if (Math.abs(b[i] - c[i]) <= TOL) s16++; } }
+    ok("!! *** A FRAME THROUGH THE TREE IS THE FRAME THROUGH THE LIST, BIT FOR BIT: sixteen instances, eight bounces, four seeds ***", differ === 0, `${differ} of ${4 * W * H} pixels differ`);
+    const fourCpu = cpuScene(FOUR); let s4 = 0, p4 = 0; const d4 = [];
+    for (let seed = 1; seed <= 4; seed++) { const g = await frame({ instanceTree: true }, fourView, seed, fourBuf, FOUR.length), c = cpuAt(fourCpu, fourView, seed), bg = cpuAt([], fourView, seed); d4.push(meanOf(g) / meanOf(c) - 1);
+        for (let i = 0; i < c.length; i++) { if (c[i] === bg[i]) continue; p4++; if (Math.abs(g[i] - c[i]) <= TOL) s4++; } }
+    const m4 = meanOf(d4), se4 = sdOf(d4, m4) / 2, m16 = meanOf(d16), se16 = sdOf(d16, m16) / 2;
+    say(`two meshes under four instances, through the tree: ${s4} of ${p4} mesh pixels within ${TOL} (${(100 * s4 / p4).toFixed(2)}%), paired gpu/cpu-1 ${e2(m4)} +- ${e2(se4)}`);
+    say(`two meshes under sixteen: ${s16} of ${p16} mesh pixels (${(100 * s16 / p16).toFixed(2)}%), paired ${e2(m16)} +- ${e2(se16)} -- more surfaces to graze, more paths f32 and f64 send different ways`);
+    REPORT_ROWS.push(["two meshes under four instances, through the tree", `${W}x${H}`, `${SPP} spp x 4 seeds, same seeds`, `${s4} of ${p4} mesh pixels within ${TOL}; paired mean ${e2(m4)}, se ${e2(se4)}`]);
+    REPORT_ROWS.push(["two meshes under sixteen instances, through the tree", `${W}x${H}`, `${SPP} spp x 4 seeds, same seeds`, `${s16} of ${p16} mesh pixels within ${TOL}; paired mean ${e2(m16)}, se ${e2(se16)}`]);
+    ok("!! *** TWO MESHES: four instances of a box and a pyramid walk the CPU's paths, where the CPU placed each instance's own triangles ***",
+        s4 / p4 >= 0.85 && Math.abs(m4) < 3 * se4 + TOL, `${(100 * s4 / p4).toFixed(2)}% of mesh pixels, paired mean ${e2(m4)} against 3 x ${e2(se4)}`);
+    ok("!! and at sixteen the agreement THINS without drifting: fewer pixels identical, the paired mean still inside 3 of its standard errors",
+        s16 / p16 > 0.5 && s16 / p16 < s4 / p4 && Math.abs(m16) < 3 * se16 + TOL,
+        `${(100 * s16 / p16).toFixed(2)}% against ${(100 * s4 / p4).toFixed(2)}% at four; paired mean ${e2(m16)} against 3 x ${e2(se16)}. Section 4's boundary, with sixteen neighbours instead of three`);
+
+    // ---- 17d. the plants, on the probe, where the answer is exact ------------------------------------------------------------
+    const PL = [
+        { id: "a leaf enters only its first instance", patch: patchOf("for (var s = -la - 1; s < -la - 1 + lb; s = s + 1) {", "for (var s = -la - 1; s < -la; s = s + 1) {"), wrong: true },
+        { id: "every instance entered as the first mesh", patch: patchOf("bvhRoot = i32(bvhInst[b + 16]);", "bvhRoot = 0;"), wrong: true },
+        { id: "the far child walked first", patch: patchOf("if (dl < dr) { instStack[sp] = lb;", "if (dl >= dr) { instStack[sp] = lb;"), wrong: false },
+        { id: "boxes tested to the ray's end, not to its best hit", patch: patchOf("if (rtHitInstanceBox(nb, orig, invD, best) >= 1e30) { continue; }", "if (rtHitInstanceBox(nb, orig, invD, 1e30) >= 1e30) { continue; }"), wrong: false },
+    ];
+    const seen = []; for (const pl of PL) { const g = grade(await probe(true, pl.patch), pList); seen.push({ pl, g }); say(`plant, ${pl.id}: same hit as the list on ${g.same} of ${NR}, ${g.entered.toFixed(2)} instances entered a ray`); }
+    ok("each section-17 plant's target is in the probe's WGSL exactly once", missed.size === 0, [...missed].map((f) => f.slice(0, 50)).join(" | ") || `${PL.length} plants`);
+    ok("!! the two plants that break the tree are seen by the hit: neither finds the list's answer on every ray",
+        seen.filter((x) => x.pl.wrong).every((x) => x.g.same < NR), seen.filter((x) => x.pl.wrong).map((x) => `${x.pl.id}: ${x.g.same} of ${NR}`).join("; "));
+    ok("!! and the two that only make it SLOWER are seen by the one number that can see them: the same hits, more instances entered",
+        seen.filter((x) => !x.pl.wrong).every((x) => x.g.same === NR && x.g.entered > gT.entered),
+        seen.filter((x) => !x.pl.wrong).map((x) => `${x.pl.id}: ${x.g.entered.toFixed(2)} against ${gT.entered.toFixed(2)}`).join("; ") + " -- no picture would have shown either");
+    // SABOTAGE (v4918), six, each against rtPipeline.mjs, restored and md5-verified; reds over the whole gate.
+    //   A  a second mesh's leaf order not shifted to its own triangles -> 4 red: the end-to-end row, THE SAME HIT (the CPU's
+    //      nearest on 91 of 128), TWO MESHES (54.82%), and the sixteen-instance row.
+    //   B  a second mesh's child links not shifted to its own nodes -> *** 0 RED THE FIRST TIME ***: the second mesh was the
+    //      pyramid, one leaf, no links. With the box second -> the end-to-end row red by name, and then the device never
+    //      returns (the links make a loop; the session drops at 60 s). A hang after a named red, said rather than hidden.
+    //   C  a tree node's box taking the smallest upper corner beneath it -> 6 red: "is a tree", IT IS A TREE (11.39 entered),
+    //      A FRAME THROUGH THE TREE (348 of 1024 pixels), TWO MESHES, sixteen, and the slower-plants row.
+    //   D  an instance's world box built from the mesh box's low corner alone -> 6 red: THE SAME HIT at 84 of 128.
+    //   E  the tree never skipping a box -> 3 red: IT IS A TREE (16.00 against 16.00), the plant-target row, the slower-plants row.
+    //      The frames and the hits stay right, as they must: this is the defect only the count can see.
+    //   F  every instance packed as the first mesh -> 4 red: THE SAME HIT (the CPU's nearest on 88 of 128), TWO MESHES.
 }
 
 // ---- THE CACHE'S OWN ROWS ---------------------------------------------------------------------------------------------

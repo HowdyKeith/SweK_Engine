@@ -16428,6 +16428,13 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
         widened: Object.freeze([]),
         verdict: "no gate file added, so nothing is claimed here (a gate may be claimed by ONE closing); two gates grew rows: physics/render/rtPipeline-selfcheck twelve (section 16: translucency, a sphere's any-hit, materials under an instance, three shaders graded; 161 PASS; eight sabotages, one of which went 0 red and moved the light-sampling scene) and tools/ship/sweepRotation-selfcheck three (a rotation prunes the scale entries it orphans, and a held outlier is written only after a day of the same answer; 40 PASS; three sabotages, each red)",
     }),
+    since626: Object.freeze({
+        at: "v4918", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "no gate file added, so nothing is claimed here (a gate may be claimed by ONE closing); physics/render/rtPipeline-selfcheck grew twelve rows (section 17: a tree over the instances and more than one mesh; 173 PASS; six sabotages, one of which went 0 red and reordered the meshes) and tools/ship/absenceScope-selfcheck's two second-level rows were re-taken on the day the list row said it would go red, each sabotaged",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

@@ -1,6 +1,6 @@
 {
  "gate": "physics/render/rtPipeline-selfcheck.mjs",
- "at": "2026-11-15",
+ "at": "2026-11-16",
  "tables": [
   {
    "title": "two spheres: CPU against the pipeline, per resolution and sample count",
@@ -400,6 +400,24 @@
      "16x16",
      "32 spp x 4 seeds, same seeds",
      "64.2% of values identical"
+    ],
+    [
+     "instances entered per ray, sixteen instances of two meshes",
+     "128 rays",
+     "list against tree",
+     "list 16.00, tree 1.91; same hit on 128 of 128; the CPU's nearest on 128"
+    ],
+    [
+     "two meshes under four instances, through the tree",
+     "16x16",
+     "32 spp x 4 seeds, same seeds",
+     "298 of 301 mesh pixels within 0.00001; paired mean -1.22e-4, se 7.22e-5"
+    ],
+    [
+     "two meshes under sixteen instances, through the tree",
+     "16x16",
+     "32 spp x 4 seeds, same seeds",
+     "306 of 390 mesh pixels within 0.00001; paired mean -7.99e-4, se 3.82e-4"
     ]
    ],
    "note": "A sweep whose numbers only reached the terminal it was written to is a measurement nobody can re-read."
