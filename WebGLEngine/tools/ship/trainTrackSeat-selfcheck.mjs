@@ -121,6 +121,13 @@ await section(() => {
     ok("!! WHEN NEITHER CHAMPION CARRIES A SYNAPSE THE FILE SAYS THE WIRING TOOK NO PART; when either does, it does not say so", /NEITHER CHAMPION CARRIES A WEIGHT ON A SYNAPSE, SO THE WIRING TOOK NO PART/.test(T.blobOf(noSyn).by) && !/TOOK NO PART/.test(blob.by) && !/TOOK NO PART/.test(T.blobOf(half).by));
 });
 
+console.log("5b. WHAT THE SANDBOX'S SEARCHES FOUND (read off the kept files; nothing is flown)");
+await section(() => {
+    const B = new URL("../../brain/", import.meta.url), J = (f) => JSON.parse(fs.readFileSync(new URL(f, B), "utf8")), rd = J("seatTrackGunnerWeightsDefault.reading.json"), fr = J("rig-results/trackSeat/s9800.json"), cr = J("rig-results/trackSeatControl/s9820.json");
+    ok("!! NEITHER SEARCH KEPT A CHILD: 0 of 100 over the fly's wiring (43 of them synapse children) and 0 of 100 over the control's (42), so both records ARE the start -- the race car's hand rule -- and the start, in this fight (no cannon, an eighth of the magazines), LEADS THE HAND GUNNER BY 0.937 on the 600 audit pairs (z 21)", fr.improved === 0 && cr.improved === 0 && fr.iters === 100 && cr.iters === 100 && fr.tried.synapse === 43 && cr.tried.synapse === 42 && fr.kept === 0 && cr.kept === 0 && T.differs(Float32Array.from(fr.weights), BASE).length === 0 && T.differs(Float32Array.from(cr.weights), BASE).length === 0 && Math.abs(rd.reading.start.mean - 0.937) < 5e-4 && rd.reading.start.z > 15 && cr.wiring === "control:4242" && fr.wiring === "fly");
+    ok("!! so T1 is the start's lead, and the training, the synapses and the wiring each read EXACTLY 0: it does not qualify (it must lead the start) and there is no weights file", rd.reading.T1.mean === rd.reading.start.mean && rd.reading.T2.mean === 0 && rd.reading.T3.mean === 0 && rd.reading.T4.mean === 0 && rd.words.T2 === "CANNOT BE TOLD" && !rd.verdict.ok && /no better than the untrained hand rule/.test(rd.verdict.reasons[0]) && !fs.existsSync(new URL("seatTrackGunnerWeightsDefault.json", B)));
+});
+
 console.log("6. REAL PAIRS AND THE COMMAND");
 await section(async () => {
     const pool = createPool({ workers: 2 }), two = [T.TRAIN_PAIRS[0], T.TRAIN_PAIRS[150]], hw = Array.from(BASE);

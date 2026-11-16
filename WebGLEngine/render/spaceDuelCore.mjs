@@ -27,6 +27,7 @@ import * as HS from "../brain/helmSteerPolicy.mjs";
 import * as SK from "../brain/seatTrackGunner.mjs";
 import * as HC from "../brain/helmCompassPolicy.mjs";
 import * as FS from "../brain/flySteering.mjs";
+import * as FT from "../brain/flyTracking.mjs";
 import * as PF from "../brain/peerFleet.mjs";
 
 /** The brain files the page loads, by the name the catalogues below use: a path under brain/ and the policy it must be for. */
@@ -36,6 +37,7 @@ export const FILES = Object.freeze({
     fish: Object.freeze({ path: "brain/seatGunnerFishWeightsDefault.json", policy: "seatGunnerFish", mod: SF }),
     "car-trained": Object.freeze({ path: "brain/seatTurretGunnerWeightsDefault.json", policy: "gunnerPolicy", mod: ST }),
     "car-big": Object.freeze({ path: "brain/seatTurretGunnerWeightsBig.json", policy: "gunnerPolicy", mod: ST }),
+    "seat-flywired": Object.freeze({ path: "brain/seatFlyWiredWeightsDefault.json", policy: "seatFlyWired", mod: FT }),
     helm: Object.freeze({ path: "brain/helmWeightsDefault.json", policy: "helmPolicy", mod: HP }),
     "helm-steer": Object.freeze({ path: "brain/helmSteerWeightsDefault.json", policy: "helmSteerPolicy", mod: HS }),
     "helm-compass": Object.freeze({ path: "brain/helmCompassWeightsDefault.json", policy: "helmCompassPolicy", mod: HC }),
@@ -50,6 +52,7 @@ export const HANDS = Object.freeze([
     Object.freeze({ id: "car-trained", label: "race car's turret gunner, trained in a seat (lays the gun)", file: "car-trained", note: "trained against a ship; on 300 fresh pairs its training bought nothing that could be told from the untrained one" }),
     Object.freeze({ id: "car-big", label: "race car's turret gunner, trained on 300 pairs a child (lays the gun, always fires)", file: "car-big", note: "the one trained gunner shown to beat the rest: +0.85 over the hand gunner on 600 pairs. What it learned is to HOLD THE TRIGGER whenever it has a target; its one synapse does what a trigger bias would" }),
     Object.freeze({ id: "track", label: "fruit fly's target-tracking circuit, untrained (lays the gun)", file: null, note: "281 neurons of the fly's visual pursuit pathway, carrying the race car's hand rule and no weight on any of its 6,589 synapses: untrained, it flies the untrained car's fights to the bit" }),
+    Object.freeze({ id: "flywired", label: "the fly's tracking circuit, wired as the fly wires it (lays the gun)", file: "seat-flywired", note: "a target's bearing goes onto the fly's LC10a cells of one eye, each at its own place; the connectome's own weights do the rest and NOTHING inside is learned (two gains outside it are; the trigger is the sight's). With no cannon it leads the hand gunner by 0.75 on 600 pairs and cannot be told from the race car's untrained rule or from an ideal comparator; the cells' places are worth 0.10" }),
 ]);
 export const HELMS = Object.freeze([
     Object.freeze({ id: "face", label: "bow-on rule", rule: "face", file: null, note: "the arena's own: the bow, and the cannon, on the nearest enemy" }),

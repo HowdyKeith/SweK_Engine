@@ -19,6 +19,9 @@
 // THE GUNNER (gunnerFor): brain/seatTurretGunner.mjs's gunner -- the sight, the hand's error, the rates turned over a tick -- with this in place of its network: the sight's error in traverse is a bearing, its error in elevation is another, each goes through the circuit, and tanh(gain x S) is the share of the seat's slew
 // rate commanded on that axis. THE TRIGGER IS THE SIGHT'S OWN RULE, untouched. TWO WEIGHTS: the two gains. (Zero gains are a gun that does not move: there is no rule underneath a gunner as there is under a helm.)
 //
+// WHAT A SHIP MAKES OF IT (tools/ship/takeFlyWiredGunner.mjs, registered before its pairs, read once on 600, no cannon): the fly-wired gunner LEADS the seat's hand gunner either way round (medial +0.748, lateral +0.704), cannot be told from the sine's (-0.020) or from the race car's untrained hand rule (+0.024),
+// and THE CELLS' PLACES ARE WORTH +0.101 (z 2.7) over the same circuit with none -- the graded command beats the switch, against my forecast. The shuffled circuit trails (-0.600): one seed, a weak control, said so.
+//
 // *** CHOSEN BY ME, NOT BY A FLY AND NOT IN A FIGHT: sigma 0.15, the 15 degrees of overlap, the constant 0.5 on DNa02, three steps, the normalisation, a rank for a place, and that eccentricity maps linearly to place over a half turn. One axis of the sheet is used; the other (ALONG) is not. A real LC10a cell answers
 // a small MOVING object; nothing here moves. ***
 "use strict";
