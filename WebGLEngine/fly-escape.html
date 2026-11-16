@@ -60,7 +60,7 @@
 <script type="module">
 import * as S from "/brain/flyEscapeShow.mjs";
 
-const el = (id) => document.getElementById(id), out = el("out"), g = out.getContext("2d"), eye = el("eye"), ge = eye.getContext("2d"), files = new Map(), TRAINED = new Set([...S.ARMS, ...S.VISION_ARMS, ...S.DEGREE_ARMS]);
+const el = (id) => document.getElementById(id), out = el("out"), g = out.getContext("2d"), eye = el("eye"), ge = eye.getContext("2d"), files = new Map(), TRAINED = new Set([...S.ARMS, ...S.VISION_ARMS, ...S.DEGREE_ARMS, ...S.SPLIT_ARMS]);
 const small = document.createElement("canvas"); small.width = 180; small.height = 45; const gs = small.getContext("2d");
 const option = (sel, value, text) => { const o = document.createElement("option"); o.value = value; o.textContent = text; sel.appendChild(o); };
 for (const k of S.KINDS) option(el("kind"), k, S.LABELS[k]);
@@ -116,7 +116,7 @@ el("play").addEventListener("click", () => setPlaying(!playing));
 el("one").addEventListener("click", () => { if (!ep) return; setPlaying(false); if (k < ep.ticks) k++; paint(); });
 el("again").addEventListener("click", () => { playing = true; el("play").textContent = "Pause"; start(); });
 // a fly belongs to some rounds and not others: choosing a fly moves the round to one that has it (round 5's four flies are round 5's alone)
-el("kind").addEventListener("change", () => { const kind = el("kind").value, r = el("round"); if (TRAINED.has(kind) && !S.armsOf(Number(r.value)).includes(kind)) { r.value = kind === "GDEG" ? "6" : S.VISION_ARMS.includes(kind) ? "5" : "3"; fillDraws(); } });
+el("kind").addEventListener("change", () => { const kind = el("kind").value, r = el("round"); if (TRAINED.has(kind) && !S.armsOf(Number(r.value)).includes(kind)) { r.value = kind === "GDEG" ? "6" : S.SPLIT_ARMS.includes(kind) && !S.VISION_ARMS.includes(kind) ? "7" : S.VISION_ARMS.includes(kind) ? "5" : "3"; fillDraws(); } });
 el("round").addEventListener("change", fillDraws);
 for (const id of ["kind", "round", "draw", "seed"]) el(id).addEventListener("change", () => { playing = true; el("play").textContent = "Pause"; start(); });
 let drag = null;

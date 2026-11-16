@@ -1,7 +1,7 @@
 {
  "version": 1,
  "generated": "derived by tools/ship/buildPageIndex.mjs -- DO NOT HAND-EDIT, the group comes from tools/ship/pageSections.mjs",
- "count": 505,
+ "count": 506,
  "pages": [
   {
    "f": "AudioLab.html",
@@ -1316,6 +1316,13 @@
    "f": "fly-portrait.html",
    "t": "SweK The Fly's Self-Portrait",
    "d": "What the 34 neurons of the fruit fly's Giant Fiber Circuit did in one 6-DOF duel, drawn by a stated rule with the procedural brushes: one line a neuron, time outward, activity as a turn. Nothing is trained and nothing is expression.",
+   "g": "flybrain",
+   "p": 0
+  },
+  {
+   "f": "fly-ram.html",
+   "t": "SweK The Collision Reflex",
+   "d": "Watch two 6-DOF craft joust: the fruit fly's close-quarters pilot with a collision reflex over it, against the autopilot, from outside (drag to turn) and from the craft's own nose. Reflexes written by hand, or the craft trained in the collision reflex round, played from the round's own results. Nothing is trained on the page.",
    "g": "flybrain",
    "p": 0
   },

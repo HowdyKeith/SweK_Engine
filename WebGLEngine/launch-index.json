@@ -21,7 +21,7 @@
   }
  },
  "counts": {
-  "page": 505,
+  "page": 506,
   "demo": 49,
   "builtin": 38
  },
@@ -1519,6 +1519,14 @@
    "id": "fly-escape.html",
    "display": "Fly Escape",
    "href": "/fly-escape.html",
+   "section": "Fruit Fly Brain",
+   "collision": false
+  },
+  {
+   "kind": "page",
+   "id": "fly-ram.html",
+   "display": "Fly Ram",
+   "href": "/fly-ram.html",
    "section": "Fruit Fly Brain",
    "collision": false
   },

@@ -158,6 +158,9 @@ console.log(`\n  ${pure} gates assume NOTHING outside their own arithmetic.\n`);
         // UNNUMBERED (2026-11-15) -- 39 -> 40: tools/ship/flyEscapeShow-selfcheck.mjs opens fly-escape.html in headless Chromium and reads its two 2D canvases' pixels (the outside view and the fly's eye), to hold that the pictures
         // computed in node are the ones painted; its other three sections are arithmetic and need no context. The pictures are ray-cast in JavaScript: no GPU is asked for.
         "tools/ship/flyEscapeShow-selfcheck.mjs",
+        // UNNUMBERED (2026-11-16) -- 40 -> 41: tools/ship/flyRamShow-selfcheck.mjs opens fly-ram.html in headless Chromium and reads its two 2D canvases' pixels (the outside view and the craft's eye), to hold that the craft, the
+        // reflex firing and the hulls touching are painted in their colours; its other three sections are arithmetic and need no context. The pictures are 2D lines and a disc: no GPU is asked for.
+        "tools/ship/flyRamShow-selfcheck.mjs",
     ]);
     const gpuNow = [...byGate.entries()].filter(([, h]) => h.includes("gpu")).map(([f]) => f).sort();
     const arrived = gpuNow.filter((g) => !GPU_GATES.includes(g));

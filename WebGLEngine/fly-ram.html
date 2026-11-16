@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="demo:title" content="The Collision Reflex">
+<meta name="demo:desc" content="Watch two 6-DOF craft joust: the fruit fly's close-quarters pilot with a collision reflex over it, against the autopilot, from outside (drag to turn) and from the craft's own nose. Reflexes written by hand, or the craft trained in the collision reflex round, played from the round's own results. Nothing is trained on the page.">
+<title>SweK The Collision Reflex</title>
+<!-- fly-ram.html -- UNNUMBERED (the version is chosen at ship time). The joust and both pictures are brain/flyRamShow.mjs's: episode() flies one joust of the collision reflex round
+     (brain/rl/ramEnv.mjs over brain/pilot6dofPolicy.mjs's duel) with a craft and keeps every tick, scene() gives a tick's outside view as line segments, eyeOf() what the reflex's eye has.
+     The trained craft's weights are read from the round's committed results file. Gate: tools/ship/flyRamShow-selfcheck.mjs. -->
+<style>
+  :root { --ink:#dbe6f5; --dim:#7e93ad; --edge:#243247; --bg:#080b11; }
+  html,body { margin:0; background:var(--bg); color:var(--ink); font:13px system-ui,sans-serif; }
+  header { display:flex; align-items:center; gap:10px; padding:8px 12px; border-bottom:1px solid var(--edge); flex-wrap:wrap; }
+  h1 { margin:0; font-size:14px; font-weight:700; color:#8fd0ff; letter-spacing:.3px; }
+  select,input,button { background:#131c28; color:var(--ink); border:1px solid var(--edge); border-radius:7px; padding:5px 8px; font:12px system-ui,sans-serif; }
+  input { width:84px; } button { cursor:pointer; } select:disabled { opacity:.4; }
+  main { display:flex; flex-wrap:wrap; gap:16px; padding:12px; align-items:flex-start; }
+  .views { flex:0 1 720px; min-width:0; }
+  canvas { display:block; border:1px solid var(--edge); border-radius:8px; background:#05070b; width:100%; height:auto; }
+  #out { aspect-ratio:720/440; cursor:grab; touch-action:none; } #eye { aspect-ratio:720/180; margin-top:4px; }
+  h2 { font-size:12px; font-weight:600; color:var(--dim); margin:10px 0 4px; }
+  aside { flex:1 1 280px; max-width:440px; color:var(--dim); line-height:1.5; }
+  aside p { margin:0 0 9px; }
+  #stats, #end { font:12px ui-monospace,monospace; color:var(--ink); }
+  .meter { display:grid; grid-template-columns:150px 1fr 54px; gap:8px; align-items:center; margin:3px 0; font-size:12px; }
+  .bar { height:10px; background:#131c28; border:1px solid var(--edge); border-radius:5px; position:relative; overflow:hidden; }
+  .bar i { position:absolute; top:0; bottom:0; background:#8fd0ff; }
+  #m4 { background:#ff6b6b; }
+  .val { font:11px ui-monospace,monospace; color:var(--ink); text-align:right; }
+  #choice { font:600 12px ui-monospace,monospace; margin:6px 0 10px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>The Collision Reflex</h1>
+  <label>craft <select id="kind"></select></label>
+  <label>draw <select id="draw"></select></label>
+  <label>joust <input id="seed" type="number" min="1" max="99999999" value="939596"></label>
+  <button id="play">Pause</button><button id="one">Step</button><button id="again">Restart</button>
+  <label>speed <select id="speed"><option value="15">slow</option><option value="30" selected>as flown</option><option value="120">fast</option></select></label>
+</header>
+<main>
+  <div class="views">
+    <h2>From outside (drag to turn): blue is the craft, orange while its reflex has it breaking away, red the autopilot, white when the hulls touch</h2>
+    <canvas id="out" width="720" height="440"></canvas>
+    <h2>From the craft's nose, all the way round (the middle is dead ahead; the edges are behind it): the other craft at the size it looks</h2>
+    <canvas id="eye" width="720" height="180"></canvas>
+  </div>
+  <aside>
+    <p id="stats">flying the joust...</p>
+    <p id="end"></p>
+    <div class="meter"><span>how big it looks</span><div class="bar"><i id="m1"></i></div><span class="val" id="v1"></span></div>
+    <div class="meter"><span>how fast it looms</span><div class="bar"><i id="m2"></i></div><span class="val" id="v2"></span></div>
+    <div class="meter"><span>the craft's hull</span><div class="bar"><i id="m3"></i></div><span class="val" id="v3"></span></div>
+    <div class="meter"><span>the autopilot's hull</span><div class="bar"><i id="m4"></i></div><span class="val" id="v4"></span></div>
+    <p id="choice"></p>
+    <div id="said"></div>
+  </aside>
+</main>
+<script type="module">
+import * as S from "/brain/flyRamShow.mjs";
+
+const el = (id) => document.getElementById(id), out = el("out"), g = out.getContext("2d"), eye = el("eye"), ge = eye.getContext("2d"), TRAINED = new Set(S.ARMS);
+const option = (sel, value, text) => { const o = document.createElement("option"); o.value = value; o.textContent = text; sel.appendChild(o); };
+for (const k of S.KINDS) option(el("kind"), k, S.LABELS[k]);
+for (let d = 1; d <= S.DRAWS; d++) option(el("draw"), d, String(d));
+for (const line of S.saidLines()) { const p = document.createElement("p"); p.textContent = line; el("said").appendChild(p); }
+el("kind").value = "never"; el("seed").value = S.FIRST_JOUST;
+
+let ep = null, k = 0, playing = true, timer = null, token = 0, under = null, records = null; const cam = { ...S.CAM };
+async function fetched(file, read) { const res = await fetch("/" + file); if (!res.ok) throw new Error(`${file} answered ${res.status}`); return read(res); }
+
+function meter(id, value, signed) { const m = el("m" + id), v = Math.max(-1, Math.min(1, value)); if (signed) { m.style.left = (v < 0 ? 50 + v * 50 : 50) + "%"; m.style.width = Math.abs(v) * 50 + "%"; } else { m.style.left = "0"; m.style.width = Math.max(0, v) * 100 + "%"; } }
+function paint() {
+  const last = ep.frames.length - 1, i = Math.min(k, last), f = ep.frames[i], sc = S.scene(ep, i, cam, out.width, out.height), e = S.eyeOf(ep, i), done = k >= ep.ticks;
+  g.fillStyle = "#05070b"; g.fillRect(0, 0, out.width, out.height); g.lineWidth = 1.5;
+  for (const [x1, y1, x2, y2, c] of sc.lines) { g.strokeStyle = S.COLOURS[c]; g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke(); }
+  ge.fillStyle = "#05070b"; ge.fillRect(0, 0, eye.width, eye.height);
+  ge.strokeStyle = "#1c2838"; ge.lineWidth = 1; ge.beginPath(); for (const q of [0.25, 0.5, 0.75]) { ge.moveTo(eye.width * q, 0); ge.lineTo(eye.width * q, eye.height); } ge.moveTo(0, eye.height / 2); ge.lineTo(eye.width, eye.height / 2); ge.stroke();
+  const ex = eye.width / 2 + e.bearing / Math.PI * eye.width / 2, ey = eye.height / 2 - e.elevation / (Math.PI / 2) * eye.height / 2, er = Math.max(1.5, e.radius / Math.PI * eye.width / 2);
+  ge.fillStyle = f.touch ? S.COLOURS.ram : S.COLOURS.foe; ge.beginPath(); ge.arc(ex, ey, er, 0, Math.PI * 2); ge.fill();
+  meter(1, f.size / Math.PI / 2, false); el("v1").textContent = f.size.toFixed(3); meter(2, f.loom, true); el("v2").textContent = f.loom.toFixed(3);
+  const aHp = done ? ep.aHp : f.a.hp, bHp = done ? ep.bHp : f.b.hp;
+  meter(3, aHp / 100, false); el("v3").textContent = Math.max(0, aHp).toFixed(0); meter(4, bHp / 100, false); el("v4").textContent = Math.max(0, bHp).toFixed(0);
+  el("choice").textContent = f.brk ? "the reflex: FIRED -- breaking away" : "the reflex: quiet -- the pilot flies";
+  el("choice").style.color = f.brk ? S.COLOURS.breaking : S.COLOURS.craft;
+  el("stats").textContent = `tick ${k} of ${ep.ticks} · ${f.range.toFixed(1)} m apart · ${Number.isFinite(f.seconds) ? f.seconds.toFixed(1) + " s to contact" : "not closing"}${f.touch ? " · THE HULLS TOUCH" : ""}`;
+  el("end").textContent = !done ? "" : `${ep.win ? "The craft won." : ep.loss ? "The craft lost." : "No winner."} Reward ${ep.reward.toFixed(2)}: the fight's ${ep.fight.toFixed(2)}, less ${ep.ramHp.toFixed(1)} hull points lost to ${ep.rams} ram${ep.rams === 1 ? "" : "s"}. The reflex fired on ${ep.breaks} of ${ep.ticks} ticks.`;
+  window.swekRam = { kind: ep.kind, draw: ep.draw, seed: ep.seed, ticks: ep.ticks, t: k, reward: ep.reward, fight: ep.fight, ramHp: ep.ramHp, rams: ep.rams, breaks: ep.breaks, win: ep.win, loss: ep.loss, hash: ep.hash, fingerprint: ep.fingerprint,
+    scene: sc.hash, lines: sc.lines.length, brk: f.brk, touch: f.touch, eye: { x: ex, y: ey, r: er }, az: cam.az, el: cam.el, playing, done, error: null };
+}
+async function start() {
+  const mine = ++token, kind = el("kind").value, trained = TRAINED.has(kind), draw = Number(el("draw").value);
+  const seed = Math.max(1, Math.min(99999999, Math.round(Number(el("seed").value)) || 1)); el("seed").value = seed;
+  el("draw").disabled = !trained; clearTimeout(timer); el("stats").textContent = "flying the joust..."; el("end").textContent = "";
+  try {
+    if (!under) under = S.underOf(await fetched(S.UNDER_FILE, (r) => r.json())); if (mine !== token) return;
+    if (trained && !records) records = S.recordsOf(await fetched(S.RESULTS, (r) => r.text())); if (mine !== token) return;
+    const record = trained ? records.get(`${kind} ${draw}`) : null;
+    if (trained && !record) throw new Error(`${S.RESULTS} holds no ${kind} draw ${draw}`);
+    ep = S.episode(under, S.flyOf(kind, { draw, record }), seed); k = 0; paint();
+    if (playing) timer = setTimeout(tick, 1000 / Number(el("speed").value));
+  } catch (e) {
+    if (mine !== token) return; ep = null;
+    el("stats").textContent = "the joust could not be flown: " + e.message;
+    for (const [c, x] of [[out, g], [eye, ge]]) { x.fillStyle = "#05070b"; x.fillRect(0, 0, c.width, c.height); }
+    window.swekRam = { kind, draw: trained ? draw : null, seed, error: String(e.message) };
+  }
+}
+function tick() { if (!ep || !playing) return; if (k < ep.ticks) { k++; paint(); } if (k >= ep.ticks) { playing = false; el("play").textContent = "Play"; paint(); return; } timer = setTimeout(tick, 1000 / Number(el("speed").value)); }
+function setPlaying(on) { playing = on; el("play").textContent = on ? "Pause" : "Play"; clearTimeout(timer); if (on) { if (ep && k >= ep.ticks) k = 0; tick(); } else if (ep) paint(); }
+el("play").addEventListener("click", () => setPlaying(!playing));
+el("one").addEventListener("click", () => { if (!ep) return; setPlaying(false); if (k < ep.ticks) k++; paint(); });
+el("again").addEventListener("click", () => { playing = true; el("play").textContent = "Pause"; start(); });
+for (const id of ["kind", "draw", "seed"]) el(id).addEventListener("change", () => { playing = true; el("play").textContent = "Pause"; start(); });
+let drag = null;
+out.addEventListener("pointerdown", (e) => { drag = { x: e.clientX, y: e.clientY, az: cam.az, el: cam.el }; out.setPointerCapture(e.pointerId); });
+out.addEventListener("pointermove", (e) => { if (!drag) return; cam.az = drag.az + (e.clientX - drag.x) * 0.01; cam.el = Math.max(-1.45, Math.min(1.45, drag.el + (e.clientY - drag.y) * 0.008)); if (ep) paint(); });
+for (const type of ["pointerup", "pointercancel"]) out.addEventListener(type, () => { drag = null; });
+window.swekRamSeek = (t) => { if (!ep) return; setPlaying(false); k = Math.max(0, Math.min(ep.ticks, Math.round(t))); paint(); };
+window.swekRamTurn = (az, elv) => { cam.az = az; cam.el = elv; if (ep) paint(); };
+start();
+</script>
+</body>
+</html>
