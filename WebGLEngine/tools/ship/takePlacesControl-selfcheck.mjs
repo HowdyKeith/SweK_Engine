@@ -52,6 +52,19 @@ await section(async () => {
     fs.rmSync(tmp, { recursive: true, force: true });
 });
 
+console.log("2b. THE RIG'S STUDY (--study rig: four times the pairs and one more control)");
+await section(async () => {
+    const R = P.STUDIES.rig, mine = Object.values(R.sets).flat().map((p) => p.seed), first = Object.values(P.SETS).flat().map((p) => p.seed), gun = [...G.TRAIN_PAIRS, ...G.HELD_OUT_PAIRS, ...G.AUDIT_PAIRS].map((p) => p.seed);
+    ok("!! two studies: `1` is the first registration unchanged; `rig` has 300 train pairs (71001-), 300 held-out (72001-) and 2,500 AUDIT pairs (seeds 73001-73625 of each kind) -- none flown by study 1 or by the gunner study -- nine wirings (the two orientations, the three scrambles, THREE unneighboured circuits, flat), the gains -3 and -1, a reading file and a kept directory of its own", Object.keys(P.STUDIES).join() === "1,rig" && P.STUDIES[1].sets === P.SETS && P.STUDIES[1].wirings === P.WIRINGS && P.STUDIES[1].unneighboured.length === 0 && R.sets.train.length === 300 && R.sets.heldOut.length === 300 && R.sets.audit.length === 2500 && R.sets.train[0].seed === 71001 && R.sets.heldOut[0].seed === 72001 && R.sets.audit[0].seed === 73001 && Math.max(...mine) === 73625 && mine.every((x) => !first.includes(x) && !gun.includes(x)) && R.wirings.join() === "fly:medial,fly:lateral,scrambled:4242,scrambled:1,scrambled:2,unneighboured:4242,unneighboured:1,unneighboured:2,flat" && R.gains.join() === "-3,-1" && R.wirings.every((w) => typeof FT.wiringOf(w).gunnerFactory === "function") && /flyTrackingPlacesControlRig\.reading\.json$/.test(R.reading) && /placesControlRig$/.test(R.kept) && R.reading !== P.READING);
+    const worth = { "fly:medial": 0.8, "fly:lateral": 0.78, "scrambled:4242": 0.72, "scrambled:1": 0.7, "scrambled:2": 0.68, "unneighboured:4242": 0.79, "unneighboured:1": 0.77, "unneighboured:2": 0.75, flat: 0.66 }, calls = [];
+    const res = await P.study(async (w, g, set) => { calls.push({ w, g, set }); return R.sets[set].map((_, i) => (worth[w] - (g + 3) ** 2 / 50) * factor(i)); }, () => {}, R), mf = R.sets.audit.reduce((a, _, i) => a + factor(i), 0) / 2500, close = (s, v) => Math.abs(s.mean - v * mf) < 1e-9;
+    ok("!! flown as the rig's study: ITS wirings at ITS gains (18 train arms), 2,500 audit leads an arm; P1-P3 as before and TWO MORE -- N1 fly:medial less the UNNEIGHBOURED mean (0.80 - 0.77) and N2 the unneighboured mean less the scrambled mean (0.77 - 0.70); the result names its study", res.study === "rig" && calls.filter((c) => c.set === "train").length === 18 && calls.filter((c) => c.set === "audit").length === 9 && calls.every((c) => R.wirings.includes(c.w) && R.gains.includes(c.g)) && res.reading.P1.n === 2500 && close(res.reading.P1, 0.10) && close(res.reading.P3, 0.04) && close(res.reading.N1, 0.03) && close(res.reading.N2, 0.07) && close(res.reading.unneighboured, 0.77) && close(res.reading.scrambled, 0.70) && res.words.N1 === "LEADS");
+    const one = await P.study(standIn([]), () => {});
+    ok("and study 1 has no N1 or N2 (it flew no unneighboured circuit) and names itself", one.study === "1" && !("N1" in one.reading) && !("N2" in one.reading) && !("unneighboured" in one.reading));
+    const bad = spawnSync("node", [CMD, "--study", "big"], { encoding: "utf8", timeout: 180000 });
+    ok("the command refuses a study it does not have, by name", bad.status === 2 && /--study is 1 or rig \(got big\)/.test(bad.stderr));
+});
+
 console.log("3. WHAT WAS FOUND");
 await section(() => {
     if (!fs.existsSync(P.READING)) { console.log("  ----  the study has not been flown here yet: no kept reading to pin"); return; }

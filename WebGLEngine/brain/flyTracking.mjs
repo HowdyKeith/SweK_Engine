@@ -11,7 +11,7 @@
 //   OUT   DNa02 on the right less DNa02 on the left, READ THE ODD WAY as the helm's second variant is: asked for e and for -e, half the difference -- exactly zero when the gun is on its target. One number, S(e), over its own peak.
 //
 // WHAT IS NOT KNOWN AND IS FLOWN BOTH WAYS: which end of the sheet's axis is the FRONT of the visual field. `fly:medial` puts straight ahead at the medial end (place 1) and the rear at the lateral; `fly:lateral` the other way. The data used here cannot say (the gate of the vendored positions says so).
-// THE OTHER WIRINGS: `flat` -- the same circuit with NO places: every cell of an eye answers alike, so only the SIDE of the target is carried; `shuffled:<seed>` -- `fly:medial` with each pathway's targets shuffled within their type; `sine` -- no circuit, S = -sin(e) to a quarter turn and held beyond; `scrambled:<seed>` -- THE CONTROL FOR THE PLACES: the fly's circuit and connections with each eye's cells trading places among themselves, so that a target drives as many cells as much but not the fly's own cells for that bearing.
+// THE OTHER WIRINGS: `flat` -- the same circuit with NO places: every cell of an eye answers alike, so only the SIDE of the target is carried; `shuffled:<seed>` -- `fly:medial` with each pathway's targets shuffled within their type; `sine` -- no circuit, S = -sin(e) to a quarter turn and held beyond; `scrambled:<seed>` -- THE CONTROL FOR THE PLACES: the fly's circuit and connections with each eye's cells trading places among themselves, so that a target drives as many cells as much but not the fly's own cells for that bearing; `unneighboured:<seed>` -- every cell at ITS place and with its own connections onward, and only the LC10a cells' connections TO EACH OTHER shuffled within an eye (a scramble breaks that neighbourhood too; this breaks only it).
 //
 // WHAT IT COMPUTES (tuning(); the gate pins it): with places, S rises smoothly from zero through the overlap and on to a peak near a quarter turn, then falls toward the rear -- a graded command, larger for a target further off -- where `flat` is at its full value by 15 degrees and stays there (a switch).
 // The two orientations differ little in this (the peak moves): the gradient the positions show in which pathway a cell feeds is real and is small beside the overlap and the sheet's own shape.
@@ -62,6 +62,12 @@ function circuitOf(M, { front = 1, flat = false, baseline = BASELINE, places = P
     const raw = (e) => { const h = cells(e); return h[DNA02_R] - h[DNA02_L]; };
     return { cells, raw };
 }
+/** THE NEIGHBOURHOOD SHUFFLED, THE PLACES KEPT: the retarget for `unneighboured:<seed>` -- only the LC10a-to-LC10a connections move, each to another LC10a cell of the same eye (one random permutation an eye). Every cell stays at its place and keeps its connections onto AOTU019 and AOTU025. */
+function unneighbourOf(seed) {
+    const rng = mulberry(seed), map = new Map();
+    for (const eye of [EYE_L, EYE_R]) { const p = eye.slice(); for (let i = p.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [p[i], p[j]] = [p[j], p[i]]; } eye.forEach((c, k) => map.set(c, p[k])); }
+    return (sourceType, to) => (sourceType === "LC10a" && TYPES[to] === "LC10a" ? map.get(to) : to);
+}
 /** THE PLACES SCRAMBLED: each eye's cells keep their connections and trade PLACES among themselves (one random permutation an eye, from `seed`). The set of places is the same, so a target still drives as many cells as much; WHICH cell is where -- and so which pathway the cells under a target feed -- is not the fly's. */
 function scrambledPlaces(seed) {
     const rng = mulberry(seed), out = Array.from(PL.ACROSS);
@@ -93,8 +99,9 @@ export function wiringOf(name = "fly:medial") {
     else if (name === "flat") { const c = circuitOf(matrixOf(), { flat: true }); lib = libraryOf(name, c.raw, c.cells); }
     else if (name === "sine") lib = libraryOf(name, (e) => -Math.sin(Math.max(-Math.PI / 2, Math.min(Math.PI / 2, e))));
     else if (m) { const c = circuitOf(matrixOf(retargetOf(Number(m[1]))), { front: 1 }); lib = libraryOf(name, c.raw, c.cells); }
+    else if (/^unneighboured:\d+$/.test(String(name))) { const c = circuitOf(matrixOf(unneighbourOf(Number(String(name).slice(14)))), { front: 1 }); lib = libraryOf(name, c.raw, c.cells); }
     else if (/^scrambled:\d+$/.test(String(name))) { const c = circuitOf(matrixOf(), { front: 1, places: scrambledPlaces(Number(String(name).slice(10))) }); lib = libraryOf(name, c.raw, c.cells); }
-    else throw new Error(`flyTracking.wiringOf: a wiring is "fly:medial", "fly:lateral", "flat", "sine", "shuffled:<seed>" or "scrambled:<seed>" (got ${name})`);
+    else throw new Error(`flyTracking.wiringOf: a wiring is "fly:medial", "fly:lateral", "flat", "sine", "shuffled:<seed>", "scrambled:<seed>" or "unneighboured:<seed>" (got ${name})`);
     LIBS.set(name, lib); return lib;
 }
 const MAIN = wiringOf("fly:medial");
