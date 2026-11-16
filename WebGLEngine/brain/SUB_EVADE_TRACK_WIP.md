@@ -76,3 +76,11 @@ Why these: the lead over both comparators is large (about +1.05 on DEV), so R0 i
 ## 7. Cost
 
 29 matchups of 96 duels a set, about three minutes of one core; the command, its gate and a sabotage pass are the work.
+
+## AMENDMENT A (2026-11-16; written after the command and its gate and after the smoke run, BEFORE any geometry of the DEV set 118001 to 118048 or of HELD is flown)
+
+**1. The smoke headline, said before any DEV geometry (the rule of section 3).** The command's `smoke` was run on geometries 1 to 4 (8 duels a matchup; never recorded; free to read). Its headline was **"ONSET AT D / SLOW END MIXED"**: R0 holds on it (league7100 over league7001 +1.902, over exploit7204 +1.548); **RD1 holds** (the arm at D pays on both comparator bases, +1.517 and +1.181); the values that pay on both are **2.5, 3.0 and D**; **3.5 does not pay on both** (+1.140 on league7001, which is decided, and +0.794 on exploit7204, which is not); the arm at 1.0 is NEUTRAL on both bases (-0.413 and exactly 0, 0-8-0), so the slow end is MIXED; the peaks are 2.00 (+1.525) on league7001 and 2.50 (+1.561) on exploit7204. **Of the donor base's arms, every one from 1.0 to 3.5 is exactly 0.000, 0-8-0 (eight draws), and only 4.0 and 4.5 are decided against league7100 (-1.522 and -1.546):** on these four geometries league7100 with any trackSpeed from 1.0 to 3.5 plays out the same eight draws as league7100 itself. Eight duels on four geometries are a smoke test and not a reading, and **the forecasts of section 5 stand as written before it was seen and are scored as written; but I have seen this headline, and the 30 given to "ONSET AT D" and the 40 given to PAYS are no longer blind numbers**: the DEV read and HELD are the evidence, and the smoke is not counted in them.
+
+**2. One clause of the grid check is stated here, which section 4 says in fewer words (an identity, said before data):** the check "D is league7100's trackSpeed of the files and the grid is strictly increasing" in the command also requires that **each of the three bases carries exactly the nine values of the grid** (no arm dropped or changed). It is in the command and its gate.
+
+**3. What is not changed:** the grid, the arms, the sets, the rules R0 and RD1 to RD4, the forecasts, the geometries, the order of work.
