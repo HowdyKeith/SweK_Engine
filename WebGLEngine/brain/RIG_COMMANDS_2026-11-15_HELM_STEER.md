@@ -53,3 +53,17 @@ It prints H1 to H4, each with its word, and `QUALIFIES` or `DOES NOT QUALIFY`. I
 ## 4. Send back
 
 The console output of step 3, and the folders `brain\rig-results\helmSteerRig` and `brain\rig-results\helmSteerRigControl` with the two `helmSteerWeightsRig*` files.
+
+## 5. The same again over the circuit WITH ITS INPUTS (added 2026-11-16; optional, after steps 1-4)
+
+`brain/helmCompassPolicy.mjs` is the steering circuit with the compass and the goal cells: 220 neurons, 7,981 connections. Registered with pairs of its own (train 24001-, held-out 25001-, audit 26001-). The sandbox's one search a wiring (150 children) found the same thing as over the smaller circuit: a helm that leads the rule (+0.466) on three weights and no synapse. A fight costs more here (about three to four times a steering-circuit fight in the sandbox).
+
+```
+node tools\ship\trainHelmSteer.mjs search --circuit compass --seed 9610 --iters 1000 --record brain\rig-results\helmCompassRig\s9610.json
+node tools\ship\trainHelmSteer.mjs search --circuit compass --seed 9611 --iters 1000 --record brain\rig-results\helmCompassRig\s9611.json
+node tools\ship\trainHelmSteer.mjs search --circuit compass --wiring control:4242 --seed 9630 --iters 1000 --record brain\rig-results\helmCompassRigControl\s9630.json
+node tools\ship\trainHelmSteer.mjs search --circuit compass --wiring control:4242 --seed 9631 --iters 1000 --record brain\rig-results\helmCompassRigControl\s9631.json
+node tools\ship\trainHelmSteer.mjs finish --circuit compass --records-dir brain\rig-results\helmCompassRig --control-records-dir brain\rig-results\helmCompassRigControl --out brain\helmCompassWeightsRig.json --write
+```
+
+The last line ONCE, after the four searches. Send back its output, the two folders and the `helmCompassWeightsRig*` files.
