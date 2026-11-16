@@ -128,3 +128,54 @@ DEV is free to read. **HELD (119001 to 119048) is NOT flown by this note's work 
 ## PREMISE UPDATE (2026-11-16, after the move round's HELD; not an amendment: no rule, forecast, set or arm of this note changes)
 
 The premise of this note said the move round's HELD was waiting for Keith's word. **It has been flown** (`SUB_EVADE_MOVE_WIP.md`, HELD RESULT, geometries 117001 to 117048, flown once): R0 held and the headline was **TRACKSPEED** again: trackSpeed alone grafted onto league7001 and exploit7204 is **+0.820 and +0.908**, taken out of league7100 **-0.863 and -0.871**, searchSpeed nothing. So the single-number claim that this round rests on now stands on **two sets of its own round (DEV and HELD)** and the ladder's two sets; **this note's own HELD is still not flown.**
+
+## HELD RESULT (2026-11-16; `node tools/ship/takeEvadeTrack.mjs held --write`, geometries 119001 to 119048 (96 duels a matchup), flown ONCE, exit 0; record `brain/subEvadeTrackHeld.json`: 29 matchups, no check failed)
+
+Flown on Keith's word ("Rounds 2 and 3 HELD can fly when ready"), after the DEV read above; the registration and the command's HELD gate allowed it (R0 held on DEV and no check failed). **The rules are about this set.**
+
+**R0 holds.** league7100 beats league7001 by **+1.328** (z 7.5, 48-42-6) and exploit7204 by **+1.415** (z 6.8, 52-36-8), both decided.
+
+**The arms** (HELD edge over the arm's own base; DEV beside it in the last two columns):
+
+| trackSpeed | league7001 | exploit7204 | league7100 (read, not ruled) | DEV: league7001, exploit7204 |
+|---|---|---|---|---|
+| 1.0 | -0.241 (z -2.2; 2-85-9) | -0.204 (z -2.6; 6-78-12) | +0.221 | -0.070, -0.171 |
+| 1.5 | **+0.655** (z 4.8) | +0.009 (11-75-10) | +0.220 (z 2.8) | +0.674, +0.045 |
+| 2.0 | **+1.178** (z 9.0) | **+0.555** (z 3.4) | +0.094 | +1.302, +0.692 |
+| 2.5 | **+1.113** (z 8.8) | **+1.018** (z 6.3) | +0.094 | +1.173, +1.060 |
+| 3.0 | **+1.075** (z 8.9) | **+0.843** (z 5.1) | +0.094 | +0.951, +1.262 |
+| **D (3.15)** | **+1.075** (z 8.3) | **+0.714** (z 4.0) | identical | +0.919, +1.200 |
+| 3.5 | **+0.672** (z 5.7) | +0.398 (z 2.7) | -0.347 (z -3.4) | +0.699, +0.471 |
+| 4.0 | +0.096 (z 1.4) | -0.026 | **-0.987** (z -8.5) | +0.096, +0.205 |
+| 4.5 | +0.019 | identical | **-1.196** (z -11.4) | -0.295, identical |
+
+**RD1 THE GRAFT REPLICATES: yes** (D pays on both: +1.075 and +0.714). **RD2 THE ONSET:** the values that pay on both comparator bases are **2.0, 2.5, 3.0 and D**; the highest is D. **RD3 THE SLOW END:** the arm at 1.0 is NEUTRAL on both (-0.241 and -0.204): **SLOW END MIXED**. **RD4 THE HEADLINE: ONSET AT D / SLOW END MIXED** (the same as DEV). The peaks (reported): league7001 at 2.0 (+1.178), exploit7204 at 2.5 (+1.018). The donor base is decided against league7100 at 4.0 and 4.5.
+
+**The forecasts, scored** (as the larger side of each probability; none is at 50):
+
+| forecast | probability | outcome |
+|---|---|---|
+| R0 holds on DEV | 92 | **true** |
+| R0 holds on HELD | 90 | **true** |
+| RD1: the graft at D replicates | 85 | **true** |
+| onset ABOVE D | 55 | false (**a miss**: the larger side was "yes") |
+| onset AT D | 30 | **true (a miss**: the larger side was "no") |
+| NOT REPLICATED | 15 | false (right) |
+| SLOW END PAYS | 40 | false (right) |
+| SLOW END COSTS | 30 | false (right) |
+| SLOW END MIXED | 30 | **true (a miss)** |
+| the arm at 2.0 PAYS on both | 60 | **true** |
+| both peaks at 3.0 or below | 45 | **true (a miss)** |
+| the donor's arm at 4.5 COSTS | 90 | **true** |
+
+**8 of 12 as the larger side.** The four misses are four outcomes I gave 55, 30, 30 and 45: the onset is at D, not above it; the slow end is mixed; the peaks are low. **Said plainly:** two of those (onset at D, slow end mixed) were the smoke report's headline (Amendment A item 1) and the DEV read's, which I had seen before HELD; the registered forecasts are scored as written.
+
+**Observations (HELD, for reading, not rules; the DEV read's observations stand):**
+
+1. **HELD replicates DEV in every rule and in the shape.** The hump is the same: on league7001 the gain climbs from -0.24 at 1.0 through +0.655 at 1.5 to **+1.18 at 2.0**, holds +1.08 to +1.11 from 2.5 to D, falls to +0.67 at 3.5 and is about 0 at 4.0 and 4.5; on exploit7204 it peaks at **+1.02 at 2.5**, +0.84 at 3.0, +0.71 at D, +0.40 at 3.5, and is about 0 at 4.0. Both pay at 2.0, 2.5, 3.0 and D on both sets.
+2. **The onset reading is firmer than on DEV.** 3.5 is **+0.398** on exploit7204 here, 0.102 under the bar (on DEV +0.471, 0.029 under), while it pays on league7001 on both sets (+0.672, +0.699): the paying range ends between 3.15 and 3.5 for exploit7204 and between 3.5 and 4.0 for league7001, and "ONSET AT D" is the reading on both sets.
+3. **The slow end is a stalemate with a small cost.** The arms at 1.0 draw 85 and 78 of 96 duels and are **slightly negative on both bases on both sets** (-0.241 and -0.204 on HELD, z -2.2 and -2.6; -0.070 and -0.171 on DEV): sub-bar, the same sign four times. The arm at 1.5 on exploit7204 is 11-75-10 (+0.009) on HELD and 7-84-5 on DEV. Post-hoc: very slow tracking neither kills nor is killed, and loses a little.
+4. **The donor base repeats its cost above D and its nothing below.** League7100 with 4.0 and 4.5 is -0.987 and -1.196 (DEV -0.790, -1.060), 3.5 is -0.347 (z -3.4; DEV -0.251); with 1.0 to 3.0 it is +0.094 to +0.221 on HELD (decided on none; z up to 2.8 at 1.5) after -0.114 to +0.065 on DEV: the sign is not the same on the two sets at 1.0 and 1.5, so I read **no effect of slowing league7100 below its own value** and not the HELD signs.
+5. **Edges against different bases are not comparable with one another**, as on DEV; the table is nine arms of each base against that base.
+
+**What is NOT shown:** the effect against an opponent that is not the boat's own base (the reach round has the same limit); a graded dose of any other number; the shape between grid values; a mechanism for the stalemate.
