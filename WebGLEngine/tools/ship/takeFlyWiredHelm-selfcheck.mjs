@@ -75,6 +75,14 @@ await section(() => {
     ok("an arm's kept file is named for its wiring, its gain and its set", F.keptName("fly", -0.5, "train") === "fly_g-0.5_train.json" && F.keptName(SH, 2, "audit") === "shuffled4242_g2_audit.json");
 });
 
+console.log("4b. THE SECOND STUDY (registered after the first was read)");
+await section(async () => {
+    const S2 = F.STUDIES[2], mine = Object.values(S2.sets).flat().map((p) => p.seed), first = [...F.TRAIN_PAIRS, ...F.HELD_OUT_PAIRS, ...F.AUDIT_PAIRS].map((p) => p.seed);
+    ok("!! two studies: 1 is the first registration unchanged; 2 has the odd read-outs of the second variant (`fly2~odd`, `shuffled2:4242~odd`) and the sine, seven gains from -4 to 2, 300/300/600 pairs from 44001, 45001 and 46001 -- none flown by study 1, and none the pilot's scratch seeds (90001-90010) -- a file, a kept directory and a policy of its own", Object.keys(F.STUDIES).join() === "1,2" && F.STUDIES[1].sets === F.SETS && F.STUDIES[1].gains === F.GAINS && F.STUDIES[1].out === F.DEFAULT_OUT && JSON.stringify(S2.wirings) === '{"fly":"fly2~odd","shuffled":"shuffled2:4242~odd","sine":"sine"}' && S2.gains.join() === "-4,-2,-1,-0.5,-0.25,0.5,2" && S2.sets.train.length === 300 && S2.sets.audit.length === 600 && S2.sets.train[0].seed === 44001 && S2.sets.heldOut[0].seed === 45001 && S2.sets.audit[0].seed === 46001 && mine.every((x) => !first.includes(x) && x < 90001) && /helmFlyWired2WeightsDefault\.json$/.test(S2.out) && /flyWiredHelm2$/.test(S2.kept) && S2.policy === "helmFlyWired2" && S2.lib === FS.second);
+    const calls = [], r2 = await F.study(async (w, g, set) => { calls.push({ w, g, set }); return S2.sets[set].map((_, i) => (w === "fly2~odd" ? 0.5 - (g + 2) ** 2 / 10 : w === "sine" ? 1 - (g + 4) ** 2 / 10 : -0.5 + 0.01 * g) * factor(i)); }, () => {}, S2), blob = F.blobOf(r2);
+    ok("!! a study flown as study 2 flies ITS wirings at ITS gains (21 train arms), reads fly less shuffled and fly less sine by role, and its blob is a helmFlyWired2 brain that says it is A SECOND ATTEMPT and names the wiring", r2.study === 2 && calls.filter((c) => c.set === "train").length === 21 && calls.every((c) => Object.values(S2.wirings).includes(c.w) && S2.gains.includes(c.g)) && r2.chosen["fly2~odd"].gain === -2 && r2.chosen.sine.gain === -4 && r2.words.F2 === "LEADS" && r2.words.F3 === "TRAILS" && PB.importBrain(PB.describePolicy(FS.POLICY_ID2, FS.second), blob).ok && !PB.importBrain(PB.describePolicy(FS.POLICY_ID, FS), blob).ok && Array.from(blob.weights).join() === "-2,-2" && /A SECOND ATTEMPT, made after the first/.test(blob.by) && /the wiring "fly2~odd"/.test(blob.by) && /shuffled2:4242~odd, at its own best gain/.test(blob.by) && /seeds 46001-46150/.test(blob.by) && /threshold \(0\.05\)/.test(blob.by) && F.keptName("fly2~odd", -2, "audit") === "fly2-odd_g-2_audit.json");
+});
+
 console.log("5. REAL PAIRS, THE COMMAND, AND WHAT WAS FOUND");
 await section(async () => {
     const [a, b] = [F.jobsOf("fly", -1, [F.TRAIN_PAIRS[0]])[0], F.jobsOf(SH, -1, [F.TRAIN_PAIRS[0]])[0]].map(leadOf);
@@ -83,9 +91,10 @@ await section(async () => {
     const bad = run("--speed", "3"), again = run("--out", out, "--kept", path.join(tmp, "kept"));
     ok("!! THE COMMAND REFUSES an option it does not know, and A SECOND READ OF THE AUDIT (the reading file is there) before it flies anything: no kept flight is written", bad.status === 2 && /unknown option --speed/.test(bad.stderr) && again.status === 1 && /THE AUDIT HAS BEEN READ ONCE/.test(again.stderr) && !fs.existsSync(path.join(tmp, "kept")));
     fs.rmSync(tmp, { recursive: true, force: true });
-    const rf = F.DEFAULT_OUT.replace(/\.json$/, ".reading.json");
-    if (!fs.existsSync(rf)) { console.log("  ----  the study has not been flown here yet: no kept reading to pin"); return; }
-    /*@@FOUND@@*/
+    const rd = JSON.parse(fs.readFileSync(F.DEFAULT_OUT.replace(/\.json$/, ".reading.json"), "utf8")), kept = (w, g, set) => JSON.parse(fs.readFileSync(path.join(F.KEPT_DIR, F.keptName(w, g, set)), "utf8")).leads, re = F.readings({ fly: kept("fly", 1, "audit"), shuffled: kept(SH, -1, "audit"), sine: kept("sine", -2, "audit") }).reading;
+    ok("!! STUDY 1, AS KEPT AND RE-DERIVED FROM THE KEPT FLIGHTS: the fly-wired helm TRAILS the rule at every one of its eight gains on the train pairs (its `best`, +1, by -1.16) and on the 600 audit pairs by 1.275; the shuffled helm trails by 1.305 and THE TWO CANNOT BE TOLD APART (F2 +0.029); THE SINE HELM LEADS BY 1.069 at a gain of -2, so the fly's helm trails it by 2.345. It did not qualify and there is no weights file", rd.chosen.fly.gain === 1 && rd.chosen.fly.rows.every((r) => r.stat.mean < -1) && rd.chosen[SH].gain === -1 && rd.chosen.sine.gain === -2 && Math.abs(rd.reading.F1.mean + 1.275) < 5e-4 && rd.words.F1 === "TRAILS" && Math.abs(rd.reading.F2.mean - 0.029) < 5e-4 && rd.words.F2 === "CANNOT BE TOLD" && Math.abs(rd.reading.F3.mean + 2.345) < 5e-4 && rd.words.F3 === "TRAILS" && Math.abs(rd.reading.sine.mean - 1.069) < 5e-4 && rd.words.sine === "LEADS" && Math.abs(rd.reading.shuffled.mean + 1.305) < 5e-4 && !rd.verdict.ok && !fs.existsSync(F.DEFAULT_OUT)
+        && ["F1", "F2", "F3", "shuffled", "sine"].every((k) => Math.abs(re[k].mean - rd.reading[k].mean) < 1e-12) && fs.readdirSync(F.KEPT_DIR).length === 30);
+    ok("the sine helm's train leads say which way to turn: every NEGATIVE gain leads the rule (+0.70 to +1.08) and every positive one trails it (-1.3 to -2.3)", rd.chosen.sine.rows.every((r) => (r.gain < 0 ? r.stat.mean > 0.6 : r.stat.mean < -1)));
 });
 
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);

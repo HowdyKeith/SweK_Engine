@@ -55,12 +55,13 @@ function matrixOf(retarget = null) {
     return { start, src: Int32Array.from(src), val: Float64Array.from(val) };
 }
 /** A steering circuit over a matrix: steer(H, G) -> D, and cells(H, G) -> the 220 activities after the three steps (for a picture or a gate). */
-function circuitOf(M, { threshold = THRESHOLD } = {}) {
+function circuitOf(M, { threshold = THRESHOLD, perPlace = false } = {}) {
     const bias = new Float64Array(N); for (const i of PFL) bias[i] = -threshold;
+    const share = new Float64Array(N).fill(1); if (perPlace) { const count = new Map(), place = (i) => (TYPES[i] === "EPG" ? "E" + PHI[i] : "F" + PSI[i]); for (const i of [...EPG, ...FC2]) count.set(place(i), (count.get(place(i)) || 0) + 1); for (const i of [...EPG, ...FC2]) share[i] = 1 / count.get(place(i)); }   // `perPlace`: a glomerulus's or a column's bump is shared among the cells there (2-4 compass cells a glomerulus, 9-11 goal cells a column), so every PLACE carries the same total
     function cells(H, G) {
         let h = new Float64Array(N);
-        for (const i of EPG) { const c = Math.cos(H - PHI[i]); h[i] = c > 0 ? c : 0; }
-        for (const i of FC2) { const c = Math.cos(G - PSI[i]); h[i] = c > 0 ? c : 0; }
+        for (const i of EPG) { const c = Math.cos(H - PHI[i]); h[i] = c > 0 ? c * share[i] : 0; }
+        for (const i of FC2) { const c = Math.cos(G - PSI[i]); h[i] = c > 0 ? c * share[i] : 0; }
         for (let s = 0; s < STEPS; s++) { const y = new Float64Array(N); for (let i = 0; i < N; i++) { let a = h[i] + bias[i]; for (let t = M.start[i], e = M.start[i + 1]; t < e; t++) a += M.val[t] * h[M.src[t]]; y[i] = a > 0 ? a : 0; } h = y; }
         return h;
     }
@@ -74,7 +75,7 @@ function retargetOf(seed) {
 
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 /** The helm library over a steering function steer(H, G) -> D: brain/helmPolicy.mjs's contract (helmFor, helmFactory, zeroWeights, WEIGHT_COUNT) with two weights. */
-function libraryOf(name, steer, cells = null) {
+function libraryOf(name, steer, cells = null, amplitude = AMPLITUDE) {
     const zeroWeights = () => new Float32Array(WEIGHT_COUNT);
     function helmFor(w) {
         function helm(rule, ctx) {
@@ -82,24 +83,38 @@ function libraryOf(name, steer, cells = null) {
             if (w[0] === 0 && w[1] === 0) { helm.last = { H: [0, 0], G: [0, 0], D: [0, 0] }; return rule; }   // the zero gains are the rule: nothing is added, not even a zero
             const g = P6.geometry(ctx.body, { pos: ctx.foe.body.pos, vel: ctx.foe.body.vel }, { thrustForce: 0, standoff: 1e9 }), f = RB.rotateByQuat(ctx.body.q, [1, 0, 0]), u = RB.rotateByQuat(ctx.body.q, [0, 0, 1]);
             const H = [Math.atan2(u[1], u[0]), Math.atan2(f[1], f[0])], e = [g.eBody[1], g.eBody[2]], G = [wrap(H[0] + e[0]), wrap(H[1] + e[1])], D = [steer(H[0], G[0]), steer(H[1], G[1])], lim = ctx.ship.maxAlpha, torque = rule.torque.slice();
-            for (let a = 0; a < 2; a++) torque[a + 1] += TORQUE_FRACTION * lim * ctx.body.I[a + 1] * Math.tanh(w[a] * D[a] / AMPLITUDE);
+            for (let a = 0; a < 2; a++) torque[a + 1] += TORQUE_FRACTION * lim * ctx.body.I[a + 1] * Math.tanh(w[a] * D[a] / amplitude);
             helm.last = { H, G, D };
             return { torque, thrust: rule.thrust };
         }
         helm.last = null;
         return helm;
     }
-    return Object.freeze({ name, FEATURES, HIDDEN, OUTPUTS, WEIGHT_COUNT, TORQUE_FRACTION, steer, cells, zeroWeights, handWeights: zeroWeights, helmFor, helmFactory: (w) => () => helmFor(w) });
+    return Object.freeze({ name, amplitude, FEATURES, HIDDEN, OUTPUTS, WEIGHT_COUNT, TORQUE_FRACTION, steer, cells, zeroWeights, handWeights: zeroWeights, helmFor, helmFactory: (w) => () => helmFor(w) });
 }
 const FLY_CIRCUIT = circuitOf(matrixOf()), FLY = libraryOf("fly", FLY_CIRCUIT.steer, FLY_CIRCUIT.cells), SINE = libraryOf("sine", (H, G) => -AMPLITUDE * Math.sin(G - H)), SHUFFLED = new Map();
+// THE SECOND VARIANT (`fly2`, `shuffled2:<seed>`), MADE AFTER THE FIRST STUDY WAS READ (tools/ship/takeFlyWiredHelm.mjs: the helm on `fly` TRAILS the rule by 1.3 while the sine helm LEADS it by 1.1 -- the mean signal is right and the wander from heading to heading ruins it). Here a glomerulus's or a column's bump is
+// SHARED among the cells there, so every place carries the same total whatever its number of cells; the threshold is 0.05 (again chosen on the tuning curve, from 0.03, 0.05, 0.1, 0.2: the best ratio of amplitude to wander). Measured: correlation -0.991, amplitude 0.0127, wander 0.0027 -- a ratio of 4.6 where the first
+// variant has 1.8. Everything else is the first variant's. It is a second attempt and is said to be one wherever it is used.
+export const THRESHOLD2 = 0.05, AMPLITUDE2 = 0.0127;
+const FLY2_CIRCUIT = circuitOf(matrixOf(), { threshold: THRESHOLD2, perPlace: true }), FLY2 = libraryOf("fly2", FLY2_CIRCUIT.steer, FLY2_CIRCUIT.cells, AMPLITUDE2), SHUFFLED2 = new Map();
 /** The library for a wiring NAME: "fly"; "shuffled:<seed>" (the same cells and weights, each pathway's targets shuffled within their type); "sine" (no circuit: an ideal comparator of the fly circuit's amplitude and sign). */
+const ODD = new Map();
 export function wiringOf(name = "fly") {
+    // "<wiring>~odd": THE SAME CIRCUIT ASKED TWICE, the goal on either side of the heading by the same error, and half the difference taken -- D(H, H + e) less D(H, H - e), over two. Odd in the error by construction, so EXACTLY ZERO WHEN THE SHIP IS ON ITS GOAL, whatever the heading; what a wander that does not depend on
+    // the error's sign contributes is gone, and the circuit still does the comparing. A helm-side read-out, not a claim about a fly.
+    if (typeof name === "string" && name.endsWith("~odd")) { if (!ODD.has(name)) { const base = wiringOf(name.slice(0, -4)); ODD.set(name, libraryOf(name, (H, G) => (base.steer(H, G) - base.steer(H, 2 * H - G)) / 2, null, base.amplitude)); } return ODD.get(name); }
     if (name === "fly") return FLY;
     if (name === "sine") return SINE;
-    const m = /^shuffled:(\d+)$/.exec(String(name)); if (!m) throw new Error(`flySteering.wiringOf: a wiring is "fly", "sine" or "shuffled:<seed>" (got ${name})`);
+    if (name === "fly2") return FLY2;
+    const m2 = /^shuffled2:(\d+)$/.exec(String(name));
+    if (m2) { const seed = Number(m2[1]); if (!SHUFFLED2.has(seed)) { const c = circuitOf(matrixOf(retargetOf(seed)), { threshold: THRESHOLD2, perPlace: true }); SHUFFLED2.set(seed, libraryOf(`shuffled2:${seed}`, c.steer, c.cells, AMPLITUDE2)); } return SHUFFLED2.get(seed); }
+    const m = /^shuffled:(\d+)$/.exec(String(name)); if (!m) throw new Error(`flySteering.wiringOf: a wiring is "fly", "sine", "shuffled:<seed>", "fly2" or "shuffled2:<seed>" (got ${name})`);
     const seed = Number(m[1]); if (!SHUFFLED.has(seed)) { const c = circuitOf(matrixOf(retargetOf(seed))); SHUFFLED.set(seed, libraryOf(`shuffled:${seed}`, c.steer, c.cells)); }
     return SHUFFLED.get(seed);
 }
+/** THE SECOND HELM, as a policy of its own (`helmFlyWired2`): the second variant read the odd way (`fly2~odd`). A brain file for it is two gains, as the first's. */
+export const POLICY_ID2 = "helmFlyWired2", second = wiringOf("fly2~odd");
 /** The circuit with another threshold (for the gate's and the header's claim about what the threshold does). */
 export const withThreshold = (threshold) => circuitOf(matrixOf(), { threshold });
 export const steer = FLY.steer, cells = FLY.cells, zeroWeights = FLY.zeroWeights, handWeights = FLY.handWeights, helmFor = FLY.helmFor, helmFactory = FLY.helmFactory, topology = CX;
