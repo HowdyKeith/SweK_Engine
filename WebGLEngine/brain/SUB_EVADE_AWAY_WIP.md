@@ -76,3 +76,42 @@ Why these: against its own copy a hunter gained on three bases of 14, all strong
 **2. A property of the design that the smoke shows and that this note did not say (said before data; no rule is changed).** The effect of a change is the difference of two edges, and **an edge has a ceiling**: against the weak evaders the unchanged hunter already scores **+3.22 to +3.31** in both seats' mean on the smoke geometries (30 of the 42 BASE edges), so there is no room for a slower tracker to add anything there (its SLOW edge there is within 0.05 of the BASE edge on all thirty; the largest difference is 0.043); the other twelve BASE edges run from -1.93 to +2.41, and these are the opponents against which a change can show. **An opponent the hunter beats at the ceiling therefore reads NEUTRAL whatever the trackSpeed does**; the reach read's finding that the effect sits on strong evaders is partly this. The reading is post-hoc, from the smoke; the registered rules (RA1 to RA4) count what they count, and the report prints BASE and SLOW beside each effect so that it can be seen.
 
 **3. What is not changed:** the hunters, the opponents, the matchups, the sets, the rules R0 and RA1 to RA4, the forecasts, the geometries, the order of work.
+
+## DEV RESULT (2026-11-16; `node tools/ship/takeEvadeAway.mjs dev --write`, geometries 124001 to 124048 (96 duels a matchup), exit 0; record `brain/subEvadeAwayDev.json`: 87 matchups, no check failed)
+
+DEV is free to read. **HELD (125001 to 125048) is NOT flown by this note's work so far**: Keith's earlier HELD words ("fly Round 1 HELD whenever ready", "Rounds 2 and 3 HELD can fly when ready") named those rounds, and his message for these two did not say "fly HELD", so I am waiting for his word. R0 held on DEV and no check failed (none printed), so the command's HELD gate would accept this record. Forecasts are scored on DEV only for "R0 holds on DEV" (88): **TRUE**. The others stand as written for HELD. **I flew DEV on my own reading of "do the round"**, as free-to-read data that gates HELD; it spent the DEV set 124001 to 124048, recorded once.
+
+**R0 holds.** OWN is **+1.107** for league7001 (z 9.3, 40-51-5), **+0.927** for exploit7200 (z 7.3, 40-45-11) and **+0.936** for exploit7204 (z 5.3, 42-41-13), all decided.
+
+**Where the slowed hunter HELPS or HURTS** (the paired effect of SLOW over BASE against each opponent; the BASE edge, the unchanged hunter's, and the SLOW edge beside it; every other opponent is NEUTRAL):
+
+| hunter | opponent | BASE | SLOW | effect | z | status |
+|---|---|---|---|---|---|---|
+| league7001 | league7100 | -1.392 | +0.031 | **+1.423** | 10.2 | HELPS |
+| league7001 | exploit7200 | -0.117 | +0.581 | **+0.698** | 3.8 | HELPS |
+| league7001 | exploit7204 | +0.311 | +1.488 | **+1.177** | 9.6 | HELPS |
+| exploit7200 | league7001 | +0.117 | +1.174 | **+1.057** | 6.4 | HELPS |
+| exploit7200 | league7100 | -0.865 | -0.037 | **+0.828** | 4.3 | HELPS |
+| exploit7200 | exploit7204 | +0.650 | +1.357 | **+0.707** | 4.1 | HELPS |
+| exploit7204 | league7001 | -0.311 | +0.947 | **+1.258** | 9.3 | HELPS |
+| exploit7204 | league7100 | -1.654 | -0.232 | **+1.422** | 7.7 | HELPS |
+| exploit7204 | exploit7200 | -0.650 | +0.513 | **+1.163** | 7.7 | HELPS |
+| exploit7204 | league7103 | +1.802 | +1.180 | **-0.622** | -2.5 | HURTS |
+
+The other **32 of 42** pairs are NEUTRAL: league7001's effects run -0.095 to +0.220, exploit7200's -0.129 to +0.205 and exploit7204's -0.118 to +0.178, with a BASE edge of +1.5 to +3.1 (league7001's and exploit7200's) and +2.5 to +3.0 (exploit7204's).
+
+**RA1 THE REACH:** **3 of 14** for each hunter, **NARROW** for all three. **RA2 THE COST: HURTS SOMEWHERE** (exploit7204 against league7103, -0.622, z -2.5; league7001 against league7103 is +0.220 and exploit7200 against it -0.059, neither decided). **RA3 THE COMMON OPPONENTS:** **league7001, league7100, exploit7200 and exploit7204** (each the opponent of every hunter that meets it). **RA4 THE HEADLINE: AWAY: league7001 NARROW, exploit7200 NARROW, exploit7204 NARROW, HURTS SOMEWHERE.**
+
+**The forecast quantities as printed** (scored on HELD, not here): all three NARROW yes; some GENERAL no; hurts somewhere yes; league7100 common yes; the strong three common yes; G helped by none yes; league7103 hurt yes. **Every one of the seven came out the way I gave the larger probability.**
+
+**Said plainly about this read:** the smoke report (Amendment A item 1) had all three NARROW and the same common opponents but league7103 not hurt and exploit7200 not common; DEV is a different 48 geometries, but **I saw the smoke headline before writing any DEV rule down as read**: the 60 given to "all three NARROW" is not a blind number, and every forecast of section 5 is scored on HELD as written.
+
+**Observations (DEV, for reading, not rules):**
+
+1. **Each hunter is helped against exactly the other strong evaders and league7100.** The four opponents the change helps against are league7001, exploit7200, exploit7204 and league7100, the four boats with evadeSpeed 4.3 or more and evadeTurn 2.65 or more; each hunter is helped against the strong evaders that are not itself, which for each of the three hunters is three of the four (league7100 and the two other strong hunters), and against none of the other ten. This is the reach read's finding (against the boat's own copy) again, now against other boats; **a post-hoc reading of three hunters' lists**, labelled.
+2. **They are the opponents the unchanged hunter does not beat.** Against the four strong boats the BASE edge is **-1.65 to +0.65** (the hunter loses to league7100 by 0.87 to 1.65); against the other ten it is **+1.5 to +3.1**, the ceiling the Amendment A item 2 said, where the effect is within -0.13 to +0.22. **This read cannot separate "a slower tracker helps against strong evaders" from "a slower tracker helps where the hunter was not already winning".**
+3. **Against league7100 the slowed hunter loses almost nothing.** The three hunters lose to league7100 by 1.39, 0.87 and 1.65 unchanged and by **-0.03 to +0.03 (league7001's +0.031, exploit7200's -0.037) and -0.23 (exploit7204)** with D: the change recovers 98%, 96% and 86% of the deficit. league7100's trackSpeed is D, and the move read found its lead over league7001 and exploit7204 to be its trackSpeed's; **here the same number, set on three other boats, closes their gap to league7100 itself.**
+4. **One cost, repeating the reach read's.** exploit7204 against league7103 (evadeSpeed 3.55, evadeTurn 2.80) is **-0.622 (z -2.5)**, BASE +1.802 to SLOW +1.180; the other two hunters' effects against league7103 are +0.220 and -0.059 (z 0.9 and -0.2). The reach read found league7103 costing its own copy 0.49 to 0.61 (DEV and HELD). One opponent, one hunter decided, one set.
+5. **Against G the change does nothing** (-0.095, -0.001 and -0.062: z -1.3 to -0.2), BASE +2.88 to +3.00.
+
+**What is NOT shown:** any HELD read; the effect against opponents with weights or trained after the finders; a hunter that does not gain against its own copy; any dose of trackSpeed (only D is flown); a mechanism.
