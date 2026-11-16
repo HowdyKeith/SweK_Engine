@@ -135,13 +135,38 @@
 //           shape round 15's own sabotage L already found for vertexColors, confirmed again for meshMaterials.
 //   V  RTX round 17 -- rtx-viewer.html's own makeRtSession() call reverted to omit `meshMaterials: MESH_MATERIALS`
 //        -> exit=1, 1 red: section 6's own "the page reads a `meshMaterials` URL param..." test, by name.
+//
+// v4919 -- INSTANCES, THE TREE OVER THEM, THE ANY-HIT CUTOUT (sections 1j, 4g and three rows of 6). Twenty-two plants,
+// each applied, the gate run, the exit read, the file restored byte for byte. NONE WENT 0 RED.
+//   against render/rtViewer.mjs:
+//   V2   each instance's rotation handed to instanceBuffer transposed        -> 7 red: 1j's buffer rows, 4g's nine-against-baked
+//   V3   instanceTree ignored, the list always walked                        -> 5 red     V3b  the tree always walked -> 1 red
+//   V4   the uniform's instance count one short                              -> 8 red
+//   V5   the cutout never reaches the uniforms                               -> 6 red     V5b  its margin halved on the way -> 1 red
+//   V6   cutout 0 read as "off"                                              -> 4 red
+//   V7   `bounds` always the one mesh's                                      -> 4 red
+//   V8   an instance's own albedo ignored                                    -> 1 red     V9   its sbtOffset ignored -> 1 red
+//   V10  the meshes not handed to instanceBuffer, so no tree is appended     -> 12 red: the tree then reads past the instances
+//   V11  the sceneCapture refusal removed                                    -> 1 red
+//   V12  the instance buffer built and never bound                           -> 5 red in 1j, and THE GATE THEN STOPS at section 3-5:
+//        gfx/device.js refuses the dispatch by name ("the shader declares storage buffer "bvhInst" ... and nothing was
+//        bound to it") and this gate has always thrown when its page fails. Exit 1, and the message is the finding.
+//        FIRST RUN OF V12 WAS A THROW INSIDE 1j ITSELF, one red and a TypeError reading `.data` of nothing: the rows read
+//        the bound buffer directly. They read it through inst() now, which is empty when nothing is bound.
+//   V13  instanceGrid turning the other way                                  -> 1 red: the row that pins one transform to the
+//        number, added BEFORE the run because nothing else could see it -- the baked comparison uses the same grid
+//   V14  instanceGrid's gap ignored -> 3 red     V15  placedBounds reading only the first instance -> 3 red
+//   V16  the light left over the one mesh -> 2 red     V17  microfacet instances packed as lambertian -> 2 red
+//   against rtx-viewer.html:
+//   P1 the page never passes instances -> 1 red   P2 it frames the one mesh -> 1 red
+//   P3 the cutout link drops the instances -> 1 red   P4 it passes cutout as a fixed null -> 1 red
 "use strict";
 
 import { gateReport } from "./gateReport.mjs";
 import { webgpuSkipReason, runWgslCompute, runInEngineOrigin } from "./webgpuHarness.mjs";
 import * as V from "../../render/rtViewer.mjs";
 import * as PTW from "../../physics/render/pathTracerWgsl.mjs";
-import { pipelineWgsl, bvhBuffersFromMesh, sbtRecord } from "../../physics/render/rtPipeline.mjs";
+import { pipelineWgsl, pipelineUniforms, bvhBuffersFromMesh, sbtRecord, instanceBuffer, INSTANCE_FLOATS, MESH_META_SLOT, ANYHIT_SLOT, ANY_HIT_SHADERS, EPS } from "../../physics/render/rtPipeline.mjs";
 import { captureAtlasHalves, captureBaseCubemap, packCapturedAtlas } from "../../physics/render/specularProbeCapture.mjs";
 import { fromHalf } from "../../text/slugAtlas.js";
 import { GLBParser } from "../../gpu/GLBParser.js";
@@ -774,6 +799,112 @@ console.log("\n1i. RTX ROUND 17 -- makeRtSession's `meshMaterials` OPTION, AGAIN
         "not silently fall back to one flat material");
 }
 
+// ---- 1j. v4919 -- instances, the tree over them, and the any-hit cutout: WHAT THE SESSION ASKS THE PIPELINE FOR ----
+console.log("\n1j. v4919 -- makeRtSession's `instances`, `instanceTree` AND `cutout`, AGAINST pipelineWgsl(), instanceBuffer() AND pipelineUniforms() (NO GPU NEEDED)");
+{
+    const P = [[-1,-0.5,-0.3],[1,-0.5,-0.3],[1,0.7,-0.3],[-1,0.7,-0.3],[-1,-0.5,1.5],[1,-0.5,1.5],[1,0.7,1.5],[-1,0.7,1.5]];
+    const I = [[0,2,1],[0,3,2],[4,5,6],[4,6,7],[0,5,4],[0,1,5],[3,6,2],[3,7,6],[0,7,3],[0,4,7],[1,6,5],[1,2,6]];
+    const bvh = bvhBuffersFromMesh(P, I, { materialIndex: I.map((_, i) => i % 2) });
+    const mesh = { bvh, bounds: V.meshBounds(bvh), meshRecords: [sbtRecord({ hit: "lambertian", albedo: [1, 0, 0] }), sbtRecord({ hit: "lambertian", albedo: [0, 1, 0] })] };
+    // a device that keeps what it was handed: every compute's text and binds, every buffer's data, every write
+    const stub = () => { const wgsls = [], binds = {}, writes = [];
+        return { wgsls, binds, writes, device: {
+            compute({ wgsl }) { wgsls.push(wgsl); return { bind(name, buf) { binds[name] = buf; }, bindTexture() {} }; },
+            buffer(d) { const b = { data: d.data, write(x) { b.data = x; writes.push(x); }, destroy() {} }; return b; },
+            texture() { return { destroy() {} }; }, pipeline() { return {}; }, frame() { return null; } } }; };
+    const same = (a, b) => !!a && !!b && a.length === b.length && Array.from(a).every((v, i) => Object.is(v, b[i]) || v === b[i]);
+    const view = { w: 4, h: 4, ...V.orbitEye({ center: mesh.bounds.center }), fovDeg: 45 };
+    const eq = (label, got, want, d) => ok(label, got === want, d);
+    // what a session bound as "bvhInst", or an empty array: a session that binds nothing fails its rows and does not throw
+    const inst = (x) => (x.binds.bvhInst && x.binds.bvhInst.data) || new Float32Array(0);
+
+    // -- the two helpers, to exact values
+    const grid = V.instanceGrid(mesh, 3), gb = V.placedBounds(mesh, grid);
+    const det = (m) => m[0] * (m[5] * m[10] - m[6] * m[9]) - m[1] * (m[4] * m[10] - m[6] * m[8]) + m[2] * (m[4] * m[9] - m[5] * m[8]);
+    ok(`instanceGrid(mesh, 3) is nine placements, every one rigid and unmirrored (determinant exactly +1), no two alike`,
+        grid.length === 9 && grid.every((g) => det(g.transform) === 1) && new Set(grid.map((g) => g.transform.join())).size === 9,
+        `determinants: ${grid.map((g) => det(g.transform)).join(" ")}`);
+    ok("and the second cell, to the number: a quarter turn carrying +x to -z, about the vertical through the mesh's centre, then 2.5 back along z",
+        grid[1].transform.every((v, i) => Math.abs(v - [0, 0, 1, -0.6, 0, 1, 0, 0, -1, 0, 0, -1.9][i]) < 1e-6),
+        `[${grid[1].transform.map((v) => +v.toFixed(4)).join(", ")}] -- the direction of the turn is this function's choice, and this row is what holds it`);
+    const pitch = 2 * 1.25, cx = 0, cz = 0.6;
+    const centres = grid.map((g) => { const m = g.transform; return [m[0] * cx + m[2] * cz + m[3], m[8] * cx + m[10] * cz + m[11]]; });
+    ok(`and each carries the mesh's own centre to its cell: pitch ${pitch} (the larger ground extent, 2, and a quarter of it between), centred on the one mesh`,
+        centres.every((c, k) => Math.abs(c[0] - (cx + ((k % 3) - 1) * pitch)) < 1e-6 && Math.abs(c[1] - (cz + (Math.floor(k / 3) - 1) * pitch)) < 1e-6),
+        `cell centres (x, z): ${centres.map((c) => c.map((v) => +v.toFixed(3)).join(",")).join("  ")}`);
+    ok(`placedBounds() of one identity placement is the mesh's own bounds, and of the nine is the box around all of them`,
+        same(V.placedBounds(mesh, [{ transform: [1,0,0,0, 0,1,0,0, 0,0,1,0] }]).min, mesh.bounds.min) && same(V.placedBounds(mesh, [{ transform: [1,0,0,0, 0,1,0,0, 0,0,1,0] }]).max, mesh.bounds.max) &&
+        Math.abs(gb.min[0] + 3.5) < 1e-6 && Math.abs(gb.max[0] - 3.5) < 1e-6 && Math.abs(gb.min[1] + 0.5) < 1e-6 && Math.abs(gb.max[1] - 0.7) < 1e-6 && Math.abs(gb.min[2] + 2.9) < 1e-6 && Math.abs(gb.max[2] - 4.1) < 1e-6,
+        `nine: min ${gb.min.map((v) => +v.toFixed(3))}, max ${gb.max.map((v) => +v.toFixed(3))} -- a quarter-turned copy is 1.8 wide in x where the mesh is 2, so x is set by the unturned ones`);
+
+    // -- instances
+    const a = stub(); const sa = V.makeRtSession(a.device, { mesh, w: 4, h: 4, instances: grid }); sa.renderFrame(view);
+    eq("*** `instances` generates pipelineWgsl({ bvh, rgb, gradient, instances, instanceTree }) BYTE FOR BYTE -- the tree is the default ***",
+        a.wgsls[0], pipelineWgsl({ bvh: true, rgb: true, gradient: true, instances: true, instanceTree: true }));
+    const wantBuf = instanceBuffer(grid.map((g) => ({ transform: g.transform, hit: "lambertian", albedo: V.DEFAULT_ALBEDO })), { rgb: true, meshes: bvh });
+    ok(`  and binds "bvhInst" to instanceBuffer()'s own ${wantBuf.length} floats -- nine instances of the session's albedo, and the tree behind them`,
+        !!a.binds.bvhInst && same(inst(a), wantBuf) && wantBuf.length > 9 * INSTANCE_FLOATS,
+        `bound: ${inst(a).length} floats; nine instances alone are ${9 * INSTANCE_FLOATS}`);
+    const baseU = { spp: 1, seed: 1, view, eps: EPS, rgb: true };
+    ok("  and the uniforms carry the count: pipelineUniforms(..., { bvh: { instanceCount: 9 } }) byte for byte",
+        same(a.writes.find((x) => x.length === 96), pipelineUniforms([], { ...baseU, bvh: { nodeCount: bvh.nodeCount, triCount: bvh.triCount, hit: "lambertian", albedo: V.DEFAULT_ALBEDO, instanceCount: 9 } })) &&
+        a.writes.find((x) => x.length === 96)[MESH_META_SLOT * 4 + 3] === 9);
+    ok("  and the session's `bounds` is placedBounds(), not the one mesh's", same(sa.bounds.min, gb.min) && same(sa.bounds.max, gb.max) && sa.bounds.radius > mesh.bounds.radius * 2,
+        `radius ${sa.bounds.radius.toFixed(3)} against the mesh's ${mesh.bounds.radius.toFixed(3)}`);
+    const b = stub(); V.makeRtSession(b.device, { mesh, w: 4, h: 4, instances: grid, instanceTree: false });
+    ok("`instanceTree: false` walks the LIST -- pipelineWgsl without instanceTree -- over the SAME buffer, tree and all",
+        b.wgsls[0] === pipelineWgsl({ bvh: true, rgb: true, gradient: true, instances: true }) && b.wgsls[0] !== a.wgsls[0] && same(inst(b), wantBuf));
+    const c = stub(); const sc = V.makeRtSession(c.device, { mesh, w: 4, h: 4 }); sc.renderFrame(view);
+    ok("left out, nothing moves: v4918's text, v4918's uniforms, no \"bvhInst\" bound, and `bounds` is the mesh's own",
+        c.wgsls[0] === pipelineWgsl({ bvh: true, rgb: true, gradient: true }) && !("bvhInst" in c.binds) && sc.bounds === mesh.bounds &&
+        same(c.writes.find((x) => x.length === 96), pipelineUniforms([], { ...baseU, bvh: { nodeCount: bvh.nodeCount, triCount: bvh.triCount, hit: "lambertian", albedo: V.DEFAULT_ALBEDO } })));
+    const own = stub(); V.makeRtSession(own.device, { mesh, w: 4, h: 4, instances: [{ transform: grid[0].transform, albedo: [0.1, 0.2, 0.3] }, { transform: grid[1].transform }] });
+    ok("an instance that names its own albedo keeps it; one that does not takes the session's",
+        same(inst(own), instanceBuffer([{ transform: grid[0].transform, hit: "lambertian", albedo: [0.1, 0.2, 0.3] }, { transform: grid[1].transform, hit: "lambertian", albedo: V.DEFAULT_ALBEDO }], { rgb: true, meshes: bvh })));
+    const mm = stub(); V.makeRtSession(mm.device, { mesh, w: 4, h: 4, meshMaterials: true, instances: [{ transform: grid[0].transform }, { transform: grid[1].transform, sbtOffset: 2 }] });
+    ok("under meshMaterials an instance's record is an OFFSET into the mesh's table (0 unless it names one), not a material",
+        mm.wgsls[0] === pipelineWgsl({ bvh: true, rgb: true, gradient: true, meshMaterials: true, instances: true, instanceTree: true }) &&
+        same(inst(mm), instanceBuffer([{ transform: grid[0].transform, sbtOffset: 0 }, { transform: grid[1].transform, sbtOffset: 2 }], { rgb: true, meshes: bvh })) &&
+        inst(mm)[12] === 0 && inst(mm)[INSTANCE_FLOATS + 12] === 2);
+    const mf = stub(); const smf = V.makeRtSession(mf.device, { mesh, w: 4, h: 4, material: "microfacet", direct: "nee", instances: grid }); smf.renderFrame(view);
+    const mfU = mf.writes.find((x) => x.length === 96);
+    ok("under the microfacet material every instance carries the session's roughness and ior, in the scalar packing",
+        mf.wgsls[0] === pipelineWgsl({ bvh: true, gradient: true, microfacet: "nee", msComp: true, instances: true, instanceTree: true }) &&
+        same(inst(mf), instanceBuffer(grid.map((g) => ({ transform: g.transform, hit: "microfacet", roughness: V.DEFAULT_ROUGHNESS, ior: V.DEFAULT_IOR })), { rgb: false, meshes: bvh })));
+    ok(`  and the LIGHT stands over the placements, not over the one mesh: centre y ${mfU[8 * 4 + 1].toFixed(3)}, radius ${mfU[8 * 4 + 3].toFixed(3)}`,
+        Math.abs(mfU[8 * 4] - gb.center[0]) < 1e-5 && Math.abs(mfU[8 * 4 + 1] - (gb.center[1] + gb.radius * V.DEFAULT_LIGHT_OFFSET_SCALE)) < 1e-4 && Math.abs(mfU[8 * 4 + 3] - gb.radius * V.DEFAULT_LIGHT_RADIUS_SCALE) < 1e-4,
+        `the one mesh's would be y ${(mesh.bounds.center[1] + mesh.bounds.radius * V.DEFAULT_LIGHT_OFFSET_SCALE).toFixed(3)}, radius ${(mesh.bounds.radius * V.DEFAULT_LIGHT_RADIUS_SCALE).toFixed(3)} -- inside the grid`);
+
+    // -- cutout
+    const k = stub(); const sk = V.makeRtSession(k.device, { mesh, w: 4, h: 4, cutout: 0.12 }); sk.renderFrame(view);
+    const kU = k.writes.find((x) => x.length === 96);
+    ok("*** `cutout: 0.12` generates pipelineWgsl({ ..., anyHit: true }) and writes the cutout rule and its margin into the any-hit slot ***",
+        k.wgsls[0] === pipelineWgsl({ bvh: true, rgb: true, gradient: true, anyHit: true }) && kU[ANYHIT_SLOT * 4] === ANY_HIT_SHADERS.cutout && Math.abs(kU[ANYHIT_SLOT * 4 + 1] - 0.12) < 1e-7 &&
+        same(kU, pipelineUniforms([], { ...baseU, bvh: { nodeCount: bvh.nodeCount, triCount: bvh.triCount, hit: "lambertian", albedo: V.DEFAULT_ALBEDO, anyHit: { rule: "cutout", param: 0.12 } } })),
+        `slot ${ANYHIT_SLOT}: rule ${kU[ANYHIT_SLOT * 4]}, margin ${kU[ANYHIT_SLOT * 4 + 1]}`);
+    const k0 = stub(); const sk0 = V.makeRtSession(k0.device, { mesh, w: 4, h: 4, cutout: 0 }); sk0.renderFrame(view);
+    const k0U = k0.writes.find((x) => x.length === 96);
+    ok("`cutout: 0` is a VALUE, not \"off\": the stage is compiled in and the rule is cutout with margin 0 -- every triangle all hole",
+        k0.wgsls[0] === k.wgsls[0] && k0U[ANYHIT_SLOT * 4] === ANY_HIT_SHADERS.cutout && k0U[ANYHIT_SLOT * 4 + 1] === 0);
+    ok("  and left out (or null) the stage is not compiled and the slot is zero", c.writes.find((x) => x.length === 96)[ANYHIT_SLOT * 4] === 0 && !/rtAnyHit/.test(c.wgsls[0]) && /rtAnyHit/.test(k.wgsls[0]));
+    const both = stub(); V.makeRtSession(both.device, { mesh, w: 4, h: 4, material: "microfacet", cutout: 0.1, instances: grid });
+    ok("all three together, under the microfacet material, are one pipelineWgsl call's text",
+        both.wgsls[0] === pipelineWgsl({ bvh: true, gradient: true, microfacet: "bsdf", msComp: true, anyHit: true, instances: true, instanceTree: true }));
+
+    // -- refusals
+    const throws = (opts, re) => { try { V.makeRtSession(stub().device, { mesh, w: 4, h: 4, ...opts }); return "did not throw"; } catch (e) { return re.test(e.message) ? true : e.message; } };
+    for (const [label, opts, re] of [
+        ["an empty `instances` array is refused by name, not drawn as nothing", { instances: [] }, /non-empty array/],
+        ["`instances` with sky:\"sceneCapture\" is refused -- the capture traces the one mesh", { instances: grid, sky: "sceneCapture" }, /sceneCapture/],
+        ["a cutout margin of 0.4 is refused -- at 1/3 the hole is a point", { cutout: 0.4 }, /0 <= m < 1\/3/],
+        ["a negative cutout margin is refused", { cutout: -0.1 }, /0 <= m < 1\/3/],
+        ["a mirrored instance is refused by instanceBuffer, through the session", { instances: [{ transform: [-1,0,0,0, 0,1,0,0, 0,0,1,0] }] }, /mirrors the mesh/]]) {
+        const t = throws(opts, re); ok(label, t === true, t === true ? "" : String(t).slice(0, 120));
+    }
+    ok("placedBounds() and instanceGrid() refuse what they cannot place", (() => { try { V.placedBounds(mesh, []); return false; } catch (e) { return /at least one/.test(e.message); } })() &&
+        (() => { try { V.instanceGrid(mesh, 0); return false; } catch (e) { return /whole number/.test(e.message); } })());
+}
+
 // ---- 2. THE ACCUMULATE KERNEL, EXACT, AGAINST FABRICATED INPUT -----------------------------------------------
 console.log("\n2. accumulateWgsl -- A RUNNING MEAN, HELD TO HAND-COMPUTED EXPECTED VALUES");
 {
@@ -1144,11 +1275,71 @@ console.log("\n3-5. THE PRESENT KERNEL, THE NAME-BASED DEVICE INTEGRATION, AND A
                                            recordCount: mesh.meshRecords.length };
                 session.destroy();
             }
+
+            // ---- 4g. v4919 -- instances, the tree over them, and the any-hit cutout, through makeRtSession ----
+            {
+                const { bvhBuffersFromTriSoup } = await import("/physics/render/rtPipeline.mjs");
+                const { instanceGrid, placedBounds } = await import("/render/rtViewer.mjs");
+                // a box that is NOT its own quarter turn: 2 x 1.2 x 1.8, off-centre
+                const P = [[-1,-0.5,-0.3],[1,-0.5,-0.3],[1,0.7,-0.3],[-1,0.7,-0.3],[-1,-0.5,1.5],[1,-0.5,1.5],[1,0.7,1.5],[-1,0.7,1.5]];
+                const I = [[0,2,1],[0,3,2],[4,5,6],[4,6,7],[0,5,4],[0,1,5],[3,6,2],[3,7,6],[0,7,3],[0,4,7],[1,6,5],[1,2,6]];
+                const bvh = bvhBuffersFromMesh(P, I);
+                const mesh = { bvh, bounds: meshBounds(bvh) };
+                const w = 48, h = 36;
+                const canvas = document.createElement("canvas"); canvas.width = w; canvas.height = h;
+                const device = await requestDevice(canvas, { backend: "webgpu" });
+                const viewOf = (b, shift = [0, 0, 0]) => { const o = orbitEye({ yaw: 0.6, pitch: 0.5, dist: b.radius * 3.2 + 0.5, center: b.center });
+                    return { w, h, eye: o.eye.map((v, k) => v + shift[k]), look: o.look.map((v, k) => v + shift[k]), up: o.up, fovDeg: 45 }; };
+                // ONE dispatch, read raw: the same seed (frame 1) and the same per-pixel generator in every session below
+                const shoot = async (opts, view, m = mesh) => { const s = makeRtSession(device, { mesh: m, w, h, spp: 4, ...opts });
+                    await s.renderFrame(view, { offscreen: true, read: true });
+                    const f = new Float32Array(await device.read(s.outBuf)); const b = s.bounds; s.destroy(); return { f, bounds: b }; };
+                const cmp = (a, b, tol = 1e-3) => { let same = 0, bit = 0, worst = 0, nan = 0;
+                    for (let p = 0; p < w * h; p++) { let d = 0, e = true;
+                        for (let c = 0; c < 3; c++) { const x = a[p * 3 + c], y = b[p * 3 + c]; if (!isFinite(x) || !isFinite(y)) nan++; d = Math.max(d, Math.abs(x - y)); if (x !== y) e = false; }
+                        if (d <= tol) same++; if (e) bit++; worst = Math.max(worst, d); }
+                    return { same, bit, worst, nan, pixels: w * h }; };
+                const ident = [1,0,0,0, 0,1,0,0, 0,0,1,0], T = [3, -2, 5];
+                const v0 = viewOf(mesh.bounds);
+                const plain = await shoot({}, v0);
+                const empty = await shoot({ cutout: 0 }, v0);                       // every triangle all hole: the sky alone
+                const covered = (f) => cmp(f, empty.f, 0).pixels - cmp(f, empty.f, 0).bit;
+                const one = await shoot({ instances: [{ transform: ident }] }, v0);
+                const moved = await shoot({ instances: [{ transform: [1,0,0,T[0], 0,1,0,T[1], 0,0,1,T[2]] }] }, viewOf(mesh.bounds, T));
+                const away = await shoot({ instances: [{ transform: [1,0,0,0, 0,1,0,0, 0,0,1,5000] }] }, v0);
+                // nine placements, against the SAME nine baked into one mesh's triangles on the CPU and drawn with no instances
+                const grid = instanceGrid(mesh, 3), gb = placedBounds(mesh, grid), vg = viewOf(gb);
+                const soup = [];
+                for (const g of grid) for (const tri of I) for (const k of tri) { const p = P[k], m = g.transform;
+                    soup.push(m[0]*p[0]+m[1]*p[1]+m[2]*p[2]+m[3], m[4]*p[0]+m[5]*p[1]+m[6]*p[2]+m[7], m[8]*p[0]+m[9]*p[1]+m[10]*p[2]+m[11]); }
+                const bakedBvh = bvhBuffersFromTriSoup(soup);
+                const baked = await shoot({}, vg, { bvh: bakedBvh, bounds: meshBounds(bakedBvh) });
+                const tree = await shoot({ instances: grid }, vg), list = await shoot({ instances: grid, instanceTree: false }, vg);
+                const emptyG = await shoot({ cutout: 0 }, vg);
+                const cut = await shoot({ cutout: 0.12 }, v0);
+                const cutGrid = await shoot({ instances: grid, cutout: 0.12 }, vg), cutBaked = await shoot({ cutout: 0.12 }, vg, { bvh: bakedBvh, bounds: meshBounds(bakedBvh) });
+                // per-triangle materials under an instance: the table's offset path
+                const matBvh = bvhBuffersFromMesh(P, I, { materialIndex: I.map((_, i) => i % 2) });
+                const { sbtRecord } = await import("/physics/render/rtPipeline.mjs");
+                const matMesh = { bvh: matBvh, bounds: meshBounds(matBvh), meshRecords: [sbtRecord({ hit: "lambertian", albedo: [0.9, 0.1, 0.1] }), sbtRecord({ hit: "lambertian", albedo: [0.1, 0.9, 0.1] })] };
+                const matPlain = await shoot({ meshMaterials: true }, v0, matMesh), matOne = await shoot({ meshMaterials: true, instances: [{ transform: ident }] }, v0, matMesh);
+                // the microfacet material, lit, over the placements
+                const mfPlain = await shoot({ material: "microfacet", direct: "mis" }, vg, { bvh: bakedBvh, bounds: meshBounds(bakedBvh) });
+                const mf = await shoot({ material: "microfacet", direct: "mis", instances: grid }, vg);
+                const cmp1 = (a, b) => { let same = 0, nan = 0, n = a.length; for (let i = 0; i < n; i++) { if (!isFinite(a[i]) || !isFinite(b[i])) nan++; if (Math.abs(a[i] - b[i]) <= 1e-3) same++; } return { same, nan, pixels: n }; };
+                const coveredG = (f) => { const c = cmp(f, emptyG.f, 0); return c.pixels - c.bit; };
+                out.v19 = { pixels: w * h, coveredPlain: covered(plain.f), coveredCut: covered(cut.f), coveredGrid: coveredG(tree.f), coveredBaked: coveredG(baked.f),
+                    oneVsPlain: cmp(one.f, plain.f), movedVsPlain: cmp(moved.f, plain.f), awayVsEmpty: cmp(away.f, empty.f, 0),
+                    treeVsList: cmp(tree.f, list.f, 0), gridVsBaked: cmp(tree.f, baked.f), gridVsPlainView: cmp(tree.f, plain.f),
+                    cutVsPlain: cmp(cut.f, plain.f), cutGridVsBaked: cmp(cutGrid.f, cutBaked.f), cutGridVsGrid: cmp(cutGrid.f, tree.f),
+                    matOneVsPlain: cmp(matOne.f, matPlain.f), matVsFlat: cmp(matPlain.f, plain.f),
+                    mfVsBaked: cmp1(mf.f, mfPlain.f), gridBounds: tree.bounds, gb };
+            }
             return out;
         }`,
     });
     if (!r.ok) throw new Error("runInEngineOrigin failed: " + r.reason + (r.pageErrors && r.pageErrors.length ? " | " + r.pageErrors.slice(0, 3).join(" | ") : ""));
-    const { present, cube, cubeMicrofacet, cubeEnvMap, cubeDirectBsdf, cubeDirectNee, cubeDirectMis, cubeSceneCapture, accumBitExact, convergence, mesh, city, cityVertexColors, cityMeshMaterials } = r.result;
+    const { present, cube, cubeMicrofacet, cubeEnvMap, cubeDirectBsdf, cubeDirectNee, cubeDirectMis, cubeSceneCapture, accumBitExact, convergence, mesh, city, cityVertexColors, cityMeshMaterials, v19 } = r.result;
 
     console.log("\n3. presentWgsl -- A DISTINCT-PER-PIXEL FRAME, PIXEL FOR PIXEL");
     say(`4x2, values include 1.5 and -0.3 to exercise the clamp`);
@@ -1429,6 +1620,40 @@ console.log("\n3-5. THE PRESENT KERNEL, THE NAME-BASED DEVICE INTEGRATION, AND A
         "checksums here would mean the two renders are pixel-for-pixel the same despite meshMaterials:true, the " +
         "exact signature a mean/range comparison alone cannot rule out");
 
+    console.log("\n4g. v4919 -- INSTANCES, THE TREE OVER THEM AND THE ANY-HIT CUTOUT, THROUGH makeRtSession ON A REAL DEVICE -- THE FIRST CALLER OUTSIDE rtPipeline's OWN GATE");
+    {
+        // One dispatch each, 48 x 36, spp 4, read raw: the same seed and the same per-pixel generator in every session,
+        // so two sessions that trace the same rays agree to the BIT and a pixel that differs is a ray that went elsewhere.
+        const N = v19.pixels, pct = (c) => (100 * c.same / c.pixels).toFixed(1) + "%";
+        const FLOOR = 0.97;                     // measured 99.4% (1717 of 1728) for the nine placements against the nine baked in
+        say(`a 2 x 1.2 x 1.8 box, off-centre, that is not its own quarter turn: ${v19.coveredPlain} of ${N} pixels covered (differ from the sky alone); nine placements: ${v19.coveredGrid}`);
+        REPORT_ROWS.push(["nine instances vs nine baked", `${v19.gridVsBaked.bit} of ${N} pixels bit-identical`, `tree vs list ${v19.treeVsList.bit} of ${N}`, `cutout ${v19.cutGridVsBaked.bit} of ${N}`]);
+        ok(`*** ONE IDENTITY INSTANCE IS THE MESH: ${v19.oneVsPlain.bit} of ${N} pixels bit-identical to the session with no instances ***`,
+            v19.oneVsPlain.bit === N && v19.oneVsPlain.nan === 0 && v19.coveredPlain > N / 10,
+            "the instance's record carries the session's albedo and its transform is exact, so nothing may move");
+        ok(`*** AN INSTANCE MOVED BY (3, -2, 5), SEEN BY A CAMERA MOVED THE SAME WAY, IS THE SAME PICTURE: ${v19.movedVsPlain.same} of ${N} within 1e-3 (${v19.movedVsPlain.bit} to the bit) ***`,
+            v19.movedVsPlain.same >= N * FLOOR && v19.movedVsPlain.nan === 0, `worst difference ${v19.movedVsPlain.worst.toExponential(2)}`);
+        ok(`*** THE TREE AND THE LIST AGREE ON EVERY PIXEL of the nine placements: ${v19.treeVsList.bit} of ${N} bit-identical ***`,
+            v19.treeVsList.bit === N && v19.coveredGrid > N / 20, "the list is the tree's control: same buffer, same rays, a different walk");
+        ok(`*** THE NINE PLACEMENTS ARE WHERE instanceGrid() PUT THEM: against the same nine baked into one mesh's triangles on the CPU and drawn with NO instances, ${v19.gridVsBaked.same} of ${N} within 1e-3 (${pct(v19.gridVsBaked)}), and ${v19.coveredGrid} covered against ${v19.coveredBaked} ***`,
+            v19.gridVsBaked.same >= N * FLOOR && Math.abs(v19.coveredGrid - v19.coveredBaked) <= 6 && v19.gridVsBaked.nan === 0,
+            `turns, offsets and normals all have to be right for this: a quarter turn the wrong way moves whole boxes. Worst difference ${v19.gridVsBaked.worst.toFixed(3)}, at the ${N - v19.gridVsBaked.same} pixels where f32 put a ray either side of an edge`);
+        ok(`  and that is not the one mesh seen from further off: against the plain session's own picture only ${v19.gridVsPlainView.same} of ${N} agree`,
+            v19.gridVsPlainView.same < N * FLOOR);
+        ok(`an instance 5000 units behind the scene leaves the sky alone, bit for bit -- and that sky is the frame \`cutout: 0\` draws: ${v19.awayVsEmpty.bit} of ${N}`,
+            v19.awayVsEmpty.bit === N, "two features, one empty picture: a mesh that is all hole and a mesh that is not there");
+        ok(`*** THE CUTOUT OPENS THE MESH: ${v19.coveredCut} pixels covered against ${v19.coveredPlain} solid, ${N - v19.cutVsPlain.same} pixels changed ***`,
+            v19.coveredCut > 0 && v19.coveredCut < v19.coveredPlain && v19.cutVsPlain.same < N - 20 && v19.cutVsPlain.nan === 0,
+            "fewer and not none: a ray through a front hole still meets the back wall unless it finds a hole there too");
+        ok(`*** AND THE CUTOUT IS ASKED IN OBJECT SPACE under an instance: nine cut placements against nine cut baked, ${v19.cutGridVsBaked.same} of ${N} within 1e-3 (${pct(v19.cutGridVsBaked)}) -- and ${N - v19.cutGridVsGrid.same} pixels from the solid nine ***`,
+            v19.cutGridVsBaked.same >= N * FLOOR && v19.cutGridVsGrid.same < N - 20 && v19.cutGridVsBaked.nan === 0);
+        ok(`per-triangle materials under an instance: one identity instance at offset 0 is the plain meshMaterials session, ${v19.matOneVsPlain.bit} of ${N} to the bit -- and not the flat one (${N - v19.matVsFlat.same} pixels differ)`,
+            v19.matOneVsPlain.bit === N && v19.matVsFlat.same < N - 50);
+        ok(`the microfacet material, lit by MIS, over the nine placements: ${v19.mfVsBaked.same} of ${v19.mfVsBaked.pixels} values within 1e-3 of the nine baked in, no NaN`,
+            v19.mfVsBaked.same >= v19.mfVsBaked.pixels * FLOOR && v19.mfVsBaked.nan === 0, "the light is placed by the same bounds in both sessions, so it too has to stand where placedBounds() says");
+        ok("the session's bounds on the device are placedBounds()'s", JSON.stringify(v19.gridBounds) === JSON.stringify(v19.gb));
+    }
+
     console.log("\n6. THE LIVE PAGE ITSELF");
     const page = read("rtx-viewer.html");
     ok("carries demo:title/demo:desc/demo:category and imports render/rtViewer.mjs",
@@ -1491,6 +1716,17 @@ console.log("\n3-5. THE PRESENT KERNEL, THE NAME-BASED DEVICE INTEGRATION, AND A
         "a page that never read the param would still call makeRtSession successfully (meshMaterials defaults to " +
         "false) and every check above this one would still pass -- the same shape of gap round 10/11/12/15's own " +
         "checks exist to catch, extended to the sixth toggle");
+    ok("*** v4919 -- the page reads `instances` and `cutout` from the URL, builds the placements with instanceGrid() and passes both into makeRtSession ***",
+        /import\s*\{[^}]*\binstanceGrid\b[^}]*\}\s*from\s*"\/render\/rtViewer\.mjs"/.test(page) &&
+        /instances\s*:\s*INSTANCES\s*\?\s*instanceGrid\(mesh,\s*INSTANCES\)\s*:\s*null/.test(page) && /instanceTree\s*:\s*INSTANCE_TREE/.test(page) &&
+        /cutout\s*:\s*CUTOUT\s*\?\s*CUTOUT_MARGIN\s*:\s*null/.test(page) && /get\("instances"\)/.test(page) && /get\("cutout"\)/.test(page),
+        "a page that never read them would still start a session, with one copy and solid triangles");
+    ok("  and both have a link on the page, and every other toggle's link carries them across",
+        /id="instancesToggle"/.test(page) && /id="cutoutToggle"/.test(page) && /instancesToggleEl\.href\s*=\s*qs\(/.test(page) && /cutoutToggleEl\.href\s*=\s*qs\(/.test(page) &&
+        (page.match(/\.href = qs\([^\n]*INSTANCES[^\n]*CUTOUT\);/g) || []).length === 8,
+        `${(page.match(/\.href = qs\([^\n]*INSTANCES[^\n]*CUTOUT\);/g) || []).length} of the page's 8 toggle links name both`);
+    ok("  and the camera frames, and dollies within, the SESSION's bounds -- the placements' -- and no longer the one mesh's",
+        /bounds = session\.bounds/.test(page) && /center:\s*bounds\.center/.test(page) && /dollyOrbit\(dist, e\.deltaY, bounds\)/.test(page) && !/mesh\.bounds/.test(page.replace(/\/\/[^\n]*/g, "")));
 }
 
 console.log("\n" + (fails ? "FAIL -- " + fails + " check(s)" : "ALL GREEN"));

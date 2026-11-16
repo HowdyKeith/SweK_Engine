@@ -285,7 +285,19 @@ console.log("\n5. LOAD THE REAL PAGE AND CLICK THE BUTTON");
             why: document.getElementById("fxwhy").textContent.trim(),
             disabled: document.getElementById("fxbtn").disabled,
         }));
-        const shot = async () => (await pg.screenshot({ type: "png" }));
+        // *** v4919 -- EVERY CAPTURE IS NAMED AND TIMED, AND HAS pageShot.mjs's CEILING, BECAUSE THE RIG'S v4917 VERIFY COULD NOT SAY
+        // WHICH ONE HUNG. *** On win32-x64-12c-32gb-b70b27 this section failed seven rows on one message, "TimeoutError:
+        // page.screenshot: Timeout 30000ms exceeded" -- Playwright's default -- with nothing to say whether it was the first
+        // capture or the fifth, or whether the box was slow or stuck. It passes on Linux in under a second a capture, and
+        // nothing in v4914 to v4917 touches this page. So the cause is NOT KNOWN, and this does not claim to fix it: the
+        // ceiling is the 120 s tools/ship/pageShot.mjs already gives the same call on the same box, the step in hand is
+        // carried into the error, and the timings are printed either way. One run on the rig then passes, or names the step.
+        // SABOTAGE (v4919): the "effect on" capture made to throw a timeout -> 7 red, every one opening `at "capture: effect
+        // on"`, and the timings line listing the three captures that did complete before it.
+        const SHOT_MS = 120000, shots = [];
+        let step = "before the first capture";
+        const shot = async (name) => { step = "capture: " + name; const t0 = Date.now();
+            const png = await pg.screenshot({ type: "png", timeout: SHOT_MS }); shots.push(`${name} ${Date.now() - t0} ms`); return png; };
         let r2;
         try {
             // *** THE ORRERY ANIMATES, SO TWO SCREENSHOTS DIFFER WHETHER OR NOT THE EFFECT IS ON. ***
@@ -296,11 +308,12 @@ console.log("\n5. LOAD THE REAL PAGE AND CLICK THE BUTTON");
             // MATCH, and only then attribute a difference to the effect.
             await pg.click("#play");
             await pg.waitForTimeout(400);
-            const still1 = await shot();
+            const still1 = await shot("paused, first");
             await pg.waitForTimeout(400);
-            const still2 = await shot();
+            const still2 = await shot("paused, second");
             const before = await state();
-            const imgOff = await shot();
+            const imgOff = await shot("effect off");
+            step = "the attach";
             await pg.click("#fxbtn");
             // v4896 -- WAIT FOR THE STATE, NOT FOR 900 ms. The rig's clone-verify read the label at "attaching..." with the overlay still hidden: the attach is an import plus a
             // device request, and on a busy Windows box that took longer than the fixed wait, so the row failed on the box's speed and not on the page. The button leaves "attaching"
@@ -309,19 +322,21 @@ console.log("\n5. LOAD THE REAL PAGE AND CLICK THE BUTTON");
             await pg.waitForFunction(() => !/attaching/.test(document.getElementById("fxbtn").textContent), null, { timeout: 60000 });
             await pg.waitForTimeout(150);
             const after = await state();
-            const imgOn = await shot();
+            const imgOn = await shot("effect on");
+            step = "turning it off";
             await pg.click("#fxbtn");
             await pg.waitForTimeout(300);
             const off = await state();
-            const imgOff2 = await shot();
+            const imgOff2 = await shot("effect off again");
             const same = (a, b) => a.length === b.length && a.equals(b);
             r2 = { before, after, off,
                    paused: same(still1, still2),
                    changed: !same(imgOff, imgOn),
                    restored: !same(imgOn, imgOff2),
                    bytesOff: imgOff.length, bytesOn: imgOn.length };
-        } catch (e) { r2 = { err: String(e).slice(0, 200) }; }
+        } catch (e) { r2 = { err: `at "${step}": ` + String(e).slice(0, 200) }; }
         await br.close(); srv2.close();
+        console.log("  ----  captures: " + (shots.join(", ") || "none completed") + (r2.err ? ` -- stopped ${r2.err.slice(0, 60)}` : ""));
 
         ok("the page loads and the control starts OFF and hidden", !r2.err &&
             /off/.test(r2.before.label) && r2.before.shown === "none",

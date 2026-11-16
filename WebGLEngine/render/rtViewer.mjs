@@ -34,7 +34,7 @@
 // underlying radiance, exactly as the paragraph above already states.
 "use strict";
 
-import { pipelineWgsl, pipelineUniforms, bvhBuffersFromMesh, bvhBuffersFromTriSoup, sbtRecord, meshSbtBuffer, VIEW, EPS } from "../physics/render/rtPipeline.mjs";
+import { pipelineWgsl, pipelineUniforms, bvhBuffersFromMesh, bvhBuffersFromTriSoup, sbtRecord, meshSbtBuffer, instanceBuffer, VIEW, EPS } from "../physics/render/rtPipeline.mjs";
 import { meshTriples } from "../physics/splat/splatMesh.mjs";
 import { GLBParser } from "../gpu/GLBParser.js";
 import { citySceneMesh } from "../world/cityChunkScene.mjs";
@@ -169,6 +169,50 @@ export function packAtlasHalfFloat(atlas) {
     const half = new Uint16Array(atlas.data.length);
     for (let i = 0; i < atlas.data.length; i++) half[i] = toHalf(atlas.data[i]);
     return half;
+}
+
+// *** v4919 -- INSTANCES, THE TREE OVER THEM, AND THE ANY-HIT CUTOUT REACH THE VIEWER. ***
+// physics/render/rtPipeline.mjs has had the any-hit stage and instances since v4915 and the tree over instances
+// since v4918, each held to the CPU reference in its own gate, and none with a caller outside that gate. These two
+// helpers and three makeRtSession options (`instances`, `instanceTree`, `cutout`) are the first.
+/**
+ * Where a mesh's placements are: the box around the mesh's own root box carried through each instance's `transform`
+ * (world-from-object, row-major 3x4), in meshBounds()'s shape. A session with instances frames its camera and places
+ * its light by this, because the mesh's own bounds say where ONE copy is.
+ */
+export function placedBounds(mesh, instances) {
+    if (!instances || !instances.length) throw new Error("rtViewer: placedBounds needs at least one instance");
+    const b = mesh.bounds, lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+    for (const inst of instances) {
+        const m = inst.transform;
+        for (let c = 0; c < 8; c++) {
+            const p = [c & 1 ? b.max[0] : b.min[0], c & 2 ? b.max[1] : b.min[1], c & 4 ? b.max[2] : b.min[2]];
+            for (let r = 0; r < 3; r++) {
+                const v = m[r * 4] * p[0] + m[r * 4 + 1] * p[1] + m[r * 4 + 2] * p[2] + m[r * 4 + 3];
+                lo[r] = Math.min(lo[r], v); hi[r] = Math.max(hi[r], v);
+            }
+        }
+    }
+    const center = [(lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, (lo[2] + hi[2]) / 2];
+    return Object.freeze({ min: lo, max: hi, center, radius: Math.max(1e-4, Math.hypot(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]) / 2) });
+}
+
+/**
+ * `n` x `n` placements of a mesh on its own ground plane (x, z), centred where the one mesh is, each a quarter turn
+ * about the vertical through the mesh's centre further than the last so the copies do not read as one tiled picture.
+ * `gap` is the space between neighbours as a fraction of the mesh's larger ground extent. Returns the `instances`
+ * array makeRtSession takes: [{ transform }], rigid, never mirrored.
+ */
+export function instanceGrid(mesh, n = 3, { gap = 0.25 } = {}) {
+    if (!Number.isInteger(n) || n < 1) throw new Error("rtViewer: instanceGrid needs a whole number of copies a side, got " + n);
+    const b = mesh.bounds, pitch = Math.max(b.max[0] - b.min[0], b.max[2] - b.min[2]) * (1 + gap), [cx, cy, cz] = b.center, out = [];
+    for (let iz = 0; iz < n; iz++) for (let ix = 0; ix < n; ix++) {
+        const q = (ix + iz * n) % 4, co = [1, 0, -1, 0][q], si = [0, 1, 0, -1][q];
+        const ox = (ix - (n - 1) / 2) * pitch, oz = (iz - (n - 1) / 2) * pitch;
+        // world = R (p - c) + c + o, R a turn about +y: rows (co, 0, si), (0, 1, 0), (-si, 0, co)
+        out.push({ transform: [co, 0, si, cx + ox - (co * cx + si * cz), 0, 1, 0, 0, -si, 0, co, cz + oz - (-si * cx + co * cz)] });
+    }
+    return out;
 }
 
 /**
@@ -416,11 +460,24 @@ struct VSOut { @builtin(position) pos : vec4<f32> };
  * `mesh.meshRecords` and `bvh.matIndex` automatically (see its own doc); loadMeshBvh() does not yet, since the
  * live pavement-tile GLB is a single primitive with exactly one material slot (a degenerate case not worth the
  * wiring for a demo whose whole point is showing MULTIPLE materials).
+ *
+ * v4919 -- three more, each rtPipeline.mjs's own option with no caller until now, each BYTE-IDENTICAL WGSL and
+ * uniforms when left out:
+ * `instances` (default null): [{ transform, albedo?, sbtOffset? }], transform world-from-object, row-major 3x4. The
+ * mesh is then drawn once per instance and NOT where it was built. Every instance takes the session's own material
+ * (its `albedo` if it names one, lambertian only); under meshMaterials each takes the mesh's table, from `sbtOffset`
+ * (default 0). The light and the returned `bounds` follow placedBounds(). Refused with sky:"sceneCapture", whose
+ * capture traces the one mesh on the CPU and would light the placements with a room they are not standing in.
+ * `instanceTree` (default true, read only with `instances`): walk the tree instanceBuffer() appends; false walks the
+ * list. They must agree on every pixel -- the list is the tree's control, and the gate holds them to it.
+ * `cutout` (default null): the any-hit stage's cutout rule with this barycentric margin kept solid, 0 <= m < 1/3.
+ * 0 is a real value -- every triangle is all hole -- so null, not 0, is "off".
  */
 export function makeRtSession(device, { mesh, w, h, albedo = DEFAULT_ALBEDO, gradient = true, spp = 1, eps = EPS,
                                           material = "lambertian", roughness = DEFAULT_ROUGHNESS, ior = DEFAULT_IOR,
                                           sky = "gradient", envFaceSize = DEFAULT_ENV_FACE_SIZE, direct = "bsdf",
-                                          vertexColors = false, meshMaterials = false }) {
+                                          vertexColors = false, meshMaterials = false,
+                                          instances = null, instanceTree = true, cutout = null }) {
     if (material !== "lambertian" && material !== "microfacet") throw new Error(
         "rtViewer: material must be \"lambertian\" or \"microfacet\", got " + material);
     if (sky !== "gradient" && sky !== "envMap" && sky !== "sceneCapture") throw new Error(
@@ -450,6 +507,16 @@ export function makeRtSession(device, { mesh, w, h, albedo = DEFAULT_ALBEDO, gra
         "world/chunkMesherCore.js's own PALETTE; loadMeshBvh() does not, and a mesh built another way must " +
         "supply both itself.");
     const isSceneCapture = sky === "sceneCapture";
+    // v4919
+    const hasInstances = instances !== null && instances !== undefined, hasCutout = cutout !== null && cutout !== undefined && cutout !== false;
+    if (hasInstances && !(Array.isArray(instances) && instances.length)) throw new Error(
+        "rtViewer: instances must be a non-empty array of { transform } -- pass null to draw the mesh where it was built");
+    if (hasInstances && isSceneCapture) throw new Error(
+        "rtViewer: instances cannot be combined with sky:\"sceneCapture\" -- the capture traces the ONE mesh on the CPU, " +
+        "so the placements would be lit by a room none of them stands in. Use \"gradient\" or \"envMap\".");
+    if (hasCutout && !(typeof cutout === "number" && cutout >= 0 && cutout < 1 / 3)) throw new Error(
+        "rtViewer: cutout is the barycentric margin kept solid, 0 <= m < 1/3, or null for off -- got " + cutout);
+    const bounds = hasInstances ? placedBounds(mesh, instances) : mesh.bounds;
     const isEnvMap = sky === "envMap" || isSceneCapture;
     // A background adversarial review found this specific numeric option needed a guard `roughness`/`ior`
     // do not: those two feed into an otherwise well-formed (if numerically implausible) material regardless of
@@ -498,14 +565,17 @@ export function makeRtSession(device, { mesh, w, h, albedo = DEFAULT_ALBEDO, gra
     // avoids that picture-change, not a dodge around an invisible-light bug that was never actually at risk.
     const hasLight = isMicrofacet && direct !== "bsdf";
     const lightRecord = hasLight ? sbtRecord({
-        centre: [mesh.bounds.center[0], mesh.bounds.center[1] + mesh.bounds.radius * DEFAULT_LIGHT_OFFSET_SCALE, mesh.bounds.center[2]],
-        radius: mesh.bounds.radius * DEFAULT_LIGHT_RADIUS_SCALE, hit: "lambertian", albedo: 0, emit: DEFAULT_LIGHT_EMIT,
+        centre: [bounds.center[0], bounds.center[1] + bounds.radius * DEFAULT_LIGHT_OFFSET_SCALE, bounds.center[2]],
+        radius: bounds.radius * DEFAULT_LIGHT_RADIUS_SCALE, hit: "lambertian", albedo: 0, emit: DEFAULT_LIGHT_EMIT,
     }) : null;
     const sbt = hasLight ? [lightRecord] : [];
 
+    // v4919 -- spread, and EMPTY when none of the three is asked for, so the two calls below hand pipelineWgsl the
+    // very objects they did before and the default session's text cannot move.
+    const stageOpts = { ...(hasCutout ? { anyHit: true } : {}), ...(hasInstances ? { instances: true, ...(instanceTree ? { instanceTree: true } : {}) } : {}) };
     const rtPipe = device.compute({ wgsl: isMicrofacet
-        ? pipelineWgsl({ bvh: true, gradient: useGradient, microfacet: direct, msComp: true, envMap: isEnvMap })
-        : pipelineWgsl({ bvh: true, rgb: true, gradient: useGradient, envMap: isEnvMap, vertexColors: wantsVertexColors, meshMaterials: wantsMeshMaterials }) });
+        ? pipelineWgsl({ bvh: true, gradient: useGradient, microfacet: direct, msComp: true, envMap: isEnvMap, ...stageOpts })
+        : pipelineWgsl({ bvh: true, rgb: true, gradient: useGradient, envMap: isEnvMap, vertexColors: wantsVertexColors, meshMaterials: wantsMeshMaterials, ...stageOpts }) });
     const outBuf = device.buffer({ usage: "storage", size: floats * 4 });
     const uBuf = device.buffer({ usage: "uniform", data: new Float32Array(24 * 4) });
     const boundsBuf = device.buffer({ usage: "storage", data: bvh.bounds });
@@ -530,6 +600,16 @@ export function makeRtSession(device, { mesh, w, h, albedo = DEFAULT_ALBEDO, gra
     const meshSbtBuf = wantsMeshMaterials ? device.buffer({ usage: "storage", data: meshSbtBuffer(mesh.meshRecords, { rgb: true }) }) : null;
     if (matIdxBuf) rtPipe.bind("bvhMatIdx", matIdxBuf);
     if (meshSbtBuf) rtPipe.bind("bvhSbt", meshSbtBuf);
+    // v4919 -- rtPipeline.mjs's own instance binding (BVH_BINDINGS.instances, WGSL name "bvhInst"). Each instance's
+    // record is the session's material, or an offset into the mesh's table under meshMaterials; `meshes: bvh` is what
+    // makes instanceBuffer append the tree, and it is passed whether or not the tree is walked so the list and the
+    // tree read the SAME buffer.
+    const instBuf = hasInstances ? device.buffer({ usage: "storage", data: instanceBuffer(instances.map((inst) => ({
+        transform: inst.transform,
+        ...(wantsMeshMaterials ? { sbtOffset: inst.sbtOffset === undefined ? 0 : inst.sbtOffset }
+            : isMicrofacet ? { hit: "microfacet", roughness, ior }
+            : { hit: "lambertian", albedo: inst.albedo === undefined ? albedo : inst.albedo }) })), { rgb: !isMicrofacet, meshes: bvh }) }) : null;
+    if (instBuf) rtPipe.bind("bvhInst", instBuf);
     // The shared multi-scatter E(mu) table (physics/render/rtPipeline.mjs's own `msE` binding, msComp:true's
     // one pipeline-level storage buffer -- see sbtRecord's own doc on why this is shared rather than per-record).
     const msBuf = isMicrofacet ? device.buffer({ usage: "storage", data: Float32Array.from(msTable.E) }) : null;
@@ -551,10 +631,14 @@ export function makeRtSession(device, { mesh, w, h, albedo = DEFAULT_ALBEDO, gra
     const presentPipe = device.pipeline({ shaders: { wgsl: presentWgsl(w, h) } });
 
     const rayWg = Math.ceil((w * h) / 64), accumWg = Math.ceil(floats / 64);
+    // v4919 -- the uniform side of stageOpts, from the SAME two flags, and empty when neither is set
+    const stageU = { ...(hasInstances ? { instanceCount: instances.length } : {}), ...(hasCutout ? { anyHit: { rule: "cutout", param: cutout } } : {}) };
     let frame = 0;
 
     return Object.freeze({
         w, h, outBuf, accumBuf,
+        /** v4919 -- where the picture is: the mesh's own bounds, or its placements' under `instances`. */
+        bounds,
         /** Restart progressive accumulation (a camera move): n=1 next frame fully overwrites accumBuf. */
         reset() { frame = 0; },
         frameCount() { return frame; },
@@ -569,8 +653,8 @@ export function makeRtSession(device, { mesh, w, h, albedo = DEFAULT_ALBEDO, gra
             // the ONE flag both sides are computed from, on purpose, so the two calls cannot drift apart.
             uBuf.write(pipelineUniforms(sbt, { spp, seed: frame, view, eps, rgb: !isMicrofacet,
                 bvh: isMicrofacet
-                    ? { nodeCount: bvh.nodeCount, triCount: bvh.triCount, hit: "microfacet", roughness, ior, msTable }
-                    : { nodeCount: bvh.nodeCount, triCount: bvh.triCount, hit: "lambertian", albedo },
+                    ? { nodeCount: bvh.nodeCount, triCount: bvh.triCount, hit: "microfacet", roughness, ior, msTable, ...stageU }
+                    : { nodeCount: bvh.nodeCount, triCount: bvh.triCount, hit: "lambertian", albedo, ...stageU },
                 ...(isMicrofacet ? { microfacet: direct, msComp: true } : {}),
                 // pipelineUniforms's own `envMap` option takes the ATLAS OBJECT itself (matching `bvh`'s own
                 // "take the descriptor" convention), not a boolean -- `isEnvMap` decides whether it is passed
@@ -598,6 +682,7 @@ export function makeRtSession(device, { mesh, w, h, albedo = DEFAULT_ALBEDO, gra
             if (vertColorsBuf) buffers.push(vertColorsBuf);
             if (matIdxBuf) buffers.push(matIdxBuf);
             if (meshSbtBuf) buffers.push(meshSbtBuf);
+            if (instBuf) buffers.push(instBuf);
             for (const b of buffers) { try { b.destroy(); } catch (e) {} }
         },
     });

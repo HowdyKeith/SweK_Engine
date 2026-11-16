@@ -16435,6 +16435,13 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
         widened: Object.freeze([]),
         verdict: "no gate file added, so nothing is claimed here (a gate may be claimed by ONE closing); physics/render/rtPipeline-selfcheck grew twelve rows (section 17: a tree over the instances and more than one mesh; 173 PASS; six sabotages, one of which went 0 red and reordered the meshes) and tools/ship/absenceScope-selfcheck's two second-level rows were re-taken on the day the list row said it would go red, each sabotaged",
     }),
+    since627: Object.freeze({
+        at: "v4919", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "no gate file added, so nothing is claimed here (a gate may be claimed by ONE closing); tools/ship/rtViewer-selfcheck grew from 99 rows to 137 (sections 1j and 4g and three rows of 6: instances, the tree over them and the any-hit cutout through makeRtSession and rtx-viewer.html; twenty-two sabotages, none 0 red, one of which first made the new rows throw and they fail by row now) and tools/ship/orreryPost-selfcheck names and times each capture and gives it pageShot's 120 s ceiling -- its cause on the rig is not known and that change is unverified there; render/seaPicker-selfcheck, which this round's rotation returned red on a fixed 900 ms wait (red on v4918's tree too), waits for the page to settle and its row is unchanged; no register widened",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

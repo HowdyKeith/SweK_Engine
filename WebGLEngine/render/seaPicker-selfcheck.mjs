@@ -133,7 +133,19 @@ console.log("\n3. THE VIEW");
             await pg2.selectOption("#seaSel", "rough"); await pg2.waitForTimeout(300);
             const saved = await pg2.evaluate(() => localStorage.getItem("subAquarium.sea"));
             ok("!! choosing a physics sea is remembered, and a reload comes back to it", saved === "rough" && (await (async () => { await pg2.reload({ waitUntil: "load" }); await pg2.waitForTimeout(500); return pg2.evaluate(() => document.getElementById("seaSel").value); })()) === "rough");
-            await pg2.selectOption("#seaSel", "gpu"); await pg2.waitForTimeout(900);
+            // *** v4919 -- WAIT FOR THE PAGE TO SETTLE, NOT FOR 900 ms. *** The page writes its state line from a 500 ms
+            // interval, and this read it after a fixed 900. On linux-x64-4c-16gb-142c0d on 2026-11-16 the read came back
+            // {sel: "gpu", state: "", frame: "block"} -- the frame shown and the first tick not yet run -- three runs of
+            // three alone, and on v4918's tree as well, so it is this box and not this round: the same day
+            // tools/ship/subAquariumPage-selfcheck took 25 s against its ring's 3.8 s. v4919's rotation returned it red.
+            // The row is unchanged and still refuses a half state; what changed is that it is asked once the page has
+            // said one thing or the other, with 30 s to say it, and the time it took is printed.
+            // SABOTAGE (v4919): the page's interval no longer writing the state line -> 1 red, this row, after 12151 ms:
+            // the page gives up at 12 s and falls back, and its message then ("the GPU ocean did not start ...") is not the refusal's wording.
+            const tSea = Date.now();
+            await pg2.selectOption("#seaSel", "gpu");
+            const settled = await pg2.waitForFunction(() => document.getElementById("seaSel").value !== "gpu" || /^GPU ocean: /.test(document.getElementById("seaState").textContent), null, { timeout: 30000 }).then(() => true, () => false);
+            console.log(`  ----  the GPU ocean ${settled ? "settled" : "DID NOT SETTLE"} ${Date.now() - tSea} ms after it was chosen`);
             const g = await pg2.evaluate(() => ({ sel: document.getElementById("seaSel").value, msg: document.getElementById("msg").textContent, state: document.getElementById("seaState").textContent, hasGpu: !!navigator.gpu, frame: document.getElementById("seaFrame").style.display }));
             ok("!! the GPU ocean is either TRIED (a state line, the frame shown) or REFUSED with its reason and the select back where it was -- never a half state" + " (here: " + (g.hasGpu ? "navigator.gpu present" : "no navigator.gpu") + ")", (g.sel === "gpu" && /^GPU ocean: (waiting|live)/.test(g.state) && g.frame === "block") || (g.sel !== "gpu" && /GPU ocean: /.test(g.msg) && g.frame === "none"), JSON.stringify(g).slice(0, 220));
             const aq = fs.readFileSync(path.join(ENG, "sub-aquarium.html"), "utf8");

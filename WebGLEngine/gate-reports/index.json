@@ -89,6 +89,7 @@
   "rigidCouple-selfcheck.json",
   "rigidFloat-selfcheck.json",
   "rtPipeline-selfcheck.json",
+  "rtViewer-selfcheck.json",
   "runtimeGap-selfcheck.json",
   "shipDebris-selfcheck.json",
   "shipyard-selfcheck.json",

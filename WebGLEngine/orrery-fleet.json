@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "f0380469943d099c4e7e81bb6d38de5ebadeeb7b",
+ "head": "e2af71abefe0d3fd051a7c8ede4e10e8ff14e9ff",
  "bodies": {
   "box3d": [
    {
@@ -461,12 +461,12 @@
   "kenney-city": [
    {
     "path": "rtx-viewer.html",
-    "bytes": 15443,
+    "bytes": 17872,
     "sha": "8aa6387c28c8c67f67e7a026e38ab3a2ddeb2c92"
    },
    {
     "path": "tools/ship/rtViewer-selfcheck.mjs",
-    "bytes": 131378,
+    "bytes": 158946,
     "sha": "e2d918cca123e8b5eee1818b6115659dcfcd2dbb"
    },
    {
@@ -920,7 +920,7 @@
    },
    {
     "path": "main.js",
-    "bytes": 3781174,
+    "bytes": 3785289,
     "sha": "ac9c232e8b2beee28634773274b7f756796ca72b"
    },
    {
@@ -950,7 +950,7 @@
    },
    {
     "path": "render/seaPicker-selfcheck.mjs",
-    "bytes": 17420,
+    "bytes": 18881,
     "sha": "19f50377e874b430dbc3da3b28d29c11102662ef"
    },
    {
