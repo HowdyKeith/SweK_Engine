@@ -130,3 +130,54 @@ DEV is free to read; HELD (113001 to 113048) was authorised by Keith to follow t
 4. **Where the order of league7100 could sit:** in the other ten numbers (search, track, fire range, aim tolerance, ping after, echo window, blind SNR, ping every, search ping, evade time). Nothing here says which; the time was inert against G only.
 
 **What is NOT shown:** which of the other ten numbers carry league7100's order (not asked); any HELD read; whether league7100's order holds against opponents but the other finders. R0 held and no check failed, so HELD may be flown.
+
+## HELD RESULT (2026-11-16; `node tools/ship/takeEvadePairs.mjs held --write`, geometries 113001 to 113048 (96 duels a matchup), flown ONCE, exit 0; record `brain/subEvadePairsHeld.json`: 7 arms, 10 P pairs, 10 U pairs, 4 steps)
+
+Keith asked for it with the DEV flight ("the next 2 rounds"); R0 held on DEV and no check failed. The void-checks passed on HELD too (none printed). Nothing in the rules, the arms or the forecasts was changed between DEV and HELD (Amendment A is dated before DEV).
+
+**R0 holds on HELD.** The P arms of league7001 (+2.697, z 16.2, 87-2-7) and league7100 (+2.760, z 17.6, 88-2-6) find against G; league7103's +1.099 (z 5.0, 64-0-32), exploit7200's +2.763, exploit7204's +2.693; the two 2 x 2 arms +2.829 and +2.695.
+
+**The ten pairs side by side, HELD with the DEV edge beside it** (the first finder's edge over the second; decided at 0.5 and z 2 in size):
+
+| pair | U: HELD (DEV) | P: HELD (DEV) | category on HELD |
+|---|---|---|---|
+| league7001 / league7100 | **-1.048** (z -6.7), 10-43-43 (-1.008) | -0.032 (+0.067) | LOST |
+| league7001 / league7103 | **+1.402** (z 4.4) (+1.295) | **+1.656** (z 7.1) (+1.524) | CARRIED |
+| league7001 / exploit7200 | **-0.575** (z -3.0) (+0.072) | -0.065 (+0.064) | LOST |
+| league7001 / exploit7204 | -0.005 (+0.099) | +0.033 (+0.007) | both undecided |
+| league7100 / league7103 | **+1.638** (z 6.0) (+1.442) | **+1.718** (z 7.4) (+1.520) | CARRIED |
+| league7100 / exploit7200 | +0.434 (z 2.0) (+0.669, decided) | -0.002 (-0.096) | both undecided |
+| league7100 / exploit7204 | **+1.215** (z 5.7) (+1.023) | +0.095 (+0.034) | LOST |
+| league7103 / exploit7200 | **-2.021** (z -8.5) (-1.892) | **-1.721** (z -7.4) (-1.553) | CARRIED |
+| league7103 / exploit7204 | **-1.744** (z -6.9) (-1.436) | **-1.654** (z -7.1) (-1.454) | CARRIED |
+| exploit7200 / exploit7204 | **+0.709** (z 3.3) (+0.196) | +0.128 (+0.067) | LOST |
+
+**RP1 THE PAIRS CARRY THE ORDER: PARTIAL** (4 of 8 decided U pairs carried; DEV 4 of 7). **RP2 NO CONTRADICTION: yes.** **RP3 THE PAIR EXPLAINS league7103'S LOSSES: yes** (4 of 4 strong grafts decided over it). **RP4 THE STRONG FOUR'S GRAFTS ARE ALIKE: yes** (none of their six pairs is decided; the largest is +0.128). **RB1 THE HEADLINE: NEITHER** (all four 2 x 2 steps FLAT: S@2.80 +0.067, S@2.70 +0.063, N@4.32 -0.094, N@4.50 -0.036; DEV had S@2.80 DOWN at -0.129, which did not repeat). **RB2: undecided** (league7001 over league7100 by -0.032, z -0.4).
+
+**Forecasts, scored** (my probability; outcome on the printed quantity of HELD; "calls" is the probability I gave to what happened):
+
+| forecast | mine | outcome | calls |
+|---|---|---|---|
+| R0 holds on DEV | 90 | held | 90 |
+| R0 holds on HELD | 88 | held | 88 |
+| RP1 YES | 15 | no | 85 |
+| RP1 PARTIAL | 60 | **yes** | 60 |
+| RP1 NO | 25 | no | 75 |
+| RP2: no contradiction | 80 | yes | 80 |
+| RP3: the pair explains league7103's losses | 85 | yes (4 of 4) | 85 |
+| RP4: the strong four's grafts are alike | 65 | yes | 65 |
+| RB2: league7100's pair over league7001's is decided | 25 | no | 75 |
+| RB1: NEITHER | 50 | yes | 50 |
+| RB1: THE SPEED | 20 | no | 80 |
+| RB1: THE TURN | 15 | no | 85 |
+
+**All twelve went as the larger side said, and the one weight on a middle outcome (PARTIAL at 60, NEITHER at 50) was the right one on both sets; I take no credit for it beyond a prior that the grafts of near-copies would be near-equal.**
+
+**What the two sets say together (post hoc, labelled as such: no rule reads two sets).**
+
+1. **The partial replicates to the pair.** All four pairs with league7103 are CARRIED on both sets (8 of 8, the grafts' edges within 0.3 of the finders'): league7103 loses to the strong four **because of its (speed, turn)**, a speed (3.546) near G's (3.418) with a turn of 2.8. The strong four's grafts are never decided against each other on either set (12 of 12 pairs undecided, the largest |edge| 0.13): **their pairs are interchangeable.**
+2. **The strong four are not interchangeable as finders, and the order is not in the pair.** league7100 beats league7001, league7200 and league7204 on both sets as the finder (league7001: -1.008 and -1.048 the other way round; exploit7200: +0.669 and +0.434; exploit7204: +1.023 and +1.215; three of three, the same sign twice); exploit7200 beats exploit7204 (+0.196 and +0.709, decided on HELD) and league7001 on HELD (+0.575, but league7001 over it by +0.072 on DEV, so not a stable sign); league7001 and exploit7204 are level (+0.099, -0.005). **So the strong four's order is: league7100 first, exploit7200 next (with a weaker claim), league7001 and exploit7204 level; and the grafted pair carries none of it** (league7100's graft over the others: +0.067 and -0.032 over league7001, -0.096 and -0.002 over exploit7200, +0.034 and +0.095 over exploit7204; 0 of 6).
+3. **The order sits in the other ten numbers (search, track, fire, aim, ping after, echo window, evade time, blind SNR, ping every, search ping), and which of them is what the ladder of the next note asks.** A reading of the finders' numbers (a table, not a result) shows that **three of the ten split the strong four the way their order does**: pingEvery (league7100 8.31 and exploit7200 8.17 against league7001 4.00 and exploit7204 4.00), blindSnr (league7001 80.9 and exploit7204 77.7 against league7100 47.0 and exploit7200 51.4) and, less cleanly, searchSpeed (exploit7200 4.30, league7100 4.09, league7001 3.83, exploit7204 3.31). That is a hypothesis from a table, said as one; the ladder is by groups chosen by function before any of its results, and tests all of them, not these three.
+4. **The 2 x 2 did not move:** every speed step and turn step is FLAT on HELD, and DEV's one small DOWN (4.5 under 4.317 at turn 2.8, -0.129) did not repeat: neither the speed nor the turn separates league7100's pair from league7001's, as the speed notes found at a single turn.
+
+**What is NOT shown:** which of the ten numbers carry league7100's order (not asked here); anything against an opponent but the finders and G; a mechanism. RP1 PARTIAL is the registered pointer to a ladder over the other ten numbers, restricted to the strong four: `brain/SUB_EVADE_LADDER_WIP.md`.
