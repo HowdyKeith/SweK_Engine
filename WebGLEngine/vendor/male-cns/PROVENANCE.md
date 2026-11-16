@@ -105,6 +105,18 @@ GABA), `AOTU025` 2, `DNa02` 2. 281 neurons, 6,589 edges.
 
 Both are DATA ONLY so far (nothing runs on them). `brain/maleCnsCircuits-selfcheck.mjs` pins all three.
 
+### Where the tracking cells' dendrites are (2026-11-16, same route)
+
+- `syn-partners-male-cns-v1.0-minconf-0.5-significant-only.feather` (2,965,702,122 bytes)
+  sha256 `43748c76db13e339e9eeb6f4d56e98aab704a4f7fa8bf3cb916b323000070d04` (124,039,080 rows)
+
+`tools/maleCnsDendritePositions.py` reads every synapse's coordinates from it and writes
+`lc10-positions.json`: for each of the 275 `LC10a` cells, the median place of its dendrite's input sites
+(the inputs far from the type's output region; 158,922 of 251,485 sites). Units are the dataset's voxels.
+The body annotations give these cells no place in the eye (`assignedOlHex*` is empty for them); this is
+the only position the tree has for them. **Which way the sheet maps onto the visual field is not in
+this file.** `brain/maleCnsCircuits-selfcheck.mjs` (section 5) pins the file and what it shows.
+
 **Licence, said plainly:** the bucket's own README states no licence. CC-BY-4.0 is what this file
 records for the dataset as served by Neuprint; it was NOT re-confirmed for the bucket route.
 
@@ -113,7 +125,7 @@ records for the dataset as served by Neuprint; it was NOT re-confirmed for the b
 ## Contents
 
 - `giant-fiber-circuit.json`, `epg-compass-circuit.json`, `cx-steering-circuit.json`,
-  `cx-steering-inputs-circuit.json`, `lc10-tracking-circuit.json` — see the circuit sections above.
+  `cx-steering-inputs-circuit.json`, `lc10-tracking-circuit.json`, `lc10-positions.json` — see the circuit sections above.
 - `PROVENANCE.md` — this file.
 
 Re-running the fetch (e.g. for a different circuit, or a refreshed dataset version) uses the same fetch
