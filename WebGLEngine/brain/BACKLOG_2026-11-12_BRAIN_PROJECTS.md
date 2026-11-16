@@ -276,6 +276,26 @@ cannot be told from a shuffle of it (p 0.78).** Most of the trainer's gain was i
 **OPEN, not registered:** the fish's circuit with memory, asked properly; real left and right eyes and receptive fields (that
 chat's `brain/FLY_RETINOTOPY_RF_WIP.md`); the published Giant Fiber model as a hand-written fly beside the reflex.
 
+Keith, 2026-11-16, after round 5: "Do we need to integrate more fly cells? ... What else could the fly do? 2 flies? We can check
+6dof for any gaps or new possible modes. Can we surgically merge 2 Flys and use that to pilot or walk on all fours? Can our fly
+see and paint that? Is our fly looking for other flies to mate with?" **None of these is registered; each is said with what is
+real in it and what would be invented.** (Round 6, `brain/FLY_ESCAPE_DEGREE_WIP.md`, was asked for in the same message and is
+its own entry above.)
+
+| name | what | what is real | what is invented or missing | needs more cells? |
+|---|---|---|---|---|
+| `more-escape-cells` | The rest of the Giant Fiber's visual input: the tree holds 40 of the 311 LC4 and LPLC2 cells that reach the fibres (a fifth of that input) | all of it is in the connectome | nothing, but **more cells do not sharpen rounds 5 and 6's question**; they matter once each cell looks at its own patch of the eye | yes, from the other chat: its `giant-fiber-visual-retinotopy.json` is not on this branch |
+| `fly-eyes-left-right` | Each visual cell given what ITS patch of the eye sees (the page's eye picture is already 180 x 45 lenses), so a mover on the left drives the left cells and the fly can turn away from it | retinotopy; left and right fibres | the fly here chooses home or food, not a direction: the task needs a second action | the retinotopy file |
+| `two-flies-one-yard` | A second fly in the yard. It also looms when it comes near, and it is not a strike: the fly must tell a fly from a predator, and the two compete for one food tile | flies do share food and do startle each other | the second fly's behaviour is a rule or another trained fly | no |
+| `fly-courts-fly` | **The honest answer to "is our fly looking for a mate": no. Nothing in the tree does courtship.** The round: a small thing that moves across the eye is to be FOLLOWED, a thing that looms is to be FLED -- one eye, two circuits pulling opposite ways | in a male fly LC10a visual cells and P1 cells drive the chase of a female, and the connectome this tree uses is a male's | the other fly, and everything after the chase | yes: LC10a and P1 and their path to steering, from the other chat |
+| `fly-pilots-6dof` | The Giant Fiber visual circuit as a 6-DOF craft's collision reflex: an incoming craft or shot has an angular size and a looming rate, which are exactly the circuit's two inputs; the output is "break away now" on top of the pilot | the circuit's job is this job | a craft is not a fly; the pilot under it is the tree's MLP. **Gap found reading the backlog: no helm with a fly circuit has ever been trained** (`brain/helmPolicy.mjs`: hand weights of zero) | no |
+| `two-flies-merged` | "Surgically merge two flies": one network of two copies of a circuit with connections across. **Said plainly: the real circuit is already two halves, left and right, joined by exactly two connections between the Giant Fibers**; a merge of two whole flies has no anatomy to follow, so every joining connection would be invented | each half's wiring | the joins; and a body: four legs is not a fly's six, and the tree holds no leg circuit at all | for walking: the leg circuits of the nerve cord, which the male connectome has and the tree does not |
+| `fly-paints-what-it-sees` | The fly-wired painter (`painting-fly`, done: its wiring could not be told from a shuffle) given the picture from the fly's own eye on the escape page as the thing to paint | the eye picture is the escape task's own | the painter is handed the picture as numbers; nothing is seen through visual cells. A picture of a looming disc is a simple target, so it would mostly test the painter | no |
+
+**If asked for an order:** round 6's reading first (it says whether anything finer than convergence is worth chasing); then
+`fly-pilots-6dof` (no new data, and it closes a gap); then `fly-eyes-left-right` and `fly-courts-fly`, which both wait on cells
+from the other chat.
+
 Keith, 2026-11-13: "How else could the fly brain live in voxel world? Could it play minecraft or create something to attract a
 different fly brain?" and, of the five answers: "Yes, add those to the backlog". Each builds on `voxel-home` (`brain/rl/buildEnv.mjs`:
 the site, the plan, `homeCheck`). **Said first: the real Minecraft is not reachable from here and is not to be rebuilt; "play
