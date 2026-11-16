@@ -32,7 +32,10 @@ export function makeEscapeRound(cfg) {
 if (!cfg || typeof cfg.results !== "string" || (cfg.start !== undefined && cfg.start !== "reflex") || (cfg.report !== undefined && cfg.report !== "lived" && cfg.report !== "return") ||
     (cfg.fresh !== undefined && cfg.fresh !== true) || (cfg.battery !== undefined && !(Number.isInteger(cfg.battery) && cfg.battery >= 24)) || (cfg.memory !== undefined && cfg.memory !== true)) throw new Error("flyEscape.makeEscapeRound: a cfg is { results, start: \"reflex\" (optional), report: \"lived\" | \"return\" (optional) }");
 const RECIPE = Object.freeze({ maxSteps: 160, iters: 150, pop: 96, sigma: 0.14, lr: 0.05, trainEps: 8, ...(cfg.fresh ? { fresh: true } : {}), ...(cfg.battery ? { battery: cfg.battery } : {}) });   // round 3: the trainer's fresh episodes and its battery's size (brain/rl/dockPolicy.js), carried in the recipe so a record says how it was trained
-const SEEDS = Object.freeze(Array.from({ length: 16 }, (_, k) => k + 1));
+// 2026-11-16 -- A ROUND MAY NAME ITS OWN DRAWS (cfg.seeds: distinct whole numbers above 0, at least two; round 6 uses 17 to 48). Without it nothing changes: draws 1 to 16. The draw trained a second
+// time is the first of them.
+if (cfg.seeds !== undefined && !(Array.isArray(cfg.seeds) && cfg.seeds.length >= 2 && cfg.seeds.every((s) => Number.isInteger(s) && s > 0) && new Set(cfg.seeds).size === cfg.seeds.length)) throw new Error("flyEscape.makeEscapeRound: cfg.seeds is a list of distinct whole numbers above 0, at least two");
+const SEEDS = Object.freeze(cfg.seeds === undefined ? Array.from({ length: 16 }, (_, k) => k + 1) : [...cfg.seeds]), FIRST = SEEDS[0];
 const MEMORY = cfg.memory === true;   // round 4: a unit's activity is carried from one tick to the next (brain/rl/carryCircuit.mjs); the MLP has nothing to carry and is not in such a round
 // 2026-11-16 -- A ROUND MAY BRING ITS OWN ARMS (cfg.arms: { NAME: { weights, under, circuit(s) -> { units, edges }, make(s) -> ({ obsDim, actDim, seed }) -> policy } }; `under` is how many weights its
 // output reads, so the reflex start can zero them and the bias). Then cfg.lead is the arm T0 and the recheck are of (the first unless given), cfg.versus the arms T1 and T2 set it against, and
@@ -148,8 +151,8 @@ function checkRecords(lines) {
             }
         }
     }
-    const re = lines.filter((r) => r && r.kind === "recheck"), fly1 = draws.find((r) => r.arm === LEAD && r.s === 1);
-    if (re.length !== 1 || !fly1 || re[0].arm !== LEAD || re[0].s !== 1 || re[0].weightsHash !== fly1.weightsHash) bad.push(`${LEAD} draw 1 trained a second time is not there once with the same weights`);
+    const re = lines.filter((r) => r && r.kind === "recheck"), fly1 = draws.find((r) => r.arm === LEAD && r.s === FIRST);
+    if (re.length !== 1 || !fly1 || re[0].arm !== LEAD || re[0].s !== FIRST || re[0].weightsHash !== fly1.weightsHash) bad.push(`${LEAD} draw ${FIRST} trained a second time is not there once with the same weights`);
     const fl = lines.filter((r) => r && r.kind === "floors");
     if (fl.length !== 1 || !Object.keys(FLOORS).every((k) => fl[0][k] && Number.isFinite(fl[0][k].score) && Math.abs(fl[0][k].score - FLOORS[k]) < 5e-5)) bad.push("the floors are not there once with the registration's five numbers (freeze 0.2840, hide 0.5000, fleeAll 0.5395, reflex 0.6465, told 0.8351)");
     if (START === "reflex" && fl.length === 1) for (const a of ARMS) if (!(fl[0].untrained && fl[0].reflex && fl[0].untrained[a] === fl[0].reflex.score)) bad.push(`the untrained ${a} fly does not score the reflex's number: the start is not the reflex`);
@@ -174,7 +177,7 @@ function reading(lines) {
 function readingLines(R) {
     const out = [], f = (x) => x.toFixed(4);
     if (R.checks.length) { out.push("A CHECK FAILED, AND THE READING IS NOT WEIGHED:"); for (const c of R.checks) out.push("  " + c); }
-    else out.push(`the checks hold: ${ARMS.length * SEEDS.length} draws, each once, the registered recipe, each arm's weight count and wiring, ${LEAD} draw 1 the same twice, a history in every record, the registration's floors`);
+    else out.push(`the checks hold: ${ARMS.length * SEEDS.length} draws, each once, the registered recipe, each arm's weight count and wiring, ${LEAD} draw ${FIRST} the same twice, a history in every record, the registration's floors`);
     out.push("", "arm     n   mean    sd      least   most    lives (of 200)  feeds   leaves for a pass  caught by a strike");
     for (const [arm, s] of Object.entries(R.arms)) out.push(`${arm.padEnd(7)} ${String(s.n).padStart(2)}  ${f(s.mean)}  ${f(s.sd)}  ${f(s.min)}  ${f(s.max)}  ${s.alive.toFixed(1).padStart(6)}          ${s.fed.toFixed(3)}   ${s.fledPass.toFixed(3)}              ${s.caught.toFixed(3)}`);
     if (R.floors) { out.push(""); for (const k of Object.keys(FLOORS)) { const x = R.floors[k]; if (x) out.push(`${(k === "told" ? "told the kind" : k).padEnd(14)} ${f(x.score)}  lives ${String(x.alive).padStart(3)}  feeds ${x.fed.toFixed(3)}   leaves for a pass ${(x.fledPass / Math.max(1, x.passes)).toFixed(3)}   caught by a strike ${(x.caught / Math.max(1, x.strikes)).toFixed(3)}`); } }
