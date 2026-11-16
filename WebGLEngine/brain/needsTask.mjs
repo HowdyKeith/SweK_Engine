@@ -55,10 +55,20 @@ export function scenario(seed, kind = "plain") {
 // acts on the sample chatters at its thresholds.
 export const GAUGE = Object.freeze({ sd: 0.1, hz: 1 });
 const gaussOf = (r) => { let u = 0, v = 0; while (!u) u = r(); while (!v) v = r(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
-export function gaugeOf(sc, { sd = GAUGE.sd, hz = GAUGE.hz } = {}, dt = DT) {
+// Round 34 (brain/NEEDS_AND_LIMITS.md, registered first): an optional `fault` { bias, driftPerS, dropEveryS, dropFromS } makes the gauge WRONG as well as noisy -- the reading
+// gains bias + driftPerS x t, and is not refreshed while t mod dropEveryS >= dropFromS (the noise draw is still taken, so the stream stays REF's). No fault: the formula above, unchanged.
+export function gaugeOf(sc, { sd = GAUGE.sd, hz = GAUGE.hz, fault = null } = {}, dt = DT) {
     const rng = mulberry((sc.seed * 15485863 + KINDS.indexOf(sc.kind) * 32452843 + 977) >>> 0), every = Math.max(1, Math.round(1 / (hz * dt)));
     let held = null;
-    return (i, frac) => { if (held === null || i % every === 0) held = clamp(frac + sd * gaussOf(rng), 0, 1); return held; };
+    if (!fault) return (i, frac) => { if (held === null || i % every === 0) held = clamp(frac + sd * gaussOf(rng), 0, 1); return held; };
+    const { bias = 0, driftPerS = 0, dropEveryS = 0, dropFromS = 0 } = fault;
+    return (i, frac) => {
+        if (held === null || i % every === 0) {
+            const n = gaussOf(rng), t = i * dt, stuck = held !== null && dropEveryS > 0 && (t % dropEveryS) >= dropFromS;
+            if (!stuck) held = clamp(frac + bias + driftPerS * t + sd * n, 0, 1);
+        }
+        return held;
+    };
 }
 
 /** The score of a run from its parts (see the header): a crushed boat is 0; otherwise 0.45 x the reachable stations visited + 0.45 x returned + 0.1 x hull, in [0, 1]. */
