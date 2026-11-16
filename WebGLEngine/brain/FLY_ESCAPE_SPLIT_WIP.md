@@ -68,3 +68,41 @@ Round 6: 64.7 minutes for 96 trainings. 160 trainings: under two hours. Resumabl
 ## 9. The run (the gate never runs it and never gives the command the word `run`)
 `node tools/ship/takeFlyEscapeSplit.mjs run` -> `brain/flyEscapeSplitRound.jsonl`, committed byte for byte, whole, before
 it is read; `node tools/ship/takeFlyEscapeSplit.mjs read` prints the checks and the reading.
+
+## 10. The result
+The run took 96.1 minutes. `brain/flyEscapeSplitRound.jsonl` (162 records, sha256 `66fd20977af8fd27...`) was committed
+whole at 89684b4a before it was read, and read once. The checks hold: 160 draws each once, the registered recipe, each
+arm's own shuffle of the draw, GDEG draw 49 the same twice, and the untrained fly of every arm scoring the reflex's 0.6465.
+
+- **R0: KEEPING EVERY CELL'S COUNTS ESCAPES BETTER THAN A FREE SHUFFLE** -- ranks 1245.5, the middle 1040, p 0.0057.
+  Round 6's difference came again, on new draws and new shuffles. The split was asked of a difference that is there.
+- **K1: KEEPING EVERY CELL'S COUNT IN CANNOT BE TOLD APART FROM A FREE SHUFFLE** -- ranks 1145.5, p 0.16.
+- **K2: KEEPING EVERY CELL'S COUNT OUT CANNOT BE TOLD APART FROM A FREE SHUFFLE** -- ranks 1075, p 0.67.
+- **K3: KEEPING ONLY WHAT THE TWO GIANT FIBERS RECEIVE CANNOT BE TOLD APART FROM A FREE SHUFFLE** -- ranks 1225.5,
+  p 0.013.
+- **T0: A FLY WHOSE WIRING KEEPS EVERY CELL'S COUNTS, STARTED AT THE REFLEX, ESCAPES BETTER THAN THE REFLEX** -- 32 of 32.
+- **T3: A FLY STARTED AT THE REFLEX ESCAPES BETTER THAN THE REFLEX** -- 158 of 160 above, 2 equal.
+
+BETTER, CANNOT, CANNOT, CANNOT is the fifth row of section 5's table: **the difference needs both counts together; no one
+part carries it.** That is the registered sentence and it stands as registered.
+
+What it is worth, said with it. K3 missed the line by little (p 0.013 against 0.01), and the fibres' arm is the one that
+looks like GDEG: the same mean and median (0.7494 and 0.7495 against 0.7496 and 0.7493), no failed training, the smallest
+spread of the five, and beside GDEG a rank sum of 1067.5 on a middle of 1040 (p 0.72). The count out alone is the free
+shuffle's twin (means 0.7444 and 0.7444, one failed training each) and is the lowest beside GDEG (863, p 0.018). So this
+round cannot tell "it needs both counts" from "it is what the fibres receive, and 32 draws were too few to show it". The
+three arms in which the fibres keep their 42 connections have no failed training; the two in which they do not have one
+each.
+
+| arm | mean | median | sd | failed of 32 | beside GDEG (ranks, p) |
+|---|---|---|---|---|---|
+| GDEG (both counts) | 0.7496 | 0.7493 | 0.0039 | 0 | |
+| GIN (count in) | 0.7480 | 0.7490 | 0.0039 | 0 | 980.5, 0.43 |
+| GOUT (count out) | 0.7444 | 0.7483 | 0.0181 | 1 | 863, 0.018 |
+| GGF (the fibres' inputs) | 0.7494 | 0.7495 | 0.0024 | 0 | 1067.5, 0.72 |
+| GSHUF (nothing) | 0.7444 | 0.7479 | 0.0179 | 1 | |
+
+Against section 6: R0 BETTER (50) came; K3 BETTER (40) and K1 BETTER (40) did not; K2 CANNOT (85) came; T0 and T3 came;
+the table's first row (20) did not; the failures came as guessed. The difference is still small: a thousandth and a half
+at the median, and one failed training in 32. A round that could settle K3 would be GGF against GSHUF alone on many more
+draws; it is not registered.
