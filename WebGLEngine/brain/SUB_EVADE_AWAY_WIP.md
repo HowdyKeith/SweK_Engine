@@ -67,3 +67,12 @@ Why these: against its own copy a hunter gained on three bases of 14, all strong
 ## 7. Cost
 
 87 matchups of 96 duels a set, about twenty minutes of one core a set; the command, its gate and a sabotage pass are the work.
+
+
+## AMENDMENT A (2026-11-16; written after the command was written and smoke-run on geometries 1 to 4, BEFORE any geometry of the DEV set 124001 to 124048 or of HELD is flown)
+
+**1. The smoke headline, said before any DEV geometry (the rule of section 3).** The command's `smoke` was run on geometries 1 to 4 (8 duels a matchup; never recorded; free to read). Its headline was **"AWAY: league7001 NARROW, exploit7200 NARROW, exploit7204 NARROW"**: R0 holds on it (OWN +1.517, +1.913 and +1.181); the slowed hunter HELPS against **3, 3 and 2** of the 14 opponents; it HURTS none; the common opponents are league7001, league7100 and exploit7204 (not exploit7200). The three it helps league7001 against are league7100 (+1.902), exploit7200 (+1.520) and exploit7204 (+1.154). Eight duels on four geometries are a smoke test and not a reading, and **the forecasts of section 5 stand as written before it was seen and are scored as written; but I have seen this headline, and the 60 given to "all three NARROW" is no longer a blind number**: the DEV read and HELD are the evidence, and the smoke is not counted in them.
+
+**2. A property of the design that the smoke shows and that this note did not say (said before data; no rule is changed).** The effect of a change is the difference of two edges, and **an edge has a ceiling**: against the weak evaders the unchanged hunter already scores **+3.22 to +3.31** in both seats' mean on the smoke geometries (30 of the 42 BASE edges), so there is no room for a slower tracker to add anything there (its SLOW edge there is within 0.05 of the BASE edge on all thirty; the largest difference is 0.043); the other twelve BASE edges run from -1.93 to +2.41, and these are the opponents against which a change can show. **An opponent the hunter beats at the ceiling therefore reads NEUTRAL whatever the trackSpeed does**; the reach read's finding that the effect sits on strong evaders is partly this. The reading is post-hoc, from the smoke; the registered rules (RA1 to RA4) count what they count, and the report prints BASE and SLOW beside each effect so that it can be seen.
+
+**3. What is not changed:** the hunters, the opponents, the matchups, the sets, the rules R0 and RA1 to RA4, the forecasts, the geometries, the order of work.
