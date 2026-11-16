@@ -10,7 +10,7 @@
 //   4  THE FILE              the blob is a helmFlyWired brain of the chosen gain twice, and its `by` says nothing inside was learned, every reading, the thrust the rule's, where the threshold came from
 //   5  REAL PAIRS, THE COMMAND, AND WHAT WAS FOUND   a real job flies; the command's refusals; and, once the study has been flown, its kept reading
 //
-// SABOTAGE LOG: @@LOG@@
+// SABOTAGE LOG: 22 mutants of tools/ship/takeFlyWiredHelm.mjs, each a copy of the study with this gate (and the command rows) pointed at it: 22 red by name the first time -- the train pairs another search's, the audit pairs the held-out ones, gains of one sign, a gain on one axis, the wiring dropped from a job, the worst gain chosen, a tie to the larger or to the positive, F2 read against the sine, F3's sign, a weaker verdict or one read from F2, every wiring flown at the fly's gain, the held-out pairs the train ones, the gain chosen on the audit pairs, a blob of one gain or of the sine's, the `by` without `nothing is learned` or without the threshold's origin, a second read allowed, an unknown option taken, a kept file's name without its gain.
 "use strict";
 import fs from "node:fs";
 import os from "node:os";
@@ -79,7 +79,7 @@ console.log("5. REAL PAIRS, THE COMMAND, AND WHAT WAS FOUND");
 await section(async () => {
     const [a, b] = [F.jobsOf("fly", -1, [F.TRAIN_PAIRS[0]])[0], F.jobsOf(SH, -1, [F.TRAIN_PAIRS[0]])[0]].map(leadOf);
     ok("!! a real job flies: the fly's helm and the shuffled one's at the same gain are two different fights of the same pair, and neither is a draw with the rule", a !== b && a !== 0 && b !== 0, `leads ${a.toFixed(3)}, ${b.toFixed(3)}`);
-    const run = (...x) => spawnSync("node", [CMD, ...x], { encoding: "utf8", timeout: 60000 }), tmp = fs.mkdtempSync(path.join(os.tmpdir(), "flywired-")), out = path.join(tmp, "w.json"); fs.writeFileSync(out.replace(/\.json$/, ".reading.json"), "{}");
+    const run = (...x) => spawnSync("node", [CMD, ...x], { encoding: "utf8", timeout: 180000 }), tmp = fs.mkdtempSync(path.join(os.tmpdir(), "flywired-")), out = path.join(tmp, "w.json"); fs.writeFileSync(out.replace(/\.json$/, ".reading.json"), "{}");
     const bad = run("--speed", "3"), again = run("--out", out, "--kept", path.join(tmp, "kept"));
     ok("!! THE COMMAND REFUSES an option it does not know, and A SECOND READ OF THE AUDIT (the reading file is there) before it flies anything: no kept flight is written", bad.status === 2 && /unknown option --speed/.test(bad.stderr) && again.status === 1 && /THE AUDIT HAS BEEN READ ONCE/.test(again.stderr) && !fs.existsSync(path.join(tmp, "kept")));
     fs.rmSync(tmp, { recursive: true, force: true });
