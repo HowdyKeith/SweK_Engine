@@ -22,6 +22,10 @@
 // task); the circuit's D, over its amplitude, times a gain, through tanh, is the fraction of half the hull's torque limit added about that axis. TWO WEIGHTS: the two gains. The thrust and the roll are the rule's. Zero gains are the rule to the bit. wiringOf(name): "fly", "shuffled:<seed>", or "sine" -- no circuit, D
 // = -AMPLITUDE sin(G - H), what an ideal comparator would hand the same helm.
 //
+// WHAT A SHIP MAKES OF IT (tools/ship/takeFlyWiredHelm.mjs; both studies registered before their pairs, each read once on 600): STUDY 1, the helm on `fly` as described above: it TRAILS the rule by 1.275 -- as its shuffled twin does (-1.305) -- while the sine helm LEADS by 1.069. STUDY 2, a second attempt, the helm on
+// `fly2~odd` (below): it LEADS the rule by 1.019 (z 27), THE SHUFFLED CIRCUIT'S HELM LEADS BY NOTHING (+0.006), so the fly's wiring is worth 1.013 (z 22), and it cannot be told from the sine helm (-0.039). That is the first result in this tree in which a fly's wiring, and not a free weight beside it, does the work.
+// What made the difference between the studies was not the circuit but how it is read: exactly nothing must be added when the ship is on its goal.
+//
 // WHAT IS NOT HERE: anything learned inside the circuit; dynamics (no time constants: three steps from rest each tick); the other 0.03 of each cell's inputs from outside these 220 neurons; a ring attractor (the bump is put where H says); DNa03's read-out; any claim that a fly steers a starship.
 "use strict";
 import * as CX from "./cxInputsTopology.mjs";

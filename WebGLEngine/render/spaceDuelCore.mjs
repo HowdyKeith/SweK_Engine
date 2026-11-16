@@ -5,7 +5,7 @@
 //
 //   HANDS   who works a side's thirteen gun seats: `rule` (the hand gunner), the three CORRECTING networks' shipped files (`fly`: the fruit fly's circuit; `gpu`: the GPU Brain's plain network, run here by its CPU twin; `fish`: the zebrafish circuit -- whose wiring did nothing in training, its file says), and the
 //           RACE CAR'S turret gunner laying the gun itself (`car`: the car's own untrained hand weights, no file; `car-trained`: the file trained in a ship's seat on 8 pairs a child; `car-big`: the file the rig trained on 300 pairs a child, which always fires; `track`: brain/seatTrackGunner.mjs, the fly's target-tracking circuit with the car's hand rule on it, untrained, no file). Each says in `note` what it is NOT, in a line a page can show.
-//   HELMS   `face` (the arena's rule: the bow on the enemy), `broadside` (the hand rule), `trained` (the trained helm network correcting the bow-on rule -- the only rule it was trained for), `steer` (the helm trained over the fly's steering circuit, brain/helmSteerPolicy.mjs, correcting the bow-on rule), `compass` (the same over the circuit with its inputs, brain/helmCompassPolicy.mjs).
+//   HELMS   `face` (the arena's rule: the bow on the enemy), `broadside` (the hand rule), `trained` (the trained helm network correcting the bow-on rule -- the only rule it was trained for), `steer` (the helm trained over the fly's steering circuit, brain/helmSteerPolicy.mjs, correcting the bow-on rule), `compass` (the same over the circuit with its inputs, brain/helmCompassPolicy.mjs), `flywired` (brain/flySteering.mjs: the fly's steering circuit wired as the fly wires it, nothing inside it learned, two gains).
 //   FILES   the core reads no disk and no network: the page (or a gate) loads the brain files named in FILES and hands the parsed objects in. Each goes through brain/peerBrain.mjs's importBrain against the module it is for; a file that is refused refuses the SIDE, by name and with the reason.
 //   PEERS   a side's choice may carry `peer`: brain files as they arrived ([{ name, text }]). They go through brain/peerFleet.mjs (which never throws on a file) and take the seats, the helm and the escorts where they have a brain for them; the catalogue's choice stands for the rest. peerLines() is the report.
 //   RATION  `setup.ammo` is battleshipDuel's: the fraction of every gun seat's magazine both sides carry (1 by default: the whole magazines). A snapshot's seat says the rounds it has LEFT.
@@ -26,6 +26,7 @@ import * as HP from "../brain/helmPolicy.mjs";
 import * as HS from "../brain/helmSteerPolicy.mjs";
 import * as SK from "../brain/seatTrackGunner.mjs";
 import * as HC from "../brain/helmCompassPolicy.mjs";
+import * as FS from "../brain/flySteering.mjs";
 import * as PF from "../brain/peerFleet.mjs";
 
 /** The brain files the page loads, by the name the catalogues below use: a path under brain/ and the policy it must be for. */
@@ -38,6 +39,7 @@ export const FILES = Object.freeze({
     helm: Object.freeze({ path: "brain/helmWeightsDefault.json", policy: "helmPolicy", mod: HP }),
     "helm-steer": Object.freeze({ path: "brain/helmSteerWeightsDefault.json", policy: "helmSteerPolicy", mod: HS }),
     "helm-compass": Object.freeze({ path: "brain/helmCompassWeightsDefault.json", policy: "helmCompassPolicy", mod: HC }),
+    "helm-flywired": Object.freeze({ path: "brain/helmFlyWired2WeightsDefault.json", policy: "helmFlyWired2", mod: FS.second }),
 });
 export const HANDS = Object.freeze([
     Object.freeze({ id: "rule", label: "hand gunner (the rule)", file: null, note: "no network: the sight's own aim and trigger" }),
@@ -55,6 +57,7 @@ export const HELMS = Object.freeze([
     Object.freeze({ id: "trained", label: "trained helm (corrects the bow-on rule)", rule: "face", file: "helm", note: "on 300 fresh pairs it leads the bow-on rule by 0.38; with no cannon on either side it is no better than the rule; it was not trained for the broadside rule and trails behind it" }),
     Object.freeze({ id: "steer", label: "trained helm over the fly's steering circuit (corrects the bow-on rule)", rule: "face", file: "helm-steer", note: "three weights and no synapse: it throttles back and turns harder about one axis. On 600 pairs it leads the bow-on rule by 0.64 and the other trained helm by 0.20, in the one fight it was trained in; the fly's wiring took no part" }),
     Object.freeze({ id: "compass", label: "trained helm over the fly's steering circuit with its inputs (corrects the bow-on rule)", rule: "face", file: "helm-compass", note: "220 neurons, the compass and the goal cells with the steering cells; what was trained is three weights and no synapse: it throttles back and damps the spin about one axis. On 600 pairs it leads the bow-on rule by 0.47 and cannot be told from the first trained helm; the fly's wiring took no part" }),
+    Object.freeze({ id: "flywired", label: "the fly's steering circuit, wired as the fly wires it (corrects the bow-on rule)", rule: "face", file: "helm-flywired", note: "the ship's heading goes into the fly's compass cells and the enemy's bearing into its goal cells; the connectome's own weights do the rest and NOTHING inside is learned (two gains outside it are). On 600 pairs it leads the bow-on rule by 1.02, the same circuit with its connections shuffled leads by nothing, and an ideal comparator does no better. A second attempt: the first way of reading the circuit lost by 1.3" }),
 ]);
 /** The rations of the magazines a page offers (battleshipDuel's `ammo`): the whole magazines, and what tools/ship/takeAmmoStudy.mjs flew. */
 export const RATIONS = Object.freeze([1, 0.5, 0.25, 0.125, 0.0625]);
