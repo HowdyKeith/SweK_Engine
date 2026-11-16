@@ -1,6 +1,6 @@
 {
  "gate": "physics/render/rtPipeline-selfcheck.mjs",
- "at": "2026-11-15",
+ "at": "2026-11-16",
  "tables": [
   {
    "title": "two spheres: CPU against the pipeline, per resolution and sample count",
