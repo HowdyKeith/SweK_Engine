@@ -59,7 +59,7 @@ function evaluate(flat, opts = {}) {
     const p = opts.policyFactory ? opts.policyFactory(dims) : new FlightPolicy({ hidden: opts.hidden || [16, 16], ...dims });
     p.setParams(flat);
     const K = opts.episodes || 24; let ret = 0, docks = 0, dsum = 0, crashes = 0;
-    for (let k = 0; k < K; k++) { const r = rollout(p, env, 5000 + k * 17); ret += r.total; if (r.docked) docks++; dsum += r.dist; crashes += r.crashes || 0; }
+    for (let k = 0; k < K; k++) { const r = rollout(p, env, (opts.seedBase === undefined ? 5000 : opts.seedBase) + k * 17); ret += r.total; if (r.docked) docks++; dsum += r.dist; crashes += r.crashes || 0; }
     return { avgReturn: ret / K, dockRate: docks / K, avgDist: dsum / K, avgCrashes: crashes / K };
 }
 
@@ -85,8 +85,13 @@ function trainDockES(opts = {}) {
     for (let it = 0; it < iters; it++) {
         // antithetic pairs: for each of pop/2 noise vectors, evaluate +noise and -noise
         const half = pop >> 1; const noises = [], rets = [];
+        // 2026-11-15 (unnumbered) -- TWO OPTIONS, AND WITHOUT THEM NOTHING CHANGES. Every policy tried, at every iteration, was flown on the SAME trainEps episodes (the first of the battery's
+        // seeds, 5000 + 17 k), and the best was chosen on a battery of 24 that includes them: a training fitted 8 episodes (brain/FLY_ESCAPE_FRESH_WIP.md section 1). `freshEpisodes: true` gives each
+        // iteration its own episodes (seeds 5000 + 17 k + 104729 (it + 1): the same for every policy of the iteration, so they are compared fairly; never the battery's). `batteryEps` is the
+        // battery's size (24 unless given). tools/ship/paintingFly-selfcheck.mjs pins this trainer's answers without either.
+        const trainBase = opts.freshEpisodes === true ? 5000 + 104729 * (it + 1) : undefined;
         for (let i = 0; i < half; i++) { const eps = new Float32Array(n); for (let j = 0; j < n; j++) eps[j] = gauss(rng); noises.push(eps);
-            for (const sgn of [1, -1]) { for (let j = 0; j < n; j++) scratch[j] = theta[j] + sgn * sigma * eps[j]; rets.push({ i, sgn, r: evaluate(scratch, { ...evOpts, episodes: opts.trainEps || 10 }).avgReturn }); }
+            for (const sgn of [1, -1]) { for (let j = 0; j < n; j++) scratch[j] = theta[j] + sgn * sigma * eps[j]; rets.push({ i, sgn, r: evaluate(scratch, { ...evOpts, episodes: opts.trainEps || 10, seedBase: trainBase }).avgReturn }); }
         }
         // normalize returns to advantages
         const mean = rets.reduce((s, x) => s + x.r, 0) / rets.length; let sd = Math.sqrt(rets.reduce((s, x) => s + (x.r - mean) ** 2, 0) / rets.length) || 1;
@@ -94,7 +99,7 @@ function trainDockES(opts = {}) {
         for (const x of rets) { const adv = (x.r - mean) / sd; const eps = noises[x.i]; const c = adv * x.sgn; for (let j = 0; j < n; j++) grad[j] += c * eps[j]; }
         const scale = lr / (rets.length * sigma); for (let j = 0; j < n; j++) theta[j] += scale * grad[j];
         // full eval each iter, on a fixed battery, and keep the best (ES walks can drift off a good spot)
-        const ev = evaluate(theta, { ...evOpts, episodes: 24 });
+        const ev = evaluate(theta, { ...evOpts, episodes: opts.batteryEps || 24 });
         const score = ev.dockRate * 1000 - ev.avgDist - (ev.avgCrashes || 0) * 200;   // docks, then closeness, penalize crashes
         if (score > best.score) best = { params: theta.slice(), score, ev };
         // v3969 -- AN OPTIONAL PER-ITERATION OBSERVER, AND IT IS OPTIONAL SO THAT NOTHING CHANGES WITHOUT ONE.

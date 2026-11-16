@@ -15,7 +15,8 @@
 //   readingLines(R)
 // ONE CODE, TWO ROUNDS (2026-11-15): everything below is makeEscapeRound(cfg). Round 1 is cfg { results }; round 2 (brain/FLY_ESCAPE_REFLEX_WIP.md, tools/ship/flyEscapeReflex.mjs) adds
 // start: "reflex" (the fly is the reflex plus its network, brain/rl/reflexStart.mjs; T0 and T3 are then both against the reflex, the floors carry every arm's untrained fly, and the reading
-// says whether T1 is asked of flies that do the task) and report: "return" (the trainer keeps the best return: brain/rl/escapeEnv.mjs REPORT).
+// says whether T1 is asked of flies that do the task) and report: "return" (the trainer keeps the best return: brain/rl/escapeEnv.mjs REPORT). Round 3 adds fresh: true and
+// battery: 200 (the trainer's own episodes: brain/rl/dockPolicy.js). Round 4 adds memory: true (brain/rl/carryCircuit.mjs: four arms, the MLP not among them).
 // NOT HERE: the 80 trainings (the command runs them; tools/ship/flyEscape-selfcheck.mjs never does). Pure but for what trainOne costs.
 "use strict";
 import { trainDockES, FlightPolicy } from "../../brain/rl/dockPolicy.js";
@@ -24,13 +25,16 @@ import * as P from "../../brain/rl/paintCircuitPolicy.mjs";
 import { rankSum, hashWeights, packWeights, unpackWeights, hashEdges } from "./paintingFly.mjs";
 import { signTest } from "./voxelHome.mjs";
 import { ReflexStart } from "../../brain/rl/reflexStart.mjs";
+import { CarryCircuitPolicy } from "../../brain/rl/carryCircuit.mjs";
 
 /** See the header: a round's whole arithmetic for a cfg { results, start: "reflex" (optional), report: "lived" | "return" (optional) }. */
 export function makeEscapeRound(cfg) {
-if (!cfg || typeof cfg.results !== "string" || (cfg.start !== undefined && cfg.start !== "reflex") || (cfg.report !== undefined && cfg.report !== "lived" && cfg.report !== "return")) throw new Error("flyEscape.makeEscapeRound: a cfg is { results, start: \"reflex\" (optional), report: \"lived\" | \"return\" (optional) }");
-const RECIPE = Object.freeze({ maxSteps: 160, iters: 150, pop: 96, sigma: 0.14, lr: 0.05, trainEps: 8 });
+if (!cfg || typeof cfg.results !== "string" || (cfg.start !== undefined && cfg.start !== "reflex") || (cfg.report !== undefined && cfg.report !== "lived" && cfg.report !== "return") ||
+    (cfg.fresh !== undefined && cfg.fresh !== true) || (cfg.battery !== undefined && !(Number.isInteger(cfg.battery) && cfg.battery >= 24)) || (cfg.memory !== undefined && cfg.memory !== true)) throw new Error("flyEscape.makeEscapeRound: a cfg is { results, start: \"reflex\" (optional), report: \"lived\" | \"return\" (optional) }");
+const RECIPE = Object.freeze({ maxSteps: 160, iters: 150, pop: 96, sigma: 0.14, lr: 0.05, trainEps: 8, ...(cfg.fresh ? { fresh: true } : {}), ...(cfg.battery ? { battery: cfg.battery } : {}) });   // round 3: the trainer's fresh episodes and its battery's size (brain/rl/dockPolicy.js), carried in the recipe so a record says how it was trained
 const SEEDS = Object.freeze(Array.from({ length: 16 }, (_, k) => k + 1));
-const ARMS = Object.freeze(["FLY", "SHUF", "PLAIN", "FISH", "MLP"]);
+const MEMORY = cfg.memory === true;   // round 4: a unit's activity is carried from one tick to the next (brain/rl/carryCircuit.mjs); the MLP has nothing to carry and is not in such a round
+const ARMS = Object.freeze(MEMORY ? ["FLY", "SHUF", "PLAIN", "FISH"] : ["FLY", "SHUF", "PLAIN", "FISH", "MLP"]);
 const MLP_HIDDEN = Object.freeze([16, 16]), PLAIN_UNITS = 55;
 const WEIGHTS = Object.freeze({ FLY: 824, SHUF: 824, PLAIN: 826, FISH: 664, MLP: 513 });
 const AUDIT = Object.freeze(Array.from({ length: 200 }, (_, k) => 900001 + 7919 * k));
@@ -54,10 +58,12 @@ function circuitOf(arm, s) {
     if (arm === "FLY" || arm === "SHUF" || arm === "FISH") return P.ARMS[arm](s);
     throw new Error(`flyEscape.circuitOf: no circuit arm ${arm} (FLY, SHUF, PLAIN, FISH)`);
 }
+const CLOCK = 10;
 const started = (inner, under) => (START === "reflex" ? new ReflexStart(inner, { rule: RULES.reflex, tail: under + 1 }) : inner);   // the output layer of a one-output net: `under` weights and a bias
 const factoryOf = (arm, s) => {
     if (arm === "MLP") return ({ obsDim, actDim, seed } = {}) => started(new FlightPolicy({ hidden: [...MLP_HIDDEN], obsDim, actDim, seed: seed ?? 3 }), MLP_HIDDEN[MLP_HIDDEN.length - 1]);
-    const c = circuitOf(arm, s); return ({ obsDim, actDim, seed } = {}) => started(new P.CircuitPolicy({ obsDim, actDim, units: c.units, edges: c.edges, seed: seed ?? 1234 }), c.units);
+    const c = circuitOf(arm, s), Circuit = MEMORY ? CarryCircuitPolicy : P.CircuitPolicy;   // the clock is the environment's eleventh number, the step over maxSteps: 0 at an episode's first tick
+    return ({ obsDim, actDim, seed } = {}) => started(new Circuit({ obsDim, actDim, units: c.units, edges: c.edges, seed: seed ?? 1234, ...(MEMORY ? { clock: CLOCK } : {}) }), c.units);
 };
 /** See the header. */
 function policyOf(arm, s) {
@@ -78,7 +84,8 @@ function auditScore(act, seeds = AUDIT, maxSteps = RECIPE.maxSteps) {
 function trainOne(arm, s, recipe = RECIPE, audit = AUDIT) {
     if (!Number.isInteger(s) || s < 1) throw new Error(`flyEscape.trainOne: a draw is a whole number from 1 (got ${s})`);
     const fly = policyOf(arm, s), circuit = arm === "MLP" ? null : circuitOf(arm, s);
-    const res = trainDockES({ envFactory: (o = {}) => new EscapeEnv({ maxSteps: recipe.maxSteps, report: REPORT, ...o }), obsDim: OBS_DIM, actDim: ACT_DIM, maxSteps: recipe.maxSteps, iters: recipe.iters, pop: recipe.pop, sigma: recipe.sigma, lr: recipe.lr, trainEps: recipe.trainEps, seed: s, policyFactory: factoryOf(arm, s) });
+    const res = trainDockES({ envFactory: (o = {}) => new EscapeEnv({ maxSteps: recipe.maxSteps, report: REPORT, ...o }), obsDim: OBS_DIM, actDim: ACT_DIM, maxSteps: recipe.maxSteps, iters: recipe.iters, pop: recipe.pop, sigma: recipe.sigma, lr: recipe.lr, trainEps: recipe.trainEps, seed: s, policyFactory: factoryOf(arm, s),
+        ...(recipe.fresh === true ? { freshEpisodes: true } : {}), ...(recipe.battery ? { batteryEps: recipe.battery } : {}) });
     fly.setParams(res.params);
     const a = auditScore((o) => fly.act(o), audit, recipe.maxSteps);
     return { kind: "draw", arm, s, recipe: { ...recipe }, units: circuit ? circuit.units : null, edges: circuit ? circuit.edges.length : null, edgesHash: circuit ? hashEdges(circuit.edges) : null,
@@ -157,7 +164,7 @@ function reading(lines) {
 function readingLines(R) {
     const out = [], f = (x) => x.toFixed(4);
     if (R.checks.length) { out.push("A CHECK FAILED, AND THE READING IS NOT WEIGHED:"); for (const c of R.checks) out.push("  " + c); }
-    else out.push("the checks hold: 80 draws, each once, the registered recipe, each arm's weight count and wiring, FLY draw 1 the same twice, a history in every record, the registration's floors");
+    else out.push(`the checks hold: ${ARMS.length * SEEDS.length} draws, each once, the registered recipe, each arm's weight count and wiring, FLY draw 1 the same twice, a history in every record, the registration's floors`);
     out.push("", "arm     n   mean    sd      least   most    lives (of 200)  feeds   leaves for a pass  caught by a strike");
     for (const [arm, s] of Object.entries(R.arms)) out.push(`${arm.padEnd(7)} ${String(s.n).padStart(2)}  ${f(s.mean)}  ${f(s.sd)}  ${f(s.min)}  ${f(s.max)}  ${s.alive.toFixed(1).padStart(6)}          ${s.fed.toFixed(3)}   ${s.fledPass.toFixed(3)}              ${s.caught.toFixed(3)}`);
     if (R.floors) { out.push(""); for (const k of Object.keys(FLOORS)) { const x = R.floors[k]; if (x) out.push(`${(k === "told" ? "told the kind" : k).padEnd(14)} ${f(x.score)}  lives ${String(x.alive).padStart(3)}  feeds ${x.fed.toFixed(3)}   leaves for a pass ${(x.fledPass / Math.max(1, x.passes)).toFixed(3)}   caught by a strike ${(x.caught / Math.max(1, x.strikes)).toFixed(3)}`); } }
@@ -167,7 +174,7 @@ function readingLines(R) {
     for (const [name, t] of [["T1 (FLY against SHUF)", R.T1], ["T2 (FLY against PLAIN)", R.T2]]) if (t) out.push("", `${name}: the fly's ranks sum to ${t.sumA} (the middle is ${t.n * (t.n + t.m + 1) / 2}), ties ${t.ties}; exact two-sided p ${t.p.toExponential(3)}`, `  ${t.word}`);
     return out;
 }
-return Object.freeze({ START, REPORT, RECIPE, SEEDS, ARMS, MLP_HIDDEN, PLAIN_UNITS, WEIGHTS, AUDIT, ALPHA, RESULTS, FLOORS, WORDS, circuitOf, policyOf, auditScore, trainOne, floors, parseArgs, checkRecords, reading, readingLines });
+return Object.freeze({ MEMORY, START, REPORT, RECIPE, SEEDS, ARMS, MLP_HIDDEN, PLAIN_UNITS, WEIGHTS, AUDIT, ALPHA, RESULTS, FLOORS, WORDS, circuitOf, policyOf, auditScore, trainOne, floors, parseArgs, checkRecords, reading, readingLines });
 }
 
 /** Round 1 (brain/FLY_ESCAPE_WIP.md): a random start, and the trainer told which episodes LIVED. */
