@@ -34,9 +34,16 @@ if (!cfg || typeof cfg.results !== "string" || (cfg.start !== undefined && cfg.s
 const RECIPE = Object.freeze({ maxSteps: 160, iters: 150, pop: 96, sigma: 0.14, lr: 0.05, trainEps: 8, ...(cfg.fresh ? { fresh: true } : {}), ...(cfg.battery ? { battery: cfg.battery } : {}) });   // round 3: the trainer's fresh episodes and its battery's size (brain/rl/dockPolicy.js), carried in the recipe so a record says how it was trained
 const SEEDS = Object.freeze(Array.from({ length: 16 }, (_, k) => k + 1));
 const MEMORY = cfg.memory === true;   // round 4: a unit's activity is carried from one tick to the next (brain/rl/carryCircuit.mjs); the MLP has nothing to carry and is not in such a round
-const ARMS = Object.freeze(MEMORY ? ["FLY", "SHUF", "PLAIN", "FISH"] : ["FLY", "SHUF", "PLAIN", "FISH", "MLP"]);
+// 2026-11-16 -- A ROUND MAY BRING ITS OWN ARMS (cfg.arms: { NAME: { weights, under, circuit(s) -> { units, edges }, make(s) -> ({ obsDim, actDim, seed }) -> policy } }; `under` is how many weights its
+// output reads, so the reflex start can zero them and the bias). Then cfg.lead is the arm T0 and the recheck are of (the first unless given), cfg.versus the arms T1 and T2 set it against, and
+// cfg.words may give T1's and T2's words. Without cfg.arms nothing changes: the five arms below, FLY the lead, against SHUF and PLAIN.
+const CUSTOM = cfg.arms || null;
+if (CUSTOM && !(Object.keys(CUSTOM).length >= 2 && Object.values(CUSTOM).every((a) => a && Number.isInteger(a.weights) && Number.isInteger(a.under) && typeof a.circuit === "function" && typeof a.make === "function"))) throw new Error("flyEscape.makeEscapeRound: cfg.arms is { NAME: { weights, under, circuit(s), make(s) } } for at least two arms");
+const ARMS = Object.freeze(CUSTOM ? Object.keys(CUSTOM) : MEMORY ? ["FLY", "SHUF", "PLAIN", "FISH"] : ["FLY", "SHUF", "PLAIN", "FISH", "MLP"]);
+const LEAD = cfg.lead === undefined ? (CUSTOM ? ARMS[0] : "FLY") : cfg.lead, VERSUS = Object.freeze(cfg.versus === undefined ? (CUSTOM ? ARMS.slice(1, 3) : ["SHUF", "PLAIN"]) : [...cfg.versus]);
+if (!ARMS.includes(LEAD) || VERSUS.length < 1 || VERSUS.length > 2 || !VERSUS.every((a) => ARMS.includes(a) && a !== LEAD)) throw new Error("flyEscape.makeEscapeRound: cfg.lead is one of the arms and cfg.versus one or two others");
 const MLP_HIDDEN = Object.freeze([16, 16]), PLAIN_UNITS = 55;
-const WEIGHTS = Object.freeze({ FLY: 824, SHUF: 824, PLAIN: 826, FISH: 664, MLP: 513 });
+const WEIGHTS = Object.freeze(CUSTOM ? Object.fromEntries(ARMS.map((a) => [a, CUSTOM[a].weights])) : { FLY: 824, SHUF: 824, PLAIN: 826, FISH: 664, MLP: 513 });
 const AUDIT = Object.freeze(Array.from({ length: 200 }, (_, k) => 900001 + 7919 * k));
 const ALPHA = 0.01, RESULTS = cfg.results;
 const START = cfg.start === undefined ? null : cfg.start, REPORT = cfg.report === undefined ? "lived" : cfg.report;   // round 2: the fly is the reflex plus its network (brain/rl/reflexStart.mjs), and the trainer keeps the best return
@@ -50,10 +57,12 @@ const WORDS = Object.freeze({
         T0: ["A FLY-WIRED FLY STARTED AT THE REFLEX ESCAPES BETTER THAN THE REFLEX", "A FLY-WIRED FLY STARTED AT THE REFLEX ESCAPES WORSE THAN THE REFLEX", "A FLY-WIRED FLY STARTED AT THE REFLEX CANNOT BE TOLD APART FROM THE REFLEX"],
         T3: ["A FLY STARTED AT THE REFLEX ESCAPES BETTER THAN THE REFLEX", "A FLY STARTED AT THE REFLEX ESCAPES WORSE THAN THE REFLEX", "A FLY STARTED AT THE REFLEX CANNOT BE TOLD APART FROM THE REFLEX"],
     } : {}),
+    ...(cfg.words || {}),
 });
 
 /** See the header. */
 function circuitOf(arm, s) {
+    if (CUSTOM) { if (!Object.hasOwn(CUSTOM, arm)) throw new Error(`flyEscape.circuitOf: no arm ${arm} (the arms are ${ARMS.join(", ")})`); return CUSTOM[arm].circuit(s); }
     if (arm === "PLAIN") return { units: PLAIN_UNITS, edges: [] };
     if (arm === "FLY" || arm === "SHUF" || arm === "FISH") return P.ARMS[arm](s);
     throw new Error(`flyEscape.circuitOf: no circuit arm ${arm} (FLY, SHUF, PLAIN, FISH)`);
@@ -61,6 +70,7 @@ function circuitOf(arm, s) {
 const CLOCK = 10;
 const started = (inner, under) => (START === "reflex" ? new ReflexStart(inner, { rule: RULES.reflex, tail: under + 1 }) : inner);   // the output layer of a one-output net: `under` weights and a bias
 const factoryOf = (arm, s) => {
+    if (CUSTOM) { const make = CUSTOM[arm].make(s), under = CUSTOM[arm].under; return (dims = {}) => started(make(dims), under); }
     if (arm === "MLP") return ({ obsDim, actDim, seed } = {}) => started(new FlightPolicy({ hidden: [...MLP_HIDDEN], obsDim, actDim, seed: seed ?? 3 }), MLP_HIDDEN[MLP_HIDDEN.length - 1]);
     const c = circuitOf(arm, s), Circuit = MEMORY ? CarryCircuitPolicy : P.CircuitPolicy;   // the clock is the environment's eleventh number, the step over maxSteps: 0 at an episode's first tick
     return ({ obsDim, actDim, seed } = {}) => started(new Circuit({ obsDim, actDim, units: c.units, edges: c.edges, seed: seed ?? 1234, ...(MEMORY ? { clock: CLOCK } : {}) }), c.units);
@@ -83,7 +93,7 @@ function auditScore(act, seeds = AUDIT, maxSteps = RECIPE.maxSteps) {
 /** See the header. `recipe` and `audit` are the registration's unless a gate hands in its own. */
 function trainOne(arm, s, recipe = RECIPE, audit = AUDIT) {
     if (!Number.isInteger(s) || s < 1) throw new Error(`flyEscape.trainOne: a draw is a whole number from 1 (got ${s})`);
-    const fly = policyOf(arm, s), circuit = arm === "MLP" ? null : circuitOf(arm, s);
+    const fly = policyOf(arm, s), circuit = !CUSTOM && arm === "MLP" ? null : circuitOf(arm, s);
     const res = trainDockES({ envFactory: (o = {}) => new EscapeEnv({ maxSteps: recipe.maxSteps, report: REPORT, ...o }), obsDim: OBS_DIM, actDim: ACT_DIM, maxSteps: recipe.maxSteps, iters: recipe.iters, pop: recipe.pop, sigma: recipe.sigma, lr: recipe.lr, trainEps: recipe.trainEps, seed: s, policyFactory: factoryOf(arm, s),
         ...(recipe.fresh === true ? { freshEpisodes: true } : {}), ...(recipe.battery ? { batteryEps: recipe.battery } : {}) });
     fly.setParams(res.params);
@@ -128,18 +138,18 @@ function checkRecords(lines) {
         if (!Number.isFinite(r.score) || r.score < 0 || r.score > 1) bad.push(`${id} has no score that is a share`);
         if (!Number.isInteger(r.alive) || r.alive < 0 || r.alive > AUDIT.length) bad.push(`${id} has no count of episodes lived`);
         if (!(Array.isArray(r.history) && r.history.length >= 2 && r.history.every((h) => h && Number.isInteger(h.it) && Number.isFinite(h.ret)) && r.history[0].it === 0 && r.history[r.history.length - 1].it === RECIPE.iters - 1)) bad.push(`${id} has no history from iteration 0 to ${RECIPE.iters - 1}`);
-        if (r.arm !== "MLP") {
+        if (CUSTOM || r.arm !== "MLP") {
             const c = circuitOf(r.arm, r.s);
             if (r.edgesHash !== hashEdges(c.edges) || r.edges !== c.edges.length || r.units !== c.units) bad.push(`${id}'s wiring is not its arm's`);
-            if (r.arm === "SHUF") {
+            if (!CUSTOM && r.arm === "SHUF") {
                 const set = new Set(c.edges.map((e) => e[0] * c.units + e[1]));
                 if (c.edges.length !== 313 || set.size !== 313 || c.edges.some((e) => e[0] === e[1])) bad.push(`${id}'s shuffle is not 313 distinct off-diagonal pairs`);
                 if (r.edgesHash === hashEdges(P.ARMS.FLY().edges)) bad.push(`${id}'s shuffle is the fly's own wiring`);
             }
         }
     }
-    const re = lines.filter((r) => r && r.kind === "recheck"), fly1 = draws.find((r) => r.arm === "FLY" && r.s === 1);
-    if (re.length !== 1 || !fly1 || re[0].arm !== "FLY" || re[0].s !== 1 || re[0].weightsHash !== fly1.weightsHash) bad.push("FLY draw 1 trained a second time is not there once with the same weights");
+    const re = lines.filter((r) => r && r.kind === "recheck"), fly1 = draws.find((r) => r.arm === LEAD && r.s === 1);
+    if (re.length !== 1 || !fly1 || re[0].arm !== LEAD || re[0].s !== 1 || re[0].weightsHash !== fly1.weightsHash) bad.push(`${LEAD} draw 1 trained a second time is not there once with the same weights`);
     const fl = lines.filter((r) => r && r.kind === "floors");
     if (fl.length !== 1 || !Object.keys(FLOORS).every((k) => fl[0][k] && Number.isFinite(fl[0][k].score) && Math.abs(fl[0][k].score - FLOORS[k]) < 5e-5)) bad.push("the floors are not there once with the registration's five numbers (freeze 0.2840, hide 0.5000, fleeAll 0.5395, reflex 0.6465, told 0.8351)");
     if (START === "reflex" && fl.length === 1) for (const a of ARMS) if (!(fl[0].untrained && fl[0].reflex && fl[0].untrained[a] === fl[0].reflex.score)) bad.push(`the untrained ${a} fly does not score the reflex's number: the start is not the reflex`);
@@ -156,25 +166,25 @@ function reading(lines) {
     const fl = lines.find((r) => r && r.kind === "floors") || null;
     if (checks.length) return { checks, arms, floors: fl, T0: null, T1: null, T2: null, T3: null, ...(START ? { asked: null } : {}) };
     const sg = (name, values, ref) => { const t = signTest(values, ref); return { ...t, sign: true, ref, word: pick(WORDS[name], t.p <= ALPHA && t.above > t.below, t.p <= ALPHA && t.below > t.above) }; };
-    const rs = (name, other) => { const t = rankSum(scores("FLY"), other); return { ...t, word: pick(WORDS[name], t.p <= ALPHA && t.pHigher < t.pLower, t.p <= ALPHA && t.pLower < t.pHigher) }; };
-    return { checks, arms, floors: fl, T0: sg("T0", scores("FLY"), fl.reflex.score), T1: rs("T1", scores("SHUF")), T2: rs("T2", scores("PLAIN")), T3: sg("T3", ARMS.flatMap((a) => scores(a)), START === "reflex" ? fl.reflex.score : fl.fleeAll.score),
-        ...(START === "reflex" ? { asked: arms.FLY.mean >= fl.reflex.score && arms.SHUF.mean >= fl.reflex.score } : {}) };   // round 2: is T1 asked of flies that do the task (registered: both arms' means at or above the reflex)
+    const rs = (name, other) => { const t = rankSum(scores(LEAD), other); return { ...t, word: pick(WORDS[name], t.p <= ALPHA && t.pHigher < t.pLower, t.p <= ALPHA && t.pLower < t.pHigher) }; };
+    return { checks, arms, floors: fl, T0: sg("T0", scores(LEAD), fl.reflex.score), T1: rs("T1", scores(VERSUS[0])), T2: VERSUS.length > 1 ? rs("T2", scores(VERSUS[1])) : null, T3: sg("T3", ARMS.flatMap((a) => scores(a)), START === "reflex" ? fl.reflex.score : fl.fleeAll.score),
+        ...(START === "reflex" ? { asked: arms[LEAD].mean >= fl.reflex.score && arms[VERSUS[0]].mean >= fl.reflex.score } : {}) };   // round 2: is T1 asked of flies that do the task (registered: both arms' means at or above the reflex)
 }
 /** See the header. */
 function readingLines(R) {
     const out = [], f = (x) => x.toFixed(4);
     if (R.checks.length) { out.push("A CHECK FAILED, AND THE READING IS NOT WEIGHED:"); for (const c of R.checks) out.push("  " + c); }
-    else out.push(`the checks hold: ${ARMS.length * SEEDS.length} draws, each once, the registered recipe, each arm's weight count and wiring, FLY draw 1 the same twice, a history in every record, the registration's floors`);
+    else out.push(`the checks hold: ${ARMS.length * SEEDS.length} draws, each once, the registered recipe, each arm's weight count and wiring, ${LEAD} draw 1 the same twice, a history in every record, the registration's floors`);
     out.push("", "arm     n   mean    sd      least   most    lives (of 200)  feeds   leaves for a pass  caught by a strike");
     for (const [arm, s] of Object.entries(R.arms)) out.push(`${arm.padEnd(7)} ${String(s.n).padStart(2)}  ${f(s.mean)}  ${f(s.sd)}  ${f(s.min)}  ${f(s.max)}  ${s.alive.toFixed(1).padStart(6)}          ${s.fed.toFixed(3)}   ${s.fledPass.toFixed(3)}              ${s.caught.toFixed(3)}`);
     if (R.floors) { out.push(""); for (const k of Object.keys(FLOORS)) { const x = R.floors[k]; if (x) out.push(`${(k === "told" ? "told the kind" : k).padEnd(14)} ${f(x.score)}  lives ${String(x.alive).padStart(3)}  feeds ${x.fed.toFixed(3)}   leaves for a pass ${(x.fledPass / Math.max(1, x.passes)).toFixed(3)}   caught by a strike ${(x.caught / Math.max(1, x.strikes)).toFixed(3)}`); } }
     for (const [arm, a] of Object.entries(R.arms)) if (a.history) out.push(`${arm.padEnd(7)} the trainer's own battery, mean return at iteration ${a.history.map((h) => `${h.it}: ${f(h.ret)}`).join(", ")}`);
-    for (const [name, t] of [[START === "reflex" ? "T3 (all the flies against the reflex)" : "T3 (all the trained flies against fleeAll)", R.T3], ["T0 (FLY against the reflex)", R.T0]]) if (t) out.push("", `${name}: of ${t.n}, ${t.above} above its ${f(t.ref)}, ${t.below} below, ${t.ties} equal; exact two-sided p ${t.p.toExponential(3)}`, `  ${t.word}`);
-    if (R.asked !== undefined && R.asked !== null) out.push("", R.asked ? "T1 IS ASKED OF FLIES THAT DO THE TASK: the FLY arm's mean and the SHUF arm's are both at or above the reflex's" : "T1 IS NOT ASKED OF FLIES THAT DO THE TASK: the FLY arm's mean or the SHUF arm's is below the reflex's");
-    for (const [name, t] of [["T1 (FLY against SHUF)", R.T1], ["T2 (FLY against PLAIN)", R.T2]]) if (t) out.push("", `${name}: the fly's ranks sum to ${t.sumA} (the middle is ${t.n * (t.n + t.m + 1) / 2}), ties ${t.ties}; exact two-sided p ${t.p.toExponential(3)}`, `  ${t.word}`);
+    for (const [name, t] of [[START === "reflex" ? "T3 (all the flies against the reflex)" : "T3 (all the trained flies against fleeAll)", R.T3], [`T0 (${LEAD} against the reflex)`, R.T0]]) if (t) out.push("", `${name}: of ${t.n}, ${t.above} above its ${f(t.ref)}, ${t.below} below, ${t.ties} equal; exact two-sided p ${t.p.toExponential(3)}`, `  ${t.word}`);
+    if (R.asked !== undefined && R.asked !== null) out.push("", R.asked ? `T1 IS ASKED OF FLIES THAT DO THE TASK: the ${LEAD} arm's mean and the ${VERSUS[0]} arm's are both at or above the reflex's` : `T1 IS NOT ASKED OF FLIES THAT DO THE TASK: the ${LEAD} arm's mean or the ${VERSUS[0]} arm's is below the reflex's`);
+    for (const [name, t] of [[`T1 (${LEAD} against ${VERSUS[0]})`, R.T1], [`T2 (${LEAD} against ${VERSUS[1]})`, R.T2]]) if (t) out.push("", `${name}: the fly's ranks sum to ${t.sumA} (the middle is ${t.n * (t.n + t.m + 1) / 2}), ties ${t.ties}; exact two-sided p ${t.p.toExponential(3)}`, `  ${t.word}`);
     return out;
 }
-return Object.freeze({ MEMORY, START, REPORT, RECIPE, SEEDS, ARMS, MLP_HIDDEN, PLAIN_UNITS, WEIGHTS, AUDIT, ALPHA, RESULTS, FLOORS, WORDS, circuitOf, policyOf, auditScore, trainOne, floors, parseArgs, checkRecords, reading, readingLines });
+return Object.freeze({ LEAD, VERSUS, MEMORY, START, REPORT, RECIPE, SEEDS, ARMS, MLP_HIDDEN, PLAIN_UNITS, WEIGHTS, AUDIT, ALPHA, RESULTS, FLOORS, WORDS, circuitOf, policyOf, auditScore, trainOne, floors, parseArgs, checkRecords, reading, readingLines });
 }
 
 /** Round 1 (brain/FLY_ESCAPE_WIP.md): a random start, and the trainer told which episodes LIVED. */
