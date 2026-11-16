@@ -9,6 +9,19 @@
 //   3  ONE TRAINING          a record's weights are the trainer's from a wrapped policy made here by hand
 //   4  THE RECORDS           160 draws; R0, K1, K2, K3; each part beside GDEG; the failures
 //   5  THE COMMAND           it is this round's; no training of the round's, no process
+// SABOTAGE LOG (2026-11-16) -- through a byte-safe runner (one at a time, every file restored and its sha256 checked), this gate and tools/ship/voxelHome-selfcheck.mjs (which probes the command as a
+// process) run whole for each; every one red by name, none 0 red (the number is the rows red over the two):
+//   THE SHUFFLES (brain/rl/splitShuffle.mjs): S1 inShuffle keeps the source, not the target 4 | S2 outShuffle keeps the target, not the source 4 | S3 a redrawn end may repeat a connection 4
+//   S4 a redrawn end may be the cell itself 5 | S5 the redraw ignores its seed 5 | S6 keepOnto keeps nothing 4 | S7 keepOnto places the others onto a kept cell too 7 | S8 keepOnto ignores its seed 2
+//   S9 keepOnto places the others in order, unshuffled 2 | S10 the redraw always takes the first free cell 7
+//   THE ROUND (tools/ship/flyEscapeSplit.mjs): F1 GIN is the out shuffle 4 | F2 GOUT is the in shuffle 4 | F3 GGF keeps what two visual cells receive 3 | F4 GDEG is the real wiring 3
+//   F5 every draw's GIN is one shuffle 3 | F6 the draws are round 6's 5 | F7 sixteen draws an arm 8 | F8 K1 is of GOUT and K2 of GIN 4 | F9 the K tests are against GDEG 1
+//   F10 the K tests' BETTER and WORSE each other's 1 | F11 the K tests are made with a failed check 1 | F12 the parts are set beside GSHUF, not GDEG 1 | F13 the lead is GIN 3
+//   F14 the failing line is 0.70 2 | F15 the round writes round 6's results file 1 | F16 R0's words are K1's 1 | F17 GOUT's seeds are GIN's 3 | F18 the shuffles start with no strengths 4
+//   F19 R0 is against GOUT 3 | F20 every draw's free shuffle is one shuffle 2 | F21 a failure is any score under 0.76 2
+//   THE COMMAND: C1 the second training is of the second draw 1 | C2 exits 0 on a word it does not know 1 | C3 reads round 6's library 1
+//   Two throws of mine could never fire (a list of distinct connections always leaves a free cell, and always fits its places) and were taken out before the sabotages, with the row that pretended to
+//   test one of them.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
