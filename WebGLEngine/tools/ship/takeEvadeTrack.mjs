@@ -61,7 +61,7 @@ export function checksOf({ rows, matchups, equal, G, runs, count, finders }) {
     if (!matchups.every((m) => same(m.lo.theta, fin(m.base))) || !matchups.filter((m) => m.kind === "LEAD").every((m) => same(m.hi.theta, fin(DONOR)))) c.push("a base side is not the finder's final theta of the files");
     if (!matchups.filter((m) => m.kind === "ARM").every((m) => same(m.hi.theta, { ...fin(m.base), trackSpeed: m.value }))) c.push("an arm is not its base with its trackSpeed set to its value of the grid");
     const grid = gridOf(finders);
-    if (grid[5] !== fin(DONOR).trackSpeed || !grid.every((v, i) => i === 0 || v > grid[i - 1]) || !BASES.every((b) => same(matchups.filter((m) => m.kind === "ARM" && m.base === b).map((m) => m.value), grid))) c.push("the grid is not the nine increasing values with league7100's own trackSpeed in it, on every base");
+    if (!matchups.every((m) => m.kind !== "ARM" || m.isD === (m.value === fin(DONOR).trackSpeed)) || matchups.filter((m) => m.isD).length !== BASES.length || !grid.every((v, i) => i === 0 || v > grid[i - 1]) || !BASES.every((b) => same(matchups.filter((m) => m.kind === "ARM" && m.base === b).map((m) => m.value), grid))) c.push("the grid is not the nine increasing values with league7100's own trackSpeed in it, marked D on every base");
     if (rows.some((r) => r.identical && r.edge !== 0)) c.push("an identical arm has an edge other than exactly 0");
     return c;
 }
