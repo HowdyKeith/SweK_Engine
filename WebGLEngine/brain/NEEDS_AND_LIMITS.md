@@ -1206,3 +1206,46 @@ Per arm, as Round 5 section 7: HELPS / HURTS / NO EFFECT (or MIXED) against ALON
 
 ## Round 14, AMENDMENT 2 (2026-11-03; made after the FIRST CALLS TO THE REAL MODEL and before any recording was completed or any audit seed was read as a result; the sections above and Amendment 1 are kept as written and this overrides them where it says so)
 **The station question is not asked when every station has been visited.** Section 3 says the station Choice offers "each unvisited station by index, or none". With every station visited that is one option, and the real model refuses it: `ValueError: choice criteria: a map of 2..255 options` (measured on `Mapika/decider-2b`, decider-ai 1.10.0, through `deciderServe.py`; the rig's first recording attempt stopped on it at its 9th call, with 8 answers saved, and the reason was found by reproducing the call). Decider's Choice needs 2 to 255 options, so the question is now asked only while at least one station is unvisited; with none left the question is absent, the decision's station is the neutral null (the brain's own), and the ask counts as fully answered without it. **What this does not change:** the arms, sets, thresholds, checks and verdicts. **What it does change:** the prompt text of the asks with no unvisited station (they have four questions, not five); the 8 answers already saved were all asks with a station question and their prompts are unchanged, so a resumed recording reuses them. I found this in the first run on the real model; the gate did not, because its stub model answered whatever it was asked. The stub now answers only the questions it is asked, and the gate holds that no choice with fewer than 2 options is ever asked in a real 600 s dive of each kind (and that the all-visited case occurs in those dives).
+
+# Round 34 -- gauge faults: does the slow filter, the Round 33 rule or the shipped seat fail when the gauge is WRONG rather than noisy (REGISTERED 2026-11-16, before any code and before any of its seeds was flown)
+
+## 1. Why
+Every round so far gave the charge gauge zero-mean noise (sd 0.10 to 0.30, refreshed at 1 Hz). Round 8 found that the rule's main lever is a slow filter (alpha 0.001, a time constant of about 33 s), and Round 31 found that constants tuned at one gauge condition can lose their gain and crush dives at another. A gauge that is wrong in a slow way -- an offset, a drift, a reading that sticks -- is the untested way the shipped seat could fail: no filter removes an offset, and a slow one may hold a stale reading longer. Every fault here is OPTIMISTIC (the reading high or stale), the direction that can strand or crush a boat. A pessimistic gauge costs score, not hull, and is not tested here.
+
+## 2. The faults (on top of the sd 0.10 noise at 1 Hz; the noise draws are REF's, draw for draw)
+- **REF:** no fault.
+- **BIAS:** +0.10 on every reading.
+- **DRIFT:** +0.15 x t / 600 s on every reading (0 at the start of the dive, +0.15 at its end).
+- **DROP:** the reading is not refreshed in the second half of every minute (t mod 60 s in [30, 60)); it holds its last value. The noise draw is still taken, so the stream stays aligned with REF's.
+Each reading is clipped to [0, 1] after the fault, as today.
+
+## 3. The arms (the same dives in every condition, paired)
+- **R8:** the tuned rule on the Round 8 constants (`surveySeat.SURVEY_R8`, alpha 0.001).
+- **R8-RAW:** the same constants with the filter taken out (alpha 1: the rule acts on each reading as it comes), flown with `WIDE_BOUNDS` whose alpha bound is widened to admit 1 and nothing else changed. The control for the filter.
+- **L06:** the tuned rule on the Round 33 constants (`SURVEY_CONSTANTS`, low -0.06).
+- **SEAT:** the shipped survey seat (`surveySeat.surveyPilot()`, the twin planner on the Round 33 constants, profile `standard`).
+
+## 4. The seeds
+**43001-43150, kinds far and both: 300 dives per arm and condition**, 4 arms x 4 conditions = 4,800 dives, 600 s each. Nothing in the tree uses these seeds. The gate flies only 43901-43902, on shortened dives, and nothing else ever reads them.
+
+## 5. Checks (run first; a failure is the first line of the report and the verdicts are then NOT WEIGHED)
+- **GENERATOR:** the scenarios are `needsTask.scenario`'s.
+- **NO FAULT, NO CHANGE:** with no fault, the changed `gaugeOf` returns the readings of the formula it had before this round, bit for bit, on the REF dives' sample (a frozen copy of the old formula in the library).
+- **SIZES and ALIGNED:** every arm has 300 dives in every condition, the same scenarios in the same order.
+- **THE FAULTS REACH THE PILOT:** in each fault condition, R8's dives differ from its REF dives (fingerprint) on at least one dive.
+
+## 6. The verdicts (the series' margin: A beats B iff the pooled paired difference exceeds max(0.02, 2 se); the hull: Round 33's test, b - b0 <= 2 x sqrt(b + b0), on crushed plus stranded dives)
+For each fault c in BIAS, DRIFT, DROP:
+- **V1, the filter:** `THE FILTER IS A LIABILITY UNDER <c>` iff R8-RAW beats R8 under c by the margin. Bottom line: `THE FILTER IS A LIABILITY UNDER <list>` or `THE FILTER IS NOT A LIABILITY UNDER ANY FAULT`.
+- **V2, the hull:** each arm's crushed plus stranded dives under c against its OWN under REF (the same dives) by the test. Bottom line for the shipped seat: `THE SEAT'S HULL HOLDS UNDER ALL THREE FAULTS` or `THE SEAT'S HULL PAYS MORE UNDER <list>`; the same line for each other arm, reported.
+- **V3, the seat's lead:** `THE SEAT KEEPS ITS LEAD OVER THE ROUND 8 RULE UNDER <c>` iff SEAT minus R8 under c is real (positive and above 2 se, the series' KEEPS); HURTS iff negative and beyond 2 se; LOSES otherwise.
+**REPORTED, NOT IN THE VERDICT:** each arm's mean score and crushed / stranded counts by condition; each arm's fault cost (c minus REF, paired over the same dives) with its se; L06 minus R8 in each condition.
+
+## 7. Expectations, recorded BEFORE any seed is flown
+- A +0.10 high gauge delays every surfacing by a tenth of the battery, against trip points of 0.32-0.38. **R8's hull pays more under BIAS: about 75 percent; under DRIFT (a mean +0.075, largest late, when the charge is low): about 60; under DROP: about 15.** The seat's hull pays more under BIAS: about 70; DRIFT: about 55; DROP: about 15.
+- **The filter is a liability under BIAS about 10 percent** (an offset passes through both arms alike), **DRIFT about 15** (a 33 s lag on a drift of 0.00025 a second is under 0.01), **DROP about 15.** The bottom line `NOT A LIABILITY UNDER ANY FAULT`: about 65.
+- **The seat keeps its lead over R8 under BIAS about 50 percent, DRIFT 60, DROP 75** (it kept it in all five of Round 33's conditions, at +0.012 to +0.033 over L06).
+- R8's fault cost under BIAS lies between -0.01 and -0.08: about 60.
+
+## 8. What will be built, in this order
+`brain/needsTask.mjs`: `gaugeOf` gains an optional `fault` ({ bias, driftPerS, dropEveryS, dropFromS }); absent, nothing changes (check 2 and a gate row). `tools/ship/gaugeFaults.mjs` (library), `tools/ship/gaugeFaultsCmd.mjs` (export-free: `run`, `report`; one worker per arm and condition, each writes its file), `tools/ship/gaugeFaults-selfcheck.mjs` with a mutation pass. Then the run, once, and the report, read once. **NOT IN THIS ROUND:** pessimistic faults, other noise levels, DMG or STN5 with a fault, a fault-aware seat, changing or shipping any constant.
