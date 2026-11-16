@@ -107,3 +107,39 @@ No rule's bar, no arm, no group and no forecast is changed; item 8 says somethin
 6. **The HELD gate** refuses a DEV record whose `checks` is not an empty list (or records none), as in the speed note's Amendment A item 1; the DEV run prints "DEV: a check FAILED, the read is void" in place of the R0 line when one failed.
 7. **Printed besides the rules**, as section 4 says: each arm's edge, se, z, wins-draws-losses and seat edges, its status (decided for or against the first side, not decided, identical), the share of the lead a GRAFT or ALL recovers (its edge over the lead of league7100 over that comparator), the group table (SUFFICIENT and NECESSARY, BOTH / ONE / NONE) and the forecast quantities of section 5 as yes/no, by these names: `RL1`, `headline THE TEN ARE NOT THE LEAD`, `headline ONE GROUP`, `headline SEVERAL GROUPS`, `headline NO GROUP ALONE`, `group P sufficient`, `group L sufficient`, `group M sufficient`, `group W sufficient`, `group T sufficient` ("R0 holds" is the DEV line and the R0 line).
 8. **What smoke is and is not, and what I saw.** Geometries 1 to 4 are among those (1 to 8) on which every league was TRAINED, and a smoke matchup is 8 duels, so a smoke read says nothing about the claims. **I saw the smoke report, and its headline was "ONE GROUP: M" (movement: searchSpeed and trackSpeed), with LESION:M the exact reverse of the lead over both comparators and every other group NONE.** I say so because it is a headline seen before DEV, on training geometries at 8 duels a matchup; **the forecasts of section 5 (group M sufficient at 20, "ONE GROUP" at 25) stand as written and are scored as written.** The command ran in 18 s and no check failed; a DEV read is 48 geometries, 12 times the smoke's duels: about three minutes.
+
+## DEV RESULT (2026-11-16; `node tools/ship/takeEvadeLadder.mjs dev --write`, geometries 114001 to 114048 (96 duels a matchup), exit 0; record `brain/subEvadeLadderDev.json`: 26 matchups)
+
+DEV is free to read; HELD (115001 to 115048) was authorised by Keith to follow this read ("fly DEV and HELD"), and the registration allows it: R0 held and no check failed (none printed; the HELD gate of Amendment A item 6 accepts this record). Forecasts are not scored on DEV except "R0 holds on DEV" (90): **TRUE**. The others stand as written for HELD.
+
+**R0 holds.** league7100 beats league7001 by **+1.016** (z 7.3, 47-34-15) and exploit7204 by **+0.899** (z 4.1, 49-26-21), both decided.
+
+**The ladder, against each comparator** (an arm's edge over its own base; GRAFT and ALL: the comparator with league7100's numbers, against the comparator; LESION and LESALL: league7100 with the comparator's numbers, against league7100; "share" is the graft's edge over the lead):
+
+| arm | against league7001 | share | against exploit7204 | share |
+|---|---|---|---|---|
+| LEAD (league7100 over c) | **+1.016** (z 7.3) | | **+0.899** (z 4.1) | |
+| GRAFT M (searchSpeed, trackSpeed) | **+0.888** (z 8.1) | **0.87** | **+0.752** (z 5.1) | **0.84** |
+| GRAFT W (fireRange, aimTol) | +0.068 | 0.07 | -0.137 | -0.15 |
+| GRAFT P (pingAfter, pingEvery, searchPing) | +0.159 | 0.16 | -0.077 | -0.09 |
+| GRAFT L (echoWindow, blindSnr) | +0.031 | 0.03 | -0.097 | -0.11 |
+| GRAFT T (evadeTime) | +0.005 | 0.01 | +0.066 | 0.07 |
+| LESION M | **-0.757** (z -5.2) | | **-0.639** (z -4.0) | |
+| LESION W, P, L, T | +0.000, +0.037, +0.032, -0.032 | | +0.138, +0.069, -0.028, +0.063 | |
+| ALL (the ten) | **+0.926** (z 6.8) | 0.91 | **+0.670** (z 3.1) | 0.75 |
+| LESALL | **-0.915** (z -6.4) | | **-0.923** (z -4.4) | |
+
+**RL1 THE TEN CARRY THE LEAD: yes** (ALL sufficient for both, LESALL necessary for both). **RL2 THE HEADLINE: ONE GROUP: M.** **RL3 the necessary groups: M.** Groups: **M SUFFICIENT BOTH, NECESSARY BOTH**; W, P, L and T NONE and NONE (every one of their eight grafts is within 0.16 of 0 and none is decided; their lesions are within 0.14). A graft of M alone recovers 0.87 and 0.84 of the lead, the ten together 0.91 and 0.75.
+
+**The forecast quantities as printed** (scored on HELD, not here): RL1 yes; headline THE TEN ARE NOT THE LEAD no; ONE GROUP yes; SEVERAL GROUPS no; NO GROUP ALONE no; group P sufficient no; L no; **M yes**; W no; T no.
+
+**Said plainly about this read:** the smoke report I saw before DEV (Amendment A item 8) had the same headline, ONE GROUP: M, on four training geometries at 8 duels a matchup. That is not independent evidence of anything, and DEV is a different set of 48 geometries, but I **saw the smoke headline before writing any DEV rule down as read**, and the registered forecasts for HELD (M sufficient at 20, "ONE GROUP" at 25, "NO GROUP ALONE" the likeliest at 30) are scored on HELD as written.
+
+**Observations (DEV, for reading, not rules):**
+
+1. **The lead sits in two numbers, and not in pinging or listening.** The finders' table suggested `pingEvery` and `blindSnr` (the two numbers that split the strong four into tiers); on this set the pinging and listening groups carry **nothing** (their grafts are +0.16 to -0.10, undecided). The group that does is movement: league7100's **trackSpeed is 3.15 against the others' 4.07 to 4.5** (the slowest tracker of the five finders) and its searchSpeed 4.09 lies between league7001's 3.83 and exploit7200's 4.30. **The table's tier reading was wrong on this set, which is what a test is for.**
+2. **The lesions say the same from the other side:** removing league7100's movement numbers (giving it league7001's or exploit7204's) costs it -0.76 and -0.64, the whole lead; removing any other group costs nothing decided.
+3. **The ten together recover most but not all** (0.91 and 0.75 of the lead): the rest is spread or sits in the interaction of the pair with the ten, which this read does not look at; the movement group alone recovers 0.87 and 0.84.
+4. **Lesion matchups against league7100 are mostly draws for the four groups that do not matter** (13-70-13, 14-69-13, 13-71-12, 12-71-13): the arms and league7100 play alike in 70 of 96 duels.
+
+**What is NOT shown:** which of M's two numbers carries it (not asked: searchSpeed and trackSpeed were one group by function); any HELD read; anything against an opponent but the strong finders and a graft that is not league7100's. R0 held and no check failed, so HELD may be flown.
