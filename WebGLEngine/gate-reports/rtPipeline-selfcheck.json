@@ -334,6 +334,72 @@
      "16x16",
      "32 spp x 6 seeds, same seeds",
      "30.2% of pixels identical, paired mean NaN"
+    ],
+    [
+     "open box, alpha 0.3 (a coin per candidate)",
+     "16x16",
+     "64 spp x 8 seeds a side, different seeds",
+     "cpu 0.86014 vs gpu 0.86034, ratio-1 2.41e-4, bound 3.45e-3"
+    ],
+    [
+     "two spheres, each open above latitude 0.2",
+     "16x16",
+     "32 spp x 4 seeds, same seeds",
+     "395 of 395 values within 0.00001; paired mean -4.00e-7, se 9.05e-9"
+    ],
+    [
+     "three instances, two materials a mesh, two instances offset into a second pair",
+     "16x16",
+     "32 spp x 4 seeds, same seeds",
+     "317 of 335 values within 0.00001; paired mean -1.81e-4, se 2.18e-4"
+    ],
+    [
+     "COLOUR: three coloured instances, each cut out, three channels",
+     "16x16",
+     "32 spp x 4 seeds, same seeds",
+     "930 of 1005 values within 0.00001; paired mean -9.93e-5, se 7.71e-5"
+    ],
+    [
+     "MICROFACET: three instances, three roughnesses, three indices of refraction",
+     "16x16",
+     "32 spp x 4 seeds, same seeds",
+     "335 of 335 values within 0.00001; paired mean -4.30e-8, se 2.56e-8"
+    ],
+    [
+     "LIGHT SAMPLING: a sphere light beside the cut box, seen from above",
+     "16x16",
+     "32 spp x 8 seeds a side, different seeds",
+     "cpu 0.83413 vs gpu 0.83489, ratio-1 9.15e-4, bound 2.59e-3; holes worth 264.8%"
+    ],
+    [
+     "planted device: sphere: the far root never tried",
+     "16x16",
+     "32 spp x 4 seeds, same seeds",
+     "35.7% of values identical"
+    ],
+    [
+     "planted device: sphere: the latitude taken along x",
+     "16x16",
+     "32 spp x 4 seeds, same seeds",
+     "17.7% of values identical"
+    ],
+    [
+     "planted device: materials: the instance's offset ignored",
+     "16x16",
+     "32 spp x 4 seeds, same seeds",
+     "34.0% of values identical"
+    ],
+    [
+     "planted device: materials: the triangle's index ignored",
+     "16x16",
+     "32 spp x 4 seeds, same seeds",
+     "15.8% of values identical"
+    ],
+    [
+     "planted device: microfacet: every instance shaded with its neighbour's record",
+     "16x16",
+     "32 spp x 4 seeds, same seeds",
+     "64.2% of values identical"
     ]
    ],
    "note": "A sweep whose numbers only reached the terminal it was written to is a measurement nobody can re-read."

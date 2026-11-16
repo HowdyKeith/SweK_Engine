@@ -1,7 +1,7 @@
 {
  "note": "rtCpuCache.mjs -- see its header. Keyed renderer-hash:math-print; a mean is a double, JSON round-trips it exactly.",
  "sections": {
-  "8776c1357df95724:a2ee05261692c109": {
+  "54138fef9d920fac:a2ee05261692c109": {
    "renderer": "24 files",
    "means": {
     "0000142807b9a895c17cd277": 0.38930000570782214,

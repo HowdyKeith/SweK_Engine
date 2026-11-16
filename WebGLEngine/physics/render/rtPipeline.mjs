@@ -97,6 +97,8 @@
 // triangles, as one procedural rule; and the one mesh can be placed more than once. Both are described where
 // they are declared, above ANYHIT_SLOT, with what each still is not: no translucency, no any-hit for a sphere,
 // a LIST of instances rather than a tree over them, one mesh, and no per-triangle material under an instance.)
+// (v4917: three of those five are written -- translucency as a coin, a sphere's any-hit, and per-triangle material
+// under an instance. Still a list, still one mesh.)
 //
 // ---- THIS ROUND -- THE BVH THE PARAGRAPH ABOVE USED TO SAY WAS MISSING ---------------------------------------
 //
@@ -165,9 +167,10 @@ export const STAGES = Object.freeze([
                     what: "a PROCEDURAL primitive's hit test -- a sphere, which in Vulkan needs this stage " +
                           "because only triangles get the built-in intersector" }),
     Object.freeze({ id: "anyHit", fn: "rtAnyHit", implemented: true, since: "v4915",
-                    what: "accept or reject a candidate TRIANGLE hit before it becomes closest (v4915). One rule, " +
-                          "a barycentric cutout, selected by a record; a sphere has no any-hit, and nothing " +
-                          "here is translucent -- a rejected hit is a hole, not a partial transmission" }),
+                    what: "accept or reject a candidate hit before it becomes closest. For a triangle (v4915) a " +
+                          "barycentric cutout or (v4917) a coin of probability alpha; for a sphere (v4917) a cap " +
+                          "cut off at a latitude. Each rule is selected by data, and alpha is stochastic: no hit " +
+                          "is ever partly accepted" }),
     Object.freeze({ id: "closestHit", fn: "rtClosestHit", implemented: true,
                     what: "shade the winning hit and produce the continuation ray" }),
     Object.freeze({ id: "miss", fn: "rtMiss", implemented: true,
@@ -370,7 +373,20 @@ export const BVH_BINDINGS = Object.freeze({ bounds: 2, meta: 3, order: 4, tris: 
 // line of code with this file. NOT translucency: there is no partial acceptance, no stochastic alpha, and no
 // any-hit for the procedural spheres.
 export const ANYHIT_SLOT = 5;
-export const ANY_HIT_SHADERS = Object.freeze({ none: 0, cutout: 1 });
+export const ANY_HIT_SHADERS = Object.freeze({ none: 0, cutout: 1, alpha: 2 });
+// v4917 -- THREE THINGS v4915 SAID WERE NOT WRITTEN, WRITTEN.
+//   "alpha" IS TRANSLUCENCY AS A COIN: a candidate is accepted with probability p, by one draw from the path's own
+//     generator. Stochastic transparency -- each crossing transmits with probability 1 - p, so the EXPECTED picture
+//     is the blended one and no pixel ever holds a blend. The draw is taken in traversal order, which is the BVH's
+//     and not the ray's, so a path's tape is no longer the reference's: this rule is held STATISTICALLY (different
+//     seeds a side, section 9's row) and by its two ends, never pixel for pixel.
+//   A SPHERE HAS AN ANY-HIT TOO, and it needed the intersection to change shape: a rejected NEAR root must fall
+//     through to the FAR one, which is the inside of the shell seen through the hole. One rule, "cap": the part of
+//     the sphere above a latitude is open. U[ANYHIT_SLOT].z names it and .w is the latitude as a fraction of the
+//     radius. Refused with light sampling: the cone sampler aims at a whole sphere, and a cut light is not one.
+//   AN INSTANCE MAY CARRY PER-TRIANGLE MATERIALS: its record is then an OFFSET into the material table and the
+//     triangle's index is added to it -- Vulkan's instanceShaderBindingTableRecordOffset plus the geometry's own.
+export const SPHERE_ANY_HIT_SHADERS = Object.freeze({ none: 0, cap: 1 });
 
 // *** INSTANCES ARE A LIST, AND IT IS NOT CALLED A TLAS BECAUSE IT IS NOT A TREE. *** Vulkan's top level is a
 // BVH over instance boxes. This is its leaf content without the tree: each instance is the ONE mesh's BVH under
@@ -392,6 +408,9 @@ export const INSTANCE_FLOATS = 16;
  * (determinant < 0 -- the mesh's winding flips, so cross(e1, e2) and the inverse-transpose normal point
  * opposite ways and the closest-hit would shade the back); and an emissive record (the same half-working light
  * meshSbtBuffer already refuses).
+ *
+ * v4917 -- an instance with `sbtOffset` (a whole number) packs THAT in place of a material: under
+ * pipelineWgsl({ instances, meshMaterials }) its triangles read bvhSbt[sbtOffset + bvhMatIdx[tri]].
  */
 export function instanceBuffer(instances, { rgb = false } = {}) {
     if (!instances || !instances.length) throw new Error("rtPipeline: instanceBuffer needs at least one instance");
@@ -415,7 +434,10 @@ export function instanceBuffer(instances, { rgb = false } = {}) {
             out[o + r * 4] = inv[r * 3]; out[o + r * 4 + 1] = inv[r * 3 + 1]; out[o + r * 4 + 2] = inv[r * 3 + 2];
             out[o + r * 4 + 3] = -(inv[r * 3] * tx + inv[r * 3 + 1] * ty + inv[r * 3 + 2] * tz);
         }
-        out.set(sbtRecordFloats({ hit: inst.hit || "lambertian", albedo: inst.albedo, roughness: inst.roughness, ior: inst.ior }, { rgb }), o + 12);
+        if (inst.sbtOffset !== undefined) {
+            if (!Number.isInteger(inst.sbtOffset) || inst.sbtOffset < 0) throw new Error("rtPipeline: instance " + k + " has sbtOffset " + inst.sbtOffset + " -- a whole number of records into the material table");
+            out.set([inst.sbtOffset, 0, 0, 0], o + 12);
+        } else out.set(sbtRecordFloats({ hit: inst.hit || "lambertian", albedo: inst.albedo, roughness: inst.roughness, ior: inst.ior }, { rgb }), o + 12);
     });
     return out;
 }
@@ -687,6 +709,8 @@ var<private> bvhHitInst : i32;             // which instance rtTraverseInstances
 fn rtAnyHit(tri : i32, u : f32, v : f32) -> bool {
   let rule = U[${ANYHIT_SLOT}];
   if (rule.x < 0.5) { return true; }
+  // alpha (v4917): one draw, accepted with probability rule.y
+  if (rule.x > 1.5) { return nextF32() < rule.y; }
   // cutout: a hole where all three weights exceed the parameter
   return min(1.0 - u - v, min(u, v)) <= rule.y;
 }` : ""}
@@ -1105,13 +1129,17 @@ export function pipelineWgsl({ workgroupSize = 64, gradient = false,
                                msComp = false, plantMsNoDenominator = false,
                                // v4915 -- both default false, and false leaves the generated WGSL byte
                                // identical to v4914's. See the block above ANYHIT_SLOT for what each is.
-                               anyHit = false, instances = false } = {}) {
+                               anyHit = false, instances = false,
+                               // v4917 -- the sphere's own any-hit; false leaves rtIntersect's text as it was
+                               sphereAnyHit = false } = {}) {
     const PI = "3.141592653589793";
     if (anyHit && !bvh) throw new Error("rtPipeline: anyHit needs bvh -- the stage is asked of a candidate TRIANGLE, and a sphere has none");
     if (instances && !bvh) throw new Error("rtPipeline: instances needs bvh -- there is no mesh to place otherwise");
-    if (instances && meshMaterials) throw new Error(
-        "rtPipeline: instances and meshMaterials are two answers to 'which record does this hit read' -- per " +
-        "instance or per triangle. Composing them (Vulkan adds the two offsets) is not written; pass one.");
+    // v4917 -- instances WITH meshMaterials is the composition v4915 refused: the instance's record is an offset
+    // and the triangle's material index is added to it. See instanceBuffer's sbtOffset.
+    if (sphereAnyHit && (nee || (microfacet && microfacet !== "bsdf"))) throw new Error(
+        "rtPipeline: sphereAnyHit cannot be combined with light sampling (nee, or microfacet \"nee\"/\"mis\") -- the cone " +
+        "sampler aims at a whole sphere and weights by its whole solid angle, and a light with its cap cut off is neither.");
     if (microfacet && !["bsdf", "nee", "mis"].includes(microfacet)) throw new Error(
         "rtPipeline: microfacet must be \"bsdf\", \"nee\" or \"mis\" (pathTracer.mjs's own `direct` values), got " + microfacet);
     if (microfacet && rgb) throw new Error(
@@ -1153,7 +1181,7 @@ ${msComp ? `// RTX round 9 -- the shared multi-scatter E(mu) table, one entry pe
 // U[0]  eye.xyz, tanHalfFov          U[1]  fwd.xyz, geometryCount
 // U[2]  w, h, spp, eps               U[3]  right.xyz, seedBits
 // U[4]  camUp.xyz, _                 U[8+i]  geometry i: centre.xyz, radius
-${anyHit ? `// U[${ANYHIT_SLOT}]  any-hit rule (v4915): ruleIndex, parameter, _, _
+${anyHit || sphereAnyHit ? `// U[${ANYHIT_SLOT}]  any-hit rules: triangle ruleIndex, parameter (v4915); sphere ruleIndex, parameter (v4917)
 ` : ""}// U[16+i] SBT record i: hitShaderIndex, albedo, emit, _   (emit is RTX round 6 -- 0 means "not a light",
 //                                                           scalar pipeline only, see sbtRecord's own doc)
 // U[${MESH_META_SLOT}] mesh meta (bvh only): hasMesh, nodeCount, triCount, _
@@ -1302,10 +1330,20 @@ fn rtIntersect(orig : vec3<f32>, dir : vec3<f32>, centre : vec3<f32>, radius : f
   let sq = sqrt(disc);
   let t0 = (-b - sq) / 2.0;
   let t1 = (-b + sq) / 2.0;
-  if (t0 > eps) { return t0; }
-  if (t1 > eps) { return t1; }
+  if (t0 > eps${sphereAnyHit ? " && rtAnyHitSphere(orig + dir * t0, centre, radius)" : ""}) { return t0; }
+  if (t1 > eps${sphereAnyHit ? " && rtAnyHitSphere(orig + dir * t1, centre, radius)" : ""}) { return t1; }
   return -1.0;
-}
+}${sphereAnyHit ? `
+
+// ---- STAGE: any-hit, for the procedural sphere (v4917) ---------------------------------------------------
+// Asked of each root in turn, nearest first, so a rejected near root falls through to the far one: the inside
+// of the shell, seen through the hole. U[${ANYHIT_SLOT}].z names the rule and .w is its parameter; rule 0 accepts.
+fn rtAnyHitSphere(P : vec3<f32>, centre : vec3<f32>, radius : f32) -> bool {
+  let rule = U[${ANYHIT_SLOT}];
+  if (rule.z < 0.5) { return true; }
+  // cap: open above the latitude
+  return (P.y - centre.y) / radius <= rule.w;
+}` : ""}
 
 // ---- TRAVERSAL: which record wins ----------------------------------------------------------------------
 // Linear over the spheres -- honest at four of them, useless at four thousand, which is exactly why a
@@ -1564,7 +1602,7 @@ ${rgb ? `
       var albedo : vec3<f32>;
       ${bvh ? `if (hit.geo == nGeo) {
         N = ${instances ? "rtInstanceNormal(bvhHitInst, bvhHitTri)" : "rtTriNormal(bvhHitTri * 9)"};
-        ${meshMaterials ? `rec = bvhSbt[bvhMatIdx[bvhHitTri]];` : instances ? `rec = rtInstanceRecord(bvhHitInst);` : `rec = U[MESH_SBT];`}
+        ${meshMaterials ? (instances ? `rec = bvhSbt[i32(rtInstanceRecord(bvhHitInst).x) + bvhMatIdx[bvhHitTri]];` : `rec = bvhSbt[bvhMatIdx[bvhHitTri]];`) : instances ? `rec = rtInstanceRecord(bvhHitInst);` : `rec = U[MESH_SBT];`}
         albedo = rec.yzw;
         ${vertexColors ? `albedo = albedo * rtVertColor(bvhHitTri * 9, bvhHitU, bvhHitV);` : ""}
       } else {` : ""}
@@ -1613,7 +1651,7 @@ ${rgb ? `
         // centre, and its material from the ONE record a bvh scene carries rather than the per-sphere table
         // (RTX round 4's meshMaterials: PER-TRIANGLE, via bvhMatIdx -- Vulkan's own SBT-offset idiom).
         N = ${instances ? "rtInstanceNormal(bvhHitInst, bvhHitTri)" : "rtTriNormal(bvhHitTri * 9)"};
-        ${meshMaterials ? `rec = bvhSbt[bvhMatIdx[bvhHitTri]];` : instances ? `rec = rtInstanceRecord(bvhHitInst);` : `rec = U[MESH_SBT];`}
+        ${meshMaterials ? (instances ? `rec = bvhSbt[i32(rtInstanceRecord(bvhHitInst).x) + bvhMatIdx[bvhHitTri]];` : `rec = bvhSbt[bvhMatIdx[bvhHitTri]];`) : instances ? `rec = rtInstanceRecord(bvhHitInst);` : `rec = U[MESH_SBT];`}
       } else {` : ""}
       let g = U[GEO_BASE + hit.geo];
       N = nrm(P - g.xyz);
@@ -1804,7 +1842,7 @@ ${rgb ? `
  * Both are silent. Pass the identical `meshMaterials` value to both calls, the same discipline `rgb` already
  * asks for.
  */
-export function pipelineUniforms(sbt, { spp = 16, seed = 1, view = VIEW, eps = EPS, bvh = null, rgb = false, meshMaterials = false, envMap = null, microfacet = false, msComp = false, meshRecords = null } = {}) {
+export function pipelineUniforms(sbt, { spp = 16, seed = 1, view = VIEW, eps = EPS, bvh = null, rgb = false, meshMaterials = false, sphereAnyHit = null, envMap = null, microfacet = false, msComp = false, meshRecords = null } = {}) {
     if (sbt.length > MAX_GEOMETRY) throw new Error("rtPipeline: at most " + MAX_GEOMETRY + " geometries");
     // RTX round 8 -- found by an adversarial review, and refused rather than left silent the way rgb/
     // meshMaterials still are: a `hit: "microfacet"` record packs and binds unconditionally (sbtRecordFloats
@@ -1897,7 +1935,8 @@ export function pipelineUniforms(sbt, { spp = 16, seed = 1, view = VIEW, eps = E
             if (!(rule in ANY_HIT_SHADERS)) throw new Error("rtPipeline: no any-hit rule named " + rule);
             if (rule === "cutout" && !(param >= 0 && param < 1 / 3)) throw new Error(
                 "rtPipeline: the cutout parameter is the barycentric margin kept solid, 0 <= p < 1/3 (at 1/3 the hole is a point), got " + param);
-            U.set([ANY_HIT_SHADERS[rule], param, 0, 0], ANYHIT_SLOT * 4);
+            if (rule === "alpha" && !(param >= 0 && param <= 1)) throw new Error("rtPipeline: alpha is a probability of acceptance, 0 <= p <= 1, got " + param);
+            U[ANYHIT_SLOT * 4] = ANY_HIT_SHADERS[rule]; U[ANYHIT_SLOT * 4 + 1] = param;
         }
         // RTX round 4 -- under meshMaterials, the WGSL mesh-hit branch reads bvhSbt[bvhMatIdx[bvhHitTri]]
         // instead of U[MESH_SBT] (pipelineWgsl's own `meshMaterials` option decides which text it generates),
@@ -1913,6 +1952,13 @@ export function pipelineUniforms(sbt, { spp = 16, seed = 1, view = VIEW, eps = E
         // v4915 -- with instances the record is the instance's own (instanceBuffer packs it), so a mesh-wide
         // hit/albedo is not required and, if absent, not packed.
         if (!meshMaterials && !(instanceCount > 0 && bvh.hit === undefined)) U.set(sbtRecordFloats(bvh, { rgb }), MESH_SBT_SLOT * 4);
+    }
+    // v4917 -- the sphere's any-hit rule, in the same slot's other half
+    if (sphereAnyHit) {
+        const { rule, param = 0 } = sphereAnyHit;
+        if (!(rule in SPHERE_ANY_HIT_SHADERS)) throw new Error("rtPipeline: no sphere any-hit rule named " + rule);
+        if (rule === "cap" && !(param > -1 && param < 1)) throw new Error("rtPipeline: the cap latitude is a fraction of the radius, -1 < h < 1, got " + param);
+        U[ANYHIT_SLOT * 4 + 2] = SPHERE_ANY_HIT_SHADERS[rule]; U[ANYHIT_SLOT * 4 + 3] = param;
     }
     // RTX round 7 -- envMap is the atlas object itself (captureBaseCubemap()/packCapturedAtlas()'s own shape),
     // matching `bvh`'s own convention of taking the descriptor rather than a caller-picked subset of its fields.

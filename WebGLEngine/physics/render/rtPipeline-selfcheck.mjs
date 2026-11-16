@@ -77,6 +77,14 @@
 // tightens the bound, and a formula that used the per-run relSd here would be a looser bound than the evidence
 // supports.
 //
+// *** SECTION 16 (v4917) IS WHAT v4915 LISTED AS NOT WRITTEN OR NOT GRADED. *** Translucency (any-hit rule "alpha", a
+// coin per candidate); a sphere's own any-hit (a cap cut off, the far root seen through it); per-triangle materials
+// under an instance (the instance's record is an offset); and the colour, microfacet and light-sampling shaders with
+// the v4915 options, which had only been compiled. Four are held pixel for pixel on the same seeds (92.5% to 100% of
+// the values that see the scene; five planted devices at most 64.2%). Two are held by their frame mean against their
+// own noise, and say why: the coin is tossed in the BVH's order and light sampling orders its draws differently on
+// the two sides. The light-sampling scene was moved after a sabotage went 0 red -- see 16e.
+//
 // *** SECTION 15 (v4915) IS ANY-HIT AND INSTANCES, AND SECTION 1's "DO NOT DELETE THIS CHECK" ROW WAS FLIPPED, NOT
 // DELETED. *** The fifth stage exists: rtAnyHit, asked of each candidate triangle inside the BVH's leaf loop, one
 // procedural rule (a barycentric cutout) selected by a uniform. And the one mesh can be placed more than once: a list
@@ -2285,14 +2293,14 @@ say("14. RTX ROUND 9: MULTI-SCATTER ENERGY COMPENSATION");
     const refusals = [
         ["anyHit without a mesh", () => R.pipelineWgsl({ anyHit: true }), /needs bvh/],
         ["instances without a mesh", () => R.pipelineWgsl({ instances: true }), /needs bvh/],
-        ["instances with per-triangle materials", () => R.pipelineWgsl({ bvh: true, instances: true, meshMaterials: true }), /two answers/],
+        ["a cut sphere under light sampling", () => R.pipelineWgsl({ sphereAnyHit: true, nee: true }), /cannot be combined with light sampling/],   // v4917: v4915's third refusal, instances with per-triangle materials, is written now
         ["a mirroring instance", () => R.instanceBuffer([{ transform: mirrorT, albedo: 0.5 }]), /mirrors/],
         ["a singular instance", () => R.instanceBuffer([{ transform: flatT, albedo: 0.5 }]), /singular/],
         ["an emissive instance", () => R.instanceBuffer([{ transform: INST[0].transform, albedo: 0.5, emit: 1 }]), /cannot emit/],
         ["an instance with no transform", () => R.instanceBuffer([{ albedo: 0.5 }]), /12 finite numbers/],
         ["no instances at all", () => R.instanceBuffer([]), /at least one/],
         ["a cutout margin of a third", () => R.pipelineUniforms([], { bvh: { nodeCount: 1, triCount: 1, hit: "lambertian", albedo: 0.5, anyHit: { rule: "cutout", param: 1 / 3 } } }), /0 <= p < 1\/3/],
-        ["an any-hit rule nobody wrote", () => R.pipelineUniforms([], { bvh: { nodeCount: 1, triCount: 1, hit: "lambertian", albedo: 0.5, anyHit: { rule: "alpha" } } }), /no any-hit rule/],
+        ["an any-hit rule nobody wrote", () => R.pipelineUniforms([], { bvh: { nodeCount: 1, triCount: 1, hit: "lambertian", albedo: 0.5, anyHit: { rule: "dither" } } }), /no any-hit rule/],
     ].map(([name, f, want]) => ({ name, msg: throws(f), want }));
     ok("ten things are REFUSED by name rather than rendered wrong", refusals.every((r) => r.msg && r.want.test(r.msg)),
         refusals.filter((r) => !(r.msg && r.want.test(r.msg))).map((r) => r.name + ": " + r.msg).join(" | ") || refusals.map((r) => r.name).join("; "));
@@ -2417,6 +2425,189 @@ say("14. RTX ROUND 9: MULTI-SCATTER ENERGY COMPENSATION");
     ok("!! and a plant whose frame mean stays inside its own noise is still seen, by pixels: the mean alone would have passed it",
         seen.filter((x) => Math.abs(x.r.mean) < 3 * x.r.se + TOL).every((x) => x.r.share < PLANTED),
         (seen.filter((x) => Math.abs(x.r.mean) < 3 * x.r.se + TOL).map((x) => `${x.pl.id} (mean ${e2(x.r.mean)} inside its noise, ${pct(x.r.share)} of pixels)`).join("; ")) || "every plant moves the paired mean past 3 standard errors as well");
+
+    // ---- 16. v4917: WHAT v4915 LISTED AS NOT WRITTEN OR NOT GRADED ----------------------------------------------
+    // Six things, each against the CPU: translucency as a coin; a sphere's own any-hit; per-triangle materials under
+    // an instance; and the colour, light-sampling and microfacet shaders with the v4915 options, which v4915 had
+    // only compiled and run. FOUR are held pixel for pixel on the same seeds. TWO cannot be and are not pretended to
+    // be: the coin draws in the BVH's order and light sampling orders its draws differently on the two sides, so
+    // each is held by its frame mean against its own measured noise -- and by a plant that moves it.
+    {
+        console.log("\n16. translucency, a sphere's any-hit, materials under an instance, and the combinations (v4917)");
+        const N16 = 4;
+        const pairedOf = async ({ code, ch = 1, uniforms, inputs, cpu, empty, patch = null, n = N16 }) => {
+            let same = 0, pix = 0; const d = [];
+            for (let sd = 1; sd <= n; sd++) {
+                const c = Array.from(cpu(sd)), bg = Array.from(empty(sd));
+                const r = await runWgslCompute({ code: patch ? patch(code) : code, outCount: W * H * ch, workgroups: Math.ceil(W * H / 64), uniforms: uniforms(sd), inputs });
+                if (!r.ok) throw new Error("section 16 GPU render failed: " + r.reason);
+                const g = Array.from(r.values);
+                for (let i = 0; i < c.length; i++) { if (c[i] === bg[i]) continue; pix++; if (Math.abs(g[i] - c[i]) <= TOL) same++; }
+                d.push(meanOf(g) / meanOf(c) - 1);
+            }
+            const m = meanOf(d);
+            return { same, pix, share: same / pix, mean: m, se: sdOf(d, m) / Math.sqrt(n) };
+        };
+        const cpuOf = (scene, view, { gradient = false, extra = {} } = {}) => (sd) => renderCpuMesh(scene, { ...view, spp: SPP, seed: sd, maxDepth: R.MAX_DEPTH, sky: gradient ? sky : () => 1, nee: false, ...extra });
+        const tell16 = (name, r) => { say(`${name}: ${r.same} of ${r.pix} values that see the scene within ${TOL} (${(r.share * 100).toFixed(2)}%), paired gpu/cpu-1 ${e2(r.mean)} +- ${e2(r.se)}`);
+            REPORT_ROWS.push([name, `${W}x${H}`, `${SPP} spp x ${N16} seeds, same seeds`, `${r.same} of ${r.pix} values within ${TOL}; paired mean ${e2(r.mean)}, se ${e2(r.se)}`]); };
+        const meshU = (extra) => ({ nodeCount: gpuBvh.nodeCount, triCount: gpuBvh.triCount, ...extra });
+
+        // ---- 16a. structure and refusals --------------------------------------------------------------------------
+        const sphSrc = R.pipelineWgsl({ sphereAnyHit: true });
+        ok("the sphere's any-hit is in a shader only when asked, asked of BOTH roots, and the triangle's coin is one draw",
+            /fn rtAnyHitSphere\(/.test(sphSrc) && !/rtAnyHitSphere/.test(R.pipelineWgsl({})) && sphSrc.split("rtAnyHitSphere(").length - 1 === 3 &&
+            /if \(rule\.x > 1\.5\) \{ return nextF32\(\) < rule\.y; \}/.test(R.pipelineWgsl({ bvh: true, anyHit: true })),
+            "three mentions: the definition, the near root, the far root");
+        const refuse16 = [
+            ["an alpha above one", () => R.pipelineUniforms([], { bvh: meshU({ hit: "lambertian", albedo: 0.5, anyHit: { rule: "alpha", param: 1.5 } }) }), /probability of acceptance/],
+            ["a cap at the pole", () => R.pipelineUniforms([], { sphereAnyHit: { rule: "cap", param: 1 } }), /fraction of the radius/],
+            ["a sphere rule nobody wrote", () => R.pipelineUniforms([], { sphereAnyHit: { rule: "stripes" } }), /no sphere any-hit rule/],
+            ["a negative record offset", () => R.instanceBuffer([{ transform: INST[0].transform, sbtOffset: -1 }]), /whole number of records/],
+            ["a cut sphere under microfacet mis", () => R.pipelineWgsl({ sphereAnyHit: true, microfacet: "mis" }), /cannot be combined with light sampling/],
+        ].map(([name, f, want]) => ({ name, msg: throws(f), want }));
+        const uSph = R.pipelineUniforms([], { sphereAnyHit: { rule: "cap", param: 0.2 }, bvh: meshU({ hit: "lambertian", albedo: 0.5, anyHit: { rule: "alpha", param: 0.3 } }) });
+        ok("five more refusals by name, and the two rules share U[5] without touching each other's half",
+            refuse16.every((r) => r.msg && r.want.test(r.msg)) && uSph[20] === R.ANY_HIT_SHADERS.alpha && Math.abs(uSph[21] - 0.3) < 1e-7 &&
+            uSph[22] === R.SPHERE_ANY_HIT_SHADERS.cap && Math.abs(uSph[23] - 0.2) < 1e-7,
+            refuse16.filter((r) => !(r.msg && r.want.test(r.msg))).map((r) => r.name + ": " + r.msg).join(" | ") || `U[5] = ${Array.from(uSph.slice(20, 24)).map((v) => +v.toFixed(3))}`);
+
+        // ---- 16b. translucency: a coin, held by its two ends and its mean ---------------------------------------------
+        const ALPHA = 0.3, NA = 8, SPPA = 64, coin = (p) => (tri, u, v, rand) => rand() < p;
+        const alphaRun = async (p, seed, patch = null) => { const code = R.pipelineWgsl({ bvh: true, anyHit: true });
+            const r = await runWgslCompute({ code: patch ? patch(code) : code, outCount: W * H, workgroups: Math.ceil(W * H / 64), inputs: meshIn,
+                uniforms: R.pipelineUniforms([], { spp: SPPA, seed, view: top, eps: R.EPS, bvh: meshU({ hit: "lambertian", albedo: 0.6, anyHit: { rule: "alpha", param: p } }) }) });
+            if (!r.ok) throw new Error("section 16 alpha render failed: " + r.reason); return Array.from(r.values); };
+        const a0 = await alphaRun(0, 1);
+        ok("!! alpha 0 is an EMPTY scene: every candidate is refused and every pixel is the sky, exactly", a0.every((v) => v === 1), `${a0.filter((v) => v !== 1).length} of ${a0.length} pixels are not 1`);
+        const cA = [], gA = [], gAplant = [];
+        const coinPlant = plantOf("if (rule.x > 1.5) { return nextF32() < rule.y; }", "if (rule.x > 1.5) { return nextF32() >= rule.y; }");
+        for (let k = 1; k <= NA; k++) {
+            cA.push(meanOf(Array.from(renderCpuMesh([{ bvh: cpuBvh, albedo: 0.6, anyHit: coin(ALPHA) }], { ...top, spp: SPPA, seed: k, maxDepth: R.MAX_DEPTH, sky: () => 1, nee: false }))));
+            gA.push(meanOf(await alphaRun(ALPHA, 5000 + k))); gAplant.push(meanOf(await alphaRun(ALPHA, 5000 + k, coinPlant)));
+        }
+        const stat = (c, g) => { const cm = meanOf(c), gm = meanOf(g), cs = sdOf(c, cm) / cm, gs = sdOf(g, gm) / gm; return { cm, gm, ratio: gm / cm, cs, gs, bound: 3 * Math.sqrt(cs * cs / c.length + gs * gs / g.length) }; };
+        const sA = stat(cA, gA), sAp = stat(cA, gAplant);
+        say(`alpha ${ALPHA}: cpu ${sA.cm.toFixed(5)} (relSd ${e2(sA.cs)}), gpu ${sA.gm.toFixed(5)} (relSd ${e2(sA.gs)}), ratio-1 ${e2(sA.ratio - 1)} against ${e2(sA.bound)}; the coin inverted reads ${e2(sAp.ratio - 1)}`);
+        REPORT_ROWS.push([`open box, alpha ${ALPHA} (a coin per candidate)`, `${W}x${H}`, `${SPPA} spp x ${NA} seeds a side, different seeds`, `cpu ${sA.cm.toFixed(5)} vs gpu ${sA.gm.toFixed(5)}, ratio-1 ${e2(sA.ratio - 1)}, bound ${e2(sA.bound)}`]);
+        ok("!! *** TRANSLUCENCY: the device's coin and the CPU's agree on the frame mean within 3 measured standard errors, both sides noisy ***",
+            Math.abs(sA.ratio - 1) < sA.bound && sA.cs > 1e-4 && sA.gs > 1e-4, `ratio-1 ${e2(sA.ratio - 1)} against ${e2(sA.bound)} -- not pixel for pixel, and it cannot be: the coin is tossed in the BVH's order`);
+        ok("!! and the row has the power to matter: the same coin INVERTED (accept with 1 - p) is far outside that bound", Math.abs(sAp.ratio - 1) > 3 * sAp.bound,
+            `${e2(sAp.ratio - 1)} against ${e2(sAp.bound)}, ${(Math.abs(sAp.ratio - 1) / sAp.bound).toFixed(0)} bounds out`);
+
+        // ---- 16c. a sphere's any-hit ----------------------------------------------------------------------------------
+        const sbtS = [R.sbtRecord({ centre: [-0.9, 0, 0], radius: 1, hit: "lambertian", albedo: 0.75 }), R.sbtRecord({ centre: [1.1, 0.2, 0.3], radius: 0.8, hit: "lambertian", albedo: 0.5 })];
+        const viewS = { w: W, h: H, eye: [0.5, 2.5, 4.5], look: [0, 0, 0], up: [0, 1, 0], fovDeg: 40 }, CAP = 0.2, SEPS = 1e-4;   // 1e-4: the eps every sphere scene in this file uses
+        const capped = (on) => sbtS.map((r) => ({ centre: r.centre, radius: r.radius, albedo: r.albedo, ...(on ? { anyHit: (P) => (P[1] - r.centre[1]) / r.radius <= CAP } : {}) }));
+        const sphCode = R.pipelineWgsl({ sphereAnyHit: true, gradient: true });
+        const sphU = (rule) => (sd) => R.pipelineUniforms(sbtS, { spp: SPP, seed: sd, view: viewS, eps: SEPS, ...(rule ? { sphereAnyHit: rule } : {}) });
+        const sphRun = async (code, sd) => Array.from((await runWgslCompute({ code, outCount: W * H, workgroups: Math.ceil(W * H / 64), uniforms: sphU(null)(sd), inputs: [] })).values);
+        const s0 = await sphRun(R.pipelineWgsl({ gradient: true }), 1), s1 = await sphRun(sphCode, 1);
+        ok("!! the sphere stage compiled in and bound to no rule changes NOTHING: the frame is the plain shader's, bit for bit", s0.every((v, i) => Object.is(v, s1[i])), `${s0.filter((v, i) => !Object.is(v, s1[i])).length} of ${s0.length} pixels differ`);
+        const emptyS = cpuOf([], viewS, { gradient: true });
+        const capR = await pairedOf({ code: sphCode, uniforms: sphU({ rule: "cap", param: CAP }), inputs: [], cpu: cpuOf(capped(true), viewS, { gradient: true }), empty: emptyS });
+        tell16(`two spheres, each open above latitude ${CAP}`, capR);
+        const solidMean = meanOf(Array.from(cpuOf(capped(false), viewS, { gradient: true })(1))), capMean = meanOf(Array.from(cpuOf(capped(true), viewS, { gradient: true })(1)));
+        ok("!! *** A SPHERE'S ANY-HIT: the device's two-root test and the CPU's re-cast walk the same paths, and the cap is really off ***",
+            capR.share >= CLEAN && Math.abs(capR.mean) < 3 * capR.se + TOL && Math.abs(capMean / solidMean - 1) > 0.01,
+            `${(capR.share * 100).toFixed(2)}% of values; the CPU's frame mean ${capMean.toFixed(4)} cut against ${solidMean.toFixed(4)} whole`);
+
+        // ---- 16d. per-triangle materials under an instance ------------------------------------------------------------
+        const matIdx = indices.map((_, i) => (i === 4 || i === 5 ? 1 : 0));                    // the floor is material 1
+        const table = [{ hit: "lambertian", albedo: 0.3 }, { hit: "lambertian", albedo: 0.8 }, { hit: "lambertian", albedo: 0.7 }, { hit: "lambertian", albedo: 0.2 }];
+        const OFFS = [0, 2, 2], gpuMat = R.bvhBuffersFromMesh(positions, indices, { materialIndex: matIdx });
+        const subTris = (m) => { const out = []; indices.forEach((_, i) => { if (matIdx[i] === m) for (let k = 0; k < 9; k++) out.push(tris[i * 9 + k]); }); return out; };
+        const placedOf = (M, src) => { const out = new Float64Array(src.length); for (let i = 0; i < src.length; i += 3) for (let r = 0; r < 3; r++) out[i + r] = M[r * 4] * src[i] + M[r * 4 + 1] * src[i + 1] + M[r * 4 + 2] * src[i + 2] + M[r * 4 + 3]; return out; };
+        // the CPU has no per-triangle material and no offset: each instance is SPLIT by material into its own meshes
+        const sceneMat = []; INST.forEach((it, k) => { for (const m of [0, 1]) sceneMat.push({ bvh: new MeshBVH(placedOf(it.transform, subTris(m))), albedo: table[OFFS[k] + m].albedo }); });
+        const matIn = [...R.bvhInputs(gpuMat), { binding: R.BVH_BINDINGS.meshSbt, data: R.meshSbtBuffer(table) },
+                       { binding: R.BVH_BINDINGS.instances, data: R.instanceBuffer(INST.map((it, k) => ({ transform: it.transform, sbtOffset: OFFS[k] }))) }];
+        const matCode = R.pipelineWgsl({ bvh: true, instances: true, meshMaterials: true, gradient: true });
+        const matU = (sd) => R.pipelineUniforms([], { spp: SPP, seed: sd, view: wide, eps: R.EPS, meshMaterials: true, meshRecords: table, bvh: { nodeCount: gpuMat.nodeCount, triCount: gpuMat.triCount, instanceCount: 3 } });
+        const emptyW = cpuOf([], wide, { gradient: true }), cpuMat = cpuOf(sceneMat, wide, { gradient: true });
+        const matR = await pairedOf({ code: matCode, uniforms: matU, inputs: matIn, cpu: cpuMat, empty: emptyW });
+        tell16("three instances, two materials a mesh, two instances offset into a second pair", matR);
+        ok("!! *** MATERIALS UNDER AN INSTANCE: record = table[the instance's offset + the triangle's index], against a CPU that split each instance by material ***",
+            matR.share >= CLEAN && Math.abs(matR.mean) < 3 * matR.se + TOL, `${(matR.share * 100).toFixed(2)}% of values, paired mean ${e2(matR.mean)} against 3 x ${e2(matR.se)}`);
+
+        // ---- 16e. the colour, microfacet and light-sampling shaders, with the v4915 options -------------------------------
+        const COLS = [[0.6, 0.4, 0.2], [0.3, 0.5, 0.7], [0.8, 0.8, 0.3]];
+        const rgbR = await pairedOf({ ch: 3, code: R.pipelineWgsl({ bvh: true, rgb: true, instances: true, anyHit: true, gradient: true }), inputs: withInst(R.instanceBuffer(INST.map((it, k) => ({ transform: it.transform, albedo: COLS[k] })), { rgb: true })),
+            uniforms: (sd) => R.pipelineUniforms([], { spp: SPP, seed: sd, view: wide, eps: R.EPS, rgb: true, bvh: meshU({ instanceCount: 3, anyHit: { rule: "cutout", param: CUT } }) }),
+            cpu: cpuOf(INST.map((it, k) => ({ bvh: new MeshBVH(placed(it.transform)), albedo: COLS[k], anyHit: cutout(CUT) })), wide, { gradient: true, extra: { rgb: true } }), empty: cpuOf([], wide, { gradient: true, extra: { rgb: true } }) });
+        tell16("COLOUR: three coloured instances, each cut out, three channels", rgbR);
+        const MATS = [{ roughness: 0.2, ior: 1.5 }, { roughness: 0.5, ior: 2.4 }, { roughness: 0.9, ior: 1.33 }];
+        const mfCode = R.pipelineWgsl({ bvh: true, instances: true, microfacet: "bsdf", gradient: true });
+        const mfIn = withInst(R.instanceBuffer(INST.map((it, k) => ({ transform: it.transform, hit: "microfacet", ...MATS[k] }))));
+        const mfU = (sd) => R.pipelineUniforms([], { spp: SPP, seed: sd, view: wide, eps: R.EPS, microfacet: "bsdf", bvh: meshU({ instanceCount: 3 }) });
+        const cpuMf = cpuOf(INST.map((it, k) => ({ bvh: new MeshBVH(placed(it.transform)), albedo: 0.5, ...MATS[k] })), wide, { gradient: true, extra: { direct: "bsdf" } });
+        const emptyMf = cpuOf([], wide, { gradient: true, extra: { direct: "bsdf" } });
+        const mfR = await pairedOf({ code: mfCode, uniforms: mfU, inputs: mfIn, cpu: cpuMf, empty: emptyMf });
+        tell16("MICROFACET: three instances, three roughnesses, three indices of refraction", mfR);
+        ok("!! *** COLOUR and MICROFACET with instances (and a cutout): each walks the CPU's paths on the same seeds ***",
+            rgbR.share >= CLEAN && Math.abs(rgbR.mean) < 3 * rgbR.se + TOL && mfR.share >= CLEAN && Math.abs(mfR.mean) < 3 * mfR.se + TOL,
+            `${(rgbR.share * 100).toFixed(2)}% of ${rgbR.pix} colour values and ${(mfR.share * 100).toFixed(2)}% of ${mfR.pix} microfacet ones`);
+        // light sampling. Draw order differs on the two sides, so the mean is the claim.
+        // *** THE LIGHT IS BESIDE THE BOX, NOT OVER IT, AND A SABOTAGE THAT WENT 0 RED IS WHY. *** The first scene hung the
+        // light above the opening: the holes were worth 8.2% of the frame and the row passed -- and went on passing with
+        // the CPU's shadow ray cast at the SOLID mesh (sabotage H), because light arriving through the opening needs no
+        // hole. Here the camera looks down into the box and the light is outside a wall, so direct light reaches the
+        // floor only THROUGH that wall's cutouts: measured on the CPU alone, a shadow ray that ignores them is 8.0% off.
+        const light = R.sbtRecord({ centre: [3.2, 0.3, 0], radius: 0.4, hit: "lambertian", albedo: 0.5, emit: 80 });
+        const viewL = top, NL = 8;
+        const cpuLight = { centre: light.centre, radius: light.radius, albedo: light.albedo, emit: 80 };
+        const neeCode = R.pipelineWgsl({ bvh: true, nee: true, anyHit: true });
+        const neeRun = async (sd, patch = null) => { const r = await runWgslCompute({ code: patch ? patch(neeCode) : neeCode, outCount: W * H, workgroups: Math.ceil(W * H / 64), inputs: meshIn,
+            uniforms: R.pipelineUniforms([light], { spp: SPP, seed: sd, view: viewL, eps: SEPS, bvh: meshU({ hit: "lambertian", albedo: 0.6, anyHit: { rule: "cutout", param: CUT } }) }) });
+            if (!r.ok) throw new Error("section 16 nee render failed: " + r.reason); return meanOf(Array.from(r.values)); };
+        const cL = [], gL = [], cLsolid = [];
+        for (let k = 1; k <= NL; k++) {
+            cL.push(meanOf(Array.from(renderCpuMesh([cpuLight, { bvh: cpuBvh, albedo: 0.6, anyHit: cutout(CUT) }], { ...viewL, spp: SPP, seed: k, maxDepth: R.MAX_DEPTH, sky: () => 1, nee: true }))));
+            cLsolid.push(meanOf(Array.from(renderCpuMesh([cpuLight, { bvh: cpuBvh, albedo: 0.6 }], { ...viewL, spp: SPP, seed: k, maxDepth: R.MAX_DEPTH, sky: () => 1, nee: true }))));
+            gL.push(await neeRun(6000 + k));
+        }
+        const sL = stat(cL, gL), effect = meanOf(cL) / meanOf(cLsolid) - 1;
+        say(`LIGHT SAMPLING through the cutout: cpu ${sL.cm.toFixed(5)}, gpu ${sL.gm.toFixed(5)}, ratio-1 ${e2(sL.ratio - 1)} against ${e2(sL.bound)}; the holes are worth ${pct(effect)} of the frame`);
+        REPORT_ROWS.push(["LIGHT SAMPLING: a sphere light beside the cut box, seen from above", `${W}x${H}`, `${SPP} spp x ${NL} seeds a side, different seeds`, `cpu ${sL.cm.toFixed(5)} vs gpu ${sL.gm.toFixed(5)}, ratio-1 ${e2(sL.ratio - 1)}, bound ${e2(sL.bound)}; holes worth ${pct(effect)}`]);
+        ok("!! *** LIGHT SAMPLING: shadow rays and bounces through the holes agree with the CPU's within 3 standard errors, and the holes are worth many times that ***",
+            Math.abs(sL.ratio - 1) < sL.bound && Math.abs(effect) > 5 * sL.bound, `ratio-1 ${e2(sL.ratio - 1)} against ${e2(sL.bound)}; a device that ignored the cutout would be ${pct(effect)} off, ${(Math.abs(effect) / sL.bound).toFixed(0)} bounds`);
+
+        // ---- 16f. the plants --------------------------------------------------------------------------------------------
+        const P16 = [
+            { id: "sphere: the far root never tried", run: () => pairedOf({ code: sphCode, uniforms: sphU({ rule: "cap", param: CAP }), inputs: [], cpu: cpuOf(capped(true), viewS, { gradient: true }), empty: emptyS,
+                patch: plantOf("if (t1 > eps && rtAnyHitSphere(orig + dir * t1, centre, radius)) { return t1; }", "if (false) { return t1; }") }) },
+            { id: "sphere: the latitude taken along x", run: () => pairedOf({ code: sphCode, uniforms: sphU({ rule: "cap", param: CAP }), inputs: [], cpu: cpuOf(capped(true), viewS, { gradient: true }), empty: emptyS,
+                patch: plantOf("return (P.y - centre.y) / radius <= rule.w;", "return (P.x - centre.x) / radius <= rule.w;") }) },
+            { id: "materials: the instance's offset ignored", run: () => pairedOf({ code: matCode, uniforms: matU, inputs: matIn, cpu: cpuMat, empty: emptyW,
+                patch: plantOf("rec = bvhSbt[i32(rtInstanceRecord(bvhHitInst).x) + bvhMatIdx[bvhHitTri]];", "rec = bvhSbt[bvhMatIdx[bvhHitTri]];") }) },
+            { id: "materials: the triangle's index ignored", run: () => pairedOf({ code: matCode, uniforms: matU, inputs: matIn, cpu: cpuMat, empty: emptyW,
+                patch: plantOf("rec = bvhSbt[i32(rtInstanceRecord(bvhHitInst).x) + bvhMatIdx[bvhHitTri]];", "rec = bvhSbt[i32(rtInstanceRecord(bvhHitInst).x) + bvhMatIdx[0]];") }) },
+            { id: "microfacet: every instance shaded with its neighbour's record", run: () => pairedOf({ code: mfCode, uniforms: mfU, inputs: mfIn, cpu: cpuMf, empty: emptyMf,
+                patch: plantOf("rec = rtInstanceRecord(bvhHitInst);", "rec = rtInstanceRecord((bvhHitInst + 1) % 3);") }) },
+        ];
+        const seen16 = [];
+        for (const pl of P16) { const r = await pl.run(); seen16.push({ pl, r }); say(`plant, ${pl.id}: ${pct(r.share)} of values where the reference put them`);
+            REPORT_ROWS.push([`planted device: ${pl.id}`, `${W}x${H}`, `${SPP} spp x ${N16} seeds, same seeds`, `${pct(r.share)} of values identical`]); }
+        const neePlant = []; for (let k = 1; k <= NL; k++) neePlant.push(await neeRun(6000 + k, plantOf("return min(1.0 - u - v, min(u, v)) <= rule.y;", "return true;")));
+        const sLp = stat(cL, neePlant);
+        ok("each section-16 plant's target is in the generated WGSL exactly once", missed.size === 0, [...missed].map((f) => f.slice(0, 60)).join(" | ") || `${P16.length + 2} plants`);
+        ok("!! *** EVERY PLANTED DEVICE OF THIS SECTION IS SEEN: five by pixels, and a device that ignores the cutout under light sampling by its mean ***",
+            seen16.every((x) => x.r.share < PLANTED) && Math.abs(sLp.ratio - 1) > 3 * sLp.bound,
+            seen16.map((x) => pct(x.r.share)).join(", ") + `; light sampling with the rule ignored reads ${e2(sLp.ratio - 1)} against ${e2(sLp.bound)}`);
+        // SABOTAGE (v4917), eight, each against the real file, restored and md5-verified; reds over the whole gate.
+        //   A  rtPipeline.mjs, the coin accepting with 1 - p -> 4 red: the structure row, "alpha 0 is an EMPTY scene"
+        //      (256 of 256 pixels), TRANSLUCENCY (-3.26e-1 against 6.33e-3), the plant-target row.
+        //   B  rtPipeline.mjs, a sphere's far root taken without asking -> 3 red: structure, A SPHERE'S ANY-HIT (70.38%),
+        //      plant-target. C  the instance's offset multiplied by zero -> 2 red: MATERIALS UNDER AN INSTANCE (34.03%).
+        //   D  pathTracer.mjs, the CPU never looking through a sphere's hole -> 2 red: A SPHERE'S ANY-HIT (65.89%), and
+        //      EVERY PLANTED DEVICE (the far-root plant now AGREES with the broken reference, 100.0%).
+        //   E  rtPipeline.mjs, the sphere rule's parameter written over the triangle's -> 2 red, the U[5] row by name.
+        //   F  rtPipeline.mjs, a cut sphere allowed under light sampling -> 2 red, both refusal rows, each naming it.
+        //   G  rtPipeline.mjs, sbtOffset packed one record on -> 1 red: MATERIALS UNDER AN INSTANCE (1.49%).
+        //   H  pathTracer.mjs, the CPU's shadow ray cast at the solid mesh -> *** 0 RED THE FIRST TIME ***, with the light over
+        //      the opening; the scene was wrong, not the code (see 16e). With the light beside the box -> 1 red, LIGHT
+        //      SAMPLING by name (8.78e-2 against 3.01e-3).
+    }
     // SABOTAGE (v4915), fourteen, each against the real file, each restored and md5-verified; reds over the whole gate.
     // TWO WENT WRONG FIRST AND BOTH ARE FIXED ABOVE: J threw inside instanceBuffer and ended the run in a stack trace
     // with 0 rows red (the packer is now called under a guard and the record has its own row), and three others
