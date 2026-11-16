@@ -104,3 +104,44 @@ inputs and output, and would want a second round before it is believed. T1 CANNO
 ## 9. The run (to be written; the gate never runs it and never gives the command the word `run`)
 `node tools/ship/takeFlyEscapeVision.mjs run` -> `brain/flyEscapeVisionRound.jsonl`, committed byte for byte before it is read;
 `node tools/ship/takeFlyEscapeVision.mjs read` prints the checks and the reading.
+
+## 10. The result (run 2026-11-16 in the sandbox, 31.0 minutes; `brain/flyEscapeVisionRound.jsonl` committed whole at 3b26b297 before it was read; read once)
+**A slip of mine, said first.** While the run was writing the file, a commit of other work (2b048f15) swept in a partial copy
+of it: its first four records. I had not read it and did not; the whole file was committed again when the run ended, the
+partial copy is its first bytes exactly, and the reading below was made once, after that.
+
+**The checks hold, and the start was the reflex:** the untrained fly of every arm scores 0.6465, to the bit.
+
+| | mean score | sd | least | most | lives (of 200) | feeds | caught by a strike |
+|---|---|---|---|---|---|---|---|
+| **GF**, the real circuit | 0.7501 | 0.0031 | 0.7411 | 0.7569 | 193.4 | 0.533 | 0.015 |
+| GSHUF, its strengths in shuffled places | 0.7323 | 0.0286 | 0.6623 | 0.7524 | 188.8 | 0.521 | 0.025 |
+| FREE, 113 units on the same two numbers | 0.7571 | 0.0103 | 0.7360 | 0.7736 | 185.6 | 0.586 | 0.036 |
+| GNONE, the cells with no connections | 0.6465 | 0 | 0.6465 | 0.6465 | 156 | 0.513 | 0.107 |
+| the reflex | 0.6465 | | | | 156 | 0.513 | 0.107 |
+
+* **T1: THE REAL ESCAPE CIRCUIT'S WIRING ESCAPES BETTER THAN A SHUFFLE OF IT** (asked of flies that do the task; ranks 333, the
+  middle 264; exact two-sided p 0.0085 against the registered 0.01).
+* **T2: THE REAL ESCAPE CIRCUIT CANNOT BE TOLD APART FROM A FREE NET ON THE SAME TWO NUMBERS** (206; p 0.029; it leans below).
+* **T0: A FLY WITH THE REAL ESCAPE CIRCUIT, STARTED AT THE REFLEX, ESCAPES BETTER THAN THE REFLEX** (16 of 16; p 3.1e-5).
+* **T3: A FLY STARTED AT THE REFLEX ESCAPES BETTER THAN THE REFLEX** (48 of 64 above, the 16 GNONE flies equal; p 7.7e-5).
+
+**What T1 is, and what it is not.** It is the first time in this work that a real wiring is told from a shuffle of itself, and
+it is the registered test giving the registered word. It is not a better fly: 12 of the 16 shuffles end where the real circuit
+ends (0.743 to 0.752 against 0.741 to 0.757) and the best shuffle is above 14 of the 16 real-wired flies. The difference is
+that the real wiring trained to the same place every time (sd 0.003) and 4 of the 16 shuffles did not get there (0.66 to
+0.71). That is the thing section 3b said to watch for: the real wiring brings all 40 visual cells onto the two cells that are
+read, a shuffle brings 13 to 20 of them, and the trainer has a longer, surer lever on the real one. So what was shown is that
+THIS wiring's convergence onto its output makes it easier to train here -- which is a property of the wiring, and a plain one.
+It was not shown that anything finer about where the connections are matters. And the p is 0.0085 beside a line at 0.01.
+
+**It wants a second round before it is believed, as section 7 said**, and the round is clear: a shuffle that keeps each cell's
+count of connections in and out (so the convergence onto the Giant Fibers is kept and only the rest is moved), more draws, and
+new shuffles. If the real wiring still trains more surely than that, the finer wiring matters; if not, it was the convergence.
+
+**The rest.** Without connections nothing was learned: all 16 GNONE trainings ended with the weights they began with. A free
+net on the same two numbers does as well or a little better (0.757), by feeding more and being caught more. Two numbers through
+the real circuit (0.750) do as well as round 3's arms did on all thirteen (0.741).
+
+**Expectations against what came.** I gave T1 BETTER 14 percent. T2, T3 and GNONE came as weighted; T0 BETTER I gave 30.
+

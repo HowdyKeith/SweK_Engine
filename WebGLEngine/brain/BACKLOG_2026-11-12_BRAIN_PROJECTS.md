@@ -257,11 +257,19 @@ cannot be told from a shuffle of it (p 0.78).** Most of the trainer's gain was i
   round 3 selves, 42 below; p 0.017 against the registered 0.01); the plain net is lower in all 16 draws. **The wiring: cannot
   be told from a shuffle (p 0.64).** Seen after the reading and not registered: the fish's circuit is the one arm not lower
   with memory and ranks above the others -- a thing to ask of a round, not a finding.
-* **Round 5, the real visual inputs: REGISTERED AND RUNNING** (`brain/FLY_ESCAPE_VISION_WIP.md`, amended in its section 3b
-  before any training; `tools/ship/flyEscapeVision-selfcheck.mjs`). Another chat's data file
-  (`vendor/male-cns/giant-fiber-visual-circuit.json`: the two Giant Fibers and each one's 10 strongest LC4 and LPLC2 cells, 369
-  connections) as a policy in which the only road from what the fly sees to what it does is the wiring
-  (`brain/rl/maskedCircuitPolicy.mjs`). Its result goes in that note.
+* **Round 5, the real visual inputs: DONE, AND IT IS THE FIRST ROUND IN WHICH A REAL WIRING IS TOLD FROM ITS SHUFFLE**
+  (`brain/FLY_ESCAPE_VISION_WIP.md` section 10, amended in 3b before any training; `tools/ship/flyEscapeVision-selfcheck.mjs`
+  section 7; `brain/rl/maskedCircuitPolicy.mjs`, `brain/gfVisualTopology.mjs` baked from another chat's
+  `vendor/male-cns/giant-fiber-visual-circuit.json`). The two Giant Fibers and each one's 10 strongest LC4 and LPLC2 cells,
+  the looming rate into LC4 and the size into LPLC2, the answer read from the Giant Fibers alone. **T1: the real circuit's
+  wiring escapes better than a shuffle of it (p 0.0085 against 0.01).** Said with it: not a better fly but a surer training --
+  all 16 real-wired flies end at 0.741 to 0.757, 12 of 16 shuffles end in the same place and 4 fail (0.66 to 0.71). The real
+  wiring brings all 40 visual cells onto the two cells read; a shuffle brings 13 to 20. A free net on the same two numbers
+  cannot be told from the real circuit (0.757 against 0.750). With no connections nothing was learned (16 of 16 unmoved).
+* **OPEN, AND THE NEXT ROUND IF ASKED (`fly-escapes-degree-shuffle`, not registered):** the second round T1 needs before it is
+  believed -- a shuffle that keeps each cell's count of connections in and out (so the convergence onto the Giant Fibers is
+  kept), more draws, new shuffles. If the real wiring still trains more surely, the finer wiring matters; if not, it was the
+  convergence.
 **OPEN, not registered:** the fish's circuit with memory, asked properly; real left and right eyes and receptive fields (that
 chat's `brain/FLY_RETINOTOPY_RF_WIP.md`); the published Giant Fiber model as a hand-written fly beside the reflex.
 
