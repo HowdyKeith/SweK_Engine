@@ -5,6 +5,7 @@
 //
 //   node tools/ship/trainHelmSteer.mjs search --seed 9500 --iters 1000 --record brain/rig-results/helmSteer/s9500.json                                  (the fly's wiring)
 //   node tools/ship/trainHelmSteer.mjs search --seed 9520 --iters 1000 --record brain/rig-results/helmSteerControl/s9520.json --wiring control:4242     (a random circuit of its size)
+//   ... --circuit turn on every step: the steering circuit's search with THE THROTTLE LEFT TO THE RULE (registered at CIRCUITS below)
 //   ... --circuit compass on every step: the same search over the circuit WITH ITS INPUTS (brain/helmCompassPolicy.mjs; registered at CIRCUITS below, pairs and file of its own)
 //   node tools/ship/trainHelmSteer.mjs finish --records-dir brain/rig-results/helmSteer --control-records-dir brain/rig-results/helmSteerControl --wiring control:4242 [--write]
 //
@@ -56,6 +57,10 @@ export { stagedTest, STAGES, Z_ACCEPT };
 export const CIRCUITS = Object.freeze({
     steer: Object.freeze({ id: "steer", mod: HS, label: "the fly's steering circuit", train: TRAIN_PAIRS, heldOut: HELD_OUT_PAIRS, audit: AUDIT_PAIRS, out: DEFAULT_OUT, citation: "male-cns central-complex steering output, PFL2/PFL3/DNa02/DNa03 (Janelia FlyEM, vendor/male-cns/PROVENANCE.md)" }),
     compass: Object.freeze({ id: "compass", mod: HC, label: "the fly's steering circuit with its inputs (the compass and the goal cells)", train: pairs(24001, 75), heldOut: pairs(25001, 75), audit: pairs(26001, 150), out: path.join(BRAIN, "helmCompassWeightsDefault.json"), citation: "male-cns central-complex steering circuit with its inputs, EPG/Delta7/FC2A-C/PFL2/PFL3/DNa02/DNa03 (Janelia FlyEM, vendor/male-cns/PROVENANCE.md)" }),
+    // THE THROTTLE LEFT TO THE RULE. All three trained helms won by throttling back, and none put a weight on a synapse. `turn` is the steering circuit's search with the children kept off the throttle output (outputs 0-2 only: the three torque corrections), so the helm's thrust is the rule's and what is left to
+    // find is STEERING. REGISTERED 2026-11-16 BEFORE ANY OF ITS PAIRS WAS FLOWN: train seeds 27001-27075 of each kind, held-out 28001-28075, audit 29001-29150; H1-H4 as before (H4, against the escape circuit's shipped helm, is against a helm that DOES throttle and is kept only to place this one beside it).
+    // FORECAST: H1 LEADS by a little, 0.1 to 0.2 (the first search's one steering path was worth +0.15 on its train pairs) or CANNOT BE TOLD; H2 and H3 CANNOT BE TOLD; H4 TRAILS.
+    turn: Object.freeze({ id: "turn", mod: HS, outputs: Object.freeze([0, 1, 2]), label: "the fly's steering circuit, the throttle left to the rule (no child touches the throttle output)", train: pairs(27001, 75), heldOut: pairs(28001, 75), audit: pairs(29001, 150), out: path.join(BRAIN, "helmSteerTurnWeightsDefault.json"), citation: "male-cns central-complex steering output, PFL2/PFL3/DNa02/DNa03 (Janelia FlyEM, vendor/male-cns/PROVENANCE.md)" }),
 });
 
 const RULE = Object.freeze({ id: "rule" });
@@ -71,25 +76,25 @@ export function awake(L, w) {
     for (let grew = true; grew;) { grew = false; L.edges.forEach(([to, from], k) => { if (on.has(from) && !on.has(to) && w[L.synapseAt(k)] !== 0) { on.add(to); grew = true; } }); }
     return on;
 }
-export const isRead = (L, w, h) => READ_OUTPUTS.some((o) => w[L.outputAt(o, h)] !== 0);
+export const isRead = (L, w, h, outs = READ_OUTPUTS) => outs.some((o) => w[L.outputAt(o, h)] !== 0);
 /** The synapses a child may move: those whose source neuron is awake. Indices into the wiring's edges. */
 export const reachable = (L, w) => { const on = awake(L, w), ks = []; L.edges.forEach(([, from], k) => { if (on.has(from)) ks.push(k); }); return ks; };
-export function pathChild(L, w, sigma, rng) { const o = Float32Array.from(w), h = pick(rng, L.HIDDEN); o[L.encoderAt(h, pick(rng, L.FEATURES))] += gauss(rng) * sigma; o[L.outputAt(READ_OUTPUTS[pick(rng, READ_OUTPUTS.length)], h)] += gauss(rng) * sigma; return o; }
-export function biasChild(L, w, sigma, rng) { const o = Float32Array.from(w); o[L.biasAt(READ_OUTPUTS[pick(rng, READ_OUTPUTS.length)])] += gauss(rng) * sigma; return o; }
+export function pathChild(L, w, sigma, rng, outs = READ_OUTPUTS) { const o = Float32Array.from(w), h = pick(rng, L.HIDDEN); o[L.encoderAt(h, pick(rng, L.FEATURES))] += gauss(rng) * sigma; o[L.outputAt(outs[pick(rng, outs.length)], h)] += gauss(rng) * sigma; return o; }
+export function biasChild(L, w, sigma, rng, outs = READ_OUTPUTS) { const o = Float32Array.from(w); o[L.biasAt(outs[pick(rng, outs.length)])] += gauss(rng) * sigma; return o; }
 /** A synapse child, or null when no neuron is awake (the caller makes a path child). The target gets a read-out if it has none, so that the synapse can be heard. */
-export function synapseChild(L, w, sigma, rng) {
+export function synapseChild(L, w, sigma, rng, outs = READ_OUTPUTS) {
     const ks = reachable(L, w); if (!ks.length) return null;
     const o = Float32Array.from(w), k = ks[pick(rng, ks.length)], to = L.edges[k][0]; o[L.synapseAt(k)] += gauss(rng) * sigma;
-    if (!isRead(L, o, to)) o[L.outputAt(READ_OUTPUTS[pick(rng, READ_OUTPUTS.length)], to)] += gauss(rng) * sigma;
+    if (!isRead(L, o, to, outs)) o[L.outputAt(outs[pick(rng, outs.length)], to)] += gauss(rng) * sigma;
     return o;
 }
 export const movedOf = (w) => { const idx = []; for (let i = 0; i < w.length; i++) if (w[i] !== 0) idx.push(i); return idx; };
 export function tuneChild(L, w, sigma, rng, maxK) { const idx = movedOf(w); if (!idx.length) return null; const o = Float32Array.from(w), k = 1 + pick(rng, maxK); for (let j = 0; j < k; j++) o[idx[pick(rng, idx.length)]] += gauss(rng) * sigma; return o; }
 /** One child: { w, kind }. The kind is what was MADE: a synapse or tune child that cannot be made yet is a path child and is counted as one. */
-export function child(L, w, sigma, rng, maxK) {
+export function child(L, w, sigma, rng, maxK, outs = READ_OUTPUTS) {
     const r = rng(); let c = null, kind = r < SHARE.synapse ? "synapse" : r < SHARE.synapse + SHARE.path ? "path" : r < SHARE.synapse + SHARE.path + SHARE.tune ? "tune" : "bias";
-    if (kind === "synapse") c = synapseChild(L, w, sigma, rng); else if (kind === "tune") c = tuneChild(L, w, sigma, rng, maxK); else if (kind === "bias") c = biasChild(L, w, sigma, rng);
-    if (!c) { c = pathChild(L, w, sigma, rng); kind = "path"; }
+    if (kind === "synapse") c = synapseChild(L, w, sigma, rng, outs); else if (kind === "tune") c = tuneChild(L, w, sigma, rng, maxK); else if (kind === "bias") c = biasChild(L, w, sigma, rng, outs);
+    if (!c) { c = pathChild(L, w, sigma, rng, outs); kind = "path"; }
     return { w: c, kind };
 }
 export const synapsesUsed = (L, w) => { let n = 0; for (let k = 0; k < L.REC_EDGES; k++) if (w[L.synapseAt(k)] !== 0) n++; return n; };
@@ -107,7 +112,7 @@ export async function search(opts = {}, log = () => {}, { fly, circuit = CIRCUIT
     const by = saved ? saved.by : { synapse: 0, path: 0, tune: 0, bias: 0 }, tried = saved ? saved.tried : { synapse: 0, path: 0, tune: 0, bias: 0 }, dropped = saved ? saved.dropped : Object.fromEntries(stages.map((s) => [s.n, 0])), accepted = saved ? saved.accepted : [];
     if (saved) { gen.a = saved.gen; flown = saved.flown; log(`  seed ${o.seed}: resumed after child ${saved.i} (${accepted.length} accepted, ${flown} pairs flown)`); } else log(`  seed ${o.seed} (${wiring}): from the zero weights, the rule`);
     for (let i = saved ? saved.i + 1 : 1; i <= o.iters; i++) {
-        const c = child(L, best, o.sigma, rng, o.maxK); tried[c.kind]++;
+        const c = child(L, best, o.sigma, rng, o.maxK, circuit.outputs ?? READ_OUTPUTS); tried[c.kind]++;
         const r = await stagedTest((from, to) => leadsOn(c.w, from, to), bestLeads, stages);
         if (r.accepted) { best = c.w; bestLeads = r.leads; by[c.kind]++; accepted.push({ i, kind: c.kind, z: r.z, mean: r.mean }); log(`    seed ${o.seed} child ${i}: a ${c.kind} child ACCEPTED, +${r.mean.toFixed(3)} over its parent (z ${r.z.toFixed(2)}); train ${mean(bestLeads).toFixed(3)}, ${synapsesUsed(L, best)} synapses`); }
         else dropped[r.stage]++;
@@ -173,7 +178,7 @@ export function gfcHelm(file = GFC_HELM_FILE, log = () => {}) { if (!fs.existsSy
 if (import.meta.url === pathToFileURL(process.argv[1] || "").href) {
     const [step, ...rest] = process.argv.slice(2), arg = (k, d = null) => { const i = rest.indexOf("--" + k); return i >= 0 ? rest[i + 1] : d; }, known = ["seed", "iters", "record", "records-dir", "control-records-dir", "workers", "write", "out", "wiring", "circuit"], bad = rest.filter((a) => a.startsWith("--") && !known.includes(a.slice(2)));
     if (!["search", "finish"].includes(step) || bad.length) { console.error(`trainHelmSteer: ${bad.length ? `unknown option ${bad.join(", ")}` : "the first argument is search or finish"}`); process.exit(2); }
-    const circuit = CIRCUITS[arg("circuit", "steer")]; if (!circuit) { console.error(`trainHelmSteer: --circuit is ${Object.keys(CIRCUITS).join(" or ")} (got ${arg("circuit")})`); process.exit(2); }
+    const circuit = CIRCUITS[arg("circuit", "steer")]; if (!circuit) { console.error(`trainHelmSteer: --circuit is ${Object.keys(CIRCUITS).join(", ")} (got ${arg("circuit")})`); process.exit(2); }
     if (circuit.id !== "steer") console.log(`the circuit: ${circuit.label} (${circuit.mod.HIDDEN} neurons, ${circuit.mod.REC_EDGES} connections); pairs from seed ${circuit.train[0].seed}`);
     const wiring = arg("wiring", step === "finish" ? `control:${HS.CONTROL_SEED}` : "fly"); try { circuit.mod.wiringOf(wiring); } catch (e) { console.error("trainHelmSteer: " + e.message); process.exit(2); }
     const pool = createPool(arg("workers") ? { workers: Number(arg("workers")) } : {}), flyOver = (wr, policy = circuit.mod.POLICY_ID) => (w, list) => pool.leads(jobsOf(Array.from(w), list, wr, policy)), log = (m) => console.log(m);
