@@ -79,3 +79,41 @@ Why these: against the boats' own copies the gain sat at the top corner of the p
 **2. A property of the design that the smoke shows and that this note did not say (said before data; no rule is changed), the same as the first note's Amendment A item 2.** The effect is a difference of two edges and **an edge has a ceiling**: at 25 of the 32 cells' BASE matchups on the smoke geometries (16 cells of each of two hunters) the unchanged hunter already scores **+3.18 to +3.28** against the changed opponent, so a slower tracker has no room to add anything there. **A cell can therefore HELP only where the hunter is not already at the ceiling, which is where the opponent evades well enough to survive it**, and the "gates" this note reads are in part the places where the opponent is strong enough for there to be anything to gain. The registered rules count what they count (a gate is where the effect is decided); the report prints BASE and SLOW beside each effect so that the ceiling can be seen, and **any reading of the surface beyond the corners and the two gates stays post-hoc and labelled**.
 
 **3. What is not changed:** the hunters, the grid, the corners, the matchups, the sets, the rules R0 and RG1 to RG5, the forecasts, the geometries, the order of work.
+
+## DEV RESULT (2026-11-16; `node tools/ship/takeEvadeGates.mjs dev --write`, geometries 126001 to 126048 (96 duels a matchup), exit 0; record `brain/subEvadeGatesDev.json`: 66 matchups, no check failed)
+
+DEV is free to read. **HELD (127001 to 127048) is NOT flown by this note's work so far**: Keith's earlier HELD words ("fly Round 1 HELD whenever ready", "Rounds 2 and 3 HELD can fly when ready") named those rounds, and his message for these two did not say "fly HELD", so I am waiting for his word. R0 held on DEV and no check failed (none printed), so the command's HELD gate would accept this record. Forecasts are scored on DEV only for "R0 holds on DEV" (90): **TRUE**. The others stand as written for HELD. **I flew DEV on my own reading of "do the round"**, as free-to-read data that gates HELD; it spent the DEV set 126001 to 126048, recorded once.
+
+**R0 holds.** OWN (U(h) with trackSpeed D against U(h)) is **+0.889** for league7001 (z 7.5, 35-54-7) and **+0.974** for exploit7204 (z 6.8, 45-36-15), both decided.
+
+**The effect Delta(h; s, u) of the slower trackSpeed against the opponent with evadeSpeed s and evadeTurn u** (the paired difference by geometry of SLOW over BASE; HELPS in bold):
+
+| league7001 | turn 0.8 | turn 1.8 | turn 2.4 | turn 2.8 |
+|---|---|---|---|---|
+| speed 2.0 | -0.002 | -0.002 | -0.002 | -0.034 |
+| speed 3.0 | -0.003 | -0.033 | -0.003 | +0.185 (z 1.7) |
+| speed 4.0 | -0.003 | -0.002 | +0.185 (z 1.6) | **+0.696** (z 4.4) |
+| speed 4.5 | -0.034 | -0.001 | -0.045 | **+0.763** (z 6.0) |
+
+| exploit7204 | turn 0.8 | turn 1.8 | turn 2.4 | turn 2.8 |
+|---|---|---|---|---|
+| speed 2.0 | -0.072 | -0.072 | -0.071 | -0.072 |
+| speed 3.0 | -0.073 | -0.071 | -0.136 | -0.466 (z -2.7) |
+| speed 4.0 | -0.073 | -0.071 | -0.134 | **+0.697** (z 3.6) |
+| speed 4.5 | -0.073 | -0.071 | -0.206 | **+1.083** (z 8.9) |
+
+**RG1 THE STRONG CORNER (4.5, 2.8) HELPS: yes** (+0.763 and +1.083). **RG2 THE HEADLINE: AND** (neither A (2.0, 2.8) nor B (4.5, 0.8) helps: -0.034 and -0.072; -0.034 and -0.073). **RG3 THE GATES:** the speed gate (at turn 2.8) is **4.0**, the turn gate (at speed 4.5) is **2.8**. **RG4 THE COUNT: 2 of the 16 cells HELP: (4.0, 2.8) and (4.5, 2.8).** **RG5 THE COSTS:** none decided (exploit7204 at (3.0, 2.8) is -0.466, z -2.7, 0.034 under the bar).
+
+**The forecast quantities as printed** (scored on HELD, not here): strong corner helps yes; AND yes; TURN ALONE, SPEED ALONE, EITHER and NOT REPLICATED no; turn gate 2.4 or higher or none yes; speed gate 4.0 or higher or none yes; four or more cells no; hurts somewhere no.
+
+**Said plainly about this read:** the smoke report (Amendment A item 1) had the same headline, AND, with the same two cells helping, on four geometries at 8 duels a matchup. That is not independent evidence and DEV is a different 48, but **I saw the smoke headline before writing any DEV rule down as read**: the 62 given to AND and the 70 and 60 given to the gates are not blind numbers, and every forecast of section 5 is scored on HELD as written.
+
+**Observations (DEV, for reading, not rules):**
+
+1. **The effect is decided at the two top cells of the turn-2.8 column and nowhere else.** At turn 2.8 it climbs with the opponent's speed (league7001: -0.034, +0.185, +0.696, +0.763; exploit7204: -0.072, -0.466, +0.697, +1.083); at turn 2.4 and below it is within -0.21 to +0.19 at every speed. By the registered rule that is AND: the strong speed alone (B) and the strong turn alone (A) do nothing.
+2. **It sits where the unchanged hunter is near parity.** At the two helped cells the BASE edge is +0.43 and +0.02 (league7001) and +0.51 and +0.05 (exploit7204); at the cells that do nothing it is +1.4 to +2.8, the hunter already well ahead, as the ceiling remark of Amendment A item 2 said. **Post-hoc:** the "gate" this read finds is in part the place where the opponent evades well enough that there is anything left to gain; this read cannot separate the two.
+3. **A possible cost where the opponent turns hard and is slower, under the bar.** exploit7204 against the (3.0, 2.8) opponent is **-0.466 (z -2.7)**, and the speed-3.0 cell of league7001 is +0.185: the same sign flip along speed at turn 2.8 that the reach read found as league7103's cost (-0.5; evadeSpeed 3.55, evadeTurn 2.80). Not decided here (0.034 under the bar), one base, one set; **HELD's RG5 will say.**
+4. **A small constant cost at the ceiling for exploit7204:** -0.071 to -0.073 in twelve cells (z -1.1 each), against -0.002 to -0.034 for league7001: the slower hunter loses a little more than 0.07 in the same way whatever the opponent's pair, when it is already far ahead. Under every bar; not a rule.
+5. **The count is two, so "four or more" (45) did not come true, and the gates sit at the top of both grids** (the speed gate at 4.0, the turn gate at 2.8): 2.4 is not enough at speed 4.5 (-0.045 and -0.206).
+
+**What is NOT shown:** any HELD read; the surface between the grid's values (the turn gate is placed to within 0.4, the speed gate to within 0.5 or 1.0); a hunter with another body; any dose of trackSpeed; a mechanism.
