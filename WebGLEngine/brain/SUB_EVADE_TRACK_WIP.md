@@ -124,3 +124,7 @@ DEV is free to read. **HELD (119001 to 119048) is NOT flown by this note's work 
 5. **Seat edges are large and mostly cancel.** e.g. exploit7204 at 4.0 is 44-14-38 with seat A -0.807 and seat B +1.218; the two-seat edge (+0.205) is a small difference of two large numbers, as in every earlier read.
 
 **What is NOT shown:** any HELD read; a graded dose of league7100's other numbers; the effect against any opponent but the boat's own base; the shape between grid values (a peak inside the 0.5 steps); a mechanism for the stalemate at the slow end.
+
+## PREMISE UPDATE (2026-11-16, after the move round's HELD; not an amendment: no rule, forecast, set or arm of this note changes)
+
+The premise of this note said the move round's HELD was waiting for Keith's word. **It has been flown** (`SUB_EVADE_MOVE_WIP.md`, HELD RESULT, geometries 117001 to 117048, flown once): R0 held and the headline was **TRACKSPEED** again: trackSpeed alone grafted onto league7001 and exploit7204 is **+0.820 and +0.908**, taken out of league7100 **-0.863 and -0.871**, searchSpeed nothing. So the single-number claim that this round rests on now stands on **two sets of its own round (DEV and HELD)** and the ladder's two sets; **this note's own HELD is still not flown.**

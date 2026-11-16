@@ -79,3 +79,7 @@ Why these: the 13 finders share most of their doctrine with the two known bases 
 **4. A second statement of this note is imprecise, and is corrected here.** Section 2 says "every base's trackSpeed is 4.23 or more" and section 1 gives the other finders' trackSpeeds as 4.23 to 4.5. **league7001's is 4.07** (it is one of the two known bases, so section 1 named it separately); the lowest of the fourteen bases is league7001's 4.07, then league7102's 4.23. The conclusion drawn, that no arm is identical to its base, stands (every base's trackSpeed is above D, 3.15); the gate asserts it with the true bound (above 4.0).
 
 **5. What is not changed:** the bases, the arms, the sets, the rules R0 and RR1 to RR4, the forecasts, the geometries, the order of work.
+
+## PREMISE UPDATE (2026-11-16, after the move round's HELD; not an amendment: no rule, forecast, set or arm of this note changes)
+
+The premise of this note said the move round's HELD was waiting for Keith's word. **It has been flown** (`SUB_EVADE_MOVE_WIP.md`, HELD RESULT, geometries 117001 to 117048, flown once): R0 held and the headline was **TRACKSPEED** again: trackSpeed alone grafted onto league7001 and exploit7204 is **+0.820 and +0.908**, taken out of league7100 **-0.863 and -0.871**, searchSpeed nothing. So the single-number claim that this round rests on now stands on **two sets of its own round (DEV and HELD)** and the ladder's two sets; **this note's own HELD is still not flown.**
