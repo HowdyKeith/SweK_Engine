@@ -2687,9 +2687,9 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "fsr4-moving-lights",
-        blocker: "OPEN",
-        what: "Round 83 (section 188), set up and awaiting its harvest: only the lights move (section 176's speeds, their own stream, backwards from the measured frame so each still twin shares its references), on 24 new scenes (12 R 89000-89011, 12 C 90000-90011). H83a: U_TH beats Bt by the 1 % rule; H83b: Bt beats B1 -- does the history still pay when the light moves? Code: movingScenes.lightMotion, runMovingTest's `lights`.",
-        how: "node tools/denoiseStudy.mjs --harvest-upscale-temporal-test --round 83 on the rig, render/denoise-results-upscale-lights-r83.json committed byte for byte before it is read; section 189 reads it.",
+        blocker: "CLOSED",
+        what: "CLOSED, BOTH HOLD (section 189): with only the lights moving, U_TH's chain is 8.10 % below Bt's (19 of 24, sign-flip p 0.00010) and Bt is still 3.94 % below B1 (15 of 24, p 0.0116), C1-C5 holding. The history pays less than with the lights still (Bt over B1 9.18 % still) but it pays, and U_TH's gain over Bt is the still twins' (7.88 %). Bt's mean history is unchanged (5.12 against 5.13). Nothing changes in the chain; the luminance-change rejection, fixed to follow only a failed H83b, is not opened. Lead, not registered: the loss is almost all in family C (Bt over B1 7.15 % still, 0.68 % moving). P2 and P3 missed.",
+        how: "render/denoise-results-upscale-lights-r83.json, committed unread and re-derived by render/movingScenes-selfcheck.mjs section 16.",
         why: "Every scene in rounds 32-82 kept its lights still; a moving light leaves every history valid and wrong, the case that should hurt the history most.",
     },
     {
