@@ -81,7 +81,7 @@ if (has("--one")) {
     const wip = loadWip(), h27 = h27Sets(), s32 = s32Sets(), fixture = X.fixtureOf(), startVal = X.startVal(wip);
     const parts = Number(val("--parts", 4)), tmp = fs.mkdtempSync(path.join(os.tmpdir(), "h39-")), files = Array.from({ length: parts }, (_, p) => path.join(tmp, `part${p}.json`)), sfile = path.join(tmp, "sets.json");
     fs.writeFileSync(sfile, JSON.stringify({ h27, s32, fresh }));
-    console.log(`[h39] 1800-iteration champion: seed ${X.GROUPS.forEach((g) => X.champion(rows, g, 1800)).seed}; flying ${X.ARM_IDS.length} arms on ids ${range.from}-${range.to}, ${seconds} s, dark and lit, in ${parts} parts`);
+    console.log(`[h39] 1800-iteration champion: seeds ${X.GROUPS.map((g) => g + " " + X.champion(rows, g, 1800).seed).join(", ")}; flying ${X.ARM_IDS.length} arms on ids ${range.from}-${range.to}, ${seconds} s, dark and lit, in ${parts} parts`);
     const codes = await Promise.all(files.map((f, p) => new Promise((resolve) => {
         const child = spawn(process.execPath, [self, "--part", `${p}/${parts}`, "--sets-file", sfile, "--to-file", f, "--from", String(range.from), "--to", String(range.to), "--seconds", String(seconds)], { stdio: ["ignore", "inherit", "inherit"] });
         child.on("close", resolve);
