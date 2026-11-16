@@ -1316,3 +1316,28 @@ All four registered bottom lines: `ROUND 34'S FAILURE REPLICATES: THE SEAT'S HUL
 **Against the expectations of section 6 (written first).** About 14 crushes expected: 9 came. V1 replicates, about 80: held. V2 the Round 8 seat holds, about 75: held. V3 the shift crushes, about 70: held. V4 going back costs score, about 55: held.
 
 **WHAT THIS MEANS and does not.** The Round 33 shift is a trade, and both sides of it are now measured on the same dives. **With a sound gauge it is worth +0.029 on deep-and-far dives; with a gauge reading 0.10 high it costs 9 crushed boats of 300 (3 percent), where the Round 8 constants lose none.** Because a crushed dive scores 0 and the score already counts it, the shifted seat still scores a little higher under bias (+0.007, not distinguishable from zero). So the score alone will never choose against the shift: whether 3 percent crushed under a faulty gauge is acceptable is the cost judgement the series has twice left to Keith (`hull-cost-of-a-crushed-boat`). This round does not change the shipped constants. Shifts between 0 and -0.06, other biases, and any gauge-health check that would let the seat know its gauge is wrong are not tested.
+
+# Round 36 -- the shift curve under a biased gauge: the seat at low 0, -0.02, -0.04 and -0.06, sound gauge and +0.10 bias, so that the hull-cost choice can be made on measured numbers (REGISTERED 2026-11-16, before any code and before any of its seeds was flown)
+
+## 1. Why
+Round 35 measured the two ends: the shipped shift (-0.06) is worth +0.029 at a sound gauge on deep-and-far dives and crushes 9 of 300 under a gauge reading +0.10 high; no shift crushes none. What a crushed boat is worth is Keith's call (`hull-cost-of-a-crushed-boat`), and it is easier to make on a curve than on two points. This round measures the two shifts between, with the two ends again, on one fresh set.
+
+## 2. The arms, conditions and seeds
+- **Arms:** the shipped seat's planner and profile (`plannerPerturbed.perturbedSeat`, profile `standard`) on the Round 8 constants with low moved by **0 (L0), -0.02 (L-0.02), -0.04 (L-0.04), -0.06 (L-0.06, the shipped seat)**, nothing else changed.
+- **Conditions:** REF (noise sd 0.10, 1 Hz) and BIAS (the same plus +0.10, Round 34's fault).
+- **Seeds:** **48001-48300, kind `both` (300 dives per arm and condition)**, unused anywhere in the tree; the gate flies only 48901-48902.
+
+## 3. Checks (a failure: the verdicts are NOT WEIGHED)
+GENERATOR; SIZES; ALIGNED; THE FAULT REACHES THE PILOT (every arm's BIAS differs from its REF on at least one dive); THE SHIFTS DIFFER (each pair of arms differs on at least one REF dive); L-0.06 IS THE SHIPPED SEAT (its pilot is `surveyPilot()` on two gate dives, fingerprint for fingerprint).
+
+## 4. The verdicts (hull: Round 33's test, b - b0 <= 2 x sqrt(b + b0), crushed plus stranded; score: the series' 2 se)
+- **Per shift, the hull:** `L-0.0x HOLDS ITS HULL UNDER BIAS` iff its BIAS count passes the test against its own REF count; `PAYS MORE UNDER BIAS` otherwise.
+- **Per shift, the gain:** its REF score minus L0's REF score, paired: KEEPS (positive beyond 2 se), LOSES or HURTS.
+- **The bottom line:** `THE LARGEST SHIFT THAT HOLDS ITS HULL UNDER BIAS AND KEEPS A GAIN IS LOW -0.0x (+gain at a sound gauge)` -- the largest |shift| that both holds and KEEPS; `NO SHIFT HOLDS ITS HULL UNDER BIAS AND KEEPS A GAIN` if none does.
+**REPORTED, NOT IN THE VERDICT, for Keith's choice:** each arm's mean and crushed / stranded count in both conditions; each shift's gain over L0 under BIAS; each shift's extra crushed dives under BIAS over L0's; and the break-even price per crushed boat at which the shift's sound-gauge gain equals its bias crushes, stated as score points per crushed boat (gain x 300 / extra crushes), with the plain warning that it assumes the gauge is biased on every dive.
+
+## 5. Expectations, recorded BEFORE any seed is flown
+L-0.06 pays more under BIAS: about 90 (it did twice). L-0.04 pays more: about 50. L-0.02 pays more: about 20. L0 holds: about 95. Gains at REF: L-0.06 KEEPS about 90; L-0.04 KEEPS about 70; L-0.02 KEEPS about 40. The bottom line names L-0.04: about 35; L-0.02: about 30; none: about 25; L-0.06: about 10.
+
+## 6. What will be built
+`tools/ship/gaugeCurve.mjs` (on `gaugeShift.mjs`'s chunks and `gaugeFaults.mjs`'s gauge, difference and hull test), `tools/ship/gaugeCurveCmd.mjs` (`run`, `report`), `tools/ship/gaugeCurve-selfcheck.mjs` with a mutation pass; then the run once and the report read once. **NOT IN THIS ROUND:** choosing or shipping a shift (Keith's), other biases, the rule arms, other dive kinds.
