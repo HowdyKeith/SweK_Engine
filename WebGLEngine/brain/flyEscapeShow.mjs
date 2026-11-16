@@ -5,7 +5,8 @@
 // tools/ship/flyEscapeReflex.mjs), and this file plays their flies -- the same environment, the same episodes, the weights read from the rounds' own committed results.
 //
 // THE FLIES (KINDS). Five need no file: the four written by hand (brain/rl/escapeEnv.mjs RULES: freeze, hide, fleeAll, reflex) and `told`, which is told each mover's kind. Five are a round's
-// trained arm (FLY, SHUF, PLAIN, FISH, MLP), draw 1 to 16, whose weights are the record's in that round's results file (ROUNDS).
+// trained arm (FLY, SHUF, PLAIN, FISH, MLP), draw 1 to 16, whose weights are the record's in that round's results file (ROUNDS). Round 5 has its own four flies (VISION_ARMS) and round 6 its own
+// three (DEGREE_ARMS) on its own draws, 17 to 48 (drawsOf).
 //
 // THE PICTURES ARE RAY-CAST FROM THE EPISODE'S OWN VOXELS: a ray a pixel, through the house's blocks (the plan's cells, the same the environment stamped into its world), the ground, the mover (a
 // sphere of the environment's radius at the height of the fly's eye) and, in the outside view, the fly. No GPU: the page is to open anywhere, and the gate holds the pictures without a browser.
@@ -15,7 +16,7 @@
 //                              THE MOVER'S DISC IN THIS PICTURE IS WHAT THE ENVIRONMENT CALLS ITS ANGULAR SIZE, and how fast it grows is the looming rate.
 // Both return { width, height, data (RGBA bytes), hash }.
 //
-//   ROUNDS, KINDS, ARMS, LABELS, COLOURS, CAM, EYE_ELEV, EYE_HEIGHT
+//   ROUNDS, KINDS, ARMS, LABELS, COLOURS, CAM, EYE_ELEV, EYE_HEIGHT; armsOf(round), drawsOf(round)
 //   policyFor(round, arm, s)                 that round's untrained fly of an arm and a draw (tools/ship/flyEscape.mjs's policyOf, which a page cannot load: it reads files)
 //   flyOf(kind, { round, draw, record })     { kind, round, draw, act(obs, env) }
 //   episode(fly, seed, opts)                 { seed, plan, food, frames: [{ t, x, z, heading, home, inRoom, atFood, fed, mover, obs }], ticks, ret, caught, fed, log, hash }
@@ -29,6 +30,7 @@ import * as P from "./rl/paintCircuitPolicy.mjs";
 import { ReflexStart } from "./rl/reflexStart.mjs";
 import { CarryCircuitPolicy } from "./rl/carryCircuit.mjs";
 import { MaskedCircuitPolicy } from "./rl/maskedCircuitPolicy.mjs";
+import { degreeShuffle } from "./rl/degreeShuffle.mjs";
 import * as GFT from "./gfVisualTopology.mjs";
 import { unpackWeights, recordsOf } from "./voxelHomeShow.mjs";
 
@@ -39,23 +41,28 @@ export const ROUNDS = Object.freeze({
     3: Object.freeze({ file: "brain/flyEscapeFreshRound.jsonl", start: "reflex", label: "round 3: started at the reflex, trained on fresh episodes (the best flies)" }),   // 2026-11-16: the same flies, a trainer whose episodes change (tools/ship/flyEscapeFresh.mjs)
     4: Object.freeze({ file: "brain/flyEscapeMemoryRound.jsonl", start: "reflex", memory: true, label: "round 4: round 3 with memory between ticks (no MLP)" }),   // 2026-11-16: brain/rl/carryCircuit.mjs; the MLP has nothing to carry and is not in the round   // 2026-11-15: the fly is half the reflex plus its network (brain/rl/reflexStart.mjs)
     5: Object.freeze({ file: "brain/flyEscapeVisionRound.jsonl", start: "reflex", vision: true, label: "round 5: the real Giant Fiber circuit, seeing only size and looming (its own four flies)" }),   // 2026-11-16: tools/ship/flyEscapeVision.mjs
+    6: Object.freeze({ file: "brain/flyEscapeDegreeRound.jsonl", start: "reflex", vision: true, degree: true, draws: Object.freeze([17, 48]), label: "round 6: the real circuit, a shuffle that keeps every cell's counts, and a free shuffle (draws 17 to 48)" }),   // 2026-11-16: tools/ship/flyEscapeDegree.mjs
 });
 export const ARMS = Object.freeze(["FLY", "SHUF", "PLAIN", "FISH", "MLP"]);
 // Round 5's arms (tools/ship/flyEscapeVision.mjs, which a page cannot load): the 42 real cells of brain/gfVisualTopology.mjs, the looming rate (number 2) into each LC4 cell and the size (number 1) into
 // each LPLC2 cell, read from the two Giant Fibers; a connection starts at 0.01 x its synapse count; a shuffle puts the same strengths in shuffledEdges(42, 369, 7000 + the draw)'s places.
 export const VISION_ARMS = Object.freeze(["GF", "GSHUF", "FREE", "GNONE"]), VISION = Object.freeze({ size: 1, loom: 2, freeUnits: 113, shuffleSeed: 7000, gain: 0.01 });
+// Round 6's arms (tools/ship/flyEscapeDegree.mjs): round 5's GF and GSHUF, and GDEG, whose connections are brain/rl/degreeShuffle.mjs's shuffle of the real ones by DEGREE_SEED + the draw.
+export const DEGREE_ARMS = Object.freeze(["GF", "GDEG", "GSHUF"]), DEGREE_SEED = 9000;
 /** The arms a round's flies come from. */
-export const armsOf = (round) => { const R = ROUNDS[round]; if (!R) throw new Error(`flyEscapeShow: no round ${round} (the rounds are ${Object.keys(ROUNDS).join(", ")})`); return R.vision ? VISION_ARMS : R.memory ? ARMS.filter((a) => a !== "MLP") : ARMS; };
+export const armsOf = (round) => { const R = ROUNDS[round]; if (!R) throw new Error(`flyEscapeShow: no round ${round} (the rounds are ${Object.keys(ROUNDS).join(", ")})`); return R.degree ? DEGREE_ARMS : R.vision ? VISION_ARMS : R.memory ? ARMS.filter((a) => a !== "MLP") : ARMS; };
+/** The first and the last draw a round's flies have: 1 to 16 unless the round says its own. */
+export const drawsOf = (round) => { const R = ROUNDS[round]; if (!R) throw new Error(`flyEscapeShow: no round ${round} (the rounds are ${Object.keys(ROUNDS).join(", ")})`); return R.draws ? [...R.draws] : [1, DRAWS]; };
 function visionPolicy(arm, s) {
     const inputs = [...GFT.LC4.map((u) => [u, VISION.loom]), ...GFT.LPLC2.map((u) => [u, VISION.size])], units = GFT.NEURON_ORDER.length, start = GFT.SYNAPSES.map((n) => n * VISION.gain), out = [...GFT.GF];
     if (arm === "FREE") return new MaskedCircuitPolicy({ obsDim: OBS_DIM, units: VISION.freeUnits, inputs: Array.from({ length: VISION.freeUnits }, (_, u) => [[u, VISION.loom], [u, VISION.size]]).flat(), edges: [], outputs: Array.from({ length: VISION.freeUnits }, (_, u) => u), seed: s });
     if (arm === "GNONE") return new MaskedCircuitPolicy({ obsDim: OBS_DIM, units, inputs, edges: [], outputs: out, seed: s });
-    return new MaskedCircuitPolicy({ obsDim: OBS_DIM, units, inputs, edges: arm === "GF" ? GFT.EDGES.map((e) => [e[0], e[1]]) : P.shuffledEdges(units, GFT.EDGES.length, VISION.shuffleSeed + s), outputs: out, edgeStart: start, seed: s });
+    return new MaskedCircuitPolicy({ obsDim: OBS_DIM, units, inputs, edges: arm === "GF" ? GFT.EDGES.map((e) => [e[0], e[1]]) : arm === "GDEG" ? degreeShuffle(GFT.EDGES.map((e) => [e[0], e[1]]), DEGREE_SEED + s) : P.shuffledEdges(units, GFT.EDGES.length, VISION.shuffleSeed + s), outputs: out, edgeStart: start, seed: s });
 }
-export const KINDS = Object.freeze(["reflex", "fleeAll", "hide", "freeze", "told", ...ARMS, ...VISION_ARMS]);
+export const KINDS = Object.freeze(["reflex", "fleeAll", "hide", "freeze", "told", ...ARMS, ...VISION_ARMS, "GDEG"]);
 export const LABELS = Object.freeze({ reflex: "written by hand: the reflex (looms on a steady bearing)", fleeAll: "written by hand: flees from everything", hide: "written by hand: never leaves home", freeze: "written by hand: never flees",
     told: "told which movers are strikes", FLY: "trained: the fly's wiring", SHUF: "trained: the fly's wiring, shuffled", PLAIN: "trained: a plain net of its size", FISH: "trained: the fish's wiring", MLP: "trained: a small standard net",
-    GF: "round 5: the real Giant Fiber circuit (42 cells)", GSHUF: "round 5: the same cells, connections shuffled", FREE: "round 5: a free net on the same two numbers", GNONE: "round 5: the cells with no connections (stays the reflex)" });
+    GF: "rounds 5 and 6: the real Giant Fiber circuit (42 cells)", GSHUF: "rounds 5 and 6: the same cells, connections shuffled freely", GDEG: "round 6: the same cells, shuffled keeping every cell's counts", FREE: "round 5: a free net on the same two numbers", GNONE: "round 5: the cells with no connections (stays the reflex)" });
 export const CLOCK = 10;   // the observation's eleventh number is the episode's clock (brain/rl/escapeEnv.mjs); a remembering fly forgets when it reads 0
 export const DRAWS = 16, PLAIN_UNITS = 55, MLP_HIDDEN = Object.freeze([16, 16]);
 export const COLOURS = Object.freeze({ wall: [185, 178, 163], glass: [127, 200, 255], roof: [181, 83, 60], yard: [58, 92, 62], beyond: [34, 52, 38], food: [232, 196, 64], door: [138, 106, 60], sky: [120, 170, 230], horizon: [200, 222, 245],
@@ -66,7 +73,8 @@ export const CAM = Object.freeze({ az: 0.9, el: 0.42, dist: 16, fov: 0.9 }), EYE
 export function policyFor(round, arm, s) {
     const R = ROUNDS[round]; if (!R) throw new Error(`flyEscapeShow: no round ${round} (the rounds are ${Object.keys(ROUNDS).join(", ")})`);
     if (!armsOf(round).includes(arm)) throw new Error(R.memory && arm === "MLP" ? `flyEscapeShow.policyFor: round ${round} has no MLP (it has nothing to carry between ticks)` : `flyEscapeShow.policyFor: round ${round} has no arm ${arm} (its arms are ${armsOf(round).join(", ")})`);
-    if (!Number.isInteger(s) || s < 1 || s > DRAWS) throw new Error(`flyEscapeShow: no draw ${s} (the draws are 1 to ${DRAWS})`);
+    const [lo, hi] = drawsOf(round);
+    if (!Number.isInteger(s) || s < lo || s > hi) throw new Error(`flyEscapeShow: round ${round} has no draw ${s} (its draws are ${lo} to ${hi})`);
     const started = (inner, under) => (R.start === "reflex" ? new ReflexStart(inner, { rule: RULES.reflex, tail: under + 1 }) : inner);
     if (R.vision) { const inner = visionPolicy(arm, s); return started(inner, inner.out.length); }
     if (arm === "MLP") return started(new FlightPolicy({ hidden: [...MLP_HIDDEN], obsDim: OBS_DIM, actDim: ACT_DIM, seed: s }), MLP_HIDDEN[MLP_HIDDEN.length - 1]);
@@ -180,6 +188,7 @@ export function saidLines() {
         "The lower picture is from the fly's own eye, all the way round: the middle is straight ahead and the two edges are behind it, from 30 degrees below the horizon to 60 above, one lens a dot. The dark disc is the mover. How big it is, how fast it grows (it LOOMS) and how fast it slides sideways are three of the thirteen numbers the fly is given; a thing on a collision course grows while staying where it is in the picture.",
         "What the rounds found: trained from nothing, no fly learned to tell a strike from a harmless fly-by -- they go home for everything and score less than a fly written to do just that. The reflex written by hand (go home for what looms on a steady bearing) does better and is still caught by one strike in ten. Round 2 started every fly AT that reflex and trained a correction to it: most then do a little better than the reflex -- a hundredth and a half -- and still nothing like a fly that is told which movers are strikes. Round 3 gave the trainer new episodes every step: every fly then beats the reflex and is almost never caught (round 3's flies are the ones to watch). Round 4 gave them memory between ticks, which did not help.",
         "Round 5 is another kind of fly: the two Giant Fibers and forty of the real visual cells that feed them (LC4 and LPLC2, from the male fly's connectome), given only how big the mover looks and how fast it looms, with the answer read from the Giant Fibers alone. With the real wiring every training ends at the same good fly; with the same connections shuffled, twelve of sixteen do and four fail. It is the first round in which a real wiring was told from its shuffle -- as a surer training, not a better fly -- and it wants a second round before it is believed.",
+        "Round 6 is that second round, on 32 new trainings an arm (draws 17 to 48). The result came again: the real wiring escapes better than a free shuffle of it. But a shuffle that keeps how many connections each cell receives and sends -- and so keeps the heavy drive onto the two Giant Fibers -- could not be told from the real wiring at all. So what round 5 found is the convergence onto the cells that are read, not which cell is wired to which. The difference is small: about a thousandth of the score, and two failed trainings of 32 for the free shuffle against none.",
         "Not a fly's nervous system at work. The Giant Fiber Circuit is the fruit fly's real escape circuit, and a trained fly here is a small network with that circuit's wiring -- but it walks where a fly would take off, its cells are simple rectified sums and not neurons, and in rounds 1 to 4 its wiring could not be told apart from a shuffle of it. Round 5's forty visual cells are a fifth of the visual input a Giant Fiber has, and each is given one number where the real cell looks at its own patch of the eye.",
     ];
 }

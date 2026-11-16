@@ -60,12 +60,14 @@
 <script type="module">
 import * as S from "/brain/flyEscapeShow.mjs";
 
-const el = (id) => document.getElementById(id), out = el("out"), g = out.getContext("2d"), eye = el("eye"), ge = eye.getContext("2d"), files = new Map(), TRAINED = new Set([...S.ARMS, ...S.VISION_ARMS]);
+const el = (id) => document.getElementById(id), out = el("out"), g = out.getContext("2d"), eye = el("eye"), ge = eye.getContext("2d"), files = new Map(), TRAINED = new Set([...S.ARMS, ...S.VISION_ARMS, ...S.DEGREE_ARMS]);
 const small = document.createElement("canvas"); small.width = 180; small.height = 45; const gs = small.getContext("2d");
 const option = (sel, value, text) => { const o = document.createElement("option"); o.value = value; o.textContent = text; sel.appendChild(o); };
 for (const k of S.KINDS) option(el("kind"), k, S.LABELS[k]);
 for (const [n, R] of Object.entries(S.ROUNDS)) option(el("round"), n, R.label);
-for (let d = 1; d <= S.DRAWS; d++) option(el("draw"), d, String(d));
+// a round has its own draws (1 to 16; round 6's are 17 to 48): the list is the chosen round's, and a draw the round does not have becomes its first
+function fillDraws() { const sel = el("draw"), was = Number(sel.value), [lo, hi] = S.drawsOf(Number(el("round").value)); sel.textContent = ""; for (let d = lo; d <= hi; d++) option(sel, d, String(d)); sel.value = String(was >= lo && was <= hi ? was : lo); }
+fillDraws();
 for (const line of S.saidLines()) { const p = document.createElement("p"); p.textContent = line; el("said").appendChild(p); }
 
 let ep = null, k = 0, playing = true, timer = null, token = 0; const cam = { ...S.CAM };
@@ -114,7 +116,8 @@ el("play").addEventListener("click", () => setPlaying(!playing));
 el("one").addEventListener("click", () => { if (!ep) return; setPlaying(false); if (k < ep.ticks) k++; paint(); });
 el("again").addEventListener("click", () => { playing = true; el("play").textContent = "Pause"; start(); });
 // a fly belongs to some rounds and not others: choosing a fly moves the round to one that has it (round 5's four flies are round 5's alone)
-el("kind").addEventListener("change", () => { const kind = el("kind").value, r = el("round"); if (TRAINED.has(kind) && !S.armsOf(Number(r.value)).includes(kind)) r.value = S.VISION_ARMS.includes(kind) ? "5" : "3"; });
+el("kind").addEventListener("change", () => { const kind = el("kind").value, r = el("round"); if (TRAINED.has(kind) && !S.armsOf(Number(r.value)).includes(kind)) { r.value = kind === "GDEG" ? "6" : S.VISION_ARMS.includes(kind) ? "5" : "3"; fillDraws(); } });
+el("round").addEventListener("change", fillDraws);
 for (const id of ["kind", "round", "draw", "seed"]) el(id).addEventListener("change", () => { playing = true; el("play").textContent = "Pause"; start(); });
 let drag = null;
 out.addEventListener("pointerdown", (e) => { drag = { x: e.clientX, y: e.clientY, az: cam.az, el: cam.el }; out.setPointerCapture(e.pointerId); });
