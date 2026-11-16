@@ -94,6 +94,44 @@ fly: the manoeuvre is mine, the price is the duel's, the cells are rectified sum
 ## 8. The cost
 36 trainings of about 9 minutes, four at a time: about an hour and a half. Resumable.
 
-## 9. The run (to be written; the gate never runs it and never gives the command the word `run`)
+## 9. The run (the gate never runs it and never gives the command the word `run`)
 `node tools/ship/takeFlyRam.mjs run` -> `brain/flyRamRound.jsonl`, committed byte for byte, whole, before it is read;
 `node tools/ship/takeFlyRam.mjs read` prints the checks and the reading.
+
+## 10. The result
+The run took 99.7 minutes. `brain/flyRamRound.jsonl` (38 records, sha256 `8f476618d4bbdda1...`) was committed whole at
+8169ef64 before it was read, and read once. The checks hold: 36 draws each once, the registered recipe, each arm's weight
+count and wiring, GF draw 1 the same twice, and the untrained craft of every arm scoring the pilot's 16.5092 to the bit.
+
+- **P: A CRAFT WITH THE FLY'S ESCAPE CIRCUIT AS ITS COLLISION REFLEX CANNOT BE TOLD APART FROM ITS PILOT ALONE** -- none
+  above, none below, 12 equal; p 1. Said with it: every one of the 12 is the pilot, to the bit. Their weights moved in
+  training (none is the start's), but not one breaks on one tick of the 200 audit games, so each flies the pilot's games.
+- **H: A CRAFT WITH THE FLY'S ESCAPE CIRCUIT AS ITS COLLISION REFLEX FLIES BETTER THAN ONE WITH THE REFLEX WRITTEN BY HAND**
+  -- 12 of 12 above 13.5227, p 4.9e-4. This is the pilot's number against the hand rule's and says nothing for the circuit:
+  the 3-second rule cuts ram damage from 8.981 to 3.740 hit points a game and costs more fight than that (14.15 against
+  18.01).
+- **T1: AS A COLLISION REFLEX THE REAL ESCAPE CIRCUIT'S WIRING CANNOT BE TOLD APART FROM A SHUFFLE OF IT** -- ranks 156,
+  the middle 150, p 1.
+- **T2: AS A COLLISION REFLEX THE REAL ESCAPE CIRCUIT CANNOT BE TOLD APART FROM A FREE NET ON THE SAME TWO NUMBERS** --
+  ranks 168, p 1.
+
+| | reward | fight | W / L of 200 | games with a ram | hit points to rams a game | never break |
+|---|---|---|---|---|---|---|
+| the pilot alone | 16.5092 | 18.0060 | 150 / 21 | 100 | 8.981 | |
+| GF (12 craft) | 16.5092 | 18.0060 | 150 / 21 | 100 | 8.981 | 12 of 12 |
+| GSHUF | 16.4339 | 17.9136 | 149.0 / 22.3 | 99.8 | 8.878 | 9 of 12 |
+| FREE | 16.3548 | 17.8045 | 148.5 / 22.8 | 101.0 | 8.698 | 7 of 12 |
+| hand reflex (3 s) | 13.5227 | 14.1461 | 127 / 25 | 60 | 3.740 | |
+| break always | 4.0347 | 4.6628 | 13 / 62 | 60 | 3.768 | |
+
+28 of the 36 craft never break. Of the 8 that do, six are below the pilot and two above (draw 8 of GSHUF and of FREE,
+16.5664 and 16.6984). No craft rams less and flies no worse: the two above take the pilot's ram damage to the bit and
+break a fifth of a tick a game; what they gain is fight, and one craft of 12 above is no finding. The craft that rams least
+(FREE draw 3, 6.296 hit points) has more games with a ram, 112, and the round's worst reward. The careful profile's bar,
+half the pilot's ram damage, is met by no arm and no craft; the least any craft keeps is 70 percent.
+
+Against section 6: P CANNOT (60) came; H BETTER (80) came; T1 and T2 CANNOT (75, 70) came; at least half never breaking
+(45) came; an arm at half the pilot's ram damage (3) did not. What section 2 leaned to is what the round says: for this
+pilot, with this break and at the duel's own price for a ram, the best reflex found is the one that stays shut. That is a
+statement about the manoeuvre and the price as much as the circuit; the round cannot say which wiring would time a better
+break, because no arm found a break worth timing.
