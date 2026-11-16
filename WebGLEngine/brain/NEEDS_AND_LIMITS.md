@@ -1271,3 +1271,32 @@ All five registered bottom lines: `THE FILTER IS NOT A LIABILITY UNDER ANY FAULT
 - **The filter is not a liability; but the control I registered is weaker than the verdict sounds.** R8-RAW is the Round 8 constants with alpha 1, and those constants were tuned WITH the filter: without it the rule chatters on noise sd 0.10 and crushes or strands 81 of 300 dives with a sound gauge. So "removing the filter from these constants is far worse under every fault" is shown (-0.45 to -0.63); "a filter-free rule tuned for itself would not do better under a fault" is not.
 - **DROP costs nothing measurable** for the rules and -0.011 (1.9 se) for the seat; a stale half-minute is short against how slowly the charge moves.
 - **Not shown:** why the BIAS failures are crushes and not strandings (not traced: the depth cap, the trip and the planner's rollouts all read the charge); a pessimistic gauge; a bias other than 0.10; BIAS with DMG or STN5; whether the seat at the Round 8 constants (no shift) would hold its hull under BIAS -- that arm was not flown, and is the obvious next question. Nothing is changed or shipped by this round.
+
+# Round 35 -- is the Round 33 shift what crushes the seat under a biased gauge: the shipped seat against the same seat on the Round 8 constants, +0.10 bias, fresh dives (REGISTERED 2026-11-16, before any code and before any of its seeds was flown)
+
+## 1. Why
+Round 34 found one registered failure: under a gauge reading +0.10 high, the shipped seat (twin planner, Round 33 constants, low -0.06) crushed 7 of 300 dives and the L06 rule 8, all deep-and-far, while the Round 8 rule crushed none. The reading offered was that an optimistic gauge acts as a lower trip point, and the -0.06 shift had already spent the margin. The arm that tests that reading -- the same seat on the Round 8 constants -- was not flown. If it holds its hull where the shipped seat does not, the shift is the cause, and what it buys (Round 33: +0.02 at a sound gauge) has a price in a biased one.
+
+## 2. The arms and conditions
+- **SEAT:** the shipped seat, `surveySeat.surveyPilot()` (twin planner, `SURVEY_CONSTANTS`, profile `standard`).
+- **SEAT-R8:** the same planner and profile on the Round 8 constants (`SURVEY_R8`, low 0.380), nothing else changed.
+- **REF:** noise sd 0.10 at 1 Hz. **BIAS:** the same plus +0.10 on every reading (Round 34's fault, `gaugeFaults.FAULTS.BIAS`).
+
+## 3. The seeds
+**45001-45300, kind `both` only (300 dives per arm and condition)**: every Round 34 crush was a `both` dive, so the round spends its dives there. Nothing in the tree uses these seeds. The gate flies only 45901-45902, on shortened dives.
+
+## 4. Checks (a failure: the verdicts are NOT WEIGHED)
+GENERATOR (needsTask.scenario); SIZES (300 each); ALIGNED (the same scenarios in the same order everywhere); THE FAULT REACHES THE PILOT (each arm's BIAS dives differ from its REF dives on at least one dive); THE ARMS DIFFER (SEAT and SEAT-R8 differ on at least one REF dive).
+
+## 5. The verdicts (the hull test is Round 33's, b - b0 <= 2 x sqrt(b + b0), on crushed plus stranded dives; the score margin is the series' 2 se)
+- **V1, replication:** `ROUND 34'S FAILURE REPLICATES: THE SEAT'S HULL PAYS MORE UNDER BIAS` iff SEAT under BIAS fails the test against SEAT under REF; `... DOES NOT REPLICATE` otherwise.
+- **V2, the Round 8 constants:** `THE SEAT ON THE ROUND 8 CONSTANTS HOLDS ITS HULL UNDER BIAS` iff SEAT-R8 under BIAS passes the test against SEAT-R8 under REF; `... PAYS MORE UNDER BIAS` otherwise.
+- **V3, the cause:** `THE SHIFT IS WHAT CRUSHES` iff, under BIAS, SEAT's bad dives fail the test against SEAT-R8's (SEAT has more, beyond the test); `THE SHIFT IS NOT SHOWN TO CRUSH` otherwise.
+- **V4, the price of going back:** SEAT-R8 minus SEAT at REF, pooled and paired: `GOING BACK TO THE ROUND 8 CONSTANTS COSTS SCORE` iff negative beyond 2 se; `... COSTS NO SCORE THE TEST CAN SEE` otherwise. Under BIAS the same difference is reported, not weighed.
+**REPORTED, NOT IN THE VERDICT:** each arm's mean and crushed / stranded count by condition, each arm's bias cost (BIAS minus REF, paired), the start damage of every crushed dive.
+
+## 6. Expectations, recorded BEFORE any seed is flown
+Round 34 crushed 7 of its 150 `both` dives under BIAS (4.7 percent), so about 14 of 300 are expected here. V1 replicates: about 80 percent. V2, the Round 8 seat holds: about 75. V3, the shift is what crushes: about 70. V4, going back costs score at REF (Round 33's rule gain was +0.024 and the twin's +0.016 on top): about 55.
+
+## 7. What will be built
+`tools/ship/gaugeShift.mjs` (library, on `gaugeFaults.mjs`'s gauge, difference and hull test), `tools/ship/gaugeShiftCmd.mjs` (export-free: `run`, `report`), `tools/ship/gaugeShift-selfcheck.mjs` with a mutation pass. Then the run, once, and the report, read once. **NOT IN THIS ROUND:** shifts between 0 and -0.06, other biases, the rule arms, changing or shipping any constant.
