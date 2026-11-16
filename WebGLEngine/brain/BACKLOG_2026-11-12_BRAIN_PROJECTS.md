@@ -294,9 +294,22 @@ its own entry above.)
 | `two-flies-merged` | "Surgically merge two flies": one network of two copies of a circuit with connections across. **Said plainly: the real circuit is already two halves, left and right, joined by exactly two connections between the Giant Fibers**; a merge of two whole flies has no anatomy to follow, so every joining connection would be invented | each half's wiring | the joins; and a body: four legs is not a fly's six, and the tree holds no leg circuit at all | for walking: the leg circuits of the nerve cord, which the male connectome has and the tree does not |
 | `fly-paints-what-it-sees` | The fly-wired painter (`painting-fly`, done: its wiring could not be told from a shuffle) given the picture from the fly's own eye on the escape page as the thing to paint | the eye picture is the escape task's own | the painter is handed the picture as numbers; nothing is seen through visual cells. A picture of a looming disc is a simple target, so it would mostly test the painter | no |
 
-**If asked for an order:** round 6's reading first (it says whether anything finer than convergence is worth chasing); then
-`fly-pilots-6dof` (no new data, and it closes a gap); then `fly-eyes-left-right` and `fly-courts-fly`, which both wait on cells
-from the other chat.
+**Added 2026-11-16, after the collision reflex round** (Keith: "Let's add the rest to backlog if not there already. And commit
+so another chat could pick up a item."). None is registered unless it says so.
+
+| name | what | what it stands on | what is open | who has it |
+|---|---|---|---|---|
+| `fly-escapes-convergence-split` | Escape round 7: round 6 said the real wiring's edge over a free shuffle is the counts each cell has, not which cell connects to which. Split the counts: a shuffle that keeps only each cell's INCOMING counts, one that keeps only its OUTGOING counts, one that keeps only the drive onto the two Giant Fibers | round 6's code and records (`tools/ship/flyEscapeDegree.mjs`, `brain/FLY_ESCAPE_DEGREE_WIP.md`); no new data | the effect to split is a thousandth at the median, so "cannot tell" is likely | **TAKEN 2026-11-16 by the chat on `claude/tier-2-keys-patch-4lwhzk`; its registration note will be `brain/FLY_ESCAPE_SPLIT_WIP.md`** |
+| `fly-ram-sidestep` | The collision reflex again with another manoeuvre: a short sidestep that returns to the fight, and/or the circuit choosing the break's direction as well as its moment | `brain/rl/ramEnv.mjs`, `tools/ship/flyRam.mjs`, `brain/FLY_RAM_REFLEX_WIP.md` section 10: with the flee written by hand, the best reflex found stays shut, and two thirds of the rams begin under two seconds from contact | **SCOPE BY HAND FIRST (minutes): if no hand-timed sidestep beats the pilot alone's 16.5092 on the scoping seeds, there is nothing for a circuit to learn and the round is not to be run.** The ceiling is low | free |
+| `fly-watch-rounds-6-and-ram` | Page work, not a round: round 6's flies and the collision round's craft on a watch page (`fly-escape.html` plays rounds 1 to 5) | the records hold every fly's weights (`brain/flyEscapeDegreeRound.jsonl`, `brain/flyRamRound.jsonl`) | the collision craft need a 6-DOF view, and 28 of the 36 look exactly like the pilot | free |
+
+**To pick one up:** write its registration note and commit it before any code; mark the row TAKEN with the branch; follow the
+method in `brain/FLY_ESCAPE_DEGREE_WIP.md` (register, code, gate, sabotage, run, commit the results unread, read once). The
+fly vision data belongs to the chat on `claude/inspiring-mayer-9mdcut` and is used unmodified.
+
+**If asked for an order:** `fly-escapes-convergence-split` (taken); then the hand scoping of `fly-ram-sidestep`; then
+`fly-eyes-left-right` and `fly-courts-fly`, which both wait on cells from the other chat; `two-flies-merged` last, because
+every joining connection would be invented. (Round 6 and `fly-pilots-6dof`, first in the earlier order, are done.)
 
 Keith, 2026-11-13: "How else could the fly brain live in voxel world? Could it play minecraft or create something to attract a
 different fly brain?" and, of the five answers: "Yes, add those to the backlog". Each builds on `voxel-home` (`brain/rl/buildEnv.mjs`:
