@@ -26,7 +26,7 @@ reproduce its response. This round uses exactly that and no more: an LC4 cell is
 The fly is half the reflex's answer plus its network's output, the output layer at zero, as in rounds 2 and 3. The network:
 | arm | cells | what goes in | connections among them | what is read out | weights |
 |---|---|---|---|---|---|
-| **GF** | the 42 real cells | the looming rate into each of the 20 LC4 cells; the size into each of the 20 LPLC2 cells; nothing into the Giant Fibers | the 369 real ones | **the two Giant Fibers only** | 40 + 42 + 369 + 2 + 1 = 454 |
+| **GF** (see 3b: its connections start at 0.01 x their synapse counts) | the 42 real cells | the looming rate into each of the 20 LC4 cells; the size into each of the 20 LPLC2 cells; nothing into the Giant Fibers | the 369 real ones | **the two Giant Fibers only** | 40 + 42 + 369 + 2 + 1 = 454 |
 | **GSHUF** | the same 42 | the same | 369 connections placed by the draw's own shuffle among the 42 (`shuffledEdges(42, 369, 7000 + s)`) | the same two cells | 454 |
 | **FREE** | 113 units | the looming rate and the size into every unit | none | every unit | 226 + 113 + 113 + 1 = 453 |
 | **GNONE** | the same 42 | as GF | none | the two Giant Fibers | 40 + 42 + 2 + 1 = 85 |
@@ -45,6 +45,29 @@ environment's fly has no heading, so both sides' cells are given the same two nu
 (the lattice-to-visual-field calibration is not derived in that chat's note), so where the mover is does not choose which cells
 see it; (d) no memory between ticks; (e) in the animal the Giant Fiber fires for a take-off within milliseconds, and this fly
 must decide early enough to WALK home, so the reflex half (which uses the bearing) still does most of the work.
+
+## 3b. AMENDMENT, 2026-11-16, made after the code was written and BEFORE ANY TRAINING OF THE ROUND: the connections start at their synapse counts
+**What section 3 registered cannot be trained, and I found that out on a draw the round does not use.** With every connection at
+zero nothing reaches a Giant Fiber cell, the read-out sees silence, and no fly the trainer tries ever chooses differently from
+the reflex: every return is the same and the trainer does not move. On draw 901 (3 iterations, the round's 96 flies tried): GSHUF
+moved 0 of 454 weights and GNONE 0 of 85; GF moved once and its battery reading did not change; only FREE trained.
+
+**The amendment, one thing:** a connection starts at **0.01 x its synapse count** (so the 2,355 synapses onto the two Giant
+Fibers start as a real drive), and is learned from there. **GSHUF keeps the same 369 strengths and puts them in its shuffle's
+369 places**, so GF and GSHUF differ in where the strengths are and in nothing else. GNONE has no connections and so no
+strengths; it cannot train, by construction, and is kept as the arm that must stay the reflex. Section 3's "(a) the synapse
+counts are not used" is withdrawn: they are now the start. The 0.01 was chosen before it was tried, to bring a Giant Fiber's
+input to order 1, and was not adjusted.
+
+**On draw 901 with the amendment** (3 iterations): GF moved all 454 weights and its battery readings were 0.557, 0.684, 0.630
+(the reflex there: 0.674); GSHUF moved all 454 and its three readings were 0.674; FREE as before; GNONE 0 of 85. **What that
+shows before the round, and it bears on T1:** the real wiring converges 40 visual cells onto 2 Giant Fibers, so those two cells
+are driven hard and the two read-out weights have a long lever -- the trainer's noise changes the real-wired fly's choices much
+more than the shuffled one's. T1 may therefore turn on how far the trainer can move the read-out as much as on what the wiring
+computes. That is still a difference the wiring makes, and it is said here so it is not found later.
+
+**The expectations of section 6 were written before this and are left as written.** One is added: GNONE's 16 flies score the
+reflex's number exactly (it cannot move): about 95 percent.
 
 ## 4. The questions and the reading (each read ONCE from the committed records; alpha 0.01, two-sided, a tie counted against the claim)
 * **T1, THE WIRING: GF against GSHUF** -- the exact rank-sum, 16 against 16. Words: `THE REAL ESCAPE CIRCUIT'S WIRING ESCAPES
