@@ -67,3 +67,17 @@ node tools\ship\trainHelmSteer.mjs finish --circuit compass --records-dir brain\
 ```
 
 The last line ONCE, after the four searches. Send back its output, the two folders and the `helmCompassWeightsRig*` files.
+
+## 6. The steering circuit's search with THE THROTTLE LEFT TO THE RULE (added 2026-11-16; optional)
+
+Every trained helm so far won by throttling back and none put a weight on a synapse. `--circuit turn` keeps every child off the throttle output, so what is left to find is steering. Pairs of its own (train 27001-, held-out 28001-, audit 29001-). Cost as steps 1 and 2.
+
+```
+node tools\ship\trainHelmSteer.mjs search --circuit turn --seed 9710 --iters 1000 --record brain\rig-results\helmTurnRig\s9710.json
+node tools\ship\trainHelmSteer.mjs search --circuit turn --seed 9711 --iters 1000 --record brain\rig-results\helmTurnRig\s9711.json
+node tools\ship\trainHelmSteer.mjs search --circuit turn --wiring control:4242 --seed 9730 --iters 1000 --record brain\rig-results\helmTurnRigControl\s9730.json
+node tools\ship\trainHelmSteer.mjs search --circuit turn --wiring control:4242 --seed 9731 --iters 1000 --record brain\rig-results\helmTurnRigControl\s9731.json
+node tools\ship\trainHelmSteer.mjs finish --circuit turn --records-dir brain\rig-results\helmTurnRig --control-records-dir brain\rig-results\helmTurnRigControl --out brain\helmSteerTurnWeightsRig.json --write
+```
+
+The last line ONCE, after the four searches.

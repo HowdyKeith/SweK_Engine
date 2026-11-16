@@ -51,6 +51,11 @@
     "path": "brain/RIG_COMMANDS_2026-11-15_HELM_STEER.md",
     "title": "Rig commands: the fly's steering circuit at the helm, against a random circuit",
     "why": "A helm searched over the fly's own steering circuit, and the same search over a random circuit of its size, so that a result can say whether the wiring mattered."
+   },
+   {
+    "path": "brain/RIG_COMMANDS_2026-11-16_TRACK_SEAT.md",
+    "title": "Rig commands: the fly's target-tracking circuit in the gun seats, against a random circuit",
+    "why": "A gunner searched over the fly's visual pursuit pathway in the fight where a trigger is worth learning, with a random circuit of its size as the control."
    }
   ],
   "sea-ogre.html": [
