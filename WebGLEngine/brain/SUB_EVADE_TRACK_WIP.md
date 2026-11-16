@@ -113,7 +113,7 @@ DEV is free to read. **HELD (119001 to 119048) is NOT flown by this note's work 
 
 **The forecast quantities as printed** (scored on HELD, not here): RD1 yes; onset above D no; onset at D yes; not replicated no; slow end pays no; slow end costs no; slow end mixed yes; the arm at 2.0 pays on both yes; both peaks at 3.0 or below yes; the donor's arm at 4.5 costs yes.
 
-**Said plainly about this read:** the smoke report (Amendment A item 1) had the same headline, "ONSET AT D / SLOW END MIXED", on four training geometries at 8 duels a matchup, and the same lowest arms at exactly 0 draws. That is not independent evidence, and DEV is a different set of 48 geometries, but **I saw the smoke headline before writing any DEV rule down as read**: the forecasts for it (30 for "onset at D", 40 for PAYS, which did not come true) are scored on HELD as written.
+**Said plainly about this read:** the smoke report (Amendment A item 1) had the same headline, "ONSET AT D / SLOW END MIXED", on four training geometries at 8 duels a matchup, with league7100's own arms from 1.0 to 3.5 drawing all eight duels (0-8-0). That is not independent evidence, and DEV is a different set of 48 geometries, but **I saw the smoke headline before writing any DEV rule down as read**: the forecasts for it (30 for "onset at D", 40 for PAYS, which did not come true) are scored on HELD as written.
 
 **Observations (DEV, for reading, not rules):**
 
