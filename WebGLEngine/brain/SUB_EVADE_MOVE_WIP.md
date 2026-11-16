@@ -75,3 +75,13 @@ Why these: the movement group carried the lead on both sets by large margins (0.
 ## 7. Cost
 
 28 matchups of 96 duels a set, about three minutes of one core; the command, its gate and a sabotage pass are the work.
+
+## AMENDMENT A (2026-11-16; written after the command and its gate and after the smoke run, BEFORE any geometry of the DEV set 116001 to 116048 or of HELD is flown)
+
+**1. The smoke headline, said before any DEV geometry (the rule of section 3).** The command's `smoke` was run on geometries 1 to 4 (8 duels a matchup; never recorded; free to read). Its headline was **"TRACKSPEED"**: R0 holds on it (league7100 over league7001 +1.902, over exploit7204 +1.548); the movement set M is sufficient for both comparators (RM1 yes); **K (trackSpeed) is sufficient for both (+1.517 and +1.181) and necessary for both (-1.525 and -1.546)**; S (searchSpeed) is not sufficient and not necessary (its lesions against league7100 are exactly 0, 0-8-0, on these four geometries); A and E are not sufficient (+0.754 and +0.381 against league7001, z 1.0; about 0 against exploit7204); P is not sufficient (RP1 no); Q's graft onto exploit7204 is not decided (-0.002). Eight duels on four geometries are a smoke test and not a reading (the z values of a deterministic 4-4-0 are not evidence), and **the forecasts of section 5 stand as written before it was seen, and are scored as written; but I have seen this headline, and the 40 given to TRACKSPEED is no longer a blind number: the DEV read and HELD are the evidence, and the smoke is not counted in them.**
+
+**2. One void-check added to section 4's list (an identity, said before data):** *an arm identical to its base has an edge of exactly 0* (a row flagged `identical` with any other edge voids the read; the two Q arms against league7001 are such rows by the files' own numbers). It is the 8th check, after the arm check, and is in the command and its gate.
+
+**3. The report's column of set keys is padded to 53 characters** (the length of the set of five), so the three sets align; the first printing padded to 40 and misaligned MP. A formatting change, made after the first gate run and before the smoke report was pinned.
+
+**4. What is not changed:** the units, the arms, the sets, the rules R0, RM1 to RM3, RP1 and RP2, the forecasts, the geometries, the order of work.
