@@ -369,3 +369,23 @@ The designated arm `any+predict+edge+yield` left the region on HELD5 seeds 504, 
 4. **The fallback asks for a turn the vessel cannot make in the room left.** The straight bearing is 70-145 deg off the vessel's heading; at 3 m/s the turn needs about 35 m (the turning radius the notes give) and 20-24 m remain. The vessel leaves 9-13 s later (at x = 119, 270, 217, 316, as recorded). `+yield` does not slow it: it slows only for a ship conflict, and by then none is in front.
 
 **What this says, and does not.** The band is a wall for the PLAN only; nothing in the arm slows or turns the vessel when the plan has no route, so a vessel that enters the band at speed and square to it leaves. Two changes follow from the trace and are NOT tested here: free the edge cells around the vessel as `own` frees the shapes (so a route always exists from where it is, pointing inward), and slow to the yield speed while the vessel's cell is blocked. Neither touches the 14 ship collisions, which are the other half of the entry; a give-way move is the registered round's question.
+
+## FOLLOW-UP 6: GIVE WAY, AND A WAY OUT OF THE EDGE BAND (Keith, 2026-11-16: "lets do all 3 next steps", the third being `nav-traffic-avoid-not-slow`; REGISTERED 2026-11-16, before any code and before any of its seeds was flown)
+
+**Why.** HELD5 left two failures in the traffic kind: 14 collisions with ships that a 2 m/s slow-down did not prevent, and 4 exits, which the diagnosis above traced to a vessel standing inside the blocked edge band with no route from its own cell. This round adds one fix for each and flies them alone and together.
+
+**The two options (new, in a new module; `brain/subHardNav.mjs` is not edited).**
+- **`+free`:** when a plan is rebuilt, the cells within OWN_CLEAR (15 m) of the vessel are freed of the EDGE as well as of shapes, so a route always starts where the vessel is; and while the vessel's own cell is in the blocked edge band of the plan in force, its speed target is YIELD_SPEED (2.0 m/s).
+- **`+giveway`:** when `shipConflict` fires (the same test `+yield` uses: a ship within r + half-hull + 20 m in the next 30 s, the vessel holding heading and speed), the vessel steers instead of only slowing: of the headings within +-90 deg of the plan's target heading, in 5 deg steps, nearest the target first (a tie to the turn to starboard, that is to the smaller heading), it takes the first whose straight run at its present speed for the next 30 s keeps every ship farther than r + half-hull + 20 m and every point at least half-hull + 3 m inside the region. If none does, it keeps the plan's heading and slows to 2.0 m/s, as `+yield` does. No constant is chosen on data.
+
+**Arms (hard-traffic, ships holding course and speed):** `ref` = `any+predict+edge+yield` (HELD5's designated arm, flown by a copy of `flyHard` that the gate holds equal to it bit for bit with both options off); `ref+free`; `ref+giveway`; **`ref+free+giveway` (designated)**.
+
+**The set:** **HELD78 = hard-traffic seeds 7501 to 7560**, no navigation set uses them, flown ONCE after the options, the command and their gates are sabotaged. DEV (seeds 1 to 30) is flown once as a sanity run and is not a result. Every flight is flown under the engine's default orientation step (RK4); nothing here is read against a first-order record.
+
+**Checks (a failure: the verdict is NOT WEIGHED):** with both options off the copy equals `flyHard` on every DEV flight (status, ticks, path, minimum clearance); every arm flies the same 60 scenarios; each option changes at least one HELD78 flight.
+
+**The rule (FOLLOW-UP 5's, unchanged in form).** SUPPORTED iff the designated arm reaches **at least 48 of 60**, **no flight leaves the region**, its **ship collisions are at most half the reference's**, and it **gains at least 5 flights net over `ref` with an exact two-sided sign test p <= 0.10** on the discordant flights. PARTLY SUPPORTED iff only the gain bar holds; NOT SUPPORTED otherwise. Reported, not weighed: each single option against `ref` the same way, median arrival time, path over chord, minimum clearance.
+
+**Expectations, written before any flight.** `+free` alone leaves no exit: about 70 percent. `+giveway` alone halves the ship collisions: about 40. The designated arm reaches 48 of 60: about 25; gains 5 net at p <= 0.10: about 45; the verdict SUPPORTED about 20, PARTLY about 30, NOT about 50.
+
+**What will be built:** `brain/subGiveWay.mjs` (the flight copy and the two options), `tools/ship/subGiveWayStudy.mjs` (DEV, HELD78, the report), gates for both with mutation passes; then HELD78 once.
