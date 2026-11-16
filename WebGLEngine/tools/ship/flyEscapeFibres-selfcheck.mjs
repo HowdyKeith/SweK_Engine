@@ -8,6 +8,14 @@
 //   2  ONE TRAINING          a record's weights are round 7's code's
 //   3  THE RECORDS           256 draws; F1; the share of pairs; the failures
 //   4  THE COMMAND           it is this round's; no training of the round's, no process
+// SABOTAGE LOG (2026-11-16) -- through a byte-safe runner (one at a time, every file restored and its sha256 checked), this gate and tools/ship/voxelHome-selfcheck.mjs (which probes the command as a
+// process) run whole for each; every one red by name, none 0 red (the number is the rows red over the two):
+//   THE ROUND (tools/ship/flyEscapeFibres.mjs): B1 GGF is round 7's count-in shuffle 3 | B2 GSHUF is round 7's count-out shuffle 2 | B3 the draws are round 7's 5 | B4 32 draws an arm 6
+//   B5 the lead is the free shuffle 3 | B6 F1's words are round 7's R0's 1 | B7 the share is half what it is 1 | B8 a share is given with a failed check 1 | B9 the failing line is 0.70 3
+//   B10 the round writes round 7's results file 1 | B11 a failure is any score under 0.76 2 | B12 F1 is made with a failed check 1
+//   THE COMMAND: C1 the second training is of the second draw 1 | C2 exits 0 on a word it does not know 1 | C3 reads round 7's library 1 | C4 a second start trains everything again 1
+//   Two rows of mine were wrong when written and were corrected: a fixture's "failing" fly sat exactly on the line (0.7199 plus its draw's millionths is 0.72), and a file of free shuffles at 0.70
+//   has 127 failures, not 128, once one is taken out.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
