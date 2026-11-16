@@ -9,6 +9,7 @@
 //   2  THE ROUND'S NUMBERS   round 3's cfg and `memory: true`; four arms, the MLP not among them; the start is still the reflex
 //   3  ONE TRAINING          a record's weights are the trainer's from a remembering, wrapped policy made here by hand
 //   4  THE RECORDS           64 draws; M3, each fly against its round 3 self; round 3's MLP is not asked for
+//   6  THE VERDICT            the round's results, read from the committed file
 //   5  THE COMMAND           it is this round's and reads round 3's file; no training of the round's, no process
 // ONE LOOK BEFORE THE ROUND, SAID: to see that a remembering fly trains at all, one training of 2 iterations with 8 flies tried was run on draw 901 (which the round does not use); its two history
 // readings were 0.537 and 0.505. Nothing else was trained before the round's own run.
@@ -19,10 +20,13 @@
 //   THE ROUND: Y21 round 4's circuits forget 2 | Y22 round 4 has the MLP 4 | Y23 the clock taken to be the tenth number 3 | Y24 every round remembers 23 | Y28 writes round 3's results file 1
 //   THE READING AND THE COMMAND: Y25 M3 pairs each fly with round 3's draw 1 1 | Y26 M3's BETTER and WORSE each other's 2 | Y27 round 3's MLP among the flies asked for 2
 //   Y29 the command reads round 3's library 1 | Y30 the command exits 0 on a word it does not know 1
+// THE VERDICT'S SABOTAGES (2026-11-16, section 6; the same runner, this gate and the other of rounds 3 and 4 run whole for each; the number is the rows red over the two; the library was not
+// sabotaged again, round 5's run was importing it): V1 a round 3 fly's score raised by 0.05 in round 3's file 6 | V2 a round 4 fly's score raised by 0.05 in the file 6 | V3 a round 4 fly that fell below the reflex put above it 7 | V5 round 4's note says memory is worse 1
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { createHash } from "node:crypto";
 import * as V from "./flyEscapeMemory.mjs";
 import * as V3 from "./flyEscapeFresh.mjs";
 import * as V1 from "./flyEscape.mjs";
@@ -125,6 +129,38 @@ section(() => {
     const me = src("tools/ship/flyEscapeMemory-selfcheck.mjs"), calls = [...me.matchAll(/V3?\.trainOne\(([^)]*)\)/g)].map((m) => m[1]);
     ok("!! THIS GATE STARTS NO TRAINING OF THE ROUND'S AND LEAVES ITS RESULTS FILE AS IT WAS: its three trainings through the rounds' code are of 2 iterations with 8 flies tried on draw 901; this gate starts no process at all; and the file's size and time are what they were before this section",
         calls.length === 3 && calls.every((c) => /^"(FLY|PLAIN)", 901, TINY, TINY_AUDIT$/.test(c)) && TINY.iters === 2 && TINY.pop === 8 && !V.SEEDS.includes(901) && !/Sync\(/.test(me.replace(/readFileSync\(|statSync\(|existsSync\(/g, "")) && stateOf() === before, `${calls.length} trainings, no process, the file ${before === "absent" ? "absent" : "unchanged"}`);
+});
+
+console.log("\n6. THE VERDICT (round 4; the results were committed at 13b8fe4b before they were read, and are read here from the file)");
+section(() => {
+    const bytes = fs.readFileSync(path.join(ENG, V.RESULTS)), lines = bytes.toString("utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l)), old = fs.readFileSync(path.join(ENG, V.BEFORE), "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l));
+    const R = V.reading(lines, old), A = R.arms, draws = lines.filter((r) => r.kind === "draw"), ref = R.floors.reflex.score, was = (r) => old.find((x) => x.kind === "draw" && x.arm === r.arm && x.s === r.s).score;
+    ok("!! the results file is the one the run wrote: 66 records, sha256 b67c9e111bce3683...", lines.length === 66 && createHash("sha256").update(bytes).digest("hex") === "b67c9e111bce368319a9d62f2d6b495a4ae40e5c795aaa83e13ec3d70e3e8124");
+    ok("!! THE CHECKS HOLD, AND THE START WAS THE REFLEX: 64 draws each once, round 3's recipe, each arm's weight count and wiring, FLY draw 1 the same twice, a history in every record, the registered floors, round 3's file with these arms' 64 draws -- and the untrained remembering fly of every arm scores the reflex's 0.6465, to the bit", R.checks.length === 0 && V.ARMS.every((a) => R.floors.untrained[a] === ref) && near(ref, 0.6465), R.checks.slice(0, 2).join(" | "));
+    ok("!! *** M3: MEMORY BETWEEN TICKS CANNOT BE TOLD APART FROM NONE -- AND IT LEANS WORSE *** -- of the 64 flies 22 score above their round 3 selves and 42 below (exact two-sided p 0.017; 0.01 was registered). The 64 average 0.7240 with memory against 0.7420 without",
+        R.M3 && R.M3.word === V.WORDS.M3[2] && R.M3.above === 22 && R.M3.below === 42 && R.M3.ties === 0 && near(R.M3.p, 0.016858) && near(draws.reduce((n, r) => n + r.score, 0) / 64, 0.7240) && near(draws.reduce((n, r) => n + was(r), 0) / 64, 0.7420, 1e-4));
+    ok("!! *** T1, WITH MEMORY TO ROUTE: THE FLY'S WIRING CANNOT BE TOLD APART FROM A SHUFFLE OF IT *** -- asked of flies that do the task (both means above the reflex's); the fly's ranks sum to 277, the middle is 264 (exact two-sided p 0.64). T2, memory that moves between cells against memory that stays in each: CANNOT BE TOLD APART FROM A PLAIN NET (316; p 0.051)",
+        R.asked === true && R.T1 && R.T1.word === V.WORDS.T1[2] && R.T1.sumA === 277 && near(R.T1.p, 0.64202) && R.T2 && R.T2.word === V.WORDS.T2[2] && R.T2.sumA === 316 && near(R.T2.p, 0.05134));
+    ok("!! T3: A FLY STARTED AT THE REFLEX ESCAPES BETTER THAN THE REFLEX (59 of the 64 above, 4 below, 1 equal: p 9.0e-13); T0: the FLY arm CANNOT BE TOLD APART FROM THE REFLEX (13 above, 3 below; p 0.021 -- 14 speaks). The four below are FLY draws 7, 13 and 16 and SHUF draw 4 (0.5624, the least), and SHUF draw 11 ended at the reflex's own number",
+        R.T3 && R.T3.word === V.WORDS.T3[0] && R.T3.above === 59 && R.T3.below === 4 && R.T3.ties === 1 && near(R.T3.p, 9.003e-13, 1e-15) && R.T0 && R.T0.word === V.WORDS.T0[2] && R.T0.above === 13 && R.T0.below === 3 && near(R.T0.p, 0.02127) &&
+        J(draws.filter((r) => r.score < ref).map((r) => r.arm + r.s).sort()) === J(["FLY13", "FLY16", "FLY7", "SHUF4"]) && draws.find((r) => r.arm === "SHUF" && r.s === 11).score === ref && near(Math.min(...draws.map((r) => r.score)), 0.5624));
+    const pair = (a) => { const v = draws.filter((r) => r.arm === a); return [v.filter((r) => r.score > was(r)).length, v.filter((r) => r.score < was(r)).length]; }, sc = (a) => draws.filter((r) => r.arm === a).sort((x, y) => x.s - y.s).map((r) => r.score);
+    ok("!! the arms with memory beside themselves without (mean, sd; round 3's mean; flies above / below their own round 3 selves): FLY 0.7134 0.0533 (0.7432; 6 / 10), SHUF 0.7173 0.0477 (0.7392; 6 / 10), PLAIN 0.7157 0.0123 (0.7444; 0 / 16), FISH 0.7497 0.0096 (0.7410; 10 / 6) -- THE PLAIN NET IS WORSE WITH MEMORY IN ALL 16 DRAWS, the two fly-sized circuits spread out (three FLY draws fell below the reflex), the fish's is the only arm not lower",
+        near(A.FLY.mean, 0.7134) && near(A.FLY.sd, 0.0533) && near(A.SHUF.mean, 0.7173) && near(A.SHUF.sd, 0.0477) && near(A.PLAIN.mean, 0.7157) && near(A.PLAIN.sd, 0.0123) && near(A.FISH.mean, 0.7497) && near(A.FISH.sd, 0.0096) && near(R.before.FLY, 0.7432) && near(R.before.SHUF, 0.7392) && near(R.before.PLAIN, 0.7444) && near(R.before.FISH, 0.7410) &&
+        J(V.ARMS.map(pair)) === J([[6, 10], [6, 10], [0, 16], [10, 6]]));
+    const fishV = (a) => PF.rankSum(sc("FISH"), sc(a));
+    ok("!! SEEN AFTER THE READING, NOT REGISTERED, AND NOT A FINDING UNTIL A ROUND ASKS IT: the fish's circuit with memory ranks above each other arm with memory (against PLAIN the ranks sum to 388 of a possible 392, p 4.0e-8; against SHUF 348, p 0.0011; against FLY 328, p 0.015) -- three comparisons chosen after looking, of an arm whose own gain over its round 3 self is 10 of 16",
+        fishV("PLAIN").sumA === 388 && fishV("PLAIN").p < 1e-7 && fishV("SHUF").sumA === 348 && near(fishV("SHUF").p, 0.00106, 1e-5) && fishV("FLY").sumA === 328 && near(fishV("FLY").p, 0.01518, 1e-5));
+    const H = (a) => A[a].history.map((h) => h.ret);
+    ok("!! WHAT THE TRAINER SAW: with memory every arm's battery reading FALLS at first -- at iteration 25 the four arms read 0.546 to 0.586, below the 0.60 to 0.64 they read at iteration 0 -- and climbs back; the plain net never gets past 0.621, the fish's circuit ends at 0.741. The gain on the battery and on the audit, by arm: FLY 0.073 and 0.067, SHUF 0.084 and 0.071, PLAIN 0.052 and 0.069, FISH 0.133 and 0.103",
+        V.ARMS.every((a) => H(a)[1] > 0.545 && H(a)[1] < 0.587 && H(a)[0] > 0.60 && H(a)[0] < 0.64 && H(a)[1] < H(a)[0]) && Math.max(...H("PLAIN")) < 0.6215 && near(H("FISH")[6], 0.7411) &&
+        near(R.gap.FLY.battery, 0.0732) && near(R.gap.FLY.audit, 0.0669) && near(R.gap.SHUF.battery, 0.0837) && near(R.gap.SHUF.audit, 0.0708) && near(R.gap.PLAIN.battery, 0.0520) && near(R.gap.PLAIN.audit, 0.0692) && near(R.gap.FISH.battery, 0.1325) && near(R.gap.FISH.audit, 0.1033));
+    const again = V.ARMS.flatMap((arm) => [2, 4].map((s) => { const r = draws.find((d) => d.arm === arm && d.s === s), p = V.policyOf(arm, s); p.setParams(PF.unpackWeights(r.weights)); const a = V.auditScore((o) => p.act(o)); return [arm, s, a.score === r.score && a.alive === r.alive && a.fledPass === r.fledPass && a.caught === r.caught]; }));
+    ok("!! THE WEIGHTS IN A RECORD GIVE ITS SCORE AND ITS COUNTS AGAIN: draws 2 and 4 of every arm (the best fly and the worst among them), audited here on the 200 episodes through the remembering, wrapped fly, to the bit", again.every((x) => x[2]), again.filter((x) => !x[2]).map((x) => x[0] + " " + x[1]).join(", "));
+    const note = src("brain/FLY_ESCAPE_MEMORY_WIP.md"), res = note.slice(note.indexOf("## 8. The result"));
+    ok("the expectations, written before the code, against what came: M3 CANNOT was the 45 percent guess and came (WORSE, which it leans to, was given 20); T1 CANNOT BE TOLD APART the 70, came; T2 CANNOT the 60, came; T3 BETTER the 70, came; some arm's mean above 0.70 was given 25 percent and all four are",
+        /M3: BETTER about 35 percent, CANNOT about 45, WORSE about 20/.test(note) && /\*\*T1: CANNOT BE TOLD APART about 70 percent/.test(note) && /T2: CANNOT about 60/.test(note) && /T3: BETTER about 70/.test(note) && /above 0\.70: about 25 percent/.test(note) && V.ARMS.every((a) => A[a].mean > 0.70));
+    ok("the registration's RESULT SECTION (section 8, and not the list of possible words in section 2) carries the five readings' words", /## 8\. The result/.test(note) && [["M3", R.M3.word], ["T0", R.T0.word], ["T1", R.T1.word], ["T2", R.T2.word], ["T3", R.T3.word]].every(([t, w]) => res.includes(`**${t}: ${w}**`)));
 });
 
 console.log(`\nflyEscapeMemory-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILED"}`);

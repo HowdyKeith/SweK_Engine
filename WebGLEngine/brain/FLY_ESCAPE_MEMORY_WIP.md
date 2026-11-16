@@ -56,3 +56,35 @@ still no visual cells feeding the circuit (the tree does not hold them; see the 
 ## 7. The run (to be written; the gate never runs it and never gives the command the word `run`)
 `node tools/ship/takeFlyEscapeMemory.mjs run` -> `brain/flyEscapeMemoryRound.jsonl`, committed byte for byte before it is read;
 `node tools/ship/takeFlyEscapeMemory.mjs read` prints the checks and the reading.
+
+## 8. The result (run 2026-11-16 in the sandbox, 50.0 minutes beside round 3's run; `brain/flyEscapeMemoryRound.jsonl` committed at 13b8fe4b before it was read; read once)
+**The checks hold, and the start was the reflex:** the untrained remembering fly of every arm scores 0.6465, to the bit.
+
+| | mean score | sd | round 3's mean (no memory) | above / below its round 3 self | lives (of 200) | feeds | caught by a strike |
+|---|---|---|---|---|---|---|---|
+| FLY | 0.7134 | 0.0533 | 0.7432 | 6 / 10 | 187.2 | 0.491 | 0.030 |
+| SHUF | 0.7173 | 0.0477 | 0.7392 | 6 / 10 | 187.7 | 0.496 | 0.028 |
+| PLAIN | 0.7157 | 0.0123 | 0.7444 | 0 / 16 | 187.2 | 0.495 | 0.029 |
+| FISH | 0.7497 | 0.0096 | 0.7410 | 10 / 6 | 193.7 | 0.531 | 0.014 |
+| the reflex | 0.6465 | | | | 156 | 0.513 | 0.107 |
+
+* **M3: MEMORY BETWEEN TICKS CANNOT BE TOLD APART FROM NONE** (22 of the 64 above their round 3 selves, 42 below; exact
+  two-sided p 0.017 against the registered 0.01). It leans worse: the 64 average 0.724 with memory and 0.742 without.
+* T1 is asked of flies that do the task. **T1: THE FLY'S WIRING CANNOT BE TOLD APART FROM A SHUFFLE OF IT** (ranks 277, the
+  middle 264; p 0.64).
+* **T2: THE FLY'S WIRING CANNOT BE TOLD APART FROM A PLAIN NET OF ITS SIZE** (316; p 0.051).
+* **T3: A FLY STARTED AT THE REFLEX ESCAPES BETTER THAN THE REFLEX** (59 above, 4 below, 1 equal; p 9.0e-13).
+* **T0: A FLY-WIRED FLY STARTED AT THE REFLEX CANNOT BE TOLD APART FROM THE REFLEX** (13 above, 3 below; p 0.021; 14 speaks).
+
+**What it says.** A carried half of each unit's activity did not help these flies escape, and for three arms of four it made
+training harder: every arm's battery reading falls in the first 25 iterations before it climbs, the plain net is lower in all
+16 of its draws, and three FLY draws and one SHUF draw ended below the reflex they started as. With memory to route, the fly's
+wiring is again in the middle of its shuffles.
+
+**Seen after the reading, and not registered.** The fish's circuit is the one arm not lower with memory (0.7497 against
+0.7410; 10 of 16 above), and with memory it ranks above each other arm (against PLAIN p 4.0e-8, SHUF 0.0011, FLY 0.015). Those
+are three comparisons chosen after looking. It is a thing to ask of a round, not a finding of this one.
+
+**Expectations against what came.** The words I gave most weight came. I gave "some arm above 0.70" one chance in four; all
+four are, because round 3's trainer -- which I had not read when I wrote that -- carries them there.
+

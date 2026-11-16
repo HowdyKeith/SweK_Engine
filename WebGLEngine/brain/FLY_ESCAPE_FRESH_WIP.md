@@ -53,3 +53,34 @@ Round 2 measured 28.6 minutes alone. A battery of 200 adds 176 episodes to an it
 ## 8. The run (to be written; the gate never runs it and never gives the command the word `run`)
 `node tools/ship/takeFlyEscapeFresh.mjs run` -> `brain/flyEscapeFreshRound.jsonl`, committed byte for byte before it is read;
 `node tools/ship/takeFlyEscapeFresh.mjs read` prints the checks and the reading.
+
+## 9. The result (run 2026-11-16 in the sandbox, 51.1 minutes beside round 4's run; `brain/flyEscapeFreshRound.jsonl` committed at 13b8fe4b before it was read; read once)
+**The checks hold, and the start was the reflex:** the untrained fly of every arm scores 0.6465, to the bit.
+
+| | mean score | sd | round 2's mean | lives (of 200) | feeds | off its food for a pass | caught by a strike |
+|---|---|---|---|---|---|---|---|
+| MLP | 0.7366 | 0.0122 | 0.6623 | 191.1 | 0.518 | 0.291 | 0.020 |
+| SHUF | 0.7392 | 0.0134 | 0.6617 | 192.8 | 0.515 | 0.298 | 0.016 |
+| FISH | 0.7410 | 0.0123 | 0.6583 | 192.0 | 0.522 | 0.296 | 0.018 |
+| FLY | 0.7432 | 0.0113 | 0.6636 | 193.4 | 0.520 | 0.299 | 0.015 |
+| PLAIN | 0.7444 | 0.0121 | 0.6595 | 192.6 | 0.526 | 0.307 | 0.017 |
+| the reflex (and every fly at iteration 0) | 0.6465 | | | 156 | 0.513 | 0.247 | 0.107 |
+| told each mover's kind | 0.8351 | | | 198 | 0.680 | 0.296 | 0.004 |
+
+* **P3: FRESH EPISODES AND A LARGER BATTERY ESCAPE BETTER THAN ROUND 2'S TRAINER** (all 80 flies above their round 2 selves;
+  exact two-sided p 1.7e-24; the least gain of a pair 0.009, the most 0.193).
+* **T3: A FLY STARTED AT THE REFLEX ESCAPES BETTER THAN THE REFLEX** (80 of 80; round 2: 59).
+* **T0: A FLY-WIRED FLY STARTED AT THE REFLEX ESCAPES BETTER THAN THE REFLEX** (16 of 16; p 3.1e-5).
+* T1 is asked of flies that do the task. **T1: THE FLY'S WIRING CANNOT BE TOLD APART FROM A SHUFFLE OF IT** (ranks 265, the
+  middle 264; p 0.99).
+* **T2: THE FLY'S WIRING CANNOT BE TOLD APART FROM A PLAIN NET OF ITS SIZE** (252; p 0.67).
+
+**What it says.** Round 2's small gain was the trainer's doing, not the task's. The gain a training saw on its battery was the
+same in both rounds (0.08 to 0.10); in round 2 the audit saw 0.012 to 0.017 of it and here it sees 0.090 to 0.098 -- all of it.
+The 80 flies average 0.741, about half the way from the reflex to a fly told each mover's kind, and what they learned is not to
+be caught: a strike catches 1.5 to 2 percent of the time against the reflex's 10.7, while they feed as much as the reflex does.
+The five arms are within eight thousandths of each other and the fly's wiring sits in the middle of its shuffles.
+
+**Expectations against what came.** Every word I gave the most weight came. The size did not: I gave the mean above 0.72 one
+chance in ten, and it is 0.741.
+

@@ -246,8 +246,24 @@ section 8, `tools/ship/flyEscapeReflex-selfcheck.mjs` section 6; `brain/rl/refle
 trainer keeping the best return, **59 of the 80 flies escape better than the reflex (p 2.5e-5), by a hundredth and a half**
 (0.661 for 0.6465; the fly told the kind 0.835). **T1 was, for the first time, asked of flies that do the task: the fly's wiring
 cannot be told from a shuffle of it (p 0.78).** Most of the trainer's gain was its own 24 battery episodes' (0.08 to 0.10 there,
-0.012 to 0.017 on the audit). **OPEN, not registered:** a battery that changes or a larger one; memory between ticks (the real
-circuit integrates); the visual inputs the real circuit has.
+0.012 to 0.017 on the audit). **All three of that round's open items are now rounds (2026-11-16):**
+* **Round 3, a trainer whose episodes change and whose battery is 200: DONE** (`brain/FLY_ESCAPE_FRESH_WIP.md` section 9,
+  `tools/ship/flyEscapeFresh-selfcheck.mjs` section 6). **All 80 flies beat their round 2 selves and all 80 beat the reflex;
+  the mean is 0.741** (round 2: 0.661; the reflex 0.6465; told the kind 0.835). The battery's gain is now the audit's gain
+  (0.08 to 0.10 both). They learned not to be caught (a strike catches 1.5 to 2 percent, the reflex 10.7). **The fly's wiring
+  cannot be told from a shuffle (p 0.99) or a plain net (p 0.67).**
+* **Round 4, memory between ticks: DONE** (`brain/FLY_ESCAPE_MEMORY_WIP.md` section 8, `tools/ship/flyEscapeMemory-selfcheck.mjs`
+  section 6; `brain/rl/carryCircuit.mjs`). **Memory cannot be told apart from none and leans worse** (22 of 64 above their
+  round 3 selves, 42 below; p 0.017 against the registered 0.01); the plain net is lower in all 16 draws. **The wiring: cannot
+  be told from a shuffle (p 0.64).** Seen after the reading and not registered: the fish's circuit is the one arm not lower
+  with memory and ranks above the others -- a thing to ask of a round, not a finding.
+* **Round 5, the real visual inputs: REGISTERED AND RUNNING** (`brain/FLY_ESCAPE_VISION_WIP.md`, amended in its section 3b
+  before any training; `tools/ship/flyEscapeVision-selfcheck.mjs`). Another chat's data file
+  (`vendor/male-cns/giant-fiber-visual-circuit.json`: the two Giant Fibers and each one's 10 strongest LC4 and LPLC2 cells, 369
+  connections) as a policy in which the only road from what the fly sees to what it does is the wiring
+  (`brain/rl/maskedCircuitPolicy.mjs`). Its result goes in that note.
+**OPEN, not registered:** the fish's circuit with memory, asked properly; real left and right eyes and receptive fields (that
+chat's `brain/FLY_RETINOTOPY_RF_WIP.md`); the published Giant Fiber model as a hand-written fly beside the reflex.
 
 Keith, 2026-11-13: "How else could the fly brain live in voxel world? Could it play minecraft or create something to attract a
 different fly brain?" and, of the five answers: "Yes, add those to the backlog". Each builds on `voxel-home` (`brain/rl/buildEnv.mjs`:
