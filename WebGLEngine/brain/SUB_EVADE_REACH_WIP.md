@@ -76,4 +76,6 @@ Why these: the 13 finders share most of their doctrine with the two known bases 
 
 **3. What the smoke shows about the design, said and not acted on:** the rules are about how many of the 14 bases gain, and an arm against its own base can gain only if the boat's tracking decides the game, which on this evidence is a property of the boats with a strong evade pair. The report prints each base's own evadeSpeed and evadeTurn beside it, so that reading is available **post-hoc and labelled**; it is not a rule, and the registered count and labels (GENERAL, COMMON, NARROW) are unchanged.
 
-**4. What is not changed:** the bases, the arms, the sets, the rules R0 and RR1 to RR4, the forecasts, the geometries, the order of work.
+**4. A second statement of this note is imprecise, and is corrected here.** Section 2 says "every base's trackSpeed is 4.23 or more" and section 1 gives the other finders' trackSpeeds as 4.23 to 4.5. **league7001's is 4.07** (it is one of the two known bases, so section 1 named it separately); the lowest of the fourteen bases is league7001's 4.07, then league7102's 4.23. The conclusion drawn, that no arm is identical to its base, stands (every base's trackSpeed is above D, 3.15); the gate asserts it with the true bound (above 4.0).
+
+**5. What is not changed:** the bases, the arms, the sets, the rules R0 and RR1 to RR4, the forecasts, the geometries, the order of work.
