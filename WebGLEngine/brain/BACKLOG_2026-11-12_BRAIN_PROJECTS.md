@@ -269,10 +269,12 @@ cannot be told from a shuffle of it (p 0.78).** Most of the trainer's gain was i
 * **The page plays all five rounds (2026-11-16):** `fly-escape.html` offers rounds 3 and 4's flies and round 5's four (the real
   Giant Fiber circuit, its shuffle, the free net, the cells with no connections), each from its round's committed file, in 3D
   and through the fly's eye; choosing a round 5 fly moves the page to round 5.
-* **OPEN, AND THE NEXT ROUND IF ASKED (`fly-escapes-degree-shuffle`, not registered):** the second round T1 needs before it is
-  believed -- a shuffle that keeps each cell's count of connections in and out (so the convergence onto the Giant Fibers is
-  kept), more draws, new shuffles. If the real wiring still trains more surely, the finer wiring matters; if not, it was the
-  convergence.
+* **DONE (`fly-escapes-degree-shuffle`, escape round 6, 2026-11-16; `brain/FLY_ESCAPE_DEGREE_WIP.md` section 9):** round 5's
+  result came again and it was the convergence. On 32 new draws an arm: the real circuit beats a free shuffle (D2, ranks
+  1247.5 of a middle 1040, p 0.0050); it cannot be told from a shuffle that keeps every cell's counts in and out (D1, p 0.98;
+  means 0.7494 and 0.7496); and that count-keeping shuffle beats the free one too (D3, p 0.0046). The difference is small: a
+  thousandth of the score at the median, and 2 failed trainings of 32 free shuffles (expected 4 to 12; that guess missed).
+  Nothing finer than each cell's counts was shown to matter. Not yet on the page.
 **OPEN, not registered:** the fish's circuit with memory, asked properly; real left and right eyes and receptive fields (that
 chat's `brain/FLY_RETINOTOPY_RF_WIP.md`); the published Giant Fiber model as a hand-written fly beside the reflex.
 
