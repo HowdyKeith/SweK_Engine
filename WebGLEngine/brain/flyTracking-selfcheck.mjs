@@ -20,6 +20,7 @@ import * as SY from "./lc10Synapses.mjs";
 import * as PL from "./lc10Places.mjs";
 import * as D from "./battleshipDuel.mjs";
 import * as ST from "./seatTurretGunner.mjs";
+import * as BF from "./battleshipFight.mjs";
 import * as PB from "./peerBrain.mjs";
 import { placesOf } from "../tools/bakeDendritePlaces.mjs";
 import { leadOf } from "../tools/ship/pairPool.mjs";
@@ -98,6 +99,15 @@ section(() => {
     ok("!! ONE SHIP A SIDE THE STICKY GUNNER IS THE FLY-WIRED GUNNER TO THE BIT (the sight only ever has one ship to choose); in a FLEET it is another fight; seatFlyWired2 is its policy and battleshipDuel seats its file", one(FT.sticky).fingerprint === one(FT).fingerprint && FT.sticky.sticky === true && [0.1, 0.7, 1.5, -2.2].every((e) => FT.sticky.S(e) === FT.S(e)) && FT.POLICY_ID2 === "seatFlyWired2" && D.duel(D.makeSide("n", { cannon: false, network: { module: FT.sticky, weights: Float32Array.from([-3, -3]) } }), hand, 90003, "crossing", { ships: 3 }).fingerprint !== D.duel(D.makeSide("n", { cannon: false, network: { module: FT, weights: Float32Array.from([-3, -3]) } }), hand, 90003, "crossing", { ships: 3 }).fingerprint && D.sideFromBrains("s", [PB.exportBrain(PB.describePolicy(FT.POLICY_ID2, FT.sticky), Float32Array.from([-3, -3]))]).side.seatNetworks["main-a"].module === FT.sticky);
 });
 
+section(() => {
+    const c4 = [], s4 = ST.stickySight((seat, st, body, targets) => { c4.push(targets.map((q) => q.id).join()); const b = targets.filter((q) => q.ok).sort((x, y) => x.d - y.d)[0]; return b ? { target: b.id } : { target: null }; }, { only: ST.SHIPS_ONLY });
+    const ship = (id, d) => ({ id, d, ok: true, radius: 6 }), fighter = (id, d) => ({ id, d, ok: true, radius: 1.5 });
+    s4(null, null, null, [fighter(1, 5), fighter(2, 9)], 0); s4(null, null, null, [fighter(1, 9), fighter(2, 5)], 1); s4(null, null, null, [ship(3, 5), fighter(2, 9)], 2); s4(null, null, null, [ship(3, 9), fighter(2, 5)], 3);
+    ok("!! SHIPS_ONLY: among fighters it re-picks every tick (asked about all, never about one alone: the plain sight); once on a SHIP it keeps the ship when a fighter becomes the sooner (asked about the ship alone); what counts as a ship is an aim radius over 3 (a ship's is 6, a fighter's 1.5)", c4.join("|") === "1,2|1,2|3,2|3" && ST.SHIP_RADIUS_MIN === 3 && ST.SHIPS_ONLY({ radius: 6 }) && !ST.SHIPS_ONLY({ radius: 1.5 }) && !ST.SHIPS_ONLY({}));
+    const BFm = BF, w = Float32Array.from([-3, -3]), ft = (lib) => BFm.fight(99001, "swarm", { network: { module: lib, weights: w } }), hand = D.makeSide("hand", { cannon: false }), fleet = (lib, o) => D.duel(D.makeSide("n", { cannon: false, network: { module: lib, weights: w } }), hand, 90003, "crossing", o).fingerprint;
+    ok("!! THE GUNNER THAT STICKS TO SHIPS (seatFlyWired3): AGAINST FIGHTERS ALONE IT IS THE SHIPPED GUNNER TO THE BIT, IN A FLEET WITH NO FIGHTERS THE STICKY GUNNER TO THE BIT, and in a fleet WITH escort fighters it is neither", JSON.stringify(ft(FT.stickyShips)) === JSON.stringify(ft(FT)) && JSON.stringify(ft(FT.sticky)) !== JSON.stringify(ft(FT)) && fleet(FT.stickyShips, { ships: 3 }) === fleet(FT.sticky, { ships: 3 }) && fleet(FT.stickyShips, { ships: 3, escorts: 4 }) !== fleet(FT.sticky, { ships: 3, escorts: 4 }) && fleet(FT.stickyShips, { ships: 3, escorts: 4 }) !== fleet(FT, { ships: 3, escorts: 4 }) && FT.POLICY_ID3 === "seatFlyWired3" && D.PEER_POLICIES.seatFlyWired3.mod === FT.stickyShips);
+});
+
 console.log("5. THE FRONT DOOR");
 section(() => {
     ok("wirings by NAME, one object each: `fly:medial` is this file's own, `fly:lateral`, `flat`, `sine` (minus the sine of the bearing to a quarter turn and HELD at -1 behind it) and `shuffled:<seed>` are others with another S; a bad name is refused", FT.wiringOf() === FT.wiringOf("fly:medial") && FT.wiringOf("fly:medial").S === FT.S && FT.wiringOf("flat") === FT.wiringOf("flat") && ["fly:lateral", "flat", "sine", "shuffled:4242", "shuffled:7"].every((w) => FT.wiringOf(w).S(1.9) !== FT.S(1.9)) && Math.abs(FT.wiringOf("sine").S(0.4) + Math.sin(0.4)) < 1e-5 && Math.abs(FT.wiringOf("sine").S(120 * RAD) + 1) < 1e-9 && Math.abs(FT.wiringOf("sine").S(175 * RAD) + 1) < 1e-9 && throwsWith(() => FT.wiringOf("fly"), /a wiring is "fly:medial", "fly:lateral", "flat", "sine", "shuffled:<seed>", "scrambled:<seed>" or "unneighboured:<seed>" \(got fly\)/));
@@ -106,7 +116,7 @@ section(() => {
     const job = (wiring) => ({ x: { id: "n", cannon: false, network: wiring ? { policy: "seatFlyWired", weights: [-4, -4], wiring } : { policy: "seatFlyWired", weights: [-4, -4] } }, y: { id: "hand", cannon: false }, kind: "crossing", seed: 90003 }), a = leadOf(job(null)), b = leadOf(job("flat")), c = leadOf(job("fly:medial"));
     ok("!! the pool flies it over a named wiring: `flat` is another fight of the same gains, and `fly:medial` by name is the default", a !== b && a === c, `leads ${a.toFixed(3)}, ${b.toFixed(3)}`);
     ok("the report says real numbers", /281 neurons, 6589 connections, no learned weight inside; with places the command reaches 90% of its peak at 55\.5 degrees and peaks at 80\.5/.test(FT.reportLines()[1]));
-    ok("the export list", Object.keys(FT).sort().join() === "BASELINE,CONTROL_SEED,EYES,FEATURES,HIDDEN,OUTPUTS,OVERLAP,POLICY_ID,POLICY_ID2,S,SIGMA,STEPS,WEIGHT_COUNT,cells,forward,gunnerFactory,gunnerFor,handWeights,raw,reportLines,signOf,sticky,topology,tuning,wiringOf,withBaseline,zeroWeights");
+    ok("the export list", Object.keys(FT).sort().join() === "BASELINE,CONTROL_SEED,EYES,FEATURES,HIDDEN,OUTPUTS,OVERLAP,POLICY_ID,POLICY_ID2,POLICY_ID3,S,SIGMA,STEPS,WEIGHT_COUNT,cells,forward,gunnerFactory,gunnerFor,handWeights,raw,reportLines,signOf,sticky,stickyShips,topology,tuning,wiringOf,withBaseline,zeroWeights");
 });
 
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);

@@ -108,6 +108,8 @@ const MAIN = wiringOf("fly:medial");
 export const S = MAIN.S, raw = MAIN.raw, cells = MAIN.cells, forward = MAIN.forward, zeroWeights = MAIN.zeroWeights, handWeights = MAIN.handWeights, gunnerFor = MAIN.gunnerFor, gunnerFactory = MAIN.gunnerFactory, topology = LC;
 /** THE STICKY GUNNER (`seatFlyWired2`): the fly-wired gunner (`fly:medial`, the same two gains) behind brain/seatTurretGunner.mjs's stickySight -- it keeps the target it chose while it can still be shot. See tools/ship/takeFlyWiredGunnerFix.mjs. */
 export const POLICY_ID2 = "seatFlyWired2", sticky = libraryOf("fly:medial, sticky", FLY_M.raw, FLY_M.cells, { sticky: true });
+/** THE GUNNER WHOSE SIGHT STICKS TO SHIPS ONLY (`seatFlyWired3`): the sticky gunner trailed the shipped one against fighters (tools/ship/takeFlyWiredGunnerFix.mjs); this one sticks to a capital ship and re-picks among fighters every tick. See tools/ship/takeFlyWiredGunnerShips.mjs. */
+export const POLICY_ID3 = "seatFlyWired3", stickyShips = libraryOf("fly:medial, sticky to ships", FLY_M.raw, FLY_M.cells, { sticky: "ships" });
 export const EYES = Object.freeze({ L: Object.freeze(EYE_L.slice()), R: Object.freeze(EYE_R.slice()), DNa02: Object.freeze([DNA02_L, DNA02_R]) });
 /** The circuit with another constant drive on DNa02 (for the gate's and the header's claim about what the baseline does). */
 export const withBaseline = (baseline) => circuitOf(matrixOf(), { front: 1, baseline });

@@ -63,15 +63,18 @@ export function features(seat, st, body, rule, tg, reach = REACH, spent = 0) {
  * seconds, and a gun laid by rates smooths its aim and is left pointing between the targets (tools/ship/takeFlyWiredFights.mjs's header has the diagnosis). With one target it is the sight itself, to the bit (it is never asked twice). WHAT IT COSTS: while it sticks, the sight's memory of the OTHER
  * targets is not kept up, so a sight with a tracking delay needs that delay before it can choose a new one.
  */
-export function stickySight(sight) {
+// `only` (optional): a target the sight may stick to (a predicate on the shown target); a target it may not is re-picked every tick, as the plain sight does. SHIPS_ONLY sticks to a capital ship and to nothing else: the arena shows a ship with its aim radius (6) and a fighter with its own (1.5), and nothing else
+// about what a target is; anything shown bigger than 3 is taken for a ship. Against fighters alone a sight with it is the plain sight to the bit (it never sticks); against ships alone it is the sticky sight to the bit.
+export const SHIP_RADIUS_MIN = 3, SHIPS_ONLY = (q) => (q.radius ?? 0) > SHIP_RADIUS_MIN;
+export function stickySight(sight, { only: may = null } = {}) {
     let cur = null;
     return function sticky(seat, st, body, targets, t) {
-        if (cur != null) { const only = targets.filter((q) => q.id === cur); if (only.length) { const r = sight(seat, st, body, only, t); if (r.target != null || only.length === targets.length) { cur = r.target; return r; } } }
+        if (cur != null) { const only = targets.filter((q) => q.id === cur && (may === null || may(q))); if (only.length) { const r = sight(seat, st, body, only, t); if (r.target != null || only.length === targets.length) { cur = r.target; return r; } } }
         const r = sight(seat, st, body, targets, t); cur = r.target; return r;
     };
 }
 export function gunnerFor(w, sight0, { reach = REACH, dt = 1 / 30, idle = "hold", sigma = 0, seed = 1, ammoSense = false, sticky = false, forward: fwd = forward, layersOf: lo = layersOf, post: pst = post } = {}) {
-    const sight = sticky ? stickySight(sight0) : sight0;   // `sticky` (default false): see stickySight
+    const sight = sticky === "ships" ? stickySight(sight0, { only: SHIPS_ONLY }) : sticky ? stickySight(sight0) : sight0;   // `sticky` (default false; true, or "ships" for a sight that sticks to capital ships only): see stickySight
     if (idle !== "hold" && idle !== "rest") throw new Error(`seatTurretGunner.gunnerFor: idle is "hold" or "rest" (got ${idle})`);
     let laid = null;   // where the hand MEANS the gun to be: the seat's own angles are this plus the hand's error of the tick, and the error is not carried from one tick into the next (a gunner's hand shakes about where it holds the gun; it does not wander)
     function prepare(seat, st, body, targets, t = 0) {
