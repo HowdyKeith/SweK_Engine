@@ -531,3 +531,26 @@ The module, the study and both gates were committed and sabotaged first (ef15e8c
 **What this says.** **Going under the keel is the fix that works; turning the least bad way is not.** Diving below a ship in conflict turned 5 flights that the reference lost into arrivals and lost none, on fresh seeds and on the post hoc set alike (5 to 0 there too). Steering at the last moment does nothing measurable: once give-way has no clear heading, there is no heading that helps. The designated arm reached 49 of 60, the best of any traffic arm so far (FOLLOW-UP 7's 48 on HELD79, 45 on its own set), with no exit. **Traffic is still not fixed**: 6 flights in 60 still meet a ship, and 5 more an iceberg or an island.
 
 **What it leaves open (`nav-traffic-avoid-not-slow` stays OPEN).** The dive starts only when a conflict is predicted, 30 s out, and a 15 m dive at 1 m/s nearly fills that. A plan that chooses a depth beneath the traffic from the start is the obvious next registration, building on the vertical plan of `brain/NAV_3D_WIP.md`. Least-bad can be dropped.
+
+## FOLLOW-UP 9: A DEEP TRANSIT, BENEATH THE TRAFFIC FROM THE START (Keith, 2026-11-17: "let's do the next sandbox rounds, smallest first"; REGISTERED 2026-11-17, BEFORE ANY CODE FOR IT AND BEFORE ANY OF ITS SEEDS IS FLOWN)
+
+**Why.** FOLLOW-UP 8 found that going under a ship's keel is the fix that works, but its dive starts only when a conflict is predicted 30 s out, and a 15 m dive at 1 m/s nearly fills that. Measured before registering (a property of the scenario generator, no flight): in DEV's 30 hard-traffic scenarios, **82 of 99 ships have keels a vessel can pass under within 60 m** (keel + VMARGIN + 2 <= 60; keels 18 to 60 m, median 39), and in 15 of the 30 scenarios every ship can be.
+
+**The option, `+deep`.** From the start, the target depth is the **transit depth**: the deepest keel among the scenario's ships that can be passed under (keel + VMARGIN + DIVE_PAD <= DIVE_MAX = 60 m), plus VMARGIN, plus DIVE_PAD (2 m). It holds while the vessel is more than **ASCEND_M = 140 m** from the goal on the plane, then gives way to the goal's depth.
+
+ASCEND_M is fixed here from the arrival rule: within 4 m of the goal's depth, a climb of up to 45 m at the autopilot's 1 m/s takes about 45 s, which is 110 to 135 m of track at cruise. Only the depth changes, and only deeper. A scenario with no passable ship, or whose transit depth is not deeper than the target, is unchanged. `+deep` acts on the final target before FOLLOW-UP 8's dive and FOLLOW-UP 7's sweep, both kept. The plan and give-way are unchanged and still avoid ships the vessel may already be under: conservative, and said.
+
+**The arms** (hard-traffic): `sweep+dive` (the reference: FOLLOW-UP 8's arm that carried its gain; least-bad is dropped, as its result advised); **`sweep+dive+deep` (designated)**.
+
+**The set.** HELD82 = hard-traffic seeds 7881 to 7940, flown ONCE (HELD81 ended at 7880). DEV (1 to 30) is the sanity run.
+
+**The registered test** (FOLLOW-UP 8's): the designated arm against the reference, paired by seed.
+* **SUPPORTED** iff ship collisions at most half the reference's, AND a net gain >= 5 at an exact two-sided sign p <= 0.10, AND no exit.
+* **PARTLY SUPPORTED** iff no exit and exactly one of the first two holds.
+* **NOT SUPPORTED** otherwise.
+
+**Checks (a failure: NOT WEIGHED).** (1) THE COPY: the reference reproduces FOLLOW-UP 8's stored `sweep+dive` HELD81 flights on the first five seeds (status, ticks, path). (2) SAME SCENARIOS. (3) DEEP BITES: it changes at least one flight. (4) NO CRUSH.
+
+**Expectations, written before any seed is flown.** E1 the ship collisions at most halve: about 55 percent. E2 SUPPORTED: about 30 percent. E3 some flight is lost to arriving deep or timing out on the climb (more timeouts than the reference): about 35 percent. E4 no crush: about 95 percent.
+
+**What a result would not say.** The ships' keels are known exactly from the start. A deeper transit costs energy, which is not counted here (`brain/NAV_MISSIONS_WIP.md` prices a metre, not a depth).
