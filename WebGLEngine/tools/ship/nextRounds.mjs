@@ -3040,8 +3040,8 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "tank-nav-3d",
-        blocker: "OPEN",
-        what: "The tank's 3D view (render/subAquarium3d.mjs) does not draw the navigation sea or the goals; the top and depth views do.",
+        state: "CLOSED",
+        what: "CLOSED 2026-11-17: render/subAquarium3d.mjs draws the navigation sea (navColumns: islands from the floor to above the surface, opaque; icebergs and ships see-through from the surface to their keel, moved every frame so the ships sail) and each courier's goal (navGoals: a buoy in its hue and a line from the sub); the page passes tank.sceneNow() to setSea() before every 3D render. Gate render/subAquarium3dNav-selfcheck.mjs (11 mutants). A ship is drawn as the disc the planner avoids, not a modelled hull (sceneNow gives no heading). Nobody has looked at it on a GPU. WAS: The tank's 3D view (render/subAquarium3d.mjs) does not draw the navigation sea or the goals; the top and depth views do.",
         how: "Islands as columns, icebergs as discs with a keel, ships as hulls, goals as buoys, from tank.sceneNow() and each sub's nav.goal.",
         why: "The 3D view is the one people look at.",
     },
