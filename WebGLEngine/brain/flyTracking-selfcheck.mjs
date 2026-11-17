@@ -19,6 +19,7 @@ import * as LC from "./lc10Topology.mjs";
 import * as SY from "./lc10Synapses.mjs";
 import * as PL from "./lc10Places.mjs";
 import * as D from "./battleshipDuel.mjs";
+import * as ST from "./seatTurretGunner.mjs";
 import * as PB from "./peerBrain.mjs";
 import { placesOf } from "../tools/bakeDendritePlaces.mjs";
 import { leadOf } from "../tools/ship/pairPool.mjs";
@@ -81,6 +82,16 @@ section(() => {
     ok("!! IN A FIGHT (a scratch pair, no cannon): a NEGATIVE gain lays the guns on the enemy -- it deals damage and thirteen circuits are asked -- a positive gain lays them off it and a zero gain leaves them where they were: both deal far less", toward.brains.seated[0] === 13 && toward.brains.asked > 5000 && toward.scores[0] > away.scores[0] + 1 && toward.scores[0] > still.scores[0] + 1 && toward.fingerprint !== away.fingerprint, `scores ${toward.scores[0].toFixed(2)}, ${away.scores[0].toFixed(2)}, ${still.scores[0].toFixed(2)}`);
 });
 
+console.log("4b. THE STICKY SIGHT AND THE STICKY GUNNER");
+section(() => {
+    const calls = [], fake = (seat, st, body, targets) => { calls.push(targets.map((q) => q.id).join()); const ok2 = targets.filter((q) => q.ok); const best = ok2.sort((a, b) => a.d - b.d)[0]; return best ? { yaw: 0, pitch: 0, fire: true, target: best.id } : { yaw: 0, pitch: 0, fire: false, target: null }; };
+    const s = ST.stickySight(fake), T1 = [{ id: 1, d: 5, ok: true }, { id: 2, d: 9, ok: true }], T2 = [{ id: 1, d: 9, ok: true }, { id: 2, d: 5, ok: true }], T3 = [{ id: 1, d: 9, ok: false }, { id: 2, d: 5, ok: true }];
+    const a = s(null, null, null, T1, 0).target, b = s(null, null, null, T2, 1).target, c = s(null, null, null, T3, 2).target, d = s(null, null, null, [{ id: 2, d: 1, ok: true }], 3).target;
+    ok("!! stickySight KEEPS ITS TARGET WHILE IT CAN BE SHOT: it chooses 1 (the soonest), keeps 1 when 2 becomes the sooner (asking the sight about 1 ALONE), takes 2 when 1 cannot be shot (asking about all), and with ONE target asks the sight once", a === 1 && b === 1 && c === 2 && d === 2 && calls.join("|") === "1,2|1|1|1,2|2");
+    const hand = D.makeSide("hand", { cannon: false }), one = (lib) => D.duel(D.makeSide("n", { cannon: false, network: { module: lib, weights: Float32Array.from([-3, -3]) } }), hand, 90003, "crossing");
+    ok("!! ONE SHIP A SIDE THE STICKY GUNNER IS THE FLY-WIRED GUNNER TO THE BIT (the sight only ever has one ship to choose); in a FLEET it is another fight; seatFlyWired2 is its policy and battleshipDuel seats its file", one(FT.sticky).fingerprint === one(FT).fingerprint && FT.sticky.sticky === true && [0.1, 0.7, 1.5, -2.2].every((e) => FT.sticky.S(e) === FT.S(e)) && FT.POLICY_ID2 === "seatFlyWired2" && D.duel(D.makeSide("n", { cannon: false, network: { module: FT.sticky, weights: Float32Array.from([-3, -3]) } }), hand, 90003, "crossing", { ships: 3 }).fingerprint !== D.duel(D.makeSide("n", { cannon: false, network: { module: FT, weights: Float32Array.from([-3, -3]) } }), hand, 90003, "crossing", { ships: 3 }).fingerprint && D.sideFromBrains("s", [PB.exportBrain(PB.describePolicy(FT.POLICY_ID2, FT.sticky), Float32Array.from([-3, -3]))]).side.seatNetworks["main-a"].module === FT.sticky);
+});
+
 console.log("5. THE FRONT DOOR");
 section(() => {
     ok("wirings by NAME, one object each: `fly:medial` is this file's own, `fly:lateral`, `flat`, `sine` (minus the sine of the bearing to a quarter turn and HELD at -1 behind it) and `shuffled:<seed>` are others with another S; a bad name is refused", FT.wiringOf() === FT.wiringOf("fly:medial") && FT.wiringOf("fly:medial").S === FT.S && FT.wiringOf("flat") === FT.wiringOf("flat") && ["fly:lateral", "flat", "sine", "shuffled:4242", "shuffled:7"].every((w) => FT.wiringOf(w).S(1.9) !== FT.S(1.9)) && Math.abs(FT.wiringOf("sine").S(0.4) + Math.sin(0.4)) < 1e-5 && Math.abs(FT.wiringOf("sine").S(120 * RAD) + 1) < 1e-9 && Math.abs(FT.wiringOf("sine").S(175 * RAD) + 1) < 1e-9 && throwsWith(() => FT.wiringOf("fly"), /a wiring is "fly:medial", "fly:lateral", "flat", "sine", "shuffled:<seed>", "scrambled:<seed>" or "unneighboured:<seed>" \(got fly\)/));
@@ -89,7 +100,7 @@ section(() => {
     const job = (wiring) => ({ x: { id: "n", cannon: false, network: wiring ? { policy: "seatFlyWired", weights: [-4, -4], wiring } : { policy: "seatFlyWired", weights: [-4, -4] } }, y: { id: "hand", cannon: false }, kind: "crossing", seed: 90003 }), a = leadOf(job(null)), b = leadOf(job("flat")), c = leadOf(job("fly:medial"));
     ok("!! the pool flies it over a named wiring: `flat` is another fight of the same gains, and `fly:medial` by name is the default", a !== b && a === c, `leads ${a.toFixed(3)}, ${b.toFixed(3)}`);
     ok("the report says real numbers", /281 neurons, 6589 connections, no learned weight inside; with places the command reaches 90% of its peak at 55\.5 degrees and peaks at 80\.5/.test(FT.reportLines()[1]));
-    ok("the export list", Object.keys(FT).sort().join() === "BASELINE,CONTROL_SEED,EYES,FEATURES,HIDDEN,OUTPUTS,OVERLAP,POLICY_ID,S,SIGMA,STEPS,WEIGHT_COUNT,cells,forward,gunnerFactory,gunnerFor,handWeights,raw,reportLines,signOf,topology,tuning,wiringOf,withBaseline,zeroWeights");
+    ok("the export list", Object.keys(FT).sort().join() === "BASELINE,CONTROL_SEED,EYES,FEATURES,HIDDEN,OUTPUTS,OVERLAP,POLICY_ID,POLICY_ID2,S,SIGMA,STEPS,WEIGHT_COUNT,cells,forward,gunnerFactory,gunnerFor,handWeights,raw,reportLines,signOf,sticky,topology,tuning,wiringOf,withBaseline,zeroWeights");
 });
 
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);

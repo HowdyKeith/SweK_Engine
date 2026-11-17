@@ -58,7 +58,20 @@ export function features(seat, st, body, rule, tg, reach = REACH, spent = 0) {
  * `idle` is what the seat does with NO target: "hold" (default: it stays where it points) or "rest" (it is sent back to yaw 0, pitch 0, which is what gunSeats.handGunner does). THIS IS THE ADAPTER'S CHOICE, NOT THE NETWORK'S, and the gate measures what it is worth.
  * The gunner for weights `w` behind `sight` (a gunSeats.handGunner or anything with its contract): decide(seat, state, body, targets, t) -> { yaw, pitch, fire, target }, the contract of a seat's gunner. `dt` is the tick the rates are turned over (the arena's, 1/30).
  */
-export function gunnerFor(w, sight, { reach = REACH, dt = 1 / 30, idle = "hold", sigma = 0, seed = 1, ammoSense = false, forward: fwd = forward, layersOf: lo = layersOf, post: pst = post } = {}) {
+/**
+ * A STICKY SIGHT (2026-11-17): the sight asked about the target it chose last, ALONE, first; only if that target cannot be shot (gone, out of reach or out of arc) is it asked about all of them. gunSeats.handGunner re-picks every tick the target it could hit soonest, which in a fleet changes a seat's target every two
+ * seconds, and a gun laid by rates smooths its aim and is left pointing between the targets (tools/ship/takeFlyWiredFights.mjs's header has the diagnosis). With one target it is the sight itself, to the bit (it is never asked twice). WHAT IT COSTS: while it sticks, the sight's memory of the OTHER
+ * targets is not kept up, so a sight with a tracking delay needs that delay before it can choose a new one.
+ */
+export function stickySight(sight) {
+    let cur = null;
+    return function sticky(seat, st, body, targets, t) {
+        if (cur != null) { const only = targets.filter((q) => q.id === cur); if (only.length) { const r = sight(seat, st, body, only, t); if (r.target != null || only.length === targets.length) { cur = r.target; return r; } } }
+        const r = sight(seat, st, body, targets, t); cur = r.target; return r;
+    };
+}
+export function gunnerFor(w, sight0, { reach = REACH, dt = 1 / 30, idle = "hold", sigma = 0, seed = 1, ammoSense = false, sticky = false, forward: fwd = forward, layersOf: lo = layersOf, post: pst = post } = {}) {
+    const sight = sticky ? stickySight(sight0) : sight0;   // `sticky` (default false): see stickySight
     if (idle !== "hold" && idle !== "rest") throw new Error(`seatTurretGunner.gunnerFor: idle is "hold" or "rest" (got ${idle})`);
     let laid = null;   // where the hand MEANS the gun to be: the seat's own angles are this plus the hand's error of the tick, and the error is not carried from one tick into the next (a gunner's hand shakes about where it holds the gun; it does not wander)
     function prepare(seat, st, body, targets, t = 0) {

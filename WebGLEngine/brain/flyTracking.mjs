@@ -76,7 +76,7 @@ function scrambledPlaces(seed) {
 }
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 /** A gunner library over a raw read-out raw(e): S(e) = the odd half of raw over its own peak, memoised on a fine grid of bearings (a gunner asks 26 times a tick); and the seat gunner's contract. */
-function libraryOf(name, raw, cells = null) {
+function libraryOf(name, raw, cells = null, { sticky = false } = {}) {
     const GRID = 720, table = new Float64Array(GRID + 1); let peak = 0;
     for (let k = 0; k <= GRID; k++) { const e = Math.PI * k / GRID; table[k] = (raw(e) - raw(-e)) / 2; peak = Math.max(peak, Math.abs(table[k])); }
     const amplitude = peak || 1;
@@ -85,9 +85,9 @@ function libraryOf(name, raw, cells = null) {
     const zeroWeights = () => new Float32Array(WEIGHT_COUNT);
     /** The seat's five outputs from its eleven features: the two rates from the circuit, the trigger the sight's own. */
     const forward = (w, x) => [Math.tanh(w[0] * S(x[1] * Math.PI)), Math.tanh(w[1] * S(x[2] * Math.PI / 2)), x[8] > 0 ? 1 : -1, 0, 0];
-    const gunnerFor = (w, sight, opts = {}) => ST.gunnerFor(w, sight, { ...opts, forward, layersOf: () => [], post: (y) => y });
+    const gunnerFor = (w, sight, opts = {}) => ST.gunnerFor(w, sight, { ...opts, sticky, forward, layersOf: () => [], post: (y) => y });
     const gunnerFactory = (w, makeSight, opts = {}) => (seat, k) => gunnerFor(w, makeSight(seat, k), { ...opts, seed: (opts.seed ?? 1) + k });
-    return Object.freeze({ name, amplitude, FEATURES, HIDDEN, OUTPUTS, WEIGHT_COUNT, raw, cells, S, zeroWeights, handWeights: zeroWeights, forward, gunnerFor, gunnerFactory });
+    return Object.freeze({ name, amplitude, sticky, FEATURES, HIDDEN, OUTPUTS, WEIGHT_COUNT, raw, cells, S, zeroWeights, handWeights: zeroWeights, forward, gunnerFor, gunnerFactory });
 }
 const FLY_M = circuitOf(matrixOf(), { front: 1 }), LIBS = new Map();
 /** The library for a wiring NAME: "fly:medial", "fly:lateral", "flat", "shuffled:<seed>", "sine". See the header. */
@@ -106,6 +106,8 @@ export function wiringOf(name = "fly:medial") {
 }
 const MAIN = wiringOf("fly:medial");
 export const S = MAIN.S, raw = MAIN.raw, cells = MAIN.cells, forward = MAIN.forward, zeroWeights = MAIN.zeroWeights, handWeights = MAIN.handWeights, gunnerFor = MAIN.gunnerFor, gunnerFactory = MAIN.gunnerFactory, topology = LC;
+/** THE STICKY GUNNER (`seatFlyWired2`): the fly-wired gunner (`fly:medial`, the same two gains) behind brain/seatTurretGunner.mjs's stickySight -- it keeps the target it chose while it can still be shot. See tools/ship/takeFlyWiredGunnerFix.mjs. */
+export const POLICY_ID2 = "seatFlyWired2", sticky = libraryOf("fly:medial, sticky", FLY_M.raw, FLY_M.cells, { sticky: true });
 export const EYES = Object.freeze({ L: Object.freeze(EYE_L.slice()), R: Object.freeze(EYE_R.slice()), DNa02: Object.freeze([DNA02_L, DNA02_R]) });
 /** The circuit with another constant drive on DNa02 (for the gate's and the header's claim about what the baseline does). */
 export const withBaseline = (baseline) => circuitOf(matrixOf(), { front: 1, baseline });
