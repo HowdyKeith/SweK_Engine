@@ -44,11 +44,11 @@ export function matchupsOf(runs) {
 /** The two sides of the equal-thetas flight: U(league7100) and a copy of it (their edge against each other is exactly 0). */
 export const equalPair = (runs) => { const D = { ...runs.find((r) => r.id === DONOR).final }; return [D, { ...D }]; };
 
-/** Flies the matchups on a set ("smoke", "dev" or "held"), plus U(league7100) against a copy of itself (`equal`). Returns { rows, equal: { edge } }. A row carries `identical` (the two thetas are the same, so the edge is exactly 0). */
+/** Flies the matchups on a set ("smoke", "dev" or "held"), plus U(league7100) against a copy of itself (`equal`). Returns { rows, equal: { edge, thetas } } (the two thetas the equal flight was flown with, for the gate). A row carries `identical` (the two thetas are the same, so the edge is exactly 0). */
 export function fly(matchups, runs, setName, opts = {}) {
-    const geos = T.geometries(SETS[setName].count, SETS[setName].first), side = (id, theta) => T.makeSide(id, { theta }), [e1, e2] = equalPair(runs);
+    const geos = T.geometries(SETS[setName].count, SETS[setName].first), side = (id, theta) => T.makeSide(id, { theta }), [e1, e2] = equalPair(runs), eq = [side("equal1", e1), side("equal2", e2)];
     const rows = matchups.map((m) => ({ ...rowOf({ id: m.id, kind: m.kind, finder: m.comparator }, T.matchup(side(m.hi.id, m.hi.theta), side(m.lo.id, m.lo.theta), geos, opts), geos), base: m.base, family: m.family, comparator: m.comparator, value: m.value, isP: m.isP, identical: JSON.stringify(m.hi.theta) === JSON.stringify(m.lo.theta) }));
-    return { rows, equal: { edge: T.matchup(side("equal1", e1), side("equal2", e2), geos, opts).summary.edge } };
+    return { rows, equal: { edge: T.matchup(eq[0], eq[1], geos, opts).summary.edge, thetas: [eq[0].theta, eq[1].theta] } };
 }
 
 /** The checks that VOID the read, by name and not weighed; every one is an identity or a file's own number. ctx { rows, matchups, equal, G, runs, count }. */
