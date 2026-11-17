@@ -469,3 +469,34 @@ The module, the study and both gates were committed and sabotaged first (dfe83ca
 **What this says.** The diagnosis was right about the exits. Taking the long way round when the short way leaves the region removed every exit on a fresh set, and it never cost the give-way arm a flight it had reached. It did not fix traffic. The flights it kept inside mostly ended against a ship instead (`ref+sweep`: 4 fewer exits, 2 more collisions), and the designated arm reached 48, three more than either reference, not significant. **Traffic is still not fixed. The failures left are collisions with ships, about 1 flight in 6, with no exit on any arm that has the sweep.**
 
 **What it leaves open (`nav-traffic-avoid-not-slow` stays OPEN).** The collisions: whether the sweep's long way, which checks only the edge, turns into ships (the registration said it might, and it was not checked). A sweep that checks ships as well as the edge is the obvious next registration. The one remaining exit of `ref+sweep` (both ways out).
+
+## WHY THE HELD79 SHIP COLLISIONS HAPPENED (2026-11-17; post hoc, a diagnosis of recorded flights, NOT a registered result; part 1 of FOLLOW-UP 8)
+
+FOLLOW-UP 7's designated arm hit a ship in 10 of 60 HELD79 flights. **The sweep's forced turns were not the main cause**: 9 of its 12 collisions (ships and bergs) had no forced turn. The sweep did turn 3 exits into ship collisions (7627, 7633, and 7657 under `ref+sweep`). Re-flying seven of the designated arm's ship collisions with a pilot that logs every tick (the tick is 1/30 s):
+
+* **Head-on, mostly.** In 5 of 7 the ship's course is within 35 degrees of opposite the vessel's (relative course -155 to 175). The others: -134 and -54. Ship speeds 1.25 to 2.8 m/s against the vessel's 1.9 to 2.1.
+* **Deep keels.** The ships' keels are 27 to 51 m. The vessel was at 15 to 40 m, always ABOVE the keel, so a ship cannot be passed beneath at the depth the vessel holds.
+* **Give-way runs out of headings.** The conflict lasted 15 to 31 s. Ten seconds before the hit, give-way had a heading in 6 of 7. **One and five seconds before, it had none in all 7 but one**: no candidate within 90 degrees keeps a straight 30 s run clear. Give-way then FALLS BACK TO THE PLAN, the worst choice, and the vessel holds on into the ship.
+
+## FOLLOW-UP 8: WHEN NO HEADING IS CLEAR, THE LEAST BAD ONE; AND A DIVE UNDER THE KEEL (Keith, 2026-11-17: "then the sandbox rounds, smallest first"; REGISTERED 2026-11-17, BEFORE ANY CODE FOR IT AND BEFORE ANY OF ITS SEEDS IS FLOWN)
+
+Two options on top of FOLLOW-UP 7's designated arm (`ref+free+giveway+sweep`, the reference here, flown unchanged).
+
+* **`+leastbad`.** When give-way acts (a ship conflict) and finds no clear heading, it takes the candidate whose straight run stays clear the LONGEST: the most whole seconds before the run first breaks the region margin or a ship's clearance, by `runClear`'s own geometry. Ties go to the nearer offset, in give-way's order. A best run of 0 s changes nothing. It holds the plan's depth and speed, as give-way does.
+* **`+dive`.** When there is a ship conflict, the vessel is commanded down to the deepest keel among the ships in conflict, plus VMARGIN, plus 2 m, if that is deeper than the target's depth and no deeper than **DIVE_MAX = 60 m** (crush depth 100 m). It is held while the conflict lasts. Only the depth changes. "In conflict" is `shipConflict`'s test, applied ship by ship.
+
+**The arms** (hard-traffic): `sweep` (the reference, FOLLOW-UP 7's designated arm); `sweep+leastbad` and `sweep+dive` (reported); **`sweep+leastbad+dive` (designated)**.
+
+**The set.** HELD81 = hard-traffic seeds 7821 to 7880, flown ONCE; spent by no navigation set (HELD80 ends at 7820). DEV (1 to 30) is the sanity run. HELD79 will also be flown with the new arms as a labelled POST HOC check: its collisions chose the fix.
+
+**The registered test.** The designated arm against the reference, paired by seed:
+* **SUPPORTED** iff (1) ship collisions at most half the reference's, (2) net gain >= 5 at an exact two-sided sign p <= 0.10, and (3) no flight leaves the region.
+* **PARTLY SUPPORTED** iff (3) holds and exactly one of (1) and (2) does.
+* **NOT SUPPORTED** otherwise.
+Reported beside it: each option alone against the reference; how often each option acted (ticks); the deepest depth any flight reached.
+
+**Checks (a failure: NOT WEIGHED).** (1) THE COPY: with both options off, the reference reproduces FOLLOW-UP 7's stored HELD79 flights of its designated arm on the first five seeds (status, ticks, path). (2) SAME SCENARIOS. (3) EACH OPTION BITES: each changes at least one flight on the set. (4) NO CRUSH: no flight is lost to depth.
+
+**Expectations, written before any seed is flown.** E1 `sweep+dive` alone at most halves the ship collisions: about 45 percent (a 20 m dive takes about 20 s at 1 m/s, against conflicts of 15 to 30 s). E2 `sweep+leastbad` alone reduces them: about 50 percent. E3 SUPPORTED: about 25 percent. E4 PARTLY SUPPORTED: about 35 percent. E5 no flight is lost to depth: about 95 percent.
+
+**What a result would not say.** The ships do not react here (hard-traffic: the reacting kind is NAV_PLUS item 3's). Their keels are known exactly. The dive ignores icebergs' keels and the region's floor (the navigation model's seabed is 1,000 m).
