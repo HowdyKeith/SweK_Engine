@@ -67,4 +67,4 @@ What it says: **no class of either circuit costs more than random sets of its si
 * **`demo-brain-lesion` as a claim:** the reading above says there is no class effect to show. A demo would show a TIE, which the switchboard page already does.
 * **The stateful fly (1,729 weights):** its circuit (`render/subAquariumFlyCx.mjs`) is not a `createSubPolicy` pilot and has no classes in `TOPOLOGIES`. A lesion of it needs its own silencing rule.
 * **`nav-fleet-avoidance`:** held (section 1).
-* **Gate census and version:** the new gate is in no register yet; the ship does that.
+* **Gate census and version:** the new gate is in no register yet; the ship does that. Until then `tools/ship/gateReach-selfcheck.mjs` reads RED on this branch on one row: the gate population is 588 against the recorded 587, and the one added is `brain/lesion-selfcheck.mjs`. The census is re-recorded at ship time (`populationCensus.mjs`). `definitionGates-selfcheck` and `orphanScan-selfcheck` pass.
