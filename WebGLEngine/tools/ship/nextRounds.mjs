@@ -3013,7 +3013,7 @@ export const NEXT_ROUNDS = [
     {
         id: "nav-missions-and-cost",
         blocker: "OPEN",
-        what: "One waypoint per flight, and a detour costs nothing.",
+        what: "One waypoint per flight, and a detour costs nothing. UPDATE 2026-11-17 (PART 1 DONE, brain/NAV_MISSIONS_WIP.md): an energy meter on the needs model's own power (brain/navEnergy.mjs; equal to stepNeeds to the last bit) priced HELD80 (120 fresh traffic legs): THE DETOUR COSTS -- any+predict pays a median 142 kJ (4.7 percent of a battery) more than any+replan for 38 m more path, but reaches 81 against 65; the traffic reference (it slows near ships) costs replan's energy and reaches 79. A leg takes 38-45 percent of a 3 MJ battery; speed matters more than path (490 J/m at 1 m/s, 2,675 at cruise). PART 2 OPEN: multi-leg missions on one clock that can run a battery dry; an energy-aware arm.",
         how: "Multi-waypoint missions through the field; the energy of a detour through the submarine needs model (physics/mechanics/subNeeds.mjs, brain/NEEDS_AND_LIMITS.md).",
         why: "any+predict flew paths 25 percent longer than replan's in traffic; whether that matters depends on what a metre costs.",
     },

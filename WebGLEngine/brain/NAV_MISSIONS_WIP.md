@@ -44,3 +44,23 @@ Multi-waypoint missions: one clock across legs, the ships sailing on between the
 ### AMENDMENT 1 TO PART 1 (2026-11-17; made on DEV, BEFORE ANY HELD80 SEED IS FLOWN; DEV is not a result)
 
 DEV (30 seeds) gave only **10 flights reached by both `any+predict` and `any+replan`**: `any+replan` reaches few in traffic. At that rate the registered 60 seeds would give about 20 pairs, exactly the ENOUGH PAIRS floor, and the reading would stand or fall on a coin. **HELD80 is widened to seeds 7701 to 7820 (120 scenarios, 360 flights).** 7761 to 7820 are spent by no navigation set either. The arms, the reading, the bars (3 and 1 percent of a battery), the checks and the floor of 20 pairs are unchanged. The DEV table was not printed (its check failed, as the rule says) and nothing else of DEV was read.
+
+## PART 1, RESULT (2026-11-17; `node tools/ship/navEnergyStudy.mjs --set held80 --write`, HELD80 = hard-traffic seeds 7701 to 7820 after Amendment 1, flown ONCE; 360 flights in `brain/navEnergyHeld80.jsonl`): **THE DETOUR COSTS**
+
+The meter, the study and both gates were committed and sabotaged first (64201749; 15 mutants logged, two of which first read 0 red and got rows). All three checks passed. The meter equals the needs model's energy drop to the last bit and leaves every flight unchanged.
+
+| arm | reached | median path | median energy of a reached flight | median J/m | flights over one battery |
+|---|---|---|---|---|---|
+| any+replan | 65 / 120 | 399 m | 1,133 kJ (37.8%) | 2,834 | 0 |
+| any+predict | **81 / 120** | 463 m | 1,340 kJ (44.7%) | 2,877 | 0 |
+| any+predict+edge+yield | 79 / 120 | 432 m | 1,146 kJ (38.2%) | **2,683** | 0 |
+
+**The registered reading.** On the 47 flights both `any+predict` and `any+replan` reach, `any+predict` pays a **median 142 kJ more, 4.7 percent of a battery**, for a median 38 m more path. The bar was 3 percent: **THE DETOUR COSTS.**
+
+**Reported beside it.** The traffic reference (`any+predict+edge+yield`) against `any+replan` on the 44 flights both reach: a median **7 kJ less** for 26 m more path. Slowing near ships (the yield) is cheaper per metre (2,683 J/m against 2,877) and pays for its longer path.
+
+**Against the expectations (written first).** E1 THE DETOUR COSTS, about 45: held. E2 the reference uses less energy per reached flight than `any+predict`, about 65: held (1,146 against 1,340 kJ). E3 `any+replan` reaches fewer than `any+predict`, about 75: held (65 against 81). E4 a flight empties a battery, about 30: no (none did).
+
+**What it says.** A metre is not free: one leg through traffic takes 38 to 45 percent of a 3 MJ battery, and `any+predict`'s detour adds about 5 percent of a battery to each leg it shares with `any+replan`. It also reaches 16 more legs of 120, so the detour buys arrivals. The reference arm gets both: as many arrivals as `any+predict` (79) for replan's energy, because slowing is cheap. **On this hull, the speed a vessel goes matters more to its energy than the path it takes**: 1 m/s costs 490 J/m and cruise 2,675 J/m.
+
+**Not checked, said plainly.** One hull (the explorer), one battery class, no recharge. The arms were not asked to save energy; none of them knows it is spending it. PART 2 (missions of several legs on one clock, which can run a battery dry) is not built.
