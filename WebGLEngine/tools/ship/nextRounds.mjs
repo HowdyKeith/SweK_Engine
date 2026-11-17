@@ -2999,7 +2999,7 @@ export const NEXT_ROUNDS = [
     {
         id: "nav-current-in-field",
         blocker: "OPEN",
-        what: "The field does not know the current. The harder test's strong-current kind (mean up to 1.2 m/s) is flown on a plan that ignores it, and reached 93 percent with 4 collisions.",
+        what: "The field does not know the current. The harder test's strong-current kind (mean up to 1.2 m/s) is flown on a plan that ignores it, and reached 93 percent with 4 collisions. UPDATE 2026-11-17: the crab alone REPLICATED on a fresh set (brain/NAV_PLUS_WIP.md, ITEM 2 REPLICATE, HELD73): any+crab against any, 12 to 3, gain 9, p 0.0352, collisions 5 against 13 -- SUPPORTED. Open: the current in the COST and the corner-angle margin (never tried), and whether the crab becomes a default arm (the tank's couriers, subHardNav).",
         how: "A crab angle in the aim point; the current in the cost (a cell costs more against the set); a margin that grows with the current; the turn radius (about 35 m) in the margin.",
         why: "The documented failures in a current are collisions on the way, not arrival failures (follow-up 1).",
     },

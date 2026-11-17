@@ -181,3 +181,22 @@ The margin sweep covers one sea family at an exact fix; the crab result is post 
 * E4 the gain is larger on hard-current than on the gap kind: about 70 percent (7 against 3 in item 2).
 
 **What a result would not say.** The logs the estimate reads are perfect (no sensor noise), the current is steady per scenario, and the vessel is the PD autopilot's. SUPPORTED says that pointing into a known current helps this planner reach goals in these two kinds, nothing about a real current meter.
+
+## ITEM 2 REPLICATE, RESULT (2026-11-17; `node tools/ship/subNavPlusStudy.mjs --study crab --set held73 --write`, HELD73 = seeds 7301 to 7400 of both kinds, flown ONCE; 400 flights in `brain/subNavPlusCrabHeld73.jsonl`): **SUPPORTED**
+
+The study, its checks and its gates were committed and sabotaged first (9ed89170; 14 mutants logged in `tools/ship/subNavPlusStudy-selfcheck.mjs`). DEV was flown once as the sanity run (PARTLY SUPPORTED on 60 scenarios, not a result). All three checks passed: both arms reproduce item 2's stored HELD71 flights tick for tick, so these are the same arms.
+
+| kind | arm | reached | collided | left | timed out | median path / chord |
+|---|---|---|---|---|---|---|
+| hard-current | any | 95/100 | 4 | 1 | 0 | 1.087 |
+| | any+crab | 96/100 | 3 | 1 | 0 | 1.035 |
+| hard-current-gap | any | 90/100 | 9 | 0 | 1 | 1.069 |
+| | any+crab | **98/100** | 2 | 0 | 0 | 1.015 |
+
+`any+crab` against `any`, pooled and paired: **12 only the crab, 3 only `any`, both 182, neither 3; gain 9, exact sign p 0.0352; collisions 5 against 13.** Every bar is met (gain >= 5, p <= 0.05, no more collisions), so the verdict is **SUPPORTED**.
+
+**Against the expectations (written first).** E1 SUPPORTED, about 60: held. E2 the crab reaches at least 97 on hard-current, about 75: MISSED (96; one exit and three collisions). E3 a shorter path on hard-current, about 85: held (1.035 against 1.087). E4 the gain larger on hard-current than on the gap kind, about 70: MISSED, and by a lot. The gain is 1 on hard-current (3 to 2) and 8 on the gap kind (9 to 1). Item 2 had it the other way round: 7 to 0 on hard-current, 5 to 2 on the gap kind.
+
+**What it says.** Pointing the nose into a current the vessel estimates from its own logs helps this planner reach its goals on a fresh set of both current kinds, mostly by not colliding (5 against 13). The track is straighter on both kinds (path / chord 1.035 and 1.015 against 1.087 and 1.069). Two draws of 200 now agree on the pooled gain (10, then 9). They disagree on WHICH kind it comes from, so the per-kind split should not be read as a property of the kinds.
+
+**Not checked, said plainly.** The estimate reads perfect logs. The current is uniform in space and steady per scenario. The vessel is the PD autopilot's. The crab is not yet an option of the tank's couriers or of `subHardNav`'s default arms. Making it the default is a separate decision, not taken here.
