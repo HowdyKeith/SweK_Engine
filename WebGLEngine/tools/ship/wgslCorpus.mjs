@@ -684,6 +684,22 @@ export function corpus() {
               return { code: R.bvhProbeWgsl(rayCount), outCount: rayCount * 2, workgroups: Math.ceil(rayCount / 64),
                        inputs: [...R.bvhInputs(bvh), { binding: 6, data: rays }] };
           })() },
+        // v4918 -- the instance probe: what a ray hits among placed meshes and how many instances it entered, by the
+        // list here (the tree is the same kernel with one option; rtPipeline-selfcheck section 17 holds the two together).
+        { id: "rtPipeline.instanceProbeWgsl", from: "physics/render/rtPipeline.mjs",
+          why: "one ray per invocation against three instances of a unit cube -- distance, instance, triangle and instances entered; graded against a brute search over CPU-placed meshes by rtPipeline-selfcheck.mjs section 17, here for the corpus's own shader-compiles-and-runs claim",
+          opts: (() => {
+              const positions = [[-1, -1, -1], [1, -1, -1], [1, 1, -1], [-1, 1, -1], [-1, -1, 1], [1, -1, 1], [1, 1, 1], [-1, 1, 1]];
+              const indices = [[0, 2, 1], [0, 3, 2], [4, 5, 6], [4, 6, 7], [0, 5, 4], [0, 1, 5], [3, 6, 2], [3, 7, 6], [0, 7, 3], [0, 4, 7], [1, 6, 5], [1, 2, 6]];
+              const bvh = R.bvhBuffersFromMesh(positions, indices);
+              const at = (x) => [1, 0, 0, x, 0, 1, 0, 0, 0, 0, 1, 0];
+              const inst = R.instanceBuffer([{ transform: at(-3), albedo: 0.5 }, { transform: at(0), albedo: 0.5 }, { transform: at(3), albedo: 0.5 }], { meshes: bvh });
+              const rays = new Float32Array([-3, 0, -5, 0, 0, 1, 0, 0, -5, 0, 0, 1, 3, 0, -5, 0, 0, 1, -8, 0, 0, 1, 0, 0, 0, 9, 0, 0, 1, 0, 1.5, 0, -5, 0, 0, 1, 0, 5, 0, 0, -1, 0, 8, 0.5, 0.5, -1, 0, 0]);
+              const rayCount = rays.length / 6, U = new Float32Array(96);
+              U[R.MESH_META_SLOT * 4] = 1; U[R.MESH_META_SLOT * 4 + 3] = 3;
+              return { code: R.instanceProbeWgsl(rayCount), outCount: rayCount * 4, workgroups: Math.ceil(rayCount / 64), uniforms: U,
+                       inputs: [...R.bvhInputs(bvh), { binding: R.BVH_BINDINGS.instances, data: inst }, { binding: 6, data: rays }] };
+          })() },
         { id: "rtPipeline.bvhShadeProbeWgsl", from: "physics/render/rtPipeline.mjs",
           why: "the interpolated vertex colour at each ray's hit point, over the same cube with a hand-designed per-vertex gradient -- graded against meshBVH.mjs's independent baryAt() by rtPipeline-selfcheck.mjs; here for the second backend",
           opts: (() => {

@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "afd88bc92a633fba23e4ee951fea37d0f228ec5c",
+ "head": "9b095398471cd908fb40167aa3dbb1980f74c5c8",
  "bodies": {
   "box3d": [
    {
@@ -461,13 +461,13 @@
   "kenney-city": [
    {
     "path": "rtx-viewer.html",
-    "bytes": 15443,
-    "sha": "8aa6387c28c8c67f67e7a026e38ab3a2ddeb2c92"
+    "bytes": 17872,
+    "sha": "4575be6607990b52ef3b7c55ada0a9d22f689f07"
    },
    {
     "path": "tools/ship/rtViewer-selfcheck.mjs",
-    "bytes": 131378,
-    "sha": "e2d918cca123e8b5eee1818b6115659dcfcd2dbb"
+    "bytes": 158946,
+    "sha": "4575be6607990b52ef3b7c55ada0a9d22f689f07"
    },
    {
     "path": "world/kenneyKit.mjs",
@@ -676,8 +676,8 @@
    },
    {
     "path": "tools/ship/wgslCorpus.mjs",
-    "bytes": 159167,
-    "sha": "7d423e172187a6c68e46843700f01ba9de3ddb22"
+    "bytes": 161053,
+    "sha": "ac9c232e8b2beee28634773274b7f756796ca72b"
    }
   ],
   "taichi-js": [
@@ -920,8 +920,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 3770823,
-    "sha": "afd88bc92a633fba23e4ee951fea37d0f228ec5c"
+    "bytes": 3791991,
+    "sha": "99f074f78ffc4595889215dd438424892e1ef1b6"
    },
    {
     "path": "mpm3d.html",
@@ -950,8 +950,8 @@
    },
    {
     "path": "render/seaPicker-selfcheck.mjs",
-    "bytes": 17420,
-    "sha": "19f50377e874b430dbc3da3b28d29c11102662ef"
+    "bytes": 18881,
+    "sha": "4575be6607990b52ef3b7c55ada0a9d22f689f07"
    },
    {
     "path": "render/seaThree-selfcheck.mjs",

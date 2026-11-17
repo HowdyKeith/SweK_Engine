@@ -97,6 +97,9 @@
 // triangles, as one procedural rule; and the one mesh can be placed more than once. Both are described where
 // they are declared, above ANYHIT_SLOT, with what each still is not: no translucency, no any-hit for a sphere,
 // a LIST of instances rather than a tree over them, one mesh, and no per-triangle material under an instance.)
+// (v4917: three of those five are written -- translucency as a coin, a sphere's any-hit, and per-triangle material
+// under an instance. Still a list, still one mesh.)
+// (v4918: and those two. A tree over the instances, asked for with instanceTree, and any number of meshes.)
 //
 // ---- THIS ROUND -- THE BVH THE PARAGRAPH ABOVE USED TO SAY WAS MISSING ---------------------------------------
 //
@@ -165,9 +168,10 @@ export const STAGES = Object.freeze([
                     what: "a PROCEDURAL primitive's hit test -- a sphere, which in Vulkan needs this stage " +
                           "because only triangles get the built-in intersector" }),
     Object.freeze({ id: "anyHit", fn: "rtAnyHit", implemented: true, since: "v4915",
-                    what: "accept or reject a candidate TRIANGLE hit before it becomes closest (v4915). One rule, " +
-                          "a barycentric cutout, selected by a record; a sphere has no any-hit, and nothing " +
-                          "here is translucent -- a rejected hit is a hole, not a partial transmission" }),
+                    what: "accept or reject a candidate hit before it becomes closest. For a triangle (v4915) a " +
+                          "barycentric cutout or (v4917) a coin of probability alpha; for a sphere (v4917) a cap " +
+                          "cut off at a latitude. Each rule is selected by data, and alpha is stochastic: no hit " +
+                          "is ever partly accepted" }),
     Object.freeze({ id: "closestHit", fn: "rtClosestHit", implemented: true,
                     what: "shade the winning hit and produce the continuation ray" }),
     Object.freeze({ id: "miss", fn: "rtMiss", implemented: true,
@@ -370,7 +374,20 @@ export const BVH_BINDINGS = Object.freeze({ bounds: 2, meta: 3, order: 4, tris: 
 // line of code with this file. NOT translucency: there is no partial acceptance, no stochastic alpha, and no
 // any-hit for the procedural spheres.
 export const ANYHIT_SLOT = 5;
-export const ANY_HIT_SHADERS = Object.freeze({ none: 0, cutout: 1 });
+export const ANY_HIT_SHADERS = Object.freeze({ none: 0, cutout: 1, alpha: 2 });
+// v4917 -- THREE THINGS v4915 SAID WERE NOT WRITTEN, WRITTEN.
+//   "alpha" IS TRANSLUCENCY AS A COIN: a candidate is accepted with probability p, by one draw from the path's own
+//     generator. Stochastic transparency -- each crossing transmits with probability 1 - p, so the EXPECTED picture
+//     is the blended one and no pixel ever holds a blend. The draw is taken in traversal order, which is the BVH's
+//     and not the ray's, so a path's tape is no longer the reference's: this rule is held STATISTICALLY (different
+//     seeds a side, section 9's row) and by its two ends, never pixel for pixel.
+//   A SPHERE HAS AN ANY-HIT TOO, and it needed the intersection to change shape: a rejected NEAR root must fall
+//     through to the FAR one, which is the inside of the shell seen through the hole. One rule, "cap": the part of
+//     the sphere above a latitude is open. U[ANYHIT_SLOT].z names it and .w is the latitude as a fraction of the
+//     radius. Refused with light sampling: the cone sampler aims at a whole sphere, and a cut light is not one.
+//   AN INSTANCE MAY CARRY PER-TRIANGLE MATERIALS: its record is then an OFFSET into the material table and the
+//     triangle's index is added to it -- Vulkan's instanceShaderBindingTableRecordOffset plus the geometry's own.
+export const SPHERE_ANY_HIT_SHADERS = Object.freeze({ none: 0, cap: 1 });
 
 // *** INSTANCES ARE A LIST, AND IT IS NOT CALLED A TLAS BECAUSE IT IS NOT A TREE. *** Vulkan's top level is a
 // BVH over instance boxes. This is its leaf content without the tree: each instance is the ONE mesh's BVH under
@@ -380,8 +397,41 @@ export const ANY_HIT_SHADERS = Object.freeze({ none: 0, cutout: 1 });
 // renormalised, so t means the same distance in both spaces and the nearest hit across instances needs no
 // conversion); the winning normal comes back out through the inverse transpose. One mesh, many placements:
 // a second BLAS is not supported, and neither is per-triangle material under an instance.
-/** Floats per instance in the storage buffer: three rows of the object-from-world 3x4, then one SBT record. */
-export const INSTANCE_FLOATS = 16;
+/** Floats per instance in the storage buffer: three rows of the object-from-world 3x4, one SBT record, and (v4918)
+ *  four more whose first is the root node of the instance's own mesh. */
+export const INSTANCE_FLOATS = 20;
+
+// *** v4918 -- THE TREE OVER THE INSTANCES, AND MORE THAN ONE MESH. ***
+// v4915 called the instances a list and said why it was not called a top-level structure. This is the structure.
+//   MORE THAN ONE MESH: bvhBuffersFromMeshes() builds one MeshBVH per mesh and lays them end to end in the SAME four
+//     buffers, each node's child and leaf indices and each leaf's triangle indices shifted to where that mesh landed.
+//     A mesh is then a ROOT NODE, and an instance names one (`mesh: k`); rtTraverseBvh starts wherever it is told.
+//   THE TREE: instanceBuffer(), given the meshes, appends a BVH over the instances' WORLD boxes to its own buffer --
+//     a count, then eight floats a node (box, then two links: children, or -(first + 1) and a count for a leaf), then
+//     the leaf order. pipelineWgsl({ instanceTree: true }) walks it near child first and enters only the instances
+//     whose box the ray reaches before its best hit. Same buffer, no new binding: a compute stage has eight storage
+//     buffers and this pipeline already uses seven.
+// The list is kept and is still the default: it is the tree's control, and they must agree on every pixel.
+/** A BVH over axis-aligned boxes ([minx,miny,minz,maxx,maxy,maxz] each): median split on the longest axis of the
+ *  centroids, leaves of at most `maxLeaf`. Returns { nodes: Float32Array (8 a node), order: Int32Array }. */
+export function buildInstanceTree(boxes, { maxLeaf = 2 } = {}) {
+    const order = boxes.map((_, i) => i), nodes = [];
+    const centre = (i, ax) => (boxes[i][ax] + boxes[i][ax + 3]) / 2;
+    const build = (lo, hi) => {
+        const me = nodes.length; nodes.push(null);
+        const bb = [Infinity, Infinity, Infinity, -Infinity, -Infinity, -Infinity], cb = [Infinity, Infinity, Infinity, -Infinity, -Infinity, -Infinity];
+        for (let s = lo; s < hi; s++) { const b = boxes[order[s]];
+            for (let a = 0; a < 3; a++) { bb[a] = Math.min(bb[a], b[a]); bb[a + 3] = Math.max(bb[a + 3], b[a + 3]); const c = centre(order[s], a); cb[a] = Math.min(cb[a], c); cb[a + 3] = Math.max(cb[a + 3], c); } }
+        if (hi - lo <= maxLeaf) { nodes[me] = [...bb, -(lo + 1), hi - lo]; return me; }
+        const ext = [cb[3] - cb[0], cb[4] - cb[1], cb[5] - cb[2]], ax = ext.indexOf(Math.max(...ext));
+        const part = order.slice(lo, hi).sort((p, q) => centre(p, ax) - centre(q, ax) || p - q);
+        for (let s = lo; s < hi; s++) order[s] = part[s - lo];
+        const mid = (lo + hi) >> 1, left = build(lo, mid), right = build(mid, hi);
+        nodes[me] = [...bb, left, right]; return me;
+    };
+    if (boxes.length) build(0, boxes.length);
+    return { nodes: Float32Array.from(nodes.flat()), order: Int32Array.from(order), nodeCount: nodes.length };
+}
 
 /**
  * Pack instances for BVH_BINDINGS.instances. Each is { transform, hit, albedo }: `transform` is the WORLD-FROM-
@@ -392,9 +442,16 @@ export const INSTANCE_FLOATS = 16;
  * (determinant < 0 -- the mesh's winding flips, so cross(e1, e2) and the inverse-transpose normal point
  * opposite ways and the closest-hit would shade the back); and an emissive record (the same half-working light
  * meshSbtBuffer already refuses).
+ *
+ * v4917 -- an instance with `sbtOffset` (a whole number) packs THAT in place of a material: under
+ * pipelineWgsl({ instances, meshMaterials }) its triangles read bvhSbt[sbtOffset + bvhMatIdx[tri]].
  */
-export function instanceBuffer(instances, { rgb = false } = {}) {
+export function instanceBuffer(instances, { rgb = false, meshes = null } = {}) {
     if (!instances || !instances.length) throw new Error("rtPipeline: instanceBuffer needs at least one instance");
+    // v4918 -- `meshes` is what bvhBuffersFromMesh/-TriSoup/-Meshes returned. With it an instance's `mesh` (default 0)
+    // becomes that mesh's root node, and the tree over the instances' world boxes is appended. Without it every
+    // instance is of the buffers' first mesh and there is no tree, exactly as v4915 packed.
+    const roots = meshes ? (meshes.roots || [0]) : [0], boxes = [];
     const out = new Float32Array(instances.length * INSTANCE_FLOATS);
     instances.forEach((inst, k) => {
         const m = inst.transform;
@@ -415,9 +472,62 @@ export function instanceBuffer(instances, { rgb = false } = {}) {
             out[o + r * 4] = inv[r * 3]; out[o + r * 4 + 1] = inv[r * 3 + 1]; out[o + r * 4 + 2] = inv[r * 3 + 2];
             out[o + r * 4 + 3] = -(inv[r * 3] * tx + inv[r * 3 + 1] * ty + inv[r * 3 + 2] * tz);
         }
-        out.set(sbtRecordFloats({ hit: inst.hit || "lambertian", albedo: inst.albedo, roughness: inst.roughness, ior: inst.ior }, { rgb }), o + 12);
+        const meshK = inst.mesh || 0;
+        if (!Number.isInteger(meshK) || meshK < 0 || meshK >= roots.length) throw new Error(
+            "rtPipeline: instance " + k + " names mesh " + inst.mesh + " and the buffers hold " + roots.length + (meshes ? "" : " (pass `meshes` to instanceBuffer to place more than the first)"));
+        out[o + 16] = roots[meshK];
+        if (meshes) {                                     // the mesh's own root box, its eight corners carried to the world
+            const rb = roots[meshK] * 6, B = meshes.bounds, bb = [Infinity, Infinity, Infinity, -Infinity, -Infinity, -Infinity];
+            for (let c = 0; c < 8; c++) {
+                const px = B[rb + (c & 1 ? 3 : 0)], py = B[rb + 1 + (c & 2 ? 3 : 0)], pz = B[rb + 2 + (c & 4 ? 3 : 0)];
+                const w = [a * px + b * py + m[2] * pz + tx, d * px + e * py + f * pz + ty, g * px + h * py + i * pz + tz];
+                for (let ax = 0; ax < 3; ax++) { bb[ax] = Math.min(bb[ax], w[ax]); bb[ax + 3] = Math.max(bb[ax + 3], w[ax]); }
+            }
+            boxes.push(bb);
+        }
+        if (inst.sbtOffset !== undefined) {
+            if (!Number.isInteger(inst.sbtOffset) || inst.sbtOffset < 0) throw new Error("rtPipeline: instance " + k + " has sbtOffset " + inst.sbtOffset + " -- a whole number of records into the material table");
+            out.set([inst.sbtOffset, 0, 0, 0], o + 12);
+        } else out.set(sbtRecordFloats({ hit: inst.hit || "lambertian", albedo: inst.albedo, roughness: inst.roughness, ior: inst.ior }, { rgb }), o + 12);
     });
-    return out;
+    if (!meshes) return out;
+    // the tree, behind the instances: [nodeCount, 0, 0, 0], the nodes, the leaf order. f32 holds an index exactly to 2^24.
+    const tree = buildInstanceTree(boxes), all = new Float32Array(out.length + 4 + tree.nodes.length + tree.order.length);
+    all.set(out); all[out.length] = tree.nodeCount; all.set(tree.nodes, out.length + 4); all.set(tree.order, out.length + 4 + tree.nodes.length);
+    return all;
+}
+
+/**
+ * v4918 -- several meshes in the one set of buffers. Each entry is { positions, indices } or { tris } (a flat
+ * 9-floats-a-triangle buffer). Returns what bvhBuffersFromMesh returns, plus `roots` (each mesh's root node) and
+ * `triBase` (where each mesh's triangles start). Vertex colours and per-triangle material indices are not carried:
+ * a caller that needs them on one mesh still has bvhBuffersFromMesh, and saying so beats half-carrying them.
+ */
+export function bvhBuffersFromMeshes(list, opts = {}) {
+    if (!list || !list.length) throw new Error("rtPipeline: bvhBuffersFromMeshes needs at least one mesh");
+    const parts = list.map((mm, k) => {
+        const tris = mm.tris ? (mm.tris instanceof Float64Array ? mm.tris : Float64Array.from(mm.tris)) : trianglesFrom(mm.positions, mm.indices);
+        if (tris.length % 9 !== 0 || !tris.length) throw new Error("rtPipeline: mesh " + k + " is not a whole number of triangles (" + tris.length + " floats)");
+        return { tris, bvh: new MeshBVH(tris, opts) };
+    });
+    const nodeCount = parts.reduce((a, q) => a + q.bvh.nodes, 0), triCount = parts.reduce((a, q) => a + q.bvh.count, 0);
+    const bounds = new Float32Array(nodeCount * 6), meta = new Int32Array(nodeCount * 3), order = new Int32Array(triCount), tris = new Float32Array(triCount * 9);
+    const roots = [], triBase = [];
+    let nb = 0, tb = 0;
+    for (const { tris: t, bvh } of parts) {
+        roots.push(nb); triBase.push(tb);
+        bounds.set(bvh.bounds.subarray(0, bvh.nodes * 6), nb * 6);
+        for (let n = 0; n < bvh.nodes; n++) {
+            const a = bvh.meta[n * 3], b = bvh.meta[n * 3 + 1], c = bvh.meta[n * 3 + 2];
+            // a leaf (a < 0) carries a start into `order` and a count; an interior node carries two children
+            if (a < 0) meta.set([a, b + tb, c], (nb + n) * 3); else meta.set([a + nb, b + nb, c], (nb + n) * 3);
+        }
+        for (let s = 0; s < bvh.count; s++) order[tb + s] = bvh.order[s] + tb;
+        tris.set(t, tb * 9);
+        nb += bvh.nodes; tb += bvh.count;
+    }
+    return Object.freeze({ bounds, meta, order, tris, vertColors: null, matIndex: null, nodeCount, triCount,
+                           roots: Object.freeze(roots), triBase: Object.freeze(triBase), bvhs: parts.map((q) => q.bvh) });
 }
 
 // ================================================================================================
@@ -666,7 +776,17 @@ fn rtEnvSample(d : vec3<f32>) -> vec3<f32> {
  * meshBVH.mjs's traversal, not two copies that can drift apart the way multiplayer/wadLevelHost.js and
  * tools/krbn/krbnCompare.js's independent ray-triangle kernels already did (meshBVH.mjs's own header).
  */
-function bvhWgslBlock({ vertexColors = false, meshMaterials = false, anyHit = false, instances = false } = {}) {
+function bvhWgslBlock({ vertexColors = false, meshMaterials = false, anyHit = false, instances = false, instanceTree = false, countVisits = false } = {}) {
+    // one instance, entered: shared by the list and the tree so the two cannot drift (v4918)
+    const enter = `    let b = k * ${INSTANCE_FLOATS};
+    let r0 = vec4<f32>(bvhInst[b], bvhInst[b + 1], bvhInst[b + 2], bvhInst[b + 3]);
+    let r1 = vec4<f32>(bvhInst[b + 4], bvhInst[b + 5], bvhInst[b + 6], bvhInst[b + 7]);
+    let r2 = vec4<f32>(bvhInst[b + 8], bvhInst[b + 9], bvhInst[b + 10], bvhInst[b + 11]);
+    let o = vec3<f32>(dot(r0.xyz, orig) + r0.w, dot(r1.xyz, orig) + r1.w, dot(r2.xyz, orig) + r2.w);
+    let d = vec3<f32>(dot(r0.xyz, dir), dot(r1.xyz, dir), dot(r2.xyz, dir));
+    bvhRoot = i32(bvhInst[b + 16]);${countVisits ? "\n    bvhInstVisits = bvhInstVisits + 1;" : ""}
+    let t = rtTraverseBvh(o, d, best);
+    if (t > 0.0) { best = t; tri = bvhHitTri; inst = k; hu = bvhHitU; hv = bvhHitV; }`;
     return `
 @group(0) @binding(${BVH_BINDINGS.bounds}) var<storage, read> bvhBounds : array<f32>;
 @group(0) @binding(${BVH_BINDINGS.meta}) var<storage, read> bvhMeta : array<i32>;
@@ -678,7 +798,10 @@ ${meshMaterials ? `// RTX round 4 -- one material index per triangle, and the SB
 @group(0) @binding(${BVH_BINDINGS.meshSbt}) var<storage, read> bvhSbt : array<vec4<f32>>;` : ""}${instances ? `
 // v4915 -- ${INSTANCE_FLOATS} floats per instance: the object-from-world 3x4 by rows, then its SBT record.
 @group(0) @binding(${BVH_BINDINGS.instances}) var<storage, read> bvhInst : array<f32>;
-var<private> bvhHitInst : i32;             // which instance rtTraverseInstances' last call landed on, or -1` : ""}${anyHit ? `
+var<private> bvhHitInst : i32;             // which instance rtTraverseInstances' last call landed on, or -1
+var<private> bvhRoot : i32;                // v4918 -- the root node of the mesh the instance being entered is of${instanceTree ? `
+var<private> instStack : array<i32, 32>;   // v4918 -- the tree over the instances has its own stack` : ""}${countVisits ? `
+var<private> bvhInstVisits : i32;          // v4918 -- how many instances this invocation has entered` : ""}` : ""}${anyHit ? `
 
 // ---- STAGE: any-hit (v4915) -----------------------------------------------------------------------------
 // Asked of a CANDIDATE, inside the leaf loop below, before it may become the closest hit. U[${ANYHIT_SLOT}].x names
@@ -687,6 +810,8 @@ var<private> bvhHitInst : i32;             // which instance rtTraverseInstances
 fn rtAnyHit(tri : i32, u : f32, v : f32) -> bool {
   let rule = U[${ANYHIT_SLOT}];
   if (rule.x < 0.5) { return true; }
+  // alpha (v4917): one draw, accepted with probability rule.y
+  if (rule.x > 1.5) { return nextF32() < rule.y; }
   // cutout: a hole where all three weights exceed the parameter
   return min(1.0 - u - v, min(u, v)) <= rule.y;
 }` : ""}
@@ -788,7 +913,7 @@ fn rtTraverseBvh(orig : vec3<f32>, dir : vec3<f32>, maxT : f32) -> f32 {
                         select(1.0 / dir.z, 1e30, dir.z == 0.0));
   var best = maxT;
   var sp = 1;
-  bvhStack[0] = 0;
+  bvhStack[0] = ${instances ? "bvhRoot" : "0"};
   loop {
     if (sp == 0) { break; }
     sp = sp - 1;
@@ -819,23 +944,57 @@ fn rtTraverseBvh(orig : vec3<f32>, dir : vec3<f32>, maxT : f32) -> f32 {
 // t then measures the same thing in both spaces, so "best so far" can be handed straight to the next instance
 // as its maxT and the nearest hit across all of them needs no conversion. rtTraverseBvh overwrites the hit
 // registers on every call, so the winner's are kept here and written back once.
-fn rtTraverseInstances(orig : vec3<f32>, dir : vec3<f32>, maxT : f32) -> f32 {
+${instanceTree ? `// The slab test of rtHitBox, on a box that lives in the instance buffer (v4918).
+fn rtHitInstanceBox(nb : i32, o : vec3<f32>, invD : vec3<f32>, maxT : f32) -> f32 {
+  var t0 = 0.0;
+  var t1 = maxT;
+  for (var a = 0; a < 3; a = a + 1) {
+    var n0 = (bvhInst[nb + a] - o[a]) * invD[a];
+    var n1 = (bvhInst[nb + 3 + a] - o[a]) * invD[a];
+    if (n0 > n1) { let tmp = n0; n0 = n1; n1 = tmp; }
+    t0 = max(t0, n0); t1 = min(t1, n1);
+    if (t0 > t1) { return 1e30; }
+  }
+  return t0;
+}
+
+` : ""}fn rtTraverseInstances(orig : vec3<f32>, dir : vec3<f32>, maxT : f32) -> f32 {
   let count = i32(U[MESH_META].w);
   var best = maxT;
   var tri = -1;
   var inst = -1;
   var hu = 0.0;
   var hv = 0.0;
-  for (var k = 0; k < count; k = k + 1) {
-    let b = k * ${INSTANCE_FLOATS};
-    let r0 = vec4<f32>(bvhInst[b], bvhInst[b + 1], bvhInst[b + 2], bvhInst[b + 3]);
-    let r1 = vec4<f32>(bvhInst[b + 4], bvhInst[b + 5], bvhInst[b + 6], bvhInst[b + 7]);
-    let r2 = vec4<f32>(bvhInst[b + 8], bvhInst[b + 9], bvhInst[b + 10], bvhInst[b + 11]);
-    let o = vec3<f32>(dot(r0.xyz, orig) + r0.w, dot(r1.xyz, orig) + r1.w, dot(r2.xyz, orig) + r2.w);
-    let d = vec3<f32>(dot(r0.xyz, dir), dot(r1.xyz, dir), dot(r2.xyz, dir));
-    let t = rtTraverseBvh(o, d, best);
-    if (t > 0.0) { best = t; tri = bvhHitTri; inst = k; hu = bvhHitU; hv = bvhHitV; }
-  }
+${instanceTree ? `  // v4918 -- THE TREE. Behind the instances the buffer holds [nodeCount, _, _, _], eight floats a node (the world
+  // box, then two links) and the leaf order. Near child first, and a box the ray reaches only after its best hit
+  // is not entered: the same two rules rtTraverseBvh keeps one level down, with the instance as the leaf.
+  let base = count * ${INSTANCE_FLOATS};
+  let nodes = base + 4;
+  let ord = nodes + i32(bvhInst[base]) * 8;
+  let invD = vec3<f32>(select(1.0 / dir.x, 1e30, dir.x == 0.0), select(1.0 / dir.y, 1e30, dir.y == 0.0), select(1.0 / dir.z, 1e30, dir.z == 0.0));
+  var sp = 1;
+  instStack[0] = 0;
+  loop {
+    if (sp == 0) { break; }
+    sp = sp - 1;
+    let nb = nodes + instStack[sp] * 8;
+    if (rtHitInstanceBox(nb, orig, invD, best) >= 1e30) { continue; }
+    let la = i32(bvhInst[nb + 6]);
+    let lb = i32(bvhInst[nb + 7]);
+    if (la < 0) {
+      for (var s = -la - 1; s < -la - 1 + lb; s = s + 1) {
+        let k = i32(bvhInst[ord + s]);
+${enter.replace(/^/gm, "    ")}
+      }
+      continue;
+    }
+    let dl = rtHitInstanceBox(nodes + la * 8, orig, invD, best);
+    let dr = rtHitInstanceBox(nodes + lb * 8, orig, invD, best);
+    if (dl < dr) { instStack[sp] = lb; sp = sp + 1; instStack[sp] = la; sp = sp + 1; }
+    else { instStack[sp] = la; sp = sp + 1; instStack[sp] = lb; sp = sp + 1; }
+  }` : `  for (var k = 0; k < count; k = k + 1) {
+${enter}
+  }`}
   bvhHitTri = tri; bvhHitInst = inst; bvhHitU = hu; bvhHitV = hv;
   return select(-1.0, best, tri >= 0);
 }
@@ -895,6 +1054,35 @@ fn main(@builtin(global_invocation_id) gid : vec3<u32>) {
   let t = rtTraverseBvh(orig, dir, 1e30);
   outBuf[i * 2] = t;
   outBuf[i * 2 + 1] = f32(bvhHitTri);
+}
+`;
+}
+
+/**
+ * v4918 -- one ray per invocation against the INSTANCES, by the list or by the tree: four floats a ray, [t, instance,
+ * triangle, instances entered]. The last is the only number that tells a tree from a list, since they must agree
+ * on the other three. Binds the instance buffer at its usual place and reads the count from a one-vec4 uniform.
+ */
+export function instanceProbeWgsl(rayCount, { tree = false } = {}) {
+    if (!(rayCount > 0)) throw new Error("rtPipeline: instanceProbeWgsl needs the real ray count, to guard the invocations @workgroup_size(64) launches beyond it");
+    return `
+@group(0) @binding(0) var<storage, read_write> outBuf : array<f32>;
+@group(0) @binding(1) var<uniform> U : array<vec4<f32>, 24>;
+@group(0) @binding(6) var<storage, read> rays : array<f32>;
+const MESH_META : i32 = ${MESH_META_SLOT};
+${bvhWgslBlock({ instances: true, instanceTree: tree, countVisits: true })}
+const RAY_COUNT : u32 = ${rayCount}u;
+@compute @workgroup_size(64)
+fn main(@builtin(global_invocation_id) gid : vec3<u32>) {
+  if (gid.x >= RAY_COUNT) { return; }
+  let i = i32(gid.x);
+  let r = i * 6;
+  bvhInstVisits = 0;
+  let t = rtTraverseInstances(vec3<f32>(rays[r], rays[r + 1], rays[r + 2]), vec3<f32>(rays[r + 3], rays[r + 4], rays[r + 5]), 1e30);
+  outBuf[i * 4] = t;
+  outBuf[i * 4 + 1] = f32(bvhHitInst);
+  outBuf[i * 4 + 2] = f32(bvhHitTri);
+  outBuf[i * 4 + 3] = f32(bvhInstVisits);
 }
 `;
 }
@@ -1105,13 +1293,20 @@ export function pipelineWgsl({ workgroupSize = 64, gradient = false,
                                msComp = false, plantMsNoDenominator = false,
                                // v4915 -- both default false, and false leaves the generated WGSL byte
                                // identical to v4914's. See the block above ANYHIT_SLOT for what each is.
-                               anyHit = false, instances = false } = {}) {
+                               anyHit = false, instances = false,
+                               // v4917 -- the sphere's own any-hit; false leaves rtIntersect's text as it was
+                               sphereAnyHit = false,
+                               // v4918 -- walk the tree instanceBuffer appends, instead of the list
+                               instanceTree = false } = {}) {
+    if (instanceTree && !instances) throw new Error("rtPipeline: instanceTree needs instances -- it is a tree over them");
     const PI = "3.141592653589793";
     if (anyHit && !bvh) throw new Error("rtPipeline: anyHit needs bvh -- the stage is asked of a candidate TRIANGLE, and a sphere has none");
     if (instances && !bvh) throw new Error("rtPipeline: instances needs bvh -- there is no mesh to place otherwise");
-    if (instances && meshMaterials) throw new Error(
-        "rtPipeline: instances and meshMaterials are two answers to 'which record does this hit read' -- per " +
-        "instance or per triangle. Composing them (Vulkan adds the two offsets) is not written; pass one.");
+    // v4917 -- instances WITH meshMaterials is the composition v4915 refused: the instance's record is an offset
+    // and the triangle's material index is added to it. See instanceBuffer's sbtOffset.
+    if (sphereAnyHit && (nee || (microfacet && microfacet !== "bsdf"))) throw new Error(
+        "rtPipeline: sphereAnyHit cannot be combined with light sampling (nee, or microfacet \"nee\"/\"mis\") -- the cone " +
+        "sampler aims at a whole sphere and weights by its whole solid angle, and a light with its cap cut off is neither.");
     if (microfacet && !["bsdf", "nee", "mis"].includes(microfacet)) throw new Error(
         "rtPipeline: microfacet must be \"bsdf\", \"nee\" or \"mis\" (pathTracer.mjs's own `direct` values), got " + microfacet);
     if (microfacet && rgb) throw new Error(
@@ -1145,7 +1340,7 @@ export function pipelineWgsl({ workgroupSize = 64, gradient = false,
     return `
 @group(0) @binding(0) var<storage, read_write> outBuf : array<f32>;
 @group(0) @binding(1) var<uniform> U : array<vec4<f32>, 24>;
-${bvh ? bvhWgslBlock({ vertexColors, meshMaterials, anyHit, instances }) : ""}
+${bvh ? bvhWgslBlock({ vertexColors, meshMaterials, anyHit, instances, instanceTree }) : ""}
 ${envMap ? `@group(0) @binding(${ENV_BINDING}) var tAtlas : texture_2d<f32>;` : ""}
 ${msComp ? `// RTX round 9 -- the shared multi-scatter E(mu) table, one entry per row, K rows (U[${MS_TABLE_SLOT}].x).
 @group(0) @binding(${MS_TABLE_BINDING}) var<storage, read> msE : array<f32>;` : ""}
@@ -1153,7 +1348,7 @@ ${msComp ? `// RTX round 9 -- the shared multi-scatter E(mu) table, one entry pe
 // U[0]  eye.xyz, tanHalfFov          U[1]  fwd.xyz, geometryCount
 // U[2]  w, h, spp, eps               U[3]  right.xyz, seedBits
 // U[4]  camUp.xyz, _                 U[8+i]  geometry i: centre.xyz, radius
-${anyHit ? `// U[${ANYHIT_SLOT}]  any-hit rule (v4915): ruleIndex, parameter, _, _
+${anyHit || sphereAnyHit ? `// U[${ANYHIT_SLOT}]  any-hit rules: triangle ruleIndex, parameter (v4915); sphere ruleIndex, parameter (v4917)
 ` : ""}// U[16+i] SBT record i: hitShaderIndex, albedo, emit, _   (emit is RTX round 6 -- 0 means "not a light",
 //                                                           scalar pipeline only, see sbtRecord's own doc)
 // U[${MESH_META_SLOT}] mesh meta (bvh only): hasMesh, nodeCount, triCount, _
@@ -1302,10 +1497,20 @@ fn rtIntersect(orig : vec3<f32>, dir : vec3<f32>, centre : vec3<f32>, radius : f
   let sq = sqrt(disc);
   let t0 = (-b - sq) / 2.0;
   let t1 = (-b + sq) / 2.0;
-  if (t0 > eps) { return t0; }
-  if (t1 > eps) { return t1; }
+  if (t0 > eps${sphereAnyHit ? " && rtAnyHitSphere(orig + dir * t0, centre, radius)" : ""}) { return t0; }
+  if (t1 > eps${sphereAnyHit ? " && rtAnyHitSphere(orig + dir * t1, centre, radius)" : ""}) { return t1; }
   return -1.0;
-}
+}${sphereAnyHit ? `
+
+// ---- STAGE: any-hit, for the procedural sphere (v4917) ---------------------------------------------------
+// Asked of each root in turn, nearest first, so a rejected near root falls through to the far one: the inside
+// of the shell, seen through the hole. U[${ANYHIT_SLOT}].z names the rule and .w is its parameter; rule 0 accepts.
+fn rtAnyHitSphere(P : vec3<f32>, centre : vec3<f32>, radius : f32) -> bool {
+  let rule = U[${ANYHIT_SLOT}];
+  if (rule.z < 0.5) { return true; }
+  // cap: open above the latitude
+  return (P.y - centre.y) / radius <= rule.w;
+}` : ""}
 
 // ---- TRAVERSAL: which record wins ----------------------------------------------------------------------
 // Linear over the spheres -- honest at four of them, useless at four thousand, which is exactly why a
@@ -1564,7 +1769,7 @@ ${rgb ? `
       var albedo : vec3<f32>;
       ${bvh ? `if (hit.geo == nGeo) {
         N = ${instances ? "rtInstanceNormal(bvhHitInst, bvhHitTri)" : "rtTriNormal(bvhHitTri * 9)"};
-        ${meshMaterials ? `rec = bvhSbt[bvhMatIdx[bvhHitTri]];` : instances ? `rec = rtInstanceRecord(bvhHitInst);` : `rec = U[MESH_SBT];`}
+        ${meshMaterials ? (instances ? `rec = bvhSbt[i32(rtInstanceRecord(bvhHitInst).x) + bvhMatIdx[bvhHitTri]];` : `rec = bvhSbt[bvhMatIdx[bvhHitTri]];`) : instances ? `rec = rtInstanceRecord(bvhHitInst);` : `rec = U[MESH_SBT];`}
         albedo = rec.yzw;
         ${vertexColors ? `albedo = albedo * rtVertColor(bvhHitTri * 9, bvhHitU, bvhHitV);` : ""}
       } else {` : ""}
@@ -1613,7 +1818,7 @@ ${rgb ? `
         // centre, and its material from the ONE record a bvh scene carries rather than the per-sphere table
         // (RTX round 4's meshMaterials: PER-TRIANGLE, via bvhMatIdx -- Vulkan's own SBT-offset idiom).
         N = ${instances ? "rtInstanceNormal(bvhHitInst, bvhHitTri)" : "rtTriNormal(bvhHitTri * 9)"};
-        ${meshMaterials ? `rec = bvhSbt[bvhMatIdx[bvhHitTri]];` : instances ? `rec = rtInstanceRecord(bvhHitInst);` : `rec = U[MESH_SBT];`}
+        ${meshMaterials ? (instances ? `rec = bvhSbt[i32(rtInstanceRecord(bvhHitInst).x) + bvhMatIdx[bvhHitTri]];` : `rec = bvhSbt[bvhMatIdx[bvhHitTri]];`) : instances ? `rec = rtInstanceRecord(bvhHitInst);` : `rec = U[MESH_SBT];`}
       } else {` : ""}
       let g = U[GEO_BASE + hit.geo];
       N = nrm(P - g.xyz);
@@ -1804,7 +2009,7 @@ ${rgb ? `
  * Both are silent. Pass the identical `meshMaterials` value to both calls, the same discipline `rgb` already
  * asks for.
  */
-export function pipelineUniforms(sbt, { spp = 16, seed = 1, view = VIEW, eps = EPS, bvh = null, rgb = false, meshMaterials = false, envMap = null, microfacet = false, msComp = false, meshRecords = null } = {}) {
+export function pipelineUniforms(sbt, { spp = 16, seed = 1, view = VIEW, eps = EPS, bvh = null, rgb = false, meshMaterials = false, sphereAnyHit = null, envMap = null, microfacet = false, msComp = false, meshRecords = null } = {}) {
     if (sbt.length > MAX_GEOMETRY) throw new Error("rtPipeline: at most " + MAX_GEOMETRY + " geometries");
     // RTX round 8 -- found by an adversarial review, and refused rather than left silent the way rgb/
     // meshMaterials still are: a `hit: "microfacet"` record packs and binds unconditionally (sbtRecordFloats
@@ -1897,7 +2102,8 @@ export function pipelineUniforms(sbt, { spp = 16, seed = 1, view = VIEW, eps = E
             if (!(rule in ANY_HIT_SHADERS)) throw new Error("rtPipeline: no any-hit rule named " + rule);
             if (rule === "cutout" && !(param >= 0 && param < 1 / 3)) throw new Error(
                 "rtPipeline: the cutout parameter is the barycentric margin kept solid, 0 <= p < 1/3 (at 1/3 the hole is a point), got " + param);
-            U.set([ANY_HIT_SHADERS[rule], param, 0, 0], ANYHIT_SLOT * 4);
+            if (rule === "alpha" && !(param >= 0 && param <= 1)) throw new Error("rtPipeline: alpha is a probability of acceptance, 0 <= p <= 1, got " + param);
+            U[ANYHIT_SLOT * 4] = ANY_HIT_SHADERS[rule]; U[ANYHIT_SLOT * 4 + 1] = param;
         }
         // RTX round 4 -- under meshMaterials, the WGSL mesh-hit branch reads bvhSbt[bvhMatIdx[bvhHitTri]]
         // instead of U[MESH_SBT] (pipelineWgsl's own `meshMaterials` option decides which text it generates),
@@ -1913,6 +2119,13 @@ export function pipelineUniforms(sbt, { spp = 16, seed = 1, view = VIEW, eps = E
         // v4915 -- with instances the record is the instance's own (instanceBuffer packs it), so a mesh-wide
         // hit/albedo is not required and, if absent, not packed.
         if (!meshMaterials && !(instanceCount > 0 && bvh.hit === undefined)) U.set(sbtRecordFloats(bvh, { rgb }), MESH_SBT_SLOT * 4);
+    }
+    // v4917 -- the sphere's any-hit rule, in the same slot's other half
+    if (sphereAnyHit) {
+        const { rule, param = 0 } = sphereAnyHit;
+        if (!(rule in SPHERE_ANY_HIT_SHADERS)) throw new Error("rtPipeline: no sphere any-hit rule named " + rule);
+        if (rule === "cap" && !(param > -1 && param < 1)) throw new Error("rtPipeline: the cap latitude is a fraction of the radius, -1 < h < 1, got " + param);
+        U[ANYHIT_SLOT * 4 + 2] = SPHERE_ANY_HIT_SHADERS[rule]; U[ANYHIT_SLOT * 4 + 3] = param;
     }
     // RTX round 7 -- envMap is the atlas object itself (captureBaseCubemap()/packCapturedAtlas()'s own shape),
     // matching `bvh`'s own convention of taking the descriptor rather than a caller-picked subset of its fields.
@@ -2085,6 +2298,22 @@ export const PROBES = Object.freeze([Object.freeze({
                 for (let k = 0; k < 3; k++) out[3 * i + k] = w[0] * C[v[0]][k] + w[1] * C[v[1]][k] + w[2] * C[v[2]][k]; }
             return out; },
         key: () => ({ rays: PROBE_CUBE.shadeSweep.length / 6, colours: PROBE_CUBE.colors.length }) }),
+    // v4918 -- the instance probe, by the list: three unit cubes side by side. Its CPU twin never packs an instance: it
+    // moves each RAY by hand (a translation needs no inverse) and asks the one mesh's own raycastFirst, three times.
+    Object.freeze({ id: "rtPipeline.instanceProbeWgsl", code: (a) => instanceProbeWgsl(a.rays.length / 6), entryPoint: "main",
+        args: Object.freeze((() => { const bvh = bvhBuffersFromMesh(PROBE_CUBE.positions, PROBE_CUBE.indices), xs = [-3, 0, 3];
+            return { bvh, xs, inst: instanceBuffer(xs.map((x) => ({ transform: [1, 0, 0, x, 0, 1, 0, 0, 0, 0, 1, 0], albedo: 0.5 })), { meshes: bvh }),
+                     rays: new Float32Array([-3.2, 0.1, -5, 0, 0, 1, 0.3, -0.2, -5, 0, 0, 1, 2.7, 0.4, -5, 0, 0, 1, -8, 0.2, 0.1, 1, 0, 0, 0.2, 9, 0.1, 0, 1, 0, 1.5, 0, -5, 0, 0, 1, 0.1, 5, 0.3, 0, -1, 0, 8, 0.5, 0.4, -1, 0, 0]) }; })()),
+        pack: (a) => { const U = new Float32Array(96); U[MESH_META_SLOT * 4] = 1; U[MESH_META_SLOT * 4 + 3] = a.xs.length; return U; },
+        inputs: (a) => [...bvhInputs(a.bvh), { binding: BVH_BINDINGS.instances, data: a.inst }, { binding: 6, data: a.rays }],
+        outCount: (a) => a.rays.length / 6 * 4, workgroups: (a) => Math.ceil(a.rays.length / 6 / 64),
+        cpu: (a) => { const n = a.rays.length / 6, out = new Float32Array(4 * n);
+            for (let i = 0; i < n; i++) { const r = a.rays.subarray(6 * i, 6 * i + 6); let best = null;
+                a.xs.forEach((x, k) => { const h = a.bvh.bvh.raycastFirst(r[0] - x, r[1], r[2], r[3], r[4], r[5]); if (h && (!best || h.t < best.t)) best = { t: h.t, k, tri: h.tri }; });
+                out.set([best ? best.t : -1, best ? best.k : -1, best ? best.tri : -1, a.xs.length], 4 * i); }
+            return out; },
+        graded: "physics/render/rtPipeline-selfcheck.mjs section 17 -- 128 rays over sixteen instances of two meshes, the list against the tree and both against a brute search; the triangle on a shared edge is a tie that gate grades as one",
+        key: () => ({ rays: 8, instances: 3 }) }),
     Object.freeze({ id: "rtPipeline.bvhMaterialProbeWgsl", code: (a) => bvhMaterialProbeWgsl(a.rays.length / 6), entryPoint: "main",
         args: Object.freeze({ bvh: bvhBuffersFromMesh(PROBE_CUBE.positions, PROBE_CUBE.indices, { materialIndex: PROBE_CUBE.materialIndex }),
             sbt: meshSbtBuffer(PROBE_CUBE.records, { rgb: true }), rays: PROBE_CUBE.centroids }),

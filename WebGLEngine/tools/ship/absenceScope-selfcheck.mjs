@@ -172,15 +172,20 @@ ok("the tracer HAS a BVH since the rtx merge -- rtPipeline.mjs builds on meshBVH
 // ray into object space -- and uses the word only to say what that is NOT: a LIST walked linearly, with no tree
 // built over the instances. So the row is two, from the file's code and not its vocabulary: the second level exists,
 // and it is not accelerated. What stays open of item 10 is the tree over instances, and a second mesh.
-const instFn = (rt.match(/fn rtTraverseInstances\([\s\S]*?\n}\n/) || [""])[0];
-ok("  ...and since v4915 it has a SECOND level: the one mesh under a list of instance transforms, each with its own record",
-   /export function instanceBuffer\(/.test(rt) && instFn.length > 0 && instFn.split("rtTraverseBvh(").length === 2,
-   "rtTraverseInstances calls the one BVH's traversal once per instance; physics/render/rtPipeline-selfcheck.mjs section 15 grades it");
-ok("  ...which is a LIST and not a tree: one linear loop over the count, no stack, no boxes over instances -- item 10's open half, narrowed",
-   /for \(var k = 0; k < count; k = k \+ 1\)/.test(instFn) && !/bvhStack|rtHitBox/.test(instFn) && (rt.match(/^\s*const bvh = new MeshBVH\(/gm) || []).length === 2,
-   "one mesh, one BVH (built in two packers, one per input shape); the day a tree is built over the instances this row goes red and item 10 closes");
-// SABOTAGE (v4915), against rtPipeline.mjs, restored by copy: a stack write put inside rtTraverseInstances -> 1 red, the
-// LIST row; instanceBuffer renamed -> 1 red, the SECOND-level row.
+// *** v4918 -- AND THE LIST ROW WENT RED THE DAY A TREE WAS BUILT OVER THE INSTANCES, AS IT SAID IT WOULD. *** Both rows
+// are re-taken on the code, again: the second level exists and is a TREE when asked for (buildInstanceTree packs a BVH
+// over the instances' world boxes behind them; the WGSL walks it with its own stack and box test), and a scene may hold
+// more than one mesh (bvhBuffersFromMeshes; an instance names its mesh's root node). Item 10's open half is closed. What
+// it is not, and the row says so: the tree is a median split, not SAH, and it is rebuilt whole, never refitted.
+ok("  ...and since v4915 it has a SECOND level: instance transforms over the mesh's BVH, each with its own record",
+   /export function instanceBuffer\(/.test(rt) && /fn rtTraverseInstances\(/.test(rt) && /let t = rtTraverseBvh\(o, d, best\);/.test(rt),
+   "physics/render/rtPipeline-selfcheck.mjs sections 15 to 17 grade it");
+ok("  ...which since v4918 is a TREE over the instances, and over more than one mesh -- item 10's two-level half, closed",
+   /export function buildInstanceTree\(/.test(rt) && /fn rtHitInstanceBox\(/.test(rt) && /instStack\[sp\]/.test(rt) && /export function bvhBuffersFromMeshes\(/.test(rt) &&
+   /bvhRoot = i32\(bvhInst\[b \+ 16\]\);/.test(rt),
+   "a median split over world boxes, rebuilt whole; the list is kept as its control and the gate holds the two to the same hit on every ray");
+// SABOTAGE (v4918), against rtPipeline.mjs, restored by copy: buildInstanceTree renamed -> 1 red, the TREE row;
+// instanceBuffer renamed -> 1 red, the SECOND-level row. (v4915's two were of the rows these replaced.)
 
 // ---- 4. THE FROZEN RECORD MATCHES THE TREE ---------------------------------------------------------------
 console.log("\n4. the record is a record, not a rendering");

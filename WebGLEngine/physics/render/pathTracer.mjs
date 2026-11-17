@@ -69,7 +69,7 @@ const cadd = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
  * normal comes from mesh/meshBVH.mjs's triNormal() -- the SAME cross(e1,e2) formula rtPipeline.mjs's WGSL
  * rtTriNormal() computes on the device, not a second derivation of it.
  */
-export function intersect(orig, dir, scene) {
+export function intersect(orig, dir, scene, rand = null) {
     let best = null;
     for (const s of scene) {
         if (s.bvh) {
@@ -87,7 +87,7 @@ export function intersect(orig, dir, scene) {
                     const h = s.bvh.raycastFirst(o[0], o[1], o[2], dir[0], dir[1], dir[2]);
                     if (!h) break;
                     const w = baryAt(s.bvh.tris, h.tri * 9, h.point[0], h.point[1], h.point[2]);
-                    if (s.anyHit(h.tri, w[1], w[2])) { hit = { t: tAcc + h.t, point: h.point, tri: h.tri }; break; }
+                    if (s.anyHit(h.tri, w[1], w[2], rand)) { hit = { t: tAcc + h.t, point: h.point, tri: h.tri }; break; }
                     tAcc += h.t; o = h.point;
                 }
             }
@@ -96,7 +96,13 @@ export function intersect(orig, dir, scene) {
             }
             continue;
         }
-        const t = raySphere(orig, dir, s.centre, s.radius);
+        let t = raySphere(orig, dir, s.centre, s.radius);
+        // v4917 -- a sphere's any-hit, the second way: `s.anyHit` is (P) => accept. A rejected nearest root is left
+        // behind by casting again from it, which finds the far root (the near one is now at t ~ 0, under the eps).
+        if (t !== null && s.anyHit && !s.anyHit(add(orig, mul(dir, t)))) {
+            const P1 = add(orig, mul(dir, t)), t2 = raySphere(P1, dir, s.centre, s.radius);
+            t = t2 !== null && s.anyHit(add(P1, mul(dir, t2))) ? t + t2 : null;
+        }
         if (t !== null && (best === null || t < best.t)) {
             const P = add(orig, mul(dir, t));
             best = { t, P, N: norm(sub(P, s.centre)), sphere: s };
@@ -163,7 +169,7 @@ export function trace(orig, dir, scene, rand, { maxDepth = 8, rrQ = null, sky = 
     let misFrom = null;
     const lights = scene.filter((s) => s.emit);
     for (let depth = 0; depth < maxDepth; depth++) {
-        const hit = intersect(o, d, scene);
+        const hit = intersect(o, d, scene, rand);
         if (!hit) return out(cadd(radiance, cmul(throughput, col(sky(d)))));
         if (hit.sphere.emit) {
             // *** THE DOUBLE-COUNT GUARD, AND IT IS THE WHOLE DIFFICULTY OF WIRING NEE IN. With direct sampling
@@ -220,7 +226,7 @@ export function trace(orig, dir, scene, rand, { maxDepth = 8, rrQ = null, sky = 
             const cos = dot(sd, hit.N);
             if (cos <= 0) continue;
             const shadowOrig = add(hit.P, mul(hit.N, 1e-6));
-            const blocker = intersect(shadowOrig, sd, scene);
+            const blocker = intersect(shadowOrig, sd, scene, rand);
             if (!blocker || blocker.sphere !== L) continue;        // something else is in the way
             // *** THE LAMBERTIAN INTEGRAND IS albedo/pi AND A SIGMA SURFACE'S IS NOT. *** Rather than skip
             // NEE the way a microfacet surface does, the BRDF is evaluated at the light direction -- which
@@ -271,7 +277,7 @@ export function trace(orig, dir, scene, rand, { maxDepth = 8, rrQ = null, sky = 
                 const sd = toWorld(sampleCone(rand(), rand(), cosA), wl, Lt, Lb);
                 const cosI = dot(sd, hit.N);
                 if (cosI <= 0) continue;
-                const blocker = intersect(add(hit.P, mul(hit.N, 1e-6)), sd, scene);
+                const blocker = intersect(add(hit.P, mul(hit.N, 1e-6)), sd, scene, rand);
                 if (!blocker || blocker.sphere !== L) continue;
                 const wh = norm(add(wo, sd));
                 const cosH = dot(wh, hit.N), dotOH = dot(wo, wh);

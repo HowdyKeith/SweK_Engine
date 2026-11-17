@@ -265,6 +265,31 @@ console.log("\n5. LOAD THE REAL PAGE AND CLICK THE BUTTON");
         await new Promise((r) => srv2.listen(0, "127.0.0.1", r));
         const br = await pw2.chromium.launch({ executablePath: HEADLESS_SHELL, args: [...webglLaunchArgs().args] });
         const pg = await br.newPage();
+        // *** v4920 -- THE CAUSE OF THE RIG'S TIMEOUT, FOUND WITH v4919's TIMINGS, AND IT IS A QUEUE. *** v4919 named and timed
+        // the captures; the rig (win32-x64-12c-32gb-b70b27) answered 7404 ms, 44314 ms, then the third past 120 s. Each one
+        // slower than the last is not a slow box, it is a backlog. orrery.html repaints its whole 1280 x 720 canvas on every
+        // animation frame, paused or not; its own callback costs 1 ms, so it asks for 60 a second, and a headless shell on a
+        // software GL cannot present them that fast. A screenshot waits its turn behind them. MEASURED on
+        // linux-x64-4c-16gb-142c0d, five captures each: as shipped 1561, 5674, 9773, 2028, 2070 ms; at 640 x 360 961, 2897,
+        // 7288, 1620, 1494 (smaller does not cure it); with the loop stopped outright, 11260 ms for the one that drains the
+        // queue and 329 after; held to a frame every 100 ms, 302, 273, 183, 244, 245.
+        // So this section holds the page's loop to FRAME_MS. It does not stop it and does not touch the page's file: the
+        // callback the page hands requestAnimationFrame runs unchanged, later. What that costs the section: nothing it
+        // measures. The page is paused for every capture and the rows ask what is on screen, not how often it was drawn.
+        // A browser with a GPU presents 60 a second and never builds the queue, which is why no person has seen this.
+        // NOT CLAIMED: that the rig passes -- the same queue is the explanation for its numbers, and one run there says.
+        // SABOTAGES (v4920): the hold never releasing a frame -> 7 red, stopped at "the attach" (nothing polls, nothing draws);
+        // the hold removed -> 1 red, the HELD row (789 frames where 411 fit), and the captures back at 1666, 7402, 11398,
+        // 10689, 2551 ms; one caller let through per frame, the first draft -> 7 red at "the attach" after 60 s.
+        const FRAME_MS = 100;
+        // EVERY callback asked for since the last held frame runs on the next one, together. The first draft let one caller
+        // through per frame and gave the page's loop all of them: Playwright's waitForFunction polls on animation frames
+        // too, never got one, and the attach wait timed out at 60 s on a page that had attached.
+        await pg.addInitScript((ms) => { const raf = window.requestAnimationFrame.bind(window); let last = -Infinity, queue = [], driving = false; window.__heldFrames = 0;
+            const drive = (t) => { if (t - last < ms) return raf(drive); last = t; driving = false; window.__heldFrames++;
+                const run = queue; queue = []; for (const cb of run) { try { cb(t); } catch (e) { setTimeout(() => { throw e; }); } } };
+            window.requestAnimationFrame = (cb) => { queue.push(cb); if (!driving) { driving = true; raf(drive); } return queue.length; }; }, FRAME_MS);
+        const tHold = Date.now();
         const perr = [];
         pg.on("pageerror", (e) => perr.push(String(e).slice(0, 200)));
         await pg.goto(`http://127.0.0.1:${srv2.address().port}/`, { waitUntil: "load" });
@@ -285,7 +310,20 @@ console.log("\n5. LOAD THE REAL PAGE AND CLICK THE BUTTON");
             why: document.getElementById("fxwhy").textContent.trim(),
             disabled: document.getElementById("fxbtn").disabled,
         }));
-        const shot = async () => (await pg.screenshot({ type: "png" }));
+        // *** v4919 -- EVERY CAPTURE IS NAMED AND TIMED, AND HAS pageShot.mjs's CEILING, BECAUSE THE RIG'S v4917 VERIFY COULD NOT SAY
+        // WHICH ONE HUNG. *** On win32-x64-12c-32gb-b70b27 this section failed seven rows on one message, "TimeoutError:
+        // page.screenshot: Timeout 30000ms exceeded" -- Playwright's default -- with nothing to say whether it was the first
+        // capture or the fifth, or whether the box was slow or stuck. It passes on Linux in under a second a capture, and
+        // nothing in v4914 to v4917 touches this page. So the cause is NOT KNOWN, and this does not claim to fix it: the
+        // ceiling is the 120 s tools/ship/pageShot.mjs already gives the same call on the same box, the step in hand is
+        // carried into the error, and the timings are printed either way. One run on the rig then passes, or names the step.
+        // v4920: the rig's answer was 7404 ms, 44314 ms, then a timeout at 120 s on the third. See the note at newPage above.
+        // SABOTAGE (v4919): the "effect on" capture made to throw a timeout -> 7 red, every one opening `at "capture: effect
+        // on"`, and the timings line listing the three captures that did complete before it.
+        const SHOT_MS = 120000, shots = [];
+        let step = "before the first capture";
+        const shot = async (name) => { step = "capture: " + name; const t0 = Date.now();
+            const png = await pg.screenshot({ type: "png", timeout: SHOT_MS }); shots.push(`${name} ${Date.now() - t0} ms`); return png; };
         let r2;
         try {
             // *** THE ORRERY ANIMATES, SO TWO SCREENSHOTS DIFFER WHETHER OR NOT THE EFFECT IS ON. ***
@@ -296,11 +334,12 @@ console.log("\n5. LOAD THE REAL PAGE AND CLICK THE BUTTON");
             // MATCH, and only then attribute a difference to the effect.
             await pg.click("#play");
             await pg.waitForTimeout(400);
-            const still1 = await shot();
+            const still1 = await shot("paused, first");
             await pg.waitForTimeout(400);
-            const still2 = await shot();
+            const still2 = await shot("paused, second");
             const before = await state();
-            const imgOff = await shot();
+            const imgOff = await shot("effect off");
+            step = "the attach";
             await pg.click("#fxbtn");
             // v4896 -- WAIT FOR THE STATE, NOT FOR 900 ms. The rig's clone-verify read the label at "attaching..." with the overlay still hidden: the attach is an import plus a
             // device request, and on a busy Windows box that took longer than the fixed wait, so the row failed on the box's speed and not on the page. The button leaves "attaching"
@@ -309,19 +348,22 @@ console.log("\n5. LOAD THE REAL PAGE AND CLICK THE BUTTON");
             await pg.waitForFunction(() => !/attaching/.test(document.getElementById("fxbtn").textContent), null, { timeout: 60000 });
             await pg.waitForTimeout(150);
             const after = await state();
-            const imgOn = await shot();
+            const imgOn = await shot("effect on");
+            step = "turning it off";
             await pg.click("#fxbtn");
             await pg.waitForTimeout(300);
             const off = await state();
-            const imgOff2 = await shot();
+            const imgOff2 = await shot("effect off again");
             const same = (a, b) => a.length === b.length && a.equals(b);
             r2 = { before, after, off,
                    paused: same(still1, still2),
                    changed: !same(imgOff, imgOn),
                    restored: !same(imgOn, imgOff2),
                    bytesOff: imgOff.length, bytesOn: imgOn.length };
-        } catch (e) { r2 = { err: String(e).slice(0, 200) }; }
+        } catch (e) { r2 = { err: `at "${step}": ` + String(e).slice(0, 200) }; }
+        const held = await pg.evaluate(() => window.__heldFrames).catch(() => -1), tEnd = Date.now();
         await br.close(); srv2.close();
+        console.log("  ----  captures: " + (shots.join(", ") || "none completed") + (r2.err ? ` -- stopped ${r2.err.slice(0, 60)}` : ""));
 
         ok("the page loads and the control starts OFF and hidden", !r2.err &&
             /off/.test(r2.before.label) && r2.before.shown === "none",
@@ -351,6 +393,11 @@ console.log("\n5. LOAD THE REAL PAGE AND CLICK THE BUTTON");
         ok("  clicking again turns it off and hides the overlay", !r2.err &&
             /off/.test(r2.off.label) && r2.off.shown === "none");
         const real = (perr || []).filter((e) => !/favicon/i.test(e));
+        // v4920 -- the hold above must slow the loop and must not stop it: a page that never drew would still load, and
+        // the capture rows cannot tell (see the note above on what a screenshot can and cannot see).
+        const heldS = (tEnd - tHold) / 1000, ceil = Math.ceil(heldS * 1000 / FRAME_MS) + 2;
+        ok(`  the page's frame loop was HELD to one frame per ${FRAME_MS} ms for this section, not stopped: ${held} frames in ${heldS.toFixed(1)} s`,
+            held >= 10 && held <= ceil, `at most ${ceil} fit; unheld it would be about ${Math.round(heldS * 60)}`);
         ok("  and the page threw nothing on the way", real.length === 0, real.slice(0, 2).join(" | ") || "clean");
         report("this is the step v4273 named and did not take: the module existed, attached and drew, and " +
             "nothing on the page could ask it to. Now a person can.");

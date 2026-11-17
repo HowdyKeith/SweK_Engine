@@ -1296,7 +1296,8 @@ export const MEASURED_AT_V4462 = Object.freeze({
     // v4898 -- files 4960 -> 5036, ES modules 4651 -> 4727, closures 4484 -> 4551, async/await 1895 -> 1929, typed arrays 1410 -> 1428, Promises 478 -> 486, performance.now 274 -> 275, fetch/XHR 258 -> 259, WebGL 205 -> 207: the channel page, the map selector, the two merged lines' modules and gates, read off the gate; the other rows hold.
     // v4901 -- files 5036 -> 5090, ES modules 4727 -> 4781, closures 4551 -> 4603, async/await 1929 -> 1952 (the last three from this round's own naming rows, which import the module they name), typed arrays 1428 -> 1454, Promises 486 -> 493, performance.now 275 -> 277, fetch/XHR 259 -> 260, requestAnimationFrame 131 -> 134, WebGPU 78 -> 81, workers/threads 26 -> 27 (read off the module's own derivation).
     esModules: 5251, closures: 5036, asyncAwait: 2173, typedArrays: 1583, promises: 574,
-    fetchXhr: 267, performanceNow: 282, raf: 135, webgl: 210, webgpu: 84, threads: 31, wasm: 28,
+    // v4920 -- tools/ship/orreryPost-selfcheck.mjs holds the orrery page's frame loop from an init script and so names requestAnimationFrame for the first time: 135 -> 136; the other rows held.
+    fetchXhr: 267, performanceNow: 282, raf: 136, webgl: 210, webgpu: 84, threads: 31, wasm: 28,
     // *** ALL TWELVE ARE CHECKED, NOT THREE. *** The gate's first draft re-derived the census and then
     // compared only files/threads/closures against it, so nine of these were decoration -- and asyncAwait was
     // already stale by one when this round's own note strings landed. Every row below is now a red if it drifts.

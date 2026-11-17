@@ -16421,6 +16421,41 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
         widened: Object.freeze([]),
         verdict: "no gate file added, so nothing is claimed here (a gate may be claimed by ONE closing); one gate grew nine rows (tools/ship/sweepRotation-selfcheck: a cap retried once, an outlier held once), run alone and green (37 PASS) and sabotaged seven ways, each red by name",
     }),
+    since625: Object.freeze({
+        at: "v4917", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "no gate file added, so nothing is claimed here (a gate may be claimed by ONE closing); two gates grew rows: physics/render/rtPipeline-selfcheck twelve (section 16: translucency, a sphere's any-hit, materials under an instance, three shaders graded; 161 PASS; eight sabotages, one of which went 0 red and moved the light-sampling scene) and tools/ship/sweepRotation-selfcheck three (a rotation prunes the scale entries it orphans, and a held outlier is written only after a day of the same answer; 40 PASS; three sabotages, each red)",
+    }),
+    since626: Object.freeze({
+        at: "v4918", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "no gate file added, so nothing is claimed here (a gate may be claimed by ONE closing); physics/render/rtPipeline-selfcheck grew twelve rows (section 17: a tree over the instances and more than one mesh; 173 PASS; six sabotages, one of which went 0 red and reordered the meshes) and tools/ship/absenceScope-selfcheck's two second-level rows were re-taken on the day the list row said it would go red, each sabotaged",
+    }),
+    since627: Object.freeze({
+        at: "v4919", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "no gate file added, so nothing is claimed here (a gate may be claimed by ONE closing); tools/ship/rtViewer-selfcheck grew from 99 rows to 137 (sections 1j and 4g and three rows of 6: instances, the tree over them and the any-hit cutout through makeRtSession and rtx-viewer.html; twenty-two sabotages, none 0 red, one of which first made the new rows throw and they fail by row now) and tools/ship/orreryPost-selfcheck names and times each capture and gives it pageShot's 120 s ceiling -- its cause on the rig is not known and that change is unverified there; render/seaPicker-selfcheck, which this round's rotation returned red on a fixed 900 ms wait (red on v4918's tree too), waits for the page to settle and its row is unchanged; no register widened",
+    }),
+    since628: Object.freeze({
+        at: "v4920", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "no gate file added, so nothing is claimed here (a gate may be claimed by ONE closing); tools/ship/orreryPost-selfcheck holds the page's frame loop to one frame per 100 ms in its page section and gained the row that holds the hold (44 rows to 45; three sabotages, none 0 red) -- the rig's timeout was a queue of frames a software GL could not present, reproduced here, and the change is unverified on the rig; tools/ship/gitEconomy-selfcheck, which this round's rotation returned red, aimed its pointer at a body behind the page's HUD panel and aims now at the largest one the pointer can reach (two sabotages, 1 red each); no register widened",
+    }),
+    since629: Object.freeze({
+        at: "v4921", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "no gate file added, so nothing is claimed here (a gate may be claimed by ONE closing); tools/ship/strandCensus-selfcheck gained the row that holds ignoredSet to a directory-only rule whose directory is not on the disk (15 rows to 16; one sabotage, 1 red) -- the rig's fresh clone of v4920 went red there with nothing left behind, reproduced here by moving the directory aside; unverified on the rig; no register widened",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

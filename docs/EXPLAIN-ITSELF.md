@@ -322,6 +322,14 @@ walked linearly, exactly as honest at three and as useless at three thousand as 
 in those words, and `tools/ship/absenceScope-selfcheck.mjs` holds both halves from its code. What stays open is a
 BVH over the instances, and more than one mesh. (Any-hit, the fifth Vulkan stage, was written in the same round.)
 
+**v4918 -- and the other half: the item is closed.** `buildInstanceTree()` packs a BVH over the instances' world
+boxes behind them in the same buffer, `pipelineWgsl({ instanceTree: true })` walks it near child first with its own
+stack, and `bvhBuffersFromMeshes()` lays several meshes end to end so an instance names its mesh by root node. The
+list is kept as the tree's control: on sixteen instances of two meshes the two find the same hit on every probed ray
+and the same frame bit for bit, and the tree enters 1.84 instances a ray where the list enters 16. It was not done
+the way this item proposed -- `mesh/meshBVH.mjs` was not made two-level; the second level lives in the tracer, which
+is the only caller that has instances. The tree is a median split, not SAH, and is rebuilt whole rather than refitted.
+
 **So the item shrinks, and its hard part is already solved.** It is not "build a BVH" -- the tree ships one,
 with SAH, graded. It is: **make `mesh/meshBVH.mjs` two-level (a TLAS over instance transforms with a shared
 BLAS) and point `physics/render/rtPipeline.mjs`'s linear-over-geometries loop at it.**
