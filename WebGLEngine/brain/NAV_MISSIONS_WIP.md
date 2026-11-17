@@ -100,3 +100,9 @@ W2 and W3 take y in -80 to 80 and depth 15 to 40, from a generator seeded by the
 **Expectations, written before any seed is flown.** E1 the reference ends flat on at least a third of its missions: about 60 percent. E2 SUPPORTED: about 55 percent. E3 `eco` ends flat on none: about 75 percent. E4 `eco` collides with ships more often than the reference (slower in traffic): about 40 percent.
 
 **What a result would not say.** One hull and battery class with no recharge, three legs of a fixed layout, ships that do not react. An arm that knew its battery and chose its speed would be the next question. This one fixes the speed.
+
+### AMENDMENT 1 TO PART 2 (2026-11-17; made on DEV seeds 1 to 6 while building, BEFORE ANY HELD83 SEED IS FLOWN; DEV is not a result)
+
+**The registered leg cap of 260 s scores speed, not energy.** It was `flyHard`'s cap for a vessel at 3 m/s. On DEV seeds 2 and 5, `eco` (2 m/s) timed out on its FIRST leg with 77 percent of its battery left: chords of 376 and 394 m, paths of about 510 m, more than 260 s at 2 m/s. With 390 s it completed all three legs on both. A cap that ends a slower arm for being slower answers a question the round did not ask.
+
+**Amended:** each arm's leg cap is 260 s x CRUISE (3 m/s) / the arm's cruise, which is the same distance budget per leg (780 m at cruise speed). The reference and `any+predict` keep 260 s; `eco` gets 390 s. The mission cap is three legs of each arm's cap. The arms, the set, the battery, the test, the bars and the checks are unchanged. Check (1) uses 260 s, the cap of the arms it copies.
