@@ -6,7 +6,8 @@
 //
 // THE FLIES (KINDS). Five need no file: the four written by hand (brain/rl/escapeEnv.mjs RULES: freeze, hide, fleeAll, reflex) and `told`, which is told each mover's kind. Five are a round's
 // trained arm (FLY, SHUF, PLAIN, FISH, MLP), draw 1 to 16, whose weights are the record's in that round's results file (ROUNDS). Round 5 has its own four flies (VISION_ARMS), round 6 its own
-// three (DEGREE_ARMS) on its own draws, 17 to 48, and round 7 its own five (SPLIT_ARMS) on draws 49 to 80 (drawsOf).
+// three (DEGREE_ARMS) on its own draws, 17 to 48, round 7 its own five (SPLIT_ARMS) on draws 49 to 80, and round 8 two of those
+// (FIBRES_ARMS) on draws 81 to 208 (drawsOf).
 //
 // THE PICTURES ARE RAY-CAST FROM THE EPISODE'S OWN VOXELS: a ray a pixel, through the house's blocks (the plan's cells, the same the environment stamped into its world), the ground, the mover (a
 // sphere of the environment's radius at the height of the fly's eye) and, in the outside view, the fly. No GPU: the page is to open anywhere, and the gate holds the pictures without a browser.
@@ -44,6 +45,7 @@ export const ROUNDS = Object.freeze({
     5: Object.freeze({ file: "brain/flyEscapeVisionRound.jsonl", start: "reflex", vision: true, label: "round 5: the real Giant Fiber circuit, seeing only size and looming (its own four flies)" }),   // 2026-11-16: tools/ship/flyEscapeVision.mjs
     6: Object.freeze({ file: "brain/flyEscapeDegreeRound.jsonl", start: "reflex", vision: true, degree: true, draws: Object.freeze([17, 48]), label: "round 6: the real circuit, a shuffle that keeps every cell's counts, and a free shuffle (draws 17 to 48)" }),   // 2026-11-16: tools/ship/flyEscapeDegree.mjs
     7: Object.freeze({ file: "brain/flyEscapeSplitRound.jsonl", start: "reflex", vision: true, split: true, draws: Object.freeze([49, 80]), label: "round 7: five shuffles, each keeping one part of the counts (draws 49 to 80)" }),   // 2026-11-16: tools/ship/flyEscapeSplit.mjs
+    8: Object.freeze({ file: "brain/flyEscapeFibresRound.jsonl", start: "reflex", vision: true, fibres: true, draws: Object.freeze([81, 208]), label: "round 8: the Giant Fibers' own inputs kept, against a free shuffle (draws 81 to 208)" }),   // 2026-11-17: tools/ship/flyEscapeFibres.mjs
 });
 export const ARMS = Object.freeze(["FLY", "SHUF", "PLAIN", "FISH", "MLP"]);
 // Round 5's arms (tools/ship/flyEscapeVision.mjs, which a page cannot load): the 42 real cells of brain/gfVisualTopology.mjs, the looming rate (number 2) into each LC4 cell and the size (number 1) into
@@ -53,9 +55,11 @@ export const VISION_ARMS = Object.freeze(["GF", "GSHUF", "FREE", "GNONE"]), VISI
 export const DEGREE_ARMS = Object.freeze(["GF", "GDEG", "GSHUF"]), DEGREE_SEED = 9000;
 // Round 7's arms (tools/ship/flyEscapeSplit.mjs): GDEG and GSHUF again, and three shuffles of brain/rl/splitShuffle.mjs by their own seed + the draw: GIN keeps each connection's target, GOUT its
 // source, GGF the 42 real connections onto the two Giant Fibers.
+// Round 8's two arms (tools/ship/flyEscapeFibres.mjs) are round 7's GGF and GSHUF, built the same way, on draws 81 to 208.
+export const FIBRES_ARMS = Object.freeze(["GGF", "GSHUF"]);
 export const SPLIT_ARMS = Object.freeze(["GDEG", "GIN", "GOUT", "GGF", "GSHUF"]), SPLIT_SEEDS = Object.freeze({ GIN: 11000, GOUT: 12000, GGF: 13000 });
 /** The arms a round's flies come from. */
-export const armsOf = (round) => { const R = ROUNDS[round]; if (!R) throw new Error(`flyEscapeShow: no round ${round} (the rounds are ${Object.keys(ROUNDS).join(", ")})`); return R.split ? SPLIT_ARMS : R.degree ? DEGREE_ARMS : R.vision ? VISION_ARMS : R.memory ? ARMS.filter((a) => a !== "MLP") : ARMS; };
+export const armsOf = (round) => { const R = ROUNDS[round]; if (!R) throw new Error(`flyEscapeShow: no round ${round} (the rounds are ${Object.keys(ROUNDS).join(", ")})`); return R.fibres ? FIBRES_ARMS : R.split ? SPLIT_ARMS : R.degree ? DEGREE_ARMS : R.vision ? VISION_ARMS : R.memory ? ARMS.filter((a) => a !== "MLP") : ARMS; };
 /** The first and the last draw a round's flies have: 1 to 16 unless the round says its own. */
 export const drawsOf = (round) => { const R = ROUNDS[round]; if (!R) throw new Error(`flyEscapeShow: no round ${round} (the rounds are ${Object.keys(ROUNDS).join(", ")})`); return R.draws ? [...R.draws] : [1, DRAWS]; };
 function visionPolicy(arm, s) {
@@ -197,6 +201,7 @@ export function saidLines() {
         "Round 5 is another kind of fly: the two Giant Fibers and forty of the real visual cells that feed them (LC4 and LPLC2, from the male fly's connectome), given only how big the mover looks and how fast it looms, with the answer read from the Giant Fibers alone. With the real wiring every training ends at the same good fly; with the same connections shuffled, twelve of sixteen do and four fail. It is the first round in which a real wiring was told from its shuffle -- as a surer training, not a better fly -- and it wants a second round before it is believed.",
         "Round 6 is that second round, on 32 new trainings an arm (draws 17 to 48). The result came again: the real wiring escapes better than a free shuffle of it. But a shuffle that keeps how many connections each cell receives and sends -- and so keeps the heavy drive onto the two Giant Fibers -- could not be told from the real wiring at all. So what round 5 found is the convergence onto the cells that are read, not which cell is wired to which. The difference is small: about a thousandth of the score, and two failed trainings of 32 for the free shuffle against none.",
         "Round 7 took 'the counts' apart, on 32 more trainings an arm (draws 49 to 80). The difference came a third time. But no one part alone could be told from a free shuffle: not what each cell receives, not what each cell sends, not the two Giant Fibers' own inputs. The last of those came closest and looks just like the shuffle that keeps everything, so the round cannot say whether the whole pattern is needed or whether the Giant Fibers' inputs are the answer and 32 trainings were too few to show it.",
+        "Round 8 asked that last question again on 128 trainings an arm (draws 81 to 208): a fly whose two Giant Fibers keep their 42 real inputs, and nothing else of the real wiring, against a free shuffle. It escapes better -- surely, and by little: it wins about 72 of 100 pairs, the middle flies differ by about a thousandth of the score, and none of its trainings failed against five of the shuffle's. Round 7's near miss was too few trainings. Taken with rounds 6 and 7, the plainest reading is that the real circuit's edge over a free shuffle is the drive onto the two cells that are read, and nothing finer has been shown.",
         "Not a fly's nervous system at work. The Giant Fiber Circuit is the fruit fly's real escape circuit, and a trained fly here is a small network with that circuit's wiring -- but it walks where a fly would take off, its cells are simple rectified sums and not neurons, and in rounds 1 to 4 its wiring could not be told apart from a shuffle of it. Round 5's forty visual cells are a fifth of the visual input a Giant Fiber has, and each is given one number where the real cell looks at its own patch of the eye.",
     ];
 }
