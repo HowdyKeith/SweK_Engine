@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "212cb5c9a14dd780a9af82e9a478816b3d68cd4d",
+ "head": "65a671380f12854a606511ad847ef7a562601d52",
  "bodies": {
   "box3d": [
    {
@@ -188,7 +188,7 @@
    {
     "path": "orrery-gpu.html",
     "bytes": 50739,
-    "sha": "cc2293510dd6de403175380275e7a76a7a4ececf"
+    "sha": "65a671380f12854a606511ad847ef7a562601d52"
    },
    {
     "path": "slug-curved.html",
@@ -507,12 +507,12 @@
    {
     "path": "rtx-viewer.html",
     "bytes": 19609,
-    "sha": "4575be6607990b52ef3b7c55ada0a9d22f689f07"
+    "sha": "65a671380f12854a606511ad847ef7a562601d52"
    },
    {
     "path": "tools/ship/rtViewer-selfcheck.mjs",
     "bytes": 178380,
-    "sha": "4575be6607990b52ef3b7c55ada0a9d22f689f07"
+    "sha": "65a671380f12854a606511ad847ef7a562601d52"
    },
    {
     "path": "world/kenneyKit.mjs",
@@ -965,8 +965,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 3802903,
-    "sha": "1756d6a67c1d556c686010636198ed878628cf2b"
+    "bytes": 3808412,
+    "sha": "65a671380f12854a606511ad847ef7a562601d52"
    },
    {
     "path": "mpm3d.html",
@@ -1403,7 +1403,7 @@
    {
     "path": "orrery-gpu.html",
     "bytes": 50739,
-    "sha": "cc2293510dd6de403175380275e7a76a7a4ececf"
+    "sha": "65a671380f12854a606511ad847ef7a562601d52"
    },
    {
     "path": "render/denoiseFrameGenCost-selfcheck.mjs",
