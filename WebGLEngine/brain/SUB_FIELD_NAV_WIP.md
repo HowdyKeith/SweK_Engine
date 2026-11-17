@@ -504,3 +504,9 @@ Reported beside it: each option alone against the reference; how often each opti
 ### CLARIFICATION OF FOLLOW-UP 8's REGISTRATION (2026-11-17, before any of its code is run and before any seed is flown)
 
 "It holds the plan's depth and speed, as give-way does" was ambiguous. When give-way finds no heading, the target the vessel is given is the plan's WITH the yield's slowing (2 m/s at a predicted conflict). Give-way's own target, when it finds one, has no yield. **`+leastbad` changes only the heading of the target it is given, so the yield's slowing stays.** Both options act on the final target, after give-way and `+free` and before FOLLOW-UP 7's sweep. Nothing else changes.
+
+### AMENDMENT 1 TO FOLLOW-UP 8 (2026-11-17; made while building, on five seeds of HELD79, the POST HOC set; BEFORE DEV OR ANY HELD81 SEED IS FLOWN)
+
+**The registered `+leastbad` score cannot act when it is needed.** "The most whole seconds the run stays clear" is 0 for EVERY candidate once the vessel is already inside a ship's clearance ring (r + HULL_HALF + 20 m), which is exactly the last seconds the diagnosis found give-way empty in. The rule then changes nothing. Smoke-flown on HELD79's 7601, 7605, 7620, 7635 and 7641, it acted on 0 to 62 ticks and saved none.
+
+**Amended `+leastbad`.** In a ship conflict with no clear give-way heading, each candidate is scored by its straight run's **closest predicted approach** to the ships in conflict over the horizon: the minimum of the distance to each one, less its r and HULL_HALF. Runs that leave the region margin within the horizon are not candidates. The candidate with the largest closest approach is taken (ties to the earlier offset) if it is larger than the target heading's own; otherwise nothing changes. Only the heading changes. `+dive`, the arms, the set, the test, the bars and the checks are unchanged.
