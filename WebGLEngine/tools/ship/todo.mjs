@@ -510,7 +510,7 @@ export const TODO = [
         status: "open", size: "small", order: 27,
         title: "The fly-wired helm and the fly-wired gunner in ONE ship, in one fight",
         why: "The fly-wired helm leads the rule by 1.02 (with the cannon) and the fly-wired gunner leads the hand gunner by 0.75 (without it): they were measured in different fights and never together, so nothing says whether the two gains add.",
-        note: "A registered study of the helm alone, the gunner alone and both, with the cannon and without (tools/ship/takeFlyWiredNext.mjs, `together`). Sandbox-sized.",
+        note: "A registered study of the helm alone, the gunner alone and both, with the cannon and without (tools/ship/takeFlyWiredNext.mjs, `together`). DONE, UNSHIPPED (2026-11-17, read once on 600 pairs): WITH THE CANNON the two ADD -- helm +0.945, gunner +0.141, both +1.127; both less the helm +0.182 (z 5.1), both less the sum +0.041 (cannot be told). WITHOUT THE CANNON THE FLY-WIRED HELM HURTS: alone it TRAILS the plain ship by 0.692 (z -15), the gunner alone leads by 0.790, both by only 0.224 (both less the gunner -0.567). The helm's note on space-duel.html now says so. NEXT: a helm that knows which fight it is in, or its gain chosen without the cannon (the backlog's fly-wired-other-fights).",
         evidence: "node -e 'const fs=require(\"fs\");console.log(\"the together study has been read:\",fs.existsSync(\"brain/flyWiredTogether.reading.json\"))'",
     },
     {
@@ -518,7 +518,7 @@ export const TODO = [
         status: "open", size: "small", order: 28,
         title: "More shuffle seeds for the fly-wired helm: the strongest result in the tree rests on one shuffled circuit in a fight",
         why: "tools/ship/takeFlyWiredHelm.mjs's study 2 read that the fly's wiring is worth 1.013 of a point over the same circuit with its connections shuffled -- from ONE shuffle seed (4242) in fights; eight seeds were looked at only in the no-fight tuning curve.",
-        note: "A registered study of five more shuffle seeds against the fly's helm on fresh pairs (tools/ship/takeFlyWiredNext.mjs, `seeds`). Sandbox-sized.",
+        note: "A registered study of five more shuffle seeds against the fly's helm on fresh pairs (tools/ship/takeFlyWiredNext.mjs, `seeds`). DONE, UNSHIPPED (2026-11-17, read once on 600 pairs): the fly's helm leads the rule by 0.945; it leads EACH of the five shuffled circuits' helms (+0.671 to +0.849, every z above 15) and their mean by +0.784 (z 20). The shuffles' helms themselves lead the rule a little at their own weak gains (+0.096 to +0.274), against the forecast -- so the wiring is worth about 0.78 of the fly's 0.95, and study 2's one seed (1.013) was at the favourable end.",
         evidence: "node -e 'const fs=require(\"fs\");console.log(\"the shuffle-seeds study has been read:\",fs.existsSync(\"brain/flyHelmShuffleSeeds.reading.json\"))'",
     },
     {

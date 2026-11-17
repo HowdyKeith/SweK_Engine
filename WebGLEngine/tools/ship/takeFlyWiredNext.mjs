@@ -13,6 +13,9 @@
 //   (seeds 84001-84075), then on 600 audit pairs (86001-86150) beside the fly's helm at its shipped gain. REGISTERED THE SAME DAY BEFORE ANY OF ITS PAIRS. Readings: the fly's helm less EACH shuffle's, and less THE MEAN OF THE FIVE. FORECAST: the fly's leads the rule by about 1; each shuffle's helm cannot be told
 //   from the rule or trails it; every difference LEADS.
 //
+// READ 2026-11-17 (brain/flyWiredTogether.reading.json, brain/flyHelmShuffleSeeds.reading.json). `together`, WITH THE CANNON: helm +0.945, gunner +0.141, both +1.127; both less the helm +0.182 (z 5.1) LEADS -- the forecast said it would not add, and it does; both less the sum +0.041, cannot be told: the gains ADD.
+//   WITHOUT THE CANNON: THE HELM ALONE TRAILS, -0.692 (z -15); gunner +0.790; both +0.224; both less the gunner -0.567 TRAILS. The forecast (`little or nothing`) was wrong: the fly-wired helm is tuned to a fight the cannon decides and HURTS where it does not. `seeds`: the fly's helm +0.945; the five shuffles' helms +0.096 to
+//   +0.274 (the forecast said they would not lead; at their own weak gains they do, a little); the fly's less each +0.671 to +0.849 and less their mean +0.784 (z 20): LEADS. The wiring is worth about 0.78, not study 2's 1.013 (its one shuffle was at the favourable end).
 // Every arm's leads are kept (brain/rig-results/flyWiredTogether, flyHelmShuffleSeeds); each study's reading file is the mark that it was read, and a second read is refused. NOTHING SHIPS.
 // WHAT IS NOT HERE: fleets or fighters (the backlog's fly-wired-other-fights), gains re-chosen for the combined ship, a held-out set for `seeds` (a shuffle's gain is chosen on its train pairs and read on the audit pairs; nothing is chosen between).
 "use strict";
