@@ -16,6 +16,7 @@
 import { Worker, isMainThread, parentPort } from "node:worker_threads";
 import os from "node:os";
 import * as D from "../../brain/battleshipDuel.mjs";
+import * as BF from "../../brain/battleshipFight.mjs";
 import * as TC from "../../brain/seatTurretCircuit.mjs";
 import * as HS from "../../brain/helmSteerPolicy.mjs";
 import * as HC from "../../brain/helmCompassPolicy.mjs";
@@ -38,8 +39,20 @@ export function sideOf(spec) {
     };
     return D.makeSide(spec.id, { gunners: spec.gunners ?? "regular", helmRule: spec.helmRule ?? "face", cannon: spec.cannon ?? true, network: net(spec.network, "seat"), helmNet: net(spec.helmNet, "helm") });
 }
-/** One pair, flown here: the lead of side x over side y. */
-export function leadOf(job) { return D.pair(sideOf(job.x), sideOf(job.y), job.seed, job.kind, { countBrains: false, ...(job.opts || {}) }).lead; }
+/** A fight against fighters in numbers: the share of the raiders destroyed, less the share of the ship side's hit points lost. In [-1, 1]; a ship that downs all eight and takes nothing scores 1. */
+export const fighterScore = (t, fighters = BF.FIGHTERS) => t.killed / fighters - t.damageOnShips / (1500 * t.ships.length);
+/**
+ * A FIGHTER JOB ({ vsFighters: { network, helm, seed, kind, opts } }): the same attack (battleshipFight.build's seed and kind, its other options as given) flown twice -- once against a ship with `network` in its seats and `helm` at its helm (each { policy, weights } or null, the module looked up in
+ * battleshipDuel.PEER_POLICIES as a side's is), once against the plain ship (the hand gunner, the rule) -- and the first's fighterScore less the second's. Paired by construction: the raiders, their seeds and the sights' seeds are the same.
+ */
+export function fighterLead({ network = null, helm = null, seed, kind, opts = {} }) {
+    const mod = (n, role) => { if (!n) return null; const k = D.PEER_POLICIES[n.policy]; if (!k || k.role !== role) throw new Error(`pairPool.fighterLead: "${n.policy}" is not a ${role} policy`); return { module: k.mod, weights: Float32Array.from(n.weights) }; };
+    const x = BF.fight(seed, kind, { ...opts, network: mod(network, "seat"), helm: mod(helm, "helm") }), y = BF.fight(seed, kind, opts);
+    return fighterScore(x) - fighterScore(y);
+}
+/** One pair, flown here: the lead of side x over side y -- or, for a fighter job, fighterLead. */
+export function leadOf(job) {
+    if (job.vsFighters) return fighterLead(job.vsFighters); return D.pair(sideOf(job.x), sideOf(job.y), job.seed, job.kind, { countBrains: false, ...(job.opts || {}) }).lead; }
 
 /**
  * A pool of `workers` threads (default: the machine's cores). leads(jobs) -> Promise of the leads in the jobs' order; `onLead(i, lead)` is called as each arrives. close() ends the threads. `flown` counts the pairs flown since the pool was made.
