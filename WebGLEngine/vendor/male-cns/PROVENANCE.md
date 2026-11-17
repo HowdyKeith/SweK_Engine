@@ -100,10 +100,35 @@ The licence: the bucket's README states none. The Neuprint server declares CC-BY
 the top of this file; this is the same dataset version, and the same caution applies -- not re-confirmed against Janelia's
 own terms beyond that.
 
+## Circuit: Ring neurons onto the compass neurons (ER > EPG)
+
+The **ring neurons** (ER types) carry what the fly sees into the ellipsoid body, and their connections onto the **compass
+(E-PG) neurons** are where, in the animal, the visual scene is tied to the heading -- connections that are plastic (Fisher
+et al. 2019, Kim et al. 2019). Added 2026-11-17 for the backlog's `fly-compass-learns`.
+
+**Fetched the way the mushroom body was**: from the same two public release tables (above, with their sizes and sha256),
+no token and no Neuprint query. **`tools/maleCnsCompassRing.py`** bakes them into
+`ring-compass-circuit.json`; run twice it gives the same bytes. Which cells: every body whose type is a ring neuron's (`ER`
+and a digit) and every `EPG` and `EPGt` body.
+
+| group | count |
+|---|---|
+| RING | 282 (ER1 28, ER2 41, ER3 151, ER4 37, ER5 21, ER6 4) |
+| EPG | 50 (46 EPG, 4 EPGt -- the same 50 bodies as `epg-compass-circuit.json`) |
+332 cells, 167 with the soma on the left and 165 on the right.
+
+**What is kept and what is not.** Topology only, and only one direction: ring neuron onto compass neuron. At every weight
+there are 11,719 such connections carrying 124,264 synapses; **the file keeps the 8,847 of at least 5 synapses**, which
+carry 117,073 (94 percent). The wiring is close to all-to-all: 260 of the 282 ring neurons reach a compass neuron, and the
+kept connections are 63 percent of every possible ring-to-compass pair -- in the animal, which ring neuron excites which
+part of the ring is set by plasticity, not by the wiring. The strongest connection is 75 synapses (an ER4m neuron onto
+EPG(PB08)_L4). The licence is the dataset's, as above, with the same caution.
+
 ## Contents
 
 - `giant-fiber-circuit.json`, `epg-compass-circuit.json` — see the circuit sections above.
 - `mushroom-body-circuit.json` — see the mushroom body section above (from the public release tables, not Neuprint).
+- `ring-compass-circuit.json` — see the ring neurons section above (from the same public release tables).
 - `PROVENANCE.md` — this file.
 
 Re-running the fetch (e.g. for a different circuit, or a refreshed dataset version) uses the same fetch

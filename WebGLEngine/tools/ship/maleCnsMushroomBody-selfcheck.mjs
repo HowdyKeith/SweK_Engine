@@ -17,6 +17,8 @@
 //   THE BAKE (tools/maleCnsMushroomBody.py): T1 it keeps 3 synapses 1 | T2 it fetches over the network 1 | T3 its groups in another order 1
 //   Two rows of mine were wrong when written and were corrected to the data: the one connection of a cell onto itself is the right APL neuron's (14 synapses), not a Kenyon cell's; and a
 //   phrase of the provenance was matched with the wrong capital.
+//   2026-11-17, LATER: the bake row's network words missed urllib (found by the ring neurons' gate, tools/ship/maleCnsCompassRing-selfcheck.mjs, whose sabotage T2 went 0 red on the same words);
+//   they now name urllib, socket and http.client, and the bake given `import urllib.request` goes red here: 1.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -81,7 +83,7 @@ section(() => {
         /## Circuit: Mushroom Body \(MB\)/.test(prov) && /\*\*This file was NOT fetched the way the two above were\.\*\*/.test(flat) && /public release bucket/.test(flat) && /no token/.test(flat) && /4,505 cells/.test(flat) && /\*\*the file keeps the 101,392 of at least 5 synapses\*\*/.test(flat) && /1,018,725 connections carrying 2,794,887 synapses/.test(flat) &&
         /Topology only: no skeletons, no coordinates/.test(flat) && /the bucket's README states none/.test(flat) && /- `mushroom-body-circuit\.json`/.test(prov));
     ok("!! THE BAKE SCRIPT IS THE ONE THE PROVENANCE NAMES AND ITS THRESHOLD IS THE FILE'S: tools/maleCnsMushroomBody.py, MIN_SYNAPSES = 5, the five groups in the file's order, the dataset's name; it reads only the two paths it is given -- no URL, no token, no Neuprint query",
-        /`tools\/maleCnsMushroomBody\.py`/.test(prov) && /^MIN_SYNAPSES = 5$/m.test(tool) && /^GROUPS = \["KC", "MBON", "DAN", "APL", "DPM"\]$/m.test(tool) && /^DATASET = "male-cns:v1\.0"$/m.test(tool) && !/https?:\/\/|urlopen|requests|token|Authorization|neuprint\.janelia/i.test(tool.replace(/^#.*$/gm, "")) && /def main\(ann_path, w_path, out_path\)/.test(tool));
+        /`tools\/maleCnsMushroomBody\.py`/.test(prov) && /^MIN_SYNAPSES = 5$/m.test(tool) && /^GROUPS = \["KC", "MBON", "DAN", "APL", "DPM"\]$/m.test(tool) && /^DATASET = "male-cns:v1\.0"$/m.test(tool) && !/https?:\/\/|urlopen|urllib|requests|socket|http\.client|token|Authorization|neuprint\.janelia/i.test(tool.replace(/^#.*$/gm, "")) && /def main\(ann_path, w_path, out_path\)/.test(tool));
     const sha = createHash("sha256").update(fs.readFileSync(path.join(ENG, FILE))).digest("hex");
     ok("the file is one line of JSON and a newline, as the bake writes it (a hand edit that re-indents it is seen here)", text.endsWith("\n") && text.indexOf("\n") === text.length - 1 && /^[0-9a-f]{64}$/.test(sha), sha.slice(0, 16));
 });
