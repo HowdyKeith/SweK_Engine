@@ -13,7 +13,7 @@ import * as H from "./subHardNav.mjs";
 
 export const PLUS_KINDS = Object.freeze(["hard-current-gap", "hard-reactive"]);
 export const ALL_KINDS = Object.freeze([...H.HARD_KINDS, ...PLUS_KINDS]);
-export const PLUS_SETS = Object.freeze({ dev: N.range(1, 30), held70: N.range(7001, 7060), held71: N.range(7101, 7200), held72: N.range(7201, 7260) });
+export const PLUS_SETS = Object.freeze({ dev: N.range(1, 30), held70: N.range(7001, 7060), held71: N.range(7101, 7200), held72: N.range(7201, 7260), held73: N.range(7301, 7400) });   // held73: the crab replicate (NAV_PLUS_WIP.md, ITEM 2 REPLICATE, registered 2026-11-17)
 // item 2: the current estimate's time constant (s) and the margin's growth per m/s of current (s: the 35 m turn radius over the 3 m/s cruise)
 export const TAU_C = 15, CUR_K = 12;
 // item 3: a ship's reaction (registered in NAV_PLUS_WIP.md) and the plan's velocity filter
