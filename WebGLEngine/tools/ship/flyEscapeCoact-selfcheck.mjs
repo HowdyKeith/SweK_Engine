@@ -9,6 +9,7 @@
 //   3  ONE TRAINING             a record's weights are the trainer's from a policy made here by hand; its score with the rates at 0
 //   4  THE RECORDS              36 draws; P, T1, H; USES and ACROSS counted
 //   5  THE COMMAND              it is this round's; no training of the round's, no process
+//   6  THE VERDICT              the results file as committed unread at dd9f5c2f, read from the file: the checks, P, T1, H, the arms, USES and ACROSS, re-audits, the expectations, the note's result
 // SABOTAGE LOG (2026-11-17) -- through a byte-safe runner (one at a time, every file restored and its sha256 checked), this gate and tools/ship/voxelHome-selfcheck.mjs (which probes the command as a
 // process) run whole for each; every one red by name (the number is the rows red over the two):
 //   THE FLY (brain/rl/coactReflex.mjs): K1 the weakening needs no firing (activity alone, round 9's) 1 | K2 the line is not asked 2 | K3 a life does not start afresh 1 | K4 no recovery 2
@@ -23,9 +24,14 @@
 //   0.101 - 0.001 are the lines exactly in doubles). A row was added for each and they were run again: 1, 1 and 1.
 //   Four rows of mine were wrong when written and were corrected: the connections onto the fibres are edges [to, from], so the count is of e[0] (I had read e[1] and counted 9, not 42); the rule by
 //   hand used a = 0.15 exactly where the 32-bit weight 0.3 gives 0.15000000596; and two fixtures sat on their lines in doubles (0.7 - 0.69 is above 0.01, 0.6 - 0.5 is under 0.1).
+// THE VERDICT'S SABOTAGES (2026-11-17, after the reading, the same runner, this gate alone): V1 a record's caught count changed by one 1 | V2 alpha is 0.05 4 | V3 USES needs 0.1 4 | V4 ACROSS
+//   needs 0.3 3 | V5 the fly's gain is 0.6 4 | V6 rates at 0 keeps the depression rate 2 | V7 the note's P says BETTER 1 | V8 the note's expectation of P is CANNOT 75 1 | V9 the note names another
+//   commit 1 | V10 the note leaves out the output layer 1 | V11 the shuffle's lead is said as registered 1.  V10 WENT 0 RED AT FIRST AND WAS A FINDING: the row asked only for the words "output
+//   layer", which the section's last paragraph also has; it now asks for the sentence that says how the three flies stop, and V10 was run again: 1.
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
+import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import * as V from "./flyEscapeCoact.mjs";
 import * as R9 from "./flyEscapeHabituate.mjs";
@@ -182,6 +188,42 @@ section(() => {
     const me = src("tools/ship/flyEscapeCoact-selfcheck.mjs"), calls = [...me.matchAll(/V\.trainOne\(([^)]*)\)/g)].map((m) => m[1]);
     ok("!! THIS GATE STARTS NO TRAINING OF THE ROUND'S AND LEAVES ITS RESULTS FILE AS IT WAS: its two trainings through the round's code are of 2 iterations with 4 flies tried on draw 901; this gate starts no process at all; and the file's size and time are what they were before this section",
         calls.length === 2 && calls.every((c) => /^"(COACT|FROZEN)", 901, TINY, TINY_AUDIT$/.test(c)) && TINY.iters === 2 && TINY.pop === 4 && !V.SEEDS.includes(901) && !/Sync\(/.test(me.replace(/readFileSync\(|statSync\(|existsSync\(/g, "")) && stateOf() === before, `${calls.length} trainings, no process, the file ${before === "absent" ? "absent" : "unchanged"}`);
+});
+
+console.log("\n6. THE VERDICT (the whole results file was committed at dd9f5c2f before it was read, and is read here from the file)");
+section(() => {
+    const bytes = fs.readFileSync(path.join(ENG, V.RESULTS)), lines = bytes.toString("utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l)), R = V.reading(lines), A = R.arms, F = R.floors, draws = lines.filter((r) => r.kind === "draw");
+    const of = (a) => draws.filter((r) => r.arm === a).sort((x, y) => x.s - y.s), sc = (a) => of(a).map((r) => r.score), never = F.freeze.score, rec = (a, s) => draws.find((r) => r.arm === a && r.s === s), ids = (a, f) => J(of(a).filter(f).map((r) => r.s));
+    ok("!! the results file is the one the run wrote: 38 records, sha256 515c4fe3bd98ff77... (one start, 107.1 minutes, no restart)", lines.length === 38 && createHash("sha256").update(bytes).digest("hex") === "515c4fe3bd98ff7726beafad55f80f28cc8fea82aa1a3fb35b240d8071d726ef");
+    ok("!! THE CHECKS HOLD, AND THE START WAS THE REFLEX: 36 draws each once, the registered recipe, each arm's weights and wiring, a rates-at-0 score for every plastic fly, COACT draw 13 the same twice, the floors -- and the untrained fly of all three arms scores the reflex's 0.6057, to the bit",
+        R.checks.length === 0 && draws.length === 36 && near(F.reflex.score, 0.6057) && V.ARMS.every((a) => F.untrained[a] === F.reflex.score));
+    ok("!! *** P: A FLY WHOSE ESCAPE RUNS THROUGH FIBRES WHOSE INPUTS WEAKEN WITH CO-ACTIVITY CANNOT BE TOLD APART FROM ONE WHOSE CANNOT *** -- COACT's ranks 204 on a middle of 150, 36 of the 144 pairs tied, exact two-sided p 0.0387: above alpha 0.01, so not a reading, whichever way it leans",
+        R.P && R.P.word === V.WORDS.P[2] && R.P.sumA === 204 && R.P.ties === 36 && near(R.P.p, 0.038721, 1e-6) && R.P.p > V.ALPHA);
+    ok("!! T1: THE REAL WIRING CANNOT BE TOLD APART FROM A SHUFFLE OF IT -- and it leans the OTHER way: COACT's ranks 116 under the middle, no ties, p 0.0519. H: COACT DOES WORSE THAN THE HAND HABITUATING REFLEX -- 0 of 12 above its 0.7276, 12 below, p 0.00049",
+        R.T1.word === V.WORDS.T1[2] && R.T1.sumA === 116 && R.T1.ties === 0 && near(R.T1.p, 0.051865, 1e-6) && R.H.word === V.WORDS.H[1] && R.H.above === 0 && R.H.below === 12 && near(R.H.ref, 0.7276) && R.H.p === 2 ** -11);
+    ok("!! *** EVERY FROZEN FLY NEVER FLEES TO THE BIT, AND SO DO 3 OF THE 12 COACT FLIES (draws 16, 19 and 24) -- NO CSHUF FLY DOES ***; by the registered line (ordinary lives under 0.35) FROZEN 12, COACT 4 (draw 21 too, at 0.3446), CSHUF 0",
+        sc("FROZEN").every((v) => v === never) && ids("COACT", (r) => r.score === never) === J([16, 19, 24]) && sc("CSHUF").every((v) => v > never) && A.FROZEN.neverFlee === 12 && A.COACT.neverFlee === 4 && A.CSHUF.neverFlee === 0 && near(rec("COACT", 21).ordinary, 0.3446));
+    ok("!! the arms (mean, sd, decoy lives, ordinary lives): FROZEN 0.6348 0 1.0000 0.2695 | COACT 0.6613 0.0218 0.9199 0.4027 | CSHUF 0.6806 0.0064 0.8575 0.5036; COACT's best 0.6964 (draw 13), CSHUF's least 0.6641",
+        near(A.FROZEN.mean, 0.6348) && A.FROZEN.sd < 1e-12 && near(A.COACT.mean, 0.6613) && near(A.COACT.sd, 0.0218) && near(A.COACT.decoy, 0.9199) && near(A.COACT.ordinary, 0.4027) && near(A.CSHUF.mean, 0.6806) && near(A.CSHUF.sd, 0.0064) && near(A.CSHUF.decoy, 0.8575) && near(A.CSHUF.ordinary, 0.5036) && near(A.COACT.max, 0.6964) && rec("COACT", 13).score === A.COACT.max && near(A.CSHUF.min, 0.6641));
+    ok("!! USES AND ACROSS: COACT 9 of 12 each, the three that fail both being the three that never flee; CSHUF 12 of 12 each; COACT's decoy lives rise 0.2653 from the first episode to the fourth, CSHUF's 0.4121 (the hand reflex's 0.4192)",
+        A.COACT.uses === 9 && A.COACT.across === 9 && ids("COACT", (r) => !V.uses(r)) === J([16, 19, 24]) && ids("COACT", (r) => !V.across(r)) === J([16, 19, 24]) && A.CSHUF.uses === 12 && A.CSHUF.across === 12 && near(A.COACT.signature, 0.2653) && near(A.CSHUF.signature, 0.4121) && near(F.hand.ep.decoy[3] - F.hand.ep.decoy[0], 0.4192));
+    ok("!! *** WITH ITS RATES AT 0 EVERY CSHUF FLY IS THE REFLEX TO THE BIT (0.6057); THE COACT FLIES ARE NOT *** -- their mean is 0.5880, under the reflex, and four are never-fleeing (draws 16, 19, 22 and 24): the real wiring's network moved with the plasticity, the shuffle's never moved enough to change one action",
+        of("CSHUF").every((r) => r.ratesOff === F.reflex.score) && near(A.COACT.ratesOff, 0.5880) && A.COACT.ratesOff < F.reflex.score && ids("COACT", (r) => r.ratesOff === never) === J([16, 19, 22, 24]));
+    const again = (a, s, zero) => { const r = rec(a, s), w = PF.unpackWeights(r.weights), p = zero ? V.ratesOff(a, s, w) : V.policyOf(a, s).setParams(w); return V.auditScore(() => (o) => p.act(o)).score; };
+    const life = (a, s) => { const p = V.policyOf(a, s).setParams(PF.unpackWeights(rec(a, s).weights)); let fired = 0, still = 0, top = -9; for (const seed of [900001, 907920]) { const env = new L.LifeEnv(); let o = env.reset(seed), done = false; while (!done) { const act = p.act(o)[0]; top = Math.max(top, act - (p.fired ? CR.GAIN : -CR.GAIN)); if (p.fired) { fired++; if (act <= 0) still++; } const st = env.step([act]); o = st.obs; done = st.done; } } return { fired, still, top }; };
+    const c16 = life("COACT", 16);
+    ok("!! RE-AUDITED AFTER THE READING (not registered): COACT draw 13 and CSHUF draw 13 give their scores again on the 200 lives to the bit, with their rates and at 0 -- and HOW COACT DRAW 16 NEVER FLEES: in the audit's first two lives its fibres fire on 53 ticks and its network's output is under -0.5 on every tick, so not one firing moves it; the escape is shut off downstream of the fibres, by the output layer",
+        again("COACT", 13) === rec("COACT", 13).score && again("COACT", 13, true) === rec("COACT", 13).ratesOff && again("CSHUF", 13) === rec("CSHUF", 13).score && again("CSHUF", 13, true) === F.reflex.score && c16.fired === 53 && c16.still === 53 && c16.top < -CR.GAIN, `COACT 16: fired ${c16.fired}, still ${c16.still}, the network's highest ${c16.top.toFixed(3)}`);
+    ok("!! NOT REGISTERED, SAID AS SUCH: every CSHUF fly scores above every FROZEN fly (least 0.6641 against 0.6348) -- the shuffle did what P asked of the real wiring",
+        Math.min(...sc("CSHUF")) > Math.max(...sc("FROZEN")));
+    ok("!! WHAT THE TRAINER SAW: on its own lives COACT starts at 0.632 and climbs to 0.670; CSHUF starts at 0.682 and ends at 0.686; FROZEN goes from 0.636 to 0.661 by iteration 25 and stops",
+        near(A.COACT.history[0].ret, 0.6318) && near(A.COACT.history[6].ret, 0.6697) && near(A.CSHUF.history[0].ret, 0.6822) && near(A.CSHUF.history[6].ret, 0.6862) && near(A.FROZEN.history[0].ret, 0.6360) && A.FROZEN.history.slice(1).every((h) => near(h.ret, 0.6613)));
+    const note = src("brain/FLY_ESCAPE_COACT_WIP.md"), flat = note.replace(/\s+/g, " "), res = flat.slice(flat.indexOf("## 11. The result"));
+    ok("the expectations, written before the code, against what came: P BETTER (75) did NOT come; COACT at least 9 of 12 USES (75) and ACROSS (70) came, with 9 each; its mean between 0.66 and 0.71 (65) came, 0.6613; FROZEN at least 8 of 12 never flee (70) came, with 12; T1 CANNOT (75) and H WORSE (85) came",
+        /P: \*\*BETTER about 75 percent, CANNOT about 25\.\*\*/.test(flat) && /at least 9 of 12 USES, about 75; at least 9 of 12 ACROSS, about 70; COACT's mean between 0\.66 and 0\.71, about 65\. FROZEN at least 8 of 12 never flee, about 70\. T1: CANNOT about 75\. H: WORSE about 85\./.test(flat) &&
+        R.P.word !== V.WORDS.P[0] && A.COACT.uses >= 9 && A.COACT.across >= 9 && A.COACT.mean >= 0.66 && A.COACT.mean <= 0.71 && A.FROZEN.neverFlee >= 8 && R.T1.word === V.WORDS.T1[2] && R.H.word === V.WORDS.H[1]);
+    ok("the registration's RESULT SECTION (section 11) carries the three readings' words, the commit the file was read at, the three COACT flies that never flee and how, that every CSHUF fly at rates 0 is the reflex, the shuffle's lead said as NOT registered, and that P's expectation did not come",
+        /## 11\. The result/.test(note) && [["P", R.P.word], ["T1", R.T1.word], ["H", R.H.word]].every(([t, w]) => res.includes(`**${t}: ${w}**`)) && /dd9f5c2f/.test(res) && /draws 16, 19 and 24/.test(res) && /The trainer found round 9's hill again, through the \*\*output layer\*\*, which sits downstream of the fibres/.test(res) && /every CSHUF fly is the reflex/.test(res) && /NOT registered/.test(res) && /\(75\) did not come/.test(res));
 });
 
 console.log(`\nflyEscapeCoact-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILED"}`);

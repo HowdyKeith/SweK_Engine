@@ -104,3 +104,46 @@ about 7 (round 9). 36 trainings, four at a time: about 100 minutes. Resumable.
 ## 10. The run (the gate never runs it and never gives the command the word `run`)
 `node tools/ship/takeFlyEscapeCoact.mjs run` -> `brain/flyEscapeCoactRound.jsonl`, committed byte for byte, whole,
 before it is read; `node tools/ship/takeFlyEscapeCoact.mjs read` prints the checks and the reading.
+
+## 11. The result (the run: one start, 107.1 minutes, no restart; the whole file committed unread at dd9f5c2f, then read once)
+The checks hold, and the untrained fly of all three arms scored the reflex's 0.6057 to the bit.
+
+**P: A FLY WHOSE ESCAPE RUNS THROUGH FIBRES WHOSE INPUTS WEAKEN WITH CO-ACTIVITY CANNOT BE TOLD APART FROM ONE WHOSE CANNOT**
+(COACT's ranks 204 on a middle of 150, 36 ties, exact two-sided p 0.0387). It leans toward COACT, but 0.0387 is not under
+0.01, and a lean is not a reading.
+
+**T1: THE REAL WIRING CANNOT BE TOLD APART FROM A SHUFFLE OF IT** (ranks 116, no ties, p 0.0519) -- leaning the other way,
+toward the shuffle.
+
+**H: A FLY WHOSE ESCAPE RUNS THROUGH FIBRES WHOSE INPUTS WEAKEN WITH CO-ACTIVITY DOES WORSE THAN THE HABITUATING REFLEX
+WRITTEN BY HAND** (0 of 12 above its 0.7276, p 0.00049).
+
+| arm | mean | sd | decoy lives | ordinary lives | decoy, 4th episode less 1st | never flee | USES | ACROSS | with rates at 0 |
+|---|---|---|---|---|---|---|---|---|---|
+| FROZEN | 0.6348 | 0 | 1.0000 | 0.2695 | 0 | 12 | -- | -- | -- |
+| COACT | 0.6613 | 0.0218 | 0.9199 | 0.4027 | 0.2653 | 4 | 9 | 9 | 0.5880 |
+| CSHUF | 0.6806 | 0.0064 | 0.8575 | 0.5036 | 0.4121 | 0 | 12 | 12 | 0.6057 |
+
+**What happened.** Every FROZEN fly went to never fleeing, as in round 9. Nine of the twelve COACT flies learned within their
+lives (decoy lives about 0.6 in the first episode, 1.00 by the fourth) and use their plasticity. **The other three, draws 16,
+19 and 24, never flee to the bit -- and not through the fibres.** Re-audited after the reading (not registered): in the audit's
+first two lives draw 16's fibres fire on 53 ticks, but its network's output is under -0.5 on every tick, so no firing ever
+moves it. The trainer found round 9's hill again, through the **output layer**, which sits downstream of the fibres and is not
+plastic. Those three are what took P from a reading to a lean.
+
+**The shuffle never did that.** With its rates set to 0, **every CSHUF fly is the reflex to the bit** (0.6057): its network
+never moved far enough to change a single action, and all its learning is in the two rates. The COACT flies' networks did
+move (rates at 0: mean 0.5880, under the reflex; four at never fleeing). Why the real wiring's network moves and the shuffle's
+does not is not measured here. **NOT registered, and said as such:** every CSHUF fly scores above every FROZEN fly (least
+0.6641 against 0.6348) -- the shuffle did what P asked of the real wiring.
+
+The trainer's own lives: COACT 0.632 to 0.670, CSHUF 0.682 to 0.686, FROZEN 0.636 to 0.661 by iteration 25 and no further.
+
+**Expectations against what came:** P BETTER (75) did not come -- CANNOT, leaning toward COACT. COACT at least 9 of 12 USES
+(75) and ACROSS (70) came, with 9 each. Its mean between 0.66 and 0.71 (65) came, at 0.6613. FROZEN at least 8 of 12 never flee
+(70) came, with 12. T1 CANNOT (75) and H WORSE (85) came.
+
+**What it means.** The rule this round chose works when the trainer leaves it alone: the shuffled flies are the clean case
+of it, and all twelve learn within a life. On the real wiring the trainer has a second way out, quieting the network's
+output, and three times in twelve it took it. The next round would close that door (an output layer that cannot veto the
+fibres, or no output layer) rather than change the rule. That is a suggestion, not a registration.
