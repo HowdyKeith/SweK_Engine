@@ -140,3 +140,32 @@ PART 1 found that speed matters more to energy than path. Over a mission, it is 
 * Ships that hold course and may sail out of the region late in a long mission. Eco's missions are longer, so it may meet fewer ships late. That is not separated here.
 * No arm KNEW its battery. The next question is an arm that chooses its speed from the battery left and the distance to go.
 * Eco's leg cap was widened to 390 s by Amendment 1, on DEV and before HELD83, so that a slower arm is not ended for being slower.
+
+## PART 3: AN ARM THAT CHOOSES ITS SPEED FROM THE BATTERY (Keith, 2026-11-17, naming it among "good rounds to do"; REGISTERED 2026-11-17, BEFORE ANY CODE FOR IT AND BEFORE ANY OF ITS SEEDS IS FLOWN)
+
+**Why.** PART 2's `eco` completed 49 of 60 missions by flying everything at 2 m/s, and came home with half its battery: energy it could have spent going faster. **`budget`** spends what the battery can afford.
+
+**Measured before registering (DEV, the sanity set; no held seed).** On the 22 DEV missions `eco` completed, the path flown over the sum of the straight lines from the start through the three waypoints is: median 1.226, 90th percentile 1.342, largest 1.399. **DETOUR = 1.35** is fixed from that.
+
+**The arm, `budget`.** The reference (`any+predict+edge+yield`) with its commanded speed capped (only down) at a speed chosen every 3 s, as the plan is replanned. The chosen speed is the FASTEST of 3.0, 2.5, 2.0 and 1.5 m/s for which
+
+  (energy per metre at that speed) x (the distance to go) x DETOUR <= the energy left in the battery.
+
+* The distance to go is the straight line to the current waypoint plus the straight lines between the waypoints after it.
+* The energy per metre is this note's measured table: 2,675 / 1,891 / 1,259 / 785 J/m at 3.0 / 2.5 / 2.0 / 1.5 m/s.
+* When none qualifies, 1.5 m/s.
+* The leg cap is Amendment 1's distance budget at the slowest speed the arm may fly: 260 x 3 / 1.5 = 520 s.
+
+**The set.** HELD84 = seeds 8001 to 8060 (60 missions), flown ONCE, spent by no navigation set. DEV is the sanity run.
+
+**The registered test, `budget` against `eco`, paired by seed.**
+* (1) NOT WORSE AT FINISHING: completed missions, budget at least eco's minus 2.
+* (2) FASTER: on the missions both complete, the median mission time at least 10 percent shorter.
+
+**SUPPORTED** iff both. **PARTLY SUPPORTED** iff exactly one. **NOT SUPPORTED** otherwise. Reported beside it: each arm against the reference (as PART 2); missions flat; the speeds `budget` chose (the share of decisions at each).
+
+**Checks (a failure: NOT WEIGHED).** (1) THE COPY: `eco` reproduces PART 2's stored HELD83 `eco` missions on its first five seeds (status, ticks, path). (2) THE TABLE IS THE MODEL'S: re-measured as above (60 s settled, 60 s timed at 20 m), each energy per metre within 2 percent of the table. (3) SAME SCENARIOS. (4) BUDGET BITES: it changes at least one mission.
+
+**Expectations, written before any seed is flown.** E1 (1) holds: about 70 percent. E2 (2) holds: about 65 percent. E3 SUPPORTED: about 45 percent. E4 `budget` ends flat on at least one mission (its estimate is a straight line, not the route): about 35 percent.
+
+**What a result would not say.** The table is still water at 20 m (the current, the depth changes and the turns are not in it), and DETOUR is one number for every sea. An arm that learned its own detour as it went is not this one.
