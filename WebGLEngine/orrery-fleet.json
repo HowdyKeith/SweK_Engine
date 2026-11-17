@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "9b095398471cd908fb40167aa3dbb1980f74c5c8",
+ "head": "65a671380f12854a606511ad847ef7a562601d52",
  "bodies": {
   "box3d": [
    {
@@ -187,8 +187,8 @@
    },
    {
     "path": "orrery-gpu.html",
-    "bytes": 49611,
-    "sha": "cc2293510dd6de403175380275e7a76a7a4ececf"
+    "bytes": 50739,
+    "sha": "65a671380f12854a606511ad847ef7a562601d52"
    },
    {
     "path": "slug-curved.html",
@@ -339,9 +339,19 @@
     "sha": "f09ba231411d443dca6bd265b95df6364732bea1"
    },
    {
+    "path": "brain/lesionFlyCx-selfcheck.mjs",
+    "bytes": 19536,
+    "sha": "57efad3b3405e727f237afaf20fa29a913638c82"
+   },
+   {
     "path": "brain/pilotSubCircuitState-selfcheck.mjs",
     "bytes": 29802,
     "sha": "d4cc23c4ec8beb962f40866504b88fc497abc964"
+   },
+   {
+    "path": "brain/reservoirGpu-selfcheck.mjs",
+    "bytes": 16972,
+    "sha": "57efad3b3405e727f237afaf20fa29a913638c82"
    },
    {
     "path": "render/brainPanel-selfcheck.mjs",
@@ -359,9 +369,19 @@
     "sha": "6cf3b2f6957172874dc47d2e13a85bbf68ae94cb"
    },
    {
+    "path": "render/switchboardView-selfcheck.mjs",
+    "bytes": 14222,
+    "sha": "8b116178fb6f8843417655711a69098ba23c6184"
+   },
+   {
     "path": "sub-aquarium.html",
     "bytes": 50634,
     "sha": "a6ce4134db2c73df4ff55e345d9980ad108e77f2"
+   },
+   {
+    "path": "switchboard.html",
+    "bytes": 17395,
+    "sha": "57efad3b3405e727f237afaf20fa29a913638c82"
    },
    {
     "path": "tools/flyCx.mjs",
@@ -394,6 +414,26 @@
     "sha": "f56f08f95fa766ecacceb62742eda6fce9fa2f7c"
    },
    {
+    "path": "tools/ship/lesionLeftSide-selfcheck.mjs",
+    "bytes": 13371,
+    "sha": "57efad3b3405e727f237afaf20fa29a913638c82"
+   },
+   {
+    "path": "tools/ship/lesionLeftSideCmd.mjs",
+    "bytes": 3189,
+    "sha": "6f50c3a6913121b34c41bcfe71faae96ddb7a86c"
+   },
+   {
+    "path": "tools/ship/takeReservoirGpu.mjs",
+    "bytes": 3878,
+    "sha": "ac90b472d068949851993f6ee7f48e90b2b59197"
+   },
+   {
+    "path": "tools/ship/takeSwitchboard.mjs",
+    "bytes": 4028,
+    "sha": "8b116178fb6f8843417655711a69098ba23c6184"
+   },
+   {
     "path": "tools/ship/trainNeedsCircuit.mjs",
     "bytes": 33594,
     "sha": "c1ec0cb0c471b04d1bfdcc8687c04f77a95f2617"
@@ -407,6 +447,11 @@
     "path": "tools/ship/trainSubState.mjs",
     "bytes": 25084,
     "sha": "d66beb17f067dff0e9bc21ff7ccb44e7d7f1576d"
+   },
+   {
+    "path": "tools/subReservoirV6-selfcheck.mjs",
+    "bytes": 15368,
+    "sha": "57efad3b3405e727f237afaf20fa29a913638c82"
    },
    {
     "path": "tools/tankFlyCxBench.mjs",
@@ -461,13 +506,13 @@
   "kenney-city": [
    {
     "path": "rtx-viewer.html",
-    "bytes": 17872,
-    "sha": "4575be6607990b52ef3b7c55ada0a9d22f689f07"
+    "bytes": 19609,
+    "sha": "65a671380f12854a606511ad847ef7a562601d52"
    },
    {
     "path": "tools/ship/rtViewer-selfcheck.mjs",
-    "bytes": 158946,
-    "sha": "4575be6607990b52ef3b7c55ada0a9d22f689f07"
+    "bytes": 178380,
+    "sha": "65a671380f12854a606511ad847ef7a562601d52"
    },
    {
     "path": "world/kenneyKit.mjs",
@@ -920,8 +965,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 3791991,
-    "sha": "99f074f78ffc4595889215dd438424892e1ef1b6"
+    "bytes": 3808412,
+    "sha": "65a671380f12854a606511ad847ef7a562601d52"
    },
    {
     "path": "mpm3d.html",
@@ -955,8 +1000,8 @@
    },
    {
     "path": "render/seaThree-selfcheck.mjs",
-    "bytes": 12601,
-    "sha": "73795feb626921ab015e3c9b64dd55387c7f7b24"
+    "bytes": 13105,
+    "sha": "1756d6a67c1d556c686010636198ed878628cf2b"
    },
    {
     "path": "render/skyBake-selfcheck.mjs",
@@ -1357,8 +1402,8 @@
    },
    {
     "path": "orrery-gpu.html",
-    "bytes": 49611,
-    "sha": "cc2293510dd6de403175380275e7a76a7a4ececf"
+    "bytes": 50739,
+    "sha": "65a671380f12854a606511ad847ef7a562601d52"
    },
    {
     "path": "render/denoiseFrameGenCost-selfcheck.mjs",

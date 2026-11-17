@@ -17,7 +17,7 @@ import path from "node:path";
 import http from "node:http";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
-import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL, webglLaunchArgs } from "./playwrightResolve.mjs";
+import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL, webglLaunchArgs, holdFrames, heldFrames } from "./playwrightResolve.mjs";
 // rig run 13: section 3 draws through BOTH routes and diffs them, so it launches with PARITY_ARGS -- on Keith's rig ANGLE on
 // SwiftShader leaves WebGPU with no adapter at all (realGpuRun's GL table), and the page fell to its WebGL2 route
 import { PARITY_ARGS } from "./webgpuHarness.mjs";
@@ -285,10 +285,7 @@ console.log("\n5. LOAD THE REAL PAGE AND CLICK THE BUTTON");
         // EVERY callback asked for since the last held frame runs on the next one, together. The first draft let one caller
         // through per frame and gave the page's loop all of them: Playwright's waitForFunction polls on animation frames
         // too, never got one, and the attach wait timed out at 60 s on a page that had attached.
-        await pg.addInitScript((ms) => { const raf = window.requestAnimationFrame.bind(window); let last = -Infinity, queue = [], driving = false; window.__heldFrames = 0;
-            const drive = (t) => { if (t - last < ms) return raf(drive); last = t; driving = false; window.__heldFrames++;
-                const run = queue; queue = []; for (const cb of run) { try { cb(t); } catch (e) { setTimeout(() => { throw e; }); } } };
-            window.requestAnimationFrame = (cb) => { queue.push(cb); if (!driving) { driving = true; raf(drive); } return queue.length; }; }, FRAME_MS);
+        await holdFrames(pg, FRAME_MS);   // v4923: the same function, moved to tools/ship/playwrightResolve.mjs (frameHold) so every page gate shares one copy
         const tHold = Date.now();
         const perr = [];
         pg.on("pageerror", (e) => perr.push(String(e).slice(0, 200)));
@@ -361,7 +358,33 @@ console.log("\n5. LOAD THE REAL PAGE AND CLICK THE BUTTON");
                    restored: !same(imgOn, imgOff2),
                    bytesOff: imgOff.length, bytesOn: imgOn.length };
         } catch (e) { r2 = { err: `at "${step}": ` + String(e).slice(0, 200) }; }
-        const held = await pg.evaluate(() => window.__heldFrames).catch(() => -1), tEnd = Date.now();
+        // v4923 -- THE PAGE REPAINTS WHEN ITS PICTURE CHANGES AND NOT OTHERWISE (orrery.html frame(), viewKey). The page is
+        // paused here. Idle, its loop still runs (the held frames climb) and the canvas is not repainted; each input that
+        // changes the picture repaints it; playing repaints every frame. paints is window.orrery's own count.
+        // SABOTAGES (v4923, against orrery.html's viewKey; restored byte for byte): the clock left out -> 2 red (time 0, playing
+        // 0); every frame painting -> 3 red (14 repaints idle); the canvas size left out -> 1 red; the surface mode -> 1 red;
+        // the zoom -> 1 red; the followed body -> 0 RED AT FIRST, because following also zooms, and 1 red once the unfollow
+        // step was added. NOT CHECKED: the hovered body, which a row could only change by aiming the pointer at one.
+        let rp;
+        try {
+            const P = () => pg.evaluate(() => [window.orrery.paints, window.__heldFrames]);
+            const [p0, h0] = await P(); await pg.waitForTimeout(1500); const [p1, h1] = await P();
+            const delta = async (go) => { const [a] = await P(); await go(); await pg.waitForTimeout(400); const [b] = await P(); return b - a; };
+            rp = { idle: p1 - p0, idleFrames: h1 - h0,
+                   time: await delta(() => pg.evaluate(() => window.orrery.setTime(123.4))),
+                   follow: await delta(() => pg.evaluate(() => window.orrery.follow(window.orrery.system.bodies[1].name))),
+                   zoom: await delta(() => pg.evaluate(() => window.orrery.zoomTo(300))),
+                   surface: await delta(() => pg.evaluate(() => window.orrery.setSurfMode(1))),
+                   size: await delta(() => pg.setViewportSize({ width: 1000, height: 640 })),
+                   // following a body ZOOMS to it too, so `follow` above repaints on the zoom alone: v4923's sabotage O2 (the
+                   // followed body left out of the key) went 0 red on it. Letting go changes the followed body and nothing else.
+                   unfollow: await delta(() => pg.evaluate(() => { const z = window.orrery.pxPerUnit; window.orrery.follow(null); return z === window.orrery.pxPerUnit; })),
+                   again: 0, playing: 0 };
+            const [q0] = await P(); await pg.waitForTimeout(800); const [q1] = await P(); rp.again = q1 - q0;
+            rp.playing = await delta(async () => { await pg.click("#play"); await pg.waitForTimeout(800); });
+            await pg.click("#play");
+        } catch (e) { rp = { err: String(e).slice(0, 160) }; }
+        const held = await heldFrames(pg), tEnd = Date.now();
         await br.close(); srv2.close();
         console.log("  ----  captures: " + (shots.join(", ") || "none completed") + (r2.err ? ` -- stopped ${r2.err.slice(0, 60)}` : ""));
 
@@ -398,6 +421,16 @@ console.log("\n5. LOAD THE REAL PAGE AND CLICK THE BUTTON");
         const heldS = (tEnd - tHold) / 1000, ceil = Math.ceil(heldS * 1000 / FRAME_MS) + 2;
         ok(`  the page's frame loop was HELD to one frame per ${FRAME_MS} ms for this section, not stopped: ${held} frames in ${heldS.toFixed(1)} s`,
             held >= 10 && held <= ceil, `at most ${ceil} fit; unheld it would be about ${Math.round(heldS * 60)}`);
+        if (rp.err) ok("*** the paused page's repaints could be counted ***", false, rp.err);
+        else {
+            ok(`*** PAUSED AND IDLE, THE PAGE DOES NOT REPAINT: ${rp.idle} repaints in 1.5 s while its loop ran ${rp.idleFrames} frames ***`,
+                rp.idle <= 1 && rp.idleFrames >= 5, "orrery.html repainted its whole canvas every frame before v4923, and that is what queued the rig's screenshots");
+            ok(`  and every input that changes the picture repaints it: time ${rp.time}, follow ${rp.follow}, zoom ${rp.zoom}, surface ${rp.surface}, window size ${rp.size}, letting go of the body (zoom unchanged) ${rp.unfollow}`,
+                [rp.time, rp.follow, rp.zoom, rp.surface, rp.size, rp.unfollow].every((n) => n >= 1),
+                "an input missing from the page's key would leave its picture stale until something else moved");
+            ok(`  and settles again after them (${rp.again} in 0.8 s), and PLAYING repaints every frame: ${rp.playing} in 0.8 s`,
+                rp.again <= 1 && rp.playing >= 4);
+        }
         ok("  and the page threw nothing on the way", real.length === 0, real.slice(0, 2).join(" | ") || "clean");
         report("this is the step v4273 named and did not take: the module existed, attached and drew, and " +
             "nothing on the page could ask it to. Now a person can.");

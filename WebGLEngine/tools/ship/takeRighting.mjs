@@ -5,7 +5,7 @@
 // percent of the autopilot's area over the first 5 s, REAL against PLAIN, five bottom lines). --set dev is nominal dives 1 to 4, is a sanity run and does not rebuild-check the pilots unless --rebuild-check is given (the registered set always does); --set registered is dives 190001 to 190048 and is flown ONCE; --write (registered only) writes every kick to brain/subRightingRegistered.jsonl.
 // The first-order orientation step is flown (Amendment C): the pilots' records were measured under it.
 "use strict";
-import { setOrientationDefault } from "../../physics/mechanics/rigidBody6dof.mjs";   // the step is set BY NAME below, after the imports: only gates import the rigidBody6dofEuler module (tools/roundhouse/orientationStep-selfcheck.mjs section 7, 2026-11-16) -- Amendment C: the trained pilots' records were measured under the first-order orientation step (rebuilt under RK4 they differ by ~0.001, ten times the reproduction tolerance)
+import "../../physics/mechanics/rigidBody6dofEuler.mjs";   // Amendment C: the trained pilots' records were measured under the first-order orientation step (rebuilt under RK4 they differ by ~0.001, ten times the reproduction tolerance)
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -15,7 +15,6 @@ import * as PF from "../../brain/pilotSubFish.mjs";
 import * as R from "../../brain/subRighting.mjs";
 import * as TR from "./trainSubVestibular.mjs";
 import * as PS from "./plainNetStudy.mjs";
-setOrientationDefault("euler");   // the records this file is read against were measured under the first-order orientation step; set before anything flies, and carried to the processes it starts
 
 const ENG = fileURLToPath(new URL("../../", import.meta.url));
 export const RIG_DIR = path.join(ENG, "brain", "rig-results"), FISH_FILE = path.join(ENG, "brain", "pilotSubWeightsFishWip.json"), OUT_FILE = "brain/subRightingRegistered.jsonl";

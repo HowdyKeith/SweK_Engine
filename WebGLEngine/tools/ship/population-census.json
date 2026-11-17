@@ -1,7 +1,7 @@
 {
  "generatedFrom": "tools/ship/populationCensus.mjs",
  "roots": "physics,simulation,fluid",
- "total": 587,
+ "total": 588,
  "areas": {
   "fluid": 8,
   "physics/acoustics": 2,
@@ -28,7 +28,7 @@
   "physics/jolt": 4,
   "physics/langevin": 1,
   "physics/md": 13,
-  "physics/mechanics": 33,
+  "physics/mechanics": 34,
   "physics/mesh": 33,
   "physics/mpm": 14,
   "physics/nuclear": 4,
@@ -237,6 +237,7 @@
   "physics/mechanics/rigidBody6dofWeapon.mjs",
   "physics/mechanics/rigidKeys.mjs",
   "physics/mechanics/rotorcraftModel6dof.mjs",
+  "physics/mechanics/shipContactBox3d.mjs",
   "physics/mechanics/subActuators.mjs",
   "physics/mechanics/subHulls.mjs",
   "physics/mechanics/subModel6dof.mjs",

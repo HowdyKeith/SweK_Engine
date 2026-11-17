@@ -1,6 +1,6 @@
 {
  "gate": "tools/ship/rtViewer-selfcheck.mjs",
- "at": "2026-11-16",
+ "at": "2026-11-17",
  "tables": [
   {
    "title": "accumulate kernel and the real mesh render, measured",
@@ -69,25 +69,31 @@
      "city scene",
      "120 tris",
      "8 frames",
-     "284 distinct, range [0.236, 0.614]"
+     "258 distinct, range [0.289, 0.622]"
     ],
     [
      "city scene, vertexColors",
      "120 tris",
      "8 frames",
-     "mean 0.466390 vs flat-albedo 0.492166"
+     "mean 0.471207 vs flat-albedo 0.497373"
     ],
     [
      "city scene, meshMaterials",
      "120 tris, 4 records",
      "8 frames",
-     "mean 0.484881 vs flat-albedo 0.492166"
+     "mean 0.490061 vs flat-albedo 0.497373"
     ],
     [
      "nine instances vs nine baked",
-     "1717 of 1728 pixels bit-identical",
+     "1728 of 1728 pixels bit-identical",
      "tree vs list 1728 of 1728",
-     "cutout 1709 of 1728"
+     "cutout 1728 of 1728"
+    ],
+    [
+     "two meshes, nine instances, vs baked",
+     "1728 of 1728 within 1e-3",
+     "226 covered vs 226",
+     "none"
     ]
    ],
    "note": "A number that only reached this terminal is a measurement nobody else can re-read."

@@ -41,7 +41,7 @@ import path from "node:path";
 import http from "node:http";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
-import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL, webglLaunchArgs } from "./playwrightResolve.mjs";
+import { resolvePlaywright, browserSkipReason, HEADLESS_SHELL, webglLaunchArgs, holdFrames, heldFrames, FRAME_HOLD_MS } from "./playwrightResolve.mjs";
 import * as TN from "../../brain/subTankNav.mjs";
 
 const require_ = createRequire(import.meta.url);
@@ -102,6 +102,7 @@ console.log("\n3. THE LIVE PAGE");
         const b = await chromium.launch({ executablePath: HEADLESS_SHELL, args: webglLaunchArgs().args });
         try {
             const pg = await (await b.newContext({ viewport: { width: 1200, height: 900 } })).newPage();
+            await holdFrames(pg);   // v4923 -- the frame loop held while this gate looks: see frameHold in tools/ship/playwrightResolve.mjs, and the row below.
             const errs = [], cerrs = [], dialogs = []; pg.on("pageerror", (e) => errs.push(String(e.message))); pg.on("console", (m) => { if (m.type() === "error") cerrs.push(m.text()); }); pg.on("dialog", (d) => { dialogs.push(d.message()); d.dismiss(); });
             await pg.goto(base + "/sub-aquarium.html", { waitUntil: "load" });
             // wait for the page to be READY (the first list answer rendered and the chip answered), never for a fixed time: this gate once failed once in four runs under CPU load on a 900 ms sleep
@@ -183,6 +184,7 @@ console.log("\n3. THE LIVE PAGE");
             const offMsg = await pg.textContent("#msg"), offStats = await pg.$$eval("#list .row .sub", (e) => e.map((x) => x.textContent)), land2 = await landPx();
             ok("!! 'off' takes the sea away and sends the subs wandering: the message says navigation off, no row mentions an arrival, the islands are gone from the plan view, the new-sea button is disabled again", /navigation off/.test(offMsg) && offStats.length > 0 && offStats.every((x) => !/arrival|plan ahead/.test(x)) && land2 === 0 && (await pg.$eval("#navSeaBtn", (e) => e.disabled)) === true && errs.length === 0);
             const pgL = await (await b.newContext({ viewport: { width: 1200, height: 900 } })).newPage(), errsL = []; pgL.on("pageerror", (e) => errsL.push(String(e.message)));
+            await holdFrames(pgL);   // v4923 -- the frame loop held while this gate looks: see frameHold in tools/ship/playwrightResolve.mjs, and the row below.
             await pgL.goto(base + "/sub-aquarium.html?size=large", { waitUntil: "load" });
             await pgL.waitForFunction(() => document.getElementById("navSel").disabled, null, { timeout: 10000 }).catch(() => {});   // the page's module runs after its first await: wait for it, not for 'load'
             const largeNav = await pgL.evaluate(() => ({ disabled: document.getElementById("navSel").disabled, title: document.getElementById("navSel").title }));
@@ -193,6 +195,7 @@ console.log("\n3. THE LIVE PAGE");
             ok("!! on a large tank the navigation picker is DISABLED and says why (the sea is for the standard 500 x 300 m tank), and the page throws nothing", largeNav.disabled === true && /standard 500 x 300/.test(largeNav.title) && errsL.length === 0);
             // unnumbered work -- THE KIND CANNOT BE LOADED (its module is refused): the stateful sub is still in the list, flies the PD autopilot, SAYS it does ("PD autopilot", never "stateful") and the page says why; nothing throws
             const pg2 = await (await b.newContext({ viewport: { width: 1200, height: 900 } })).newPage(), errs2 = []; pg2.on("pageerror", (e) => errs2.push(String(e.message)));
+            await holdFrames(pg2);   // v4923 -- the frame loop held while this gate looks: see frameHold in tools/ship/playwrightResolve.mjs, and the row below.
             await pg2.route("**/render/subAquariumFlyCx.mjs", (r) => r.abort());
             await pg2.goto(base + "/sub-aquarium.html", { waitUntil: "load" });
             await pg2.waitForFunction(() => /stateful fly pilot is not available/.test(document.getElementById("msg").textContent), null, { timeout: 15000 }).catch(() => {});   // merge 2026-11-04: the page now awaits the sub-model picker's imports before its handlers exist (v4910 + the pilot kinds); the refusal is said once the page's module has run, and the offer below would overwrite it: take the message first
@@ -201,6 +204,10 @@ console.log("\n3. THE LIVE PAGE");
             await pg2.waitForFunction(() => [...document.querySelectorAll("#list .row")].some((x) => /Fly heading-loop/.test(x.querySelector(".nm").textContent) && /m\/s/.test(x.querySelector(".sub").textContent)), null, { timeout: 15000 }).catch(() => {});
             const fb = await pg2.evaluate(() => { const r = [...document.querySelectorAll("#list .row")].find((x) => /Fly heading-loop/.test(x.querySelector(".nm").textContent)); return { stats: r ? r.querySelector(".sub").textContent : null, msg: null, stateful: [...document.querySelectorAll("#list .row .sub")].filter((e) => /^stateful/.test(e.textContent)).length }; });
             ok("!! the stateful pilot's module REFUSED: the page says the stateful fly pilot is not available here, the stateful sub stays in the list and its line reads 'PD autopilot' (what it really flies), not 'stateful', and the page throws nothing", /stateful fly pilot is not available here/.test(refusalMsg) && fb.stats !== null && /^PD autopilot · this box/.test(fb.stats) && fb.stateful === 0 && errs2.length === 0, JSON.stringify(fb) + " " + errs2.join(" | ").slice(0, 120));
+            // v4923 -- measured: 32.8 and 32.4 s for this gate unheld, 17.1 and 18.3 s held.
+            const heldMain = await heldFrames(pg), held2 = await heldFrames(pg2);
+            ok(`the frame loop of the pages this gate drives was HELD to one frame per ${FRAME_HOLD_MS} ms, and ran: ${heldMain} and ${held2} frames`,
+               heldMain > 0 && held2 > 0, "-1: the hold was never installed; 0: it stopped the loop");
             try { await pg.screenshot({ path: process.env.AQ_SHOT || "/tmp/sub-aquarium.png" }); report("screenshot at " + (process.env.AQ_SHOT || "/tmp/sub-aquarium.png")); } catch {}
         } finally { await b.close(); server.close(); }
     }

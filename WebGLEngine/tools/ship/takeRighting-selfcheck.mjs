@@ -138,7 +138,7 @@ console.log("\n7. THE SOURCE");
 {
     const cmd = fs.readFileSync(new URL("./takeRighting.mjs", import.meta.url), "utf8"), me = fs.readFileSync(new URL(import.meta.url), "utf8");
     const code = cmd.split("\n").filter((l) => !l.trim().startsWith("//") && !l.trim().startsWith("*") && !l.trim().startsWith("/*")).join("\n");
-    ok("!! no clock and no random number in the command; its first import is setOrientationDefault and it sets euler by name right after its imports (Amendment C; only gates import rigidBody6dofEuler, orientationStep-selfcheck section 7)", !/Math\.random|Date\.now|new Date|performance\.now/.test(code) && /^import \{ setOrientationDefault \} from "\.\.\/\.\.\/physics\/mechanics\/rigidBody6dof\.mjs";/.test(cmd.split("\n").find((l) => l.startsWith("import "))) && /\nsetOrientationDefault\("euler"\);/.test(cmd) && !/rigidBody6dofEuler\.mjs";/.test(cmd));
+    ok("!! no clock and no random number in the command; its first import is rigidBody6dofEuler (Amendment C)", !/Math\.random|Date\.now|new Date|performance\.now/.test(code) && /^import "\.\.\/\.\.\/physics\/mechanics\/rigidBody6dofEuler\.mjs";/.test(cmd.split("\n").find((l) => l.startsWith("import "))));
     ok("the header names the registration, the library and the gate, and the files are ASCII", /FISH_RIGHTING_WIP\.md/.test(cmd) && /subRighting\.mjs/.test(cmd) && /takeRighting-selfcheck\.mjs/.test(cmd) && [cmd, me].every((t) => !/[^\x00-\x7F]/.test(t)));
 }
 console.log(fails ? `\n${fails} FAIL` : "\nall checks pass");

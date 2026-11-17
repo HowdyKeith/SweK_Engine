@@ -34,7 +34,7 @@
 // underlying radiance, exactly as the paragraph above already states.
 "use strict";
 
-import { pipelineWgsl, pipelineUniforms, bvhBuffersFromMesh, bvhBuffersFromTriSoup, sbtRecord, meshSbtBuffer, instanceBuffer, VIEW, EPS } from "../physics/render/rtPipeline.mjs";
+import { pipelineWgsl, pipelineUniforms, bvhBuffersFromMesh, bvhBuffersFromTriSoup, bvhBuffersFromMeshes, sbtRecord, meshSbtBuffer, instanceBuffer, VIEW, EPS } from "../physics/render/rtPipeline.mjs";
 import { meshTriples } from "../physics/splat/splatMesh.mjs";
 import { GLBParser } from "../gpu/GLBParser.js";
 import { citySceneMesh } from "../world/cityChunkScene.mjs";
@@ -42,7 +42,7 @@ import { PALETTE } from "../world/chunkMesherCore.js";
 import { buildTable } from "../physics/render/energyCompensation.mjs";
 import { captureBaseCubemap, packCapturedAtlas } from "../physics/render/specularProbeCapture.mjs";
 import { toHalf } from "../text/slugAtlas.js";
-import { triNormal } from "../mesh/meshBVH.mjs";
+import { triNormal, baryAt } from "../mesh/meshBVH.mjs";
 
 export const DEFAULT_ALBEDO = Object.freeze([0.68, 0.66, 0.62]);
 // RTX round 10 -- the microfacet material's own demo defaults. Roughness picked mid-range (neither a near-
@@ -140,13 +140,66 @@ export function sceneCaptureBakePos(mesh) {
     return [mesh.bounds.center[0], mesh.bounds.center[1] + mesh.bounds.radius * DEFAULT_SCENE_CAPTURE_HEIGHT_SCALE, mesh.bounds.center[2]];
 }
 
-export function makeSceneRadianceOf(mesh) {
+export function makeSceneRadianceOf(mesh, { instances = null, extraMeshes = [], cutout = null } = {}) {
+    // v4925 -- WITH `instances` the capture traces every placement, as the GPU will draw them, and with `cutout` it looks
+    // through the same holes. Before v4925 makeRtSession refused instances under this sky because the capture saw only
+    // the one mesh where it was built; and a cutout under it was not refused at all -- the capture saw solid triangles
+    // while the frame showed holes. Without either option this is the function it was, to the bit.
+    if (instances || cutout !== null) return placedRadianceOf(mesh, { instances, extraMeshes, cutout });
     const inst = mesh.bvh.bvh, tris = inst.tris;
     return (pos, dir) => {
         const hit = inst.raycastFirst(pos[0], pos[1], pos[2], dir[0], dir[1], dir[2]);
         if (!hit) return envRadianceOf(pos, dir);
         const n = triNormal(tris, hit.tri * 9);
         const ndotl = Math.max(0, n[0] * ENV_SUN_DIR[0] + n[1] * ENV_SUN_DIR[1] + n[2] * ENV_SUN_DIR[2]);
+        const shade = 0.35 + 0.65 * ndotl;
+        return [DEFAULT_ALBEDO[0] * shade, DEFAULT_ALBEDO[1] * shade, DEFAULT_ALBEDO[2] * shade];
+    };
+}
+
+/**
+ * v4925 -- the capture through placements. Each instance's transform (world-from-object, row-major 3x4) is inverted
+ * once; a ray is carried into each placement's object space -- its direction NOT renormalised, so `t` is the same
+ * distance in both spaces, as physics/render/rtPipeline.mjs's instance stage does -- and the nearest hit over all of
+ * them wins. The normal comes back through the inverse transpose. `cutout` is the any-hit cutout rule with the same
+ * margin the GPU applies (a hole where all three barycentric weights exceed it): a hit in a hole is passed and the
+ * search resumes beyond it. Shading is makeSceneRadianceOf's own.
+ */
+export function placedRadianceOf(mesh, { instances = null, extraMeshes = [], cutout = null } = {}) {
+    const list = [mesh, ...extraMeshes];
+    const places = (instances || [{ transform: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0] }]).map((it, k) => {
+        const src = list[it.mesh || 0];
+        if (!src) throw new Error("rtViewer: instance " + k + " names mesh " + it.mesh + " and the session holds " + list.length);
+        const [a, b, c, tx, d, e, f, ty, g, h, i, tz] = it.transform;
+        const det = a * (e * i - f * h) - b * (d * i - f * g) + c * (d * h - e * g);
+        const inv = [(e * i - f * h) / det, (c * h - b * i) / det, (b * f - c * e) / det,
+                     (f * g - d * i) / det, (a * i - c * g) / det, (c * d - a * f) / det,
+                     (d * h - e * g) / det, (b * g - a * h) / det, (a * e - b * d) / det];
+        return { bvh: src.bvh.bvh, inv, t: [tx, ty, tz] };
+    });
+    const solid = (tris, tri, P) => { if (cutout === null) return true; const w = baryAt(tris, tri * 9, P[0], P[1], P[2]); return Math.min(w[0], w[1], w[2]) <= cutout; };
+    return (pos, dir) => {
+        let best = Infinity, bestN = null;
+        for (const pl of places) {
+            const m = pl.inv, q = [pos[0] - pl.t[0], pos[1] - pl.t[1], pos[2] - pl.t[2]];
+            const o = [m[0] * q[0] + m[1] * q[1] + m[2] * q[2], m[3] * q[0] + m[4] * q[1] + m[5] * q[2], m[6] * q[0] + m[7] * q[1] + m[8] * q[2]];
+            const dd = [m[0] * dir[0] + m[1] * dir[1] + m[2] * dir[2], m[3] * dir[0] + m[4] * dir[1] + m[5] * dir[2], m[6] * dir[0] + m[7] * dir[1] + m[8] * dir[2]];
+            let tMin = 1e-9;
+            for (let pass = 0; pass < 64; pass++) {
+                const hit = pl.bvh.raycastFirst(o[0], o[1], o[2], dd[0], dd[1], dd[2], best, tMin);
+                if (!hit) break;
+                if (solid(pl.bvh.tris, hit.tri, hit.point)) {
+                    const n = triNormal(pl.bvh.tris, hit.tri * 9);
+                    const w = [m[0] * n[0] + m[3] * n[1] + m[6] * n[2], m[1] * n[0] + m[4] * n[1] + m[7] * n[2], m[2] * n[0] + m[5] * n[1] + m[8] * n[2]];
+                    const l = Math.hypot(w[0], w[1], w[2]) || 1;
+                    best = hit.t; bestN = [w[0] / l, w[1] / l, w[2] / l];
+                    break;
+                }
+                tMin = hit.t * (1 + 1e-9) + 1e-9;            // a hole: look again beyond it
+            }
+        }
+        if (!bestN) return envRadianceOf(pos, dir);
+        const ndotl = Math.max(0, bestN[0] * ENV_SUN_DIR[0] + bestN[1] * ENV_SUN_DIR[1] + bestN[2] * ENV_SUN_DIR[2]);
         const shade = 0.35 + 0.65 * ndotl;
         return [DEFAULT_ALBEDO[0] * shade, DEFAULT_ALBEDO[1] * shade, DEFAULT_ALBEDO[2] * shade];
     };
@@ -180,11 +233,11 @@ export function packAtlasHalfFloat(atlas) {
  * (world-from-object, row-major 3x4), in meshBounds()'s shape. A session with instances frames its camera and places
  * its light by this, because the mesh's own bounds say where ONE copy is.
  */
-export function placedBounds(mesh, instances) {
+export function placedBounds(mesh, instances, extraMeshes = []) {
     if (!instances || !instances.length) throw new Error("rtViewer: placedBounds needs at least one instance");
-    const b = mesh.bounds, lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+    const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity], list = [mesh, ...extraMeshes];
     for (const inst of instances) {
-        const m = inst.transform;
+        const m = inst.transform, b = (list[inst.mesh || 0] || mesh).bounds;   // v4925 -- each placement's own mesh
         for (let c = 0; c < 8; c++) {
             const p = [c & 1 ? b.max[0] : b.min[0], c & 2 ? b.max[1] : b.min[1], c & 4 ? b.max[2] : b.min[2]];
             for (let r = 0; r < 3; r++) {
@@ -205,12 +258,18 @@ export function placedBounds(mesh, instances) {
  */
 export function instanceGrid(mesh, n = 3, { gap = 0.25 } = {}) {
     if (!Number.isInteger(n) || n < 1) throw new Error("rtViewer: instanceGrid needs a whole number of copies a side, got " + n);
-    const b = mesh.bounds, pitch = Math.max(b.max[0] - b.min[0], b.max[2] - b.min[2]) * (1 + gap), [cx, cy, cz] = b.center, out = [];
+    // v4925 -- `mesh` may be a LIST: the placements then take its meshes in turn (mesh: k % length), the pitch is the
+    // largest ground extent among them, and each is turned about ITS OWN centre and set down with that centre where the
+    // first mesh's centre would be in its cell (ground position only: every mesh keeps its own height). One mesh: as before.
+    const list = Array.isArray(mesh) ? mesh : [mesh];
+    const b = list[0].bounds, pitch = Math.max(...list.map((m) => Math.max(m.bounds.max[0] - m.bounds.min[0], m.bounds.max[2] - m.bounds.min[2]))) * (1 + gap), [cx, , cz] = b.center, out = [];
     for (let iz = 0; iz < n; iz++) for (let ix = 0; ix < n; ix++) {
         const q = (ix + iz * n) % 4, co = [1, 0, -1, 0][q], si = [0, 1, 0, -1][q];
         const ox = (ix - (n - 1) / 2) * pitch, oz = (iz - (n - 1) / 2) * pitch;
-        // world = R (p - c) + c + o, R a turn about +y: rows (co, 0, si), (0, 1, 0), (-si, 0, co)
-        out.push({ transform: [co, 0, si, cx + ox - (co * cx + si * cz), 0, 1, 0, 0, -si, 0, co, cz + oz - (-si * cx + co * cz)] });
+        // world = R (p - c_k) + c_0 + o, R a turn about +y: rows (co, 0, si), (0, 1, 0), (-si, 0, co); c_k = c_0 for one mesh
+        const k = (ix + iz * n) % list.length, [kx, , kz] = list[k].bounds.center;
+        out.push({ transform: [co, 0, si, cx + ox - (co * kx + si * kz), 0, 1, 0, 0, -si, 0, co, cz + oz - (-si * kx + co * kz)],
+                   ...(list.length > 1 ? { mesh: k } : {}) });
     }
     return out;
 }
@@ -466,25 +525,32 @@ struct VSOut { @builtin(position) pos : vec4<f32> };
  * `instances` (default null): [{ transform, albedo?, sbtOffset? }], transform world-from-object, row-major 3x4. The
  * mesh is then drawn once per instance and NOT where it was built. Every instance takes the session's own material
  * (its `albedo` if it names one, lambertian only); under meshMaterials each takes the mesh's table, from `sbtOffset`
- * (default 0). The light and the returned `bounds` follow placedBounds(). Refused with sky:"sceneCapture", whose
- * capture traces the one mesh on the CPU and would light the placements with a room they are not standing in.
+ * (default 0). The light and the returned `bounds` follow placedBounds(). v4925: allowed with sky:"sceneCapture",
+ * whose capture now traces every placement (placedRadianceOf) from the middle of placedBounds(); refused before.
  * `instanceTree` (default true, read only with `instances`): walk the tree instanceBuffer() appends; false walks the
  * list. They must agree on every pixel -- the list is the tree's control, and the gate holds them to it.
  * `cutout` (default null): the any-hit stage's cutout rule with this barycentric margin kept solid, 0 <= m < 1/3.
- * 0 is a real value -- every triangle is all hole -- so null, not 0, is "off".
+ * 0 is a real value -- every triangle is all hole -- so null, not 0, is "off". v4925: sky:"sceneCapture" now looks
+ * through the same holes; before it captured the triangles solid while the frame drew them cut.
+ * v4925 -- `extraMeshes` (default []): more viewer meshes the instances may name by index (`mesh: k`, 0 being `mesh`).
+ * They are laid end to end in one set of buffers (rtPipeline.mjs's bvhBuffersFromMeshes); per-vertex colours and
+ * per-triangle materials do not survive that, so vertexColors and meshMaterials are refused with them. Needs instances.
+ * v4925 -- `alpha` (default null): the any-hit stage's alpha rule, each candidate hit accepted with this probability,
+ * 0 <= p <= 1 -- see-through on average. One any-hit rule at a time, so it is refused with `cutout`; and refused with
+ * sky:"sceneCapture", whose capture is a fixed picture a probability cannot be baked into honestly.
  */
 export function makeRtSession(device, { mesh, w, h, albedo = DEFAULT_ALBEDO, gradient = true, spp = 1, eps = EPS,
                                           material = "lambertian", roughness = DEFAULT_ROUGHNESS, ior = DEFAULT_IOR,
                                           sky = "gradient", envFaceSize = DEFAULT_ENV_FACE_SIZE, direct = "bsdf",
                                           vertexColors = false, meshMaterials = false,
-                                          instances = null, instanceTree = true, cutout = null }) {
+                                          instances = null, instanceTree = true, cutout = null, extraMeshes = [], alpha = null }) {
     if (material !== "lambertian" && material !== "microfacet") throw new Error(
         "rtViewer: material must be \"lambertian\" or \"microfacet\", got " + material);
     if (sky !== "gradient" && sky !== "envMap" && sky !== "sceneCapture") throw new Error(
         "rtViewer: sky must be \"gradient\", \"envMap\" or \"sceneCapture\", got " + sky);
     if (direct !== "bsdf" && direct !== "nee" && direct !== "mis") throw new Error(
         "rtViewer: direct must be \"bsdf\", \"nee\" or \"mis\", got " + direct);
-    const { bvh } = mesh;
+    const { bvh: ownBvh } = mesh;
     const floats = w * h * 3;
     const isMicrofacet = material === "microfacet";
     // Meaningful only under lambertian (rtPipeline.mjs's own vertexColors requires rgb, which microfacet
@@ -493,7 +559,7 @@ export function makeRtSession(device, { mesh, w, h, albedo = DEFAULT_ALBEDO, gra
     // checked when sky is gradient" reasoning round 11 already established: a caller who sets
     // vertexColors:true under material:"microfacet" is not penalized for an option that will never be read.
     const wantsVertexColors = vertexColors && !isMicrofacet;
-    if (wantsVertexColors && !bvh.vertColors) throw new Error(
+    if (wantsVertexColors && !ownBvh.vertColors) throw new Error(
         "rtViewer: vertexColors:true was requested but this mesh has no per-vertex colour data (bvh.vertColors " +
         "is null) -- loadMeshBvh()/loadCityBvh() only attach it when the underlying source (a GLB's own COLOR_0 " +
         "accessor, or citySceneMesh()'s own baked cols) actually has some, and this mesh's does not.");
@@ -501,7 +567,7 @@ export function makeRtSession(device, { mesh, w, h, albedo = DEFAULT_ALBEDO, gra
     // own records are built `hit:"lambertian"` from real PALETTE colour, with no roughness/ior to offer a
     // microfacet record (see this function's own doc above) -- accepted-but-inert under microfacet either way.
     const wantsMeshMaterials = meshMaterials && !isMicrofacet;
-    if (wantsMeshMaterials && (!mesh.meshRecords || !bvh.matIndex)) throw new Error(
+    if (wantsMeshMaterials && (!mesh.meshRecords || !ownBvh.matIndex)) throw new Error(
         "rtViewer: meshMaterials:true was requested but this mesh has no per-triangle material table " +
         "(mesh.meshRecords and/or bvh.matIndex is missing) -- loadCityBvh() attaches both automatically from " +
         "world/chunkMesherCore.js's own PALETTE; loadMeshBvh() does not, and a mesh built another way must " +
@@ -511,12 +577,26 @@ export function makeRtSession(device, { mesh, w, h, albedo = DEFAULT_ALBEDO, gra
     const hasInstances = instances !== null && instances !== undefined, hasCutout = cutout !== null && cutout !== undefined && cutout !== false;
     if (hasInstances && !(Array.isArray(instances) && instances.length)) throw new Error(
         "rtViewer: instances must be a non-empty array of { transform } -- pass null to draw the mesh where it was built");
-    if (hasInstances && isSceneCapture) throw new Error(
-        "rtViewer: instances cannot be combined with sky:\"sceneCapture\" -- the capture traces the ONE mesh on the CPU, " +
-        "so the placements would be lit by a room none of them stands in. Use \"gradient\" or \"envMap\".");
+    // v4925
+    const hasAlpha = alpha !== null && alpha !== undefined, hasExtra = Array.isArray(extraMeshes) && extraMeshes.length > 0;
+    if (hasAlpha && !(typeof alpha === "number" && alpha >= 0 && alpha <= 1)) throw new Error(
+        "rtViewer: alpha is the probability a hit is accepted, 0 <= p <= 1, or null for off -- got " + alpha);
+    if (hasAlpha && hasCutout) throw new Error("rtViewer: alpha and cutout are two any-hit rules and the stage runs one -- pass one, or neither");
+    if (hasAlpha && isSceneCapture) throw new Error(
+        "rtViewer: alpha cannot be combined with sky:\"sceneCapture\" -- the capture is one fixed picture and a hit accepted " +
+        "with a probability has no single answer to bake into it. Use \"gradient\" or \"envMap\", or cutout, which is geometric.");
+    if (hasExtra && !hasInstances) throw new Error("rtViewer: extraMeshes needs instances -- nothing names a second mesh otherwise");
+    if (hasExtra && (wantsVertexColors || wantsMeshMaterials)) throw new Error(
+        "rtViewer: extraMeshes cannot be combined with vertexColors or meshMaterials -- the meshes are laid end to end from their " +
+        "triangles, and the colours and material tables do not come with them");
+    if (hasExtra && !extraMeshes.every((m) => m && m.bvh && m.bvh.bvh && m.bounds)) throw new Error("rtViewer: every extra mesh must be a viewer mesh (loadMeshBvh/loadCityBvh's shape)");
+    if (hasInstances) instances.forEach((it, k) => { const m = it.mesh || 0; if (!(Number.isInteger(m) && m >= 0 && m <= (hasExtra ? extraMeshes.length : 0))) throw new Error(
+        "rtViewer: instance " + k + " names mesh " + it.mesh + " and the session holds " + (1 + (hasExtra ? extraMeshes.length : 0))); });
     if (hasCutout && !(typeof cutout === "number" && cutout >= 0 && cutout < 1 / 3)) throw new Error(
         "rtViewer: cutout is the barycentric margin kept solid, 0 <= m < 1/3, or null for off -- got " + cutout);
-    const bounds = hasInstances ? placedBounds(mesh, instances) : mesh.bounds;
+    const bounds = hasInstances ? placedBounds(mesh, instances, hasExtra ? extraMeshes : []) : mesh.bounds;
+    // v4925 -- one set of buffers for every mesh the instances may name; the mesh's own when there is only it
+    const bvh = hasExtra ? bvhBuffersFromMeshes([mesh, ...extraMeshes].map((m) => ({ tris: m.bvh.bvh.tris }))) : ownBvh;
     const isEnvMap = sky === "envMap" || isSceneCapture;
     // A background adversarial review found this specific numeric option needed a guard `roughness`/`ior`
     // do not: those two feed into an otherwise well-formed (if numerically implausible) material regardless of
@@ -545,8 +625,8 @@ export function makeRtSession(device, { mesh, w, h, albedo = DEFAULT_ALBEDO, gra
     // cost it nothing -- makeSceneRadianceOf's own capture position is the whole point, see its doc above).
     // `sky:"envMap"`'s own capture position is left as [0,0,0] UNCHANGED, so this branch is a strict addition,
     // not a rework of round 11's own shipped behaviour.
-    const bakeRadianceOf = isSceneCapture ? makeSceneRadianceOf(mesh) : envRadianceOf;
-    const bakePos = isSceneCapture ? sceneCaptureBakePos(mesh) : [0, 0, 0];
+    const bakeRadianceOf = isSceneCapture ? makeSceneRadianceOf(mesh, { instances: hasInstances ? instances : null, extraMeshes: hasExtra ? extraMeshes : [], cutout: hasCutout ? cutout : null }) : envRadianceOf;
+    const bakePos = isSceneCapture ? sceneCaptureBakePos(hasInstances ? { bounds } : mesh) : [0, 0, 0];   // v4925 -- the placements' middle
     const envAtlas = isEnvMap ? packCapturedAtlas(captureBaseCubemap(bakeRadianceOf, bakePos, envFaceSize)) : null;
     const useGradient = isEnvMap ? false : gradient;
     // RTX round 12 -- `direct` is meaningful ONLY for the microfacet material (round 8's own three-way
@@ -572,7 +652,7 @@ export function makeRtSession(device, { mesh, w, h, albedo = DEFAULT_ALBEDO, gra
 
     // v4919 -- spread, and EMPTY when none of the three is asked for, so the two calls below hand pipelineWgsl the
     // very objects they did before and the default session's text cannot move.
-    const stageOpts = { ...(hasCutout ? { anyHit: true } : {}), ...(hasInstances ? { instances: true, ...(instanceTree ? { instanceTree: true } : {}) } : {}) };
+    const stageOpts = { ...(hasCutout || hasAlpha ? { anyHit: true } : {}), ...(hasInstances ? { instances: true, ...(instanceTree ? { instanceTree: true } : {}) } : {}) };
     const rtPipe = device.compute({ wgsl: isMicrofacet
         ? pipelineWgsl({ bvh: true, gradient: useGradient, microfacet: direct, msComp: true, envMap: isEnvMap, ...stageOpts })
         : pipelineWgsl({ bvh: true, rgb: true, gradient: useGradient, envMap: isEnvMap, vertexColors: wantsVertexColors, meshMaterials: wantsMeshMaterials, ...stageOpts }) });
@@ -605,7 +685,7 @@ export function makeRtSession(device, { mesh, w, h, albedo = DEFAULT_ALBEDO, gra
     // makes instanceBuffer append the tree, and it is passed whether or not the tree is walked so the list and the
     // tree read the SAME buffer.
     const instBuf = hasInstances ? device.buffer({ usage: "storage", data: instanceBuffer(instances.map((inst) => ({
-        transform: inst.transform,
+        transform: inst.transform, ...(hasExtra && inst.mesh !== undefined ? { mesh: inst.mesh } : {}),   // the default (mesh 0) is instanceBuffer's own; restating it here erased it (tools/mutate/shadowedDefaults, v4925)
         ...(wantsMeshMaterials ? { sbtOffset: inst.sbtOffset === undefined ? 0 : inst.sbtOffset }
             : isMicrofacet ? { hit: "microfacet", roughness, ior }
             : { hit: "lambertian", albedo: inst.albedo === undefined ? albedo : inst.albedo }) })), { rgb: !isMicrofacet, meshes: bvh }) }) : null;
@@ -632,7 +712,7 @@ export function makeRtSession(device, { mesh, w, h, albedo = DEFAULT_ALBEDO, gra
 
     const rayWg = Math.ceil((w * h) / 64), accumWg = Math.ceil(floats / 64);
     // v4919 -- the uniform side of stageOpts, from the SAME two flags, and empty when neither is set
-    const stageU = { ...(hasInstances ? { instanceCount: instances.length } : {}), ...(hasCutout ? { anyHit: { rule: "cutout", param: cutout } } : {}) };
+    const stageU = { ...(hasInstances ? { instanceCount: instances.length } : {}), ...(hasCutout ? { anyHit: { rule: "cutout", param: cutout } } : hasAlpha ? { anyHit: { rule: "alpha", param: alpha } } : {}) };
     let frame = 0;
 
     return Object.freeze({

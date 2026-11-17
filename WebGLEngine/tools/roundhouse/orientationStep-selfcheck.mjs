@@ -292,7 +292,20 @@ try {
     const users = walk(ENG).map((f) => path.relative(ENG, f).split(path.sep).join("/")).filter((f) => !f.endsWith("rigidBody6dofEuler.mjs") && staticImports(f).length > 0);
     const BROWSER = ["tools/ship/sixdofPageFight.mjs"], firstImport = (f) => { const m = fs.readFileSync(path.join(ENG, f), "utf8").match(/^import\s[^\n]*/m); return m ? m[0] : ""; };
     // only gates import it; a library may name it inside the browser script it hands a page (BROWSER), never in an import of its own
-    const gates = users.filter((f) => f.endsWith("-selfcheck.mjs")), others = users.filter((f) => !f.endsWith("-selfcheck.mjs"));
+    // v4925 -- TWO LIBRARIES ARE NAMED, AND ONLY TWO, BECAUSE THEIR ROUNDS REGISTERED IT. tools/ship/plainNetVariants.mjs
+    // (Amendment A, 2026-11-07) and tools/ship/takeRighting.mjs (Amendment C, the same day) import the first-order step on
+    // purpose: the records they reproduce were measured under it. Nobody told this row, which went red that day and stayed
+    // red unseen -- it runs in no quick sweep -- until v4925's rotation read it. Keith chose, on 2026-11-17, to name them
+    // here rather than move their imports. A named library must still say why ON ITS IMPORT LINE ("first-order orientation
+    // step"); any other library, page or command importing the module is still red. What this costs, said: a module that
+    // imports either library flies first-order too (tools/ship/reportDoors.mjs names them as strings and does not import
+    // them; brain/subRighting.mjs names takeRighting in a comment only; render/subAquariumSim.mjs stays on RK4, checked).
+    // SABOTAGES (v4925, each restored byte for byte): takeRighting's import line without its reason -> red; a command
+    // (plainNetVariantsCmd.mjs) importing the module -> red; a named library no longer importing it -> red.
+    const DECLARED_LIBS = Object.freeze({ "tools/ship/plainNetVariants.mjs": "Amendment A", "tools/ship/takeRighting.mjs": "Amendment C" });
+    const declares = (f) => staticImports(f).every((l) => /first-order orientation step/.test(l));
+    const gates = users.filter((f) => f.endsWith("-selfcheck.mjs")), others = users.filter((f) => !f.endsWith("-selfcheck.mjs") && !(f in DECLARED_LIBS && declares(f)));
+    const namedFound = Object.keys(DECLARED_LIBS).filter((f) => users.includes(f));
     const notFirst = gates.filter((f) => !/rigidBody6dofEuler\.mjs/.test(firstImport(f)));
     const restated = gates, pageLine = 'await import("/physics/mechanics/rigidBody6dofEuler.mjs");';
     const pageScript = /BROWSER_SCRIPT = `async \(args\) => \{\n {4}await import\("\/physics\/mechanics\/rigidBody6dofEuler\.mjs"\);/.test(src("tools/ship/sixdofPageFight.mjs")) &&
@@ -308,9 +321,8 @@ try {
     // 2026-11-16 -- 51 -> 55. Four more gates held first-order numbers and were red under RK4 since the merge, unseen because each runs over the quick sweep's budget:
     // plannerEvents, plannerCap, plannerEnsemble and plannerEnsConfirm, each pinning the twin planner's rollout seconds and plan counts. Each was red with the old
     // needsTask.gaugeOf as well, and green under SWEK_6DOF_ORIENTATION=euler with nothing else changed; each now imports this module first.
-    // Also 2026-11-16: the row had been red since 2026-11-07 on a second count -- two ROUND LIBRARIES (tools/ship/plainNetVariants.mjs, tools/ship/takeRighting.mjs) imported
-    // the module. Both now set "euler" BY NAME right after their imports, as needsHeadCmd does, and their gates hold that line. Sabotaged: the call removed from takeRighting
-    // -> 5 red (its gate); the module imported by plainNetVariants again -> 1 red (this row); a planner gate's import removed -> 1 red here and 1 in that gate.
+    // (2026-11-16 this branch also moved the two round libraries' imports to setOrientationDefault; at the merge of main's v4925 (2026-11-17) that was UNDONE in favour of main's
+    // DECLARED_LIBS above, Keith's choice. The planner gates' first-order import stands. Sabotaged at the merge: a planner gate's import removed -> 1 red here and 1 in that gate.)
     // 2026-11-17 -- 55 -> 56. tools/ship/trainSubVestibular-selfcheck.mjs: the fish trainer never named a step, so each generation flew the default of its day, and
     // re-flying the stored files shows Gen2/4/5 first-order and Gen6 RK4 (brain/FISH_WIRING_RANK_WIP.md section 9). The trainer now flies each generation's own step BY NAME
     // (STEP_OF_GEN, set with setOrientationDefault, as needsHeadCmd does), and its gate, which re-derives first-order smoke records in-process, imports this module first.
@@ -319,8 +331,8 @@ try {
     const MISSED = ["brain/pilotFlightTrain-selfcheck.mjs", "render/subDropoutView-selfcheck.mjs", "tools/ship/dogfightPage-selfcheck.mjs", "tools/ship/tournamentDogfightShipped-selfcheck.mjs",
         "tools/ship/trainDogfightPilotShipped-selfcheck.mjs", "tools/ship/trainDronePilot-selfcheck.mjs", "tools/ship/trainFlightPilotGpu-selfcheck.mjs", "tools/ship/trainSubPilot-selfcheck.mjs"];
     ok("!! the gates that hold first-order numbers say so: 56 of them import rigidBody6dofEuler.mjs as their FIRST import (before any module that steps a body), no library or page does, the four page scripts import it first in the browser, and the one page a gate opens itself is given the step before it loads",
-        restated.length === 56 && notFirst.length === 0 && others.length === 0 && pageScript && MISSED.every((f) => restated.includes(f)) && MISSED_PLANNERS.every((f) => restated.includes(f)),
-        `${restated.length} gates${notFirst.length ? "; not first in " + notFirst.join(", ") : ""}${others.length ? "; imported by " + others.join(", ") : ""}${pageScript ? "" : "; a page script does not import it first"}`);
+        restated.length === 56 && MISSED_PLANNERS.every((f) => restated.includes(f)) && notFirst.length === 0 && others.length === 0 && pageScript && MISSED.every((f) => restated.includes(f)) && namedFound.length === Object.keys(DECLARED_LIBS).length,
+        `${restated.length} gates${notFirst.length ? "; not first in " + notFirst.join(", ") : ""}${others.length ? "; imported by " + others.join(", ") : ""}${pageScript ? "" : "; a page script does not import it first"}; the two libraries named for their registered amendments: ${namedFound.length} of 2 still import it, each saying why${namedFound.length < 2 ? " -- a named one no longer imports it: drop its name rather than keep a stale exception" : ""}`);
     // every 6-DOF craft family, under both steps: the baseline each task pins, flown here with each step named
     const FT = await import("../../brain/flightTask.mjs"), AF = await import("../../brain/autopilotFlight.mjs"), DTk = await import("../../brain/droneTask.mjs"), AD = await import("../../brain/autopilotDrone.mjs");
     const RT = await import("../../brain/rotorTask.mjs"), AR = await import("../../brain/autopilotRotor.mjs"), STk = await import("../../brain/subTask.mjs"), AS = await import("../../brain/autopilotSub.mjs");

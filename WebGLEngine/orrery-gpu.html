@@ -10,6 +10,14 @@
   #hud { position: absolute; left: 12px; top: 10px; background: rgba(4, 18, 11, .82); border: 1px solid #14351f; padding: 8px 10px; max-width: 520px; line-height: 1.5; }
   #hud b { color: #9ef0b4; }
   #hud .warn { color: #f0c66a; }
+  /* v4925 -- THE PANEL'S TEXT LETS THE POINTER THROUGH; ITS CONTROLS DO NOT. At 800 x 600 this panel covered 67% of the
+     canvas (measured, v4920), and a body behind it could not be pointed at, followed or dragged past: the panel's text
+     took the events. Now only what can be operated -- inputs, selects, buttons, links, labels -- catches the pointer,
+     and the text is read through. The panel also folds to its title line (#hudFold). Text in it can no longer be
+     selected with the mouse; that is the cost, said. */
+  #hud { pointer-events: none; }
+  #hud input, #hud select, #hud button, #hud a, #hud label { pointer-events: auto; }
+  #hud.folded > div:not(:first-child) { display: none; }
   label { display: inline-block; margin-right: 12px; }
   input[type=range] { width: 160px; vertical-align: middle; }
   a { color: #9ef0b4; }
@@ -49,7 +57,7 @@
 -->
 <canvas id="stage"></canvas>
 <div id="hud">
-  <div><b>SweK orrery, GPU-driven</b> &mdash; <span id="route">starting&hellip;</span></div>
+  <div><b>SweK orrery, GPU-driven</b> &mdash; <span id="route">starting&hellip;</span> <button id="hudFold" title="fold the panel to this line, so the bodies behind it can be seen">hide panel</button></div>
   <div id="bodies"></div>
   <div>
     <label>tilt <input id="tilt" type="range" min="0" max="80" value="35"></label> <span style="color:#9fb8a8">drag turns, wheel dollies, click a body to follow it, click space to stop</span>
@@ -102,6 +110,11 @@ import { makeMaskRig } from "./render/fleetMask.mjs";
 import { applyCommitsFeed, fixtureFeed, liveFeed, marketForRepo } from "./world/commitsFeed.mjs";
 
 const cv = document.getElementById("stage"), route = document.getElementById("route");
+// v4925 -- the panel folds to its title line and back; see the #hud style note
+document.getElementById("hudFold").addEventListener("click", (e) => {
+    const hud = document.getElementById("hud"), folded = hud.classList.toggle("folded");
+    e.target.textContent = folded ? "show panel" : "hide panel";
+});
 const say = (s, warn) => { route.innerHTML = warn ? `<span class="warn">${s}</span>` : s; };
 
 const raw = await fetch("./orrery.json").then((r) => r.json()).catch(() => null);

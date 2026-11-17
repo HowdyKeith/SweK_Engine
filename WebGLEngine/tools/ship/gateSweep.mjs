@@ -16456,6 +16456,33 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
         widened: Object.freeze([]),
         verdict: "no gate file added, so nothing is claimed here (a gate may be claimed by ONE closing); tools/ship/strandCensus-selfcheck gained the row that holds ignoredSet to a directory-only rule whose directory is not on the disk (15 rows to 16; one sabotage, 1 red) -- the rig's fresh clone of v4920 went red there with nothing left behind, reproduced here by moving the directory aside; unverified on the rig; no register widened",
     }),
+    since630: Object.freeze({
+        at: "v4922", swept: 5, green: 5, red: 0,
+        added: Object.freeze([
+            "brain/lesion-selfcheck.mjs",
+            "brain/lesionFlyCx-selfcheck.mjs",
+            "brain/reservoirGpu-selfcheck.mjs",
+            "tools/ship/lesionLeftSide-selfcheck.mjs",
+            "tools/subReservoirV6-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "five gates, each green on arrival and each sabotaged before it was trusted: the lesion toggle (45 mutants, all red), the stateful fly's lesions (33, all red), the GPU reservoir kernel (23, all red), the left-side lesion round (32, all red) and rung 4a v6 (36, 35 red and 1 declared equivalent); render/switchboardView-selfcheck gained the lesion and fly rows (existing gate, not claimed here).",
+    }),
+    since631: Object.freeze({
+        at: "v4923", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "no gate file added, so nothing is claimed here (a gate may be claimed by ONE closing); orrery.html repaints only when its view key changes and tools/ship/orreryPost-selfcheck holds that (three rows); tools/ship/playwrightResolve.mjs exports the frame hold, held on a fake clock in its own gate (five rows, two of them added after the first verdict found holdFrames and heldFrames unnamed), and subAquariumPage, avatarFraming and render/seaThree hold their pages with it (a row each); twenty sabotages, one 0 red and fixed (the followed body); no register widened",
+    }),
+    since633: Object.freeze({
+        at: "v4925", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "no gate file added, so nothing is claimed here (a gate may be claimed by ONE closing); physics/render/rtPipeline-selfcheck holds the GPU's bounce paths to the CPU's bounce by bounce and against a rounding-sized control, and the row that called sixteen instances' disagreement rounding is rewritten (173 to 175 rows); tools/ship/rtViewer-selfcheck holds a second mesh, the alpha rule and the capture sky through placements and holes (137 to 161); tools/ship/gitEconomy-selfcheck holds the GPU orrery's panel passing the pointer through and folding (28 to 31); sixteen sabotages, two 0 red at first and fixed; tools/roundhouse/orientationStep-selfcheck, red since 2026-11-07 and found by this round's rotation, names the two study libraries that import the first-order step under registered amendments (Keith's choice), three sabotages red; no register widened",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
@@ -16701,6 +16728,13 @@ export const REGRESSIONS_REPAIRED = Object.freeze({
         "tools/ship/postChain-selfcheck.mjs": "v4303: the SSAO draw line is derived from the on/off diff and confirmed in bloomPass.js's source, never typed (750 until v4288, 754 since)",
         "tools/ship/staleness-selfcheck.mjs": "green by v4300 once the derived files were regenerated; red mid-round by design",
         "tools/ship/windowsImport-selfcheck.mjs": "v4303: roughDiffuseWired-selfcheck imports its scratch module by pathToFileURL, not a raw path",
+    }),
+    since632: Object.freeze({
+        at: "v4924", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "no gate file added, so nothing is claimed here (a gate may be claimed by ONE closing): the Decider chip's gates (brain/deciderAdvisor-selfcheck 37 mutants red, tools/ship/deciderAudit-selfcheck 35), the install bridge's (tools/ship/appInstall-selfcheck, 26) and net/bridgeBase-selfcheck were claimed by the closings that first carried them; this round records them, and the Round 14 result, in the changelog.",
     }),
 });
 

@@ -277,7 +277,29 @@ console.log("\n3. THE PAGE: LIFE ON, THE LOG MOVES, AND THE POINTER NAMES A TRAD
             const txt = await pg.evaluate(() => document.getElementById("pick").textContent);
             if (/ cr$| -- /.test(txt)) named = txt;
         }
+        // SABOTAGES (v4925, against orrery-gpu.html's style, each restored): the panel's pointer-events:none removed -> 1 red
+        // (the trade log's middle reaches DIV); the controls' pointer-events:auto removed -> 1 red (the slider reaches the
+        // canvas); the fold's display:none rule removed -> 1 red (617, 597, 597 px).
+        // v4925 -- THE PANEL'S TEXT PASSES THE POINTER TO THE CANVAS, ITS CONTROLS DO NOT, AND IT FOLDS (orrery-gpu.html #hud).
+        // Asked of the page itself with elementFromPoint, which honours pointer-events, at the middle of a text line and
+        // of a control; then the fold button is clicked twice and the panel's height read each time.
+        const hudCheck = await pg.evaluate(async () => {
+            const at = (el) => { const r = el.getBoundingClientRect(), e = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2); return e ? e.tagName + (e.id ? "#" + e.id : "") : "none"; };
+            const hud = document.getElementById("hud"), h0 = hud.getBoundingClientRect().height;
+            const r = { text: at(document.getElementById("trade")), races: at(document.getElementById("races")), control: at(document.getElementById("tilt")), h0 };
+            document.getElementById("hudFold").click(); await new Promise((q) => setTimeout(q, 50));
+            r.h1 = hud.getBoundingClientRect().height; r.label1 = document.getElementById("hudFold").textContent; r.tradeShown1 = getComputedStyle(document.getElementById("trade")).display;
+            document.getElementById("hudFold").click(); await new Promise((q) => setTimeout(q, 50));
+            r.h2 = hud.getBoundingClientRect().height; r.label2 = document.getElementById("hudFold").textContent; r.tradeShown2 = getComputedStyle(document.getElementById("trade")).display;
+            return r;
+        }).catch((e) => ({ err: String(e).slice(0, 160) }));
         await br.close(); srv.close();
+        ok("*** v4925 -- the HUD panel's TEXT lets the pointer through to the canvas, and its CONTROLS still catch it ***",
+            hudCheck.text === "CANVAS#stage" && hudCheck.races === "CANVAS#stage" && hudCheck.control === "INPUT#tilt",
+            `the trade log's middle reaches ${hudCheck.text}, the races line's ${hudCheck.races}, the tilt slider's ${hudCheck.control}${hudCheck.err ? "; " + hudCheck.err : ""}`);
+        ok("  and the panel FOLDS to its title line and comes back: its height, open, folded, open again",
+            hudCheck.h1 < hudCheck.h0 * 0.25 && hudCheck.tradeShown1 === "none" && hudCheck.tradeShown2 !== "none" && hudCheck.h2 > hudCheck.h0 * 0.8 && hudCheck.label1 === "show panel" && hudCheck.label2 === "hide panel",
+            `${Math.round(hudCheck.h0)}, ${Math.round(hudCheck.h1)}, ${Math.round(hudCheck.h2)} px -- not to the pixel: the trade log is live and changes its own height between reads`);
         ok("the page loads with life on and reports the traders", /traders/.test(st.drawn), st.drawn);
         ok("*** the trade log fills and moves ***", st.log.length > 20 && st.log !== log1, st.log.slice(0, 120));
         ok("*** THE POINTER, AIMED AT A NAMED BODY, NAMES THAT BODY AND ITS PRICES ***",

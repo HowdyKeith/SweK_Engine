@@ -160,18 +160,31 @@
 //   against rtx-viewer.html:
 //   P1 the page never passes instances -> 1 red   P2 it frames the one mesh -> 1 red
 //   P3 the cutout link drops the instances -> 1 red   P4 it passes cutout as a fixed null -> 1 red
+//
+// v4925 -- A SECOND MESH, THE ALPHA RULE, THE CAPTURE SKY THROUGH PLACEMENTS (sections 1k, 4h, one row of 6). Nine plants
+// against render/rtViewer.mjs and rtx-viewer.html, each restored byte for byte:
+//   X1 the capture ignores the cutout -> 2 red        X2 its normal not carried back through the inverse transpose -> 1 red
+//   X3 the capture traces only the first placement -> 0 RED AT FIRST: the two placements were one box twice, seen from the
+//      side the sun does not light, and faces turned from the sun shade alike whichever mesh they are. The second is the
+//      pyramid now, seen from the lit side, and X3 is 1 red.
+//   X4 extraMeshes never merged into the buffers -> exit 1 and 0 red AT FIRST: the session threw inside 1k and stopped the
+//      gate. The session is built inside a try now and X4 is 1 red, by name.
+//   X5 an instance's mesh index not handed to instanceBuffer -> 2 red   X6 alpha written as the cutout rule -> 2 red
+//   X7 the capture baked from the one mesh's middle -> 1 red          X8 every mesh centred on the first's centre -> 1 red
+//   P1 the page never passes alpha -> 1 red
 "use strict";
 
 import { gateReport } from "./gateReport.mjs";
 import { webgpuSkipReason, runWgslCompute, runInEngineOrigin } from "./webgpuHarness.mjs";
 import * as V from "../../render/rtViewer.mjs";
 import * as PTW from "../../physics/render/pathTracerWgsl.mjs";
-import { pipelineWgsl, pipelineUniforms, bvhBuffersFromMesh, sbtRecord, instanceBuffer, INSTANCE_FLOATS, MESH_META_SLOT, ANYHIT_SLOT, ANY_HIT_SHADERS, EPS } from "../../physics/render/rtPipeline.mjs";
+import { pipelineWgsl, pipelineUniforms, bvhBuffersFromMesh, bvhBuffersFromMeshes, bvhBuffersFromTriSoup, sbtRecord, instanceBuffer, INSTANCE_FLOATS, MESH_META_SLOT, ANYHIT_SLOT, ANY_HIT_SHADERS, EPS } from "../../physics/render/rtPipeline.mjs";
 import { captureAtlasHalves, captureBaseCubemap, packCapturedAtlas } from "../../physics/render/specularProbeCapture.mjs";
 import { fromHalf } from "../../text/slugAtlas.js";
 import { GLBParser } from "../../gpu/GLBParser.js";
 import { PALETTE } from "../../world/chunkMesherCore.js";
 import { meshTriples } from "../../physics/splat/splatMesh.mjs";
+import { triNormal } from "../../mesh/meshBVH.mjs";
 import { faceTexelDir } from "../../render/cubeBake.js";
 import fs from "node:fs";
 import path from "node:path";
@@ -895,7 +908,6 @@ console.log("\n1j. v4919 -- makeRtSession's `instances`, `instanceTree` AND `cut
     const throws = (opts, re) => { try { V.makeRtSession(stub().device, { mesh, w: 4, h: 4, ...opts }); return "did not throw"; } catch (e) { return re.test(e.message) ? true : e.message; } };
     for (const [label, opts, re] of [
         ["an empty `instances` array is refused by name, not drawn as nothing", { instances: [] }, /non-empty array/],
-        ["`instances` with sky:\"sceneCapture\" is refused -- the capture traces the one mesh", { instances: grid, sky: "sceneCapture" }, /sceneCapture/],
         ["a cutout margin of 0.4 is refused -- at 1/3 the hole is a point", { cutout: 0.4 }, /0 <= m < 1\/3/],
         ["a negative cutout margin is refused", { cutout: -0.1 }, /0 <= m < 1\/3/],
         ["a mirrored instance is refused by instanceBuffer, through the session", { instances: [{ transform: [-1,0,0,0, 0,1,0,0, 0,0,1,0] }] }, /mirrors the mesh/]]) {
@@ -903,6 +915,111 @@ console.log("\n1j. v4919 -- makeRtSession's `instances`, `instanceTree` AND `cut
     }
     ok("placedBounds() and instanceGrid() refuse what they cannot place", (() => { try { V.placedBounds(mesh, []); return false; } catch (e) { return /at least one/.test(e.message); } })() &&
         (() => { try { V.instanceGrid(mesh, 0); return false; } catch (e) { return /whole number/.test(e.message); } })());
+}
+
+// ---- 1k. v4925 -- a second mesh, the alpha rule, and the scene-capture sky through placements and holes (NO GPU NEEDED) ----
+console.log("\n1k. v4925 -- makeRtSession's `extraMeshes` AND `alpha`, AND sky:\"sceneCapture\" THROUGH INSTANCES AND A CUTOUT (NO GPU NEEDED)");
+{
+    const P = [[-1,-0.5,-0.3],[1,-0.5,-0.3],[1,0.7,-0.3],[-1,0.7,-0.3],[-1,-0.5,1.5],[1,-0.5,1.5],[1,0.7,1.5],[-1,0.7,1.5]];
+    const I = [[0,2,1],[0,3,2],[4,5,6],[4,6,7],[0,5,4],[0,1,5],[3,6,2],[3,7,6],[0,7,3],[0,4,7],[1,6,5],[1,2,6]];
+    const YP = [[-0.6,0,-0.6],[0.6,0,-0.6],[0.6,0,0.6],[-0.6,0,0.6],[0,1.4,0]], YI = [[0,4,1],[1,4,2],[2,4,3],[3,4,0],[0,1,2],[0,2,3]];
+    const bA = bvhBuffersFromMesh(P, I), bB = bvhBuffersFromMesh(YP, YI), A_CENTRE = V.meshBounds(bA).center;
+    const A = { bvh: bA, bounds: V.meshBounds(bA) }, B = { bvh: bB, bounds: V.meshBounds(bB) };
+    const stub = () => { const wgsls = [], binds = {}, writes = [], textures = [];
+        return { wgsls, binds, writes, textures, device: {
+            compute({ wgsl }) { wgsls.push(wgsl); return { bind(name, buf) { binds[name] = buf; }, bindTexture() {} }; },
+            buffer(d) { const b = { data: d.data, write(x) { b.data = x; writes.push(x); }, destroy() {} }; return b; },
+            texture(d) { textures.push(d); return { destroy() {} }; }, pipeline() { return {}; }, frame() { return null; } } }; };
+    const same = (a, b) => !!a && !!b && a.length === b.length && Array.from(a).every((v, i) => v === b[i] || Object.is(v, b[i]));
+    const ident = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0];
+    const dirs = []; for (let k = 0; k < 200; k++) { const z = 1 - 2 * (k + 0.5) / 200, r = Math.sqrt(1 - z * z), ph = k * 2.399963; dirs.push([r * Math.cos(ph), z, r * Math.sin(ph)]); }
+    const from = [0.2, 3.1, 4.3];
+    // and as many again AIMED at the mesh, so a good share of the directions hit it
+    for (let k = 0; k < 200; k++) { const c = A_CENTRE, j = [Math.sin(k * 1.7) * 0.9, Math.cos(k * 2.3) * 0.5, Math.sin(k * 0.7) * 0.8];
+        const v = [c[0] + j[0] - from[0], c[1] + j[1] - from[1], c[2] + j[2] - from[2]], l = Math.hypot(...v); dirs.push(v.map((q) => q / l)); }
+    const close = (a, b) => Math.max(Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1]), Math.abs(a[2] - b[2])) < 1e-12;
+
+    // -- the capture through placements
+    const one = V.makeSceneRadianceOf(A), viaId = V.makeSceneRadianceOf(A, { instances: [{ transform: ident }] });
+    const hits = dirs.filter((d) => !close(one(from, d), V.envRadianceOf(from, d))).length;
+    ok(`*** the capture through ONE identity placement is the capture of the mesh: ${dirs.length} directions from outside it, ${hits} of them hitting it ***`,
+        hits > 10 && hits < dirs.length - 10 && dirs.every((d) => close(one(from, d), viaId(from, d))));
+    const T = [4, -1, 2.5], moved = V.makeSceneRadianceOf(A, { instances: [{ transform: [1, 0, 0, T[0], 0, 1, 0, T[1], 0, 0, 1, T[2]] }] });
+    ok("  and a placement moved by (4, -1, 2.5), asked from a point moved the same way, sees the same thing in every direction",
+        dirs.every((d) => close(one(from, d), moved([from[0] + T[0], from[1] + T[1], from[2] + T[2]], d))));
+    const turned = [0, 0, 1, 0, 0, 1, 0, 0, -1, 0, 0, 0];             // a quarter turn about +y, carrying +x to -z
+    const viaTurn = V.makeSceneRadianceOf(A, { instances: [{ transform: turned }] });
+    const rot = (v) => [v[2], v[1], -v[0]];
+    // the SAME turn baked into the triangles on the CPU: shading uses a fixed sun, so a turned copy shades as a turned copy
+    const bakedTurn = (() => { const t = bA.bvh.tris, out = new Float64Array(t.length); for (let i = 0; i < t.length; i += 3) { const r = rot([t[i], t[i + 1], t[i + 2]]); out[i] = r[0]; out[i + 1] = r[1]; out[i + 2] = r[2]; }
+        const b = bvhBuffersFromTriSoup(out); return V.makeSceneRadianceOf({ bvh: b, bounds: V.meshBounds(b) }); })();
+    ok("  and a quarter-turned placement sees what the same turn baked into the triangles sees -- the normal comes back through the inverse transpose",
+        dirs.every((d) => close(bakedTurn(rot(from), rot(d)), viaTurn(rot(from), rot(d)))) && dirs.some((d) => !close(viaTurn(rot(from), rot(d)), one(from, d))),
+        "and differs from the unturned capture somewhere, because the sun does not turn with it");
+    // THE SECOND PLACEMENT IS THE PYRAMID, and a sabotage is why: with the box twice, both facing the same way, the two
+    // shade alike and a capture that traced only the first read the same (v4925's X3 went 0 red on it). And it is seen from
+    // the FRONT, lit: from behind, both meshes show faces turned from the sun, and those shade alike whichever mesh they are.
+    const zm6 = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 6];
+    const twoPl = V.makeSceneRadianceOf(A, { instances: [{ transform: ident }, { transform: zm6, mesh: 1 }], extraMeshes: [B] });
+    const behind = [0, 0.3, 12], toward = [0, 0, -1], seeB = V.makeSceneRadianceOf(A, { instances: [{ transform: zm6, mesh: 1 }], extraMeshes: [B] })(behind, toward);
+    ok("  and with two placements the NEAREST wins: from behind the second (the pyramid), looking at both, the capture sees the pyramid and not the box",
+        close(twoPl(behind, toward), seeB) && !close(seeB, V.makeSceneRadianceOf(A)(behind, toward)) && !close(seeB, V.envRadianceOf(behind, toward)),
+        `${twoPl(behind, toward).map((v) => v.toFixed(3))} against the pyramid's ${seeB.map((v) => v.toFixed(3))} and the box's ${V.makeSceneRadianceOf(A)(behind, toward).map((v) => v.toFixed(3))}`);
+    const mixed = V.makeSceneRadianceOf(A, { instances: [{ transform: [1, 0, 0, 3, 0, 1, 0, 0, 0, 0, 1, 0], mesh: 1 }], extraMeshes: [B] }), onlyB = V.makeSceneRadianceOf(B);
+    ok("  and a placement naming mesh 1 traces the extra mesh, not the first",
+        dirs.every((d) => close(onlyB(from, d), mixed([from[0] + 3, from[1], from[2]], d))));
+    // the cutout: a ray through the middle of one front triangle is not stopped there; near a corner it is
+    const t0 = bA.bvh.tris, frontTri = (() => { for (let k = 0; k < bA.bvh.count; k++) { const n = triNormal(t0, k * 9); if (n[2] < -0.99) return k; } return -1; })();
+    const cen = [0, 1, 2].map((a) => (t0[frontTri * 9 + a] + t0[frontTri * 9 + 3 + a] + t0[frontTri * 9 + 6 + a]) / 3), corner = [0, 1, 2].map((a) => 0.9 * t0[frontTri * 9 + a] + 0.05 * t0[frontTri * 9 + 3 + a] + 0.05 * t0[frontTri * 9 + 6 + a]);
+    const eyeAt = (p) => [p[0], p[1], p[2] - 3], dz = [0, 0, 1];
+    const cut = V.makeSceneRadianceOf(A, { cutout: 0.12 });
+    ok("*** with the cutout the capture looks THROUGH a hole: a ray at the centroid of a front triangle is not stopped there, and a ray at its corner still is ***",
+        frontTri >= 0 && !close(cut(eyeAt(cen), dz), one(eyeAt(cen), dz)) && close(cut(eyeAt(corner), dz), one(eyeAt(corner), dz)),
+        `front triangle ${frontTri}; the centroid ray reads ${cut(eyeAt(cen), dz).map((v) => v.toFixed(3))} with the cutout and ${one(eyeAt(cen), dz).map((v) => v.toFixed(3))} without`);
+    ok("  and placedRadianceOf with no instances and no cutout -- one identity placement -- reads as the plain capture, direction for direction",
+        dirs.every((d) => close(one(from, d), V.placedRadianceOf(A)(from, d))));
+    ok("  and without the cutout or instances makeSceneRadianceOf is the function it was, direction for direction", dirs.every((d) => close(one(from, d), V.makeSceneRadianceOf(A, {})(from, d))));
+
+    // -- the session
+    const grid2 = V.instanceGrid([A, B], 3), gb2 = V.placedBounds(A, grid2, [B]);
+    ok("instanceGrid([A, B], 3) alternates the two meshes (mesh 0, 1, 0, ...) and sets each one's OWN centre in its cell",
+        grid2.map((g) => g.mesh).join("") === "010101010" && grid2.every((g, k) => { const m = g.transform, c = (g.mesh ? B : A).bounds.center, x = m[0] * c[0] + m[2] * c[2] + m[3], z = m[8] * c[0] + m[10] * c[2] + m[11];
+            return Math.abs(x - (A.bounds.center[0] + ((k % 3) - 1) * 2.5)) < 1e-9 && Math.abs(z - (A.bounds.center[2] + (Math.floor(k / 3) - 1) * 2.5)) < 1e-9; }),
+        grid2.map((g) => g.mesh).join(""));
+    // the session is built inside a try: a session that throws fails this row by name rather than stopping the gate (v4925's
+    // sabotage X4, the meshes never merged, first stopped it here with instanceBuffer's own throw)
+    const x = stub(); let sx = null, sxErr = "";
+    try { sx = V.makeRtSession(x.device, { mesh: A, w: 4, h: 4, instances: grid2, extraMeshes: [B] }); } catch (e) { sxErr = String(e.message).slice(0, 140); }
+    const both = bvhBuffersFromMeshes([A, B].map((m) => ({ tris: m.bvh.bvh.tris })));
+    ok("*** `extraMeshes` binds ONE set of buffers holding both meshes (bvhBuffersFromMeshes) and each instance's root is its own mesh's ***",
+        !!sx && same(x.binds.bvhBounds && x.binds.bvhBounds.data, both.bounds) && same(x.binds.bvhTris && x.binds.bvhTris.data, both.tris) &&
+        grid2.every((g, k) => x.binds.bvhInst.data[k * INSTANCE_FLOATS + 16] === both.roots[g.mesh]) && same(sx.bounds.max, gb2.max),
+        sxErr || `roots ${both.roots.join(", ")}; the placements' box ${gb2.min.map((v) => +v.toFixed(2))} to ${gb2.max.map((v) => +v.toFixed(2))}`);
+    const al = stub(); const sal = V.makeRtSession(al.device, { mesh: A, w: 4, h: 4, alpha: 0.4 }); sal.renderFrame({ w: 4, h: 4, ...V.orbitEye({ center: A.bounds.center }), fovDeg: 45 });
+    const alU = al.writes.find((q) => q.length === 96);
+    ok("*** `alpha: 0.4` compiles the any-hit stage and writes the ALPHA rule and its probability -- not the cutout's ***",
+        al.wgsls[0] === pipelineWgsl({ bvh: true, rgb: true, gradient: true, anyHit: true }) && alU[ANYHIT_SLOT * 4] === ANY_HIT_SHADERS.alpha && Math.abs(alU[ANYHIT_SLOT * 4 + 1] - 0.4) < 1e-7,
+        `rule ${alU[ANYHIT_SLOT * 4]}, p ${alU[ANYHIT_SLOT * 4 + 1]}`);
+    const sc = stub(); V.makeRtSession(sc.device, { mesh: A, w: 4, h: 4, instances: grid2.slice(0, 4).map(({ transform }) => ({ transform })), sky: "sceneCapture", envFaceSize: 8 });
+    const gb4 = V.placedBounds(A, grid2.slice(0, 4).map(({ transform }) => ({ transform })));
+    const want = V.packAtlasHalfFloat(packCapturedAtlas(captureBaseCubemap(V.makeSceneRadianceOf(A, { instances: grid2.slice(0, 4).map(({ transform }) => ({ transform })) }), V.sceneCaptureBakePos({ bounds: gb4 }), 8)));
+    const solo = stub(); V.makeRtSession(solo.device, { mesh: A, w: 4, h: 4, sky: "sceneCapture", envFaceSize: 8 });
+    ok("*** `instances` with sky:\"sceneCapture\" is ALLOWED now, and bakes the capture of the placements from their middle -- byte for byte, and not the one mesh's capture ***",
+        sc.textures.length === 1 && same(sc.textures[0].data, want) && !same(sc.textures[0].data, solo.textures[0].data),
+        "refused from v4919 to v4923, because the capture traced only the one mesh");
+    const cs = stub(); V.makeRtSession(cs.device, { mesh: A, w: 4, h: 4, cutout: 0.12, sky: "sceneCapture", envFaceSize: 8 });
+    ok("  and a cutout under that sky is captured with its holes (before v4925 the capture saw them solid)",
+        same(cs.textures[0].data, V.packAtlasHalfFloat(packCapturedAtlas(captureBaseCubemap(V.makeSceneRadianceOf(A, { cutout: 0.12 }), V.sceneCaptureBakePos(A), 8)))) && !same(cs.textures[0].data, solo.textures[0].data));
+    const throws = (opts, re) => { try { V.makeRtSession(stub().device, { mesh: A, w: 4, h: 4, ...opts }); return "did not throw"; } catch (e) { return re.test(e.message) ? true : e.message; } };
+    for (const [label, opts, re] of [
+        ["alpha with a cutout is refused -- the stage runs one rule", { alpha: 0.5, cutout: 0.1 }, /two any-hit rules/],
+        ["alpha under sky:\"sceneCapture\" is refused -- a probability has no single picture to bake", { alpha: 0.5, sky: "sceneCapture" }, /alpha cannot be combined/],
+        ["alpha of 1.2 is refused", { alpha: 1.2 }, /0 <= p <= 1/],
+        ["extraMeshes without instances is refused", { extraMeshes: [B] }, /needs instances/],
+        ["extraMeshes with meshMaterials is refused -- the tables do not survive the merge", { extraMeshes: [B], instances: grid2, meshMaterials: true, mesh: { ...A, meshRecords: [sbtRecord({ hit: "lambertian", albedo: 1 })], bvh: { ...bA, matIndex: new Int32Array(12) } } }, /cannot be combined with vertexColors or meshMaterials/],
+        ["an instance naming a mesh the session does not hold is refused", { extraMeshes: [B], instances: [{ transform: ident, mesh: 2 }] }, /names mesh 2/]]) {
+        const t = throws(opts, re); ok(label, t === true, t === true ? "" : String(t).slice(0, 120));
+    }
 }
 
 // ---- 2. THE ACCUMULATE KERNEL, EXACT, AGAINST FABRICATED INPUT -----------------------------------------------
@@ -1334,12 +1451,31 @@ console.log("\n3-5. THE PRESENT KERNEL, THE NAME-BASED DEVICE INTEGRATION, AND A
                     cutVsPlain: cmp(cut.f, plain.f), cutGridVsBaked: cmp(cutGrid.f, cutBaked.f), cutGridVsGrid: cmp(cutGrid.f, tree.f),
                     matOneVsPlain: cmp(matOne.f, matPlain.f), matVsFlat: cmp(matPlain.f, plain.f),
                     mfVsBaked: cmp1(mf.f, mfPlain.f), gridBounds: tree.bounds, gb };
+                // ---- 4h. v4925 -- a second mesh, the alpha rule, and the capture sky through placements ----
+                const YP = [[-0.6,0,-0.6],[0.6,0,-0.6],[0.6,0,0.6],[-0.6,0,0.6],[0,1.4,0]], YI = [[0,4,1],[1,4,2],[2,4,3],[3,4,0],[0,1,2],[0,2,3]];
+                const bB = bvhBuffersFromMesh(YP, YI), meshB = { bvh: bB, bounds: meshBounds(bB) };
+                const grid2 = instanceGrid([mesh, meshB], 3), vg2 = viewOf(placedBounds(mesh, grid2, [meshB]));
+                const soup2 = [];
+                for (const g of grid2) { const PP = g.mesh ? YP : P, II = g.mesh ? YI : I;
+                    for (const tri of II) for (const k of tri) { const p = PP[k], m = g.transform;
+                        soup2.push(m[0]*p[0]+m[1]*p[1]+m[2]*p[2]+m[3], m[4]*p[0]+m[5]*p[1]+m[6]*p[2]+m[7], m[8]*p[0]+m[9]*p[1]+m[10]*p[2]+m[11]); } }
+                const baked2Bvh = bvhBuffersFromTriSoup(soup2);
+                const two = await shoot({ instances: grid2, extraMeshes: [meshB] }, vg2), baked2 = await shoot({}, vg2, { bvh: baked2Bvh, bounds: meshBounds(baked2Bvh) });
+                const empty2 = await shoot({ cutout: 0 }, vg2);
+                const a0 = await shoot({ alpha: 0, spp: 1 }, v0), empty1 = await shoot({ cutout: 0, spp: 1 }, v0), a1 = await shoot({ alpha: 1 }, v0), a5 = await shoot({ alpha: 0.5 }, v0), a25 = await shoot({ alpha: 0.25 }, v0);
+                const lightFrom = (f, e) => { let s = 0; for (let i = 0; i < f.length; i++) s += Math.abs(f[i] - e[i]); return s; };
+                const sc = await shoot({ instances: grid, sky: "sceneCapture", envFaceSize: 8 }, vg);
+                let scNan = 0; for (const v of sc.f) if (!isFinite(v)) scNan++;
+                out.v24 = { pixels: w * h, twoVsBaked: cmp(two.f, baked2.f), coveredTwo: cmp(two.f, empty2.f, 0).pixels - cmp(two.f, empty2.f, 0).bit, coveredBaked2: cmp(baked2.f, empty2.f, 0).pixels - cmp(baked2.f, empty2.f, 0).bit,
+                    a0VsEmpty: cmp(a0.f, empty1.f, 0), coveredA1: covered(a1.f), coveredPlain: covered(plain.f),
+                    away: { plain: lightFrom(plain.f, empty.f), a25: lightFrom(a25.f, empty.f), a5: lightFrom(a5.f, empty.f), a1: lightFrom(a1.f, empty.f) },
+                    scNan, scVsGradient: cmp(sc.f, tree.f) };
             }
             return out;
         }`,
     });
     if (!r.ok) throw new Error("runInEngineOrigin failed: " + r.reason + (r.pageErrors && r.pageErrors.length ? " | " + r.pageErrors.slice(0, 3).join(" | ") : ""));
-    const { present, cube, cubeMicrofacet, cubeEnvMap, cubeDirectBsdf, cubeDirectNee, cubeDirectMis, cubeSceneCapture, accumBitExact, convergence, mesh, city, cityVertexColors, cityMeshMaterials, v19 } = r.result;
+    const { present, cube, cubeMicrofacet, cubeEnvMap, cubeDirectBsdf, cubeDirectNee, cubeDirectMis, cubeSceneCapture, accumBitExact, convergence, mesh, city, cityVertexColors, cityMeshMaterials, v19, v24 } = r.result;
 
     console.log("\n3. presentWgsl -- A DISTINCT-PER-PIXEL FRAME, PIXEL FOR PIXEL");
     say(`4x2, values include 1.5 and -0.3 to exercise the clamp`);
@@ -1625,7 +1761,11 @@ console.log("\n3-5. THE PRESENT KERNEL, THE NAME-BASED DEVICE INTEGRATION, AND A
         // One dispatch each, 48 x 36, spp 4, read raw: the same seed and the same per-pixel generator in every session,
         // so two sessions that trace the same rays agree to the BIT and a pixel that differs is a ray that went elsewhere.
         const N = v19.pixels, pct = (c) => (100 * c.same / c.pixels).toFixed(1) + "%";
-        const FLOOR = 0.97;                     // measured 99.4% (1717 of 1728) for the nine placements against the nine baked in
+        // v4925 -- WAS 0.97, against a measured 99.4% (1717 of 1728) that v4919 put down to f32 putting rays either side of an
+        // edge. It was not: physics/render/rtPipeline.mjs's bounce rays re-hit their own slanted faces when a fixed 1e-6
+        // offset was smaller than f32's error in the hit point (rtSpawnEps, v4925). With that fixed every comparison
+        // below reads 100% here (1728 of 1728, 1728 of 1728 cut, 5184 of 5184 lit), and the floor holds that.
+        const FLOOR = 0.995;   // SABOTAGE (v4925): the spawn offset left fixed -> 2 red here, 1717 and 1709 of 1728, the readings v4919 shipped with
         say(`a 2 x 1.2 x 1.8 box, off-centre, that is not its own quarter turn: ${v19.coveredPlain} of ${N} pixels covered (differ from the sky alone); nine placements: ${v19.coveredGrid}`);
         REPORT_ROWS.push(["nine instances vs nine baked", `${v19.gridVsBaked.bit} of ${N} pixels bit-identical`, `tree vs list ${v19.treeVsList.bit} of ${N}`, `cutout ${v19.cutGridVsBaked.bit} of ${N}`]);
         ok(`*** ONE IDENTITY INSTANCE IS THE MESH: ${v19.oneVsPlain.bit} of ${N} pixels bit-identical to the session with no instances ***`,
@@ -1637,7 +1777,7 @@ console.log("\n3-5. THE PRESENT KERNEL, THE NAME-BASED DEVICE INTEGRATION, AND A
             v19.treeVsList.bit === N && v19.coveredGrid > N / 20, "the list is the tree's control: same buffer, same rays, a different walk");
         ok(`*** THE NINE PLACEMENTS ARE WHERE instanceGrid() PUT THEM: against the same nine baked into one mesh's triangles on the CPU and drawn with NO instances, ${v19.gridVsBaked.same} of ${N} within 1e-3 (${pct(v19.gridVsBaked)}), and ${v19.coveredGrid} covered against ${v19.coveredBaked} ***`,
             v19.gridVsBaked.same >= N * FLOOR && Math.abs(v19.coveredGrid - v19.coveredBaked) <= 6 && v19.gridVsBaked.nan === 0,
-            `turns, offsets and normals all have to be right for this: a quarter turn the wrong way moves whole boxes. Worst difference ${v19.gridVsBaked.worst.toFixed(3)}, at the ${N - v19.gridVsBaked.same} pixels where f32 put a ray either side of an edge`);
+            `turns, offsets and normals all have to be right for this: a quarter turn the wrong way moves whole boxes. Worst difference ${v19.gridVsBaked.worst.toFixed(3)}, at ${N - v19.gridVsBaked.same} pixel(s) (11 before v4925's spawn offset)`);
         ok(`  and that is not the one mesh seen from further off: against the plain session's own picture only ${v19.gridVsPlainView.same} of ${N} agree`,
             v19.gridVsPlainView.same < N * FLOOR);
         ok(`an instance 5000 units behind the scene leaves the sky alone, bit for bit -- and that sky is the frame \`cutout: 0\` draws: ${v19.awayVsEmpty.bit} of ${N}`,
@@ -1652,6 +1792,26 @@ console.log("\n3-5. THE PRESENT KERNEL, THE NAME-BASED DEVICE INTEGRATION, AND A
         ok(`the microfacet material, lit by MIS, over the nine placements: ${v19.mfVsBaked.same} of ${v19.mfVsBaked.pixels} values within 1e-3 of the nine baked in, no NaN`,
             v19.mfVsBaked.same >= v19.mfVsBaked.pixels * FLOOR && v19.mfVsBaked.nan === 0, "the light is placed by the same bounds in both sessions, so it too has to stand where placedBounds() says");
         ok("the session's bounds on the device are placedBounds()'s", JSON.stringify(v19.gridBounds) === JSON.stringify(v19.gb));
+    }
+
+    console.log("\n4h. v4925 -- A SECOND MESH, THE ALPHA RULE, AND THE CAPTURE SKY THROUGH PLACEMENTS, ON A REAL DEVICE");
+    {
+        const N = v24.pixels;
+        REPORT_ROWS.push(["two meshes, nine instances, vs baked", `${v24.twoVsBaked.same} of ${N} within 1e-3`, `${v24.coveredTwo} covered vs ${v24.coveredBaked2}`, ""]);
+        ok(`*** TWO MESHES under nine placements -- box and pyramid in turn, through extraMeshes -- are where instanceGrid() put them: ${v24.twoVsBaked.same} of ${N} within 1e-3 of the same nine baked into one mesh, ${v24.coveredTwo} covered against ${v24.coveredBaked2} ***`,
+            v24.twoVsBaked.same >= N * 0.995 && v24.coveredTwo === v24.coveredBaked2 && v24.coveredTwo > N / 20 && v24.twoVsBaked.nan === 0);
+        // AT ONE SAMPLE A PIXEL, and why: a refused candidate still draws its random number, so at four samples the pixel's
+        // later samples jitter elsewhere in it and read a slightly different sky. The first draft asked for the bit at four
+        // and got 1389 of 1728 -- the 339 others being exactly the pixels the mesh covers; within 1e-3 it got 1614, the
+        // sky's gradient across a pixel being larger than that. At one sample the jitter is drawn before any any-hit draw.
+        ok(`*** ALPHA 0 is see-through: every candidate refused, and at one sample a pixel the frame is the empty frame bit for bit (${v24.a0VsEmpty.bit} of ${N}) ***`,
+            v24.a0VsEmpty.bit === N);
+        ok(`  and ALPHA 1 covers exactly what the solid mesh covers: ${v24.coveredA1} pixels against ${v24.coveredPlain}`, v24.coveredA1 === v24.coveredPlain && v24.coveredPlain > 0);
+        ok(`  and the frame leaves the empty one further as alpha rises: ${v24.away.a25.toFixed(1)} at 0.25, ${v24.away.a5.toFixed(1)} at 0.5, ${v24.away.a1.toFixed(1)} at 1`,
+            0 < v24.away.a25 && v24.away.a25 < v24.away.a5 && v24.away.a5 < v24.away.a1,
+            "not in proportion: a ray through a closed box meets two faces, and is refused at each with probability 1 - p");
+        ok(`*** the capture sky over NINE PLACEMENTS renders on the device: no NaN, and not the gradient sky's picture (${N - v24.scVsGradient.same} pixels differ) ***`,
+            v24.scNan === 0 && v24.scVsGradient.same < N - 20, "refused from v4919 to v4923");
     }
 
     console.log("\n6. THE LIVE PAGE ITSELF");
@@ -1718,13 +1878,18 @@ console.log("\n3-5. THE PRESENT KERNEL, THE NAME-BASED DEVICE INTEGRATION, AND A
         "checks exist to catch, extended to the sixth toggle");
     ok("*** v4919 -- the page reads `instances` and `cutout` from the URL, builds the placements with instanceGrid() and passes both into makeRtSession ***",
         /import\s*\{[^}]*\binstanceGrid\b[^}]*\}\s*from\s*"\/render\/rtViewer\.mjs"/.test(page) &&
-        /instances\s*:\s*INSTANCES\s*\?\s*instanceGrid\(mesh,\s*INSTANCES\)\s*:\s*null/.test(page) && /instanceTree\s*:\s*INSTANCE_TREE/.test(page) &&
+        /instances\s*:\s*INSTANCES\s*\?\s*instanceGrid\((extra \? \[mesh, extra\] : )?mesh,\s*INSTANCES\)\s*:\s*null/.test(page) && /instanceTree\s*:\s*INSTANCE_TREE/.test(page) &&
         /cutout\s*:\s*CUTOUT\s*\?\s*CUTOUT_MARGIN\s*:\s*null/.test(page) && /get\("instances"\)/.test(page) && /get\("cutout"\)/.test(page),
         "a page that never read them would still start a session, with one copy and solid triangles");
     ok("  and both have a link on the page, and every other toggle's link carries them across",
         /id="instancesToggle"/.test(page) && /id="cutoutToggle"/.test(page) && /instancesToggleEl\.href\s*=\s*qs\(/.test(page) && /cutoutToggleEl\.href\s*=\s*qs\(/.test(page) &&
-        (page.match(/\.href = qs\([^\n]*INSTANCES[^\n]*CUTOUT\);/g) || []).length === 8,
-        `${(page.match(/\.href = qs\([^\n]*INSTANCES[^\n]*CUTOUT\);/g) || []).length} of the page's 8 toggle links name both`);
+        // v4925: nine links now, and the cutout link's own arguments are the cycle's next state rather than CUTOUT itself
+        (page.match(/\.href = qs\([^\n]*INSTANCE[^\n]*CUTOUT[^\n]*\);/g) || []).length === 9,
+        `${(page.match(/\.href = qs\([^\n]*INSTANCE[^\n]*CUTOUT[^\n]*\);/g) || []).length} of the page's 9 toggle links name both`);
+    ok("*** v4925 -- the page reads `alpha` and `mix` from the URL and passes the alpha rule and the second mesh into makeRtSession, and every link carries them ***",
+        /get\("alpha"\)/.test(page) && /get\("mix"\)/.test(page) && /alpha\s*:\s*ALPHA\s*\?\s*ALPHA_P\s*:\s*null/.test(page) && /extraMeshes\s*:\s*extra\s*\?\s*\[extra\]\s*:\s*\[\]/.test(page) &&
+        /instanceGrid\(extra \? \[mesh, extra\] : mesh, INSTANCES\)/.test(page) && /alpha = ALPHA, mix = MIX\)/.test(page) && /id="mixToggle"/.test(page),
+        "a page that never read them would still start, solid and with one mesh");
     ok("  and the camera frames, and dollies within, the SESSION's bounds -- the placements' -- and no longer the one mesh's",
         /bounds = session\.bounds/.test(page) && /center:\s*bounds\.center/.test(page) && /dollyOrbit\(dist, e\.deltaY, bounds\)/.test(page) && !/mesh\.bounds/.test(page.replace(/\/\/[^\n]*/g, "")));
 }
