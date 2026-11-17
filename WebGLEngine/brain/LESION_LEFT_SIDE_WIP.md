@@ -54,3 +54,20 @@ It is about the stateful fly's learned residual on the tank's compass dropout, n
 `tools/ship/lesionLeftSide.mjs`, `tools/ship/lesionLeftSideCmd.mjs`, gate `tools/ship/lesionLeftSide-selfcheck.mjs` (about 30 rows, under 1 s; the only real flights are the no-op check, 20 s on sb-6001 and sb-6002). The gate's first run had three rows red, all three my own expectations, not the library: a Holm case I wrote by hand actually confirms three classes, a p printed with three decimals, and a floating-point equality. Each row was corrected to what the registration says. **SABOTAGE:** 32 mutants of `lesionLeftSide.mjs`, each alone in a scratch copy, **32 of 32 red** on the first pass: the seed, ids, draw counts, alpha, matching, a class's grouping, a mirror, the no-op's ids and cells, Holm (flat Bonferroni, no stop, strict, rank), the bottom line, the cost's sign, the tie rule, the +1, every check, NOT WEIGHED, the 1 percent line, the mirror difference's sign and the board's word.
 
 The run: `node tools/ship/lesionLeftSideCmd.mjs run --out brain/lesionLeftSide.part<i>.jsonl --part <i>/3` for i = 0, 1, 2 (402 arms; about 6,400 flight-seconds). The three part files are committed UNREAD, then read once with `report --in` over the three.
+
+## 11. RESULT (2026-11-17; the three part files committed unread at `61f5a943`, then read ONCE with `report --in` over the three)
+
+**All five checks pass** (IDS, WEIGHTS, DRAWS, COMPLETE, NO-OP). The intact stateful fly scores 0.8307 on sb-6001 to sb-6020.
+
+| primary class (cells) | cost | share of the intact score | 79 random sets | rank p | Holm step (threshold) | verdict | against the intact arm |
+|---|---|---|---|---|---|---|---|
+| EPG_L (23) | +0.0063 | 0.76 % | -0.0081 .. +0.0258 | 0.3250 | 3 (0.0250) | NOT CONFIRMED | TIES (-0.0063, se 0.0083) |
+| PEG_L (9) | -0.0002 | -0.02 % | -0.0003 .. +0.0020 | 0.9375 | 4 (0.0500) | NOT CONFIRMED | TIES |
+| L5 (6) | +0.0045 | 0.54 % | -0.0087 .. +0.0068 | **0.0250** | 1 (0.0125) | NOT CONFIRMED | TIES (-0.0045, se 0.0072) |
+| L7 (6) | +0.0017 | 0.20 % | -0.0087 .. +0.0068 | 0.1000 | 2 (0.0167) | NOT CONFIRMED | TIES |
+
+**BOTTOM LINE (registered): NOT REPLICATED.** No primary class is confirmed: the exploratory floor was chance, as far as 20 fresh ids and 79 fresh draws can tell.
+
+**Secondary (reported, never weighed).** The mirrors' costs are EPG_R +0.0021 (p 0.85), PEG_R +0.0003 (p 0.80), R4 -0.0039 (p 0.90) and R2 -0.0002 (p 0.65). **Every left-minus-right paired difference TIES:** EPG +0.0042 (se 0.0087), PEG -0.0005 (se 0.0054), L5/R4 +0.0083 (se 0.0085), L7/R2 +0.0019 (se 0.0087).
+
+**Read against the expectation recorded before the run** ("NOT REPLICATED, at about four chances in five"): as expected. Only L5 is under a nominal 0.05: 2 of its 79 random sets cost at least as much as it did, and that is not below Holm's first threshold. L5 is the one class worth a mention, and the registration's rule says what it is worth: a single class's p of 0.025 among four tests is not a finding. **What this closes:** the "left-side pattern" of `brain/LESION_TOGGLE_WIP.md` section 6a. Silencing any type, side or glomerulus of the stateful fly's heading loop costs it less than 1 percent of its score on the compass dropout. No lesion has been shown to cost more than a random lesion of the same size and roles, and that holds in this round as in the exploratory one.
