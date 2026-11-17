@@ -59,9 +59,51 @@ confirmed by z-centroid, ~26000 vs ~22000 for the core ring). 893 within-fetch s
 neurons (core ring + tangential). A consumer wiring this circuit's topology into a policy decides for
 itself whether to include the 4 `EPGt` neurons or restrict to the 46-neuron core ring.
 
+## Circuit: Mushroom Body (MB)
+
+The **mushroom body** -- where the fly learns associations: Kenyon cells (KC) carry what is sensed, mushroom-body output
+neurons (MBON) read them, dopamine neurons (DAN) teach the KC-to-MBON connections, and the APL and DPM neurons feed back
+onto the Kenyon cells. Added 2026-11-17 for the backlog's `fly-mushroom-body-data` (a fly brain that learns while it lives).
+
+**This file was NOT fetched the way the two above were.** Its source is the **public release bucket** of the same dataset,
+with no token and no Neuprint query: Janelia FlyEM's flat connectome tables at
+`gs://flyem-male-cns/v1.0/connectome-data/flat-connectome/`, read over HTTPS from inside a Claude Code session on
+2026-11-17 (Neuprint and the bucket were both reachable from that sandbox by then; the bucket needs no credential):
+
+| table | bytes | sha256 |
+|---|---|---|
+| `body-annotations-male-cns-v1.0-minconf-0.5.feather` | 14,483,314 | `2177e246113e4cfbf1e7772ec37c6da1955ff22e8063d0b1f833101f99a9a3b2` |
+| `connectome-weights-male-cns-v1.0-minconf-0.5-traced-only.feather` | 508,025,642 | `9b3beab17bad5f618be3f2c02d3139a8d07b822565919c013f1e5506d93e604b` |
+
+The tables are not in this repo (half a gigabyte). `tools/maleCnsMushroomBody.py` bakes them into
+`mushroom-body-circuit.json`; run twice it gives the same bytes. Which cells: every body whose `class` is `Kenyon_Cell`,
+`MBON` or `DAN`, and the bodies typed `APL` and `DPM` -- all `Traced`.
+
+| group | count |
+|---|---|
+| KC | 4,064 (KCg-m 1,342; KCab-s 657; KCab-m 536; KCab-c 488; KCa'b'-ap2 291; KCg-d 206; KCa'b'-m 205; KCa'b'-ap1 199; KCab-p 129; 11 more) |
+| MBON | 97 |
+| DAN | 340 (PAM 316, PPL1 16, others 8) |
+| APL | 2 |
+| DPM | 2 |
+4,505 cells, 2,266 with the soma on the right and 2,239 on the left.
+
+**What is kept and what is not.** Topology only: no skeletons, no coordinates (the bucket has skeletons for every body if a
+page ever wants them). Between these cells there are 1,018,725 connections carrying 2,794,887 synapses; **the file keeps the
+101,392 of at least 5 synapses**, the threshold most connectome work uses for a reliable connection. The file's `totals`
+holds every pair of groups at every weight and as kept, so what the threshold drops is in the data. It keeps 87 percent of
+the KC-to-MBON synapses, 92 percent of DAN-to-MBON, over 99 percent of the APL and DPM loops -- and only 16 to 22 percent of
+DAN-to-KC, KC-to-DAN and KC-to-KC, which are mostly many weak connections. A dopamine neuron's teaching role is read from
+which MBON compartment it reaches, which is kept.
+
+The licence: the bucket's README states none. The Neuprint server declares CC-BY-4.0 for `male-cns:v1.0`, as recorded at
+the top of this file; this is the same dataset version, and the same caution applies -- not re-confirmed against Janelia's
+own terms beyond that.
+
 ## Contents
 
 - `giant-fiber-circuit.json`, `epg-compass-circuit.json` — see the circuit sections above.
+- `mushroom-body-circuit.json` — see the mushroom body section above (from the public release tables, not Neuprint).
 - `PROVENANCE.md` — this file.
 
 Re-running the fetch (e.g. for a different circuit, or a refreshed dataset version) uses the same fetch
