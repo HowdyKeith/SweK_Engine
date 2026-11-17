@@ -65,6 +65,56 @@ What it says: **no class of either circuit costs more than random sets of its si
 
 * **The brain panel and the aquarium page:** the backlog wording says "shown in the brain panel and flown in the tank". Lesioned weights fly in the tank already (they are ordinary weights), but there is no toggle on `sub-aquarium.html` or in `render/brainPanel.mjs`. Both are shared files another chat edited today (`a14cd3e5`), so they wait for a merge.
 * **`demo-brain-lesion` as a claim:** the reading above says there is no class effect to show. A demo would show a TIE, which the switchboard page already does.
-* **The stateful fly (1,729 weights):** its circuit (`render/subAquariumFlyCx.mjs`) is not a `createSubPolicy` pilot and has no classes in `TOPOLOGIES`. A lesion of it needs its own silencing rule.
+* ~~**The stateful fly (1,729 weights)**~~: DONE 2026-11-17, section 6.
 * **`nav-fleet-avoidance`:** held (section 1).
 * **Gate census and version:** the new gate is in no register yet; the ship does that. Until then `tools/ship/gateReach-selfcheck.mjs` reads RED on this branch on one row: the gate population is 588 against the recorded 587, and the one added is `brain/lesion-selfcheck.mjs`. The census is re-recorded at ship time (`populationCensus.mjs`). `definitionGates-selfcheck` and `orphanScan-selfcheck` pass.
+
+## 6. The stateful fly (2026-11-17, Keith: "Can we do the Lesions of the stateful fly?")
+
+No other branch was working on this: the "lesion" commits on `claude/fish-vestibular-helper` are about the sub-duel pilots' numbers, not neurons.
+
+**Why the weight edit of section 2 does not carry over.** The fly pilot (`brain/pilotSubCircuitState.mjs`, 1,729 weights) is a RESERVOIR. Its 7,080 recurrent weights are not in the weight vector: they are the circuit's signed counts scaled so that the WHOLE matrix has a largest singular value of 1. Cutting the edges into a cell would rescale every other cell's gains. Silencing is instead a **bias clamp**: the silenced cells' biases are set to -1e30. A cell's activity is relu(bias + inputs + recurrent), so it is 0 on every tick unless that sum passes 1e30. The gate measures the largest positive sum any cell reaches on a real tank flight and on random features: **4.6**.
+
+**Built:**
+* `brain/lesionFlyCx.mjs`: `reservoirTopology(circuit)` (labels, roles, the weight layout), `flyCxArms` (`flycx-stateful` and `flycx-stateless` on the switchboard, held to the autopilot), `checkFile`, `glomerulusOf`.
+* `brain/lesion.mjs` branches on `KIND: "reservoir"`: the clamp, the reservoir inert rule, strata, LABELS groupings, and an arm's own `topo`.
+* `switchboard.html`: the fly arms are on the board, and the grouping menu now comes from the arm's circuit. `takeSwitchboard.mjs` takes `--by side|glomerulus`.
+* Gate: `brain/lesionFlyCx-selfcheck.mjs`, about 30 rows in about 1.5 s. The clamp equals this gate's own masked re-run of the circuit (silenced cells forced to 0 and fed back as 0) to 1e-9 on every cell and tick. That holds on 20 runs (memory and no state, recorded and random features, five sets including input, output and hidden cells). Also on real tank flights: silencing all 148 cells flies exactly the zero-readout pilot, and silencing none flies exactly the intact pilot.
+
+**Groupings:**
+* **type** (EPG 46, PEN_a 20, PEN_b 22, Delta7 42, PEG 18);
+* **side** (type and side, e.g. PEN_b_L 11);
+* **glomerulus** (the protocerebral-bridge glomerulus from the instance name, L1-L9 and R1-R9, 3 to 8 cells each, across types; the 42 Delta7 span several glomeruli and form one class).
+
+**The confound here is ROLE, not hand channels.** The reservoir's autopilot laws sit outside the network, so it has no hand channels. Each cell does have a role: input only (42: PEN_a, PEN_b), output only (18: PEG), both (46: EPG) or neither (42: Delta7). The random control is matched on role. **In this circuit each type is exactly one role**, so a whole type has no matched random set: the only one is itself. The library refuses it as matched and says why. A type lesion is read UNMATCHED, and its cost includes losing that role (all of PEG is the readout's only output-only cells; all of Delta7 is the only inhibition). Side and glomerulus classes are matched.
+
+**Found by the gate, and true:** with no state, silencing Delta7 changes nothing at all. Delta7 cells are hidden: no input and no readout, reached only through recurrence. With the memory wiped every tick they never fire.
+
+**SABOTAGE LOG (the fly half):** 33 mutants of `lesion.mjs`'s reservoir branches and of `lesionFlyCx.mjs`, run against both gates. On the first pass 31 went red. The 2 greens got rows:
+* "liveness runs backwards": the real circuit is strongly connected, so every cell reaches every other and direction cannot be seen. A three-cell chain a -> b -> c is used instead.
+* "the input row lights the slot, not the cell": `INPUTS[5]` is 5. The row now uses input slot 30.
+
+A third row, a chain whose second edge is listed first, catches one-pass liveness on the reservoir. The first set (section 3) was re-run against both gates after the refactor: 46 of 46 red (two `topologyOf` mutants were rewritten for its new shape, one added).
+
+### 6a. An exploratory reading of the fly (NOT REGISTERED; a demonstration of the tool, not a round)
+
+The stateful fly on the dropout task, ids sb-0 to sb-19, 120 s, 6 random sets per class (seed 1); the smallest rank p six draws can give is 0.143. Cost = intact minus lesioned score.
+
+| class (cells) | control | class cost | random costs (range) | rank p |
+|---|---|---|---|---|
+| EPG (46) | unmatched | +0.0072 | -0.003 .. +0.011 | 0.429 |
+| PEN_a (20) | unmatched | -0.0009 | -0.001 .. +0.006 | 0.857 |
+| PEN_b (22) | unmatched | +0.0007 | -0.001 .. +0.006 | 0.857 |
+| Delta7 (42) | unmatched | +0.0000 | -0.003 .. +0.010 | 0.714 |
+| PEG (18) | unmatched | +0.0056 | -0.001 .. +0.006 | 0.286 |
+| EPG_L (23) | role-matched | +0.0114 | -0.003 .. +0.009 | **0.143** |
+| EPG_R (23) | role-matched | +0.0007 | (the same draws) | 0.714 |
+| PEN_a_L / PEN_a_R (10) | role-matched | -0.0013 / -0.0013 | -0.002 .. +0.000 | 0.857 / 0.857 |
+| PEN_b_L / PEN_b_R (11) | role-matched | -0.0007 / -0.0002 | -0.002 .. +0.001 | 0.714 / 0.714 |
+| Delta7_L / Delta7_R (21) | role-matched | +0.0001 / +0.0000 | -0.000 .. +0.000 | 0.714 / 0.714 |
+| PEG_L (9) | role-matched | +0.0047 | -0.001 .. +0.005 | **0.143** |
+| PEG_R (9) | role-matched | +0.0004 | (the same draws) | 0.857 |
+
+What it says: **every lesion of the fly costs about 1 percent of the score or less** (the largest is EPG_L's 0.011; the stateful pilot scores 0.784). Two of the ten side classes sit at the floor (EPG_L, PEG_L), and ten tests at a floor of 1/7 would give about 1.4 by chance. Each L/R pair shares one set of draws (same size, same role, same seed), so the two halves are not independent controls. EPG_L TIES its intact pilot on the board (-0.0114, se 0.0085); PEG_L is below it (-0.0047, se 0.0022, worse on 17 of 20). Delta7 is active (88 percent of cell-ticks on a recorded flight) but weak (at most 0.23, against 1.8-2.8 for the input types), and silencing it averages to nothing (better on 14 ids, worse on 6). This fits the rung 4a close-out: the reservoir's gain is the recipe's generic gain, not a compass the wiring holds. A left-side effect would need a registered round with fresh ids and draws before it says anything.
+
+The glomerulus classes (L1-L9, R1-R9, role-matched) were still flying when this was written; their table goes here when read.
