@@ -64,3 +64,39 @@ The meter, the study and both gates were committed and sabotaged first (64201749
 **What it says.** A metre is not free: one leg through traffic takes 38 to 45 percent of a 3 MJ battery, and `any+predict`'s detour adds about 5 percent of a battery to each leg it shares with `any+replan`. It also reaches 16 more legs of 120, so the detour buys arrivals. The reference arm gets both: as many arrivals as `any+predict` (79) for replan's energy, because slowing is cheap. **On this hull, the speed a vessel goes matters more to its energy than the path it takes**: 1 m/s costs 490 J/m and cruise 2,675 J/m.
 
 **Not checked, said plainly.** One hull (the explorer), one battery class, no recharge. The arms were not asked to save energy; none of them knows it is spending it. PART 2 (missions of several legs on one clock, which can run a battery dry) is not built.
+
+## PART 2: THREE-LEG MISSIONS ON ONE BATTERY (Keith, 2026-11-17: "start the multi-leg missions round"; REGISTERED 2026-11-17, BEFORE ANY CODE FOR IT AND BEFORE ANY OF ITS SEEDS IS FLOWN)
+
+**Why.** PART 1 measured one hard-traffic leg at 38 to 45 percent of a 3 MJ battery at cruise. Three legs is then about 115 to 135 percent, so **a mission at cruise should often run the battery flat**, and the energy a single leg could ignore decides a mission. At 2 m/s a metre costs 1,259 J against cruise's 2,675 (the table above).
+
+**The mission.** The sea is a hard-traffic scenario (`brain/subHardNav.mjs` `hardScenario(seed, "hard-traffic")`): its start, obstacles, current and weight error, unchanged. Three waypoints:
+* W1 is the scenario's own goal (x 360 to 400).
+* W2 is drawn at x 40 to 120.
+* W3 is drawn at x 280 to 400, on the side of y opposite W1's.
+
+W2 and W3 take y in -80 to 80 and depth 15 to 40, from a generator seeded by the mission seed apart from the scenario's. Each must stand as the scenario's goal does: r + 40 m from every static obstacle and from the previous waypoint; up to 200 tries, else the mission is not built and the seed is skipped and REPORTED.
+
+**One clock.** The ships keep sailing across legs (the scenario's constant velocities, which may carry them out of the region late in a mission: a property of the sea, said). Each leg is flown as `flyHard` flies one: the arm's plan built for the leg's waypoint at the moment the leg starts, replanned on the arm's rule. A leg ends on the arrival rule (10 m, 4 m in depth); the next starts on the next tick. Each leg is capped at 260 s, the mission at 780 s.
+
+**One battery.** The energy meter of PART 1 runs across the whole mission from a full 3 MJ, with no recharge. **When it reaches zero the mission ends FLAT.** A collision, an exit, a leg past 260 s, or the vessel's own loss ends it as in `flyHard`.
+
+**The arms.**
+* `any+predict+edge+yield` (the reference: the traffic arm of FOLLOW-UPs 5 to 7 underneath).
+* `any+predict` (reported).
+* **`eco`, designated**: the reference with its commanded speed capped at ECO_SPEED = 2.0 m/s. A pilot wrapper; only the speed changes, only down.
+
+**The set.** HELD83 = seeds 7941 to 8000 (60 missions), flown ONCE; spent by no navigation set (HELD82 ended at 7940). DEV (1 to 30) first, as the sanity run.
+
+**The registered test.** Missions COMPLETED (all three waypoints reached), `eco` against the reference, paired by seed.
+* **SUPPORTED** iff net gain >= 5 at an exact two-sided sign p <= 0.10.
+* **PARTLY SUPPORTED** iff the gain is 3 or 4.
+* **NOT SUPPORTED** otherwise.
+* **HARMFUL** is printed beside it if the gain is -5 or worse.
+
+**Reported beside it.** Per arm: missions completed, legs completed, missions ended flat, collided, left and timed out; the median energy of a completed mission; the median battery left at the end.
+
+**Checks (a failure: NOT WEIGHED).** (1) ONE LEG IS flyHard: a one-waypoint mission is `flyHard`'s flight (status, ticks, path) on five DEV seeds, each arm. (2) THE METER IS PART 1's: a one-waypoint mission's energy equals `brain/navEnergy.mjs`'s `flyMetered` on the same seeds. (3) SAME SCENARIOS (and the same waypoints) for every arm. (4) ECO BITES: it changes at least one mission.
+
+**Expectations, written before any seed is flown.** E1 the reference ends flat on at least a third of its missions: about 60 percent. E2 SUPPORTED: about 55 percent. E3 `eco` ends flat on none: about 75 percent. E4 `eco` collides with ships more often than the reference (slower in traffic): about 40 percent.
+
+**What a result would not say.** One hull and battery class with no recharge, three legs of a fixed layout, ships that do not react. An arm that knew its battery and chose its speed would be the next question. This one fixes the speed.
