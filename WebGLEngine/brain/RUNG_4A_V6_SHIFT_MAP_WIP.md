@@ -69,3 +69,27 @@ Gate rows owed:
 * every branch of the bottom line;
 * the audit base 131000;
 * the input map is v5's RMF bit for bit.
+
+## 9. BUILT AND GATED (2026-11-17, before the run on the registered dives)
+
+**Files.**
+* `tools/subReservoirV6.mjs`, `tools/ship/subEstimatorStudyV6.mjs` and `tools/ship/subEstimatorStudyV6Cmd.mjs`.
+* The gate `tools/subReservoirV6-selfcheck.mjs`: about 35 rows in about 7 s, with every row section 8 owes.
+* One field was added to each record before any registered dive was read: `settingsTried`, the number of distinct (gain, amplitude) settings `fitModel` tried. It lets the gate see that all 14 were tried.
+
+**Corrections to rows, made while gating (the library was right in each case).**
+* The population vector is the registered raw sum (each EPG cell's activity times its glomerulus direction). The circuit's glomeruli hold 2 to 4 EPG cells each, so a centred cosine bump reads up to **2.49 degrees** off-centre on the real circuit. The row now holds the measure exact on an evenly populated ring and pins the circuit's bias under 3 degrees, well inside the mechanism rule's 10.
+
+**SABOTAGE.** 36 mutants of the library and the study, each alone in a scratch copy. On the first pass 31 went red and 5 stayed green:
+* **one declared EQUIVALENT:** "the amplitude scale read from the RMF map instead of the random map". v5's matched-drive rule sets RMF's weight so that its rms drive EQUALS the random map's, so the two scales are the same number by construction;
+* **four that got rows:** the start shared between dives (the row had mutated the array it compared against); negative activities voting in the population vector; the study's edge found at the small amplitude instead of 4r; the settings cut to one amplitude.
+
+After that: **35 of 36 red, 1 equivalent.**
+
+**TWO DISCLOSURES, made before the run.** Neither touched the audit dives or the registered fitting set's full run.
+1. While building `mechanism()`, I ran it by hand on cx's circuit alone (no dives) at four hand-picked gains of the unscaled RMF map. At gain 0.5 the bump moved +62 / -28 degrees; at 0.9 and above it did not pass the rule (+41 / -9, +31 / -3, +15 / +22).
+2. The command's smoke mode (`--smoke`: 4 of the fitting dives, 2 held-out, the fitting dives standing in for the audits) on cx, er:0 and nostate:0 gave SB and SF the same scores, with cx's in-sample skill 0.00. A diagnostic on 4 fitting dives with no input followed. At g* the bump persists but drifts from any start to about 18 degrees: the circuit's dominant mode, not a ring that holds any angle. Just below g* it decays within 30 to 100 ticks.
+
+This is the failure section 6 put at about one in two ("a relu reservoir below its edge has no attractor"). **The design is run as registered, not changed after seeing it.**
+
+The run: `subEstimatorStudyV6Cmd.mjs run --specs <part> --out brain/flyEstimatorStudyV6.<part>.jsonl` over four processes, with the registered list split as cx,er:0-9 / layer:0-9,nostate:0 / degree:0-9 / sign:0-3,count:0-3. The references are computed in each part (they are the same) and kept once by `report`. The four files are committed unread, then read once.
