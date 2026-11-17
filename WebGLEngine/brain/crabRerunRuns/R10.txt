@@ -1,0 +1,9 @@
+R10 S/on: r/v 0.15: plain 13.6 static 17.7 (x1.30) moving none recede no | r/v 0.5: plain 17.1 static 20.3 (x1.19) moving 14.4 (x0.84) recede no -> no
+R10 G/on: r/v 0.15: plain 13.6 static 17.7 (x1.30) moving 33.5 (x2.46) recede no | r/v 0.5: plain 17.1 static 20.3 (x1.19) moving 14.4 (x0.84) recede no -> no
+R10 E/on: r/v 0.15: plain 13.6 static 17.7 (x1.30) moving none recede no | r/v 0.5: plain 17.1 static 20.3 (x1.19) moving none recede no -> no
+R10 GE/on: r/v 0.15: plain 13.6 static 17.7 (x1.30) moving 33.5 (x2.46) recede no | r/v 0.5: plain 17.1 static 20.3 (x1.19) moving 14.4 (x0.84) recede no -> no
+R10 S/both: r/v 0.15: plain 13.6 static 17.7 (x1.30) moving 7.8 (x0.57) recede ALARM | r/v 0.5: plain 17.1 static 19.6 (x1.15) moving 6.4 (x0.37) recede ALARM -> no
+R10 G/both: r/v 0.15: plain 13.6 static 17.7 (x1.30) moving 7.8 (x0.57) recede ALARM | r/v 0.5: plain 17.1 static 19.6 (x1.15) moving 6.4 (x0.37) recede ALARM -> no
+R10 E/both: r/v 0.15: plain 13.6 static 17.7 (x1.30) moving 7.8 (x0.57) recede no | r/v 0.5: plain 17.1 static 19.6 (x1.15) moving 6.4 (x0.37) recede ALARM -> no
+R10 GE/both: r/v 0.15: plain 13.6 static 17.7 (x1.30) moving 7.8 (x0.57) recede ALARM | r/v 0.5: plain 17.1 static 19.6 (x1.15) moving 6.4 (x0.37) recede ALARM -> no
+R10 animal-like variants with polarity on: 0 of 4

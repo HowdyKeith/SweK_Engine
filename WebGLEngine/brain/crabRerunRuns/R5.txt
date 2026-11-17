@@ -1,0 +1,4 @@
+R5 on r/v 0.2: plain 13.2 deg (47 spikes) | static 17.6 deg (33 spikes) ratio 1.33 | moving 14.6 deg (39 spikes) ratio 1.10
+R5 on r/v 0.4: plain 16.7 deg (67 spikes) | static 23.4 deg (42 spikes) ratio 1.40 | moving 20.1 deg (74 spikes) ratio 1.20
+R5 both r/v 0.2: plain 13.2 deg (47 spikes) | static 17.6 deg (34 spikes) ratio 1.33 | moving 7.9 deg (62 spikes) ratio 0.60
+R5 both r/v 0.4: plain 16.7 deg (67 spikes) | static 20.7 deg (53 spikes) ratio 1.24 | moving 7.6 deg (111 spikes) ratio 0.46
