@@ -314,6 +314,21 @@ fly vision data belongs to the chat on `claude/inspiring-mayer-9mdcut` and is us
 `fly-eyes-left-right` and `fly-courts-fly`, which both wait on cells from the other chat; `two-flies-merged` last, because
 every joining connection would be invented. (Round 6 and `fly-pilots-6dof`, first in the earlier order, are done.)
 
+**Added 2026-11-17: a fly brain that learns while it lives.** Keith asked "What would it take for the fly brain to
+dynamically learn?" and then: "Add as backlog entries. Let's pull in The mushroom body, and do the habitation round and if
+that shows anything, then lets also do the compass circuit." **Said first: today no fly in this tree learns during its life.**
+Every fly's weights are found offline by the trainer and then frozen; nothing changes a connection while a fly flies, and
+round 4 found that memory between ticks did not help, because every episode comes from one unchanging world. A fly that
+learns during its life can only beat a frozen one in a world that changes from one life to the next.
+
+| name | what | what it stands on | what is open | who has it |
+|---|---|---|---|---|
+| `fly-mushroom-body-data` | The mushroom body (Kenyon cells, its output neurons, the dopamine neurons that teach it, APL and DPM) from the male-cns connectome, into `vendor/male-cns/` as a circuit file | the public FlyEM release tables (`gs://flyem-male-cns/v1.0/connectome-data/flat-connectome/`): no token, the same dataset version as the files already here | the circuit is thousands of cells (about 2,000 Kenyon cells a side), so what is kept and how is said in its provenance; topology only unless skeletons are asked for | **TAKEN 2026-11-17 by the chat on `claude/tier-2-keys-patch-4lwhzk`** |
+| `fly-escape-habituates` | Escape round 9: the connections onto the two Giant Fibers weaken with repeated harmless looming and recover with time (habituation, which the real escape pathway does), in a world where how many harmless fly-bys come differs from life to life | rounds 5 to 8's task, cells and trainer; a fly's score is over a whole life of several episodes | the task must make learning during a life pay, or plastic and frozen will tie as memory did; costlier than an escape round, since a training scores whole lives | **TAKEN 2026-11-17 by the chat on `claude/tier-2-keys-patch-4lwhzk`** |
+| `fly-compass-learns` | The compass circuit learns: in the real fly the ring neurons' connections onto the compass (E-PG) neurons are plastic, which is how heading is tied to the visual scene. A plastic ring-to-compass map in a world whose landmarks change between lives | `vendor/male-cns/epg-compass-circuit.json` holds the compass neurons only; **the ring neurons and their connections onto the compass neurons would have to be pulled in** (the same public tables) | to be done only if `fly-escape-habituates` shows plasticity paying (Keith's condition); a heading task does not exist in the tree yet | queued behind `fly-escape-habituates`, this chat |
+| `fly-mushroom-body-learns` | The fly's associative learning: a cue (a looming pattern, a colour of mover) paired with being caught or fed, learned through the dopamine neurons onto the Kenyon-cell-to-output connections, in a world where which cue means danger changes between lives | `fly-mushroom-body-data` | everything after the data: the task, how the cells are fed, the plasticity rule; the biggest of these | free, after the data |
+| `fly-live-training-page` | Page work, not a round: the trainer runs live in a worker on a page and the watcher sees a fly get better over minutes | the escape page and `brain/rl/dockPolicy.js` | it is the trainer learning, not the fly; say so on the page | free |
+
 Keith, 2026-11-13: "How else could the fly brain live in voxel world? Could it play minecraft or create something to attract a
 different fly brain?" and, of the five answers: "Yes, add those to the backlog". Each builds on `voxel-home` (`brain/rl/buildEnv.mjs`:
 the site, the plan, `homeCheck`). **Said first: the real Minecraft is not reachable from here and is not to be rebuilt; "play
