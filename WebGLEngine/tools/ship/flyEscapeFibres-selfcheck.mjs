@@ -8,12 +8,17 @@
 //   2  ONE TRAINING          a record's weights are round 7's code's
 //   3  THE RECORDS           256 draws; F1; the share of pairs; the failures
 //   4  THE COMMAND           it is this round's; no training of the round's, no process
+//   5  THE VERDICT           the round's results, read from the committed file
 // SABOTAGE LOG (2026-11-16) -- through a byte-safe runner (one at a time, every file restored and its sha256 checked), this gate and tools/ship/voxelHome-selfcheck.mjs (which probes the command as a
 // process) run whole for each; every one red by name, none 0 red (the number is the rows red over the two):
 //   THE ROUND (tools/ship/flyEscapeFibres.mjs): B1 GGF is round 7's count-in shuffle 3 | B2 GSHUF is round 7's count-out shuffle 2 | B3 the draws are round 7's 5 | B4 32 draws an arm 6
 //   B5 the lead is the free shuffle 3 | B6 F1's words are round 7's R0's 1 | B7 the share is half what it is 1 | B8 a share is given with a failed check 1 | B9 the failing line is 0.70 3
 //   B10 the round writes round 7's results file 1 | B11 a failure is any score under 0.76 2 | B12 F1 is made with a failed check 1
 //   THE COMMAND: C1 the second training is of the second draw 1 | C2 exits 0 on a word it does not know 1 | C3 reads round 7's library 1 | C4 a second start trains everything again 1
+//   THE VERDICT (section 5; the results file and the note sabotaged, this gate run whole for each): V1 a failed free shuffle (draw 82) given a passing score 8 | V2 a failed free shuffle (draw
+//   151) lifted just over the line 5 | V3 a GGF fly's score lowered to 0.70 5 | V4 a free shuffle's score raised to 0.80 4 | V5 the second training's record gone 6 | V6 the note's F1 says CANNOT 1
+//   V7 the note names another commit 1 | V8 the note says the share expectation came 1 | V9 the note no longer says GGF was not set against GDEG 1 | V10 the note says the difference is a
+//   hundredth 1 | V11 the expectation for F1 raised after the fact 1
 //   Two rows of mine were wrong when written and were corrected: a fixture's "failing" fly sat exactly on the line (0.7199 plus its draw's millionths is 0.72), and a file of free shuffles at 0.70
 //   has 127 failures, not 128, once one is taken out.
 "use strict";
@@ -109,6 +114,35 @@ section(() => {
     const me = src("tools/ship/flyEscapeFibres-selfcheck.mjs"), calls = [...me.matchAll(/V7?\.trainOne\(([^)]*)\)/g)].map((m) => m[1]);
     ok("!! THIS GATE STARTS NO TRAINING OF THE ROUND'S AND LEAVES ITS RESULTS FILE AS IT WAS: its four trainings through the rounds' code are of 3 iterations with 16 flies tried on draw 901; this gate starts no process at all; and the file's size and time are what they were before this section",
         calls.length === 4 && calls.every((c) => /^"(GGF|GSHUF)", 901, TINY, TINY_AUDIT$/.test(c)) && TINY.iters === 3 && TINY.pop === 16 && !V.SEEDS.includes(901) && !/Sync\(/.test(me.replace(/readFileSync\(|statSync\(|existsSync\(/g, "")) && stateOf() === before && typeof createHash === "function", `${calls.length} trainings, no process, the file ${before === "absent" ? "absent" : "unchanged"}`);
+});
+
+console.log("\n5. THE VERDICT (the whole results file was committed at aeb1cb6d before it was read, and is read here from the file)");
+section(() => {
+    const bytes = fs.readFileSync(path.join(ENG, V.RESULTS)), lines = bytes.toString("utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l)), R = V.reading(lines), A = R.arms, draws = lines.filter((r) => r.kind === "draw"), ref = R.floors.reflex.score;
+    const sc = (a) => draws.filter((r) => r.arm === a).sort((x, y) => x.s - y.s).map((r) => r.score), med = (a) => { const v = sc(a).sort((x, y) => x - y); return (v[63] + v[64]) / 2; }, under = (a, line) => draws.filter((r) => r.arm === a && r.score < line).map((r) => r.s).sort((x, y) => x - y);
+    ok("!! the results file is the one the run wrote: 258 records, sha256 4cfa11bab7c3407b... (the run was stopped twice by the container and started again; each start trained only what the file did not hold)", lines.length === 258 && createHash("sha256").update(bytes).digest("hex") === "4cfa11bab7c3407b3373666d05a32a244c1ce09edf392c5ac1c4e874dd49a106");
+    ok("!! THE CHECKS HOLD, AND THE START WAS THE REFLEX: 256 draws each once, the registered recipe, each arm's weight count and its own shuffle of the draw, GGF draw 81 the same twice, a history in every record, the registered floors -- and the untrained fly of both arms scores the reflex's 0.6465, to the bit",
+        R.checks.length === 0 && draws.length === 256 && near(ref, 0.6465) && V.ARMS.every((a) => R.floors.untrained[a] === ref));
+    ok("!! *** F1: KEEPING ONLY WHAT THE TWO GIANT FIBERS RECEIVE ESCAPES BETTER THAN A FREE SHUFFLE *** on 128 new draws an arm: GGF's ranks sum to 20128.5, the middle is 16448; exact two-sided p 2.2e-10 against the registered 0.01. ROUND 7'S NEAR MISS WAS TOO FEW DRAWS: a fly whose Giant Fibers keep their 42 real inputs has the higher score in 72.5 of 100 pairs",
+        R.F1 && R.F1 === R.T1 && R.F1.word === V.WORDS.F1[0] && R.F1.sumA === 20128.5 && R.F1.ties === 13 && R.F1.p < 1e-9 && near(R.F1.p, 2.24e-10, 1e-12) && R.F1.pHigher < R.F1.pLower && near(R.share, 0.7246, 1e-4));
+    ok("!! *** HOW BIG, SAID WITH IT: SMALL, AND SURE *** -- the medians are 0.7492 and 0.7479, a thousandth and a third; the means 0.7495 and 0.7441. Most of the mean's gap is the free shuffle's tail: 51 of its 128 flies end below 0.7474 against 10 of GGF's, and the best free shuffle (0.7546) is above 123 of the 128 GGF flies",
+        near(med("GGF"), 0.7492, 1e-4) && near(med("GSHUF"), 0.7479, 1e-4) && near(A.GGF.mean, 0.7495) && near(A.GSHUF.mean, 0.7441) && under("GSHUF", 0.7474).length === 51 && under("GGF", 0.7474).length === 10 && near(Math.max(...sc("GSHUF")), 0.7546) && sc("GGF").filter((v) => v < Math.max(...sc("GSHUF"))).length === 123);
+    ok("!! THE FAILURES (a score below the registered 0.72): GGF 0 of 128 (its worst is 0.7234), GSHUF 5 -- draws 82, 97, 99, 105 and 151; 82 and 97 are the reflex's score to the bit, the two ties of T3",
+        J(R.failed) === J({ GGF: 0, GSHUF: 5 }) && J(under("GSHUF", V.FAIL_BELOW)) === J([82, 97, 99, 105, 151]) && [82, 97].every((s) => draws.find((r) => r.arm === "GSHUF" && r.s === s).score === ref) && near(Math.min(...sc("GGF")), 0.7234));
+    ok("!! T0: all 128 GGF flies beat the reflex (p 5.9e-39) -> BETTER. T3: 254 of the 256 above the reflex, none below, 2 equal and counted against (p 5.7e-73) -> BETTER",
+        R.T0 && R.T0.word === V.WORDS.T0[0] && R.T0.above === 128 && R.T0.below === 0 && R.T0.p < 1e-38 && R.T3 && R.T3.word === V.WORDS.T3[0] && R.T3.above === 254 && R.T3.ties === 2 && R.T3.below === 0 && R.T3.p < 1e-72);
+    ok("!! the arms (mean, sd; lives of 200; feeds; caught by a strike): GGF 0.7495 0.0039, 193.6, 0.531, 0.014 | GSHUF 0.7441 0.0162, 192.4, 0.526, 0.017. The best fly of the round is a GGF (0.7729)",
+        near(A.GGF.sd, 0.0039) && near(A.GSHUF.sd, 0.0162) && near(A.GGF.alive, 193.57, 0.01) && near(A.GSHUF.alive, 192.37, 0.01) && near(A.GGF.fed, 0.531, 5e-4) && near(A.GSHUF.fed, 0.526, 5e-4) && near(A.GGF.caught, 0.0143, 5e-4) && near(A.GSHUF.caught, 0.0169, 5e-4) && near(Math.max(...draws.map((r) => r.score)), 0.7729) && near(Math.max(...sc("GGF")), 0.7729));
+    const H = (a) => A[a].history.map((h) => h.ret);
+    ok("!! WHAT THE TRAINER SAW, AS IN ROUND 7: GGF starts far below the reflex on the trainer's own episodes (0.544) and ends at 0.744; the free shuffle starts at 0.669 and ends at 0.742 -- the fibres' heavy real drive is the bad start and the better end",
+        near(H("GGF")[0], 0.5438) && near(H("GSHUF")[0], 0.6687) && near(H("GGF")[6], 0.7439) && near(H("GSHUF")[6], 0.7416));
+    const again = V.ARMS.flatMap((arm) => [82, 99].map((s) => { const r = draws.find((d) => d.arm === arm && d.s === s), p = V.policyOf(arm, s); p.setParams(PF.unpackWeights(r.weights)); const a = V.auditScore((o) => p.act(o)); return [arm, s, a.score === r.score && a.alive === r.alive && a.fledPass === r.fledPass && a.caught === r.caught]; }));
+    ok("!! THE WEIGHTS IN A RECORD GIVE ITS SCORE AND ITS COUNTS AGAIN: draws 82 and 99 of both arms (two of the free shuffle's failures among them), audited here on the 200 episodes through the wrapped fly, to the bit", again.length === 4 && again.every((x) => x[2]), again.filter((x) => !x[2]).map((x) => x[0] + " " + x[1]).join(", "));
+    const note = src("brain/FLY_ESCAPE_FIBRES_WIP.md"), res = note.slice(note.indexOf("## 10. The result")).replace(/\s+/g, " ");
+    ok("the expectations, written before the code, against what came: F1 BETTER was the 60 percent guess and came; the share between 58 and 68 in 100 (60) DID NOT -- it was 72.5, above round 7's 68, where the note had said a near miss's number is likely an overestimate; GGF 0 to 2 failures (75) came; GSHUF between 2 and 10 (70) came, with 5; T0 and T3 (95 each) came",
+        /F1: \*\*BETTER about 60 percent\*\*, CANNOT about 40/.test(note) && /between 58 and 68 in\s+100 \(about 60 percent\)/.test(note) && /GGF 0 to 2 of 128 \(about 75\); GSHUF between 2 and 10 \(about 70\)/.test(note) && R.share > 0.68 && R.failed.GSHUF === 5);
+    ok("the registration's RESULT SECTION (section 10, and not the possible words in section 5) carries the three readings' words, the commit the file was read at, the share of pairs, that the difference is small, that the share expectation missed, and what F1 does NOT say (GGF was not set against GDEG)",
+        /## 10\. The result/.test(note) && [["F1", R.F1.word], ["T0", R.T0.word], ["T3", R.T3.word]].every(([t, w]) => res.includes(`**${t}: ${w}**`)) && /aeb1cb6d/.test(res) && /72\.5 of 100 pairs/.test(res) && /a thousandth and a third/.test(res) && /did not come/.test(res) && /not set against GDEG/.test(res));
 });
 
 console.log(`\nflyEscapeFibres-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILED"}`);

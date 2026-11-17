@@ -64,3 +64,37 @@ may be started more than once, and a start after a stop trains only what the fil
 ## 9. The run (the gate never runs it and never gives the command the word `run`)
 `node tools/ship/takeFlyEscapeFibres.mjs run` -> `brain/flyEscapeFibresRound.jsonl`, committed byte for byte, whole,
 before it is read; `node tools/ship/takeFlyEscapeFibres.mjs read` prints the checks and the reading.
+
+## 10. The result
+The run was stopped twice by container restarts (after 20 and after 148 of the 256 trainings) and started again each time;
+a start trains only what the file does not hold, and every record was a whole line when it stopped. The last start took
+62.1 minutes. `brain/flyEscapeFibresRound.jsonl` (258 records, sha256 `4cfa11bab7c3407b...`) was committed whole at
+aeb1cb6d before it was read, and read once. The checks hold: 256 draws each once, the registered recipe, each arm's own
+shuffle of the draw, GGF draw 81 the same twice, and the untrained fly of both arms scoring the reflex's 0.6465.
+
+- **F1: KEEPING ONLY WHAT THE TWO GIANT FIBERS RECEIVE ESCAPES BETTER THAN A FREE SHUFFLE** -- ranks 20128.5, the middle
+  16448, exact two-sided p 2.2e-10. A GGF fly has the higher score in 72.5 of 100 pairs with a GSHUF fly. Round 7's
+  near miss (p 0.013 on 32 draws) was too few draws.
+- **T0: A FLY WHOSE GIANT FIBERS KEEP THEIR REAL INPUTS, STARTED AT THE REFLEX, ESCAPES BETTER THAN THE REFLEX** -- 128 of
+  128.
+- **T3: A FLY STARTED AT THE REFLEX ESCAPES BETTER THAN THE REFLEX** -- 254 of 256 above, 2 equal.
+
+| arm | mean | median | sd | failed of 128 | below 0.7474 | best |
+|---|---|---|---|---|---|---|
+| GGF (the fibres' 42 real inputs kept) | 0.7495 | 0.7492 | 0.0039 | 0 | 10 | 0.7729 |
+| GSHUF (nothing kept) | 0.7441 | 0.7479 | 0.0162 | 5 | 51 | 0.7546 |
+
+How big, said with it: small, and sure. The medians differ by a thousandth and a third; most of the gap in the means is the
+free shuffle's tail -- five failed trainings and 51 flies below 0.7474 against none and 10. The best free shuffle is above
+123 of the 128 GGF flies. As in round 7, the GGF arm starts the trainer far below the reflex (0.544 on its own episodes;
+the free shuffle 0.669) and ends higher (0.744 against 0.742).
+
+What F1 does NOT say. GGF was not set against GDEG here, so this round does not say the fibres' inputs are all of what
+rounds 6 and 7 found. With round 7 (where GGF beside GDEG was a rank sum of 1067.5 on a middle of 1040, p 0.72, and the
+count out alone was the free shuffle's twin), the plainest reading of the three rounds is: **the real circuit's advantage
+over a free shuffle is the 42 connections onto the two Giant Fibers, and nothing finer has been shown.** That sentence
+joins three rounds and was not itself registered.
+
+Against section 6: F1 BETTER (60) came. The share of pairs between 58 and 68 in 100 (60) did not come: it was 72.5, above
+round 7's 68, where this note had said a number noticed for nearly crossing a line is likely an overestimate. GGF 0 to 2
+failures (75) came, with 0; GSHUF between 2 and 10 (70) came, with 5. T0 and T3 (95 each) came.
