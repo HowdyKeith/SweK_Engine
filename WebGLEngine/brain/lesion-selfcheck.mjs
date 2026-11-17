@@ -15,6 +15,7 @@
 // NOT CHECKED, said plainly: whether any class matters (that is the experiment); the page.
 // SABOTAGE LOG: see the end of brain/LESION_TOGGLE_WIP.md (each mutant of brain/lesion.mjs alone in a scratch copy).
 "use strict";
+import { pathToFileURL } from "node:url";   // a dynamic import of a filesystem path must be a file URL: new URL("file://" + "C:\\...") crashes on Windows (tools/ship/windowsImport-selfcheck.mjs)
 import fs from "node:fs";
 let fails = 0, finished = false;
 const died = (e) => { console.log("  FAIL  !! THE GATE THREW before it finished: " + String((e && e.stack) || e).split("\n").slice(0, 3).join(" | ").slice(0, 400)); process.exitCode = 1; };
@@ -23,7 +24,7 @@ process.on("exit", () => { if (!finished) { console.log("  FAIL  !! THE GATE END
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
 const sec = (t) => console.log("\n" + t);
 const J = JSON.stringify;
-const LESION_URL = process.env.LESION_UNDER_TEST ? new URL("file://" + process.env.LESION_UNDER_TEST) : new URL("./lesion.mjs", import.meta.url);
+const LESION_URL = process.env.LESION_UNDER_TEST ? pathToFileURL(process.env.LESION_UNDER_TEST) : new URL("./lesion.mjs", import.meta.url);
 const L = await import(LESION_URL.href);
 import * as P from "./pilotSubPolicy.mjs";
 import * as PF from "./pilotSubFish.mjs";
@@ -176,6 +177,9 @@ sec("7. REAL (the switchboard's dropout task)");
     ok("!! silencing the 26 inert neurons of the hand network flies it seed for seed (the same scores exactly)", J(res.runs["hand~inert"]) === J(res.runs["network-hand"]), J(res.runs["network-hand"].map((r) => r.score.toFixed(4))));
     ok("!! silencing one yaw channel (neuron 2) moves the score on every seed", res.runs["hand~yaw"].every((r, i) => Math.abs(r.score - res.runs["network-hand"][i].score) > 1e-4), J(res.runs["hand~yaw"].map((r) => r.score.toFixed(4))));
 }
+
+sec("7b. NAMES");
+ok("!! groupingsOf: type and instance for a createSubPolicy circuit; a topology with LABELS offers exactly its labels' keys; LESION_BIAS is -1e30", J(L.groupingsOf(G)) === '["type","instance"]' && J(L.groupingsOf(Z)) === '["type","instance"]' && J(L.groupingsOf({ LABELS: { a: [], b: [] } })) === '["a","b"]' && J(L.groupingsOf(null)) === '["type","instance"]' && L.LESION_BIAS === -1e30);
 
 sec("8. SOURCE");
 {

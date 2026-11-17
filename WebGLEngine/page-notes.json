@@ -184,6 +184,19 @@
     "title": "Round 7 stage 2 (one stage): the robust-objective control, registered, to run",
     "why": "Twenty draws started from the stage-1 champions and trained for the five-vessel objective, then read once; the commands are in the rig commands.",
     "kind": "rig"
+   },
+   {
+    "path": "brain/RESERVOIR_GPU_WIP.md",
+    "title": "The GPU reservoir kernel",
+    "why": "The fly reservoir's step on a WebGPU device, held to the CPU twin; the rig's timing is owed: node tools/ship/takeReservoirGpu.mjs on the rig, and send back what it prints.",
+    "kind": "rig"
+   }
+  ],
+  "switchboard.html": [
+   {
+    "path": "brain/LESION_TOGGLE_WIP.md",
+    "title": "The lesion toggle",
+    "why": "What the Lesion box silences and how (an exact weight edit, or the fly's bias clamp), why the random sets are matched, and the exploratory readings of every class."
    }
   ]
  },
@@ -192,7 +205,7 @@
   "brain/BACKLOG_2026-11-04_BRAINS.md": "another chat's backlog; not edited or linked from this chat",
   "brain/DECIDER_AUDIT_RESULT.md": "the result of one audit read once; nothing to run",
   "brain/DECISION_CIRCUIT_VS_TWIN_DRAFT.md": "a draft registration, superseded by DECISION_CIRCUIT_VS_TWIN_WIP.md",
- "brain/HEAD_TO_HEAD_HANDOFF_2026-11-06.md": "another chat's hand-off note (written 2026-11-07) for whoever collects, merges and publishes the head-to-head rounds H2 and H4 to H10; merged at that chat's stable commit d4615eea; not edited or linked from this chat",
+  "brain/HEAD_TO_HEAD_HANDOFF_2026-11-06.md": "another chat's hand-off note (written 2026-11-07) for whoever collects, merges and publishes the head-to-head rounds H2 and H4 to H10; merged at that chat's stable commit d4615eea; not edited or linked from this chat",
   "brain/DECISION_CIRCUIT_VS_TWIN_WIP.md": "a registration and its result, read once; nothing to run",
   "brain/DEEP_PLAIN_WIP.md": "a registration and its result, read once; the flights it needed are done",
   "brain/DOGFIGHT_LEAGUE_WIP.md": "the record of two finished training runs and their results; nothing to run",
@@ -203,7 +216,7 @@
   "brain/HEAD_TO_HEAD.md": "its page, switchboard.html, is another chat's file and is not edited from here; link it when that chat allows",
   "brain/KIND_MATCHED_WIP.md": "a registration and its result, read once; nothing to run",
   "brain/PAGE_NOTES_WIP.md": "the record of the Notes row and its rule (the rule is also in this file and in the gate that enforces it); nothing to run",
-  "brain/PLAIN_FAMILY_WIP.md":"a registration and its result, read once; the searches and flights are done",
+  "brain/PLAIN_FAMILY_WIP.md": "a registration and its result, read once; the searches and flights are done",
   "brain/PLAIN_NET_CONTROL_WIP.md": "a registration and its result, read once; nothing to run",
   "brain/PLAIN_NET_VARIANTS_WIP.md": "a registration and its result, read once; the rig run has come back",
   "brain/PLAIN_THIRD_AUDIT_WIP.md": "a registration and its result, read once; nothing to run",
@@ -211,6 +224,8 @@
   "brain/RANKING_VALIDITY_WIP.md": "a registration and its result, read once; nothing to run",
   "brain/RUNG_4A_CLOSEOUT.md": "the close-out of a finished rung; nothing to run",
   "brain/STATION_AND_PRICE_WIP.md": "a registration and its result, read once; nothing to run",
-  "brain/SUBMARINE_WIP.md": "another chat's work-in-progress note; not edited or linked from this chat"
+  "brain/SUBMARINE_WIP.md": "another chat's work-in-progress note; not edited or linked from this chat",
+  "brain/LESION_LEFT_SIDE_WIP.md": "the left-side lesion round: its registration and its result (NOT REPLICATED); nothing to run",
+  "brain/RUNG_4A_V6_SHIFT_MAP_WIP.md": "rung 4a version 6, the glomerulus-shift map: its registration and its result (NO SIGNAL); nothing to run"
  }
 }

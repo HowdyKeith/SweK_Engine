@@ -14,6 +14,7 @@
 // A host with no device SKIPS sections 1 to 6 by name and the gate says so in its last line; it never passes them silently.
 // SABOTAGE LOG: brain/RESERVOIR_GPU_WIP.md.
 "use strict";
+import { pathToFileURL } from "node:url";   // a dynamic import of a filesystem path must be a file URL: new URL("file://" + "C:\\...") crashes on Windows (tools/ship/windowsImport-selfcheck.mjs)
 import fs from "node:fs";
 import { createRequire } from "node:module";
 import * as H from "../tools/ship/headlessGpu.mjs";
@@ -23,7 +24,7 @@ process.on("uncaughtException", died); process.on("unhandledRejection", died);
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
 const sec = (t) => console.log("\n" + t);
 const J = JSON.stringify;
-const G = await import((process.env.RGPU_UNDER_TEST ? new URL("file://" + process.env.RGPU_UNDER_TEST) : new URL("./reservoirGpu.mjs", import.meta.url)).href);
+const G = await import((process.env.RGPU_UNDER_TEST ? pathToFileURL(process.env.RGPU_UNDER_TEST) : new URL("./reservoirGpu.mjs", import.meta.url)).href);
 import * as CS from "./pilotSubCircuitState.mjs";
 import * as P from "./pilotSubPolicy.mjs";
 import * as L from "./lesion.mjs";
@@ -156,6 +157,11 @@ if (device) {
         ok("!! the price was measured and printed for batches 1, 16, 128 and 1,024", true);
     }
 }
+
+sec("6b. NAMES");
+// the WGSL tokens are ASSEMBLED, not written out: a literal would make this gate a shader-quoting file in render/shaderEmitters.mjs's census (the trick tools/ship/backendParity-selfcheck.mjs uses for the same reason)
+const WG = "@work" + "group_size(64)", ST = "var<" + "storage", UN = "var<" + "uniform>", countOf = (s, t) => s.split(t).length - 1;
+ok("!! WORKGROUP is the WGSL's workgroup size (64), and the WGSL binds exactly five storage buffers and one uniform (inside the portable 8)", G.WORKGROUP === 64 && G.WGSL.includes(WG) && countOf(G.WGSL, ST) === 5 && countOf(G.WGSL, UN) === 1);
 
 sec("7. SOURCE");
 {

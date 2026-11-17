@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "9b095398471cd908fb40167aa3dbb1980f74c5c8",
+ "head": "ac90b472d068949851993f6ee7f48e90b2b59197",
  "bodies": {
   "box3d": [
    {
@@ -339,9 +339,19 @@
     "sha": "f09ba231411d443dca6bd265b95df6364732bea1"
    },
    {
+    "path": "brain/lesionFlyCx-selfcheck.mjs",
+    "bytes": 19536,
+    "sha": "8b116178fb6f8843417655711a69098ba23c6184"
+   },
+   {
     "path": "brain/pilotSubCircuitState-selfcheck.mjs",
     "bytes": 29802,
     "sha": "d4cc23c4ec8beb962f40866504b88fc497abc964"
+   },
+   {
+    "path": "brain/reservoirGpu-selfcheck.mjs",
+    "bytes": 16972,
+    "sha": "47dd247db493481c09151d1948f08a0c60720bef"
    },
    {
     "path": "render/brainPanel-selfcheck.mjs",
@@ -359,9 +369,19 @@
     "sha": "6cf3b2f6957172874dc47d2e13a85bbf68ae94cb"
    },
    {
+    "path": "render/switchboardView-selfcheck.mjs",
+    "bytes": 14222,
+    "sha": "8b116178fb6f8843417655711a69098ba23c6184"
+   },
+   {
     "path": "sub-aquarium.html",
     "bytes": 50634,
     "sha": "a6ce4134db2c73df4ff55e345d9980ad108e77f2"
+   },
+   {
+    "path": "switchboard.html",
+    "bytes": 17395,
+    "sha": "8b116178fb6f8843417655711a69098ba23c6184"
    },
    {
     "path": "tools/flyCx.mjs",
@@ -394,6 +414,26 @@
     "sha": "f56f08f95fa766ecacceb62742eda6fce9fa2f7c"
    },
    {
+    "path": "tools/ship/lesionLeftSide-selfcheck.mjs",
+    "bytes": 13371,
+    "sha": "6f50c3a6913121b34c41bcfe71faae96ddb7a86c"
+   },
+   {
+    "path": "tools/ship/lesionLeftSideCmd.mjs",
+    "bytes": 3189,
+    "sha": "6f50c3a6913121b34c41bcfe71faae96ddb7a86c"
+   },
+   {
+    "path": "tools/ship/takeReservoirGpu.mjs",
+    "bytes": 3878,
+    "sha": "ac90b472d068949851993f6ee7f48e90b2b59197"
+   },
+   {
+    "path": "tools/ship/takeSwitchboard.mjs",
+    "bytes": 4028,
+    "sha": "8b116178fb6f8843417655711a69098ba23c6184"
+   },
+   {
     "path": "tools/ship/trainNeedsCircuit.mjs",
     "bytes": 33594,
     "sha": "c1ec0cb0c471b04d1bfdcc8687c04f77a95f2617"
@@ -407,6 +447,11 @@
     "path": "tools/ship/trainSubState.mjs",
     "bytes": 25084,
     "sha": "d66beb17f067dff0e9bc21ff7ccb44e7d7f1576d"
+   },
+   {
+    "path": "tools/subReservoirV6-selfcheck.mjs",
+    "bytes": 15368,
+    "sha": "662613008aeb5b6d0122e8dfb4accc7aeb4f362c"
    },
    {
     "path": "tools/tankFlyCxBench.mjs",
@@ -920,8 +965,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 3791991,
-    "sha": "99f074f78ffc4595889215dd438424892e1ef1b6"
+    "bytes": 3791927,
+    "sha": "0513238ab7b67253e40de3c9c8658921c92f1603"
    },
    {
     "path": "mpm3d.html",

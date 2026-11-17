@@ -16456,6 +16456,19 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
         widened: Object.freeze([]),
         verdict: "no gate file added, so nothing is claimed here (a gate may be claimed by ONE closing); tools/ship/strandCensus-selfcheck gained the row that holds ignoredSet to a directory-only rule whose directory is not on the disk (15 rows to 16; one sabotage, 1 red) -- the rig's fresh clone of v4920 went red there with nothing left behind, reproduced here by moving the directory aside; unverified on the rig; no register widened",
     }),
+    since630: Object.freeze({
+        at: "v4922", swept: 5, green: 5, red: 0,
+        added: Object.freeze([
+            "brain/lesion-selfcheck.mjs",
+            "brain/lesionFlyCx-selfcheck.mjs",
+            "brain/reservoirGpu-selfcheck.mjs",
+            "tools/ship/lesionLeftSide-selfcheck.mjs",
+            "tools/subReservoirV6-selfcheck.mjs",
+        ]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "five gates, each green on arrival and each sabotaged before it was trusted: the lesion toggle (45 mutants, all red), the stateful fly's lesions (33, all red), the GPU reservoir kernel (23, all red), the left-side lesion round (32, all red) and rung 4a v6 (36, 35 red and 1 declared equivalent); render/switchboardView-selfcheck gained the lesion and fly rows (existing gate, not claimed here).",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {

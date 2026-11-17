@@ -11,6 +11,7 @@
 //   6 STUDY      every branch of the bottom line; the SB-against-SF line; the mechanism line; the audit base 131000; the arms; a smoke run of one circuit records the chosen gain and amplitude among the settings.
 // SABOTAGE LOG: brain/RUNG_4A_V6_SHIFT_MAP_WIP.md, the build section.
 "use strict";
+import { pathToFileURL } from "node:url";   // a dynamic import of a filesystem path must be a file URL: new URL("file://" + "C:\\...") crashes on Windows (tools/ship/windowsImport-selfcheck.mjs)
 import fs from "node:fs";
 let fails = 0, finished = false;
 const died = (e) => { console.log("  FAIL  !! THE GATE THREW before it finished: " + String((e && e.stack) || e).split("\n").slice(0, 3).join(" | ").slice(0, 400)); process.exitCode = 1; };
@@ -19,7 +20,7 @@ process.on("exit", () => { if (!finished) { console.log("  FAIL  !! THE GATE END
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
 const sec = (t) => console.log("\n" + t);
 const J = JSON.stringify, near = (a, b, t = 1e-9) => Math.abs(a - b) <= t;
-const env = (k, f) => (process.env[k] ? new URL("file://" + process.env[k]) : new URL(f, import.meta.url));
+const env = (k, f) => (process.env[k] ? pathToFileURL(process.env[k]) : new URL(f, import.meta.url));
 const V = await import(env("V6_UNDER_TEST", "./subReservoirV6.mjs").href), S = await import(env("STUDY6_UNDER_TEST", "./ship/subEstimatorStudyV6.mjs").href);
 import * as V4 from "./subReservoirV4.mjs";
 import * as V5 from "./subReservoirV5.mjs";
@@ -71,6 +72,8 @@ sec("4. SETTINGS");
     ok("!! the input map is v5's RMF at v5's matched weight, bit for bit", J(Array.from(win)) === J(Array.from(V5.windowFor(V5.ARMS.RMF, C, fit))));
     ok("!! the amplitude scale is the v3 random map's rms drive over the fitting dives", near(V.ampScale(C, fit), V4.rmsDrive(C, V4.randomWeights(C), fit), 1e-12));
 }
+
+ok("!! the shared parts are v4's and v5's, the same objects: LAMBDAS, CAP, BLOWUP, RATE_SLOT (5, the heading rate), scoreWith, targetRange, signalCheck and SIGNAL_MIN 0.05", V.LAMBDAS === V4.LAMBDAS && V.CAP === V4.CAP && V.BLOWUP === V4.BLOWUP && V.RATE_SLOT === V4.RATE_SLOT && V.RATE_SLOT === 5 && V.scoreWith === V4.scoreWith && V.targetRange === V4.targetRange && V.signalCheck === V5.signalCheck && V.SIGNAL_MIN === 0.05);
 
 sec("5. MECHANISM");
 {

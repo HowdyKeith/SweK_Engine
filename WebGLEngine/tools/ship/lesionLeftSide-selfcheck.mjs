@@ -11,6 +11,7 @@
 //   6 REAL     the no-op arm flies the intact arm exactly on two real ids (20 s).
 // SABOTAGE LOG: brain/LESION_LEFT_SIDE_WIP.md, the build section.
 "use strict";
+import { pathToFileURL } from "node:url";   // a dynamic import of a filesystem path must be a file URL: new URL("file://" + "C:\\...") crashes on Windows (tools/ship/windowsImport-selfcheck.mjs)
 import fs from "node:fs";
 let fails = 0, finished = false;
 const died = (e) => { console.log("  FAIL  !! THE GATE THREW before it finished: " + String((e && e.stack) || e).split("\n").slice(0, 3).join(" | ").slice(0, 400)); process.exitCode = 1; };
@@ -19,7 +20,7 @@ process.on("exit", () => { if (!finished) { console.log("  FAIL  !! THE GATE END
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
 const sec = (t) => console.log("\n" + t);
 const J = JSON.stringify;
-const R = await import((process.env.LLS_UNDER_TEST ? new URL("file://" + process.env.LLS_UNDER_TEST) : new URL("./lesionLeftSide.mjs", import.meta.url)).href);
+const R = await import((process.env.LLS_UNDER_TEST ? pathToFileURL(process.env.LLS_UNDER_TEST) : new URL("./lesionLeftSide.mjs", import.meta.url)).href);
 import * as L from "../../brain/lesion.mjs";
 import * as LF from "../../brain/lesionFlyCx.mjs";
 const eng = new URL("../../", import.meta.url), rd = (f) => JSON.parse(fs.readFileSync(new URL(f, eng), "utf8"));
@@ -42,6 +43,8 @@ sec("1. PLAN");
     ok("!! the no-op flies the first two ids, every other arm the twenty; the no-op silences nothing", J(R.rangeOf("noop")) === J({ from: 6001, to: 6002 }) && J(R.rangeOf("primary")) === J({ from: 6001, to: 6020 }) && plan.find((p) => p.role === "noop").neurons.length === 0 && J(plan.find((p) => p.role === "noop").arm.entry("x").weights) === J(base.entry("x").weights));
     ok("!! a base without the reservoir topology is refused", /must carry the fly's reservoir topology/.test((() => { try { R.planArms({ ...base, topo: null }); return ""; } catch (e) { return e.message; } })()));
 }
+
+ok("!! INTACT is the stateful fly's arm id and NOOP the no-op arm's; the plan's first arm is INTACT and its last NOOP", R.INTACT === "flycx-stateful" && R.NOOP === "flycx-stateful~noop" && plan[0].id === R.INTACT && plan[plan.length - 1].id === R.NOOP);
 
 sec("2. HOLM");
 {

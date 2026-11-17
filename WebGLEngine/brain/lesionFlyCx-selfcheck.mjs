@@ -14,6 +14,7 @@
 // NOT CHECKED, said plainly: whether any class matters (the experiment); the page.
 // SABOTAGE LOG: brain/LESION_TOGGLE_WIP.md section 6.
 "use strict";
+import { pathToFileURL } from "node:url";   // a dynamic import of a filesystem path must be a file URL: new URL("file://" + "C:\\...") crashes on Windows (tools/ship/windowsImport-selfcheck.mjs)
 import fs from "node:fs";
 let fails = 0, finished = false;
 const died = (e) => { console.log("  FAIL  !! THE GATE THREW before it finished: " + String((e && e.stack) || e).split("\n").slice(0, 3).join(" | ").slice(0, 400)); process.exitCode = 1; };
@@ -22,7 +23,7 @@ process.on("exit", () => { if (!finished) { console.log("  FAIL  !! THE GATE END
 const ok = (n, c, d) => { console.log((c ? "  PASS  " : "  FAIL  ") + n + (d ? "   " + d : "")); if (!c) fails++; };
 const sec = (t) => console.log("\n" + t);
 const J = JSON.stringify;
-const env = (k, f) => (process.env[k] ? new URL("file://" + process.env[k]) : new URL(f, import.meta.url));
+const env = (k, f) => (process.env[k] ? pathToFileURL(process.env[k]) : new URL(f, import.meta.url));
 const LESION_URL = env("LESION_UNDER_TEST", "./lesion.mjs"), FLY_URL = env("LESIONFLYCX_UNDER_TEST", "./lesionFlyCx.mjs");
 const L = await import(LESION_URL.href), F = await import(FLY_URL.href);
 import * as CS from "./pilotSubCircuitState.mjs";
@@ -142,6 +143,9 @@ sec("6. REAL (the switchboard's dropout task)");
     ok("!! silencing all 148 cells flies exactly the pilot with a zero readout (both leave the autopilot plus the readout bias), seed for seed", J(res.runs.all) === J(res.runs.noOut), J(res.runs.all.map((r) => r.score.toFixed(4))));
     ok("!! silencing nothing flies the intact pilot exactly; silencing L4 moves the score", J(res.runs.none) === J(res.runs[sf.id]) && res.runs.L4.some((r, i) => Math.abs(r.score - res.runs[sf.id][i].score) > 1e-6));
 }
+
+sec("6b. NAMES");
+ok("!! the file it reads is FORMAT swek-brain-v1, POLICY pilotSubCircuitState, CIRCUIT flycx (render/subAquariumFlyCx.mjs's); ROLES are the four, in STRATA's order", F.FORMAT === "swek-brain-v1" && F.POLICY === "pilotSubCircuitState" && F.CIRCUIT === "flycx" && F.CIRCUIT === FX.CIRCUIT && file.format === F.FORMAT && file.policy === F.POLICY && J(F.ROLES) === J(["input only", "output only", "input and output", "neither"]) && T.ROLE.filter((r) => r === F.ROLES[1]).length === T.STRATA[1].length);
 
 sec("7. SOURCE");
 {
