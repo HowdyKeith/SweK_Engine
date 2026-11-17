@@ -12,6 +12,8 @@
 // REGISTERED 2026-11-17, BEFORE ANY PAIR BELOW WAS FLOWN. Readings in each fight, each a mean with a word at |z| >= 2: the ships-sticky gunner against the plain side; the shipped against the plain side; THE SHIPS-STICKY LESS THE SHIPPED, pair by pair.
 // FORECAST, for the record: in the fleets without escorts the gain is what the sticky gunner's was (it is the same gunner there): LEADS by about 0.6 without the cannon and 0.3 with; against fighters EXACTLY 0 (the same gunner); in fleets with escorts LEADS, by less (about 0.3).
 // WHAT SHIPS: brain/seatFlyWired3WeightsDefault.json (policy seatFlyWired3, the gains -3) if the gain LEADS in both fleets without escorts and TRAILS in no fight. It would replace the shipped gunner on space-duel.html.
+// READ 2026-11-17 (brain/seatFlyWired3WeightsDefault.reading.json): the gain +0.706 (z 9.4) with no cannon, +0.269 (z 5.2) with it, +0.932 (z 13.8) with escorts, exactly 0 against fighters. IT SHIPS: brain/seatFlyWired3WeightsDefault.json, the `flywired` hand on space-duel.html.
+//   Against the plain side it is then level in fleets without the cannon (+0.066) and with escorts (+0.105), and still behind with the cannon (-0.283) and against fighters (-0.148). The forecast was under for the escort fleet: the gain there is the largest.
 // Every arm's leads are kept (brain/rig-results/flyWiredGunnerShips/); the reading file is the mark that it was read, and a second read is refused.
 // WHAT IS NOT HERE: the trained 6DOF fighter pilot, escorts with the cannon on, a sight that remembers the other targets while it sticks, a radius rule told by anything but the aim radius the arena shows.
 "use strict";
