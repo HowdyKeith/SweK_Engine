@@ -1361,3 +1361,28 @@ Nothing was stranded. Bottom lines: `L-0.02 HOLDS ITS HULL UNDER BIAS`; `L-0.04 
 **Against the expectations of section 5 (written first).** L-0.06 pays more, about 90: held (a third time). L-0.04 pays more, about 50: no (1 against 0). L-0.02 pays more, about 20: held (it holds). L0 holds, about 95: held. Gains KEEP: L-0.06 (90) held, L-0.04 (70) held, L-0.02 (40) held. The bottom line names L-0.04, about 35: it came.
 
 **WHAT THIS MEANS and does not.** The curve is not linear in the hull: -0.02 and -0.04 cost nothing measurable under the biased gauge (0 and 1 crushed), -0.06 costs 10. **-0.04 keeps 57 percent of the shipped shift's sound-gauge gain (+0.016 of +0.029) and gives up 9 of its 10 crushed boats.** The break-even prices say the same in money: the shipped -0.06 is worth less than L0 as soon as a crushed boat costs more than about 16 good dives' score with a gauge biased 5 percent of the time (2.7 at 25 percent); -0.04 needs a price above about 97 (19 at 25 percent) before L0 wins. **This round chooses nothing**: which shift the seat flies is Keith's decision (the hull cost), and a change would be a round of its own, registered, with the confirmation on fresh dives Round 33 used.
+
+# Round 37 -- the seat moved to low -0.04, Keith's decision, confirmed on fresh dives before it ships (REGISTERED 2026-11-17, before any code and before any of its seeds was flown)
+
+## 1. Why
+Keith, 2026-11-17, after Round 36: "move the seat to -0.04." Round 36 found -0.04 the largest shift that holds its hull under a +0.10 gauge bias and keeps a gain (+0.016 at a sound gauge, 1 crushed of 300 against the shipped -0.06's 10). Round 33 changed the shipped constants only after a confirmation on fresh dives across its conditions; this round is that confirmation for the move. **The decision is Keith's and is not re-made here.** The round can only stop it: if a check fails, or if the -0.04 seat's hull is worse than the shipped seat's in any condition, the constant is NOT changed and the finding goes back to Keith.
+
+## 2. The arms, conditions and seeds
+- **Arms:** **SEAT-04**, the seat's planner and profile (`standard`) on the Round 8 constants with low -0.04, nothing else changed; **SEAT-06**, the shipped `surveyPilot()` (low -0.06).
+- **Conditions** (Round 33's five by `plannerRobust.scenarioX`, and Round 34's bias): **REF** (3 stations, damage x1, sd 0.10), **DMG** (damage x1.6), **N20** (sd 0.20), **N30** (sd 0.30), **STN5** (5 stations), **BIAS** (sd 0.10 and +0.10 on every reading).
+- **Seeds, far and both, 150 of each (300 dives per arm and condition):** REF 49001-49150, DMG 49201-49350, N20 49401-49550, N30 49601-49750, STN5 49801-49950, BIAS 50201-50350. None is used by any needs-and-limits round; the gate flies only 50901-50902. 2 arms x 6 conditions x 300 = 3,600 dives.
+
+## 3. Checks (a failure: NOT WEIGHED, and the constant is not changed)
+GENERATOR (`scenarioX` at 3 stations and damage x1 equals `needsTask.scenario`); SIZES; ALIGNED; THE ARMS DIFFER (on at least one dive of every condition); SEAT-06 IS THE SHIPPED SEAT (its pilot is `surveyPilot()`, fingerprint for fingerprint, on the gate's dives).
+
+## 4. The verdicts (hull: Round 33's test, b - b0 <= 2 x sqrt(b + b0), crushed plus stranded; score: the series' 2 se)
+- **Per condition, the hull:** `SEAT-04'S HULL IS NO WORSE THAN THE SHIPPED SEAT'S IN <c>` iff SEAT-04's count passes the test against SEAT-06's; `... IS WORSE IN <c>` otherwise.
+- **Per condition, the price:** SEAT-04 minus SEAT-06, pooled and paired: HURTS (negative beyond 2 se), LOSES (inside), KEEPS (positive beyond 2 se) -- REPORTED; the move is expected to cost a little score at a sound gauge and is not judged by it.
+- **The bottom line:** `THE MOVE IS CONFIRMED: SEAT-04'S HULL IS NO WORSE IN ANY CONDITION` -> the constant is changed (`SURVEY_LOW_SHIFT` -0.04); `THE MOVE IS HELD: SEAT-04'S HULL IS WORSE IN <list>` -> it is not, and Keith is told.
+**REPORTED:** each arm's mean and crushed / stranded count per condition, and the BIAS hull counts of both arms against Round 36's (1 and 10 of 300).
+
+## 5. Expectations, recorded BEFORE any seed is flown
+The move is confirmed: about 85 percent. SEAT-04's crushed plus stranded under BIAS is lower than SEAT-06's: about 85. The price HURTS at REF (about -0.012, Round 36's -0.0285 + 0.0163): about 55; in DMG it LOSES or KEEPS (fewer crushes on damaged hulls): about 70. N30: the two tie on the hull (both 0): about 80.
+
+## 6. What will be built, and what changes if the move is confirmed
+`tools/ship/seatMove.mjs`, `tools/ship/seatMoveCmd.mjs` (`run`, `report`), `tools/ship/seatMove-selfcheck.mjs` with a mutation pass; the run once, the report read once. **If confirmed:** `brain/surveySeat.mjs`'s `SURVEY_LOW_SHIFT` becomes -0.04 (low 0.3403560726214647); every gate that pins the shipped constants is restated to the new value with its old value said in a dated line; the Round 34-36 libraries, which name what they FLEW, are frozen on the -0.06 constants by value rather than by import. **Not in this round:** any other constant, the rule arms, shipping a version.
