@@ -1,6 +1,6 @@
 {
  "gate": "physics/render/rtPipeline-selfcheck.mjs",
- "at": "2026-11-16",
+ "at": "2026-11-17",
  "tables": [
   {
    "title": "two spheres: CPU against the pipeline, per resolution and sample count",
@@ -105,7 +105,7 @@
      "planted GPU: the image transposed (right and up swapped)",
      "12x12",
      "64 spp x 8 + 8 seeds",
-     "frame-mean row accepts (-2.98e-3 vs 1.36e-2); same seeds 0.1% identical, paired mean -1.99e-3"
+     "frame-mean row accepts (-2.98e-3 vs 1.36e-2); same seeds 0.1% identical, paired mean -2.00e-3"
     ],
     [
      "planted GPU: one bounce fewer on the GPU (depth < 7)",
@@ -273,13 +273,13 @@
      "three instances of the box (identity; turned and shrunk; turned and unevenly scaled)",
      "16x16",
      "32 spp x 6 seeds, same seeds",
-     "477 of 504 mesh pixels within 0.00001; paired mean -1.21e-4, se 1.07e-4"
+     "500 of 504 mesh pixels within 0.00001; paired mean -5.80e-5, se 5.09e-5"
     ],
     [
      "three instances, each cut out at 0.15",
      "16x16",
      "32 spp x 6 seeds, same seeds",
-     "469 of 504 mesh pixels within 0.00001; paired mean -1.04e-4, se 6.35e-5"
+     "495 of 504 mesh pixels within 0.00001; paired mean -2.92e-5, se 5.29e-5"
     ],
     [
      "planted device: any-hit: the rule inverted (holes solid, margins open)",
@@ -303,31 +303,31 @@
      "planted device: instances: the normal left in object space",
      "16x16",
      "32 spp x 6 seeds, same seeds",
-     "34.9% of pixels identical, paired mean 7.58e-4"
+     "35.1% of pixels identical, paired mean 9.36e-4"
     ],
     [
      "planted device: instances: the normal through the inverse instead of its transpose",
      "16x16",
      "32 spp x 6 seeds, same seeds",
-     "45.6% of pixels identical, paired mean -1.59e-3"
+     "45.6% of pixels identical, paired mean -2.82e-3"
     ],
     [
      "planted device: instances: every hit reads instance 0's record",
      "16x16",
      "32 spp x 6 seeds, same seeds",
-     "33.7% of pixels identical, paired mean -1.94e-3"
+     "33.7% of pixels identical, paired mean -1.84e-3"
     ],
     [
      "planted device: instances: the object-space direction renormalised",
      "16x16",
      "32 spp x 6 seeds, same seeds",
-     "28.2% of pixels identical, paired mean 6.50e-2"
+     "33.7% of pixels identical, paired mean 6.52e-2"
     ],
     [
      "planted device: instances: the translation's x dropped",
      "16x16",
      "32 spp x 6 seeds, same seeds",
-     "0.0% of pixels identical, paired mean 3.16e-2"
+     "0.0% of pixels identical, paired mean 3.17e-2"
     ],
     [
      "planted device: instances: the winner's triangle not written back",
@@ -351,13 +351,13 @@
      "three instances, two materials a mesh, two instances offset into a second pair",
      "16x16",
      "32 spp x 4 seeds, same seeds",
-     "317 of 335 values within 0.00001; paired mean -1.81e-4, se 2.18e-4"
+     "332 of 335 values within 0.00001; paired mean -4.66e-5, se 8.24e-5"
     ],
     [
      "COLOUR: three coloured instances, each cut out, three channels",
      "16x16",
      "32 spp x 4 seeds, same seeds",
-     "930 of 1005 values within 0.00001; paired mean -9.93e-5, se 7.71e-5"
+     "987 of 1005 values within 0.00001; paired mean -7.44e-5, se 6.21e-5"
     ],
     [
      "MICROFACET: three instances, three roughnesses, three indices of refraction",
@@ -369,7 +369,7 @@
      "LIGHT SAMPLING: a sphere light beside the cut box, seen from above",
      "16x16",
      "32 spp x 8 seeds a side, different seeds",
-     "cpu 0.83413 vs gpu 0.83489, ratio-1 9.15e-4, bound 2.59e-3; holes worth 264.8%"
+     "cpu 0.83413 vs gpu 0.83491, ratio-1 9.36e-4, bound 2.58e-3; holes worth 264.8%"
     ],
     [
      "planted device: sphere: the far root never tried",
@@ -411,13 +411,13 @@
      "two meshes under four instances, through the tree",
      "16x16",
      "32 spp x 4 seeds, same seeds",
-     "298 of 301 mesh pixels within 0.00001; paired mean -1.22e-4, se 7.22e-5"
+     "301 of 301 mesh pixels within 0.00001; paired mean -1.43e-7, se 2.77e-8"
     ],
     [
      "two meshes under sixteen instances, through the tree",
      "16x16",
      "32 spp x 4 seeds, same seeds",
-     "306 of 390 mesh pixels within 0.00001; paired mean -7.99e-4, se 3.82e-4"
+     "390 of 390 mesh pixels within 0.00001; paired mean -2.31e-7, se 2.36e-8"
     ]
    ],
    "note": "A sweep whose numbers only reached the terminal it was written to is a measurement nobody can re-read."

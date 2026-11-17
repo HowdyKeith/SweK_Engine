@@ -25,7 +25,7 @@
 <div id="hud">
   <div id="cap">RTX viewer</div>
   <div id="be">requesting a WebGPU device&hellip;</div>
-  <div id="sub">drag to orbit &middot; wheel to dolly &middot; <a id="sceneToggle" href="#">scene</a> &middot; <a id="materialToggle" href="#">material</a> &middot; <a id="skyToggle" href="#">sky</a> &middot; <a id="directToggle" href="#">direct</a> &middot; <a id="vertexColorsToggle" href="#">vertex colors</a> &middot; <a id="meshMaterialsToggle" href="#">mesh materials</a> &middot; <a id="instancesToggle" href="#">instances</a> &middot; <a id="cutoutToggle" href="#">cutout</a> &middot; <a href="/server.html">&larr; back</a></div>
+  <div id="sub">drag to orbit &middot; wheel to dolly &middot; <a id="sceneToggle" href="#">scene</a> &middot; <a id="materialToggle" href="#">material</a> &middot; <a id="skyToggle" href="#">sky</a> &middot; <a id="directToggle" href="#">direct</a> &middot; <a id="vertexColorsToggle" href="#">vertex colors</a> &middot; <a id="meshMaterialsToggle" href="#">mesh materials</a> &middot; <a id="instancesToggle" href="#">instances</a> &middot; <a id="cutoutToggle" href="#">cutout</a> &middot; <a id="mixToggle" href="#">second mesh</a> &middot; <a href="/server.html">&larr; back</a></div>
 </div>
 <script type="module" src="/ui/originNotice.js"></script>
 <script type="module">
@@ -42,6 +42,7 @@ const vertexColorsToggleEl = document.getElementById("vertexColorsToggle");
 const meshMaterialsToggleEl = document.getElementById("meshMaterialsToggle");
 const instancesToggleEl = document.getElementById("instancesToggle");
 const cutoutToggleEl = document.getElementById("cutoutToggle");
+const mixToggleEl = document.getElementById("mixToggle");
 const fail = (m) => { beEl.innerHTML = '<span class="bad">' + m + "</span>"; };
 
 // RTX round 5 -- which scene to load, read once at page load (not hot-swapped mid-session: a running WebGPU
@@ -84,15 +85,22 @@ const MESH_MATERIALS = new URLSearchParams(location.search).get("meshMaterials")
 // v4919 -- a SEVENTH and an EIGHTH, the first callers of rtPipeline.mjs's instances (v4915), the tree over them (v4918)
 // and the any-hit cutout (v4915). `instances=N` draws the scene N x N times through instanceGrid(), walked by the tree
 // (`tree=false` in the URL walks the list instead -- same picture, the gate holds them to that). `cutout=m` punches
-// every triangle's middle out, keeping a margin m of its edges. Both work on either scene and either material;
-// instances with the sceneCapture sky is refused by makeRtSession, and the page says so.
+// every triangle's middle out, keeping a margin m of its edges. Both work on either scene and either material.
+// v4925 -- the cutout link now CYCLES solid -> cutout -> alpha (`alpha=true`: each hit kept with probability ALPHA_P,
+// see-through on average; refused under the sceneCapture sky, and the page says so), and `mix=true` alternates the
+// pavement tile with a second model under instances (the pavement-tile scene only: the city is one mesh twelve units
+// across). Instances under the sceneCapture sky are no longer refused: the capture traces the placements.
 const INSTANCE_SIDES = [0, 3];
 const rawInstances = Number(new URLSearchParams(location.search).get("instances"));
 const INSTANCES = Number.isInteger(rawInstances) && rawInstances >= 1 && rawInstances <= 6 ? rawInstances : 0;
 const INSTANCE_TREE = new URLSearchParams(location.search).get("tree") !== "false";
 const CUTOUT_MARGIN = 0.12;
 const CUTOUT = new URLSearchParams(location.search).get("cutout") === "true";
-const qs = (scene, material, sky, direct, vertexColors, meshMaterials, instances, cutout) => "?scene=" + scene + "&material=" + material + "&sky=" + sky + "&direct=" + direct + "&vertexColors=" + vertexColors + "&meshMaterials=" + meshMaterials + "&instances=" + instances + "&cutout=" + cutout + (INSTANCE_TREE ? "" : "&tree=false");
+const ALPHA_P = 0.5;
+const ALPHA = !CUTOUT && new URLSearchParams(location.search).get("alpha") === "true";
+const MIX_MODEL = "building-small-a.glb";
+const MIX = new URLSearchParams(location.search).get("mix") === "true";
+const qs = (scene, material, sky, direct, vertexColors, meshMaterials, instances, cutout, alpha = ALPHA, mix = MIX) => "?scene=" + scene + "&material=" + material + "&sky=" + sky + "&direct=" + direct + "&vertexColors=" + vertexColors + "&meshMaterials=" + meshMaterials + "&instances=" + instances + "&cutout=" + cutout + (INSTANCE_TREE ? "" : "&tree=false") + (alpha ? "&alpha=true" : "") + (mix ? "&mix=true" : "");
 toggleEl.href = qs(SCENE === "city" ? "tile" : "city", MATERIAL, SKY, DIRECT, VERTEX_COLORS, MESH_MATERIALS, INSTANCES, CUTOUT);
 toggleEl.textContent = SCENE === "city" ? "try the pavement tile" : "try the procedural city";
 materialToggleEl.href = qs(SCENE, MATERIAL === "microfacet" ? "lambertian" : "microfacet", SKY, DIRECT, VERTEX_COLORS, MESH_MATERIALS, INSTANCES, CUTOUT);
@@ -109,11 +117,13 @@ vertexColorsToggleEl.textContent = VERTEX_COLORS ? "try the flat albedo (no vert
 meshMaterialsToggleEl.href = qs(SCENE, MATERIAL, SKY, DIRECT, VERTEX_COLORS, !MESH_MATERIALS, INSTANCES, CUTOUT);
 instancesToggleEl.href = qs(SCENE, MATERIAL, SKY, DIRECT, VERTEX_COLORS, MESH_MATERIALS, INSTANCES ? 0 : INSTANCE_SIDES[1], CUTOUT);
 instancesToggleEl.textContent = INSTANCES ? "try one copy (no instances)" : "try nine INSTANCES of the scene";
-cutoutToggleEl.href = qs(SCENE, MATERIAL, SKY, DIRECT, VERTEX_COLORS, MESH_MATERIALS, INSTANCES, !CUTOUT);
-cutoutToggleEl.textContent = CUTOUT ? "try solid triangles (no cutout)" : "try the any-hit CUTOUT";
+cutoutToggleEl.href = qs(SCENE, MATERIAL, SKY, DIRECT, VERTEX_COLORS, MESH_MATERIALS, INSTANCES, !CUTOUT && !ALPHA, CUTOUT);
+cutoutToggleEl.textContent = CUTOUT ? "try the any-hit ALPHA (see-through)" : ALPHA ? "try solid triangles (no any-hit)" : "try the any-hit CUTOUT";
+mixToggleEl.href = qs(SCENE, MATERIAL, SKY, DIRECT, VERTEX_COLORS, MESH_MATERIALS, INSTANCES || INSTANCE_SIDES[1], CUTOUT, ALPHA, !MIX);
+mixToggleEl.textContent = MIX ? "try one mesh under the instances" : "try a SECOND MESH under the instances (pavement tile only)";
 meshMaterialsToggleEl.textContent = MESH_MATERIALS ? "try one flat material (no mesh materials)" : "try REAL per-voxel materials (procedural city only)";
 
-let session = null, mesh = null, device = null, bounds = null;
+let session = null, mesh = null, device = null, bounds = null, extra = null;
 let yaw = 0.7, pitch = 0.45, dist = 3, dragging = null, dirty = true;
 
 function view() {
@@ -150,12 +160,18 @@ async function main() {
             const res = await fetch("/vendor/kenney-city/models/pavement.glb");
             if (!res.ok) throw new Error("HTTP " + res.status);
             mesh = await loadMeshBvh(await res.arrayBuffer());
+            if (MIX && INSTANCES) {
+                const res2 = await fetch("/vendor/kenney-city/models/" + MIX_MODEL);
+                if (!res2.ok) throw new Error("HTTP " + res2.status + " for " + MIX_MODEL);
+                extra = await loadMeshBvh(await res2.arrayBuffer());
+            }
         }
     } catch (e) { return fail("loading the mesh threw: " + e.message); }
 
     try {
         session = makeRtSession(device, { mesh, w: cvs.width, h: cvs.height, spp: 1, material: MATERIAL, sky: SKY, direct: DIRECT, vertexColors: VERTEX_COLORS, meshMaterials: MESH_MATERIALS,
-            instances: INSTANCES ? instanceGrid(mesh, INSTANCES) : null, instanceTree: INSTANCE_TREE, cutout: CUTOUT ? CUTOUT_MARGIN : null });
+            instances: INSTANCES ? instanceGrid(extra ? [mesh, extra] : mesh, INSTANCES) : null, instanceTree: INSTANCE_TREE, cutout: CUTOUT ? CUTOUT_MARGIN : null,
+            extraMeshes: extra ? [extra] : [], alpha: ALPHA ? ALPHA_P : null });
     } catch (e) { return fail("makeRtSession threw: " + e.message); }
     // v4919 -- the session's bounds, which are the placements' under instances: the mesh's own say where ONE copy is
     bounds = session.bounds;
@@ -164,8 +180,9 @@ async function main() {
     const vcNote = !VERTEX_COLORS ? "flat albedo" : MATERIAL === "microfacet" ? "vertex colors (inert -- microfacet ignores it)" : "REAL vertex colors";
     const mmNote = !MESH_MATERIALS ? "one flat material" : MATERIAL === "microfacet" ? "mesh materials (inert -- microfacet ignores it)" : "REAL per-voxel materials";
     const instNote = INSTANCES ? `${INSTANCES * INSTANCES} instances (${INSTANCE_TREE ? "tree" : "list"})` : "one copy";
-    const cutNote = CUTOUT ? `any-hit cutout, margin ${CUTOUT_MARGIN}` : "solid triangles";
-    subEl.textContent += ` -- ${mesh.triangleCount} triangles, ${mesh.vertexCount} vertices, ${MATERIAL} material, ${SKY} sky, ${directNote}, ${vcNote}, ${mmNote}, ${instNote}, ${cutNote}`;
+    const cutNote = CUTOUT ? `any-hit cutout, margin ${CUTOUT_MARGIN}` : ALPHA ? `any-hit alpha, each hit kept with p ${ALPHA_P}` : "solid triangles";
+    const mixNote = extra ? `, a second mesh (${MIX_MODEL})` : MIX ? ", second mesh ignored (pavement tile with instances only)" : "";
+    subEl.textContent += ` -- ${mesh.triangleCount} triangles, ${mesh.vertexCount} vertices, ${MATERIAL} material, ${SKY} sky, ${directNote}, ${vcNote}, ${mmNote}, ${instNote}${mixNote}, ${cutNote}`;
 
     cvs.addEventListener("pointerdown", (e) => { dragging = [e.clientX, e.clientY]; cvs.setPointerCapture(e.pointerId); });
     addEventListener("pointerup", () => { dragging = null; });

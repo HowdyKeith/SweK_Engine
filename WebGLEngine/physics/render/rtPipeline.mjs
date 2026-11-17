@@ -1297,8 +1297,13 @@ export function pipelineWgsl({ workgroupSize = 64, gradient = false,
                                // v4917 -- the sphere's own any-hit; false leaves rtIntersect's text as it was
                                sphereAnyHit = false,
                                // v4918 -- walk the tree instanceBuffer appends, instead of the list
-                               instanceTree = false } = {}) {
+                               instanceTree = false,
+                               // v4925 -- the bounce count, compiled in. MAX_DEPTH (8) leaves the text as it was; a smaller
+                               // number lets a gate watch GPU and CPU paths part bounce by bounce (renderCpu takes the same
+                               // maxDepth and counts it the same way: the loop runs `depth < maxDepth` times on both sides).
+                               maxDepth = MAX_DEPTH } = {}) {
     if (instanceTree && !instances) throw new Error("rtPipeline: instanceTree needs instances -- it is a tree over them");
+    if (!(Number.isInteger(maxDepth) && maxDepth >= 1 && maxDepth <= 64)) throw new Error("rtPipeline: maxDepth is a whole number of path segments, 1 to 64, got " + maxDepth);
     const PI = "3.141592653589793";
     if (anyHit && !bvh) throw new Error("rtPipeline: anyHit needs bvh -- the stage is asked of a candidate TRIANGLE, and a sphere has none");
     if (instances && !bvh) throw new Error("rtPipeline: instances needs bvh -- there is no mesh to place otherwise");
@@ -1536,6 +1541,20 @@ fn rtTraverse(orig : vec3<f32>, dir : vec3<f32>, n : i32, eps : f32) -> Hit {
   return best;
 }
 
+// *** v4925 -- THE OFFSET A NEW RAY LEAVES A SURFACE BY GROWS WITH THE COORDINATES, BECAUSE f32's ERROR DOES. ***
+// A hit point is computed as o + d * t in f32, and its error is a few ulps of the largest magnitude in that sum --
+// the ray's origin as much as the point itself. A camera ten units out puts P a few times 1e-7 off the surface,
+// and a fixed 1e-6 offset along N is then sometimes not enough: the bounce ray re-hits its own face and the sample
+// goes dark. MEASURED (physics/render/rtPipeline-selfcheck.mjs section 17c'): one pyramid, nothing else in the
+// scene, agreed with the CPU on 87.3% of its pixels at two path segments and 100% at one; an axis-aligned box, whose
+// faces carry no such error, agreed on 100%; raising the offset to 1e-5 on both sides made the pyramid 100%. The
+// CPU works in f64 and keeps its fixed offset: a 3e-7 nudge of every placement parts none of its paths (same
+// section), so the larger GPU offset changes which surface is reached only where f32 had got it wrong.
+fn rtSpawnEps(o : vec3<f32>, P : vec3<f32>, eps : f32) -> f32 {
+  let m = max(abs(o), abs(P));
+  return eps * max(1.0, max(m.x, max(m.y, m.z)));
+}
+
 fn coordSystem(N : vec3<f32>) -> mat3x3<f32> {
   var Nt : vec3<f32>;
   if (abs(N.x) > abs(N.y)) {
@@ -1760,10 +1779,11 @@ ${rgb ? `
     var throughput = vec3<f32>(1.0, 1.0, 1.0);
     var radiance = vec3<f32>(0.0, 0.0, 0.0);
 
-    for (var depth = 0; depth < ${MAX_DEPTH}; depth = depth + 1) {
+    for (var depth = 0; depth < ${maxDepth}; depth = depth + 1) {
       let hit = rtTraverse(o, d, nGeo, eps);
       if (hit.geo < 0) { radiance = radiance + throughput * rtMissRgb(d); break; }
       let P = o + d * hit.t;
+      let sEps = ${bvh ? "rtSpawnEps(o, P, eps)" : "eps"};   // v4925 -- scaled where a mesh is traced; an analytic sphere scene keeps its fixed offset, bit for bit
       var N : vec3<f32>;
       var rec : vec4<f32>;
       var albedo : vec3<f32>;
@@ -1780,7 +1800,7 @@ ${rgb ? `
       ${bvh ? `}` : ""}
       let b = rtClosestHitRgb(i32(rec.x), albedo, N, d);
       d = b.dir;
-      o = P + N * eps;
+      o = P + N * sEps;
       throughput = throughput * b.weight;
     }
     acc = acc + radiance;
@@ -1807,10 +1827,11 @@ ${rgb ? `
     var misFromP = vec3<f32>(0.0, 0.0, 0.0);
     var misFromPdf = 0.0;` : ""}
 
-    for (var depth = 0; depth < ${MAX_DEPTH}; depth = depth + 1) {
+    for (var depth = 0; depth < ${maxDepth}; depth = depth + 1) {
       let hit = rtTraverse(o, d, nGeo, eps);
       if (hit.geo < 0) { radiance = radiance + throughput * rtMiss(d); break; }
       let P = o + d * hit.t;
+      let sEps = ${bvh ? "rtSpawnEps(o, P, eps)" : "eps"};   // v4925 -- scaled where a mesh is traced; an analytic sphere scene keeps its fixed offset, bit for bit
       var N : vec3<f32>;
       var rec : vec4<f32>;
       ${bvh ? `if (hit.geo == nGeo) {
@@ -1881,7 +1902,7 @@ ${rgb ? `
       // sample to land on). rtDirectLight is what populates neeSkippedMask for THIS vertex, read back at the
       // NEXT one.
       if (i32(rec.x) == ${HIT_SHADERS.lambertian}) {
-        radiance = radiance + throughput * rec.y * rtDirectLight(P, N, nGeo, eps);
+        radiance = radiance + throughput * rec.y * rtDirectLight(P, N, nGeo, sEps);
       }
       prevHadNeeRoute = (i32(rec.x) == ${HIT_SHADERS.lambertian});` : ""}
       prevWasCamera = false;
@@ -1905,7 +1926,7 @@ ${rgb ? `
         let aRough = rec.y;
         let ior = rec.w;
         ${msComp ? `let p = msP(cosO);` : ""}
-        ${microfacet !== "bsdf" ? `radiance = radiance + throughput * rtDirectLightMicrofacet(P, N, wo, cosO, aRough, ior, nGeo, eps);` : ""}
+        ${microfacet !== "bsdf" ? `radiance = radiance + throughput * rtDirectLightMicrofacet(P, N, wo, cosO, aRough, ior, nGeo, sEps);` : ""}
         ${msComp ? `// RTX round 9 -- TWO LOBES, CHOSEN BY A COIN WHOSE BIAS IS THE SHORTFALL ITSELF (pathTracer.mjs's
         // own comment, term for term): p = 1 - E(cos_o) is exactly the energy the single-scattering lobe fails
         // to return, so the compensation is sampled exactly as often as it is needed. The coin-flip draw comes
@@ -1940,7 +1961,7 @@ ${rgb ? `
           misFromP = P;
           misFromPdf = p * (cosIM / ${PI}) + (1.0 - p) * pSpec;
           d = dM;
-          o = P + N * eps;
+          o = P + N * sEps;
           continue;
         }` : ""}
         let r1b = nextF32();
@@ -1967,13 +1988,13 @@ ${rgb ? `
             ? "(1.0 - p) * sampleDirPdfGgx(cosH, dotOH, aRough) + p * (cosI / " + PI + ")"
             : "sampleDirPdfGgx(cosH, dotOH, aRough)"};
         d = dNew;
-        o = P + N * eps;
+        o = P + N * sEps;
         continue;
       }` : ""}
       ` : ""}
       let b = rtClosestHit(i32(rec.x), rec.y, N, d);
       d = b.dir;
-      o = P + N * eps;
+      o = P + N * sEps;
       throughput = throughput * b.weight;
     }
     acc = acc + radiance;

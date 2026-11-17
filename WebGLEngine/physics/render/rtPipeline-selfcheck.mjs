@@ -2743,6 +2743,45 @@ say("14. RTX ROUND 9: MULTI-SCATTER ENERGY COMPENSATION");
         const c = cpuAt(gridCpu, gridView, seed), bg = cpuAt([], gridView, seed); d16.push(meanOf(b) / meanOf(c) - 1);
         for (let i = 0; i < c.length; i++) { if (c[i] === bg[i]) continue; p16++; if (Math.abs(b[i] - c[i]) <= TOL) s16++; } }
     ok("!! *** A FRAME THROUGH THE TREE IS THE FRAME THROUGH THE LIST, BIT FOR BIT: sixteen instances, eight bounces, four seeds ***", differ === 0, `${differ} of ${4 * W * H} pixels differ`);
+    // v4925 SABOTAGES of physics/render/rtPipeline.mjs, each restored byte for byte. None 0 red.
+    //   E1 the spawn offset left fixed at eps          -> 2 red here (346, 319, 316 of 390 at 2, 3, 4 segments; 78.46% at 8),
+    //                                                     2 red in tools/ship/rtViewer-selfcheck (1717 and 1709 of 1728)
+    //   E2 scaled by the hit point only, not the origin -> 2 red here (384, 385, 384 of 390): the error comes from the camera's distance
+    //   E3 sphere-only scenes scaled too               -> 1 red here, the two-sphere bit-exact row
+    //   E4 maxDepth ignored by the WGSL                -> 1 red here (50, 63, 69 of 390 when the GPU runs 8 segments against the CPU's 2-4)
+    // ---- 17c'. v4925 -- WHY sixteen agreed less than four, measured bounce by bounce: it was a spawn offset, not rounding ----
+    const cpuAtD = (scene, view, seed, D) => Array.from(renderCpuMesh(scene, { ...view, spp: SPP, seed, maxDepth: D, sky, nee: false }));
+    const curve = [];
+    for (const D of [2, 3, 4]) {
+        let s = 0, p = 0, miss = 0, edge = 0, worstK = 0; const ks = [];
+        for (let seed = 1; seed <= 4; seed++) {
+            const g = await frame({ instanceTree: true, maxDepth: D }, gridView, seed, gridBuf, GRID.length), c = cpuAtD(gridCpu, gridView, seed, D), bg = cpuAtD([], gridView, seed, D);
+            const sky = (i) => c[i] === bg[i];
+            for (let i = 0; i < c.length; i++) { if (sky(i)) continue; p++;
+                if (Math.abs(g[i] - c[i]) <= TOL) { s++; continue; }
+                miss++; const k = Math.abs(g[i] - c[i]) * SPP; ks.push(k); worstK = Math.max(worstK, k); const x = i % W, y = (i / W) | 0;
+                if ([[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => { const X = x + dx, Y = y + dy; return X < 0 || Y < 0 || X >= W || Y >= H || sky(Y * W + X); })) edge++; }
+        }
+        ks.sort((a, b) => a - b); curve.push({ D, s, p, miss, edge, worstK, medK: ks[ks.length >> 1] || 0, over1: ks.filter((k) => k > 1).length });
+    }
+    curve.push({ D: R.MAX_DEPTH, s: s16, p: p16 });
+    // THE CONTROL: the CPU against ITSELF, with every placement moved by a rounding-sized step (3e-7, about the f32
+    // spacing at these coordinates, 2^-23 x 2.4). If the GPU's differences are f32 rounding, this nudge parts the CPU's
+    // paths about as often; a real fault in the GPU would part them far more often than a rounding step does.
+    const NUDGE = 3e-7, nudged = cpuScene(GRID.map((it, k) => ({ ...it, transform: it.transform.map((v, j) => (j % 4 === 3 ? v + NUDGE * (((k * 7 + j) % 3) - 1) : v)) })));
+    for (const c of curve) { let s = 0, p = 0;
+        for (let seed = 1; seed <= 4; seed++) { const a = cpuAtD(gridCpu, gridView, seed, c.D), b = cpuAtD(nudged, gridView, seed, c.D), bg = cpuAtD([], gridView, seed, c.D);
+            for (let i = 0; i < a.length; i++) { if (a[i] === bg[i]) continue; p++; if (Math.abs(a[i] - b[i]) <= TOL) s++; } }
+        c.selfS = s; c.selfP = p; }
+    say("the CPU against itself nudged by " + NUDGE + ": " + curve.map((c) => `${c.D} segments ${(100 * c.selfS / c.selfP).toFixed(2)}% (GPU ${(100 * c.s / c.p).toFixed(2)}%)`).join("; "));
+    // v4925 -- before rtSpawnEps this read 88.72%, 81.79%, 81.03% and 78.46% at 2, 3, 4 and 8 segments, against the nudged
+    // CPU's 100% at each: the GPU parted paths that a rounding-sized move of the scene did not, which is what ruled out
+    // rounding and sent the search to the offset. The rows hold both halves.
+    ok("!! *** sixteen instances agree with the CPU at EVERY bounce count -- 2, 3, 4 and 8 path segments -- not only on average ***",
+        curve.every((c) => c.s / c.p >= 0.995), curve.map((c) => `${c.D}: ${c.s} of ${c.p}`).join(", ") + " (88.72, 81.79, 81.03 and 78.46% before v4925)");
+    ok("  and the CONTROL holds: moving every placement by a rounding-sized 3e-7 parts none of the CPU's own paths, so a GPU that parted them would not be rounding",
+        curve.every((c) => c.selfS === c.selfP), curve.map((c) => `${c.D}: ${c.selfS} of ${c.selfP}`).join(", "));
+    say("sixteen instances, agreement by bounce count: " + curve.map((c) => `${c.D} segments ${(100 * c.s / c.p).toFixed(2)}%` + (c.miss !== undefined ? ` (${c.miss} apart, ${c.edge} of them beside the sky; difference x SPP median ${c.medK.toFixed(3)}, worst ${c.worstK.toFixed(3)}, ${c.over1} over one sample)` : "")).join("; "));
     const fourCpu = cpuScene(FOUR); let s4 = 0, p4 = 0; const d4 = [];
     for (let seed = 1; seed <= 4; seed++) { const g = await frame({ instanceTree: true }, fourView, seed, fourBuf, FOUR.length), c = cpuAt(fourCpu, fourView, seed), bg = cpuAt([], fourView, seed); d4.push(meanOf(g) / meanOf(c) - 1);
         for (let i = 0; i < c.length; i++) { if (c[i] === bg[i]) continue; p4++; if (Math.abs(g[i] - c[i]) <= TOL) s4++; } }
@@ -2753,9 +2792,15 @@ say("14. RTX ROUND 9: MULTI-SCATTER ENERGY COMPENSATION");
     REPORT_ROWS.push(["two meshes under sixteen instances, through the tree", `${W}x${H}`, `${SPP} spp x 4 seeds, same seeds`, `${s16} of ${p16} mesh pixels within ${TOL}; paired mean ${e2(m16)}, se ${e2(se16)}`]);
     ok("!! *** TWO MESHES: four instances of a box and a pyramid walk the CPU's paths, where the CPU placed each instance's own triangles ***",
         s4 / p4 >= 0.85 && Math.abs(m4) < 3 * se4 + TOL, `${(100 * s4 / p4).toFixed(2)}% of mesh pixels, paired mean ${e2(m4)} against 3 x ${e2(se4)}`);
-    ok("!! and at sixteen the agreement THINS without drifting: fewer pixels identical, the paired mean still inside 3 of its standard errors",
-        s16 / p16 > 0.5 && s16 / p16 < s4 / p4 && Math.abs(m16) < 3 * se16 + TOL,
-        `${(100 * s16 / p16).toFixed(2)}% against ${(100 * s4 / p4).toFixed(2)}% at four; paired mean ${e2(m16)} against 3 x ${e2(se16)}. Section 4's boundary, with sixteen neighbours instead of three`);
+    // v4925 -- THIS ROW SAID THE AGREEMENT THINS AT SIXTEEN, AND THE EXPLANATION IN IT WAS WRONG. It read 78.46% here and
+    // called it f32 and f64 sending paths different ways at grazing angles. Section 17c' took it apart: one pyramid with
+    // nothing else in the scene disagreed as much, a box did not, and a 3e-7 nudge of every placement parted none of
+    // the CPU's paths -- so it was not rounding at grazing angles. It was the bounce ray re-hitting its own slanted face,
+    // because a fixed 1e-6 offset is smaller than f32's error in a hit point ten units from the origin. With the offset
+    // scaled (rtSpawnEps) sixteen agree as four do, and the row now says that.
+    ok("!! *** and at sixteen the paths are still the CPU's: as many pixels agree as at four, and the paired mean is f32 accumulation, not a bias ***",
+        s16 / p16 >= 0.995 && s4 / p4 >= 0.995 && Math.abs(m16) < 1e-5 && Math.abs(m4) < 1e-5,
+        `${(100 * s16 / p16).toFixed(2)}% at sixteen, ${(100 * s4 / p4).toFixed(2)}% at four; paired means ${e2(m16)} and ${e2(m4)} (78.46% and a -7.99e-4 mean before v4925)`);
 
     // ---- 17d. the plants, on the probe, where the answer is exact ------------------------------------------------------------
     const PL = [

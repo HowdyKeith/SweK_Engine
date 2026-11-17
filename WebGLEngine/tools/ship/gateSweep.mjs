@@ -16476,6 +16476,13 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
         widened: Object.freeze([]),
         verdict: "no gate file added, so nothing is claimed here (a gate may be claimed by ONE closing); orrery.html repaints only when its view key changes and tools/ship/orreryPost-selfcheck holds that (three rows); tools/ship/playwrightResolve.mjs exports the frame hold, held on a fake clock in its own gate (five rows, two of them added after the first verdict found holdFrames and heldFrames unnamed), and subAquariumPage, avatarFraming and render/seaThree hold their pages with it (a row each); twenty sabotages, one 0 red and fixed (the followed body); no register widened",
     }),
+    since633: Object.freeze({
+        at: "v4925", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "no gate file added, so nothing is claimed here (a gate may be claimed by ONE closing); physics/render/rtPipeline-selfcheck holds the GPU's bounce paths to the CPU's bounce by bounce and against a rounding-sized control, and the row that called sixteen instances' disagreement rounding is rewritten (173 to 175 rows); tools/ship/rtViewer-selfcheck holds a second mesh, the alpha rule and the capture sky through placements and holes (137 to 161); tools/ship/gitEconomy-selfcheck holds the GPU orrery's panel passing the pointer through and folding (28 to 31); sixteen sabotages, two 0 red at first and fixed; tools/roundhouse/orientationStep-selfcheck, red since 2026-11-07 and found by this round's rotation, names the two study libraries that import the first-order step under registered amendments (Keith's choice), three sabotages red; no register widened",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
