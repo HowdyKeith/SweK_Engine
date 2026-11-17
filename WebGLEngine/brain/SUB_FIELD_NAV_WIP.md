@@ -500,3 +500,7 @@ Reported beside it: each option alone against the reference; how often each opti
 **Expectations, written before any seed is flown.** E1 `sweep+dive` alone at most halves the ship collisions: about 45 percent (a 20 m dive takes about 20 s at 1 m/s, against conflicts of 15 to 30 s). E2 `sweep+leastbad` alone reduces them: about 50 percent. E3 SUPPORTED: about 25 percent. E4 PARTLY SUPPORTED: about 35 percent. E5 no flight is lost to depth: about 95 percent.
 
 **What a result would not say.** The ships do not react here (hard-traffic: the reacting kind is NAV_PLUS item 3's). Their keels are known exactly. The dive ignores icebergs' keels and the region's floor (the navigation model's seabed is 1,000 m).
+
+### CLARIFICATION OF FOLLOW-UP 8's REGISTRATION (2026-11-17, before any of its code is run and before any seed is flown)
+
+"It holds the plan's depth and speed, as give-way does" was ambiguous. When give-way finds no heading, the target the vessel is given is the plan's WITH the yield's slowing (2 m/s at a predicted conflict). Give-way's own target, when it finds one, has no yield. **`+leastbad` changes only the heading of the target it is given, so the yield's slowing stays.** Both options act on the final target, after give-way and `+free` and before FOLLOW-UP 7's sweep. Nothing else changes.
