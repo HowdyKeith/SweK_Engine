@@ -448,3 +448,24 @@ Reported beside it: the designated arm against `ref+free+giveway` (what the swee
 * The mechanism is unchanged and was read from positions and headings, not times: a reversal of the plan about 50 m from the edge, the short way sweeping through the heading at the edge, the plan changing its mind mid-turn.
 
 The turn table and the 28 s, 32 m and 47 m of the turn measurement were computed with the model's own tick and are right. The module's gate now checks a real 180-degree turn of the model against the table at every 5 degrees (worst 0.000 m).
+
+## RESULT OF FOLLOW-UP 7 (2026-11-17; `node tools/ship/subTurnSweepStudy.mjs --set held79 --write`, HELD79 = hard-traffic seeds 7601 to 7660, read once; 240 flights in `brain/subTurnSweepHeld79.jsonl`): **PARTLY SUPPORTED.**
+
+The module, the study and both gates were committed and sabotaged first (dfe83ca0; 23 mutants logged; one of them exposed the time-scale error corrected above). DEV was flown once as the sanity run (no exit in any arm; PARTLY SUPPORTED on 30, not a result). HELD78 was flown as the labelled post hoc check (the designated arm's exits 4 to 1, the reference's 1 to 0; not a result). All four checks passed on HELD79.
+
+| arm | reached | collided (with a ship) | left | timeout | sweep turns | ticks overridden |
+|---|---|---|---|---|---|---|
+| ref (`any+predict+edge+yield`) | 45 / 60 | 10 (9) | **5** | 0 | 0 | 0 |
+| ref+sweep | 47 / 60 | 12 (11) | 1 | 0 | 6 | 0.82% |
+| ref+free+giveway (FOLLOW-UP 6) | 45 / 60 | 11 (8) | 4 | 0 | 0 | 0 |
+| **ref+free+giveway+sweep** | **48 / 60** | 12 (10) | **0** | 0 | 8 | 1.23% |
+
+**Verdict.** No exit: MET (0, against the reference's 5). Net gain of 5 at p <= 0.10 against `ref`: MISSED (10 gained, 7 lost, net 3, exact sign p 0.6291). Ship collisions no more than `ref`'s: MISSED (10 against 9). By the registered rule, PARTLY SUPPORTED.
+
+**Reported beside it.** What the sweep adds to FOLLOW-UP 6's arm: 3 gained, 0 lost (p 0.25); exits 4 to 0. `ref+sweep` against `ref`: 3 gained, 1 lost; exits 5 to 1.
+
+**Against the expectations (written first).** E1 no exit, about 55: held. E2 SUPPORTED, about 20: no. E3 PARTLY SUPPORTED, about 35: held. E4 fewer than 2 percent of ticks overridden: held (1.23). E5 `ref+sweep` reaches at least as many as `ref`: held (47 against 45).
+
+**What this says.** The diagnosis was right about the exits. Taking the long way round when the short way leaves the region removed every exit on a fresh set, and it never cost the give-way arm a flight it had reached. It did not fix traffic. The flights it kept inside mostly ended against a ship instead (`ref+sweep`: 4 fewer exits, 2 more collisions), and the designated arm reached 48, three more than either reference, not significant. **Traffic is still not fixed. The failures left are collisions with ships, about 1 flight in 6, with no exit on any arm that has the sweep.**
+
+**What it leaves open (`nav-traffic-avoid-not-slow` stays OPEN).** The collisions: whether the sweep's long way, which checks only the edge, turns into ships (the registration said it might, and it was not checked). A sweep that checks ships as well as the edge is the obvious next registration. The one remaining exit of `ref+sweep` (both ways out).
