@@ -30,7 +30,8 @@ export const DEFAULT_OUT = path.join(BRAIN, "seatFlyWired3WeightsDefault.json"),
 export const REGIMES = Object.freeze(["fleetNoCannon", "fleetCannon", "fleetEscorts", "fighters"]), ARMS = Object.freeze(["shipped", "ships"]), FLEET_SHIPS = 3, ESCORTS = 6, GAINS = Object.freeze([-3, -3]);
 export const POLICY = Object.freeze({ shipped: FT.POLICY_ID, ships: FT.POLICY_ID3 });
 const pairs = (kinds, first, n) => Object.freeze(kinds.flatMap((kind) => Array.from({ length: n }, (_, i) => Object.freeze({ kind, seed: first + i }))));
-export const SETS = Object.freeze({ fleetNoCannon: pairs(D.KINDS, 161001, 75), fleetCannon: pairs(D.KINDS, 161001, 75), fleetEscorts: pairs(D.KINDS, 171001, 75), fighters: pairs(BF.KINDS, 181001, 75) });
+const FLEET = pairs(D.KINDS, 161001, 75);   // the two fleets without escorts fly the same pairs
+export const SETS = Object.freeze({ fleetNoCannon: FLEET, fleetCannon: FLEET, fleetEscorts: pairs(D.KINDS, 171001, 75), fighters: pairs(BF.KINDS, 181001, 75) });
 /** The jobs of one fight and arm. */
 export function jobsOf(regime, arm, list = SETS[regime]) {
     const network = { policy: POLICY[arm], weights: GAINS.slice() };
