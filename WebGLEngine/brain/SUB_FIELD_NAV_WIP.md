@@ -438,3 +438,13 @@ Reported beside it: the designated arm against `ref+free+giveway` (what the swee
 **Expectations, written before any seed is flown.** E1 the designated arm has no exit: about 55 percent. Exits are about 1 in 15 flights on this kind, and the sweep cannot help a vessel whose both directions are out. E2 SUPPORTED: about 20 percent, because the gain bar needs 5 net and exits were at most 4 of 60. E3 PARTLY SUPPORTED: about 35 percent. E4 the sweep overrides fewer than 2 percent of ticks: about 80 percent. E5 `ref+sweep` reaches at least as many as `ref`: about 70 percent.
 
 **What a result would not say.** The table is the clean turn of one hull at cruise. The region's edge is a hard wall here and the islands are not in the check (only the edge is), so a sweep could steer into an island. The verdict is about exits on hard-traffic.
+
+### CORRECTION TO THE DIAGNOSIS AND TO FOLLOW-UP 7's REGISTRATION (2026-11-17, while building its gate, BEFORE ANY HELD79 SEED IS FLOWN; the option, the arms, the set, the test, the bars and SWEEP_PAD are UNCHANGED)
+
+**My trace scripts counted time as ticks x 0.1 s. The model's tick is 1/30 s**, so every time in the diagnosis above is three times too large. The gate found it: a flight of 3310 ticks cannot be 331 s long when a flight is capped at 260 s. Corrected:
+* The last ship conflict ended **10 to 79 s** before the exit in the three late cases (not 90 to 236), and 7539 exits **5 s** after its episode (not 16).
+* 7503's reversal is at **78 s** (not 235); the reference's on 7553 at **66 s** (not 199).
+* **"In the traces the turns ran slower than the clean one" is WRONG.** 7503 turned 67 degrees in 11.7 s, about 5.7 degrees a second, near the clean turn's 6.4. That sentence was SWEEP_PAD's stated reason. SWEEP_PAD stays 10 m as registered, as a fixed allowance for the plan moving during the turn and for the vessel not starting the turn at cruise. It has no measured basis, which is what "not tuned" already said.
+* The mechanism is unchanged and was read from positions and headings, not times: a reversal of the plan about 50 m from the edge, the short way sweeping through the heading at the edge, the plan changing its mind mid-turn.
+
+The turn table and the 28 s, 32 m and 47 m of the turn measurement were computed with the model's own tick and are right. The module's gate now checks a real 180-degree turn of the model against the table at every 5 degrees (worst 0.000 m).
