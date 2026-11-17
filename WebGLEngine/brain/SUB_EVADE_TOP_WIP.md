@@ -112,3 +112,55 @@ DEV is free to read. **HELD (131001 to 131096) is NOT flown by this note's work 
 * **No mechanism is read.**
 
 **What this does to HELD: nothing is changed.** HELD scores the registered rules. **On DEV seven of my 17 forecasts other than R0 on HELD would have been wrong as the larger side** (RA1 "PLATEAU", 52, and "MIXED", 34; the arm at 40.0 pays on both fast bases, 85, and costs on some fast base, 6; each fast peak at 30.0 or higher, 38; "DONOR ONE VALUE", 14; some arm COSTS anywhere, 25); they are scored on HELD only.
+
+## HELD RESULT (2026-11-17; `node tools/ship/takeEvadeTop.mjs held --write` flown ONCE on Keith's word "fly HELD now", geometries 131001 to 131096 (192 duels a matchup), exit 0; record `brain/subEvadeTopHeld.json`: 22 matchups, no check failed)
+
+**The rules are about HELD.** **R0 holds:** league7100 over league7001 **+1.317** (z 15.2, 94-87-11) and over exploit7204 **+1.440** (z 12.9, 106-69-17), both decided.
+
+* **RA1 THE TOP: "MIXED".** The paired step from the arm at 25.0 to the arm at 40.0 is **+0.013 +- 0.117 (z 0.1): FLAT on F:league7001** and **-0.913 +- 0.158 (z -5.8): FALLS on F:exploit7204** (r = 0, f = 1). **DEV read +0.132 (FLAT) and -1.071 (FALLS): the same words on both sets.**
+* **RA2 THE BOUND:** the arm at 40.0 PAYS on 1 of 2 fast bases (F:league7001 **+0.409**, z 2.8, 77-66-49) and **COSTS on 1 (F:exploit7204 -0.348, z -2.4, 38-95-59).**
+* **RA3 THE DOSE:** F:league7001 PAYS at all five values (16.00 +0.349, 25.00 +0.395, **30.00 +0.669**, 35.00 +0.504, 40.00 +0.409), peak **30.00**; F:exploit7204 PAYS at 16.00 (+0.363), 25.00 (+0.564) and **30.00 (+0.658)**, is NEUTRAL at 35.00 (+0.071) and **COSTS at 40.00**, peak **30.00**.
+* **RB1 THE DONOR: "DONOR ONE VALUE".** D:league7100's arm at 25.0 is **+0.133 +- 0.077 (z 1.7): NEUTRAL**; at 40.0 **+0.620 +- 0.105 (z 5.9, 59-114-19): PAYS** (p = 1, c = 0). Its arms at 16.0, 30.0 and 35.0 are +0.207, +0.209 and **+0.399 (z 4.1: PAYS)**.
+* **RT THE HEADLINE: "MIXED / DONOR ONE VALUE", the same on DEV and on HELD.**
+* **The forecast quantities on HELD:** PLATEAU no; RISES TO THE BOUND no; FALLS ABOVE 25 no; MIXED yes; the arm at 40.0 pays on both fast bases no; costs on some fast base yes; each fast peak at 30.0 or higher yes; the arm at 40.0 is the greatest on a fast base no; DONOR PAYS no; ONE VALUE yes; MIXED no; COSTS no; NEUTRAL no; the donor's arm at 25.0 is smaller than the fast mean yes (+0.133 against +0.480); both of S:exploit7204's arms at 25.0 and 40.0 pay yes; some arm COSTS yes (one: F:exploit7204 at 40.0).
+* **15 of the 20 arms PAY and 1 COSTS** (5 on F:league7001, 3 on F:exploit7204, 5 on S:exploit7204, 2 on D:league7100); on DEV 14 and 1.
+
+### The forecasts, scored (section 5, as the larger side; none was at exactly 50)
+
+| forecast | p | HELD | as the larger side |
+|---|---|---|---|
+| R0 holds on DEV | 96 | true | right |
+| R0 holds on HELD | 95 | true | right |
+| RA1 is "PLATEAU" | 52 | **false (MIXED)** | **wrong** |
+| RA1 is "RISES TO THE BOUND" | 8 | false | right |
+| RA1 is "FALLS ABOVE 25" | 6 | false | right |
+| RA1 is "MIXED" | 34 | **true** | **wrong** |
+| the arm at 40.0 PAYS on both fast bases | 85 | **false** | **wrong** |
+| the arm at 40.0 COSTS on some fast base | 6 | **true** | **wrong** |
+| the peak of each fast base is 30.0 or higher | 38 | **true** | **wrong** |
+| the arm at 40.0 is the greatest arm on at least one fast base | 48 | false | right |
+| RB1 is "DONOR PAYS" | 36 | false | right |
+| RB1 is "DONOR ONE VALUE" | 14 | **true** | **wrong** |
+| RB1 is "DONOR MIXED" | 4 | false | right |
+| RB1 is "DONOR COSTS" | 10 | false | right |
+| RB1 is "DONOR NEUTRAL" | 36 | false | right |
+| the donor's arm at 25.0 is smaller than the mean of the two fast arms at 25.0 | 80 | true | right |
+| both of S:exploit7204's arms at 25.0 and 40.0 PAY | 60 | true | right |
+| some arm COSTS anywhere | 25 | **true** | **wrong** |
+
+**11 of the 18 forecasts are right as the larger side; the seven misses are the same seven DEV showed.** The reading behind them: I took the pooled steps from 16 to 25 (+0.16, +0.14) as a dose flattening gently, and the fast trackers' top is not a flattening but, on exploit7204, a fall; a long interval costs a boat that tracks fast, and I had put that at 6.
+
+### What the two sets show together (POST-HOC, labelled; not a rule of this note)
+
+* **The two sets agree.** The 20 arm edges of DEV and HELD correlate at **0.93**; **19 of the 20 arm statuses are the same** (the one that differs is D:league7100 at 35.00: +0.248 NEUTRAL on DEV, +0.399 PAYS on HELD); the four steps from 25 to 40 have the same words on both sets (FLAT, FALLS, RISES, RISES).
+* **Pooled over the two sets of this round** (inverse-variance, each estimate's own standard error): the step from 25 to 40 is **+0.069 (se 0.085) on F:league7001, -0.996 (se 0.109) on F:exploit7204, +0.638 (se 0.068) on S:exploit7204 and +0.473 (se 0.077) on D:league7100.** The pooled arms by value (16, 25, 30, 35, 40): F:league7001 +0.45, +0.47, **+0.69**, +0.60, +0.55; F:exploit7204 +0.40, +0.61, **+0.67**, +0.10, **-0.38**; S:exploit7204 +0.28, +0.39, +0.76, +0.83, **+1.02**; D:league7100 +0.16, +0.10, +0.18, +0.34, **+0.56**.
+* **The top of the dose depends on the base, and the cleanest contrast is within one boat.** S:exploit7204 and F:exploit7204 are the same boat except for trackSpeed (3.15 against 4.50): **at pingEvery 40 the one gains +0.96 and +1.08 and the other loses -0.41 and -0.35** (DEV, HELD). **S:exploit7204 and D:league7100 (both trackSpeed 3.15) keep rising to the bound; the two fast trackers peak at 30 and exploit7204 falls**; F:league7001 stays flat from 16 to 40. **Neither S nor D is in RA1, so the rise of the slow trackers is not a rule of this note; it is the same on both sets.** On the fast bases the drawn duels grow with the value (F:exploit7204 7, 8, 15, 62, 95 of 192 at 16, 25, 30, 35, 40 on HELD; F:league7001 15, 12, 23, 31, 66) and fall on S:exploit7204 (110 to 75) and D:league7100 (145 to 114). **No mechanism is read.**
+* **league7100's own pingEvery of 8.30 is not at the top of its dose either.** Its own boat gains from a longer interval only at the top of the grid (35.0 and 40.0 on HELD, 40.0 on DEV; pooled +0.34 and +0.56) and **its dose is still rising at the bound of 40**, so this grid has not found its top; the bound is the limit of the theta space (`THETA_BOUNDS`, 4 to 40), not a result.
+* **The anchors:** the arms at 16.00 and 25.00 on the fast bases agree with the ping note's within about 2 combined standard errors; F:league7001 at 25.00 on HELD (+0.395) is again below the ping note's pooled +0.814.
+
+### What this result does and does not say
+
+* **It says, by this note's rules:** on the two fast trackers the dose above 25 does not rise (flat on league7001, a decided fall on exploit7204 from 35), and **league7100 with a longer pingEvery gains at the bound of 40 and not at 25**: "MIXED / DONOR ONE VALUE" on DEV and on HELD.
+* **It does not say** that a longer interval is a piece of league7100's lead (its own interval is 8.30 and the donor's arm at 8.30-to-25 does not pay); **nor** that the slow-tracker rise is general (two bases, one of them a copy of a fast base with trackSpeed 3.15); **nor** anything about a boat other than the base (every arm is against its base).
+* **Not flown, so not said:** any pingEvery above 40 (the bound); an interaction grid of trackSpeed and pingEvery (does trackSpeed set where the top of the dose is?); league7100 with pingEvery 40 (or 35) as a boat against the other fourteen boats; an interaction with pingAfter or searchPing.
+* **The candidates this leaves, each its own registration and none decided:** league7100's theta with a longer pingEvery against the other boats (the shape of `sub-evade-away`: does the gain at 40 survive against boats that are not its base?); a trackSpeed by pingEvery grid on exploit7204 (the one boat with both a fast and a slow variant on the books); the bound itself (a change to `THETA_BOUNDS`, a shared file, so a registration of its own).
