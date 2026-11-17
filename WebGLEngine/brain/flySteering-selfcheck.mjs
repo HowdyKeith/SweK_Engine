@@ -91,6 +91,19 @@ section(() => {
     ok("!! THE SECOND HELM (policy helmFlyWired2: `fly2~odd`) ADDS NOTHING WHEN THE ENEMY IS DEAD AHEAD -- the rule's torque comes back as it is -- where the first helm adds a torque of its own there; battleshipDuel seats a helmFlyWired2 file with that library", FS.second === FS.wiringOf("fly2~odd") && FS.POLICY_ID2 === "helmFlyWired2" && on.torque.join() === "7,3,-2" && off.torque.join() !== "7,3,-2" && (() => { const r = D.sideFromBrains("s", [PB.exportBrain(PB.describePolicy(FS.POLICY_ID2, FS.second), Float32Array.from([-2, -2]), { by: "x" })]); return r.refused.length === 0 && r.side.helmNet.module === FS.second; })());
 });
 
+console.log("5c. THE THIRD HELM: THE SECOND THAT KNOWS WHICH FIGHT IT IS IN");
+section(() => {
+    const rule = D.makeSide("rule"), ruleN = D.makeSide("ruleN", { cannon: false }), w3 = Float32Array.from([-2, -2, 0.5, 0.5]), mk3 = (cannon) => D.makeSide("t", { cannon, helmNet: { module: FS.third, weights: w3 } }), mk2 = (g, cannon) => D.makeSide("s", { cannon, helmNet: { module: FS.second, weights: Float32Array.from([g, g]) } });
+    const a = D.duel(mk3(true), rule, 3, "crossing"), b = D.duel(mk2(-2, true), rule, 3, "crossing"), c = D.duel(mk3(false), ruleN, 3, "crossing"), d = D.duel(mk2(0.5, false), ruleN, 3, "crossing");
+    ok("!! WITH A CANNON THE THIRD HELM IS THE SECOND AT ITS FIRST PAIR OF GAINS, WITHOUT ONE AT ITS SECOND PAIR, TO THE BIT, in a fight each way (the fingerprints); the two fights are different fights", a.fingerprint === b.fingerprint && c.fingerprint === d.fingerprint && a.fingerprint !== c.fingerprint && FS.third.WEIGHT_COUNT === 4 && FS.POLICY_ID3 === "helmFlyWired3");
+    const z = D.duel(D.makeSide("z", { cannon: false, helmNet: { module: FS.third, weights: Float32Array.from([-2, -2, 0, 0]) } }), ruleN, 3, "crossing"), r0 = D.duel(D.makeSide("r", { cannon: false }), ruleN, 3, "crossing");
+    ok("!! ZERO GAINS WITHOUT A CANNON ARE THE RULE: [-2, -2, 0, 0] in a fight with no cannon is the plain ship's fight to the bit, whatever its gains with one", z.fingerprint === r0.fingerprint);
+    const SHIP = CS.createCapitalShip(), none = { ...SHIP, waveGun: { ...SHIP.waveGun, charge: Infinity } };
+    ok("hasCannon() reads the hull as battleshipDuel leaves it: a cannon that charges is one, a cannon that never finishes charging is none, and a hull with no cannon at all is none; the helm says which pair it used", FS.hasCannon(SHIP) && !FS.hasCannon(none) && !FS.hasCannon({}) && !FS.hasCannon(null) && (() => { const body = RB.createBody({ mass: SHIP.mass, I: [...SHIP.I] }), h = FS.third.helmFor(w3), ctx = (ship) => ({ body, ship, foe: { body: { pos: [300, 100, 50], vel: [0, 0, 0] } }, thrustMax: 1500 }); h({ torque: [0, 0, 0], thrust: 1 }, ctx(SHIP)); const c1 = h.cannon; h({ torque: [0, 0, 0], thrust: 1 }, ctx(none)); return c1 === true && h.cannon === false && h.last && h.last.D.length === 2; })());
+    const blob = PB.exportBrain(PB.describePolicy(FS.POLICY_ID3, FS.third), w3, { by: "x" }), r = D.sideFromBrains("s", [blob]);
+    ok("battleshipDuel seats a helmFlyWired3 file (four numbers) at the helm; one a weight short is refused", r.refused.length === 0 && r.side.helmNet.module === FS.third && /weight count 3 does not match helmFlyWired3's current 4/.test(D.sideFromBrains("b", [{ ...blob, weights: [1, 2, 3] }]).refused[0].reason));
+});
+
 console.log("6. THE FRONT DOOR");
 section(() => {
     const blob = PB.exportBrain(PB.describePolicy(FS.POLICY_ID, FS), Float32Array.from([-1, -0.5]), { by: "a fly-wired helm" }), r = D.sideFromBrains("s", [blob]), bad = D.sideFromBrains("b", [{ ...blob, weights: [1] }]);
@@ -98,7 +111,7 @@ section(() => {
     const job = (wiring) => ({ x: { id: "n", helmNet: wiring ? { policy: "helmFlyWired", weights: [-1, -1], wiring } : { policy: "helmFlyWired", weights: [-1, -1] } }, y: { id: "rule" }, kind: "crossing", seed: 3 }), lf = leadOf(job(null)), ls = leadOf(job("shuffled:4242")), ln = leadOf(job("sine"));
     ok("!! the pool flies it over a named wiring: the fly's, the shuffled control's and the sine's are three different fights of the same gains, and the fly's by name is the fly's", lf !== ls && lf !== ln && ls !== ln && leadOf(job("fly")) === lf && lf === D.pair(D.makeSide("n", { helmNet: { module: FS, weights: Float32Array.from([-1, -1]) } }), D.makeSide("rule"), 3, "crossing", { countBrains: false }).lead, `leads ${lf.toFixed(3)}, ${ls.toFixed(3)}, ${ln.toFixed(3)}`);
     ok("the report says real numbers", /220 neurons, 7981 connections, no learned weight inside; D follows -sin\(goal - heading\): correlation -1\.000, amplitude 0\.056/.test(FS.reportLines()[1]));
-    ok("the export list", Object.keys(FS).sort().join() === "AMPLITUDE,AMPLITUDE2,CONTROL_SEED,FEATURES,HIDDEN,INPUT_CELLS,OUTPUTS,POLICY_ID,POLICY_ID2,STEPS,THRESHOLD,THRESHOLD2,TORQUE_FRACTION,WEIGHT_COUNT,bridgeAngle,cells,columnAngle,epgAngle,handWeights,helmFactory,helmFor,reportLines,second,signOf,steer,topology,tuning,wiringOf,withThreshold,zeroWeights");
+    ok("the export list", Object.keys(FS).sort().join() === "AMPLITUDE,AMPLITUDE2,CONTROL_SEED,FEATURES,HIDDEN,INPUT_CELLS,OUTPUTS,POLICY_ID,POLICY_ID2,POLICY_ID3,STEPS,THRESHOLD,THRESHOLD2,TORQUE_FRACTION,WEIGHT_COUNT,bridgeAngle,cells,columnAngle,epgAngle,handWeights,hasCannon,helmFactory,helmFor,reportLines,second,signOf,steer,third,topology,tuning,wiringOf,withThreshold,zeroWeights");
 });
 
 console.log(`\n${fails === 0 ? "ALL PASS" : fails + " FAILED"}`);

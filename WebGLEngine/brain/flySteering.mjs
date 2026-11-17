@@ -119,6 +119,23 @@ export function wiringOf(name = "fly") {
 }
 /** THE SECOND HELM, as a policy of its own (`helmFlyWired2`): the second variant read the odd way (`fly2~odd`). A brain file for it is two gains, as the first's. */
 export const POLICY_ID2 = "helmFlyWired2", second = wiringOf("fly2~odd");
+/** Has this ship a cannon? battleshipDuel takes a side's cannon away by giving its hull a cannon that never finishes charging (waveGun.charge Infinity); the arena is not edited. */
+export const hasCannon = (ship) => !!(ship && ship.waveGun && Number.isFinite(ship.waveGun.charge));
+/**
+ * THE THIRD HELM (`helmFlyWired3`): THE SECOND HELM THAT KNOWS WHICH FIGHT IT IS IN. tools/ship/takeFlyWiredNext.mjs's `together` read the second helm LEADING the rule by 0.945 with the cannon and TRAILING it by 0.692 without. Four weights: the two gains with a cannon (w[0], w[1]) and the two without (w[2], w[3]); each tick
+ * the helm asks hasCannon(ctx.ship) and answers as the second helm at that pair of gains. With a cannon it IS the second helm at w[0..1] to the bit, without one at w[2..3] (the gate flies both); zero gains are the rule. tools/ship/takeFlyWiredHelmFix.mjs chose the gains without a cannon.
+ */
+export const POLICY_ID3 = "helmFlyWired3";
+export const third = (() => {
+    const zeroWeights = () => new Float32Array(4);
+    function helmFor(w) {
+        const withC = second.helmFor(Float32Array.from([w[0], w[1]])), without = second.helmFor(Float32Array.from([w[2], w[3]]));
+        function helm(rule, ctx) { const h = hasCannon(ctx.ship) ? withC : without, out = h(rule, ctx); helm.last = h.last; helm.cannon = h === withC; return out; }
+        helm.last = null; helm.cannon = null;
+        return helm;
+    }
+    return Object.freeze({ name: "fly2~odd, cannon-aware", amplitude: second.amplitude, FEATURES, HIDDEN, OUTPUTS: 4, WEIGHT_COUNT: 4, TORQUE_FRACTION, steer: second.steer, zeroWeights, handWeights: zeroWeights, helmFor, helmFactory: (w) => () => helmFor(w) });
+})();
 /** The circuit with another threshold (for the gate's and the header's claim about what the threshold does). */
 export const withThreshold = (threshold) => circuitOf(matrixOf(), { threshold });
 export const steer = FLY.steer, cells = FLY.cells, zeroWeights = FLY.zeroWeights, handWeights = FLY.handWeights, helmFor = FLY.helmFor, helmFactory = FLY.helmFactory, topology = CX;
