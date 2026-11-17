@@ -21,7 +21,7 @@ export const PARAMS = Object.freeze({
     Cw: 4, dc: 0.01, Tg: 30,
     ci1: 0.5, ci2: 0.3, ca: 0.3, tau: 0.04,
     Ts: 0.7, nsp: 4, Na: 1, aFfi1: 0.5, TF0: 15, aFfi: 0.02,
-    mFromThresholded: true, polarity: "both", ffiPool: "segment",       // true: m = sum |G| over the pixels that pass T_g (eq. 11; the grouping layer exists to suppress noise); false: sum |G~| over all pixels (eq. 12 as printed)
+    mFromThresholded: true, polarity: "both", ffiPool: "segment", channels: "pooled", kappa: 0.5,       // true: m = sum |G| over the pixels that pass T_g (eq. 11; the grouping layer exists to suppress noise); false: sum |G~| over all pixels (eq. 12 as printed)
 });
 
 // the lateral inhibition kernel (eq. 5): the 8 neighbours, 1/8 at the corners and 1/4 at the edge midpoints, 0 at the centre
@@ -74,6 +74,21 @@ export function adaptC(c, m, m1, m2, { ci1, ci2, ca, tau, dc }) {
 /** Eq. 13: M = 1 / (1 + exp(-c m / n_cell)). */
 export const sigmoidM = (c, m, ncell) => 1 / (1 + Math.exp(-(c * m) / ncell));
 
+/**
+ * Round 23: the COMBINED ON/OFF grouping channels. Each polarity has its own grouping potential m and its own adaptive coefficient c (eq. 14 to 16); the cell's output M is built from the two a = c_on m_on and b = c_off m_off, per `rule`:
+ *   "sum"       M = sigmoid((a + b) / n_cell)
+ *   "max"       M = max(sigmoid(a / n_cell), sigmoid(b / n_cell))
+ *   "dominance" M = sigmoid((max(a, b) - kappa min(a, b)) / n_cell): the stronger channel excites, the weaker inhibits (mixed-polarity activity is suppressed)
+ * Returns { M, m } with m the combined potential (a + b for sum; the larger of a and b for max; max - kappa min for dominance), as c m.
+ */
+export function combineChannels(rule, mOn, cOn, mOff, cOff, ncell, kappa = 0.5) {
+    const a = cOn * mOn, b = cOff * mOff;
+    if (rule === "sum") return { M: sigmoidM(1, a + b, ncell), m: a + b };
+    if (rule === "max") return { M: Math.max(sigmoidM(1, a, ncell), sigmoidM(1, b, ncell)), m: Math.max(a, b) };
+    if (rule === "dominance") { const v = Math.max(a, b) - kappa * Math.min(a, b); return { M: sigmoidM(1, v, ncell), m: v }; }
+    throw new Error(`crabMlg1.combineChannels: rule is sum, max or dominance, got ${JSON.stringify(rule)}`);
+}
+
 /** Eq. 17 and 18 with N_a = 1: F = a_1 F(t - 1) + (sum |P(t - 1)|) / n_cell and T_FFI = T_F0 + a_ffi T_FFI(t - 1). Returns { F, Tffi }. */
 export function ffiStep(F, Tffi, absP, ncell, { aFfi1, TF0, aFfi }) { return { F: aFfi1 * F + absP / ncell, Tffi: TF0 + aFfi * Tffi }; }
 
@@ -99,10 +114,11 @@ export function winnerTakeAll(active, n) {
 export function createNetwork({ W, H, params = {} }) {
     const P = { ...PARAMS, ...params }, n = P.segments;
     if (!["segment", "global"].includes(P.ffiPool)) throw new Error(`crabMlg1.createNetwork: ffiPool is segment or global, got ${JSON.stringify(P.ffiPool)}`);
+    if (!["pooled", "sum", "max", "dominance"].includes(P.channels)) throw new Error(`crabMlg1.createNetwork: channels is pooled, sum, max or dominance, got ${JSON.stringify(P.channels)}`);
     if (!["both", "off", "on"].includes(P.polarity)) throw new Error(`crabMlg1.createNetwork: polarity is both, off or on, got ${JSON.stringify(P.polarity)}`);
     if (!(W >= n && H >= 3)) throw new Error(`crabMlg1.createNetwork: a panorama at least ${n} x 3 pixels, got ${W} x ${H}`);
     const cols = Array.from({ length: n }, (_, j) => segmentColumns(j, W, P)), sw = cols[0].length, ncell = sw * H;
-    const a1 = 1 / (1 + Math.exp(P.mu * 1)), fresh = () => ({ Lprev: null, Pprev: new Float32Array(sw * H), c: P.dc, m1: 0, m2: 0, F: 0, Tffi: P.TF0, hist: [], started: false });
+    const a1 = 1 / (1 + Math.exp(P.mu * 1)), fresh = () => ({ Lprev: null, Pprev: new Float32Array(sw * H), c: P.dc, m1: 0, m2: 0, cOff: P.dc, m1Off: 0, m2Off: 0, F: 0, Tffi: P.TF0, hist: [], started: false });
     let st = Array.from({ length: n }, fresh), t = -1, won = false, winnerIdx = null, lslVal = null;
     const step = (frame) => {
         if (frame.w !== W || frame.h !== H) throw new Error(`crabMlg1.step: the frame is ${frame.w} x ${frame.h}, the network ${W} x ${H}`);
@@ -115,15 +131,23 @@ export function createNetwork({ W, H, params = {} }) {
             if (!s.started) { s.Lprev = L; s.started = true; continue; }
             const Pn = photoreceptor(s.Pprev, L, s.Lprev, a1);                                            // eq. 1, 2
             const Iin = conv3(s.Pprev, sw, H, KI), Sg = summation(Pn, Iin, P.Wi, P.inhibitionSign);       // eq. 3 to 6
-            const { m } = groupingM(Sg, sw, H, { Cw: P.Cw, dc: P.dc, Tg: P.Tg, thresholded: P.mFromThresholded, polarity: P.polarity });   // eq. 7 to 12
-            s.c = adaptC(s.c, m, s.m1, s.m2, P);                                                          // eq. 14 to 16
-            const M = sigmoidM(s.c, m, ncell);                                                            // eq. 13
+            let m, M, mOn = 0, mOff = 0;
+            if (P.channels === "pooled") {
+                m = groupingM(Sg, sw, H, { Cw: P.Cw, dc: P.dc, Tg: P.Tg, thresholded: P.mFromThresholded, polarity: P.polarity }).m;   // eq. 7 to 12
+                s.c = adaptC(s.c, m, s.m1, s.m2, P);                                                      // eq. 14 to 16
+                M = sigmoidM(s.c, m, ncell);                                                              // eq. 13
+            } else {                                                                                      // Round 23: two channels, two adaptive coefficients
+                const gp = { Cw: P.Cw, dc: P.dc, Tg: P.Tg, thresholded: P.mFromThresholded };
+                mOn = groupingM(Sg, sw, H, { ...gp, polarity: "on" }).m; mOff = groupingM(Sg, sw, H, { ...gp, polarity: "off" }).m;
+                s.c = adaptC(s.c, mOn, s.m1, s.m2, P); s.cOff = adaptC(s.cOff, mOff, s.m1Off, s.m2Off, P);
+                const cc = combineChannels(P.channels, mOn, s.c, mOff, s.cOff, ncell, P.kappa); M = cc.M; m = cc.m;
+            }
             let absP = 0; for (let i = 0; i < s.Pprev.length; i++) absP += Math.abs(s.Pprev[i]);
             const ff = ffiStep(s.F, s.Tffi, P.ffiPool === "global" ? globalAbs : absP, ncell, P); s.F = ff.F; s.Tffi = ff.Tffi;                // eq. 17, 18
             const spike = spikeOf(M, s.F, s.Tffi, P.Ts); s.hist.push(spike); if (s.hist.length > P.nsp) s.hist.shift();   // eq. 19
             const alarm = alarmOf(s.hist, P.nsp);                                                         // eq. 20
             out.M[j] = M; out.spike[j] = spike; out.alarm[j] = alarm; out.m[j] = m; out.F[j] = s.F; out.c[j] = s.c;
-            s.m2 = s.m1; s.m1 = m; s.Pprev = Pn; s.Lprev = L;
+            if (P.channels === "pooled") { s.m2 = s.m1; s.m1 = m; } else { s.m2 = s.m1; s.m1 = mOn; s.m2Off = s.m1Off; s.m1Off = mOff; } s.Pprev = Pn; s.Lprev = L;
         }
         // eq. 21, 22: the first frame with an alarm names the location
         if (!won) {
