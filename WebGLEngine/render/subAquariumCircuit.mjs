@@ -21,7 +21,7 @@ let policy = null;
 export const plainPolicy = () => policy || (policy = CS.createPlainPolicy(PLAIN_CHAMPION.hidden, "plain"));
 /** The seat of a circuit profile: a function of the dive's context that returns the seat, the shape brain/surveySeat.mjs `surveySeat` gives. An unknown name is refused by name. `champion` is a seam for the gate (default the generated champion). */
 export function circuitSeat(profile, champion = PLAIN_CHAMPION) {
-    if (profile === "rule") return U.tunedSeat(SS.SURVEY_CONSTANTS, U.WIDE_BOUNDS);
+    if (profile === "rule") return U.tunedSeat(SS.SURVEY_ROUND33, U.WIDE_BOUNDS);   // 2026-11-17: the circuit's own base rule (low -0.06), which it is shown against
     if (profile === "circuit") {
         const Pol = plainPolicy(), w = Float32Array.from(champion.weights);
         if (w.length !== Pol.WEIGHT_COUNT) throw new Error(`subAquariumCircuit.circuitSeat: the champion has ${w.length} weights and its net takes ${Pol.WEIGHT_COUNT}`);

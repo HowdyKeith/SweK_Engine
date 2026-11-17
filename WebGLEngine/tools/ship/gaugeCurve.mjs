@@ -18,7 +18,8 @@ export const nameOf = (s) => (s === 0 ? "L0" : "L" + s.toFixed(2));
 export const ARMS = Object.freeze(SHIFTS.map(nameOf));
 export function shiftOf(arm) { const i = ARMS.indexOf(arm); if (i < 0) throw new Error(`gaugeCurve.shiftOf: unknown arm ${JSON.stringify(arm)} (${ARMS.join(", ")})`); return SHIFTS[i]; }
 /** The constants of an arm: the Round 8 constants with low moved by its shift, nothing else. L-0.06 is SURVEY_CONSTANTS exactly. */
-export const constantsOf = (arm) => { const s = shiftOf(arm); return s === SS.SURVEY_LOW_SHIFT ? SS.SURVEY_CONSTANTS : { ...SS.SURVEY_R8, low: SS.SURVEY_R8.low + s }; };
+// 2026-11-17 (Round 37): the seat moved to low -0.04. This round FLEW the seat on low -0.06, so the constants it names are written here BY VALUE (every arm, L-0.06 included), not read from surveySeat.
+export const constantsOf = (arm) => { const s = shiftOf(arm); return Object.freeze({ ...SS.SURVEY_R8, low: SS.SURVEY_R8.low + s }); };
 /** The pilot of an arm: the seat's planner and profile on the arm's constants. `overrides` is for the gate. */
 export const pilotOf = (arm, overrides = {}) => T.flyDecision(Q.perturbedSeat(constantsOf(arm), {}, SS.planOf("standard", overrides)));
 export function chunkRange(j, range = SEEDS) {

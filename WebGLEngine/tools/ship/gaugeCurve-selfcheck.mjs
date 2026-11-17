@@ -38,8 +38,8 @@ console.log("gaugeCurve-selfcheck -- Round 36, the shift curve under a biased ga
 sec("1. REGISTRATION");
 ok("!! seeds 48001-48300, kind both, 300 dives; the gate's 48901-48902 outside them", J(X.SEEDS) === J([48001, 48300]) && X.KIND === "both" && X.DIVES === 300 && X.SEEDS[1] - X.SEEDS[0] + 1 === 300 && J(X.GATE_SEEDS) === J([48901, 48902]));
 ok("!! the shifts 0, -0.02, -0.04, -0.06 named L0, L-0.02, L-0.04, L-0.06; REF and BIAS; the shares 5, 25 and 100 percent", J(X.SHIFTS) === J([0, -0.02, -0.04, -0.06]) && J(X.ARMS) === J(["L0", "L-0.02", "L-0.04", "L-0.06"]) && J(X.COND_NAMES) === J(["REF", "BIAS"]) && J(X.SHARES) === J([0.05, 0.25, 1]));
-ok("!! each arm's constants are the Round 8 constants with low moved by its shift and nothing else; L-0.06 is SURVEY_CONSTANTS itself", X.ARMS.every((a) => J({ ...X.constantsOf(a), low: SS.SURVEY_R8.low }) === J(SS.SURVEY_R8) && near(X.constantsOf(a).low, SS.SURVEY_R8.low + X.shiftOf(a), 1e-15)) &&
-    X.constantsOf("L-0.06") === SS.SURVEY_CONSTANTS && X.constantsOf("L0").low === SS.SURVEY_R8.low && throws(() => X.shiftOf("L-0.08"), /unknown arm/));
+ok("!! each arm's constants are the Round 8 constants with low moved by its shift and nothing else; L-0.06 is the Round 33 constants it flew (SURVEY_ROUND33; until 2026-11-17 SURVEY_CONSTANTS itself)", X.ARMS.every((a) => J({ ...X.constantsOf(a), low: SS.SURVEY_R8.low }) === J(SS.SURVEY_R8) && near(X.constantsOf(a).low, SS.SURVEY_R8.low + X.shiftOf(a), 1e-15)) &&
+    JSON.stringify(X.constantsOf("L-0.06")) === JSON.stringify(SS.SURVEY_ROUND33) && X.constantsOf("L0").low === SS.SURVEY_R8.low && throws(() => X.shiftOf("L-0.08"), /unknown arm/));
 const ch = Array.from({ length: X.CHUNKS }, (_, j) => X.chunkRange(j));
 ok("!! the 32 jobs; four chunks cover 48001-48300 once, in order", X.JOBS.length === 32 && new Set(X.JOBS.map((j) => j.join())).size === 32 && ch[0][0] === 48001 && ch[3][1] === 48300 && ch.every((c, j) => j === 0 || c[0] === ch[j - 1][1] + 1) && throws(() => X.chunkRange(4), /not 0\.\.3/));
 
@@ -87,7 +87,7 @@ sec("4. FLIGHT (short dives on the gate's seeds)");
     ok("!! L-0.02 is the planner on R8 with low - 0.02, standard profile; BIAS is Round 34's gauge and reaches it", a2.runs.length === 1 &&
         fps(a2) === fps(T.evaluate(T.flyDecision(Q.perturbedSeat({ ...SS.SURVEY_R8, low: SS.SURVEY_R8.low - 0.02 }, {}, SS.planOf("standard", { seconds: 60 }))), set, { gauge: F.gaugeOfCond("REF"), seconds: 60 })) &&
         fps(b2) === fps(T.evaluate(T.flyDecision(Q.perturbedSeat({ ...SS.SURVEY_R8, low: SS.SURVEY_R8.low - 0.02 }, {}, SS.planOf("standard", { seconds: 60 }))), set, { gauge: { sd: 0.1, hz: 1, fault: { bias: 0.1 } }, seconds: 60 })) && fps(a2) !== fps(b2));
-    ok("!! check 6 flown: L-0.06 is the shipped surveyPilot on the gate's two dives", X.shippedSame() === true);
+    ok("!! check 6 is history now: L-0.06 WAS the shipped seat when Round 36 flew (its committed report says PASS), and since the seat moved to -0.04 (2026-11-17) its constants are not the shipped seat's (shippedSame() flies 60 s dives, too short to tell -0.04 from -0.06, so it is not the test)", JSON.stringify(X.constantsOf("L-0.06")) !== JSON.stringify(SS.SURVEY_CONSTANTS) && JSON.stringify(X.constantsOf("L-0.04")) === JSON.stringify(SS.SURVEY_CONSTANTS) && fs.readFileSync(new URL("../../brain/rig-results/gauge-curve-report.json", import.meta.url), "utf8").includes("PASS L-0.06 IS THE SHIPPED SEAT"));
     ok("  refusals: an unknown arm or condition", throws(() => X.pilotOf("L+0.02"), /unknown arm/) && throws(() => X.flyJob("L0", "DROP", "0", o), /unknown condition/));
 }
 

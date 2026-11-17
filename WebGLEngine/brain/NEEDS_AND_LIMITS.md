@@ -1386,3 +1386,22 @@ The move is confirmed: about 85 percent. SEAT-04's crushed plus stranded under B
 
 ## 6. What will be built, and what changes if the move is confirmed
 `tools/ship/seatMove.mjs`, `tools/ship/seatMoveCmd.mjs` (`run`, `report`), `tools/ship/seatMove-selfcheck.mjs` with a mutation pass; the run once, the report read once. **If confirmed:** `brain/surveySeat.mjs`'s `SURVEY_LOW_SHIFT` becomes -0.04 (low 0.3403560726214647); every gate that pins the shipped constants is restated to the new value with its old value said in a dated line; the Round 34-36 libraries, which name what they FLEW, are frozen on the -0.06 constants by value rather than by import. **Not in this round:** any other constant, the rule arms, shipping a version.
+
+## Round 37, RESULT (2026-11-17): THE MOVE IS CONFIRMED -- SEAT-04'S HULL IS NO WORSE THAN THE SHIPPED SEAT'S IN ANY CONDITION; the seat now flies low -0.04
+
+**The run.** `node tools/ship/seatMoveCmd.mjs run --jobs 4` in the sandbox, 24 jobs, all exit 0, 3,600 dives, read once (`brain/rig-results/seat-move/`, `brain/rig-results/seat-move-report.json`; the first 23 job files were committed unread while the last flew). All five checks passed, SEAT-06 flown as the shipped `surveyPilot()`.
+
+| condition | SEAT-04 (crushed) | SEAT-06 (crushed) | hull | price, SEAT-04 minus SEAT-06 (reported) |
+|---|---|---|---|---|
+| REF | 0.8267 (0) | 0.8315 (0) | no worse | -0.0047 (se 0.0037) LOSES |
+| DMG | 0.7977 (13) | 0.8000 (15) | no worse | -0.0023 (se 0.0056) LOSES |
+| N20 | 0.8217 (0) | 0.8297 (0) | no worse | -0.0080 (se 0.0032) HURTS |
+| N30 | 0.8406 (0) | 0.8489 (0) | no worse | -0.0082 (se 0.0035) HURTS |
+| STN5 | 0.7982 (0) | 0.8011 (0) | no worse | -0.0029 (se 0.0031) LOSES |
+| BIAS | 0.8535 (**0**) | 0.8442 (**6**) | no worse | +0.0093 (se 0.0074) LOSES |
+
+Nothing stranded. Bottom line: `THE MOVE IS CONFIRMED: SEAT-04'S HULL IS NO WORSE IN ANY CONDITION`.
+
+**Against the expectations of section 5 (written first).** Confirmed, about 85: held. Fewer crushed under BIAS, about 85: held (0 against 6). The price HURTS at REF, about 55: no (-0.0047, 1.3 se; it HURTS only under the two noisier gauges, -0.008). DMG LOSES or KEEPS, about 70: held (13 against 15 crushed, -0.0023). N30 ties on the hull, about 80: held.
+
+**What changed, as section 6 fixed it.** `brain/surveySeat.mjs`'s `SURVEY_LOW_SHIFT` is -0.04 (low 0.3403560726214647); the gates that pinned the -0.06 constants are restated with a dated line; the Round 34-37 libraries name the constants they flew by value. **The price, said plainly:** the seat gives up 0.002 to 0.008 of score in five of six conditions (two of them beyond 2 se) and, with a gauge reading 0.10 high, crushes 0 boats in 300 where the old seat crushed 6 (Round 36: 10). That trade is Keith's decision of 2026-11-17.

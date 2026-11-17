@@ -81,8 +81,8 @@ sec("4. FLIGHT (short dives on the gate's seeds)");
 {
     const o = { range: X.GATE_SEEDS, seconds: 90, overrides: { seconds: 90 } }, set = T.setOf(["both"], 45901, 45901), fps = (r) => r.runs.map((x) => x.fingerprint).join("|");
     const seat = X.flyJob("SEAT", "REF", "0", o), r8 = X.flyJob("SEAT-R8", "REF", "0", o), r8b = X.flyJob("SEAT-R8", "BIAS", "0", o);
-    ok("!! chunk 0 of the gate's seeds is its first seed; SEAT is surveyPilot, SEAT-R8 the same planner and profile on SURVEY_R8", seat.runs.length === 1 &&
-        fps(seat) === fps(T.evaluate(SS.surveyPilot({ overrides: { seconds: 90 } }), set, { gauge: F.gaugeOfCond("REF"), seconds: 90 })) &&
+    ok("!! chunk 0 of the gate's seeds is its first seed; SEAT is the planner on SEAT_06 (the shipped seat when flown), SEAT-R8 the same planner and profile on SURVEY_R8", seat.runs.length === 1 &&
+        fps(seat) === fps(T.evaluate(T.flyDecision(Q.perturbedSeat(X.SEAT_06, {}, SS.planOf("standard", { seconds: 90 }))), set, { gauge: F.gaugeOfCond("REF"), seconds: 90 })) && JSON.stringify(X.SEAT_06) === JSON.stringify({ ...SS.SURVEY_R8, low: SS.SURVEY_R8.low - 0.06 }) &&
         fps(r8) === fps(T.evaluate(T.flyDecision(Q.perturbedSeat(SS.SURVEY_R8, {}, SS.planOf("standard", { seconds: 90 }))), set, { gauge: F.gaugeOfCond("REF"), seconds: 90 })));
     ok("!! BIAS is Round 34's gauge and reaches the pilot", fps(r8b) === fps(T.evaluate(T.flyDecision(Q.perturbedSeat(SS.SURVEY_R8, {}, SS.planOf("standard", { seconds: 90 }))), set, { gauge: { sd: 0.1, hz: 1, fault: { bias: 0.1 } }, seconds: 90 })) && fps(r8b) !== fps(r8));
     ok("  refusals: an unknown arm or condition", throws(() => X.pilotOf("SEAT-R9"), /unknown arm/) && throws(() => X.flyJob("SEAT", "DRIFT", "0", o), /unknown condition/));
@@ -92,8 +92,8 @@ sec("5. SOURCE");
 {
     const code = fs.readFileSync(new URL("./gaugeShift.mjs", import.meta.url), "utf8").split("\n").filter((l) => !/^\s*\/\//.test(l)).join("\n");
     ok("!! the seeds appear once in the library's code, the gate's once", (code.match(/45001/g) || []).length === 1 && (code.match(/45300/g) || []).length === 1 && (code.match(/45901/g) || []).length === 1);
-    ok("!! no clock, no random, no file; the seat is surveyPilot with no profile and SEAT-R8 the standard profile", !/Date\.now|Math\.random|new Date|from "node:fs"|readFileSync/.test(code) &&
-        /if \(arm === "SEAT"\) return SS\.surveyPilot\(\{ overrides \}\);/.test(code) && /Q\.perturbedSeat\(SS\.SURVEY_R8, \{\}, SS\.planOf\("standard", overrides\)\)/.test(code));
+    ok("!! no clock, no random, no file; the seat is the planner on the -0.06 constants it flew (SEAT_06, by value since 2026-11-17) in the standard profile and SEAT-R8 the standard profile", !/Date\.now|Math\.random|new Date|from "node:fs"|readFileSync/.test(code) &&
+        /if \(arm === "SEAT"\) return T\.flyDecision\(Q\.perturbedSeat\(SEAT_06, \{\}, SS\.planOf\("standard", overrides\)\)\);/.test(code) && /Q\.perturbedSeat\(SS\.SURVEY_R8, \{\}, SS\.planOf\("standard", overrides\)\)/.test(code));
 }
 
 sec("6. THE RESULT, RE-DERIVED FROM THE COMMITTED RUN (brain/rig-results/gauge-shift/, read once)");

@@ -70,7 +70,7 @@ export function flyArm(armId, training, last, { range = RANGE, kinds = KINDS, se
     const runs = boardOf(training, last).run("survey-strain", [armId], range, { kinds: [...kinds], ...(seconds ? { seconds } : {}) }).runs[armId];
     return { arm: armId, range: { ...range }, kinds: [...kinds], seconds: seconds || null, runs, ...(armId === PLAIN_ARM || TS.FAMILIES.includes(armId) ? { champion: trainedArm(armId, training, last).champion } : {}) };
 }
-const rule = () => T.flyDecision(U.tunedSeat(SV.SURVEY_CONSTANTS, U.WIDE_BOUNDS));
+const rule = () => T.flyDecision(U.tunedSeat(SV.SURVEY_ROUND33, U.WIDE_BOUNDS));   // 2026-11-17: the round measured against the -0.06 rule
 const startDives = () => START_KINDS.flatMap((kind) => Array.from({ length: START_SEEDS.to - START_SEEDS.from + 1 }, (_, i) => ({ kind, seed: START_SEEDS.from + i })));
 /** The START rows: the untrained station-large, station-small and plain-priced pilots against rule-low06 on 24 baseline dives (seeds 501-506 of the four kinds, the noisy gauge): score and fingerprint of each. `fam` is the families' policies (a seam for the gate). */
 export function startRows(seconds = null, fam = Object.fromEntries(TS.FAMILIES.map((f) => [f, TS.familyPolicy(f)]))) {
@@ -90,7 +90,7 @@ export function maskRows(seconds = null, { station = TS.familyPolicy("station-la
         const row = { key: `${kind}:${seed}`, calls: 0, mismatches: 0, controlMismatches: 0, stationDiffs: 0 };
         const same = (a, b) => a.surface === b.surface && a.cap === b.cap && a.pump === b.pump && a.repair === b.repair;
         const probe = (ctx) => {
-            const r = U.tunedSeat(SV.SURVEY_CONSTANTS, U.WIDE_BOUNDS)(ctx), s = station.seatFor(pushed(station))(ctx), p = plain.seatFor(pushed(plain))(ctx);
+            const r = U.tunedSeat(SV.SURVEY_ROUND33, U.WIDE_BOUNDS)(ctx), s = station.seatFor(pushed(station))(ctx), p = plain.seatFor(pushed(plain))(ctx);
             return (st, obs) => { const d = r(st, obs), e = s(st, obs), g = p(st, obs); row.calls++; if (!same(d, e)) row.mismatches++; if (!same(d, g)) row.controlMismatches++; if (d.station !== e.station) row.stationDiffs++; return d; };
         };
         T.fly(T.flyDecision(probe), T.scenario(seed, kind), { gauge: T.GAUGE, ...(seconds ? { seconds } : {}) });

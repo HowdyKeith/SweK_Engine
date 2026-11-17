@@ -12,10 +12,12 @@ import { gaugeOfCond, diffOf, keepsOf, hullOk, badOf, mergeKinds } from "./gauge
 
 export { hullOk, mergeKinds, diffOf };
 export const KIND = "both", SEEDS = Object.freeze([45001, 45300]), GATE_SEEDS = Object.freeze([45901, 45902]), DIVES = 300, CHUNKS = 4;
+// 2026-11-17 (Round 37): the seat moved to low -0.04. This round FLEW the seat on low -0.06, so the constants it names are written here BY VALUE (SEAT_06), not read from surveySeat.
+export const SEAT_06 = Object.freeze({ ...SS.SURVEY_R8, low: SS.SURVEY_R8.low - 0.06 });
 export const ARMS = Object.freeze(["SEAT", "SEAT-R8"]), COND_NAMES = Object.freeze(["REF", "BIAS"]);
 /** The pilot of an arm: the shipped seat, or the same planner and profile on the Round 8 constants. `overrides` is for the gate. */
 export function pilotOf(arm, overrides = {}) {
-    if (arm === "SEAT") return SS.surveyPilot({ overrides });
+    if (arm === "SEAT") return T.flyDecision(Q.perturbedSeat(SEAT_06, {}, SS.planOf("standard", overrides)));
     if (arm === "SEAT-R8") return T.flyDecision(Q.perturbedSeat(SS.SURVEY_R8, {}, SS.planOf("standard", overrides)));
     throw new Error(`gaugeShift.pilotOf: unknown arm ${JSON.stringify(arm)} (${ARMS.join(", ")})`);
 }

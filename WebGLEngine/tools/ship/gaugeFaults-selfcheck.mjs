@@ -36,6 +36,7 @@ const throws = (f, re) => { try { f(); return false; } catch (e) { return re.tes
 import * as T from "../../brain/needsTask.mjs";
 import * as U from "../../brain/tunedRule.mjs";
 import * as SS from "../../brain/surveySeat.mjs";
+import * as Q from "../../brain/plannerPerturbed.mjs";
 import * as X from "./gaugeFaults.mjs";
 const t0 = Date.now();
 console.log("gaugeFaults-selfcheck -- Round 34, gauge faults\n");
@@ -127,8 +128,8 @@ sec("5. FLIGHT (short dives on the gate's seeds)");
     ok("!! R8 is the tuned rule on the Round 8 constants; R8-RAW is the same rule with alpha 1, and differs from R8", fps(r8) === fps(T.evaluate(T.flyDecision(U.tunedSeat(SS.SURVEY_R8, U.WIDE_BOUNDS)), set, { gauge: g("REF"), seconds: 90 })) &&
         fps(raw) === fps(T.evaluate(T.flyDecision(U.tunedSeat({ ...SS.SURVEY_R8, alpha: 1 }, X.RAW_BOUNDS)), set, { gauge: g("REF"), seconds: 90 })) && fps(raw) !== fps(r8));
     const l06 = X.flyJob("L06", "DRIFT", "far", o);
-    ok("!! L06 is the rule on SURVEY_CONSTANTS; SEAT is the shipped survey pilot", fps(l06) === fps(T.evaluate(T.flyDecision(U.tunedSeat(SS.SURVEY_CONSTANTS, U.WIDE_BOUNDS)), set, { gauge: g("DRIFT"), seconds: 90 })) &&
-        fps(seat) === fps(T.evaluate(SS.surveyPilot({ overrides: { seconds: 90 } }), X.setOfKind("both", X.GATE_SEEDS), { gauge: g("BIAS"), seconds: 90 })));
+    ok("!! L06 is the rule on the -0.06 constants it flew (SEAT_06, by value since the seat moved on 2026-11-17); SEAT is the planner on them, the shipped pilot when flown", J(X.SEAT_06) === J({ ...SS.SURVEY_R8, low: SS.SURVEY_R8.low - 0.06 }) && fps(l06) === fps(T.evaluate(T.flyDecision(U.tunedSeat(X.SEAT_06, U.WIDE_BOUNDS)), set, { gauge: g("DRIFT"), seconds: 90 })) &&
+        fps(seat) === fps(T.evaluate(T.flyDecision(Q.perturbedSeat(X.SEAT_06, {}, SS.planOf("standard", { seconds: 90 }))), X.setOfKind("both", X.GATE_SEEDS), { gauge: g("BIAS"), seconds: 90 })));
     const rb = X.flyJob("R8", "BIAS", "far", o);
     ok("!! a fault reaches the pilot: R8 under BIAS flies differently from R8 under REF on the same dives", fps(rb) !== fps(r8) && rb.runs.length === 2 && rb.runs.every((x, i) => x.kind === r8.runs[i].kind));
     ok("  refusals: an unknown arm, kind or condition", throws(() => X.pilotOf("R9"), /unknown arm/) && throws(() => X.flyJob("R8", "REF", "deep", o), /unknown kind/) && throws(() => X.flyJob("R8", "HEAT", "far", o), /unknown condition/));
@@ -139,7 +140,7 @@ sec("6. SOURCE");
     const code = fs.readFileSync(new URL("./gaugeFaults.mjs", import.meta.url), "utf8").split("\n").filter((l) => !/^\s*\/\//.test(l)).join("\n");
     ok("!! the registered seeds appear once in the library's code, the gate's once", (code.match(/43001/g) || []).length === 1 && (code.match(/43150/g) || []).length === 1 && (code.match(/43901/g) || []).length === 1);
     ok("!! no clock, no random, no file in the library", !/Date\.now|Math\.random|new Date|from "node:fs"|readFileSync|writeFileSync/.test(code));
-    ok("!! the SEAT arm is the shipped pilot in its default (standard) profile: no profile is passed", /if \(arm === "SEAT"\) return SS\.surveyPilot\(\{ overrides \}\);/.test(code) && SS.planOf().replanS === undefined);
+    ok("!! the SEAT arm is the planner on SEAT_06 in the standard profile, the shipped seat's profile (no other profile is passed)", /if \(arm === "SEAT"\) return T\.flyDecision\(Q\.perturbedSeat\(SEAT_06, \{\}, SS\.planOf\("standard", overrides\)\)\);/.test(code) && SS.planOf().replanS === undefined);
     const nt = fs.readFileSync(new URL("../../brain/needsTask.mjs", import.meta.url), "utf8");
     ok("  needsTask's no-fault branch is the old line, character for character", nt.includes("if (!fault) return (i, frac) => { if (held === null || i % every === 0) held = clamp(frac + sd * gaussOf(rng), 0, 1); return held; };"));
 }

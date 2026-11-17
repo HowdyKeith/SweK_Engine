@@ -18,10 +18,13 @@ import * as Q from "./plannerPerturbed.mjs";
 
 /** The tuned rule's constants, Round 8 (brain/rig-results/tune-report.json): the filter, the charge trip points, the depth ramp and the depth cap. Frozen. The baseline the shift below is measured from. */
 export const SURVEY_R8 = Object.freeze({ alpha: 0.001, low: 0.3803560726214647, high: 0.68938489754682, ramp: 20, cap: 0.8861494767879255 });
-/** The Round 33 shift of the low trip point (the winner L-0.06). */
-export const SURVEY_LOW_SHIFT = -0.06;
-/** What the seat flies: the Round 8 constants with low moved by the shift (low = 0.3203560726214647), nothing else. Frozen. */
+/** The shift of the low trip point: Round 37's -0.04 (Round 33 chose -0.06; Rounds 34-36 found it crushes under a biased gauge). */
+export const SURVEY_LOW_SHIFT = -0.04;   // 2026-11-17, Keith's decision confirmed by Round 37 (brain/NEEDS_AND_LIMITS.md): was -0.06 (Round 33), which crushed 6-10 of 300 deep-and-far dives under a gauge reading +0.10 high where -0.04 crushes 0-1
+/** What the seat flies: the Round 8 constants with low moved by the shift (low = 0.3403560726214647; it was 0.3203560726214647 before 2026-11-17), nothing else. Frozen. */
 export const SURVEY_CONSTANTS = Object.freeze({ ...SURVEY_R8, low: SURVEY_R8.low + SURVEY_LOW_SHIFT });
+/** The Round 33 constants (low -0.06, 0.3203560726214647), FROZEN: what the seat flew until 2026-11-17, and the base rule the trained decision circuit (brain/circuitSeat.mjs) and station choice
+ *  (brain/stationSeat.mjs) were trained on and Rounds 33-37 measured against. Those keep it; the shipped seat follows SURVEY_CONSTANTS. */
+export const SURVEY_ROUND33 = Object.freeze({ ...SURVEY_R8, low: SURVEY_R8.low - 0.06 });
 /** The planning options of each profile (see the header for what each was measured to be worth). Frozen. */
 export const SURVEY_PROFILES = Object.freeze({
     standard: Object.freeze({}),
@@ -35,7 +38,7 @@ export function planOf(profile = "standard", overrides = {}) {
     if (!Object.prototype.hasOwnProperty.call(SURVEY_PROFILES, profile)) throw new Error(`surveySeat.planOf: unknown profile ${JSON.stringify(profile)} (${PROFILE_NAMES.join(", ")})`);
     return { ...SURVEY_PROFILES[profile], ...overrides };
 }
-/** The seat factory (ctx) => seat for needsTask: the twin planner on the Round 33 constants (low -0.06) in the named profile. The seat carries `stats` { ticks, switches, plans, rolloutSeconds }. */
+/** The seat factory (ctx) => seat for needsTask: the twin planner on the seat's constants (low -0.04 since Round 37; -0.06 before) in the named profile. The seat carries `stats` { ticks, switches, plans, rolloutSeconds }. */
 export function surveySeat({ profile = "standard", overrides = {} } = {}) { return Q.perturbedSeat(SURVEY_CONSTANTS, {}, planOf(profile, overrides)); }
 /** The pilot factory for T.fly / T.evaluate: the survey seat behind needsTask's decision wrapper. */
 export function surveyPilot(opts = {}) { return T.flyDecision(surveySeat(opts)); }

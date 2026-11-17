@@ -10,6 +10,7 @@
 import * as T from "../../brain/needsTask.mjs";
 import * as U from "../../brain/tunedRule.mjs";
 import * as SS from "../../brain/surveySeat.mjs";
+import * as Q from "../../brain/plannerPerturbed.mjs";
 import { hullOk } from "./plannerTolerate.mjs";
 import { mergeKinds } from "./plannerCap.mjs";
 
@@ -26,13 +27,15 @@ export const COND_NAMES = Object.freeze(Object.keys(FAULTS)), FAULT_NAMES = Obje
 export const ARMS = Object.freeze(["R8", "R8-RAW", "L06", "SEAT"]);
 /** WIDE_BOUNDS with alpha's upper bound widened to admit 1 (the filter taken out); every other bound as it is. */
 export const RAW_BOUNDS = Object.freeze({ ...U.WIDE_BOUNDS, alpha: Object.freeze([U.WIDE_BOUNDS.alpha[0], 1]) });
+// 2026-11-17 (Round 37): the seat moved to low -0.04. This round FLEW the seat on low -0.06, so the constants it names are written here BY VALUE (SEAT_06), not read from surveySeat.
+export const SEAT_06 = Object.freeze({ ...SS.SURVEY_R8, low: SS.SURVEY_R8.low - 0.06 });
 export const RAW_CONSTANTS = Object.freeze({ ...SS.SURVEY_R8, alpha: 1 });
 /** The pilot factory of an arm. `overrides` is for the gate (shortened dives for the seat's planner); the real run never passes it. */
 export function pilotOf(arm, overrides = {}) {
     if (arm === "R8") return T.flyDecision(U.tunedSeat(SS.SURVEY_R8, U.WIDE_BOUNDS));
     if (arm === "R8-RAW") return T.flyDecision(U.tunedSeat(RAW_CONSTANTS, RAW_BOUNDS));
-    if (arm === "L06") return T.flyDecision(U.tunedSeat(SS.SURVEY_CONSTANTS, U.WIDE_BOUNDS));
-    if (arm === "SEAT") return SS.surveyPilot({ overrides });
+    if (arm === "L06") return T.flyDecision(U.tunedSeat(SEAT_06, U.WIDE_BOUNDS));
+    if (arm === "SEAT") return T.flyDecision(Q.perturbedSeat(SEAT_06, {}, SS.planOf("standard", overrides)));
     throw new Error(`gaugeFaults.pilotOf: unknown arm ${JSON.stringify(arm)} (${ARMS.join(", ")})`);
 }
 /** The gauge of a condition: the registered noise plus the condition's fault (none for REF). */

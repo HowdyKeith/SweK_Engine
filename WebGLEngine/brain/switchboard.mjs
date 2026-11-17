@@ -123,7 +123,7 @@ export function surveyArms() {
     const rule = (consts) => () => T.flyDecision(U.tunedSeat(consts, U.WIDE_BOUNDS));
     const arms = [
         { id: "rule-r8", layer: "decision", controls: [], pilot: rule(S.SURVEY_R8), note: "the tuned rule, Round 8 constants" },
-        { id: "rule-low06", layer: "decision", controls: ["rule-r8"], pilot: rule(S.SURVEY_CONSTANTS), note: "the tuned rule, low -0.06 (Round 33)" },
+        { id: "rule-low06", layer: "decision", controls: ["rule-r8"], pilot: rule(S.SURVEY_ROUND33), note: "the tuned rule, low -0.06 (Round 33; the shipped seat flies -0.04 since 2026-11-17)" },
     ];
     for (const profile of S.PROFILE_NAMES) arms.push({ id: "twin-" + profile, layer: "decision", controls: ["rule-low06"], pilot: ({ seconds } = {}) => S.surveyPilot({ profile, overrides: seconds ? { seconds } : {} }), note: `the twin planner, ${profile} profile` });
     return arms;

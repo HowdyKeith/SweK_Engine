@@ -47,10 +47,10 @@ const ctxOf = () => ({ model: M, read: () => { throw new Error("the seat must no
 const stateAt = (x, y, depth, heading = 0) => { const s = S.createState({ depth, speed: 2, heading, model: M }); s.pos[0] = x; s.pos[1] = y; return { ...s, tank: S.initialTank(M) }; };
 const q = (x, y, depth, visited = false) => ({ x, y, depth, visited });
 const obsOf = (o = {}) => ({ t: 0, stations: [q(50, 0, 20)], ...o, r: { frac: 0.8, depth: 20, flood: 0, damage: 0, collapseDepth: 60, ...(o.r || {}) } });
-const Q = U.normalise(SV.SURVEY_CONSTANTS, U.WIDE_BOUNDS);
+const Q = U.normalise(SV.SURVEY_ROUND33, U.WIDE_BOUNDS);
 
 sec("1. THE CONSTANTS");
-ok("!! the base parameters are the survey seat's own (alpha 0.001, low 0.3204, high 0.6894, ramp 20, cap 0.8861) and the bounds the wide ones", CS.BASE_PARAMS === SV.SURVEY_CONSTANTS && CS.BASE_BOUNDS === U.WIDE_BOUNDS && near(Q.alpha, 0.001, 1e-12) && near(Q.low, 0.3203560726, 1e-9) && near(Q.high, 0.6893848975, 1e-9) && Q.ramp === 20 && near(Q.cap, 0.8861494767, 1e-9));
+ok("!! the base parameters are the Round 33 constants the circuit was trained on, SURVEY_ROUND33 (since 2026-11-17 no longer the shipped seat's: alpha 0.001, low 0.3204, high 0.6894, ramp 20, cap 0.8861) and the bounds the wide ones", CS.BASE_PARAMS === SV.SURVEY_ROUND33 && CS.BASE_BOUNDS === U.WIDE_BOUNDS && near(Q.alpha, 0.001, 1e-12) && near(Q.low, 0.3203560726, 1e-9) && near(Q.high, 0.6893848975, 1e-9) && Q.ramp === 20 && near(Q.cap, 0.8861494767, 1e-9));
 ok("!! 21 features, 7 outputs, one step every 30 ticks (the Round 3 decode, imported and not copied)", CS.FEATURES === 21 && CS.OUTPUTS === 7 && CS.STEP_TICKS === 30 && CS.FEATURES === P.FEATURES && CS.OUTPUTS === P.OUTPUTS && CS.STEP_TICKS === P.STEP_TICKS);
 ok("!! the plain net's width is the nearest to the reservoir's weight count: H = round((count - 7) / 29), 2,452 -> 84 and a plain net of 84 has 2,443 weights; 7 -> 1, 36 -> 1 and 37 -> 1, 65 -> 2, and it ROUNDS (82 -> 2.59 -> 3, 64 -> 1.97 -> 2, 50 -> 1.48 -> 1), never below 1", CS.matchedHidden(2452) === 84 && CS.plainCount(84) === 2443 && CS.matchedHidden(7) === 1 && CS.matchedHidden(36) === 1 && CS.matchedHidden(65) === 2 && CS.plainCount(1) === 36 && CS.plainCount(2) === 65 && CS.matchedHidden(82) === 3 && CS.matchedHidden(64) === 2 && CS.matchedHidden(50) === 1 && CS.matchedHidden(0) === 1);
 {
@@ -102,8 +102,8 @@ sec("2. THE DECODE (input weights zeroed: the outputs are the output bias exactl
     const sp1 = spy(), sp2 = spy(), sp3 = spy(), sp4 = spy();
     CS.makeSeat(sp1.sp)(st, obsOf({ r: { frac: 0.5, flood: 0.02, damage: 0.3 } })); CS.makeSeat(sp2.sp, { withheld: true })(st, obsOf({ r: { frac: 0.5, flood: 0.02, damage: 0.3 } }));
     ok("!! makeSeat feeds the circuit the features of the observation: by default the charge, strain, damage and flood are NOT withheld (feature 0 reads 0.5), with { withheld: true } the first four read 0", sp1.xs.length === 1 && sp1.xs[0].length === 21 && sp1.xs[0][0] === 0.5 && sp1.xs[0][2] === 0.3 && sp2.xs[0].slice(0, 4).every((v) => v === 0) && sp2.xs[0][4] !== 0);
-    const tight = { ...SV.SURVEY_CONSTANTS, low: 0.5 }, lowB = { alpha: [0.0001, 0.02], low: [0.4, 0.6], high: [0.35, 0.95], ramp: [2, 60], cap: [0.6, 0.9] };
-    const dflt = CS.makeSeat(sp3.sp)(st, obsOf({ r: { frac: 0.45 } })), own = CS.makeSeat(sp3.sp, { params: tight })(st, obsOf({ r: { frac: 0.45 } })), clamped = CS.makeSeat(sp4.sp, { params: SV.SURVEY_CONSTANTS, bounds: lowB })(st, obsOf({ r: { frac: 0.38 } }));
+    const tight = { ...SV.SURVEY_ROUND33, low: 0.5 }, lowB = { alpha: [0.0001, 0.02], low: [0.4, 0.6], high: [0.35, 0.95], ramp: [2, 60], cap: [0.6, 0.9] };
+    const dflt = CS.makeSeat(sp3.sp)(st, obsOf({ r: { frac: 0.45 } })), own = CS.makeSeat(sp3.sp, { params: tight })(st, obsOf({ r: { frac: 0.45 } })), clamped = CS.makeSeat(sp4.sp, { params: SV.SURVEY_ROUND33, bounds: lowB })(st, obsOf({ r: { frac: 0.38 } }));
     ok("!! makeSeat takes its constants and bounds from its options: at 20 m a charge of 0.45 stays down at the survey seat's low 0.3204 and surfaces at a low of 0.5; a low of 0.3204 under bounds of [0.4, 0.6] is clamped to 0.4 and surfaces 0.38", dflt.surface === false && own.surface === true && clamped.surface === true);
 }
 
@@ -175,7 +175,7 @@ sec("4. THE PLAIN NET");
 
 sec("5. THE START: ALL OUTPUTS ZERO IS rule-low06");
 {
-    const fam = CS.familiesOf(cx), rule = T.flyDecision(U.tunedSeat(SV.SURVEY_CONSTANTS, U.WIDE_BOUNDS)), kinds = ["plain", "deep", "far", "both"], bad = [];
+    const fam = CS.familiesOf(cx), rule = T.flyDecision(U.tunedSeat(SV.SURVEY_ROUND33, U.WIDE_BOUNDS)), kinds = ["plain", "deep", "far", "both"], bad = [];
     let n = 0;
     for (const name of ["cx", "nostate", "plain"]) {
         const pol = fam[name], pilot = pol.pilotFor(pol.handWeights());
