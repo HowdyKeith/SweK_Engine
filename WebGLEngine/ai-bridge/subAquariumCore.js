@@ -20,7 +20,7 @@
 // Pure: no I/O, no clock beyond the `now` handed in, no randomness.
 "use strict";
 
-const WEIGHTS = { gfc: 963, flycx: 1729 };
+const WEIGHTS = { gfc: 963, flycx: 1729, fish: 803 };   // fish (2026-11-17, nextRounds fish-pilot-tank-kind): brain/pilotSubFish.mjs FISH.WEIGHT_COUNT, the zebrafish TEN-core pilot (render/subAquariumFish.mjs is its kind)
 const PILOT_LABEL = { gfc: "network", flycx: "stateful" };   // what the list calls a sub that arrived with weights, by circuit
 const THETA_NAMES = ["searchSpeed", "trackSpeed", "evadeSpeed", "fireRange", "aimTol", "pingAfter", "echoWindow", "evadeTime", "evadeTurn", "blindSnr", "pingEvery", "searchPing"];
 const MAX_BODY = 64 * 1024, CAP = 24, MAX_W = 1000, MAX_THETA = 10000;
@@ -97,6 +97,7 @@ const SEED_RECIPES = [
     { name: "Explorer tail pilot", weights: "brain/pilotSubWeightsRobustTail2Wip.json", theta: "brain/subTacticsThetaSearchPingWip.json" },   // seed 9400: the one that qualifies on the Munk x3 hull too (brain/SUBMARINE_WIP.md)
     { name: "Explorer noisy-senses pilot", weights: "brain/pilotSubWeightsRobustNoisyWip.json", theta: "brain/subTacticsThetaSearchPingWip.json" },   // seed 9602: trained on sensor noise, delay and gusts; qualifies at every disturbance level on five hulls (brain/SUBMARINE_WIP.md)
     { name: "Fly heading-loop pilot (rung 4a)", circuit: "flycx", weights: "brain/pilotSubFlyCxWip.json", theta: null },   // the stateful fly pilot: the cx champion of brain/flyCxStageA.jsonl (tools/ship/flyCxPilotFile.mjs writes the file); no tactician theta of its own
+    { name: "Zebrafish TEN-core pilot (rung 4b)", circuit: "fish", weights: "brain/pilotSubWeightsFishWip.json", theta: null },   // the 803-weight fish champion; no state, not an escape circuit (render/subAquariumFish.mjs says what seating it shows)
 ];
 /** Build the offerable subs from a reader: read(relPath) -> parsed JSON or null. A recipe whose file is missing or invalid is skipped, by name, with the reason. */
 function seedSubs(read) {

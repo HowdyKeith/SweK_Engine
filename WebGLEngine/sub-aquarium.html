@@ -135,6 +135,7 @@ import { hostUrl } from "/ui/seaFrame.mjs";
 import { subPanel, drawPanel } from "/render/brainPanel.mjs";
 import { pickNeuron } from "/render/brainLens.mjs";
 import { needsLine } from "/render/needsView.mjs";
+import * as LBL from "/render/subAquariumLabel.mjs";   // 2026-11-17: what flies a sub, said in its row (a waiting or refused kind is named, not called the autopilot)
 import { CLASSES as NEEDS_CLASSES } from "/physics/mechanics/subNeeds.mjs";   // the menu's values are checked against the model's own class table
 import { dialInfo, pair, pushTrace, lineFor, drawDial, drawTrace, drawDark } from "/render/compassView.mjs";
 
@@ -287,7 +288,7 @@ function updateStats(snap) {
     if (cm && s.cmd) { const f = (v, w) => (v >= 0 ? "+" : "") + v.toFixed(w); cm.textContent = `pitch ${f(s.cmd.pitch, 2)} · yaw ${f(s.cmd.yaw, 2)} · thrust ${f(s.cmd.thrust, 2)} · ballast ${f(s.cmd.ballast, 2)}`; }
     const tk = document.getElementById("t_" + s.id); if (tk) tk.textContent = needsLine(s) || readout(s) || lineFor(s);
     const m = document.getElementById("m_" + s.id); if (!m) continue;
-    m.textContent = `${s.kind === "flycx" ? "stateful" : s.pilot === "network" ? "network" : "PD autopilot"} · ${s.local ? "this box" : "from " + s.from} · ${s.depth.toFixed(0)} m · ${s.speed.toFixed(1)} m/s` + (s.hull && s.hull !== "nominal" ? ` · ${LABELS[s.hull] || s.hull}` : "") + (s.nav ? ` · ${NAV_NAMES[s.nav.arm] || s.nav.arm}: ${s.nav.arrivals} arrival${s.nav.arrivals === 1 ? "" : "s"}, ${s.nav.hits} hit${s.nav.hits === 1 ? "" : "s"}` : "") + (s.lost ? ` · lost ${s.lost}×` : "");
+    m.textContent = `${LBL.pilotLabel(s)} · ${s.local ? "this box" : "from " + s.from} · ${s.depth.toFixed(0)} m · ${s.speed.toFixed(1)} m/s` + (s.hull && s.hull !== "nominal" ? ` · ${LABELS[s.hull] || s.hull}` : "") + (s.nav ? ` · ${NAV_NAMES[s.nav.arm] || s.nav.arm}: ${s.nav.arrivals} arrival${s.nav.arrivals === 1 ? "" : "s"}, ${s.nav.hits} hit${s.nav.hits === 1 ? "" : "s"}` : "") + (s.lost ? ` · lost ${s.lost}×` : "");
   }
 }
 
@@ -410,6 +411,10 @@ refresh(); fishHealth(); setInterval(refresh, 3000); setInterval(fishHealth, 500
             const fx = await import("/render/subAquariumFlyCx.mjs");
             tank.registerPilotKind(fx.CIRCUIT, fx.flyCxKind(circuit));
         } catch (e) { $("msg").textContent = "the stateful fly pilot is not available here: its subs fly the autopilot"; }
+        try {   // 2026-11-17 (nextRounds fish-pilot-tank-kind): the zebrafish TEN-core pilot as a kind of sub the tank can fly (803 weights, no state; render/subAquariumFish.mjs says what seating it shows); its weights come with the sub
+            const fk = await import("/render/subAquariumFish.mjs");
+            tank.registerPilotKind(fk.CIRCUIT, fk.fishKind());
+        } catch (e) { $("msg").textContent = "the zebrafish pilot is not available here: its subs fly the autopilot"; }
     } catch (e) { host.textContent = "The compass-dropout view is unavailable here (" + String((e && e.message) || e).slice(0, 100) + "). The tank above is not affected."; }
 })();
 </script>

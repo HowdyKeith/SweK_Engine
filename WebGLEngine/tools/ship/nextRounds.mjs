@@ -3375,8 +3375,8 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "fly-kind-peer-registration",
-        blocker: "OPEN",
-        what: "A peer that sends a stateful fly sub (1,729 weights) lands in a tank whose page registers the kind only if that page loaded the circuit; otherwise the sub flies the PD autopilot and says why only in its snapshot.",
+        blocker: "CLOSED",
+        what: "CLOSED 2026-11-17: a sub whose kind the page has not registered now reads 'PD autopilot, waiting for its kind (<circuit>)' and a refused kind 'PD autopilot (<circuit> refused: <reason>)' (render/subAquariumLabel.mjs; the tank's snapshot gained `waiting`; render/subAquariumLabel-selfcheck.mjs, 9 mutants red). NOT looked at in a real browser. Earlier text: A peer that sends a stateful fly sub (1,729 weights) lands in a tank whose page registers the kind only if that page loaded the circuit; otherwise the sub flies the PD autopilot and says why only in its snapshot.",
         how: "Show the sub as waiting for its kind in the list, or make the page register the kind on arrival.",
         why: "The tank already keeps such a sub's weights; the page says nothing.",
     },
@@ -3389,8 +3389,8 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "fish-pilot-tank-kind",
-        blocker: "OPEN",
-        what: "A pilot wired to the zebrafish core exists (brain/pilotSubWeightsFishWip.json, 803 weights) but the tank flies only the fly's 963 and the stateful 1,729.",
+        blocker: "CLOSED",
+        what: "CLOSED 2026-11-17: the page half -- the bridge knows circuit fish (803 weights) and offers the zebrafish champion as an eighth seed sub; sub-aquarium.html registers fishKind() at load and labels it 'zebrafish'. Gates restated (seven subs -> eight; the snapshot field list). The switchboard arm is fishArm (render/subAquariumFish.mjs) and was already in the tree. NOT looked at in a real browser. Earlier text: A pilot wired to the zebrafish core exists (brain/pilotSubWeightsFishWip.json, 803 weights) but the tank flies only the fly's 963 and the stateful 1,729.",
         how: "Register an 803-weight kind with tank.registerPilotKind (the way render/subAquariumFlyCx.mjs registers the fly's) and let the page offer it.",
         why: "The page's FISH BRAIN chip names where this is going.",
     },
