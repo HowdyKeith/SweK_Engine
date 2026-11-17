@@ -160,3 +160,24 @@ By kind (reached of 60, m12 / m8): hard-islands 59 / 59, **hard-gaps 60 / 60 (ev
 ## Not checked, said plainly
 
 The margin sweep covers one sea family at an exact fix; the crab result is post hoc and unreplicated; K was not swept; the current is uniform in space; the reactive ships' rule was not varied (the turn rate, the sense range, the clearance); the three HELD sets are 240, 200 and 60 scenarios. The gates for the module and the command are sabotaged and logged in their headers (three passes each; the survivors left are argued equivalent there).
+
+# ITEM 2 REPLICATE: THE CRAB ALONE, ON A FRESH SET (backlog nav-current-in-field; Keith 2026-11-17, "Let's do all the next sandbox rounds, smallest first"; REGISTERED 2026-11-17, BEFORE ANY CODE FOR IT AND BEFORE ANY OF ITS SEEDS IS FLOWN)
+
+**Why.** Item 2's strongest reading was post hoc: `any+crab` against `any`, gain 10, p 0.0129. It was the second arm of four, and the note said "it wants its own fresh set before it is called a result". This is that set. Nothing in the arms changes: `any` and `any+crab` are flown exactly as item 2 flew them (`brain/subNavPlus.mjs` PLUS_ARMS, tau 15 s, the estimate from the vessel's own logs, no margin growth).
+
+**The set.** HELD73 = seeds 7301 to 7400 of each of `hard-current` and `hard-current-gap`: 200 scenarios, 400 flights, flown ONCE. These seeds are spent by no navigation module (checked against every `range(...)` in brain/sub*Nav*.mjs, subGiveWay, subSensedNav, subNav3d and subTankNav). DEV (seeds 1 to 30) is flown first as a sanity run and is not a result.
+
+**The registered test.** `any+crab` against `any`, paired by scenario, both kinds pooled. Gain = (only the crab reached) - (only `any` reached); p = the exact two-sided sign test on the discordant pairs.
+* **SUPPORTED** iff gain >= 5, p <= 0.05 AND the crab has no more collisions than `any`. The p bar is 0.05, not item 2's 0.10, because this confirms a finding that was chosen after looking.
+* **PARTLY SUPPORTED** iff gain >= 3 and not SUPPORTED.
+* **NOT SUPPORTED** otherwise. **HARMFUL** is printed beside the verdict if gain <= -5.
+
+**Checks (a failure: NOT WEIGHED).** (1) SAME SCENARIOS: both arms fly the same 200 scenarios in the same order. (2) THE ARMS ARE ITEM 2'S: on item 2's first five HELD71 seeds of each kind, both arms reproduce the flights stored in `brain/subNavPlusCurrentHeld71.jsonl` (status, ticks and path). (3) THE CRAB BITES: the two arms differ on at least one flight.
+
+**Expectations, written before any seed is flown.**
+* E1 the verdict is SUPPORTED: about 60 percent. Item 2's gain of 10 in 200 shrinks toward the registered arm's 7 on a fresh draw, and 5 at p 0.05 needs roughly 9 to 1 among the discordant pairs, or 12 to 3.
+* E2 the crab reaches at least 97 of 100 on hard-current: about 75 percent (item 2: 100).
+* E3 the crab's median path / chord is below `any`'s on hard-current: about 85 percent (1.03 against 1.09).
+* E4 the gain is larger on hard-current than on the gap kind: about 70 percent (7 against 3 in item 2).
+
+**What a result would not say.** The logs the estimate reads are perfect (no sensor noise), the current is steady per scenario, and the vessel is the PD autopilot's. SUPPORTED says that pointing into a known current helps this planner reach goals in these two kinds, nothing about a real current meter.
