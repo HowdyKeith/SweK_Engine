@@ -75,3 +75,23 @@ node tools/ship/trainSubVestibularCmd.mjs report --in brain/rig-results/fishVest
 ```
 
 Run on a copy if the file is to stay as it was: the run appends to it.
+
+## 9. AMENDMENT 2026-11-17, BEFORE ANY CIRCUIT OF THIS ADDENDUM IS TRAINED: the orientation step. Sections 1 to 8 are unchanged except that the 64 circuits now fly the first-order step.
+
+**What was found.** RK4 became the engine's default orientation step on 2026-11-04. The trainer (`tools/ship/trainSubVestibular.mjs`) never named a step, so each generation flew the default of the day it ran. Addendum 12's records (`fishVestibularGen2.jsonl`, 2026-10-30) were therefore first-order, and section 8's command, run today, would have trained the 64 shuffled circuits under RK4 and ranked them against a real circuit flown first-order. The test would have compared two integrators as well as two wirings.
+
+**Measured, not assumed.** Stored dives were re-flown under both steps (two to three dives of audit a1 each):
+
+| File | Records re-flown | First-order | RK4 |
+|---|---|---|---|
+| Gen2 (Addendum 12) | refs:PQ autopilot; qns and qdg champions from their stored weights | matches (bit for bit; champions to 1e-7, the 6-decimal rounding of the weights) | off at 1e-3 |
+| Gen4 (Addenda 14, 15) | refs:PT; tt1, tt4, tt11 champions | matches (1e-7) | off at 1e-3 |
+| Gen6 (Addendum 16) | refs:PF; fns champion | off at 1e-3 | matches |
+
+So every file is consistent within itself: Gen2, Gen4 and Gen5 are first-order, Gen6 is RK4. Addendum 16's verdict stands on its own file. Nothing already read changes.
+
+**The amendment.** The trainer flies each generation on its own file's step, by name: `STEP_OF_GEN` = { 6: rk4 }, every other generation first-order (generation 7 included, because it is written into Gen2's file and ranked against its records). The command calls `setOrientationDefault`, which also carries the step to the worker processes. Every new record carries `orientation`. A run whose specs need two steps is refused, and so is a run into a file that holds records of the other step. The gate (`tools/ship/trainSubVestibular-selfcheck.mjs` section 11) holds all of this, plus the measurement itself on Gen2 and Gen6, and was sabotaged eight ways (logged in its header). It now imports the first-order shim first, and `tools/roundhouse/orientationStep-selfcheck.mjs` counts it (55 -> 56).
+
+**The rig command is unchanged** (section 8). Its log now prints `orientation step: euler` near the top. If it says anything else, stop the run.
+
+**Not checked, said now.** Gen3 (Addendum 13, 4b-E), the replicate file and stage A were not re-flown. They predate the switch by date (2026-10-29/30) and are mapped to first-order on that basis alone.

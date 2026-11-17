@@ -13,7 +13,15 @@
 //   7  THE VERDICTS   (records by hand) PASS, FAIL, IN BETWEEN and NOT ASSESSED per cell; the autopilot and NO STATE readings; reach; the two-pathway claim; a failed check marks the verdicts NOT READ.
 //   8  THE COMMAND    arguments, resume, the stale-file refusal, the workers, the report, and a tiny real run on the smoke sets.
 //  10  THE FINDINGS  rows the first mutation pass showed were missing (below).
+//  11  THE STEP      (2026-11-17) each generation flies the orientation step its own file was measured under (STEP_OF_GEN), set by name and restored, stamped on every record; a mixed
+//                   run and a file of the other step are refused; and the measurement itself: Gen2's stored dives re-fly bit for bit under the first-order step only, Gen6's under RK4 only.
 //   9  THE SOURCE     pure.
+// SABOTAGED FOR SECTION 11 (2026-11-17), one mutant at a time of tools/ship/trainSubVestibular.mjs, every file restored byte-identical (git diff empty after):
+//   S1 STEP_OF_GEN emptied (gen 6 first-order) -> 5 red (the step table, the mixed refusal, the gen-6 refusal, the mixed run, the worker); S2 gen 7 put on RK4 -> 5 red (the table, the
+//   mixed refusal, the gen-7 run, the gen-6 refusal, the mixed run); S3 a mixed spec list let through (steps.length < 1) -> 2 red (the refusal, the mixed run); S4 the step never set
+//   (was = null) and S4b (was = "was") -> the gate THREW naming the step ("orientation null/\"was\" is neither euler nor rk4") and 2 red; S5 the restore removed -> 2 red (the gen-7 run,
+//   the gen-6 refusal); S6 the orientation stamp removed from records -> 2 red; S7 the other-step file refusal removed -> 1 red (the gen-6 refusal); S8 the worker's RESULT unstamped
+//   -> 1 red (the worker). And the gate's own first-order import removed -> 3 red (the scales, the autopilot summaries, the reflex row: the smoke records it re-derives in-process).
 // NOT CHECKED, said plainly: that any trained weights dodge anything (nothing is trained); the full-size task re-check (the references record of the real sets is measured by the command, and 0.0517 and 3.11 are Runs 1 and 2 of the note).
 //
 // SABOTAGED -- 223 mutants of tools/ship/trainSubVestibular.mjs, each run against a copy of this gate, 4 at a time, a mutant past 120 s counted red, and every one red BY NAME; plus an IDENTITY mutant that must read 0 red (it does: the harness does not invent reds. A first harness did: it replaced
@@ -40,6 +48,7 @@
 // GENERATION 6 ROUND (2026-11-05, Addendum 16, brain/FISH_WIRING_FRESH_WIP.md: fns / fer / fcl / fdg, shuffle offset 40, audits 87001-87060, the registered test, the direction reading and the overall line; 228 mutants of the changed lines of trainSubVestibular.mjs, 197 mechanical and 31 by hand): 221 killed (152 red BY NAME, 69 threw), 7 survivors. Two were real and are closed by report rows -- the direction needing only two audits instead of all three (G22) and the overall counting an incomplete cell (G26: it needed a cell that EXISTS and is not complete, one real search and one shuffled search; a cell with no shuffled search is not made at all) -- both red on the rerun. Five are equivalent: `tt0` admitted by the family pattern (P0072: the family is refused either way, by a different error); `p <= 0.05` read as `p < 0.05` (P0086: with four searches against twelve the attainable p values are k / 1820 for k = 71, 94, 121 ... and never exactly 0.05); GENS[5] for GENS[6] in the overall's cell count (P0166-P0168: both generations are on the same two cells).
 // GENERATION 7 ROUND (2026-11-06, Addendum 17, brain/FISH_WIRING_RANK_WIP.md: wer1-3 / wcl1-3 / wdg1-2, shuffle offset 20 + shift 4 / 8 / 12, audits and references of generation 2, ordinals 1200-1263, the registered circuit-level rank of Addendum 12's real wiring among 44 shuffled circuits, the shared rankCircuits, the WIRING AT THE CIRCUIT LEVEL line and the ADDENDUM 17 OVERALL line; 279 mechanical mutants of the changed lines of trainSubVestibular.mjs): 226 killed (133 red BY NAME, 86 threw, 7 crashed the gate by making the module fail to load), 53 survivors. 42 are in comment lines (the GEN 7 doc line and rankCircuits' doc: inert by construction). Ten are equivalent: `wer0` / `wdg0` admitted by one of the two family patterns (P0109, P0112, P0119, P0122: the family is refused either way, by a different error); `x >= r0 - 1e-12` read as `x > r0 - 1e-12` (P0148: the tolerance makes a tie count either way); GENS[5] for GENS[4] in circuitRank's cell list and GENS[6] for GENS[7] in wiringRank's and in the overall's cell count (P0167, P0171, P0225-P0227: the generations are on the same two cells). ONE WAS REAL AND IS CLOSED BY A ROW: `p <= 0.05` read as `p < 0.05` (P0159) -- the generation-6 note had called this equivalent because no p of the registered 4-against-12 test is exactly 0.05, and for the registered 44 no p is either (k / 45), but a SHORT pool can reach it (1 / 20 with 19 circuits in), and the cell then prints MET or not; the row "the 0.05 line is INCLUSIVE" pins p = 0.05 exactly at 19 circuits and is red on the rerun. The generation 6 claim stands as written for its own test.
 "use strict";
+import "../../physics/mechanics/rigidBody6dofEuler.mjs";   // 2026-11-17 -- the trainer flies each generation on the step its file was measured under (STEP_OF_GEN; every generation but 6 is first-order), and this gate re-derives its smoke records in-process, so it flies that step too (brain/FISH_WIRING_RANK_WIP.md section 9)
 import fs from "node:fs";
 import * as T from "../../brain/subTask.mjs";
 import * as AS from "../../brain/autopilotSub.mjs";
@@ -664,6 +673,36 @@ sec("9. THE SOURCE");
     ok("!! no Math.random and no clock anywhere in the trainer (every draw comes from a seed)", !/Math\.random|Date\.now|new Date|performance\.now/.test(code));
     const cmd = fs.readFileSync(new URL("./trainSubVestibularCmd.mjs", import.meta.url), "utf8");
     ok("!! the command file is three lines that import command from the library and set the exit code", /import \{ command \} from "\.\/trainSubVestibular\.mjs"/.test(cmd) && /process\.exitCode = await command\(process\.argv\.slice\(2\)\)/.test(cmd));
+}
+
+sec("11. THE STEP (2026-11-17, brain/FISH_WIRING_RANK_WIP.md section 9): each generation flies the orientation step its own file was measured under");
+{
+    const RB = await import("../../physics/mechanics/rigidBody6dof.mjs");
+    ok("!! the step of each generation: generation 6 (fns, fer, fcl, fdg) is RK4; generations 2, 4, 5 and 7, the replicates and stage A are first-order",
+        J(L.STEP_OF_GEN) === J({ 6: "rk4" }) && L.STEP_DEFAULT === "euler" && ["fns", "fer", "fcl", "fdg"].every((f) => L.stepOfFamily(f) === "rk4") && ["qns", "qer", "tns", "tt1", "tt4", "tt11", "wer1", "wcl3", "wdg2", "rl50", "er50", "cx", "nostate", "er", "tuning", "el99"].every((f) => L.stepOfFamily(f) === "euler"));
+    let mixErr = ""; try { L.stepOfSpecs(L.parseSpecs("P/B/fns:0,P/B/wer1:0")); } catch (e) { mixErr = e.message; }
+    ok("!! specs that need two steps are refused by name; one step is returned", /two orientation steps \(rk4, euler\)|two orientation steps \(euler, rk4\)/.test(mixErr) && L.stepOfSpecs(L.parseSpecs("P/B/wer1:0,P/whole/wdg2:1")) === "euler" && L.stepOfSpecs(L.parseSpecs("P/B/fns:0")) === "rk4", mixErr);
+    // the command: the step is set by name before anything flies, restored after, stamped on every record; a mixed run and a file of the other step are refused
+    const set = [], files = new Map(), io = { out: () => {}, err: (m) => set.push("ERR " + m), readFile: (f) => files.get(f), appendFile: (f, t) => files.set(f, (files.get(f) || "") + t), exists: (f) => files.has(f),
+        setStep: (h) => { set.push(h); return "was"; }, runner: (spec, o = {}) => ({ spec: L.specName(spec), task: spec.task, arm: spec.arm, family: spec.family, index: spec.index, smoke: !!o.smoke, recipe: o.recipe, asStart: false, champion: 9, movement: { moved: 1, kept: 1, largest: 0.1, lambda: 0.9 }, scores: { champion: null }, searches: [], reach: 1 }),
+        refsRunner: (t, o = {}) => ({ family: "refs", spec: o.replicate ? L.GENS[o.replicate].refs : L.REFS_NAME(t), task: t, ...(o.replicate ? { replicate: o.replicate } : {}), smoke: !!o.smoke, autopilot: { a1: { score: -3, early: 0 }, a2: { score: -3, early: 0 }, a3: { score: -3, early: 0 } }, cost: 1, startCheck: [], selfTests: { runnerBad: [], signsFailed: [] }, reflex: { best: "x", recovered: 1 }, trigger: { a: 1, b: 1, c: 1, n: 1 } }) };
+    const c1 = await L.command(["run", "--specs", "P/B/wer1:0", "--out", "g7.jsonl"], io), r1 = files.get("g7.jsonl").trim().split("\n").map((l) => JSON.parse(l));
+    ok("!! a generation 7 run sets the first-order step BY NAME before anything flies and restores what was there after; every record it writes (references and circuit) says orientation euler",
+        c1 === 0 && J(set) === J(["euler", "was"]) && r1.length >= 2 && r1.some((r) => r.family === "wer1") && r1.every((r) => r.orientation === "euler"), J(set) + " " + J(r1.map((r) => r.orientation)));
+    set.length = 0;
+    const c2 = await L.command(["run", "--specs", "P/B/fns:0", "--out", "g7.jsonl"], io);
+    ok("!! a generation 6 run into a file of first-order records is refused (exit 1) and writes nothing; the step it needs (rk4) was set and then restored", c2 === 1 && files.get("g7.jsonl").trim().split("\n").length === r1.length && set[0] === "rk4" && set.some((m) => /flown on the euler step and this run flies rk4/.test(m)) && set[set.length - 1] === "was", J(set));
+    set.length = 0;
+    const c3 = await L.command(["run", "--specs", "P/B/fns:0,P/B/wer1:0", "--out", "mix.jsonl"], io);
+    ok("!! a run whose specs need two steps is refused (exit 1) before the step is touched or anything is written", c3 === 1 && !set.some((m) => m === "euler" || m === "rk4") && !files.has("mix.jsonl") && set.some((m) => /two orientation steps/.test(m)), J(set));
+    set.length = 0; const outs = [];
+    const c4 = await L.command(["run", "--one", "P/B/fns:0", "--quiet"], { ...io, out: (m) => outs.push(m) });
+    ok("!! a worker (--one) sets its generation's step itself and its RESULT says it", c4 === 0 && set[0] === "rk4" && JSON.parse(outs.find((l) => l.startsWith("RESULT ")).slice(7)).orientation === "rk4", J(set));
+    // THE MEASUREMENT the table above rests on: two stored dives of each file re-flown under both steps
+    const fly = (file, rep, how) => { const was = RB.setOrientationDefault(how); try { const rec = JSON.parse(fs.readFileSync(new URL("../../brain/rig-results/" + file, import.meta.url), "utf8").split("\n")[0]); const got = L.evalDives(AS.pilot(), L.setsOf("P", { replicate: rep }).a1.slice(0, 2)).runs; return rec.autopilot.a1.runs.slice(0, 2).every((r, i) => r.score === got[i].score); } finally { RB.setOrientationDefault(was); } };
+    const m = { g2e: fly("fishVestibularGen2.jsonl", 2, "euler"), g2r: fly("fishVestibularGen2.jsonl", 2, "rk4"), g6e: fly("fishVestibularGen6.jsonl", 6, "euler"), g6r: fly("fishVestibularGen6.jsonl", 6, "rk4") };
+    ok("!! MEASURED: Addendum 12's stored autopilot dives (Gen2, refs:PQ) re-fly to the last bit under the first-order step and NOT under RK4; Addendum 16's (Gen6, refs:PF) under RK4 and NOT first-order",
+        m.g2e && !m.g2r && m.g6r && !m.g6e, J(m));
 }
 
 sec("16. THE EXPORTS THE VERDICT AND THE COMMAND REACH ONLY THROUGH THEIR OWN LINES (named here so the definition ratchet can see them)");
