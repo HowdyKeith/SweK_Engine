@@ -13,6 +13,11 @@
 //   THOSE seeds and THOSE draws.
 //   INERT NEURONS: a neuron with a zero input row, a bias <= 0 and no incoming edge from a neuron that can fire can never fire, and silencing it changes nothing. inertOf counts them, and the reading names how many of a lesion's
 //   neurons were already inert, so a TIE that is a lesion of dead cells reads as that.
+//   THE STATEFUL FLY (a RESERVOIR: brain/pilotSubCircuitState.mjs, the 1,729-weight heading-loop pilot; its topology is built by brain/lesionFlyCx.mjs and has KIND "reservoir"). Its 7,080 recurrent weights are NOT in the weight
+//   vector (fixed, the signed count matrix scaled to a largest singular value of 1 over the WHOLE circuit), so cutting edges would rescale every other cell. Silencing is instead a BIAS CLAMP: the cell's bias is set to
+//   LESION_BIAS (-1e30), and since its activity is relu(bias + inputs + recurrent), it is 0 on every tick while |inputs + recurrent| stays below 1e30 (brain/lesionFlyCx-selfcheck.mjs measures the margin on real flights).
+//   Its random control is MATCHED ON ROLE (input cell, output cell, both, neither: the topology's STRATA) instead of on hand channels; the reservoir's autopilot laws sit outside the network, so it has no hand channels.
+//   In this circuit a cell TYPE is exactly one role, so a whole type has no matched random set (the only matched set is the type itself) and is refused as matched: lesion it unmatched, or by type and side, or by glomerulus.
 // Pure: no clock, no Math.random, no file, no DOM (the caller reads weight files and hands them in).
 "use strict";
 import { FEATURES, OUTPUTS, mulberry } from "./pilotSubPolicy.mjs";
@@ -21,18 +26,29 @@ import * as ZF from "./zebrafishTopology.mjs";
 
 /** The circuits a tank entry can name whose neurons have classes: the fly's Giant Fiber Circuit (the 963-weight networks) and the zebrafish TEN core (the 803-weight fish pilot). */
 export const TOPOLOGIES = Object.freeze({ gfc: GFC, fish: ZF });
-/** The topology an arm flies (by its entry's circuit), or null when the arm has no entry, flies no weights (the autopilot), or flies a circuit without classes here. */
+/** The bias a silenced reservoir cell is given: its activity relu(bias + inputs + recurrent) is then 0 while the rest stays below 1e30 (float32 holds it exactly enough: about -1.0000000150e30). */
+export const LESION_BIAS = -1e30;
+/** The topology an arm flies: the arm's own `topo` (a reservoir arm carries one, brain/lesionFlyCx.mjs) or the one its entry's circuit names in TOPOLOGIES; null when the arm has no entry, flies no weights (the autopilot), flies
+ *  a circuit without classes here, or its weight count is not the topology's. */
 export function topologyOf(arm) {
     if (!arm || typeof arm.entry !== "function") return null;
-    const e = arm.entry("probe"), t = e && TOPOLOGIES[e.circuit];
-    return t && Array.isArray(e.weights) && e.weights.length === FEATURES * t.NEURON_ORDER.length + t.NEURON_ORDER.length + t.EDGES.length + t.NEURON_ORDER.length * OUTPUTS + OUTPUTS ? t : null;
+    const e = arm.entry("probe"), t = arm.topo || (e && TOPOLOGIES[e.circuit]);
+    return t && e && Array.isArray(e.weights) && e.weights.length === dims(t).WEIGHT_COUNT ? t : null;
 }
 
 /** The neurons that carry the hand weights' laws: 0 .. 2*OUTPUTS-1 (handWeights' relu pair per output). */
 export const HAND_CHANNELS = Object.freeze(Array.from({ length: 2 * OUTPUTS }, (_, i) => i));
 
-/** The named classes of a topology: { by: "type" | "instance", classes: { name: [indices ascending] } } from NEURON_TYPES (default) or NEURON_INSTANCES. A topology without the labels is refused. */
+/** The ways a topology's neurons can be grouped: its LABELS' keys (a reservoir: type, side, glomerulus), else type and instance. */
+export const groupingsOf = (topo) => (topo && topo.LABELS ? Object.keys(topo.LABELS) : ["type", "instance"]);
+/** The named classes of a topology: { by, classes: { name: [indices ascending] } }. A createSubPolicy topology groups by NEURON_TYPES ("type", default) or NEURON_INSTANCES ("instance"); a reservoir by its LABELS. A topology without the labels is refused. */
 export function classesOf(topo, by = "type") {
+    if (topo && topo.LABELS) {
+        const lab = Object.prototype.hasOwnProperty.call(topo.LABELS, by) ? topo.LABELS[by] : null;
+        if (!lab) throw new Error(`lesion.classesOf: by must be one of ${Object.keys(topo.LABELS).join(", ")} for this circuit, got ${JSON.stringify(by)}`);
+        if (lab.length !== topo.NEURON_ORDER.length) throw new Error(`lesion.classesOf: the ${by} labels are not of its neurons' length`);
+        const classes = {}; lab.forEach((l, i) => { (classes[l] ??= []).push(i); }); return { by, classes };
+    }
     const labels = by === "type" ? topo && topo.NEURON_TYPES : by === "instance" ? topo && topo.NEURON_INSTANCES : null;
     if (by !== "type" && by !== "instance") throw new Error(`lesion.classesOf: by must be "type" or "instance", got ${JSON.stringify(by)}`);
     if (!labels || !topo.NEURON_ORDER || labels.length !== topo.NEURON_ORDER.length) throw new Error(`lesion.classesOf: the topology has no ${by === "type" ? "NEURON_TYPES" : "NEURON_INSTANCES"} of its neurons' length`);
@@ -43,6 +59,7 @@ export function classesOf(topo, by = "type") {
 
 function dims(topo) {
     if (!topo || !topo.NEURON_ORDER || !topo.EDGES) throw new Error("lesion: a topology is { NEURON_ORDER, EDGES }");
+    if (topo.KIND === "reservoir") return { HIDDEN: topo.NEURON_ORDER.length, REC_EDGES: topo.EDGES.length, OFF_B: topo.OFF_B, SIGMA: topo.SIGMA_INDEX, WEIGHT_COUNT: topo.WEIGHT_COUNT, reservoir: true };
     const HIDDEN = topo.NEURON_ORDER.length, REC_EDGES = topo.EDGES.length;
     return { HIDDEN, REC_EDGES, REC: FEATURES * HIDDEN + HIDDEN, WEIGHT_COUNT: FEATURES * HIDDEN + HIDDEN + REC_EDGES + HIDDEN * OUTPUTS + OUTPUTS };
 }
@@ -57,6 +74,7 @@ export function lesionWeights(topo, w, idx) {
     const { HIDDEN, REC, WEIGHT_COUNT } = dims(topo);
     if (!w || w.length !== WEIGHT_COUNT) throw new Error(`lesion.lesionWeights: the circuit takes ${WEIGHT_COUNT} weights, got ${w ? w.length : "none"}`);
     checkIdx(idx, HIDDEN);
+    if (topo.KIND === "reservoir") { const o = Array.from(w); for (const j of idx) o[topo.OFF_B + j] = LESION_BIAS; return o; }
     const o = Array.from(w), dead = new Set(idx);
     for (const j of dead) { for (let f = 0; f < FEATURES; f++) o[j * FEATURES + f] = 0; o[FEATURES * HIDDEN + j] = 0; }
     topo.EDGES.forEach(([to], k) => { if (dead.has(to)) o[REC + k] = 0; });
@@ -68,27 +86,36 @@ export function inertOf(topo, w) {
     const { HIDDEN, REC, WEIGHT_COUNT } = dims(topo);
     if (!w || w.length !== WEIGHT_COUNT) throw new Error(`lesion.inertOf: the circuit takes ${WEIGHT_COUNT} weights, got ${w ? w.length : "none"}`);
     const live = new Array(HIDDEN).fill(false);
+    if (topo.KIND === "reservoir") {   // live: a bias > 0, an input cell with a non-zero input row, or an edge from a live cell while sigma > 0 (the recurrent gains are fixed and non-zero). Computed WITH recurrence, so for the no-state kind it can call a cell live that is not.
+        const sigma = w[topo.SIGMA_INDEX] > 0, F = topo.STATE_FEATURES;
+        for (let j = 0; j < HIDDEN; j++) live[j] = w[topo.OFF_B + j] > 0;
+        topo.INPUTS.forEach((cell, a) => { for (let f = 0; f < F && !live[cell]; f++) if (w[a * F + f] !== 0) live[cell] = true; });
+        if (sigma) for (let changed = true; changed;) { changed = false; topo.EDGES.forEach(([to, from]) => { if (!live[to] && live[from]) { live[to] = true; changed = true; } }); }
+        return live.map((l, j) => (l ? -1 : j)).filter((j) => j >= 0);
+    }
     for (let j = 0; j < HIDDEN; j++) { let any = w[FEATURES * HIDDEN + j] > 0; for (let f = 0; f < FEATURES && !any; f++) any = w[j * FEATURES + f] !== 0; live[j] = any; }
     for (let changed = true; changed;) { changed = false; topo.EDGES.forEach(([to, from], k) => { if (!live[to] && live[from] && w[REC + k] !== 0) { live[to] = true; changed = true; } }); }
     return live.map((l, j) => (l ? -1 : j)).filter((j) => j >= 0);
 }
 
 /**
- * `count` random sets of neurons the size of `cls` (indices), each distinct from `cls` and from each other, drawn with mulberry(seed). MATCHED (default): each set holds as many hand-channel neurons as `cls` does, drawn from
- * the hand channels, and the rest from the other neurons. Throws when the circuit cannot supply `count` distinct sets (e.g. a class that is every neuron).
+ * `count` random sets of neurons the size of `cls` (indices), each distinct from `cls` and from each other, drawn with mulberry(seed). MATCHED (default): each set holds as many neurons of each STRATUM as `cls` does (a reservoir's roles,
+ * topo.STRATA; otherwise the hand channels and the rest). Throws when the circuit cannot supply `count` distinct sets (e.g. a class that is every neuron).
  */
 export function randomSets(topo, cls, { count = 4, seed = 1, matched = true } = {}) {
     const { HIDDEN } = dims(topo); checkIdx(cls, HIDDEN);
     if (!Number.isInteger(count) || count < 1) throw new Error(`lesion.randomSets: count must be a positive integer, got ${JSON.stringify(count)}`);
-    const rng = mulberry(seed >>> 0), hand = new Set(HAND_CHANNELS.filter((j) => j < HIDDEN));
+    const rng = mulberry(seed >>> 0), all = Array.from({ length: HIDDEN }, (_, j) => j);
     const pick = (pool, k) => { const p = [...pool]; for (let i = p.length - 1; i > 0; i--) { const r = Math.floor(rng() * (i + 1)); [p[i], p[r]] = [p[r], p[i]]; } return p.slice(0, k); };
-    const all = Array.from({ length: HIDDEN }, (_, j) => j), nh = cls.filter((j) => hand.has(j)).length;
+    // the strata a matched draw keeps the class's counts in: a reservoir's roles, else the hand channels and the rest
+    const strata = topo.STRATA ? topo.STRATA.map((g) => [...g]) : (() => { const hand = new Set(HAND_CHANNELS.filter((j) => j < HIDDEN)); return [all.filter((j) => hand.has(j)), all.filter((j) => !hand.has(j))]; })();
+    const inCls = new Set(cls), need = strata.map((g) => g.filter((j) => inCls.has(j)).length);
     const key = (s) => [...s].sort((a, b) => a - b).join(","), seen = new Set([key(cls)]), out = [];
     for (let tries = 0; out.length < count && tries < 200 * count; tries++) {
-        const s = matched ? [...pick(all.filter((j) => hand.has(j)), nh), ...pick(all.filter((j) => !hand.has(j)), cls.length - nh)] : pick(all, cls.length);
+        const s = matched ? strata.flatMap((g, i) => pick(g, need[i])) : pick(all, cls.length);
         const k = key(s); if (seen.has(k)) continue; seen.add(k); out.push(s.sort((a, b) => a - b));
     }
-    if (out.length < count) throw new Error(`lesion.randomSets: the circuit has fewer than ${count} distinct ${matched ? "matched " : ""}sets of ${cls.length} neurons other than the class`);
+    if (out.length < count) throw new Error(`lesion.randomSets: the circuit has fewer than ${count} distinct ${matched ? "matched " : ""}sets of ${cls.length} neurons other than the class${matched ? " (a matched set keeps the class's count in every stratum, so a class that fills its strata has none: draw it unmatched)" : ""}`);
     return out;
 }
 
