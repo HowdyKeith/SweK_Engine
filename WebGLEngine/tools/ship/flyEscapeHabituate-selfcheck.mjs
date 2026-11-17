@@ -10,6 +10,7 @@
 //   4  ONE TRAINING             a record's weights are the trainer's from a policy made here by hand
 //   5  THE RECORDS              36 draws; P, T1, H; the flies that learn and never flee
 //   6  THE COMMAND              it is this round's; no training of the round's, no process
+//   7  THE VERDICT              the round's results, read from the committed file
 // SABOTAGE LOG (2026-11-17) -- through a byte-safe runner (one at a time, every file restored and its sha256 checked), this gate and tools/ship/voxelHome-selfcheck.mjs (which probes the command as a
 // process) run whole for each; every one red by name (the number is the rows red over the two):
 //   THE LIFE (brain/rl/lifeEnv.mjs): L1 a decoy catches 2 | L2 the decoy's kind draw is skipped 1 | L3 an ordinary episode is a decoy one 3 | L4 every life is ordinary 2 | L5 three episodes a life 4
@@ -23,6 +24,10 @@
 //   TWO WENT 0 RED AT FIRST AND WERE FINDINGS: F3 P is against HSHUF (the fixture had both other arms below HAB, so which one P was against made no difference) and F11 the floors' untrained
 //   fly is not checked against the reflex (no fixture had an untrained fly that was not the reflex). A row was added for each and they were run again: 1 and 1.
 //   THE COMMAND: C1 the second training is of draw 2 1 | C2 exits 0 on a word it does not know 1 | C3 reads round 8's library 1
+//   THE VERDICT (section 7; the results file and the note sabotaged, this gate run whole for each): V1 HAB draw 3's score set to never fleeing's 4 | V2 HSHUF draw 2's depression rate
+//   set to 0.1 3 | V3 the second training's record names other weights 4 | V4 the note's P says BETTER 1 | V5 the note names another commit 1 | V6 the rates-at-0 measure called registered 1
+//   V7 the note says the learn expectation came 1 | V8 the learn expectation lowered after the fact 1 | V9 the note drops that the learn count does not measure learning 1 | V10 the note says
+//   eight HAB flies never flee 1. A row of mine in section 7 asked a field that is not there (the floors' own floors) and so asked nothing; it was taken out before the sabotages.
 //   Three rows of mine were wrong when written and were corrected: the hand floor stops fleeing at the seventh mover, not before (0.9 to the 6th is 0.53, above the line); a fixture's learning flies
 //   scored 0.74, not under the 0.74 I gave its hand floor; and the registration's cost of a training was 8 to 9 minutes where two iterations measure 12.
 "use strict";
@@ -172,6 +177,38 @@ section(() => {
     const me = src("tools/ship/flyEscapeHabituate-selfcheck.mjs"), calls = [...me.matchAll(/V\.trainOne\(([^)]*)\)/g)].map((m) => m[1]);
     ok("!! THIS GATE STARTS NO TRAINING OF THE ROUND'S AND LEAVES ITS RESULTS FILE AS IT WAS: its two trainings through the round's code are of 2 iterations with 4 flies tried on draw 901; this gate starts no process at all; and the file's size and time are what they were before this section",
         calls.length === 2 && calls.every((c) => /^"(HAB|FROZEN)", 901, TINY, TINY_AUDIT$/.test(c)) && TINY.iters === 2 && TINY.pop === 4 && !V.SEEDS.includes(901) && !/Sync\(/.test(me.replace(/readFileSync\(|statSync\(|existsSync\(/g, "")) && stateOf() === before && typeof createHash === "function", `${calls.length} trainings, no process, the file ${before === "absent" ? "absent" : "unchanged"}`);
+});
+
+console.log("\n7. THE VERDICT (the whole results file was committed at 515cb21a before it was read, and is read here from the file)");
+section(() => {
+    const bytes = fs.readFileSync(path.join(ENG, V.RESULTS)), lines = bytes.toString("utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l)), R = V.reading(lines), A = R.arms, F = R.floors, draws = lines.filter((r) => r.kind === "draw");
+    const sc = (a) => draws.filter((r) => r.arm === a).sort((x, y) => x.s - y.s).map((r) => r.score), never = F.freeze.score, rec = (a, s) => draws.find((r) => r.arm === a && r.s === s);
+    ok("!! the results file is the one the run wrote: 38 records, sha256 e01bfbd4f9c08afd... (one start, 99.6 minutes, no restart)", lines.length === 38 && createHash("sha256").update(bytes).digest("hex") === "e01bfbd4f9c08afdb65f64ce65d53af6c8c1b4d06abe66e6c0bbc41b46659a36");
+    ok("!! THE CHECKS HOLD, AND THE START WAS THE REFLEX: 36 draws each once, the registered recipe, each arm's weights and wiring, HAB draw 1 the same twice, the floors -- and the untrained fly of all three arms scores the reflex's 0.6057, to the bit",
+        R.checks.length === 0 && draws.length === 36 && near(F.reflex.score, 0.6057) && V.ARMS.every((a) => F.untrained[a] === F.reflex.score));
+    ok("!! *** P: A FLY WHOSE CONNECTIONS ONTO THE GIANT FIBERS HABITUATE CANNOT BE TOLD APART FROM ONE WHOSE CANNOT *** -- HAB's ranks 168 on a middle of 150, 108 of the 144 pairs tied, exact two-sided p 1.0",
+        R.P && R.P.word === V.WORDS.P[2] && R.P.sumA === 168 && R.P.ties === 108 && R.P.p === 1);
+    ok("!! T1: THE REAL WIRING HABITUATING CANNOT BE TOLD APART FROM A SHUFFLE OF IT (ranks 125.5, 27 ties, p 0.55). H: IT DOES WORSE THAN THE HAND HABITUATING REFLEX -- 1 of 12 above its 0.7276, 11 below, p 0.0063",
+        R.T1.word === V.WORDS.T1[2] && R.T1.sumA === 125.5 && R.T1.ties === 27 && near(R.T1.p, 0.5512, 1e-4) && R.H.word === V.WORDS.H[1] && R.H.above === 1 && R.H.below === 11 && near(R.H.ref, 0.7276) && near(R.H.p, 0.006348, 1e-6));
+    ok("!! *** EVERY FROZEN FLY IS THE FLY THAT NEVER FLEES, TO THE BIT, AND SO ARE 9 OF THE 12 HAB FLIES *** (0.6348, the never-flees floor's own number); the three that are not are HAB draws 2, 3 and 12 (0.7187, 0.8203, 0.6728)",
+        sc("FROZEN").every((v) => v === never) && A.FROZEN.neverFlee === 12 && sc("HAB").filter((v) => v === never).length === 9 && A.HAB.neverFlee === 9 && J(draws.filter((r) => r.arm === "HAB" && r.score !== never).map((r) => r.s).sort((x, y) => x - y)) === J([2, 3, 12]) && near(rec("HAB", 3).score, 0.8203) && near(rec("HAB", 2).score, 0.7187) && near(rec("HAB", 12).score, 0.6728));
+    ok("!! the arms (mean, sd, decoy lives, ordinary lives): FROZEN 0.6348 0 1.0000 0.2695 | HAB 0.6604 0.0540 0.9467 0.3741 | HSHUF 0.6590 0.0150 0.7008 0.6172; the floors: the habituating reflex 0.7276, told the kind 0.8137",
+        near(A.FROZEN.mean, 0.6348) && A.FROZEN.sd < 1e-12 && near(A.HAB.mean, 0.6604) && near(A.HAB.sd, 0.0540) && near(A.HAB.decoy, 0.9467) && near(A.HAB.ordinary, 0.3741) && near(A.HSHUF.mean, 0.6590) && near(A.HSHUF.sd, 0.0150) && near(A.HSHUF.decoy, 0.7008) && near(A.HSHUF.ordinary, 0.6172) && near(F.hand.score, 0.7276) && near(F.told.score, 0.8137));
+    const zero = (arm, s) => { const r = rec(arm, s), w = PF.unpackWeights(r.weights), p = V.policyOf(arm, s); p.setParams(w); const a = V.auditScore(() => (o) => p.act(o)); const z = Float64Array.from(w); z[0] = 0; z[1] = 0; const q = V.policyOf(arm, s); q.setParams(z); return [a.score === r.score, V.auditScore(() => (o) => q.act(o)).score]; };
+    const h3 = zero("HAB", 3), h2 = zero("HAB", 2), s2 = zero("HSHUF", 2);
+    ok("!! *** THE THREE HAB FLIES THAT ARE NOT NEVER-FLEEING LEAN ON THE PLASTICITY *** (measured after the reading, not registered): re-audited on the 200 lives, each record's weights give its score to the bit; with its two rates set to 0, HAB draw 3 falls from 0.8203 to the never-flees 0.6348 and HAB draw 2 from 0.7187 to 0.5000 -- while HSHUF draw 2, whose depression rate is 0, gives its 0.6818 again with them at 0",
+        h3[0] && h2[0] && s2[0] && h3[1] === never && near(h2[1], 0.5, 1e-9) && s2[1] === rec("HSHUF", 2).score && rec("HSHUF", 2).rates.a === 0, `HAB 3 -> ${h3[1].toFixed(4)}, HAB 2 -> ${h2[1].toFixed(4)}, HSHUF 2 -> ${s2[1].toFixed(4)}`);
+    ok("!! HAB draw 3, the best fly of the round and the only one above the hand floor, never pays a decoy from its life's first episode (1.00 in all four): what it does is within an episode, not the slow habituation across episodes the signature looks for",
+        J(rec("HAB", 3).ep.decoy.map((v) => v.toFixed(4))) === J(["1.0000", "1.0000", "1.0000", "1.0000"]) && rec("HAB", 3).score > F.hand.score && sc("HAB").filter((v) => v > F.hand.score).length === 1);
+    ok("!! *** THE REGISTERED LEARN COUNT DOES NOT MEASURE LEARNING *** -- the reflex floor itself passes it (ordinary 0.6275 over 0.5; decoy 4th episode 0.5894 over its 1st 0.5776), and all 9 of HSHUF's \"learners\" have the depression rate at 0, so their connections cannot change; HAB's 2 are draws 2 and 12",
+        V.learns(F.reflex) && A.HSHUF.learn === 9 && draws.filter((r) => r.arm === "HSHUF" && V.learns(r)).every((r) => r.rates.a === 0) && A.HAB.learn === 2 && J(draws.filter((r) => r.arm === "HAB" && V.learns(r)).map((r) => r.s).sort((x, y) => x - y)) === J([2, 12]));
+    ok("!! WHAT THE TRAINER SAW: on its own lives HAB starts at 0.578 and HSHUF at 0.621, FROZEN at 0.649 -- the real wiring's drive onto the Giant Fibers starts far below the reflex, as in rounds 7 and 8 -- and FROZEN stops at 0.661 by iteration 25",
+        near(A.HAB.history[0].ret, 0.5783) && near(A.HSHUF.history[0].ret, 0.6206) && near(A.FROZEN.history[0].ret, 0.6490) && A.FROZEN.history.slice(1).every((h) => near(h.ret, 0.6613)));
+    const note = src("brain/FLY_ESCAPE_HABITUATE_WIP.md"), res = note.slice(note.indexOf("## 10. The result")).replace(/\s+/g, " ");
+    ok("the expectations, written before the code, against what came: P CANNOT (55) came; FROZEN at least 10 of 12 never flee (85) came, with 12; HAB at least 3 of 12 learn (45) did NOT, with 2; T1 CANNOT (75) and H WORSE (65) came",
+        /P: \*\*CANNOT BE TOLD APART about 55 percent, BETTER about 40, WORSE about 5\.\*\*/.test(note) && /least 10 of 12 never flee, about\s+85/.test(note) && /HAB: at least 3 of 12 learn/.test(note) && /T1: CANNOT about 75\. H: WORSE about 65\./.test(note) && A.HAB.learn < 3 && A.FROZEN.neverFlee >= 10);
+    ok("the registration's RESULT SECTION (section 10, not the possible words of section 5) carries the three readings' words, the commit the file was read at, that 9 of 12 HAB flies never flee, the rates-at-0 measure said as unregistered, that the learn count does not measure learning, and that the HAB learn expectation did not come",
+        /## 10\. The result/.test(note) && [["P", R.P.word], ["T1", R.T1.word], ["H", R.H.word]].every(([t, w]) => res.includes(`**${t}: ${w}**`)) && /515cb21a/.test(res) && /Nine of the twelve HAB flies did the same/.test(res) && /NOT registered/.test(res) && /does not measure learning/.test(res) && /\(45\) did not come, with 2/.test(res));
 });
 
 console.log(`\nflyEscapeHabituate-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILED"}`);

@@ -102,3 +102,53 @@ a time: about 80 minutes. Resumable.
 ## 9. The run (the gate never runs it and never gives the command the word `run`)
 `node tools/ship/takeFlyEscapeHabituate.mjs run` -> `brain/flyEscapeHabituateRound.jsonl`, committed byte for byte, whole,
 before it is read; `node tools/ship/takeFlyEscapeHabituate.mjs read` prints the checks and the reading.
+
+## 10. The result
+The run took 99.6 minutes in one start (no restart): FROZEN about 7 minutes a training, HAB about 10.5, HSHUF about 10 --
+not the 8 to 9 of section 8, and not the 12 the gate's two-iteration timing gave either. `brain/flyEscapeHabituateRound.jsonl`
+(38 records, sha256 `e01bfbd4f9c08afd...`) was committed whole at 515cb21a before it was read, and read once. The checks
+hold: 36 draws each once, the registered recipe, each arm's weight count and wiring, HAB draw 1 the same twice, and every
+untrained fly the reflex (0.6057).
+
+- **P: A FLY WHOSE CONNECTIONS ONTO THE GIANT FIBERS HABITUATE CANNOT BE TOLD APART FROM ONE WHOSE CANNOT** -- HAB's ranks
+  168, the middle 150, 108 ties; exact two-sided p 1.0.
+- **T1: THE REAL WIRING HABITUATING CANNOT BE TOLD APART FROM A SHUFFLE OF IT** -- ranks 125.5, 27 ties, p 0.55.
+- **H: A FLY WHOSE CONNECTIONS ONTO THE GIANT FIBERS HABITUATE DOES WORSE THAN THE HABITUATING REFLEX WRITTEN BY HAND** --
+  1 of 12 above its 0.7276, 11 below, p 0.0063.
+
+| arm | mean | sd | decoy lives | ordinary lives | never flee | learn (registered) | best |
+|---|---|---|---|---|---|---|---|
+| FROZEN | 0.6348 | 0 | 1.0000 | 0.2695 | 12 of 12 | 0 | 0.6348 |
+| HAB | 0.6604 | 0.0540 | 0.9467 | 0.3741 | 9 of 12 | 2 | 0.8203 |
+| HSHUF | 0.6590 | 0.0150 | 0.7008 | 0.6172 | 3 of 12 | 9 | 0.6818 |
+
+Floors: the reflex 0.6057; never flees 0.6348; the habituating reflex 0.7276 (its decoy 4th episode less its 1st 0.42);
+told the kind 0.8137.
+
+What happened, plainly. **Every FROZEN fly became the fly that never flees, to the bit** (0.6348, the never-flees floor's
+number). **Nine of the twelve HAB flies did the same.** The trainer found never fleeing first, as section 5's CANNOT
+foresaw, and P is a tie on 108 of 144 pairs.
+
+**The other three HAB flies do use the plasticity, and it pays them.** Measured after the reading and NOT registered: each
+of the three re-audited on the 200 lives with its two rates set to 0 (the rest of its weights kept) gives, draw 3: 0.8203 ->
+0.6348 (it becomes the fly that never flees); draw 2: 0.7187 -> 0.5000; draw 12: 0.6728 -> 0.5000. Draw 3 is the best
+fly of the round and the only one above the hand floor; it never pays a decoy from its life's FIRST episode (1.00 in all
+four), so what it does is fast, within an episode, and not the slow across-episode habituation the signature looks for.
+How it tells a decoy life from an ordinary one has not been measured.
+
+**The registered "learn" count does not measure learning, and this is said against my own definition.** The reflex floor
+passes it (an ordinary-life score 0.63 over 0.5, and a decoy fourth episode 0.589 over its first 0.578), so does any fly
+that flees in ordinary lives. HSHUF's 9 "learners" all have the depression rate `a` at 0 -- their connections CANNOT
+change -- and re-audited with both rates at 0, HSHUF draws 2 and 6 give their scores to the bit. The HSHUF arm's lead over
+FROZEN in ordinary lives is a shuffled fly that stayed reflex-like, not habituation; as in rounds 7 and 8, the real
+wiring's heavy drive onto the Giant Fibers starts the trainer far below the reflex (HAB 0.578 at iteration 0, HSHUF 0.621),
+and from there never fleeing is the near hill.
+
+Against section 6: P CANNOT (55) came. FROZEN at least 10 of 12 never flee (85) came, with 12. HAB at least 3 of 12 learn
+(45) did not come, with 2 -- and the count is the one shown above not to measure it. T1 CANNOT (75) came. H WORSE (65)
+came.
+
+What this does and does not say. It does not say habituation cannot pay this fly: three of twelve trainings found a use for
+it, and the best of them (0.82) beat every frozen fly and the hand rule. It says this trainer, from the reflex start on the
+real wiring, mostly does not find it -- 9 of 12 times it stops at never fleeing. The question for a next round is the
+trainer's start, not the rule.
