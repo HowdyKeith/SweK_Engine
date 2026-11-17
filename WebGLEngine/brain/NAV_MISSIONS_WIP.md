@@ -40,3 +40,7 @@ The submarine needs model (`physics/mechanics/subNeeds.mjs`) charges a hotel loa
 ## PART 2 (NOT BUILT, said now)
 
 Multi-waypoint missions: one clock across legs, the ships sailing on between them, energy carried from leg to leg, and a mission failing when the battery empties. The meter of PART 1 is the piece it needs. The flight loop that chains legs is not written.
+
+### AMENDMENT 1 TO PART 1 (2026-11-17; made on DEV, BEFORE ANY HELD80 SEED IS FLOWN; DEV is not a result)
+
+DEV (30 seeds) gave only **10 flights reached by both `any+predict` and `any+replan`**: `any+replan` reaches few in traffic. At that rate the registered 60 seeds would give about 20 pairs, exactly the ENOUGH PAIRS floor, and the reading would stand or fall on a coin. **HELD80 is widened to seeds 7701 to 7820 (120 scenarios, 360 flights).** 7761 to 7820 are spent by no navigation set either. The arms, the reading, the bars (3 and 1 percent of a battery), the checks and the floor of 20 pairs are unchanged. The DEV table was not printed (its check failed, as the rule says) and nothing else of DEV was read.

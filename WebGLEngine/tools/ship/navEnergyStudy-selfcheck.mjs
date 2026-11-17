@@ -30,7 +30,7 @@ sec("1. THE SETS");
 {
     const spent = new Set([...Object.values(H.HARD_SETS).flat(), ...H.HELD5, ...Object.values(SN.SENSE_SETS).flat(), ...Object.values(P.PLUS_SETS).flat(), ...G.HELD78, ...W.HELD79]);
     for (let s = 9001; s <= 9040; s++) spent.add(s);
-    ok("!! HELD80 is 7701-7760 and no seed of it was spent before (HELD4, HELD5, the sensed and plus sets, HELD73, HELD77, HELD78, HELD79); DEV is 1-30", T.SETS.held80.length === 60 && T.SETS.held80[0] === 7701 && T.SETS.held80[59] === 7760 && T.SETS.held80.every((s) => !spent.has(s)) && T.SETS.dev.length === 30 && T.SETS.dev[0] === 1);
+    ok("!! HELD80 is 7701-7820 (Amendment 1: widened on DEV from 7701-7760) and no seed of it was spent before (HELD4, HELD5, the sensed and plus sets, HELD73, HELD77, HELD78, HELD79); DEV is 1-30", T.SETS.held80.length === 120 && T.SETS.held80[0] === 7701 && T.SETS.held80[119] === 7820 && T.SETS.held80.every((s) => !spent.has(s)) && T.SETS.dev.length === 30 && T.SETS.dev[0] === 1);
 }
 
 // records: per arm over seeds 1..n; `e(arm, seed)` the energy (J), `r(arm, seed)` reached
@@ -61,7 +61,7 @@ sec("4. THE COMMAND");
     const run = (argv) => { const out = [], errs = [], files = [], sets = []; const code = T.command(argv, { out: (m) => out.push(m), err: (m) => errs.push(m), writeFile: (f, t) => files.push([f, t]), flySet: (seeds) => { sets.push(seeds.length + ":" + seeds[0]); return resOf(seeds.length, (a) => 600000 + (a === "any+predict" ? 100000 : 0)); }, meterOk: () => true }); return { code, out: out.join("\n"), errs, files, sets }; };
     const d = run(["--set", "dev"]), dw = run(["--set", "dev", "--write"]), h = run(["--set", "held80", "--write"]), none = run([]);
     ok("!! DEV flies 1-30, says it is not a result and writes nothing; --write with DEV is refused (exit 2); no set prints the usage", d.code === 0 && d.sets[0] === "30:1" && /not a result/.test(d.out) && d.files.length === 0 && dw.code === 2 && dw.sets.length === 0 && none.code === 2);
-    ok("!! held80 flies 7701-7760 once and writes brain/navEnergyHeld80.jsonl with all 180 flights, each carrying set held80; the reading is printed", h.code === 0 && J(h.sets) === J(["60:7701"]) && h.files[0][0].endsWith("brain/navEnergyHeld80.jsonl") && h.files[0][1].trim().split("\n").length === 180 && JSON.parse(h.files[0][1].split("\n")[0]).set === "held80" && /READING: THE DETOUR COSTS/.test(h.out));
+    ok("!! held80 flies 7701-7820 once and writes brain/navEnergyHeld80.jsonl with all 360 flights, each carrying set held80; the reading is printed", h.code === 0 && J(h.sets) === J(["120:7701"]) && h.files[0][0].endsWith("brain/navEnergyHeld80.jsonl") && h.files[0][1].trim().split("\n").length === 360 && JSON.parse(h.files[0][1].split("\n")[0]).set === "held80" && /READING: THE DETOUR COSTS/.test(h.out));
 }
 
 sec("5. THE SOURCE");

@@ -2,7 +2,7 @@
 // tools/ship/navEnergyStudy-selfcheck.mjs)
 //
 //   node tools/ship/navEnergyStudy.mjs --set dev|held80 [--write]
-// Flies the three traffic arms with the energy meter of brain/navEnergy.mjs on hard-traffic: DEV (seeds 1-30, a sanity run, not a result) or HELD80 (7701-7760, flown once;
+// Flies the three traffic arms with the energy meter of brain/navEnergy.mjs on hard-traffic: DEV (seeds 1-30, a sanity run, not a result) or HELD80 (7701-7820 after Amendment 1, flown once;
 // --write puts every flight in brain/navEnergyHeld80.jsonl). Prints the checks, the table, the registered reading of the detour's price and what is reported beside it.
 "use strict";
 import fs from "node:fs";
@@ -18,7 +18,7 @@ import { parseOrExit } from "./cliArgs.mjs";
 const HERE = path.dirname(fileURLToPath(import.meta.url)), ENG = path.resolve(HERE, "..", "..");
 const range = (a, b) => Array.from({ length: b - a + 1 }, (_, i) => a + i);
 export const KIND = "hard-traffic", ARMS = Object.freeze(["any+replan", "any+predict", "any+predict+edge+yield"]), OUT_FILE = "brain/navEnergyHeld80.jsonl";
-export const SETS = Object.freeze({ dev: Object.freeze(range(1, 30)), held80: Object.freeze(range(7701, 7760)) });
+export const SETS = Object.freeze({ dev: Object.freeze(range(1, 30)), held80: Object.freeze(range(7701, 7820)) });   // AMENDMENT 1 (brain/NAV_MISSIONS_WIP.md): widened from 7701-7760 on DEV, before any HELD80 seed was flown
 export const COSTS = 0.03, CHEAP = 0.01, MIN_PAIRS = 20;
 export function flySet(seeds, { fly = (sc, arm) => E.flyMetered(sc, arm) } = {}) {
     const scs = seeds.map((s) => H.hardScenario(s, KIND));
