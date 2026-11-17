@@ -3382,8 +3382,8 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "fly-dark-sub-3d",
-        blocker: "OPEN",
-        what: "The 3D view does not mark a sub whose compass is dark; the top and depth views do (an amber ring and a ghost line along the heading the autopilot believes).",
+        blocker: "CLOSED",
+        what: "CLOSED 2026-11-17: the 3D view draws an amber ring round a sub whose compass is dark and a ghost line along the heading its autopilot believes, and the survey's stations as buoys (amber, green once visited) -- render/subAquarium3d.mjs darkMark / stationMarks / syncMarks, gate render/subAquarium3dMarks-selfcheck.mjs (9 mutants red); subAquarium3d-selfcheck's live draw still green. NOT looked at on a real GPU. The navigation sea in 3D (tank-nav-3d) stays open. Earlier text: The 3D view does not mark a sub whose compass is dark; the top and depth views do (an amber ring and a ghost line along the heading the autopilot believes).",
         how: "The same ring and ghost line in render/subAquarium3d.mjs.",
         why: "Consistency.",
     },

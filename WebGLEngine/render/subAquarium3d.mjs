@@ -64,6 +64,50 @@ export function poseFins(group, cmd) {
 export function subPose(s) { return { x: s.x, y: -s.depth, z: s.y, rotY: s.heading, rotZ: s.pitch }; }
 
 /** How close the camera sits to a sub it is following (metres): the hull is drawn 32 m long, so the tower and the tail fill the panel. */
+// 2026-11-17 (nextRounds fly-dark-sub-3d and the survey markers of BACKLOG_2026-11-04_BRAINS): THE TWO MARKS THE PLAN VIEW HAD AND THIS VIEW DID NOT. A sub whose compass is
+// dark wears an amber ring in the horizontal plane at its depth and an amber GHOST LINE along the heading its autopilot believes (the snapshot's compass.seen) -- the plan view's
+// drawDark, in the scene's frame: a heading h points along (cos h, 0, -sin h), as the hull's nose does (section 1 of the gate). A survey's stations are buoys, amber until the boat
+// has been on them and green after, as the plan and side views draw them.
+export const DARK_COLOUR = 0xf6a623, STATION_COLOURS = Object.freeze({ open: 0xffc94d, visited: 0x5be37d }), DARK_RING = HULL_LENGTH * 0.9, GHOST = 2.2, BUOY_R = 1.6;
+/** The dark-compass mark of a snapshot row, or null when its compass is not dark: { centre [X, Y, Z], r, tip [X, Y, Z] or null (a non-finite belief draws the ring only) }. */
+export function darkMark(s, scale = 1) {
+    if (!s || !s.compass || s.compass.valid) return null;
+    const p = subPose(s), r = DARK_RING * scale, seen = s.compass.seen;
+    return { centre: [p.x, p.y, p.z], r, tip: Number.isFinite(seen) ? [p.x + Math.cos(seen) * r * GHOST, p.y, p.z - Math.sin(seen) * r * GHOST] : null };
+}
+/** The buoys of every running survey in a snapshot: [{ id, pos [X, Y, Z], visited }] (a finished survey draws none, as in the plan view). */
+export function stationMarks(snapshot) {
+    const out = [];
+    for (const s of snapshot) if (s.survey && !s.survey.finished) s.survey.stations.forEach((q, i) => out.push({ id: `${s.id}#${i}`, pos: [q.x, -q.depth, q.y], visited: !!q.visited }));
+    return out;
+}
+/** Keep `store` ({ group, dark: Map, buoys: Map }, made by marksStore) in step with a snapshot: one ring and ghost line per dark sub, one buoy per open station. Returns { dark, buoys } counts. */
+export function marksStore(THREE) {
+    const group = new THREE.Group(), ringGeo = new THREE.BufferGeometry().setFromPoints(Array.from({ length: 48 }, (_, i) => new THREE.Vector3(Math.cos((i / 48) * 2 * Math.PI), 0, Math.sin((i / 48) * 2 * Math.PI))));
+    return { group, ringGeo, buoyGeo: new THREE.SphereGeometry(BUOY_R, 10, 8), darkMat: new THREE.LineBasicMaterial({ color: DARK_COLOUR }), dark: new Map(), buoys: new Map(),
+        buoyMats: { open: new THREE.MeshBasicMaterial({ color: STATION_COLOURS.open }), visited: new THREE.MeshBasicMaterial({ color: STATION_COLOURS.visited }) } };
+}
+export function syncMarks(THREE, store, snapshot, scale = 1) {
+    const liveDark = new Set();
+    for (const s of snapshot) {
+        const mk = darkMark(s, scale); if (!mk) continue;
+        liveDark.add(s.id);
+        let d = store.dark.get(s.id);
+        if (!d) { const ring = new THREE.LineLoop(store.ringGeo, store.darkMat), ghost = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]), store.darkMat); store.group.add(ring, ghost); d = { ring, ghost }; store.dark.set(s.id, d); }
+        d.ring.position.set(mk.centre[0], mk.centre[1], mk.centre[2]); d.ring.scale.setScalar(mk.r);
+        d.ghost.visible = !!mk.tip;
+        if (mk.tip) { const a = d.ghost.geometry.attributes.position.array; a.set([mk.centre[0], mk.centre[1], mk.centre[2], mk.tip[0], mk.tip[1], mk.tip[2]]); d.ghost.geometry.attributes.position.needsUpdate = true; }
+    }
+    for (const [id, d] of store.dark) if (!liveDark.has(id)) { store.group.remove(d.ring, d.ghost); d.ghost.geometry.dispose(); store.dark.delete(id); }
+    const marks = stationMarks(snapshot), liveB = new Set(marks.map((m) => m.id));
+    for (const m of marks) {
+        let b = store.buoys.get(m.id);
+        if (!b) { b = new THREE.Mesh(store.buoyGeo, store.buoyMats.open); store.group.add(b); store.buoys.set(m.id, b); }
+        b.position.set(m.pos[0], m.pos[1], m.pos[2]); b.material = m.visited ? store.buoyMats.visited : store.buoyMats.open;
+    }
+    for (const [id, b] of store.buoys) if (!liveB.has(id)) { store.group.remove(b); store.buoys.delete(id); }
+    return { dark: store.dark.size, buoys: store.buoys.size };
+}
 export const FOLLOW_DIST = 70;
 /** The camera for an orbit `view` ({ yaw, pitch, dist }) around `centre` ({ x, y, z }): a point on a sphere about the centre, looking at it. At the tank's centre this is the pose the page has always had. */
 export function cameraPose(centre, view) {
@@ -101,6 +145,7 @@ export function createView3d(THREE, canvas, { length = 500, width = 300, depthMa
     const bubbleGeo = new THREE.BufferGeometry(); bubbleGeo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(BUBBLE_MAX * 3), 3)); bubbleGeo.setDrawRange(0, 0);
     const bubblePts = new THREE.Points(bubbleGeo, new THREE.PointsMaterial({ color: 0xcdf2ff, size: 1.4, transparent: true, opacity: 0.8, depthWrite: false })); bubblePts.frustumCulled = false; scene.add(bubblePts);
     const weightMat = new THREE.MeshStandardMaterial({ color: 0x3a3f45, roughness: 0.8, metalness: 0.4 });
+    const marks = marksStore(THREE); scene.add(marks.group);   // 2026-11-17: the dark-compass ring and ghost line, and the survey's buoys
     // v4899 -- FOLLOW: the camera orbits a centre, and the centre is the tank's middle unless a sub is being followed, when it eases toward that sub (and eases back when it is not).
     const home = { x: length / 2, y: -15, z: width / 2 };
     let centre = { ...home }, follow = null, distBefore = null, focus = null;   // focus: a scene point the camera orbits instead of a sub (the Sea OGRE's monster), overriding the follow
@@ -153,6 +198,7 @@ export function createView3d(THREE, canvas, { length = 500, width = 300, depthMa
                 const p = subPose(s); m.position.set(p.x, p.y, p.z); m.rotation.set(0, p.rotY, p.rotZ); poseFins(m, s.cmd); poseCues(m, s);
                 if (modelHost) modelHost.sync(m, s);
             }
+            syncMarks(THREE, marks, snapshot, subScale);
             for (const [id, m] of subs) if (!live.has(id)) { if (modelHost) modelHost.release(m); scene.remove(m); m.userData.mat.dispose(); subs.delete(id); wasReleased.delete(id); }
             // the ballast cues that live in the world, not on the hull: the bubbles of a tank being blown, and a weight that has just been released
             const dt = lastT === null ? 0 : Math.max(0, Math.min(0.25, t - lastT)); lastT = t;
@@ -174,6 +220,8 @@ export function createView3d(THREE, canvas, { length = 500, width = 300, depthMa
             renderer.render(scene, camera);
         },
         /** For a gate: how many bubbles the view holds and how many it DRAWS, and how many dropped weights it holds, right now. */
+        /** For a gate: how many dark-compass marks and survey buoys the view holds right now. */
+        marks() { return { dark: marks.dark.size, buoys: marks.buoys.size }; },
         cues() { return { bubbles: bubbles.list.length, drawn: bubbleGeo.drawRange.count, weights: weights.length, resting: weights.filter((w) => w.rest >= 0).length }; },
         dispose() { bubbleGeo.dispose(); weightMat.dispose(); sea.dispose(); for (const k of Object.keys(geo)) geo[k].dispose(); renderer.dispose(); },
     };
