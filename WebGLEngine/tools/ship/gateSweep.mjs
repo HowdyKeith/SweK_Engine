@@ -16722,6 +16722,13 @@ export const REGRESSIONS_REPAIRED = Object.freeze({
         "tools/ship/staleness-selfcheck.mjs": "green by v4300 once the derived files were regenerated; red mid-round by design",
         "tools/ship/windowsImport-selfcheck.mjs": "v4303: roughDiffuseWired-selfcheck imports its scratch module by pathToFileURL, not a raw path",
     }),
+    since632: Object.freeze({
+        at: "v4924", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "no gate file added, so nothing is claimed here (a gate may be claimed by ONE closing): the Decider chip's gates (brain/deciderAdvisor-selfcheck 37 mutants red, tools/ship/deciderAudit-selfcheck 35), the install bridge's (tools/ship/appInstall-selfcheck, 26) and net/bridgeBase-selfcheck were claimed by the closings that first carried them; this round records them, and the Round 14 result, in the changelog.",
+    }),
 });
 
 export const SWEEP_V4297 = Object.freeze({
