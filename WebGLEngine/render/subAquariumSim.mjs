@@ -101,6 +101,7 @@ export function createTank({ hull = "nominal", length = LENGTH, width = WIDTH } 
     const subs = new Map();   // id -> live sub
     const estimators = new Map();   // event name -> build(inner) -> pilot, registered by a page (the estimators need the fly circuit it loads)
     const kinds = new Map();   // circuit name -> { weightCount, build(weights, { sub }) -> pilot }, registered by a page that has loaded what the kind needs (unnumbered work, brain/TANK_PILOTS_WIP.md)
+    let fleet = true;   // 2026-11-17: the couriers keep clear of the other subs (setFleet)
     let scene = null;   // the sea of obstacles (brain/subTankNav.mjs tankScene) or null; the subs that have a navigator (sub.nav) are flown to goals through it
     let clock = 0, hullName = hull, MODEL = H.model(hull);   // the vessel every sub in the tank is (physics/mechanics/subHulls.mjs); the pilots do not know which
 
@@ -310,6 +311,9 @@ export function createTank({ hull = "nominal", length = LENGTH, width = WIDTH } 
          * Make one sub a COURIER (arm: one of subTankNav.TANK_ARMS: straight, any, any+replan, any+predict) or, with null, send it wandering again. The sub's own pilot flies the navigator's target; contact with an obstacle is counted (`hits`), not punished; a goal reached is counted (`arrivals`)
          * and another is drawn. An unknown arm throws and changes nothing (before the id is looked up); an unknown id answers null; no sea throws ("start a sea first"). Returns the arm now running, or null.
          */
+        /** 2026-11-17 (nav-fleet-avoidance): whether the couriers treat the other subs as traffic (true by default); returns what it was. */
+        setFleet(on) { const was = fleet; fleet = !!on; return was; },
+        get fleet() { return fleet; },
         setNav(id, arm) {
             const off = arm === null || arm === undefined || arm === "";
             if (!off && !TN.TANK_ARMS.includes(arm)) throw new Error(`subAquariumSim.setNav: unknown arm "${arm}" (${TN.TANK_ARMS.join(", ")})`);
@@ -369,12 +373,14 @@ export function createTank({ hull = "nominal", length = LENGTH, width = WIDTH } 
             let left = Math.min(Math.max(0, seconds || 0), MAX_STEP);
             while (left > 1e-9) {
                 const dt = Math.min(DT, left); left -= dt; clock += dt;
+                // 2026-11-17 (nav-fleet-avoidance): every sub where it is at the start of this tick; each courier counts its contacts with them always and plans around them while `fleet` is on
+                const fleetNow = scene ? [...subs.values()].map((q) => { const a = S.attitude(q.state); return { id: q.id, x: q.state.pos[0], y: q.state.pos[1], vx: a.speed * Math.cos(a.heading), vy: -a.speed * Math.sin(a.heading), depth: -q.state.pos[2] }; }) : null;
                 for (const sub of subs.values()) {
                     sub.age += dt;
                     if (sub.kick && !sub.kick.fired && sub.eventT >= sub.kick.at) { sub.state = RT.kickState(sub.state, sub.kick.sign); sub.kick.fired = true; }   // the kick lands before the pilot reads the state
                     const s = sub.state, x = s.pos[0], y = s.pos[1];
                     let t;
-                    if (sub.nav) t = sub.tgt = sub.target = sub.nav.step(s, clock, dt);   // a courier: the navigator's target (it brings a sub in from outside the tank by itself)
+                    if (sub.nav) t = sub.tgt = sub.target = sub.nav.step(s, clock, dt, fleetNow && fleetNow.filter((q) => q.id !== sub.id), fleet);   // a courier: the navigator's target (it brings a sub in from outside the tank by itself)
                     else {
                         if (sub.age >= sub.nextTarget) retarget(sub);
                         const inside = insideBox(x, y);

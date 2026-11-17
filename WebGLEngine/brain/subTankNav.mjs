@@ -16,6 +16,18 @@ export const DEPTH_MIN = 14, DEPTH_MAX = 40;   // the tank's own wandering range
 export const SCENE = Object.freeze({ islands: 2, bergs: 3, ships: 2, wallClear: 30, gap: 24, laneClear: 10 });
 // a goal is r + GOAL_CLEAR m from every static disc and every lane: 28 = the plan's 16 m at the widest margin + 12 m, so the goal cell is free and the 10 m arrival circle stays out of the zone (the study kept r + 40, which in a 500 x 300 m tank with seven obstacles leaves
 // almost nothing: the first draft did and fell back to its default corner in 18 of 25 draws)
+// 2026-11-17 (nextRounds nav-fleet-avoidance): THE OTHER SUBS AS TRAFFIC. `step` takes the other subs ({ id, x, y, vx, vy, depth }, this tick); each becomes a moving full-depth
+// column of FLEET_R (a hull's half-length: two hulls touch at 2 x HULL_HALF, as gapTo counts it) extrapolated along its velocity, in the plan's predicted shapes. A column is
+// conservative -- the plan is a plan view, so subs at different depths still keep apart -- and a CONTACT between subs is counted in three dimensions (the hulls within 2 x HULL_HALF
+// on the plane and SUB_CONTACT_DZ in depth), in subHits, apart from the scene's hits. The contacts are counted whenever the others are given; they are planned around only when
+// step's avoidFleet is on (so "off" is measured with the same eyes).
+export const FLEET_R = N.HULL_HALF, SUB_CONTACT_DZ = 2;
+/** The other subs as obstacles for a plan made at time t: [{ type "sub", id, x, y, vx, vy, r, keel Infinity, t0 }]. */
+export const fleetObstacles = (others, t) => (others || []).map((q) => ({ type: "sub", id: q.id, x: q.x, y: q.y, vx: q.vx, vy: q.vy, r: FLEET_R, keel: Infinity, t0: t }));
+/** Where an obstacle is at time t: a sub straight along its velocity from t0, anything else as the scene moves it. */
+export const fleetAt = (o, t) => (o.type === "sub" ? [o.x + o.vx * (t - o.t0), o.y + o.vy * (t - o.t0)] : sceneAt(o, t));
+/** Is this sub touching another (three dimensions)? */
+export const subTouch = (x, y, depth, others) => (others || []).some((q) => Math.hypot(x - q.x, y - q.y) < 2 * N.HULL_HALF && Math.abs(depth - q.depth) < SUB_CONTACT_DZ);
 export const GOAL_MARGIN = 60, GOAL_MIN_DIST = 150, GOAL_CLEAR = 28, GOAL_TRIES = 200, GOAL_DEPTH_INSET = 2, HIT_CLEAR_S = 1;
 
 const mulberry = (a) => () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
@@ -75,6 +87,7 @@ export function createNavigator(scene, { arm = DEFAULT_ARM, seed = 1 } = {}) {
     if (!TANK_ARMS.includes(arm)) throw new Error(`subTankNav.createNavigator: unknown arm "${arm}" (${TANK_ARMS.join(", ")})`);
     const rng = mulberry(((seed >>> 0) + 977) >>> 0), u = (lo, hi) => lo + (hi - lo) * rng(), spec = H.ARM_SPEC[arm], mode = spec.replan === "predict" ? "predict" : "now";
     let goal = null, field = null, planT = -Infinity, lastT = null, clearFor = 0, last = null, arrivals = 0, hits = 0, replans = 0, noRoute = false, margin = null, travel = 0, contact = false;
+    let others = [], avoid = true, subHits = 0, subContact = false, subClearFor = 0;
     const clearOf = (o, g) => (o.lane ? N.segmentDistance(g.x, g.y, ...laneSegment(o)) : Math.hypot(g.x - o.x, g.y - o.y)) >= o.r + GOAL_CLEAR;
     const routeFrom = (g, state, t) => {
         const f = H.buildLadderField(H.planShapes({ obstacles: scene.obstacles, minDepth: Math.min(-state.pos[2], g.depth) }, t, { mode: "now", at: sceneAt }), g, { x: state.pos[0], y: state.pos[1] }, { grid: TANK_GRID }), c = N.cellOf(f, state.pos[0], state.pos[1]);
@@ -93,15 +106,17 @@ export function createNavigator(scene, { arm = DEFAULT_ARM, seed = 1 } = {}) {
     }
     function plan(state, t) {
         const at = { x: state.pos[0], y: state.pos[1] };
-        field = H.buildLadderField(H.planShapes({ obstacles: scene.obstacles, minDepth: Math.min(-state.pos[2], goal.depth) }, t, { mode, at: sceneAt }), goal, at, { own: at, grid: TANK_GRID });
+        field = H.buildLadderField(H.planShapes({ obstacles: [...scene.obstacles, ...(avoid ? fleetObstacles(others, t) : [])], minDepth: Math.min(-state.pos[2], goal.depth) }, t, { mode, at: fleetAt }), goal, at, { own: at, grid: TANK_GRID });
         planT = t; replans++; margin = field.margin;
         const c = N.cellOf(field, at.x, at.y); noRoute = !(c && field.dist[c.i] < N.BIG);
     }
     return {
         arm,
         invalidate() { field = null; },
-        step(state, t, dt) {
+        step(state, t, dt, fleet = null, avoidFleet = true) {
             const x = state.pos[0], y = state.pos[1], depth = -state.pos[2];
+            others = fleet || []; avoid = avoidFleet;   // the other subs are always SEEN (their contacts counted) and AVOIDED only when avoidFleet is on
+            if (subTouch(x, y, depth, others)) { if (!subContact) { subHits++; subContact = true; } subClearFor = 0; } else if (subContact) { subClearFor += dt; if (subClearFor >= HIT_CLEAR_S) subContact = false; }
             lastT = t;
             if (last) travel += Math.hypot(x - last[0], y - last[1]);
             last = [x, y];
@@ -113,6 +128,6 @@ export function createNavigator(scene, { arm = DEFAULT_ARM, seed = 1 } = {}) {
             if (x < 0 || x > scene.length || y < 0 || y > scene.width) return { depth: goal.depth, heading: Math.atan2(-(scene.width / 2 - y), scene.length / 2 - x), speed: 2 };   // outside the tank: back to the middle, as a wanderer does
             return H.hardTarget(arm, state, field, goal);
         },
-        snapshot() { return { arm, goal: goal ? { ...goal } : null, arrivals, hits, replans, noRoute, margin, travel, contact, t: lastT }; },
+        snapshot() { return { arm, goal: goal ? { ...goal } : null, arrivals, hits, replans, noRoute, margin, travel, contact, subHits, subContact, t: lastT }; },
     };
 }

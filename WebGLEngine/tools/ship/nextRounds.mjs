@@ -3026,8 +3026,8 @@ export const NEXT_ROUNDS = [
     },
     {
         id: "nav-fleet-avoidance",
-        blocker: "OPEN",
-        what: "Every courier in the Sub Aquarium's navigation scene (brain/subTankNav.mjs) sails alone: the other subs are not obstacles.",
+        state: "CLOSED",
+        what: "CLOSED 2026-11-17: every courier now treats every other sub in the tank as traffic (brain/subTankNav.mjs fleetObstacles / fleetAt / subTouch: each other sub a moving full-depth column of a hull's half-length, extrapolated along its velocity, in the plan's predicted shapes; render/subAquariumSim.mjs passes every OTHER sub each tick, setFleet(on) switches it, on by default). Sub-to-sub contacts are counted in 3D (subHits) whether or not they are avoided. DESCRIPTIVE, not a registered test: six couriers, 300 tank-seconds, seas 1-4: contacts 22 off against 6 on, at a cost in arrivals, 61 against 46 (a column blocks subs at other depths too). Gate render/subAquariumFleet-selfcheck.mjs (9 mutants). Wanderers still avoid nothing. WAS: Every courier in the Sub Aquarium's navigation scene (brain/subTankNav.mjs) sails alone: the other subs are not obstacles.",
         how: "Many couriers at once treating each other as traffic (each sub's position and velocity as a moving obstacle in the others' plans).",
         why: "The tank scene is where a crowd can be seen; today the subs pass through one another.",
     },
