@@ -526,7 +526,7 @@ export const TODO = [
         status: "open", size: "medium", order: 29,
         title: "The two shipped fly-wired brains outside their one fight: fleets, fighters, the cannon the other way",
         why: "brain/helmFlyWired2WeightsDefault.json and brain/seatFlyWiredWeightsDefault.json were each read in one fight (one ship a side). The first trained helm lost its lead when the cannon was taken away; nothing says these keep theirs in a fleet of four, against fighters (brain/battleshipFight.mjs), or with the cannon setting flipped.",
-        note: "Registered studies on fresh pairs, a few fights each; no search. The `together` study (fly-wired-together) covers the cannon both ways for one ship a side.",
+        note: "Registered studies on fresh pairs, a few fights each; no search. DONE, UNSHIPPED (2026-11-17, tools/ship/takeFlyWiredFights.mjs, read once): THE HELM HOLDS -- fleets of three with the cannon +1.220, without +0.061 (cannot be told), against eight fighters +0.027; THE GUNNER DOES NOT -- it trails the plain fleet by 0.50 with the cannon and without, and the plain ship by 0.15 against fighters, and wherever both are seated they trail the helm alone. Not registered, on scratch pairs: the race car's gunner, which also lays its gun by rates, does the same in fleets (-0.49), so the loss is the way it lays a gun, not the fly's wiring. The gunner's note on space-duel.html says so. NEXT IF WANTED: why a rate-laid gun loses in a fleet (target switching between ships is the first suspect), and the trained 6DOF fighter pilot.",
         evidence: "node -e 'console.log(\"not started: no study file\", require(\"fs\").existsSync(\"tools/ship/takeFlyWiredFights.mjs\"))'",
     },
     {

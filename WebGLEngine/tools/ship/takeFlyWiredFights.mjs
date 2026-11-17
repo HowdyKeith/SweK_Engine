@@ -14,6 +14,9 @@
 // three regimes (fleets with the cannon, fleets without, fighters), and in each regime BOTH LESS THE BETTER ALONE.
 // FORECAST, for the record: in fleets, the duel's story -- with the cannon the helm LEADS (about 0.9) and the gunner adds a little, without it the gunner LEADS (about 0.7) and the helm adds a little; against fighters the helm CANNOT BE TOLD (a few fighters are not a ship to hold a bow on) and the gunner TRAILS
 // (it lays by rates, and a fighter crosses the sky faster than a ship; the hand gunner's sight leads its target), so both TRAILS too.
+// READ 2026-11-17 (brain/flyWiredFights.reading.json): FLEETS WITH THE CANNON helm +1.220, gunner -0.504, both +0.574; FLEETS WITHOUT helm +0.061 (cannot be told), gunner -0.500, both -0.445; FIGHTERS helm +0.027, gunner -0.154, both -0.045. The helm holds (more than holds, with the cannon); THE GUNNER
+// TRAILS EVERYWHERE BUT THE ONE-SHIP DUEL. Not registered, on 48 scratch pairs (seeds 131001-131012 of each kind, no cannon): the race car's untrained gunner, which also lays its gun by rates, does the same -- +0.735 one ship a side, -0.488 in fleets of three, beside the fly's +0.813 and -0.538 -- so the fleet's
+// loss is laying a gun by rates where there are several ships to lay it on, not the fly's circuit.
 // NOTHING SHIPS: it says where the shipped brains hold and where they do not. Every arm's leads are kept (brain/rig-results/flyWiredFights/); the reading file is the mark that it was read, and a second read is refused.
 // WHAT IS NOT HERE: the trained 6DOF fighter pilot (the page's real threat), fleets of two or four, escorts, green or ace gunners, a fleet whose ships fly in formation.
 "use strict";
