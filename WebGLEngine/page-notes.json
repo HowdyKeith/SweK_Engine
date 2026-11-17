@@ -98,6 +98,11 @@
     "path": "brain/NEEDS_AND_LIMITS.md",
     "title": "Needs and limits",
     "why": "Energy that only the surface refills and a hull that feels the pressure: the design behind the survey."
+   },
+   {
+    "path": "brain/NAV_MISSIONS_WIP.md",
+    "title": "Missions and what a metre costs",
+    "why": "The energy of a navigation flight on the needs model's own power, and three-leg missions on one battery: the registered parts and their results."
    }
   ],
   "rotorcraft-demo.html": [

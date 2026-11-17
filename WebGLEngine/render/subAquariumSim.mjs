@@ -95,6 +95,8 @@ export const insideBox = (x, y) => x >= MARGIN && x <= LENGTH - MARGIN && y >= M
 
 
 /** A new tank. `sync(list)` reconciles it with the aquarium's list; `step(seconds)` advances it; `subs` are the live boats. */
+/** The strongest steady current the tank takes (m/s): the navigation studies' strongest current family, half the explorer's cruise. */
+export const CURRENT_MAX = 1.5;
 export function createTank({ hull = "nominal", length = LENGTH, width = WIDTH } = {}) {
     // v4902 -- the tank may be bigger than the default 500 x 300 m (the subs need room to swim: the Sea OGRE and a crowded tank both do); every wall below is THIS tank's own
     const insideBox = (x, y) => x >= MARGIN && x <= length - MARGIN && y >= MARGIN && y <= width - MARGIN;
@@ -102,6 +104,9 @@ export function createTank({ hull = "nominal", length = LENGTH, width = WIDTH } 
     const estimators = new Map();   // event name -> build(inner) -> pilot, registered by a page (the estimators need the fly circuit it loads)
     const kinds = new Map();   // circuit name -> { weightCount, build(weights, { sub }) -> pilot }, registered by a page that has loaded what the kind needs (unnumbered work, brain/TANK_PILOTS_WIP.md)
     let fleet = true;   // 2026-11-17: the couriers keep clear of the other subs (setFleet)
+    // 2026-11-17 (Keith: "add the tank current, steady, off by default"): a STEADY, uniform, horizontal current every sub swims in -- the physics steps it, the pilots are told it (as the
+    // navigation studies tell theirs), the needs model meters thrust through it. null is off, the default, and is exactly the tank as it was ([0, 0, 0] everywhere).
+    let current = null; const STILL = Object.freeze([0, 0, 0]);
     let scene = null;   // the sea of obstacles (brain/subTankNav.mjs tankScene) or null; the subs that have a navigator (sub.nav) are flown to goals through it
     let clock = 0, hullName = hull, MODEL = H.model(hull);   // the vessel every sub in the tank is (physics/mechanics/subHulls.mjs); the pilots do not know which
 
@@ -311,6 +316,16 @@ export function createTank({ hull = "nominal", length = LENGTH, width = WIDTH } 
          * Make one sub a COURIER (arm: one of subTankNav.TANK_ARMS: straight, any, any+replan, any+predict) or, with null, send it wandering again. The sub's own pilot flies the navigator's target; contact with an obstacle is counted (`hits`), not punished; a goal reached is counted (`arrivals`)
          * and another is drawn. An unknown arm throws and changes nothing (before the id is looked up); an unknown id answers null; no sea throws ("start a sea first"). Returns the arm now running, or null.
          */
+        /** 2026-11-17: the tank's steady current, [vx, vy] in m/s on the plane (x along the tank's length, y across it), or null for none (the default). Each component finite and the
+         *  speed at most CURRENT_MAX; anything else throws and changes nothing. Returns what it was ([vx, vy] or null). */
+        setCurrent(v) {
+            const was = current ? [current[0], current[1]] : null;
+            if (v === null || v === undefined || v === false) { current = null; return was; }
+            if (!Array.isArray(v) || v.length !== 2 || !v.every(Number.isFinite)) throw new Error(`subAquariumSim.setCurrent: [vx, vy] in m/s or null, got ${JSON.stringify(v)}`);
+            if (Math.hypot(v[0], v[1]) > CURRENT_MAX) throw new Error(`subAquariumSim.setCurrent: ${Math.hypot(v[0], v[1]).toFixed(2)} m/s is more than ${CURRENT_MAX} m/s`);
+            current = v[0] === 0 && v[1] === 0 ? null : Object.freeze([v[0], v[1], 0]); return was;
+        },
+        get current() { return current ? [current[0], current[1]] : null; },
         /** 2026-11-17 (nav-fleet-avoidance): whether the couriers treat the other subs as traffic (true by default); returns what it was. */
         setFleet(on) { const was = fleet; fleet = !!on; return was; },
         get fleet() { return fleet; },
@@ -391,12 +406,12 @@ export function createTank({ hull = "nominal", length = LENGTH, width = WIDTH } 
                     sub.tickDt = dt;   // the navigator integrates over THIS tick, which is shorter than DT when a frame ends mid-tick
                     const ev = sub.event, model = ev ? sub.eventModel : MODEL;
                     const tg = ev === "surface" ? { ...t, surface: true } : ev === "flood" || ev === "sink" ? { ...t, depth: sub.holdDepth } : t;   // a flooded boat holds the depth it was at; a surfacing one is asked to surface
-                    const cmd = (ev ? sub.eventPilot : sub.pilot)(s, tg, [0, 0, 0]);
+                    const cmd = (ev ? sub.eventPilot : sub.pilot)(s, tg, current || STILL);
                     let res;
                     if (ev === "needs" && sub.advice) sub.aux = { pump: sub.advice.pump ? 1 : 0, repair: sub.advice.repair ? 1 : 0 };   // the advisor works the pump and the repair itself
                     if (ev === "survey") sub.aux = { pump: cmd.pump ? 1 : 0, repair: cmd.repair ? 1 : 0 };   // the survey seat works the pump and the repair itself
-                    if (ev === "needs" || ev === "survey") { res = N.stepNeeds(model, s, sub.needs, cmd, dt, [0, 0, 0], 0, sub.aux); sub.needs = res.needs; sub.needsInfo = { watts: res.watts, charging: res.charging, exposed: res.exposed }; }
-                    else res = S.stepSub(model, s, cmd, dt, [0, 0, 0], ev === "flood" || ev === "sink" ? FL.leakAt({ leak: LEAK }, sub.eventT) : 0);
+                    if (ev === "needs" || ev === "survey") { res = N.stepNeeds(model, s, sub.needs, cmd, dt, current || STILL, 0, sub.aux); sub.needs = res.needs; sub.needsInfo = { watts: res.watts, charging: res.charging, exposed: res.exposed }; }
+                    else res = S.stepSub(model, s, cmd, dt, current || STILL, ev === "flood" || ev === "sink" ? FL.leakAt({ leak: LEAK }, sub.eventT) : 0);
                     if (ev) sub.eventT += dt;
                     sub.cmd = { pitch: cmd.pitch, yaw: cmd.yaw, thrust: cmd.thrust, ballast: cmd.ballast };   // what the pilot asked for this tick: the page draws the fins from it
                     if (cmd.blow !== undefined) sub.cmd.blow = cmd.blow; if (cmd.release !== undefined) sub.cmd.release = cmd.release;

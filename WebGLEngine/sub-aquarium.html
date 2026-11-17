@@ -11,8 +11,8 @@
 
      THE STAND-IN, SAID PLAINLY: the network in every sub THIS PAGE FLIES is wired like the fruit fly's Giant Fiber Circuit (34 neurons, 313 synapses). A real zebrafish circuit IS vendored now -- the densest 34-neuron, 153-synapse core of the
      Fish1 TEN-analysis set (vendor/zebrafish/PROVENANCE.md; mostly inputs to the dorsal motor nucleus of the vagus, real wiring and not a circuit anyone has shown steers a body; the Mauthner escape circuit is not in it) -- and a pilot
-     wired to it exists (brain/pilotSubWeightsFishWip.json, 803 weights), so the chip can say live; but this page does not fly an 803-weight fish body yet (the tank validates the fly's 963), so the chip names where this is going and
-     the subs in the tank are still the fly's.
+     wired to it exists (brain/pilotSubWeightsFishWip.json, 803 weights), so the chip can say live. SINCE 2026-11-17 the tank flies that pilot as ONE KIND of sub (the "Zebrafish TEN-core pilot"
+     that "Offer my subs" adds; its line reads 'zebrafish'); every other sub in the tank is still the fly's.
 
      Nothing from the network is ever put in the page as markup: every name and address goes in with textContent. -->
 <html lang="en">
@@ -89,6 +89,7 @@
     <span title="v4912 -- the SURVEY: the selected sub is made a battery boat with a charge, given three stations in the tank and the survey seat (the twin planner of the needs-and-limits series) chooses the order it visits them in, rises to recharge and comes home by the end of 600 s. The profile is the planner's trade: standard (replan every 120 s), events (plan when it leaves the surface: the same gain for three quarters of the work), wide (five stations tried at a time), ensemble (plan against a charge a little high and a little low); and two SEATS of the decision-circuit rounds, not planners: rule (the tuned rule, nearest-first) and circuit (the plain net trained from the rule, digest c916e7f5; the audits found it within noise of the rule, so watch where the two differ, not which scores more: the tank's dynamics are not the task's). The stations are drawn amber, green once visited; the list line gives the score at the end. Press restore to end it."><button id="surveyBtn">survey</button> <select id="surveyProf" title="the planner's profile"><option value="standard">standard</option><option value="events">events</option><option value="wide">wide</option><option value="ensemble">ensemble</option><option value="rule">rule (nearest-first)</option><option value="circuit">circuit (trained net)</option></select></span>
     <button id="flyEstBtn" disabled title="The fly's heading-loop circuit as an estimator behind the autopilot, flown through the compass dropout (available once the page has loaded the circuit)">fly estimator</button> <button id="erEstBtn" disabled title="The best random wiring of the same size, fitted the same way, behind the autopilot (available once the page has loaded the circuit)">random-wiring estimator</button></span>
   <label title="Put a sea of islands, icebergs (with a keel: a sub passes beneath one that is shallower than it swims) and patrolling ships in the tank and send the subs to goals through it. The sub's own pilot flies; the guidance only replaces the wandering. Contact is counted, not punished. Standard 500 x 300 m tank only. 'plan ahead' is the arm that did best in the harder navigation test (brain/SUB_FIELD_NAV_WIP.md); 'straight' ignores the sea."><span>navigation</span> <select id="navSel"><option value="">off (wander)</option><option value="any+predict">plan ahead</option><option value="any+replan">re-plan</option><option value="any">plan once</option><option value="straight">straight at the goal</option></select></label> <button id="navSeaBtn" disabled title="Draw a new sea (the counters start again)">new sea</button>
+  <label title="A steady current the whole tank swims in: every sub feels it and its pilot is told it (the explorer cruises at 3 m/s). Off by default, which is the tank as it always was. The direction is as the plan view shows it."><span>current</span> <select id="curSpeed"><option value="0" selected>off</option><option value="0.3">0.3 m/s</option><option value="0.6">0.6 m/s</option><option value="1">1.0 m/s</option><option value="1.5">1.5 m/s</option></select> <select id="curDir"><option value="right">&rarr; right</option><option value="left">&larr; left</option><option value="down">&darr; down</option><option value="up">&uarr; up</option></select></label>
   <span class="chip"><span class="dot" id="fishDot"></span><b>FISH BRAIN</b> <span id="fishWord">checking&hellip;</span></span>
   <span id="msg" class="sub"></span>
 </div>
@@ -230,6 +231,14 @@ function applyNav() {
   } catch (e) { $("navSel").value = ""; $("navSeaBtn").disabled = true; $("msg").textContent = String((e && e.message) || e).slice(0, 110); }
 }
 $("navSel").onchange = applyNav;
+// 2026-11-17: the tank's steady current (render/subAquariumSim.mjs setCurrent), off by default. Plan-view directions: x grows to the right, y downward.
+const CUR_DIRS = { right: [1, 0], left: [-1, 0], down: [0, 1], up: [0, -1] };
+function applyCurrent() {
+  const v = Number($("curSpeed").value), d = CUR_DIRS[$("curDir").value] || CUR_DIRS.right;
+  try { tank.setCurrent(v > 0 ? [v * d[0], v * d[1]] : null); $("msg").textContent = v > 0 ? `a steady current of ${v} m/s (${$("curDir").selectedOptions[0].textContent.slice(2)}) in the whole tank` : "no current: still water"; }
+  catch (e) { $("curSpeed").value = "0"; tank.setCurrent(null); $("msg").textContent = String((e && e.message) || e).slice(0, 110); }
+}
+$("curSpeed").onchange = applyCurrent; $("curDir").onchange = applyCurrent;
 $("navSeaBtn").onclick = () => { navSeed++; try { tank.setScene(navSeed); $("msg").textContent = "a new sea (" + navSeed + "): counters start again"; } catch (e) { $("msg").textContent = String((e && e.message) || e).slice(0, 110); } };
 if (sizeKey !== "standard") { $("navSel").disabled = true; $("navSel").title = "The navigation sea is for the standard 500 x 300 m tank (larger tanks make the plan too costly to rebuild)."; }
 $("flyEstBtn").onclick = () => setEvent("fly-estimator"); $("erEstBtn").onclick = () => setEvent("er-estimator");   // v4904: the study's two estimators as events on the selected sub; their builders are registered below once the circuit is loaded
