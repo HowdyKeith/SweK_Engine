@@ -117,4 +117,18 @@ The stateful fly on the dropout task, ids sb-0 to sb-19, 120 s, 6 random sets pe
 
 What it says: **every lesion of the fly costs about 1 percent of the score or less** (the largest is EPG_L's 0.011; the stateful pilot scores 0.784). Two of the ten side classes sit at the floor (EPG_L, PEG_L), and ten tests at a floor of 1/7 would give about 1.4 by chance. Each L/R pair shares one set of draws (same size, same role, same seed), so the two halves are not independent controls. EPG_L TIES its intact pilot on the board (-0.0114, se 0.0085); PEG_L is below it (-0.0047, se 0.0022, worse on 17 of 20). Delta7 is active (88 percent of cell-ticks on a recorded flight) but weak (at most 0.23, against 1.8-2.8 for the input types), and silencing it averages to nothing (better on 14 ids, worse on 6). This fits the rung 4a close-out: the reservoir's gain is the recipe's generic gain, not a compass the wiring holds. A left-side effect would need a registered round with fresh ids and draws before it says anything.
 
-The glomerulus classes (L1-L9, R1-R9, role-matched) were still flying when this was written; their table goes here when read.
+**The glomerulus classes** (L1-L9, R1-R9; 3 to 8 cells each, across EPG, PEN_a, PEN_b and PEG; role-matched; same ids, seconds and draws):
+
+| glomerulus (cells) | cost | rank p | glomerulus (cells) | cost | rank p |
+|---|---|---|---|---|---|
+| L1 (3) | -0.0006 | 0.714 | R1 (3) | -0.0039 | 1.000 |
+| L2 (5) | -0.0006 | 0.714 | R2 (5) | +0.0003 | 0.571 |
+| L3 (6) | -0.0003 | 0.714 | R3 (6) | +0.0009 | 0.571 |
+| L4 (8) | -0.0024 | 0.857 | R4 (8) | +0.0006 | 0.714 |
+| L5 (6) | +0.0055 | **0.143** | R5 (6) | -0.0009 | 0.857 |
+| L6 (8) | +0.0003 | 0.857 | R6 (8) | -0.0009 | 0.857 |
+| L7 (6) | +0.0052 | **0.143** | R7 (6) | -0.0006 | 0.714 |
+| L8 (7) | -0.0003 | 0.571 | R8 (7) | +0.0002 | 0.429 |
+| L9 (4) | +0.0001 | 0.429 | R9 (4) | -0.0005 | 0.429 |
+
+The random costs run from -0.003 to +0.0035. Classes with the same size and role mix (e.g. all the 6-cell glomeruli) share one set of draws, so the 18 rows are not 18 independent tests. Two of 18 sit at the floor (L5, L7, about +0.005 each), where chance would put about 2.6. **No glomerulus lesion costs more than half a percent of the score.** Together with the types and sides: on the compass dropout, nothing the fly's heading loop is made of (type, side or glomerulus) carries the pilot's score, which is what rung 4a found for its wiring as a whole. The left-side cells turning up at the floor in both tables (EPG_L, PEG_L, L5, L7) is a pattern worth one registered round on fresh ids and fresh draws, and nothing more until then.
