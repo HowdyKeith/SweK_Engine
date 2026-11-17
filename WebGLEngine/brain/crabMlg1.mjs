@@ -123,7 +123,7 @@ export function createNetwork({ W, H, params = {} }) {
     const step = (frame) => {
         if (frame.w !== W || frame.h !== H) throw new Error(`crabMlg1.step: the frame is ${frame.w} x ${frame.h}, the network ${W} x ${H}`);
         t++;
-        const out = { M: new Array(n).fill(0), spike: new Array(n).fill(0), alarm: new Array(n).fill(0), m: new Array(n).fill(0), F: new Array(n).fill(0), c: new Array(n).fill(0), lsl: lslVal, winner: winnerIdx, t };
+        const out = { M: new Array(n).fill(0), spike: new Array(n).fill(0), alarm: new Array(n).fill(0), m: new Array(n).fill(0), F: new Array(n).fill(0), c: new Array(n).fill(0), cOff: new Array(n).fill(0), mOn: new Array(n).fill(0), mOff: new Array(n).fill(0), lsl: lslVal, winner: winnerIdx, t };
         let globalAbs = 0; if (P.ffiPool === "global") { for (let j = 0; j < n; j++) for (let i = 0; i < st[j].Pprev.length; i++) globalAbs += Math.abs(st[j].Pprev[i]); globalAbs /= n; }   // Round 10: the previous-frame |P| over all segments, per segment
         for (let j = 0; j < n; j++) {
             const s = st[j], L = new Float32Array(sw * H);
@@ -146,7 +146,7 @@ export function createNetwork({ W, H, params = {} }) {
             const ff = ffiStep(s.F, s.Tffi, P.ffiPool === "global" ? globalAbs : absP, ncell, P); s.F = ff.F; s.Tffi = ff.Tffi;                // eq. 17, 18
             const spike = spikeOf(M, s.F, s.Tffi, P.Ts); s.hist.push(spike); if (s.hist.length > P.nsp) s.hist.shift();   // eq. 19
             const alarm = alarmOf(s.hist, P.nsp);                                                         // eq. 20
-            out.M[j] = M; out.spike[j] = spike; out.alarm[j] = alarm; out.m[j] = m; out.F[j] = s.F; out.c[j] = s.c;
+            out.M[j] = M; out.spike[j] = spike; out.alarm[j] = alarm; out.m[j] = m; out.F[j] = s.F; out.c[j] = s.c; out.cOff[j] = P.channels === "pooled" ? 0 : s.cOff; out.mOn[j] = mOn; out.mOff[j] = mOff;
             if (P.channels === "pooled") { s.m2 = s.m1; s.m1 = m; } else { s.m2 = s.m1; s.m1 = mOn; s.m2Off = s.m1Off; s.m1Off = mOff; } s.Pprev = Pn; s.Lprev = L;
         }
         // eq. 21, 22: the first frame with an alarm names the location
