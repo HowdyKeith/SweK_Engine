@@ -78,12 +78,22 @@ export function trackedSets(root = ENG) {
 }
 
 /** Which of `rels` git ignores, asked in one call. */
+// *** v4921 -- EACH PATH IS ASKED TWICE, AS ITSELF AND AS A DIRECTORY, BECAUSE git ANSWERS BY LOOKING AT THE DISK. ***
+// A rule that ends in a slash (.gitignore: "WebGLEngine/ai-bridge/apks/") matches directories only, and for a path
+// with no trailing slash `git check-ignore` decides whether it IS one by lstat. So "ai-bridge/apks" read ignored on
+// a box where that directory existed and NOT ignored on one where it did not -- measured in a scratch repository, both
+// ways -- and the rig's v4920 verify, in a fresh clone, went red on "ai-bridge/apks <- routeShadow-selfcheck" with a
+// clean `git status`. The census records the path as written; whether it is on this disk today is not the question
+// this function is asked. A path is ignored if git ignores it as written OR with a slash appended.
+// The cost, said: a FILE named exactly like a directory-only rule would read ignored here. No path in the census is.
 export function ignoredSet(rels, root = ENG) {
     if (!rels.length) return new Set();
-    try {
-        return new Set(execFileSync("git", ["check-ignore", "--no-index", "--stdin"], { cwd: root, input: rels.join("\n"), encoding: "utf8" })
-            .split("\n").map((l) => l.trim()).filter(Boolean));
-    } catch (e) { return new Set(String(e.stdout || "").split("\n").map((l) => l.trim()).filter(Boolean)); }   // exit 1: none ignored
+    const ask = [...rels, ...rels.filter((r) => r && !r.endsWith("/")).map((r) => r + "/")];
+    let out;
+    try { out = execFileSync("git", ["check-ignore", "--no-index", "--stdin"], { cwd: root, input: ask.join("\n"), encoding: "utf8" }); }
+    catch (e) { out = String(e.stdout || ""); }                                  // exit 1: none ignored
+    const hit = new Set(out.split("\n").map((l) => l.trim()).filter(Boolean));
+    return new Set(rels.filter((r) => hit.has(r) || hit.has(r + "/")));
 }
 
 // v4857 -- runnerBudget asks every runner that spawns a gate under a limit to read gateBudget or say why not.

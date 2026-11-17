@@ -16449,6 +16449,13 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
         widened: Object.freeze([]),
         verdict: "no gate file added, so nothing is claimed here (a gate may be claimed by ONE closing); tools/ship/orreryPost-selfcheck holds the page's frame loop to one frame per 100 ms in its page section and gained the row that holds the hold (44 rows to 45; three sabotages, none 0 red) -- the rig's timeout was a queue of frames a software GL could not present, reproduced here, and the change is unverified on the rig; tools/ship/gitEconomy-selfcheck, which this round's rotation returned red, aimed its pointer at a body behind the page's HUD panel and aims now at the largest one the pointer can reach (two sabotages, 1 red each); no register widened",
     }),
+    since629: Object.freeze({
+        at: "v4921", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "no gate file added, so nothing is claimed here (a gate may be claimed by ONE closing); tools/ship/strandCensus-selfcheck gained the row that holds ignoredSet to a directory-only rule whose directory is not on the disk (15 rows to 16; one sabotage, 1 red) -- the rig's fresh clone of v4920 went red there with nothing left behind, reproduced here by moving the directory aside; unverified on the rig; no register widened",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
