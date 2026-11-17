@@ -251,14 +251,33 @@ async function toggleFx() {
 }
 document.getElementById("fxbtn").addEventListener("click", toggleFx);
 
+// *** v4923 -- THE PICTURE IS REPAINTED WHEN SOMETHING IN IT CHANGED, AND NOT 60 TIMES A SECOND REGARDLESS. ***
+// Every frame cleared and redrew the whole canvas, paused or not. Everything draw() reads is the page's own state --
+// the clock t, the zoom pxPerUnit, the followed and hovered bodies, the surface mode, the canvas size, the data as it
+// arrives, the effect -- and nothing in ui/orreryDraw.js, world/orrery*.mjs or the post effect reads a wall clock or
+// a random number (checked at v4923). So a frame whose key matches the last painted one would paint the same
+// pixels, and is skipped. The loop itself keeps running, which costs a string compare; what stops is the repaint,
+// and with it the presentation a headless shell on a software GL could not keep up with (v4920: the rig's
+// orreryPost screenshots queued to a timeout behind it). PLAYING, t moves every frame and every frame paints, as
+// before. window.orrery.paints counts them, so a gate can see both halves.
+// A piece of state that changes the picture and is NOT in this key would leave the picture stale until something
+// else moves: that is the failure this change can introduce, and tools/ship/orreryView-selfcheck holds the
+// inputs that exist today (time, zoom, follow, surface, size, effect) to repainting.
+let paints = 0, paintedKey = "";
+const viewKey = () => [t, pxPerUnit, focus ? focus.name : "", hover ? hover.name : "", surfMode, cv.width, cv.height,
+    system ? 1 : 0, fleets ? 1 : 0, flybys.length, fxOn ? 1 : 0, fx && fx.ok ? 1 : 0].join("|");
 function frame(now) {
     const dt = Math.min(0.1, (now - last) / 1000); last = now;
     if (playing && system) { t += dt * SPAN; document.getElementById("scrub").value = String(Math.round((t % slowestPeriod(system)) * 10)); }
-    ctx.fillStyle = "#06120b"; ctx.fillRect(0, 0, innerWidth, innerHeight);
-    if (system) draw();
-    // *** THE 2D FRAME IS FINISHED BEFORE THE EFFECT READS IT. *** The post stage samples #stage as a texture,
-    // so it must run after drawSystem and not beside it; uploading mid-draw would show a half-built system.
-    if (fx && fx.ok && fxOn) fx.draw(t);
+    const key = viewKey();
+    if (key !== paintedKey) {
+        paintedKey = key; paints++;
+        ctx.fillStyle = "#06120b"; ctx.fillRect(0, 0, innerWidth, innerHeight);
+        if (system) draw();
+        // *** THE 2D FRAME IS FINISHED BEFORE THE EFFECT READS IT. *** The post stage samples #stage as a texture,
+        // so it must run after drawSystem and not beside it; uploading mid-draw would show a half-built system.
+        if (fx && fx.ok && fxOn) fx.draw(t);
+    }
     requestAnimationFrame(frame);
 }
 
@@ -395,6 +414,7 @@ window.orrery = {
     setSeeded: (v) => { surfMode = v ? 1 : 0; seeded = surfMode === 1; document.getElementById("surf").textContent = "surface: " + SURF_LABELS[surfMode]; },
     setSurfMode: (m) => { surfMode = ((m | 0) % SURF_LABELS.length + SURF_LABELS.length) % SURF_LABELS.length; seeded = surfMode === 1; document.getElementById("surf").textContent = "surface: " + SURF_LABELS[surfMode]; },
     get surfMode() { return surfMode; },
+    get paints() { return paints; },   // v4923 -- frames that repainted the canvas; see frame()
     get seeded() { return seeded; },
     pause: () => { playing = false; document.getElementById("play").innerHTML = "&#9654; play"; },
 };

@@ -1,7 +1,7 @@
 {
  "built": "deterministic",
  "source": "importers of WebGLEngine/vendor/<name>/, with each one's last commit",
- "head": "9b095398471cd908fb40167aa3dbb1980f74c5c8",
+ "head": "9fd49eea6e9f7f0a97a219e2537b82ab6c903fd6",
  "bodies": {
   "box3d": [
    {
@@ -920,8 +920,8 @@
    },
    {
     "path": "main.js",
-    "bytes": 3791991,
-    "sha": "99f074f78ffc4595889215dd438424892e1ef1b6"
+    "bytes": 3795253,
+    "sha": "0513238ab7b67253e40de3c9c8658921c92f1603"
    },
    {
     "path": "mpm3d.html",
@@ -955,7 +955,7 @@
    },
    {
     "path": "render/seaThree-selfcheck.mjs",
-    "bytes": 12601,
+    "bytes": 13105,
     "sha": "73795feb626921ab015e3c9b64dd55387c7f7b24"
    },
    {

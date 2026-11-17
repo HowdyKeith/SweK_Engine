@@ -452,5 +452,51 @@ console.log("\n9. A RESOLVED PLAYWRIGHT IS A PATH, AND THE LIST IS THE ONLY PLAC
         `none of ${files.length} sources outside tools/ship/playwrightResolve.mjs, whose own list the same pattern does find (${listOwn}) -- so the scan can see one`);
 }
 
+// v4923 SABOTAGES, each applied, the gate (and where named a page gate) run, restored byte for byte. None 0 red.
+//   H1 one caller let through per frame, v4920's first draft     -> 2 red here (the together row; the throw row, whose second callback never ran)
+//   H2 the hold never releases a frame                           -> 3 red here; 1 red in render/seaThree-selfcheck (0 frames)
+//   H3 no hold at all                                            -> 1 red here (61 runs in a second); 1 red in seaThree (-1)
+//   H4 a throwing callback swallowed                             -> 1 red here
+//   H5 heldFrames saying 0, not -1, for a page with no hold -> 1 red    H6 holdFrames ignoring the interval it is given -> 1 red
+//      (H5 and H6 were added after v4923's first verdict: definitionGates found holdFrames and heldFrames named by no gate)
+//   G1-G4 the hold not installed in subAquariumPage, avatarFraming, seaThree, orreryPost -> 1 red in each, its own held row, reading -1
+// ---- v4923 -- THE FRAME HOLD, ON A FAKE CLOCK (no browser: the function is plain JavaScript run against a stand-in window) ----
+console.log("\nTHE FRAME HOLD -- frameHold() against a fake window and a clock this gate turns");
+{
+    const { frameHold, FRAME_HOLD_MS } = await import("./playwrightResolve.mjs");
+    const pending = [], errs = [], ran = [];
+    const fakeWin = { requestAnimationFrame: (cb) => { pending.push(cb); return pending.length; } };
+    const tick = (t) => { const run = pending.splice(0); for (const cb of run) cb(t); };     // the browser presenting one frame at time t
+    const realWin = globalThis.window, realTimeout = globalThis.setTimeout;
+    globalThis.window = fakeWin; globalThis.setTimeout = (f) => { try { f(); } catch (e) { errs.push(String(e.message)); } };
+    try {
+        frameHold(FRAME_HOLD_MS);
+        // a page loop: one callback that asks for the next frame every time it runs, as orrery.html's does
+        let loopRuns = 0; const loop = () => { loopRuns++; window.requestAnimationFrame(loop); }; window.requestAnimationFrame(loop);
+        for (let t = 0; t <= 1000; t += 1000 / 60) tick(t);                                   // one second at 60 presentations
+        ok(`a page loop asking for every frame runs ${loopRuns} times in a second of 60 frames held to ${FRAME_HOLD_MS} ms -- at most 11, and not 0`,
+            loopRuns >= 9 && loopRuns <= 11 && window.__heldFrames === loopRuns, `__heldFrames ${window.__heldFrames}`);
+        // three callers waiting at once -- the page's loop, a poller, a one-shot -- all run on the SAME released frame
+        let polls = 0, once = 0, at = []; const poll = (t) => { polls++; at.push(t); };
+        window.requestAnimationFrame(poll); window.requestAnimationFrame((t) => { once++; at.push(t); });
+        const before = loopRuns; for (let t = 1001; t <= 1200; t += 1000 / 60) tick(t);
+        ok("every callback waiting when a frame is released runs on that frame, together -- not one caller per frame, which starved Playwright's own polling (v4920's first draft)",
+            polls === 1 && once === 1 && at[0] === at[1] && loopRuns > before, `poller ${polls}, one-shot ${once}, at ${at.map((v) => v.toFixed(1)).join(" and ")}`);
+        // a callback that throws: the error reaches the page, and the callbacks queued behind it still run
+        let after = 0; window.requestAnimationFrame(() => { throw new Error("planted"); }); window.requestAnimationFrame(() => { after++; });
+        for (let t = 1201; t <= 1400; t += 1000 / 60) tick(t);
+        ok("a callback that throws is re-thrown on a timer and does not stop the ones behind it", after === 1 && errs.includes("planted"), `after ${after}, errors ${JSON.stringify(errs)}`);
+    } finally { globalThis.window = realWin; globalThis.setTimeout = realTimeout; }
+    // holdFrames installs frameHold, with its ms, on whatever it is handed (a Page or a BrowserContext); heldFrames reads the
+    // count back and says -1 for a page the hold was never installed on, or one that cannot be asked.
+    const { holdFrames, heldFrames } = await import("./playwrightResolve.mjs");
+    const installs = []; await holdFrames({ addInitScript: async (fn, arg) => { installs.push([fn, arg]); } }, 250);
+    ok("holdFrames installs frameHold itself as an init script, with the interval it was given", installs.length === 1 && installs[0][0] === frameHold && installs[0][1] === 250,
+        `${installs.length} install(s), interval ${installs[0] && installs[0][1]}`);
+    const asked = (w) => ({ evaluate: async (fn) => { const real = globalThis.window; globalThis.window = w; try { return fn(); } finally { globalThis.window = real; } } });
+    const n = await heldFrames(asked({ __heldFrames: 7 })), none = await heldFrames(asked({})), broken = await heldFrames({ evaluate: async () => { throw new Error("closed"); } });
+    ok("heldFrames reads the count back, and says -1 where the hold was never installed or the page cannot be asked", n === 7 && none === -1 && broken === -1, `${n}, ${none}, ${broken}`);
+}
+
 console.log(`\nplaywrightResolve-selfcheck: ${fails === 0 ? "all checks pass" : fails + " FAILURE(S)"}`);
 process.exit(fails === 0 ? 0 : 1);

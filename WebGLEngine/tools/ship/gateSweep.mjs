@@ -16456,6 +16456,13 @@ export const SWEEP_SINCE_V4297 = Object.freeze({
         widened: Object.freeze([]),
         verdict: "no gate file added, so nothing is claimed here (a gate may be claimed by ONE closing); tools/ship/strandCensus-selfcheck gained the row that holds ignoredSet to a directory-only rule whose directory is not on the disk (15 rows to 16; one sabotage, 1 red) -- the rig's fresh clone of v4920 went red there with nothing left behind, reproduced here by moving the directory aside; unverified on the rig; no register widened",
     }),
+    since631: Object.freeze({
+        at: "v4923", swept: 0, green: 0, red: 0,
+        added: Object.freeze([]),
+        redOnArrival: Object.freeze([]),
+        widened: Object.freeze([]),
+        verdict: "no gate file added, so nothing is claimed here (a gate may be claimed by ONE closing); orrery.html repaints only when its view key changes and tools/ship/orreryPost-selfcheck holds that (three rows); tools/ship/playwrightResolve.mjs exports the frame hold, held on a fake clock in its own gate (five rows, two of them added after the first verdict found holdFrames and heldFrames unnamed), and subAquariumPage, avatarFraming and render/seaThree hold their pages with it (a row each); twenty sabotages, one 0 red and fixed (the followed body); no register widened",
+    }),
 });
 
 export function coversRegressions(sweptGates, knownRedGates) {
