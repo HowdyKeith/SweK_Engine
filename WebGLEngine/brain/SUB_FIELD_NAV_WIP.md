@@ -510,3 +510,24 @@ Reported beside it: each option alone against the reference; how often each opti
 **The registered `+leastbad` score cannot act when it is needed.** "The most whole seconds the run stays clear" is 0 for EVERY candidate once the vessel is already inside a ship's clearance ring (r + HULL_HALF + 20 m), which is exactly the last seconds the diagnosis found give-way empty in. The rule then changes nothing. Smoke-flown on HELD79's 7601, 7605, 7620, 7635 and 7641, it acted on 0 to 62 ticks and saved none.
 
 **Amended `+leastbad`.** In a ship conflict with no clear give-way heading, each candidate is scored by its straight run's **closest predicted approach** to the ships in conflict over the horizon: the minimum of the distance to each one, less its r and HULL_HALF. Runs that leave the region margin within the horizon are not candidates. The candidate with the largest closest approach is taken (ties to the earlier offset) if it is larger than the target heading's own; otherwise nothing changes. Only the heading changes. `+dive`, the arms, the set, the test, the bars and the checks are unchanged.
+
+## RESULT OF FOLLOW-UP 8 (2026-11-17; `node tools/ship/subTrafficDiveStudy.mjs --set held81 --write`, HELD81 = hard-traffic seeds 7821 to 7880, read once; 240 flights in `brain/subTrafficDiveHeld81.jsonl`): **PARTLY SUPPORTED.**
+
+The module, the study and both gates were committed and sabotaged first (ef15e8c7; 18 mutants logged). DEV was the sanity run (NOT SUPPORTED on 30, not a result). HELD79 was the labelled post hoc check (NOT SUPPORTED: the designated arm gained 5 and lost 1, ship collisions 7 against 10; not a result). All four checks passed on HELD81.
+
+| arm | reached | collided (with a ship) | left | least-bad ticks | dive ticks | deepest (m) |
+|---|---|---|---|---|---|---|
+| sweep (FOLLOW-UP 7's designated arm, the reference) | 44 / 60 | 15 (9) | 1 | 0 | 0 | 40.9 |
+| sweep+leastbad | 45 / 60 | 14 (9) | 1 | 4,230 | 0 | 40.9 |
+| sweep+dive | 49 / 60 | 11 (6) | 0 | 0 | 29,260 | 55.1 |
+| **sweep+leastbad+dive** | **49 / 60** | 11 (6) | **0** | 4,645 | 28,867 | 55.1 |
+
+**Verdict.** Ship collisions at most half the reference's: MISSED (6 against 9). Net gain of 5 at p <= 0.10: MET (5 gained, 0 lost, exact sign p 0.0625). No exit: MET. Exactly one of the first two bars holds with no exit, so the registered rule gives PARTLY SUPPORTED.
+
+**Reported beside it.** `sweep+dive` alone against the reference: the same 5 gained, 0 lost. `sweep+leastbad` alone: 1 gained, 0 lost; it leaves the ship collisions at 9.
+
+**Against the expectations (written first).** E1 `sweep+dive` at most halves the ship collisions, about 45: no (9 to 6). E2 `sweep+leastbad` reduces them, about 50: no (9 to 9). E3 SUPPORTED, about 25: no. E4 PARTLY SUPPORTED, about 35: held. E5 no flight lost to depth, about 95: held (deepest 55.1 m against a crush depth of 100).
+
+**What this says.** **Going under the keel is the fix that works; turning the least bad way is not.** Diving below a ship in conflict turned 5 flights that the reference lost into arrivals and lost none, on fresh seeds and on the post hoc set alike (5 to 0 there too). Steering at the last moment does nothing measurable: once give-way has no clear heading, there is no heading that helps. The designated arm reached 49 of 60, the best of any traffic arm so far (FOLLOW-UP 7's 48 on HELD79, 45 on its own set), with no exit. **Traffic is still not fixed**: 6 flights in 60 still meet a ship, and 5 more an iceberg or an island.
+
+**What it leaves open (`nav-traffic-avoid-not-slow` stays OPEN).** The dive starts only when a conflict is predicted, 30 s out, and a 15 m dive at 1 m/s nearly fills that. A plan that chooses a depth beneath the traffic from the start is the obvious next registration, building on the vertical plan of `brain/NAV_3D_WIP.md`. Least-bad can be dropped.
