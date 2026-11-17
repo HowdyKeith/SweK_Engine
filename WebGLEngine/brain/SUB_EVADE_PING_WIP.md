@@ -107,3 +107,50 @@ DEV is free to read. **HELD (129001 to 129096) is NOT flown by this note's work 
 * **No mechanism is read** (a longer interval could be quieter, or give the target less to track: no event of any duel is looked at).
 
 **What this does to HELD: nothing is changed.** HELD scores the registered rules at P and the dose (RE3) as registered. **If HELD reads the arm at P at the bar on neither base or on one, the registered answer is "NO PIECE" or "ONE BASE" whatever the dose does at 16.00 and 25.00;** a note that asks whether the effect is a dose above P (a grid above 25.00, up to the bound of 40, and a boat other than the base) is a new registration, not an amendment of this one.
+
+## HELD RESULT (2026-11-17; `node tools/ship/takeEvadePing.mjs held --write` flown ONCE on Keith's word "fly HELD now", geometries 129001 to 129096 (192 duels a matchup), exit 0; record `brain/subEvadePingHeld.json`: 26 matchups, no check failed)
+
+**The rules are about HELD.** **R0 holds:** league7100 over league7001 **+1.288** (z 12.5, 93-87-12) and over exploit7204 **+1.327** (z 9.5, 100-74-18), both decided.
+
+* **RE1 THE PIECE: ONE.** The arm at P (8.30) on F:league7001 is **+0.266 +- 0.096 (z 2.8, 88-33-71): PAYS**, over the bar of 0.25 by 0.016; on F:exploit7204 it is **+0.055 +- 0.087 (z 0.6, 93-10-89): NEUTRAL.**
+* **RE2 THE SIZE:** +0.266 and +0.055, the mean **+0.161**, the shares of the lead +0.207 and +0.042.
+* **RE3 THE DOSE:** F:league7001 PAYS at 6.50, 8.30, 11.00, 16.00 and 25.00 (not at 5.00, +0.016), peak **25.00 (+0.725)**; F:exploit7204 PAYS at 11.00 (+0.320), 16.00 (+0.367) and 25.00 (+0.452) (6.50 is +0.229, z 2.0, under the edge bar), peak **25.00 (+0.452)**; **the common paying values are 11.00, 16.00 and 25.00**; **nothing COSTS on any base** (the lowest arm is 5.00 on F:exploit7204 at -0.081, z -0.7).
+* **RE4 THE TRACKER:** the arm at P PAYS on **0 of 2** slow bases (S:league7001 +0.014, z 0.5; S:exploit7204 -0.066, z -1.0).
+* **RE5 THE HEADLINE: "ONE BASE".** **By the rules of this note pingEvery at league7100's own value is NOT a piece of its lead: the arm pays on league7001 and not on exploit7204, on DEV and on HELD alike** (DEV +0.264 and +0.061; HELD +0.266 and +0.055).
+* **The forecast quantities on HELD:** both fast bases no; at least one yes; the mean at P 0.25 or more no; no slow base yes; FAST TRACKERS ONLY no; SLOW TRACKERS TOO no; MIXED no; ONE BASE yes; NO PIECE no; each peak at P or 11.00 no (both at 25.00); the arm at 25.00 COSTS on a fast base no; some arm COSTS no.
+* **11 of the 24 arms PAY** (5 on F:league7001, 3 on F:exploit7204, 0 on S:league7001, 3 on S:exploit7204).
+
+### The forecasts, scored (section 5, as the larger side; a forecast at exactly 50 has no larger side and is not counted)
+
+| forecast | p | HELD | as the larger side |
+|---|---|---|---|
+| R0 holds on DEV | 92 | true | right |
+| R0 holds on HELD | 90 | true | right |
+| RE1 is BOTH | 45 | false (ONE) | right (the larger side is false) |
+| RE1 is BOTH or ONE | 70 | true | right |
+| the mean of the two fast arms at P is 0.25 or more | 55 | **false (+0.161)** | **wrong** |
+| the arm at P PAYS on neither slow base | 70 | true | right |
+| "A PIECE, FAST TRACKERS ONLY" | 28 | false | right |
+| "A PIECE, SLOW TRACKERS TOO" | 8 | false | right |
+| "A PIECE, MIXED ON SLOW TRACKERS" | 9 | false | right |
+| "ONE BASE" | 25 | **true** | **wrong** |
+| "NO PIECE" | 30 | false | right |
+| the peak of each fast base is P or 11.0 | 35 | false (both 25.00) | right |
+| the arm at 25.0 COSTS on some fast base | 40 | false | right |
+| some arm COSTS anywhere | 50 | false | not counted |
+
+**11 of the 13 counted forecasts are right as the larger side; the two misses are the mean at P (55; +0.161, because exploit7204's arm is +0.055) and ONE BASE (25), which is what happened.** I had put the three BOTH headlines together at 45 and ONE and NONE at 25 and 30, and the arm on exploit7204 sat at +0.06 on two sets: the earlier graft reads of that arm (+0.349 and +0.255 on 48 geometries) had been the reason for the round and were the larger numbers.
+
+### What the two sets show together (POST-HOC, labelled; not a rule of this note)
+
+* **The dose replicates.** The mean of the two fast arms by value on HELD: 5.00 -0.032, 6.50 +0.257, 8.30 +0.161, 11.00 +0.428, 16.00 +0.517, 25.00 +0.588 (DEV: +0.195, +0.185, +0.163, +0.282, +0.581, +0.849). **On both sets, on both fast bases, 25.00 is the largest arm and 16.00 pays at the bar**; on both sets the third paying base is S:exploit7204 at 16.00 and 25.00 (HELD also at 11.00: +0.285). **The statuses of the 24 arms are the same on DEV and HELD in 21; the three that differ (F:league7001 at 6.50, F:exploit7204 at 11.00, S:exploit7204 at 11.00) are NEUTRAL on DEV (+0.219, +0.155, +0.217) and PAY on HELD (+0.285, +0.320, +0.285), each within 0.1 of the bar.** The 24 arm edges of the two sets correlate at **0.85**.
+* **Pooled over the two sets of this round** (inverse-variance, each arm's own standard error): the arm at P is **+0.265 (se 0.072) on league7001 and +0.058 (se 0.065) on exploit7204**; at 11.00 +0.471 and +0.225; at 16.00 +0.651 and +0.457; at 25.00 **+0.814 and +0.601**.
+* **The earlier graft reads of exploit7204 (+0.349, +0.255; pooled +0.288, se 0.103) against this round's +0.058 (se 0.065) differ by 0.23, about 1.9 combined standard errors; on league7001 the earlier +0.313 and +0.305 and this round's +0.264 and +0.266 agree.** The earlier reads were the ones that made this the candidate (four reads of one sign at z of about 2), a selection that favours large numbers; I do not read it as more than that.
+* **league7100's own number is not special on this grid:** its value (8.30) is among the smallest effects on each fast base and a longer interval pays more on three of the four bases (S:league7001 draws 147 to 168 of 192 duels, its largest arm is +0.199 at 25.00, z 3.2, under the edge bar). **The lesion (league7100 with the comparators' pingEvery of 4, against league7100) was -0.035 and +0.065 (`SUB_EVADE_MOVE_WIP.md`)**: a lower interval costs league7100 nothing, and a higher one is what pays the comparators. **No arm in this note gives league7100 a longer interval, so nothing here says whether it would pay league7100 itself.**
+* **No mechanism is read** (a longer interval could be quieter, or give the target less to track: no event of any duel is looked at).
+
+### What this result does and does not say
+
+* **It says, by this note's rules:** pingEvery at league7100's own value is not a second piece of its lead on the two comparators (ONE BASE on DEV and HELD, the same base and the same size both times). **It does not say** that pingEvery does nothing: the registered dose read finds a longer interval paying on three of four bases up to the top of the grid on both sets.
+* **Not flown, so not said:** any value above 25.00 (the bound is 40); a longer interval on league7100 itself; the effect against a boat other than its own base; an interaction with pingAfter or searchPing; the surface between the grid's values.
+* **The candidates this leaves, each its own registration and none decided:** a dose above 25.00 up to 40 and league7100's own theta with a longer pingEvery against league7100 (does the dose pay the donor as well as its comparators?); the effect of a long interval against boats that are not its base.
