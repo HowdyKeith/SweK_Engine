@@ -93,3 +93,34 @@ After that: **35 of 36 red, 1 equivalent.**
 This is the failure section 6 put at about one in two ("a relu reservoir below its edge has no attractor"). **The design is run as registered, not changed after seeing it.**
 
 The run: `subEstimatorStudyV6Cmd.mjs run --specs <part> --out brain/flyEstimatorStudyV6.<part>.jsonl` over four processes, with the registered list split as cx,er:0-9 / layer:0-9,nostate:0 / degree:0-9 / sign:0-3,count:0-3. The references are computed in each part (they are the same) and kept once by `report`. The four files are committed unread, then read once.
+
+## 10. RESULT (2026-11-17; the four result files committed unread at `4f308e64`, then read ONCE with `report --in` over the four; 80 circuit-arm records and one `refs`)
+
+**RUNG 4a v6 BOTTOM LINE (registered reading d): NO SIGNAL in the shift-map arm.** SB and SF both FAIL and both read NO SIGNAL. The bump and the side-coded rate carry no readable signal in any wiring, so this arm says nothing about the wiring.
+
+| arm | signal check (mean in-sample skill, ER / TYPE-BLOCK / DEGREE, 30 circuits; needs 0.05) | cx skill (audit / safety / reserve; in-sample) | control family means (audit skill) | verdict |
+|---|---|---|---|---|
+| **SB** bump start | **0.020: NO SIGNAL** | 0.00 / 0.00 / 0.00; 0.00 | ER 0.03, TYPE-BLOCK 0.01, DEGREE 0.02 (4,184 cap ticks), SIGN 0.21, COUNT 0.05 | FAIL, 0 of 3 (not weighed) |
+| **SF** flat start | **0.006: NO SIGNAL** | 0.00 / 0.00 / 0.00; 0.00 | ER 0.03, TYPE-BLOCK 0.01, DEGREE -0.17 (9,097 cap ticks), SIGN 0.21, COUNT 0.04 | FAIL, 0 of 3 (not weighed) |
+
+**The registered readings, one by one.**
+* (a) **LEAK CHECK passes** (NO STATE 0.00 in both arms).
+* (b) **NO SIGNAL in both arms.**
+* (c) **FAIL in both**, not weighed. cx RMSE is 0.2158 / 0.2488 / 0.3259 against NONE's 0.2162 / 0.2490 / 0.3261: cx's estimate is "say zero".
+* (d) **NO SIGNAL.**
+* (e) **SB exceeds SF by more than 0.05 in 1 of 7 families** (DEGREE, where SF's controls blow up more: 0.02 against -0.17). Everywhere else the two arms are the same to two places: CX 0.00 / 0.00, ER 0.03 / 0.03, TYPE-BLOCK 0.01 / 0.01, SIGN 0.21 / 0.21, COUNT 0.05 / 0.04. **The heading-shaped start made no difference.**
+* (f) **THE MECHANISM CHECK: cx's bump does NOT move with the turn.** At its chosen setting (0.999 x g*, amplitude 4r), +1 for 60 ticks puts the population vector at +19.6 degrees and -1 puts it at +22.9: both near the circuit's dominant mode, in the same direction. ER: the bump moves in 1 of 10.
+* (g) Top factor in 3 of 39; the larger amplitude in 20 of 40 (SB) and 14 of 40 (SF). The target never exceeds pi (largest 2.01 / 2.02 / 1.88 rad). LEAKY1 reads 0.89 / 0.90 / 0.92 again. SIGN (randomised edge signs, reported) is again the only family with readable skill (0.21), as in v5.
+
+**What the result says, and does not.**
+* The opposite PEN-to-EPG shifts are in the wiring (section 1, measured).
+* But in this reservoir at its edge gain the activity collapses onto one slow mode within tens of ticks. A pre-run diagnostic (section 9, disclosure 2) found the bump drifting to about 18 degrees from any start, and the registered mechanism check finds both turn directions ending there.
+* There is no ring that holds an angle, so there is nothing for the shift to move. The side-coded rate reaches the readout as something like |rate| again, which is v5's finding.
+* So the glomerulus-shift map adds no readable signal to a linear readout of this relu reservoir.
+* It says nothing about the fly's compass. The fly's EPG ring is held by an attractor (local excitation, Delta7's broad inhibition, gains this model does not have), and a model with that dynamics, rather than a scaled count matrix at its edge, is what the shift would need.
+
+**The expectation recorded before the run, held against it.**
+* "SB PASS with SIGNAL at about one in three, FAIL with SIGNAL about one in two, NO SIGNAL about one in six": NO SIGNAL, the outcome I gave the smallest chance. The pre-run smoke run had already pointed to it, and the design was run unchanged.
+* "The mechanism check showing cx's bump moving with the turn (about two in three)": **wrong.** It does not move.
+
+**Rung 4a after v6.** Six designs, six registrations, and no PASS: v6 joins v5's NO SIGNAL. `brain/RUNG_4A_CLOSEOUT.md` (another session's file, not edited here) lists "a map that uses each PEN and EPG cell's glomerulus number" as untested. It is tested now: NO SIGNAL, with the reason measured. What stays untested, and what a seventh registration would need, is a dynamics that can HOLD an angle (a ring attractor: the circuit's own local excitation and inhibition with gains set to keep a bump, not a count matrix scaled to its largest singular value), and a decoder of bump position.
